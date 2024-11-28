@@ -10,7 +10,7 @@ This project was generated with a template that includes Kotlin application laun
 - `desktop`: Primary desktop platform using LWJGL3.
 - `android`: Android mobile platform. Needs Android SDK.
 - `ios`: iOS mobile platform using RoboVM.
-- `headless`: Desktop platform without a graphical interface.
+- `tools`: Desktop platform without a graphical interface.
 - `kgdx`: A common module shared by `core` and `server` platforms.
 
 ## Gradle
@@ -29,7 +29,7 @@ Useful Gradle tasks and flags:
 - `cleanIdea`: removes IntelliJ project data.
 - `clean`: removes `build` folders, which store compiled classes and built archives.
 - `eclipse`: generates Eclipse project data.
-- `headless:run`: starts the headless application. Note: if headless sources were not modified - and the application still creates `ApplicationListener` from `core` project - this task might fail due to no graphics support.
+- `tools:run`: starts the headless application. Note: if headless sources were not modified - and the application still creates `ApplicationListener` from `core` project - this task might fail due to no graphics support.
 - `idea`: generates IntelliJ project data.
 - `desktop:jar`: builds application's runnable jar, which can be found at `desktop/build/libs`.
 - `desktop:run`: starts the application.

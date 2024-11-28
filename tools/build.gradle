@@ -11,7 +11,7 @@ kotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.J
 
 mainClassName = 'dev.ebnbin.warmoji.headless.HeadlessLauncher'
 application.setMainClass(mainClassName)
-eclipse.project.name = appName + '-headless'
+eclipse.project.name = appName + '-tools'
 
 dependencies {
   implementation "com.badlogicgames.gdx:gdx-backend-headless:$gdxVersion"
