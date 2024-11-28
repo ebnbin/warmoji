@@ -1,6 +1,6 @@
-@file:JvmName("Lwjgl3Launcher")
+@file:JvmName("DesktopLauncher")
 
-package dev.ebnbin.warmoji.lwjgl3
+package dev.ebnbin.warmoji.desktop
 
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration

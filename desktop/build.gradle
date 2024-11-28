@@ -20,7 +20,7 @@ apply plugin: 'org.jetbrains.kotlin.jvm'
 import io.github.fourlastor.construo.Target
 
 sourceSets.main.resources.srcDirs += [ rootProject.file('assets').path ]
-mainClassName = 'dev.ebnbin.warmoji.lwjgl3.Lwjgl3Launcher'
+mainClassName = 'dev.ebnbin.warmoji.desktop.DesktopLauncher'
 application.setMainClass(mainClassName)
 eclipse.project.name = appName + '-desktop'
 java.sourceCompatibility = 8
