@@ -7,7 +7,7 @@ This project was generated with a template that includes Kotlin application laun
 ## Platforms
 
 - `core`: Main module with the application logic shared by all platforms.
-- `lwjgl3`: Primary desktop platform using LWJGL3; was called 'desktop' in older docs.
+- `desktop`: Primary desktop platform using LWJGL3.
 - `android`: Android mobile platform. Needs Android SDK.
 - `ios`: iOS mobile platform using RoboVM.
 - `headless`: Desktop platform without a graphical interface.
@@ -31,8 +31,8 @@ Useful Gradle tasks and flags:
 - `eclipse`: generates Eclipse project data.
 - `headless:run`: starts the headless application. Note: if headless sources were not modified - and the application still creates `ApplicationListener` from `core` project - this task might fail due to no graphics support.
 - `idea`: generates IntelliJ project data.
-- `lwjgl3:jar`: builds application's runnable jar, which can be found at `lwjgl3/build/libs`.
-- `lwjgl3:run`: starts the application.
+- `desktop:jar`: builds application's runnable jar, which can be found at `desktop/build/libs`.
+- `desktop:run`: starts the application.
 - `test`: runs unit tests (if any).
 
 Note that most tasks that are not specific to a single project can be run with `name:` prefix, where the `name` should be replaced with the ID of a specific project.
