@@ -19,15 +19,11 @@ apply plugin: 'org.jetbrains.kotlin.jvm'
 
 import io.github.fourlastor.construo.Target
 
+java.toolchain.languageVersion.set(JavaLanguageVersion.of(BuildConfig.JAVA_VERSION))
+
 sourceSets.main.resources.srcDirs += [ rootProject.file('assets').path ]
 mainClassName = 'dev.ebnbin.warmoji.desktop.DesktopLauncher'
 application.setMainClass(mainClassName)
-java.sourceCompatibility = 8
-java.targetCompatibility = 8
-if (JavaVersion.current().isJava9Compatible()) {
-        compileJava.options.release.set(8)
-}
-kotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
 
 dependencies {
   implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"

@@ -1,3 +1,5 @@
+java.toolchain.languageVersion.set(JavaLanguageVersion.of(BuildConfig.JAVA_VERSION))
+
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 
 dependencies {

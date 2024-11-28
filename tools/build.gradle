@@ -1,13 +1,7 @@
 apply plugin: 'application'
 apply plugin: 'org.jetbrains.kotlin.jvm'
 
-
-java.sourceCompatibility = 8
-java.targetCompatibility = 8
-if (JavaVersion.current().isJava9Compatible()) {
-        compileJava.options.release.set(8)
-}
-kotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+java.toolchain.languageVersion.set(JavaLanguageVersion.of(BuildConfig.JAVA_VERSION))
 
 mainClassName = 'dev.ebnbin.warmoji.tools.ToolsLauncher'
 application.setMainClass(mainClassName)

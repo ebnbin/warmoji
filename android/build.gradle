@@ -8,6 +8,8 @@ buildscript {
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
+java.toolchain.languageVersion.set(JavaLanguageVersion.of(BuildConfig.JAVA_VERSION))
+
 android {
   namespace "dev.ebnbin.warmoji"
   compileSdk 34
@@ -33,8 +35,6 @@ android {
     multiDexEnabled true
   }
   compileOptions {
-    sourceCompatibility "8"
-    targetCompatibility "8"
     coreLibraryDesugaringEnabled true
   }
   buildTypes {
@@ -43,9 +43,6 @@ android {
       proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
     }
   }
-
-  kotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
-
 }
 
 repositories {
