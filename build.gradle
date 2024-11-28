@@ -16,12 +16,7 @@ buildscript {
 }
 
 configure(subprojects - project(':android')) {
-  apply plugin: 'java-library'
   apply plugin: 'kotlin'
-
-  compileJava {
-    options.incremental = true
-  }
 }
 
 subprojects {

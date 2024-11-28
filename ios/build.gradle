@@ -10,8 +10,6 @@ apply plugin: 'robovm'
 
 java.toolchain.languageVersion.set(JavaLanguageVersion.of(BuildConfig.JAVA_VERSION))
 
-[compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
-
 ext {
   mainClassName = "dev.ebnbin.warmoji.ios.IOSLauncher"
 }
