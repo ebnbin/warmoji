@@ -12,4 +12,5 @@ dependencies {
   implementation Dependencies.GDX_BACKEND_HEADLESS
   implementation Dependencies.GDX_PLATFORM_NATIVES_DESKTOP
   implementation project(':core')
+  implementation Dependencies.GDX_BACKEND_LWJGL3
 }

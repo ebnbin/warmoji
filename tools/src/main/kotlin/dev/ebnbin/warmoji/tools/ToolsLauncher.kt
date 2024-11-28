@@ -2,14 +2,39 @@
 
 package dev.ebnbin.warmoji.tools
 
+import com.badlogic.gdx.ApplicationListener
 import com.badlogic.gdx.backends.headless.HeadlessApplication
 import com.badlogic.gdx.backends.headless.HeadlessApplicationConfiguration
-import dev.ebnbin.warmoji.WarMoji
 
-/** Launches the headless application. Can be converted into a server application or a scripting utility. */
 fun main() {
-    HeadlessApplication(WarMoji(), HeadlessApplicationConfiguration().apply {
-        // When this value is negative, WarMoji#render() is never called:
-        updatesPerSecond = -1
-    })
+    if (StartupHelper.startNewJvmIfRequired()) return
+    runHeadlessApplication {
+    }
+}
+
+private fun runHeadlessApplication(block: ApplicationListener.() -> Unit) {
+    val listener = object : ApplicationListener {
+        override fun create() {
+            block()
+        }
+
+        override fun resize(width: Int, height: Int) {
+        }
+
+        override fun render() {
+        }
+
+        override fun pause() {
+        }
+
+        override fun resume() {
+        }
+
+        override fun dispose() {
+        }
+    }
+    val config = HeadlessApplicationConfiguration().also {
+        it.updatesPerSecond = -1
+    }
+    HeadlessApplication(listener, config)
 }
