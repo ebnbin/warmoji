@@ -1,6 +1,6 @@
-@file:JvmName("HeadlessLauncher")
+@file:JvmName("ToolsLauncher")
 
-package dev.ebnbin.warmoji.headless
+package dev.ebnbin.warmoji.tools
 
 import com.badlogic.gdx.backends.headless.HeadlessApplication
 import com.badlogic.gdx.backends.headless.HeadlessApplicationConfiguration

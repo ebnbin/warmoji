@@ -9,7 +9,7 @@ if (JavaVersion.current().isJava9Compatible()) {
 }
 kotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
 
-mainClassName = 'dev.ebnbin.warmoji.headless.HeadlessLauncher'
+mainClassName = 'dev.ebnbin.warmoji.tools.ToolsLauncher'
 application.setMainClass(mainClassName)
 eclipse.project.name = appName + '-tools'
 
