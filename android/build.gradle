@@ -82,25 +82,3 @@ tasks.register('copyAndroidNatives') {
 tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach { packageTask ->
   packageTask.dependsOn 'copyAndroidNatives'
 }
-
-tasks.register('run', Exec) {
-  def path
-  def localProperties = project.file("../local.properties")
-  if (localProperties.exists()) {
-    Properties properties = new Properties()
-    localProperties.withInputStream { instr ->
-      properties.load(instr)
-    }
-    def sdkDir = properties.getProperty('sdk.dir')
-    if (sdkDir) {
-      path = sdkDir
-    } else {
-      path = "$System.env.ANDROID_SDK_ROOT"
-    }
-  } else {
-    path = "$System.env.ANDROID_SDK_ROOT"
-  }
-
-  def adb = path + "/platform-tools/adb"
-  commandLine "$adb", 'shell', 'am', 'start', '-n', 'dev.ebnbin.warmoji/dev.ebnbin.warmoji.android.AndroidLauncher'
-}
