@@ -1,17 +1,17 @@
 # WarMoji
 
-A [libGDX](https://libgdx.com/) project generated with [gdx-liftoff](https://github.com/libgdx/gdx-liftoff).
+A [libGDX](https://libgdx.com/) project generated with [gdx-liftoff](https://github.com/libgdx/gdx-liftoff/releases/tag/v1.13.0.1).
 
 This project was generated with a template that includes Kotlin application launchers and draws the libGDX logo within the application listener.
 
 ## Platforms
 
+- `kgdx`: A common module shared by `core` and `server` platforms.
 - `core`: Main module with the application logic shared by all platforms.
 - `desktop`: Primary desktop platform using LWJGL3.
 - `android`: Android mobile platform. Needs Android SDK.
 - `ios`: iOS mobile platform using RoboVM.
 - `tools`: Desktop platform without a graphical interface.
-- `kgdx`: A common module shared by `core` and `server` platforms.
 
 ## Gradle
 
@@ -26,7 +26,7 @@ Useful Gradle tasks and flags:
 - `android:lint`: performs Android project validation.
 - `build`: builds sources and archives of every project.
 - `clean`: removes `build` folders, which store compiled classes and built archives.
-- `tools:run`: starts the headless application. Note: if headless sources were not modified - and the application still creates `ApplicationListener` from `core` project - this task might fail due to no graphics support.
+- `tools:run`: starts the headless application.
 - `desktop:jar`: builds application's runnable jar, which can be found at `desktop/build/libs`.
 - `desktop:run`: starts the application.
 - `test`: runs unit tests (if any).
