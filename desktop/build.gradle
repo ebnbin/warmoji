@@ -1,12 +1,3 @@
-
-buildscript {
-  repositories {
-    gradlePluginPortal()
-  }
-  dependencies {
-    classpath "io.github.fourlastor:construo:1.4.3"
-  }
-}
 plugins {
   id "application"
 }

@@ -1,11 +1,3 @@
-buildscript {
-  repositories {
-    mavenCentral()
-  }
-  dependencies {
-    classpath "com.mobidevelop.robovm:robovm-gradle-plugin:$robovmVersion"
-  }
-}
 apply plugin: 'kotlin'
 apply plugin: 'robovm'
 
