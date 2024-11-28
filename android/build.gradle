@@ -16,7 +16,7 @@ android {
   packagingOptions {
 		resources {
 			excludes += ['META-INF/robovm/ios/robovm.xml', 'META-INF/DEPENDENCIES.txt', 'META-INF/DEPENDENCIES',
-                   'META-INF/dependencies.txt', '**/*.gwt.xml']
+                   'META-INF/dependencies.txt', '**/*.gwt.xml', 'DebugProbesKt.bin']
 			pickFirsts += ['META-INF/LICENSE.txt', 'META-INF/LICENSE', 'META-INF/license.txt', 'META-INF/LGPL2.1',
                      'META-INF/NOTICE.txt', 'META-INF/NOTICE', 'META-INF/notice.txt']
 		}
@@ -42,6 +42,7 @@ configurations { natives }
 dependencies {
   implementation Dependencies.GDX_BACKEND_ANDROID
   implementation project(':core')
+  implementation Dependencies.KOTLINX_COROUTINES_ANDROID
 
   natives Dependencies.GDX_FREETYPE_PLATFORM_NATIVES_ARM64_V8A
   natives Dependencies.GDX_FREETYPE_PLATFORM_NATIVES_ARMEABI_V7A
