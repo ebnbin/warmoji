@@ -13,7 +13,7 @@ gradle-app.setting
 /ios-moe/build/
 /headless/build/
 /server/build/
-/shared/build/
+/kgdx/build/
 
 ## Java:
 *.class
@@ -77,7 +77,7 @@ www-test/
 /ios-moe/bin/
 /headless/bin/
 /server/bin/
-/shared/bin/
+/kgdx/bin/
 *.tmp
 *.bak
 *.swp
@@ -101,7 +101,7 @@ www-test/
 /ios-moe/nbproject/private/
 /headless/nbproject/private/
 /server/nbproject/private/
-/shared/nbproject/private/
+/kgdx/nbproject/private/
 
 /nbbuild/
 /android/nbbuild/
@@ -114,7 +114,7 @@ www-test/
 /ios-moe/nbbuild/
 /headless/nbbuild/
 /server/nbbuild/
-/shared/nbbuild/
+/kgdx/nbbuild/
 
 /dist/
 /android/dist/
@@ -127,7 +127,7 @@ www-test/
 /ios-moe/dist/
 /headless/dist/
 /server/dist/
-/shared/dist/
+/kgdx/dist/
 
 /nbdist/
 /android/nbdist/
@@ -140,7 +140,7 @@ www-test/
 /ios-moe/nbdist/
 /headless/nbdist/
 /server/nbdist/
-/shared/nbdist/
+/kgdx/nbdist/
 
 nbactions.xml
 nb-configuration.xml

@@ -11,7 +11,7 @@ This project was generated with a template that includes Kotlin application laun
 - `android`: Android mobile platform. Needs Android SDK.
 - `ios`: iOS mobile platform using RoboVM.
 - `headless`: Desktop platform without a graphical interface.
-- `shared`: A common module shared by `core` and `server` platforms.
+- `kgdx`: A common module shared by `core` and `server` platforms.
 
 ## Gradle
 

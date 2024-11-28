@@ -1,4 +1,4 @@
-eclipse.project.name = appName + '-shared'
+eclipse.project.name = appName + '-kgdx'
 
 dependencies {
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
