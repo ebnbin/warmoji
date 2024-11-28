@@ -5,7 +5,7 @@ java.toolchain.languageVersion.set(JavaLanguageVersion.of(BuildConfig.JAVA_VERSI
 
 android {
   namespace BuildConfig.ID
-  compileSdk 34
+  compileSdk 35
   sourceSets {
     main {
       assets.setSrcDirs(['../assets'])
@@ -22,7 +22,7 @@ android {
   defaultConfig {
     applicationId BuildConfig.ID
     minSdkVersion 30
-    targetSdkVersion 34
+    targetSdkVersion 35
     versionCode BuildConfig.VERSION_CODE
     versionName BuildConfig.VERSION
     multiDexEnabled true
