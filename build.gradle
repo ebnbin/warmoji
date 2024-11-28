@@ -16,7 +16,6 @@ buildscript {
 }
 
 allprojects {
-  apply plugin: 'eclipse'
   apply plugin: 'idea'
 
   // This allows you to "Build and run using IntelliJ IDEA", an option in IDEA's Settings.
@@ -58,7 +57,7 @@ configure(subprojects - project(':android')) {
   }
   compileKotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
   compileTestKotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
-  
+
 }
 
 subprojects {
@@ -74,5 +73,3 @@ subprojects {
     maven { url 'https://jitpack.io' }
   }
 }
-
-eclipse.project.name = 'warmoji' + '-parent'

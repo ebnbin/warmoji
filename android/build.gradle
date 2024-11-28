@@ -123,5 +123,3 @@ tasks.register('run', Exec) {
   def adb = path + "/platform-tools/adb"
   commandLine "$adb", 'shell', 'am', 'start', '-n', 'dev.ebnbin.warmoji/dev.ebnbin.warmoji.android.AndroidLauncher'
 }
-
-eclipse.project.name = appName + "-android"

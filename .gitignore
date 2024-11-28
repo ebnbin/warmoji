@@ -63,31 +63,6 @@ www-test/
 *.iws
 *.iml
 
-## Eclipse:
-.classpath
-.project
-.metadata/
-/android/bin/
-/core/bin/
-/lwjgl2/bin/
-/desktop/bin/
-/html/bin/
-/teavm/bin/
-/ios/bin/
-/ios-moe/bin/
-/tools/bin/
-/server/bin/
-/kgdx/bin/
-*.tmp
-*.bak
-*.swp
-*~.nib
-.settings/
-.loadpath
-.externalToolBuilders/
-*.launch
-
-
 ## NetBeans:
 
 /nbproject/private/
