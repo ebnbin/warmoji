@@ -12,7 +12,7 @@ fun main() {
     if (StartupHelper.startNewJvmIfRequired())
       return
     Lwjgl3Application(WarMoji(), Lwjgl3ApplicationConfiguration().apply {
-        setTitle("warmoji")
+        setTitle("WarMoji")
         setWindowedMode(640, 480)
         setWindowIcon(*(arrayOf(128, 64, 32, 16).map { "libgdx$it.png" }.toTypedArray()))
     })

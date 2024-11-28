@@ -4,7 +4,7 @@ apply plugin: 'kotlin-android'
 java.toolchain.languageVersion.set(JavaLanguageVersion.of(BuildConfig.JAVA_VERSION))
 
 android {
-  namespace "dev.ebnbin.warmoji"
+  namespace BuildConfig.ID
   compileSdk 34
   sourceSets {
     main {
@@ -20,11 +20,11 @@ android {
 		}
   }
   defaultConfig {
-    applicationId 'dev.ebnbin.warmoji'
+    applicationId BuildConfig.ID
     minSdkVersion 19
     targetSdkVersion 34
-    versionCode 1
-    versionName "1.0"
+    versionCode BuildConfig.VERSION_CODE
+    versionName BuildConfig.VERSION
     multiDexEnabled true
   }
   compileOptions {

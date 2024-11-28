@@ -17,8 +17,6 @@ buildscript {
 }
 
 subprojects {
-  version = '$projectVersion'
-  ext.appName = 'warmoji'
   repositories {
     mavenCentral()
     maven { url 'https://s01.oss.sonatype.org' }

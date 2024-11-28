@@ -1,4 +1,12 @@
 object BuildConfig {
+    const val SHORT_ID = "warmoji"
+    const val ID = "dev.ebnbin.$SHORT_ID"
+
+    const val NAME = "WarMoji"
+
+    const val VERSION = "0.1.0"
+    const val VERSION_CODE = 100
+
     const val JAVA_VERSION = 21
 
     // https://github.com/adoptium/temurin21-binaries
