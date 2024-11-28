@@ -1,3 +1,0 @@
-apply plugin: 'kotlin'
-
-java.toolchain.languageVersion.set(JavaLanguageVersion.of(BuildConfig.JAVA_VERSION))
