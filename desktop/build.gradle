@@ -11,7 +11,7 @@ import io.github.fourlastor.construo.Target
 java.toolchain.languageVersion.set(JavaLanguageVersion.of(BuildConfig.JAVA_VERSION))
 
 sourceSets.main.resources.srcDirs += [ rootProject.file('assets').path ]
-mainClassName = 'dev.ebnbin.warmoji.desktop.DesktopLauncher'
+mainClassName = "${BuildConfig.ID}.desktop.DesktopLauncher"
 application.setMainClass(mainClassName)
 
 dependencies {
@@ -19,7 +19,6 @@ dependencies {
   implementation Dependencies.GDX_FREETYPE_PLATFORM_NATIVES_DESKTOP
   implementation Dependencies.GDX_PLATFORM_NATIVES_DESKTOP
   implementation project(':core')
-  implementation(Dependencies.GDX_TOOLS){exclude group: 'com.badlogicgames.gdx', module: 'gdx-backend-lwjgl'}
 }
 
 def os = System.properties['os.name'].toLowerCase()

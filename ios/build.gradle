@@ -6,7 +6,7 @@ apply plugin: 'robovm'
 java.toolchain.languageVersion.set(JavaLanguageVersion.of(BuildConfig.JAVA_VERSION))
 
 ext {
-  mainClassName = "dev.ebnbin.warmoji.ios.IOSLauncher"
+  mainClassName = "${BuildConfig.ID}.ios.IOSLauncher"
 }
 
 launchIPhoneSimulator.dependsOn build
