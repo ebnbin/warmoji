@@ -1,29 +1,29 @@
-@file:JvmName("IOSLauncher")
-
 package dev.ebnbin.warmoji.ios
-
-import org.robovm.apple.foundation.NSAutoreleasePool
-import org.robovm.apple.uikit.UIApplication
 
 import com.badlogic.gdx.backends.iosrobovm.IOSApplication
 import com.badlogic.gdx.backends.iosrobovm.IOSApplicationConfiguration
+import com.badlogic.gdx.graphics.glutils.HdpiMode
 import dev.ebnbin.warmoji.WarMoji
+import org.robovm.apple.foundation.NSAutoreleasePool
+import org.robovm.apple.uikit.UIApplication
 
-/** Launches the iOS (RoboVM) application. */
 class IOSLauncher : IOSApplication.Delegate() {
     override fun createApplication(): IOSApplication {
-        return IOSApplication(WarMoji(), IOSApplicationConfiguration().apply {
-            // Configure your application here.
-        })
+        val listener = WarMoji()
+        val config = IOSApplicationConfiguration().also {
+            it.hdpiMode = HdpiMode.Pixels
+        }
+        return IOSApplication(listener, config)
     }
 
     companion object {
-        @JvmStatic fun main(args: Array<String>) {
-            val pool = NSAutoreleasePool()
-            val principalClass: Class<UIApplication>? = null
-            val delegateClass = IOSLauncher::class.java
-            UIApplication.main(args, principalClass, delegateClass)
-            pool.close()
+        @JvmStatic
+        fun main(args: Array<String>) {
+            NSAutoreleasePool().use {
+                val principalClass: Class<UIApplication>? = null
+                val delegateClass = IOSLauncher::class.java
+                UIApplication.main(args, principalClass, delegateClass)
+            }
         }
     }
 }
