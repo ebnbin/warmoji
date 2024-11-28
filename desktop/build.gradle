@@ -1,3 +1,5 @@
+import Dependencies
+
 plugins {
   id "application"
 }
@@ -13,11 +15,11 @@ mainClassName = 'dev.ebnbin.warmoji.desktop.DesktopLauncher'
 application.setMainClass(mainClassName)
 
 dependencies {
-  implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"
-  implementation "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-desktop"
-  implementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
+  implementation Dependencies.GDX_BACKEND_LWJGL3
+  implementation Dependencies.GDX_FREETYPE_PLATFORM_NATIVES_DESKTOP
+  implementation Dependencies.GDX_PLATFORM_NATIVES_DESKTOP
   implementation project(':core')
-  implementation("com.badlogicgames.gdx:gdx-tools:$gdxVersion"){exclude group: 'com.badlogicgames.gdx', module: 'gdx-backend-lwjgl'}
+  implementation(Dependencies.GDX_TOOLS){exclude group: 'com.badlogicgames.gdx', module: 'gdx-backend-lwjgl'}
 }
 
 def os = System.properties['os.name'].toLowerCase()

@@ -1,3 +1,5 @@
+import Dependencies
+
 buildscript {
   repositories {
     mavenCentral()
@@ -9,10 +11,10 @@ buildscript {
     maven { url 'https://s01.oss.sonatype.org/content/repositories/snapshots/' }
   }
   dependencies {
-    classpath "com.android.tools.build:gradle:8.5.2"
-    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
-    classpath "io.github.fourlastor:construo:1.4.3"
-    classpath "com.mobidevelop.robovm:robovm-gradle-plugin:$robovmVersion"
+    classpath Dependencies.GRADLE
+    classpath Dependencies.KOTLIN_GRADLE_PLUGIN
+    classpath Dependencies.CONSTRUO
+    classpath Dependencies.ROBOVM_GRADLE_PLUGIN
   }
 }
 

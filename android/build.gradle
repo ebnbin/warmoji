@@ -1,3 +1,5 @@
+import Dependencies
+
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
@@ -38,17 +40,17 @@ android {
 configurations { natives }
 
 dependencies {
-  implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
+  implementation Dependencies.GDX_BACKEND_ANDROID
   implementation project(':core')
 
-  natives "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-arm64-v8a"
-  natives "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-armeabi-v7a"
-  natives "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-x86"
-  natives "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-x86_64"
-  natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
-  natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
-  natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86"
-  natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86_64"
+  natives Dependencies.GDX_FREETYPE_PLATFORM_NATIVES_ARM64_V8A
+  natives Dependencies.GDX_FREETYPE_PLATFORM_NATIVES_ARMEABI_V7A
+  natives Dependencies.GDX_FREETYPE_PLATFORM_NATIVES_X86
+  natives Dependencies.GDX_FREETYPE_PLATFORM_NATIVES_X86_64
+  natives Dependencies.GDX_PLATFORM_NATIVES_ARM64_V8A
+  natives Dependencies.GDX_PLATFORM_NATIVES_ARMEABI_V7A
+  natives Dependencies.GDX_PLATFORM_NATIVES_X86
+  natives Dependencies.GDX_PLATFORM_NATIVES_X86_64
 
 }
 

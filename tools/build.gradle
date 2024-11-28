@@ -1,3 +1,5 @@
+import Dependencies
+
 apply plugin: 'kotlin'
 apply plugin: 'application'
 
@@ -7,7 +9,7 @@ mainClassName = 'dev.ebnbin.warmoji.tools.ToolsLauncher'
 application.setMainClass(mainClassName)
 
 dependencies {
-  implementation "com.badlogicgames.gdx:gdx-backend-headless:$gdxVersion"
-  implementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
+  implementation Dependencies.GDX_BACKEND_HEADLESS
+  implementation Dependencies.GDX_PLATFORM_NATIVES_DESKTOP
   implementation project(':core')
 }

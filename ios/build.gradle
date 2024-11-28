@@ -1,3 +1,5 @@
+import Dependencies
+
 apply plugin: 'kotlin'
 apply plugin: 'robovm'
 
@@ -13,10 +15,10 @@ launchIOSDevice.dependsOn build
 createIPA.dependsOn build
 
 dependencies {
-  implementation "com.badlogicgames.gdx:gdx-backend-robovm:$gdxVersion"
-  implementation "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-ios"
-  implementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-ios"
-  implementation "com.mobidevelop.robovm:robovm-cocoatouch:$robovmVersion"
-  implementation "com.mobidevelop.robovm:robovm-rt:$robovmVersion"
+  implementation Dependencies.GDX_BACKEND_ROBOVM
+  implementation Dependencies.GDX_FREETYPE_PLATFORM_NATIVES_IOS
+  implementation Dependencies.GDX_PLATFORM_NATIVES_IOS
+  implementation Dependencies.ROBOVM_COCOATOUCH
+  implementation Dependencies.ROBOVM_RT
   implementation project(':core')
 }
