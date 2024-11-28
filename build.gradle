@@ -15,10 +15,6 @@ buildscript {
   }
 }
 
-configure(subprojects - project(':android')) {
-  apply plugin: 'kotlin'
-}
-
 subprojects {
   version = '$projectVersion'
   ext.appName = 'warmoji'

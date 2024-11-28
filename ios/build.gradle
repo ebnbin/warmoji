@@ -6,6 +6,7 @@ buildscript {
     classpath "com.mobidevelop.robovm:robovm-gradle-plugin:$robovmVersion"
   }
 }
+apply plugin: 'kotlin'
 apply plugin: 'robovm'
 
 java.toolchain.languageVersion.set(JavaLanguageVersion.of(BuildConfig.JAVA_VERSION))
