@@ -15,11 +15,11 @@ class WarStage : LifecycleStage(object : ScreenViewport() {
         super.update(screenWidth, screenHeight, centerCamera)
     }
 }) {
-    init {
-        camera.position.x = COLUMNS / 2f
-        camera.position.y = ROWS / 2f
-        camera.update()
-    }
+    private val warCameraHelper: WarCameraHelper = WarCameraHelper(
+        camera = camera,
+        rows = ROWS,
+        columns = COLUMNS,
+    )
 
     init {
         WarBackgroundActor(ROWS, COLUMNS).also {
@@ -33,6 +33,11 @@ class WarStage : LifecycleStage(object : ScreenViewport() {
         it.setOrigin(Align.center)
         it.scaleY = -1f
         addActor(it)
+    }
+
+    override fun resize(width: Float, height: Float) {
+        super.resize(width, height)
+        warCameraHelper.resize(width, height)
     }
 
     override fun act(delta: Float) {
@@ -57,23 +62,7 @@ class WarStage : LifecycleStage(object : ScreenViewport() {
             .coerceIn(playerMinY, playerMaxY)
         playerImage.setPosition(playerX, playerY, Align.center)
 
-        val cameraMinX = width / 2f - MARGIN_HORIZONTAL
-        val cameraMaxX = COLUMNS - width / 2f + MARGIN_HORIZONTAL
-        val cameraMinY = height / 2f - MARGIN_BOTTOM
-        val cameraMaxY = ROWS - height / 2f + MARGIN_TOP
-        val cameraX = if (cameraMinX > cameraMaxX) {
-            COLUMNS / 2f
-        } else {
-            playerX.coerceIn(cameraMinX, cameraMaxX)
-        }
-        val cameraY = if (cameraMinY > cameraMaxY) {
-            (ROWS - MARGIN_BOTTOM + MARGIN_TOP) / 2f
-        } else {
-            playerY.coerceIn(cameraMinY, cameraMaxY)
-        }
-        camera.position.x = cameraX
-        camera.position.y = cameraY
-        camera.update()
+        warCameraHelper.act(playerX, playerY)
     }
 
     companion object {
@@ -81,8 +70,5 @@ class WarStage : LifecycleStage(object : ScreenViewport() {
         private const val ROWS = 25
         private const val COLUMNS = 25
         private const val PLAYER_SPEED = 3f
-        private const val MARGIN_HORIZONTAL = 1.5f
-        private const val MARGIN_BOTTOM = 1f
-        private const val MARGIN_TOP = 2f
     }
 }

@@ -35,8 +35,8 @@ class WarBackgroundActor(rows: Int, columns: Int) : Actor() {
                 if (Random.nextFloat() > EMOJI_DENSITY) continue
                 val tile = Tile(
                     texture = emojiTextureList.random(),
-                    x = x.toFloat() + Random.nextFloat() * EMOJI_OFFSET * 2f - EMOJI_OFFSET,
-                    y = y.toFloat() + Random.nextFloat() * EMOJI_OFFSET * 2f - EMOJI_OFFSET,
+                    x = x + Random.nextFloat() * EMOJI_OFFSET * 2f - EMOJI_OFFSET,
+                    y = y + Random.nextFloat() * EMOJI_OFFSET * 2f - EMOJI_OFFSET,
                     scale = Random.nextFloat() * (EMOJI_SCALE_MAX - EMOJI_SCALE_MIN) + EMOJI_SCALE_MIN,
                     rotation = Random.nextFloat() * 360f,
                 )
