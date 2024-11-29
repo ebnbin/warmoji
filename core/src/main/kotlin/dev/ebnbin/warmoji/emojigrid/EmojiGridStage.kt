@@ -1,16 +1,18 @@
 package dev.ebnbin.warmoji.emojigrid
 
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.OrthographicCamera
 import com.badlogic.gdx.graphics.Texture
-import com.badlogic.gdx.scenes.scene2d.Stage
+import com.badlogic.gdx.utils.ScreenUtils
 import com.badlogic.gdx.utils.viewport.ScreenViewport
 import com.mazatech.gdx.SVGAssetsConfigGDX
 import com.mazatech.gdx.SVGAssetsGDX
+import dev.ebnbin.kgdx.scene.LifecycleStage
 import java.util.zip.ZipInputStream
 import kotlin.math.roundToInt
 
-class EmojiGridStage : Stage(object : ScreenViewport() {
+class EmojiGridStage : LifecycleStage(object : ScreenViewport() {
     override fun update(screenWidth: Int, screenHeight: Int, centerCamera: Boolean) {
         (camera as OrthographicCamera).setToOrtho(true, screenWidth.toFloat(), screenHeight.toFloat())
         super.update(screenWidth, screenHeight, centerCamera)
@@ -22,9 +24,14 @@ class EmojiGridStage : Stage(object : ScreenViewport() {
         addActor(it)
     }
 
-    fun resize(width: Int, height: Int) {
-        viewport.update(width, height)
-        emojiGridActor.setSize(this.width, this.height)
+    override fun resize(width: Float, height: Float) {
+        super.resize(width, height)
+        emojiGridActor.setSize(width, height)
+    }
+
+    override fun draw() {
+        ScreenUtils.clear(Color.WHITE)
+        super.draw()
     }
 
     override fun dispose() {
