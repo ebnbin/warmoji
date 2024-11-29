@@ -8,8 +8,18 @@ val warMoji: WarMoji
     get() = game as WarMoji
 
 class WarMoji : Game() {
+    lateinit var emojiManager: EmojiManager
+        private set
+
     override fun create() {
         super.create()
+        emojiManager = EmojiManager()
         stageList = listOf(EmojiGridStage())
+    }
+
+    override fun dispose() {
+        stageList = null
+        emojiManager.dispose()
+        super.dispose()
     }
 }
