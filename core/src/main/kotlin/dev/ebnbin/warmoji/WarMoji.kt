@@ -1,11 +1,15 @@
 package dev.ebnbin.warmoji
 
-import com.badlogic.gdx.ApplicationAdapter
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.utils.ScreenUtils
+import dev.ebnbin.kgdx.Game
+import dev.ebnbin.kgdx.game
 
-class WarMoji : ApplicationAdapter() {
+val warMoji: WarMoji
+    get() = game as WarMoji
+
+class WarMoji : Game() {
     private lateinit var spriteBatch: SpriteBatch
     private lateinit var texture: Texture
 
