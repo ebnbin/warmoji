@@ -11,7 +11,7 @@ fun main() {
     if (StartupHelper.startNewJvmIfRequired()) return
     val listener = WarMoji()
     val config = Lwjgl3ApplicationConfiguration().also {
-        it.setMaximized(true)
+        it.setWindowedMode(1280, 800)
         it.setHdpiMode(HdpiMode.Pixels)
     }
     Lwjgl3Application(listener, config)
