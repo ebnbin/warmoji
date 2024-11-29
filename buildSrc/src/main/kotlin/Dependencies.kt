@@ -83,6 +83,9 @@ object Dependencies {
     const val KTX_VIS = "io.github.libktx:ktx-vis:${Versions.KTX}"
     const val KTX_VIS_STYLE = "io.github.libktx:ktx-vis-style:${Versions.KTX}"
 
+    // https://github.com/google/gson
+    const val GSON = "com.google.code.gson:gson:2.11.0"
+
     // https://github.com/Mazatech/amanithsvg-sdk
     const val AMANITHSVG_GDX_NATIVES_DESKTOP = "com.mazatech.amanithsvg:amanithsvg-gdx:${Versions.AMANITHSVG}:natives-desktop"
     const val AMANITHSVG_GDX_NATIVES_ARM64_V8A = "com.mazatech.amanithsvg:amanithsvg-gdx:${Versions.AMANITHSVG}:natives-arm64-v8a"
