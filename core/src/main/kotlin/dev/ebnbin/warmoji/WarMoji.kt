@@ -2,7 +2,7 @@ package dev.ebnbin.warmoji
 
 import dev.ebnbin.kgdx.Game
 import dev.ebnbin.kgdx.game
-import dev.ebnbin.warmoji.emojigrid.EmojiGridStage
+import dev.ebnbin.warmoji.war.WarStage
 
 val warMoji: WarMoji
     get() = game as WarMoji
@@ -14,7 +14,7 @@ class WarMoji : Game() {
     override fun create() {
         super.create()
         emojiManager = EmojiManager()
-        stageList = listOf(EmojiGridStage())
+        stageList = listOf(WarStage())
     }
 
     override fun dispose() {
