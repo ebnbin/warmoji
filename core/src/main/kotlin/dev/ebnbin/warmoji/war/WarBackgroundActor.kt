@@ -56,6 +56,7 @@ class WarBackgroundActor(rows: Int, columns: Int) : Actor() {
         Gdx.gl.glDisable(GL20.GL_BLEND)
         batch.begin()
 
+        val oldColor = batch.color.cpy()
         batch.color = batch.color.cpy().also { it.a *= parentAlpha * EMOJI_ALPHA }
         val area = Rectangle(x, y, width, height)
         val scissor = Rectangle()
@@ -68,6 +69,7 @@ class WarBackgroundActor(rows: Int, columns: Int) : Actor() {
         }
         batch.flush()
         ScissorStack.popScissors()
+        batch.color = oldColor
     }
 
     companion object {

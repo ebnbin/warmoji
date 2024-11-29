@@ -44,6 +44,9 @@ object Dependencies {
     const val GDX_FREETYPE_PLATFORM_NATIVES_IOS = "com.badlogicgames.gdx:gdx-freetype-platform:${Versions.GDX}:natives-ios"
     const val GDX_TOOLS = "com.badlogicgames.gdx:gdx-tools:${Versions.GDX}"
 
+    // https://github.com/libgdx/ashley
+    const val ASHLEY = "com.badlogicgames.ashley:ashley:1.7.4"
+
     // https://github.com/fourlastor-alexandria/construo
     const val CONSTRUO = "io.github.fourlastor:construo:1.5.1"
 

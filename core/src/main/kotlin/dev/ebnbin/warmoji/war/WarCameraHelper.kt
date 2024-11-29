@@ -28,16 +28,16 @@ class WarCameraHelper(
         maxY = rows - height / 2f + MARGIN_TOP
     }
 
-    fun act(playerX: Float, playerY: Float) {
+    fun act(playerPosition: Pair<Float, Float>) {
         camera.position.x = if (minX > maxX) {
             defaultX
         } else {
-            playerX.coerceIn(minX, maxX)
+            playerPosition.first.coerceIn(minX, maxX)
         }
         camera.position.y = if (minY > maxY) {
             defaultY
         } else {
-            playerY.coerceIn(minY, maxY)
+            playerPosition.second.coerceIn(minY, maxY)
         }
         camera.update()
     }
