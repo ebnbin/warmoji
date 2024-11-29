@@ -18,4 +18,5 @@ dependencies {
     implementation(Dependencies.GDX_PLATFORM_NATIVES_DESKTOP)
     implementation(Dependencies.GDX_FREETYPE_PLATFORM_NATIVES_DESKTOP)
     implementation(Dependencies.GDX_TOOLS)
+    implementation(Dependencies.AMANITHSVG_GDX_NATIVES_DESKTOP)
 }

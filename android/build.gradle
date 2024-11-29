@@ -52,7 +52,10 @@ dependencies {
   natives Dependencies.GDX_PLATFORM_NATIVES_ARMEABI_V7A
   natives Dependencies.GDX_PLATFORM_NATIVES_X86
   natives Dependencies.GDX_PLATFORM_NATIVES_X86_64
-
+  natives Dependencies.AMANITHSVG_GDX_NATIVES_ARM64_V8A
+  natives Dependencies.AMANITHSVG_GDX_NATIVES_ARMEABI_V7A
+  natives Dependencies.AMANITHSVG_GDX_NATIVES_X86
+  natives Dependencies.AMANITHSVG_GDX_NATIVES_X86_64
 }
 
 // Called every time gradle gets executed, takes the native dependencies of
