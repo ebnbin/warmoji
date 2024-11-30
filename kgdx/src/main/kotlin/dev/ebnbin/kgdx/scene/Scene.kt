@@ -1,6 +1,6 @@
 package dev.ebnbin.kgdx.scene
 
-interface LifecycleScene {
+interface Scene {
     fun resize(width: Int, height: Int)
 
     fun resume()
@@ -12,31 +12,31 @@ interface LifecycleScene {
     fun dispose()
 
     companion object {
-        internal fun List<LifecycleScene>.resize(width: Int, height: Int) {
+        internal fun List<Scene>.resize(width: Int, height: Int) {
             forEach { scene ->
                 scene.resize(width, height)
             }
         }
 
-        internal fun List<LifecycleScene>.resume() {
+        internal fun List<Scene>.resume() {
             forEach { scene ->
                 scene.resume()
             }
         }
 
-        internal fun List<LifecycleScene>.render(deltaTime: Float) {
+        internal fun List<Scene>.render(deltaTime: Float) {
             forEach { scene ->
                 scene.render(deltaTime)
             }
         }
 
-        internal fun List<LifecycleScene>.pause() {
+        internal fun List<Scene>.pause() {
             reversed().forEach { scene ->
                 scene.pause()
             }
         }
 
-        internal fun List<LifecycleScene>.dispose() {
+        internal fun List<Scene>.dispose() {
             reversed().forEach { scene ->
                 scene.dispose()
             }

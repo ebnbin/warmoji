@@ -6,7 +6,7 @@ import com.badlogic.gdx.scenes.scene2d.Stage
 import com.badlogic.gdx.utils.viewport.StretchViewport
 import com.badlogic.gdx.utils.viewport.Viewport
 
-abstract class LifecycleStage : Stage, LifecycleScene {
+abstract class LifecycleStage : Stage, Scene {
     constructor(viewport: Viewport = defaultViewport()) : super(viewport)
 
     constructor(viewport: Viewport = defaultViewport(), batch: Batch) : super(viewport, batch)

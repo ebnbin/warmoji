@@ -4,12 +4,12 @@ import com.badlogic.gdx.ApplicationListener
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.utils.ScreenUtils
-import dev.ebnbin.kgdx.scene.LifecycleScene
-import dev.ebnbin.kgdx.scene.LifecycleScene.Companion.dispose
-import dev.ebnbin.kgdx.scene.LifecycleScene.Companion.pause
-import dev.ebnbin.kgdx.scene.LifecycleScene.Companion.render
-import dev.ebnbin.kgdx.scene.LifecycleScene.Companion.resize
-import dev.ebnbin.kgdx.scene.LifecycleScene.Companion.resume
+import dev.ebnbin.kgdx.scene.Scene
+import dev.ebnbin.kgdx.scene.Scene.Companion.dispose
+import dev.ebnbin.kgdx.scene.Scene.Companion.pause
+import dev.ebnbin.kgdx.scene.Scene.Companion.render
+import dev.ebnbin.kgdx.scene.Scene.Companion.resize
+import dev.ebnbin.kgdx.scene.Scene.Companion.resume
 
 val game: Game
     get() = Gdx.app.applicationListener as Game
@@ -18,7 +18,7 @@ abstract class Game : ApplicationListener {
     private var canRender: Boolean = false
     private var resumed: Boolean = false
 
-    var sceneList: List<LifecycleScene>? = null
+    var sceneList: List<Scene>? = null
         set(value) {
             val resumed = resumed
             if (resumed) {

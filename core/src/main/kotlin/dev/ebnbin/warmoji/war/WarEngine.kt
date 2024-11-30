@@ -9,13 +9,13 @@ import com.badlogic.gdx.Input
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.utils.viewport.ScreenViewport
-import dev.ebnbin.kgdx.scene.LifecycleScene
+import dev.ebnbin.kgdx.scene.Scene
 import dev.ebnbin.warmoji.warMoji
 import ktx.ashley.allOf
 import ktx.ashley.mapperFor
 import kotlin.math.max
 
-class WarEngine : Engine(), LifecycleScene {
+class WarEngine : Engine(), Scene {
     val tilesPerScreen: Float = TILES_PER_SCREEN
     val rows: Int = ROWS
     val columns: Int = COLUMNS
