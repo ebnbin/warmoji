@@ -2,7 +2,7 @@ package dev.ebnbin.warmoji
 
 import dev.ebnbin.kgdx.Game
 import dev.ebnbin.kgdx.game
-import dev.ebnbin.warmoji.war.WarEngine
+import dev.ebnbin.warmoji.engine.WarEngine
 
 val warMoji: WarMoji
     get() = game as WarMoji
