@@ -3,23 +3,32 @@ package dev.ebnbin.warmoji.engine
 import com.badlogic.ashley.core.Component
 import com.badlogic.gdx.graphics.Texture
 
-object PlayerComponent : Component {
-    const val SPEED = 3f
+object PlayerComponent : Component
+
+class PositionComponent : Component {
+    var x: Float = 0f
+    var y: Float = 0f
 }
 
-data class PositionComponent @JvmOverloads constructor(
-    var x: Float = 0f,
-    var y: Float = 0f,
-) : Component
+class RenderSizeComponent : Component {
+    var width: Float = 0f
+    var height: Float = 0f
+}
 
-data class VelocityComponent @JvmOverloads constructor(
-    var x: Float = 0f,
-    var y: Float = 0f,
-) : Component
+class HitSizeComponent : Component {
+    var width: Float = 0f
+    var height: Float = 0f
+}
 
-data class TextureComponent @JvmOverloads constructor(
-    var lateinitTexture: Texture? = null,
-) : Component {
-    val texture: Texture
-        get() = requireNotNull(lateinitTexture)
+class SpeedComponent : Component {
+    var value: Float = 0f
+}
+
+class VelocityComponent : Component {
+    var x: Float = 0f
+    var y: Float = 0f
+}
+
+class TextureComponent : Component {
+    lateinit var value: Texture
 }

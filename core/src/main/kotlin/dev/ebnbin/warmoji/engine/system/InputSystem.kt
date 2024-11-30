@@ -6,6 +6,7 @@ import com.badlogic.ashley.core.EntitySystem
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import dev.ebnbin.warmoji.engine.PlayerComponent
+import dev.ebnbin.warmoji.engine.SpeedComponent
 import dev.ebnbin.warmoji.engine.VelocityComponent
 import dev.ebnbin.warmoji.engine.mapperRequire
 import ktx.ashley.allOf
@@ -33,7 +34,8 @@ class InputSystem : EntitySystem() {
         }
 
         val playerVelocity = player.mapperRequire<VelocityComponent>()
-        playerVelocity.x = directionX * PlayerComponent.SPEED
-        playerVelocity.y = directionY * PlayerComponent.SPEED
+        val speed = player.mapperRequire<SpeedComponent>()
+        playerVelocity.x = directionX * speed.value
+        playerVelocity.y = directionY * speed.value
     }
 }

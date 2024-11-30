@@ -26,11 +26,6 @@ class WarEngine : PooledEngine(), Scene {
     val rows: Int = ROWS
     val columns: Int = COLUMNS
 
-    val minX: Float = 0.5f
-    val maxX: Float = columns - 0.5f
-    val minY: Float = 0.5f
-    val maxY: Float = rows - 0.5f
-
     interface ResizeListener {
         fun resize(width: Float, height: Float)
     }
@@ -94,9 +89,20 @@ class WarEngine : PooledEngine(), Scene {
                 x = columns / 2f
                 y = rows / 2f
             }
+            it.addComponent<RenderSizeComponent>(this) {
+                width = 1f
+                height = 1f
+            }
+            it.addComponent<HitSizeComponent>(this) {
+                width = 0f
+                height = 0f
+            }
+            it.addComponent<SpeedComponent>(this) {
+                value = 3f
+            }
             it.addComponent<VelocityComponent>(this)
             it.addComponent<TextureComponent>(this) {
-                lateinitTexture = warMoji.emojiManager.textureList.random()
+                value = warMoji.emojiManager.textureList.random()
             }
         }
         addEntity(player)
