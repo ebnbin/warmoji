@@ -14,11 +14,11 @@ class WarMoji : Game() {
     override fun create() {
         super.create()
         emojiManager = EmojiManager()
-        stageList = listOf(WarStage())
+        sceneList = listOf(WarStage())
     }
 
     override fun dispose() {
-        stageList = null
+        sceneList = null
         emojiManager.dispose()
         super.dispose()
     }

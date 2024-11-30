@@ -6,7 +6,7 @@ import com.badlogic.gdx.scenes.scene2d.Stage
 import com.badlogic.gdx.utils.viewport.StretchViewport
 import com.badlogic.gdx.utils.viewport.Viewport
 
-abstract class LifecycleStage : Stage {
+abstract class LifecycleStage : Stage, LifecycleScene {
     constructor(viewport: Viewport = defaultViewport()) : super(viewport)
 
     constructor(viewport: Viewport = defaultViewport(), batch: Batch) : super(viewport, batch)
@@ -16,13 +16,25 @@ abstract class LifecycleStage : Stage {
     protected open val centerCameraOnResize: Boolean = false
     protected open val centerCameraOnDraw: Boolean = false
 
+    final override fun resize(width: Int, height: Int) {
+        diffSize {
+            viewport.update(width, height, centerCameraOnResize)
+        }
+    }
+
     protected open fun resize(width: Float, height: Float) {
     }
 
-    protected open fun resume() {
+    override fun resume() {
     }
 
-    protected open fun pause() {
+    final override fun render(deltaTime: Float) {
+        act(deltaTime)
+        viewport.apply(centerCameraOnDraw)
+        draw()
+    }
+
+    override fun pause() {
     }
 
     override fun setViewport(viewport: Viewport) {
@@ -52,45 +64,6 @@ abstract class LifecycleStage : Stage {
     companion object {
         private fun defaultViewport(): Viewport {
             return StretchViewport(Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
-        }
-
-        internal fun List<LifecycleStage>.resize(width: Int, height: Int) {
-            forEach { stage ->
-                stage.diffSize {
-                    stage.viewport.update(width, height, stage.centerCameraOnResize)
-                }
-            }
-        }
-
-        internal fun List<LifecycleStage>.resume() {
-            forEach { stage ->
-                stage.resume()
-            }
-        }
-
-        internal fun List<LifecycleStage>.act(delta: Float) {
-            forEach { stage ->
-                stage.act(delta)
-            }
-        }
-
-        internal fun List<LifecycleStage>.draw() {
-            forEach { stage ->
-                stage.viewport.apply(stage.centerCameraOnDraw)
-                stage.draw()
-            }
-        }
-
-        internal fun List<LifecycleStage>.pause() {
-            reversed().forEach { stage ->
-                stage.pause()
-            }
-        }
-
-        internal fun List<LifecycleStage>.dispose() {
-            reversed().forEach { stage ->
-                stage.dispose()
-            }
         }
     }
 }

@@ -4,13 +4,12 @@ import com.badlogic.gdx.ApplicationListener
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.utils.ScreenUtils
-import dev.ebnbin.kgdx.scene.LifecycleStage
-import dev.ebnbin.kgdx.scene.LifecycleStage.Companion.act
-import dev.ebnbin.kgdx.scene.LifecycleStage.Companion.dispose
-import dev.ebnbin.kgdx.scene.LifecycleStage.Companion.draw
-import dev.ebnbin.kgdx.scene.LifecycleStage.Companion.pause
-import dev.ebnbin.kgdx.scene.LifecycleStage.Companion.resize
-import dev.ebnbin.kgdx.scene.LifecycleStage.Companion.resume
+import dev.ebnbin.kgdx.scene.LifecycleScene
+import dev.ebnbin.kgdx.scene.LifecycleScene.Companion.dispose
+import dev.ebnbin.kgdx.scene.LifecycleScene.Companion.pause
+import dev.ebnbin.kgdx.scene.LifecycleScene.Companion.render
+import dev.ebnbin.kgdx.scene.LifecycleScene.Companion.resize
+import dev.ebnbin.kgdx.scene.LifecycleScene.Companion.resume
 
 val game: Game
     get() = Gdx.app.applicationListener as Game
@@ -19,7 +18,7 @@ abstract class Game : ApplicationListener {
     private var canRender: Boolean = false
     private var resumed: Boolean = false
 
-    var stageList: List<LifecycleStage>? = null
+    var sceneList: List<LifecycleScene>? = null
         set(value) {
             val resumed = resumed
             if (resumed) {
@@ -38,7 +37,7 @@ abstract class Game : ApplicationListener {
     }
 
     override fun resize(width: Int, height: Int) {
-        stageList?.resize(width, height)
+        sceneList?.resize(width, height)
     }
 
     override fun resume() {
@@ -49,22 +48,22 @@ abstract class Game : ApplicationListener {
         if (!canRender) return
         if (!resumed) {
             resumed = true
-            stageList?.resume()
+            sceneList?.resume()
         }
-        stageList?.act(Gdx.graphics.deltaTime)
         ScreenUtils.clear(Color.CLEAR)
-        stageList?.draw()
+        val deltaTime = Gdx.graphics.deltaTime
+        sceneList?.render(deltaTime)
     }
 
     override fun pause() {
         if (resumed) {
-            stageList?.pause()
+            sceneList?.pause()
             resumed = false
         }
         canRender = false
     }
 
     override fun dispose() {
-        stageList = null
+        sceneList = null
     }
 }
