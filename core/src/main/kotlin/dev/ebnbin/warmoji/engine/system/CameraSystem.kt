@@ -3,14 +3,14 @@ package dev.ebnbin.warmoji.engine.system
 import com.badlogic.ashley.core.Engine
 import com.badlogic.ashley.core.Entity
 import com.badlogic.ashley.core.EntitySystem
+import dev.ebnbin.kgdx.scene.LifecycleSystem
 import dev.ebnbin.warmoji.engine.PlayerComponent
 import dev.ebnbin.warmoji.engine.PositionComponent
-import dev.ebnbin.warmoji.engine.WarEngine
 import dev.ebnbin.warmoji.engine.mapperRequire
 import dev.ebnbin.warmoji.engine.warEngine
 import ktx.ashley.allOf
 
-class CameraSystem : EntitySystem(), WarEngine.ResizeListener {
+class CameraSystem : EntitySystem(), LifecycleSystem {
     private lateinit var player: Entity
 
     private var defaultX: Float = 0f
@@ -23,8 +23,6 @@ class CameraSystem : EntitySystem(), WarEngine.ResizeListener {
 
     override fun addedToEngine(engine: Engine) {
         super.addedToEngine(engine)
-        warEngine.addResizeListener(this)
-
         val players = engine.getEntitiesFor(allOf(PlayerComponent::class).get())
         player = players.single()
 
@@ -42,6 +40,7 @@ class CameraSystem : EntitySystem(), WarEngine.ResizeListener {
     }
 
     override fun resize(width: Float, height: Float) {
+        super.resize(width, height)
         minX = width / 2f - MARGIN_HORIZONTAL
         maxX = warEngine.columns - width / 2f + MARGIN_HORIZONTAL
         minY = height / 2f - MARGIN_BOTTOM
@@ -62,11 +61,6 @@ class CameraSystem : EntitySystem(), WarEngine.ResizeListener {
             playerPosition.y.coerceIn(minY, maxY)
         }
         warEngine.viewport.camera.update()
-    }
-
-    override fun removedFromEngine(engine: Engine) {
-        warEngine.removeResizeListener(this)
-        super.removedFromEngine(engine)
     }
 
     companion object {

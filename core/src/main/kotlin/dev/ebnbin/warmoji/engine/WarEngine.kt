@@ -3,21 +3,22 @@ package dev.ebnbin.warmoji.engine
 import com.badlogic.ashley.core.Component
 import com.badlogic.ashley.core.Entity
 import com.badlogic.ashley.core.EntitySystem
-import com.badlogic.ashley.core.PooledEngine
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
-import dev.ebnbin.kgdx.scene.Scene
+import com.badlogic.gdx.utils.viewport.Viewport
+import dev.ebnbin.kgdx.scene.LifecycleEngine
+import dev.ebnbin.kgdx.scene.LifecycleSystem
 import dev.ebnbin.warmoji.engine.system.BackgroundDrawingSystem
 import dev.ebnbin.warmoji.engine.system.CameraSystem
-import dev.ebnbin.warmoji.engine.system.TextureDrawingSystem
 import dev.ebnbin.warmoji.engine.system.InputSystem
 import dev.ebnbin.warmoji.engine.system.MovementSystem
+import dev.ebnbin.warmoji.engine.system.TextureDrawingSystem
 import dev.ebnbin.warmoji.warMoji
 import ktx.ashley.addComponent
 import ktx.ashley.mapperFor
 
-class WarEngine : PooledEngine(), Scene {
-    val viewport: WarViewport = WarViewport(TILES_PER_SCREEN)
+class WarEngine : LifecycleEngine() {
+    override val viewport: Viewport = WarViewport(TILES_PER_SCREEN)
 
     val shapeRenderer: ShapeRenderer = ShapeRenderer()
 
@@ -25,62 +26,6 @@ class WarEngine : PooledEngine(), Scene {
 
     val rows: Int = ROWS
     val columns: Int = COLUMNS
-
-    interface ResizeListener {
-        fun resize(width: Float, height: Float)
-    }
-
-    private val resizeListenerList: MutableList<ResizeListener> = mutableListOf()
-
-    fun addResizeListener(listener: ResizeListener) {
-        resizeListenerList.add(listener)
-    }
-
-    fun removeResizeListener(listener: ResizeListener) {
-        resizeListenerList.remove(listener)
-    }
-
-    private var resized: Boolean = false
-
-    override fun resize(width: Int, height: Int) {
-        diffSize {
-            viewport.update(width, height)
-        }
-    }
-
-    private fun resize(width: Float, height: Float) {
-        resizeListenerList.forEach { listener ->
-            listener.resize(width, height)
-        }
-    }
-
-    private fun diffSize(updateViewport: () -> Unit) {
-        val oldWidth = viewport.worldWidth
-        val oldHeight = viewport.worldHeight
-        updateViewport()
-        val newWidth = viewport.worldWidth
-        val newHeight = viewport.worldHeight
-        if (resized && oldWidth == newWidth && oldHeight == newHeight) return
-        if (!resized) {
-            resized = true
-        }
-        resize(newWidth, newHeight)
-    }
-
-    override fun resume() {
-    }
-
-    override fun render(deltaTime: Float) {
-        update(deltaTime)
-    }
-
-    override fun pause() {
-    }
-
-    override fun dispose() {
-        batch.dispose()
-        shapeRenderer.dispose()
-    }
 
     init {
         val player = createEntity().also {
@@ -107,6 +52,13 @@ class WarEngine : PooledEngine(), Scene {
         }
         addEntity(player)
 
+        addSystem(object : EntitySystem(), LifecycleSystem {
+            override fun dispose() {
+                batch.dispose()
+                shapeRenderer.dispose()
+                super.dispose()
+            }
+        })
         addSystem(InputSystem())
         addSystem(MovementSystem())
         addSystem(CameraSystem())
