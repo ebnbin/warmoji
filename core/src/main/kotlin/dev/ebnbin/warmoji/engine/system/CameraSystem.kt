@@ -3,10 +3,10 @@ package dev.ebnbin.warmoji.engine.system
 import com.badlogic.ashley.core.Engine
 import com.badlogic.ashley.core.Entity
 import com.badlogic.ashley.core.EntitySystem
+import dev.ebnbin.kgdx.ashley.mapperRequire
 import dev.ebnbin.kgdx.scene.LifecycleSystem
 import dev.ebnbin.warmoji.engine.PlayerComponent
 import dev.ebnbin.warmoji.engine.PositionComponent
-import dev.ebnbin.warmoji.engine.mapperRequire
 import dev.ebnbin.warmoji.engine.warEngine
 import ktx.ashley.allOf
 

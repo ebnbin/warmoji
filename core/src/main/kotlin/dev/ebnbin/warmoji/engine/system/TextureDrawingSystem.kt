@@ -2,10 +2,10 @@ package dev.ebnbin.warmoji.engine.system
 
 import com.badlogic.ashley.core.Entity
 import com.badlogic.ashley.systems.IteratingSystem
+import dev.ebnbin.kgdx.ashley.mapperRequire
 import dev.ebnbin.warmoji.engine.PositionComponent
 import dev.ebnbin.warmoji.engine.RenderSizeComponent
 import dev.ebnbin.warmoji.engine.TextureComponent
-import dev.ebnbin.warmoji.engine.mapperRequire
 import dev.ebnbin.warmoji.engine.warEngine
 import ktx.ashley.allOf
 

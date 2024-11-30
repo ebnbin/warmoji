@@ -1,7 +1,5 @@
 package dev.ebnbin.warmoji.engine
 
-import com.badlogic.ashley.core.Component
-import com.badlogic.ashley.core.Entity
 import com.badlogic.ashley.core.EntitySystem
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
@@ -15,7 +13,9 @@ import dev.ebnbin.warmoji.engine.system.MovementSystem
 import dev.ebnbin.warmoji.engine.system.TextureDrawingSystem
 import dev.ebnbin.warmoji.warMoji
 import ktx.ashley.addComponent
-import ktx.ashley.mapperFor
+
+val EntitySystem.warEngine: WarEngine
+    get() = engine as WarEngine
 
 class WarEngine : LifecycleEngine() {
     override val viewport: Viewport = WarViewport(TILES_PER_SCREEN)
@@ -71,15 +71,4 @@ class WarEngine : LifecycleEngine() {
         private const val ROWS = 25
         private const val COLUMNS = 25
     }
-}
-
-val EntitySystem.warEngine: WarEngine
-    get() = engine as WarEngine
-
-inline fun <reified T : Component> Entity.mapperGet(): T? {
-    return mapperFor<T>().get(this)
-}
-
-inline fun <reified T : Component> Entity.mapperRequire(): T {
-    return requireNotNull(mapperGet())
 }

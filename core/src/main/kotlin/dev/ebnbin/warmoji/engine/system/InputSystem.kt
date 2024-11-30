@@ -5,10 +5,10 @@ import com.badlogic.ashley.core.Entity
 import com.badlogic.ashley.core.EntitySystem
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
+import dev.ebnbin.kgdx.ashley.mapperRequire
 import dev.ebnbin.warmoji.engine.PlayerComponent
 import dev.ebnbin.warmoji.engine.SpeedComponent
 import dev.ebnbin.warmoji.engine.VelocityComponent
-import dev.ebnbin.warmoji.engine.mapperRequire
 import ktx.ashley.allOf
 
 class InputSystem : EntitySystem() {
