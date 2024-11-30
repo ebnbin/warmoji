@@ -18,13 +18,9 @@ class MovementSystem : IteratingSystem(allOf(
         val position = entity.mapperRequire<PositionComponent>()
         val velocity = entity.mapperRequire<VelocityComponent>()
         val hitSize = entity.mapperGet<HitSizeComponent>()
-        position.x = (position.x + velocity.x * deltaTime).coerceIn(
-            (hitSize?.width ?: 0f) / 2f,
-            warEngine.columns - (hitSize?.width ?: 0f) / 2f,
-        )
-        position.y = (position.y + velocity.y * deltaTime).coerceIn(
-            (hitSize?.height ?: 0f) / 2f,
-            warEngine.rows - (hitSize?.height ?: 0f) / 2f,
-        )
+        val hitHalfWidth = (hitSize?.width ?: 0f) / 2f
+        val hitHalfHeight = (hitSize?.height ?: 0f) / 2f
+        position.x = (position.x + velocity.x * deltaTime).coerceIn(hitHalfWidth, warEngine.columns - hitHalfWidth)
+        position.y = (position.y + velocity.y * deltaTime).coerceIn(hitHalfHeight, warEngine.rows - hitHalfHeight)
     }
 }

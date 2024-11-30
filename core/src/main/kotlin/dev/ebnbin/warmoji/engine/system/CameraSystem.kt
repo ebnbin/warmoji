@@ -1,18 +1,13 @@
 package dev.ebnbin.warmoji.engine.system
 
 import com.badlogic.ashley.core.Engine
-import com.badlogic.ashley.core.Entity
 import com.badlogic.ashley.core.EntitySystem
 import dev.ebnbin.kgdx.ashley.mapperRequire
 import dev.ebnbin.kgdx.scene.LifecycleSystem
-import dev.ebnbin.warmoji.engine.PlayerComponent
 import dev.ebnbin.warmoji.engine.PositionComponent
 import dev.ebnbin.warmoji.engine.warEngine
-import ktx.ashley.allOf
 
 class CameraSystem : EntitySystem(), LifecycleSystem {
-    private lateinit var player: Entity
-
     private var defaultX: Float = 0f
     private var defaultY: Float = 0f
 
@@ -23,9 +18,6 @@ class CameraSystem : EntitySystem(), LifecycleSystem {
 
     override fun addedToEngine(engine: Engine) {
         super.addedToEngine(engine)
-        val players = engine.getEntitiesFor(allOf(PlayerComponent::class).get())
-        player = players.single()
-
         defaultX = warEngine.columns / 2f
         defaultY = (warEngine.rows - MARGIN_BOTTOM + MARGIN_TOP) / 2f
 
@@ -49,7 +41,7 @@ class CameraSystem : EntitySystem(), LifecycleSystem {
 
     override fun update(deltaTime: Float) {
         super.update(deltaTime)
-        val playerPosition = player.mapperRequire<PositionComponent>()
+        val playerPosition = warEngine.player.mapperRequire<PositionComponent>()
         warEngine.viewport.camera.position.x = if (minX > maxX) {
             defaultX
         } else {

@@ -9,7 +9,7 @@ import dev.ebnbin.warmoji.engine.TextureComponent
 import dev.ebnbin.warmoji.engine.warEngine
 import ktx.ashley.allOf
 
-class TextureDrawingSystem : IteratingSystem(allOf(
+class TextureRenderSystem : IteratingSystem(allOf(
     PositionComponent::class,
     RenderSizeComponent::class,
     TextureComponent::class,

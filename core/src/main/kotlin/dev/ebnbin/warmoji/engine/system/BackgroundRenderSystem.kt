@@ -13,7 +13,7 @@ import dev.ebnbin.warmoji.engine.warEngine
 import dev.ebnbin.warmoji.warMoji
 import kotlin.random.Random
 
-class BackgroundDrawingSystem : EntitySystem() {
+class BackgroundRenderSystem : EntitySystem() {
     private lateinit var backgroundColor: Color
 
     private data class Tile(
