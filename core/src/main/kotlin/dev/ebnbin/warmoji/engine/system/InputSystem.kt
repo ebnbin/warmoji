@@ -11,14 +11,22 @@ import dev.ebnbin.warmoji.engine.warEngine
 class InputSystem : EntitySystem() {
     override fun update(deltaTime: Float) {
         super.update(deltaTime)
+        val isLeftPressed = Gdx.input.isKeyPressed(Input.Keys.A) && !Gdx.input.isKeyPressed(Input.Keys.D)
+        val isRightPressed = Gdx.input.isKeyPressed(Input.Keys.D) && !Gdx.input.isKeyPressed(Input.Keys.A)
+        val isBottomPressed = Gdx.input.isKeyPressed(Input.Keys.S) && !Gdx.input.isKeyPressed(Input.Keys.W)
+        val isTopPressed = Gdx.input.isKeyPressed(Input.Keys.W) && !Gdx.input.isKeyPressed(Input.Keys.S)
+        val isLeftTouched = Gdx.input.isTouched(0) && Gdx.input.getX(0) < Gdx.graphics.width / 3
+        val isRightTouched = Gdx.input.isTouched(0) && Gdx.input.getX(0) > Gdx.graphics.width * 2 / 3
+        val isBottomTouched = Gdx.input.isTouched(0) && Gdx.input.getY(0) > Gdx.graphics.height * 2 / 3
+        val isTopTouched = Gdx.input.isTouched(0) && Gdx.input.getY(0) < Gdx.graphics.height / 3
         val directionX = when {
-            Gdx.input.isKeyPressed(Input.Keys.A) && !Gdx.input.isKeyPressed(Input.Keys.D) -> -1f
-            Gdx.input.isKeyPressed(Input.Keys.D) && !Gdx.input.isKeyPressed(Input.Keys.A) -> 1f
+            isLeftPressed || isLeftTouched -> -1f
+            isRightPressed || isRightTouched -> 1f
             else -> 0f
         }
         val directionY = when {
-            Gdx.input.isKeyPressed(Input.Keys.S) && !Gdx.input.isKeyPressed(Input.Keys.W) -> -1f
-            Gdx.input.isKeyPressed(Input.Keys.W) && !Gdx.input.isKeyPressed(Input.Keys.S) -> 1f
+            isBottomPressed || isBottomTouched -> -1f
+            isTopPressed || isTopTouched -> 1f
             else -> 0f
         }
 
