@@ -9,8 +9,11 @@ import dev.ebnbin.kgdx.scene.LifecycleEngine
 import dev.ebnbin.kgdx.scene.LifecycleSystem
 import dev.ebnbin.warmoji.engine.system.BackgroundRenderSystem
 import dev.ebnbin.warmoji.engine.system.CameraSystem
+import dev.ebnbin.warmoji.engine.system.EnemySpawnSystem
+import dev.ebnbin.warmoji.engine.system.EnemyTargetingSystem
 import dev.ebnbin.warmoji.engine.system.InputSystem
 import dev.ebnbin.warmoji.engine.system.MovementSystem
+import dev.ebnbin.warmoji.engine.system.PlayerEnemyHitSystem
 import dev.ebnbin.warmoji.engine.system.TextureRenderSystem
 import dev.ebnbin.warmoji.warMoji
 import ktx.ashley.addComponent
@@ -38,8 +41,8 @@ class WarEngine : LifecycleEngine() {
             height = 1f
         }
         it.addComponent<HitSizeComponent>(this) {
-            width = 0f
-            height = 0f
+            width = 0.6f
+            height = 0.6f
         }
         it.addComponent<SpeedComponent>(this) {
             value = 3f
@@ -60,8 +63,11 @@ class WarEngine : LifecycleEngine() {
                 super.dispose()
             }
         })
+        addSystem(EnemySpawnSystem())
         addSystem(InputSystem())
+        addSystem(EnemyTargetingSystem())
         addSystem(MovementSystem())
+        addSystem(PlayerEnemyHitSystem())
         addSystem(CameraSystem())
         addSystem(BackgroundRenderSystem())
         addSystem(TextureRenderSystem())

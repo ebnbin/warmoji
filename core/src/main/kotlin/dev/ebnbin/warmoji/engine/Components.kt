@@ -5,6 +5,8 @@ import com.badlogic.gdx.graphics.Texture
 
 object PlayerComponent : Component
 
+object EnemyComponent : Component
+
 class PositionComponent : Component {
     var x: Float = 0f
     var y: Float = 0f
