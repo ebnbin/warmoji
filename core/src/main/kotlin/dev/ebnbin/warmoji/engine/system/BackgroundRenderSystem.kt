@@ -8,7 +8,7 @@ import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.math.Rectangle
-import com.badlogic.gdx.scenes.scene2d.utils.ScissorStack
+import dev.ebnbin.kgdx.graphics.copy
 import dev.ebnbin.warmoji.engine.warEngine
 import dev.ebnbin.warmoji.warMoji
 import kotlin.random.Random
@@ -25,6 +25,8 @@ class BackgroundRenderSystem : EntitySystem() {
     )
 
     private lateinit var tileList: List<Tile>
+
+    private val clipArea: Rectangle = Rectangle()
 
     override fun addedToEngine(engine: Engine) {
         super.addedToEngine(engine)
@@ -45,36 +47,27 @@ class BackgroundRenderSystem : EntitySystem() {
             }
         }
         this.tileList = tileList
+        clipArea.set(0f, 0f, warEngine.columns.toFloat(), warEngine.rows.toFloat())
     }
 
     override fun update(deltaTime: Float) {
         super.update(deltaTime)
         Gdx.gl.glEnable(GL20.GL_BLEND)
-        warEngine.shapeRenderer.color = backgroundColor
-        warEngine.shapeRenderer.projectionMatrix = warEngine.viewport.camera.combined
-        warEngine.shapeRenderer.begin(ShapeRenderer.ShapeType.Filled)
-        warEngine.shapeRenderer.rect(0f, 0f, warEngine.columns.toFloat(), warEngine.rows.toFloat())
-        warEngine.shapeRenderer.end()
-        Gdx.gl.glDisable(GL20.GL_BLEND)
-
-        warEngine.batch.projectionMatrix = warEngine.viewport.camera.combined
-        warEngine.batch.begin()
-        val oldColor = warEngine.batch.color.cpy()
-        warEngine.batch.color = warEngine.batch.color.cpy().also { it.a *= EMOJI_ALPHA }
-        val area = Rectangle(0f, 0f, warEngine.columns.toFloat(), warEngine.rows.toFloat())
-        val scissor = Rectangle()
-        ScissorStack.calculateScissors(warEngine.viewport.camera, warEngine.batch.transformMatrix, area, scissor)
-        warEngine.batch.flush()
-        if (ScissorStack.pushScissors(scissor)) {
-            tileList.forEach { tile ->
-                warEngine.batch.draw(tile.texture, tile.x, tile.y, 0.5f, 0.5f, 1f, 1f, tile.scale, tile.scale,
-                    tile.rotation, 0, 0, tile.texture.width, tile.texture.height, false, true)
-            }
-            warEngine.batch.flush()
-            ScissorStack.popScissors()
+        warEngine.rendererManager.useShape(
+            type = ShapeRenderer.ShapeType.Filled,
+        ) {
+            color = backgroundColor
+            rect(0f, 0f, warEngine.columns.toFloat(), warEngine.rows.toFloat())
         }
-        warEngine.batch.color = oldColor
-        warEngine.batch.end()
+        warEngine.rendererManager.useBatch(
+            clipArea = clipArea,
+        ) {
+            color = Color.WHITE.copy(a = EMOJI_ALPHA)
+            tileList.forEach { tile ->
+                draw(tile.texture, tile.x, tile.y, 0.5f, 0.5f, 1f, 1f, tile.scale, tile.scale, tile.rotation, 0, 0,
+                    tile.texture.width, tile.texture.height, false, true)
+            }
+        }
     }
 
     companion object {

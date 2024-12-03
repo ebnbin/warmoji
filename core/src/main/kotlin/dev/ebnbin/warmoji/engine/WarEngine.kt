@@ -2,8 +2,6 @@ package dev.ebnbin.warmoji.engine
 
 import com.badlogic.ashley.core.Entity
 import com.badlogic.ashley.core.EntitySystem
-import com.badlogic.gdx.graphics.g2d.SpriteBatch
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.utils.viewport.Viewport
 import dev.ebnbin.kgdx.scene.LifecycleEngine
 import dev.ebnbin.kgdx.scene.LifecycleSystem
@@ -22,8 +20,9 @@ val EntitySystem.warEngine: WarEngine
 class WarEngine : LifecycleEngine() {
     override val viewport: Viewport = WarViewport(TILES_PER_SCREEN)
 
-    val shapeRenderer: ShapeRenderer = ShapeRenderer()
-    val batch: SpriteBatch = SpriteBatch()
+    val rendererManager: RendererManager = RendererManager(
+        viewport = viewport,
+    )
 
     val rows: Int = ROWS
     val columns: Int = COLUMNS
@@ -33,8 +32,7 @@ class WarEngine : LifecycleEngine() {
     init {
         addSystem(object : EntitySystem(), LifecycleSystem {
             override fun dispose() {
-                batch.dispose()
-                shapeRenderer.dispose()
+                rendererManager.dispose()
                 super.dispose()
             }
         })
