@@ -4,9 +4,9 @@ import com.badlogic.ashley.core.EntitySystem
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import dev.ebnbin.kgdx.ashley.mapperRequire
-import dev.ebnbin.warmoji.engine.SpeedComponent
-import dev.ebnbin.warmoji.engine.VelocityComponent
+import dev.ebnbin.warmoji.engine.DirectionComponent
 import dev.ebnbin.warmoji.engine.warEngine
+import kotlin.math.sqrt
 
 class InputSystem : EntitySystem() {
     override fun update(deltaTime: Float) {
@@ -29,10 +29,16 @@ class InputSystem : EntitySystem() {
             isTopPressed || isTopTouched -> 1f
             else -> 0f
         }
-
-        val playerSpeed = warEngine.player.mapperRequire<SpeedComponent>()
-        val playerVelocity = warEngine.player.mapperRequire<VelocityComponent>()
-        playerVelocity.x = playerSpeed.value * directionX
-        playerVelocity.y = playerSpeed.value * directionY
+        val playerDirection = warEngine.player.mapperRequire<DirectionComponent>()
+        playerDirection.x = when {
+            directionX == 0f -> 0f
+            directionY == 0f -> directionX
+            else -> directionX / sqrt(2f)
+        }
+        playerDirection.y = when {
+            directionY == 0f -> 0f
+            directionX == 0f -> directionY
+            else -> directionY / sqrt(2f)
+        }
     }
 }

@@ -26,7 +26,7 @@ class SpeedComponent : Component {
     var value: Float = 0f
 }
 
-class VelocityComponent : Component {
+class DirectionComponent : Component {
     var x: Float = 0f
     var y: Float = 0f
 }

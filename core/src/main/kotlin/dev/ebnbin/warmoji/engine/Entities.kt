@@ -37,9 +37,9 @@ fun WarEngine.entityPlayer(): Entity {
             height = 0.6f
         }
         component<SpeedComponent> {
-            value = 3f
+            value = 4f
         }
-        component<VelocityComponent>()
+        component<DirectionComponent>()
         component<TextureComponent> {
             value = warMoji.emojiManager.textureList.random()
         }
@@ -64,9 +64,9 @@ fun WarEngine.entityEnemy(): Entity {
             height = hitHeight
         }
         component<SpeedComponent> {
-            value = 2f
+            value = 3f
         }
-        component<VelocityComponent>()
+        component<DirectionComponent>()
         component<TextureComponent> {
             value = warMoji.emojiManager.textureList.random()
         }
