@@ -15,8 +15,6 @@ import dev.ebnbin.warmoji.engine.system.InputSystem
 import dev.ebnbin.warmoji.engine.system.MovementSystem
 import dev.ebnbin.warmoji.engine.system.PlayerEnemyHitSystem
 import dev.ebnbin.warmoji.engine.system.TextureRenderSystem
-import dev.ebnbin.warmoji.warMoji
-import ktx.ashley.addComponent
 
 val EntitySystem.warEngine: WarEngine
     get() = engine as WarEngine
@@ -30,32 +28,9 @@ class WarEngine : LifecycleEngine() {
     val rows: Int = ROWS
     val columns: Int = COLUMNS
 
-    val player: Entity = createEntity().also {
-        it.addComponent<PlayerComponent>(this)
-        it.addComponent<PositionComponent>(this) {
-            x = columns / 2f
-            y = rows / 2f
-        }
-        it.addComponent<RenderSizeComponent>(this) {
-            width = 1f
-            height = 1f
-        }
-        it.addComponent<HitSizeComponent>(this) {
-            width = 0.6f
-            height = 0.6f
-        }
-        it.addComponent<SpeedComponent>(this) {
-            value = 3f
-        }
-        it.addComponent<VelocityComponent>(this)
-        it.addComponent<TextureComponent>(this) {
-            value = warMoji.emojiManager.textureList.random()
-        }
-    }
+    val player: Entity = entityPlayer()
 
     init {
-        addEntity(player)
-
         addSystem(object : EntitySystem(), LifecycleSystem {
             override fun dispose() {
                 batch.dispose()
