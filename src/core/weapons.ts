@@ -92,7 +92,38 @@ export interface BoomerangSpec {
   readonly held: HeldVisual
 }
 
-export type WeaponSpec = ThrustSpec | ProjectileSpec | SweepSpec | AreaBlastSpec | BoomerangSpec
+export interface LaserSpec {
+  readonly kind: 'laser'
+  readonly name: string
+  readonly icon: string
+  readonly damage: number
+  readonly cooldownMs: number
+  /** 光束长度；判定为线段胶囊（thrustHitIndices），贯穿直线上所有敌人 */
+  readonly range: number
+  readonly beamRadius: number
+  readonly color: number
+  readonly held: HeldVisual
+}
+
+export interface SlowAuraSpec {
+  readonly kind: 'slowAura'
+  readonly name: string
+  readonly icon: string
+  /** 光环以队伍中心为圆心持续生效（角色只是来源），无伤害无冷却 */
+  readonly radius: number
+  /** 敌人移速乘数 */
+  readonly slowFactor: number
+  readonly color: number
+}
+
+export type WeaponSpec =
+  | ThrustSpec
+  | ProjectileSpec
+  | SweepSpec
+  | AreaBlastSpec
+  | BoomerangSpec
+  | LaserSpec
+  | SlowAuraSpec
 
 export interface HitTarget {
   x: number

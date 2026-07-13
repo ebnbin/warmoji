@@ -14,7 +14,9 @@ export const MAP = {
 import type {
   AreaBlastSpec,
   BoomerangSpec,
+  LaserSpec,
   ProjectileSpec,
+  SlowAuraSpec,
   SweepSpec,
   ThrustSpec,
   WeaponSpec,
@@ -108,6 +110,31 @@ export const WEAPONS = {
     blastRadius: 1.3 * UNIT,
     color: 0x9575cd,
   } satisfies AreaBlastSpec,
+  laserBeam: {
+    kind: 'laser',
+    name: '贯穿激光',
+    icon: '🔦',
+    damage: 14,
+    cooldownMs: 900,
+    range: 8 * UNIT,
+    beamRadius: 0.22 * UNIT,
+    color: 0xff5252,
+    held: {
+      emoji: '🔦',
+      size: 0.55 * UNIT,
+      restOffset: 0.45 * UNIT,
+      // twemoji 1f526 灯头朝左下
+      rotationOffsetRad: (3 * Math.PI) / 4,
+    },
+  } satisfies LaserSpec,
+  frostAura: {
+    kind: 'slowAura',
+    name: '寒气光环',
+    icon: '❄️',
+    radius: 3 * UNIT,
+    slowFactor: 0.5,
+    color: 0x81d4fa,
+  } satisfies SlowAuraSpec,
   boomerang: {
     kind: 'boomerang',
     name: '回旋镖',
@@ -172,6 +199,18 @@ export const CHARACTERS = {
     name: '袋鼠',
     desc: '掷出回旋镖，去程回程皆可伤敌',
     weapons: [WEAPONS.boomerang],
+  },
+  robot: {
+    emoji: '🤖',
+    name: '机器人',
+    desc: '手持激光器，灼穿一条直线上的所有敌人',
+    weapons: [WEAPONS.laserBeam],
+  },
+  snowman: {
+    emoji: '⛄',
+    name: '雪人',
+    desc: '以队伍中心散发寒气，持续减速范围内的敌人',
+    weapons: [WEAPONS.frostAura],
   },
 } as const satisfies Record<string, CharacterSpec>
 

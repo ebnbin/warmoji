@@ -50,7 +50,7 @@ describe('出战阵容选择', () => {
   it('合法子集保留（允许未选满），去重并按编制截断', () => {
     expect(sanitizeLineup(['mage', 'mage', 'troll'], SIZE)).toEqual(['mage', 'troll'])
     expect(sanitizeLineup([...ROSTER_IDS], SIZE)).toEqual(DEFAULT)
-    expect(sanitizeLineup([...ROSTER_IDS], 6)).toEqual([...ROSTER_IDS])
+    expect(sanitizeLineup([...ROSTER_IDS], 6)).toEqual(ROSTER_IDS.slice(0, 6))
   })
 
   it('toggle：已选则移除，未满则追加，满员时忽略新增', () => {

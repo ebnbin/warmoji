@@ -1,7 +1,9 @@
 import type { WeaponSpec } from '../core/weapons'
 import { AreaBlastWeapon } from './AreaBlastWeapon'
 import { BoomerangWeapon } from './BoomerangWeapon'
+import { LaserWeapon } from './LaserWeapon'
 import { ProjectileWeapon } from './ProjectileWeapon'
+import { SlowAuraWeapon } from './SlowAuraWeapon'
 import { SweepWeapon } from './SweepWeapon'
 import { ThrustWeapon } from './ThrustWeapon'
 import type { WeaponContext, WeaponRuntime } from './types'
@@ -22,5 +24,9 @@ export function createWeapon(
       return new AreaBlastWeapon(spec, ctx, initialCooldownMs)
     case 'boomerang':
       return new BoomerangWeapon(spec, ctx, initialCooldownMs)
+    case 'laser':
+      return new LaserWeapon(spec, ctx, initialCooldownMs)
+    case 'slowAura':
+      return new SlowAuraWeapon(spec, ctx, initialCooldownMs)
   }
 }

@@ -24,10 +24,28 @@ test.describe('组队页 横屏 1280×720', () => {
     expect(s.detail.x + s.detail.w).toBeLessThanOrEqual(s.list.x)
     expect(inBounds(s.list, 1280, 720)).toBe(true)
     expect(inBounds(s.detail, 1280, 720)).toBe(true)
-    for (const it of s.items) expect(inBounds(it, 1280, 720)).toBe(true)
+    // 花名册超出列表视口（可滚动），只断言可视区内的行
+    const visible = (it: { y: number; h: number }): boolean =>
+      it.y >= s.list.y && it.y + it.h <= s.list.y + s.list.h
+    for (const it of s.items.filter(visible)) expect(inBounds(it, 1280, 720)).toBe(true)
+    expect(s.list.contentH).toBeGreaterThan(s.list.h)
 
-    // 聚焦替补：详情切换，满员时按钮为「阵容已满」
-    const benched = s.items.find((i) => !i.inLineup)!
+    // 滚轮滚动：末位角色滚入可视区
+    const wheelAt = await page.evaluate(() => {
+      const d = window.__warmoji!
+      const k = window.innerWidth / d.viewW
+      const L = d.select!.list
+      return { x: (L.x + L.w / 2) * k, y: (L.y + L.h / 2) * k }
+    })
+    await page.mouse.move(wheelAt.x, wheelAt.y)
+    await page.mouse.wheel(0, 300)
+    await page.waitForFunction(() => (window.__warmoji?.select?.list.scrollY ?? 0) > 0)
+    await page.mouse.wheel(0, -600)
+    await page.waitForFunction(() => (window.__warmoji?.select?.list.scrollY ?? 0) === 0)
+
+    // 聚焦替补：详情切换，满员时按钮为「阵容已满」（取可视区内的替补）
+    s = await selectState(page)
+    const benched = s.items.find((i) => !i.inLineup && visible(i))!
     await clickItem(page, benched.id)
     await page.waitForFunction((id) => window.__warmoji?.select?.focusedId === id, benched.id)
     s = await selectState(page)
@@ -69,7 +87,8 @@ test.describe('组队页 竖屏 720×1280', () => {
     expect(s.detail.y + s.detail.h).toBeLessThanOrEqual(s.list.y)
     expect(inBounds(s.list, 720, 1280)).toBe(true)
     expect(inBounds(s.detail, 720, 1280)).toBe(true)
-    for (const it of s.items) expect(inBounds(it, 720, 1280)).toBe(true)
+    for (const it of s.items.filter((i) => i.y >= s.list.y && i.y + i.h <= s.list.y + s.list.h))
+      expect(inBounds(it, 720, 1280)).toBe(true)
     expect(
       inBounds(
         { x: s.start.x - s.start.w / 2, y: s.start.y - s.start.h / 2, w: s.start.w, h: s.start.h },
@@ -138,7 +157,8 @@ test.describe('组队页 多分辨率', () => {
       }))
       expect(inBounds(s.list, vw, vh), `list @${size.w}x${size.h}`).toBe(true)
       expect(inBounds(s.detail, vw, vh), `detail @${size.w}x${size.h}`).toBe(true)
-      for (const it of s.items) expect(inBounds(it, vw, vh), `item ${it.id} @${size.w}x${size.h}`).toBe(true)
+      for (const it of s.items.filter((i) => i.y >= s.list.y && i.y + i.h <= s.list.y + s.list.h))
+        expect(inBounds(it, vw, vh), `item ${it.id} @${size.w}x${size.h}`).toBe(true)
       const btn = { x: s.start.x - s.start.w / 2, y: s.start.y - s.start.h / 2, w: s.start.w, h: s.start.h }
       expect(inBounds(btn, vw, vh), `start @${size.w}x${size.h}`).toBe(true)
       // 内容块水平居中：左右留白相等

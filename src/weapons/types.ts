@@ -22,6 +22,10 @@ export interface WeaponContext {
   enemyTargets(): readonly EnemyTarget[]
   damageEnemy(enemy: Phaser.GameObjects.Image, damage: number): void
   spawnProjectile(x: number, y: number, angle: number, spec: ProjectileSpec, damage: number): void
+  /** 队伍中心（光环类武器的锚点） */
+  teamCenter(): { x: number; y: number }
+  /** 登记一个仅本帧生效的减速区域（光环每帧重新登记），索敌时叠乘敌人移速 */
+  applySlow(x: number, y: number, radius: number, factor: number): void
   damageMul(): number
   cooldownMul(): number
 }

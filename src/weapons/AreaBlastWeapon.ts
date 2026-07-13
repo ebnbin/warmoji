@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import { circleHitIndices } from '../core/weapons'
 import type { AreaBlastSpec } from '../core/weapons'
+import { emojiImage } from '../ui/emoji'
 import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
 /** 远程范围轰炸：在侦测范围内以最近敌人为爆心，对爆心圆形区域内所有敌人各一次伤害 */
@@ -46,18 +47,44 @@ export class AreaBlastWeapon implements WeaponRuntime {
   }
 
   private blastEffect(x: number, y: number): void {
-    const ring: Phaser.GameObjects.Arc = this.ctx.scene.add
-      .circle(x, y, this.spec.blastRadius, this.spec.color, 0.18)
-      .setStrokeStyle(4, this.spec.color, 0.9)
-      .setDepth(7)
-      .setScale(0.2)
-    this.ctx.scene.tweens.add({
-      targets: ring,
-      scale: 1,
+    const scene = this.ctx.scene
+    // 白闪核心
+    const flash: Phaser.GameObjects.Arc = scene.add
+      .circle(x, y, this.spec.blastRadius * 0.55, 0xffffff, 0.9)
+      .setDepth(8)
+    scene.tweens.add({
+      targets: flash,
+      scale: 1.7,
       alpha: 0,
-      duration: 320,
-      ease: 'Sine.easeOut',
+      duration: 170,
+      ease: 'Cubic.easeOut',
+      onComplete: () => flash.destroy(),
+    })
+    // 冲击环
+    const ring: Phaser.GameObjects.Arc = scene.add
+      .circle(x, y, this.spec.blastRadius, this.spec.color, 0.4)
+      .setStrokeStyle(6, this.spec.color, 1)
+      .setDepth(7)
+      .setScale(0.25)
+    scene.tweens.add({
+      targets: ring,
+      scale: 1.08,
+      alpha: 0,
+      duration: 400,
+      ease: 'Cubic.easeOut',
       onComplete: () => ring.destroy(),
+    })
+    // 💥 爆裂
+    const boom = emojiImage(scene, x, y, '💥', this.spec.blastRadius * 1.5).setDepth(9)
+    const full = boom.scale
+    boom.setScale(full * 0.4).setRotation((Math.random() - 0.5) * 0.8)
+    scene.tweens.add({
+      targets: boom,
+      scale: full,
+      alpha: 0,
+      duration: 340,
+      ease: 'Back.easeOut',
+      onComplete: () => boom.destroy(),
     })
   }
 

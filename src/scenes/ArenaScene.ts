@@ -96,11 +96,15 @@ export class ArenaScene extends Phaser.Scene {
   private projectiles!: Phaser.GameObjects.Group
   private coins!: Phaser.GameObjects.Group
   private frameTargets: EnemyTarget[] = []
+  private frameSlowZones: { x: number; y: number; r2: number; factor: number }[] = []
   private weaponCtx: WeaponContext = {
     scene: this,
     enemyTargets: () => this.frameTargets,
     damageEnemy: (e, d) => this.applyDamage(e as ImageObj, d),
     spawnProjectile: (x, y, angle, spec, damage) => this.spawnProjectile(x, y, angle, spec, damage),
+    teamCenter: () => this.center,
+    applySlow: (x, y, radius, factor) =>
+      this.frameSlowZones.push({ x, y, r2: radius * radius, factor }),
     damageMul: () => this.stats.damageMul,
     cooldownMul: () => this.stats.cooldownMul,
   }
@@ -250,6 +254,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.moveTeam(delta)
+    this.frameSlowZones.length = 0
     this.frameTargets = (this.enemies.getChildren() as ImageObj[])
       .filter((e) => e.active)
       .map((e) => ({ x: e.x, y: e.y, radius: (e.getData('spec') as EnemySpec).radius, ref: e }))
@@ -656,8 +661,24 @@ export class ArenaScene extends Phaser.Scene {
           best = m
         }
       }
+      // 减速区域叠乘移速（寒气光环等），并给减速中的敌人上冷色调
+      let speed = spec.speed
+      let slowed = false
+      for (const z of this.frameSlowZones) {
+        const zx = e.x - z.x
+        const zy = e.y - z.y
+        if (zx * zx + zy * zy <= z.r2) {
+          speed *= z.factor
+          slowed = true
+        }
+      }
+      if (slowed !== (e.getData('slowed') as boolean | undefined)) {
+        e.setData('slowed', slowed)
+        if (slowed) e.setTint(0xa5d8ff)
+        else e.clearTint()
+      }
       const dir = norm(best.image.x - e.x, best.image.y - e.y)
-      ;(e.body as ArcadeBody).setVelocity(dir.x * spec.speed, dir.y * spec.speed)
+      ;(e.body as ArcadeBody).setVelocity(dir.x * speed, dir.y * speed)
     }
   }
 

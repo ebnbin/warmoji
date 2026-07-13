@@ -17,6 +17,8 @@ export const WEAPON_KIND_LABEL: Record<WeaponSpec['kind'], string> = {
   sweep: '横扫',
   areaBlast: '轰炸',
   boomerang: '回旋',
+  laser: '激光',
+  slowAura: '光环',
 }
 
 /** px → 格 */
@@ -29,6 +31,13 @@ function sec(ms: number): string {
 }
 
 export function weaponStatLines(w: WeaponSpec): string[] {
+  // slowAura 无伤害无冷却，其余 kind 首行统一为 伤害·冷却
+  if (w.kind === 'slowAura') {
+    return [
+      `减速 ${Math.round((1 - w.slowFactor) * 100)}% · 范围 ${grid(w.radius)}`,
+      '以队伍中心为圆心持续生效',
+    ]
+  }
   const base = `伤害 ${w.damage} · 冷却 ${sec(w.cooldownMs)}`
   switch (w.kind) {
     case 'projectile':
@@ -41,6 +50,8 @@ export function weaponStatLines(w: WeaponSpec): string[] {
       return [base, `侦测 ${grid(w.detectRange)} · 爆炸半径 ${grid(w.blastRadius)}`]
     case 'boomerang':
       return [base, `射程 ${grid(w.range)} · 判定 ${grid(w.hitRadius)} · 回收 ${grid(w.returnSpeed)}/秒`]
+    case 'laser':
+      return [base, `射程 ${grid(w.range)} · 束宽 ${grid(w.beamRadius * 2)} · 贯穿直线全部敌人`]
   }
 }
 
