@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GEM, GHOST, MAP, MEMBER, SPAWN, STRESS, TEAM, UNIT, ZOMBIE } from '../core/config'
+import { GEM, GHOST, HIT_SHAKE, MAP, MEMBER, SPAWN, STRESS, TEAM, UNIT, ZOMBIE } from '../core/config'
 import type { EnemySpec } from '../core/config'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
 import { slotOffset } from '../core/formation'
@@ -379,7 +379,7 @@ export class ArenaScene extends Phaser.Scene {
     m.lastHitMs = this.elapsedMs
     const spec = enemy.getData('spec') as EnemySpec
     m.hp = Math.max(0, m.hp - spec.damage)
-    this.cameras.main.shake(80, 0.003)
+    this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     m.image.setTint(0xff7777)
     this.time.delayedCall(120, () => {
       if (m.alive) m.image.clearTint()

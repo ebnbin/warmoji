@@ -19,7 +19,7 @@ describe('单位制锚定', () => {
 
   it('花名册覆盖六种攻击形态', () => {
     const kinds = Object.values(CHARACTERS).flatMap((c) => c.weapons.map((w) => w.kind))
-    expect(new Set(kinds)).toEqual(new Set(['projectile', 'thrust', 'sweep', 'areaPulse', 'boomerang']))
+    expect(new Set(kinds)).toEqual(new Set(['projectile', 'thrust', 'sweep', 'areaBlast', 'boomerang']))
     // 双持：牛仔两把武器
     expect(CHARACTERS.cowboy.weapons.length).toBe(2)
     // 自体攻击（无持有物）：杂耍者与独角兽

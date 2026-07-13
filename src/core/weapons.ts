@@ -54,11 +54,14 @@ export interface SweepSpec {
   readonly held: HeldVisual
 }
 
-export interface AreaPulseSpec {
-  readonly kind: 'areaPulse'
+export interface AreaBlastSpec {
+  readonly kind: 'areaBlast'
   readonly damage: number
   readonly cooldownMs: number
-  readonly radius: number
+  /** 侦测范围：在此距离内选取爆心（离持有者最近的敌人） */
+  readonly detectRange: number
+  /** 爆炸判定半径（以爆心为圆心） */
+  readonly blastRadius: number
   /** 特效环颜色 */
   readonly color: number
 }
@@ -78,7 +81,7 @@ export interface BoomerangSpec {
   readonly held: HeldVisual
 }
 
-export type WeaponSpec = ThrustSpec | ProjectileSpec | SweepSpec | AreaPulseSpec | BoomerangSpec
+export type WeaponSpec = ThrustSpec | ProjectileSpec | SweepSpec | AreaBlastSpec | BoomerangSpec
 
 export interface HitTarget {
   x: number

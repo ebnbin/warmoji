@@ -12,7 +12,7 @@ export const MAP = {
 } as const
 
 import type {
-  AreaPulseSpec,
+  AreaBlastSpec,
   BoomerangSpec,
   ProjectileSpec,
   SweepSpec,
@@ -82,13 +82,14 @@ export const WEAPONS = {
   } satisfies SweepSpec,
   pistolLeft: { ...pistol, held: { ...pistol.held, mountSide: -1 } } satisfies ProjectileSpec,
   pistolRight: { ...pistol, held: { ...pistol.held, mountSide: 1 } } satisfies ProjectileSpec,
-  arcanePulse: {
-    kind: 'areaPulse',
-    damage: 20,
+  arcaneBlast: {
+    kind: 'areaBlast',
+    damage: 22,
     cooldownMs: 1300,
-    radius: 2 * UNIT,
+    detectRange: 6 * UNIT,
+    blastRadius: 1.3 * UNIT,
     color: 0x9575cd,
-  } satisfies AreaPulseSpec,
+  } satisfies AreaBlastSpec,
   boomerang: {
     kind: 'boomerang',
     damage: 18,
@@ -118,7 +119,7 @@ export const CHARACTERS = {
   unicorn: { emoji: '🦄', weapons: [WEAPONS.hornThrust] },
   troll: { emoji: '🧌', weapons: [WEAPONS.axeSweep] },
   cowboy: { emoji: '🤠', weapons: [WEAPONS.pistolLeft, WEAPONS.pistolRight] },
-  mage: { emoji: '🧙', weapons: [WEAPONS.arcanePulse] },
+  mage: { emoji: '🧙', weapons: [WEAPONS.arcaneBlast] },
   kangaroo: { emoji: '🦘', weapons: [WEAPONS.boomerang] },
 } as const satisfies Record<string, CharacterSpec>
 
@@ -217,6 +218,9 @@ export const STRESS = {
 } as const
 
 export const XP = { base: 8, perLevel: 6 } as const
+
+// 角色受击时的相机震动
+export const HIT_SHAKE = { durationMs: 60, intensity: 0.0012 } as const
 
 // 剪影描边（radius 单位 = twemoji viewBox 单位，36 格）
 export const OUTLINE = { radius: 2, color: '#000000' } as const

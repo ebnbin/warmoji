@@ -1,5 +1,5 @@
 import type { WeaponSpec } from '../core/weapons'
-import { AreaPulseWeapon } from './AreaPulseWeapon'
+import { AreaBlastWeapon } from './AreaBlastWeapon'
 import { BoomerangWeapon } from './BoomerangWeapon'
 import { ProjectileWeapon } from './ProjectileWeapon'
 import { SweepWeapon } from './SweepWeapon'
@@ -18,8 +18,8 @@ export function createWeapon(
       return new ProjectileWeapon(spec, ctx, initialCooldownMs)
     case 'sweep':
       return new SweepWeapon(spec, ctx, initialCooldownMs)
-    case 'areaPulse':
-      return new AreaPulseWeapon(spec, ctx, initialCooldownMs)
+    case 'areaBlast':
+      return new AreaBlastWeapon(spec, ctx, initialCooldownMs)
     case 'boomerang':
       return new BoomerangWeapon(spec, ctx, initialCooldownMs)
   }
