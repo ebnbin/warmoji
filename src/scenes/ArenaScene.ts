@@ -16,6 +16,7 @@ import { norm } from '../core/vec'
 import { waveAt } from '../core/waves'
 import { gainXp, xpToNext } from '../core/xp'
 import { applyBackground } from '../ui/background'
+import { DAMAGE_FONT, ensureDamageFont } from '../ui/damageFont'
 import { reportDebug } from '../ui/debug'
 import { isStress } from '../ui/dev'
 import { emojiImage } from '../ui/emoji'
@@ -110,6 +111,8 @@ export class ArenaScene extends Phaser.Scene {
   private palette!: Palette
   private stats!: TeamStats
   private run!: RunState
+  private damagePool: Phaser.GameObjects.BitmapText[] = []
+  private damagePoolIdx = 0
   private elapsedMs = 0
   private spawnCooldownMs = 0
   private pendingSpawns = 0
@@ -205,6 +208,13 @@ export class ArenaScene extends Phaser.Scene {
     this.enemies = this.add.group()
     this.projectiles = this.add.group()
     this.coins = this.add.group()
+
+    // 伤害数字对象池：复用固定数量 BitmapText（见 ui/damageFont.ts）
+    ensureDamageFont(this)
+    this.damagePool = Array.from({ length: 64 }, () =>
+      this.add.bitmapText(0, 0, DAMAGE_FONT).setFontSize(18).setOrigin(0.5).setDepth(50).setVisible(false),
+    )
+    this.damagePoolIdx = 0
 
     this.cursors = this.input.keyboard?.createCursorKeys()
     this.wasd = this.input.keyboard?.addKeys('W,A,S,D') as
@@ -555,23 +565,17 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private floatDamage(x: number, y: number, amount: number): void {
-    const t = this.add
-      .text(x, y - 14, String(amount), {
-        fontFamily: UI_FONT,
-        fontSize: '15px',
-        color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 3,
-        resolution: textRes(),
-      })
-      .setOrigin(0.5)
-      .setDepth(50)
+    // 池满时偷用最旧的一个（结束它未完成的动画）
+    const t = this.damagePool[this.damagePoolIdx]!
+    this.damagePoolIdx = (this.damagePoolIdx + 1) % this.damagePool.length
+    this.tweens.killTweensOf(t)
+    t.setText(String(amount)).setPosition(x, y - 14).setAlpha(1).setVisible(true)
     this.tweens.add({
       targets: t,
       y: y - 40,
       alpha: 0,
       duration: 350,
-      onComplete: () => t.destroy(),
+      onComplete: () => t.setVisible(false),
     })
   }
 
@@ -675,6 +679,10 @@ export class ArenaScene extends Phaser.Scene {
       this.physics.add.existing(coin)
       circleBody(coin, COIN.radius)
       this.coins.add(coin)
+    }
+    const over = this.coins.getLength() - COIN.maxGround
+    if (over > 0) {
+      for (const c of (this.coins.getChildren() as ImageObj[]).slice(0, over)) c.destroy()
     }
   }
 
