@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { circleHitIndices, sectorHitIndices, thrustHitIndices, wrapAngle } from './weapons'
+import { circleHitIndices, sectorHitIndices, sweepFirstHitIndex, thrustHitIndices, wrapAngle } from './weapons'
 
 describe('thrustHitIndices', () => {
   const origin = { x: 0, y: 0 }
@@ -83,5 +83,32 @@ describe('wrapAngle', () => {
     expect(wrapAngle(3 * Math.PI)).toBeCloseTo(Math.PI)
     expect(wrapAngle(-3 * Math.PI)).toBeCloseTo(Math.PI)
     expect(wrapAngle(0.5)).toBeCloseTo(0.5)
+  })
+})
+
+describe('sweepFirstHitIndex', () => {
+  it('单帧大步长跨过目标也能命中（穿模防护）', () => {
+    const targets = [{ x: 60, y: 0, radius: 10 }]
+    expect(sweepFirstHitIndex({ x: 0, y: 0 }, { x: 200, y: 0 }, 5, targets)).toBe(0)
+  })
+
+  it('多目标取路径上最先命中者', () => {
+    const targets = [
+      { x: 150, y: 0, radius: 10 },
+      { x: 50, y: 0, radius: 10 },
+    ]
+    expect(sweepFirstHitIndex({ x: 0, y: 0 }, { x: 200, y: 0 }, 5, targets)).toBe(1)
+  })
+
+  it('路径旁超出半径的目标不命中', () => {
+    const targets = [{ x: 100, y: 40, radius: 10 }]
+    expect(sweepFirstHitIndex({ x: 0, y: 0 }, { x: 200, y: 0 }, 5, targets)).toBe(-1)
+  })
+
+  it('零长度线段退化为原地圆判定', () => {
+    const near = [{ x: 8, y: 0, radius: 10 }]
+    expect(sweepFirstHitIndex({ x: 0, y: 0 }, { x: 0, y: 0 }, 5, near)).toBe(0)
+    const far = [{ x: 30, y: 0, radius: 10 }]
+    expect(sweepFirstHitIndex({ x: 0, y: 0 }, { x: 0, y: 0 }, 5, far)).toBe(-1)
   })
 })

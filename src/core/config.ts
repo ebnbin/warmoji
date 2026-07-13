@@ -173,7 +173,14 @@ export const MEMBER = {
   size: 0.9 * UNIT,
   radius: 0.45 * UNIT,
   maxHp: 100,
-  iframesMs: 400,
+  // 波次制要求整波存活，受击间隔放宽让「蹭到怪」是磨损而非速死
+  iframesMs: 700,
+} as const
+
+// 波次制：一波战斗固定时长 → 商店 → 下一波；上一波阵亡者下波以低血量复活
+export const WAVE = {
+  durationMs: 30_000,
+  reviveHpRatio: 0.3,
 } as const
 
 export interface EnemySpec {
@@ -184,7 +191,9 @@ export interface EnemySpec {
   readonly hp: number
   readonly speed: number
   readonly damage: number
+  // 经验击杀即得；金币落地需拾取（波次结束未拾取的消失）
   readonly xp: number
+  readonly coins: number
 }
 
 export const ZOMBIE: EnemySpec = {
@@ -194,8 +203,9 @@ export const ZOMBIE: EnemySpec = {
   radius: 0.5 * UNIT,
   hp: 60,
   speed: 1.375 * UNIT,
-  damage: 12,
+  damage: 8,
   xp: 3,
+  coins: 1,
 }
 
 export const GHOST: EnemySpec = {
@@ -205,23 +215,25 @@ export const GHOST: EnemySpec = {
   radius: 0.45 * UNIT,
   hp: 25,
   speed: 2.875 * UNIT,
-  damage: 7,
+  damage: 5,
   xp: 2,
+  coins: 1,
 }
 
-export const GEM = {
-  emoji: '💎',
-  size: 0.5 * UNIT,
-  radius: 0.25 * UNIT,
+export const COIN = {
+  emoji: '🪙',
+  size: 0.45 * UNIT,
+  radius: 0.22 * UNIT,
   magnetRadius: 2.25 * UNIT,
   magnetSpeed: 8 * UNIT,
 } as const
 
-// 刷怪节奏按 5 人火力校准（约为单人时代的 5 倍）
+// 刷怪节奏（波次制）：第 1 波基础火力可稳过，随跨波累计战斗时长持续加压，
+// 后期压力超出基础火力，由商店成长补差
 export const SPAWN = {
-  startIntervalMs: 220,
-  minIntervalMs: 70,
-  rampSeconds: 150,
+  startIntervalMs: 450,
+  minIntervalMs: 80,
+  rampSeconds: 300,
   hpGrowthPerMin: 0.5,
   ghostShareStart: 0.15,
   ghostShareMax: 0.55,
@@ -265,7 +277,7 @@ export const OUTLINED_EMOJIS: readonly string[] = [
   ),
   ZOMBIE.emoji,
   GHOST.emoji,
-  GEM.emoji,
+  COIN.emoji,
   '💀',
 ]
 

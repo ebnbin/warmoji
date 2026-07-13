@@ -121,6 +121,35 @@ export function thrustHitIndices(
   return out
 }
 
+/** 线段扫掠命中：沿 a→b 最先进入命中范围的目标下标，无命中返回 -1。
+ * 子弹按帧步进，低帧率下单帧位移可远超目标直径（穿模），必须用扫掠而非点重叠判定 */
+export function sweepFirstHitIndex(
+  a: Point,
+  b: Point,
+  radius: number,
+  targets: readonly HitTarget[],
+): number {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const len2 = dx * dx + dy * dy
+  let best = -1
+  let bestT = Infinity
+  for (let i = 0; i < targets.length; i++) {
+    const t = targets[i]!
+    const px = t.x - a.x
+    const py = t.y - a.y
+    const proj = len2 > 0 ? Math.max(0, Math.min(1, (px * dx + py * dy) / len2)) : 0
+    const cx = px - dx * proj
+    const cy = py - dy * proj
+    const rr = radius + t.radius
+    if (cx * cx + cy * cy <= rr * rr && proj < bestT) {
+      bestT = proj
+      best = i
+    }
+  }
+  return best
+}
+
 /** 圆形命中：与圆心距离 ≤ radius + 目标半径 */
 export function circleHitIndices(
   center: Point,

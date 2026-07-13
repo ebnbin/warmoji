@@ -14,31 +14,38 @@ function fakeStorage(initial?: Record<string, string>): StringStorage {
 
 describe('highscore', () => {
   it('无存储或无记录时返回零分', () => {
-    expect(loadHighScore(undefined)).toEqual({ bestSeconds: 0, bestKills: 0 })
-    expect(loadHighScore(fakeStorage())).toEqual({ bestSeconds: 0, bestKills: 0 })
+    expect(loadHighScore(undefined)).toEqual({ bestWave: 0, bestKills: 0 })
+    expect(loadHighScore(fakeStorage())).toEqual({ bestWave: 0, bestKills: 0 })
   })
 
-  it('损坏的 JSON 安全降级为零分', () => {
-    const s = fakeStorage({ 'warmoji.highscore.v1': '{oops' })
-    expect(loadHighScore(s)).toEqual({ bestSeconds: 0, bestKills: 0 })
+  it('损坏的 JSON 安全降级为零分；旧版 v1 记录被忽略', () => {
+    expect(loadHighScore(fakeStorage({ 'warmoji.highscore.v2': '{oops' }))).toEqual({
+      bestWave: 0,
+      bestKills: 0,
+    })
+    const v1 = fakeStorage({ 'warmoji.highscore.v1': '{"bestSeconds":60,"bestKills":20}' })
+    expect(loadHighScore(v1)).toEqual({ bestWave: 0, bestKills: 0 })
   })
 
-  it('提交成绩后可读回，且识别新纪录', () => {
+  it('提交成绩后可读回，且识别新纪录（波次优先，平波次比击杀）', () => {
     const s = fakeStorage()
-    const first = submitScore(s, 60, 20)
+    const first = submitScore(s, 3, 120)
     expect(first.newBest).toBe(true)
-    expect(loadHighScore(s)).toEqual({ bestSeconds: 60, bestKills: 20 })
+    expect(loadHighScore(s)).toEqual({ bestWave: 3, bestKills: 120 })
 
-    const worse = submitScore(s, 30, 5)
+    const worse = submitScore(s, 2, 50)
     expect(worse.newBest).toBe(false)
-    expect(loadHighScore(s)).toEqual({ bestSeconds: 60, bestKills: 20 })
+    expect(loadHighScore(s)).toEqual({ bestWave: 3, bestKills: 120 })
 
-    const better = submitScore(s, 90, 10)
-    expect(better.newBest).toBe(true)
-    expect(loadHighScore(s)).toEqual({ bestSeconds: 90, bestKills: 20 })
+    const sameWaveMoreKills = submitScore(s, 3, 150)
+    expect(sameWaveMoreKills.newBest).toBe(true)
+
+    const deeperWave = submitScore(s, 5, 90)
+    expect(deeperWave.newBest).toBe(true)
+    expect(loadHighScore(s)).toEqual({ bestWave: 5, bestKills: 150 })
   })
 
   it('无存储时提交不抛错', () => {
-    expect(() => submitScore(undefined, 10, 1)).not.toThrow()
+    expect(() => submitScore(undefined, 1, 1)).not.toThrow()
   })
 })

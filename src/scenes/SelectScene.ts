@@ -4,6 +4,7 @@ import { CHARACTERS, ROSTER_IDS, TEAM } from '../core/config'
 import { browserStorage } from '../core/highscore'
 import { randomPalette } from '../core/palette'
 import { Rng } from '../core/rng'
+import { beginRun } from '../core/run'
 import { loadLineup, saveLineup, toggleLineup } from '../core/selection'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
@@ -339,6 +340,7 @@ export class SelectScene extends Phaser.Scene {
 
   private startRun(): void {
     if (this.lineup.length !== TEAM.size) return
+    beginRun(this.lineup.length)
     this.scene.start('arena')
   }
 

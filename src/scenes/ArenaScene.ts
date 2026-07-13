@@ -1,9 +1,12 @@
 import Phaser from 'phaser'
-import { CHARACTERS, GEM, GHOST, HIT_SHAKE, MAP, MEMBER, SPAWN, STRESS, TEAM, UNIT, ZOMBIE } from '../core/config'
+import { CHARACTERS, COIN, GHOST, HIT_SHAKE, MAP, MEMBER, SPAWN, STRESS, TEAM, UNIT, WAVE, ZOMBIE } from '../core/config'
 import type { CharacterSpec, EnemySpec } from '../core/config'
+import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
 import { slotOffset } from '../core/formation'
 import { browserStorage, submitScore } from '../core/highscore'
+import { endRun, getRun, waveStartHp } from '../core/run'
+import type { RunState } from '../core/run'
 import { loadLineup } from '../core/selection'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
@@ -12,7 +15,6 @@ import { randomMapPoint } from '../core/spawn'
 import { norm } from '../core/vec'
 import { waveAt } from '../core/waves'
 import { gainXp, xpToNext } from '../core/xp'
-import type { XpState } from '../core/xp'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { isStress } from '../ui/dev'
@@ -38,16 +40,19 @@ export interface HudSnapshot {
   xpNext: number
   level: number
   kills: number
+  coins: number
+  wave: number
   seconds: number
+  remainMs: number
   over: boolean
 }
 
 export interface GameOverInfo {
-  seconds: number
+  wave: number
   kills: number
   level: number
   newBest: boolean
-  bestSeconds: number
+  bestWave: number
   bestKills: number
 }
 
@@ -88,7 +93,7 @@ export class ArenaScene extends Phaser.Scene {
   private centerObj!: Phaser.GameObjects.Zone
   private enemies!: Phaser.GameObjects.Group
   private projectiles!: Phaser.GameObjects.Group
-  private gems!: Phaser.GameObjects.Group
+  private coins!: Phaser.GameObjects.Group
   private frameTargets: EnemyTarget[] = []
   private weaponCtx: WeaponContext = {
     scene: this,
@@ -104,8 +109,7 @@ export class ArenaScene extends Phaser.Scene {
   private rng = new Rng(1)
   private palette!: Palette
   private stats!: TeamStats
-  private xpState!: XpState
-  private kills = 0
+  private run!: RunState
   private elapsedMs = 0
   private spawnCooldownMs = 0
   private pendingSpawns = 0
@@ -117,11 +121,11 @@ export class ArenaScene extends Phaser.Scene {
     super('arena')
   }
 
-  perfSnapshot(): { enemies: number; projectiles: number; gems: number; pending: number; objects: number } {
+  perfSnapshot(): { enemies: number; projectiles: number; coins: number; pending: number; objects: number } {
     return {
       enemies: this.enemies.countActive(true),
       projectiles: this.projectiles.getLength(),
-      gems: this.gems.getLength(),
+      coins: this.coins.getLength(),
       pending: this.pendingSpawns,
       objects: this.children.list.length,
     }
@@ -129,11 +133,14 @@ export class ArenaScene extends Phaser.Scene {
 
   hudSnapshot(): HudSnapshot {
     return {
-      xp: this.xpState.xp,
-      xpNext: xpToNext(this.xpState.level),
-      level: this.xpState.level,
-      kills: this.kills,
+      xp: this.run.xp.xp,
+      xpNext: xpToNext(this.run.xp.level),
+      level: this.run.xp.level,
+      kills: this.run.kills,
+      coins: this.run.coins,
+      wave: this.run.wave,
       seconds: Math.floor(this.elapsedMs / 1000),
+      remainMs: Math.max(0, WAVE.durationMs - this.elapsedMs),
       over: this.over,
     }
   }
@@ -150,8 +157,6 @@ export class ArenaScene extends Phaser.Scene {
       moveSpeed: TEAM.moveSpeed,
       maxHp: this.stress ? STRESS.maxHp : MEMBER.maxHp,
     }
-    this.xpState = { level: 1, xp: 0 }
-    this.kills = 0
     this.elapsedMs = 0
     this.spawnCooldownMs = 300
     this.pendingSpawns = 0
@@ -166,6 +171,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.memberGroup = this.add.group()
     this.lineup = loadLineup(browserStorage()).map((id) => CHARACTERS[id])
+    this.run = getRun(this.lineup.length)
     this.members = this.lineup.map((spec, slot) => this.createMember(spec.emoji, spec.weapons, slot))
 
     const cam = this.cameras.main
@@ -180,21 +186,19 @@ export class ArenaScene extends Phaser.Scene {
 
     this.enemies = this.add.group()
     this.projectiles = this.add.group()
-    this.gems = this.add.group()
+    this.coins = this.add.group()
 
     this.cursors = this.input.keyboard?.createCursorKeys()
     this.wasd = this.input.keyboard?.addKeys('W,A,S,D') as
       | Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
       | undefined
 
-    this.physics.add.overlap(this.projectiles, this.enemies, (a, b) =>
-      this.onProjectileHit(a as unknown as ImageObj, b as unknown as ImageObj),
-    )
+    // 子弹命中走线段扫掠（sweepProjectiles），不用点重叠：低帧率下会穿模漏判
     this.physics.add.overlap(this.memberGroup, this.enemies, (m, e) =>
       this.onMemberTouched(m as unknown as ImageObj, e as unknown as ImageObj),
     )
-    this.physics.add.overlap(this.memberGroup, this.gems, (_m, g) =>
-      this.collectGem(g as unknown as ImageObj),
+    this.physics.add.overlap(this.memberGroup, this.coins, (_m, c) =>
+      this.collectCoin(c as unknown as ImageObj),
     )
 
     this.layoutTeam()
@@ -211,6 +215,12 @@ export class ArenaScene extends Phaser.Scene {
     if (this.over) return
     this.elapsedMs += delta
 
+    // 波次时间到 → 商店（压测模式无尽，便于性能观测）
+    if (!this.stress && this.elapsedMs >= WAVE.durationMs) {
+      this.endWave()
+      return
+    }
+
     this.moveTeam(delta)
     this.frameTargets = (this.enemies.getChildren() as ImageObj[])
       .filter((e) => e.active)
@@ -218,7 +228,8 @@ export class ArenaScene extends Phaser.Scene {
     this.updateMembers(delta)
     this.spawn(delta)
     this.steerEnemies()
-    this.magnetGems()
+    this.magnetCoins()
+    this.sweepProjectiles()
     this.cullProjectiles()
 
     const cam = this.cameras.main
@@ -227,8 +238,10 @@ export class ArenaScene extends Phaser.Scene {
       elapsed: this.elapsedMs / 1000,
       hp: this.members.reduce((sum, m) => sum + m.hp, 0),
       alive: this.members.filter((m) => m.alive).length,
-      kills: this.kills,
-      level: this.xpState.level,
+      kills: this.run.kills,
+      level: this.run.xp.level,
+      wave: this.run.wave,
+      coins: this.run.coins,
       enemies: this.enemies.countActive(true),
       pending: this.pendingSpawns,
       fps: Math.round(this.game.loop.actualFps),
@@ -239,6 +252,15 @@ export class ArenaScene extends Phaser.Scene {
       camX: cam.worldView.centerX,
       camY: cam.worldView.centerY,
     })
+  }
+
+  /** 波次结束：快照队伍状态进 run，未拾取的金币随场景一并消失 */
+  private endWave(): void {
+    this.over = true
+    this.run.combatMs += this.elapsedMs
+    this.run.wave += 1
+    this.run.memberHp = this.members.map((m) => (m.alive ? m.hp : 0))
+    this.scene.start('shop')
   }
 
   private onViewportChanged(): void {
@@ -284,7 +306,10 @@ export class ArenaScene extends Phaser.Scene {
       weapons: weaponSpecs.map((w, i) => createWeapon(w, this.weaponCtx, 300 + slot * 120 + i * 230)),
       handle,
       visualOffset,
-      hp: this.stats.maxHp,
+      // 血量跨波保留；上一波阵亡者低血量复活（压测模式不走 run 状态）
+      hp: this.stress
+        ? this.stats.maxHp
+        : waveStartHp(this.run.memberHp[slot] ?? MEMBER.maxHp, this.stats.maxHp),
       alive: true,
       reviveAt: 0,
       lastHitMs: -Infinity,
@@ -443,7 +468,27 @@ export class ArenaScene extends Phaser.Scene {
       Math.sin(angle) * spec.projectile.speed,
     )
     p.setData('damage', damage)
+    p.setData('radius', spec.projectile.radius)
+    p.setData('px', x)
+    p.setData('py', y)
     this.projectiles.add(p)
+  }
+
+  /** 逐帧对每颗子弹做上一帧位置 → 当前位置的线段扫掠命中 */
+  private sweepProjectiles(): void {
+    for (const p of this.projectiles.getChildren() as ImageObj[]) {
+      if (!p.active) continue
+      const prev = { x: p.getData('px') as number, y: p.getData('py') as number }
+      const hit = sweepFirstHitIndex(prev, { x: p.x, y: p.y }, p.getData('radius') as number, this.frameTargets)
+      if (hit >= 0) {
+        const damage = p.getData('damage') as number
+        p.destroy()
+        this.applyDamage(this.frameTargets[hit]!.ref as ImageObj, damage)
+        continue
+      }
+      p.setData('px', p.x)
+      p.setData('py', p.y)
+    }
   }
 
   private cullProjectiles(): void {
@@ -461,13 +506,6 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private onProjectileHit(projectile: ImageObj, enemy: ImageObj): void {
-    if (!projectile.active || !enemy.active) return
-    const damage = projectile.getData('damage') as number
-    projectile.destroy()
-    this.applyDamage(enemy, damage)
-  }
-
   private applyDamage(enemy: ImageObj, damage: number): void {
     if (!enemy.active) return
     const hp = (enemy.getData('hp') as number) - damage
@@ -482,9 +520,11 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private killEnemy(enemy: ImageObj): void {
-    this.kills++
+    this.run.kills++
     const spec = enemy.getData('spec') as EnemySpec
-    this.spawnGem(enemy.x, enemy.y, spec.xp)
+    // 经验击杀即得；金币落地等待拾取
+    this.run.xp = gainXp(this.run.xp, spec.xp).state
+    this.spawnCoins(enemy.x, enemy.y, spec.coins)
     enemy.setActive(false)
     ;(enemy.body as ArcadeBody).enable = false
     this.tweens.add({
@@ -522,7 +562,8 @@ export class ArenaScene extends Phaser.Scene {
   private spawn(delta: number): void {
     this.spawnCooldownMs -= delta
     if (this.spawnCooldownMs > 0) return
-    const wave = waveAt(this.elapsedMs / 1000)
+    // 难度按跨波累计战斗时长递增
+    const wave = waveAt((this.run.combatMs + this.elapsedMs) / 1000)
     this.spawnCooldownMs = this.stress ? STRESS.spawnIntervalMs : wave.spawnIntervalMs
     const cap = this.stress ? STRESS.maxAlive : SPAWN.maxAlive
     const batch = this.stress ? STRESS.spawnBatch : 1
@@ -598,36 +639,40 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  // ── 经验 ────────────────────────────────────────────────────
+  // ── 金币 ────────────────────────────────────────────────────
 
-  private spawnGem(x: number, y: number, xp: number): void {
-    const gem = emojiImage(
-      this,
-      Phaser.Math.Clamp(x, GEM.radius, MAP.width - GEM.radius),
-      Phaser.Math.Clamp(y, GEM.radius, MAP.height - GEM.radius),
-      GEM.emoji,
-      GEM.size,
-      true,
-    ).setDepth(3)
-    this.physics.add.existing(gem)
-    circleBody(gem, GEM.radius)
-    gem.setData('xp', xp)
-    this.gems.add(gem)
+  private spawnCoins(x: number, y: number, count: number): void {
+    for (let i = 0; i < count; i++) {
+      // 多枚时散开一点，便于看清数量
+      const jx = count > 1 ? (this.rng.next() - 0.5) * 0.6 * UNIT : 0
+      const jy = count > 1 ? (this.rng.next() - 0.5) * 0.6 * UNIT : 0
+      const coin = emojiImage(
+        this,
+        Phaser.Math.Clamp(x + jx, COIN.radius, MAP.width - COIN.radius),
+        Phaser.Math.Clamp(y + jy, COIN.radius, MAP.height - COIN.radius),
+        COIN.emoji,
+        COIN.size,
+        true,
+      ).setDepth(3)
+      this.physics.add.existing(coin)
+      circleBody(coin, COIN.radius)
+      this.coins.add(coin)
+    }
   }
 
-  private magnetGems(): void {
+  private magnetCoins(): void {
     const alive = this.aliveMembers()
     if (alive.length === 0) return
-    const r2 = GEM.magnetRadius * GEM.magnetRadius
-    for (const g of this.gems.getChildren() as ImageObj[]) {
-      if (!g.active) continue
-      // 吸附到离经验珠最近的存活角色
+    const r2 = COIN.magnetRadius * COIN.magnetRadius
+    for (const c of this.coins.getChildren() as ImageObj[]) {
+      if (!c.active) continue
+      // 吸附到离金币最近的存活角色
       let bx = 0
       let by = 0
       let bestD = Infinity
       for (const m of alive) {
-        const dx = m.image.x - g.x
-        const dy = m.image.y - g.y
+        const dx = m.image.x - c.x
+        const dy = m.image.y - c.y
         const d = dx * dx + dy * dy
         if (d < bestD) {
           bestD = d
@@ -635,22 +680,20 @@ export class ArenaScene extends Phaser.Scene {
           by = dy
         }
       }
-      const body = g.body as ArcadeBody
+      const body = c.body as ArcadeBody
       if (bestD < r2) {
         const dir = norm(bx, by)
-        body.setVelocity(dir.x * GEM.magnetSpeed, dir.y * GEM.magnetSpeed)
+        body.setVelocity(dir.x * COIN.magnetSpeed, dir.y * COIN.magnetSpeed)
       } else {
         body.setVelocity(0, 0)
       }
     }
   }
 
-  private collectGem(gem: ImageObj): void {
-    if (!gem.active) return
-    const xp = gem.getData('xp') as number
-    gem.destroy()
-    // 升级奖励机制已移除（待重构）：经验与等级仅作为数值累积
-    this.xpState = gainXp(this.xpState, xp).state
+  private collectCoin(coin: ImageObj): void {
+    if (!coin.active) return
+    coin.destroy()
+    this.run.coins += 1
   }
 
   // ── 结算 ────────────────────────────────────────────────────
@@ -659,25 +702,26 @@ export class ArenaScene extends Phaser.Scene {
     this.over = true
     this.physics.pause()
 
-    const seconds = Math.floor(this.elapsedMs / 1000)
-    const result = submitScore(browserStorage(), seconds, this.kills)
+    const result = submitScore(browserStorage(), this.run.wave, this.run.kills)
     this.gameOverInfo = {
-      seconds,
-      kills: this.kills,
-      level: this.xpState.level,
+      wave: this.run.wave,
+      kills: this.run.kills,
+      level: this.run.xp.level,
       newBest: result.newBest,
-      bestSeconds: result.score.bestSeconds,
+      bestWave: result.score.bestWave,
       bestKills: result.score.bestKills,
     }
     this.events.emit('game-over', this.gameOverInfo)
 
     reportDebug({
       scene: 'gameover',
-      elapsed: seconds,
+      elapsed: this.elapsedMs / 1000,
       hp: 0,
       alive: 0,
-      kills: this.kills,
-      level: this.xpState.level,
+      kills: this.run.kills,
+      level: this.run.xp.level,
+      wave: this.run.wave,
+      coins: this.run.coins,
       enemies: this.enemies.countActive(true),
       pending: this.pendingSpawns,
       fps: Math.round(this.game.loop.actualFps),
@@ -689,9 +733,10 @@ export class ArenaScene extends Phaser.Scene {
       camY: this.cameras.main.worldView.centerY,
     })
 
-    // 防死亡瞬间误触；结束后回组队页，可换阵容再战
+    // 防死亡瞬间误触；结束后弃局回组队页，可换阵容再战
     this.time.delayedCall(500, () => {
       const backToSelect = (): void => {
+        endRun()
         this.scene.start('select')
       }
       this.input.once('pointerdown', backToSelect)

@@ -1,5 +1,5 @@
 export interface HighScore {
-  bestSeconds: number
+  bestWave: number
   bestKills: number
 }
 
@@ -8,8 +8,9 @@ export interface StringStorage {
   setItem(key: string, value: string): void
 }
 
-const KEY = 'warmoji.highscore.v1'
-const ZERO: HighScore = { bestSeconds: 0, bestKills: 0 }
+// v1 记录的是存活秒数，波次制后语义失效，直接换 key 弃旧
+const KEY = 'warmoji.highscore.v2'
+const ZERO: HighScore = { bestWave: 0, bestKills: 0 }
 
 /** 隐私模式下访问 localStorage 会抛错 */
 export function browserStorage(): StringStorage | undefined {
@@ -27,7 +28,7 @@ export function loadHighScore(storage: StringStorage | undefined): HighScore {
     if (!raw) return { ...ZERO }
     const parsed = JSON.parse(raw) as Partial<HighScore>
     return {
-      bestSeconds: typeof parsed.bestSeconds === 'number' ? parsed.bestSeconds : 0,
+      bestWave: typeof parsed.bestWave === 'number' ? parsed.bestWave : 0,
       bestKills: typeof parsed.bestKills === 'number' ? parsed.bestKills : 0,
     }
   } catch {
@@ -37,13 +38,13 @@ export function loadHighScore(storage: StringStorage | undefined): HighScore {
 
 export function submitScore(
   storage: StringStorage | undefined,
-  seconds: number,
+  wave: number,
   kills: number,
 ): { score: HighScore; newBest: boolean } {
   const prev = loadHighScore(storage)
-  const newBest = seconds > prev.bestSeconds || (seconds === prev.bestSeconds && kills > prev.bestKills)
+  const newBest = wave > prev.bestWave || (wave === prev.bestWave && kills > prev.bestKills)
   const score: HighScore = {
-    bestSeconds: Math.max(prev.bestSeconds, seconds),
+    bestWave: Math.max(prev.bestWave, wave),
     bestKills: Math.max(prev.bestKills, kills),
   }
   if (storage) {

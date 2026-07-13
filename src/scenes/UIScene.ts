@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { COIN } from '../core/config'
 import { formatTime } from '../core/format'
 import { isDevOpen, isStress, setDevOpen, setStress } from '../ui/dev'
 import { emojiImage, iconLabel } from '../ui/emoji'
@@ -15,6 +16,7 @@ export class UIScene extends Phaser.Scene {
   private levelText!: Phaser.GameObjects.Text
   private timeText!: Phaser.GameObjects.Text
   private killsText!: Phaser.GameObjects.Text
+  private coinsText!: Phaser.GameObjects.Text
   private last!: HudSnapshot
   private devText?: Phaser.GameObjects.Text
   private fpsWindowMin = Infinity
@@ -37,7 +39,17 @@ export class UIScene extends Phaser.Scene {
     applyCamera(this)
     const res = textRes()
     const w = viewport.logicalWidth
-    this.last = { xp: -1, xpNext: -1, level: -1, kills: -1, seconds: -1, over: false }
+    this.last = {
+      xp: -1,
+      xpNext: -1,
+      level: -1,
+      kills: -1,
+      coins: -1,
+      wave: -1,
+      seconds: -1,
+      remainMs: -1,
+      over: false,
+    }
 
     this.joystick = new Joystick(this)
 
@@ -52,11 +64,15 @@ export class UIScene extends Phaser.Scene {
     }
     this.levelText = this.add.text(224, 10, 'Lv.1', { ...hudText, fontSize: '16px' })
     this.timeText = this.add
-      .text(w / 2, 10, '0:00', { ...hudText, fontSize: '22px' })
+      .text(w / 2, 10, '', { ...hudText, fontSize: '22px' })
       .setOrigin(0.5, 0)
     emojiImage(this, w - 22, 22, '💀', 20, true)
     this.killsText = this.add
       .text(w - 38, 10, '0', { ...hudText, fontSize: '20px' })
+      .setOrigin(1, 0)
+    emojiImage(this, w - 22, 50, COIN.emoji, 20, true)
+    this.coinsText = this.add
+      .text(w - 38, 38, '0', { ...hudText, fontSize: '20px' })
       .setOrigin(1, 0)
 
     const wrench = emojiImage(this, w - 12, viewport.logicalHeight - 26, '🔧', 24)
@@ -88,7 +104,15 @@ export class UIScene extends Phaser.Scene {
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.drawXpBar(s)
     if (s.level !== this.last.level) this.levelText.setText(`Lv.${s.level}`)
     if (s.kills !== this.last.kills) this.killsText.setText(String(s.kills))
-    if (s.seconds !== this.last.seconds) this.timeText.setText(formatTime(s.seconds))
+    if (s.coins !== this.last.coins) this.coinsText.setText(String(s.coins))
+    // 常规显示本波倒计时；压测模式无波次限时，显示已进行时间
+    const remainSec = Math.ceil(s.remainMs / 1000)
+    const lastRemainSec = Math.ceil(this.last.remainMs / 1000)
+    if (s.wave !== this.last.wave || remainSec !== lastRemainSec || s.seconds !== this.last.seconds) {
+      this.timeText.setText(
+        isStress() ? formatTime(s.seconds) : `第${s.wave}波 ${formatTime(remainSec)}`,
+      )
+    }
     this.last = s
   }
 
@@ -146,7 +170,7 @@ export class UIScene extends Phaser.Scene {
     this.devText!.setText([
       `FPS ${fps.toFixed(0)}  (5s min ${Number.isFinite(this.fpsWindowMin) ? this.fpsWindowMin.toFixed(0) : '-'})`,
       `敌人 ${p.enemies}  预告 ${p.pending}`,
-      `子弹 ${p.projectiles}  经验珠 ${p.gems}`,
+      `子弹 ${p.projectiles}  金币 ${p.coins}`,
       `总对象 ${p.objects}`,
     ])
   }
@@ -164,7 +188,7 @@ export class UIScene extends Phaser.Scene {
       resolution: res,
     }).setDepth(201)
     this.add
-      .text(cx, cy - 26, `存活 ${formatTime(info.seconds)} · 击杀 ${info.kills} · 等级 ${info.level}`, {
+      .text(cx, cy - 26, `倒在第 ${info.wave} 波 · 击杀 ${info.kills} · 等级 ${info.level}`, {
         fontFamily: UI_FONT,
         fontSize: '24px',
         color: '#dddddd',
@@ -178,7 +202,7 @@ export class UIScene extends Phaser.Scene {
       cy + 24,
       '🏆',
       22,
-      info.newBest ? '新纪录！' : `最佳：存活 ${formatTime(info.bestSeconds)} · 击杀 ${info.bestKills}`,
+      info.newBest ? '新纪录！' : `最佳：第 ${info.bestWave} 波 · 击杀 ${info.bestKills}`,
       { fontFamily: UI_FONT, fontSize: '20px', color: '#d4b106', resolution: res },
     ).setDepth(201)
     const prompt = this.add

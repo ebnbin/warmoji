@@ -1,6 +1,5 @@
 import Phaser from 'phaser'
 import { CHARACTERS } from '../core/config'
-import { formatTime } from '../core/format'
 import { browserStorage, loadHighScore } from '../core/highscore'
 import { randomPalette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -62,8 +61,8 @@ export class MenuScene extends Phaser.Scene {
     })
 
     const best = loadHighScore(browserStorage())
-    if (best.bestSeconds > 0) {
-      iconLabel(this, w / 2, h * 0.7, '🏆', 20, `最佳：存活 ${formatTime(best.bestSeconds)} · 击杀 ${best.bestKills}`, {
+    if (best.bestWave > 0) {
+      iconLabel(this, w / 2, h * 0.7, '🏆', 20, `最佳：第 ${best.bestWave} 波 · 击杀 ${best.bestKills}`, {
         fontFamily: UI_FONT,
         fontSize: '18px',
         color: '#d4b106',

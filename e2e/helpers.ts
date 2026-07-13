@@ -45,3 +45,10 @@ export async function startRun(page: Page): Promise<void> {
   await enterSelect(page)
   await clickStart(page)
 }
+
+/** 商店页点击「开始第 N 波」进入下一波 */
+export async function clickShopNext(page: Page): Promise<void> {
+  const s = await page.evaluate(() => window.__warmoji!.shop!.start)
+  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: s.x, y: s.y }) })
+  await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
+}
