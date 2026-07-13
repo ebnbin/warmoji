@@ -5,6 +5,14 @@ declare const __BUILD_TIME__: string
 declare const __TWEMOJI_VERSION__: string
 
 // e2e 读取的运行时状态（src/ui/debug.ts 写入）
+interface WarmojiMenuDebug {
+  selected: number
+  size: number
+  // 逻辑坐标：卡片为左上角+宽高，start 为按钮中心
+  cards: { id: string; x: number; y: number; w: number; h: number; selected: boolean }[]
+  start: { x: number; y: number; w: number; h: number; enabled: boolean }
+}
+
 interface WarmojiDebug {
   scene: 'menu' | 'arena' | 'gameover'
   elapsed: number
@@ -21,6 +29,7 @@ interface WarmojiDebug {
   playerY: number
   camX: number
   camY: number
+  menu?: WarmojiMenuDebug
 }
 
 interface Window {

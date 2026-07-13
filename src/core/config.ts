@@ -111,34 +111,62 @@ export const WEAPONS = {
 // 角色花名册：角色 → 武器为单向绑定（角色配装固定；武器可被复用）
 export interface CharacterSpec {
   readonly emoji: string
+  readonly name: string
+  readonly desc: string
   readonly weapons: readonly WeaponSpec[]
 }
 
 export const CHARACTERS = {
-  juggler: { emoji: '🤹', weapons: [WEAPONS.tomatoThrow] },
-  unicorn: { emoji: '🦄', weapons: [WEAPONS.hornThrust] },
-  troll: { emoji: '🧌', weapons: [WEAPONS.axeSweep] },
-  cowboy: { emoji: '🤠', weapons: [WEAPONS.pistolLeft, WEAPONS.pistolRight] },
-  mage: { emoji: '🧙', weapons: [WEAPONS.arcaneBlast] },
-  kangaroo: { emoji: '🦘', weapons: [WEAPONS.boomerang] },
+  juggler: {
+    emoji: '🤹',
+    name: '杂耍演员',
+    desc: '向最近的敌人连续抛掷番茄',
+    weapons: [WEAPONS.tomatoThrow],
+  },
+  unicorn: {
+    emoji: '🦄',
+    name: '独角兽',
+    desc: '独角向前突刺，穿透沿途敌人',
+    weapons: [WEAPONS.hornThrust],
+  },
+  troll: {
+    emoji: '🧌',
+    name: '巨魔',
+    desc: '挥舞巨斧，横扫身前扇形范围',
+    weapons: [WEAPONS.axeSweep],
+  },
+  cowboy: {
+    emoji: '🤠',
+    name: '牛仔',
+    desc: '左右双枪齐发，射出高速水弹',
+    weapons: [WEAPONS.pistolLeft, WEAPONS.pistolRight],
+  },
+  mage: {
+    emoji: '🧙',
+    name: '法师',
+    desc: '在远处敌人脚下引爆奥术轰炸',
+    weapons: [WEAPONS.arcaneBlast],
+  },
+  kangaroo: {
+    emoji: '🦘',
+    name: '袋鼠',
+    desc: '掷出回旋镖，去程回程皆可伤敌',
+    weapons: [WEAPONS.boomerang],
+  },
 } as const satisfies Record<string, CharacterSpec>
 
-// 队伍 = 1 队长（无实体，提供全队被动，能力后续设计）+ 出战角色。
+export type CharacterId = keyof typeof CHARACTERS
+export const ROSTER_IDS = Object.keys(CHARACTERS) as readonly CharacterId[]
+
+// 队伍 = 1 队长（无实体，提供全队被动，能力后续设计）+ size 名出战角色。
 // 玩家操控队伍中心点，角色环状固定槽位随行；除此之外角色是完全独立的单位。
-// 当前阵容 = 花名册全员上场（测试期）；正式的五人挑选等选人系统。
+// 出战阵容由组队页选择并持久化（core/selection.ts）。
 export const TEAM = {
+  size: 5,
   ringRadius: 0.8 * UNIT,
   moveSpeed: 5.5 * UNIT,
   reviveMs: 10_000,
   captainEmoji: '👑',
-  lineup: [
-    CHARACTERS.juggler,
-    CHARACTERS.unicorn,
-    CHARACTERS.troll,
-    CHARACTERS.cowboy,
-    CHARACTERS.mage,
-    CHARACTERS.kangaroo,
-  ],
 } as const
 
 export const MEMBER = {
@@ -225,9 +253,11 @@ export const HIT_SHAKE = { durationMs: 60, intensity: 0.0012 } as const
 // 剪影描边（radius 单位 = twemoji viewBox 单位，36 格）
 export const OUTLINE = { radius: 2, color: '#000000' } as const
 
+const roster: readonly CharacterSpec[] = Object.values(CHARACTERS)
+
 export const OUTLINED_EMOJIS: readonly string[] = [
-  ...TEAM.lineup.map((c) => c.emoji),
-  ...TEAM.lineup.flatMap((c) =>
+  ...roster.map((c) => c.emoji),
+  ...roster.flatMap((c) =>
     c.weapons.flatMap((w) => [
       ...('held' in w && w.held ? [w.held.emoji] : []),
       ...(w.kind === 'projectile' ? [w.projectile.emoji] : []),
@@ -249,4 +279,5 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '👟',
   '❤️',
   '🔧',
+  '✅',
 ]

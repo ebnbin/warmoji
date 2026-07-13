@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { startRun } from './helpers'
 
 test('压测模式：敌人数突破常规上限、血量拉满、FPS 指标可读、无报错', async ({ page }) => {
   test.setTimeout(150_000)
@@ -9,9 +10,7 @@ test('压测模式：敌人数突破常规上限、血量拉满、FPS 指标可�
   })
 
   await page.goto('/')
-  await page.waitForFunction(() => window.__warmoji?.scene === 'menu')
-  await page.locator('#game canvas').click()
-  await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
+  await startRun(page)
 
   // 右下角 🔧 常驻按钮打开性能面板
   await page.locator('#game canvas').click({ position: { x: 1256, y: 682 } })

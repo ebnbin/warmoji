@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHARACTERS, MAP, TEAM, UNIT, VIEW } from './config'
+import { CHARACTERS, MAP, UNIT, VIEW } from './config'
 
 describe('单位制锚定', () => {
   it('最小视口长边容纳 20 个单位：1 单位 = 64 逻辑px', () => {
@@ -12,9 +12,14 @@ describe('单位制锚定', () => {
     expect(MAP.height).toBe(25 * UNIT)
   })
 
-  it('阵容角色 emoji 各不相同，每人至少配置 1 把武器', () => {
-    expect(new Set(TEAM.lineup.map((c) => c.emoji)).size).toBe(TEAM.lineup.length)
-    for (const c of TEAM.lineup) expect(c.weapons.length).toBeGreaterThan(0)
+  it('花名册：emoji 不重复，每人有名字、介绍且至少 1 把武器', () => {
+    const roster = Object.values(CHARACTERS)
+    expect(new Set(roster.map((c) => c.emoji)).size).toBe(roster.length)
+    for (const c of roster) {
+      expect(c.name.length).toBeGreaterThan(0)
+      expect(c.desc.length).toBeGreaterThan(0)
+      expect(c.weapons.length).toBeGreaterThan(0)
+    }
   })
 
   it('花名册覆盖六种攻击形态', () => {

@@ -182,7 +182,7 @@ export class UIScene extends Phaser.Scene {
       { fontFamily: UI_FONT, fontSize: '20px', color: '#d4b106', resolution: res },
     ).setDepth(201)
     const prompt = this.add
-      .text(cx, cy + 106, '点击或按任意键重新开始', {
+      .text(cx, cy + 106, '点击或按任意键返回组队', {
         fontFamily: UI_FONT,
         fontSize: '20px',
         color: '#aaaaaa',

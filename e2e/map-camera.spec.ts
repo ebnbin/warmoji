@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { startRun } from './helpers'
 
 test('25×25 地图：出生居中、相机跟随、边缘钳制到 margin', async ({ page }) => {
   const errors: string[] = []
@@ -8,9 +9,7 @@ test('25×25 地图：出生居中、相机跟随、边缘钳制到 margin', asy
   })
 
   await page.goto('/')
-  await page.waitForFunction(() => window.__warmoji?.scene === 'menu')
-  await page.locator('#game canvas').click()
-  await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
+  await startRun(page)
 
   // 出生在地图中心（1600×1600 的中点）
   const spawn = await page.evaluate(() => window.__warmoji!)

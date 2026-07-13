@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { startRun } from './helpers'
 
 test.describe('竖屏 720×1600：1x，保底 720×1280 上下各扩 160', () => {
   test.use({ viewport: { width: 720, height: 1600 } })
@@ -17,8 +18,7 @@ test.describe('竖屏 720×1600：1x，保底 720×1280 上下各扩 160', () =>
     expect(v.viewH).toBeCloseTo(1600, 0)
     await page.screenshot({ path: 'test-results/portrait-menu.png' })
 
-    await page.locator('#game canvas').click()
-    await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
+    await startRun(page)
     await page.waitForFunction(() => (window.__warmoji?.enemies ?? 0) > 0, undefined, {
       timeout: 30_000,
     })

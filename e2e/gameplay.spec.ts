@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { startRun } from './helpers'
 
 test('开局后自动战斗：出怪、飞刀击杀、计时推进、无控制台错误', async ({ page }) => {
   const errors: string[] = []
@@ -8,10 +9,7 @@ test('开局后自动战斗：出怪、飞刀击杀、计时推进、无控制�
   page.on('pageerror', (err) => errors.push(String(err)))
 
   await page.goto('/')
-  await page.waitForFunction(() => window.__warmoji?.scene === 'menu')
-
-  await page.locator('#game canvas').click()
-  await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
+  await startRun(page)
 
   // 先出现刷怪预告标记，随后敌人落地
   await page.waitForFunction(() => (window.__warmoji?.pending ?? 0) > 0, undefined, {

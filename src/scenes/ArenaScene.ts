@@ -1,9 +1,10 @@
 import Phaser from 'phaser'
-import { GEM, GHOST, HIT_SHAKE, MAP, MEMBER, SPAWN, STRESS, TEAM, UNIT, ZOMBIE } from '../core/config'
-import type { EnemySpec } from '../core/config'
+import { CHARACTERS, GEM, GHOST, HIT_SHAKE, MAP, MEMBER, SPAWN, STRESS, TEAM, UNIT, ZOMBIE } from '../core/config'
+import type { CharacterSpec, EnemySpec } from '../core/config'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
 import { slotOffset } from '../core/formation'
 import { browserStorage, submitScore } from '../core/highscore'
+import { loadLineup } from '../core/selection'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -80,6 +81,7 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
 }
 
 export class ArenaScene extends Phaser.Scene {
+  private lineup: readonly CharacterSpec[] = []
   private members: Member[] = []
   private memberGroup!: Phaser.GameObjects.Group
   private center = { x: 0, y: 0 }
@@ -163,7 +165,8 @@ export class ArenaScene extends Phaser.Scene {
     this.centerObj = this.add.zone(this.center.x, this.center.y, 1, 1)
 
     this.memberGroup = this.add.group()
-    this.members = TEAM.lineup.map((spec, slot) => this.createMember(spec.emoji, spec.weapons, slot))
+    this.lineup = loadLineup(browserStorage()).map((id) => CHARACTERS[id])
+    this.members = this.lineup.map((spec, slot) => this.createMember(spec.emoji, spec.weapons, slot))
 
     const cam = this.cameras.main
     cam.setZoom(viewport.renderScale)
@@ -245,7 +248,7 @@ export class ArenaScene extends Phaser.Scene {
   // ── 队伍 ────────────────────────────────────────────────────
 
   private createMember(emoji: string, weaponSpecs: readonly WeaponSpec[], slot: number): Member {
-    const off = slotOffset(slot, TEAM.lineup.length, TEAM.ringRadius)
+    const off = slotOffset(slot, this.lineup.length, TEAM.ringRadius)
     const image = emojiImage(
       this,
       this.center.x + off.x,
@@ -327,7 +330,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private layoutTeam(): void {
     for (const m of this.members) {
-      const off = slotOffset(m.slot, TEAM.lineup.length, TEAM.ringRadius)
+      const off = slotOffset(m.slot, this.lineup.length, TEAM.ringRadius)
       m.image.setPosition(
         this.center.x + off.x + m.visualOffset.x,
         this.center.y + off.y + m.visualOffset.y,
@@ -686,13 +689,13 @@ export class ArenaScene extends Phaser.Scene {
       camY: this.cameras.main.worldView.centerY,
     })
 
-    // 防死亡瞬间误触重开
+    // 防死亡瞬间误触；结束后回组队页，可换阵容再战
     this.time.delayedCall(500, () => {
-      const restart = (): void => {
-        this.scene.restart()
+      const backToMenu = (): void => {
+        this.scene.start('menu')
       }
-      this.input.once('pointerdown', restart)
-      this.input.keyboard?.once('keydown', restart)
+      this.input.once('pointerdown', backToMenu)
+      this.input.keyboard?.once('keydown', backToMenu)
     })
   }
 
