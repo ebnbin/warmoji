@@ -13,8 +13,10 @@ export function setSvgSize(svg: string, size: number): string {
 }
 
 /**
- * 给整个图形加剪影描边：feMorphology 把 SourceAlpha 向外膨胀 radius（viewBox 单位）、
- * 填 color 垫底；viewBox 四周外扩 radius+1 防止描边被裁切。
+ * 给整个图形加剪影描边（矢量方案）：把内容复制一份垫在下层，
+ * CSS 强制副本所有填充/描边为 color 且 stroke 圆角外扩 radius（viewBox 单位），
+ * 各形状的 黑fill ∪ 黑stroke 的并集即平滑的剪影轮廓，任意分辨率无锯齿。
+ * viewBox 四周外扩 radius+1 防止描边被裁切。
  */
 export function outlineSvg(svg: string, radius: number, color: string): string {
   const open = OPEN_TAG.exec(svg)
@@ -32,16 +34,13 @@ export function outlineSvg(svg: string, radius: number, color: string): string {
     VIEW_BOX,
     `viewBox="${x - pad} ${y - pad} ${w + pad * 2} ${h + pad * 2}"`,
   )
-  const filter =
-    `<defs><filter id="ol" x="-30%" y="-30%" width="160%" height="160%">` +
-    `<feMorphology in="SourceAlpha" operator="dilate" radius="${radius}" result="d"/>` +
-    `<feFlood flood-color="${color}"/>` +
-    `<feComposite in2="d" operator="in" result="o"/>` +
-    `<feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge>` +
-    `</filter></defs><g filter="url(#ol)">`
+  // CSS 规则优先级高于 SVG 表现属性（fill="..."），可整体改写副本配色
+  const style =
+    `<style>.__ol,.__ol *{fill:${color} !important;stroke:${color} !important;` +
+    `stroke-width:${radius * 2} !important;stroke-linejoin:round !important;stroke-linecap:round !important;}</style>`
 
   const closeIdx = svg.lastIndexOf('</svg>')
   if (closeIdx < 0) throw new Error('SVG 缺少闭合标签')
   const body = svg.slice(open.index + open[0].length, closeIdx)
-  return svg.slice(0, open.index) + openTag + filter + body + '</g></svg>'
+  return svg.slice(0, open.index) + openTag + style + `<g class="__ol">${body}</g>` + body + '</svg>'
 }

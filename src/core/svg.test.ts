@@ -29,17 +29,18 @@ describe('outlineSvg', () => {
     expect(out).toContain('viewBox="-3 -3 42 42"')
   })
 
-  it('注入膨胀滤镜并把原内容包进滤镜组', () => {
-    const out = outlineSvg(SAMPLE, 2, '#ffffff')
-    expect(out).toContain('feMorphology')
-    expect(out).toContain('radius="2"')
-    expect(out).toContain('flood-color="#ffffff"')
-    expect(out).toContain('<g filter="url(#ol)"><path d="M0 0h36v36H0z"/></g></svg>')
+  it('内容复制为下层描边副本：CSS 强制配色 + 圆角描边', () => {
+    const out = outlineSvg(SAMPLE, 2, '#000000')
+    expect(out).toContain('stroke-width:4 !important')
+    expect(out).toContain('stroke-linejoin:round')
+    expect(out).toContain('fill:#000000 !important')
+    // 副本在前（下层），原内容在后（上层）
+    expect(out).toContain('<g class="__ol"><path d="M0 0h36v36H0z"/></g><path d="M0 0h36v36H0z"/></svg>')
   })
 
-  it('原始内容不丢失、不修改', () => {
+  it('原始内容出现两次且未被修改', () => {
     const out = outlineSvg(SAMPLE, 1.5, '#000000')
-    expect(out).toContain('<path d="M0 0h36v36H0z"/>')
+    expect(out.split('<path d="M0 0h36v36H0z"/>').length - 1).toBe(2)
   })
 
   it('缺少 viewBox 抛错', () => {

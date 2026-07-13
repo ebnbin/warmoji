@@ -31,11 +31,11 @@ test.describe('高分屏（DPR 2）', () => {
     expect(v.viewW).toBeCloseTo(1280, 0)
     expect(v.viewH).toBeCloseTo(720, 0)
 
-    // 高 DPR 下游戏可正常开局
+    // 高 DPR 下游戏可正常开局（CI 的软件渲染器在大 canvas 下帧率低，超时放宽）
     await page.locator('#game canvas').click()
     await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
     await page.waitForFunction(() => (window.__warmoji?.enemies ?? 0) > 0, undefined, {
-      timeout: 10_000,
+      timeout: 30_000,
     })
     expect(errors).toEqual([])
   })

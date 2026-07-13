@@ -16,6 +16,8 @@ const game = new Phaser.Game({
   parent: 'game',
   // 背景渐变画在 canvas 之下的页面层，canvas 必须透明
   transparent: true,
+  // emoji 纹理为 2 次幂尺寸，mipmap 消除缩小采样的锯齿
+  render: { mipmapFilter: 'LINEAR_MIPMAP_LINEAR' },
   width: Math.round(viewport.cssWidth * viewport.dpr),
   height: Math.round(viewport.cssHeight * viewport.dpr),
   input: { activePointers: 3 },
