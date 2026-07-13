@@ -11,7 +11,7 @@ export interface StringStorage {
 const KEY = 'warmoji.highscore.v1'
 const ZERO: HighScore = { bestSeconds: 0, bestKills: 0 }
 
-/** 隐私模式下访问 localStorage 可能直接抛错，必须包一层。 */
+/** 隐私模式下访问 localStorage 会抛错 */
 export function browserStorage(): StringStorage | undefined {
   try {
     return globalThis.localStorage
@@ -50,7 +50,7 @@ export function submitScore(
     try {
       storage.setItem(KEY, JSON.stringify(score))
     } catch {
-      // 写入失败（隐私模式/配额）不影响本局结算
+      // 隐私模式/配额写入失败可忽略
     }
   }
   return { score, newBest }

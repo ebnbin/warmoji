@@ -1,4 +1,4 @@
-// 显式列出各平台 emoji 字体，保证 headless 测试环境（Noto）与真实设备都能渲染彩色 emoji。
+// 显式列出 emoji 字体，headless 环境（Noto）才能渲染彩色 emoji
 export const EMOJI_FONT =
   '"Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", system-ui, sans-serif'
 

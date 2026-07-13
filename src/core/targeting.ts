@@ -1,7 +1,7 @@
 import { dist2 } from './vec'
 import type { Point } from './vec'
 
-/** 距 from 最近的点的下标；空数组返回 -1，距离相同取靠前者。 */
+/** 最近点的下标；空数组返回 -1 */
 export function nearestIndex(from: Point, points: readonly Point[]): number {
   let best = -1
   let bestD = Infinity

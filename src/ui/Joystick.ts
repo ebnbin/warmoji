@@ -4,10 +4,7 @@ const RADIUS = 56
 const THUMB_RADIUS = 24
 const DEADZONE = 0.12
 
-/**
- * 浮动虚拟摇杆：在任意位置按下即以该点为原点，拖动产生方向向量（模长 0~1）。
- * 触屏与鼠标拖拽通用；监听注册在 scene.input 上，场景重启时自动清理。
- */
+/** 浮动虚拟摇杆：按下处为原点，拖出方向向量（模 0~1）；监听挂在 scene.input，场景重启自动清理 */
 export class Joystick {
   private scene: Phaser.Scene
   private base: Phaser.GameObjects.Arc | null = null

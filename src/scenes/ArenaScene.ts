@@ -137,8 +137,6 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
-  // ── 输入与移动 ──────────────────────────────────────────────
-
   private movePlayer(): void {
     const kx =
       (held(this.cursors?.left) || held(this.wasd?.A) ? -1 : 0) +
@@ -153,8 +151,6 @@ export class ArenaScene extends Phaser.Scene {
       dir.y * this.stats.moveSpeed,
     )
   }
-
-  // ── 攻击 ────────────────────────────────────────────────────
 
   private autoAttack(delta: number): void {
     this.attackCooldownMs -= delta
@@ -245,8 +241,6 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
-  // ── 刷怪 ────────────────────────────────────────────────────
-
   private spawn(delta: number): void {
     this.spawnCooldownMs -= delta
     if (this.spawnCooldownMs > 0) return
@@ -289,8 +283,6 @@ export class ArenaScene extends Phaser.Scene {
       ;(e.body as ArcadeBody).setVelocity(dir.x * spec.speed, dir.y * spec.speed)
     }
   }
-
-  // ── 经验与升级 ──────────────────────────────────────────────
 
   private spawnGem(x: number, y: number, xp: number): void {
     const gem = this.add
@@ -362,8 +354,6 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
-  // ── 受击与结算 ──────────────────────────────────────────────
-
   private onPlayerTouched(enemy: TextObj): void {
     if (this.over || !enemy.active) return
     if (this.elapsedMs - this.lastHitMs < PLAYER.iframesMs) return
@@ -425,7 +415,7 @@ export class ArenaScene extends Phaser.Scene {
       enemies: this.enemies.countActive(true),
     })
 
-    // 稍作延迟再接受输入，避免死亡瞬间的点击误触重开
+    // 防死亡瞬间误触重开
     this.time.delayedCall(500, () => {
       const restart = (): void => {
         this.scene.restart()
@@ -434,8 +424,6 @@ export class ArenaScene extends Phaser.Scene {
       this.input.keyboard?.once('keydown', restart)
     })
   }
-
-  // ── 场景装饰与 HUD ──────────────────────────────────────────
 
   private drawFloor(): void {
     const g = this.add.graphics()

@@ -15,7 +15,7 @@ test('页面可加载：canvas 渲染、版本徽章存在、无控制台错误'
 
   await page.waitForFunction(() => window.__warmoji?.scene === 'menu')
 
-  // 让菜单动画跑几帧，暴露启动后才出现的运行时错误。
+  // 跑几帧，暴露启动后才出现的运行时错误
   await page.waitForTimeout(800)
   expect(errors).toEqual([])
 

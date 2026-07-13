@@ -1,5 +1,3 @@
-// 全部玩法数值集中在此文件，调参需求只改这里。
-
 export const ARENA = { width: 960, height: 540 } as const
 
 export const PLAYER = {

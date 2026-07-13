@@ -1,8 +1,7 @@
 import { existsSync } from 'node:fs'
 import { defineConfig } from '@playwright/test'
 
-// 远程开发容器预装了固定版本的 Chromium（禁止在容器内下载浏览器），
-// 存在时直接使用；CI 等其他环境走 playwright install 下载的默认浏览器。
+// 容器预装固定版 Chromium 且禁止下载浏览器；CI 走 playwright install 的默认浏览器
 const containerChromium = '/opt/pw-browsers/chromium'
 
 export default defineConfig({

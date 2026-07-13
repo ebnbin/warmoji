@@ -18,7 +18,6 @@ export const UPGRADE_LABELS: Record<UpgradeId, string> = {
 
 const CYCLE: readonly UpgradeId[] = ['knife', 'attackSpeed', 'moveSpeed', 'heal']
 
-/** v0.1 无三选一 UI，按等级轮转自动强化；飞刀满编后由攻速顶替。 */
 export function pickUpgrade(level: number, stats: PlayerStats): UpgradeId {
   const id = CYCLE[(((level - 2) % CYCLE.length) + CYCLE.length) % CYCLE.length]!
   if (id === 'knife' && stats.knives >= KNIFE.maxCount) return 'attackSpeed'

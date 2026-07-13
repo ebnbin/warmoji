@@ -6,7 +6,6 @@ export interface WaveState {
   ghostShare: number
 }
 
-/** 随时间推进的难度曲线：刷怪更快、怪更硬、快速怪占比更高。 */
 export function waveAt(elapsedSec: number): WaveState {
   const t = Math.max(0, elapsedSec)
   const ramp = Math.min(1, t / SPAWN.rampSeconds)

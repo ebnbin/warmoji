@@ -13,7 +13,6 @@ test('开局后自动战斗：出怪、飞刀击杀、计时推进、无控制�
   await page.locator('#game canvas').click()
   await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
 
-  // 敌人开始刷新
   await page.waitForFunction(() => (window.__warmoji?.enemies ?? 0) > 0, undefined, {
     timeout: 10_000,
   })
@@ -23,7 +22,7 @@ test('开局后自动战斗：出怪、飞刀击杀、计时推进、无控制�
     timeout: 20_000,
   })
 
-  // 计时正常推进；等到战场热闹一点再截图
+  // 等战场热闹些再截图
   await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 8, undefined, {
     timeout: 20_000,
   })

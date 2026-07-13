@@ -24,5 +24,5 @@ const game = new Phaser.Game({
   scene: [MenuScene, ArenaScene],
 })
 
-// 暴露给调试与临时脚本使用（e2e 正式断言走 window.__warmoji）
+// 供临时验证脚本注入状态
 window.__game = game
