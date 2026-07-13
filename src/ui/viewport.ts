@@ -4,9 +4,22 @@ import type { ViewportSpec } from '../core/viewport'
 
 export const VIEWPORT_CHANGED = 'viewport-changed'
 
-/** 画布 CSS 尺寸取 #game 容器实测矩形（html 高度为 100dvh）：
- * iOS 独立 PWA 下 window.innerHeight 不含 Home 条区域，不能作为全屏依据 */
+/** iOS 从主屏幕启动的独立 PWA（navigator.standalone 为 Safari 私有属性） */
+export function isStandalone(): boolean {
+  return (navigator as unknown as { standalone?: boolean }).standalone === true
+}
+
+/** 画布 CSS 尺寸。
+ * 独立 PWA 恒为全屏，但 iOS 竖屏首次布局会把 Home 条区域从视口里扣掉且不再更新
+ * （innerHeight/dvh 全是错的，事件也不补发），故直接取屏幕物理尺寸按方向映射；
+ * 浏览器模式取 #game 实测矩形（html 高度 100dvh） */
 function cssSize(): { w: number; h: number } {
+  if (isStandalone()) {
+    const short = Math.min(screen.width, screen.height)
+    const long = Math.max(screen.width, screen.height)
+    const landscape = window.matchMedia('(orientation: landscape)').matches
+    return landscape ? { w: long, h: short } : { w: short, h: long }
+  }
   const rect = document.getElementById('game')?.getBoundingClientRect()
   return {
     w: rect?.width || window.innerWidth,

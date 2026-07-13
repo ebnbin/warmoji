@@ -6,7 +6,7 @@ import { SelectScene } from './scenes/SelectScene'
 import { ShopScene } from './scenes/ShopScene'
 import { UIScene } from './scenes/UIScene'
 import { setStress } from './ui/dev'
-import { refreshViewport, viewport } from './ui/viewport'
+import { isStandalone, refreshViewport, viewport } from './ui/viewport'
 
 const badge = document.getElementById('build-badge')
 if (badge) {
@@ -45,6 +45,8 @@ window.visualViewport?.addEventListener('resize', scheduleRefresh)
 const gameEl = document.getElementById('game')
 if (gameEl) new ResizeObserver(scheduleRefresh).observe(gameEl)
 window.addEventListener('orientationchange', () => {
+  // 独立 PWA 的目标尺寸由屏幕尺寸确定，立即重算消除旋转延迟；浏览器模式等尺寸稳定
+  if (isStandalone()) refreshViewport(game)
   scheduleRefresh()
   window.setTimeout(() => refreshViewport(game), 400)
   window.setTimeout(() => refreshViewport(game), 1000)
