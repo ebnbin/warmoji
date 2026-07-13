@@ -5,6 +5,12 @@ import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
 import { slotOffset } from '../core/formation'
 import { browserStorage, submitScore } from '../core/highscore'
+import {
+  aggregateCharacterEffects,
+  aggregateTeamEffects,
+  resolveWeaponSpec,
+} from '../core/items'
+import type { TeamEffects } from '../core/items'
 import { getRun, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { loadTeam } from '../core/selection'
@@ -64,6 +70,10 @@ interface Member {
   weapons: WeaponRuntime[]
   handle: WeaponOwner
   visualOffset: { x: number; y: number }
+  // 道具修正后的个体生效值
+  maxHp: number
+  iframesMs: number
+  reviveMs: number
   hp: number
   alive: boolean
   reviveAt: number
@@ -114,6 +124,7 @@ export class ArenaScene extends Phaser.Scene {
   private rng = new Rng(1)
   private palette!: Palette
   private stats!: TeamStats
+  private teamFx: TeamEffects = aggregateTeamEffects([])
   private run!: RunState
   private damagePool: Phaser.GameObjects.BitmapText[] = []
   private damagePoolIdx = 0
@@ -197,6 +208,9 @@ export class ArenaScene extends Phaser.Scene {
     this.memberGroup = this.add.group()
     this.lineup = loadTeam(browserStorage()).lineup.map((id) => CHARACTERS[id])
     this.run = getRun(this.lineup.length)
+    // 队长道具：团队修正（移速/磁吸/掉落/全队伤害）
+    this.teamFx = aggregateTeamEffects(this.run.captainItems)
+    this.stats.moveSpeed = TEAM.moveSpeed * this.teamFx.moveSpeedMul
     this.members = this.lineup.map((spec, slot) => this.createMember(spec.emoji, spec.weapons, slot))
 
     const cam = this.cameras.main
@@ -331,18 +345,31 @@ export class ArenaScene extends Phaser.Scene {
         visualOffset.y = dy
       },
     }
+    // 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效武器参数
+    const fx = aggregateCharacterEffects(this.run.memberItems[slot] ?? [])
+    const memberCtx: WeaponContext = {
+      ...this.weaponCtx,
+      damageMul: () => this.stats.damageMul * fx.damageMul * this.teamFx.teamDamageMul,
+      cooldownMul: () => this.stats.cooldownMul * fx.cooldownMul,
+    }
+    const maxHp = this.stress ? this.stats.maxHp : Math.max(10, MEMBER.maxHp + fx.hpAdd)
     const member: Member = {
       emoji,
       slot,
       image,
       // 错开初始冷却，避免全队同帧齐射
-      weapons: weaponSpecs.map((w, i) => createWeapon(w, this.weaponCtx, 300 + slot * 120 + i * 230)),
+      weapons: weaponSpecs.map((w, i) =>
+        createWeapon(resolveWeaponSpec(w, fx), memberCtx, 300 + slot * 120 + i * 230),
+      ),
       handle,
       visualOffset,
+      maxHp,
+      iframesMs: MEMBER.iframesMs + fx.iframesAddMs,
+      reviveMs: Math.max(1000, TEAM.reviveMs + fx.reviveAddMs),
       // 血量跨波保留；上一波阵亡者低血量复活（压测模式不走 run 状态）
       hp: this.stress
         ? this.stats.maxHp
-        : waveStartHp(this.run.memberHp[slot] ?? MEMBER.maxHp, this.stats.maxHp),
+        : waveStartHp(this.run.memberHp[slot] ?? MEMBER.maxHp, maxHp),
       alive: true,
       reviveAt: 0,
       lastHitMs: -Infinity,
@@ -419,7 +446,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private drawMemberHp(m: Member): void {
-    const ratio = Math.max(0, m.hp / this.stats.maxHp)
+    const ratio = Math.max(0, m.hp / m.maxHp)
     if (Math.abs(ratio - m.shownHpRatio) < 0.005) return
     m.shownHpRatio = ratio
     const w = 0.8 * UNIT
@@ -436,7 +463,7 @@ export class ArenaScene extends Phaser.Scene {
     if (this.over || !enemy.active) return
     const m = memberImg.getData('member') as Member
     if (!m.alive) return
-    if (this.elapsedMs - m.lastHitMs < MEMBER.iframesMs) return
+    if (this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
     const spec = enemy.getData('spec') as EnemySpec
     m.hp = Math.max(0, m.hp - spec.damage)
@@ -451,7 +478,7 @@ export class ArenaScene extends Phaser.Scene {
   private killMember(m: Member): void {
     m.alive = false
     m.hp = 0
-    m.reviveAt = this.elapsedMs + TEAM.reviveMs
+    m.reviveAt = this.elapsedMs + m.reviveMs
     m.shownCountdown = -1
     ;(m.image.body as ArcadeBody).enable = false
     m.image.setAlpha(0.35).setTint(0x888888)
@@ -465,7 +492,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private reviveMember(m: Member): void {
     m.alive = true
-    m.hp = this.stats.maxHp
+    m.hp = m.maxHp
     m.shownHpRatio = -1
     m.lastHitMs = this.elapsedMs
     ;(m.image.body as ArcadeBody).enable = true
@@ -557,7 +584,8 @@ export class ArenaScene extends Phaser.Scene {
     const spec = enemy.getData('spec') as EnemySpec
     // 经验击杀即得；金币落地等待拾取
     this.run.xp = gainXp(this.run.xp, spec.xp).state
-    this.spawnCoins(enemy.x, enemy.y, spec.coins)
+    const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? spec.coins : 0
+    this.spawnCoins(enemy.x, enemy.y, spec.coins + doubled)
     enemy.setActive(false)
     ;(enemy.body as ArcadeBody).enable = false
     this.tweens.add({
@@ -705,7 +733,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private magnetCoins(): void {
     // 金币拾取是团队能力：以队伍中心为基点磁吸并入账（成员碰到也能捡，见 overlap）
-    const r2 = COIN.magnetRadius * COIN.magnetRadius
+    const magnetRadius = COIN.magnetRadius * this.teamFx.magnetMul
+    const r2 = magnetRadius * magnetRadius
     const collect2 = COIN.collectRadius * COIN.collectRadius
     for (const c of this.coins.getChildren() as ImageObj[]) {
       if (!c.active) continue

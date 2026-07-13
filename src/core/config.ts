@@ -11,6 +11,7 @@ export const MAP = {
   cameraMargin: 2 * UNIT,
 } as const
 
+import { ITEMS } from './items'
 import type {
   AreaBlastSpec,
   BoomerangSpec,
@@ -226,7 +227,7 @@ export interface CaptainSpec {
   readonly teamSize: number
   /** 每次进商店全员复活并恢复满血（默认规则：存活者血量保留、阵亡者 30% 血复活） */
   readonly reviveInShop: boolean
-  /** 每次进商店的免费道具刷新次数（道具刷新实装后生效） */
+  /** 每次进商店的免费道具刷新次数 */
   readonly freeRefreshes: number
 }
 
@@ -242,7 +243,7 @@ export const CAPTAINS = {
   moneybags: {
     emoji: '🤑',
     name: '财迷',
-    desc: '每次进入商店，前 3 次道具刷新免费（道具上架后生效）',
+    desc: '每次进入商店，前 3 次道具刷新免费',
     teamSize: 5,
     reviveInShop: false,
     freeRefreshes: 3,
@@ -360,6 +361,9 @@ export const STRESS = {
 
 export const XP = { base: 8, perLevel: 6 } as const
 
+// 商店：每个上架位可付费重新随机（队长可提供免费次数）
+export const SHOP = { refreshPrice: 2 } as const
+
 // 角色受击时的相机震动
 export const HIT_SHAKE = { durationMs: 60, intensity: 0.0012 } as const
 
@@ -386,8 +390,9 @@ export const OUTLINED_EMOJIS: readonly string[] = [
 // 启动时预载的 emoji（含 UI 图标）；其余全集按需加载（ui/emoji.ts ensureEmoji）
 export const PRELOAD_EMOJIS: readonly string[] = [
   ...OUTLINED_EMOJIS,
-  // 属性面板的武器/基础组图标
+  // 属性面板的武器/基础组图标 + 商店道具图标
   ...roster.flatMap((c) => c.weapons.map((w) => w.icon)),
+  ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),
   SPAWN.markEmoji,
   '⚔️',
   '🏆',

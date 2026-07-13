@@ -85,6 +85,18 @@ export async function clickShopSlot(page: Page, id: string): Promise<void> {
     .click({ position: await cssPoint(page, { x: r.x + r.w / 2, y: r.y + r.h / 2 }) })
 }
 
+/** 商店页点击「购买」（作用于当前聚焦的上架位） */
+export async function clickShopBuy(page: Page): Promise<void> {
+  const b = await page.evaluate(() => window.__warmoji!.shop!.buy)
+  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: b.x, y: b.y }) })
+}
+
+/** 商店页点击「刷新」（作用于当前聚焦的上架位） */
+export async function clickShopRefresh(page: Page): Promise<void> {
+  const r = await page.evaluate(() => window.__warmoji!.shop!.refresh)
+  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: r.x, y: r.y }) })
+}
+
 /** 商店页点击「开始第 N 波」进入下一波 */
 export async function clickShopNext(page: Page): Promise<void> {
   const s = await page.evaluate(() => window.__warmoji!.shop!.start)

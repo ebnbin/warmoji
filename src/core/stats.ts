@@ -1,5 +1,7 @@
 import type { CaptainSpec, CharacterSpec } from './config'
 import { COIN, MEMBER, TEAM, UNIT } from './config'
+import { aggregateCharacterEffects, aggregateTeamEffects, resolveWeaponSpec } from './items'
+import type { ItemId } from './items'
 import type { WeaponSpec } from './weapons'
 
 // 角色属性面板的展示模型：把异构的角色/武器参数组织成统一的「属性组」。
@@ -55,35 +57,48 @@ export function weaponStatLines(w: WeaponSpec): string[] {
   }
 }
 
-export function characterStatGroups(spec: CharacterSpec): StatGroup[] {
+/** 角色面板：数值为道具修正后的生效值（伤害/冷却在展示层套倍率） */
+export function characterStatGroups(spec: CharacterSpec, items: readonly ItemId[] = []): StatGroup[] {
+  const fx = aggregateCharacterEffects(items)
   return [
     {
       icon: '❤️',
       title: '基础',
       lines: [
-        `生命上限 ${MEMBER.maxHp} · 受击无敌 ${sec(MEMBER.iframesMs)}`,
-        `复活 ${sec(TEAM.reviveMs)}`,
+        `生命上限 ${MEMBER.maxHp + fx.hpAdd} · 受击无敌 ${sec(MEMBER.iframesMs + fx.iframesAddMs)}`,
+        `复活 ${sec(Math.max(1000, TEAM.reviveMs + fx.reviveAddMs))}`,
       ],
     },
-    ...spec.weapons.map((w) => ({
-      icon: w.icon,
-      title: `${w.name}（${WEAPON_KIND_LABEL[w.kind]}）`,
-      lines: weaponStatLines(w),
-    })),
+    ...spec.weapons.map((w) => {
+      const resolved = resolveWeaponSpec(w, fx)
+      const display =
+        resolved.kind === 'slowAura'
+          ? resolved
+          : {
+              ...resolved,
+              damage: Math.round(resolved.damage * fx.damageMul),
+              cooldownMs: resolved.cooldownMs * fx.cooldownMul,
+            }
+      return {
+        icon: w.icon,
+        title: `${w.name}（${WEAPON_KIND_LABEL[w.kind]}）`,
+        lines: weaponStatLines(display),
+      }
+    }),
   ]
 }
 
-/** 队长面板：能力描述 + 团队属性（移速/金币拾取等团队级数值都归队长） */
-export function captainStatGroups(spec: CaptainSpec): StatGroup[] {
+/** 队长面板：能力描述 + 团队属性（移速/金币拾取等团队级数值都归队长，含道具修正） */
+export function captainStatGroups(spec: CaptainSpec, items: readonly ItemId[] = []): StatGroup[] {
+  const fx = aggregateTeamEffects(items)
+  const lines = [
+    `出战人数 ${spec.teamSize} · 移速 ${grid(TEAM.moveSpeed * fx.moveSpeedMul)}/秒`,
+    `金币拾取范围 ${grid(COIN.magnetRadius * fx.magnetMul)}（以队伍中心为基点）`,
+  ]
+  if (fx.teamDamageMul !== 1) lines.push(`全队伤害 ×${+fx.teamDamageMul.toFixed(2)}`)
+  if (fx.doubleCoinChance > 0) lines.push(`双倍金币概率 ${Math.round(fx.doubleCoinChance * 100)}%`)
   return [
     { icon: '👑', title: '队长能力', lines: [spec.desc] },
-    {
-      icon: '👟',
-      title: '团队',
-      lines: [
-        `出战人数 ${spec.teamSize} · 移速 ${grid(TEAM.moveSpeed)}/秒`,
-        `金币拾取范围 ${grid(COIN.magnetRadius)}（以队伍中心为基点）`,
-      ],
-    },
+    { icon: '👟', title: '团队', lines },
   ]
 }

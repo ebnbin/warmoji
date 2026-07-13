@@ -21,7 +21,19 @@ interface WarmojiShopDebug {
   wave: number
   coins: number
   focusedId: string
-  slots: { id: string; x: number; y: number; w: number; h: number }[]
+  freeRefreshes: number
+  slots: {
+    id: string
+    x: number
+    y: number
+    w: number
+    h: number
+    offer: string | null
+    price: number | null
+    owned: number
+  }[]
+  buy: { x: number; y: number; w: number; h: number; enabled: boolean }
+  refresh: { x: number; y: number; w: number; h: number; enabled: boolean }
   start: { x: number; y: number; w: number; h: number }
 }
 
@@ -64,4 +76,5 @@ interface Window {
   __game?: unknown
   __twemojiVersion?: string
   __setStress?: (on: boolean) => void
+  __addCoins?: (n: number) => void
 }

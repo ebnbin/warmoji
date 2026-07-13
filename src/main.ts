@@ -6,6 +6,7 @@ import { PreloadScene } from './scenes/PreloadScene'
 import { SelectScene } from './scenes/SelectScene'
 import { ShopScene } from './scenes/ShopScene'
 import { UIScene } from './scenes/UIScene'
+import { grantCoins } from './core/run'
 import { setStress } from './ui/dev'
 import { isStandalone, nudgeIosViewport, refreshViewport, viewport } from './ui/viewport'
 
@@ -70,3 +71,5 @@ window.__setStress = (on: boolean): void => {
   setStress(on)
   if (game.scene.isActive('arena')) game.scene.getScene('arena').scene.restart()
 }
+
+window.__addCoins = (n: number): void => grantCoins(n)
