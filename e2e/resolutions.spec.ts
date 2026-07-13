@@ -20,10 +20,10 @@ test.describe('竖屏 720×1600：1x，保底 720×1280 上下各扩 160', () =>
     await page.locator('#game canvas').click()
     await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
     await page.waitForFunction(() => (window.__warmoji?.enemies ?? 0) > 0, undefined, {
-      timeout: 10_000,
+      timeout: 30_000,
     })
     await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 5, undefined, {
-      timeout: 15_000,
+      timeout: 30_000,
     })
     await page.screenshot({ path: 'test-results/portrait-arena.png' })
 

@@ -5,7 +5,7 @@ import { browserStorage, submitScore } from '../core/highscore'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
-import { edgeSpawnPoint } from '../core/spawn'
+import { randomMapPoint } from '../core/spawn'
 import { nearestIndex } from '../core/targeting'
 import { applyUpgrade, pickUpgrade, UPGRADE_LABELS } from '../core/upgrades'
 import type { PlayerStats } from '../core/upgrades'
@@ -73,6 +73,7 @@ export class ArenaScene extends Phaser.Scene {
   private spawnCooldownMs = 0
   private attackCooldownMs = 0
   private lastHitMs = -Infinity
+  private pendingSpawns = 0
   private over = false
   gameOverInfo?: GameOverInfo
 
@@ -111,6 +112,7 @@ export class ArenaScene extends Phaser.Scene {
     this.spawnCooldownMs = 300
     this.attackCooldownMs = 0
     this.lastHitMs = -Infinity
+    this.pendingSpawns = 0
     this.over = false
     this.gameOverInfo = undefined
 
@@ -179,6 +181,7 @@ export class ArenaScene extends Phaser.Scene {
       kills: this.kills,
       level: this.xpState.level,
       enemies: this.enemies.countActive(true),
+      pending: this.pendingSpawns,
       viewW: viewport.logicalWidth,
       viewH: viewport.logicalHeight,
       playerX: this.player.x,
@@ -312,16 +315,48 @@ export class ArenaScene extends Phaser.Scene {
     if (this.spawnCooldownMs > 0) return
     const wave = waveAt(this.elapsedMs / 1000)
     this.spawnCooldownMs = wave.spawnIntervalMs
-    if (this.enemies.countActive(true) >= SPAWN.maxAlive) return
+    if (this.enemies.countActive(true) + this.pendingSpawns >= SPAWN.maxAlive) return
 
     const spec = this.rng.chance(wave.ghostShare) ? GHOST : ZOMBIE
-    const { x, y } = edgeSpawnPoint(this.rng, this.cameras.main.worldView, SPAWN.outset)
+    const hp = Math.round(spec.hp * wave.hpMultiplier)
+    const pos = randomMapPoint(
+      this.rng,
+      MAP.width,
+      MAP.height,
+      SPAWN.edgeInset,
+      { x: this.player.x, y: this.player.y },
+      SPAWN.minPlayerDist,
+    )
+
+    // 预告标记闪烁后敌人才落地；预告期间无碰撞
+    this.pendingSpawns++
+    const mark = emojiImage(this, pos.x, pos.y, SPAWN.markEmoji, SPAWN.markSize)
+      .setDepth(4)
+      .setAlpha(0)
+    this.tweens.add({
+      targets: mark,
+      alpha: 1,
+      duration: SPAWN.telegraphMs / 6,
+      yoyo: true,
+      repeat: 2,
+    })
+    this.time.delayedCall(SPAWN.telegraphMs, () => {
+      mark.destroy()
+      this.pendingSpawns--
+      if (!this.over) this.materializeEnemy(spec, pos.x, pos.y, hp)
+    })
+  }
+
+  private materializeEnemy(spec: EnemySpec, x: number, y: number, hp: number): void {
     const enemy = emojiImage(this, x, y, spec.emoji, spec.size, true).setDepth(5)
     this.physics.add.existing(enemy)
     circleBody(enemy, spec.radius)
-    enemy.setData('hp', Math.round(spec.hp * wave.hpMultiplier))
+    enemy.setData('hp', hp)
     enemy.setData('spec', spec)
     this.enemies.add(enemy)
+    const targetScale = enemy.scale
+    enemy.setScale(targetScale * 0.3).setAlpha(0.3)
+    this.tweens.add({ targets: enemy, scale: targetScale, alpha: 1, duration: 130 })
   }
 
   private steerEnemies(): void {
@@ -419,6 +454,7 @@ export class ArenaScene extends Phaser.Scene {
       kills: this.kills,
       level: this.xpState.level,
       enemies: this.enemies.countActive(true),
+      pending: this.pendingSpawns,
       viewW: viewport.logicalWidth,
       viewH: viewport.logicalHeight,
       playerX: this.player.x,

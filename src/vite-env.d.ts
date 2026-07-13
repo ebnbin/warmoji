@@ -12,6 +12,7 @@ interface WarmojiDebug {
   kills: number
   level: number
   enemies: number
+  pending: number
   viewW: number
   viewH: number
   playerX: number

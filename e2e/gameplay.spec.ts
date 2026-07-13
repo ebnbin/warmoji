@@ -13,18 +13,23 @@ test('开局后自动战斗：出怪、飞刀击杀、计时推进、无控制�
   await page.locator('#game canvas').click()
   await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
 
+  // 先出现刷怪预告标记，随后敌人落地
+  await page.waitForFunction(() => (window.__warmoji?.pending ?? 0) > 0, undefined, {
+    timeout: 15_000,
+  })
+  await page.screenshot({ path: 'test-results/telegraph.png' })
   await page.waitForFunction(() => (window.__warmoji?.enemies ?? 0) > 0, undefined, {
-    timeout: 10_000,
+    timeout: 15_000,
   })
 
   // 玩家不动，飞刀自动索敌应产生击杀
   await page.waitForFunction(() => (window.__warmoji?.kills ?? 0) >= 1, undefined, {
-    timeout: 20_000,
+    timeout: 45_000,
   })
 
   // 等战场热闹些再截图
   await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 8, undefined, {
-    timeout: 20_000,
+    timeout: 45_000,
   })
   await page.screenshot({ path: 'test-results/gameplay.png' })
 

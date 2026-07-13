@@ -1,27 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import { Rng } from './rng'
-import { edgeSpawnPoint } from './spawn'
+import { randomMapPoint } from './spawn'
 
-describe('edgeSpawnPoint', () => {
-  it('生成点全部在矩形之外、外扩圈之内，且四边都会出现', () => {
-    const rng = new Rng(123)
-    const view = { x: 100, y: 200, width: 800, height: 600 }
-    const outset = 50
-    const sides = new Set<string>()
+describe('randomMapPoint', () => {
+  it('落点在边缘内缩范围内，且与玩家保持最小距离', () => {
+    const rng = new Rng(42)
+    const avoid = { x: 800, y: 800 }
     for (let i = 0; i < 500; i++) {
-      const p = edgeSpawnPoint(rng, view, outset)
-      const insideView =
-        p.x > view.x && p.x < view.x + view.width && p.y > view.y && p.y < view.y + view.height
-      expect(insideView).toBe(false)
-      expect(p.x).toBeGreaterThanOrEqual(view.x - outset)
-      expect(p.x).toBeLessThanOrEqual(view.x + view.width + outset)
-      expect(p.y).toBeGreaterThanOrEqual(view.y - outset)
-      expect(p.y).toBeLessThanOrEqual(view.y + view.height + outset)
-      if (p.y === Math.round(view.y - outset)) sides.add('top')
-      if (p.y === Math.round(view.y + view.height + outset)) sides.add('bottom')
-      if (p.x === Math.round(view.x - outset)) sides.add('left')
-      if (p.x === Math.round(view.x + view.width + outset)) sides.add('right')
+      const p = randomMapPoint(rng, 1600, 1600, 32, avoid, 192)
+      expect(p.x).toBeGreaterThanOrEqual(32)
+      expect(p.x).toBeLessThanOrEqual(1568)
+      expect(p.y).toBeGreaterThanOrEqual(32)
+      expect(p.y).toBeLessThanOrEqual(1568)
+      expect(Math.hypot(p.x - avoid.x, p.y - avoid.y)).toBeGreaterThanOrEqual(192)
     }
-    expect(sides.size).toBe(4)
+  })
+
+  it('minDist 大到无解时兜底返回界内点，不死循环', () => {
+    const rng = new Rng(7)
+    const p = randomMapPoint(rng, 1600, 1600, 32, { x: 800, y: 800 }, 99999)
+    expect(p.x).toBeGreaterThanOrEqual(32)
+    expect(p.x).toBeLessThanOrEqual(1568)
+  })
+
+  it('相同种子结果可复现', () => {
+    const a = randomMapPoint(new Rng(9), 1600, 1600, 32, { x: 0, y: 0 }, 100)
+    const b = randomMapPoint(new Rng(9), 1600, 1600, 32, { x: 0, y: 0 }, 100)
+    expect(a).toEqual(b)
   })
 })

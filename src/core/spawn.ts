@@ -1,27 +1,27 @@
 import type { Rng } from './rng'
+import { dist2 } from './vec'
 import type { Point } from './vec'
 
-export interface Rect {
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-/** 在矩形四边外 outset 距离的一圈上取随机点（用于在相机可见区外刷怪） */
-export function edgeSpawnPoint(rng: Rng, view: Rect, outset: number): Point {
-  const left = Math.round(view.x - outset)
-  const right = Math.round(view.x + view.width + outset)
-  const top = Math.round(view.y - outset)
-  const bottom = Math.round(view.y + view.height + outset)
-  switch (rng.int(0, 3)) {
-    case 0:
-      return { x: rng.int(left, right), y: top }
-    case 1:
-      return { x: rng.int(left, right), y: bottom }
-    case 2:
-      return { x: left, y: rng.int(top, bottom) }
-    default:
-      return { x: right, y: rng.int(top, bottom) }
+/**
+ * 地图内随机刷怪点：距边缘 ≥ inset，距 avoid（玩家）≥ minDist；
+ * 拒绝采样最多 20 次，全拒则返回最后一次（minDist 过大时的兜底）。
+ */
+export function randomMapPoint(
+  rng: Rng,
+  width: number,
+  height: number,
+  inset: number,
+  avoid: Point,
+  minDist: number,
+): Point {
+  const xMin = Math.round(inset)
+  const xMax = Math.round(width - inset)
+  const yMin = Math.round(inset)
+  const yMax = Math.round(height - inset)
+  let p: Point = { x: xMin, y: yMin }
+  for (let i = 0; i < 20; i++) {
+    p = { x: rng.int(xMin, xMax), y: rng.int(yMin, yMax) }
+    if (dist2(p, avoid) >= minDist * minDist) return p
   }
+  return p
 }

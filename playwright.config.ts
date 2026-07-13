@@ -6,7 +6,8 @@ const containerChromium = '/opt/pw-browsers/chromium'
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
+  // 无 GPU 环境（CI/容器）软件渲染帧率低，游戏时间流逝慢，预算放宽
+  timeout: 90_000,
   reporter: [['list']],
   use: {
     baseURL: 'http://127.0.0.1:4173',

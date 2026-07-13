@@ -81,9 +81,13 @@ export const SPAWN = {
   ghostShareStart: 0.15,
   ghostShareMax: 0.55,
   ghostShareRampSeconds: 240,
-  // 刷怪点在相机可见区边缘外的距离
-  outset: 0.75 * UNIT,
   maxAlive: 120,
+  // 地图内随机刷怪：先显示预告标记再落地
+  telegraphMs: 900,
+  markEmoji: '⚠️',
+  markSize: 0.75 * UNIT,
+  minPlayerDist: 3 * UNIT,
+  edgeInset: 0.5 * UNIT,
 } as const
 
 export const XP = { base: 8, perLevel: 6 } as const
@@ -104,4 +108,12 @@ export const OUTLINED_EMOJIS: readonly string[] = [
 ]
 
 // 启动时预载的 emoji（含 UI 图标）；其余全集按需加载（ui/emoji.ts ensureEmoji）
-export const PRELOAD_EMOJIS: readonly string[] = [...OUTLINED_EMOJIS, '⚔️', '🏆', '⚡', '👟', '❤️']
+export const PRELOAD_EMOJIS: readonly string[] = [
+  ...OUTLINED_EMOJIS,
+  SPAWN.markEmoji,
+  '⚔️',
+  '🏆',
+  '⚡',
+  '👟',
+  '❤️',
+]
