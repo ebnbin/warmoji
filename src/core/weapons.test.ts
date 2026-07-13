@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { thrustHitIndices } from './weapons'
+import { circleHitIndices, sectorHitIndices, thrustHitIndices, wrapAngle } from './weapons'
 
 describe('thrustHitIndices', () => {
   const origin = { x: 0, y: 0 }
@@ -40,5 +40,48 @@ describe('thrustHitIndices', () => {
     expect(up).toEqual([0])
     const miss = thrustHitIndices(origin, -Math.PI / 2, 100, 15, [{ x: 50, y: 50, radius: 8 }])
     expect(miss).toEqual([])
+  })
+})
+
+describe('circleHitIndices', () => {
+  it('半径+目标半径内命中，外未命中', () => {
+    const targets = [
+      { x: 90, y: 0, radius: 15 },
+      { x: 120, y: 0, radius: 10 },
+      { x: 0, y: -100, radius: 10 },
+    ]
+    expect(circleHitIndices({ x: 0, y: 0 }, 100, targets)).toEqual([0, 2])
+  })
+})
+
+describe('sectorHitIndices', () => {
+  const origin = { x: 0, y: 0 }
+
+  it('弧宽内命中、弧外未命中、超距未命中', () => {
+    const targets = [
+      { x: 80, y: 0, radius: 10 },
+      { x: 0, y: 80, radius: 10 },
+      { x: 200, y: 0, radius: 10 },
+    ]
+    // 朝右 120° 扇形
+    expect(sectorHitIndices(origin, 0, (120 * Math.PI) / 180, 100, targets)).toEqual([0])
+  })
+
+  it('弧宽跨越 ±π 边界时命中正确', () => {
+    const targets = [{ x: -80, y: 5, radius: 10 }]
+    expect(sectorHitIndices(origin, Math.PI, Math.PI / 2, 100, targets)).toEqual([0])
+  })
+
+  it('贴身目标无视角度直接命中', () => {
+    const targets = [{ x: -5, y: 0, radius: 12 }]
+    expect(sectorHitIndices(origin, 0, Math.PI / 4, 100, targets)).toEqual([0])
+  })
+})
+
+describe('wrapAngle', () => {
+  it('归一化到 (-π, π]', () => {
+    expect(wrapAngle(3 * Math.PI)).toBeCloseTo(Math.PI)
+    expect(wrapAngle(-3 * Math.PI)).toBeCloseTo(Math.PI)
+    expect(wrapAngle(0.5)).toBeCloseTo(0.5)
   })
 })

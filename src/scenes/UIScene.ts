@@ -71,11 +71,9 @@ export class UIScene extends Phaser.Scene {
     if (isDevOpen()) this.createDevPanel(res)
 
     const arenaEvents = this.arena.events
-    arenaEvents.on('upgrade-toast', this.onToast, this)
     arenaEvents.on('game-over', this.onGameOver, this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      arenaEvents.off('upgrade-toast', this.onToast, this)
       arenaEvents.off('game-over', this.onGameOver, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
@@ -151,33 +149,6 @@ export class UIScene extends Phaser.Scene {
       `子弹 ${p.projectiles}  经验珠 ${p.gems}`,
       `总对象 ${p.objects}`,
     ])
-  }
-
-  private onToast(upgrade: { emoji: string; text: string; index: number }): void {
-    const toast = iconLabel(
-      this,
-      viewport.logicalWidth / 2,
-      viewport.logicalHeight * 0.36 + upgrade.index * 36,
-      upgrade.emoji,
-      26,
-      upgrade.text,
-      {
-        fontFamily: UI_FONT,
-        fontSize: '24px',
-        color: '#ffe082',
-        stroke: '#000000',
-        strokeThickness: 4,
-        resolution: textRes(),
-      },
-    ).setDepth(120)
-    this.tweens.add({
-      targets: toast,
-      y: toast.y - 34,
-      alpha: 0,
-      duration: 1100,
-      delay: 150 + upgrade.index * 150,
-      onComplete: () => toast.destroy(),
-    })
   }
 
   private onGameOver(info: GameOverInfo): void {

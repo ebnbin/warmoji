@@ -11,60 +11,132 @@ export const MAP = {
   cameraMargin: 2 * UNIT,
 } as const
 
-import type { ProjectileSpec, ThrustSpec } from './weapons'
+import type {
+  AreaPulseSpec,
+  BoomerangSpec,
+  ProjectileSpec,
+  SweepSpec,
+  ThrustSpec,
+  WeaponSpec,
+} from './weapons'
 
-// 武器库：突刺型=群体伤害（每次突刺范围内每敌一次），发射型=子弹单体
-export const WEAPONS = {
-  thrustKnife: {
-    kind: 'thrust',
-    emoji: '🔪',
-    size: 0.6 * UNIT,
-    restOffset: 0.55 * UNIT,
-    damage: 30,
-    cooldownMs: 1100,
-    reach: 1.6 * UNIT,
-    hitRadius: 0.55 * UNIT,
-    thrustMs: 200,
-    // twemoji 1f52a 原始刀刃朝向 +45°（右下）
-    rotationOffsetRad: -Math.PI / 4,
-  } satisfies ThrustSpec,
-  pistol: {
-    kind: 'projectile',
+// 武器库（可被不同角色复用；held 缺省 = 行为主体是角色本体）
+const pistol = {
+  kind: 'projectile',
+  damage: 16,
+  cooldownMs: 600,
+  held: {
     emoji: '🔫',
     size: 0.55 * UNIT,
-    restOffset: 0.5 * UNIT,
-    damage: 24,
-    cooldownMs: 500,
+    restOffset: 0.45 * UNIT,
     // twemoji 1f52b 枪口朝左
     rotationOffsetRad: Math.PI,
-    flipWhenLeft: false,
+    mountGap: 0.32 * UNIT,
+  },
+  projectile: {
+    emoji: '💧',
+    size: 0.35 * UNIT,
+    radius: 0.15 * UNIT,
+    speed: 13 * UNIT,
+    // twemoji 1f4a7 水滴尖端朝上
+    rotationOffsetRad: Math.PI / 2,
+  },
+} satisfies ProjectileSpec
+
+export const WEAPONS = {
+  tomatoThrow: {
+    kind: 'projectile',
+    damage: 22,
+    cooldownMs: 450,
     projectile: {
-      emoji: '💧',
-      size: 0.35 * UNIT,
-      radius: 0.15 * UNIT,
-      speed: 13 * UNIT,
-      // twemoji 1f4a7 水滴尖端朝上
-      rotationOffsetRad: Math.PI / 2,
+      emoji: '🍅',
+      size: 0.4 * UNIT,
+      radius: 0.18 * UNIT,
+      speed: 12 * UNIT,
+      rotationOffsetRad: 0,
     },
   } satisfies ProjectileSpec,
+  hornThrust: {
+    kind: 'thrust',
+    damage: 26,
+    cooldownMs: 900,
+    reach: 1.4 * UNIT,
+    hitRadius: 0.5 * UNIT,
+    thrustMs: 220,
+    lungeDist: 0.7 * UNIT,
+  } satisfies ThrustSpec,
+  axeSweep: {
+    kind: 'sweep',
+    damage: 30,
+    cooldownMs: 1200,
+    radius: 1.5 * UNIT,
+    arcRad: (150 * Math.PI) / 180,
+    sweepMs: 260,
+    held: {
+      emoji: '🪓',
+      size: 0.65 * UNIT,
+      restOffset: 0.6 * UNIT,
+      // twemoji 1fa93 斧刃朝左上
+      rotationOffsetRad: (3 * Math.PI) / 4,
+    },
+  } satisfies SweepSpec,
+  pistolLeft: { ...pistol, held: { ...pistol.held, mountSide: -1 } } satisfies ProjectileSpec,
+  pistolRight: { ...pistol, held: { ...pistol.held, mountSide: 1 } } satisfies ProjectileSpec,
+  arcanePulse: {
+    kind: 'areaPulse',
+    damage: 20,
+    cooldownMs: 1300,
+    radius: 2 * UNIT,
+    color: 0x9575cd,
+  } satisfies AreaPulseSpec,
+  boomerang: {
+    kind: 'boomerang',
+    damage: 18,
+    cooldownMs: 1200,
+    range: 4 * UNIT,
+    outMs: 500,
+    returnSpeed: 10 * UNIT,
+    hitRadius: 0.5 * UNIT,
+    spinRadPerSec: 14,
+    held: {
+      emoji: '🪃',
+      size: 0.55 * UNIT,
+      restOffset: 0.5 * UNIT,
+      rotationOffsetRad: 0,
+    },
+  } satisfies BoomerangSpec,
 } as const
 
-// 队伍 = 1 队长（无实体，提供全队被动，能力后续设计）+ 5 角色（真正参战）。
+// 角色花名册：角色 → 武器为单向绑定（角色配装固定；武器可被复用）
+export interface CharacterSpec {
+  readonly emoji: string
+  readonly weapons: readonly WeaponSpec[]
+}
+
+export const CHARACTERS = {
+  juggler: { emoji: '🤹', weapons: [WEAPONS.tomatoThrow] },
+  unicorn: { emoji: '🦄', weapons: [WEAPONS.hornThrust] },
+  troll: { emoji: '🧌', weapons: [WEAPONS.axeSweep] },
+  cowboy: { emoji: '🤠', weapons: [WEAPONS.pistolLeft, WEAPONS.pistolRight] },
+  mage: { emoji: '🧙', weapons: [WEAPONS.arcanePulse] },
+  kangaroo: { emoji: '🦘', weapons: [WEAPONS.boomerang] },
+} as const satisfies Record<string, CharacterSpec>
+
+// 队伍 = 1 队长（无实体，提供全队被动，能力后续设计）+ 出战角色。
 // 玩家操控队伍中心点，角色环状固定槽位随行；除此之外角色是完全独立的单位。
-// 角色与武器松耦合：0..n 把（🤠 双持验证多武器通路）。
+// 当前阵容 = 花名册全员上场（测试期）；正式的五人挑选等选人系统。
 export const TEAM = {
-  size: 5,
-  // 紧凑阵型：相邻间距略小于角色体宽，允许少量重叠
-  ringRadius: 0.7 * UNIT,
+  ringRadius: 0.8 * UNIT,
   moveSpeed: 5.5 * UNIT,
   reviveMs: 10_000,
   captainEmoji: '👑',
-  members: [
-    { emoji: '😎', weapons: [WEAPONS.pistol] },
-    { emoji: '🥷', weapons: [WEAPONS.thrustKnife] },
-    { emoji: '🧙', weapons: [WEAPONS.pistol] },
-    { emoji: '🤠', weapons: [WEAPONS.thrustKnife, WEAPONS.pistol] },
-    { emoji: '👽', weapons: [WEAPONS.thrustKnife] },
+  lineup: [
+    CHARACTERS.juggler,
+    CHARACTERS.unicorn,
+    CHARACTERS.troll,
+    CHARACTERS.cowboy,
+    CHARACTERS.mage,
+    CHARACTERS.kangaroo,
   ],
 } as const
 
@@ -146,16 +218,17 @@ export const STRESS = {
 
 export const XP = { base: 8, perLevel: 6 } as const
 
-export const HEAL_AMOUNT = 30
-
 // 剪影描边（radius 单位 = twemoji viewBox 单位，36 格）
 export const OUTLINE = { radius: 2, color: '#000000' } as const
 
 export const OUTLINED_EMOJIS: readonly string[] = [
-  ...TEAM.members.map((m) => m.emoji),
-  WEAPONS.thrustKnife.emoji,
-  WEAPONS.pistol.emoji,
-  WEAPONS.pistol.projectile.emoji,
+  ...TEAM.lineup.map((c) => c.emoji),
+  ...TEAM.lineup.flatMap((c) =>
+    c.weapons.flatMap((w) => [
+      ...('held' in w && w.held ? [w.held.emoji] : []),
+      ...(w.kind === 'projectile' ? [w.projectile.emoji] : []),
+    ]),
+  ),
   ZOMBIE.emoji,
   GHOST.emoji,
   GEM.emoji,

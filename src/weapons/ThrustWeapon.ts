@@ -1,13 +1,13 @@
 import type Phaser from 'phaser'
-import type { Point } from '../core/vec'
 import { thrustHitIndices } from '../core/weapons'
 import type { ThrustSpec } from '../core/weapons'
 import { emojiImage } from '../ui/emoji'
-import type { WeaponContext, WeaponRuntime } from './types'
+import { nearestAngle } from './types'
+import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
-/** 突刺型：持有物朝最近敌人方向挥出再收回，胶囊判定内每敌一次伤害 */
+/** 突刺型：held 时持有物挥出收回；无 held 时角色本体前冲收回。胶囊判定内每敌一次伤害 */
 export class ThrustWeapon implements WeaponRuntime {
-  private image: Phaser.GameObjects.Image
+  private image?: Phaser.GameObjects.Image
   private cooldown: number
   private aim = 0
   private lunge = { t: 0 }
@@ -18,38 +18,41 @@ export class ThrustWeapon implements WeaponRuntime {
     private ctx: WeaponContext,
     initialCooldownMs: number,
   ) {
-    this.image = emojiImage(ctx.scene, 0, 0, spec.emoji, spec.size, true).setDepth(13)
+    if (spec.held) {
+      this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, true).setDepth(13)
+    }
     this.cooldown = initialCooldownMs
   }
 
-  update(delta: number, owner: Point): void {
+  update(delta: number, owner: WeaponOwner): void {
     this.cooldown -= delta
-    const dist = this.spec.restOffset + this.lunge.t * (this.spec.reach - this.spec.restOffset)
-    this.image.setPosition(
-      owner.x + Math.cos(this.aim) * dist,
-      owner.y + Math.sin(this.aim) * dist,
-    )
-    this.image.setRotation(this.aim + this.spec.rotationOffsetRad)
+    if (this.spec.held && this.image) {
+      const dist =
+        this.spec.held.restOffset + this.lunge.t * (this.spec.reach - this.spec.held.restOffset)
+      this.image.setPosition(owner.x + Math.cos(this.aim) * dist, owner.y + Math.sin(this.aim) * dist)
+      this.image.setRotation(this.aim + this.spec.held.rotationOffsetRad)
+    } else {
+      owner.setVisualOffset(
+        Math.cos(this.aim) * this.lunge.t * this.spec.lungeDist,
+        Math.sin(this.aim) * this.lunge.t * this.spec.lungeDist,
+      )
+    }
 
     if (this.cooldown > 0) return
     const targets = this.ctx.enemyTargets()
-    if (targets.length === 0) return
+    const aim = nearestAngle(owner, targets)
+    if (aim === null) return
+    this.aim = aim
     this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
 
-    // 瞄准离自己最近的敌人
-    let bestD = Infinity
-    for (const t of targets) {
-      const dx = t.x - owner.x
-      const dy = t.y - owner.y
-      const d = dx * dx + dy * dy
-      if (d < bestD) {
-        bestD = d
-        this.aim = Math.atan2(dy, dx)
-      }
-    }
-
     const damage = Math.round(this.spec.damage * this.ctx.damageMul())
-    for (const i of thrustHitIndices(owner, this.aim, this.spec.reach, this.spec.hitRadius, targets)) {
+    for (const i of thrustHitIndices(
+      { x: owner.x, y: owner.y },
+      this.aim,
+      this.spec.reach,
+      this.spec.hitRadius,
+      targets,
+    )) {
       this.ctx.damageEnemy(targets[i]!.ref, damage)
     }
 
@@ -65,7 +68,7 @@ export class ThrustWeapon implements WeaponRuntime {
   }
 
   setVisible(on: boolean): void {
-    this.image.setVisible(on)
+    this.image?.setVisible(on)
     if (!on) {
       this.tween?.remove()
       this.lunge.t = 0
@@ -74,6 +77,6 @@ export class ThrustWeapon implements WeaponRuntime {
 
   destroy(): void {
     this.tween?.remove()
-    this.image.destroy()
+    this.image?.destroy()
   }
 }

@@ -1,16 +1,5 @@
 import Phaser from 'phaser'
-import {
-  GEM,
-  GHOST,
-  HEAL_AMOUNT,
-  MAP,
-  MEMBER,
-  SPAWN,
-  STRESS,
-  TEAM,
-  UNIT,
-  ZOMBIE,
-} from '../core/config'
+import { GEM, GHOST, MAP, MEMBER, SPAWN, STRESS, TEAM, UNIT, ZOMBIE } from '../core/config'
 import type { EnemySpec } from '../core/config'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
 import { slotOffset } from '../core/formation'
@@ -19,8 +8,6 @@ import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import { randomMapPoint } from '../core/spawn'
-import { applyUpgrade, pickUpgrade, UPGRADE_LABELS } from '../core/upgrades'
-import type { PlayerStats } from '../core/upgrades'
 import { norm } from '../core/vec'
 import { waveAt } from '../core/waves'
 import { gainXp, xpToNext } from '../core/xp'
@@ -32,8 +19,15 @@ import { emojiImage } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 import { createWeapon } from '../weapons/create'
-import type { EnemyTarget, WeaponContext, WeaponRuntime } from '../weapons/types'
+import type { EnemyTarget, WeaponContext, WeaponOwner, WeaponRuntime } from '../weapons/types'
 import type { UIScene } from './UIScene'
+
+interface TeamStats {
+  damageMul: number
+  cooldownMul: number
+  moveSpeed: number
+  maxHp: number
+}
 
 type ArcadeBody = Phaser.Physics.Arcade.Body
 type ImageObj = Phaser.GameObjects.Image
@@ -61,6 +55,8 @@ interface Member {
   slot: number
   image: ImageObj
   weapons: WeaponRuntime[]
+  handle: WeaponOwner
+  visualOffset: { x: number; y: number }
   hp: number
   alive: boolean
   reviveAt: number
@@ -105,7 +101,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private rng = new Rng(1)
   private palette!: Palette
-  private stats!: PlayerStats
+  private stats!: TeamStats
   private xpState!: XpState
   private kills = 0
   private elapsedMs = 0
@@ -167,7 +163,7 @@ export class ArenaScene extends Phaser.Scene {
     this.centerObj = this.add.zone(this.center.x, this.center.y, 1, 1)
 
     this.memberGroup = this.add.group()
-    this.members = TEAM.members.map((spec, slot) => this.createMember(spec.emoji, spec.weapons, slot))
+    this.members = TEAM.lineup.map((spec, slot) => this.createMember(spec.emoji, spec.weapons, slot))
 
     const cam = this.cameras.main
     cam.setZoom(viewport.renderScale)
@@ -249,7 +245,7 @@ export class ArenaScene extends Phaser.Scene {
   // ── 队伍 ────────────────────────────────────────────────────
 
   private createMember(emoji: string, weaponSpecs: readonly WeaponSpec[], slot: number): Member {
-    const off = slotOffset(slot, TEAM.size, TEAM.ringRadius)
+    const off = slotOffset(slot, TEAM.lineup.length, TEAM.ringRadius)
     const image = emojiImage(
       this,
       this.center.x + off.x,
@@ -264,12 +260,27 @@ export class ArenaScene extends Phaser.Scene {
     // 角色是纯随队走位的运动学对象：body 只跟随图片用于碰撞，
     // 不允许物理引擎把位移回写到图片（否则与手动定位叠加产生抖动）
     ;(image.body as ArcadeBody).moves = false
+    const visualOffset = { x: 0, y: 0 }
+    const handle: WeaponOwner = {
+      get x() {
+        return image.x
+      },
+      get y() {
+        return image.y
+      },
+      setVisualOffset(dx: number, dy: number) {
+        visualOffset.x = dx
+        visualOffset.y = dy
+      },
+    }
     const member: Member = {
       emoji,
       slot,
       image,
       // 错开初始冷却，避免全队同帧齐射
       weapons: weaponSpecs.map((w, i) => createWeapon(w, this.weaponCtx, 300 + slot * 120 + i * 230)),
+      handle,
+      visualOffset,
       hp: this.stats.maxHp,
       alive: true,
       reviveAt: 0,
@@ -316,8 +327,11 @@ export class ArenaScene extends Phaser.Scene {
 
   private layoutTeam(): void {
     for (const m of this.members) {
-      const off = slotOffset(m.slot, TEAM.size, TEAM.ringRadius)
-      m.image.setPosition(this.center.x + off.x, this.center.y + off.y)
+      const off = slotOffset(m.slot, TEAM.lineup.length, TEAM.ringRadius)
+      m.image.setPosition(
+        this.center.x + off.x + m.visualOffset.x,
+        this.center.y + off.y + m.visualOffset.y,
+      )
       ;(m.image.body as ArcadeBody).updateFromGameObject()
       m.hpBar.setPosition(m.image.x, m.image.y)
       m.deadText.setPosition(m.image.x, m.image.y)
@@ -328,7 +342,7 @@ export class ArenaScene extends Phaser.Scene {
     for (const m of this.members) {
       if (m.alive) {
         this.drawMemberHp(m)
-        for (const w of m.weapons) w.update(delta, m.image)
+        for (const w of m.weapons) w.update(delta, m.handle)
       } else {
         if (this.elapsedMs >= m.reviveAt) {
           this.reviveMember(m)
@@ -382,6 +396,8 @@ export class ArenaScene extends Phaser.Scene {
     m.image.setAlpha(0.35).setTint(0x888888)
     m.hpBar.setVisible(false)
     m.deadText.setVisible(true)
+    m.visualOffset.x = 0
+    m.visualOffset.y = 0
     for (const w of m.weapons) w.setVisible(false)
     if (this.members.every((x) => !x.alive)) this.gameOver()
   }
@@ -630,25 +646,8 @@ export class ArenaScene extends Phaser.Scene {
     if (!gem.active) return
     const xp = gem.getData('xp') as number
     gem.destroy()
-    const result = gainXp(this.xpState, xp)
-    this.xpState = result.state
-    if (result.levelsGained > 0) this.onLevelUps(result.levelsGained)
-  }
-
-  private onLevelUps(count: number): void {
-    for (let i = 0; i < count; i++) {
-      const level = this.xpState.level - count + i + 1
-      const id = pickUpgrade(level)
-      this.stats = applyUpgrade(this.stats, id)
-      if (id === 'heal') {
-        for (const m of this.aliveMembers()) m.hp = Math.min(this.stats.maxHp, m.hp + HEAL_AMOUNT)
-      }
-      this.events.emit('upgrade-toast', { ...UPGRADE_LABELS[id], index: i })
-    }
-    // 压测模式下升级不允许把攻速拉回常规下限
-    if (this.stress) {
-      this.stats.cooldownMul = Math.min(this.stats.cooldownMul, STRESS.cooldownMul)
-    }
+    // 升级奖励机制已移除（待重构）：经验与等级仅作为数值累积
+    this.xpState = gainXp(this.xpState, xp).state
   }
 
   // ── 结算 ────────────────────────────────────────────────────
