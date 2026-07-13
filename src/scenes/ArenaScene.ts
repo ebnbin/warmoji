@@ -99,7 +99,7 @@ export class ArenaScene extends Phaser.Scene {
     this.floor = this.add.graphics()
     this.drawFloor()
 
-    this.player = emojiImage(this, this.viewW / 2, this.viewH / 2, PLAYER.emoji, PLAYER.size).setDepth(10)
+    this.player = emojiImage(this, this.viewW / 2, this.viewH / 2, PLAYER.emoji, PLAYER.size, true).setDepth(10)
     this.physics.add.existing(this.player)
     circleBody(this.player, PLAYER.radius)
     ;(this.player.body as ArcadeBody).setCollideWorldBounds(true)
@@ -206,6 +206,7 @@ export class ArenaScene extends Phaser.Scene {
       this.player.y + Math.sin(angle) * 26,
       KNIFE.emoji,
       KNIFE.size,
+      true,
     )
       // twemoji 1f52a 原始刀刃朝向 +45°（右下）
       .setDepth(8)
@@ -284,7 +285,7 @@ export class ArenaScene extends Phaser.Scene {
 
     const spec = this.rng.chance(wave.ghostShare) ? GHOST : ZOMBIE
     const { x, y } = this.randomEdgePoint()
-    const enemy = emojiImage(this, x, y, spec.emoji, spec.size).setDepth(5)
+    const enemy = emojiImage(this, x, y, spec.emoji, spec.size, true).setDepth(5)
     this.physics.add.existing(enemy)
     circleBody(enemy, spec.radius)
     enemy.setData('hp', Math.round(spec.hp * wave.hpMultiplier))
@@ -318,7 +319,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private spawnGem(x: number, y: number, xp: number): void {
-    const gem = emojiImage(this, x, y, GEM.emoji, GEM.size).setDepth(3)
+    const gem = emojiImage(this, x, y, GEM.emoji, GEM.size, true).setDepth(3)
     this.physics.add.existing(gem)
     circleBody(gem, GEM.radius)
     gem.setData('xp', xp)
@@ -398,7 +399,7 @@ export class ArenaScene extends Phaser.Scene {
   private gameOver(): void {
     this.over = true
     this.physics.pause()
-    this.player.setTexture(emojiKey('😵'))
+    this.player.setTexture(emojiKey(PLAYER.deadEmoji, true))
 
     const seconds = Math.floor(this.elapsedMs / 1000)
     const result = submitScore(browserStorage(), seconds, this.kills)

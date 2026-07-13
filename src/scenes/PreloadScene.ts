@@ -1,20 +1,14 @@
 import Phaser from 'phaser'
-import { preloadEmojis } from '../ui/emoji'
+import { loadEmojiTextures } from '../ui/emoji'
 
 export class PreloadScene extends Phaser.Scene {
   constructor() {
     super('preload')
   }
 
-  preload(): void {
-    // 打成 console.error 让 e2e 的无报错断言能捕获资源缺失
-    this.load.on('loaderror', (file: Phaser.Loader.File) => {
-      console.error(`资源加载失败: ${file.key}`)
-    })
-    preloadEmojis(this)
-  }
-
   create(): void {
-    this.scene.start('menu')
+    loadEmojiTextures(this)
+      .catch((err) => console.error(`emoji 纹理加载失败: ${String(err)}`))
+      .finally(() => this.scene.start('menu'))
   }
 }
