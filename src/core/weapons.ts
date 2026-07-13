@@ -18,6 +18,9 @@ export interface HeldVisual {
 
 export interface ThrustSpec {
   readonly kind: 'thrust'
+  readonly name: string
+  /** 属性面板等 UI 的展示图标 */
+  readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
   /** 判定：从角色中心沿瞄准方向的线段长度 */
@@ -31,6 +34,8 @@ export interface ThrustSpec {
 
 export interface ProjectileSpec {
   readonly kind: 'projectile'
+  readonly name: string
+  readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
   readonly held?: HeldVisual
@@ -45,6 +50,8 @@ export interface ProjectileSpec {
 
 export interface SweepSpec {
   readonly kind: 'sweep'
+  readonly name: string
+  readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
   /** 扇形判定半径与弧宽 */
@@ -56,6 +63,8 @@ export interface SweepSpec {
 
 export interface AreaBlastSpec {
   readonly kind: 'areaBlast'
+  readonly name: string
+  readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
   /** 侦测范围：在此距离内选取爆心（离持有者最近的敌人） */
@@ -68,6 +77,8 @@ export interface AreaBlastSpec {
 
 export interface BoomerangSpec {
   readonly kind: 'boomerang'
+  readonly name: string
+  readonly icon: string
   readonly damage: number
   /** 接住后才开始计冷却 */
   readonly cooldownMs: number

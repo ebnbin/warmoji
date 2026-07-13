@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { clickShopNext, startRun } from './helpers'
+import { clickShopNext, clickShopSlot, startRun } from './helpers'
 
 // 存活 30 秒受随机刷怪影响，慢渲染环境下偶发全灭，允许重试
 test.describe.configure({ retries: 2 })
@@ -35,6 +35,12 @@ test('波次循环：30 秒战斗 → 商店 → 下一波，金币/击杀/血�
   expect(shop.shop!.wave).toBe(2)
   expect(shop.kills).toBeGreaterThanOrEqual(1)
   expect(shop.shop!.coins).toBeGreaterThanOrEqual(1)
+
+  // 每个出战角色一个上架位；点其他位切换属性面板焦点
+  expect(shop.shop!.slots.length).toBe(5)
+  const other = shop.shop!.slots.find((s) => s.id !== shop.shop!.focusedId)!
+  await clickShopSlot(page, other.id)
+  await page.waitForFunction((id) => window.__warmoji?.shop?.focusedId === id, other.id)
   await page.screenshot({ path: 'test-results/shop.png' })
 
   // 继续下一波：波次推进，全员在场，金币与击杀延续

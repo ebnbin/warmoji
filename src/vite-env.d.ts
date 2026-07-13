@@ -20,6 +20,8 @@ interface WarmojiSelectDebug {
 interface WarmojiShopDebug {
   wave: number
   coins: number
+  focusedId: string
+  slots: { id: string; x: number; y: number; w: number; h: number }[]
   start: { x: number; y: number; w: number; h: number }
 }
 

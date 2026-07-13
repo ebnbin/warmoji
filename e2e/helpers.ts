@@ -46,6 +46,17 @@ export async function startRun(page: Page): Promise<void> {
   await clickStart(page)
 }
 
+/** 商店页点击某个角色的上架位（切换属性面板焦点） */
+export async function clickShopSlot(page: Page, id: string): Promise<void> {
+  const r = await page.evaluate(
+    (cid) => window.__warmoji!.shop!.slots.find((x) => x.id === cid)!,
+    id,
+  )
+  await page
+    .locator('#game canvas')
+    .click({ position: await cssPoint(page, { x: r.x + r.w / 2, y: r.y + r.h / 2 }) })
+}
+
 /** 商店页点击「开始第 N 波」进入下一波 */
 export async function clickShopNext(page: Page): Promise<void> {
   const s = await page.evaluate(() => window.__warmoji!.shop!.start)

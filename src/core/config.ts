@@ -23,6 +23,8 @@ import type {
 // 武器库（可被不同角色复用；held 缺省 = 行为主体是角色本体）
 const pistol = {
   kind: 'projectile',
+  name: '左轮水枪',
+  icon: '🔫',
   damage: 16,
   cooldownMs: 600,
   held: {
@@ -46,6 +48,8 @@ const pistol = {
 export const WEAPONS = {
   tomatoThrow: {
     kind: 'projectile',
+    name: '番茄连投',
+    icon: '🍅',
     damage: 22,
     cooldownMs: 450,
     projectile: {
@@ -58,6 +62,8 @@ export const WEAPONS = {
   } satisfies ProjectileSpec,
   hornThrust: {
     kind: 'thrust',
+    name: '独角突刺',
+    icon: '⚔️',
     damage: 26,
     cooldownMs: 900,
     reach: 1.4 * UNIT,
@@ -67,6 +73,8 @@ export const WEAPONS = {
   } satisfies ThrustSpec,
   axeSweep: {
     kind: 'sweep',
+    name: '巨斧横扫',
+    icon: '🪓',
     damage: 30,
     cooldownMs: 1200,
     radius: 1.5 * UNIT,
@@ -80,10 +88,20 @@ export const WEAPONS = {
       rotationOffsetRad: (3 * Math.PI) / 4,
     },
   } satisfies SweepSpec,
-  pistolLeft: { ...pistol, held: { ...pistol.held, mountSide: -1 } } satisfies ProjectileSpec,
-  pistolRight: { ...pistol, held: { ...pistol.held, mountSide: 1 } } satisfies ProjectileSpec,
+  pistolLeft: {
+    ...pistol,
+    name: '左轮水枪·左',
+    held: { ...pistol.held, mountSide: -1 },
+  } satisfies ProjectileSpec,
+  pistolRight: {
+    ...pistol,
+    name: '左轮水枪·右',
+    held: { ...pistol.held, mountSide: 1 },
+  } satisfies ProjectileSpec,
   arcaneBlast: {
     kind: 'areaBlast',
+    name: '奥术轰炸',
+    icon: '💥',
     damage: 22,
     cooldownMs: 1300,
     detectRange: 6 * UNIT,
@@ -92,6 +110,8 @@ export const WEAPONS = {
   } satisfies AreaBlastSpec,
   boomerang: {
     kind: 'boomerang',
+    name: '回旋镖',
+    icon: '🪃',
     damage: 18,
     cooldownMs: 1200,
     range: 4 * UNIT,
@@ -284,6 +304,8 @@ export const OUTLINED_EMOJIS: readonly string[] = [
 // 启动时预载的 emoji（含 UI 图标）；其余全集按需加载（ui/emoji.ts ensureEmoji）
 export const PRELOAD_EMOJIS: readonly string[] = [
   ...OUTLINED_EMOJIS,
+  // 属性面板的武器/基础组图标
+  ...roster.flatMap((c) => c.weapons.map((w) => w.icon)),
   SPAWN.markEmoji,
   '⚔️',
   '🏆',
