@@ -19,6 +19,12 @@ test('页面可加载：canvas 渲染、版本徽章存在、无控制台错误'
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundImage)
   expect(bg).toContain('linear-gradient')
 
+  // twemoji 全集已部署：抽查一个未预载的 emoji（😀）
+  const ver = await page.evaluate(() => window.__twemojiVersion)
+  const dynamicSvg = await page.request.get(`/emoji/${ver}/1f600.svg`)
+  expect(dynamicSvg.ok()).toBeTruthy()
+  expect(await dynamicSvg.text()).toContain('<svg')
+
   // 跑几帧，暴露启动后才出现的运行时错误
   await page.waitForTimeout(800)
   expect(errors).toEqual([])

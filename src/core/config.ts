@@ -102,3 +102,6 @@ export const OUTLINED_EMOJIS: readonly string[] = [
   GEM.emoji,
   '💀',
 ]
+
+// 启动时预载的 emoji（含 UI 图标）；其余全集按需加载（ui/emoji.ts ensureEmoji）
+export const PRELOAD_EMOJIS: readonly string[] = [...OUTLINED_EMOJIS, '⚔️', '🏆', '⚡', '👟', '❤️']

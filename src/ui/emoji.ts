@@ -1,22 +1,25 @@
 import Phaser from 'phaser'
-import { OUTLINE, OUTLINED_EMOJIS } from '../core/config'
+import { OUTLINE, OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../core/config'
 import { emojiCodepoints } from '../core/emoji'
 import { outlineSvg, setSvgSize } from '../core/svg'
 
-// twemoji SVG（jdecked/twemoji@15.1.0，图形 CC-BY 4.0），文件名 = 码点；
-// 与源码中 emoji 的一一对应由 src/emoji-assets.test.ts 校验。
-// 加载管线：fetch SVG 文本 → core/svg.ts 的纯函数改写 → 光栅化 → Phaser 纹理，
-// 原始 SVG 文件永不改动，后续对 SVG 的定制都加在改写这一步。
-const files = import.meta.glob('../assets/emoji/*.svg', {
-  eager: true,
-  query: '?url',
-  import: 'default',
-}) as Record<string, string>
-
+// twemoji 全集（@twemoji/svg，构建时同步到 public/emoji/<版本>/，图形 CC-BY 4.0）。
+// 加载管线：fetch SVG 文本 → core/svg.ts 纯函数改写 → 光栅化 → Phaser 纹理；
+// 启动只预载 PRELOAD_EMOJIS，其余按需 ensureEmoji，超 LRU 上限淘汰最久未用。
 const RASTER = 256
+const LRU_LIMIT = 256
+
+const inflight = new Map<string, Promise<string>>()
+const lastUsed = new Map<string, number>()
+const pinned = new Set<string>()
+let useTick = 0
 
 export function emojiKey(emoji: string, outlined = false): string {
   return `emoji-${emojiCodepoints(emoji)}${outlined ? '-ol' : ''}`
+}
+
+function emojiUrl(emoji: string): string {
+  return `/emoji/${__TWEMOJI_VERSION__}/${emojiCodepoints(emoji)}.svg`
 }
 
 async function rasterize(svgText: string): Promise<HTMLImageElement> {
@@ -34,24 +37,61 @@ async function rasterize(svgText: string): Promise<HTMLImageElement> {
   }
 }
 
+async function createTexture(scene: Phaser.Scene, emoji: string, outlined: boolean): Promise<string> {
+  const key = emojiKey(emoji, outlined)
+  const res = await fetch(emojiUrl(emoji))
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${emojiUrl(emoji)}`)
+  const raw = await res.text()
+  const svg = outlined ? outlineSvg(raw, OUTLINE.radius, OUTLINE.color) : raw
+  scene.textures.addImage(key, await rasterize(setSvgSize(svg, RASTER)))
+  return key
+}
+
+/** 确保 emoji 纹理可用（按需 fetch + 改写 + 光栅化），并发去重 */
+export function ensureEmoji(scene: Phaser.Scene, emoji: string, outlined = false): Promise<string> {
+  const key = emojiKey(emoji, outlined)
+  lastUsed.set(key, ++useTick)
+  if (scene.textures.exists(key)) return Promise.resolve(key)
+  const pending = inflight.get(key)
+  if (pending) return pending
+  const p = createTexture(scene, emoji, outlined)
+    .then((k) => {
+      evictIfNeeded(scene)
+      return k
+    })
+    .finally(() => inflight.delete(key))
+  inflight.set(key, p)
+  return p
+}
+
+function evictIfNeeded(scene: Phaser.Scene): void {
+  const candidates = [...lastUsed.entries()].filter(
+    ([k]) => !pinned.has(k) && scene.textures.exists(k),
+  )
+  if (candidates.length <= LRU_LIMIT) return
+  candidates.sort((a, b) => a[1] - b[1])
+  for (const [k] of candidates.slice(0, candidates.length - LRU_LIMIT)) {
+    scene.textures.remove(k)
+    lastUsed.delete(k)
+  }
+}
+
+/** 启动预载：游戏当前用到的全部 emoji（含描边变体），预载纹理不参与 LRU 淘汰 */
 export async function loadEmojiTextures(scene: Phaser.Scene): Promise<void> {
-  const entityCodes = new Set(OUTLINED_EMOJIS.map(emojiCodepoints))
+  const outlinedSet = new Set(OUTLINED_EMOJIS)
   await Promise.all(
-    Object.entries(files).map(async ([path, url]) => {
-      const code = /([0-9a-f-]+)\.svg$/.exec(path)?.[1]
-      if (!code) return
-      try {
-        const raw = await (await fetch(url)).text()
-        scene.textures.addImage(`emoji-${code}`, await rasterize(setSvgSize(raw, RASTER)))
-        if (entityCodes.has(code)) {
-          const outlined = setSvgSize(outlineSvg(raw, OUTLINE.radius, OUTLINE.color), RASTER)
-          scene.textures.addImage(`emoji-${code}-ol`, await rasterize(outlined))
-        }
-      } catch (err) {
-        // console.error 让 e2e 的无报错断言能捕获资源问题
-        console.error(`emoji 纹理加载失败 ${code}: ${String(err)}`)
-      }
-    }),
+    PRELOAD_EMOJIS.flatMap((emoji) => {
+      const jobs = [ensureEmoji(scene, emoji, false)]
+      if (outlinedSet.has(emoji)) jobs.push(ensureEmoji(scene, emoji, true))
+      return jobs
+    }).map((p) =>
+      p
+        .then((key) => {
+          pinned.add(key)
+        })
+        // console.error 让 e2e 的无报错断言能捕获资源缺失
+        .catch((err) => console.error(`emoji 纹理加载失败: ${String(err)}`)),
+    ),
   )
 }
 

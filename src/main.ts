@@ -36,3 +36,4 @@ window.addEventListener('resize', () => {
 
 // 供临时验证脚本注入状态
 window.__game = game
+window.__twemojiVersion = __TWEMOJI_VERSION__
