@@ -11,6 +11,8 @@ interface WarmojiDebug {
   kills: number
   level: number
   enemies: number
+  viewW: number
+  viewH: number
 }
 
 interface Window {

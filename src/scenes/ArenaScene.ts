@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { ARENA, GEM, GHOST, HEAL_AMOUNT, KNIFE, PLAYER, SPAWN, ZOMBIE } from '../core/config'
+import { GEM, GHOST, HEAL_AMOUNT, KNIFE, PLAYER, SPAWN, ZOMBIE } from '../core/config'
 import type { EnemySpec } from '../core/config'
 import { formatTime } from '../core/format'
 import { browserStorage, submitScore } from '../core/highscore'
@@ -14,11 +14,12 @@ import type { XpState } from '../core/xp'
 import { reportDebug } from '../ui/debug'
 import { Joystick } from '../ui/Joystick'
 import { EMOJI_FONT, UI_FONT } from '../ui/fonts'
+import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 type ArcadeBody = Phaser.Physics.Arcade.Body
 type TextObj = Phaser.GameObjects.Text
 
-// Text 的物理体默认贴左上角，这里换算偏移让圆形碰撞体居中。
+// Text 的物理体默认贴左上角，这里换算偏移让圆形碰撞体居中
 function circleBody(obj: TextObj, radius: number): void {
   const body = obj.body as ArcadeBody
   body.setCircle(radius, obj.displayWidth / 2 - radius, obj.displayHeight / 2 - radius)
@@ -48,15 +49,25 @@ export class ArenaScene extends Phaser.Scene {
   private lastHitMs = -Infinity
   private over = false
 
+  private floor!: Phaser.GameObjects.Graphics
   private hpBar!: Phaser.GameObjects.Graphics
   private xpBar!: Phaser.GameObjects.Graphics
   private timeText!: TextObj
   private killsText!: TextObj
   private levelText!: TextObj
+  private overlay?: Phaser.GameObjects.Container
   private lastShownSecond = -1
 
   constructor() {
     super('arena')
+  }
+
+  private get viewW(): number {
+    return viewport.logicalWidth
+  }
+
+  private get viewH(): number {
+    return viewport.logicalHeight
   }
 
   create(): void {
@@ -77,14 +88,18 @@ export class ArenaScene extends Phaser.Scene {
     this.lastHitMs = -Infinity
     this.over = false
     this.lastShownSecond = -1
+    this.overlay = undefined
 
-    this.physics.world.setBounds(0, 0, ARENA.width, ARENA.height)
+    applyCamera(this)
+    this.physics.world.setBounds(0, 0, this.viewW, this.viewH)
+    this.floor = this.add.graphics()
     this.drawFloor()
 
     this.player = this.add
-      .text(ARENA.width / 2, ARENA.height / 2, PLAYER.emoji, {
+      .text(this.viewW / 2, this.viewH / 2, PLAYER.emoji, {
         fontFamily: EMOJI_FONT,
         fontSize: `${PLAYER.fontSize}px`,
+        resolution: textRes(),
       })
       .setOrigin(0.5)
       .setDepth(10)
@@ -113,6 +128,11 @@ export class ArenaScene extends Phaser.Scene {
     )
 
     this.createHud()
+
+    this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
+    })
   }
 
   update(_time: number, delta: number): void {
@@ -134,7 +154,21 @@ export class ArenaScene extends Phaser.Scene {
       kills: this.kills,
       level: this.xpState.level,
       enemies: this.enemies.countActive(true),
+      viewW: this.viewW,
+      viewH: this.viewH,
     })
+  }
+
+  private onViewportChanged(): void {
+    applyCamera(this)
+    this.physics.world.setBounds(0, 0, this.viewW, this.viewH)
+    this.drawFloor()
+    this.layoutHud()
+    this.player.setPosition(
+      Phaser.Math.Clamp(this.player.x, PLAYER.radius, this.viewW - PLAYER.radius),
+      Phaser.Math.Clamp(this.player.y, PLAYER.radius, this.viewH - PLAYER.radius),
+    )
+    this.overlay?.setPosition(this.viewW / 2, this.viewH / 2)
   }
 
   private movePlayer(): void {
@@ -173,6 +207,7 @@ export class ArenaScene extends Phaser.Scene {
       .text(this.player.x + Math.cos(angle) * 26, this.player.y + Math.sin(angle) * 26, KNIFE.emoji, {
         fontFamily: EMOJI_FONT,
         fontSize: `${KNIFE.fontSize}px`,
+        resolution: textRes(),
       })
       .setOrigin(0.5)
       .setDepth(8)
@@ -185,7 +220,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private cullKnives(): void {
     for (const k of this.knives.getChildren() as TextObj[]) {
-      if (k.x < -60 || k.x > ARENA.width + 60 || k.y < -60 || k.y > ARENA.height + 60) {
+      if (k.x < -60 || k.x > this.viewW + 60 || k.y < -60 || k.y > this.viewH + 60) {
         k.destroy()
       }
     }
@@ -229,6 +264,7 @@ export class ArenaScene extends Phaser.Scene {
         color: '#ffffff',
         stroke: '#000000',
         strokeThickness: 3,
+        resolution: textRes(),
       })
       .setOrigin(0.5)
       .setDepth(50)
@@ -251,7 +287,11 @@ export class ArenaScene extends Phaser.Scene {
     const spec = this.rng.chance(wave.ghostShare) ? GHOST : ZOMBIE
     const { x, y } = this.randomEdgePoint()
     const enemy = this.add
-      .text(x, y, spec.emoji, { fontFamily: EMOJI_FONT, fontSize: `${spec.fontSize}px` })
+      .text(x, y, spec.emoji, {
+        fontFamily: EMOJI_FONT,
+        fontSize: `${spec.fontSize}px`,
+        resolution: textRes(),
+      })
       .setOrigin(0.5)
       .setDepth(5)
     this.physics.add.existing(enemy)
@@ -263,15 +303,17 @@ export class ArenaScene extends Phaser.Scene {
 
   private randomEdgePoint(): { x: number; y: number } {
     const m = SPAWN.edgeMargin
+    const w = Math.round(this.viewW)
+    const h = Math.round(this.viewH)
     switch (this.rng.int(0, 3)) {
       case 0:
-        return { x: this.rng.int(0, ARENA.width), y: -m }
+        return { x: this.rng.int(0, w), y: -m }
       case 1:
-        return { x: this.rng.int(0, ARENA.width), y: ARENA.height + m }
+        return { x: this.rng.int(0, w), y: h + m }
       case 2:
-        return { x: -m, y: this.rng.int(0, ARENA.height) }
+        return { x: -m, y: this.rng.int(0, h) }
       default:
-        return { x: ARENA.width + m, y: this.rng.int(0, ARENA.height) }
+        return { x: w + m, y: this.rng.int(0, h) }
     }
   }
 
@@ -286,7 +328,11 @@ export class ArenaScene extends Phaser.Scene {
 
   private spawnGem(x: number, y: number, xp: number): void {
     const gem = this.add
-      .text(x, y, GEM.emoji, { fontFamily: EMOJI_FONT, fontSize: `${GEM.fontSize}px` })
+      .text(x, y, GEM.emoji, {
+        fontFamily: EMOJI_FONT,
+        fontSize: `${GEM.fontSize}px`,
+        resolution: textRes(),
+      })
       .setOrigin(0.5)
       .setDepth(3)
     this.physics.add.existing(gem)
@@ -335,12 +381,13 @@ export class ArenaScene extends Phaser.Scene {
 
   private showUpgradeToast(label: string, index: number): void {
     const t = this.add
-      .text(ARENA.width / 2, ARENA.height * 0.36 + index * 36, `⬆️ ${label}`, {
+      .text(this.viewW / 2, this.viewH * 0.36 + index * 36, `⬆️ ${label}`, {
         fontFamily: EMOJI_FONT,
         fontSize: '28px',
         color: '#ffe082',
         stroke: '#000000',
         strokeThickness: 4,
+        resolution: textRes(),
       })
       .setOrigin(0.5)
       .setDepth(120)
@@ -374,37 +421,43 @@ export class ArenaScene extends Phaser.Scene {
 
     const seconds = Math.floor(this.elapsedMs / 1000)
     const result = submitScore(browserStorage(), seconds, this.kills)
-    const cx = ARENA.width / 2
+    const res = textRes()
 
-    this.add.rectangle(cx, ARENA.height / 2, ARENA.width, ARENA.height, 0x000000, 0.72).setDepth(200)
-    this.add
-      .text(cx, 168, '💀 游戏结束', { fontFamily: EMOJI_FONT, fontSize: '52px', color: '#ffffff' })
+    const dim = this.add.rectangle(0, 0, 6000, 6000, 0x000000, 0.72)
+    const title = this.add
+      .text(0, -110, '💀 游戏结束', { fontFamily: EMOJI_FONT, fontSize: '52px', color: '#ffffff', resolution: res })
       .setOrigin(0.5)
-      .setDepth(201)
-    this.add
-      .text(cx, 252, `存活 ${formatTime(seconds)} · 击杀 ${this.kills} · 等级 ${this.xpState.level}`, {
+    const statsLine = this.add
+      .text(0, -26, `存活 ${formatTime(seconds)} · 击杀 ${this.kills} · 等级 ${this.xpState.level}`, {
         fontFamily: UI_FONT,
         fontSize: '24px',
         color: '#dddddd',
+        resolution: res,
       })
       .setOrigin(0.5)
-      .setDepth(201)
-    this.add
+    const bestLine = this.add
       .text(
-        cx,
-        300,
+        0,
+        22,
         result.newBest
           ? '🏆 新纪录！'
           : `🏆 最佳：存活 ${formatTime(result.score.bestSeconds)} · 击杀 ${result.score.bestKills}`,
-        { fontFamily: EMOJI_FONT, fontSize: '20px', color: '#d4b106' },
+        { fontFamily: EMOJI_FONT, fontSize: '20px', color: '#d4b106', resolution: res },
       )
       .setOrigin(0.5)
-      .setDepth(201)
     const prompt = this.add
-      .text(cx, 384, '点击或按任意键重新开始', { fontFamily: UI_FONT, fontSize: '20px', color: '#aaaaaa' })
+      .text(0, 106, '点击或按任意键重新开始', {
+        fontFamily: UI_FONT,
+        fontSize: '20px',
+        color: '#aaaaaa',
+        resolution: res,
+      })
       .setOrigin(0.5)
-      .setDepth(201)
     this.tweens.add({ targets: prompt, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 })
+
+    this.overlay = this.add
+      .container(this.viewW / 2, this.viewH / 2, [dim, title, statsLine, bestLine, prompt])
+      .setDepth(200)
 
     reportDebug({
       scene: 'gameover',
@@ -413,6 +466,8 @@ export class ArenaScene extends Phaser.Scene {
       kills: this.kills,
       level: this.xpState.level,
       enemies: this.enemies.countActive(true),
+      viewW: this.viewW,
+      viewH: this.viewH,
     })
 
     // 防死亡瞬间误触重开
@@ -426,30 +481,38 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private drawFloor(): void {
-    const g = this.add.graphics()
+    const g = this.floor
+    g.clear()
     g.lineStyle(1, 0xffffff, 0.05)
-    for (let x = 0; x <= ARENA.width; x += 60) g.lineBetween(x, 0, x, ARENA.height)
-    for (let y = 0; y <= ARENA.height; y += 60) g.lineBetween(0, y, ARENA.width, y)
+    for (let x = 0; x <= this.viewW; x += 60) g.lineBetween(x, 0, x, this.viewH)
+    for (let y = 0; y <= this.viewH; y += 60) g.lineBetween(0, y, this.viewW, y)
     g.lineStyle(2, 0xffffff, 0.15)
-    g.strokeRect(1, 1, ARENA.width - 2, ARENA.height - 2)
+    g.strokeRect(1, 1, this.viewW - 2, this.viewH - 2)
   }
 
   private createHud(): void {
+    const res = textRes()
     this.hpBar = this.add.graphics().setDepth(100)
     this.xpBar = this.add.graphics().setDepth(100)
     this.levelText = this.add
-      .text(224, 10, 'Lv.1', { fontFamily: UI_FONT, fontSize: '16px', color: '#cccccc' })
+      .text(224, 10, 'Lv.1', { fontFamily: UI_FONT, fontSize: '16px', color: '#cccccc', resolution: res })
       .setDepth(100)
     this.timeText = this.add
-      .text(ARENA.width / 2, 10, '0:00', { fontFamily: UI_FONT, fontSize: '22px', color: '#dddddd' })
+      .text(0, 10, '0:00', { fontFamily: UI_FONT, fontSize: '22px', color: '#dddddd', resolution: res })
       .setOrigin(0.5, 0)
       .setDepth(100)
     this.killsText = this.add
-      .text(ARENA.width - 12, 10, '💀 0', { fontFamily: EMOJI_FONT, fontSize: '20px', color: '#dddddd' })
+      .text(0, 10, '💀 0', { fontFamily: EMOJI_FONT, fontSize: '20px', color: '#dddddd', resolution: res })
       .setOrigin(1, 0)
       .setDepth(100)
+    this.layoutHud()
     this.drawHpBar()
     this.drawXpBar()
+  }
+
+  private layoutHud(): void {
+    this.timeText.setX(this.viewW / 2)
+    this.killsText.setX(this.viewW - 12)
   }
 
   private drawHpBar(): void {

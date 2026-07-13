@@ -1,4 +1,5 @@
-export const ARENA = { width: 960, height: 540 } as const
+// 保底可视区：横屏 1280×720，竖屏 720×1280；多余空间向两侧扩展为真实战场
+export const VIEW = { minLong: 1280, minShort: 720 } as const
 
 export const PLAYER = {
   emoji: '😎',

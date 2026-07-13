@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
-import { ARENA } from './core/config'
 import { ArenaScene } from './scenes/ArenaScene'
 import { MenuScene } from './scenes/MenuScene'
+import { refreshViewport } from './ui/viewport'
 
 const badge = document.getElementById('build-badge')
 if (badge) {
@@ -12,16 +12,17 @@ if (badge) {
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  width: ARENA.width,
-  height: ARENA.height,
   backgroundColor: '#12122a',
   input: { activePointers: 3 },
   physics: { default: 'arcade' },
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-  },
+  scale: { mode: Phaser.Scale.RESIZE },
   scene: [MenuScene, ArenaScene],
+})
+
+let resizeTimer: number | undefined
+game.scale.on('resize', () => {
+  window.clearTimeout(resizeTimer)
+  resizeTimer = window.setTimeout(() => refreshViewport(game), 100)
 })
 
 // 供临时验证脚本注入状态

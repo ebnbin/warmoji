@@ -29,19 +29,21 @@ export class Joystick {
   private onDown(pointer: Phaser.Input.Pointer): void {
     if (this.pointerId !== null) return
     this.pointerId = pointer.id
-    this.originX = pointer.x
-    this.originY = pointer.y
+    this.originX = pointer.worldX
+    this.originY = pointer.worldY
     this.base = this.scene.add
-      .circle(pointer.x, pointer.y, RADIUS, 0xffffff, 0.06)
+      .circle(this.originX, this.originY, RADIUS, 0xffffff, 0.06)
       .setStrokeStyle(2, 0xffffff, 0.2)
       .setDepth(150)
-    this.thumb = this.scene.add.circle(pointer.x, pointer.y, THUMB_RADIUS, 0xffffff, 0.18).setDepth(151)
+    this.thumb = this.scene.add
+      .circle(this.originX, this.originY, THUMB_RADIUS, 0xffffff, 0.18)
+      .setDepth(151)
   }
 
   private onMove(pointer: Phaser.Input.Pointer): void {
     if (pointer.id !== this.pointerId) return
-    let dx = pointer.x - this.originX
-    let dy = pointer.y - this.originY
+    let dx = pointer.worldX - this.originX
+    let dy = pointer.worldY - this.originY
     const len = Math.hypot(dx, dy)
     if (len > RADIUS) {
       dx = (dx / len) * RADIUS
