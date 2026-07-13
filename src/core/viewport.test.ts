@@ -45,4 +45,19 @@ describe('computeViewport', () => {
     expect(v.logicalWidth).toBeCloseTo(1280)
     expect(v.logicalHeight).toBeCloseTo(1280)
   })
+
+  it('DPR 计入渲染缩放但不影响逻辑尺寸', () => {
+    const v = computeViewport(1280, 720, 2)
+    expect(v.dpr).toBe(2)
+    expect(v.fitScale).toBe(1)
+    expect(v.renderScale).toBe(2)
+    expect(v.logicalWidth).toBe(1280)
+    expect(v.logicalHeight).toBe(720)
+  })
+
+  it('DPR 钳制在 [1, 2]，缺省为 1', () => {
+    expect(computeViewport(1280, 720, 3).dpr).toBe(2)
+    expect(computeViewport(1280, 720, 0).dpr).toBe(1)
+    expect(computeViewport(1280, 720).renderScale).toBe(computeViewport(1280, 720).fitScale)
+  })
 })

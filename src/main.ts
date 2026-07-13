@@ -3,7 +3,7 @@ import { ArenaScene } from './scenes/ArenaScene'
 import { MenuScene } from './scenes/MenuScene'
 import { PreloadScene } from './scenes/PreloadScene'
 import { UIScene } from './scenes/UIScene'
-import { refreshViewport } from './ui/viewport'
+import { refreshViewport, viewport } from './ui/viewport'
 
 const badge = document.getElementById('build-badge')
 if (badge) {
@@ -16,14 +16,18 @@ const game = new Phaser.Game({
   parent: 'game',
   // 背景渐变画在 canvas 之下的页面层，canvas 必须透明
   transparent: true,
+  width: Math.round(viewport.cssWidth * viewport.dpr),
+  height: Math.round(viewport.cssHeight * viewport.dpr),
   input: { activePointers: 3 },
   physics: { default: 'arcade' },
-  scale: { mode: Phaser.Scale.RESIZE },
+  scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
   scene: [PreloadScene, MenuScene, ArenaScene, UIScene],
 })
 
+game.events.once(Phaser.Core.Events.READY, () => refreshViewport(game))
+
 let resizeTimer: number | undefined
-game.scale.on('resize', () => {
+window.addEventListener('resize', () => {
   window.clearTimeout(resizeTimer)
   resizeTimer = window.setTimeout(() => refreshViewport(game), 100)
 })

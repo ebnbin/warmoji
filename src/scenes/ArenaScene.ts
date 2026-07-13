@@ -123,7 +123,7 @@ export class ArenaScene extends Phaser.Scene {
     ;(this.player.body as ArcadeBody).setCollideWorldBounds(true)
 
     const cam = this.cameras.main
-    cam.setZoom(viewport.fitScale)
+    cam.setZoom(viewport.renderScale)
     cam.setBounds(
       -MAP.cameraMargin,
       -MAP.cameraMargin,
@@ -189,7 +189,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private onViewportChanged(): void {
-    this.cameras.main.setZoom(viewport.fitScale)
+    this.cameras.main.setZoom(viewport.renderScale)
   }
 
   private movePlayer(): void {
