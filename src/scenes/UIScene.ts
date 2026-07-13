@@ -2,7 +2,8 @@ import Phaser from 'phaser'
 import { COIN } from '../core/config'
 import { formatTime } from '../core/format'
 import { isDevOpen, isStress, setDevOpen, setStress } from '../ui/dev'
-import { emojiImage, iconLabel } from '../ui/emoji'
+import { heapMB, rafHz, rendererInfo, startRafMeter } from '../ui/diagnostics'
+import { emojiCacheStats, emojiImage, iconLabel } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
 import { Joystick } from '../ui/Joystick'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
@@ -20,6 +21,7 @@ export class UIScene extends Phaser.Scene {
   private last!: HudSnapshot
   private devText?: Phaser.GameObjects.Text
   private fpsWindowMin = Infinity
+  private frameMaxMs = 0
   private fpsWindowStart = 0
   private devRefreshedAt = 0
 
@@ -121,7 +123,9 @@ export class UIScene extends Phaser.Scene {
   }
 
   private createDevPanel(res: number): void {
+    startRafMeter()
     this.fpsWindowMin = Infinity
+    this.frameMaxMs = 0
     this.fpsWindowStart = 0
     this.devRefreshedAt = 0
     const h = viewport.logicalHeight
@@ -158,20 +162,31 @@ export class UIScene extends Phaser.Scene {
 
   private updateDevPanel(time: number): void {
     const fps = this.game.loop.actualFps
+    const rawDelta = this.game.loop.rawDelta
     if (time - this.fpsWindowStart > 5000) {
       this.fpsWindowStart = time
       this.fpsWindowMin = fps
-    } else if (fps < this.fpsWindowMin) {
-      this.fpsWindowMin = fps
+      this.frameMaxMs = rawDelta
+    } else {
+      if (fps < this.fpsWindowMin) this.fpsWindowMin = fps
+      if (rawDelta > this.frameMaxMs) this.frameMaxMs = rawDelta
     }
     if (time - this.devRefreshedAt < 250) return
     this.devRefreshedAt = time
     const p = this.arena.perfSnapshot()
+    const cache = emojiCacheStats(this)
+    const raf = rafHz()
+    const heap = heapMB()
+    const vp = viewport
+    const gl = rendererInfo(this.game)
     this.devText!.setText([
-      `FPS ${fps.toFixed(0)}  (5s min ${Number.isFinite(this.fpsWindowMin) ? this.fpsWindowMin.toFixed(0) : '-'})`,
-      `敌人 ${p.enemies}  预告 ${p.pending}`,
-      `子弹 ${p.projectiles}  金币 ${p.coins}`,
-      `总对象 ${p.objects}`,
+      `FPS ${fps.toFixed(0)}（5s低 ${Number.isFinite(this.fpsWindowMin) ? this.fpsWindowMin.toFixed(0) : '-'}）· rAF ${raf > 0 ? raf : '-'}`,
+      `帧峰值 ${this.frameMaxMs.toFixed(0)}ms${heap === undefined ? '' : ` · 内存 ${heap}MB`}`,
+      `敌人 ${p.enemies} · 预告 ${p.pending} · 子弹 ${p.projectiles} · 金币 ${p.coins}`,
+      `对象 ${p.objects} · 物理体 ${p.bodies} · emoji纹理 ${cache.textures}（固定 ${cache.pinned}）`,
+      `难度 t ${p.combatSec}s · 刷怪 ${p.spawnIntervalMs}ms · 幽灵 ${(p.ghostShare * 100).toFixed(0)}% · 血量 ×${p.hpMultiplier.toFixed(2)}`,
+      `视口 ${Math.round(vp.logicalWidth)}×${Math.round(vp.logicalHeight)} ×${vp.fitScale.toFixed(2)} · DPR ${vp.dpr} · 画布 ${Math.round(vp.cssWidth * vp.dpr)}×${Math.round(vp.cssHeight * vp.dpr)}`,
+      gl.length > 54 ? `${gl.slice(0, 53)}…` : gl,
     ])
   }
 

@@ -14,6 +14,14 @@ const lastUsed = new Map<string, number>()
 const pinned = new Set<string>()
 let useTick = 0
 
+/** dev 面板诊断：存活 emoji 纹理数与固定预载数（LRU 上限只约束非固定部分） */
+export function emojiCacheStats(scene: Phaser.Scene): { textures: number; pinned: number } {
+  return {
+    textures: scene.textures.getTextureKeys().filter((k) => k.startsWith('emoji-')).length,
+    pinned: pinned.size,
+  }
+}
+
 export function emojiKey(emoji: string, outlined = false): string {
   return `emoji-${emojiCodepoints(emoji)}${outlined ? '-ol' : ''}`
 }

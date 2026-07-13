@@ -121,13 +121,31 @@ export class ArenaScene extends Phaser.Scene {
     super('arena')
   }
 
-  perfSnapshot(): { enemies: number; projectiles: number; coins: number; pending: number; objects: number } {
+  perfSnapshot(): {
+    enemies: number
+    projectiles: number
+    coins: number
+    pending: number
+    objects: number
+    bodies: number
+    combatSec: number
+    spawnIntervalMs: number
+    ghostShare: number
+    hpMultiplier: number
+  } {
+    const totalSec = (this.run.combatMs + this.elapsedMs) / 1000
+    const wave = waveAt(totalSec)
     return {
       enemies: this.enemies.countActive(true),
       projectiles: this.projectiles.getLength(),
       coins: this.coins.getLength(),
       pending: this.pendingSpawns,
       objects: this.children.list.length,
+      bodies: this.physics.world.bodies.size,
+      combatSec: Math.floor(totalSec),
+      spawnIntervalMs: Math.round(this.stress ? STRESS.spawnIntervalMs : wave.spawnIntervalMs),
+      ghostShare: wave.ghostShare,
+      hpMultiplier: wave.hpMultiplier,
     }
   }
 
