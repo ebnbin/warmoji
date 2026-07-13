@@ -15,6 +15,8 @@ emoji 幸存者 web 游戏：Phaser 3 + Vite + TypeScript。纯 vibe coding 项�
 
 - shell 直连 api.github.com 被拦且静默失败，查 CI/仓库状态用 GitHub MCP 工具
 - 不要运行 `playwright install`，本地用预装 Chromium（playwright.config.ts 已处理）
+- Playwright 每次运行会清空 `test-results/`：要发给用户或留存的截图先拷到别处
+- 容器无 GPU（SwiftShader 软件渲染），大 canvas 下帧率极低是环境现象，与线上真机无关
 
 ## 代码约定
 
