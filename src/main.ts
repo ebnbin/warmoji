@@ -3,7 +3,7 @@ import { ArenaScene } from './scenes/ArenaScene'
 import { MenuScene } from './scenes/MenuScene'
 import { PreloadScene } from './scenes/PreloadScene'
 import { UIScene } from './scenes/UIScene'
-import { devMode, setStress } from './ui/dev'
+import { setStress } from './ui/dev'
 import { refreshViewport, viewport } from './ui/viewport'
 
 const badge = document.getElementById('build-badge')
@@ -39,9 +39,7 @@ window.addEventListener('resize', () => {
 window.__game = game
 window.__twemojiVersion = __TWEMOJI_VERSION__
 
-if (devMode) {
-  window.__setStress = (on: boolean): void => {
-    setStress(on)
-    if (game.scene.isActive('arena')) game.scene.getScene('arena').scene.restart()
-  }
+window.__setStress = (on: boolean): void => {
+  setStress(on)
+  if (game.scene.isActive('arena')) game.scene.getScene('arena').scene.restart()
 }

@@ -8,10 +8,14 @@ test('压测模式：敌人数突破常规上限、血量拉满、FPS 指标可�
     if (msg.type() === 'error') errors.push(msg.text())
   })
 
-  await page.goto('/?dev=1')
+  await page.goto('/')
   await page.waitForFunction(() => window.__warmoji?.scene === 'menu')
   await page.locator('#game canvas').click()
   await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
+
+  // 右下角 🔧 常驻按钮打开性能面板
+  await page.locator('#game canvas').click({ position: { x: 1256, y: 682 } })
+  await page.waitForTimeout(400)
 
   await page.evaluate(() => window.__setStress!(true))
 

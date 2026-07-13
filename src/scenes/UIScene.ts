@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { formatTime } from '../core/format'
-import { devMode, isStress, setStress } from '../ui/dev'
+import { isDevOpen, isStress, setDevOpen, setStress } from '../ui/dev'
 import { emojiImage, iconLabel } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
 import { Joystick } from '../ui/Joystick'
@@ -61,7 +61,16 @@ export class UIScene extends Phaser.Scene {
       .text(w - 38, 10, '0', { ...hudText, fontSize: '20px' })
       .setOrigin(1, 0)
 
-    if (devMode) this.createDevPanel(res)
+    const wrench = emojiImage(this, w - 12, viewport.logicalHeight - 26, '🔧', 24)
+      .setOrigin(1, 1)
+      .setDepth(300)
+      .setAlpha(0.45)
+      .setInteractive({ useHandCursor: true })
+    wrench.on('pointerdown', () => {
+      setDevOpen(!isDevOpen())
+      this.scene.restart()
+    })
+    if (isDevOpen()) this.createDevPanel(res)
 
     const arenaEvents = this.arena.events
     arenaEvents.on('upgrade-toast', this.onToast, this)

@@ -1,7 +1,14 @@
-// ?dev=1 开启性能面板与压测开关；正常玩家不可见
-export const devMode = new URLSearchParams(window.location.search).has('dev')
-
+// dev 工具随线上版本常驻：游戏内 🔧 按钮开合面板，无需 URL 参数
+let devOpen = false
 let stress = false
+
+export function isDevOpen(): boolean {
+  return devOpen
+}
+
+export function setDevOpen(on: boolean): void {
+  devOpen = on
+}
 
 export function isStress(): boolean {
   return stress
