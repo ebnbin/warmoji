@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { ArenaScene } from './scenes/ArenaScene'
 import { MenuScene } from './scenes/MenuScene'
 import { PreloadScene } from './scenes/PreloadScene'
+import { UIScene } from './scenes/UIScene'
 import { refreshViewport } from './ui/viewport'
 
 const badge = document.getElementById('build-badge')
@@ -17,7 +18,7 @@ const game = new Phaser.Game({
   input: { activePointers: 3 },
   physics: { default: 'arcade' },
   scale: { mode: Phaser.Scale.RESIZE },
-  scene: [PreloadScene, MenuScene, ArenaScene],
+  scene: [PreloadScene, MenuScene, ArenaScene, UIScene],
 })
 
 let resizeTimer: number | undefined

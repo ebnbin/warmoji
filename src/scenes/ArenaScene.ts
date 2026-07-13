@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
-import { GEM, GHOST, HEAL_AMOUNT, KNIFE, PLAYER, SPAWN, ZOMBIE } from '../core/config'
+import { GEM, GHOST, HEAL_AMOUNT, KNIFE, MAP, PLAYER, SPAWN, UNIT, ZOMBIE } from '../core/config'
 import type { EnemySpec } from '../core/config'
-import { formatTime } from '../core/format'
 import { browserStorage, submitScore } from '../core/highscore'
 import { Rng } from '../core/rng'
+import { edgeSpawnPoint } from '../core/spawn'
 import { nearestIndex } from '../core/targeting'
 import { applyUpgrade, pickUpgrade, UPGRADE_LABELS } from '../core/upgrades'
 import type { PlayerStats } from '../core/upgrades'
@@ -12,13 +12,33 @@ import { waveAt } from '../core/waves'
 import { gainXp, xpToNext } from '../core/xp'
 import type { XpState } from '../core/xp'
 import { reportDebug } from '../ui/debug'
-import { emojiImage, emojiKey, iconLabel } from '../ui/emoji'
-import { Joystick } from '../ui/Joystick'
+import { emojiImage, emojiKey } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
-import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
+import { textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
+import type { UIScene } from './UIScene'
 
 type ArcadeBody = Phaser.Physics.Arcade.Body
 type ImageObj = Phaser.GameObjects.Image
+
+export interface HudSnapshot {
+  hp: number
+  maxHp: number
+  xp: number
+  xpNext: number
+  level: number
+  kills: number
+  seconds: number
+  over: boolean
+}
+
+export interface GameOverInfo {
+  seconds: number
+  kills: number
+  level: number
+  newBest: boolean
+  bestSeconds: number
+  bestKills: number
+}
 
 // 碰撞圆按逻辑半径换算回源纹理坐标（body 随对象缩放）
 function circleBody(obj: ImageObj, radius: number): void {
@@ -37,7 +57,6 @@ export class ArenaScene extends Phaser.Scene {
   private enemies!: Phaser.GameObjects.Group
   private knives!: Phaser.GameObjects.Group
   private gems!: Phaser.GameObjects.Group
-  private joystick!: Joystick
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
 
@@ -51,27 +70,23 @@ export class ArenaScene extends Phaser.Scene {
   private attackCooldownMs = 0
   private lastHitMs = -Infinity
   private over = false
-
-  private floor!: Phaser.GameObjects.Graphics
-  private hpBar!: Phaser.GameObjects.Graphics
-  private xpBar!: Phaser.GameObjects.Graphics
-  private timeText!: Phaser.GameObjects.Text
-  private killsText!: Phaser.GameObjects.Text
-  private killsIcon!: ImageObj
-  private levelText!: Phaser.GameObjects.Text
-  private overlay?: Phaser.GameObjects.Container
-  private lastShownSecond = -1
+  gameOverInfo?: GameOverInfo
 
   constructor() {
     super('arena')
   }
 
-  private get viewW(): number {
-    return viewport.logicalWidth
-  }
-
-  private get viewH(): number {
-    return viewport.logicalHeight
+  hudSnapshot(): HudSnapshot {
+    return {
+      hp: this.hp,
+      maxHp: this.stats.maxHp,
+      xp: this.xpState.xp,
+      xpNext: xpToNext(this.xpState.level),
+      level: this.xpState.level,
+      kills: this.kills,
+      seconds: Math.floor(this.elapsedMs / 1000),
+      over: this.over,
+    }
   }
 
   create(): void {
@@ -91,24 +106,30 @@ export class ArenaScene extends Phaser.Scene {
     this.attackCooldownMs = 0
     this.lastHitMs = -Infinity
     this.over = false
-    this.lastShownSecond = -1
-    this.overlay = undefined
+    this.gameOverInfo = undefined
 
-    applyCamera(this)
-    this.physics.world.setBounds(0, 0, this.viewW, this.viewH)
-    this.floor = this.add.graphics()
+    this.physics.world.setBounds(0, 0, MAP.width, MAP.height)
     this.drawFloor()
 
-    this.player = emojiImage(this, this.viewW / 2, this.viewH / 2, PLAYER.emoji, PLAYER.size, true).setDepth(10)
+    this.player = emojiImage(this, MAP.width / 2, MAP.height / 2, PLAYER.emoji, PLAYER.size, true).setDepth(10)
     this.physics.add.existing(this.player)
     circleBody(this.player, PLAYER.radius)
     ;(this.player.body as ArcadeBody).setCollideWorldBounds(true)
+
+    const cam = this.cameras.main
+    cam.setZoom(viewport.fitScale)
+    cam.setBounds(
+      -MAP.cameraMargin,
+      -MAP.cameraMargin,
+      MAP.width + MAP.cameraMargin * 2,
+      MAP.height + MAP.cameraMargin * 2,
+    )
+    cam.startFollow(this.player)
 
     this.enemies = this.add.group()
     this.knives = this.add.group()
     this.gems = this.add.group()
 
-    this.joystick = new Joystick(this)
     this.cursors = this.input.keyboard?.createCursorKeys()
     this.wasd = this.input.keyboard?.addKeys('W,A,S,D') as
       | Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -124,11 +145,12 @@ export class ArenaScene extends Phaser.Scene {
       this.collectGem(g as unknown as ImageObj),
     )
 
-    this.createHud()
+    this.scene.launch('ui')
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
+      this.scene.stop('ui')
     })
   }
 
@@ -142,8 +164,8 @@ export class ArenaScene extends Phaser.Scene {
     this.steerEnemies()
     this.magnetGems()
     this.cullKnives()
-    this.refreshTime()
 
+    const cam = this.cameras.main
     reportDebug({
       scene: 'arena',
       elapsed: this.elapsedMs / 1000,
@@ -151,21 +173,17 @@ export class ArenaScene extends Phaser.Scene {
       kills: this.kills,
       level: this.xpState.level,
       enemies: this.enemies.countActive(true),
-      viewW: this.viewW,
-      viewH: this.viewH,
+      viewW: viewport.logicalWidth,
+      viewH: viewport.logicalHeight,
+      playerX: this.player.x,
+      playerY: this.player.y,
+      camX: cam.worldView.centerX,
+      camY: cam.worldView.centerY,
     })
   }
 
   private onViewportChanged(): void {
-    applyCamera(this)
-    this.physics.world.setBounds(0, 0, this.viewW, this.viewH)
-    this.drawFloor()
-    this.layoutHud()
-    this.player.setPosition(
-      Phaser.Math.Clamp(this.player.x, PLAYER.radius, this.viewW - PLAYER.radius),
-      Phaser.Math.Clamp(this.player.y, PLAYER.radius, this.viewH - PLAYER.radius),
-    )
-    this.overlay?.setPosition(this.viewW / 2, this.viewH / 2)
+    this.cameras.main.setZoom(viewport.fitScale)
   }
 
   private movePlayer(): void {
@@ -176,7 +194,8 @@ export class ArenaScene extends Phaser.Scene {
       (held(this.cursors?.up) || held(this.wasd?.W) ? -1 : 0) +
       (held(this.cursors?.down) || held(this.wasd?.S) ? 1 : 0)
 
-    const dir = kx !== 0 || ky !== 0 ? norm(kx, ky) : this.joystick.vector
+    const ui = this.scene.get('ui') as UIScene
+    const dir = kx !== 0 || ky !== 0 ? norm(kx, ky) : ui.joystickVector
     ;(this.player.body as ArcadeBody).setVelocity(
       dir.x * this.stats.moveSpeed,
       dir.y * this.stats.moveSpeed,
@@ -202,8 +221,8 @@ export class ArenaScene extends Phaser.Scene {
   private throwKnife(angle: number): void {
     const knife = emojiImage(
       this,
-      this.player.x + Math.cos(angle) * 26,
-      this.player.y + Math.sin(angle) * 26,
+      this.player.x + Math.cos(angle) * KNIFE.size,
+      this.player.y + Math.sin(angle) * KNIFE.size,
       KNIFE.emoji,
       KNIFE.size,
       true,
@@ -218,8 +237,15 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private cullKnives(): void {
+    const view = this.cameras.main.worldView
+    const slack = 4 * UNIT
     for (const k of this.knives.getChildren() as ImageObj[]) {
-      if (k.x < -60 || k.x > this.viewW + 60 || k.y < -60 || k.y > this.viewH + 60) {
+      if (
+        k.x < view.x - slack ||
+        k.x > view.right + slack ||
+        k.y < view.y - slack ||
+        k.y > view.bottom + slack
+      ) {
         k.destroy()
       }
     }
@@ -241,7 +267,6 @@ export class ArenaScene extends Phaser.Scene {
 
   private killEnemy(enemy: ImageObj): void {
     this.kills++
-    this.killsText.setText(String(this.kills))
     const spec = enemy.getData('spec') as EnemySpec
     this.spawnGem(enemy.x, enemy.y, spec.xp)
     enemy.setActive(false)
@@ -284,29 +309,13 @@ export class ArenaScene extends Phaser.Scene {
     if (this.enemies.countActive(true) >= SPAWN.maxAlive) return
 
     const spec = this.rng.chance(wave.ghostShare) ? GHOST : ZOMBIE
-    const { x, y } = this.randomEdgePoint()
+    const { x, y } = edgeSpawnPoint(this.rng, this.cameras.main.worldView, SPAWN.outset)
     const enemy = emojiImage(this, x, y, spec.emoji, spec.size, true).setDepth(5)
     this.physics.add.existing(enemy)
     circleBody(enemy, spec.radius)
     enemy.setData('hp', Math.round(spec.hp * wave.hpMultiplier))
     enemy.setData('spec', spec)
     this.enemies.add(enemy)
-  }
-
-  private randomEdgePoint(): { x: number; y: number } {
-    const m = SPAWN.edgeMargin
-    const w = Math.round(this.viewW)
-    const h = Math.round(this.viewH)
-    switch (this.rng.int(0, 3)) {
-      case 0:
-        return { x: this.rng.int(0, w), y: -m }
-      case 1:
-        return { x: this.rng.int(0, w), y: h + m }
-      case 2:
-        return { x: -m, y: this.rng.int(0, h) }
-      default:
-        return { x: w + m, y: this.rng.int(0, h) }
-    }
   }
 
   private steerEnemies(): void {
@@ -319,7 +328,14 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private spawnGem(x: number, y: number, xp: number): void {
-    const gem = emojiImage(this, x, y, GEM.emoji, GEM.size, true).setDepth(3)
+    const gem = emojiImage(
+      this,
+      Phaser.Math.Clamp(x, GEM.radius, MAP.width - GEM.radius),
+      Phaser.Math.Clamp(y, GEM.radius, MAP.height - GEM.radius),
+      GEM.emoji,
+      GEM.size,
+      true,
+    ).setDepth(3)
     this.physics.add.existing(gem)
     circleBody(gem, GEM.radius)
     gem.setData('xp', xp)
@@ -349,7 +365,6 @@ export class ArenaScene extends Phaser.Scene {
     const result = gainXp(this.xpState, xp)
     this.xpState = result.state
     if (result.levelsGained > 0) this.onLevelUps(result.levelsGained)
-    this.drawXpBar()
   }
 
   private onLevelUps(count: number): void {
@@ -358,29 +373,8 @@ export class ArenaScene extends Phaser.Scene {
       const id = pickUpgrade(level, this.stats)
       this.stats = applyUpgrade(this.stats, id)
       if (id === 'heal') this.hp = Math.min(this.stats.maxHp, this.hp + HEAL_AMOUNT)
-      this.showUpgradeToast(UPGRADE_LABELS[id], i)
+      this.events.emit('upgrade-toast', { ...UPGRADE_LABELS[id], index: i })
     }
-    this.levelText.setText(`Lv.${this.xpState.level}`)
-    this.drawHpBar()
-  }
-
-  private showUpgradeToast(upgrade: { emoji: string; text: string }, index: number): void {
-    const toast = iconLabel(this, this.viewW / 2, this.viewH * 0.36 + index * 36, upgrade.emoji, 26, upgrade.text, {
-      fontFamily: UI_FONT,
-      fontSize: '24px',
-      color: '#ffe082',
-      stroke: '#000000',
-      strokeThickness: 4,
-      resolution: textRes(),
-    }).setDepth(120)
-    this.tweens.add({
-      targets: toast,
-      y: toast.y - 34,
-      alpha: 0,
-      duration: 1100,
-      delay: 150 + index * 150,
-      onComplete: () => toast.destroy(),
-    })
   }
 
   private onPlayerTouched(enemy: ImageObj): void {
@@ -389,7 +383,6 @@ export class ArenaScene extends Phaser.Scene {
     this.lastHitMs = this.elapsedMs
     const spec = enemy.getData('spec') as EnemySpec
     this.hp = Math.max(0, this.hp - spec.damage)
-    this.drawHpBar()
     this.cameras.main.shake(90, 0.004)
     this.player.setAlpha(0.4)
     this.tweens.add({ targets: this.player, alpha: 1, duration: PLAYER.iframesMs })
@@ -403,45 +396,15 @@ export class ArenaScene extends Phaser.Scene {
 
     const seconds = Math.floor(this.elapsedMs / 1000)
     const result = submitScore(browserStorage(), seconds, this.kills)
-    const res = textRes()
-
-    const dim = this.add.rectangle(0, 0, 6000, 6000, 0x000000, 0.72)
-    const title = iconLabel(this, 0, -110, '💀', 50, '游戏结束', {
-      fontFamily: UI_FONT,
-      fontSize: '48px',
-      color: '#ffffff',
-      resolution: res,
-    })
-    const statsLine = this.add
-      .text(0, -26, `存活 ${formatTime(seconds)} · 击杀 ${this.kills} · 等级 ${this.xpState.level}`, {
-        fontFamily: UI_FONT,
-        fontSize: '24px',
-        color: '#dddddd',
-        resolution: res,
-      })
-      .setOrigin(0.5)
-    const bestLine = iconLabel(
-      this,
-      0,
-      24,
-      '🏆',
-      22,
-      result.newBest ? '新纪录！' : `最佳：存活 ${formatTime(result.score.bestSeconds)} · 击杀 ${result.score.bestKills}`,
-      { fontFamily: UI_FONT, fontSize: '20px', color: '#d4b106', resolution: res },
-    )
-    const prompt = this.add
-      .text(0, 106, '点击或按任意键重新开始', {
-        fontFamily: UI_FONT,
-        fontSize: '20px',
-        color: '#aaaaaa',
-        resolution: res,
-      })
-      .setOrigin(0.5)
-    this.tweens.add({ targets: prompt, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 })
-
-    this.overlay = this.add
-      .container(this.viewW / 2, this.viewH / 2, [dim, title, statsLine, bestLine, prompt])
-      .setDepth(200)
+    this.gameOverInfo = {
+      seconds,
+      kills: this.kills,
+      level: this.xpState.level,
+      newBest: result.newBest,
+      bestSeconds: result.score.bestSeconds,
+      bestKills: result.score.bestKills,
+    }
+    this.events.emit('game-over', this.gameOverInfo)
 
     reportDebug({
       scene: 'gameover',
@@ -450,8 +413,12 @@ export class ArenaScene extends Phaser.Scene {
       kills: this.kills,
       level: this.xpState.level,
       enemies: this.enemies.countActive(true),
-      viewW: this.viewW,
-      viewH: this.viewH,
+      viewW: viewport.logicalWidth,
+      viewH: viewport.logicalHeight,
+      playerX: this.player.x,
+      playerY: this.player.y,
+      camX: this.cameras.main.worldView.centerX,
+      camY: this.cameras.main.worldView.centerY,
     })
 
     // 防死亡瞬间误触重开
@@ -465,67 +432,11 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private drawFloor(): void {
-    const g = this.floor
-    g.clear()
+    const g = this.add.graphics()
     g.lineStyle(1, 0xffffff, 0.05)
-    for (let x = 0; x <= this.viewW; x += 60) g.lineBetween(x, 0, x, this.viewH)
-    for (let y = 0; y <= this.viewH; y += 60) g.lineBetween(0, y, this.viewW, y)
-    g.lineStyle(2, 0xffffff, 0.15)
-    g.strokeRect(1, 1, this.viewW - 2, this.viewH - 2)
-  }
-
-  private createHud(): void {
-    const res = textRes()
-    this.hpBar = this.add.graphics().setDepth(100)
-    this.xpBar = this.add.graphics().setDepth(100)
-    this.levelText = this.add
-      .text(224, 10, 'Lv.1', { fontFamily: UI_FONT, fontSize: '16px', color: '#cccccc', resolution: res })
-      .setDepth(100)
-    this.timeText = this.add
-      .text(0, 10, '0:00', { fontFamily: UI_FONT, fontSize: '22px', color: '#dddddd', resolution: res })
-      .setOrigin(0.5, 0)
-      .setDepth(100)
-    this.killsIcon = emojiImage(this, 0, 22, '💀', 20).setDepth(100)
-    this.killsText = this.add
-      .text(0, 10, '0', { fontFamily: UI_FONT, fontSize: '20px', color: '#dddddd', resolution: res })
-      .setOrigin(1, 0)
-      .setDepth(100)
-    this.layoutHud()
-    this.drawHpBar()
-    this.drawXpBar()
-  }
-
-  private layoutHud(): void {
-    this.timeText.setX(this.viewW / 2)
-    this.killsIcon.setPosition(this.viewW - 22, 22)
-    this.killsText.setX(this.viewW - 38)
-  }
-
-  private drawHpBar(): void {
-    const g = this.hpBar
-    g.clear()
-    g.fillStyle(0x000000, 0.5)
-    g.fillRect(12, 12, 204, 16)
-    g.fillStyle(0xef5350, 1)
-    g.fillRect(14, 14, 200 * (this.hp / this.stats.maxHp), 12)
-    g.lineStyle(1, 0xffffff, 0.4)
-    g.strokeRect(12, 12, 204, 16)
-  }
-
-  private drawXpBar(): void {
-    const g = this.xpBar
-    g.clear()
-    g.fillStyle(0x000000, 0.5)
-    g.fillRect(12, 32, 204, 8)
-    g.fillStyle(0x4dd0e1, 1)
-    g.fillRect(13, 33, 202 * Math.min(1, this.xpState.xp / xpToNext(this.xpState.level)), 6)
-  }
-
-  private refreshTime(): void {
-    const second = Math.floor(this.elapsedMs / 1000)
-    if (second !== this.lastShownSecond) {
-      this.lastShownSecond = second
-      this.timeText.setText(formatTime(second))
-    }
+    for (let x = 0; x <= MAP.width; x += UNIT) g.lineBetween(x, 0, x, MAP.height)
+    for (let y = 0; y <= MAP.height; y += UNIT) g.lineBetween(0, y, MAP.width, y)
+    g.lineStyle(2, 0xffffff, 0.18)
+    g.strokeRect(0, 0, MAP.width, MAP.height)
   }
 }

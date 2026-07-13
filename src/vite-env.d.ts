@@ -13,6 +13,10 @@ interface WarmojiDebug {
   enemies: number
   viewW: number
   viewH: number
+  playerX: number
+  playerY: number
+  camX: number
+  camY: number
 }
 
 interface Window {

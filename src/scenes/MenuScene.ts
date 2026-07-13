@@ -104,6 +104,10 @@ export class MenuScene extends Phaser.Scene {
       enemies: 0,
       viewW: w,
       viewH: h,
+      playerX: 0,
+      playerY: 0,
+      camX: 0,
+      camY: 0,
     })
   }
 
