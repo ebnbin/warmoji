@@ -22,7 +22,8 @@ const game = new Phaser.Game({
   width: Math.round(viewport.cssWidth * viewport.dpr),
   height: Math.round(viewport.cssHeight * viewport.dpr),
   input: { activePointers: 3 },
-  physics: { default: 'arcade' },
+  // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
+  physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
   scene: [PreloadScene, MenuScene, ArenaScene, UIScene],
 })
