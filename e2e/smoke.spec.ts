@@ -15,9 +15,13 @@ test('页面可加载：canvas 渲染、版本徽章存在、无控制台错误'
 
   await page.waitForFunction(() => window.__warmoji?.scene === 'menu')
 
-  // 屏幕锚定的渐变背景画在页面层
+  // 屏幕锚定的渐变背景画在页面层；theme-color 跟随渐变顶色（iOS 状态栏着色）
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundImage)
   expect(bg).toContain('linear-gradient')
+  const themeColor = await page.evaluate(
+    () => document.querySelector('meta[name="theme-color"]')?.getAttribute('content') ?? '',
+  )
+  expect(themeColor).toMatch(/^hsl\(/)
 
   // twemoji 全集已部署：抽查一个未预载的 emoji（😀）
   const ver = await page.evaluate(() => window.__twemojiVersion)
