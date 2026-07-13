@@ -3,6 +3,7 @@ import type { CharacterId } from '../core/config'
 import { CHARACTERS, COIN, MEMBER } from '../core/config'
 import { browserStorage } from '../core/highscore'
 import { randomPalette } from '../core/palette'
+import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import { getRun, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
@@ -54,6 +55,9 @@ interface SlotRow {
 }
 
 export class ShopScene extends Phaser.Scene {
+  // 视口变化触发的 restart 只重排布局，保留背景色/焦点等页面状态
+  private preserveOnRestart = false
+  private palette?: Palette
   private run!: RunState
   private lineup: CharacterId[] = []
   private focusedId!: CharacterId
@@ -69,10 +73,15 @@ export class ShopScene extends Phaser.Scene {
 
   create(): void {
     applyCamera(this)
-    applyBackground(randomPalette(new Rng(Date.now() >>> 0)))
+    const preserved = this.preserveOnRestart
+    this.preserveOnRestart = false
+    if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
+    applyBackground(this.palette)
     this.lineup = loadLineup(browserStorage())
     this.run = getRun(this.lineup.length)
-    this.focusedId = this.lineup[0] ?? 'juggler'
+    if (!preserved || !this.lineup.includes(this.focusedId)) {
+      this.focusedId = this.lineup[0] ?? 'juggler'
+    }
     this.rows = []
     this.detailObjs = []
 
@@ -341,6 +350,7 @@ export class ShopScene extends Phaser.Scene {
   }
 
   private onViewportChanged(): void {
+    this.preserveOnRestart = true
     this.scene.restart()
   }
 }

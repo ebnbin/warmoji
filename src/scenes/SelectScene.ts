@@ -3,6 +3,7 @@ import type { CharacterId } from '../core/config'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../core/config'
 import { browserStorage } from '../core/highscore'
 import { randomPalette } from '../core/palette'
+import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import { beginRun } from '../core/run'
 import { loadLineup, saveLineup, toggleLineup } from '../core/selection'
@@ -49,6 +50,9 @@ interface Row {
 }
 
 export class SelectScene extends Phaser.Scene {
+  // 视口变化触发的 restart 只重排布局，保留背景色/焦点/滚动位置等页面状态
+  private preserveOnRestart = false
+  private palette?: Palette
   private lineup: CharacterId[] = []
   private focusedId: CharacterId = ROSTER_IDS[0]!
   private layout!: SelectLayout
@@ -80,11 +84,16 @@ export class SelectScene extends Phaser.Scene {
 
   create(): void {
     applyCamera(this)
-    applyBackground(randomPalette(new Rng(Date.now() >>> 0)))
+    const preserved = this.preserveOnRestart
+    this.preserveOnRestart = false
+    if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
+    applyBackground(this.palette)
     this.lineup = loadLineup(browserStorage())
-    this.focusedId = this.lineup[0] ?? ROSTER_IDS[0]!
+    if (!preserved) {
+      this.focusedId = this.lineup[0] ?? ROSTER_IDS[0]!
+      this.scrollY = 0
+    }
     this.rows = []
-    this.scrollY = 0
     this.dragging = false
     this.dragMoved = false
 
@@ -211,6 +220,8 @@ export class SelectScene extends Phaser.Scene {
 
     this.contentH = ROSTER_IDS.length * pitch - L.gap
     this.maxScroll = Math.max(0, this.contentH - L.h)
+    // 视口重启后按新布局重新钳制滚动位置
+    this.setScroll(this.scrollY)
 
     // 滚轮 + 拖动滚动；拖过阈值的抬手不算点击
     this.input.on(
@@ -455,7 +466,7 @@ export class SelectScene extends Phaser.Scene {
   }
 
   private onViewportChanged(): void {
-    // 选择已持久化，直接重建适配新尺寸
+    this.preserveOnRestart = true
     this.scene.restart()
   }
 }

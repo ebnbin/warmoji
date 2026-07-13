@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { CHARACTERS } from '../core/config'
 import { browserStorage, loadHighScore } from '../core/highscore'
 import { randomPalette } from '../core/palette'
+import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
@@ -10,13 +11,21 @@ import { UI_FONT } from '../ui/fonts'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 export class MenuScene extends Phaser.Scene {
+  // 视口变化触发的 restart 只重排布局，保留背景色等页面状态
+  private preserveOnRestart = false
+  private palette?: Palette
+
   constructor() {
     super('menu')
   }
 
   create(): void {
     applyCamera(this)
-    applyBackground(randomPalette(new Rng(Date.now() >>> 0)))
+    if (!this.preserveOnRestart || !this.palette) {
+      this.palette = randomPalette(new Rng(Date.now() >>> 0))
+    }
+    this.preserveOnRestart = false
+    applyBackground(this.palette)
     const w = viewport.logicalWidth
     const h = viewport.logicalHeight
     const res = textRes()
@@ -122,7 +131,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private onViewportChanged(): void {
-    // 菜单无状态，直接重建适配新尺寸
+    this.preserveOnRestart = true
     this.scene.restart()
   }
 }

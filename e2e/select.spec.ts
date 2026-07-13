@@ -83,6 +83,29 @@ test.describe('组队页 竖屏 720×1280', () => {
   })
 })
 
+test.describe('组队页 旋转保持状态', () => {
+  test.use({ viewport: { width: 1280, height: 720 } })
+
+  test('横竖屏切换只重排布局：焦点角色与背景色不变', async ({ page }) => {
+    await page.goto('/')
+    await enterSelect(page)
+    const s = await selectState(page)
+    const target = s.items.find((i) => i.id !== s.focusedId)!
+    await clickItem(page, target.id)
+    await page.waitForFunction((id) => window.__warmoji?.select?.focusedId === id, target.id)
+    const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundImage)
+
+    await page.setViewportSize({ width: 720, height: 1280 })
+    await page.waitForFunction(
+      () => Math.abs((window.__warmoji?.viewW ?? 0) - 720) < 1 && !!window.__warmoji?.select,
+      undefined,
+      { timeout: 5_000 },
+    )
+    expect(await page.evaluate(() => window.__warmoji!.select!.focusedId)).toBe(target.id)
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundImage)).toBe(bg)
+  })
+})
+
 test.describe('组队页 多分辨率', () => {
   test.use({ viewport: { width: 1024, height: 720 } })
 
