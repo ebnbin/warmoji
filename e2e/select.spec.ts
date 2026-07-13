@@ -20,8 +20,8 @@ test.describe('组队页 横屏 1280×720', () => {
     expect(s.items.length).toBeGreaterThanOrEqual(6)
     expect(s.selected).toBe(s.size)
     expect(s.start.enabled).toBe(true)
-    // 列表与详情左右分栏且都在最小可用空间内
-    expect(s.list.x + s.list.w).toBeLessThanOrEqual(s.detail.x)
+    // 详情在左、列表在右（对应竖屏的 上/下），都在最小可用空间内
+    expect(s.detail.x + s.detail.w).toBeLessThanOrEqual(s.list.x)
     expect(inBounds(s.list, 1280, 720)).toBe(true)
     expect(inBounds(s.detail, 1280, 720)).toBe(true)
     for (const it of s.items) expect(inBounds(it, 1280, 720)).toBe(true)

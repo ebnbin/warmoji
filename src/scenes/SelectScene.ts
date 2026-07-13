@@ -23,11 +23,12 @@ interface SelectLayout {
   btn: { y: number; w: number; h: number }
 }
 
+// 方向对应约定：竖屏「上」= 横屏「左」（详情），竖屏「下」= 横屏「右」（列表）
 const LANDSCAPE: SelectLayout = {
   content: { w: 1280, h: 720 },
   headerY: 40,
-  list: { x: 40, y: 84, w: 430, h: 552, rowH: 64, gap: 8 },
-  detail: { x: 510, y: 84, w: 730, h: 460 },
+  detail: { x: 40, y: 84, w: 730, h: 460 },
+  list: { x: 810, y: 84, w: 430, h: 552, rowH: 64, gap: 8 },
   btn: { y: 648, w: 280, h: 58 },
 }
 

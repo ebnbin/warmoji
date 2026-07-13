@@ -26,12 +26,13 @@ interface ShopLayout {
   btn: { y: number; w: number; h: number }
 }
 
+// 方向对应约定：竖屏「上」= 横屏「左」（详情），竖屏「下」= 横屏「右」（上架位列表）
 const LANDSCAPE: ShopLayout = {
   content: { w: 1280, h: 720 },
   titleY: 42,
   coinsY: 86,
-  slots: { x: 40, y: 122, w: 430, rowH: 78, gap: 10 },
-  detail: { x: 510, y: 122, w: 730, h: 458 },
+  detail: { x: 40, y: 122, w: 730, h: 458 },
+  slots: { x: 810, y: 122, w: 430, rowH: 78, gap: 10 },
   btn: { y: 648, w: 280, h: 58 },
 }
 
