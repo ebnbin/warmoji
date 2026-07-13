@@ -15,7 +15,8 @@ export const MAP = {
 // 玩家操控队伍中心点，角色环状固定槽位随行；除此之外角色是完全独立的单位。
 export const TEAM = {
   size: 5,
-  ringRadius: 1.2 * UNIT,
+  // 紧凑阵型：相邻间距略小于角色体宽，允许少量重叠
+  ringRadius: 0.7 * UNIT,
   moveSpeed: 5.5 * UNIT,
   reviveMs: 10_000,
   captainEmoji: '👑',
@@ -81,15 +82,16 @@ export const GEM = {
   magnetSpeed: 8 * UNIT,
 } as const
 
+// 刷怪节奏按 5 人火力校准（约为单人时代的 5 倍）
 export const SPAWN = {
-  startIntervalMs: 1100,
-  minIntervalMs: 350,
+  startIntervalMs: 220,
+  minIntervalMs: 70,
   rampSeconds: 150,
   hpGrowthPerMin: 0.5,
   ghostShareStart: 0.15,
   ghostShareMax: 0.55,
   ghostShareRampSeconds: 240,
-  maxAlive: 120,
+  maxAlive: 400,
   // 地图内随机刷怪：先显示预告标记再落地
   telegraphMs: 900,
   markEmoji: '⚠️',

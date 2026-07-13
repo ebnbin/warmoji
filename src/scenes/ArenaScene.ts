@@ -244,7 +244,8 @@ export class ArenaScene extends Phaser.Scene {
       emoji,
       MEMBER.size,
       true,
-    ).setDepth(10)
+      // 重叠时靠下的角色遮挡靠上的，聚团更自然
+    ).setDepth(10 + off.y / UNIT)
     this.physics.add.existing(image)
     circleBody(image, MEMBER.radius)
     // 角色是纯随队走位的运动学对象：body 只跟随图片用于碰撞，
