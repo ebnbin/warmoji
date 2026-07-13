@@ -8,12 +8,39 @@ async function cssPoint(page: Page, logical: { x: number; y: number }): Promise<
   }, logical)
 }
 
-/** 标题页点「组建队伍」按钮 → 组队页 */
-export async function enterSelect(page: Page): Promise<void> {
+/** 标题页点「组建队伍」按钮 → 队长选择页 */
+export async function enterCaptain(page: Page): Promise<void> {
   await page.waitForFunction(() => window.__warmoji?.scene === 'menu' && !!window.__warmoji.menu)
   const s = await page.evaluate(() => window.__warmoji!.menu!.start)
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: s.x, y: s.y }) })
+  await page.waitForFunction(
+    () => window.__warmoji?.scene === 'captain' && !!window.__warmoji.captain,
+  )
+}
+
+/** 队长页点击某个队长行（单选） */
+export async function clickCaptain(page: Page, id: string): Promise<void> {
+  const r = await page.evaluate(
+    (cid) => window.__warmoji!.captain!.items.find((x) => x.id === cid)!,
+    id,
+  )
+  await page
+    .locator('#game canvas')
+    .click({ position: await cssPoint(page, { x: r.x + r.w / 2, y: r.y + r.h / 2 }) })
+  await page.waitForFunction((cid) => window.__warmoji?.captain?.selected === cid, id)
+}
+
+/** 队长页确认 → 组队页 */
+export async function confirmCaptain(page: Page): Promise<void> {
+  const s = await page.evaluate(() => window.__warmoji!.captain!.start)
+  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: s.x, y: s.y }) })
   await page.waitForFunction(() => window.__warmoji?.scene === 'select' && !!window.__warmoji.select)
+}
+
+/** 标题页 → 队长页（默认队长）→ 组队页 */
+export async function enterSelect(page: Page): Promise<void> {
+  await enterCaptain(page)
+  await confirmCaptain(page)
 }
 
 /** 点击列表中某个角色行（聚焦并展开详情） */

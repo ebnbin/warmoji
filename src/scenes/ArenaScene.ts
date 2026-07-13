@@ -7,7 +7,7 @@ import { slotOffset } from '../core/formation'
 import { browserStorage, submitScore } from '../core/highscore'
 import { getRun, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
-import { loadLineup } from '../core/selection'
+import { loadTeam } from '../core/selection'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -191,7 +191,7 @@ export class ArenaScene extends Phaser.Scene {
     this.centerObj = this.add.zone(this.center.x, this.center.y, 1, 1)
 
     this.memberGroup = this.add.group()
-    this.lineup = loadLineup(browserStorage()).map((id) => CHARACTERS[id])
+    this.lineup = loadTeam(browserStorage()).lineup.map((id) => CHARACTERS[id])
     this.run = getRun(this.lineup.length)
     this.members = this.lineup.map((spec, slot) => this.createMember(spec.emoji, spec.weapons, slot))
 
@@ -683,28 +683,21 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private magnetCoins(): void {
-    const alive = this.aliveMembers()
-    if (alive.length === 0) return
+    // 金币拾取是团队能力：以队伍中心为基点磁吸并入账（成员碰到也能捡，见 overlap）
     const r2 = COIN.magnetRadius * COIN.magnetRadius
+    const collect2 = COIN.collectRadius * COIN.collectRadius
     for (const c of this.coins.getChildren() as ImageObj[]) {
       if (!c.active) continue
-      // 吸附到离金币最近的存活角色
-      let bx = 0
-      let by = 0
-      let bestD = Infinity
-      for (const m of alive) {
-        const dx = m.image.x - c.x
-        const dy = m.image.y - c.y
-        const d = dx * dx + dy * dy
-        if (d < bestD) {
-          bestD = d
-          bx = dx
-          by = dy
-        }
+      const dx = this.center.x - c.x
+      const dy = this.center.y - c.y
+      const d = dx * dx + dy * dy
+      if (d <= collect2) {
+        this.collectCoin(c)
+        continue
       }
       const body = c.body as ArcadeBody
-      if (bestD < r2) {
-        const dir = norm(bx, by)
+      if (d < r2) {
+        const dir = norm(dx, dy)
         body.setVelocity(dir.x * COIN.magnetSpeed, dir.y * COIN.magnetSpeed)
       } else {
         body.setVelocity(0, 0)

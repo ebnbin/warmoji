@@ -36,8 +36,9 @@ test('波次循环：30 秒战斗 → 商店 → 下一波，金币/击杀/血�
   expect(shop.kills).toBeGreaterThanOrEqual(1)
   expect(shop.shop!.coins).toBeGreaterThanOrEqual(1)
 
-  // 每个出战角色一个上架位；点其他位切换属性面板焦点
-  expect(shop.shop!.slots.length).toBe(5)
+  // 上架位 = 队长 1 + 出战角色 5；点其他位切换属性面板焦点
+  expect(shop.shop!.slots.length).toBe(6)
+  expect(shop.shop!.slots[0]!.id).toBe('captain')
   const other = shop.shop!.slots.find((s) => s.id !== shop.shop!.focusedId)!
   await clickShopSlot(page, other.id)
   await page.waitForFunction((id) => window.__warmoji?.shop?.focusedId === id, other.id)

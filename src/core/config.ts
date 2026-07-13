@@ -178,15 +178,55 @@ export const CHARACTERS = {
 export type CharacterId = keyof typeof CHARACTERS
 export const ROSTER_IDS = Object.keys(CHARACTERS) as readonly CharacterId[]
 
-// 队伍 = 1 队长（无实体，提供全队被动，能力后续设计）+ size 名出战角色。
-// 玩家操控队伍中心点，角色环状固定槽位随行；除此之外角色是完全独立的单位。
-// 出战阵容由组队页选择并持久化（core/selection.ts）。
+// 队长：不登场、无实体的团队增益提供者（emotion 表情形象）。
+// 能力先直接建模为字段，需要通用效果系统时再抽象；出战人数由队长决定。
+export interface CaptainSpec {
+  readonly emoji: string
+  readonly name: string
+  readonly desc: string
+  readonly teamSize: number
+  /** 每次进商店全员复活并恢复满血（默认规则：存活者血量保留、阵亡者 30% 血复活） */
+  readonly reviveInShop: boolean
+  /** 每次进商店的免费道具刷新次数（道具刷新实装后生效） */
+  readonly freeRefreshes: number
+}
+
+export const CAPTAINS = {
+  angel: {
+    emoji: '😇',
+    name: '天使',
+    desc: '每次进入商店，全体队员复活并恢复满血',
+    teamSize: 5,
+    reviveInShop: true,
+    freeRefreshes: 0,
+  },
+  moneybags: {
+    emoji: '🤑',
+    name: '财迷',
+    desc: '每次进入商店，前 3 次道具刷新免费（道具上架后生效）',
+    teamSize: 5,
+    reviveInShop: false,
+    freeRefreshes: 3,
+  },
+  party: {
+    emoji: '🥳',
+    name: '派对之星',
+    desc: '气氛组拉满，可以招募 6 名队员出战',
+    teamSize: 6,
+    reviveInShop: false,
+    freeRefreshes: 0,
+  },
+} as const satisfies Record<string, CaptainSpec>
+
+export type CaptainId = keyof typeof CAPTAINS
+export const CAPTAIN_IDS = Object.keys(CAPTAINS) as readonly CaptainId[]
+
+// 队伍：玩家操控队伍中心点，角色环状固定槽位随行；除此之外角色是完全独立的单位。
+// 队长与出战阵容由队长页/组队页选择并持久化（core/selection.ts）。
 export const TEAM = {
-  size: 5,
   ringRadius: 0.8 * UNIT,
   moveSpeed: 5.5 * UNIT,
   reviveMs: 10_000,
-  captainEmoji: '👑',
 } as const
 
 export const MEMBER = {
@@ -240,12 +280,14 @@ export const GHOST: EnemySpec = {
   coins: 1,
 }
 
+// 金币拾取是团队能力：磁吸与入账都以队伍中心为基点（拾取范围类道具挂队长）
 export const COIN = {
   emoji: '🪙',
   size: 0.45 * UNIT,
   radius: 0.22 * UNIT,
   magnetRadius: 2.25 * UNIT,
   magnetSpeed: 8 * UNIT,
+  collectRadius: 0.5 * UNIT,
 } as const
 
 // 刷怪节奏（波次制）：第 1 波基础火力可稳过，随跨波累计战斗时长持续加压，
@@ -289,6 +331,7 @@ const roster: readonly CharacterSpec[] = Object.values(CHARACTERS)
 
 export const OUTLINED_EMOJIS: readonly string[] = [
   ...roster.map((c) => c.emoji),
+  ...Object.values<CaptainSpec>(CAPTAINS).map((c) => c.emoji),
   ...roster.flatMap((c) =>
     c.weapons.flatMap((w) => [
       ...('held' in w && w.held ? [w.held.emoji] : []),
@@ -315,4 +358,5 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '🔧',
   '✅',
   '⏸️',
+  '👑',
 ]

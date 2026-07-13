@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CHARACTERS, UNIT, WEAPONS } from './config'
-import { characterStatGroups, weaponStatLines } from './stats'
+import { CAPTAINS, CHARACTERS, UNIT, WEAPONS } from './config'
+import { captainStatGroups, characterStatGroups, weaponStatLines } from './stats'
 
 describe('角色属性面板模型', () => {
   it('每个角色 = 基础组 + 每把武器一组，组内均有内容', () => {
@@ -38,6 +38,21 @@ describe('角色属性面板模型', () => {
     for (const w of Object.values(WEAPONS)) {
       expect(w.name.length).toBeGreaterThan(0)
       expect(w.icon.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('团队属性归队长面板，角色基础组不再含移速', () => {
+    for (const c of Object.values(CHARACTERS)) {
+      const base = characterStatGroups(c)[0]!
+      expect(base.lines.join(' ')).not.toContain('移速')
+    }
+    for (const cap of Object.values(CAPTAINS)) {
+      const groups = captainStatGroups(cap)
+      expect(groups[0]!.lines[0]).toBe(cap.desc)
+      const team = groups[1]!.lines.join(' ')
+      expect(team).toContain('移速')
+      expect(team).toContain(`出战人数 ${cap.teamSize}`)
+      expect(team).toContain('金币拾取')
     }
   })
 })

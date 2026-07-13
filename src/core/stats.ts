@@ -1,5 +1,5 @@
-import type { CharacterSpec } from './config'
-import { MEMBER, TEAM, UNIT } from './config'
+import type { CaptainSpec, CharacterSpec } from './config'
+import { COIN, MEMBER, TEAM, UNIT } from './config'
 import type { WeaponSpec } from './weapons'
 
 // 角色属性面板的展示模型：把异构的角色/武器参数组织成统一的「属性组」。
@@ -51,7 +51,7 @@ export function characterStatGroups(spec: CharacterSpec): StatGroup[] {
       title: '基础',
       lines: [
         `生命上限 ${MEMBER.maxHp} · 受击无敌 ${sec(MEMBER.iframesMs)}`,
-        `复活 ${sec(TEAM.reviveMs)} · 移速 ${grid(TEAM.moveSpeed)}/秒（全队）`,
+        `复活 ${sec(TEAM.reviveMs)}`,
       ],
     },
     ...spec.weapons.map((w) => ({
@@ -59,5 +59,20 @@ export function characterStatGroups(spec: CharacterSpec): StatGroup[] {
       title: `${w.name}（${WEAPON_KIND_LABEL[w.kind]}）`,
       lines: weaponStatLines(w),
     })),
+  ]
+}
+
+/** 队长面板：能力描述 + 团队属性（移速/金币拾取等团队级数值都归队长） */
+export function captainStatGroups(spec: CaptainSpec): StatGroup[] {
+  return [
+    { icon: '👑', title: '队长能力', lines: [spec.desc] },
+    {
+      icon: '👟',
+      title: '团队',
+      lines: [
+        `出战人数 ${spec.teamSize} · 移速 ${grid(TEAM.moveSpeed)}/秒`,
+        `金币拾取范围 ${grid(COIN.magnetRadius)}（以队伍中心为基点）`,
+      ],
+    },
   ]
 }

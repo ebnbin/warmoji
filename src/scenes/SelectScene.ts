@@ -1,12 +1,12 @@
 import Phaser from 'phaser'
-import type { CharacterId } from '../core/config'
-import { CHARACTERS, ROSTER_IDS, TEAM } from '../core/config'
+import type { CaptainId, CharacterId } from '../core/config'
+import { CAPTAINS, CHARACTERS, ROSTER_IDS } from '../core/config'
 import { browserStorage } from '../core/highscore'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import { beginRun } from '../core/run'
-import { loadLineup, saveLineup, toggleLineup } from '../core/selection'
+import { loadCaptain, loadLineup, saveLineup, toggleLineup } from '../core/selection'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiKey } from '../ui/emoji'
@@ -53,6 +53,8 @@ export class SelectScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色/焦点/滚动位置等页面状态
   private preserveOnRestart = false
   private palette?: Palette
+  private captainId: CaptainId = 'angel'
+  private teamSize = 5
   private lineup: CharacterId[] = []
   private focusedId: CharacterId = ROSTER_IDS[0]!
   private layout!: SelectLayout
@@ -88,7 +90,9 @@ export class SelectScene extends Phaser.Scene {
     this.preserveOnRestart = false
     if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
     applyBackground(this.palette)
-    this.lineup = loadLineup(browserStorage())
+    this.captainId = loadCaptain(browserStorage())
+    this.teamSize = CAPTAINS[this.captainId].teamSize
+    this.lineup = loadLineup(browserStorage(), this.teamSize)
     if (!preserved) {
       this.focusedId = this.lineup[0] ?? ROSTER_IDS[0]!
       this.scrollY = 0
@@ -116,7 +120,7 @@ export class SelectScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (!this.dragMoved) this.scene.start('menu')
+        if (!this.dragMoved) this.scene.start('captain')
       })
     this.add
       .text(w / 2, oy + L.headerY, '组建队伍', {
@@ -127,6 +131,21 @@ export class SelectScene extends Phaser.Scene {
         resolution: res,
       })
       .setOrigin(0.5)
+    // 当前队长（点击回队长页更换）
+    const captain = CAPTAINS[this.captainId]
+    const capText = this.add
+      .text(ox + L.content.w - 40, oy + L.headerY, `队长 ${captain.name}`, {
+        fontFamily: UI_FONT,
+        fontSize: '16px',
+        color: '#c8c8d4',
+        resolution: res,
+      })
+      .setOrigin(1, 0.5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => {
+        if (!this.dragMoved) this.scene.start('captain')
+      })
+    emojiImage(this, capText.x - capText.width - 18, oy + L.headerY, captain.emoji, 26, true)
 
     this.createList(res)
     this.createDetail(res)
@@ -156,7 +175,7 @@ export class SelectScene extends Phaser.Scene {
       })
     this.input.keyboard?.on('keydown-ENTER', () => this.startRun())
     this.input.keyboard?.on('keydown-SPACE', () => this.startRun())
-    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
+    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('captain'))
 
     // Twemoji 图形许可（CC-BY 4.0）要求署名
     this.add
@@ -340,18 +359,18 @@ export class SelectScene extends Phaser.Scene {
 
   private toggleMode(): 'add' | 'remove' | 'full' {
     if (this.lineup.includes(this.focusedId)) return 'remove'
-    return this.lineup.length >= TEAM.size ? 'full' : 'add'
+    return this.lineup.length >= this.teamSize ? 'full' : 'add'
   }
 
   private onToggle(): void {
     if (this.toggleMode() === 'full') return
-    this.lineup = toggleLineup(this.lineup, this.focusedId)
+    this.lineup = toggleLineup(this.lineup, this.focusedId, this.teamSize)
     saveLineup(browserStorage(), this.lineup)
     this.refresh()
   }
 
   private startRun(): void {
-    if (this.lineup.length !== TEAM.size) return
+    if (this.lineup.length !== this.teamSize) return
     beginRun(this.lineup.length)
     this.scene.start('arena')
   }
@@ -396,13 +415,13 @@ export class SelectScene extends Phaser.Scene {
     this.toggleBg.fillRoundedRect(t.x, t.y, t.w, t.h, t.h / 2)
     if (mode === 'remove') this.toggleBg.strokeRoundedRect(t.x, t.y, t.w, t.h, t.h / 2)
 
-    const ready = this.lineup.length === TEAM.size
+    const ready = this.lineup.length === this.teamSize
     const b = this.btnRect
     this.btnBg.clear()
     this.btnBg.fillStyle(ready ? 0xffd54f : 0xffffff, ready ? 1 : 0.14)
     this.btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
     this.btnText
-      .setText(ready ? '出 发' : `出发（${this.lineup.length}/${TEAM.size}）`)
+      .setText(ready ? '出 发' : `出发（${this.lineup.length}/${this.teamSize}）`)
       .setColor(ready ? '#25262e' : '#9a9aa8')
 
     this.reportSelect()
@@ -430,7 +449,7 @@ export class SelectScene extends Phaser.Scene {
       camY: 0,
       select: {
         selected: this.lineup.length,
-        size: TEAM.size,
+        size: this.teamSize,
         focusedId: this.focusedId,
         items: this.rows.map((r) => ({
           id: r.id,
@@ -459,7 +478,7 @@ export class SelectScene extends Phaser.Scene {
           y: this.btnRect.y + this.btnRect.h / 2,
           w: this.btnRect.w,
           h: this.btnRect.h,
-          enabled: this.lineup.length === TEAM.size,
+          enabled: this.lineup.length === this.teamSize,
         },
       },
     })

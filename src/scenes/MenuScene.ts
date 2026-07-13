@@ -99,9 +99,9 @@ export class MenuScene extends Phaser.Scene {
       .zone(btn.x, btn.y, btn.w, btn.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.scene.start('select'))
-    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('select'))
-    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('select'))
+      .on('pointerup', () => this.scene.start('captain'))
+    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('captain'))
+    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('captain'))
 
     // Twemoji 图形许可（CC-BY 4.0）要求署名
     this.add
