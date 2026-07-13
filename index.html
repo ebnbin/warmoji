@@ -28,7 +28,9 @@
       body {
         margin: 0;
         padding: 0;
+        /* iOS 独立 PWA 下 innerHeight/100% 不含 Home 条区域，dvh 才是全屏高度 */
         height: 100%;
+        height: 100dvh;
         background: #12122a;
         overflow: hidden;
       }

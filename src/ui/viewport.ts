@@ -4,9 +4,20 @@ import type { ViewportSpec } from '../core/viewport'
 
 export const VIEWPORT_CHANGED = 'viewport-changed'
 
+/** 画布 CSS 尺寸取 #game 容器实测矩形（html 高度为 100dvh）：
+ * iOS 独立 PWA 下 window.innerHeight 不含 Home 条区域，不能作为全屏依据 */
+function cssSize(): { w: number; h: number } {
+  const rect = document.getElementById('game')?.getBoundingClientRect()
+  return {
+    w: rect?.width || window.innerWidth,
+    h: rect?.height || window.innerHeight,
+  }
+}
+
+const initial = cssSize()
 export let viewport: ViewportSpec = computeViewport(
-  window.innerWidth,
-  window.innerHeight,
+  initial.w,
+  initial.h,
   window.devicePixelRatio,
 )
 
@@ -48,7 +59,8 @@ export function applyCamera(scene: Phaser.Scene): void {
  * 高分屏上 1 canvas 像素 = 1 设备像素，浏览器不再做拉伸重采样。
  */
 export function refreshViewport(game: Phaser.Game): void {
-  viewport = computeViewport(window.innerWidth, window.innerHeight, window.devicePixelRatio)
+  const css = cssSize()
+  viewport = computeViewport(css.w, css.h, window.devicePixelRatio)
   safeInsets = readSafeInsets()
   game.scale.resize(
     Math.round(viewport.cssWidth * viewport.dpr),
