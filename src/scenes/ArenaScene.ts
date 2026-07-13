@@ -691,11 +691,11 @@ export class ArenaScene extends Phaser.Scene {
 
     // 防死亡瞬间误触；结束后回组队页，可换阵容再战
     this.time.delayedCall(500, () => {
-      const backToMenu = (): void => {
-        this.scene.start('menu')
+      const backToSelect = (): void => {
+        this.scene.start('select')
       }
-      this.input.once('pointerdown', backToMenu)
-      this.input.keyboard?.once('keydown', backToMenu)
+      this.input.once('pointerdown', backToSelect)
+      this.input.keyboard?.once('keydown', backToSelect)
     })
   }
 

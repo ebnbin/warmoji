@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { ArenaScene } from './scenes/ArenaScene'
 import { MenuScene } from './scenes/MenuScene'
 import { PreloadScene } from './scenes/PreloadScene'
+import { SelectScene } from './scenes/SelectScene'
 import { UIScene } from './scenes/UIScene'
 import { setStress } from './ui/dev'
 import { refreshViewport, viewport } from './ui/viewport'
@@ -25,7 +26,7 @@ const game = new Phaser.Game({
   // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
   physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, ArenaScene, UIScene],
+  scene: [PreloadScene, MenuScene, SelectScene, ArenaScene, UIScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => refreshViewport(game))

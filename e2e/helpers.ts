@@ -8,23 +8,40 @@ async function cssPoint(page: Page, logical: { x: number; y: number }): Promise<
   }, logical)
 }
 
-/** 点击组队页上某张角色卡的中心 */
-export async function clickCard(page: Page, id: string): Promise<void> {
-  const c = await page.evaluate(
-    (cid) => window.__warmoji!.menu!.cards.find((x) => x.id === cid)!,
+/** 标题页点击任意处 → 组队页 */
+export async function enterSelect(page: Page): Promise<void> {
+  await page.waitForFunction(() => window.__warmoji?.scene === 'menu')
+  await page.locator('#game canvas').click()
+  await page.waitForFunction(() => window.__warmoji?.scene === 'select' && !!window.__warmoji.select)
+}
+
+/** 点击列表中某个角色行（聚焦并展开详情） */
+export async function clickItem(page: Page, id: string): Promise<void> {
+  const it = await page.evaluate(
+    (cid) => window.__warmoji!.select!.items.find((x) => x.id === cid)!,
     id,
   )
   await page
     .locator('#game canvas')
-    .click({ position: await cssPoint(page, { x: c.x + c.w / 2, y: c.y + c.h / 2 }) })
+    .click({ position: await cssPoint(page, { x: it.x + it.w / 2, y: it.y + it.h / 2 }) })
 }
 
-/** 通过组队页「出发」按钮真实点击开局 */
-export async function startRun(page: Page): Promise<void> {
-  await page.waitForFunction(
-    () => window.__warmoji?.scene === 'menu' && window.__warmoji.menu?.start.enabled === true,
-  )
-  const s = await page.evaluate(() => window.__warmoji!.menu!.start)
+/** 点击详情面板的 加入/移出 按钮 */
+export async function clickToggle(page: Page): Promise<void> {
+  const t = await page.evaluate(() => window.__warmoji!.select!.toggle)
+  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: t.x, y: t.y }) })
+}
+
+/** 点击「出发」（需阵容已满）并等待进入战斗 */
+export async function clickStart(page: Page): Promise<void> {
+  await page.waitForFunction(() => window.__warmoji?.select?.start.enabled === true)
+  const s = await page.evaluate(() => window.__warmoji!.select!.start)
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: s.x, y: s.y }) })
   await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
+}
+
+/** 走完整流程开局：标题页 → 组队页 → 出发 */
+export async function startRun(page: Page): Promise<void> {
+  await enterSelect(page)
+  await clickStart(page)
 }
