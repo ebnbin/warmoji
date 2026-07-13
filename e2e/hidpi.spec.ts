@@ -40,3 +40,19 @@ test.describe('高分屏（DPR 2）', () => {
     expect(errors).toEqual([])
   })
 })
+
+test.describe('手机竖屏（iPhone 尺寸，DPR 3）', () => {
+  test.use({ viewport: { width: 393, height: 852 }, deviceScaleFactor: 3 })
+
+  test('canvas 物理像素 = CSS × 3，竖屏保底 720 生效', async ({ page }) => {
+    await page.goto('/')
+    await page.waitForFunction(() => window.__warmoji?.scene === 'menu')
+    const m = await page.evaluate(() => {
+      const c = document.querySelector('#game canvas') as HTMLCanvasElement
+      return { backingW: c.width, backingH: c.height, viewW: window.__warmoji!.viewW }
+    })
+    expect(m.backingW).toBe(1179)
+    expect(m.backingH).toBe(2556)
+    expect(m.viewW).toBeCloseTo(720, 0)
+  })
+})

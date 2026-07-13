@@ -55,8 +55,9 @@ describe('computeViewport', () => {
     expect(v.logicalHeight).toBe(720)
   })
 
-  it('DPR 钳制在 [1, 2]，缺省为 1', () => {
-    expect(computeViewport(1280, 720, 3).dpr).toBe(2)
+  it('DPR 钳制在 [1, 3]，缺省为 1', () => {
+    expect(computeViewport(1280, 720, 3).dpr).toBe(3)
+    expect(computeViewport(1280, 720, 4).dpr).toBe(3)
     expect(computeViewport(1280, 720, 0).dpr).toBe(1)
     expect(computeViewport(1280, 720).renderScale).toBe(computeViewport(1280, 720).fitScale)
   })
