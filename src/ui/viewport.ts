@@ -29,17 +29,16 @@ export interface SafeInsets {
 }
 
 /** 刘海/状态栏/Home 条的安全区侵入（逻辑 px）：全屏贴边的 UI 须以此偏移 */
-export let safeInsets: SafeInsets = readSafeInsets()
+export let safeInsets: SafeInsets = readSafeInsets(viewport.fitScale)
 
-function readSafeInsets(): SafeInsets {
+function readSafeInsets(fitScale: number): SafeInsets {
   const style = getComputedStyle(document.documentElement)
   const px = (name: string): number => parseFloat(style.getPropertyValue(name)) || 0
-  const s = viewport.fitScale
   return {
-    top: px('--safe-top') / s,
-    right: px('--safe-right') / s,
-    bottom: px('--safe-bottom') / s,
-    left: px('--safe-left') / s,
+    top: px('--safe-top') / fitScale,
+    right: px('--safe-right') / fitScale,
+    bottom: px('--safe-bottom') / fitScale,
+    left: px('--safe-left') / fitScale,
   }
 }
 
@@ -55,13 +54,25 @@ export function applyCamera(scene: Phaser.Scene): void {
 }
 
 /**
- * canvas 物理像素 = CSS × DPR，CSS 尺寸手动钉在窗口大小；
+ * canvas 物理像素 = CSS × DPR，CSS 尺寸手动钉在 #game 实测矩形；
  * 高分屏上 1 canvas 像素 = 1 设备像素，浏览器不再做拉伸重采样。
+ * 无实际变化时跳过（iOS 视口异步稳定需要多次复查，不能每次都重启场景）。
  */
-export function refreshViewport(game: Phaser.Game): void {
+export function refreshViewport(game: Phaser.Game, force = false): void {
   const css = cssSize()
-  viewport = computeViewport(css.w, css.h, window.devicePixelRatio)
-  safeInsets = readSafeInsets()
+  const next = computeViewport(css.w, css.h, window.devicePixelRatio)
+  const nextInsets = readSafeInsets(next.fitScale)
+  const same =
+    Math.abs(next.cssWidth - viewport.cssWidth) < 0.5 &&
+    Math.abs(next.cssHeight - viewport.cssHeight) < 0.5 &&
+    next.dpr === viewport.dpr &&
+    Math.abs(nextInsets.top - safeInsets.top) < 0.5 &&
+    Math.abs(nextInsets.right - safeInsets.right) < 0.5 &&
+    Math.abs(nextInsets.bottom - safeInsets.bottom) < 0.5 &&
+    Math.abs(nextInsets.left - safeInsets.left) < 0.5
+  if (same && !force) return
+  viewport = next
+  safeInsets = nextInsets
   game.scale.resize(
     Math.round(viewport.cssWidth * viewport.dpr),
     Math.round(viewport.cssHeight * viewport.dpr),

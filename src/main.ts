@@ -30,12 +30,24 @@ const game = new Phaser.Game({
   scene: [PreloadScene, MenuScene, SelectScene, ShopScene, ArenaScene, UIScene],
 })
 
-game.events.once(Phaser.Core.Events.READY, () => refreshViewport(game))
+game.events.once(Phaser.Core.Events.READY, () => refreshViewport(game, true))
 
+// iOS（尤其独立 PWA）旋转/启动后视口尺寸异步稳定且不补发 resize：
+// 除 resize 外再观察 #game 盒子实际变化 + 旋转后定时复查；
+// refreshViewport 自带无变化跳过，重复触发无副作用
 let resizeTimer: number | undefined
-window.addEventListener('resize', () => {
+const scheduleRefresh = (): void => {
   window.clearTimeout(resizeTimer)
   resizeTimer = window.setTimeout(() => refreshViewport(game), 100)
+}
+window.addEventListener('resize', scheduleRefresh)
+window.visualViewport?.addEventListener('resize', scheduleRefresh)
+const gameEl = document.getElementById('game')
+if (gameEl) new ResizeObserver(scheduleRefresh).observe(gameEl)
+window.addEventListener('orientationchange', () => {
+  scheduleRefresh()
+  window.setTimeout(() => refreshViewport(game), 400)
+  window.setTimeout(() => refreshViewport(game), 1000)
 })
 
 // 供临时验证脚本注入状态
