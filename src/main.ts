@@ -14,7 +14,8 @@ if (badge) {
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  backgroundColor: '#12122a',
+  // 背景渐变画在 canvas 之下的页面层，canvas 必须透明
+  transparent: true,
   input: { activePointers: 3 },
   physics: { default: 'arcade' },
   scale: { mode: Phaser.Scale.RESIZE },

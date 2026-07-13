@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { ENTITY_EMOJIS, OUTLINE } from '../core/config'
+import { OUTLINE, OUTLINED_EMOJIS } from '../core/config'
 import { emojiCodepoints } from '../core/emoji'
 import { outlineSvg, setSvgSize } from '../core/svg'
 
@@ -35,7 +35,7 @@ async function rasterize(svgText: string): Promise<HTMLImageElement> {
 }
 
 export async function loadEmojiTextures(scene: Phaser.Scene): Promise<void> {
-  const entityCodes = new Set(ENTITY_EMOJIS.map(emojiCodepoints))
+  const entityCodes = new Set(OUTLINED_EMOJIS.map(emojiCodepoints))
   await Promise.all(
     Object.entries(files).map(async ([path, url]) => {
       const code = /([0-9a-f-]+)\.svg$/.exec(path)?.[1]

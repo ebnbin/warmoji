@@ -2,6 +2,8 @@ import Phaser from 'phaser'
 import { GEM, GHOST, HEAL_AMOUNT, KNIFE, MAP, PLAYER, SPAWN, UNIT, ZOMBIE } from '../core/config'
 import type { EnemySpec } from '../core/config'
 import { browserStorage, submitScore } from '../core/highscore'
+import { randomPalette } from '../core/palette'
+import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import { edgeSpawnPoint } from '../core/spawn'
 import { nearestIndex } from '../core/targeting'
@@ -11,6 +13,7 @@ import { norm } from '../core/vec'
 import { waveAt } from '../core/waves'
 import { gainXp, xpToNext } from '../core/xp'
 import type { XpState } from '../core/xp'
+import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiKey } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
@@ -61,6 +64,7 @@ export class ArenaScene extends Phaser.Scene {
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
 
   private rng = new Rng(1)
+  private palette!: Palette
   private stats!: PlayerStats
   private xpState!: XpState
   private hp = 0
@@ -92,6 +96,8 @@ export class ArenaScene extends Phaser.Scene {
   create(): void {
     // scene.restart() 复用同一实例，所有局内状态必须在这里重置
     this.rng = new Rng(Date.now() >>> 0)
+    this.palette = randomPalette(this.rng)
+    applyBackground(this.palette)
     this.stats = {
       knives: 1,
       attackCooldownMs: KNIFE.cooldownMs,
@@ -433,10 +439,13 @@ export class ArenaScene extends Phaser.Scene {
 
   private drawFloor(): void {
     const g = this.add.graphics()
-    g.lineStyle(1, 0xffffff, 0.05)
-    for (let x = 0; x <= MAP.width; x += UNIT) g.lineBetween(x, 0, x, MAP.height)
-    for (let y = 0; y <= MAP.height; y += UNIT) g.lineBetween(0, y, MAP.width, y)
-    g.lineStyle(2, 0xffffff, 0.18)
-    g.strokeRect(0, 0, MAP.width, MAP.height)
+    const shadowOffset = 0.25 * UNIT
+    g.fillStyle(this.palette.shadow, 1)
+    g.fillRect(shadowOffset, shadowOffset, MAP.width, MAP.height)
+    g.fillStyle(this.palette.map, 1)
+    g.fillRect(0, 0, MAP.width, MAP.height)
+    g.lineStyle(1, this.palette.grid, this.palette.gridAlpha)
+    for (let x = UNIT; x < MAP.width; x += UNIT) g.lineBetween(x, 0, x, MAP.height)
+    for (let y = UNIT; y < MAP.height; y += UNIT) g.lineBetween(0, y, MAP.width, y)
   }
 }

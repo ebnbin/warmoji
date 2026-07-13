@@ -90,14 +90,15 @@ export const XP = { base: 8, perLevel: 6 } as const
 
 export const HEAL_AMOUNT = 30
 
-// 战场实体的剪影描边（radius 单位 = twemoji viewBox 单位，36 格）
-export const OUTLINE = { radius: 2, color: '#ffffff' } as const
+// 剪影描边（radius 单位 = twemoji viewBox 单位，36 格）
+export const OUTLINE = { radius: 2, color: '#000000' } as const
 
-export const ENTITY_EMOJIS: readonly string[] = [
+export const OUTLINED_EMOJIS: readonly string[] = [
   PLAYER.emoji,
   PLAYER.deadEmoji,
   KNIFE.emoji,
   ZOMBIE.emoji,
   GHOST.emoji,
   GEM.emoji,
+  '💀',
 ]

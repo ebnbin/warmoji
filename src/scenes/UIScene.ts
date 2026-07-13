@@ -39,18 +39,21 @@ export class UIScene extends Phaser.Scene {
 
     this.hpBar = this.add.graphics()
     this.xpBar = this.add.graphics()
-    this.levelText = this.add.text(224, 10, 'Lv.1', {
+    // 深色字 + 白描边：浅色地图与暗色背景（相机贴边时）上都可读
+    const hudText = {
       fontFamily: UI_FONT,
-      fontSize: '16px',
-      color: '#cccccc',
+      color: '#2b2b33',
+      stroke: '#ffffff',
+      strokeThickness: 3,
       resolution: res,
-    })
+    }
+    this.levelText = this.add.text(224, 10, 'Lv.1', { ...hudText, fontSize: '16px' })
     this.timeText = this.add
-      .text(w / 2, 10, '0:00', { fontFamily: UI_FONT, fontSize: '22px', color: '#dddddd', resolution: res })
+      .text(w / 2, 10, '0:00', { ...hudText, fontSize: '22px' })
       .setOrigin(0.5, 0)
-    emojiImage(this, w - 22, 22, '💀', 20)
+    emojiImage(this, w - 22, 22, '💀', 20, true)
     this.killsText = this.add
-      .text(w - 38, 10, '0', { fontFamily: UI_FONT, fontSize: '20px', color: '#dddddd', resolution: res })
+      .text(w - 38, 10, '0', { ...hudText, fontSize: '20px' })
       .setOrigin(1, 0)
 
     const arenaEvents = this.arena.events
@@ -157,7 +160,7 @@ export class UIScene extends Phaser.Scene {
     g.fillRect(12, 12, 204, 16)
     g.fillStyle(0xef5350, 1)
     g.fillRect(14, 14, 200 * (s.hp / s.maxHp), 12)
-    g.lineStyle(1, 0xffffff, 0.4)
+    g.lineStyle(1, 0x000000, 0.35)
     g.strokeRect(12, 12, 204, 16)
   }
 

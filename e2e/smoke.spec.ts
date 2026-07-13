@@ -15,6 +15,10 @@ test('页面可加载：canvas 渲染、版本徽章存在、无控制台错误'
 
   await page.waitForFunction(() => window.__warmoji?.scene === 'menu')
 
+  // 屏幕锚定的渐变背景画在页面层
+  const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundImage)
+  expect(bg).toContain('linear-gradient')
+
   // 跑几帧，暴露启动后才出现的运行时错误
   await page.waitForTimeout(800)
   expect(errors).toEqual([])

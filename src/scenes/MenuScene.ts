@@ -1,6 +1,9 @@
 import Phaser from 'phaser'
 import { formatTime } from '../core/format'
 import { browserStorage, loadHighScore } from '../core/highscore'
+import { randomPalette } from '../core/palette'
+import { Rng } from '../core/rng'
+import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, iconLabel } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
@@ -13,6 +16,7 @@ export class MenuScene extends Phaser.Scene {
 
   create(): void {
     applyCamera(this)
+    applyBackground(randomPalette(new Rng(Date.now() >>> 0)))
     const w = viewport.logicalWidth
     const h = viewport.logicalHeight
     const res = textRes()
