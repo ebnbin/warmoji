@@ -13,7 +13,7 @@ import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, iconLabel } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
-import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
+import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // 波次间商店：左（竖屏为下）为角色上架位列表——每个出战角色固定占一个位，
 // 未来的道具购买/刷新都发生在自己的位置上互不影响；右（竖屏为上）为选中角色的属性面板。
@@ -159,7 +159,7 @@ export class ShopScene extends Phaser.Scene {
 
     // Twemoji 图形许可（CC-BY 4.0）要求署名
     this.add
-      .text(w / 2, h - 10, 'emoji graphics © Twemoji · CC-BY 4.0', {
+      .text(w / 2, h - safeInsets.bottom - 10, 'emoji graphics © Twemoji · CC-BY 4.0', {
         fontFamily: UI_FONT,
         fontSize: '11px',
         color: '#ffffff',

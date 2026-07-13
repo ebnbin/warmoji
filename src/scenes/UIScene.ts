@@ -6,7 +6,7 @@ import { heapMB, rafHz, rendererInfo, startRafMeter } from '../ui/diagnostics'
 import { emojiCacheStats, emojiImage, iconLabel } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
 import { Joystick } from '../ui/Joystick'
-import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
+import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 import type { ArenaScene, GameOverInfo, HudSnapshot } from './ArenaScene'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
@@ -41,6 +41,8 @@ export class UIScene extends Phaser.Scene {
     applyCamera(this)
     const res = textRes()
     const w = viewport.logicalWidth
+    // 全屏贴边的 HUD 须避开刘海/状态栏/Home 条
+    const { top: sT, right: sR, left: sL } = safeInsets
     this.last = {
       xp: -1,
       xpNext: -1,
@@ -64,20 +66,26 @@ export class UIScene extends Phaser.Scene {
       strokeThickness: 3,
       resolution: res,
     }
-    this.levelText = this.add.text(224, 10, 'Lv.1', { ...hudText, fontSize: '16px' })
+    this.levelText = this.add.text(sL + 224, sT + 10, 'Lv.1', { ...hudText, fontSize: '16px' })
     this.timeText = this.add
-      .text(w / 2, 10, '', { ...hudText, fontSize: '22px' })
+      .text(w / 2, sT + 10, '', { ...hudText, fontSize: '22px' })
       .setOrigin(0.5, 0)
-    emojiImage(this, w - 22, 22, '💀', 20, true)
+    emojiImage(this, w - sR - 22, sT + 22, '💀', 20, true)
     this.killsText = this.add
-      .text(w - 38, 10, '0', { ...hudText, fontSize: '20px' })
+      .text(w - sR - 38, sT + 10, '0', { ...hudText, fontSize: '20px' })
       .setOrigin(1, 0)
-    emojiImage(this, w - 22, 50, COIN.emoji, 20, true)
+    emojiImage(this, w - sR - 22, sT + 50, COIN.emoji, 20, true)
     this.coinsText = this.add
-      .text(w - 38, 38, '0', { ...hudText, fontSize: '20px' })
+      .text(w - sR - 38, sT + 38, '0', { ...hudText, fontSize: '20px' })
       .setOrigin(1, 0)
 
-    const wrench = emojiImage(this, w - 12, viewport.logicalHeight - 26, '🔧', 24)
+    const wrench = emojiImage(
+      this,
+      w - sR - 12,
+      viewport.logicalHeight - safeInsets.bottom - 26,
+      '🔧',
+      24,
+    )
       .setOrigin(1, 1)
       .setDepth(300)
       .setAlpha(0.45)
@@ -130,7 +138,7 @@ export class UIScene extends Phaser.Scene {
     this.devRefreshedAt = 0
     const h = viewport.logicalHeight
     const stressBtn = this.add
-      .text(12, h - 12, `压测模式：${isStress() ? '开' : '关'}（点击切换）`, {
+      .text(safeInsets.left + 12, h - safeInsets.bottom - 12, `压测模式：${isStress() ? '开' : '关'}（点击切换）`, {
         fontFamily: UI_FONT,
         fontSize: '14px',
         color: '#ffffff',
@@ -146,7 +154,7 @@ export class UIScene extends Phaser.Scene {
       this.arena.scene.restart()
     })
     this.devText = this.add
-      .text(12, h - 12 - stressBtn.height - 8, '', {
+      .text(safeInsets.left + 12, h - safeInsets.bottom - 12 - stressBtn.height - 8, '', {
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
         fontSize: '13px',
         color: '#ffffff',
@@ -233,11 +241,13 @@ export class UIScene extends Phaser.Scene {
   }
 
   private drawXpBar(s: HudSnapshot): void {
+    const x = safeInsets.left + 12
+    const y = safeInsets.top + 14
     const g = this.xpBar
     g.clear()
     g.fillStyle(0x000000, 0.5)
-    g.fillRect(12, 14, 204, 10)
+    g.fillRect(x, y, 204, 10)
     g.fillStyle(0x4dd0e1, 1)
-    g.fillRect(13, 15, 202 * Math.min(1, s.xp / s.xpNext), 8)
+    g.fillRect(x + 1, y + 1, 202 * Math.min(1, s.xp / s.xpNext), 8)
   }
 }

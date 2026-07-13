@@ -11,7 +11,7 @@ import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiKey } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
-import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
+import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // 组队页 = 游戏流程中的一步（主菜单 → 组队 → 战斗；战斗结束回到这里）。
 // 「列表 + 详情」结构：花名册增长只影响列表长度（超出可滚动），详情区固定，
@@ -160,7 +160,7 @@ export class SelectScene extends Phaser.Scene {
 
     // Twemoji 图形许可（CC-BY 4.0）要求署名
     this.add
-      .text(w / 2, h - 10, 'emoji graphics © Twemoji · CC-BY 4.0', {
+      .text(w / 2, h - safeInsets.bottom - 10, 'emoji graphics © Twemoji · CC-BY 4.0', {
         fontFamily: UI_FONT,
         fontSize: '11px',
         color: '#ffffff',

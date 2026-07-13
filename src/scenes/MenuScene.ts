@@ -8,7 +8,7 @@ import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, iconLabel } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
-import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
+import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 export class MenuScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色等页面状态
@@ -91,7 +91,7 @@ export class MenuScene extends Phaser.Scene {
 
     // Twemoji 图形许可（CC-BY 4.0）要求署名
     this.add
-      .text(w / 2, h - 10, 'emoji graphics © Twemoji · CC-BY 4.0', {
+      .text(w / 2, h - safeInsets.bottom - 10, 'emoji graphics © Twemoji · CC-BY 4.0', {
         fontFamily: UI_FONT,
         fontSize: '11px',
         color: '#ffffff',

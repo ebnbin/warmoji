@@ -10,6 +10,28 @@ export let viewport: ViewportSpec = computeViewport(
   window.devicePixelRatio,
 )
 
+export interface SafeInsets {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+/** 刘海/状态栏/Home 条的安全区侵入（逻辑 px）：全屏贴边的 UI 须以此偏移 */
+export let safeInsets: SafeInsets = readSafeInsets()
+
+function readSafeInsets(): SafeInsets {
+  const style = getComputedStyle(document.documentElement)
+  const px = (name: string): number => parseFloat(style.getPropertyValue(name)) || 0
+  const s = viewport.fitScale
+  return {
+    top: px('--safe-top') / s,
+    right: px('--safe-right') / s,
+    bottom: px('--safe-bottom') / s,
+    left: px('--safe-left') / s,
+  }
+}
+
 /** 文本栅格化密度跟随渲染缩放（含 DPR），避免放大发糊 */
 export function textRes(): number {
   return Math.max(1, viewport.renderScale)
@@ -27,6 +49,7 @@ export function applyCamera(scene: Phaser.Scene): void {
  */
 export function refreshViewport(game: Phaser.Game): void {
   viewport = computeViewport(window.innerWidth, window.innerHeight, window.devicePixelRatio)
+  safeInsets = readSafeInsets()
   game.scale.resize(
     Math.round(viewport.cssWidth * viewport.dpr),
     Math.round(viewport.cssHeight * viewport.dpr),
