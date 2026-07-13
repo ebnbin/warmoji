@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { GEM, GHOST, HEAL_AMOUNT, KNIFE, MAP, PLAYER, SPAWN, UNIT, ZOMBIE } from '../core/config'
+import { GEM, GHOST, HEAL_AMOUNT, KNIFE, MAP, PLAYER, SPAWN, STRESS, UNIT, ZOMBIE } from '../core/config'
 import type { EnemySpec } from '../core/config'
 import { browserStorage, submitScore } from '../core/highscore'
 import { randomPalette } from '../core/palette'
@@ -15,6 +15,7 @@ import { gainXp, xpToNext } from '../core/xp'
 import type { XpState } from '../core/xp'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
+import { isStress } from '../ui/dev'
 import { emojiImage, emojiKey } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
@@ -74,11 +75,22 @@ export class ArenaScene extends Phaser.Scene {
   private attackCooldownMs = 0
   private lastHitMs = -Infinity
   private pendingSpawns = 0
+  private stress = false
   private over = false
   gameOverInfo?: GameOverInfo
 
   constructor() {
     super('arena')
+  }
+
+  perfSnapshot(): { enemies: number; knives: number; gems: number; pending: number; objects: number } {
+    return {
+      enemies: this.enemies.countActive(true),
+      knives: this.knives.getLength(),
+      gems: this.gems.getLength(),
+      pending: this.pendingSpawns,
+      objects: this.children.list.length,
+    }
   }
 
   hudSnapshot(): HudSnapshot {
@@ -99,14 +111,15 @@ export class ArenaScene extends Phaser.Scene {
     this.rng = new Rng(Date.now() >>> 0)
     this.palette = randomPalette(this.rng)
     applyBackground(this.palette)
+    this.stress = isStress()
     this.stats = {
-      knives: 1,
-      attackCooldownMs: KNIFE.cooldownMs,
+      knives: this.stress ? STRESS.knives : 1,
+      attackCooldownMs: this.stress ? STRESS.attackCooldownMs : KNIFE.cooldownMs,
       moveSpeed: PLAYER.speed,
-      maxHp: PLAYER.maxHp,
+      maxHp: this.stress ? STRESS.maxHp : PLAYER.maxHp,
     }
     this.xpState = { level: 1, xp: 0 }
-    this.hp = PLAYER.maxHp
+    this.hp = this.stats.maxHp
     this.kills = 0
     this.elapsedMs = 0
     this.spawnCooldownMs = 300
@@ -182,6 +195,7 @@ export class ArenaScene extends Phaser.Scene {
       level: this.xpState.level,
       enemies: this.enemies.countActive(true),
       pending: this.pendingSpawns,
+      fps: Math.round(this.game.loop.actualFps),
       viewW: viewport.logicalWidth,
       viewH: viewport.logicalHeight,
       playerX: this.player.x,
@@ -314,11 +328,18 @@ export class ArenaScene extends Phaser.Scene {
     this.spawnCooldownMs -= delta
     if (this.spawnCooldownMs > 0) return
     const wave = waveAt(this.elapsedMs / 1000)
-    this.spawnCooldownMs = wave.spawnIntervalMs
-    if (this.enemies.countActive(true) + this.pendingSpawns >= SPAWN.maxAlive) return
+    this.spawnCooldownMs = this.stress ? STRESS.spawnIntervalMs : wave.spawnIntervalMs
+    const cap = this.stress ? STRESS.maxAlive : SPAWN.maxAlive
+    const batch = this.stress ? STRESS.spawnBatch : 1
+    for (let i = 0; i < batch; i++) {
+      if (this.enemies.countActive(true) + this.pendingSpawns >= cap) return
+      this.spawnOne(wave.ghostShare, wave.hpMultiplier)
+    }
+  }
 
-    const spec = this.rng.chance(wave.ghostShare) ? GHOST : ZOMBIE
-    const hp = Math.round(spec.hp * wave.hpMultiplier)
+  private spawnOne(ghostShare: number, hpMultiplier: number): void {
+    const spec = this.rng.chance(ghostShare) ? GHOST : ZOMBIE
+    const hp = Math.round(spec.hp * hpMultiplier)
     const pos = randomMapPoint(
       this.rng,
       MAP.width,
@@ -416,6 +437,10 @@ export class ArenaScene extends Phaser.Scene {
       if (id === 'heal') this.hp = Math.min(this.stats.maxHp, this.hp + HEAL_AMOUNT)
       this.events.emit('upgrade-toast', { ...UPGRADE_LABELS[id], index: i })
     }
+    // 压测模式下升级不允许把攻速拉回常规下限
+    if (this.stress) {
+      this.stats.attackCooldownMs = Math.min(this.stats.attackCooldownMs, STRESS.attackCooldownMs)
+    }
   }
 
   private onPlayerTouched(enemy: ImageObj): void {
@@ -455,6 +480,7 @@ export class ArenaScene extends Phaser.Scene {
       level: this.xpState.level,
       enemies: this.enemies.countActive(true),
       pending: this.pendingSpawns,
+      fps: Math.round(this.game.loop.actualFps),
       viewW: viewport.logicalWidth,
       viewH: viewport.logicalHeight,
       playerX: this.player.x,

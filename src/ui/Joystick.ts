@@ -28,6 +28,8 @@ export class Joystick {
 
   private onDown(pointer: Phaser.Input.Pointer): void {
     if (this.pointerId !== null) return
+    // 点在可交互 UI（如压测按钮）上时不触发摇杆
+    if (this.scene.input.hitTestPointer(pointer).length > 0) return
     this.pointerId = pointer.id
     this.originX = pointer.worldX
     this.originY = pointer.worldY

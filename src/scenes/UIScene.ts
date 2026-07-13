@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { formatTime } from '../core/format'
+import { devMode, isStress, setStress } from '../ui/dev'
 import { emojiImage, iconLabel } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
 import { Joystick } from '../ui/Joystick'
@@ -16,6 +17,10 @@ export class UIScene extends Phaser.Scene {
   private timeText!: Phaser.GameObjects.Text
   private killsText!: Phaser.GameObjects.Text
   private last!: HudSnapshot
+  private devText?: Phaser.GameObjects.Text
+  private fpsWindowMin = Infinity
+  private fpsWindowStart = 0
+  private devRefreshedAt = 0
 
   constructor() {
     super('ui')
@@ -56,6 +61,8 @@ export class UIScene extends Phaser.Scene {
       .text(w - 38, 10, '0', { ...hudText, fontSize: '20px' })
       .setOrigin(1, 0)
 
+    if (devMode) this.createDevPanel(res)
+
     const arenaEvents = this.arena.events
     arenaEvents.on('upgrade-toast', this.onToast, this)
     arenaEvents.on('game-over', this.onGameOver, this)
@@ -70,7 +77,8 @@ export class UIScene extends Phaser.Scene {
     if (this.arena.gameOverInfo) this.onGameOver(this.arena.gameOverInfo)
   }
 
-  update(): void {
+  update(time: number): void {
+    if (this.devText) this.updateDevPanel(time)
     const s = this.arena.hudSnapshot()
     if (s.hp !== this.last.hp || s.maxHp !== this.last.maxHp) this.drawHpBar(s)
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.drawXpBar(s)
@@ -82,6 +90,61 @@ export class UIScene extends Phaser.Scene {
 
   private onViewportChanged(): void {
     this.scene.restart()
+  }
+
+  private createDevPanel(res: number): void {
+    this.fpsWindowMin = Infinity
+    this.fpsWindowStart = 0
+    this.devRefreshedAt = 0
+    const h = viewport.logicalHeight
+    const stressBtn = this.add
+      .text(12, h - 12, `压测模式：${isStress() ? '开' : '关'}（点击切换）`, {
+        fontFamily: UI_FONT,
+        fontSize: '14px',
+        color: '#ffffff',
+        backgroundColor: isStress() ? '#2e7d32' : '#c62828',
+        padding: { x: 10, y: 6 },
+        resolution: textRes(),
+      })
+      .setOrigin(0, 1)
+      .setDepth(300)
+      .setInteractive({ useHandCursor: true })
+    stressBtn.on('pointerdown', () => {
+      setStress(!isStress())
+      this.arena.scene.restart()
+    })
+    this.devText = this.add
+      .text(12, h - 12 - stressBtn.height - 8, '', {
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+        fontSize: '13px',
+        color: '#ffffff',
+        backgroundColor: '#000000',
+        padding: { x: 8, y: 6 },
+        lineSpacing: 3,
+        resolution: res,
+      })
+      .setOrigin(0, 1)
+      .setDepth(300)
+      .setAlpha(0.88)
+  }
+
+  private updateDevPanel(time: number): void {
+    const fps = this.game.loop.actualFps
+    if (time - this.fpsWindowStart > 5000) {
+      this.fpsWindowStart = time
+      this.fpsWindowMin = fps
+    } else if (fps < this.fpsWindowMin) {
+      this.fpsWindowMin = fps
+    }
+    if (time - this.devRefreshedAt < 250) return
+    this.devRefreshedAt = time
+    const p = this.arena.perfSnapshot()
+    this.devText!.setText([
+      `FPS ${fps.toFixed(0)}  (5s min ${Number.isFinite(this.fpsWindowMin) ? this.fpsWindowMin.toFixed(0) : '-'})`,
+      `敌人 ${p.enemies}  预告 ${p.pending}`,
+      `飞刀 ${p.knives}  经验珠 ${p.gems}`,
+      `总对象 ${p.objects}`,
+    ])
   }
 
   private onToast(upgrade: { emoji: string; text: string; index: number }): void {

@@ -13,6 +13,7 @@ interface WarmojiDebug {
   level: number
   enemies: number
   pending: number
+  fps: number
   viewW: number
   viewH: number
   playerX: number
@@ -25,4 +26,5 @@ interface Window {
   __warmoji?: WarmojiDebug
   __game?: unknown
   __twemojiVersion?: string
+  __setStress?: (on: boolean) => void
 }

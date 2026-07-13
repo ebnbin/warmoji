@@ -90,6 +90,16 @@ export const SPAWN = {
   edgeInset: 0.5 * UNIT,
 } as const
 
+// 压力测试模式（?dev=1 面板开关）：拉高负载且保证测得下去
+export const STRESS = {
+  maxHp: 10_000_000,
+  spawnIntervalMs: 80,
+  spawnBatch: 5,
+  maxAlive: 800,
+  attackCooldownMs: 100,
+  knives: 6,
+} as const
+
 export const XP = { base: 8, perLevel: 6 } as const
 
 export const HEAL_AMOUNT = 30
