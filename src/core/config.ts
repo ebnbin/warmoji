@@ -11,12 +11,20 @@ export const MAP = {
   cameraMargin: 2 * UNIT,
 } as const
 
-export const PLAYER = {
-  emoji: '😎',
-  deadEmoji: '😵',
-  size: 1 * UNIT,
-  radius: 0.5 * UNIT,
-  speed: 5.5 * UNIT,
+// 队伍 = 1 队长（无实体，提供全队被动，能力后续设计）+ 5 角色（真正参战）。
+// 玩家操控队伍中心点，角色环状固定槽位随行；除此之外角色是完全独立的单位。
+export const TEAM = {
+  size: 5,
+  ringRadius: 1.2 * UNIT,
+  moveSpeed: 5.5 * UNIT,
+  reviveMs: 10_000,
+  captainEmoji: '👑',
+  memberEmojis: ['😎', '🥷', '🧙', '🤠', '👽'],
+} as const
+
+export const MEMBER = {
+  size: 0.9 * UNIT,
+  radius: 0.45 * UNIT,
   maxHp: 100,
   iframesMs: 400,
 } as const
@@ -108,8 +116,7 @@ export const HEAL_AMOUNT = 30
 export const OUTLINE = { radius: 2, color: '#000000' } as const
 
 export const OUTLINED_EMOJIS: readonly string[] = [
-  PLAYER.emoji,
-  PLAYER.deadEmoji,
+  ...TEAM.memberEmojis,
   KNIFE.emoji,
   ZOMBIE.emoji,
   GHOST.emoji,

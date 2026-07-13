@@ -1,6 +1,19 @@
 import Phaser from 'phaser'
-import { GEM, GHOST, HEAL_AMOUNT, KNIFE, MAP, PLAYER, SPAWN, STRESS, UNIT, ZOMBIE } from '../core/config'
+import {
+  GEM,
+  GHOST,
+  HEAL_AMOUNT,
+  KNIFE,
+  MAP,
+  MEMBER,
+  SPAWN,
+  STRESS,
+  TEAM,
+  UNIT,
+  ZOMBIE,
+} from '../core/config'
 import type { EnemySpec } from '../core/config'
+import { slotOffset } from '../core/formation'
 import { browserStorage, submitScore } from '../core/highscore'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
@@ -16,7 +29,7 @@ import type { XpState } from '../core/xp'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { isStress } from '../ui/dev'
-import { emojiImage, emojiKey } from '../ui/emoji'
+import { emojiImage } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 import type { UIScene } from './UIScene'
@@ -25,8 +38,6 @@ type ArcadeBody = Phaser.Physics.Arcade.Body
 type ImageObj = Phaser.GameObjects.Image
 
 export interface HudSnapshot {
-  hp: number
-  maxHp: number
   xp: number
   xpNext: number
   level: number
@@ -44,6 +55,21 @@ export interface GameOverInfo {
   bestKills: number
 }
 
+interface Member {
+  emoji: string
+  slot: number
+  image: ImageObj
+  hp: number
+  alive: boolean
+  reviveAt: number
+  attackCooldownMs: number
+  lastHitMs: number
+  hpBar: Phaser.GameObjects.Graphics
+  shownHpRatio: number
+  deadText: Phaser.GameObjects.Text
+  shownCountdown: number
+}
+
 // 碰撞圆按逻辑半径换算回源纹理坐标（body 随对象缩放）
 function circleBody(obj: ImageObj, radius: number): void {
   const body = obj.body as ArcadeBody
@@ -57,7 +83,10 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
 }
 
 export class ArenaScene extends Phaser.Scene {
-  private player!: ImageObj
+  private members: Member[] = []
+  private memberGroup!: Phaser.GameObjects.Group
+  private center = { x: 0, y: 0 }
+  private centerObj!: Phaser.GameObjects.Zone
   private enemies!: Phaser.GameObjects.Group
   private knives!: Phaser.GameObjects.Group
   private gems!: Phaser.GameObjects.Group
@@ -68,12 +97,9 @@ export class ArenaScene extends Phaser.Scene {
   private palette!: Palette
   private stats!: PlayerStats
   private xpState!: XpState
-  private hp = 0
   private kills = 0
   private elapsedMs = 0
   private spawnCooldownMs = 0
-  private attackCooldownMs = 0
-  private lastHitMs = -Infinity
   private pendingSpawns = 0
   private stress = false
   private over = false
@@ -95,8 +121,6 @@ export class ArenaScene extends Phaser.Scene {
 
   hudSnapshot(): HudSnapshot {
     return {
-      hp: this.hp,
-      maxHp: this.stats.maxHp,
       xp: this.xpState.xp,
       xpNext: xpToNext(this.xpState.level),
       level: this.xpState.level,
@@ -115,16 +139,13 @@ export class ArenaScene extends Phaser.Scene {
     this.stats = {
       knives: this.stress ? STRESS.knives : 1,
       attackCooldownMs: this.stress ? STRESS.attackCooldownMs : KNIFE.cooldownMs,
-      moveSpeed: PLAYER.speed,
-      maxHp: this.stress ? STRESS.maxHp : PLAYER.maxHp,
+      moveSpeed: TEAM.moveSpeed,
+      maxHp: this.stress ? STRESS.maxHp : MEMBER.maxHp,
     }
     this.xpState = { level: 1, xp: 0 }
-    this.hp = this.stats.maxHp
     this.kills = 0
     this.elapsedMs = 0
     this.spawnCooldownMs = 300
-    this.attackCooldownMs = 0
-    this.lastHitMs = -Infinity
     this.pendingSpawns = 0
     this.over = false
     this.gameOverInfo = undefined
@@ -132,10 +153,11 @@ export class ArenaScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, MAP.width, MAP.height)
     this.drawFloor()
 
-    this.player = emojiImage(this, MAP.width / 2, MAP.height / 2, PLAYER.emoji, PLAYER.size, true).setDepth(10)
-    this.physics.add.existing(this.player)
-    circleBody(this.player, PLAYER.radius)
-    ;(this.player.body as ArcadeBody).setCollideWorldBounds(true)
+    this.center = { x: MAP.width / 2, y: MAP.height / 2 }
+    this.centerObj = this.add.zone(this.center.x, this.center.y, 1, 1)
+
+    this.memberGroup = this.add.group()
+    this.members = TEAM.memberEmojis.map((emoji, slot) => this.createMember(emoji, slot))
 
     const cam = this.cameras.main
     cam.setZoom(viewport.renderScale)
@@ -145,7 +167,7 @@ export class ArenaScene extends Phaser.Scene {
       MAP.width + MAP.cameraMargin * 2,
       MAP.height + MAP.cameraMargin * 2,
     )
-    cam.startFollow(this.player)
+    cam.startFollow(this.centerObj)
 
     this.enemies = this.add.group()
     this.knives = this.add.group()
@@ -159,13 +181,14 @@ export class ArenaScene extends Phaser.Scene {
     this.physics.add.overlap(this.knives, this.enemies, (a, b) =>
       this.onKnifeHit(a as unknown as ImageObj, b as unknown as ImageObj),
     )
-    this.physics.add.overlap(this.player, this.enemies, (_p, e) =>
-      this.onPlayerTouched(e as unknown as ImageObj),
+    this.physics.add.overlap(this.memberGroup, this.enemies, (m, e) =>
+      this.onMemberTouched(m as unknown as ImageObj, e as unknown as ImageObj),
     )
-    this.physics.add.overlap(this.player, this.gems, (_p, g) =>
+    this.physics.add.overlap(this.memberGroup, this.gems, (_m, g) =>
       this.collectGem(g as unknown as ImageObj),
     )
 
+    this.layoutTeam()
     this.scene.launch('ui')
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
@@ -179,8 +202,8 @@ export class ArenaScene extends Phaser.Scene {
     if (this.over) return
     this.elapsedMs += delta
 
-    this.movePlayer()
-    this.autoAttack(delta)
+    this.moveTeam(delta)
+    this.updateMembers(delta)
     this.spawn(delta)
     this.steerEnemies()
     this.magnetGems()
@@ -190,7 +213,8 @@ export class ArenaScene extends Phaser.Scene {
     reportDebug({
       scene: 'arena',
       elapsed: this.elapsedMs / 1000,
-      hp: this.hp,
+      hp: this.members.reduce((sum, m) => sum + m.hp, 0),
+      alive: this.members.filter((m) => m.alive).length,
       kills: this.kills,
       level: this.xpState.level,
       enemies: this.enemies.countActive(true),
@@ -198,8 +222,8 @@ export class ArenaScene extends Phaser.Scene {
       fps: Math.round(this.game.loop.actualFps),
       viewW: viewport.logicalWidth,
       viewH: viewport.logicalHeight,
-      playerX: this.player.x,
-      playerY: this.player.y,
+      playerX: this.center.x,
+      playerY: this.center.y,
       camX: cam.worldView.centerX,
       camY: cam.worldView.centerY,
     })
@@ -209,7 +233,53 @@ export class ArenaScene extends Phaser.Scene {
     this.cameras.main.setZoom(viewport.renderScale)
   }
 
-  private movePlayer(): void {
+  // ── 队伍 ────────────────────────────────────────────────────
+
+  private createMember(emoji: string, slot: number): Member {
+    const off = slotOffset(slot, TEAM.size, TEAM.ringRadius)
+    const image = emojiImage(
+      this,
+      this.center.x + off.x,
+      this.center.y + off.y,
+      emoji,
+      MEMBER.size,
+      true,
+    ).setDepth(10)
+    this.physics.add.existing(image)
+    circleBody(image, MEMBER.radius)
+    const member: Member = {
+      emoji,
+      slot,
+      image,
+      hp: this.stats.maxHp,
+      alive: true,
+      reviveAt: 0,
+      // 错开初始冷却，避免 5 人同帧齐射
+      attackCooldownMs: slot * 120,
+      lastHitMs: -Infinity,
+      hpBar: this.add.graphics().setDepth(11),
+      shownHpRatio: -1,
+      deadText: this.add
+        .text(0, 0, '', {
+          fontFamily: UI_FONT,
+          fontSize: '20px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+          stroke: '#000000',
+          strokeThickness: 4,
+          resolution: textRes(),
+        })
+        .setOrigin(0.5)
+        .setDepth(12)
+        .setVisible(false),
+      shownCountdown: -1,
+    }
+    image.setData('member', member)
+    this.memberGroup.add(image)
+    return member
+  }
+
+  private moveTeam(delta: number): void {
     const kx =
       (held(this.cursors?.left) || held(this.wasd?.A) ? -1 : 0) +
       (held(this.cursors?.right) || held(this.wasd?.D) ? 1 : 0)
@@ -219,33 +289,126 @@ export class ArenaScene extends Phaser.Scene {
 
     const ui = this.scene.get('ui') as UIScene
     const dir = kx !== 0 || ky !== 0 ? norm(kx, ky) : ui.joystickVector
-    ;(this.player.body as ArcadeBody).setVelocity(
-      dir.x * this.stats.moveSpeed,
-      dir.y * this.stats.moveSpeed,
-    )
+    const step = (this.stats.moveSpeed * delta) / 1000
+    const clampMin = TEAM.ringRadius + MEMBER.radius
+    this.center.x = Phaser.Math.Clamp(this.center.x + dir.x * step, clampMin, MAP.width - clampMin)
+    this.center.y = Phaser.Math.Clamp(this.center.y + dir.y * step, clampMin, MAP.height - clampMin)
+    this.centerObj.setPosition(this.center.x, this.center.y)
+    this.layoutTeam()
   }
 
-  private autoAttack(delta: number): void {
-    this.attackCooldownMs -= delta
-    if (this.attackCooldownMs > 0) return
-    const targets = (this.enemies.getChildren() as ImageObj[]).filter((e) => e.active)
-    if (targets.length === 0) return
-    this.attackCooldownMs = this.stats.attackCooldownMs
-
-    const idx = nearestIndex({ x: this.player.x, y: this.player.y }, targets)
-    if (idx < 0) return
-    const target = targets[idx]!
-    const base = Math.atan2(target.y - this.player.y, target.x - this.player.x)
-    for (let i = 0; i < this.stats.knives; i++) {
-      this.throwKnife(base + (i - (this.stats.knives - 1) / 2) * KNIFE.volleySpreadRad)
+  private layoutTeam(): void {
+    for (const m of this.members) {
+      const off = slotOffset(m.slot, TEAM.size, TEAM.ringRadius)
+      m.image.setPosition(this.center.x + off.x, this.center.y + off.y)
+      ;(m.image.body as ArcadeBody).updateFromGameObject()
+      m.hpBar.setPosition(m.image.x, m.image.y)
+      m.deadText.setPosition(m.image.x, m.image.y)
     }
   }
 
-  private throwKnife(angle: number): void {
+  private updateMembers(delta: number): void {
+    for (const m of this.members) {
+      if (m.alive) {
+        this.drawMemberHp(m)
+        this.memberAttack(m, delta)
+      } else {
+        if (this.elapsedMs >= m.reviveAt) {
+          this.reviveMember(m)
+        } else {
+          const remain = Math.ceil((m.reviveAt - this.elapsedMs) / 1000)
+          if (remain !== m.shownCountdown) {
+            m.shownCountdown = remain
+            m.deadText.setText(String(remain))
+          }
+        }
+      }
+    }
+  }
+
+  private drawMemberHp(m: Member): void {
+    const ratio = Math.max(0, m.hp / this.stats.maxHp)
+    if (Math.abs(ratio - m.shownHpRatio) < 0.005) return
+    m.shownHpRatio = ratio
+    const w = 0.8 * UNIT
+    const y = MEMBER.size * 0.62
+    const g = m.hpBar
+    g.clear()
+    g.fillStyle(0x000000, 0.45)
+    g.fillRect(-w / 2, y, w, 6)
+    g.fillStyle(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffb300 : 0xef5350, 1)
+    g.fillRect(-w / 2 + 1, y + 1, (w - 2) * ratio, 4)
+  }
+
+  private memberAttack(m: Member, delta: number): void {
+    m.attackCooldownMs -= delta
+    if (m.attackCooldownMs > 0) return
+    const targets = (this.enemies.getChildren() as ImageObj[]).filter((e) => e.active)
+    if (targets.length === 0) return
+    m.attackCooldownMs = this.stats.attackCooldownMs
+
+    const idx = nearestIndex({ x: m.image.x, y: m.image.y }, targets)
+    if (idx < 0) return
+    const target = targets[idx]!
+    const base = Math.atan2(target.y - m.image.y, target.x - m.image.x)
+    for (let i = 0; i < this.stats.knives; i++) {
+      this.throwKnife(m.image.x, m.image.y, base + (i - (this.stats.knives - 1) / 2) * KNIFE.volleySpreadRad)
+    }
+  }
+
+  private onMemberTouched(memberImg: ImageObj, enemy: ImageObj): void {
+    if (this.over || !enemy.active) return
+    const m = memberImg.getData('member') as Member
+    if (!m.alive) return
+    if (this.elapsedMs - m.lastHitMs < MEMBER.iframesMs) return
+    m.lastHitMs = this.elapsedMs
+    const spec = enemy.getData('spec') as EnemySpec
+    m.hp = Math.max(0, m.hp - spec.damage)
+    this.cameras.main.shake(80, 0.003)
+    m.image.setTint(0xff7777)
+    this.time.delayedCall(120, () => {
+      if (m.alive) m.image.clearTint()
+    })
+    if (m.hp <= 0) this.killMember(m)
+  }
+
+  private killMember(m: Member): void {
+    m.alive = false
+    m.hp = 0
+    m.reviveAt = this.elapsedMs + TEAM.reviveMs
+    m.shownCountdown = -1
+    ;(m.image.body as ArcadeBody).enable = false
+    m.image.setAlpha(0.35).setTint(0x888888)
+    m.hpBar.setVisible(false)
+    m.deadText.setVisible(true)
+    if (this.members.every((x) => !x.alive)) this.gameOver()
+  }
+
+  private reviveMember(m: Member): void {
+    m.alive = true
+    m.hp = this.stats.maxHp
+    m.shownHpRatio = -1
+    m.lastHitMs = this.elapsedMs
+    ;(m.image.body as ArcadeBody).enable = true
+    m.image.setAlpha(1).clearTint()
+    m.hpBar.setVisible(true)
+    m.deadText.setVisible(false)
+    const targetScale = m.image.scale
+    m.image.setScale(targetScale * 0.3)
+    this.tweens.add({ targets: m.image, scale: targetScale, duration: 200, ease: 'Back.easeOut' })
+  }
+
+  private aliveMembers(): Member[] {
+    return this.members.filter((m) => m.alive)
+  }
+
+  // ── 攻击 ────────────────────────────────────────────────────
+
+  private throwKnife(fromX: number, fromY: number, angle: number): void {
     const knife = emojiImage(
       this,
-      this.player.x + Math.cos(angle) * KNIFE.size,
-      this.player.y + Math.sin(angle) * KNIFE.size,
+      fromX + Math.cos(angle) * KNIFE.size,
+      fromY + Math.sin(angle) * KNIFE.size,
       KNIFE.emoji,
       KNIFE.size,
       true,
@@ -324,6 +487,8 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
+  // ── 刷怪 ────────────────────────────────────────────────────
+
   private spawn(delta: number): void {
     this.spawnCooldownMs -= delta
     if (this.spawnCooldownMs > 0) return
@@ -345,7 +510,7 @@ export class ArenaScene extends Phaser.Scene {
       MAP.width,
       MAP.height,
       SPAWN.edgeInset,
-      { x: this.player.x, y: this.player.y },
+      this.center,
       SPAWN.minPlayerDist,
     )
 
@@ -381,13 +546,29 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private steerEnemies(): void {
+    const alive = this.aliveMembers()
+    if (alive.length === 0) return
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       const spec = e.getData('spec') as EnemySpec
-      const dir = norm(this.player.x - e.x, this.player.y - e.y)
+      // 以角色为单位索敌：追离自己最近的存活角色
+      let best = alive[0]!
+      let bestD = Infinity
+      for (const m of alive) {
+        const dx = m.image.x - e.x
+        const dy = m.image.y - e.y
+        const d = dx * dx + dy * dy
+        if (d < bestD) {
+          bestD = d
+          best = m
+        }
+      }
+      const dir = norm(best.image.x - e.x, best.image.y - e.y)
       ;(e.body as ArcadeBody).setVelocity(dir.x * spec.speed, dir.y * spec.speed)
     }
   }
+
+  // ── 经验 ────────────────────────────────────────────────────
 
   private spawnGem(x: number, y: number, xp: number): void {
     const gem = emojiImage(
@@ -405,14 +586,28 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private magnetGems(): void {
+    const alive = this.aliveMembers()
+    if (alive.length === 0) return
     const r2 = GEM.magnetRadius * GEM.magnetRadius
     for (const g of this.gems.getChildren() as ImageObj[]) {
       if (!g.active) continue
-      const dx = this.player.x - g.x
-      const dy = this.player.y - g.y
+      // 吸附到离经验珠最近的存活角色
+      let bx = 0
+      let by = 0
+      let bestD = Infinity
+      for (const m of alive) {
+        const dx = m.image.x - g.x
+        const dy = m.image.y - g.y
+        const d = dx * dx + dy * dy
+        if (d < bestD) {
+          bestD = d
+          bx = dx
+          by = dy
+        }
+      }
       const body = g.body as ArcadeBody
-      if (dx * dx + dy * dy < r2) {
-        const dir = norm(dx, dy)
+      if (bestD < r2) {
+        const dir = norm(bx, by)
         body.setVelocity(dir.x * GEM.magnetSpeed, dir.y * GEM.magnetSpeed)
       } else {
         body.setVelocity(0, 0)
@@ -434,7 +629,9 @@ export class ArenaScene extends Phaser.Scene {
       const level = this.xpState.level - count + i + 1
       const id = pickUpgrade(level, this.stats)
       this.stats = applyUpgrade(this.stats, id)
-      if (id === 'heal') this.hp = Math.min(this.stats.maxHp, this.hp + HEAL_AMOUNT)
+      if (id === 'heal') {
+        for (const m of this.aliveMembers()) m.hp = Math.min(this.stats.maxHp, m.hp + HEAL_AMOUNT)
+      }
       this.events.emit('upgrade-toast', { ...UPGRADE_LABELS[id], index: i })
     }
     // 压测模式下升级不允许把攻速拉回常规下限
@@ -443,22 +640,11 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private onPlayerTouched(enemy: ImageObj): void {
-    if (this.over || !enemy.active) return
-    if (this.elapsedMs - this.lastHitMs < PLAYER.iframesMs) return
-    this.lastHitMs = this.elapsedMs
-    const spec = enemy.getData('spec') as EnemySpec
-    this.hp = Math.max(0, this.hp - spec.damage)
-    this.cameras.main.shake(90, 0.004)
-    this.player.setAlpha(0.4)
-    this.tweens.add({ targets: this.player, alpha: 1, duration: PLAYER.iframesMs })
-    if (this.hp <= 0) this.gameOver()
-  }
+  // ── 结算 ────────────────────────────────────────────────────
 
   private gameOver(): void {
     this.over = true
     this.physics.pause()
-    this.player.setTexture(emojiKey(PLAYER.deadEmoji, true))
 
     const seconds = Math.floor(this.elapsedMs / 1000)
     const result = submitScore(browserStorage(), seconds, this.kills)
@@ -476,6 +662,7 @@ export class ArenaScene extends Phaser.Scene {
       scene: 'gameover',
       elapsed: seconds,
       hp: 0,
+      alive: 0,
       kills: this.kills,
       level: this.xpState.level,
       enemies: this.enemies.countActive(true),
@@ -483,8 +670,8 @@ export class ArenaScene extends Phaser.Scene {
       fps: Math.round(this.game.loop.actualFps),
       viewW: viewport.logicalWidth,
       viewH: viewport.logicalHeight,
-      playerX: this.player.x,
-      playerY: this.player.y,
+      playerX: this.center.x,
+      playerY: this.center.y,
       camX: this.cameras.main.worldView.centerX,
       camY: this.cameras.main.worldView.centerY,
     })

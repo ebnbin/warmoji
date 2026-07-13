@@ -103,6 +103,7 @@ export class MenuScene extends Phaser.Scene {
       scene: 'menu',
       elapsed: 0,
       hp: 0,
+      alive: 0,
       kills: 0,
       level: 1,
       enemies: 0,

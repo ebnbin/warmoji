@@ -28,8 +28,8 @@ test('25×25 地图：出生居中、相机跟随、边缘钳制到 margin', asy
     { timeout: 10_000 },
   )
 
-  // 到达右缘：相机被钳制在 地图+margin 内，玩家偏离屏幕中心
-  await page.waitForFunction(() => (window.__warmoji?.playerX ?? 0) > 1500, undefined, {
+  // 到达右缘：中心钳制在 地图边缘-(环半径+角色半径)≈1494，相机钳制在 地图+margin 内
+  await page.waitForFunction(() => (window.__warmoji?.playerX ?? 0) > 1480, undefined, {
     timeout: 10_000,
   })
   await page.keyboard.up('KeyD')

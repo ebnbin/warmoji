@@ -9,6 +9,7 @@ interface WarmojiDebug {
   scene: 'menu' | 'arena' | 'gameover'
   elapsed: number
   hp: number
+  alive: number
   kills: number
   level: number
   enemies: number

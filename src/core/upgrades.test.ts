@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { KNIFE, PLAYER } from './config'
+import { KNIFE, MEMBER, TEAM } from './config'
 import { applyUpgrade, pickUpgrade } from './upgrades'
 import type { PlayerStats } from './upgrades'
 
 function baseStats(): PlayerStats {
-  return { knives: 1, attackCooldownMs: KNIFE.cooldownMs, moveSpeed: PLAYER.speed, maxHp: PLAYER.maxHp }
+  return { knives: 1, attackCooldownMs: KNIFE.cooldownMs, moveSpeed: TEAM.moveSpeed, maxHp: MEMBER.maxHp }
 }
 
 describe('upgrades', () => {
@@ -26,8 +26,8 @@ describe('upgrades', () => {
     const s = baseStats()
     expect(applyUpgrade(s, 'knife').knives).toBe(2)
     expect(applyUpgrade(s, 'attackSpeed').attackCooldownMs).toBe(Math.round(KNIFE.cooldownMs * 0.85))
-    expect(applyUpgrade(s, 'moveSpeed').moveSpeed).toBe(Math.round(PLAYER.speed * 1.08))
-    expect(applyUpgrade(s, 'heal').maxHp).toBe(PLAYER.maxHp + 15)
+    expect(applyUpgrade(s, 'moveSpeed').moveSpeed).toBe(Math.round(TEAM.moveSpeed * 1.08))
+    expect(applyUpgrade(s, 'heal').maxHp).toBe(MEMBER.maxHp + 15)
     expect(s).toEqual(baseStats())
   })
 

@@ -19,8 +19,8 @@ test('压测模式：敌人数突破常规上限、血量拉满、FPS 指标可�
 
   await page.evaluate(() => window.__setStress!(true))
 
-  // 常规同屏上限 120，压测模式下应显著突破
-  await page.waitForFunction(() => (window.__warmoji?.enemies ?? 0) > 140, undefined, {
+  // 压测下刷怪 62/s、全队 300 刀/s，短时间内击杀吞吐应远超常规节奏
+  await page.waitForFunction(() => (window.__warmoji?.kills ?? 0) > 300, undefined, {
     timeout: 100_000,
   })
 

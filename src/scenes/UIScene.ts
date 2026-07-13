@@ -11,7 +11,6 @@ import type { ArenaScene, GameOverInfo, HudSnapshot } from './ArenaScene'
 // 与 ArenaScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
 export class UIScene extends Phaser.Scene {
   private joystick?: Joystick
-  private hpBar!: Phaser.GameObjects.Graphics
   private xpBar!: Phaser.GameObjects.Graphics
   private levelText!: Phaser.GameObjects.Text
   private timeText!: Phaser.GameObjects.Text
@@ -38,11 +37,10 @@ export class UIScene extends Phaser.Scene {
     applyCamera(this)
     const res = textRes()
     const w = viewport.logicalWidth
-    this.last = { hp: -1, maxHp: -1, xp: -1, xpNext: -1, level: -1, kills: -1, seconds: -1, over: false }
+    this.last = { xp: -1, xpNext: -1, level: -1, kills: -1, seconds: -1, over: false }
 
     this.joystick = new Joystick(this)
 
-    this.hpBar = this.add.graphics()
     this.xpBar = this.add.graphics()
     // 深色字 + 白描边：浅色地图与暗色背景（相机贴边时）上都可读
     const hudText = {
@@ -89,7 +87,6 @@ export class UIScene extends Phaser.Scene {
   update(time: number): void {
     if (this.devText) this.updateDevPanel(time)
     const s = this.arena.hudSnapshot()
-    if (s.hp !== this.last.hp || s.maxHp !== this.last.maxHp) this.drawHpBar(s)
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.drawXpBar(s)
     if (s.level !== this.last.level) this.levelText.setText(`Lv.${s.level}`)
     if (s.kills !== this.last.kills) this.killsText.setText(String(s.kills))
@@ -225,23 +222,12 @@ export class UIScene extends Phaser.Scene {
     this.tweens.add({ targets: prompt, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 })
   }
 
-  private drawHpBar(s: HudSnapshot): void {
-    const g = this.hpBar
-    g.clear()
-    g.fillStyle(0x000000, 0.5)
-    g.fillRect(12, 12, 204, 16)
-    g.fillStyle(0xef5350, 1)
-    g.fillRect(14, 14, 200 * (s.hp / s.maxHp), 12)
-    g.lineStyle(1, 0x000000, 0.35)
-    g.strokeRect(12, 12, 204, 16)
-  }
-
   private drawXpBar(s: HudSnapshot): void {
     const g = this.xpBar
     g.clear()
     g.fillStyle(0x000000, 0.5)
-    g.fillRect(12, 32, 204, 8)
+    g.fillRect(12, 14, 204, 10)
     g.fillStyle(0x4dd0e1, 1)
-    g.fillRect(13, 33, 202 * Math.min(1, s.xp / s.xpNext), 6)
+    g.fillRect(13, 15, 202 * Math.min(1, s.xp / s.xpNext), 8)
   }
 }
