@@ -6,7 +6,7 @@ import { SelectScene } from './scenes/SelectScene'
 import { ShopScene } from './scenes/ShopScene'
 import { UIScene } from './scenes/UIScene'
 import { setStress } from './ui/dev'
-import { isStandalone, refreshViewport, viewport } from './ui/viewport'
+import { isStandalone, nudgeIosViewport, refreshViewport, viewport } from './ui/viewport'
 
 const badge = document.getElementById('build-badge')
 if (badge) {
@@ -30,7 +30,13 @@ const game = new Phaser.Game({
   scene: [PreloadScene, MenuScene, SelectScene, ShopScene, ArenaScene, UIScene],
 })
 
-game.events.once(Phaser.Core.Events.READY, () => refreshViewport(game, true))
+game.events.once(Phaser.Core.Events.READY, () => {
+  refreshViewport(game, true)
+  // iOS PWA 冷启动视口修正：多时点 nudge 兜底（无变化时 refresh 为空操作）
+  for (const delay of [0, 100, 500, 1000]) {
+    window.setTimeout(() => nudgeIosViewport(() => refreshViewport(game)), delay)
+  }
+})
 
 // iOS（尤其独立 PWA）旋转/启动后视口尺寸异步稳定且不补发 resize：
 // 除 resize 外再观察 #game 盒子实际变化 + 旋转后定时复查；
@@ -46,7 +52,10 @@ const gameEl = document.getElementById('game')
 if (gameEl) new ResizeObserver(scheduleRefresh).observe(gameEl)
 window.addEventListener('orientationchange', () => {
   // 独立 PWA 的目标尺寸由屏幕尺寸确定，立即重算消除旋转延迟；浏览器模式等尺寸稳定
-  if (isStandalone()) refreshViewport(game)
+  if (isStandalone()) {
+    refreshViewport(game)
+    nudgeIosViewport(() => refreshViewport(game))
+  }
   scheduleRefresh()
   window.setTimeout(() => refreshViewport(game), 400)
   window.setTimeout(() => refreshViewport(game), 1000)

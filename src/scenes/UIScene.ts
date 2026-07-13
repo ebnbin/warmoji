@@ -6,7 +6,14 @@ import { heapMB, rafHz, rendererInfo, startRafMeter } from '../ui/diagnostics'
 import { emojiCacheStats, emojiImage, iconLabel } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
 import { Joystick } from '../ui/Joystick'
-import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
+import {
+  applyCamera,
+  isStandalone,
+  safeInsets,
+  textRes,
+  viewport,
+  VIEWPORT_CHANGED,
+} from '../ui/viewport'
 import type { ArenaScene, GameOverInfo, HudSnapshot } from './ArenaScene'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
@@ -194,6 +201,7 @@ export class UIScene extends Phaser.Scene {
       `对象 ${p.objects} · 物理体 ${p.bodies} · emoji纹理 ${cache.textures}（固定 ${cache.pinned}）`,
       `难度 t ${p.combatSec}s · 刷怪 ${p.spawnIntervalMs}ms · 幽灵 ${(p.ghostShare * 100).toFixed(0)}% · 血量 ×${p.hpMultiplier.toFixed(2)}`,
       `视口 ${Math.round(vp.logicalWidth)}×${Math.round(vp.logicalHeight)} ×${vp.fitScale.toFixed(2)} · DPR ${vp.dpr} · 画布 ${Math.round(vp.cssWidth * vp.dpr)}×${Math.round(vp.cssHeight * vp.dpr)}`,
+      `inner ${window.innerWidth}×${window.innerHeight} · screen ${screen.width}×${screen.height} · 安全区 ${Math.round(safeInsets.top)}/${Math.round(safeInsets.right)}/${Math.round(safeInsets.bottom)}/${Math.round(safeInsets.left)}${isStandalone() ? ' · PWA' : ''}`,
       gl.length > 54 ? `${gl.slice(0, 53)}…` : gl,
     ])
   }

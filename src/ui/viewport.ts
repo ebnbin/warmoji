@@ -9,6 +9,21 @@ export function isStandalone(): boolean {
   return (navigator as unknown as { standalone?: boolean }).standalone === true
 }
 
+/** iOS PWA 冷启动/旋转后内容层可能钉在扣掉 Home 条的错误视口上（已知 WebKit bug，
+ * 物理旋转才修正）。短暂把 viewport-fit 切成 auto 再切回 cover，隔帧生效，
+ * 强制 WebKit 做等效旋转的视口重算；完成后回调方重新量尺寸 */
+export function nudgeIosViewport(onDone: () => void): void {
+  if (!isStandalone()) return
+  const meta = document.querySelector('meta[name="viewport"]')
+  const original = meta?.getAttribute('content')
+  if (!meta || !original || !original.includes('viewport-fit=cover')) return
+  meta.setAttribute('content', original.replace('viewport-fit=cover', 'viewport-fit=auto'))
+  requestAnimationFrame(() => {
+    meta.setAttribute('content', original)
+    requestAnimationFrame(onDone)
+  })
+}
+
 /** 画布 CSS 尺寸。
  * 独立 PWA 恒为全屏，但 iOS 竖屏首次布局会把 Home 条区域从视口里扣掉且不再更新
  * （innerHeight/dvh 全是错的，事件也不补发），故直接取屏幕物理尺寸按方向映射；
