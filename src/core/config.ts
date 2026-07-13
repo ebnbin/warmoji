@@ -226,8 +226,6 @@ export const COIN = {
   radius: 0.22 * UNIT,
   magnetRadius: 2.25 * UNIT,
   magnetSpeed: 8 * UNIT,
-  // 地面同时存在的上限，超出时最旧的消失（正常一波打不到；防压测/挂机无限堆积）
-  maxGround: 300,
 } as const
 
 // 刷怪节奏（波次制）：第 1 波基础火力可稳过，随跨波累计战斗时长持续加压，

@@ -680,10 +680,6 @@ export class ArenaScene extends Phaser.Scene {
       circleBody(coin, COIN.radius)
       this.coins.add(coin)
     }
-    const over = this.coins.getLength() - COIN.maxGround
-    if (over > 0) {
-      for (const c of (this.coins.getChildren() as ImageObj[]).slice(0, over)) c.destroy()
-    }
   }
 
   private magnetCoins(): void {
