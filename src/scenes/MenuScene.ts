@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { CHARACTERS } from '../core/config'
 import { formatTime } from '../core/format'
 import { browserStorage, loadHighScore } from '../core/highscore'
 import { randomPalette } from '../core/palette'
@@ -43,9 +44,12 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    const emojis = ['😎', '🧟', '👻', '💀', '🤖']
+    // 装饰行用花名册角色（已预载 + 描边）；人数多了只展示前 6 个
+    const emojis = Object.values(CHARACTERS)
+      .slice(0, 6)
+      .map((c) => c.emoji)
     emojis.forEach((emoji, i) => {
-      const sprite = emojiImage(this, w / 2 + (i - (emojis.length - 1) / 2) * 90, h * 0.55, emoji, 48)
+      const sprite = emojiImage(this, w / 2 + (i - (emojis.length - 1) / 2) * 90, h * 0.55, emoji, 48, true)
       this.tweens.add({
         targets: sprite,
         y: h * 0.55 - 18,
