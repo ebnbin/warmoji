@@ -9,11 +9,11 @@ export interface PlayerStats {
   maxHp: number
 }
 
-export const UPGRADE_LABELS: Record<UpgradeId, string> = {
-  knife: '🔪 +1 飞刀',
-  attackSpeed: '⚡ 攻速提升',
-  moveSpeed: '👟 移速提升',
-  heal: '❤️ 生命回复',
+export const UPGRADE_LABELS: Record<UpgradeId, { emoji: string; text: string }> = {
+  knife: { emoji: '🔪', text: '+1 飞刀' },
+  attackSpeed: { emoji: '⚡', text: '攻速提升' },
+  moveSpeed: { emoji: '👟', text: '移速提升' },
+  heal: { emoji: '❤️', text: '生命回复' },
 }
 
 const CYCLE: readonly UpgradeId[] = ['knife', 'attackSpeed', 'moveSpeed', 'heal']

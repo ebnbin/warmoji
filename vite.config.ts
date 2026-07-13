@@ -15,6 +15,10 @@ function commitHash(): string {
 }
 
 export default defineConfig({
+  build: {
+    // SVG 必须以文件形式产出，Phaser 用 XHR 加载，内联 data URI 有兼容风险
+    assetsInlineLimit: 0,
+  },
   define: {
     __BUILD_HASH__: JSON.stringify(commitHash()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'),

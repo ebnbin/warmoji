@@ -3,7 +3,7 @@ export const VIEW = { minLong: 1280, minShort: 720 } as const
 
 export const PLAYER = {
   emoji: '😎',
-  fontSize: 40,
+  size: 40,
   radius: 20,
   speed: 220,
   maxHp: 100,
@@ -12,7 +12,7 @@ export const PLAYER = {
 
 export const KNIFE = {
   emoji: '🔪',
-  fontSize: 26,
+  size: 26,
   radius: 12,
   damage: 34,
   speed: 520,
@@ -24,7 +24,7 @@ export const KNIFE = {
 export interface EnemySpec {
   readonly kind: 'zombie' | 'ghost'
   readonly emoji: string
-  readonly fontSize: number
+  readonly size: number
   readonly radius: number
   readonly hp: number
   readonly speed: number
@@ -35,7 +35,7 @@ export interface EnemySpec {
 export const ZOMBIE: EnemySpec = {
   kind: 'zombie',
   emoji: '🧟',
-  fontSize: 40,
+  size: 40,
   radius: 20,
   hp: 60,
   speed: 55,
@@ -46,7 +46,7 @@ export const ZOMBIE: EnemySpec = {
 export const GHOST: EnemySpec = {
   kind: 'ghost',
   emoji: '👻',
-  fontSize: 36,
+  size: 36,
   radius: 18,
   hp: 25,
   speed: 115,
@@ -56,7 +56,7 @@ export const GHOST: EnemySpec = {
 
 export const GEM = {
   emoji: '💎',
-  fontSize: 20,
+  size: 20,
   radius: 10,
   magnetRadius: 90,
   magnetSpeed: 320,

@@ -12,17 +12,20 @@ import { waveAt } from '../core/waves'
 import { gainXp, xpToNext } from '../core/xp'
 import type { XpState } from '../core/xp'
 import { reportDebug } from '../ui/debug'
+import { emojiImage, emojiKey, iconLabel } from '../ui/emoji'
 import { Joystick } from '../ui/Joystick'
-import { EMOJI_FONT, UI_FONT } from '../ui/fonts'
+import { UI_FONT } from '../ui/fonts'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 type ArcadeBody = Phaser.Physics.Arcade.Body
-type TextObj = Phaser.GameObjects.Text
+type ImageObj = Phaser.GameObjects.Image
 
-// Text 的物理体默认贴左上角，这里换算偏移让圆形碰撞体居中
-function circleBody(obj: TextObj, radius: number): void {
+// 碰撞圆按逻辑半径换算回源纹理坐标（body 随对象缩放）
+function circleBody(obj: ImageObj, radius: number): void {
   const body = obj.body as ArcadeBody
-  body.setCircle(radius, obj.displayWidth / 2 - radius, obj.displayHeight / 2 - radius)
+  const frame = obj.width
+  const r = (radius / obj.displayWidth) * frame
+  body.setCircle(r, frame / 2 - r, frame / 2 - r)
 }
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
@@ -30,7 +33,7 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
 }
 
 export class ArenaScene extends Phaser.Scene {
-  private player!: TextObj
+  private player!: ImageObj
   private enemies!: Phaser.GameObjects.Group
   private knives!: Phaser.GameObjects.Group
   private gems!: Phaser.GameObjects.Group
@@ -52,9 +55,10 @@ export class ArenaScene extends Phaser.Scene {
   private floor!: Phaser.GameObjects.Graphics
   private hpBar!: Phaser.GameObjects.Graphics
   private xpBar!: Phaser.GameObjects.Graphics
-  private timeText!: TextObj
-  private killsText!: TextObj
-  private levelText!: TextObj
+  private timeText!: Phaser.GameObjects.Text
+  private killsText!: Phaser.GameObjects.Text
+  private killsIcon!: ImageObj
+  private levelText!: Phaser.GameObjects.Text
   private overlay?: Phaser.GameObjects.Container
   private lastShownSecond = -1
 
@@ -95,14 +99,7 @@ export class ArenaScene extends Phaser.Scene {
     this.floor = this.add.graphics()
     this.drawFloor()
 
-    this.player = this.add
-      .text(this.viewW / 2, this.viewH / 2, PLAYER.emoji, {
-        fontFamily: EMOJI_FONT,
-        fontSize: `${PLAYER.fontSize}px`,
-        resolution: textRes(),
-      })
-      .setOrigin(0.5)
-      .setDepth(10)
+    this.player = emojiImage(this, this.viewW / 2, this.viewH / 2, PLAYER.emoji, PLAYER.size).setDepth(10)
     this.physics.add.existing(this.player)
     circleBody(this.player, PLAYER.radius)
     ;(this.player.body as ArcadeBody).setCollideWorldBounds(true)
@@ -118,13 +115,13 @@ export class ArenaScene extends Phaser.Scene {
       | undefined
 
     this.physics.add.overlap(this.knives, this.enemies, (a, b) =>
-      this.onKnifeHit(a as unknown as TextObj, b as unknown as TextObj),
+      this.onKnifeHit(a as unknown as ImageObj, b as unknown as ImageObj),
     )
     this.physics.add.overlap(this.player, this.enemies, (_p, e) =>
-      this.onPlayerTouched(e as unknown as TextObj),
+      this.onPlayerTouched(e as unknown as ImageObj),
     )
     this.physics.add.overlap(this.player, this.gems, (_p, g) =>
-      this.collectGem(g as unknown as TextObj),
+      this.collectGem(g as unknown as ImageObj),
     )
 
     this.createHud()
@@ -189,7 +186,7 @@ export class ArenaScene extends Phaser.Scene {
   private autoAttack(delta: number): void {
     this.attackCooldownMs -= delta
     if (this.attackCooldownMs > 0) return
-    const targets = (this.enemies.getChildren() as TextObj[]).filter((e) => e.active)
+    const targets = (this.enemies.getChildren() as ImageObj[]).filter((e) => e.active)
     if (targets.length === 0) return
     this.attackCooldownMs = this.stats.attackCooldownMs
 
@@ -203,15 +200,16 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private throwKnife(angle: number): void {
-    const knife = this.add
-      .text(this.player.x + Math.cos(angle) * 26, this.player.y + Math.sin(angle) * 26, KNIFE.emoji, {
-        fontFamily: EMOJI_FONT,
-        fontSize: `${KNIFE.fontSize}px`,
-        resolution: textRes(),
-      })
-      .setOrigin(0.5)
+    const knife = emojiImage(
+      this,
+      this.player.x + Math.cos(angle) * 26,
+      this.player.y + Math.sin(angle) * 26,
+      KNIFE.emoji,
+      KNIFE.size,
+    )
+      // twemoji 1f52a 原始刀刃朝向 +45°（右下）
       .setDepth(8)
-      .setRotation(angle + Math.PI / 4)
+      .setRotation(angle - Math.PI / 4)
     this.physics.add.existing(knife)
     circleBody(knife, KNIFE.radius)
     ;(knife.body as ArcadeBody).setVelocity(Math.cos(angle) * KNIFE.speed, Math.sin(angle) * KNIFE.speed)
@@ -219,14 +217,14 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private cullKnives(): void {
-    for (const k of this.knives.getChildren() as TextObj[]) {
+    for (const k of this.knives.getChildren() as ImageObj[]) {
       if (k.x < -60 || k.x > this.viewW + 60 || k.y < -60 || k.y > this.viewH + 60) {
         k.destroy()
       }
     }
   }
 
-  private onKnifeHit(knife: TextObj, enemy: TextObj): void {
+  private onKnifeHit(knife: ImageObj, enemy: ImageObj): void {
     if (!knife.active || !enemy.active) return
     knife.destroy()
     const hp = (enemy.getData('hp') as number) - KNIFE.damage
@@ -240,16 +238,16 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private killEnemy(enemy: TextObj): void {
+  private killEnemy(enemy: ImageObj): void {
     this.kills++
-    this.killsText.setText(`💀 ${this.kills}`)
+    this.killsText.setText(String(this.kills))
     const spec = enemy.getData('spec') as EnemySpec
     this.spawnGem(enemy.x, enemy.y, spec.xp)
     enemy.setActive(false)
     ;(enemy.body as ArcadeBody).enable = false
     this.tweens.add({
       targets: enemy,
-      scale: 1.5,
+      scale: enemy.scale * 1.5,
       alpha: 0,
       duration: 130,
       onComplete: () => enemy.destroy(),
@@ -286,14 +284,7 @@ export class ArenaScene extends Phaser.Scene {
 
     const spec = this.rng.chance(wave.ghostShare) ? GHOST : ZOMBIE
     const { x, y } = this.randomEdgePoint()
-    const enemy = this.add
-      .text(x, y, spec.emoji, {
-        fontFamily: EMOJI_FONT,
-        fontSize: `${spec.fontSize}px`,
-        resolution: textRes(),
-      })
-      .setOrigin(0.5)
-      .setDepth(5)
+    const enemy = emojiImage(this, x, y, spec.emoji, spec.size).setDepth(5)
     this.physics.add.existing(enemy)
     circleBody(enemy, spec.radius)
     enemy.setData('hp', Math.round(spec.hp * wave.hpMultiplier))
@@ -318,7 +309,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private steerEnemies(): void {
-    for (const e of this.enemies.getChildren() as TextObj[]) {
+    for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       const spec = e.getData('spec') as EnemySpec
       const dir = norm(this.player.x - e.x, this.player.y - e.y)
@@ -327,14 +318,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private spawnGem(x: number, y: number, xp: number): void {
-    const gem = this.add
-      .text(x, y, GEM.emoji, {
-        fontFamily: EMOJI_FONT,
-        fontSize: `${GEM.fontSize}px`,
-        resolution: textRes(),
-      })
-      .setOrigin(0.5)
-      .setDepth(3)
+    const gem = emojiImage(this, x, y, GEM.emoji, GEM.size).setDepth(3)
     this.physics.add.existing(gem)
     circleBody(gem, GEM.radius)
     gem.setData('xp', xp)
@@ -343,7 +327,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private magnetGems(): void {
     const r2 = GEM.magnetRadius * GEM.magnetRadius
-    for (const g of this.gems.getChildren() as TextObj[]) {
+    for (const g of this.gems.getChildren() as ImageObj[]) {
       if (!g.active) continue
       const dx = this.player.x - g.x
       const dy = this.player.y - g.y
@@ -357,7 +341,7 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private collectGem(gem: TextObj): void {
+  private collectGem(gem: ImageObj): void {
     if (!gem.active) return
     const xp = gem.getData('xp') as number
     gem.destroy()
@@ -379,29 +363,26 @@ export class ArenaScene extends Phaser.Scene {
     this.drawHpBar()
   }
 
-  private showUpgradeToast(label: string, index: number): void {
-    const t = this.add
-      .text(this.viewW / 2, this.viewH * 0.36 + index * 36, `⬆️ ${label}`, {
-        fontFamily: EMOJI_FONT,
-        fontSize: '28px',
-        color: '#ffe082',
-        stroke: '#000000',
-        strokeThickness: 4,
-        resolution: textRes(),
-      })
-      .setOrigin(0.5)
-      .setDepth(120)
+  private showUpgradeToast(upgrade: { emoji: string; text: string }, index: number): void {
+    const toast = iconLabel(this, this.viewW / 2, this.viewH * 0.36 + index * 36, upgrade.emoji, 26, upgrade.text, {
+      fontFamily: UI_FONT,
+      fontSize: '24px',
+      color: '#ffe082',
+      stroke: '#000000',
+      strokeThickness: 4,
+      resolution: textRes(),
+    }).setDepth(120)
     this.tweens.add({
-      targets: t,
-      y: t.y - 34,
+      targets: toast,
+      y: toast.y - 34,
       alpha: 0,
       duration: 1100,
       delay: 150 + index * 150,
-      onComplete: () => t.destroy(),
+      onComplete: () => toast.destroy(),
     })
   }
 
-  private onPlayerTouched(enemy: TextObj): void {
+  private onPlayerTouched(enemy: ImageObj): void {
     if (this.over || !enemy.active) return
     if (this.elapsedMs - this.lastHitMs < PLAYER.iframesMs) return
     this.lastHitMs = this.elapsedMs
@@ -417,16 +398,19 @@ export class ArenaScene extends Phaser.Scene {
   private gameOver(): void {
     this.over = true
     this.physics.pause()
-    this.player.setText('😵')
+    this.player.setTexture(emojiKey('😵'))
 
     const seconds = Math.floor(this.elapsedMs / 1000)
     const result = submitScore(browserStorage(), seconds, this.kills)
     const res = textRes()
 
     const dim = this.add.rectangle(0, 0, 6000, 6000, 0x000000, 0.72)
-    const title = this.add
-      .text(0, -110, '💀 游戏结束', { fontFamily: EMOJI_FONT, fontSize: '52px', color: '#ffffff', resolution: res })
-      .setOrigin(0.5)
+    const title = iconLabel(this, 0, -110, '💀', 50, '游戏结束', {
+      fontFamily: UI_FONT,
+      fontSize: '48px',
+      color: '#ffffff',
+      resolution: res,
+    })
     const statsLine = this.add
       .text(0, -26, `存活 ${formatTime(seconds)} · 击杀 ${this.kills} · 等级 ${this.xpState.level}`, {
         fontFamily: UI_FONT,
@@ -435,16 +419,15 @@ export class ArenaScene extends Phaser.Scene {
         resolution: res,
       })
       .setOrigin(0.5)
-    const bestLine = this.add
-      .text(
-        0,
-        22,
-        result.newBest
-          ? '🏆 新纪录！'
-          : `🏆 最佳：存活 ${formatTime(result.score.bestSeconds)} · 击杀 ${result.score.bestKills}`,
-        { fontFamily: EMOJI_FONT, fontSize: '20px', color: '#d4b106', resolution: res },
-      )
-      .setOrigin(0.5)
+    const bestLine = iconLabel(
+      this,
+      0,
+      24,
+      '🏆',
+      22,
+      result.newBest ? '新纪录！' : `最佳：存活 ${formatTime(result.score.bestSeconds)} · 击杀 ${result.score.bestKills}`,
+      { fontFamily: UI_FONT, fontSize: '20px', color: '#d4b106', resolution: res },
+    )
     const prompt = this.add
       .text(0, 106, '点击或按任意键重新开始', {
         fontFamily: UI_FONT,
@@ -501,8 +484,9 @@ export class ArenaScene extends Phaser.Scene {
       .text(0, 10, '0:00', { fontFamily: UI_FONT, fontSize: '22px', color: '#dddddd', resolution: res })
       .setOrigin(0.5, 0)
       .setDepth(100)
+    this.killsIcon = emojiImage(this, 0, 22, '💀', 20).setDepth(100)
     this.killsText = this.add
-      .text(0, 10, '💀 0', { fontFamily: EMOJI_FONT, fontSize: '20px', color: '#dddddd', resolution: res })
+      .text(0, 10, '0', { fontFamily: UI_FONT, fontSize: '20px', color: '#dddddd', resolution: res })
       .setOrigin(1, 0)
       .setDepth(100)
     this.layoutHud()
@@ -512,7 +496,8 @@ export class ArenaScene extends Phaser.Scene {
 
   private layoutHud(): void {
     this.timeText.setX(this.viewW / 2)
-    this.killsText.setX(this.viewW - 12)
+    this.killsIcon.setPosition(this.viewW - 22, 22)
+    this.killsText.setX(this.viewW - 38)
   }
 
   private drawHpBar(): void {

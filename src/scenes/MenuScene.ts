@@ -2,7 +2,8 @@ import Phaser from 'phaser'
 import { formatTime } from '../core/format'
 import { browserStorage, loadHighScore } from '../core/highscore'
 import { reportDebug } from '../ui/debug'
-import { EMOJI_FONT, UI_FONT } from '../ui/fonts'
+import { emojiImage, iconLabel } from '../ui/emoji'
+import { UI_FONT } from '../ui/fonts'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 export class MenuScene extends Phaser.Scene {
@@ -16,14 +17,18 @@ export class MenuScene extends Phaser.Scene {
     const h = viewport.logicalHeight
     const res = textRes()
 
-    this.add
-      .text(w / 2, h * 0.26, '⚔️ WARMOJI ⚔️', {
-        fontFamily: EMOJI_FONT,
+    const title = this.add
+      .text(w / 2, h * 0.26, 'WARMOJI', {
+        fontFamily: UI_FONT,
         fontSize: '64px',
+        fontStyle: 'bold',
         color: '#f5f5f5',
         resolution: res,
       })
       .setOrigin(0.5)
+    const swordOffset = title.width / 2 + 64
+    emojiImage(this, w / 2 - swordOffset, h * 0.26, '⚔️', 60)
+    emojiImage(this, w / 2 + swordOffset, h * 0.26, '⚔️', 60)
 
     this.add
       .text(w / 2, h * 0.4, 'emoji 幸存者 · 走位躲避，武器全自动', {
@@ -36,13 +41,7 @@ export class MenuScene extends Phaser.Scene {
 
     const emojis = ['😎', '🧟', '👻', '💀', '🤖']
     emojis.forEach((emoji, i) => {
-      const sprite = this.add
-        .text(w / 2 + (i - (emojis.length - 1) / 2) * 90, h * 0.55, emoji, {
-          fontFamily: EMOJI_FONT,
-          fontSize: '48px',
-          resolution: res,
-        })
-        .setOrigin(0.5)
+      const sprite = emojiImage(this, w / 2 + (i - (emojis.length - 1) / 2) * 90, h * 0.55, emoji, 48)
       this.tweens.add({
         targets: sprite,
         y: h * 0.55 - 18,
@@ -56,14 +55,12 @@ export class MenuScene extends Phaser.Scene {
 
     const best = loadHighScore(browserStorage())
     if (best.bestSeconds > 0) {
-      this.add
-        .text(w / 2, h * 0.7, `🏆 最佳：存活 ${formatTime(best.bestSeconds)} · 击杀 ${best.bestKills}`, {
-          fontFamily: EMOJI_FONT,
-          fontSize: '18px',
-          color: '#d4b106',
-          resolution: res,
-        })
-        .setOrigin(0.5)
+      iconLabel(this, w / 2, h * 0.7, '🏆', 20, `最佳：存活 ${formatTime(best.bestSeconds)} · 击杀 ${best.bestKills}`, {
+        fontFamily: UI_FONT,
+        fontSize: '18px',
+        color: '#d4b106',
+        resolution: res,
+      })
     }
 
     const prompt = this.add
@@ -75,6 +72,17 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
     this.tweens.add({ targets: prompt, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 })
+
+    // Twemoji 图形许可（CC-BY 4.0）要求署名
+    this.add
+      .text(w / 2, h - 10, 'emoji graphics © Twemoji · CC-BY 4.0', {
+        fontFamily: UI_FONT,
+        fontSize: '11px',
+        color: '#ffffff',
+        resolution: res,
+      })
+      .setOrigin(0.5, 1)
+      .setAlpha(0.28)
 
     const start = (): void => {
       this.scene.start('arena')
