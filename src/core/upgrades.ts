@@ -1,35 +1,33 @@
-import { KNIFE } from './config'
-
-export type UpgradeId = 'knife' | 'attackSpeed' | 'moveSpeed' | 'heal'
+export type UpgradeId = 'damage' | 'attackSpeed' | 'moveSpeed' | 'heal'
 
 export interface PlayerStats {
-  knives: number
-  attackCooldownMs: number
+  /** 全队伤害乘数 */
+  damageMul: number
+  /** 全队武器冷却乘数（越小攻速越快） */
+  cooldownMul: number
   moveSpeed: number
   maxHp: number
 }
 
 export const UPGRADE_LABELS: Record<UpgradeId, { emoji: string; text: string }> = {
-  knife: { emoji: '🔪', text: '+1 飞刀' },
+  damage: { emoji: '⚔️', text: '伤害提升' },
   attackSpeed: { emoji: '⚡', text: '攻速提升' },
   moveSpeed: { emoji: '👟', text: '移速提升' },
   heal: { emoji: '❤️', text: '生命回复' },
 }
 
-const CYCLE: readonly UpgradeId[] = ['knife', 'attackSpeed', 'moveSpeed', 'heal']
+const CYCLE: readonly UpgradeId[] = ['damage', 'attackSpeed', 'moveSpeed', 'heal']
 
-export function pickUpgrade(level: number, stats: PlayerStats): UpgradeId {
-  const id = CYCLE[(((level - 2) % CYCLE.length) + CYCLE.length) % CYCLE.length]!
-  if (id === 'knife' && stats.knives >= KNIFE.maxCount) return 'attackSpeed'
-  return id
+export function pickUpgrade(level: number): UpgradeId {
+  return CYCLE[(((level - 2) % CYCLE.length) + CYCLE.length) % CYCLE.length]!
 }
 
 export function applyUpgrade(stats: PlayerStats, id: UpgradeId): PlayerStats {
   switch (id) {
-    case 'knife':
-      return { ...stats, knives: Math.min(KNIFE.maxCount, stats.knives + 1) }
+    case 'damage':
+      return { ...stats, damageMul: stats.damageMul + 0.15 }
     case 'attackSpeed':
-      return { ...stats, attackCooldownMs: Math.max(300, Math.round(stats.attackCooldownMs * 0.85)) }
+      return { ...stats, cooldownMul: Math.max(0.4, stats.cooldownMul * 0.85) }
     case 'moveSpeed':
       return { ...stats, moveSpeed: Math.round(stats.moveSpeed * 1.08) }
     case 'heal':

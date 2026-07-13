@@ -3,7 +3,6 @@ import {
   GEM,
   GHOST,
   HEAL_AMOUNT,
-  KNIFE,
   MAP,
   MEMBER,
   SPAWN,
@@ -13,13 +12,13 @@ import {
   ZOMBIE,
 } from '../core/config'
 import type { EnemySpec } from '../core/config'
+import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
 import { slotOffset } from '../core/formation'
 import { browserStorage, submitScore } from '../core/highscore'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import { randomMapPoint } from '../core/spawn'
-import { nearestIndex } from '../core/targeting'
 import { applyUpgrade, pickUpgrade, UPGRADE_LABELS } from '../core/upgrades'
 import type { PlayerStats } from '../core/upgrades'
 import { norm } from '../core/vec'
@@ -32,6 +31,8 @@ import { isStress } from '../ui/dev'
 import { emojiImage } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
+import { createWeapon } from '../weapons/create'
+import type { EnemyTarget, WeaponContext, WeaponRuntime } from '../weapons/types'
 import type { UIScene } from './UIScene'
 
 type ArcadeBody = Phaser.Physics.Arcade.Body
@@ -59,10 +60,10 @@ interface Member {
   emoji: string
   slot: number
   image: ImageObj
+  weapons: WeaponRuntime[]
   hp: number
   alive: boolean
   reviveAt: number
-  attackCooldownMs: number
   lastHitMs: number
   hpBar: Phaser.GameObjects.Graphics
   shownHpRatio: number
@@ -88,8 +89,17 @@ export class ArenaScene extends Phaser.Scene {
   private center = { x: 0, y: 0 }
   private centerObj!: Phaser.GameObjects.Zone
   private enemies!: Phaser.GameObjects.Group
-  private knives!: Phaser.GameObjects.Group
+  private projectiles!: Phaser.GameObjects.Group
   private gems!: Phaser.GameObjects.Group
+  private frameTargets: EnemyTarget[] = []
+  private weaponCtx: WeaponContext = {
+    scene: this,
+    enemyTargets: () => this.frameTargets,
+    damageEnemy: (e, d) => this.applyDamage(e as ImageObj, d),
+    spawnProjectile: (x, y, angle, spec, damage) => this.spawnProjectile(x, y, angle, spec, damage),
+    damageMul: () => this.stats.damageMul,
+    cooldownMul: () => this.stats.cooldownMul,
+  }
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
 
@@ -109,10 +119,10 @@ export class ArenaScene extends Phaser.Scene {
     super('arena')
   }
 
-  perfSnapshot(): { enemies: number; knives: number; gems: number; pending: number; objects: number } {
+  perfSnapshot(): { enemies: number; projectiles: number; gems: number; pending: number; objects: number } {
     return {
       enemies: this.enemies.countActive(true),
-      knives: this.knives.getLength(),
+      projectiles: this.projectiles.getLength(),
       gems: this.gems.getLength(),
       pending: this.pendingSpawns,
       objects: this.children.list.length,
@@ -137,8 +147,8 @@ export class ArenaScene extends Phaser.Scene {
     applyBackground(this.palette)
     this.stress = isStress()
     this.stats = {
-      knives: this.stress ? STRESS.knives : 1,
-      attackCooldownMs: this.stress ? STRESS.attackCooldownMs : KNIFE.cooldownMs,
+      damageMul: 1,
+      cooldownMul: this.stress ? STRESS.cooldownMul : 1,
       moveSpeed: TEAM.moveSpeed,
       maxHp: this.stress ? STRESS.maxHp : MEMBER.maxHp,
     }
@@ -157,7 +167,7 @@ export class ArenaScene extends Phaser.Scene {
     this.centerObj = this.add.zone(this.center.x, this.center.y, 1, 1)
 
     this.memberGroup = this.add.group()
-    this.members = TEAM.memberEmojis.map((emoji, slot) => this.createMember(emoji, slot))
+    this.members = TEAM.members.map((spec, slot) => this.createMember(spec.emoji, spec.weapons, slot))
 
     const cam = this.cameras.main
     cam.setZoom(viewport.renderScale)
@@ -170,7 +180,7 @@ export class ArenaScene extends Phaser.Scene {
     cam.startFollow(this.centerObj)
 
     this.enemies = this.add.group()
-    this.knives = this.add.group()
+    this.projectiles = this.add.group()
     this.gems = this.add.group()
 
     this.cursors = this.input.keyboard?.createCursorKeys()
@@ -178,8 +188,8 @@ export class ArenaScene extends Phaser.Scene {
       | Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
       | undefined
 
-    this.physics.add.overlap(this.knives, this.enemies, (a, b) =>
-      this.onKnifeHit(a as unknown as ImageObj, b as unknown as ImageObj),
+    this.physics.add.overlap(this.projectiles, this.enemies, (a, b) =>
+      this.onProjectileHit(a as unknown as ImageObj, b as unknown as ImageObj),
     )
     this.physics.add.overlap(this.memberGroup, this.enemies, (m, e) =>
       this.onMemberTouched(m as unknown as ImageObj, e as unknown as ImageObj),
@@ -203,11 +213,14 @@ export class ArenaScene extends Phaser.Scene {
     this.elapsedMs += delta
 
     this.moveTeam(delta)
+    this.frameTargets = (this.enemies.getChildren() as ImageObj[])
+      .filter((e) => e.active)
+      .map((e) => ({ x: e.x, y: e.y, radius: (e.getData('spec') as EnemySpec).radius, ref: e }))
     this.updateMembers(delta)
     this.spawn(delta)
     this.steerEnemies()
     this.magnetGems()
-    this.cullKnives()
+    this.cullProjectiles()
 
     const cam = this.cameras.main
     reportDebug({
@@ -235,7 +248,7 @@ export class ArenaScene extends Phaser.Scene {
 
   // ── 队伍 ────────────────────────────────────────────────────
 
-  private createMember(emoji: string, slot: number): Member {
+  private createMember(emoji: string, weaponSpecs: readonly WeaponSpec[], slot: number): Member {
     const off = slotOffset(slot, TEAM.size, TEAM.ringRadius)
     const image = emojiImage(
       this,
@@ -255,11 +268,11 @@ export class ArenaScene extends Phaser.Scene {
       emoji,
       slot,
       image,
+      // 错开初始冷却，避免全队同帧齐射
+      weapons: weaponSpecs.map((w, i) => createWeapon(w, this.weaponCtx, 300 + slot * 120 + i * 230)),
       hp: this.stats.maxHp,
       alive: true,
       reviveAt: 0,
-      // 错开初始冷却，避免 5 人同帧齐射
-      attackCooldownMs: slot * 120,
       lastHitMs: -Infinity,
       hpBar: this.add.graphics().setDepth(11),
       shownHpRatio: -1,
@@ -315,7 +328,7 @@ export class ArenaScene extends Phaser.Scene {
     for (const m of this.members) {
       if (m.alive) {
         this.drawMemberHp(m)
-        this.memberAttack(m, delta)
+        for (const w of m.weapons) w.update(delta, m.image)
       } else {
         if (this.elapsedMs >= m.reviveAt) {
           this.reviveMember(m)
@@ -344,22 +357,6 @@ export class ArenaScene extends Phaser.Scene {
     g.fillRect(-w / 2 + 1, y + 1, (w - 2) * ratio, 4)
   }
 
-  private memberAttack(m: Member, delta: number): void {
-    m.attackCooldownMs -= delta
-    if (m.attackCooldownMs > 0) return
-    const targets = (this.enemies.getChildren() as ImageObj[]).filter((e) => e.active)
-    if (targets.length === 0) return
-    m.attackCooldownMs = this.stats.attackCooldownMs
-
-    const idx = nearestIndex({ x: m.image.x, y: m.image.y }, targets)
-    if (idx < 0) return
-    const target = targets[idx]!
-    const base = Math.atan2(target.y - m.image.y, target.x - m.image.x)
-    for (let i = 0; i < this.stats.knives; i++) {
-      this.throwKnife(m.image.x, m.image.y, base + (i - (this.stats.knives - 1) / 2) * KNIFE.volleySpreadRad)
-    }
-  }
-
   private onMemberTouched(memberImg: ImageObj, enemy: ImageObj): void {
     if (this.over || !enemy.active) return
     const m = memberImg.getData('member') as Member
@@ -385,6 +382,7 @@ export class ArenaScene extends Phaser.Scene {
     m.image.setAlpha(0.35).setTint(0x888888)
     m.hpBar.setVisible(false)
     m.deadText.setVisible(true)
+    for (const w of m.weapons) w.setVisible(false)
     if (this.members.every((x) => !x.alive)) this.gameOver()
   }
 
@@ -397,6 +395,7 @@ export class ArenaScene extends Phaser.Scene {
     m.image.setAlpha(1).clearTint()
     m.hpBar.setVisible(true)
     m.deadText.setVisible(false)
+    for (const w of m.weapons) w.setVisible(true)
     const targetScale = m.image.scale
     m.image.setScale(targetScale * 0.3)
     this.tweens.add({ targets: m.image, scale: targetScale, duration: 200, ease: 'Back.easeOut' })
@@ -406,46 +405,54 @@ export class ArenaScene extends Phaser.Scene {
     return this.members.filter((m) => m.alive)
   }
 
-  // ── 攻击 ────────────────────────────────────────────────────
+  // ── 攻击与伤害 ──────────────────────────────────────────────
 
-  private throwKnife(fromX: number, fromY: number, angle: number): void {
-    const knife = emojiImage(
-      this,
-      fromX + Math.cos(angle) * KNIFE.size,
-      fromY + Math.sin(angle) * KNIFE.size,
-      KNIFE.emoji,
-      KNIFE.size,
-      true,
-    )
-      // twemoji 1f52a 原始刀刃朝向 +45°（右下）
+  private spawnProjectile(
+    x: number,
+    y: number,
+    angle: number,
+    spec: ProjectileSpec,
+    damage: number,
+  ): void {
+    const p = emojiImage(this, x, y, spec.projectile.emoji, spec.projectile.size, true)
       .setDepth(8)
-      .setRotation(angle - Math.PI / 4)
-    this.physics.add.existing(knife)
-    circleBody(knife, KNIFE.radius)
-    ;(knife.body as ArcadeBody).setVelocity(Math.cos(angle) * KNIFE.speed, Math.sin(angle) * KNIFE.speed)
-    this.knives.add(knife)
+      .setRotation(angle + spec.projectile.rotationOffsetRad)
+    this.physics.add.existing(p)
+    circleBody(p, spec.projectile.radius)
+    ;(p.body as ArcadeBody).setVelocity(
+      Math.cos(angle) * spec.projectile.speed,
+      Math.sin(angle) * spec.projectile.speed,
+    )
+    p.setData('damage', damage)
+    this.projectiles.add(p)
   }
 
-  private cullKnives(): void {
+  private cullProjectiles(): void {
     const view = this.cameras.main.worldView
     const slack = 4 * UNIT
-    for (const k of this.knives.getChildren() as ImageObj[]) {
+    for (const p of this.projectiles.getChildren() as ImageObj[]) {
       if (
-        k.x < view.x - slack ||
-        k.x > view.right + slack ||
-        k.y < view.y - slack ||
-        k.y > view.bottom + slack
+        p.x < view.x - slack ||
+        p.x > view.right + slack ||
+        p.y < view.y - slack ||
+        p.y > view.bottom + slack
       ) {
-        k.destroy()
+        p.destroy()
       }
     }
   }
 
-  private onKnifeHit(knife: ImageObj, enemy: ImageObj): void {
-    if (!knife.active || !enemy.active) return
-    knife.destroy()
-    const hp = (enemy.getData('hp') as number) - KNIFE.damage
-    this.floatDamage(enemy.x, enemy.y, KNIFE.damage)
+  private onProjectileHit(projectile: ImageObj, enemy: ImageObj): void {
+    if (!projectile.active || !enemy.active) return
+    const damage = projectile.getData('damage') as number
+    projectile.destroy()
+    this.applyDamage(enemy, damage)
+  }
+
+  private applyDamage(enemy: ImageObj, damage: number): void {
+    if (!enemy.active) return
+    const hp = (enemy.getData('hp') as number) - damage
+    this.floatDamage(enemy.x, enemy.y, damage)
     if (hp <= 0) {
       this.killEnemy(enemy)
     } else {
@@ -631,7 +638,7 @@ export class ArenaScene extends Phaser.Scene {
   private onLevelUps(count: number): void {
     for (let i = 0; i < count; i++) {
       const level = this.xpState.level - count + i + 1
-      const id = pickUpgrade(level, this.stats)
+      const id = pickUpgrade(level)
       this.stats = applyUpgrade(this.stats, id)
       if (id === 'heal') {
         for (const m of this.aliveMembers()) m.hp = Math.min(this.stats.maxHp, m.hp + HEAL_AMOUNT)
@@ -640,7 +647,7 @@ export class ArenaScene extends Phaser.Scene {
     }
     // 压测模式下升级不允许把攻速拉回常规下限
     if (this.stress) {
-      this.stats.attackCooldownMs = Math.min(this.stats.attackCooldownMs, STRESS.attackCooldownMs)
+      this.stats.cooldownMul = Math.min(this.stats.cooldownMul, STRESS.cooldownMul)
     }
   }
 

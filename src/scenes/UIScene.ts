@@ -148,7 +148,7 @@ export class UIScene extends Phaser.Scene {
     this.devText!.setText([
       `FPS ${fps.toFixed(0)}  (5s min ${Number.isFinite(this.fpsWindowMin) ? this.fpsWindowMin.toFixed(0) : '-'})`,
       `敌人 ${p.enemies}  预告 ${p.pending}`,
-      `飞刀 ${p.knives}  经验珠 ${p.gems}`,
+      `子弹 ${p.projectiles}  经验珠 ${p.gems}`,
       `总对象 ${p.objects}`,
     ])
   }

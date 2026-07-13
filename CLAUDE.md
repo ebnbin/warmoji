@@ -21,3 +21,4 @@ emoji 幸存者 web 游戏：Phaser 3 + Vite + TypeScript。纯 vibe coding 项�
 ## 代码约定
 
 - 玩法数值集中在 `src/core/config.ts`；`src/core` 为纯逻辑层（禁 phaser/DOM），单测都在这层
+- 武器系统：类型与纯判定在 `core/weapons.ts`，运行时在 `src/weapons/`；新武器 = 新 kind + 运行时类 + `create.ts` 注册，角色在 config 里持 0..n 把

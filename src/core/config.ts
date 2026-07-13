@@ -11,8 +11,47 @@ export const MAP = {
   cameraMargin: 2 * UNIT,
 } as const
 
+import type { ProjectileSpec, ThrustSpec } from './weapons'
+
+// 武器库：突刺型=群体伤害（每次突刺范围内每敌一次），发射型=子弹单体
+export const WEAPONS = {
+  thrustKnife: {
+    kind: 'thrust',
+    emoji: '🔪',
+    size: 0.6 * UNIT,
+    restOffset: 0.55 * UNIT,
+    damage: 30,
+    cooldownMs: 1100,
+    reach: 1.6 * UNIT,
+    hitRadius: 0.55 * UNIT,
+    thrustMs: 200,
+    // twemoji 1f52a 原始刀刃朝向 +45°（右下）
+    rotationOffsetRad: -Math.PI / 4,
+  } satisfies ThrustSpec,
+  pistol: {
+    kind: 'projectile',
+    emoji: '🔫',
+    size: 0.55 * UNIT,
+    restOffset: 0.5 * UNIT,
+    damage: 24,
+    cooldownMs: 500,
+    // twemoji 1f52b 枪口朝左
+    rotationOffsetRad: Math.PI,
+    flipWhenLeft: false,
+    projectile: {
+      emoji: '💧',
+      size: 0.35 * UNIT,
+      radius: 0.15 * UNIT,
+      speed: 13 * UNIT,
+      // twemoji 1f4a7 水滴尖端朝上
+      rotationOffsetRad: Math.PI / 2,
+    },
+  } satisfies ProjectileSpec,
+} as const
+
 // 队伍 = 1 队长（无实体，提供全队被动，能力后续设计）+ 5 角色（真正参战）。
 // 玩家操控队伍中心点，角色环状固定槽位随行；除此之外角色是完全独立的单位。
+// 角色与武器松耦合：0..n 把（🤠 双持验证多武器通路）。
 export const TEAM = {
   size: 5,
   // 紧凑阵型：相邻间距略小于角色体宽，允许少量重叠
@@ -20,7 +59,13 @@ export const TEAM = {
   moveSpeed: 5.5 * UNIT,
   reviveMs: 10_000,
   captainEmoji: '👑',
-  memberEmojis: ['😎', '🥷', '🧙', '🤠', '👽'],
+  members: [
+    { emoji: '😎', weapons: [WEAPONS.pistol] },
+    { emoji: '🥷', weapons: [WEAPONS.thrustKnife] },
+    { emoji: '🧙', weapons: [WEAPONS.pistol] },
+    { emoji: '🤠', weapons: [WEAPONS.thrustKnife, WEAPONS.pistol] },
+    { emoji: '👽', weapons: [WEAPONS.thrustKnife] },
+  ],
 } as const
 
 export const MEMBER = {
@@ -28,17 +73,6 @@ export const MEMBER = {
   radius: 0.45 * UNIT,
   maxHp: 100,
   iframesMs: 400,
-} as const
-
-export const KNIFE = {
-  emoji: '🔪',
-  size: 0.65 * UNIT,
-  radius: 0.3 * UNIT,
-  damage: 34,
-  speed: 13 * UNIT,
-  cooldownMs: 900,
-  volleySpreadRad: 0.2,
-  maxCount: 6,
 } as const
 
 export interface EnemySpec {
@@ -100,14 +134,14 @@ export const SPAWN = {
   edgeInset: 0.5 * UNIT,
 } as const
 
-// 压力测试模式（?dev=1 面板开关）：拉高负载且保证测得下去
+// 压力测试模式（🔧 面板开关）：拉高负载且保证测得下去
 export const STRESS = {
   maxHp: 10_000_000,
   spawnIntervalMs: 80,
   spawnBatch: 5,
   maxAlive: 800,
-  attackCooldownMs: 100,
-  knives: 6,
+  // 所有武器冷却乘数（0.1 = 十倍攻速）
+  cooldownMul: 0.1,
 } as const
 
 export const XP = { base: 8, perLevel: 6 } as const
@@ -118,8 +152,10 @@ export const HEAL_AMOUNT = 30
 export const OUTLINE = { radius: 2, color: '#000000' } as const
 
 export const OUTLINED_EMOJIS: readonly string[] = [
-  ...TEAM.memberEmojis,
-  KNIFE.emoji,
+  ...TEAM.members.map((m) => m.emoji),
+  WEAPONS.thrustKnife.emoji,
+  WEAPONS.pistol.emoji,
+  WEAPONS.pistol.projectile.emoji,
   ZOMBIE.emoji,
   GHOST.emoji,
   GEM.emoji,
