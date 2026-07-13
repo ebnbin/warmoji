@@ -5,7 +5,7 @@ import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
 import { slotOffset } from '../core/formation'
 import { browserStorage, submitScore } from '../core/highscore'
-import { endRun, getRun, waveStartHp } from '../core/run'
+import { getRun, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { loadLineup } from '../core/selection'
 import { randomPalette } from '../core/palette'
@@ -755,15 +755,7 @@ export class ArenaScene extends Phaser.Scene {
       camY: this.cameras.main.worldView.centerY,
     })
 
-    // 防死亡瞬间误触；结束后弃局回组队页，可换阵容再战
-    this.time.delayedCall(500, () => {
-      const backToSelect = (): void => {
-        endRun()
-        this.scene.start('select')
-      }
-      this.input.once('pointerdown', backToSelect)
-      this.input.keyboard?.once('keydown', backToSelect)
-    })
+    // 返回入口在 UIScene 的结算浮层（按钮/空格），弃局回组队页
   }
 
   private drawFloor(): void {

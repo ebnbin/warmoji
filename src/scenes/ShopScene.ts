@@ -5,7 +5,7 @@ import { browserStorage } from '../core/highscore'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
-import { getRun, waveStartHp } from '../core/run'
+import { endRun, getRun, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { loadLineup } from '../core/selection'
 import { characterStatGroups } from '../core/stats'
@@ -66,6 +66,7 @@ export class ShopScene extends Phaser.Scene {
   private rows: SlotRow[] = []
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
+  private quitArmed = false
 
   constructor() {
     super('shop')
@@ -84,6 +85,7 @@ export class ShopScene extends Phaser.Scene {
     }
     this.rows = []
     this.detailObjs = []
+    this.quitArmed = false
 
     const w = viewport.logicalWidth
     const h = viewport.logicalHeight
@@ -101,6 +103,30 @@ export class ShopScene extends Phaser.Scene {
         resolution: res,
       })
       .setOrigin(0.5)
+
+    // 结束本局回主界面：二次点击确认，防误触弃局
+    const quit = this.add
+      .text(this.origin.x + 40, oy + L.titleY, '✕ 结束本局', {
+        fontFamily: UI_FONT,
+        fontSize: '18px',
+        color: '#c8c8d4',
+        resolution: res,
+      })
+      .setOrigin(0, 0.5)
+      .setInteractive({ useHandCursor: true })
+    quit.on('pointerup', () => {
+      if (this.quitArmed) {
+        endRun()
+        this.scene.start('menu')
+        return
+      }
+      this.quitArmed = true
+      quit.setText('确认结束？再点一次').setColor('#ef9a9a')
+      this.time.delayedCall(2500, () => {
+        this.quitArmed = false
+        if (quit.active) quit.setText('✕ 结束本局').setColor('#c8c8d4')
+      })
+    })
     iconLabel(this, w / 2, oy + L.coinsY, COIN.emoji, 26, `${this.run.coins}`, {
       fontFamily: UI_FONT,
       fontSize: '24px',

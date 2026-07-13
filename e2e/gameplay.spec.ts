@@ -36,5 +36,17 @@ test('开局后自动战斗：出怪、飞刀击杀、计时推进、无控制�
   expect(state?.kills ?? 0).toBeGreaterThanOrEqual(1)
   expect(state?.hp ?? 0).toBeGreaterThan(0)
 
+  // 暂停（ESC）：局内时间冻结；恢复后继续推进
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  const t1 = await page.evaluate(() => window.__warmoji!.elapsed)
+  await page.waitForTimeout(700)
+  const t2 = await page.evaluate(() => window.__warmoji!.elapsed)
+  expect(t2).toBe(t1)
+  await page.keyboard.press('Escape')
+  await page.waitForFunction((t) => (window.__warmoji?.elapsed ?? 0) > t, t2, {
+    timeout: 10_000,
+  })
+
   expect(errors).toEqual([])
 })

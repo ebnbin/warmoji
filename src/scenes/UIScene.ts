@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { COIN } from '../core/config'
 import { formatTime } from '../core/format'
+import { endRun } from '../core/run'
 import { isDevOpen, isStress, setDevOpen, setStress } from '../ui/dev'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../ui/diagnostics'
 import { emojiCacheStats, emojiImage, iconLabel } from '../ui/emoji'
@@ -31,6 +32,8 @@ export class UIScene extends Phaser.Scene {
   private frameMaxMs = 0
   private fpsWindowStart = 0
   private devRefreshedAt = 0
+  private paused = false
+  private pauseObjs: Phaser.GameObjects.GameObject[] = []
 
   constructor() {
     super('ui')
@@ -86,6 +89,17 @@ export class UIScene extends Phaser.Scene {
       .text(w - sR - 38, sT + 38, '0', { ...hudText, fontSize: '20px' })
       .setOrigin(1, 0)
 
+    // 暂停：按钮或 ESC；已暂停或已结算时按钮行为由 togglePause 把关
+    emojiImage(this, w - sR - 22, sT + 88, '⏸️', 26)
+      .setDepth(300)
+      .setAlpha(0.85)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => this.togglePause())
+    this.input.keyboard?.on('keydown-ESC', () => this.togglePause())
+    this.input.keyboard?.on('keydown-SPACE', () => {
+      if (this.paused) this.togglePause()
+    })
+
     const wrench = emojiImage(
       this,
       w - sR - 12,
@@ -98,6 +112,7 @@ export class UIScene extends Phaser.Scene {
       .setAlpha(0.45)
       .setInteractive({ useHandCursor: true })
     wrench.on('pointerdown', () => {
+      if (this.paused) return
       setDevOpen(!isDevOpen())
       this.scene.restart()
     })
@@ -111,8 +126,87 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
 
-    // 视口变化会重启本场景：若一局已结束，重建结算界面
+    // 视口变化会重启本场景：恢复结算界面/暂停浮层
     if (this.arena.gameOverInfo) this.onGameOver(this.arena.gameOverInfo)
+    else if (this.arena.scene.isPaused()) {
+      this.paused = true
+      this.showPauseOverlay()
+    }
+  }
+
+  // ── 暂停 ────────────────────────────────────────────────────
+
+  private togglePause(): void {
+    if (this.arena.gameOverInfo) return
+    if (this.paused) {
+      this.paused = false
+      for (const o of this.pauseObjs) o.destroy()
+      this.pauseObjs = []
+      this.arena.scene.resume()
+    } else {
+      this.paused = true
+      this.arena.scene.pause()
+      this.showPauseOverlay()
+    }
+  }
+
+  private showPauseOverlay(): void {
+    const res = textRes()
+    const cx = viewport.logicalWidth / 2
+    const cy = viewport.logicalHeight / 2
+    const button = (
+      y: number,
+      label: string,
+      filled: boolean,
+      onTap: () => void,
+    ): Phaser.GameObjects.GameObject[] => {
+      const rect = { x: cx - 120, y: y - 28, w: 240, h: 56 }
+      const g = this.add.graphics().setDepth(251)
+      if (filled) {
+        g.fillStyle(0xffd54f, 1)
+        g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 28)
+      } else {
+        g.fillStyle(0xffffff, 0.12)
+        g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 28)
+        g.lineStyle(1, 0xffffff, 0.35)
+        g.strokeRoundedRect(rect.x, rect.y, rect.w, rect.h, 28)
+      }
+      const t = this.add
+        .text(cx, y, label, {
+          fontFamily: UI_FONT,
+          fontSize: '22px',
+          fontStyle: 'bold',
+          color: filled ? '#25262e' : '#ffffff',
+          resolution: res,
+        })
+        .setOrigin(0.5)
+        .setDepth(252)
+      const z = this.add
+        .zone(rect.x, rect.y, rect.w, rect.h)
+        .setOrigin(0)
+        .setDepth(252)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerup', onTap)
+      return [g, t, z]
+    }
+    this.pauseObjs = [
+      this.add.rectangle(cx, cy, 6000, 6000, 0x000000, 0.6).setDepth(250),
+      this.add
+        .text(cx, cy - 100, '已暂停', {
+          fontFamily: UI_FONT,
+          fontSize: '40px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+          resolution: textRes(),
+        })
+        .setOrigin(0.5)
+        .setDepth(251),
+      ...button(cy + 4, '继 续', true, () => this.togglePause()),
+      ...button(cy + 78, '结束本局', false, () => {
+        endRun()
+        this.arena.scene.start('menu')
+      }),
+    ]
   }
 
   update(time: number): void {
@@ -236,16 +330,37 @@ export class UIScene extends Phaser.Scene {
       info.newBest ? '新纪录！' : `最佳：第 ${info.bestWave} 波 · 击杀 ${info.bestKills}`,
       { fontFamily: UI_FONT, fontSize: '20px', color: '#d4b106', resolution: res },
     ).setDepth(201)
-    const prompt = this.add
-      .text(cx, cy + 106, '点击或按任意键返回组队', {
+    // 明确按钮 + 空格返回，防死亡瞬间误触（500ms 后才可交互）
+    const back = (): void => {
+      endRun()
+      this.arena.scene.start('select')
+    }
+    const rect = { x: cx - 120, y: cy + 96, w: 240, h: 56 }
+    const g = this.add.graphics().setDepth(201).setAlpha(0)
+    g.fillStyle(0xffd54f, 1)
+    g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 28)
+    const label = this.add
+      .text(cx, cy + 124, '返回组队', {
         fontFamily: UI_FONT,
-        fontSize: '20px',
-        color: '#aaaaaa',
+        fontSize: '22px',
+        fontStyle: 'bold',
+        color: '#25262e',
         resolution: res,
       })
       .setOrigin(0.5)
-      .setDepth(201)
-    this.tweens.add({ targets: prompt, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 })
+      .setDepth(202)
+      .setAlpha(0)
+    this.time.delayedCall(500, () => {
+      this.tweens.add({ targets: [g, label], alpha: 1, duration: 150 })
+      this.add
+        .zone(rect.x, rect.y, rect.w, rect.h)
+        .setOrigin(0)
+        .setDepth(202)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerup', back)
+      this.input.keyboard?.once('keydown-SPACE', back)
+      this.input.keyboard?.once('keydown-ENTER', back)
+    })
   }
 
   private drawXpBar(s: HudSnapshot): void {

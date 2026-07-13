@@ -314,4 +314,5 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '❤️',
   '🔧',
   '✅',
+  '⏸️',
 ]

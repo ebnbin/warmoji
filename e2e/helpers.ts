@@ -8,10 +8,11 @@ async function cssPoint(page: Page, logical: { x: number; y: number }): Promise<
   }, logical)
 }
 
-/** 标题页点击任意处 → 组队页 */
+/** 标题页点「组建队伍」按钮 → 组队页 */
 export async function enterSelect(page: Page): Promise<void> {
-  await page.waitForFunction(() => window.__warmoji?.scene === 'menu')
-  await page.locator('#game canvas').click()
+  await page.waitForFunction(() => window.__warmoji?.scene === 'menu' && !!window.__warmoji.menu)
+  const s = await page.evaluate(() => window.__warmoji!.menu!.start)
+  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: s.x, y: s.y }) })
   await page.waitForFunction(() => window.__warmoji?.scene === 'select' && !!window.__warmoji.select)
 }
 

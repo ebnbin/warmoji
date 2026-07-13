@@ -25,6 +25,10 @@ interface WarmojiShopDebug {
   start: { x: number; y: number; w: number; h: number }
 }
 
+interface WarmojiMenuDebug {
+  start: { x: number; y: number; w: number; h: number }
+}
+
 interface WarmojiDebug {
   scene: 'menu' | 'select' | 'shop' | 'arena' | 'gameover'
   elapsed: number
@@ -43,6 +47,7 @@ interface WarmojiDebug {
   camY: number
   wave?: number
   coins?: number
+  menu?: WarmojiMenuDebug
   select?: WarmojiSelectDebug
   shop?: WarmojiShopDebug
 }

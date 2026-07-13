@@ -14,6 +14,7 @@ export class MenuScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色等页面状态
   private preserveOnRestart = false
   private palette?: Palette
+  private menuBtn = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
     super('menu')
@@ -79,15 +80,28 @@ export class MenuScene extends Phaser.Scene {
       })
     }
 
-    const prompt = this.add
-      .text(w / 2, h * 0.82, '点击或按任意键组建队伍', {
+    // 明确的按钮 + 空格键开始，避免任意点击误触
+    const btn = { x: w / 2 - 140, y: h * 0.82 - 29, w: 280, h: 58 }
+    this.menuBtn = btn
+    const btnBg = this.add.graphics()
+    btnBg.fillStyle(0xffd54f, 1)
+    btnBg.fillRoundedRect(btn.x, btn.y, btn.w, btn.h, btn.h / 2)
+    this.add
+      .text(w / 2, h * 0.82, '组建队伍', {
         fontFamily: UI_FONT,
-        fontSize: '22px',
-        color: '#ffffff',
+        fontSize: '24px',
+        fontStyle: 'bold',
+        color: '#25262e',
         resolution: res,
       })
       .setOrigin(0.5)
-    this.tweens.add({ targets: prompt, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 })
+    this.add
+      .zone(btn.x, btn.y, btn.w, btn.h)
+      .setOrigin(0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => this.scene.start('select'))
+    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('select'))
+    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('select'))
 
     // Twemoji 图形许可（CC-BY 4.0）要求署名
     this.add
@@ -99,12 +113,6 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 1)
       .setAlpha(0.28)
-
-    const start = (): void => {
-      this.scene.start('select')
-    }
-    this.input.once('pointerdown', start)
-    this.input.keyboard?.once('keydown', start)
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -127,6 +135,14 @@ export class MenuScene extends Phaser.Scene {
       playerY: 0,
       camX: 0,
       camY: 0,
+      menu: {
+        start: {
+          x: this.menuBtn.x + this.menuBtn.w / 2,
+          y: this.menuBtn.y + this.menuBtn.h / 2,
+          w: this.menuBtn.w,
+          h: this.menuBtn.h,
+        },
+      },
     })
   }
 
