@@ -12,7 +12,7 @@
 ## 已确认的决策
 
 - 仓库保持 **private**。
-- 托管：**Vercel**（Git 集成，`main` 分支即生产环境）；用户的个人域名后续绑定。
+- 托管：**Vercel**（Git 集成，`main` 分支即生产环境）。生产地址 https://warmoji.vercel.app，自定义域名 **warmoji.ebnbin.dev**。
 - 工作流：**直接 push `main`，不走 PR**；用户已授权 agent 自行管理 `main`。
 - 技术栈：Vite + TypeScript(strict) + Phaser 3；Vitest 单测；Playwright 冒烟测试。
 - 目标设备：桌面 + 手机（触屏）都要支持。
@@ -33,6 +33,12 @@ npm run check   # typecheck + lint + 单测 + 构建 + Playwright 冒烟
 - `src/scenes/`：Phaser 场景，只做渲染和输入绑定，逻辑尽量下沉到 core。
 - 随机数一律使用 `src/core/rng.ts` 的种子化 `Rng`，不直接用 `Math.random()`，保证可测试、可复现。
 - `e2e/`：Playwright 冒烟测试，底线是页面能加载、canvas 出现、无 console error。
+
+## 远程开发容器的环境注意事项
+
+- 容器 shell 直连 `api.github.com` 会被网络策略拦截（静默失败）：查 GitHub API（CI 状态等）一律用 `mcp__github__*` 工具。
+- 访问 `*.vercel.app` 等一般网站正常：部署验证用 curl 抓线上 `/assets/*.js`，确认其中包含目标 commit 短 hash。
+- 本地 Playwright 使用容器预装的 Chromium（见 playwright.config.ts 的 executablePath 逻辑），不要在容器里运行 `playwright install`。
 
 ## 版本徽章
 
