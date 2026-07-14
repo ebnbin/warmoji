@@ -154,6 +154,9 @@ export class ArenaScene extends Phaser.Scene {
   private run!: RunState
   private damagePool: Phaser.GameObjects.BitmapText[] = []
   private damagePoolIdx = 0
+  // 死亡碎块对象池：敌人死亡时本体裂成 4 个象限碎片（复用固定数量 Image，零分配）
+  private shardPool: ImageObj[] = []
+  private shardPoolIdx = 0
   // 爆发型粒子：敌人死亡（紫系）/ 金币拾取（金系）/ 队员倒下（烟尘）
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -282,6 +285,10 @@ export class ArenaScene extends Phaser.Scene {
       this.add.bitmapText(0, 0, DAMAGE_FONT).setFontSize(24).setOrigin(0.5).setDepth(50).setVisible(false),
     )
     this.damagePoolIdx = 0
+    this.shardPool = Array.from({ length: 64 }, () =>
+      this.add.image(0, 0, '__DEFAULT').setDepth(6).setVisible(false),
+    )
+    this.shardPoolIdx = 0
 
     this.cursors = this.input.keyboard?.createCursorKeys()
     this.wasd = this.input.keyboard?.addKeys('W,A,S,D') as
@@ -735,29 +742,55 @@ export class ArenaScene extends Phaser.Scene {
     }
     enemy.setActive(false)
     ;(enemy.body as ArcadeBody).enable = false
-    this.deathBurst.explode(10, enemy.x, enemy.y)
+    this.deathBurst.explode(6, enemy.x, enemy.y)
     this.tweens.killTweensOf(enemy)
-    if (flingVx !== 0 || flingVy !== 0) {
-      // 致死击飞：匀速（线性、无衰减）滑出 + 顺势翻滚 + 淡出
-      const t = KNOCKBACK.deathSlideMs / 1000
+    // 本体裂成 4 个象限碎片：继承致死击退速度（不衰减）+ 象限散开 + 自旋 + 淡出
+    this.spawnShards(enemy, flingVx, flingVy)
+    enemy.destroy()
+  }
+
+  /** 敌人纹理的四象限碎片：frame 每种纹理只注册一次；碎片来自共享对象池 */
+  private spawnShards(enemy: ImageObj, flingVx: number, flingVy: number): void {
+    const tex = enemy.texture
+    if (!tex.has('shard0')) {
+      const sw = tex.source[0]!.width
+      const sh = tex.source[0]!.height
+      tex.add('shard0', 0, 0, 0, sw / 2, sh / 2)
+      tex.add('shard1', 0, sw / 2, 0, sw / 2, sh / 2)
+      tex.add('shard2', 0, 0, sh / 2, sw / 2, sh / 2)
+      tex.add('shard3', 0, sw / 2, sh / 2, sw / 2, sh / 2)
+    }
+    const dw = enemy.displayWidth / 2
+    const dh = enemy.displayHeight / 2
+    const t = KNOCKBACK.deathSlideMs / 1000
+    for (let i = 0; i < 4; i++) {
+      const shard = this.shardPool[this.shardPoolIdx]!
+      this.shardPoolIdx = (this.shardPoolIdx + 1) % this.shardPool.length
+      this.tweens.killTweensOf(shard)
+      // 翻转的敌人纹理左半显示在右侧：碎片同步镜像保证碎裂瞬间与本体无缝
+      const col = i % 2 === 0 ? -1 : 1
+      const ox = (enemy.flipX ? -col : col) * (dw / 2)
+      const oy = (i < 2 ? -1 : 1) * (dh / 2)
+      shard
+        .setTexture(tex.key, `shard${i}`)
+        .setDisplaySize(dw, dh)
+        .setFlipX(enemy.flipX)
+        .setPosition(enemy.x + ox, enemy.y + oy)
+        .setRotation(0)
+        .setAlpha(1)
+        .setVisible(true)
+      const dir = norm(ox, oy)
+      const scatter = 60 + this.rng.next() * 90
+      const vx = flingVx + dir.x * scatter
+      const vy = flingVy + dir.y * scatter
       this.tweens.add({
-        targets: enemy,
-        x: Phaser.Math.Clamp(enemy.x + flingVx * t, 0, MAP.width),
-        y: Phaser.Math.Clamp(enemy.y + flingVy * t, 0, MAP.height),
-        rotation: enemy.rotation + (flingVx >= 0 ? 1 : -1) * (1.4 + this.rng.next() * 1.4),
+        targets: shard,
+        x: Phaser.Math.Clamp(shard.x + vx * t, 0, MAP.width),
+        y: Phaser.Math.Clamp(shard.y + vy * t, 0, MAP.height),
+        rotation: (this.rng.next() - 0.5) * 6,
         alpha: 0,
         duration: KNOCKBACK.deathSlideMs,
-        onComplete: () => enemy.destroy(),
-      })
-    } else {
-      // 无击退来源（兜底）：原地带转体的放大消散
-      this.tweens.add({
-        targets: enemy,
-        scale: enemy.scale * 1.6,
-        rotation: enemy.rotation + (this.rng.next() - 0.5) * 1.6,
-        alpha: 0,
-        duration: 150,
-        onComplete: () => enemy.destroy(),
+        onComplete: () => shard.setVisible(false),
       })
     }
   }
