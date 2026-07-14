@@ -12,15 +12,13 @@ import { UI_FONT } from '../ui/fonts'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 import { buildWikiAtlas, wikiAtlasProgress, wikiFrame } from '../ui/wikiAtlas'
 
-// 图鉴：两个标签页。
-// 「图鉴」= 类别横向 tab（角色/队长/敌人/武器/道具）+ 该类条目列表 + 详情；
-// 「全部 emoji」= twemoji 基础形态完整列表（构建期 manifest 懒加载）+ 虚拟化网格。
-// 网格性能：环形缓冲窗口 + 容器平移——滚动帧只移动容器，跨行才重绑格子，
-// 纹理拉取带防抖（快速滑动不触发无效请求），LRU 自动淘汰离屏纹理。
+// 图鉴：单排类别 tab——角色/队长/敌人/武器/道具（条目列表+详情）与
+// 「全部」（twemoji 基础形态完整网格）平级，「全部」排最后。
+// 网格性能：进入时一次性构建 64px 缩略图集（常驻、带进度条），
+// 之后格子绑定是同步查表；滚动 = 容器平移 + 环形缓冲窗口，任意方向零异步。
 interface WikiLayout {
   content: { w: number; h: number }
   headerY: number
-  tabsY: number
   catsY: number
   detail: { x: number; y: number; w: number; h: number }
   list: { x: number; y: number; w: number; h: number }
@@ -30,22 +28,18 @@ interface WikiLayout {
 const LANDSCAPE: WikiLayout = {
   content: { w: 1280, h: 720 },
   headerY: 40,
-  tabsY: 84,
-  catsY: 130,
-  detail: { x: 40, y: 164, w: 620, h: 516 },
-  list: { x: 700, y: 164, w: 540, h: 516 },
+  catsY: 88,
+  detail: { x: 40, y: 124, w: 620, h: 556 },
+  list: { x: 700, y: 124, w: 540, h: 556 },
 }
 
 const PORTRAIT: WikiLayout = {
   content: { w: 720, h: 1280 },
   headerY: 48,
-  tabsY: 92,
-  catsY: 138,
-  detail: { x: 24, y: 176, w: 672, h: 386 },
+  catsY: 96,
+  detail: { x: 24, y: 134, w: 672, h: 428 },
   list: { x: 24, y: 586, w: 672, h: 640 },
 }
-
-type Tab = 'entries' | 'all'
 
 interface EntryRow {
   key: string
@@ -79,7 +73,7 @@ export class WikiScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色/标签页/类别/焦点/滚动等页面状态
   private preserveOnRestart = false
   private palette?: Palette
-  private tab: Tab = 'entries'
+  /** 0..groups.length-1 = 分组条目；groups.length = 「全部」网格页 */
   private category = 0
   private focusedKey = ''
   private allSelected: string | null = null
@@ -104,7 +98,6 @@ export class WikiScene extends Phaser.Scene {
   private gridCols = 1
   private poolSize = 0
   private pool?: DetailPool
-  private tabRects: { id: Tab; x: number; y: number; w: number; h: number }[] = []
   private catRects: { title: string; x: number; y: number; w: number; h: number }[] = []
   private backRect = { x: 0, y: 0, w: 0, h: 0 }
   private dragging = false
@@ -137,7 +130,6 @@ export class WikiScene extends Phaser.Scene {
     this.entryLookup = wikiEntryByEmoji()
     this.pool = undefined
     if (!preserved) {
-      this.tab = 'entries'
       this.category = 0
       this.focusedKey = ''
       this.allSelected = null
@@ -182,13 +174,13 @@ export class WikiScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    this.createTabs(res)
-    if (this.tab === 'entries') this.createEntriesView(res)
-    else this.createAllView()
+    this.createCategoryTabs(res)
+    if (this.isAllPage()) this.createAllView()
+    else this.createEntriesView(res)
 
     // 滚动：滚轮 + 拖动（列表/网格通用）
     this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
-      if (this.inList(p)) this.scrollTo((this.tab === 'entries' ? this.listScroll : this.gridScroll) + dy * 0.6)
+      if (this.inList(p)) this.scrollTo((this.isAllPage() ? this.gridScroll : this.listScroll) + dy * 0.6)
     })
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.dragMoved = false
@@ -196,7 +188,7 @@ export class WikiScene extends Phaser.Scene {
       if (this.inList(p)) {
         this.dragging = true
         this.dragStartY = p.worldY
-        this.dragStartScroll = this.tab === 'entries' ? this.listScroll : this.gridScroll
+        this.dragStartScroll = this.isAllPage() ? this.gridScroll : this.listScroll
         this.lastMoveY = p.worldY
         this.lastMoveT = this.time.now
       }
@@ -233,10 +225,10 @@ export class WikiScene extends Phaser.Scene {
 
   /** 惯性滚动 + 图集加载进度刷新 */
   update(_time: number, delta: number): void {
-    if (this.tab === 'all' && !this.gridBuilt) this.refreshLoading()
+    if (this.isAllPage() && !this.gridBuilt) this.refreshLoading()
     if (this.flingV === 0 || this.dragging) return
-    const cur = this.tab === 'entries' ? this.listScroll : this.gridScroll
-    const max = this.tab === 'entries' ? this.listMax : this.gridMax
+    const cur = this.isAllPage() ? this.gridScroll : this.listScroll
+    const max = this.isAllPage() ? this.gridMax : this.listMax
     const next = cur + this.flingV * delta
     this.scrollTo(next)
     this.flingV *= Math.exp(-delta / 320)
@@ -263,60 +255,23 @@ export class WikiScene extends Phaser.Scene {
     )
   }
 
-  // ── 标签页与类别 tab ────────────────────────────────────────
+  // ── 类别横向 tab ────────────────────────────────────────────
 
-  private createTabs(res: number): void {
-    const L = this.layout
-    const w = viewport.logicalWidth
-    const defs: { id: Tab; label: string }[] = [
-      { id: 'entries', label: '图鉴' },
-      { id: 'all', label: '全部 emoji' },
-    ]
-    this.tabRects = []
-    const tw = 150
-    const th = 40
-    const total = defs.length * tw + 12
-    defs.forEach((d, i) => {
-      const x = w / 2 - total / 2 + i * (tw + 12)
-      const y = this.origin.y + L.tabsY - th / 2
-      const on = this.tab === d.id
-      const g = this.add.graphics()
-      g.fillStyle(on ? 0xffd54f : 0xffffff, on ? 1 : 0.1)
-      g.fillRoundedRect(x, y, tw, th, th / 2)
-      this.add
-        .text(x + tw / 2, y + th / 2, d.label, {
-          fontFamily: UI_FONT,
-          fontSize: '17px',
-          fontStyle: 'bold',
-          color: on ? '#25262e' : '#c8c8d4',
-          resolution: res,
-        })
-        .setOrigin(0.5)
-      this.add
-        .zone(x, y, tw, th)
-        .setOrigin(0)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
-          if (this.dragMoved || this.tab === d.id) return
-          this.tab = d.id
-          this.preserveOnRestart = true
-          this.scene.restart()
-        })
-      this.tabRects.push({ id: d.id, x, y, w: tw, h: th })
-    })
-  }
-
-  /** 类别横向 tab（仅图鉴页）：角色/队长/敌人/武器/道具 */
+  /** 类别横向 tab：角色/队长/敌人/武器/道具 + 「全部」（完整 emoji 网格）平级排在最后 */
   private createCategoryTabs(res: number): void {
     const L = this.layout
     const w = viewport.logicalWidth
     this.catRects = []
     const ch = 34
     const gap = 10
-    const widths = this.groups.map((g) => 30 + g.title.length * 17 + 26)
-    const total = widths.reduce((s, x) => s + x, 0) + gap * (this.groups.length - 1)
+    const defs = [
+      ...this.groups.map((g) => ({ icon: g.icon, label: `${g.title} ${g.entries.length}`, title: g.title })),
+      { icon: '🌐', label: '全部', title: '全部' },
+    ]
+    const widths = defs.map((d) => 30 + d.label.length * 12 + 30)
+    const total = widths.reduce((s, x) => s + x, 0) + gap * (defs.length - 1)
     let x = w / 2 - total / 2
-    this.groups.forEach((g, i) => {
+    defs.forEach((d, i) => {
       const cw = widths[i]!
       const y = this.origin.y + L.catsY - ch / 2
       const on = this.category === i
@@ -325,9 +280,9 @@ export class WikiScene extends Phaser.Scene {
       bg.fillRoundedRect(x, y, cw, ch, ch / 2)
       bg.lineStyle(on ? 2 : 1, 0xffffff, on ? 0.85 : 0.1)
       bg.strokeRoundedRect(x, y, cw, ch, ch / 2)
-      emojiImage(this, x + 20, y + ch / 2, g.icon, 18)
+      emojiImage(this, x + 20, y + ch / 2, d.icon, 18)
       this.add
-        .text(x + 34, y + ch / 2, `${g.title} ${g.entries.length}`, {
+        .text(x + 34, y + ch / 2, d.label, {
           fontFamily: UI_FONT,
           fontSize: '14px',
           fontStyle: on ? 'bold' : 'normal',
@@ -347,7 +302,7 @@ export class WikiScene extends Phaser.Scene {
           this.preserveOnRestart = true
           this.scene.restart()
         })
-      this.catRects.push({ title: g.title, x, y, w: cw, h: ch })
+      this.catRects.push({ title: d.title, x, y, w: cw, h: ch })
       x += cw + gap
     })
   }
@@ -359,15 +314,19 @@ export class WikiScene extends Phaser.Scene {
     return p.worldX >= lx && p.worldX <= lx + L.w && p.worldY >= ly && p.worldY <= ly + L.h
   }
 
+  private isAllPage(): boolean {
+    return this.category === this.groups.length
+  }
+
   private scrollTo(y: number): void {
     const L = this.layout.list
-    if (this.tab === 'entries') {
-      this.listScroll = Math.max(0, Math.min(this.listMax, y))
-      this.listContainer.y = this.origin.y + L.y - this.listScroll
-    } else {
+    if (this.isAllPage()) {
       this.gridScroll = Math.max(0, Math.min(this.gridMax, y))
       this.gridContainer.y = this.origin.y + L.y - this.gridScroll
       this.updateWindow()
+    } else {
+      this.listScroll = Math.max(0, Math.min(this.listMax, y))
+      this.listContainer.y = this.origin.y + L.y - this.listScroll
     }
     // 滚动中的调试上报节流；拖动结束/惯性停止时 forceReport 补终态
     if (this.time.now - this.reportAt > 120) this.reportWiki()
@@ -380,7 +339,6 @@ export class WikiScene extends Phaser.Scene {
   // ── 图鉴视图：当前类别的条目列表 + 详情 ─────────────────────
 
   private createEntriesView(res: number): void {
-    this.createCategoryTabs(res)
     const L = this.layout.list
     const lx = this.origin.x + L.x
     const ly = this.origin.y + L.y
@@ -650,7 +608,7 @@ export class WikiScene extends Phaser.Scene {
         return buildWikiAtlas(this, this.manifest)
       })
       .then(() => {
-        if (!this.scene.isActive('wiki') || this.tab !== 'all') return
+        if (!this.scene.isActive('wiki') || !this.isAllPage()) return
         if (wikiAtlasProgress().state !== 'ready') return
         for (const o of loadingObjs) o.destroy()
         this.loadingFill = undefined
@@ -784,16 +742,15 @@ export class WikiScene extends Phaser.Scene {
       camX: 0,
       camY: 0,
       wiki: {
-        tab: this.tab,
-        category: this.groups[this.category]?.title ?? '',
+        category: this.isAllPage() ? '全部' : (this.groups[this.category]?.title ?? ''),
         focused: this.focusedKey,
         allSelected: this.allSelected,
         entryCount: this.rows.length,
         manifestCount: this.manifest.length,
         usedCount: this.used.size,
         atlas: wikiAtlasProgress().state,
-        scrollY: this.tab === 'entries' ? this.listScroll : this.gridScroll,
-        maxScroll: this.tab === 'entries' ? this.listMax : this.gridMax,
+        scrollY: this.isAllPage() ? this.gridScroll : this.listScroll,
+        maxScroll: this.isAllPage() ? this.gridMax : this.listMax,
         items: this.rows.map((r) => ({
           key: r.key,
           x: this.origin.x + this.layout.list.x,
@@ -807,13 +764,6 @@ export class WikiScene extends Phaser.Scene {
           w: this.layout.list.w,
           h: this.layout.list.h,
         },
-        tabs: this.tabRects.map((t) => ({
-          id: t.id,
-          x: t.x + t.w / 2,
-          y: t.y + t.h / 2,
-          w: t.w,
-          h: t.h,
-        })),
         categories: this.catRects.map((c) => ({
           title: c.title,
           x: c.x + c.w / 2,

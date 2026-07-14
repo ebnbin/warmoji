@@ -9,6 +9,8 @@ async function cssPoint(page: Page, logical: { x: number; y: number }): Promise<
 }
 
 test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚动、返回', async ({ page }) => {
+  // 全量图集构建（1905 张光栅化）在软渲染容器里与其他用例并行时很慢，放宽预算
+  test.setTimeout(240_000)
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(String(err)))
   page.on('console', (msg) => {
@@ -21,11 +23,10 @@ test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: book.x, y: book.y }) })
   await page.waitForFunction(() => window.__warmoji?.scene === 'wiki' && !!window.__warmoji.wiki)
 
-  // 图鉴页：默认类别为角色，五个类别 tab
+  // 默认类别为角色；「全部」与其余类别平级排在最后
   let w = await page.evaluate(() => window.__warmoji!.wiki!)
-  expect(w.tab).toBe('entries')
   expect(w.category).toBe('角色')
-  expect(w.categories.map((c) => c.title)).toEqual(['角色', '队长', '敌人', '武器', '道具'])
+  expect(w.categories.map((c) => c.title)).toEqual(['角色', '队长', '敌人', '武器', '道具', '全部'])
   expect(w.entryCount).toBe(8)
 
   // 切到敌人类别：条目数与聚焦跟随
@@ -44,12 +45,14 @@ test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚
   await page.waitForFunction((k) => window.__warmoji?.wiki?.focused === k, target.key)
   await page.screenshot({ path: 'test-results/wiki-entries.png' })
 
-  // 切到全部 emoji：等全量缩略图集构建完成（1905 张 → 2 张 2048 图集），网格可滚动
-  const allTab = w.tabs.find((t) => t.id === 'all')!
+  // 切到「全部」类别：等全量缩略图集构建完成（1905 张 → 2 张 2048 图集），网格可滚动
+  const allTab = w.categories.find((c) => c.title === '全部')!
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: allTab.x, y: allTab.y }) })
-  await page.waitForFunction(() => window.__warmoji?.wiki?.atlas === 'ready', undefined, {
-    timeout: 60_000,
-  })
+  await page.waitForFunction(
+    () => window.__warmoji?.wiki?.category === '全部' && window.__warmoji.wiki.atlas === 'ready',
+    undefined,
+    { timeout: 150_000 },
+  )
   w = await page.evaluate(() => window.__warmoji!.wiki!)
   expect(w.manifestCount).toBeGreaterThan(1500)
   expect(w.maxScroll).toBeGreaterThan(1000)
@@ -76,13 +79,13 @@ test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚
   await page.waitForTimeout(300)
   await page.screenshot({ path: 'test-results/wiki-backscroll.png' })
 
-  // 旋转保持：标签页与选中不丢
+  // 旋转保持：类别与选中不丢
   await page.setViewportSize({ width: 720, height: 1280 })
   await page.waitForFunction(
     () => window.__warmoji?.scene === 'wiki' && (window.__warmoji.viewH ?? 0) > (window.__warmoji.viewW ?? 0),
   )
   w = await page.evaluate(() => window.__warmoji!.wiki!)
-  expect(w.tab).toBe('all')
+  expect(w.category).toBe('全部')
   expect(w.allSelected).not.toBeNull()
 
   // 返回主界面

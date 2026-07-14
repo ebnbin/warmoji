@@ -677,6 +677,7 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   SPAWN.markEmoji,
   '⚙️',
   '📖',
+  '🌐',
   '➕',
   '⬆️',
   '⚔️',

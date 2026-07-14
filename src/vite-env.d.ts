@@ -52,7 +52,6 @@ interface WarmojiMenuDebug {
 }
 
 interface WarmojiWikiDebug {
-  tab: 'entries' | 'all'
   category: string
   focused: string
   allSelected: string | null
@@ -64,7 +63,6 @@ interface WarmojiWikiDebug {
   maxScroll: number
   items: { key: string; x: number; y: number; w: number; h: number }[]
   list: { x: number; y: number; w: number; h: number }
-  tabs: { id: string; x: number; y: number; w: number; h: number }[]
   categories: { title: string; x: number; y: number; w: number; h: number }[]
   back: { x: number; y: number; w: number; h: number }
 }
