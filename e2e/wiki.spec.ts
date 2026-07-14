@@ -8,7 +8,7 @@ async function cssPoint(page: Page, logical: { x: number; y: number }): Promise<
   }, logical)
 }
 
-test('图鉴：分组条目与详情、全部 emoji 虚拟网格、返回', async ({ page }) => {
+test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚动、返回', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(String(err)))
   page.on('console', (msg) => {
@@ -21,49 +21,60 @@ test('图鉴：分组条目与详情、全部 emoji 虚拟网格、返回', asyn
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: book.x, y: book.y }) })
   await page.waitForFunction(() => window.__warmoji?.scene === 'wiki' && !!window.__warmoji.wiki)
 
-  // 图鉴页：五组条目聚合自注册表（角色8+队长5+敌人9+武器9+道具18=49）
+  // 图鉴页：默认类别为角色，五个类别 tab
   let w = await page.evaluate(() => window.__warmoji!.wiki!)
   expect(w.tab).toBe('entries')
-  expect(w.entryCount).toBeGreaterThanOrEqual(45)
-  expect(w.focused.length).toBeGreaterThan(0)
+  expect(w.category).toBe('角色')
+  expect(w.categories.map((c) => c.title)).toEqual(['角色', '队长', '敌人', '武器', '道具'])
+  expect(w.entryCount).toBe(8)
 
-  // 点另一个可视条目切换详情
-  const target = w.items.find((i) => i.key !== w.focused && i.y >= 0)!
+  // 切到敌人类别：条目数与聚焦跟随
+  const enemyCat = w.categories.find((c) => c.title === '敌人')!
+  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: enemyCat.x, y: enemyCat.y }) })
+  await page.waitForFunction(() => window.__warmoji?.wiki?.category === '敌人')
+  w = await page.evaluate(() => window.__warmoji!.wiki!)
+  expect(w.entryCount).toBe(9)
+  expect(w.focused.startsWith('敌人:')).toBe(true)
+
+  // 点另一个条目切换详情
+  const target = w.items.find((i) => i.key !== w.focused)!
   await page
     .locator('#game canvas')
     .click({ position: await cssPoint(page, { x: target.x + target.w / 2, y: target.y + 26 }) })
   await page.waitForFunction((k) => window.__warmoji?.wiki?.focused === k, target.key)
   await page.screenshot({ path: 'test-results/wiki-entries.png' })
 
-  // 切到全部 emoji：清单懒加载完成、收录数正确、网格可滚动
+  // 切到全部 emoji：清单懒加载、网格可滚动
   const allTab = w.tabs.find((t) => t.id === 'all')!
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: allTab.x, y: allTab.y }) })
   await page.waitForFunction(() => (window.__warmoji?.wiki?.manifestCount ?? 0) > 1500, undefined, {
     timeout: 15_000,
   })
   w = await page.evaluate(() => window.__warmoji!.wiki!)
-  expect(w.usedCount).toBeGreaterThanOrEqual(40)
   expect(w.maxScroll).toBeGreaterThan(1000)
 
-  const gridCenter = await page.evaluate(() => {
-    const d = window.__warmoji!
-    const k = window.innerWidth / d.viewW
-    const L = d.wiki!.list
-    return { x: (L.x + L.w / 2) * k, y: (L.y + L.h / 2) * k }
-  })
+  // 点选第一个格子：选中态 + 详情出现（首个是未收录 emoji）
+  await page
+    .locator('#game canvas')
+    .click({ position: await cssPoint(page, { x: w.list.x + 31, y: w.list.y + 31 }) })
+  await page.waitForFunction(() => window.__warmoji?.wiki?.allSelected !== null)
+
+  // 滚动网格
+  const gridCenter = await cssPoint(page, { x: w.list.x + w.list.w / 2, y: w.list.y + w.list.h / 2 })
   await page.mouse.move(gridCenter.x, gridCenter.y)
   await page.mouse.wheel(0, 600)
   await page.waitForFunction(() => (window.__warmoji?.wiki?.scrollY ?? 0) > 0)
-  await page.waitForTimeout(600)
+  await page.waitForTimeout(700)
   await page.screenshot({ path: 'test-results/wiki-all.png' })
 
-  // 旋转保持：标签页与滚动状态不丢
+  // 旋转保持：标签页与选中不丢
   await page.setViewportSize({ width: 720, height: 1280 })
   await page.waitForFunction(
     () => window.__warmoji?.scene === 'wiki' && (window.__warmoji.viewH ?? 0) > (window.__warmoji.viewW ?? 0),
   )
   w = await page.evaluate(() => window.__warmoji!.wiki!)
   expect(w.tab).toBe('all')
+  expect(w.allSelected).not.toBeNull()
 
   // 返回主界面
   const back = await page.evaluate(() => window.__warmoji!.wiki!.back)

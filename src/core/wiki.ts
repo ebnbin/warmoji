@@ -111,6 +111,17 @@ export function wikiGroups(): WikiGroup[] {
   ]
 }
 
+/** emoji → 图鉴条目反查（完整列表点击已收录项时展示类别与详情；重复归属取首个） */
+export function wikiEntryByEmoji(): Map<string, { category: string; entry: WikiEntry }> {
+  const map = new Map<string, { category: string; entry: WikiEntry }>()
+  for (const g of wikiGroups()) {
+    for (const e of g.entries) {
+      if (!map.has(e.emoji)) map.set(e.emoji, { category: g.title, entry: e })
+    }
+  }
+  return map
+}
+
 /** 已作为游戏实体登场的 emoji（语义集合，用于完整列表的「已收录」标记） */
 export function usedEmojiSet(): Set<string> {
   const used = new Set<string>()
