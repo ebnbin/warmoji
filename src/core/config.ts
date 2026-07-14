@@ -331,6 +331,8 @@ export interface EnemyBulletSpec {
 
 interface EnemyBase {
   readonly emoji: string
+  readonly name: string
+  readonly desc: string
   readonly size: number
   readonly radius: number
   readonly hp: number
@@ -396,6 +398,8 @@ export const ZOMBIE: ChaseEnemySpec = {
   kind: 'zombie',
   behavior: 'chase',
   emoji: '🧟',
+  name: '僵尸',
+  desc: '缓慢但成群，最基础的追击者',
   size: 1 * UNIT,
   radius: 0.5 * UNIT,
   hp: 60,
@@ -409,6 +413,8 @@ export const GHOST: ChaseEnemySpec = {
   kind: 'ghost',
   behavior: 'chase',
   emoji: '👻',
+  name: '幽灵',
+  desc: '飘得很快的追击者，血薄',
   size: 0.9 * UNIT,
   radius: 0.45 * UNIT,
   hp: 25,
@@ -423,6 +429,8 @@ export const INVADER: WanderFireEnemySpec = {
   kind: 'invader',
   behavior: 'wanderFire',
   emoji: '👾',
+  name: '外星怪',
+  desc: '不追人，游荡途中朝前方吐慢速弹',
   size: 0.95 * UNIT,
   radius: 0.48 * UNIT,
   hp: 40,
@@ -439,6 +447,8 @@ export const BOAR: DashEnemySpec = {
   kind: 'boar',
   behavior: 'dash',
   emoji: '🐗',
+  name: '野猪',
+  desc: '发现猎物后蓄力直线突刺，横向可躲',
   size: 1.05 * UNIT,
   radius: 0.52 * UNIT,
   hp: 80,
@@ -458,6 +468,8 @@ export const SNAKE: FleeFireEnemySpec = {
   kind: 'snake',
   behavior: 'fleeFire',
   emoji: '🐍',
+  name: '毒蛇',
+  desc: '见人就溜，边逃边回头吐毒弹',
   size: 0.95 * UNIT,
   radius: 0.45 * UNIT,
   hp: 35,
@@ -475,6 +487,8 @@ export const MUSHROOM: ChaseEnemySpec = {
   kind: 'mushroom',
   behavior: 'chase',
   emoji: '🍄',
+  name: '毒蘑菇',
+  desc: '死亡时在原地留下一片毒液',
   size: 0.95 * UNIT,
   radius: 0.46 * UNIT,
   hp: 50,
@@ -490,6 +504,8 @@ export const RAT: CoinThiefEnemySpec = {
   kind: 'rat',
   behavior: 'coinThief',
   emoji: '🐀',
+  name: '偷币鼠',
+  desc: '专偷地上的金币，击杀可全额讨回并有利息',
   size: 0.8 * UNIT,
   radius: 0.4 * UNIT,
   hp: 30,
@@ -503,6 +519,8 @@ export const BLOBLING: ChaseEnemySpec = {
   kind: 'blobling',
   behavior: 'chase',
   emoji: '🫧',
+  name: '小泡泡',
+  desc: '泡泡分裂出的迷你体，快而脆',
   size: 0.55 * UNIT,
   radius: 0.28 * UNIT,
   hp: 18,
@@ -517,6 +535,8 @@ export const BLOB: ChaseEnemySpec = {
   kind: 'blob',
   behavior: 'chase',
   emoji: '🫧',
+  name: '泡泡',
+  desc: '被击破时分裂成两只小泡泡',
   size: 1.15 * UNIT,
   radius: 0.55 * UNIT,
   hp: 70,
@@ -656,6 +676,7 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   ...SETTING_DEFS.map((d) => d.icon),
   SPAWN.markEmoji,
   '⚙️',
+  '📖',
   '➕',
   '⬆️',
   '⚔️',

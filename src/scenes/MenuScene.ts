@@ -16,6 +16,7 @@ export class MenuScene extends Phaser.Scene {
   private palette?: Palette
   private menuBtn = { x: 0, y: 0, w: 0, h: 0 }
   private gearRect = { x: 0, y: 0, w: 0, h: 0 }
+  private bookRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
     super('menu')
@@ -81,12 +82,17 @@ export class MenuScene extends Phaser.Scene {
       })
     }
 
-    // 设置入口：右上角齿轮
+    // 右上角入口：📖 图鉴 + ⚙️ 设置
     const gear = emojiImage(this, w - safeInsets.right - 34, safeInsets.top + 34, '⚙️', 30)
       .setAlpha(0.8)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => this.scene.start('settings'))
     this.gearRect = { x: gear.x - 22, y: gear.y - 22, w: 44, h: 44 }
+    const book = emojiImage(this, gear.x - 56, gear.y, '📖', 30)
+      .setAlpha(0.8)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => this.scene.start('wiki'))
+    this.bookRect = { x: book.x - 22, y: book.y - 22, w: 44, h: 44 }
 
     // 明确的按钮 + 空格键开始，避免任意点击误触
     const btn = { x: w / 2 - 140, y: h * 0.82 - 29, w: 280, h: 58 }
@@ -155,6 +161,12 @@ export class MenuScene extends Phaser.Scene {
           y: this.gearRect.y + this.gearRect.h / 2,
           w: this.gearRect.w,
           h: this.gearRect.h,
+        },
+        wiki: {
+          x: this.bookRect.x + this.bookRect.w / 2,
+          y: this.bookRect.y + this.bookRect.h / 2,
+          w: this.bookRect.w,
+          h: this.bookRect.h,
         },
       },
     })

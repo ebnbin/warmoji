@@ -7,3 +7,11 @@ export function emojiCodepoints(emoji: string): string {
     .map((p) => p.toString(16))
     .join('-')
 }
+
+/** 反向：twemoji 文件名（codepoint 串）→ emoji 字符串；与 emojiCodepoints 往返稳定 */
+export function codepointsToEmoji(codepoints: string): string {
+  return codepoints
+    .split('-')
+    .map((h) => String.fromCodePoint(parseInt(h, 16)))
+    .join('')
+}
