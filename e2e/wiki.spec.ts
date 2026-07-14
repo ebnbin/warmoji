@@ -44,13 +44,14 @@ test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚
   await page.waitForFunction((k) => window.__warmoji?.wiki?.focused === k, target.key)
   await page.screenshot({ path: 'test-results/wiki-entries.png' })
 
-  // 切到全部 emoji：清单懒加载、网格可滚动
+  // 切到全部 emoji：等全量缩略图集构建完成（1905 张 → 2 张 2048 图集），网格可滚动
   const allTab = w.tabs.find((t) => t.id === 'all')!
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: allTab.x, y: allTab.y }) })
-  await page.waitForFunction(() => (window.__warmoji?.wiki?.manifestCount ?? 0) > 1500, undefined, {
-    timeout: 15_000,
+  await page.waitForFunction(() => window.__warmoji?.wiki?.atlas === 'ready', undefined, {
+    timeout: 60_000,
   })
   w = await page.evaluate(() => window.__warmoji!.wiki!)
+  expect(w.manifestCount).toBeGreaterThan(1500)
   expect(w.maxScroll).toBeGreaterThan(1000)
 
   // 点选第一个格子：选中态 + 详情出现（首个是未收录 emoji）
@@ -66,6 +67,14 @@ test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚
   await page.waitForFunction(() => (window.__warmoji?.wiki?.scrollY ?? 0) > 0)
   await page.waitForTimeout(700)
   await page.screenshot({ path: 'test-results/wiki-all.png' })
+
+  // 深下滑再回滑到顶：图集常驻，回看已翻阅区域不应空白/报错
+  for (let i = 0; i < 6; i++) await page.mouse.wheel(0, 5000)
+  await page.waitForFunction(() => (window.__warmoji?.wiki?.scrollY ?? 0) > 5000)
+  for (let i = 0; i < 8; i++) await page.mouse.wheel(0, -6000)
+  await page.waitForFunction(() => (window.__warmoji?.wiki?.scrollY ?? 0) === 0)
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: 'test-results/wiki-backscroll.png' })
 
   // 旋转保持：标签页与选中不丢
   await page.setViewportSize({ width: 720, height: 1280 })

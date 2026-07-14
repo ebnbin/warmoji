@@ -59,6 +59,7 @@ interface WarmojiWikiDebug {
   entryCount: number
   manifestCount: number
   usedCount: number
+  atlas: 'idle' | 'loading' | 'ready'
   scrollY: number
   maxScroll: number
   items: { key: string; x: number; y: number; w: number; h: number }[]

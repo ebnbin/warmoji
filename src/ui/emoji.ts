@@ -39,7 +39,8 @@ function emojiUrl(emoji: string): string {
   return `/emoji/${__TWEMOJI_VERSION__}/${emojiCodepoints(emoji)}.svg`
 }
 
-async function rasterize(svgText: string): Promise<HTMLImageElement> {
+/** SVG 文本 → 位图（尺寸由 SVG 自身的 width/height 决定），图鉴图集也复用 */
+export async function svgToImage(svgText: string): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }))
   try {
     const img = new Image()
@@ -54,13 +55,17 @@ async function rasterize(svgText: string): Promise<HTMLImageElement> {
   }
 }
 
+export function emojiSvgUrl(emoji: string): string {
+  return emojiUrl(emoji)
+}
+
 async function createTexture(scene: Phaser.Scene, emoji: string, outline?: OutlineKind): Promise<string> {
   const key = emojiKey(emoji, outline)
   const res = await fetch(emojiUrl(emoji))
   if (!res.ok) throw new Error(`HTTP ${res.status} ${emojiUrl(emoji)}`)
   const raw = await res.text()
   const svg = outline ? outlineSvg(raw, OUTLINE.radius, OUTLINE.colors[outline]) : raw
-  scene.textures.addImage(key, await rasterize(setSvgSize(svg, RASTER)))
+  scene.textures.addImage(key, await svgToImage(setSvgSize(svg, RASTER)))
   return key
 }
 

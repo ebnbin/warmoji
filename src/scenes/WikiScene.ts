@@ -10,6 +10,7 @@ import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiKey, ensureEmoji } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
+import { buildWikiAtlas, wikiAtlasProgress, wikiFrame } from '../ui/wikiAtlas'
 
 // 图鉴：两个标签页。
 // 「图鉴」= 类别横向 tab（角色/队长/敌人/武器/道具）+ 该类条目列表 + 详情；
@@ -65,10 +66,9 @@ interface DetailPool {
   footer: Phaser.GameObjects.Text
 }
 
-/** 虚拟网格的格子（环形缓冲复用：slot = index % poolSize） */
+/** 虚拟网格的格子（环形缓冲复用：slot = index % poolSize；纹理来自常驻图集，绑定为同步查表） */
 interface Cell {
   image: Phaser.GameObjects.Image
-  holder: Phaser.GameObjects.Graphics
   boundIndex: number
 }
 
@@ -116,6 +116,11 @@ export class WikiScene extends Phaser.Scene {
   private lastMoveY = 0
   private lastMoveT = 0
   private reportAt = 0
+  // 图集加载进度条（仅全部页构建期间）
+  private gridBuilt = false
+  private loadingFill?: Phaser.GameObjects.Graphics
+  private loadingText?: Phaser.GameObjects.Text
+  private loadingShownDone = -1
 
   constructor() {
     super('wiki')
@@ -226,8 +231,9 @@ export class WikiScene extends Phaser.Scene {
     this.reportWiki()
   }
 
-  /** 惯性滚动：指数衰减，撞到边界或速度耗尽即停 */
+  /** 惯性滚动 + 图集加载进度刷新 */
   update(_time: number, delta: number): void {
+    if (this.tab === 'all' && !this.gridBuilt) this.refreshLoading()
     if (this.flingV === 0 || this.dragging) return
     const cur = this.tab === 'entries' ? this.listScroll : this.gridScroll
     const max = this.tab === 'entries' ? this.listMax : this.gridMax
@@ -238,6 +244,23 @@ export class WikiScene extends Phaser.Scene {
       this.flingV = 0
       this.forceReport()
     }
+  }
+
+  private refreshLoading(): void {
+    const p = wikiAtlasProgress()
+    if (!this.loadingFill || !this.loadingText || p.done === this.loadingShownDone) return
+    this.loadingShownDone = p.done
+    const L = this.layout.list
+    const lx = this.origin.x + L.x
+    const ly = this.origin.y + L.y
+    const bw = L.w - 80
+    const ratio = p.total > 0 ? p.done / p.total : 0
+    this.loadingFill.clear()
+    this.loadingFill.fillStyle(0xffd54f, 1)
+    this.loadingFill.fillRoundedRect(lx + 40, ly + L.h / 2 - 8, Math.max(8, bw * ratio), 16, 8)
+    this.loadingText.setText(
+      p.total > 0 ? `首次加载全部 emoji… ${p.done} / ${p.total}` : '加载清单中…',
+    )
   }
 
   // ── 标签页与类别 tab ────────────────────────────────────────
@@ -574,6 +597,7 @@ export class WikiScene extends Phaser.Scene {
     frame.fillRoundedRect(lx - 8, ly - 8, L.w + 16, L.h + 16, 14)
 
     this.gridCols = Math.floor(L.w / CELL)
+    this.gridBuilt = false
     this.renderAllDetail()
 
     const mask = this.add.graphics().setVisible(false)
@@ -584,13 +608,29 @@ export class WikiScene extends Phaser.Scene {
     this.selectRing = this.add.graphics()
     this.gridContainer.add(this.selectRing)
 
-    // 点击选中格子（拖动不算）
+    // 首次进入：全量缩略图集构建进度（完成后此区域变成网格）
+    const barBg = this.add.graphics()
+    barBg.fillStyle(0xffffff, 0.1)
+    barBg.fillRoundedRect(lx + 40, ly + L.h / 2 - 8, L.w - 80, 16, 8)
+    this.loadingFill = this.add.graphics()
+    this.loadingText = this.add
+      .text(lx + L.w / 2, ly + L.h / 2 - 32, '加载清单中…', {
+        fontFamily: UI_FONT,
+        fontSize: '15px',
+        color: '#d0d0d8',
+        resolution: textRes(),
+      })
+      .setOrigin(0.5)
+    this.loadingShownDone = -1
+    const loadingObjs = [barBg, this.loadingFill, this.loadingText]
+
+    // 点击选中格子（拖动不算；网格就绪后才可选）
     this.add
       .zone(lx, ly, L.w, L.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', (p: Phaser.Input.Pointer) => {
-        if (this.dragMoved || this.manifest.length === 0) return
+        if (this.dragMoved || !this.gridBuilt) return
         const col = Math.floor((p.worldX - lx) / CELL)
         const row = Math.floor((p.worldY - ly + this.gridScroll) / CELL)
         const index = row * this.gridCols + col
@@ -602,24 +642,40 @@ export class WikiScene extends Phaser.Scene {
         this.reportWiki()
       })
 
-    void this.loadManifest().then(() => {
-      if (!this.scene.isActive('wiki') || this.tab !== 'all') return
-      this.manifestUsed = this.manifest.filter((cp) => this.used.has(codepointsToEmoji(cp))).length
-      const totalRows = Math.ceil(this.manifest.length / this.gridCols)
-      this.gridMax = Math.max(0, totalRows * CELL - L.h)
-      const poolRows = Math.ceil(L.h / CELL) + 2
-      this.poolSize = poolRows * this.gridCols
-      for (let i = 0; i < this.poolSize; i++) {
-        const holder = this.add.graphics()
-        const image = this.add.image(0, 0, '__DEFAULT').setVisible(false)
-        this.gridContainer.add([holder, image])
-        this.cells.push({ image, holder, boundIndex: -1 })
-      }
-      if (this.allSelected) this.drawSelectRing(this.manifest.indexOf(this.allSelected))
-      this.scrollTo(this.gridScroll)
-      this.renderAllDetail()
-      this.reportWiki()
-    })
+    void this.loadManifest()
+      .then(() => {
+        if (!this.scene.isActive('wiki')) return
+        this.manifestUsed = this.manifest.filter((cp) => this.used.has(codepointsToEmoji(cp))).length
+        // 一次性预载全部缩略图（幂等：会话内只构建一次，之后进入秒开）
+        return buildWikiAtlas(this, this.manifest)
+      })
+      .then(() => {
+        if (!this.scene.isActive('wiki') || this.tab !== 'all') return
+        if (wikiAtlasProgress().state !== 'ready') return
+        for (const o of loadingObjs) o.destroy()
+        this.loadingFill = undefined
+        this.loadingText = undefined
+        this.buildGrid()
+      })
+  }
+
+  /** 图集就绪后构建网格：格子纹理同步查表，滚动无任何异步加载 */
+  private buildGrid(): void {
+    const L = this.layout.list
+    const totalRows = Math.ceil(this.manifest.length / this.gridCols)
+    this.gridMax = Math.max(0, totalRows * CELL - L.h)
+    const poolRows = Math.ceil(L.h / CELL) + 2
+    this.poolSize = poolRows * this.gridCols
+    for (let i = 0; i < this.poolSize; i++) {
+      const image = this.add.image(0, 0, '__DEFAULT').setVisible(false)
+      this.gridContainer.add(image)
+      this.cells.push({ image, boundIndex: -1 })
+    }
+    this.gridBuilt = true
+    if (this.allSelected) this.drawSelectRing(this.manifest.indexOf(this.allSelected))
+    this.scrollTo(this.gridScroll)
+    this.renderAllDetail()
+    this.forceReport()
   }
 
   private async loadManifest(): Promise<void> {
@@ -652,26 +708,17 @@ export class WikiScene extends Phaser.Scene {
     const col = index % this.gridCols
     const cx = col * CELL + CELL / 2
     const cy = Math.floor(index / this.gridCols) * CELL + CELL / 2
-    const emoji = codepointsToEmoji(cp)
-    const key = emojiKey(emoji)
-    cell.holder.clear()
-    cell.image.setPosition(cx, cy).setAlpha(this.used.has(emoji) ? 1 : 0.26)
-    if (this.textures.exists(key)) {
-      cell.image.setTexture(key).setDisplaySize(44, 44).setVisible(true)
+    const f = wikiFrame(cp)
+    if (!f) {
+      cell.image.setVisible(false)
       return
     }
-    cell.image.setVisible(false)
-    cell.holder.fillStyle(0xffffff, 0.08)
-    cell.holder.fillCircle(cx, cy, 14)
-    // 拉取防抖：快速滑动时格子很快换绑，120ms 后仍绑定同一索引才发起请求
-    this.time.delayedCall(120, () => {
-      if (cell.boundIndex !== index || !this.scene.isActive('wiki')) return
-      void ensureEmoji(this, emoji).then((k) => {
-        if (cell.boundIndex !== index || !this.scene.isActive('wiki')) return
-        cell.holder.clear()
-        cell.image.setTexture(k).setDisplaySize(44, 44).setVisible(true)
-      })
-    })
+    cell.image
+      .setPosition(cx, cy)
+      .setTexture(f.key, f.frame)
+      .setDisplaySize(44, 44)
+      .setAlpha(this.used.has(codepointsToEmoji(cp)) ? 1 : 0.26)
+      .setVisible(true)
   }
 
   private drawSelectRing(index: number): void {
@@ -744,6 +791,7 @@ export class WikiScene extends Phaser.Scene {
         entryCount: this.rows.length,
         manifestCount: this.manifest.length,
         usedCount: this.used.size,
+        atlas: wikiAtlasProgress().state,
         scrollY: this.tab === 'entries' ? this.listScroll : this.gridScroll,
         maxScroll: this.tab === 'entries' ? this.listMax : this.gridMax,
         items: this.rows.map((r) => ({
