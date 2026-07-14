@@ -53,6 +53,18 @@ interface EntryRow {
   bg: Phaser.GameObjects.Graphics
 }
 
+/** 详情卡对象池：Text 只创建一次，切换条目仅 setText——
+ * 点击时批量 创建+销毁 文本会触发成串的 canvas 光栅化与 GPU 纹理增删（真机掉帧主因） */
+interface DetailPool {
+  panel: Phaser.GameObjects.Graphics
+  icon: Phaser.GameObjects.Image
+  badge: Phaser.GameObjects.Text
+  name: Phaser.GameObjects.Text
+  desc: Phaser.GameObjects.Text
+  sections: { title: Phaser.GameObjects.Text; body: Phaser.GameObjects.Text }[]
+  footer: Phaser.GameObjects.Text
+}
+
 /** 虚拟网格的格子（环形缓冲复用：slot = index % poolSize） */
 interface Cell {
   image: Phaser.GameObjects.Image
@@ -74,6 +86,9 @@ export class WikiScene extends Phaser.Scene {
   private manifest: string[] = []
   private used = new Set<string>()
   private groups: WikiGroup[] = []
+  /** 进场缓存，避免每次点击重建反查表/重算收录数 */
+  private entryLookup = new Map<string, { category: string; entry: WikiEntry }>()
+  private manifestUsed = 0
 
   private layout!: WikiLayout
   private origin = { x: 0, y: 0 }
@@ -88,7 +103,7 @@ export class WikiScene extends Phaser.Scene {
   private cells: Cell[] = []
   private gridCols = 1
   private poolSize = 0
-  private detailObjs: Phaser.GameObjects.GameObject[] = []
+  private pool?: DetailPool
   private tabRects: { id: Tab; x: number; y: number; w: number; h: number }[] = []
   private catRects: { title: string; x: number; y: number; w: number; h: number }[] = []
   private backRect = { x: 0, y: 0, w: 0, h: 0 }
@@ -96,6 +111,11 @@ export class WikiScene extends Phaser.Scene {
   private dragMoved = false
   private dragStartY = 0
   private dragStartScroll = 0
+  // 惯性滚动：拖动时采样速度（px/ms），松手后指数衰减
+  private flingV = 0
+  private lastMoveY = 0
+  private lastMoveT = 0
+  private reportAt = 0
 
   constructor() {
     super('wiki')
@@ -109,6 +129,8 @@ export class WikiScene extends Phaser.Scene {
     applyBackground(this.palette)
     this.groups = wikiGroups()
     this.used = usedEmojiSet()
+    this.entryLookup = wikiEntryByEmoji()
+    this.pool = undefined
     if (!preserved) {
       this.tab = 'entries'
       this.category = 0
@@ -119,7 +141,6 @@ export class WikiScene extends Phaser.Scene {
     }
     this.rows = []
     this.cells = []
-    this.detailObjs = []
     this.dragging = false
     this.dragMoved = false
 
@@ -166,20 +187,35 @@ export class WikiScene extends Phaser.Scene {
     })
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.dragMoved = false
+      this.flingV = 0
       if (this.inList(p)) {
         this.dragging = true
         this.dragStartY = p.worldY
         this.dragStartScroll = this.tab === 'entries' ? this.listScroll : this.gridScroll
+        this.lastMoveY = p.worldY
+        this.lastMoveT = this.time.now
       }
     })
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dy = this.dragStartY - p.worldY
       if (Math.abs(dy) > 10) this.dragMoved = true
-      if (this.dragMoved) this.scrollTo(this.dragStartScroll + dy)
+      if (this.dragMoved) {
+        this.scrollTo(this.dragStartScroll + dy)
+        const dt = Math.max(1, this.time.now - this.lastMoveT)
+        const inst = (this.lastMoveY - p.worldY) / dt
+        this.flingV = 0.5 * this.flingV + 0.5 * inst
+        this.lastMoveY = p.worldY
+        this.lastMoveT = this.time.now
+      }
     })
     this.input.on('pointerup', () => {
       this.dragging = false
+      // 松手：速度足够则进入惯性滑动，否则立即定格并上报终态
+      if (!this.dragMoved || Math.abs(this.flingV) < 0.05) {
+        this.flingV = 0
+        this.forceReport()
+      }
     })
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
@@ -188,6 +224,20 @@ export class WikiScene extends Phaser.Scene {
     })
 
     this.reportWiki()
+  }
+
+  /** 惯性滚动：指数衰减，撞到边界或速度耗尽即停 */
+  update(_time: number, delta: number): void {
+    if (this.flingV === 0 || this.dragging) return
+    const cur = this.tab === 'entries' ? this.listScroll : this.gridScroll
+    const max = this.tab === 'entries' ? this.listMax : this.gridMax
+    const next = cur + this.flingV * delta
+    this.scrollTo(next)
+    this.flingV *= Math.exp(-delta / 320)
+    if (Math.abs(this.flingV) < 0.02 || next <= 0 || next >= max) {
+      this.flingV = 0
+      this.forceReport()
+    }
   }
 
   // ── 标签页与类别 tab ────────────────────────────────────────
@@ -296,6 +346,11 @@ export class WikiScene extends Phaser.Scene {
       this.gridContainer.y = this.origin.y + L.y - this.gridScroll
       this.updateWindow()
     }
+    // 滚动中的调试上报节流；拖动结束/惯性停止时 forceReport 补终态
+    if (this.time.now - this.reportAt > 120) this.reportWiki()
+  }
+
+  private forceReport(): void {
     this.reportWiki()
   }
 
@@ -370,10 +425,9 @@ export class WikiScene extends Phaser.Scene {
     this.reportWiki()
   }
 
-  /** 详情卡（图鉴页与完整列表页共用）：类别 + 名称 + 介绍 + 属性行 */
-  private renderDetailCard(category: string, e: WikiEntry): void {
-    for (const o of this.detailObjs) o.destroy()
-    this.detailObjs = []
+  /** 详情卡对象池：所有 Text/Image 只创建一次，之后仅 setText/setTexture 复用 */
+  private ensurePool(): DetailPool {
+    if (this.pool) return this.pool
     const res = textRes()
     const D = this.layout.detail
     const dx = this.origin.x + D.x
@@ -384,11 +438,9 @@ export class WikiScene extends Phaser.Scene {
     panel.fillRoundedRect(dx, dy, D.w, D.h, 14)
     panel.lineStyle(1, 0xffffff, 0.1)
     panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
-    this.detailObjs.push(panel)
 
-    // 类别徽标
     const badge = this.add
-      .text(dx + D.w - 20, dy + 22, category, {
+      .text(dx + D.w - 20, dy + 22, '', {
         fontFamily: UI_FONT,
         fontSize: '13px',
         fontStyle: 'bold',
@@ -398,46 +450,117 @@ export class WikiScene extends Phaser.Scene {
         resolution: res,
       })
       .setOrigin(1, 0.5)
-    this.detailObjs.push(
-      badge,
-      emojiImage(this, dx + 58, dy + 56, e.emoji, 64),
-      this.add
-        .text(dx + 104, dy + 40, e.name, {
+      .setVisible(false)
+    const icon = this.add.image(dx + 58, dy + 56, '__DEFAULT').setVisible(false)
+    const name = this.add
+      .text(dx + 104, dy + 40, '', {
+        fontFamily: UI_FONT,
+        fontSize: '26px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        resolution: res,
+      })
+      .setOrigin(0, 0.5)
+      .setVisible(false)
+    const desc = this.add
+      .text(dx + 104, dy + 68, '', {
+        fontFamily: UI_FONT,
+        fontSize: '14px',
+        color: '#b9b9c6',
+        wordWrap: { width: D.w - 130 },
+        lineSpacing: 6,
+        resolution: res,
+      })
+      .setOrigin(0, 0.5)
+      .setVisible(false)
+    const sections = Array.from({ length: 6 }, () => ({
+      title: this.add
+        .text(0, 0, '', {
           fontFamily: UI_FONT,
-          fontSize: '26px',
+          fontSize: '15px',
           fontStyle: 'bold',
-          color: '#ffffff',
+          color: '#ffd54f',
           resolution: res,
         })
-        .setOrigin(0, 0.5),
-      this.add
-        .text(dx + 104, dy + 68, e.desc, {
+        .setOrigin(0, 0)
+        .setVisible(false),
+      body: this.add
+        .text(0, 0, '', {
           fontFamily: UI_FONT,
           fontSize: '14px',
-          color: '#b9b9c6',
-          wordWrap: { width: D.w - 130 },
+          color: '#d0d0d8',
+          wordWrap: { width: D.w - 56 },
+          lineSpacing: 6,
           resolution: res,
         })
-        .setOrigin(0, 0.5),
-    )
-    let cursor = dy + 112
-    for (const line of e.lines) {
-      const isTitle = line.startsWith('◆')
-      this.detailObjs.push(
-        this.add
-          .text(dx + 28, cursor, line, {
-            fontFamily: UI_FONT,
-            fontSize: isTitle ? '15px' : '14px',
-            fontStyle: isTitle ? 'bold' : 'normal',
-            color: isTitle ? '#ffd54f' : '#d0d0d8',
-            wordWrap: { width: D.w - 56 },
-            resolution: res,
-          })
-          .setOrigin(0, 0),
-      )
-      cursor += isTitle ? 26 : 22
-      if (cursor > dy + D.h - 24) break
+        .setOrigin(0, 0)
+        .setVisible(false),
+    }))
+    const footer = this.add
+      .text(dx + 28, dy + D.h - 24, '', {
+        fontFamily: UI_FONT,
+        fontSize: '13px',
+        color: '#8f8f9a',
+        resolution: res,
+      })
+      .setOrigin(0, 1)
+      .setVisible(false)
+    this.pool = { panel, icon, badge, name, desc, sections, footer }
+    return this.pool
+  }
+
+  /** 池化的 emoji 图标：纹理未就绪时异步拉取，回填前校验仍是同一目标 */
+  private setPoolIcon(icon: Phaser.GameObjects.Image, emoji: string, size: number): void {
+    const key = emojiKey(emoji)
+    icon.setData('want', key)
+    if (this.textures.exists(key)) {
+      icon.setTexture(key).setDisplaySize(size, size).setVisible(true)
+      return
     }
+    icon.setVisible(false)
+    void ensureEmoji(this, emoji).then((k) => {
+      if (icon.getData('want') !== k || !this.scene.isActive('wiki')) return
+      icon.setTexture(k).setDisplaySize(size, size).setVisible(true)
+    })
+  }
+
+  /** 详情卡（图鉴页与完整列表页共用）：类别 + 名称 + 介绍 + 属性分段 */
+  private renderDetailCard(category: string, e: WikiEntry): void {
+    const P = this.ensurePool()
+    const D = this.layout.detail
+    const dx = this.origin.x + D.x
+    const dy = this.origin.y + D.y
+
+    P.badge.setText(category).setVisible(true)
+    this.setPoolIcon(P.icon, e.emoji, 64)
+    P.name.setText(e.name).setColor('#ffffff').setVisible(true)
+    P.desc.setText(e.desc).setVisible(true)
+    P.footer.setVisible(false)
+
+    // 属性行分段：◆ 标题 + 后续内容合并为一个多行 Text（少量对象、单次光栅化）
+    const segments: { title: string; body: string[] }[] = []
+    for (const line of e.lines) {
+      if (line.startsWith('◆')) segments.push({ title: line, body: [] })
+      else if (segments.length === 0) segments.push({ title: '', body: [line] })
+      else segments[segments.length - 1]!.body.push(line)
+    }
+    let cursor = dy + 112
+    P.sections.forEach((s, i) => {
+      const seg = segments[i]
+      if (!seg || cursor > dy + D.h - 40) {
+        s.title.setVisible(false)
+        s.body.setVisible(false)
+        return
+      }
+      if (seg.title) {
+        s.title.setPosition(dx + 28, cursor).setText(seg.title).setVisible(true)
+        cursor += 26
+      } else {
+        s.title.setVisible(false)
+      }
+      s.body.setPosition(dx + 28, cursor).setText(seg.body.join('\n')).setVisible(true)
+      cursor += s.body.height + 10
+    })
   }
 
   // ── 全部 emoji 视图：懒加载清单 + 虚拟网格 ──────────────────
@@ -481,6 +604,7 @@ export class WikiScene extends Phaser.Scene {
 
     void this.loadManifest().then(() => {
       if (!this.scene.isActive('wiki') || this.tab !== 'all') return
+      this.manifestUsed = this.manifest.filter((cp) => this.used.has(codepointsToEmoji(cp))).length
       const totalRows = Math.ceil(this.manifest.length / this.gridCols)
       this.gridMax = Math.max(0, totalRows * CELL - L.h)
       const poolRows = Math.ceil(L.h / CELL) + 2
@@ -562,70 +686,37 @@ export class WikiScene extends Phaser.Scene {
 
   /** 完整列表页的详情面板：收录进度 + 选中项详情（已收录展示类别与属性） */
   private renderAllDetail(): void {
-    const res = textRes()
-    const D = this.layout.detail
-    const dx = this.origin.x + D.x
-    const dy = this.origin.y + D.y
-
+    const P = this.ensurePool()
     const selected = this.allSelected ? codepointsToEmoji(this.allSelected) : null
-    const hit = selected ? wikiEntryByEmoji().get(selected) : undefined
+    const hit = selected ? this.entryLookup.get(selected) : undefined
     if (selected && hit) {
       this.renderDetailCard(hit.category, hit.entry)
     } else {
-      for (const o of this.detailObjs) o.destroy()
-      this.detailObjs = []
-      const panel = this.add.graphics()
-      panel.fillStyle(0x000000, 0.22)
-      panel.fillRoundedRect(dx, dy, D.w, D.h, 14)
-      panel.lineStyle(1, 0xffffff, 0.1)
-      panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
-      this.detailObjs.push(panel)
+      P.badge.setVisible(false)
+      for (const s of P.sections) {
+        s.title.setVisible(false)
+        s.body.setVisible(false)
+      }
       if (selected) {
         // 未收录：展示 emoji 本体与待收录状态
-        this.detailObjs.push(
-          emojiImage(this, dx + 58, dy + 56, selected, 64).setAlpha(0.9),
-          this.add
-            .text(dx + 104, dy + 46, '未收录', {
-              fontFamily: UI_FONT,
-              fontSize: '24px',
-              fontStyle: 'bold',
-              color: '#9a9aa8',
-              resolution: res,
-            })
-            .setOrigin(0, 0.5),
-          this.add
-            .text(dx + 28, dy + 108, '这个 emoji 还没有成为游戏实体。\n随版本迭代，目标是把它们全部做进游戏。', {
-              fontFamily: UI_FONT,
-              fontSize: '14px',
-              color: '#b9b9c6',
-              lineSpacing: 8,
-              resolution: res,
-            })
-            .setOrigin(0, 0),
-        )
+        this.setPoolIcon(P.icon, selected, 64)
+        P.name.setText('未收录').setColor('#9a9aa8').setVisible(true)
+        P.desc
+          .setText('这个 emoji 还没有成为游戏实体。\n随版本迭代，目标是把它们全部做进游戏。')
+          .setVisible(true)
+      } else {
+        P.icon.setVisible(false)
+        P.name.setText('全部 emoji').setColor('#ffffff').setVisible(true)
+        P.desc.setText('点击任意格子查看详情').setVisible(true)
       }
-      const usedCount =
-        this.manifest.length > 0
-          ? this.manifest.filter((cp) => this.used.has(codepointsToEmoji(cp))).length
-          : 0
-      this.detailObjs.push(
-        this.add
-          .text(
-            dx + 28,
-            dy + D.h - 24,
-            this.manifest.length > 0
-              ? `已收录 ${usedCount} / ${this.manifest.length} · 亮色 = 已登场，点击查看详情`
-              : '加载清单中…',
-            {
-              fontFamily: UI_FONT,
-              fontSize: '13px',
-              color: '#8f8f9a',
-              resolution: res,
-            },
-          )
-          .setOrigin(0, 1),
-      )
     }
+    P.footer
+      .setText(
+        this.manifest.length > 0
+          ? `已收录 ${this.manifestUsed} / ${this.manifest.length} · 亮色 = 已登场，点击查看详情`
+          : '加载清单中…',
+      )
+      .setVisible(true)
   }
 
   private reportWiki(): void {
@@ -690,6 +781,7 @@ export class WikiScene extends Phaser.Scene {
         },
       },
     })
+    this.reportAt = this.time.now
   }
 
   private onViewportChanged(): void {
