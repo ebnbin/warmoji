@@ -15,7 +15,7 @@ import {
   viewport,
   VIEWPORT_CHANGED,
 } from '../ui/viewport'
-import type { ArenaScene, GameOverInfo, HudSnapshot } from './ArenaScene'
+import type { ArenaScene, GameOverInfo, HudSnapshot, WaveSummary } from './ArenaScene'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
 // 与 ArenaScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
@@ -120,9 +120,11 @@ export class UIScene extends Phaser.Scene {
 
     const arenaEvents = this.arena.events
     arenaEvents.on('game-over', this.onGameOver, this)
+    arenaEvents.on('wave-complete', this.onWaveComplete, this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       arenaEvents.off('game-over', this.onGameOver, this)
+      arenaEvents.off('wave-complete', this.onWaveComplete, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
 
@@ -298,6 +300,38 @@ export class UIScene extends Phaser.Scene {
       `inner ${window.innerWidth}×${window.innerHeight} · screen ${screen.width}×${screen.height} · 安全区 ${Math.round(safeInsets.top)}/${Math.round(safeInsets.right)}/${Math.round(safeInsets.bottom)}/${Math.round(safeInsets.left)}${isStandalone() ? ' · PWA' : ''}`,
       gl.length > 54 ? `${gl.slice(0, 53)}…` : gl,
     ])
+  }
+
+  /** 波末结算横幅：冻结期展示本波战果，随场景切换自然销毁 */
+  private onWaveComplete(s: WaveSummary): void {
+    const res = textRes()
+    const cx = viewport.logicalWidth / 2
+    const cy = viewport.logicalHeight / 2
+    this.add.rectangle(cx, cy, 6000, 6000, 0x000000, 0.55).setDepth(230)
+
+    const title = this.add
+      .text(cx, cy - 64, `第 ${s.wave} 波完成！`, {
+        fontFamily: UI_FONT,
+        fontSize: '44px',
+        fontStyle: 'bold',
+        color: '#ffd54f',
+        resolution: res,
+      })
+      .setOrigin(0.5)
+      .setDepth(231)
+    title.setScale(0.6)
+    this.tweens.add({ targets: title, scale: 1, duration: 320, ease: 'Back.easeOut' })
+
+    const lineStyle = { fontFamily: UI_FONT, fontSize: '22px', color: '#ffffff', resolution: res }
+    iconLabel(this, cx - 110, cy + 8, '💀', 22, `击杀 ${s.kills}`, lineStyle).setDepth(231)
+    iconLabel(this, cx + 110, cy + 8, COIN.emoji, 22, `金币 +${s.coins}`, lineStyle).setDepth(231)
+    if (s.levels > 0) {
+      iconLabel(this, cx, cy + 56, '⬆️', 22, `队伍等级 +${s.levels}，商店里花点数招募/升级`, {
+        ...lineStyle,
+        fontSize: '18px',
+        color: '#b3e5fc',
+      }).setDepth(231)
+    }
   }
 
   private onGameOver(info: GameOverInfo): void {

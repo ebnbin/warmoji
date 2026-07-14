@@ -309,10 +309,12 @@ export const MEMBER = {
   iframesMs: 700,
 } as const
 
-// 波次制：一波战斗固定时长 → 商店 → 下一波；上一波阵亡者下波以低血量复活
+// 波次制：一波战斗固定时长 → 结算横幅 → 商店 → 下一波；上一波阵亡者下波以低血量复活
 export const WAVE = {
   durationMs: 30_000,
   reviveHpRatio: 0.3,
+  /** 波末结算横幅停留时长：给玩家松手时间，防止战斗输入误触商店按钮 */
+  summaryMs: 1600,
 } as const
 
 export interface EnemySpec {

@@ -65,6 +65,14 @@ export interface GameOverInfo {
   bestKills: number
 }
 
+/** 波末结算横幅的战果（本波增量） */
+export interface WaveSummary {
+  wave: number
+  kills: number
+  coins: number
+  levels: number
+}
+
 interface Member {
   emoji: string
   slot: number
@@ -136,6 +144,10 @@ export class ArenaScene extends Phaser.Scene {
   private pendingSpawns = 0
   private stress = false
   private over = false
+  // 本波战果基线（结算横幅展示增量用）
+  private waveBaseKills = 0
+  private waveBaseCoins = 0
+  private waveBaseLevel = 1
   gameOverInfo?: GameOverInfo
 
   constructor() {
@@ -217,6 +229,9 @@ export class ArenaScene extends Phaser.Scene {
     // 队长道具：团队修正（移速/磁吸/掉落/全队伤害）
     this.teamFx = aggregateTeamEffects(this.run.captainItems)
     this.stats.moveSpeed = TEAM.moveSpeed * this.teamFx.moveSpeedMul
+    this.waveBaseKills = this.run.kills
+    this.waveBaseCoins = this.run.coins
+    this.waveBaseLevel = this.run.xp.level
     this.members = this.lineup.map((spec, slot) => this.createMember(spec.emoji, spec.weapons, slot))
 
     const cam = this.cameras.main
@@ -310,13 +325,22 @@ export class ArenaScene extends Phaser.Scene {
   /** 波次结束：快照队伍状态进 run，未拾取的金币随场景一并消失 */
   private endWave(): void {
     this.over = true
+    this.physics.pause()
     // 波末保底经验：躲避流杀得少也有基本收益（队长倍率同样生效）
     const xpMul = CAPTAINS[this.run.captainId].xpGainMul
     this.run.xp = gainXp(this.run.xp, Math.round(waveBonusXp(this.run.wave) * xpMul)).state
     this.run.combatMs += this.elapsedMs
     this.run.wave += 1
-    this.run.memberHp = this.members.map((m) => (m.alive ? m.hp : 0))
-    this.scene.start('shop')
+    this.run.memberHp = this.members.map((m) => (m.alive ? Math.round(m.hp) : 0))
+    // 先冻结战场弹结算横幅（UIScene 渲染），停留片刻再进商店：
+    // 给正在操作移动的手指留出松手时间，防止战斗输入误触商店按钮
+    this.events.emit('wave-complete', {
+      wave: this.run.wave - 1,
+      kills: this.run.kills - this.waveBaseKills,
+      coins: this.run.coins - this.waveBaseCoins,
+      levels: this.run.xp.level - this.waveBaseLevel,
+    } satisfies WaveSummary)
+    this.time.delayedCall(WAVE.summaryMs, () => this.scene.start('shop'))
   }
 
   private onViewportChanged(): void {
