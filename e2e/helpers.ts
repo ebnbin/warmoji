@@ -97,6 +97,23 @@ export async function clickShopRefresh(page: Page): Promise<void> {
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: r.x, y: r.y }) })
 }
 
+/** 商店页点击「升级」（作用于当前聚焦的队员） */
+export async function clickShopUpgrade(page: Page): Promise<void> {
+  const u = await page.evaluate(() => window.__warmoji!.shop!.upgrade)
+  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: u.x, y: u.y }) })
+}
+
+/** 商店页招募详情里点击某个候选角色 */
+export async function clickShopCandidate(page: Page, id: string): Promise<void> {
+  const c = await page.evaluate(
+    (cid) => window.__warmoji!.shop!.recruit.candidates.find((x) => x.id === cid)!,
+    id,
+  )
+  await page
+    .locator('#game canvas')
+    .click({ position: await cssPoint(page, { x: c.x + c.w / 2, y: c.y + c.h / 2 }) })
+}
+
 /** 商店页点击「开始第 N 波」进入下一波 */
 export async function clickShopNext(page: Page): Promise<void> {
   const s = await page.evaluate(() => window.__warmoji!.shop!.start)

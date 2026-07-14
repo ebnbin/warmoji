@@ -12,12 +12,14 @@ function inBounds(r: { x: number; y: number; w: number; h: number }, vw: number,
 test.describe('组队页 横屏 1280×720', () => {
   test.use({ viewport: { width: 1280, height: 720 } })
 
-  test('列表+详情左右分栏；聚焦、换人、出发上场 5 人', async ({ page }) => {
+  test('列表+详情左右分栏；聚焦、换首发、出发上场', async ({ page }) => {
     await page.goto('/')
     await enterSelect(page)
 
     let s = await selectState(page)
     expect(s.items.length).toBeGreaterThanOrEqual(6)
+    // 默认队长开局 1 级 → 首发 1 人（默认取花名册首位），可直接出发
+    expect(s.size).toBe(1)
     expect(s.selected).toBe(s.size)
     expect(s.start.enabled).toBe(true)
     // 详情在左、列表在右（对应竖屏的 上/下），都在最小可用空间内
@@ -43,36 +45,36 @@ test.describe('组队页 横屏 1280×720', () => {
     await page.mouse.wheel(0, -600)
     await page.waitForFunction(() => (window.__warmoji?.select?.list.scrollY ?? 0) === 0)
 
-    // 聚焦替补：详情切换，满员时按钮为「阵容已满」（取可视区内的替补）
+    // 聚焦替补并「选为首发」：满员替换最早选入的（首发单选 = 点谁换谁）
     s = await selectState(page)
+    const original = s.items.find((i) => i.inLineup)!
     const benched = s.items.find((i) => !i.inLineup && visible(i))!
     await clickItem(page, benched.id)
     await page.waitForFunction((id) => window.__warmoji?.select?.focusedId === id, benched.id)
     s = await selectState(page)
-    expect(s.toggle.mode).toBe('full')
+    expect(s.toggle.mode).toBe('add')
     await page.screenshot({ path: 'test-results/select-landscape.png' })
-
-    // 移出一名出战成员 → 出发禁用，且该角色详情变为可加入
-    const member = s.items.find((i) => i.inLineup)!
-    await clickItem(page, member.id)
-    await page.waitForFunction((id) => window.__warmoji?.select?.focusedId === id, member.id)
     await clickToggle(page)
-    await page.waitForFunction((n) => window.__warmoji?.select?.selected === n, s.size - 1)
+    await page.waitForFunction(
+      (id) => window.__warmoji?.select?.items.find((x) => x.id === id)?.inLineup === true,
+      benched.id,
+    )
+    s = await selectState(page)
+    expect(s.selected).toBe(1)
+    expect(s.items.find((i) => i.id === original.id)!.inLineup).toBe(false)
+    expect(s.toggle.mode).toBe('remove')
+
+    // 移出首发 → 出发禁用；再选回 → 恢复
+    await clickToggle(page)
+    await page.waitForFunction(() => window.__warmoji?.select?.selected === 0)
     s = await selectState(page)
     expect(s.start.enabled).toBe(false)
     expect(s.toggle.mode).toBe('add')
-
-    // 换上替补 → 恢复满员
-    await clickItem(page, benched.id)
-    await page.waitForFunction((id) => window.__warmoji?.select?.focusedId === id, benched.id)
     await clickToggle(page)
-    await page.waitForFunction((n) => window.__warmoji?.select?.selected === n, s.size)
-    s = await selectState(page)
-    expect(s.start.enabled).toBe(true)
-    expect(s.items.find((i) => i.id === benched.id)!.inLineup).toBe(true)
+    await page.waitForFunction(() => window.__warmoji?.select?.selected === 1)
 
     await clickStart(page)
-    await page.waitForFunction((n) => window.__warmoji?.alive === n, s.size)
+    await page.waitForFunction(() => window.__warmoji?.alive === 1)
   })
 })
 

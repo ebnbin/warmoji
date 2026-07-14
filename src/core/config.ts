@@ -220,12 +220,17 @@ export type CharacterId = keyof typeof CHARACTERS
 export const ROSTER_IDS = Object.keys(CHARACTERS) as readonly CharacterId[]
 
 // 队长：不登场、无实体的团队增益提供者（emotion 表情形象）。
-// 能力先直接建模为字段，需要通用效果系统时再抽象；出战人数由队长决定。
+// 能力先直接建模为字段，需要通用效果系统时再抽象；编制上限/经验相关能力由队长决定。
 export interface CaptainSpec {
   readonly emoji: string
   readonly name: string
   readonly desc: string
+  /** 编制上限：可招募的角色总数 */
   readonly teamSize: number
+  /** 开局队伍等级（= 可立刻花掉的点数；通常 1） */
+  readonly startLevel: number
+  /** 全队经验获取倍率 */
+  readonly xpGainMul: number
   /** 每次进商店全员复活并恢复满血（默认规则：存活者血量保留、阵亡者 30% 血复活） */
   readonly reviveInShop: boolean
   /** 每次进商店的免费道具刷新次数 */
@@ -238,6 +243,8 @@ export const CAPTAINS = {
     name: '天使',
     desc: '每次进入商店，全体队员复活并恢复满血',
     teamSize: 5,
+    startLevel: 1,
+    xpGainMul: 1,
     reviveInShop: true,
     freeRefreshes: 0,
   },
@@ -246,14 +253,38 @@ export const CAPTAINS = {
     name: '财迷',
     desc: '每次进入商店，前 3 次道具刷新免费',
     teamSize: 5,
+    startLevel: 1,
+    xpGainMul: 1,
     reviveInShop: false,
     freeRefreshes: 3,
   },
   party: {
     emoji: '🥳',
     name: '派对之星',
-    desc: '气氛组拉满，可以招募 6 名队员出战',
+    desc: '气氛组拉满，编制上限 6 人',
     teamSize: 6,
+    startLevel: 1,
+    xpGainMul: 1,
+    reviveInShop: false,
+    freeRefreshes: 0,
+  },
+  prodigy: {
+    emoji: '🤓',
+    name: '神童',
+    desc: '天资聪颖，开局队伍等级 2，可立刻招募两名队员',
+    teamSize: 5,
+    startLevel: 2,
+    xpGainMul: 1,
+    reviveInShop: false,
+    freeRefreshes: 0,
+  },
+  scholar: {
+    emoji: '🧐',
+    name: '学者',
+    desc: '带队有方，全队经验获取 +25%',
+    teamSize: 5,
+    startLevel: 1,
+    xpGainMul: 1.25,
     reviveInShop: false,
     freeRefreshes: 0,
   },
@@ -342,6 +373,10 @@ export const SPAWN = {
   ghostShareMax: 0.55,
   ghostShareRampSeconds: 240,
   maxAlive: 400,
+  // 刷怪供给随在场人数缩放：factor = base + perMember×人数（5 人 = 1.0），
+  // 让单人首发的第 1 波与满编后期压力手感一致
+  teamFactorBase: 0.35,
+  teamFactorPerMember: 0.13,
   // 地图内随机刷怪：先显示预告标记再落地
   telegraphMs: 900,
   markEmoji: '⚠️',
@@ -360,7 +395,18 @@ export const STRESS = {
   cooldownMul: 0.1,
 } as const
 
-export const XP = { base: 8, perLevel: 6 } as const
+// 经验：等比升级曲线（前快后慢），点数经济见 core/run.ts。
+// 校准依据自动游玩实测：第 1 波结束 2~3 级，20 波累计约 17~18 级
+export const XP = {
+  base: 35,
+  growth: 1.25,
+  /** 波末保底经验 = base + perWave×波次（躲避流的兜底，占比小头） */
+  waveBonusBase: 12,
+  waveBonusPerWave: 3,
+} as const
+
+// 角色等级（点数升级）：v1 数值脊柱，满级 6
+export const LEVELS = { max: 6, damagePerLevel: 0.12, hpPerLevel: 0.1 } as const
 
 // 商店：每个上架位可付费重新随机（队长可提供免费次数）
 export const SHOP = { refreshPrice: 2 } as const
@@ -385,6 +431,7 @@ export const OUTLINED_EMOJIS: readonly string[] = [
   ZOMBIE.emoji,
   GHOST.emoji,
   COIN.emoji,
+  '➕',
   '💀',
 ]
 
@@ -397,6 +444,8 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   ...SETTING_DEFS.map((d) => d.icon),
   SPAWN.markEmoji,
   '⚙️',
+  '➕',
+  '⬆️',
   '⚔️',
   '🏆',
   '⚡',

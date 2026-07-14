@@ -22,6 +22,8 @@ interface WarmojiShopDebug {
   coins: number
   focusedId: string
   freeRefreshes: number
+  level: number
+  points: number
   slots: {
     id: string
     x: number
@@ -31,9 +33,15 @@ interface WarmojiShopDebug {
     offer: string | null
     price: number | null
     owned: number
+    memberLevel: number | null
   }[]
   buy: { x: number; y: number; w: number; h: number; enabled: boolean }
   refresh: { x: number; y: number; w: number; h: number; enabled: boolean }
+  upgrade: { x: number; y: number; w: number; h: number; enabled: boolean }
+  recruit: {
+    candidates: { id: string; x: number; y: number; w: number; h: number }[]
+    selected: string | null
+  }
   start: { x: number; y: number; w: number; h: number }
 }
 
@@ -84,4 +92,5 @@ interface Window {
   __twemojiVersion?: string
   __setStress?: (on: boolean) => void
   __addCoins?: (n: number) => void
+  __addXp?: (n: number) => void
 }

@@ -7,7 +7,7 @@ import { SelectScene } from './scenes/SelectScene'
 import { SettingsScene } from './scenes/SettingsScene'
 import { ShopScene } from './scenes/ShopScene'
 import { UIScene } from './scenes/UIScene'
-import { grantCoins } from './core/run'
+import { grantCoins, grantXp } from './core/run'
 import { setStress } from './ui/dev'
 import { isStandalone, nudgeIosViewport, refreshViewport, viewport } from './ui/viewport'
 
@@ -74,3 +74,4 @@ window.__setStress = (on: boolean): void => {
 }
 
 window.__addCoins = (n: number): void => grantCoins(n)
+window.__addXp = (n: number): void => grantXp(n)

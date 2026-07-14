@@ -25,7 +25,7 @@ export function saveCaptain(storage: StringStorage | undefined, id: CaptainId): 
   }
 }
 
-/** 过滤非法/重复 id 并截断到队伍上限（由队长决定）；全空时回退默认阵容（花名册前 size 名） */
+/** 过滤非法/重复 id 并截断到首发人数（由队长开局等级决定）；全空时回退花名册前 size 名 */
 export function sanitizeLineup(ids: unknown, size: number): CharacterId[] {
   const valid = Array.isArray(ids)
     ? [...new Set(ids)].filter((x): x is CharacterId => typeof x === 'string' && x in CHARACTERS)
@@ -34,14 +34,14 @@ export function sanitizeLineup(ids: unknown, size: number): CharacterId[] {
   return valid.slice(0, size)
 }
 
-/** 选/弃切换；满员时忽略新增 */
+/** 选/弃切换；满员时替换最早选入的（首发人数通常 1~2，替换比忽略顺手） */
 export function toggleLineup(
   sel: readonly CharacterId[],
   id: CharacterId,
   size: number,
 ): CharacterId[] {
   if (sel.includes(id)) return sel.filter((x) => x !== id)
-  if (sel.length >= size) return [...sel]
+  if (sel.length >= size) return [...sel.slice(sel.length - size + 1), id]
   return [...sel, id]
 }
 
@@ -62,11 +62,11 @@ export function saveLineup(storage: StringStorage | undefined, ids: readonly Cha
   }
 }
 
-/** 一次读出当前队长与按其编制截断的阵容 */
+/** 一次读出当前队长与按其开局点数截断的首发阵容 */
 export function loadTeam(storage: StringStorage | undefined): {
   captainId: CaptainId
   lineup: CharacterId[]
 } {
   const captainId = loadCaptain(storage)
-  return { captainId, lineup: loadLineup(storage, CAPTAINS[captainId].teamSize) }
+  return { captainId, lineup: loadLineup(storage, CAPTAINS[captainId].startLevel) }
 }

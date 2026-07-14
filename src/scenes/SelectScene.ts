@@ -54,7 +54,7 @@ export class SelectScene extends Phaser.Scene {
   private preserveOnRestart = false
   private palette?: Palette
   private captainId: CaptainId = 'angel'
-  private teamSize = 5
+  private starterCount = 1
   private lineup: CharacterId[] = []
   private focusedId: CharacterId = ROSTER_IDS[0]!
   private layout!: SelectLayout
@@ -91,8 +91,9 @@ export class SelectScene extends Phaser.Scene {
     if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
     applyBackground(this.palette)
     this.captainId = loadCaptain(browserStorage())
-    this.teamSize = CAPTAINS[this.captainId].teamSize
-    this.lineup = loadLineup(browserStorage(), this.teamSize)
+    // 首发人数 = 队长开局等级（点数）；其余角色靠波次间招募
+    this.starterCount = CAPTAINS[this.captainId].startLevel
+    this.lineup = loadLineup(browserStorage(), this.starterCount)
     if (!preserved) {
       this.focusedId = this.lineup[0] ?? ROSTER_IDS[0]!
       this.scrollY = 0
@@ -123,7 +124,7 @@ export class SelectScene extends Phaser.Scene {
         if (!this.dragMoved) this.scene.start('captain')
       })
     this.add
-      .text(w / 2, oy + L.headerY, '组建队伍', {
+      .text(w / 2, oy + L.headerY, `选择首发（${this.starterCount} 人）`, {
         fontFamily: UI_FONT,
         fontSize: '26px',
         fontStyle: 'bold',
@@ -358,20 +359,19 @@ export class SelectScene extends Phaser.Scene {
   }
 
   private toggleMode(): 'add' | 'remove' | 'full' {
-    if (this.lineup.includes(this.focusedId)) return 'remove'
-    return this.lineup.length >= this.teamSize ? 'full' : 'add'
+    // 满员时点选未选中角色 = 替换最早选入的，因此不存在 full 态
+    return this.lineup.includes(this.focusedId) ? 'remove' : 'add'
   }
 
   private onToggle(): void {
-    if (this.toggleMode() === 'full') return
-    this.lineup = toggleLineup(this.lineup, this.focusedId, this.teamSize)
+    this.lineup = toggleLineup(this.lineup, this.focusedId, this.starterCount)
     saveLineup(browserStorage(), this.lineup)
     this.refresh()
   }
 
   private startRun(): void {
-    if (this.lineup.length !== this.teamSize) return
-    beginRun(this.lineup.length)
+    if (this.lineup.length !== this.starterCount) return
+    beginRun(this.captainId, this.lineup)
     this.scene.start('arena')
   }
 
@@ -403,25 +403,22 @@ export class SelectScene extends Phaser.Scene {
     this.toggleBg.clear()
     if (mode === 'add') {
       this.toggleBg.fillStyle(0xffd54f, 1)
-      this.toggleText.setText('加入出战').setColor('#25262e')
-    } else if (mode === 'remove') {
+      this.toggleText.setText('选为首发').setColor('#25262e')
+    } else {
       this.toggleBg.fillStyle(0xffffff, 0.12)
       this.toggleBg.lineStyle(1, 0xffffff, 0.35)
-      this.toggleText.setText('移出出战').setColor('#ffffff')
-    } else {
-      this.toggleBg.fillStyle(0xffffff, 0.07)
-      this.toggleText.setText('阵容已满').setColor('#8f8f9a')
+      this.toggleText.setText('移出首发').setColor('#ffffff')
     }
     this.toggleBg.fillRoundedRect(t.x, t.y, t.w, t.h, t.h / 2)
     if (mode === 'remove') this.toggleBg.strokeRoundedRect(t.x, t.y, t.w, t.h, t.h / 2)
 
-    const ready = this.lineup.length === this.teamSize
+    const ready = this.lineup.length === this.starterCount
     const b = this.btnRect
     this.btnBg.clear()
     this.btnBg.fillStyle(ready ? 0xffd54f : 0xffffff, ready ? 1 : 0.14)
     this.btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
     this.btnText
-      .setText(ready ? '出 发' : `出发（${this.lineup.length}/${this.teamSize}）`)
+      .setText(ready ? '出 发' : `出发（${this.lineup.length}/${this.starterCount}）`)
       .setColor(ready ? '#25262e' : '#9a9aa8')
 
     this.reportSelect()
@@ -449,7 +446,7 @@ export class SelectScene extends Phaser.Scene {
       camY: 0,
       select: {
         selected: this.lineup.length,
-        size: this.teamSize,
+        size: this.starterCount,
         focusedId: this.focusedId,
         items: this.rows.map((r) => ({
           id: r.id,
@@ -478,7 +475,7 @@ export class SelectScene extends Phaser.Scene {
           y: this.btnRect.y + this.btnRect.h / 2,
           w: this.btnRect.w,
           h: this.btnRect.h,
-          enabled: this.lineup.length === this.teamSize,
+          enabled: this.lineup.length === this.starterCount,
         },
       },
     })

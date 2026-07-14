@@ -1,30 +1,43 @@
 import { describe, expect, it } from 'vitest'
-import { gainXp, xpToNext } from './xp'
+import { XP } from './config'
+import { gainXp, waveBonusXp, xpToNext } from './xp'
 
 describe('xp', () => {
-  it('升级所需经验严格递增且为正', () => {
-    for (let level = 1; level < 30; level++) {
+  it('等比曲线：门槛严格递增，前快后慢', () => {
+    expect(xpToNext(1)).toBe(XP.base)
+    for (let level = 1; level < 25; level++) {
       expect(xpToNext(level)).toBeGreaterThan(0)
       expect(xpToNext(level + 1)).toBeGreaterThan(xpToNext(level))
     }
+    // 后期门槛显著高于前期（前快后慢的量化下限）
+    expect(xpToNext(15)).toBeGreaterThan(xpToNext(1) * 10)
   })
 
-  it('经验不足时不升级', () => {
-    const r = gainXp({ level: 1, xp: 0 }, xpToNext(1) - 1)
-    expect(r.levelsGained).toBe(0)
-    expect(r.state.level).toBe(1)
+  it('校准锚点：第 1 波（约 45~90 经验）应到 2~3 级，不到 4 级', () => {
+    const wave1Low = gainXp({ level: 1, xp: 0 }, 45 + waveBonusXp(1))
+    const wave1High = gainXp({ level: 1, xp: 0 }, 90 + waveBonusXp(1))
+    expect(wave1Low.state.level).toBeGreaterThanOrEqual(2)
+    expect(wave1High.state.level).toBeLessThanOrEqual(3)
   })
 
-  it('一次获得大量经验可连升多级，余数正确', () => {
-    // L1→L2 需 8，L2→L3 需 14；25 = 8 + 14 + 余 3
-    const r = gainXp({ level: 1, xp: 0 }, 25)
-    expect(r.levelsGained).toBe(2)
-    expect(r.state).toEqual({ level: 3, xp: 3 })
+  it('校准锚点：20 波总量（约 6000 经验）落在 16~19 级', () => {
+    const total = gainXp({ level: 1, xp: 0 }, 6000)
+    expect(total.state.level).toBeGreaterThanOrEqual(16)
+    expect(total.state.level).toBeLessThanOrEqual(19)
   })
 
-  it('恰好达到阈值即升级', () => {
-    const r = gainXp({ level: 1, xp: 0 }, xpToNext(1))
-    expect(r.levelsGained).toBe(1)
-    expect(r.state).toEqual({ level: 2, xp: 0 })
+  it('波末保底经验随波次缓涨', () => {
+    expect(waveBonusXp(1)).toBe(XP.waveBonusBase + XP.waveBonusPerWave)
+    expect(waveBonusXp(10)).toBeGreaterThan(waveBonusXp(1))
+  })
+
+  it('经验不足时不升级；恰好达到阈值即升级；连升多级余数正确', () => {
+    expect(gainXp({ level: 1, xp: 0 }, xpToNext(1) - 1).levelsGained).toBe(0)
+    const exact = gainXp({ level: 1, xp: 0 }, xpToNext(1))
+    expect(exact.levelsGained).toBe(1)
+    expect(exact.state).toEqual({ level: 2, xp: 0 })
+    const multi = gainXp({ level: 1, xp: 0 }, xpToNext(1) + xpToNext(2) + 3)
+    expect(multi.levelsGained).toBe(2)
+    expect(multi.state).toEqual({ level: 3, xp: 3 })
   })
 })

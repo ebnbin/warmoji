@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CHARACTERS, COIN, GHOST, HIT_SHAKE, MAP, MEMBER, SPAWN, STRESS, TEAM, UNIT, WAVE, ZOMBIE } from '../core/config'
+import { CAPTAINS, CHARACTERS, COIN, GHOST, HIT_SHAKE, MAP, MEMBER, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WAVE, ZOMBIE } from '../core/config'
 import type { CharacterSpec, EnemySpec } from '../core/config'
 import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
@@ -11,9 +11,9 @@ import {
   resolveWeaponSpec,
 } from '../core/items'
 import type { TeamEffects } from '../core/items'
+import { levelDamageMul, memberMaxHp } from '../core/levels'
 import { getRun, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
-import { loadTeam } from '../core/selection'
 import { DEFAULT_SETTINGS, loadSettings } from '../core/settings'
 import type { Settings } from '../core/settings'
 import { randomPalette } from '../core/palette'
@@ -22,7 +22,7 @@ import { Rng } from '../core/rng'
 import { randomMapPoint } from '../core/spawn'
 import { norm } from '../core/vec'
 import { waveAt } from '../core/waves'
-import { gainXp, xpToNext } from '../core/xp'
+import { gainXp, waveBonusXp, xpToNext } from '../core/xp'
 import { applyBackground } from '../ui/background'
 import { DAMAGE_FONT, ensureDamageFont } from '../ui/damageFont'
 import { reportDebug } from '../ui/debug'
@@ -210,8 +210,10 @@ export class ArenaScene extends Phaser.Scene {
     this.centerObj = this.add.zone(this.center.x, this.center.y, 1, 1)
 
     this.memberGroup = this.add.group()
-    this.lineup = loadTeam(browserStorage()).lineup.map((id) => CHARACTERS[id])
-    this.run = getRun(this.lineup.length)
+    this.run = getRun()
+    // 压测固定 5 人满编便于跑分对比；正常局阵容来自 run（招募制，逐波扩编）
+    const rosterIds = this.stress ? ROSTER_IDS.slice(0, 5) : this.run.roster
+    this.lineup = rosterIds.map((id) => CHARACTERS[id])
     // 队长道具：团队修正（移速/磁吸/掉落/全队伤害）
     this.teamFx = aggregateTeamEffects(this.run.captainItems)
     this.stats.moveSpeed = TEAM.moveSpeed * this.teamFx.moveSpeedMul
@@ -308,6 +310,9 @@ export class ArenaScene extends Phaser.Scene {
   /** 波次结束：快照队伍状态进 run，未拾取的金币随场景一并消失 */
   private endWave(): void {
     this.over = true
+    // 波末保底经验：躲避流杀得少也有基本收益（队长倍率同样生效）
+    const xpMul = CAPTAINS[this.run.captainId].xpGainMul
+    this.run.xp = gainXp(this.run.xp, Math.round(waveBonusXp(this.run.wave) * xpMul)).state
     this.run.combatMs += this.elapsedMs
     this.run.wave += 1
     this.run.memberHp = this.members.map((m) => (m.alive ? m.hp : 0))
@@ -349,14 +354,16 @@ export class ArenaScene extends Phaser.Scene {
         visualOffset.y = dy
       },
     }
-    // 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效武器参数
+    // 等级 × 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效武器参数
+    const level = this.stress ? 1 : (this.run.memberLevels[slot] ?? 1)
+    const lvlDmg = levelDamageMul(level)
     const fx = aggregateCharacterEffects(this.run.memberItems[slot] ?? [])
     const memberCtx: WeaponContext = {
       ...this.weaponCtx,
-      damageMul: () => this.stats.damageMul * fx.damageMul * this.teamFx.teamDamageMul,
+      damageMul: () => this.stats.damageMul * fx.damageMul * lvlDmg * this.teamFx.teamDamageMul,
       cooldownMul: () => this.stats.cooldownMul * fx.cooldownMul,
     }
-    const maxHp = this.stress ? this.stats.maxHp : Math.max(10, MEMBER.maxHp + fx.hpAdd)
+    const maxHp = this.stress ? this.stats.maxHp : memberMaxHp(level, fx.hpAdd)
     const member: Member = {
       emoji,
       slot,
@@ -586,8 +593,9 @@ export class ArenaScene extends Phaser.Scene {
   private killEnemy(enemy: ImageObj): void {
     this.run.kills++
     const spec = enemy.getData('spec') as EnemySpec
-    // 经验击杀即得；金币落地等待拾取
-    this.run.xp = gainXp(this.run.xp, spec.xp).state
+    // 经验击杀即得（队长可提供倍率）；金币落地等待拾取
+    const xpMul = CAPTAINS[this.run.captainId].xpGainMul
+    this.run.xp = gainXp(this.run.xp, Math.round(spec.xp * xpMul)).state
     const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? spec.coins : 0
     this.spawnCoins(enemy.x, enemy.y, spec.coins + doubled)
     enemy.setActive(false)
@@ -622,9 +630,10 @@ export class ArenaScene extends Phaser.Scene {
   private spawn(delta: number): void {
     this.spawnCooldownMs -= delta
     if (this.spawnCooldownMs > 0) return
-    // 难度按跨波累计战斗时长递增
+    // 难度按跨波累计战斗时长递增；刷怪供给随在场人数缩放（单人首发不会被满编压力淹没）
     const wave = waveAt((this.run.combatMs + this.elapsedMs) / 1000)
-    this.spawnCooldownMs = this.stress ? STRESS.spawnIntervalMs : wave.spawnIntervalMs
+    const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * this.members.length
+    this.spawnCooldownMs = this.stress ? STRESS.spawnIntervalMs : wave.spawnIntervalMs / teamFactor
     const cap = this.stress ? STRESS.maxAlive : SPAWN.maxAlive
     const batch = this.stress ? STRESS.spawnBatch : 1
     for (let i = 0; i < batch; i++) {

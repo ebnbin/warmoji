@@ -8,6 +8,11 @@ test('开局后自动战斗：出怪、飞刀击杀、计时推进、无控制�
   })
   page.on('pageerror', (err) => errors.push(String(err)))
 
+  // 站桩测试：神童开局 2 人（牛仔+巨魔），无操作也能撑过断言窗口
+  await page.addInitScript(() => {
+    localStorage.setItem('warmoji.captain.v1', 'prodigy')
+    localStorage.setItem('warmoji.lineup.v1', JSON.stringify(['cowboy', 'troll']))
+  })
   await page.goto('/')
   await startRun(page)
 

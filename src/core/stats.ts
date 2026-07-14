@@ -1,7 +1,8 @@
 import type { CaptainSpec, CharacterSpec } from './config'
-import { COIN, MEMBER, TEAM, UNIT } from './config'
+import { COIN, LEVELS, MEMBER, TEAM, UNIT } from './config'
 import { aggregateCharacterEffects, aggregateTeamEffects, resolveWeaponSpec } from './items'
 import type { ItemId } from './items'
+import { levelDamageMul, memberMaxHp } from './levels'
 import type { WeaponSpec } from './weapons'
 
 // 角色属性面板的展示模型：把异构的角色/武器参数组织成统一的「属性组」。
@@ -57,15 +58,20 @@ export function weaponStatLines(w: WeaponSpec): string[] {
   }
 }
 
-/** 角色面板：数值为道具修正后的生效值（伤害/冷却在展示层套倍率） */
-export function characterStatGroups(spec: CharacterSpec, items: readonly ItemId[] = []): StatGroup[] {
+/** 角色面板：数值为 等级 × 道具 修正后的生效值（伤害/冷却在展示层套倍率） */
+export function characterStatGroups(
+  spec: CharacterSpec,
+  items: readonly ItemId[] = [],
+  level = 1,
+): StatGroup[] {
   const fx = aggregateCharacterEffects(items)
+  const dmgMul = fx.damageMul * levelDamageMul(level)
   return [
     {
       icon: '❤️',
-      title: '基础',
+      title: level > 1 ? `基础（Lv.${level}）` : '基础',
       lines: [
-        `生命上限 ${MEMBER.maxHp + fx.hpAdd} · 受击无敌 ${sec(MEMBER.iframesMs + fx.iframesAddMs)}`,
+        `生命上限 ${memberMaxHp(level, fx.hpAdd)} · 受击无敌 ${sec(MEMBER.iframesMs + fx.iframesAddMs)}`,
         `复活 ${sec(Math.max(1000, TEAM.reviveMs + fx.reviveAddMs))}`,
       ],
     },
@@ -76,7 +82,7 @@ export function characterStatGroups(spec: CharacterSpec, items: readonly ItemId[
           ? resolved
           : {
               ...resolved,
-              damage: Math.round(resolved.damage * fx.damageMul),
+              damage: Math.round(resolved.damage * dmgMul),
               cooldownMs: resolved.cooldownMs * fx.cooldownMul,
             }
       return {
@@ -88,17 +94,18 @@ export function characterStatGroups(spec: CharacterSpec, items: readonly ItemId[
   ]
 }
 
-/** 队长面板：能力描述 + 团队属性（移速/金币拾取等团队级数值都归队长，含道具修正） */
+/** 队长面板：能力描述 + 团队属性（移速/金币拾取/经验等团队级数值都归队长，含道具修正） */
 export function captainStatGroups(spec: CaptainSpec, items: readonly ItemId[] = []): StatGroup[] {
   const fx = aggregateTeamEffects(items)
   const lines = [
-    `出战人数 ${spec.teamSize} · 移速 ${grid(TEAM.moveSpeed * fx.moveSpeedMul)}/秒`,
-    `金币拾取范围 ${grid(COIN.magnetRadius * fx.magnetMul)}（以队伍中心为基点）`,
+    `编制上限 ${spec.teamSize} 人 · 开局等级 ${spec.startLevel}`,
+    `移速 ${grid(TEAM.moveSpeed * fx.moveSpeedMul)}/秒 · 金币拾取 ${grid(COIN.magnetRadius * fx.magnetMul)}`,
   ]
+  if (spec.xpGainMul !== 1) lines.push(`经验获取 ×${+spec.xpGainMul.toFixed(2)}`)
   if (fx.teamDamageMul !== 1) lines.push(`全队伤害 ×${+fx.teamDamageMul.toFixed(2)}`)
   if (fx.doubleCoinChance > 0) lines.push(`双倍金币概率 ${Math.round(fx.doubleCoinChance * 100)}%`)
   return [
     { icon: '👑', title: '队长能力', lines: [spec.desc] },
-    { icon: '👟', title: '团队', lines },
+    { icon: '👟', title: '团队', lines: [...lines, `角色满级 Lv.${LEVELS.max}（升级/招募各花 1 点）`] },
   ]
 }

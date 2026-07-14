@@ -53,13 +53,16 @@ describe('出战阵容选择', () => {
     expect(sanitizeLineup([...ROSTER_IDS], 6)).toEqual(ROSTER_IDS.slice(0, 6))
   })
 
-  it('toggle：已选则移除，未满则追加，满员时忽略新增', () => {
+  it('toggle：已选则移除，未满则追加，满员时替换最早选入的', () => {
     const benched = ROSTER_IDS[SIZE]!
-    expect(toggleLineup(DEFAULT, benched, SIZE)).toEqual(DEFAULT)
+    expect(toggleLineup(DEFAULT, benched, SIZE)).toEqual([...DEFAULT.slice(1), benched])
     expect(toggleLineup(DEFAULT, benched, 6)).toEqual([...DEFAULT, benched])
     const four = toggleLineup(DEFAULT, DEFAULT[0]!, SIZE)
     expect(four).toHaveLength(SIZE - 1)
     expect(toggleLineup(four, benched, SIZE)).toEqual([...four, benched])
+    // 首发单选场景：点谁换谁
+    expect(toggleLineup(['cowboy'], 'mage', 1)).toEqual(['mage'])
+    expect(toggleLineup(['cowboy'], 'cowboy', 1)).toEqual([])
   })
 
   it('存储读写往返；坏数据与无存储都回退默认', () => {
@@ -71,12 +74,12 @@ describe('出战阵容选择', () => {
     expect(loadLineup(s, SIZE)).toEqual(DEFAULT)
   })
 
-  it('loadTeam：阵容按当前队长的编制截断', () => {
+  it('loadTeam：首发人数 = 队长开局等级（点数）', () => {
     const s = memStorage()
-    saveCaptain(s, 'party')
+    saveCaptain(s, 'prodigy')
     saveLineup(s, [...ROSTER_IDS])
-    expect(loadTeam(s).lineup).toHaveLength(CAPTAINS.party.teamSize)
+    expect(loadTeam(s).lineup).toHaveLength(CAPTAINS.prodigy.startLevel)
     saveCaptain(s, 'angel')
-    expect(loadTeam(s).lineup).toHaveLength(CAPTAINS.angel.teamSize)
+    expect(loadTeam(s).lineup).toHaveLength(CAPTAINS.angel.startLevel)
   })
 })
