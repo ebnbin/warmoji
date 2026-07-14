@@ -526,8 +526,8 @@ export class ArenaScene extends Phaser.Scene {
     if (this.elapsedMs < m.animLockUntil) return
     const img = m.image
     // 相位按各自频率累积（slot 初相错开），移动/静止切换不会跳变
-    m.breathPhase += delta / (moving ? 190 : 300)
-    const s = Math.sin(m.breathPhase) * (moving ? 0.085 : 0.05)
+    m.breathPhase += delta / (moving ? 85 : 140)
+    const s = Math.sin(m.breathPhase) * (moving ? 0.13 : 0.09)
     img.setScale(m.baseScale * (1 - s * 0.6), m.baseScale * (1 + s))
     if (img.rotation !== 0) img.setRotation(0)
     if (Math.abs(this.teamDir.x) > 0.2) img.setFlipX(this.teamDir.x > 0)
