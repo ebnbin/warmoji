@@ -65,6 +65,7 @@ interface WarmojiDebug {
   camY: number
   wave?: number
   coins?: number
+  zones?: { count: number; kinds: string[]; next: string }
   menu?: WarmojiMenuDebug
   captain?: WarmojiCaptainDebug
   select?: WarmojiSelectDebug
