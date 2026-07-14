@@ -681,7 +681,13 @@ export class ArenaScene extends Phaser.Scene {
     const hp = (enemy.getData('hp') as number) - damage
     this.floatDamage(enemy.x, enemy.y, damage)
     if (hp <= 0) {
-      this.killEnemy(enemy)
+      // 致死一击：敌人失去自身动力，击退不再衰减——尸体被匀速击飞
+      if (knockback > 0 && srcX !== undefined && srcY !== undefined) {
+        const dir = norm(enemy.x - srcX, enemy.y - srcY)
+        this.killEnemy(enemy, dir.x * knockback, dir.y * knockback)
+      } else {
+        this.killEnemy(enemy)
+      }
     } else {
       enemy.setData('hp', hp)
       // 受击纯白闪光：时间戳驱动（steerEnemies 里恢复），高频命中不堆 timer/tween
@@ -703,7 +709,7 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private killEnemy(enemy: ImageObj): void {
+  private killEnemy(enemy: ImageObj, flingVx = 0, flingVy = 0): void {
     this.run.kills++
     const spec = enemy.getData('spec') as EnemySpec
     // 经验击杀即得（队长可提供倍率）；金币落地等待拾取
@@ -729,17 +735,31 @@ export class ArenaScene extends Phaser.Scene {
     }
     enemy.setActive(false)
     ;(enemy.body as ArcadeBody).enable = false
-    // 死亡：紫系粒子爆开 + 带转体的放大消散
     this.deathBurst.explode(10, enemy.x, enemy.y)
     this.tweens.killTweensOf(enemy)
-    this.tweens.add({
-      targets: enemy,
-      scale: enemy.scale * 1.6,
-      rotation: enemy.rotation + (this.rng.next() - 0.5) * 1.6,
-      alpha: 0,
-      duration: 150,
-      onComplete: () => enemy.destroy(),
-    })
+    if (flingVx !== 0 || flingVy !== 0) {
+      // 致死击飞：匀速（线性、无衰减）滑出 + 顺势翻滚 + 淡出
+      const t = KNOCKBACK.deathSlideMs / 1000
+      this.tweens.add({
+        targets: enemy,
+        x: Phaser.Math.Clamp(enemy.x + flingVx * t, 0, MAP.width),
+        y: Phaser.Math.Clamp(enemy.y + flingVy * t, 0, MAP.height),
+        rotation: enemy.rotation + (flingVx >= 0 ? 1 : -1) * (1.4 + this.rng.next() * 1.4),
+        alpha: 0,
+        duration: KNOCKBACK.deathSlideMs,
+        onComplete: () => enemy.destroy(),
+      })
+    } else {
+      // 无击退来源（兜底）：原地带转体的放大消散
+      this.tweens.add({
+        targets: enemy,
+        scale: enemy.scale * 1.6,
+        rotation: enemy.rotation + (this.rng.next() - 0.5) * 1.6,
+        alpha: 0,
+        duration: 150,
+        onComplete: () => enemy.destroy(),
+      })
+    }
   }
 
   private floatDamage(x: number, y: number, amount: number): void {
