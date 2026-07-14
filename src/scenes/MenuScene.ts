@@ -7,7 +7,7 @@ import { Rng } from '../core/rng'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, iconLabel } from '../ui/emoji'
-import { UI_FONT } from '../ui/fonts'
+import { FONT, UI_FONT } from '../ui/fonts'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 export class MenuScene extends Phaser.Scene {
@@ -36,20 +36,20 @@ export class MenuScene extends Phaser.Scene {
     const title = this.add
       .text(w / 2, h * 0.26, 'WARMOJI', {
         fontFamily: UI_FONT,
-        fontSize: '64px',
+        fontSize: FONT.display,
         fontStyle: 'bold',
         color: '#f5f5f5',
         resolution: res,
       })
       .setOrigin(0.5)
-    const swordOffset = title.width / 2 + 64
-    emojiImage(this, w / 2 - swordOffset, h * 0.26, '⚔️', 60)
-    emojiImage(this, w / 2 + swordOffset, h * 0.26, '⚔️', 60)
+    const swordOffset = title.width / 2 + 70
+    emojiImage(this, w / 2 - swordOffset, h * 0.26, '⚔️', 68)
+    emojiImage(this, w / 2 + swordOffset, h * 0.26, '⚔️', 68)
 
     this.add
       .text(w / 2, h * 0.4, 'emoji 幸存者 · 走位躲避，武器全自动', {
         fontFamily: UI_FONT,
-        fontSize: '20px',
+        fontSize: FONT.strong,
         color: '#8888aa',
         resolution: res,
       })
@@ -60,7 +60,7 @@ export class MenuScene extends Phaser.Scene {
       .slice(0, 6)
       .map((c) => c.emoji)
     emojis.forEach((emoji, i) => {
-      const sprite = emojiImage(this, w / 2 + (i - (emojis.length - 1) / 2) * 90, h * 0.55, emoji, 48, 'player')
+      const sprite = emojiImage(this, w / 2 + (i - (emojis.length - 1) / 2) * 100, h * 0.55, emoji, 54, 'player')
       this.tweens.add({
         targets: sprite,
         y: h * 0.55 - 18,
@@ -74,28 +74,28 @@ export class MenuScene extends Phaser.Scene {
 
     const best = loadHighScore(browserStorage())
     if (best.bestWave > 0) {
-      iconLabel(this, w / 2, h * 0.7, '🏆', 20, `最佳：第 ${best.bestWave} 波 · 击杀 ${best.bestKills}`, {
+      iconLabel(this, w / 2, h * 0.7, '🏆', 26, `最佳：第 ${best.bestWave} 波 · 击杀 ${best.bestKills}`, {
         fontFamily: UI_FONT,
-        fontSize: '18px',
+        fontSize: FONT.body,
         color: '#d4b106',
         resolution: res,
       })
     }
 
     // 右上角入口：📖 图鉴 + ⚙️ 设置
-    const gear = emojiImage(this, w - safeInsets.right - 34, safeInsets.top + 34, '⚙️', 30)
+    const gear = emojiImage(this, w - safeInsets.right - 42, safeInsets.top + 42, '⚙️', 40)
       .setAlpha(0.8)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => this.scene.start('settings'))
-    this.gearRect = { x: gear.x - 22, y: gear.y - 22, w: 44, h: 44 }
-    const book = emojiImage(this, gear.x - 56, gear.y, '📖', 30)
+    this.gearRect = { x: gear.x - 28, y: gear.y - 28, w: 56, h: 56 }
+    const book = emojiImage(this, gear.x - 72, gear.y, '📖', 40)
       .setAlpha(0.8)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => this.scene.start('wiki'))
-    this.bookRect = { x: book.x - 22, y: book.y - 22, w: 44, h: 44 }
+    this.bookRect = { x: book.x - 28, y: book.y - 28, w: 56, h: 56 }
 
     // 明确的按钮 + 空格键开始，避免任意点击误触
-    const btn = { x: w / 2 - 140, y: h * 0.82 - 29, w: 280, h: 58 }
+    const btn = { x: w / 2 - 170, y: h * 0.82 - 36, w: 340, h: 72 }
     this.menuBtn = btn
     const btnBg = this.add.graphics()
     btnBg.fillStyle(0xffd54f, 1)
@@ -103,7 +103,7 @@ export class MenuScene extends Phaser.Scene {
     this.add
       .text(w / 2, h * 0.82, '组建队伍', {
         fontFamily: UI_FONT,
-        fontSize: '24px',
+        fontSize: FONT.lead,
         fontStyle: 'bold',
         color: '#25262e',
         resolution: res,
@@ -121,7 +121,7 @@ export class MenuScene extends Phaser.Scene {
     this.add
       .text(w / 2, h - safeInsets.bottom - 10, 'emoji graphics © Twemoji · CC-BY 4.0', {
         fontFamily: UI_FONT,
-        fontSize: '11px',
+        fontSize: FONT.caption,
         color: '#ffffff',
         resolution: res,
       })

@@ -8,7 +8,7 @@ import type { Settings } from '../core/settings'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage } from '../ui/emoji'
-import { UI_FONT } from '../ui/fonts'
+import { FONT, UI_FONT } from '../ui/fonts'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // 设置页：按 SETTING_DEFS 定义表渲染开关列表，改动即时持久化。
@@ -22,13 +22,13 @@ interface SettingsLayout {
 const LANDSCAPE: SettingsLayout = {
   content: { w: 1280, h: 720 },
   headerY: 64,
-  list: { y: 150, w: 640, rowH: 84, gap: 12 },
+  list: { y: 160, w: 680, rowH: 110, gap: 14 },
 }
 
 const PORTRAIT: SettingsLayout = {
   content: { w: 720, h: 1280 },
   headerY: 72,
-  list: { y: 170, w: 640, rowH: 84, gap: 12 },
+  list: { y: 180, w: 672, rowH: 110, gap: 14 },
 }
 
 interface Row {
@@ -70,7 +70,7 @@ export class SettingsScene extends Phaser.Scene {
     const back = this.add
       .text(origin.x + 40, oy + L.headerY, '← 返回', {
         fontFamily: UI_FONT,
-        fontSize: '18px',
+        fontSize: FONT.strong,
         color: '#c8c8d4',
         resolution: res,
       })
@@ -88,7 +88,7 @@ export class SettingsScene extends Phaser.Scene {
     this.add
       .text(w / 2, oy + L.headerY, '⚙️ 设置', {
         fontFamily: UI_FONT,
-        fontSize: '26px',
+        fontSize: FONT.title,
         fontStyle: 'bold',
         color: '#f5f5f5',
         resolution: res,
@@ -102,24 +102,24 @@ export class SettingsScene extends Phaser.Scene {
       const y = oy + S.y + i * (S.rowH + S.gap)
       const bg = this.add.graphics()
       bg.fillStyle(0x000000, 0.22)
-      bg.fillRoundedRect(lx, y, S.w, S.rowH, 14)
+      bg.fillRoundedRect(lx, y, S.w, S.rowH, 16)
       bg.lineStyle(1, 0xffffff, 0.1)
-      bg.strokeRoundedRect(lx, y, S.w, S.rowH, 14)
+      bg.strokeRoundedRect(lx, y, S.w, S.rowH, 16)
 
-      emojiImage(this, lx + 42, y + S.rowH / 2, def.icon, 34)
+      emojiImage(this, lx + 50, y + S.rowH / 2, def.icon, 44)
       this.add
-        .text(lx + 76, y + S.rowH / 2 - 13, def.label, {
+        .text(lx + 92, y + S.rowH / 2 - 18, def.label, {
           fontFamily: UI_FONT,
-          fontSize: '19px',
+          fontSize: FONT.head,
           fontStyle: 'bold',
           color: '#ffffff',
           resolution: res,
         })
         .setOrigin(0, 0.5)
       this.add
-        .text(lx + 76, y + S.rowH / 2 + 13, def.desc, {
+        .text(lx + 92, y + S.rowH / 2 + 20, def.desc, {
           fontFamily: UI_FONT,
-          fontSize: '13px',
+          fontSize: FONT.small,
           color: '#b9b9c6',
           resolution: res,
         })
@@ -154,8 +154,8 @@ export class SettingsScene extends Phaser.Scene {
   private drawToggle(row: Row): void {
     const on = this.settings[row.key]
     const S = this.layout.list
-    const tw = 58
-    const th = 32
+    const tw = 76
+    const th = 42
     const tx = row.x + S.w - 24 - tw
     const ty = row.y + S.rowH / 2 - th / 2
     const g = row.toggle

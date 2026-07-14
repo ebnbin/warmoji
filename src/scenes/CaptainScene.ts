@@ -10,7 +10,7 @@ import { captainStatGroups } from '../core/stats'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage } from '../ui/emoji'
-import { UI_FONT } from '../ui/fonts'
+import { FONT, UI_FONT } from '../ui/fonts'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // 队长选择页 = 组队流程第一步（主菜单 → 选队长 → 组队 → 战斗）。
@@ -26,18 +26,18 @@ interface CaptainLayout {
 
 const LANDSCAPE: CaptainLayout = {
   content: { w: 1280, h: 720 },
-  headerY: 40,
-  detail: { x: 40, y: 84, w: 730, h: 460 },
-  list: { x: 810, y: 84, w: 430, rowH: 64, gap: 8 },
-  btn: { y: 648, w: 300, h: 58 },
+  headerY: 44,
+  detail: { x: 40, y: 96, w: 730, h: 520 },
+  list: { x: 810, y: 96, w: 430, rowH: 84, gap: 10 },
+  btn: { y: 660, w: 340, h: 68 },
 }
 
 const PORTRAIT: CaptainLayout = {
   content: { w: 720, h: 1280 },
-  headerY: 48,
-  detail: { x: 24, y: 92, w: 672, h: 452 },
-  list: { x: 24, y: 568, w: 672, rowH: 64, gap: 8 },
-  btn: { y: 1176, w: 300, h: 60 },
+  headerY: 52,
+  detail: { x: 24, y: 100, w: 672, h: 480 },
+  list: { x: 24, y: 604, w: 672, rowH: 84, gap: 10 },
+  btn: { y: 1184, w: 360, h: 72 },
 }
 
 interface Row {
@@ -84,7 +84,7 @@ export class CaptainScene extends Phaser.Scene {
     this.add
       .text(ox + 40, oy + L.headerY, '← 返回', {
         fontFamily: UI_FONT,
-        fontSize: '18px',
+        fontSize: FONT.strong,
         color: '#c8c8d4',
         resolution: res,
       })
@@ -94,7 +94,7 @@ export class CaptainScene extends Phaser.Scene {
     this.add
       .text(w / 2, oy + L.headerY, '选择队长', {
         fontFamily: UI_FONT,
-        fontSize: '26px',
+        fontSize: FONT.title,
         fontStyle: 'bold',
         color: '#f5f5f5',
         resolution: res,
@@ -113,16 +113,16 @@ export class CaptainScene extends Phaser.Scene {
       const spec = CAPTAINS[id]
       const y = ly + i * (S.rowH + S.gap)
       const bg = this.add.graphics()
-      emojiImage(this, lx + 38, y + S.rowH / 2, spec.emoji, 40, 'player')
+      emojiImage(this, lx + 44, y + S.rowH / 2, spec.emoji, 48, 'player')
       this.add
-        .text(lx + 74, y + S.rowH / 2, spec.name, {
+        .text(lx + 86, y + S.rowH / 2, spec.name, {
           fontFamily: UI_FONT,
-          fontSize: '20px',
+          fontSize: FONT.head,
           color: '#ffffff',
           resolution: res,
         })
         .setOrigin(0, 0.5)
-      const badge = emojiImage(this, lx + S.w - 32, y + S.rowH / 2, '✅', 24)
+      const badge = emojiImage(this, lx + S.w - 36, y + S.rowH / 2, '✅', 30)
       this.add
         .zone(lx, y, S.w, S.rowH)
         .setOrigin(0)
@@ -159,7 +159,7 @@ export class CaptainScene extends Phaser.Scene {
     this.add
       .text(w / 2, oy + L.btn.y, '组建队伍', {
         fontFamily: UI_FONT,
-        fontSize: '24px',
+        fontSize: FONT.lead,
         fontStyle: 'bold',
         color: '#25262e',
         resolution: res,
@@ -178,7 +178,7 @@ export class CaptainScene extends Phaser.Scene {
     this.add
       .text(w / 2, h - safeInsets.bottom - 10, 'emoji graphics © Twemoji · CC-BY 4.0', {
         fontFamily: UI_FONT,
-        fontSize: '11px',
+        fontSize: FONT.caption,
         color: '#ffffff',
         resolution: res,
       })
@@ -202,56 +202,56 @@ export class CaptainScene extends Phaser.Scene {
     const spec = CAPTAINS[this.selectedId]
 
     this.detailObjs.push(
-      emojiImage(this, dx + 52, dy + 46, spec.emoji, 52, 'player'),
+      emojiImage(this, dx + 58, dy + 56, spec.emoji, 64, 'player'),
       this.add
-        .text(dx + 92, dy + 34, spec.name, {
+        .text(dx + 104, dy + 42, spec.name, {
           fontFamily: UI_FONT,
-          fontSize: '24px',
+          fontSize: FONT.lead,
           fontStyle: 'bold',
           color: '#ffffff',
           resolution: res,
         })
         .setOrigin(0, 0.5),
       this.add
-        .text(dx + 92, dy + 60, '队长 · 提供团队增益，不参与战斗', {
+        .text(dx + 104, dy + 76, '队长 · 提供团队增益，不参与战斗', {
           fontFamily: UI_FONT,
-          fontSize: '14px',
+          fontSize: FONT.small,
           color: '#b9b9c6',
           resolution: res,
         })
         .setOrigin(0, 0.5),
     )
 
-    let cursor = dy + 100
+    let cursor = dy + 128
     for (const group of captainStatGroups(spec)) {
       this.detailObjs.push(
-        emojiImage(this, dx + 38, cursor, group.icon, 20),
+        emojiImage(this, dx + 42, cursor, group.icon, 26),
         this.add
-          .text(dx + 56, cursor, group.title, {
+          .text(dx + 62, cursor, group.title, {
             fontFamily: UI_FONT,
-            fontSize: '18px',
+            fontSize: FONT.strong,
             fontStyle: 'bold',
             color: '#ffffff',
             resolution: res,
           })
           .setOrigin(0, 0.5),
       )
-      cursor += 27
+      cursor += 40
       for (const line of group.lines) {
-        this.detailObjs.push(
-          this.add
-            .text(dx + 56, cursor, line, {
-              fontFamily: UI_FONT,
-              fontSize: '15px',
-              color: '#d0d0d8',
-              wordWrap: { width: D.w - 96 },
-              resolution: res,
-            })
-            .setOrigin(0, 0.5),
-        )
-        cursor += 23
+        const t = this.add
+          .text(dx + 62, cursor, line, {
+            fontFamily: UI_FONT,
+            fontSize: FONT.body,
+            color: '#d0d0d8',
+            wordWrap: { width: D.w - 104 },
+            lineSpacing: 6,
+            resolution: res,
+          })
+          .setOrigin(0, 0)
+        this.detailObjs.push(t)
+        cursor += Math.max(36, t.height + 8)
       }
-      cursor += 12
+      cursor += 14
     }
   }
 

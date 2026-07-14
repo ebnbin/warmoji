@@ -8,7 +8,7 @@ import type { WikiEntry, WikiGroup } from '../core/wiki'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiKey, ensureEmoji } from '../ui/emoji'
-import { UI_FONT } from '../ui/fonts'
+import { FONT, UI_FONT } from '../ui/fonts'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 import { buildWikiAtlas, wikiAtlasProgress, wikiFrame } from '../ui/wikiAtlas'
 
@@ -24,21 +24,22 @@ interface WikiLayout {
   list: { x: number; y: number; w: number; h: number }
 }
 
-// 方向对应约定：竖屏「上」= 横屏「左」（详情），竖屏「下」= 横屏「右」（列表/网格）
+// 方向对应约定：竖屏「上」= 横屏「左」（详情），竖屏「下」= 横屏「右」（列表/网格）。
+// 类别 chip 横屏单行；竖屏一行放不下，拆成两行（catsY 为首行中心）。
 const LANDSCAPE: WikiLayout = {
   content: { w: 1280, h: 720 },
-  headerY: 40,
-  catsY: 88,
-  detail: { x: 40, y: 124, w: 620, h: 556 },
-  list: { x: 700, y: 124, w: 540, h: 556 },
+  headerY: 44,
+  catsY: 102,
+  detail: { x: 40, y: 140, w: 620, h: 548 },
+  list: { x: 700, y: 140, w: 540, h: 548 },
 }
 
 const PORTRAIT: WikiLayout = {
   content: { w: 720, h: 1280 },
-  headerY: 48,
-  catsY: 96,
-  detail: { x: 24, y: 134, w: 672, h: 428 },
-  list: { x: 24, y: 586, w: 672, h: 640 },
+  headerY: 52,
+  catsY: 116,
+  detail: { x: 24, y: 212, w: 672, h: 436 },
+  list: { x: 24, y: 664, w: 672, h: 588 },
 }
 
 interface EntryRow {
@@ -66,8 +67,8 @@ interface Cell {
   boundIndex: number
 }
 
-const ROW_H = 52
-const CELL = 62
+const ROW_H = 76
+const CELL = 72
 
 export class WikiScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色/标签页/类别/焦点/滚动等页面状态
@@ -152,7 +153,7 @@ export class WikiScene extends Phaser.Scene {
     const back = this.add
       .text(ox + 40, oy + L.headerY, '← 返回', {
         fontFamily: UI_FONT,
-        fontSize: '18px',
+        fontSize: FONT.strong,
         color: '#c8c8d4',
         resolution: res,
       })
@@ -167,7 +168,7 @@ export class WikiScene extends Phaser.Scene {
     this.add
       .text(w / 2, oy + L.headerY, '📖 图鉴', {
         fontFamily: UI_FONT,
-        fontSize: '26px',
+        fontSize: FONT.title,
         fontStyle: 'bold',
         color: '#f5f5f5',
         resolution: res,
@@ -249,7 +250,7 @@ export class WikiScene extends Phaser.Scene {
     const ratio = p.total > 0 ? p.done / p.total : 0
     this.loadingFill.clear()
     this.loadingFill.fillStyle(0xffd54f, 1)
-    this.loadingFill.fillRoundedRect(lx + 40, ly + L.h / 2 - 8, Math.max(8, bw * ratio), 16, 8)
+    this.loadingFill.fillRoundedRect(lx + 40, ly + L.h / 2 - 10, Math.max(10, bw * ratio), 20, 10)
     this.loadingText.setText(
       p.total > 0 ? `首次加载全部 emoji… ${p.done} / ${p.total}` : '加载清单中…',
     )
@@ -257,53 +258,61 @@ export class WikiScene extends Phaser.Scene {
 
   // ── 类别横向 tab ────────────────────────────────────────────
 
-  /** 类别横向 tab：角色/队长/敌人/武器/道具 + 「全部」（完整 emoji 网格）平级排在最后 */
+  /** 类别横向 tab：角色/队长/敌人/武器/道具 + 「全部」（完整 emoji 网格）平级排在最后；
+   * 横屏单行，竖屏拆两行（720 宽放不下一行） */
   private createCategoryTabs(res: number): void {
     const L = this.layout
     const w = viewport.logicalWidth
     this.catRects = []
-    const ch = 34
+    const ch = 48
     const gap = 10
     const defs = [
       ...this.groups.map((g) => ({ icon: g.icon, label: `${g.title} ${g.entries.length}`, title: g.title })),
       { icon: '🌐', label: '全部', title: '全部' },
     ]
-    const widths = defs.map((d) => 30 + d.label.length * 12 + 30)
-    const total = widths.reduce((s, x) => s + x, 0) + gap * (defs.length - 1)
-    let x = w / 2 - total / 2
-    defs.forEach((d, i) => {
-      const cw = widths[i]!
-      const y = this.origin.y + L.catsY - ch / 2
-      const on = this.category === i
-      const bg = this.add.graphics()
-      bg.fillStyle(on ? 0xffffff : 0x000000, on ? 0.2 : 0.22)
-      bg.fillRoundedRect(x, y, cw, ch, ch / 2)
-      bg.lineStyle(on ? 2 : 1, 0xffffff, on ? 0.85 : 0.1)
-      bg.strokeRoundedRect(x, y, cw, ch, ch / 2)
-      emojiImage(this, x + 20, y + ch / 2, d.icon, 18)
-      this.add
-        .text(x + 34, y + ch / 2, d.label, {
-          fontFamily: UI_FONT,
-          fontSize: '14px',
-          fontStyle: on ? 'bold' : 'normal',
-          color: on ? '#ffffff' : '#b9b9c6',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5)
-      this.add
-        .zone(x, y, cw, ch)
-        .setOrigin(0)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
-          if (this.dragMoved || this.category === i) return
-          this.category = i
-          this.focusedKey = ''
-          this.listScroll = 0
-          this.preserveOnRestart = true
-          this.scene.restart()
-        })
-      this.catRects.push({ title: d.title, x, y, w: cw, h: ch })
-      x += cw + gap
+    const widths = defs.map((d) => 44 + d.label.length * 22 + 20)
+    const half = Math.ceil(defs.length / 2)
+    const rows = this.layout === PORTRAIT ? [defs.slice(0, half), defs.slice(half)] : [defs]
+    rows.forEach((rowDefs, r) => {
+      const offset = r === 0 ? 0 : half
+      const rowWidths = rowDefs.map((_, j) => widths[offset + j]!)
+      const total = rowWidths.reduce((s, x) => s + x, 0) + gap * (rowDefs.length - 1)
+      let x = w / 2 - total / 2
+      const y = this.origin.y + L.catsY - ch / 2 + r * (ch + 10)
+      rowDefs.forEach((d, j) => {
+        const i = offset + j
+        const cw = rowWidths[j]!
+        const on = this.category === i
+        const bg = this.add.graphics()
+        bg.fillStyle(on ? 0xffffff : 0x000000, on ? 0.2 : 0.22)
+        bg.fillRoundedRect(x, y, cw, ch, ch / 2)
+        bg.lineStyle(on ? 2 : 1, 0xffffff, on ? 0.85 : 0.1)
+        bg.strokeRoundedRect(x, y, cw, ch, ch / 2)
+        emojiImage(this, x + 28, y + ch / 2, d.icon, 26)
+        this.add
+          .text(x + 46, y + ch / 2, d.label, {
+            fontFamily: UI_FONT,
+            fontSize: FONT.small,
+            fontStyle: on ? 'bold' : 'normal',
+            color: on ? '#ffffff' : '#b9b9c6',
+            resolution: res,
+          })
+          .setOrigin(0, 0.5)
+        this.add
+          .zone(x, y, cw, ch)
+          .setOrigin(0)
+          .setInteractive({ useHandCursor: true })
+          .on('pointerup', () => {
+            if (this.dragMoved || this.category === i) return
+            this.category = i
+            this.focusedKey = ''
+            this.listScroll = 0
+            this.preserveOnRestart = true
+            this.scene.restart()
+          })
+        this.catRects.push({ title: d.title, x, y, w: cw, h: ch })
+        x += cw + gap
+      })
     })
   }
 
@@ -353,18 +362,18 @@ export class WikiScene extends Phaser.Scene {
     this.listContainer.setMask(mask.createGeometryMask())
 
     const group = this.groups[this.category]!
-    const gap = 6
+    const gap = 8
     let cursor = 0
     for (const entry of group.entries) {
       const key = `${group.title}:${entry.name}`
       if (!this.focusedKey) this.focusedKey = key
       const relY = cursor
       const bg = this.add.graphics()
-      const icon = emojiImage(this, 30, relY + ROW_H / 2, entry.emoji, 32)
+      const icon = emojiImage(this, 40, relY + ROW_H / 2, entry.emoji, 44)
       const name = this.add
-        .text(58, relY + ROW_H / 2, entry.name, {
+        .text(74, relY + ROW_H / 2, entry.name, {
           fontFamily: UI_FONT,
-          fontSize: '17px',
+          fontSize: FONT.strong,
           color: '#ffffff',
           resolution: res,
         })
@@ -421,22 +430,22 @@ export class WikiScene extends Phaser.Scene {
     panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
 
     const badge = this.add
-      .text(dx + D.w - 20, dy + 22, '', {
+      .text(dx + D.w - 20, dy + 30, '', {
         fontFamily: UI_FONT,
-        fontSize: '13px',
+        fontSize: FONT.small,
         fontStyle: 'bold',
         color: '#25262e',
         backgroundColor: '#ffd54f',
-        padding: { x: 10, y: 4 },
+        padding: { x: 12, y: 5 },
         resolution: res,
       })
       .setOrigin(1, 0.5)
       .setVisible(false)
-    const icon = this.add.image(dx + 58, dy + 56, '__DEFAULT').setVisible(false)
+    const icon = this.add.image(dx + 66, dy + 70, '__DEFAULT').setVisible(false)
     const name = this.add
-      .text(dx + 104, dy + 40, '', {
+      .text(dx + 122, dy + 52, '', {
         fontFamily: UI_FONT,
-        fontSize: '26px',
+        fontSize: FONT.lead,
         fontStyle: 'bold',
         color: '#ffffff',
         resolution: res,
@@ -444,11 +453,11 @@ export class WikiScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setVisible(false)
     const desc = this.add
-      .text(dx + 104, dy + 68, '', {
+      .text(dx + 122, dy + 92, '', {
         fontFamily: UI_FONT,
-        fontSize: '14px',
+        fontSize: FONT.small,
         color: '#b9b9c6',
-        wordWrap: { width: D.w - 130 },
+        wordWrap: { width: D.w - 150 },
         lineSpacing: 6,
         resolution: res,
       })
@@ -458,7 +467,7 @@ export class WikiScene extends Phaser.Scene {
       title: this.add
         .text(0, 0, '', {
           fontFamily: UI_FONT,
-          fontSize: '15px',
+          fontSize: FONT.body,
           fontStyle: 'bold',
           color: '#ffd54f',
           resolution: res,
@@ -468,10 +477,10 @@ export class WikiScene extends Phaser.Scene {
       body: this.add
         .text(0, 0, '', {
           fontFamily: UI_FONT,
-          fontSize: '14px',
+          fontSize: FONT.body,
           color: '#d0d0d8',
           wordWrap: { width: D.w - 56 },
-          lineSpacing: 6,
+          lineSpacing: 8,
           resolution: res,
         })
         .setOrigin(0, 0)
@@ -480,7 +489,7 @@ export class WikiScene extends Phaser.Scene {
     const footer = this.add
       .text(dx + 28, dy + D.h - 24, '', {
         fontFamily: UI_FONT,
-        fontSize: '13px',
+        fontSize: FONT.caption,
         color: '#8f8f9a',
         resolution: res,
       })
@@ -513,7 +522,7 @@ export class WikiScene extends Phaser.Scene {
     const dy = this.origin.y + D.y
 
     P.badge.setText(category).setVisible(true)
-    this.setPoolIcon(P.icon, e.emoji, 64)
+    this.setPoolIcon(P.icon, e.emoji, 76)
     P.name.setText(e.name).setColor('#ffffff').setVisible(true)
     P.desc.setText(e.desc).setVisible(true)
     P.footer.setVisible(false)
@@ -525,22 +534,22 @@ export class WikiScene extends Phaser.Scene {
       else if (segments.length === 0) segments.push({ title: '', body: [line] })
       else segments[segments.length - 1]!.body.push(line)
     }
-    let cursor = dy + 112
+    let cursor = dy + 138
     P.sections.forEach((s, i) => {
       const seg = segments[i]
-      if (!seg || cursor > dy + D.h - 40) {
+      if (!seg || cursor > dy + D.h - 56) {
         s.title.setVisible(false)
         s.body.setVisible(false)
         return
       }
       if (seg.title) {
         s.title.setPosition(dx + 28, cursor).setText(seg.title).setVisible(true)
-        cursor += 26
+        cursor += 38
       } else {
         s.title.setVisible(false)
       }
       s.body.setPosition(dx + 28, cursor).setText(seg.body.join('\n')).setVisible(true)
-      cursor += s.body.height + 10
+      cursor += s.body.height + 12
     })
   }
 
@@ -569,12 +578,12 @@ export class WikiScene extends Phaser.Scene {
     // 首次进入：全量缩略图集构建进度（完成后此区域变成网格）
     const barBg = this.add.graphics()
     barBg.fillStyle(0xffffff, 0.1)
-    barBg.fillRoundedRect(lx + 40, ly + L.h / 2 - 8, L.w - 80, 16, 8)
+    barBg.fillRoundedRect(lx + 40, ly + L.h / 2 - 10, L.w - 80, 20, 10)
     this.loadingFill = this.add.graphics()
     this.loadingText = this.add
-      .text(lx + L.w / 2, ly + L.h / 2 - 32, '加载清单中…', {
+      .text(lx + L.w / 2, ly + L.h / 2 - 44, '加载清单中…', {
         fontFamily: UI_FONT,
-        fontSize: '15px',
+        fontSize: FONT.body,
         color: '#d0d0d8',
         resolution: textRes(),
       })
@@ -674,7 +683,7 @@ export class WikiScene extends Phaser.Scene {
     cell.image
       .setPosition(cx, cy)
       .setTexture(f.key, f.frame)
-      .setDisplaySize(44, 44)
+      .setDisplaySize(52, 52)
       .setAlpha(this.used.has(codepointsToEmoji(cp)) ? 1 : 0.26)
       .setVisible(true)
   }
@@ -685,8 +694,8 @@ export class WikiScene extends Phaser.Scene {
     const col = index % this.gridCols
     const x = col * CELL
     const y = Math.floor(index / this.gridCols) * CELL
-    this.selectRing.lineStyle(2, 0xffd54f, 0.95)
-    this.selectRing.strokeRoundedRect(x + 4, y + 4, CELL - 8, CELL - 8, 10)
+    this.selectRing.lineStyle(3, 0xffd54f, 0.95)
+    this.selectRing.strokeRoundedRect(x + 4, y + 4, CELL - 8, CELL - 8, 12)
   }
 
   /** 完整列表页的详情面板：收录进度 + 选中项详情（已收录展示类别与属性） */

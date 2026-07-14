@@ -5,7 +5,7 @@ import { endRun } from '../core/run'
 import { isDevOpen, isStress, setDevOpen, setStress } from '../ui/dev'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../ui/diagnostics'
 import { emojiCacheStats, emojiImage, iconLabel } from '../ui/emoji'
-import { UI_FONT } from '../ui/fonts'
+import { FONT, UI_FONT } from '../ui/fonts'
 import { Joystick } from '../ui/Joystick'
 import {
   applyCamera,
@@ -76,21 +76,22 @@ export class UIScene extends Phaser.Scene {
       strokeThickness: 3,
       resolution: res,
     }
-    this.levelText = this.add.text(sL + 224, sT + 10, 'Lv.1', { ...hudText, fontSize: '16px' })
+    // 等级放在经验条下方：竖屏 720 逻辑宽下与居中的波次计时互不侵占
+    this.levelText = this.add.text(sL + 12, sT + 32, 'Lv.1', { ...hudText, fontSize: FONT.body })
     this.timeText = this.add
-      .text(w / 2, sT + 10, '', { ...hudText, fontSize: '22px' })
+      .text(w / 2, sT + 10, '', { ...hudText, fontSize: FONT.lead })
       .setOrigin(0.5, 0)
-    emojiImage(this, w - sR - 22, sT + 22, '💀', 20, 'player')
+    emojiImage(this, w - sR - 26, sT + 26, '💀', 26, 'player')
     this.killsText = this.add
-      .text(w - sR - 38, sT + 10, '0', { ...hudText, fontSize: '20px' })
+      .text(w - sR - 46, sT + 10, '0', { ...hudText, fontSize: FONT.head })
       .setOrigin(1, 0)
-    emojiImage(this, w - sR - 22, sT + 50, COIN.emoji, 20, 'player')
+    emojiImage(this, w - sR - 26, sT + 64, COIN.emoji, 26, 'player')
     this.coinsText = this.add
-      .text(w - sR - 38, sT + 38, '0', { ...hudText, fontSize: '20px' })
+      .text(w - sR - 46, sT + 48, '0', { ...hudText, fontSize: FONT.head })
       .setOrigin(1, 0)
 
     // 暂停：按钮或 ESC；已暂停或已结算时按钮行为由 togglePause 把关
-    emojiImage(this, w - sR - 22, sT + 88, '⏸️', 26)
+    emojiImage(this, w - sR - 26, sT + 112, '⏸️', 36)
       .setDepth(300)
       .setAlpha(0.85)
       .setInteractive({ useHandCursor: true })
@@ -105,7 +106,7 @@ export class UIScene extends Phaser.Scene {
       w - sR - 12,
       viewport.logicalHeight - safeInsets.bottom - 26,
       '🔧',
-      24,
+      30,
     )
       .setOrigin(1, 1)
       .setDepth(300)
@@ -162,21 +163,21 @@ export class UIScene extends Phaser.Scene {
       filled: boolean,
       onTap: () => void,
     ): Phaser.GameObjects.GameObject[] => {
-      const rect = { x: cx - 120, y: y - 28, w: 240, h: 56 }
+      const rect = { x: cx - 150, y: y - 36, w: 300, h: 72 }
       const g = this.add.graphics().setDepth(251)
       if (filled) {
         g.fillStyle(0xffd54f, 1)
-        g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 28)
+        g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 36)
       } else {
         g.fillStyle(0xffffff, 0.12)
-        g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 28)
+        g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 36)
         g.lineStyle(1, 0xffffff, 0.35)
-        g.strokeRoundedRect(rect.x, rect.y, rect.w, rect.h, 28)
+        g.strokeRoundedRect(rect.x, rect.y, rect.w, rect.h, 36)
       }
       const t = this.add
         .text(cx, y, label, {
           fontFamily: UI_FONT,
-          fontSize: '22px',
+          fontSize: FONT.lead,
           fontStyle: 'bold',
           color: filled ? '#25262e' : '#ffffff',
           resolution: res,
@@ -194,17 +195,17 @@ export class UIScene extends Phaser.Scene {
     this.pauseObjs = [
       this.add.rectangle(cx, cy, 6000, 6000, 0x000000, 0.6).setDepth(250),
       this.add
-        .text(cx, cy - 100, '已暂停', {
+        .text(cx, cy - 116, '已暂停', {
           fontFamily: UI_FONT,
-          fontSize: '40px',
+          fontSize: FONT.big,
           fontStyle: 'bold',
           color: '#ffffff',
           resolution: textRes(),
         })
         .setOrigin(0.5)
         .setDepth(251),
-      ...button(cy + 4, '继 续', true, () => this.togglePause()),
-      ...button(cy + 78, '结束本局', false, () => {
+      ...button(cy + 8, '继 续', true, () => this.togglePause()),
+      ...button(cy + 100, '结束本局', false, () => {
         endRun()
         this.arena.scene.start('menu')
       }),
@@ -243,7 +244,7 @@ export class UIScene extends Phaser.Scene {
     const stressBtn = this.add
       .text(safeInsets.left + 12, h - safeInsets.bottom - 12, `压测模式：${isStress() ? '开' : '关'}（点击切换）`, {
         fontFamily: UI_FONT,
-        fontSize: '14px',
+        fontSize: FONT.caption,
         color: '#ffffff',
         backgroundColor: isStress() ? '#2e7d32' : '#c62828',
         padding: { x: 10, y: 6 },
@@ -259,11 +260,11 @@ export class UIScene extends Phaser.Scene {
     this.devText = this.add
       .text(safeInsets.left + 12, h - safeInsets.bottom - 12 - stressBtn.height - 8, '', {
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-        fontSize: '13px',
+        fontSize: '16px',
         color: '#ffffff',
         backgroundColor: '#000000',
         padding: { x: 8, y: 6 },
-        lineSpacing: 3,
+        lineSpacing: 4,
         resolution: res,
       })
       .setOrigin(0, 1)
@@ -310,9 +311,9 @@ export class UIScene extends Phaser.Scene {
     this.add.rectangle(cx, cy, 6000, 6000, 0x000000, 0.55).setDepth(230)
 
     const title = this.add
-      .text(cx, cy - 64, `第 ${s.wave} 波完成！`, {
+      .text(cx, cy - 76, `第 ${s.wave} 波完成！`, {
         fontFamily: UI_FONT,
-        fontSize: '44px',
+        fontSize: FONT.banner,
         fontStyle: 'bold',
         color: '#ffd54f',
         resolution: res,
@@ -322,13 +323,13 @@ export class UIScene extends Phaser.Scene {
     title.setScale(0.6)
     this.tweens.add({ targets: title, scale: 1, duration: 320, ease: 'Back.easeOut' })
 
-    const lineStyle = { fontFamily: UI_FONT, fontSize: '22px', color: '#ffffff', resolution: res }
-    iconLabel(this, cx - 110, cy + 8, '💀', 22, `击杀 ${s.kills}`, lineStyle).setDepth(231)
-    iconLabel(this, cx + 110, cy + 8, COIN.emoji, 22, `金币 +${s.coins}`, lineStyle).setDepth(231)
+    const lineStyle = { fontFamily: UI_FONT, fontSize: FONT.head, color: '#ffffff', resolution: res }
+    iconLabel(this, cx - 140, cy + 12, '💀', 28, `击杀 ${s.kills}`, lineStyle).setDepth(231)
+    iconLabel(this, cx + 140, cy + 12, COIN.emoji, 28, `金币 +${s.coins}`, lineStyle).setDepth(231)
     if (s.levels > 0) {
-      iconLabel(this, cx, cy + 56, '⬆️', 22, `队伍等级 +${s.levels}，商店里花点数招募/升级`, {
+      iconLabel(this, cx, cy + 72, '⬆️', 26, `队伍等级 +${s.levels}，商店里花点数招募/升级`, {
         ...lineStyle,
-        fontSize: '18px',
+        fontSize: FONT.body,
         color: '#b3e5fc',
       }).setDepth(231)
     }
@@ -340,16 +341,16 @@ export class UIScene extends Phaser.Scene {
     const cy = viewport.logicalHeight / 2
 
     this.add.rectangle(cx, cy, 6000, 6000, 0x000000, 0.72).setDepth(200)
-    iconLabel(this, cx, cy - 110, '💀', 50, '游戏结束', {
+    iconLabel(this, cx, cy - 130, '💀', 58, '游戏结束', {
       fontFamily: UI_FONT,
-      fontSize: '48px',
+      fontSize: FONT.banner,
       color: '#ffffff',
       resolution: res,
     }).setDepth(201)
     this.add
-      .text(cx, cy - 26, `倒在第 ${info.wave} 波 · 击杀 ${info.kills} · 等级 ${info.level}`, {
+      .text(cx, cy - 36, `倒在第 ${info.wave} 波 · 击杀 ${info.kills} · 等级 ${info.level}`, {
         fontFamily: UI_FONT,
-        fontSize: '24px',
+        fontSize: FONT.head,
         color: '#dddddd',
         resolution: res,
       })
@@ -358,25 +359,25 @@ export class UIScene extends Phaser.Scene {
     iconLabel(
       this,
       cx,
-      cy + 24,
+      cy + 22,
       '🏆',
-      22,
+      28,
       info.newBest ? '新纪录！' : `最佳：第 ${info.bestWave} 波 · 击杀 ${info.bestKills}`,
-      { fontFamily: UI_FONT, fontSize: '20px', color: '#d4b106', resolution: res },
+      { fontFamily: UI_FONT, fontSize: FONT.strong, color: '#d4b106', resolution: res },
     ).setDepth(201)
     // 明确按钮 + 空格返回，防死亡瞬间误触（500ms 后才可交互）
     const back = (): void => {
       endRun()
       this.arena.scene.start('select')
     }
-    const rect = { x: cx - 120, y: cy + 96, w: 240, h: 56 }
+    const rect = { x: cx - 150, y: cy + 92, w: 300, h: 72 }
     const g = this.add.graphics().setDepth(201).setAlpha(0)
     g.fillStyle(0xffd54f, 1)
-    g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 28)
+    g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 36)
     const label = this.add
-      .text(cx, cy + 124, '返回组队', {
+      .text(cx, cy + 128, '返回组队', {
         fontFamily: UI_FONT,
-        fontSize: '22px',
+        fontSize: FONT.lead,
         fontStyle: 'bold',
         color: '#25262e',
         resolution: res,
@@ -399,12 +400,12 @@ export class UIScene extends Phaser.Scene {
 
   private drawXpBar(s: HudSnapshot): void {
     const x = safeInsets.left + 12
-    const y = safeInsets.top + 14
+    const y = safeInsets.top + 12
     const g = this.xpBar
     g.clear()
     g.fillStyle(0x000000, 0.5)
-    g.fillRect(x, y, 204, 10)
+    g.fillRect(x, y, 200, 14)
     g.fillStyle(0x4dd0e1, 1)
-    g.fillRect(x + 1, y + 1, 202 * Math.min(1, s.xp / s.xpNext), 8)
+    g.fillRect(x + 1, y + 1, 198 * Math.min(1, s.xp / s.xpNext), 12)
   }
 }

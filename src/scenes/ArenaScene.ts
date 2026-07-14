@@ -261,7 +261,7 @@ export class ArenaScene extends Phaser.Scene {
     // 伤害数字对象池：复用固定数量 BitmapText（见 ui/damageFont.ts）
     ensureDamageFont(this)
     this.damagePool = Array.from({ length: 64 }, () =>
-      this.add.bitmapText(0, 0, DAMAGE_FONT).setFontSize(18).setOrigin(0.5).setDepth(50).setVisible(false),
+      this.add.bitmapText(0, 0, DAMAGE_FONT).setFontSize(24).setOrigin(0.5).setDepth(50).setVisible(false),
     )
     this.damagePoolIdx = 0
 
@@ -429,11 +429,11 @@ export class ArenaScene extends Phaser.Scene {
       deadText: this.add
         .text(0, 0, '', {
           fontFamily: UI_FONT,
-          fontSize: '20px',
+          fontSize: '26px',
           fontStyle: 'bold',
           color: '#ffffff',
           stroke: '#000000',
-          strokeThickness: 4,
+          strokeThickness: 5,
           resolution: textRes(),
         })
         .setOrigin(0.5)

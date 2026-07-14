@@ -10,7 +10,7 @@ import { loadCaptain, loadLineup, saveLineup, toggleLineup } from '../core/selec
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiKey } from '../ui/emoji'
-import { UI_FONT } from '../ui/fonts'
+import { FONT, UI_FONT } from '../ui/fonts'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // 组队页 = 游戏流程中的一步（主菜单 → 组队 → 战斗；战斗结束回到这里）。
@@ -27,18 +27,18 @@ interface SelectLayout {
 // 方向对应约定：竖屏「上」= 横屏「左」（详情），竖屏「下」= 横屏「右」（列表）
 const LANDSCAPE: SelectLayout = {
   content: { w: 1280, h: 720 },
-  headerY: 40,
-  detail: { x: 40, y: 84, w: 730, h: 460 },
-  list: { x: 810, y: 84, w: 430, h: 552, rowH: 64, gap: 8 },
-  btn: { y: 648, w: 280, h: 58 },
+  headerY: 44,
+  detail: { x: 40, y: 96, w: 730, h: 520 },
+  list: { x: 810, y: 96, w: 430, h: 520, rowH: 84, gap: 10 },
+  btn: { y: 660, w: 340, h: 68 },
 }
 
 const PORTRAIT: SelectLayout = {
   content: { w: 720, h: 1280 },
-  headerY: 48,
-  detail: { x: 24, y: 92, w: 672, h: 452 },
-  list: { x: 24, y: 568, w: 672, h: 540, rowH: 64, gap: 8 },
-  btn: { y: 1176, w: 300, h: 60 },
+  headerY: 52,
+  detail: { x: 24, y: 100, w: 672, h: 500 },
+  list: { x: 24, y: 624, w: 672, h: 500, rowH: 84, gap: 10 },
+  btn: { y: 1188, w: 360, h: 72 },
 }
 
 interface Row {
@@ -114,7 +114,7 @@ export class SelectScene extends Phaser.Scene {
     this.add
       .text(ox + 40, oy + L.headerY, '← 返回', {
         fontFamily: UI_FONT,
-        fontSize: '18px',
+        fontSize: FONT.strong,
         color: '#c8c8d4',
         resolution: res,
       })
@@ -126,7 +126,7 @@ export class SelectScene extends Phaser.Scene {
     this.add
       .text(w / 2, oy + L.headerY, `选择首发（${this.starterCount} 人）`, {
         fontFamily: UI_FONT,
-        fontSize: '26px',
+        fontSize: FONT.title,
         fontStyle: 'bold',
         color: '#f5f5f5',
         resolution: res,
@@ -137,7 +137,7 @@ export class SelectScene extends Phaser.Scene {
     const capText = this.add
       .text(ox + L.content.w - 40, oy + L.headerY, `队长 ${captain.name}`, {
         fontFamily: UI_FONT,
-        fontSize: '16px',
+        fontSize: FONT.small,
         color: '#c8c8d4',
         resolution: res,
       })
@@ -146,7 +146,7 @@ export class SelectScene extends Phaser.Scene {
       .on('pointerup', () => {
         if (!this.dragMoved) this.scene.start('captain')
       })
-    emojiImage(this, capText.x - capText.width - 18, oy + L.headerY, captain.emoji, 26, 'player')
+    emojiImage(this, capText.x - capText.width - 22, oy + L.headerY, captain.emoji, 32, 'player')
 
     this.createList(res)
     this.createDetail(res)
@@ -162,7 +162,7 @@ export class SelectScene extends Phaser.Scene {
     this.btnText = this.add
       .text(w / 2, oy + L.btn.y, '', {
         fontFamily: UI_FONT,
-        fontSize: '24px',
+        fontSize: FONT.lead,
         fontStyle: 'bold',
         resolution: res,
       })
@@ -182,7 +182,7 @@ export class SelectScene extends Phaser.Scene {
     this.add
       .text(w / 2, h - safeInsets.bottom - 10, 'emoji graphics © Twemoji · CC-BY 4.0', {
         fontFamily: UI_FONT,
-        fontSize: '11px',
+        fontSize: FONT.caption,
         color: '#ffffff',
         resolution: res,
       })
@@ -219,16 +219,16 @@ export class SelectScene extends Phaser.Scene {
       const spec = CHARACTERS[id]
       const relY = i * pitch
       const bg = this.add.graphics()
-      const emoji = emojiImage(this, 38, relY + L.rowH / 2, spec.emoji, 40, 'player')
+      const emoji = emojiImage(this, 44, relY + L.rowH / 2, spec.emoji, 48, 'player')
       const name = this.add
-        .text(74, relY + L.rowH / 2, spec.name, {
+        .text(86, relY + L.rowH / 2, spec.name, {
           fontFamily: UI_FONT,
-          fontSize: '20px',
+          fontSize: FONT.head,
           color: '#ffffff',
           resolution: res,
         })
         .setOrigin(0, 0.5)
-      const badge = emojiImage(this, L.w - 32, relY + L.rowH / 2, '✅', 24)
+      const badge = emojiImage(this, L.w - 36, relY + L.rowH / 2, '✅', 30)
       const zone = this.add
         .zone(0, relY, L.w, L.rowH)
         .setOrigin(0)
@@ -310,41 +310,41 @@ export class SelectScene extends Phaser.Scene {
     this.detailEmoji = emojiImage(
       this,
       cx,
-      dy + (portrait ? 92 : 96),
+      dy + (portrait ? 112 : 120),
       CHARACTERS[this.focusedId].emoji,
-      portrait ? 104 : 110,
+      portrait ? 116 : 124,
       'player',
     )
     this.detailName = this.add
-      .text(cx, dy + (portrait ? 188 : 196), '', {
+      .text(cx, dy + (portrait ? 224 : 236), '', {
         fontFamily: UI_FONT,
-        fontSize: portrait ? '28px' : '30px',
+        fontSize: FONT.title,
         fontStyle: 'bold',
         color: '#ffffff',
         resolution: res,
       })
       .setOrigin(0.5)
     this.detailDesc = this.add
-      .text(cx, dy + (portrait ? 230 : 240), '', {
+      .text(cx, dy + (portrait ? 268 : 284), '', {
         fontFamily: UI_FONT,
-        fontSize: portrait ? '18px' : '19px',
+        fontSize: FONT.body,
         color: '#d6d6de',
         align: 'center',
         wordWrap: { width: D.w - (portrait ? 72 : 90) },
-        lineSpacing: 6,
+        lineSpacing: 8,
         resolution: res,
       })
       .setOrigin(0.5, 0)
 
-    const tw = 220
-    const th = 50
-    const tcy = dy + D.h - 56
+    const tw = 280
+    const th = 64
+    const tcy = dy + D.h - 62
     this.toggleRect = { x: cx - tw / 2, y: tcy - th / 2, w: tw, h: th }
     this.toggleBg = this.add.graphics()
     this.toggleText = this.add
       .text(cx, tcy, '', {
         fontFamily: UI_FONT,
-        fontSize: '20px',
+        fontSize: FONT.head,
         fontStyle: 'bold',
         resolution: res,
       })
@@ -393,7 +393,7 @@ export class SelectScene extends Phaser.Scene {
     }
 
     const spec = CHARACTERS[this.focusedId]
-    const size = this.layout === PORTRAIT ? 104 : 110
+    const size = this.layout === PORTRAIT ? 116 : 124
     this.detailEmoji.setTexture(emojiKey(spec.emoji, 'player')).setDisplaySize(size, size)
     this.detailName.setText(spec.name)
     this.detailDesc.setText(spec.desc)
