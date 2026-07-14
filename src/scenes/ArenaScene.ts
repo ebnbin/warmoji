@@ -759,6 +759,9 @@ export class ArenaScene extends Phaser.Scene {
       tex.add('shard1', 0, sw / 2, 0, sw / 2, sh / 2)
       tex.add('shard2', 0, 0, sh / 2, sw / 2, sh / 2)
       tex.add('shard3', 0, sw / 2, sh / 2, sw / 2, sh / 2)
+      // Texture.add 会把 firstFrame 改指向新 frame，导致此后按 key 默认创建的
+      // 同类敌人渲染成左上角碎片——必须拨回基础帧
+      tex.firstFrame = '__BASE'
     }
     const dw = enemy.displayWidth / 2
     const dh = enemy.displayHeight / 2
