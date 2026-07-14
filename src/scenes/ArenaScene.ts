@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { CAPTAINS, CHARACTERS, COIN, HIT_SHAKE, MAP, MEMBER, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WAVE } from '../core/config'
 import type { CharacterSpec, ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../core/config'
-import { enemyMixAt, pickEnemy } from '../core/enemies'
+import { enemyMixAt, fleeSteer, pickEnemy } from '../core/enemies'
 import type { EnemyMixEntry } from '../core/enemies'
 import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
@@ -747,6 +747,8 @@ export class ArenaScene extends Phaser.Scene {
     const enemy = emojiImage(this, x, y, spec.emoji, spec.size, 'enemy').setDepth(5)
     this.physics.add.existing(enemy)
     circleBody(enemy, spec.radius)
+    // 兜底：任何行为都不允许把敌人推出地图
+    ;(enemy.body as ArcadeBody).setCollideWorldBounds(true)
     enemy.setData('hp', hp)
     enemy.setData('spec', spec)
     // 行为状态：游荡方向/换向与开火计时（elapsedMs 时基，暂停安全）
@@ -887,7 +889,9 @@ export class ArenaScene extends Phaser.Scene {
           const tdy = target.image.y - e.y
           const dist2 = tdx * tdx + tdy * tdy
           if (dist2 <= spec.fleeRange * spec.fleeRange) {
-            const dir = norm(-tdx, -tdy)
+            // 逃离方向贴边时沿墙滑行，不顶出地图
+            const away = norm(-tdx, -tdy)
+            const dir = fleeSteer(e.x, e.y, away.x, away.y, MAP.width, MAP.height, 1.5 * UNIT)
             body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
           } else {
             const dir = this.wanderDir(e)

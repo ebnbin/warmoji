@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BLOB, ENEMY_SPECS, MUSHROOM, ZOMBIE } from './config'
-import { enemyMixAt, pickEnemy } from './enemies'
+import { enemyMixAt, fleeSteer, pickEnemy } from './enemies'
 import { Rng } from './rng'
 
 describe('敌人规格', () => {
@@ -56,5 +56,33 @@ describe('出场配比', () => {
       const got = (counts.get(m.spec.kind) ?? 0) / 8000
       expect(Math.abs(got - m.weight / total)).toBeLessThan(0.03)
     }
+  })
+})
+
+describe('逃离转向（fleeSteer）', () => {
+  const W = 1600
+  const H = 1600
+  const M = 96
+
+  it('地图中央：原样沿逃离方向', () => {
+    const d = fleeSteer(800, 800, -1, 0, W, H, M)
+    expect(d.x).toBeCloseTo(-1)
+    expect(d.y).toBeCloseTo(0)
+  })
+
+  it('顶着左边缘逃：被折向内侧（不再向外顶）', () => {
+    const d = fleeSteer(10, 800, -1, 0, W, H, M)
+    expect(d.x).toBeGreaterThan(0)
+  })
+
+  it('斜向撞下边缘：竖直分量翻向内，水平分量保留（沿墙滑行）', () => {
+    const d = fleeSteer(800, H - 10, 0.7071, 0.7071, W, H, M)
+    expect(d.y).toBeLessThan(0)
+    expect(d.x).toBeGreaterThan(0)
+  })
+
+  it('角落完全抵消时走切线，永不返回零向量', () => {
+    const d = fleeSteer(0, 800, -2, 0, W, H, M)
+    expect(Math.hypot(d.x, d.y)).toBeCloseTo(1)
   })
 })

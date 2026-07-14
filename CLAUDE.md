@@ -8,6 +8,7 @@ emoji 幸存者 web 游戏：Phaser 3 + Vite + TypeScript。纯 vibe coding 项�
 - 推送前 `npm run check` 必须全绿
 - 推送后验证线上：抓 https://warmoji.ebnbin.dev 的 `/assets/*.js` 应包含新 commit 短 hash（页面右下角 `#build-badge` 同理）
 - 有可见变化时把 Playwright 截图发给用户
+- 验证只针对改动本身（单测/针对性探针），不必每次跑 `scripts/playtest.mjs` 全 20 波平衡回归——仅在用户要求或大改数值体系时跑
 - 与用户中文沟通；一次聊天聚焦少量问题
 - 不要改 package.json 的 version（用户明确要求，版本以 commit hash 为准）
 
