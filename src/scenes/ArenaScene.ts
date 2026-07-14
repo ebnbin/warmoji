@@ -783,13 +783,15 @@ export class ArenaScene extends Phaser.Scene {
         .setAlpha(1)
         .setVisible(true)
       const dir = norm(ox, oy)
-      const scatter = 60 + this.rng.next() * 90
+      // 散开幅度收紧 + 飞行中缩小到 ~1/5：碎裂足迹整体控制在原尺寸 ~1.5 倍内
+      const scatter = 45 + this.rng.next() * 65
       const vx = flingVx + dir.x * scatter
       const vy = flingVy + dir.y * scatter
       this.tweens.add({
         targets: shard,
         x: Phaser.Math.Clamp(shard.x + vx * t, 0, MAP.width),
         y: Phaser.Math.Clamp(shard.y + vy * t, 0, MAP.height),
+        scale: shard.scaleX * 0.2,
         rotation: (this.rng.next() - 0.5) * 6,
         alpha: 0,
         duration: KNOCKBACK.deathSlideMs,
