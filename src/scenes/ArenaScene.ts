@@ -97,8 +97,10 @@ interface Member {
   shownHpRatio: number
   deadText: Phaser.GameObjects.Text
   shownCountdown: number
-  /** 行走摇摆/呼吸动画的基准缩放（setDisplaySize 得到的比例） */
+  /** 呼吸动画的基准缩放（setDisplaySize 得到的比例） */
   baseScale: number
+  /** 呼吸相位累积（移动/静止频率不同，用累积保证切换平滑） */
+  breathPhase: number
   /** 复活弹出等 tween 期间暂停程序化动画，避免逐帧写缩放打架 */
   animLockUntil: number
 }
@@ -457,6 +459,7 @@ export class ArenaScene extends Phaser.Scene {
         .setVisible(false),
       shownCountdown: -1,
       baseScale: image.scaleX,
+      breathPhase: slot * 1.3,
       animLockUntil: 0,
     }
     image.setData('member', member)
@@ -500,7 +503,7 @@ export class ArenaScene extends Phaser.Scene {
     const moving = this.teamDir.x !== 0 || this.teamDir.y !== 0
     for (const m of this.members) {
       if (m.alive) {
-        this.animateMember(m, moving)
+        this.animateMember(m, moving, delta)
         this.drawMemberHp(m)
         for (const w of m.weapons) w.update(delta, m.handle)
       } else {
@@ -517,20 +520,16 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  /** 程序化小动画：行走左右摇摆 + 朝向翻转；静止时轻微呼吸。逐帧写值，零 tween 开销 */
-  private animateMember(m: Member, moving: boolean): void {
+  /** 程序化小动画：全程呼吸缩放（移动时稍快稍深）+ 朝移动方向翻转。逐帧写值，零 tween 开销 */
+  private animateMember(m: Member, moving: boolean, delta: number): void {
     if (this.elapsedMs < m.animLockUntil) return
     const img = m.image
-    if (moving) {
-      // 各 slot 错开相位，队伍不至于齐刷刷同步摆
-      img.setRotation(Math.sin(this.elapsedMs / 85 + m.slot * 1.9) * 0.085)
-      img.setScale(m.baseScale)
-      if (Math.abs(this.teamDir.x) > 0.2) img.setFlipX(this.teamDir.x > 0)
-    } else {
-      img.setRotation(img.rotation * 0.8)
-      const breath = 1 + Math.sin(this.elapsedMs / 320 + m.slot * 1.3) * 0.025
-      img.setScale(m.baseScale, m.baseScale * breath)
-    }
+    // 相位按各自频率累积（slot 初相错开），移动/静止切换不会跳变
+    m.breathPhase += delta / (moving ? 200 : 320)
+    const breath = 1 + Math.sin(m.breathPhase) * (moving ? 0.04 : 0.025)
+    img.setScale(m.baseScale, m.baseScale * breath)
+    if (img.rotation !== 0) img.setRotation(0)
+    if (Math.abs(this.teamDir.x) > 0.2) img.setFlipX(this.teamDir.x > 0)
   }
 
   private drawMemberHp(m: Member): void {
