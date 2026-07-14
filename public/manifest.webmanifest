@@ -1,6 +1,6 @@
 {
-  "name": "Warmoji",
-  "short_name": "Warmoji",
+  "name": "WarMoji",
+  "short_name": "WarMoji",
   "description": "emoji 幸存者 · 走位躲避，武器全自动",
   "start_url": "/",
   "display": "fullscreen",
