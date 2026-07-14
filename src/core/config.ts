@@ -431,7 +431,7 @@ export const INVADER: WanderFireEnemySpec = {
   xp: 4,
   coins: 2,
   fireIntervalMs: 2800,
-  bullet: { emoji: '🔴', size: 0.3 * UNIT, radius: 0.14 * UNIT, speed: 3 * UNIT, damage: 7, lifeMs: 4500 },
+  bullet: { emoji: '🔴', size: 0.3 * UNIT, radius: 0.14 * UNIT, speed: 3 * UNIT, damage: 6, lifeMs: 4500 },
 }
 
 /** 突刺怪：探测圈内锁定蓄力方向 → 短延迟 → 直线冲刺一段距离（横向位移可躲） */
@@ -467,7 +467,7 @@ export const SNAKE: FleeFireEnemySpec = {
   coins: 2,
   fleeRange: 5 * UNIT,
   fireIntervalMs: 2600,
-  bullet: { emoji: '🟢', size: 0.3 * UNIT, radius: 0.14 * UNIT, speed: 3.2 * UNIT, damage: 6, lifeMs: 4500 },
+  bullet: { emoji: '🟢', size: 0.3 * UNIT, radius: 0.14 * UNIT, speed: 3.2 * UNIT, damage: 5, lifeMs: 4500 },
 }
 
 /** 毒爆怪：慢速近战，死亡原地留毒液池（别在自己的风筝路线上打爆它） */
@@ -544,9 +544,9 @@ export const ENEMY_SPECS: readonly EnemySpec[] = [
 export const ENEMY_MIX = [
   { kind: 'zombie', sinceWave: 1, base: 80, perWave: -2, min: 40, max: 80 },
   { kind: 'ghost', sinceWave: 1, base: 15, perWave: 1, min: 15, max: 32 },
-  { kind: 'invader', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'invader', sinceWave: 2, base: 8, perWave: 0.3, min: 0, max: 12 },
   { kind: 'boar', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'snake', sinceWave: 4, base: 7, perWave: 0.4, min: 0, max: 14 },
+  { kind: 'snake', sinceWave: 4, base: 7, perWave: 0.3, min: 0, max: 10 },
   { kind: 'mushroom', sinceWave: 4, base: 7, perWave: 0.4, min: 0, max: 14 },
   { kind: 'rat', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
   { kind: 'blob', sinceWave: 5, base: 7, perWave: 0.4, min: 0, max: 14 },

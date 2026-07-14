@@ -8,7 +8,15 @@ export default tseslint.config(
   {
     files: ['scripts/**/*.mjs'],
     languageOptions: {
-      globals: { console: 'readonly', process: 'readonly', URL: 'readonly' },
+      // 含 Playwright 探针：page.evaluate 回调在浏览器执行，需要浏览器全局
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        URL: 'readonly',
+        setTimeout: 'readonly',
+        window: 'readonly',
+        localStorage: 'readonly',
+      },
     },
   },
 )
