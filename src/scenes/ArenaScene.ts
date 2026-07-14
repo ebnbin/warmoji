@@ -30,6 +30,7 @@ import { DAMAGE_FONT, ensureDamageFont } from '../ui/damageFont'
 import { reportDebug } from '../ui/debug'
 import { isStress } from '../ui/dev'
 import { emojiImage } from '../ui/emoji'
+import { burstEmitter } from '../ui/fx'
 import { UI_FONT } from '../ui/fonts'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 import { createWeapon } from '../weapons/create'
@@ -96,6 +97,10 @@ interface Member {
   shownHpRatio: number
   deadText: Phaser.GameObjects.Text
   shownCountdown: number
+  /** 行走摇摆/呼吸动画的基准缩放（setDisplaySize 得到的比例） */
+  baseScale: number
+  /** 复活弹出等 tween 期间暂停程序化动画，避免逐帧写缩放打架 */
+  animLockUntil: number
 }
 
 // 碰撞圆按逻辑半径换算回源纹理坐标（body 随对象缩放）
@@ -147,6 +152,12 @@ export class ArenaScene extends Phaser.Scene {
   private run!: RunState
   private damagePool: Phaser.GameObjects.BitmapText[] = []
   private damagePoolIdx = 0
+  // 爆发型粒子：敌人死亡（紫系）/ 金币拾取（金系）/ 队员倒下（烟尘）
+  private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
+  private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
+  private puffBurst!: Phaser.GameObjects.Particles.ParticleEmitter
+  /** 本帧队伍移动方向（行走摇摆与朝向翻转用） */
+  private teamDir = { x: 0, y: 0 }
   private elapsedMs = 0
   private spawnCooldownMs = 0
   private pendingSpawns = 0
@@ -258,6 +269,11 @@ export class ArenaScene extends Phaser.Scene {
     // 压测按后期混编出怪；正常局按当前波次配比
     this.enemyMix = enemyMixAt(this.stress ? 10 : this.run.wave)
 
+    // 爆发型粒子发射器（复用，explode 触发；速度为 px/秒，UNIT=64）
+    this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
+    this.coinBurst = burstEmitter(this, [0xffb300, 0xffd54f, 0xfff8e1], 150, 340)
+    this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
+
     // 伤害数字对象池：复用固定数量 BitmapText（见 ui/damageFont.ts）
     ensureDamageFont(this)
     this.damagePool = Array.from({ length: 64 }, () =>
@@ -312,7 +328,7 @@ export class ArenaScene extends Phaser.Scene {
     this.updateEnemyShots()
     this.updatePoisonPools()
     this.magnetCoins()
-    this.sweepProjectiles()
+    this.sweepProjectiles(delta)
     this.cullProjectiles()
 
     const cam = this.cameras.main
@@ -440,6 +456,8 @@ export class ArenaScene extends Phaser.Scene {
         .setDepth(12)
         .setVisible(false),
       shownCountdown: -1,
+      baseScale: image.scaleX,
+      animLockUntil: 0,
     }
     image.setData('member', member)
     this.memberGroup.add(image)
@@ -456,6 +474,7 @@ export class ArenaScene extends Phaser.Scene {
 
     const ui = this.scene.get('ui') as UIScene
     const dir = kx !== 0 || ky !== 0 ? norm(kx, ky) : ui.joystickVector
+    this.teamDir = dir
     const step = (this.stats.moveSpeed * delta) / 1000
     const clampMin = TEAM.ringRadius + MEMBER.radius
     this.center.x = Phaser.Math.Clamp(this.center.x + dir.x * step, clampMin, MAP.width - clampMin)
@@ -478,8 +497,10 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private updateMembers(delta: number): void {
+    const moving = this.teamDir.x !== 0 || this.teamDir.y !== 0
     for (const m of this.members) {
       if (m.alive) {
+        this.animateMember(m, moving)
         this.drawMemberHp(m)
         for (const w of m.weapons) w.update(delta, m.handle)
       } else {
@@ -493,6 +514,22 @@ export class ArenaScene extends Phaser.Scene {
           }
         }
       }
+    }
+  }
+
+  /** 程序化小动画：行走左右摇摆 + 朝向翻转；静止时轻微呼吸。逐帧写值，零 tween 开销 */
+  private animateMember(m: Member, moving: boolean): void {
+    if (this.elapsedMs < m.animLockUntil) return
+    const img = m.image
+    if (moving) {
+      // 各 slot 错开相位，队伍不至于齐刷刷同步摆
+      img.setRotation(Math.sin(this.elapsedMs / 85 + m.slot * 1.9) * 0.085)
+      img.setScale(m.baseScale)
+      if (Math.abs(this.teamDir.x) > 0.2) img.setFlipX(this.teamDir.x > 0)
+    } else {
+      img.setRotation(img.rotation * 0.8)
+      const breath = 1 + Math.sin(this.elapsedMs / 320 + m.slot * 1.3) * 0.025
+      img.setScale(m.baseScale, m.baseScale * breath)
     }
   }
 
@@ -546,7 +583,8 @@ export class ArenaScene extends Phaser.Scene {
     m.reviveAt = this.elapsedMs + m.reviveMs
     m.shownCountdown = -1
     ;(m.image.body as ArcadeBody).enable = false
-    m.image.setAlpha(0.35).setTint(0x888888)
+    m.image.setAlpha(0.35).setTint(0x888888).setRotation(0).setScale(m.baseScale)
+    this.puffBurst.explode(10, m.image.x, m.image.y)
     m.hpBar.setVisible(false)
     m.deadText.setVisible(true)
     m.visualOffset.x = 0
@@ -565,9 +603,9 @@ export class ArenaScene extends Phaser.Scene {
     m.hpBar.setVisible(true)
     m.deadText.setVisible(false)
     for (const w of m.weapons) w.setVisible(true)
-    const targetScale = m.image.scale
-    m.image.setScale(targetScale * 0.3)
-    this.tweens.add({ targets: m.image, scale: targetScale, duration: 200, ease: 'Back.easeOut' })
+    m.animLockUntil = this.elapsedMs + 220
+    m.image.setScale(m.baseScale * 0.3)
+    this.tweens.add({ targets: m.image, scale: m.baseScale, duration: 200, ease: 'Back.easeOut' })
   }
 
   private aliveMembers(): Member[] {
@@ -596,11 +634,13 @@ export class ArenaScene extends Phaser.Scene {
     p.setData('radius', spec.projectile.radius)
     p.setData('px', x)
     p.setData('py', y)
+    // 对称投掷物（无指向修正角）飞行中自旋；有指向的（飞刀类）保持箭头朝向
+    p.setData('spin', spec.projectile.rotationOffsetRad === 0 ? 9 : 0)
     this.projectiles.add(p)
   }
 
   /** 逐帧对每颗子弹做上一帧位置 → 当前位置的线段扫掠命中 */
-  private sweepProjectiles(): void {
+  private sweepProjectiles(delta: number): void {
     for (const p of this.projectiles.getChildren() as ImageObj[]) {
       if (!p.active) continue
       const prev = { x: p.getData('px') as number, y: p.getData('py') as number }
@@ -611,6 +651,8 @@ export class ArenaScene extends Phaser.Scene {
         this.applyDamage(this.frameTargets[hit]!.ref as ImageObj, damage)
         continue
       }
+      const spin = p.getData('spin') as number
+      if (spin > 0) p.rotation += (spin * delta) / 1000
       p.setData('px', p.x)
       p.setData('py', p.y)
     }
@@ -639,8 +681,9 @@ export class ArenaScene extends Phaser.Scene {
       this.killEnemy(enemy)
     } else {
       enemy.setData('hp', hp)
-      enemy.setAlpha(0.5)
-      this.tweens.add({ targets: enemy, alpha: 1, duration: 120 })
+      // 受击纯白闪光：时间戳驱动（steerEnemies 里恢复），高频命中不堆 timer/tween
+      enemy.setData('flashUntil', this.elapsedMs + 70)
+      enemy.setTintFill(0xffffff)
     }
   }
 
@@ -670,11 +713,15 @@ export class ArenaScene extends Phaser.Scene {
     }
     enemy.setActive(false)
     ;(enemy.body as ArcadeBody).enable = false
+    // 死亡：紫系粒子爆开 + 带转体的放大消散
+    this.deathBurst.explode(10, enemy.x, enemy.y)
+    this.tweens.killTweensOf(enemy)
     this.tweens.add({
       targets: enemy,
-      scale: enemy.scale * 1.5,
+      scale: enemy.scale * 1.6,
+      rotation: enemy.rotation + (this.rng.next() - 0.5) * 1.6,
       alpha: 0,
-      duration: 130,
+      duration: 150,
       onComplete: () => enemy.destroy(),
     })
   }
@@ -758,6 +805,8 @@ export class ArenaScene extends Phaser.Scene {
     enemy.setData('turnAt', this.elapsedMs + 600 + this.rng.next() * 900)
     enemy.setData('fireAt', this.elapsedMs + 900 + this.rng.next() * 1500)
     enemy.setData('eaten', 0)
+    // 行走摇摆的随机相位：同屏大量敌人不齐步摆
+    enemy.setData('ph', this.rng.next() * Math.PI * 2)
     this.enemies.add(enemy)
     const targetScale = enemy.scale
     enemy.setScale(targetScale * 0.3).setAlpha(0.3)
@@ -823,6 +872,14 @@ export class ArenaScene extends Phaser.Scene {
       if (!e.active) continue
       const spec = e.getData('spec') as EnemySpec
       const body = e.body as ArcadeBody
+      // 受击白闪到时恢复：清 tint 并让减速色下一帧重新生效
+      const flashUntil = e.getData('flashUntil') as number | undefined
+      if (flashUntil !== undefined && now >= flashUntil) {
+        e.setData('flashUntil', undefined)
+        e.clearTint()
+        e.setData('slowed', undefined)
+        if (e.getData('state') === 'windup') e.setTint(0xffb74d)
+      }
       const slow = this.slowFactorFor(e)
       const target = this.nearestAlive(e.x, e.y)!
 
@@ -933,6 +990,18 @@ export class ArenaScene extends Phaser.Scene {
           break
         }
       }
+
+      // 行走动画：恒摇摆 + 按移动方向翻转（twemoji 默认朝左）；
+      // 蓄力有自己的颤动，冲刺改为朝冲刺方向前倾
+      const state = e.getData('state') as string
+      if (state === 'dash') {
+        e.setRotation((e.getData('dirX') as number) * 0.3)
+        e.setFlipX((e.getData('dirX') as number) > 0)
+      } else if (state !== 'windup') {
+        e.setRotation(Math.sin(now / 95 + (e.getData('ph') as number)) * 0.1)
+        const vx = body.velocity.x
+        if (Math.abs(vx) > 8) e.setFlipX(vx > 0)
+      }
     }
   }
 
@@ -1026,6 +1095,10 @@ export class ArenaScene extends Phaser.Scene {
       this.physics.add.existing(coin)
       circleBody(coin, COIN.radius)
       this.coins.add(coin)
+      // 掉落弹出
+      const base = coin.scaleX
+      coin.setScale(base * 0.3)
+      this.tweens.add({ targets: coin, scale: base, duration: 160, ease: 'Back.easeOut' })
     }
   }
 
@@ -1055,6 +1128,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private collectCoin(coin: ImageObj): void {
     if (!coin.active) return
+    this.coinBurst.explode(4, coin.x, coin.y)
     coin.destroy()
     this.run.coins += 1
   }
