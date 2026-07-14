@@ -45,7 +45,7 @@ export class SweepWeapon implements WeaponRuntime {
       this.spec.radius,
       targets,
     )) {
-      this.ctx.damageEnemy(targets[i]!.ref, damage)
+      this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, owner.x, owner.y)
     }
 
     this.tween?.remove()

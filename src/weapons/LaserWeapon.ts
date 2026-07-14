@@ -50,7 +50,7 @@ export class LaserWeapon implements WeaponRuntime {
     const damage = Math.round(this.spec.damage * this.ctx.damageMul())
     const origin = { x: owner.x, y: owner.y }
     for (const i of thrustHitIndices(origin, aim, this.spec.range, this.spec.beamRadius, targets)) {
-      this.ctx.damageEnemy(targets[i]!.ref, damage)
+      this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, origin.x, origin.y)
     }
     this.beamEffect(origin.x, origin.y, aim)
   }

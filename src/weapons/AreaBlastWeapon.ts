@@ -41,7 +41,7 @@ export class AreaBlastWeapon implements WeaponRuntime {
 
     const damage = Math.round(this.spec.damage * this.ctx.damageMul())
     for (const i of circleHitIndices(center, this.spec.blastRadius, targets)) {
-      this.ctx.damageEnemy(targets[i]!.ref, damage)
+      this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, center.x, center.y)
     }
     this.blastEffect(center.x, center.y)
   }

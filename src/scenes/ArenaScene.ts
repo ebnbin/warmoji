@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CAPTAINS, CHARACTERS, COIN, HIT_SHAKE, MAP, MEMBER, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WAVE } from '../core/config'
+import { CAPTAINS, CHARACTERS, COIN, HIT_SHAKE, KNOCKBACK, MAP, MEMBER, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WAVE } from '../core/config'
 import type { CharacterSpec, ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../core/config'
 import { enemyMixAt, fleeSteer, pickEnemy } from '../core/enemies'
 import type { EnemyMixEntry } from '../core/enemies'
@@ -135,7 +135,7 @@ export class ArenaScene extends Phaser.Scene {
   private weaponCtx: WeaponContext = {
     scene: this,
     enemyTargets: () => this.frameTargets,
-    damageEnemy: (e, d) => this.applyDamage(e as ImageObj, d),
+    damageEnemy: (e, d, kb, sx, sy) => this.applyDamage(e as ImageObj, d, kb, sx, sy),
     spawnProjectile: (x, y, angle, spec, damage) => this.spawnProjectile(x, y, angle, spec, damage),
     teamCenter: () => this.center,
     applySlow: (x, y, radius, factor) =>
@@ -326,7 +326,7 @@ export class ArenaScene extends Phaser.Scene {
       .map((e) => ({ x: e.x, y: e.y, radius: (e.getData('spec') as EnemySpec).radius, ref: e }))
     this.updateMembers(delta)
     this.spawn(delta)
-    this.steerEnemies()
+    this.steerEnemies(delta)
     this.updateEnemyShots()
     this.updatePoisonPools()
     this.magnetCoins()
@@ -632,6 +632,7 @@ export class ArenaScene extends Phaser.Scene {
     )
     p.setData('damage', damage)
     p.setData('radius', spec.projectile.radius)
+    p.setData('kb', spec.knockback)
     p.setData('px', x)
     p.setData('py', y)
     // 对称投掷物（无指向修正角）飞行中自旋；有指向的（飞刀类）保持箭头朝向
@@ -647,8 +648,10 @@ export class ArenaScene extends Phaser.Scene {
       const hit = sweepFirstHitIndex(prev, { x: p.x, y: p.y }, p.getData('radius') as number, this.frameTargets)
       if (hit >= 0) {
         const damage = p.getData('damage') as number
+        const kb = p.getData('kb') as number
         p.destroy()
-        this.applyDamage(this.frameTargets[hit]!.ref as ImageObj, damage)
+        // 击退源取上一帧位置：方向即子弹飞行方向
+        this.applyDamage(this.frameTargets[hit]!.ref as ImageObj, damage, kb, prev.x, prev.y)
         continue
       }
       const spin = p.getData('spin') as number
@@ -673,7 +676,7 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private applyDamage(enemy: ImageObj, damage: number): void {
+  private applyDamage(enemy: ImageObj, damage: number, knockback = 0, srcX?: number, srcY?: number): void {
     if (!enemy.active) return
     const hp = (enemy.getData('hp') as number) - damage
     this.floatDamage(enemy.x, enemy.y, damage)
@@ -684,6 +687,19 @@ export class ArenaScene extends Phaser.Scene {
       // 受击纯白闪光：时间戳驱动（steerEnemies 里恢复），高频命中不堆 timer/tween
       enemy.setData('flashUntil', this.elapsedMs + 70)
       enemy.setTintFill(0xffffff)
+      // 击退冲量：从伤害源指向敌人，叠加进敌人临时速度（steerEnemies 合成并衰减）
+      if (knockback > 0 && srcX !== undefined && srcY !== undefined) {
+        const dir = norm(enemy.x - srcX, enemy.y - srcY)
+        let kvx = ((enemy.getData('kvx') as number) ?? 0) + dir.x * knockback
+        let kvy = ((enemy.getData('kvy') as number) ?? 0) + dir.y * knockback
+        const len = Math.hypot(kvx, kvy)
+        if (len > KNOCKBACK.maxSpeed) {
+          kvx = (kvx / len) * KNOCKBACK.maxSpeed
+          kvy = (kvy / len) * KNOCKBACK.maxSpeed
+        }
+        enemy.setData('kvx', kvx)
+        enemy.setData('kvy', kvy)
+      }
     }
   }
 
@@ -864,7 +880,7 @@ export class ArenaScene extends Phaser.Scene {
     return best
   }
 
-  private steerEnemies(): void {
+  private steerEnemies(delta: number): void {
     const alive = this.aliveMembers()
     if (alive.length === 0) return
     const now = this.elapsedMs
@@ -988,6 +1004,22 @@ export class ArenaScene extends Phaser.Scene {
             body.setVelocity(dir.x * spec.speed * 0.3 * slow, dir.y * spec.speed * 0.3 * slow)
           }
           break
+        }
+      }
+
+      // 击退：临时冲量叠加进行为速度并指数衰减（不打断行为状态机）
+      const kvx = e.getData('kvx') as number | undefined
+      if (kvx !== undefined) {
+        const kvy = e.getData('kvy') as number
+        body.velocity.x += kvx
+        body.velocity.y += kvy
+        const decay = Math.exp(-delta / KNOCKBACK.tauMs)
+        if ((kvx * kvx + kvy * kvy) * decay * decay < 100) {
+          e.setData('kvx', undefined)
+          e.setData('kvy', undefined)
+        } else {
+          e.setData('kvx', kvx * decay)
+          e.setData('kvy', kvy * decay)
         }
       }
 

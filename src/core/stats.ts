@@ -1,5 +1,5 @@
 import type { CaptainSpec, CharacterSpec } from './config'
-import { COIN, LEVELS, MEMBER, TEAM, UNIT } from './config'
+import { COIN, KNOCKBACK, LEVELS, MEMBER, TEAM, UNIT } from './config'
 import { aggregateCharacterEffects, aggregateTeamEffects, resolveWeaponSpec } from './items'
 import type { ItemId } from './items'
 import { levelDamageMul, memberMaxHp } from './levels'
@@ -41,7 +41,8 @@ export function weaponStatLines(w: WeaponSpec): string[] {
       '以队伍中心为圆心持续生效',
     ]
   }
-  const base = `伤害 ${w.damage} · 冷却 ${sec(w.cooldownMs)}`
+  // 击退展示为大致位移距离（冲量 × 衰减时间常数）
+  const base = `伤害 ${w.damage} · 冷却 ${sec(w.cooldownMs)} · 击退 ${grid((w.knockback * KNOCKBACK.tauMs) / 1000)}`
   switch (w.kind) {
     case 'projectile':
       return [base, `弹速 ${grid(w.projectile.speed)}/秒 · 弹体 ${grid(w.projectile.radius * 2)}`]

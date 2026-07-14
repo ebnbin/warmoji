@@ -20,7 +20,14 @@ export interface WeaponContext {
   scene: Phaser.Scene
   /** 当前帧的存活敌人快照（每帧重建一次，武器间共享） */
   enemyTargets(): readonly EnemyTarget[]
-  damageEnemy(enemy: Phaser.GameObjects.Image, damage: number): void
+  /** knockback：击退冲量（px/秒），方向 = 源点 (srcX, srcY) 指向敌人中心 */
+  damageEnemy(
+    enemy: Phaser.GameObjects.Image,
+    damage: number,
+    knockback?: number,
+    srcX?: number,
+    srcY?: number,
+  ): void
   spawnProjectile(x: number, y: number, angle: number, spec: ProjectileSpec, damage: number): void
   /** 队伍中心（光环类武器的锚点） */
   teamCenter(): { x: number; y: number }

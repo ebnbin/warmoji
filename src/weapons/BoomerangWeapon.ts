@@ -103,7 +103,7 @@ export class BoomerangWeapon implements WeaponRuntime {
       const rr = this.spec.hitRadius + t.radius
       if (dx * dx + dy * dy <= rr * rr) {
         this.hitSet.add(t.ref)
-        this.ctx.damageEnemy(t.ref, this.damage)
+        this.ctx.damageEnemy(t.ref, this.damage, this.spec.knockback, this.image.x, this.image.y)
       }
     }
   }

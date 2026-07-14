@@ -23,6 +23,8 @@ export interface ThrustSpec {
   readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
+  /** 命中击退冲量（px/秒，方向从伤害源指向敌人；位移 ≈ 冲量 × KNOCKBACK.tauMs/1000） */
+  readonly knockback: number
   /** 判定：从角色中心沿瞄准方向的线段长度 */
   readonly reach: number
   readonly hitRadius: number
@@ -38,6 +40,7 @@ export interface ProjectileSpec {
   readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
+  readonly knockback: number
   readonly held?: HeldVisual
   readonly projectile: {
     readonly emoji: string
@@ -54,6 +57,7 @@ export interface SweepSpec {
   readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
+  readonly knockback: number
   /** 扇形判定半径与弧宽 */
   readonly radius: number
   readonly arcRad: number
@@ -67,6 +71,7 @@ export interface AreaBlastSpec {
   readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
+  readonly knockback: number
   /** 侦测范围：在此距离内选取爆心（离持有者最近的敌人） */
   readonly detectRange: number
   /** 爆炸判定半径（以爆心为圆心） */
@@ -82,6 +87,7 @@ export interface BoomerangSpec {
   readonly damage: number
   /** 接住后才开始计冷却 */
   readonly cooldownMs: number
+  readonly knockback: number
   /** 去程距离在出手瞬间锁定 */
   readonly range: number
   readonly outMs: number
@@ -98,6 +104,7 @@ export interface LaserSpec {
   readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
+  readonly knockback: number
   /** 光束长度；判定为线段胶囊（thrustHitIndices），贯穿直线上所有敌人 */
   readonly range: number
   readonly beamRadius: number

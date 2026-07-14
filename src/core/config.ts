@@ -24,6 +24,10 @@ import type {
   WeaponSpec,
 } from './weapons'
 
+// 击退：命中冲量按指数衰减（时间常数 tauMs），实际位移 ≈ 冲量 × tauMs/1000；
+// 多次命中冲量叠加但合速度不超过 maxSpeed
+export const KNOCKBACK = { tauMs: 100, maxSpeed: 1300 } as const
+
 // 武器库（可被不同角色复用；held 缺省 = 行为主体是角色本体）
 const pistol = {
   kind: 'projectile',
@@ -31,6 +35,7 @@ const pistol = {
   icon: '🔫',
   damage: 16,
   cooldownMs: 600,
+  knockback: 3 * UNIT,
   held: {
     emoji: '🔫',
     size: 0.55 * UNIT,
@@ -56,6 +61,7 @@ export const WEAPONS = {
     icon: '🍅',
     damage: 22,
     cooldownMs: 450,
+    knockback: 3.5 * UNIT,
     projectile: {
       emoji: '🍅',
       size: 0.4 * UNIT,
@@ -70,6 +76,7 @@ export const WEAPONS = {
     icon: '⚔️',
     damage: 26,
     cooldownMs: 900,
+    knockback: 9 * UNIT,
     reach: 1.4 * UNIT,
     hitRadius: 0.5 * UNIT,
     thrustMs: 220,
@@ -81,6 +88,7 @@ export const WEAPONS = {
     icon: '🪓',
     damage: 30,
     cooldownMs: 1200,
+    knockback: 7 * UNIT,
     radius: 1.5 * UNIT,
     arcRad: (150 * Math.PI) / 180,
     sweepMs: 260,
@@ -108,6 +116,7 @@ export const WEAPONS = {
     icon: '💥',
     damage: 22,
     cooldownMs: 1300,
+    knockback: 12 * UNIT,
     detectRange: 6 * UNIT,
     blastRadius: 1.3 * UNIT,
     color: 0x9575cd,
@@ -118,6 +127,7 @@ export const WEAPONS = {
     icon: '🔦',
     damage: 14,
     cooldownMs: 900,
+    knockback: 2.5 * UNIT,
     range: 8 * UNIT,
     beamRadius: 0.22 * UNIT,
     color: 0xff5252,
@@ -143,6 +153,7 @@ export const WEAPONS = {
     icon: '🪃',
     damage: 18,
     cooldownMs: 1200,
+    knockback: 4.5 * UNIT,
     range: 4 * UNIT,
     outMs: 500,
     returnSpeed: 10 * UNIT,

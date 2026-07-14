@@ -53,7 +53,7 @@ export class ThrustWeapon implements WeaponRuntime {
       this.spec.hitRadius,
       targets,
     )) {
-      this.ctx.damageEnemy(targets[i]!.ref, damage)
+      this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, owner.x, owner.y)
     }
 
     this.tween?.remove()
