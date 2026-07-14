@@ -14,6 +14,8 @@ import type { TeamEffects } from '../core/items'
 import { getRun, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { loadTeam } from '../core/selection'
+import { DEFAULT_SETTINGS, loadSettings } from '../core/settings'
+import type { Settings } from '../core/settings'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -125,6 +127,7 @@ export class ArenaScene extends Phaser.Scene {
   private palette!: Palette
   private stats!: TeamStats
   private teamFx: TeamEffects = aggregateTeamEffects([])
+  private settings: Settings = DEFAULT_SETTINGS
   private run!: RunState
   private damagePool: Phaser.GameObjects.BitmapText[] = []
   private damagePoolIdx = 0
@@ -187,6 +190,7 @@ export class ArenaScene extends Phaser.Scene {
     this.palette = randomPalette(this.rng)
     applyBackground(this.palette)
     this.stress = isStress()
+    this.settings = loadSettings(browserStorage())
     this.stats = {
       damageMul: 1,
       cooldownMul: this.stress ? STRESS.cooldownMul : 1,
@@ -467,7 +471,7 @@ export class ArenaScene extends Phaser.Scene {
     m.lastHitMs = this.elapsedMs
     const spec = enemy.getData('spec') as EnemySpec
     m.hp = Math.max(0, m.hp - spec.damage)
-    this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
+    if (this.settings.hitShake) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     m.image.setTint(0xff7777)
     this.time.delayedCall(120, () => {
       if (m.alive) m.image.clearTint()
@@ -598,6 +602,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private floatDamage(x: number, y: number, amount: number): void {
+    if (!this.settings.damageNumbers) return
     // 池满时偷用最旧的一个（结束它未完成的动画）
     const t = this.damagePool[this.damagePoolIdx]!
     this.damagePoolIdx = (this.damagePoolIdx + 1) % this.damagePool.length

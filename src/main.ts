@@ -4,6 +4,7 @@ import { CaptainScene } from './scenes/CaptainScene'
 import { MenuScene } from './scenes/MenuScene'
 import { PreloadScene } from './scenes/PreloadScene'
 import { SelectScene } from './scenes/SelectScene'
+import { SettingsScene } from './scenes/SettingsScene'
 import { ShopScene } from './scenes/ShopScene'
 import { UIScene } from './scenes/UIScene'
 import { grantCoins } from './core/run'
@@ -29,7 +30,7 @@ const game = new Phaser.Game({
   // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
   physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, CaptainScene, SelectScene, ShopScene, ArenaScene, UIScene],
+  scene: [PreloadScene, MenuScene, SettingsScene, CaptainScene, SelectScene, ShopScene, ArenaScene, UIScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {

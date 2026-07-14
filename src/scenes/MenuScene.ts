@@ -15,6 +15,7 @@ export class MenuScene extends Phaser.Scene {
   private preserveOnRestart = false
   private palette?: Palette
   private menuBtn = { x: 0, y: 0, w: 0, h: 0 }
+  private gearRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
     super('menu')
@@ -80,6 +81,13 @@ export class MenuScene extends Phaser.Scene {
       })
     }
 
+    // 设置入口：右上角齿轮
+    const gear = emojiImage(this, w - safeInsets.right - 34, safeInsets.top + 34, '⚙️', 30)
+      .setAlpha(0.8)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => this.scene.start('settings'))
+    this.gearRect = { x: gear.x - 22, y: gear.y - 22, w: 44, h: 44 }
+
     // 明确的按钮 + 空格键开始，避免任意点击误触
     const btn = { x: w / 2 - 140, y: h * 0.82 - 29, w: 280, h: 58 }
     this.menuBtn = btn
@@ -141,6 +149,12 @@ export class MenuScene extends Phaser.Scene {
           y: this.menuBtn.y + this.menuBtn.h / 2,
           w: this.menuBtn.w,
           h: this.menuBtn.h,
+        },
+        settings: {
+          x: this.gearRect.x + this.gearRect.w / 2,
+          y: this.gearRect.y + this.gearRect.h / 2,
+          w: this.gearRect.w,
+          h: this.gearRect.h,
         },
       },
     })

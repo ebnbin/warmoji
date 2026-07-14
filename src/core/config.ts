@@ -12,6 +12,7 @@ export const MAP = {
 } as const
 
 import { ITEMS } from './items'
+import { SETTING_DEFS } from './settings'
 import type {
   AreaBlastSpec,
   BoomerangSpec,
@@ -393,7 +394,9 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   // 属性面板的武器/基础组图标 + 商店道具图标
   ...roster.flatMap((c) => c.weapons.map((w) => w.icon)),
   ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),
+  ...SETTING_DEFS.map((d) => d.icon),
   SPAWN.markEmoji,
+  '⚙️',
   '⚔️',
   '🏆',
   '⚡',

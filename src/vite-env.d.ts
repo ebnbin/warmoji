@@ -39,6 +39,12 @@ interface WarmojiShopDebug {
 
 interface WarmojiMenuDebug {
   start: { x: number; y: number; w: number; h: number }
+  settings: { x: number; y: number; w: number; h: number }
+}
+
+interface WarmojiSettingsDebug {
+  items: { id: string; x: number; y: number; w: number; h: number; on: boolean }[]
+  back: { x: number; y: number; w: number; h: number }
 }
 
 interface WarmojiCaptainDebug {
@@ -48,7 +54,7 @@ interface WarmojiCaptainDebug {
 }
 
 interface WarmojiDebug {
-  scene: 'menu' | 'captain' | 'select' | 'shop' | 'arena' | 'gameover'
+  scene: 'menu' | 'settings' | 'captain' | 'select' | 'shop' | 'arena' | 'gameover'
   elapsed: number
   hp: number
   alive: number
@@ -66,6 +72,7 @@ interface WarmojiDebug {
   wave?: number
   coins?: number
   menu?: WarmojiMenuDebug
+  settings?: WarmojiSettingsDebug
   captain?: WarmojiCaptainDebug
   select?: WarmojiSelectDebug
   shop?: WarmojiShopDebug
