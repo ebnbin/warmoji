@@ -520,14 +520,15 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  /** 程序化小动画：全程呼吸缩放（移动时稍快稍深）+ 朝移动方向翻转。逐帧写值，零 tween 开销 */
+  /** 程序化小动画：全程呼吸（挤压拉伸：高度胀时宽度反向收，体积感守恒，
+   * 比单轴缩放醒目得多）+ 朝移动方向翻转。逐帧写值，零 tween 开销 */
   private animateMember(m: Member, moving: boolean, delta: number): void {
     if (this.elapsedMs < m.animLockUntil) return
     const img = m.image
     // 相位按各自频率累积（slot 初相错开），移动/静止切换不会跳变
-    m.breathPhase += delta / (moving ? 200 : 320)
-    const breath = 1 + Math.sin(m.breathPhase) * (moving ? 0.04 : 0.025)
-    img.setScale(m.baseScale, m.baseScale * breath)
+    m.breathPhase += delta / (moving ? 190 : 300)
+    const s = Math.sin(m.breathPhase) * (moving ? 0.085 : 0.05)
+    img.setScale(m.baseScale * (1 - s * 0.6), m.baseScale * (1 + s))
     if (img.rotation !== 0) img.setRotation(0)
     if (Math.abs(this.teamDir.x) > 0.2) img.setFlipX(this.teamDir.x > 0)
   }
