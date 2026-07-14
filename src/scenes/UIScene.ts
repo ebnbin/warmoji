@@ -2,10 +2,9 @@ import Phaser from 'phaser'
 import { COIN } from '../core/config'
 import { formatTime } from '../core/format'
 import { endRun } from '../core/run'
-import { nextZoneKind, ZONE_SPECS } from '../core/zones'
 import { isDevOpen, isStress, setDevOpen, setStress } from '../ui/dev'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../ui/diagnostics'
-import { emojiCacheStats, emojiImage, emojiKey, iconLabel } from '../ui/emoji'
+import { emojiCacheStats, emojiImage, iconLabel } from '../ui/emoji'
 import { UI_FONT } from '../ui/fonts'
 import { Joystick } from '../ui/Joystick'
 import {
@@ -23,7 +22,6 @@ import type { ArenaScene, GameOverInfo, HudSnapshot } from './ArenaScene'
 export class UIScene extends Phaser.Scene {
   private joystick?: Joystick
   private xpBar!: Phaser.GameObjects.Graphics
-  private nextZoneIcon!: Phaser.GameObjects.Image
   private levelText!: Phaser.GameObjects.Text
   private timeText!: Phaser.GameObjects.Text
   private killsText!: Phaser.GameObjects.Text
@@ -78,9 +76,7 @@ export class UIScene extends Phaser.Scene {
       strokeThickness: 3,
       resolution: res,
     }
-    // 经验条尽头 = 下一座图腾的类型预告：条满即种
-    this.nextZoneIcon = emojiImage(this, sL + 228, sT + 19, ZONE_SPECS.war.emoji, 17, true)
-    this.levelText = this.add.text(sL + 244, sT + 10, 'Lv.1', { ...hudText, fontSize: '16px' })
+    this.levelText = this.add.text(sL + 224, sT + 10, 'Lv.1', { ...hudText, fontSize: '16px' })
     this.timeText = this.add
       .text(w / 2, sT + 10, '', { ...hudText, fontSize: '22px' })
       .setOrigin(0.5, 0)
@@ -217,10 +213,7 @@ export class UIScene extends Phaser.Scene {
     if (this.devText) this.updateDevPanel(time)
     const s = this.arena.hudSnapshot()
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.drawXpBar(s)
-    if (s.level !== this.last.level) {
-      this.levelText.setText(`Lv.${s.level}`)
-      this.nextZoneIcon.setTexture(emojiKey(ZONE_SPECS[nextZoneKind(s.level)].emoji, true))
-    }
+    if (s.level !== this.last.level) this.levelText.setText(`Lv.${s.level}`)
     if (s.kills !== this.last.kills) this.killsText.setText(String(s.kills))
     if (s.coins !== this.last.coins) this.coinsText.setText(String(s.coins))
     // 常规显示本波倒计时；压测模式无波次限时，显示已进行时间

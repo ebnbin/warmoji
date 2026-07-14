@@ -12,7 +12,6 @@ export const MAP = {
 } as const
 
 import { ITEMS } from './items'
-import { ZONE_SPECS } from './zones'
 import type {
   AreaBlastSpec,
   BoomerangSpec,
@@ -360,22 +359,7 @@ export const STRESS = {
   cooldownMul: 0.1,
 } as const
 
-// 升级门槛曲线；按怪均 2~3 经验校准到每波约种 3~4 座图腾
-export const XP = { base: 10, perLevel: 8 } as const
-
-// 经验领域（图腾，见 core/zones.ts）：升级即在队伍中心种下，持续到波末
-export const ZONES = {
-  radius: 3 * UNIT,
-  /** 场上同时存在的上限，超出时最旧的消散 */
-  maxActive: 6,
-  /** 队员离开领域后增益的延续时间：风筝路线穿域也能吃到收益 */
-  lingerMs: 2000,
-  war: { cooldownMul: 0.75 },
-  heal: { hpPerSec: 4 },
-  chill: { speedMul: 0.55 },
-  /** 多重减速（迟滞域×寒气光环等）叠乘后的移速下限（占原速比例） */
-  minSlowMul: 0.4,
-} as const
+export const XP = { base: 8, perLevel: 6 } as const
 
 // 商店：每个上架位可付费重新随机（队长可提供免费次数）
 export const SHOP = { refreshPrice: 2 } as const
@@ -400,7 +384,6 @@ export const OUTLINED_EMOJIS: readonly string[] = [
   ZOMBIE.emoji,
   GHOST.emoji,
   COIN.emoji,
-  ...Object.values(ZONE_SPECS).map((z) => z.emoji),
   '💀',
 ]
 

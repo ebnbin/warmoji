@@ -16,9 +16,8 @@ describe('xp', () => {
   })
 
   it('一次获得大量经验可连升多级，余数正确', () => {
-    // L1→L2 需 base，L2→L3 需 base+perLevel
-    const need = xpToNext(1) + xpToNext(2)
-    const r = gainXp({ level: 1, xp: 0 }, need + 3)
+    // L1→L2 需 8，L2→L3 需 14；25 = 8 + 14 + 余 3
+    const r = gainXp({ level: 1, xp: 0 }, 25)
     expect(r.levelsGained).toBe(2)
     expect(r.state).toEqual({ level: 3, xp: 3 })
   })

@@ -25,14 +25,6 @@ test('开局后自动战斗：出怪、飞刀击杀、计时推进、无控制�
     timeout: 45_000,
   })
 
-  // 经验领域：击杀升级后地图上种下图腾，HUD 预告下一座类型
-  await page.waitForFunction(() => (window.__warmoji?.zones?.count ?? 0) >= 1, undefined, {
-    timeout: 45_000,
-  })
-  const zones = await page.evaluate(() => window.__warmoji!.zones!)
-  expect(zones.kinds[0]).toBe('war')
-  expect(['war', 'heal', 'chill']).toContain(zones.next)
-
   // 等战场热闹些再截图
   await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 8, undefined, {
     timeout: 45_000,

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CHARACTERS, COIN, GHOST, HIT_SHAKE, MAP, MEMBER, SPAWN, STRESS, TEAM, UNIT, WAVE, ZOMBIE, ZONES } from '../core/config'
+import { CHARACTERS, COIN, GHOST, HIT_SHAKE, MAP, MEMBER, SPAWN, STRESS, TEAM, UNIT, WAVE, ZOMBIE } from '../core/config'
 import type { CharacterSpec, EnemySpec } from '../core/config'
 import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
@@ -21,8 +21,6 @@ import { randomMapPoint } from '../core/spawn'
 import { norm } from '../core/vec'
 import { waveAt } from '../core/waves'
 import { gainXp, xpToNext } from '../core/xp'
-import { inZone, nextZoneKind, ZONE_SPECS, zoneKindForLevel } from '../core/zones'
-import type { ZoneKind } from '../core/zones'
 import { applyBackground } from '../ui/background'
 import { DAMAGE_FONT, ensureDamageFont } from '../ui/damageFont'
 import { reportDebug } from '../ui/debug'
@@ -76,8 +74,6 @@ interface Member {
   maxHp: number
   iframesMs: number
   reviveMs: number
-  /** 领域增益的余温截止时刻（elapsedMs 基准）；武器 ctx 闭包引用同一对象 */
-  zoneFx: { warUntil: number; healUntil: number }
   hp: number
   alive: boolean
   reviveAt: number
@@ -109,8 +105,6 @@ export class ArenaScene extends Phaser.Scene {
   private enemies!: Phaser.GameObjects.Group
   private projectiles!: Phaser.GameObjects.Group
   private coins!: Phaser.GameObjects.Group
-  /** 本波已种下的经验领域（随场景销毁，波末自然消失） */
-  private zones: { kind: ZoneKind; x: number; y: number; circle: Phaser.GameObjects.Graphics; icon: ImageObj }[] = []
   private frameTargets: EnemyTarget[] = []
   private frameSlowZones: { x: number; y: number; r2: number; factor: number }[] = []
   private weaponCtx: WeaponContext = {
@@ -204,7 +198,6 @@ export class ArenaScene extends Phaser.Scene {
     this.pendingSpawns = 0
     this.over = false
     this.gameOverInfo = undefined
-    this.zones = []
 
     this.physics.world.setBounds(0, 0, MAP.width, MAP.height)
     this.drawFloor()
@@ -279,7 +272,6 @@ export class ArenaScene extends Phaser.Scene {
     this.frameTargets = (this.enemies.getChildren() as ImageObj[])
       .filter((e) => e.active)
       .map((e) => ({ x: e.x, y: e.y, radius: (e.getData('spec') as EnemySpec).radius, ref: e }))
-    this.updateZoneBuffs(delta)
     this.updateMembers(delta)
     this.spawn(delta)
     this.steerEnemies()
@@ -306,11 +298,6 @@ export class ArenaScene extends Phaser.Scene {
       playerY: this.center.y,
       camX: cam.worldView.centerX,
       camY: cam.worldView.centerY,
-      zones: {
-        count: this.zones.length,
-        kinds: this.zones.map((z) => z.kind),
-        next: nextZoneKind(this.run.xp.level),
-      },
     })
   }
 
@@ -319,8 +306,7 @@ export class ArenaScene extends Phaser.Scene {
     this.over = true
     this.run.combatMs += this.elapsedMs
     this.run.wave += 1
-    // 治愈域回血按帧累积是小数，快照取整
-    this.run.memberHp = this.members.map((m) => (m.alive ? Math.round(m.hp) : 0))
+    this.run.memberHp = this.members.map((m) => (m.alive ? m.hp : 0))
     this.scene.start('shop')
   }
 
@@ -361,14 +347,10 @@ export class ArenaScene extends Phaser.Scene {
     }
     // 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效武器参数
     const fx = aggregateCharacterEffects(this.run.memberItems[slot] ?? [])
-    const zoneFx = { warUntil: -Infinity, healUntil: -Infinity }
     const memberCtx: WeaponContext = {
       ...this.weaponCtx,
       damageMul: () => this.stats.damageMul * fx.damageMul * this.teamFx.teamDamageMul,
-      cooldownMul: () =>
-        this.stats.cooldownMul *
-        fx.cooldownMul *
-        (this.elapsedMs < zoneFx.warUntil ? ZONES.war.cooldownMul : 1),
+      cooldownMul: () => this.stats.cooldownMul * fx.cooldownMul,
     }
     const maxHp = this.stress ? this.stats.maxHp : Math.max(10, MEMBER.maxHp + fx.hpAdd)
     const member: Member = {
@@ -384,7 +366,6 @@ export class ArenaScene extends Phaser.Scene {
       maxHp,
       iframesMs: MEMBER.iframesMs + fx.iframesAddMs,
       reviveMs: Math.max(1000, TEAM.reviveMs + fx.reviveAddMs),
-      zoneFx,
       // 血量跨波保留；上一波阵亡者低血量复活（压测模式不走 run 状态）
       hp: this.stress
         ? this.stats.maxHp
@@ -602,12 +583,7 @@ export class ArenaScene extends Phaser.Scene {
     this.run.kills++
     const spec = enemy.getData('spec') as EnemySpec
     // 经验击杀即得；金币落地等待拾取
-    const gained = gainXp(this.run.xp, spec.xp)
-    this.run.xp = gained.state
-    // 升级即在队伍当前中心种下领域图腾（连升多级时逐座错开）
-    for (let i = 0; i < gained.levelsGained; i++) {
-      this.plantZone(zoneKindForLevel(gained.state.level - gained.levelsGained + 1 + i), i)
-    }
+    this.run.xp = gainXp(this.run.xp, spec.xp).state
     const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? spec.coins : 0
     this.spawnCoins(enemy.x, enemy.y, spec.coins + doubled)
     enemy.setActive(false)
@@ -724,14 +700,6 @@ export class ArenaScene extends Phaser.Scene {
           slowed = true
         }
       }
-      // 迟滞图腾：同类不叠加，命中任意一座即生效一次；与光环叠乘后有保底
-      for (const z of this.zones) {
-        if (z.kind !== 'chill' || !inZone(z.x, z.y, ZONES.radius, e.x, e.y)) continue
-        speed *= ZONES.chill.speedMul
-        slowed = true
-        break
-      }
-      speed = Math.max(speed, spec.speed * ZONES.minSlowMul)
       if (slowed !== (e.getData('slowed') as boolean | undefined)) {
         e.setData('slowed', slowed)
         if (slowed) e.setTint(0xa5d8ff)
@@ -791,61 +759,6 @@ export class ArenaScene extends Phaser.Scene {
     if (!coin.active) return
     coin.destroy()
     this.run.coins += 1
-  }
-
-  // ── 经验领域（图腾） ────────────────────────────────────────
-
-  private plantZone(kind: ZoneKind, jitterIndex = 0): void {
-    // 超出上限：最旧的一座淡出消散
-    if (this.zones.length >= ZONES.maxActive) {
-      const old = this.zones.shift()!
-      this.tweens.add({
-        targets: [old.circle, old.icon],
-        alpha: 0,
-        duration: 400,
-        onComplete: () => {
-          old.circle.destroy()
-          old.icon.destroy()
-        },
-      })
-    }
-    const spec = ZONE_SPECS[kind]
-    const x = Phaser.Math.Clamp(
-      this.center.x + jitterIndex * 1.2 * UNIT,
-      ZONES.radius / 2,
-      MAP.width - ZONES.radius / 2,
-    )
-    const y = this.center.y
-    // 圆环画在实体层之下：地面染色而非遮挡
-    const circle = this.add.graphics().setDepth(1)
-    circle.fillStyle(spec.color, 0.1)
-    circle.fillCircle(0, 0, ZONES.radius)
-    circle.lineStyle(2, spec.color, 0.5)
-    circle.strokeCircle(0, 0, ZONES.radius)
-    circle.setPosition(x, y)
-    const icon = emojiImage(this, x, y, spec.emoji, 0.55 * UNIT, true).setDepth(2).setAlpha(0.9)
-    const iconScale = icon.scale
-    circle.setScale(0.15)
-    icon.setScale(iconScale * 0.15)
-    this.tweens.add({ targets: circle, scale: 1, duration: 400, ease: 'Back.easeOut' })
-    this.tweens.add({ targets: icon, scale: iconScale, duration: 400, ease: 'Back.easeOut' })
-    this.zones.push({ kind, x, y, circle, icon })
-  }
-
-  /** 队员领域增益：圈内刷新余温时间戳；治愈在余温期内持续回血 */
-  private updateZoneBuffs(delta: number): void {
-    if (this.zones.length === 0) return
-    for (const m of this.members) {
-      if (!m.alive) continue
-      for (const z of this.zones) {
-        if (z.kind === 'chill' || !inZone(z.x, z.y, ZONES.radius, m.image.x, m.image.y)) continue
-        if (z.kind === 'war') m.zoneFx.warUntil = this.elapsedMs + ZONES.lingerMs
-        else m.zoneFx.healUntil = this.elapsedMs + ZONES.lingerMs
-      }
-      if (m.hp < m.maxHp && this.elapsedMs < m.zoneFx.healUntil) {
-        m.hp = Math.min(m.maxHp, m.hp + (ZONES.heal.hpPerSec * delta) / 1000)
-      }
-    }
   }
 
   // ── 结算 ────────────────────────────────────────────────────
