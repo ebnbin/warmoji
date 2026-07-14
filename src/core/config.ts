@@ -317,8 +317,19 @@ export const WAVE = {
   summaryMs: 1600,
 } as const
 
-export interface EnemySpec {
-  readonly kind: 'zombie' | 'ghost'
+// 敌人：behavior 决定战斗内行为分支（ArenaScene 按此分派）。
+// chase 直追最近队员；wanderFire 游荡+朝移动方向放枪；dash 探测→蓄力→直线突刺；
+// fleeFire 见人就逃+朝人冷枪；coinThief 抢地上的金币，击杀吐回+利息。
+export interface EnemyBulletSpec {
+  readonly emoji: string
+  readonly size: number
+  readonly radius: number
+  readonly speed: number
+  readonly damage: number
+  readonly lifeMs: number
+}
+
+interface EnemyBase {
   readonly emoji: string
   readonly size: number
   readonly radius: number
@@ -330,8 +341,60 @@ export interface EnemySpec {
   readonly coins: number
 }
 
-export const ZOMBIE: EnemySpec = {
+export interface ChaseEnemySpec extends EnemyBase {
+  readonly kind: 'zombie' | 'ghost' | 'mushroom' | 'blob' | 'blobling'
+  readonly behavior: 'chase'
+  /** 死亡在原地留毒液池（玩家踩入按 tick 掉血） */
+  readonly poison?: {
+    readonly radius: number
+    readonly durationMs: number
+    readonly tickMs: number
+    readonly damage: number
+  }
+  /** 死亡分裂出迷你体 */
+  readonly split?: { readonly into: ChaseEnemySpec; readonly count: number }
+}
+
+export interface WanderFireEnemySpec extends EnemyBase {
+  readonly kind: 'invader'
+  readonly behavior: 'wanderFire'
+  readonly fireIntervalMs: number
+  readonly bullet: EnemyBulletSpec
+}
+
+export interface DashEnemySpec extends EnemyBase {
+  readonly kind: 'boar'
+  readonly behavior: 'dash'
+  readonly detectRange: number
+  readonly windupMs: number
+  readonly dashSpeed: number
+  readonly dashDist: number
+  readonly cooldownMs: number
+}
+
+export interface FleeFireEnemySpec extends EnemyBase {
+  readonly kind: 'snake'
+  readonly behavior: 'fleeFire'
+  readonly fleeRange: number
+  readonly fireIntervalMs: number
+  readonly bullet: EnemyBulletSpec
+}
+
+export interface CoinThiefEnemySpec extends EnemyBase {
+  readonly kind: 'rat'
+  readonly behavior: 'coinThief'
+}
+
+export type EnemySpec =
+  | ChaseEnemySpec
+  | WanderFireEnemySpec
+  | DashEnemySpec
+  | FleeFireEnemySpec
+  | CoinThiefEnemySpec
+
+export const ZOMBIE: ChaseEnemySpec = {
   kind: 'zombie',
+  behavior: 'chase',
   emoji: '🧟',
   size: 1 * UNIT,
   radius: 0.5 * UNIT,
@@ -342,8 +405,9 @@ export const ZOMBIE: EnemySpec = {
   coins: 1,
 }
 
-export const GHOST: EnemySpec = {
+export const GHOST: ChaseEnemySpec = {
   kind: 'ghost',
+  behavior: 'chase',
   emoji: '👻',
   size: 0.9 * UNIT,
   radius: 0.45 * UNIT,
@@ -353,6 +417,140 @@ export const GHOST: EnemySpec = {
   xp: 2,
   coins: 1,
 }
+
+/** 游荡射手：不索敌，慢速乱逛，周期性朝自己移动方向放一发慢弹（弹幕污染走位空间） */
+export const INVADER: WanderFireEnemySpec = {
+  kind: 'invader',
+  behavior: 'wanderFire',
+  emoji: '👾',
+  size: 0.95 * UNIT,
+  radius: 0.48 * UNIT,
+  hp: 40,
+  speed: 0.9 * UNIT,
+  damage: 6,
+  xp: 4,
+  coins: 2,
+  fireIntervalMs: 2800,
+  bullet: { emoji: '🔴', size: 0.3 * UNIT, radius: 0.14 * UNIT, speed: 3 * UNIT, damage: 7, lifeMs: 4500 },
+}
+
+/** 突刺怪：探测圈内锁定蓄力方向 → 短延迟 → 直线冲刺一段距离（横向位移可躲） */
+export const BOAR: DashEnemySpec = {
+  kind: 'boar',
+  behavior: 'dash',
+  emoji: '🐗',
+  size: 1.05 * UNIT,
+  radius: 0.52 * UNIT,
+  hp: 80,
+  speed: 1.1 * UNIT,
+  damage: 10,
+  xp: 5,
+  coins: 2,
+  detectRange: 4 * UNIT,
+  windupMs: 550,
+  dashSpeed: 8 * UNIT,
+  dashDist: 3.5 * UNIT,
+  cooldownMs: 1800,
+}
+
+/** 逃跑射手：见人就拉开距离，周期性朝人吐慢速毒弹（制造追不追的抉择） */
+export const SNAKE: FleeFireEnemySpec = {
+  kind: 'snake',
+  behavior: 'fleeFire',
+  emoji: '🐍',
+  size: 0.95 * UNIT,
+  radius: 0.45 * UNIT,
+  hp: 35,
+  speed: 2.4 * UNIT,
+  damage: 5,
+  xp: 4,
+  coins: 2,
+  fleeRange: 5 * UNIT,
+  fireIntervalMs: 2600,
+  bullet: { emoji: '🟢', size: 0.3 * UNIT, radius: 0.14 * UNIT, speed: 3.2 * UNIT, damage: 6, lifeMs: 4500 },
+}
+
+/** 毒爆怪：慢速近战，死亡原地留毒液池（别在自己的风筝路线上打爆它） */
+export const MUSHROOM: ChaseEnemySpec = {
+  kind: 'mushroom',
+  behavior: 'chase',
+  emoji: '🍄',
+  size: 0.95 * UNIT,
+  radius: 0.46 * UNIT,
+  hp: 50,
+  speed: 1 * UNIT,
+  damage: 6,
+  xp: 4,
+  coins: 2,
+  poison: { radius: 1.6 * UNIT, durationMs: 3000, tickMs: 500, damage: 4 },
+}
+
+/** 偷金币鼠：不理玩家，直奔地上最近的金币吃掉；击杀吐回吃掉的 + 1 枚利息 */
+export const RAT: CoinThiefEnemySpec = {
+  kind: 'rat',
+  behavior: 'coinThief',
+  emoji: '🐀',
+  size: 0.8 * UNIT,
+  radius: 0.4 * UNIT,
+  hp: 30,
+  speed: 3.2 * UNIT,
+  damage: 3,
+  xp: 3,
+  coins: 1,
+}
+
+export const BLOBLING: ChaseEnemySpec = {
+  kind: 'blobling',
+  behavior: 'chase',
+  emoji: '🫧',
+  size: 0.55 * UNIT,
+  radius: 0.28 * UNIT,
+  hp: 18,
+  speed: 2.6 * UNIT,
+  damage: 4,
+  xp: 1,
+  coins: 0,
+}
+
+/** 分裂怪：死亡分裂成 2 只更小更快的迷你泡泡 */
+export const BLOB: ChaseEnemySpec = {
+  kind: 'blob',
+  behavior: 'chase',
+  emoji: '🫧',
+  size: 1.15 * UNIT,
+  radius: 0.55 * UNIT,
+  hp: 70,
+  speed: 1.2 * UNIT,
+  damage: 6,
+  xp: 4,
+  coins: 2,
+  split: { into: BLOBLING, count: 2 },
+}
+
+export const ENEMY_SPECS: readonly EnemySpec[] = [
+  ZOMBIE,
+  GHOST,
+  INVADER,
+  BOAR,
+  SNAKE,
+  MUSHROOM,
+  RAT,
+  BLOB,
+  BLOBLING,
+]
+
+// 出场配比：新怪按波次渐入（sinceWave），僵尸/幽灵始终是主体；
+// 权重随波次线性微调，zombie 有下限兜底（见 core/enemies.ts enemyMixAt）
+export const ENEMY_MIX = [
+  { kind: 'zombie', sinceWave: 1, base: 80, perWave: -2, min: 40, max: 80 },
+  { kind: 'ghost', sinceWave: 1, base: 15, perWave: 1, min: 15, max: 32 },
+  { kind: 'invader', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'boar', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'snake', sinceWave: 4, base: 7, perWave: 0.4, min: 0, max: 14 },
+  { kind: 'mushroom', sinceWave: 4, base: 7, perWave: 0.4, min: 0, max: 14 },
+  { kind: 'rat', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'blob', sinceWave: 5, base: 7, perWave: 0.4, min: 0, max: 14 },
+] as const
 
 // 金币拾取是团队能力：磁吸与入账都以队伍中心为基点（拾取范围类道具挂队长）
 export const COIN = {
@@ -371,9 +569,6 @@ export const SPAWN = {
   minIntervalMs: 80,
   rampSeconds: 300,
   hpGrowthPerMin: 0.5,
-  ghostShareStart: 0.15,
-  ghostShareMax: 0.55,
-  ghostShareRampSeconds: 240,
   maxAlive: 400,
   // 刷怪供给随在场人数缩放：factor = base + perMember×人数（5 人 = 1.0），
   // 让单人首发的第 1 波与满编后期压力手感一致
@@ -416,30 +611,45 @@ export const SHOP = { refreshPrice: 2 } as const
 // 角色受击时的相机震动
 export const HIT_SHAKE = { durationMs: 60, intensity: 0.0012 } as const
 
-// 剪影描边（radius 单位 = twemoji viewBox 单位，36 格）
-export const OUTLINE = { radius: 2, color: '#000000' } as const
+// 剪影描边（radius 单位 = twemoji viewBox 单位，36 格）：按阵营配色
+// 玩家侧黑、敌人紫、敌方子弹红——一眼分清敌我与危险物
+export const OUTLINE = {
+  radius: 2,
+  colors: {
+    player: '#000000',
+    enemy: '#8e24aa',
+    enemyShot: '#d32f2f',
+  },
+} as const
+
+export type OutlineKind = keyof typeof OUTLINE.colors
 
 const roster: readonly CharacterSpec[] = Object.values(CHARACTERS)
 
-export const OUTLINED_EMOJIS: readonly string[] = [
-  ...roster.map((c) => c.emoji),
-  ...Object.values<CaptainSpec>(CAPTAINS).map((c) => c.emoji),
-  ...roster.flatMap((c) =>
-    c.weapons.flatMap((w) => [
-      ...('held' in w && w.held ? [w.held.emoji] : []),
-      ...(w.kind === 'projectile' ? [w.projectile.emoji] : []),
-    ]),
-  ),
-  ZOMBIE.emoji,
-  GHOST.emoji,
-  COIN.emoji,
-  '➕',
-  '💀',
-]
+// 描边变体按阵营分组预载：玩家侧黑、敌人紫、敌方子弹红
+export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
+  player: [
+    ...roster.map((c) => c.emoji),
+    ...Object.values<CaptainSpec>(CAPTAINS).map((c) => c.emoji),
+    ...roster.flatMap((c) =>
+      c.weapons.flatMap((w) => [
+        ...('held' in w && w.held ? [w.held.emoji] : []),
+        ...(w.kind === 'projectile' ? [w.projectile.emoji] : []),
+      ]),
+    ),
+    COIN.emoji,
+    '➕',
+    '💀',
+  ],
+  enemy: [...new Set(ENEMY_SPECS.map((e) => e.emoji))],
+  enemyShot: [
+    ...new Set(ENEMY_SPECS.flatMap((e) => ('bullet' in e ? [e.bullet.emoji] : []))),
+  ],
+}
 
 // 启动时预载的 emoji（含 UI 图标）；其余全集按需加载（ui/emoji.ts ensureEmoji）
 export const PRELOAD_EMOJIS: readonly string[] = [
-  ...OUTLINED_EMOJIS,
+  ...Object.values(OUTLINED_EMOJIS).flat(),
   // 属性面板的武器/基础组图标 + 商店道具图标
   ...roster.flatMap((c) => c.weapons.map((w) => w.icon)),
   ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),

@@ -146,7 +146,7 @@ export class SelectScene extends Phaser.Scene {
       .on('pointerup', () => {
         if (!this.dragMoved) this.scene.start('captain')
       })
-    emojiImage(this, capText.x - capText.width - 18, oy + L.headerY, captain.emoji, 26, true)
+    emojiImage(this, capText.x - capText.width - 18, oy + L.headerY, captain.emoji, 26, 'player')
 
     this.createList(res)
     this.createDetail(res)
@@ -219,7 +219,7 @@ export class SelectScene extends Phaser.Scene {
       const spec = CHARACTERS[id]
       const relY = i * pitch
       const bg = this.add.graphics()
-      const emoji = emojiImage(this, 38, relY + L.rowH / 2, spec.emoji, 40, true)
+      const emoji = emojiImage(this, 38, relY + L.rowH / 2, spec.emoji, 40, 'player')
       const name = this.add
         .text(74, relY + L.rowH / 2, spec.name, {
           fontFamily: UI_FONT,
@@ -313,7 +313,7 @@ export class SelectScene extends Phaser.Scene {
       dy + (portrait ? 92 : 96),
       CHARACTERS[this.focusedId].emoji,
       portrait ? 104 : 110,
-      true,
+      'player',
     )
     this.detailName = this.add
       .text(cx, dy + (portrait ? 188 : 196), '', {
@@ -394,7 +394,7 @@ export class SelectScene extends Phaser.Scene {
 
     const spec = CHARACTERS[this.focusedId]
     const size = this.layout === PORTRAIT ? 104 : 110
-    this.detailEmoji.setTexture(emojiKey(spec.emoji, true)).setDisplaySize(size, size)
+    this.detailEmoji.setTexture(emojiKey(spec.emoji, 'player')).setDisplaySize(size, size)
     this.detailName.setText(spec.name)
     this.detailDesc.setText(spec.desc)
 

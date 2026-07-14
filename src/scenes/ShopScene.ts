@@ -176,7 +176,7 @@ export class ShopScene extends Phaser.Scene {
       })
     })
 
-    emojiImage(this, w / 2 - 118, oy + L.coinsY, COIN.emoji, 26, true)
+    emojiImage(this, w / 2 - 118, oy + L.coinsY, COIN.emoji, 26, 'player')
     this.coinsText = this.add
       .text(w / 2 - 100, oy + L.coinsY, `${this.run.coins}`, {
         fontFamily: UI_FONT,
@@ -365,7 +365,7 @@ export class ShopScene extends Phaser.Scene {
     const slotRow = (id: SlotId, index: number, emoji: string, name: string, extra: (y: number) => void): void => {
       const y = sy + index * (S.rowH + S.gap)
       const bg = this.add.graphics()
-      emojiImage(this, sx + 36, y + S.rowH / 2, emoji, 40, true)
+      emojiImage(this, sx + 36, y + S.rowH / 2, emoji, 40, 'player')
       this.add
         .text(sx + 70, y + S.rowH / 2 - 12, name, {
           fontFamily: UI_FONT,
@@ -476,7 +476,7 @@ export class ShopScene extends Phaser.Scene {
     }
 
     this.detailObjs.push(
-      emojiImage(this, dx + 52, dy + 46, spec.emoji, 52, true),
+      emojiImage(this, dx + 52, dy + 46, spec.emoji, 52, 'player'),
       this.add
         .text(dx + 92, dy + 34, isCaptain ? spec.name : `${spec.name} Lv.${level}`, {
           fontFamily: UI_FONT,
@@ -696,7 +696,7 @@ export class ShopScene extends Phaser.Scene {
     }
 
     this.detailObjs.push(
-      emojiImage(this, dx + 52, dy + 46, '➕', 44, true),
+      emojiImage(this, dx + 52, dy + 46, '➕', 44, 'player'),
       this.add
         .text(dx + 92, dy + 34, '招募新队员', {
           fontFamily: UI_FONT,
@@ -742,7 +742,7 @@ export class ShopScene extends Phaser.Scene {
         })
       this.detailObjs.push(
         g,
-        emojiImage(this, cx + 26, cy + ch / 2, spec.emoji, 30, true),
+        emojiImage(this, cx + 26, cy + ch / 2, spec.emoji, 30, 'player'),
         this.add
           .text(cx + 48, cy + ch / 2, spec.name, {
             fontFamily: UI_FONT,
@@ -769,7 +769,7 @@ export class ShopScene extends Phaser.Scene {
     if (picked) {
       const spec = CHARACTERS[picked]
       this.detailObjs.push(
-        emojiImage(this, dx + 48, cardY + 39, spec.emoji, 40, true),
+        emojiImage(this, dx + 48, cardY + 39, spec.emoji, 40, 'player'),
         this.add
           .text(dx + 80, cardY + 22, spec.name, {
             fontFamily: UI_FONT,

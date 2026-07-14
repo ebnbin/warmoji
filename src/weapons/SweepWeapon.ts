@@ -19,7 +19,7 @@ export class SweepWeapon implements WeaponRuntime {
     private ctx: WeaponContext,
     initialCooldownMs: number,
   ) {
-    this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, true).setDepth(13)
+    this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, 'player').setDepth(13)
     this.cooldown = initialCooldownMs
   }
 

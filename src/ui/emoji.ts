@@ -1,10 +1,12 @@
 import Phaser from 'phaser'
 import { OUTLINE, OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../core/config'
+import type { OutlineKind } from '../core/config'
 import { emojiCodepoints } from '../core/emoji'
 import { outlineSvg, setSvgSize } from '../core/svg'
 
 // twemoji 全集（@twemoji/svg，构建时同步到 public/emoji/<版本>/，图形 CC-BY 4.0）。
 // 加载管线：fetch SVG 文本 → core/svg.ts 纯函数改写 → 光栅化 → Phaser 纹理；
+// 描边按阵营配色（player 黑 / enemy 紫 / enemyShot 红），每色一个纹理变体。
 // 启动只预载 PRELOAD_EMOJIS，其余按需 ensureEmoji，超 LRU 上限淘汰最久未用。
 const RASTER = 256
 const LRU_LIMIT = 256
@@ -22,8 +24,15 @@ export function emojiCacheStats(scene: Phaser.Scene): { textures: number; pinned
   }
 }
 
-export function emojiKey(emoji: string, outlined = false): string {
-  return `emoji-${emojiCodepoints(emoji)}${outlined ? '-ol' : ''}`
+// player 沿用旧后缀 '-ol'，其余按阵营命名
+const KIND_SUFFIX: Record<OutlineKind, string> = {
+  player: '-ol',
+  enemy: '-ole',
+  enemyShot: '-olr',
+}
+
+export function emojiKey(emoji: string, outline?: OutlineKind): string {
+  return `emoji-${emojiCodepoints(emoji)}${outline ? KIND_SUFFIX[outline] : ''}`
 }
 
 function emojiUrl(emoji: string): string {
@@ -45,24 +54,24 @@ async function rasterize(svgText: string): Promise<HTMLImageElement> {
   }
 }
 
-async function createTexture(scene: Phaser.Scene, emoji: string, outlined: boolean): Promise<string> {
-  const key = emojiKey(emoji, outlined)
+async function createTexture(scene: Phaser.Scene, emoji: string, outline?: OutlineKind): Promise<string> {
+  const key = emojiKey(emoji, outline)
   const res = await fetch(emojiUrl(emoji))
   if (!res.ok) throw new Error(`HTTP ${res.status} ${emojiUrl(emoji)}`)
   const raw = await res.text()
-  const svg = outlined ? outlineSvg(raw, OUTLINE.radius, OUTLINE.color) : raw
+  const svg = outline ? outlineSvg(raw, OUTLINE.radius, OUTLINE.colors[outline]) : raw
   scene.textures.addImage(key, await rasterize(setSvgSize(svg, RASTER)))
   return key
 }
 
 /** 确保 emoji 纹理可用（按需 fetch + 改写 + 光栅化），并发去重 */
-export function ensureEmoji(scene: Phaser.Scene, emoji: string, outlined = false): Promise<string> {
-  const key = emojiKey(emoji, outlined)
+export function ensureEmoji(scene: Phaser.Scene, emoji: string, outline?: OutlineKind): Promise<string> {
+  const key = emojiKey(emoji, outline)
   lastUsed.set(key, ++useTick)
   if (scene.textures.exists(key)) return Promise.resolve(key)
   const pending = inflight.get(key)
   if (pending) return pending
-  const p = createTexture(scene, emoji, outlined)
+  const p = createTexture(scene, emoji, outline)
     .then((k) => {
       evictIfNeeded(scene)
       return k
@@ -84,15 +93,14 @@ function evictIfNeeded(scene: Phaser.Scene): void {
   }
 }
 
-/** 启动预载：游戏当前用到的全部 emoji（含描边变体），预载纹理不参与 LRU 淘汰 */
+/** 启动预载：游戏当前用到的全部 emoji（含各阵营描边变体），预载纹理不参与 LRU 淘汰 */
 export async function loadEmojiTextures(scene: Phaser.Scene): Promise<void> {
-  const outlinedSet = new Set(OUTLINED_EMOJIS)
+  const jobs: Promise<string>[] = PRELOAD_EMOJIS.map((emoji) => ensureEmoji(scene, emoji))
+  for (const kind of Object.keys(OUTLINED_EMOJIS) as OutlineKind[]) {
+    for (const emoji of OUTLINED_EMOJIS[kind]) jobs.push(ensureEmoji(scene, emoji, kind))
+  }
   await Promise.all(
-    PRELOAD_EMOJIS.flatMap((emoji) => {
-      const jobs = [ensureEmoji(scene, emoji, false)]
-      if (outlinedSet.has(emoji)) jobs.push(ensureEmoji(scene, emoji, true))
-      return jobs
-    }).map((p) =>
+    jobs.map((p) =>
       p
         .then((key) => {
           pinned.add(key)
@@ -109,9 +117,9 @@ export function emojiImage(
   y: number,
   emoji: string,
   size: number,
-  outlined = false,
+  outline?: OutlineKind,
 ): Phaser.GameObjects.Image {
-  return scene.add.image(x, y, emojiKey(emoji, outlined)).setDisplaySize(size, size)
+  return scene.add.image(x, y, emojiKey(emoji, outline)).setDisplaySize(size, size)
 }
 
 /** 图标 + 文字的水平居中组合 */

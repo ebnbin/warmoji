@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
-import { CAPTAINS, CHARACTERS, COIN, GHOST, HIT_SHAKE, MAP, MEMBER, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WAVE, ZOMBIE } from '../core/config'
-import type { CharacterSpec, EnemySpec } from '../core/config'
+import { CAPTAINS, CHARACTERS, COIN, HIT_SHAKE, MAP, MEMBER, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WAVE } from '../core/config'
+import type { CharacterSpec, ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../core/config'
+import { enemyMixAt, pickEnemy } from '../core/enemies'
+import type { EnemyMixEntry } from '../core/enemies'
 import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
 import { slotOffset } from '../core/formation'
@@ -88,6 +90,8 @@ interface Member {
   alive: boolean
   reviveAt: number
   lastHitMs: number
+  /** 毒液池独立于接触伤害的跳伤计时 */
+  lastPoisonMs: number
   hpBar: Phaser.GameObjects.Graphics
   shownHpRatio: number
   deadText: Phaser.GameObjects.Text
@@ -114,7 +118,11 @@ export class ArenaScene extends Phaser.Scene {
   private centerObj!: Phaser.GameObjects.Zone
   private enemies!: Phaser.GameObjects.Group
   private projectiles!: Phaser.GameObjects.Group
+  private enemyShots!: Phaser.GameObjects.Group
   private coins!: Phaser.GameObjects.Group
+  /** 毒液池（蘑菇死亡遗留），波末随场景销毁 */
+  private poisonPools: { x: number; y: number; r2: number; until: number; tickMs: number; damage: number; gfx: Phaser.GameObjects.Graphics }[] = []
+  private enemyMix: EnemyMixEntry[] = []
   private frameTargets: EnemyTarget[] = []
   private frameSlowZones: { x: number; y: number; r2: number; factor: number }[] = []
   private weaponCtx: WeaponContext = {
@@ -163,7 +171,6 @@ export class ArenaScene extends Phaser.Scene {
     bodies: number
     combatSec: number
     spawnIntervalMs: number
-    ghostShare: number
     hpMultiplier: number
   } {
     const totalSec = (this.run.combatMs + this.elapsedMs) / 1000
@@ -177,7 +184,6 @@ export class ArenaScene extends Phaser.Scene {
       bodies: this.physics.world.bodies.size,
       combatSec: Math.floor(totalSec),
       spawnIntervalMs: Math.round(this.stress ? STRESS.spawnIntervalMs : wave.spawnIntervalMs),
-      ghostShare: wave.ghostShare,
       hpMultiplier: wave.hpMultiplier,
     }
   }
@@ -214,6 +220,7 @@ export class ArenaScene extends Phaser.Scene {
     this.pendingSpawns = 0
     this.over = false
     this.gameOverInfo = undefined
+    this.poisonPools = []
 
     this.physics.world.setBounds(0, 0, MAP.width, MAP.height)
     this.drawFloor()
@@ -246,7 +253,10 @@ export class ArenaScene extends Phaser.Scene {
 
     this.enemies = this.add.group()
     this.projectiles = this.add.group()
+    this.enemyShots = this.add.group()
     this.coins = this.add.group()
+    // 压测按后期混编出怪；正常局按当前波次配比
+    this.enemyMix = enemyMixAt(this.stress ? 10 : this.run.wave)
 
     // 伤害数字对象池：复用固定数量 BitmapText（见 ui/damageFont.ts）
     ensureDamageFont(this)
@@ -263,6 +273,9 @@ export class ArenaScene extends Phaser.Scene {
     // 子弹命中走线段扫掠（sweepProjectiles），不用点重叠：低帧率下会穿模漏判
     this.physics.add.overlap(this.memberGroup, this.enemies, (m, e) =>
       this.onMemberTouched(m as unknown as ImageObj, e as unknown as ImageObj),
+    )
+    this.physics.add.overlap(this.memberGroup, this.enemyShots, (m, s) =>
+      this.onMemberShot(m as unknown as ImageObj, s as unknown as ImageObj),
     )
     this.physics.add.overlap(this.memberGroup, this.coins, (_m, c) =>
       this.collectCoin(c as unknown as ImageObj),
@@ -296,6 +309,8 @@ export class ArenaScene extends Phaser.Scene {
     this.updateMembers(delta)
     this.spawn(delta)
     this.steerEnemies()
+    this.updateEnemyShots()
+    this.updatePoisonPools()
     this.magnetCoins()
     this.sweepProjectiles()
     this.cullProjectiles()
@@ -357,7 +372,7 @@ export class ArenaScene extends Phaser.Scene {
       this.center.y + off.y,
       emoji,
       MEMBER.size,
-      true,
+      'player',
       // 重叠时靠下的角色遮挡靠上的，聚团更自然
     ).setDepth(10 + off.y / UNIT)
     this.physics.add.existing(image)
@@ -408,6 +423,7 @@ export class ArenaScene extends Phaser.Scene {
       alive: true,
       reviveAt: 0,
       lastHitMs: -Infinity,
+      lastPoisonMs: -Infinity,
       hpBar: this.add.graphics().setDepth(11),
       shownHpRatio: -1,
       deadText: this.add
@@ -497,13 +513,27 @@ export class ArenaScene extends Phaser.Scene {
   private onMemberTouched(memberImg: ImageObj, enemy: ImageObj): void {
     if (this.over || !enemy.active) return
     const m = memberImg.getData('member') as Member
+    if (!m.alive || this.elapsedMs - m.lastHitMs < m.iframesMs) return
+    m.lastHitMs = this.elapsedMs
+    this.hurtMember(m, (enemy.getData('spec') as EnemySpec).damage, 0xff7777)
+  }
+
+  private onMemberShot(memberImg: ImageObj, shot: ImageObj): void {
+    if (this.over || !shot.active) return
+    const m = memberImg.getData('member') as Member
     if (!m.alive) return
+    const damage = shot.getData('damage') as number
+    shot.destroy()
+    // 子弹命中吃无敌帧：帧内先中弹则后续接触伤害被同一层保护挡下
     if (this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
-    const spec = enemy.getData('spec') as EnemySpec
-    m.hp = Math.max(0, m.hp - spec.damage)
+    this.hurtMember(m, damage, 0xff7777)
+  }
+
+  private hurtMember(m: Member, damage: number, tint: number): void {
+    m.hp = Math.max(0, m.hp - damage)
     if (this.settings.hitShake) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
-    m.image.setTint(0xff7777)
+    m.image.setTint(tint)
     this.time.delayedCall(120, () => {
       if (m.alive) m.image.clearTint()
     })
@@ -553,7 +583,7 @@ export class ArenaScene extends Phaser.Scene {
     spec: ProjectileSpec,
     damage: number,
   ): void {
-    const p = emojiImage(this, x, y, spec.projectile.emoji, spec.projectile.size, true)
+    const p = emojiImage(this, x, y, spec.projectile.emoji, spec.projectile.size, 'player')
       .setDepth(8)
       .setRotation(angle + spec.projectile.rotationOffsetRad)
     this.physics.add.existing(p)
@@ -620,8 +650,24 @@ export class ArenaScene extends Phaser.Scene {
     // 经验击杀即得（队长可提供倍率）；金币落地等待拾取
     const xpMul = CAPTAINS[this.run.captainId].xpGainMul
     this.run.xp = gainXp(this.run.xp, Math.round(spec.xp * xpMul)).state
+    // 偷金币鼠：吐回吃掉的金币 + 1 枚利息
+    const eaten = (enemy.getData('eaten') as number) || 0
     const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? spec.coins : 0
-    this.spawnCoins(enemy.x, enemy.y, spec.coins + doubled)
+    this.spawnCoins(enemy.x, enemy.y, spec.coins + doubled + eaten + (eaten > 0 ? 1 : 0))
+    // 特殊死亡：蘑菇留毒液池；泡泡分裂出迷你体
+    if (spec.behavior === 'chase' && spec.poison) this.spawnPoisonPool(enemy.x, enemy.y, spec.poison)
+    if (spec.behavior === 'chase' && spec.split && !this.over) {
+      const hpMul = waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier
+      for (let i = 0; i < spec.split.count; i++) {
+        const a = this.rng.next() * Math.PI * 2
+        this.materializeEnemy(
+          spec.split.into,
+          Phaser.Math.Clamp(enemy.x + Math.cos(a) * 0.5 * UNIT, 0, MAP.width),
+          Phaser.Math.Clamp(enemy.y + Math.sin(a) * 0.5 * UNIT, 0, MAP.height),
+          Math.round(spec.split.into.hp * hpMul),
+        )
+      }
+    }
     enemy.setActive(false)
     ;(enemy.body as ArcadeBody).enable = false
     this.tweens.add({
@@ -662,12 +708,12 @@ export class ArenaScene extends Phaser.Scene {
     const batch = this.stress ? STRESS.spawnBatch : 1
     for (let i = 0; i < batch; i++) {
       if (this.enemies.countActive(true) + this.pendingSpawns >= cap) return
-      this.spawnOne(wave.ghostShare, wave.hpMultiplier)
+      this.spawnOne(wave.hpMultiplier)
     }
   }
 
-  private spawnOne(ghostShare: number, hpMultiplier: number): void {
-    const spec = this.rng.chance(ghostShare) ? GHOST : ZOMBIE
+  private spawnOne(hpMultiplier: number): void {
+    const spec = pickEnemy(this.enemyMix, () => this.rng.next())
     const hp = Math.round(spec.hp * hpMultiplier)
     const pos = randomMapPoint(
       this.rng,
@@ -698,53 +744,263 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private materializeEnemy(spec: EnemySpec, x: number, y: number, hp: number): void {
-    const enemy = emojiImage(this, x, y, spec.emoji, spec.size, true).setDepth(5)
+    const enemy = emojiImage(this, x, y, spec.emoji, spec.size, 'enemy').setDepth(5)
     this.physics.add.existing(enemy)
     circleBody(enemy, spec.radius)
     enemy.setData('hp', hp)
     enemy.setData('spec', spec)
+    // 行为状态：游荡方向/换向与开火计时（elapsedMs 时基，暂停安全）
+    enemy.setData('state', 'wander')
+    enemy.setData('dirX', Math.cos(this.rng.next() * Math.PI * 2))
+    enemy.setData('dirY', Math.sin(this.rng.next() * Math.PI * 2))
+    enemy.setData('turnAt', this.elapsedMs + 600 + this.rng.next() * 900)
+    enemy.setData('fireAt', this.elapsedMs + 900 + this.rng.next() * 1500)
+    enemy.setData('eaten', 0)
     this.enemies.add(enemy)
     const targetScale = enemy.scale
     enemy.setScale(targetScale * 0.3).setAlpha(0.3)
     this.tweens.add({ targets: enemy, scale: targetScale, alpha: 1, duration: 130 })
   }
 
+  /** 敌人减速倍率（寒气光环等），并同步冷色调提示 */
+  private slowFactorFor(e: ImageObj): number {
+    let factor = 1
+    for (const z of this.frameSlowZones) {
+      const zx = e.x - z.x
+      const zy = e.y - z.y
+      if (zx * zx + zy * zy <= z.r2) factor *= z.factor
+    }
+    const slowed = factor < 1
+    if (slowed !== (e.getData('slowed') as boolean | undefined)) {
+      e.setData('slowed', slowed)
+      if (slowed) e.setTint(0xa5d8ff)
+      else e.clearTint()
+    }
+    return factor
+  }
+
+  /** 游荡：周期性随机换向，撞图边时折返 */
+  private wanderDir(e: ImageObj): { x: number; y: number } {
+    if (this.elapsedMs >= (e.getData('turnAt') as number)) {
+      const a = this.rng.next() * Math.PI * 2
+      e.setData('dirX', Math.cos(a))
+      e.setData('dirY', Math.sin(a))
+      e.setData('turnAt', this.elapsedMs + 800 + this.rng.next() * 1200)
+    }
+    let dx = e.getData('dirX') as number
+    let dy = e.getData('dirY') as number
+    const margin = 0.6 * UNIT
+    if ((e.x < margin && dx < 0) || (e.x > MAP.width - margin && dx > 0)) dx = -dx
+    if ((e.y < margin && dy < 0) || (e.y > MAP.height - margin && dy > 0)) dy = -dy
+    e.setData('dirX', dx)
+    e.setData('dirY', dy)
+    return { x: dx, y: dy }
+  }
+
+  private nearestAlive(x: number, y: number): Member | undefined {
+    let best: Member | undefined
+    let bestD = Infinity
+    for (const m of this.members) {
+      if (!m.alive) continue
+      const dx = m.image.x - x
+      const dy = m.image.y - y
+      const d = dx * dx + dy * dy
+      if (d < bestD) {
+        bestD = d
+        best = m
+      }
+    }
+    return best
+  }
+
   private steerEnemies(): void {
     const alive = this.aliveMembers()
     if (alive.length === 0) return
+    const now = this.elapsedMs
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       const spec = e.getData('spec') as EnemySpec
-      // 以角色为单位索敌：追离自己最近的存活角色
-      let best = alive[0]!
-      let bestD = Infinity
-      for (const m of alive) {
-        const dx = m.image.x - e.x
-        const dy = m.image.y - e.y
-        const d = dx * dx + dy * dy
-        if (d < bestD) {
-          bestD = d
-          best = m
+      const body = e.body as ArcadeBody
+      const slow = this.slowFactorFor(e)
+      const target = this.nearestAlive(e.x, e.y)!
+
+      switch (spec.behavior) {
+        case 'chase': {
+          const dir = norm(target.image.x - e.x, target.image.y - e.y)
+          body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
+          break
+        }
+        case 'wanderFire': {
+          const dir = this.wanderDir(e)
+          body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
+          if (now >= (e.getData('fireAt') as number)) {
+            e.setData('fireAt', now + spec.fireIntervalMs)
+            this.spawnEnemyShot(e.x, e.y, Math.atan2(dir.y, dir.x), spec.bullet)
+          }
+          break
+        }
+        case 'dash': {
+          const state = e.getData('state') as string
+          const tdx = target.image.x - e.x
+          const tdy = target.image.y - e.y
+          const dist2 = tdx * tdx + tdy * tdy
+          if (state === 'windup') {
+            body.setVelocity(0, 0)
+            // 蓄力颤动提示
+            e.setRotation(Math.sin(now / 28) * 0.14)
+            if (now >= (e.getData('windupUntil') as number)) {
+              e.setData('state', 'dash')
+              e.setData('dashUntil', now + (spec.dashDist / spec.dashSpeed) * 1000)
+              e.setRotation(0)
+              e.clearTint()
+            }
+          } else if (state === 'dash') {
+            const dx = e.getData('dirX') as number
+            const dy = e.getData('dirY') as number
+            body.setVelocity(dx * spec.dashSpeed * slow, dy * spec.dashSpeed * slow)
+            if (now >= (e.getData('dashUntil') as number)) {
+              e.setData('state', 'cool')
+              e.setData('coolUntil', now + spec.cooldownMs)
+            }
+          } else if (
+            state !== 'cool' &&
+            dist2 <= spec.detectRange * spec.detectRange
+          ) {
+            // 进入探测圈：锁定当前方向蓄力（横向位移可躲）
+            const dir = norm(tdx, tdy)
+            e.setData('state', 'windup')
+            e.setData('windupUntil', now + spec.windupMs)
+            e.setData('dirX', dir.x)
+            e.setData('dirY', dir.y)
+            e.setTint(0xffb74d)
+          } else {
+            if (state === 'cool' && now >= (e.getData('coolUntil') as number)) {
+              e.setData('state', 'wander')
+            }
+            const dir = this.wanderDir(e)
+            body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
+          }
+          break
+        }
+        case 'fleeFire': {
+          const tdx = target.image.x - e.x
+          const tdy = target.image.y - e.y
+          const dist2 = tdx * tdx + tdy * tdy
+          if (dist2 <= spec.fleeRange * spec.fleeRange) {
+            const dir = norm(-tdx, -tdy)
+            body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
+          } else {
+            const dir = this.wanderDir(e)
+            body.setVelocity(dir.x * spec.speed * 0.4 * slow, dir.y * spec.speed * 0.4 * slow)
+          }
+          if (now >= (e.getData('fireAt') as number)) {
+            e.setData('fireAt', now + spec.fireIntervalMs)
+            this.spawnEnemyShot(e.x, e.y, Math.atan2(tdy, tdx), spec.bullet)
+          }
+          break
+        }
+        case 'coinThief': {
+          // 直奔最近的金币；没金币就慢速游荡
+          let coin: ImageObj | undefined
+          let bestD = Infinity
+          for (const c of this.coins.getChildren() as ImageObj[]) {
+            if (!c.active) continue
+            const dx = c.x - e.x
+            const dy = c.y - e.y
+            const d = dx * dx + dy * dy
+            if (d < bestD) {
+              bestD = d
+              coin = c
+            }
+          }
+          if (coin) {
+            const eatR = spec.radius + COIN.radius
+            if (bestD <= eatR * eatR) {
+              coin.destroy()
+              e.setData('eaten', ((e.getData('eaten') as number) ?? 0) + 1)
+            } else {
+              const dir = norm(coin.x - e.x, coin.y - e.y)
+              body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
+            }
+          } else {
+            const dir = this.wanderDir(e)
+            body.setVelocity(dir.x * spec.speed * 0.3 * slow, dir.y * spec.speed * 0.3 * slow)
+          }
+          break
         }
       }
-      // 减速区域叠乘移速（寒气光环等），并给减速中的敌人上冷色调
-      let speed = spec.speed
-      let slowed = false
-      for (const z of this.frameSlowZones) {
-        const zx = e.x - z.x
-        const zy = e.y - z.y
-        if (zx * zx + zy * zy <= z.r2) {
-          speed *= z.factor
-          slowed = true
+    }
+  }
+
+  // ── 敌方子弹与毒液池 ────────────────────────────────────────
+
+  private spawnEnemyShot(x: number, y: number, angle: number, bullet: EnemyBulletSpec): void {
+    const shot = emojiImage(this, x, y, bullet.emoji, bullet.size, 'enemyShot').setDepth(6)
+    this.physics.add.existing(shot)
+    circleBody(shot, bullet.radius)
+    ;(shot.body as ArcadeBody).setVelocity(Math.cos(angle) * bullet.speed, Math.sin(angle) * bullet.speed)
+    shot.setData('damage', bullet.damage)
+    shot.setData('dieAt', this.elapsedMs + bullet.lifeMs)
+    this.enemyShots.add(shot)
+  }
+
+  private updateEnemyShots(): void {
+    for (const s of this.enemyShots.getChildren() as ImageObj[]) {
+      if (!s.active) continue
+      if (
+        this.elapsedMs >= (s.getData('dieAt') as number) ||
+        s.x < -UNIT ||
+        s.x > MAP.width + UNIT ||
+        s.y < -UNIT ||
+        s.y > MAP.height + UNIT
+      ) {
+        s.destroy()
+      }
+    }
+  }
+
+  private spawnPoisonPool(x: number, y: number, poison: NonNullable<ChaseEnemySpec['poison']>): void {
+    const gfx = this.add.graphics().setDepth(2)
+    gfx.fillStyle(0x7cb342, 0.22)
+    gfx.fillCircle(0, 0, poison.radius)
+    gfx.lineStyle(2, 0x7cb342, 0.5)
+    gfx.strokeCircle(0, 0, poison.radius)
+    gfx.setPosition(x, y)
+    gfx.setScale(0.3)
+    this.tweens.add({ targets: gfx, scale: 1, duration: 220, ease: 'Back.easeOut' })
+    this.poisonPools.push({
+      x,
+      y,
+      r2: poison.radius * poison.radius,
+      until: this.elapsedMs + poison.durationMs,
+      tickMs: poison.tickMs,
+      damage: poison.damage,
+      gfx,
+    })
+  }
+
+  private updatePoisonPools(): void {
+    if (this.poisonPools.length === 0) return
+    const now = this.elapsedMs
+    this.poisonPools = this.poisonPools.filter((p) => {
+      if (now >= p.until) {
+        this.tweens.add({ targets: p.gfx, alpha: 0, duration: 250, onComplete: () => p.gfx.destroy() })
+        return false
+      }
+      return true
+    })
+    for (const m of this.members) {
+      if (!m.alive || now - m.lastPoisonMs < 0) continue
+      for (const p of this.poisonPools) {
+        const dx = m.image.x - p.x
+        const dy = m.image.y - p.y
+        if (dx * dx + dy * dy > p.r2) continue
+        if (now - m.lastPoisonMs >= p.tickMs) {
+          m.lastPoisonMs = now
+          this.hurtMember(m, p.damage, 0xa5d86a)
         }
+        break
       }
-      if (slowed !== (e.getData('slowed') as boolean | undefined)) {
-        e.setData('slowed', slowed)
-        if (slowed) e.setTint(0xa5d8ff)
-        else e.clearTint()
-      }
-      const dir = norm(best.image.x - e.x, best.image.y - e.y)
-      ;(e.body as ArcadeBody).setVelocity(dir.x * speed, dir.y * speed)
     }
   }
 
@@ -761,7 +1017,7 @@ export class ArenaScene extends Phaser.Scene {
         Phaser.Math.Clamp(y + jy, COIN.radius, MAP.height - COIN.radius),
         COIN.emoji,
         COIN.size,
-        true,
+        'player',
       ).setDepth(3)
       this.physics.add.existing(coin)
       circleBody(coin, COIN.radius)

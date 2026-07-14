@@ -59,7 +59,7 @@ export class MenuScene extends Phaser.Scene {
       .slice(0, 6)
       .map((c) => c.emoji)
     emojis.forEach((emoji, i) => {
-      const sprite = emojiImage(this, w / 2 + (i - (emojis.length - 1) / 2) * 90, h * 0.55, emoji, 48, true)
+      const sprite = emojiImage(this, w / 2 + (i - (emojis.length - 1) / 2) * 90, h * 0.55, emoji, 48, 'player')
       this.tweens.add({
         targets: sprite,
         y: h * 0.55 - 18,

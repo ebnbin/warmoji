@@ -1,9 +1,9 @@
 import { SPAWN } from './config'
 
+// 难度曲线随跨波累计战斗时长走；出什么怪由 core/enemies.ts 的按波配比决定
 export interface WaveState {
   spawnIntervalMs: number
   hpMultiplier: number
-  ghostShare: number
 }
 
 export function waveAt(elapsedSec: number): WaveState {
@@ -12,10 +12,5 @@ export function waveAt(elapsedSec: number): WaveState {
   return {
     spawnIntervalMs: SPAWN.startIntervalMs - (SPAWN.startIntervalMs - SPAWN.minIntervalMs) * ramp,
     hpMultiplier: 1 + (t / 60) * SPAWN.hpGrowthPerMin,
-    ghostShare: Math.min(
-      SPAWN.ghostShareMax,
-      SPAWN.ghostShareStart +
-        (SPAWN.ghostShareMax - SPAWN.ghostShareStart) * (t / SPAWN.ghostShareRampSeconds),
-    ),
   }
 }

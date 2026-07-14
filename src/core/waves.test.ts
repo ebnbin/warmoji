@@ -7,7 +7,6 @@ describe('waves', () => {
     const w = waveAt(0)
     expect(w.spawnIntervalMs).toBe(SPAWN.startIntervalMs)
     expect(w.hpMultiplier).toBe(1)
-    expect(w.ghostShare).toBe(SPAWN.ghostShareStart)
   })
 
   it('刷怪间隔随时间递减且不低于下限', () => {
@@ -24,11 +23,6 @@ describe('waves', () => {
   it('敌人血量随时间增长', () => {
     expect(waveAt(60).hpMultiplier).toBeCloseTo(1 + SPAWN.hpGrowthPerMin)
     expect(waveAt(120).hpMultiplier).toBeGreaterThan(waveAt(60).hpMultiplier)
-  })
-
-  it('幽灵占比递增且封顶', () => {
-    expect(waveAt(60).ghostShare).toBeGreaterThan(waveAt(0).ghostShare)
-    expect(waveAt(10_000).ghostShare).toBe(SPAWN.ghostShareMax)
   })
 
   it('负数时间按 0 处理', () => {
