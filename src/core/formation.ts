@@ -15,9 +15,9 @@ export function slotOffset(slot: number, count: number, radius: number): Point {
   return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
 }
 
-/** 前后阵的前排人数 = 半数向上取整（5 人 → 前三后二） */
+/** 前后阵 = 定向版四保一：殿后恒 1 人，其余全员上前弧（5 人 → 前四后一） */
 export function vanguardSplit(count: number): { front: number; back: number } {
-  const front = Math.ceil(count / 2)
+  const front = Math.max(1, count - 1)
   return { front, back: count - front }
 }
 
@@ -34,7 +34,7 @@ export function formationName(id: FormationId, count: number): string {
 export function formationDesc(id: FormationId): string {
   if (id === 'ring') return '全员均匀环绕，四面兼顾'
   if (id === 'guard') return '一人居中受掩护，更少被摸到'
-  return '前排弧形开路，随移动转向'
+  return '前弧随移动开路，掩护殿后'
 }
 
 /** 岗位在「可旋转环」上的基准角（不含相位）：环形全员上环；多保一 0 号居中（null）、
@@ -68,26 +68,18 @@ export function formationPosts(
     })
   }
   if (id === 'vanguard' && count >= 2) {
-    const { front, back } = vanguardSplit(count)
-    const fx = Math.cos(facingRad)
-    const fy = Math.sin(facingRad)
-    // 屏幕坐标 y 向下，(−fy, fx) 是朝向的左手边 → 排内从左到右
-    const rx = -fy
-    const ry = fx
-    // 前排半弧：以中心为圆心，弧上均匀铺开，居中者正对朝向
+    const { front } = vanguardSplit(count)
+    // 前弧：以中心为圆心，弧上均匀铺开，弧心正对朝向
     const arc = (i: number): Point => {
       const a = facingRad + (i - (front - 1) / 2) * FORMATION.frontArcStep
       return { x: Math.cos(a) * FORMATION.frontRadius, y: Math.sin(a) * FORMATION.frontRadius }
     }
-    // 后排横排，相对固定
-    const backPost = (i: number): Point => {
-      const lat = (i - (back - 1) / 2) * FORMATION.spacing
-      return { x: -fx * FORMATION.backDist + rx * lat, y: -fy * FORMATION.backDist + ry * lat }
+    // 殿后一人：紧贴中心背侧
+    const rear: Point = {
+      x: -Math.cos(facingRad) * FORMATION.backDist,
+      y: -Math.sin(facingRad) * FORMATION.backDist,
     }
-    return [
-      ...Array.from({ length: front }, (_, i) => arc(i)),
-      ...Array.from({ length: back }, (_, i) => backPost(i)),
-    ]
+    return [...Array.from({ length: front }, (_, i) => arc(i)), rear]
   }
   return Array.from({ length: count }, (_, post) => {
     const a = (ringPostAngle('ring', post, count) ?? 0) + ringPhase

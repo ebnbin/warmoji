@@ -35,19 +35,19 @@ describe('slotOffset', () => {
 })
 
 describe('vanguardSplit / formationName', () => {
-  it('前排 = 半数向上取整', () => {
+  it('殿后恒 1 人，其余全员上前弧', () => {
     expect(vanguardSplit(3)).toEqual({ front: 2, back: 1 })
-    expect(vanguardSplit(4)).toEqual({ front: 2, back: 2 })
-    expect(vanguardSplit(5)).toEqual({ front: 3, back: 2 })
-    expect(vanguardSplit(6)).toEqual({ front: 3, back: 3 })
+    expect(vanguardSplit(4)).toEqual({ front: 3, back: 1 })
+    expect(vanguardSplit(5)).toEqual({ front: 4, back: 1 })
+    expect(vanguardSplit(6)).toEqual({ front: 5, back: 1 })
   })
 
   it('展示名按人数自适应', () => {
     expect(formationName('ring', 5)).toBe('环形阵')
     expect(formationName('guard', 5)).toBe('多保一')
-    expect(formationName('vanguard', 5)).toBe('前三后二')
-    expect(formationName('vanguard', 6)).toBe('前三后三')
-    expect(formationName('vanguard', 4)).toBe('前二后二')
+    expect(formationName('vanguard', 5)).toBe('前四后一')
+    expect(formationName('vanguard', 6)).toBe('前五后一')
+    expect(formationName('vanguard', 4)).toBe('前三后一')
   })
 })
 
@@ -72,30 +72,33 @@ describe('formationPosts', () => {
     }
   })
 
-  it('前后阵朝右：前排呈半弧（等半径、居中者正对朝向），后排横排在 −x', () => {
+  it('前四后一朝右：四人等半径前弧对称包抄，殿后一人紧贴中心背侧', () => {
     const posts = formationPosts('vanguard', 5, 0)
     expect(posts).toHaveLength(5)
-    const front = posts.slice(0, 3)
-    const back = posts.slice(3)
-    // 前排都在弧上：到中心距离 = frontRadius，居中者（下标 1）正对 +x
+    const front = posts.slice(0, 4)
+    const rear = posts[4]!
+    // 前弧都在弧上：到中心距离 = frontRadius；无居中者，两对翼位对称
     for (const p of front) expect(Math.hypot(p.x, p.y)).toBeCloseTo(FORMATION.frontRadius)
-    expect(front[1]!.x).toBeCloseTo(FORMATION.frontRadius)
-    expect(front[1]!.y).toBeCloseTo(0)
-    // 两翼对称且弧间隔 = frontArcStep（翼位前向分量小于居中者 → 弧形而非直线）
-    expect(front[0]!.y).toBeCloseTo(-front[2]!.y)
-    expect(front[0]!.x).toBeCloseTo(front[2]!.x)
-    expect(front[0]!.x).toBeLessThan(front[1]!.x)
-    expect(Math.abs(Math.atan2(front[0]!.y, front[0]!.x))).toBeCloseTo(FORMATION.frontArcStep)
-    // 后排横排相对固定
-    for (const p of back) expect(p.x).toBeCloseTo(-FORMATION.backDist)
-    expect(Math.abs(back[0]!.y - back[1]!.y)).toBeCloseTo(FORMATION.spacing)
+    expect(front[0]!.y).toBeCloseTo(-front[3]!.y)
+    expect(front[1]!.y).toBeCloseTo(-front[2]!.y)
+    expect(front[0]!.x).toBeCloseTo(front[3]!.x)
+    // 内对正向分量大于外对（弧形张开），相邻弧间隔 = frontArcStep
+    expect(front[1]!.x).toBeGreaterThan(front[0]!.x)
+    expect(Math.abs(Math.atan2(front[1]!.y, front[1]!.x))).toBeCloseTo(FORMATION.frontArcStep / 2)
+    expect(Math.abs(Math.atan2(front[0]!.y, front[0]!.x))).toBeCloseTo(FORMATION.frontArcStep * 1.5)
+    // 殿后一人在正后方
+    expect(rear.x).toBeCloseTo(-FORMATION.backDist)
+    expect(rear.y).toBeCloseTo(0)
   })
 
-  it('前后阵随朝向整体旋转（朝上时居中前锋在 −y）', () => {
+  it('前后阵随朝向整体旋转（朝上时殿后者在 +y 正下方）', () => {
     const posts = formationPosts('vanguard', 5, UP)
-    expect(posts[1]!.y).toBeCloseTo(-FORMATION.frontRadius)
-    expect(posts[1]!.x).toBeCloseTo(0)
-    for (const p of posts.slice(3)) expect(p.y).toBeCloseTo(FORMATION.backDist)
+    expect(posts[4]!.y).toBeCloseTo(FORMATION.backDist)
+    expect(posts[4]!.x).toBeCloseTo(0)
+    for (const p of posts.slice(0, 4)) {
+      expect(Math.hypot(p.x, p.y)).toBeCloseTo(FORMATION.frontRadius)
+      expect(p.y).toBeLessThan(1) // 前弧整体在上半侧（外翼可贴近水平线）
+    }
   })
 
   it('环相位：环形全员随相位旋转；多保一外圈旋转而中心不动', () => {
