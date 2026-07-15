@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { clickCaptain, clickPromoteConfirm, clickPromoteItem, confirmCaptain, enterCaptain } from './helpers'
+import {
+  clickCaptain,
+  clickPromoteConfirm,
+  clickPromoteItem,
+  completePromote,
+  confirmCaptain,
+  enterCaptain,
+} from './helpers'
 
 async function cssPoint(page: Page, logical: { x: number; y: number }): Promise<{ x: number; y: number }> {
   return page.evaluate(({ x, y }) => {
@@ -62,7 +69,7 @@ test.describe('开局整编 竖屏', () => {
 
     let p = await page.evaluate(() => window.__warmoji!.promote!)
     expect(p.mode).toBe('recruit')
-    expect(p.points).toBe(2)
+    expect(p.points).toBe(6)
     for (const it of p.items) expect(inBounds(it, 720, 1280)).toBe(true)
     await clickPromoteItem(page, 'robot')
     await page.screenshot({ path: 'test-results/promote-portrait.png' })
@@ -76,12 +83,12 @@ test.describe('开局整编 竖屏', () => {
     expect(p.mode).toBe('recruit')
     expect(p.selected).toBe('robot')
 
-    // 招募两次（神童 2 点）后直接开战，2 人上场
+    // 神童 6 点：招满 5 人（含机器人）+ 升 1 级 → 开局队形环节 → 开战，5 人上场
     await clickPromoteConfirm(page)
-    await page.waitForFunction(() => (window.__warmoji?.promote?.points ?? 0) === 1)
-    await clickPromoteConfirm(page)
+    await page.waitForFunction(() => (window.__warmoji?.promote?.points ?? 0) === 5)
+    await completePromote(page)
     await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
     const alive = await page.evaluate(() => window.__warmoji!.alive)
-    expect(alive).toBe(2)
+    expect(alive).toBe(5)
   })
 })

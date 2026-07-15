@@ -289,9 +289,9 @@ export const CAPTAINS = {
   prodigy: {
     emoji: '🤓',
     name: '神童',
-    desc: '天资聪颖，开局队伍等级 2，可立刻招募两名队员',
+    desc: '天资聪颖，开局队伍等级 6：招满 5 人还能升级一次',
     teamSize: 5,
-    startLevel: 2,
+    startLevel: 6,
     xpGainMul: 1,
     reviveInShop: false,
     freeRefreshes: 0,

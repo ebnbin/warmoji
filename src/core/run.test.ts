@@ -32,10 +32,10 @@ describe('run 生命周期', () => {
     endRun()
   })
 
-  it('神童开局 2 级：招 2 人后点数归零', () => {
+  it('神童开局带高等级：可用点数 = 开局等级 − 首发人数', () => {
     const run = beginRun('prodigy', ['cowboy', 'troll'])
     expect(run.xp.level).toBe(CAPTAINS.prodigy.startLevel)
-    expect(pointsAvailable(run)).toBe(0)
+    expect(pointsAvailable(run)).toBe(CAPTAINS.prodigy.startLevel - 2)
     endRun()
   })
 
