@@ -1,11 +1,14 @@
 import Phaser from 'phaser'
-import { CAPTAINS, CHARACTERS, COIN, FORMATION, HIT_SHAKE, KNOCKBACK, MAP, MEMBER, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WAVE } from '../core/config'
+import { CAPTAINS, CHARACTERS, COIN, FOLLOW, FORMATION, HIT_SHAKE, KNOCKBACK, MAP, MEMBER, ORBIT, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WANDER, WAVE } from '../core/config'
 import type { CharacterSpec, ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../core/config'
 import { enemyMixAt, fleeSteer, pickEnemy } from '../core/enemies'
 import type { EnemyMixEntry } from '../core/enemies'
 import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
 import { formationPosts } from '../core/formation'
+import type { FormationId } from '../core/formation'
+import { angleDiff, orbitTendency, stepOrbit, threatWeight } from '../core/orbit'
+import type { OrbitThreat } from '../core/orbit'
 import { browserStorage, submitScore } from '../core/highscore'
 import {
   aggregateCharacterEffects,
@@ -105,6 +108,17 @@ interface Member {
   breathPhase: number
   /** 复活弹出等 tween 期间暂停程序化动画，避免逐帧写缩放打架 */
   animLockUntil: number
+  // 跟随惯性：欠阻尼弹簧位置/速度 + 每人略异的刚度（步调不齐才像一群人）
+  followX: number
+  followY: number
+  followVx: number
+  followVy: number
+  followK: number
+  /** 待机游移：相位种子 + 幅度（静止且探测范围内无敌时淡入） */
+  wanderSeed: number
+  wanderAmp: number
+  /** 本帧探测范围内是否有敌人（orbit 倾向输入 + 游移门控） */
+  hasThreat: boolean
 }
 
 // 碰撞圆按逻辑半径换算回源纹理坐标（body 随对象缩放）
@@ -170,6 +184,8 @@ export class ArenaScene extends Phaser.Scene {
   private formationFacing = -Math.PI / 2
   /** 槽位 → 队形岗位序号（由 run.formationOrder 排列决定） */
   private postBySlot: number[] = []
+  /** 环形阵专用：各岗位的环上角度（core/orbit.ts 逐帧演化） */
+  private orbitAngles: number[] = []
   private elapsedMs = 0
   private spawnCooldownMs = 0
   private pendingSpawns = 0
@@ -262,6 +278,10 @@ export class ArenaScene extends Phaser.Scene {
       return post >= 0 ? post : slot
     })
     this.formationFacing = -Math.PI / 2
+    // 环形阵各岗位从均匀槽位角出发，随后被 orbit 动力学接管
+    this.orbitAngles = formationPosts('ring', rosterIds.length, this.formationFacing).map((p) =>
+      Math.atan2(p.y, p.x),
+    )
     // 队长道具：团队修正（移速/磁吸/掉落/全队伤害）
     this.teamFx = aggregateTeamEffects(this.run.captainItems)
     this.stats.moveSpeed = TEAM.moveSpeed * this.teamFx.moveSpeedMul
@@ -319,7 +339,7 @@ export class ArenaScene extends Phaser.Scene {
       this.collectCoin(c as unknown as ImageObj),
     )
 
-    this.layoutTeam()
+    this.layoutTeam(0)
     this.scene.launch('ui')
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
@@ -339,11 +359,12 @@ export class ArenaScene extends Phaser.Scene {
       return
     }
 
-    this.moveTeam(delta)
     this.frameSlowZones.length = 0
     this.frameTargets = (this.enemies.getChildren() as ImageObj[])
       .filter((e) => e.active)
       .map((e) => ({ x: e.x, y: e.y, radius: (e.getData('spec') as EnemySpec).radius, ref: e }))
+    this.updateOrbit(delta)
+    this.moveTeam(delta)
     this.updateMembers(delta)
     this.spawn(delta)
     this.steerEnemies(delta)
@@ -405,13 +426,14 @@ export class ArenaScene extends Phaser.Scene {
 
   // ── 队伍 ────────────────────────────────────────────────────
 
-  /** 当前队形的全部岗位偏移（压测固定环形） */
+  /** 生效队形：压测阵容不来自 run，固定环形 */
+  private activeFormation(): FormationId {
+    return this.stress ? 'ring' : this.run.formation
+  }
+
+  /** 当前队形的全部岗位偏移（环形阵的动态角度另由 orbitAngles 提供） */
   private currentPosts(): Point[] {
-    return formationPosts(
-      this.stress ? 'ring' : this.run.formation,
-      this.lineup.length,
-      this.formationFacing,
-    )
+    return formationPosts(this.activeFormation(), this.lineup.length, this.formationFacing)
   }
 
   private createMember(emoji: string, weaponSpecs: readonly WeaponSpec[], slot: number): Member {
@@ -493,6 +515,14 @@ export class ArenaScene extends Phaser.Scene {
       baseScale: image.scaleX,
       breathPhase: slot * 1.3,
       animLockUntil: 0,
+      followX: image.x,
+      followY: image.y,
+      followVx: 0,
+      followVy: 0,
+      followK: FOLLOW.kBase * (1 + FOLLOW.kJitter * Math.sin(slot * 12.9898)),
+      wanderSeed: slot * 2.399,
+      wanderAmp: 0,
+      hasThreat: false,
     }
     image.setData('member', member)
     this.memberGroup.add(image)
@@ -523,19 +553,87 @@ export class ArenaScene extends Phaser.Scene {
     this.center.x = Phaser.Math.Clamp(this.center.x + dir.x * step, clampMin, MAP.width - clampMin)
     this.center.y = Phaser.Math.Clamp(this.center.y + dir.y * step, clampMin, MAP.height - clampMin)
     this.centerObj.setPosition(this.center.x, this.center.y)
-    this.layoutTeam()
+    this.layoutTeam(delta)
   }
 
-  private layoutTeam(): void {
-    const posts = this.currentPosts()
+  /** 队伍活感·探测与轨道：逐员判定探测范围内有无敌人（游移门控）；
+   * 环形阵额外把「秉性 × 敌情」化为沿环角速度，交给 orbit 动力学推挤演化 */
+  private updateOrbit(delta: number): void {
+    if (this.members.length === 0) return
+    const ring = this.activeFormation() === 'ring'
+    const range = ORBIT.detectRange
+    const rangeSq = range * range
+    const omegas = new Array<number>(this.orbitAngles.length).fill(0)
     for (const m of this.members) {
-      const off = posts[this.postBySlot[m.slot] ?? m.slot] ?? { x: 0, y: 0 }
-      m.image.setPosition(
-        this.center.x + off.x + m.visualOffset.x,
-        this.center.y + off.y + m.visualOffset.y,
-      )
-      // 队形会旋转，遮挡关系按当前 y 逐帧更新（靠下者盖住靠上者）
-      m.image.setDepth(10 + off.y / UNIT)
+      m.hasThreat = false
+      if (!m.alive) continue
+      const bias = this.lineup[m.slot]?.orbit ?? 0
+      const idx = this.postBySlot[m.slot] ?? m.slot
+      const theta = this.orbitAngles[idx] ?? 0
+      const threats: OrbitThreat[] = []
+      for (const t of this.frameTargets) {
+        const dx = t.x - m.image.x
+        const dy = t.y - m.image.y
+        const dSq = dx * dx + dy * dy
+        if (dSq >= rangeSq) continue
+        m.hasThreat = true
+        // 只做游移门控时知道「有威胁」即可，无需收集全部敌情
+        if (!ring || bias === 0) break
+        threats.push({
+          diff: angleDiff(theta, Math.atan2(t.y - this.center.y, t.x - this.center.x)),
+          weight: threatWeight(Math.sqrt(dSq), range),
+        })
+      }
+      if (ring && bias !== 0) omegas[idx] = orbitTendency(bias, threats)
+    }
+    if (ring) this.orbitAngles = stepOrbit(this.orbitAngles, omegas, delta)
+  }
+
+  private layoutTeam(delta: number): void {
+    const ring = this.activeFormation() === 'ring'
+    const posts = ring ? null : this.currentPosts()
+    const moving = this.teamDir.x !== 0 || this.teamDir.y !== 0
+    const dt = Math.min(delta, 50) / 1000
+    const tSec = this.elapsedMs / 1000
+    for (const m of this.members) {
+      const idx = this.postBySlot[m.slot] ?? m.slot
+      let ox: number
+      let oy: number
+      if (ring) {
+        const a = this.orbitAngles[idx] ?? 0
+        ox = Math.cos(a) * TEAM.ringRadius
+        oy = Math.sin(a) * TEAM.ringRadius
+      } else {
+        const p = posts![idx] ?? { x: 0, y: 0 }
+        ox = p.x
+        oy = p.y
+      }
+      // 待机游移：静止且探测范围内无敌时淡入的小幅李萨如漂移
+      const wanderOn = m.alive && !moving && !m.hasThreat
+      m.wanderAmp += ((wanderOn ? 1 : 0) - m.wanderAmp) * Math.min(1, delta / WANDER.rampMs)
+      const wander = m.wanderAmp * WANDER.radius
+      const tx = this.center.x + ox + Math.sin(tSec * WANDER.freqX + m.wanderSeed) * wander
+      const ty = this.center.y + oy + Math.sin(tSec * WANDER.freqY + m.wanderSeed * 2.3) * wander
+      // 跟随惯性：欠阻尼弹簧追岗位（起步慢半拍、急停小回弹），拖拽超限硬拉回
+      if (dt > 0) {
+        const k = m.followK
+        const c = 2 * Math.sqrt(k) * FOLLOW.zeta
+        m.followVx += (k * (tx - m.followX) - c * m.followVx) * dt
+        m.followVy += (k * (ty - m.followY) - c * m.followVy) * dt
+        m.followX += m.followVx * dt
+        m.followY += m.followVy * dt
+      }
+      const lagX = tx - m.followX
+      const lagY = ty - m.followY
+      const lag = Math.hypot(lagX, lagY)
+      if (lag > FOLLOW.maxLag) {
+        const pull = 1 - FOLLOW.maxLag / lag
+        m.followX += lagX * pull
+        m.followY += lagY * pull
+      }
+      m.image.setPosition(m.followX + m.visualOffset.x, m.followY + m.visualOffset.y)
+      // 队形会旋转、队员会滑动，遮挡关系按当前相对纵深逐帧更新
+      m.image.setDepth(10 + (m.followY - this.center.y) / UNIT)
       ;(m.image.body as ArcadeBody).updateFromGameObject()
       m.hpBar.setPosition(m.image.x, m.image.y)
       m.deadText.setPosition(m.image.x, m.image.y)

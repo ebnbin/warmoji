@@ -176,6 +176,8 @@ export interface CharacterSpec {
   readonly name: string
   readonly desc: string
   readonly weapons: readonly WeaponSpec[]
+  /** 环形阵移动秉性：>0 沿环迎敌滑动，<0 避敌滑动，0 安分（被推才动）；见 core/orbit.ts */
+  readonly orbit: number
 }
 
 export const CHARACTERS = {
@@ -184,48 +186,56 @@ export const CHARACTERS = {
     name: '杂耍演员',
     desc: '向最近的敌人连续抛掷番茄',
     weapons: [WEAPONS.tomatoThrow],
+    orbit: -0.5,
   },
   unicorn: {
     emoji: '🦄',
     name: '独角兽',
     desc: '独角向前突刺，穿透沿途敌人',
     weapons: [WEAPONS.hornThrust],
+    orbit: 0.8,
   },
   troll: {
     emoji: '🧌',
     name: '巨魔',
     desc: '挥舞巨斧，横扫身前扇形范围',
     weapons: [WEAPONS.axeSweep],
+    orbit: 1,
   },
   cowboy: {
     emoji: '🤠',
     name: '牛仔',
     desc: '左右双枪齐发，射出高速水弹',
     weapons: [WEAPONS.pistolLeft, WEAPONS.pistolRight],
+    orbit: -0.7,
   },
   mage: {
     emoji: '🧙',
     name: '法师',
     desc: '在远处敌人脚下引爆奥术轰炸',
     weapons: [WEAPONS.arcaneBlast],
+    orbit: -1,
   },
   kangaroo: {
     emoji: '🦘',
     name: '袋鼠',
     desc: '掷出回旋镖，去程回程皆可伤敌',
     weapons: [WEAPONS.boomerang],
+    orbit: 0.4,
   },
   robot: {
     emoji: '🤖',
     name: '机器人',
     desc: '手持激光器，灼穿一条直线上的所有敌人',
     weapons: [WEAPONS.laserBeam],
+    orbit: -0.6,
   },
   snowman: {
     emoji: '⛄',
     name: '雪人',
     desc: '以队伍中心散发寒气，持续减速范围内的敌人',
     weapons: [WEAPONS.frostAura],
+    orbit: 0,
   },
 } as const satisfies Record<string, CharacterSpec>
 
@@ -330,6 +340,44 @@ export const FORMATION = {
   backDist: 0.65 * UNIT,
   /** 前后阵朝向跟随移动方向的转速（弧度/毫秒），约 0.26s 完成 180° 转向 */
   turnRadPerMs: 0.012,
+} as const
+
+// 环形阵轨道动力学：角色沿环滑动的「移动倾向」= 秉性（CHARACTERS.orbit）× 探测范围内的敌情；
+// 相邻不穿模，只会链式推挤（core/orbit.ts）。
+export const ORBIT = {
+  /** 敌人进入该距离（从角色自身量起）才产生移动倾向 */
+  detectRange: 3.5 * UNIT,
+  /** 沿环最大角速度（rad/s）≈ 每 4 秒一整圈 */
+  maxSpeed: 1.6,
+  /** 避敌/迎敌倾向增益 */
+  avoidGain: 2.4,
+  seekGain: 1.8,
+  /** 无倾向时向两侧邻居中点的匀布回复强度（1/s） */
+  spreadGain: 0.4,
+  /** 环上最小角间隔（rad）：略小于贴图直径，保留现有轻微交叠观感 */
+  minGap: 0.88,
+  /** 推挤松弛迭代次数（Gauss-Seidel，残差随轮数指数收敛） */
+  iterations: 4,
+} as const
+
+// 跟随惯性：队员用轻微欠阻尼弹簧追自己的岗位，起步慢半拍、急停带一点回弹
+export const FOLLOW = {
+  /** 弹簧刚度（1/s²）；kJitter 按槽位抖动刚度，让各队员步调不齐 */
+  kBase: 230,
+  kJitter: 0.3,
+  /** 阻尼比 <1 → 轻微过冲 */
+  zeta: 0.86,
+  /** 拖拽距离上限（px）：高速移动时不被甩得太远 */
+  maxLag: 60,
+} as const
+
+// 待机游移：静止且探测范围内无敌时，绕岗位做缓慢李萨如漂移
+export const WANDER = {
+  radius: 6,
+  freqX: 0.8,
+  freqY: 1.13,
+  /** 幅度淡入淡出时长 */
+  rampMs: 350,
 } as const
 
 export const MEMBER = {
