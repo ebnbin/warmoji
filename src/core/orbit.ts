@@ -1,10 +1,10 @@
 import { ORBIT } from './config'
 
-// 环形阵轨道动力学：角色被队伍中心束缚在固定半径的环上，唯一自由度是环上角度。
-// 每名角色都会按「秉性（CHARACTERS.orbit）× 探测范围内敌情」计算移动倾向，
-// 但同一时刻最多一名「主力」生效（力量竞争 + 粘性防抖 + 同力随机，见 pickDriver）——
-// 单源驱动杜绝了多角色倾向互相抵消。其余角色纯被动：不穿模的相邻推挤把主力的
-// 动势沿环传导，匀布回复又让众人流动补位，一个人动、全环跟着动。
+// 环形阵轨道动力学：环是刚性同步的——所有角色保持均匀间距，共享一个相位，
+// 每人角度 = 均匀槽位角 + 相位。全员按「秉性（CHARACTERS.orbit）× 探测范围内敌情」
+// 计算移动倾向，但每帧只有力量（倾向绝对值）最大者掌舵（同力随机、阵亡出局、
+// 随时换手——环形移动平滑，频繁换手不可见），主力的倾向直接驱动相位转速：
+// 一个人动，全环同一帧等量转动，等距/不穿模/无空隙由构造保证。
 
 export interface OrbitThreat {
   /** 角色环上角与敌人方位角（都相对队伍中心）的最短角差，(−π, π] */
@@ -57,21 +57,13 @@ export function orbitTendency(bias: number, threats: readonly OrbitThreat[]): nu
   return Math.max(-ORBIT.maxSpeed, Math.min(ORBIT.maxSpeed, omega))
 }
 
-/** 主力竞争：力量 = 各自倾向的绝对值，最强者掌舵；现任享受粘性（挑战者须超过
- * 现任 × holdFactor 才能夺权）；并列最强随机选一；全员无力（≈0）→ −1 无主力。
- * 阵亡者传 0 力量即自然出局（现任阵亡力量归零，随即让位）。 */
-export function pickDriver(
-  strengths: readonly number[],
-  current: number,
-  rng01: () => number,
-  cfg: { holdFactor: number } = ORBIT,
-): number {
+/** 主力竞争：力量最大者即刻掌舵（无粘性，随时换手）；并列最强（含浮点同力）
+ * 随机选一；全员无力（≈0）→ −1 无主力。阵亡者传 0 力量即自然出局。 */
+export function pickDriver(strengths: readonly number[], rng01: () => number): number {
   const EPS = 1e-6
   let max = 0
   for (const s of strengths) max = Math.max(max, s)
   if (max <= EPS) return -1
-  const held = current >= 0 ? (strengths[current] ?? 0) : 0
-  if (held > EPS && max <= held * cfg.holdFactor) return current
   const top: number[] = []
   for (let i = 0; i < strengths.length; i++) {
     if (strengths[i]! >= max - EPS) top.push(i)
@@ -79,62 +71,9 @@ export function pickDriver(
   return top.length === 1 ? top[0]! : top[Math.floor(rng01() * top.length) % top.length]!
 }
 
-export interface OrbitConfig {
-  maxSpeed: number
-  spreadGain: number
-  minGap: number
-  iterations: number
-}
-
-/** 推进一帧。angles 按环上次序排列（相邻下标即相邻角色，首尾相接），
- * omegas 为各自的角速度（rad/s，通常只有主力非零）；dt 钳制在 50ms 内（长卡顿不瞬移）。
- * spreadMask[i]=false 的岗位不受匀布回复（主力驱动中/阵亡尸体不被拉回）。
- * 返回同次序的新角度（wrap 到 (−π, π]）。不变式：次序不变、任意相邻角距
- * ≥ min(minGap, 2π/n)（超编自动放宽；松弛为迭代法，残差 < 百分之一弧度量级）。 */
-export function stepOrbit(
-  angles: readonly number[],
-  omegas: readonly number[],
-  dtMs: number,
-  cfg: OrbitConfig = ORBIT,
-  spreadMask?: readonly boolean[],
-): number[] {
-  const n = angles.length
+/** 相位积分：omega 钳制在最大角速度内，dt 钳制 50ms（长卡顿不瞬移），结果 wrap */
+export function stepPhase(phase: number, omega: number, dtMs: number): number {
   const dt = Math.min(dtMs, 50) / 1000
-  if (n === 0) return []
-  const clampW = (w: number): number => Math.max(-cfg.maxSpeed, Math.min(cfg.maxSpeed, w))
-  if (n === 1) return [wrapAngle(angles[0]! + clampW(omegas[0]!) * dt)]
-
-  // 展开成单调递增序列（沿正向逐个取相邻间隔），绕圈从此不需要特殊分支
-  const un: number[] = [angles[0]!]
-  for (let i = 1; i < n; i++) {
-    let gap = wrapAngle(angles[i]! - angles[i - 1]!)
-    if (gap < 0) gap += Math.PI * 2
-    un.push(un[i - 1]! + gap)
-  }
-
-  const TAU = Math.PI * 2
-  // 匀布回复：向两侧邻居中点缓慢靠拢（环上拉普拉斯平滑）——被动者借此
-  // 流动补位/跟随主力，平静时把挤歪的分布慢慢抹回均匀
-  for (let i = 0; i < n; i++) {
-    const prev = i === 0 ? un[n - 1]! - TAU : un[i - 1]!
-    const next = i === n - 1 ? un[0]! + TAU : un[i + 1]!
-    const spread = (spreadMask?.[i] ?? true) ? cfg.spreadGain * ((prev + next) / 2 - un[i]!) : 0
-    un[i] = un[i]! + clampW(omegas[i]! + spread) * dt
-  }
-
-  // 相邻对约束松弛：间距不足就对半推开（含首尾相接对）；
-  // 超编（n×minGap > 2π）时放宽到均分，保证有解
-  const minGap = Math.min(cfg.minGap, TAU / n)
-  for (let iter = 0; iter < cfg.iterations; iter++) {
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n
-      const gap = (j === 0 ? un[0]! + TAU : un[j]!) - un[i]!
-      if (gap >= minGap) continue
-      const d = (minGap - gap) / 2
-      un[i] = un[i]! - d
-      un[j] = un[j]! + d
-    }
-  }
-
-  return un.map(wrapAngle)
+  const w = Math.max(-ORBIT.maxSpeed, Math.min(ORBIT.maxSpeed, omega))
+  return wrapAngle(phase + w * dt)
 }

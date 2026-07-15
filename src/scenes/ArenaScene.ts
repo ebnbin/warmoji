@@ -7,7 +7,7 @@ import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
 import { formationPosts } from '../core/formation'
 import type { FormationId } from '../core/formation'
-import { angleDiff, orbitTendency, pickDriver, stepOrbit, threatWeight } from '../core/orbit'
+import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../core/orbit'
 import type { OrbitThreat } from '../core/orbit'
 import { browserStorage, submitScore } from '../core/highscore'
 import {
@@ -184,9 +184,9 @@ export class ArenaScene extends Phaser.Scene {
   private formationFacing = -Math.PI / 2
   /** 槽位 → 队形岗位序号（由 run.formationOrder 排列决定） */
   private postBySlot: number[] = []
-  /** 环形阵专用：各岗位的环上角度（core/orbit.ts 逐帧演化） */
-  private orbitAngles: number[] = []
-  /** 当前主力岗位（-1 = 无人驱动）；带粘性的力量竞争逐帧裁定 */
+  /** 环形阵专用：全环共享相位（刚性同步转动，core/orbit.ts 逐帧演化） */
+  private orbitPhase = 0
+  /** 当前主力岗位（-1 = 无人驱动）；力量竞争逐帧裁定，随时换手 */
   private driverPost = -1
   private elapsedMs = 0
   private spawnCooldownMs = 0
@@ -280,10 +280,7 @@ export class ArenaScene extends Phaser.Scene {
       return post >= 0 ? post : slot
     })
     this.formationFacing = -Math.PI / 2
-    // 环形阵各岗位从均匀槽位角出发，随后被 orbit 动力学接管
-    this.orbitAngles = formationPosts('ring', rosterIds.length, this.formationFacing).map((p) =>
-      Math.atan2(p.y, p.x),
-    )
+    this.orbitPhase = 0
     this.driverPost = -1
     // 队长道具：团队修正（移速/磁吸/掉落/全队伤害）
     this.teamFx = aggregateTeamEffects(this.run.captainItems)
@@ -559,23 +556,26 @@ export class ArenaScene extends Phaser.Scene {
     this.layoutTeam(delta)
   }
 
+  /** 环形阵岗位的当前环上角：均匀槽位角 + 全环共享相位 */
+  private ringAngle(idx: number): number {
+    return -Math.PI / 2 + (idx * 2 * Math.PI) / this.lineup.length + this.orbitPhase
+  }
+
   /** 队伍活感·探测与轨道：逐员判定探测范围内有无敌人（游移门控）；
-   * 环形阵额外让全员计算移动倾向，但只有力量竞争胜出的「主力」生效——
-   * 单源驱动不抵消，其余角色被推挤 + 匀布跟流（core/orbit.ts） */
+   * 环形阵额外让全员计算移动倾向，每帧力量最大者即刻掌舵（同力随机、随时换手），
+   * 主力的倾向直接驱动共享相位——全环刚性同步转动，等距不穿模由构造保证 */
   private updateOrbit(delta: number): void {
     if (this.members.length === 0) return
     const ring = this.activeFormation() === 'ring'
     const range = ORBIT.detectRange
     const rangeSq = range * range
-    const wants = new Array<number>(this.orbitAngles.length).fill(0)
-    const spreadMask = new Array<boolean>(this.orbitAngles.length).fill(false)
+    const wants = new Array<number>(this.members.length).fill(0)
     for (const m of this.members) {
       m.hasThreat = false
       if (!m.alive) continue
       const bias = this.lineup[m.slot]?.orbit ?? 0
       const idx = this.postBySlot[m.slot] ?? m.slot
-      spreadMask[idx] = true
-      const theta = this.orbitAngles[idx] ?? 0
+      const theta = this.ringAngle(idx)
       const threats: OrbitThreat[] = []
       for (const t of this.frameTargets) {
         const dx = t.x - m.image.x
@@ -593,19 +593,16 @@ export class ArenaScene extends Phaser.Scene {
       if (ring && bias !== 0) wants[idx] = orbitTendency(bias, threats)
     }
     if (!ring) return
-    // 主力竞争：力量 = 倾向绝对值，粘性防抖、同力随机、阵亡出局（力量恒 0）
+    // 主力竞争：力量 = 倾向绝对值（阵亡恒 0 出局），胜者直接驱动共享相位
     this.driverPost = pickDriver(
       wants.map((w) => Math.abs(w)),
-      this.driverPost,
       Math.random,
     )
-    const omegas = new Array<number>(this.orbitAngles.length).fill(0)
-    if (this.driverPost >= 0) {
-      omegas[this.driverPost] = wants[this.driverPost] ?? 0
-      // 主力驱动中不受匀布回复拉扯（否则又被拉回原地）
-      spreadMask[this.driverPost] = false
-    }
-    this.orbitAngles = stepOrbit(this.orbitAngles, omegas, delta, ORBIT, spreadMask)
+    this.orbitPhase = stepPhase(
+      this.orbitPhase,
+      this.driverPost >= 0 ? (wants[this.driverPost] ?? 0) : 0,
+      delta,
+    )
   }
 
   private layoutTeam(delta: number): void {
@@ -619,7 +616,7 @@ export class ArenaScene extends Phaser.Scene {
       let ox: number
       let oy: number
       if (ring) {
-        const a = this.orbitAngles[idx] ?? 0
+        const a = this.ringAngle(idx)
         ox = Math.cos(a) * TEAM.ringRadius
         oy = Math.sin(a) * TEAM.ringRadius
       } else {
