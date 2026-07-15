@@ -334,15 +334,15 @@ export const TEAM = {
 // 队形：承伤差异纯几何——谁先被敌人摸到谁掉血，无任何数值加成。
 export const FORMATION = {
   /** 前后阵前排半弧：以队伍中心为圆心的弧上均匀分布，居中者正对移动方向 */
-  frontRadius: 1.0 * UNIT,
-  /** 前排弧上相邻岗位的角间隔（rad） */
-  frontArcStep: 0.72,
-  /** 前后阵后排（横排，相对固定）到中心的距离与横向间距 */
-  backDist: 0.65 * UNIT,
-  spacing: 0.85 * UNIT,
+  frontRadius: 0.9 * UNIT,
+  /** 前排弧上相邻岗位的角间隔（rad）：张角大，两翼后掠成包住后排的月牙 */
+  frontArcStep: 1.1,
+  /** 前后阵后排（横排，相对固定）紧贴中心、彼此靠拢，窝在前排月牙里 */
+  backDist: 0.35 * UNIT,
+  spacing: 0.62 * UNIT,
   /** 转向平滑：朝移动方向的指数趋近时间常数 + 转速上限（慢而顺滑，收尾渐停） */
-  turnTauMs: 260,
-  turnMaxRadPerMs: 0.0045,
+  turnTauMs: 300,
+  turnMaxRadPerMs: 0.003,
 } as const
 
 // 环形阵轨道动力学：全员按「秉性（CHARACTERS.orbit）× 探测范围内敌情」计算移动倾向，
