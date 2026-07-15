@@ -706,14 +706,14 @@ export const BOSS = {
   hp: 4000,
   /** 平时缓速逼近队伍中心 */
   speed: 1.4 * UNIT,
-  damage: 24,
+  damage: 20,
   xp: 60,
   coins: 40,
   /** 环形弹幕：周期性向四周均匀发射（带随机整体旋转） */
   ring: {
     count: 12,
     intervalMs: 2800,
-    bullet: { emoji: '🟣', size: 0.34 * UNIT, radius: 0.16 * UNIT, speed: 2.4 * UNIT, damage: 10, lifeMs: 6000 },
+    bullet: { emoji: '🟣', size: 0.34 * UNIT, radius: 0.16 * UNIT, speed: 2.4 * UNIT, damage: 8, lifeMs: 6000 },
   },
   /** 突刺循环：蓄力提示后朝队伍中心猛冲 */
   dash: { intervalMs: 5600, windupMs: 750, speed: 8 * UNIT, durationMs: 450 },
@@ -732,15 +732,17 @@ export const STRESS = {
 } as const
 
 // 经验：等比升级曲线（前快后慢），点数经济见 core/run.ts。
-// 校准依据自动游玩实测：第 1 波结束 2~3 级，20 波累计约 17~18 级
+// 校准依据自动游玩实测：第 1 波结束 2~3 级，通关（15 波）约到满级 18
 export const XP = {
   base: 35,
   growth: 1.25,
   /** 波末保底经验 = base + perWave×波次：15 波制下是经验主梁之一，
    * 保证前几波（15 秒短波杀怪少）每波也能升级、第 15 波打完约到满级。
-   * 自动游玩实测（天使队）：45+16w 只到 15 级 → 上调到 50+26w */
-  waveBonusBase: 50,
-  waveBonusPerWave: 26,
+   * 自动游玩实测：45+16w 至 14 波末 15 级、50+26w 至 16 级 → 抬斜率降截距
+   * （第 1 波保底 76 不变守住"首波 2~3 级"锚点，中后期累计 +1050，
+   * 通关局可摸到 18 封顶，Boss 波阵亡局约 17） */
+  waveBonusBase: 40,
+  waveBonusPerWave: 36,
   /** 队伍等级上限：到顶后不再获得经验（点数总量因此固定为 maxLevel-1） */
   maxLevel: 18,
 } as const
