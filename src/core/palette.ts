@@ -7,8 +7,6 @@ export interface Palette {
   bgTo: string
   /** 地图面填充色（Phaser 数值色） */
   map: number
-  grid: number
-  gridAlpha: number
   shadow: number
 }
 
@@ -37,8 +35,6 @@ export function randomPalette(rng: Rng): Palette {
     bgFrom: `hsl(${h} 28% 34%)`,
     bgTo: `hsl(${(h + 40) % 360} 28% 20%)`,
     map: hslToInt(h, 0.35, 0.72),
-    grid: 0x000000,
-    gridAlpha: 0.07,
     shadow: 0x000000,
   }
 }

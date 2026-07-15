@@ -15,11 +15,11 @@ describe('地图定义', () => {
     }
   })
 
-  it('装饰规则数值健全：透明度极低、密度稀疏、范围区间有序', () => {
+  it('装饰规则数值健全：透明度低于战斗实体、密度稀疏、范围区间有序', () => {
     for (const id of MAP_IDS) {
       const d = MAPS[id].decor
       expect(d.alpha[0]).toBeLessThanOrEqual(d.alpha[1])
-      expect(d.alpha[1]).toBeLessThanOrEqual(0.15)
+      expect(d.alpha[1]).toBeLessThanOrEqual(0.35)
       expect(d.density[0]).toBeLessThanOrEqual(d.density[1])
       expect(d.density[1]).toBeLessThanOrEqual(0.2)
       expect(d.sizeU[0]).toBeLessThanOrEqual(d.sizeU[1])
@@ -37,12 +37,12 @@ describe('地图定义', () => {
 describe('装饰散布 rollDecor', () => {
   const spec = MAPS.forest.decor
 
-  it('数量围绕 密度×格数 波动；全部落在地图内、数值在配置范围内', () => {
+  it('数量围绕 密度×格数×噪声均值 波动；全部落在地图内、数值在配置范围内', () => {
     const rng = new Rng(42)
     const out = rollDecor(spec, () => rng.next(), 25, 25)
-    // density [0.07,0.1] × 625 = 44~63 期望；二项分布放宽到 ±3σ
-    expect(out.length).toBeGreaterThan(20)
-    expect(out.length).toBeLessThan(95)
+    // density [0.09,0.13] × 625 × 噪声均值≈0.76 ≈ 43~62 期望；噪声场加宽波动，放宽界
+    expect(out.length).toBeGreaterThan(15)
+    expect(out.length).toBeLessThan(110)
     for (const d of out) {
       expect(spec.emojis).toContain(d.emoji)
       expect(d.xU).toBeGreaterThanOrEqual(0)

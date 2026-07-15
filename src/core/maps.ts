@@ -11,7 +11,7 @@ export interface MapDecor {
   readonly emojis: readonly string[]
   /** 单个装饰的尺寸范围（格） */
   readonly sizeU: readonly [number, number]
-  /** 透明度范围（极低，不干扰战场读性） */
+  /** 透明度范围（低于战斗实体一大截，保证战场读性） */
   readonly alpha: readonly [number, number]
   /** 每格出现装饰的概率范围（逐局掷一次；25×25 = 625 格，0.08 ≈ 50 个） */
   readonly density: readonly [number, number]
@@ -38,15 +38,13 @@ export const MAPS = {
       bgFrom: 'hsl(150 30% 30%)',
       bgTo: 'hsl(170 32% 17%)',
       map: hslToInt(110, 0.3, 0.7),
-      grid: 0x000000,
-      gridAlpha: 0.07,
       shadow: 0x000000,
     },
     decor: {
       emojis: ['🌲', '🌳', '🌿', '🍂', '🍃', '🪨'],
-      sizeU: [0.5, 1.2],
-      alpha: [0.05, 0.1],
-      density: [0.07, 0.1],
+      sizeU: [0.45, 1.6],
+      alpha: [0.14, 0.26],
+      density: [0.09, 0.13],
       maxTiltRad: 0.35,
     },
   },
@@ -58,16 +56,14 @@ export const MAPS = {
       bgFrom: 'hsl(30 42% 36%)',
       bgTo: 'hsl(15 38% 20%)',
       map: hslToInt(45, 0.48, 0.76),
-      grid: 0x000000,
-      gridAlpha: 0.06,
       shadow: 0x000000,
     },
     decor: {
       emojis: ['🌵', '🪨', '🦴', '💀', '🥀'],
-      sizeU: [0.5, 1.1],
-      alpha: [0.05, 0.1],
+      sizeU: [0.45, 1.5],
+      alpha: [0.14, 0.26],
       // 荒漠刻意更稀疏
-      density: [0.05, 0.08],
+      density: [0.07, 0.1],
       maxTiltRad: 0.3,
     },
   },
@@ -79,15 +75,13 @@ export const MAPS = {
       bgFrom: 'hsl(210 34% 34%)',
       bgTo: 'hsl(235 30% 18%)',
       map: hslToInt(205, 0.28, 0.82),
-      grid: 0x000000,
-      gridAlpha: 0.06,
       shadow: 0x000000,
     },
     decor: {
       emojis: ['❄️', '🧊', '✨'],
-      sizeU: [0.4, 1.0],
-      alpha: [0.06, 0.11],
-      density: [0.08, 0.12],
+      sizeU: [0.35, 1.3],
+      alpha: [0.16, 0.3],
+      density: [0.11, 0.15],
       // 雪花/冰晶无上下之分，全向旋转
       maxTiltRad: Math.PI,
     },
@@ -113,8 +107,38 @@ export interface DecorInstance {
   rotation: number
 }
 
-/** 逐局随机的装饰摆放：地图自身的 1×1 格即虚拟网格，每格按密度掷
- * 是否放置，格内随机 offset 破坏规整感；中心钳制进地图，避免探出边缘 */
+/** 低频值噪声场：晶格随机值 + 平滑双线性插值，返回 (xU,yU) → 0..1。
+ * 晶格取自同一 rand 流，保证同种子同摆放 */
+function noiseField(
+  rand: () => number,
+  cols: number,
+  rows: number,
+  waveU: number,
+): (x: number, y: number) => number {
+  const gw = Math.ceil(cols / waveU) + 2
+  const gh = Math.ceil(rows / waveU) + 2
+  const lattice: number[] = []
+  for (let i = 0; i < gw * gh; i++) lattice.push(rand())
+  const smooth = (t: number): number => t * t * (3 - 2 * t)
+  return (x, y) => {
+    const gx = Math.min(gw - 2, Math.max(0, x / waveU))
+    const gy = Math.min(gh - 2, Math.max(0, y / waveU))
+    const ix = Math.floor(gx)
+    const iy = Math.floor(gy)
+    const fx = smooth(gx - ix)
+    const fy = smooth(gy - iy)
+    const v00 = lattice[iy * gw + ix]!
+    const v10 = lattice[iy * gw + ix + 1]!
+    const v01 = lattice[(iy + 1) * gw + ix]!
+    const v11 = lattice[(iy + 1) * gw + ix + 1]!
+    return (v00 * (1 - fx) + v10 * fx) * (1 - fy) + (v01 * (1 - fx) + v11 * fx) * fy
+  }
+}
+
+/** 逐局随机的装饰摆放：地图自身的 1×1 格即虚拟网格，每格按密度掷是否放置。
+ * 防「太整齐」两板斧：低频噪声场调制每格密度（自然成簇、留出空地），
+ * 摆放中心允许溢出到邻格（±1.1 格）而非只在本格内 jitter；
+ * 中心钳制进地图，避免探出边缘 */
 export function rollDecor(
   spec: MapDecor,
   rand: () => number,
@@ -122,18 +146,21 @@ export function rollDecor(
   rows: number,
 ): DecorInstance[] {
   const density = spec.density[0] + rand() * (spec.density[1] - spec.density[0])
+  const noise = noiseField(rand, cols, rows, 6)
   const out: DecorInstance[] = []
   for (let cy = 0; cy < rows; cy++) {
     for (let cx = 0; cx < cols; cx++) {
-      if (rand() >= density) continue
+      // 场值重映射：低处近乎空地、高处密聚（均值 ≈0.76，总量仍由 density 主导）
+      const local = density * (0.15 + 1.7 * Math.pow(noise(cx + 0.5, cy + 0.5), 1.5))
+      if (rand() >= local) continue
       const emoji = spec.emojis[Math.min(spec.emojis.length - 1, Math.floor(rand() * spec.emojis.length))]!
       const sizeU = spec.sizeU[0] + rand() * (spec.sizeU[1] - spec.sizeU[0])
       const clamp = (v: number, max: number): number =>
         Math.min(Math.max(v, sizeU / 2), max - sizeU / 2)
       out.push({
         emoji,
-        xU: clamp(cx + rand(), cols),
-        yU: clamp(cy + rand(), rows),
+        xU: clamp(cx + 0.5 + (rand() * 2 - 1) * 1.1, cols),
+        yU: clamp(cy + 0.5 + (rand() * 2 - 1) * 1.1, rows),
         sizeU,
         alpha: spec.alpha[0] + rand() * (spec.alpha[1] - spec.alpha[0]),
         rotation: (rand() * 2 - 1) * spec.maxTiltRad,

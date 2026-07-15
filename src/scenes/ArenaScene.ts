@@ -1670,6 +1670,7 @@ export class ArenaScene extends Phaser.Scene {
     this.time.delayedCall(900, () => this.scene.start('result', { win: false }))
   }
 
+  /** 地面 = 纯色面 + 右下阴影；地表纹理交给 emoji 装饰层（不再画网格线） */
   private drawFloor(): void {
     const g = this.add.graphics()
     const shadowOffset = 0.25 * UNIT
@@ -1677,9 +1678,6 @@ export class ArenaScene extends Phaser.Scene {
     g.fillRect(shadowOffset, shadowOffset, MAP.width, MAP.height)
     g.fillStyle(this.palette.map, 1)
     g.fillRect(0, 0, MAP.width, MAP.height)
-    g.lineStyle(1, this.palette.grid, this.palette.gridAlpha)
-    for (let x = UNIT; x < MAP.width; x += UNIT) g.lineBetween(x, 0, x, MAP.height)
-    for (let y = UNIT; y < MAP.height; y += UNIT) g.lineBetween(0, y, MAP.width, y)
   }
 
   /** 地图装饰：按 run 内种子随机散布的低透明度 emoji（一局一景，同局各波不变）。

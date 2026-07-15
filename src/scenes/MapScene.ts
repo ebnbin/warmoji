@@ -236,7 +236,7 @@ export class MapScene extends Phaser.Scene {
       px += 46
     }
     cursor += 44
-    line('战斗中以极低透明度随机散布，一局一景', '#9a9aa8')
+    line('战斗中以低透明度随机成簇散布，一局一景', '#9a9aa8')
     cursor += 14
     group('🚧', '差异')
     line('目前各地图仅主题不同；难度、专属怪物与增益后续开放', '#9a9aa8')
