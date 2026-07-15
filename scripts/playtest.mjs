@@ -298,7 +298,8 @@ try {
       }
       await applyAngle(decide(st))
       await new Promise((r) => setTimeout(r, TICK))
-    } else if (st.scene === 'shop') {
+    } else if (st.scene === 'shop' || st.scene === 'promote') {
+      // 波末整编（招募/升级/队形）与商店都由 shopPhase 一体处理
       await releaseKeys()
       lastAngle = null
       await shopPhase(lastCombat)
