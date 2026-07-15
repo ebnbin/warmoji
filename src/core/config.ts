@@ -313,12 +313,23 @@ export const CAPTAINS = {
 export type CaptainId = keyof typeof CAPTAINS
 export const CAPTAIN_IDS = Object.keys(CAPTAINS) as readonly CaptainId[]
 
-// 队伍：玩家操控队伍中心点，角色环状固定槽位随行；除此之外角色是完全独立的单位。
-// 队长与出战阵容由队长页/组队页选择并持久化（core/selection.ts）。
+// 队伍：玩家操控队伍中心点，角色按队形岗位随行；除此之外角色是完全独立的单位。
+// 队形几何在 core/formation.ts；满员后可在整编页切换队形与互换站位。
 export const TEAM = {
   ringRadius: 0.8 * UNIT,
   moveSpeed: 5.5 * UNIT,
   reviveMs: 10_000,
+} as const
+
+// 队形：承伤差异纯几何——谁先被敌人摸到谁掉血，无任何数值加成。
+export const FORMATION = {
+  /** 前后阵同排相邻岗位的横向间距 */
+  spacing: 0.85 * UNIT,
+  /** 前后阵前排/后排到队伍中心的纵向距离 */
+  frontDist: 0.7 * UNIT,
+  backDist: 0.65 * UNIT,
+  /** 前后阵朝向跟随移动方向的转速（弧度/毫秒），约 0.26s 完成 180° 转向 */
+  turnRadPerMs: 0.012,
 } as const
 
 export const MEMBER = {

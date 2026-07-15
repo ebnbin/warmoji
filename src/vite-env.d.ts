@@ -6,13 +6,21 @@ declare const __TWEMOJI_VERSION__: string
 
 // e2e 读取的运行时状态（src/ui/debug.ts 写入）
 interface WarmojiPromoteDebug {
-  mode: 'recruit' | 'upgrade'
+  mode: 'recruit' | 'upgrade' | 'formation'
   points: number
   selected: string
+  /** 招募/升级模式 = 网格候选；队形模式 = 预览中的队员站位 */
   items: { id: string; x: number; y: number; w: number; h: number }[]
   confirm: { x: number; y: number; w: number; h: number; enabled: boolean }
   /** wave=1 为「返回队长页」，wave>1 为「结束本局」 */
   back: { x: number; y: number; w: number; h: number }
+  /** 队形环节（mode='formation' 时提供） */
+  formation?: {
+    id: string
+    locked: boolean
+    order: string[]
+    cards: { id: string; x: number; y: number; w: number; h: number }[]
+  }
 }
 
 interface WarmojiShopDebug {
@@ -88,6 +96,8 @@ interface WarmojiDebug {
   camY: number
   wave?: number
   coins?: number
+  /** arena：当前局队形 id */
+  formation?: string
   menu?: WarmojiMenuDebug
   wiki?: WarmojiWikiDebug
   settings?: WarmojiSettingsDebug

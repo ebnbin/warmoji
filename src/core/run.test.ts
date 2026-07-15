@@ -6,11 +6,14 @@ import {
   canUpgrade,
   endRun,
   getRun,
+  isTeamFull,
   pointsAvailable,
   promoteStep,
   recruitCandidates,
   recruitMember,
   rosterCap,
+  setFormation,
+  swapFormationPosts,
   upgradeMember,
   waveStartHp,
 } from './run'
@@ -126,5 +129,40 @@ describe('waveStartHp', () => {
     expect(waveStartHp(64, 100)).toBe(64)
     expect(waveStartHp(150, 100)).toBe(100)
     expect(waveStartHp(0, 100)).toBe(Math.round(100 * WAVE.reviveHpRatio))
+  })
+})
+
+describe('队形状态', () => {
+  it('开局环形；招募追加到岗位表（岗位表始终是 roster 的排列）', () => {
+    const run = beginRun('angel', ['cowboy'])
+    expect(run.formation).toBe('ring')
+    expect(run.formationOrder).toEqual(['cowboy'])
+    run.xp.level = 99
+    recruitMember(run, 'mage')
+    expect(run.formationOrder).toEqual(['cowboy', 'mage'])
+    endRun()
+  })
+
+  it('未满员不可切队形/换位；满员后可切换并互换岗位', () => {
+    const run = beginRun('angel', ['cowboy'])
+    run.xp.level = 99
+    expect(isTeamFull(run)).toBe(false)
+    expect(setFormation(run, 'guard')).toBe(false)
+    expect(swapFormationPosts(run, 0, 0)).toBe(false)
+    expect(run.formation).toBe('ring')
+
+    while (run.roster.length < rosterCap(run)) recruitMember(run, recruitCandidates(run)[0]!)
+    expect(isTeamFull(run)).toBe(true)
+    expect(setFormation(run, 'vanguard')).toBe(true)
+    expect(run.formation).toBe('vanguard')
+
+    const [a, b] = [run.formationOrder[0]!, run.formationOrder[2]!]
+    expect(swapFormationPosts(run, 0, 2)).toBe(true)
+    expect(run.formationOrder[0]).toBe(b)
+    expect(run.formationOrder[2]).toBe(a)
+    // 越界与同岗位互换拒绝
+    expect(swapFormationPosts(run, 0, 99)).toBe(false)
+    expect(swapFormationPosts(run, 1, 1)).toBe(false)
+    endRun()
   })
 })

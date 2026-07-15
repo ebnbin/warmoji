@@ -1,16 +1,22 @@
 import Phaser from 'phaser'
 import type { CharacterId } from '../core/config'
 import { CAPTAINS, CHARACTERS, LEVELS } from '../core/config'
+import type { FormationId } from '../core/formation'
+import { FORMATION_IDS, formationDesc, formationName, formationPosts } from '../core/formation'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import {
   endRun,
   getRun,
+  isTeamFull,
   pointsAvailable,
   promoteStep,
   recruitCandidates,
   recruitMember,
+  rosterCap,
+  setFormation,
+  swapFormationPosts,
   upgradeMember,
 } from '../core/run'
 import type { RunState } from '../core/run'
@@ -23,12 +29,11 @@ import { FONT, UI_FONT } from '../ui/fonts'
 import { playSfx } from '../ui/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
-// 整编页：每波战斗前的强制点数结算——经验不可延迟消费。开局组队与波末整编
-// 完全复用本页：队长确认后带着开局点数进来（wave=1，可返回重选队长），
-// 波末带着升级点数进来（wave>1，队长不可重选，只能结束本局）。
-// 每 1 点为一步：未满编必须招募（网格 = 候选角色），满编后必须升级（网格 = 未满级队员）；
-// 点数花完后的去向：wave=1 看队长 firstWaveShop（默认直接开战），wave>1 进商店。
-// 布局沿用「详情 + 网格」方向约定：竖屏「上」= 横屏「左」（详情）。
+// 整编页：每波战斗前的必经一站。开局组队与波末整编完全复用本页：
+// 队长确认后带着开局点数进来（wave=1，可返回重选队长），波末必进（wave>1，只能结束本局）。
+// 环节顺序：有点数先强制结算（未满编必须招募、满编后必须升级，每 1 点一步），
+// 点数结清后落在「队形」环节——满员可切换队形/互换站位，未满员固定环形只作检阅；
+// 开局未满员时跳过队形环节直接开拔（去向看队长 firstWaveShop），波末从队形环节进商店。
 interface PromoteLayout {
   content: { w: number; h: number }
   headerY: number
@@ -56,18 +61,29 @@ const PORTRAIT: PromoteLayout = {
   btn: { y: 1184, w: 360, h: 72 },
 }
 
+/** 预览/示意图统一朝上（与开战时初始朝向一致） */
+const PREVIEW_FACING = -Math.PI / 2
+
 export class PromoteScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色/选中等页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
-  private mode: 'recruit' | 'upgrade' = 'recruit'
+  private mode: 'recruit' | 'upgrade' | 'formation' = 'recruit'
   /** recruit 模式为候选角色 id；upgrade 模式为 `slot:N` */
   private selectedKey = ''
+  /** 队形环节选中的岗位（-1 = 未选） */
+  private selectedPost = -1
+  /** 互换动画播放中，忽略输入 */
+  private swapBusy = false
   private layout!: PromoteLayout
   private origin = { x: 0, y: 0 }
-  private grid!: EmojiGrid
+  private grid?: EmojiGrid
   private detailObjs: Phaser.GameObjects.GameObject[] = []
+  private formationObjs: Phaser.GameObjects.GameObject[] = []
+  private memberImgs: Phaser.GameObjects.Image[] = []
+  private memberRects: { id: string; x: number; y: number; w: number; h: number }[] = []
+  private cardRects: { id: FormationId; x: number; y: number; w: number; h: number }[] = []
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private backRect = { x: 0, y: 0, w: 0, h: 0 }
   private quitArmed = false
@@ -84,16 +100,21 @@ export class PromoteScene extends Phaser.Scene {
     applyBackground(this.palette)
     this.run = getRun()
     this.detailObjs = []
+    this.formationObjs = []
+    this.grid = undefined
     this.quitArmed = false
+    this.swapBusy = false
 
-    // 兜底：无事可办直接去下一站（正常由队长页/Arena 决定是否进入本页）
-    const step = promoteStep(this.run)
-    if (!step) {
+    const resolved = this.resolveMode()
+    if (!resolved) {
+      // 开局未满员且点数已结清：跳过队形环节直接开拔
       this.scene.start(this.nextScene())
       return
     }
-    this.mode = step
-    if (!preserved || !this.validSelection()) {
+    this.mode = resolved
+    if (this.mode === 'formation') {
+      if (!preserved || this.selectedPost >= this.run.roster.length) this.selectedPost = -1
+    } else if (!preserved || !this.validSelection()) {
       this.selectedKey = this.defaultSelection()
     }
 
@@ -126,7 +147,7 @@ export class PromoteScene extends Phaser.Scene {
         .setOrigin(0, 0.5)
         .setInteractive({ useHandCursor: true })
       back.on('pointerup', () => {
-        if (this.grid.wasDragged) return
+        if (this.grid?.wasDragged) return
         endRun()
         this.scene.start('captain')
       })
@@ -147,7 +168,7 @@ export class PromoteScene extends Phaser.Scene {
         .setOrigin(0, 0.5)
         .setInteractive({ useHandCursor: true })
       quit.on('pointerup', () => {
-        if (this.grid.wasDragged) return
+        if (this.grid?.wasDragged) return
         if (this.quitArmed) {
           endRun()
           this.scene.start('menu')
@@ -163,40 +184,18 @@ export class PromoteScene extends Phaser.Scene {
       this.backRect = { x: quit.x, y: quit.y - quit.height / 2, w: quit.width, h: quit.height }
     }
 
-    // 步骤说明：剩余点数 + 当前必须执行的动作
-    const points = pointsAvailable(this.run)
+    // 步骤说明：剩余点数 + 当前环节要做的事
     this.add
-      .text(
-        w / 2,
-        oy + L.stepY,
-        this.mode === 'recruit'
-          ? `剩余 ${points} 点 · 必须招募新队员（未满编不可升级）`
-          : `剩余 ${points} 点 · 已满编，选择一名队员升级`,
-        {
-          fontFamily: UI_FONT,
-          fontSize: FONT.body,
-          fontStyle: 'bold',
-          color: '#b3e5fc',
-          resolution: res,
-        },
-      )
+      .text(w / 2, oy + L.stepY, this.stepBanner(), {
+        fontFamily: UI_FONT,
+        fontSize: FONT.body,
+        fontStyle: 'bold',
+        color: '#b3e5fc',
+        resolution: res,
+      })
       .setOrigin(0.5)
 
-    // 候选网格
-    this.grid = new EmojiGrid(this, {
-      x: this.origin.x + L.list.x,
-      y: oy + L.list.y,
-      w: L.list.w,
-      h: L.list.h,
-    })
-    this.grid.onTap = (key): void => {
-      playSfx('click')
-      this.selectedKey = key
-      this.refresh()
-    }
-    this.grid.setItems(this.buildItems())
-
-    // 详情面板底板
+    // 详情/预览面板底板（两种模式共用同一块区域）
     const D = L.detail
     const dx = this.origin.x + D.x
     const dy = oy + D.y
@@ -205,6 +204,22 @@ export class PromoteScene extends Phaser.Scene {
     panel.fillRoundedRect(dx, dy, D.w, D.h, 14)
     panel.lineStyle(1, 0xffffff, 0.1)
     panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
+
+    if (this.mode !== 'formation') {
+      // 候选网格
+      this.grid = new EmojiGrid(this, {
+        x: this.origin.x + L.list.x,
+        y: oy + L.list.y,
+        w: L.list.w,
+        h: L.list.h,
+      })
+      this.grid.onTap = (key): void => {
+        playSfx('click')
+        this.selectedKey = key
+        this.refresh()
+      }
+      this.grid.setItems(this.buildItems())
+    }
 
     // 确认按钮
     this.btnRect = {
@@ -218,7 +233,7 @@ export class PromoteScene extends Phaser.Scene {
     btnBg.fillStyle(0x81d4fa, 1)
     btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
     this.add
-      .text(w / 2, oy + L.btn.y, this.mode === 'recruit' ? '招募（花 1 点）' : '升级（花 1 点）', {
+      .text(w / 2, oy + L.btn.y, this.confirmLabel(), {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
         fontStyle: 'bold',
@@ -231,7 +246,7 @@ export class PromoteScene extends Phaser.Scene {
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (!this.grid.wasDragged) this.confirm()
+        if (!this.grid?.wasDragged) this.confirm()
       })
     this.input.keyboard?.on('keydown-ENTER', () => this.confirm())
     this.input.keyboard?.on('keydown-SPACE', () => this.confirm())
@@ -247,7 +262,11 @@ export class PromoteScene extends Phaser.Scene {
       .setOrigin(0.5, 1)
       .setAlpha(0.28)
 
-    this.refresh()
+    if (this.mode === 'formation') {
+      this.rebuildFormation()
+    } else {
+      this.refresh()
+    }
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -264,6 +283,31 @@ export class PromoteScene extends Phaser.Scene {
   private nextScene(): 'arena' | 'shop' {
     if (this.isInitial() && !CAPTAINS[this.run.captainId].firstWaveShop) return 'arena'
     return 'shop'
+  }
+
+  /** 当前环节：有点数先强制结算；波末（或开局已满员）随后落在队形环节；
+   * 开局未满员点数结清即离开（null） */
+  private resolveMode(): 'recruit' | 'upgrade' | 'formation' | null {
+    const step = promoteStep(this.run)
+    if (step) return step
+    if (!this.isInitial() || isTeamFull(this.run)) return 'formation'
+    return null
+  }
+
+  private stepBanner(): string {
+    const points = pointsAvailable(this.run)
+    if (this.mode === 'recruit') return `剩余 ${points} 点 · 必须招募新队员（未满编不可升级）`
+    if (this.mode === 'upgrade') return `剩余 ${points} 点 · 已满编，选择一名队员升级`
+    if (!isTeamFull(this.run)) {
+      return `队伍未满员（${this.run.roster.length}/${rosterCap(this.run)}），满员后解锁队形调整`
+    }
+    return '选择队形 · 点选两名队员互换站位'
+  }
+
+  private confirmLabel(): string {
+    if (this.mode === 'recruit') return '招募（花 1 点）'
+    if (this.mode === 'upgrade') return '升级（花 1 点）'
+    return this.nextScene() === 'arena' ? '开战' : '前往商店'
   }
 
   // ── 数据 ────────────────────────────────────────────────────
@@ -307,6 +351,11 @@ export class PromoteScene extends Phaser.Scene {
   // ── 确认执行 ────────────────────────────────────────────────
 
   private confirm(): void {
+    if (this.mode === 'formation') {
+      playSfx('click')
+      this.scene.start(this.nextScene())
+      return
+    }
     if (!this.selectedKey) return
     if (this.mode === 'recruit') {
       const id = this.selectedKey as CharacterId
@@ -317,8 +366,8 @@ export class PromoteScene extends Phaser.Scene {
       if (slot < 0 || !upgradeMember(this.run, slot)) return
       playSfx('upgrade')
     }
-    // 下一步或去下一站（重建页面刷新模式/候选；保留背景色）
-    if (promoteStep(this.run)) {
+    // 下一环节或直接开拔（重建页面刷新模式/候选；保留背景色）
+    if (this.resolveMode()) {
       this.selectedKey = ''
       this.preserveOnRestart = true
       this.scene.restart()
@@ -327,7 +376,213 @@ export class PromoteScene extends Phaser.Scene {
     }
   }
 
-  // ── 详情 ────────────────────────────────────────────────────
+  // ── 队形环节：预览即编辑 ────────────────────────────────────
+
+  /** 重建队形环节全部动态对象（选择卡 + 阵型预览） */
+  private rebuildFormation(): void {
+    for (const o of this.formationObjs) o.destroy()
+    this.formationObjs = []
+    this.memberImgs = []
+    this.memberRects = []
+    this.cardRects = []
+    const res = textRes()
+    this.renderFormationCards(res)
+    this.renderFormationPreview(res)
+    this.reportPromote()
+  }
+
+  /** 右侧/下方：三张队形选择卡（小圆点示意图 + 名称 + 说明） */
+  private renderFormationCards(res: number): void {
+    const L = this.layout.list
+    const lx = this.origin.x + L.x
+    const ly = this.origin.y + L.y
+    const n = this.run.roster.length
+    const locked = !isTeamFull(this.run)
+    const gap = 14
+    const cardH = Math.min(150, (L.h - gap * (FORMATION_IDS.length - 1)) / FORMATION_IDS.length)
+
+    FORMATION_IDS.forEach((id, i) => {
+      const cy = ly + i * (cardH + gap)
+      const active = this.run.formation === id
+      const g = this.add.graphics()
+      g.fillStyle(active ? 0xffffff : 0x000000, active ? 0.16 : 0.22)
+      g.fillRoundedRect(lx, cy, L.w, cardH, 14)
+      g.lineStyle(active ? 2 : 1, 0xffffff, active ? 0.9 : 0.1)
+      g.strokeRoundedRect(lx, cy, L.w, cardH, 14)
+      this.formationObjs.push(g)
+
+      // 小圆点示意图：与真实岗位同一几何，前排/中心岗位用琥珀色点出
+      const posts = formationPosts(id, Math.max(n, 2), PREVIEW_FACING)
+      const maxR = Math.max(...posts.map((p) => Math.hypot(p.x, p.y)), 1)
+      const diag = this.add.graphics()
+      const dcx = lx + 62
+      const dcy = cy + cardH / 2
+      const ds = 36 / maxR
+      posts.forEach((p, post) => {
+        const special = id === 'guard' ? post === 0 : id === 'vanguard' && post < Math.ceil(Math.max(n, 2) / 2)
+        diag.fillStyle(special ? 0xffca28 : 0xffffff, special ? 0.95 : 0.8)
+        diag.fillCircle(dcx + p.x * ds, dcy + p.y * ds, 5.5)
+      })
+      this.formationObjs.push(diag)
+
+      const name = this.add
+        .text(lx + 118, cy + cardH / 2 - 17, formationName(id, n), {
+          fontFamily: UI_FONT,
+          fontSize: FONT.head,
+          fontStyle: 'bold',
+          color: '#ffffff',
+          resolution: res,
+        })
+        .setOrigin(0, 0.5)
+      const desc = this.add
+        .text(lx + 118, cy + cardH / 2 + 16, formationDesc(id), {
+          fontFamily: UI_FONT,
+          fontSize: FONT.small,
+          color: '#b9b9c6',
+          // 中文无空格，必须逐字换行才能在窄卡片内折行
+          wordWrap: { width: L.w - 136, useAdvancedWrap: true },
+          resolution: res,
+        })
+        .setOrigin(0, 0.5)
+      this.formationObjs.push(name, desc)
+      if (locked) {
+        diag.setAlpha(0.4)
+        name.setAlpha(0.4)
+        desc.setAlpha(0.4)
+      }
+
+      const zone = this.add
+        .zone(lx, cy, L.w, cardH)
+        .setOrigin(0)
+        .setInteractive({ useHandCursor: !locked })
+        .on('pointerup', () => {
+          if (locked || this.swapBusy || this.run.formation === id) return
+          playSfx('click')
+          setFormation(this.run, id)
+          this.selectedPost = -1
+          this.rebuildFormation()
+        })
+      this.formationObjs.push(zone)
+      this.cardRects.push({ id, x: lx, y: cy, w: L.w, h: cardH })
+    })
+  }
+
+  /** 左侧/上方：把队伍按当前队形真实摆出来，点两名队员互换站位 */
+  private renderFormationPreview(res: number): void {
+    const D = this.layout.detail
+    const dx = this.origin.x + D.x
+    const dy = this.origin.y + D.y
+    const run = this.run
+    const n = run.roster.length
+    const locked = !isTeamFull(run)
+    const posts = formationPosts(run.formation, n, PREVIEW_FACING)
+    const maxR = Math.max(...posts.map((p) => Math.hypot(p.x, p.y)), 1)
+    const cx = dx + D.w / 2
+    const cy = dy + D.h / 2 + 12
+    const scale = Math.min(2.4, (Math.min(D.w, D.h) / 2 - 84) / maxR)
+
+    // 前后阵是方向性队形：标注移动方向（预览朝上）
+    if (run.formation === 'vanguard') {
+      this.formationObjs.push(
+        this.add
+          .text(cx, dy + 26, '↑ 移动方向', {
+            fontFamily: UI_FONT,
+            fontSize: FONT.small,
+            color: '#ffffff',
+            resolution: res,
+          })
+          .setOrigin(0.5, 0)
+          .setAlpha(0.55),
+      )
+    }
+
+    posts.forEach((p, post) => {
+      const id = run.formationOrder[post]
+      if (!id) return
+      const px = cx + p.x * scale
+      const py = cy + p.y * scale
+      if (post === this.selectedPost) {
+        const ring = this.add.graphics()
+        ring.lineStyle(3, 0xffffff, 0.95)
+        ring.strokeCircle(px, py, 46)
+        this.formationObjs.push(ring)
+      }
+      const img = emojiImage(this, px, py, CHARACTERS[id].emoji, 64, 'player')
+      this.formationObjs.push(img)
+      this.memberImgs[post] = img
+      const zone = this.add
+        .zone(px - 42, py - 42, 84, 84)
+        .setOrigin(0)
+        .setInteractive({ useHandCursor: !locked })
+        .on('pointerup', () => this.onMemberTap(post))
+      this.formationObjs.push(zone)
+      this.memberRects.push({ id, x: px - 42, y: py - 42, w: 84, h: 84 })
+    })
+
+    // 底部提示：选中队员名 + 互换指引
+    const hint = locked
+      ? '阵容检阅：确认无误就出发吧'
+      : this.selectedPost >= 0
+        ? `${CHARACTERS[run.formationOrder[this.selectedPost]!]?.name ?? ''}：再点另一名队员互换位置`
+        : '点选队员可互换站位'
+    this.formationObjs.push(
+      this.add
+        .text(cx, dy + D.h - 22, hint, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.body,
+          color: '#d0d0d8',
+          resolution: res,
+        })
+        .setOrigin(0.5, 1),
+    )
+  }
+
+  /** 队形预览点选：第一次选中，第二次互换（带滑动动画） */
+  private onMemberTap(post: number): void {
+    if (this.swapBusy || !isTeamFull(this.run)) return
+    playSfx('click')
+    if (this.selectedPost === post) {
+      this.selectedPost = -1
+      this.rebuildFormation()
+      return
+    }
+    if (this.selectedPost < 0) {
+      this.selectedPost = post
+      this.rebuildFormation()
+      return
+    }
+    const a = this.selectedPost
+    const b = post
+    this.selectedPost = -1
+    if (!swapFormationPosts(this.run, a, b)) {
+      this.rebuildFormation()
+      return
+    }
+    // 两名队员滑到对方岗位后重建（重建同步选中态/调试状态）
+    const ia = this.memberImgs[a]
+    const ib = this.memberImgs[b]
+    if (!ia || !ib) {
+      this.rebuildFormation()
+      return
+    }
+    this.swapBusy = true
+    playSfx('whoosh')
+    const done = (): void => {
+      this.swapBusy = false
+      this.rebuildFormation()
+    }
+    this.tweens.add({ targets: ia, x: ib.x, y: ib.y, duration: 170, ease: 'Cubic.easeInOut' })
+    this.tweens.add({
+      targets: ib,
+      x: ia.x,
+      y: ia.y,
+      duration: 170,
+      ease: 'Cubic.easeInOut',
+      onComplete: done,
+    })
+  }
+
+  // ── 详情（招募/升级模式） ───────────────────────────────────
 
   private renderDetail(res: number): void {
     for (const o of this.detailObjs) o.destroy()
@@ -401,12 +656,14 @@ export class PromoteScene extends Phaser.Scene {
   }
 
   private refresh(): void {
-    this.grid.setSelected(this.selectedKey || null)
+    this.grid?.setSelected(this.selectedKey || null)
     this.renderDetail(textRes())
     this.reportPromote()
   }
 
   private reportPromote(): void {
+    const formationSelected =
+      this.selectedPost >= 0 ? (this.run.formationOrder[this.selectedPost] ?? '') : ''
     reportDebug({
       scene: 'promote',
       elapsed: 0,
@@ -428,14 +685,23 @@ export class PromoteScene extends Phaser.Scene {
       promote: {
         mode: this.mode,
         points: pointsAvailable(this.run),
-        selected: this.selectedKey,
-        items: this.grid.cellRects().map((r) => ({ id: r.key, x: r.x, y: r.y, w: r.w, h: r.h })),
+        selected: this.mode === 'formation' ? formationSelected : this.selectedKey,
+        items:
+          this.mode === 'formation'
+            ? this.memberRects.map((r) => ({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h }))
+            : (this.grid?.cellRects() ?? []).map((r) => ({
+                id: r.key,
+                x: r.x,
+                y: r.y,
+                w: r.w,
+                h: r.h,
+              })),
         confirm: {
           x: this.btnRect.x + this.btnRect.w / 2,
           y: this.btnRect.y + this.btnRect.h / 2,
           w: this.btnRect.w,
           h: this.btnRect.h,
-          enabled: this.selectedKey !== '',
+          enabled: this.mode === 'formation' || this.selectedKey !== '',
         },
         back: {
           x: this.backRect.x + this.backRect.w / 2,
@@ -443,6 +709,16 @@ export class PromoteScene extends Phaser.Scene {
           w: this.backRect.w,
           h: this.backRect.h,
         },
+        ...(this.mode === 'formation'
+          ? {
+              formation: {
+                id: this.run.formation,
+                locked: !isTeamFull(this.run),
+                order: [...this.run.formationOrder],
+                cards: this.cardRects.map((c) => ({ id: c.id, x: c.x, y: c.y, w: c.w, h: c.h })),
+              },
+            }
+          : {}),
       },
     })
   }

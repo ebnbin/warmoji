@@ -144,13 +144,18 @@ async function focusSlot(id) {
   return true
 }
 
-/** 整编页：强制招募/升级逐步结算（波末有点数时先于商店出现） */
+/** 整编页：强制招募/升级逐步结算，随后的队形环节维持现状直接出发（波末必进本页） */
 async function promotePhase() {
   const actions = []
   for (let guard = 0; guard < 24; guard++) {
     const scene = await page.evaluate(() => window.__warmoji.scene)
     if (scene !== 'promote') break
     const pr = await page.evaluate(() => window.__warmoji.promote)
+    if (pr.mode === 'formation') {
+      await clickAt({ x: pr.confirm.x, y: pr.confirm.y })
+      await page.waitForFunction(() => window.__warmoji?.scene !== 'promote', undefined, { timeout: 10000 })
+      break
+    }
     let pickKey = pr.selected
     if (pr.mode === 'recruit') {
       const wish = ['mage', 'robot', 'troll', 'snowman', 'unicorn', 'kangaroo', 'juggler']
@@ -231,7 +236,7 @@ async function buyItems(lastCombat) {
 const levelHistory = []
 
 async function shopPhase(lastCombat) {
-  // 波末：有点数先进整编页强制结算，再进商店
+  // 波末必进整编页：强制结算点数 + 队形环节，随后进商店
   await page.waitForFunction(
     () => window.__warmoji?.scene === 'promote' || (window.__warmoji?.scene === 'shop' && !!window.__warmoji.shop),
   )

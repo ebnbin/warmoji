@@ -1,5 +1,6 @@
 import type { CaptainId, CharacterId } from './config'
 import { CAPTAINS, CHARACTERS, LEVELS, MEMBER, ROSTER_IDS, WAVE } from './config'
+import type { FormationId } from './formation'
 import type { ItemId } from './items'
 import { gainXp } from './xp'
 import type { XpState } from './xp'
@@ -29,6 +30,10 @@ export interface RunState {
   captainItems: ItemId[]
   /** 本次商店剩余的免费刷新次数（进店时按队长能力重置） */
   freeRefreshes: number
+  /** 当前队形（满员后可在整编页切换；未满员固定环形） */
+  formation: FormationId
+  /** 队形岗位分配：下标 = 岗位序号，值 = 角色 id（roster 的一个排列） */
+  formationOrder: CharacterId[]
 }
 
 let current: RunState | undefined
@@ -48,6 +53,8 @@ export function beginRun(captainId: CaptainId, starters: readonly CharacterId[])
     memberItems: starters.map(() => []),
     captainItems: [],
     freeRefreshes: 0,
+    formation: 'ring',
+    formationOrder: [...starters],
   }
   return current
 }
@@ -92,7 +99,30 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   run.memberLevels.push(1)
   run.memberHp.push(MEMBER.maxHp)
   run.memberItems.push([])
+  run.formationOrder.push(id)
   return run.roster.length - 1
+}
+
+export function isTeamFull(run: RunState): boolean {
+  return run.roster.length >= rosterCap(run)
+}
+
+/** 切换队形；未满员固定环形阵不可调 */
+export function setFormation(run: RunState, id: FormationId): boolean {
+  if (!isTeamFull(run)) return false
+  run.formation = id
+  return true
+}
+
+/** 互换两个岗位上的队员；未满员不可调 */
+export function swapFormationPosts(run: RunState, a: number, b: number): boolean {
+  if (!isTeamFull(run) || a === b) return false
+  const va = run.formationOrder[a]
+  const vb = run.formationOrder[b]
+  if (va === undefined || vb === undefined) return false
+  run.formationOrder[a] = vb
+  run.formationOrder[b] = va
+  return true
 }
 
 /** 整编步骤：进商店前强制消费点数的类型——未满编先招募，满编后给未满级队员升级；

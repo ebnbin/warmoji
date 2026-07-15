@@ -39,18 +39,30 @@ export async function confirmCaptain(page: Page): Promise<void> {
   )
 }
 
-/** 把整编页的强制步骤走完（默认选中项逐点确认），直到离开整编页 */
+/** 把整编页走完（默认选中项逐点确认；队形环节直接出发），直到离开整编页 */
 export async function completePromote(page: Page): Promise<void> {
   for (let step = 0; step < 24; step++) {
-    const scene = await page.evaluate(() => window.__warmoji!.scene)
-    if (scene !== 'promote') return
-    const before = await page.evaluate(() => window.__warmoji!.promote!.points)
+    const st = await page.evaluate(() => ({
+      scene: window.__warmoji!.scene,
+      mode: window.__warmoji!.promote?.mode,
+      points: window.__warmoji!.promote?.points ?? 0,
+    }))
+    if (st.scene !== 'promote') return
+    if (st.mode === 'formation') {
+      // 队形环节没有点数消耗，确认即离开整编页
+      await clickPromoteConfirm(page)
+      await page.waitForFunction(() => window.__warmoji?.scene !== 'promote', undefined, {
+        timeout: 15_000,
+      })
+      return
+    }
     await clickPromoteConfirm(page)
     await page.waitForFunction(
       (prev) =>
         window.__warmoji?.scene !== 'promote' ||
+        window.__warmoji.promote?.mode === 'formation' ||
         (window.__warmoji.promote?.points ?? 99) < prev,
-      before,
+      st.points,
       { timeout: 15_000 },
     )
   }
@@ -99,10 +111,30 @@ export async function clickPromoteItem(page: Page, key: string): Promise<void> {
   await page.waitForFunction((k) => window.__warmoji?.promote?.selected === k, key)
 }
 
-/** 整编页点击确认按钮（招募/升级 花 1 点） */
+/** 整编页点击确认按钮（招募/升级花 1 点；队形环节 = 出发） */
 export async function clickPromoteConfirm(page: Page): Promise<void> {
   const b = await page.evaluate(() => window.__warmoji!.promote!.confirm)
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: b.x, y: b.y }) })
+}
+
+/** 整编页队形环节：点击一张队形卡并等待切换生效 */
+export async function clickFormationCard(page: Page, id: string): Promise<void> {
+  const c = await page.evaluate(
+    (cid) => window.__warmoji!.promote!.formation!.cards.find((x) => x.id === cid)!,
+    id,
+  )
+  await page
+    .locator('#game canvas')
+    .click({ position: await cssPoint(page, { x: c.x + c.w / 2, y: c.y + c.h / 2 }) })
+  await page.waitForFunction((cid) => window.__warmoji?.promote?.formation?.id === cid, id)
+}
+
+/** 整编页队形环节：点击预览中的某个岗位（items 下标 = 岗位序号） */
+export async function clickFormationPost(page: Page, post: number): Promise<void> {
+  const r = await page.evaluate((i) => window.__warmoji!.promote!.items[i]!, post)
+  await page
+    .locator('#game canvas')
+    .click({ position: await cssPoint(page, { x: r.x + r.w / 2, y: r.y + r.h / 2 }) })
 }
 
 /** 商店页点击「开始第 N 波」进入下一波 */

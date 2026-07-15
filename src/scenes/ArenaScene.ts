@@ -1,11 +1,11 @@
 import Phaser from 'phaser'
-import { CAPTAINS, CHARACTERS, COIN, HIT_SHAKE, KNOCKBACK, MAP, MEMBER, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WAVE } from '../core/config'
+import { CAPTAINS, CHARACTERS, COIN, FORMATION, HIT_SHAKE, KNOCKBACK, MAP, MEMBER, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WAVE } from '../core/config'
 import type { CharacterSpec, ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../core/config'
 import { enemyMixAt, fleeSteer, pickEnemy } from '../core/enemies'
 import type { EnemyMixEntry } from '../core/enemies'
 import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
-import { slotOffset } from '../core/formation'
+import { formationPosts } from '../core/formation'
 import { browserStorage, submitScore } from '../core/highscore'
 import {
   aggregateCharacterEffects,
@@ -14,7 +14,7 @@ import {
 } from '../core/items'
 import type { TeamEffects } from '../core/items'
 import { levelDamageMul, memberMaxHp } from '../core/levels'
-import { getRun, promoteStep, waveStartHp } from '../core/run'
+import { getRun, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { DEFAULT_SETTINGS, loadSettings } from '../core/settings'
 import type { Settings } from '../core/settings'
@@ -23,6 +23,7 @@ import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import { randomMapPoint } from '../core/spawn'
 import { norm } from '../core/vec'
+import type { Point } from '../core/vec'
 import { waveAt } from '../core/waves'
 import { gainXp, waveBonusXp, xpToNext } from '../core/xp'
 import { applyBackground } from '../ui/background'
@@ -165,6 +166,10 @@ export class ArenaScene extends Phaser.Scene {
   private puffBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   /** 本帧队伍移动方向（行走摇摆与朝向翻转用） */
   private teamDir = { x: 0, y: 0 }
+  /** 队形朝向（弧度），平滑跟随移动方向；前后阵随之整体旋转 */
+  private formationFacing = -Math.PI / 2
+  /** 槽位 → 队形岗位序号（由 run.formationOrder 排列决定） */
+  private postBySlot: number[] = []
   private elapsedMs = 0
   private spawnCooldownMs = 0
   private pendingSpawns = 0
@@ -251,6 +256,12 @@ export class ArenaScene extends Phaser.Scene {
     // 压测固定 5 人满编便于跑分对比；正常局阵容来自 run（招募制，逐波扩编）
     const rosterIds = this.stress ? ROSTER_IDS.slice(0, 5) : this.run.roster
     this.lineup = rosterIds.map((id) => CHARACTERS[id])
+    // 槽位 → 队形岗位：正常局按整编页的岗位分配；压测阵容不走 run，槽位即岗位
+    this.postBySlot = rosterIds.map((id, slot) => {
+      const post = this.stress ? -1 : this.run.formationOrder.indexOf(id)
+      return post >= 0 ? post : slot
+    })
+    this.formationFacing = -Math.PI / 2
     // 队长道具：团队修正（移速/磁吸/掉落/全队伤害）
     this.teamFx = aggregateTeamEffects(this.run.captainItems)
     this.stats.moveSpeed = TEAM.moveSpeed * this.teamFx.moveSpeedMul
@@ -361,6 +372,7 @@ export class ArenaScene extends Phaser.Scene {
       playerY: this.center.y,
       camX: cam.worldView.centerX,
       camY: cam.worldView.centerY,
+      formation: this.run.formation,
     })
   }
 
@@ -383,10 +395,8 @@ export class ArenaScene extends Phaser.Scene {
       coins: this.run.coins - this.waveBaseCoins,
       levels: this.run.xp.level - this.waveBaseLevel,
     } satisfies WaveSummary)
-    // 有待结算点数先进整编页（强制招募/升级），否则直进商店
-    this.time.delayedCall(WAVE.summaryMs, () =>
-      this.scene.start(promoteStep(this.run) ? 'promote' : 'shop'),
-    )
+    // 每波结束必进整编页：有点数先强制招募/升级，随后落在队形环节，再去商店
+    this.time.delayedCall(WAVE.summaryMs, () => this.scene.start('promote'))
   }
 
   private onViewportChanged(): void {
@@ -395,8 +405,17 @@ export class ArenaScene extends Phaser.Scene {
 
   // ── 队伍 ────────────────────────────────────────────────────
 
+  /** 当前队形的全部岗位偏移（压测固定环形） */
+  private currentPosts(): Point[] {
+    return formationPosts(
+      this.stress ? 'ring' : this.run.formation,
+      this.lineup.length,
+      this.formationFacing,
+    )
+  }
+
   private createMember(emoji: string, weaponSpecs: readonly WeaponSpec[], slot: number): Member {
-    const off = slotOffset(slot, this.lineup.length, TEAM.ringRadius)
+    const off = this.currentPosts()[this.postBySlot[slot] ?? slot] ?? { x: 0, y: 0 }
     const image = emojiImage(
       this,
       this.center.x + off.x,
@@ -491,6 +510,14 @@ export class ArenaScene extends Phaser.Scene {
     const ui = this.scene.get('ui') as UIScene
     const dir = kx !== 0 || ky !== 0 ? norm(kx, ky) : ui.joystickVector
     this.teamDir = dir
+    // 队形朝向平滑转向移动方向（前后阵随之旋转）；静止保持最后朝向
+    if (dir.x !== 0 || dir.y !== 0) {
+      this.formationFacing = Phaser.Math.Angle.RotateTo(
+        this.formationFacing,
+        Math.atan2(dir.y, dir.x),
+        FORMATION.turnRadPerMs * delta,
+      )
+    }
     const step = (this.stats.moveSpeed * delta) / 1000
     const clampMin = TEAM.ringRadius + MEMBER.radius
     this.center.x = Phaser.Math.Clamp(this.center.x + dir.x * step, clampMin, MAP.width - clampMin)
@@ -500,12 +527,15 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private layoutTeam(): void {
+    const posts = this.currentPosts()
     for (const m of this.members) {
-      const off = slotOffset(m.slot, this.lineup.length, TEAM.ringRadius)
+      const off = posts[this.postBySlot[m.slot] ?? m.slot] ?? { x: 0, y: 0 }
       m.image.setPosition(
         this.center.x + off.x + m.visualOffset.x,
         this.center.y + off.y + m.visualOffset.y,
       )
+      // 队形会旋转，遮挡关系按当前 y 逐帧更新（靠下者盖住靠上者）
+      m.image.setDepth(10 + off.y / UNIT)
       ;(m.image.body as ArcadeBody).updateFromGameObject()
       m.hpBar.setPosition(m.image.x, m.image.y)
       m.deadText.setPosition(m.image.x, m.image.y)
