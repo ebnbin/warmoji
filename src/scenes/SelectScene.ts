@@ -11,6 +11,7 @@ import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiKey } from '../ui/emoji'
 import { FONT, UI_FONT } from '../ui/fonts'
+import { playSfx } from '../ui/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // 组队页 = 游戏流程中的一步（主菜单 → 组队 → 战斗；战斗结束回到这里）。
@@ -288,6 +289,7 @@ export class SelectScene extends Phaser.Scene {
     const L = this.layout.list
     const centerY = this.origin.y + L.y + relY - this.scrollY + L.rowH / 2
     if (centerY < this.origin.y + L.y || centerY > this.origin.y + L.y + L.h) return
+    playSfx('click')
     this.focusedId = id
     this.refresh()
   }
@@ -364,6 +366,7 @@ export class SelectScene extends Phaser.Scene {
   }
 
   private onToggle(): void {
+    playSfx('click')
     this.lineup = toggleLineup(this.lineup, this.focusedId, this.starterCount)
     saveLineup(browserStorage(), this.lineup)
     this.refresh()
@@ -371,6 +374,7 @@ export class SelectScene extends Phaser.Scene {
 
   private startRun(): void {
     if (this.lineup.length !== this.starterCount) return
+    playSfx('click')
     beginRun(this.captainId, this.lineup)
     this.scene.start('arena')
   }

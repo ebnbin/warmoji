@@ -1,5 +1,6 @@
 import type Phaser from 'phaser'
 import type { ProjectileSpec } from '../core/weapons'
+import type { SfxId } from '../ui/sfx'
 
 export interface EnemyTarget {
   x: number
@@ -35,6 +36,8 @@ export interface WeaponContext {
   applySlow(x: number, y: number, radius: number, factor: number): void
   damageMul(): number
   cooldownMul(): number
+  /** 出手/爆炸等武器音效（内部已节流） */
+  sfx(id: SfxId): void
 }
 
 /** 武器运行时：每（角色×武器）一个实例，自管冷却/视觉/攻击行为 */

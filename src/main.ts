@@ -8,8 +8,11 @@ import { SettingsScene } from './scenes/SettingsScene'
 import { ShopScene } from './scenes/ShopScene'
 import { UIScene } from './scenes/UIScene'
 import { WikiScene } from './scenes/WikiScene'
+import { browserStorage } from './core/highscore'
 import { grantCoins, grantXp } from './core/run'
+import { loadSettings } from './core/settings'
 import { setStress } from './ui/dev'
+import { initSfx, setSfxEnabled, sfxStats } from './ui/sfx'
 import { isStandalone, nudgeIosViewport, refreshViewport, viewport } from './ui/viewport'
 
 const badge = document.getElementById('build-badge')
@@ -17,6 +20,10 @@ if (badge) {
   badge.textContent = __BUILD_HASH__
   badge.title = `构建于 ${__BUILD_TIME__}`
 }
+
+// 程序化音效：首个手势解锁 + 按设置开关
+initSfx()
+setSfxEnabled(loadSettings(browserStorage()).sound)
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -76,3 +83,4 @@ window.__setStress = (on: boolean): void => {
 
 window.__addCoins = (n: number): void => grantCoins(n)
 window.__addXp = (n: number): void => grantXp(n)
+window.__sfxStats = (): { baked: number; played: number } => sfxStats()

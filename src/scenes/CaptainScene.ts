@@ -11,6 +11,7 @@ import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage } from '../ui/emoji'
 import { FONT, UI_FONT } from '../ui/fonts'
+import { playSfx } from '../ui/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // 队长选择页 = 组队流程第一步（主菜单 → 选队长 → 组队 → 战斗）。
@@ -128,6 +129,7 @@ export class CaptainScene extends Phaser.Scene {
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
         .on('pointerup', () => {
+          playSfx('click')
           this.selectedId = id
           saveCaptain(browserStorage(), id)
           this.refresh()
@@ -169,7 +171,10 @@ export class CaptainScene extends Phaser.Scene {
       .zone(b.x, b.y, b.w, b.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.scene.start('select'))
+      .on('pointerup', () => {
+        playSfx('click')
+        this.scene.start('select')
+      })
     this.input.keyboard?.on('keydown-ENTER', () => this.scene.start('select'))
     this.input.keyboard?.on('keydown-SPACE', () => this.scene.start('select'))
     this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))

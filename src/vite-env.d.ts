@@ -111,4 +111,5 @@ interface Window {
   __setStress?: (on: boolean) => void
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
+  __sfxStats?: () => { baked: number; played: number }
 }

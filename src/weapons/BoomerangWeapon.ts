@@ -85,6 +85,7 @@ export class BoomerangWeapon implements WeaponRuntime {
   }
 
   private launch(owner: WeaponOwner): void {
+    this.ctx.sfx('whoosh')
     this.phase = 'out'
     this.flightT = 0
     this.hitSet.clear()

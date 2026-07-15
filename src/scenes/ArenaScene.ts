@@ -31,6 +31,7 @@ import { reportDebug } from '../ui/debug'
 import { isStress } from '../ui/dev'
 import { emojiImage } from '../ui/emoji'
 import { burstEmitter } from '../ui/fx'
+import { playSfx } from '../ui/sfx'
 import { UI_FONT } from '../ui/fonts'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 import { createWeapon } from '../weapons/create'
@@ -142,6 +143,7 @@ export class ArenaScene extends Phaser.Scene {
       this.frameSlowZones.push({ x, y, r2: radius * radius, factor }),
     damageMul: () => this.stats.damageMul,
     cooldownMul: () => this.stats.cooldownMul,
+    sfx: (id) => playSfx(id),
   }
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -366,6 +368,7 @@ export class ArenaScene extends Phaser.Scene {
   private endWave(): void {
     this.over = true
     this.physics.pause()
+    playSfx('wave')
     // 波末保底经验：躲避流杀得少也有基本收益（队长倍率同样生效）
     const xpMul = CAPTAINS[this.run.captainId].xpGainMul
     this.run.xp = gainXp(this.run.xp, Math.round(waveBonusXp(this.run.wave) * xpMul)).state
@@ -576,6 +579,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private hurtMember(m: Member, damage: number, tint: number): void {
     m.hp = Math.max(0, m.hp - damage)
+    playSfx('hurt')
     if (this.settings.hitShake) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     m.image.setTint(tint)
     this.time.delayedCall(120, () => {
@@ -601,6 +605,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private reviveMember(m: Member): void {
+    playSfx('revive')
     m.alive = true
     m.hp = m.maxHp
     m.shownHpRatio = -1
@@ -637,6 +642,7 @@ export class ArenaScene extends Phaser.Scene {
       Math.cos(angle) * spec.projectile.speed,
       Math.sin(angle) * spec.projectile.speed,
     )
+    playSfx('shoot')
     p.setData('damage', damage)
     p.setData('radius', spec.projectile.radius)
     p.setData('kb', spec.knockback)
@@ -697,6 +703,7 @@ export class ArenaScene extends Phaser.Scene {
       }
     } else {
       enemy.setData('hp', hp)
+      playSfx('hit')
       // 受击纯白闪光：时间戳驱动（steerEnemies 里恢复），高频命中不堆 timer/tween
       enemy.setData('flashUntil', this.elapsedMs + 70)
       enemy.setTintFill(0xffffff)
@@ -718,10 +725,13 @@ export class ArenaScene extends Phaser.Scene {
 
   private killEnemy(enemy: ImageObj, flingVx = 0, flingVy = 0): void {
     this.run.kills++
+    playSfx('kill')
     const spec = enemy.getData('spec') as EnemySpec
     // 经验击杀即得（队长可提供倍率）；金币落地等待拾取
     const xpMul = CAPTAINS[this.run.captainId].xpGainMul
-    this.run.xp = gainXp(this.run.xp, Math.round(spec.xp * xpMul)).state
+    const gained = gainXp(this.run.xp, Math.round(spec.xp * xpMul))
+    this.run.xp = gained.state
+    if (gained.levelsGained > 0) playSfx('levelup')
     // 偷金币鼠：吐回吃掉的金币 + 1 枚利息
     const eaten = (enemy.getData('eaten') as number) || 0
     const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? spec.coins : 0
@@ -1219,6 +1229,7 @@ export class ArenaScene extends Phaser.Scene {
   private collectCoin(coin: ImageObj): void {
     if (!coin.active) return
     this.coinBurst.explode(4, coin.x, coin.y)
+    playSfx('coin')
     coin.destroy()
     this.run.coins += 1
   }
@@ -1228,6 +1239,7 @@ export class ArenaScene extends Phaser.Scene {
   private gameOver(): void {
     this.over = true
     this.physics.pause()
+    playSfx('over')
 
     const result = submitScore(browserStorage(), this.run.wave, this.run.kills)
     this.gameOverInfo = {

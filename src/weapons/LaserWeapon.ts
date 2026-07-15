@@ -47,6 +47,7 @@ export class LaserWeapon implements WeaponRuntime {
     this.aim = aim
     this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
 
+    this.ctx.sfx('zap')
     const damage = Math.round(this.spec.damage * this.ctx.damageMul())
     const origin = { x: owner.x, y: owner.y }
     for (const i of thrustHitIndices(origin, aim, this.spec.range, this.spec.beamRadius, targets)) {

@@ -39,6 +39,7 @@ export class AreaBlastWeapon implements WeaponRuntime {
     if (!center) return
     this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
 
+    this.ctx.sfx('boom')
     const damage = Math.round(this.spec.damage * this.ctx.damageMul())
     for (const i of circleHitIndices(center, this.spec.blastRadius, targets)) {
       this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, center.x, center.y)

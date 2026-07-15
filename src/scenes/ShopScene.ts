@@ -32,6 +32,7 @@ import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiKey } from '../ui/emoji'
 import { FONT, UI_FONT } from '../ui/fonts'
+import { playSfx } from '../ui/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // 波次间商店：左（竖屏为下）为上架位列表——队长占首位、每个出战角色一个位，
@@ -368,6 +369,7 @@ export class ShopScene extends Phaser.Scene {
     const item = ITEMS[offer]
     if (this.run.coins < item.price) return
     this.run.coins -= item.price
+    playSfx('buy')
     const owned = this.ownedFor(idx)
     owned.push(offer)
     // 购买后自动补货下一件
@@ -382,6 +384,7 @@ export class ShopScene extends Phaser.Scene {
     if (!free && this.run.coins < SHOP.refreshPrice) return
     if (free) this.run.freeRefreshes -= 1
     else this.run.coins -= SHOP.refreshPrice
+    playSfx('click')
     this.offers[idx] = rollItem(this.poolFor(idx), this.ownedFor(idx), Math.random)
     this.refresh()
   }
@@ -392,6 +395,7 @@ export class ShopScene extends Phaser.Scene {
     if (!id || !canRecruit(this.run, id)) return
     const slot = recruitMember(this.run, id)
     if (slot < 0) return
+    playSfx('recruit')
     // 先同步 lineup 再补上架：poolFor 按 lineup 找角色
     this.lineup = [...this.run.roster]
     this.offers.push(rollItem(this.poolFor(slot + 1), [], Math.random))
@@ -406,6 +410,7 @@ export class ShopScene extends Phaser.Scene {
     const idx = this.focusedIndex()
     if (idx < 1) return
     if (!upgradeMember(this.run, idx - 1)) return
+    playSfx('upgrade')
     this.preserveOnRestart = true
     this.scene.restart()
   }
@@ -474,6 +479,7 @@ export class ShopScene extends Phaser.Scene {
           const cy = sy + relY - this.slotScroll + S.rowH / 2
           if (cy < sy || cy > sy + S.h) return
           if (this.focusedId !== id) this.statsScroll = 0
+          playSfx('click')
           this.focusedId = id
           this.refresh()
         })
@@ -864,6 +870,7 @@ export class ShopScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .on('pointerup', () => {
           if (this.dragMoved) return
+          playSfx('click')
           this.candidateId = id
           this.refresh()
         })
@@ -977,6 +984,7 @@ export class ShopScene extends Phaser.Scene {
   }
 
   private nextWave(): void {
+    playSfx('click')
     this.scene.start('arena')
   }
 

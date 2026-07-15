@@ -9,6 +9,7 @@ import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage } from '../ui/emoji'
 import { FONT, UI_FONT } from '../ui/fonts'
+import { playSfx, setSfxEnabled } from '../ui/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // 设置页：按 SETTING_DEFS 定义表渲染开关列表，改动即时持久化。
@@ -137,6 +138,9 @@ export class SettingsScene extends Phaser.Scene {
         .on('pointerup', () => {
           this.settings[def.key] = !this.settings[def.key]
           saveSettings(browserStorage(), this.settings)
+          // 音效开关即时生效；开启瞬间用一声 click 给听感反馈
+          setSfxEnabled(this.settings.sound)
+          playSfx('click')
           this.drawToggle(row)
           this.reportSettings()
         })

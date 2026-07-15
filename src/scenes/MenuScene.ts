@@ -8,6 +8,7 @@ import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, iconLabel } from '../ui/emoji'
 import { FONT, UI_FONT } from '../ui/fonts'
+import { playSfx } from '../ui/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // 主菜单：分字母弹跳的两色 logo + 背景漂浮暗纹 + 「角色 vs 敌人」对峙小剧场，
@@ -70,12 +71,18 @@ export class MenuScene extends Phaser.Scene {
     emojiImage(this, gearX, gearY, '⚙️', 40)
       .setAlpha(0.9)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.scene.start('settings'))
+      .on('pointerup', () => {
+        playSfx('click')
+        this.scene.start('settings')
+      })
     this.gearRect = { x: gearX - 28, y: gearY - 28, w: 56, h: 56 }
     emojiImage(this, gearX - 84, gearY, '📖', 40)
       .setAlpha(0.9)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.scene.start('wiki'))
+      .on('pointerup', () => {
+        playSfx('click')
+        this.scene.start('wiki')
+      })
     this.bookRect = { x: gearX - 84 - 28, y: gearY - 28, w: 56, h: 56 }
 
     // 明确的按钮 + 空格键开始，避免任意点击误触；轻微脉动引导视线
@@ -106,7 +113,10 @@ export class MenuScene extends Phaser.Scene {
       .zone(btn.x, btn.y, btn.w, btn.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.scene.start('captain'))
+      .on('pointerup', () => {
+        playSfx('click')
+        this.scene.start('captain')
+      })
     this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('captain'))
     this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('captain'))
 

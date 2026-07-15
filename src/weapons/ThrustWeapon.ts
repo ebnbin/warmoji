@@ -45,6 +45,7 @@ export class ThrustWeapon implements WeaponRuntime {
     this.aim = aim
     this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
 
+    this.ctx.sfx('whoosh')
     const damage = Math.round(this.spec.damage * this.ctx.damageMul())
     for (const i of thrustHitIndices(
       { x: owner.x, y: owner.y },
