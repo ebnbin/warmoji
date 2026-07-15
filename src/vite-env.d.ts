@@ -76,6 +76,12 @@ interface WarmojiCaptainDebug {
   start: { x: number; y: number; w: number; h: number }
 }
 
+interface WarmojiMapDebug {
+  selected: string
+  items: { id: string; x: number; y: number; w: number; h: number }[]
+  start: { x: number; y: number; w: number; h: number }
+}
+
 interface WarmojiResultDebug {
   win: boolean
   rows: number
@@ -85,7 +91,7 @@ interface WarmojiResultDebug {
 }
 
 interface WarmojiDebug {
-  scene: 'menu' | 'wiki' | 'settings' | 'captain' | 'promote' | 'shop' | 'arena' | 'result'
+  scene: 'menu' | 'map' | 'wiki' | 'settings' | 'captain' | 'promote' | 'shop' | 'arena' | 'result'
   elapsed: number
   hp: number
   alive: number
@@ -104,7 +110,10 @@ interface WarmojiDebug {
   coins?: number
   /** arena：当前局队形 id */
   formation?: string
+  /** arena：当前局地图 id */
+  mapId?: string
   menu?: WarmojiMenuDebug
+  map?: WarmojiMapDebug
   wiki?: WarmojiWikiDebug
   settings?: WarmojiSettingsDebug
   captain?: WarmojiCaptainDebug

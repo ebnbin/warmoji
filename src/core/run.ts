@@ -2,6 +2,8 @@ import type { CaptainId, CharacterId } from './config'
 import { CAPTAINS, CHARACTERS, LEVELS, MEMBER, ROSTER_IDS, WAVE } from './config'
 import type { FormationId } from './formation'
 import type { ItemId } from './items'
+import type { MapId } from './maps'
+import { MAP_IDS } from './maps'
 import { gainXp } from './xp'
 import type { XpState } from './xp'
 
@@ -10,6 +12,10 @@ import type { XpState } from './xp'
 // 点数不可逆、允许攒着不花。阵容从首发（通常 1 人）逐波扩编，上限 = 队长编制。
 export interface RunState {
   captainId: CaptainId
+  /** 本局地图（关卡）；开局在地图选择页定下 */
+  mapId: MapId
+  /** 地面装饰的摆放种子：一局一景，同局各波不变 */
+  decorSeed: number
   /** 当前要打的波次（1 起）；波次结束进商店前 +1 */
   wave: number
   coins: number
@@ -51,9 +57,15 @@ export interface RunState {
 
 let current: RunState | undefined
 
-export function beginRun(captainId: CaptainId, starters: readonly CharacterId[]): RunState {
+export function beginRun(
+  captainId: CaptainId,
+  starters: readonly CharacterId[],
+  mapId: MapId = MAP_IDS[0]!,
+): RunState {
   current = {
     captainId,
+    mapId,
+    decorSeed: (Math.random() * 0xffffffff) >>> 0,
     wave: 1,
     coins: 0,
     kills: 0,

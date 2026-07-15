@@ -272,6 +272,9 @@ try {
   await page.goto(`http://localhost:${PORT}/`)
   await page.waitForFunction(() => window.__warmoji?.scene === 'menu' && !!window.__warmoji.menu)
   await clickAt(await page.evaluate(() => window.__warmoji.menu.start))
+  // 地图选择页：沿用记忆/默认地图直接确认
+  await page.waitForFunction(() => window.__warmoji?.scene === 'map' && !!window.__warmoji.map)
+  await clickAt(await page.evaluate(() => window.__warmoji.map.start))
   await page.waitForFunction(() => window.__warmoji?.scene === 'captain')
   await clickAt(await page.evaluate(() => window.__warmoji.captain.start))
   // 开局整编：按心愿单强制招募（点数花完直接开战）

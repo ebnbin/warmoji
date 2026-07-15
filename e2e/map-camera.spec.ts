@@ -16,20 +16,22 @@ test('25×25 地图：出生居中、相机跟随、边缘钳制到 margin', asy
   expect(spawn.playerX).toBeCloseTo(800, 0)
   expect(spawn.playerY).toBeCloseTo(800, 0)
 
-  // 向右移动途中相机跟随玩家保持居中
+  // 向右移动途中相机跟随玩家保持居中。
+  // 断言窗口必须整体落在相机钳制区（camX ≤ 1088）之前：若下限取 1100，
+  // 条件仅在 playerX ∈ (1100,1120) 的 20px 内成立，低帧率大步进会整帧跳过
   await page.keyboard.down('KeyD')
   await page.waitForFunction(
     () => {
       const d = window.__warmoji!
-      return d.playerX > 1100 && Math.abs(d.camX - d.playerX) < 32
+      return d.playerX > 950 && Math.abs(d.camX - d.playerX) < 32
     },
     undefined,
-    { timeout: 10_000 },
+    { timeout: 25_000 },
   )
 
   // 到达右缘：中心钳制在 地图边缘-(环半径+角色半径)≈1494，相机钳制在 地图+margin 内
   await page.waitForFunction(() => (window.__warmoji?.playerX ?? 0) > 1480, undefined, {
-    timeout: 10_000,
+    timeout: 25_000,
   })
   await page.keyboard.up('KeyD')
   await page.waitForTimeout(300)

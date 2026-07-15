@@ -1,13 +1,11 @@
 import Phaser from 'phaser'
-import type { CaptainId } from '../core/config'
-import { CAPTAIN_IDS, CAPTAINS } from '../core/config'
 import { browserStorage } from '../core/highscore'
+import type { MapId } from '../core/maps'
+import { MAP_IDS, MAPS } from '../core/maps'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
-import { beginRun } from '../core/run'
-import { loadCaptain, loadMap, saveCaptain } from '../core/selection'
-import { captainStatGroups } from '../core/stats'
+import { loadMap, saveMap } from '../core/selection'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage } from '../ui/emoji'
@@ -16,10 +14,10 @@ import { FONT, UI_FONT } from '../ui/fonts'
 import { playSfx } from '../ui/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
-// 队长选择页 = 组队流程第一步（主菜单 → 选队长 → 组队 → 战斗）。
-// 单选：点列表行即选定并展开详情；队长不参战，其编制/被动影响后续组队与商店。
+// 地图选择页 = 开始游戏第一步（主菜单 → 选地图 → 选队长 → 组队 → 战斗）。
+// 地图即关卡：当前只有主题（色板 + 地面装饰）差异，难度/专属机制后续扩展。
 // 布局沿用方向约定：竖屏「上」= 横屏「左」（详情），列表在下/右。
-interface CaptainLayout {
+interface MapLayout {
   content: { w: number; h: number }
   headerY: number
   list: { x: number; y: number; w: number; h: number }
@@ -27,7 +25,7 @@ interface CaptainLayout {
   btn: { y: number; w: number; h: number }
 }
 
-const LANDSCAPE: CaptainLayout = {
+const LANDSCAPE: MapLayout = {
   content: { w: 1280, h: 720 },
   headerY: 44,
   detail: { x: 40, y: 96, w: 730, h: 520 },
@@ -35,7 +33,7 @@ const LANDSCAPE: CaptainLayout = {
   btn: { y: 660, w: 340, h: 68 },
 }
 
-const PORTRAIT: CaptainLayout = {
+const PORTRAIT: MapLayout = {
   content: { w: 720, h: 1280 },
   headerY: 52,
   detail: { x: 24, y: 100, w: 672, h: 480 },
@@ -43,19 +41,19 @@ const PORTRAIT: CaptainLayout = {
   btn: { y: 1184, w: 360, h: 72 },
 }
 
-export class CaptainScene extends Phaser.Scene {
+export class MapScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色等页面状态
   private preserveOnRestart = false
   private palette?: Palette
-  private selectedId: CaptainId = CAPTAIN_IDS[0]!
-  private layout!: CaptainLayout
+  private selectedId: MapId = MAP_IDS[0]!
+  private layout!: MapLayout
   private origin = { x: 0, y: 0 }
   private grid!: EmojiGrid
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
-    super('captain')
+    super('map')
   }
 
   create(): void {
@@ -64,7 +62,7 @@ export class CaptainScene extends Phaser.Scene {
     this.preserveOnRestart = false
     if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
     applyBackground(this.palette)
-    if (!preserved) this.selectedId = loadCaptain(browserStorage())
+    if (!preserved) this.selectedId = loadMap(browserStorage())
     this.detailObjs = []
 
     const w = viewport.logicalWidth
@@ -84,9 +82,9 @@ export class CaptainScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.scene.start('map'))
+      .on('pointerup', () => this.scene.start('menu'))
     this.add
-      .text(w / 2, oy + L.headerY, '选择队长', {
+      .text(w / 2, oy + L.headerY, '选择地图', {
         fontFamily: UI_FONT,
         fontSize: FONT.title,
         fontStyle: 'bold',
@@ -95,17 +93,15 @@ export class CaptainScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    // 队长网格（单选；形象即含义，名字与能力看详情面板）
+    // 地图网格（单选；形象即含义，主题与装饰看详情面板）
     this.grid = new EmojiGrid(this, { x: ox + L.list.x, y: oy + L.list.y, w: L.list.w, h: L.list.h })
     this.grid.onTap = (key): void => {
       playSfx('click')
-      this.selectedId = key as CaptainId
-      saveCaptain(browserStorage(), this.selectedId)
+      this.selectedId = key as MapId
+      saveMap(browserStorage(), this.selectedId)
       this.refresh()
     }
-    this.grid.setItems(
-      CAPTAIN_IDS.map((id) => ({ key: id, emoji: CAPTAINS[id].emoji, outline: 'player' as const })),
-    )
+    this.grid.setItems(MAP_IDS.map((id) => ({ key: id, emoji: MAPS[id].emoji })))
 
     // 详情面板底板
     const D = L.detail
@@ -129,7 +125,7 @@ export class CaptainScene extends Phaser.Scene {
     btnBg.fillStyle(0xffd54f, 1)
     btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
     this.add
-      .text(w / 2, oy + L.btn.y, '组建队伍', {
+      .text(w / 2, oy + L.btn.y, '选择队长', {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
         fontStyle: 'bold',
@@ -139,10 +135,7 @@ export class CaptainScene extends Phaser.Scene {
       .setOrigin(0.5)
     const confirm = (): void => {
       playSfx('click')
-      // 开局组队 = 第一次整编：空阵容起步，按队长开局点数强制招募/升级；
-      // 地图在上一步已选定并持久化，这里读入本局
-      beginRun(this.selectedId, [], loadMap(browserStorage()))
-      this.scene.start('promote')
+      this.scene.start('captain')
     }
     this.add
       .zone(b.x, b.y, b.w, b.h)
@@ -151,7 +144,7 @@ export class CaptainScene extends Phaser.Scene {
       .on('pointerup', confirm)
     this.input.keyboard?.on('keydown-ENTER', confirm)
     this.input.keyboard?.on('keydown-SPACE', confirm)
-    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('map'))
+    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
 
     // Twemoji 图形许可（CC-BY 4.0）要求署名
     this.add
@@ -178,10 +171,10 @@ export class CaptainScene extends Phaser.Scene {
     const D = this.layout.detail
     const dx = this.origin.x + D.x
     const dy = this.origin.y + D.y
-    const spec = CAPTAINS[this.selectedId]
+    const spec = MAPS[this.selectedId]
 
     this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, spec.emoji, 64, 'player'),
+      emojiImage(this, dx + 58, dy + 56, spec.emoji, 64),
       this.add
         .text(dx + 104, dy + 42, spec.name, {
           fontFamily: UI_FONT,
@@ -192,7 +185,7 @@ export class CaptainScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5),
       this.add
-        .text(dx + 104, dy + 76, '队长 · 提供团队增益，不参与战斗', {
+        .text(dx + 104, dy + 76, '地图 · 决定战场的主题与景观', {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           color: '#b9b9c6',
@@ -201,12 +194,12 @@ export class CaptainScene extends Phaser.Scene {
         .setOrigin(0, 0.5),
     )
 
-    let cursor = dy + 128
-    for (const group of captainStatGroups(spec)) {
+    let cursor = dy + 132
+    const group = (icon: string, title: string): void => {
       this.detailObjs.push(
-        emojiImage(this, dx + 42, cursor, group.icon, 26),
+        emojiImage(this, dx + 42, cursor, icon, 26),
         this.add
-          .text(dx + 62, cursor, group.title, {
+          .text(dx + 62, cursor, title, {
             fontFamily: UI_FONT,
             fontSize: FONT.strong,
             fontStyle: 'bold',
@@ -216,33 +209,48 @@ export class CaptainScene extends Phaser.Scene {
           .setOrigin(0, 0.5),
       )
       cursor += 40
-      for (const line of group.lines) {
-        const t = this.add
-          .text(dx + 62, cursor, line, {
-            fontFamily: UI_FONT,
-            fontSize: FONT.body,
-            color: '#d0d0d8',
-            wordWrap: { width: D.w - 104 },
-            lineSpacing: 6,
-            resolution: res,
-          })
-          .setOrigin(0, 0)
-        this.detailObjs.push(t)
-        cursor += Math.max(36, t.height + 8)
-      }
-      cursor += 14
     }
+    const line = (text: string, color = '#d0d0d8'): void => {
+      const t = this.add
+        .text(dx + 62, cursor, text, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.body,
+          color,
+          wordWrap: { width: D.w - 104 },
+          lineSpacing: 6,
+          resolution: res,
+        })
+        .setOrigin(0, 0)
+      this.detailObjs.push(t)
+      cursor += Math.max(36, t.height + 8)
+    }
+
+    group('🗺️', '主题')
+    line(spec.desc)
+    cursor += 14
+    group('🌿', '地面装饰')
+    // 装饰 emoji 预览行（战斗中以极低透明度散布在地面）
+    let px = dx + 62 + 16
+    for (const e of spec.decor.emojis) {
+      this.detailObjs.push(emojiImage(this, px, cursor + 10, e, 34))
+      px += 46
+    }
+    cursor += 44
+    line('战斗中以极低透明度随机散布，一局一景', '#9a9aa8')
+    cursor += 14
+    group('🚧', '差异')
+    line('目前各地图仅主题不同；难度、专属怪物与增益后续开放', '#9a9aa8')
   }
 
   private refresh(): void {
     this.grid.setSelected(this.selectedId)
     this.renderDetail(textRes())
-    this.reportCaptain()
+    this.reportMap()
   }
 
-  private reportCaptain(): void {
+  private reportMap(): void {
     reportDebug({
-      scene: 'captain',
+      scene: 'map',
       elapsed: 0,
       hp: 0,
       alive: 0,
@@ -257,7 +265,7 @@ export class CaptainScene extends Phaser.Scene {
       playerY: 0,
       camX: 0,
       camY: 0,
-      captain: {
+      map: {
         selected: this.selectedId,
         items: this.grid.cellRects().map((r) => ({ id: r.key, x: r.x, y: r.y, w: r.w, h: r.h })),
         start: {

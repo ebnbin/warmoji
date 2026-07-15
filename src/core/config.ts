@@ -12,6 +12,7 @@ export const MAP = {
 } as const
 
 import { ITEMS } from './items'
+import { MAPS } from './maps'
 import { SETTING_DEFS } from './settings'
 import type {
   AreaBlastSpec,
@@ -804,6 +805,10 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   // 属性面板的武器/基础组图标 + 商店道具图标
   ...roster.flatMap((c) => c.weapons.map((w) => w.icon)),
   ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),
+  // 地图图标与地面装饰（emojiImage 直取纹理，装饰必须预载）+ 地图详情组图标
+  ...Object.values(MAPS).flatMap((m) => [m.emoji, ...m.decor.emojis]),
+  '🗺️',
+  '🚧',
   ...SETTING_DEFS.map((d) => d.icon),
   SPAWN.markEmoji,
   '⚙️',

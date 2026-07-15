@@ -115,10 +115,10 @@ export class MenuScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
         playSfx('click')
-        this.scene.start('captain')
+        this.scene.start('map')
       })
-    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('captain'))
-    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('captain'))
+    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('map'))
+    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('map'))
 
     // Twemoji 图形许可（CC-BY 4.0）要求署名
     this.add

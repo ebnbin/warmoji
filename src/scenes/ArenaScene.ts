@@ -22,7 +22,8 @@ import { currentFormation, getRun, guardOrder, isTeamFull, promoteStep, waveStar
 import type { RunState } from '../core/run'
 import { DEFAULT_SETTINGS, loadSettings } from '../core/settings'
 import type { Settings } from '../core/settings'
-import { randomPalette } from '../core/palette'
+import { MAPS, rollDecor } from '../core/maps'
+import type { MapSpec } from '../core/maps'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import { randomMapPoint } from '../core/spawn'
@@ -246,7 +247,10 @@ export class ArenaScene extends Phaser.Scene {
   create(): void {
     // scene.restart() 复用同一实例，所有局内状态必须在这里重置
     this.rng = new Rng(Date.now() >>> 0)
-    this.palette = randomPalette(this.rng)
+    this.run = getRun()
+    // 地图即关卡：色板固定按所选地图，不再逐局随机
+    const mapSpec = MAPS[this.run.mapId]
+    this.palette = mapSpec.palette
     applyBackground(this.palette)
     this.stress = isStress()
     this.settings = loadSettings(browserStorage())
@@ -264,12 +268,12 @@ export class ArenaScene extends Phaser.Scene {
 
     this.physics.world.setBounds(0, 0, MAP.width, MAP.height)
     this.drawFloor()
+    this.drawDecor(mapSpec)
 
     this.center = { x: MAP.width / 2, y: MAP.height / 2 }
     this.centerObj = this.add.zone(this.center.x, this.center.y, 1, 1)
 
     this.memberGroup = this.add.group()
-    this.run = getRun()
     // 压测固定 5 人满编便于跑分对比；正常局阵容来自 run（招募制，逐波扩编）
     const rosterIds = this.stress ? ROSTER_IDS.slice(0, 5) : this.run.roster
     this.lineup = rosterIds.map((id) => CHARACTERS[id])
@@ -418,6 +422,7 @@ export class ArenaScene extends Phaser.Scene {
       camX: cam.worldView.centerX,
       camY: cam.worldView.centerY,
       formation: this.activeFormation(),
+      mapId: this.run.mapId,
     })
   }
 
@@ -1675,5 +1680,19 @@ export class ArenaScene extends Phaser.Scene {
     g.lineStyle(1, this.palette.grid, this.palette.gridAlpha)
     for (let x = UNIT; x < MAP.width; x += UNIT) g.lineBetween(x, 0, x, MAP.height)
     for (let y = UNIT; y < MAP.height; y += UNIT) g.lineBetween(0, y, MAP.width, y)
+  }
+
+  /** 地图装饰：按 run 内种子随机散布的低透明度 emoji（一局一景，同局各波不变）。
+   * 静态贴地（depth 1）：在地面/网格之上、毒液池（2）与所有战斗实体之下 */
+  private drawDecor(spec: MapSpec): void {
+    const rng = new Rng(this.run.decorSeed)
+    const cols = Math.round(MAP.width / UNIT)
+    const rows = Math.round(MAP.height / UNIT)
+    for (const d of rollDecor(spec.decor, () => rng.next(), cols, rows)) {
+      emojiImage(this, d.xU * UNIT, d.yU * UNIT, d.emoji, d.sizeU * UNIT)
+        .setAlpha(d.alpha)
+        .setRotation(d.rotation)
+        .setDepth(1)
+    }
   }
 }
