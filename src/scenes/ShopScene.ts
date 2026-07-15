@@ -30,7 +30,8 @@ import type { RunState } from '../core/run'
 import { captainStatGroups, characterStatGroups } from '../core/stats'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
-import { emojiImage, emojiKey } from '../ui/emoji'
+import { emojiImage } from '../ui/emoji'
+import { EmojiGrid } from '../ui/grid'
 import { FONT, UI_FONT } from '../ui/fonts'
 import { playSfx } from '../ui/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
@@ -71,18 +72,6 @@ const PORTRAIT: ShopLayout = {
 // 未满编时末尾追加招募位（'recruit' 哨兵）——点数在此花掉（招募新人/给角色升级）
 type SlotId = 'captain' | CharacterId | 'recruit'
 
-interface SlotRow {
-  id: SlotId
-  /** offers/持有列表的下标：0 = 队长，1.. = 阵容槽位+1 */
-  index: number
-  /** 列表容器内的相对 Y（列表可滚动） */
-  relY: number
-  bg: Phaser.GameObjects.Graphics
-  chipBg: Phaser.GameObjects.Graphics
-  chipEmoji: Phaser.GameObjects.Image
-  chipText: Phaser.GameObjects.Text
-}
-
 export class ShopScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色/焦点/上架结果等页面状态
   private preserveOnRestart = false
@@ -94,7 +83,7 @@ export class ShopScene extends Phaser.Scene {
   private offers: (ItemId | null)[] = []
   private layout!: ShopLayout
   private origin = { x: 0, y: 0 }
-  private rows: SlotRow[] = []
+  private grid!: EmojiGrid
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private coinsText!: Phaser.GameObjects.Text
   private pointsText!: Phaser.GameObjects.Text
@@ -106,16 +95,14 @@ export class ShopScene extends Phaser.Scene {
   private candidateId?: CharacterId
   private candidateRects: { id: CharacterId; x: number; y: number; w: number; h: number }[] = []
   private quitArmed = false
-  // 字号放大后满编上架位/属性行可能超出面板：两个区域各自可滚动
-  private slotContainer!: Phaser.GameObjects.Container
+  // 上架位网格自带滚动；详情属性区行数多时也可滚动
   private slotScroll = 0
-  private slotMax = 0
   private statsContainer!: Phaser.GameObjects.Container
   private statsScroll = 0
   private statsMax = 0
   private statsTop = 0
   private statsH = 0
-  private dragging: 'slots' | 'stats' | null = null
+  private dragging = false
   private dragMoved = false
   private dragStartY = 0
   private dragStartScroll = 0
@@ -145,10 +132,9 @@ export class ShopScene extends Phaser.Scene {
       this.focusedId = 'captain'
       this.candidateId = undefined
     }
-    this.rows = []
     this.detailObjs = []
     this.quitArmed = false
-    this.dragging = null
+    this.dragging = false
     this.dragMoved = false
 
     const w = viewport.logicalWidth
@@ -179,7 +165,7 @@ export class ShopScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
     quit.on('pointerup', () => {
-      if (this.dragMoved) return
+      if (this.dragMoved || this.grid.wasDragged) return
       if (this.quitArmed) {
         endRun()
         this.scene.start('menu')
@@ -214,7 +200,7 @@ export class ShopScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
 
-    this.createSlots(res)
+    this.createSlots()
 
     // 详情面板底板
     const D = L.detail
@@ -245,7 +231,7 @@ export class ShopScene extends Phaser.Scene {
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (this.dragMoved) return
+        if (this.dragMoved || this.grid.wasDragged) return
         if (this.focusedId === 'recruit') this.recruitFocused()
         else this.buyFocused()
       })
@@ -254,7 +240,7 @@ export class ShopScene extends Phaser.Scene {
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (!this.dragMoved) this.refreshFocused()
+        if (!this.dragMoved && !this.grid.wasDragged) this.refreshFocused()
       })
     // 升级按钮（详情头部右侧；仅聚焦队员时可用）
     this.upgradeRect = { x: dx + D.w - 14 - 150, y: dy + 26, w: 150, h: 52 }
@@ -263,34 +249,29 @@ export class ShopScene extends Phaser.Scene {
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (!this.dragMoved) this.upgradeFocused()
+        if (!this.dragMoved && !this.grid.wasDragged) this.upgradeFocused()
       })
 
-    // 滚动：上架位列表 / 详情属性区，滚轮 + 拖动（拖过阈值的抬手不算点击）
+    // 详情属性区滚动（上架位网格的滚动由 EmojiGrid 自理）
     this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy2: number) => {
-      if (this.inSlots(p)) this.setSlotScroll(this.slotScroll + dy2 * 0.6)
-      else if (this.inStats(p)) this.setStatsScroll(this.statsScroll + dy2 * 0.6)
+      if (this.inStats(p)) this.setStatsScroll(this.statsScroll + dy2 * 0.6)
     })
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.dragMoved = false
-      this.dragging = this.inSlots(p) ? 'slots' : this.inStats(p) ? 'stats' : null
+      this.dragging = this.inStats(p)
       if (this.dragging) {
         this.dragStartY = p.worldY
-        this.dragStartScroll = this.dragging === 'slots' ? this.slotScroll : this.statsScroll
+        this.dragStartScroll = this.statsScroll
       }
     })
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dyDrag = this.dragStartY - p.worldY
-      const max = this.dragging === 'slots' ? this.slotMax : this.statsMax
-      if (max > 0 && Math.abs(dyDrag) > 10) this.dragMoved = true
-      if (this.dragMoved) {
-        if (this.dragging === 'slots') this.setSlotScroll(this.dragStartScroll + dyDrag)
-        else this.setStatsScroll(this.dragStartScroll + dyDrag)
-      }
+      if (this.statsMax > 0 && Math.abs(dyDrag) > 10) this.dragMoved = true
+      if (this.dragMoved) this.setStatsScroll(this.dragStartScroll + dyDrag)
     })
     this.input.on('pointerup', () => {
-      this.dragging = null
+      this.dragging = false
     })
 
     // 继续按钮
@@ -318,7 +299,7 @@ export class ShopScene extends Phaser.Scene {
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (!this.dragMoved) this.nextWave()
+        if (!this.dragMoved && !this.grid.wasDragged) this.nextWave()
       })
     this.input.keyboard?.on('keydown-ENTER', () => this.nextWave())
     this.input.keyboard?.on('keydown-SPACE', () => this.nextWave())
@@ -422,126 +403,52 @@ export class ShopScene extends Phaser.Scene {
     )
   }
 
-  // ── 上架位列表（队长 + 队员；超出面板可滚动） ───────────────
+  // ── 上架位网格（队长 + 队员 + 招募；形象即含义，角标 = 当前上架道具） ──
 
-  private createSlots(res: number): void {
-    const S = this.layout.slots
-    const sx = this.origin.x + S.x
-    const sy = this.origin.y + S.y
-
-    const frame = this.add.graphics()
-    frame.fillStyle(0x000000, 0.18)
-    frame.fillRoundedRect(sx - 8, sy - 8, S.w + 16, S.h + 16, 14)
-
-    this.slotContainer = this.add.container(sx, sy)
-    const mask = this.add.graphics().setVisible(false)
-    mask.fillStyle(0xffffff, 1)
-    mask.fillRect(sx, sy, S.w, S.h)
-    this.slotContainer.setMask(mask.createGeometryMask())
-
-    const slotRow = (
-      id: SlotId,
-      index: number,
-      emoji: string,
-      name: string,
-      extra: (relY: number) => Phaser.GameObjects.GameObject[],
-    ): void => {
-      const relY = index * (S.rowH + S.gap)
-      const bg = this.add.graphics()
-      const icon = emojiImage(this, 44, relY + S.rowH / 2, emoji, 48, 'player')
-      const nameText = this.add
-        .text(84, relY + S.rowH / 2 - 17, name, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.strong,
-          fontStyle: 'bold',
-          color: '#ffffff',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5)
-      // 上架位道具卡（内容随 refresh 重绘）
-      const chipBg = this.add.graphics()
-      const chipEmoji = emojiImage(this, S.w - 146, relY + S.rowH / 2, COIN.emoji, 30).setVisible(false)
-      const chipText = this.add
-        .text(S.w - 124, relY + S.rowH / 2, '', {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          color: '#ffd54f',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5)
-      const zone = this.add
-        .zone(0, relY, S.w, S.rowH)
-        .setOrigin(0)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
-          if (this.dragMoved) return
-          // 被裁剪到列表视口外的行不响应
-          const cy = sy + relY - this.slotScroll + S.rowH / 2
-          if (cy < sy || cy > sy + S.h) return
-          if (this.focusedId !== id) this.statsScroll = 0
-          playSfx('click')
-          this.focusedId = id
-          this.refresh()
-        })
-      this.slotContainer.add([bg, icon, nameText, chipBg, chipEmoji, chipText, zone, ...extra(relY)])
-      this.rows.push({ id, index, relY, bg, chipBg, chipEmoji, chipText })
-    }
-
-    // 队长固定占第一个上架位（团队道具池）
-    const captain = CAPTAINS[this.captainId]
-    slotRow('captain', 0, captain.emoji, captain.name, (relY) => [
-      this.add
-        .text(84, relY + S.rowH / 2 + 19, '队长 · 团队道具', {
-          fontFamily: UI_FONT,
-          fontSize: FONT.caption,
-          color: '#ffd54f',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5),
-    ])
-
+  /** 网格条目：id 即 key；角标显示该位当前上架道具，队员带血条 */
+  private buildSlotItems(): { key: string; emoji: string; outline: 'player'; badge?: string; hpRatio?: number }[] {
+    const items: { key: string; emoji: string; outline: 'player'; badge?: string; hpRatio?: number }[] = [
+      {
+        key: 'captain',
+        emoji: CAPTAINS[this.captainId].emoji,
+        outline: 'player',
+        badge: this.offers[0] ? ITEMS[this.offers[0]].emoji : undefined,
+      },
+    ]
     this.lineup.forEach((id, i) => {
-      const spec = CHARACTERS[id]
-      const level = this.run.memberLevels[i] ?? 1
-      slotRow(id, i + 1, spec.emoji, `${spec.name} Lv.${level}`, (relY) => {
-        // 下一波开局血量（按等级+道具修正后的上限）
-        const max = this.slotMaxHp(i)
-        const hp = waveStartHp(this.run.memberHp[i] ?? max, max)
-        const ratio = hp / max
-        const bar = this.add.graphics()
-        bar.fillStyle(0x000000, 0.45)
-        bar.fillRect(84, relY + S.rowH / 2 + 12, 130, 8)
-        bar.fillStyle(ratio > 0.5 ? 0x66bb6a : ratio > 0.3 ? 0xffb300 : 0xef5350, 1)
-        bar.fillRect(85, relY + S.rowH / 2 + 13, 128 * ratio, 6)
-        return [bar]
+      const max = this.slotMaxHp(i)
+      const hp = waveStartHp(this.run.memberHp[i] ?? max, max)
+      const offer = this.offers[i + 1]
+      items.push({
+        key: id,
+        emoji: CHARACTERS[id].emoji,
+        outline: 'player',
+        badge: offer ? ITEMS[offer].emoji : undefined,
+        hpRatio: hp / max,
       })
     })
-
-    // 未满编：末尾追加招募位
     if (this.lineup.length < rosterCap(this.run)) {
-      slotRow('recruit', this.lineup.length + 1, '➕', '招募队员', (relY) => [
-        this.add
-          .text(84, relY + S.rowH / 2 + 19, `花 1 点招募（上限 ${rosterCap(this.run)} 人）`, {
-            fontFamily: UI_FONT,
-            fontSize: FONT.caption,
-            color: '#b3e5fc',
-            resolution: res,
-          })
-          .setOrigin(0, 0.5),
-      ])
+      items.push({ key: 'recruit', emoji: '➕', outline: 'player' })
     }
-
-    const contentH = this.rows.length * (S.rowH + S.gap) - S.gap
-    this.slotMax = Math.max(0, contentH - S.h)
-    // 视口重启/扩编后按新布局重新钳制滚动位置
-    this.setSlotScroll(this.slotScroll)
+    return items
   }
 
-  private inSlots(p: Phaser.Input.Pointer): boolean {
+  private createSlots(): void {
     const S = this.layout.slots
-    const sx = this.origin.x + S.x
-    const sy = this.origin.y + S.y
-    return p.worldX >= sx && p.worldX <= sx + S.w && p.worldY >= sy && p.worldY <= sy + S.h
+    this.grid = new EmojiGrid(
+      this,
+      { x: this.origin.x + S.x, y: this.origin.y + S.y, w: S.w, h: S.h },
+      { initialScroll: this.slotScroll },
+    )
+    this.grid.onTap = (key): void => {
+      if (this.focusedId !== key) this.statsScroll = 0
+      playSfx('click')
+      this.focusedId = key as SlotId
+      this.refresh()
+    }
+    this.grid.onScroll = (): void => {
+      this.slotScroll = this.grid.scrollY
+    }
   }
 
   private inStats(p: Phaser.Input.Pointer): boolean {
@@ -553,12 +460,6 @@ export class ShopScene extends Phaser.Scene {
       p.worldY >= this.statsTop &&
       p.worldY <= this.statsTop + this.statsH
     )
-  }
-
-  private setSlotScroll(y: number): void {
-    this.slotScroll = Math.max(0, Math.min(this.slotMax, y))
-    this.slotContainer.y = this.origin.y + this.layout.slots.y - this.slotScroll
-    this.reportShop()
   }
 
   private setStatsScroll(y: number): void {
@@ -944,40 +845,12 @@ export class ShopScene extends Phaser.Scene {
   }
 
   private refresh(): void {
-    const S = this.layout.slots
     this.coinsText.setText(`${this.run.coins}`)
     this.pointsText.setText(`等级 ${this.run.xp.level} · 点数 ${pointsAvailable(this.run)}`)
     this.pointsText.setColor(pointsAvailable(this.run) > 0 ? '#b3e5fc' : '#8f8f9a')
-    for (const row of this.rows) {
-      const focused = row.id === this.focusedId
-      const g = row.bg
-      g.clear()
-      g.fillStyle(focused ? 0xffffff : 0x000000, focused ? 0.16 : 0.25)
-      g.fillRoundedRect(0, row.relY, S.w, S.rowH, 12)
-      g.lineStyle(focused ? 2 : 1, 0xffffff, focused ? 0.9 : 0.1)
-      g.strokeRoundedRect(0, row.relY, S.w, S.rowH, 12)
-      // 上架道具卡：emoji + 价格；招募位显示点数开销
-      const offer = row.id === 'recruit' ? null : (this.offers[row.index] ?? null)
-      const cb = row.chipBg
-      cb.clear()
-      cb.fillStyle(0xffffff, 0.06)
-      cb.fillRoundedRect(S.w - 174, row.relY + S.rowH / 2 - 22, 160, 44, 12)
-      cb.lineStyle(1, row.id === 'recruit' ? 0x81d4fa : 0xffd54f, offer || row.id === 'recruit' ? 0.4 : 0.1)
-      cb.strokeRoundedRect(S.w - 174, row.relY + S.rowH / 2 - 22, 160, 44, 12)
-      if (row.id === 'recruit') {
-        row.chipEmoji.setVisible(false)
-        row.chipText
-          .setText(pointsAvailable(this.run) > 0 ? '花 1 点' : '点数不足')
-          .setColor(pointsAvailable(this.run) > 0 ? '#b3e5fc' : '#8f8f9a')
-      } else if (offer) {
-        const item = ITEMS[offer]
-        row.chipEmoji.setTexture(emojiKey(item.emoji)).setVisible(true)
-        row.chipText.setText(`${item.price} 金币`).setColor('#ffd54f')
-      } else {
-        row.chipEmoji.setVisible(false)
-        row.chipText.setText('已购罄').setColor('#8f8f9a')
-      }
-    }
+    // 购买/刷新会换上架、升级/招募会变血条：整格重建 + 选中态
+    this.grid.setItems(this.buildSlotItems())
+    this.grid.setSelected(this.focusedId)
     // 招募位以外的聚焦对象变化时，属性区滚动位置由 renderDetail 重新钳制
     this.renderDetail(textRes())
     this.reportShop()
@@ -989,7 +862,6 @@ export class ShopScene extends Phaser.Scene {
   }
 
   private reportShop(): void {
-    const S = this.layout.slots
     const idx = this.focusedIndex()
     const offer = this.offers[idx] ?? null
     reportDebug({
@@ -1017,18 +889,21 @@ export class ShopScene extends Phaser.Scene {
         freeRefreshes: this.run.freeRefreshes,
         level: this.run.xp.level,
         points: pointsAvailable(this.run),
-        slots: this.rows.map((r) => ({
-          id: r.id,
-          x: this.origin.x + S.x,
-          y: this.origin.y + S.y + r.relY - this.slotScroll,
-          w: S.w,
-          h: S.rowH,
-          offer: r.id === 'recruit' ? null : (this.offers[r.index] ?? null),
-          price:
-            r.id !== 'recruit' && this.offers[r.index] ? ITEMS[this.offers[r.index]!].price : null,
-          owned: r.id === 'recruit' ? 0 : this.ownedFor(r.index).length,
-          memberLevel: r.id === 'captain' || r.id === 'recruit' ? null : (this.run.memberLevels[r.index - 1] ?? 1),
-        })),
+        slots: this.grid.cellRects().map((r) => {
+          const id = r.key as SlotId
+          const index = id === 'captain' ? 0 : id === 'recruit' ? -1 : this.lineup.indexOf(id) + 1
+          return {
+            id,
+            x: r.x,
+            y: r.y,
+            w: r.w,
+            h: r.h,
+            offer: index < 0 ? null : (this.offers[index] ?? null),
+            price: index >= 0 && this.offers[index] ? ITEMS[this.offers[index]!].price : null,
+            owned: index < 0 ? 0 : this.ownedFor(index).length,
+            memberLevel: index <= 0 ? null : (this.run.memberLevels[index - 1] ?? 1),
+          }
+        }),
         buy: {
           x: this.buyRect.x + this.buyRect.w / 2,
           y: this.buyRect.y + this.buyRect.h / 2,

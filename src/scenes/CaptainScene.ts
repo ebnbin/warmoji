@@ -10,6 +10,7 @@ import { captainStatGroups } from '../core/stats'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage } from '../ui/emoji'
+import { EmojiGrid } from '../ui/grid'
 import { FONT, UI_FONT } from '../ui/fonts'
 import { playSfx } from '../ui/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
@@ -20,7 +21,7 @@ import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '..
 interface CaptainLayout {
   content: { w: number; h: number }
   headerY: number
-  list: { x: number; y: number; w: number; rowH: number; gap: number }
+  list: { x: number; y: number; w: number; h: number }
   detail: { x: number; y: number; w: number; h: number }
   btn: { y: number; w: number; h: number }
 }
@@ -29,7 +30,7 @@ const LANDSCAPE: CaptainLayout = {
   content: { w: 1280, h: 720 },
   headerY: 44,
   detail: { x: 40, y: 96, w: 730, h: 520 },
-  list: { x: 810, y: 96, w: 430, rowH: 84, gap: 10 },
+  list: { x: 810, y: 96, w: 430, h: 520 },
   btn: { y: 660, w: 340, h: 68 },
 }
 
@@ -37,16 +38,8 @@ const PORTRAIT: CaptainLayout = {
   content: { w: 720, h: 1280 },
   headerY: 52,
   detail: { x: 24, y: 100, w: 672, h: 480 },
-  list: { x: 24, y: 604, w: 672, rowH: 84, gap: 10 },
+  list: { x: 24, y: 604, w: 672, h: 520 },
   btn: { y: 1184, w: 360, h: 72 },
-}
-
-interface Row {
-  id: CaptainId
-  x: number
-  y: number
-  bg: Phaser.GameObjects.Graphics
-  badge: Phaser.GameObjects.Image
 }
 
 export class CaptainScene extends Phaser.Scene {
@@ -56,7 +49,7 @@ export class CaptainScene extends Phaser.Scene {
   private selectedId: CaptainId = CAPTAIN_IDS[0]!
   private layout!: CaptainLayout
   private origin = { x: 0, y: 0 }
-  private rows: Row[] = []
+  private grid!: EmojiGrid
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
 
@@ -71,7 +64,6 @@ export class CaptainScene extends Phaser.Scene {
     if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
     applyBackground(this.palette)
     if (!preserved) this.selectedId = loadCaptain(browserStorage())
-    this.rows = []
     this.detailObjs = []
 
     const w = viewport.logicalWidth
@@ -102,40 +94,17 @@ export class CaptainScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    // 队长列表（单选；人数多了再做滚动）
-    const S = L.list
-    const lx = ox + S.x
-    const ly = oy + S.y
-    const frame = this.add.graphics()
-    frame.fillStyle(0x000000, 0.18)
-    const frameH = CAPTAIN_IDS.length * (S.rowH + S.gap) - S.gap + 16
-    frame.fillRoundedRect(lx - 8, ly - 8, S.w + 16, frameH, 14)
-    CAPTAIN_IDS.forEach((id, i) => {
-      const spec = CAPTAINS[id]
-      const y = ly + i * (S.rowH + S.gap)
-      const bg = this.add.graphics()
-      emojiImage(this, lx + 44, y + S.rowH / 2, spec.emoji, 48, 'player')
-      this.add
-        .text(lx + 86, y + S.rowH / 2, spec.name, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.head,
-          color: '#ffffff',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5)
-      const badge = emojiImage(this, lx + S.w - 36, y + S.rowH / 2, '✅', 30)
-      this.add
-        .zone(lx, y, S.w, S.rowH)
-        .setOrigin(0)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
-          playSfx('click')
-          this.selectedId = id
-          saveCaptain(browserStorage(), id)
-          this.refresh()
-        })
-      this.rows.push({ id, x: lx, y, bg, badge })
-    })
+    // 队长网格（单选；形象即含义，名字与能力看详情面板）
+    this.grid = new EmojiGrid(this, { x: ox + L.list.x, y: oy + L.list.y, w: L.list.w, h: L.list.h })
+    this.grid.onTap = (key): void => {
+      playSfx('click')
+      this.selectedId = key as CaptainId
+      saveCaptain(browserStorage(), this.selectedId)
+      this.refresh()
+    }
+    this.grid.setItems(
+      CAPTAIN_IDS.map((id) => ({ key: id, emoji: CAPTAINS[id].emoji, outline: 'player' as const })),
+    )
 
     // 详情面板底板
     const D = L.detail
@@ -261,23 +230,12 @@ export class CaptainScene extends Phaser.Scene {
   }
 
   private refresh(): void {
-    const S = this.layout.list
-    for (const row of this.rows) {
-      const selected = row.id === this.selectedId
-      const g = row.bg
-      g.clear()
-      g.fillStyle(selected ? 0xffffff : 0x000000, selected ? 0.16 : 0.25)
-      g.fillRoundedRect(row.x, row.y, S.w, S.rowH, 12)
-      g.lineStyle(selected ? 2 : 1, 0xffffff, selected ? 0.9 : 0.1)
-      g.strokeRoundedRect(row.x, row.y, S.w, S.rowH, 12)
-      row.badge.setVisible(selected)
-    }
+    this.grid.setSelected(this.selectedId)
     this.renderDetail(textRes())
     this.reportCaptain()
   }
 
   private reportCaptain(): void {
-    const S = this.layout.list
     reportDebug({
       scene: 'captain',
       elapsed: 0,
@@ -296,7 +254,7 @@ export class CaptainScene extends Phaser.Scene {
       camY: 0,
       captain: {
         selected: this.selectedId,
-        items: this.rows.map((r) => ({ id: r.id, x: r.x, y: r.y, w: S.w, h: S.rowH })),
+        items: this.grid.cellRects().map((r) => ({ id: r.key, x: r.x, y: r.y, w: r.w, h: r.h })),
         start: {
           x: this.btnRect.x + this.btnRect.w / 2,
           y: this.btnRect.y + this.btnRect.h / 2,

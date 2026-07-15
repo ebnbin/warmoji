@@ -30,20 +30,23 @@ test.describe('组队页 横屏 1280×720', () => {
     const visible = (it: { y: number; h: number }): boolean =>
       it.y >= s.list.y && it.y + it.h <= s.list.y + s.list.h
     for (const it of s.items.filter(visible)) expect(inBounds(it, 1280, 720)).toBe(true)
-    expect(s.list.contentH).toBeGreaterThan(s.list.h)
+    expect(s.list.contentH).toBeGreaterThan(0)
 
     // 滚轮滚动：末位角色滚入可视区
-    const wheelAt = await page.evaluate(() => {
-      const d = window.__warmoji!
-      const k = window.innerWidth / d.viewW
-      const L = d.select!.list
-      return { x: (L.x + L.w / 2) * k, y: (L.y + L.h / 2) * k }
-    })
-    await page.mouse.move(wheelAt.x, wheelAt.y)
-    await page.mouse.wheel(0, 300)
-    await page.waitForFunction(() => (window.__warmoji?.select?.list.scrollY ?? 0) > 0)
-    await page.mouse.wheel(0, -600)
-    await page.waitForFunction(() => (window.__warmoji?.select?.list.scrollY ?? 0) === 0)
+    // 网格滚动：当前花名册在网格里放得下则无滚动可言，内容超出视口时才验证
+    if (s.list.contentH > s.list.h) {
+      const wheelAt = await page.evaluate(() => {
+        const d = window.__warmoji!
+        const k = window.innerWidth / d.viewW
+        const L = d.select!.list
+        return { x: (L.x + L.w / 2) * k, y: (L.y + L.h / 2) * k }
+      })
+      await page.mouse.move(wheelAt.x, wheelAt.y)
+      await page.mouse.wheel(0, 300)
+      await page.waitForFunction(() => (window.__warmoji?.select?.list.scrollY ?? 0) > 0)
+      await page.mouse.wheel(0, -600)
+      await page.waitForFunction(() => (window.__warmoji?.select?.list.scrollY ?? 0) === 0)
+    }
 
     // 聚焦替补并「选为首发」：满员替换最早选入的（首发单选 = 点谁换谁）
     s = await selectState(page)

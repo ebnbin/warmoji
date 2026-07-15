@@ -10,27 +10,29 @@ import { loadCaptain, loadLineup, saveLineup, toggleLineup } from '../core/selec
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiKey } from '../ui/emoji'
+import { EmojiGrid } from '../ui/grid'
 import { FONT, UI_FONT } from '../ui/fonts'
 import { playSfx } from '../ui/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // 组队页 = 游戏流程中的一步（主菜单 → 组队 → 战斗；战斗结束回到这里）。
-// 「列表 + 详情」结构：花名册增长只影响列表长度（超出可滚动），详情区固定，
+// 「网格 + 详情」结构：花名册用 emoji 网格呈现（形象即含义，✅ 角标 = 已入首发），
+// 名字/介绍在详情面板；花名册增长只是网格变长（可滚动）。
 // 布局按最小可用空间设计（横 1280×720 左右分栏 / 竖 720×1280 上下分栏），内容块居中于实际视口。
 interface SelectLayout {
   content: { w: number; h: number }
   headerY: number
-  list: { x: number; y: number; w: number; h: number; rowH: number; gap: number }
+  list: { x: number; y: number; w: number; h: number }
   detail: { x: number; y: number; w: number; h: number }
   btn: { y: number; w: number; h: number }
 }
 
-// 方向对应约定：竖屏「上」= 横屏「左」（详情），竖屏「下」= 横屏「右」（列表）
+// 方向对应约定：竖屏「上」= 横屏「左」（详情），竖屏「下」= 横屏「右」（网格）
 const LANDSCAPE: SelectLayout = {
   content: { w: 1280, h: 720 },
   headerY: 44,
   detail: { x: 40, y: 96, w: 730, h: 520 },
-  list: { x: 810, y: 96, w: 430, h: 520, rowH: 84, gap: 10 },
+  list: { x: 810, y: 96, w: 430, h: 520 },
   btn: { y: 660, w: 340, h: 68 },
 }
 
@@ -38,16 +40,8 @@ const PORTRAIT: SelectLayout = {
   content: { w: 720, h: 1280 },
   headerY: 52,
   detail: { x: 24, y: 100, w: 672, h: 500 },
-  list: { x: 24, y: 624, w: 672, h: 500, rowH: 84, gap: 10 },
+  list: { x: 24, y: 624, w: 672, h: 500 },
   btn: { y: 1188, w: 360, h: 72 },
-}
-
-interface Row {
-  id: CharacterId
-  relY: number
-  bg: Phaser.GameObjects.Graphics
-  name: Phaser.GameObjects.Text
-  badge: Phaser.GameObjects.Image
 }
 
 export class SelectScene extends Phaser.Scene {
@@ -60,16 +54,8 @@ export class SelectScene extends Phaser.Scene {
   private focusedId: CharacterId = ROSTER_IDS[0]!
   private layout!: SelectLayout
   private origin = { x: 0, y: 0 }
-
-  private rows: Row[] = []
-  private listContainer!: Phaser.GameObjects.Container
+  private grid!: EmojiGrid
   private scrollY = 0
-  private maxScroll = 0
-  private contentH = 0
-  private dragging = false
-  private dragMoved = false
-  private dragStartY = 0
-  private dragStartScroll = 0
 
   private detailEmoji!: Phaser.GameObjects.Image
   private detailName!: Phaser.GameObjects.Text
@@ -99,9 +85,6 @@ export class SelectScene extends Phaser.Scene {
       this.focusedId = this.lineup[0] ?? ROSTER_IDS[0]!
       this.scrollY = 0
     }
-    this.rows = []
-    this.dragging = false
-    this.dragMoved = false
 
     const w = viewport.logicalWidth
     const h = viewport.logicalHeight
@@ -122,7 +105,7 @@ export class SelectScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (!this.dragMoved) this.scene.start('captain')
+        if (!this.grid.wasDragged) this.scene.start('captain')
       })
     this.add
       .text(w / 2, oy + L.headerY, `选择首发（${this.starterCount} 人）`, {
@@ -145,11 +128,26 @@ export class SelectScene extends Phaser.Scene {
       .setOrigin(1, 0.5)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (!this.dragMoved) this.scene.start('captain')
+        if (!this.grid.wasDragged) this.scene.start('captain')
       })
     emojiImage(this, capText.x - capText.width - 22, oy + L.headerY, captain.emoji, 32, 'player')
 
-    this.createList(res)
+    // 花名册网格
+    this.grid = new EmojiGrid(
+      this,
+      { x: ox + L.list.x, y: oy + L.list.y, w: L.list.w, h: L.list.h },
+      { initialScroll: this.scrollY },
+    )
+    this.grid.onTap = (key): void => {
+      playSfx('click')
+      this.focusedId = key as CharacterId
+      this.refresh()
+    }
+    this.grid.onScroll = (): void => {
+      this.scrollY = this.grid.scrollY
+      this.reportSelect()
+    }
+
     this.createDetail(res)
 
     // 出发按钮
@@ -173,7 +171,7 @@ export class SelectScene extends Phaser.Scene {
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (!this.dragMoved) this.startRun()
+        if (!this.grid.wasDragged) this.startRun()
       })
     this.input.keyboard?.on('keydown-ENTER', () => this.startRun())
     this.input.keyboard?.on('keydown-SPACE', () => this.startRun())
@@ -196,102 +194,6 @@ export class SelectScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
-  }
-
-  // ── 列表栏（可滚动） ────────────────────────────────────────
-
-  private createList(res: number): void {
-    const L = this.layout.list
-    const lx = this.origin.x + L.x
-    const ly = this.origin.y + L.y
-
-    const frame = this.add.graphics()
-    frame.fillStyle(0x000000, 0.18)
-    frame.fillRoundedRect(lx - 8, ly - 8, L.w + 16, L.h + 16, 14)
-
-    this.listContainer = this.add.container(lx, ly)
-    const maskShape = this.add.graphics().setVisible(false)
-    maskShape.fillStyle(0xffffff, 1)
-    maskShape.fillRect(lx, ly, L.w, L.h)
-    this.listContainer.setMask(maskShape.createGeometryMask())
-
-    const pitch = L.rowH + L.gap
-    ROSTER_IDS.forEach((id, i) => {
-      const spec = CHARACTERS[id]
-      const relY = i * pitch
-      const bg = this.add.graphics()
-      const emoji = emojiImage(this, 44, relY + L.rowH / 2, spec.emoji, 48, 'player')
-      const name = this.add
-        .text(86, relY + L.rowH / 2, spec.name, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.head,
-          color: '#ffffff',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5)
-      const badge = emojiImage(this, L.w - 36, relY + L.rowH / 2, '✅', 30)
-      const zone = this.add
-        .zone(0, relY, L.w, L.rowH)
-        .setOrigin(0)
-        .setInteractive({ useHandCursor: true })
-      zone.on('pointerup', () => this.onRowTap(id, relY))
-      this.listContainer.add([bg, emoji, name, badge, zone])
-      this.rows.push({ id, relY, bg, name, badge })
-    })
-
-    this.contentH = ROSTER_IDS.length * pitch - L.gap
-    this.maxScroll = Math.max(0, this.contentH - L.h)
-    // 视口重启后按新布局重新钳制滚动位置
-    this.setScroll(this.scrollY)
-
-    // 滚轮 + 拖动滚动；拖过阈值的抬手不算点击
-    this.input.on(
-      'wheel',
-      (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
-        if (this.inList(p)) this.setScroll(this.scrollY + dy * 0.6)
-      },
-    )
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      this.dragMoved = false
-      if (this.inList(p)) {
-        this.dragging = true
-        this.dragStartY = p.worldY
-        this.dragStartScroll = this.scrollY
-      }
-    })
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      if (!this.dragging || !p.isDown) return
-      const dy = this.dragStartY - p.worldY
-      if (this.maxScroll > 0 && Math.abs(dy) > 10) this.dragMoved = true
-      if (this.dragMoved) this.setScroll(this.dragStartScroll + dy)
-    })
-    this.input.on('pointerup', () => {
-      this.dragging = false
-    })
-  }
-
-  private inList(p: Phaser.Input.Pointer): boolean {
-    const L = this.layout.list
-    const lx = this.origin.x + L.x
-    const ly = this.origin.y + L.y
-    return p.worldX >= lx && p.worldX <= lx + L.w && p.worldY >= ly && p.worldY <= ly + L.h
-  }
-
-  private setScroll(y: number): void {
-    this.scrollY = Math.max(0, Math.min(this.maxScroll, y))
-    this.listContainer.y = this.origin.y + this.layout.list.y - this.scrollY
-    this.reportSelect()
-  }
-
-  private onRowTap(id: CharacterId, relY: number): void {
-    if (this.dragMoved) return
-    // 被裁剪到列表视口外的行不响应
-    const L = this.layout.list
-    const centerY = this.origin.y + L.y + relY - this.scrollY + L.rowH / 2
-    if (centerY < this.origin.y + L.y || centerY > this.origin.y + L.y + L.h) return
-    playSfx('click')
-    this.focusedId = id
-    this.refresh()
   }
 
   // ── 详情栏 ──────────────────────────────────────────────────
@@ -356,7 +258,7 @@ export class SelectScene extends Phaser.Scene {
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (!this.dragMoved) this.onToggle()
+        if (!this.grid.wasDragged) this.onToggle()
       })
   }
 
@@ -382,19 +284,15 @@ export class SelectScene extends Phaser.Scene {
   // ── 状态刷新 ────────────────────────────────────────────────
 
   private refresh(): void {
-    const L = this.layout.list
-    for (const row of this.rows) {
-      const focused = row.id === this.focusedId
-      const inLineup = this.lineup.includes(row.id)
-      const g = row.bg
-      g.clear()
-      g.fillStyle(focused ? 0xffffff : 0x000000, focused ? 0.16 : 0.25)
-      g.fillRoundedRect(0, row.relY, L.w, L.rowH, 12)
-      g.lineStyle(focused ? 2 : 1, 0xffffff, focused ? 0.9 : 0.1)
-      g.strokeRoundedRect(0, row.relY, L.w, L.rowH, 12)
-      row.badge.setVisible(inLineup)
-      row.name.setAlpha(inLineup || focused ? 1 : 0.7)
-    }
+    this.grid.setItems(
+      ROSTER_IDS.map((id) => ({
+        key: id,
+        emoji: CHARACTERS[id].emoji,
+        outline: 'player' as const,
+        badge: this.lineup.includes(id) ? '✅' : undefined,
+      })),
+    )
+    this.grid.setSelected(this.focusedId)
 
     const spec = CHARACTERS[this.focusedId]
     const size = this.layout === PORTRAIT ? 116 : 124
@@ -430,8 +328,6 @@ export class SelectScene extends Phaser.Scene {
 
   private reportSelect(): void {
     const L = this.layout.list
-    const lx = this.origin.x + L.x
-    const ly = this.origin.y + L.y
     reportDebug({
       scene: 'select',
       elapsed: 0,
@@ -452,15 +348,22 @@ export class SelectScene extends Phaser.Scene {
         selected: this.lineup.length,
         size: this.starterCount,
         focusedId: this.focusedId,
-        items: this.rows.map((r) => ({
-          id: r.id,
-          x: lx,
-          y: ly + r.relY - this.scrollY,
-          w: L.w,
-          h: L.rowH,
-          inLineup: this.lineup.includes(r.id),
+        items: this.grid.cellRects().map((r) => ({
+          id: r.key,
+          x: r.x,
+          y: r.y,
+          w: r.w,
+          h: r.h,
+          inLineup: this.lineup.includes(r.key as CharacterId),
         })),
-        list: { x: lx, y: ly, w: L.w, h: L.h, scrollY: this.scrollY, contentH: this.contentH },
+        list: {
+          x: this.origin.x + L.x,
+          y: this.origin.y + L.y,
+          w: L.w,
+          h: L.h,
+          scrollY: this.grid.scrollY,
+          contentH: this.grid.contentH,
+        },
         detail: {
           x: this.origin.x + this.layout.detail.x,
           y: this.origin.y + this.layout.detail.y,

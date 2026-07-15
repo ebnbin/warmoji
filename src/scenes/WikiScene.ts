@@ -8,6 +8,7 @@ import type { WikiEntry, WikiGroup } from '../core/wiki'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiKey, ensureEmoji } from '../ui/emoji'
+import { EmojiGrid } from '../ui/grid'
 import { FONT, UI_FONT } from '../ui/fonts'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 import { buildWikiAtlas, wikiAtlasProgress, wikiFrame } from '../ui/wikiAtlas'
@@ -42,13 +43,6 @@ const PORTRAIT: WikiLayout = {
   list: { x: 24, y: 664, w: 672, h: 588 },
 }
 
-interface EntryRow {
-  key: string
-  entry: WikiEntry
-  relY: number
-  bg: Phaser.GameObjects.Graphics
-}
-
 /** 详情卡对象池：Text 只创建一次，切换条目仅 setText——
  * 点击时批量 创建+销毁 文本会触发成串的 canvas 光栅化与 GPU 纹理增删（真机掉帧主因） */
 interface DetailPool {
@@ -67,7 +61,6 @@ interface Cell {
   boundIndex: number
 }
 
-const ROW_H = 76
 const CELL = 72
 
 export class WikiScene extends Phaser.Scene {
@@ -87,10 +80,8 @@ export class WikiScene extends Phaser.Scene {
 
   private layout!: WikiLayout
   private origin = { x: 0, y: 0 }
-  private rows: EntryRow[] = []
-  private listContainer!: Phaser.GameObjects.Container
+  private entryGrid?: EmojiGrid
   private listScroll = 0
-  private listMax = 0
   private gridScroll = 0
   private gridMax = 0
   private gridContainer!: Phaser.GameObjects.Container
@@ -137,7 +128,7 @@ export class WikiScene extends Phaser.Scene {
       this.listScroll = 0
       this.gridScroll = 0
     }
-    this.rows = []
+    this.entryGrid = undefined
     this.cells = []
     this.dragging = false
     this.dragMoved = false
@@ -160,7 +151,7 @@ export class WikiScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (!this.dragMoved) this.scene.start('menu')
+        if (!this.dragMoved && !(this.entryGrid?.wasDragged ?? false)) this.scene.start('menu')
       })
     this.backRect = { x: back.x, y: back.y - back.height / 2, w: back.width, h: back.height }
     this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
@@ -177,19 +168,19 @@ export class WikiScene extends Phaser.Scene {
 
     this.createCategoryTabs(res)
     if (this.isAllPage()) this.createAllView()
-    else this.createEntriesView(res)
+    else this.createEntriesView()
 
-    // 滚动：滚轮 + 拖动（列表/网格通用）
+    // 滚动：滚轮 + 拖动——仅「全部」页的虚拟网格（条目页由 EmojiGrid 自理）
     this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
-      if (this.inList(p)) this.scrollTo((this.isAllPage() ? this.gridScroll : this.listScroll) + dy * 0.6)
+      if (this.isAllPage() && this.inList(p)) this.scrollTo(this.gridScroll + dy * 0.6)
     })
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.dragMoved = false
       this.flingV = 0
-      if (this.inList(p)) {
+      if (this.isAllPage() && this.inList(p)) {
         this.dragging = true
         this.dragStartY = p.worldY
-        this.dragStartScroll = this.isAllPage() ? this.gridScroll : this.listScroll
+        this.dragStartScroll = this.gridScroll
         this.lastMoveY = p.worldY
         this.lastMoveT = this.time.now
       }
@@ -226,10 +217,11 @@ export class WikiScene extends Phaser.Scene {
 
   /** 惯性滚动 + 图集加载进度刷新 */
   update(_time: number, delta: number): void {
-    if (this.isAllPage() && !this.gridBuilt) this.refreshLoading()
+    if (!this.isAllPage()) return
+    if (!this.gridBuilt) this.refreshLoading()
     if (this.flingV === 0 || this.dragging) return
-    const cur = this.isAllPage() ? this.gridScroll : this.listScroll
-    const max = this.isAllPage() ? this.gridMax : this.listMax
+    const cur = this.gridScroll
+    const max = this.gridMax
     const next = cur + this.flingV * delta
     this.scrollTo(next)
     this.flingV *= Math.exp(-delta / 320)
@@ -303,7 +295,7 @@ export class WikiScene extends Phaser.Scene {
           .setOrigin(0)
           .setInteractive({ useHandCursor: true })
           .on('pointerup', () => {
-            if (this.dragMoved || this.category === i) return
+            if (this.dragMoved || (this.entryGrid?.wasDragged ?? false) || this.category === i) return
             this.category = i
             this.focusedKey = ''
             this.listScroll = 0
@@ -329,14 +321,9 @@ export class WikiScene extends Phaser.Scene {
 
   private scrollTo(y: number): void {
     const L = this.layout.list
-    if (this.isAllPage()) {
-      this.gridScroll = Math.max(0, Math.min(this.gridMax, y))
-      this.gridContainer.y = this.origin.y + L.y - this.gridScroll
-      this.updateWindow()
-    } else {
-      this.listScroll = Math.max(0, Math.min(this.listMax, y))
-      this.listContainer.y = this.origin.y + L.y - this.listScroll
-    }
+    this.gridScroll = Math.max(0, Math.min(this.gridMax, y))
+    this.gridContainer.y = this.origin.y + L.y - this.gridScroll
+    this.updateWindow()
     // 滚动中的调试上报节流；拖动结束/惯性停止时 forceReport 补终态
     if (this.time.now - this.reportAt > 120) this.reportWiki()
   }
@@ -345,73 +332,39 @@ export class WikiScene extends Phaser.Scene {
     this.reportWiki()
   }
 
-  // ── 图鉴视图：当前类别的条目列表 + 详情 ─────────────────────
+  // ── 图鉴视图：当前类别的条目网格 + 详情 ─────────────────────
 
-  private createEntriesView(res: number): void {
+  private createEntriesView(): void {
     const L = this.layout.list
-    const lx = this.origin.x + L.x
-    const ly = this.origin.y + L.y
-    const frame = this.add.graphics()
-    frame.fillStyle(0x000000, 0.18)
-    frame.fillRoundedRect(lx - 8, ly - 8, L.w + 16, L.h + 16, 14)
-
-    this.listContainer = this.add.container(lx, ly)
-    const mask = this.add.graphics().setVisible(false)
-    mask.fillStyle(0xffffff, 1)
-    mask.fillRect(lx, ly, L.w, L.h)
-    this.listContainer.setMask(mask.createGeometryMask())
-
     const group = this.groups[this.category]!
-    const gap = 8
-    let cursor = 0
-    for (const entry of group.entries) {
-      const key = `${group.title}:${entry.name}`
-      if (!this.focusedKey) this.focusedKey = key
-      const relY = cursor
-      const bg = this.add.graphics()
-      const icon = emojiImage(this, 40, relY + ROW_H / 2, entry.emoji, 44)
-      const name = this.add
-        .text(74, relY + ROW_H / 2, entry.name, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.strong,
-          color: '#ffffff',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5)
-      const zone = this.add
-        .zone(0, relY, L.w, ROW_H)
-        .setOrigin(0)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
-          if (this.dragMoved) return
-          const cy = ly + relY - this.listScroll + ROW_H / 2
-          if (cy < ly || cy > ly + L.h) return
-          this.focusedKey = key
-          this.refreshEntries()
-        })
-      this.listContainer.add([bg, icon, name, zone])
-      this.rows.push({ key, entry, relY, bg })
-      cursor += ROW_H + gap
+    if (!this.focusedKey && group.entries[0]) {
+      this.focusedKey = `${group.title}:${group.entries[0].name}`
     }
-    this.listMax = Math.max(0, cursor - gap - L.h)
-    this.scrollTo(this.listScroll)
+    this.entryGrid = new EmojiGrid(
+      this,
+      { x: this.origin.x + L.x, y: this.origin.y + L.y, w: L.w, h: L.h },
+      { initialScroll: this.listScroll },
+    )
+    this.entryGrid.onTap = (key): void => {
+      this.focusedKey = key
+      this.refreshEntries()
+    }
+    this.entryGrid.onScroll = (): void => {
+      this.listScroll = this.entryGrid!.scrollY
+      if (this.time.now - this.reportAt > 120) this.reportWiki()
+    }
+    this.entryGrid.setItems(
+      group.entries.map((entry) => ({ key: `${group.title}:${entry.name}`, emoji: entry.emoji })),
+    )
     this.refreshEntries()
   }
 
   private refreshEntries(): void {
-    const L = this.layout.list
-    for (const row of this.rows) {
-      const focused = row.key === this.focusedKey
-      row.bg.clear()
-      row.bg.fillStyle(focused ? 0xffffff : 0x000000, focused ? 0.16 : 0.22)
-      row.bg.fillRoundedRect(0, row.relY, L.w, ROW_H, 10)
-      row.bg.lineStyle(focused ? 2 : 1, 0xffffff, focused ? 0.9 : 0.08)
-      row.bg.strokeRoundedRect(0, row.relY, L.w, ROW_H, 10)
-    }
-    const row = this.rows.find((r) => r.key === this.focusedKey) ?? this.rows[0]
-    if (row) {
-      this.renderDetailCard(this.groups[this.category]!.title, row.entry)
-    }
+    const group = this.groups[this.category]!
+    this.entryGrid?.setSelected(this.focusedKey)
+    const entry =
+      group.entries.find((e) => `${group.title}:${e.name}` === this.focusedKey) ?? group.entries[0]
+    if (entry) this.renderDetailCard(group.title, entry)
     this.reportWiki()
   }
 
@@ -754,18 +707,20 @@ export class WikiScene extends Phaser.Scene {
         category: this.isAllPage() ? '全部' : (this.groups[this.category]?.title ?? ''),
         focused: this.focusedKey,
         allSelected: this.allSelected,
-        entryCount: this.rows.length,
+        entryCount: this.entryGrid ? this.entryGrid.cellRects().length : 0,
         manifestCount: this.manifest.length,
         usedCount: this.used.size,
         atlas: wikiAtlasProgress().state,
         scrollY: this.isAllPage() ? this.gridScroll : this.listScroll,
-        maxScroll: this.isAllPage() ? this.gridMax : this.listMax,
-        items: this.rows.map((r) => ({
+        maxScroll: this.isAllPage()
+          ? this.gridMax
+          : Math.max(0, (this.entryGrid?.contentH ?? 0) - this.layout.list.h),
+        items: (this.entryGrid?.cellRects() ?? []).map((r) => ({
           key: r.key,
-          x: this.origin.x + this.layout.list.x,
-          y: this.origin.y + this.layout.list.y + r.relY - this.listScroll,
-          w: this.layout.list.w,
-          h: ROW_H,
+          x: r.x,
+          y: r.y,
+          w: r.w,
+          h: r.h,
         })),
         list: {
           x: this.origin.x + this.layout.list.x,
