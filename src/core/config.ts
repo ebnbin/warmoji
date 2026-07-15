@@ -717,6 +717,8 @@ export const BOSS = {
   },
   /** 突刺循环：蓄力提示后朝队伍中心猛冲 */
   dash: { intervalMs: 5600, windupMs: 750, speed: 8 * UNIT, durationMs: 450 },
+  /** 终波常规刷怪减压倍率（间隔 ×N）：把火力焦点留给 Boss */
+  spawnRelief: 2,
 } as const
 
 // 压力测试模式（🔧 面板开关）：拉高负载且保证测得下去
@@ -735,9 +737,10 @@ export const XP = {
   base: 35,
   growth: 1.25,
   /** 波末保底经验 = base + perWave×波次：15 波制下是经验主梁之一，
-   * 保证前几波（15 秒短波杀怪少）每波也能升级、第 15 波打完约到满级 */
-  waveBonusBase: 45,
-  waveBonusPerWave: 16,
+   * 保证前几波（15 秒短波杀怪少）每波也能升级、第 15 波打完约到满级。
+   * 自动游玩实测（天使队）：45+16w 只到 15 级 → 上调到 50+26w */
+  waveBonusBase: 50,
+  waveBonusPerWave: 26,
   /** 队伍等级上限：到顶后不再获得经验（点数总量因此固定为 maxLevel-1） */
   maxLevel: 18,
 } as const

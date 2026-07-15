@@ -1042,10 +1042,14 @@ export class ArenaScene extends Phaser.Scene {
   private spawn(delta: number): void {
     this.spawnCooldownMs -= delta
     if (this.spawnCooldownMs > 0) return
-    // 难度按跨波累计战斗时长递增；刷怪供给随在场人数缩放（单人首发不会被满编压力淹没）
+    // 难度按跨波累计战斗时长递增；刷怪供给随在场人数缩放（单人首发不会被满编压力淹没）；
+    // 终波常规刷怪减压：焦点让给 Boss，避免「满速杂兵 + 精英 + Boss」三重压力叠满
     const wave = waveAt((this.run.combatMs + this.elapsedMs) / 1000)
     const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * this.members.length
-    this.spawnCooldownMs = this.stress ? STRESS.spawnIntervalMs : wave.spawnIntervalMs / teamFactor
+    const relief = !this.stress && isFinalWave(this.run.wave) ? BOSS.spawnRelief : 1
+    this.spawnCooldownMs = this.stress
+      ? STRESS.spawnIntervalMs
+      : (wave.spawnIntervalMs * relief) / teamFactor
     const cap = this.stress ? STRESS.maxAlive : SPAWN.maxAlive
     const batch = this.stress ? STRESS.spawnBatch : 1
     for (let i = 0; i < batch; i++) {
