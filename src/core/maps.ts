@@ -7,16 +7,14 @@ import { hslToInt } from './palette'
 // 由 rollDecor 按 run 内的种子随机生成——一局一景，同局各波不变。
 
 export interface MapDecor {
-  /** 装饰 emoji 池（逐格随机挑选，无描边纹理） */
+  /** 装饰 emoji 池（逐格随机挑选，黑描边纹理与玩家侧同款） */
   readonly emojis: readonly string[]
-  /** 单个装饰的尺寸范围（格） */
+  /** 单个装饰的尺寸范围（格）：明显小于战斗实体（1 格），不抢注意力 */
   readonly sizeU: readonly [number, number]
   /** 透明度范围（低于战斗实体一大截，保证战场读性） */
   readonly alpha: readonly [number, number]
   /** 每格出现装饰的概率范围（逐局掷一次；25×25 = 625 格，0.08 ≈ 50 个） */
   readonly density: readonly [number, number]
-  /** 最大倾斜角（± 弧度）：雪花类可全向 π，有明确上下的（树/仙人掌）给小值 */
-  readonly maxTiltRad: number
 }
 
 export interface MapSpec {
@@ -42,10 +40,9 @@ export const MAPS = {
     },
     decor: {
       emojis: ['🌲', '🌳', '🌿', '🍂', '🍃', '🪨'],
-      sizeU: [0.45, 1.6],
+      sizeU: [0.28, 0.7],
       alpha: [0.14, 0.26],
-      density: [0.09, 0.13],
-      maxTiltRad: 0.35,
+      density: [0.1, 0.14],
     },
   },
   desert: {
@@ -60,11 +57,10 @@ export const MAPS = {
     },
     decor: {
       emojis: ['🌵', '🪨', '🦴', '💀', '🥀'],
-      sizeU: [0.45, 1.5],
+      sizeU: [0.28, 0.68],
       alpha: [0.14, 0.26],
       // 荒漠刻意更稀疏
-      density: [0.07, 0.1],
-      maxTiltRad: 0.3,
+      density: [0.08, 0.11],
     },
   },
   snow: {
@@ -79,11 +75,9 @@ export const MAPS = {
     },
     decor: {
       emojis: ['❄️', '🧊', '✨'],
-      sizeU: [0.35, 1.3],
+      sizeU: [0.25, 0.62],
       alpha: [0.16, 0.3],
-      density: [0.11, 0.15],
-      // 雪花/冰晶无上下之分，全向旋转
-      maxTiltRad: Math.PI,
+      density: [0.12, 0.16],
     },
   },
 } as const satisfies Record<string, MapSpec>
@@ -163,7 +157,8 @@ export function rollDecor(
         yU: clamp(cy + 0.5 + (rand() * 2 - 1) * 1.1, rows),
         sizeU,
         alpha: spec.alpha[0] + rand() * (spec.alpha[1] - spec.alpha[0]),
-        rotation: (rand() * 2 - 1) * spec.maxTiltRad,
+        // 全部 360° 随机旋转：装饰是「散落在地上的东西」，没有统一朝向才自然
+        rotation: (rand() * 2 - 1) * Math.PI,
       })
     }
   }

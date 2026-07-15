@@ -1687,7 +1687,7 @@ export class ArenaScene extends Phaser.Scene {
     const cols = Math.round(MAP.width / UNIT)
     const rows = Math.round(MAP.height / UNIT)
     for (const d of rollDecor(spec.decor, () => rng.next(), cols, rows)) {
-      emojiImage(this, d.xU * UNIT, d.yU * UNIT, d.emoji, d.sizeU * UNIT)
+      emojiImage(this, d.xU * UNIT, d.yU * UNIT, d.emoji, d.sizeU * UNIT, 'player')
         .setAlpha(d.alpha)
         .setRotation(d.rotation)
         .setDepth(1)

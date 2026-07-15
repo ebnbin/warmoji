@@ -787,6 +787,8 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     COIN.emoji,
     '➕',
     '💀',
+    // 地图地面装饰：与玩家侧同款黑描边（低透明度贴地）
+    ...new Set(Object.values(MAPS).flatMap((m) => m.decor.emojis)),
   ],
   enemy: [...new Set(ENEMY_SPECS.map((e) => e.emoji))],
   enemyShot: [
@@ -805,8 +807,8 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   // 属性面板的武器/基础组图标 + 商店道具图标
   ...roster.flatMap((c) => c.weapons.map((w) => w.icon)),
   ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),
-  // 地图图标与地面装饰（emojiImage 直取纹理，装饰必须预载）+ 地图详情组图标
-  ...Object.values(MAPS).flatMap((m) => [m.emoji, ...m.decor.emojis]),
+  // 地图图标（选择页素体）+ 地图详情组图标；装饰的描边变体在 OUTLINED_EMOJIS.player
+  ...Object.values(MAPS).map((m) => m.emoji),
   '🗺️',
   '🚧',
   ...SETTING_DEFS.map((d) => d.icon),

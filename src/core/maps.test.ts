@@ -23,7 +23,8 @@ describe('地图定义', () => {
       expect(d.density[0]).toBeLessThanOrEqual(d.density[1])
       expect(d.density[1]).toBeLessThanOrEqual(0.2)
       expect(d.sizeU[0]).toBeLessThanOrEqual(d.sizeU[1])
-      expect(d.maxTiltRad).toBeGreaterThanOrEqual(0)
+      // 背景装饰必须明显小于战斗实体（1 格），不抢注意力
+      expect(d.sizeU[1]).toBeLessThanOrEqual(0.8)
     }
   })
 
@@ -53,7 +54,7 @@ describe('装饰散布 rollDecor', () => {
       expect(d.sizeU).toBeLessThanOrEqual(spec.sizeU[1])
       expect(d.alpha).toBeGreaterThanOrEqual(spec.alpha[0])
       expect(d.alpha).toBeLessThanOrEqual(spec.alpha[1])
-      expect(Math.abs(d.rotation)).toBeLessThanOrEqual(spec.maxTiltRad)
+      expect(Math.abs(d.rotation)).toBeLessThanOrEqual(Math.PI)
     }
   })
 

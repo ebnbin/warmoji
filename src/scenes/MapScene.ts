@@ -229,10 +229,10 @@ export class MapScene extends Phaser.Scene {
     line(spec.desc)
     cursor += 14
     group('🌿', '地面装饰')
-    // 装饰 emoji 预览行（战斗中以极低透明度散布在地面）
+    // 装饰 emoji 预览行（与战斗内同款黑描边）
     let px = dx + 62 + 16
     for (const e of spec.decor.emojis) {
-      this.detailObjs.push(emojiImage(this, px, cursor + 10, e, 34))
+      this.detailObjs.push(emojiImage(this, px, cursor + 10, e, 34, 'player'))
       px += 46
     }
     cursor += 44
