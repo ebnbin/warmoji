@@ -13,6 +13,7 @@ import { browserStorage } from '../core/highscore'
 import {
   aggregateCharacterEffects,
   aggregateTeamEffects,
+  CRIT_MUL,
   resolveWeaponSpec,
 } from '../core/items'
 import type { TeamEffects } from '../core/items'
@@ -86,6 +87,10 @@ interface Member {
   maxHp: number
   iframesMs: number
   reviveMs: number
+  // 稀有道具的触发式属性：每秒回复 / 接触反伤 / 击杀回血
+  regenPerSec: number
+  thorns: number
+  killHeal: number
   hp: number
   alive: boolean
   reviveAt: number
@@ -422,9 +427,16 @@ export class ArenaScene extends Phaser.Scene {
     this.physics.pause()
     playSfx('wave')
     const finished = isFinalWave(this.run.wave)
-    // 波末保底经验：躲避流杀得少也有基本收益（队长倍率同样生效）
-    const xpMul = CAPTAINS[this.run.captainId].xpGainMul
+    // 波末保底经验：躲避流杀得少也有基本收益（队长倍率 × 四叶草团队倍率）
+    const xpMul = CAPTAINS[this.run.captainId].xpGainMul * this.teamFx.xpGainMul
     this.run.xp = gainXp(this.run.xp, Math.round(waveBonusXp(this.run.wave) * xpMul)).state
+    // 团队道具的波末结算：大锅回复在血量快照前生效，债券分红计入本波金币小结
+    if (this.teamFx.waveHealRatio > 0) {
+      for (const m of this.members) {
+        if (m.alive) m.hp = Math.min(m.maxHp, m.hp + m.maxHp * this.teamFx.waveHealRatio)
+      }
+    }
+    if (this.teamFx.waveCoins > 0) this.run.coins += this.teamFx.waveCoins
     this.run.combatMs += this.elapsedMs
     this.run.wave += 1
     this.run.memberHp = this.members.map((m) => (m.alive ? Math.round(m.hp) : 0))
@@ -500,8 +512,20 @@ export class ArenaScene extends Phaser.Scene {
       ...this.weaponCtx,
       damageMul: () => this.stats.damageMul * fx.damageMul * lvlDmg * this.teamFx.teamDamageMul,
       cooldownMul: () => this.stats.cooldownMul * fx.cooldownMul,
-      // 伤害/子弹带上来源槽位：结算页按角色统计输出与击杀
-      damageEnemy: (e, d, kb, sx, sy) => this.applyDamage(e as ImageObj, d, kb, sx, sy, slot),
+      // 伤害/子弹带上来源槽位：结算页按角色统计输出与击杀。
+      // 暴击/击退倍率在这里收口：所有武器伤害路径统一生效，无需逐武器改造
+      damageEnemy: (e, d, kb, sx, sy) => {
+        const crit = fx.critChance > 0 && this.rng.next() < fx.critChance
+        this.applyDamage(
+          e as ImageObj,
+          crit ? Math.round(d * CRIT_MUL) : d,
+          (kb ?? 0) * fx.knockbackMul,
+          sx,
+          sy,
+          slot,
+          crit,
+        )
+      },
       spawnProjectile: (x, y, angle, spec, damage) =>
         this.spawnProjectile(x, y, angle, spec, damage, slot),
     }
@@ -519,6 +543,9 @@ export class ArenaScene extends Phaser.Scene {
       maxHp,
       iframesMs: MEMBER.iframesMs + fx.iframesAddMs,
       reviveMs: Math.max(1000, TEAM.reviveMs + fx.reviveAddMs),
+      regenPerSec: fx.regenPerSec,
+      thorns: fx.thorns,
+      killHeal: fx.killHeal,
       // 血量跨波保留；上一波阵亡者低血量复活（压测模式不走 run 状态）
       hp: this.stress
         ? this.stats.maxHp
@@ -677,6 +704,10 @@ export class ArenaScene extends Phaser.Scene {
     const moving = this.teamDir.x !== 0 || this.teamDir.y !== 0
     for (const m of this.members) {
       if (m.alive) {
+        // 再生戒指：持续回复（hp 允许小数，展示与快照处各自取整）
+        if (m.regenPerSec > 0 && m.hp < m.maxHp) {
+          m.hp = Math.min(m.maxHp, m.hp + (m.regenPerSec * delta) / 1000)
+        }
         this.animateMember(m, moving, delta)
         this.drawMemberHp(m)
         for (const w of m.weapons) w.update(delta, m.handle)
@@ -729,6 +760,10 @@ export class ArenaScene extends Phaser.Scene {
     const spec = enemy.getData('spec') as EnemySpec
     const dmgMul = (enemy.getData('dmgMul') as number | undefined) ?? 1
     this.hurtMember(m, Math.round(spec.damage * dmgMul), 0xff7777, spec.name)
+    // 荆棘背心：接触反伤（与受击同帧、同吃无敌帧节流；击杀归属穿刺者）
+    if (m.thorns > 0 && enemy.active) {
+      this.applyDamage(enemy, m.thorns, 0, undefined, undefined, m.slot)
+    }
   }
 
   private onMemberShot(memberImg: ImageObj, shot: ImageObj): void {
@@ -874,6 +909,7 @@ export class ArenaScene extends Phaser.Scene {
     srcX?: number,
     srcY?: number,
     srcSlot = -1,
+    crit = false,
   ): void {
     if (!enemy.active) return
     const hpBefore = enemy.getData('hp') as number
@@ -884,16 +920,16 @@ export class ArenaScene extends Phaser.Scene {
       st.damage[srcSlot] = (st.damage[srcSlot] ?? 0) + Math.min(damage, Math.max(0, hpBefore))
       if (hp <= 0) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
     }
-    this.floatDamage(enemy.x, enemy.y, damage)
+    this.floatDamage(enemy.x, enemy.y, damage, crit)
     // Boss 体格击退免疫：不吃冲量也不被致死击飞
     if (enemy.getData('kbImmune')) knockback = 0
     if (hp <= 0) {
       // 致死一击：敌人失去自身动力，击退不再衰减——尸体被匀速击飞
       if (knockback > 0 && srcX !== undefined && srcY !== undefined) {
         const dir = norm(enemy.x - srcX, enemy.y - srcY)
-        this.killEnemy(enemy, dir.x * knockback, dir.y * knockback)
+        this.killEnemy(enemy, dir.x * knockback, dir.y * knockback, srcSlot)
       } else {
-        this.killEnemy(enemy)
+        this.killEnemy(enemy, 0, 0, srcSlot)
       }
     } else {
       enemy.setData('hp', hp)
@@ -917,7 +953,7 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private killEnemy(enemy: ImageObj, flingVx = 0, flingVy = 0): void {
+  private killEnemy(enemy: ImageObj, flingVx = 0, flingVy = 0, srcSlot = -1): void {
     this.run.kills++
     playSfx('kill')
     const spec = enemy.getData('spec') as EnemySpec
@@ -927,8 +963,14 @@ export class ArenaScene extends Phaser.Scene {
     const st = this.run.stats
     st.enemyKills[spec.name] = (st.enemyKills[spec.name] ?? 0) + 1
     if (elite) st.eliteKills += 1
-    // 经验击杀即得（队长可提供倍率，精英有额外倍率）；金币落地等待拾取
-    const xpMul = CAPTAINS[this.run.captainId].xpGainMul * (elite ? ELITE.xpMul : 1)
+    // 吸血獠牙：击杀者回血
+    const killer = this.members[srcSlot]
+    if (killer?.alive && killer.killHeal > 0) {
+      killer.hp = Math.min(killer.maxHp, killer.hp + killer.killHeal)
+    }
+    // 经验击杀即得（队长倍率 × 四叶草团队倍率，精英有额外倍率）；金币落地等待拾取
+    const xpMul =
+      CAPTAINS[this.run.captainId].xpGainMul * this.teamFx.xpGainMul * (elite ? ELITE.xpMul : 1)
     const gained = gainXp(this.run.xp, Math.round(spec.xp * xpMul))
     this.run.xp = gained.state
     if (gained.levelsGained > 0) playSfx('levelup')
@@ -1021,12 +1063,14 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private floatDamage(x: number, y: number, amount: number): void {
+  private floatDamage(x: number, y: number, amount: number, crit = false): void {
     if (!this.settings.damageNumbers) return
     // 池满时偷用最旧的一个（结束它未完成的动画）
     const t = this.damagePool[this.damagePoolIdx]!
     this.damagePoolIdx = (this.damagePoolIdx + 1) % this.damagePool.length
     this.tweens.killTweensOf(t)
+    // 暴击金色放大；池对象复用，普通伤害要复位样式
+    t.setFontSize(crit ? 34 : 24).setTint(crit ? 0xffd54f : 0xffffff)
     t.setText(String(amount)).setPosition(x, y - 14).setAlpha(1).setVisible(true)
     this.tweens.add({
       targets: t,
@@ -1251,7 +1295,8 @@ export class ArenaScene extends Phaser.Scene {
       if (slowed) e.setTint(0xa5d8ff)
       else e.clearTint()
     }
-    return factor * ((e.getData('spMul') as number | undefined) ?? 1)
+    // 时之沙的全局减速与精英加速同为「体质」倍率，不参与光环减速的染色判定
+    return factor * ((e.getData('spMul') as number | undefined) ?? 1) * this.teamFx.enemySlowMul
   }
 
   /** 游荡：周期性随机换向，撞图边时折返 */

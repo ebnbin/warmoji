@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CHARACTERS, WEAPONS } from './config'
+import type { ItemRarity } from './items'
 import {
   aggregateCharacterEffects,
   aggregateTeamEffects,
@@ -7,6 +8,8 @@ import {
   characterPool,
   ITEM_IDS,
   ITEMS,
+  RARITY_ORDER,
+  rarityWeights,
   reachedStackLimit,
   resolveWeaponSpec,
   rollItem,
@@ -22,6 +25,48 @@ describe('道具定义', () => {
       expect(item.price).toBeGreaterThan(0)
       expect(Object.keys(item.effects).length).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('稀有度', () => {
+  const prices = (r: ItemRarity): number[] =>
+    ITEM_IDS.filter((id) => ITEMS[id].rarity === r).map((id) => ITEMS[id].price)
+
+  it('三档都有道具；价格档严格递增（最贵普通 < 最便宜稀有 < ... 史诗）', () => {
+    for (const r of RARITY_ORDER) expect(prices(r).length).toBeGreaterThan(0)
+    expect(Math.max(...prices('common'))).toBeLessThan(Math.min(...prices('rare')))
+    expect(Math.max(...prices('rare'))).toBeLessThan(Math.min(...prices('epic')))
+  })
+
+  it('稀有及以上道具都有堆叠上限（大件不允许无限堆）', () => {
+    for (const id of ITEM_IDS) {
+      if (ITEMS[id].rarity !== 'common') expect(ITEMS[id].maxStacks).toBeDefined()
+    }
+  })
+
+  it('权重曲线：和为 1、非负；史诗第 5 波前为 0，档位权重随波次单调不减且有封顶', () => {
+    for (let w = 1; w <= 15; w++) {
+      const wt = rarityWeights(w)
+      expect(wt.common + wt.rare + wt.epic).toBeCloseTo(1)
+      expect(Math.min(wt.common, wt.rare, wt.epic)).toBeGreaterThanOrEqual(0)
+    }
+    expect(rarityWeights(1).epic).toBe(0)
+    expect(rarityWeights(4).epic).toBe(0)
+    expect(rarityWeights(5).epic).toBeGreaterThan(0)
+    expect(rarityWeights(12).rare).toBeCloseTo(0.3)
+    expect(rarityWeights(15).epic).toBeCloseTo(0.2)
+    expect(rarityWeights(15).rare).toBeGreaterThan(rarityWeights(1).rare)
+  })
+
+  it('第 1 波抽不到史诗；后期高随机数落入史诗档', () => {
+    const pool = ['gemHeart', 'fateDice'] as const
+    // rand 恒 0.99：第 1 波史诗权重 0 → 只能抽普通；第 15 波 → 落入档尾（史诗）
+    expect(rollItem([...pool], [], () => 0.99, 1)).toBe('gemHeart')
+    expect(rollItem([...pool], [], () => 0.99, 15)).toBe('fateDice')
+  })
+
+  it('空档权重归拢：池里只剩史诗而史诗未解锁时仍可上架（兜底不空货）', () => {
+    expect(rollItem(['fateDice'], [], () => 0.99, 1)).toBe('fateDice')
   })
 })
 
@@ -76,6 +121,34 @@ describe('效果叠加', () => {
     expect(fx.moveSpeedMul).toBeCloseTo(1.08 * 0.95)
     expect(fx.teamDamageMul).toBeCloseTo(1.1)
     expect(aggregateTeamEffects(Array(10).fill('luckyCoin')).doubleCoinChance).toBe(0.9)
+  })
+
+  it('新角色轴：回复/反伤/击杀回血加法叠加，暴击封顶 0.5，击退叠乘', () => {
+    const fx = aggregateCharacterEffects([
+      'regenRing',
+      'regenRing',
+      'thornVest',
+      'vampFang',
+      'fateDice',
+      'fateDice',
+      'hammerWeight',
+    ])
+    expect(fx.regenPerSec).toBe(4)
+    expect(fx.thorns).toBe(14)
+    expect(fx.killHeal).toBe(3)
+    expect(fx.critChance).toBeCloseTo(0.4)
+    expect(fx.knockbackMul).toBeCloseTo(1.35)
+    expect(aggregateCharacterEffects(Array(5).fill('fateDice')).critChance).toBe(0.5)
+  })
+
+  it('新团队轴：经验叠乘、敌速有保底、波末回复封顶、分红叠加', () => {
+    const fx = aggregateTeamEffects(['clover', 'fieldKitchen', 'warBond', 'warBond', 'timeSand'])
+    expect(fx.xpGainMul).toBeCloseTo(1.15)
+    expect(fx.enemySlowMul).toBeCloseTo(0.88)
+    expect(fx.waveHealRatio).toBeCloseTo(0.25)
+    expect(fx.waveCoins).toBe(20)
+    expect(aggregateTeamEffects(Array(8).fill('timeSand')).enemySlowMul).toBe(0.6)
+    expect(aggregateTeamEffects(Array(8).fill('fieldKitchen')).waveHealRatio).toBe(0.6)
   })
 })
 

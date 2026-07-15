@@ -67,14 +67,20 @@ export function characterStatGroups(
 ): StatGroup[] {
   const fx = aggregateCharacterEffects(items)
   const dmgMul = fx.damageMul * levelDamageMul(level)
+  const baseLines = [
+    `生命上限 ${memberMaxHp(level, fx.hpAdd)} · 受击无敌 ${sec(MEMBER.iframesMs + fx.iframesAddMs)}`,
+    `复活 ${sec(Math.max(1000, TEAM.reviveMs + fx.reviveAddMs))}`,
+  ]
+  // 稀有道具带来的触发式属性：有才显示，避免面板常年一排 0
+  if (fx.regenPerSec > 0) baseLines.push(`每秒回复 ${fx.regenPerSec} 生命`)
+  if (fx.killHeal > 0) baseLines.push(`击杀回复 ${fx.killHeal} 生命`)
+  if (fx.thorns > 0) baseLines.push(`敌人接触反伤 ${fx.thorns}`)
+  if (fx.critChance > 0) baseLines.push(`暴击率 ${Math.round(fx.critChance * 100)}%（伤害 ×2）`)
   return [
     {
       icon: '❤️',
       title: level > 1 ? `基础（Lv.${level}）` : '基础',
-      lines: [
-        `生命上限 ${memberMaxHp(level, fx.hpAdd)} · 受击无敌 ${sec(MEMBER.iframesMs + fx.iframesAddMs)}`,
-        `复活 ${sec(Math.max(1000, TEAM.reviveMs + fx.reviveAddMs))}`,
-      ],
+      lines: baseLines,
     },
     ...spec.weapons.map((w) => {
       const resolved = resolveWeaponSpec(w, fx)
@@ -85,6 +91,7 @@ export function characterStatGroups(
               ...resolved,
               damage: Math.round(resolved.damage * dmgMul),
               cooldownMs: resolved.cooldownMs * fx.cooldownMul,
+              knockback: resolved.knockback * fx.knockbackMul,
             }
       return {
         icon: w.icon,
@@ -102,9 +109,13 @@ export function captainStatGroups(spec: CaptainSpec, items: readonly ItemId[] = 
     `编制上限 ${spec.teamSize} 人 · 开局等级 ${spec.startLevel}`,
     `移速 ${grid(TEAM.moveSpeed * fx.moveSpeedMul)}/秒 · 金币拾取 ${grid(COIN.magnetRadius * fx.magnetMul)}`,
   ]
-  if (spec.xpGainMul !== 1) lines.push(`经验获取 ×${+spec.xpGainMul.toFixed(2)}`)
+  const xpMul = spec.xpGainMul * fx.xpGainMul
+  if (xpMul !== 1) lines.push(`经验获取 ×${+xpMul.toFixed(2)}`)
   if (fx.teamDamageMul !== 1) lines.push(`全队伤害 ×${+fx.teamDamageMul.toFixed(2)}`)
   if (fx.doubleCoinChance > 0) lines.push(`双倍金币概率 ${Math.round(fx.doubleCoinChance * 100)}%`)
+  if (fx.enemySlowMul < 1) lines.push(`全体敌人减速 ${Math.round((1 - fx.enemySlowMul) * 100)}%`)
+  if (fx.waveHealRatio > 0) lines.push(`波末全队回复 ${Math.round(fx.waveHealRatio * 100)}% 生命`)
+  if (fx.waveCoins > 0) lines.push(`波末分红 +${fx.waveCoins} 金币`)
   return [
     { icon: '👑', title: '队长能力', lines: [spec.desc] },
     { icon: '👟', title: '团队', lines: [...lines, `角色满级 Lv.${LEVELS.max}（升级/招募各花 1 点）`] },

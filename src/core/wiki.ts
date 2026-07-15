@@ -1,6 +1,6 @@
 import type { EnemySpec } from './config'
 import { CAPTAINS, CHARACTERS, COIN, ENEMY_SPECS, UNIT, WEAPONS } from './config'
-import { ITEMS } from './items'
+import { ITEMS, RARITIES } from './items'
 import type { ItemSpec } from './items'
 import { captainStatGroups, characterStatGroups, WEAPON_KIND_LABEL, weaponStatLines } from './stats'
 
@@ -103,7 +103,7 @@ export function wikiGroups(): WikiGroup[] {
         name: i.name,
         desc: i.desc,
         lines: [
-          `价格 ${i.price} 金币 · ${i.maxStacks === undefined ? '无限堆叠' : `上限 ${i.maxStacks} 件`}`,
+          `${RARITIES[i.rarity].label} · 价格 ${i.price} 金币 · ${i.maxStacks === undefined ? '无限堆叠' : `上限 ${i.maxStacks} 件`}`,
           `池归属 ${i.pool === 'all' ? '通用' : i.pool === 'team' ? '队长' : WEAPON_KIND_LABEL[i.pool]}`,
         ],
       })),

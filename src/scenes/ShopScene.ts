@@ -6,6 +6,7 @@ import {
   captainPool,
   characterPool,
   ITEMS,
+  RARITIES,
   rollItem,
   stackCount,
 } from '../core/items'
@@ -114,7 +115,7 @@ export class ShopScene extends Phaser.Scene {
       }
       this.run.freeRefreshes = CAPTAINS[this.captainId].freeRefreshes
       this.offers = Array.from({ length: this.lineup.length + 1 }, (_, i) =>
-        rollItem(this.poolFor(i), this.ownedFor(i), Math.random),
+        rollItem(this.poolFor(i), this.ownedFor(i), Math.random, this.run.wave),
       )
       this.focusedId = 'captain'
     }
@@ -337,7 +338,7 @@ export class ShopScene extends Phaser.Scene {
     const owned = this.ownedFor(idx)
     owned.push(offer)
     // 购买后自动补货下一件
-    this.offers[idx] = rollItem(this.poolFor(idx), owned, Math.random)
+    this.offers[idx] = rollItem(this.poolFor(idx), owned, Math.random, this.run.wave)
     this.refresh()
   }
 
@@ -349,7 +350,7 @@ export class ShopScene extends Phaser.Scene {
     if (free) this.run.freeRefreshes -= 1
     else this.run.coins -= SHOP.refreshPrice
     playSfx('click')
-    this.offers[idx] = rollItem(this.poolFor(idx), this.ownedFor(idx), Math.random)
+    this.offers[idx] = rollItem(this.poolFor(idx), this.ownedFor(idx), Math.random, this.run.wave)
     this.refresh()
   }
 
@@ -542,10 +543,14 @@ export class ShopScene extends Phaser.Scene {
     const offer = this.offers[idx] ?? null
     const owned = this.ownedFor(idx)
 
+    // 卡片边框随稀有度着色：普通保持原金色弱描边，稀有/史诗用档位色加亮
+    const rarity = offer ? ITEMS[offer].rarity : 'common'
+    const rarityColor = Number.parseInt(RARITIES[rarity].color.slice(1), 16)
     const card = this.add.graphics()
     card.fillStyle(0xffffff, 0.07)
     card.fillRoundedRect(dx + 14, cardY, D.w - 28, 96, 12)
-    card.lineStyle(1, 0xffd54f, 0.35)
+    if (offer && rarity !== 'common') card.lineStyle(2, rarityColor, 0.8)
+    else card.lineStyle(1, 0xffd54f, 0.35)
     card.strokeRoundedRect(dx + 14, cardY, D.w - 28, 96, 12)
     this.detailObjs.push(card)
 
@@ -558,14 +563,23 @@ export class ShopScene extends Phaser.Scene {
             ? ` · 已持有 ×${held}`
             : ''
           : ` · 已持有 ${held}/${item.maxStacks}`
+      const name = this.add
+        .text(dx + 88, cardY + 28, item.name, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.strong,
+          fontStyle: 'bold',
+          color: item.rarity === 'common' ? '#ffffff' : RARITIES[item.rarity].color,
+          resolution: res,
+        })
+        .setOrigin(0, 0.5)
       this.detailObjs.push(
         emojiImage(this, dx + 52, cardY + 48, item.emoji, 48),
+        name,
         this.add
-          .text(dx + 88, cardY + 28, item.name, {
+          .text(name.x + name.width + 10, cardY + 28, RARITIES[item.rarity].label, {
             fontFamily: UI_FONT,
-            fontSize: FONT.strong,
-            fontStyle: 'bold',
-            color: '#ffffff',
+            fontSize: FONT.caption,
+            color: RARITIES[item.rarity].color,
             resolution: res,
           })
           .setOrigin(0, 0.5),
