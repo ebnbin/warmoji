@@ -31,7 +31,15 @@ describe('run 生命周期', () => {
     expect(run.memberLevels).toEqual([1])
     expect(run.memberHp).toEqual([MEMBER.maxHp])
     expect(run.memberItems).toEqual([[]])
-    expect(run.stats).toEqual({ damage: [0], kills: [0], deaths: [0] })
+    expect(run.stats).toEqual({
+      damage: [0],
+      kills: [0],
+      deaths: [0],
+      damageTaken: [0],
+      enemyKills: {},
+      enemyDamage: {},
+      eliteKills: 0,
+    })
     endRun()
   })
 
@@ -42,6 +50,7 @@ describe('run 生命周期', () => {
     expect(run.stats.damage).toEqual([0, 0])
     expect(run.stats.kills).toEqual([0, 0])
     expect(run.stats.deaths).toEqual([0, 0])
+    expect(run.stats.damageTaken).toEqual([0, 0])
     endRun()
   })
 

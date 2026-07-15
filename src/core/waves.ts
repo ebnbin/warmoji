@@ -15,8 +15,9 @@ export function waveAt(elapsedSec: number): WaveState {
   }
 }
 
-/** 本波战斗时长：前几波短波快节奏，之后标准波 */
+/** 本波战斗时长：前几波短波快节奏，中段标准波，终波（Boss）加长 */
 export function waveDurationMs(wave: number): number {
+  if (wave >= WAVE.totalWaves) return WAVE.finalMs
   return wave <= WAVE.shortWaves ? WAVE.shortMs : WAVE.longMs
 }
 

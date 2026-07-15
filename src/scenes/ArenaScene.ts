@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CAPTAINS, CHARACTERS, COIN, FOLLOW, HIT_SHAKE, KNOCKBACK, MAP, MEMBER, ORBIT, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WANDER, WAVE } from '../core/config'
+import { BOSS, CAPTAINS, CHARACTERS, COIN, ELITE, FOLLOW, HIT_SHAKE, KNOCKBACK, MAP, MEMBER, ORBIT, ROSTER_IDS, SPAWN, STRESS, SURGE, TEAM, UNIT, WANDER, WAVE } from '../core/config'
 import type { CharacterSpec, ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../core/config'
 import { enemyMixAt, fleeSteer, pickEnemy } from '../core/enemies'
 import type { EnemyMixEntry } from '../core/enemies'
@@ -62,6 +62,9 @@ export interface HudSnapshot {
   seconds: number
   remainMs: number
   over: boolean
+  /** 终波 Boss 在场时的血量（null = 无 Boss） */
+  bossHp: number | null
+  bossMaxHp: number
 }
 
 /** 波末结算横幅的战果（本波增量） */
@@ -135,7 +138,7 @@ export class ArenaScene extends Phaser.Scene {
   private enemyShots!: Phaser.GameObjects.Group
   private coins!: Phaser.GameObjects.Group
   /** 毒液池（蘑菇死亡遗留），波末随场景销毁 */
-  private poisonPools: { x: number; y: number; r2: number; until: number; tickMs: number; damage: number; gfx: Phaser.GameObjects.Graphics }[] = []
+  private poisonPools: { x: number; y: number; r2: number; until: number; tickMs: number; damage: number; srcName: string; gfx: Phaser.GameObjects.Graphics }[] = []
   private enemyMix: EnemyMixEntry[] = []
   private frameTargets: EnemyTarget[] = []
   private frameSlowZones: { x: number; y: number; r2: number; factor: number }[] = []
@@ -173,6 +176,8 @@ export class ArenaScene extends Phaser.Scene {
   private teamDir = { x: 0, y: 0 }
   /** 槽位 → 队形岗位序号（N 保 1 时受保护中心占 0 号岗） */
   private postBySlot: number[] = []
+  /** 终波 Boss 实体（在场时 HUD 显示血条；击杀即提前通关） */
+  private boss?: ImageObj
   /** 环形阵专用：全环共享相位（刚性同步转动，core/orbit.ts 逐帧演化） */
   private orbitPhase = 0
   /** 当前主力岗位（-1 = 无人驱动）；力量竞争逐帧裁定，随时换手 */
@@ -228,6 +233,8 @@ export class ArenaScene extends Phaser.Scene {
       seconds: Math.floor(this.elapsedMs / 1000),
       remainMs: Math.max(0, waveDurationMs(this.run.wave) - this.elapsedMs),
       over: this.over,
+      bossHp: this.boss?.active ? (this.boss.getData('hp') as number) : null,
+      bossMaxHp: BOSS.hp,
     }
   }
 
@@ -295,6 +302,29 @@ export class ArenaScene extends Phaser.Scene {
     this.coins = this.add.group()
     // 压测按后期混编出怪；正常局按当前波次配比
     this.enemyMix = enemyMixAt(this.stress ? 10 : this.run.wave)
+    this.boss = undefined
+
+    // 节点波：敌人潮（精英登场波）与终波 Boss，开场警示横幅后兑现
+    if (!this.stress && this.run.wave === SURGE.wave) {
+      this.time.delayedCall(600, () => {
+        if (this.over) return
+        this.events.emit('wave-warning', {
+          title: '⚠️ 精英来袭',
+          sub: '敌人潮涌来，小心金边强敌！',
+        })
+        this.spawnSurge()
+      })
+    }
+    if (!this.stress && this.run.wave >= WAVE.totalWaves) {
+      this.time.delayedCall(600, () => {
+        if (this.over) return
+        this.events.emit('wave-warning', {
+          title: `☠️ ${BOSS.name}出现`,
+          sub: `击败它，或撑过 ${Math.round(waveDurationMs(this.run.wave) / 1000)} 秒！`,
+        })
+        this.spawnBoss()
+      })
+    }
 
     // 爆发型粒子发射器（复用，explode 触发；速度为 px/秒，UNIT=64）
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
@@ -696,7 +726,9 @@ export class ArenaScene extends Phaser.Scene {
     const m = memberImg.getData('member') as Member
     if (!m.alive || this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
-    this.hurtMember(m, (enemy.getData('spec') as EnemySpec).damage, 0xff7777)
+    const spec = enemy.getData('spec') as EnemySpec
+    const dmgMul = (enemy.getData('dmgMul') as number | undefined) ?? 1
+    this.hurtMember(m, Math.round(spec.damage * dmgMul), 0xff7777, spec.name)
   }
 
   private onMemberShot(memberImg: ImageObj, shot: ImageObj): void {
@@ -704,14 +736,21 @@ export class ArenaScene extends Phaser.Scene {
     const m = memberImg.getData('member') as Member
     if (!m.alive) return
     const damage = shot.getData('damage') as number
+    const srcName = shot.getData('srcName') as string | undefined
     shot.destroy()
     // 子弹命中吃无敌帧：帧内先中弹则后续接触伤害被同一层保护挡下
     if (this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
-    this.hurtMember(m, damage, 0xff7777)
+    this.hurtMember(m, damage, 0xff7777, srcName)
   }
 
-  private hurtMember(m: Member, damage: number, tint: number): void {
+  private hurtMember(m: Member, damage: number, tint: number, srcName?: string): void {
+    // 敌情明细：承伤按人累计 + 按敌人名归属
+    const st = this.run.stats
+    if (m.slot < st.damageTaken.length) {
+      st.damageTaken[m.slot] = (st.damageTaken[m.slot] ?? 0) + damage
+    }
+    if (srcName) st.enemyDamage[srcName] = (st.enemyDamage[srcName] ?? 0) + damage
     m.hp = Math.max(0, m.hp - damage)
     playSfx('hurt')
     if (this.settings.hitShake) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
@@ -846,6 +885,8 @@ export class ArenaScene extends Phaser.Scene {
       if (hp <= 0) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
     }
     this.floatDamage(enemy.x, enemy.y, damage)
+    // Boss 体格击退免疫：不吃冲量也不被致死击飞
+    if (enemy.getData('kbImmune')) knockback = 0
     if (hp <= 0) {
       // 致死一击：敌人失去自身动力，击退不再衰减——尸体被匀速击飞
       if (knockback > 0 && srcX !== undefined && srcY !== undefined) {
@@ -880,17 +921,34 @@ export class ArenaScene extends Phaser.Scene {
     this.run.kills++
     playSfx('kill')
     const spec = enemy.getData('spec') as EnemySpec
-    // 经验击杀即得（队长可提供倍率）；金币落地等待拾取
-    const xpMul = CAPTAINS[this.run.captainId].xpGainMul
+    const elite = !!enemy.getData('elite')
+    const isBoss = !!enemy.getData('boss')
+    // 敌情明细：按敌人名计击杀，精英另计总数
+    const st = this.run.stats
+    st.enemyKills[spec.name] = (st.enemyKills[spec.name] ?? 0) + 1
+    if (elite) st.eliteKills += 1
+    // 经验击杀即得（队长可提供倍率，精英有额外倍率）；金币落地等待拾取
+    const xpMul = CAPTAINS[this.run.captainId].xpGainMul * (elite ? ELITE.xpMul : 1)
     const gained = gainXp(this.run.xp, Math.round(spec.xp * xpMul))
     this.run.xp = gained.state
     if (gained.levelsGained > 0) playSfx('levelup')
     // 偷金币鼠：吐回吃掉的金币 + 1 枚利息
     const eaten = (enemy.getData('eaten') as number) || 0
-    const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? spec.coins : 0
-    this.spawnCoins(enemy.x, enemy.y, spec.coins + doubled + eaten + (eaten > 0 ? 1 : 0))
+    const baseCoins = spec.coins * (elite ? ELITE.coinsMul : 1)
+    const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? baseCoins : 0
+    this.spawnCoins(enemy.x, enemy.y, baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0))
+    // 击败终波 Boss：稍候（碎块飞散可见）直接提前通关
+    if (isBoss) {
+      this.boss = undefined
+      this.deathBurst.explode(24, enemy.x, enemy.y)
+      this.time.delayedCall(700, () => {
+        if (!this.over) this.endWave()
+      })
+    }
     // 特殊死亡：蘑菇留毒液池；泡泡分裂出迷你体
-    if (spec.behavior === 'chase' && spec.poison) this.spawnPoisonPool(enemy.x, enemy.y, spec.poison)
+    if (spec.behavior === 'chase' && spec.poison) {
+      this.spawnPoisonPool(enemy.x, enemy.y, spec.poison, spec.name)
+    }
     if (spec.behavior === 'chase' && spec.split && !this.over) {
       const hpMul = waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier
       for (let i = 0; i < spec.split.count; i++) {
@@ -996,9 +1054,14 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private spawnOne(hpMultiplier: number): void {
+  private spawnOne(hpMultiplier: number, forceElite = false): void {
     const spec = pickEnemy(this.enemyMix, () => this.rng.next())
-    const hp = Math.round(spec.hp * hpMultiplier)
+    // 精英怪：到波数后按概率强化出场（血量刷怪时算入，移速/伤害走敌身标记）
+    const elite =
+      !this.stress &&
+      (forceElite ||
+        (this.run.wave >= ELITE.fromWave && this.rng.next() < ELITE.chance))
+    const hp = Math.round(spec.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
     const pos = randomMapPoint(
       this.rng,
       MAP.width,
@@ -1023,12 +1086,132 @@ export class ArenaScene extends Phaser.Scene {
     this.time.delayedCall(SPAWN.telegraphMs, () => {
       mark.destroy()
       this.pendingSpawns--
-      if (!this.over) this.materializeEnemy(spec, pos.x, pos.y, hp)
+      if (!this.over) this.materializeEnemy(spec, pos.x, pos.y, hp, elite)
     })
   }
 
-  private materializeEnemy(spec: EnemySpec, x: number, y: number, hp: number): void {
-    const enemy = emojiImage(this, x, y, spec.emoji, spec.size, 'enemy').setDepth(5)
+  /** 终波 Boss：大型预告标记后落地；血量固定、击退免疫、金边高亮 */
+  private spawnBoss(): void {
+    const pos = randomMapPoint(
+      this.rng,
+      MAP.width,
+      MAP.height,
+      2 * UNIT,
+      this.center,
+      SPAWN.minPlayerDist * 1.6,
+    )
+    this.pendingSpawns++
+    const mark = emojiImage(this, pos.x, pos.y, SPAWN.markEmoji, SPAWN.markSize * 2).setDepth(4).setAlpha(0)
+    this.tweens.add({ targets: mark, alpha: 1, duration: SPAWN.telegraphMs / 4, yoyo: true, repeat: 3 })
+    this.time.delayedCall(SPAWN.telegraphMs * 1.6, () => {
+      mark.destroy()
+      this.pendingSpawns--
+      if (this.over) return
+      const enemy = emojiImage(this, pos.x, pos.y, BOSS.emoji, BOSS.size, 'elite').setDepth(7)
+      this.physics.add.existing(enemy)
+      circleBody(enemy, BOSS.radius)
+      ;(enemy.body as ArcadeBody).setCollideWorldBounds(true)
+      // Boss 的运行时规格只消费公共字段（伤害/掉落/名字等），行为走专属状态机
+      const bossSpec = {
+        behavior: 'boss',
+        emoji: BOSS.emoji,
+        name: BOSS.name,
+        size: BOSS.size,
+        radius: BOSS.radius,
+        hp: BOSS.hp,
+        speed: BOSS.speed,
+        damage: BOSS.damage,
+        xp: BOSS.xp,
+        coins: BOSS.coins,
+      } as unknown as EnemySpec
+      enemy.setData('hp', BOSS.hp)
+      enemy.setData('spec', bossSpec)
+      enemy.setData('boss', true)
+      enemy.setData('kbImmune', true)
+      enemy.setData('eaten', 0)
+      enemy.setData('ph', 0)
+      enemy.setData('state', 'chase')
+      enemy.setData('nextRingAt', this.elapsedMs + 1800)
+      enemy.setData('nextDashAt', this.elapsedMs + 3600)
+      this.enemies.add(enemy)
+      this.boss = enemy
+      playSfx('boom')
+      const targetScale = enemy.scale
+      enemy.setScale(targetScale * 0.2).setAlpha(0.2)
+      this.tweens.add({ targets: enemy, scale: targetScale, alpha: 1, duration: 320, ease: 'Back.easeOut' })
+    })
+  }
+
+  /** Boss 状态机：缓速逼近；周期环形弹幕；周期蓄力 → 朝队伍中心突刺 */
+  private steerBoss(e: ImageObj, body: ArcadeBody, slow: number, now: number): void {
+    const state = e.getData('state') as string
+    if (now >= (e.getData('nextRingAt') as number)) {
+      e.setData('nextRingAt', now + BOSS.ring.intervalMs)
+      const rot = this.rng.next() * Math.PI * 2
+      for (let i = 0; i < BOSS.ring.count; i++) {
+        this.spawnEnemyShot(e.x, e.y, rot + (i * 2 * Math.PI) / BOSS.ring.count, BOSS.ring.bullet, BOSS.name)
+      }
+      playSfx('boom')
+    }
+    if (state === 'windup') {
+      body.setVelocity(0, 0)
+      e.setRotation(Math.sin(now / 26) * 0.12)
+      if (now >= (e.getData('windupUntil') as number)) {
+        const dir = norm(this.center.x - e.x, this.center.y - e.y)
+        e.setData('state', 'dash')
+        e.setData('dashUntil', now + BOSS.dash.durationMs)
+        e.setData('dirX', dir.x)
+        e.setData('dirY', dir.y)
+        e.setRotation(0)
+        e.clearTint()
+        playSfx('whoosh')
+      }
+      return
+    }
+    if (state === 'dash') {
+      const dx = e.getData('dirX') as number
+      const dy = e.getData('dirY') as number
+      body.setVelocity(dx * BOSS.dash.speed * slow, dy * BOSS.dash.speed * slow)
+      if (now >= (e.getData('dashUntil') as number)) {
+        e.setData('state', 'chase')
+        e.setData('nextDashAt', now + BOSS.dash.intervalMs)
+      }
+      return
+    }
+    if (now >= (e.getData('nextDashAt') as number)) {
+      e.setData('state', 'windup')
+      e.setData('windupUntil', now + BOSS.dash.windupMs)
+      e.setTint(0xffb74d)
+      return
+    }
+    const dir = norm(this.center.x - e.x, this.center.y - e.y)
+    body.setVelocity(dir.x * BOSS.speed * slow, dir.y * BOSS.speed * slow)
+  }
+
+  /** 敌人潮：一段时间内密集落地一批敌人（含保底精英） */
+  private spawnSurge(): void {
+    const hpMul = waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier
+    for (let i = 0; i < SURGE.count; i++) {
+      this.time.delayedCall((i * SURGE.spreadMs) / SURGE.count, () => {
+        if (!this.over) this.spawnOne(hpMul, i < SURGE.elites)
+      })
+    }
+  }
+
+  private materializeEnemy(spec: EnemySpec, x: number, y: number, hp: number, elite = false): void {
+    const enemy = emojiImage(
+      this,
+      x,
+      y,
+      spec.emoji,
+      spec.size * (elite ? ELITE.sizeMul : 1),
+      elite ? 'elite' : 'enemy',
+    ).setDepth(5)
+    if (elite) {
+      enemy.setData('elite', true)
+      enemy.setData('spMul', ELITE.speedMul)
+      enemy.setData('dmgMul', ELITE.damageMul)
+    }
     this.physics.add.existing(enemy)
     circleBody(enemy, spec.radius)
     // 兜底：任何行为都不允许把敌人推出地图
@@ -1050,7 +1233,7 @@ export class ArenaScene extends Phaser.Scene {
     this.tweens.add({ targets: enemy, scale: targetScale, alpha: 1, duration: 130 })
   }
 
-  /** 敌人减速倍率（寒气光环等），并同步冷色调提示 */
+  /** 敌人速度倍率 = 减速区叠乘（寒气光环等，带冷色调提示）× 精英加速标记 */
   private slowFactorFor(e: ImageObj): number {
     let factor = 1
     for (const z of this.frameSlowZones) {
@@ -1064,7 +1247,7 @@ export class ArenaScene extends Phaser.Scene {
       if (slowed) e.setTint(0xa5d8ff)
       else e.clearTint()
     }
-    return factor
+    return factor * ((e.getData('spMul') as number | undefined) ?? 1)
   }
 
   /** 游荡：周期性随机换向，撞图边时折返 */
@@ -1120,6 +1303,12 @@ export class ArenaScene extends Phaser.Scene {
       const slow = this.slowFactorFor(e)
       const target = this.nearestAlive(e.x, e.y)!
 
+      // 终波 Boss：专属状态机（缓速逼近 + 环形弹幕 + 蓄力突刺）
+      if (e.getData('boss')) {
+        this.steerBoss(e, body, slow, now)
+        continue
+      }
+
       switch (spec.behavior) {
         case 'chase': {
           const dir = norm(target.image.x - e.x, target.image.y - e.y)
@@ -1131,7 +1320,14 @@ export class ArenaScene extends Phaser.Scene {
           body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
           if (now >= (e.getData('fireAt') as number)) {
             e.setData('fireAt', now + spec.fireIntervalMs)
-            this.spawnEnemyShot(e.x, e.y, Math.atan2(dir.y, dir.x), spec.bullet)
+            this.spawnEnemyShot(
+              e.x,
+              e.y,
+              Math.atan2(dir.y, dir.x),
+              spec.bullet,
+              spec.name,
+              (e.getData('dmgMul') as number | undefined) ?? 1,
+            )
           }
           break
         }
@@ -1193,7 +1389,14 @@ export class ArenaScene extends Phaser.Scene {
           }
           if (now >= (e.getData('fireAt') as number)) {
             e.setData('fireAt', now + spec.fireIntervalMs)
-            this.spawnEnemyShot(e.x, e.y, Math.atan2(tdy, tdx), spec.bullet)
+            this.spawnEnemyShot(
+              e.x,
+              e.y,
+              Math.atan2(tdy, tdx),
+              spec.bullet,
+              spec.name,
+              (e.getData('dmgMul') as number | undefined) ?? 1,
+            )
           }
           break
         }
@@ -1260,12 +1463,20 @@ export class ArenaScene extends Phaser.Scene {
 
   // ── 敌方子弹与毒液池 ────────────────────────────────────────
 
-  private spawnEnemyShot(x: number, y: number, angle: number, bullet: EnemyBulletSpec): void {
+  private spawnEnemyShot(
+    x: number,
+    y: number,
+    angle: number,
+    bullet: EnemyBulletSpec,
+    srcName: string,
+    dmgMul = 1,
+  ): void {
     const shot = emojiImage(this, x, y, bullet.emoji, bullet.size, 'enemyShot').setDepth(6)
     this.physics.add.existing(shot)
     circleBody(shot, bullet.radius)
     ;(shot.body as ArcadeBody).setVelocity(Math.cos(angle) * bullet.speed, Math.sin(angle) * bullet.speed)
-    shot.setData('damage', bullet.damage)
+    shot.setData('damage', Math.round(bullet.damage * dmgMul))
+    shot.setData('srcName', srcName)
     shot.setData('dieAt', this.elapsedMs + bullet.lifeMs)
     this.enemyShots.add(shot)
   }
@@ -1285,7 +1496,12 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private spawnPoisonPool(x: number, y: number, poison: NonNullable<ChaseEnemySpec['poison']>): void {
+  private spawnPoisonPool(
+    x: number,
+    y: number,
+    poison: NonNullable<ChaseEnemySpec['poison']>,
+    srcName: string,
+  ): void {
     const gfx = this.add.graphics().setDepth(2)
     gfx.fillStyle(0x7cb342, 0.22)
     gfx.fillCircle(0, 0, poison.radius)
@@ -1301,6 +1517,7 @@ export class ArenaScene extends Phaser.Scene {
       until: this.elapsedMs + poison.durationMs,
       tickMs: poison.tickMs,
       damage: poison.damage,
+      srcName,
       gfx,
     })
   }
@@ -1323,7 +1540,7 @@ export class ArenaScene extends Phaser.Scene {
         if (dx * dx + dy * dy > p.r2) continue
         if (now - m.lastPoisonMs >= p.tickMs) {
           m.lastPoisonMs = now
-          this.hurtMember(m, p.damage, 0xa5d86a)
+          this.hurtMember(m, p.damage, 0xa5d86a, p.srcName)
         }
         break
       }

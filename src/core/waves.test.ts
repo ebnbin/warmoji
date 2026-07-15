@@ -29,11 +29,12 @@ describe('waves', () => {
     expect(waveAt(-10)).toEqual(waveAt(0))
   })
 
-  it('波时长：前几波短波，之后标准波', () => {
+  it('波时长：前几波短波、中段标准波、终波（Boss）加长', () => {
     expect(waveDurationMs(1)).toBe(WAVE.shortMs)
     expect(waveDurationMs(WAVE.shortWaves)).toBe(WAVE.shortMs)
     expect(waveDurationMs(WAVE.shortWaves + 1)).toBe(WAVE.longMs)
-    expect(waveDurationMs(WAVE.totalWaves)).toBe(WAVE.longMs)
+    expect(waveDurationMs(WAVE.totalWaves - 1)).toBe(WAVE.longMs)
+    expect(waveDurationMs(WAVE.totalWaves)).toBe(WAVE.finalMs)
   })
 
   it('通关判定：打完最后一波为真', () => {

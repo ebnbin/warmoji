@@ -35,8 +35,18 @@ export interface RunState {
   guardOrder: CharacterId[]
   /** 首次满员的阵型页是否已自动展示（只展示一次，之后走商店入口调整） */
   formationIntroduced: boolean
-  /** 结算统计（按槽位整局累计）：输出伤害/击杀/阵亡次数 */
-  stats: { damage: number[]; kills: number[]; deaths: number[] }
+  /** 结算统计：按槽位整局累计（输出/承伤/击杀/阵亡）+ 按敌人名的敌情明细 */
+  stats: {
+    damage: number[]
+    kills: number[]
+    deaths: number[]
+    damageTaken: number[]
+    /** 敌人名 → 我方击杀数 */
+    enemyKills: Record<string, number>
+    /** 敌人名 → 它们对我方造成的伤害 */
+    enemyDamage: Record<string, number>
+    eliteKills: number
+  }
 }
 
 let current: RunState | undefined
@@ -62,6 +72,10 @@ export function beginRun(captainId: CaptainId, starters: readonly CharacterId[])
       damage: starters.map(() => 0),
       kills: starters.map(() => 0),
       deaths: starters.map(() => 0),
+      damageTaken: starters.map(() => 0),
+      enemyKills: {},
+      enemyDamage: {},
+      eliteKills: 0,
     },
   }
   return current
@@ -110,6 +124,7 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   run.stats.damage.push(0)
   run.stats.kills.push(0)
   run.stats.deaths.push(0)
+  run.stats.damageTaken.push(0)
   return run.roster.length - 1
 }
 

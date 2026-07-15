@@ -7,6 +7,7 @@ import { heapMB, rafHz, rendererInfo, startRafMeter } from '../ui/diagnostics'
 import { emojiCacheStats, emojiImage, iconLabel } from '../ui/emoji'
 import { FONT, UI_FONT } from '../ui/fonts'
 import { Joystick } from '../ui/Joystick'
+import { playSfx } from '../ui/sfx'
 import {
   applyCamera,
   isStandalone,
@@ -24,6 +25,7 @@ export class UIScene extends Phaser.Scene {
   private xpBar!: Phaser.GameObjects.Graphics
   private levelText!: Phaser.GameObjects.Text
   private timeText!: Phaser.GameObjects.Text
+  private bossBar!: Phaser.GameObjects.Graphics
   private killsText!: Phaser.GameObjects.Text
   private coinsText!: Phaser.GameObjects.Text
   private last!: HudSnapshot
@@ -63,11 +65,14 @@ export class UIScene extends Phaser.Scene {
       seconds: -1,
       remainMs: -1,
       over: false,
+      bossHp: null,
+      bossMaxHp: 1,
     }
 
     this.joystick = new Joystick(this)
 
     this.xpBar = this.add.graphics()
+    this.bossBar = this.add.graphics().setDepth(120)
     // 深色字 + 白描边：浅色地图与暗色背景（相机贴边时）上都可读
     const hudText = {
       fontFamily: UI_FONT,
@@ -121,9 +126,11 @@ export class UIScene extends Phaser.Scene {
 
     const arenaEvents = this.arena.events
     arenaEvents.on('wave-complete', this.onWaveComplete, this)
+    arenaEvents.on('wave-warning', this.onWaveWarning, this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       arenaEvents.off('wave-complete', this.onWaveComplete, this)
+      arenaEvents.off('wave-warning', this.onWaveWarning, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
 
@@ -223,7 +230,66 @@ export class UIScene extends Phaser.Scene {
         isStress() ? formatTime(s.seconds) : `第${s.wave}波 ${formatTime(remainSec)}`,
       )
     }
+    if (s.bossHp !== this.last.bossHp) this.drawBossBar(s)
     this.last = s
+  }
+
+  /** 终波 Boss 血条：波次计时下方居中的红条 */
+  private drawBossBar(s: HudSnapshot): void {
+    const g = this.bossBar
+    g.clear()
+    if (s.bossHp === null) return
+    const w = 320
+    const x = viewport.logicalWidth / 2 - w / 2
+    const y = safeInsets.top + 56
+    g.fillStyle(0x000000, 0.55)
+    g.fillRoundedRect(x, y, w, 16, 8)
+    const ratio = Math.max(0, Math.min(1, s.bossHp / s.bossMaxHp))
+    g.fillStyle(0xef5350, 1)
+    g.fillRoundedRect(x + 2, y + 2, Math.max(6, (w - 4) * ratio), 12, 6)
+  }
+
+  /** 节点波警示横幅：短暂弹出后淡出（精英潮 / Boss 登场） */
+  private onWaveWarning(w: { title: string; sub: string }): void {
+    const res = textRes()
+    const cx = viewport.logicalWidth / 2
+    const cy = viewport.logicalHeight * 0.3
+    playSfx('over')
+    const title = this.add
+      .text(cx, cy, w.title, {
+        fontFamily: UI_FONT,
+        fontSize: FONT.banner,
+        fontStyle: 'bold',
+        color: '#ff8a80',
+        stroke: '#2b0000',
+        strokeThickness: 6,
+        resolution: res,
+      })
+      .setOrigin(0.5)
+      .setDepth(226)
+    const sub = this.add
+      .text(cx, cy + 58, w.sub, {
+        fontFamily: UI_FONT,
+        fontSize: FONT.head,
+        color: '#ffd54f',
+        stroke: '#000000',
+        strokeThickness: 4,
+        resolution: res,
+      })
+      .setOrigin(0.5)
+      .setDepth(226)
+    title.setScale(0.5)
+    this.tweens.add({ targets: title, scale: 1, duration: 300, ease: 'Back.easeOut' })
+    this.tweens.add({
+      targets: [title, sub],
+      alpha: 0,
+      delay: 2300,
+      duration: 500,
+      onComplete: () => {
+        title.destroy()
+        sub.destroy()
+      },
+    })
   }
 
   private onViewportChanged(): void {

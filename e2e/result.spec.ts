@@ -58,8 +58,24 @@ test('通关胜利：快进到最后一波打完 → 胜利结算页 → 再来�
   await page.evaluate(() => window.__setWave!(15))
   await clickShopNext(page)
 
-  // 最后一波（30 秒）：绕圈撑完 → 胜利结算
-  await kiteUntilLeaveArena(page)
+  // 最后一波（45 秒 Boss 波）：等 Boss 落地后把它血量拨到 1，
+  // 队伍随手一击即触发「击败 Boss 提前通关」（确定性覆盖 Boss 击杀胜利分支）
+  await page.waitForFunction(
+    () => {
+      const game = window.__game as { scene: { keys: Record<string, { boss?: { active: boolean } }> } }
+      return !!game?.scene?.keys?.['arena']?.boss?.active
+    },
+    undefined,
+    { timeout: 20_000 },
+  )
+  await page.evaluate(() => {
+    const game = window.__game as {
+      scene: { keys: Record<string, { boss?: { setData(k: string, v: number): void } }> }
+    }
+    game.scene.keys['arena']!.boss!.setData('hp', 1)
+  })
+  // 绕圈把 Boss 引进武器射程内补刀
+  await kiteUntilLeaveArena(page, 40)
   await page.waitForFunction(() => window.__warmoji?.scene === 'result' && !!window.__warmoji.result, undefined, {
     timeout: 20_000,
   })

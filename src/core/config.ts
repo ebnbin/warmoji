@@ -382,6 +382,8 @@ export const WAVE = {
   shortMs: 15_000,
   longMs: 30_000,
   totalWaves: 15,
+  /** 终波（Boss 波）时长：击败 Boss 或撑满时长皆通关 */
+  finalMs: 45_000,
   reviveHpRatio: 0.3,
   /** 波末结算横幅停留时长：给玩家松手时间，防止战斗输入误触商店按钮 */
   summaryMs: 1600,
@@ -672,6 +674,51 @@ export const SPAWN = {
   edgeInset: 0.5 * UNIT,
 } as const
 
+// 精英怪：第 fromWave 波起按概率出现——金色描边 + 三围强化，掉更多经验金币。
+// 强化走乘数（血量在刷怪时算入，移速/伤害在运行时按敌身上的标记生效）
+export const ELITE = {
+  fromWave: 10,
+  chance: 0.15,
+  hpMul: 4,
+  speedMul: 1.25,
+  damageMul: 2,
+  sizeMul: 1.2,
+  xpMul: 4,
+  coinsMul: 3,
+} as const
+
+// 敌人潮：第 wave 波开局的一波密集冲锋（含保底精英），配警示横幅
+export const SURGE = {
+  wave: 10,
+  count: 14,
+  elites: 3,
+  /** 潮水在这段时间内陆续落地 */
+  spreadMs: 2600,
+} as const
+
+// 终局 Boss（最后一波）：大体型 + 周期环形弹幕 + 蓄力突刺；击退免疫。
+// 血量固定不吃时间成长曲线（平衡按满编 15 波队伍校准），击败或撑满时长皆通关
+export const BOSS = {
+  emoji: '👹',
+  name: '赤鬼',
+  size: 2.4 * UNIT,
+  radius: 1.05 * UNIT,
+  hp: 4000,
+  /** 平时缓速逼近队伍中心 */
+  speed: 1.4 * UNIT,
+  damage: 24,
+  xp: 60,
+  coins: 40,
+  /** 环形弹幕：周期性向四周均匀发射（带随机整体旋转） */
+  ring: {
+    count: 12,
+    intervalMs: 2800,
+    bullet: { emoji: '🟣', size: 0.34 * UNIT, radius: 0.16 * UNIT, speed: 2.4 * UNIT, damage: 10, lifeMs: 6000 },
+  },
+  /** 突刺循环：蓄力提示后朝队伍中心猛冲 */
+  dash: { intervalMs: 5600, windupMs: 750, speed: 8 * UNIT, durationMs: 450 },
+} as const
+
 // 压力测试模式（🔧 面板开关）：拉高负载且保证测得下去
 export const STRESS = {
   maxHp: 10_000_000,
@@ -705,13 +752,14 @@ export const SHOP = { refreshPrice: 2 } as const
 export const HIT_SHAKE = { durationMs: 60, intensity: 0.0012 } as const
 
 // 剪影描边（radius 单位 = twemoji viewBox 单位，36 格）：按阵营配色
-// 玩家侧黑、敌人紫、敌方子弹红——一眼分清敌我与危险物
+// 玩家侧黑、敌人紫、敌方子弹红、精英/Boss 金——一眼分清敌我与威胁等级
 export const OUTLINE = {
   radius: 2,
   colors: {
     player: '#000000',
     enemy: '#8e24aa',
     enemyShot: '#d32f2f',
+    elite: '#ffb300',
   },
 } as const
 
@@ -736,8 +784,13 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   ],
   enemy: [...new Set(ENEMY_SPECS.map((e) => e.emoji))],
   enemyShot: [
-    ...new Set(ENEMY_SPECS.flatMap((e) => ('bullet' in e ? [e.bullet.emoji] : []))),
+    ...new Set([
+      ...ENEMY_SPECS.flatMap((e) => ('bullet' in e ? [e.bullet.emoji] : [])),
+      BOSS.ring.bullet.emoji,
+    ]),
   ],
+  // 精英变体（含 Boss）：金边
+  elite: [...new Set(ENEMY_SPECS.map((e) => e.emoji)), BOSS.emoji],
 }
 
 // 启动时预载的 emoji（含 UI 图标）；其余全集按需加载（ui/emoji.ts ensureEmoji）

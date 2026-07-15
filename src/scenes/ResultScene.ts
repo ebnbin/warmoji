@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CAPTAINS, CHARACTERS, COIN, WAVE } from '../core/config'
+import { BOSS, CAPTAINS, CHARACTERS, COIN, ENEMY_SPECS, WAVE } from '../core/config'
 import { browserStorage, submitScore } from '../core/highscore'
 import { ITEMS, stackCount } from '../core/items'
 import type { ItemId } from '../core/items'
@@ -25,6 +25,7 @@ interface ResultLayout {
   subY: number
   bestY: number
   table: { x: number; y: number; w: number; h: number }
+  enemy: { x: number; y: number; w: number; h: number }
   btnY: number
 }
 
@@ -33,7 +34,8 @@ const LANDSCAPE: ResultLayout = {
   titleY: 64,
   subY: 122,
   bestY: 160,
-  table: { x: 160, y: 190, w: 960, h: 428 },
+  table: { x: 56, y: 190, w: 690, h: 428 },
+  enemy: { x: 766, y: 190, w: 458, h: 428 },
   btnY: 668,
 }
 
@@ -42,7 +44,8 @@ const PORTRAIT: ResultLayout = {
   titleY: 96,
   subY: 158,
   bestY: 198,
-  table: { x: 24, y: 236, w: 672, h: 900 },
+  table: { x: 24, y: 236, w: 672, h: 496 },
+  enemy: { x: 24, y: 748, w: 672, h: 392 },
   btnY: 1206,
 }
 
@@ -136,6 +139,7 @@ export class ResultScene extends Phaser.Scene {
       .setOrigin(0.5)
 
     this.renderTable(origin.x + L.table.x, oy + L.table.y, L.table.w, L.table.h, res)
+    this.renderEnemyPanel(origin.x + L.enemy.x, oy + L.enemy.y, L.enemy.w, L.enemy.h, res)
 
     // 按钮：再来一局（主）/ 回主菜单（副）；防误触 500ms 后可交互
     const btnW = 300
@@ -182,11 +186,13 @@ export class ResultScene extends Phaser.Scene {
         .setOrigin(0.5)
     }
     // 列布局（相对表宽的比例，横竖屏通吃）
-    const colDamage = x + w * 0.42
-    const colKills = x + w * 0.56
-    const colDeaths = x + w * 0.68
-    const colItems = x + w * 0.84
+    const colDamage = x + w * 0.43
+    const colTaken = x + w * 0.55
+    const colKills = x + w * 0.65
+    const colDeaths = x + w * 0.75
+    const colItems = x + w * 0.88
     label(colDamage, y + headerH / 2 + 4, '伤害')
+    label(colTaken, y + headerH / 2 + 4, '承伤')
     label(colKills, y + headerH / 2 + 4, '击杀')
     label(colDeaths, y + headerH / 2 + 4, '阵亡')
     label(colItems, y + headerH / 2 + 4, '道具')
@@ -198,7 +204,7 @@ export class ResultScene extends Phaser.Scene {
       this.add
         .text(x + 82, cy, `${spec.name} Lv.${this.run.memberLevels[slot] ?? 1}`, {
           fontFamily: UI_FONT,
-          fontSize: FONT.body,
+          fontSize: FONT.small,
           fontStyle: 'bold',
           color: '#ffffff',
           resolution: res,
@@ -209,17 +215,19 @@ export class ResultScene extends Phaser.Scene {
           .text(tx, cy, text, { fontFamily: UI_FONT, fontSize: FONT.body, color, resolution: res })
           .setOrigin(0.5)
       }
-      const dmg = this.run.stats.damage[slot] ?? 0
-      cell(colDamage, dmg >= 10000 ? `${(dmg / 1000).toFixed(1)}k` : `${Math.round(dmg)}`)
+      const fmt = (v: number): string => (v >= 10000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`)
+      cell(colDamage, fmt(this.run.stats.damage[slot] ?? 0))
+      const taken = this.run.stats.damageTaken[slot] ?? 0
+      cell(colTaken, taken > 0 ? fmt(taken) : '—', taken > 0 ? '#ffab91' : '#6f6f7d')
       cell(colKills, `${this.run.stats.kills[slot] ?? 0}`)
       const deaths = this.run.stats.deaths[slot] ?? 0
       cell(colDeaths, deaths > 0 ? `${deaths}` : '—', deaths > 0 ? '#ef9a9a' : '#6f6f7d')
-      // 随身道具：去重带层数，最多 4 组图标 + 溢出计数
+      // 随身道具：去重带层数，最多 2 组图标 + 溢出计数
       const owned = this.run.memberItems[slot] ?? []
       const unique = [...new Set(owned)] as ItemId[]
-      const shown = unique.slice(0, 4)
+      const shown = unique.slice(0, 2)
       shown.forEach((item, i) => {
-        const ix = colItems - ((shown.length - 1) / 2 - i) * 40
+        const ix = colItems - ((shown.length - 1) / 2 - i) * 38
         emojiImage(this, ix, cy, ITEMS[item].emoji, 26)
         const stacks = stackCount(owned, item)
         if (stacks > 1) {
@@ -234,9 +242,9 @@ export class ResultScene extends Phaser.Scene {
             .setOrigin(0.5)
         }
       })
-      if (unique.length > 4) {
+      if (unique.length > 2) {
         this.add
-          .text(colItems + 96, cy, `+${unique.length - 4}`, {
+          .text(colItems + 52, cy, `+${unique.length - 2}`, {
             fontFamily: UI_FONT,
             fontSize: FONT.caption,
             color: '#9d9dad',
@@ -245,6 +253,95 @@ export class ResultScene extends Phaser.Scene {
           .setOrigin(0.5)
       }
       if (unique.length === 0) cell(colItems, '—', '#6f6f7d')
+    })
+  }
+
+  /** 敌情面板：按敌人类型的我方击杀数与其对我方造成的伤害（按击杀降序） */
+  private renderEnemyPanel(x: number, y: number, w: number, h: number, res: number): void {
+    const panel = this.add.graphics()
+    panel.fillStyle(0x000000, 0.22)
+    panel.fillRoundedRect(x, y, w, h, 14)
+    panel.lineStyle(1, 0xffffff, 0.1)
+    panel.strokeRoundedRect(x, y, w, h, 14)
+
+    const st = this.run.stats
+    this.add
+      .text(x + 20, y + 24, '⚔️ 敌情', {
+        fontFamily: UI_FONT,
+        fontSize: FONT.strong,
+        fontStyle: 'bold',
+        color: '#ffffff',
+        resolution: res,
+      })
+      .setOrigin(0, 0.5)
+    if (st.eliteKills > 0) {
+      this.add
+        .text(x + w - 20, y + 24, `⭐ 精英 ×${st.eliteKills}`, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.small,
+          color: '#ffd54f',
+          resolution: res,
+        })
+        .setOrigin(1, 0.5)
+    }
+
+    const emojiByName = new Map<string, string>([
+      ...ENEMY_SPECS.map((e) => [e.name, e.emoji] as const),
+      [BOSS.name, BOSS.emoji],
+    ])
+    const names = [...new Set([...Object.keys(st.enemyKills), ...Object.keys(st.enemyDamage)])]
+      .sort((a, b) => (st.enemyKills[b] ?? 0) - (st.enemyKills[a] ?? 0))
+    if (names.length === 0) {
+      this.add
+        .text(x + w / 2, y + h / 2, '—', {
+          fontFamily: UI_FONT,
+          fontSize: FONT.head,
+          color: '#6f6f7d',
+          resolution: res,
+        })
+        .setOrigin(0.5)
+      return
+    }
+
+    const headerH = 48
+    const colKills = x + w * 0.56
+    const colDmg = x + w * 0.82
+    const label = (tx: number, text: string): void => {
+      this.add
+        .text(tx, y + headerH + 2, text, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.small,
+          color: '#9d9dad',
+          resolution: res,
+        })
+        .setOrigin(0.5)
+    }
+    label(colKills, '击杀')
+    label(colDmg, '对我方伤害')
+    const top = y + headerH + 22
+    const rowH = Math.min(42, (h - headerH - 34) / names.length)
+    const fmt = (v: number): string => (v >= 10000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`)
+    names.forEach((name, i) => {
+      const cy = top + rowH * i + rowH / 2
+      const isBoss = name === BOSS.name
+      const emoji = emojiByName.get(name)
+      if (emoji) emojiImage(this, x + 34, cy, emoji, Math.min(30, rowH - 8), isBoss ? 'elite' : 'enemy')
+      this.add
+        .text(x + 58, cy, name, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.body,
+          color: isBoss ? '#ffd54f' : '#e4e4ec',
+          resolution: res,
+        })
+        .setOrigin(0, 0.5)
+      const cell = (tx: number, text: string, color = '#e4e4ec'): void => {
+        this.add
+          .text(tx, cy, text, { fontFamily: UI_FONT, fontSize: FONT.body, color, resolution: res })
+          .setOrigin(0.5)
+      }
+      cell(colKills, `${st.enemyKills[name] ?? 0}`)
+      const dmg = st.enemyDamage[name] ?? 0
+      cell(colDmg, dmg > 0 ? fmt(dmg) : '—', dmg > 0 ? '#ffab91' : '#6f6f7d')
     })
   }
 

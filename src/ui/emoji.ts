@@ -29,6 +29,7 @@ const KIND_SUFFIX: Record<OutlineKind, string> = {
   player: '-ol',
   enemy: '-ole',
   enemyShot: '-olr',
+  elite: '-olg',
 }
 
 export function emojiKey(emoji: string, outline?: OutlineKind): string {
