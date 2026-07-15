@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ORBIT } from './config'
-import { angleDiff, orbitTendency, stepOrbit, threatWeight, wrapAngle } from './orbit'
+import { angleDiff, orbitTendency, pickDriver, stepOrbit, threatWeight, wrapAngle } from './orbit'
 
 const TAU = Math.PI * 2
 
@@ -15,10 +15,10 @@ function gaps(angles: number[]): number[] {
 }
 
 describe('threatWeight', () => {
-  it('探测范围外为 0，越近越强，贴脸为 1', () => {
+  it('探测范围外为 0，线性升至贴脸为 1', () => {
     expect(threatWeight(999, 200)).toBe(0)
     expect(threatWeight(200, 200)).toBe(0)
-    expect(threatWeight(100, 200)).toBeCloseTo(0.25)
+    expect(threatWeight(100, 200)).toBeCloseTo(0.5)
     expect(threatWeight(0, 200)).toBe(1)
   })
 })
@@ -47,6 +47,43 @@ describe('orbitTendency', () => {
   it('输出被钳制在最大角速度内', () => {
     const threats = Array.from({ length: 30 }, () => ({ diff: 0.4, weight: 1 }))
     expect(Math.abs(orbitTendency(-1, threats))).toBeLessThanOrEqual(ORBIT.maxSpeed)
+  })
+
+  it('圆均值聚合：一侧蜂群压过另一侧散敌，滑动方向由蜂群决定', () => {
+    // 蜂群在 diff=+0.5 方向（3 个高权重），另一侧 diff=−2.8 一个弱敌
+    const threats = [
+      { diff: 0.5, weight: 0.9 },
+      { diff: 0.6, weight: 0.8 },
+      { diff: 0.4, weight: 0.9 },
+      { diff: -2.8, weight: 0.3 },
+    ]
+    // 避敌：合成方位仍在 +  侧 → 向 + 方向滑离（逐敌求和会被反向敌拉扯抵消）
+    expect(orbitTendency(-1, threats)).toBeGreaterThan(0)
+  })
+})
+
+describe('pickDriver', () => {
+  const rng = (): number => 0.999 // 平局时取并列末位，便于断言
+  it('全员无力 → 无主力', () => {
+    expect(pickDriver([0, 0, 0], -1, rng)).toBe(-1)
+    expect(pickDriver([], -1, rng)).toBe(-1)
+  })
+
+  it('最强者掌舵；并列最强随机取一', () => {
+    expect(pickDriver([0.2, 0.9, 0.5], -1, rng)).toBe(1)
+    const tied = pickDriver([0.7, 0.7, 0.1], -1, rng)
+    expect([0, 1]).toContain(tied)
+  })
+
+  it('粘性：挑战者未超过现任 × holdFactor 时现任续任，超过则夺权', () => {
+    // 现任 0 号力量 0.6，挑战者 0.7 < 0.6×1.3 → 续任
+    expect(pickDriver([0.6, 0.7], 0, rng)).toBe(0)
+    // 挑战者 0.9 > 0.78 → 夺权
+    expect(pickDriver([0.6, 0.9], 0, rng)).toBe(1)
+  })
+
+  it('现任力量归零（阵亡/敌人离开）→ 立即让位给有力者', () => {
+    expect(pickDriver([0, 0.4], 0, rng)).toBe(1)
   })
 })
 
@@ -86,6 +123,17 @@ describe('stepOrbit', () => {
     let angles = [0, 0.9, 1.8, 2.7] // 4 人挤在不到半圈里
     for (let s = 0; s < 600; s++) angles = stepOrbit(angles, [0, 0, 0, 0], 16)
     for (const g of gaps(angles)) expect(g).toBeCloseTo(TAU / 4, 1)
+  })
+
+  it('spreadMask：被掩掉的岗位不受匀布拉扯，原地不动', () => {
+    const start = [0, 0.9, 1.8, 2.7]
+    let angles = [...start]
+    // 只有 0 号被掩（如主力驱动中/尸体），其余照常回复
+    for (let s = 0; s < 200; s++) {
+      angles = stepOrbit(angles, [0, 0, 0, 0], 16, ORBIT, [false, true, true, true])
+    }
+    expect(Math.abs(wrapAngle(angles[0]! - start[0]!))).toBeLessThan(0.05)
+    expect(Math.abs(wrapAngle(angles[2]! - start[2]!))).toBeGreaterThan(0.2)
   })
 
   it('超编放宽：8 人 minGap 装不下时按均分解开，不发散', () => {

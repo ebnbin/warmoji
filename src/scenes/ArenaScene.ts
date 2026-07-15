@@ -7,7 +7,7 @@ import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
 import { formationPosts } from '../core/formation'
 import type { FormationId } from '../core/formation'
-import { angleDiff, orbitTendency, stepOrbit, threatWeight } from '../core/orbit'
+import { angleDiff, orbitTendency, pickDriver, stepOrbit, threatWeight } from '../core/orbit'
 import type { OrbitThreat } from '../core/orbit'
 import { browserStorage, submitScore } from '../core/highscore'
 import {
@@ -186,6 +186,8 @@ export class ArenaScene extends Phaser.Scene {
   private postBySlot: number[] = []
   /** 环形阵专用：各岗位的环上角度（core/orbit.ts 逐帧演化） */
   private orbitAngles: number[] = []
+  /** 当前主力岗位（-1 = 无人驱动）；带粘性的力量竞争逐帧裁定 */
+  private driverPost = -1
   private elapsedMs = 0
   private spawnCooldownMs = 0
   private pendingSpawns = 0
@@ -282,6 +284,7 @@ export class ArenaScene extends Phaser.Scene {
     this.orbitAngles = formationPosts('ring', rosterIds.length, this.formationFacing).map((p) =>
       Math.atan2(p.y, p.x),
     )
+    this.driverPost = -1
     // 队长道具：团队修正（移速/磁吸/掉落/全队伤害）
     this.teamFx = aggregateTeamEffects(this.run.captainItems)
     this.stats.moveSpeed = TEAM.moveSpeed * this.teamFx.moveSpeedMul
@@ -557,18 +560,21 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   /** 队伍活感·探测与轨道：逐员判定探测范围内有无敌人（游移门控）；
-   * 环形阵额外把「秉性 × 敌情」化为沿环角速度，交给 orbit 动力学推挤演化 */
+   * 环形阵额外让全员计算移动倾向，但只有力量竞争胜出的「主力」生效——
+   * 单源驱动不抵消，其余角色被推挤 + 匀布跟流（core/orbit.ts） */
   private updateOrbit(delta: number): void {
     if (this.members.length === 0) return
     const ring = this.activeFormation() === 'ring'
     const range = ORBIT.detectRange
     const rangeSq = range * range
-    const omegas = new Array<number>(this.orbitAngles.length).fill(0)
+    const wants = new Array<number>(this.orbitAngles.length).fill(0)
+    const spreadMask = new Array<boolean>(this.orbitAngles.length).fill(false)
     for (const m of this.members) {
       m.hasThreat = false
       if (!m.alive) continue
       const bias = this.lineup[m.slot]?.orbit ?? 0
       const idx = this.postBySlot[m.slot] ?? m.slot
+      spreadMask[idx] = true
       const theta = this.orbitAngles[idx] ?? 0
       const threats: OrbitThreat[] = []
       for (const t of this.frameTargets) {
@@ -584,9 +590,22 @@ export class ArenaScene extends Phaser.Scene {
           weight: threatWeight(Math.sqrt(dSq), range),
         })
       }
-      if (ring && bias !== 0) omegas[idx] = orbitTendency(bias, threats)
+      if (ring && bias !== 0) wants[idx] = orbitTendency(bias, threats)
     }
-    if (ring) this.orbitAngles = stepOrbit(this.orbitAngles, omegas, delta)
+    if (!ring) return
+    // 主力竞争：力量 = 倾向绝对值，粘性防抖、同力随机、阵亡出局（力量恒 0）
+    this.driverPost = pickDriver(
+      wants.map((w) => Math.abs(w)),
+      this.driverPost,
+      Math.random,
+    )
+    const omegas = new Array<number>(this.orbitAngles.length).fill(0)
+    if (this.driverPost >= 0) {
+      omegas[this.driverPost] = wants[this.driverPost] ?? 0
+      // 主力驱动中不受匀布回复拉扯（否则又被拉回原地）
+      spreadMask[this.driverPost] = false
+    }
+    this.orbitAngles = stepOrbit(this.orbitAngles, omegas, delta, ORBIT, spreadMask)
   }
 
   private layoutTeam(delta: number): void {

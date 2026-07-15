@@ -343,21 +343,24 @@ export const FORMATION = {
 } as const
 
 // 环形阵轨道动力学：角色沿环滑动的「移动倾向」= 秉性（CHARACTERS.orbit）× 探测范围内的敌情；
-// 相邻不穿模，只会链式推挤（core/orbit.ts）。
+// 同一时刻最多一名「主力」驱动（按倾向力量竞争 + 粘性防抖，同力随机），
+// 其余角色被动：被推挤 + 匀布跟流；相邻不穿模（core/orbit.ts）。
 export const ORBIT = {
   /** 敌人进入该距离（从角色自身量起）才产生移动倾向 */
-  detectRange: 3.5 * UNIT,
-  /** 沿环最大角速度（rad/s）≈ 每 4 秒一整圈 */
-  maxSpeed: 1.6,
+  detectRange: 4.5 * UNIT,
+  /** 沿环最大角速度（rad/s）≈ 每 3 秒一整圈 */
+  maxSpeed: 2,
   /** 避敌/迎敌倾向增益 */
-  avoidGain: 2.4,
-  seekGain: 1.8,
-  /** 无倾向时向两侧邻居中点的匀布回复强度（1/s） */
+  avoidGain: 3.2,
+  seekGain: 2.6,
+  /** 被动角色向两侧邻居中点的匀布回复强度（1/s）：主力滑走后众人跟流补位 */
   spreadGain: 0.4,
   /** 环上最小角间隔（rad）：略小于贴图直径，保留现有轻微交叠观感 */
   minGap: 0.88,
   /** 推挤松弛迭代次数（Gauss-Seidel，残差随轮数指数收敛） */
   iterations: 4,
+  /** 主力粘性：挑战者力量须超过现任 × 此系数才能夺权（防近力抖动换人） */
+  holdFactor: 1.3,
 } as const
 
 // 跟随惯性：队员用轻微欠阻尼弹簧追自己的岗位，起步慢半拍、急停带一点回弹
