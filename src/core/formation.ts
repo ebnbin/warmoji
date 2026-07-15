@@ -3,6 +3,8 @@ import type { Point } from './vec'
 
 // 队形系统：满员队伍可在整编页切换队形、互换岗位（未满员固定环形阵）。
 // 承伤差异纯几何概率——站位决定谁先被敌人摸到，没有额外的减伤/仇恨机制。
+// 环形阵与多保一外圈支持整体旋转（ringPhase 由 Arena 的主力竞争驱动，多保一中心固定）；
+// 前后阵前排呈半弧、后排横排相对固定，整阵随移动方向平滑转向。
 export type FormationId = 'ring' | 'guard' | 'vanguard'
 
 export const FORMATION_IDS: readonly FormationId[] = ['ring', 'guard', 'vanguard']
@@ -32,18 +34,38 @@ export function formationName(id: FormationId, count: number): string {
 export function formationDesc(id: FormationId): string {
   if (id === 'ring') return '全员均匀环绕，四面兼顾'
   if (id === 'guard') return '一人居中受掩护，更少被摸到'
-  return '随移动方向旋转，前排先接敌'
+  return '前排弧形开路，随移动转向'
 }
 
-/** 队形各岗位相对队伍中心的偏移；facingRad 为移动朝向（仅前后阵生效）。
- * 岗位序：环形 0 号正上顺时针；多保一 0 号中心、1.. 外圈；
- * 前后阵先前排后后排，各排沿朝向从左到右 */
-export function formationPosts(id: FormationId, count: number, facingRad: number): Point[] {
+/** 岗位在「可旋转环」上的基准角（不含相位）：环形全员上环；多保一 0 号居中（null）、
+ * 其余上外圈；前后阵不旋转（null）。返回 null 的岗位不参与环上主力竞争 */
+export function ringPostAngle(id: FormationId, post: number, count: number): number | null {
+  if (id === 'ring') return -Math.PI / 2 + (post * 2 * Math.PI) / count
   if (id === 'guard' && count >= 2) {
-    return [
-      { x: 0, y: 0 },
-      ...Array.from({ length: count - 1 }, (_, i) => slotOffset(i, count - 1, TEAM.ringRadius)),
-    ]
+    if (post === 0) return null
+    return -Math.PI / 2 + ((post - 1) * 2 * Math.PI) / (count - 1)
+  }
+  return null
+}
+
+/** 队形各岗位相对队伍中心的偏移。
+ * facingRad 为移动朝向（仅前后阵生效）；ringPhase 为环相位（环形全员、
+ * 多保一外圈随之整体旋转，中心与前后阵不受影响）。
+ * 岗位序：环形 0 号正上顺时针；多保一 0 号中心、1.. 外圈；
+ * 前后阵先前排（弧上从一端到另一端）后后排（横排从左到右） */
+export function formationPosts(
+  id: FormationId,
+  count: number,
+  facingRad: number,
+  ringPhase = 0,
+): Point[] {
+  if (id === 'guard' && count >= 2) {
+    return Array.from({ length: count }, (_, post) => {
+      const base = ringPostAngle('guard', post, count)
+      if (base === null) return { x: 0, y: 0 }
+      const a = base + ringPhase
+      return { x: Math.cos(a) * TEAM.ringRadius, y: Math.sin(a) * TEAM.ringRadius }
+    })
   }
   if (id === 'vanguard' && count >= 2) {
     const { front, back } = vanguardSplit(count)
@@ -52,14 +74,23 @@ export function formationPosts(id: FormationId, count: number, facingRad: number
     // 屏幕坐标 y 向下，(−fy, fx) 是朝向的左手边 → 排内从左到右
     const rx = -fy
     const ry = fx
-    const post = (n: number, i: number, dist: number): Point => {
-      const lat = (i - (n - 1) / 2) * FORMATION.spacing
-      return { x: fx * dist + rx * lat, y: fy * dist + ry * lat }
+    // 前排半弧：以中心为圆心，弧上均匀铺开，居中者正对朝向
+    const arc = (i: number): Point => {
+      const a = facingRad + (i - (front - 1) / 2) * FORMATION.frontArcStep
+      return { x: Math.cos(a) * FORMATION.frontRadius, y: Math.sin(a) * FORMATION.frontRadius }
+    }
+    // 后排横排，相对固定
+    const backPost = (i: number): Point => {
+      const lat = (i - (back - 1) / 2) * FORMATION.spacing
+      return { x: -fx * FORMATION.backDist + rx * lat, y: -fy * FORMATION.backDist + ry * lat }
     }
     return [
-      ...Array.from({ length: front }, (_, i) => post(front, i, FORMATION.frontDist)),
-      ...Array.from({ length: back }, (_, i) => post(back, i, -FORMATION.backDist)),
+      ...Array.from({ length: front }, (_, i) => arc(i)),
+      ...Array.from({ length: back }, (_, i) => backPost(i)),
     ]
   }
-  return Array.from({ length: count }, (_, i) => slotOffset(i, count, TEAM.ringRadius))
+  return Array.from({ length: count }, (_, post) => {
+    const a = (ringPostAngle('ring', post, count) ?? 0) + ringPhase
+    return { x: Math.cos(a) * TEAM.ringRadius, y: Math.sin(a) * TEAM.ringRadius }
+  })
 }

@@ -5,9 +5,9 @@ import { enemyMixAt, fleeSteer, pickEnemy } from '../core/enemies'
 import type { EnemyMixEntry } from '../core/enemies'
 import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
-import { formationPosts } from '../core/formation'
+import { formationPosts, ringPostAngle } from '../core/formation'
 import type { FormationId } from '../core/formation'
-import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../core/orbit'
+import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight, wrapAngle } from '../core/orbit'
 import type { OrbitThreat } from '../core/orbit'
 import { browserStorage, submitScore } from '../core/highscore'
 import {
@@ -431,9 +431,14 @@ export class ArenaScene extends Phaser.Scene {
     return this.stress ? 'ring' : this.run.formation
   }
 
-  /** 当前队形的全部岗位偏移（环形阵的动态角度另由 orbitAngles 提供） */
+  /** 当前队形的全部岗位偏移（环形/多保一外圈含主力驱动的共享相位） */
   private currentPosts(): Point[] {
-    return formationPosts(this.activeFormation(), this.lineup.length, this.formationFacing)
+    return formationPosts(
+      this.activeFormation(),
+      this.lineup.length,
+      this.formationFacing,
+      this.orbitPhase,
+    )
   }
 
   private createMember(emoji: string, weaponSpecs: readonly WeaponSpec[], slot: number): Member {
@@ -540,13 +545,15 @@ export class ArenaScene extends Phaser.Scene {
     const ui = this.scene.get('ui') as UIScene
     const dir = kx !== 0 || ky !== 0 ? norm(kx, ky) : ui.joystickVector
     this.teamDir = dir
-    // 队形朝向平滑转向移动方向（前后阵随之旋转）；静止保持最后朝向
+    // 队形朝向平滑转向移动方向（前后阵随之旋转）；静止保持最后朝向。
+    // 指数趋近 + 转速上限：起步不猛、收尾渐停，慢而顺滑
     if (dir.x !== 0 || dir.y !== 0) {
-      this.formationFacing = Phaser.Math.Angle.RotateTo(
-        this.formationFacing,
-        Math.atan2(dir.y, dir.x),
-        FORMATION.turnRadPerMs * delta,
+      const d = angleDiff(Math.atan2(dir.y, dir.x), this.formationFacing)
+      const step = Math.min(
+        Math.abs(d) * Math.min(1, delta / FORMATION.turnTauMs),
+        FORMATION.turnMaxRadPerMs * delta,
       )
+      this.formationFacing = wrapAngle(this.formationFacing + Math.sign(d) * step)
     }
     const step = (this.stats.moveSpeed * delta) / 1000
     const clampMin = TEAM.ringRadius + MEMBER.radius
@@ -556,26 +563,27 @@ export class ArenaScene extends Phaser.Scene {
     this.layoutTeam(delta)
   }
 
-  /** 环形阵岗位的当前环上角：均匀槽位角 + 全环共享相位 */
-  private ringAngle(idx: number): number {
-    return -Math.PI / 2 + (idx * 2 * Math.PI) / this.lineup.length + this.orbitPhase
-  }
-
   /** 队伍活感·探测与轨道：逐员判定探测范围内有无敌人（游移门控）；
-   * 环形阵额外让全员计算移动倾向，每帧力量最大者即刻掌舵（同力随机、随时换手），
-   * 主力的倾向直接驱动共享相位——全环刚性同步转动，等距不穿模由构造保证 */
+   * 可旋转的环（环形阵全员、多保一外圈）额外让环上岗位计算移动倾向，
+   * 每帧力量最大者即刻掌舵（同力随机、随时换手），主力的倾向直接驱动共享相位——
+   * 全环刚性同步转动，等距不穿模由构造保证；多保一中心固定，只保留游移 */
   private updateOrbit(delta: number): void {
     if (this.members.length === 0) return
-    const ring = this.activeFormation() === 'ring'
+    const formation = this.activeFormation()
+    const n = this.lineup.length
     const range = ORBIT.detectRange
     const rangeSq = range * range
     const wants = new Array<number>(this.members.length).fill(0)
+    let rotatable = false
     for (const m of this.members) {
       m.hasThreat = false
       if (!m.alive) continue
       const bias = this.lineup[m.slot]?.orbit ?? 0
       const idx = this.postBySlot[m.slot] ?? m.slot
-      const theta = this.ringAngle(idx)
+      // 不在可旋转环上的岗位（多保一中心/整个前后阵）不参与主力竞争
+      const base = ringPostAngle(formation, idx, n)
+      if (base !== null) rotatable = true
+      const theta = (base ?? 0) + this.orbitPhase
       const threats: OrbitThreat[] = []
       for (const t of this.frameTargets) {
         const dx = t.x - m.image.x
@@ -584,15 +592,15 @@ export class ArenaScene extends Phaser.Scene {
         if (dSq >= rangeSq) continue
         m.hasThreat = true
         // 只做游移门控时知道「有威胁」即可，无需收集全部敌情
-        if (!ring || bias === 0) break
+        if (base === null || bias === 0) break
         threats.push({
           diff: angleDiff(theta, Math.atan2(t.y - this.center.y, t.x - this.center.x)),
           weight: threatWeight(Math.sqrt(dSq), range),
         })
       }
-      if (ring && bias !== 0) wants[idx] = orbitTendency(bias, threats)
+      if (base !== null && bias !== 0) wants[idx] = orbitTendency(bias, threats)
     }
-    if (!ring) return
+    if (!rotatable) return
     // 主力竞争：力量 = 倾向绝对值（阵亡恒 0 出局），胜者直接驱动共享相位
     this.driverPost = pickDriver(
       wants.map((w) => Math.abs(w)),
@@ -606,24 +614,15 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private layoutTeam(delta: number): void {
-    const ring = this.activeFormation() === 'ring'
-    const posts = ring ? null : this.currentPosts()
+    const posts = this.currentPosts()
     const moving = this.teamDir.x !== 0 || this.teamDir.y !== 0
     const dt = Math.min(delta, 50) / 1000
     const tSec = this.elapsedMs / 1000
     for (const m of this.members) {
       const idx = this.postBySlot[m.slot] ?? m.slot
-      let ox: number
-      let oy: number
-      if (ring) {
-        const a = this.ringAngle(idx)
-        ox = Math.cos(a) * TEAM.ringRadius
-        oy = Math.sin(a) * TEAM.ringRadius
-      } else {
-        const p = posts![idx] ?? { x: 0, y: 0 }
-        ox = p.x
-        oy = p.y
-      }
+      const p = posts[idx] ?? { x: 0, y: 0 }
+      const ox = p.x
+      const oy = p.y
       // 待机游移：静止且探测范围内无敌时淡入的小幅李萨如漂移
       const wanderOn = m.alive && !moving && !m.hasThreat
       m.wanderAmp += ((wanderOn ? 1 : 0) - m.wanderAmp) * Math.min(1, delta / WANDER.rampMs)
