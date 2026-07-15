@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CAPTAINS, CHARACTERS, COIN, FOLLOW, FORMATION, HIT_SHAKE, KNOCKBACK, MAP, MEMBER, ORBIT, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WANDER, WAVE } from '../core/config'
+import { CAPTAINS, CHARACTERS, COIN, FOLLOW, HIT_SHAKE, KNOCKBACK, MAP, MEMBER, ORBIT, ROSTER_IDS, SPAWN, STRESS, TEAM, UNIT, WANDER, WAVE } from '../core/config'
 import type { CharacterSpec, ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../core/config'
 import { enemyMixAt, fleeSteer, pickEnemy } from '../core/enemies'
 import type { EnemyMixEntry } from '../core/enemies'
@@ -7,7 +7,7 @@ import { sweepFirstHitIndex } from '../core/weapons'
 import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
 import { formationPosts, ringPostAngle } from '../core/formation'
 import type { FormationId } from '../core/formation'
-import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight, wrapAngle } from '../core/orbit'
+import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../core/orbit'
 import type { OrbitThreat } from '../core/orbit'
 import { browserStorage, submitScore } from '../core/highscore'
 import {
@@ -17,7 +17,7 @@ import {
 } from '../core/items'
 import type { TeamEffects } from '../core/items'
 import { levelDamageMul, memberMaxHp } from '../core/levels'
-import { getRun, waveStartHp } from '../core/run'
+import { currentFormation, getRun, guardCenter, promoteStep, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { DEFAULT_SETTINGS, loadSettings } from '../core/settings'
 import type { Settings } from '../core/settings'
@@ -180,9 +180,7 @@ export class ArenaScene extends Phaser.Scene {
   private puffBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   /** 本帧队伍移动方向（行走摇摆与朝向翻转用） */
   private teamDir = { x: 0, y: 0 }
-  /** 队形朝向（弧度），平滑跟随移动方向；前后阵随之整体旋转 */
-  private formationFacing = -Math.PI / 2
-  /** 槽位 → 队形岗位序号（由 run.formationOrder 排列决定） */
+  /** 槽位 → 队形岗位序号（N 保 1 时受保护中心占 0 号岗） */
   private postBySlot: number[] = []
   /** 环形阵专用：全环共享相位（刚性同步转动，core/orbit.ts 逐帧演化） */
   private orbitPhase = 0
@@ -274,12 +272,14 @@ export class ArenaScene extends Phaser.Scene {
     // 压测固定 5 人满编便于跑分对比；正常局阵容来自 run（招募制，逐波扩编）
     const rosterIds = this.stress ? ROSTER_IDS.slice(0, 5) : this.run.roster
     this.lineup = rosterIds.map((id) => CHARACTERS[id])
-    // 槽位 → 队形岗位：正常局按整编页的岗位分配；压测阵容不走 run，槽位即岗位
+    // 槽位 → 队形岗位：满员 N 保 1 时受保护中心占 0 号岗、其余按槽位序上外圈；
+    // 未满员/压测为环形，槽位即岗位
+    const center = this.stress ? null : guardCenter(this.run)
+    let outer = 0
     this.postBySlot = rosterIds.map((id, slot) => {
-      const post = this.stress ? -1 : this.run.formationOrder.indexOf(id)
-      return post >= 0 ? post : slot
+      if (!center) return slot
+      return id === center ? 0 : ++outer
     })
-    this.formationFacing = -Math.PI / 2
     this.orbitPhase = 0
     this.driverPost = -1
     // 队长道具：团队修正（移速/磁吸/掉落/全队伤害）
@@ -393,7 +393,7 @@ export class ArenaScene extends Phaser.Scene {
       playerY: this.center.y,
       camX: cam.worldView.centerX,
       camY: cam.worldView.centerY,
-      formation: this.run.formation,
+      formation: this.activeFormation(),
     })
   }
 
@@ -416,8 +416,11 @@ export class ArenaScene extends Phaser.Scene {
       coins: this.run.coins - this.waveBaseCoins,
       levels: this.run.xp.level - this.waveBaseLevel,
     } satisfies WaveSummary)
-    // 每波结束必进整编页：有点数先强制招募/升级，随后落在队形环节，再去商店
-    this.time.delayedCall(WAVE.summaryMs, () => this.scene.start('promote'))
+    // 有待结算点数才进整编页（强制招募/升级；首次满员时会顺带展示一次阵型页），
+    // 否则直进商店——阵型调整的常驻入口在商店
+    this.time.delayedCall(WAVE.summaryMs, () =>
+      this.scene.start(promoteStep(this.run) ? 'promote' : 'shop'),
+    )
   }
 
   private onViewportChanged(): void {
@@ -426,19 +429,14 @@ export class ArenaScene extends Phaser.Scene {
 
   // ── 队伍 ────────────────────────────────────────────────────
 
-  /** 生效队形：压测阵容不来自 run，固定环形 */
+  /** 生效队形：满员自动 N 保 1（压测阵容不来自 run，固定环形） */
   private activeFormation(): FormationId {
-    return this.stress ? 'ring' : this.run.formation
+    return this.stress ? 'ring' : currentFormation(this.run)
   }
 
-  /** 当前队形的全部岗位偏移（环形/多保一外圈含主力驱动的共享相位） */
+  /** 当前队形的全部岗位偏移（环形全员/N 保 1 外圈含主力驱动的共享相位） */
   private currentPosts(): Point[] {
-    return formationPosts(
-      this.activeFormation(),
-      this.lineup.length,
-      this.formationFacing,
-      this.orbitPhase,
-    )
+    return formationPosts(this.activeFormation(), this.lineup.length, this.orbitPhase)
   }
 
   private createMember(emoji: string, weaponSpecs: readonly WeaponSpec[], slot: number): Member {
@@ -545,16 +543,6 @@ export class ArenaScene extends Phaser.Scene {
     const ui = this.scene.get('ui') as UIScene
     const dir = kx !== 0 || ky !== 0 ? norm(kx, ky) : ui.joystickVector
     this.teamDir = dir
-    // 队形朝向平滑转向移动方向（前后阵随之旋转）；静止保持最后朝向。
-    // 指数趋近 + 转速上限：起步不猛、收尾渐停，慢而顺滑
-    if (dir.x !== 0 || dir.y !== 0) {
-      const d = angleDiff(Math.atan2(dir.y, dir.x), this.formationFacing)
-      const step = Math.min(
-        Math.abs(d) * Math.min(1, delta / FORMATION.turnTauMs),
-        FORMATION.turnMaxRadPerMs * delta,
-      )
-      this.formationFacing = wrapAngle(this.formationFacing + Math.sign(d) * step)
-    }
     const step = (this.stats.moveSpeed * delta) / 1000
     const clampMin = TEAM.ringRadius + MEMBER.radius
     this.center.x = Phaser.Math.Clamp(this.center.x + dir.x * step, clampMin, MAP.width - clampMin)

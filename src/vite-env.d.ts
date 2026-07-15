@@ -8,19 +8,15 @@ declare const __TWEMOJI_VERSION__: string
 interface WarmojiPromoteDebug {
   mode: 'recruit' | 'upgrade' | 'formation'
   points: number
+  /** 招募/升级模式 = 当前网格选中；阵型模式 = 当前受保护中心 */
   selected: string
-  /** 招募/升级模式 = 网格候选；队形模式 = 预览中的队员站位 */
+  /** 招募/升级模式 = 网格候选；阵型模式 = 预览中的队员站位（点选与中心互换） */
   items: { id: string; x: number; y: number; w: number; h: number }[]
   confirm: { x: number; y: number; w: number; h: number; enabled: boolean }
-  /** wave=1 为「返回队长页」，wave>1 为「结束本局」 */
+  /** wave=1 为「返回队长页」，wave>1 为「结束本局」，fromShop 为「返回商店」 */
   back: { x: number; y: number; w: number; h: number }
-  /** 队形环节（mode='formation' 时提供） */
-  formation?: {
-    id: string
-    locked: boolean
-    order: string[]
-    cards: { id: string; x: number; y: number; w: number; h: number }[]
-  }
+  /** 阵型页（mode='formation' 时提供）：满员自动 N 保 1，只可选中心 */
+  formation?: { center: string }
 }
 
 interface WarmojiShopDebug {
@@ -43,6 +39,8 @@ interface WarmojiShopDebug {
   buy: { x: number; y: number; w: number; h: number; enabled: boolean }
   refresh: { x: number; y: number; w: number; h: number; enabled: boolean }
   start: { x: number; y: number; w: number; h: number }
+  /** 阵型页入口（满员后出现） */
+  formation: { x: number; y: number; w: number; h: number } | null
 }
 
 interface WarmojiMenuDebug {

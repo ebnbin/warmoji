@@ -14,7 +14,7 @@ import { memberMaxHp } from '../core/levels'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
-import { endRun, getRun, waveStartHp } from '../core/run'
+import { endRun, getRun, isTeamFull, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { captainStatGroups, characterStatGroups } from '../core/stats'
 import { applyBackground } from '../ui/background'
@@ -78,6 +78,9 @@ export class ShopScene extends Phaser.Scene {
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private buyRect = { x: 0, y: 0, w: 0, h: 0 }
   private refreshRect = { x: 0, y: 0, w: 0, h: 0 }
+  private formationRect: { x: number; y: number; w: number; h: number } | null = null
+  /** 沉睡（阵型页打开）期间视口变过，唤醒时需要重排 */
+  private wakeDirty = false
   private quitArmed = false
   // 上架位网格自带滚动；详情属性区行数多时也可滚动
   private slotScroll = 0
@@ -161,6 +164,26 @@ export class ShopScene extends Phaser.Scene {
         if (quit.active) quit.setText('✕ 结束').setColor('#c8c8d4')
       })
     })
+
+    // 阵型入口：满员后常驻——商店睡眠等待，从阵型页返回时货架原样保留
+    this.formationRect = null
+    if (isTeamFull(this.run)) {
+      const fm = this.add
+        .text(this.origin.x + L.content.w - 40, oy + L.titleY, '⛨ 队形', {
+          fontFamily: UI_FONT,
+          fontSize: FONT.strong,
+          color: '#ffd54f',
+          resolution: res,
+        })
+        .setOrigin(1, 0.5)
+        .setInteractive({ useHandCursor: true })
+      fm.on('pointerup', () => {
+        if (this.dragMoved || this.grid.wasDragged) return
+        this.openFormation()
+      })
+      this.formationRect = { x: fm.x - fm.width, y: fm.y - fm.height / 2, w: fm.width, h: fm.height }
+    }
+    this.events.on(Phaser.Scenes.Events.WAKE, this.onWake, this)
 
     emojiImage(this, w / 2 - 28, oy + L.coinsY, COIN.emoji, 32, 'player')
     this.coinsText = this.add
@@ -632,6 +655,24 @@ export class ShopScene extends Phaser.Scene {
     this.scene.start('arena')
   }
 
+  /** 打开阵型页（本场景睡眠，返回时唤醒，货架/金币/免费刷新原样保留） */
+  private openFormation(): void {
+    playSfx('click')
+    this.scene.run('promote', { fromShop: true })
+    this.scene.sleep()
+  }
+
+  /** 从阵型页返回：沉睡期间视口变过则重排（保留货架），否则仅恢复调试上报 */
+  private onWake(): void {
+    if (this.wakeDirty) {
+      this.wakeDirty = false
+      this.preserveOnRestart = true
+      this.scene.restart()
+      return
+    }
+    this.reportShop()
+  }
+
   private reportShop(): void {
     const idx = this.focusedIndex()
     const offer = this.offers[idx] ?? null
@@ -694,11 +735,24 @@ export class ShopScene extends Phaser.Scene {
           w: this.btnRect.w,
           h: this.btnRect.h,
         },
+        formation: this.formationRect
+          ? {
+              x: this.formationRect.x + this.formationRect.w / 2,
+              y: this.formationRect.y + this.formationRect.h / 2,
+              w: this.formationRect.w,
+              h: this.formationRect.h,
+            }
+          : null,
       },
     })
   }
 
   private onViewportChanged(): void {
+    // 阵型页打开期间（本场景沉睡）不能 restart，否则会顶掉上层页面；唤醒时补排
+    if (this.scene.isSleeping()) {
+      this.wakeDirty = true
+      return
+    }
     this.preserveOnRestart = true
     this.scene.restart()
   }

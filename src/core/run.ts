@@ -30,10 +30,10 @@ export interface RunState {
   captainItems: ItemId[]
   /** 本次商店剩余的免费刷新次数（进店时按队长能力重置） */
   freeRefreshes: number
-  /** 当前队形（满员后可在整编页切换；未满员固定环形） */
-  formation: FormationId
-  /** 队形岗位分配：下标 = 岗位序号，值 = 角色 id（roster 的一个排列） */
-  formationOrder: CharacterId[]
+  /** N 保 1 的受保护中心（null = 未设置，取 roster 首位）；仅满员后生效 */
+  guardCenterId: CharacterId | null
+  /** 首次满员的阵型页是否已自动展示（只展示一次，之后走商店入口调整） */
+  formationIntroduced: boolean
 }
 
 let current: RunState | undefined
@@ -53,8 +53,8 @@ export function beginRun(captainId: CaptainId, starters: readonly CharacterId[])
     memberItems: starters.map(() => []),
     captainItems: [],
     freeRefreshes: 0,
-    formation: 'ring',
-    formationOrder: [...starters],
+    guardCenterId: null,
+    formationIntroduced: false,
   }
   return current
 }
@@ -99,7 +99,6 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   run.memberLevels.push(1)
   run.memberHp.push(MEMBER.maxHp)
   run.memberItems.push([])
-  run.formationOrder.push(id)
   return run.roster.length - 1
 }
 
@@ -107,21 +106,22 @@ export function isTeamFull(run: RunState): boolean {
   return run.roster.length >= rosterCap(run)
 }
 
-/** 切换队形；未满员固定环形阵不可调 */
-export function setFormation(run: RunState, id: FormationId): boolean {
-  if (!isTeamFull(run)) return false
-  run.formation = id
-  return true
+/** 满员后自动 N 保 1，未满员固定环形（阵型不可选） */
+export function currentFormation(run: RunState): FormationId {
+  return isTeamFull(run) ? 'guard' : 'ring'
 }
 
-/** 互换两个岗位上的队员；未满员不可调 */
-export function swapFormationPosts(run: RunState, a: number, b: number): boolean {
-  if (!isTeamFull(run) || a === b) return false
-  const va = run.formationOrder[a]
-  const vb = run.formationOrder[b]
-  if (va === undefined || vb === undefined) return false
-  run.formationOrder[a] = vb
-  run.formationOrder[b] = va
+/** 受保护中心：未设置时默认 1 号位；未满员无中心 */
+export function guardCenter(run: RunState): CharacterId | null {
+  if (!isTeamFull(run)) return null
+  if (run.guardCenterId && run.roster.includes(run.guardCenterId)) return run.guardCenterId
+  return run.roster[0] ?? null
+}
+
+/** 设置受保护中心（满员后唯一可调的阵型决策） */
+export function setGuardCenter(run: RunState, id: CharacterId): boolean {
+  if (!isTeamFull(run) || !run.roster.includes(id)) return false
+  run.guardCenterId = id
   return true
 }
 

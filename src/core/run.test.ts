@@ -4,16 +4,17 @@ import {
   beginRun,
   canRecruit,
   canUpgrade,
+  currentFormation,
   endRun,
   getRun,
+  guardCenter,
   isTeamFull,
   pointsAvailable,
   promoteStep,
   recruitCandidates,
   recruitMember,
   rosterCap,
-  setFormation,
-  swapFormationPosts,
+  setGuardCenter,
   upgradeMember,
   waveStartHp,
 } from './run'
@@ -132,37 +133,31 @@ describe('waveStartHp', () => {
   })
 })
 
-describe('队形状态', () => {
-  it('开局环形；招募追加到岗位表（岗位表始终是 roster 的排列）', () => {
-    const run = beginRun('angel', ['cowboy'])
-    expect(run.formation).toBe('ring')
-    expect(run.formationOrder).toEqual(['cowboy'])
-    run.xp.level = 99
-    recruitMember(run, 'mage')
-    expect(run.formationOrder).toEqual(['cowboy', 'mage'])
-    endRun()
-  })
-
-  it('未满员不可切队形/换位；满员后可切换并互换岗位', () => {
+describe('队形状态：满员自动 N 保 1，唯一决策是保谁', () => {
+  it('未满员固定环形、无中心且不可设置；满员自动变 guard', () => {
     const run = beginRun('angel', ['cowboy'])
     run.xp.level = 99
-    expect(isTeamFull(run)).toBe(false)
-    expect(setFormation(run, 'guard')).toBe(false)
-    expect(swapFormationPosts(run, 0, 0)).toBe(false)
-    expect(run.formation).toBe('ring')
+    expect(currentFormation(run)).toBe('ring')
+    expect(guardCenter(run)).toBeNull()
+    expect(setGuardCenter(run, 'cowboy')).toBe(false)
 
     while (run.roster.length < rosterCap(run)) recruitMember(run, recruitCandidates(run)[0]!)
     expect(isTeamFull(run)).toBe(true)
-    expect(setFormation(run, 'vanguard')).toBe(true)
-    expect(run.formation).toBe('vanguard')
+    expect(currentFormation(run)).toBe('guard')
+    endRun()
+  })
 
-    const [a, b] = [run.formationOrder[0]!, run.formationOrder[2]!]
-    expect(swapFormationPosts(run, 0, 2)).toBe(true)
-    expect(run.formationOrder[0]).toBe(b)
-    expect(run.formationOrder[2]).toBe(a)
-    // 越界与同岗位互换拒绝
-    expect(swapFormationPosts(run, 0, 99)).toBe(false)
-    expect(swapFormationPosts(run, 1, 1)).toBe(false)
+  it('中心默认 1 号位；可改为任意在编角色，不可指定编外角色', () => {
+    const run = beginRun('angel', ['cowboy'])
+    run.xp.level = 99
+    while (run.roster.length < rosterCap(run)) recruitMember(run, recruitCandidates(run)[0]!)
+    expect(guardCenter(run)).toBe('cowboy')
+    const other = run.roster[2]!
+    expect(setGuardCenter(run, other)).toBe(true)
+    expect(guardCenter(run)).toBe(other)
+    const outsider = recruitCandidates(run)[0]
+    if (outsider) expect(setGuardCenter(run, outsider)).toBe(false)
+    expect(run.formationIntroduced).toBe(false)
     endRun()
   })
 })

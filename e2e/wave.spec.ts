@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
-  clickFormationCard,
-  clickFormationPost,
+  clickFormationMember,
   clickPromoteConfirm,
   clickPromoteItem,
   clickShopBuy,
@@ -77,24 +76,12 @@ test('波次循环：整编强制招募→满编升级 → 商店纯购物 → �
   // 未满编先招募、满编才升级：两种步骤都必须出现过
   expect([...modesSeen].sort()).toEqual(['recruit', 'upgrade'])
 
-  // 队形环节：满员解锁三张队形卡；切到多保一并互换 0 号（中心）与 2 号岗位
+  // 首次满员：自动展示一次阵型页（N 保 1），默认中心 = 1 号位，点选改保法师
   const f0 = await page.evaluate(() => window.__warmoji!.promote!)
   expect(f0.mode).toBe('formation')
-  expect(f0.formation!.locked).toBe(false)
-  expect(f0.formation!.cards.map((c) => c.id)).toEqual(['ring', 'guard', 'vanguard'])
-  await clickFormationCard(page, 'guard')
-  const order0 = await page.evaluate(() => window.__warmoji!.promote!.formation!.order)
-  await clickFormationPost(page, 0)
-  await page.waitForFunction((id) => window.__warmoji?.promote?.selected === id, order0[0]!)
-  await clickFormationPost(page, 2)
-  await page.waitForFunction(
-    (b) => {
-      const o = window.__warmoji?.promote?.formation?.order
-      return !!o && o[0] === b[2] && o[2] === b[0]
-    },
-    order0,
-    { timeout: 5000 },
-  )
+  expect(f0.formation!.center).toBe('juggler')
+  expect(f0.items).toHaveLength(5)
+  await clickFormationMember(page, 'mage')
   await page.screenshot({ path: 'test-results/promote-done.png' })
   await clickPromoteConfirm(page)
   await page.waitForFunction(() => window.__warmoji?.scene === 'shop' && !!window.__warmoji.shop)
@@ -108,6 +95,27 @@ test('波次循环：整编强制招募→满编升级 → 商店纯购物 → �
   expect(shop.slots.every((s) => s.id !== 'recruit')).toBe(true)
   expect(shop.slots.some((s) => (s.memberLevel ?? 1) >= 2)).toBe(true)
   expect(shop.slots[1]!.offer).not.toBeNull()
+
+  // 商店阵型入口：进阵型页改保巨魔，返回后货架/免费刷新/金币原样保留
+  expect(shop.formation).not.toBeNull()
+  const offersBefore = shop.slots.map((s) => s.offer)
+  await page.locator('#game canvas').click({
+    position: await page.evaluate(({ x, y }) => {
+      const k = window.innerWidth / window.__warmoji!.viewW
+      return { x: Math.round(x * k), y: Math.round(y * k) }
+    }, shop.formation!),
+  })
+  await page.waitForFunction(
+    () => window.__warmoji?.scene === 'promote' && window.__warmoji.promote?.mode === 'formation',
+  )
+  expect(await page.evaluate(() => window.__warmoji!.promote!.formation!.center)).toBe('mage')
+  await clickFormationMember(page, 'troll')
+  await clickPromoteConfirm(page) // 「返回商店」
+  await page.waitForFunction(() => window.__warmoji?.scene === 'shop' && !!window.__warmoji.shop)
+  const shopBack = await page.evaluate(() => window.__warmoji!.shop!)
+  expect(shopBack.freeRefreshes).toBe(3)
+  expect(shopBack.coins).toBe(shop.coins)
+  expect(shopBack.slots.map((s) => s.offer)).toEqual(offersBefore)
 
   // 注入金币走道具购买：扣款、持有 +1、自动补货
   await page.evaluate(() => window.__addCoins!(200))
