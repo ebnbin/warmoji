@@ -655,11 +655,12 @@ export class ShopScene extends Phaser.Scene {
     this.scene.start('arena')
   }
 
-  /** 打开阵型页（本场景睡眠，返回时唤醒，货架/金币/免费刷新原样保留） */
+  /** 打开阵型页（本场景睡眠，返回时唤醒，货架/金币/免费刷新原样保留）。
+   * 必须先入睡再启动阵型页：promote 的 init 以「商店确实在沉睡」验证 fromShop */
   private openFormation(): void {
     playSfx('click')
-    this.scene.run('promote', { fromShop: true })
     this.scene.sleep()
+    this.scene.run('promote', { fromShop: true })
   }
 
   /** 从阵型页返回：沉睡期间视口变过则重排（保留货架），否则仅恢复调试上报 */

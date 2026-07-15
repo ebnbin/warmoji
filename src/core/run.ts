@@ -30,8 +30,9 @@ export interface RunState {
   captainItems: ItemId[]
   /** 本次商店剩余的免费刷新次数（进店时按队长能力重置） */
   freeRefreshes: number
-  /** N 保 1 的受保护中心（null = 未设置，取 roster 首位）；仅满员后生效 */
-  guardCenterId: CharacterId | null
+  /** N 保 1 的岗位次序：0 号 = 受保护中心，1.. = 外圈固定次序；满员时懒初始化。
+   * 互换中心只交换两个人的岗位，其他人永不跳位 */
+  guardOrder: CharacterId[]
   /** 首次满员的阵型页是否已自动展示（只展示一次，之后走商店入口调整） */
   formationIntroduced: boolean
 }
@@ -53,7 +54,7 @@ export function beginRun(captainId: CaptainId, starters: readonly CharacterId[])
     memberItems: starters.map(() => []),
     captainItems: [],
     freeRefreshes: 0,
-    guardCenterId: null,
+    guardOrder: [],
     formationIntroduced: false,
   }
   return current
@@ -111,17 +112,40 @@ export function currentFormation(run: RunState): FormationId {
   return isTeamFull(run) ? 'guard' : 'ring'
 }
 
-/** 受保护中心：未设置时默认 1 号位；未满员无中心 */
-export function guardCenter(run: RunState): CharacterId | null {
-  if (!isTeamFull(run)) return null
-  if (run.guardCenterId && run.roster.includes(run.guardCenterId)) return run.guardCenterId
-  return run.roster[0] ?? null
+/** 满员时懒初始化岗位次序（默认 = 花名册顺序，1 号位居中） */
+function ensureGuardOrder(run: RunState): void {
+  if (!isTeamFull(run)) return
+  const valid =
+    run.guardOrder.length === run.roster.length &&
+    run.roster.every((id) => run.guardOrder.includes(id))
+  if (!valid) run.guardOrder = [...run.roster]
 }
 
-/** 设置受保护中心（满员后唯一可调的阵型决策） */
+/** N 保 1 的岗位次序快照：0 号中心、1.. 外圈；未满员按花名册顺序（环形用） */
+export function guardOrder(run: RunState): CharacterId[] {
+  if (!isTeamFull(run)) return [...run.roster]
+  ensureGuardOrder(run)
+  return [...run.guardOrder]
+}
+
+/** 受保护中心（岗位 0）；未满员无中心 */
+export function guardCenter(run: RunState): CharacterId | null {
+  if (!isTeamFull(run)) return null
+  ensureGuardOrder(run)
+  return run.guardOrder[0] ?? null
+}
+
+/** 设置受保护中心：只交换新旧中心两人的岗位，外圈其他人保持原位 */
 export function setGuardCenter(run: RunState, id: CharacterId): boolean {
   if (!isTeamFull(run) || !run.roster.includes(id)) return false
-  run.guardCenterId = id
+  ensureGuardOrder(run)
+  const idx = run.guardOrder.indexOf(id)
+  if (idx < 0) return false
+  if (idx > 0) {
+    const prev = run.guardOrder[0]!
+    run.guardOrder[0] = id
+    run.guardOrder[idx] = prev
+  }
   return true
 }
 

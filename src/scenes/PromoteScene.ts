@@ -10,6 +10,7 @@ import {
   endRun,
   getRun,
   guardCenter,
+  guardOrder,
   isTeamFull,
   pointsAvailable,
   promoteStep,
@@ -60,6 +61,9 @@ const PORTRAIT: PromoteLayout = {
   btn: { y: 1184, w: 360, h: 72 },
 }
 
+/** 阵型预览外圈的缓慢顺时针环绕转速（rad/s，纯装饰） */
+const PREVIEW_SPIN = 0.18
+
 export class PromoteScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色/选中等页面状态
   private preserveOnRestart = false
@@ -78,7 +82,12 @@ export class PromoteScene extends Phaser.Scene {
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private formationObjs: Phaser.GameObjects.GameObject[] = []
   private memberImgs: Phaser.GameObjects.Image[] = []
+  private memberZones: Phaser.GameObjects.Zone[] = []
   private memberRects: { id: string; x: number; y: number; w: number; h: number }[] = []
+  /** 预览外圈的环绕相位与几何（update 逐帧推进） */
+  private previewPhase = 0
+  private previewGeom = { cx: 0, cy: 0, scale: 1 }
+  private reportTimer = 0
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private backRect = { x: 0, y: 0, w: 0, h: 0 }
   private quitArmed = false
@@ -88,7 +97,9 @@ export class PromoteScene extends Phaser.Scene {
   }
 
   init(data?: { fromShop?: boolean }): void {
-    this.fromShop = !!data?.fromShop
+    // Phaser 的 scene.start 不传 data 时会沿用上一次的 data——只有商店确实在
+    // 沉睡等待（阵型入口打开）时才认 fromShop，防脏标记把正常整编顶成阵型页
+    this.fromShop = !!data?.fromShop && this.scene.isSleeping('shop')
   }
 
   create(): void {
@@ -407,18 +418,18 @@ export class PromoteScene extends Phaser.Scene {
 
   // ── 阵型页：N 保 1 中心选择器 ───────────────────────────────
 
-  /** 岗位 → 角色：0 号中心，其余按花名册顺序上外圈 */
+  /** 岗位 → 角色：0 号中心，其余外圈（guardOrder 稳定次序，互换不牵连他人） */
   private postIds(): CharacterId[] {
-    const center = guardCenter(this.run)
-    if (!center) return [...this.run.roster]
-    return [center, ...this.run.roster.filter((id) => id !== center)]
+    return guardOrder(this.run)
   }
 
-  /** 重建阵型预览（列表区）：真实摆出 N 保 1，点选外圈队员与中心互换 */
+  /** 重建阵型预览（列表区）：真实摆出 N 保 1，点选外圈队员与中心互换；
+   * 外圈随 previewPhase 缓慢顺时针环绕（layoutFormationPreview 逐帧摆位） */
   private rebuildFormation(): void {
     for (const o of this.formationObjs) o.destroy()
     this.formationObjs = []
     this.memberImgs = []
+    this.memberZones = []
     this.memberRects = []
     const res = textRes()
     const L = this.layout.list
@@ -426,7 +437,7 @@ export class PromoteScene extends Phaser.Scene {
     const ly = this.origin.y + L.y
     const ids = this.postIds()
     const n = ids.length
-    const posts = formationPosts('guard', n)
+    const posts = formationPosts('guard', n, this.previewPhase)
 
     const panel = this.add.graphics()
     panel.fillStyle(0x000000, 0.22)
@@ -439,6 +450,7 @@ export class PromoteScene extends Phaser.Scene {
     const cx = lx + L.w / 2
     const cy = ly + L.h / 2
     const scale = Math.min(2.4, (Math.min(L.w, L.h) / 2 - 76) / maxR)
+    this.previewGeom = { cx, cy, scale }
 
     posts.forEach((p, post) => {
       const id = ids[post]
@@ -446,7 +458,7 @@ export class PromoteScene extends Phaser.Scene {
       const px = cx + p.x * scale
       const py = cy + p.y * scale
       if (post === 0) {
-        // 受保护中心：琥珀色光环标注
+        // 受保护中心：琥珀色光环标注（中心不随外圈环绕）
         const ring = this.add.graphics()
         ring.lineStyle(3, 0xffca28, 0.95)
         ring.strokeCircle(px, py, 44)
@@ -461,7 +473,8 @@ export class PromoteScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: post !== 0 })
         .on('pointerup', () => this.onMemberTap(post))
       this.formationObjs.push(zone)
-      this.memberRects.push({ id, x: px - 40, y: py - 40, w: 80, h: 80 })
+      this.memberZones[post] = zone
+      this.memberRects[post] = { id, x: px - 40, y: py - 40, w: 80, h: 80 }
     })
 
     this.formationObjs.push(
@@ -478,6 +491,38 @@ export class PromoteScene extends Phaser.Scene {
 
     this.renderCenterDetail(res)
     this.reportPromote()
+  }
+
+  /** 按当前环绕相位重摆外圈成员（图像/命中区/调试矩形同步；互换动画期间暂停） */
+  private layoutFormationPreview(): void {
+    const ids = this.postIds()
+    const posts = formationPosts('guard', ids.length, this.previewPhase)
+    const { cx, cy, scale } = this.previewGeom
+    posts.forEach((p, post) => {
+      if (post === 0) return // 中心不动
+      const img = this.memberImgs[post]
+      const zone = this.memberZones[post]
+      const rect = this.memberRects[post]
+      if (!img || !zone || !rect) return
+      const px = cx + p.x * scale
+      const py = cy + p.y * scale
+      img.setPosition(px, py)
+      zone.setPosition(px - 40, py - 40)
+      rect.x = px - 40
+      rect.y = py - 40
+    })
+  }
+
+  update(_time: number, delta: number): void {
+    if (this.mode !== 'formation' || this.swapBusy) return
+    this.previewPhase += (delta / 1000) * PREVIEW_SPIN
+    this.layoutFormationPreview()
+    // 外圈在转，调试矩形定期刷新，e2e 取到的坐标不至于过期
+    this.reportTimer += delta
+    if (this.reportTimer >= 300) {
+      this.reportTimer = 0
+      this.reportPromote()
+    }
   }
 
   /** 点选外圈队员：与中心互换（带滑动动画） */
@@ -536,7 +581,7 @@ export class PromoteScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5),
       this.add
-        .text(dx + 104, dy + 80, '站在队伍正中，被外圈掩护，更少被敌人摸到', {
+        .text(dx + 104, dy + 80, '站在队伍正中，受击判定减半，更少被敌人摸到', {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           color: '#b9b9c6',

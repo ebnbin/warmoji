@@ -8,6 +8,7 @@ import {
   endRun,
   getRun,
   guardCenter,
+  guardOrder,
   isTeamFull,
   pointsAvailable,
   promoteStep,
@@ -158,6 +159,26 @@ describe('队形状态：满员自动 N 保 1，唯一决策是保谁', () => {
     const outsider = recruitCandidates(run)[0]
     if (outsider) expect(setGuardCenter(run, outsider)).toBe(false)
     expect(run.formationIntroduced).toBe(false)
+    endRun()
+  })
+
+  it('互换中心只动两个人：其他外圈岗位永不跳位', () => {
+    const run = beginRun('angel', ['cowboy'])
+    run.xp.level = 99
+    while (run.roster.length < rosterCap(run)) recruitMember(run, recruitCandidates(run)[0]!)
+    const before = guardOrder(run) // [中心, 外1, 外2, 外3, 外4]
+    const target = before[3]!
+    expect(setGuardCenter(run, target)).toBe(true)
+    const after = guardOrder(run)
+    // 新中心与旧中心互换岗位，其余原位
+    expect(after[0]).toBe(target)
+    expect(after[3]).toBe(before[0])
+    expect(after[1]).toBe(before[1])
+    expect(after[2]).toBe(before[2])
+    expect(after[4]).toBe(before[4])
+    // 再换回：完全还原
+    expect(setGuardCenter(run, before[0]!)).toBe(true)
+    expect(guardOrder(run)).toEqual(before)
     endRun()
   })
 })

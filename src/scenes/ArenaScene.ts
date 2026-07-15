@@ -17,7 +17,7 @@ import {
 } from '../core/items'
 import type { TeamEffects } from '../core/items'
 import { levelDamageMul, memberMaxHp } from '../core/levels'
-import { currentFormation, getRun, guardCenter, promoteStep, waveStartHp } from '../core/run'
+import { currentFormation, getRun, guardOrder, isTeamFull, promoteStep, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { DEFAULT_SETTINGS, loadSettings } from '../core/settings'
 import type { Settings } from '../core/settings'
@@ -272,13 +272,13 @@ export class ArenaScene extends Phaser.Scene {
     // 压测固定 5 人满编便于跑分对比；正常局阵容来自 run（招募制，逐波扩编）
     const rosterIds = this.stress ? ROSTER_IDS.slice(0, 5) : this.run.roster
     this.lineup = rosterIds.map((id) => CHARACTERS[id])
-    // 槽位 → 队形岗位：满员 N 保 1 时受保护中心占 0 号岗、其余按槽位序上外圈；
-    // 未满员/压测为环形，槽位即岗位
-    const center = this.stress ? null : guardCenter(this.run)
-    let outer = 0
+    // 槽位 → 队形岗位：满员 N 保 1 按 guardOrder（0 号岗 = 受保护中心，
+    // 互换中心不影响其他人的岗位）；未满员/压测为环形，槽位即岗位
+    const order = this.stress || !isTeamFull(this.run) ? null : guardOrder(this.run)
     this.postBySlot = rosterIds.map((id, slot) => {
-      if (!center) return slot
-      return id === center ? 0 : ++outer
+      if (!order) return slot
+      const post = order.indexOf(id)
+      return post >= 0 ? post : slot
     })
     this.orbitPhase = 0
     this.driverPost = -1
@@ -440,7 +440,8 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private createMember(emoji: string, weaponSpecs: readonly WeaponSpec[], slot: number): Member {
-    const off = this.currentPosts()[this.postBySlot[slot] ?? slot] ?? { x: 0, y: 0 }
+    const post = this.postBySlot[slot] ?? slot
+    const off = this.currentPosts()[post] ?? { x: 0, y: 0 }
     const image = emojiImage(
       this,
       this.center.x + off.x,
@@ -451,7 +452,9 @@ export class ArenaScene extends Phaser.Scene {
       // 重叠时靠下的角色遮挡靠上的，聚团更自然
     ).setDepth(10 + off.y / UNIT)
     this.physics.add.existing(image)
-    circleBody(image, MEMBER.radius)
+    // N 保 1 中心的被保护收益：受击判定圆减半，更难被敌人/敌弹摸到
+    const guarded = this.activeFormation() === 'guard' && post === 0
+    circleBody(image, guarded ? MEMBER.radius * TEAM.guardCenterHurtboxMul : MEMBER.radius)
     // 角色是纯随队走位的运动学对象：body 只跟随图片用于碰撞，
     // 不允许物理引擎把位移回写到图片（否则与手动定位叠加产生抖动）
     ;(image.body as ArcadeBody).moves = false
@@ -635,8 +638,10 @@ export class ArenaScene extends Phaser.Scene {
         m.followY += lagY * pull
       }
       m.image.setPosition(m.followX + m.visualOffset.x, m.followY + m.visualOffset.y)
-      // 队形会旋转、队员会滑动，遮挡关系按当前相对纵深逐帧更新
-      m.image.setDepth(10 + (m.followY - this.center.y) / UNIT)
+      // 队形会旋转、队员会滑动，遮挡关系按当前相对纵深逐帧更新；
+      // N 保 1 中心垫底显示，被外圈四人盖住才有「窝在里面」的感觉
+      const guarded = this.activeFormation() === 'guard' && idx === 0
+      m.image.setDepth(guarded ? 8.5 : 10 + (m.followY - this.center.y) / UNIT)
       ;(m.image.body as ArcadeBody).updateFromGameObject()
       m.hpBar.setPosition(m.image.x, m.image.y)
       m.deadText.setPosition(m.image.x, m.image.y)

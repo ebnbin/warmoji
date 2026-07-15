@@ -81,7 +81,11 @@ test('波次循环：整编强制招募→满编升级 → 商店纯购物 → �
   expect(f0.mode).toBe('formation')
   expect(f0.formation!.center).toBe('juggler')
   expect(f0.items).toHaveLength(5)
+  const order0 = f0.items.map((i) => i.id) // [juggler, mage, unicorn, troll, cowboy]
   await clickFormationMember(page, 'mage')
+  // 稳定次序：互换只动法师与旧中心两人，其他外圈不跳位
+  const order1 = await page.evaluate(() => window.__warmoji!.promote!.items.map((i) => i.id))
+  expect(order1).toEqual(['mage', ...order0.slice(1).map((id) => (id === 'mage' ? 'juggler' : id))])
   await page.screenshot({ path: 'test-results/promote-done.png' })
   await clickPromoteConfirm(page)
   await page.waitForFunction(() => window.__warmoji?.scene === 'shop' && !!window.__warmoji.shop)
@@ -110,6 +114,9 @@ test('波次循环：整编强制招募→满编升级 → 商店纯购物 → �
   )
   expect(await page.evaluate(() => window.__warmoji!.promote!.formation!.center)).toBe('mage')
   await clickFormationMember(page, 'troll')
+  // 换保巨魔后：法师顶到巨魔原岗位，其余原位
+  const order2 = await page.evaluate(() => window.__warmoji!.promote!.items.map((i) => i.id))
+  expect(order2).toEqual(order1.map((id) => (id === 'troll' ? 'mage' : id === 'mage' ? 'troll' : id)))
   await clickPromoteConfirm(page) // 「返回商店」
   await page.waitForFunction(() => window.__warmoji?.scene === 'shop' && !!window.__warmoji.shop)
   const shopBack = await page.evaluate(() => window.__warmoji!.shop!)

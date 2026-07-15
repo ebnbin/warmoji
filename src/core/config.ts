@@ -329,6 +329,8 @@ export const TEAM = {
   ringRadius: 0.8 * UNIT,
   moveSpeed: 5.5 * UNIT,
   reviveMs: 10_000,
+  /** N 保 1 中心的受击判定半径系数：被保护的实际收益（碰撞圆减半更难被摸到） */
+  guardCenterHurtboxMul: 0.5,
 } as const
 
 // 环形阵轨道动力学：全员按「秉性（CHARACTERS.orbit）× 探测范围内敌情」计算移动倾向，
