@@ -14,7 +14,7 @@ import {
 } from '../core/items'
 import type { TeamEffects } from '../core/items'
 import { levelDamageMul, memberMaxHp } from '../core/levels'
-import { getRun, waveStartHp } from '../core/run'
+import { getRun, promoteStep, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { DEFAULT_SETTINGS, loadSettings } from '../core/settings'
 import type { Settings } from '../core/settings'
@@ -383,7 +383,10 @@ export class ArenaScene extends Phaser.Scene {
       coins: this.run.coins - this.waveBaseCoins,
       levels: this.run.xp.level - this.waveBaseLevel,
     } satisfies WaveSummary)
-    this.time.delayedCall(WAVE.summaryMs, () => this.scene.start('shop'))
+    // 有待结算点数先进整编页（强制招募/升级），否则直进商店
+    this.time.delayedCall(WAVE.summaryMs, () =>
+      this.scene.start(promoteStep(this.run) ? 'promote' : 'shop'),
+    )
   }
 
   private onViewportChanged(): void {

@@ -95,6 +95,15 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   return run.roster.length - 1
 }
 
+/** 整编步骤：进商店前强制消费点数的类型——未满编先招募，满编后给未满级队员升级；
+ * 无点数或无事可办（满编且全员满级）返回 null，直接进店 */
+export function promoteStep(run: RunState): 'recruit' | 'upgrade' | null {
+  if (pointsAvailable(run) <= 0) return null
+  if (run.roster.length < rosterCap(run) && recruitCandidates(run).length > 0) return 'recruit'
+  if (run.memberLevels.some((lv) => lv < LEVELS.max)) return 'upgrade'
+  return null
+}
+
 export function canUpgrade(run: RunState, slot: number): boolean {
   const level = run.memberLevels[slot]
   return pointsAvailable(run) > 0 && level !== undefined && level < LEVELS.max

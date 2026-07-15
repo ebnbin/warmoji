@@ -40,4 +40,13 @@ describe('xp', () => {
     expect(multi.levelsGained).toBe(2)
     expect(multi.state).toEqual({ level: 3, xp: 3 })
   })
+
+  it('满级封顶：到 maxLevel 停止升级并清空余量，之后不再获得经验', () => {
+    const nearCap = gainXp({ level: XP.maxLevel - 1, xp: 0 }, xpToNext(XP.maxLevel - 1) + 999)
+    expect(nearCap.levelsGained).toBe(1)
+    expect(nearCap.state).toEqual({ level: XP.maxLevel, xp: 0 })
+    const atCap = gainXp(nearCap.state, 10_000)
+    expect(atCap.levelsGained).toBe(0)
+    expect(atCap.state).toEqual({ level: XP.maxLevel, xp: 0 })
+  })
 })

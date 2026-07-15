@@ -144,45 +144,39 @@ async function focusSlot(id) {
   return true
 }
 
-async function spendPoints() {
+/** 整编页：强制招募/升级逐步结算（波末有点数时先于商店出现） */
+async function promotePhase() {
   const actions = []
-  for (let guard = 0; guard < 16; guard++) {
-    const s = await shopState()
-    if (s.points <= 0) break
-    if (s.slots.some((x) => x.id === 'recruit')) {
+  for (let guard = 0; guard < 24; guard++) {
+    const scene = await page.evaluate(() => window.__warmoji.scene)
+    if (scene !== 'promote') break
+    const pr = await page.evaluate(() => window.__warmoji.promote)
+    let pickKey = pr.selected
+    if (pr.mode === 'recruit') {
       const wish = ['mage', 'robot', 'troll', 'snowman', 'unicorn', 'kangaroo', 'juggler']
-      if (!(await focusSlot('recruit'))) break
-      const cands = await page.evaluate(() => window.__warmoji.shop.recruit.candidates.map((c) => c.id))
-      const pick = wish.find((x) => cands.includes(x)) ?? cands[0]
-      if (!pick) break
-      const c = await page.evaluate(
-        (cid) => window.__warmoji.shop.recruit.candidates.find((x) => x.id === cid),
-        pick,
-      )
-      await clickAt({ x: c.x + c.w / 2, y: c.y + c.h / 2 })
-      await page.waitForFunction((cid) => window.__warmoji?.shop?.recruit.selected === cid, pick, { timeout: 8000 })
-      const buy = await page.evaluate(() => window.__warmoji.shop.buy)
-      await clickAt({ x: buy.x, y: buy.y })
-      await page.waitForFunction((cid) => window.__warmoji?.shop?.slots.some((x) => x.id === cid), pick, { timeout: 8000 })
-      actions.push(`招募${pick}`)
+      const ids = pr.items.map((x) => x.id)
+      pickKey = wish.find((x) => ids.includes(x)) ?? ids[0]
     } else {
-      const order = ['cowboy', 'mage', 'robot', 'troll', 'snowman', 'unicorn', 'kangaroo', 'juggler']
-      const members = s.slots
-        .filter((x) => x.memberLevel !== null && x.memberLevel < 6)
-        .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
-      const target = members[0]
-      if (!target) break
-      if (!(await focusSlot(target.id))) break
-      const up = await page.evaluate(() => window.__warmoji.shop.upgrade)
-      if (!up.enabled) break
-      await clickAt({ x: up.x, y: up.y })
-      await page.waitForFunction(
-        ({ id, want }) => window.__warmoji?.shop?.slots.find((x) => x.id === id)?.memberLevel === want,
-        { id: target.id, want: target.memberLevel + 1 },
-        { timeout: 8000 },
-      )
-      actions.push(`${target.id}升${target.memberLevel + 1}`)
+      // 升级优先主力（按 slot 顺序即可）
+      pickKey = pr.items[0]?.id ?? pr.selected
     }
+    if (!pickKey) break
+    if (pickKey !== pr.selected) {
+      const it = pr.items.find((x) => x.id === pickKey)
+      await clickAt({ x: it.x + it.w / 2, y: it.y + it.h / 2 })
+      await page.waitForFunction((k) => window.__warmoji?.promote?.selected === k, pickKey, { timeout: 8000 })
+    }
+    const confirm = await page.evaluate(() => window.__warmoji.promote.confirm)
+    const before = pr.points
+    await clickAt({ x: confirm.x, y: confirm.y })
+    await page.waitForFunction(
+      (prev) =>
+        window.__warmoji?.scene === 'shop' ||
+        (window.__warmoji?.scene === 'promote' && (window.__warmoji.promote?.points ?? 99) < prev),
+      before,
+      { timeout: 10000 },
+    )
+    actions.push(`${pr.mode === 'recruit' ? '招募' : '升级'}${pickKey}`)
   }
   return actions
 }
@@ -219,7 +213,7 @@ async function buyItems(lastCombat) {
     const hpRatio = lastCombat ? lastCombat.hp / (lastCombat.alive * 100 || 1) : 1
     const table = scoreTable(s.wave, Math.min(1, hpRatio))
     const cands = s.slots
-      .filter((x) => x.id !== 'recruit' && x.offer && x.price !== null && x.price <= s.coins)
+      .filter((x) => x.offer && x.price !== null && x.price <= s.coins)
       .sort((a, b) => (table[b.offer] ?? 10) - (table[a.offer] ?? 10))
     if (!cands.length) break
     const pick = cands[0]
@@ -237,6 +231,11 @@ async function buyItems(lastCombat) {
 const levelHistory = []
 
 async function shopPhase(lastCombat) {
+  // 波末：有点数先进整编页强制结算，再进商店
+  await page.waitForFunction(
+    () => window.__warmoji?.scene === 'promote' || (window.__warmoji?.scene === 'shop' && !!window.__warmoji.shop),
+  )
+  const actions = await promotePhase()
   await page.waitForFunction(() => window.__warmoji?.scene === 'shop' && !!window.__warmoji.shop)
   const s0 = await shopState()
   const doneWave = s0.wave - 1
@@ -244,12 +243,10 @@ async function shopPhase(lastCombat) {
   log('WAVE_END', {
     wave: doneWave,
     level: s0.level,
-    points: s0.points,
     kills: await page.evaluate(() => window.__warmoji.kills),
     coins: s0.coins,
     endHp: lastCombat ? `${lastCombat.hp}/${lastCombat.alive}人` : '?',
   })
-  const actions = await spendPoints()
   const bought = await buyItems(lastCombat)
   const after = await shopState()
   log('SHOP', {

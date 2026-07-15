@@ -7,6 +7,7 @@ import {
   endRun,
   getRun,
   pointsAvailable,
+  promoteStep,
   recruitCandidates,
   recruitMember,
   rosterCap,
@@ -93,6 +94,29 @@ describe('点数经济：招募与升级', () => {
   it('候选 = 花名册减去已招募', () => {
     const run = beginRun('angel', ['cowboy'])
     expect(recruitCandidates(run)).toEqual(ROSTER_IDS.filter((x) => x !== 'cowboy'))
+    endRun()
+  })
+
+  it('整编步骤：无点数 null；未满编先招募；满编后升级；全满级 null', () => {
+    const run = beginRun('angel', ['cowboy'])
+    expect(promoteStep(run)).toBe(null)
+    run.xp.level = 3 // 2 点可用
+    expect(promoteStep(run)).toBe('recruit')
+    // 招满编制（天使 5 人）
+    run.xp.level = 99
+    while (run.roster.length < CAPTAINS.angel.teamSize) {
+      expect(promoteStep(run)).toBe('recruit')
+      recruitMember(run, recruitCandidates(run)[0]!)
+    }
+    expect(promoteStep(run)).toBe('upgrade')
+    // 全员升到满级后无事可办
+    for (let slot = 0; slot < run.roster.length; slot++) {
+      while (upgradeMember(run, slot)) {
+        /* 升到满级 */
+      }
+    }
+    expect(run.memberLevels.every((lv) => lv === LEVELS.max)).toBe(true)
+    expect(promoteStep(run)).toBe(null)
     endRun()
   })
 })

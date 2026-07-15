@@ -633,6 +633,8 @@ export const XP = {
   /** 波末保底经验 = base + perWave×波次（躲避流的兜底，占比小头） */
   waveBonusBase: 12,
   waveBonusPerWave: 3,
+  /** 队伍等级上限：到顶后不再获得经验（点数总量因此固定为 maxLevel-1） */
+  maxLevel: 18,
 } as const
 
 // 角色等级（点数升级）：v1 数值脊柱，满级 6

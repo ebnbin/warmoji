@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import type { CaptainId, CharacterId } from '../core/config'
-import { CAPTAINS, CHARACTERS, COIN, LEVELS, SHOP } from '../core/config'
+import { CAPTAINS, CHARACTERS, COIN, SHOP } from '../core/config'
 import {
   aggregateCharacterEffects,
   captainPool,
@@ -14,18 +14,7 @@ import { memberMaxHp } from '../core/levels'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
-import {
-  canRecruit,
-  canUpgrade,
-  endRun,
-  getRun,
-  pointsAvailable,
-  recruitCandidates,
-  recruitMember,
-  rosterCap,
-  upgradeMember,
-  waveStartHp,
-} from '../core/run'
+import { endRun, getRun, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { captainStatGroups, characterStatGroups } from '../core/stats'
 import { applyBackground } from '../ui/background'
@@ -68,9 +57,9 @@ const PORTRAIT: ShopLayout = {
   btn: { y: 1162, w: 360, h: 72 },
 }
 
-// 上架位：队长固定占第一位（'captain' 哨兵），队员按阵容槽位排列，
-// 未满编时末尾追加招募位（'recruit' 哨兵）——点数在此花掉（招募新人/给角色升级）
-type SlotId = 'captain' | CharacterId | 'recruit'
+// 上架位：队长固定占第一位（'captain' 哨兵），队员按阵容槽位排列。
+// 招募/升级已拆分到整编页（PromoteScene），商店只管道具购物
+type SlotId = 'captain' | CharacterId
 
 export class ShopScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色/焦点/上架结果等页面状态
@@ -86,14 +75,9 @@ export class ShopScene extends Phaser.Scene {
   private grid!: EmojiGrid
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private coinsText!: Phaser.GameObjects.Text
-  private pointsText!: Phaser.GameObjects.Text
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private buyRect = { x: 0, y: 0, w: 0, h: 0 }
   private refreshRect = { x: 0, y: 0, w: 0, h: 0 }
-  private upgradeRect = { x: 0, y: 0, w: 0, h: 0 }
-  /** 招募位详情里当前挑中的候选角色 */
-  private candidateId?: CharacterId
-  private candidateRects: { id: CharacterId; x: number; y: number; w: number; h: number }[] = []
   private quitArmed = false
   // 上架位网格自带滚动；详情属性区行数多时也可滚动
   private slotScroll = 0
@@ -130,7 +114,6 @@ export class ShopScene extends Phaser.Scene {
         rollItem(this.poolFor(i), this.ownedFor(i), Math.random),
       )
       this.focusedId = 'captain'
-      this.candidateId = undefined
     }
     this.detailObjs = []
     this.quitArmed = false
@@ -179,23 +162,13 @@ export class ShopScene extends Phaser.Scene {
       })
     })
 
-    emojiImage(this, w / 2 - 150, oy + L.coinsY, COIN.emoji, 32, 'player')
+    emojiImage(this, w / 2 - 28, oy + L.coinsY, COIN.emoji, 32, 'player')
     this.coinsText = this.add
-      .text(w / 2 - 128, oy + L.coinsY, `${this.run.coins}`, {
+      .text(w / 2 - 4, oy + L.coinsY, `${this.run.coins}`, {
         fontFamily: UI_FONT,
         fontSize: FONT.head,
         fontStyle: 'bold',
         color: '#ffd54f',
-        resolution: res,
-      })
-      .setOrigin(0, 0.5)
-    // 队伍等级与可点数：点数是招募/升级的唯一货币
-    this.pointsText = this.add
-      .text(w / 2 - 30, oy + L.coinsY, '', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.body,
-        fontStyle: 'bold',
-        color: '#b3e5fc',
         resolution: res,
       })
       .setOrigin(0, 0.5)
@@ -221,8 +194,7 @@ export class ShopScene extends Phaser.Scene {
     statsMask.fillRect(dx, this.statsTop, D.w, this.statsH)
     this.statsContainer.setMask(statsMask.createGeometryMask())
 
-    // 上架道具卡的购买/刷新按钮命中区（内容随 refresh 重绘）；
-    // 聚焦招募位时购买位变为「招募」，刷新不可用
+    // 上架道具卡的购买/刷新按钮命中区（内容随 refresh 重绘）
     const cardY = dy + D.h - 110
     this.buyRect = { x: dx + D.w - 26 - 140, y: cardY + 21, w: 140, h: 54 }
     this.refreshRect = { x: this.buyRect.x - 8 - 150, y: cardY + 21, w: 150, h: 54 }
@@ -231,9 +203,7 @@ export class ShopScene extends Phaser.Scene {
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (this.dragMoved || this.grid.wasDragged) return
-        if (this.focusedId === 'recruit') this.recruitFocused()
-        else this.buyFocused()
+        if (!this.dragMoved && !this.grid.wasDragged) this.buyFocused()
       })
     this.add
       .zone(this.refreshRect.x, this.refreshRect.y, this.refreshRect.w, this.refreshRect.h)
@@ -241,15 +211,6 @@ export class ShopScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
         if (!this.dragMoved && !this.grid.wasDragged) this.refreshFocused()
-      })
-    // 升级按钮（详情头部右侧；仅聚焦队员时可用）
-    this.upgradeRect = { x: dx + D.w - 14 - 150, y: dy + 26, w: 150, h: 52 }
-    this.add
-      .zone(this.upgradeRect.x, this.upgradeRect.y, this.upgradeRect.w, this.upgradeRect.h)
-      .setOrigin(0)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
-        if (!this.dragMoved && !this.grid.wasDragged) this.upgradeFocused()
       })
 
     // 详情属性区滚动（上架位网格的滚动由 EmojiGrid 自理）
@@ -335,10 +296,9 @@ export class ShopScene extends Phaser.Scene {
     return (this.run.memberItems[index - 1] ??= [])
   }
 
-  /** 0 = 队长，1.. = 队员槽位+1，-1 = 招募位 */
+  /** 0 = 队长，1.. = 队员槽位+1 */
   private focusedIndex(): number {
     if (this.focusedId === 'captain') return 0
-    if (this.focusedId === 'recruit') return -1
     return this.lineup.indexOf(this.focusedId) + 1
   }
 
@@ -368,32 +328,6 @@ export class ShopScene extends Phaser.Scene {
     playSfx('click')
     this.offers[idx] = rollItem(this.poolFor(idx), this.ownedFor(idx), Math.random)
     this.refresh()
-  }
-
-  /** 花 1 点招募详情里挑中的候选；扩编后重建页面（保留焦点与上架结果） */
-  private recruitFocused(): void {
-    const id = this.candidateId
-    if (!id || !canRecruit(this.run, id)) return
-    const slot = recruitMember(this.run, id)
-    if (slot < 0) return
-    playSfx('recruit')
-    // 先同步 lineup 再补上架：poolFor 按 lineup 找角色
-    this.lineup = [...this.run.roster]
-    this.offers.push(rollItem(this.poolFor(slot + 1), [], Math.random))
-    this.focusedId = id
-    this.candidateId = undefined
-    this.preserveOnRestart = true
-    this.scene.restart()
-  }
-
-  /** 花 1 点给聚焦队员升 1 级；重建页面同步血条/属性 */
-  private upgradeFocused(): void {
-    const idx = this.focusedIndex()
-    if (idx < 1) return
-    if (!upgradeMember(this.run, idx - 1)) return
-    playSfx('upgrade')
-    this.preserveOnRestart = true
-    this.scene.restart()
   }
 
   private slotMaxHp(slot: number): number {
@@ -427,9 +361,6 @@ export class ShopScene extends Phaser.Scene {
         hpRatio: hp / max,
       })
     })
-    if (this.lineup.length < rosterCap(this.run)) {
-      items.push({ key: 'recruit', emoji: '➕', outline: 'player' })
-    }
     return items
   }
 
@@ -472,15 +403,9 @@ export class ShopScene extends Phaser.Scene {
   private renderDetail(res: number): void {
     for (const o of this.detailObjs) o.destroy()
     this.detailObjs = []
-    this.candidateRects = []
     const D = this.layout.detail
     const dx = this.origin.x + D.x
     const dy = this.origin.y + D.y
-
-    if (this.focusedId === 'recruit') {
-      this.renderRecruitDetail(res)
-      return
-    }
 
     const isCaptain = this.focusedId === 'captain'
     const idx = this.focusedIndex()
@@ -520,28 +445,6 @@ export class ShopScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5),
     )
-
-    // 升级按钮（仅队员）：花 1 点 +1 级
-    if (!isCaptain) {
-      const can = canUpgrade(this.run, idx - 1)
-      const maxed = level >= LEVELS.max
-      const u = this.upgradeRect
-      const ug = this.add.graphics()
-      ug.fillStyle(can ? 0x81d4fa : 0xffffff, can ? 1 : 0.08)
-      ug.fillRoundedRect(u.x, u.y, u.w, u.h, 26)
-      this.detailObjs.push(
-        ug,
-        this.add
-          .text(u.x + u.w / 2, u.y + u.h / 2, maxed ? '已满级' : '升级 1点', {
-            fontFamily: UI_FONT,
-            fontSize: FONT.body,
-            fontStyle: 'bold',
-            color: can ? '#17323f' : '#8f8f9a',
-            resolution: res,
-          })
-          .setOrigin(0.5),
-      )
-    }
 
     // 属性区（可滚动）：已购道具行 + 属性组
     const statObjs: Phaser.GameObjects.GameObject[] = []
@@ -714,140 +617,8 @@ export class ShopScene extends Phaser.Scene {
     )
   }
 
-  /** 招募位详情：候选角色三列网格 + 底部招募卡（挑中者简介与招募按钮）；
-   * 当前花名册下网格必定放得下（列数×行高按 8 人算过），花名册扩容后再考虑滚动 */
-  private renderRecruitDetail(res: number): void {
-    const D = this.layout.detail
-    const dx = this.origin.x + D.x
-    const dy = this.origin.y + D.y
-    const points = pointsAvailable(this.run)
-    const candidates = recruitCandidates(this.run)
-    if (!this.candidateId || !candidates.includes(this.candidateId)) {
-      this.candidateId = candidates[0]
-    }
-    this.statsMax = 0
-    this.setStatsScroll(0)
-
-    this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, '➕', 52, 'player'),
-      this.add
-        .text(dx + 104, dy + 44, '招募新队员', {
-          fontFamily: UI_FONT,
-          fontSize: FONT.lead,
-          fontStyle: 'bold',
-          color: '#ffffff',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5),
-      this.add
-        .text(dx + 104, dy + 80, `花 1 点 · 可用点数 ${points}（升级得点）`, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          color: points > 0 ? '#b3e5fc' : '#ffb74d',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5),
-    )
-
-    // 候选网格：三列卡片，点选查看/切换
-    this.candidateRects = []
-    const cols = 3
-    const gap = 10
-    const cw = (D.w - 28 - gap * (cols - 1)) / cols
-    const ch = 64
-    candidates.forEach((id, i) => {
-      const spec = CHARACTERS[id]
-      const cx = dx + 14 + (i % cols) * (cw + gap)
-      const cy = dy + 118 + Math.floor(i / cols) * (ch + gap)
-      const picked = id === this.candidateId
-      const g = this.add.graphics()
-      g.fillStyle(picked ? 0xffffff : 0x000000, picked ? 0.16 : 0.25)
-      g.fillRoundedRect(cx, cy, cw, ch, 12)
-      g.lineStyle(picked ? 2 : 1, 0xffffff, picked ? 0.9 : 0.1)
-      g.strokeRoundedRect(cx, cy, cw, ch, 12)
-      const zone = this.add
-        .zone(cx, cy, cw, ch)
-        .setOrigin(0)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
-          if (this.dragMoved) return
-          playSfx('click')
-          this.candidateId = id
-          this.refresh()
-        })
-      this.detailObjs.push(
-        g,
-        emojiImage(this, cx + 34, cy + ch / 2, spec.emoji, 38, 'player'),
-        this.add
-          .text(cx + 62, cy + ch / 2, spec.name, {
-            fontFamily: UI_FONT,
-            fontSize: FONT.body,
-            fontStyle: 'bold',
-            color: '#ffffff',
-            resolution: res,
-          })
-          .setOrigin(0, 0.5),
-        zone,
-      )
-      this.candidateRects.push({ id, x: cx, y: cy, w: cw, h: ch })
-    })
-
-    // 底部招募卡：挑中者简介 + 招募按钮（复用购买按钮位）
-    const cardY = dy + D.h - 110
-    const card = this.add.graphics()
-    card.fillStyle(0xffffff, 0.07)
-    card.fillRoundedRect(dx + 14, cardY, D.w - 28, 96, 12)
-    card.lineStyle(1, 0x81d4fa, 0.35)
-    card.strokeRoundedRect(dx + 14, cardY, D.w - 28, 96, 12)
-    this.detailObjs.push(card)
-    const picked = this.candidateId
-    if (picked) {
-      const spec = CHARACTERS[picked]
-      this.detailObjs.push(
-        emojiImage(this, dx + 52, cardY + 48, spec.emoji, 48, 'player'),
-        this.add
-          .text(dx + 88, cardY + 28, spec.name, {
-            fontFamily: UI_FONT,
-            fontSize: FONT.strong,
-            fontStyle: 'bold',
-            color: '#ffffff',
-            resolution: res,
-          })
-          .setOrigin(0, 0.5),
-        this.add
-          .text(dx + 88, cardY + 64, spec.desc, {
-            fontFamily: UI_FONT,
-            fontSize: FONT.caption,
-            color: '#b9b9c6',
-            wordWrap: { width: this.buyRect.x - (dx + 88) - 12 },
-            resolution: res,
-          })
-          .setOrigin(0, 0.5),
-      )
-    }
-    const can = !!picked && canRecruit(this.run, picked)
-    const bb = this.buyRect
-    const bg = this.add.graphics()
-    bg.fillStyle(can ? 0x81d4fa : 0xffffff, can ? 1 : 0.1)
-    bg.fillRoundedRect(bb.x, bb.y, bb.w, bb.h, 27)
-    this.detailObjs.push(
-      bg,
-      this.add
-        .text(bb.x + bb.w / 2, bb.y + bb.h / 2, '招募 1点', {
-          fontFamily: UI_FONT,
-          fontSize: FONT.body,
-          fontStyle: 'bold',
-          color: can ? '#17323f' : '#8f8f9a',
-          resolution: res,
-        })
-        .setOrigin(0.5),
-    )
-  }
-
   private refresh(): void {
     this.coinsText.setText(`${this.run.coins}`)
-    this.pointsText.setText(`等级 ${this.run.xp.level} · 点数 ${pointsAvailable(this.run)}`)
-    this.pointsText.setColor(pointsAvailable(this.run) > 0 ? '#b3e5fc' : '#8f8f9a')
     // 购买/刷新会换上架、升级/招募会变血条：整格重建 + 选中态
     this.grid.setItems(this.buildSlotItems())
     this.grid.setSelected(this.focusedId)
@@ -888,20 +659,19 @@ export class ShopScene extends Phaser.Scene {
         focusedId: this.focusedId,
         freeRefreshes: this.run.freeRefreshes,
         level: this.run.xp.level,
-        points: pointsAvailable(this.run),
         slots: this.grid.cellRects().map((r) => {
           const id = r.key as SlotId
-          const index = id === 'captain' ? 0 : id === 'recruit' ? -1 : this.lineup.indexOf(id) + 1
+          const index = id === 'captain' ? 0 : this.lineup.indexOf(id) + 1
           return {
             id,
             x: r.x,
             y: r.y,
             w: r.w,
             h: r.h,
-            offer: index < 0 ? null : (this.offers[index] ?? null),
-            price: index >= 0 && this.offers[index] ? ITEMS[this.offers[index]!].price : null,
-            owned: index < 0 ? 0 : this.ownedFor(index).length,
-            memberLevel: index <= 0 ? null : (this.run.memberLevels[index - 1] ?? 1),
+            offer: this.offers[index] ?? null,
+            price: this.offers[index] ? ITEMS[this.offers[index]!].price : null,
+            owned: this.ownedFor(index).length,
+            memberLevel: index === 0 ? null : (this.run.memberLevels[index - 1] ?? 1),
           }
         }),
         buy: {
@@ -909,36 +679,14 @@ export class ShopScene extends Phaser.Scene {
           y: this.buyRect.y + this.buyRect.h / 2,
           w: this.buyRect.w,
           h: this.buyRect.h,
-          enabled:
-            this.focusedId === 'recruit'
-              ? !!this.candidateId && canRecruit(this.run, this.candidateId)
-              : offer !== null && this.run.coins >= ITEMS[offer].price,
+          enabled: offer !== null && this.run.coins >= ITEMS[offer].price,
         },
         refresh: {
           x: this.refreshRect.x + this.refreshRect.w / 2,
           y: this.refreshRect.y + this.refreshRect.h / 2,
           w: this.refreshRect.w,
           h: this.refreshRect.h,
-          enabled:
-            this.focusedId !== 'recruit' &&
-            (this.run.freeRefreshes > 0 || this.run.coins >= SHOP.refreshPrice),
-        },
-        upgrade: {
-          x: this.upgradeRect.x + this.upgradeRect.w / 2,
-          y: this.upgradeRect.y + this.upgradeRect.h / 2,
-          w: this.upgradeRect.w,
-          h: this.upgradeRect.h,
-          enabled: idx >= 1 && canUpgrade(this.run, idx - 1),
-        },
-        recruit: {
-          candidates: this.candidateRects.map((c) => ({
-            id: c.id,
-            x: c.x,
-            y: c.y,
-            w: c.w,
-            h: c.h,
-          })),
-          selected: this.candidateId ?? null,
+          enabled: this.run.freeRefreshes > 0 || this.run.coins >= SHOP.refreshPrice,
         },
         start: {
           x: this.btnRect.x + this.btnRect.w / 2,

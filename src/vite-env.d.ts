@@ -17,13 +17,20 @@ interface WarmojiSelectDebug {
   start: { x: number; y: number; w: number; h: number; enabled: boolean }
 }
 
+interface WarmojiPromoteDebug {
+  mode: 'recruit' | 'upgrade'
+  points: number
+  selected: string
+  items: { id: string; x: number; y: number; w: number; h: number }[]
+  confirm: { x: number; y: number; w: number; h: number; enabled: boolean }
+}
+
 interface WarmojiShopDebug {
   wave: number
   coins: number
   focusedId: string
   freeRefreshes: number
   level: number
-  points: number
   slots: {
     id: string
     x: number
@@ -37,11 +44,6 @@ interface WarmojiShopDebug {
   }[]
   buy: { x: number; y: number; w: number; h: number; enabled: boolean }
   refresh: { x: number; y: number; w: number; h: number; enabled: boolean }
-  upgrade: { x: number; y: number; w: number; h: number; enabled: boolean }
-  recruit: {
-    candidates: { id: string; x: number; y: number; w: number; h: number }[]
-    selected: string | null
-  }
   start: { x: number; y: number; w: number; h: number }
 }
 
@@ -79,7 +81,7 @@ interface WarmojiCaptainDebug {
 }
 
 interface WarmojiDebug {
-  scene: 'menu' | 'wiki' | 'settings' | 'captain' | 'select' | 'shop' | 'arena' | 'gameover'
+  scene: 'menu' | 'wiki' | 'settings' | 'captain' | 'select' | 'promote' | 'shop' | 'arena' | 'gameover'
   elapsed: number
   hp: number
   alive: number
@@ -101,6 +103,7 @@ interface WarmojiDebug {
   settings?: WarmojiSettingsDebug
   captain?: WarmojiCaptainDebug
   select?: WarmojiSelectDebug
+  promote?: WarmojiPromoteDebug
   shop?: WarmojiShopDebug
 }
 

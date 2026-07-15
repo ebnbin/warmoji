@@ -97,21 +97,22 @@ export async function clickShopRefresh(page: Page): Promise<void> {
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: r.x, y: r.y }) })
 }
 
-/** 商店页点击「升级」（作用于当前聚焦的队员） */
-export async function clickShopUpgrade(page: Page): Promise<void> {
-  const u = await page.evaluate(() => window.__warmoji!.shop!.upgrade)
-  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: u.x, y: u.y }) })
-}
-
-/** 商店页招募详情里点击某个候选角色 */
-export async function clickShopCandidate(page: Page, id: string): Promise<void> {
-  const c = await page.evaluate(
-    (cid) => window.__warmoji!.shop!.recruit.candidates.find((x) => x.id === cid)!,
-    id,
+/** 整编页点击网格中某个候选/队员 */
+export async function clickPromoteItem(page: Page, key: string): Promise<void> {
+  const r = await page.evaluate(
+    (k) => window.__warmoji!.promote!.items.find((x) => x.id === k)!,
+    key,
   )
   await page
     .locator('#game canvas')
-    .click({ position: await cssPoint(page, { x: c.x + c.w / 2, y: c.y + c.h / 2 }) })
+    .click({ position: await cssPoint(page, { x: r.x + r.w / 2, y: r.y + r.h / 2 }) })
+  await page.waitForFunction((k) => window.__warmoji?.promote?.selected === k, key)
+}
+
+/** 整编页点击确认按钮（招募/升级 花 1 点） */
+export async function clickPromoteConfirm(page: Page): Promise<void> {
+  const b = await page.evaluate(() => window.__warmoji!.promote!.confirm)
+  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: b.x, y: b.y }) })
 }
 
 /** 商店页点击「开始第 N 波」进入下一波 */

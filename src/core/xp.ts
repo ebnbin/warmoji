@@ -19,13 +19,17 @@ export function waveBonusXp(wave: number): number {
 }
 
 export function gainXp(state: XpState, amount: number): { state: XpState; levelsGained: number } {
+  // 满级封顶：不再获得任何经验
+  if (state.level >= XP.maxLevel) return { state, levelsGained: 0 }
   let { level, xp } = state
   xp += amount
   let levelsGained = 0
-  while (xp >= xpToNext(level)) {
+  while (xp >= xpToNext(level) && level < XP.maxLevel) {
     xp -= xpToNext(level)
     level++
     levelsGained++
   }
+  // 恰好到顶时清空余量，经验条不再有意义
+  if (level >= XP.maxLevel) xp = 0
   return { state: { level, xp }, levelsGained }
 }
