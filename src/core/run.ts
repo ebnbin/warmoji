@@ -35,6 +35,8 @@ export interface RunState {
   guardOrder: CharacterId[]
   /** 首次满员的阵型页是否已自动展示（只展示一次，之后走商店入口调整） */
   formationIntroduced: boolean
+  /** 结算统计（按槽位整局累计）：输出伤害/击杀/阵亡次数 */
+  stats: { damage: number[]; kills: number[]; deaths: number[] }
 }
 
 let current: RunState | undefined
@@ -56,6 +58,11 @@ export function beginRun(captainId: CaptainId, starters: readonly CharacterId[])
     freeRefreshes: 0,
     guardOrder: [],
     formationIntroduced: false,
+    stats: {
+      damage: starters.map(() => 0),
+      kills: starters.map(() => 0),
+      deaths: starters.map(() => 0),
+    },
   }
   return current
 }
@@ -100,6 +107,9 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   run.memberLevels.push(1)
   run.memberHp.push(MEMBER.maxHp)
   run.memberItems.push([])
+  run.stats.damage.push(0)
+  run.stats.kills.push(0)
+  run.stats.deaths.push(0)
   return run.roster.length - 1
 }
 

@@ -13,17 +13,19 @@ describe('xp', () => {
     expect(xpToNext(15)).toBeGreaterThan(xpToNext(1) * 10)
   })
 
-  it('校准锚点：第 1 波（约 45~90 经验）应到 2~3 级，不到 4 级', () => {
-    const wave1Low = gainXp({ level: 1, xp: 0 }, 45 + waveBonusXp(1))
-    const wave1High = gainXp({ level: 1, xp: 0 }, 90 + waveBonusXp(1))
+  it('校准锚点：第 1 波（15 秒短波，击杀约 15~50 经验）应到 2~3 级，不到 4 级', () => {
+    const wave1Low = gainXp({ level: 1, xp: 0 }, 15 + waveBonusXp(1))
+    const wave1High = gainXp({ level: 1, xp: 0 }, 50 + waveBonusXp(1))
     expect(wave1Low.state.level).toBeGreaterThanOrEqual(2)
     expect(wave1High.state.level).toBeLessThanOrEqual(3)
   })
 
-  it('校准锚点：20 波总量（约 6000 经验）落在 16~19 级', () => {
-    const total = gainXp({ level: 1, xp: 0 }, 6000)
-    expect(total.state.level).toBeGreaterThanOrEqual(16)
-    expect(total.state.level).toBeLessThanOrEqual(19)
+  it('校准锚点：15 波总量（保底约 2600 + 击杀约 3400）应触及 18 级封顶附近', () => {
+    let bonus = 0
+    for (let w = 1; w <= 15; w++) bonus += waveBonusXp(w)
+    expect(bonus).toBeGreaterThanOrEqual(2400)
+    const total = gainXp({ level: 1, xp: 0 }, bonus + 3400)
+    expect(total.state.level).toBeGreaterThanOrEqual(17)
   })
 
   it('波末保底经验随波次缓涨', () => {

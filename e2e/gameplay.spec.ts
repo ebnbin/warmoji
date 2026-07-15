@@ -8,10 +8,9 @@ test('开局后自动战斗：出怪、飞刀击杀、计时推进、无控制�
   })
   page.on('pageerror', (err) => errors.push(String(err)))
 
-  // 站桩测试：神童开局 2 人（牛仔+巨魔），无操作也能撑过断言窗口
+  // 站桩测试：神童开局满编 5 人，无操作也能撑过断言窗口
   await page.addInitScript(() => {
     localStorage.setItem('warmoji.captain.v1', 'prodigy')
-    localStorage.setItem('warmoji.lineup.v1', JSON.stringify(['cowboy', 'troll']))
   })
   await page.goto('/')
   await startRun(page)
@@ -30,8 +29,8 @@ test('开局后自动战斗：出怪、飞刀击杀、计时推进、无控制�
     timeout: 45_000,
   })
 
-  // 等战场热闹些再截图
-  await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 8, undefined, {
+  // 等战场热闹些再截图（第 1 波只有 15 秒，节点前移给暂停测试留时间）
+  await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 6, undefined, {
     timeout: 45_000,
   })
   await page.screenshot({ path: 'test-results/gameplay.png' })

@@ -4,12 +4,14 @@ import { CaptainScene } from './scenes/CaptainScene'
 import { MenuScene } from './scenes/MenuScene'
 import { PreloadScene } from './scenes/PreloadScene'
 import { PromoteScene } from './scenes/PromoteScene'
+import { ResultScene } from './scenes/ResultScene'
 import { SettingsScene } from './scenes/SettingsScene'
 import { ShopScene } from './scenes/ShopScene'
 import { UIScene } from './scenes/UIScene'
 import { WikiScene } from './scenes/WikiScene'
+import { WAVE } from './core/config'
 import { browserStorage } from './core/highscore'
-import { grantCoins, grantXp } from './core/run'
+import { getRun, grantCoins, grantXp } from './core/run'
 import { loadSettings } from './core/settings'
 import { setStress } from './ui/dev'
 import { initSfx, setSfxEnabled, sfxStats } from './ui/sfx'
@@ -38,7 +40,7 @@ const game = new Phaser.Game({
   // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
   physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, WikiScene, SettingsScene, CaptainScene, PromoteScene, ShopScene, ArenaScene, UIScene],
+  scene: [PreloadScene, MenuScene, WikiScene, SettingsScene, CaptainScene, PromoteScene, ShopScene, ArenaScene, UIScene, ResultScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {
@@ -83,4 +85,8 @@ window.__setStress = (on: boolean): void => {
 
 window.__addCoins = (n: number): void => grantCoins(n)
 window.__addXp = (n: number): void => grantXp(n)
+// e2e 快进到指定波（在商店/整编期间调用，下次开战即该波）
+window.__setWave = (n: number): void => {
+  getRun().wave = Math.max(1, Math.min(WAVE.totalWaves, Math.round(n)))
+}
 window.__sfxStats = (): { baked: number; played: number } => sfxStats()

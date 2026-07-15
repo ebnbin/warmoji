@@ -374,9 +374,14 @@ export const MEMBER = {
   iframesMs: 700,
 } as const
 
-// 波次制：一波战斗固定时长 → 结算横幅 → 商店 → 下一波；上一波阵亡者下波以低血量复活
+// 波次制：一波战斗固定时长 → 结算横幅 → 整编/商店 → 下一波；上一波阵亡者下波低血复活。
+// 有限局：打满 totalWaves 波即通关（进结算页），中途团灭进同一结算页的失败版
 export const WAVE = {
-  durationMs: 30_000,
+  /** 前 shortWaves 波每波 shortMs（快节奏开局），之后每波 longMs */
+  shortWaves: 5,
+  shortMs: 15_000,
+  longMs: 30_000,
+  totalWaves: 15,
   reviveHpRatio: 0.3,
   /** 波末结算横幅停留时长：给玩家松手时间，防止战斗输入误触商店按钮 */
   summaryMs: 1600,
@@ -682,9 +687,10 @@ export const STRESS = {
 export const XP = {
   base: 35,
   growth: 1.25,
-  /** 波末保底经验 = base + perWave×波次（躲避流的兜底，占比小头） */
-  waveBonusBase: 12,
-  waveBonusPerWave: 3,
+  /** 波末保底经验 = base + perWave×波次：15 波制下是经验主梁之一，
+   * 保证前几波（15 秒短波杀怪少）每波也能升级、第 15 波打完约到满级 */
+  waveBonusBase: 45,
+  waveBonusPerWave: 16,
   /** 队伍等级上限：到顶后不再获得经验（点数总量因此固定为 maxLevel-1） */
   maxLevel: 18,
 } as const

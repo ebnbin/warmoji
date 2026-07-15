@@ -291,10 +291,6 @@ try {
     const st = await snapshot().catch(() => ({ scene: 'err' }))
     if (st.scene === 'arena') {
       lastCombat = { hp: Math.round(st.hp), alive: st.alive, fps: st.fps }
-      if (st.wave > 20) {
-        log('DONE', { reason: '20 波封顶', level: st.level, kills: st.kills, levels: levelHistory })
-        break
-      }
       // 战斗实拍：新敌人渐入的几个波次
       if ([3, 5, 7].includes(st.wave) && st.elapsed > 12 && !shots.has(st.wave)) {
         shots.add(st.wave)
@@ -306,16 +302,17 @@ try {
       await releaseKeys()
       lastAngle = null
       await shopPhase(lastCombat)
-    } else if (st.scene === 'gameover') {
+    } else if (st.scene === 'result') {
       await releaseKeys()
       const fin = await page.evaluate(() => ({
+        win: window.__warmoji.result?.win ?? false,
         wave: window.__warmoji.wave,
         kills: window.__warmoji.kills,
         level: window.__warmoji.level,
       }))
-      await page.screenshot({ path: `${OUT}/en-gameover.png` })
-      log('GAMEOVER', fin)
-      log('DONE', { reason: '全灭', levels: levelHistory })
+      await page.screenshot({ path: `${OUT}/en-result.png` })
+      log('RESULT', fin)
+      log('DONE', { reason: fin.win ? '通关' : '全灭', levels: levelHistory })
       break
     } else {
       await new Promise((r) => setTimeout(r, 300))

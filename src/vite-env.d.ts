@@ -76,8 +76,16 @@ interface WarmojiCaptainDebug {
   start: { x: number; y: number; w: number; h: number }
 }
 
+interface WarmojiResultDebug {
+  win: boolean
+  rows: number
+  newBest: boolean
+  again: { x: number; y: number; w: number; h: number }
+  menu: { x: number; y: number; w: number; h: number }
+}
+
 interface WarmojiDebug {
-  scene: 'menu' | 'wiki' | 'settings' | 'captain' | 'promote' | 'shop' | 'arena' | 'gameover'
+  scene: 'menu' | 'wiki' | 'settings' | 'captain' | 'promote' | 'shop' | 'arena' | 'result'
   elapsed: number
   hp: number
   alive: number
@@ -102,6 +110,7 @@ interface WarmojiDebug {
   captain?: WarmojiCaptainDebug
   promote?: WarmojiPromoteDebug
   shop?: WarmojiShopDebug
+  result?: WarmojiResultDebug
 }
 
 interface Window {
@@ -111,5 +120,6 @@ interface Window {
   __setStress?: (on: boolean) => void
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
+  __setWave?: (n: number) => void
   __sfxStats?: () => { baked: number; played: number }
 }

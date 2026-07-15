@@ -15,7 +15,7 @@ import {
   viewport,
   VIEWPORT_CHANGED,
 } from '../ui/viewport'
-import type { ArenaScene, GameOverInfo, HudSnapshot, WaveSummary } from './ArenaScene'
+import type { ArenaScene, HudSnapshot, WaveSummary } from './ArenaScene'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
 // 与 ArenaScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
@@ -120,18 +120,15 @@ export class UIScene extends Phaser.Scene {
     if (isDevOpen()) this.createDevPanel(res)
 
     const arenaEvents = this.arena.events
-    arenaEvents.on('game-over', this.onGameOver, this)
     arenaEvents.on('wave-complete', this.onWaveComplete, this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      arenaEvents.off('game-over', this.onGameOver, this)
       arenaEvents.off('wave-complete', this.onWaveComplete, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
 
-    // 视口变化会重启本场景：恢复结算界面/暂停浮层
-    if (this.arena.gameOverInfo) this.onGameOver(this.arena.gameOverInfo)
-    else if (this.arena.scene.isPaused()) {
+    // 视口变化会重启本场景：恢复暂停浮层
+    if (this.arena.scene.isPaused()) {
       this.paused = true
       this.showPauseOverlay()
     }
@@ -140,7 +137,6 @@ export class UIScene extends Phaser.Scene {
   // ── 暂停 ────────────────────────────────────────────────────
 
   private togglePause(): void {
-    if (this.arena.gameOverInfo) return
     if (this.paused) {
       this.paused = false
       for (const o of this.pauseObjs) o.destroy()
@@ -333,69 +329,6 @@ export class UIScene extends Phaser.Scene {
         color: '#b3e5fc',
       }).setDepth(231)
     }
-  }
-
-  private onGameOver(info: GameOverInfo): void {
-    const res = textRes()
-    const cx = viewport.logicalWidth / 2
-    const cy = viewport.logicalHeight / 2
-
-    this.add.rectangle(cx, cy, 6000, 6000, 0x000000, 0.72).setDepth(200)
-    iconLabel(this, cx, cy - 130, '💀', 58, '游戏结束', {
-      fontFamily: UI_FONT,
-      fontSize: FONT.banner,
-      color: '#ffffff',
-      resolution: res,
-    }).setDepth(201)
-    this.add
-      .text(cx, cy - 36, `倒在第 ${info.wave} 波 · 击杀 ${info.kills} · 等级 ${info.level}`, {
-        fontFamily: UI_FONT,
-        fontSize: FONT.head,
-        color: '#dddddd',
-        resolution: res,
-      })
-      .setOrigin(0.5)
-      .setDepth(201)
-    iconLabel(
-      this,
-      cx,
-      cy + 22,
-      '🏆',
-      28,
-      info.newBest ? '新纪录！' : `最佳：第 ${info.bestWave} 波 · 击杀 ${info.bestKills}`,
-      { fontFamily: UI_FONT, fontSize: FONT.strong, color: '#d4b106', resolution: res },
-    ).setDepth(201)
-    // 明确按钮 + 空格返回，防死亡瞬间误触（500ms 后才可交互）
-    const back = (): void => {
-      endRun()
-      this.arena.scene.start('captain')
-    }
-    const rect = { x: cx - 150, y: cy + 92, w: 300, h: 72 }
-    const g = this.add.graphics().setDepth(201).setAlpha(0)
-    g.fillStyle(0xffd54f, 1)
-    g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 36)
-    const label = this.add
-      .text(cx, cy + 128, '重新组队', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.lead,
-        fontStyle: 'bold',
-        color: '#25262e',
-        resolution: res,
-      })
-      .setOrigin(0.5)
-      .setDepth(202)
-      .setAlpha(0)
-    this.time.delayedCall(500, () => {
-      this.tweens.add({ targets: [g, label], alpha: 1, duration: 150 })
-      this.add
-        .zone(rect.x, rect.y, rect.w, rect.h)
-        .setOrigin(0)
-        .setDepth(202)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerup', back)
-      this.input.keyboard?.once('keydown-SPACE', back)
-      this.input.keyboard?.once('keydown-ENTER', back)
-    })
   }
 
   private drawXpBar(s: HudSnapshot): void {

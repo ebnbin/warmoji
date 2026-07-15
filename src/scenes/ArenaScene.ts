@@ -9,7 +9,7 @@ import { formationPosts, ringPostAngle } from '../core/formation'
 import type { FormationId } from '../core/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../core/orbit'
 import type { OrbitThreat } from '../core/orbit'
-import { browserStorage, submitScore } from '../core/highscore'
+import { browserStorage } from '../core/highscore'
 import {
   aggregateCharacterEffects,
   aggregateTeamEffects,
@@ -27,7 +27,7 @@ import { Rng } from '../core/rng'
 import { randomMapPoint } from '../core/spawn'
 import { norm } from '../core/vec'
 import type { Point } from '../core/vec'
-import { waveAt } from '../core/waves'
+import { isFinalWave, waveAt, waveDurationMs } from '../core/waves'
 import { gainXp, waveBonusXp, xpToNext } from '../core/xp'
 import { applyBackground } from '../ui/background'
 import { DAMAGE_FONT, ensureDamageFont } from '../ui/damageFont'
@@ -62,15 +62,6 @@ export interface HudSnapshot {
   seconds: number
   remainMs: number
   over: boolean
-}
-
-export interface GameOverInfo {
-  wave: number
-  kills: number
-  level: number
-  newBest: boolean
-  bestWave: number
-  bestKills: number
 }
 
 /** 波末结算横幅的战果（本波增量） */
@@ -195,7 +186,6 @@ export class ArenaScene extends Phaser.Scene {
   private waveBaseKills = 0
   private waveBaseCoins = 0
   private waveBaseLevel = 1
-  gameOverInfo?: GameOverInfo
 
   constructor() {
     super('arena')
@@ -236,7 +226,7 @@ export class ArenaScene extends Phaser.Scene {
       coins: this.run.coins,
       wave: this.run.wave,
       seconds: Math.floor(this.elapsedMs / 1000),
-      remainMs: Math.max(0, WAVE.durationMs - this.elapsedMs),
+      remainMs: Math.max(0, waveDurationMs(this.run.wave) - this.elapsedMs),
       over: this.over,
     }
   }
@@ -258,7 +248,6 @@ export class ArenaScene extends Phaser.Scene {
     this.spawnCooldownMs = 300
     this.pendingSpawns = 0
     this.over = false
-    this.gameOverInfo = undefined
     this.poisonPools = []
 
     this.physics.world.setBounds(0, 0, MAP.width, MAP.height)
@@ -353,8 +342,8 @@ export class ArenaScene extends Phaser.Scene {
     if (this.over) return
     this.elapsedMs += delta
 
-    // 波次时间到 → 商店（压测模式无尽，便于性能观测）
-    if (!this.stress && this.elapsedMs >= WAVE.durationMs) {
+    // 波次时间到 → 结算/商店（压测模式无尽，便于性能观测）
+    if (!this.stress && this.elapsedMs >= waveDurationMs(this.run.wave)) {
       this.endWave()
       return
     }
@@ -397,30 +386,32 @@ export class ArenaScene extends Phaser.Scene {
     })
   }
 
-  /** 波次结束：快照队伍状态进 run，未拾取的金币随场景一并消失 */
+  /** 波次结束：快照队伍状态进 run；打满最后一波直接进胜利结算 */
   private endWave(): void {
     this.over = true
     this.physics.pause()
     playSfx('wave')
+    const finished = isFinalWave(this.run.wave)
     // 波末保底经验：躲避流杀得少也有基本收益（队长倍率同样生效）
     const xpMul = CAPTAINS[this.run.captainId].xpGainMul
     this.run.xp = gainXp(this.run.xp, Math.round(waveBonusXp(this.run.wave) * xpMul)).state
     this.run.combatMs += this.elapsedMs
     this.run.wave += 1
     this.run.memberHp = this.members.map((m) => (m.alive ? Math.round(m.hp) : 0))
-    // 先冻结战场弹结算横幅（UIScene 渲染），停留片刻再进商店：
-    // 给正在操作移动的手指留出松手时间，防止战斗输入误触商店按钮
+    // 先冻结战场弹结算横幅（UIScene 渲染），停留片刻再走：
+    // 给正在操作移动的手指留出松手时间，防止战斗输入误触下一页按钮
     this.events.emit('wave-complete', {
       wave: this.run.wave - 1,
       kills: this.run.kills - this.waveBaseKills,
       coins: this.run.coins - this.waveBaseCoins,
       levels: this.run.xp.level - this.waveBaseLevel,
     } satisfies WaveSummary)
-    // 有待结算点数才进整编页（强制招募/升级；首次满员时会顺带展示一次阵型页），
-    // 否则直进商店——阵型调整的常驻入口在商店
-    this.time.delayedCall(WAVE.summaryMs, () =>
-      this.scene.start(promoteStep(this.run) ? 'promote' : 'shop'),
-    )
+    // 通关 → 胜利结算；否则有待结算点数才进整编页（首次满员顺带阵型页），
+    // 没点数直进商店——阵型调整的常驻入口在商店
+    this.time.delayedCall(WAVE.summaryMs, () => {
+      if (finished) this.scene.start('result', { win: true })
+      else this.scene.start(promoteStep(this.run) ? 'promote' : 'shop')
+    })
   }
 
   private onViewportChanged(): void {
@@ -479,6 +470,10 @@ export class ArenaScene extends Phaser.Scene {
       ...this.weaponCtx,
       damageMul: () => this.stats.damageMul * fx.damageMul * lvlDmg * this.teamFx.teamDamageMul,
       cooldownMul: () => this.stats.cooldownMul * fx.cooldownMul,
+      // 伤害/子弹带上来源槽位：结算页按角色统计输出与击杀
+      damageEnemy: (e, d, kb, sx, sy) => this.applyDamage(e as ImageObj, d, kb, sx, sy, slot),
+      spawnProjectile: (x, y, angle, spec, damage) =>
+        this.spawnProjectile(x, y, angle, spec, damage, slot),
     }
     const maxHp = this.stress ? this.stats.maxHp : memberMaxHp(level, fx.hpAdd)
     const member: Member = {
@@ -730,6 +725,8 @@ export class ArenaScene extends Phaser.Scene {
   private killMember(m: Member): void {
     m.alive = false
     m.hp = 0
+    const deaths = this.run.stats.deaths
+    if (m.slot < deaths.length) deaths[m.slot] = (deaths[m.slot] ?? 0) + 1
     m.reviveAt = this.elapsedMs + m.reviveMs
     m.shownCountdown = -1
     ;(m.image.body as ArcadeBody).enable = false
@@ -771,6 +768,7 @@ export class ArenaScene extends Phaser.Scene {
     angle: number,
     spec: ProjectileSpec,
     damage: number,
+    srcSlot = -1,
   ): void {
     const p = emojiImage(this, x, y, spec.projectile.emoji, spec.projectile.size, 'player')
       .setDepth(8)
@@ -782,6 +780,7 @@ export class ArenaScene extends Phaser.Scene {
       Math.sin(angle) * spec.projectile.speed,
     )
     playSfx('shoot')
+    p.setData('srcSlot', srcSlot)
     p.setData('damage', damage)
     p.setData('radius', spec.projectile.radius)
     p.setData('kb', spec.knockback)
@@ -801,9 +800,10 @@ export class ArenaScene extends Phaser.Scene {
       if (hit >= 0) {
         const damage = p.getData('damage') as number
         const kb = p.getData('kb') as number
+        const srcSlot = (p.getData('srcSlot') as number) ?? -1
         p.destroy()
         // 击退源取上一帧位置：方向即子弹飞行方向
-        this.applyDamage(this.frameTargets[hit]!.ref as ImageObj, damage, kb, prev.x, prev.y)
+        this.applyDamage(this.frameTargets[hit]!.ref as ImageObj, damage, kb, prev.x, prev.y, srcSlot)
         continue
       }
       const spin = p.getData('spin') as number
@@ -828,9 +828,23 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private applyDamage(enemy: ImageObj, damage: number, knockback = 0, srcX?: number, srcY?: number): void {
+  private applyDamage(
+    enemy: ImageObj,
+    damage: number,
+    knockback = 0,
+    srcX?: number,
+    srcY?: number,
+    srcSlot = -1,
+  ): void {
     if (!enemy.active) return
-    const hp = (enemy.getData('hp') as number) - damage
+    const hpBefore = enemy.getData('hp') as number
+    const hp = hpBefore - damage
+    // 结算统计：按伤害来源槽位累计有效伤害与击杀（压测阵容槽位越界则跳过）
+    const st = this.run.stats
+    if (srcSlot >= 0 && srcSlot < st.damage.length) {
+      st.damage[srcSlot] = (st.damage[srcSlot] ?? 0) + Math.min(damage, Math.max(0, hpBefore))
+      if (hp <= 0) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
+    }
     this.floatDamage(enemy.x, enemy.y, damage)
     if (hp <= 0) {
       // 致死一击：敌人失去自身动力，击退不再衰减——尸体被匀速击飞
@@ -1379,39 +1393,10 @@ export class ArenaScene extends Phaser.Scene {
     this.over = true
     this.physics.pause()
     playSfx('over')
-
-    const result = submitScore(browserStorage(), this.run.wave, this.run.kills)
-    this.gameOverInfo = {
-      wave: this.run.wave,
-      kills: this.run.kills,
-      level: this.run.xp.level,
-      newBest: result.newBest,
-      bestWave: result.score.bestWave,
-      bestKills: result.score.bestKills,
-    }
-    this.events.emit('game-over', this.gameOverInfo)
-
-    reportDebug({
-      scene: 'gameover',
-      elapsed: this.elapsedMs / 1000,
-      hp: 0,
-      alive: 0,
-      kills: this.run.kills,
-      level: this.run.xp.level,
-      wave: this.run.wave,
-      coins: this.run.coins,
-      enemies: this.enemies.countActive(true),
-      pending: this.pendingSpawns,
-      fps: Math.round(this.game.loop.actualFps),
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      playerX: this.center.x,
-      playerY: this.center.y,
-      camX: this.cameras.main.worldView.centerX,
-      camY: this.cameras.main.worldView.centerY,
-    })
-
-    // 返回入口在 UIScene 的结算浮层（按钮/空格），弃局回组队页
+    // 败局也计入本波已打的时长（结算页展示用时）
+    this.run.combatMs += this.elapsedMs
+    // 冻结战场停留片刻（消化死亡瞬间），再进失败结算页
+    this.time.delayedCall(900, () => this.scene.start('result', { win: false }))
   }
 
   private drawFloor(): void {

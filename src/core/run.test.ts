@@ -31,6 +31,17 @@ describe('run 生命周期', () => {
     expect(run.memberLevels).toEqual([1])
     expect(run.memberHp).toEqual([MEMBER.maxHp])
     expect(run.memberItems).toEqual([[]])
+    expect(run.stats).toEqual({ damage: [0], kills: [0], deaths: [0] })
+    endRun()
+  })
+
+  it('招募时结算统计数组同步扩容', () => {
+    const run = beginRun('angel', ['cowboy'])
+    run.xp.level = 3
+    recruitMember(run, 'mage')
+    expect(run.stats.damage).toEqual([0, 0])
+    expect(run.stats.kills).toEqual([0, 0])
+    expect(run.stats.deaths).toEqual([0, 0])
     endRun()
   })
 
