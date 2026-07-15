@@ -5,24 +5,14 @@ declare const __BUILD_TIME__: string
 declare const __TWEMOJI_VERSION__: string
 
 // e2e 读取的运行时状态（src/ui/debug.ts 写入）
-interface WarmojiSelectDebug {
-  selected: number
-  size: number
-  focusedId: string
-  // 逻辑坐标：矩形为左上角+宽高，toggle/start 的 x/y 为按钮中心
-  items: { id: string; x: number; y: number; w: number; h: number; inLineup: boolean }[]
-  list: { x: number; y: number; w: number; h: number; scrollY: number; contentH: number }
-  detail: { x: number; y: number; w: number; h: number }
-  toggle: { x: number; y: number; w: number; h: number; mode: 'add' | 'remove' | 'full' }
-  start: { x: number; y: number; w: number; h: number; enabled: boolean }
-}
-
 interface WarmojiPromoteDebug {
   mode: 'recruit' | 'upgrade'
   points: number
   selected: string
   items: { id: string; x: number; y: number; w: number; h: number }[]
   confirm: { x: number; y: number; w: number; h: number; enabled: boolean }
+  /** wave=1 为「返回队长页」，wave>1 为「结束本局」 */
+  back: { x: number; y: number; w: number; h: number }
 }
 
 interface WarmojiShopDebug {
@@ -81,7 +71,7 @@ interface WarmojiCaptainDebug {
 }
 
 interface WarmojiDebug {
-  scene: 'menu' | 'wiki' | 'settings' | 'captain' | 'select' | 'promote' | 'shop' | 'arena' | 'gameover'
+  scene: 'menu' | 'wiki' | 'settings' | 'captain' | 'promote' | 'shop' | 'arena' | 'gameover'
   elapsed: number
   hp: number
   alive: number
@@ -102,7 +92,6 @@ interface WarmojiDebug {
   wiki?: WarmojiWikiDebug
   settings?: WarmojiSettingsDebug
   captain?: WarmojiCaptainDebug
-  select?: WarmojiSelectDebug
   promote?: WarmojiPromoteDebug
   shop?: WarmojiShopDebug
 }

@@ -368,14 +368,14 @@ export class UIScene extends Phaser.Scene {
     // 明确按钮 + 空格返回，防死亡瞬间误触（500ms 后才可交互）
     const back = (): void => {
       endRun()
-      this.arena.scene.start('select')
+      this.arena.scene.start('captain')
     }
     const rect = { x: cx - 150, y: cy + 92, w: 300, h: 72 }
     const g = this.add.graphics().setDepth(201).setAlpha(0)
     g.fillStyle(0xffd54f, 1)
     g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 36)
     const label = this.add
-      .text(cx, cy + 128, '返回组队', {
+      .text(cx, cy + 128, '重新组队', {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
         fontStyle: 'bold',

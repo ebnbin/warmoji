@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import type { CharacterId } from '../core/config'
-import { CHARACTERS, LEVELS } from '../core/config'
+import { CAPTAINS, CHARACTERS, LEVELS } from '../core/config'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -23,9 +23,11 @@ import { FONT, UI_FONT } from '../ui/fonts'
 import { playSfx } from '../ui/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
-// 整编页：波次结束后、进商店前的强制点数结算——经验不可延迟消费。
-// 每 1 点为一步：未满编必须招募（网格 = 候选角色），满编后必须升级（网格 = 未满级队员），
-// 全部点数花完自动进商店；无点数/无事可办（满编且全员满级）时由 Arena 直接跳过本页。
+// 整编页：每波战斗前的强制点数结算——经验不可延迟消费。开局组队与波末整编
+// 完全复用本页：队长确认后带着开局点数进来（wave=1，可返回重选队长），
+// 波末带着升级点数进来（wave>1，队长不可重选，只能结束本局）。
+// 每 1 点为一步：未满编必须招募（网格 = 候选角色），满编后必须升级（网格 = 未满级队员）；
+// 点数花完后的去向：wave=1 看队长 firstWaveShop（默认直接开战），wave>1 进商店。
 // 布局沿用「详情 + 网格」方向约定：竖屏「上」= 横屏「左」（详情）。
 interface PromoteLayout {
   content: { w: number; h: number }
@@ -67,6 +69,7 @@ export class PromoteScene extends Phaser.Scene {
   private grid!: EmojiGrid
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
+  private backRect = { x: 0, y: 0, w: 0, h: 0 }
   private quitArmed = false
 
   constructor() {
@@ -83,10 +86,10 @@ export class PromoteScene extends Phaser.Scene {
     this.detailObjs = []
     this.quitArmed = false
 
-    // 兜底：无事可办直接进店（正常由 Arena 决定是否进入本页）
+    // 兜底：无事可办直接去下一站（正常由队长页/Arena 决定是否进入本页）
     const step = promoteStep(this.run)
     if (!step) {
-      this.scene.start('shop')
+      this.scene.start(this.nextScene())
       return
     }
     this.mode = step
@@ -102,7 +105,7 @@ export class PromoteScene extends Phaser.Scene {
     const oy = this.origin.y
 
     this.add
-      .text(w / 2, oy + L.headerY, '队伍整编', {
+      .text(w / 2, oy + L.headerY, this.isInitial() ? '组建队伍' : '队伍整编', {
         fontFamily: UI_FONT,
         fontSize: FONT.title,
         fontStyle: 'bold',
@@ -111,30 +114,54 @@ export class PromoteScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    // 结束本局：二次点击确认，防误触弃局
-    const quit = this.add
-      .text(this.origin.x + 40, oy + L.headerY, '✕ 结束', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.strong,
-        color: '#c8c8d4',
-        resolution: res,
-      })
-      .setOrigin(0, 0.5)
-      .setInteractive({ useHandCursor: true })
-    quit.on('pointerup', () => {
-      if (this.grid.wasDragged) return
-      if (this.quitArmed) {
+    if (this.isInitial()) {
+      // 开局组队：可反悔，返回重选队长（本局作废）
+      const back = this.add
+        .text(this.origin.x + 40, oy + L.headerY, '← 返回', {
+          fontFamily: UI_FONT,
+          fontSize: FONT.strong,
+          color: '#c8c8d4',
+          resolution: res,
+        })
+        .setOrigin(0, 0.5)
+        .setInteractive({ useHandCursor: true })
+      back.on('pointerup', () => {
+        if (this.grid.wasDragged) return
         endRun()
-        this.scene.start('menu')
-        return
-      }
-      this.quitArmed = true
-      quit.setText('再点一次确认').setColor('#ef9a9a')
-      this.time.delayedCall(2500, () => {
-        this.quitArmed = false
-        if (quit.active) quit.setText('✕ 结束').setColor('#c8c8d4')
+        this.scene.start('captain')
       })
-    })
+      this.backRect = { x: back.x, y: back.y - back.height / 2, w: back.width, h: back.height }
+      this.input.keyboard?.on('keydown-ESC', () => {
+        endRun()
+        this.scene.start('captain')
+      })
+    } else {
+      // 波末整编：队长不可重选，只能结束本局（二次点击确认，防误触弃局）
+      const quit = this.add
+        .text(this.origin.x + 40, oy + L.headerY, '✕ 结束', {
+          fontFamily: UI_FONT,
+          fontSize: FONT.strong,
+          color: '#c8c8d4',
+          resolution: res,
+        })
+        .setOrigin(0, 0.5)
+        .setInteractive({ useHandCursor: true })
+      quit.on('pointerup', () => {
+        if (this.grid.wasDragged) return
+        if (this.quitArmed) {
+          endRun()
+          this.scene.start('menu')
+          return
+        }
+        this.quitArmed = true
+        quit.setText('再点一次确认').setColor('#ef9a9a')
+        this.time.delayedCall(2500, () => {
+          this.quitArmed = false
+          if (quit.active) quit.setText('✕ 结束').setColor('#c8c8d4')
+        })
+      })
+      this.backRect = { x: quit.x, y: quit.y - quit.height / 2, w: quit.width, h: quit.height }
+    }
 
     // 步骤说明：剩余点数 + 当前必须执行的动作
     const points = pointsAvailable(this.run)
@@ -228,6 +255,17 @@ export class PromoteScene extends Phaser.Scene {
     })
   }
 
+  /** 开局组队（第 1 波开战前）还是波末整编 */
+  private isInitial(): boolean {
+    return this.run.wave === 1
+  }
+
+  /** 点数花完后的去向：开局看队长 firstWaveShop（默认直接开战），波末必进商店 */
+  private nextScene(): 'arena' | 'shop' {
+    if (this.isInitial() && !CAPTAINS[this.run.captainId].firstWaveShop) return 'arena'
+    return 'shop'
+  }
+
   // ── 数据 ────────────────────────────────────────────────────
 
   private buildItems(): { key: string; emoji: string; outline: 'player'; badge?: string }[] {
@@ -279,13 +317,13 @@ export class PromoteScene extends Phaser.Scene {
       if (slot < 0 || !upgradeMember(this.run, slot)) return
       playSfx('upgrade')
     }
-    // 下一步或进店（重建页面刷新模式/候选；保留背景色）
+    // 下一步或去下一站（重建页面刷新模式/候选；保留背景色）
     if (promoteStep(this.run)) {
       this.selectedKey = ''
       this.preserveOnRestart = true
       this.scene.restart()
     } else {
-      this.scene.start('shop')
+      this.scene.start(this.nextScene())
     }
   }
 
@@ -398,6 +436,12 @@ export class PromoteScene extends Phaser.Scene {
           w: this.btnRect.w,
           h: this.btnRect.h,
           enabled: this.selectedKey !== '',
+        },
+        back: {
+          x: this.backRect.x + this.backRect.w / 2,
+          y: this.backRect.y + this.backRect.h / 2,
+          w: this.backRect.w,
+          h: this.backRect.h,
         },
       },
     })

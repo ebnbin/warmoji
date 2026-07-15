@@ -171,8 +171,8 @@ async function promotePhase() {
     await clickAt({ x: confirm.x, y: confirm.y })
     await page.waitForFunction(
       (prev) =>
-        window.__warmoji?.scene === 'shop' ||
-        (window.__warmoji?.scene === 'promote' && (window.__warmoji.promote?.points ?? 99) < prev),
+        window.__warmoji?.scene !== 'promote' ||
+        (window.__warmoji.promote?.points ?? 99) < prev,
       before,
       { timeout: 10000 },
     )
@@ -263,17 +263,17 @@ async function shopPhase(lastCombat) {
 try {
   await page.addInitScript(() => {
     localStorage.setItem('warmoji.captain.v1', 'angel')
-    localStorage.setItem('warmoji.lineup.v1', JSON.stringify(['cowboy']))
   })
   await page.goto(`http://localhost:${PORT}/`)
   await page.waitForFunction(() => window.__warmoji?.scene === 'menu' && !!window.__warmoji.menu)
   await clickAt(await page.evaluate(() => window.__warmoji.menu.start))
   await page.waitForFunction(() => window.__warmoji?.scene === 'captain')
   await clickAt(await page.evaluate(() => window.__warmoji.captain.start))
-  await page.waitForFunction(() => window.__warmoji?.select?.start.enabled === true)
-  await clickAt(await page.evaluate(() => window.__warmoji.select.start))
+  // 开局整编：按心愿单强制招募（点数花完直接开战）
+  await page.waitForFunction(() => window.__warmoji?.scene === 'promote' && !!window.__warmoji.promote)
+  const starters = await promotePhase()
   await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
-  log('START', { captain: 'angel', starter: 'cowboy' })
+  log('START', { captain: 'angel', starters })
 
   const t0 = Date.now()
   let lastCombat = null

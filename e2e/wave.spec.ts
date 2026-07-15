@@ -20,10 +20,9 @@ test('波次循环：整编强制招募→满编升级 → 商店纯购物 → �
     if (msg.type() === 'error') errors.push(msg.text())
   })
 
-  // 预选财迷队长（验证免费刷新）+ 牛仔首发（单人输出稳）
+  // 预选财迷队长（验证免费刷新）；开局整编默认招募第一位候选
   await page.addInitScript(() => {
     localStorage.setItem('warmoji.captain.v1', 'moneybags')
-    localStorage.setItem('warmoji.lineup.v1', JSON.stringify(['cowboy']))
   })
   await page.goto('/')
   await startRun(page)

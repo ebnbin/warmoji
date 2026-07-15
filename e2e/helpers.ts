@@ -30,48 +30,38 @@ export async function clickCaptain(page: Page, id: string): Promise<void> {
   await page.waitForFunction((cid) => window.__warmoji?.captain?.selected === cid, id)
 }
 
-/** 队长页确认 → 组队页 */
+/** 队长页确认 → 整编页（开局组队 = 第一次强制整编） */
 export async function confirmCaptain(page: Page): Promise<void> {
   const s = await page.evaluate(() => window.__warmoji!.captain!.start)
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: s.x, y: s.y }) })
-  await page.waitForFunction(() => window.__warmoji?.scene === 'select' && !!window.__warmoji.select)
+  await page.waitForFunction(
+    () => window.__warmoji?.scene === 'promote' && !!window.__warmoji.promote,
+  )
 }
 
-/** 标题页 → 队长页（默认队长）→ 组队页 */
-export async function enterSelect(page: Page): Promise<void> {
+/** 把整编页的强制步骤走完（默认选中项逐点确认），直到离开整编页 */
+export async function completePromote(page: Page): Promise<void> {
+  for (let step = 0; step < 24; step++) {
+    const scene = await page.evaluate(() => window.__warmoji!.scene)
+    if (scene !== 'promote') return
+    const before = await page.evaluate(() => window.__warmoji!.promote!.points)
+    await clickPromoteConfirm(page)
+    await page.waitForFunction(
+      (prev) =>
+        window.__warmoji?.scene !== 'promote' ||
+        (window.__warmoji.promote?.points ?? 99) < prev,
+      before,
+      { timeout: 15_000 },
+    )
+  }
+}
+
+/** 走完整流程开局：标题页 → 队长确认 → 开局整编（默认招募）→ 战斗 */
+export async function startRun(page: Page): Promise<void> {
   await enterCaptain(page)
   await confirmCaptain(page)
-}
-
-/** 点击列表中某个角色行（聚焦并展开详情） */
-export async function clickItem(page: Page, id: string): Promise<void> {
-  const it = await page.evaluate(
-    (cid) => window.__warmoji!.select!.items.find((x) => x.id === cid)!,
-    id,
-  )
-  await page
-    .locator('#game canvas')
-    .click({ position: await cssPoint(page, { x: it.x + it.w / 2, y: it.y + it.h / 2 }) })
-}
-
-/** 点击详情面板的 加入/移出 按钮 */
-export async function clickToggle(page: Page): Promise<void> {
-  const t = await page.evaluate(() => window.__warmoji!.select!.toggle)
-  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: t.x, y: t.y }) })
-}
-
-/** 点击「出发」（需阵容已满）并等待进入战斗 */
-export async function clickStart(page: Page): Promise<void> {
-  await page.waitForFunction(() => window.__warmoji?.select?.start.enabled === true)
-  const s = await page.evaluate(() => window.__warmoji!.select!.start)
-  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: s.x, y: s.y }) })
+  await completePromote(page)
   await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
-}
-
-/** 走完整流程开局：标题页 → 组队页 → 出发 */
-export async function startRun(page: Page): Promise<void> {
-  await enterSelect(page)
-  await clickStart(page)
 }
 
 /** 商店页点击某个角色的上架位（切换属性面板焦点） */

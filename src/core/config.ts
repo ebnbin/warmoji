@@ -248,6 +248,8 @@ export interface CaptainSpec {
   readonly reviveInShop: boolean
   /** 每次进商店的免费道具刷新次数 */
   readonly freeRefreshes: number
+  /** 第 1 波开战前是否开放商店（整编结束后）；为未来自带初始金币的队长预留 */
+  readonly firstWaveShop: boolean
 }
 
 export const CAPTAINS = {
@@ -260,6 +262,7 @@ export const CAPTAINS = {
     xpGainMul: 1,
     reviveInShop: true,
     freeRefreshes: 0,
+    firstWaveShop: false,
   },
   moneybags: {
     emoji: '🤑',
@@ -270,6 +273,7 @@ export const CAPTAINS = {
     xpGainMul: 1,
     reviveInShop: false,
     freeRefreshes: 3,
+    firstWaveShop: false,
   },
   party: {
     emoji: '🥳',
@@ -280,6 +284,7 @@ export const CAPTAINS = {
     xpGainMul: 1,
     reviveInShop: false,
     freeRefreshes: 0,
+    firstWaveShop: false,
   },
   prodigy: {
     emoji: '🤓',
@@ -290,6 +295,7 @@ export const CAPTAINS = {
     xpGainMul: 1,
     reviveInShop: false,
     freeRefreshes: 0,
+    firstWaveShop: false,
   },
   scholar: {
     emoji: '🧐',
@@ -300,6 +306,7 @@ export const CAPTAINS = {
     xpGainMul: 1.25,
     reviveInShop: false,
     freeRefreshes: 0,
+    firstWaveShop: false,
   },
 } as const satisfies Record<string, CaptainSpec>
 

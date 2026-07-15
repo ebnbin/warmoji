@@ -5,6 +5,7 @@ import { browserStorage } from '../core/highscore'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
+import { beginRun } from '../core/run'
 import { loadCaptain, saveCaptain } from '../core/selection'
 import { captainStatGroups } from '../core/stats'
 import { applyBackground } from '../ui/background'
@@ -136,16 +137,19 @@ export class CaptainScene extends Phaser.Scene {
         resolution: res,
       })
       .setOrigin(0.5)
+    const confirm = (): void => {
+      playSfx('click')
+      // 开局组队 = 第一次整编：空阵容起步，按队长开局点数强制招募/升级
+      beginRun(this.selectedId, [])
+      this.scene.start('promote')
+    }
     this.add
       .zone(b.x, b.y, b.w, b.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
-        playSfx('click')
-        this.scene.start('select')
-      })
-    this.input.keyboard?.on('keydown-ENTER', () => this.scene.start('select'))
-    this.input.keyboard?.on('keydown-SPACE', () => this.scene.start('select'))
+      .on('pointerup', confirm)
+    this.input.keyboard?.on('keydown-ENTER', confirm)
+    this.input.keyboard?.on('keydown-SPACE', confirm)
     this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
 
     // Twemoji 图形许可（CC-BY 4.0）要求署名
