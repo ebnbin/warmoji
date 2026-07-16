@@ -13,6 +13,7 @@ import {
   mergeSvg,
   shadeHex,
   splitSvg,
+  star4,
   subpathsOf,
 } from './studio'
 
@@ -94,7 +95,7 @@ describe('bakeAnimFrame', () => {
 
   it('部件包 g 并写死插值后的 transform', () => {
     const out = bakeAnimFrame(SVG, recipe, 0.5)
-    expect(out).toContain('<g transform="translate(-4 0) rotate(0) scale(1) translate(0 0)">')
+    expect(out).toContain('<g transform="translate(-4 0) rotate(0) scale(1 1) translate(0 0)">')
     expect(out).toContain('#DD2E44')
     // 未入组元素原样保留
     expect(out).toContain('<circle cx="19"')
@@ -114,6 +115,58 @@ describe('bakeAnimFrame', () => {
     // 组内两个成员按原顺序
     const inner = out.slice(gIdx)
     expect(inner.indexOf('#DD2E44')).toBeLessThan(inner.indexOf('#77B255'))
+  })
+})
+
+describe('fx 程序化效果层', () => {
+  const fxRecipe = {
+    emoji: '🧪',
+    name: '试验体',
+    desc: '',
+    anatomy: '',
+    viewBox: '0 -6 36 42',
+    parts: [
+      {
+        indices: [0],
+        cx: 1,
+        cy: 2,
+        keyframes: [
+          { t: 0, scaleX: 1, scaleY: 1 },
+          { t: 0.5, scaleX: 1.3, scaleY: 0.7 },
+          { t: 1, scaleX: 1, scaleY: 1 },
+        ],
+      },
+    ],
+    fx: [
+      { layer: 'back' as const, render: (t: number) => `<circle class="bk" r="${t.toFixed(2)}"/>` },
+      { layer: 'front' as const, render: () => '<path class="ft" d="M0 0"/>' },
+    ],
+  }
+
+  it('fx 层注入：back 垫底、front 盖面、随相位变化', () => {
+    const out = bakeAnimFrame(SVG, fxRecipe, 0.5)
+    const bk = out.indexOf('class="bk"')
+    const body = out.indexOf('#DD2E44')
+    const ft = out.indexOf('class="ft"')
+    expect(bk).toBeGreaterThan(-1)
+    expect(bk).toBeLessThan(body)
+    expect(body).toBeLessThan(ft)
+    expect(out).toContain('r="0.50"')
+  })
+
+  it('viewBox 覆盖 + 不等比缩放写入 transform', () => {
+    const out = bakeAnimFrame(SVG, fxRecipe, 0.5)
+    expect(out).toContain('viewBox="0 -6 36 42"')
+    expect(out).toContain('scale(1.3 0.7)')
+  })
+
+  it('fx 生成器输出合法片段（全相位不抛错、star4 闭合）', () => {
+    for (const r of ANIM_RECIPES) {
+      for (const f of r.fx ?? []) {
+        for (let k = 0; k < 10; k++) expect(() => f.render(k / 10)).not.toThrow()
+      }
+    }
+    expect(star4(18, 18, 2)).toMatch(/^M.*Z$/)
   })
 })
 
