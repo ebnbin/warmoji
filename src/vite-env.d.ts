@@ -51,9 +51,21 @@ interface WarmojiMenuDebug {
 }
 
 interface WarmojiStudioDebug {
+  tab: 'recipes' | 'templates' | 'anatomy'
+  tabs: { id: string; x: number; y: number; w: number; h: number }[]
   items: { key: string; x: number; y: number; w: number; h: number }[]
-  /** 选中的动画配方 emoji */
+  /** 当前 tab 在素材网格中的选中 key */
   selected: string
+  /** 模板页当前模板 id */
+  template: string
+  templates: { id: string; x: number; y: number; w: number; h: number }[]
+  /** 解剖页当前独显的元素下标 */
+  anatomyIndex: number
+  anatomyParts: { index: number; x: number; y: number; w: number; h: number }[]
+  /** 播放控制按钮命中区（prev/toggle/next/speed） */
+  controls: Record<string, { x: number; y: number; w: number; h: number }>
+  paused: boolean
+  speed: number
   preview: 'idle' | 'loading' | 'ready'
   back: { x: number; y: number; w: number; h: number }
 }

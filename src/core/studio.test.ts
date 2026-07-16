@@ -3,8 +3,13 @@ import {
   ANIM_FORMAT,
   ANIM_RECIPES,
   ANIM_SPEC,
+  ANIM_TEMPLATES,
+  STUDIO_POOL,
   animRecipeOf,
+  animTemplateOf,
+  applyTemplate,
   bakeAnimFrame,
+  dissectSvg,
   lerpKeyframes,
   loadAnimRecipes,
   splitSvg,
@@ -266,5 +271,70 @@ describe('动画花名册（从资源文件加载）', () => {
   it('按 emoji 查配方', () => {
     expect(animRecipeOf('🤖')?.name).toBe('机器人')
     expect(animRecipeOf('🀄')).toBeUndefined()
+  })
+})
+
+describe('通用动画模板', () => {
+  const SVG3 =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">' +
+    '<path fill="#AAA" d="M0 0h1z"/><circle cx="5" cy="5" r="2" fill="#BBB"/>' +
+    '<path fill="#CCC" d="M9 9h1z"/></svg>'
+
+  it('模板关键帧闭环 + fx 声明合法（借用资源校验器把关）', () => {
+    for (const tpl of ANIM_TEMPLATES) {
+      const recipe = applyTemplate(tpl, '🧪', SVG3)
+      validateAnimResource({
+        format: ANIM_FORMAT,
+        spec: { frames: 10, durMs: 1000 },
+        animations: {
+          test: {
+            emoji: recipe.emoji,
+            name: recipe.name,
+            desc: recipe.desc,
+            anatomy: recipe.anatomy,
+            parts: recipe.parts,
+            fx: tpl.fx,
+          },
+        },
+      } as AnimResource)
+    }
+  })
+
+  it('applyTemplate 把 whole 展开为全体元素下标', () => {
+    const tpl = animTemplateOf('breathe')!
+    const recipe = applyTemplate(tpl, '🧪', SVG3)
+    expect(recipe.parts[0]!.indices).toEqual([0, 1, 2])
+    expect(recipe.emoji).toBe('🧪')
+  })
+
+  it('纯 fx 模板无 parts，烘焙出的帧包含 fx 内容', () => {
+    const tpl = animTemplateOf('sparkle')!
+    const recipe = applyTemplate(tpl, '🧪', SVG3)
+    expect(recipe.parts).toHaveLength(0)
+    const frame = bakeAnimFrame(SVG3, recipe, 0.8)
+    expect(frame).toContain('<path fill="#FFFFFF"')
+  })
+
+  it('模板 id 唯一且可查', () => {
+    expect(new Set(ANIM_TEMPLATES.map((t) => t.id)).size).toBe(ANIM_TEMPLATES.length)
+    expect(animTemplateOf('bounce')?.name).toBe('弹跳')
+    expect(animTemplateOf('nope')).toBeUndefined()
+  })
+})
+
+describe('dissectSvg', () => {
+  it('逐元素独立渲染，序号/标签/填色齐全', () => {
+    const parts = dissectSvg(SVG)
+    expect(parts).toHaveLength(3)
+    expect(parts[1]).toMatchObject({ index: 1, tag: 'circle', fill: '#292F33' })
+    expect(parts[0]!.svg).toContain('#DD2E44')
+    expect(parts[0]!.svg).not.toContain('circle')
+    expect(parts[0]!.svg.endsWith('</svg>')).toBe(true)
+  })
+})
+
+describe('素材池', () => {
+  it('无重复', () => {
+    expect(new Set(STUDIO_POOL).size).toBe(STUDIO_POOL.length)
   })
 })

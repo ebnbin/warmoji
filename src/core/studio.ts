@@ -434,6 +434,13 @@ export function validateAnimResource(data: AnimResource): void {
 }
 
 /** 加载资源：校验后把 fx 声明经注册表还原成渲染函数，产出运行时配方表 */
+/** fx 声明 → 渲染函数（模板套用与资源加载共用的还原逻辑） */
+export function restoreFx(decl: FxDecl): FxLayer {
+  const make = FX_REGISTRY[decl.gen as keyof typeof FX_REGISTRY] as (params: unknown) => FxLayer
+  const fx = make(decl.params)
+  return decl.layer ? { ...fx, layer: decl.layer } : fx
+}
+
 export function loadAnimRecipes(data: AnimResource): AnimRecipe[] {
   validateAnimResource(data)
   return Object.values(data.animations).map((entry) => ({
@@ -443,11 +450,7 @@ export function loadAnimRecipes(data: AnimResource): AnimRecipe[] {
     anatomy: entry.anatomy,
     viewBox: entry.viewBox,
     parts: entry.parts,
-    fx: entry.fx?.map((decl) => {
-      const make = FX_REGISTRY[decl.gen as keyof typeof FX_REGISTRY] as (params: unknown) => FxLayer
-      const fx = make(decl.params)
-      return decl.layer ? { ...fx, layer: decl.layer } : fx
-    }),
+    fx: entry.fx?.map(restoreFx),
   }))
 }
 
@@ -462,3 +465,283 @@ export const ANIM_RECIPES: readonly AnimRecipe[] = loadAnimRecipes(RESOURCE)
 export function animRecipeOf(emoji: string): AnimRecipe | undefined {
   return ANIM_RECIPES.find((r) => r.emoji === emoji)
 }
+
+// ── 通用动画模板：不依赖部件解剖，任意 emoji 即选即用 ──────────
+// 模板 = 全体元素的关键帧（whole，套用时展开成 [0..n-1]）+ fx 声明。
+// 专属配方（animations.json）是逐 emoji 精修；模板是批量铺动画的底座，
+// 也是「预测一个静态物品动起来什么样」的快速试衣间。
+
+export interface AnimTemplate {
+  readonly id: string
+  readonly icon: string
+  readonly name: string
+  readonly desc: string
+  /** 全体元素统一施加的关键帧动画（可缺省：纯 fx 模板） */
+  readonly whole?: {
+    readonly cx?: number
+    readonly cy?: number
+    readonly keyframes: readonly PartKeyframe[]
+  }
+  readonly fx?: readonly FxDecl[]
+  readonly viewBox?: string
+}
+
+export const ANIM_TEMPLATES: readonly AnimTemplate[] = [
+  {
+    id: 'breathe',
+    icon: '😮‍💨',
+    name: '呼吸',
+    desc: '整体缓慢地鼓起又收回，安静的活物感。',
+    whole: {
+      cx: 18,
+      cy: 18,
+      keyframes: [
+        { t: 0, scale: 1 },
+        { t: 0.5, scale: 1.045 },
+        { t: 1, scale: 1 },
+      ],
+    },
+  },
+  {
+    id: 'sway',
+    icon: '🌾',
+    name: '摇摆',
+    desc: '绕底部左右摆动，像被风吹着。',
+    whole: {
+      cx: 18,
+      cy: 34,
+      keyframes: [
+        { t: 0, rotate: -4 },
+        { t: 0.5, rotate: 4 },
+        { t: 1, rotate: -4 },
+      ],
+    },
+  },
+  {
+    id: 'bounce',
+    icon: '🏀',
+    name: '弹跳',
+    desc: '蹲身蓄力、跃起、落地压扁回弹——完整的挤压拉伸循环。',
+    whole: {
+      cx: 18,
+      cy: 36,
+      keyframes: [
+        { t: 0, ty: 0, scaleX: 1, scaleY: 1 },
+        { t: 0.12, ty: 0, scaleX: 1.09, scaleY: 0.9 },
+        { t: 0.4, ty: -3.6, scaleX: 0.97, scaleY: 1.04 },
+        { t: 0.62, ty: 0, scaleX: 1.07, scaleY: 0.92 },
+        { t: 0.78, ty: 0, scaleX: 1, scaleY: 1 },
+        { t: 1, ty: 0, scaleX: 1, scaleY: 1 },
+      ],
+    },
+  },
+  {
+    id: 'float',
+    icon: '🎈',
+    name: '悬浮',
+    desc: '轻轻上下漂浮并微微倾侧，幽灵与气球的质感。',
+    whole: {
+      cx: 18,
+      cy: 18,
+      keyframes: [
+        { t: 0, ty: 0, rotate: 0 },
+        { t: 0.3, ty: -1.3, rotate: 1.2 },
+        { t: 0.55, ty: 0, rotate: 0 },
+        { t: 0.8, ty: 0.8, rotate: -1.2 },
+        { t: 1, ty: 0, rotate: 0 },
+      ],
+    },
+  },
+  {
+    id: 'shiver',
+    icon: '🥶',
+    name: '战栗',
+    desc: '高频左右哆嗦，受惊或冻僵的样子。',
+    whole: {
+      cx: 18,
+      cy: 18,
+      keyframes: [
+        { t: 0, tx: 0 },
+        { t: 0.14, tx: -0.7 },
+        { t: 0.28, tx: 0.6 },
+        { t: 0.42, tx: -0.5 },
+        { t: 0.56, tx: 0.7 },
+        { t: 0.7, tx: -0.6 },
+        { t: 0.84, tx: 0.4 },
+        { t: 1, tx: 0 },
+      ],
+    },
+  },
+  {
+    id: 'pulse',
+    icon: '💓',
+    name: '心跳',
+    desc: '咚-咚两连跳后歇一拍，心脏与警报的节奏。',
+    whole: {
+      cx: 18,
+      cy: 18,
+      keyframes: [
+        { t: 0, scale: 1 },
+        { t: 0.1, scale: 1.07 },
+        { t: 0.2, scale: 1 },
+        { t: 0.3, scale: 1.05 },
+        { t: 0.42, scale: 1 },
+        { t: 1, scale: 1 },
+      ],
+    },
+  },
+  {
+    id: 'ignite',
+    icon: '🔥',
+    name: '燃烧',
+    desc: '轻微摇曳，火星从身后升起——着火了。',
+    whole: {
+      cx: 18,
+      cy: 34,
+      keyframes: [
+        { t: 0, rotate: -1.5 },
+        { t: 0.5, rotate: 1.5 },
+        { t: 1, rotate: -1.5 },
+      ],
+    },
+    fx: [
+      {
+        gen: 'rise',
+        params: {
+          particles: [
+            { x: 11, phase: 0, size: 1.5, color: '#FFD983' },
+            { x: 24.5, phase: 0.28, size: 1.2, color: '#E85319', drift: 1.2 },
+            { x: 16, phase: 0.55, size: 1.6, color: '#FFAC33' },
+            { x: 27, phase: 0.8, size: 1, color: '#FFD983', drift: 0.6 },
+          ],
+          y0: 26,
+          y1: -3,
+        },
+      },
+    ],
+    viewBox: '0 -5 36 41',
+  },
+  {
+    id: 'sparkle',
+    icon: '✨',
+    name: '闪耀',
+    desc: '周身三颗星光错相闪烁，稀有物品的光泽。',
+    fx: [
+      {
+        gen: 'sparkles',
+        params: {
+          stars: [
+            { x: 6, y: 7, r: 2.2, phase: 0 },
+            { x: 30, y: 10, r: 1.8, phase: 0.33 },
+            { x: 26, y: 29, r: 2, phase: 0.66 },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: 'steaming',
+    icon: '♨️',
+    name: '蒸腾',
+    desc: '头顶两缕热气袅袅升起，刚出锅或怒气值拉满。',
+    fx: [
+      {
+        gen: 'steam',
+        params: {
+          wisps: [
+            { x: 12, y0: 0.5, phase: 0 },
+            { x: 24, y0: 0.5, phase: 0.5 },
+          ],
+        },
+      },
+    ],
+    viewBox: '0 -7 36 43',
+  },
+  {
+    id: 'electrified',
+    icon: '⚡',
+    name: '触电',
+    desc: '细微高频抖动，三道电弧在周身错时炸开。',
+    whole: {
+      cx: 18,
+      cy: 18,
+      keyframes: [
+        { t: 0, tx: 0 },
+        { t: 0.25, tx: -0.5 },
+        { t: 0.5, tx: 0.5 },
+        { t: 0.75, tx: -0.4 },
+        { t: 1, tx: 0 },
+      ],
+    },
+    fx: [
+      {
+        gen: 'bolts',
+        params: {
+          bolts: [
+            { points: [[3, 10], [6, 12], [4, 15]], window: [0.1, 0.22] },
+            { points: [[33, 8], [30, 11], [32, 14]], window: [0.48, 0.6] },
+            { points: [[14, 31], [17, 32.5], [15.5, 35]], window: [0.78, 0.88] },
+          ],
+        },
+      },
+      {
+        gen: 'sparkles',
+        params: { stars: [{ x: 29, y: 27, r: 1.8, phase: 0.3, color: '#FFE8B6' }] },
+      },
+    ],
+  },
+]
+
+export function animTemplateOf(id: string): AnimTemplate | undefined {
+  return ANIM_TEMPLATES.find((t) => t.id === id)
+}
+
+/** 模板 × 任意 emoji：全体元素展开成一个部件，fx 声明还原，产出可烘焙配方 */
+export function applyTemplate(tpl: AnimTemplate, emoji: string, svg: string): AnimRecipe {
+  const n = splitSvg(svg).els.length
+  return {
+    emoji,
+    name: tpl.name,
+    desc: tpl.desc,
+    anatomy: `模板「${tpl.name}」整体施加于全部 ${n} 个元素，无需部件解剖。`,
+    parts: tpl.whole
+      ? [
+          {
+            indices: Array.from({ length: n }, (_, i) => i),
+            cx: tpl.whole.cx,
+            cy: tpl.whole.cy,
+            keyframes: tpl.whole.keyframes,
+          },
+        ]
+      : [],
+    fx: tpl.fx?.map(restoreFx),
+    viewBox: tpl.viewBox,
+  }
+}
+
+// ── SVG 解剖：逐元素独立渲染（写专属配方时的部件情报） ──────────
+
+export interface AnatomyPart {
+  readonly index: number
+  readonly tag: string
+  readonly fill: string | null
+  /** 仅含该元素的完整 SVG（可直接光栅化成独显图） */
+  readonly svg: string
+}
+
+export function dissectSvg(svg: string): AnatomyPart[] {
+  const { open, els } = splitSvg(svg)
+  return els.map((el, index) => ({
+    index,
+    tag: /^<(\w+)/.exec(el)?.[1] ?? '?',
+    fill: /\bfill="([^"]+)"/.exec(el)?.[1] ?? null,
+    svg: `${open}${el}</svg>`,
+  }))
+}
+
+/** Studio 素材池：游戏在用的形象与物品（模板试穿/解剖页共用） */
+export const STUDIO_POOL: readonly string[] = [
+  '🤹', '🦄', '🧌', '🤠', '🧙', '🦘', '🤖', '⛄',
+  '🧟', '👻', '👾', '🐗', '🐍', '🍄', '🐀', '🫧', '👹',
+  '🪙', '🔥', '⚡', '💧', '🍅', '🪓', '🔫', '🪃', '🔦', '⭐', '🏆', '💎', '👑',
+]
