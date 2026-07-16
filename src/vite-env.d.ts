@@ -51,16 +51,9 @@ interface WarmojiMenuDebug {
 }
 
 interface WarmojiStudioDebug {
-  tab: 'anim' | 'merge'
-  tabs: { id: string; x: number; y: number; w: number; h: number }[]
   items: { key: string; x: number; y: number; w: number; h: number }[]
-  /** anim = 选中的配方 emoji；merge = 当前活跃槽的 emoji */
+  /** 选中的动画配方 emoji */
   selected: string
-  slots: { a: string | null; b: string | null; active: 'a' | 'b' }
-  slotRects: {
-    a: { x: number; y: number; w: number; h: number }
-    b: { x: number; y: number; w: number; h: number }
-  }
   preview: 'idle' | 'loading' | 'ready'
   back: { x: number; y: number; w: number; h: number }
 }
