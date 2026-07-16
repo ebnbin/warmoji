@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { join } from 'node:path'
 
 // 脚本行为变更时 bump，强制重新生成
-const GENERATOR = 3
+const GENERATOR = 4
 
 const root = new URL('..', import.meta.url).pathname
 const srcDir = join(root, 'node_modules/twemoji-svg/dist')
@@ -96,6 +96,12 @@ function extractBody(key) {
     if (!ids.has(ref)) throw new Error(`${key}.svg: 引用了正文外的 id "#${ref}"`)
   }
   if (/href=/.test(body)) throw new Error(`${key}.svg: 含 href 外部引用，需人工确认`)
+  // id 命名空间化：多个正文可被拼进同一张网格大 SVG，短 id（如 "a"）会互相污染
+  if (ids.size > 0) {
+    body = body
+      .replace(/\bid="([^"]+)"/g, (_, v) => `id="${key}-${v}"`)
+      .replace(/url\(#([^)]+)\)/g, (_, v) => `url(#${key}-${v})`)
+  }
 
   // 换行压平（打包格式一行一个；SVG 中行内空白等价）
   if (/[\r\n]/.test(body)) {
