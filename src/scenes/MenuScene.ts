@@ -132,7 +132,7 @@ export class MenuScene extends Phaser.Scene {
 
     // Twemoji 图形许可（CC-BY 4.0）要求署名
     this.add
-      .text(w / 2, h - safeInsets.bottom - 10, 'emoji graphics © Twemoji · CC-BY 4.0', {
+      .text(w / 2, h - safeInsets.bottom - 10, 'emoji graphics © Twemoji · CC-BY 4.0 · 有改动', {
         fontFamily: UI_FONT,
         fontSize: FONT.caption,
         color: '#ffffff',
