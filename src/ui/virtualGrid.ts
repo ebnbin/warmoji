@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { emojiThumbKey, requestEmojiThumb } from './emojiThumbs'
+import { TAP_SLOP } from './grid'
 
 // 全量 emoji 虚拟网格（feed 流）：环形缓冲复用固定数量 Image——
 // slot = index % poolSize，只有窗口边缘换入的格子才重绑；格子滚入视口
@@ -38,6 +39,10 @@ export class VirtualEmojiGrid {
   private selected: string | null = null
   private dragging = false
   private dragMoved = false
+  /** 本次按下是否落在网格内（防止跨面板拖过来松手触发误选） */
+  private pressIn = false
+  /** 本次按下发生在惯性滚动中 = 截停滚动，不算点击（移动端惯例） */
+  private stopPress = false
   private dragStartY = 0
   private dragStartScroll = 0
   // 惯性滚动：拖动时采样速度（px/ms），松手后指数衰减
@@ -71,7 +76,7 @@ export class VirtualEmojiGrid {
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', (p: Phaser.Input.Pointer) => {
-        if (this.dragMoved) return
+        if (this.dragMoved || !this.pressIn || this.stopPress) return
         const col = Math.floor((p.worldX - rect.x) / CELL)
         const index = Math.floor((p.worldY - rect.y + this.scroll) / CELL) * this.cols + col
         const cp = this.keys[index]
@@ -84,8 +89,10 @@ export class VirtualEmojiGrid {
     })
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.dragMoved = false
+      this.stopPress = Math.abs(this.flingV) >= 0.05
       this.flingV = 0
-      if (this.contains(p)) {
+      this.pressIn = this.contains(p)
+      if (this.pressIn) {
         this.dragging = true
         this.dragStartY = p.worldY
         this.dragStartScroll = this.scroll
@@ -96,7 +103,8 @@ export class VirtualEmojiGrid {
     scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dy = this.dragStartY - p.worldY
-      if (Math.abs(dy) > 10) this.dragMoved = true
+      // 不可滚动时拖动无意义，不判拖——轻点永不被误杀
+      if (this.max > 0 && Math.abs(dy) > TAP_SLOP) this.dragMoved = true
       if (this.dragMoved) {
         this.scrollTo(this.dragStartScroll + dy)
         const dt = Math.max(1, scene.time.now - this.lastMoveT)

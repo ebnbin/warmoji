@@ -23,6 +23,7 @@ import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../ui/emoji'
 import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../ui/emojiThumbs'
 import { FONT, UI_FONT } from '../ui/fonts'
+import { TAP_SLOP } from '../ui/grid'
 import { VirtualEmojiGrid } from '../ui/virtualGrid'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
@@ -43,20 +44,21 @@ interface StudioLayout {
   list: { x: number; y: number; w: number; h: number }
 }
 
+// 素材网格收窄（横屏 4 列 / 竖屏 5 行）：主体面积让给详情——大图展示与结构树
 const LANDSCAPE: StudioLayout = {
   content: { w: 1280, h: 720 },
   headerY: 44,
   tabsY: 100,
-  detail: { x: 40, y: 138, w: 620, h: 550 },
-  list: { x: 700, y: 138, w: 540, h: 550 },
+  detail: { x: 40, y: 138, w: 856, h: 550 },
+  list: { x: 920, y: 138, w: 320, h: 550 },
 }
 
 const PORTRAIT: StudioLayout = {
   content: { w: 720, h: 1280 },
   headerY: 52,
   tabsY: 112,
-  detail: { x: 24, y: 152, w: 672, h: 522 },
-  list: { x: 24, y: 704, w: 672, h: 552 },
+  detail: { x: 24, y: 152, w: 672, h: 700 },
+  list: { x: 24, y: 868, w: 672, h: 388 },
 }
 
 const RASTER = 256
@@ -230,7 +232,7 @@ export class StudioScene extends Phaser.Scene {
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (!this.anatDragging || !p.isDown) return
       const dy = this.anatDragStartY - p.worldY
-      if (Math.abs(dy) > 10) this.anatDragMoved = true
+      if (this.anatScrollMax > 0 && Math.abs(dy) > TAP_SLOP) this.anatDragMoved = true
       if (this.anatDragMoved) this.anatScrollTo(this.anatDragStartScroll + dy)
     })
     this.input.on('pointerup', () => {
@@ -522,17 +524,18 @@ export class StudioScene extends Phaser.Scene {
       })
   }
 
-  /** 🔬 解剖页：双大图（完整原图 vs 按显隐+选中合成的拆分图）+ SVG 结构树 */
+  /** 🔬 解剖页：双大图（完整原图 vs 按显隐+选中合成的拆分图）+ SVG 结构树。
+   * 横屏树在右侧竖排整列（一眼十多行），竖屏树在大图下方全宽 */
   private buildAnatomyDetail(): void {
     const { d, res } = this.resetDetail()
     const portrait = this.layout === PORTRAIT
-    const bigSize = portrait ? 150 : 180
+    const bigSize = portrait ? 240 : 232
     const emoji = this.anatEmoji
     const gen = ++this.jobGen
     this.previewState = 'loading'
 
     const title = this.add
-      .text(d.x + 24, d.y + 14, `${emoji} 结构树 · 点行选中高亮 · 👁 显/隐`, {
+      .text(d.x + 24, d.y + 14, portrait ? `${emoji} 结构树 · 点行选中 · 👁 显/隐` : `${emoji} 结构树`, {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         color: '#aab6cc',
@@ -575,10 +578,19 @@ export class StudioScene extends Phaser.Scene {
         }
         if (gen !== this.jobGen || !this.scene.isActive('studio')) return
 
-        // 双大图：左完整 | 右拆分（初始无状态 = 同图）
-        const cxAll = d.x + d.w / 2 - bigSize / 2 - 14
-        const cxSplit = d.x + d.w / 2 + bigSize / 2 + 14
+        // 布局：横屏 = 大图区居左 + 树列居右；竖屏 = 大图在上 + 树全宽在下
+        const treeArea = portrait
+          ? { x: d.x + 24, y: d.y + 52 + bigSize + 74, w: d.w - 48, h: d.h - (52 + bigSize + 74) - 16 }
+          : { x: d.x + d.w - 312, y: d.y + 48, w: 288, h: d.h - 64 }
+        const zoneW = portrait ? d.w : d.w - 324
+        const pairW = bigSize * 2 + 20
+        const startX = d.x + (zoneW - pairW) / 2
+        const cxAll = startX + bigSize / 2
+        const cxSplit = startX + bigSize + 20 + bigSize / 2
+        const midX = (cxAll + cxSplit) / 2
         const imgY = d.y + 52 + bigSize / 2
+
+        // 双大图：左完整 | 右拆分（初始无状态 = 同图）
         const boxes = this.add.graphics()
         boxes.fillStyle(0x000000, 0.25)
         for (const bx of [cxAll, cxSplit]) {
@@ -597,25 +609,40 @@ export class StudioScene extends Phaser.Scene {
             .setOrigin(0.5),
         )
         const info = this.add
-          .text(d.x + d.w / 2, imgY + bigSize / 2 + 38, '', {
+          .text(midX, imgY + bigSize / 2 + 38, '', {
             fontFamily: UI_FONT,
             fontSize: FONT.small,
             color: '#e8e8f2',
             resolution: res,
           })
           .setOrigin(0.5, 0)
+        if (!portrait) {
+          // 横屏大图下方富余空间放操作说明（竖屏紧凑，靠标题一句话）
+          const legend = this.add
+            .text(midX, imgY + bigSize / 2 + 82, '👁 显 · 🙈 隐 · ▸▾ 展开收起\n点行选中，再点取消 · ↺ 复位', {
+              fontFamily: UI_FONT,
+              fontSize: FONT.caption,
+              color: '#8f8f9a',
+              resolution: res,
+              align: 'center',
+              lineSpacing: 8,
+            })
+            .setOrigin(0.5, 0)
+          this.detailObjs.push(legend)
+        }
 
         // 结构树列表：遮罩 + 滚动（遮罩不裁输入，行内自校验可见性）
-        const treeY = imgY + bigSize / 2 + 74
-        const area = { x: d.x + 20, y: treeY, w: d.w - 40, h: d.y + d.h - 16 - treeY }
+        const treeBg = this.add.graphics()
+        treeBg.fillStyle(0x000000, 0.16)
+        treeBg.fillRoundedRect(treeArea.x - 8, treeArea.y - 8, treeArea.w + 16, treeArea.h + 16, 12)
         const mask = this.add.graphics().setVisible(false)
         mask.fillStyle(0xffffff, 1)
-        mask.fillRect(area.x, area.y, area.w, area.h)
-        const rowsBox = this.add.container(area.x, area.y)
+        mask.fillRect(treeArea.x, treeArea.y, treeArea.w, treeArea.h)
+        const rowsBox = this.add.container(treeArea.x, treeArea.y)
         rowsBox.setMask(mask.createGeometryMask())
 
-        this.detailObjs.push(boxes, fullImg, splitImg, ...caps, info, mask, rowsBox)
-        this.anat = { tree, splitImg, fullKey, info, rowsBox, area, rowObjs: [], res, bigSize }
+        this.detailObjs.push(treeBg, boxes, fullImg, splitImg, ...caps, info, mask, rowsBox)
+        this.anat = { tree, splitImg, fullKey, info, rowsBox, area: treeArea, rowObjs: [], res, bigSize }
         this.anatAllRows = flattenTree(tree, new Set())
         this.anatFullRect = { x: cxAll - bigSize / 2, y: imgY - bigSize / 2, w: bigSize, h: bigSize }
         this.anatSplitRect = { x: cxSplit - bigSize / 2, y: imgY - bigSize / 2, w: bigSize, h: bigSize }
@@ -678,7 +705,8 @@ export class StudioScene extends Phaser.Scene {
       bg.strokeRoundedRect(1, y + 3, a.area.w - 2, ANAT_ROW - 6, 10)
       const parts: Phaser.GameObjects.GameObject[] = [bg]
 
-      const indent = 14 + row.depth * 26
+      // 树列较窄（横屏 288px），缩进克制些给标签留宽
+      const indent = 12 + row.depth * 22
       if (row.container) {
         parts.push(
           this.add

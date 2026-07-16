@@ -7,6 +7,10 @@ import { emojiImage } from './emoji'
 // 选中白圈高亮、可选右上角标（✅ / 上架道具）与底部血条。
 // 列数按容器宽自适应，条目再多也只是变长可滚动。
 
+/** 点击容差（逻辑 px）：按下到抬起位移小于它仍算点击。手机 fitScale≈0.5，
+ * 16 逻辑 px ≈ 8 CSS px 手指晃动——再小会大量误杀轻点（实测 10 会吃点击） */
+export const TAP_SLOP = 16
+
 export interface EmojiGridItem {
   key: string
   emoji: string
@@ -80,7 +84,7 @@ export class EmojiGrid {
     scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dy = this.dragStartY - p.worldY
-      if (this.max > 0 && Math.abs(dy) > 10) this.dragMovedFlag = true
+      if (this.max > 0 && Math.abs(dy) > TAP_SLOP) this.dragMovedFlag = true
       if (this.dragMovedFlag) this.setScroll(this.dragStartScroll + dy)
     })
     scene.input.on('pointerup', () => {
