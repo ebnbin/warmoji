@@ -4,7 +4,6 @@ import {
   ANIM_RECIPES,
   ANIM_SPEC,
   ANIM_TEMPLATES,
-  STUDIO_POOL,
   animRecipeOf,
   animTemplateOf,
   applyTemplate,
@@ -330,11 +329,5 @@ describe('dissectSvg', () => {
     expect(parts[0]!.svg).toContain('#DD2E44')
     expect(parts[0]!.svg).not.toContain('circle')
     expect(parts[0]!.svg.endsWith('</svg>')).toBe(true)
-  })
-})
-
-describe('素材池', () => {
-  it('无重复', () => {
-    expect(new Set(STUDIO_POOL).size).toBe(STUDIO_POOL.length)
   })
 })

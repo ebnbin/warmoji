@@ -67,6 +67,8 @@ interface WarmojiStudioDebug {
   paused: boolean
   speed: number
   preview: 'idle' | 'loading' | 'ready'
+  /** 已按需渲染的素材缩略图数量（feed 流，与图鉴共用缓存） */
+  thumbsReady: number
   back: { x: number; y: number; w: number; h: number }
 }
 

@@ -12,20 +12,13 @@ import { emojiImage, emojiKey, ensureEmoji, loadEmojiPack } from '../ui/emoji'
 import { EmojiGrid } from '../ui/grid'
 import { FONT, UI_FONT } from '../ui/fonts'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
-import {
-  prepareWikiThumbs,
-  releaseWikiThumbs,
-  requestWikiThumb,
-  wikiThumbKey,
-  wikiThumbSize,
-  wikiThumbsReady,
-} from '../ui/wikiThumbs'
+import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../ui/emojiThumbs'
+import { VirtualEmojiGrid } from '../ui/virtualGrid'
 
 // 图鉴：单排类别 tab——角色/队长/敌人/武器/道具（条目列表+详情）与
 // 「全部」（twemoji 基础形态完整网格）平级，「全部」排最后。
-// 「全部」页是 feed 流：无前置构建，滚到哪个格子哪个格子按需光栅化
-// 自己的缩略图（页内缓存、滚回零等待），退出图鉴全量释放内存；
-// 滚动 = 容器平移 + 环形缓冲窗口。
+// 「全部」页 = VirtualEmojiGrid feed 流组件：无前置构建，滚到哪个格子
+// 哪个格子按需光栅化（页内缓存、滚回零等待），退出图鉴全量释放内存。
 interface WikiLayout {
   content: { w: number; h: number }
   headerY: number
@@ -64,14 +57,6 @@ interface DetailPool {
   footer: Phaser.GameObjects.Text
 }
 
-/** 虚拟网格的格子（环形缓冲复用：slot = index % poolSize；缩略图缓存命中即同步贴上，未命中按需渲染后浮现） */
-interface Cell {
-  image: Phaser.GameObjects.Image
-  boundIndex: number
-}
-
-const CELL = 72
-
 export class WikiScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色/标签页/类别/焦点/滚动等页面状态
   private preserveOnRestart = false
@@ -90,28 +75,13 @@ export class WikiScene extends Phaser.Scene {
   private layout!: WikiLayout
   private origin = { x: 0, y: 0 }
   private entryGrid?: EmojiGrid
+  private allGrid?: VirtualEmojiGrid
   private listScroll = 0
   private gridScroll = 0
-  private gridMax = 0
-  private gridContainer!: Phaser.GameObjects.Container
-  private selectRing!: Phaser.GameObjects.Graphics
-  private cells: Cell[] = []
-  private gridCols = 1
-  private poolSize = 0
   private pool?: DetailPool
   private catRects: { title: string; x: number; y: number; w: number; h: number }[] = []
   private backRect = { x: 0, y: 0, w: 0, h: 0 }
-  private dragging = false
-  private dragMoved = false
-  private dragStartY = 0
-  private dragStartScroll = 0
-  // 惯性滚动：拖动时采样速度（px/ms），松手后指数衰减
-  private flingV = 0
-  private lastMoveY = 0
-  private lastMoveT = 0
   private reportAt = 0
-  private gridBuilt = false
-  private thumbReportPending = false
 
   constructor() {
     super('wiki')
@@ -126,7 +96,7 @@ export class WikiScene extends Phaser.Scene {
     this.groups = wikiGroups()
     this.used = usedEmojiSet()
     // 缩略图档位按设备渲染缩放定（52 逻辑 px 格子的物理像素 1:1）；同档复用缓存
-    prepareWikiThumbs(this, wikiThumbSize(52, viewport.renderScale))
+    prepareEmojiThumbs(this, emojiThumbSize(52, viewport.renderScale))
     this.entryLookup = wikiEntryByEmoji()
     this.pool = undefined
     if (!preserved) {
@@ -137,11 +107,7 @@ export class WikiScene extends Phaser.Scene {
       this.gridScroll = 0
     }
     this.entryGrid = undefined
-    this.cells = []
-    this.dragging = false
-    this.dragMoved = false
-    // restart 会清掉挂起的 delayedCall，标志随之复位
-    this.thumbReportPending = false
+    this.allGrid = undefined
 
     const w = viewport.logicalWidth
     const h = viewport.logicalHeight
@@ -161,7 +127,7 @@ export class WikiScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
-        if (!this.dragMoved && !(this.entryGrid?.wasDragged ?? false)) this.scene.start('menu')
+        if (!this.wasDragged()) this.scene.start('menu')
       })
     this.backRect = { x: back.x, y: back.y - back.height / 2, w: back.width, h: back.height }
     this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
@@ -180,66 +146,19 @@ export class WikiScene extends Phaser.Scene {
     if (this.isAllPage()) this.createAllView()
     else this.createEntriesView()
 
-    // 滚动：滚轮 + 拖动——仅「全部」页的虚拟网格（条目页由 EmojiGrid 自理）
-    this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
-      if (this.isAllPage() && this.inList(p)) this.scrollTo(this.gridScroll + dy * 0.6)
-    })
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      this.dragMoved = false
-      this.flingV = 0
-      if (this.isAllPage() && this.inList(p)) {
-        this.dragging = true
-        this.dragStartY = p.worldY
-        this.dragStartScroll = this.gridScroll
-        this.lastMoveY = p.worldY
-        this.lastMoveT = this.time.now
-      }
-    })
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      if (!this.dragging || !p.isDown) return
-      const dy = this.dragStartY - p.worldY
-      if (Math.abs(dy) > 10) this.dragMoved = true
-      if (this.dragMoved) {
-        this.scrollTo(this.dragStartScroll + dy)
-        const dt = Math.max(1, this.time.now - this.lastMoveT)
-        const inst = (this.lastMoveY - p.worldY) / dt
-        this.flingV = 0.5 * this.flingV + 0.5 * inst
-        this.lastMoveY = p.worldY
-        this.lastMoveT = this.time.now
-      }
-    })
-    this.input.on('pointerup', () => {
-      this.dragging = false
-      // 松手：速度足够则进入惯性滑动，否则立即定格并上报终态
-      if (!this.dragMoved || Math.abs(this.flingV) < 0.05) {
-        this.flingV = 0
-        this.forceReport()
-      }
-    })
-
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       // 真退出图鉴才释放缩略缓存；旋转/切类别的内部 restart 保留（同档位复用）
-      if (!this.preserveOnRestart) releaseWikiThumbs(this)
+      if (!this.preserveOnRestart) releaseEmojiThumbs(this)
     })
 
     this.reportWiki()
   }
 
-  /** 惯性滚动 */
-  update(_time: number, delta: number): void {
-    if (!this.isAllPage()) return
-    if (this.flingV === 0 || this.dragging) return
-    const cur = this.gridScroll
-    const max = this.gridMax
-    const next = cur + this.flingV * delta
-    this.scrollTo(next)
-    this.flingV *= Math.exp(-delta / 320)
-    if (Math.abs(this.flingV) < 0.02 || next <= 0 || next >= max) {
-      this.flingV = 0
-      this.forceReport()
-    }
+  /** 两套网格任一发生拖动即视为拖动（返回/类别按钮防误触） */
+  private wasDragged(): boolean {
+    return (this.entryGrid?.wasDragged ?? false) || (this.allGrid?.wasDragged ?? false)
   }
 
   // ── 类别横向 tab ────────────────────────────────────────────
@@ -289,7 +208,7 @@ export class WikiScene extends Phaser.Scene {
           .setOrigin(0)
           .setInteractive({ useHandCursor: true })
           .on('pointerup', () => {
-            if (this.dragMoved || (this.entryGrid?.wasDragged ?? false) || this.category === i) return
+            if (this.wasDragged() || this.category === i) return
             this.category = i
             this.focusedKey = ''
             this.listScroll = 0
@@ -302,28 +221,8 @@ export class WikiScene extends Phaser.Scene {
     })
   }
 
-  private inList(p: Phaser.Input.Pointer): boolean {
-    const L = this.layout.list
-    const lx = this.origin.x + L.x
-    const ly = this.origin.y + L.y
-    return p.worldX >= lx && p.worldX <= lx + L.w && p.worldY >= ly && p.worldY <= ly + L.h
-  }
-
   private isAllPage(): boolean {
     return this.category === this.groups.length
-  }
-
-  private scrollTo(y: number): void {
-    const L = this.layout.list
-    this.gridScroll = Math.max(0, Math.min(this.gridMax, y))
-    this.gridContainer.y = this.origin.y + L.y - this.gridScroll
-    this.updateWindow()
-    // 滚动中的调试上报节流；拖动结束/惯性停止时 forceReport 补终态
-    if (this.time.now - this.reportAt > 120) this.reportWiki()
-  }
-
-  private forceReport(): void {
-    this.reportWiki()
   }
 
   // ── 图鉴视图：当前类别的条目网格 + 详情 ─────────────────────
@@ -500,7 +399,7 @@ export class WikiScene extends Phaser.Scene {
     })
   }
 
-  // ── 全部 emoji 视图：懒加载清单 + 虚拟网格 ──────────────────
+  // ── 全部 emoji 视图：懒加载清单 + feed 流虚拟网格组件 ───────
 
   private createAllView(): void {
     const L = this.layout.list
@@ -509,61 +408,37 @@ export class WikiScene extends Phaser.Scene {
     const frame = this.add.graphics()
     frame.fillStyle(0x000000, 0.18)
     frame.fillRoundedRect(lx - 8, ly - 8, L.w + 16, L.h + 16, 14)
-
-    this.gridCols = Math.floor(L.w / CELL)
-    this.gridBuilt = false
     this.renderAllDetail()
 
-    const mask = this.add.graphics().setVisible(false)
-    mask.fillStyle(0xffffff, 1)
-    mask.fillRect(lx, ly, L.w, L.h)
-    this.gridContainer = this.add.container(lx, ly)
-    this.gridContainer.setMask(mask.createGeometryMask())
-    this.selectRing = this.add.graphics()
-    this.gridContainer.add(this.selectRing)
-
-    // 点击选中格子（拖动不算；网格就绪后才可选）
-    this.add
-      .zone(lx, ly, L.w, L.h)
-      .setOrigin(0)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerup', (p: Phaser.Input.Pointer) => {
-        if (this.dragMoved || !this.gridBuilt) return
-        const col = Math.floor((p.worldX - lx) / CELL)
-        const row = Math.floor((p.worldY - ly + this.gridScroll) / CELL)
-        const index = row * this.gridCols + col
-        const cp = this.manifest[index]
-        if (col < 0 || col >= this.gridCols || cp === undefined) return
-        this.allSelected = cp
-        this.drawSelectRing(index)
-        this.renderAllDetail()
-        this.reportWiki()
-      })
+    const grid = (this.allGrid = new VirtualEmojiGrid(
+      this,
+      { x: lx, y: ly, w: L.w, h: L.h },
+      {
+        initialScroll: this.gridScroll,
+        alphaOf: (cp): number => (this.used.has(codepointsToEmoji(cp)) ? 1 : 0.26),
+      },
+    ))
+    grid.onTap = (cp): void => {
+      this.allSelected = cp
+      grid.setSelected(cp)
+      this.renderAllDetail()
+      this.reportWiki()
+    }
+    grid.onScrolled = (settled): void => {
+      this.gridScroll = grid.scrollY
+      // 滚动中的调试上报节流；拖动结束/惯性停止补终态
+      if (settled || this.time.now - this.reportAt > 120) this.reportWiki()
+    }
+    grid.onThumbsProgress = (): void => this.reportWiki()
 
     void this.loadManifest().then(() => {
       if (!this.scene.isActive('wiki') || !this.isAllPage()) return
       this.manifestUsed = this.manifest.filter((cp) => this.used.has(codepointsToEmoji(cp))).length
-      this.buildGrid()
+      grid.setItems(this.manifest)
+      grid.setSelected(this.allSelected)
+      this.renderAllDetail()
+      this.reportWiki()
     })
-  }
-
-  /** 清单就绪即建网格：格子滚入视口时按需渲染自己的缩略图（feed 流） */
-  private buildGrid(): void {
-    const L = this.layout.list
-    const totalRows = Math.ceil(this.manifest.length / this.gridCols)
-    this.gridMax = Math.max(0, totalRows * CELL - L.h)
-    const poolRows = Math.ceil(L.h / CELL) + 2
-    this.poolSize = poolRows * this.gridCols
-    for (let i = 0; i < this.poolSize; i++) {
-      const image = this.add.image(0, 0, '__DEFAULT').setVisible(false)
-      this.gridContainer.add(image)
-      this.cells.push({ image, boundIndex: -1 })
-    }
-    this.gridBuilt = true
-    if (this.allSelected) this.drawSelectRing(this.manifest.indexOf(this.allSelected))
-    this.scrollTo(this.gridScroll)
-    this.renderAllDetail()
-    this.forceReport()
   }
 
   private async loadManifest(): Promise<void> {
@@ -574,60 +449,6 @@ export class WikiScene extends Phaser.Scene {
     } catch (err) {
       console.error(`emoji 清单加载失败: ${String(err)}`)
     }
-  }
-
-  /** 虚拟滚动核心：环形缓冲——只有窗口边缘换入的格子才重绑 */
-  private updateWindow(): void {
-    if (this.cells.length === 0) return
-    const firstRow = Math.floor(this.gridScroll / CELL)
-    const first = firstRow * this.gridCols
-    const last = Math.min(first + this.poolSize - 1, this.manifest.length - 1)
-    for (let index = first; index <= last; index++) {
-      const cell = this.cells[index % this.poolSize]!
-      if (cell.boundIndex === index) continue
-      this.bindCell(cell, index)
-    }
-  }
-
-  private bindCell(cell: Cell, index: number): void {
-    cell.boundIndex = index
-    const cp = this.manifest[index]!
-    const col = index % this.gridCols
-    const cx = col * CELL + CELL / 2
-    const cy = Math.floor(index / this.gridCols) * CELL + CELL / 2
-    const alpha = this.used.has(codepointsToEmoji(cp)) ? 1 : 0.26
-    const hit = wikiThumbKey(cp)
-    if (hit) {
-      cell.image.setPosition(cx, cy).setTexture(hit).setDisplaySize(52, 52).setAlpha(alpha).setVisible(true)
-      return
-    }
-    // 缓存未命中：先空格，渲染完成且格子仍绑着本条目时浮现（feed 流）
-    cell.image.setVisible(false)
-    void requestWikiThumb(this, cp).then((key) => {
-      if (!key || cell.boundIndex !== index || !this.scene.isActive('wiki')) return
-      cell.image.setPosition(cx, cy).setTexture(key).setDisplaySize(52, 52).setAlpha(alpha).setVisible(true)
-      this.reportThumbProgress()
-    })
-  }
-
-  /** 缩略图落地后的拖尾节流上报：thumbsReady 才能反映真实渲染进度（调试/e2e 依赖） */
-  private reportThumbProgress(): void {
-    if (this.thumbReportPending) return
-    this.thumbReportPending = true
-    this.time.delayedCall(150, () => {
-      this.thumbReportPending = false
-      if (this.scene.isActive('wiki')) this.reportWiki()
-    })
-  }
-
-  private drawSelectRing(index: number): void {
-    this.selectRing.clear()
-    if (index < 0) return
-    const col = index % this.gridCols
-    const x = col * CELL
-    const y = Math.floor(index / this.gridCols) * CELL
-    this.selectRing.lineStyle(3, 0xffd54f, 0.95)
-    this.selectRing.strokeRoundedRect(x + 4, y + 4, CELL - 8, CELL - 8, 12)
   }
 
   /** 完整列表页的详情面板：收录进度 + 选中项详情（已收录展示类别与属性） */
@@ -689,10 +510,10 @@ export class WikiScene extends Phaser.Scene {
         entryCount: this.entryGrid ? this.entryGrid.cellRects().length : 0,
         manifestCount: this.manifest.length,
         usedCount: this.used.size,
-        thumbsReady: wikiThumbsReady(),
+        thumbsReady: emojiThumbsReady(),
         scrollY: this.isAllPage() ? this.gridScroll : this.listScroll,
         maxScroll: this.isAllPage()
-          ? this.gridMax
+          ? (this.allGrid?.maxScroll ?? 0)
           : Math.max(0, (this.entryGrid?.contentH ?? 0) - this.layout.list.h),
         items: (this.entryGrid?.cellRects() ?? []).map((r) => ({
           key: r.key,

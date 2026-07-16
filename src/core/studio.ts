@@ -740,8 +740,3 @@ export function dissectSvg(svg: string): AnatomyPart[] {
 }
 
 /** Studio 素材池：游戏在用的形象与物品（模板试穿/解剖页共用） */
-export const STUDIO_POOL: readonly string[] = [
-  '🤹', '🦄', '🧌', '🤠', '🧙', '🦘', '🤖', '⛄',
-  '🧟', '👻', '👾', '🐗', '🐍', '🍄', '🐀', '🫧', '👹',
-  '🪙', '🔥', '⚡', '💧', '🍅', '🪓', '🔫', '🪃', '🔦', '⭐', '🏆', '💎', '👑',
-]

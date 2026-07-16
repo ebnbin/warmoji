@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { emojiCodepoints } from '../core/emoji'
+import { codepointsToEmoji, emojiCodepoints } from '../core/emoji'
+import { packBaseKeys } from '../core/emojipack'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -8,7 +9,6 @@ import {
   ANIM_RECIPES,
   ANIM_SPEC,
   ANIM_TEMPLATES,
-  STUDIO_POOL,
   animRecipeOf,
   animTemplateOf,
   applyTemplate,
@@ -18,16 +18,19 @@ import {
 import type { AnimRecipe } from '../core/studio'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
-import { emojiImage, emojiSvgText, ensureEmoji, svgToImage } from '../ui/emoji'
-import { EmojiGrid } from '../ui/grid'
+import { emojiImage, emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../ui/emoji'
+import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../ui/emojiThumbs'
 import { FONT, UI_FONT } from '../ui/fonts'
+import { VirtualEmojiGrid } from '../ui/virtualGrid'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // Emoji Studio：twemoji 部件动画的游戏内工作台，三个 tab——
 // 🎬 配方 = animations.json 里的精修动画预览；🧩 模板 = 任选 emoji × 通用
 // 动画模板即选即看（铺量动画的试衣间）；🔬 解剖 = 逐元素独显 + 下标/填色
-// 情报（写专属配方的 X 光）。预览区带暂停/逐帧/速度控制，检查烘焙质量。
-// 内容按保底画布设计、整体居中；studio- 纹理场景自管理，shutdown 全清。
+// 情报（写专属配方的 X 光）。素材区 = feed 流虚拟网格：配方页列有配方的
+// emoji，模板/解剖页列全部基础形态（模板与解剖对任意 SVG 通用）。
+// 预览区带暂停/逐帧/速度控制，检查烘焙质量。内容按保底画布设计、整体
+// 居中；studio- 纹理场景自管理，shutdown 全清，缩略缓存真退出才释放。
 interface StudioLayout {
   content: { w: number; h: number }
   headerY: number
@@ -57,19 +60,25 @@ const SPEEDS = [1, 0.5, 0.25] as const
 
 type Tab = 'recipes' | 'templates' | 'anatomy'
 
+/** 模板/解剖页的默认素材（任意 emoji 皆可选，这里只是进场的起点） */
+const DEFAULT_SUBJECT = '🤹'
+
 export class StudioScene extends Phaser.Scene {
   private preserveOnRestart = false
   private palette?: Palette
   private tab: Tab = 'recipes'
   private recipeSel = ANIM_RECIPES[0]!.emoji
-  private tplEmoji = STUDIO_POOL[0]!
+  private tplEmoji = DEFAULT_SUBJECT
   private tplId = ANIM_TEMPLATES[0]!.id
-  private anatEmoji = STUDIO_POOL[0]!
+  private anatEmoji = DEFAULT_SUBJECT
   private anatIndex = 0
+  /** 全部基础形态码点清单（打包资源就绪后填充） */
+  private allKeys: string[] = []
 
   private layout!: StudioLayout
   private origin = { x: 0, y: 0 }
-  private grid?: EmojiGrid
+  private grid?: VirtualEmojiGrid
+  private reportAt = 0
   private previewImg?: Phaser.GameObjects.Image
   private previewState: 'idle' | 'loading' | 'ready' = 'idle'
   // 播放控制：暂停 + 逐帧步进 + 速度（跨选择保留，换 tab 重置暂停）
@@ -105,13 +114,15 @@ export class StudioScene extends Phaser.Scene {
     if (!preserved) {
       this.tab = 'recipes'
       this.recipeSel = ANIM_RECIPES[0]!.emoji
-      this.tplEmoji = STUDIO_POOL[0]!
+      this.tplEmoji = DEFAULT_SUBJECT
       this.tplId = ANIM_TEMPLATES[0]!.id
-      this.anatEmoji = STUDIO_POOL[0]!
+      this.anatEmoji = DEFAULT_SUBJECT
       this.anatIndex = 0
       this.paused = false
       this.speedIdx = 0
     }
+    // 缩略图档位按设备渲染缩放定（52 逻辑 px 格子的物理像素 1:1）；同档复用缓存
+    prepareEmojiThumbs(this, emojiThumbSize(52, viewport.renderScale))
     this.previewState = 'idle'
     this.detailObjs = []
     this.tabObjs = []
@@ -158,16 +169,23 @@ export class StudioScene extends Phaser.Scene {
     frames.fillRoundedRect(G.x - 8, G.y - 8, G.w + 16, G.h + 16, 14)
 
     this.buildTabs(res)
-    this.grid = new EmojiGrid(this, G, { cellSize: 96 })
-    this.grid.onTap = (key) => this.onGridTap(key)
-    this.grid.onScroll = () => this.report()
+    const grid = (this.grid = new VirtualEmojiGrid(this, G))
+    grid.onTap = (cp) => this.onGridTap(cp)
+    grid.onScrolled = (settled) => {
+      if (settled || this.time.now - this.reportAt > 120) this.report()
+    }
+    grid.onThumbsProgress = () => this.report()
 
-    const need = new Set<string>([
-      ...STUDIO_POOL,
-      ...ANIM_RECIPES.map((r) => r.emoji),
-      ...ANIM_TEMPLATES.map((t) => t.icon),
-    ])
-    void Promise.all([...need].map((e) => ensureEmoji(this, e).catch(() => ''))).then(() => {
+    // 模板 chips 的图标走常规纹理需预载；素材网格与预览均按需异步
+    const need = new Set<string>(ANIM_TEMPLATES.map((t) => t.icon))
+    void Promise.all([
+      Promise.all([...need].map((e) => ensureEmoji(this, e).catch(() => ''))),
+      loadEmojiPack()
+        .then((p) => {
+          this.allKeys = packBaseKeys(p)
+        })
+        .catch((err) => console.error(`emoji 清单加载失败: ${String(err)}`)),
+    ]).then(() => {
       if (!this.scene.isActive('studio')) return
       this.applyTab()
     })
@@ -179,6 +197,8 @@ export class StudioScene extends Phaser.Scene {
       this.jobGen++
       for (const key of this.ownedKeys) this.textures.remove(key)
       this.ownedKeys.clear()
+      // 真退出 Studio 才释放缩略缓存；旋转的内部 restart 保留（同档位复用）
+      if (!this.preserveOnRestart) releaseEmojiThumbs(this)
     })
     this.report()
   }
@@ -243,39 +263,44 @@ export class StudioScene extends Phaser.Scene {
     }
   }
 
+  /** 素材清单：配方页 = 有配方的 emoji；模板/解剖页 = 全部基础形态（通用操作） */
   private applyTab(): void {
-    if (this.tab === 'recipes') {
-      this.grid?.setItems(ANIM_RECIPES.map((r) => ({ key: r.emoji, emoji: r.emoji })))
-      this.grid?.setSelected(this.recipeSel)
-      this.buildRecipeDetail()
-    } else if (this.tab === 'templates') {
-      this.grid?.setItems(STUDIO_POOL.map((e) => ({ key: e, emoji: e })))
-      this.grid?.setSelected(this.tplEmoji)
-      this.buildTemplateDetail()
-    } else {
-      this.grid?.setItems(STUDIO_POOL.map((e) => ({ key: e, emoji: e })))
-      this.grid?.setSelected(this.anatEmoji)
-      this.buildAnatomyDetail()
+    const grid = this.grid
+    if (grid) {
+      if (this.tab === 'recipes') {
+        grid.setItems(ANIM_RECIPES.map((r) => emojiCodepoints(r.emoji)))
+        grid.setSelected(emojiCodepoints(this.recipeSel))
+      } else {
+        grid.setItems(this.allKeys)
+        grid.setSelected(emojiCodepoints(this.tab === 'templates' ? this.tplEmoji : this.anatEmoji))
+      }
+      grid.ensureVisible()
     }
+    if (this.tab === 'recipes') this.buildRecipeDetail()
+    else if (this.tab === 'templates') this.buildTemplateDetail()
+    else this.buildAnatomyDetail()
     this.report()
   }
 
-  private onGridTap(key: string): void {
+  private onGridTap(cp: string): void {
     if (this.tab === 'recipes') {
-      if (key === this.recipeSel) return
-      this.recipeSel = key
-      this.grid?.setSelected(key)
+      const recipe = ANIM_RECIPES.find((r) => emojiCodepoints(r.emoji) === cp)
+      if (!recipe || recipe.emoji === this.recipeSel) return
+      this.recipeSel = recipe.emoji
+      this.grid?.setSelected(cp)
       this.buildRecipeDetail()
     } else if (this.tab === 'templates') {
-      if (key === this.tplEmoji) return
-      this.tplEmoji = key
-      this.grid?.setSelected(key)
+      const emoji = codepointsToEmoji(cp)
+      if (emoji === this.tplEmoji) return
+      this.tplEmoji = emoji
+      this.grid?.setSelected(cp)
       this.buildTemplateDetail()
     } else {
-      if (key === this.anatEmoji) return
-      this.anatEmoji = key
+      const emoji = codepointsToEmoji(cp)
+      if (emoji === this.anatEmoji) return
+      this.anatEmoji = emoji
       this.anatIndex = 0
-      this.grid?.setSelected(key)
+      this.grid?.setSelected(cp)
       this.buildAnatomyDetail()
     }
     this.report()
@@ -549,10 +574,19 @@ export class StudioScene extends Phaser.Scene {
 
   // ── 预览与播放控制 ──────────────────────────────────────────
 
+  /** 预览 Image：全量网格任选的 emoji 纹理未必就绪——先占位隐藏，
+   * 静态图异步浮现垫底（烘焙帧若先到位则不再回退到静态图） */
   private spawnPreview(cx: number, cy: number, size: number, emoji: string): void {
-    this.previewImg = emojiImage(this, cx, cy, emoji, size)
+    const img = this.add.image(cx, cy, '__DEFAULT').setVisible(false)
+    this.previewImg = img
     this.previewSize = size
-    this.detailObjs.push(this.previewImg)
+    this.detailObjs.push(img)
+    void ensureEmoji(this, emoji)
+      .then((key) => {
+        if (this.previewImg !== img || this.frameKeys.length > 0 || !this.scene.isActive('studio')) return
+        img.setTexture(key).setDisplaySize(size, size).setVisible(true)
+      })
+      .catch((err) => console.warn(`预览加载失败 ${emoji}: ${String(err)}`))
   }
 
   /** 播放控制条：⏮ ⏯ ⏭ 速度；返回控制条底部 y */
@@ -667,7 +701,7 @@ export class StudioScene extends Phaser.Scene {
         this.frameKeys = keys
         this.frameIdx = 0
         this.previewSize = size
-        this.previewImg.setTexture(keys[0]!).setDisplaySize(size, size)
+        this.previewImg.setTexture(keys[0]!).setDisplaySize(size, size).setVisible(true)
         this.restartTimer()
         this.report()
       })
@@ -733,8 +767,10 @@ export class StudioScene extends Phaser.Scene {
         paused: this.paused,
         speed: SPEEDS[this.speedIdx]!,
         preview: this.previewState,
+        thumbsReady: emojiThumbsReady(),
         back: this.backRect,
       },
     })
+    this.reportAt = this.time.now
   }
 }
