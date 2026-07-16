@@ -45,6 +45,7 @@ export class VirtualEmojiGrid {
   private lastMoveY = 0
   private lastMoveT = 0
   private progressPending = false
+  private settleTimer?: Phaser.Time.TimerEvent
 
   constructor(
     scene: Phaser.Scene,
@@ -191,6 +192,12 @@ export class VirtualEmojiGrid {
     this.container.y = this.rect.y - this.scroll
     this.updateWindow()
     this.onScrolled?.(false)
+    // 滚轮没有「松手」事件：拖尾去抖一发终态，消费方的节流上报才能收敛到最终位置
+    this.settleTimer?.remove()
+    this.settleTimer = this.scene.time.delayedCall(160, () => {
+      this.settleTimer = undefined
+      if (this.scene.sys.isActive()) this.onScrolled?.(true)
+    })
   }
 
   private onUpdate(_time: number, delta: number): void {
