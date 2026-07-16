@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ANIM_FORMAT,
   ANIM_RECIPES,
+  ANIM_SPEC,
   animRecipeOf,
   bakeAnimFrame,
   lerpKeyframes,
+  loadAnimRecipes,
   splitSvg,
   star4,
+  validateAnimResource,
 } from './studio'
+import type { AnimResource } from './studio'
 
 const SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">' +
@@ -149,32 +154,117 @@ describe('fx 程序化效果层', () => {
   })
 })
 
-describe('动画花名册', () => {
-  it('配方关键帧闭环（首尾姿态一致，循环播放不跳变）', () => {
+describe('动画资源格式', () => {
+  const goodEntry = {
+    emoji: '🧪',
+    name: '试验体',
+    desc: '',
+    anatomy: '',
+    parts: [
+      {
+        indices: [0],
+        keyframes: [
+          { t: 0, tx: 0 },
+          { t: 1, tx: 0 },
+        ],
+      },
+    ],
+  }
+  const resource = (patch: object): AnimResource =>
+    ({
+      format: ANIM_FORMAT,
+      spec: { frames: 10, durMs: 1000 },
+      animations: { '1f9ea': { ...goodEntry, ...patch } },
+    }) as AnimResource
+
+  it('合法资源通过校验并还原 fx 渲染函数', () => {
+    const recipes = loadAnimRecipes(
+      resource({
+        fx: [{ gen: 'sparkles', params: { stars: [{ x: 1, y: 1, r: 1, phase: 0 }] } }],
+      }),
+    )
+    expect(recipes).toHaveLength(1)
+    expect(recipes[0]!.fx![0]!.render(0.8)).toContain('<path')
+  })
+
+  it('fx 声明可覆盖生成器默认 layer', () => {
+    const recipes = loadAnimRecipes(
+      resource({
+        fx: [{ gen: 'sparkles', layer: 'back', params: { stars: [] } }],
+      }),
+    )
+    expect(recipes[0]!.fx![0]!.layer).toBe('back')
+  })
+
+  it('格式版本不符 → 报错', () => {
+    expect(() =>
+      validateAnimResource({ ...resource({}), format: 'warmoji-anim@0' }),
+    ).toThrow('格式不符')
+  })
+
+  it('未知 fx 生成器 → 报错', () => {
+    expect(() =>
+      validateAnimResource(resource({ fx: [{ gen: 'nova', params: {} }] })),
+    ).toThrow('未知生成器')
+  })
+
+  it('关键帧不闭环 → 报错', () => {
+    expect(() =>
+      validateAnimResource(
+        resource({
+          parts: [{ indices: [0], keyframes: [{ t: 0, tx: 0 }, { t: 1, tx: 5 }] }],
+        }),
+      ),
+    ).toThrow('闭环')
+  })
+
+  it('关键帧时序倒退 → 报错', () => {
+    expect(() =>
+      validateAnimResource(
+        resource({
+          parts: [
+            { indices: [0], keyframes: [{ t: 0.5, tx: 0 }, { t: 0.2, tx: 0 }, { t: 0.5, tx: 0 }] },
+          ],
+        }),
+      ),
+    ).toThrow('升序')
+  })
+
+  it('下标被多个部件占用 → 报错', () => {
+    expect(() =>
+      validateAnimResource(
+        resource({
+          parts: [
+            { indices: [0], keyframes: [{ t: 0 }, { t: 1 }] },
+            { indices: [0], keyframes: [{ t: 0 }, { t: 1 }] },
+          ],
+        }),
+      ),
+    ).toThrow('占用')
+  })
+
+  it('parts 与 fx 全空 → 报错', () => {
+    expect(() => validateAnimResource(resource({ parts: [], fx: [] }))).toThrow('至少')
+  })
+})
+
+describe('动画花名册（从资源文件加载）', () => {
+  it('统一播放规格来自资源 spec', () => {
+    expect(ANIM_SPEC.frames).toBeGreaterThanOrEqual(2)
+    expect(ANIM_SPEC.durMs).toBeGreaterThan(0)
+  })
+
+  it('全部配方可烘焙出合法帧（闭环等约束已由加载期校验器把关）', () => {
+    expect(ANIM_RECIPES.length).toBeGreaterThanOrEqual(9)
+    const blank = '<svg xmlns="x" viewBox="0 0 36 36"><path d="M0 0"/></svg>'
     for (const r of ANIM_RECIPES) {
-      for (const part of r.parts) {
-        const a = lerpKeyframes(part.keyframes, 0)
-        const b = lerpKeyframes(part.keyframes, 1)
-        expect(a).toEqual(b)
-      }
+      const frame = bakeAnimFrame(blank.repeat(1), { ...r, parts: [] }, 0.3)
+      expect(frame.endsWith('</svg>')).toBe(true)
     }
   })
 
   it('按 emoji 查配方', () => {
     expect(animRecipeOf('🤖')?.name).toBe('机器人')
     expect(animRecipeOf('🀄')).toBeUndefined()
-  })
-
-  it('部件下标不越界不重复', () => {
-    for (const r of ANIM_RECIPES) {
-      const seen = new Set<number>()
-      for (const part of r.parts) {
-        for (const i of part.indices) {
-          expect(i).toBeGreaterThanOrEqual(0)
-          expect(seen.has(i)).toBe(false)
-          seen.add(i)
-        }
-      }
-    }
   })
 })

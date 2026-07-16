@@ -1,8 +1,9 @@
-// Emoji Studio 纯逻辑层：twemoji 部件动画的配方与烘焙函数。
+// Emoji Studio 纯逻辑层：twemoji 部件动画的资源格式与烘焙函数。
 // twemoji 无语义标签，部件识别靠「固定色板 + getBBox 边界 + 绘制顺序」人工判读后
-// 沉淀为配方数据；本层只做纯字符串变换（禁 DOM），原始 SVG 永不改动。
-// 动画配方 = 部件分组关键帧 + fx 程序化效果层，按统一规格烘焙成
-// N 帧静态 SVG → N 张纹理循环播放（与未来战斗内落地同一条管线）。
+// 沉淀为资源数据（animations.json = 原始 SVG 引用 + 动画参数）；本层只做
+// 纯字符串变换（禁 DOM），原始 SVG 永不改动。动画 = 部件分组关键帧 +
+// fx 程序化效果层，按统一规格烘焙成 N 帧静态 SVG → N 张纹理循环播放。
+import animationsJson from './animations.json'
 
 const OPEN_TAG = /<svg\b[^>]*>/
 const TOP_LEVEL = /<(?:path|circle|ellipse|rect)\b[^>]*\/>|<g\b[^>]*>[\s\S]*?<\/g>/g
@@ -27,9 +28,6 @@ function replaceViewBox(open: string, viewBox: string): string {
 }
 
 // ── 动画 ────────────────────────────────────────────────────
-
-/** 全体动画统一规格：10 帧 / 1 秒循环——效果整齐划一，未来新配方也照此编排 */
-export const ANIM_SPEC = { frames: 10, durMs: 1000 } as const
 
 /** 关键帧：t 为周期内相位 0..1（首尾值应闭环）；变换绕 (cx,cy) 施加。
  * scaleX/scaleY 与 scale 相乘——挤压拉伸（squash & stretch）用 */
@@ -234,13 +232,13 @@ export function fxShineSweep(opts: {
 }
 
 /** 星光闪烁：定点四芒星错相缩放脉冲 */
-export function fxSparkles(
-  stars: readonly { x: number; y: number; r: number; phase: number; color?: string }[],
-): FxLayer {
+export function fxSparkles(opts: {
+  readonly stars: readonly { x: number; y: number; r: number; phase: number; color?: string }[]
+}): FxLayer {
   return {
     layer: 'front',
     render: (t) =>
-      stars
+      opts.stars
         .map((s) => {
           const pt = (t + s.phase) % 1
           // 每颗每周期亮一次：前 55% 隐藏
@@ -280,18 +278,18 @@ export function fxRipples(opts: {
 }
 
 /** 电弧闪现：小折线在各自相位窗内硬切出现（放电的随机感靠错窗） */
-export function fxBolts(
-  bolts: readonly {
+export function fxBolts(opts: {
+  readonly bolts: readonly {
     points: readonly (readonly [number, number])[]
     window: readonly [number, number]
     color?: string
     width?: number
-  }[],
-): FxLayer {
+  }[]
+}): FxLayer {
   return {
     layer: 'front',
     render: (t) =>
-      bolts
+      opts.bolts
         .map((b) => {
           const [w0, w1] = b.window
           if (t < w0 || t > w1) return ''
@@ -303,13 +301,13 @@ export function fxBolts(
 }
 
 /** 蒸汽波浪：竖向 S 形描边升起淡出（怒气/热气） */
-export function fxSteam(
-  wisps: readonly { x: number; y0: number; phase: number }[],
-): FxLayer {
+export function fxSteam(opts: {
+  readonly wisps: readonly { x: number; y0: number; phase: number }[]
+}): FxLayer {
   return {
     layer: 'front',
     render: (t) =>
-      wisps
+      opts.wisps
         .map((w) => {
           const pt = (t + w.phase) % 1
           const y = w.y0 - pt * 4.5
@@ -325,337 +323,141 @@ export function fxSteam(
   }
 }
 
-/** 部件动画花名册：每条 = 一个 emoji 的部件拆解 + 1 秒周期内的关键帧编排 */
-export const ANIM_RECIPES: readonly AnimRecipe[] = [
-  {
-    emoji: '🤖',
-    name: '机器人',
-    desc: '红瞳左右扫视巡逻，天线上下浮动，双耳信号灯呼吸闪烁。',
-    anatomy: '红瞳 = 仅有的两个 #DD2E44 圆；天线组在 viewBox 顶部；耳朵是两侧橙色椭圆。',
-    parts: [
-      // 双耳信号灯：opacity 呼吸一次
-      {
-        indices: [0, 1],
-        keyframes: [
-          { t: 0, opacity: 1 },
-          { t: 0.5, opacity: 0.5 },
-          { t: 1, opacity: 1 },
-        ],
-      },
-      // 天线顶盘：上下浮动一次
-      {
-        indices: [3, 4],
-        keyframes: [
-          { t: 0, ty: 0 },
-          { t: 0.5, ty: -1.1 },
-          { t: 1, ty: 0 },
-        ],
-      },
-      // 双眼红瞳：左右扫视一个来回
-      {
-        indices: [9, 13],
-        keyframes: [
-          { t: 0, tx: 0 },
-          { t: 0.25, tx: 1.7 },
-          { t: 0.5, tx: 0 },
-          { t: 0.75, tx: -1.7 },
-          { t: 1, tx: 0 },
-        ],
-      },
-    ],
-  },
-  {
-    emoji: '🐍',
-    name: '毒蛇',
-    desc: '分叉舌头快速吞吐两下再收回，眨一下眼，身体盘绕不动。',
-    anatomy: '舌头 = 唯一的红色 path，位于头部朝向的延长线上；眼睛是黑色小圆。',
-    parts: [
-      // 舌头：前半周期吞吐两下，后半收拢
-      {
-        indices: [0],
-        keyframes: [
-          { t: 0, tx: 0, ty: 0 },
-          { t: 0.12, tx: -2.4, ty: -0.4 },
-          { t: 0.24, tx: -0.6, ty: -0.1 },
-          { t: 0.36, tx: -2.4, ty: -0.4 },
-          { t: 0.5, tx: 0, ty: 0 },
-          { t: 1, tx: 0, ty: 0 },
-        ],
-      },
-      // 眨眼：黑点瞬隐
-      {
-        indices: [2],
-        keyframes: [
-          { t: 0, opacity: 1 },
-          { t: 0.7, opacity: 1 },
-          { t: 0.78, opacity: 0 },
-          { t: 0.86, opacity: 1 },
-          { t: 1, opacity: 1 },
-        ],
-      },
-    ],
-  },
-  {
-    emoji: '🧟',
-    name: '僵尸',
-    desc: '躯干蹒跚摇摆，伸出的手前后抓挠，头部反相晃动——三组反相运动合成「挪步逼近」。',
-    anatomy: '橙衫躯干在底部；灰白手掌是独立 path；头组（发/脸/五官）占上半。旋转轴分设肩/颈。',
-    parts: [
-      // 躯干（衫+暗部）：绕下摆摇摆
-      {
-        indices: [0, 1],
-        cx: 18,
-        cy: 32,
-        keyframes: [
-          { t: 0, rotate: -2 },
-          { t: 0.5, rotate: 2 },
-          { t: 1, rotate: -2 },
-        ],
-      },
-      // 手掌：向前抓挠两下
-      {
-        indices: [2],
-        keyframes: [
-          { t: 0, tx: 0, ty: 0 },
-          { t: 0.25, tx: -1.1, ty: 0.5 },
-          { t: 0.5, tx: 0, ty: 0 },
-          { t: 0.75, tx: -0.5, ty: 0.25 },
-          { t: 1, tx: 0, ty: 0 },
-        ],
-      },
-      // 头组：绕颈根反相摇摆
-      {
-        indices: [5, 6, 7, 8, 9, 10, 11],
-        cx: 18,
-        cy: 27,
-        keyframes: [
-          { t: 0, rotate: 2.2 },
-          { t: 0.5, rotate: -2.2 },
-          { t: 1, rotate: 2.2 },
-        ],
-      },
-    ],
-  },
-  {
-    emoji: '👻',
-    name: '幽灵',
-    desc: '双眼在眼窝内游移画圈（盯人感），嘴巴以自身中心一缩一张地「呜~」。',
-    anatomy: '身体一整片 path；双眼 + 高光是三个圆；嘴是黑色斜椭圆 path，缩放锚点取其几何中心。',
-    parts: [
-      // 双眼：小菱形轨迹游移一圈
-      {
-        indices: [1, 2, 3],
-        keyframes: [
-          { t: 0, tx: 0, ty: 0 },
-          { t: 0.25, tx: 0.9, ty: 0.5 },
-          { t: 0.5, tx: 0, ty: 1 },
-          { t: 0.75, tx: -0.9, ty: 0.5 },
-          { t: 1, tx: 0, ty: 0 },
-        ],
-      },
-      // 嘴：绕自身中心缩放
-      {
-        indices: [4],
-        cx: 19.5,
-        cy: 23.5,
-        keyframes: [
-          { t: 0, scale: 1 },
-          { t: 0.3, scale: 0.8 },
-          { t: 0.6, scale: 1 },
-          { t: 0.8, scale: 1.18 },
-          { t: 1, scale: 1 },
-        ],
-      },
-    ],
-  },
-  // ── 以下配方展示 fx 能力：为静态物品程序化生成原本不存在的 path ──
-  {
-    emoji: '🔥',
-    name: '火焰',
-    desc: '双层火苗反相摇曳，四颗火星从焰心升起——渐小、随风摆、熄灭，循环不息。',
-    anatomy: '本体仅外焰/内焰两个 path（绕焰底反相摆动）；火星是程序化新建的四芒星 path，逐帧计算位置与明暗。',
-    viewBox: '0 -5 36 41',
-    parts: [
-      // 外焰：绕焰底摇曳
-      {
-        indices: [0],
-        cx: 18,
-        cy: 34,
-        keyframes: [
-          { t: 0, rotate: -2.4, scaleY: 1 },
-          { t: 0.25, rotate: 0, scaleY: 1.025 },
-          { t: 0.5, rotate: 2.4, scaleY: 1 },
-          { t: 0.75, rotate: 0, scaleY: 0.985 },
-          { t: 1, rotate: -2.4, scaleY: 1 },
-        ],
-      },
-      // 内焰：反相摆 + 呼吸
-      {
-        indices: [1],
-        cx: 18,
-        cy: 35,
-        keyframes: [
-          { t: 0, rotate: 2, scale: 1 },
-          { t: 0.5, rotate: -2, scale: 1.05 },
-          { t: 1, rotate: 2, scale: 1 },
-        ],
-      },
-    ],
-    fx: [
-      // 火星从焰尖上方的空域升起：亮金/深橙交替，与焰体拉开对比
-      fxRise({
-        particles: [
-          { x: 13, phase: 0, size: 1.7, color: '#FFD983' },
-          { x: 21.5, phase: 0.31, size: 1.3, color: '#E85319', drift: 1.3 },
-          { x: 16.5, phase: 0.55, size: 1.8, color: '#FFD983' },
-          { x: 24.5, phase: 0.78, size: 1.1, color: '#E85319', drift: 0.7 },
-        ],
-        y0: 7,
-        y1: -4,
-      }),
-    ],
-  },
-  {
-    emoji: '🪙',
-    name: '金币',
-    desc: '一道高光斜扫过币面（裁剪在圆内不越界），边缘三颗星光错相闪烁——金光闪闪。',
-    anatomy: '本体 15 个元素全部静止；高光条与四芒星都是新建 path，高光用程序化 clipPath 裁在币面圆内。',
-    parts: [],
-    fx: [
-      fxShineSweep({ clip: { cx: 18, cy: 18, r: 16.2 }, id: 'coin-shine' }),
-      fxSparkles([
-        { x: 5.5, y: 7.5, r: 2.4, phase: 0 },
-        { x: 30.5, y: 25, r: 1.9, phase: 0.33 },
-        { x: 27, y: 5.5, r: 1.6, phase: 0.66 },
-      ]),
-    ],
-  },
-  {
-    emoji: '⚡',
-    name: '闪电',
-    desc: '本体充能鼓胀、亮度脉动，三道小电弧在周围错时炸开，一颗电光闪过。',
-    anatomy: '本体是单个 path（缩放+明暗脉冲）；电弧是新建的折线 path，各自只在周期的一小段窗口内闪现。',
-    parts: [
-      {
-        indices: [0],
-        cx: 18,
-        cy: 18,
-        keyframes: [
-          { t: 0, scale: 1, opacity: 0.82 },
-          { t: 0.18, scale: 1.05, opacity: 1 },
-          { t: 0.36, scale: 1, opacity: 0.86 },
-          { t: 0.6, scale: 1.04, opacity: 1 },
-          { t: 1, scale: 1, opacity: 0.82 },
-        ],
-      },
-    ],
-    fx: [
-      fxBolts([
-        { points: [[6, 8], [9, 10.5], [7, 13], [10, 15.5]], window: [0.12, 0.24] },
-        { points: [[30.5, 14], [27.5, 16], [29.5, 19], [26.5, 21.5]], window: [0.55, 0.68] },
-        { points: [[10, 27], [13, 28], [11.5, 31]], window: [0.82, 0.92] },
-      ]),
-      fxSparkles([{ x: 28, y: 6, r: 2.1, phase: 0.4, color: '#FFE8B6' }]),
-    ],
-  },
-  {
-    emoji: '💧',
-    name: '水滴',
-    desc: '一颗水珠淡入、坠落、触底压扁又回弹（挤压拉伸），底部漾开两圈涟漪后消散。',
-    anatomy: '本体单 path 走「位移+不等比缩放」的经典 squash & stretch；涟漪椭圆环是新建 path，只在触底后的相位窗内扩散。',
-    viewBox: '0 -8 36 44',
-    parts: [
-      {
-        indices: [0],
-        cx: 18,
-        cy: 35,
-        keyframes: [
-          { t: 0, ty: -9, opacity: 0 },
-          { t: 0.1, ty: -9, opacity: 1 },
-          { t: 0.3, ty: 0, scaleX: 1, scaleY: 1 },
-          { t: 0.38, scaleX: 1.24, scaleY: 0.74 },
-          { t: 0.48, scaleX: 0.94, scaleY: 1.05 },
-          { t: 0.56, scaleX: 1, scaleY: 1 },
-          { t: 0.85, scaleX: 1, scaleY: 1, opacity: 1 },
-          // 透明期把水珠搬回顶部，闭环衔接下一次坠落
-          { t: 0.93, ty: 0, opacity: 0 },
-          { t: 1, ty: -9, opacity: 0 },
-        ],
-      },
-    ],
-    fx: [
-      fxRipples({
-        cx: 18,
-        cy: 33.5,
-        color: '#5DADEC',
-        rings: [{ phase: 0 }, { phase: 0.16 }],
-        window: [0.3, 0.85],
-      }),
-    ],
-  },
-  {
-    emoji: '👹',
-    name: '赤鬼',
-    desc: '红脸怒气起伏，双瞳收缩瞪视，头顶两缕怒气蒸腾而上——Boss 的待机威压。',
-    anatomy: '红脸 path 呼吸缩放；两只瞳孔是独立圆，各绕自身中心收放；蒸汽是新建的 S 形描边 path，升起淡出。',
-    viewBox: '0 -7 36 43',
-    parts: [
-      // 红脸：呼吸
-      {
-        indices: [1],
-        cx: 18,
-        cy: 22,
-        keyframes: [
-          { t: 0, scale: 1 },
-          { t: 0.5, scale: 1.018 },
-          { t: 1, scale: 1 },
-        ],
-      },
-      // 左瞳：收缩瞪视
-      {
-        indices: [6],
-        cx: 12.74,
-        cy: 17.71,
-        keyframes: [
-          { t: 0, scale: 1 },
-          { t: 0.35, scale: 0.72 },
-          { t: 0.55, scale: 1.18 },
-          { t: 0.75, scale: 1 },
-          { t: 1, scale: 1 },
-        ],
-      },
-      // 右瞳：同步收放
-      {
-        indices: [8],
-        cx: 23.26,
-        cy: 17.71,
-        keyframes: [
-          { t: 0, scale: 1 },
-          { t: 0.35, scale: 0.72 },
-          { t: 0.55, scale: 1.18 },
-          { t: 0.75, scale: 1 },
-          { t: 1, scale: 1 },
-        ],
-      },
-      // 眉弓：随怒气微皱
-      {
-        indices: [12],
-        keyframes: [
-          { t: 0, ty: 0 },
-          { t: 0.35, ty: 0.6 },
-          { t: 0.55, ty: -0.3 },
-          { t: 1, ty: 0 },
-        ],
-      },
-    ],
-    fx: [
-      fxSteam([
-        { x: 10.5, y0: -0.5, phase: 0 },
-        { x: 25.5, y0: -0.5, phase: 0.5 },
-      ]),
-    ],
-  },
-]
+// ── 动画资源格式：原始 SVG + 动画参数 = 可存储/校验/热加载的数据资产 ──
+// fx 用「生成器名 + 参数」声明（函数无法序列化），加载时经注册表还原成渲染函数。
+// 资源文件：src/core/animations.json（format 版本化；spec 为全体统一播放规格）。
+
+export const ANIM_FORMAT = 'warmoji-anim@1'
+
+/** fx 声明：gen 必须是注册表成员；layer 缺省用生成器自身默认 */
+export interface FxDecl {
+  readonly gen: string
+  readonly layer?: 'back' | 'front'
+  readonly params: unknown
+}
+
+export interface AnimResourceEntry {
+  readonly emoji: string
+  readonly name: string
+  readonly desc: string
+  readonly anatomy: string
+  readonly viewBox?: string
+  readonly parts: readonly AnimPart[]
+  readonly fx?: readonly FxDecl[]
+}
+
+export interface AnimResource {
+  readonly format: string
+  readonly spec: { readonly frames: number; readonly durMs: number }
+  /** key = emoji 的 codepoints（与 public/emoji 下的 SVG 文件名一致） */
+  readonly animations: Readonly<Record<string, AnimResourceEntry>>
+}
+
+/** fx 生成器注册表：资源里的 gen 名 → 还原函数。新增效果类型 = 此处加一行 */
+const FX_REGISTRY = {
+  rise: fxRise,
+  shine: fxShineSweep,
+  sparkles: fxSparkles,
+  ripples: fxRipples,
+  bolts: fxBolts,
+  steam: fxSteam,
+} as const satisfies Record<string, (params: never) => FxLayer>
+
+export const FX_GENERATORS = Object.keys(FX_REGISTRY) as readonly string[]
+
+// 注意不能用 lerpKeyframes(kfs,0) 与 (kfs,1) 对比——相位 1 会归一化回 0，恒等
+const poseOf = (kf: PartKeyframe): PartPose => ({
+  rotate: kf.rotate ?? 0,
+  tx: kf.tx ?? 0,
+  ty: kf.ty ?? 0,
+  scale: kf.scale ?? 1,
+  scaleX: kf.scaleX ?? 1,
+  scaleY: kf.scaleY ?? 1,
+  opacity: kf.opacity ?? 1,
+})
+
+const poseEq = (a: PartPose, b: PartPose): boolean =>
+  Math.abs(a.rotate - b.rotate) < 1e-9 &&
+  Math.abs(a.tx - b.tx) < 1e-9 &&
+  Math.abs(a.ty - b.ty) < 1e-9 &&
+  Math.abs(a.scale - b.scale) < 1e-9 &&
+  Math.abs(a.scaleX - b.scaleX) < 1e-9 &&
+  Math.abs(a.scaleY - b.scaleY) < 1e-9 &&
+  Math.abs(a.opacity - b.opacity) < 1e-9
+
+/** 资源校验：格式版本 / 播放规格 / 关键帧闭环与时序 / 部件下标 / fx 生成器存在。
+ * 违规即抛错（带定位信息）——坏资源在加载期暴露，不进运行时 */
+export function validateAnimResource(data: AnimResource): void {
+  if (data.format !== ANIM_FORMAT) {
+    throw new Error(`动画资源格式不符：期望 ${ANIM_FORMAT}，得到 ${String(data.format)}`)
+  }
+  if (!(data.spec.frames >= 2) || !(data.spec.durMs > 0)) {
+    throw new Error('动画资源 spec 非法：frames 需 ≥2，durMs 需 >0')
+  }
+  for (const [key, entry] of Object.entries(data.animations)) {
+    const at = `animations.${key}`
+    if (!entry.emoji || !entry.name) throw new Error(`${at}: 缺少 emoji/name`)
+    if (entry.parts.length === 0 && (entry.fx?.length ?? 0) === 0) {
+      throw new Error(`${at}: parts 与 fx 至少要有一项`)
+    }
+    const seen = new Set<number>()
+    entry.parts.forEach((part, pi) => {
+      const pat = `${at}.parts[${pi}]`
+      if (part.indices.length === 0) throw new Error(`${pat}: indices 为空`)
+      for (const i of part.indices) {
+        if (!Number.isInteger(i) || i < 0) throw new Error(`${pat}: 非法下标 ${i}`)
+        if (seen.has(i)) throw new Error(`${pat}: 下标 ${i} 被多个部件占用`)
+        seen.add(i)
+      }
+      if (part.keyframes.length < 2) throw new Error(`${pat}: 关键帧不足 2 个`)
+      let prev = -Infinity
+      for (const kf of part.keyframes) {
+        if (kf.t < 0 || kf.t > 1) throw new Error(`${pat}: 关键帧 t=${kf.t} 超出 [0,1]`)
+        if (kf.t < prev) throw new Error(`${pat}: 关键帧 t 未按升序排列`)
+        prev = kf.t
+      }
+      const first = part.keyframes[0]!
+      const last = part.keyframes[part.keyframes.length - 1]!
+      if (!poseEq(poseOf(first), poseOf(last))) {
+        throw new Error(`${pat}: 首尾姿态不闭环（循环播放会跳变）`)
+      }
+    })
+    entry.fx?.forEach((decl, fi) => {
+      if (!(decl.gen in FX_REGISTRY)) {
+        throw new Error(`${at}.fx[${fi}]: 未知生成器 "${decl.gen}"（可用：${FX_GENERATORS.join('/')}）`)
+      }
+      if (decl.layer !== undefined && decl.layer !== 'back' && decl.layer !== 'front') {
+        throw new Error(`${at}.fx[${fi}]: layer 只能是 back/front`)
+      }
+    })
+  }
+}
+
+/** 加载资源：校验后把 fx 声明经注册表还原成渲染函数，产出运行时配方表 */
+export function loadAnimRecipes(data: AnimResource): AnimRecipe[] {
+  validateAnimResource(data)
+  return Object.values(data.animations).map((entry) => ({
+    emoji: entry.emoji,
+    name: entry.name,
+    desc: entry.desc,
+    anatomy: entry.anatomy,
+    viewBox: entry.viewBox,
+    parts: entry.parts,
+    fx: entry.fx?.map((decl) => {
+      const make = FX_REGISTRY[decl.gen as keyof typeof FX_REGISTRY] as (params: unknown) => FxLayer
+      const fx = make(decl.params)
+      return decl.layer ? { ...fx, layer: decl.layer } : fx
+    }),
+  }))
+}
+
+const RESOURCE = animationsJson as unknown as AnimResource
+
+/** 全体动画统一播放规格（来自资源文件 spec 字段） */
+export const ANIM_SPEC: { readonly frames: number; readonly durMs: number } = RESOURCE.spec
+
+/** 部件动画花名册：从资源文件加载（坏数据在此即抛错，dev/测试期暴露） */
+export const ANIM_RECIPES: readonly AnimRecipe[] = loadAnimRecipes(RESOURCE)
 
 export function animRecipeOf(emoji: string): AnimRecipe | undefined {
   return ANIM_RECIPES.find((r) => r.emoji === emoji)
