@@ -71,16 +71,16 @@ export function emojiKey(emoji: string, outline?: OutlineKind): string {
   return `emoji-${emojiCodepoints(emoji)}${outline ? KIND_SUFFIX[outline] : ''}`
 }
 
-/** SVG 文本 → 位图（尺寸由 SVG 自身的 width/height 决定），图鉴图集也复用 */
+/** SVG 文本 → 位图（尺寸由 SVG 自身的 width/height 决定），图鉴图集也复用。
+ * decode()：加载与解码一次完成，drawImage 时不再同步光栅化——
+ * 少挤占主线程帧间隙（高刷屏上 rAF 争用尤其明显），实测比 onload 快近半 */
 export async function svgToImage(svgText: string): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }))
   try {
     const img = new Image()
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve()
-      img.onerror = () => reject(new Error('SVG 光栅化失败'))
-      img.src = url
-    })
+    img.decoding = 'async'
+    img.src = url
+    await img.decode()
     return img
   } finally {
     URL.revokeObjectURL(url)
