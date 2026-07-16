@@ -1,8 +1,8 @@
 // 构建前把 twemoji-svg（jdecked/twemoji 官方资产的转打包，已抽样 hash 验证一致）
 // 打包为两份资源（生成物不进 git）：
-//   public/emoji/<版本>/index.json —— Unicode 官方索引（CLDR 顺序）与 twemoji
+//   public/emoji/index.json —— Unicode 官方索引（CLDR 顺序）与 twemoji
 //     的交集：key/字符/英文名/分组 + 全库统一 header；行序即打包文件行序
-//   public/emoji/<版本>/pack.txt   —— 每行一个去 header 的 SVG 正文
+//   public/emoji/pack.txt   —— 每行一个去 header 的 SVG 正文
 // 一切以官方数据为准：Unicode 索引来自 scripts/data/emoji-test.txt（unicode.org
 // 原文），twemoji 形态逐文件实测。所有例外（header 变体/换行/引用）显式处理，
 // 未知情况直接报错退出，不做静默假设。
@@ -17,7 +17,10 @@ const srcDir = join(root, 'node_modules/twemoji-svg/dist')
 const twemojiVersion = JSON.parse(
   readFileSync(join(root, 'node_modules/twemoji-svg/package.json'), 'utf8'),
 ).version
-const destDir = join(root, 'public/emoji', twemojiVersion)
+// 资源 URL 不含版本（版本写在 index.json 内容里）：跨部署升级时，
+// 持有旧 JS 的活跃客户端请求同一路径拿到新数据，格式兼容即正常工作，
+// 绝不 404 全挂（版本目录方案曾在 15.0.0→17.0.2 升级时击穿线上旧客户端）
+const destDir = join(root, 'public/emoji')
 const indexPath = join(destDir, 'index.json')
 const packPath = join(destDir, 'pack.txt')
 
@@ -170,19 +173,27 @@ if (emojis.length === 0) throw new Error('交集为空，检查数据源')
 
 rmSync(join(root, 'public/emoji'), { recursive: true, force: true })
 mkdirSync(destDir, { recursive: true })
-writeFileSync(
-  indexPath,
-  JSON.stringify({
-    format: 'warmoji-emoji@1',
-    generator: GENERATOR,
-    unicodeVersion,
-    twemojiVersion,
-    header: STD_HEADER,
-    groups,
-    emojis,
-  }),
-)
-writeFileSync(packPath, packLines.join('\n'))
+const indexJson = JSON.stringify({
+  format: 'warmoji-emoji@1',
+  generator: GENERATOR,
+  unicodeVersion,
+  twemojiVersion,
+  header: STD_HEADER,
+  groups,
+  emojis,
+})
+const packText = packLines.join('\n')
+writeFileSync(indexPath, indexJson)
+writeFileSync(packPath, packText)
+
+// 过渡期兼容：仍持有旧版 JS（带版本路径）的活跃客户端不 404。
+// 这些客户端的 HTML 一经 revalidate 就会换新 JS，几个版本后可清空此列表
+for (const legacy of ['17.0.2']) {
+  const dir = join(destDir, legacy)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'index.json'), indexJson)
+  writeFileSync(join(dir, 'pack.txt'), packText)
+}
 
 const kb = (p) => Math.round(readFileSync(p).length / 1024)
 console.log(

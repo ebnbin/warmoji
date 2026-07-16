@@ -24,7 +24,8 @@ let packPromise: Promise<EmojiPack> | undefined
 /** 加载打包资源（幂等，全局仅一次两个请求） */
 export function loadEmojiPack(): Promise<EmojiPack> {
   if (!packPromise) {
-    const base = `/emoji/${__TWEMOJI_VERSION__}`
+    // 路径不带版本：跨部署时旧 JS 也能取到新资源（版本在 index.json 内容里）
+    const base = '/emoji'
     packPromise = Promise.all([
       fetch(`${base}/index.json`).then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status} ${base}/index.json`)
