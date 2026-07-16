@@ -47,6 +47,22 @@ interface WarmojiMenuDebug {
   start: { x: number; y: number; w: number; h: number }
   settings: { x: number; y: number; w: number; h: number }
   wiki: { x: number; y: number; w: number; h: number }
+  studio: { x: number; y: number; w: number; h: number }
+}
+
+interface WarmojiStudioDebug {
+  tab: 'anim' | 'merge'
+  tabs: { id: string; x: number; y: number; w: number; h: number }[]
+  items: { key: string; x: number; y: number; w: number; h: number }[]
+  /** anim = 选中的配方 emoji；merge = 当前活跃槽的 emoji */
+  selected: string
+  slots: { a: string | null; b: string | null; active: 'a' | 'b' }
+  slotRects: {
+    a: { x: number; y: number; w: number; h: number }
+    b: { x: number; y: number; w: number; h: number }
+  }
+  preview: 'idle' | 'loading' | 'ready'
+  back: { x: number; y: number; w: number; h: number }
 }
 
 interface WarmojiWikiDebug {
@@ -91,7 +107,7 @@ interface WarmojiResultDebug {
 }
 
 interface WarmojiDebug {
-  scene: 'menu' | 'map' | 'wiki' | 'settings' | 'captain' | 'promote' | 'shop' | 'arena' | 'result'
+  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'promote' | 'shop' | 'arena' | 'result'
   elapsed: number
   hp: number
   alive: number
@@ -115,6 +131,7 @@ interface WarmojiDebug {
   menu?: WarmojiMenuDebug
   map?: WarmojiMapDebug
   wiki?: WarmojiWikiDebug
+  studio?: WarmojiStudioDebug
   settings?: WarmojiSettingsDebug
   captain?: WarmojiCaptainDebug
   promote?: WarmojiPromoteDebug

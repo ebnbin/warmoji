@@ -827,4 +827,6 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '✅',
   '⏸️',
   '👑',
+  // 主菜单 Emoji Studio 入口图标（studio 页内素材按需加载）
+  '🧪',
 ]

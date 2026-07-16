@@ -20,6 +20,7 @@ export class MenuScene extends Phaser.Scene {
   private menuBtn = { x: 0, y: 0, w: 0, h: 0 }
   private gearRect = { x: 0, y: 0, w: 0, h: 0 }
   private bookRect = { x: 0, y: 0, w: 0, h: 0 }
+  private studioRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
     super('menu')
@@ -61,13 +62,14 @@ export class MenuScene extends Phaser.Scene {
       })
     }
 
-    // 右上角入口：📖 图鉴 + ⚙️ 设置（圆底增强可点性）
+    // 右上角入口：🧪 Emoji Studio + 📖 图鉴 + ⚙️ 设置（圆底增强可点性）
     const iconBg = this.add.graphics()
     iconBg.fillStyle(0x000000, 0.18)
     const gearX = w - safeInsets.right - 44
     const gearY = safeInsets.top + 44
     iconBg.fillCircle(gearX, gearY, 32)
     iconBg.fillCircle(gearX - 84, gearY, 32)
+    iconBg.fillCircle(gearX - 168, gearY, 32)
     emojiImage(this, gearX, gearY, '⚙️', 40)
       .setAlpha(0.9)
       .setInteractive({ useHandCursor: true })
@@ -84,6 +86,14 @@ export class MenuScene extends Phaser.Scene {
         this.scene.start('wiki')
       })
     this.bookRect = { x: gearX - 84 - 28, y: gearY - 28, w: 56, h: 56 }
+    emojiImage(this, gearX - 168, gearY, '🧪', 40)
+      .setAlpha(0.9)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => {
+        playSfx('click')
+        this.scene.start('studio')
+      })
+    this.studioRect = { x: gearX - 168 - 28, y: gearY - 28, w: 56, h: 56 }
 
     // 明确的按钮 + 空格键开始，避免任意点击误触；轻微脉动引导视线
     const btn = { x: w / 2 - 170, y: h * 0.82 - 36, w: 340, h: 72 }
@@ -170,6 +180,12 @@ export class MenuScene extends Phaser.Scene {
           y: this.bookRect.y + this.bookRect.h / 2,
           w: this.bookRect.w,
           h: this.bookRect.h,
+        },
+        studio: {
+          x: this.studioRect.x + this.studioRect.w / 2,
+          y: this.studioRect.y + this.studioRect.h / 2,
+          w: this.studioRect.w,
+          h: this.studioRect.h,
         },
       },
     })
