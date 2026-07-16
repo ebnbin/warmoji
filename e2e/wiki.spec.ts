@@ -9,8 +9,8 @@ async function cssPoint(page: Page, logical: { x: number; y: number }): Promise<
 }
 
 test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚动、返回', async ({ page }) => {
-  // 全量图集构建（1905 张光栅化）在软渲染容器里与其他用例并行时很慢，放宽预算
-  test.setTimeout(240_000)
+  // 软渲染容器里与其他用例并行时光栅化偏慢，预算适当放宽
+  test.setTimeout(120_000)
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(String(err)))
   page.on('console', (msg) => {
@@ -45,13 +45,13 @@ test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚
   await page.waitForFunction((k) => window.__warmoji?.wiki?.focused === k, target.key)
   await page.screenshot({ path: 'test-results/wiki-entries.png' })
 
-  // 切到「全部」类别：等全量缩略图集构建完成（1905 张 → 2 张 2048 图集），网格可滚动
+  // 切到「全部」类别：feed 流无 loading，网格即刻就绪，首屏缩略图按需渲染
   const allTab = w.categories.find((c) => c.title === '全部')!
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: allTab.x, y: allTab.y }) })
   await page.waitForFunction(
-    () => window.__warmoji?.wiki?.category === '全部' && window.__warmoji.wiki.atlas === 'ready',
+    () => window.__warmoji?.wiki?.category === '全部' && (window.__warmoji.wiki.thumbsReady ?? 0) > 30,
     undefined,
-    { timeout: 150_000 },
+    { timeout: 30_000 },
   )
   w = await page.evaluate(() => window.__warmoji!.wiki!)
   expect(w.manifestCount).toBeGreaterThan(1500)
@@ -71,7 +71,7 @@ test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚
   await page.waitForTimeout(700)
   await page.screenshot({ path: 'test-results/wiki-all.png' })
 
-  // 深下滑再回滑到顶：图集常驻，回看已翻阅区域不应空白/报错
+  // 深下滑再回滑到顶：页内缓存命中，回看已翻阅区域不应空白/报错
   for (let i = 0; i < 6; i++) await page.mouse.wheel(0, 5000)
   await page.waitForFunction(() => (window.__warmoji?.wiki?.scrollY ?? 0) > 5000)
   for (let i = 0; i < 8; i++) await page.mouse.wheel(0, -6000)

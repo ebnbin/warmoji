@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  EMOJI_PACK_FORMAT,
-  PACK_CELL,
-  packBaseKeys,
-  packGridSvg,
-  packSvg,
-  parseEmojiPack,
-} from './emojipack'
+import { EMOJI_PACK_FORMAT, packBaseKeys, packSvg, parseEmojiPack } from './emojipack'
 import type { EmojiIndex } from './emojipack'
 
 const HEADER = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">'
@@ -56,21 +49,5 @@ describe('packSvg', () => {
 describe('packBaseKeys', () => {
   it('剔除肤色变体，保持顺序', () => {
     expect(packBaseKeys(pack())).toEqual(['1f600', '1f44b'])
-  })
-})
-
-describe('packGridSvg', () => {
-  it('按网格平铺：viewBox 尺寸与每格 translate 正确', () => {
-    const svg = packGridSvg(pack(), ['1f600', '1f44b', '1f44b-1f3fb'], 2)
-    expect(svg).toContain(`viewBox="0 0 ${2 * PACK_CELL} ${2 * PACK_CELL}"`)
-    expect(svg).toContain('<g transform="translate(0 0)"><circle r="1"/></g>')
-    expect(svg).toContain(`<g transform="translate(${PACK_CELL} 0)"><path d="M0 0"/></g>`)
-    expect(svg).toContain(`<g transform="translate(0 ${PACK_CELL})"><path d="M1 1"/></g>`)
-  })
-
-  it('未收录 key 留空格，不产出该格内容', () => {
-    const svg = packGridSvg(pack(), ['ffff', '1f600'], 2)
-    expect(svg).not.toContain('translate(0 0)')
-    expect(svg).toContain(`<g transform="translate(${PACK_CELL} 0)">`)
   })
 })

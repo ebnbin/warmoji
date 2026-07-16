@@ -12,12 +12,20 @@ import { emojiImage, emojiKey, ensureEmoji, loadEmojiPack } from '../ui/emoji'
 import { EmojiGrid } from '../ui/grid'
 import { FONT, UI_FONT } from '../ui/fonts'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
-import { buildWikiAtlas, wikiAtlasProgress, wikiFrame } from '../ui/wikiAtlas'
+import {
+  prepareWikiThumbs,
+  releaseWikiThumbs,
+  requestWikiThumb,
+  wikiThumbKey,
+  wikiThumbSize,
+  wikiThumbsReady,
+} from '../ui/wikiThumbs'
 
 // 图鉴：单排类别 tab——角色/队长/敌人/武器/道具（条目列表+详情）与
 // 「全部」（twemoji 基础形态完整网格）平级，「全部」排最后。
-// 网格性能：进入时一次性构建 64px 缩略图集（常驻、带进度条），
-// 之后格子绑定是同步查表；滚动 = 容器平移 + 环形缓冲窗口，任意方向零异步。
+// 「全部」页是 feed 流：无前置构建，滚到哪个格子哪个格子按需光栅化
+// 自己的缩略图（页内缓存、滚回零等待），退出图鉴全量释放内存；
+// 滚动 = 容器平移 + 环形缓冲窗口。
 interface WikiLayout {
   content: { w: number; h: number }
   headerY: number
@@ -56,7 +64,7 @@ interface DetailPool {
   footer: Phaser.GameObjects.Text
 }
 
-/** 虚拟网格的格子（环形缓冲复用：slot = index % poolSize；纹理来自常驻图集，绑定为同步查表） */
+/** 虚拟网格的格子（环形缓冲复用：slot = index % poolSize；缩略图缓存命中即同步贴上，未命中按需渲染后浮现） */
 interface Cell {
   image: Phaser.GameObjects.Image
   boundIndex: number
@@ -102,11 +110,8 @@ export class WikiScene extends Phaser.Scene {
   private lastMoveY = 0
   private lastMoveT = 0
   private reportAt = 0
-  // 图集加载进度条（仅全部页构建期间）
   private gridBuilt = false
-  private loadingFill?: Phaser.GameObjects.Graphics
-  private loadingText?: Phaser.GameObjects.Text
-  private loadingShownDone = -1
+  private thumbReportPending = false
 
   constructor() {
     super('wiki')
@@ -120,6 +125,8 @@ export class WikiScene extends Phaser.Scene {
     applyBackground(this.palette)
     this.groups = wikiGroups()
     this.used = usedEmojiSet()
+    // 缩略图档位按设备渲染缩放定（52 逻辑 px 格子的物理像素 1:1）；同档复用缓存
+    prepareWikiThumbs(this, wikiThumbSize(52, viewport.renderScale))
     this.entryLookup = wikiEntryByEmoji()
     this.pool = undefined
     if (!preserved) {
@@ -133,6 +140,8 @@ export class WikiScene extends Phaser.Scene {
     this.cells = []
     this.dragging = false
     this.dragMoved = false
+    // restart 会清掉挂起的 delayedCall，标志随之复位
+    this.thumbReportPending = false
 
     const w = viewport.logicalWidth
     const h = viewport.logicalHeight
@@ -211,15 +220,16 @@ export class WikiScene extends Phaser.Scene {
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
+      // 真退出图鉴才释放缩略缓存；旋转/切类别的内部 restart 保留（同档位复用）
+      if (!this.preserveOnRestart) releaseWikiThumbs(this)
     })
 
     this.reportWiki()
   }
 
-  /** 惯性滚动 + 图集加载进度刷新 */
+  /** 惯性滚动 */
   update(_time: number, delta: number): void {
     if (!this.isAllPage()) return
-    if (!this.gridBuilt) this.refreshLoading()
     if (this.flingV === 0 || this.dragging) return
     const cur = this.gridScroll
     const max = this.gridMax
@@ -230,23 +240,6 @@ export class WikiScene extends Phaser.Scene {
       this.flingV = 0
       this.forceReport()
     }
-  }
-
-  private refreshLoading(): void {
-    const p = wikiAtlasProgress()
-    if (!this.loadingFill || !this.loadingText || p.done === this.loadingShownDone) return
-    this.loadingShownDone = p.done
-    const L = this.layout.list
-    const lx = this.origin.x + L.x
-    const ly = this.origin.y + L.y
-    const bw = L.w - 80
-    const ratio = p.total > 0 ? p.done / p.total : 0
-    this.loadingFill.clear()
-    this.loadingFill.fillStyle(0xffd54f, 1)
-    this.loadingFill.fillRoundedRect(lx + 40, ly + L.h / 2 - 10, Math.max(10, bw * ratio), 20, 10)
-    this.loadingText.setText(
-      p.total > 0 ? `首次加载全部 emoji… ${p.done} / ${p.total}` : '加载清单中…',
-    )
   }
 
   // ── 类别横向 tab ────────────────────────────────────────────
@@ -529,22 +522,6 @@ export class WikiScene extends Phaser.Scene {
     this.selectRing = this.add.graphics()
     this.gridContainer.add(this.selectRing)
 
-    // 首次进入：全量缩略图集构建进度（完成后此区域变成网格）
-    const barBg = this.add.graphics()
-    barBg.fillStyle(0xffffff, 0.1)
-    barBg.fillRoundedRect(lx + 40, ly + L.h / 2 - 10, L.w - 80, 20, 10)
-    this.loadingFill = this.add.graphics()
-    this.loadingText = this.add
-      .text(lx + L.w / 2, ly + L.h / 2 - 44, '加载清单中…', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.body,
-        color: '#d0d0d8',
-        resolution: textRes(),
-      })
-      .setOrigin(0.5)
-    this.loadingShownDone = -1
-    const loadingObjs = [barBg, this.loadingFill, this.loadingText]
-
     // 点击选中格子（拖动不算；网格就绪后才可选）
     this.add
       .zone(lx, ly, L.w, L.h)
@@ -563,24 +540,14 @@ export class WikiScene extends Phaser.Scene {
         this.reportWiki()
       })
 
-    void this.loadManifest()
-      .then(() => {
-        if (!this.scene.isActive('wiki')) return
-        this.manifestUsed = this.manifest.filter((cp) => this.used.has(codepointsToEmoji(cp))).length
-        // 一次性预载全部缩略图（幂等：会话内只构建一次，之后进入秒开）
-        return buildWikiAtlas(this, this.manifest)
-      })
-      .then(() => {
-        if (!this.scene.isActive('wiki') || !this.isAllPage()) return
-        if (wikiAtlasProgress().state !== 'ready') return
-        for (const o of loadingObjs) o.destroy()
-        this.loadingFill = undefined
-        this.loadingText = undefined
-        this.buildGrid()
-      })
+    void this.loadManifest().then(() => {
+      if (!this.scene.isActive('wiki') || !this.isAllPage()) return
+      this.manifestUsed = this.manifest.filter((cp) => this.used.has(codepointsToEmoji(cp))).length
+      this.buildGrid()
+    })
   }
 
-  /** 图集就绪后构建网格：格子纹理同步查表，滚动无任何异步加载 */
+  /** 清单就绪即建网格：格子滚入视口时按需渲染自己的缩略图（feed 流） */
   private buildGrid(): void {
     const L = this.layout.list
     const totalRows = Math.ceil(this.manifest.length / this.gridCols)
@@ -628,17 +595,29 @@ export class WikiScene extends Phaser.Scene {
     const col = index % this.gridCols
     const cx = col * CELL + CELL / 2
     const cy = Math.floor(index / this.gridCols) * CELL + CELL / 2
-    const f = wikiFrame(cp)
-    if (!f) {
-      cell.image.setVisible(false)
+    const alpha = this.used.has(codepointsToEmoji(cp)) ? 1 : 0.26
+    const hit = wikiThumbKey(cp)
+    if (hit) {
+      cell.image.setPosition(cx, cy).setTexture(hit).setDisplaySize(52, 52).setAlpha(alpha).setVisible(true)
       return
     }
-    cell.image
-      .setPosition(cx, cy)
-      .setTexture(f.key, f.frame)
-      .setDisplaySize(52, 52)
-      .setAlpha(this.used.has(codepointsToEmoji(cp)) ? 1 : 0.26)
-      .setVisible(true)
+    // 缓存未命中：先空格，渲染完成且格子仍绑着本条目时浮现（feed 流）
+    cell.image.setVisible(false)
+    void requestWikiThumb(this, cp).then((key) => {
+      if (!key || cell.boundIndex !== index || !this.scene.isActive('wiki')) return
+      cell.image.setPosition(cx, cy).setTexture(key).setDisplaySize(52, 52).setAlpha(alpha).setVisible(true)
+      this.reportThumbProgress()
+    })
+  }
+
+  /** 缩略图落地后的拖尾节流上报：thumbsReady 才能反映真实渲染进度（调试/e2e 依赖） */
+  private reportThumbProgress(): void {
+    if (this.thumbReportPending) return
+    this.thumbReportPending = true
+    this.time.delayedCall(150, () => {
+      this.thumbReportPending = false
+      if (this.scene.isActive('wiki')) this.reportWiki()
+    })
   }
 
   private drawSelectRing(index: number): void {
@@ -710,7 +689,7 @@ export class WikiScene extends Phaser.Scene {
         entryCount: this.entryGrid ? this.entryGrid.cellRects().length : 0,
         manifestCount: this.manifest.length,
         usedCount: this.used.size,
-        atlas: wikiAtlasProgress().state,
+        thumbsReady: wikiThumbsReady(),
         scrollY: this.isAllPage() ? this.gridScroll : this.listScroll,
         maxScroll: this.isAllPage()
           ? this.gridMax

@@ -81,27 +81,3 @@ export function packBaseKeys(pack: EmojiPack): string[] {
     .map((e) => e.c)
     .filter((key) => !key.split('-').some((seg) => TONES.has(seg)))
 }
-
-/** twemoji 原生画布边长（viewBox 单位） */
-export const PACK_CELL = 36
-
-/** 把一批 emoji 拼成网格大 SVG（每格一个 <g translate>，格边 = PACK_CELL 单位）：
- * 整张一次光栅化，取代逐个 Image 的 N 次固定开销。不在库中的 key 留空格。
- * 打包正文的 id 已在构建期按 key 命名空间化，同文档拼接不会互相污染 */
-export function packGridSvg(pack: EmojiPack, keys: readonly string[], cols: number): string {
-  if (cols < 1) throw new Error('cols 必须 ≥ 1')
-  const rows = Math.max(1, Math.ceil(keys.length / cols))
-  const cells = keys
-    .map((key, i) => {
-      const body = pack.bodyByKey.get(key)
-      if (body === undefined) return ''
-      const x = (i % cols) * PACK_CELL
-      const y = Math.floor(i / cols) * PACK_CELL
-      return `<g transform="translate(${x} ${y})">${body}</g>`
-    })
-    .join('')
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${cols * PACK_CELL} ${rows * PACK_CELL}">` +
-    `${cells}</svg>`
-  )
-}

@@ -77,7 +77,8 @@ interface WarmojiWikiDebug {
   entryCount: number
   manifestCount: number
   usedCount: number
-  atlas: 'idle' | 'loading' | 'ready'
+  /** 已按需渲染的缩略图数量（feed 流：滚到哪渲染到哪） */
+  thumbsReady: number
   scrollY: number
   maxScroll: number
   items: { key: string; x: number; y: number; w: number; h: number }[]
