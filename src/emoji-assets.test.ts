@@ -17,7 +17,7 @@ function tsFiles(dir: string): string[] {
 }
 
 describe('twemoji 资产完整性', () => {
-  it('源码用到的每个 emoji 在 @twemoji/svg 全集中都有对应文件', () => {
+  it('源码用到的每个 emoji 在 twemoji-svg 全集中都有对应文件', () => {
     const emojiRe = new RegExp('\\p{RGI_Emoji}', 'gv')
     const used = new Set<string>()
     for (const file of tsFiles(srcDir)) {
@@ -26,7 +26,7 @@ describe('twemoji 资产完整性', () => {
       }
     }
     const available = new Set(
-      readdirSync(join(srcDir, '../node_modules/@twemoji/svg'))
+      readdirSync(join(srcDir, '../node_modules/twemoji-svg/dist'))
         .filter((f) => f.endsWith('.svg'))
         .map((f) => f.replace('.svg', '')),
     )

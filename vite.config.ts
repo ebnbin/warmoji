@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vitest/config'
 
 const twemojiVersion = (
-  JSON.parse(readFileSync('node_modules/@twemoji/svg/package.json', 'utf8')) as { version: string }
+  JSON.parse(readFileSync('node_modules/twemoji-svg/package.json', 'utf8')) as { version: string }
 ).version
 
 // 构建版本号：Vercel/CI 环境取平台注入的 commit SHA，本地取 git HEAD，兜底 'dev'。

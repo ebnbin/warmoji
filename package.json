@@ -16,12 +16,12 @@
     "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run e2e"
   },
   "dependencies": {
-    "phaser": "^3.90.0"
+    "phaser": "^3.90.0",
+    "twemoji-svg": "17.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
-    "@twemoji/svg": "^15.0.0",
     "@types/node": "^26.1.1",
     "eslint": "^10.7.0",
     "typescript": "^6.0.3",

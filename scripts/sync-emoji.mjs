@@ -1,4 +1,5 @@
-// 构建前把 @twemoji/svg 打包为两份资源（生成物不进 git）：
+// 构建前把 twemoji-svg（jdecked/twemoji 官方资产的转打包，已抽样 hash 验证一致）
+// 打包为两份资源（生成物不进 git）：
 //   public/emoji/<版本>/index.json —— Unicode 官方索引（CLDR 顺序）与 twemoji
 //     的交集：key/字符/英文名/分组 + 全库统一 header；行序即打包文件行序
 //   public/emoji/<版本>/pack.txt   —— 每行一个去 header 的 SVG 正文
@@ -9,11 +10,13 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { join } from 'node:path'
 
 // 脚本行为变更时 bump，强制重新生成
-const GENERATOR = 2
+const GENERATOR = 3
 
 const root = new URL('..', import.meta.url).pathname
-const srcDir = join(root, 'node_modules/@twemoji/svg')
-const twemojiVersion = JSON.parse(readFileSync(join(srcDir, 'package.json'), 'utf8')).version
+const srcDir = join(root, 'node_modules/twemoji-svg/dist')
+const twemojiVersion = JSON.parse(
+  readFileSync(join(root, 'node_modules/twemoji-svg/package.json'), 'utf8'),
+).version
 const destDir = join(root, 'public/emoji', twemojiVersion)
 const indexPath = join(destDir, 'index.json')
 const packPath = join(destDir, 'pack.txt')
@@ -132,20 +135,34 @@ function extractBody(key) {
 }
 
 // ── 3. 交集匹配 + 产出 ─────────────────────────────────────────
+// 文件名查找：主规则（= 运行时 emojiCodepoints 输出，索引 key 恒用它）→
+// 个别历史特例 fallback（如 👁️‍🗨️ 含 ZWJ 却全去 FE0F 的 1f441-200d-1f5e8）
+const fileOf = (key) => {
+  if (files.has(key)) return key
+  const stripped = key
+    .split('-')
+    .filter((seg) => seg !== 'fe0f')
+    .join('-')
+  return files.has(stripped) ? stripped : null
+}
+
 const emojis = []
 const packLines = []
 let missUnicode = 0
+let fallbackHits = 0
 const usedKeys = new Set()
 for (const e of unicodeEntries) {
-  if (!files.has(e.key)) {
+  const file = fileOf(e.key)
+  if (!file) {
     missUnicode++
     continue
   }
-  const body = extractBody(e.key)
+  if (file !== e.key) fallbackHits++
+  const body = extractBody(file)
   if (/[\r\n]/.test(body)) throw new Error(`${e.key}: 正文仍含换行`)
   emojis.push({ c: e.key, e: e.emoji, n: e.name, g: e.group })
   packLines.push(body)
-  usedKeys.add(e.key)
+  usedKeys.add(file)
 }
 const orphans = files.size - usedKeys.size
 
@@ -172,6 +189,6 @@ console.log(
   `emoji 打包：Unicode ${unicodeVersion} ∩ twemoji ${twemojiVersion} = ${emojis.length} 条 → ` +
     `index.json ${kb(indexPath)}KB + pack.txt ${kb(packPath)}KB\n` +
     `  标准 header ${stats.std} · 变体归一 ${stats.headerVariant} · viewBox 缩放 ${stats.normalized} · ` +
-    `换行修复 ${stats.newlineFixed}\n` +
+    `换行修复 ${stats.newlineFixed} · 文件名特例 ${fallbackHits}\n` +
     `  丢弃：Unicode 有而 twemoji 无 ${missUnicode} · twemoji 孤儿（区域字母/组件等） ${orphans}`,
 )
