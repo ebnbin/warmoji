@@ -59,9 +59,27 @@ interface WarmojiStudioDebug {
   /** 模板页当前模板 id */
   template: string
   templates: { id: string; x: number; y: number; w: number; h: number }[]
-  /** 解剖页当前独显的元素下标 */
-  anatomyIndex: number
-  anatomyParts: { index: number; x: number; y: number; w: number; h: number }[]
+  /** 解剖页结构树工作台（仅解剖 tab 且树就绪时提供；rows 只含完整可见行） */
+  anatomy?: {
+    selected: string | null
+    hidden: string[]
+    rows: {
+      path: string
+      tag: string
+      depth: number
+      container: boolean
+      expanded: boolean | null
+      hidden: boolean
+      x: number
+      y: number
+      w: number
+      h: number
+      eye: { x: number; y: number; w: number; h: number } | null
+    }[]
+    reset: { x: number; y: number; w: number; h: number }
+    full: { x: number; y: number; w: number; h: number }
+    split: { x: number; y: number; w: number; h: number }
+  }
   /** 播放控制按钮命中区（prev/toggle/next/speed） */
   controls: Record<string, { x: number; y: number; w: number; h: number }>
   paused: boolean

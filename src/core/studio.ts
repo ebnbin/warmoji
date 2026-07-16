@@ -6,21 +6,79 @@
 import animationsJson from './animations.json'
 
 const OPEN_TAG = /<svg\b[^>]*>/
-const TOP_LEVEL = /<(?:path|circle|ellipse|rect)\b[^>]*\/>|<g\b[^>]*>[\s\S]*?<\/g>/g
+// 通用标签 token：属性内引号里的 > 不会截断
+const TAG = /<(\/?)([a-zA-Z][\w:-]*)((?:"[^"]*"|[^">])*?)(\/?)>/g
 
 export interface SplitSvg {
   open: string
+  /** <defs> 原文（无则空串）——绘制元素可能引用其中的 clipPath 等，重组输出必须带上 */
+  defs: string
   els: string[]
 }
 
-/** 把 SVG 切成开标签 + 顶层元素数组（twemoji 顶层不嵌套 g 套 g，正则足够） */
+interface TopSegment {
+  tag: string
+  /** 平衡的元素原文（容器含整个子树） */
+  text: string
+  /** 容器开标签；自闭合叶子为 null */
+  open: string | null
+  /** 容器内部原文；叶子为 null */
+  inner: string | null
+}
+
+/** 深度计数切顶层段落：任意标签、任意嵌套都平衡正确（不依赖标签白名单） */
+function topLevelSegments(body: string): TopSegment[] {
+  const out: TopSegment[] = []
+  const re = new RegExp(TAG.source, 'g')
+  let depth = 0
+  let start = 0
+  let startTag = ''
+  let startOpen = ''
+  let m: RegExpExecArray | null
+  while ((m = re.exec(body))) {
+    const close = m[1] === '/'
+    const self = m[4] === '/'
+    if (close) {
+      depth--
+      if (depth < 0) throw new Error('SVG 标签不平衡')
+      if (depth === 0) {
+        out.push({
+          tag: startTag,
+          text: body.slice(start, m.index + m[0].length),
+          open: startOpen,
+          inner: body.slice(start + startOpen.length, m.index),
+        })
+      }
+    } else if (self) {
+      if (depth === 0) out.push({ tag: m[2]!, text: m[0], open: null, inner: null })
+    } else {
+      if (depth === 0) {
+        start = m.index
+        startTag = m[2]!
+        startOpen = m[0]
+      }
+      depth++
+    }
+  }
+  if (depth !== 0) throw new Error('SVG 标签不平衡')
+  return out
+}
+
+/** 把 SVG 切成开标签 + defs + 顶层绘制元素数组。defs 单列：它不绘制、
+ * 只是共享定义（clipPath 等），下标序保持「绘制元素」语义，重组时恒带上 */
 export function splitSvg(svg: string): SplitSvg {
   const open = OPEN_TAG.exec(svg)?.[0]
   if (!open) throw new Error('不是有效的 SVG')
   const closeIdx = svg.lastIndexOf('</svg>')
   if (closeIdx < 0) throw new Error('SVG 缺少闭合标签')
   const body = svg.slice(svg.indexOf(open) + open.length, closeIdx)
-  return { open, els: body.match(TOP_LEVEL) ?? [] }
+  let defs = ''
+  const els: string[] = []
+  for (const seg of topLevelSegments(body)) {
+    if (seg.tag === 'defs') defs += seg.text
+    else els.push(seg.text)
+  }
+  return { open, defs, els }
 }
 
 function replaceViewBox(open: string, viewBox: string): string {
@@ -133,7 +191,7 @@ const fmt = (n: number): string => {
 /** 把动画在相位 t 烘焙成一帧静态 SVG：部件包 <g> 写死 transform、
  * fx 层按帧生成新 path（back 垫底 / front 盖面），其余元素原样保序 */
 export function bakeAnimFrame(svg: string, recipe: AnimRecipe, t: number): string {
-  const { open, els } = splitSvg(svg)
+  const { open, defs, els } = splitSvg(svg)
   const ownerAt = new Map<number, AnimPart>()
   const skip = new Set<number>()
   for (const part of recipe.parts) {
@@ -168,7 +226,7 @@ export function bakeAnimFrame(svg: string, recipe: AnimRecipe, t: number): strin
       .map((f) => f.render(phase))
       .join('')
   const openTag = recipe.viewBox ? replaceViewBox(open, recipe.viewBox) : open
-  return `${openTag}${fxAt('back')}${out}${fxAt('front')}</svg>`
+  return `${openTag}${defs}${fxAt('back')}${out}${fxAt('front')}</svg>`
 }
 
 // ── fx 生成器：程序化几何，产出原 SVG 里不存在的 path ──────────
@@ -719,24 +777,130 @@ export function applyTemplate(tpl: AnimTemplate, emoji: string, svg: string): An
   }
 }
 
-// ── SVG 解剖：逐元素独立渲染（写专属配方时的部件情报） ──────────
+// ── SVG 结构树：解剖工作台（写专属配方时的部件情报）──────────────
+// 树 = SVG 原文的镜像：顶层元素为一级节点，g/defs 等容器可下钻到子元素。
+// 节点 path key：顶层 "3"，组内 "3/1"——显隐/选中状态都以它为键。
 
-export interface AnatomyPart {
-  readonly index: number
+export interface SvgTreeNode {
+  readonly path: string
+  readonly tag: string
+  /** 平衡的节点原文（容器含整个子树） */
+  readonly raw: string
+  /** 容器开标签；叶子为 null */
+  readonly open: string | null
+  readonly fill: string | null
+  readonly children: readonly SvgTreeNode[]
+  /** 绘制型节点；defs 子树 = 共享定义（clipPath 等），不绘制、不可显隐 */
+  readonly paints: boolean
+}
+
+export interface SvgTree {
+  readonly open: string
+  readonly nodes: readonly SvgTreeNode[]
+}
+
+function buildNodes(body: string, parentPath: string, paints: boolean): SvgTreeNode[] {
+  return topLevelSegments(body).map((seg, i) => {
+    const path = parentPath === '' ? String(i) : `${parentPath}/${i}`
+    const selfPaints = paints && seg.tag !== 'defs'
+    return {
+      path,
+      tag: seg.tag,
+      raw: seg.text,
+      open: seg.open,
+      fill: /\bfill="([^"]+)"/.exec(seg.open ?? seg.text)?.[1] ?? null,
+      children: seg.inner === null ? [] : buildNodes(seg.inner, path, selfPaints),
+      paints: selfPaints,
+    }
+  })
+}
+
+/** SVG 文本 → 结构树（含 defs 节点，paints=false） */
+export function parseSvgTree(svg: string): SvgTree {
+  const open = OPEN_TAG.exec(svg)?.[0]
+  if (!open) throw new Error('不是有效的 SVG')
+  const closeIdx = svg.lastIndexOf('</svg>')
+  if (closeIdx < 0) throw new Error('SVG 缺少闭合标签')
+  const body = svg.slice(svg.indexOf(open) + open.length, closeIdx)
+  return { open, nodes: buildNodes(body, '', true) }
+}
+
+export interface ComposeState {
+  /** 隐藏节点 path 集合（容器隐藏 = 整个子树消失） */
+  readonly hidden?: ReadonlySet<string>
+  /** 选中节点 path：其余绘制内容压成低不透明度幽灵，突出选中项在原图中的位置 */
+  readonly focus?: string | null
+  /** 幽灵不透明度（默认 0.15） */
+  readonly ghostAlpha?: number
+}
+
+/** 按显隐/选中状态把结构树重组回 SVG 文本。defs 恒原样保留（裁剪引用不能断）；
+ * 无状态时输出与原文等价。纯字符串操作，不改任何原文片段 */
+export function composeSvg(tree: SvgTree, state: ComposeState = {}): string {
+  const hidden = state.hidden ?? new Set<string>()
+  const focus = state.focus ?? null
+  const alpha = state.ghostAlpha ?? 0.15
+  const nodeAt = (path: string): SvgTreeNode | undefined => {
+    let list = tree.nodes
+    let found: SvgTreeNode | undefined
+    for (const seg of path.split('/')) {
+      found = list[Number(seg)]
+      if (!found) return undefined
+      list = found.children
+    }
+    return found
+  }
+  // 焦点只对绘制节点生效（defs 子树选中只看信息，不影响渲染）
+  const focusOn = focus !== null && nodeAt(focus)?.paints === true
+  const anyHiddenWithin = (path: string): boolean => {
+    for (const h of hidden) if (h.startsWith(`${path}/`)) return true
+    return false
+  }
+  // mode：normal=常规；full=焦点子树内（不压幽灵）；ghost=已被外层幽灵包裹（不再包）
+  const emit = (node: SvgTreeNode, mode: 'normal' | 'full' | 'ghost'): string => {
+    if (!node.paints) return node.raw
+    if (hidden.has(node.path)) return ''
+    const isFocus = focusOn && node.path === focus
+    const isAncestor = focusOn && focus!.startsWith(`${node.path}/`)
+    const ghostIt = focusOn && mode === 'normal' && !isFocus && !isAncestor
+    const innerMode = isFocus || mode === 'full' ? 'full' : ghostIt || mode === 'ghost' ? 'ghost' : 'normal'
+    const body =
+      node.children.length > 0 && (isAncestor || anyHiddenWithin(node.path))
+        ? `${node.open}${node.children.map((c) => emit(c, innerMode)).join('')}</${node.tag}>`
+        : node.raw
+    return ghostIt ? `<g opacity="${fmt(alpha)}">${body}</g>` : body
+  }
+  return `${tree.open}${tree.nodes.map((n) => emit(n, 'normal')).join('')}</svg>`
+}
+
+export interface TreeRow {
+  readonly path: string
   readonly tag: string
   readonly fill: string | null
-  /** 仅含该元素的完整 SVG（可直接光栅化成独显图） */
-  readonly svg: string
+  readonly depth: number
+  readonly paints: boolean
+  /** 有子节点（可展开/收起） */
+  readonly container: boolean
+  readonly childCount: number
 }
 
-export function dissectSvg(svg: string): AnatomyPart[] {
-  const { open, els } = splitSvg(svg)
-  return els.map((el, index) => ({
-    index,
-    tag: /^<(\w+)/.exec(el)?.[1] ?? '?',
-    fill: /\bfill="([^"]+)"/.exec(el)?.[1] ?? null,
-    svg: `${open}${el}</svg>`,
-  }))
+/** 结构树 → 平铺行（UI 列表用）；collapsed 中的容器不展开其子行 */
+export function flattenTree(tree: SvgTree, collapsed: ReadonlySet<string>): TreeRow[] {
+  const rows: TreeRow[] = []
+  const walk = (nodes: readonly SvgTreeNode[], depth: number): void => {
+    for (const node of nodes) {
+      rows.push({
+        path: node.path,
+        tag: node.tag,
+        fill: node.fill,
+        depth,
+        paints: node.paints,
+        container: node.children.length > 0,
+        childCount: node.children.length,
+      })
+      if (node.children.length > 0 && !collapsed.has(node.path)) walk(node.children, depth + 1)
+    }
+  }
+  walk(tree.nodes, 0)
+  return rows
 }
-
-/** Studio 素材池：游戏在用的形象与物品（模板试穿/解剖页共用） */

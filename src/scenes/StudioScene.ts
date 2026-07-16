@@ -13,9 +13,11 @@ import {
   animTemplateOf,
   applyTemplate,
   bakeAnimFrame,
-  dissectSvg,
+  composeSvg,
+  flattenTree,
+  parseSvgTree,
 } from '../core/studio'
-import type { AnimRecipe } from '../core/studio'
+import type { AnimRecipe, SvgTree, TreeRow } from '../core/studio'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../ui/emoji'
@@ -26,11 +28,13 @@ import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '..
 
 // Emoji Studio：twemoji 部件动画的游戏内工作台，三个 tab——
 // 🎬 配方 = animations.json 里的精修动画预览；🧩 模板 = 任选 emoji × 通用
-// 动画模板即选即看（铺量动画的试衣间）；🔬 解剖 = 逐元素独显 + 下标/填色
-// 情报（写专属配方的 X 光）。素材区 = feed 流虚拟网格：配方页列有配方的
-// emoji，模板/解剖页列全部基础形态（模板与解剖对任意 SVG 通用）。
-// 预览区带暂停/逐帧/速度控制，检查烘焙质量。内容按保底画布设计、整体
-// 居中；studio- 纹理场景自管理，shutdown 全清，缩略缓存真退出才释放。
+// 动画模板即选即看（铺量动画的试衣间）；🔬 解剖 = SVG 结构树工作台：
+// 树镜像原文结构（顶层元素 + 组/defs 可下钻），任意节点显/隐/选中，
+// 双大图对照（完整原图 vs 按状态合成的拆分图，选中项高亮、其余压幽灵）。
+// 素材区 = feed 流虚拟网格：配方页列有配方的 emoji，模板/解剖页列全部
+// 基础形态（两者对任意 SVG 通用）。预览区带暂停/逐帧/速度控制。内容按
+// 保底画布设计、整体居中；studio- 纹理场景自管理，shutdown 全清，
+// 缩略缓存真退出才释放。
 interface StudioLayout {
   content: { w: number; h: number }
   headerY: number
@@ -57,8 +61,23 @@ const PORTRAIT: StudioLayout = {
 
 const RASTER = 256
 const SPEEDS = [1, 0.5, 0.25] as const
+/** 解剖页结构树行高（逻辑 px） */
+const ANAT_ROW = 38
 
 type Tab = 'recipes' | 'templates' | 'anatomy'
+
+/** 解剖页一次构建期的引用集合（切换选择/emoji 时随 detailObjs 整组销毁重建） */
+interface AnatUi {
+  tree: SvgTree
+  splitImg: Phaser.GameObjects.Image
+  fullKey: string
+  info: Phaser.GameObjects.Text
+  rowsBox: Phaser.GameObjects.Container
+  area: { x: number; y: number; w: number; h: number }
+  rowObjs: Phaser.GameObjects.GameObject[]
+  res: number
+  bigSize: number
+}
 
 /** 模板/解剖页的默认素材（任意 emoji 皆可选，这里只是进场的起点） */
 const DEFAULT_SUBJECT = '🤹'
@@ -71,9 +90,30 @@ export class StudioScene extends Phaser.Scene {
   private tplEmoji = DEFAULT_SUBJECT
   private tplId = ANIM_TEMPLATES[0]!.id
   private anatEmoji = DEFAULT_SUBJECT
-  private anatIndex = 0
   /** 全部基础形态码点清单（打包资源就绪后填充） */
   private allKeys: string[] = []
+
+  // 解剖页结构树工作台状态（换 emoji 归零；旋转 restart 保留）
+  private anat?: AnatUi
+  private anatSelected: string | null = null
+  private anatHidden = new Set<string>()
+  private anatCollapsed = new Set<string>()
+  private anatScroll = 0
+  private anatScrollMax = 0
+  /** 全展开行（信息行计数/选中查找用；视图行见 anatRowMeta） */
+  private anatAllRows: TreeRow[] = []
+  private anatRowMeta: { row: TreeRow; eyeX: number | null }[] = []
+  /** 拆分图光栅化竞态令牌与滚动纹理键（新帧就绪才替换/回收旧帧） */
+  private anatSplitGen = 0
+  private anatLiveCounter = 0
+  private anatLiveKey?: string
+  private anatDragging = false
+  private anatDragMoved = false
+  private anatDragStartY = 0
+  private anatDragStartScroll = 0
+  private anatResetRect = { x: 0, y: 0, w: 0, h: 0 }
+  private anatFullRect = { x: 0, y: 0, w: 0, h: 0 }
+  private anatSplitRect = { x: 0, y: 0, w: 0, h: 0 }
 
   private layout!: StudioLayout
   private origin = { x: 0, y: 0 }
@@ -97,7 +137,6 @@ export class StudioScene extends Phaser.Scene {
   private tabObjs: Phaser.GameObjects.GameObject[] = []
   private tabRects: { id: Tab; x: number; y: number; w: number; h: number }[] = []
   private tplRects: { id: string; x: number; y: number; w: number; h: number }[] = []
-  private anatRects: { index: number; x: number; y: number; w: number; h: number }[] = []
   private controlRects: Record<string, { x: number; y: number; w: number; h: number }> = {}
   private backRect = { x: 0, y: 0, w: 0, h: 0 }
 
@@ -117,7 +156,7 @@ export class StudioScene extends Phaser.Scene {
       this.tplEmoji = DEFAULT_SUBJECT
       this.tplId = ANIM_TEMPLATES[0]!.id
       this.anatEmoji = DEFAULT_SUBJECT
-      this.anatIndex = 0
+      this.resetAnatState()
       this.paused = false
       this.speedIdx = 0
     }
@@ -175,6 +214,28 @@ export class StudioScene extends Phaser.Scene {
       if (settled || this.time.now - this.reportAt > 120) this.report()
     }
     grid.onThumbsProgress = () => this.report()
+
+    // 解剖结构树滚动：滚轮 + 拖动（命中区与素材网格不重叠；挂 scene.input 随场景重启自清）
+    this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+      if (this.anatContains(p)) this.anatScrollTo(this.anatScroll + dy * 0.6)
+    })
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      this.anatDragMoved = false
+      if (this.anatContains(p)) {
+        this.anatDragging = true
+        this.anatDragStartY = p.worldY
+        this.anatDragStartScroll = this.anatScroll
+      }
+    })
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (!this.anatDragging || !p.isDown) return
+      const dy = this.anatDragStartY - p.worldY
+      if (Math.abs(dy) > 10) this.anatDragMoved = true
+      if (this.anatDragMoved) this.anatScrollTo(this.anatDragStartScroll + dy)
+    })
+    this.input.on('pointerup', () => {
+      this.anatDragging = false
+    })
 
     // 模板 chips 的图标走常规纹理需预载；素材网格与预览均按需异步
     const need = new Set<string>(ANIM_TEMPLATES.map((t) => t.icon))
@@ -299,11 +360,19 @@ export class StudioScene extends Phaser.Scene {
       const emoji = codepointsToEmoji(cp)
       if (emoji === this.anatEmoji) return
       this.anatEmoji = emoji
-      this.anatIndex = 0
+      this.resetAnatState()
       this.grid?.setSelected(cp)
       this.buildAnatomyDetail()
     }
     this.report()
+  }
+
+  /** 解剖工作台状态归零（换 emoji / 进场重置） */
+  private resetAnatState(): void {
+    this.anatSelected = null
+    this.anatHidden = new Set()
+    this.anatCollapsed = new Set()
+    this.anatScroll = 0
   }
 
   // ── 详情面板（三种形态共用清场逻辑） ────────────────────────
@@ -312,12 +381,14 @@ export class StudioScene extends Phaser.Scene {
     this.animTimer?.remove()
     this.animTimer = undefined
     this.jobGen++
+    this.anatSplitGen++
     for (const o of this.detailObjs) o.destroy()
     this.detailObjs = []
     this.previewImg = undefined
     this.frameKeys = []
     this.tplRects = []
-    this.anatRects = []
+    this.anat = undefined
+    this.anatRowMeta = []
     this.controlRects = {}
     return { d: this.detailRect(), res: textRes() }
   }
@@ -451,116 +522,106 @@ export class StudioScene extends Phaser.Scene {
       })
   }
 
-  /** 🔬 解剖页：选中元素大图 + 信息行 + 元素缩略网格 */
+  /** 🔬 解剖页：双大图（完整原图 vs 按显隐+选中合成的拆分图）+ SVG 结构树 */
   private buildAnatomyDetail(): void {
     const { d, res } = this.resetDetail()
     const portrait = this.layout === PORTRAIT
-    const bigSize = portrait ? 150 : 170
-    const cx = d.x + d.w / 2
+    const bigSize = portrait ? 150 : 180
     const emoji = this.anatEmoji
     const gen = ++this.jobGen
     this.previewState = 'loading'
 
     const title = this.add
-      .text(cx, d.y + 14, `${emoji} 部件解剖 · 点击缩略图独显该元素`, {
+      .text(d.x + 24, d.y + 14, `${emoji} 结构树 · 点行选中高亮 · 👁 显/隐`, {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         color: '#aab6cc',
         resolution: res,
       })
-      .setOrigin(0.5, 0)
-    this.detailObjs.push(title)
+      .setOrigin(0, 0)
+    const reset = this.add
+      .text(d.x + d.w - 24, d.y + 14, '↺ 复位', {
+        fontFamily: UI_FONT,
+        fontSize: FONT.small,
+        color: '#ffd54f',
+        resolution: res,
+      })
+      .setOrigin(1, 0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => {
+        if (this.grid?.wasDragged || this.anatDragMoved) return
+        if (this.anatHidden.size === 0 && this.anatSelected === null && this.anatCollapsed.size === 0) return
+        this.resetAnatState()
+        this.rebuildAnatRows()
+        this.refreshAnatInfo()
+        void this.refreshAnatSplit()
+        this.report()
+      })
+    this.anatResetRect = { x: reset.x - reset.width, y: reset.y, w: reset.width, h: reset.height }
+    this.detailObjs.push(title, reset)
 
     void emojiSvgText(emoji)
       .then(async (svg) => {
         if (gen !== this.jobGen) return
-        const parts = dissectSvg(svg)
-        this.anatIndex = Math.min(this.anatIndex, parts.length - 1)
-        // 逐元素独显纹理（一次全烘，供大图与缩略共用）
-        const keys: string[] = []
-        for (const part of parts) {
-          const key = `studio-anat-${emojiCodepoints(emoji)}-${part.index}`
-          keys.push(key)
-          if (!this.textures.exists(key)) {
-            const img = await svgToImage(setSvgSize(part.svg, 128))
-            if (!this.textures.exists(key)) {
-              this.textures.addImage(key, img)
-              this.ownedKeys.add(key)
-            }
+        const tree = parseSvgTree(svg)
+        // 完整大图纹理：每 emoji 只烘一次
+        const fullKey = `studio-anat-full-${emojiCodepoints(emoji)}`
+        if (!this.textures.exists(fullKey)) {
+          const img = await svgToImage(setSvgSize(svg, RASTER))
+          if (!this.textures.exists(fullKey)) {
+            this.textures.addImage(fullKey, img)
+            this.ownedKeys.add(fullKey)
           }
         }
         if (gen !== this.jobGen || !this.scene.isActive('studio')) return
 
-        // 大图 + 信息行
-        const bigY = d.y + 46 + bigSize / 2
-        const bigBg = this.add.graphics()
-        bigBg.fillStyle(0x000000, 0.25)
-        bigBg.fillRoundedRect(cx - bigSize / 2 - 10, bigY - bigSize / 2 - 10, bigSize + 20, bigSize + 20, 14)
-        const bigImg = this.add.image(cx, bigY, keys[this.anatIndex]!).setDisplaySize(bigSize, bigSize)
+        // 双大图：左完整 | 右拆分（初始无状态 = 同图）
+        const cxAll = d.x + d.w / 2 - bigSize / 2 - 14
+        const cxSplit = d.x + d.w / 2 + bigSize / 2 + 14
+        const imgY = d.y + 52 + bigSize / 2
+        const boxes = this.add.graphics()
+        boxes.fillStyle(0x000000, 0.25)
+        for (const bx of [cxAll, cxSplit]) {
+          boxes.fillRoundedRect(bx - bigSize / 2 - 8, imgY - bigSize / 2 - 8, bigSize + 16, bigSize + 16, 12)
+        }
+        const fullImg = this.add.image(cxAll, imgY, fullKey).setDisplaySize(bigSize, bigSize)
+        const splitImg = this.add.image(cxSplit, imgY, fullKey).setDisplaySize(bigSize, bigSize)
+        const caps = (['完整', '拆分'] as const).map((label, i) =>
+          this.add
+            .text(i === 0 ? cxAll : cxSplit, imgY + bigSize / 2 + 20, label, {
+              fontFamily: UI_FONT,
+              fontSize: FONT.caption,
+              color: '#8f8f9a',
+              resolution: res,
+            })
+            .setOrigin(0.5),
+        )
         const info = this.add
-          .text(cx, bigY + bigSize / 2 + 18, '', {
+          .text(d.x + d.w / 2, imgY + bigSize / 2 + 38, '', {
             fontFamily: UI_FONT,
             fontSize: FONT.small,
             color: '#e8e8f2',
             resolution: res,
           })
           .setOrigin(0.5, 0)
-        const setInfo = (i: number): void => {
-          const p = parts[i]!
-          info.setText(`#${p.index} · <${p.tag}> · fill ${p.fill ?? '(无)'} · 共 ${parts.length} 个元素`)
-        }
-        setInfo(this.anatIndex)
-        this.detailObjs.push(bigBg, bigImg, info)
 
-        // 缩略网格
-        const thumb = 52
-        const gap = 8
-        const cols = Math.floor((d.w - 40 + gap) / (thumb + gap))
-        const gridW = cols * (thumb + gap) - gap
-        const x0 = d.x + (d.w - gridW) / 2
-        const y0 = bigY + bigSize / 2 + 52
-        const thumbRedraws: (() => void)[] = []
-        parts.forEach((part, i) => {
-          const x = x0 + (i % cols) * (thumb + gap)
-          const ty = y0 + Math.floor(i / cols) * (thumb + gap)
-          const bg = this.add.graphics()
-          const drawThumb = (): void => {
-            bg.clear()
-            const active = i === this.anatIndex
-            bg.fillStyle(active ? 0xffffff : 0x000000, active ? 0.2 : 0.28)
-            bg.fillRoundedRect(x, ty, thumb, thumb, 8)
-            bg.lineStyle(active ? 2 : 1, 0xffffff, active ? 0.9 : 0.1)
-            bg.strokeRoundedRect(x, ty, thumb, thumb, 8)
-          }
-          drawThumb()
-          const img = this.add.image(x + thumb / 2, ty + thumb / 2, keys[i]!).setDisplaySize(thumb - 10, thumb - 10)
-          const num = this.add
-            .text(x + thumb - 3, ty + 1, String(part.index), {
-              fontFamily: UI_FONT,
-              fontSize: FONT.caption,
-              color: '#ffd54f',
-              resolution: res,
-            })
-            .setOrigin(1, 0)
-          const zone = this.add
-            .zone(x, ty, thumb, thumb)
-            .setOrigin(0)
-            .setInteractive({ useHandCursor: true })
-            .on('pointerup', () => {
-              if (this.grid?.wasDragged || this.anatIndex === i) return
-              this.anatIndex = i
-              bigImg.setTexture(keys[i]!).setDisplaySize(bigSize, bigSize)
-              setInfo(i)
-              // 重画全部缩略选中框（数量小，直接全刷）
-              this.buildAnatomyDetailThumbs?.()
-              this.report()
-            })
-          this.anatRects.push({ index: i, x, y: ty, w: thumb, h: thumb })
-          this.detailObjs.push(bg, img, num, zone)
-          // 登记重绘钩子：选中态变化时全刷（数量小）
-          thumbRedraws.push(drawThumb)
-        })
-        this.buildAnatomyDetailThumbs = () => thumbRedraws.forEach((f) => f())
+        // 结构树列表：遮罩 + 滚动（遮罩不裁输入，行内自校验可见性）
+        const treeY = imgY + bigSize / 2 + 74
+        const area = { x: d.x + 20, y: treeY, w: d.w - 40, h: d.y + d.h - 16 - treeY }
+        const mask = this.add.graphics().setVisible(false)
+        mask.fillStyle(0xffffff, 1)
+        mask.fillRect(area.x, area.y, area.w, area.h)
+        const rowsBox = this.add.container(area.x, area.y)
+        rowsBox.setMask(mask.createGeometryMask())
+
+        this.detailObjs.push(boxes, fullImg, splitImg, ...caps, info, mask, rowsBox)
+        this.anat = { tree, splitImg, fullKey, info, rowsBox, area, rowObjs: [], res, bigSize }
+        this.anatAllRows = flattenTree(tree, new Set())
+        this.anatFullRect = { x: cxAll - bigSize / 2, y: imgY - bigSize / 2, w: bigSize, h: bigSize }
+        this.anatSplitRect = { x: cxSplit - bigSize / 2, y: imgY - bigSize / 2, w: bigSize, h: bigSize }
+        this.rebuildAnatRows()
+        this.refreshAnatInfo()
+        void this.refreshAnatSplit()
         this.previewState = 'ready'
         this.report()
       })
@@ -570,7 +631,193 @@ export class StudioScene extends Phaser.Scene {
       })
   }
 
-  private buildAnatomyDetailThumbs?: () => void
+  /** path 自身或任一祖先被隐藏（行置灰与上报共用） */
+  private anatEffHidden(path: string): boolean {
+    const segs = path.split('/')
+    for (let i = 1; i <= segs.length; i++) {
+      if (this.anatHidden.has(segs.slice(0, i).join('/'))) return true
+    }
+    return false
+  }
+
+  private anatContains(p: Phaser.Input.Pointer): boolean {
+    const a = this.anat
+    if (!a) return false
+    const r = a.area
+    return p.worldX >= r.x && p.worldX <= r.x + r.w && p.worldY >= r.y && p.worldY <= r.y + r.h
+  }
+
+  private anatScrollTo(y: number): void {
+    const a = this.anat
+    if (!a) return
+    this.anatScroll = Math.max(0, Math.min(this.anatScrollMax, y))
+    a.rowsBox.y = a.area.y - this.anatScroll
+    if (this.time.now - this.reportAt > 120) this.report()
+  }
+
+  /** 结构树行列表全量重建（行数小；选中/显隐/展开任一变化都走这里） */
+  private rebuildAnatRows(): void {
+    const a = this.anat
+    if (!a) return
+    for (const o of a.rowObjs) o.destroy()
+    a.rowObjs = []
+    const rows = flattenTree(a.tree, this.anatCollapsed)
+    this.anatRowMeta = []
+    this.anatScrollMax = Math.max(0, rows.length * ANAT_ROW - a.area.h)
+    this.anatScroll = Math.max(0, Math.min(this.anatScrollMax, this.anatScroll))
+    a.rowsBox.y = a.area.y - this.anatScroll
+
+    rows.forEach((row, i) => {
+      const y = i * ANAT_ROW
+      const selected = row.path === this.anatSelected
+      const dim = this.anatEffHidden(row.path)
+      const bg = this.add.graphics()
+      bg.fillStyle(selected ? 0xffffff : 0x000000, selected ? 0.16 : 0.2)
+      bg.fillRoundedRect(0, y + 2, a.area.w, ANAT_ROW - 4, 10)
+      bg.lineStyle(selected ? 2 : 1, selected ? 0xffd54f : 0xffffff, selected ? 0.9 : 0.08)
+      bg.strokeRoundedRect(1, y + 3, a.area.w - 2, ANAT_ROW - 6, 10)
+      const parts: Phaser.GameObjects.GameObject[] = [bg]
+
+      const indent = 14 + row.depth * 26
+      if (row.container) {
+        parts.push(
+          this.add
+            .text(indent, y + ANAT_ROW / 2, this.anatCollapsed.has(row.path) ? '▸' : '▾', {
+              fontFamily: UI_FONT,
+              fontSize: FONT.small,
+              color: '#c8c8d4',
+              resolution: a.res,
+            })
+            .setOrigin(0, 0.5),
+        )
+      }
+      let x = indent + 26
+      let eyeX: number | null = null
+      if (row.paints) {
+        eyeX = x
+        parts.push(
+          this.add
+            .text(x, y + ANAT_ROW / 2, this.anatHidden.has(row.path) ? '🙈' : '👁', {
+              fontFamily: UI_FONT,
+              fontSize: FONT.small,
+              resolution: a.res,
+            })
+            .setOrigin(0, 0.5)
+            .setAlpha(dim && !this.anatHidden.has(row.path) ? 0.4 : 1),
+        )
+        x += 36
+      }
+      if (row.fill && /^#[0-9a-fA-F]{6}$/.test(row.fill)) {
+        const sw = this.add.graphics()
+        sw.fillStyle(Number.parseInt(row.fill.slice(1), 16), 1)
+        sw.fillRoundedRect(x, y + ANAT_ROW / 2 - 8, 16, 16, 4)
+        sw.lineStyle(1, 0xffffff, 0.25)
+        sw.strokeRoundedRect(x, y + ANAT_ROW / 2 - 8, 16, 16, 4)
+        parts.push(sw)
+        x += 26
+      }
+      const label = `#${row.path} <${row.tag}>${row.container ? ` ×${row.childCount}` : ''}${row.paints ? '' : ' 共享定义'}`
+      parts.push(
+        this.add
+          .text(x, y + ANAT_ROW / 2, label, {
+            fontFamily: UI_FONT,
+            fontSize: FONT.small,
+            color: dim ? '#787885' : '#e8e8f2',
+            resolution: a.res,
+          })
+          .setOrigin(0, 0.5)
+          .setAlpha(row.paints ? 1 : 0.75),
+      )
+
+      // 单行一个命中区，按点击 x 分派：展开箭头 / 眼睛 / 选中
+      const zone = this.add
+        .zone(0, y, a.area.w, ANAT_ROW)
+        .setOrigin(0)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerup', (p: Phaser.Input.Pointer) => {
+          if (this.grid?.wasDragged || this.anatDragMoved) return
+          const relY = y - this.anatScroll
+          if (relY + ANAT_ROW < 0 || relY > a.area.h) return
+          const localX = p.worldX - a.area.x
+          if (row.container && localX >= indent - 8 && localX < indent + 24) {
+            if (this.anatCollapsed.has(row.path)) this.anatCollapsed.delete(row.path)
+            else this.anatCollapsed.add(row.path)
+            this.rebuildAnatRows()
+            this.report()
+            return
+          }
+          if (eyeX !== null && localX >= eyeX - 8 && localX < eyeX + 32) {
+            if (this.anatHidden.has(row.path)) this.anatHidden.delete(row.path)
+            else this.anatHidden.add(row.path)
+            this.rebuildAnatRows()
+            this.refreshAnatInfo()
+            void this.refreshAnatSplit()
+            this.report()
+            return
+          }
+          this.anatSelected = this.anatSelected === row.path ? null : row.path
+          this.rebuildAnatRows()
+          this.refreshAnatInfo()
+          void this.refreshAnatSplit()
+          this.report()
+        })
+      parts.push(zone)
+
+      for (const o of parts) a.rowsBox.add(o)
+      a.rowObjs.push(...parts)
+      this.anatRowMeta.push({ row, eyeX })
+    })
+  }
+
+  private refreshAnatInfo(): void {
+    const a = this.anat
+    if (!a) return
+    const sel = this.anatSelected ? this.anatAllRows.find((r) => r.path === this.anatSelected) : undefined
+    if (sel) {
+      a.info.setText(
+        `#${sel.path} <${sel.tag}> · fill ${sel.fill ?? '(无)'}` +
+          `${sel.container ? ` · ${sel.childCount} 子元素` : ''}${this.anatEffHidden(sel.path) ? ' · 已隐藏' : ''}`,
+      )
+      return
+    }
+    const paintCount = this.anatAllRows.filter((r) => r.paints).length
+    a.info.setText(`共 ${paintCount} 个绘制节点 · 已隐藏 ${this.anatHidden.size} · 点行选中/👁 显隐`)
+  }
+
+  /** 拆分大图重光栅化：无状态时直接复用完整图纹理；有状态时合成 → 烘新帧 →
+   * 就绪才替换并回收上一帧纹理（竞态凭代数自弃） */
+  private async refreshAnatSplit(): Promise<void> {
+    const a = this.anat
+    if (!a) return
+    const detailGen = this.jobGen
+    const gen = ++this.anatSplitGen
+    if (this.anatHidden.size === 0 && this.anatSelected === null) {
+      a.splitImg.setTexture(a.fullKey).setDisplaySize(a.bigSize, a.bigSize)
+      this.dropAnatLive(undefined)
+      return
+    }
+    const svg = composeSvg(a.tree, { hidden: this.anatHidden, focus: this.anatSelected })
+    try {
+      const img = await svgToImage(setSvgSize(svg, RASTER))
+      if (gen !== this.anatSplitGen || detailGen !== this.jobGen || !this.scene.isActive('studio')) return
+      const key = `studio-anat-live-${++this.anatLiveCounter}`
+      this.textures.addImage(key, img)
+      this.ownedKeys.add(key)
+      a.splitImg.setTexture(key).setDisplaySize(a.bigSize, a.bigSize)
+      this.dropAnatLive(key)
+    } catch (err) {
+      console.warn(`拆分图渲染失败: ${String(err)}`)
+    }
+  }
+
+  /** 回收上一帧拆分纹理，记录新帧 key（undefined = 只回收） */
+  private dropAnatLive(next: string | undefined): void {
+    if (this.anatLiveKey && this.anatLiveKey !== next && this.textures.exists(this.anatLiveKey)) {
+      this.textures.remove(this.anatLiveKey)
+      this.ownedKeys.delete(this.anatLiveKey)
+    }
+    this.anatLiveKey = next
+  }
 
   // ── 预览与播放控制 ──────────────────────────────────────────
 
@@ -731,6 +978,34 @@ export class StudioScene extends Phaser.Scene {
 
   // ── 杂项 ────────────────────────────────────────────────────
 
+  /** 解剖工作台调试上报：完整可见的行（含眼睛命中区）+ 状态 + 关键矩形 */
+  private anatReport(): NonNullable<WarmojiStudioDebug['anatomy']> | undefined {
+    const a = this.anat
+    if (this.tab !== 'anatomy' || !a) return undefined
+    return {
+      selected: this.anatSelected,
+      hidden: [...this.anatHidden],
+      rows: this.anatRowMeta
+        .map(({ row, eyeX }, i) => ({
+          path: row.path,
+          tag: row.tag,
+          depth: row.depth,
+          container: row.container,
+          expanded: row.container ? !this.anatCollapsed.has(row.path) : null,
+          hidden: this.anatEffHidden(row.path),
+          x: a.area.x,
+          y: a.area.y + i * ANAT_ROW - this.anatScroll,
+          w: a.area.w,
+          h: ANAT_ROW,
+          eye: eyeX === null ? null : { x: a.area.x + eyeX, y: a.area.y + i * ANAT_ROW - this.anatScroll, w: 32, h: ANAT_ROW },
+        }))
+        .filter((r) => r.y >= a.area.y && r.y + r.h <= a.area.y + a.area.h),
+      reset: this.anatResetRect,
+      full: this.anatFullRect,
+      split: this.anatSplitRect,
+    }
+  }
+
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
@@ -761,8 +1036,7 @@ export class StudioScene extends Phaser.Scene {
           this.tab === 'recipes' ? this.recipeSel : this.tab === 'templates' ? this.tplEmoji : this.anatEmoji,
         template: this.tplId,
         templates: this.tplRects,
-        anatomyIndex: this.anatIndex,
-        anatomyParts: this.anatRects,
+        anatomy: this.anatReport(),
         controls: this.controlRects,
         paused: this.paused,
         speed: SPEEDS[this.speedIdx]!,

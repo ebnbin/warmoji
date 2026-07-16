@@ -8,9 +8,11 @@ import {
   animTemplateOf,
   applyTemplate,
   bakeAnimFrame,
-  dissectSvg,
+  composeSvg,
+  flattenTree,
   lerpKeyframes,
   loadAnimRecipes,
+  parseSvgTree,
   splitSvg,
   star4,
   validateAnimResource,
@@ -24,16 +26,36 @@ const SVG =
   '<path fill="#77B255" d="M0 0h1M5 5h1M9 9h1"/>' +
   '</svg>'
 
+// 嵌套 + defs 的合成样例：g 套 g（twemoji 现库没有，但切分必须结构性正确）
+const NESTED =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">' +
+  '<defs><clipPath id="a"><path fill="none" d="M0 0h36v36H0z"/></clipPath></defs>' +
+  '<path fill="#111" d="M1 1h1z"/>' +
+  '<g clip-path="url(#a)"><circle cx="3" cy="3" r="2" fill="#222"/>' +
+  '<g fill="#333"><path d="M5 5h1z"/></g></g>' +
+  '</svg>'
+
 describe('splitSvg', () => {
   it('切出开标签与顶层元素', () => {
-    const { open, els } = splitSvg(SVG)
+    const { open, defs, els } = splitSvg(SVG)
     expect(open).toContain('viewBox="0 0 36 36"')
+    expect(defs).toBe('')
     expect(els).toHaveLength(3)
     expect(els[1]).toContain('circle')
   })
 
-  it('拒绝非 SVG 文本', () => {
+  it('defs 单列；g 套 g 平衡切分不截断', () => {
+    const { defs, els } = splitSvg(NESTED)
+    expect(defs).toBe('<defs><clipPath id="a"><path fill="none" d="M0 0h36v36H0z"/></clipPath></defs>')
+    expect(els).toHaveLength(2)
+    expect(els[1]!.startsWith('<g clip-path="url(#a)">')).toBe(true)
+    expect(els[1]!.endsWith('</g>')).toBe(true)
+    expect(els[1]).toContain('<g fill="#333">')
+  })
+
+  it('拒绝非 SVG 文本与不平衡标签', () => {
     expect(() => splitSvg('<div/>')).toThrow()
+    expect(() => splitSvg('<svg viewBox="0 0 1 1"><g><path d="M0 0z"/></svg>')).toThrow('不平衡')
   })
 })
 
@@ -103,6 +125,12 @@ describe('bakeAnimFrame', () => {
     // 组内两个成员按原顺序
     const inner = out.slice(gIdx)
     expect(inner.indexOf('#DD2E44')).toBeLessThan(inner.indexOf('#77B255'))
+  })
+
+  it('defs 原样带入输出（clipPath 引用不断）', () => {
+    const out = bakeAnimFrame(NESTED, recipe, 0.5)
+    expect(out).toContain('<defs><clipPath id="a">')
+    expect(out).toContain('clip-path="url(#a)"')
   })
 })
 
@@ -321,13 +349,69 @@ describe('通用动画模板', () => {
   })
 })
 
-describe('dissectSvg', () => {
-  it('逐元素独立渲染，序号/标签/填色齐全', () => {
-    const parts = dissectSvg(SVG)
-    expect(parts).toHaveLength(3)
-    expect(parts[1]).toMatchObject({ index: 1, tag: 'circle', fill: '#292F33' })
-    expect(parts[0]!.svg).toContain('#DD2E44')
-    expect(parts[0]!.svg).not.toContain('circle')
-    expect(parts[0]!.svg.endsWith('</svg>')).toBe(true)
+describe('parseSvgTree', () => {
+  it('镜像 SVG 结构：顶层节点 + 组内子节点 + defs 标记不绘制', () => {
+    const tree = parseSvgTree(NESTED)
+    expect(tree.nodes.map((n) => n.tag)).toEqual(['defs', 'path', 'g'])
+    expect(tree.nodes[0]!.paints).toBe(false)
+    expect(tree.nodes[0]!.children[0]!.tag).toBe('clipPath')
+    expect(tree.nodes[0]!.children[0]!.paints).toBe(false)
+    const g = tree.nodes[2]!
+    expect(g.path).toBe('2')
+    expect(g.children.map((c) => c.tag)).toEqual(['circle', 'g'])
+    expect(g.children[1]!.path).toBe('2/1')
+    expect(g.children[1]!.children[0]!.path).toBe('2/1/0')
+    expect(g.children[0]!.fill).toBe('#222')
+  })
+})
+
+describe('composeSvg', () => {
+  const tree = parseSvgTree(NESTED)
+
+  it('无状态时输出与原文等价', () => {
+    expect(composeSvg(tree)).toBe(NESTED)
+  })
+
+  it('隐藏叶子/隐藏子树；defs 恒保留', () => {
+    const hidLeaf = composeSvg(tree, { hidden: new Set(['2/0']) })
+    expect(hidLeaf).not.toContain('<circle')
+    expect(hidLeaf).toContain('<g fill="#333">')
+    const hidTree = composeSvg(tree, { hidden: new Set(['2']) })
+    expect(hidTree).not.toContain('clip-path="url(#a)"')
+    expect(hidTree).toContain('<defs>')
+  })
+
+  it('选中焦点：其余压成幽灵、焦点全量、祖先包裹保留', () => {
+    const out = composeSvg(tree, { focus: '2/1/0' })
+    // 顶层 path 被幽灵包裹
+    expect(out).toContain('<g opacity="0.15"><path fill="#111"')
+    // 焦点的祖先链保留原开标签；同组兄弟压幽灵，焦点本体不包
+    expect(out).toContain('<g clip-path="url(#a)">')
+    expect(out).toContain('<g opacity="0.15"><circle')
+    expect(out).toContain('<g fill="#333"><path d="M5 5h1z"/></g>')
+    expect(out).not.toContain('opacity="0.15"><g fill="#333">')
+  })
+
+  it('焦点与隐藏叠加：隐藏优先', () => {
+    const out = composeSvg(tree, { focus: '1', hidden: new Set(['2']) })
+    expect(out).not.toContain('clip-path')
+    expect(out).toContain('<path fill="#111"')
+    expect(out).not.toContain('opacity="0.15"><path fill="#111"')
+  })
+})
+
+describe('flattenTree', () => {
+  const tree = parseSvgTree(NESTED)
+
+  it('全展开的行序与深度', () => {
+    const rows = flattenTree(tree, new Set())
+    expect(rows.map((r) => r.path)).toEqual(['0', '0/0', '0/0/0', '1', '2', '2/0', '2/1', '2/1/0'])
+    expect(rows.find((r) => r.path === '2/1')!.depth).toBe(1)
+    expect(rows.find((r) => r.path === '2')!.container).toBe(true)
+  })
+
+  it('收起容器则不展开其子行', () => {
+    const rows = flattenTree(tree, new Set(['2', '0']))
+    expect(rows.map((r) => r.path)).toEqual(['0', '1', '2'])
   })
 })
