@@ -47,6 +47,9 @@ function applyRecolor(s: string, pairs: readonly (readonly [string, string])[]):
 
 // ── 动画 ────────────────────────────────────────────────────
 
+/** 全体动画统一规格：10 帧 / 1 秒循环——效果整齐划一，未来新配方也照此编排 */
+export const ANIM_SPEC = { frames: 10, durMs: 1000 } as const
+
 /** 关键帧：t 为周期内相位 0..1（首尾值应闭环）；变换绕 (cx,cy) 施加 */
 export interface PartKeyframe {
   readonly t: number
@@ -72,9 +75,6 @@ export interface AnimRecipe {
   readonly desc: string
   /** 部件拆解说明（Studio 详情页展示识别依据） */
   readonly anatomy: string
-  readonly durMs: number
-  /** 烘焙帧数：每帧一张纹理，显存与流畅度的折中 */
-  readonly frames: number
   readonly parts: readonly AnimPart[]
 }
 
@@ -169,50 +169,40 @@ export function bakeAnimFrame(svg: string, recipe: AnimRecipe, t: number): strin
   return `${open}${out}</svg>`
 }
 
-/** 部件动画花名册：每条 = 一个 emoji 的部件拆解 + 关键帧编排 */
+/** 部件动画花名册：每条 = 一个 emoji 的部件拆解 + 1 秒周期内的关键帧编排 */
 export const ANIM_RECIPES: readonly AnimRecipe[] = [
   {
     emoji: '🤖',
     name: '机器人',
-    desc: '红瞳左右扫视（带停顿的巡逻节奏），天线上下浮动，双耳信号灯呼吸闪烁。',
+    desc: '红瞳左右扫视巡逻，天线上下浮动，双耳信号灯呼吸闪烁。',
     anatomy: '红瞳 = 仅有的两个 #DD2E44 圆；天线组在 viewBox 顶部；耳朵是两侧橙色椭圆。',
-    durMs: 4000,
-    frames: 10,
     parts: [
-      // 双耳信号灯：opacity 呼吸 ×2
+      // 双耳信号灯：opacity 呼吸一次
       {
         indices: [0, 1],
         keyframes: [
           { t: 0, opacity: 1 },
-          { t: 0.25, opacity: 0.55 },
-          { t: 0.5, opacity: 1 },
-          { t: 0.75, opacity: 0.55 },
+          { t: 0.5, opacity: 0.5 },
           { t: 1, opacity: 1 },
         ],
       },
-      // 天线顶盘：上下浮动 ×3
+      // 天线顶盘：上下浮动一次
       {
         indices: [3, 4],
         keyframes: [
           { t: 0, ty: 0 },
-          { t: 1 / 6, ty: -1.1 },
-          { t: 2 / 6, ty: 0 },
-          { t: 3 / 6, ty: -1.1 },
-          { t: 4 / 6, ty: 0 },
-          { t: 5 / 6, ty: -1.1 },
+          { t: 0.5, ty: -1.1 },
           { t: 1, ty: 0 },
         ],
       },
-      // 双眼红瞳：同步左右扫视，两端各停一拍
+      // 双眼红瞳：左右扫视一个来回
       {
         indices: [9, 13],
         keyframes: [
           { t: 0, tx: 0 },
-          { t: 0.12, tx: 1.7 },
-          { t: 0.3, tx: 1.7 },
-          { t: 0.45, tx: -1.7 },
-          { t: 0.72, tx: -1.7 },
-          { t: 0.85, tx: 0 },
+          { t: 0.25, tx: 1.7 },
+          { t: 0.5, tx: 0 },
+          { t: 0.75, tx: -1.7 },
           { t: 1, tx: 0 },
         ],
       },
@@ -221,21 +211,18 @@ export const ANIM_RECIPES: readonly AnimRecipe[] = [
   {
     emoji: '🐍',
     name: '毒蛇',
-    desc: '分叉舌头快速吞吐两下、停顿、再吞吐，眼睛偶尔眨一下，身体盘绕不动。',
+    desc: '分叉舌头快速吞吐两下再收回，眨一下眼，身体盘绕不动。',
     anatomy: '舌头 = 唯一的红色 path，位于头部朝向的延长线上；眼睛是黑色小圆。',
-    durMs: 3000,
-    frames: 10,
     parts: [
-      // 舌头：吐-半收-再吐-收，前半周期静止
+      // 舌头：前半周期吞吐两下，后半收拢
       {
         indices: [0],
         keyframes: [
           { t: 0, tx: 0, ty: 0 },
+          { t: 0.12, tx: -2.4, ty: -0.4 },
+          { t: 0.24, tx: -0.6, ty: -0.1 },
+          { t: 0.36, tx: -2.4, ty: -0.4 },
           { t: 0.5, tx: 0, ty: 0 },
-          { t: 0.58, tx: -2.4, ty: -0.4 },
-          { t: 0.66, tx: -0.6, ty: -0.1 },
-          { t: 0.74, tx: -2.4, ty: -0.4 },
-          { t: 0.82, tx: 0, ty: 0 },
           { t: 1, tx: 0, ty: 0 },
         ],
       },
@@ -244,9 +231,9 @@ export const ANIM_RECIPES: readonly AnimRecipe[] = [
         indices: [2],
         keyframes: [
           { t: 0, opacity: 1 },
-          { t: 0.88, opacity: 1 },
-          { t: 0.92, opacity: 0 },
-          { t: 0.96, opacity: 1 },
+          { t: 0.7, opacity: 1 },
+          { t: 0.78, opacity: 0 },
+          { t: 0.86, opacity: 1 },
           { t: 1, opacity: 1 },
         ],
       },
@@ -257,8 +244,6 @@ export const ANIM_RECIPES: readonly AnimRecipe[] = [
     name: '僵尸',
     desc: '躯干蹒跚摇摆，伸出的手前后抓挠，头部反相晃动——三组反相运动合成「挪步逼近」。',
     anatomy: '橙衫躯干在底部；灰白手掌是独立 path；头组（发/脸/五官）占上半。旋转轴分设肩/颈。',
-    durMs: 1700,
-    frames: 8,
     parts: [
       // 躯干（衫+暗部）：绕下摆摇摆
       {
@@ -298,12 +283,10 @@ export const ANIM_RECIPES: readonly AnimRecipe[] = [
   {
     emoji: '👻',
     name: '幽灵',
-    desc: '双眼在眼窝内缓慢游移画圈（盯人感），嘴巴以自身中心一缩一张地「呜~」。',
+    desc: '双眼在眼窝内游移画圈（盯人感），嘴巴以自身中心一缩一张地「呜~」。',
     anatomy: '身体一整片 path；双眼 + 高光是三个圆；嘴是黑色斜椭圆 path，缩放锚点取其几何中心。',
-    durMs: 3200,
-    frames: 10,
     parts: [
-      // 双眼：小菱形轨迹游移
+      // 双眼：小菱形轨迹游移一圈
       {
         indices: [1, 2, 3],
         keyframes: [
@@ -419,25 +402,88 @@ export const MERGE_RECIPES: readonly MergeRecipe[] = [
   },
 ]
 
-/** 兜底配方：B 缩小叠在 A 右上角当徽章——保证任意组合都有结果 */
-export function genericMergeRecipe(a: string, b: string): MergeRecipe {
+/** 查精品配方（含 a/b 反序，反序按注册方向合成）；未命中返回 null → 走 fusionRecipe */
+export function findMergeRecipe(a: string, b: string): MergeRecipe | null {
+  return (
+    MERGE_RECIPES.find((r) => (r.a === a && r.b === b) || (r.a === b && r.b === a)) ?? null
+  )
+}
+
+// ── 通用融合（未收录组合的程序化真合并）────────────────────────
+// A 的形体 + B 的配色：提取双方色板（按图形数据量近似面积加权、排除眼睛等
+// 保护色），A 的主色系按明暗序映射到 B 的主色系（B 色不足时以主色生成明暗
+// 变体补足，保住 A 的立体层次），再把 B 本体缩小栖在 A 头顶保留识别度。
+
+/** 不参与融合的保护色：眼睛/线条近黑与眼白高光，保证五官可读 */
+const PROTECTED_FILLS = new Set(['#292F33', '#31373D', '#000000', '#000', '#FFFFFF', '#FFF', '#F5F8FA'])
+
+/** 提取 SVG 色板：fill → 图形数据量权重（d/半径长度近似面积），降序 */
+export function extractPalette(svg: string): { color: string; weight: number }[] {
+  const { els } = splitSvg(svg)
+  const weights = new Map<string, number>()
+  for (const el of els) {
+    const fill = /\bfill="(#[0-9a-fA-F]{3,6})"/.exec(el)?.[1]?.toUpperCase()
+    if (!fill || PROTECTED_FILLS.has(fill)) continue
+    const d = /\bd="([^"]+)"/.exec(el)?.[1]
+    // circle/ellipse 无 d：按半径估权重；g 内多形状：整段长度
+    const w = d ? d.length : el.length / 2
+    weights.set(fill, (weights.get(fill) ?? 0) + w)
+  }
+  return [...weights.entries()]
+    .map(([color, weight]) => ({ color, weight }))
+    .sort((x, y) => y.weight - x.weight)
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const s = hex.length === 4 ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}` : hex
+  return [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)]
+}
+
+function luma(hex: string): number {
+  const [r, g, b] = hexToRgb(hex)
+  return 0.299 * r + 0.587 * g + 0.114 * b
+}
+
+/** 明暗变体：RGB 按比例向白/黑插值（k>0 变亮，k<0 变暗） */
+export function shadeHex(hex: string, k: number): string {
+  const [r, g, b] = hexToRgb(hex)
+  const to = (c: number): number => {
+    const v = k > 0 ? c + (255 - c) * k : c * (1 + k)
+    return Math.max(0, Math.min(255, Math.round(v)))
+  }
+  const h = (n: number): string => n.toString(16).padStart(2, '0').toUpperCase()
+  return `#${h(to(r))}${h(to(g))}${h(to(b))}`
+}
+
+/** A 全色板 → B 主色的明暗梯度映射：A 每色按自身亮度在色板中的位置，
+ * 落到 B 主色的对应明暗档上——整体色调统一为 B 系，明暗层次严格保留 */
+export function fusionRecolor(
+  palA: readonly { color: string; weight: number }[],
+  palB: readonly { color: string; weight: number }[],
+): [string, string][] {
+  if (palA.length === 0 || palB.length === 0) return []
+  const base = palB[0]!.color
+  const lumas = palA.map((p) => luma(p.color))
+  const lo = Math.min(...lumas)
+  const hi = Math.max(...lumas)
+  return palA.map((p, i) => {
+    const t = hi > lo ? (lumas[i]! - lo) / (hi - lo) : 0.5
+    return [p.color, shadeHex(base, (t - 0.5) * 1.1)]
+  })
+}
+
+/** 通用融合配方：需要双方 SVG 文本才能算出换色映射 */
+export function fusionRecipe(a: string, b: string, svgA: string, svgB: string): MergeRecipe {
   return {
     a,
     b,
-    name: '自由合成',
-    method: '徽章叠加',
-    desc: '未收录的组合走通用配方：B 缩小叠在 A 的右上角。调参后可晋升为精品配方。',
-    transformB: 'translate(19 -4) scale(0.45)',
-    viewBox: '-1 -5 38 42',
+    name: '元素融合',
+    method: '色板注入',
+    desc: 'B 的配色按明暗层次注入 A 全身（眼睛等保护色不动），B 本体缩小栖在头顶。',
+    recolorA: fusionRecolor(extractPalette(svgA), extractPalette(svgB)),
+    transformB: 'translate(9.9 -14.7) scale(0.45)',
+    viewBox: '-8 -15.5 52 52',
   }
-}
-
-/** 查配方：精品注册表命中（含 a/b 反序，反序按注册方向合成）→ 否则通用兜底 */
-export function findMergeRecipe(a: string, b: string): MergeRecipe {
-  const hit = MERGE_RECIPES.find(
-    (r) => (r.a === a && r.b === b) || (r.a === b && r.b === a),
-  )
-  return hit ?? genericMergeRecipe(a, b)
 }
 
 /** 合并主函数：svgA/svgB 为两个原始 twemoji 文本，按配方产出新 SVG */

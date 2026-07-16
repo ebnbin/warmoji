@@ -6,10 +6,12 @@ import { Rng } from '../core/rng'
 import { setSvgSize } from '../core/svg'
 import {
   ANIM_RECIPES,
+  ANIM_SPEC,
   MERGE_POOL,
   animRecipeOf,
   bakeAnimFrame,
   findMergeRecipe,
+  fusionRecipe,
   mergeSvg,
 } from '../core/studio'
 import type { AnimRecipe } from '../core/studio'
@@ -331,7 +333,7 @@ export class StudioScene extends Phaser.Scene {
     this.detailObjs.push(this.previewImg)
     y += previewSize + 10
     const frameInfo = this.add
-      .text(cx, y, `${recipe.frames} 帧 · ${(recipe.durMs / 1000).toFixed(1)} 秒循环`, {
+      .text(cx, y, `统一规格：${ANIM_SPEC.frames} 帧 · ${(ANIM_SPEC.durMs / 1000).toFixed(0)} 秒循环`, {
         fontFamily: UI_FONT,
         fontSize: FONT.caption,
         color: '#ffffff',
@@ -394,7 +396,7 @@ export class StudioScene extends Phaser.Scene {
       .then((keys) => {
         if (gen !== this.jobGen || !this.previewImg) return
         this.previewState = 'ready'
-        this.playFrames(keys, recipe.durMs, previewSize)
+        this.playFrames(keys, ANIM_SPEC.durMs, previewSize)
         this.report()
       })
       .catch((err) => {
@@ -409,7 +411,17 @@ export class StudioScene extends Phaser.Scene {
     const { d, res } = this.resetDetail()
     const a = this.slotA
     const b = this.slotB
-    const recipe = a && b ? findMergeRecipe(a, b) : null
+    // 精品配方命中显示其调参说明；未命中走通用融合（名称/手法固定，换色映射合成时算）
+    const curated = a && b ? findMergeRecipe(a, b) : null
+    const info =
+      curated ??
+      (a && b
+        ? {
+            name: '元素融合',
+            method: '色板注入',
+            desc: 'B 的配色按明暗层次注入 A 全身（眼睛等保护色不动），B 本体缩小栖在头顶。收录调参后可晋升精品配方。',
+          }
+        : null)
     const portrait = this.layout === PORTRAIT
     const cx = d.x + d.w / 2
 
@@ -469,7 +481,7 @@ export class StudioScene extends Phaser.Scene {
     // 名称 + 手法 + 描述（居中）
     let y = rowY + resultSize / 2 + 52
     const name = this.add
-      .text(cx, y, recipe ? `${recipe.name} ·「${recipe.method}」` : '从素材库点选两个 emoji', {
+      .text(cx, y, info ? `${info.name} ·「${info.method}」` : '从素材库点选两个 emoji', {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
         fontStyle: 'bold',
@@ -480,9 +492,9 @@ export class StudioScene extends Phaser.Scene {
     this.detailObjs.push(name)
     y += 52
     let contentBottom = y
-    if (recipe) {
+    if (info) {
       const desc = this.add
-        .text(cx, y, recipe.desc, {
+        .text(cx, y, info.desc, {
           fontFamily: UI_FONT,
           fontSize: FONT.body,
           color: '#e8e8f2',
@@ -509,7 +521,7 @@ export class StudioScene extends Phaser.Scene {
     }
 
     this.previewState = a && b ? 'loading' : 'idle'
-    if (a && b && recipe) {
+    if (a && b) {
       const gen = ++this.jobGen
       void this.composeMergeTexture(a, b)
         .then((key) => {
@@ -575,15 +587,15 @@ export class StudioScene extends Phaser.Scene {
 
   // ── 纹理烘焙 ────────────────────────────────────────────────
 
-  /** 动画配方 → N 帧纹理（已存在的帧直接复用；返回按帧序的纹理 key） */
+  /** 动画配方 → 统一规格 N 帧纹理（已存在的帧直接复用；返回按帧序的纹理 key） */
   private async bakeAnimTextures(recipe: AnimRecipe): Promise<string[]> {
     const svg = await fetchSvgText(recipe.emoji)
     const keys: string[] = []
-    for (let k = 0; k < recipe.frames; k++) {
+    for (let k = 0; k < ANIM_SPEC.frames; k++) {
       const key = `studio-anim-${emojiCodepoints(recipe.emoji)}-${k}`
       keys.push(key)
       if (this.textures.exists(key)) continue
-      const frame = bakeAnimFrame(svg, recipe, k / recipe.frames)
+      const frame = bakeAnimFrame(svg, recipe, k / ANIM_SPEC.frames)
       const img = await svgToImage(setSvgSize(frame, RASTER))
       if (!this.textures.exists(key)) {
         this.textures.addImage(key, img)
@@ -609,13 +621,15 @@ export class StudioScene extends Phaser.Scene {
     })
   }
 
-  /** 合并两 emoji → 一张纹理（key 含双方 codepoints，重复合成直接复用） */
+  /** 合并两 emoji → 一张纹理：精品配方直出，未收录组合走通用融合（key 复用去重） */
   private async composeMergeTexture(a: string, b: string): Promise<string> {
     const key = `studio-merge-${emojiCodepoints(a)}-${emojiCodepoints(b)}`
     if (this.textures.exists(key)) return key
-    const recipe = findMergeRecipe(a, b)
-    // 配方登记方向可能与槽位相反：素材按配方的 a/b 取
-    const [svgA, svgB] = await Promise.all([fetchSvgText(recipe.a), fetchSvgText(recipe.b)])
+    // 精品配方登记方向可能与槽位相反：素材按配方的 a/b 取；通用融合按槽位方向
+    const curated = findMergeRecipe(a, b)
+    const [ra, rb] = curated ? [curated.a, curated.b] : [a, b]
+    const [svgA, svgB] = await Promise.all([fetchSvgText(ra), fetchSvgText(rb)])
+    const recipe = curated ?? fusionRecipe(a, b, svgA, svgB)
     const merged = mergeSvg(svgA, svgB, recipe)
     const img = await svgToImage(setSvgSize(merged, RASTER))
     if (!this.textures.exists(key)) {
