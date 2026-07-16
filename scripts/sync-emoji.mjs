@@ -1,35 +1,177 @@
-// 构建前把 @twemoji/svg 全集同步到 public/emoji/<版本>/（生成物不进 git），
-// 并生成图鉴用清单 manifest.json：基础形态 codepoint 列表（剔除肤色变体）
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+// 构建前把 @twemoji/svg 打包为两份资源（生成物不进 git）：
+//   public/emoji/<版本>/index.json —— Unicode 官方索引（CLDR 顺序）与 twemoji
+//     的交集：key/字符/英文名/分组 + 全库统一 header；行序即打包文件行序
+//   public/emoji/<版本>/pack.txt   —— 每行一个去 header 的 SVG 正文
+// 一切以官方数据为准：Unicode 索引来自 scripts/data/emoji-test.txt（unicode.org
+// 原文），twemoji 形态逐文件实测。所有例外（header 变体/换行/引用）显式处理，
+// 未知情况直接报错退出，不做静默假设。
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+// 脚本行为变更时 bump，强制重新生成
+const GENERATOR = 2
 
 const root = new URL('..', import.meta.url).pathname
 const srcDir = join(root, 'node_modules/@twemoji/svg')
-const version = JSON.parse(readFileSync(join(srcDir, 'package.json'), 'utf8')).version
-const destRoot = join(root, 'public/emoji')
-const destDir = join(destRoot, version)
-const manifestPath = join(destDir, 'manifest.json')
+const twemojiVersion = JSON.parse(readFileSync(join(srcDir, 'package.json'), 'utf8')).version
+const destDir = join(root, 'public/emoji', twemojiVersion)
+const indexPath = join(destDir, 'index.json')
+const packPath = join(destDir, 'pack.txt')
 
-// 肤色修饰符 1F3FB..1F3FF：含任一段即视为变体，不进完整列表
-const TONES = new Set(['1f3fb', '1f3fc', '1f3fd', '1f3fe', '1f3ff'])
-const isBase = (name) => !name.split('-').some((seg) => TONES.has(seg))
+// 幂等：产物存在且由同版本脚本生成则跳过
+if (existsSync(indexPath) && existsSync(packPath)) {
+  try {
+    const prev = JSON.parse(readFileSync(indexPath, 'utf8'))
+    if (prev.generator === GENERATOR && prev.twemojiVersion === twemojiVersion) process.exit(0)
+  } catch {
+    // 产物损坏则重建
+  }
+}
 
-const files = readdirSync(srcDir).filter((f) => f.endsWith('.svg'))
-const synced =
-  existsSync(destDir) &&
-  readdirSync(destDir).filter((f) => f.endsWith('.svg')).length === files.length &&
-  existsSync(manifestPath)
-if (synced) process.exit(0)
+// ── 1. 解析 Unicode 官方索引（fully-qualified，CLDR 顺序；component 是
+//       肤色/发色零件而非独立形象，不收） ────────────────────────
+const testTxt = readFileSync(join(root, 'scripts/data/emoji-test.txt'), 'utf8')
+const unicodeVersion = /^# Version: (.+)$/m.exec(testTxt)?.[1]?.trim()
+if (!unicodeVersion) throw new Error('emoji-test.txt 缺少 Version 行')
 
-rmSync(destRoot, { recursive: true, force: true })
+/** twemoji 文件名规则（与 src/core/emoji.ts 的 emojiCodepoints 一致）：
+ * 码点小写十六进制以 - 连接；不含 ZWJ 的序列去掉 FE0F */
+const keyOf = (points) => {
+  const hasZwj = points.includes(0x200d)
+  return points
+    .filter((p) => hasZwj || p !== 0xfe0f)
+    .map((p) => p.toString(16))
+    .join('-')
+}
+
+const groups = []
+const unicodeEntries = []
+{
+  let groupIdx = -1
+  for (const line of testTxt.split('\n')) {
+    const g = /^# group: (.+)$/.exec(line)
+    if (g) {
+      groups.push(g[1].trim())
+      groupIdx = groups.length - 1
+      continue
+    }
+    const m = /^([0-9A-F ]+?)\s*;\s*fully-qualified\s*#\s*(\S+)\s+E[\d.]+\s+(.+)$/.exec(line)
+    if (!m) continue
+    const points = m[1].trim().split(/\s+/).map((h) => parseInt(h, 16))
+    unicodeEntries.push({ key: keyOf(points), emoji: m[2], name: m[3].trim(), group: groupIdx })
+  }
+}
+if (unicodeEntries.length === 0) throw new Error('emoji-test.txt 未解析出任何 fully-qualified 条目')
+
+// ── 2. twemoji 实测形态处理 ─────────────────────────────────────
+const STD_HEADER = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">'
+const STD_VIEWBOX = [0, 0, 36, 36]
+const files = new Set(readdirSync(srcDir).filter((f) => f.endsWith('.svg')).map((f) => f.slice(0, -4)))
+
+const fmtNum = (n) => {
+  const r = Math.round(n * 10000) / 10000
+  return Object.is(r, -0) ? '0' : String(r)
+}
+
+const stats = { std: 0, headerVariant: 0, normalized: 0, newlineFixed: 0 }
+
+/** 读取并把一个 SVG 处理成「能在标准 header 中原样呈现」的单行正文 */
+function extractBody(key) {
+  const text = readFileSync(join(srcDir, `${key}.svg`), 'utf8')
+  const open = /<svg\b[^>]*>/.exec(text)?.[0]
+  if (!open) throw new Error(`${key}.svg: 无 <svg> 开标签`)
+  const closeIdx = text.lastIndexOf('</svg>')
+  if (closeIdx < 0) throw new Error(`${key}.svg: 无 </svg> 闭合`)
+  let body = text.slice(text.indexOf(open) + open.length, closeIdx).trim()
+
+  // 自包含校验：正文内的 url(#x) 引用必须在正文内定义
+  const ids = new Set([...body.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]))
+  for (const [, ref] of body.matchAll(/url\(#([^)]+)\)/g)) {
+    if (!ids.has(ref)) throw new Error(`${key}.svg: 引用了正文外的 id "#${ref}"`)
+  }
+  if (/href=/.test(body)) throw new Error(`${key}.svg: 含 href 外部引用，需人工确认`)
+
+  // 换行压平（打包格式一行一个；SVG 中行内空白等价）
+  if (/[\r\n]/.test(body)) {
+    body = body.replace(/\s*[\r\n]+\s*/g, ' ')
+    stats.newlineFixed++
+  }
+
+  if (open === STD_HEADER) {
+    stats.std++
+    return body
+  }
+
+  // header 变体：解析属性，决定能否安全归一
+  const attrs = {}
+  for (const [, k, v] of open.matchAll(/([\w:-]+)="([^"]*)"/g)) attrs[k] = v
+  const known = new Set(['xmlns', 'viewBox', 'xml:space', 'width', 'height', 'xmlns:xlink'])
+  for (const k of Object.keys(attrs)) {
+    if (!known.has(k)) throw new Error(`${key}.svg: header 含未知属性 ${k}="${attrs[k]}"，需人工确认`)
+  }
+  // xml:space 只影响 <text> 空白；确认无 text 后可安全丢弃
+  if (attrs['xml:space'] && /<text\b/.test(body)) {
+    throw new Error(`${key}.svg: xml:space 变体含 <text>，不能丢弃该属性`)
+  }
+  const vb = (attrs.viewBox ?? '0 0 36 36').trim().split(/[\s,]+/).map(Number)
+  if (vb.length !== 4 || vb.some((n) => !Number.isFinite(n))) {
+    throw new Error(`${key}.svg: viewBox 无法解析 "${attrs.viewBox}"`)
+  }
+  if (vb.every((v, i) => v === STD_VIEWBOX[i])) {
+    stats.headerVariant++
+    return body
+  }
+  // viewBox 不同：等比缩放 + 居中平移，使原内容在 36 格里呈现一致
+  const [x, y, w, h] = vb
+  if (w <= 0 || h <= 0) throw new Error(`${key}.svg: viewBox 尺寸非法 "${attrs.viewBox}"`)
+  const s = 36 / Math.max(w, h)
+  const tx = -x * s + (36 - w * s) / 2
+  const ty = -y * s + (36 - h * s) / 2
+  stats.normalized++
+  return `<g transform="translate(${fmtNum(tx)} ${fmtNum(ty)}) scale(${fmtNum(s)})">${body}</g>`
+}
+
+// ── 3. 交集匹配 + 产出 ─────────────────────────────────────────
+const emojis = []
+const packLines = []
+let missUnicode = 0
+const usedKeys = new Set()
+for (const e of unicodeEntries) {
+  if (!files.has(e.key)) {
+    missUnicode++
+    continue
+  }
+  const body = extractBody(e.key)
+  if (/[\r\n]/.test(body)) throw new Error(`${e.key}: 正文仍含换行`)
+  emojis.push({ c: e.key, e: e.emoji, n: e.name, g: e.group })
+  packLines.push(body)
+  usedKeys.add(e.key)
+}
+const orphans = files.size - usedKeys.size
+
+if (emojis.length === 0) throw new Error('交集为空，检查数据源')
+
+rmSync(join(root, 'public/emoji'), { recursive: true, force: true })
 mkdirSync(destDir, { recursive: true })
-for (const f of files) copyFileSync(join(srcDir, f), join(destDir, f))
+writeFileSync(
+  indexPath,
+  JSON.stringify({
+    format: 'warmoji-emoji@1',
+    generator: GENERATOR,
+    unicodeVersion,
+    twemojiVersion,
+    header: STD_HEADER,
+    groups,
+    emojis,
+  }),
+)
+writeFileSync(packPath, packLines.join('\n'))
 
-const base = files
-  .map((f) => f.slice(0, -4))
-  .filter(isBase)
-  .sort()
-writeFileSync(manifestPath, JSON.stringify({ base }))
+const kb = (p) => Math.round(readFileSync(p).length / 1024)
 console.log(
-  `twemoji ${version}: ${files.length} 个 SVG → public/emoji/${version}/（基础形态 ${base.length}）`,
+  `emoji 打包：Unicode ${unicodeVersion} ∩ twemoji ${twemojiVersion} = ${emojis.length} 条 → ` +
+    `index.json ${kb(indexPath)}KB + pack.txt ${kb(packPath)}KB\n` +
+    `  标准 header ${stats.std} · 变体归一 ${stats.headerVariant} · viewBox 缩放 ${stats.normalized} · ` +
+    `换行修复 ${stats.newlineFixed}\n` +
+    `  丢弃：Unicode 有而 twemoji 无 ${missUnicode} · twemoji 孤儿（区域字母/组件等） ${orphans}`,
 )

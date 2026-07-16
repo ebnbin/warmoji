@@ -2,10 +2,13 @@ import Phaser from 'phaser'
 import { OUTLINE, OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../core/config'
 import type { OutlineKind } from '../core/config'
 import { emojiCodepoints } from '../core/emoji'
+import { packSvg, parseEmojiPack } from '../core/emojipack'
+import type { EmojiPack } from '../core/emojipack'
 import { outlineSvg, setSvgSize } from '../core/svg'
 
-// twemoji 全集（@twemoji/svg，构建时同步到 public/emoji/<版本>/，图形 CC-BY 4.0）。
-// 加载管线：fetch SVG 文本 → core/svg.ts 纯函数改写 → 光栅化 → Phaser 纹理；
+// twemoji 全集打包资源（构建期由 sync-emoji.mjs 生成 index.json + pack.txt，
+// 图形 CC-BY 4.0）：全库仅两个请求，之后任意 emoji 的 SVG 文本同步可取。
+// 纹理管线：SVG 文本 → core/svg.ts 纯函数改写 → 光栅化 → Phaser 纹理；
 // 描边按阵营配色（player 黑 / enemy 紫 / enemyShot 红），每色一个纹理变体。
 // 启动只预载 PRELOAD_EMOJIS，其余按需 ensureEmoji，超 LRU 上限淘汰最久未用。
 const RASTER = 256
@@ -15,6 +18,37 @@ const inflight = new Map<string, Promise<string>>()
 const lastUsed = new Map<string, number>()
 const pinned = new Set<string>()
 let useTick = 0
+
+let packPromise: Promise<EmojiPack> | undefined
+
+/** 加载打包资源（幂等，全局仅一次两个请求） */
+export function loadEmojiPack(): Promise<EmojiPack> {
+  if (!packPromise) {
+    const base = `/emoji/${__TWEMOJI_VERSION__}`
+    packPromise = Promise.all([
+      fetch(`${base}/index.json`).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status} ${base}/index.json`)
+        return r.json()
+      }),
+      fetch(`${base}/pack.txt`).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status} ${base}/pack.txt`)
+        return r.text()
+      }),
+    ]).then(([index, text]) => parseEmojiPack(index, text))
+    packPromise.catch(() => {
+      packPromise = undefined
+    })
+  }
+  return packPromise
+}
+
+/** emoji → 完整 SVG 文本（从打包资源取；未收录即抛错） */
+export async function emojiSvgText(emoji: string): Promise<string> {
+  const pack = await loadEmojiPack()
+  const svg = packSvg(pack, emojiCodepoints(emoji))
+  if (!svg) throw new Error(`emoji 不在打包资源中: ${emoji} (${emojiCodepoints(emoji)})`)
+  return svg
+}
 
 /** dev 面板诊断：存活 emoji 纹理数与固定预载数（LRU 上限只约束非固定部分） */
 export function emojiCacheStats(scene: Phaser.Scene): { textures: number; pinned: number } {
@@ -36,10 +70,6 @@ export function emojiKey(emoji: string, outline?: OutlineKind): string {
   return `emoji-${emojiCodepoints(emoji)}${outline ? KIND_SUFFIX[outline] : ''}`
 }
 
-function emojiUrl(emoji: string): string {
-  return `/emoji/${__TWEMOJI_VERSION__}/${emojiCodepoints(emoji)}.svg`
-}
-
 /** SVG 文本 → 位图（尺寸由 SVG 自身的 width/height 决定），图鉴图集也复用 */
 export async function svgToImage(svgText: string): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }))
@@ -56,15 +86,9 @@ export async function svgToImage(svgText: string): Promise<HTMLImageElement> {
   }
 }
 
-export function emojiSvgUrl(emoji: string): string {
-  return emojiUrl(emoji)
-}
-
 async function createTexture(scene: Phaser.Scene, emoji: string, outline?: OutlineKind): Promise<string> {
   const key = emojiKey(emoji, outline)
-  const res = await fetch(emojiUrl(emoji))
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${emojiUrl(emoji)}`)
-  const raw = await res.text()
+  const raw = await emojiSvgText(emoji)
   const svg = outline ? outlineSvg(raw, OUTLINE.radius, OUTLINE.colors[outline]) : raw
   scene.textures.addImage(key, await svgToImage(setSvgSize(svg, RASTER)))
   return key

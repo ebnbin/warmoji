@@ -3,11 +3,12 @@ import { codepointsToEmoji } from '../core/emoji'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
+import { packBaseKeys } from '../core/emojipack'
 import { usedEmojiSet, wikiEntryByEmoji, wikiGroups } from '../core/wiki'
 import type { WikiEntry, WikiGroup } from '../core/wiki'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
-import { emojiImage, emojiKey, ensureEmoji } from '../ui/emoji'
+import { emojiImage, emojiKey, ensureEmoji, loadEmojiPack } from '../ui/emoji'
 import { EmojiGrid } from '../ui/grid'
 import { FONT, UI_FONT } from '../ui/fonts'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
@@ -601,9 +602,8 @@ export class WikiScene extends Phaser.Scene {
   private async loadManifest(): Promise<void> {
     if (this.manifest.length > 0) return
     try {
-      const res = await fetch(`/emoji/${__TWEMOJI_VERSION__}/manifest.json`)
-      const data = (await res.json()) as { base: string[] }
-      this.manifest = data.base
+      // 基础形态清单来自打包资源索引（CLDR 标准顺序，剔除肤色变体）
+      this.manifest = packBaseKeys(await loadEmojiPack())
     } catch (err) {
       console.error(`emoji 清单加载失败: ${String(err)}`)
     }

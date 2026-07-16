@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { codepointsToEmoji } from '../core/emoji'
 import { setSvgSize } from '../core/svg'
-import { emojiSvgUrl, svgToImage } from './emoji'
+import { emojiSvgText, svgToImage } from './emoji'
 
 // 图鉴「全部 emoji」专用缩略图集：进入该页时一次性把全部基础形态
 // 光栅化成 64px 小图并合入少量 2048×2048 画布纹理（全量约 32MB，手机可承受）。
@@ -59,9 +59,7 @@ export function buildWikiAtlas(scene: Phaser.Scene, cps: readonly string[]): Pro
         if (index >= cps.length) return
         const cp = cps[index]!
         try {
-          const res = await fetch(emojiSvgUrl(codepointsToEmoji(cp)))
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          const img = await svgToImage(setSvgSize(await res.text(), THUMB))
+          const img = await svgToImage(setSvgSize(await emojiSvgText(codepointsToEmoji(cp)), THUMB))
           const atlas = Math.floor(index / PER_ATLAS)
           const slot = index % PER_ATLAS
           const cols = ATLAS_SIZE / THUMB

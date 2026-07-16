@@ -18,7 +18,7 @@ import {
 import type { AnimRecipe } from '../core/studio'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
-import { emojiImage, emojiSvgUrl, ensureEmoji, svgToImage } from '../ui/emoji'
+import { emojiImage, emojiSvgText, ensureEmoji, svgToImage } from '../ui/emoji'
 import { EmojiGrid } from '../ui/grid'
 import { FONT, UI_FONT } from '../ui/fonts'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
@@ -56,22 +56,6 @@ const RASTER = 256
 const SPEEDS = [1, 0.5, 0.25] as const
 
 type Tab = 'recipes' | 'templates' | 'anatomy'
-
-// SVG 文本缓存（模块级：跨场景重启复用，twemoji 文件不可变）
-const svgTextCache = new Map<string, Promise<string>>()
-
-function fetchSvgText(emoji: string): Promise<string> {
-  let p = svgTextCache.get(emoji)
-  if (!p) {
-    p = fetch(emojiSvgUrl(emoji)).then((res) => {
-      if (!res.ok) throw new Error(`HTTP ${res.status} ${emojiSvgUrl(emoji)}`)
-      return res.text()
-    })
-    p.catch(() => svgTextCache.delete(emoji))
-    svgTextCache.set(emoji, p)
-  }
-  return p
-}
 
 export class StudioScene extends Phaser.Scene {
   private preserveOnRestart = false
@@ -430,7 +414,7 @@ export class StudioScene extends Phaser.Scene {
     const emoji = this.tplEmoji
     const gen = ++this.jobGen
     this.previewState = 'loading'
-    void fetchSvgText(emoji)
+    void emojiSvgText(emoji)
       .then((svg) => {
         if (gen !== this.jobGen) return
         const recipe = applyTemplate(tpl, emoji, svg)
@@ -462,7 +446,7 @@ export class StudioScene extends Phaser.Scene {
       .setOrigin(0.5, 0)
     this.detailObjs.push(title)
 
-    void fetchSvgText(emoji)
+    void emojiSvgText(emoji)
       .then(async (svg) => {
         if (gen !== this.jobGen) return
         const parts = dissectSvg(svg)
@@ -694,7 +678,7 @@ export class StudioScene extends Phaser.Scene {
   }
 
   private async bakeAnimTextures(recipe: AnimRecipe, keyPrefix?: string): Promise<string[]> {
-    const svg = await fetchSvgText(recipe.emoji)
+    const svg = await emojiSvgText(recipe.emoji)
     const prefix = keyPrefix ?? `studio-anim-${emojiCodepoints(recipe.emoji)}`
     const keys: string[] = []
     for (let k = 0; k < ANIM_SPEC.frames; k++) {
