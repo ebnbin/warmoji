@@ -643,8 +643,16 @@ export class StudioScene extends Phaser.Scene {
         mask.fillRect(treeArea.x, treeArea.y, treeArea.w, treeArea.h)
         const rowsBox = this.add.container(treeArea.x, treeArea.y)
         rowsBox.setMask(mask.createGeometryMask())
+        // 树区只有这一个命中区（与可视区域等大），行/眼睛/箭头按坐标分派。
+        // 行级隐形 zone 会在遮罩外照常拦截输入（遮罩不裁点击），竖屏时
+        // 溢出行盖住下方素材网格、点击整块被吞——这就是"解剖页点不了网格"
+        const treeZone = this.add
+          .zone(treeArea.x, treeArea.y, treeArea.w, treeArea.h)
+          .setOrigin(0)
+          .setInteractive({ useHandCursor: true })
+          .on('pointerup', (p: Phaser.Input.Pointer) => this.onTreeTap(p))
 
-        this.detailObjs.push(treeBg, boxes, fullImg, splitImg, ...caps, info, mask, rowsBox)
+        this.detailObjs.push(treeBg, boxes, fullImg, splitImg, ...caps, info, mask, rowsBox, treeZone)
         this.anat = { tree, splitImg, fullKey, info, rowsBox, area: treeArea, rowObjs: [], res, bigSize }
         this.anatAllRows = flattenTree(tree, new Set())
         this.anatFullRect = { x: cxAll - bigSize / 2, y: imgY - bigSize / 2, w: bigSize, h: bigSize }
@@ -760,44 +768,43 @@ export class StudioScene extends Phaser.Scene {
           .setAlpha(row.paints ? 1 : 0.75),
       )
 
-      // 单行一个命中区，按点击 x 分派：展开箭头 / 眼睛 / 选中
-      const zone = this.add
-        .zone(0, y, a.area.w, ANAT_ROW)
-        .setOrigin(0)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerup', (p: Phaser.Input.Pointer) => {
-          if (this.grid?.wasDragged || this.anatDragMoved) return
-          const relY = y - this.anatScroll
-          if (relY + ANAT_ROW < 0 || relY > a.area.h) return
-          const localX = p.worldX - a.area.x
-          if (row.container && localX >= indent - 8 && localX < indent + 24) {
-            if (this.anatCollapsed.has(row.path)) this.anatCollapsed.delete(row.path)
-            else this.anatCollapsed.add(row.path)
-            this.rebuildAnatRows()
-            this.report()
-            return
-          }
-          if (eyeX !== null && localX >= eyeX - 8 && localX < eyeX + 32) {
-            if (this.anatHidden.has(row.path)) this.anatHidden.delete(row.path)
-            else this.anatHidden.add(row.path)
-            this.rebuildAnatRows()
-            this.refreshAnatInfo()
-            void this.refreshAnatSplit()
-            this.report()
-            return
-          }
-          this.anatSelected = this.anatSelected === row.path ? null : row.path
-          this.rebuildAnatRows()
-          this.refreshAnatInfo()
-          void this.refreshAnatSplit()
-          this.report()
-        })
-      parts.push(zone)
-
       for (const o of parts) a.rowsBox.add(o)
       a.rowObjs.push(...parts)
       this.anatRowMeta.push({ row, eyeX })
     })
+  }
+
+  /** 树区统一命中分派：按 y 反解行、按 x 命中箭头/眼睛，其余为行选中（再点取消） */
+  private onTreeTap(p: Phaser.Input.Pointer): void {
+    const a = this.anat
+    if (!a || this.grid?.wasDragged || this.anatDragMoved) return
+    const i = Math.floor((p.worldY - a.area.y + this.anatScroll) / ANAT_ROW)
+    const meta = this.anatRowMeta[i]
+    if (!meta) return
+    const row = meta.row
+    const localX = p.worldX - a.area.x
+    const indent = 12 + row.depth * 22
+    if (row.container && localX >= indent - 8 && localX < indent + 24) {
+      if (this.anatCollapsed.has(row.path)) this.anatCollapsed.delete(row.path)
+      else this.anatCollapsed.add(row.path)
+      this.rebuildAnatRows()
+      this.report()
+      return
+    }
+    if (meta.eyeX !== null && localX >= meta.eyeX - 8 && localX < meta.eyeX + 32) {
+      if (this.anatHidden.has(row.path)) this.anatHidden.delete(row.path)
+      else this.anatHidden.add(row.path)
+      this.rebuildAnatRows()
+      this.refreshAnatInfo()
+      void this.refreshAnatSplit()
+      this.report()
+      return
+    }
+    this.anatSelected = this.anatSelected === row.path ? null : row.path
+    this.rebuildAnatRows()
+    this.refreshAnatInfo()
+    void this.refreshAnatSplit()
+    this.report()
   }
 
   private refreshAnatInfo(): void {

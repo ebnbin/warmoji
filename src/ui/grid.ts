@@ -28,6 +28,9 @@ interface Cell {
   bg: Phaser.GameObjects.Graphics
 }
 
+// 网格间隙（逻辑 px）；命中反解时落在缝隙不算点中
+const GAP = 10
+
 export class EmojiGrid {
   onTap?: (key: string) => void
   onScroll?: () => void
@@ -35,7 +38,7 @@ export class EmojiGrid {
   private scene: Phaser.Scene
   private rect: { x: number; y: number; w: number; h: number }
   private cell: number
-  private readonly gap = 10
+  private readonly gap = GAP
   private cols: number
   private container: Phaser.GameObjects.Container
   private cells: Cell[] = []
@@ -68,6 +71,26 @@ export class EmojiGrid {
     mask.fillStyle(0xffffff, 1)
     mask.fillRect(rect.x, rect.y, rect.w, rect.h)
     this.container.setMask(mask.createGeometryMask())
+
+    // 网格只有这一个命中区（与可视区域等大），格子从坐标反解。
+    // 逐格 zone 会在遮罩外照常拦截输入（遮罩不裁点击），滚出视口的
+    // 格子会盖住网格外侧控件、把那里的点击整块吃掉
+    scene.add
+      .zone(rect.x, rect.y, rect.w, rect.h)
+      .setOrigin(0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', (p: Phaser.Input.Pointer) => {
+        if (this.dragMovedFlag) return
+        const pitch = this.cell + this.gap
+        const lx = p.worldX - rect.x
+        const ly = p.worldY - rect.y + this.scroll
+        // 落在格间缝隙不算点中
+        if (lx % pitch > this.cell || ly % pitch > this.cell) return
+        const col = Math.floor(lx / pitch)
+        if (col < 0 || col >= this.cols) return
+        const item = this.cells[Math.floor(ly / pitch) * this.cols + col]?.item
+        if (item) this.onTap?.(item.key)
+      })
 
     // 滚轮 + 拖动；监听挂 scene.input，场景重启自动清理
     scene.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
@@ -125,18 +148,7 @@ export class EmojiGrid {
         this.cell - 34,
         item.outline,
       )
-      const zone = this.scene.add
-        .zone(relX, relY, this.cell, this.cell)
-        .setOrigin(0)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
-          if (this.dragMovedFlag) return
-          // 被裁剪到视口外的格子不响应
-          const cy = this.rect.y + relY - this.scroll + this.cell / 2
-          if (cy < this.rect.y || cy > this.rect.y + this.rect.h) return
-          this.onTap?.(item.key)
-        })
-      this.container.add([bg, icon, zone])
+      this.container.add([bg, icon])
       if (item.badge) {
         const badge = emojiImage(this.scene, relX + this.cell - 17, relY + 17, item.badge, 24)
         this.container.add(badge)
