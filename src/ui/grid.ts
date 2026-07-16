@@ -8,8 +8,8 @@ import { emojiImage } from './emoji'
 // 列数按容器宽自适应，条目再多也只是变长可滚动。
 
 /** 点击容差（逻辑 px）：按下到抬起位移小于它仍算点击。手机 fitScale≈0.5，
- * 16 逻辑 px ≈ 8 CSS px 手指晃动——再小会大量误杀轻点（实测 10 会吃点击） */
-export const TAP_SLOP = 16
+ * 20 逻辑 px ≈ 10 CSS px——快速拇指点按的晃动上限（实测 10 逻辑 px 大量吃点击） */
+export const TAP_SLOP = 20
 
 export interface EmojiGridItem {
   key: string
@@ -75,8 +75,9 @@ export class EmojiGrid {
     })
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.dragMovedFlag = false
-      if (this.contains(p)) {
-        this.dragging = true
+      // 恒赋值：上一轮手势异常结束（出画布/系统打断）不能把拖动态卡住
+      this.dragging = this.contains(p)
+      if (this.dragging) {
         this.dragStartY = p.worldY
         this.dragStartScroll = this.scroll
       }
@@ -87,9 +88,11 @@ export class EmojiGrid {
       if (this.max > 0 && Math.abs(dy) > TAP_SLOP) this.dragMovedFlag = true
       if (this.dragMovedFlag) this.setScroll(this.dragStartScroll + dy)
     })
-    scene.input.on('pointerup', () => {
+    const release = (): void => {
       this.dragging = false
-    })
+    }
+    scene.input.on('pointerup', release)
+    scene.input.on('pointerupoutside', release)
   }
 
   get scrollY(): number {

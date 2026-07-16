@@ -89,11 +89,14 @@ export class VirtualEmojiGrid {
     })
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.dragMoved = false
-      this.stopPress = Math.abs(this.flingV) >= 0.05
+      // 只有列表在明显滑动中（≥ 每帧约 6px）按下才算截停；衰减尾巴的
+      // 不可见余速不能吃掉点击（0.05 阈值实测把"甩完即点"大量误杀）
+      this.stopPress = Math.abs(this.flingV) >= 0.35
       this.flingV = 0
       this.pressIn = this.contains(p)
+      // 恒赋值：异常结束的上一轮手势不能把 dragging 卡在 true
+      this.dragging = this.pressIn
       if (this.pressIn) {
-        this.dragging = true
         this.dragStartY = p.worldY
         this.dragStartScroll = this.scroll
         this.lastMoveY = p.worldY
@@ -113,14 +116,11 @@ export class VirtualEmojiGrid {
         this.lastMoveT = scene.time.now
       }
     })
-    scene.input.on('pointerup', () => {
-      this.dragging = false
-      // 松手：速度足够则进入惯性滑动，否则立即定格并通知终态
-      if (!this.dragMoved || Math.abs(this.flingV) < 0.05) {
-        this.flingV = 0
-        this.onScrolled?.(true)
-      }
-    })
+    // 画布外松手（pointerupoutside）与正常松手同路；系统手势打断（touchcancel）
+    // 两者都不发 pointerup——不清 dragging 会冻结惯性速度，之后每次按下都被
+    // 误判截停、点击全灭（用户实报的"点击经常没反应"）
+    scene.input.on('pointerup', this.release, this)
+    scene.input.on('pointerupoutside', this.release, this)
 
     scene.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this)
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -208,12 +208,25 @@ export class VirtualEmojiGrid {
     })
   }
 
+  /** 松手/出画布松手共用；释放拖动态并决定是否进入惯性 */
+  private release(): void {
+    this.dragging = false
+    // 松手：速度足够则进入惯性滑动，否则立即定格并通知终态
+    if (!this.dragMoved || Math.abs(this.flingV) < 0.05) {
+      this.flingV = 0
+      this.onScrolled?.(true)
+    }
+  }
+
   private onUpdate(_time: number, delta: number): void {
+    // 兜底：手势被系统打断（touchcancel 等不发任何 up 事件）时按指针实况解除拖动
+    if (this.dragging && !this.scene.input.activePointer.isDown) this.release()
     if (this.flingV === 0 || this.dragging) return
     const next = this.scroll + this.flingV * delta
     this.scrollTo(next)
     this.flingV *= Math.exp(-delta / 320)
-    if (Math.abs(this.flingV) < 0.02 || next <= 0 || next >= this.max) {
+    // 低于每帧约 1px 就定格——指数衰减的尾巴又长又不可见，拖着只会挡点击
+    if (Math.abs(this.flingV) < 0.05 || next <= 0 || next >= this.max) {
       this.flingV = 0
       this.onScrolled?.(true)
     }

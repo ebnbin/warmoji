@@ -223,8 +223,9 @@ export class StudioScene extends Phaser.Scene {
     })
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.anatDragMoved = false
-      if (this.anatContains(p)) {
-        this.anatDragging = true
+      // 恒赋值：手势异常结束不能把拖动态卡住
+      this.anatDragging = this.anatContains(p)
+      if (this.anatDragging) {
         this.anatDragStartY = p.worldY
         this.anatDragStartScroll = this.anatScroll
       }
@@ -235,9 +236,11 @@ export class StudioScene extends Phaser.Scene {
       if (this.anatScrollMax > 0 && Math.abs(dy) > TAP_SLOP) this.anatDragMoved = true
       if (this.anatDragMoved) this.anatScrollTo(this.anatDragStartScroll + dy)
     })
-    this.input.on('pointerup', () => {
+    const releaseTree = (): void => {
       this.anatDragging = false
-    })
+    }
+    this.input.on('pointerup', releaseTree)
+    this.input.on('pointerupoutside', releaseTree)
 
     // 模板 chips 的图标走常规纹理需预载；素材网格与预览均按需异步
     const need = new Set<string>(ANIM_TEMPLATES.map((t) => t.icon))
