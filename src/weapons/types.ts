@@ -34,6 +34,12 @@ export interface WeaponContext {
   teamCenter(): { x: number; y: number }
   /** 登记一个仅本帧生效的减速区域（光环每帧重新登记），索敌时叠乘敌人移速 */
   applySlow(x: number, y: number, radius: number, factor: number): void
+  /** 给单个敌人施加限时减速（factor=0 即冻结），到时自动恢复 */
+  slowEnemy(enemy: Phaser.GameObjects.Image, factor: number, durationMs: number): void
+  /** 在地面生成灼烧区：期间内周期性烧伤区域内敌人（伤害归属出招角色） */
+  spawnBurnZone(x: number, y: number, radius: number, dps: number, durationMs: number): void
+  /** 登记一个仅本帧生效的金币吸取点（回旋镖沿途收币） */
+  attractCoins(x: number, y: number, radius: number): void
   damageMul(): number
   cooldownMul(): number
   /** 出手/爆炸等武器音效（内部已节流） */

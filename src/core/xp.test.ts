@@ -9,8 +9,8 @@ describe('xp', () => {
       expect(xpToNext(level)).toBeGreaterThan(0)
       expect(xpToNext(level + 1)).toBeGreaterThan(xpToNext(level))
     }
-    // 后期门槛显著高于前期（前快后慢的量化下限）
-    expect(xpToNext(15)).toBeGreaterThan(xpToNext(1) * 10)
+    // 后期门槛显著高于前期（前快后慢的量化下限；曲线已放缓，1.14^14 ≈ 6.3）
+    expect(xpToNext(15)).toBeGreaterThan(xpToNext(1) * 5)
   })
 
   it('校准锚点：第 1 波（15 秒短波，击杀约 15~50 经验）应到 2~3 级，不到 4 级', () => {
@@ -20,12 +20,13 @@ describe('xp', () => {
     expect(wave1High.state.level).toBeLessThanOrEqual(3)
   })
 
-  it('校准锚点：15 波总量（保底约 2600 + 击杀约 3400）应触及 18 级封顶附近', () => {
+  it('校准锚点：15 波总量（保底约 4900 + 击杀约 3400）应落在 22~28 级（点数≈满配 30 的七八成）', () => {
     let bonus = 0
     for (let w = 1; w <= 15; w++) bonus += waveBonusXp(w)
     expect(bonus).toBeGreaterThanOrEqual(2400)
     const total = gainXp({ level: 1, xp: 0 }, bonus + 3400)
-    expect(total.state.level).toBeGreaterThanOrEqual(17)
+    expect(total.state.level).toBeGreaterThanOrEqual(22)
+    expect(total.state.level).toBeLessThanOrEqual(28)
   })
 
   it('波末保底经验随波次缓涨', () => {
@@ -43,12 +44,9 @@ describe('xp', () => {
     expect(multi.state).toEqual({ level: 3, xp: 3 })
   })
 
-  it('满级封顶：到 maxLevel 停止升级并清空余量，之后不再获得经验', () => {
-    const nearCap = gainXp({ level: XP.maxLevel - 1, xp: 0 }, xpToNext(XP.maxLevel - 1) + 999)
-    expect(nearCap.levelsGained).toBe(1)
-    expect(nearCap.state).toEqual({ level: XP.maxLevel, xp: 0 })
-    const atCap = gainXp(nearCap.state, 10_000)
-    expect(atCap.levelsGained).toBe(0)
-    expect(atCap.state).toEqual({ level: XP.maxLevel, xp: 0 })
+  it('无上限：高等级照常升级（无尽模式直接复用此曲线）', () => {
+    const high = gainXp({ level: 40, xp: 0 }, xpToNext(40) + 5)
+    expect(high.levelsGained).toBe(1)
+    expect(high.state).toEqual({ level: 41, xp: 5 })
   })
 })

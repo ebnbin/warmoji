@@ -1,8 +1,9 @@
 import { XP } from './config'
 
 // 队伍经验：击杀 + 波末保底两条腿（短波杀怪少，保底占比更高）。
-// 每升 1 级 = 获得 1 个点数（core/run.ts），用于招募/升级角色，前快后慢的等比曲线
-// 校准目标（15 波制）：第 1 波结束 2~3 级，第 15 波打完约到 18 级封顶。
+// 每升 1 级 = 获得 1 个点数（core/run.ts），用于招募/升级角色，前快后慢的等比曲线。
+// 无上限：点数花不出去也继续涨（无尽模式直接复用这条曲线）。
+// 校准目标（15 波制）：第 1 波结束 2~3 级，无经验加成队长通关约 22~24 级。
 
 export interface XpState {
   level: number
@@ -19,17 +20,13 @@ export function waveBonusXp(wave: number): number {
 }
 
 export function gainXp(state: XpState, amount: number): { state: XpState; levelsGained: number } {
-  // 满级封顶：不再获得任何经验
-  if (state.level >= XP.maxLevel) return { state, levelsGained: 0 }
   let { level, xp } = state
   xp += amount
   let levelsGained = 0
-  while (xp >= xpToNext(level) && level < XP.maxLevel) {
+  while (xp >= xpToNext(level)) {
     xp -= xpToNext(level)
     level++
     levelsGained++
   }
-  // 恰好到顶时清空余量，经验条不再有意义
-  if (level >= XP.maxLevel) xp = 0
   return { state: { level, xp }, levelsGained }
 }

@@ -2,12 +2,16 @@ import type Phaser from 'phaser'
 import { circleHitIndices } from '../core/weapons'
 import type { AreaBlastSpec } from '../core/weapons'
 import { emojiImage } from '../ui/emoji'
-import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { EnemyTarget, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
-/** 远程范围轰炸：在侦测范围内以最近敌人为爆心，对爆心圆形区域内所有敌人各一次伤害 */
+/** 远程范围轰炸：在侦测范围内以最近敌人为爆心，对爆心圆形区域内所有敌人各一次伤害。
+ * 能力：burn 爆心留灼烧地面；echo 延迟向随机敌人追加一次折损轰炸 */
 export class AreaBlastWeapon implements WeaponRuntime {
   private cooldown: number
   private hidden = false
+  /** 连锁轰炸倒计时；≤0 无待发 */
+  private echoIn = 0
+  private echoDamage = 0
 
   constructor(
     private spec: AreaBlastSpec,
@@ -19,7 +23,21 @@ export class AreaBlastWeapon implements WeaponRuntime {
 
   update(delta: number, owner: WeaponOwner): void {
     this.cooldown -= delta
-    if (this.cooldown > 0 || this.hidden) return
+    if (this.hidden) return
+
+    // 连锁轰炸：主炸后向随机敌人追加
+    if (this.echoIn > 0) {
+      this.echoIn -= delta
+      if (this.echoIn <= 0) {
+        const targets = this.ctx.enemyTargets()
+        if (targets.length > 0) {
+          const t = targets[Math.floor(Math.random() * targets.length)]!
+          this.blastAt(t.x, t.y, this.echoDamage, targets)
+        }
+      }
+    }
+
+    if (this.cooldown > 0) return
     const targets = this.ctx.enemyTargets()
     if (targets.length === 0) return
 
@@ -39,12 +57,24 @@ export class AreaBlastWeapon implements WeaponRuntime {
     if (!center) return
     this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
 
-    this.ctx.sfx('boom')
     const damage = Math.round(this.spec.damage * this.ctx.damageMul())
-    for (const i of circleHitIndices(center, this.spec.blastRadius, targets)) {
-      this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, center.x, center.y)
+    this.blastAt(center.x, center.y, damage, targets)
+    if (this.spec.echo) {
+      this.echoIn = this.spec.echo.delayMs
+      this.echoDamage = Math.max(1, Math.round(damage * this.spec.echo.ratio))
     }
-    this.blastEffect(center.x, center.y)
+  }
+
+  /** 一次完整爆炸：伤害 + 特效 + 灼烧地面（能力） */
+  private blastAt(x: number, y: number, damage: number, targets: readonly EnemyTarget[]): void {
+    this.ctx.sfx('boom')
+    for (const i of circleHitIndices({ x, y }, this.spec.blastRadius, targets)) {
+      this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, x, y)
+    }
+    if (this.spec.burn) {
+      this.ctx.spawnBurnZone(x, y, this.spec.burn.radius, this.spec.burn.dps, this.spec.burn.durationMs)
+    }
+    this.blastEffect(x, y)
   }
 
   private blastEffect(x: number, y: number): void {

@@ -4,24 +4,28 @@ import { emojiImage } from '../ui/emoji'
 import { nearestAngle } from './types'
 import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
-type Phase = 'idle' | 'out' | 'back'
+/** 单枚镖的飞行状态 */
+interface Flyer {
+  image: Phaser.GameObjects.Image
+  phase: 'idle' | 'out' | 'back'
+  launchX: number
+  launchY: number
+  destX: number
+  destY: number
+  flightT: number
+  hitSet: Set<Phaser.GameObjects.Image>
+}
 
 /**
  * 回旋镖：出手瞬间锁定最远点，去程飞向该点；回程追踪角色实时位置。
  * 飞行途中碰到的敌人受伤，去程/回程各判一次（同一程内每敌最多一次）。
- * 接住后才开始计冷却。
+ * 全部接住后才开始计冷却。
+ * 能力：twin 同时向反方向掷出第二枚；coinMagnetRadius 飞行途中吸取金币。
  */
 export class BoomerangWeapon implements WeaponRuntime {
-  private image: Phaser.GameObjects.Image
+  private flyers: Flyer[]
   private cooldown: number
   private aim = 0
-  private phase: Phase = 'idle'
-  private launchX = 0
-  private launchY = 0
-  private destX = 0
-  private destY = 0
-  private flightT = 0
-  private hitSet = new Set<Phaser.GameObjects.Image>()
   private damage = 0
 
   constructor(
@@ -29,18 +33,36 @@ export class BoomerangWeapon implements WeaponRuntime {
     private ctx: WeaponContext,
     initialCooldownMs: number,
   ) {
-    this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, 'player').setDepth(13)
+    const makeFlyer = (visible: boolean): Flyer => ({
+      image: emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, 'player')
+        .setDepth(13)
+        .setVisible(visible),
+      phase: 'idle',
+      launchX: 0,
+      launchY: 0,
+      destX: 0,
+      destY: 0,
+      flightT: 0,
+      hitSet: new Set(),
+    })
+    // 主镖兼作持有物视觉；双子镖只在飞行中可见
+    this.flyers = spec.twin ? [makeFlyer(true), makeFlyer(false)] : [makeFlyer(true)]
     this.cooldown = initialCooldownMs
   }
 
+  private get idle(): boolean {
+    return this.flyers.every((f) => f.phase === 'idle')
+  }
+
   update(delta: number, owner: WeaponOwner): void {
-    if (this.phase === 'idle') {
+    if (this.idle) {
       this.cooldown -= delta
-      this.image.setPosition(
+      const main = this.flyers[0]!
+      main.image.setPosition(
         owner.x + Math.cos(this.aim) * this.spec.held.restOffset,
         owner.y + Math.sin(this.aim) * this.spec.held.restOffset,
       )
-      this.image.setRotation(this.aim + this.spec.held.rotationOffsetRad)
+      main.image.setRotation(this.aim + this.spec.held.rotationOffsetRad)
 
       if (this.cooldown > 0) return
       const aim = nearestAngle(owner, this.ctx.enemyTargets())
@@ -50,75 +72,87 @@ export class BoomerangWeapon implements WeaponRuntime {
       return
     }
 
-    // 飞行中：自旋 + 途中判伤
-    this.image.rotation += (this.spec.spinRadPerSec * delta) / 1000
-    if (this.phase === 'out') {
-      this.flightT = Math.min(1, this.flightT + delta / this.spec.outMs)
-      // 去程终点在出手瞬间已锁定
-      const ease = Math.sin((this.flightT * Math.PI) / 2)
-      this.image.setPosition(
-        this.launchX + (this.destX - this.launchX) * ease,
-        this.launchY + (this.destY - this.launchY) * ease,
+    for (const f of this.flyers) {
+      if (f.phase === 'idle') continue
+      this.updateFlyer(f, delta, owner)
+    }
+    // 全部接住 → 开始计冷却
+    if (this.idle) this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
+  }
+
+  private updateFlyer(f: Flyer, delta: number, owner: WeaponOwner): void {
+    // 自旋 + 途中判伤 + 磁力吸币（能力）
+    f.image.rotation += (this.spec.spinRadPerSec * delta) / 1000
+    if (f.phase === 'out') {
+      f.flightT = Math.min(1, f.flightT + delta / this.spec.outMs)
+      const ease = Math.sin((f.flightT * Math.PI) / 2)
+      f.image.setPosition(
+        f.launchX + (f.destX - f.launchX) * ease,
+        f.launchY + (f.destY - f.launchY) * ease,
       )
-      if (this.flightT >= 1) {
-        this.phase = 'back'
-        this.hitSet.clear()
+      if (f.flightT >= 1) {
+        f.phase = 'back'
+        f.hitSet.clear()
       }
     } else {
-      // 回程：追踪角色实时位置
-      const dx = owner.x - this.image.x
-      const dy = owner.y - this.image.y
+      const dx = owner.x - f.image.x
+      const dy = owner.y - f.image.y
       const dist = Math.hypot(dx, dy)
       const step = (this.spec.returnSpeed * delta) / 1000
       if (dist <= Math.max(step, 20)) {
-        this.phase = 'idle'
-        this.hitSet.clear()
-        this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
+        f.phase = 'idle'
+        f.hitSet.clear()
+        // 双子镖收回后隐藏，主镖回到持有物姿态
+        if (f !== this.flyers[0]) f.image.setVisible(false)
         return
       }
-      this.image.setPosition(
-        this.image.x + (dx / dist) * step,
-        this.image.y + (dy / dist) * step,
-      )
+      f.image.setPosition(f.image.x + (dx / dist) * step, f.image.y + (dy / dist) * step)
     }
-    this.hitAlongPath()
+
+    if (this.spec.coinMagnetRadius) {
+      this.ctx.attractCoins(f.image.x, f.image.y, this.spec.coinMagnetRadius)
+    }
+    for (const t of this.ctx.enemyTargets()) {
+      if (f.hitSet.has(t.ref)) continue
+      const dx = t.x - f.image.x
+      const dy = t.y - f.image.y
+      const rr = this.spec.hitRadius + t.radius
+      if (dx * dx + dy * dy <= rr * rr) {
+        f.hitSet.add(t.ref)
+        this.ctx.damageEnemy(t.ref, this.damage, this.spec.knockback, f.image.x, f.image.y)
+      }
+    }
   }
 
   private launch(owner: WeaponOwner): void {
     this.ctx.sfx('whoosh')
-    this.phase = 'out'
-    this.flightT = 0
-    this.hitSet.clear()
-    this.launchX = owner.x
-    this.launchY = owner.y
-    this.destX = owner.x + Math.cos(this.aim) * this.spec.range
-    this.destY = owner.y + Math.sin(this.aim) * this.spec.range
     this.damage = Math.round(this.spec.damage * this.ctx.damageMul())
-  }
-
-  private hitAlongPath(): void {
-    for (const t of this.ctx.enemyTargets()) {
-      if (this.hitSet.has(t.ref)) continue
-      const dx = t.x - this.image.x
-      const dy = t.y - this.image.y
-      const rr = this.spec.hitRadius + t.radius
-      if (dx * dx + dy * dy <= rr * rr) {
-        this.hitSet.add(t.ref)
-        this.ctx.damageEnemy(t.ref, this.damage, this.spec.knockback, this.image.x, this.image.y)
-      }
-    }
+    this.flyers.forEach((f, i) => {
+      // 双子镖朝正反两个方向出手
+      const angle = this.aim + i * Math.PI
+      f.phase = 'out'
+      f.flightT = 0
+      f.hitSet.clear()
+      f.launchX = owner.x
+      f.launchY = owner.y
+      f.destX = owner.x + Math.cos(angle) * this.spec.range
+      f.destY = owner.y + Math.sin(angle) * this.spec.range
+      f.image.setVisible(true).setPosition(owner.x, owner.y)
+    })
   }
 
   setVisible(on: boolean): void {
-    this.image.setVisible(on)
-    if (!on) {
-      this.phase = 'idle'
-      this.hitSet.clear()
-      this.cooldown = this.spec.cooldownMs
-    }
+    this.flyers.forEach((f, i) => {
+      f.image.setVisible(on && (i === 0 || f.phase !== 'idle'))
+      if (!on) {
+        f.phase = 'idle'
+        f.hitSet.clear()
+      }
+    })
+    if (!on) this.cooldown = this.spec.cooldownMs
   }
 
   destroy(): void {
-    this.image.destroy()
+    for (const f of this.flyers) f.image.destroy()
   }
 }

@@ -4,12 +4,16 @@ import type { LaserSpec } from '../core/weapons'
 import { emojiImage } from '../ui/emoji'
 import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
-/** 贯穿激光：向最近的敌人方向发射光束，线段胶囊判定命中直线上的所有敌人 */
+/** 贯穿激光：向最近的敌人方向发射光束，线段胶囊判定命中直线上的所有敌人。
+ * 能力：backBeam 向正后方补一道；radial 出手变为绕一周的多向序列扫射（取代单束） */
 export class LaserWeapon implements WeaponRuntime {
   private image: Phaser.GameObjects.Image
   private cooldown: number
   private aim = 0
   private hidden = false
+  /** 全域扫射的待发队列（内部时钟驱动，随角色死亡自然暂停） */
+  private radialQueue: { angle: number; at: number }[] = []
+  private clock = 0
 
   constructor(
     private spec: LaserSpec,
@@ -22,12 +26,24 @@ export class LaserWeapon implements WeaponRuntime {
 
   update(delta: number, owner: WeaponOwner): void {
     this.cooldown -= delta
+    this.clock += delta
     const held = this.spec.held
     this.image.setPosition(
       owner.x + Math.cos(this.aim) * held.restOffset,
       owner.y + Math.sin(this.aim) * held.restOffset,
     )
     this.image.setRotation(this.aim + held.rotationOffsetRad)
+
+    // 全域扫射：按时序逐束兑现（跟随角色实时位置）
+    if (this.radialQueue.length > 0 && !this.hidden) {
+      const ratio = this.spec.radial?.ratio ?? 1
+      while (this.radialQueue.length > 0 && this.radialQueue[0]!.at <= this.clock) {
+        const shot = this.radialQueue.shift()!
+        this.aim = shot.angle
+        this.fireBeam(owner, shot.angle, ratio)
+      }
+      return
+    }
 
     if (this.cooldown > 0 || this.hidden) return
     const targets = this.ctx.enemyTargets()
@@ -47,13 +63,30 @@ export class LaserWeapon implements WeaponRuntime {
     this.aim = aim
     this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
 
+    if (this.spec.radial) {
+      // 出手变为绕一周的序列扫射：从瞄准角起步，逐束旋转铺满 360°
+      const { beams, stepMs } = this.spec.radial
+      for (let k = 0; k < beams; k++) {
+        this.radialQueue.push({ angle: aim + (k * 2 * Math.PI) / beams, at: this.clock + k * stepMs })
+      }
+      return
+    }
+
+    this.fireBeam(owner, aim, 1)
+    // 双联光束：正后方补一道
+    if (this.spec.backBeam) this.fireBeam(owner, aim + Math.PI, 1)
+  }
+
+  /** 发射一束：胶囊判定 + 特效（ratio 折损用于扫射分束） */
+  private fireBeam(owner: WeaponOwner, angle: number, ratio: number): void {
     this.ctx.sfx('zap')
-    const damage = Math.round(this.spec.damage * this.ctx.damageMul())
+    const damage = Math.max(1, Math.round(this.spec.damage * this.ctx.damageMul() * ratio))
     const origin = { x: owner.x, y: owner.y }
-    for (const i of thrustHitIndices(origin, aim, this.spec.range, this.spec.beamRadius, targets)) {
+    const targets = this.ctx.enemyTargets()
+    for (const i of thrustHitIndices(origin, angle, this.spec.range, this.spec.beamRadius, targets)) {
       this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, origin.x, origin.y)
     }
-    this.beamEffect(origin.x, origin.y, aim)
+    this.beamEffect(origin.x, origin.y, angle)
   }
 
   private beamEffect(x: number, y: number, angle: number): void {
@@ -83,6 +116,7 @@ export class LaserWeapon implements WeaponRuntime {
   setVisible(on: boolean): void {
     this.hidden = !on
     this.image.setVisible(on)
+    if (!on) this.radialQueue.length = 0
   }
 
   destroy(): void {

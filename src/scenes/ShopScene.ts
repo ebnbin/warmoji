@@ -356,6 +356,7 @@ export class ShopScene extends Phaser.Scene {
 
   private slotMaxHp(slot: number): number {
     return memberMaxHp(
+      this.lineup[slot]!,
       this.run.memberLevels[slot] ?? 1,
       aggregateCharacterEffects(this.run.memberItems[slot] ?? []).hpAdd,
     )
@@ -495,7 +496,7 @@ export class ShopScene extends Phaser.Scene {
 
     const groups = isCaptain
       ? captainStatGroups(CAPTAINS[this.captainId], owned)
-      : characterStatGroups(CHARACTERS[this.focusedId as CharacterId], owned, level)
+      : characterStatGroups(this.focusedId as CharacterId, owned, level)
     for (const group of groups) {
       statObjs.push(
         emojiImage(this, dx + 42, cursor, group.icon, 26),

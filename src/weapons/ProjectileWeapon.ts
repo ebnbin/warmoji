@@ -4,11 +4,13 @@ import { emojiImage } from '../ui/emoji'
 import { nearestAngle } from './types'
 import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
-/** 发射型：held 时持有物定身指向目标（可带左右手挂载位）；无 held 时角色本体出弹 */
+/** 发射型：held 时持有物定身指向目标（可带左右手挂载位）；无 held 时角色本体出弹。
+ * 能力：volley 恒定齐射；everyN 每第 n 次出手改为特殊齐射（左轮风暴） */
 export class ProjectileWeapon implements WeaponRuntime {
   private image?: Phaser.GameObjects.Image
   private cooldown: number
   private aim = 0
+  private shots = 0
 
   constructor(
     private spec: ProjectileSpec,
@@ -51,6 +53,18 @@ export class ProjectileWeapon implements WeaponRuntime {
 
     const damage = Math.round(this.spec.damage * this.ctx.damageMul())
     const from = this.muzzle(owner)
+    this.shots++
+    const special = this.spec.everyN && this.shots % this.spec.everyN.n === 0
+    const volley = special
+      ? { count: this.spec.everyN!.count, spreadRad: this.spec.everyN!.spreadRad }
+      : this.spec.volley
+    if (volley && volley.count > 1) {
+      for (let i = 0; i < volley.count; i++) {
+        const angle = this.aim + volley.spreadRad * (i / (volley.count - 1) - 0.5)
+        this.ctx.spawnProjectile(from.x, from.y, angle, this.spec, damage)
+      }
+      return
+    }
     this.ctx.spawnProjectile(from.x, from.y, this.aim, this.spec, damage)
   }
 

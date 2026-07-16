@@ -32,6 +32,16 @@ export interface ThrustSpec {
   /** 无持有物时角色本体前冲的距离 */
   readonly lungeDist: number
   readonly held?: HeldVisual
+  // ── 能力字段（core/abilities.ts 按角色等级注入） ──
+  /** 二连突：出手后隔 delayMs 重新索敌再刺一段 */
+  readonly combo?: { readonly delayMs: number }
+  /** 枪尖震波：突刺终点圆形爆发（ratio × 伤害 + 强击退） */
+  readonly tipBurst?: {
+    readonly radius: number
+    readonly ratio: number
+    readonly knockback: number
+    readonly color: number
+  }
 }
 
 export interface ProjectileSpec {
@@ -49,6 +59,15 @@ export interface ProjectileSpec {
     readonly speed: number
     readonly rotationOffsetRad: number
   }
+  // ── 能力字段 ──
+  /** 齐射：每次出手发射 count 枚，扇形均匀散开 spreadRad */
+  readonly volley?: { readonly count: number; readonly spreadRad: number }
+  /** 每第 n 次出手改为一轮特殊齐射 */
+  readonly everyN?: { readonly n: number; readonly count: number; readonly spreadRad: number }
+  /** 贯穿：命中后继续飞行，可再命中的额外敌人数 */
+  readonly pierce?: number
+  /** 溅射：命中点圆形爆裂（ratio × 伤害） */
+  readonly splash?: { readonly radius: number; readonly ratio: number }
 }
 
 export interface SweepSpec {
@@ -63,6 +82,9 @@ export interface SweepSpec {
   readonly arcRad: number
   readonly sweepMs: number
   readonly held: HeldVisual
+  // ── 能力字段 ──
+  /** 命中减速：被扫中的敌人临时减速 */
+  readonly slowOnHit?: { readonly factor: number; readonly durationMs: number }
 }
 
 export interface AreaBlastSpec {
@@ -78,6 +100,11 @@ export interface AreaBlastSpec {
   readonly blastRadius: number
   /** 特效环颜色 */
   readonly color: number
+  // ── 能力字段 ──
+  /** 灼烧地面：爆心留下持续伤害区域 */
+  readonly burn?: { readonly radius: number; readonly dps: number; readonly durationMs: number }
+  /** 连锁：延迟 delayMs 后向随机敌人追加一次 ratio × 伤害的轰炸 */
+  readonly echo?: { readonly delayMs: number; readonly ratio: number }
 }
 
 export interface BoomerangSpec {
@@ -96,6 +123,11 @@ export interface BoomerangSpec {
   readonly hitRadius: number
   readonly spinRadPerSec: number
   readonly held: HeldVisual
+  // ── 能力字段 ──
+  /** 双镖：同时向反方向掷出第二枚 */
+  readonly twin?: boolean
+  /** 磁力：飞行途中吸取半径内金币 */
+  readonly coinMagnetRadius?: number
 }
 
 export interface LaserSpec {
@@ -110,6 +142,11 @@ export interface LaserSpec {
   readonly beamRadius: number
   readonly color: number
   readonly held: HeldVisual
+  // ── 能力字段 ──
+  /** 双联：向正后方同步射出第二道光束 */
+  readonly backBeam?: boolean
+  /** 全域扫射：出手变为绕一周的多向序列光束（每束 ratio × 伤害），取代常规单束 */
+  readonly radial?: { readonly beams: number; readonly ratio: number; readonly stepMs: number }
 }
 
 export interface SlowAuraSpec {
@@ -121,6 +158,11 @@ export interface SlowAuraSpec {
   /** 敌人移速乘数 */
   readonly slowFactor: number
   readonly color: number
+  // ── 能力字段 ──
+  /** 冻伤：光环内敌人持续掉血（每秒） */
+  readonly dps?: number
+  /** 冰冻脉冲：每 intervalMs 冻结（移速归零）光环内敌人 durationMs */
+  readonly freeze?: { readonly intervalMs: number; readonly durationMs: number }
 }
 
 export type WeaponSpec =

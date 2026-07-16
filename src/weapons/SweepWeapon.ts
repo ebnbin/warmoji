@@ -47,6 +47,10 @@ export class SweepWeapon implements WeaponRuntime {
       targets,
     )) {
       this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, owner.x, owner.y)
+      // 震慑余波：被扫中的敌人限时减速
+      if (this.spec.slowOnHit) {
+        this.ctx.slowEnemy(targets[i]!.ref, this.spec.slowOnHit.factor, this.spec.slowOnHit.durationMs)
+      }
     }
 
     this.tween?.remove()

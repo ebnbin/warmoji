@@ -1,7 +1,9 @@
 import Phaser from 'phaser'
+import { ABILITIES } from '../core/abilities'
 import type { CharacterId } from '../core/config'
 import { CAPTAINS, CHARACTERS, LEVELS } from '../core/config'
 import { formationPosts } from '../core/formation'
+import { nextLevelKind, statUpgradeLabel } from '../core/levels'
 import type { ItemId } from '../core/items'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
@@ -590,7 +592,7 @@ export class PromoteScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5),
     )
-    this.renderStatGroups(spec, items, level, res)
+    this.renderStatGroups(center, items, level, res)
   }
 
   // ── 详情（招募/升级模式） ───────────────────────────────────
@@ -610,6 +612,20 @@ export class PromoteScene extends Phaser.Scene {
     const level = isRecruit ? 1 : (this.run.memberLevels[slot] ?? 1)
     const items = isRecruit ? [] : (this.run.memberItems[slot] ?? [])
 
+    // 升级预览：3/6 级是能力质变（紫金高亮），2/4/5 级是维度数值
+    let subtitle: string = spec.desc
+    let subtitleColor = '#b9b9c6'
+    if (!isRecruit) {
+      const next = level + 1
+      if (nextLevelKind(level) === 'ability') {
+        const ability = ABILITIES[id][next === 3 ? 0 : 1]!
+        subtitle = `✨ 解锁能力「${ability.name}」：${ability.desc}`
+        subtitleColor = '#ce93d8'
+      } else {
+        subtitle = `数值升级：${statUpgradeLabel(id, next)}`
+        subtitleColor = '#9ccc9c'
+      }
+    }
     this.detailObjs.push(
       emojiImage(this, dx + 58, dy + 56, spec.emoji, 64, 'player'),
       this.add
@@ -622,30 +638,25 @@ export class PromoteScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5),
       this.add
-        .text(dx + 104, dy + 80, isRecruit ? spec.desc : '升级提升伤害与生命上限', {
+        .text(dx + 104, dy + 80, subtitle, {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
-          color: '#b9b9c6',
+          color: subtitleColor,
           wordWrap: { width: D.w - 130 },
           resolution: res,
         })
         .setOrigin(0, 0.5),
     )
-    this.renderStatGroups(spec, items, level, res)
+    this.renderStatGroups(id, items, level, res)
   }
 
   /** 属性组列表（招募/升级/阵型详情共用） */
-  private renderStatGroups(
-    spec: (typeof CHARACTERS)[CharacterId],
-    items: ItemId[],
-    level: number,
-    res: number,
-  ): void {
+  private renderStatGroups(id: CharacterId, items: ItemId[], level: number, res: number): void {
     const D = this.layout.detail
     const dx = this.origin.x + D.x
     const dy = this.origin.y + D.y
     let cursor = dy + 128
-    for (const group of characterStatGroups(spec, items, level)) {
+    for (const group of characterStatGroups(id, items, level)) {
       this.detailObjs.push(
         emojiImage(this, dx + 42, cursor, group.icon, 26),
         this.add

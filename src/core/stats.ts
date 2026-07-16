@@ -1,8 +1,9 @@
-import type { CaptainSpec, CharacterSpec } from './config'
-import { COIN, KNOCKBACK, LEVELS, MEMBER, TEAM, UNIT } from './config'
+import { ABILITIES, ABILITY_LEVELS, applyAbilities } from './abilities'
+import type { CaptainSpec, CharacterId } from './config'
+import { CHARACTERS, COIN, KNOCKBACK, LEVELS, MEMBER, TEAM, UNIT } from './config'
 import { aggregateCharacterEffects, aggregateTeamEffects, resolveWeaponSpec } from './items'
 import type { ItemId } from './items'
-import { levelDamageMul, memberMaxHp } from './levels'
+import { levelEffects, memberMaxHp } from './levels'
 import type { WeaponSpec } from './weapons'
 
 // 角色属性面板的展示模型：把异构的角色/武器参数组织成统一的「属性组」。
@@ -59,16 +60,20 @@ export function weaponStatLines(w: WeaponSpec): string[] {
   }
 }
 
-/** 角色面板：数值为 等级 × 道具 修正后的生效值（伤害/冷却在展示层套倍率） */
+/** 角色面板：数值为 等级维度 × 道具 修正后的生效值（伤害/冷却在展示层套倍率），
+ * 武器行数取「能力注入后」的生效 spec（如全周横扫的 360° 弧宽）+ 特殊能力组 */
 export function characterStatGroups(
-  spec: CharacterSpec,
+  id: CharacterId,
   items: readonly ItemId[] = [],
   level = 1,
 ): StatGroup[] {
+  const spec = CHARACTERS[id]
   const fx = aggregateCharacterEffects(items)
-  const dmgMul = fx.damageMul * levelDamageMul(level)
+  const lvl = levelEffects(id, level)
+  const dmgMul = fx.damageMul * lvl.damageMul
+  const cdMul = fx.cooldownMul * lvl.cooldownMul
   const baseLines = [
-    `生命上限 ${memberMaxHp(level, fx.hpAdd)} · 受击无敌 ${sec(MEMBER.iframesMs + fx.iframesAddMs)}`,
+    `生命上限 ${memberMaxHp(id, level, fx.hpAdd)} · 受击无敌 ${sec(MEMBER.iframesMs + fx.iframesAddMs)}`,
     `复活 ${sec(Math.max(1000, TEAM.reviveMs + fx.reviveAddMs))}`,
   ]
   // 稀有道具带来的触发式属性：有才显示，避免面板常年一排 0
@@ -82,15 +87,24 @@ export function characterStatGroups(
       title: level > 1 ? `基础（Lv.${level}）` : '基础',
       lines: baseLines,
     },
-    ...spec.weapons.map((w) => {
-      const resolved = resolveWeaponSpec(w, fx)
+    {
+      icon: '⭐',
+      title: '特殊能力',
+      lines: ABILITIES[id].map((a, i) => {
+        const lv = ABILITY_LEVELS[i]!
+        const locked = level < lv
+        return `${a.icon} Lv.${lv}「${a.name}」${a.desc}${locked ? '（未解锁）' : ''}`
+      }),
+    },
+    ...applyAbilities(id, level, spec.weapons).map((w) => {
+      const resolved = resolveWeaponSpec(w, { ...fx, rangeMul: fx.rangeMul * lvl.rangeMul })
       const display =
         resolved.kind === 'slowAura'
           ? resolved
           : {
               ...resolved,
               damage: Math.round(resolved.damage * dmgMul),
-              cooldownMs: resolved.cooldownMs * fx.cooldownMul,
+              cooldownMs: resolved.cooldownMs * cdMul,
               knockback: resolved.knockback * fx.knockbackMul,
             }
       return {

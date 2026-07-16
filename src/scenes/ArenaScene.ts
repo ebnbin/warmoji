@@ -1,10 +1,11 @@
 import Phaser from 'phaser'
 import { BOSS, CAPTAINS, CHARACTERS, COIN, ELITE, FOLLOW, HIT_SHAKE, KNOCKBACK, MAP, MEMBER, ORBIT, ROSTER_IDS, SPAWN, STRESS, SURGE, TEAM, UNIT, WANDER, WAVE } from '../core/config'
-import type { CharacterSpec, ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../core/config'
+import type { CharacterId, CharacterSpec, ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../core/config'
+import { applyAbilities } from '../core/abilities'
 import { enemyMixAt, fleeSteer, pickEnemy } from '../core/enemies'
 import type { EnemyMixEntry } from '../core/enemies'
-import { sweepFirstHitIndex } from '../core/weapons'
-import type { ProjectileSpec, WeaponSpec } from '../core/weapons'
+import { circleHitIndices, sweepFirstHitIndex } from '../core/weapons'
+import type { ProjectileSpec } from '../core/weapons'
 import { formationPosts, ringPostAngle } from '../core/formation'
 import type { FormationId } from '../core/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../core/orbit'
@@ -17,7 +18,7 @@ import {
   resolveWeaponSpec,
 } from '../core/items'
 import type { TeamEffects } from '../core/items'
-import { levelDamageMul, memberMaxHp } from '../core/levels'
+import { levelEffects, memberMaxHp } from '../core/levels'
 import { currentFormation, getRun, guardOrder, isTeamFull, promoteStep, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { DEFAULT_SETTINGS, loadSettings } from '../core/settings'
@@ -148,6 +149,19 @@ export class ArenaScene extends Phaser.Scene {
   private enemyMix: EnemyMixEntry[] = []
   private frameTargets: EnemyTarget[] = []
   private frameSlowZones: { x: number; y: number; r2: number; factor: number }[] = []
+  /** 仅本帧生效的金币吸取点（磁力回旋镖沿途登记） */
+  private frameAttractors: { x: number; y: number; r2: number }[] = []
+  /** 灼烧地面（余烬秘火）：周期烧伤区域内敌人，伤害归属 srcSlot */
+  private burnZones: {
+    x: number
+    y: number
+    r2: number
+    until: number
+    tickDamage: number
+    nextTickAt: number
+    srcSlot: number
+    gfx: Phaser.GameObjects.Graphics
+  }[] = []
   private weaponCtx: WeaponContext = {
     scene: this,
     enemyTargets: () => this.frameTargets,
@@ -156,6 +170,12 @@ export class ArenaScene extends Phaser.Scene {
     teamCenter: () => this.center,
     applySlow: (x, y, radius, factor) =>
       this.frameSlowZones.push({ x, y, r2: radius * radius, factor }),
+    slowEnemy: (enemy, factor, durationMs) => {
+      enemy.setData('abilitySlowMul', factor)
+      enemy.setData('abilitySlowUntil', this.elapsedMs + durationMs)
+    },
+    spawnBurnZone: (x, y, radius, dps, durationMs) => this.spawnBurnZone(x, y, radius, dps, durationMs),
+    attractCoins: (x, y, radius) => this.frameAttractors.push({ x, y, r2: radius * radius }),
     damageMul: () => this.stats.damageMul,
     cooldownMul: () => this.stats.cooldownMul,
     sfx: (id) => playSfx(id),
@@ -265,6 +285,9 @@ export class ArenaScene extends Phaser.Scene {
     this.pendingSpawns = 0
     this.over = false
     this.poisonPools = []
+    // 场景 restart 已销毁全部显示对象，这里只需重置引用
+    this.burnZones = []
+    this.frameAttractors = []
 
     this.physics.world.setBounds(0, 0, MAP.width, MAP.height)
     this.drawFloor()
@@ -293,7 +316,7 @@ export class ArenaScene extends Phaser.Scene {
     this.waveBaseKills = this.run.kills
     this.waveBaseCoins = this.run.coins
     this.waveBaseLevel = this.run.xp.level
-    this.members = this.lineup.map((spec, slot) => this.createMember(spec.emoji, spec.weapons, slot))
+    this.members = rosterIds.map((id, slot) => this.createMember(id, slot))
 
     const cam = this.cameras.main
     cam.setZoom(viewport.renderScale)
@@ -388,6 +411,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.frameSlowZones.length = 0
+    this.frameAttractors.length = 0
     this.frameTargets = (this.enemies.getChildren() as ImageObj[])
       .filter((e) => e.active)
       .map((e) => ({ x: e.x, y: e.y, radius: (e.getData('spec') as EnemySpec).radius, ref: e }))
@@ -398,6 +422,7 @@ export class ArenaScene extends Phaser.Scene {
     this.steerEnemies(delta)
     this.updateEnemyShots()
     this.updatePoisonPools()
+    this.updateBurnZones()
     this.magnetCoins()
     this.sweepProjectiles(delta)
     this.cullProjectiles()
@@ -477,7 +502,9 @@ export class ArenaScene extends Phaser.Scene {
     return formationPosts(this.activeFormation(), this.lineup.length, this.orbitPhase)
   }
 
-  private createMember(emoji: string, weaponSpecs: readonly WeaponSpec[], slot: number): Member {
+  private createMember(id: CharacterId, slot: number): Member {
+    const spec = CHARACTERS[id]
+    const emoji = spec.emoji
     const post = this.postBySlot[slot] ?? slot
     const off = this.currentPosts()[post] ?? { x: 0, y: 0 }
     const image = emojiImage(
@@ -509,14 +536,15 @@ export class ArenaScene extends Phaser.Scene {
         visualOffset.y = dy
       },
     }
-    // 等级 × 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效武器参数
+    // 等级维度 × 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效武器参数
     const level = this.stress ? 1 : (this.run.memberLevels[slot] ?? 1)
-    const lvlDmg = levelDamageMul(level)
+    const lvlFx = levelEffects(id, level)
     const fx = aggregateCharacterEffects(this.run.memberItems[slot] ?? [])
     const memberCtx: WeaponContext = {
       ...this.weaponCtx,
-      damageMul: () => this.stats.damageMul * fx.damageMul * lvlDmg * this.teamFx.teamDamageMul,
-      cooldownMul: () => this.stats.cooldownMul * fx.cooldownMul,
+      damageMul: () =>
+        this.stats.damageMul * fx.damageMul * lvlFx.damageMul * this.teamFx.teamDamageMul,
+      cooldownMul: () => this.stats.cooldownMul * fx.cooldownMul * lvlFx.cooldownMul,
       // 伤害/子弹带上来源槽位：结算页按角色统计输出与击杀。
       // 暴击/击退倍率在这里收口：所有武器伤害路径统一生效，无需逐武器改造
       damageEnemy: (e, d, kb, sx, sy) => {
@@ -531,17 +559,24 @@ export class ArenaScene extends Phaser.Scene {
           crit,
         )
       },
-      spawnProjectile: (x, y, angle, spec, damage) =>
-        this.spawnProjectile(x, y, angle, spec, damage, slot),
+      spawnProjectile: (x, y, angle, pSpec, damage) =>
+        this.spawnProjectile(x, y, angle, pSpec, damage, slot),
+      spawnBurnZone: (x, y, radius, dps, durationMs) =>
+        this.spawnBurnZone(x, y, radius, dps, durationMs, slot),
     }
-    const maxHp = this.stress ? this.stats.maxHp : memberMaxHp(level, fx.hpAdd)
+    const maxHp = this.stress ? this.stats.maxHp : memberMaxHp(id, level, fx.hpAdd)
     const member: Member = {
       emoji,
       slot,
       image,
-      // 错开初始冷却，避免全队同帧齐射
-      weapons: weaponSpecs.map((w, i) =>
-        createWeapon(resolveWeaponSpec(w, fx), memberCtx, 300 + slot * 120 + i * 230),
+      // 错开初始冷却，避免全队同帧齐射。
+      // 生效武器 = 原始配装 → 能力注入（3/6 级质变）→ 空间参数按 道具×等级维度 缩放
+      weapons: applyAbilities(id, level, spec.weapons).map((w, i) =>
+        createWeapon(
+          resolveWeaponSpec(w, { ...fx, rangeMul: fx.rangeMul * lvlFx.rangeMul }),
+          memberCtx,
+          300 + slot * 120 + i * 230,
+        ),
       ),
       handle,
       visualOffset,
@@ -865,31 +900,75 @@ export class ArenaScene extends Phaser.Scene {
     p.setData('kb', spec.knockback)
     p.setData('px', x)
     p.setData('py', y)
+    // 能力字段：贯穿余量 + 溅射参数（sweepProjectiles 消费）
+    if (spec.pierce) p.setData('pierce', spec.pierce)
+    if (spec.splash) p.setData('splash', spec.splash)
     // 对称投掷物（无指向修正角）飞行中自旋；有指向的（飞刀类）保持箭头朝向
     p.setData('spin', spec.projectile.rotationOffsetRad === 0 ? 9 : 0)
     this.projectiles.add(p)
   }
 
-  /** 逐帧对每颗子弹做上一帧位置 → 当前位置的线段扫掠命中 */
+  /** 逐帧对每颗子弹做上一帧位置 → 当前位置的线段扫掠命中。
+   * 能力：pierce 命中后不销毁继续飞（跳过已命中敌人）；splash 命中点溅射 */
   private sweepProjectiles(delta: number): void {
     for (const p of this.projectiles.getChildren() as ImageObj[]) {
       if (!p.active) continue
       const prev = { x: p.getData('px') as number, y: p.getData('py') as number }
-      const hit = sweepFirstHitIndex(prev, { x: p.x, y: p.y }, p.getData('radius') as number, this.frameTargets)
+      // 贯穿弹跳过已命中的敌人（否则下一帧会再撞同一个）
+      const hitRefs = p.getData('hitRefs') as Set<ImageObj> | undefined
+      const targets = hitRefs ? this.frameTargets.filter((t) => !hitRefs.has(t.ref as ImageObj)) : this.frameTargets
+      const hit = sweepFirstHitIndex(prev, { x: p.x, y: p.y }, p.getData('radius') as number, targets)
       if (hit >= 0) {
+        const target = targets[hit]!
         const damage = p.getData('damage') as number
         const kb = p.getData('kb') as number
         const srcSlot = (p.getData('srcSlot') as number) ?? -1
-        p.destroy()
+        // 爆浆溅射：命中点小圈内其余敌人吃折损伤害
+        const splash = p.getData('splash') as { radius: number; ratio: number } | undefined
+        if (splash) {
+          const splashDamage = Math.max(1, Math.round(damage * splash.ratio))
+          for (const i of circleHitIndices({ x: target.x, y: target.y }, splash.radius, this.frameTargets)) {
+            const other = this.frameTargets[i]!
+            if (other.ref === target.ref) continue
+            this.applyDamage(other.ref as ImageObj, splashDamage, 0, undefined, undefined, srcSlot)
+          }
+          this.splashEffect(target.x, target.y, splash.radius)
+        }
+        const pierceLeft = (p.getData('pierce') as number | undefined) ?? 0
+        if (pierceLeft > 0) {
+          p.setData('pierce', pierceLeft - 1)
+          const set = hitRefs ?? new Set<ImageObj>()
+          set.add(target.ref as ImageObj)
+          p.setData('hitRefs', set)
+        } else {
+          p.destroy()
+        }
         // 击退源取上一帧位置：方向即子弹飞行方向
-        this.applyDamage(this.frameTargets[hit]!.ref as ImageObj, damage, kb, prev.x, prev.y, srcSlot)
-        continue
+        this.applyDamage(target.ref as ImageObj, damage, kb, prev.x, prev.y, srcSlot)
+        if (!p.active) continue
       }
       const spin = p.getData('spin') as number
       if (spin > 0) p.rotation += (spin * delta) / 1000
       p.setData('px', p.x)
       p.setData('py', p.y)
     }
+  }
+
+  /** 爆浆番茄的溅射视觉：小号红色冲击环 */
+  private splashEffect(x: number, y: number, radius: number): void {
+    const ring = this.add
+      .circle(x, y, radius, 0xef5350, 0.25)
+      .setStrokeStyle(3, 0xef5350, 0.8)
+      .setDepth(7)
+      .setScale(0.3)
+    this.tweens.add({
+      targets: ring,
+      scale: 1,
+      alpha: 0,
+      duration: 220,
+      ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    })
   }
 
   private cullProjectiles(): void {
@@ -1300,6 +1379,11 @@ export class ArenaScene extends Phaser.Scene {
       if (slowed) e.setTint(0xa5d8ff)
       else e.clearTint()
     }
+    // 能力施加的限时减速/冻结（震慑余波、凛冬降临）：到时自动失效
+    const abilityUntil = e.getData('abilitySlowUntil') as number | undefined
+    if (abilityUntil !== undefined && this.elapsedMs < abilityUntil) {
+      factor *= (e.getData('abilitySlowMul') as number) ?? 1
+    }
     // 时之沙的全局减速与精英加速同为「体质」倍率，不参与光环减速的染色判定
     return factor * ((e.getData('spMul') as number | undefined) ?? 1) * this.teamFx.enemySlowMul
   }
@@ -1601,6 +1685,59 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
+  /** 灼烧地面（余烬秘火）：橙红圈，期间周期烧伤区域内敌人，伤害归属出招角色 */
+  private spawnBurnZone(
+    x: number,
+    y: number,
+    radius: number,
+    dps: number,
+    durationMs: number,
+    srcSlot = -1,
+  ): void {
+    const gfx = this.add.graphics().setDepth(2)
+    gfx.fillStyle(0xff7043, 0.18)
+    gfx.fillCircle(0, 0, radius)
+    gfx.lineStyle(2, 0xff7043, 0.55)
+    gfx.strokeCircle(0, 0, radius)
+    gfx.setPosition(x, y)
+    gfx.setScale(0.3)
+    this.tweens.add({ targets: gfx, scale: 1, duration: 200, ease: 'Back.easeOut' })
+    const tickMs = 400
+    this.burnZones.push({
+      x,
+      y,
+      r2: radius * radius,
+      until: this.elapsedMs + durationMs,
+      tickDamage: Math.max(1, Math.round((dps * tickMs) / 1000)),
+      nextTickAt: this.elapsedMs + tickMs,
+      srcSlot,
+      gfx,
+    })
+  }
+
+  private updateBurnZones(): void {
+    if (this.burnZones.length === 0) return
+    const now = this.elapsedMs
+    this.burnZones = this.burnZones.filter((z) => {
+      if (now >= z.until) {
+        this.tweens.add({ targets: z.gfx, alpha: 0, duration: 250, onComplete: () => z.gfx.destroy() })
+        return false
+      }
+      return true
+    })
+    for (const z of this.burnZones) {
+      if (now < z.nextTickAt) continue
+      z.nextTickAt = now + 400
+      for (const t of this.frameTargets) {
+        const dx = t.x - z.x
+        const dy = t.y - z.y
+        if (dx * dx + dy * dy <= z.r2) {
+          this.applyDamage(t.ref as ImageObj, z.tickDamage, 0, undefined, undefined, z.srcSlot)
+        }
+      }
+    }
+  }
+
   // ── 金币 ────────────────────────────────────────────────────
 
   private spawnCoins(x: number, y: number, count: number): void {
@@ -1627,12 +1764,26 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private magnetCoins(): void {
-    // 金币拾取是团队能力：以队伍中心为基点磁吸并入账（成员碰到也能捡，见 overlap）
+    // 金币拾取是团队能力：以队伍中心为基点磁吸并入账（成员碰到也能捡，见 overlap）。
+    // 磁力回旋镖（frameAttractors）优先：镖旁的金币直接入账，省去飞回中心的路程
     const magnetRadius = COIN.magnetRadius * this.teamFx.magnetMul
     const r2 = magnetRadius * magnetRadius
     const collect2 = COIN.collectRadius * COIN.collectRadius
     for (const c of this.coins.getChildren() as ImageObj[]) {
       if (!c.active) continue
+      if (this.frameAttractors.length > 0) {
+        let taken = false
+        for (const a of this.frameAttractors) {
+          const ax = a.x - c.x
+          const ay = a.y - c.y
+          if (ax * ax + ay * ay <= a.r2) {
+            this.collectCoin(c)
+            taken = true
+            break
+          }
+        }
+        if (taken) continue
+      }
       const dx = this.center.x - c.x
       const dy = this.center.y - c.y
       const d = dx * dx + dy * dy

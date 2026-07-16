@@ -1,5 +1,5 @@
-import type { EnemySpec } from './config'
-import { CAPTAINS, CHARACTERS, COIN, ENEMY_SPECS, UNIT, WEAPONS } from './config'
+import type { CharacterId, EnemySpec } from './config'
+import { CAPTAINS, CHARACTERS, COIN, ENEMY_SPECS, LEVELS, UNIT, WEAPONS } from './config'
 import { ITEMS, RARITIES } from './items'
 import type { ItemSpec } from './items'
 import { captainStatGroups, characterStatGroups, WEAPON_KIND_LABEL, weaponStatLines } from './stats'
@@ -58,11 +58,12 @@ export function wikiGroups(): WikiGroup[] {
     {
       icon: '🤹',
       title: '角色',
-      entries: Object.values(CHARACTERS).map((c) => ({
-        emoji: c.emoji,
-        name: c.name,
-        desc: c.desc,
-        lines: flatten(characterStatGroups(c)),
+      // 图鉴按满级视角展示：能力全解锁、维度数值拉满
+      entries: (Object.keys(CHARACTERS) as CharacterId[]).map((id) => ({
+        emoji: CHARACTERS[id].emoji,
+        name: CHARACTERS[id].name,
+        desc: CHARACTERS[id].desc,
+        lines: flatten(characterStatGroups(id, [], LEVELS.max)),
       })),
     },
     {

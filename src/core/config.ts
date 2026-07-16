@@ -733,23 +733,21 @@ export const STRESS = {
 } as const
 
 // 经验：等比升级曲线（前快后慢），点数经济见 core/run.ts。
-// 校准依据自动游玩实测：第 1 波结束 2~3 级，通关（15 波）约到满级 18
+// 经验/等级无上限（点数花不出去也继续涨，作容错溢出）；曲线放缓换更高点数产出。
+// 满配需求 = 5 人 × 6 级 = 30 点；校准目标：无经验加成队长 15 波约 22~24 点，
+// 快队长可摸满、慢队长 ~18，保留「点数不够、必须取舍」的决策
 export const XP = {
-  base: 35,
-  growth: 1.25,
+  base: 45,
+  growth: 1.14,
   /** 波末保底经验 = base + perWave×波次：15 波制下是经验主梁之一，
-   * 保证前几波（15 秒短波杀怪少）每波也能升级、第 15 波打完约到满级。
-   * 自动游玩实测：45+16w 至 14 波末 15 级、50+26w 至 16 级 → 抬斜率降截距
-   * （第 1 波保底 76 不变守住"首波 2~3 级"锚点，中后期累计 +1050，
-   * 通关局可摸到 18 封顶，Boss 波阵亡局约 17） */
+   * 保证前几波（15 秒短波杀怪少）每波也能升级 */
   waveBonusBase: 40,
   waveBonusPerWave: 36,
-  /** 队伍等级上限：到顶后不再获得经验（点数总量因此固定为 maxLevel-1） */
-  maxLevel: 18,
 } as const
 
-// 角色等级（点数升级）：v1 数值脊柱，满级 6
-export const LEVELS = { max: 6, damagePerLevel: 0.12, hpPerLevel: 0.1 } as const
+// 角色等级：1 拥有 · 2/4/5 维度数值（core/levels.ts）· 3/6 特殊能力
+// （core/abilities.ts）。普通模式满级 6；无尽模式后续放开 7+（纯数值）
+export const LEVELS = { max: 6 } as const
 
 // 商店：每个上架位可付费重新随机（队长可提供免费次数）
 export const SHOP = { refreshPrice: 2 } as const
@@ -813,6 +811,8 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '🚧',
   ...SETTING_DEFS.map((d) => d.icon),
   SPAWN.markEmoji,
+  // 属性面板「特殊能力」组图标
+  '⭐',
   '⚙️',
   '📖',
   '🌐',
