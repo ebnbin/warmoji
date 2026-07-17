@@ -44,27 +44,31 @@ interface StudioLayout {
   list: { x: number; y: number; w: number; h: number }
 }
 
-// 素材网格收窄（横屏 4 列 / 竖屏 5 行）：主体面积让给详情——大图展示与结构树
+// 主体详情块横竖屏都是接近正方形的大块（横屏受视口高限制为 720×550，
+// 竖屏 672×672），剩余空间给素材网格：横屏在右（6 列），竖屏在下（5 行）
 const LANDSCAPE: StudioLayout = {
   content: { w: 1280, h: 720 },
   headerY: 44,
   tabsY: 100,
-  detail: { x: 40, y: 138, w: 856, h: 550 },
-  list: { x: 920, y: 138, w: 320, h: 550 },
+  detail: { x: 40, y: 138, w: 720, h: 550 },
+  list: { x: 784, y: 138, w: 456, h: 550 },
 }
 
 const PORTRAIT: StudioLayout = {
   content: { w: 720, h: 1280 },
   headerY: 52,
   tabsY: 112,
-  detail: { x: 24, y: 152, w: 672, h: 700 },
-  list: { x: 24, y: 868, w: 672, h: 388 },
+  detail: { x: 24, y: 152, w: 672, h: 672 },
+  list: { x: 24, y: 840, w: 672, h: 416 },
 }
 
 const RASTER = 256
 const SPEEDS = [1, 0.5, 0.25] as const
-/** 解剖页结构树行高（逻辑 px） */
-const ANAT_ROW = 38
+// 解剖页结构树：行高/缩进按手机可点性放大（64 逻辑 px ≈ 手机 32 CSS px 行高）
+const ANAT_ROW = 64
+const ANAT_INDENT = 28
+/** 树行内缩进起点与箭头/眼睛列宽（点击分派与绘制共用） */
+const anatIndentOf = (depth: number): number => 16 + depth * ANAT_INDENT
 
 type Tab = 'recipes' | 'templates' | 'anatomy'
 
@@ -527,18 +531,18 @@ export class StudioScene extends Phaser.Scene {
       })
   }
 
-  /** 🔬 解剖页：双大图（完整原图 vs 按显隐+选中合成的拆分图）+ SVG 结构树。
-   * 横屏树在右侧竖排整列（一眼十多行），竖屏树在大图下方全宽 */
+  /** 🔬 解剖页：主体块横竖屏同构——左列预览（上「完整」下「拆分」，
+   * 空间不够图缩小）+ 右侧竖排结构树（行高/命中区按手机可点性放大） */
   private buildAnatomyDetail(): void {
     const { d, res } = this.resetDetail()
     const portrait = this.layout === PORTRAIT
-    const bigSize = portrait ? 240 : 232
+    const bigSize = portrait ? 225 : 180
     const emoji = this.anatEmoji
     const gen = ++this.jobGen
     this.previewState = 'loading'
 
     const title = this.add
-      .text(d.x + 24, d.y + 14, portrait ? `${emoji} 结构树 · 点行选中 · 👁 显/隐` : `${emoji} 结构树`, {
+      .text(d.x + 24, d.y + 14, `${emoji} 结构树 · 点行选中 · 👁 显/隐`, {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         color: '#aab6cc',
@@ -581,58 +585,47 @@ export class StudioScene extends Phaser.Scene {
         }
         if (gen !== this.jobGen || !this.scene.isActive('studio')) return
 
-        // 布局：横屏 = 大图区居左 + 树列居右；竖屏 = 大图在上 + 树全宽在下
-        const treeArea = portrait
-          ? { x: d.x + 24, y: d.y + 52 + bigSize + 74, w: d.w - 48, h: d.h - (52 + bigSize + 74) - 16 }
-          : { x: d.x + d.w - 312, y: d.y + 48, w: 288, h: d.h - 64 }
-        const zoneW = portrait ? d.w : d.w - 324
-        const pairW = bigSize * 2 + 20
-        const startX = d.x + (zoneW - pairW) / 2
-        const cxAll = startX + bigSize / 2
-        const cxSplit = startX + bigSize + 20 + bigSize / 2
-        const midX = (cxAll + cxSplit) / 2
-        const imgY = d.y + 52 + bigSize / 2
+        // 主体块同构布局：左列预览 + 右侧竖排树
+        const colX = d.x + 24
+        const colW = portrait ? 250 : 260
+        const colCx = colX + colW / 2
+        const treeArea = { x: colX + colW + 20, y: d.y + 52, w: d.w - 48 - colW - 20, h: d.h - 68 }
 
-        // 双大图：左完整 | 右拆分（初始无状态 = 同图）
+        // 左列：上「完整」下「拆分」（初始无状态 = 同图），底部信息行
         const boxes = this.add.graphics()
         boxes.fillStyle(0x000000, 0.25)
-        for (const bx of [cxAll, cxSplit]) {
-          boxes.fillRoundedRect(bx - bigSize / 2 - 8, imgY - bigSize / 2 - 8, bigSize + 16, bigSize + 16, 12)
+        let cy = d.y + 52
+        const capStyle = {
+          fontFamily: UI_FONT,
+          fontSize: FONT.caption,
+          color: '#8f8f9a',
+          resolution: res,
         }
-        const fullImg = this.add.image(cxAll, imgY, fullKey).setDisplaySize(bigSize, bigSize)
-        const splitImg = this.add.image(cxSplit, imgY, fullKey).setDisplaySize(bigSize, bigSize)
-        const caps = (['完整', '拆分'] as const).map((label, i) =>
-          this.add
-            .text(i === 0 ? cxAll : cxSplit, imgY + bigSize / 2 + 20, label, {
-              fontFamily: UI_FONT,
-              fontSize: FONT.caption,
-              color: '#8f8f9a',
-              resolution: res,
-            })
-            .setOrigin(0.5),
-        )
+        const capFull = this.add.text(colX + 2, cy, '完整', capStyle).setOrigin(0, 0)
+        cy += 30
+        const fullY = cy + bigSize / 2
+        cy += bigSize + 14
+        const capSplit = this.add.text(colX + 2, cy, '拆分', capStyle).setOrigin(0, 0)
+        cy += 30
+        const splitY = cy + bigSize / 2
+        cy += bigSize + 14
+        for (const iy of [fullY, splitY]) {
+          boxes.fillRoundedRect(colCx - bigSize / 2 - 8, iy - bigSize / 2 - 8, bigSize + 16, bigSize + 16, 12)
+        }
+        const fullImg = this.add.image(colCx, fullY, fullKey).setDisplaySize(bigSize, bigSize)
+        const splitImg = this.add.image(colCx, splitY, fullKey).setDisplaySize(bigSize, bigSize)
         const info = this.add
-          .text(midX, imgY + bigSize / 2 + 38, '', {
+          .text(colCx, cy, '', {
             fontFamily: UI_FONT,
             fontSize: FONT.small,
             color: '#e8e8f2',
             resolution: res,
+            align: 'center',
+            wordWrap: { width: colW, useAdvancedWrap: true },
+            lineSpacing: 6,
           })
           .setOrigin(0.5, 0)
-        if (!portrait) {
-          // 横屏大图下方富余空间放操作说明（竖屏紧凑，靠标题一句话）
-          const legend = this.add
-            .text(midX, imgY + bigSize / 2 + 82, '👁 显 · 🙈 隐 · ▸▾ 展开收起\n点行选中，再点取消 · ↺ 复位', {
-              fontFamily: UI_FONT,
-              fontSize: FONT.caption,
-              color: '#8f8f9a',
-              resolution: res,
-              align: 'center',
-              lineSpacing: 8,
-            })
-            .setOrigin(0.5, 0)
-          this.detailObjs.push(legend)
-        }
+        const caps = [capFull, capSplit]
 
         // 结构树列表：遮罩 + 滚动（遮罩不裁输入，行内自校验可见性）
         const treeBg = this.add.graphics()
@@ -655,8 +648,8 @@ export class StudioScene extends Phaser.Scene {
         this.detailObjs.push(treeBg, boxes, fullImg, splitImg, ...caps, info, mask, rowsBox, treeZone)
         this.anat = { tree, splitImg, fullKey, info, rowsBox, area: treeArea, rowObjs: [], res, bigSize }
         this.anatAllRows = flattenTree(tree, new Set())
-        this.anatFullRect = { x: cxAll - bigSize / 2, y: imgY - bigSize / 2, w: bigSize, h: bigSize }
-        this.anatSplitRect = { x: cxSplit - bigSize / 2, y: imgY - bigSize / 2, w: bigSize, h: bigSize }
+        this.anatFullRect = { x: colCx - bigSize / 2, y: fullY - bigSize / 2, w: bigSize, h: bigSize }
+        this.anatSplitRect = { x: colCx - bigSize / 2, y: splitY - bigSize / 2, w: bigSize, h: bigSize }
         this.rebuildAnatRows()
         this.refreshAnatInfo()
         void this.refreshAnatSplit()
@@ -711,26 +704,25 @@ export class StudioScene extends Phaser.Scene {
       const dim = this.anatEffHidden(row.path)
       const bg = this.add.graphics()
       bg.fillStyle(selected ? 0xffffff : 0x000000, selected ? 0.16 : 0.2)
-      bg.fillRoundedRect(0, y + 2, a.area.w, ANAT_ROW - 4, 10)
+      bg.fillRoundedRect(0, y + 3, a.area.w, ANAT_ROW - 6, 12)
       bg.lineStyle(selected ? 2 : 1, selected ? 0xffd54f : 0xffffff, selected ? 0.9 : 0.08)
-      bg.strokeRoundedRect(1, y + 3, a.area.w - 2, ANAT_ROW - 6, 10)
+      bg.strokeRoundedRect(1, y + 4, a.area.w - 2, ANAT_ROW - 8, 12)
       const parts: Phaser.GameObjects.GameObject[] = [bg]
 
-      // 树列较窄（横屏 288px），缩进克制些给标签留宽
-      const indent = 12 + row.depth * 22
+      const indent = anatIndentOf(row.depth)
       if (row.container) {
         parts.push(
           this.add
             .text(indent, y + ANAT_ROW / 2, this.anatCollapsed.has(row.path) ? '▸' : '▾', {
               fontFamily: UI_FONT,
-              fontSize: FONT.small,
+              fontSize: FONT.strong,
               color: '#c8c8d4',
               resolution: a.res,
             })
             .setOrigin(0, 0.5),
         )
       }
-      let x = indent + 26
+      let x = indent + 34
       let eyeX: number | null = null
       if (row.paints) {
         eyeX = x
@@ -738,29 +730,29 @@ export class StudioScene extends Phaser.Scene {
           this.add
             .text(x, y + ANAT_ROW / 2, this.anatHidden.has(row.path) ? '🙈' : '👁', {
               fontFamily: UI_FONT,
-              fontSize: FONT.small,
+              fontSize: FONT.strong,
               resolution: a.res,
             })
             .setOrigin(0, 0.5)
             .setAlpha(dim && !this.anatHidden.has(row.path) ? 0.4 : 1),
         )
-        x += 36
+        x += 48
       }
       if (row.fill && /^#[0-9a-fA-F]{6}$/.test(row.fill)) {
         const sw = this.add.graphics()
         sw.fillStyle(Number.parseInt(row.fill.slice(1), 16), 1)
-        sw.fillRoundedRect(x, y + ANAT_ROW / 2 - 8, 16, 16, 4)
+        sw.fillRoundedRect(x, y + ANAT_ROW / 2 - 10, 20, 20, 5)
         sw.lineStyle(1, 0xffffff, 0.25)
-        sw.strokeRoundedRect(x, y + ANAT_ROW / 2 - 8, 16, 16, 4)
+        sw.strokeRoundedRect(x, y + ANAT_ROW / 2 - 10, 20, 20, 5)
         parts.push(sw)
-        x += 26
+        x += 32
       }
       const label = `#${row.path} <${row.tag}>${row.container ? ` ×${row.childCount}` : ''}${row.paints ? '' : ' 共享定义'}`
       parts.push(
         this.add
           .text(x, y + ANAT_ROW / 2, label, {
             fontFamily: UI_FONT,
-            fontSize: FONT.small,
+            fontSize: FONT.body,
             color: dim ? '#787885' : '#e8e8f2',
             resolution: a.res,
           })
@@ -783,15 +775,15 @@ export class StudioScene extends Phaser.Scene {
     if (!meta) return
     const row = meta.row
     const localX = p.worldX - a.area.x
-    const indent = 12 + row.depth * 22
-    if (row.container && localX >= indent - 8 && localX < indent + 24) {
+    const indent = anatIndentOf(row.depth)
+    if (row.container && localX >= indent - 12 && localX < indent + 34) {
       if (this.anatCollapsed.has(row.path)) this.anatCollapsed.delete(row.path)
       else this.anatCollapsed.add(row.path)
       this.rebuildAnatRows()
       this.report()
       return
     }
-    if (meta.eyeX !== null && localX >= meta.eyeX - 8 && localX < meta.eyeX + 32) {
+    if (meta.eyeX !== null && localX >= meta.eyeX - 10 && localX < meta.eyeX + 48) {
       if (this.anatHidden.has(row.path)) this.anatHidden.delete(row.path)
       else this.anatHidden.add(row.path)
       this.rebuildAnatRows()
@@ -1035,7 +1027,7 @@ export class StudioScene extends Phaser.Scene {
           y: a.area.y + i * ANAT_ROW - this.anatScroll,
           w: a.area.w,
           h: ANAT_ROW,
-          eye: eyeX === null ? null : { x: a.area.x + eyeX, y: a.area.y + i * ANAT_ROW - this.anatScroll, w: 32, h: ANAT_ROW },
+          eye: eyeX === null ? null : { x: a.area.x + eyeX, y: a.area.y + i * ANAT_ROW - this.anatScroll, w: 44, h: ANAT_ROW },
         }))
         .filter((r) => r.y >= a.area.y && r.y + r.h <= a.area.y + a.area.h),
       reset: this.anatResetRect,
