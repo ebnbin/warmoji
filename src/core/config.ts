@@ -13,6 +13,7 @@ export const MAP = {
 
 import { ITEMS } from './items'
 import { MAPS } from './maps'
+import type { MapSpec } from './maps'
 import { SETTING_DEFS } from './settings'
 import type {
   AreaBlastSpec,
@@ -768,6 +769,28 @@ export const ZONE = {
   tickDamage: 6,
 } as const
 
+// 河流地图（kind='river'）：单屏固定竞技场 + 恒定水流。
+// 相机静止，世界 = 逻辑视口；河道沿长轴居中（横屏水平、竖屏垂直），
+// 宽恒 10 格，短边余量为两岸暗带。水流 = 全员恒定漂移（子弹除外），
+// 顺流快/逆流慢/挂机漂向下游都由这一个矢量自然涌现。
+// 只有玩家与 Boss 被钳在河道内；敌人/金币自由出界——敌人沿用无限图
+// 休眠机制（32 格）并会逆流游回，金币漂出下游即冲走
+export const RIVER = {
+  /** 河道宽度（跨流向恒定）：最小屏（短边 11.25 格）也留出两岸各 0.625 格 */
+  width: 10 * UNIT,
+  /** 流速：恒定漂移速度（对比队伍移速 5.5 格/秒，是氛围 + 长期站位压力） */
+  flow: 0.5 * UNIT,
+  /** 金币漂出下游边界这一距离后清理（玩家钳在屏内，永远追不回） */
+  coinCullPad: 2 * UNIT,
+  /** 水面漂浮物数量（🍃🌸🫧 顺流循环，流向的直白提示） */
+  driftCount: 18,
+  /** 漂浮物个体速度倍率区间（再乘河心快近岸慢的剖面） */
+  driftSpeedMul: [0.75, 1.3],
+  /** 双层水纹滚动速度（视差；只是贴图偏移，与实体漂移无关） */
+  waveSlow: 0.35 * UNIT,
+  waveFast: 0.7 * UNIT,
+} as const
+
 // 压力测试模式（🔧 面板开关）：拉高负载且保证测得下去
 export const STRESS = {
   maxHp: 10_000_000,
@@ -831,8 +854,10 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     COIN.emoji,
     '➕',
     '💀',
-    // 地图地面装饰：与玩家侧同款黑描边（低透明度贴地）
-    ...new Set(Object.values(MAPS).flatMap((m) => m.decor.emojis)),
+    // 地图地面装饰 + 河流水面漂浮物：与玩家侧同款黑描边（低透明度贴地/浮水）
+    ...new Set(
+      Object.values<MapSpec>(MAPS).flatMap((m) => [...m.decor.emojis, ...(m.drift ?? [])]),
+    ),
   ],
   enemy: [...new Set(ENEMY_SPECS.map((e) => e.emoji))],
   enemyShot: [

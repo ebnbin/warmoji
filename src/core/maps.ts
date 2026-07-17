@@ -21,11 +21,14 @@ export interface MapSpec {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  /** 世界形态：bounded = 25×25 有界竞技场；infinite = 无边界（终波缩圈） */
-  readonly kind: 'bounded' | 'infinite'
+  /** 世界形态：bounded = 25×25 有界竞技场；infinite = 无边界（终波缩圈）；
+   * river = 单屏固定相机 + 恒定水流 */
+  readonly kind: 'bounded' | 'infinite' | 'river'
   /** 固定色板：战斗场景不再逐局随机 */
   readonly palette: Palette
   readonly decor: MapDecor
+  /** 河流图：水面漂浮物池（顺流循环，区别于岸上静态 decor） */
+  readonly drift?: readonly string[]
   // 未来扩展位：难度曲线 / 专属怪物表 / 开局 buff 等字段后续追加
 }
 
@@ -103,6 +106,27 @@ export const MAPS = {
       density: [0.1, 0.14],
     },
   },
+  river: {
+    emoji: '🌊',
+    name: '奔流',
+    desc: '一条永不停歇的大河，万物皆随波逐流；两岸静看你逆流而战',
+    kind: 'river',
+    palette: {
+      bgFrom: 'hsl(155 32% 28%)',
+      bgTo: 'hsl(200 36% 15%)',
+      // map 色即河水基色（河谷两岸的暗带由场景另行绘制）
+      map: hslToInt(199, 0.46, 0.56),
+      shadow: 0x000000,
+    },
+    decor: {
+      // 岸上静态植被（战斗区外，透明度可比战斗区装饰略高）
+      emojis: ['🌾', '🌿', '🪨', '🌳', '🍄'],
+      sizeU: [0.3, 0.6],
+      alpha: [0.3, 0.45],
+      density: [0.1, 0.14],
+    },
+    drift: ['🍃', '🌸', '🫧', '🍂'],
+  },
 } as const satisfies Record<string, MapSpec>
 
 export type MapId = keyof typeof MAPS
@@ -112,9 +136,12 @@ export function sanitizeMapId(id: unknown): MapId {
   return typeof id === 'string' && id in MAPS ? (id as MapId) : MAP_IDS[0]!
 }
 
-/** 该地图应进入的竞技场场景（有界/无界是两套场景实现，按图路由） */
-export function arenaSceneFor(id: MapId): 'arena' | 'arenaInfinite' {
-  return MAPS[id].kind === 'infinite' ? 'arenaInfinite' : 'arena'
+/** 该地图应进入的竞技场场景（有界/无界/河流是三套场景实现，按图路由） */
+export function arenaSceneFor(id: MapId): 'arena' | 'arenaInfinite' | 'arenaRiver' {
+  const kind = MAPS[id].kind
+  if (kind === 'infinite') return 'arenaInfinite'
+  if (kind === 'river') return 'arenaRiver'
+  return 'arena'
 }
 
 // ── 装饰散布 ────────────────────────────────────────────────

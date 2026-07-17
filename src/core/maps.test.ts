@@ -3,27 +3,31 @@ import { arenaSceneFor, MAP_IDS, MAPS, rollDecor, sanitizeMapId } from './maps'
 import { Rng } from './rng'
 
 describe('地图定义', () => {
-  it('四张图齐备：图标/名字/描述/形态/固定色板/装饰规则', () => {
-    expect(MAP_IDS.length).toBe(4)
+  it('五张图齐备：图标/名字/描述/形态/固定色板/装饰规则', () => {
+    expect(MAP_IDS.length).toBe(5)
     for (const id of MAP_IDS) {
       const m = MAPS[id]
       expect(m.emoji.length).toBeGreaterThan(0)
       expect(m.name.length).toBeGreaterThan(0)
       expect(m.desc.length).toBeGreaterThan(0)
-      expect(['bounded', 'infinite']).toContain(m.kind)
+      expect(['bounded', 'infinite', 'river']).toContain(m.kind)
       expect(m.palette.bgFrom).toContain('hsl')
       expect(m.decor.emojis.length).toBeGreaterThan(0)
     }
-    // 无限图路由到独立场景，有界图仍走原场景
+    // 三种形态各路由到独立场景
     expect(MAPS.wilds.kind).toBe('infinite')
     expect(MAPS.forest.kind).toBe('bounded')
+    expect(MAPS.river.kind).toBe('river')
+    // 河流图必须有水面漂浮物池
+    expect(MAPS.river.drift!.length).toBeGreaterThan(0)
   })
 
   it('装饰规则数值健全：透明度低于战斗实体、密度稀疏、范围区间有序', () => {
     for (const id of MAP_IDS) {
       const d = MAPS[id].decor
       expect(d.alpha[0]).toBeLessThanOrEqual(d.alpha[1])
-      expect(d.alpha[1]).toBeLessThanOrEqual(0.35)
+      // 战斗区内的装饰须远淡于战斗实体；河流图的装饰在岸上（战斗区外），可以更实
+      expect(d.alpha[1]).toBeLessThanOrEqual(MAPS[id].kind === 'river' ? 0.5 : 0.35)
       expect(d.density[0]).toBeLessThanOrEqual(d.density[1])
       expect(d.density[1]).toBeLessThanOrEqual(0.2)
       expect(d.sizeU[0]).toBeLessThanOrEqual(d.sizeU[1])
@@ -41,6 +45,7 @@ describe('地图定义', () => {
   it('arenaSceneFor：按形态路由竞技场场景', () => {
     expect(arenaSceneFor('forest')).toBe('arena')
     expect(arenaSceneFor('wilds')).toBe('arenaInfinite')
+    expect(arenaSceneFor('river')).toBe('arenaRiver')
   })
 })
 

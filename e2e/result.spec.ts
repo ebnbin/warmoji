@@ -9,8 +9,9 @@ async function cssPoint(page: Page, logical: { x: number; y: number }): Promise<
   }, logical)
 }
 
-/** 绕圈走位撑完当前波（波末离开 arena 即返回） */
-async function kiteUntilLeaveArena(page: Page, maxSteps = 40): Promise<void> {
+/** 绕圈走位撑完当前波（波末离开 arena 即返回）。步数按墙钟给足：
+ * 软渲染 + 并行争抢下游戏时钟可能只有墙钟的几分之一 */
+async function kiteUntilLeaveArena(page: Page, maxSteps = 120): Promise<void> {
   const KEYS = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'] as const
   for (let i = 0; i < maxSteps; i++) {
     const scene = await page.evaluate(() => window.__warmoji?.scene)
@@ -26,7 +27,7 @@ async function kiteUntilLeaveArena(page: Page, maxSteps = 40): Promise<void> {
 test.describe.configure({ retries: 2 })
 
 test('通关胜利：快进到最后一波打完 → 胜利结算页 → 再来一局', async ({ page }) => {
-  test.setTimeout(180_000)
+  test.setTimeout(300_000)
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(String(err)))
 
@@ -41,6 +42,8 @@ test('通关胜利：快进到最后一波打完 → 胜利结算页 → 再来�
   await kiteUntilLeaveArena(page)
   await page.waitForFunction(
     () => window.__warmoji?.scene === 'promote' || window.__warmoji?.scene === 'shop',
+    undefined,
+    { timeout: 60_000 },
   )
   // 结清可能的升级点数，进商店后把波数拨到最后一波
   for (let i = 0; i < 12; i++) {
@@ -66,7 +69,7 @@ test('通关胜利：快进到最后一波打完 → 胜利结算页 → 再来�
       return !!game?.scene?.keys?.['arena']?.boss?.active
     },
     undefined,
-    { timeout: 20_000 },
+    { timeout: 40_000 },
   )
   await page.evaluate(() => {
     const game = window.__game as {

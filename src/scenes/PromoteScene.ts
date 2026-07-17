@@ -312,7 +312,7 @@ export class PromoteScene extends Phaser.Scene {
   }
 
   /** 点数花完后的去向：开局看队长 firstWaveShop（默认直接开战），波末必进商店 */
-  private nextScene(): 'arena' | 'arenaInfinite' | 'shop' {
+  private nextScene(): 'arena' | 'arenaInfinite' | 'arenaRiver' | 'shop' {
     if (this.isInitial() && !CAPTAINS[this.run.captainId].firstWaveShop) {
       return arenaSceneFor(this.run.mapId)
     }
