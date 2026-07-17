@@ -62,8 +62,8 @@ import type { UIScene } from './UIScene'
 //   短边余量为两岸暗带（不可进入，只是视觉）
 // · 水流：恒定漂移矢量（横屏右→左，竖屏上→下）逐帧加在所有实体上
 //   （子弹除外）——顺流快/逆流慢/挂机漂向下游全部由此自然涌现
-// · 钳制：只有队伍中心与 Boss 被钳在河道内；敌人/金币自由出界——
-//   敌人沿用无限图休眠机制（32 格，屏内永不休眠）并会逆流游回，
+// · 钳制：队伍中心与 Boss 被钳在河道内；敌人只钳跨向（不能上岸），
+//   上下游可自由出屏——沿用无限图休眠机制（32 格）并会逆流游回；
 //   金币漂出下游一段距离即清理（玩家钳在屏内永远追不回）
 // · 旋转：横竖屏是同一条河，视口变化时按「流向进度 + 跨向偏移」重映射
 //   全部实体（等价于逆时针 90° 旋转），水面视觉层整体重建
@@ -1354,6 +1354,12 @@ export class RiverArenaScene extends Phaser.Scene {
   }
 
   private materializeEnemy(spec: EnemySpec, x: number, y: number, hp: number, elite = false): void {
+    // 落点跨向钳入河道（分裂怪贴岸溅出等边缘情况兜底；沿流向不钳）
+    if (this.horizontal) {
+      y = Math.min(Math.max(y, this.river.y + spec.radius), this.river.y + this.river.h - spec.radius)
+    } else {
+      x = Math.min(Math.max(x, this.river.x + spec.radius), this.river.x + this.river.w - spec.radius)
+    }
     const enemy = emojiImage(
       this,
       x,
@@ -1623,9 +1629,8 @@ export class RiverArenaScene extends Phaser.Scene {
         }
       }
 
-      // 水流：普通敌人不钳边界（可漂出屏外，AI 会自己逆流游回）
-      body.velocity.x += this.flow.x
-      body.velocity.y += this.flow.y
+      // 水流 + 跨向钳制：敌人不能上岸（上下游可自由出屏，AI 会自己游回）
+      this.applyFlowAndBankClamp(e, body, spec.radius)
 
       const state = e.getData('state') as string
       if (state === 'dash') {
@@ -1636,6 +1641,27 @@ export class RiverArenaScene extends Phaser.Scene {
         const vx = body.velocity.x
         if (Math.abs(vx) > 8) e.setFlipX(vx > 0)
       }
+    }
+  }
+
+  /** 普通敌人：加水流后钳住跨向速度（不能上岸），越界一帧内硬拉回岸线；
+   * 沿流向不钳——漂出上下游屏外是设计的一部分 */
+  private applyFlowAndBankClamp(e: ImageObj, body: ArcadeBody, radius: number): void {
+    body.velocity.x += this.flow.x
+    body.velocity.y += this.flow.y
+    const r = this.river
+    if (this.horizontal) {
+      const lo = r.y + radius
+      const hi = r.y + r.h - radius
+      if (e.y <= lo && body.velocity.y < 0) body.velocity.y = 0
+      if (e.y >= hi && body.velocity.y > 0) body.velocity.y = 0
+      if (e.y < lo - 1 || e.y > hi + 1) body.reset(e.x, Math.min(Math.max(e.y, lo), hi))
+    } else {
+      const lo = r.x + radius
+      const hi = r.x + r.w - radius
+      if (e.x <= lo && body.velocity.x < 0) body.velocity.x = 0
+      if (e.x >= hi && body.velocity.x > 0) body.velocity.x = 0
+      if (e.x < lo - 1 || e.x > hi + 1) body.reset(Math.min(Math.max(e.x, lo), hi), e.y)
     }
   }
 
@@ -1914,8 +1940,9 @@ export class RiverArenaScene extends Phaser.Scene {
     const vh = this.viewH
     const r = this.river
     const water = this.palette.map
-    const bank = 0x233826
-    const bankFar = 0x1b2c1f
+    // 大地/树干棕：与浅蓝河水强对比
+    const bank = 0x54402a
+    const bankFar = 0x40301f
 
     // 两岸暗带（河道以外的短边余量；河道贯穿长轴，只有跨轴两侧有岸）
     const gBank = this.add.graphics().setDepth(0)

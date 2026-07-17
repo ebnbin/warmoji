@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { clickShopNext, startRun } from './helpers'
+import { clickShopNext, completePromote, confirmCaptain, enterCaptain, startRun } from './helpers'
 
 async function cssPoint(page: Page, logical: { x: number; y: number }): Promise<{ x: number; y: number }> {
   return page.evaluate(({ x, y }) => {
@@ -31,34 +31,20 @@ test('通关胜利：快进到最后一波打完 → 胜利结算页 → 再来�
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(String(err)))
 
-  // 神童（测试直通车）：15 级满编、从第 10 波开战，难度时钟同步预推进
+  // 神童（测试直通车）15 级满编；开局整编期间就把波次拨到 15——点数结清后
+  // 按波末规则进商店、直接开终波。不打中间波次：无人值守的生存暴露在
+  // 慢渲染环境下会随机团灭（这正是本测试历史上的翻车点）
   await page.addInitScript(() => {
     localStorage.setItem('warmoji.captain.v1', 'prodigy')
   })
   await page.goto('/')
-  await startRun(page)
-
-  // 第 10 波（30 秒标准波）打完 → 整编/商店
-  await kiteUntilLeaveArena(page)
-  await page.waitForFunction(
-    () => window.__warmoji?.scene === 'promote' || window.__warmoji?.scene === 'shop',
-    undefined,
-    { timeout: 60_000 },
-  )
-  // 结清可能的升级点数，进商店后把波数拨到最后一波
-  for (let i = 0; i < 12; i++) {
-    const st = await page.evaluate(() => ({
-      scene: window.__warmoji!.scene,
-      confirm: window.__warmoji!.promote?.confirm,
-    }))
-    if (st.scene === 'shop') break
-    await page
-      .locator('#game canvas')
-      .click({ position: await cssPoint(page, { x: st.confirm!.x, y: st.confirm!.y }) })
-    await page.waitForTimeout(400)
-  }
-  await page.waitForFunction(() => window.__warmoji?.scene === 'shop')
+  await enterCaptain(page)
+  await confirmCaptain(page)
   await page.evaluate(() => window.__setWave!(15))
+  await completePromote(page)
+  await page.waitForFunction(() => window.__warmoji?.scene === 'shop', undefined, {
+    timeout: 30_000,
+  })
   await clickShopNext(page)
 
   // 最后一波（45 秒 Boss 波）：等 Boss 落地后把它血量拨到 1，

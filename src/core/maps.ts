@@ -112,10 +112,11 @@ export const MAPS = {
     desc: '一条永不停歇的大河，万物皆随波逐流；两岸静看你逆流而战',
     kind: 'river',
     palette: {
-      bgFrom: 'hsl(155 32% 28%)',
-      bgTo: 'hsl(200 36% 15%)',
-      // map 色即河水基色（河谷两岸的暗带由场景另行绘制）
-      map: hslToInt(199, 0.46, 0.56),
+      // 页面底色呼应「棕岸 + 蓝水」主题
+      bgFrom: 'hsl(28 32% 30%)',
+      bgTo: 'hsl(205 38% 15%)',
+      // map 色即河水基色（浅亮蓝，与棕色两岸强对比；岸带由场景另行绘制）
+      map: hslToInt(197, 0.52, 0.66),
       shadow: 0x000000,
     },
     decor: {
