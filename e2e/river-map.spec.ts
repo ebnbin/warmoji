@@ -55,8 +55,8 @@ test('河流地图：单屏固定相机、挂机被水流推向下游卡边、�
   }))
   expect(st.playerX).toBeGreaterThan(0)
   expect(st.playerX).toBeLessThan(st.viewW / 4)
-  // 队伍中心始终在河道内（跨向 = 竖直方向，河道居中宽 10 格 = 640px）
-  expect(Math.abs(st.playerY - st.viewH / 2)).toBeLessThanOrEqual(320)
+  // 队伍中心始终在河道内（跨向 = 竖直方向，河道居中宽 12 格 = 768px）
+  expect(Math.abs(st.playerY - st.viewH / 2)).toBeLessThanOrEqual(384)
   // 相机自始至终纹丝不动（战斗受击抖动留少量容差）
   expect(Math.abs(st.camX - cam0.x)).toBeLessThan(24)
   expect(Math.abs(st.camY - cam0.y)).toBeLessThan(24)

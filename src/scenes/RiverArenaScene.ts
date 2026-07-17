@@ -50,7 +50,7 @@ import { emojiImage } from '../ui/emoji'
 import { burstEmitter } from '../ui/fx'
 import { playSfx } from '../ui/sfx'
 import { UI_FONT } from '../ui/fonts'
-import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
+import { textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 import { createWeapon } from '../weapons/create'
 import type { EnemyTarget, WeaponContext, WeaponOwner, WeaponRuntime } from '../weapons/types'
 import type { HudSnapshot, WaveSummary } from './ArenaScene'
@@ -306,13 +306,8 @@ export class RiverArenaScene extends Phaser.Scene {
     this.drifts = []
     this.pendingMarks = []
 
-    // 单屏世界：相机静止，世界坐标 = 逻辑视口坐标
-    applyCamera(this)
-    this.viewW = viewport.logicalWidth
-    this.viewH = viewport.logicalHeight
-    this.horizontal = isHorizontal(this.viewW, this.viewH)
-    this.river = riverRect(this.viewW, this.viewH, RIVER.width)
-    this.flow = flowVector(this.horizontal, RIVER.flow)
+    // 单屏世界：相机静止，视野按 viewScale 放大（世界 = 逻辑视口 × 1.2）
+    this.setupCamera()
     this.buildRiverVisuals()
 
     this.center = { x: this.viewW / 2, y: this.viewH / 2 }
@@ -441,8 +436,9 @@ export class RiverArenaScene extends Phaser.Scene {
       enemies: this.awakeCount,
       pending: this.pendingSpawns,
       fps: Math.round(this.game.loop.actualFps),
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
+      // 河流图上报世界尺寸（= 逻辑视口 × viewScale），供探针换算位置
+      viewW: this.viewW,
+      viewH: this.viewH,
       playerX: this.center.x,
       playerY: this.center.y,
       camX: cam.worldView.centerX,
@@ -489,12 +485,7 @@ export class RiverArenaScene extends Phaser.Scene {
     const fromW = this.viewW
     const fromH = this.viewH
     const fromHorizontal = this.horizontal
-    applyCamera(this)
-    this.viewW = viewport.logicalWidth
-    this.viewH = viewport.logicalHeight
-    this.horizontal = isHorizontal(this.viewW, this.viewH)
-    this.river = riverRect(this.viewW, this.viewH, RIVER.width)
-    this.flow = flowVector(this.horizontal, RIVER.flow)
+    this.setupCamera()
 
     const map = (p: Point): Point => remapPoint(p, fromW, fromH, this.viewW, this.viewH)
     const rot = (v: Point): Point => remapVector(v, fromHorizontal, this.horizontal)
@@ -574,6 +565,18 @@ export class RiverArenaScene extends Phaser.Scene {
     }
 
     this.buildRiverVisuals()
+  }
+
+  /** 静止相机 + 河流图专属视野倍率，并同步派生的世界几何 */
+  private setupCamera(): void {
+    this.viewW = viewport.logicalWidth * RIVER.viewScale
+    this.viewH = viewport.logicalHeight * RIVER.viewScale
+    const cam = this.cameras.main
+    cam.setZoom(viewport.renderScale / RIVER.viewScale)
+    cam.centerOn(this.viewW / 2, this.viewH / 2)
+    this.horizontal = isHorizontal(this.viewW, this.viewH)
+    this.river = riverRect(this.viewW, this.viewH, RIVER.width)
+    this.flow = flowVector(this.horizontal, RIVER.flow)
   }
 
   // ── 队伍 ────────────────────────────────────────────────────
