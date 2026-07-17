@@ -1,4 +1,5 @@
 import type Phaser from 'phaser'
+import { ACQUIRE } from '../core/config'
 import type { ProjectileSpec } from '../core/weapons'
 import type { SfxId } from '../ui/sfx'
 
@@ -53,9 +54,14 @@ export interface WeaponRuntime {
   destroy(): void
 }
 
-/** 瞄准离 owner 最近的敌人，无敌人返回 null */
-export function nearestAngle(owner: WeaponOwner, targets: readonly EnemyTarget[]): number | null {
-  let best = Infinity
+/** 瞄准索敌上限内离 owner 最近的敌人；无敌人或全部超出上限返回 null。
+ * 上限缺省 ACQUIRE.range——索敌必须有界，无限地图上不能瞄到无穷远 */
+export function nearestAngle(
+  owner: WeaponOwner,
+  targets: readonly EnemyTarget[],
+  maxRange = ACQUIRE.range,
+): number | null {
+  let best = maxRange * maxRange
   let angle: number | null = null
   for (const t of targets) {
     const dx = t.x - owner.x

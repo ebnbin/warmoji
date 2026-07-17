@@ -171,6 +171,11 @@ export const WEAPONS = {
   } satisfies BoomerangSpec,
 } as const
 
+// 武器索敌上限：超出此距离的敌人不作为开火/瞄准目标。12 单位略大于
+// 屏幕中心到角落（≈11.5U），可见敌必打、屏外远敌不追——索敌逻辑必须
+// 有界（无限地图防御）。激光用自身更短的 range 门槛，不受此值影响
+export const ACQUIRE = { range: 12 * UNIT } as const
+
 // 角色花名册：角色 → 武器为单向绑定（角色配装固定；武器可被复用）
 export interface CharacterSpec {
   readonly emoji: string

@@ -1,4 +1,5 @@
 import type Phaser from 'phaser'
+import { ACQUIRE } from '../core/config'
 import { circleHitIndices } from '../core/weapons'
 import type { AreaBlastSpec } from '../core/weapons'
 import { emojiImage } from '../ui/emoji'
@@ -25,13 +26,19 @@ export class AreaBlastWeapon implements WeaponRuntime {
     this.cooldown -= delta
     if (this.hidden) return
 
-    // 连锁轰炸：主炸后向随机敌人追加
+    // 连锁轰炸：主炸后向索敌上限内的随机敌人追加（不能轰到无穷远）
     if (this.echoIn > 0) {
       this.echoIn -= delta
       if (this.echoIn <= 0) {
         const targets = this.ctx.enemyTargets()
-        if (targets.length > 0) {
-          const t = targets[Math.floor(Math.random() * targets.length)]!
+        const max2 = ACQUIRE.range * ACQUIRE.range
+        const near = targets.filter((t) => {
+          const dx = t.x - owner.x
+          const dy = t.y - owner.y
+          return dx * dx + dy * dy <= max2
+        })
+        if (near.length > 0) {
+          const t = near[Math.floor(Math.random() * near.length)]!
           this.blastAt(t.x, t.y, this.echoDamage, targets)
         }
       }
