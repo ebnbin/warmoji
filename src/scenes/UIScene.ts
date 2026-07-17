@@ -110,22 +110,22 @@ export class UIScene extends Phaser.Scene {
       resolution: res,
     }
     // 能量豆计数放在经验条下方（经验条 = 下一颗豆的攒取进度）
-    emojiImage(this, sL + 24, sT + 44, '🫘', 22, 'player')
+    emojiImage(this, sL + 24, sT + 44, '🫘', 30, 'player')
     this.levelText = this.add.text(sL + 40, sT + 32, '0/3', { ...hudText, fontSize: FONT.body })
     this.timeText = this.add
       .text(w / 2, sT + 10, '', { ...hudText, fontSize: FONT.lead })
       .setOrigin(0.5, 0)
-    emojiImage(this, w - sR - 26, sT + 26, '💀', 26, 'player')
+    emojiImage(this, w - sR - 26, sT + 26, '💀', 35, 'player')
     this.killsText = this.add
       .text(w - sR - 46, sT + 10, '0', { ...hudText, fontSize: FONT.head })
       .setOrigin(1, 0)
-    emojiImage(this, w - sR - 26, sT + 64, COIN.emoji, 26, 'player')
+    emojiImage(this, w - sR - 26, sT + 64, COIN.emoji, 35, 'player')
     this.coinsText = this.add
       .text(w - sR - 46, sT + 48, '0', { ...hudText, fontSize: FONT.head })
       .setOrigin(1, 0)
 
     // 暂停：按钮或 ESC；已暂停或已结算时按钮行为由 togglePause 把关
-    emojiImage(this, w - sR - 26, sT + 112, '⏸️', 36)
+    emojiImage(this, w - sR - 26, sT + 112, '⏸️', 48)
       .setDepth(300)
       .setAlpha(0.85)
       .setInteractive({ useHandCursor: true })
@@ -140,7 +140,7 @@ export class UIScene extends Phaser.Scene {
       w - sR - 12,
       viewport.logicalHeight - safeInsets.bottom - 26,
       '🔧',
-      30,
+      40,
     )
       .setOrigin(1, 1)
       .setDepth(300)
@@ -345,7 +345,7 @@ export class UIScene extends Phaser.Scene {
       .circle(cx, cy, r, 0x000000, 0.38)
       .setStrokeStyle(3, 0xffffff, 0.28)
       .setDepth(300)
-    this.skillEmoji = emojiImage(this, cx, cy, CAPTAINS[getRun().captainId].emoji, 58, 'player').setDepth(301)
+    this.skillEmoji = emojiImage(this, cx, cy, CAPTAINS[getRun().captainId].emoji, 76, 'player').setDepth(301)
     this.skillEmojiScale = this.skillEmoji.scaleX
     this.skillMask = this.add.graphics().setDepth(302)
     this.skillCdText = this.add
@@ -581,10 +581,10 @@ export class UIScene extends Phaser.Scene {
     this.tweens.add({ targets: title, scale: 1, duration: 320, ease: 'Back.easeOut' })
 
     const lineStyle = { fontFamily: UI_FONT, fontSize: FONT.head, color: '#ffffff', resolution: res }
-    iconLabel(this, cx - 140, cy + 12, '💀', 28, `击杀 ${s.kills}`, lineStyle).setDepth(231)
-    iconLabel(this, cx + 140, cy + 12, COIN.emoji, 28, `金币 +${s.coins}`, lineStyle).setDepth(231)
+    iconLabel(this, cx - 140, cy + 12, '💀', 37, `击杀 ${s.kills}`, lineStyle).setDepth(231)
+    iconLabel(this, cx + 140, cy + 12, COIN.emoji, 37, `金币 +${s.coins}`, lineStyle).setDepth(231)
     if (s.levels > 0) {
-      iconLabel(this, cx, cy + 72, '🫘', 26, `能量豆 +${s.levels}（队长技能弹药）`, {
+      iconLabel(this, cx, cy + 72, '🫘', 35, `能量豆 +${s.levels}（队长技能弹药）`, {
         ...lineStyle,
         fontSize: FONT.body,
         color: '#b3e5fc',

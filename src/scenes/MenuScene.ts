@@ -54,7 +54,7 @@ export class MenuScene extends Phaser.Scene {
 
     const best = loadHighScore(browserStorage())
     if (best.bestWave > 0) {
-      iconLabel(this, w / 2, h * 0.66, '🏆', 26, `最佳：第 ${best.bestWave} 波 · 击杀 ${best.bestKills}`, {
+      iconLabel(this, w / 2, h * 0.66, '🏆', 35, `最佳：第 ${best.bestWave} 波 · 击杀 ${best.bestKills}`, {
         fontFamily: UI_FONT,
         fontSize: FONT.body,
         color: '#d4b106',
@@ -70,7 +70,7 @@ export class MenuScene extends Phaser.Scene {
     iconBg.fillCircle(gearX, gearY, 32)
     iconBg.fillCircle(gearX - 84, gearY, 32)
     iconBg.fillCircle(gearX - 168, gearY, 32)
-    emojiImage(this, gearX, gearY, '⚙️', 40)
+    emojiImage(this, gearX, gearY, '⚙️', 54)
       .setAlpha(0.9)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
@@ -78,7 +78,7 @@ export class MenuScene extends Phaser.Scene {
         this.scene.start('settings')
       })
     this.gearRect = { x: gearX - 28, y: gearY - 28, w: 56, h: 56 }
-    emojiImage(this, gearX - 84, gearY, '📖', 40)
+    emojiImage(this, gearX - 84, gearY, '📖', 54)
       .setAlpha(0.9)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
@@ -86,7 +86,7 @@ export class MenuScene extends Phaser.Scene {
         this.scene.start('wiki')
       })
     this.bookRect = { x: gearX - 84 - 28, y: gearY - 28, w: 56, h: 56 }
-    emojiImage(this, gearX - 168, gearY, '🧪', 40)
+    emojiImage(this, gearX - 168, gearY, '🧪', 54)
       .setAlpha(0.9)
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
@@ -209,7 +209,7 @@ export class MenuScene extends Phaser.Scene {
         w * side,
         h * (0.12 + rng.next() * 0.76),
         d.emoji,
-        56 + rng.next() * 40,
+        75 + rng.next() * 54,
         d.outline,
       )
         .setAlpha(0.1)
@@ -264,8 +264,8 @@ export class MenuScene extends Phaser.Scene {
         delay: i * 110,
       })
     })
-    const left = emojiImage(this, w / 2 - total / 2 - 58, y, '⚔️', 64)
-    const right = emojiImage(this, w / 2 + total / 2 + 58, y, '⚔️', 64)
+    const left = emojiImage(this, w / 2 - total / 2 - 58, y, '⚔️', 85)
+    const right = emojiImage(this, w / 2 + total / 2 + 58, y, '⚔️', 85)
     this.tweens.add({
       targets: left,
       rotation: { from: -0.12, to: 0.12 },
@@ -290,7 +290,7 @@ export class MenuScene extends Phaser.Scene {
       .slice(0, 3)
       .map((c) => c.emoji)
     chars.forEach((emoji, i) => {
-      const img = emojiImage(this, cx - 260 + i * 90, cy, emoji, 56, 'player').setFlipX(true)
+      const img = emojiImage(this, cx - 260 + i * 90, cy, emoji, 75, 'player').setFlipX(true)
       this.tweens.add({
         targets: img,
         y: cy - 12,
@@ -303,7 +303,7 @@ export class MenuScene extends Phaser.Scene {
     })
     const enemies = ENEMY_SPECS.slice(0, 3).map((s) => s.emoji)
     enemies.forEach((emoji, i) => {
-      const img = emojiImage(this, cx + 80 + i * 90, cy, emoji, 52, 'enemy')
+      const img = emojiImage(this, cx + 80 + i * 90, cy, emoji, 70, 'enemy')
       this.tweens.add({
         targets: img,
         rotation: { from: -0.09, to: 0.09 },
@@ -315,7 +315,7 @@ export class MenuScene extends Phaser.Scene {
       })
     })
     // 互射：番茄向右、敌弹向左，循环往复（弹道两端与两队保持间隙）
-    const tomato = emojiImage(this, cx - 34, cy - 6, '🍅', 30, 'player')
+    const tomato = emojiImage(this, cx - 34, cy - 6, '🍅', 40, 'player')
     this.tweens.add({
       targets: tomato,
       x: cx + 42,
@@ -324,7 +324,7 @@ export class MenuScene extends Phaser.Scene {
       repeat: -1,
       repeatDelay: 260,
     })
-    const shot = emojiImage(this, cx + 42, cy + 22, '🔴', 22, 'enemyShot')
+    const shot = emojiImage(this, cx + 42, cy + 22, '🔴', 30, 'enemyShot')
     this.tweens.add({
       targets: shot,
       x: cx - 34,

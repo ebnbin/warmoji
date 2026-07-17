@@ -200,7 +200,7 @@ export class ResultScene extends Phaser.Scene {
     this.run.roster.forEach((id, slot) => {
       const cy = y + headerH + rowH * slot + rowH / 2
       const spec = CHARACTERS[id]
-      emojiImage(this, x + 46, cy, spec.emoji, Math.min(44, rowH - 14), 'player')
+      emojiImage(this, x + 46, cy, spec.emoji, Math.min(58, rowH - 8), 'player')
       this.add
         .text(x + 82, cy, spec.name, {
           fontFamily: UI_FONT,
@@ -228,7 +228,7 @@ export class ResultScene extends Phaser.Scene {
       const shown = unique.slice(0, 2)
       shown.forEach((item, i) => {
         const ix = colItems - ((shown.length - 1) / 2 - i) * 38
-        emojiImage(this, ix, cy, ITEMS[item].emoji, 26)
+        emojiImage(this, ix, cy, ITEMS[item].emoji, 35)
         const stacks = stackCount(owned, item)
         if (stacks > 1) {
           this.add
@@ -325,7 +325,7 @@ export class ResultScene extends Phaser.Scene {
       const cy = top + rowH * i + rowH / 2
       const isBoss = name === BOSS.name
       const emoji = emojiByName.get(name)
-      if (emoji) emojiImage(this, x + 34, cy, emoji, Math.min(30, rowH - 8), isBoss ? 'elite' : 'enemy')
+      if (emoji) emojiImage(this, x + 34, cy, emoji, Math.min(40, rowH - 5), isBoss ? 'elite' : 'enemy')
       this.add
         .text(x + 58, cy, name, {
           fontFamily: UI_FONT,

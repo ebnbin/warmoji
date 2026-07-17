@@ -37,8 +37,8 @@ describe('地图定义', () => {
       expect(d.density[0]).toBeLessThanOrEqual(d.density[1])
       expect(d.density[1]).toBeLessThanOrEqual(0.2)
       expect(d.sizeU[0]).toBeLessThanOrEqual(d.sizeU[1])
-      // 背景装饰必须明显小于战斗实体（1 格），不抢注意力
-      expect(d.sizeU[1]).toBeLessThanOrEqual(0.8)
+      // 背景装饰必须明显小于战斗实体（48 标准下角色 1.2 格），不抢注意力
+      expect(d.sizeU[1]).toBeLessThanOrEqual(1.0)
     }
   })
 

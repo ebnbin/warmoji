@@ -181,7 +181,7 @@ export class CaptainScene extends Phaser.Scene {
     const spec = CAPTAINS[this.selectedId]
 
     this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, spec.emoji, 64, 'player'),
+      emojiImage(this, dx + 58, dy + 56, spec.emoji, 85, 'player'),
       this.add
         .text(dx + 104, dy + 42, spec.name, {
           fontFamily: UI_FONT,
@@ -205,7 +205,7 @@ export class CaptainScene extends Phaser.Scene {
     let cursor = dy + 122
     for (const group of captainStatGroups(spec)) {
       this.detailObjs.push(
-        emojiImage(this, dx + 42, cursor, group.icon, 26),
+        emojiImage(this, dx + 42, cursor, group.icon, 35),
         this.add
           .text(dx + 62, cursor, group.title, {
             fontFamily: UI_FONT,

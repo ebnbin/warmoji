@@ -145,12 +145,12 @@ export class EmojiGrid {
         relX + this.cell / 2,
         relY + this.cell / 2 - (item.hpRatio !== undefined ? 5 : 0),
         item.emoji,
-        this.cell - 34,
+        this.cell - 8,
         item.outline,
       )
       this.container.add([bg, icon])
       if (item.badge) {
-        const badge = emojiImage(this.scene, relX + this.cell - 17, relY + 17, item.badge, 24)
+        const badge = emojiImage(this.scene, relX + this.cell - 17, relY + 17, item.badge, 32)
         this.container.add(badge)
       }
       if (item.hpRatio !== undefined) {

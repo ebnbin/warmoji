@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { outlineSvg, setSvgSize } from './svg'
+import { EMOJI_PAD, outlineSvg, padSvg, setSvgSize } from './svg'
 
 const SAMPLE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><path d="M0 0h36v36H0z"/></svg>'
 
@@ -23,10 +23,28 @@ describe('setSvgSize', () => {
   })
 })
 
+describe('padSvg', () => {
+  it('viewBox 四周外扩、内容不动：36 贴边 → 48 标准', () => {
+    const out = padSvg(SAMPLE, EMOJI_PAD)
+    expect(out).toContain('viewBox="-6 -6 48 48"')
+    expect(out).toContain('<path d="M0 0h36v36H0z"/>')
+  })
+
+  it('非零起点 viewBox 同样按边外扩', () => {
+    const shifted = '<svg viewBox="2 4 32 30"></svg>'
+    expect(padSvg(shifted, 6)).toContain('viewBox="-4 -2 44 42"')
+  })
+
+  it('缺少 viewBox 抛错', () => {
+    expect(() => padSvg('<svg xmlns="x"></svg>', 6)).toThrow()
+  })
+})
+
 describe('outlineSvg', () => {
-  it('viewBox 四周外扩 radius+1', () => {
-    const out = outlineSvg(SAMPLE, 2, '#ffffff')
-    expect(out).toContain('viewBox="-3 -3 42 42"')
+  it('viewBox 保持原样（描边画进统一 padding 余量）', () => {
+    const padded = padSvg(SAMPLE, EMOJI_PAD)
+    const out = outlineSvg(padded, 2, '#ffffff')
+    expect(out).toContain('viewBox="-6 -6 48 48"')
   })
 
   it('内容复制为下层描边副本：CSS 强制配色 + 圆角描边', () => {
@@ -43,7 +61,7 @@ describe('outlineSvg', () => {
     expect(out.split('<path d="M0 0h36v36H0z"/>').length - 1).toBe(2)
   })
 
-  it('缺少 viewBox 抛错', () => {
-    expect(() => outlineSvg('<svg xmlns="x"></svg>', 2, '#fff')).toThrow()
+  it('非 SVG 抛错', () => {
+    expect(() => outlineSvg('<div/>', 2, '#fff')).toThrow()
   })
 })

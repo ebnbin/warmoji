@@ -96,7 +96,7 @@ export class WikiScene extends Phaser.Scene {
     this.groups = wikiGroups()
     this.used = usedEmojiSet()
     // 缩略图档位按设备渲染缩放定（52 逻辑 px 格子的物理像素 1:1）；同档复用缓存
-    prepareEmojiThumbs(this, emojiThumbSize(52, viewport.renderScale))
+    prepareEmojiThumbs(this, emojiThumbSize(70, viewport.renderScale))
     this.entryLookup = wikiEntryByEmoji()
     this.pool = undefined
     if (!preserved) {
@@ -193,7 +193,7 @@ export class WikiScene extends Phaser.Scene {
         bg.fillRoundedRect(x, y, cw, ch, ch / 2)
         bg.lineStyle(on ? 2 : 1, 0xffffff, on ? 0.85 : 0.1)
         bg.strokeRoundedRect(x, y, cw, ch, ch / 2)
-        emojiImage(this, x + 28, y + ch / 2, d.icon, 26)
+        emojiImage(this, x + 28, y + ch / 2, d.icon, 35)
         this.add
           .text(x + 46, y + ch / 2, d.label, {
             fontFamily: UI_FONT,
@@ -368,7 +368,7 @@ export class WikiScene extends Phaser.Scene {
     const dy = this.origin.y + D.y
 
     P.badge.setText(category).setVisible(true)
-    this.setPoolIcon(P.icon, e.emoji, 76)
+    this.setPoolIcon(P.icon, e.emoji, 100)
     P.name.setText(e.name).setColor('#ffffff').setVisible(true)
     P.desc.setText(e.desc).setVisible(true)
     P.footer.setVisible(false)
@@ -466,7 +466,7 @@ export class WikiScene extends Phaser.Scene {
       }
       if (selected) {
         // 未收录：展示 emoji 本体与待收录状态
-        this.setPoolIcon(P.icon, selected, 64)
+        this.setPoolIcon(P.icon, selected, 85)
         P.name.setText('未收录').setColor('#9a9aa8').setVisible(true)
         P.desc
           .setText('这个 emoji 还没有成为游戏实体。\n随版本迭代，目标是把它们全部做进游戏。')

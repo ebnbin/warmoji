@@ -107,7 +107,7 @@ export class SettingsScene extends Phaser.Scene {
       bg.lineStyle(1, 0xffffff, 0.1)
       bg.strokeRoundedRect(lx, y, S.w, S.rowH, 16)
 
-      emojiImage(this, lx + 50, y + S.rowH / 2, def.icon, 44)
+      emojiImage(this, lx + 50, y + S.rowH / 2, def.icon, 58)
       this.add
         .text(lx + 92, y + S.rowH / 2 - 18, def.label, {
           fontFamily: UI_FONT,

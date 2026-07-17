@@ -166,7 +166,7 @@ export class StudioScene extends Phaser.Scene {
       this.speedIdx = 0
     }
     // 缩略图档位按设备渲染缩放定（52 逻辑 px 格子的物理像素 1:1）；同档复用缓存
-    prepareEmojiThumbs(this, emojiThumbSize(52, viewport.renderScale))
+    prepareEmojiThumbs(this, emojiThumbSize(70, viewport.renderScale))
     this.previewState = 'idle'
     this.detailObjs = []
     this.tabObjs = []
@@ -406,7 +406,7 @@ export class StudioScene extends Phaser.Scene {
     const recipe = animRecipeOf(this.recipeSel)
     if (!recipe) return
     const portrait = this.layout === PORTRAIT
-    const previewSize = portrait ? 210 : 240
+    const previewSize = portrait ? 280 : 320
     const cx = d.x + d.w / 2
     let y = d.y + 18
     this.spawnPreview(cx, y + previewSize / 2, previewSize, recipe.emoji)
@@ -454,7 +454,7 @@ export class StudioScene extends Phaser.Scene {
     const { d, res } = this.resetDetail()
     const tpl = animTemplateOf(this.tplId) ?? ANIM_TEMPLATES[0]!
     const portrait = this.layout === PORTRAIT
-    const previewSize = portrait ? 196 : 220
+    const previewSize = portrait ? 260 : 295
     const cx = d.x + d.w / 2
     let y = d.y + 16
     this.spawnPreview(cx, y + previewSize / 2, previewSize, this.tplEmoji)
@@ -476,7 +476,7 @@ export class StudioScene extends Phaser.Scene {
       bg.fillRoundedRect(x, cy, chipW, chipH, 12)
       bg.lineStyle(active ? 2 : 1, 0xffffff, active ? 0.9 : 0.1)
       bg.strokeRoundedRect(x, cy, chipW, chipH, 12)
-      const icon = emojiImage(this, x + chipW / 2, cy + 22, t.icon, 26)
+      const icon = emojiImage(this, x + chipW / 2, cy + 22, t.icon, 35)
       const label = this.add
         .text(x + chipW / 2, cy + chipH - 15, t.name, {
           fontFamily: UI_FONT,
@@ -534,7 +534,7 @@ export class StudioScene extends Phaser.Scene {
   private buildAnatomyDetail(): void {
     const { d, res } = this.resetDetail()
     const portrait = this.layout === PORTRAIT
-    const bigSize = portrait ? 225 : 180
+    const bigSize = portrait ? 300 : 240
     const emoji = this.anatEmoji
     const gen = ++this.jobGen
     this.previewState = 'loading'

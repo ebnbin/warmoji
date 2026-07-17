@@ -5,7 +5,7 @@ import type { OutlineKind } from '../core/config'
 import { emojiCodepoints } from '../core/emoji'
 import { packSvg, parseEmojiPack } from '../core/emojipack'
 import type { EmojiPack } from '../core/emojipack'
-import { outlineSvg, setSvgSize } from '../core/svg'
+import { EMOJI_PAD, outlineSvg, padSvg, setSvgSize } from '../core/svg'
 
 // twemoji 全集打包资源（构建期由 sync-emoji.mjs 生成 index.json + pack.txt，
 // 图形 CC-BY 4.0）：全库仅两个请求，之后任意 emoji 的 SVG 文本同步可取。
@@ -44,12 +44,14 @@ export function loadEmojiPack(): Promise<EmojiPack> {
   return packPromise
 }
 
-/** emoji → 完整 SVG 文本（从打包资源取；未收录即抛错） */
+/** emoji → 完整 SVG 文本（从打包资源取；未收录即抛错）。
+ * 项目规范的唯一注入点：viewBox 统一 pad 成 48 标准（内容 36 居中 + 四周 6），
+ * 纹理/缩略图/Studio 全部经此出口——任何 emoji 素材天生自带 padding */
 export async function emojiSvgText(emoji: string): Promise<string> {
   const pack = await loadEmojiPack()
   const svg = packSvg(pack, emojiCodepoints(emoji))
   if (!svg) throw new Error(`emoji 不在打包资源中: ${emoji} (${emojiCodepoints(emoji)})`)
-  return svg
+  return padSvg(svg, EMOJI_PAD)
 }
 
 /** dev 面板诊断：存活 emoji 纹理数与固定预载数（LRU 上限只约束非固定部分） */

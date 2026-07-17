@@ -38,7 +38,7 @@ const pistol = {
   knockback: 3 * UNIT,
   held: {
     emoji: '🔫',
-    size: 0.55 * UNIT,
+    size: 0.75 * UNIT,
     restOffset: 0.45 * UNIT,
     // twemoji 1f52b 枪口朝左
     rotationOffsetRad: Math.PI,
@@ -46,7 +46,7 @@ const pistol = {
   },
   projectile: {
     emoji: '💧',
-    size: 0.35 * UNIT,
+    size: 0.45 * UNIT,
     radius: 0.15 * UNIT,
     speed: 13 * UNIT,
     // twemoji 1f4a7 水滴尖端朝上
@@ -64,7 +64,7 @@ export const WEAPONS = {
     knockback: 3.5 * UNIT,
     projectile: {
       emoji: '🍅',
-      size: 0.4 * UNIT,
+      size: 0.55 * UNIT,
       radius: 0.18 * UNIT,
       speed: 12 * UNIT,
       rotationOffsetRad: 0,
@@ -94,7 +94,7 @@ export const WEAPONS = {
     sweepMs: 260,
     held: {
       emoji: '🪓',
-      size: 0.65 * UNIT,
+      size: 0.85 * UNIT,
       restOffset: 0.6 * UNIT,
       // twemoji 1fa93 斧刃朝左上
       rotationOffsetRad: (3 * Math.PI) / 4,
@@ -133,7 +133,7 @@ export const WEAPONS = {
     color: 0xff5252,
     held: {
       emoji: '🔦',
-      size: 0.55 * UNIT,
+      size: 0.75 * UNIT,
       restOffset: 0.45 * UNIT,
       // twemoji 1f526 灯头朝左下
       rotationOffsetRad: (3 * Math.PI) / 4,
@@ -161,7 +161,7 @@ export const WEAPONS = {
     spinRadPerSec: 14,
     held: {
       emoji: '🪃',
-      size: 0.55 * UNIT,
+      size: 0.75 * UNIT,
       restOffset: 0.5 * UNIT,
       rotationOffsetRad: 0,
     },
@@ -428,7 +428,7 @@ export const WANDER = {
 } as const
 
 export const MEMBER = {
-  size: 0.9 * UNIT,
+  size: 1.2 * UNIT,
   radius: 0.45 * UNIT,
   maxHp: 100,
   // 波次制要求整波存活，受击间隔放宽让「蹭到怪」是磨损而非速死
@@ -533,7 +533,7 @@ export const ZOMBIE: ChaseEnemySpec = {
   emoji: '🧟',
   name: '僵尸',
   desc: '缓慢但成群，最基础的追击者',
-  size: 1 * UNIT,
+  size: 1.35 * UNIT,
   radius: 0.5 * UNIT,
   hp: 60,
   speed: 1.375 * UNIT,
@@ -548,7 +548,7 @@ export const GHOST: ChaseEnemySpec = {
   emoji: '👻',
   name: '幽灵',
   desc: '飘得很快的追击者，血薄',
-  size: 0.9 * UNIT,
+  size: 1.2 * UNIT,
   radius: 0.45 * UNIT,
   hp: 25,
   speed: 2.875 * UNIT,
@@ -564,7 +564,7 @@ export const INVADER: WanderFireEnemySpec = {
   emoji: '👾',
   name: '外星怪',
   desc: '不追人，游荡途中朝前方吐慢速弹',
-  size: 0.95 * UNIT,
+  size: 1.25 * UNIT,
   radius: 0.48 * UNIT,
   hp: 40,
   speed: 0.9 * UNIT,
@@ -572,7 +572,7 @@ export const INVADER: WanderFireEnemySpec = {
   xp: 4,
   coins: 3,
   fireIntervalMs: 2800,
-  bullet: { emoji: '🔴', size: 0.3 * UNIT, radius: 0.14 * UNIT, speed: 3 * UNIT, damage: 6, lifeMs: 4500 },
+  bullet: { emoji: '🔴', size: 0.4 * UNIT, radius: 0.14 * UNIT, speed: 3 * UNIT, damage: 6, lifeMs: 4500 },
 }
 
 /** 突刺怪：探测圈内锁定蓄力方向 → 短延迟 → 直线冲刺一段距离（横向位移可躲） */
@@ -582,7 +582,7 @@ export const BOAR: DashEnemySpec = {
   emoji: '🐗',
   name: '野猪',
   desc: '发现猎物后蓄力直线突刺，横向可躲',
-  size: 1.05 * UNIT,
+  size: 1.4 * UNIT,
   radius: 0.52 * UNIT,
   hp: 80,
   speed: 1.1 * UNIT,
@@ -603,7 +603,7 @@ export const SNAKE: FleeFireEnemySpec = {
   emoji: '🐍',
   name: '毒蛇',
   desc: '见人就溜，边逃边回头吐毒弹',
-  size: 0.95 * UNIT,
+  size: 1.25 * UNIT,
   radius: 0.45 * UNIT,
   hp: 35,
   speed: 2.4 * UNIT,
@@ -612,7 +612,7 @@ export const SNAKE: FleeFireEnemySpec = {
   coins: 3,
   fleeRange: 5 * UNIT,
   fireIntervalMs: 2600,
-  bullet: { emoji: '🟢', size: 0.3 * UNIT, radius: 0.14 * UNIT, speed: 3.2 * UNIT, damage: 5, lifeMs: 4500 },
+  bullet: { emoji: '🟢', size: 0.4 * UNIT, radius: 0.14 * UNIT, speed: 3.2 * UNIT, damage: 5, lifeMs: 4500 },
 }
 
 /** 毒爆怪：慢速近战，死亡原地留毒液池（别在自己的风筝路线上打爆它） */
@@ -622,7 +622,7 @@ export const MUSHROOM: ChaseEnemySpec = {
   emoji: '🍄',
   name: '毒蘑菇',
   desc: '死亡时在原地留下一片毒液',
-  size: 0.95 * UNIT,
+  size: 1.25 * UNIT,
   radius: 0.46 * UNIT,
   hp: 50,
   speed: 1 * UNIT,
@@ -639,7 +639,7 @@ export const RAT: CoinThiefEnemySpec = {
   emoji: '🐀',
   name: '偷币鼠',
   desc: '专偷地上的金币，击杀可全额讨回并有利息',
-  size: 0.8 * UNIT,
+  size: 1.05 * UNIT,
   radius: 0.4 * UNIT,
   hp: 30,
   speed: 3.2 * UNIT,
@@ -654,7 +654,7 @@ export const BLOBLING: ChaseEnemySpec = {
   emoji: '🫧',
   name: '小泡泡',
   desc: '泡泡分裂出的迷你体，快而脆',
-  size: 0.55 * UNIT,
+  size: 0.75 * UNIT,
   radius: 0.28 * UNIT,
   hp: 18,
   speed: 2.6 * UNIT,
@@ -670,7 +670,7 @@ export const BLOB: ChaseEnemySpec = {
   emoji: '🫧',
   name: '泡泡',
   desc: '被击破时分裂成两只小泡泡',
-  size: 1.15 * UNIT,
+  size: 1.55 * UNIT,
   radius: 0.55 * UNIT,
   hp: 70,
   speed: 1.2 * UNIT,
@@ -708,7 +708,7 @@ export const ENEMY_MIX = [
 // 金币拾取是团队能力：磁吸与入账都以队伍中心为基点（拾取范围类道具挂队长）
 export const COIN = {
   emoji: '🪙',
-  size: 0.45 * UNIT,
+  size: 0.6 * UNIT,
   radius: 0.22 * UNIT,
   magnetRadius: 2.25 * UNIT,
   magnetSpeed: 8 * UNIT,
@@ -730,7 +730,7 @@ export const SPAWN = {
   // 地图内随机刷怪：先显示预告标记再落地
   telegraphMs: 900,
   markEmoji: '⚠️',
-  markSize: 0.75 * UNIT,
+  markSize: 1.0 * UNIT,
   minPlayerDist: 3 * UNIT,
   edgeInset: 0.5 * UNIT,
 } as const
@@ -762,7 +762,7 @@ export const SURGE = {
 export const BOSS = {
   emoji: '👹',
   name: '赤鬼',
-  size: 2.4 * UNIT,
+  size: 3.2 * UNIT,
   radius: 1.05 * UNIT,
   hp: 4000,
   /** 平时缓速逼近队伍中心 */
@@ -774,7 +774,7 @@ export const BOSS = {
   ring: {
     count: 12,
     intervalMs: 2800,
-    bullet: { emoji: '🟣', size: 0.34 * UNIT, radius: 0.16 * UNIT, speed: 2.4 * UNIT, damage: 8, lifeMs: 6000 },
+    bullet: { emoji: '🟣', size: 0.45 * UNIT, radius: 0.16 * UNIT, speed: 2.4 * UNIT, damage: 8, lifeMs: 6000 },
   },
   /** 突刺循环：蓄力提示后朝队伍中心猛冲 */
   dash: { intervalMs: 5600, windupMs: 750, speed: 8 * UNIT, durationMs: 450 },

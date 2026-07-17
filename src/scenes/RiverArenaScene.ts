@@ -429,7 +429,7 @@ export class RiverArenaScene extends BaseArenaScene {
     const driftPool = mapSpec.drift ?? ['🍃']
     for (let i = 0; i < RIVER.driftCount; i++) {
       const emoji = driftPool[Math.floor(Math.random() * driftPool.length)]!
-      const img = emojiImage(this, 0, 0, emoji, (0.26 + Math.random() * 0.2) * UNIT, 'player')
+      const img = emojiImage(this, 0, 0, emoji, (0.35 + Math.random() * 0.25) * UNIT, 'player')
         .setAlpha(0.5)
         .setDepth(1.5)
       const d: Drift = {

@@ -188,7 +188,7 @@ export class ShopScene extends Phaser.Scene {
     }
     this.events.on(Phaser.Scenes.Events.WAKE, this.onWake, this)
 
-    emojiImage(this, w / 2 - 28, oy + L.coinsY, COIN.emoji, 32, 'player')
+    emojiImage(this, w / 2 - 28, oy + L.coinsY, COIN.emoji, 42, 'player')
     this.coinsText = this.add
       .text(w / 2 - 4, oy + L.coinsY, `${this.run.coins}`, {
         fontFamily: UI_FONT,
@@ -448,7 +448,7 @@ export class ShopScene extends Phaser.Scene {
     }
 
     this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, spec.emoji, 64, 'player'),
+      emojiImage(this, dx + 58, dy + 56, spec.emoji, 85, 'player'),
       this.add
         .text(dx + 104, dy + 44, spec.name, {
           fontFamily: UI_FONT,
@@ -475,7 +475,7 @@ export class ShopScene extends Phaser.Scene {
       let x = dx + 42
       const uniq = [...new Set(owned)]
       for (const id of uniq.slice(0, 10)) {
-        statObjs.push(emojiImage(this, x, cursor, ITEMS[id].emoji, 26))
+        statObjs.push(emojiImage(this, x, cursor, ITEMS[id].emoji, 35))
         const n = stackCount(owned, id)
         const t = this.add
           .text(x + 17, cursor + 3, `×${n}`, {
@@ -496,7 +496,7 @@ export class ShopScene extends Phaser.Scene {
       : characterStatGroups(this.focusedId as CharacterId, owned)
     for (const group of groups) {
       statObjs.push(
-        emojiImage(this, dx + 42, cursor, group.icon, 26),
+        emojiImage(this, dx + 42, cursor, group.icon, 35),
         this.add
           .text(dx + 62, cursor, group.title, {
             fontFamily: UI_FONT,
@@ -571,7 +571,7 @@ export class ShopScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5)
       this.detailObjs.push(
-        emojiImage(this, dx + 52, cardY + 48, item.emoji, 48),
+        emojiImage(this, dx + 52, cardY + 48, item.emoji, 64),
         name,
         this.add
           .text(name.x + name.width + 10, cardY + 28, RARITIES[item.rarity].label, {

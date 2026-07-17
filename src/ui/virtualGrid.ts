@@ -10,7 +10,7 @@ import { TAP_SLOP } from './grid'
 // SHUTDOWN 时自摘（scene.events 不随 restart 清空，不摘会跨局叠加）。
 
 const CELL = 72
-const ICON = 52
+const ICON = 70
 
 interface Slot {
   image: Phaser.GameObjects.Image

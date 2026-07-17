@@ -46,7 +46,7 @@ export const MAPS = {
     },
     decor: {
       emojis: ['🌲', '🌳', '🌿', '🍂', '🍃', '🪨'],
-      sizeU: [0.28, 0.7],
+      sizeU: [0.35, 0.95],
       alpha: [0.14, 0.26],
       density: [0.1, 0.14],
     },
@@ -64,7 +64,7 @@ export const MAPS = {
     },
     decor: {
       emojis: ['🌵', '🪨', '🦴', '💀', '🥀'],
-      sizeU: [0.28, 0.68],
+      sizeU: [0.35, 0.9],
       alpha: [0.14, 0.26],
       // 荒漠刻意更稀疏
       density: [0.08, 0.11],
@@ -86,7 +86,7 @@ export const MAPS = {
     decor: {
       // 岸上静态植被（战斗区外，透明度可比战斗区装饰略高）
       emojis: ['🌾', '🌿', '🪨', '🌳', '🍄'],
-      sizeU: [0.3, 0.6],
+      sizeU: [0.4, 0.8],
       alpha: [0.3, 0.45],
       density: [0.1, 0.14],
     },
@@ -107,7 +107,7 @@ export const MAPS = {
     decor: {
       // 星空点缀（静态散布，低透明度）
       emojis: ['✨', '⭐', '💫', '🪐', '☄️'],
-      sizeU: [0.16, 0.5],
+      sizeU: [0.2, 0.65],
       alpha: [0.18, 0.34],
       density: [0.05, 0.08],
     },

@@ -436,7 +436,7 @@ export class PromoteScene extends Phaser.Scene {
         ring.strokeCircle(px, py, 44)
         this.formationObjs.push(ring)
       }
-      const img = emojiImage(this, px, py, CHARACTERS[id].emoji, 60, 'player')
+      const img = emojiImage(this, px, py, CHARACTERS[id].emoji, 80, 'player')
       this.formationObjs.push(img)
       this.memberImgs[post] = img
       const zone = this.add
@@ -541,7 +541,7 @@ export class PromoteScene extends Phaser.Scene {
     const items = this.run.memberItems[slot] ?? []
 
     this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, spec.emoji, 64, 'player'),
+      emojiImage(this, dx + 58, dy + 56, spec.emoji, 85, 'player'),
       this.add
         .text(dx + 104, dy + 44, `${spec.name} · 受保护的中心`, {
           fontFamily: UI_FONT,
@@ -577,7 +577,7 @@ export class PromoteScene extends Phaser.Scene {
     const id = this.selectedKey as CharacterId
     const spec = CHARACTERS[id]
     this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, spec.emoji, 64, 'player'),
+      emojiImage(this, dx + 58, dy + 56, spec.emoji, 85, 'player'),
       this.add
         .text(dx + 104, dy + 44, spec.name, {
           fontFamily: UI_FONT,
@@ -608,7 +608,7 @@ export class PromoteScene extends Phaser.Scene {
     let cursor = dy + 128
     for (const group of characterStatGroups(id, items)) {
       this.detailObjs.push(
-        emojiImage(this, dx + 42, cursor, group.icon, 26),
+        emojiImage(this, dx + 42, cursor, group.icon, 35),
         this.add
           .text(dx + 62, cursor, group.title, {
             fontFamily: UI_FONT,

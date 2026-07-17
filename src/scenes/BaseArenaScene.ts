@@ -782,7 +782,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       .sort((a, b) => a.d2 - b.d2)
       .slice(0, SKILL.moneybags.targets)
     nearest.forEach(({ e }, i) => {
-      const bag = emojiImage(this, e.x, e.y - 3 * UNIT, '💰', 0.55 * UNIT, 'player')
+      const bag = emojiImage(this, e.x, e.y - 3 * UNIT, '💰', 0.75 * UNIT, 'player')
         .setDepth(30)
         .setAlpha(0)
       this.tweens.add({
