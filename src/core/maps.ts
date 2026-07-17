@@ -21,6 +21,8 @@ export interface MapSpec {
   readonly emoji: string
   readonly name: string
   readonly desc: string
+  /** 世界形态：bounded = 25×25 有界竞技场；infinite = 无边界（终波缩圈） */
+  readonly kind: 'bounded' | 'infinite'
   /** 固定色板：战斗场景不再逐局随机 */
   readonly palette: Palette
   readonly decor: MapDecor
@@ -32,6 +34,7 @@ export const MAPS = {
     emoji: '🌲',
     name: '黑森林',
     desc: '苍郁密林，落叶与蕨草铺满林间空地',
+    kind: 'bounded',
     palette: {
       bgFrom: 'hsl(150 30% 30%)',
       bgTo: 'hsl(170 32% 17%)',
@@ -49,6 +52,7 @@ export const MAPS = {
     emoji: '🏜️',
     name: '荒漠',
     desc: '烈日荒原，仙人掌与枯骨散落黄沙',
+    kind: 'bounded',
     palette: {
       bgFrom: 'hsl(30 42% 36%)',
       bgTo: 'hsl(15 38% 20%)',
@@ -67,6 +71,7 @@ export const MAPS = {
     emoji: '❄️',
     name: '雪原',
     desc: '冰封旷野，风雪在大地刻下冰晶',
+    kind: 'bounded',
     palette: {
       bgFrom: 'hsl(210 34% 34%)',
       bgTo: 'hsl(235 30% 18%)',
@@ -80,6 +85,24 @@ export const MAPS = {
       density: [0.12, 0.16],
     },
   },
+  wilds: {
+    emoji: '🌾',
+    name: '无垠旷野',
+    desc: '没有边界的原野，可朝任意方向走到天涯；终波赤鬼降临时毒雾收拢成圈',
+    kind: 'infinite',
+    palette: {
+      bgFrom: 'hsl(80 30% 30%)',
+      bgTo: 'hsl(100 28% 16%)',
+      map: hslToInt(75, 0.34, 0.66),
+      shadow: 0x000000,
+    },
+    decor: {
+      emojis: ['🌾', '🌼', '🍃', '🪨', '🌻'],
+      sizeU: [0.28, 0.66],
+      alpha: [0.14, 0.26],
+      density: [0.1, 0.14],
+    },
+  },
 } as const satisfies Record<string, MapSpec>
 
 export type MapId = keyof typeof MAPS
@@ -87,6 +110,11 @@ export const MAP_IDS = Object.keys(MAPS) as readonly MapId[]
 
 export function sanitizeMapId(id: unknown): MapId {
   return typeof id === 'string' && id in MAPS ? (id as MapId) : MAP_IDS[0]!
+}
+
+/** 该地图应进入的竞技场场景（有界/无界是两套场景实现，按图路由） */
+export function arenaSceneFor(id: MapId): 'arena' | 'arenaInfinite' {
+  return MAPS[id].kind === 'infinite' ? 'arenaInfinite' : 'arena'
 }
 
 // ── 装饰散布 ────────────────────────────────────────────────

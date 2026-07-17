@@ -5,6 +5,7 @@ import { CAPTAINS, CHARACTERS, LEVELS } from '../core/config'
 import { formationPosts } from '../core/formation'
 import { nextLevelKind, statUpgradeLabel } from '../core/levels'
 import type { ItemId } from '../core/items'
+import { arenaSceneFor } from '../core/maps'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -311,8 +312,10 @@ export class PromoteScene extends Phaser.Scene {
   }
 
   /** 点数花完后的去向：开局看队长 firstWaveShop（默认直接开战），波末必进商店 */
-  private nextScene(): 'arena' | 'shop' {
-    if (this.isInitial() && !CAPTAINS[this.run.captainId].firstWaveShop) return 'arena'
+  private nextScene(): 'arena' | 'arenaInfinite' | 'shop' {
+    if (this.isInitial() && !CAPTAINS[this.run.captainId].firstWaveShop) {
+      return arenaSceneFor(this.run.mapId)
+    }
     return 'shop'
   }
 
@@ -338,7 +341,7 @@ export class PromoteScene extends Phaser.Scene {
     if (this.mode === 'recruit') return '招募（花 1 点）'
     if (this.mode === 'upgrade') return '升级（花 1 点）'
     if (this.fromShop) return '返回商店'
-    return this.nextScene() === 'arena' ? '开战' : '前往商店'
+    return this.nextScene() === 'shop' ? '前往商店' : '开战'
   }
 
   /** 唤醒沉睡的商店并退出本页（商店货架/金币/刷新次数原样保留） */

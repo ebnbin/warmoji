@@ -37,8 +37,18 @@ export class UIScene extends Phaser.Scene {
   private paused = false
   private pauseObjs: Phaser.GameObjects.GameObject[] = []
 
+  /** 当前战斗场景 key：有界/无界两套竞技场互斥运行，本场景只跟随其一 */
+  private arenaKey: 'arena' | 'arenaInfinite' = 'arena'
+
   constructor() {
     super('ui')
+  }
+
+  /** 启动时探测哪个竞技场在跑（含暂停中——视口变化会带着暂停态重启本场景）。
+   * 用运行状态而非 launch 传参：场景 data 会跨局残留，探测永不脏 */
+  init(): void {
+    const inf = this.scene.isActive('arenaInfinite') || this.scene.isPaused('arenaInfinite')
+    this.arenaKey = inf ? 'arenaInfinite' : 'arena'
   }
 
   get joystickVector(): { x: number; y: number } {
@@ -46,7 +56,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   private get arena(): ArenaScene {
-    return this.scene.get('arena') as ArenaScene
+    return this.scene.get(this.arenaKey) as ArenaScene
   }
 
   create(): void {

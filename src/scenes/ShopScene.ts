@@ -12,6 +12,7 @@ import {
 } from '../core/items'
 import type { ItemId, ItemSpec } from '../core/items'
 import { memberMaxHp } from '../core/levels'
+import { arenaSceneFor } from '../core/maps'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -667,7 +668,7 @@ export class ShopScene extends Phaser.Scene {
 
   private nextWave(): void {
     playSfx('click')
-    this.scene.start('arena')
+    this.scene.start(arenaSceneFor(this.run.mapId))
   }
 
   /** 打开阵型页（本场景睡眠，返回时唤醒，货架/金币/免费刷新原样保留）。

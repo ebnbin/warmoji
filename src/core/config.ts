@@ -727,6 +727,36 @@ export const BOSS = {
   spawnRelief: 2,
 } as const
 
+// 无限地图（kind='infinite' 的关卡）：无边界世界 + 活跃方形 + 终波缩圈。
+// 活跃判定用按轴距离（Chebyshev 方形）：与地图/分块/视口的矩形几何同构；
+// 32 格半边长 > 有限地图对角任意两点的轴距（25）——未来把有限图统一进
+// 同一机制时，图上永远无人休眠，行为零差异
+export const INFINITE = {
+  /** 活跃方形半边长：超出的敌人休眠（冻结 AI/物理/不占刷怪上限，保留全状态） */
+  activeHalf: 32 * UNIT,
+  /** 刷怪环带（以队伍中心为圆心）：内环避脸、外环保证 ⚠️ 预告在屏内可见 */
+  spawnRingMin: 4 * UNIT,
+  spawnRingMax: 9 * UNIT,
+  /** 装饰分块边长（格）：块 = 精灵批量建/销毁的粒度，噪声连续性与块无关 */
+  chunkCells: 8,
+  /** 装饰活跃范围 = 相机视野外扩的块数（销毁再多留一块防抖） */
+  chunkPad: 1,
+} as const
+
+// 终波缩圈（无限地图的 Boss 战边界）：圈心 = 终波开始时的队伍中心。
+// 半径先停留（让玩家看清圈）再线性收缩到底，圈外队员按 tick 掉血；
+// 敌人不受圈伤。收到最小半径后正好容纳 N 保 1 阵 + Boss 走位
+export const ZONE = {
+  r0: 12 * UNIT,
+  rMin: 4 * UNIT,
+  /** 开圈后的静止观察期 */
+  holdMs: 6000,
+  /** 收缩结束时刻（此后维持 rMin 到波末） */
+  shrinkEndMs: 38_000,
+  tickMs: 500,
+  tickDamage: 6,
+} as const
+
 // 压力测试模式（🔧 面板开关）：拉高负载且保证测得下去
 export const STRESS = {
   maxHp: 10_000_000,

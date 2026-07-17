@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { ArenaScene } from './scenes/ArenaScene'
 import { CaptainScene } from './scenes/CaptainScene'
+import { InfiniteArenaScene } from './scenes/InfiniteArenaScene'
 import { MapScene } from './scenes/MapScene'
 import { MenuScene } from './scenes/MenuScene'
 import { PreloadScene } from './scenes/PreloadScene'
@@ -42,7 +43,7 @@ const game = new Phaser.Game({
   // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
   physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, ShopScene, ArenaScene, UIScene, ResultScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, ShopScene, ArenaScene, InfiniteArenaScene, UIScene, ResultScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {
@@ -82,7 +83,9 @@ window.__twemojiVersion = __TWEMOJI_VERSION__
 
 window.__setStress = (on: boolean): void => {
   setStress(on)
-  if (game.scene.isActive('arena')) game.scene.getScene('arena').scene.restart()
+  for (const key of ['arena', 'arenaInfinite']) {
+    if (game.scene.isActive(key)) game.scene.getScene(key).scene.restart()
+  }
 }
 
 window.__addCoins = (n: number): void => grantCoins(n)

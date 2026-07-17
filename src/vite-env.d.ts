@@ -154,6 +154,10 @@ interface WarmojiDebug {
   formation?: string
   /** arena：当前局地图 id */
   mapId?: string
+  /** 无限地图：休眠中的敌人数 */
+  dormant?: number
+  /** 无限地图终波：当前缩圈半径（未开圈为 undefined） */
+  zoneRadius?: number
   menu?: WarmojiMenuDebug
   map?: WarmojiMapDebug
   wiki?: WarmojiWikiDebug

@@ -1,18 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { MAP_IDS, MAPS, rollDecor, sanitizeMapId } from './maps'
+import { arenaSceneFor, MAP_IDS, MAPS, rollDecor, sanitizeMapId } from './maps'
 import { Rng } from './rng'
 
 describe('地图定义', () => {
-  it('三张图齐备：图标/名字/描述/固定色板/装饰规则', () => {
-    expect(MAP_IDS.length).toBe(3)
+  it('四张图齐备：图标/名字/描述/形态/固定色板/装饰规则', () => {
+    expect(MAP_IDS.length).toBe(4)
     for (const id of MAP_IDS) {
       const m = MAPS[id]
       expect(m.emoji.length).toBeGreaterThan(0)
       expect(m.name.length).toBeGreaterThan(0)
       expect(m.desc.length).toBeGreaterThan(0)
+      expect(['bounded', 'infinite']).toContain(m.kind)
       expect(m.palette.bgFrom).toContain('hsl')
       expect(m.decor.emojis.length).toBeGreaterThan(0)
     }
+    // 无限图路由到独立场景，有界图仍走原场景
+    expect(MAPS.wilds.kind).toBe('infinite')
+    expect(MAPS.forest.kind).toBe('bounded')
   })
 
   it('装饰规则数值健全：透明度低于战斗实体、密度稀疏、范围区间有序', () => {
@@ -32,6 +36,11 @@ describe('地图定义', () => {
     expect(sanitizeMapId('desert')).toBe('desert')
     expect(sanitizeMapId('nope')).toBe(MAP_IDS[0])
     expect(sanitizeMapId(undefined)).toBe(MAP_IDS[0])
+  })
+
+  it('arenaSceneFor：按形态路由竞技场场景', () => {
+    expect(arenaSceneFor('forest')).toBe('arena')
+    expect(arenaSceneFor('wilds')).toBe('arenaInfinite')
   })
 })
 
