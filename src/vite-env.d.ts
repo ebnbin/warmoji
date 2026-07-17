@@ -59,22 +59,22 @@ interface WarmojiStudioDebug {
   /** 模板页当前模板 id */
   template: string
   templates: { id: string; x: number; y: number; w: number; h: number }[]
-  /** 解剖页结构树工作台（仅解剖 tab 且树就绪时提供；rows 只含完整可见行） */
+  /** 解剖页结构树工作台（仅解剖 tab 且树就绪时提供；rows 只含完整可见行，
+   * 点行即切换该节点显/隐，容器行的箭头区收起/展开） */
   anatomy?: {
-    selected: string | null
     hidden: string[]
     rows: {
       path: string
       tag: string
       depth: number
       container: boolean
+      paints: boolean
       expanded: boolean | null
       hidden: boolean
       x: number
       y: number
       w: number
       h: number
-      eye: { x: number; y: number; w: number; h: number } | null
     }[]
     reset: { x: number; y: number; w: number; h: number }
     full: { x: number; y: number; w: number; h: number }

@@ -381,22 +381,12 @@ describe('composeSvg', () => {
     expect(hidTree).toContain('<defs>')
   })
 
-  it('选中焦点：其余压成幽灵、焦点全量、祖先包裹保留', () => {
-    const out = composeSvg(tree, { focus: '2/1/0' })
-    // 顶层 path 被幽灵包裹
-    expect(out).toContain('<g opacity="0.15"><path fill="#111"')
-    // 焦点的祖先链保留原开标签；同组兄弟压幽灵，焦点本体不包
+  it('隐藏组内单个子节点：容器拆开重组，其余兄弟保留', () => {
+    const out = composeSvg(tree, { hidden: new Set(['2/1/0']) })
     expect(out).toContain('<g clip-path="url(#a)">')
-    expect(out).toContain('<g opacity="0.15"><circle')
-    expect(out).toContain('<g fill="#333"><path d="M5 5h1z"/></g>')
-    expect(out).not.toContain('opacity="0.15"><g fill="#333">')
-  })
-
-  it('焦点与隐藏叠加：隐藏优先', () => {
-    const out = composeSvg(tree, { focus: '1', hidden: new Set(['2']) })
-    expect(out).not.toContain('clip-path')
-    expect(out).toContain('<path fill="#111"')
-    expect(out).not.toContain('opacity="0.15"><path fill="#111"')
+    expect(out).toContain('<circle')
+    expect(out).toContain('<g fill="#333"></g>')
+    expect(out).not.toContain('M5 5h1z')
   })
 })
 

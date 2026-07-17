@@ -30,8 +30,8 @@ import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '..
 // Emoji Studio：twemoji 部件动画的游戏内工作台，三个 tab——
 // 🎬 配方 = animations.json 里的精修动画预览；🧩 模板 = 任选 emoji × 通用
 // 动画模板即选即看（铺量动画的试衣间）；🔬 解剖 = SVG 结构树工作台：
-// 树镜像原文结构（顶层元素 + 组/defs 可下钻），任意节点显/隐/选中，
-// 双大图对照（完整原图 vs 按状态合成的拆分图，选中项高亮、其余压幽灵）。
+// 树镜像原文结构（顶层元素 + 组/defs 可下钻），点行切换该节点显/隐，
+// 双大图对照（上完整原图恒不变，下拆分图 = 只画可见节点）。
 // 素材区 = feed 流虚拟网格：配方页列有配方的 emoji，模板/解剖页列全部
 // 基础形态（两者对任意 SVG 通用）。预览区带暂停/逐帧/速度控制。内容按
 // 保底画布设计、整体居中；studio- 纹理场景自管理，shutdown 全清，
@@ -101,14 +101,13 @@ export class StudioScene extends Phaser.Scene {
 
   // 解剖页结构树工作台状态（换 emoji 归零；旋转 restart 保留）
   private anat?: AnatUi
-  private anatSelected: string | null = null
   private anatHidden = new Set<string>()
   private anatCollapsed = new Set<string>()
   private anatScroll = 0
   private anatScrollMax = 0
-  /** 全展开行（信息行计数/选中查找用；视图行见 anatRowMeta） */
+  /** 全展开行（信息行计数用）与当前视图行（点击反解/上报用，受收起影响） */
   private anatAllRows: TreeRow[] = []
-  private anatRowMeta: { row: TreeRow; eyeX: number | null }[] = []
+  private anatRowMeta: TreeRow[] = []
   /** 拆分图光栅化竞态令牌与滚动纹理键（新帧就绪才替换/回收旧帧） */
   private anatSplitGen = 0
   private anatLiveCounter = 0
@@ -378,7 +377,6 @@ export class StudioScene extends Phaser.Scene {
 
   /** 解剖工作台状态归零（换 emoji / 进场重置） */
   private resetAnatState(): void {
-    this.anatSelected = null
     this.anatHidden = new Set()
     this.anatCollapsed = new Set()
     this.anatScroll = 0
@@ -542,7 +540,7 @@ export class StudioScene extends Phaser.Scene {
     this.previewState = 'loading'
 
     const title = this.add
-      .text(d.x + 24, d.y + 14, `${emoji} 结构树 · 点行选中 · 👁 显/隐`, {
+      .text(d.x + 24, d.y + 14, `${emoji} 结构树 · 点行显/隐`, {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         color: '#aab6cc',
@@ -560,7 +558,7 @@ export class StudioScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .on('pointerup', () => {
         if (this.grid?.wasDragged || this.anatDragMoved) return
-        if (this.anatHidden.size === 0 && this.anatSelected === null && this.anatCollapsed.size === 0) return
+        if (this.anatHidden.size === 0 && this.anatCollapsed.size === 0) return
         this.resetAnatState()
         this.rebuildAnatRows()
         this.refreshAnatInfo()
@@ -700,12 +698,11 @@ export class StudioScene extends Phaser.Scene {
 
     rows.forEach((row, i) => {
       const y = i * ANAT_ROW
-      const selected = row.path === this.anatSelected
       const dim = this.anatEffHidden(row.path)
       const bg = this.add.graphics()
-      bg.fillStyle(selected ? 0xffffff : 0x000000, selected ? 0.16 : 0.2)
+      bg.fillStyle(0x000000, dim ? 0.3 : 0.2)
       bg.fillRoundedRect(0, y + 3, a.area.w, ANAT_ROW - 6, 12)
-      bg.lineStyle(selected ? 2 : 1, selected ? 0xffd54f : 0xffffff, selected ? 0.9 : 0.08)
+      bg.lineStyle(1, 0xffffff, dim ? 0.04 : 0.08)
       bg.strokeRoundedRect(1, y + 4, a.area.w - 2, ANAT_ROW - 8, 12)
       const parts: Phaser.GameObjects.GameObject[] = [bg]
 
@@ -723,9 +720,8 @@ export class StudioScene extends Phaser.Scene {
         )
       }
       let x = indent + 34
-      let eyeX: number | null = null
       if (row.paints) {
-        eyeX = x
+        // 眼睛是行状态指示（整行都是显/隐开关，不是独立按钮）
         parts.push(
           this.add
             .text(x, y + ANAT_ROW / 2, this.anatHidden.has(row.path) ? '🙈' : '👁', {
@@ -762,18 +758,17 @@ export class StudioScene extends Phaser.Scene {
 
       for (const o of parts) a.rowsBox.add(o)
       a.rowObjs.push(...parts)
-      this.anatRowMeta.push({ row, eyeX })
+      this.anatRowMeta.push(row)
     })
   }
 
-  /** 树区统一命中分派：按 y 反解行、按 x 命中箭头/眼睛，其余为行选中（再点取消） */
+  /** 树区统一命中分派：容器行的箭头区收起/展开，其余整行 = 显/隐开关 */
   private onTreeTap(p: Phaser.Input.Pointer): void {
     const a = this.anat
     if (!a || this.grid?.wasDragged || this.anatDragMoved) return
     const i = Math.floor((p.worldY - a.area.y + this.anatScroll) / ANAT_ROW)
-    const meta = this.anatRowMeta[i]
-    if (!meta) return
-    const row = meta.row
+    const row = this.anatRowMeta[i]
+    if (!row) return
     const localX = p.worldX - a.area.x
     const indent = anatIndentOf(row.depth)
     if (row.container && localX >= indent - 12 && localX < indent + 34) {
@@ -783,16 +778,9 @@ export class StudioScene extends Phaser.Scene {
       this.report()
       return
     }
-    if (meta.eyeX !== null && localX >= meta.eyeX - 10 && localX < meta.eyeX + 48) {
-      if (this.anatHidden.has(row.path)) this.anatHidden.delete(row.path)
-      else this.anatHidden.add(row.path)
-      this.rebuildAnatRows()
-      this.refreshAnatInfo()
-      void this.refreshAnatSplit()
-      this.report()
-      return
-    }
-    this.anatSelected = this.anatSelected === row.path ? null : row.path
+    if (!row.paints) return
+    if (this.anatHidden.has(row.path)) this.anatHidden.delete(row.path)
+    else this.anatHidden.add(row.path)
     this.rebuildAnatRows()
     this.refreshAnatInfo()
     void this.refreshAnatSplit()
@@ -802,31 +790,23 @@ export class StudioScene extends Phaser.Scene {
   private refreshAnatInfo(): void {
     const a = this.anat
     if (!a) return
-    const sel = this.anatSelected ? this.anatAllRows.find((r) => r.path === this.anatSelected) : undefined
-    if (sel) {
-      a.info.setText(
-        `#${sel.path} <${sel.tag}> · fill ${sel.fill ?? '(无)'}` +
-          `${sel.container ? ` · ${sel.childCount} 子元素` : ''}${this.anatEffHidden(sel.path) ? ' · 已隐藏' : ''}`,
-      )
-      return
-    }
     const paintCount = this.anatAllRows.filter((r) => r.paints).length
-    a.info.setText(`共 ${paintCount} 个绘制节点 · 已隐藏 ${this.anatHidden.size} · 点行选中/👁 显隐`)
+    a.info.setText(`共 ${paintCount} 个绘制节点 · 已隐藏 ${this.anatHidden.size}`)
   }
 
-  /** 拆分大图重光栅化：无状态时直接复用完整图纹理；有状态时合成 → 烘新帧 →
+  /** 拆分大图重光栅化：没有隐藏项时直接复用完整图纹理；否则合成 → 烘新帧 →
    * 就绪才替换并回收上一帧纹理（竞态凭代数自弃） */
   private async refreshAnatSplit(): Promise<void> {
     const a = this.anat
     if (!a) return
     const detailGen = this.jobGen
     const gen = ++this.anatSplitGen
-    if (this.anatHidden.size === 0 && this.anatSelected === null) {
+    if (this.anatHidden.size === 0) {
       a.splitImg.setTexture(a.fullKey).setDisplaySize(a.bigSize, a.bigSize)
       this.dropAnatLive(undefined)
       return
     }
-    const svg = composeSvg(a.tree, { hidden: this.anatHidden, focus: this.anatSelected })
+    const svg = composeSvg(a.tree, { hidden: this.anatHidden })
     try {
       const img = await svgToImage(setSvgSize(svg, RASTER))
       if (gen !== this.anatSplitGen || detailGen !== this.jobGen || !this.scene.isActive('studio')) return
@@ -1013,21 +993,20 @@ export class StudioScene extends Phaser.Scene {
     const a = this.anat
     if (this.tab !== 'anatomy' || !a) return undefined
     return {
-      selected: this.anatSelected,
       hidden: [...this.anatHidden],
       rows: this.anatRowMeta
-        .map(({ row, eyeX }, i) => ({
+        .map((row, i) => ({
           path: row.path,
           tag: row.tag,
           depth: row.depth,
           container: row.container,
+          paints: row.paints,
           expanded: row.container ? !this.anatCollapsed.has(row.path) : null,
           hidden: this.anatEffHidden(row.path),
           x: a.area.x,
           y: a.area.y + i * ANAT_ROW - this.anatScroll,
           w: a.area.w,
           h: ANAT_ROW,
-          eye: eyeX === null ? null : { x: a.area.x + eyeX, y: a.area.y + i * ANAT_ROW - this.anatScroll, w: 44, h: ANAT_ROW },
         }))
         .filter((r) => r.y >= a.area.y && r.y + r.h <= a.area.y + a.area.h),
       reset: this.anatResetRect,

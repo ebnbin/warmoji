@@ -828,49 +828,25 @@ export function parseSvgTree(svg: string): SvgTree {
 export interface ComposeState {
   /** 隐藏节点 path 集合（容器隐藏 = 整个子树消失） */
   readonly hidden?: ReadonlySet<string>
-  /** 选中节点 path：其余绘制内容压成低不透明度幽灵，突出选中项在原图中的位置 */
-  readonly focus?: string | null
-  /** 幽灵不透明度（默认 0.15） */
-  readonly ghostAlpha?: number
 }
 
-/** 按显隐/选中状态把结构树重组回 SVG 文本。defs 恒原样保留（裁剪引用不能断）；
+/** 按显隐状态把结构树重组回 SVG 文本。defs 恒原样保留（裁剪引用不能断）；
  * 无状态时输出与原文等价。纯字符串操作，不改任何原文片段 */
 export function composeSvg(tree: SvgTree, state: ComposeState = {}): string {
   const hidden = state.hidden ?? new Set<string>()
-  const focus = state.focus ?? null
-  const alpha = state.ghostAlpha ?? 0.15
-  const nodeAt = (path: string): SvgTreeNode | undefined => {
-    let list = tree.nodes
-    let found: SvgTreeNode | undefined
-    for (const seg of path.split('/')) {
-      found = list[Number(seg)]
-      if (!found) return undefined
-      list = found.children
-    }
-    return found
-  }
-  // 焦点只对绘制节点生效（defs 子树选中只看信息，不影响渲染）
-  const focusOn = focus !== null && nodeAt(focus)?.paints === true
   const anyHiddenWithin = (path: string): boolean => {
     for (const h of hidden) if (h.startsWith(`${path}/`)) return true
     return false
   }
-  // mode：normal=常规；full=焦点子树内（不压幽灵）；ghost=已被外层幽灵包裹（不再包）
-  const emit = (node: SvgTreeNode, mode: 'normal' | 'full' | 'ghost'): string => {
+  const emit = (node: SvgTreeNode): string => {
     if (!node.paints) return node.raw
     if (hidden.has(node.path)) return ''
-    const isFocus = focusOn && node.path === focus
-    const isAncestor = focusOn && focus!.startsWith(`${node.path}/`)
-    const ghostIt = focusOn && mode === 'normal' && !isFocus && !isAncestor
-    const innerMode = isFocus || mode === 'full' ? 'full' : ghostIt || mode === 'ghost' ? 'ghost' : 'normal'
-    const body =
-      node.children.length > 0 && (isAncestor || anyHiddenWithin(node.path))
-        ? `${node.open}${node.children.map((c) => emit(c, innerMode)).join('')}</${node.tag}>`
-        : node.raw
-    return ghostIt ? `<g opacity="${fmt(alpha)}">${body}</g>` : body
+    // 仅当子树内有隐藏项才需要拆开容器逐子重组，否则原样直出
+    return node.children.length > 0 && anyHiddenWithin(node.path)
+      ? `${node.open}${node.children.map(emit).join('')}</${node.tag}>`
+      : node.raw
   }
-  return `${tree.open}${tree.nodes.map((n) => emit(n, 'normal')).join('')}</svg>`
+  return `${tree.open}${tree.nodes.map(emit).join('')}</svg>`
 }
 
 export interface TreeRow {
