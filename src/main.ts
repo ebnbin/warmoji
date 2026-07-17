@@ -12,6 +12,7 @@ import { SettingsScene } from './scenes/SettingsScene'
 import { ShopScene } from './scenes/ShopScene'
 import { StudioScene } from './scenes/StudioScene'
 import { UIScene } from './scenes/UIScene'
+import { VoidArenaScene } from './scenes/VoidArenaScene'
 import { WikiScene } from './scenes/WikiScene'
 import { WAVE } from './core/config'
 import { browserStorage } from './core/highscore'
@@ -44,7 +45,7 @@ const game = new Phaser.Game({
   // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
   physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, UIScene, ResultScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, UIScene, ResultScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {
@@ -84,7 +85,7 @@ window.__twemojiVersion = __TWEMOJI_VERSION__
 
 window.__setStress = (on: boolean): void => {
   setStress(on)
-  for (const key of ['arena', 'arenaInfinite', 'arenaRiver']) {
+  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
     if (game.scene.isActive(key)) game.scene.getScene(key).scene.restart()
   }
 }

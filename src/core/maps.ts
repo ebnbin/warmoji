@@ -22,8 +22,8 @@ export interface MapSpec {
   readonly name: string
   readonly desc: string
   /** 世界形态：bounded = 25×25 有界竞技场；infinite = 无边界（终波缩圈）；
-   * river = 单屏固定相机 + 恒定水流 */
-  readonly kind: 'bounded' | 'infinite' | 'river'
+   * river = 单屏固定相机 + 恒定水流；void = 固定 16:9 环面（四边传送门） */
+  readonly kind: 'bounded' | 'infinite' | 'river' | 'void'
   /** 固定色板：战斗场景不再逐局随机 */
   readonly palette: Palette
   readonly decor: MapDecor
@@ -92,6 +92,26 @@ export const MAPS = {
     },
     drift: ['🍃', '🌸', '🫧', '🍂'],
   },
+  void: {
+    emoji: '🌀',
+    name: '虚空',
+    desc: '悬浮虚空的一方战场，四边皆是传送门——穿出此缘，即现彼缘',
+    kind: 'void',
+    palette: {
+      bgFrom: 'hsl(258 32% 14%)',
+      bgTo: 'hsl(240 45% 7%)',
+      // map 色即虚空地板（深邃暗紫，实体与星光在其上高对比）
+      map: hslToInt(252, 0.28, 0.15),
+      shadow: 0x000000,
+    },
+    decor: {
+      // 星空点缀（静态散布，低透明度）
+      emojis: ['✨', '⭐', '💫', '🪐', '☄️'],
+      sizeU: [0.16, 0.5],
+      alpha: [0.18, 0.34],
+      density: [0.05, 0.08],
+    },
+  },
 } as const satisfies Record<string, MapSpec>
 
 export type MapId = keyof typeof MAPS
@@ -101,11 +121,12 @@ export function sanitizeMapId(id: unknown): MapId {
   return typeof id === 'string' && id in MAPS ? (id as MapId) : MAP_IDS[0]!
 }
 
-/** 该地图应进入的竞技场场景（有界/无界/河流是三套场景实现，按图路由） */
-export function arenaSceneFor(id: MapId): 'arena' | 'arenaInfinite' | 'arenaRiver' {
+/** 该地图应进入的竞技场场景（每种世界形态一套独立场景实现，按图路由） */
+export function arenaSceneFor(id: MapId): 'arena' | 'arenaInfinite' | 'arenaRiver' | 'arenaVoid' {
   const kind = MAPS[id].kind
   if (kind === 'infinite') return 'arenaInfinite'
   if (kind === 'river') return 'arenaRiver'
+  if (kind === 'void') return 'arenaVoid'
   return 'arena'
 }
 
