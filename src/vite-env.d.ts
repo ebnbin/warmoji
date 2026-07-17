@@ -158,6 +158,8 @@ interface WarmojiDebug {
   dormant?: number
   /** 无限地图终波：当前缩圈半径（未开圈为 undefined） */
   zoneRadius?: number
+  /** arena：队长主动技能状态（压测模式无技能） */
+  skill?: { remainMs: number; ready: boolean }
   menu?: WarmojiMenuDebug
   map?: WarmojiMapDebug
   wiki?: WarmojiWikiDebug

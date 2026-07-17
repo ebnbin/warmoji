@@ -249,12 +249,24 @@ export const CHARACTERS = {
 export type CharacterId = keyof typeof CHARACTERS
 export const ROSTER_IDS = Object.keys(CHARACTERS) as readonly CharacterId[]
 
+// 队长主动技能：每位队长一个，跨波 CD——剩余冷却存在 run 上、只按战斗
+// 时钟推进（商店/整编不走表），上一波攒的进度带进下一波。左下角按钮或
+// E 键释放；效果逻辑按队长 id 在 BaseArenaScene.castSkill 分派，效果参数
+// 见下方 SKILL 常量（与「能力先直接建模为字段」同一约定，不做通用效果系统）
+export interface CaptainSkill {
+  readonly name: string
+  readonly desc: string
+  readonly cdMs: number
+}
+
 // 队长：不登场、无实体的团队增益提供者（emotion 表情形象）。
 // 能力先直接建模为字段，需要通用效果系统时再抽象；编制上限/经验相关能力由队长决定。
 export interface CaptainSpec {
   readonly emoji: string
   readonly name: string
   readonly desc: string
+  /** 主动技能（战斗内左下角按钮释放） */
+  readonly skill: CaptainSkill
   /** 编制上限：可招募的角色总数 */
   readonly teamSize: number
   /** 开局队伍等级（= 可立刻花掉的点数；通常 1） */
@@ -284,6 +296,11 @@ export const CAPTAINS = {
     reviveInShop: true,
     freeRefreshes: 0,
     firstWaveShop: false,
+    skill: {
+      name: '圣光降临',
+      desc: '阵亡队员满血复活，存活队员回复 50% 生命，全队无敌 2 秒',
+      cdMs: 35_000,
+    },
   },
   moneybags: {
     emoji: '🤑',
@@ -296,6 +313,11 @@ export const CAPTAINS = {
     reviveInShop: false,
     freeRefreshes: 3,
     firstWaveShop: false,
+    skill: {
+      name: '天降横财',
+      desc: '金袋砸向最近的 8 个敌人：伤害与强击退，每袋落地掉 1 枚金币',
+      cdMs: 20_000,
+    },
   },
   party: {
     emoji: '🥳',
@@ -308,6 +330,11 @@ export const CAPTAINS = {
     reviveInShop: false,
     freeRefreshes: 0,
     firstWaveShop: false,
+    skill: {
+      name: '全场蹦迪',
+      desc: '全场敌人（含 Boss）被音乐感染，跳舞 3.5 秒不能动弹',
+      cdMs: 30_000,
+    },
   },
   prodigy: {
     emoji: '🤓',
@@ -320,6 +347,11 @@ export const CAPTAINS = {
     reviveInShop: false,
     freeRefreshes: 0,
     firstWaveShop: false,
+    skill: {
+      name: '降维打击',
+      desc: '一道灵光扫过全场，所有敌人受到大额伤害（随波次增强），Boss 承伤减半',
+      cdMs: 45_000,
+    },
   },
   scholar: {
     emoji: '🧐',
@@ -332,11 +364,33 @@ export const CAPTAINS = {
     reviveInShop: false,
     freeRefreshes: 0,
     firstWaveShop: false,
+    skill: {
+      name: '弱点讲义',
+      desc: '划出敌人弱点，8 秒内全队伤害 ×1.6',
+      cdMs: 30_000,
+    },
   },
 } as const satisfies Record<string, CaptainSpec>
 
 export type CaptainId = keyof typeof CAPTAINS
 export const CAPTAIN_IDS = Object.keys(CAPTAINS) as readonly CaptainId[]
+
+// 主动技能的效果参数（CD 在 CAPTAINS[id].skill.cdMs）
+export const SKILL = {
+  /** 开局 CD 预充比例：新局第一次充能只需一半时间，尽早见到机制 */
+  startCharge: 0.5,
+  /** 圣光降临：存活者回复比例 + 全队无敌时长（走受击无敌帧通道，
+   * 挡接触与敌弹；毒液池/毒雾是独立计时通道，不受无敌保护） */
+  angel: { healRatio: 0.5, invulnMs: 2000 },
+  /** 天降横财：砸最近 targets 个敌人，每袋伤害/击退/落地金币数 */
+  moneybags: { targets: 8, damage: 60, knockback: 10 * UNIT, coinsPerHit: 1 },
+  /** 全场蹦迪：全场敌人（含 Boss）定身跳舞时长 */
+  party: { danceMs: 3500 },
+  /** 弱点讲义：全队伤害倍率 + 持续时长（不跨波） */
+  scholar: { damageMul: 1.6, durationMs: 8000 },
+  /** 降维打击：基准伤害 × 当前波次血量倍率（与敌人成长同步），Boss 承伤比例 */
+  prodigy: { damage: 70, bossRatio: 0.5 },
+} as const
 
 // 队伍：玩家操控队伍中心点，角色按队形岗位随行；除此之外角色是完全独立的单位。
 // 队形几何在 core/formation.ts；满员后可在整编页切换队形与互换站位。
@@ -875,6 +929,8 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     COIN.emoji,
     '➕',
     '💀',
+    // 财迷「天降横财」的金袋投掷物
+    '💰',
     // 地图地面装饰 + 河流水面漂浮物：与玩家侧同款黑描边（低透明度贴地/浮水）
     ...new Set(
       Object.values<MapSpec>(MAPS).flatMap((m) => [...m.decor.emojis, ...(m.drift ?? [])]),

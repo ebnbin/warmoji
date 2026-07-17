@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { BOSS, CAPTAINS, CHARACTERS, COIN, ELITE, FOLLOW, HIT_SHAKE, KNOCKBACK, MEMBER, ORBIT, ROSTER_IDS, SPAWN, STRESS, SURGE, TEAM, UNIT, WANDER, WAVE } from '../core/config'
+import { BOSS, CAPTAINS, CHARACTERS, COIN, ELITE, FOLLOW, HIT_SHAKE, KNOCKBACK, MEMBER, ORBIT, ROSTER_IDS, SKILL, SPAWN, STRESS, SURGE, TEAM, UNIT, WANDER, WAVE } from '../core/config'
 import type { CharacterId, CharacterSpec, ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../core/config'
 import { applyAbilities } from '../core/abilities'
 import { enemyMixAt, pickEnemy } from '../core/enemies'
@@ -21,6 +21,7 @@ import type { TeamEffects } from '../core/items'
 import { levelEffects, memberMaxHp } from '../core/levels'
 import { currentFormation, getRun, guardOrder, isTeamFull, promoteStep, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
+import { prodigyDamage, tickSkillCd } from '../core/skill'
 import { DEFAULT_SETTINGS, loadSettings } from '../core/settings'
 import type { Settings } from '../core/settings'
 import { MAPS } from '../core/maps'
@@ -234,6 +235,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   protected pendingMarks: { pos: Point; mark: ImageObj }[] = []
   /** 玩家子弹寿命上限（null = 不按寿命回收；虚空图必须设——环面上永不出屏） */
   protected projectileTtlMs: number | null = null
+  /** 学者「弱点讲义」的增伤到期时刻（不跨波；到期把 stats.damageMul 拨回 1） */
+  private skillBuffUntil = 0
+  /** 派对「全场蹦迪」的舞会结束时刻：窗口内新落地的敌人也要跳 */
+  private danceEndsAt = 0
 
   // ── 世界规则钩子：子类只实现自己那一列差异 ───────────────────
 
@@ -501,6 +506,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.dormantCount = 0
     this.boss = undefined
     this.pendingMarks = []
+    this.skillBuffUntil = 0
+    this.danceEndsAt = 0
     this.resetWorldFields()
 
     // 世界：物理边界/相机/地面/装饰（各图自理内部顺序）
@@ -613,6 +620,14 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       return
     }
 
+    // 队长技能：冷却按战斗时钟推进（存 run 上，天然跨波）；增伤 buff 到期复原
+    if (!this.stress) {
+      this.run.skillCdMs = tickSkillCd(this.run.skillCdMs, delta)
+      if (this.stats.damageMul !== 1 && this.elapsedMs >= this.skillBuffUntil) {
+        this.stats.damageMul = 1
+      }
+    }
+
     this.frameSlowZones.length = 0
     this.frameAttractors.length = 0
     this.buildFrameTargets()
@@ -652,8 +667,154 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       camY: cam.worldView.centerY,
       formation: this.activeFormation(),
       mapId: this.run.mapId,
+      skill: this.stress
+        ? undefined
+        : { remainMs: Math.round(this.run.skillCdMs), ready: this.run.skillCdMs <= 0 },
       ...this.debugExtras(),
     })
+  }
+
+  // ── 队长主动技能 ────────────────────────────────────────────
+
+  /** UIScene 轮询的技能状态（压测模式无技能 → null，不渲染按钮） */
+  skillSnapshot(): { name: string; remainMs: number; cdMs: number; ready: boolean } | null {
+    if (this.stress) return null
+    const s = CAPTAINS[this.run.captainId].skill
+    return { name: s.name, remainMs: this.run.skillCdMs, cdMs: s.cdMs, ready: this.run.skillCdMs <= 0 }
+  }
+
+  /** 释放主动技能（UIScene 按钮/E 键触发）；就绪校验在此收口 */
+  castSkill(): boolean {
+    if (this.over || this.stress || this.run.skillCdMs > 0) return false
+    const id = this.run.captainId
+    this.run.skillCdMs = CAPTAINS[id].skill.cdMs
+    playSfx('levelup')
+    this.events.emit('skill-cast', CAPTAINS[id].skill.name)
+    switch (id) {
+      case 'angel':
+        this.skillAngel()
+        break
+      case 'moneybags':
+        this.skillMoneybags()
+        break
+      case 'party':
+        this.skillParty()
+        break
+      case 'scholar':
+        this.skillScholar()
+        break
+      case 'prodigy':
+        this.skillProdigy()
+        break
+    }
+    return true
+  }
+
+  /** 圣光降临：阵亡者满血复活、存活者回血、全队短暂无敌。
+   * 无敌走受击无敌帧通道（把「上次受击」推到未来），挡接触与敌弹；
+   * 毒液池/毒雾走独立计时，不受无敌保护 */
+  private skillAngel(): void {
+    for (const m of this.members) {
+      if (!m.alive) this.reviveMember(m)
+      else m.hp = Math.min(m.maxHp, m.hp + m.maxHp * SKILL.angel.healRatio)
+      m.lastHitMs = this.elapsedMs + SKILL.angel.invulnMs - m.iframesMs
+      m.image.setTint(0xffe082)
+      this.time.delayedCall(320, () => {
+        if (m.alive) m.image.clearTint()
+      })
+    }
+    const ring = this.add
+      .circle(this.center.x, this.center.y, TEAM.ringRadius + MEMBER.radius, 0xfff59d, 0.3)
+      .setStrokeStyle(4, 0xffe082, 0.9)
+      .setDepth(20)
+      .setScale(0.4)
+    this.tweens.add({
+      targets: ring,
+      scale: 3,
+      alpha: 0,
+      duration: 550,
+      ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    })
+  }
+
+  /** 天降横财：金袋逐个砸向离队伍最近的 N 个敌人——伤害 + 强击退 +
+   * 每袋落地掉金币（砸死的敌人尸体照常掉落，两份都拿） */
+  private skillMoneybags(): void {
+    const nearest = (this.enemies.getChildren() as ImageObj[])
+      .filter((e) => e.active && !e.getData('dormant'))
+      .map((e) => {
+        const d = this.worldDelta(this.center, e)
+        return { e, d2: d.x * d.x + d.y * d.y }
+      })
+      .sort((a, b) => a.d2 - b.d2)
+      .slice(0, SKILL.moneybags.targets)
+    nearest.forEach(({ e }, i) => {
+      const bag = emojiImage(this, e.x, e.y - 3 * UNIT, '💰', 0.55 * UNIT, 'player')
+        .setDepth(30)
+        .setAlpha(0)
+      this.tweens.add({
+        targets: bag,
+        y: e.y,
+        alpha: 1,
+        duration: 180,
+        delay: i * 60,
+        ease: 'Quad.easeIn',
+        onComplete: () => {
+          bag.destroy()
+          if (!e.active || this.over) return
+          this.coinBurst.explode(6, e.x, e.y)
+          playSfx('coin')
+          this.spawnCoins(e.x, e.y, SKILL.moneybags.coinsPerHit)
+          this.applyDamage(e, SKILL.moneybags.damage, SKILL.moneybags.knockback, this.center.x, this.center.y)
+        },
+      })
+    })
+  }
+
+  /** 全场蹦迪：全场敌人（含 Boss）定身跳舞；正在蓄力/冲刺的直接打断；
+   * 舞会窗口内新落地的敌人也要跳（materializeEnemy 补标）。
+   * 跳舞的逐帧表现（速度清零 + 摇摆 + 粉染色）在 steerEnemies 的舞蹈分支 */
+  private skillParty(): void {
+    this.danceEndsAt = this.elapsedMs + SKILL.party.danceMs
+    for (const e of this.enemies.getChildren() as ImageObj[]) {
+      if (!e.active) continue
+      e.setData('danceUntil', this.danceEndsAt)
+      const state = e.getData('state') as string | undefined
+      if (state === 'windup' || state === 'dash') {
+        e.setData('state', e.getData('boss') ? 'chase' : 'wander')
+        e.clearTint()
+      }
+    }
+  }
+
+  /** 弱点讲义：限时全队增伤（经 stats.damageMul 流入所有武器伤害链） */
+  private skillScholar(): void {
+    this.stats.damageMul = SKILL.scholar.damageMul
+    this.skillBuffUntil = this.elapsedMs + SKILL.scholar.durationMs
+    for (const m of this.members) {
+      if (!m.alive) continue
+      m.image.setTint(0x80d8ff)
+      this.time.delayedCall(350, () => {
+        if (m.alive) m.image.clearTint()
+      })
+    }
+  }
+
+  /** 降维打击：全场活跃敌人吃一次大额伤害（随波次强度缩放，Boss 折减）+ 全屏白闪 */
+  private skillProdigy(): void {
+    const hpMul = waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier
+    const flash = this.add
+      .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, 0xffffff, 0.55)
+      .setScrollFactor(0)
+      .setDepth(200)
+    this.tweens.add({ targets: flash, alpha: 0, duration: 380, onComplete: () => flash.destroy() })
+    playSfx('boom')
+    // 击杀会边遍历边销毁，先复制快照
+    for (const e of [...(this.enemies.getChildren() as ImageObj[])]) {
+      if (!e.active || e.getData('dormant')) continue
+      this.applyDamage(e, prodigyDamage(hpMul, !!e.getData('boss')), 0)
+    }
   }
 
   /** 波次结束：快照队伍状态进 run；打满最后一波直接进胜利结算 */
@@ -1571,6 +1732,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     enemy.setData('eaten', 0)
     // 行走摇摆的随机相位：同屏大量敌人不齐步摆
     enemy.setData('ph', this.rng.next() * Math.PI * 2)
+    // 舞会窗口内落地：跟着跳（全场蹦迪对新敌同样生效）
+    if (this.elapsedMs < this.danceEndsAt) enemy.setData('danceUntil', this.danceEndsAt)
     this.enemies.add(enemy)
     const targetScale = enemy.scale
     enemy.setScale(targetScale * 0.3).setAlpha(0.3)
@@ -1631,6 +1794,25 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         e.setData('slowed', undefined)
         if (e.getData('state') === 'windup') e.setTint(0xffb74d)
       }
+
+      // 全场蹦迪：定身摇摆（行为状态机暂停），击退与世界后处理（水流/钳制）照常。
+      // 粉染色每帧重设：受击白闪到期 clearTint 后下一帧自动恢复
+      const danceUntil = e.getData('danceUntil') as number | undefined
+      if (danceUntil !== undefined) {
+        if (now < danceUntil) {
+          body.setVelocity(0, 0)
+          e.setTint(0xff9ff3)
+          e.setRotation(Math.sin(now / 80 + ((e.getData('ph') as number) ?? 0)) * 0.3)
+          this.decayKnockback(e, body, delta)
+          if (e.getData('boss')) this.postSteerBoss(e, body)
+          else this.postSteerEnemy(e, body, spec)
+          continue
+        }
+        e.setData('danceUntil', undefined)
+        e.clearTint()
+        e.setRotation(0)
+      }
+
       const slow = this.slowFactorFor(e)
       const target = this.nearestAlive(e.x, e.y)!
 
@@ -1763,20 +1945,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       }
 
       // 击退：临时冲量叠加进行为速度并指数衰减（不打断行为状态机）
-      const kvx = e.getData('kvx') as number | undefined
-      if (kvx !== undefined) {
-        const kvy = e.getData('kvy') as number
-        body.velocity.x += kvx
-        body.velocity.y += kvy
-        const decay = Math.exp(-delta / KNOCKBACK.tauMs)
-        if ((kvx * kvx + kvy * kvy) * decay * decay < 100) {
-          e.setData('kvx', undefined)
-          e.setData('kvy', undefined)
-        } else {
-          e.setData('kvx', kvx * decay)
-          e.setData('kvy', kvy * decay)
-        }
-      }
+      this.decayKnockback(e, body, delta)
 
       // 世界后处理：河流在此叠加水流并钳跨向
       this.postSteerEnemy(e, body, spec)
@@ -1792,6 +1961,23 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         const vx = body.velocity.x
         if (Math.abs(vx) > 8) e.setFlipX(vx > 0)
       }
+    }
+  }
+
+  /** 击退冲量：叠加进当前速度并指数衰减（行为分支与蹦迪定身共用） */
+  private decayKnockback(e: ImageObj, body: ArcadeBody, delta: number): void {
+    const kvx = e.getData('kvx') as number | undefined
+    if (kvx === undefined) return
+    const kvy = e.getData('kvy') as number
+    body.velocity.x += kvx
+    body.velocity.y += kvy
+    const decay = Math.exp(-delta / KNOCKBACK.tauMs)
+    if ((kvx * kvx + kvy * kvy) * decay * decay < 100) {
+      e.setData('kvx', undefined)
+      e.setData('kvy', undefined)
+    } else {
+      e.setData('kvx', kvx * decay)
+      e.setData('kvy', kvy * decay)
     }
   }
 

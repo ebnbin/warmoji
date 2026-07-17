@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
-import { COIN } from '../core/config'
+import { CAPTAINS, COIN } from '../core/config'
 import { formatTime } from '../core/format'
-import { endRun } from '../core/run'
+import { endRun, getRun } from '../core/run'
 import { isDevOpen, isStress, setDevOpen, setStress } from '../ui/dev'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../ui/diagnostics'
 import { emojiCacheStats, emojiImage, iconLabel } from '../ui/emoji'
@@ -36,6 +36,18 @@ export class UIScene extends Phaser.Scene {
   private devRefreshedAt = 0
   private paused = false
   private pauseObjs: Phaser.GameObjects.GameObject[] = []
+  // 队长技能按钮（左下角）：底圆 + 队长头像 + 冷却扇形暗罩 + 秒数 + 就绪光圈
+  private skillBase?: Phaser.GameObjects.Arc
+  private skillEmoji?: Phaser.GameObjects.Image
+  private skillMask?: Phaser.GameObjects.Graphics
+  private skillCdText?: Phaser.GameObjects.Text
+  private skillRing?: Phaser.GameObjects.Arc
+  private skillCenter = { x: 0, y: 0 }
+  /** 队长头像的基准缩放（emojiImage 经 setDisplaySize 得到的小数 scale） */
+  private skillEmojiScale = 1
+  private skillWasReady = false
+  private skillShownSec = -1
+  private skillShownRatio = -1
 
   /** 当前战斗场景 key：四套竞技场（有界/无界/河流/虚空）互斥运行，本场景只跟随其一 */
   private arenaKey: 'arena' | 'arenaInfinite' | 'arenaRiver' | 'arenaVoid' = 'arena'
@@ -136,13 +148,17 @@ export class UIScene extends Phaser.Scene {
     })
     if (isDevOpen()) this.createDevPanel(res)
 
+    this.createSkillButton(res)
+
     const arenaEvents = this.arena.events
     arenaEvents.on('wave-complete', this.onWaveComplete, this)
     arenaEvents.on('wave-warning', this.onWaveWarning, this)
+    arenaEvents.on('skill-cast', this.onSkillCast, this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       arenaEvents.off('wave-complete', this.onWaveComplete, this)
       arenaEvents.off('wave-warning', this.onWaveWarning, this)
+      arenaEvents.off('skill-cast', this.onSkillCast, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
 
@@ -229,6 +245,7 @@ export class UIScene extends Phaser.Scene {
 
   update(time: number): void {
     if (this.devText) this.updateDevPanel(time)
+    this.updateSkillButton()
     const s = this.arena.hudSnapshot()
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.drawXpBar(s)
     if (s.level !== this.last.level) this.levelText.setText(`Lv.${s.level}`)
@@ -302,6 +319,124 @@ export class UIScene extends Phaser.Scene {
         sub.destroy()
       },
     })
+  }
+
+  // ── 队长主动技能按钮（左下角）────────────────────────────────
+
+  private createSkillButton(res: number): void {
+    // 压测模式无技能（阵容不来自 run），不渲染按钮
+    if (!this.arena.skillSnapshot()) return
+    const r = 55
+    const cx = safeInsets.left + r + 24
+    const cy = viewport.logicalHeight - safeInsets.bottom - r - 24
+    this.skillCenter = { x: cx, y: cy }
+    this.skillWasReady = false
+    this.skillShownSec = -1
+    this.skillShownRatio = -1
+    this.skillBase = this.add
+      .circle(cx, cy, r, 0x000000, 0.38)
+      .setStrokeStyle(3, 0xffffff, 0.28)
+      .setDepth(300)
+    this.skillEmoji = emojiImage(this, cx, cy, CAPTAINS[getRun().captainId].emoji, 58, 'player').setDepth(301)
+    this.skillEmojiScale = this.skillEmoji.scaleX
+    this.skillMask = this.add.graphics().setDepth(302)
+    this.skillCdText = this.add
+      .text(cx, cy, '', {
+        fontFamily: UI_FONT,
+        fontSize: FONT.head,
+        fontStyle: 'bold',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 4,
+        resolution: res,
+      })
+      .setOrigin(0.5)
+      .setDepth(303)
+    this.skillRing = this.add
+      .circle(cx, cy, r + 6, 0x000000, 0)
+      .setStrokeStyle(3, 0xffd54f, 0.9)
+      .setDepth(303)
+      .setVisible(false)
+    this.add
+      .zone(cx - r, cy - r, r * 2, r * 2)
+      .setOrigin(0)
+      .setDepth(304)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => this.tryCastSkill())
+    this.input.keyboard?.on('keydown-E', () => this.tryCastSkill())
+  }
+
+  private tryCastSkill(): void {
+    if (this.paused) return
+    this.arena.castSkill()
+  }
+
+  /** 逐帧刷新按钮状态：冷却中重绘扇形暗罩（脏检查），就绪时光圈呼吸 */
+  private updateSkillButton(): void {
+    if (!this.skillMask) return
+    const sk = this.arena.skillSnapshot()
+    if (!sk) return
+    if (!sk.ready) {
+      const remainSec = Math.ceil(sk.remainMs / 1000)
+      const ratio = sk.cdMs > 0 ? sk.remainMs / sk.cdMs : 0
+      if (this.skillWasReady || remainSec !== this.skillShownSec || Math.abs(ratio - this.skillShownRatio) > 0.01) {
+        this.skillWasReady = false
+        this.skillShownSec = remainSec
+        this.skillShownRatio = ratio
+        this.skillCdText?.setText(String(remainSec))
+        this.skillEmoji?.setAlpha(0.4)
+        this.skillRing?.setVisible(false)
+        // 剩余冷却的扇形暗罩：从 12 点起顺时针，随充能收缩
+        const g = this.skillMask
+        g.clear()
+        g.fillStyle(0x000000, 0.6)
+        g.slice(this.skillCenter.x, this.skillCenter.y, 52, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2, false)
+        g.fillPath()
+      }
+      return
+    }
+    if (!this.skillWasReady) {
+      this.skillWasReady = true
+      this.skillShownSec = -1
+      this.skillMask.clear()
+      this.skillCdText?.setText('')
+      this.skillEmoji?.setAlpha(1)
+      this.skillRing?.setVisible(true)
+      // 就绪弹跳提示（各自按基准缩放做相对弹跳：emoji 的原生 scale 是小数，
+      // 不能 tween 到绝对 1）
+      const bump = (obj: Phaser.GameObjects.GameObject | undefined, base: number): void => {
+        if (!obj) return
+        this.tweens.add({
+          targets: obj,
+          scaleX: { from: base * 1.16, to: base },
+          scaleY: { from: base * 1.16, to: base },
+          duration: 260,
+          ease: 'Back.easeOut',
+        })
+      }
+      bump(this.skillBase, 1)
+      bump(this.skillEmoji, this.skillEmojiScale)
+    }
+    this.skillRing?.setAlpha(0.5 + 0.4 * Math.sin(this.time.now / 240))
+  }
+
+  /** 技能释放横幅：技能名短暂弹出（比波次警示小一号、更快收场） */
+  private onSkillCast(name: string): void {
+    const t = this.add
+      .text(viewport.logicalWidth / 2, viewport.logicalHeight * 0.36, `⚡ ${name}`, {
+        fontFamily: UI_FONT,
+        fontSize: FONT.head,
+        fontStyle: 'bold',
+        color: '#ffd54f',
+        stroke: '#000000',
+        strokeThickness: 5,
+        resolution: textRes(),
+      })
+      .setOrigin(0.5)
+      .setDepth(226)
+      .setScale(0.6)
+    this.tweens.add({ targets: t, scale: 1, duration: 220, ease: 'Back.easeOut' })
+    this.tweens.add({ targets: t, alpha: 0, delay: 900, duration: 400, onComplete: () => t.destroy() })
   }
 
   private onViewportChanged(): void {

@@ -1,5 +1,5 @@
 import type { CaptainId, CharacterId } from './config'
-import { CAPTAINS, CHARACTERS, LEVELS, MEMBER, ROSTER_IDS, WAVE } from './config'
+import { CAPTAINS, CHARACTERS, LEVELS, MEMBER, ROSTER_IDS, SKILL, WAVE } from './config'
 import type { FormationId } from './formation'
 import type { ItemId } from './items'
 import type { MapId } from './maps'
@@ -37,6 +37,8 @@ export interface RunState {
   captainItems: ItemId[]
   /** 本次商店剩余的免费刷新次数（进店时按队长能力重置） */
   freeRefreshes: number
+  /** 队长主动技能的剩余冷却：跨波持久，战斗内实时递减（商店/整编不走表） */
+  skillCdMs: number
   /** N 保 1 的岗位次序：0 号 = 受保护中心，1.. = 外圈固定次序；满员时懒初始化。
    * 互换中心只交换两个人的岗位，其他人永不跳位 */
   guardOrder: CharacterId[]
@@ -84,6 +86,8 @@ export function beginRun(
     memberItems: starters.map(() => []),
     captainItems: [],
     freeRefreshes: 0,
+    // 开局预充：第一次充能只需 (1 - startCharge) 的时间
+    skillCdMs: Math.round(captain.skill.cdMs * (1 - SKILL.startCharge)),
     guardOrder: [],
     formationIntroduced: false,
     stats: {

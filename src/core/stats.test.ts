@@ -71,7 +71,10 @@ describe('角色属性面板模型', () => {
     for (const cap of Object.values(CAPTAINS)) {
       const groups = captainStatGroups(cap)
       expect(groups[0]!.lines[0]).toBe(cap.desc)
-      const team = groups[1]!.lines.join(' ')
+      // 主动技能组：名字进标题，描述含冷却说明
+      expect(groups[1]!.title).toContain(cap.skill.name)
+      expect(groups[1]!.lines[0]).toContain('冷却')
+      const team = groups[2]!.lines.join(' ')
       expect(team).toContain('移速')
       expect(team).toContain(`编制上限 ${cap.teamSize} 人`)
       expect(team).toContain(`开局等级 ${cap.startLevel}`)

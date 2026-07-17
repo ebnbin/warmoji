@@ -133,6 +133,11 @@ export function captainStatGroups(spec: CaptainSpec, items: readonly ItemId[] = 
   if (fx.waveCoins > 0) lines.push(`波末分红 +${fx.waveCoins} 金币`)
   return [
     { icon: '👑', title: '队长能力', lines: [spec.desc] },
+    {
+      icon: '⚡',
+      title: `主动技能 · ${spec.skill.name}`,
+      lines: [`${spec.skill.desc}（冷却 ${Math.round(spec.skill.cdMs / 1000)} 秒，跨波累计）`],
+    },
     { icon: '👟', title: '团队', lines: [...lines, `角色满级 Lv.${LEVELS.max}（升级/招募各花 1 点）`] },
   ]
 }
