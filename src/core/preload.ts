@@ -1,4 +1,4 @@
-import { BOSS, CAPTAINS, CHARACTERS, COIN, ENEMY_SPECS, SPAWN } from './config'
+import { BOSS, CAPTAINS, CHARACTERS, CHEST, COIN, ENEMY_SPECS, SPAWN } from './config'
 import type { CaptainSpec, CharacterSpec, OutlineKind } from './config'
 import { ITEMS } from './items'
 import { MAPS } from './maps'
@@ -23,6 +23,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
       ]),
     ),
     COIN.emoji,
+    CHEST.emoji,
     '➕',
     '💀',
     // 财迷「天降横财」的金袋投掷物 + HUD 能量豆

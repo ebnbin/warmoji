@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { BOSS, CAPTAINS, CHARACTERS, COIN, ELITE, FOLLOW, HIT_SHAKE, KNOCKBACK, MEMBER, ORBIT, ROSTER_IDS, SKILL, SPAWN, STRESS, SURGE, TEAM, UNIT, WANDER, WAVE } from '../core/config'
+import { BOSS, CAPTAINS, CHARACTERS, CHEST, COIN, ELITE, FOLLOW, HIT_SHAKE, KNOCKBACK, MEMBER, ORBIT, ROSTER_IDS, SKILL, SPAWN, STRESS, SURGE, TEAM, UNIT, WANDER, WAVE } from '../core/config'
 import type { CharacterId, CharacterSpec, ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../core/config'
 import { applyAbilities } from '../core/abilities'
 import { enemyMixAt, pickEnemy } from '../core/enemies'
@@ -11,15 +11,17 @@ import type { FormationId } from '../core/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../core/orbit'
 import type { OrbitThreat } from '../core/orbit'
 import { browserStorage } from '../core/highscore'
+import { chestDropped, rollChestLoot } from '../core/chest'
 import {
   abilityTiers,
   aggregateCharacterEffects,
   aggregateTeamEffects,
   CRIT_MUL,
+  ITEMS,
   memberMaxHp,
   resolveWeaponSpec,
 } from '../core/items'
-import type { TeamEffects } from '../core/items'
+import type { CharacterEffects, TeamEffects } from '../core/items'
 import { currentFormation, getRun, guardOrder, isTeamFull, promoteStep, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { prodigyDamage, tickSkillCd } from '../core/skill'
@@ -96,6 +98,10 @@ export interface Member {
   weapons: WeaponRuntime[]
   handle: WeaponOwner
   visualOffset: { x: number; y: number }
+  /** 道具聚合效果：武器 ctx 闭包实时读它，开箱时原地更新即全线生效 */
+  fx: CharacterEffects
+  /** 本角色的武器上下文：开箱热重建武器时复用 */
+  ctx: WeaponContext
   // 道具修正后的个体生效值
   maxHp: number
   /** 受击判定圆半径（守护中心减半；虚空图手写接触判定复用） */
@@ -971,6 +977,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       ),
       handle,
       visualOffset,
+      fx,
+      ctx: memberCtx,
       maxHp,
       hurtRadius,
       iframesMs: MEMBER.iframesMs + fx.iframesAddMs,
@@ -1465,6 +1473,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const baseCoins = spec.coins * (elite ? ELITE.coinsMul : 1)
     const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? baseCoins : 0
     this.spawnCoins(enemy.x, enemy.y, baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0))
+    // 宝箱：极小概率掉落（精英更高）；Boss 击杀即通关，掉了也来不及捡，不掉
+    if (!this.stress && !isBoss && chestDropped(elite, () => this.rng.next())) {
+      this.spawnChest(enemy.x, enemy.y)
+    }
     // 击败终波 Boss：稍候（碎块飞散可见）直接提前通关
     if (isBoss) {
       this.boss = undefined
@@ -1940,11 +1952,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           break
         }
         case 'coinThief': {
-          // 直奔最近的金币；没金币就慢速游荡
+          // 直奔最近的金币（宝箱吃不动，不偷）；没金币就慢速游荡
           let coin: ImageObj | undefined
           let bestD = Infinity
           for (const c of this.coins.getChildren() as ImageObj[]) {
-            if (!c.active) continue
+            if (!c.active || c.getData('chest')) continue
             const d = this.worldDelta(e, c)
             const dist = d.x * d.x + d.y * d.y
             if (dist < bestD) {
@@ -2204,10 +2216,93 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   protected collectCoin(coin: ImageObj): void {
     if (!coin.active) return
+    if (coin.getData('chest')) {
+      this.openChest(coin)
+      return
+    }
     this.coinBurst.explode(4, coin.x, coin.y)
     playSfx('coin')
     coin.destroy()
     this.run.coins += 1
+  }
+
+  // ── 宝箱 ────────────────────────────────────────────────────
+
+  /** 宝箱走金币的磁吸/回收/拾取管线（同组 + data 标记分流） */
+  private spawnChest(x: number, y: number): void {
+    const pos = this.constrainCoinPos({ x, y })
+    const chest = emojiImage(this, pos.x, pos.y, CHEST.emoji, CHEST.size, 'player').setDepth(4)
+    chest.setData('chest', true)
+    this.physics.add.existing(chest)
+    circleBody(chest, CHEST.radius)
+    this.coins.add(chest)
+    const base = chest.scaleX
+    chest.setScale(base * 0.3)
+    this.tweens.add({ targets: chest, scale: base, duration: 220, ease: 'Back.easeOut' })
+  }
+
+  /** 开箱：抽 1 件当前阵容用得上的道具，免费入包并立即生效 */
+  private openChest(chest: ImageObj): void {
+    const { x, y } = chest
+    chest.destroy()
+    this.coinBurst.explode(12, x, y)
+    playSfx('levelup')
+    const loot = rollChestLoot(
+      this.run.roster,
+      this.run.memberItems,
+      this.run.captainItems,
+      () => this.rng.next(),
+    )
+    if (!loot) {
+      this.run.coins += CHEST.fallbackCoins
+      return
+    }
+    let owner: string
+    if (loot.slot < 0) {
+      this.run.captainItems.push(loot.itemId)
+      // 队长道具全部经 teamFx 实时读取，重算即生效
+      this.teamFx = aggregateTeamEffects(this.run.captainItems)
+      this.stats.moveSpeed = TEAM.moveSpeed * this.teamFx.moveSpeedMul
+      owner = `队长${CAPTAINS[this.run.captainId].name}`
+    } else {
+      this.run.memberItems[loot.slot]?.push(loot.itemId)
+      this.refreshMemberItems(loot.slot)
+      owner = CHARACTERS[this.run.roster[loot.slot]!]?.name ?? ''
+    }
+    const item = ITEMS[loot.itemId]
+    this.events.emit('chest-open', {
+      emoji: item.emoji,
+      name: item.name,
+      rarity: item.rarity,
+      owner,
+    })
+  }
+
+  /** 开箱即时生效：按最新道具重算派生属性并热重建武器（能力卡质变/
+   * 射程弹速类立即可见）。每波开局 createMember 整体重建，这里只覆盖本波剩余 */
+  private refreshMemberItems(slot: number): void {
+    const m = this.members[slot]
+    const id = this.run.roster[slot]
+    if (!m || !id) return
+    const owned = this.run.memberItems[slot] ?? []
+    const fx = aggregateCharacterEffects(owned)
+    // 原地覆写：武器 ctx 闭包读的就是这个对象（伤害/攻速/暴击/击退实时生效）
+    Object.assign(m.fx, fx)
+    const maxHp = memberMaxHp(fx.hpAdd)
+    if (m.alive) m.hp = Math.max(1, Math.min(maxHp, m.hp + Math.max(0, maxHp - m.maxHp)))
+    else m.hp = Math.min(m.hp, maxHp)
+    m.maxHp = maxHp
+    m.shownHpRatio = -1
+    m.iframesMs = MEMBER.iframesMs + fx.iframesAddMs
+    m.reviveMs = Math.max(1000, TEAM.reviveMs + fx.reviveAddMs)
+    m.regenPerSec = fx.regenPerSec
+    m.thorns = fx.thorns
+    m.killHeal = fx.killHeal
+    for (const w of m.weapons) w.destroy()
+    m.weapons = applyAbilities(id, abilityTiers(id, owned), CHARACTERS[id].weapons).map((w, i) =>
+      createWeapon(resolveWeaponSpec(w, m.fx), m.ctx, 200 + i * 230),
+    )
+    if (!m.alive) for (const w of m.weapons) w.setVisible(false)
   }
 
   // ── 结算 ────────────────────────────────────────────────────

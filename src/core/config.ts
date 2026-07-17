@@ -728,6 +728,20 @@ export const COIN = {
   collectRadius: 0.5 * UNIT,
 } as const
 
+// 宝箱：击杀极小概率掉落（精英显著更高），拾取开出 1 件免费随机道具，
+// 立即生效。抽取范围与权重见 core/chest.ts；与金币同磁吸，波末未拾取消失
+export const CHEST = {
+  emoji: '🎁',
+  size: 0.8 * UNIT,
+  radius: 0.3 * UNIT,
+  chance: 0.008,
+  eliteChance: 0.08,
+  /** 开箱稀有度权重：越稀有越难开出 */
+  rarityWeights: { common: 1, rare: 0.3, epic: 0.08 },
+  /** 兜底金币：全队所有道具池都抽无可抽时（几乎不可能）宝箱改吐金币 */
+  fallbackCoins: 10,
+} as const
+
 // 刷怪节奏（波次制）：第 1 波基础火力可稳过，随跨波累计战斗时长持续加压，
 // 后期压力超出基础火力，由商店成长补差
 export const SPAWN = {

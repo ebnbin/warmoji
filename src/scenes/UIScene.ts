@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import { CAPTAINS, COIN, SKILL } from '../core/config'
 import { formatTime } from '../core/format'
+import { RARITIES } from '../core/items'
+import type { ItemRarity } from '../core/items'
 import { endRun, getRun } from '../core/run'
 import { isDevOpen, isStress, setDevOpen, setStress } from '../ui/dev'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../ui/diagnostics'
@@ -36,6 +38,8 @@ export class UIScene extends Phaser.Scene {
   private devRefreshedAt = 0
   private paused = false
   private pauseObjs: Phaser.GameObjects.GameObject[] = []
+  /** 在场的开箱横幅数：连开多箱时逐条下移错位 */
+  private chestBanners = 0
   // 队长技能按钮（左下角）：底圆 + 队长头像 + 冷却扇形暗罩 + 秒数 + 就绪光圈
   private skillBase?: Phaser.GameObjects.Arc
   private skillEmoji?: Phaser.GameObjects.Image
@@ -159,11 +163,13 @@ export class UIScene extends Phaser.Scene {
     arenaEvents.on('wave-complete', this.onWaveComplete, this)
     arenaEvents.on('wave-warning', this.onWaveWarning, this)
     arenaEvents.on('skill-cast', this.onSkillCast, this)
+    arenaEvents.on('chest-open', this.onChestOpen, this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       arenaEvents.off('wave-complete', this.onWaveComplete, this)
       arenaEvents.off('wave-warning', this.onWaveWarning, this)
       arenaEvents.off('skill-cast', this.onSkillCast, this)
+      arenaEvents.off('chest-open', this.onChestOpen, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
 
@@ -466,6 +472,41 @@ export class UIScene extends Phaser.Scene {
       bump(this.skillEmoji, this.skillEmojiScale)
     }
     this.skillRing?.setAlpha(0.5 + 0.4 * Math.sin(this.time.now / 240))
+  }
+
+  /** 开箱横幅：道具名按稀有度着色 + 归属；位置比技能横幅低一档避免叠字。
+   * 连开多箱（精英潮 AOE）按在场横幅数逐条下移，不互相糊字 */
+  private onChestOpen(loot: { emoji: string; name: string; rarity: ItemRarity; owner: string }): void {
+    this.chestBanners += 1
+    const t = this.add
+      .text(
+        viewport.logicalWidth / 2,
+        viewport.logicalHeight * 0.46 + (this.chestBanners - 1) * 44,
+        `🎁 ${loot.emoji} ${loot.name} → ${loot.owner}`,
+        {
+          fontFamily: UI_FONT,
+          fontSize: FONT.lead,
+          fontStyle: 'bold',
+          color: RARITIES[loot.rarity].color,
+          stroke: '#000000',
+          strokeThickness: 5,
+          resolution: textRes(),
+        },
+      )
+      .setOrigin(0.5)
+      .setDepth(226)
+      .setScale(0.6)
+    this.tweens.add({ targets: t, scale: 1, duration: 220, ease: 'Back.easeOut' })
+    this.tweens.add({
+      targets: t,
+      alpha: 0,
+      delay: 1500,
+      duration: 400,
+      onComplete: () => {
+        t.destroy()
+        this.chestBanners = Math.max(0, this.chestBanners - 1)
+      },
+    })
   }
 
   /** 技能释放横幅：技能名短暂弹出（比波次警示小一号、更快收场） */
