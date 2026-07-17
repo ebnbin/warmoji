@@ -15,13 +15,30 @@ export function waveAt(elapsedSec: number): WaveState {
   }
 }
 
-/** 本波战斗时长：前几波短波快节奏，中段标准波，终波（Boss）加长 */
-export function waveDurationMs(wave: number): number {
-  if (wave >= WAVE.totalWaves) return WAVE.finalMs
-  return wave <= WAVE.shortWaves ? WAVE.shortMs : WAVE.longMs
+/** 波次 → 时长表下标波次：超出表的波次映射回 [loopFrom..末波] 循环（无尽模式的结构基础） */
+export function cycleWave(wave: number): number {
+  const last = WAVE.durationsSec.length
+  if (wave <= last) return wave
+  const span = last - WAVE.loopFrom + 1
+  return WAVE.loopFrom + ((wave - WAVE.loopFrom) % span)
 }
 
-/** 打完这一波是否通关 */
+/** 本波战斗时长：逐波配置表（WAVE.durationsSec） */
+export function waveDurationMs(wave: number): number {
+  return WAVE.durationsSec[cycleWave(wave) - 1]! * 1000
+}
+
+/** 精英波：开局一波密集敌潮（参数见 SURGE） */
+export function isEliteWave(wave: number): boolean {
+  return WAVE.eliteWaves.includes(cycleWave(wave))
+}
+
+/** Boss 波：时长表末波（无尽循环里每圈打一次 Boss） */
+export function isBossWave(wave: number): boolean {
+  return cycleWave(wave) === WAVE.durationsSec.length
+}
+
+/** 打完这一波是否通关（有限局胜利判定） */
 export function isFinalWave(wave: number): boolean {
   return wave >= WAVE.totalWaves
 }

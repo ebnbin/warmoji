@@ -31,7 +31,7 @@ import { Rng } from '../core/rng'
 import { isWithinActive } from '../core/world'
 import { norm } from '../core/vec'
 import type { Point } from '../core/vec'
-import { isFinalWave, waveAt, waveDurationMs } from '../core/waves'
+import { isBossWave, isEliteWave, isFinalWave, waveAt, waveDurationMs } from '../core/waves'
 import { gainXp, waveBonusXp, xpToNext } from '../core/xp'
 import { applyBackground } from '../ui/background'
 import { DAMAGE_FONT, ensureDamageFont } from '../ui/damageFont'
@@ -551,8 +551,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 压测按后期混编出怪；正常局按当前波次配比
     this.enemyMix = enemyMixAt(this.stress ? 10 : this.run.wave)
 
-    // 节点波：敌人潮（精英登场波）与终波 Boss，开场警示横幅后兑现
-    if (!this.stress && this.run.wave === SURGE.wave) {
+    // 节点波：精英波敌潮与末波 Boss，开场警示横幅后兑现
+    if (!this.stress && isEliteWave(this.run.wave)) {
       this.time.delayedCall(600, () => {
         if (this.over) return
         this.events.emit('wave-warning', {
@@ -562,7 +562,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         this.spawnSurge()
       })
     }
-    if (!this.stress && this.run.wave >= WAVE.totalWaves) {
+    if (!this.stress && isBossWave(this.run.wave)) {
       this.onFinalWaveSetup()
       this.time.delayedCall(600, () => {
         if (this.over) return
@@ -1574,10 +1574,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.spawnCooldownMs -= delta
     if (this.spawnCooldownMs > 0) return
     // 难度按跨波累计战斗时长递增；刷怪供给随在场人数缩放（单人首发不会被满编压力淹没）；
-    // 终波常规刷怪减压：焦点让给 Boss，避免「满速杂兵 + 精英 + Boss」三重压力叠满
+    // Boss 波常规刷怪减压：焦点让给 Boss，避免「满速杂兵 + 精英 + Boss」三重压力叠满
     const wave = waveAt((this.run.combatMs + this.elapsedMs) / 1000)
     const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * this.members.length
-    const relief = !this.stress && isFinalWave(this.run.wave) ? BOSS.spawnRelief : 1
+    const relief = !this.stress && isBossWave(this.run.wave) ? BOSS.spawnRelief : 1
     this.spawnCooldownMs = this.stress
       ? STRESS.spawnIntervalMs
       : (wave.spawnIntervalMs * relief) / teamFactor

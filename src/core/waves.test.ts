@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SPAWN, WAVE } from './config'
-import { isFinalWave, waveAt, waveDurationMs } from './waves'
+import { cycleWave, isBossWave, isEliteWave, isFinalWave, waveAt, waveDurationMs } from './waves'
 
 describe('waves', () => {
   it('开局为初始刷怪间隔、无强化', () => {
@@ -29,12 +29,39 @@ describe('waves', () => {
     expect(waveAt(-10)).toEqual(waveAt(0))
   })
 
-  it('波时长：前几波短波、中段标准波、终波（Boss）加长', () => {
-    expect(waveDurationMs(1)).toBe(WAVE.shortMs)
-    expect(waveDurationMs(WAVE.shortWaves)).toBe(WAVE.shortMs)
-    expect(waveDurationMs(WAVE.shortWaves + 1)).toBe(WAVE.longMs)
-    expect(waveDurationMs(WAVE.totalWaves - 1)).toBe(WAVE.longMs)
-    expect(waveDurationMs(WAVE.totalWaves)).toBe(WAVE.finalMs)
+  it('波时长逐波查表：表长 = 总波数，配置为正秒数', () => {
+    expect(WAVE.durationsSec.length).toBe(WAVE.totalWaves)
+    expect(WAVE.loopFrom).toBeGreaterThanOrEqual(1)
+    expect(WAVE.loopFrom).toBeLessThanOrEqual(WAVE.totalWaves)
+    for (let w = 1; w <= WAVE.totalWaves; w++) {
+      expect(WAVE.durationsSec[w - 1]).toBeGreaterThan(0)
+      expect(waveDurationMs(w)).toBe(WAVE.durationsSec[w - 1]! * 1000)
+    }
+  })
+
+  it('无尽循环映射：表内波次原样，超表回到 [loopFrom..末波] 循环', () => {
+    const last = WAVE.durationsSec.length
+    const span = last - WAVE.loopFrom + 1
+    for (let w = 1; w <= last; w++) expect(cycleWave(w)).toBe(w)
+    expect(cycleWave(last + 1)).toBe(WAVE.loopFrom)
+    expect(cycleWave(last + span)).toBe(last)
+    expect(cycleWave(last + span + 1)).toBe(WAVE.loopFrom)
+    // 循环圈内时长跟着映射走
+    expect(waveDurationMs(last + 1)).toBe(waveDurationMs(WAVE.loopFrom))
+    expect(waveDurationMs(last + span)).toBe(waveDurationMs(last))
+  })
+
+  it('精英波与 Boss 波判定（含循环圈）', () => {
+    const last = WAVE.durationsSec.length
+    const span = last - WAVE.loopFrom + 1
+    expect(isEliteWave(1)).toBe(false)
+    for (const w of WAVE.eliteWaves) {
+      expect(isEliteWave(w)).toBe(true)
+      if (w >= WAVE.loopFrom) expect(isEliteWave(w + span)).toBe(true)
+    }
+    expect(isBossWave(last)).toBe(true)
+    expect(isBossWave(last - 1)).toBe(false)
+    expect(isBossWave(last + span)).toBe(true)
   })
 
   it('通关判定：打完最后一波为真', () => {

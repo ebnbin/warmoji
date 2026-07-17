@@ -13,20 +13,20 @@ describe('xp', () => {
     expect(xpToNext(15)).toBeGreaterThan(xpToNext(1) * 5)
   })
 
-  it('校准锚点：每波 1~1.5 颗豆——第 1 波（击杀约 15~50 经验）得 1 豆、不到 2 豆', () => {
+  it('校准锚点：每波 1~1.5 颗豆——第 1 波（击杀约 15~60 经验）得 1 豆、不到 2 豆', () => {
     const wave1Low = gainXp({ level: 1, xp: 0 }, 15 + waveBonusXp(1))
-    const wave1High = gainXp({ level: 1, xp: 0 }, 50 + waveBonusXp(1))
+    const wave1High = gainXp({ level: 1, xp: 0 }, 60 + waveBonusXp(1))
     expect(wave1Low.state.level - 1).toBeGreaterThanOrEqual(1)
     expect(wave1High.state.level - 1).toBeLessThanOrEqual(1)
   })
 
-  it('校准锚点：15 波总量（保底约 3800 + 击杀约 3400）生涯 14~20 颗豆（每波约 1 颗出头）', () => {
+  it('校准锚点：18 波总量（保底约 6900 + 击杀约 7000）生涯 18~27 颗豆（每波约 1 颗出头）', () => {
     let bonus = 0
-    for (let w = 1; w <= 15; w++) bonus += waveBonusXp(w)
-    expect(bonus).toBeGreaterThanOrEqual(2400)
-    const total = gainXp({ level: 1, xp: 0 }, bonus + 3400)
-    expect(total.state.level - 1).toBeGreaterThanOrEqual(14)
-    expect(total.state.level - 1).toBeLessThanOrEqual(20)
+    for (let w = 1; w <= 18; w++) bonus += waveBonusXp(w)
+    expect(bonus).toBeGreaterThanOrEqual(4000)
+    const total = gainXp({ level: 1, xp: 0 }, bonus + 7000)
+    expect(total.state.level - 1).toBeGreaterThanOrEqual(18)
+    expect(total.state.level - 1).toBeLessThanOrEqual(27)
   })
 
   it('波末保底经验随波次缓涨', () => {

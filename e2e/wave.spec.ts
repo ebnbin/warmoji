@@ -106,7 +106,7 @@ test('波次循环：波末固定招募 1 人 → 商店购物 → 下一波扩�
   expect(errors, `控制台/页面错误：\n${errors.join('\n')}`).toHaveLength(0)
 })
 
-test('满员阵型：神童开局满编 → 阵型首秀选中心 → 互换稳定次序 → 满员上场', async ({ page }) => {
+test('满员阵型：神童自选招满 → 阵型首秀选中心 → 互换稳定次序 → 满员上场', async ({ page }) => {
   test.setTimeout(120_000)
   await page.addInitScript(() => {
     localStorage.setItem('warmoji.captain.v1', 'prodigy')
@@ -116,7 +116,22 @@ test('满员阵型：神童开局满编 → 阵型首秀选中心 → 互换稳�
   await clickCaptain(page, 'prodigy')
   await confirmCaptain(page)
 
-  // 开局满编 → 首次满员自动展示阵型页（N 保 1），默认中心 = 1 号位
+  // 开局整编一次给足 5 个名额：逐个确认默认候选（= 花名册前 5 位）直到满员
+  const p0 = await page.evaluate(() => window.__warmoji!.promote!)
+  expect(p0.mode).toBe('recruit')
+  for (let i = 0; i < 5; i++) {
+    const prev = await page.evaluate(() => window.__warmoji!.promote!.selected ?? '')
+    await clickPromoteConfirm(page)
+    await page.waitForFunction(
+      (p) =>
+        window.__warmoji?.promote?.mode === 'formation' ||
+        (window.__warmoji?.promote?.selected ?? '') !== p,
+      prev,
+      { timeout: 15_000 },
+    )
+  }
+
+  // 满员自动进入阵型首秀（N 保 1），默认中心 = 1 号位
   const f0 = await page.evaluate(() => window.__warmoji!.promote!)
   expect(f0.mode).toBe('formation')
   expect(f0.formation!.center).toBe('juggler')
@@ -127,12 +142,14 @@ test('满员阵型：神童开局满编 → 阵型首秀选中心 → 互换稳�
   const order1 = await page.evaluate(() => window.__warmoji!.promote!.items.map((i) => i.id))
   expect(order1).toEqual(['mage', ...order0.slice(1).map((id) => (id === 'mage' ? 'juggler' : id))])
   await completePromote(page)
-  await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
+  // 神童自带启动资金：开战前先过一次商店
+  await page.waitForFunction(() => window.__warmoji?.scene === 'shop')
+  await clickShopNext(page)
   await page.waitForFunction(() => window.__warmoji?.alive === 5)
   const st = await page.evaluate(() => ({
     wave: window.__warmoji!.wave,
     formation: window.__warmoji!.formation,
   }))
-  expect(st.wave).toBe(10)
+  expect(st.wave).toBe(15)
   expect(st.formation).toBe('guard')
 })

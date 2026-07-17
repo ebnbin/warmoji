@@ -266,16 +266,18 @@ export interface CaptainSpec {
   /** 编制上限：可招募的角色总数 */
   readonly teamSize: number
   /** 开局波次（通常 1）；>1 时跳过之前的波次，难度时钟按被跳过的
-   * 波次时长预推进——敌人配比与强度都是该波的真实水平，且视为
-   * 招募已完成（开局满编）、能量豆拉满（core/run.ts beginRun） */
+   * 波次时长预推进——敌人配比与强度都是该波的真实水平，且能量豆拉满；
+   * 阵容仍从零起步，由玩家在整编页逐个自选招满（core/run.ts beginRun） */
   readonly startWave: number
+  /** 开局金币 */
+  readonly startCoins: number
   /** 全队经验获取倍率 */
   readonly xpGainMul: number
   /** 每次进商店全员复活并恢复满血（默认规则：存活者血量保留、阵亡者 30% 血复活） */
   readonly reviveInShop: boolean
   /** 每次进商店的免费道具刷新次数 */
   readonly freeRefreshes: number
-  /** 第 1 波开战前是否开放商店（整编结束后）；为未来自带初始金币的队长预留 */
+  /** 开局整编结束后是否先进商店再开战（自带开局金币的队长用） */
   readonly firstWaveShop: boolean
 }
 
@@ -286,6 +288,7 @@ export const CAPTAINS = {
     desc: '每次进入商店，全体队员复活并恢复满血',
     teamSize: 5,
     startWave: 1,
+    startCoins: 0,
     xpGainMul: 1,
     reviveInShop: true,
     freeRefreshes: 0,
@@ -302,6 +305,7 @@ export const CAPTAINS = {
     desc: '每次进入商店，前 3 次道具刷新免费',
     teamSize: 5,
     startWave: 1,
+    startCoins: 0,
     xpGainMul: 1,
     reviveInShop: false,
     freeRefreshes: 3,
@@ -318,6 +322,7 @@ export const CAPTAINS = {
     desc: '气氛组拉满，编制上限 6 人',
     teamSize: 6,
     startWave: 1,
+    startCoins: 0,
     xpGainMul: 1,
     reviveInShop: false,
     freeRefreshes: 0,
@@ -331,13 +336,14 @@ export const CAPTAINS = {
   prodigy: {
     emoji: '🤓',
     name: '神童',
-    desc: '天资聪颖，开局满编、能量豆拉满，直接从第 10 波开战（测试直通车）',
+    desc: '天资聪颖，自选阵容直接满编开局，能量豆拉满、自带启动资金（测试直通车）',
     teamSize: 5,
-    startWave: 10,
+    startWave: 15,
+    startCoins: 500,
     xpGainMul: 1,
     reviveInShop: false,
     freeRefreshes: 0,
-    firstWaveShop: false,
+    firstWaveShop: true,
     skill: {
       name: '降维打击',
       desc: '一道灵光扫过全场，所有敌人受到大额伤害（随波次增强），Boss 承伤减半',
@@ -350,6 +356,7 @@ export const CAPTAINS = {
     desc: '带队有方，全队经验获取 +25%',
     teamSize: 5,
     startWave: 1,
+    startCoins: 0,
     xpGainMul: 1.25,
     reviveInShop: false,
     freeRefreshes: 0,
@@ -436,15 +443,21 @@ export const MEMBER = {
 } as const
 
 // 波次制：一波战斗固定时长 → 结算横幅 → 整编/商店 → 下一波；上一波阵亡者下波低血复活。
-// 有限局：打满 totalWaves 波即通关（进结算页），中途团灭进同一结算页的失败版
+// 有限局：打满 totalWaves 波即通关（进结算页），中途团灭进同一结算页的失败版。
+// 结构判定都在 core/waves.ts：精英波开局敌潮（SURGE）、末波 Boss 战；
+// 超出表的波次映射回 [loopFrom..末波] 循环（无尽模式的结构基础）
+const WAVE_DURATIONS_SEC: readonly number[] = [
+  20, 20, 25, 25, 30, 30, 40, 40, 40, 60, 50, 50, 50, 50, 70, 60, 60, 90,
+]
+
 export const WAVE = {
-  /** 前 shortWaves 波每波 shortMs（快节奏开局），之后每波 longMs */
-  shortWaves: 5,
-  shortMs: 15_000,
-  longMs: 30_000,
-  totalWaves: 15,
-  /** 终波（Boss 波）时长：击败 Boss 或撑满时长皆通关 */
-  finalMs: 45_000,
+  /** 每波战斗时长（秒），下标 = 波次 - 1；末波为 Boss 波（击败或撑满皆通关） */
+  durationsSec: WAVE_DURATIONS_SEC,
+  /** 精英波：开局一波密集敌潮（参数见 SURGE） */
+  eliteWaves: [10, 15] as readonly number[],
+  /** 无尽循环起点：第 loopFrom 波到末波构成循环段 */
+  loopFrom: 7,
+  totalWaves: WAVE_DURATIONS_SEC.length,
   reviveHpRatio: 0.3,
   /** 波末结算横幅停留时长：给玩家松手时间，防止战斗输入误触商店按钮 */
   summaryMs: 1600,
@@ -748,23 +761,22 @@ export const ELITE = {
   coinsMul: 3,
 } as const
 
-// 敌人潮：第 wave 波开局的一波密集冲锋（含保底精英），配警示横幅
+// 敌人潮：精英波（WAVE.eliteWaves）开局的一波密集冲锋（含保底精英），配警示横幅
 export const SURGE = {
-  wave: 10,
   count: 14,
   elites: 3,
   /** 潮水在这段时间内陆续落地 */
   spreadMs: 2600,
 } as const
 
-// 终局 Boss（最后一波）：大体型 + 周期环形弹幕 + 蓄力突刺；击退免疫。
-// 血量固定不吃时间成长曲线（平衡按满编 15 波队伍校准），击败或撑满时长皆通关
+// 终局 Boss（末波）：大体型 + 周期环形弹幕 + 蓄力突刺；击退免疫。
+// 血量固定不吃时间成长曲线（按满编 18 波队伍粗校准），击败或撑满时长皆通关
 export const BOSS = {
   emoji: '👹',
   name: '赤鬼',
   size: 3.2 * UNIT,
   radius: 1.05 * UNIT,
-  hp: 4000,
+  hp: 6000,
   /** 平时缓速逼近队伍中心 */
   speed: 1.4 * UNIT,
   damage: 20,
@@ -868,21 +880,17 @@ export const STRESS = {
   cooldownMul: 0.1,
 } as const
 
-// 经验：等比升级曲线（前快后慢），点数经济见 core/run.ts。
-// 经验/等级无上限（点数花不出去也继续涨，作容错溢出）；曲线放缓换更高点数产出。
-// 满配需求 = 5 人 × 6 级 = 30 点；校准目标：无经验加成队长 15 波约 22~24 点，
-// 快队长可摸满、慢队长 ~18，保留「点数不够、必须取舍」的决策
+// 经验：等比升级曲线（前快后慢），每升 1 级得 1 颗能量豆（见 core/run.ts）。
+// 校准目标：每波约 1~1.5 颗豆、前期不超 1.5；满豆冻结所以不必精确，
+// 加波次/拉长时长也不用动曲线——等比门槛会自然消化更多的总经验
 export const XP = {
   base: 80,
   growth: 1.15,
-  /** 波末保底经验 = base + perWave×波次：15 波制下是经验主梁之一，
-   * 保证前几波（15 秒短波杀怪少）也有稳定豆收入 */
+  /** 波末保底经验 = base + perWave×波次：保证杀怪少的短波也有稳定豆收入 */
   waveBonusBase: 40,
   waveBonusPerWave: 36,
 } as const
 
-// 角色等级：1 拥有 · 2/4/5 维度数值（core/levels.ts）· 3/6 特殊能力
-// （core/abilities.ts）。普通模式满级 6；无尽模式后续放开 7+（纯数值）
 // 商店：每个上架位可付费重新随机（队长可提供免费次数）
 export const SHOP = { refreshPrice: 2 } as const
 

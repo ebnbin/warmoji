@@ -9,7 +9,7 @@ test('开局后自动战斗：出怪、飞刀击杀、计时推进、无控制�
   page.on('pageerror', (err) => errors.push(String(err)))
 
   // 站桩测试：默认队长 1 人第 1 波，节奏缓，无操作也能撑过断言窗口
-  // （神童已是「15 级 + 跳到第 10 波」的测试直通车，不适合站桩）
+  // （神童是跳波开局的测试直通车，不适合站桩）
   await page.goto('/')
   await startRun(page)
 
@@ -27,7 +27,7 @@ test('开局后自动战斗：出怪、飞刀击杀、计时推进、无控制�
     timeout: 45_000,
   })
 
-  // 等战场热闹些再截图（第 1 波只有 15 秒，节点前移给暂停测试留时间）
+  // 等战场热闹些再截图（第 1 波只有 20 秒，节点前移给暂停测试留时间）
   await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 6, undefined, {
     timeout: 45_000,
   })

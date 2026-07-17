@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { CAPTAINS, MEMBER, ROSTER_IDS, SKILL, WAVE } from './config'
-import { waveDurationMs } from './waves'
 import {
   beginRun,
   canRecruit,
@@ -52,17 +51,21 @@ describe('run 生命周期', () => {
     endRun()
   })
 
-  it('神童跳波开局：满编 + 能量豆拉满 + 难度时钟预推进被跳过波次', () => {
+  it('神童跳波开局：空阵容自选招满 + 满豆 + 开局金币 + 难度时钟预推进', () => {
     const run = beginRun('prodigy', [])
     expect(run.wave).toBe(CAPTAINS.prodigy.startWave)
-    expect(run.roster.length).toBe(CAPTAINS.prodigy.teamSize)
+    // 阵容不代填：整编页一次给足名额（波次 ≥ 编制），玩家逐个自选
+    expect(run.roster).toEqual([])
+    expect(promoteStep(run)).toBe('recruit')
     expect(run.beans).toBe(SKILL.maxBeans)
-    expect(promoteStep(run)).toBe(null)
-    let skipped = 0
-    for (let w = 1; w < CAPTAINS.prodigy.startWave; w++) skipped += waveDurationMs(w)
+    expect(run.coins).toBe(CAPTAINS.prodigy.startCoins)
+    // 被跳过波次的时长按表累加进难度时钟
+    const skipped =
+      WAVE.durationsSec.slice(0, CAPTAINS.prodigy.startWave - 1).reduce((a, b) => a + b, 0) * 1000
     expect(run.combatMs).toBe(skipped)
-    // 15 波制下跳到第 10 波 = 5 短波 + 4 标准波
-    expect(skipped).toBe(5 * WAVE.shortMs + 4 * WAVE.longMs)
+    while (promoteStep(run) === 'recruit') recruitMember(run, recruitCandidates(run)[0]!)
+    expect(run.roster.length).toBe(CAPTAINS.prodigy.teamSize)
+    expect(promoteStep(run)).toBe(null)
     endRun()
   })
 

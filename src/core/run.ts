@@ -70,17 +70,16 @@ export function beginRun(
   const captain = CAPTAINS[captainId]
   // 跳波开局（如神童）：难度时钟按被跳过波次的时长预推进，
   // 敌人血量/刷怪节奏与正常打到该波一致（也计入结算的总时长口径）；
-  // 同时视为招募已完成（开局满编）、能量豆拉满——测试直通车不用逐波攒
+  // 能量豆拉满，阵容不代填——recruitDue 按波次给足名额，玩家整编页自选招满
   let skippedMs = 0
   for (let w = 1; w < captain.startWave; w++) skippedMs += waveDurationMs(w)
-  const roster =
-    captain.startWave > 1 ? ROSTER_IDS.slice(0, captain.teamSize) : [...starters]
+  const roster = [...starters]
   current = {
     captainId,
     mapId,
     decorSeed: (Math.random() * 0xffffffff) >>> 0,
     wave: captain.startWave,
-    coins: 0,
+    coins: captain.startCoins,
     kills: 0,
     xp: { level: 1, xp: 0 },
     beans: captain.startWave > 1 ? SKILL.maxBeans : 0,
