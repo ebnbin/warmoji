@@ -32,10 +32,10 @@ describe('地图选择', () => {
   it('非法/缺失回退首图；读写往返；与队长键互不干扰', () => {
     const s = memStorage()
     expect(loadMap(s)).toBe(MAP_IDS[0])
-    saveMap(s, 'snow')
-    expect(loadMap(s)).toBe('snow')
+    saveMap(s, 'river')
+    expect(loadMap(s)).toBe('river')
     saveCaptain(s, 'prodigy')
-    expect(loadMap(s)).toBe('snow')
+    expect(loadMap(s)).toBe('river')
     expect(loadMap(undefined)).toBe(MAP_IDS[0])
     saveMap(undefined, 'desert')
   })

@@ -4,12 +4,12 @@ import { clickMap, completePromote, confirmCaptain, confirmMap, enterMap } from 
 test('无限地图：进入无界竞技场，战斗运转，移动/相机无边界钳制', async ({ page }) => {
   await page.goto('/')
   await enterMap(page)
-  await clickMap(page, 'wilds')
+  await clickMap(page, 'desert')
   await confirmMap(page)
   await confirmCaptain(page)
   await completePromote(page)
   await page.waitForFunction(
-    () => window.__warmoji?.scene === 'arena' && window.__warmoji.mapId === 'wilds',
+    () => window.__warmoji?.scene === 'arena' && window.__warmoji.mapId === 'desert',
   )
 
   // 战斗在运转：敌人刷出（环带采样围绕队伍）

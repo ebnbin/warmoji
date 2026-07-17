@@ -1,8 +1,8 @@
 import type { Palette } from './palette'
 import { hslToInt } from './palette'
 
-// 地图 = 关卡：固定主题（色板 + 地面装饰规则），是未来难度/专属怪物/开局
-// buff 等设计的挂载框架。当前三张图只有主题差异，玩法数值完全一致。
+// 地图 = 关卡：一种玩法一个主题——黑森林（有界竞技场）、荒漠（无限世界
+// + 终波缩圈）、奔流（单屏河流 + 水流漂移），每张图都是不同的世界规则。
 // 装饰配置只固定「规则」（emoji 池/尺寸/透明度/密度/倾斜），每局的具体摆放
 // 由 rollDecor 按 run 内的种子随机生成——一局一景，同局各波不变。
 
@@ -54,8 +54,8 @@ export const MAPS = {
   desert: {
     emoji: '🏜️',
     name: '荒漠',
-    desc: '烈日荒原，仙人掌与枯骨散落黄沙',
-    kind: 'bounded',
+    desc: '无边的大漠，可朝任意方向走到天涯；终波赤鬼降临时毒雾收拢成圈',
+    kind: 'infinite',
     palette: {
       bgFrom: 'hsl(30 42% 36%)',
       bgTo: 'hsl(15 38% 20%)',
@@ -68,42 +68,6 @@ export const MAPS = {
       alpha: [0.14, 0.26],
       // 荒漠刻意更稀疏
       density: [0.08, 0.11],
-    },
-  },
-  snow: {
-    emoji: '❄️',
-    name: '雪原',
-    desc: '冰封旷野，风雪在大地刻下冰晶',
-    kind: 'bounded',
-    palette: {
-      bgFrom: 'hsl(210 34% 34%)',
-      bgTo: 'hsl(235 30% 18%)',
-      map: hslToInt(205, 0.28, 0.82),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['❄️', '🧊', '✨'],
-      sizeU: [0.25, 0.62],
-      alpha: [0.16, 0.3],
-      density: [0.12, 0.16],
-    },
-  },
-  wilds: {
-    emoji: '🌾',
-    name: '无垠旷野',
-    desc: '没有边界的原野，可朝任意方向走到天涯；终波赤鬼降临时毒雾收拢成圈',
-    kind: 'infinite',
-    palette: {
-      bgFrom: 'hsl(80 30% 30%)',
-      bgTo: 'hsl(100 28% 16%)',
-      map: hslToInt(75, 0.34, 0.66),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['🌾', '🌼', '🍃', '🪨', '🌻'],
-      sizeU: [0.28, 0.66],
-      alpha: [0.14, 0.26],
-      density: [0.1, 0.14],
     },
   },
   river: {
