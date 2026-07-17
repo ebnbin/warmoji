@@ -69,7 +69,7 @@ test.describe('开局整编 竖屏', () => {
 
     let p = await page.evaluate(() => window.__warmoji!.promote!)
     expect(p.mode).toBe('recruit')
-    expect(p.points).toBe(6)
+    expect(p.points).toBe(15)
     for (const it of p.items) expect(inBounds(it, 720, 1280)).toBe(true)
     await clickPromoteItem(page, 'robot')
     await page.screenshot({ path: 'test-results/promote-portrait.png' })
@@ -83,9 +83,9 @@ test.describe('开局整编 竖屏', () => {
     expect(p.mode).toBe('recruit')
     expect(p.selected).toBe('robot')
 
-    // 神童 6 点：招满 5 人（含机器人）+ 升 1 级 → 开局队形环节 → 开战，5 人上场
+    // 神童 15 点：招满 5 人（含机器人）+ 升 10 级 → 开局队形环节 → 第 10 波开战
     await clickPromoteConfirm(page)
-    await page.waitForFunction(() => (window.__warmoji?.promote?.points ?? 0) === 5)
+    await page.waitForFunction(() => (window.__warmoji?.promote?.points ?? 0) === 14)
     await completePromote(page)
     await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
     const alive = await page.evaluate(() => window.__warmoji!.alive)

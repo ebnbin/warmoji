@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CAPTAINS, LEVELS, MEMBER, ROSTER_IDS, WAVE } from './config'
+import { waveDurationMs } from './waves'
 import {
   beginRun,
   canRecruit,
@@ -58,6 +59,24 @@ describe('run 生命周期', () => {
     const run = beginRun('prodigy', ['cowboy', 'troll'])
     expect(run.xp.level).toBe(CAPTAINS.prodigy.startLevel)
     expect(pointsAvailable(run)).toBe(CAPTAINS.prodigy.startLevel - 2)
+    endRun()
+  })
+
+  it('神童跳波开局：从 startWave 起步，难度时钟预推进被跳过波次的时长', () => {
+    const run = beginRun('prodigy', [])
+    expect(run.wave).toBe(CAPTAINS.prodigy.startWave)
+    let skipped = 0
+    for (let w = 1; w < CAPTAINS.prodigy.startWave; w++) skipped += waveDurationMs(w)
+    expect(run.combatMs).toBe(skipped)
+    // 15 波制下跳到第 10 波 = 5 短波 + 4 标准波
+    expect(skipped).toBe(5 * WAVE.shortMs + 4 * WAVE.longMs)
+    endRun()
+  })
+
+  it('常规队长仍从第 1 波零时钟开局', () => {
+    const run = beginRun('angel', ['cowboy'])
+    expect(run.wave).toBe(1)
+    expect(run.combatMs).toBe(0)
     endRun()
   })
 

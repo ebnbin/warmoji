@@ -4,6 +4,7 @@ import type { FormationId } from './formation'
 import type { ItemId } from './items'
 import type { MapId } from './maps'
 import { MAP_IDS } from './maps'
+import { waveDurationMs } from './waves'
 import { gainXp } from './xp'
 import type { XpState } from './xp'
 
@@ -62,16 +63,21 @@ export function beginRun(
   starters: readonly CharacterId[],
   mapId: MapId = MAP_IDS[0]!,
 ): RunState {
+  const captain = CAPTAINS[captainId]
+  // 跳波开局（如神童）：难度时钟按被跳过波次的时长预推进，
+  // 敌人血量/刷怪节奏与正常打到该波一致（也计入结算的总时长口径）
+  let skippedMs = 0
+  for (let w = 1; w < captain.startWave; w++) skippedMs += waveDurationMs(w)
   current = {
     captainId,
     mapId,
     decorSeed: (Math.random() * 0xffffffff) >>> 0,
-    wave: 1,
+    wave: captain.startWave,
     coins: 0,
     kills: 0,
-    xp: { level: CAPTAINS[captainId].startLevel, xp: 0 },
+    xp: { level: captain.startLevel, xp: 0 },
     pointsSpent: starters.length,
-    combatMs: 0,
+    combatMs: skippedMs,
     roster: [...starters],
     memberLevels: starters.map(() => 1),
     memberHp: starters.map(() => MEMBER.maxHp),

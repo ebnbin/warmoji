@@ -258,6 +258,9 @@ export interface CaptainSpec {
   readonly teamSize: number
   /** 开局队伍等级（= 可立刻花掉的点数；通常 1） */
   readonly startLevel: number
+  /** 开局波次（通常 1）；>1 时跳过之前的波次，难度时钟按被跳过的
+   * 波次时长预推进——敌人配比与强度都是该波的真实水平 */
+  readonly startWave: number
   /** 全队经验获取倍率 */
   readonly xpGainMul: number
   /** 每次进商店全员复活并恢复满血（默认规则：存活者血量保留、阵亡者 30% 血复活） */
@@ -275,6 +278,7 @@ export const CAPTAINS = {
     desc: '每次进入商店，全体队员复活并恢复满血',
     teamSize: 5,
     startLevel: 1,
+    startWave: 1,
     xpGainMul: 1,
     reviveInShop: true,
     freeRefreshes: 0,
@@ -286,6 +290,7 @@ export const CAPTAINS = {
     desc: '每次进入商店，前 3 次道具刷新免费',
     teamSize: 5,
     startLevel: 1,
+    startWave: 1,
     xpGainMul: 1,
     reviveInShop: false,
     freeRefreshes: 3,
@@ -297,6 +302,7 @@ export const CAPTAINS = {
     desc: '气氛组拉满，编制上限 6 人',
     teamSize: 6,
     startLevel: 1,
+    startWave: 1,
     xpGainMul: 1,
     reviveInShop: false,
     freeRefreshes: 0,
@@ -305,9 +311,10 @@ export const CAPTAINS = {
   prodigy: {
     emoji: '🤓',
     name: '神童',
-    desc: '天资聪颖，开局队伍等级 6：招满 5 人还能升级一次',
+    desc: '天资聪颖，开局队伍等级 15，直接从第 10 波开战（测试直通车）',
     teamSize: 5,
-    startLevel: 6,
+    startLevel: 15,
+    startWave: 10,
     xpGainMul: 1,
     reviveInShop: false,
     freeRefreshes: 0,
@@ -319,6 +326,7 @@ export const CAPTAINS = {
     desc: '带队有方，全队经验获取 +25%',
     teamSize: 5,
     startLevel: 1,
+    startWave: 1,
     xpGainMul: 1.25,
     reviveInShop: false,
     freeRefreshes: 0,
@@ -734,9 +742,11 @@ export const BOSS = {
 export const INFINITE = {
   /** 活跃方形半边长：超出的敌人休眠（冻结 AI/物理/不占刷怪上限，保留全状态） */
   activeHalf: 32 * UNIT,
-  /** 刷怪环带（以队伍中心为圆心）：内环避脸、外环保证 ⚠️ 预告在屏内可见 */
+  /** 刷怪环带（以队伍中心为圆心）：内环避脸；外环 = 活跃半边长之半——
+   * 奔跑方向的前方早有已落地的敌人在等，一直跑不能白嫖（多数落点在屏外，
+   * 近处落点仍有 ⚠️ 预告） */
   spawnRingMin: 4 * UNIT,
-  spawnRingMax: 9 * UNIT,
+  spawnRingMax: 16 * UNIT,
   /** 装饰分块边长（格）：块 = 精灵批量建/销毁的粒度，噪声连续性与块无关 */
   chunkCells: 8,
   /** 装饰活跃范围 = 相机视野外扩的块数（销毁再多留一块防抖） */
@@ -744,11 +754,12 @@ export const INFINITE = {
 } as const
 
 // 终波缩圈（无限地图的 Boss 战边界）：圈心 = 终波开始时的队伍中心。
-// 半径先停留（让玩家看清圈）再线性收缩到底，圈外队员按 tick 掉血；
-// 敌人不受圈伤。收到最小半径后正好容纳 N 保 1 阵 + Boss 走位
+// 它不是吃鸡式终局压缩——只为封住「跑得比 Boss 快就能无限避战」：
+// 半径先停留（让玩家看清圈）再缓缩 4 格即停，之后恒为 rMin 的固定竞技场；
+// 圈外队员按 tick 掉血，敌人不受圈伤
 export const ZONE = {
-  r0: 12 * UNIT,
-  rMin: 4 * UNIT,
+  r0: 16 * UNIT,
+  rMin: 12 * UNIT,
   /** 开圈后的静止观察期 */
   holdMs: 6000,
   /** 收缩结束时刻（此后维持 rMin 到波末） */

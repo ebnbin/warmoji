@@ -306,9 +306,9 @@ export class PromoteScene extends Phaser.Scene {
     })
   }
 
-  /** 开局组队（第 1 波开战前）还是波末整编 */
+  /** 开局组队（首波开战前）还是波末整编：首波 = 队长的开局波次（可跳波） */
   private isInitial(): boolean {
-    return this.run.wave === 1
+    return this.run.wave === CAPTAINS[this.run.captainId].startWave
   }
 
   /** 点数花完后的去向：开局看队长 firstWaveShop（默认直接开战），波末必进商店 */

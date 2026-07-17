@@ -120,7 +120,8 @@ export function characterStatGroups(
 export function captainStatGroups(spec: CaptainSpec, items: readonly ItemId[] = []): StatGroup[] {
   const fx = aggregateTeamEffects(items)
   const lines = [
-    `编制上限 ${spec.teamSize} 人 · 开局等级 ${spec.startLevel}`,
+    `编制上限 ${spec.teamSize} 人 · 开局等级 ${spec.startLevel}` +
+      (spec.startWave > 1 ? ` · 从第 ${spec.startWave} 波开始` : ''),
     `移速 ${grid(TEAM.moveSpeed * fx.moveSpeedMul)}/秒 · 金币拾取 ${grid(COIN.magnetRadius * fx.magnetMul)}`,
   ]
   const xpMul = spec.xpGainMul * fx.xpGainMul
