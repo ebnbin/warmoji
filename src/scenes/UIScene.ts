@@ -16,7 +16,7 @@ import {
   viewport,
   VIEWPORT_CHANGED,
 } from '../ui/viewport'
-import type { ArenaScene, HudSnapshot, WaveSummary } from './ArenaScene'
+import type { BaseArenaScene, HudSnapshot, WaveSummary } from './BaseArenaScene'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
 // 与 ArenaScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
@@ -57,8 +57,8 @@ export class UIScene extends Phaser.Scene {
     return this.joystick?.vector ?? { x: 0, y: 0 }
   }
 
-  private get arena(): ArenaScene {
-    return this.scene.get(this.arenaKey) as ArenaScene
+  private get arena(): BaseArenaScene {
+    return this.scene.get(this.arenaKey) as BaseArenaScene
   }
 
   create(): void {
