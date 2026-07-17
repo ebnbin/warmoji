@@ -2,10 +2,11 @@ import type { CharacterId } from './config'
 import { UNIT } from './config'
 import type { WeaponSpec } from './weapons'
 
-// 角色特殊能力：3 级解锁第一个、6 级解锁第二个（累积生效，不替代）。
-// 能力 = 对武器行为的质变（新弹道/新区域/新机制），与数值升级（core/levels.ts
-// 的维度成长）泾渭分明。实现为纯 spec 变换：applyAbilities 按等级把能力字段
-// 注入武器 spec，运行时（src/weapons/）按字段执行，无角色分支散落。
+// 角色特殊能力：一阶/二阶两档，靠购买角色专属能力卡解锁（core/items.ts 的
+// 能力卡条目；二阶卡需先持有一阶卡，累积生效不替代）。
+// 能力 = 对武器行为的质变（新弹道/新区域/新机制）。实现为纯 spec 变换：
+// applyAbilities 按已解锁档位把能力字段注入武器 spec，运行时（src/weapons/）
+// 按字段执行，无角色分支散落。
 
 export interface AbilitySpec {
   readonly icon: string
@@ -13,8 +14,11 @@ export interface AbilitySpec {
   readonly desc: string
 }
 
-/** 能力解锁等级：下标 0 → 3 级，下标 1 → 6 级 */
-export const ABILITY_LEVELS = [3, 6] as const
+/** 已解锁的能力档位：a1 = 一阶（下标 0 的卡），a2 = 二阶（下标 1 的卡） */
+export interface AbilityTiers {
+  a1: boolean
+  a2: boolean
+}
 
 export const ABILITIES: Record<CharacterId, readonly [AbilitySpec, AbilitySpec]> = {
   juggler: [
@@ -51,19 +55,13 @@ export const ABILITIES: Record<CharacterId, readonly [AbilitySpec, AbilitySpec]>
   ],
 } as const
 
-/** 该等级已解锁的能力（3 级 1 个、6 级 2 个） */
-export function unlockedAbilities(id: CharacterId, level: number): AbilitySpec[] {
-  return ABILITIES[id].filter((_, i) => level >= ABILITY_LEVELS[i]!)
-}
-
-/** 按角色等级把能力注入武器 spec（纯变换；1、2 号能力累积生效） */
+/** 按已解锁档位把能力注入武器 spec（纯变换；一二阶累积生效） */
 export function applyAbilities(
   id: CharacterId,
-  level: number,
+  tiers: AbilityTiers,
   weapons: readonly WeaponSpec[],
 ): WeaponSpec[] {
-  const a1 = level >= ABILITY_LEVELS[0]
-  const a2 = level >= ABILITY_LEVELS[1]
+  const { a1, a2 } = tiers
   if (!a1) return [...weapons]
   return weapons.map((w) => {
     switch (id) {

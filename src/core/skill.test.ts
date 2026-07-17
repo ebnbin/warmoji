@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CAPTAIN_IDS, CAPTAINS, SKILL } from './config'
-import { beginRun } from './run'
+import { beginRun, endRun } from './run'
 import { prodigyDamage, skillCharge, skillReady, tickSkillCd } from './skill'
 
 describe('技能冷却', () => {
@@ -33,10 +33,14 @@ describe('技能冷却', () => {
     }
   })
 
-  it('开局预充：新局剩余冷却 = CD × (1 - startCharge)', () => {
+  it('开局 CD 即就绪、0 颗豆（神童拉满 3 颗）——首放卡在挣豆上', () => {
     for (const id of CAPTAIN_IDS) {
       const run = beginRun(id, [])
-      expect(run.skillCdMs).toBe(Math.round(CAPTAINS[id].skill.cdMs * (1 - SKILL.startCharge)))
+      expect(run.skillCdMs).toBe(0)
+      expect(run.beans).toBe(
+        CAPTAINS[id].startWave > 1 ? SKILL.maxBeans : 0,
+      )
+      endRun()
     }
   })
 })

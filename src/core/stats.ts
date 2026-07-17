@@ -1,9 +1,14 @@
-import { ABILITIES, ABILITY_LEVELS, applyAbilities } from './abilities'
+import { ABILITIES, applyAbilities } from './abilities'
 import type { CaptainSpec, CharacterId } from './config'
-import { CHARACTERS, COIN, KNOCKBACK, LEVELS, MEMBER, TEAM, UNIT } from './config'
-import { aggregateCharacterEffects, aggregateTeamEffects, resolveWeaponSpec } from './items'
+import { CHARACTERS, COIN, KNOCKBACK, MEMBER, TEAM, UNIT } from './config'
+import {
+  abilityTiers,
+  aggregateCharacterEffects,
+  aggregateTeamEffects,
+  memberMaxHp,
+  resolveWeaponSpec,
+} from './items'
 import type { ItemId } from './items'
-import { levelEffects, memberMaxHp } from './levels'
 import type { WeaponSpec } from './weapons'
 
 // 角色属性面板的展示模型：把异构的角色/武器参数组织成统一的「属性组」。
@@ -60,20 +65,16 @@ export function weaponStatLines(w: WeaponSpec): string[] {
   }
 }
 
-/** 角色面板：数值为 等级维度 × 道具 修正后的生效值（伤害/冷却在展示层套倍率），
+/** 角色面板：数值为道具修正后的生效值（伤害/冷却在展示层套倍率），
  * 武器行数取「能力注入后」的生效 spec（如全周横扫的 360° 弧宽）+ 特殊能力组 */
-export function characterStatGroups(
-  id: CharacterId,
-  items: readonly ItemId[] = [],
-  level = 1,
-): StatGroup[] {
+export function characterStatGroups(id: CharacterId, items: readonly ItemId[] = []): StatGroup[] {
   const spec = CHARACTERS[id]
   const fx = aggregateCharacterEffects(items)
-  const lvl = levelEffects(id, level)
-  const dmgMul = fx.damageMul * lvl.damageMul
-  const cdMul = fx.cooldownMul * lvl.cooldownMul
+  const tiers = abilityTiers(id, items)
+  const dmgMul = fx.damageMul
+  const cdMul = fx.cooldownMul
   const baseLines = [
-    `生命上限 ${memberMaxHp(id, level, fx.hpAdd)} · 受击无敌 ${sec(MEMBER.iframesMs + fx.iframesAddMs)}`,
+    `生命上限 ${memberMaxHp(fx.hpAdd)} · 受击无敌 ${sec(MEMBER.iframesMs + fx.iframesAddMs)}`,
     `复活 ${sec(Math.max(1000, TEAM.reviveMs + fx.reviveAddMs))}`,
   ]
   // 稀有道具带来的触发式属性：有才显示，避免面板常年一排 0
@@ -84,20 +85,19 @@ export function characterStatGroups(
   return [
     {
       icon: '❤️',
-      title: level > 1 ? `基础（Lv.${level}）` : '基础',
+      title: '基础',
       lines: baseLines,
     },
     {
       icon: '⭐',
-      title: '特殊能力',
+      title: '特殊能力（商店专属卡解锁）',
       lines: ABILITIES[id].map((a, i) => {
-        const lv = ABILITY_LEVELS[i]!
-        const locked = level < lv
-        return `${a.icon} Lv.${lv}「${a.name}」${a.desc}${locked ? '（未解锁）' : ''}`
+        const unlocked = i === 0 ? tiers.a1 : tiers.a2
+        return `${a.icon}「${a.name}」${a.desc}${unlocked ? '' : '（未解锁）'}`
       }),
     },
-    ...applyAbilities(id, level, spec.weapons).map((w) => {
-      const resolved = resolveWeaponSpec(w, { ...fx, rangeMul: fx.rangeMul * lvl.rangeMul })
+    ...applyAbilities(id, tiers, spec.weapons).map((w) => {
+      const resolved = resolveWeaponSpec(w, fx)
       const display =
         resolved.kind === 'slowAura'
           ? resolved
@@ -120,7 +120,7 @@ export function characterStatGroups(
 export function captainStatGroups(spec: CaptainSpec, items: readonly ItemId[] = []): StatGroup[] {
   const fx = aggregateTeamEffects(items)
   const lines = [
-    `编制上限 ${spec.teamSize} 人 · 开局等级 ${spec.startLevel}` +
+    `编制上限 ${spec.teamSize} 人 · 每波结束固定招募 1 人` +
       (spec.startWave > 1 ? ` · 从第 ${spec.startWave} 波开始` : ''),
     `移速 ${grid(TEAM.moveSpeed * fx.moveSpeedMul)}/秒 · 金币拾取 ${grid(COIN.magnetRadius * fx.magnetMul)}`,
   ]
@@ -138,6 +138,6 @@ export function captainStatGroups(spec: CaptainSpec, items: readonly ItemId[] = 
       title: `主动技能 · ${spec.skill.name}`,
       lines: [`${spec.skill.desc}（冷却 ${Math.round(spec.skill.cdMs / 1000)} 秒，跨波累计）`],
     },
-    { icon: '👟', title: '团队', lines: [...lines, `角色满级 Lv.${LEVELS.max}（升级/招募各花 1 点）`] },
+    { icon: '👟', title: '团队', lines: [...lines, '经验每升一级 = 1 颗能量豆（技能弹药，上限 3）'] },
   ]
 }

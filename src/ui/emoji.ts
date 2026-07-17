@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { OUTLINE, OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../core/config'
+import { OUTLINE } from '../core/config'
+import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../core/preload'
 import type { OutlineKind } from '../core/config'
 import { emojiCodepoints } from '../core/emoji'
 import { packSvg, parseEmojiPack } from '../core/emojipack'

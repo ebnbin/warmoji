@@ -8,10 +8,11 @@ import {
   ITEMS,
   RARITIES,
   rollItem,
+  itemPrice,
+  memberMaxHp,
   stackCount,
 } from '../core/items'
 import type { ItemId, ItemSpec } from '../core/items'
-import { memberMaxHp } from '../core/levels'
 import { arenaSceneFor } from '../core/maps'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
@@ -313,7 +314,7 @@ export class ShopScene extends Phaser.Scene {
 
   private poolFor(index: number): ItemId[] {
     if (index === 0) return captainPool()
-    return characterPool(CHARACTERS[this.lineup[index - 1]!])
+    return characterPool(this.lineup[index - 1]!, CHARACTERS[this.lineup[index - 1]!])
   }
 
   private ownedFor(index: number): ItemId[] {
@@ -332,9 +333,9 @@ export class ShopScene extends Phaser.Scene {
     if (idx < 0) return
     const offer = this.offers[idx]
     if (!offer) return
-    const item = ITEMS[offer]
-    if (this.run.coins < item.price) return
-    this.run.coins -= item.price
+    const price = itemPrice(offer, this.run.wave)
+    if (this.run.coins < price) return
+    this.run.coins -= price
     playSfx('buy')
     const owned = this.ownedFor(idx)
     owned.push(offer)
@@ -356,11 +357,7 @@ export class ShopScene extends Phaser.Scene {
   }
 
   private slotMaxHp(slot: number): number {
-    return memberMaxHp(
-      this.lineup[slot]!,
-      this.run.memberLevels[slot] ?? 1,
-      aggregateCharacterEffects(this.run.memberItems[slot] ?? []).hpAdd,
-    )
+    return memberMaxHp(aggregateCharacterEffects(this.run.memberItems[slot] ?? []).hpAdd)
   }
 
   // ── 上架位网格（队长 + 队员 + 招募；形象即含义，角标 = 当前上架道具） ──
@@ -437,7 +434,6 @@ export class ShopScene extends Phaser.Scene {
     const idx = this.focusedIndex()
     const owned = this.ownedFor(idx)
     const spec = isCaptain ? CAPTAINS[this.captainId] : CHARACTERS[this.focusedId as CharacterId]
-    const level = isCaptain ? 0 : (this.run.memberLevels[idx - 1] ?? 1)
     let subtitle: { text: string; color: string }
     if (isCaptain) {
       subtitle = { text: '队长 · 提供团队增益，不参与战斗', color: '#b9b9c6' }
@@ -454,7 +450,7 @@ export class ShopScene extends Phaser.Scene {
     this.detailObjs.push(
       emojiImage(this, dx + 58, dy + 56, spec.emoji, 64, 'player'),
       this.add
-        .text(dx + 104, dy + 44, isCaptain ? spec.name : `${spec.name} Lv.${level}`, {
+        .text(dx + 104, dy + 44, spec.name, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -497,7 +493,7 @@ export class ShopScene extends Phaser.Scene {
 
     const groups = isCaptain
       ? captainStatGroups(CAPTAINS[this.captainId], owned)
-      : characterStatGroups(this.focusedId as CharacterId, owned, level)
+      : characterStatGroups(this.focusedId as CharacterId, owned)
     for (const group of groups) {
       statObjs.push(
         emojiImage(this, dx + 42, cursor, group.icon, 26),
@@ -609,7 +605,7 @@ export class ShopScene extends Phaser.Scene {
     }
 
     // 购买按钮
-    const canBuy = offer !== null && this.run.coins >= ITEMS[offer].price
+    const canBuy = offer !== null && this.run.coins >= itemPrice(offer, this.run.wave)
     const bb = this.buyRect
     const buyBg = this.add.graphics()
     buyBg.fillStyle(canBuy ? 0xffd54f : 0xffffff, canBuy ? 1 : 0.1)
@@ -617,7 +613,7 @@ export class ShopScene extends Phaser.Scene {
     this.detailObjs.push(
       buyBg,
       this.add
-        .text(bb.x + bb.w / 2, bb.y + bb.h / 2, offer ? `购买 ${ITEMS[offer].price}` : '购买', {
+        .text(bb.x + bb.w / 2, bb.y + bb.h / 2, offer ? `购买 ${itemPrice(offer, this.run.wave)}` : '购买', {
           fontFamily: UI_FONT,
           fontSize: FONT.body,
           fontStyle: 'bold',
@@ -727,9 +723,8 @@ export class ShopScene extends Phaser.Scene {
             w: r.w,
             h: r.h,
             offer: this.offers[index] ?? null,
-            price: this.offers[index] ? ITEMS[this.offers[index]!].price : null,
+            price: this.offers[index] ? itemPrice(this.offers[index]!, this.run.wave) : null,
             owned: this.ownedFor(index).length,
-            memberLevel: index === 0 ? null : (this.run.memberLevels[index - 1] ?? 1),
           }
         }),
         buy: {
@@ -737,7 +732,7 @@ export class ShopScene extends Phaser.Scene {
           y: this.buyRect.y + this.buyRect.h / 2,
           w: this.buyRect.w,
           h: this.buyRect.h,
-          enabled: offer !== null && this.run.coins >= ITEMS[offer].price,
+          enabled: offer !== null && this.run.coins >= itemPrice(offer, this.run.wave),
         },
         refresh: {
           x: this.refreshRect.x + this.refreshRect.w / 2,

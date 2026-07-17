@@ -11,10 +11,6 @@ export const MAP = {
   cameraMargin: 2 * UNIT,
 } as const
 
-import { ITEMS } from './items'
-import { MAPS } from './maps'
-import type { MapSpec } from './maps'
-import { SETTING_DEFS } from './settings'
 import type {
   AreaBlastSpec,
   BoomerangSpec,
@@ -269,10 +265,9 @@ export interface CaptainSpec {
   readonly skill: CaptainSkill
   /** 编制上限：可招募的角色总数 */
   readonly teamSize: number
-  /** 开局队伍等级（= 可立刻花掉的点数；通常 1） */
-  readonly startLevel: number
   /** 开局波次（通常 1）；>1 时跳过之前的波次，难度时钟按被跳过的
-   * 波次时长预推进——敌人配比与强度都是该波的真实水平 */
+   * 波次时长预推进——敌人配比与强度都是该波的真实水平，且视为
+   * 招募已完成（开局满编）、能量豆拉满（core/run.ts beginRun） */
   readonly startWave: number
   /** 全队经验获取倍率 */
   readonly xpGainMul: number
@@ -290,7 +285,6 @@ export const CAPTAINS = {
     name: '天使',
     desc: '每次进入商店，全体队员复活并恢复满血',
     teamSize: 5,
-    startLevel: 1,
     startWave: 1,
     xpGainMul: 1,
     reviveInShop: true,
@@ -307,7 +301,6 @@ export const CAPTAINS = {
     name: '财迷',
     desc: '每次进入商店，前 3 次道具刷新免费',
     teamSize: 5,
-    startLevel: 1,
     startWave: 1,
     xpGainMul: 1,
     reviveInShop: false,
@@ -324,7 +317,6 @@ export const CAPTAINS = {
     name: '派对之星',
     desc: '气氛组拉满，编制上限 6 人',
     teamSize: 6,
-    startLevel: 1,
     startWave: 1,
     xpGainMul: 1,
     reviveInShop: false,
@@ -339,9 +331,8 @@ export const CAPTAINS = {
   prodigy: {
     emoji: '🤓',
     name: '神童',
-    desc: '天资聪颖，开局队伍等级 15，直接从第 10 波开战（测试直通车）',
+    desc: '天资聪颖，开局满编、能量豆拉满，直接从第 10 波开战（测试直通车）',
     teamSize: 5,
-    startLevel: 15,
     startWave: 10,
     xpGainMul: 1,
     reviveInShop: false,
@@ -358,7 +349,6 @@ export const CAPTAINS = {
     name: '学者',
     desc: '带队有方，全队经验获取 +25%',
     teamSize: 5,
-    startLevel: 1,
     startWave: 1,
     xpGainMul: 1.25,
     reviveInShop: false,
@@ -375,10 +365,12 @@ export const CAPTAINS = {
 export type CaptainId = keyof typeof CAPTAINS
 export const CAPTAIN_IDS = Object.keys(CAPTAINS) as readonly CaptainId[]
 
-// 主动技能的效果参数（CD 在 CAPTAINS[id].skill.cdMs）
+// 主动技能的效果参数（CD 在 CAPTAINS[id].skill.cdMs）。
+// 释放门槛 = CD 就绪 且 至少 1 颗能量豆（经验每升一级得 1 颗，见 core/xp.ts）；
+// 开局 CD 即就绪、0 颗豆——首放卡在挣第一颗豆上
 export const SKILL = {
-  /** 开局 CD 预充比例：新局第一次充能只需一半时间，尽早见到机制 */
-  startCharge: 0.5,
+  /** 能量豆持有上限：满豆时经验冻结（不再增长），消耗后恢复 */
+  maxBeans: 3,
   /** 圣光降临：存活者回复比例 + 全队无敌时长（走受击无敌帧通道，
    * 挡接触与敌弹；毒液池/毒雾是独立计时通道，不受无敌保护） */
   angel: { healRatio: 0.5, invulnMs: 2000 },
@@ -547,7 +539,7 @@ export const ZOMBIE: ChaseEnemySpec = {
   speed: 1.375 * UNIT,
   damage: 8,
   xp: 3,
-  coins: 1,
+  coins: 2,
 }
 
 export const GHOST: ChaseEnemySpec = {
@@ -562,7 +554,7 @@ export const GHOST: ChaseEnemySpec = {
   speed: 2.875 * UNIT,
   damage: 5,
   xp: 2,
-  coins: 1,
+  coins: 2,
 }
 
 /** 游荡射手：不索敌，慢速乱逛，周期性朝自己移动方向放一发慢弹（弹幕污染走位空间） */
@@ -578,7 +570,7 @@ export const INVADER: WanderFireEnemySpec = {
   speed: 0.9 * UNIT,
   damage: 6,
   xp: 4,
-  coins: 2,
+  coins: 3,
   fireIntervalMs: 2800,
   bullet: { emoji: '🔴', size: 0.3 * UNIT, radius: 0.14 * UNIT, speed: 3 * UNIT, damage: 6, lifeMs: 4500 },
 }
@@ -596,7 +588,7 @@ export const BOAR: DashEnemySpec = {
   speed: 1.1 * UNIT,
   damage: 10,
   xp: 5,
-  coins: 2,
+  coins: 3,
   detectRange: 4 * UNIT,
   windupMs: 550,
   dashSpeed: 8 * UNIT,
@@ -617,7 +609,7 @@ export const SNAKE: FleeFireEnemySpec = {
   speed: 2.4 * UNIT,
   damage: 5,
   xp: 4,
-  coins: 2,
+  coins: 3,
   fleeRange: 5 * UNIT,
   fireIntervalMs: 2600,
   bullet: { emoji: '🟢', size: 0.3 * UNIT, radius: 0.14 * UNIT, speed: 3.2 * UNIT, damage: 5, lifeMs: 4500 },
@@ -636,7 +628,7 @@ export const MUSHROOM: ChaseEnemySpec = {
   speed: 1 * UNIT,
   damage: 6,
   xp: 4,
-  coins: 2,
+  coins: 3,
   poison: { radius: 1.6 * UNIT, durationMs: 3000, tickMs: 500, damage: 4 },
 }
 
@@ -653,7 +645,7 @@ export const RAT: CoinThiefEnemySpec = {
   speed: 3.2 * UNIT,
   damage: 3,
   xp: 3,
-  coins: 1,
+  coins: 2,
 }
 
 export const BLOBLING: ChaseEnemySpec = {
@@ -684,7 +676,7 @@ export const BLOB: ChaseEnemySpec = {
   speed: 1.2 * UNIT,
   damage: 6,
   xp: 4,
-  coins: 2,
+  coins: 3,
   split: { into: BLOBLING, count: 2 },
 }
 
@@ -777,7 +769,7 @@ export const BOSS = {
   speed: 1.4 * UNIT,
   damage: 20,
   xp: 60,
-  coins: 40,
+  coins: 60,
   /** 环形弹幕：周期性向四周均匀发射（带随机整体旋转） */
   ring: {
     count: 12,
@@ -881,18 +873,16 @@ export const STRESS = {
 // 满配需求 = 5 人 × 6 级 = 30 点；校准目标：无经验加成队长 15 波约 22~24 点，
 // 快队长可摸满、慢队长 ~18，保留「点数不够、必须取舍」的决策
 export const XP = {
-  base: 45,
-  growth: 1.14,
+  base: 80,
+  growth: 1.15,
   /** 波末保底经验 = base + perWave×波次：15 波制下是经验主梁之一，
-   * 保证前几波（15 秒短波杀怪少）每波也能升级 */
+   * 保证前几波（15 秒短波杀怪少）也有稳定豆收入 */
   waveBonusBase: 40,
   waveBonusPerWave: 36,
 } as const
 
 // 角色等级：1 拥有 · 2/4/5 维度数值（core/levels.ts）· 3/6 特殊能力
 // （core/abilities.ts）。普通模式满级 6；无尽模式后续放开 7+（纯数值）
-export const LEVELS = { max: 6 } as const
-
 // 商店：每个上架位可付费重新随机（队长可提供免费次数）
 export const SHOP = { refreshPrice: 2 } as const
 
@@ -913,68 +903,3 @@ export const OUTLINE = {
 
 export type OutlineKind = keyof typeof OUTLINE.colors
 
-const roster: readonly CharacterSpec[] = Object.values(CHARACTERS)
-
-// 描边变体按阵营分组预载：玩家侧黑、敌人紫、敌方子弹红
-export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
-  player: [
-    ...roster.map((c) => c.emoji),
-    ...Object.values<CaptainSpec>(CAPTAINS).map((c) => c.emoji),
-    ...roster.flatMap((c) =>
-      c.weapons.flatMap((w) => [
-        ...('held' in w && w.held ? [w.held.emoji] : []),
-        ...(w.kind === 'projectile' ? [w.projectile.emoji] : []),
-      ]),
-    ),
-    COIN.emoji,
-    '➕',
-    '💀',
-    // 财迷「天降横财」的金袋投掷物
-    '💰',
-    // 地图地面装饰 + 河流水面漂浮物：与玩家侧同款黑描边（低透明度贴地/浮水）
-    ...new Set(
-      Object.values<MapSpec>(MAPS).flatMap((m) => [...m.decor.emojis, ...(m.drift ?? [])]),
-    ),
-  ],
-  enemy: [...new Set(ENEMY_SPECS.map((e) => e.emoji))],
-  enemyShot: [
-    ...new Set([
-      ...ENEMY_SPECS.flatMap((e) => ('bullet' in e ? [e.bullet.emoji] : [])),
-      BOSS.ring.bullet.emoji,
-    ]),
-  ],
-  // 精英变体（含 Boss）：金边
-  elite: [...new Set(ENEMY_SPECS.map((e) => e.emoji)), BOSS.emoji],
-}
-
-// 启动时预载的 emoji（含 UI 图标）；其余全集按需加载（ui/emoji.ts ensureEmoji）
-export const PRELOAD_EMOJIS: readonly string[] = [
-  ...Object.values(OUTLINED_EMOJIS).flat(),
-  // 属性面板的武器/基础组图标 + 商店道具图标
-  ...roster.flatMap((c) => c.weapons.map((w) => w.icon)),
-  ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),
-  // 地图图标（选择页素体）+ 地图详情组图标；装饰的描边变体在 OUTLINED_EMOJIS.player
-  ...Object.values(MAPS).map((m) => m.emoji),
-  '🗺️',
-  '🚧',
-  ...SETTING_DEFS.map((d) => d.icon),
-  SPAWN.markEmoji,
-  // 属性面板「特殊能力」组图标
-  '⭐',
-  '⚙️',
-  '📖',
-  '🌐',
-  '➕',
-  '⬆️',
-  '⚔️',
-  '🏆',
-  '⚡',
-  '👟',
-  '❤️',
-  '🔧',
-  '✅',
-  '⏸️',
-  '👑',
-  // 主菜单 Emoji Studio 入口图标（studio 页内素材按需加载）
-  '🧪',
-]

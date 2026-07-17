@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { clickMap, confirmMap, enterMap } from './helpers'
+import { clickMap, completePromote, confirmMap, enterMap } from './helpers'
 
 test('地图选择：四张玩法图、选择持久化、开局进入所选地图', async ({ page }) => {
   await page.goto('/')
@@ -32,23 +32,7 @@ test('地图选择：四张玩法图、选择持久化、开局进入所选地�
     .locator('#game canvas')
     .click({ position: { x: Math.round(start.x * k), y: Math.round(start.y * k) } })
   await page.waitForFunction(() => window.__warmoji?.scene === 'promote')
-  for (let i = 0; i < 24; i++) {
-    const st = await page.evaluate(() => ({
-      scene: window.__warmoji!.scene,
-      c: window.__warmoji!.promote?.confirm,
-      points: window.__warmoji!.promote?.points ?? 0,
-    }))
-    if (st.scene !== 'promote') break
-    await page
-      .locator('#game canvas')
-      .click({ position: { x: Math.round(st.c!.x * k), y: Math.round(st.c!.y * k) } })
-    await page.waitForFunction(
-      (prev) =>
-        window.__warmoji?.scene !== 'promote' || (window.__warmoji.promote?.points ?? 99) < prev,
-      st.points,
-      { timeout: 15_000 },
-    )
-  }
+  await completePromote(page)
   await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
   await page.waitForFunction(() => window.__warmoji?.mapId === 'desert')
 })

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  clickCaptain,
   clickFormationMember,
   clickPromoteConfirm,
   clickPromoteItem,
@@ -7,13 +8,16 @@ import {
   clickShopNext,
   clickShopRefresh,
   clickShopSlot,
+  completePromote,
+  confirmCaptain,
+  enterCaptain,
   startRun,
 } from './helpers'
 
 // 存活 30 秒受随机刷怪影响，慢渲染环境下偶发全灭，允许重试
 test.describe.configure({ retries: 2 })
 
-test('波次循环：整编强制招募→满编升级 → 商店纯购物 → 下一波满员上场', async ({ page }) => {
+test('波次循环：波末固定招募 1 人 → 商店购物 → 下一波扩编上场', async ({ page }) => {
   test.setTimeout(180_000)
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(String(err)))
@@ -30,9 +34,6 @@ test('波次循环：整编强制招募→满编升级 → 商店纯购物 → �
   const alive0 = await page.evaluate(() => window.__warmoji!.alive)
   expect(alive0).toBe(1)
 
-  // 注入经验：足够触发 4 次强制招募（满编 5 人）+ 至少 1 次强制升级
-  await page.evaluate(() => window.__addXp!(500))
-
   // 站桩会被围死：小步绕圈走位撑到波次结束
   const KEYS = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'] as const
   for (let i = 0; i < 55; i++) {
@@ -45,84 +46,24 @@ test('波次循环：整编强制招募→满编升级 → 商店纯购物 → �
     await page.keyboard.up(key)
   }
 
-  // 波末必进整编页（经验不可延迟消费）
+  // 波末必进整编页：本波固定 1 个招募名额，指定招募法师
   await page.waitForFunction(() => window.__warmoji?.scene === 'promote', undefined, {
     timeout: 15_000,
   })
-
-  // 整编循环：未满编阶段必须是招募（先点法师入队验证指定招募），满编后必须是升级；
-  // 点数逐步花光后落在队形环节
-  const modesSeen = new Set<string>()
-  let recruitedMage = false
-  for (let step = 0; step < 24; step++) {
-    const promote = await page.evaluate(() => window.__warmoji!.promote!)
-    if (promote.mode === 'formation') break
-    modesSeen.add(promote.mode)
-    expect(promote.points).toBeGreaterThan(0)
-    if (promote.mode === 'recruit' && !recruitedMage) {
-      await clickPromoteItem(page, 'mage')
-      recruitedMage = true
-    }
-    const before = promote.points
-    await clickPromoteConfirm(page)
-    await page.waitForFunction(
-      (prev) =>
-        window.__warmoji?.promote?.mode === 'formation' ||
-        (window.__warmoji?.promote?.points ?? 99) < prev,
-      before,
-      { timeout: 15_000 },
-    )
-  }
-  // 未满编先招募、满编才升级：两种步骤都必须出现过
-  expect([...modesSeen].sort()).toEqual(['recruit', 'upgrade'])
-
-  // 首次满员：自动展示一次阵型页（N 保 1），默认中心 = 1 号位，点选改保法师
-  const f0 = await page.evaluate(() => window.__warmoji!.promote!)
-  expect(f0.mode).toBe('formation')
-  expect(f0.formation!.center).toBe('juggler')
-  expect(f0.items).toHaveLength(5)
-  const order0 = f0.items.map((i) => i.id) // [juggler, mage, unicorn, troll, cowboy]
-  await clickFormationMember(page, 'mage')
-  // 稳定次序：互换只动法师与旧中心两人，其他外圈不跳位
-  const order1 = await page.evaluate(() => window.__warmoji!.promote!.items.map((i) => i.id))
-  expect(order1).toEqual(['mage', ...order0.slice(1).map((id) => (id === 'mage' ? 'juggler' : id))])
+  const promote = await page.evaluate(() => window.__warmoji!.promote!)
+  expect(promote.mode).toBe('recruit')
+  await clickPromoteItem(page, 'mage')
   await page.screenshot({ path: 'test-results/promote-done.png' })
   await clickPromoteConfirm(page)
-  await page.waitForFunction(() => window.__warmoji?.scene === 'shop' && !!window.__warmoji.shop)
 
-  // 商店：满编 6 个上架位（队长+5 队员），没有招募位；法师在队；有人已升级
+  // 名额用完直接进商店：上架位 = 队长 + 2 名队员，法师在列
+  await page.waitForFunction(() => window.__warmoji?.scene === 'shop' && !!window.__warmoji.shop)
   const shop = await page.evaluate(() => window.__warmoji!.shop!)
   expect(shop.wave).toBe(2)
   expect(shop.freeRefreshes).toBe(3)
-  expect(shop.slots).toHaveLength(6)
+  expect(shop.slots).toHaveLength(3)
   expect(shop.slots.map((s) => s.id)).toContain('mage')
-  expect(shop.slots.every((s) => s.id !== 'recruit')).toBe(true)
-  expect(shop.slots.some((s) => (s.memberLevel ?? 1) >= 2)).toBe(true)
   expect(shop.slots[1]!.offer).not.toBeNull()
-
-  // 商店阵型入口：进阵型页改保巨魔，返回后货架/免费刷新/金币原样保留
-  expect(shop.formation).not.toBeNull()
-  const offersBefore = shop.slots.map((s) => s.offer)
-  await page.locator('#game canvas').click({
-    position: await page.evaluate(({ x, y }) => {
-      const k = window.innerWidth / window.__warmoji!.viewW
-      return { x: Math.round(x * k), y: Math.round(y * k) }
-    }, shop.formation!),
-  })
-  await page.waitForFunction(
-    () => window.__warmoji?.scene === 'promote' && window.__warmoji.promote?.mode === 'formation',
-  )
-  expect(await page.evaluate(() => window.__warmoji!.promote!.formation!.center)).toBe('mage')
-  await clickFormationMember(page, 'troll')
-  // 换保巨魔后：法师顶到巨魔原岗位，其余原位
-  const order2 = await page.evaluate(() => window.__warmoji!.promote!.items.map((i) => i.id))
-  expect(order2).toEqual(order1.map((id) => (id === 'troll' ? 'mage' : id === 'mage' ? 'troll' : id)))
-  await clickPromoteConfirm(page) // 「返回商店」
-  await page.waitForFunction(() => window.__warmoji?.scene === 'shop' && !!window.__warmoji.shop)
-  const shopBack = await page.evaluate(() => window.__warmoji!.shop!)
-  expect(shopBack.freeRefreshes).toBe(3)
-  expect(shopBack.coins).toBe(shop.coins)
-  expect(shopBack.slots.map((s) => s.offer)).toEqual(offersBefore)
 
   // 注入金币走道具购买：扣款、持有 +1、自动补货
   await page.evaluate(() => window.__addCoins!(200))
@@ -141,7 +82,7 @@ test('波次循环：整编强制招募→满编升级 → 商店纯购物 → �
   expect(slotAfter.offer, '购买后自动补货').not.toBeNull()
   await page.screenshot({ path: 'test-results/shop.png' })
 
-  // 用完剩余免费刷新（不扣钱），再刷新一次转为付费（扣 2 金币）
+  // 用完剩余免费刷新（不扣钱），再刷新一次转为付费
   for (let n = 2; n > 0; n--) {
     await clickShopRefresh(page)
     await page.waitForFunction((exp) => window.__warmoji?.shop?.freeRefreshes === exp, n - 1)
@@ -149,19 +90,49 @@ test('波次循环：整编强制招募→满编升级 → 商店纯购物 → �
   const paidBefore = await page.evaluate(() => window.__warmoji!.shop!.coins)
   expect(paidBefore).toBe(bought.coins)
   await clickShopRefresh(page)
-  await page.waitForFunction((exp) => window.__warmoji?.shop?.coins === exp, paidBefore - 2)
+  await page.waitForFunction((exp) => (window.__warmoji?.shop?.coins ?? -1) < exp, paidBefore)
+  const paidAfter = await page.evaluate(() => window.__warmoji!.shop!.coins)
+  expect(paidAfter).toBeLessThan(paidBefore)
 
-  // 继续下一波：满编 5 人上场，金币与击杀延续，整编页选的队形生效
-  const coinsIntoWave = paidBefore - 2
+  // 继续下一波：扩编 2 人上场，金币与击杀延续
+  const coinsIntoWave = paidAfter
   const killsBefore = await page.evaluate(() => window.__warmoji!.kills)
   await clickShopNext(page)
   await page.waitForFunction(() => (window.__warmoji?.wave ?? 0) === 2)
   const start2 = await page.evaluate(() => window.__warmoji!)
-  expect(start2.alive).toBe(5)
-  expect(start2.formation).toBe('guard')
-  expect(start2.coins ?? 0).toBeGreaterThanOrEqual(coinsIntoWave)
-  await page.waitForFunction((k) => (window.__warmoji?.kills ?? 0) > k, killsBefore, {
-    timeout: 20_000,
+  expect(start2.alive).toBe(2)
+  expect(start2.coins).toBe(coinsIntoWave)
+  expect(start2.kills).toBe(killsBefore)
+  expect(errors, `控制台/页面错误：\n${errors.join('\n')}`).toHaveLength(0)
+})
+
+test('满员阵型：神童开局满编 → 阵型首秀选中心 → 互换稳定次序 → 满员上场', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.addInitScript(() => {
+    localStorage.setItem('warmoji.captain.v1', 'prodigy')
   })
-  expect(errors).toEqual([])
+  await page.goto('/')
+  await enterCaptain(page)
+  await clickCaptain(page, 'prodigy')
+  await confirmCaptain(page)
+
+  // 开局满编 → 首次满员自动展示阵型页（N 保 1），默认中心 = 1 号位
+  const f0 = await page.evaluate(() => window.__warmoji!.promote!)
+  expect(f0.mode).toBe('formation')
+  expect(f0.formation!.center).toBe('juggler')
+  expect(f0.items).toHaveLength(5)
+  const order0 = f0.items.map((i) => i.id)
+  await clickFormationMember(page, 'mage')
+  // 稳定次序：互换只动法师与旧中心两人，其他外圈不跳位
+  const order1 = await page.evaluate(() => window.__warmoji!.promote!.items.map((i) => i.id))
+  expect(order1).toEqual(['mage', ...order0.slice(1).map((id) => (id === 'mage' ? 'juggler' : id))])
+  await completePromote(page)
+  await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
+  await page.waitForFunction(() => window.__warmoji?.alive === 5)
+  const st = await page.evaluate(() => ({
+    wave: window.__warmoji!.wave,
+    formation: window.__warmoji!.formation,
+  }))
+  expect(st.wave).toBe(10)
+  expect(st.formation).toBe('guard')
 })

@@ -1,11 +1,17 @@
-import type { CharacterSpec } from './config'
+import { ABILITIES } from './abilities'
+import type { AbilityTiers } from './abilities'
+import { MEMBER } from './config'
+import type { CharacterId, CharacterSpec } from './config'
 import type { WeaponSpec } from './weapons'
 
 // 道具 = 一组属性修正（可带负面副作用，数值上保证净增益）。
 // 只开放少量通用属性轴，不逐武器参数开洞；乘法轴叠乘、加法轴叠加。
-// 池归属用 tag：'all' 进所有角色池，武器 kind 进对应角色池（按配装自动推导），'team' 进队长池。
+// 池归属用 tag：'all' 进所有角色池，武器 kind 进对应角色池（按配装自动推导），
+// 'team' 进队长池，'ability' 为角色专属能力卡（只进 forCharacter 的池）。
 // 稀有度三档：越稀有越贵（价格档严格递增，金币后期才买得起大件），
 // 上架时先按波次权重抽稀有度档、再在档内均匀抽取——前期以普通为主，史诗第 5 波起解锁。
+// 能力卡是角色质变的唯一来源：一阶卡要求先给该角色买过几张普通道具
+//（ABILITY_GATE），二阶卡要求已持有一阶卡——升阶节奏由此涌现。
 
 export interface CharacterEffects {
   hpAdd: number
@@ -63,7 +69,7 @@ export function rarityWeights(wave: number): Record<ItemRarity, number> {
   return { common: 1 - rare - epic, rare, epic }
 }
 
-export type ItemPool = 'all' | 'team' | WeaponSpec['kind']
+export type ItemPool = 'all' | 'team' | 'ability' | WeaponSpec['kind']
 
 export interface ItemSpec {
   readonly emoji: string
@@ -74,7 +80,30 @@ export interface ItemSpec {
   /** 单一持有者的购买上限；缺省无限堆叠 */
   readonly maxStacks?: number
   readonly pool: ItemPool
+  /** 能力卡专属：归属角色 + 档位（0 一阶 / 1 二阶） */
+  readonly forCharacter?: CharacterId
+  readonly abilityIndex?: 0 | 1
   readonly effects: Partial<CharacterEffects & TeamEffects>
+}
+
+/** 能力卡解锁门槛：一阶卡上架前该角色需已购的普通道具数 */
+export const ABILITY_GATE = { normalsForFirst: 2 } as const
+
+/** 角色专属能力卡条目（文案/图标复用 core/abilities.ts 的能力定义） */
+function abilityCard(cid: CharacterId, index: 0 | 1, price: number): ItemSpec {
+  const a = ABILITIES[cid][index]
+  return {
+    emoji: a.icon,
+    name: a.name,
+    desc: a.desc,
+    rarity: index === 0 ? 'rare' : 'epic',
+    price,
+    maxStacks: 1,
+    pool: 'ability',
+    forCharacter: cid,
+    abilityIndex: index,
+    effects: {},
+  }
 }
 
 export const ITEMS = {
@@ -382,6 +411,23 @@ export const ITEMS = {
     pool: 'team',
     effects: { teamDamageMul: 1.2 },
   },
+  // ── 角色专属能力卡（一阶 稀有 / 二阶 史诗；价格高一档，质变值这个价）──
+  abilityJuggler1: abilityCard('juggler', 0, 80),
+  abilityJuggler2: abilityCard('juggler', 1, 150),
+  abilityUnicorn1: abilityCard('unicorn', 0, 80),
+  abilityUnicorn2: abilityCard('unicorn', 1, 150),
+  abilityTroll1: abilityCard('troll', 0, 80),
+  abilityTroll2: abilityCard('troll', 1, 150),
+  abilityCowboy1: abilityCard('cowboy', 0, 80),
+  abilityCowboy2: abilityCard('cowboy', 1, 150),
+  abilityMage1: abilityCard('mage', 0, 80),
+  abilityMage2: abilityCard('mage', 1, 150),
+  abilityKangaroo1: abilityCard('kangaroo', 0, 80),
+  abilityKangaroo2: abilityCard('kangaroo', 1, 150),
+  abilityRobot1: abilityCard('robot', 0, 80),
+  abilityRobot2: abilityCard('robot', 1, 150),
+  abilitySnowman1: abilityCard('snowman', 0, 80),
+  abilitySnowman2: abilityCard('snowman', 1, 150),
 } as const satisfies Record<string, ItemSpec>
 
 export type ItemId = keyof typeof ITEMS
@@ -389,13 +435,33 @@ export const ITEM_IDS = Object.keys(ITEMS) as readonly ItemId[]
 
 // ── 池推导 ──────────────────────────────────────────────────
 
-/** 角色池 = 通用道具 + 与其武器形态匹配的专属道具（从配装自动推导） */
-export function characterPool(spec: CharacterSpec): ItemId[] {
+/** 角色池 = 通用道具 + 与其武器形态匹配的形态道具 + 自己的两张能力卡 */
+export function characterPool(id: CharacterId, spec: CharacterSpec): ItemId[] {
   const kinds = new Set<string>(spec.weapons.map((w) => w.kind))
-  return ITEM_IDS.filter((id) => {
-    const pool = ITEMS[id].pool
-    return pool === 'all' || kinds.has(pool)
+  return ITEM_IDS.filter((iid) => {
+    const item: ItemSpec = ITEMS[iid]
+    if (item.pool === 'ability') return item.forCharacter === id
+    return item.pool === 'all' || kinds.has(item.pool)
   })
+}
+
+/** 已购道具推导的能力档位（一二阶各最多一张，二阶依赖一阶） */
+export function abilityTiers(id: CharacterId, owned: readonly ItemId[]): AbilityTiers {
+  const has = (index: 0 | 1): boolean =>
+    owned.some((iid) => {
+      const item: ItemSpec = ITEMS[iid]
+      return item.pool === 'ability' && item.forCharacter === id && item.abilityIndex === index
+    })
+  return { a1: has(0), a2: has(1) }
+}
+
+/** 能力卡的上架资格：一阶要求已购普通道具达标，二阶要求已持有一阶 */
+export function abilityCardAvailable(id: ItemId, owned: readonly ItemId[]): boolean {
+  const item: ItemSpec = ITEMS[id]
+  if (item.pool !== 'ability' || item.forCharacter === undefined) return true
+  if (item.abilityIndex === 1) return abilityTiers(item.forCharacter, owned).a1
+  const normals = owned.filter((iid) => (ITEMS[iid] as ItemSpec).pool !== 'ability').length
+  return normals >= ABILITY_GATE.normalsForFirst
 }
 
 export function captainPool(): ItemId[] {
@@ -422,7 +488,7 @@ export function rollItem(
   rand: () => number,
   wave = 1,
 ): ItemId | null {
-  const avail = pool.filter((id) => !reachedStackLimit(owned, id))
+  const avail = pool.filter((id) => !reachedStackLimit(owned, id) && abilityCardAvailable(id, owned))
   if (avail.length === 0) return null
   const weights = rarityWeights(wave)
   const buckets = RARITY_ORDER.map((r) => ({
@@ -444,6 +510,19 @@ export function rollItem(
     pickList = chosen.items
   }
   return pickList[Math.min(pickList.length - 1, Math.floor(rand() * pickList.length))]!
+}
+
+/** 商店价格通胀：随波次上浮（金币掉落同步在涨，后期大件才有分量）。
+ * 展示与扣款都走 itemPrice，ITEMS.price 是第 1 波基准价 */
+export const PRICE = { perWave: 0.06 } as const
+
+export function itemPrice(id: ItemId, wave: number): number {
+  return Math.round(ITEMS[id].price * (1 + PRICE.perWave * Math.max(0, wave - 1)))
+}
+
+/** 角色生效生命上限 = 基础 + 道具加成（下限保护）；角色没有等级，血量全由道具塑造 */
+export function memberMaxHp(itemHpAdd: number): number {
+  return Math.max(10, MEMBER.maxHp + itemHpAdd)
 }
 
 // ── 效果叠加 ────────────────────────────────────────────────

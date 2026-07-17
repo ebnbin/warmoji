@@ -1,5 +1,5 @@
 import type { CaptainId, CharacterId } from './config'
-import { CAPTAINS, CHARACTERS, LEVELS, MEMBER, ROSTER_IDS, SKILL, WAVE } from './config'
+import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, SKILL, WAVE } from './config'
 import type { FormationId } from './formation'
 import type { ItemId } from './items'
 import type { MapId } from './maps'
@@ -9,8 +9,10 @@ import { gainXp } from './xp'
 import type { XpState } from './xp'
 
 // 一局（run）的跨波次状态：出发时创建，波次间经由商店传递，回组队页时丢弃。
-// 经验模型：队伍每升 1 级得 1 点数，点数用于招募新角色（入队 1 级）或给在场角色 +1 级；
-// 点数不可逆、允许攒着不花。阵容从首发（通常 1 人）逐波扩编，上限 = 队长编制。
+// 经验模型：每升 1 级得 1 颗能量豆（队长技能的弹药，上限 SKILL.maxBeans，
+// 满则经验冻结）。招募与经验无关：开局招 1 人，此后每波结束固定招 1 人
+//（强制、不可跳过、无其他途径），直到满编（上限 = 队长编制）。
+// 角色没有等级：变强只靠商店道具（含角色专属能力卡）。
 export interface RunState {
   captainId: CaptainId
   /** 本局地图（关卡）；开局在地图选择页定下 */
@@ -21,15 +23,15 @@ export interface RunState {
   wave: number
   coins: number
   kills: number
+  /** 经验进度：level = 生涯已获得的豆数（驱动下一颗豆的价格曲线），
+   * xp = 当前豆的攒取进度；满豆时冻结（见 SKILL.maxBeans） */
   xp: XpState
-  /** 已花掉的点数（招募+升级）；可用点数 = xp.level - pointsSpent */
-  pointsSpent: number
+  /** 当前可用能量豆（0..SKILL.maxBeans）：释放队长技能消耗 1 颗 */
+  beans: number
   /** 已完成波次的累计战斗时长，驱动难度曲线跨波递增 */
   combatMs: number
   /** 已招募角色（下标即槽位） */
   roster: CharacterId[]
-  /** 按槽位的角色等级（1..LEVELS.max） */
-  memberLevels: number[]
   /** 按槽位的波末血量；0 = 该波结束时已阵亡 */
   memberHp: number[]
   /** 按槽位的已购道具（重复 = 堆叠） */
@@ -67,9 +69,12 @@ export function beginRun(
 ): RunState {
   const captain = CAPTAINS[captainId]
   // 跳波开局（如神童）：难度时钟按被跳过波次的时长预推进，
-  // 敌人血量/刷怪节奏与正常打到该波一致（也计入结算的总时长口径）
+  // 敌人血量/刷怪节奏与正常打到该波一致（也计入结算的总时长口径）；
+  // 同时视为招募已完成（开局满编）、能量豆拉满——测试直通车不用逐波攒
   let skippedMs = 0
   for (let w = 1; w < captain.startWave; w++) skippedMs += waveDurationMs(w)
+  const roster =
+    captain.startWave > 1 ? ROSTER_IDS.slice(0, captain.teamSize) : [...starters]
   current = {
     captainId,
     mapId,
@@ -77,24 +82,23 @@ export function beginRun(
     wave: captain.startWave,
     coins: 0,
     kills: 0,
-    xp: { level: captain.startLevel, xp: 0 },
-    pointsSpent: starters.length,
+    xp: { level: 1, xp: 0 },
+    beans: captain.startWave > 1 ? SKILL.maxBeans : 0,
     combatMs: skippedMs,
-    roster: [...starters],
-    memberLevels: starters.map(() => 1),
-    memberHp: starters.map(() => MEMBER.maxHp),
-    memberItems: starters.map(() => []),
+    roster,
+    memberHp: roster.map(() => MEMBER.maxHp),
+    memberItems: roster.map(() => []),
     captainItems: [],
     freeRefreshes: 0,
-    // 开局预充：第一次充能只需 (1 - startCharge) 的时间
-    skillCdMs: Math.round(captain.skill.cdMs * (1 - SKILL.startCharge)),
+    // 开局 CD 即就绪：首放只卡在挣第一颗豆上
+    skillCdMs: 0,
     guardOrder: [],
     formationIntroduced: false,
     stats: {
-      damage: starters.map(() => 0),
-      kills: starters.map(() => 0),
-      deaths: starters.map(() => 0),
-      damageTaken: starters.map(() => 0),
+      damage: roster.map(() => 0),
+      kills: roster.map(() => 0),
+      deaths: roster.map(() => 0),
+      damageTaken: roster.map(() => 0),
       enemyKills: {},
       enemyDamage: {},
       eliteKills: 0,
@@ -113,10 +117,6 @@ export function endRun(): void {
   current = undefined
 }
 
-export function pointsAvailable(run: RunState): number {
-  return Math.max(0, run.xp.level - run.pointsSpent)
-}
-
 export function rosterCap(run: RunState): number {
   return CAPTAINS[run.captainId].teamSize
 }
@@ -126,21 +126,19 @@ export function recruitCandidates(run: RunState): CharacterId[] {
   return ROSTER_IDS.filter((id) => !run.roster.includes(id))
 }
 
-export function canRecruit(run: RunState, id: CharacterId): boolean {
-  return (
-    pointsAvailable(run) > 0 &&
-    run.roster.length < rosterCap(run) &&
-    id in CHARACTERS &&
-    !run.roster.includes(id)
-  )
+/** 本波是否有招募名额：开局 1 人，此后每波结束 +1，直到满编 */
+export function recruitDue(run: RunState): boolean {
+  return run.roster.length < Math.min(rosterCap(run), run.wave)
 }
 
-/** 花 1 点招募：入队 1 级、满血、无道具；返回新槽位（失败 -1） */
+export function canRecruit(run: RunState, id: CharacterId): boolean {
+  return recruitDue(run) && id in CHARACTERS && !run.roster.includes(id)
+}
+
+/** 招募（本波名额内）：入队满血、无道具；返回新槽位（失败 -1） */
 export function recruitMember(run: RunState, id: CharacterId): number {
   if (!canRecruit(run, id)) return -1
-  run.pointsSpent += 1
   run.roster.push(id)
-  run.memberLevels.push(1)
   run.memberHp.push(MEMBER.maxHp)
   run.memberItems.push([])
   run.stats.damage.push(0)
@@ -196,26 +194,9 @@ export function setGuardCenter(run: RunState, id: CharacterId): boolean {
   return true
 }
 
-/** 整编步骤：进商店前强制消费点数的类型——未满编先招募，满编后给未满级队员升级；
- * 无点数或无事可办（满编且全员满级）返回 null，直接进店 */
-export function promoteStep(run: RunState): 'recruit' | 'upgrade' | null {
-  if (pointsAvailable(run) <= 0) return null
-  if (run.roster.length < rosterCap(run) && recruitCandidates(run).length > 0) return 'recruit'
-  if (run.memberLevels.some((lv) => lv < LEVELS.max)) return 'upgrade'
-  return null
-}
-
-export function canUpgrade(run: RunState, slot: number): boolean {
-  const level = run.memberLevels[slot]
-  return pointsAvailable(run) > 0 && level !== undefined && level < LEVELS.max
-}
-
-/** 花 1 点给槽位角色 +1 级 */
-export function upgradeMember(run: RunState, slot: number): boolean {
-  if (!canUpgrade(run, slot)) return false
-  run.pointsSpent += 1
-  run.memberLevels[slot] = (run.memberLevels[slot] ?? 1) + 1
-  return true
+/** 整编步骤：本波有招募名额（且还有候选）就必须招——不可跳过；否则直接进店 */
+export function promoteStep(run: RunState): 'recruit' | null {
+  return recruitDue(run) && recruitCandidates(run).length > 0 ? 'recruit' : null
 }
 
 /** 波次开局血量：存活者延续波末血量，阵亡者以低血量复活 */
@@ -229,7 +210,10 @@ export function grantCoins(n: number): void {
   if (current) current.coins += n
 }
 
-/** 调试/e2e 注入：给进行中的一局加经验（走正常升级结算） */
+/** 调试/e2e 注入：给进行中的一局加经验（走正常升豆结算，含满豆冻结） */
 export function grantXp(n: number): void {
-  if (current) current.xp = gainXp(current.xp, n).state
+  if (!current || current.beans >= SKILL.maxBeans) return
+  const gained = gainXp(current.xp, n)
+  current.xp = gained.state
+  current.beans = Math.min(SKILL.maxBeans, current.beans + gained.levelsGained)
 }

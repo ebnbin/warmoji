@@ -202,7 +202,7 @@ export class ResultScene extends Phaser.Scene {
       const spec = CHARACTERS[id]
       emojiImage(this, x + 46, cy, spec.emoji, Math.min(44, rowH - 14), 'player')
       this.add
-        .text(x + 82, cy, `${spec.name} Lv.${this.run.memberLevels[slot] ?? 1}`, {
+        .text(x + 82, cy, spec.name, {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           fontStyle: 'bold',

@@ -6,11 +6,10 @@ declare const __TWEMOJI_VERSION__: string
 
 // e2e 读取的运行时状态（src/ui/debug.ts 写入）
 interface WarmojiPromoteDebug {
-  mode: 'recruit' | 'upgrade' | 'formation'
-  points: number
-  /** 招募/升级模式 = 当前网格选中；阵型模式 = 当前受保护中心 */
+  mode: 'recruit' | 'formation'
+  /** 招募模式 = 当前网格选中；阵型模式 = 当前受保护中心 */
   selected: string
-  /** 招募/升级模式 = 网格候选；阵型模式 = 预览中的队员站位（点选与中心互换） */
+  /** 招募模式 = 网格候选；阵型模式 = 预览中的队员站位（点选与中心互换） */
   items: { id: string; x: number; y: number; w: number; h: number }[]
   confirm: { x: number; y: number; w: number; h: number; enabled: boolean }
   /** wave=1 为「返回队长页」，wave>1 为「结束本局」，fromShop 为「返回商店」 */
@@ -34,7 +33,6 @@ interface WarmojiShopDebug {
     offer: string | null
     price: number | null
     owned: number
-    memberLevel: number | null
   }[]
   buy: { x: number; y: number; w: number; h: number; enabled: boolean }
   refresh: { x: number; y: number; w: number; h: number; enabled: boolean }
@@ -159,7 +157,7 @@ interface WarmojiDebug {
   /** 无限地图终波：当前缩圈半径（未开圈为 undefined） */
   zoneRadius?: number
   /** arena：队长主动技能状态（压测模式无技能） */
-  skill?: { remainMs: number; ready: boolean }
+  skill?: { remainMs: number; beans: number; ready: boolean }
   menu?: WarmojiMenuDebug
   map?: WarmojiMapDebug
   wiki?: WarmojiWikiDebug

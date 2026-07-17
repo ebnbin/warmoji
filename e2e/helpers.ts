@@ -70,24 +70,26 @@ export async function completePromote(page: Page): Promise<void> {
     const st = await page.evaluate(() => ({
       scene: window.__warmoji!.scene,
       mode: window.__warmoji!.promote?.mode,
-      points: window.__warmoji!.promote?.points ?? 0,
+      selected: window.__warmoji!.promote?.selected ?? '',
     }))
     if (st.scene !== 'promote') return
     if (st.mode === 'formation') {
-      // 队形环节没有点数消耗，确认即离开整编页
+      // 队形环节确认即离开整编页
       await clickPromoteConfirm(page)
       await page.waitForFunction(() => window.__warmoji?.scene !== 'promote', undefined, {
         timeout: 15_000,
       })
       return
     }
+    // 招募环节：确认默认选中；本波通常只有 1 个名额，确认后要么离开、
+    // 要么进入下一环节（首满员的阵型页）
     await clickPromoteConfirm(page)
     await page.waitForFunction(
       (prev) =>
         window.__warmoji?.scene !== 'promote' ||
         window.__warmoji.promote?.mode === 'formation' ||
-        (window.__warmoji.promote?.points ?? 99) < prev,
-      st.points,
+        (window.__warmoji.promote?.selected ?? '') !== prev,
+      st.selected,
       { timeout: 15_000 },
     )
   }

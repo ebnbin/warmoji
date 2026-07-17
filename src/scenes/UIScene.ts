@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CAPTAINS, COIN } from '../core/config'
+import { CAPTAINS, COIN, SKILL } from '../core/config'
 import { formatTime } from '../core/format'
 import { endRun, getRun } from '../core/run'
 import { isDevOpen, isStress, setDevOpen, setStress } from '../ui/dev'
@@ -48,6 +48,9 @@ export class UIScene extends Phaser.Scene {
   private skillWasReady = false
   private skillShownSec = -1
   private skillShownRatio = -1
+  /** 按钮下缘的能量豆点（亮 = 持有） */
+  private skillBeanDots?: Phaser.GameObjects.Graphics
+  private skillShownBeans = -1
 
   /** 当前战斗场景 key：四套竞技场（有界/无界/河流/虚空）互斥运行，本场景只跟随其一 */
   private arenaKey: 'arena' | 'arenaInfinite' | 'arenaRiver' | 'arenaVoid' = 'arena'
@@ -83,6 +86,7 @@ export class UIScene extends Phaser.Scene {
       xp: -1,
       xpNext: -1,
       level: -1,
+      beans: -1,
       kills: -1,
       coins: -1,
       wave: -1,
@@ -105,8 +109,9 @@ export class UIScene extends Phaser.Scene {
       strokeThickness: 3,
       resolution: res,
     }
-    // 等级放在经验条下方：竖屏 720 逻辑宽下与居中的波次计时互不侵占
-    this.levelText = this.add.text(sL + 12, sT + 32, 'Lv.1', { ...hudText, fontSize: FONT.body })
+    // 能量豆计数放在经验条下方（经验条 = 下一颗豆的攒取进度）
+    emojiImage(this, sL + 24, sT + 44, '🫘', 22, 'player')
+    this.levelText = this.add.text(sL + 40, sT + 32, '0/3', { ...hudText, fontSize: FONT.body })
     this.timeText = this.add
       .text(w / 2, sT + 10, '', { ...hudText, fontSize: FONT.lead })
       .setOrigin(0.5, 0)
@@ -248,7 +253,10 @@ export class UIScene extends Phaser.Scene {
     this.updateSkillButton()
     const s = this.arena.hudSnapshot()
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.drawXpBar(s)
-    if (s.level !== this.last.level) this.levelText.setText(`Lv.${s.level}`)
+    if (s.beans !== this.last.beans) {
+      this.levelText.setText(`${s.beans}/${SKILL.maxBeans}`)
+      this.levelText.setColor(s.beans >= SKILL.maxBeans ? '#f9a825' : '#2b2b33')
+    }
     if (s.kills !== this.last.kills) this.killsText.setText(String(s.kills))
     if (s.coins !== this.last.coins) this.coinsText.setText(String(s.coins))
     // 常规显示本波倒计时；压测模式无波次限时，显示已进行时间
@@ -357,6 +365,8 @@ export class UIScene extends Phaser.Scene {
       .setStrokeStyle(3, 0xffd54f, 0.9)
       .setDepth(303)
       .setVisible(false)
+    this.skillBeanDots = this.add.graphics().setDepth(303)
+    this.skillShownBeans = -1
     this.add
       .zone(cx - r, cy - r, r * 2, r * 2)
       .setOrigin(0)
@@ -371,12 +381,37 @@ export class UIScene extends Phaser.Scene {
     this.arena.castSkill()
   }
 
-  /** 逐帧刷新按钮状态：冷却中重绘扇形暗罩（脏检查），就绪时光圈呼吸 */
+  /** 按钮下缘的豆点：亮点 = 可用弹药（豆数变化才重绘） */
+  private drawBeanDots(beans: number): void {
+    if (!this.skillBeanDots || beans === this.skillShownBeans) return
+    this.skillShownBeans = beans
+    const g = this.skillBeanDots
+    g.clear()
+    const total = SKILL.maxBeans
+    const gap = 20
+    const y = this.skillCenter.y + 66
+    for (let i = 0; i < total; i++) {
+      const x = this.skillCenter.x + (i - (total - 1) / 2) * gap
+      if (i < beans) {
+        g.fillStyle(0xffd54f, 1)
+        g.fillCircle(x, y, 6)
+      } else {
+        g.fillStyle(0x000000, 0.4)
+        g.fillCircle(x, y, 6)
+        g.lineStyle(1.5, 0xffffff, 0.4)
+        g.strokeCircle(x, y, 6)
+      }
+    }
+  }
+
+  /** 逐帧刷新按钮状态：冷却中扇形暗罩（脏检查）；CD 好但无豆置灰；
+   * 双满就绪时光圈呼吸 */
   private updateSkillButton(): void {
     if (!this.skillMask) return
     const sk = this.arena.skillSnapshot()
     if (!sk) return
-    if (!sk.ready) {
+    this.drawBeanDots(sk.beans)
+    if (sk.remainMs > 0) {
       const remainSec = Math.ceil(sk.remainMs / 1000)
       const ratio = sk.cdMs > 0 ? sk.remainMs / sk.cdMs : 0
       if (this.skillWasReady || remainSec !== this.skillShownSec || Math.abs(ratio - this.skillShownRatio) > 0.01) {
@@ -392,6 +427,19 @@ export class UIScene extends Phaser.Scene {
         g.fillStyle(0x000000, 0.6)
         g.slice(this.skillCenter.x, this.skillCenter.y, 52, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2, false)
         g.fillPath()
+      }
+      return
+    }
+    if (!sk.ready) {
+      // CD 已转好但没有豆：无罩置灰，等经验升级喂弹
+      if (this.skillWasReady || this.skillShownSec !== 0) {
+        this.skillWasReady = false
+        this.skillShownSec = 0
+        this.skillShownRatio = -1
+        this.skillMask.clear()
+        this.skillCdText?.setText('')
+        this.skillEmoji?.setAlpha(0.55)
+        this.skillRing?.setVisible(false)
       }
       return
     }
@@ -536,7 +584,7 @@ export class UIScene extends Phaser.Scene {
     iconLabel(this, cx - 140, cy + 12, '💀', 28, `击杀 ${s.kills}`, lineStyle).setDepth(231)
     iconLabel(this, cx + 140, cy + 12, COIN.emoji, 28, `金币 +${s.coins}`, lineStyle).setDepth(231)
     if (s.levels > 0) {
-      iconLabel(this, cx, cy + 72, '⬆️', 26, `队伍等级 +${s.levels}，商店里花点数招募/升级`, {
+      iconLabel(this, cx, cy + 72, '🫘', 26, `能量豆 +${s.levels}（队长技能弹药）`, {
         ...lineStyle,
         fontSize: FONT.body,
         color: '#b3e5fc',

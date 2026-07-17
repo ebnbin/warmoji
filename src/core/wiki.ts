@@ -1,5 +1,5 @@
 import type { CharacterId, EnemySpec } from './config'
-import { CAPTAINS, CHARACTERS, COIN, ENEMY_SPECS, LEVELS, UNIT, WEAPONS } from './config'
+import { CAPTAINS, CHARACTERS, COIN, ENEMY_SPECS, UNIT, WEAPONS } from './config'
 import { ITEMS, RARITIES } from './items'
 import type { ItemSpec } from './items'
 import { captainStatGroups, characterStatGroups, WEAPON_KIND_LABEL, weaponStatLines } from './stats'
@@ -58,12 +58,12 @@ export function wikiGroups(): WikiGroup[] {
     {
       icon: '🤹',
       title: '角色',
-      // 图鉴按满级视角展示：能力全解锁、维度数值拉满
+      // 图鉴按素体视角展示（能力卡解锁状态见商店/属性面板）
       entries: (Object.keys(CHARACTERS) as CharacterId[]).map((id) => ({
         emoji: CHARACTERS[id].emoji,
         name: CHARACTERS[id].name,
         desc: CHARACTERS[id].desc,
-        lines: flatten(characterStatGroups(id, [], LEVELS.max)),
+        lines: flatten(characterStatGroups(id)),
       })),
     },
     {
@@ -105,7 +105,15 @@ export function wikiGroups(): WikiGroup[] {
         desc: i.desc,
         lines: [
           `${RARITIES[i.rarity].label} · 价格 ${i.price} 金币 · ${i.maxStacks === undefined ? '无限堆叠' : `上限 ${i.maxStacks} 件`}`,
-          `池归属 ${i.pool === 'all' ? '通用' : i.pool === 'team' ? '队长' : WEAPON_KIND_LABEL[i.pool]}`,
+          `池归属 ${
+            i.pool === 'all'
+              ? '通用'
+              : i.pool === 'team'
+                ? '队长'
+                : i.pool === 'ability'
+                  ? `${i.forCharacter ? CHARACTERS[i.forCharacter].name : ''}专属能力卡`
+                  : WEAPON_KIND_LABEL[i.pool]
+          }`,
         ],
       })),
     },

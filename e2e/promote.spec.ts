@@ -4,7 +4,6 @@ import {
   clickCaptain,
   clickPromoteConfirm,
   clickPromoteItem,
-  completePromote,
   confirmCaptain,
   enterCaptain,
 } from './helpers'
@@ -28,10 +27,9 @@ test.describe('开局整编（组建队伍）', () => {
     await enterCaptain(page)
     await confirmCaptain(page)
 
-    // 开局整编：1 点强制招募；网格与确认按钮都在最小可用区内
+    // 开局整编：首发名额强制招募；网格与确认按钮都在最小可用区内
     let p = await page.evaluate(() => window.__warmoji!.promote!)
     expect(p.mode).toBe('recruit')
-    expect(p.points).toBe(1)
     expect(p.items.length).toBeGreaterThanOrEqual(6)
     for (const it of p.items) expect(inBounds(it, 1280, 720)).toBe(true)
     expect(inBounds({ x: p.confirm.x - p.confirm.w / 2, y: p.confirm.y - p.confirm.h / 2, w: p.confirm.w, h: p.confirm.h }, 1280, 720)).toBe(true)
@@ -44,9 +42,9 @@ test.describe('开局整编（组建队伍）', () => {
     await page.waitForFunction(() => window.__warmoji?.scene === 'captain')
     await confirmCaptain(page)
     p = await page.evaluate(() => window.__warmoji!.promote!)
-    expect(p.points).toBe(1)
+    expect(p.mode).toBe('recruit')
 
-    // 指定招募法师 → 点数花完直接开战（firstWaveShop=false 不进商店）
+    // 指定招募法师 → 名额用完直接开战（firstWaveShop=false 不进商店）
     await clickPromoteItem(page, 'mage')
     await clickPromoteConfirm(page)
     await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
@@ -60,16 +58,15 @@ test.describe('开局整编 竖屏', () => {
 
   test('竖屏布局在最小可用区内；旋转保持模式与选中', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('warmoji.captain.v1', 'prodigy')
+      localStorage.setItem('warmoji.captain.v1', 'angel')
     })
     await page.goto('/')
     await enterCaptain(page)
-    await clickCaptain(page, 'prodigy')
+    await clickCaptain(page, 'angel')
     await confirmCaptain(page)
 
     let p = await page.evaluate(() => window.__warmoji!.promote!)
     expect(p.mode).toBe('recruit')
-    expect(p.points).toBe(15)
     for (const it of p.items) expect(inBounds(it, 720, 1280)).toBe(true)
     await clickPromoteItem(page, 'robot')
     await page.screenshot({ path: 'test-results/promote-portrait.png' })
@@ -83,12 +80,10 @@ test.describe('开局整编 竖屏', () => {
     expect(p.mode).toBe('recruit')
     expect(p.selected).toBe('robot')
 
-    // 神童 15 点：招满 5 人（含机器人）+ 升 10 级 → 开局队形环节 → 第 10 波开战
+    // 招募机器人（本波唯一名额）→ 直接开战
     await clickPromoteConfirm(page)
-    await page.waitForFunction(() => (window.__warmoji?.promote?.points ?? 0) === 14)
-    await completePromote(page)
     await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
     const alive = await page.evaluate(() => window.__warmoji!.alive)
-    expect(alive).toBe(5)
+    expect(alive).toBe(1)
   })
 })

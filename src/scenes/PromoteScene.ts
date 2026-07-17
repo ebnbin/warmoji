@@ -1,9 +1,7 @@
 import Phaser from 'phaser'
-import { ABILITIES } from '../core/abilities'
 import type { CharacterId } from '../core/config'
-import { CAPTAINS, CHARACTERS, LEVELS } from '../core/config'
+import { CAPTAINS, CHARACTERS } from '../core/config'
 import { formationPosts } from '../core/formation'
-import { nextLevelKind, statUpgradeLabel } from '../core/levels'
 import type { ItemId } from '../core/items'
 import { arenaSceneFor } from '../core/maps'
 import { randomPalette } from '../core/palette'
@@ -15,12 +13,10 @@ import {
   guardCenter,
   guardOrder,
   isTeamFull,
-  pointsAvailable,
   promoteStep,
   recruitCandidates,
   recruitMember,
   setGuardCenter,
-  upgradeMember,
 } from '../core/run'
 import type { RunState } from '../core/run'
 import { characterStatGroups } from '../core/stats'
@@ -32,11 +28,11 @@ import { FONT, UI_FONT } from '../ui/fonts'
 import { playSfx } from '../ui/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
-// 整编页：每波战斗前的点数强制结算 + 阵型页。开局组队与波末整编完全复用本页：
-// 队长确认后带着开局点数进来（wave=1，可返回重选队长），波末有点数才进（wave>1）。
-// 每 1 点为一步：未满编必须招募，满编后必须升级；点数结清后——
-// 首次满员额外展示一次阵型页（formation 模式：满员自动 N 保 1，玩家点选受保护
-// 的中心），此后阵型调整走商店的常驻入口（fromShop，商店睡眠等待返回）。
+// 整编页：每波战斗前的强制招募 + 阵型页。开局组队与波末整编完全复用本页：
+// 队长确认后进来招首发（可返回重选队长），此后每波结束固定招 1 人直到满编
+//（不可跳过、无其他招募途径）。招募完成后——首次满员额外展示一次阵型页
+//（formation 模式：满员自动 N 保 1，玩家点选受保护的中心），此后阵型调整走
+// 商店的常驻入口（fromShop，商店睡眠等待返回）。
 interface PromoteLayout {
   content: { w: number; h: number }
   headerY: number
@@ -72,8 +68,8 @@ export class PromoteScene extends Phaser.Scene {
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
-  private mode: 'recruit' | 'upgrade' | 'formation' = 'recruit'
-  /** recruit 模式为候选角色 id；upgrade 模式为 `slot:N` */
+  private mode: 'recruit' | 'formation' = 'recruit'
+  /** recruit 模式的当前选中候选角色 id */
   private selectedKey = ''
   /** 从商店进入的阵型调整（商店睡眠中，退出时唤醒） */
   private fromShop = false
@@ -319,9 +315,9 @@ export class PromoteScene extends Phaser.Scene {
     return 'shop'
   }
 
-  /** 当前环节：商店入口直达阵型页；否则先强制结算点数，
+  /** 当前环节：商店入口直达阵型页；否则本波有名额必须招募，
    * 首次满员再补一次阵型页，无事可办返回 null（直接去下一站） */
-  private resolveMode(): 'recruit' | 'upgrade' | 'formation' | null {
+  private resolveMode(): 'recruit' | 'formation' | null {
     if (this.fromShop) return 'formation'
     const step = promoteStep(this.run)
     if (step) return step
@@ -330,16 +326,13 @@ export class PromoteScene extends Phaser.Scene {
   }
 
   private stepBanner(): string {
-    const points = pointsAvailable(this.run)
-    if (this.mode === 'recruit') return `剩余 ${points} 点 · 必须招募新队员（未满编不可升级）`
-    if (this.mode === 'upgrade') return `剩余 ${points} 点 · 已满编，选择一名队员升级`
+    if (this.mode === 'recruit') return '本波招募名额 · 必须选一名新队员入队'
     if (this.fromShop) return '点选一名队员，与中心互换'
     return '满员自动列阵 N 保 1 · 点选队员设为受保护的中心'
   }
 
   private confirmLabel(): string {
-    if (this.mode === 'recruit') return '招募（花 1 点）'
-    if (this.mode === 'upgrade') return '升级（花 1 点）'
+    if (this.mode === 'recruit') return '招募入队'
     if (this.fromShop) return '返回商店'
     return this.nextScene() === 'shop' ? '前往商店' : '开战'
   }
@@ -354,26 +347,11 @@ export class PromoteScene extends Phaser.Scene {
   // ── 数据 ────────────────────────────────────────────────────
 
   private buildItems(): { key: string; emoji: string; outline: 'player'; badge?: string }[] {
-    if (this.mode === 'recruit') {
-      return recruitCandidates(this.run).map((id) => ({
-        key: id,
-        emoji: CHARACTERS[id].emoji,
-        outline: 'player' as const,
-      }))
-    }
-    // 升级模式：仅列出未满级的队员（满级不可选）
-    return this.run.roster
-      .map((id, slot) => ({ id, slot }))
-      .filter((m) => this.upgradeable(m.slot))
-      .map((m) => ({
-        key: `slot:${m.slot}`,
-        emoji: CHARACTERS[m.id].emoji,
-        outline: 'player' as const,
-      }))
-  }
-
-  private upgradeable(slot: number): boolean {
-    return (this.run.memberLevels[slot] ?? 1) < LEVELS.max
+    return recruitCandidates(this.run).map((id) => ({
+      key: id,
+      emoji: CHARACTERS[id].emoji,
+      outline: 'player' as const,
+    }))
   }
 
   private defaultSelection(): string {
@@ -383,10 +361,6 @@ export class PromoteScene extends Phaser.Scene {
 
   private validSelection(): boolean {
     return this.buildItems().some((i) => i.key === this.selectedKey)
-  }
-
-  private selectedSlot(): number {
-    return this.selectedKey.startsWith('slot:') ? Number(this.selectedKey.slice(5)) : -1
   }
 
   // ── 确认执行 ────────────────────────────────────────────────
@@ -402,15 +376,8 @@ export class PromoteScene extends Phaser.Scene {
       return
     }
     if (!this.selectedKey) return
-    if (this.mode === 'recruit') {
-      const id = this.selectedKey as CharacterId
-      if (recruitMember(this.run, id) < 0) return
-      playSfx('recruit')
-    } else {
-      const slot = this.selectedSlot()
-      if (slot < 0 || !upgradeMember(this.run, slot)) return
-      playSfx('upgrade')
-    }
+    if (recruitMember(this.run, this.selectedKey as CharacterId) < 0) return
+    playSfx('recruit')
     // 下一环节或直接开拔（重建页面刷新模式/候选；保留背景色）
     if (this.resolveMode()) {
       this.selectedKey = ''
@@ -571,13 +538,12 @@ export class PromoteScene extends Phaser.Scene {
     const dy = this.origin.y + D.y
     const slot = this.run.roster.indexOf(center)
     const spec = CHARACTERS[center]
-    const level = this.run.memberLevels[slot] ?? 1
     const items = this.run.memberItems[slot] ?? []
 
     this.detailObjs.push(
       emojiImage(this, dx + 58, dy + 56, spec.emoji, 64, 'player'),
       this.add
-        .text(dx + 104, dy + 44, `${spec.name} Lv.${level} · 受保护的中心`, {
+        .text(dx + 104, dy + 44, `${spec.name} · 受保护的中心`, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -595,10 +561,10 @@ export class PromoteScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5),
     )
-    this.renderStatGroups(center, items, level, res)
+    this.renderStatGroups(center, items, res)
   }
 
-  // ── 详情（招募/升级模式） ───────────────────────────────────
+  // ── 详情（招募模式） ────────────────────────────────────────
 
   private renderDetail(res: number): void {
     for (const o of this.detailObjs) o.destroy()
@@ -608,31 +574,12 @@ export class PromoteScene extends Phaser.Scene {
     const dx = this.origin.x + D.x
     const dy = this.origin.y + D.y
 
-    const isRecruit = this.mode === 'recruit'
-    const slot = this.selectedSlot()
-    const id = isRecruit ? (this.selectedKey as CharacterId) : this.run.roster[slot]!
+    const id = this.selectedKey as CharacterId
     const spec = CHARACTERS[id]
-    const level = isRecruit ? 1 : (this.run.memberLevels[slot] ?? 1)
-    const items = isRecruit ? [] : (this.run.memberItems[slot] ?? [])
-
-    // 升级预览：3/6 级是能力质变（紫金高亮），2/4/5 级是维度数值
-    let subtitle: string = spec.desc
-    let subtitleColor = '#b9b9c6'
-    if (!isRecruit) {
-      const next = level + 1
-      if (nextLevelKind(level) === 'ability') {
-        const ability = ABILITIES[id][next === 3 ? 0 : 1]!
-        subtitle = `✨ 解锁能力「${ability.name}」：${ability.desc}`
-        subtitleColor = '#ce93d8'
-      } else {
-        subtitle = `数值升级：${statUpgradeLabel(id, next)}`
-        subtitleColor = '#9ccc9c'
-      }
-    }
     this.detailObjs.push(
       emojiImage(this, dx + 58, dy + 56, spec.emoji, 64, 'player'),
       this.add
-        .text(dx + 104, dy + 44, isRecruit ? spec.name : `${spec.name} Lv.${level} → Lv.${level + 1}`, {
+        .text(dx + 104, dy + 44, spec.name, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -641,25 +588,25 @@ export class PromoteScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5),
       this.add
-        .text(dx + 104, dy + 80, subtitle, {
+        .text(dx + 104, dy + 80, spec.desc, {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
-          color: subtitleColor,
+          color: '#b9b9c6',
           wordWrap: { width: D.w - 130 },
           resolution: res,
         })
         .setOrigin(0, 0.5),
     )
-    this.renderStatGroups(id, items, level, res)
+    this.renderStatGroups(id, [], res)
   }
 
-  /** 属性组列表（招募/升级/阵型详情共用） */
-  private renderStatGroups(id: CharacterId, items: ItemId[], level: number, res: number): void {
+  /** 属性组列表（招募/阵型详情共用） */
+  private renderStatGroups(id: CharacterId, items: ItemId[], res: number): void {
     const D = this.layout.detail
     const dx = this.origin.x + D.x
     const dy = this.origin.y + D.y
     let cursor = dy + 128
-    for (const group of characterStatGroups(id, items, level)) {
+    for (const group of characterStatGroups(id, items)) {
       this.detailObjs.push(
         emojiImage(this, dx + 42, cursor, group.icon, 26),
         this.add
@@ -720,7 +667,6 @@ export class PromoteScene extends Phaser.Scene {
       camY: 0,
       promote: {
         mode: this.mode,
-        points: pointsAvailable(this.run),
         selected: this.mode === 'formation' ? center : this.selectedKey,
         items:
           this.mode === 'formation'

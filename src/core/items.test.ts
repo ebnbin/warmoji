@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { CHARACTERS, WEAPONS } from './config'
-import type { ItemRarity } from './items'
+import type { ItemRarity, ItemSpec } from './items'
 import {
+  ABILITY_GATE,
+  abilityCardAvailable,
+  abilityTiers,
+  itemPrice,
+  PRICE,
   aggregateCharacterEffects,
   aggregateTeamEffects,
   captainPool,
@@ -16,14 +21,33 @@ import {
 } from './items'
 
 describe('道具定义', () => {
-  it('每件道具有 emoji/名字/介绍/正价格与至少一条效果', () => {
+  it('每件道具有 emoji/名字/介绍/正价格；能力卡效果走武器质变，其余至少一条效果', () => {
     for (const id of ITEM_IDS) {
       const item = ITEMS[id]
       expect(item.emoji.length).toBeGreaterThan(0)
       expect(item.name.length).toBeGreaterThan(0)
       expect(item.desc.length).toBeGreaterThan(0)
       expect(item.price).toBeGreaterThan(0)
-      expect(Object.keys(item.effects).length).toBeGreaterThan(0)
+      if (item.pool === 'ability') {
+        expect(item.forCharacter).toBeDefined()
+        expect(item.maxStacks).toBe(1)
+      } else {
+        expect(Object.keys(item.effects).length).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('每个角色恰好两张能力卡：一阶稀有、二阶史诗', () => {
+    for (const cid of Object.keys(CHARACTERS)) {
+      const cards = ITEM_IDS.filter(
+        (id) => ITEMS[id].pool === 'ability' && ITEMS[id].forCharacter === cid,
+      )
+      expect(cards).toHaveLength(2)
+      const first = cards.find((id) => (ITEMS[id] as ItemSpec).abilityIndex === 0)!
+      const second = cards.find((id) => (ITEMS[id] as ItemSpec).abilityIndex === 1)!
+      expect(ITEMS[first].rarity).toBe('rare')
+      expect(ITEMS[second].rarity).toBe('epic')
+      expect(ITEMS[second].price).toBeGreaterThan(ITEMS[first].price)
     }
   })
 })
@@ -71,13 +95,16 @@ describe('稀有度', () => {
 })
 
 describe('道具池推导', () => {
-  it('角色池 = 通用 + 匹配武器形态的专属；不含队长道具', () => {
-    const magePool = characterPool(CHARACTERS.mage)
+  it('角色池 = 通用 + 匹配武器形态 + 自己的能力卡；不含队长道具与他人能力卡', () => {
+    const magePool = characterPool('mage', CHARACTERS.mage)
     expect(magePool).toContain('gemHeart')
     expect(magePool).toContain('blastPowder')
+    expect(magePool).toContain('abilityMage1')
+    expect(magePool).toContain('abilityMage2')
+    expect(magePool).not.toContain('abilityTroll1')
     expect(magePool).not.toContain('scope')
     expect(magePool).not.toContain('marchFlag')
-    const cowboyPool = characterPool(CHARACTERS.cowboy)
+    const cowboyPool = characterPool('cowboy', CHARACTERS.cowboy)
     expect(cowboyPool).toContain('scope')
     expect(cowboyPool).not.toContain('blastPowder')
   })
@@ -90,9 +117,37 @@ describe('道具池推导', () => {
 
   it('每个角色的池至少有通用道具数量', () => {
     const genericCount = ITEM_IDS.filter((id) => ITEMS[id].pool === 'all').length
-    for (const spec of Object.values(CHARACTERS)) {
-      expect(characterPool(spec).length).toBeGreaterThanOrEqual(genericCount)
+    for (const [cid, spec] of Object.entries(CHARACTERS)) {
+      expect(characterPool(cid as keyof typeof CHARACTERS, spec).length).toBeGreaterThanOrEqual(genericCount)
     }
+  })
+})
+
+describe('能力卡解锁门控', () => {
+  it('一阶卡：普通道具购满门槛才可上架；二阶卡：需已持有一阶', () => {
+    expect(abilityCardAvailable('abilityMage1', [])).toBe(false)
+    const normals = Array<'gemHeart'>(ABILITY_GATE.normalsForFirst).fill('gemHeart')
+    expect(abilityCardAvailable('abilityMage1', normals.slice(0, 1))).toBe(false)
+    expect(abilityCardAvailable('abilityMage1', normals)).toBe(true)
+    // 能力卡本身不计入普通道具数
+    expect(abilityCardAvailable('abilityMage2', normals)).toBe(false)
+    expect(abilityCardAvailable('abilityMage2', [...normals, 'abilityMage1'])).toBe(true)
+    // 非能力卡永远可上架
+    expect(abilityCardAvailable('gemHeart', [])).toBe(true)
+  })
+
+  it('rollItem 过滤未达门槛的能力卡；达标后可抽出', () => {
+    expect(rollItem(['abilityMage1'], [], () => 0, 5)).toBe(null)
+    const owned = ['gemHeart', 'gemHeart'] as const
+    expect(rollItem(['abilityMage1'], [...owned], () => 0, 5)).toBe('abilityMage1')
+  })
+
+  it('abilityTiers 由已购卡推导', () => {
+    expect(abilityTiers('mage', [])).toEqual({ a1: false, a2: false })
+    expect(abilityTiers('mage', ['abilityMage1'])).toEqual({ a1: true, a2: false })
+    expect(abilityTiers('mage', ['abilityMage1', 'abilityMage2'])).toEqual({ a1: true, a2: true })
+    // 别人的卡不算
+    expect(abilityTiers('mage', ['abilityTroll1'])).toEqual({ a1: false, a2: false })
   })
 })
 
@@ -169,5 +224,13 @@ describe('武器参数修正', () => {
     if (pistol.kind !== 'projectile') throw new Error('kind 不变')
     expect(pistol.projectile.speed).toBeCloseTo(WEAPONS.pistolLeft.projectile.speed * 1.25)
     expect(pistol.projectile.radius).toBe(WEAPONS.pistolLeft.projectile.radius)
+  })
+})
+
+describe('价格通胀', () => {
+  it('第 1 波为基准价，随波次线性上浮并取整', () => {
+    expect(itemPrice('gemHeart', 1)).toBe(ITEMS.gemHeart.price)
+    expect(itemPrice('gemHeart', 11)).toBe(Math.round(ITEMS.gemHeart.price * (1 + PRICE.perWave * 10)))
+    expect(itemPrice('gemHeart', 15)).toBeGreaterThan(itemPrice('gemHeart', 5))
   })
 })

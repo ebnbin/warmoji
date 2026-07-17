@@ -12,13 +12,14 @@ import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '.
 import type { OrbitThreat } from '../core/orbit'
 import { browserStorage } from '../core/highscore'
 import {
+  abilityTiers,
   aggregateCharacterEffects,
   aggregateTeamEffects,
   CRIT_MUL,
+  memberMaxHp,
   resolveWeaponSpec,
 } from '../core/items'
 import type { TeamEffects } from '../core/items'
-import { levelEffects, memberMaxHp } from '../core/levels'
 import { currentFormation, getRun, guardOrder, isTeamFull, promoteStep, waveStartHp } from '../core/run'
 import type { RunState } from '../core/run'
 import { prodigyDamage, tickSkillCd } from '../core/skill'
@@ -67,6 +68,8 @@ export interface HudSnapshot {
   xp: number
   xpNext: number
   level: number
+  /** 当前可用能量豆（HUD 计数 + 满豆提示） */
+  beans: number
   kills: number
   coins: number
   wave: number
@@ -467,6 +470,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       xp: this.run.xp.xp,
       xpNext: xpToNext(this.run.xp.level),
       level: this.run.xp.level,
+      beans: this.run.beans,
       kills: this.run.kills,
       coins: this.run.coins,
       wave: this.run.wave,
@@ -669,7 +673,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       mapId: this.run.mapId,
       skill: this.stress
         ? undefined
-        : { remainMs: Math.round(this.run.skillCdMs), ready: this.run.skillCdMs <= 0 },
+        : {
+            remainMs: Math.round(this.run.skillCdMs),
+            beans: this.run.beans,
+            ready: this.run.skillCdMs <= 0 && this.run.beans > 0,
+          },
       ...this.debugExtras(),
     })
   }
@@ -677,16 +685,40 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   // ── 队长主动技能 ────────────────────────────────────────────
 
   /** UIScene 轮询的技能状态（压测模式无技能 → null，不渲染按钮） */
-  skillSnapshot(): { name: string; remainMs: number; cdMs: number; ready: boolean } | null {
+  skillSnapshot(): {
+    name: string
+    remainMs: number
+    cdMs: number
+    beans: number
+    ready: boolean
+  } | null {
     if (this.stress) return null
     const s = CAPTAINS[this.run.captainId].skill
-    return { name: s.name, remainMs: this.run.skillCdMs, cdMs: s.cdMs, ready: this.run.skillCdMs <= 0 }
+    return {
+      name: s.name,
+      remainMs: this.run.skillCdMs,
+      cdMs: s.cdMs,
+      beans: this.run.beans,
+      ready: this.run.skillCdMs <= 0 && this.run.beans > 0,
+    }
   }
 
-  /** 释放主动技能（UIScene 按钮/E 键触发）；就绪校验在此收口 */
+  /** 经验统一入口：满豆冻结（不涨条不升级）；升级即得豆（钳上限） */
+  private gainTeamXp(amount: number): void {
+    if (this.run.beans >= SKILL.maxBeans) return
+    const gained = gainXp(this.run.xp, amount)
+    this.run.xp = gained.state
+    if (gained.levelsGained > 0) {
+      this.run.beans = Math.min(SKILL.maxBeans, this.run.beans + gained.levelsGained)
+      playSfx('levelup')
+    }
+  }
+
+  /** 释放主动技能（UIScene 按钮/E 键触发）；就绪与弹药校验在此收口 */
   castSkill(): boolean {
-    if (this.over || this.stress || this.run.skillCdMs > 0) return false
+    if (this.over || this.stress || this.run.skillCdMs > 0 || this.run.beans <= 0) return false
     const id = this.run.captainId
+    this.run.beans -= 1
     this.run.skillCdMs = CAPTAINS[id].skill.cdMs
     playSfx('levelup')
     this.events.emit('skill-cast', CAPTAINS[id].skill.name)
@@ -823,9 +855,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.physics.pause()
     playSfx('wave')
     const finished = isFinalWave(this.run.wave)
-    // 波末保底经验：躲避流杀得少也有基本收益（队长倍率 × 四叶草团队倍率）
+    // 波末保底经验：躲避流杀得少也有基本豆收入（队长倍率 × 四叶草团队倍率）
     const xpMul = CAPTAINS[this.run.captainId].xpGainMul * this.teamFx.xpGainMul
-    this.run.xp = gainXp(this.run.xp, Math.round(waveBonusXp(this.run.wave) * xpMul)).state
+    this.gainTeamXp(Math.round(waveBonusXp(this.run.wave) * xpMul))
     // 团队道具的波末结算：大锅回复在血量快照前生效，债券分红计入本波金币小结
     if (this.teamFx.waveHealRatio > 0) {
       for (const m of this.members) {
@@ -899,15 +931,15 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         visualOffset.y = dy
       },
     }
-    // 等级维度 × 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效武器参数
-    const level = this.stress ? 1 : (this.run.memberLevels[slot] ?? 1)
-    const lvlFx = levelEffects(id, level)
-    const fx = aggregateCharacterEffects(this.run.memberItems[slot] ?? [])
+    // 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效武器参数；
+    // 特殊能力来自已购的角色专属能力卡（压测阵容无道具 = 素体）
+    const owned = this.stress ? [] : (this.run.memberItems[slot] ?? [])
+    const fx = aggregateCharacterEffects(owned)
+    const tiers = abilityTiers(id, owned)
     const memberCtx: WeaponContext = {
       ...this.weaponCtx,
-      damageMul: () =>
-        this.stats.damageMul * fx.damageMul * lvlFx.damageMul * this.teamFx.teamDamageMul,
-      cooldownMul: () => this.stats.cooldownMul * fx.cooldownMul * lvlFx.cooldownMul,
+      damageMul: () => this.stats.damageMul * fx.damageMul * this.teamFx.teamDamageMul,
+      cooldownMul: () => this.stats.cooldownMul * fx.cooldownMul,
       // 伤害/子弹带上来源槽位：结算页按角色统计输出与击杀。
       // 暴击/击退倍率在这里收口：所有武器伤害路径统一生效，无需逐武器改造
       damageEnemy: (e, d, kb, sx, sy) => {
@@ -927,19 +959,15 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       spawnBurnZone: (x, y, radius, dps, durationMs) =>
         this.spawnBurnZone(x, y, radius, dps, durationMs, slot),
     }
-    const maxHp = this.stress ? this.stats.maxHp : memberMaxHp(id, level, fx.hpAdd)
+    const maxHp = this.stress ? this.stats.maxHp : memberMaxHp(fx.hpAdd)
     const member: Member = {
       emoji,
       slot,
       image,
       // 错开初始冷却，避免全队同帧齐射。
-      // 生效武器 = 原始配装 → 能力注入（3/6 级质变）→ 空间参数按 道具×等级维度 缩放
-      weapons: applyAbilities(id, level, spec.weapons).map((w, i) =>
-        createWeapon(
-          resolveWeaponSpec(w, { ...fx, rangeMul: fx.rangeMul * lvlFx.rangeMul }),
-          memberCtx,
-          300 + slot * 120 + i * 230,
-        ),
+      // 生效武器 = 原始配装 → 能力卡质变注入 → 空间参数按道具缩放
+      weapons: applyAbilities(id, tiers, spec.weapons).map((w, i) =>
+        createWeapon(resolveWeaponSpec(w, fx), memberCtx, 300 + slot * 120 + i * 230),
       ),
       handle,
       visualOffset,
@@ -1431,9 +1459,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 经验击杀即得（队长倍率 × 四叶草团队倍率，精英有额外倍率）；金币落地等待拾取
     const xpMul =
       CAPTAINS[this.run.captainId].xpGainMul * this.teamFx.xpGainMul * (elite ? ELITE.xpMul : 1)
-    const gained = gainXp(this.run.xp, Math.round(spec.xp * xpMul))
-    this.run.xp = gained.state
-    if (gained.levelsGained > 0) playSfx('levelup')
+    this.gainTeamXp(Math.round(spec.xp * xpMul))
     // 偷金币鼠：吐回吃掉的金币 + 1 枚利息
     const eaten = (enemy.getData('eaten') as number) || 0
     const baseCoins = spec.coins * (elite ? ELITE.coinsMul : 1)
