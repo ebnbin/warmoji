@@ -137,12 +137,12 @@ export class RiverArenaScene extends BaseArenaScene {
   }
 
   /** 漂出下游边界外一段距离：河水冲走（玩家钳在屏内，永远追不回） */
-  protected cullCoin(c: ImageObj): boolean {
+  cullCoin(c: ImageObj): boolean {
     return pastDownstream(c, this.viewW, this.viewH, RIVER.coinCullPad)
   }
 
   /** 不在磁吸范围：纯随波逐流 */
-  protected coinIdleVelocity(): Point {
+  coinIdleVelocity(): Point {
     return this.flow
   }
 

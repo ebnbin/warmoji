@@ -99,14 +99,14 @@ export class ArenaScene extends BaseArenaScene {
     }
   }
 
-  protected constrainCoinPos(p: Point): Point {
+  constrainCoinPos(p: Point): Point {
     return {
       x: Phaser.Math.Clamp(p.x, COIN.radius, MAP.width - COIN.radius),
       y: Phaser.Math.Clamp(p.y, COIN.radius, MAP.height - COIN.radius),
     }
   }
 
-  protected constrainShardTarget(p: Point): Point {
+  constrainShardTarget(p: Point): Point {
     return {
       x: Phaser.Math.Clamp(p.x, 0, MAP.width),
       y: Phaser.Math.Clamp(p.y, 0, MAP.height),

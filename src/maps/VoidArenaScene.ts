@@ -135,7 +135,7 @@ export class VoidArenaScene extends BaseArenaScene {
     return { x: wrapCoord(p.x, this.arenaW), y: wrapCoord(p.y, this.arenaH) }
   }
 
-  protected constrainCoinPos(p: Point): Point {
+  constrainCoinPos(p: Point): Point {
     return { x: wrapCoord(p.x, this.arenaW), y: wrapCoord(p.y, this.arenaH) }
   }
 

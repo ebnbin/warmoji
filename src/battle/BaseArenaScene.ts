@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
 import { castCaptainSkill } from './skills'
+import { circleBody } from './arcade'
+import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from './pickups'
 import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, TEAM } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import type { CharacterId, CharacterSpec } from '../characters/registry'
@@ -7,7 +9,6 @@ import { SKILL } from '../characters/skill'
 import { STRESS } from '../debug/dev'
 import { BOSS, ELITE, SPAWN, SURGE } from '../enemies/registry'
 import type { ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../enemies/registry'
-import { CHEST } from '../run/chest'
 import { COIN } from '../items/registry'
 import { UNIT } from '../lib/units'
 import { WAVE } from '../run/waves'
@@ -24,13 +25,12 @@ import type { FormationId } from './formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from './orbit'
 import type { OrbitThreat } from './orbit'
 import { browserStorage } from '../lib/storage'
-import { chestDropped, rollChestLoot } from '../run/chest'
+import { chestDropped } from '../run/chest'
 import {
   abilityTiers,
   aggregateCharacterEffects,
   aggregateTeamEffects,
   CRIT_MUL,
-  ITEMS,
   resolveWeaponSpec,
 } from '../items/registry'
 import type { CharacterEffects, TeamEffects } from '../items/registry'
@@ -158,14 +158,6 @@ export interface Member {
   hasThreat: boolean
 }
 
-// 碰撞圆按逻辑半径换算回源纹理坐标（body 随对象缩放）
-function circleBody(obj: ImageObj, radius: number): void {
-  const body = obj.body as ArcadeBody
-  const frame = obj.width
-  const r = (radius / obj.displayWidth) * frame
-  body.setCircle(r, frame / 2 - r, frame / 2 - r)
-}
-
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
 }
@@ -179,14 +171,14 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   enemies!: Phaser.GameObjects.Group
   protected projectiles!: Phaser.GameObjects.Group
   protected enemyShots!: Phaser.GameObjects.Group
-  protected coins!: Phaser.GameObjects.Group
+  coins!: Phaser.GameObjects.Group
   /** 毒液池（蘑菇死亡遗留），波末随场景销毁 */
   protected poisonPools: { x: number; y: number; r2: number; until: number; tickMs: number; damage: number; srcName: string; gfx: Phaser.GameObjects.Graphics }[] = []
   private enemyMix: EnemyMixEntry[] = []
   protected frameTargets: EnemyTarget[] = []
   private frameSlowZones: { x: number; y: number; r2: number; factor: number }[] = []
   /** 仅本帧生效的金币吸取点（磁力回旋镖沿途登记） */
-  private frameAttractors: { x: number; y: number; r2: number }[] = []
+  frameAttractors: { x: number; y: number; r2: number }[] = []
   /** 灼烧地面（余烬秘火）：周期烧伤区域内敌人，伤害归属 srcSlot */
   protected burnZones: {
     x: number
@@ -224,17 +216,17 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
 
-  protected rng = new Rng(1)
+  rng = new Rng(1)
   protected palette!: Palette
   stats!: TeamStats
-  protected teamFx: TeamEffects = aggregateTeamEffects([])
+  teamFx: TeamEffects = aggregateTeamEffects([])
   private settings: Settings = DEFAULT_SETTINGS
   run!: RunState
   private damagePool: Phaser.GameObjects.BitmapText[] = []
   private damagePoolIdx = 0
   // 死亡碎块对象池：敌人死亡时本体裂成 4 个象限碎片（复用固定数量 Image，零分配）
-  private shardPool: ImageObj[] = []
-  private shardPoolIdx = 0
+  shardPool: ImageObj[] = []
+  shardPoolIdx = 0
   // 爆发型粒子：敌人死亡（紫系）/ 金币拾取（金系）/ 队员倒下（烟尘）
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -344,7 +336,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.onMemberShot(member, s as unknown as ImageObj)
     })
     this.physics.add.overlap(this.memberGroup, this.coins, (_m, c) =>
-      this.collectCoin(c as unknown as ImageObj),
+      collectCoin(this, c as unknown as ImageObj),
     )
   }
   /** 逐帧接触判定（虚空图的手写环面圆-圆；overlap 图空实现） */
@@ -362,11 +354,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     return p
   }
   /** 金币落点钳制/回绕 */
-  protected constrainCoinPos(p: Point): Point {
+  constrainCoinPos(p: Point): Point {
     return p
   }
   /** 死亡碎片飞散终点钳制（有界图不许飞出地图） */
-  protected constrainShardTarget(p: Point): Point {
+  constrainShardTarget(p: Point): Point {
     return p
   }
   /** 游荡方向（有界图撞边折返版在子类） */
@@ -400,12 +392,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     return false
   }
   /** 金币的额外回收条件（河流：漂出下游） */
-  protected cullCoin(_c: ImageObj): boolean {
+  cullCoin(_c: ImageObj): boolean {
     void _c
     return false
   }
   /** 金币不受磁吸时的基础速度（河流：随波逐流） */
-  protected coinIdleVelocity(): Point {
+  coinIdleVelocity(): Point {
     return { x: 0, y: 0 }
   }
   /** 终波开场的世界准备（无界图：缩圈初始化） */
@@ -672,7 +664,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.updateEnemyShots()
     this.updatePoisonPools()
     this.updateBurnZones()
-    this.magnetCoins()
+    magnetCoins(this)
     this.sweepProjectiles(delta)
     this.cullProjectiles()
     this.updateWorld(delta)
@@ -1435,10 +1427,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const eaten = (enemy.getData('eaten') as number) || 0
     const baseCoins = spec.coins * (elite ? ELITE.coinsMul : 1)
     const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? baseCoins : 0
-    this.spawnCoins(enemy.x, enemy.y, baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0))
+    spawnCoins(this, enemy.x, enemy.y, baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0))
     // 宝箱：极小概率掉落（精英更高）；Boss 击杀即通关，掉了也来不及捡，不掉
     if (!this.stress && !isBoss && chestDropped(elite, () => this.rng.next())) {
-      this.spawnChest(enemy.x, enemy.y)
+      spawnChest(this, enemy.x, enemy.y)
     }
     // 击败终波 Boss：稍候（碎块飞散可见）直接提前通关
     if (isBoss) {
@@ -1469,62 +1461,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.deathBurst.explode(6, enemy.x, enemy.y)
     this.tweens.killTweensOf(enemy)
     // 本体裂成 4 个象限碎片：继承致死击退速度（不衰减）+ 象限散开 + 自旋 + 淡出
-    this.spawnShards(enemy, flingVx, flingVy)
+    spawnShards(this, enemy, flingVx, flingVy)
     enemy.destroy()
   }
 
   /** 敌人纹理的四象限碎片：frame 每种纹理只注册一次；碎片来自共享对象池 */
-  private spawnShards(enemy: ImageObj, flingVx: number, flingVy: number): void {
-    const tex = enemy.texture
-    if (!tex.has('shard0')) {
-      const sw = tex.source[0]!.width
-      const sh = tex.source[0]!.height
-      tex.add('shard0', 0, 0, 0, sw / 2, sh / 2)
-      tex.add('shard1', 0, sw / 2, 0, sw / 2, sh / 2)
-      tex.add('shard2', 0, 0, sh / 2, sw / 2, sh / 2)
-      tex.add('shard3', 0, sw / 2, sh / 2, sw / 2, sh / 2)
-      // Texture.add 会把 firstFrame 改指向新 frame，导致此后按 key 默认创建的
-      // 同类敌人渲染成左上角碎片——必须拨回基础帧
-      tex.firstFrame = '__BASE'
-    }
-    const dw = enemy.displayWidth / 2
-    const dh = enemy.displayHeight / 2
-    const t = KNOCKBACK.deathSlideMs / 1000
-    for (let i = 0; i < 4; i++) {
-      const shard = this.shardPool[this.shardPoolIdx]!
-      this.shardPoolIdx = (this.shardPoolIdx + 1) % this.shardPool.length
-      this.tweens.killTweensOf(shard)
-      // 翻转的敌人纹理左半显示在右侧：碎片同步镜像保证碎裂瞬间与本体无缝
-      const col = i % 2 === 0 ? -1 : 1
-      const ox = (enemy.flipX ? -col : col) * (dw / 2)
-      const oy = (i < 2 ? -1 : 1) * (dh / 2)
-      shard
-        .setTexture(tex.key, `shard${i}`)
-        .setDisplaySize(dw, dh)
-        .setFlipX(enemy.flipX)
-        .setPosition(enemy.x + ox, enemy.y + oy)
-        .setRotation(0)
-        .setAlpha(1)
-        .setVisible(true)
-      const dir = norm(ox, oy)
-      // 散开幅度收紧 + 飞行中缩小到 ~1/5：碎裂足迹整体控制在原尺寸 ~1.5 倍内
-      const scatter = 45 + this.rng.next() * 65
-      const vx = flingVx + dir.x * scatter
-      const vy = flingVy + dir.y * scatter
-      const end = this.constrainShardTarget({ x: shard.x + vx * t, y: shard.y + vy * t })
-      this.tweens.add({
-        targets: shard,
-        x: end.x,
-        y: end.y,
-        scale: shard.scaleX * 0.2,
-        rotation: (this.rng.next() - 0.5) * 6,
-        alpha: 0,
-        duration: KNOCKBACK.deathSlideMs,
-        onComplete: () => shard.setVisible(false),
-      })
-    }
-  }
-
   private floatDamage(x: number, y: number, amount: number, crit = false): void {
     if (!this.settings.damageNumbers) return
     // 池满时偷用最旧的一个（结束它未完成的动画）
@@ -2194,156 +2135,6 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   }
 
   // ── 金币 ────────────────────────────────────────────────────
-
-  spawnCoins(x: number, y: number, count: number): void {
-    for (let i = 0; i < count; i++) {
-      // 多枚时散开一点，便于看清数量
-      const jx = count > 1 ? (this.rng.next() - 0.5) * 0.6 * UNIT : 0
-      const jy = count > 1 ? (this.rng.next() - 0.5) * 0.6 * UNIT : 0
-      const pos = this.constrainCoinPos({ x: x + jx, y: y + jy })
-      const coin = emojiImage(this, pos.x, pos.y, COIN.emoji, COIN.size, 'player').setDepth(3)
-      this.physics.add.existing(coin)
-      circleBody(coin, COIN.radius)
-      this.coins.add(coin)
-      // 掉落弹出
-      const base = coin.scaleX
-      coin.setScale(base * 0.3)
-      this.tweens.add({ targets: coin, scale: base, duration: 160, ease: 'Back.easeOut' })
-    }
-  }
-
-  private magnetCoins(): void {
-    // 金币拾取是团队能力：以队伍中心为基点磁吸并入账（成员碰到也能捡，见 overlap）。
-    // 磁力回旋镖（frameAttractors）优先：镖旁的金币直接入账，省去飞回中心的路程
-    const magnetRadius = COIN.magnetRadius * this.teamFx.magnetMul
-    const r2 = magnetRadius * magnetRadius
-    const collect2 = COIN.collectRadius * COIN.collectRadius
-    const idle = this.coinIdleVelocity()
-    for (const c of this.coins.getChildren() as ImageObj[]) {
-      if (!c.active) continue
-      // 世界回收（河流：漂出下游即被冲走）
-      if (this.cullCoin(c)) {
-        c.destroy()
-        continue
-      }
-      if (this.frameAttractors.length > 0) {
-        let taken = false
-        for (const a of this.frameAttractors) {
-          const ad = this.worldDelta(c, a)
-          if (ad.x * ad.x + ad.y * ad.y <= a.r2) {
-            this.collectCoin(c)
-            taken = true
-            break
-          }
-        }
-        if (taken) continue
-      }
-      const d = this.worldDelta(c, this.center)
-      const dist = d.x * d.x + d.y * d.y
-      if (dist <= collect2) {
-        this.collectCoin(c)
-        continue
-      }
-      const body = c.body as ArcadeBody
-      if (dist < r2) {
-        const dir = norm(d.x, d.y)
-        body.setVelocity(dir.x * COIN.magnetSpeed + idle.x, dir.y * COIN.magnetSpeed + idle.y)
-      } else {
-        body.setVelocity(idle.x, idle.y)
-      }
-    }
-  }
-
-  protected collectCoin(coin: ImageObj): void {
-    if (!coin.active) return
-    if (coin.getData('chest')) {
-      this.openChest(coin)
-      return
-    }
-    this.coinBurst.explode(4, coin.x, coin.y)
-    playSfx('coin')
-    coin.destroy()
-    this.run.coins += 1
-  }
-
-  // ── 宝箱 ────────────────────────────────────────────────────
-
-  /** 宝箱走金币的磁吸/回收/拾取管线（同组 + data 标记分流） */
-  private spawnChest(x: number, y: number): void {
-    const pos = this.constrainCoinPos({ x, y })
-    const chest = emojiImage(this, pos.x, pos.y, CHEST.emoji, CHEST.size, 'player').setDepth(4)
-    chest.setData('chest', true)
-    this.physics.add.existing(chest)
-    circleBody(chest, CHEST.radius)
-    this.coins.add(chest)
-    const base = chest.scaleX
-    chest.setScale(base * 0.3)
-    this.tweens.add({ targets: chest, scale: base, duration: 220, ease: 'Back.easeOut' })
-  }
-
-  /** 开箱：抽 1 件当前阵容用得上的道具，免费入包并立即生效 */
-  private openChest(chest: ImageObj): void {
-    const { x, y } = chest
-    chest.destroy()
-    this.coinBurst.explode(12, x, y)
-    playSfx('levelup')
-    const loot = rollChestLoot(
-      this.run.roster,
-      this.run.memberItems,
-      this.run.captainItems,
-      () => this.rng.next(),
-    )
-    if (!loot) {
-      this.run.coins += CHEST.fallbackCoins
-      return
-    }
-    let owner: string
-    if (loot.slot < 0) {
-      this.run.captainItems.push(loot.itemId)
-      // 队长道具全部经 teamFx 实时读取，重算即生效
-      this.teamFx = aggregateTeamEffects(this.run.captainItems)
-      this.stats.moveSpeed = TEAM.moveSpeed * this.teamFx.moveSpeedMul
-      owner = `队长${CAPTAINS[this.run.captainId].name}`
-    } else {
-      this.run.memberItems[loot.slot]?.push(loot.itemId)
-      this.refreshMemberItems(loot.slot)
-      owner = CHARACTERS[this.run.roster[loot.slot]!]?.name ?? ''
-    }
-    const item = ITEMS[loot.itemId]
-    this.events.emit('chest-open', {
-      emoji: item.emoji,
-      name: item.name,
-      rarity: item.rarity,
-      owner,
-    })
-  }
-
-  /** 开箱即时生效：按最新道具重算派生属性并热重建武器（能力卡质变/
-   * 射程弹速类立即可见）。每波开局 createMember 整体重建，这里只覆盖本波剩余 */
-  private refreshMemberItems(slot: number): void {
-    const m = this.members[slot]
-    const id = this.run.roster[slot]
-    if (!m || !id) return
-    const owned = this.run.memberItems[slot] ?? []
-    const fx = aggregateCharacterEffects(owned)
-    // 原地覆写：武器 ctx 闭包读的就是这个对象（伤害/攻速/暴击/击退实时生效）
-    Object.assign(m.fx, fx)
-    const maxHp = memberMaxHp(fx.hpAdd)
-    if (m.alive) m.hp = Math.max(1, Math.min(maxHp, m.hp + Math.max(0, maxHp - m.maxHp)))
-    else m.hp = Math.min(m.hp, maxHp)
-    m.maxHp = maxHp
-    m.shownHpRatio = -1
-    m.iframesMs = MEMBER.iframesMs + fx.iframesAddMs
-    m.reviveMs = Math.max(1000, TEAM.reviveMs + fx.reviveAddMs)
-    m.regenPerSec = fx.regenPerSec
-    m.thorns = fx.thorns
-    m.killHeal = fx.killHeal
-    for (const w of m.weapons) w.destroy()
-    m.weapons = applyAbilities(id, abilityTiers(id, owned), CHARACTERS[id].weapons).map((w, i) =>
-      createWeapon(resolveWeaponSpec(w, m.fx), m.ctx, 200 + i * 230),
-    )
-    if (!m.alive) for (const w of m.weapons) w.setVisible(false)
-  }
 
   // ── 结算 ────────────────────────────────────────────────────
 

@@ -6,6 +6,7 @@ import { UNIT } from '../lib/units'
 import { waveAt } from '../run/waves'
 import { viewport } from '../screen/apply'
 import type { BaseArenaScene, ImageObj } from './BaseArenaScene'
+import { spawnCoins } from './pickups'
 
 // 队长主动技能的战斗内实现：castCaptainSkill 收口就绪/弹药校验、扣豆、分派；
 // 五个效果函数各自为政——每加一个队长在此长一段（与武器运行时同种的内容形状）。
@@ -94,7 +95,7 @@ function skillMoneybags(scene: BaseArenaScene): void {
         if (!e.active || scene.over) return
         scene.coinBurst.explode(6, e.x, e.y)
         playSfx('coin')
-        scene.spawnCoins(e.x, e.y, SKILL.moneybags.coinsPerHit)
+        spawnCoins(scene, e.x, e.y, SKILL.moneybags.coinsPerHit)
         scene.applyDamage(e, SKILL.moneybags.damage, SKILL.moneybags.knockback, scene.center.x, scene.center.y)
       },
     })
