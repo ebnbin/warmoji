@@ -1,7 +1,7 @@
 import type { CaptainId, CharacterId } from './config'
 import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, SKILL, WAVE } from './config'
 import type { FormationId } from './formation'
-import { browserStorage } from './highscore'
+import { browserStorage } from './storage'
 import type { ItemId } from './items'
 import type { MapId } from './maps'
 import { MAP_IDS } from './maps'

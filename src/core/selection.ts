@@ -1,6 +1,6 @@
 import type { CaptainId } from './config'
 import { CAPTAIN_IDS, CAPTAINS } from './config'
-import type { StringStorage } from './highscore'
+import type { StringStorage } from './storage'
 import type { MapId } from './maps'
 import { sanitizeMapId } from './maps'
 

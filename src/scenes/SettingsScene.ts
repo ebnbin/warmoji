@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { browserStorage } from '../core/highscore'
+import { browserStorage } from '../core/storage'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'

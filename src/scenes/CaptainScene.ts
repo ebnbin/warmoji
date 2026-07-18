@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import type { CaptainId } from '../core/config'
 import { CAPTAIN_IDS, CAPTAINS } from '../core/config'
-import { browserStorage } from '../core/highscore'
+import { browserStorage } from '../core/storage'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'

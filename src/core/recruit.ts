@@ -1,6 +1,6 @@
 import type { CaptainId, CharacterId } from './config'
 import { RECRUIT } from './config'
-import type { StringStorage } from './highscore'
+import type { StringStorage } from './storage'
 import { Rng } from './rng'
 
 // 命定卡池的随机源：种子绑队长、本地持久化。存储值 0 = 「未初始化」哨兵，

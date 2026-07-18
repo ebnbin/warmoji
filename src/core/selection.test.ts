@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CAPTAIN_IDS } from './config'
-import type { StringStorage } from './highscore'
+import type { StringStorage } from './storage'
 import { MAP_IDS } from './maps'
 import { loadCaptain, loadMap, sanitizeCaptain, saveCaptain, saveMap } from './selection'
 

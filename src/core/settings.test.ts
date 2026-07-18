@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { StringStorage } from './highscore'
+import type { StringStorage } from './storage'
 import { DEFAULT_SETTINGS, loadSettings, sanitizeSettings, saveSettings, SETTING_DEFS } from './settings'
 
 function memStorage(): StringStorage {

@@ -10,7 +10,7 @@ import { formationPosts, ringPostAngle } from '../core/formation'
 import type { FormationId } from '../core/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../core/orbit'
 import type { OrbitThreat } from '../core/orbit'
-import { browserStorage } from '../core/highscore'
+import { browserStorage } from '../core/storage'
 import { chestDropped, rollChestLoot } from '../core/chest'
 import {
   abilityTiers,

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { browserStorage } from '../core/highscore'
+import { browserStorage } from '../core/storage'
 import type { MapId } from '../core/maps'
 import { MAP_IDS, MAPS } from '../core/maps'
 import { randomPalette } from '../core/palette'

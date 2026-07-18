@@ -1,25 +1,13 @@
+import type { StringStorage } from './storage'
+
 export interface HighScore {
   bestWave: number
   bestKills: number
 }
 
-export interface StringStorage {
-  getItem(key: string): string | null
-  setItem(key: string, value: string): void
-}
-
 // v1 记录的是存活秒数，波次制后语义失效，直接换 key 弃旧
 const KEY = 'warmoji.highscore.v2'
 const ZERO: HighScore = { bestWave: 0, bestKills: 0 }
-
-/** 隐私模式下访问 localStorage 会抛错 */
-export function browserStorage(): StringStorage | undefined {
-  try {
-    return globalThis.localStorage
-  } catch {
-    return undefined
-  }
-}
 
 export function loadHighScore(storage: StringStorage | undefined): HighScore {
   if (!storage) return { ...ZERO }
