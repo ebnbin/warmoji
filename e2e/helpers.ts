@@ -64,13 +64,16 @@ export async function confirmCaptain(page: Page): Promise<void> {
   )
 }
 
-/** 把整编页走完（默认选中项逐点确认；队形环节直接出发），直到离开整编页 */
+/** 把整编页走完：招募环节把空位点满（依次取未选的候选）后整批确认；
+ * 队形环节确认即出发。循环直到离开整编页 */
 export async function completePromote(page: Page): Promise<void> {
-  for (let step = 0; step < 24; step++) {
+  for (let step = 0; step < 40; step++) {
     const st = await page.evaluate(() => ({
       scene: window.__warmoji!.scene,
       mode: window.__warmoji!.promote?.mode,
-      selected: window.__warmoji!.promote?.selected ?? '',
+      due: window.__warmoji!.promote?.due ?? 0,
+      picked: window.__warmoji!.promote?.picked ?? [],
+      items: (window.__warmoji!.promote?.items ?? []).map((x) => x.id),
     }))
     if (st.scene !== 'promote') return
     if (st.mode === 'formation') {
@@ -81,15 +84,19 @@ export async function completePromote(page: Page): Promise<void> {
       })
       return
     }
-    // 招募环节：确认默认选中；本波通常只有 1 个名额，确认后要么离开、
-    // 要么进入下一环节（首满员的阵型页）
+    if (st.picked.length < st.due) {
+      const next = st.items.find((id) => !st.picked.includes(id))
+      if (!next) throw new Error('completePromote: 招募候选不足以点满名额')
+      await clickPromoteItem(page, next)
+      continue
+    }
+    // 名额点满：整批入队，之后要么离开、要么进入首满员的阵型页
     await clickPromoteConfirm(page)
     await page.waitForFunction(
-      (prev) =>
+      () =>
         window.__warmoji?.scene !== 'promote' ||
-        window.__warmoji.promote?.mode === 'formation' ||
-        (window.__warmoji.promote?.selected ?? '') !== prev,
-      st.selected,
+        window.__warmoji.promote?.mode === 'formation',
+      undefined,
       { timeout: 15_000 },
     )
   }

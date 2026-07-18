@@ -395,6 +395,10 @@ export const SKILL = {
 // 队形几何在 core/formation.ts；满员后可在整编页切换队形与互换站位。
 export const TEAM = {
   ringRadius: 0.8 * UNIT,
+  /** 3 人环收紧的小半径（人少时更像一个整体）；≥4 人用 ringRadius */
+  smallRingRadius: 0.58 * UNIT,
+  /** 2 人阵的左右圆心距（紧凑贴身，允许轻微视觉重叠）；1~2 人不环绕 */
+  pairGap: 1.1 * UNIT,
   moveSpeed: 5.5 * UNIT,
   reviveMs: 10_000,
   /** N 保 1 中心的受击判定半径系数：被保护的实际收益（碰撞圆减半更难被摸到） */
@@ -904,6 +908,10 @@ export const XP = {
   waveBonusBase: 40,
   waveBonusPerWave: 36,
 } as const
+
+// 招募候选池：每次招募从未招募角色中随机抽 名额+poolExtra 个（不超过剩余数），
+// 随机种子绑队长（core/recruit.ts）。角色多起来后这里是主要的调节旋钮
+export const RECRUIT = { poolExtra: 4 } as const
 
 // 商店：每个上架位可付费重新随机（队长可提供免费次数）
 export const SHOP = { refreshPrice: 2 } as const

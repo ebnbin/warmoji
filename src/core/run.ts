@@ -1,9 +1,11 @@
 import type { CaptainId, CharacterId } from './config'
 import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, SKILL, WAVE } from './config'
 import type { FormationId } from './formation'
+import { browserStorage } from './highscore'
 import type { ItemId } from './items'
 import type { MapId } from './maps'
 import { MAP_IDS } from './maps'
+import { refreshRecruitSeed } from './recruit'
 import { waveDurationMs } from './waves'
 import { gainXp } from './xp'
 import type { XpState } from './xp'
@@ -112,7 +114,9 @@ export function getRun(): RunState {
   return current
 }
 
+/** 一局落幕（胜/败/主动放弃的唯一收口）：丢弃局状态并滚新招募种子 */
 export function endRun(): void {
+  if (current) refreshRecruitSeed(browserStorage(), current.captainId)
   current = undefined
 }
 
@@ -128,6 +132,12 @@ export function recruitCandidates(run: RunState): CharacterId[] {
 /** 本波是否有招募名额：开局 1 人，此后每波结束 +1，直到满编 */
 export function recruitDue(run: RunState): boolean {
   return run.roster.length < Math.min(rosterCap(run), run.wave)
+}
+
+/** 本波实际可招的名额数（跳波开局可能一次多名；受剩余候选数钳制） */
+export function recruitDueCount(run: RunState): number {
+  const due = Math.min(rosterCap(run), run.wave) - run.roster.length
+  return Math.max(0, Math.min(due, recruitCandidates(run).length))
 }
 
 export function canRecruit(run: RunState, id: CharacterId): boolean {
@@ -193,9 +203,10 @@ export function setGuardCenter(run: RunState, id: CharacterId): boolean {
   return true
 }
 
-/** 整编步骤：本波有招募名额（且还有候选）就必须招——不可跳过；否则直接进店 */
+/** 整编步骤：本波有招募名额（且还有候选）就必须招——不可跳过、一页把
+ * 全部名额选满（跳波开局可能一次多名）；否则直接进店 */
 export function promoteStep(run: RunState): 'recruit' | null {
-  return recruitDue(run) && recruitCandidates(run).length > 0 ? 'recruit' : null
+  return recruitDueCount(run) > 0 ? 'recruit' : null
 }
 
 /** 波次开局血量：存活者延续波末血量，阵亡者以低血量复活 */

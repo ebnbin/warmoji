@@ -27,15 +27,17 @@ test.describe('开局整编（组建队伍）', () => {
     await enterCaptain(page)
     await confirmCaptain(page)
 
-    // 开局整编：首发名额强制招募；网格与确认按钮都在最小可用区内
+    // 开局整编：首发名额强制招募——随机候选 5 选 1，未选满前确认不可用
     let p = await page.evaluate(() => window.__warmoji!.promote!)
     expect(p.mode).toBe('recruit')
-    expect(p.items.length).toBeGreaterThanOrEqual(6)
+    expect(p.due).toBe(1)
+    expect(p.items).toHaveLength(5)
+    expect(p.confirm.enabled).toBe(false)
     for (const it of p.items) expect(inBounds(it, 1280, 720)).toBe(true)
     expect(inBounds({ x: p.confirm.x - p.confirm.w / 2, y: p.confirm.y - p.confirm.h / 2, w: p.confirm.w, h: p.confirm.h }, 1280, 720)).toBe(true)
     await page.screenshot({ path: 'test-results/promote-initial.png' })
 
-    // 开局可反悔：返回退回队长页（本局作废），再次确认点数重置
+    // 开局可反悔：返回退回队长页（本局作废），再次确认名额重置
     await page
       .locator('#game canvas')
       .click({ position: await cssPoint(page, { x: p.back.x, y: p.back.y }) })
@@ -43,9 +45,15 @@ test.describe('开局整编（组建队伍）', () => {
     await confirmCaptain(page)
     p = await page.evaluate(() => window.__warmoji!.promote!)
     expect(p.mode).toBe('recruit')
+    expect(p.items).toHaveLength(5)
 
-    // 指定招募法师 → 名额用完直接开战（firstWaveShop=false 不进商店）
-    await clickPromoteItem(page, 'mage')
+    // 从随机候选里点第一位入空位 → 确认开战（firstWaveShop=false 不进商店）
+    const recruitId = p.items[0]!.id
+    await clickPromoteItem(page, recruitId)
+    await page.waitForFunction(
+      (id) => (window.__warmoji?.promote?.picked ?? []).includes(id),
+      recruitId,
+    )
     await clickPromoteConfirm(page)
     await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
     const alive = await page.evaluate(() => window.__warmoji!.alive)
@@ -68,19 +76,26 @@ test.describe('开局整编 竖屏', () => {
     let p = await page.evaluate(() => window.__warmoji!.promote!)
     expect(p.mode).toBe('recruit')
     for (const it of p.items) expect(inBounds(it, 720, 1280)).toBe(true)
-    await clickPromoteItem(page, 'robot')
+    // 点第二位候选入空位（避开默认详情展示位，验证选中态本身）
+    const pickId = p.items[1]!.id
+    await clickPromoteItem(page, pickId)
+    await page.waitForFunction(
+      (id) => (window.__warmoji?.promote?.picked ?? []).includes(id),
+      pickId,
+    )
     await page.screenshot({ path: 'test-results/promote-portrait.png' })
 
-    // 旋转到横屏：仍在整编页，模式与选中保持
+    // 旋转到横屏：仍在整编页，模式/已选/候选池都保持（池子同种子重抽必相同）
     await page.setViewportSize({ width: 1280, height: 720 })
     await page.waitForFunction(
       () => window.__warmoji?.scene === 'promote' && (window.__warmoji.viewW ?? 0) > (window.__warmoji.viewH ?? 0),
     )
     p = await page.evaluate(() => window.__warmoji!.promote!)
     expect(p.mode).toBe('recruit')
-    expect(p.selected).toBe('robot')
+    expect(p.selected).toBe(pickId)
+    expect(p.picked).toEqual([pickId])
 
-    // 招募机器人（本波唯一名额）→ 直接开战
+    // 名额已点满 → 确认直接开战
     await clickPromoteConfirm(page)
     await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
     const alive = await page.evaluate(() => window.__warmoji!.alive)

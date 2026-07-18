@@ -1,11 +1,13 @@
 import Phaser from 'phaser'
 import type { CharacterId } from '../core/config'
-import { CAPTAINS, CHARACTERS } from '../core/config'
+import { CAPTAINS, CHARACTERS, RECRUIT } from '../core/config'
 import { formationPosts } from '../core/formation'
+import { browserStorage } from '../core/highscore'
 import type { ItemId } from '../core/items'
 import { arenaSceneFor } from '../core/maps'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
+import { recruitSeed, rollCandidates } from '../core/recruit'
 import { Rng } from '../core/rng'
 import {
   endRun,
@@ -15,6 +17,7 @@ import {
   isTeamFull,
   promoteStep,
   recruitCandidates,
+  recruitDueCount,
   recruitMember,
   setGuardCenter,
 } from '../core/run'
@@ -29,8 +32,11 @@ import { playSfx } from '../ui/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../ui/viewport'
 
 // 整编页：每波战斗前的强制招募 + 阵型页。开局组队与波末整编完全复用本页：
-// 队长确认后进来招首发（可返回重选队长），此后每波结束固定招 1 人直到满编
-//（不可跳过、无其他招募途径）。招募完成后——首次满员额外展示一次阵型页
+// 队长确认后进来招首发（可返回重选队长），此后每波结束按名额招人直到满编
+//（不可跳过、无其他招募途径；跳波开局可能一波多名额，一页选满才能出发）。
+// 招募候选从队长绑定的随机池抽取（core/recruit.ts，名额+RECRUIT.poolExtra 个）；
+// 详情面板内嵌一块阵型预览：已有队员 + 本波空位按实际战斗布局慢转，点候选
+// 填入空位、点预览里的人换下。招募完成后——首次满员额外展示一次阵型页
 //（formation 模式：满员自动 N 保 1，玩家点选受保护的中心），此后阵型调整走
 // 商店的常驻入口（fromShop，商店睡眠等待返回）。
 interface PromoteLayout {
@@ -38,6 +44,9 @@ interface PromoteLayout {
   headerY: number
   stepY: number
   detail: { x: number; y: number; w: number; h: number }
+  /** 招募模式：详情面板内切出的阵型预览区与文字详情区 */
+  preview: { x: number; y: number; w: number; h: number }
+  detailText: { x: number; y: number; w: number; h: number }
   list: { x: number; y: number; w: number; h: number }
   btn: { y: number; w: number; h: number }
 }
@@ -47,6 +56,8 @@ const LANDSCAPE: PromoteLayout = {
   headerY: 44,
   stepY: 96,
   detail: { x: 40, y: 132, w: 730, h: 484 },
+  preview: { x: 40, y: 132, w: 264, h: 484 },
+  detailText: { x: 320, y: 132, w: 450, h: 484 },
   list: { x: 810, y: 132, w: 430, h: 484 },
   btn: { y: 660, w: 340, h: 68 },
 }
@@ -56,6 +67,8 @@ const PORTRAIT: PromoteLayout = {
   headerY: 52,
   stepY: 106,
   detail: { x: 24, y: 144, w: 672, h: 460 },
+  preview: { x: 24, y: 144, w: 672, h: 196 },
+  detailText: { x: 24, y: 352, w: 672, h: 252 },
   list: { x: 24, y: 628, w: 672, h: 470 },
   btn: { y: 1184, w: 360, h: 72 },
 }
@@ -69,8 +82,13 @@ export class PromoteScene extends Phaser.Scene {
   private palette?: Palette
   private run!: RunState
   private mode: 'recruit' | 'formation' = 'recruit'
-  /** recruit 模式的当前选中候选角色 id */
+  /** recruit 模式：详情面板正在展示的候选角色 id（不等于已选） */
   private selectedKey = ''
+  /** recruit 模式：本波名额数与随机候选池（进页时定死，重进不重抽） */
+  private due = 0
+  private pool: CharacterId[] = []
+  /** 已点进空位的候选（顺序即入队槽位序），点满 due 个才能确认 */
+  private picked: CharacterId[] = []
   /** 从商店进入的阵型调整（商店睡眠中，退出时唤醒） */
   private fromShop = false
   /** 中心互换动画播放中，忽略输入 */
@@ -86,6 +104,11 @@ export class PromoteScene extends Phaser.Scene {
   /** 预览外圈的环绕相位与几何（update 逐帧推进） */
   private previewPhase = 0
   private previewGeom = { cx: 0, cy: 0, scale: 1 }
+  /** recruit 模式的预览记号（容器 + 已选位的命中区），随相位逐帧摆位 */
+  private previewTokens: { c: Phaser.GameObjects.Container; zone?: Phaser.GameObjects.Zone; post: number }[] = []
+  private previewObjs: Phaser.GameObjects.GameObject[] = []
+  private btnBg?: Phaser.GameObjects.Graphics
+  private btnLabel?: Phaser.GameObjects.Text
   private reportTimer = 0
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private backRect = { x: 0, y: 0, w: 0, h: 0 }
@@ -110,21 +133,38 @@ export class PromoteScene extends Phaser.Scene {
     this.run = getRun()
     this.detailObjs = []
     this.formationObjs = []
+    this.previewTokens = []
+    this.previewObjs = []
     this.grid = undefined
+    this.btnBg = undefined
+    this.btnLabel = undefined
     this.quitArmed = false
     this.swapBusy = false
 
     const resolved = this.resolveMode()
     if (!resolved) {
-      // 点数结清且无阵型页可展示：直接去下一站
+      // 名额结清且无阵型页可展示：直接去下一站
       this.scene.start(this.nextScene())
       return
     }
     this.mode = resolved
     // 首次满员的阵型页只自动展示这一次
     if (this.mode === 'formation' && !this.fromShop) this.run.formationIntroduced = true
-    if (this.mode !== 'formation' && (!preserved || !this.validSelection())) {
-      this.selectedKey = this.defaultSelection()
+    if (this.mode !== 'formation') {
+      // 名额与随机候选池：纯函数抽取——同局内反复进出/转屏重排必得同一批
+      this.due = recruitDueCount(this.run)
+      this.pool = rollCandidates(
+        recruitSeed(browserStorage(), this.run.captainId),
+        this.run.roster.length,
+        recruitCandidates(this.run),
+        this.due + RECRUIT.poolExtra,
+      )
+      this.picked = preserved
+        ? this.picked.filter((id) => this.pool.includes(id)).slice(0, this.due)
+        : []
+      if (!preserved || !this.pool.includes(this.selectedKey as CharacterId)) {
+        this.selectedKey = this.pool[0] ?? ''
+      }
     }
 
     const w = viewport.logicalWidth
@@ -234,7 +274,20 @@ export class PromoteScene extends Phaser.Scene {
     panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
 
     if (this.mode !== 'formation') {
-      // 候选网格
+      // 预览区与文字详情区之间的细分隔线
+      const pv = L.preview
+      const div = this.add.graphics()
+      div.lineStyle(1, 0xffffff, 0.12)
+      if (h > w) {
+        const yy = oy + pv.y + pv.h + 6
+        div.lineBetween(this.origin.x + pv.x + 14, yy, this.origin.x + pv.x + pv.w - 14, yy)
+      } else {
+        const xx = this.origin.x + pv.x + pv.w + 8
+        div.lineBetween(xx, oy + pv.y + 14, xx, oy + pv.y + pv.h - 14)
+      }
+
+      // 候选网格：点未选中的候选 → 填进第一个空位（选满后 1 名额时点击即换人，
+      // 多名额需先在预览里把人换下）；点已选中的候选 → 换下
       this.grid = new EmojiGrid(this, {
         x: this.origin.x + L.list.x,
         y: oy + L.list.y,
@@ -243,6 +296,11 @@ export class PromoteScene extends Phaser.Scene {
       })
       this.grid.onTap = (key): void => {
         playSfx('click')
+        const id = key as CharacterId
+        const at = this.picked.indexOf(id)
+        if (at >= 0) this.picked.splice(at, 1)
+        else if (this.picked.length < this.due) this.picked.push(id)
+        else if (this.due === 1) this.picked = [id]
         this.selectedKey = key
         this.refresh()
       }
@@ -257,10 +315,10 @@ export class PromoteScene extends Phaser.Scene {
       h: L.btn.h,
     }
     const b = this.btnRect
-    const btnBg = this.add.graphics()
-    btnBg.fillStyle(0x81d4fa, 1)
-    btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
-    this.add
+    this.btnBg = this.add.graphics()
+    this.btnBg.fillStyle(0x81d4fa, 1)
+    this.btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
+    this.btnLabel = this.add
       .text(w / 2, oy + L.btn.y, this.confirmLabel(), {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
@@ -326,15 +384,33 @@ export class PromoteScene extends Phaser.Scene {
   }
 
   private stepBanner(): string {
-    if (this.mode === 'recruit') return '本波招募名额 · 必须选一名新队员入队'
+    if (this.mode === 'recruit') {
+      return this.due > 1
+        ? `随机候选 ${this.pool.length} 选 ${this.due} · 点满全部空位才能出发`
+        : `随机候选 ${this.pool.length} 选 1 · 必须选一名新队员入队`
+    }
     if (this.fromShop) return '点选一名队员，与中心互换'
     return '满员自动列阵 N 保 1 · 点选队员设为受保护的中心'
   }
 
   private confirmLabel(): string {
-    if (this.mode === 'recruit') return '招募入队'
+    if (this.mode === 'recruit') return this.due > 1 ? `全员入队 0/${this.due}` : '招募入队'
     if (this.fromShop) return '返回商店'
     return this.nextScene() === 'shop' ? '前往商店' : '开战'
+  }
+
+  private confirmEnabled(): boolean {
+    return this.mode === 'formation' || (this.due > 0 && this.picked.length === this.due)
+  }
+
+  /** 确认按钮的可用态与计数文案（招募未选满置灰不可按） */
+  private updateConfirm(): void {
+    const enabled = this.confirmEnabled()
+    this.btnBg?.setAlpha(enabled ? 1 : 0.35)
+    this.btnLabel?.setAlpha(enabled ? 1 : 0.55)
+    if (this.mode === 'recruit' && this.due > 1) {
+      this.btnLabel?.setText(`全员入队 ${this.picked.length}/${this.due}`)
+    }
   }
 
   /** 唤醒沉睡的商店并退出本页（商店货架/金币/刷新次数原样保留） */
@@ -347,25 +423,18 @@ export class PromoteScene extends Phaser.Scene {
   // ── 数据 ────────────────────────────────────────────────────
 
   private buildItems(): { key: string; emoji: string; outline: 'player'; badge?: string }[] {
-    return recruitCandidates(this.run).map((id) => ({
+    return this.pool.map((id) => ({
       key: id,
       emoji: CHARACTERS[id].emoji,
       outline: 'player' as const,
+      ...(this.picked.includes(id) ? { badge: '✅' } : {}),
     }))
-  }
-
-  private defaultSelection(): string {
-    const items = this.buildItems()
-    return items[0]?.key ?? ''
-  }
-
-  private validSelection(): boolean {
-    return this.buildItems().some((i) => i.key === this.selectedKey)
   }
 
   // ── 确认执行 ────────────────────────────────────────────────
 
   private confirm(): void {
+    if (!this.confirmEnabled()) return
     if (this.mode === 'formation') {
       if (this.fromShop) {
         this.exitToShop()
@@ -375,12 +444,15 @@ export class PromoteScene extends Phaser.Scene {
       }
       return
     }
-    if (!this.selectedKey) return
-    if (recruitMember(this.run, this.selectedKey as CharacterId) < 0) return
+    // 批量入队：按点选顺序占槽位（预览里的站位即入队后的站位）
+    for (const id of this.picked) {
+      if (recruitMember(this.run, id) < 0) return
+    }
     playSfx('recruit')
+    this.picked = []
+    this.selectedKey = ''
     // 下一环节或直接开拔（重建页面刷新模式/候选；保留背景色）
     if (this.resolveMode()) {
-      this.selectedKey = ''
       this.preserveOnRestart = true
       this.scene.restart()
     } else {
@@ -486,15 +558,20 @@ export class PromoteScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (this.mode !== 'formation' || this.swapBusy) return
-    this.previewPhase += (delta / 1000) * PREVIEW_SPIN
-    this.layoutFormationPreview()
-    // 外圈在转，调试矩形定期刷新，e2e 取到的坐标不至于过期
-    this.reportTimer += delta
-    if (this.reportTimer >= 300) {
-      this.reportTimer = 0
-      this.reportPromote()
+    if (this.mode === 'formation') {
+      if (this.swapBusy) return
+      this.previewPhase += (delta / 1000) * PREVIEW_SPIN
+      this.layoutFormationPreview()
+      // 外圈在转，调试矩形定期刷新，e2e 取到的坐标不至于过期
+      this.reportTimer += delta
+      if (this.reportTimer >= 300) {
+        this.reportTimer = 0
+        this.reportPromote()
+      }
+      return
     }
+    this.previewPhase += (delta / 1000) * PREVIEW_SPIN
+    this.layoutRecruitPreview()
   }
 
   /** 点选外圈队员：与中心互换（带滑动动画） */
@@ -564,48 +641,54 @@ export class PromoteScene extends Phaser.Scene {
     this.renderStatGroups(center, items, res)
   }
 
-  // ── 详情（招募模式） ────────────────────────────────────────
+  // ── 详情（招募模式：文字详情区，预览占掉面板一角） ──────────
 
   private renderDetail(res: number): void {
     for (const o of this.detailObjs) o.destroy()
     this.detailObjs = []
     if (!this.selectedKey) return
-    const D = this.layout.detail
+    const D = this.layout.detailText
     const dx = this.origin.x + D.x
     const dy = this.origin.y + D.y
 
     const id = this.selectedKey as CharacterId
     const spec = CHARACTERS[id]
+    const isPicked = this.picked.includes(id)
     this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, spec.emoji, 85, 'player'),
+      emojiImage(this, dx + 46, dy + 48, spec.emoji, 74, 'player'),
       this.add
-        .text(dx + 104, dy + 44, spec.name, {
+        .text(dx + 90, dy + 36, spec.name + (isPicked ? ' · 已选' : ''), {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
-          color: '#ffffff',
+          color: isPicked ? '#81d4fa' : '#ffffff',
           resolution: res,
         })
         .setOrigin(0, 0.5),
       this.add
-        .text(dx + 104, dy + 80, spec.desc, {
+        .text(dx + 90, dy + 70, spec.desc, {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           color: '#b9b9c6',
-          wordWrap: { width: D.w - 130 },
+          wordWrap: { width: D.w - 110 },
           resolution: res,
         })
         .setOrigin(0, 0.5),
     )
-    this.renderStatGroups(id, [], res)
+    this.renderStatGroups(id, [], res, D, dy + 112)
   }
 
-  /** 属性组列表（招募/阵型详情共用） */
-  private renderStatGroups(id: CharacterId, items: ItemId[], res: number): void {
-    const D = this.layout.detail
+  /** 属性组列表（招募/阵型详情共用；rect/startY 由两种模式各自指定） */
+  private renderStatGroups(
+    id: CharacterId,
+    items: ItemId[],
+    res: number,
+    D = this.layout.detail,
+    startY = this.origin.y + this.layout.detail.y + 128,
+  ): void {
     const dx = this.origin.x + D.x
     const dy = this.origin.y + D.y
-    let cursor = dy + 128
+    let cursor = startY
     for (const group of characterStatGroups(id, items)) {
       this.detailObjs.push(
         emojiImage(this, dx + 42, cursor, group.icon, 35),
@@ -640,9 +723,115 @@ export class PromoteScene extends Phaser.Scene {
   }
 
   private refresh(): void {
+    this.grid?.setItems(this.buildItems())
     this.grid?.setSelected(this.selectedKey || null)
     this.renderDetail(textRes())
+    this.rebuildRecruitPreview()
+    this.updateConfirm()
     this.reportPromote()
+  }
+
+  // ── 招募模式：阵型预览（详情面板内嵌，与阵型页同款慢转） ────
+
+  /** 重建预览记号：已有队员实心、已选候选带高亮环、空位虚线圈；
+   * 布局与战斗同源（formationPosts 按招完后的人数取形），≥3 人随相位慢转 */
+  private rebuildRecruitPreview(): void {
+    for (const t of this.previewTokens) t.zone?.destroy()
+    for (const o of this.previewObjs) o.destroy()
+    this.previewTokens = []
+    this.previewObjs = []
+    const P = this.layout.preview
+    const px = this.origin.x + P.x
+    const py = this.origin.y + P.y
+    const n = this.run.roster.length
+    const total = n + this.due
+    if (total === 0) return
+    const posts = formationPosts('ring', total, this.previewPhase)
+    const maxR = Math.max(...posts.map((p) => Math.hypot(p.x, p.y)), 1)
+    const size = Math.min(P.w, P.h) >= 240 ? 58 : 50
+    const fit = Math.min(P.w, P.h) / 2 - size / 2 - 24
+    const scale = Math.min(2.2, fit / maxR)
+    const cx = px + P.w / 2
+    const cy = py + P.h / 2 - 6
+    this.previewGeom = { cx, cy, scale }
+
+    posts.forEach((p, post) => {
+      const c = this.add.container(cx + p.x * scale, cy + p.y * scale)
+      this.previewObjs.push(c)
+      const token: { c: Phaser.GameObjects.Container; zone?: Phaser.GameObjects.Zone; post: number } = { c, post }
+      if (post < n) {
+        // 已有队员
+        c.add(emojiImage(this, 0, 0, CHARACTERS[this.run.roster[post]!].emoji, size, 'player'))
+      } else {
+        const id = this.picked[post - n]
+        if (id) {
+          // 已点进空位的候选：高亮环 + 点击换下
+          const halo = this.add.graphics()
+          halo.lineStyle(3, 0x81d4fa, 0.95)
+          halo.strokeCircle(0, 0, size / 2 + 5)
+          c.add(halo)
+          c.add(emojiImage(this, 0, 0, CHARACTERS[id].emoji, size, 'player'))
+          const zone = this.add
+            .zone(c.x - size / 2, c.y - size / 2, size, size)
+            .setOrigin(0)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerup', () => {
+              if (this.grid?.wasDragged) return
+              playSfx('click')
+              const at = this.picked.indexOf(id)
+              if (at >= 0) this.picked.splice(at, 1)
+              this.selectedKey = id
+              this.refresh()
+            })
+          token.zone = zone
+        } else {
+          // 待填的空位：虚线圈 + 淡加号
+          const dash = this.add.graphics()
+          dash.lineStyle(2.5, 0xffffff, 0.5)
+          const R = size / 2 + 3
+          const dashes = 12
+          for (let i = 0; i < dashes; i++) {
+            const a0 = (i / dashes) * Math.PI * 2
+            dash.beginPath()
+            dash.arc(0, 0, R, a0, a0 + ((Math.PI * 2) / dashes) * 0.55)
+            dash.strokePath()
+          }
+          c.add(dash)
+          const plus = emojiImage(this, 0, 0, '➕', 20)
+          plus.setAlpha(0.4)
+          c.add(plus)
+        }
+      }
+      this.previewTokens.push(token)
+    })
+
+    this.previewObjs.push(
+      this.add
+        .text(cx, py + P.h - 12, `队伍 ${n} 人 → ${total} 人`, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.small,
+          color: '#b3e5fc',
+          resolution: textRes(),
+        })
+        .setOrigin(0.5, 1)
+        .setAlpha(0.85),
+    )
+  }
+
+  /** 按当前相位重摆招募预览（容器与命中区同步；1~2 人布局天然静止） */
+  private layoutRecruitPreview(): void {
+    if (this.previewTokens.length === 0) return
+    const total = this.run.roster.length + this.due
+    const posts = formationPosts('ring', total, this.previewPhase)
+    const { cx, cy, scale } = this.previewGeom
+    for (const t of this.previewTokens) {
+      const p = posts[t.post]
+      if (!p) continue
+      const x = cx + p.x * scale
+      const y = cy + p.y * scale
+      t.c.setPosition(x, y)
+      t.zone?.setPosition(x - t.zone.width / 2, y - t.zone.height / 2)
+    }
   }
 
   private reportPromote(): void {
@@ -683,7 +872,7 @@ export class PromoteScene extends Phaser.Scene {
           y: this.btnRect.y + this.btnRect.h / 2,
           w: this.btnRect.w,
           h: this.btnRect.h,
-          enabled: this.mode === 'formation' || this.selectedKey !== '',
+          enabled: this.confirmEnabled(),
         },
         back: {
           x: this.backRect.x + this.backRect.w / 2,
@@ -691,7 +880,9 @@ export class PromoteScene extends Phaser.Scene {
           w: this.backRect.w,
           h: this.backRect.h,
         },
-        ...(this.mode === 'formation' ? { formation: { center } } : {}),
+        ...(this.mode === 'formation'
+          ? { formation: { center } }
+          : { due: this.due, picked: [...this.picked] }),
       },
     })
   }

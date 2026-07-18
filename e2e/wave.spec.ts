@@ -46,38 +46,45 @@ test('波次循环：波末固定招募 1 人 → 商店购物 → 下一波扩�
     await page.keyboard.up(key)
   }
 
-  // 波末必进整编页：本波固定 1 个招募名额，指定招募法师
+  // 波末必进整编页：本波 1 个招募名额，从随机候选（5 选 1）里招第一位
   await page.waitForFunction(() => window.__warmoji?.scene === 'promote', undefined, {
     timeout: 15_000,
   })
   const promote = await page.evaluate(() => window.__warmoji!.promote!)
   expect(promote.mode).toBe('recruit')
-  await clickPromoteItem(page, 'mage')
+  expect(promote.due).toBe(1)
+  expect(promote.items).toHaveLength(5)
+  const recruitId = promote.items[0]!.id
+  await clickPromoteItem(page, recruitId)
+  await page.waitForFunction(
+    (id) => (window.__warmoji?.promote?.picked ?? []).includes(id),
+    recruitId,
+  )
   await page.screenshot({ path: 'test-results/promote-done.png' })
   await clickPromoteConfirm(page)
 
-  // 名额用完直接进商店：上架位 = 队长 + 2 名队员，法师在列
+  // 名额用完直接进商店：上架位 = 队长 + 2 名队员，新队员在列
   await page.waitForFunction(() => window.__warmoji?.scene === 'shop' && !!window.__warmoji.shop)
   const shop = await page.evaluate(() => window.__warmoji!.shop!)
   expect(shop.wave).toBe(2)
   expect(shop.freeRefreshes).toBe(3)
   expect(shop.slots).toHaveLength(3)
-  expect(shop.slots.map((s) => s.id)).toContain('mage')
+  expect(shop.slots.map((s) => s.id)).toContain(recruitId)
   expect(shop.slots[1]!.offer).not.toBeNull()
 
   // 注入金币走道具购买：扣款、持有 +1、自动补货
   await page.evaluate(() => window.__addCoins!(200))
-  await clickShopSlot(page, 'mage')
-  await page.waitForFunction(() => window.__warmoji?.shop?.focusedId === 'mage')
+  await clickShopSlot(page, recruitId)
+  await page.waitForFunction((id) => window.__warmoji?.shop?.focusedId === id, recruitId)
   await clickShopRefresh(page) // 免费刷新一次触发重绘同步金币
   await page.waitForFunction(() => window.__warmoji?.shop?.freeRefreshes === 2)
   const before = await page.evaluate(() => window.__warmoji!.shop!)
-  const slot = before.slots.find((s) => s.id === 'mage')!
+  const slot = before.slots.find((s) => s.id === recruitId)!
   expect(before.buy.enabled).toBe(true)
   await clickShopBuy(page)
   await page.waitForFunction((exp) => window.__warmoji?.shop?.coins === exp, before.coins - slot.price!)
   const bought = await page.evaluate(() => window.__warmoji!.shop!)
-  const slotAfter = bought.slots.find((s) => s.id === 'mage')!
+  const slotAfter = bought.slots.find((s) => s.id === recruitId)!
   expect(slotAfter.owned).toBe(slot.owned + 1)
   expect(slotAfter.offer, '购买后自动补货').not.toBeNull()
   await page.screenshot({ path: 'test-results/shop.png' })
@@ -116,22 +123,37 @@ test('满员阵型：神童自选招满 → 阵型首秀选中心 → 互换稳�
   await clickCaptain(page, 'prodigy')
   await confirmCaptain(page)
 
-  // 开局整编一次给足 5 个名额：逐个确认默认候选（= 花名册前 5 位）直到满员
+  // 开局整编一次给足 5 个名额（候选 5+4 超过角色总数 → 全量 8 人在池）：
+  // 先点杂耍演员（首选 = 1 号位 = 默认中心）与法师，再补满其余空位
   const p0 = await page.evaluate(() => window.__warmoji!.promote!)
   expect(p0.mode).toBe('recruit')
-  for (let i = 0; i < 5; i++) {
-    const prev = await page.evaluate(() => window.__warmoji!.promote!.selected ?? '')
-    await clickPromoteConfirm(page)
+  expect(p0.due).toBe(5)
+  expect(p0.items).toHaveLength(8)
+  expect(p0.confirm.enabled).toBe(false)
+  for (const id of ['juggler', 'mage']) {
+    await clickPromoteItem(page, id)
     await page.waitForFunction(
-      (p) =>
-        window.__warmoji?.promote?.mode === 'formation' ||
-        (window.__warmoji?.promote?.selected ?? '') !== p,
-      prev,
-      { timeout: 15_000 },
+      (k) => (window.__warmoji?.promote?.picked ?? []).includes(k),
+      id,
     )
   }
+  for (let i = 0; i < 3; i++) {
+    const st = await page.evaluate(() => ({
+      picked: window.__warmoji!.promote?.picked ?? [],
+      items: (window.__warmoji!.promote?.items ?? []).map((x) => x.id),
+    }))
+    const next = st.items.find((id) => !st.picked.includes(id))!
+    await clickPromoteItem(page, next)
+    await page.waitForFunction(
+      (k) => (window.__warmoji?.promote?.picked ?? []).includes(k),
+      next,
+    )
+  }
+  await page.waitForFunction(() => window.__warmoji?.promote?.confirm.enabled === true)
+  await clickPromoteConfirm(page)
 
-  // 满员自动进入阵型首秀（N 保 1），默认中心 = 1 号位
+  // 满员自动进入阵型首秀（N 保 1），默认中心 = 1 号位（首个点选的杂耍演员）
+  await page.waitForFunction(() => window.__warmoji?.promote?.mode === 'formation')
   const f0 = await page.evaluate(() => window.__warmoji!.promote!)
   expect(f0.mode).toBe('formation')
   expect(f0.formation!.center).toBe('juggler')
