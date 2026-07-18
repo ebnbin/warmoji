@@ -2,13 +2,14 @@ import Phaser from 'phaser'
 import { castCaptainSkill } from './skills'
 import { circleBody } from './arcade'
 import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from './pickups'
+import { spawnBurnZone, spawnEnemyShot, spawnPoisonPool, updateBurnZones, updateEnemyShots, updatePoisonPools } from './hazards'
 import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, TEAM } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import type { CharacterId, CharacterSpec } from '../characters/registry'
 import { SKILL } from '../characters/skill'
 import { STRESS } from '../debug/dev'
 import { BOSS, ELITE, SPAWN, SURGE } from '../enemies/registry'
-import type { ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../enemies/registry'
+import type { EnemySpec } from '../enemies/registry'
 import { COIN } from '../items/registry'
 import { UNIT } from '../lib/units'
 import { WAVE } from '../run/waves'
@@ -170,17 +171,17 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   protected centerObj!: Phaser.GameObjects.Zone
   enemies!: Phaser.GameObjects.Group
   protected projectiles!: Phaser.GameObjects.Group
-  protected enemyShots!: Phaser.GameObjects.Group
+  enemyShots!: Phaser.GameObjects.Group
   coins!: Phaser.GameObjects.Group
   /** 毒液池（蘑菇死亡遗留），波末随场景销毁 */
-  protected poisonPools: { x: number; y: number; r2: number; until: number; tickMs: number; damage: number; srcName: string; gfx: Phaser.GameObjects.Graphics }[] = []
+  poisonPools: { x: number; y: number; r2: number; until: number; tickMs: number; damage: number; srcName: string; gfx: Phaser.GameObjects.Graphics }[] = []
   private enemyMix: EnemyMixEntry[] = []
-  protected frameTargets: EnemyTarget[] = []
+  frameTargets: EnemyTarget[] = []
   private frameSlowZones: { x: number; y: number; r2: number; factor: number }[] = []
   /** 仅本帧生效的金币吸取点（磁力回旋镖沿途登记） */
   frameAttractors: { x: number; y: number; r2: number }[] = []
   /** 灼烧地面（余烬秘火）：周期烧伤区域内敌人，伤害归属 srcSlot */
-  protected burnZones: {
+  burnZones: {
     x: number
     y: number
     r2: number
@@ -202,7 +203,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       enemy.setData('abilitySlowMul', factor)
       enemy.setData('abilitySlowUntil', this.elapsedMs + durationMs)
     },
-    spawnBurnZone: (x, y, radius, dps, durationMs) => this.spawnBurnZone(x, y, radius, dps, durationMs),
+    spawnBurnZone: (x, y, radius, dps, durationMs) => spawnBurnZone(this, x, y, radius, dps, durationMs),
     attractCoins: (x, y, radius) => this.frameAttractors.push({ x, y, r2: radius * radius }),
     // 基座 ctx 无「本人」概念：无敌授予/本体动画由 memberCtx 按槽位覆写
     grantMemberInvuln: () => {},
@@ -387,7 +388,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     void _body
   }
   /** 敌弹的额外回收条件（有界图出地图即灭；寿命回收在基座） */
-  protected cullEnemyShot(_s: ImageObj): boolean {
+  cullEnemyShot(_s: ImageObj): boolean {
     void _s
     return false
   }
@@ -661,9 +662,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.touchStep()
     this.spawn(delta)
     this.steerEnemies(delta)
-    this.updateEnemyShots()
-    this.updatePoisonPools()
-    this.updateBurnZones()
+    updateEnemyShots(this)
+    updatePoisonPools(this)
+    updateBurnZones(this)
     magnetCoins(this)
     this.sweepProjectiles(delta)
     this.cullProjectiles()
@@ -847,7 +848,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       spawnProjectile: (x, y, angle, pSpec, damage) =>
         this.spawnProjectile(x, y, angle, pSpec, damage, slot),
       spawnBurnZone: (x, y, radius, dps, durationMs) =>
-        this.spawnBurnZone(x, y, radius, dps, durationMs, slot),
+        spawnBurnZone(this, x, y, radius, dps, durationMs, slot),
       // 刺客出手帧：把「上次受击时刻」推到未来，等效授予 ms 无敌
       grantMemberInvuln: (ms) => {
         const mm = this.members[slot]
@@ -1168,7 +1169,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     return true
   }
 
-  protected hurtMember(m: Member, damage: number, tint: number, srcName?: string): void {
+  hurtMember(m: Member, damage: number, tint: number, srcName?: string): void {
     // 敌情明细：承伤按人累计 + 按敌人名归属
     const st = this.run.stats
     if (m.slot < st.damageTaken.length) {
@@ -1442,7 +1443,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
     // 特殊死亡：蘑菇留毒液池；泡泡分裂出迷你体
     if (spec.behavior === 'chase' && spec.poison) {
-      this.spawnPoisonPool(enemy.x, enemy.y, spec.poison, spec.name)
+      spawnPoisonPool(this, enemy.x, enemy.y, spec.poison, spec.name)
     }
     if (spec.behavior === 'chase' && spec.split && !this.over) {
       const hpMul = waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier
@@ -1598,7 +1599,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       e.setData('nextRingAt', now + BOSS.ring.intervalMs)
       const rot = this.rng.next() * Math.PI * 2
       for (let i = 0; i < BOSS.ring.count; i++) {
-        this.spawnEnemyShot(e.x, e.y, rot + (i * 2 * Math.PI) / BOSS.ring.count, BOSS.ring.bullet, BOSS.name)
+        spawnEnemyShot(this, e.x, e.y, rot + (i * 2 * Math.PI) / BOSS.ring.count, BOSS.ring.bullet, BOSS.name)
       }
       playSfx('boom')
     }
@@ -1854,7 +1855,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
           if (now >= (e.getData('fireAt') as number)) {
             e.setData('fireAt', now + spec.fireIntervalMs)
-            this.spawnEnemyShot(
+            spawnEnemyShot(
+              this,
               e.x,
               e.y,
               Math.atan2(dir.y, dir.x),
@@ -1921,7 +1923,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           }
           if (now >= (e.getData('fireAt') as number)) {
             e.setData('fireAt', now + spec.fireIntervalMs)
-            this.spawnEnemyShot(
+            spawnEnemyShot(
+              this,
               e.x,
               e.y,
               Math.atan2(d.y, d.x),
@@ -2001,140 +2004,6 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   }
 
   // ── 敌方子弹与毒液池 ────────────────────────────────────────
-
-  private spawnEnemyShot(
-    x: number,
-    y: number,
-    angle: number,
-    bullet: EnemyBulletSpec,
-    srcName: string,
-    dmgMul = 1,
-  ): void {
-    const shot = emojiImage(this, x, y, bullet.emoji, bullet.size, 'enemyShot').setDepth(6)
-    this.physics.add.existing(shot)
-    circleBody(shot, bullet.radius)
-    ;(shot.body as ArcadeBody).setVelocity(Math.cos(angle) * bullet.speed, Math.sin(angle) * bullet.speed)
-    shot.setData('damage', Math.round(bullet.damage * dmgMul))
-    shot.setData('srcName', srcName)
-    shot.setData('radius', bullet.radius)
-    shot.setData('dieAt', this.elapsedMs + bullet.lifeMs)
-    this.enemyShots.add(shot)
-  }
-
-  private updateEnemyShots(): void {
-    for (const s of this.enemyShots.getChildren() as ImageObj[]) {
-      if (!s.active) continue
-      if (this.elapsedMs >= (s.getData('dieAt') as number) || this.cullEnemyShot(s)) {
-        s.destroy()
-      }
-    }
-  }
-
-  private spawnPoisonPool(
-    x: number,
-    y: number,
-    poison: NonNullable<ChaseEnemySpec['poison']>,
-    srcName: string,
-  ): void {
-    const gfx = this.add.graphics().setDepth(2)
-    gfx.fillStyle(0x7cb342, 0.22)
-    gfx.fillCircle(0, 0, poison.radius)
-    gfx.lineStyle(2, 0x7cb342, 0.5)
-    gfx.strokeCircle(0, 0, poison.radius)
-    gfx.setPosition(x, y)
-    gfx.setScale(0.3)
-    this.tweens.add({ targets: gfx, scale: 1, duration: 220, ease: 'Back.easeOut' })
-    this.poisonPools.push({
-      x,
-      y,
-      r2: poison.radius * poison.radius,
-      until: this.elapsedMs + poison.durationMs,
-      tickMs: poison.tickMs,
-      damage: poison.damage,
-      srcName,
-      gfx,
-    })
-  }
-
-  private updatePoisonPools(): void {
-    if (this.poisonPools.length === 0) return
-    const now = this.elapsedMs
-    this.poisonPools = this.poisonPools.filter((p) => {
-      if (now >= p.until) {
-        this.tweens.add({ targets: p.gfx, alpha: 0, duration: 250, onComplete: () => p.gfx.destroy() })
-        return false
-      }
-      return true
-    })
-    for (const m of this.members) {
-      if (!m.alive) continue
-      for (const p of this.poisonPools) {
-        const d = this.worldDelta(p, m.image)
-        if (d.x * d.x + d.y * d.y > p.r2) continue
-        if (now - m.lastPoisonMs >= p.tickMs) {
-          m.lastPoisonMs = now
-          this.hurtMember(m, p.damage, 0xa5d86a, p.srcName)
-        }
-        break
-      }
-    }
-  }
-
-  /** 灼烧地面（余烬秘火）：橙红圈，期间周期烧伤区域内敌人，伤害归属出招角色 */
-  private spawnBurnZone(
-    x: number,
-    y: number,
-    radius: number,
-    dps: number,
-    durationMs: number,
-    srcSlot = -1,
-  ): void {
-    const gfx = this.add.graphics().setDepth(2)
-    gfx.fillStyle(0xff7043, 0.18)
-    gfx.fillCircle(0, 0, radius)
-    gfx.lineStyle(2, 0xff7043, 0.55)
-    gfx.strokeCircle(0, 0, radius)
-    gfx.setPosition(x, y)
-    gfx.setScale(0.3)
-    this.tweens.add({ targets: gfx, scale: 1, duration: 200, ease: 'Back.easeOut' })
-    const tickMs = 400
-    this.burnZones.push({
-      x,
-      y,
-      r2: radius * radius,
-      until: this.elapsedMs + durationMs,
-      tickDamage: Math.max(1, Math.round((dps * tickMs) / 1000)),
-      nextTickAt: this.elapsedMs + tickMs,
-      srcSlot,
-      gfx,
-    })
-  }
-
-  private updateBurnZones(): void {
-    if (this.burnZones.length === 0) return
-    const now = this.elapsedMs
-    this.burnZones = this.burnZones.filter((z) => {
-      if (now >= z.until) {
-        this.tweens.add({ targets: z.gfx, alpha: 0, duration: 250, onComplete: () => z.gfx.destroy() })
-        return false
-      }
-      return true
-    })
-    for (const z of this.burnZones) {
-      if (now < z.nextTickAt) continue
-      z.nextTickAt = now + 400
-      // frameTargets 直查（虚空含镜像：镜像间距 ≥ 半场 ≫ 燃烧半径，不会重复命中）
-      for (const t of this.frameTargets) {
-        const dx = t.x - z.x
-        const dy = t.y - z.y
-        if (dx * dx + dy * dy <= z.r2) {
-          this.applyDamage(t.ref as ImageObj, z.tickDamage, 0, undefined, undefined, z.srcSlot)
-        }
-      }
-    }
-  }
-
-  // ── 金币 ────────────────────────────────────────────────────
 
   // ── 结算 ────────────────────────────────────────────────────
 

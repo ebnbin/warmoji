@@ -136,7 +136,7 @@ export class ArenaScene extends BaseArenaScene {
     return fleeSteer(e.x, e.y, away.x, away.y, MAP.width, MAP.height, 1.5 * UNIT)
   }
 
-  protected cullEnemyShot(s: ImageObj): boolean {
+  cullEnemyShot(s: ImageObj): boolean {
     return s.x < -UNIT || s.x > MAP.width + UNIT || s.y < -UNIT || s.y > MAP.height + UNIT
   }
 
