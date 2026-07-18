@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
-import { circleHitIndices, thrustHitIndices } from '../core/weapons'
-import type { ThrustSpec } from '../core/weapons'
-import { emojiImage } from '../ui/emoji'
+import { circleHitIndices, thrustHitIndices } from './spec'
+import type { ThrustSpec } from './spec'
+import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
 import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 

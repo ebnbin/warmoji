@@ -1,4 +1,4 @@
-import type { WeaponSpec } from '../core/weapons'
+import type { WeaponSpec } from './spec'
 import { AreaBlastWeapon } from './AreaBlastWeapon'
 import { AssassinateWeapon } from './AssassinateWeapon'
 import { BoomerangWeapon } from './BoomerangWeapon'

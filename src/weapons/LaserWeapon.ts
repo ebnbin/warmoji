@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
-import { thrustHitIndices } from '../core/weapons'
-import type { LaserSpec } from '../core/weapons'
-import { emojiImage } from '../ui/emoji'
+import { thrustHitIndices } from './spec'
+import type { LaserSpec } from './spec'
+import { emojiImage } from '../emoji/textures'
 import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
 /** 贯穿激光：向最近的敌人方向发射光束，线段胶囊判定命中直线上的所有敌人。

@@ -1,5 +1,5 @@
-import { circleHitIndices } from '../core/weapons'
-import type { ChainArcSpec } from '../core/weapons'
+import { circleHitIndices } from './spec'
+import type { ChainArcSpec } from './spec'
 import type { EnemyTarget, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
 /** 连锁型：电弧命中最近敌人后在敌群间弹跳传导，每跳伤害衰减——

@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
-import { circleHitIndices } from '../core/weapons'
-import type { AssassinateSpec } from '../core/weapons'
-import { emojiImage } from '../ui/emoji'
+import { circleHitIndices } from './spec'
+import type { AssassinateSpec } from './spec'
+import { emojiImage } from '../emoji/textures'
 import type { EnemyTarget, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
 /** 瞬袭型：冷却好时瞬移到索敌范围内血量最高的敌人背后重斩，短暂停留

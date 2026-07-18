@@ -1,10 +1,10 @@
 import type Phaser from 'phaser'
-import type { SummonSpec } from '../core/weapons'
-import { ACQUIRE } from '../core/config'
-import { ANIM_SPEC } from '../core/studio'
-import { Animator } from '../ui/animator'
-import { clipFramesLive } from '../ui/animTextures'
-import { emojiImage } from '../ui/emoji'
+import type { SummonSpec } from './spec'
+import { ACQUIRE } from '../config'
+import { ANIM_SPEC } from '../emoji/studio'
+import { Animator } from '../emoji/animator'
+import { clipFramesLive } from '../emoji/animTextures'
+import { emojiImage } from '../emoji/textures'
 import type { EnemyTarget, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
 interface Minion {

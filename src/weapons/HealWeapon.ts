@@ -1,4 +1,4 @@
-import type { HealSpec } from '../core/weapons'
+import type { HealSpec } from './spec'
 import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
 /** 治疗型：周期治疗范围内血量比例最低的队友（对友军索敌）。

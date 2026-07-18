@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { SlowAuraSpec } from '../core/weapons'
+import type { SlowAuraSpec } from './spec'
 import type { WeaponContext, WeaponRuntime } from './types'
 
 /** 寒气光环：以队伍中心为圆心持续减速（角色只是来源；角色阵亡光环随之消失）。

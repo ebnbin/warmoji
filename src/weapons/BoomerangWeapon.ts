@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
-import type { BoomerangSpec } from '../core/weapons'
-import { emojiImage } from '../ui/emoji'
+import type { BoomerangSpec } from './spec'
+import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
 import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 

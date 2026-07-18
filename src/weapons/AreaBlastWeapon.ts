@@ -1,8 +1,8 @@
 import type Phaser from 'phaser'
-import { ACQUIRE } from '../core/config'
-import { circleHitIndices } from '../core/weapons'
-import type { AreaBlastSpec } from '../core/weapons'
-import { emojiImage } from '../ui/emoji'
+import { ACQUIRE } from '../config'
+import { circleHitIndices } from './spec'
+import type { AreaBlastSpec } from './spec'
+import { emojiImage } from '../emoji/textures'
 import type { EnemyTarget, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
 /** 远程范围轰炸：在侦测范围内以最近敌人为爆心，对爆心圆形区域内所有敌人各一次伤害。

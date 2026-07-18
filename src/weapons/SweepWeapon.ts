@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
-import { sectorHitIndices } from '../core/weapons'
-import type { SweepSpec } from '../core/weapons'
-import { emojiImage } from '../ui/emoji'
+import { sectorHitIndices } from './spec'
+import type { SweepSpec } from './spec'
+import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
 import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 

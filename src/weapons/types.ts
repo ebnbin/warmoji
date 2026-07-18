@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
-import { ACQUIRE } from '../core/config'
-import type { ProjectileSpec } from '../core/weapons'
-import type { SfxId } from '../ui/sfx'
+import { ACQUIRE } from '../config'
+import type { ProjectileSpec } from './spec'
+import type { SfxId } from '../audio/sfx'
 
 export interface EnemyTarget {
   x: number
