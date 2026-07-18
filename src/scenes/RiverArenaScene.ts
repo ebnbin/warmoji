@@ -2,16 +2,8 @@ import Phaser from 'phaser'
 import { BOSS, INFINITE, MEMBER, RIVER, TEAM, UNIT } from '../core/config'
 import { MAPS } from '../core/maps'
 import type { MapSpec } from '../core/maps'
-import {
-  clampToRiver,
-  driftProfile,
-  flowVector,
-  isHorizontal,
-  pastDownstream,
-  remapPoint,
-  remapVector,
-  riverRect,
-} from '../core/river'
+import { isHorizontal, remapPoint, remapVector } from '../core/remap'
+import { clampToRiver, driftProfile, flowVector, pastDownstream, riverRect } from '../core/river'
 import type { RiverRect } from '../core/river'
 import { Rng } from '../core/rng'
 import type { Point } from '../core/vec'
