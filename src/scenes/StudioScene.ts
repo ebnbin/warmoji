@@ -9,7 +9,7 @@ import {
   ANIM_RECIPES,
   ANIM_SPEC,
   ANIM_TEMPLATES,
-  animRecipeOf,
+  animSetOf,
   animTemplateOf,
   applyTemplate,
   bakeAnimFrame,
@@ -17,7 +17,7 @@ import {
   flattenTree,
   parseSvgTree,
 } from '../core/studio'
-import type { AnimRecipe, SvgTree, TreeRow } from '../core/studio'
+import type { AnimClip, AnimRecipe, SvgTree, TreeRow } from '../core/studio'
 import { applyBackground } from '../ui/background'
 import { reportDebug } from '../ui/debug'
 import { emojiImage, emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../ui/emoji'
@@ -93,6 +93,9 @@ export class StudioScene extends Phaser.Scene {
   private palette?: Palette
   private tab: Tab = 'recipes'
   private recipeSel = ANIM_RECIPES[0]!.emoji
+  /** 配方页当前 clip（多 clip 实体可切换；换实体重置为首个 clip） */
+  private clipSel = 'idle'
+  private clipRects: { id: string; x: number; y: number; w: number; h: number }[] = []
   private tplEmoji = DEFAULT_SUBJECT
   private tplId = ANIM_TEMPLATES[0]!.id
   private anatEmoji = DEFAULT_SUBJECT
@@ -356,6 +359,7 @@ export class StudioScene extends Phaser.Scene {
       const recipe = ANIM_RECIPES.find((r) => emojiCodepoints(r.emoji) === cp)
       if (!recipe || recipe.emoji === this.recipeSel) return
       this.recipeSel = recipe.emoji
+      this.clipSel = animSetOf(recipe.emoji)?.clips[0]?.id ?? 'idle'
       this.grid?.setSelected(cp)
       this.buildRecipeDetail()
     } else if (this.tab === 'templates') {
@@ -394,24 +398,29 @@ export class StudioScene extends Phaser.Scene {
     this.previewImg = undefined
     this.frameKeys = []
     this.tplRects = []
+    this.clipRects = []
     this.anat = undefined
     this.anatRowMeta = []
     this.controlRects = {}
     return { d: this.detailRect(), res: textRes() }
   }
 
-  /** 🎬 配方页：动画预览 + 播放控制 + 名称/描述/拆解 */
+  /** 🎬 配方页：动画预览 + clip 切换（多 clip 实体）+ 播放控制 + 名称/描述/拆解 */
   private buildRecipeDetail(): void {
     const { d, res } = this.resetDetail()
-    const recipe = animRecipeOf(this.recipeSel)
-    if (!recipe) return
+    const set = animSetOf(this.recipeSel)
+    if (!set) return
+    const clip = set.clips.find((c) => c.id === this.clipSel) ?? set.clips[0]!
+    this.clipSel = clip.id
     const portrait = this.layout === PORTRAIT
     const previewSize = portrait ? 280 : 320
     const cx = d.x + d.w / 2
     let y = d.y + 18
-    this.spawnPreview(cx, y + previewSize / 2, previewSize, recipe.emoji)
+    this.spawnPreview(cx, y + previewSize / 2, previewSize, set.emoji)
     y += previewSize + 14
+    if (set.clips.length > 1) y = this.buildClipChips(set, clip, cx, y, res) + 12
     y = this.buildControls(cx, y, res) + 18
+    const recipe = clip
     const name = this.add
       .text(cx, y, `${recipe.emoji} ${recipe.name}`, {
         fontFamily: UI_FONT,
@@ -446,7 +455,58 @@ export class StudioScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 0)
     this.detailObjs.push(name, desc, anatomy)
-    this.startBake(recipe, previewSize)
+    this.startBake(
+      clip,
+      previewSize,
+      `studio-anim-${emojiCodepoints(set.emoji)}-${clip.id}`,
+      clip.frames,
+    )
+  }
+
+  /** clip 切换 chips（仅多 clip 实体出现）：待机/攻击等具名动画横排即点即换 */
+  private buildClipChips(
+    set: { clips: readonly AnimClip[] },
+    current: AnimClip,
+    cx: number,
+    y: number,
+    res: number,
+  ): number {
+    const labels: Record<string, string> = { idle: '🧘 待机', attack: '⚔️ 攻击' }
+    const chipH = 46
+    const gap = 10
+    const chipW = Math.min(170, (this.detailRect().w - 48 - (set.clips.length - 1) * gap) / set.clips.length)
+    let x = cx - (set.clips.length * chipW + (set.clips.length - 1) * gap) / 2
+    for (const c of set.clips) {
+      const active = c.id === current.id
+      const bg = this.add.graphics()
+      bg.fillStyle(active ? 0xffffff : 0x000000, active ? 0.18 : 0.25)
+      bg.fillRoundedRect(x, y, chipW, chipH, 12)
+      bg.lineStyle(active ? 2 : 1, 0xffffff, active ? 0.9 : 0.12)
+      bg.strokeRoundedRect(x, y, chipW, chipH, 12)
+      const label = this.add
+        .text(x + chipW / 2, y + chipH / 2, labels[c.id] ?? c.id, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.body,
+          color: '#ffffff',
+          resolution: res,
+        })
+        .setOrigin(0.5)
+        .setAlpha(active ? 1 : 0.7)
+      const zone = this.add
+        .zone(x, y, chipW, chipH)
+        .setOrigin(0)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerup', () => {
+          if (this.grid?.wasDragged || this.clipSel === c.id) return
+          this.clipSel = c.id
+          this.buildRecipeDetail()
+          this.report()
+        })
+      this.clipRects.push({ id: c.id, x, y, w: chipW, h: chipH })
+      this.detailObjs.push(bg, label, zone)
+      x += chipW + gap
+    }
+    return y + chipH
   }
 
   /** 🧩 模板页：套用预览 + 播放控制 + 模板 chips */
@@ -938,7 +998,8 @@ export class StudioScene extends Phaser.Scene {
     this.animTimer = undefined
     if (this.paused || this.frameKeys.length === 0) return
     this.animTimer = this.time.addEvent({
-      delay: Math.max(30, ANIM_SPEC.durMs / ANIM_SPEC.frames / SPEEDS[this.speedIdx]!),
+      // 周期总时长恒为 spec.durMs，帧多的 clip 单帧更短
+      delay: Math.max(30, ANIM_SPEC.durMs / this.frameKeys.length / SPEEDS[this.speedIdx]!),
       loop: true,
       callback: () => {
         this.frameIdx = (this.frameIdx + 1) % this.frameKeys.length
@@ -947,11 +1008,11 @@ export class StudioScene extends Phaser.Scene {
     })
   }
 
-  /** 烘焙配方帧并进入播放（keyPrefix 缺省按配方 emoji 命名） */
-  private startBake(recipe: AnimRecipe, size: number, keyPrefix?: string): void {
+  /** 烘焙配方帧并进入播放（keyPrefix 缺省按配方 emoji 命名；frames 缺省用全局 spec） */
+  private startBake(recipe: AnimRecipe, size: number, keyPrefix?: string, frames?: number): void {
     const gen = ++this.jobGen
     this.previewState = 'loading'
-    void this.bakeAnimTextures(recipe, keyPrefix)
+    void this.bakeAnimTextures(recipe, keyPrefix, frames ?? ANIM_SPEC.frames)
       .then((keys) => {
         if (gen !== this.jobGen || !this.previewImg) return
         this.previewState = 'ready'
@@ -968,15 +1029,15 @@ export class StudioScene extends Phaser.Scene {
       })
   }
 
-  private async bakeAnimTextures(recipe: AnimRecipe, keyPrefix?: string): Promise<string[]> {
+  private async bakeAnimTextures(recipe: AnimRecipe, keyPrefix: string | undefined, frames: number): Promise<string[]> {
     const svg = await emojiSvgText(recipe.emoji)
     const prefix = keyPrefix ?? `studio-anim-${emojiCodepoints(recipe.emoji)}`
     const keys: string[] = []
-    for (let k = 0; k < ANIM_SPEC.frames; k++) {
+    for (let k = 0; k < frames; k++) {
       const key = `${prefix}-${k}`
       keys.push(key)
       if (this.textures.exists(key)) continue
-      const frame = bakeAnimFrame(svg, recipe, k / ANIM_SPEC.frames)
+      const frame = bakeAnimFrame(svg, recipe, k / frames)
       const img = await svgToImage(setSvgSize(frame, RASTER))
       if (!this.textures.exists(key)) {
         this.textures.addImage(key, img)
@@ -1045,6 +1106,8 @@ export class StudioScene extends Phaser.Scene {
           this.tab === 'recipes' ? this.recipeSel : this.tab === 'templates' ? this.tplEmoji : this.anatEmoji,
         template: this.tplId,
         templates: this.tplRects,
+        clip: this.clipSel,
+        clips: this.clipRects,
         anatomy: this.anatReport(),
         controls: this.controlRects,
         paused: this.paused,

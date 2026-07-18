@@ -43,6 +43,9 @@ export interface WeaponContext {
   attractCoins(x: number, y: number, radius: number): void
   /** 给持有本武器的角色授予短暂无敌（刺客出手帧；基座 ctx 为空实现） */
   grantMemberInvuln(ms: number): void
+  /** 播放持有者本体的一次性动画 clip：durMs 传行为的真实间隔（攻速越快
+   * 动画越快的绑定入口）。clip 未落地/未烘焙时静默保持静态（基座 ctx 空实现） */
+  playOwnerClip(clipId: string, durMs: number): void
   /** 治疗队友：all=false 治范围内血量比例最低的一名、true 范围内全体；
    * 返回实际被治疗的人数（满血者不计） */
   healAllies(x: number, y: number, range: number, amount: number, all: boolean): number

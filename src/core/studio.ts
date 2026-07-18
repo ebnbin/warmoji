@@ -383,9 +383,13 @@ export function fxSteam(opts: {
 
 // ── 动画资源格式：原始 SVG + 动画参数 = 可存储/校验/热加载的数据资产 ──
 // fx 用「生成器名 + 参数」声明（函数无法序列化），加载时经注册表还原成渲染函数。
-// 资源文件：src/core/animations.json（format 版本化；spec 为全体统一播放规格）。
+// 资源文件：src/core/animations.json（format 版本化；spec 为缺省播放规格）。
+// v2 起一个 emoji 是一组具名 clip（idle 待机循环、attack 攻击周期…）：
+// clip 只是纯相位空间的资产，播放时长/触发时机全由玩法侧决定——
+// kind='cycle' 的契约是「相位 0..1 = 一个完整行为周期、出手时刻锚在相位终点」，
+// 播放器按真实行为间隔铺放相位即可让动画速度天然跟随行为速度（如攻速）。
 
-export const ANIM_FORMAT = 'warmoji-anim@1'
+export const ANIM_FORMAT = 'warmoji-anim@2'
 
 /** fx 声明：gen 必须是注册表成员；layer 缺省用生成器自身默认 */
 export interface FxDecl {
@@ -394,14 +398,23 @@ export interface FxDecl {
   readonly params: unknown
 }
 
+export type AnimClipKind = 'loop' | 'cycle'
+
+/** 单个 clip 的资源形态：省略 kind 视为 loop；frames 缺省用全局 spec */
+export interface AnimClipEntry {
+  readonly kind?: AnimClipKind
+  readonly frames?: number
+  readonly viewBox?: string
+  readonly parts: readonly AnimPart[]
+  readonly fx?: readonly FxDecl[]
+}
+
 export interface AnimResourceEntry {
   readonly emoji: string
   readonly name: string
   readonly desc: string
   readonly anatomy: string
-  readonly viewBox?: string
-  readonly parts: readonly AnimPart[]
-  readonly fx?: readonly FxDecl[]
+  readonly clips: Readonly<Record<string, AnimClipEntry>>
 }
 
 export interface AnimResource {
@@ -443,8 +456,8 @@ const poseEq = (a: PartPose, b: PartPose): boolean =>
   Math.abs(a.scaleY - b.scaleY) < 1e-9 &&
   Math.abs(a.opacity - b.opacity) < 1e-9
 
-/** 资源校验：格式版本 / 播放规格 / 关键帧闭环与时序 / 部件下标 / fx 生成器存在。
- * 违规即抛错（带定位信息）——坏资源在加载期暴露，不进运行时 */
+/** 资源校验：格式版本 / 播放规格 / 每个 clip 的关键帧闭环与时序 / 部件下标 /
+ * fx 生成器存在。违规即抛错（带定位信息）——坏资源在加载期暴露，不进运行时 */
 export function validateAnimResource(data: AnimResource): void {
   if (data.format !== ANIM_FORMAT) {
     throw new Error(`动画资源格式不符：期望 ${ANIM_FORMAT}，得到 ${String(data.format)}`)
@@ -455,43 +468,53 @@ export function validateAnimResource(data: AnimResource): void {
   for (const [key, entry] of Object.entries(data.animations)) {
     const at = `animations.${key}`
     if (!entry.emoji || !entry.name) throw new Error(`${at}: 缺少 emoji/name`)
-    if (entry.parts.length === 0 && (entry.fx?.length ?? 0) === 0) {
-      throw new Error(`${at}: parts 与 fx 至少要有一项`)
+    const clipIds = Object.keys(entry.clips ?? {})
+    if (clipIds.length === 0) throw new Error(`${at}: 至少要有一个 clip`)
+    for (const [clipId, clip] of Object.entries(entry.clips)) {
+      const cat = `${at}.clips.${clipId}`
+      if (clip.kind !== undefined && clip.kind !== 'loop' && clip.kind !== 'cycle') {
+        throw new Error(`${cat}: kind 只能是 loop/cycle`)
+      }
+      if (clip.frames !== undefined && (!Number.isInteger(clip.frames) || clip.frames < 2)) {
+        throw new Error(`${cat}: frames 需为 ≥2 的整数`)
+      }
+      if (clip.parts.length === 0 && (clip.fx?.length ?? 0) === 0) {
+        throw new Error(`${cat}: parts 与 fx 至少要有一项`)
+      }
+      const seen = new Set<number>()
+      clip.parts.forEach((part, pi) => {
+        const pat = `${cat}.parts[${pi}]`
+        if (part.indices.length === 0) throw new Error(`${pat}: indices 为空`)
+        for (const i of part.indices) {
+          if (!Number.isInteger(i) || i < 0) throw new Error(`${pat}: 非法下标 ${i}`)
+          if (seen.has(i)) throw new Error(`${pat}: 下标 ${i} 被多个部件占用`)
+          seen.add(i)
+        }
+        if (part.keyframes.length < 2) throw new Error(`${pat}: 关键帧不足 2 个`)
+        let prev = -Infinity
+        for (const kf of part.keyframes) {
+          if (kf.t < 0 || kf.t > 1) throw new Error(`${pat}: 关键帧 t=${kf.t} 超出 [0,1]`)
+          if (kf.t < prev) throw new Error(`${pat}: 关键帧 t 未按升序排列`)
+          prev = kf.t
+        }
+        const first = part.keyframes[0]!
+        const last = part.keyframes[part.keyframes.length - 1]!
+        if (!poseEq(poseOf(first), poseOf(last))) {
+          throw new Error(`${pat}: 首尾姿态不闭环（循环/连续周期播放会跳变）`)
+        }
+      })
+      clip.fx?.forEach((decl, fi) => {
+        if (!(decl.gen in FX_REGISTRY)) {
+          throw new Error(`${cat}.fx[${fi}]: 未知生成器 "${decl.gen}"（可用：${FX_GENERATORS.join('/')}）`)
+        }
+        if (decl.layer !== undefined && decl.layer !== 'back' && decl.layer !== 'front') {
+          throw new Error(`${cat}.fx[${fi}]: layer 只能是 back/front`)
+        }
+      })
     }
-    const seen = new Set<number>()
-    entry.parts.forEach((part, pi) => {
-      const pat = `${at}.parts[${pi}]`
-      if (part.indices.length === 0) throw new Error(`${pat}: indices 为空`)
-      for (const i of part.indices) {
-        if (!Number.isInteger(i) || i < 0) throw new Error(`${pat}: 非法下标 ${i}`)
-        if (seen.has(i)) throw new Error(`${pat}: 下标 ${i} 被多个部件占用`)
-        seen.add(i)
-      }
-      if (part.keyframes.length < 2) throw new Error(`${pat}: 关键帧不足 2 个`)
-      let prev = -Infinity
-      for (const kf of part.keyframes) {
-        if (kf.t < 0 || kf.t > 1) throw new Error(`${pat}: 关键帧 t=${kf.t} 超出 [0,1]`)
-        if (kf.t < prev) throw new Error(`${pat}: 关键帧 t 未按升序排列`)
-        prev = kf.t
-      }
-      const first = part.keyframes[0]!
-      const last = part.keyframes[part.keyframes.length - 1]!
-      if (!poseEq(poseOf(first), poseOf(last))) {
-        throw new Error(`${pat}: 首尾姿态不闭环（循环播放会跳变）`)
-      }
-    })
-    entry.fx?.forEach((decl, fi) => {
-      if (!(decl.gen in FX_REGISTRY)) {
-        throw new Error(`${at}.fx[${fi}]: 未知生成器 "${decl.gen}"（可用：${FX_GENERATORS.join('/')}）`)
-      }
-      if (decl.layer !== undefined && decl.layer !== 'back' && decl.layer !== 'front') {
-        throw new Error(`${at}.fx[${fi}]: layer 只能是 back/front`)
-      }
-    })
   }
 }
 
-/** 加载资源：校验后把 fx 声明经注册表还原成渲染函数，产出运行时配方表 */
 /** fx 声明 → 渲染函数（模板套用与资源加载共用的还原逻辑） */
 export function restoreFx(decl: FxDecl): FxLayer {
   const make = FX_REGISTRY[decl.gen as keyof typeof FX_REGISTRY] as (params: unknown) => FxLayer
@@ -499,29 +522,80 @@ export function restoreFx(decl: FxDecl): FxLayer {
   return decl.layer ? { ...fx, layer: decl.layer } : fx
 }
 
-export function loadAnimRecipes(data: AnimResource): AnimRecipe[] {
+/** 运行时 clip：可直接喂给 bakeAnimFrame 的配方 + 播放语义（kind/frames） */
+export interface AnimClip extends AnimRecipe {
+  readonly id: string
+  readonly kind: AnimClipKind
+  readonly frames: number
+}
+
+/** 一个 emoji 的整套动画：具名 clip 集（首个视为代表作/待机） */
+export interface AnimSet {
+  readonly emoji: string
+  readonly name: string
+  readonly desc: string
+  readonly anatomy: string
+  readonly clips: readonly AnimClip[]
+}
+
+export function loadAnimSets(data: AnimResource): AnimSet[] {
   validateAnimResource(data)
   return Object.values(data.animations).map((entry) => ({
     emoji: entry.emoji,
     name: entry.name,
     desc: entry.desc,
     anatomy: entry.anatomy,
-    viewBox: entry.viewBox,
-    parts: entry.parts,
-    fx: entry.fx?.map(restoreFx),
+    clips: Object.entries(entry.clips).map(([id, clip]) => ({
+      id,
+      kind: clip.kind ?? 'loop',
+      frames: clip.frames ?? data.spec.frames,
+      emoji: entry.emoji,
+      name: entry.name,
+      desc: entry.desc,
+      anatomy: entry.anatomy,
+      viewBox: clip.viewBox,
+      parts: clip.parts,
+      fx: clip.fx?.map(restoreFx),
+    })),
   }))
 }
 
 const RESOURCE = animationsJson as unknown as AnimResource
 
-/** 全体动画统一播放规格（来自资源文件 spec 字段） */
+/** 缺省播放规格（clip 未自带 frames 时用；durMs 是 loop 类 clip 的标准时长） */
 export const ANIM_SPEC: { readonly frames: number; readonly durMs: number } = RESOURCE.spec
 
-/** 部件动画花名册：从资源文件加载（坏数据在此即抛错，dev/测试期暴露） */
-export const ANIM_RECIPES: readonly AnimRecipe[] = loadAnimRecipes(RESOURCE)
+/** 动画花名册：从资源文件加载（坏数据在此即抛错，dev/测试期暴露） */
+export const ANIM_SETS: readonly AnimSet[] = loadAnimSets(RESOURCE)
+
+/** 兼容视图：每个 emoji 的首个 clip（画廊/模板等只关心代表作的场合用） */
+export const ANIM_RECIPES: readonly AnimClip[] = ANIM_SETS.map((s) => s.clips[0]!)
+
+export function animSetOf(emoji: string): AnimSet | undefined {
+  return ANIM_SETS.find((s) => s.emoji === emoji)
+}
+
+export function animClipOf(emoji: string, clipId: string): AnimClip | undefined {
+  return animSetOf(emoji)?.clips.find((c) => c.id === clipId)
+}
 
 export function animRecipeOf(emoji: string): AnimRecipe | undefined {
   return ANIM_RECIPES.find((r) => r.emoji === emoji)
+}
+
+/** 播放进度 → 帧下标（播放器与测试共用的纯函数）：
+ * once 播完停在末帧；循环按相位回绕 */
+export function clipFrameIndex(
+  elapsedMs: number,
+  durMs: number,
+  frames: number,
+  once: boolean,
+): number {
+  if (durMs <= 0 || frames <= 0) return 0
+  const phase = elapsedMs / durMs
+  if (once && phase >= 1) return frames - 1
+  const wrapped = ((phase % 1) + 1) % 1
+  return Math.min(frames - 1, Math.floor(wrapped * frames))
 }
 
 // ── 通用动画模板：不依赖部件解剖，任意 emoji 即选即用 ──────────

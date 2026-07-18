@@ -33,8 +33,11 @@ import { Rng } from '../core/rng'
 import { isWithinActive } from '../core/world'
 import { norm } from '../core/vec'
 import type { Point } from '../core/vec'
+import { ANIM_SPEC } from '../core/studio'
 import { isBossWave, isEliteWave, isFinalWave, waveAt, waveDurationMs } from '../core/waves'
 import { gainXp, waveBonusXp, xpToNext } from '../core/xp'
+import { Animator } from '../ui/animator'
+import { clipFramesLive } from '../ui/animTextures'
 import { applyBackground } from '../ui/background'
 import { DAMAGE_FONT, ensureDamageFont } from '../ui/damageFont'
 import { reportDebug } from '../ui/debug'
@@ -126,6 +129,8 @@ export interface Member {
   baseScale: number
   /** 呼吸相位累积（移动/静止频率不同，用累积保证切换平滑） */
   breathPhase: number
+  /** 部件动画播放器：常驻 idle 翻帧，playOwnerClip 播一次性动作 */
+  anim: Animator
   /** 复活弹出等 tween 期间暂停程序化动画，避免逐帧写缩放打架 */
   animLockUntil: number
   // 跟随惯性：欠阻尼弹簧位置/速度 + 每人略异的刚度（步调不齐才像一群人）
@@ -195,8 +200,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     },
     spawnBurnZone: (x, y, radius, dps, durationMs) => this.spawnBurnZone(x, y, radius, dps, durationMs),
     attractCoins: (x, y, radius) => this.frameAttractors.push({ x, y, r2: radius * radius }),
-    // 基座 ctx 无「本人」概念：无敌授予由 memberCtx 按槽位覆写
+    // 基座 ctx 无「本人」概念：无敌授予/本体动画由 memberCtx 按槽位覆写
     grantMemberInvuln: () => {},
+    playOwnerClip: () => {},
     healAllies: (x, y, range, amount, all) => this.healAllies(x, y, range, amount, all),
     cutReviveTimer: (x, y, range, ms) => this.cutReviveTimer(x, y, range, ms),
     damageMul: () => this.stats.damageMul,
@@ -973,8 +979,19 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         const mm = this.members[slot]
         if (mm) mm.lastHitMs = this.elapsedMs + ms - mm.iframesMs
       },
+      // 本体动作动画：注册是幂等的（同一活数组引用），未烘焙时静默保持静态
+      playOwnerClip: (clipId, durMs) => {
+        const mm = this.members[slot]
+        if (!mm) return
+        mm.anim.register(clipId, clipFramesLive(this, mm.emoji, clipId, 'player'))
+        mm.anim.play(clipId, { durMs })
+      },
     }
     const maxHp = this.stress ? this.stats.maxHp : memberMaxHp(fx.hpAdd)
+    // 部件动画：idle 常驻翻帧（slot 错开相位），帧烘焙是惰性的，就绪前保持静态
+    const anim = new Animator(image)
+    anim.register('idle', clipFramesLive(this, emoji, 'idle', 'player'))
+    anim.setIdle('idle', ANIM_SPEC.durMs, slot * 173)
     const member: Member = {
       emoji,
       slot,
@@ -1021,6 +1038,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       shownCountdown: -1,
       baseScale: image.scaleX,
       breathPhase: slot * 1.3,
+      anim,
       animLockUntil: 0,
       followX: image.x,
       followY: image.y,
@@ -1187,6 +1205,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   private animateMember(m: Member, moving: boolean, delta: number): void {
     if (this.elapsedMs < m.animLockUntil) return
     const img = m.image
+    // 部件翻帧与程序化缩放/翻转正交叠加（翻帧换纹理不动 scale）
+    m.anim.update(this.elapsedMs)
     // 相位按各自频率累积（slot 初相错开），移动/静止切换不会跳变
     m.breathPhase += delta / (moving ? 85 : 140)
     const s = Math.sin(m.breathPhase) * (moving ? 0.13 : 0.09)
@@ -1735,6 +1755,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       enemy.setData('state', 'chase')
       enemy.setData('nextRingAt', this.elapsedMs + 1800)
       enemy.setData('nextDashAt', this.elapsedMs + 3600)
+      const anim = new Animator(enemy)
+      anim.register('idle', clipFramesLive(this, BOSS.emoji, 'idle', 'elite'))
+      anim.setIdle('idle', ANIM_SPEC.durMs)
+      enemy.setData('anim', anim)
       this.enemies.add(enemy)
       this.boss = enemy
       playSfx('boom')
@@ -1832,7 +1856,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     enemy.setData('fireAt', this.elapsedMs + 900 + this.rng.next() * 1500)
     enemy.setData('eaten', 0)
     // 行走摇摆的随机相位：同屏大量敌人不齐步摆
-    enemy.setData('ph', this.rng.next() * Math.PI * 2)
+    const ph = this.rng.next() * Math.PI * 2
+    enemy.setData('ph', ph)
+    // 部件动画：idle 常驻，相位偏移复用摇摆随机相（不额外消耗 rng 流）
+    const anim = new Animator(enemy)
+    anim.register('idle', clipFramesLive(this, spec.emoji, 'idle', elite ? 'elite' : 'enemy'))
+    anim.setIdle('idle', ANIM_SPEC.durMs, (ph / (Math.PI * 2)) * ANIM_SPEC.durMs)
+    enemy.setData('anim', anim)
     // 舞会窗口内落地：跟着跳（全场蹦迪对新敌同样生效）
     if (this.elapsedMs < this.danceEndsAt) enemy.setData('danceUntil', this.danceEndsAt)
     this.enemies.add(enemy)
@@ -1856,8 +1886,14 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       enemy.setData('morphed', true)
       const spec = enemy.getData('spec') as EnemySpec
       const size = spec.size * (enemy.getData('elite') ? ELITE.sizeMul : 1)
-      enemy.setTexture(emojiKey(hex.morphEmoji, enemy.getData('elite') ? 'elite' : 'enemy'))
+      const outline = enemy.getData('elite') ? ('elite' as const) : ('enemy' as const)
+      enemy.setTexture(emojiKey(hex.morphEmoji, outline))
       enemy.setDisplaySize(size, size)
+      // 动画播放器整套换成替身的 idle 帧（未烘焙则停留静态替身形象）
+      ;(enemy.getData('anim') as Animator | undefined)?.register(
+        'idle',
+        clipFramesLive(this, hex.morphEmoji, 'idle', outline),
+      )
       // 蓄力中被变形：中间状态一并打断
       if (enemy.getData('state') === 'windup') enemy.clearTint()
       enemy.setData('state', 'wander')
@@ -1872,8 +1908,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     enemy.setData('morphVuln', 1)
     enemy.setData('morphed', undefined)
     const size = spec.size * (enemy.getData('elite') ? ELITE.sizeMul : 1)
-    enemy.setTexture(emojiKey(spec.emoji, enemy.getData('elite') ? 'elite' : 'enemy'))
+    const outline = enemy.getData('elite') ? ('elite' as const) : ('enemy' as const)
+    enemy.setTexture(emojiKey(spec.emoji, outline))
     enemy.setDisplaySize(size, size)
+    ;(enemy.getData('anim') as Animator | undefined)?.register(
+      'idle',
+      clipFramesLive(this, spec.emoji, 'idle', outline),
+    )
     enemy.setData('fireAt', this.elapsedMs + 700)
     this.puffBurst.explode(6, enemy.x, enemy.y)
   }
@@ -1924,6 +1965,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       if (!e.active || e.getData('dormant')) continue
       const spec = e.getData('spec') as EnemySpec
       const body = e.body as ArcadeBody
+      // 部件动画翻帧（先于任何 continue 分支：跳舞/变形期间照常呼吸）
+      ;(e.getData('anim') as Animator | undefined)?.update(now)
       // 受击白闪到时恢复：清 tint 并让减速色下一帧重新生效
       const flashUntil = e.getData('flashUntil') as number | undefined
       if (flashUntil !== undefined && now >= flashUntil) {

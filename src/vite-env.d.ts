@@ -67,6 +67,9 @@ interface WarmojiStudioDebug {
   /** 模板页当前模板 id */
   template: string
   templates: { id: string; x: number; y: number; w: number; h: number }[]
+  /** 配方页当前 clip id 与切换 chips 命中区（单 clip 实体无 chips） */
+  clip: string
+  clips: { id: string; x: number; y: number; w: number; h: number }[]
   /** 解剖页结构树工作台（仅解剖 tab 且树就绪时提供；rows 只含完整可见行，
    * 点行即切换该节点显/隐，容器行的箭头区收起/展开） */
   anatomy?: {

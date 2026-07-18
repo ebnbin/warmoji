@@ -1,5 +1,8 @@
 import type Phaser from 'phaser'
 import type { ProjectileSpec, TurretSpec } from '../core/weapons'
+import { ANIM_SPEC } from '../core/studio'
+import { Animator } from '../ui/animator'
+import { clipFramesLive } from '../ui/animTextures'
 import { emojiImage } from '../ui/emoji'
 import { nearestAngle } from './types'
 import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
@@ -7,15 +10,23 @@ import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 interface Turret {
   img: Phaser.GameObjects.Image
   fireCd: number
+  anim: Animator
 }
 
 /** 装置型：本体无攻击，周期在脚下架设弩塔；弩塔自主索敌开火（伤害归属
- * 建造者）。同时在场有上限，超出拆最旧的。能力：burst 三连弩扇形连射 */
+ * 建造者）。同时在场有上限，超出拆最旧的。能力：burst 三连弩扇形连射。
+ * 动画绑定示范：开火即播 attack cycle clip，durMs = 本次开火间隔——
+ * 攻速（cooldownMul）越快拉弓越快，一次攻击恰好一遍动画 */
 export class TurretWeapon implements WeaponRuntime {
   private turrets: Turret[] = []
   private placeCd: number
   /** 弩塔子弹走通用投射物管线的合成 spec */
   private boltSpec: ProjectileSpec
+  /** 动画帧活数组（惰性烘焙，未就绪前弩塔保持静态形象） */
+  private idleFrames: string[]
+  private attackFrames: string[]
+  /** 动画时钟：delta 累积（暂停即停帧，与场景时基无耦合） */
+  private clock = 0
 
   constructor(
     private spec: TurretSpec,
@@ -32,9 +43,12 @@ export class TurretWeapon implements WeaponRuntime {
       knockback: spec.knockback,
       projectile: spec.projectile,
     }
+    this.idleFrames = clipFramesLive(ctx.scene, spec.turret.emoji, 'idle', 'player')
+    this.attackFrames = clipFramesLive(ctx.scene, spec.turret.emoji, 'attack', 'player')
   }
 
   update(delta: number, owner: WeaponOwner): void {
+    this.clock += delta
     this.placeCd -= delta
     if (this.placeCd <= 0) {
       this.placeCd = this.spec.placeIntervalMs * this.ctx.cooldownMul()
@@ -49,6 +63,8 @@ export class TurretWeapon implements WeaponRuntime {
       if (aim === null) continue
       t.fireCd = interval
       t.img.setRotation(aim - Math.PI / 4)
+      // 一次开火 = 一遍拉弓动画，时长恰为下次开火间隔（攻速绑定的核心一行）
+      t.anim.play('attack', { durMs: interval })
       const damage = Math.round(this.spec.damage * this.ctx.damageMul())
       const burst = this.spec.burst
       if (burst && burst.count > 1) {
@@ -61,6 +77,7 @@ export class TurretWeapon implements WeaponRuntime {
       }
       this.ctx.sfx('shoot')
     }
+    for (const t of this.turrets) t.anim.update(this.clock)
   }
 
   /** 在建造者脚下架一座；超编拆最旧 */
@@ -69,7 +86,11 @@ export class TurretWeapon implements WeaponRuntime {
     const base = img.scaleX
     img.setScale(base * 0.2)
     this.ctx.scene.tweens.add({ targets: img, scale: base, duration: 220, ease: 'Back.easeOut' })
-    this.turrets.push({ img, fireCd: 200 })
+    const anim = new Animator(img)
+    anim.register('idle', this.idleFrames)
+    anim.register('attack', this.attackFrames)
+    anim.setIdle('idle', ANIM_SPEC.durMs, this.turrets.length * 311)
+    this.turrets.push({ img, fireCd: 200, anim })
     this.ctx.sfx('recruit')
     while (this.turrets.length > this.spec.maxTurrets) {
       const old = this.turrets.shift()!

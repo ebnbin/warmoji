@@ -1,6 +1,9 @@
 import type Phaser from 'phaser'
 import type { SummonSpec } from '../core/weapons'
 import { ACQUIRE } from '../core/config'
+import { ANIM_SPEC } from '../core/studio'
+import { Animator } from '../ui/animator'
+import { clipFramesLive } from '../ui/animTextures'
 import { emojiImage } from '../ui/emoji'
 import type { EnemyTarget, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
@@ -10,6 +13,7 @@ interface Minion {
   hitCd: number
   /** 待机盘旋相位（各只错开） */
   phase: number
+  anim: Animator
 }
 
 /** 召唤型：常驻一小群独立 AI 的召唤物——追击最近的敌人，撞上即造成伤害，
@@ -17,15 +21,26 @@ interface Minion {
  * 能力：sting 蜇中减速 */
 export class SummonWeapon implements WeaponRuntime {
   private minions: Minion[] = []
+  /** 动画时钟：delta 累积（暂停即停帧） */
+  private clock = 0
 
   constructor(
     private spec: SummonSpec,
     private ctx: WeaponContext,
     initialCooldownMs: number,
   ) {
+    const frames = clipFramesLive(ctx.scene, spec.minion.emoji, 'idle', 'player')
     for (let i = 0; i < spec.count; i++) {
       const img = emojiImage(ctx.scene, 0, 0, spec.minion.emoji, spec.minion.size, 'player').setDepth(12)
-      this.minions.push({ img, hitCd: initialCooldownMs + i * 150, phase: (i * Math.PI * 2) / spec.count })
+      const anim = new Animator(img)
+      anim.register('idle', frames)
+      anim.setIdle('idle', ANIM_SPEC.durMs, (i * ANIM_SPEC.durMs) / spec.count)
+      this.minions.push({
+        img,
+        hitCd: initialCooldownMs + i * 150,
+        phase: (i * Math.PI * 2) / spec.count,
+        anim,
+      })
     }
   }
 
@@ -45,9 +60,11 @@ export class SummonWeapon implements WeaponRuntime {
   }
 
   update(delta: number, owner: WeaponOwner): void {
+    this.clock += delta
     const dt = Math.min(delta, 50) / 1000
     const speed = this.spec.minion.speed
     for (const m of this.minions) {
+      m.anim.update(this.clock)
       m.hitCd -= delta
       m.phase += dt * 2.4
       const target = m.hitCd <= 0 ? this.nearestTarget(m.img.x, m.img.y) : null

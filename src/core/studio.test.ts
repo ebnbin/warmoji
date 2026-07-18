@@ -8,10 +8,11 @@ import {
   animTemplateOf,
   applyTemplate,
   bakeAnimFrame,
+  clipFrameIndex,
   composeSvg,
   flattenTree,
   lerpKeyframes,
-  loadAnimRecipes,
+  loadAnimSets,
   parseSvgTree,
   splitSvg,
   star4,
@@ -186,12 +187,8 @@ describe('fx 程序化效果层', () => {
   })
 })
 
-describe('动画资源格式', () => {
-  const goodEntry = {
-    emoji: '🧪',
-    name: '试验体',
-    desc: '',
-    anatomy: '',
+describe('动画资源格式（v2：具名 clips）', () => {
+  const goodClip = {
     parts: [
       {
         indices: [0],
@@ -202,36 +199,77 @@ describe('动画资源格式', () => {
       },
     ],
   }
-  const resource = (patch: object): AnimResource =>
+  // clipPatch 打在 idle clip 上；entryPatch 打在实体条目上
+  const resource = (clipPatch: object, entryPatch: object = {}): AnimResource =>
     ({
       format: ANIM_FORMAT,
       spec: { frames: 10, durMs: 1000 },
-      animations: { '1f9ea': { ...goodEntry, ...patch } },
+      animations: {
+        '1f9ea': {
+          emoji: '🧪',
+          name: '试验体',
+          desc: '',
+          anatomy: '',
+          clips: { idle: { ...goodClip, ...clipPatch } },
+          ...entryPatch,
+        },
+      },
     }) as AnimResource
 
   it('合法资源通过校验并还原 fx 渲染函数', () => {
-    const recipes = loadAnimRecipes(
+    const sets = loadAnimSets(
       resource({
         fx: [{ gen: 'sparkles', params: { stars: [{ x: 1, y: 1, r: 1, phase: 0 }] } }],
       }),
     )
-    expect(recipes).toHaveLength(1)
-    expect(recipes[0]!.fx![0]!.render(0.8)).toContain('<path')
+    expect(sets).toHaveLength(1)
+    expect(sets[0]!.clips).toHaveLength(1)
+    expect(sets[0]!.clips[0]!.id).toBe('idle')
+    expect(sets[0]!.clips[0]!.fx![0]!.render(0.8)).toContain('<path')
+  })
+
+  it('clip 缺省 kind=loop、frames 用全局 spec；显式声明则覆盖', () => {
+    const sets = loadAnimSets(
+      resource({}, {
+        clips: {
+          idle: goodClip,
+          attack: { ...goodClip, kind: 'cycle', frames: 12 },
+        },
+      }),
+    )
+    const [idle, attack] = sets[0]!.clips
+    expect(idle!.kind).toBe('loop')
+    expect(idle!.frames).toBe(10)
+    expect(attack!.kind).toBe('cycle')
+    expect(attack!.frames).toBe(12)
   })
 
   it('fx 声明可覆盖生成器默认 layer', () => {
-    const recipes = loadAnimRecipes(
+    const sets = loadAnimSets(
       resource({
         fx: [{ gen: 'sparkles', layer: 'back', params: { stars: [] } }],
       }),
     )
-    expect(recipes[0]!.fx![0]!.layer).toBe('back')
+    expect(sets[0]!.clips[0]!.fx![0]!.layer).toBe('back')
   })
 
   it('格式版本不符 → 报错', () => {
     expect(() =>
       validateAnimResource({ ...resource({}), format: 'warmoji-anim@0' }),
     ).toThrow('格式不符')
+  })
+
+  it('clips 为空 → 报错', () => {
+    expect(() => validateAnimResource(resource({}, { clips: {} }))).toThrow('至少要有一个 clip')
+  })
+
+  it('kind 非 loop/cycle → 报错', () => {
+    expect(() => validateAnimResource(resource({ kind: 'boing' }))).toThrow('loop/cycle')
+  })
+
+  it('frames 非法（<2 或非整数）→ 报错', () => {
+    expect(() => validateAnimResource(resource({ frames: 1 }))).toThrow('整数')
+    expect(() => validateAnimResource(resource({ frames: 7.5 }))).toThrow('整数')
   })
 
   it('未知 fx 生成器 → 报错', () => {
@@ -262,7 +300,7 @@ describe('动画资源格式', () => {
     ).toThrow('升序')
   })
 
-  it('下标被多个部件占用 → 报错', () => {
+  it('同一 clip 内下标被多个部件占用 → 报错', () => {
     expect(() =>
       validateAnimResource(
         resource({
@@ -275,8 +313,36 @@ describe('动画资源格式', () => {
     ).toThrow('占用')
   })
 
+  it('不同 clip 可以复用同一批下标（各 clip 独立校验）', () => {
+    expect(() =>
+      validateAnimResource(resource({}, { clips: { idle: goodClip, attack: goodClip } })),
+    ).not.toThrow()
+  })
+
   it('parts 与 fx 全空 → 报错', () => {
     expect(() => validateAnimResource(resource({ parts: [], fx: [] }))).toThrow('至少')
+  })
+})
+
+describe('clipFrameIndex（播放进度 → 帧下标）', () => {
+  it('loop：按相位回绕，帧下标均匀推进', () => {
+    expect(clipFrameIndex(0, 1000, 10, false)).toBe(0)
+    expect(clipFrameIndex(550, 1000, 10, false)).toBe(5)
+    expect(clipFrameIndex(999, 1000, 10, false)).toBe(9)
+    expect(clipFrameIndex(1000, 1000, 10, false)).toBe(0)
+    expect(clipFrameIndex(2550, 1000, 10, false)).toBe(5)
+  })
+
+  it('once：播完停在末帧，不回绕', () => {
+    expect(clipFrameIndex(999, 1000, 12, true)).toBe(11)
+    expect(clipFrameIndex(1000, 1000, 12, true)).toBe(11)
+    expect(clipFrameIndex(5000, 1000, 12, true)).toBe(11)
+  })
+
+  it('degenerate 输入不炸：durMs/frames ≤0 → 0 帧', () => {
+    expect(clipFrameIndex(500, 0, 10, false)).toBe(0)
+    expect(clipFrameIndex(500, 1000, 0, true)).toBe(0)
+    expect(clipFrameIndex(-100, 1000, 10, false)).toBeGreaterThanOrEqual(0)
   })
 })
 
@@ -319,8 +385,7 @@ describe('通用动画模板', () => {
             name: recipe.name,
             desc: recipe.desc,
             anatomy: recipe.anatomy,
-            parts: recipe.parts,
-            fx: tpl.fx,
+            clips: { idle: { parts: recipe.parts, fx: tpl.fx } },
           },
         },
       } as AnimResource)
