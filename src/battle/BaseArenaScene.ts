@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { castCaptainSkill } from './skills'
 import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, TEAM } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import type { CharacterId, CharacterSpec } from '../characters/registry'
@@ -35,7 +36,7 @@ import {
 import type { CharacterEffects, TeamEffects } from '../items/registry'
 import { currentFormation, getRun, guardOrder, isTeamFull, promoteStep, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
-import { prodigyDamage, tickSkillCd } from '../characters/skill'
+import { tickSkillCd } from '../characters/skill'
 import { DEFAULT_SETTINGS, loadSettings } from '../run/settings'
 import type { Settings } from '../run/settings'
 import { MAPS } from '../maps/registry'
@@ -171,11 +172,11 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
 
 export abstract class BaseArenaScene extends Phaser.Scene {
   protected lineup: readonly CharacterSpec[] = []
-  protected members: Member[] = []
+  members: Member[] = []
   protected memberGroup!: Phaser.GameObjects.Group
-  protected center = { x: 0, y: 0 }
+  center = { x: 0, y: 0 }
   protected centerObj!: Phaser.GameObjects.Zone
-  protected enemies!: Phaser.GameObjects.Group
+  enemies!: Phaser.GameObjects.Group
   protected projectiles!: Phaser.GameObjects.Group
   protected enemyShots!: Phaser.GameObjects.Group
   protected coins!: Phaser.GameObjects.Group
@@ -225,10 +226,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   protected rng = new Rng(1)
   protected palette!: Palette
-  private stats!: TeamStats
+  stats!: TeamStats
   protected teamFx: TeamEffects = aggregateTeamEffects([])
   private settings: Settings = DEFAULT_SETTINGS
-  protected run!: RunState
+  run!: RunState
   private damagePool: Phaser.GameObjects.BitmapText[] = []
   private damagePoolIdx = 0
   // 死亡碎块对象池：敌人死亡时本体裂成 4 个象限碎片（复用固定数量 Image，零分配）
@@ -236,7 +237,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   private shardPoolIdx = 0
   // 爆发型粒子：敌人死亡（紫系）/ 金币拾取（金系）/ 队员倒下（烟尘）
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
-  private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
+  coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private puffBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   /** 本帧队伍移动方向（行走摇摆与朝向翻转用） */
   private teamDir = { x: 0, y: 0 }
@@ -248,11 +249,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   private orbitPhase = 0
   /** 当前主力岗位（-1 = 无人驱动）；力量竞争逐帧裁定，随时换手 */
   private driverPost = -1
-  protected elapsedMs = 0
+  elapsedMs = 0
   private spawnCooldownMs = 0
   private pendingSpawns = 0
-  protected stress = false
-  protected over = false
+  stress = false
+  over = false
   // 本波战果基线（结算横幅展示增量用）
   private waveBaseKills = 0
   private waveBaseCoins = 0
@@ -266,9 +267,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   /** 玩家子弹寿命上限（null = 不按寿命回收；虚空图必须设——环面上永不出屏） */
   protected projectileTtlMs: number | null = null
   /** 学者「弱点讲义」的增伤到期时刻（不跨波；到期把 stats.damageMul 拨回 1） */
-  private skillBuffUntil = 0
+  skillBuffUntil = 0
   /** 派对「全场蹦迪」的舞会结束时刻：窗口内新落地的敌人也要跳 */
-  private danceEndsAt = 0
+  danceEndsAt = 0
 
   // ── 世界规则钩子：子类只实现自己那一列差异 ───────────────────
 
@@ -290,7 +291,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     void _target
   }
   /** 差向量 from→to：索敌/追击/磁吸的几何基元（虚空图换环面最短差） */
-  protected worldDelta(from: Point, to: Point): Point {
+  worldDelta(from: Point, to: Point): Point {
     return { x: to.x - from.x, y: to.y - from.y }
   }
   /** 本帧攻击目标 + 活跃计数（无界/河流剔除休眠者；虚空附加镜像坐标） */
@@ -741,139 +742,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
   }
 
-  /** 释放主动技能（UIScene 按钮/E 键触发）；就绪与弹药校验在此收口 */
+  /** 释放主动技能（UIScene 按钮/E 键触发）；实现见 battle/skills.ts */
   castSkill(): boolean {
-    if (this.over || this.stress || this.run.skillCdMs > 0 || this.run.beans <= 0) return false
-    const id = this.run.captainId
-    this.run.beans -= 1
-    this.run.skillCdMs = CAPTAINS[id].skill.cdMs
-    playSfx('levelup')
-    this.events.emit('skill-cast', CAPTAINS[id].skill.name)
-    switch (id) {
-      case 'angel':
-        this.skillAngel()
-        break
-      case 'moneybags':
-        this.skillMoneybags()
-        break
-      case 'party':
-        this.skillParty()
-        break
-      case 'scholar':
-        this.skillScholar()
-        break
-      case 'prodigy':
-        this.skillProdigy()
-        break
-    }
-    return true
-  }
-
-  /** 圣光降临：阵亡者满血复活、存活者回血、全队短暂无敌。
-   * 无敌走受击无敌帧通道（把「上次受击」推到未来），挡接触与敌弹；
-   * 毒液池/毒雾走独立计时，不受无敌保护 */
-  private skillAngel(): void {
-    for (const m of this.members) {
-      if (!m.alive) this.reviveMember(m)
-      else m.hp = Math.min(m.maxHp, m.hp + m.maxHp * SKILL.angel.healRatio)
-      m.lastHitMs = this.elapsedMs + SKILL.angel.invulnMs - m.iframesMs
-      m.image.setTint(0xffe082)
-      this.time.delayedCall(320, () => {
-        if (m.alive) m.image.clearTint()
-      })
-    }
-    const ring = this.add
-      .circle(this.center.x, this.center.y, TEAM.ringRadius + MEMBER.radius, 0xfff59d, 0.3)
-      .setStrokeStyle(4, 0xffe082, 0.9)
-      .setDepth(20)
-      .setScale(0.4)
-    this.tweens.add({
-      targets: ring,
-      scale: 3,
-      alpha: 0,
-      duration: 550,
-      ease: 'Cubic.easeOut',
-      onComplete: () => ring.destroy(),
-    })
-  }
-
-  /** 天降横财：金袋逐个砸向离队伍最近的 N 个敌人——伤害 + 强击退 +
-   * 每袋落地掉金币（砸死的敌人尸体照常掉落，两份都拿） */
-  private skillMoneybags(): void {
-    const nearest = (this.enemies.getChildren() as ImageObj[])
-      .filter((e) => e.active && !e.getData('dormant'))
-      .map((e) => {
-        const d = this.worldDelta(this.center, e)
-        return { e, d2: d.x * d.x + d.y * d.y }
-      })
-      .sort((a, b) => a.d2 - b.d2)
-      .slice(0, SKILL.moneybags.targets)
-    nearest.forEach(({ e }, i) => {
-      const bag = emojiImage(this, e.x, e.y - 3 * UNIT, '💰', 0.75 * UNIT, 'player')
-        .setDepth(30)
-        .setAlpha(0)
-      this.tweens.add({
-        targets: bag,
-        y: e.y,
-        alpha: 1,
-        duration: 180,
-        delay: i * 60,
-        ease: 'Quad.easeIn',
-        onComplete: () => {
-          bag.destroy()
-          if (!e.active || this.over) return
-          this.coinBurst.explode(6, e.x, e.y)
-          playSfx('coin')
-          this.spawnCoins(e.x, e.y, SKILL.moneybags.coinsPerHit)
-          this.applyDamage(e, SKILL.moneybags.damage, SKILL.moneybags.knockback, this.center.x, this.center.y)
-        },
-      })
-    })
-  }
-
-  /** 全场蹦迪：全场敌人（含 Boss）定身跳舞；正在蓄力/冲刺的直接打断；
-   * 舞会窗口内新落地的敌人也要跳（materializeEnemy 补标）。
-   * 跳舞的逐帧表现（速度清零 + 摇摆 + 粉染色）在 steerEnemies 的舞蹈分支 */
-  private skillParty(): void {
-    this.danceEndsAt = this.elapsedMs + SKILL.party.danceMs
-    for (const e of this.enemies.getChildren() as ImageObj[]) {
-      if (!e.active) continue
-      e.setData('danceUntil', this.danceEndsAt)
-      const state = e.getData('state') as string | undefined
-      if (state === 'windup' || state === 'dash') {
-        e.setData('state', e.getData('boss') ? 'chase' : 'wander')
-        e.clearTint()
-      }
-    }
-  }
-
-  /** 弱点讲义：限时全队增伤（经 stats.damageMul 流入所有武器伤害链） */
-  private skillScholar(): void {
-    this.stats.damageMul = SKILL.scholar.damageMul
-    this.skillBuffUntil = this.elapsedMs + SKILL.scholar.durationMs
-    for (const m of this.members) {
-      if (!m.alive) continue
-      m.image.setTint(0x80d8ff)
-      this.time.delayedCall(350, () => {
-        if (m.alive) m.image.clearTint()
-      })
-    }
-  }
-
-  /** 降维打击：全场活跃敌人吃一次大额伤害（随波次强度缩放，Boss 折减）+ 全屏白闪 */
-  private skillProdigy(): void {
-    const hpMul = waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier
-    const flash = this.add
-      .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, 0xffffff, 0.55)
-      .setScrollFactor(0)
-      .setDepth(200)
-    this.tweens.add({ targets: flash, alpha: 0, duration: 380, onComplete: () => flash.destroy() })
-    playSfx('boom')
-    // 击杀会边遍历边销毁，先复制快照
-    for (const e of [...(this.enemies.getChildren() as ImageObj[])]) {
-      if (!e.active || e.getData('dormant')) continue
-      this.applyDamage(e, prodigyDamage(hpMul, !!e.getData('boss')), 0)
-    }
+    return castCaptainSkill(this)
   }
 
   /** 波次结束：快照队伍状态进 run；打满最后一波直接进胜利结算 */
@@ -1340,7 +1211,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (this.members.every((x) => !x.alive)) this.gameOver()
   }
 
-  private reviveMember(m: Member): void {
+  reviveMember(m: Member): void {
     playSfx('revive')
     m.alive = true
     m.hp = m.maxHp
@@ -1483,7 +1354,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
   }
 
-  protected applyDamage(
+  applyDamage(
     enemy: ImageObj,
     damage: number,
     knockback = 0,
@@ -2324,7 +2195,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   // ── 金币 ────────────────────────────────────────────────────
 
-  private spawnCoins(x: number, y: number, count: number): void {
+  spawnCoins(x: number, y: number, count: number): void {
     for (let i = 0; i < count; i++) {
       // 多枚时散开一点，便于看清数量
       const jx = count > 1 ? (this.rng.next() - 0.5) * 0.6 * UNIT : 0

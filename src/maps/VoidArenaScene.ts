@@ -78,7 +78,7 @@ export class VoidArenaScene extends BaseArenaScene {
   }
 
   /** 索敌/追击/磁吸的几何基元：环面最短差 */
-  protected worldDelta(from: Point, to: Point): Point {
+  worldDelta(from: Point, to: Point): Point {
     return torusDelta(from, to, this.arenaW, this.arenaH)
   }
 
