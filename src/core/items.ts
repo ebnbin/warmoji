@@ -428,6 +428,18 @@ export const ITEMS = {
   abilityRobot2: abilityCard('robot', 1, 150),
   abilitySnowman1: abilityCard('snowman', 0, 80),
   abilitySnowman2: abilityCard('snowman', 1, 150),
+  abilityFairy1: abilityCard('fairy', 0, 80),
+  abilityFairy2: abilityCard('fairy', 1, 150),
+  abilityAssassin1: abilityCard('assassin', 0, 80),
+  abilityAssassin2: abilityCard('assassin', 1, 150),
+  abilityBeaver1: abilityCard('beaver', 0, 80),
+  abilityBeaver2: abilityCard('beaver', 1, 150),
+  abilityQueenBee1: abilityCard('queenBee', 0, 80),
+  abilityQueenBee2: abilityCard('queenBee', 1, 150),
+  abilityMedic1: abilityCard('medic', 0, 80),
+  abilityMedic2: abilityCard('medic', 1, 150),
+  abilityJellyfish1: abilityCard('jellyfish', 0, 80),
+  abilityJellyfish2: abilityCard('jellyfish', 1, 150),
 } as const satisfies Record<string, ItemSpec>
 
 export type ItemId = keyof typeof ITEMS
@@ -610,5 +622,19 @@ export function resolveWeaponSpec(w: WeaponSpec, fx: CharacterEffects): WeaponSp
       return { ...w, range: w.range * r, beamRadius: w.beamRadius * r }
     case 'slowAura':
       return { ...w, radius: w.radius * r }
+    case 'assassinate':
+      return { ...w, range: w.range * r }
+    case 'turret':
+      return {
+        ...w,
+        range: w.range * r,
+        projectile: { ...w.projectile, speed: w.projectile.speed * fx.projSpeedMul },
+      }
+    case 'summon':
+      return { ...w, minion: { ...w.minion, speed: w.minion.speed * fx.projSpeedMul } }
+    case 'heal':
+      return { ...w, range: w.range * r }
+    case 'chainArc':
+      return { ...w, range: w.range * r, arcRange: w.arcRange * r }
   }
 }

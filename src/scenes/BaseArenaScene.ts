@@ -39,7 +39,7 @@ import { applyBackground } from '../ui/background'
 import { DAMAGE_FONT, ensureDamageFont } from '../ui/damageFont'
 import { reportDebug } from '../ui/debug'
 import { isStress } from '../ui/dev'
-import { emojiImage } from '../ui/emoji'
+import { emojiImage, emojiKey } from '../ui/emoji'
 import { burstEmitter } from '../ui/fx'
 import { playSfx } from '../ui/sfx'
 import { UI_FONT } from '../ui/fonts'
@@ -195,6 +195,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     },
     spawnBurnZone: (x, y, radius, dps, durationMs) => this.spawnBurnZone(x, y, radius, dps, durationMs),
     attractCoins: (x, y, radius) => this.frameAttractors.push({ x, y, r2: radius * radius }),
+    // 基座 ctx 无「本人」概念：无敌授予由 memberCtx 按槽位覆写
+    grantMemberInvuln: () => {},
+    healAllies: (x, y, range, amount, all) => this.healAllies(x, y, range, amount, all),
+    cutReviveTimer: (x, y, range, ms) => this.cutReviveTimer(x, y, range, ms),
     damageMul: () => this.stats.damageMul,
     cooldownMul: () => this.stats.cooldownMul,
     sfx: (id) => playSfx(id),
@@ -964,6 +968,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         this.spawnProjectile(x, y, angle, pSpec, damage, slot),
       spawnBurnZone: (x, y, radius, dps, durationMs) =>
         this.spawnBurnZone(x, y, radius, dps, durationMs, slot),
+      // 刺客出手帧：把「上次受击时刻」推到未来，等效授予 ms 无敌
+      grantMemberInvuln: (ms) => {
+        const mm = this.members[slot]
+        if (mm) mm.lastHitMs = this.elapsedMs + ms - mm.iframesMs
+      },
     }
     const maxHp = this.stress ? this.stats.maxHp : memberMaxHp(fx.hpAdd)
     const member: Member = {
@@ -1202,6 +1211,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   protected onMemberTouched(m: Member, enemy: ImageObj): void {
     if (this.over || !enemy.active || enemy.getData('dormant')) return
+    // 变形中的敌人无害：接触不造成伤害（荆棘也不触发）
+    if (((enemy.getData('morphUntil') as number | undefined) ?? 0) > this.elapsedMs) return
     if (!m.alive || this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
     const spec = enemy.getData('spec') as EnemySpec
@@ -1223,6 +1234,44 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
     this.hurtMember(m, damage, 0xff7777, srcName)
+  }
+
+  // ── 治疗（军医） ────────────────────────────────────────────
+
+  /** 治疗范围内队友：all=false 只治血量比例最低的一名；满血者不计，返回被治人数 */
+  private healAllies(x: number, y: number, range: number, amount: number, all: boolean): number {
+    const r2 = range * range
+    const hurt = this.members.filter((m) => {
+      if (!m.alive || m.hp >= m.maxHp) return false
+      const dx = m.image.x - x
+      const dy = m.image.y - y
+      return dx * dx + dy * dy <= r2
+    })
+    if (hurt.length === 0) return 0
+    const targets = all
+      ? hurt
+      : [hurt.reduce((a, b) => (a.hp / a.maxHp <= b.hp / b.maxHp ? a : b))]
+    for (const m of targets) {
+      m.hp = Math.min(m.maxHp, m.hp + amount)
+      m.shownHpRatio = -1
+    }
+    return targets.length
+  }
+
+  /** 电击起搏：给范围内复活倒计时最长的阵亡队友减 ms；无阵亡者返回 false */
+  private cutReviveTimer(x: number, y: number, range: number, ms: number): boolean {
+    const r2 = range * range
+    let best: Member | undefined
+    for (const m of this.members) {
+      if (m.alive) continue
+      const dx = m.image.x - x
+      const dy = m.image.y - y
+      if (dx * dx + dy * dy > r2) continue
+      if (!best || m.reviveAt > best.reviveAt) best = m
+    }
+    if (!best) return false
+    best.reviveAt -= ms
+    return true
   }
 
   protected hurtMember(m: Member, damage: number, tint: number, srcName?: string): void {
@@ -1308,9 +1357,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     p.setData('py', y)
     // 环面世界的子弹永不出屏：按寿命回收（其余图为 null，不设）
     if (this.projectileTtlMs !== null) p.setData('dieAt', this.elapsedMs + this.projectileTtlMs)
-    // 能力字段：贯穿余量 + 溅射参数（sweepProjectiles 消费）
+    // 能力字段：贯穿余量 + 溅射/变形参数（sweepProjectiles 消费）
     if (spec.pierce) p.setData('pierce', spec.pierce)
     if (spec.splash) p.setData('splash', spec.splash)
+    if (spec.hex) p.setData('hex', spec.hex)
     // 对称投掷物（无指向修正角）飞行中自旋；有指向的（飞刀类）保持箭头朝向
     p.setData('spin', spec.projectile.rotationOffsetRad === 0 ? 9 : 0)
     this.projectiles.add(p)
@@ -1343,6 +1393,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           }
           this.splashEffect(target.x, target.y, splash.radius)
         }
+        // 魔尘载荷必须在 destroy 前读出（销毁即拆数据管理器）
+        const hex = p.getData('hex') as
+          | { durationMs: number; morphEmoji: string; vulnMul?: number }
+          | undefined
         const pierceLeft = (p.getData('pierce') as number | undefined) ?? 0
         if (pierceLeft > 0) {
           p.setData('pierce', pierceLeft - 1)
@@ -1354,6 +1408,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         }
         // 击退源取上一帧位置：方向即子弹飞行方向
         this.applyDamage(target.ref as ImageObj, damage, kb, prev.x, prev.y, srcSlot)
+        // 魔尘：命中即变形（无害绵羊；死者不变形，Boss 免疫由 applyHex 拒绝）
+        if (hex && (target.ref as ImageObj).active) this.applyHex(target.ref as ImageObj, hex)
         if (!p.active) continue
       }
       const spin = p.getData('spin') as number
@@ -1406,6 +1462,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     crit = false,
   ): void {
     if (!enemy.active || enemy.getData('dormant')) return
+    // 脆弱诅咒：变形中的敌人受伤加深
+    const vuln = (enemy.getData('morphVuln') as number | undefined) ?? 1
+    if (vuln !== 1 && ((enemy.getData('morphUntil') as number | undefined) ?? 0) > this.elapsedMs) {
+      damage = Math.round(damage * vuln)
+    }
     const hpBefore = enemy.getData('hp') as number
     const hp = hpBefore - damage
     // 结算统计：按伤害来源槽位累计有效伤害与击杀（压测阵容槽位越界则跳过）
@@ -1665,6 +1726,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         coins: BOSS.coins,
       } as unknown as EnemySpec
       enemy.setData('hp', BOSS.hp)
+      enemy.setData('maxHp', BOSS.hp)
       enemy.setData('spec', bossSpec)
       enemy.setData('boss', true)
       enemy.setData('kbImmune', true)
@@ -1760,6 +1822,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     circleBody(enemy, spec.radius)
     this.configureEnemyBody(enemy)
     enemy.setData('hp', hp)
+    enemy.setData('maxHp', hp)
     enemy.setData('spec', spec)
     // 行为状态：游荡方向/换向与开火计时（elapsedMs 时基，暂停安全）
     enemy.setData('state', 'wander')
@@ -1776,6 +1839,43 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const targetScale = enemy.scale
     enemy.setScale(targetScale * 0.3).setAlpha(0.3)
     this.tweens.add({ targets: enemy, scale: targetScale, alpha: 1, duration: 130 })
+  }
+
+  // ── 仙子魔尘：变形/缴械 ─────────────────────────────────────
+
+  /** 把敌人变形成无害替身：变形期间失去一切伤害能力（接触/开火/突刺），
+   * 形象顶替、行为退化为缓速游荡，到期恢复。Boss 免疫 */
+  private applyHex(
+    enemy: ImageObj,
+    hex: { durationMs: number; morphEmoji: string; vulnMul?: number },
+  ): void {
+    if (enemy.getData('boss')) return
+    enemy.setData('morphUntil', this.elapsedMs + hex.durationMs)
+    enemy.setData('morphVuln', hex.vulnMul ?? 1)
+    if (!enemy.getData('morphed')) {
+      enemy.setData('morphed', true)
+      const spec = enemy.getData('spec') as EnemySpec
+      const size = spec.size * (enemy.getData('elite') ? ELITE.sizeMul : 1)
+      enemy.setTexture(emojiKey(hex.morphEmoji, enemy.getData('elite') ? 'elite' : 'enemy'))
+      enemy.setDisplaySize(size, size)
+      // 蓄力中被变形：中间状态一并打断
+      if (enemy.getData('state') === 'windup') enemy.clearTint()
+      enemy.setData('state', 'wander')
+      enemy.setRotation(0)
+      this.puffBurst.explode(8, enemy.x, enemy.y)
+    }
+  }
+
+  /** 变形到期：恢复原形与行为（开火计时后延，避免恢复瞬间齐射） */
+  private restoreMorph(enemy: ImageObj, spec: EnemySpec): void {
+    enemy.setData('morphUntil', undefined)
+    enemy.setData('morphVuln', 1)
+    enemy.setData('morphed', undefined)
+    const size = spec.size * (enemy.getData('elite') ? ELITE.sizeMul : 1)
+    enemy.setTexture(emojiKey(spec.emoji, enemy.getData('elite') ? 'elite' : 'enemy'))
+    enemy.setDisplaySize(size, size)
+    enemy.setData('fireAt', this.elapsedMs + 700)
+    this.puffBurst.explode(6, enemy.x, enemy.y)
   }
 
   /** 敌人速度倍率 = 减速区叠乘（寒气光环等，带冷色调提示）× 精英加速标记 */
@@ -1849,6 +1949,21 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         e.setData('danceUntil', undefined)
         e.clearTint()
         e.setRotation(0)
+      }
+
+      // 仙子魔尘：变形期间失去本职行为（不开火/不突刺/不偷币），
+      // 顶着绵羊形象缓速游荡；到期恢复原形
+      const morphUntil = e.getData('morphUntil') as number | undefined
+      if (morphUntil !== undefined) {
+        if (now < morphUntil) {
+          const slowM = this.slowFactorFor(e)
+          const dir = this.wanderDir(e)
+          body.setVelocity(dir.x * spec.speed * 0.5 * slowM, dir.y * spec.speed * 0.5 * slowM)
+          this.decayKnockback(e, body, delta)
+          this.postSteerEnemy(e, body, spec)
+          continue
+        }
+        this.restoreMorph(e, spec)
       }
 
       const slow = this.slowFactorFor(e)

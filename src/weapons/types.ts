@@ -41,6 +41,13 @@ export interface WeaponContext {
   spawnBurnZone(x: number, y: number, radius: number, dps: number, durationMs: number): void
   /** 登记一个仅本帧生效的金币吸取点（回旋镖沿途收币） */
   attractCoins(x: number, y: number, radius: number): void
+  /** 给持有本武器的角色授予短暂无敌（刺客出手帧；基座 ctx 为空实现） */
+  grantMemberInvuln(ms: number): void
+  /** 治疗队友：all=false 治范围内血量比例最低的一名、true 范围内全体；
+   * 返回实际被治疗的人数（满血者不计） */
+  healAllies(x: number, y: number, range: number, amount: number, all: boolean): number
+  /** 电击起搏：给范围内复活倒计时最长的阵亡队友减 ms；无阵亡者返回 false */
+  cutReviveTimer(x: number, y: number, range: number, ms: number): boolean
   damageMul(): number
   cooldownMul(): number
   /** 出手/爆炸等武器音效（内部已节流） */

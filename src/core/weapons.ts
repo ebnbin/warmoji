@@ -68,6 +68,9 @@ export interface ProjectileSpec {
   readonly pierce?: number
   /** 溅射：命中点圆形爆裂（ratio × 伤害） */
   readonly splash?: { readonly radius: number; readonly ratio: number }
+  /** 魔尘：命中把敌人变形成无害替身（失去一切伤害能力，形象顶替，
+   * 到期恢复；Boss 免疫）。vulnMul 为变形期间的受伤倍率（脆弱诅咒） */
+  readonly hex?: { readonly durationMs: number; readonly morphEmoji: string; readonly vulnMul?: number }
 }
 
 export interface SweepSpec {
@@ -165,6 +168,105 @@ export interface SlowAuraSpec {
   readonly freeze?: { readonly intervalMs: number; readonly durationMs: number }
 }
 
+export interface AssassinateSpec {
+  readonly kind: 'assassinate'
+  readonly name: string
+  readonly icon: string
+  readonly damage: number
+  readonly cooldownMs: number
+  readonly knockback: number
+  /** 索敌半径：范围内血量最高者优先（精英/厚血怪是刺杀目标） */
+  readonly range: number
+  /** 落点：目标背后（相对队伍中心的反侧）这段距离 */
+  readonly behindDist: number
+  /** 突袭停留时长；期间本体无敌，结束闪回原位 */
+  readonly strikeMs: number
+  readonly held?: HeldVisual
+  // ── 能力字段 ──
+  /** 连环刃：斩击同时命中目标周围小圈（ratio × 伤害） */
+  readonly cleave?: { readonly radius: number; readonly ratio: number }
+  /** 处决：目标血量低于 hpRatio 时伤害 ×mul */
+  readonly execute?: { readonly hpRatio: number; readonly mul: number }
+}
+
+export interface TurretSpec {
+  readonly kind: 'turret'
+  readonly name: string
+  readonly icon: string
+  /** 布置间隔；本体无攻击，输出全部来自弩塔 */
+  readonly placeIntervalMs: number
+  /** 同时在场上限，超出拆最旧的 */
+  readonly maxTurrets: number
+  readonly turret: { readonly emoji: string; readonly size: number }
+  readonly fireIntervalMs: number
+  readonly damage: number
+  readonly knockback: number
+  /** 弩塔索敌半径 */
+  readonly range: number
+  readonly projectile: {
+    readonly emoji: string
+    readonly size: number
+    readonly radius: number
+    readonly speed: number
+    readonly rotationOffsetRad: number
+  }
+  // ── 能力字段 ──
+  /** 三连弩：每次开火改为扇形连发 */
+  readonly burst?: { readonly count: number; readonly spreadRad: number }
+}
+
+export interface SummonSpec {
+  readonly kind: 'summon'
+  readonly name: string
+  readonly icon: string
+  /** 召唤物数量（独立 AI：追击最近敌人，撞击伤害） */
+  readonly count: number
+  readonly minion: { readonly emoji: string; readonly size: number; readonly speed: number }
+  readonly damage: number
+  readonly knockback: number
+  /** 单只命中后的再攻间隔（撞完弹开一小段） */
+  readonly hitCooldownMs: number
+  // ── 能力字段 ──
+  /** 麻痹毒素：蜇中的敌人临时减速 */
+  readonly sting?: { readonly slowFactor: number; readonly slowMs: number }
+}
+
+export interface HealSpec {
+  readonly kind: 'heal'
+  readonly name: string
+  readonly icon: string
+  /** 周期治疗范围内血量比例最低的队友 */
+  readonly amount: number
+  readonly cooldownMs: number
+  readonly range: number
+  // ── 能力字段 ──
+  /** 群体处方：改为范围内全体回复 ratio × amount */
+  readonly aoe?: { readonly ratio: number }
+  /** 电击起搏：范围内有阵亡队友时优先为其减少复活倒计时 */
+  readonly defib?: { readonly reviveCutMs: number }
+}
+
+export interface ChainArcSpec {
+  readonly kind: 'chainArc'
+  readonly name: string
+  readonly icon: string
+  readonly damage: number
+  readonly cooldownMs: number
+  readonly knockback: number
+  /** 首跳索敌半径 */
+  readonly range: number
+  /** 相邻弹跳的传导距离 */
+  readonly arcRange: number
+  /** 额外弹跳数（首跳之外） */
+  readonly bounces: number
+  /** 每跳伤害衰减乘数 */
+  readonly decay: number
+  readonly color: number
+  // ── 能力字段 ──
+  /** 过载：末跳落点爆出小范围电击（ratio × 伤害） */
+  readonly burstEnd?: { readonly radius: number; readonly ratio: number }
+}
+
 export type WeaponSpec =
   | ThrustSpec
   | ProjectileSpec
@@ -173,6 +275,11 @@ export type WeaponSpec =
   | BoomerangSpec
   | LaserSpec
   | SlowAuraSpec
+  | AssassinateSpec
+  | TurretSpec
+  | SummonSpec
+  | HealSpec
+  | ChainArcSpec
 
 export interface HitTarget {
   x: number

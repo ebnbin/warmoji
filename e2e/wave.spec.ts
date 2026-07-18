@@ -123,46 +123,39 @@ test('满员阵型：神童自选招满 → 阵型首秀选中心 → 互换稳�
   await clickCaptain(page, 'prodigy')
   await confirmCaptain(page)
 
-  // 开局整编一次给足 5 个名额（候选 5+4 超过角色总数 → 全量 8 人在池）：
-  // 先点杂耍演员（首选 = 1 号位 = 默认中心）与法师，再补满其余空位
+  // 开局整编一次给足 5 个名额：随机候选 5+4=9 人，从中点前 5 位入伍
+  //（顺序即槽位，1 号位 = 默认中心；候选池随机，全部按调试载荷动态取）
   const p0 = await page.evaluate(() => window.__warmoji!.promote!)
   expect(p0.mode).toBe('recruit')
   expect(p0.due).toBe(5)
-  expect(p0.items).toHaveLength(8)
+  expect(p0.items).toHaveLength(9)
   expect(p0.confirm.enabled).toBe(false)
-  for (const id of ['juggler', 'mage']) {
+  const picks = p0.items.slice(0, 5).map((i) => i.id)
+  for (const id of picks) {
     await clickPromoteItem(page, id)
     await page.waitForFunction(
       (k) => (window.__warmoji?.promote?.picked ?? []).includes(k),
       id,
     )
   }
-  for (let i = 0; i < 3; i++) {
-    const st = await page.evaluate(() => ({
-      picked: window.__warmoji!.promote?.picked ?? [],
-      items: (window.__warmoji!.promote?.items ?? []).map((x) => x.id),
-    }))
-    const next = st.items.find((id) => !st.picked.includes(id))!
-    await clickPromoteItem(page, next)
-    await page.waitForFunction(
-      (k) => (window.__warmoji?.promote?.picked ?? []).includes(k),
-      next,
-    )
-  }
   await page.waitForFunction(() => window.__warmoji?.promote?.confirm.enabled === true)
   await clickPromoteConfirm(page)
 
-  // 满员自动进入阵型首秀（N 保 1），默认中心 = 1 号位（首个点选的杂耍演员）
+  // 满员自动进入阵型首秀（N 保 1），默认中心 = 1 号位（首个点选者）
   await page.waitForFunction(() => window.__warmoji?.promote?.mode === 'formation')
   const f0 = await page.evaluate(() => window.__warmoji!.promote!)
   expect(f0.mode).toBe('formation')
-  expect(f0.formation!.center).toBe('juggler')
+  expect(f0.formation!.center).toBe(picks[0])
   expect(f0.items).toHaveLength(5)
   const order0 = f0.items.map((i) => i.id)
-  await clickFormationMember(page, 'mage')
-  // 稳定次序：互换只动法师与旧中心两人，其他外圈不跳位
+  const swapTo = picks[1]!
+  await clickFormationMember(page, swapTo)
+  // 稳定次序：互换只动新中心与旧中心两人，其他外圈不跳位
   const order1 = await page.evaluate(() => window.__warmoji!.promote!.items.map((i) => i.id))
-  expect(order1).toEqual(['mage', ...order0.slice(1).map((id) => (id === 'mage' ? 'juggler' : id))])
+  expect(order1).toEqual([
+    swapTo,
+    ...order0.slice(1).map((id) => (id === swapTo ? picks[0]! : id)),
+  ])
   await completePromote(page)
   // 神童自带启动资金：开战前先过一次商店
   await page.waitForFunction(() => window.__warmoji?.scene === 'shop')

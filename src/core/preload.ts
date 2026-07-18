@@ -19,7 +19,9 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     ...roster.flatMap((c) =>
       c.weapons.flatMap((w) => [
         ...('held' in w && w.held ? [w.held.emoji] : []),
-        ...(w.kind === 'projectile' ? [w.projectile.emoji] : []),
+        ...(w.kind === 'projectile' || w.kind === 'turret' ? [w.projectile.emoji] : []),
+        ...(w.kind === 'turret' ? [w.turret.emoji] : []),
+        ...(w.kind === 'summon' ? [w.minion.emoji] : []),
       ]),
     ),
     COIN.emoji,
@@ -34,7 +36,8 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
       Object.values<MapSpec>(MAPS).flatMap((m) => [...m.decor.emojis, ...(m.drift ?? [])]),
     ),
   ],
-  enemy: [...new Set(ENEMY_SPECS.map((e) => e.emoji))],
+  // 敌方阵营含变形替身（仙子魔尘的绵羊顶替原形象，沿用同阵营描边）
+  enemy: [...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis()])],
   enemyShot: [
     ...new Set([
       ...ENEMY_SPECS.flatMap((e) => ('bullet' in e ? [e.bullet.emoji] : [])),
@@ -42,7 +45,14 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     ]),
   ],
   // 精英变体（含 Boss）：金边
-  elite: [...new Set(ENEMY_SPECS.map((e) => e.emoji)), BOSS.emoji],
+  elite: [...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis()]), BOSS.emoji],
+}
+
+/** 全部魔尘变形替身形象（从角色配装聚合） */
+function morphEmojis(): string[] {
+  return roster.flatMap((c) =>
+    c.weapons.flatMap((w) => (w.kind === 'projectile' && w.hex ? [w.hex.morphEmoji] : [])),
+  )
 }
 
 // 启动时预载的 emoji（含 UI 图标）；其余全集按需加载（ui/emoji.ts ensureEmoji）

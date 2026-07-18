@@ -53,6 +53,30 @@ export const ABILITIES: Record<CharacterId, readonly [AbilitySpec, AbilitySpec]>
     { icon: '🩹', name: '冻伤', desc: '寒气光环每秒对范围内敌人造成 6 点伤害' },
     { icon: '🌨️', name: '凛冬降临', desc: '每 5 秒光环脉冲一次，冻结范围内敌人 0.7 秒' },
   ],
+  fairy: [
+    { icon: '🐑', name: '持久变形', desc: '变形时长延长到 4 秒，魔尘弹可贯穿 1 名敌人' },
+    { icon: '💔', name: '脆弱诅咒', desc: '被变形的敌人受到的所有伤害提高 40%' },
+  ],
+  assassin: [
+    { icon: '🌀', name: '连环刃', desc: '斩击同时命中目标周围一圈，波及 60% 伤害' },
+    { icon: '☠️', name: '处决', desc: '目标血量低于 35% 时，斩击伤害翻倍' },
+  ],
+  beaver: [
+    { icon: '🏗️', name: '扩建工地', desc: '同时在场的弩塔上限 +1' },
+    { icon: '🎯', name: '三连弩', desc: '弩塔每次开火改为 3 发扇形连射' },
+  ],
+  queenBee: [
+    { icon: '🐝', name: '扩巢', desc: '蜂群 +1 只' },
+    { icon: '🦠', name: '麻痹毒素', desc: '被蜇中的敌人减速 45%，持续 1.2 秒' },
+  ],
+  medic: [
+    { icon: '🥼', name: '群体处方', desc: '治疗改为范围内全体队友回复 60% 治疗量' },
+    { icon: '⚡', name: '电击起搏', desc: '范围内有阵亡队友时，优先为其减少 2 秒复活倒计时' },
+  ],
+  jellyfish: [
+    { icon: '🔗', name: '超导传递', desc: '电弧额外弹跳数提升到 4 跳' },
+    { icon: '💥', name: '过载爆裂', desc: '最后一跳落点爆出小范围电击，波及 60% 伤害' },
+  ],
 } as const
 
 /** 按已解锁档位把能力注入武器 spec（纯变换；一二阶累积生效） */
@@ -131,6 +155,52 @@ export function applyAbilities(
           ...w,
           dps: 6,
           ...(a2 ? { freeze: { intervalMs: 5000, durationMs: 700 } } : {}),
+        }
+      case 'fairy':
+        if (w.kind !== 'projectile' || !w.hex) return w
+        return {
+          ...w,
+          pierce: 1,
+          hex: {
+            ...w.hex,
+            durationMs: 4000,
+            ...(a2 ? { vulnMul: 1.4 } : {}),
+          },
+        }
+      case 'assassin':
+        if (w.kind !== 'assassinate') return w
+        return {
+          ...w,
+          cleave: { radius: 1.0 * UNIT, ratio: 0.6 },
+          ...(a2 ? { execute: { hpRatio: 0.35, mul: 2 } } : {}),
+        }
+      case 'beaver':
+        if (w.kind !== 'turret') return w
+        return {
+          ...w,
+          maxTurrets: w.maxTurrets + 1,
+          ...(a2 ? { burst: { count: 3, spreadRad: 0.3 } } : {}),
+        }
+      case 'queenBee':
+        if (w.kind !== 'summon') return w
+        return {
+          ...w,
+          count: w.count + 1,
+          ...(a2 ? { sting: { slowFactor: 0.55, slowMs: 1200 } } : {}),
+        }
+      case 'medic':
+        if (w.kind !== 'heal') return w
+        return {
+          ...w,
+          aoe: { ratio: 0.6 },
+          ...(a2 ? { defib: { reviveCutMs: 2000 } } : {}),
+        }
+      case 'jellyfish':
+        if (w.kind !== 'chainArc') return w
+        return {
+          ...w,
+          bounces: 4,
+          ...(a2 ? { burstEnd: { radius: 0.9 * UNIT, ratio: 0.6 } } : {}),
         }
     }
   })

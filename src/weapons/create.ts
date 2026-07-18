@@ -1,11 +1,16 @@
 import type { WeaponSpec } from '../core/weapons'
 import { AreaBlastWeapon } from './AreaBlastWeapon'
+import { AssassinateWeapon } from './AssassinateWeapon'
 import { BoomerangWeapon } from './BoomerangWeapon'
+import { ChainArcWeapon } from './ChainArcWeapon'
+import { HealWeapon } from './HealWeapon'
 import { LaserWeapon } from './LaserWeapon'
 import { ProjectileWeapon } from './ProjectileWeapon'
 import { SlowAuraWeapon } from './SlowAuraWeapon'
+import { SummonWeapon } from './SummonWeapon'
 import { SweepWeapon } from './SweepWeapon'
 import { ThrustWeapon } from './ThrustWeapon'
+import { TurretWeapon } from './TurretWeapon'
 import type { WeaponContext, WeaponRuntime } from './types'
 
 export function createWeapon(
@@ -28,5 +33,15 @@ export function createWeapon(
       return new LaserWeapon(spec, ctx, initialCooldownMs)
     case 'slowAura':
       return new SlowAuraWeapon(spec, ctx, initialCooldownMs)
+    case 'assassinate':
+      return new AssassinateWeapon(spec, ctx, initialCooldownMs)
+    case 'turret':
+      return new TurretWeapon(spec, ctx, initialCooldownMs)
+    case 'summon':
+      return new SummonWeapon(spec, ctx, initialCooldownMs)
+    case 'heal':
+      return new HealWeapon(spec, ctx, initialCooldownMs)
+    case 'chainArc':
+      return new ChainArcWeapon(spec, ctx, initialCooldownMs)
   }
 }

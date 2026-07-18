@@ -28,6 +28,11 @@ export const WEAPON_KIND_LABEL: Record<WeaponSpec['kind'], string> = {
   boomerang: '回旋',
   laser: '激光',
   slowAura: '光环',
+  assassinate: '瞬袭',
+  turret: '装置',
+  summon: '召唤',
+  heal: '治疗',
+  chainArc: '连锁',
 }
 
 /** px → 格 */
@@ -40,11 +45,29 @@ function sec(ms: number): string {
 }
 
 export function weaponStatLines(w: WeaponSpec): string[] {
-  // slowAura 无伤害无冷却，其余 kind 首行统一为 伤害·冷却
+  // slowAura/heal/summon/turret 无常规「伤害·冷却」首行语义，各自定制
   if (w.kind === 'slowAura') {
     return [
       `减速 ${Math.round((1 - w.slowFactor) * 100)}% · 范围 ${grid(w.radius)}`,
       '以队伍中心为圆心持续生效',
+    ]
+  }
+  if (w.kind === 'heal') {
+    return [
+      `治疗 ${w.amount} · 间隔 ${sec(w.cooldownMs)} · 范围 ${grid(w.range)}`,
+      w.aoe ? `范围内全体回复 ${Math.round(w.aoe.ratio * 100)}% 治疗量` : '优先血量比例最低的队友',
+    ]
+  }
+  if (w.kind === 'summon') {
+    return [
+      `蜂群 ${w.count} 只 · 每击 ${w.damage} 伤害`,
+      `蜂速 ${grid(w.minion.speed)}/秒 · 再攻间隔 ${sec(w.hitCooldownMs)}`,
+    ]
+  }
+  if (w.kind === 'turret') {
+    return [
+      `弩塔 ${w.maxTurrets} 座 · 每 ${sec(w.placeIntervalMs)} 架设一座`,
+      `塔伤害 ${w.damage} · 射速 ${sec(w.fireIntervalMs)} · 射程 ${grid(w.range)}`,
     ]
   }
   // 击退展示为大致位移距离（冲量 × 衰减时间常数）
@@ -62,6 +85,10 @@ export function weaponStatLines(w: WeaponSpec): string[] {
       return [base, `射程 ${grid(w.range)} · 判定 ${grid(w.hitRadius)} · 回收 ${grid(w.returnSpeed)}/秒`]
     case 'laser':
       return [base, `射程 ${grid(w.range)} · 束宽 ${grid(w.beamRadius * 2)} · 贯穿直线全部敌人`]
+    case 'assassinate':
+      return [base, `索敌 ${grid(w.range)} · 瞬移背刺血最厚的敌人 · 出手 ${sec(w.strikeMs)} 无敌`]
+    case 'chainArc':
+      return [base, `首跳 ${grid(w.range)} · 传导 ${grid(w.arcRange)} · 弹跳 ${w.bounces} 次（每跳 ${Math.round(w.decay * 100)}%）`]
   }
 }
 
@@ -97,16 +124,7 @@ export function characterStatGroups(id: CharacterId, items: readonly ItemId[] = 
       }),
     },
     ...applyAbilities(id, tiers, spec.weapons).map((w) => {
-      const resolved = resolveWeaponSpec(w, fx)
-      const display =
-        resolved.kind === 'slowAura'
-          ? resolved
-          : {
-              ...resolved,
-              damage: Math.round(resolved.damage * dmgMul),
-              cooldownMs: resolved.cooldownMs * cdMul,
-              knockback: resolved.knockback * fx.knockbackMul,
-            }
+      const display = displaySpec(resolveWeaponSpec(w, fx), dmgMul, cdMul, fx.knockbackMul)
       return {
         icon: w.icon,
         title: `${w.name}（${WEAPON_KIND_LABEL[w.kind]}）`,
@@ -114,6 +132,38 @@ export function characterStatGroups(id: CharacterId, items: readonly ItemId[] = 
       }
     }),
   ]
+}
+
+/** 展示用生效值：把伤害/冷却/击退倍率套进各 kind 自己的对应字段 */
+function displaySpec(w: WeaponSpec, dmgMul: number, cdMul: number, kbMul: number): WeaponSpec {
+  switch (w.kind) {
+    case 'slowAura':
+      return w
+    case 'heal':
+      return { ...w, amount: Math.round(w.amount * dmgMul), cooldownMs: w.cooldownMs * cdMul }
+    case 'turret':
+      return {
+        ...w,
+        damage: Math.round(w.damage * dmgMul),
+        placeIntervalMs: w.placeIntervalMs * cdMul,
+        fireIntervalMs: w.fireIntervalMs * cdMul,
+        knockback: w.knockback * kbMul,
+      }
+    case 'summon':
+      return {
+        ...w,
+        damage: Math.round(w.damage * dmgMul),
+        hitCooldownMs: w.hitCooldownMs * cdMul,
+        knockback: w.knockback * kbMul,
+      }
+    default:
+      return {
+        ...w,
+        damage: Math.round(w.damage * dmgMul),
+        cooldownMs: w.cooldownMs * cdMul,
+        knockback: w.knockback * kbMul,
+      }
+  }
 }
 
 /** 队长面板：能力描述 + 团队属性（移速/金币拾取/经验等团队级数值都归队长，含道具修正） */
