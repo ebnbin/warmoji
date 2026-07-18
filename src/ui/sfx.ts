@@ -123,24 +123,36 @@ function render(audio: AudioContext, spec: SfxSpec): AudioBuffer {
   return buf
 }
 
+/** 惰性创建共享 AudioContext（音效与 BGM 共用一个）并尝试恢复；
+ * 无 WebAudio 的环境返回 undefined 静默降级为无声 */
+export function ensureAudio(): AudioContext | undefined {
+  try {
+    if (!ctx) {
+      ctx = new AudioContext()
+      master = ctx.createGain()
+      master.gain.value = 0.5
+      master.connect(ctx.destination)
+      for (const [id, spec] of Object.entries(SFX) as [SfxId, SfxSpec][]) {
+        buffers.set(id, render(ctx, spec))
+        stats.baked++
+      }
+    }
+    void ctx.resume()
+    return ctx
+  } catch {
+    return undefined
+  }
+}
+
+/** 已创建的共享上下文（不触发创建/恢复） */
+export function audioCtx(): AudioContext | undefined {
+  return ctx
+}
+
 /** 注册首个用户手势解锁；重复调用/无 WebAudio 环境均安全 */
 export function initSfx(): void {
   const unlock = (): void => {
-    try {
-      if (!ctx) {
-        ctx = new AudioContext()
-        master = ctx.createGain()
-        master.gain.value = 0.5
-        master.connect(ctx.destination)
-        for (const [id, spec] of Object.entries(SFX) as [SfxId, SfxSpec][]) {
-          buffers.set(id, render(ctx, spec))
-          stats.baked++
-        }
-      }
-      void ctx.resume()
-    } catch {
-      // 无 WebAudio 的环境静默降级为无声
-    }
+    ensureAudio()
   }
   window.addEventListener('pointerdown', unlock, { once: true })
   window.addEventListener('keydown', unlock, { once: true })

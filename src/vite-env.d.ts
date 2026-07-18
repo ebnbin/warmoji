@@ -178,4 +178,13 @@ interface Window {
   __addXp?: (n: number) => void
   __setWave?: (n: number) => void
   __sfxStats?: () => { baked: number; played: number }
+  __bgmProbe?: (
+    id: 'lobby' | 'forest' | 'desert' | 'river' | 'void',
+    seconds?: number,
+  ) => Promise<{ rms: number; peak: number; notes: number }>
+  __bgmState?: () => {
+    desired: string | null
+    playing: string | null
+    enabled: boolean
+  }
 }

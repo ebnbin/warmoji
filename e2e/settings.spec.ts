@@ -35,7 +35,7 @@ test('设置页：入口可达、开关默认全开、切换即时持久化、�
 
   // 默认全部选项都开启
   const items = await page.evaluate(() => window.__warmoji!.settings!.items)
-  expect(items.map((i) => i.id).sort()).toEqual(['damageNumbers', 'hitShake', 'sound'])
+  expect(items.map((i) => i.id).sort()).toEqual(['bgm', 'damageNumbers', 'hitShake', 'sound'])
   expect(items.every((i) => i.on)).toBe(true)
   await page.screenshot({ path: 'test-results/settings.png' })
 
@@ -43,6 +43,7 @@ test('设置页：入口可达、开关默认全开、切换即时持久化、�
   await toggleItem(page, 'damageNumbers')
   await toggleItem(page, 'hitShake')
   await toggleItem(page, 'sound')
+  await toggleItem(page, 'bgm')
 
   // 旋转到竖屏：仍在设置页且开关状态保持
   await page.setViewportSize({ width: 720, height: 1280 })

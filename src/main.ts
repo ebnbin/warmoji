@@ -18,6 +18,8 @@ import { WAVE } from './core/config'
 import { browserStorage } from './core/highscore'
 import { getRun, grantCoins, grantXp } from './core/run'
 import { loadSettings } from './core/settings'
+import { bgmState, initBgm, playBgm, renderBgmOffline, setBgmEnabled } from './ui/bgm'
+import type { BgmId } from './core/music'
 import { setStress } from './ui/dev'
 import { initSfx, setSfxEnabled, sfxStats } from './ui/sfx'
 import { isStandalone, nudgeIosViewport, refreshViewport, viewport } from './ui/viewport'
@@ -28,9 +30,11 @@ if (badge) {
   badge.title = `构建于 ${__BUILD_TIME__}`
 }
 
-// 程序化音效：首个手势解锁 + 按设置开关
+// 程序化音效与 BGM：首个手势解锁 + 按设置开关
 initSfx()
+initBgm()
 setSfxEnabled(loadSettings(browserStorage()).sound)
+setBgmEnabled(loadSettings(browserStorage()).bgm)
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -53,6 +57,18 @@ game.events.once(Phaser.Core.Events.READY, () => {
   // iOS PWA 冷启动视口修正：多时点 nudge 兜底（无变化时 refresh 为空操作）
   for (const delay of [0, 100, 500, 1000]) {
     window.setTimeout(() => nudgeIosViewport(() => refreshViewport(game)), delay)
+  }
+  // 场景 → BGM：大厅页共用一首，战斗页按本局地图配曲。
+  // 挂在场景 START 上（restart 重入时 playBgm 幂等不重开）
+  const lobby = ['menu', 'map', 'wiki', 'studio', 'settings', 'captain', 'promote', 'shop', 'result']
+  const arenas = ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']
+  for (const scene of game.scene.getScenes(false)) {
+    const key = scene.scene.key
+    if (lobby.includes(key)) {
+      scene.events.on(Phaser.Scenes.Events.START, () => playBgm('lobby'))
+    } else if (arenas.includes(key)) {
+      scene.events.on(Phaser.Scenes.Events.START, () => playBgm(getRun().mapId))
+    }
   }
 })
 
@@ -97,3 +113,7 @@ window.__setWave = (n: number): void => {
   getRun().wave = Math.max(1, Math.min(WAVE.totalWaves, Math.round(n)))
 }
 window.__sfxStats = (): { baked: number; played: number } => sfxStats()
+// e2e/探针：离线渲染一段 BGM 统计响度（验证真实出声、各曲差异）+ 播放状态快照
+window.__bgmProbe = (id: BgmId, seconds?: number): Promise<{ rms: number; peak: number; notes: number }> =>
+  renderBgmOffline(id, seconds)
+window.__bgmState = (): { desired: BgmId | null; playing: BgmId | null; enabled: boolean } => bgmState()
