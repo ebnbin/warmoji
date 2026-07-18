@@ -3,6 +3,7 @@ import { castCaptainSkill } from './skills'
 import { circleBody } from './arcade'
 import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from './pickups'
 import { spawnBurnZone, spawnEnemyShot, spawnPoisonPool, updateBurnZones, updateEnemyShots, updatePoisonPools } from './hazards'
+import { spawnProjectile, sweepProjectiles } from './projectiles'
 import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, TEAM } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import type { CharacterId, CharacterSpec } from '../characters/registry'
@@ -19,8 +20,6 @@ import { ORBIT } from './orbit'
 import { applyAbilities } from '../items/abilities'
 import { enemyMixAt, pickEnemy } from '../enemies/registry'
 import type { EnemyMixEntry } from '../enemies/registry'
-import { circleHitIndices, sweepFirstHitIndex } from '../weapons/spec'
-import type { ProjectileSpec } from '../weapons/spec'
 import { formationPosts, ringPostAngle } from './formation'
 import type { FormationId } from './formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from './orbit'
@@ -170,7 +169,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   center = { x: 0, y: 0 }
   protected centerObj!: Phaser.GameObjects.Zone
   enemies!: Phaser.GameObjects.Group
-  protected projectiles!: Phaser.GameObjects.Group
+  projectiles!: Phaser.GameObjects.Group
   enemyShots!: Phaser.GameObjects.Group
   coins!: Phaser.GameObjects.Group
   /** 毒液池（蘑菇死亡遗留），波末随场景销毁 */
@@ -195,7 +194,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     scene: this,
     enemyTargets: () => this.frameTargets,
     damageEnemy: (e, d, kb, sx, sy) => this.applyDamage(e as ImageObj, d, kb, sx, sy),
-    spawnProjectile: (x, y, angle, spec, damage) => this.spawnProjectile(x, y, angle, spec, damage),
+    spawnProjectile: (x, y, angle, spec, damage) => spawnProjectile(this, x, y, angle, spec, damage),
     teamCenter: () => this.center,
     applySlow: (x, y, radius, factor) =>
       this.frameSlowZones.push({ x, y, r2: radius * radius, factor }),
@@ -258,7 +257,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   /** 刷怪预告注册表：需要重映射实体的图（河流/虚空旋转）可原位改写 pos */
   protected pendingMarks: { pos: Point; mark: ImageObj }[] = []
   /** 玩家子弹寿命上限（null = 不按寿命回收；虚空图必须设——环面上永不出屏） */
-  protected projectileTtlMs: number | null = null
+  projectileTtlMs: number | null = null
   /** 学者「弱点讲义」的增伤到期时刻（不跨波；到期把 stats.damageMul 拨回 1） */
   skillBuffUntil = 0
   /** 派对「全场蹦迪」的舞会结束时刻：窗口内新落地的敌人也要跳 */
@@ -666,7 +665,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     updatePoisonPools(this)
     updateBurnZones(this)
     magnetCoins(this)
-    this.sweepProjectiles(delta)
+    sweepProjectiles(this, delta)
     this.cullProjectiles()
     this.updateWorld(delta)
 
@@ -846,7 +845,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         )
       },
       spawnProjectile: (x, y, angle, pSpec, damage) =>
-        this.spawnProjectile(x, y, angle, pSpec, damage, slot),
+        spawnProjectile(this, x, y, angle, pSpec, damage, slot),
       spawnBurnZone: (x, y, radius, dps, durationMs) =>
         spawnBurnZone(this, x, y, radius, dps, durationMs, slot),
       // 刺客出手帧：把「上次受击时刻」推到未来，等效授予 ms 无敌
@@ -1226,111 +1225,6 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   // ── 攻击与伤害 ──────────────────────────────────────────────
 
-  private spawnProjectile(
-    x: number,
-    y: number,
-    angle: number,
-    spec: ProjectileSpec,
-    damage: number,
-    srcSlot = -1,
-  ): void {
-    const p = emojiImage(this, x, y, spec.projectile.emoji, spec.projectile.size, 'player')
-      .setDepth(8)
-      .setRotation(angle + spec.projectile.rotationOffsetRad)
-    this.physics.add.existing(p)
-    circleBody(p, spec.projectile.radius)
-    ;(p.body as ArcadeBody).setVelocity(
-      Math.cos(angle) * spec.projectile.speed,
-      Math.sin(angle) * spec.projectile.speed,
-    )
-    playSfx('shoot')
-    p.setData('srcSlot', srcSlot)
-    p.setData('damage', damage)
-    p.setData('radius', spec.projectile.radius)
-    p.setData('kb', spec.knockback)
-    p.setData('px', x)
-    p.setData('py', y)
-    // 环面世界的子弹永不出屏：按寿命回收（其余图为 null，不设）
-    if (this.projectileTtlMs !== null) p.setData('dieAt', this.elapsedMs + this.projectileTtlMs)
-    // 能力字段：贯穿余量 + 溅射/变形参数（sweepProjectiles 消费）
-    if (spec.pierce) p.setData('pierce', spec.pierce)
-    if (spec.splash) p.setData('splash', spec.splash)
-    if (spec.hex) p.setData('hex', spec.hex)
-    // 对称投掷物（无指向修正角）飞行中自旋；有指向的（飞刀类）保持箭头朝向
-    p.setData('spin', spec.projectile.rotationOffsetRad === 0 ? 9 : 0)
-    this.projectiles.add(p)
-  }
-
-  /** 逐帧对每颗子弹做上一帧位置 → 当前位置的线段扫掠命中。
-   * 能力：pierce 命中后不销毁继续飞（跳过已命中敌人）；splash 命中点溅射 */
-  private sweepProjectiles(delta: number): void {
-    for (const p of this.projectiles.getChildren() as ImageObj[]) {
-      if (!p.active) continue
-      const prev = { x: p.getData('px') as number, y: p.getData('py') as number }
-      // 贯穿弹跳过已命中的敌人（否则下一帧会再撞同一个）
-      const hitRefs = p.getData('hitRefs') as Set<ImageObj> | undefined
-      const targets = hitRefs ? this.frameTargets.filter((t) => !hitRefs.has(t.ref as ImageObj)) : this.frameTargets
-      const hit = sweepFirstHitIndex(prev, { x: p.x, y: p.y }, p.getData('radius') as number, targets)
-      if (hit >= 0) {
-        const target = targets[hit]!
-        const damage = p.getData('damage') as number
-        const kb = p.getData('kb') as number
-        const srcSlot = (p.getData('srcSlot') as number) ?? -1
-        // 爆浆溅射：命中点小圈内其余敌人吃折损伤害（同真身的镜像间距 ≥ 半场，
-        // 远大于溅射半径，不会经镜像重复命中）
-        const splash = p.getData('splash') as { radius: number; ratio: number } | undefined
-        if (splash) {
-          const splashDamage = Math.max(1, Math.round(damage * splash.ratio))
-          for (const i of circleHitIndices({ x: target.x, y: target.y }, splash.radius, this.frameTargets)) {
-            const other = this.frameTargets[i]!
-            if (other.ref === target.ref) continue
-            this.applyDamage(other.ref as ImageObj, splashDamage, 0, undefined, undefined, srcSlot)
-          }
-          this.splashEffect(target.x, target.y, splash.radius)
-        }
-        // 魔尘载荷必须在 destroy 前读出（销毁即拆数据管理器）
-        const hex = p.getData('hex') as
-          | { durationMs: number; morphEmoji: string; vulnMul?: number }
-          | undefined
-        const pierceLeft = (p.getData('pierce') as number | undefined) ?? 0
-        if (pierceLeft > 0) {
-          p.setData('pierce', pierceLeft - 1)
-          const set = hitRefs ?? new Set<ImageObj>()
-          set.add(target.ref as ImageObj)
-          p.setData('hitRefs', set)
-        } else {
-          p.destroy()
-        }
-        // 击退源取上一帧位置：方向即子弹飞行方向
-        this.applyDamage(target.ref as ImageObj, damage, kb, prev.x, prev.y, srcSlot)
-        // 魔尘：命中即变形（无害绵羊；死者不变形，Boss 免疫由 applyHex 拒绝）
-        if (hex && (target.ref as ImageObj).active) this.applyHex(target.ref as ImageObj, hex)
-        if (!p.active) continue
-      }
-      const spin = p.getData('spin') as number
-      if (spin > 0) p.rotation += (spin * delta) / 1000
-      p.setData('px', p.x)
-      p.setData('py', p.y)
-    }
-  }
-
-  /** 爆浆番茄的溅射视觉：小号红色冲击环 */
-  private splashEffect(x: number, y: number, radius: number): void {
-    const ring = this.add
-      .circle(x, y, radius, 0xef5350, 0.25)
-      .setStrokeStyle(3, 0xef5350, 0.8)
-      .setDepth(7)
-      .setScale(0.3)
-    this.tweens.add({
-      targets: ring,
-      scale: 1,
-      alpha: 0,
-      duration: 220,
-      ease: 'Cubic.easeOut',
-      onComplete: () => ring.destroy(),
-    })
-  }
-
   /** 子弹回收：默认飞出视野外一段距离即灭（虚空图覆写为寿命制） */
   protected cullProjectiles(): void {
     const view = this.cameras.main.worldView
@@ -1699,7 +1593,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   /** 把敌人变形成无害替身：变形期间失去一切伤害能力（接触/开火/突刺），
    * 形象顶替、行为退化为缓速游荡，到期恢复。Boss 免疫 */
-  private applyHex(
+  applyHex(
     enemy: ImageObj,
     hex: { durationMs: number; morphEmoji: string; vulnMul?: number },
   ): void {
