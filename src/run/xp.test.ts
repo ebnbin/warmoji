@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { XP } from '../config'
+import { XP } from './xp'
 import { gainXp, waveBonusXp, xpToNext } from './xp'
 
 describe('xp', () => {

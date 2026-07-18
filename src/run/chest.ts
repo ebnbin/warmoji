@@ -1,7 +1,8 @@
-import type { CharacterId } from '../config'
-import { CHARACTERS, CHEST } from '../config'
-import type { ItemId } from './registry'
-import { abilityCardAvailable, captainPool, characterPool, ITEMS, reachedStackLimit } from './registry'
+import { UNIT } from '../lib/units'
+import { CHARACTERS } from '../characters/registry'
+import type { CharacterId } from '../characters/registry'
+import type { ItemId } from '../items/registry'
+import { abilityCardAvailable, captainPool, characterPool, ITEMS, reachedStackLimit } from '../items/registry'
 
 // 宝箱开箱抽取：候选 = 各上场角色的道具池 ∪ 队长道具池，即「本局当前阵容
 // 用得上的道具」。同一道具进多个角色的池 = 多个候选条目，抽中哪条归谁；
@@ -58,3 +59,17 @@ export function rollChestLoot(
   }
   return entries[entries.length - 1]!
 }
+
+// 宝箱：击杀极小概率掉落（精英显著更高），拾取开出 1 件免费随机道具，
+// 立即生效。抽取范围与权重见 本文件；与金币同磁吸，波末未拾取消失
+export const CHEST = {
+  emoji: '🎁',
+  size: 0.8 * UNIT,
+  radius: 0.3 * UNIT,
+  chance: 0.008,
+  eliteChance: 0.08,
+  /** 开箱稀有度权重：越稀有越难开出 */
+  rarityWeights: { common: 1, rare: 0.3, epic: 0.08 },
+  /** 兜底金币：全队所有道具池都抽无可抽时（几乎不可能）宝箱改吐金币 */
+  fallbackCoins: 10,
+} as const

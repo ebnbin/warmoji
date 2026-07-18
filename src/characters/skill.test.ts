@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CAPTAIN_IDS, CAPTAINS, SKILL } from '../config'
+import { CAPTAINS, CAPTAIN_IDS } from './registry'
+import { SKILL } from './skill'
 import { beginRun, endRun } from '../run/state'
 import { prodigyDamage, skillCharge, skillReady, tickSkillCd } from './skill'
 

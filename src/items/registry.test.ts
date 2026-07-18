@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CHARACTERS, WEAPONS } from '../config'
+import { CHARACTERS } from '../characters/registry'
+import { WEAPONS } from '../weapons/registry'
 import type { ItemRarity, ItemSpec } from './registry'
 import {
   ABILITY_GATE,

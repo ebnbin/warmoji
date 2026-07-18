@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import { ACQUIRE } from '../config'
+import { ACQUIRE } from './registry'
 import { circleHitIndices } from './spec'
 import type { AreaBlastSpec } from './spec'
 import { emojiImage } from '../emoji/textures'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TEAM } from '../config'
+import { TEAM } from '../characters/registry'
 import { formationPosts, ringPostAngle, slotOffset } from './formation'
 
 const UP = -Math.PI / 2

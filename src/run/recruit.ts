@@ -1,5 +1,4 @@
-import type { CaptainId, CharacterId } from '../config'
-import { RECRUIT } from '../config'
+import type { CaptainId, CharacterId } from '../characters/registry'
 import type { StringStorage } from '../lib/storage'
 import { Rng } from '../lib/rng'
 
@@ -85,3 +84,12 @@ export function unlockAt(index: number): number {
   }
   return table.length
 }
+
+// 命定卡池：开局用队长种子一次抽 poolSize 张角色牌（整局固定，不逐轮重抽），
+// 按「已开放编制数」查表解锁可选张数——开放 1 人 4 张、2 人 6 张…封顶全开。
+// 未解锁的牌盖着（❓ 不露身份），已入队的牌保留在池中标记（本文件）
+export const RECRUIT = {
+  poolSize: 10,
+  /** 下标 = 开放编制数 - 1；越界取末位（≥5 人全开） */
+  unlocks: [4, 6, 8, 9, 10],
+} as const

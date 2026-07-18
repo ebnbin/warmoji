@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CAPTAIN_IDS } from '../config'
+import { CAPTAIN_IDS } from '../characters/registry'
 import type { StringStorage } from '../lib/storage'
 import { MAP_IDS } from '../maps/registry'
 import { loadCaptain, loadMap, sanitizeCaptain, saveCaptain, saveMap } from './selection'

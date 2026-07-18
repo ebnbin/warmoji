@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { CAPTAINS, MEMBER, RECRUIT, ROSTER_IDS, SKILL, WAVE } from '../config'
+import { CAPTAINS, MEMBER, ROSTER_IDS } from '../characters/registry'
+import { SKILL } from '../characters/skill'
+import { RECRUIT } from './recruit'
+import { WAVE } from './waves'
 import {
   beginRun,
   canRecruit,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ABILITIES, applyAbilities } from './abilities'
-import { CHARACTERS } from '../config'
-import type { CharacterId } from '../config'
+import { CHARACTERS } from '../characters/registry'
+import type { CharacterId } from '../characters/registry'
 
 const IDS = Object.keys(CHARACTERS) as CharacterId[]
 const NONE = { a1: false, a2: false }

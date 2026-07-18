@@ -1,3 +1,4 @@
+import { UNIT } from '../lib/units'
 import type { Point } from '../lib/vec'
 
 // 虚空地图（环面世界）的纯几何（禁 phaser/DOM）。
@@ -52,3 +53,20 @@ export function fitAspectRect(
   const h = aspectH * scale
   return { x: (containerW - w) / 2, y: (containerH - h) / 2, w, h }
 }
+
+// 虚空地图（kind='void'）：固定尺寸的环面竞技场，四边是传送门。
+// 相机静止且视口裁剪出屏幕内最大居中的 16:9（竖屏 9:16）区域，非该比例
+// 的屏幕多余处留空白；场内一切实体（含玩家/Boss/子弹）坐标按模回绕，
+// 没有任何墙。索敌/AI/磁吸全部用环面最短差（本文件）
+export const VOID = {
+  /** 竞技场长边（16:9 的 16 → 24 格，与河流同款 1.2 视野密度） */
+  arenaLong: 24 * UNIT,
+  /** 竞技场短边（13.5 格） */
+  arenaShort: 13.5 * UNIT,
+  /** 条带相机宽度：四缝各一条 + 四角，渲染实体跨缝时的对侧分身 */
+  strip: 1.5 * UNIT,
+  /** 玩家子弹寿命：环面上永远飞不出屏幕，必须按时限回收 */
+  projectileLifeMs: 1500,
+  /** 传送门门框光带厚度 */
+  frame: 0.3 * UNIT,
+} as const

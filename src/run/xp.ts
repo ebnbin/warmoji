@@ -1,4 +1,3 @@
-import { XP } from '../config'
 
 // 队伍经验：击杀 + 波末保底两条腿（短波杀怪少，保底占比更高）。
 // 每升 1 级 = 获得 1 个点数（core/run.ts），用于招募/升级角色，前快后慢的等比曲线。
@@ -30,3 +29,14 @@ export function gainXp(state: XpState, amount: number): { state: XpState; levels
   }
   return { state: { level, xp }, levelsGained }
 }
+
+// 经验：等比升级曲线（前快后慢），每升 1 级得 1 颗能量豆（见 run/state.ts）。
+// 校准目标：每波约 1~1.5 颗豆、前期不超 1.5；满豆冻结所以不必精确，
+// 加波次/拉长时长也不用动曲线——等比门槛会自然消化更多的总经验
+export const XP = {
+  base: 80,
+  growth: 1.15,
+  /** 波末保底经验 = base + perWave×波次：保证杀怪少的短波也有稳定豆收入 */
+  waveBonusBase: 40,
+  waveBonusPerWave: 36,
+} as const

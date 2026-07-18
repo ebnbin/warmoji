@@ -1,15 +1,22 @@
 import { ABILITIES, applyAbilities } from '../items/abilities'
-import type { CaptainSpec, CharacterId } from '../config'
-import { CHARACTERS, COIN, KNOCKBACK, MEMBER, TEAM, UNIT } from '../config'
+import { COIN } from '../items/registry'
+import { UNIT } from '../lib/units'
+import { KNOCKBACK } from '../weapons/registry'
+import { CHARACTERS, MEMBER, TEAM } from './registry'
+import type { CaptainSpec, CharacterId } from './registry'
 import {
   abilityTiers,
   aggregateCharacterEffects,
   aggregateTeamEffects,
-  memberMaxHp,
   resolveWeaponSpec,
 } from '../items/registry'
 import type { ItemId } from '../items/registry'
 import type { WeaponSpec } from '../weapons/spec'
+
+/** 角色生效生命上限 = 基础 + 道具加成（下限保护）；角色没有等级，血量全由道具塑造 */
+export function memberMaxHp(itemHpAdd: number): number {
+  return Math.max(10, MEMBER.maxHp + itemHpAdd)
+}
 
 // 角色属性面板的展示模型：把异构的角色/武器参数组织成统一的「属性组」。
 // 距离统一换算为「格」（1 格 = 1 单位 = 地图网格边长），时间换算为秒。

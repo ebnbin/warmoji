@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
-import { CAPTAINS, COIN, SKILL } from '../config'
+import { CAPTAINS } from '../characters/registry'
+import { SKILL } from '../characters/skill'
+import { COIN } from '../items/registry'
 import { formatTime } from '../lib/format'
 import { RARITIES } from '../items/registry'
 import type { ItemRarity } from '../items/registry'

@@ -1,4 +1,4 @@
-import { ORBIT } from '../config'
+import { UNIT } from '../lib/units'
 
 // 环形阵轨道动力学：环是刚性同步的——所有角色保持均匀间距，共享一个相位，
 // 每人角度 = 均匀槽位角 + 相位。全员按「秉性（CHARACTERS.orbit）× 探测范围内敌情」
@@ -77,3 +77,16 @@ export function stepPhase(phase: number, omega: number, dtMs: number): number {
   const w = Math.max(-ORBIT.maxSpeed, Math.min(ORBIT.maxSpeed, omega))
   return wrapAngle(phase + w * dt)
 }
+
+// 环形阵轨道动力学：全员按「秉性（CHARACTERS.orbit）× 探测范围内敌情」计算移动倾向，
+// 每帧力量（倾向绝对值）最大者即刻掌舵（同力随机、阵亡出局、随时换手），
+// 环是刚性同步的：主力驱动一个共享相位，全员保持均匀间距整体转动（core/orbit.ts）。
+export const ORBIT = {
+  /** 敌人进入该距离（从角色自身量起）才产生移动倾向 */
+  detectRange: 4.5 * UNIT,
+  /** 沿环最大角速度（rad/s）≈ 每 3 秒一整圈 */
+  maxSpeed: 2,
+  /** 避敌/迎敌倾向增益 */
+  avoidGain: 3.2,
+  seekGain: 2.6,
+} as const

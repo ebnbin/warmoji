@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { SPAWN, WAVE } from '../config'
+import { SPAWN } from '../enemies/registry'
+import { WAVE } from './waves'
 import { cycleWave, isBossWave, isEliteWave, isFinalWave, waveAt, waveDurationMs } from './waves'
 
 describe('waves', () => {

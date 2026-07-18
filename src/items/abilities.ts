@@ -1,5 +1,5 @@
-import type { CharacterId } from '../config'
-import { UNIT } from '../config'
+import type { CharacterId } from '../characters/registry'
+import { UNIT } from '../lib/units'
 import type { WeaponSpec } from '../weapons/spec'
 
 // 角色特殊能力：一阶/二阶两档，靠购买角色专属能力卡解锁（core/items.ts 的

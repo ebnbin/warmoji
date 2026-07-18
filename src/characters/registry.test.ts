@@ -1,18 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { CHARACTERS, MAP, UNIT, VIEW } from './config'
+import { CHARACTERS } from './registry'
 
-describe('单位制锚定', () => {
-  it('最小视口长边容纳 20 个单位：1 单位 = 64 逻辑px', () => {
-    expect(UNIT).toBe(VIEW.minLong / 20)
-    expect(UNIT).toBe(64)
-  })
-
-  it('地图 25×25 单位', () => {
-    expect(MAP.width).toBe(25 * UNIT)
-    expect(MAP.height).toBe(25 * UNIT)
-  })
-
-  it('花名册：emoji 不重复，每人有名字、介绍且至少 1 把武器', () => {
+describe('花名册', () => {
+  it('emoji 不重复，每人有名字、介绍且至少 1 把武器', () => {
     const roster = Object.values(CHARACTERS)
     expect(new Set(roster.map((c) => c.emoji)).size).toBe(roster.length)
     for (const c of roster) {
@@ -22,7 +12,7 @@ describe('单位制锚定', () => {
     }
   })
 
-  it('花名册覆盖全部攻击形态（含新机制型武器）', () => {
+  it('覆盖全部攻击形态（含新机制型武器）', () => {
     const kinds = Object.values(CHARACTERS).flatMap((c) => c.weapons.map((w) => w.kind))
     expect(new Set(kinds)).toEqual(
       new Set([

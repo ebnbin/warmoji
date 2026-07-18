@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BLOB, ENEMY_SPECS, MUSHROOM, ZOMBIE } from '../config'
+import { BLOB, ENEMY_SPECS, MUSHROOM, ZOMBIE } from './registry'
 import { enemyMixAt, fleeSteer, pickEnemy } from './registry'
 import { Rng } from '../lib/rng'
 

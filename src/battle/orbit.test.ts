@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ORBIT } from '../config'
+import { ORBIT } from './orbit'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from './orbit'
 
 describe('threatWeight', () => {

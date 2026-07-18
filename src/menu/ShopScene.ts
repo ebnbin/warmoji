@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
-import type { CaptainId, CharacterId } from '../config'
-import { CAPTAINS, CHARACTERS, COIN, SHOP } from '../config'
+import { CAPTAINS, CHARACTERS } from '../characters/registry'
+import type { CaptainId, CharacterId } from '../characters/registry'
+import { COIN, SHOP } from '../items/registry'
 import {
   aggregateCharacterEffects,
   captainPool,
@@ -9,7 +10,6 @@ import {
   RARITIES,
   rollItem,
   itemPrice,
-  memberMaxHp,
   stackCount,
 } from '../items/registry'
 import type { ItemId, ItemSpec } from '../items/registry'
@@ -19,7 +19,7 @@ import type { Palette } from '../lib/palette'
 import { Rng } from '../lib/rng'
 import { endRun, getRun, isTeamFull, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
-import { captainStatGroups, characterStatGroups } from '../characters/stats'
+import { captainStatGroups, characterStatGroups, memberMaxHp } from '../characters/stats'
 import { applyBackground } from '../screen/background'
 import { reportDebug } from '../debug/debug'
 import { emojiImage } from '../emoji/textures'

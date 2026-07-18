@@ -1,3 +1,4 @@
+import { UNIT } from '../lib/units'
 import type { MapDecor } from './registry'
 import type { DecorInstance } from './registry'
 import { Rng } from '../lib/rng'
@@ -151,3 +152,36 @@ export function outsideZone(p: Point, center: Point, radius: number): boolean {
   const dy = p.y - center.y
   return dx * dx + dy * dy > radius * radius
 }
+
+// 无限地图（kind='infinite' 的关卡）：无边界世界 + 活跃方形 + 终波缩圈。
+// 活跃判定用按轴距离（Chebyshev 方形）：与地图/分块/视口的矩形几何同构；
+// 32 格半边长 > 有限地图对角任意两点的轴距（25）——未来把有限图统一进
+// 同一机制时，图上永远无人休眠，行为零差异
+export const INFINITE = {
+  /** 活跃方形半边长：超出的敌人休眠（冻结 AI/物理/不占刷怪上限，保留全状态） */
+  activeHalf: 32 * UNIT,
+  /** 刷怪环带（以队伍中心为圆心）：内环避脸；外环 = 活跃半边长之半——
+   * 奔跑方向的前方早有已落地的敌人在等，一直跑不能白嫖（多数落点在屏外，
+   * 近处落点仍有 ⚠️ 预告） */
+  spawnRingMin: 4 * UNIT,
+  spawnRingMax: 16 * UNIT,
+  /** 装饰分块边长（格）：块 = 精灵批量建/销毁的粒度，噪声连续性与块无关 */
+  chunkCells: 8,
+  /** 装饰活跃范围 = 相机视野外扩的块数（销毁再多留一块防抖） */
+  chunkPad: 1,
+} as const
+
+// 终波缩圈（无限地图的 Boss 战边界）：圈心 = 终波开始时的队伍中心。
+// 它不是吃鸡式终局压缩——只为封住「跑得比 Boss 快就能无限避战」：
+// 半径先停留（让玩家看清圈）再缓缩 4 格即停，之后恒为 rMin 的固定竞技场；
+// 圈外队员按 tick 掉血，敌人不受圈伤
+export const ZONE = {
+  r0: 16 * UNIT,
+  rMin: 12 * UNIT,
+  /** 开圈后的静止观察期 */
+  holdMs: 6000,
+  /** 收缩结束时刻（此后维持 rMin 到波末） */
+  shrinkEndMs: 38_000,
+  tickMs: 500,
+  tickDamage: 6,
+} as const

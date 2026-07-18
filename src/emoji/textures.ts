@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import { OUTLINE } from '../config'
-import type { OutlineKind } from '../config'
+import { OUTLINE } from './svg'
+import type { OutlineKind } from './svg'
 import { emojiCodepoints } from './codepoints'
 import { packSvg, parseEmojiPack } from './pack'
 import type { EmojiPack } from './pack'

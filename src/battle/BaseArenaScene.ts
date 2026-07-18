@@ -1,6 +1,18 @@
 import Phaser from 'phaser'
-import { BOSS, CAPTAINS, CHARACTERS, CHEST, COIN, ELITE, FOLLOW, HIT_SHAKE, KNOCKBACK, MEMBER, ORBIT, ROSTER_IDS, SKILL, SPAWN, STRESS, SURGE, TEAM, UNIT, WANDER, WAVE } from '../config'
-import type { CharacterId, CharacterSpec, ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../config'
+import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, TEAM } from '../characters/registry'
+import { memberMaxHp } from '../characters/stats'
+import type { CharacterId, CharacterSpec } from '../characters/registry'
+import { SKILL } from '../characters/skill'
+import { STRESS } from '../debug/dev'
+import { BOSS, ELITE, SPAWN, SURGE } from '../enemies/registry'
+import type { ChaseEnemySpec, EnemyBulletSpec, EnemySpec } from '../enemies/registry'
+import { CHEST } from '../run/chest'
+import { COIN } from '../items/registry'
+import { UNIT } from '../lib/units'
+import { WAVE } from '../run/waves'
+import { KNOCKBACK } from '../weapons/registry'
+import { FOLLOW, HIT_SHAKE, WANDER } from './config'
+import { ORBIT } from './orbit'
 import { applyAbilities } from '../items/abilities'
 import { enemyMixAt, pickEnemy } from '../enemies/registry'
 import type { EnemyMixEntry } from '../enemies/registry'
@@ -11,14 +23,13 @@ import type { FormationId } from './formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from './orbit'
 import type { OrbitThreat } from './orbit'
 import { browserStorage } from '../lib/storage'
-import { chestDropped, rollChestLoot } from '../items/chest'
+import { chestDropped, rollChestLoot } from '../run/chest'
 import {
   abilityTiers,
   aggregateCharacterEffects,
   aggregateTeamEffects,
   CRIT_MUL,
   ITEMS,
-  memberMaxHp,
   resolveWeaponSpec,
 } from '../items/registry'
 import type { CharacterEffects, TeamEffects } from '../items/registry'

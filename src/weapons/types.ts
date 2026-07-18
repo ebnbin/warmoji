@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import { ACQUIRE } from '../config'
+import { ACQUIRE } from './registry'
 import type { ProjectileSpec } from './spec'
 import type { SfxId } from '../audio/sfx'
 

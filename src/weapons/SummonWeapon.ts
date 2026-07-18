@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
 import type { SummonSpec } from './spec'
-import { ACQUIRE } from '../config'
+import { ACQUIRE } from './registry'
 import { ANIM_SPEC } from '../emoji/studio'
 import { Animator } from '../emoji/animator'
 import { clipFramesLive } from '../emoji/animTextures'

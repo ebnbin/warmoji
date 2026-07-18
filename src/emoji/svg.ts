@@ -55,3 +55,17 @@ export function outlineSvg(svg: string, radius: number, color: string): string {
   const body = svg.slice(open.index + open[0].length, closeIdx)
   return svg.slice(0, open.index) + open[0] + style + `<g class="__ol">${body}</g>` + body + '</svg>'
 }
+
+// 剪影描边（radius 单位 = twemoji viewBox 单位，36 格）：按阵营配色
+// 玩家侧黑、敌人紫、敌方子弹红、精英/Boss 金——一眼分清敌我与威胁等级
+export const OUTLINE = {
+  radius: 2,
+  colors: {
+    player: '#000000',
+    enemy: '#8e24aa',
+    enemyShot: '#d32f2f',
+    elite: '#ffb300',
+  },
+} as const
+
+export type OutlineKind = keyof typeof OUTLINE.colors

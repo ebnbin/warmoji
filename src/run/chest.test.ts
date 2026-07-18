@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { chestCandidates, chestDropped, rollChestLoot } from './chest'
-import { CHEST } from '../config'
-import type { ItemId } from './registry'
-import { ITEMS } from './registry'
+import { CHEST } from './chest'
+import type { ItemId } from '../items/registry'
+import { ITEMS } from '../items/registry'
 import { Rng } from '../lib/rng'
 
 describe('chest 掉落判定', () => {

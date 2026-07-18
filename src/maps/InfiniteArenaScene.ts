@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { INFINITE, UNIT, ZONE } from '../config'
+import { UNIT } from '../lib/units'
+import { INFINITE, ZONE } from './world'
 import { MAPS } from './registry'
 import { norm } from '../lib/vec'
 import type { Point } from '../lib/vec'

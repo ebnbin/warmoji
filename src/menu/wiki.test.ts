@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BLOB, BOAR, CAPTAINS, CHARACTERS, ENEMY_SPECS, INVADER, MUSHROOM } from '../config'
+import { CAPTAINS, CHARACTERS } from '../characters/registry'
+import { BLOB, BOAR, ENEMY_SPECS, INVADER, MUSHROOM } from '../enemies/registry'
 import { codepointsToEmoji, emojiCodepoints } from '../emoji/codepoints'
 import { ITEMS } from '../items/registry'
 import { enemyStatLines, usedEmojiSet, wikiEntryByEmoji, wikiGroups } from './wiki'

@@ -23,7 +23,7 @@ import { reportDebug } from '../debug/debug'
 import { emojiImage, emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
 import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { FONT, UI_FONT } from '../lib/fonts'
-import { TAP_SLOP } from '../config'
+import { TAP_SLOP } from '../lib/units'
 import { VirtualEmojiGrid } from '../emoji/virtualGrid'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../screen/apply'
 

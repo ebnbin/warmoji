@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import type { CharacterId } from '../config'
-import { CAPTAINS, CHARACTERS } from '../config'
+import { CAPTAINS, CHARACTERS } from '../characters/registry'
+import type { CharacterId } from '../characters/registry'
 import { formationPosts } from '../battle/formation'
 import type { ItemId } from '../items/registry'
 import { arenaSceneFor } from '../maps/registry'

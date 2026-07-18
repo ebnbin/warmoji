@@ -1,7 +1,7 @@
+import { UNIT } from '../lib/units'
 import { ABILITIES } from './abilities'
 import type { AbilityTiers } from './abilities'
-import { MEMBER } from '../config'
-import type { CharacterId, CharacterSpec } from '../config'
+import type { CharacterId, CharacterSpec } from '../characters/registry'
 import type { WeaponSpec } from '../weapons/spec'
 
 // 道具 = 一组属性修正（可带负面副作用，数值上保证净增益）。
@@ -532,11 +532,6 @@ export function itemPrice(id: ItemId, wave: number): number {
   return Math.round(ITEMS[id].price * (1 + PRICE.perWave * Math.max(0, wave - 1)))
 }
 
-/** 角色生效生命上限 = 基础 + 道具加成（下限保护）；角色没有等级，血量全由道具塑造 */
-export function memberMaxHp(itemHpAdd: number): number {
-  return Math.max(10, MEMBER.maxHp + itemHpAdd)
-}
-
 // ── 效果叠加 ────────────────────────────────────────────────
 
 export function aggregateCharacterEffects(owned: readonly ItemId[]): CharacterEffects {
@@ -638,3 +633,16 @@ export function resolveWeaponSpec(w: WeaponSpec, fx: CharacterEffects): WeaponSp
       return { ...w, range: w.range * r, arcRange: w.arcRange * r }
   }
 }
+
+// 金币拾取是团队能力：磁吸与入账都以队伍中心为基点（拾取范围类道具挂队长）
+export const COIN = {
+  emoji: '🪙',
+  size: 0.6 * UNIT,
+  radius: 0.22 * UNIT,
+  magnetRadius: 2.25 * UNIT,
+  magnetSpeed: 8 * UNIT,
+  collectRadius: 0.5 * UNIT,
+} as const
+
+// 商店：每个上架位可付费重新随机（队长可提供免费次数）
+export const SHOP = { refreshPrice: 2 } as const

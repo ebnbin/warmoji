@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import { TAP_SLOP } from '../config'
-import type { OutlineKind } from '../config'
+import type { OutlineKind } from '../emoji/svg'
+import { TAP_SLOP } from '../lib/units'
 import { emojiImage } from '../emoji/textures'
 
 // 可滚动 emoji 网格：形象即含义，名字/数值留给详情面板。
