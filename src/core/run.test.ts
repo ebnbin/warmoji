@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CAPTAINS, MEMBER, ROSTER_IDS, SKILL, WAVE } from './config'
+import { CAPTAINS, MEMBER, RECRUIT, ROSTER_IDS, SKILL, WAVE } from './config'
 import {
   beginRun,
   canRecruit,
@@ -13,6 +13,7 @@ import {
   recruitCandidates,
   recruitDue,
   recruitMember,
+  recruitUnlocked,
   rosterCap,
   setGuardCenter,
   waveStartHp,
@@ -43,7 +44,7 @@ describe('run 生命周期', () => {
   it('招募时结算统计数组同步扩容', () => {
     const run = beginRun('angel', ['cowboy'])
     run.wave = 2
-    recruitMember(run, 'mage')
+    recruitMember(run, recruitCandidates(run)[0]!)
     expect(run.stats.damage).toEqual([0, 0])
     expect(run.stats.kills).toEqual([0, 0])
     expect(run.stats.deaths).toEqual([0, 0])
@@ -116,20 +117,37 @@ describe('固定招募节奏：开局 1 人，每波结束 1 人，不可跳过'
 
   it('招募约束：无名额失败、不重复、不超编', () => {
     const run = beginRun('angel', ['cowboy'])
-    // 本波无名额：招募失败
-    expect(recruitMember(run, 'mage')).toBe(-1)
+    const pick = recruitCandidates(run)[0]!
+    // 本波无名额：招募失败（首发已占掉第 1 波名额）
+    expect(recruitMember(run, pick)).toBe(-1)
     run.wave = 2
     expect(canRecruit(run, 'cowboy')).toBe(false)
-    expect(recruitMember(run, 'mage')).toBe(1)
+    expect(recruitMember(run, pick)).toBe(1)
     expect(run.memberHp[1]).toBe(MEMBER.maxHp)
     // 名额用完再招失败
-    expect(recruitMember(run, 'troll')).toBe(-1)
+    expect(recruitMember(run, recruitCandidates(run)[0]!)).toBe(-1)
     endRun()
   })
 
-  it('候选 = 花名册减去已招募', () => {
-    const run = beginRun('angel', ['cowboy'])
-    expect(recruitCandidates(run)).toEqual(ROSTER_IDS.filter((x) => x !== 'cowboy'))
+  it('命定卡池：开局抽定 10 张；候选 = 已解锁段减去已入队', () => {
+    const run = beginRun('angel', [])
+    expect(run.recruitPool).toHaveLength(RECRUIT.poolSize)
+    expect(new Set(run.recruitPool).size).toBe(RECRUIT.poolSize)
+    for (const id of run.recruitPool) expect(ROSTER_IDS).toContain(id)
+    // 第 1 波：开放 1 人 → 解锁 4 张全可选
+    expect(recruitUnlocked(run)).toBe(4)
+    expect(recruitCandidates(run)).toEqual(run.recruitPool.slice(0, 4))
+    // 招 1 人进第 2 波：解锁 6 张、去掉已入队
+    const first = recruitCandidates(run)[0]!
+    recruitMember(run, first)
+    run.wave = 2
+    expect(recruitUnlocked(run)).toBe(6)
+    expect(recruitCandidates(run)).toEqual(
+      run.recruitPool.slice(0, 6).filter((x) => x !== first),
+    )
+    // 第 5 波起全开
+    run.wave = 5
+    expect(recruitUnlocked(run)).toBe(10)
     endRun()
   })
 })

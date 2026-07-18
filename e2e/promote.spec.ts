@@ -27,11 +27,13 @@ test.describe('开局整编（组建队伍）', () => {
     await enterCaptain(page)
     await confirmCaptain(page)
 
-    // 开局整编：首发名额强制招募——随机候选 5 选 1，未选满前确认不可用
+    // 开局整编：命定卡池十卡常驻——首轮解锁 4 张、其余盖牌，未选满前确认不可用
     let p = await page.evaluate(() => window.__warmoji!.promote!)
     expect(p.mode).toBe('recruit')
     expect(p.due).toBe(1)
-    expect(p.items).toHaveLength(5)
+    expect(p.items).toHaveLength(10)
+    expect(p.items.filter((i) => i.state === 'open')).toHaveLength(4)
+    expect(p.items.filter((i) => i.state === 'locked')).toHaveLength(6)
     expect(p.confirm.enabled).toBe(false)
     for (const it of p.items) expect(inBounds(it, 1280, 720)).toBe(true)
     expect(inBounds({ x: p.confirm.x - p.confirm.w / 2, y: p.confirm.y - p.confirm.h / 2, w: p.confirm.w, h: p.confirm.h }, 1280, 720)).toBe(true)
@@ -45,10 +47,10 @@ test.describe('开局整编（组建队伍）', () => {
     await confirmCaptain(page)
     p = await page.evaluate(() => window.__warmoji!.promote!)
     expect(p.mode).toBe('recruit')
-    expect(p.items).toHaveLength(5)
+    expect(p.items).toHaveLength(10)
 
-    // 从随机候选里点第一位入空位 → 确认开战（firstWaveShop=false 不进商店）
-    const recruitId = p.items[0]!.id
+    // 从已解锁的牌里点第一张入空位 → 确认开战（firstWaveShop=false 不进商店）
+    const recruitId = p.items.find((i) => i.state === 'open')!.id
     await clickPromoteItem(page, recruitId)
     await page.waitForFunction(
       (id) => (window.__warmoji?.promote?.picked ?? []).includes(id),
@@ -76,8 +78,8 @@ test.describe('开局整编 竖屏', () => {
     let p = await page.evaluate(() => window.__warmoji!.promote!)
     expect(p.mode).toBe('recruit')
     for (const it of p.items) expect(inBounds(it, 720, 1280)).toBe(true)
-    // 点第二位候选入空位（避开默认详情展示位，验证选中态本身）
-    const pickId = p.items[1]!.id
+    // 点第二张已解锁的牌入空位（避开默认详情展示位，验证选中态本身）
+    const pickId = p.items.filter((i) => i.state === 'open')[1]!.id
     await clickPromoteItem(page, pickId)
     await page.waitForFunction(
       (id) => (window.__warmoji?.promote?.picked ?? []).includes(id),

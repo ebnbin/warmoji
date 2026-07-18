@@ -75,6 +75,9 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '➕',
   '⬆️',
   '⚔️',
+  // 命定卡池：盖牌 + 已入队角标
+  '❓',
+  '🎖️',
   '🏆',
   '⚡',
   '👟',

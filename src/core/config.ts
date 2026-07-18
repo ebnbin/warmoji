@@ -1057,9 +1057,14 @@ export const XP = {
   waveBonusPerWave: 36,
 } as const
 
-// 招募候选池：每次招募从未招募角色中随机抽 名额+poolExtra 个（不超过剩余数），
-// 随机种子绑队长（core/recruit.ts）。角色多起来后这里是主要的调节旋钮
-export const RECRUIT = { poolExtra: 4 } as const
+// 命定卡池：开局用队长种子一次抽 poolSize 张角色牌（整局固定，不逐轮重抽），
+// 按「已开放编制数」查表解锁可选张数——开放 1 人 4 张、2 人 6 张…封顶全开。
+// 未解锁的牌盖着（❓ 不露身份），已入队的牌保留在池中标记（core/recruit.ts）
+export const RECRUIT = {
+  poolSize: 10,
+  /** 下标 = 开放编制数 - 1；越界取末位（≥5 人全开） */
+  unlocks: [4, 6, 8, 9, 10],
+} as const
 
 // 商店：每个上架位可付费重新随机（队长可提供免费次数）
 export const SHOP = { refreshPrice: 2 } as const

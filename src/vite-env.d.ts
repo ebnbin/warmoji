@@ -9,8 +9,15 @@ interface WarmojiPromoteDebug {
   mode: 'recruit' | 'formation'
   /** 招募模式 = 详情面板正在展示的候选；阵型模式 = 当前受保护中心 */
   selected: string
-  /** 招募模式 = 随机候选网格；阵型模式 = 预览中的队员站位（点选与中心互换） */
-  items: { id: string; x: number; y: number; w: number; h: number }[]
+  /** 招募模式 = 命定卡池网格（state 三态）；阵型模式 = 预览中的队员站位 */
+  items: {
+    id: string
+    x: number
+    y: number
+    w: number
+    h: number
+    state?: 'open' | 'locked' | 'taken'
+  }[]
   confirm: { x: number; y: number; w: number; h: number; enabled: boolean }
   /** wave=1 为「返回队长页」，wave>1 为「结束本局」，fromShop 为「返回商店」 */
   back: { x: number; y: number; w: number; h: number }

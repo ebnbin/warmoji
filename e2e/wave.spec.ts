@@ -46,15 +46,17 @@ test('波次循环：波末固定招募 1 人 → 商店购物 → 下一波扩�
     await page.keyboard.up(key)
   }
 
-  // 波末必进整编页：本波 1 个招募名额，从随机候选（5 选 1）里招第一位
+  // 波末必进整编页：本波 1 个招募名额；第 2 波解锁 6 张、1 张已入队
   await page.waitForFunction(() => window.__warmoji?.scene === 'promote', undefined, {
     timeout: 15_000,
   })
   const promote = await page.evaluate(() => window.__warmoji!.promote!)
   expect(promote.mode).toBe('recruit')
   expect(promote.due).toBe(1)
-  expect(promote.items).toHaveLength(5)
-  const recruitId = promote.items[0]!.id
+  expect(promote.items).toHaveLength(10)
+  expect(promote.items.filter((i) => i.state === 'open')).toHaveLength(5)
+  expect(promote.items.filter((i) => i.state === 'taken')).toHaveLength(1)
+  const recruitId = promote.items.find((i) => i.state === 'open')!.id
   await clickPromoteItem(page, recruitId)
   await page.waitForFunction(
     (id) => (window.__warmoji?.promote?.picked ?? []).includes(id),
@@ -123,12 +125,13 @@ test('满员阵型：神童自选招满 → 阵型首秀选中心 → 互换稳�
   await clickCaptain(page, 'prodigy')
   await confirmCaptain(page)
 
-  // 开局整编一次给足 5 个名额：随机候选 5+4=9 人，从中点前 5 位入伍
-  //（顺序即槽位，1 号位 = 默认中心；候选池随机，全部按调试载荷动态取）
+  // 开局整编一次给足 5 个名额：开放 5 人 → 命定十卡全解锁，点前 5 张入伍
+  //（顺序即槽位，1 号位 = 默认中心；卡池随机，全部按调试载荷动态取）
   const p0 = await page.evaluate(() => window.__warmoji!.promote!)
   expect(p0.mode).toBe('recruit')
   expect(p0.due).toBe(5)
-  expect(p0.items).toHaveLength(9)
+  expect(p0.items).toHaveLength(10)
+  expect(p0.items.every((i) => i.state === 'open')).toBe(true)
   expect(p0.confirm.enabled).toBe(false)
   const picks = p0.items.slice(0, 5).map((i) => i.id)
   for (const id of picks) {

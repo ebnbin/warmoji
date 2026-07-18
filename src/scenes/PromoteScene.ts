@@ -1,13 +1,12 @@
 import Phaser from 'phaser'
 import type { CharacterId } from '../core/config'
-import { CAPTAINS, CHARACTERS, RECRUIT } from '../core/config'
+import { CAPTAINS, CHARACTERS } from '../core/config'
 import { formationPosts } from '../core/formation'
-import { browserStorage } from '../core/highscore'
 import type { ItemId } from '../core/items'
 import { arenaSceneFor } from '../core/maps'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
-import { recruitSeed, rollCandidates } from '../core/recruit'
+import { unlockAt } from '../core/recruit'
 import { Rng } from '../core/rng'
 import {
   endRun,
@@ -19,6 +18,7 @@ import {
   recruitCandidates,
   recruitDueCount,
   recruitMember,
+  recruitUnlocked,
   setGuardCenter,
 } from '../core/run'
 import type { RunState } from '../core/run'
@@ -34,7 +34,8 @@ import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '..
 // 整编页：每波战斗前的强制招募 + 阵型页。开局组队与波末整编完全复用本页：
 // 队长确认后进来招首发（可返回重选队长），此后每波结束按名额招人直到满编
 //（不可跳过、无其他招募途径；跳波开局可能一波多名额，一页选满才能出发）。
-// 招募候选从队长绑定的随机池抽取（core/recruit.ts，名额+RECRUIT.poolExtra 个）；
+// 候选来自命定卡池（run.recruitPool，开局按队长种子抽定整局固定）：网格常驻
+// 十卡三态——已解锁可选 / ❓ 盖牌（身份保密，按编制数逐档揭晓）/ 已入队 🎖️。
 // 详情面板内嵌一块阵型预览：已有队员 + 本波空位按实际战斗布局慢转，点候选
 // 填入空位、点预览里的人换下。招募完成后——首次满员额外展示一次阵型页
 //（formation 模式：满员自动 N 保 1，玩家点选受保护的中心），此后阵型调整走
@@ -82,11 +83,12 @@ export class PromoteScene extends Phaser.Scene {
   private palette?: Palette
   private run!: RunState
   private mode: 'recruit' | 'formation' = 'recruit'
-  /** recruit 模式：详情面板正在展示的候选角色 id（不等于已选） */
+  /** recruit 模式：详情面板正在展示的卡（角色 id 或 lock-N 盖牌位） */
   private selectedKey = ''
-  /** recruit 模式：本波名额数与随机候选池（进页时定死，重进不重抽） */
+  /** recruit 模式：本波名额数、命定卡池（整局固定）与本轮解锁数 */
   private due = 0
   private pool: CharacterId[] = []
+  private unlocked = 0
   /** 已点进空位的候选（顺序即入队槽位序），点满 due 个才能确认 */
   private picked: CharacterId[] = []
   /** 从商店进入的阵型调整（商店睡眠中，退出时唤醒） */
@@ -151,19 +153,16 @@ export class PromoteScene extends Phaser.Scene {
     // 首次满员的阵型页只自动展示这一次
     if (this.mode === 'formation' && !this.fromShop) this.run.formationIntroduced = true
     if (this.mode !== 'formation') {
-      // 名额与随机候选池：纯函数抽取——同局内反复进出/转屏重排必得同一批
+      // 命定卡池：开局已定（run.recruitPool），这里只算本轮名额与解锁进度
       this.due = recruitDueCount(this.run)
-      this.pool = rollCandidates(
-        recruitSeed(browserStorage(), this.run.captainId),
-        this.run.roster.length,
-        recruitCandidates(this.run),
-        this.due + RECRUIT.poolExtra,
-      )
+      this.pool = [...this.run.recruitPool]
+      this.unlocked = recruitUnlocked(this.run)
+      const open = recruitCandidates(this.run)
       this.picked = preserved
-        ? this.picked.filter((id) => this.pool.includes(id)).slice(0, this.due)
+        ? this.picked.filter((id) => open.includes(id)).slice(0, this.due)
         : []
-      if (!preserved || !this.pool.includes(this.selectedKey as CharacterId)) {
-        this.selectedKey = this.pool[0] ?? ''
+      if (!preserved || !this.validSelected()) {
+        this.selectedKey = open[0] ?? ''
       }
     }
 
@@ -286,8 +285,8 @@ export class PromoteScene extends Phaser.Scene {
         div.lineBetween(xx, oy + pv.y + 14, xx, oy + pv.y + pv.h - 14)
       }
 
-      // 候选网格：点未选中的候选 → 填进第一个空位（选满后 1 名额时点击即换人，
-      // 多名额需先在预览里把人换下）；点已选中的候选 → 换下
+      // 命定卡池网格（十卡三态）：可选牌点击进出空位（选满后 1 名额时点击
+      // 即换人，多名额需先在预览里换下）；盖牌/已入队的点击只看详情
       this.grid = new EmojiGrid(this, {
         x: this.origin.x + L.list.x,
         y: oy + L.list.y,
@@ -296,12 +295,14 @@ export class PromoteScene extends Phaser.Scene {
       })
       this.grid.onTap = (key): void => {
         playSfx('click')
-        const id = key as CharacterId
-        const at = this.picked.indexOf(id)
-        if (at >= 0) this.picked.splice(at, 1)
-        else if (this.picked.length < this.due) this.picked.push(id)
-        else if (this.due === 1) this.picked = [id]
         this.selectedKey = key
+        if (this.cardState(key) === 'open') {
+          const id = key as CharacterId
+          const at = this.picked.indexOf(id)
+          if (at >= 0) this.picked.splice(at, 1)
+          else if (this.picked.length < this.due) this.picked.push(id)
+          else if (this.due === 1) this.picked = [id]
+        }
         this.refresh()
       }
       this.grid.setItems(this.buildItems())
@@ -385,9 +386,10 @@ export class PromoteScene extends Phaser.Scene {
 
   private stepBanner(): string {
     if (this.mode === 'recruit') {
+      const base = `命定卡池已揭晓 ${this.unlocked}/${this.pool.length} 张`
       return this.due > 1
-        ? `随机候选 ${this.pool.length} 选 ${this.due} · 点满全部空位才能出发`
-        : `随机候选 ${this.pool.length} 选 1 · 必须选一名新队员入队`
+        ? `${base} · 本波选 ${this.due} 名，点满全部空位才能出发`
+        : `${base} · 必须选一名新队员入队`
     }
     if (this.fromShop) return '点选一名队员，与中心互换'
     return '满员自动列阵 N 保 1 · 点选队员设为受保护的中心'
@@ -422,13 +424,38 @@ export class PromoteScene extends Phaser.Scene {
 
   // ── 数据 ────────────────────────────────────────────────────
 
-  private buildItems(): { key: string; emoji: string; outline: 'player'; badge?: string }[] {
-    return this.pool.map((id) => ({
-      key: id,
-      emoji: CHARACTERS[id].emoji,
-      outline: 'player' as const,
-      ...(this.picked.includes(id) ? { badge: '✅' } : {}),
-    }))
+  /** 卡状态：盖牌（未解锁）/ 已入队 / 可选。key 为 lock-N 或角色 id */
+  private cardState(key: string): 'locked' | 'taken' | 'open' {
+    if (key.startsWith('lock-')) return 'locked'
+    const idx = this.pool.indexOf(key as CharacterId)
+    if (idx < 0 || idx >= this.unlocked) return 'locked'
+    return this.run.roster.includes(key as CharacterId) ? 'taken' : 'open'
+  }
+
+  private validSelected(): boolean {
+    if (!this.selectedKey) return false
+    if (this.selectedKey.startsWith('lock-')) {
+      const idx = Number(this.selectedKey.slice(5))
+      return idx >= this.unlocked && idx < this.pool.length
+    }
+    return this.pool.includes(this.selectedKey as CharacterId)
+  }
+
+  /** 十卡三态：已解锁按角色亮牌（入队 ✔️ / 本轮已选 ✅），未解锁 ❓ 盖牌 */
+  private buildItems(): { key: string; emoji: string; outline?: 'player'; badge?: string }[] {
+    return this.pool.map((id, i) => {
+      if (i >= this.unlocked) return { key: `lock-${i}`, emoji: '❓' }
+      return {
+        key: id,
+        emoji: CHARACTERS[id].emoji,
+        outline: 'player' as const,
+        ...(this.run.roster.includes(id)
+          ? { badge: '🎖️' }
+          : this.picked.includes(id)
+            ? { badge: '✅' }
+            : {}),
+      }
+    })
   }
 
   // ── 确认执行 ────────────────────────────────────────────────
@@ -651,17 +678,46 @@ export class PromoteScene extends Phaser.Scene {
     const dx = this.origin.x + D.x
     const dy = this.origin.y + D.y
 
+    // 盖牌：不透露身份，只提示揭晓条件
+    if (this.selectedKey.startsWith('lock-')) {
+      const idx = Number(this.selectedKey.slice(5))
+      this.detailObjs.push(
+        emojiImage(this, dx + 46, dy + 48, '❓', 74),
+        this.add
+          .text(dx + 90, dy + 36, '命运牌 · 未解锁', {
+            fontFamily: UI_FONT,
+            fontSize: FONT.lead,
+            fontStyle: 'bold',
+            color: '#c8c8d4',
+            resolution: res,
+          })
+          .setOrigin(0, 0.5),
+        this.add
+          .text(dx + 90, dy + 70, `队伍规模达到 ${unlockAt(idx)} 人时揭晓这张牌的真身`, {
+            fontFamily: UI_FONT,
+            fontSize: FONT.small,
+            color: '#b9b9c6',
+            wordWrap: { width: D.w - 110 },
+            resolution: res,
+          })
+          .setOrigin(0, 0.5),
+      )
+      return
+    }
+
     const id = this.selectedKey as CharacterId
     const spec = CHARACTERS[id]
-    const isPicked = this.picked.includes(id)
+    const state = this.cardState(id)
+    const tag = state === 'taken' ? ' · 已入队' : this.picked.includes(id) ? ' · 已选' : ''
+    const tagColor = state === 'taken' ? '#a5d6a7' : '#81d4fa'
     this.detailObjs.push(
       emojiImage(this, dx + 46, dy + 48, spec.emoji, 74, 'player'),
       this.add
-        .text(dx + 90, dy + 36, spec.name + (isPicked ? ' · 已选' : ''), {
+        .text(dx + 90, dy + 36, spec.name + tag, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
-          color: isPicked ? '#81d4fa' : '#ffffff',
+          color: tag ? tagColor : '#ffffff',
           resolution: res,
         })
         .setOrigin(0, 0.5),
@@ -866,6 +922,7 @@ export class PromoteScene extends Phaser.Scene {
                 y: r.y,
                 w: r.w,
                 h: r.h,
+                state: this.cardState(r.key),
               })),
         confirm: {
           x: this.btnRect.x + this.btnRect.w / 2,

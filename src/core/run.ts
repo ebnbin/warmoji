@@ -5,7 +5,7 @@ import { browserStorage } from './highscore'
 import type { ItemId } from './items'
 import type { MapId } from './maps'
 import { MAP_IDS } from './maps'
-import { refreshRecruitSeed } from './recruit'
+import { drawRecruitPool, recruitSeed, refreshRecruitSeed, unlockedCount } from './recruit'
 import { waveDurationMs } from './waves'
 import { gainXp } from './xp'
 import type { XpState } from './xp'
@@ -32,6 +32,9 @@ export interface RunState {
   beans: number
   /** 已完成波次的累计战斗时长，驱动难度曲线跨波递增 */
   combatMs: number
+  /** 命定卡池：开局按队长种子抽定的可招募范围（顺序即卡位，整局固定；
+   * 按已开放编制数逐档解锁，见 core/recruit.ts unlockedCount） */
+  recruitPool: CharacterId[]
   /** 已招募角色（下标即槽位） */
   roster: CharacterId[]
   /** 按槽位的波末血量；0 = 该波结束时已阵亡 */
@@ -78,6 +81,7 @@ export function beginRun(
   const roster = [...starters]
   current = {
     captainId,
+    recruitPool: drawRecruitPool(recruitSeed(browserStorage(), captainId), ROSTER_IDS),
     mapId,
     decorSeed: (Math.random() * 0xffffffff) >>> 0,
     wave: captain.startWave,
@@ -124,9 +128,14 @@ export function rosterCap(run: RunState): number {
   return CAPTAINS[run.captainId].teamSize
 }
 
-/** 未招募的候选角色（按花名册顺序） */
+/** 本轮解锁的卡数：按已开放编制数（含本波名额）查表 */
+export function recruitUnlocked(run: RunState): number {
+  return Math.min(unlockedCount(Math.min(rosterCap(run), run.wave)), run.recruitPool.length)
+}
+
+/** 当前可选的候选：命定卡池中已解锁且未入队的牌（保持卡位顺序） */
 export function recruitCandidates(run: RunState): CharacterId[] {
-  return ROSTER_IDS.filter((id) => !run.roster.includes(id))
+  return run.recruitPool.slice(0, recruitUnlocked(run)).filter((id) => !run.roster.includes(id))
 }
 
 /** 本波是否有招募名额：开局 1 人，此后每波结束 +1，直到满编 */
@@ -134,7 +143,7 @@ export function recruitDue(run: RunState): boolean {
   return run.roster.length < Math.min(rosterCap(run), run.wave)
 }
 
-/** 本波实际可招的名额数（跳波开局可能一次多名；受剩余候选数钳制） */
+/** 本波实际可招的名额数（跳波开局可能一次多名；受已解锁未入队数钳制） */
 export function recruitDueCount(run: RunState): number {
   const due = Math.min(rosterCap(run), run.wave) - run.roster.length
   return Math.max(0, Math.min(due, recruitCandidates(run).length))

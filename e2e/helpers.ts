@@ -73,7 +73,7 @@ export async function completePromote(page: Page): Promise<void> {
       mode: window.__warmoji!.promote?.mode,
       due: window.__warmoji!.promote?.due ?? 0,
       picked: window.__warmoji!.promote?.picked ?? [],
-      items: (window.__warmoji!.promote?.items ?? []).map((x) => x.id),
+      items: (window.__warmoji!.promote?.items ?? []).map((x) => ({ id: x.id, state: x.state })),
     }))
     if (st.scene !== 'promote') return
     if (st.mode === 'formation') {
@@ -85,9 +85,12 @@ export async function completePromote(page: Page): Promise<void> {
       return
     }
     if (st.picked.length < st.due) {
-      const next = st.items.find((id) => !st.picked.includes(id))
-      if (!next) throw new Error('completePromote: 招募候选不足以点满名额')
-      await clickPromoteItem(page, next)
+      // 命定卡池三态：只点可选（open）的牌
+      const next = st.items.find(
+        (x) => (x.state ?? 'open') === 'open' && !st.picked.includes(x.id),
+      )
+      if (!next) throw new Error('completePromote: 已解锁候选不足以点满名额')
+      await clickPromoteItem(page, next.id)
       continue
     }
     // 名额点满：整批入队，之后要么离开、要么进入首满员的阵型页

@@ -1,8 +1,9 @@
 import type { CaptainId, CharacterId } from './config'
+import { RECRUIT } from './config'
 import type { StringStorage } from './highscore'
 import { Rng } from './rng'
 
-// 招募候选池的随机源：种子绑队长、本地持久化。存储值 0 = 「未初始化」哨兵，
+// 命定卡池的随机源：种子绑队长、本地持久化。存储值 0 = 「未初始化」哨兵，
 // 第一次真正取用时以当前时间戳初始化并落盘（0 永远不会被当作实际种子）。
 // 一局任何形式的落幕（胜/败/主动放弃，收口在 run.ts endRun）都滚一个新种子；
 // 刷新页面/关浏览器/菜单里来回逛不换池——「开局立刻弃局来换池」是已知且
@@ -51,21 +52,36 @@ export function refreshRecruitSeed(storage: StringStorage | undefined, captainId
   saveSeeds(storage, seeds)
 }
 
-/** 抽一批候选：按（种子 × 已招人数）派生子流，从剩余候选中抽 k 个。
- * 纯函数——同一局内反复进出招募页、弃局重开后同样输入必得同样候选 */
-export function rollCandidates(
+/** 开局抽定整局的命定卡池：从全花名册抽 size 张（顺序即卡位，整局固定）。
+ * 纯函数——弃局重开（种子未刷）必得同样十张、同样排列 */
+export function drawRecruitPool(
   seed: number,
-  recruitedCount: number,
-  remaining: readonly CharacterId[],
-  k: number,
+  roster: readonly CharacterId[],
+  size = RECRUIT.poolSize,
 ): CharacterId[] {
-  const rng = new Rng((seed ^ Math.imul(recruitedCount + 1, 0x9e3779b9)) >>> 0)
-  const pool = [...remaining]
-  const n = Math.max(0, Math.min(k, pool.length))
+  const rng = new Rng(seed >>> 0)
+  const pool = [...roster]
+  const n = Math.max(0, Math.min(size, pool.length))
   // Fisher–Yates 只洗前 n 位
   for (let i = 0; i < n; i++) {
     const j = i + Math.floor(rng.next() * (pool.length - i))
     ;[pool[i], pool[j]] = [pool[j]!, pool[i]!]
   }
   return pool.slice(0, n)
+}
+
+/** 已开放编制数 → 解锁的卡数（查表，越界取末位并封顶池大小） */
+export function unlockedCount(openSlots: number): number {
+  const table = RECRUIT.unlocks
+  const idx = Math.max(0, Math.min(table.length - 1, openSlots - 1))
+  return Math.min(RECRUIT.poolSize, openSlots <= 0 ? 0 : table[idx]!)
+}
+
+/** 卡位 index（0 起）要到几名编制开放时才揭晓（1 起）；表外卡位视作末档 */
+export function unlockAt(index: number): number {
+  const table = RECRUIT.unlocks
+  for (let k = 0; k < table.length; k++) {
+    if (table[k]! >= index + 1) return k + 1
+  }
+  return table.length
 }
