@@ -2,8 +2,11 @@
 // 商店按策略招募/升级/购物，逐波输出战报；全灭或 20 波封顶结束。不作弊。
 import { chromium } from '@playwright/test'
 import { spawn } from 'node:child_process'
+import { mkdirSync } from 'node:fs'
 
-const OUT = '/tmp/claude-0/-home-user-warmoji/487e517d-3e3d-597f-9706-deeaf69c6517/scratchpad'
+// 截图输出目录：默认仓库内 playtest-out/（gitignored），PLAYTEST_OUT 可覆盖
+const OUT = process.env.PLAYTEST_OUT ?? 'playtest-out'
+mkdirSync(OUT, { recursive: true })
 const PORT = 4331
 const UNIT = 64
 const MAPW = 25 * UNIT
