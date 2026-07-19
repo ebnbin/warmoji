@@ -11,10 +11,10 @@ import { ANIM_SETS, animClipOf, animSetOf, bakeAnimFrame, splitSvg } from './stu
 // 动画资源与真实素材的对账：validateAnimResource 只能查格式，
 // 这里对着打包 SVG 查「部件下标是否越界」（bake 对越界静默输出空，必须显式测）
 function loadPack(): ReturnType<typeof parseEmojiPack> {
-  const index = JSON.parse(readFileSync('public/emoji/index.json', 'utf8')) as Parameters<
+  const index = JSON.parse(readFileSync('src/assets/emoji/index.json', 'utf8')) as Parameters<
     typeof parseEmojiPack
   >[0]
-  const text = readFileSync('public/emoji/pack.txt', 'utf8')
+  const text = readFileSync('src/assets/emoji/pack.txt', 'utf8')
   return parseEmojiPack(index, text)
 }
 

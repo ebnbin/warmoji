@@ -1,4 +1,4 @@
-import pickupsJson from '../gen/pickups.json'
+import pickupsJson from '../assets/pickups.json'
 
 // 拾取物（pickup）：战场上等待拾取的掉落实体（金币/宝箱）。同组同管线
 // 磁吸与拾取（battle/pickups.ts，data 标记分流）；掉率/开箱抽取是掉落

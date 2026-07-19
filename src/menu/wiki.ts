@@ -10,7 +10,7 @@ import type { ItemDef } from '../items/registry'
 import { captainStatGroups, characterStatGroups, ABILITY_KIND_LABEL, abilityStatLines } from './stats'
 
 // 图鉴：零维护成本地聚合各注册表——新增 entity 自动出现在图鉴里。
-// 完整 emoji 列表的清单由构建期生成（public/emoji/<版本>/manifest.json），
+// 完整 emoji 列表来自打包索引（构建资产，PreloadScene 已预加载），
 // 已收录集合 = 各注册表用到的全部 emoji（语义层，与描边/预载清单无关）。
 
 export interface WikiEntry {

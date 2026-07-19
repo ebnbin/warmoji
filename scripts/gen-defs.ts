@@ -9,7 +9,7 @@ import { PICKUPS } from '../defs/pickups.ts'
 import type { ItemDef } from '../src/items/registry'
 import type { CharacterDef } from '../src/characters/registry'
 
-// 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/gen/*.json。
+// 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json。
 // 校验全部在此完成（形状/数值/交叉引用/可序列化），运行时零校验直读。
 // 任何一条失败即退出非零，构建中止。
 
@@ -141,9 +141,9 @@ if (errors.length > 0) {
   process.exit(1)
 }
 
-mkdirSync('src/gen', { recursive: true })
+mkdirSync('src/assets', { recursive: true })
 const write = (name: string, data: unknown): void =>
-  writeFileSync(`src/gen/${name}.json`, JSON.stringify(data, null, 1) + '\n')
+  writeFileSync(`src/assets/${name}.json`, JSON.stringify(data, null, 1) + '\n')
 write('abilities', ABILITIES)
 write('characters', CHARACTERS)
 write('captains', CAPTAINS)
@@ -151,4 +151,4 @@ write('enemies', { enemies: ENEMIES, boss: BOSS, mix: ENEMY_MIX })
 write('items', ITEMS)
 write('maps', MAPS)
 write('pickups', PICKUPS)
-console.log('gen-defs：7 张表校验通过，已生成 src/gen/*.json')
+console.log('gen-defs：7 张表校验通过，已生成 src/assets/*.json')

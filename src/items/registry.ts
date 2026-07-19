@@ -1,4 +1,4 @@
-import itemsJson from '../gen/items.json'
+import itemsJson from '../assets/items.json'
 import type { UpgradeTiers } from '../characters/registry'
 import type { CharacterId, CharacterDef } from '../characters/registry'
 import type { AbilityDef } from '../abilities/defs'

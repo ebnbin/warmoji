@@ -3,11 +3,12 @@ import { OUTLINE } from './svg'
 import type { OutlineKind } from './svg'
 import { emojiCodepoints } from './codepoints'
 import { packSvg, parseEmojiPack } from './pack'
-import type { EmojiPack } from './pack'
+import type { EmojiIndex, EmojiPack } from './pack'
 import { EMOJI_PAD, outlineSvg, padSvg, setSvgSize } from './svg'
 
 // twemoji 全集打包资源（构建期由 sync-emoji.mjs 生成 index.json + pack.txt，
-// 图形 CC-BY 4.0）：全库仅两个请求，之后任意 emoji 的 SVG 文本同步可取。
+// 图形 CC-BY 4.0）：两个文件是带内容 hash 的构建资产，与代码同版本原子部署，
+// PreloadScene 门禁预加载后经 primeEmojiPack 注入，任意 emoji 的 SVG 文本同步可取。
 // 纹理管线：SVG 文本 → core/svg.ts 纯函数改写 → 光栅化 → Phaser 纹理；
 // 描边按阵营配色（player 黑 / enemy 紫 / enemyProjectile 红），每色一个纹理变体。
 // 启动只预载 PRELOAD_EMOJIS，其余按需 ensureEmoji，超 LRU 上限淘汰最久未用。
@@ -20,27 +21,28 @@ const pinned = new Set<string>()
 let useTick = 0
 
 let packPromise: Promise<EmojiPack> | undefined
+let resolvePack: ((pack: EmojiPack) => void) | undefined
 
-/** 加载打包资源（幂等，全局仅一次两个请求） */
-export function loadEmojiPack(): Promise<EmojiPack> {
+function packDeferred(): Promise<EmojiPack> {
   if (!packPromise) {
-    // 路径不带版本：跨部署时旧 JS 也能取到新资源（版本在 index.json 内容里）
-    const base = '/emoji'
-    packPromise = Promise.all([
-      fetch(`${base}/index.json`).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status} ${base}/index.json`)
-        return r.json()
-      }),
-      fetch(`${base}/pack.txt`).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status} ${base}/pack.txt`)
-        return r.text()
-      }),
-    ]).then(([index, text]) => parseEmojiPack(index, text))
-    packPromise.catch(() => {
-      packPromise = undefined
+    packPromise = new Promise<EmojiPack>((resolve) => {
+      resolvePack = resolve
     })
   }
   return packPromise
+}
+
+/** 预加载注入：PreloadScene 拿到构建资产后解析并解锁全部等待方（幂等）。
+ * 解析失败即抛错——资源门禁不放行 */
+export function primeEmojiPack(index: EmojiIndex, text: string): void {
+  const pack = parseEmojiPack(index, text)
+  void packDeferred()
+  resolvePack?.(pack)
+}
+
+/** 打包资源（PreloadScene 注入前保持等待） */
+export function loadEmojiPack(): Promise<EmojiPack> {
+  return packDeferred()
 }
 
 /** emoji → 完整 SVG 文本（从打包资源取；未收录即抛错）。

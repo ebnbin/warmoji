@@ -1,4 +1,4 @@
-import abilitiesJson from '../gen/abilities.json'
+import abilitiesJson from '../assets/abilities.json'
 import type { AbilityDef } from './defs'
 
 // 击退：命中冲量按指数衰减（时间常数 tauMs），实际位移 ≈ 冲量 × tauMs/1000；

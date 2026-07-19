@@ -1,4 +1,4 @@
-import enemiesJson from '../gen/enemies.json'
+import enemiesJson from '../assets/enemies.json'
 import type { AbilityDef } from '../abilities/defs'
 import type { GroundEffectDef } from '../groundEffects/defs'
 

@@ -1,4 +1,4 @@
-import captainsJson from '../gen/captains.json'
+import captainsJson from '../assets/captains.json'
 import type { AbilityDef } from '../abilities/defs'
 
 // 队长：不登场、无实体的团队增益提供者（emotion 表情形象）。

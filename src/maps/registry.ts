@@ -1,4 +1,4 @@
-import mapsJson from '../gen/maps.json'
+import mapsJson from '../assets/maps.json'
 import type { Palette } from '../lib/palette'
 
 // 地图 = 关卡：一种玩法一个主题——黑森林（有界竞技场）、荒漠（无限世界

@@ -420,7 +420,7 @@ export interface AnimResourceEntry {
 export interface AnimResource {
   readonly format: string
   readonly def: { readonly frames: number; readonly durMs: number }
-  /** key = emoji 的 codepoints（与 public/emoji 下的 SVG 文件名一致） */
+  /** key = emoji 的 codepoints（与打包索引的 c 键一致） */
   readonly animations: Readonly<Record<string, AnimResourceEntry>>
 }
 

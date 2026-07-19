@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/sync-emoji.mjs && npm run gen",
+    "predev": "npm run gen",
     "dev": "vite",
-    "prebuild": "node scripts/sync-emoji.mjs && npm run gen",
+    "prebuild": "npm run gen",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -14,7 +14,7 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run e2e",
-    "gen": "node scripts/gen-defs.ts",
+    "gen": "node scripts/sync-emoji.mjs && node scripts/gen-defs.ts",
     "pretypecheck": "npm run gen",
     "pretest": "npm run gen"
   },

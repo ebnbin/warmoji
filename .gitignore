@@ -7,4 +7,4 @@ playtest-out/
 *.log
 .DS_Store
 public/emoji/
-src/gen/
+src/assets/

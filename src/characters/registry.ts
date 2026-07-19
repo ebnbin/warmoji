@@ -1,4 +1,4 @@
-import charactersJson from '../gen/characters.json'
+import charactersJson from '../assets/characters.json'
 import type { AbilityDef } from '../abilities/defs'
 
 // 角色花名册：角色 → 能力为单向绑定（角色配装固定；能力可被复用）。
