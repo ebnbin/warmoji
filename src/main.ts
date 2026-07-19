@@ -139,7 +139,8 @@ window.__spawnArmedEnemy = (weaponId: string, dxU = 3, dyU = 0): void => {
     if (!game.scene.isActive(key)) continue
     const sc = game.scene.getScene(key) as BaseArenaScene
     const px = toPx({ ...base, weapons: [w] })
-    sc.materializeEnemy(px, sc.center.x + dxU * UNIT, sc.center.y + dyU * UNIT, px.hp)
+    // 高耐久投放：观测期不被队伍火力秒掉（首发前阵亡会让断言竞态）
+    sc.materializeEnemy(px, sc.center.x + dxU * UNIT, sc.center.y + dyU * UNIT, px.hp * 100)
   }
 }
 // e2e 行为探针：在队伍中心附近撒落地金币（偷币鼠用例）

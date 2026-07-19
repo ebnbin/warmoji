@@ -207,11 +207,16 @@ test('持械敌人：敌方 ctx 驱动武器朝队员开火，敌弹入组并命
     const game = window.__game as { scene: { keys: Record<string, { members: { alive: boolean; hp: number }[] }> } }
     return game.scene.keys['arena']!.members.filter((m) => m.alive).reduce((s, m) => s + m.hp, 0)
   })
-  await page.evaluate(() => window.__spawnArmedEnemy!('tomatoThrow', 4, 0))
+  await page.evaluate(() => window.__spawnArmedEnemy!('tomatoThrow', 2.5, 0))
+  // 波末场景切换窗口里组会被销毁：探针必须吞异常返回 false，而不是炸掉 waitForFunction
   await page.waitForFunction(
     () => {
-      const game = window.__game as { scene: { keys: Record<string, { enemyShots: { getLength(): number } }> } }
-      return game.scene.keys['arena']!.enemyShots.getLength() > 0
+      try {
+        const game = window.__game as { scene: { keys: Record<string, { enemyShots: { getLength(): number } }> } }
+        return game.scene.keys['arena']!.enemyShots.getLength() > 0
+      } catch {
+        return false
+      }
     },
     undefined,
     { timeout: 30_000 },
@@ -219,9 +224,13 @@ test('持械敌人：敌方 ctx 驱动武器朝队员开火，敌弹入组并命
   // 敌械弹按队员受击结算扣血（自然接触伤害也会扣，此断言验证的是伤害通路整体连通）
   await page.waitForFunction(
     (before) => {
-      const game = window.__game as { scene: { keys: Record<string, { members: { alive: boolean; hp: number }[] }> } }
-      const now = game.scene.keys['arena']!.members.filter((m) => m.alive).reduce((s, m) => s + m.hp, 0)
-      return now < before
+      try {
+        const game = window.__game as { scene: { keys: Record<string, { members: { alive: boolean; hp: number }[] }> } }
+        const now = game.scene.keys['arena']!.members.filter((m) => m.alive).reduce((s, m) => s + m.hp, 0)
+        return now < before
+      } catch {
+        return false
+      }
     },
     hpBefore,
     { timeout: 30_000 },
