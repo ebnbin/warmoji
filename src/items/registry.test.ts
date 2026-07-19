@@ -211,24 +211,20 @@ describe('效果叠加', () => {
 describe('武器参数修正', () => {
   it('rangeMul 缩放空间参数，不动伤害/冷却', () => {
     const fx = { ...aggregateCharacterEffects([]), rangeMul: 1.5 }
-    const src = WEAPONS.arcaneBlast
-    if (src.kind !== 'areaBlast') throw new Error('数据 kind 应为 areaBlast')
-    const blast = resolveWeaponSpec(src, fx)
+    const blast = resolveWeaponSpec(WEAPONS.arcaneBlast, fx)
     if (blast.kind !== 'areaBlast') throw new Error('kind 不变')
-    expect(blast.blastRadius).toBeCloseTo(src.blastRadius * 1.5)
-    expect(blast.detectRange).toBeCloseTo(src.detectRange * 1.5)
-    expect(blast.damage).toBe(src.damage)
-    expect(blast.cooldownMs).toBe(src.cooldownMs)
+    expect(blast.blastRadius).toBeCloseTo(WEAPONS.arcaneBlast.blastRadius * 1.5)
+    expect(blast.detectRange).toBeCloseTo(WEAPONS.arcaneBlast.detectRange * 1.5)
+    expect(blast.damage).toBe(WEAPONS.arcaneBlast.damage)
+    expect(blast.cooldownMs).toBe(WEAPONS.arcaneBlast.cooldownMs)
   })
 
   it('projSpeedMul 只作用于弹速', () => {
     const fx = { ...aggregateCharacterEffects([]), projSpeedMul: 1.25 }
-    const src = WEAPONS.pistolLeft
-    if (src.kind !== 'projectile') throw new Error('数据 kind 应为 projectile')
-    const pistol = resolveWeaponSpec(src, fx)
+    const pistol = resolveWeaponSpec(WEAPONS.pistolLeft, fx)
     if (pistol.kind !== 'projectile') throw new Error('kind 不变')
-    expect(pistol.projectile.speed).toBeCloseTo(src.projectile.speed * 1.25)
-    expect(pistol.projectile.radius).toBe(src.projectile.radius)
+    expect(pistol.projectile.speed).toBeCloseTo(WEAPONS.pistolLeft.projectile.speed * 1.25)
+    expect(pistol.projectile.radius).toBe(WEAPONS.pistolLeft.projectile.radius)
   })
 })
 

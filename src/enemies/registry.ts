@@ -1,6 +1,4 @@
-import { hydrate } from '../lib/hydrate'
 import { UNIT } from '../lib/units'
-import enemiesJson from './enemies.json'
 
 // 敌人：behavior 决定战斗内行为分支（ArenaScene 按此分派）。
 // chase 直追最近队员；wanderFire 游荡+朝移动方向放枪；dash 探测→蓄力→直线突刺；
@@ -79,56 +77,158 @@ export type EnemySpec =
   | FleeFireEnemySpec
   | CoinThiefEnemySpec
 
-// 敌人数据在 enemies.json，按格书写（"Nu"），经 lib/hydrate 唯一边界换算；
-// 分裂（泡泡 → 小泡泡）在数据里是 ID 引用，加载时解析成 spec 对象。
-export type MixKind = 'zombie' | 'ghost' | 'invader' | 'boar' | 'snake' | 'mushroom' | 'rat' | 'blob'
-
-interface BossRing {
-  readonly count: number
-  readonly intervalMs: number
-  readonly bullet: EnemyBulletSpec
+export const ZOMBIE: ChaseEnemySpec = {
+  kind: 'zombie',
+  behavior: 'chase',
+  emoji: '🧟',
+  name: '僵尸',
+  desc: '缓慢但成群，最基础的追击者',
+  size: 1.35 * UNIT,
+  radius: 0.5 * UNIT,
+  hp: 60,
+  speed: 1.375 * UNIT,
+  damage: 8,
+  xp: 3,
+  coins: 2,
 }
 
-// 终局 Boss（末波）：大体型 + 周期环形弹幕 + 蓄力突刺；击退免疫。
-// 血量固定不吃时间成长曲线（按满编 18 波队伍粗校准），击败或撑满时长皆通关
-export interface BossSpec {
-  readonly emoji: string
-  readonly name: string
-  readonly size: number
-  readonly radius: number
-  readonly hp: number
-  readonly speed: number
-  readonly damage: number
-  readonly xp: number
-  readonly coins: number
-  readonly ring: BossRing
-  readonly dash: { readonly intervalMs: number; readonly windupMs: number; readonly speed: number; readonly durationMs: number }
-  readonly spawnRelief: number
+export const GHOST: ChaseEnemySpec = {
+  kind: 'ghost',
+  behavior: 'chase',
+  emoji: '👻',
+  name: '幽灵',
+  desc: '飘得很快的追击者，血薄',
+  size: 1.2 * UNIT,
+  radius: 0.45 * UNIT,
+  hp: 25,
+  speed: 2.875 * UNIT,
+  damage: 5,
+  xp: 2,
+  coins: 2,
 }
 
-type SpecRow = EnemySpec & { split?: { into: unknown; count: number } }
-const data = hydrate<{
-  specs: Record<string, SpecRow>
-  mix: readonly { kind: MixKind; sinceWave: number; base: number; perWave: number; min: number; max: number }[]
-  boss: BossSpec
-}>(enemiesJson)
-for (const s of Object.values(data.specs)) {
-  if (s.split && typeof s.split.into === 'string') {
-    const target = data.specs[s.split.into]
-    if (!target) throw new Error(`未知分裂目标: ${s.split.into}`)
-    s.split.into = target
-  }
+/** 游荡射手：不索敌，慢速乱逛，周期性朝自己移动方向放一发慢弹（弹幕污染走位空间） */
+export const INVADER: WanderFireEnemySpec = {
+  kind: 'invader',
+  behavior: 'wanderFire',
+  emoji: '👾',
+  name: '外星怪',
+  desc: '不追人，游荡途中朝前方吐慢速弹',
+  size: 1.25 * UNIT,
+  radius: 0.48 * UNIT,
+  hp: 40,
+  speed: 0.9 * UNIT,
+  damage: 6,
+  xp: 4,
+  coins: 3,
+  fireIntervalMs: 2800,
+  bullet: { emoji: '🔴', size: 0.4 * UNIT, radius: 0.14 * UNIT, speed: 3 * UNIT, damage: 6, lifeMs: 4500 },
 }
-const S = data.specs
-export const ZOMBIE = S['zombie']! as ChaseEnemySpec
-export const GHOST = S['ghost']! as ChaseEnemySpec
-export const INVADER = S['invader']! as WanderFireEnemySpec
-export const BOAR = S['boar']! as DashEnemySpec
-export const SNAKE = S['snake']! as FleeFireEnemySpec
-export const MUSHROOM = S['mushroom']! as ChaseEnemySpec
-export const RAT = S['rat']! as CoinThiefEnemySpec
-export const BLOBLING = S['blobling']! as ChaseEnemySpec
-export const BLOB = S['blob']! as ChaseEnemySpec
+
+/** 突刺怪：探测圈内锁定蓄力方向 → 短延迟 → 直线冲刺一段距离（横向位移可躲） */
+export const BOAR: DashEnemySpec = {
+  kind: 'boar',
+  behavior: 'dash',
+  emoji: '🐗',
+  name: '野猪',
+  desc: '发现猎物后蓄力直线突刺，横向可躲',
+  size: 1.4 * UNIT,
+  radius: 0.52 * UNIT,
+  hp: 80,
+  speed: 1.1 * UNIT,
+  damage: 10,
+  xp: 5,
+  coins: 3,
+  detectRange: 4 * UNIT,
+  windupMs: 550,
+  dashSpeed: 8 * UNIT,
+  dashDist: 3.5 * UNIT,
+  cooldownMs: 1800,
+}
+
+/** 逃跑射手：见人就拉开距离，周期性朝人吐慢速毒弹（制造追不追的抉择） */
+export const SNAKE: FleeFireEnemySpec = {
+  kind: 'snake',
+  behavior: 'fleeFire',
+  emoji: '🐍',
+  name: '毒蛇',
+  desc: '见人就溜，边逃边回头吐毒弹',
+  size: 1.25 * UNIT,
+  radius: 0.45 * UNIT,
+  hp: 35,
+  speed: 2.4 * UNIT,
+  damage: 5,
+  xp: 4,
+  coins: 3,
+  fleeRange: 5 * UNIT,
+  fireIntervalMs: 2600,
+  bullet: { emoji: '🟢', size: 0.4 * UNIT, radius: 0.14 * UNIT, speed: 3.2 * UNIT, damage: 5, lifeMs: 4500 },
+}
+
+/** 毒爆怪：慢速近战，死亡原地留毒液池（别在自己的风筝路线上打爆它） */
+export const MUSHROOM: ChaseEnemySpec = {
+  kind: 'mushroom',
+  behavior: 'chase',
+  emoji: '🍄',
+  name: '毒蘑菇',
+  desc: '死亡时在原地留下一片毒液',
+  size: 1.25 * UNIT,
+  radius: 0.46 * UNIT,
+  hp: 50,
+  speed: 1 * UNIT,
+  damage: 6,
+  xp: 4,
+  coins: 3,
+  poison: { radius: 1.6 * UNIT, durationMs: 3000, tickMs: 500, damage: 4 },
+}
+
+/** 偷金币鼠：不理玩家，直奔地上最近的金币吃掉；击杀吐回吃掉的 + 1 枚利息 */
+export const RAT: CoinThiefEnemySpec = {
+  kind: 'rat',
+  behavior: 'coinThief',
+  emoji: '🐀',
+  name: '偷币鼠',
+  desc: '专偷地上的金币，击杀可全额讨回并有利息',
+  size: 1.05 * UNIT,
+  radius: 0.4 * UNIT,
+  hp: 30,
+  speed: 3.2 * UNIT,
+  damage: 3,
+  xp: 3,
+  coins: 2,
+}
+
+export const BLOBLING: ChaseEnemySpec = {
+  kind: 'blobling',
+  behavior: 'chase',
+  emoji: '🫧',
+  name: '小泡泡',
+  desc: '泡泡分裂出的迷你体，快而脆',
+  size: 0.75 * UNIT,
+  radius: 0.28 * UNIT,
+  hp: 18,
+  speed: 2.6 * UNIT,
+  damage: 4,
+  xp: 1,
+  coins: 0,
+}
+
+/** 分裂怪：死亡分裂成 2 只更小更快的迷你泡泡 */
+export const BLOB: ChaseEnemySpec = {
+  kind: 'blob',
+  behavior: 'chase',
+  emoji: '🫧',
+  name: '泡泡',
+  desc: '被击破时分裂成两只小泡泡',
+  size: 1.55 * UNIT,
+  radius: 0.55 * UNIT,
+  hp: 70,
+  speed: 1.2 * UNIT,
+  damage: 6,
+  xp: 4,
+  coins: 3,
+  split: { into: BLOBLING, count: 2 },
+}
 
 export const ENEMY_SPECS: readonly EnemySpec[] = [
   ZOMBIE,
@@ -143,11 +243,17 @@ export const ENEMY_SPECS: readonly EnemySpec[] = [
 ]
 
 // 出场配比：新怪按波次渐入（sinceWave），僵尸/幽灵始终是主体；
-// 权重随波次线性微调，zombie 有下限兜底（见本文件 enemyMixAt）
-export const ENEMY_MIX = data.mix
-
-export const BOSS = data.boss
-
+// 权重随波次线性微调，zombie 有下限兜底（见 本文件 enemyMixAt）
+export const ENEMY_MIX = [
+  { kind: 'zombie', sinceWave: 1, base: 80, perWave: -2, min: 40, max: 80 },
+  { kind: 'ghost', sinceWave: 1, base: 15, perWave: 1, min: 15, max: 32 },
+  { kind: 'invader', sinceWave: 2, base: 8, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'boar', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'snake', sinceWave: 4, base: 7, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'mushroom', sinceWave: 4, base: 7, perWave: 0.4, min: 0, max: 14 },
+  { kind: 'rat', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'blob', sinceWave: 5, base: 7, perWave: 0.4, min: 0, max: 14 },
+] as const
 
 // 刷怪节奏（波次制）：第 1 波基础火力可稳过，随跨波累计战斗时长持续加压，
 // 后期压力超出基础火力，由商店成长补差
@@ -188,6 +294,31 @@ export const SURGE = {
   elites: 3,
   /** 潮水在这段时间内陆续落地 */
   spreadMs: 2600,
+} as const
+
+// 终局 Boss（末波）：大体型 + 周期环形弹幕 + 蓄力突刺；击退免疫。
+// 血量固定不吃时间成长曲线（按满编 18 波队伍粗校准），击败或撑满时长皆通关
+export const BOSS = {
+  emoji: '👹',
+  name: '赤鬼',
+  size: 3.2 * UNIT,
+  radius: 1.05 * UNIT,
+  hp: 6000,
+  /** 平时缓速逼近队伍中心 */
+  speed: 1.4 * UNIT,
+  damage: 20,
+  xp: 60,
+  coins: 60,
+  /** 环形弹幕：周期性向四周均匀发射（带随机整体旋转） */
+  ring: {
+    count: 12,
+    intervalMs: 2800,
+    bullet: { emoji: '🟣', size: 0.45 * UNIT, radius: 0.16 * UNIT, speed: 2.4 * UNIT, damage: 8, lifeMs: 6000 },
+  },
+  /** 突刺循环：蓄力提示后朝队伍中心猛冲 */
+  dash: { intervalMs: 5600, windupMs: 750, speed: 8 * UNIT, durationMs: 450 },
+  /** 终波常规刷怪减压倍率（间隔 ×N）：把火力焦点留给 Boss */
+  spawnRelief: 2,
 } as const
 
 const BY_KIND: Record<(typeof ENEMY_MIX)[number]['kind'], EnemySpec> = {
