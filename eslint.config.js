@@ -50,6 +50,7 @@ export default tseslint.config(
         console: 'readonly',
         process: 'readonly',
         URL: 'readonly',
+        fetch: 'readonly',
         setTimeout: 'readonly',
         window: 'readonly',
         localStorage: 'readonly',

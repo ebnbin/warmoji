@@ -3,8 +3,8 @@
 //   src/assets/emoji/index.json —— Unicode 官方索引（CLDR 顺序）与 twemoji
 //     的交集：key/字符/英文名/分组 + 全库统一 header；行序即打包文件行序
 //   src/assets/emoji/pack.txt   —— 每行一个去 header 的 SVG 正文
-// 一切以官方数据为准：Unicode 索引来自 scripts/data/emoji-test.txt（unicode.org
-// 原文），twemoji 形态逐文件实测。所有例外（header 变体/换行/引用）显式处理，
+// 一切以官方数据为准：Unicode 索引按需从 unicode.org 官方地址拉取
+//（缓存在 scripts/data/，不进 git），twemoji 形态逐文件实测。所有例外（header 变体/换行/引用）显式处理，
 // 未知情况直接报错退出，不做静默假设。
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -35,8 +35,37 @@ if (existsSync(indexPath) && existsSync(packPath)) {
 
 // ── 1. 解析 Unicode 官方索引（fully-qualified，CLDR 顺序；component 是
 //       肤色/发色零件而非独立形象，不收） ────────────────────────
-const testTxt = readFileSync(join(root, 'scripts/data/emoji-test.txt'), 'utf8')
-const unicodeVersion = /^# Version: (.+)$/m.exec(testTxt)?.[1]?.trim()
+// 索引不进 git：按需从官方地址拉取，缓存在 scripts/data/（gitignore）。
+// 版本固定（latest 会随 Unicode 发布漂移，构建必须可重现），与 twemoji-svg
+// 依赖同代——升级 twemoji 时同步改这里。路径是 17.0 起的 UCD 布局
+//（16.0 及以前在 /Public/emoji/<版本>/ 下）
+const EMOJI_TEST_VERSION = '17.0'
+const EMOJI_TEST_URL = `https://unicode.org/Public/${EMOJI_TEST_VERSION}.0/emoji/emoji-test.txt`
+const emojiTestPath = join(root, 'scripts/data/emoji-test.txt')
+
+const versionOf = (text) => /^# Version: (.+)$/m.exec(text)?.[1]?.trim()
+
+async function loadEmojiTest() {
+  if (existsSync(emojiTestPath)) {
+    const cached = readFileSync(emojiTestPath, 'utf8')
+    if (versionOf(cached) === EMOJI_TEST_VERSION) return cached
+    // 版本不符（URL 已升级而缓存是旧代）：重新下载覆盖
+  }
+  console.log(`下载 Unicode emoji 索引：${EMOJI_TEST_URL}`)
+  const res = await fetch(EMOJI_TEST_URL)
+  if (!res.ok) throw new Error(`emoji-test.txt 下载失败：HTTP ${res.status}（${EMOJI_TEST_URL}）`)
+  const text = await res.text()
+  const got = versionOf(text)
+  if (got !== EMOJI_TEST_VERSION) {
+    throw new Error(`emoji-test.txt 版本不符：期望 ${EMOJI_TEST_VERSION}，得到 ${String(got)}`)
+  }
+  mkdirSync(join(root, 'scripts/data'), { recursive: true })
+  writeFileSync(emojiTestPath, text)
+  return text
+}
+
+const testTxt = await loadEmojiTest()
+const unicodeVersion = versionOf(testTxt)
 if (!unicodeVersion) throw new Error('emoji-test.txt 缺少 Version 行')
 
 /** twemoji 文件名规则（与 src/core/emoji.ts 的 emojiCodepoints 一致）：

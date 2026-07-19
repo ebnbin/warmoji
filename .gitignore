@@ -8,3 +8,4 @@ playtest-out/
 .DS_Store
 public/emoji/
 src/assets/
+scripts/data/
