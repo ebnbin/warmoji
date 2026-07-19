@@ -48,9 +48,11 @@ describe('角色属性面板模型', () => {
   })
 
   it('数值换算：px→格、ms→秒、弧度→角度', () => {
-    const thrust = abilityStatLines(ABILITIES.hornThrust)
+    const horn = ABILITIES.hornThrust
+    if (horn.kind !== 'thrust') throw new Error('kind 不变')
+    const thrust = abilityStatLines(horn)
     expect(thrust[0]).toBe('伤害 26 · 冷却 0.9秒 · 击退 0.9格')
-    expect(thrust[1]).toContain(`触及 ${ABILITIES.hornThrust.reach}格`)
+    expect(thrust[1]).toContain(`触及 ${horn.reach}格`)
     const sweep = abilityStatLines(ABILITIES.axeSweep)
     expect(sweep[1]).toContain('弧宽 150°')
     const blast = abilityStatLines(ABILITIES.arcaneBlast)

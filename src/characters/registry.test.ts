@@ -115,6 +115,7 @@ describe('升级卡换持档位行', () => {
     if (med2?.kind !== 'heal') throw new Error('kind 不变')
     expect(med2.aoe?.ratio).toBeCloseTo(0.6)
     expect(med2.defib?.reviveCutMs).toBe(2000)
-    expect(dart2).toBe(CHARACTERS.medic.abilities[1])
+    // JSON 化后档位行内联为拷贝：断言同值而非同一对象
+    expect(dart2).toEqual(CHARACTERS.medic.abilities[1])
   })
 })

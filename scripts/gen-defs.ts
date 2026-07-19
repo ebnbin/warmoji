@@ -1,0 +1,130 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { ABILITIES } from '../defs/abilities.ts'
+import { CHARACTERS, CAPTAINS } from '../defs/characters.ts'
+import { ENEMIES, BOSS, ENEMY_MIX } from '../defs/enemies.ts'
+import { ITEMS } from '../defs/items.ts'
+import { MAPS } from '../defs/maps.ts'
+import type { ItemDef } from '../src/items/registry'
+import type { CharacterDef } from '../src/characters/registry'
+
+// 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/gen/*.json。
+// 校验全部在此完成（形状/数值/交叉引用/可序列化），运行时零校验直读。
+// 任何一条失败即退出非零，构建中止。
+
+const errors: string[] = []
+function bad(path: string, msg: string): void {
+  errors.push(`${path}: ${msg}`)
+}
+function num(path: string, v: unknown, min = 0): void {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < min) bad(path, `需为 ≥${min} 的有限数，得到 ${String(v)}`)
+}
+function str(path: string, v: unknown): void {
+  if (typeof v !== 'string' || v.length === 0) bad(path, '需为非空字符串')
+}
+
+/** 纯静态性：JSON 往返后深度相等（函数/undefined/类实例在此现形） */
+function pure(path: string, v: unknown): void {
+  const roundtrip: unknown = JSON.parse(JSON.stringify(v))
+  if (JSON.stringify(roundtrip) !== JSON.stringify(v)) bad(path, '含不可序列化内容')
+}
+
+const ABILITY_KINDS = new Set([
+  'projectile', 'thrust', 'sweep', 'areaBlast', 'boomerang', 'laser',
+  'slowAura', 'assassinate', 'turret', 'summon', 'heal', 'chainArc',
+])
+
+function checkAbility(path: string, a: Record<string, unknown>): void {
+  if (!ABILITY_KINDS.has(a.kind as string)) bad(path, `未知 kind：${String(a.kind)}`)
+  str(`${path}.name`, a.name)
+  str(`${path}.icon`, a.icon)
+}
+
+// ── abilities ──
+for (const [id, a] of Object.entries(ABILITIES)) {
+  checkAbility(`abilities.${id}`, a as unknown as Record<string, unknown>)
+  pure(`abilities.${id}`, a)
+}
+
+// ── characters + captains ──
+for (const [id, c] of Object.entries<CharacterDef>(CHARACTERS as Record<string, CharacterDef>)) {
+  const p = `characters.${id}`
+  str(`${p}.emoji`, c.emoji)
+  str(`${p}.name`, c.name)
+  if (c.abilities.length === 0) bad(p, '基础配装为空')
+  if (c.upgrades.length !== 2) bad(p, '升级档位必须恰为 2')
+  for (const [ti, u] of c.upgrades.entries()) {
+    str(`${p}.upgrades[${ti}].name`, u.name)
+    if (u.abilities.length !== c.abilities.length) bad(`${p}.upgrades[${ti}]`, '换持不得增减能力数量')
+    for (const [ai, a] of u.abilities.entries()) checkAbility(`${p}.upgrades[${ti}].abilities[${ai}]`, a as unknown as Record<string, unknown>)
+  }
+  for (const [ai, a] of c.abilities.entries()) checkAbility(`${p}.abilities[${ai}]`, a as unknown as Record<string, unknown>)
+  pure(p, c)
+}
+for (const [id, c] of Object.entries(CAPTAINS)) {
+  const p = `captains.${id}`
+  str(`${p}.emoji`, c.emoji)
+  num(`${p}.teamSize`, c.teamSize, 1)
+  num(`${p}.skill.cdMs`, c.skill.cdMs, 1)
+  pure(p, c)
+}
+
+// ── enemies ──
+function checkEnemy(path: string, e: (typeof ENEMIES)[string]): void {
+  str(`${path}.emoji`, e.emoji)
+  str(`${path}.name`, e.name)
+  num(`${path}.hp`, e.hp, 1)
+  num(`${path}.speed`, e.speed)
+  num(`${path}.radius`, e.radius)
+  for (const [i, a] of (e.abilities ?? []).entries()) checkAbility(`${path}.abilities[${i}]`, a as unknown as Record<string, unknown>)
+  for (const [i, fx] of (e.onDeath ?? []).entries()) {
+    if (fx.kind === 'split') checkEnemy(`${path}.onDeath[${i}].into`, fx.into)
+    if (fx.kind === 'poison') num(`${path}.onDeath[${i}].damage`, fx.damage, 1)
+  }
+}
+for (const [kind, e] of Object.entries(ENEMIES)) {
+  if (e.kind !== kind) bad(`enemies.${kind}`, `kind 与键不一致：${e.kind}`)
+  checkEnemy(`enemies.${kind}`, e)
+  pure(`enemies.${kind}`, e)
+}
+checkEnemy('boss', BOSS)
+pure('boss', BOSS)
+for (const m of ENEMY_MIX) {
+  if (!(m.kind in ENEMIES)) bad(`mix.${m.kind}`, '引用了不存在的敌人 kind')
+}
+
+// ── items ──
+const characterIds = new Set(Object.keys(CHARACTERS))
+for (const [id, it] of Object.entries<ItemDef>(ITEMS as Record<string, ItemDef>)) {
+  const p = `items.${id}`
+  str(`${p}.emoji`, it.emoji)
+  str(`${p}.name`, it.name)
+  num(`${p}.price`, it.price, 1)
+  if (it.forCharacter !== undefined && !characterIds.has(it.forCharacter)) {
+    bad(p, `forCharacter 引用了不存在的角色：${it.forCharacter}`)
+  }
+  pure(p, it)
+}
+
+// ── maps ──
+for (const [id, m] of Object.entries(MAPS)) {
+  const p = `maps.${id}`
+  str(`${p}.emoji`, m.emoji)
+  if (!['bounded', 'infinite', 'river', 'void'].includes(m.kind)) bad(p, `未知 kind：${m.kind}`)
+  pure(p, m)
+}
+
+if (errors.length > 0) {
+  console.error(`gen-defs 校验失败（${errors.length} 条）：`)
+  for (const e of errors) console.error('  ' + e)
+  process.exit(1)
+}
+
+mkdirSync('src/gen', { recursive: true })
+const write = (name: string, data: unknown): void =>
+  writeFileSync(`src/gen/${name}.json`, JSON.stringify(data, null, 1) + '\n')
+write('abilities', ABILITIES)
+write('characters', { characters: CHARACTERS, captains: CAPTAINS })
+write('enemies', { enemies: ENEMIES, boss: BOSS, mix: ENEMY_MIX })
+write('items', ITEMS)
+write('maps', MAPS)
+console.log('gen-defs：5 张表校验通过，已生成 src/gen/*.json')

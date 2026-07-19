@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { BLOB, ENEMY_DEFS, MUSHROOM, ZOMBIE } from './registry'
+import { ENEMY_DEFS } from './registry'
 import { enemyMixAt, fleeSteer, pickEnemy } from './registry'
+
+const ZOMBIE = ENEMY_DEFS.find((e) => e.kind === 'zombie')!
+const MUSHROOM = ENEMY_DEFS.find((e) => e.kind === 'mushroom')!
+const BLOB = ENEMY_DEFS.find((e) => e.kind === 'blob')!
 import { Rng } from '../lib/rng'
 
 describe('敌人规格', () => {

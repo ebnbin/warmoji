@@ -1,5 +1,5 @@
+import mapsJson from '../gen/maps.json'
 import type { Palette } from '../lib/palette'
-import { hslToInt } from '../lib/palette'
 
 // 地图 = 关卡：一种玩法一个主题——黑森林（有界竞技场）、荒漠（无限世界
 // + 终波缩圈）、奔流（单屏河流 + 水流漂移），每张图都是不同的世界规则。
@@ -32,89 +32,11 @@ export interface MapDef {
   // 未来扩展位：难度曲线 / 专属怪物表 / 开局 buff 等字段后续追加
 }
 
-export const MAPS = {
-  forest: {
-    emoji: '🌲',
-    name: '黑森林',
-    desc: '苍郁密林，落叶与蕨草铺满林间空地',
-    kind: 'bounded',
-    palette: {
-      bgFrom: 'hsl(150 30% 30%)',
-      bgTo: 'hsl(170 32% 17%)',
-      map: hslToInt(110, 0.3, 0.7),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['🌲', '🌳', '🌿', '🍂', '🍃', '🪨'],
-      sizeU: [0.35, 0.95],
-      alpha: [0.14, 0.26],
-      density: [0.1, 0.14],
-    },
-  },
-  desert: {
-    emoji: '🏜️',
-    name: '荒漠',
-    desc: '无边的大漠，可朝任意方向走到天涯；终波赤鬼降临时毒雾收拢成圈',
-    kind: 'infinite',
-    palette: {
-      bgFrom: 'hsl(30 42% 36%)',
-      bgTo: 'hsl(15 38% 20%)',
-      map: hslToInt(45, 0.48, 0.76),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['🌵', '🪨', '🦴', '💀', '🥀'],
-      sizeU: [0.35, 0.9],
-      alpha: [0.14, 0.26],
-      // 荒漠刻意更稀疏
-      density: [0.08, 0.11],
-    },
-  },
-  river: {
-    emoji: '🌊',
-    name: '奔流',
-    desc: '一条永不停歇的大河，万物皆随波逐流；两岸静看你逆流而战',
-    kind: 'river',
-    palette: {
-      // 页面底色呼应「棕岸 + 蓝水」主题
-      bgFrom: 'hsl(28 32% 30%)',
-      bgTo: 'hsl(205 38% 15%)',
-      // map 色即河水基色（浅亮蓝，与棕色两岸强对比；岸带由场景另行绘制）
-      map: hslToInt(197, 0.52, 0.66),
-      shadow: 0x000000,
-    },
-    decor: {
-      // 岸上静态植被（战斗区外，透明度可比战斗区装饰略高）
-      emojis: ['🌾', '🌿', '🪨', '🌳', '🍄'],
-      sizeU: [0.4, 0.8],
-      alpha: [0.3, 0.45],
-      density: [0.1, 0.14],
-    },
-    drift: ['🍃', '🌸', '🫧', '🍂'],
-  },
-  void: {
-    emoji: '🌀',
-    name: '虚空',
-    desc: '悬浮虚空的一方战场，四边皆是传送门——穿出此缘，即现彼缘',
-    kind: 'void',
-    palette: {
-      bgFrom: 'hsl(258 32% 14%)',
-      bgTo: 'hsl(240 45% 7%)',
-      // map 色即虚空地板（深邃暗紫，实体与星光在其上高对比）
-      map: hslToInt(252, 0.28, 0.15),
-      shadow: 0x000000,
-    },
-    decor: {
-      // 星空点缀（静态散布，低透明度）
-      emojis: ['✨', '⭐', '💫', '🪐', '☄️'],
-      sizeU: [0.2, 0.65],
-      alpha: [0.18, 0.34],
-      density: [0.05, 0.08],
-    },
-  },
-} as const satisfies Record<string, MapDef>
+// 地图表：数据行在 defs/maps.ts（创作层），npm run gen 生成 maps.json
+export type MapId = keyof typeof mapsJson
+export const MAPS = mapsJson as unknown as Record<MapId, MapDef>
 
-export type MapId = keyof typeof MAPS
+
 export const MAP_IDS = Object.keys(MAPS) as readonly MapId[]
 
 export function sanitizeMapId(id: unknown): MapId {

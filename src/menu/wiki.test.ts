@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { CAPTAINS, CHARACTERS } from '../characters/registry'
-import { BLOB, BOAR, ENEMY_DEFS, INVADER, MUSHROOM } from '../enemies/registry'
+import { ENEMY_DEFS } from '../enemies/registry'
+const BLOB = ENEMY_DEFS.find((e) => e.kind === 'blob')!
+const BOAR = ENEMY_DEFS.find((e) => e.kind === 'boar')!
+const INVADER = ENEMY_DEFS.find((e) => e.kind === 'invader')!
+const MUSHROOM = ENEMY_DEFS.find((e) => e.kind === 'mushroom')!
 import { codepointsToEmoji, emojiCodepoints } from '../emoji/codepoints'
 import { ITEMS } from '../items/registry'
 import { enemyStatLines, usedEmojiSet, wikiEntryByEmoji, wikiGroups } from './wiki'
