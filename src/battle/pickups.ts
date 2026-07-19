@@ -1,8 +1,7 @@
 import { playSfx } from '../audio/sfx'
-import { CAPTAINS, CHARACTERS, MEMBER, TEAM } from '../characters/registry'
+import { CAPTAINS, CHARACTERS, MEMBER, TEAM, loadoutFor } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import { emojiImage } from '../emoji/textures'
-import { applyAbilities } from '../items/abilities'
 import {
   abilityTiers,
   aggregateCharacterEffects,
@@ -166,7 +165,7 @@ function refreshMemberItems(scene: BaseArenaScene, slot: number): void {
   m.thorns = fx.thorns
   m.killHeal = fx.killHeal
   for (const w of m.weapons) w.destroy()
-  m.weapons = applyAbilities(id, abilityTiers(id, owned), CHARACTERS[id].weapons).map((w, i) =>
+  m.weapons = loadoutFor(CHARACTERS[id], abilityTiers(id, owned)).map((w, i) =>
     createWeapon(toPx(resolveWeaponSpec(w, m.fx)), m.ctx, 200 + i * 230),
   )
   if (!m.alive) for (const w of m.weapons) w.setVisible(false)

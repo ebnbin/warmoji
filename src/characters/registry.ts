@@ -1,5 +1,38 @@
-import { WEAPONS } from '../weapons/registry'
+import {
+  WEAPONS,
+  arcaneBlast2,
+  arcaneBlast3,
+  axeSweep2,
+  axeSweep3,
+  beeSwarm2,
+  beeSwarm3,
+  boomerang2,
+  boomerang3,
+  fieldMedkit2,
+  fieldMedkit3,
+  frostAura2,
+  frostAura3,
+  hornThrust2,
+  hornThrust3,
+  laserBeam2,
+  laserBeam3,
+  pistolLeft2,
+  pistolLeft3,
+  pistolRight2,
+  pistolRight3,
+  shadowStrike2,
+  shadowStrike3,
+  sparkleBolt2,
+  sparkleBolt3,
+  tomatoThrow2,
+  tomatoThrow3,
+  voltArc2,
+  voltArc3,
+  woodTurret2,
+  woodTurret3,
+} from '../weapons/registry'
 import type { WeaponSpec } from '../weapons/spec'
+import type { AbilityTiers } from '../items/abilities'
 
 // 角色花名册：角色 → 武器为单向绑定（角色配装固定；武器可被复用）
 export interface CharacterSpec {
@@ -7,6 +40,9 @@ export interface CharacterSpec {
   readonly name: string
   readonly desc: string
   readonly weapons: readonly WeaponSpec[]
+  /** 能力卡档位配装：[一阶, 一阶+二阶]。升级 = 换持整行（weapons/registry
+   * 的 `2`/`3` 档位行），武器自身无升级逻辑 */
+  readonly upgrades?: readonly [readonly WeaponSpec[], readonly WeaponSpec[]]
   /** 环形阵移动秉性：>0 沿环迎敌滑动，<0 避敌滑动，0 安分（被推才动）；见 core/orbit.ts */
   readonly orbit: number
 }
@@ -17,6 +53,7 @@ export const CHARACTERS = {
     name: '杂耍演员',
     desc: '向最近的敌人连续抛掷番茄',
     weapons: [WEAPONS.tomatoThrow],
+    upgrades: [[tomatoThrow2], [tomatoThrow3]],
     orbit: -0.5,
   },
   unicorn: {
@@ -24,6 +61,7 @@ export const CHARACTERS = {
     name: '独角兽',
     desc: '独角向前突刺，穿透沿途敌人',
     weapons: [WEAPONS.hornThrust],
+    upgrades: [[hornThrust2], [hornThrust3]],
     orbit: 0.8,
   },
   troll: {
@@ -31,6 +69,7 @@ export const CHARACTERS = {
     name: '巨魔',
     desc: '挥舞巨斧，横扫身前扇形范围',
     weapons: [WEAPONS.axeSweep],
+    upgrades: [[axeSweep2], [axeSweep3]],
     orbit: 1,
   },
   cowboy: {
@@ -38,6 +77,7 @@ export const CHARACTERS = {
     name: '牛仔',
     desc: '左右双枪齐发，射出高速水弹',
     weapons: [WEAPONS.pistolLeft, WEAPONS.pistolRight],
+    upgrades: [[pistolLeft2, pistolRight2], [pistolLeft3, pistolRight3]],
     orbit: -0.7,
   },
   mage: {
@@ -45,6 +85,7 @@ export const CHARACTERS = {
     name: '法师',
     desc: '在远处敌人脚下引爆奥术轰炸',
     weapons: [WEAPONS.arcaneBlast],
+    upgrades: [[arcaneBlast2], [arcaneBlast3]],
     orbit: -1,
   },
   kangaroo: {
@@ -52,6 +93,7 @@ export const CHARACTERS = {
     name: '袋鼠',
     desc: '掷出回旋镖，去程回程皆可伤敌',
     weapons: [WEAPONS.boomerang],
+    upgrades: [[boomerang2], [boomerang3]],
     orbit: 0.4,
   },
   robot: {
@@ -59,6 +101,7 @@ export const CHARACTERS = {
     name: '机器人',
     desc: '手持激光器，灼穿一条直线上的所有敌人',
     weapons: [WEAPONS.laserBeam],
+    upgrades: [[laserBeam2], [laserBeam3]],
     orbit: -0.6,
   },
   snowman: {
@@ -66,6 +109,7 @@ export const CHARACTERS = {
     name: '雪人',
     desc: '以队伍中心散发寒气，持续减速范围内的敌人',
     weapons: [WEAPONS.frostAura],
+    upgrades: [[frostAura2], [frostAura3]],
     orbit: 0,
   },
   fairy: {
@@ -73,6 +117,7 @@ export const CHARACTERS = {
     name: '仙子',
     desc: '魔尘弹把敌人变形成无害的绵羊，变形期间不能伤人',
     weapons: [WEAPONS.sparkleBolt],
+    upgrades: [[sparkleBolt2], [sparkleBolt3]],
     orbit: -0.6,
   },
   assassin: {
@@ -80,6 +125,7 @@ export const CHARACTERS = {
     name: '刺客',
     desc: '瞬移到范围内血最厚的敌人背后重斩一刀，再闪回原位；出手瞬间无敌',
     weapons: [WEAPONS.shadowStrike],
+    upgrades: [[shadowStrike2], [shadowStrike3]],
     orbit: 0.5,
   },
   beaver: {
@@ -87,6 +133,7 @@ export const CHARACTERS = {
     name: '河狸工程师',
     desc: '自己不动手，定期在脚下架起自动开火的弩塔',
     weapons: [WEAPONS.woodTurret],
+    upgrades: [[woodTurret2], [woodTurret3]],
     orbit: -0.3,
   },
   queenBee: {
@@ -94,6 +141,7 @@ export const CHARACTERS = {
     name: '蜂后',
     desc: '统领一小群蜜蜂，蜂群自主追击撞刺敌人',
     weapons: [WEAPONS.beeSwarm],
+    upgrades: [[beeSwarm2], [beeSwarm3]],
     orbit: -0.2,
   },
   medic: {
@@ -101,6 +149,7 @@ export const CHARACTERS = {
     name: '军医',
     desc: '周期治疗附近血量最低的队友，顺手甩两支飞针',
     weapons: [WEAPONS.fieldMedkit, WEAPONS.syringeDart],
+    upgrades: [[fieldMedkit2, WEAPONS.syringeDart], [fieldMedkit3, WEAPONS.syringeDart]],
     orbit: -0.8,
   },
   jellyfish: {
@@ -108,9 +157,16 @@ export const CHARACTERS = {
     name: '水母',
     desc: '电弧在敌群间弹跳传导，敌人越密越疼',
     weapons: [WEAPONS.voltArc],
+    upgrades: [[voltArc2], [voltArc3]],
     orbit: 0.2,
   },
 } as const satisfies Record<string, CharacterSpec>
+
+/** 生效配装：能力卡质变 = 换持整行（一阶 → 二阶累积；未解锁用基础行） */
+export function loadoutFor(spec: CharacterSpec, tiers: AbilityTiers): readonly WeaponSpec[] {
+  if (!spec.upgrades || !tiers.a1) return spec.weapons
+  return tiers.a2 ? spec.upgrades[1] : spec.upgrades[0]
+}
 
 export type CharacterId = keyof typeof CHARACTERS
 export const ROSTER_IDS = Object.keys(CHARACTERS) as readonly CharacterId[]

@@ -13,7 +13,7 @@ import { spawnProjectile, sweepProjectiles } from './projectiles'
 import { STEERERS } from './steer'
 import { runEnemyAttacks } from './enemyAttacks'
 import { runDeathEffects } from './deathEffects'
-import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, TEAM } from '../characters/registry'
+import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, TEAM, loadoutFor } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import type { CharacterId, CharacterSpec } from '../characters/registry'
 import { SKILL } from '../characters/skill'
@@ -25,7 +25,6 @@ import { WAVE } from '../run/waves'
 import { KNOCKBACK } from '../weapons/registry'
 import { FOLLOW, HIT_SHAKE, WANDER } from './config'
 import { ORBIT } from './orbit'
-import { applyAbilities } from '../items/abilities'
 import { enemyMixAt, pickEnemy } from '../enemies/registry'
 import type { EnemyMixEntry } from '../enemies/registry'
 import { formationPosts, ringPostAngle } from './formation'
@@ -829,7 +828,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       image,
       // 错开初始冷却，避免全队同帧齐射。
       // 生效武器 = 原始配装 → 能力卡质变注入 → 空间参数按道具缩放
-      weapons: applyAbilities(id, tiers, spec.weapons).map((w, i) =>
+      weapons: loadoutFor(spec, tiers).map((w, i) =>
         createWeapon(toPx(resolveWeaponSpec(w, fx)), memberCtx, 300 + slot * 120 + i * 230),
       ),
       handle,

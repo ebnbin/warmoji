@@ -1,7 +1,7 @@
-import { ABILITIES, applyAbilities } from '../items/abilities'
+import { ABILITIES } from '../items/abilities'
 import { COIN } from '../items/registry'
 import { KNOCKBACK } from '../weapons/registry'
-import { CHARACTERS, MEMBER, TEAM } from './registry'
+import { CHARACTERS, MEMBER, TEAM, loadoutFor } from './registry'
 import type { CaptainSpec, CharacterId } from './registry'
 import {
   abilityTiers,
@@ -129,7 +129,7 @@ export function characterStatGroups(id: CharacterId, items: readonly ItemId[] = 
         return `${a.icon}「${a.name}」${a.desc}${unlocked ? '' : '（未解锁）'}`
       }),
     },
-    ...applyAbilities(id, tiers, spec.weapons).map((w) => {
+    ...loadoutFor(spec, tiers).map((w) => {
       const display = displaySpec(resolveWeaponSpec(w, fx), dmgMul, cdMul, fx.knockbackMul)
       return {
         icon: w.icon,

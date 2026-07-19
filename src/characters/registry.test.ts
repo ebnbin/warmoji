@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { CHARACTERS } from './registry'
+import { CHARACTERS, loadoutFor } from './registry'
+import type { CharacterId } from './registry'
+
+const IDS = Object.keys(CHARACTERS) as CharacterId[]
+const NONE = { a1: false, a2: false }
+const T1 = { a1: true, a2: false }
+const T2 = { a1: true, a2: true }
 
 describe('花名册', () => {
   it('emoji 不重复，每人有名字、介绍且至少 1 把武器', () => {
@@ -38,5 +44,72 @@ describe('花名册', () => {
     // 仙子的魔尘弹自带变形载荷（新引擎能力的数据入口）
     const bolt = CHARACTERS.fairy.weapons[0]!
     expect(bolt.kind === 'projectile' && bolt.hex?.morphEmoji).toBe('🐑')
+  })
+})
+
+describe('能力卡换持档位行', () => {
+  it('未购能力卡持基础行；每个角色都有两档且逐档配装实际变化', () => {
+    for (const id of IDS) {
+      const spec = CHARACTERS[id]
+      expect(loadoutFor(spec, NONE)).toBe(spec.weapons)
+      expect(spec.upgrades).toBeDefined()
+      expect(loadoutFor(spec, T1)).not.toEqual(spec.weapons)
+      expect(loadoutFor(spec, T2)).not.toEqual(loadoutFor(spec, T1))
+      // 换持不增减武器数量
+      expect(loadoutFor(spec, T1)).toHaveLength(spec.weapons.length)
+      expect(loadoutFor(spec, T2)).toHaveLength(spec.weapons.length)
+    }
+  })
+
+  it('杂耍演员：一阶齐射、二阶追加溅射', () => {
+    const [w3] = loadoutFor(CHARACTERS.juggler, T1)
+    if (w3?.kind !== 'projectile') throw new Error('kind 不变')
+    expect(w3.volley?.count).toBe(3)
+    expect(w3.splash).toBeUndefined()
+    const [w6] = loadoutFor(CHARACTERS.juggler, T2)
+    if (w6?.kind !== 'projectile') throw new Error('kind 不变')
+    expect(w6.volley?.count).toBe(3)
+    expect(w6.splash?.ratio).toBeCloseTo(0.6)
+  })
+
+  it('巨魔：一阶弧宽变整圈；牛仔双枪都获得贯穿', () => {
+    const [sweep] = loadoutFor(CHARACTERS.troll, T1)
+    if (sweep?.kind !== 'sweep') throw new Error('kind 不变')
+    expect(sweep.arcRad).toBeCloseTo(Math.PI * 2)
+    const pistols = loadoutFor(CHARACTERS.cowboy, T1)
+    expect(pistols).toHaveLength(2)
+    for (const p of pistols) {
+      if (p.kind !== 'projectile') throw new Error('kind 不变')
+      expect(p.pierce).toBe(2)
+    }
+  })
+
+  it('袋鼠二阶：镖体与判定同步放大且带磁力', () => {
+    const [b3] = loadoutFor(CHARACTERS.kangaroo, T1)
+    const [b6] = loadoutFor(CHARACTERS.kangaroo, T2)
+    if (b3?.kind !== 'boomerang' || b6?.kind !== 'boomerang') throw new Error('kind 不变')
+    expect(b3.twin).toBe(true)
+    expect(b3.coinMagnetRadius).toBeUndefined()
+    expect(b6.hitRadius).toBeCloseTo(b3.hitRadius * 1.4)
+    expect(b6.held.size).toBeCloseTo(b3.held.size * 1.4)
+    expect(b6.coinMagnetRadius).toBeGreaterThan(0)
+  })
+
+  it('雪人：一阶冻伤 dps、二阶追加冰冻脉冲；机器人二阶 8 向扫射', () => {
+    const [aura] = loadoutFor(CHARACTERS.snowman, T2)
+    if (aura?.kind !== 'slowAura') throw new Error('kind 不变')
+    expect(aura.dps).toBeGreaterThan(0)
+    expect(aura.freeze?.durationMs).toBeGreaterThan(0)
+    const [laser] = loadoutFor(CHARACTERS.robot, T2)
+    if (laser?.kind !== 'laser') throw new Error('kind 不变')
+    expect(laser.radial?.beams).toBe(8)
+  })
+
+  it('军医：档位只换治疗武器，飞针原样保留', () => {
+    const [med2, dart2] = loadoutFor(CHARACTERS.medic, T2)
+    if (med2?.kind !== 'heal') throw new Error('kind 不变')
+    expect(med2.aoe?.ratio).toBeCloseTo(0.6)
+    expect(med2.defib?.reviveCutMs).toBe(2000)
+    expect(dart2).toBe(CHARACTERS.medic.weapons[1])
   })
 })
