@@ -17,6 +17,11 @@ import { WikiScene } from './menu/WikiScene'
 import { WAVE } from './run/waves'
 import { browserStorage } from './lib/storage'
 import { getRun, grantCoins, grantXp } from './run/state'
+import { ENEMY_SPECS } from './enemies/registry'
+import { toPx } from './battle/px'
+import { spawnCoins } from './battle/pickups'
+import { UNIT } from './lib/units'
+import type { BaseArenaScene } from './battle/BaseArenaScene'
 import { loadSettings } from './run/settings'
 import { bgmState, initBgm, playBgm, renderBgmOffline, setBgmEnabled } from './audio/bgm'
 import type { BgmId } from './audio/music'
@@ -111,6 +116,25 @@ window.__addXp = (n: number): void => grantXp(n)
 // e2e 快进到指定波（在商店/整编期间调用，下次开战即该波）
 window.__setWave = (n: number): void => {
   getRun().wave = Math.max(1, Math.min(WAVE.totalWaves, Math.round(n)))
+}
+// e2e 行为探针：向活跃战场按 kind 投放一只敌人（相对队伍中心的格偏移落点）
+window.__spawnEnemy = (kind: string, dxU = 3, dyU = 0): void => {
+  const spec = ENEMY_SPECS.find((s) => s.kind === kind)
+  if (!spec) return
+  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
+    if (!game.scene.isActive(key)) continue
+    const sc = game.scene.getScene(key) as BaseArenaScene
+    const px = toPx(spec)
+    sc.materializeEnemy(px, sc.center.x + dxU * UNIT, sc.center.y + dyU * UNIT, px.hp)
+  }
+}
+// e2e 行为探针：在队伍中心附近撒落地金币（偷币鼠用例）
+window.__dropCoins = (n: number, dxU = 2, dyU = 0): void => {
+  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
+    if (!game.scene.isActive(key)) continue
+    const sc = game.scene.getScene(key) as BaseArenaScene
+    spawnCoins(sc, sc.center.x + dxU * UNIT, sc.center.y + dyU * UNIT, n)
+  }
 }
 window.__sfxStats = (): { baked: number; played: number } => sfxStats()
 // e2e/探针：离线渲染一段 BGM 统计响度（验证真实出声、各曲差异）+ 播放状态快照

@@ -1547,7 +1547,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
   }
 
-  private materializeEnemy(spec: EnemySpec, x: number, y: number, hp: number, elite = false): void {
+  materializeEnemy(spec: EnemySpec, x: number, y: number, hp: number, elite = false): void {
     // 落点经世界钩子兜底（有界钳制/河流钳跨向/虚空回绕；分裂溅出等边缘情况）
     const pos = this.constrainEnemyPos({ x, y }, spec.radius)
     const enemy = emojiImage(
