@@ -1,7 +1,7 @@
-import type { EnemyDef } from '../enemies/registry'
+import type { EnemyDef } from './registry'
 import type { AbilityOwner, AbilityRuntime } from '../abilities/types'
 import type { Animator } from '../emoji/animator'
-import type { ImageObj } from './BaseArenaScene'
+import type { ImageObj } from '../battle/BaseArenaScene'
 
 // 敌方实体的类型化状态：原先散落在精灵数据袋（getData/setData 字符串键 +
 // 逐处强转）的全部战斗状态收拢为一个结构体。精灵仍由 Phaser Group 持有

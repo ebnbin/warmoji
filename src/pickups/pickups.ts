@@ -12,13 +12,13 @@ import {
 } from '../items/registry'
 import { UNIT } from '../lib/units'
 import { norm } from '../lib/vec'
-import { rollChestLoot } from '../run/chest'
-import { PICKUP, PICKUPS } from '../pickups/registry'
+import { rollChestLoot } from './chest'
+import { PICKUP, PICKUPS } from './registry'
 import { createAbility } from '../abilities/create'
 import { KNOCKBACK } from '../abilities/registry'
 import { circleBody } from '../lib/arcade'
-import { toPx } from './px'
-import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
+import { toPx } from '../battle/px'
+import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
 // 拾取经济：金币/宝箱的生成、磁吸、入账与开箱即时生效，外加击杀碎裂的
 // 经验珠视觉。宝箱与金币同组同管线（data 标记分流）；世界差异（钳制/

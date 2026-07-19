@@ -1,8 +1,8 @@
 import { waveAt } from '../run/waves'
 import { UNIT } from '../lib/units'
-import { spawnGroundEffect } from './groundEffects'
+import { spawnGroundEffect } from '../battle/groundEffects'
 import type { Enemy } from './enemies'
-import type { BaseArenaScene } from './BaseArenaScene'
+import type { BaseArenaScene } from '../battle/BaseArenaScene'
 
 // 敌人死亡效果模块：按 def.onDeath 逐条执行。
 // poison 原地留毒液池；split 分裂出迷你体（血量吃当前波次成长曲线）。

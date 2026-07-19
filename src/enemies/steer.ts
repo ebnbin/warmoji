@@ -4,10 +4,10 @@ import { UNIT } from '../lib/units'
 import { norm } from '../lib/vec'
 import type { Member } from '../characters/members'
 import type { Enemy } from './enemies'
-import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
+import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
 // 敌人移动策略注册表：按 def.locomotion.kind 分发，镜像 abilities/create.ts。
-// 每个策略只负责逐帧速度决策与状态机推进；攻击在 battle/enemyAttacks.ts、
+// 每个策略只负责逐帧速度决策与状态机推进；攻击在 enemyAbilities.ts、
 // 死亡效果在 battle/deathEffects.ts、公共帧留守 BaseArenaScene.steerEnemies。
 // 世界差异经场景钩子（wanderDir/fleeDir）。
 

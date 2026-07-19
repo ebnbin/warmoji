@@ -28,7 +28,7 @@ export interface CharacterDef {
    * 每档 = 卡文案 + 该档整套配装。升级 = 换持整行（abilities/registry 的
    * `2`/`3` 档位行），能力自身无升级逻辑 */
   readonly upgrades: readonly [CharacterUpgrade, CharacterUpgrade]
-  /** 环形阵移动秉性：>0 沿环迎敌滑动，<0 避敌滑动，0 安分（被推才动）；见 core/orbit.ts */
+  /** 环形阵移动秉性：>0 沿环迎敌滑动，<0 避敌滑动，0 安分（被推才动）；见 characters/orbit.ts */
   readonly orbit: number
 }
 
@@ -44,7 +44,7 @@ export function loadoutFor(def: CharacterDef, tiers: UpgradeTiers): readonly Abi
 }
 
 // 队伍：玩家操控队伍中心点，角色按队形岗位随行；除此之外角色是完全独立的单位。
-// 队形几何在 battle/formation.ts；满员后可在整编页切换队形与互换站位。
+// 队形几何在 characters/formation.ts；满员后可在整编页切换队形与互换站位。
 export const TEAM = {
   ringRadius: 0.8,
   /** 3 人环收紧的小半径（人少时更像一个整体）；≥4 人用 ringRadius */

@@ -3,11 +3,11 @@ import { clipFramesLive } from '../emoji/animTextures'
 import { createAbility } from '../abilities/create'
 import type { AbilityContext, AbilityOwner } from '../abilities/types'
 import { spawnEnemyProjectile } from '../projectiles/projectiles'
-import { spawnGroundEffect } from './groundEffects'
+import { spawnGroundEffect } from '../battle/groundEffects'
 import { enemyOf } from './enemies'
 import { memberOf } from '../characters/members'
 import type { Enemy } from './enemies'
-import type { BaseArenaScene, ImageObj } from './BaseArenaScene'
+import type { BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
 // 敌人持械：def.abilities 有行即装配能力实例（能力类阵营中立，
 // abilities/types.ts）。此处提供敌方视角的 ctx 实现：targets = 队员快照、
