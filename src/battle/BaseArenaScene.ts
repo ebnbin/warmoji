@@ -3,6 +3,7 @@ import { castCaptainSkill } from './skills'
 import { toPx } from './px'
 import { attachEnemy, enemyOf } from './enemies'
 import type { Enemy } from './enemies'
+import { armEnemy } from './enemyWeapons'
 import { attachMember, memberOf } from './members'
 import type { Member } from './members'
 import { bulletOf } from './bullets'
@@ -132,6 +133,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   poisonPools: { x: number; y: number; r2: number; until: number; tickMs: number; damage: number; srcName: string; gfx: Phaser.GameObjects.Graphics }[] = []
   private enemyMix: EnemyMixEntry[] = []
   frameTargets: TargetInfo[] = []
+  /** 敌方武器的索敌快照：存活队员（虚空图含镜像坐标），每帧重建 */
+  frameMemberTargets: TargetInfo[] = []
   private frameSlowZones: { x: number; y: number; r2: number; factor: number }[] = []
   /** 仅本帧生效的金币吸取点（磁力回旋镖沿途登记） */
   frameAttractors: { x: number; y: number; r2: number }[] = []
@@ -257,6 +260,15 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.awakeCount = awake
     this.dormantCount = 0
     this.frameTargets = targets
+  }
+  /** 敌方武器的索敌目标：存活队员快照（虚空图附加镜像坐标） */
+  protected buildMemberTargets(): TargetInfo[] {
+    const targets: TargetInfo[] = []
+    for (const m of this.members) {
+      if (!m.alive) continue
+      targets.push({ x: m.image.x, y: m.image.y, radius: m.hurtRadius, ref: m.image })
+    }
+    return targets
   }
   /** 刷怪上限的计数口径（有界图取实时活跃数；带休眠的图取本帧活跃数） */
   protected spawnCapCount(): number {
@@ -611,6 +623,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.frameSlowZones.length = 0
     this.frameAttractors.length = 0
     this.buildFrameTargets()
+    this.frameMemberTargets = this.buildMemberTargets()
     this.updateOrbit(delta)
     this.moveTeam(delta)
     this.updateMembers(delta)
@@ -1296,6 +1309,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     runDeathEffects(this, a)
     enemy.setActive(false)
     ;(enemy.body as ArcadeBody).enable = false
+    // 持械敌人：武器实例（持有物/塔/召唤物视觉）随体销毁
+    if (a.weapons) for (const w of a.weapons) w.destroy()
     this.deathBurst.explode(6, enemy.x, enemy.y)
     this.tweens.killTweensOf(enemy)
     // 本体裂成 4 个象限碎片：继承致死击退速度（不衰减）+ 象限散开 + 自旋 + 淡出
@@ -1439,7 +1454,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const lm = spec.locomotion
     const nextDashAt =
       lm.kind === 'dash' && lm.intervalMs !== undefined ? this.elapsedMs + (lm.firstDelayMs ?? lm.intervalMs) : 0
-    attachEnemy(enemy, spec, hp, {
+    const a = attachEnemy(enemy, spec, hp, {
       elite,
       boss,
       kbImmune: spec.kbImmune ?? false,
@@ -1457,6 +1472,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       // 舞会窗口内落地：跟着跳（全场蹦迪对新敌同样生效）
       danceUntil: this.elapsedMs < this.danceEndsAt ? this.danceEndsAt : 0,
     })
+    armEnemy(this, a)
     this.enemies.add(enemy)
     if (boss) this.boss = enemy
     const targetScale = enemy.scale
@@ -1610,6 +1626,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
       // 攻击模块（周期射击/环形弹幕）：紧随移动决策，跳舞/变形分支不会到达这里
       runEnemyAttacks(this, a, body, now, target)
+
+      // 持械敌人：武器实例逐帧驱动（跳舞/变形不到达此处；休眠已跳过）
+      if (a.weapons) for (const w of a.weapons) w.update(delta, a.weaponOwner!)
 
       // 击退：临时冲量叠加进行为速度并指数衰减（不打断行为状态机）
       this.decayKnockback(a, body, delta)

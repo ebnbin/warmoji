@@ -41,14 +41,38 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     ),
   ],
   // 敌方阵营含变形替身（仙子魔尘的绵羊顶替原形象，沿用同阵营描边）
-  enemy: [...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis()])],
+  enemy: [...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()])],
   enemyShot: [
     ...new Set([
       ...[...ENEMY_SPECS, BOSS].flatMap((e) => (e.attacks ?? []).map((atk) => atk.bullet.emoji)),
+      ...armedShotEmojis(),
     ]),
   ],
-  // 精英变体（含 Boss）：金边
-  elite: [...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis()]), BOSS.emoji],
+  // 精英变体（含 Boss）：金边；持械精英的武器视觉同沾金边
+  elite: [
+    ...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()]),
+    BOSS.emoji,
+  ],
+}
+
+/** 持械敌人的武器视觉（持有物/塔体/召唤物）：随敌人本体阵营描边 */
+function armedBodyEmojis(): string[] {
+  return [...ENEMY_SPECS, BOSS].flatMap((e) =>
+    (e.weapons ?? []).flatMap((w) => [
+      ...('held' in w && w.held ? [w.held.emoji] : []),
+      ...(w.kind === 'turret' ? [w.turret.emoji] : []),
+      ...(w.kind === 'summon' ? [w.minion.emoji] : []),
+    ]),
+  )
+}
+
+/** 持械敌人的弹体：入敌弹组，红描边 */
+function armedShotEmojis(): string[] {
+  return [...ENEMY_SPECS, BOSS].flatMap((e) =>
+    (e.weapons ?? []).flatMap((w) =>
+      w.kind === 'projectile' || w.kind === 'turret' ? [w.projectile.emoji] : [],
+    ),
+  )
 }
 
 /** 全部魔尘变形替身形象（从角色配装聚合） */

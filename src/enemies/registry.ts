@@ -1,3 +1,4 @@
+import type { WeaponSpec } from '../weapons/spec'
 
 // 敌人 = 基础三围 + 移动方式（locomotion）+ 攻击模块列表 + 死亡效果列表。
 // 多样性用数据组合表达：加一种敌人 = 组合现有模块的一行数据；
@@ -105,6 +106,8 @@ export interface EnemySpec {
   readonly coins: number
   readonly locomotion: LocomotionSpec
   readonly attacks?: readonly EnemyAttackSpec[]
+  /** 持械（阵营中立武器行；battle/enemyWeapons 以敌方 ctx 装配驱动） */
+  readonly weapons?: readonly WeaponSpec[]
   readonly onDeath?: readonly DeathEffectSpec[]
   readonly kbImmune?: boolean
 }

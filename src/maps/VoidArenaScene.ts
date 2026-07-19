@@ -102,6 +102,19 @@ export class VoidArenaScene extends BaseArenaScene {
     this.frameTargets = targets
   }
 
+  /** 敌方武器的索敌目标：真身 + 三镜像（持械敌人隔门瞄准队员） */
+  protected buildMemberTargets(): TargetInfo[] {
+    const targets: TargetInfo[] = []
+    for (const m of this.members) {
+      if (!m.alive) continue
+      targets.push({ x: m.image.x, y: m.image.y, radius: m.hurtRadius, ref: m.image })
+      for (const g of ghostImages(m.image, this.arenaW, this.arenaH)) {
+        targets.push({ x: g.x, y: g.y, radius: m.hurtRadius, ref: m.image })
+      }
+    }
+    return targets
+  }
+
   /** 环面：不钳制，穿缝回绕 */
   protected constrainTeam(next: Point): Point {
     return { x: wrapCoord(next.x, this.arenaW), y: wrapCoord(next.y, this.arenaH) }

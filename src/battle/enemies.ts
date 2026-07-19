@@ -1,4 +1,5 @@
 import type { EnemySpec } from '../enemies/registry'
+import type { WeaponOwner, WeaponRuntime } from '../weapons/types'
 import type { Animator } from '../emoji/animator'
 import type { ImageObj } from './BaseArenaScene'
 
@@ -52,6 +53,9 @@ export interface Enemy {
   /** 摇摆/动画随机相位 */
   ph: number
   anim?: Animator
+  /** 持械（spec.weapons 有行时 materialize 装配；死亡随体销毁） */
+  weapons?: WeaponRuntime[]
+  weaponOwner?: WeaponOwner
 }
 
 /** 建结构体并挂到精灵上（唯一写入点） */

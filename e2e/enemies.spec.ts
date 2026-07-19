@@ -193,3 +193,41 @@ test('死亡效果与偷币：蘑菇留毒、泡泡分裂、偷币鼠吃币后�
   )
   expect(errors).toEqual([])
 })
+
+test('持械敌人：敌方 ctx 驱动武器朝队员开火，敌弹入组并命中，死亡随体销毁', async ({ page }) => {
+  test.setTimeout(240_000)
+  const errors: string[] = []
+  page.on('pageerror', (err) => errors.push(String(err)))
+  await page.goto('/')
+  await startRun(page)
+  await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 1)
+
+  // 首波自然刷怪（僵尸/幽灵）无任何射手：enemyShots 增长只能来自持械投放
+  const hpBefore = await page.evaluate(() => {
+    const game = window.__game as { scene: { keys: Record<string, { members: { alive: boolean; hp: number }[] }> } }
+    return game.scene.keys['arena']!.members.filter((m) => m.alive).reduce((s, m) => s + m.hp, 0)
+  })
+  await page.evaluate(() => window.__spawnArmedEnemy!('tomatoThrow', 4, 0))
+  await page.waitForFunction(
+    () => {
+      const game = window.__game as { scene: { keys: Record<string, { enemyShots: { getLength(): number } }> } }
+      return game.scene.keys['arena']!.enemyShots.getLength() > 0
+    },
+    undefined,
+    { timeout: 30_000 },
+  )
+  // 敌械弹按队员受击结算扣血（自然接触伤害也会扣，此断言验证的是伤害通路整体连通）
+  await page.waitForFunction(
+    (before) => {
+      const game = window.__game as { scene: { keys: Record<string, { members: { alive: boolean; hp: number }[] }> } }
+      const now = game.scene.keys['arena']!.members.filter((m) => m.alive).reduce((s, m) => s + m.hp, 0)
+      return now < before
+    },
+    hpBefore,
+    { timeout: 30_000 },
+  )
+  // 击杀持械者：武器实例随体销毁，流程无报错
+  await killKind(page, 'zombie')
+  await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 3)
+  expect(errors).toEqual([])
+})

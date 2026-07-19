@@ -19,6 +19,8 @@ import { browserStorage } from './lib/storage'
 import { getRun, grantCoins, grantXp } from './run/state'
 import { ENEMY_SPECS } from './enemies/registry'
 import { toPx } from './battle/px'
+import { WEAPONS } from './weapons/registry'
+import type { WeaponSpec } from './weapons/spec'
 import { spawnCoins } from './battle/pickups'
 import { UNIT } from './lib/units'
 import type { BaseArenaScene } from './battle/BaseArenaScene'
@@ -125,6 +127,18 @@ window.__spawnEnemy = (kind: string, dxU = 3, dyU = 0): void => {
     if (!game.scene.isActive(key)) continue
     const sc = game.scene.getScene(key) as BaseArenaScene
     const px = toPx(spec)
+    sc.materializeEnemy(px, sc.center.x + dxU * UNIT, sc.center.y + dyU * UNIT, px.hp)
+  }
+}
+// e2e 行为探针：投放一只持械敌人（僵尸三围 + 指定武器行；敌方 ctx 验证用）
+window.__spawnArmedEnemy = (weaponId: string, dxU = 3, dyU = 0): void => {
+  const w = (WEAPONS as Record<string, WeaponSpec>)[weaponId]
+  const base = ENEMY_SPECS.find((s) => s.kind === 'zombie')
+  if (!w || !base) return
+  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
+    if (!game.scene.isActive(key)) continue
+    const sc = game.scene.getScene(key) as BaseArenaScene
+    const px = toPx({ ...base, weapons: [w] })
     sc.materializeEnemy(px, sc.center.x + dxU * UNIT, sc.center.y + dyU * UNIT, px.hp)
   }
 }
