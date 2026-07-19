@@ -2,8 +2,8 @@ import { playSfx } from '../audio/sfx'
 import { COIN } from '../items/registry'
 import { UNIT } from '../lib/units'
 import { norm } from '../lib/vec'
-import type { Member } from './BaseArenaScene'
-import type { Enemy } from './actors'
+import type { Member } from './members'
+import type { Enemy } from './enemies'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
 
 // 敌人移动策略注册表：按 spec.locomotion.kind 分发，镜像 weapons/create.ts。

@@ -14,7 +14,7 @@ import type { Point } from '../lib/vec'
 import { emojiImage } from '../emoji/textures'
 import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
-import { enemyOf } from '../battle/actors'
+import { enemyOf } from '../battle/enemies'
 import { bulletOf } from '../battle/bullets'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 

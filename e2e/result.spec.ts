@@ -61,8 +61,8 @@ test('通关胜利：快进到最后一波打完 → 胜利结算页 → 再来�
     const game = window.__game as {
       scene: { keys: Record<string, { boss?: { getData(k: string): { hp: number } } }> }
     }
-    // 敌人状态在类型化 Actor 结构上（battle/actors.ts），经精灵的 'actor' 键反查
-    game.scene.keys['arena']!.boss!.getData('actor').hp = 1
+    // 敌人运行时状态是类型化结构（battle/enemies.ts），经精灵的 'enemy' 键反查
+    game.scene.keys['arena']!.boss!.getData('enemy').hp = 1
   })
   // 绕圈把 Boss 引进武器射程内补刀
   await kiteUntilLeaveArena(page, 40)

@@ -14,7 +14,7 @@ import { emojiImage } from '../emoji/textures'
 import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
-import type { Enemy } from '../battle/actors'
+import type { Enemy } from '../battle/enemies'
 
 // 使用侧换算：MAP 数值为格值（项目约定）
 const MAPW = MAP.width * UNIT

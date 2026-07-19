@@ -4,7 +4,7 @@ import type { ImageObj } from './BaseArenaScene'
 
 // 敌方实体的类型化状态：原先散落在精灵数据袋（getData/setData 字符串键 +
 // 逐处强转）的全部战斗状态收拢为一个结构体。精灵仍由 Phaser Group 持有
-//（物理/池化不变），结构体经 image.getData('actor') 单键反查——全项目
+//（物理/池化不变），结构体经 image.getData('enemy') 单键反查——全项目
 // 唯一的一次强转收口在 enemyOf。时间戳字段一律 0 哨兵 = 未生效。
 
 /** 行为状态机：wander 游荡 / chase 追击 / windup 蓄力 / dash 冲刺 / cool 冷却 */
@@ -91,11 +91,11 @@ export function attachEnemy(image: ImageObj, spec: EnemySpec, hp: number, init?:
     anim: undefined,
     ...init,
   }
-  image.setData('actor', a)
+  image.setData('enemy', a)
   return a
 }
 
 /** 精灵 → 结构体反查（全项目唯一的敌人状态强转收口） */
 export function enemyOf(image: ImageObj): Enemy {
-  return image.getData('actor') as Enemy
+  return image.getData('enemy') as Enemy
 }

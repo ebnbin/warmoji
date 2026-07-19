@@ -1,8 +1,8 @@
 import { norm } from '../lib/vec'
 import { playSfx } from '../audio/sfx'
-import type { Member } from './BaseArenaScene'
+import type { Member } from './members'
 import { spawnEnemyShot } from './hazards'
-import type { Enemy } from './actors'
+import type { Enemy } from './enemies'
 import type { ArcadeBody, BaseArenaScene } from './BaseArenaScene'
 
 // 敌人攻击模块运行时：按 spec.attacks 逐条推进（计时在 a.attackNextAt，

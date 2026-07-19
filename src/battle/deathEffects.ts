@@ -1,7 +1,7 @@
 import { waveAt } from '../run/waves'
 import { UNIT } from '../lib/units'
 import { spawnPoisonPool } from './hazards'
-import type { Enemy } from './actors'
+import type { Enemy } from './enemies'
 import type { BaseArenaScene } from './BaseArenaScene'
 
 // 敌人死亡效果模块：按 spec.onDeath 逐条执行。

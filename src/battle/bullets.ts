@@ -1,7 +1,7 @@
 import type { ImageObj } from './BaseArenaScene'
 
 // 弹药的类型化状态（敌我同构，faction 区分）：原精灵数据袋收拢为结构体，
-// 经 image.getData('bullet') 单键反查（与敌人的 'actor' 同一模式）。
+// 经 image.getData('bullet') 单键反查（与敌人的 'enemy' 同一模式）。
 // 玩家弹走线段扫掠命中（pierce/splash/hex 能力字段随弹携带）；
 // 敌弹走物理 overlap + 寿命回收。
 

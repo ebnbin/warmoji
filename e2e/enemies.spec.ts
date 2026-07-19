@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test'
 import { startRun } from './helpers'
 
 // 敌人行为断言级用例：经 __spawnEnemy 定点投放指定敌种，直接读战斗引擎的
-// 类型化 Actor 结构（image.getData('actor')）断言状态机与效果。
+// 类型化 Actor 结构（image.getData('enemy')）断言状态机与效果。
 // 自然刷怪（僵尸/幽灵）持续干扰计数，所有断言按 kind 过滤、不用全局敌数。
 
 /** 对指定 kind 的首只敌人施加致死伤害（走引擎 applyDamage 公共入口） */
@@ -21,7 +21,7 @@ async function killKind(page: Page, kind: string): Promise<void> {
       }
     }
     const arena = game.scene.keys['arena']!
-    const target = arena.enemies.getChildren().find((e) => e.active && e.getData('actor').spec.kind === k)
+    const target = arena.enemies.getChildren().find((e) => e.active && e.getData('enemy').spec.kind === k)
     if (target) arena.applyDamage(target, 999_999)
   }, kind)
 }
@@ -45,7 +45,7 @@ test('状态机行为：野猪蓄力→突刺→冷却；毒蛇放冷枪且拉�
       }
       return game.scene.keys['arena']!.enemies.getChildren().some((e) => {
         if (!e.active) return false
-        const a = e.getData('actor')
+        const a = e.getData('enemy')
         return a.spec.kind === 'boar' && a.state === 'windup'
       })
     },
@@ -59,7 +59,7 @@ test('状态机行为：野猪蓄力→突刺→冷却；毒蛇放冷枪且拉�
       }
       return game.scene.keys['arena']!.enemies.getChildren().some((e) => {
         if (!e.active) return false
-        const a = e.getData('actor')
+        const a = e.getData('enemy')
         return a.spec.kind === 'boar' && (a.state === 'dash' || a.state === 'cool')
       })
     },
@@ -88,7 +88,7 @@ test('状态机行为：野猪蓄力→突刺→冷却；毒蛇放冷枪且拉�
         }
       }
       const arena = game.scene.keys['arena']!
-      const s = arena.enemies.getChildren().find((e) => e.active && e.getData('actor').spec.kind === 'snake')
+      const s = arena.enemies.getChildren().find((e) => e.active && e.getData('enemy').spec.kind === 'snake')
       if (!s) return -1
       const dx = s.x - arena.center.x
       const dy = s.y - arena.center.y
@@ -99,7 +99,7 @@ test('状态机行为：野猪蓄力→突刺→冷却；毒蛇放冷枪且拉�
     const game = window.__game as {
       scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { spec: { kind: string } } }[] } }> }
     }
-    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('actor').spec.kind === 'snake')
+    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('enemy').spec.kind === 'snake')
   })
   const d0 = await snakeDist()
   // 蛇要么已被队伍击杀（-1），要么在逃：距离应显著增大；同时冷枪应已出弹
@@ -131,7 +131,7 @@ test('死亡效果与偷币：蘑菇留毒、泡泡分裂、偷币鼠吃币后�
     const game = window.__game as {
       scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { spec: { kind: string } } }[] } }> }
     }
-    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('actor').spec.kind === 'mushroom')
+    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('enemy').spec.kind === 'mushroom')
   })
   await killKind(page, 'mushroom')
   const pools = await page.evaluate(() => {
@@ -146,7 +146,7 @@ test('死亡效果与偷币：蘑菇留毒、泡泡分裂、偷币鼠吃币后�
     const game = window.__game as {
       scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { spec: { kind: string } } }[] } }> }
     }
-    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('actor').spec.kind === 'blob')
+    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('enemy').spec.kind === 'blob')
   })
   await killKind(page, 'blob')
   await page.waitForFunction(
@@ -154,7 +154,7 @@ test('死亡效果与偷币：蘑菇留毒、泡泡分裂、偷币鼠吃币后�
       const game = window.__game as {
         scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { spec: { kind: string } } }[] } }> }
       }
-      const n = game.scene.keys['arena']!.enemies.getChildren().filter((e) => e.active && e.getData('actor').spec.kind === 'blobling').length
+      const n = game.scene.keys['arena']!.enemies.getChildren().filter((e) => e.active && e.getData('enemy').spec.kind === 'blobling').length
       return n >= 2
     },
     undefined,
@@ -171,7 +171,7 @@ test('死亡效果与偷币：蘑菇留毒、泡泡分裂、偷币鼠吃币后�
       }
       return game.scene.keys['arena']!.enemies.getChildren().some((e) => {
         if (!e.active) return false
-        const a = e.getData('actor')
+        const a = e.getData('enemy')
         return a.spec.kind === 'rat' && a.eaten > 0
       })
     },

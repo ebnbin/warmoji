@@ -6,7 +6,7 @@ import { UNIT } from '../lib/units'
 import { waveAt } from '../run/waves'
 import { viewport } from '../screen/apply'
 import type { BaseArenaScene, ImageObj } from './BaseArenaScene'
-import { enemyOf } from './actors'
+import { enemyOf } from './enemies'
 import { spawnCoins } from './pickups'
 
 // 队长主动技能的战斗内实现：castCaptainSkill 收口就绪/弹药校验、扣豆、分派；

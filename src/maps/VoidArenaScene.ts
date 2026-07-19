@@ -11,9 +11,10 @@ import type { EnemyTarget } from '../weapons/types'
 import { emojiImage } from '../emoji/textures'
 import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
-import { enemyOf } from '../battle/actors'
+import { enemyOf } from '../battle/enemies'
 import { bulletOf } from '../battle/bullets'
-import type { ArcadeBody, ImageObj, Member } from '../battle/BaseArenaScene'
+import type { Member } from '../battle/members'
+import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 
 // 虚空竞技场（kind='void'）：环面世界。世界规则：
 // · 环面：固定 16:9 竞技场（横屏 24×13.5 格，竖屏互换），四边两两粘合成
