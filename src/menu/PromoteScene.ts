@@ -22,7 +22,7 @@ import {
   setGuardCenter,
 } from '../run/state'
 import type { RunState } from '../run/state'
-import { characterStatGroups } from '../characters/stats'
+import { characterStatGroups } from './stats'
 import { applyBackground } from '../screen/background'
 import { reportDebug } from '../debug/debug'
 import { emojiImage } from '../emoji/textures'

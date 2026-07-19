@@ -6,7 +6,7 @@ import { COIN } from '../items/registry'
 import { WEAPONS } from '../weapons/registry'
 import { ITEMS, RARITIES } from '../items/registry'
 import type { ItemSpec } from '../items/registry'
-import { captainStatGroups, characterStatGroups, WEAPON_KIND_LABEL, weaponStatLines } from '../characters/stats'
+import { captainStatGroups, characterStatGroups, WEAPON_KIND_LABEL, weaponStatLines } from './stats'
 
 // 图鉴：零维护成本地聚合各注册表——新增 entity 自动出现在图鉴里。
 // 完整 emoji 列表的清单由构建期生成（public/emoji/<版本>/manifest.json），

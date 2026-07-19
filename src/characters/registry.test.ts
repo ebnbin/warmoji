@@ -52,7 +52,12 @@ describe('能力卡换持档位行', () => {
     for (const id of IDS) {
       const spec = CHARACTERS[id]
       expect(loadoutFor(spec, NONE)).toBe(spec.weapons)
-      expect(spec.upgrades).toBeDefined()
+      expect(spec.abilities).toHaveLength(2)
+      for (const a of spec.abilities) {
+        expect(a.icon.length).toBeGreaterThan(0)
+        expect(a.name.length).toBeGreaterThan(0)
+        expect(a.desc.length).toBeGreaterThan(0)
+      }
       expect(loadoutFor(spec, T1)).not.toEqual(spec.weapons)
       expect(loadoutFor(spec, T2)).not.toEqual(loadoutFor(spec, T1))
       // 换持不增减武器数量

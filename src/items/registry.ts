@@ -1,5 +1,5 @@
-import { ABILITIES } from './abilities'
-import type { AbilityTiers } from './abilities'
+import { CHARACTERS } from '../characters/registry'
+import type { AbilityTiers } from '../characters/registry'
 import type { CharacterId, CharacterSpec } from '../characters/registry'
 import type { WeaponSpec } from '../weapons/spec'
 
@@ -88,9 +88,9 @@ export interface ItemSpec {
 /** 能力卡解锁门槛：一阶卡上架前该角色需已购的普通道具数 */
 export const ABILITY_GATE = { normalsForFirst: 2 } as const
 
-/** 角色专属能力卡条目（文案/图标复用 core/abilities.ts 的能力定义） */
+/** 角色专属能力卡条目（文案/图标取自角色行的两阶能力定义） */
 function abilityCard(cid: CharacterId, index: 0 | 1, price: number): ItemSpec {
-  const a = ABILITIES[cid][index]
+  const a = CHARACTERS[cid].abilities[index]
   return {
     emoji: a.icon,
     name: a.name,

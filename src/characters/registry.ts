@@ -32,17 +32,34 @@ import {
   woodTurret3,
 } from '../weapons/registry'
 import type { WeaponSpec } from '../weapons/spec'
-import type { AbilityTiers } from '../items/abilities'
 
-// 角色花名册：角色 → 武器为单向绑定（角色配装固定；武器可被复用）
+// 角色花名册：角色 → 武器为单向绑定（角色配装固定；武器可被复用）。
+// 两阶特殊能力随角色归行：卡文案 + 解锁后的生效配装都是角色自己的属性，
+// 商店能力卡条目（items/registry abilityCard）从这里取文案。
+
+/** 角色的一阶特殊能力：商店卡文案 + 解锁后的生效配装（换持整行） */
+export interface CharacterAbility {
+  readonly icon: string
+  readonly name: string
+  readonly desc: string
+  readonly weapons: readonly WeaponSpec[]
+}
+
+/** 已解锁的能力档位：a1 = 一阶（下标 0 的卡），a2 = 二阶（下标 1 的卡） */
+export interface AbilityTiers {
+  a1: boolean
+  a2: boolean
+}
+
 export interface CharacterSpec {
   readonly emoji: string
   readonly name: string
   readonly desc: string
   readonly weapons: readonly WeaponSpec[]
-  /** 能力卡档位配装：[一阶, 一阶+二阶]。升级 = 换持整行（weapons/registry
-   * 的 `2`/`3` 档位行），武器自身无升级逻辑 */
-  readonly upgrades?: readonly [readonly WeaponSpec[], readonly WeaponSpec[]]
+  /** 两阶特殊能力（商店专属卡解锁，累积生效）：[一阶, 一阶+二阶]，
+   * 每档 = 卡文案 + 该档整套配装。升级 = 换持整行（weapons/registry 的
+   * `2`/`3` 档位行），武器自身无升级逻辑 */
+  readonly abilities: readonly [CharacterAbility, CharacterAbility]
   /** 环形阵移动秉性：>0 沿环迎敌滑动，<0 避敌滑动，0 安分（被推才动）；见 core/orbit.ts */
   readonly orbit: number
 }
@@ -53,7 +70,10 @@ export const CHARACTERS = {
     name: '杂耍演员',
     desc: '向最近的敌人连续抛掷番茄',
     weapons: [WEAPONS.tomatoThrow],
-    upgrades: [[tomatoThrow2], [tomatoThrow3]],
+    abilities: [
+      { icon: '🍅', name: '三重抛掷', desc: '每次投掷同时抛出 3 枚番茄，扇形散开', weapons: [tomatoThrow2] },
+      { icon: '💥', name: '爆浆番茄', desc: '番茄命中后爆裂，对周围敌人造成 60% 溅射伤害', weapons: [tomatoThrow3] },
+    ],
     orbit: -0.5,
   },
   unicorn: {
@@ -61,7 +81,10 @@ export const CHARACTERS = {
     name: '独角兽',
     desc: '独角向前突刺，穿透沿途敌人',
     weapons: [WEAPONS.hornThrust],
-    upgrades: [[hornThrust2], [hornThrust3]],
+    abilities: [
+      { icon: '⚡', name: '二连突刺', desc: '每次出手连刺两段，第二段重新索敌', weapons: [hornThrust2] },
+      { icon: '🌈', name: '虹光震波', desc: '突刺终点爆发冲击波：60% 范围伤害并强力击退', weapons: [hornThrust3] },
+    ],
     orbit: 0.8,
   },
   troll: {
@@ -69,7 +92,10 @@ export const CHARACTERS = {
     name: '巨魔',
     desc: '挥舞巨斧，横扫身前扇形范围',
     weapons: [WEAPONS.axeSweep],
-    upgrades: [[axeSweep2], [axeSweep3]],
+    abilities: [
+      { icon: '🌀', name: '全周横扫', desc: '巨斧扫过整整一圈，攻击四面八方的敌人', weapons: [axeSweep2] },
+      { icon: '🥶', name: '震慑余波', desc: '被横扫命中的敌人减速 45%，持续 1.2 秒', weapons: [axeSweep3] },
+    ],
     orbit: 1,
   },
   cowboy: {
@@ -77,7 +103,10 @@ export const CHARACTERS = {
     name: '牛仔',
     desc: '左右双枪齐发，射出高速水弹',
     weapons: [WEAPONS.pistolLeft, WEAPONS.pistolRight],
-    upgrades: [[pistolLeft2, pistolRight2], [pistolLeft3, pistolRight3]],
+    abilities: [
+      { icon: '🎯', name: '贯穿弹', desc: '水弹贯穿敌人，沿途最多命中 3 名', weapons: [pistolLeft2, pistolRight2] },
+      { icon: '🔫', name: '左轮风暴', desc: '每把枪每第 4 次射击变为 5 发扇形弹幕', weapons: [pistolLeft3, pistolRight3] },
+    ],
     orbit: -0.7,
   },
   mage: {
@@ -85,7 +114,10 @@ export const CHARACTERS = {
     name: '法师',
     desc: '在远处敌人脚下引爆奥术轰炸',
     weapons: [WEAPONS.arcaneBlast],
-    upgrades: [[arcaneBlast2], [arcaneBlast3]],
+    abilities: [
+      { icon: '🔥', name: '余烬秘火', desc: '轰炸在爆心留下灼烧地面，3 秒内持续烧伤敌人', weapons: [arcaneBlast2] },
+      { icon: '✨', name: '连锁轰炸', desc: '轰炸后 0.25 秒向随机敌人追加一次 75% 伤害的轰炸', weapons: [arcaneBlast3] },
+    ],
     orbit: -1,
   },
   kangaroo: {
@@ -93,7 +125,10 @@ export const CHARACTERS = {
     name: '袋鼠',
     desc: '掷出回旋镖，去程回程皆可伤敌',
     weapons: [WEAPONS.boomerang],
-    upgrades: [[boomerang2], [boomerang3]],
+    abilities: [
+      { icon: '🪃', name: '双子回旋', desc: '同时向相反方向掷出第二枚回旋镖', weapons: [boomerang2] },
+      { icon: '🧲', name: '磁力巨镖', desc: '回旋镖增大 40%，并沿途吸取金币', weapons: [boomerang3] },
+    ],
     orbit: 0.4,
   },
   robot: {
@@ -101,7 +136,10 @@ export const CHARACTERS = {
     name: '机器人',
     desc: '手持激光器，灼穿一条直线上的所有敌人',
     weapons: [WEAPONS.laserBeam],
-    upgrades: [[laserBeam2], [laserBeam3]],
+    abilities: [
+      { icon: '🔭', name: '双联光束', desc: '开火时向正后方同步射出第二道光束', weapons: [laserBeam2] },
+      { icon: '📡', name: '全域扫射', desc: '光束改为绕自身一周的 8 向扫射，每束 60% 伤害', weapons: [laserBeam3] },
+    ],
     orbit: -0.6,
   },
   snowman: {
@@ -109,7 +147,10 @@ export const CHARACTERS = {
     name: '雪人',
     desc: '以队伍中心散发寒气，持续减速范围内的敌人',
     weapons: [WEAPONS.frostAura],
-    upgrades: [[frostAura2], [frostAura3]],
+    abilities: [
+      { icon: '🩹', name: '冻伤', desc: '寒气光环每秒对范围内敌人造成 6 点伤害', weapons: [frostAura2] },
+      { icon: '🌨️', name: '凛冬降临', desc: '每 5 秒光环脉冲一次，冻结范围内敌人 0.7 秒', weapons: [frostAura3] },
+    ],
     orbit: 0,
   },
   fairy: {
@@ -117,7 +158,10 @@ export const CHARACTERS = {
     name: '仙子',
     desc: '魔尘弹把敌人变形成无害的绵羊，变形期间不能伤人',
     weapons: [WEAPONS.sparkleBolt],
-    upgrades: [[sparkleBolt2], [sparkleBolt3]],
+    abilities: [
+      { icon: '🐑', name: '持久变形', desc: '变形时长延长到 4 秒，魔尘弹可贯穿 1 名敌人', weapons: [sparkleBolt2] },
+      { icon: '💔', name: '脆弱诅咒', desc: '被变形的敌人受到的所有伤害提高 40%', weapons: [sparkleBolt3] },
+    ],
     orbit: -0.6,
   },
   assassin: {
@@ -125,7 +169,10 @@ export const CHARACTERS = {
     name: '刺客',
     desc: '瞬移到范围内血最厚的敌人背后重斩一刀，再闪回原位；出手瞬间无敌',
     weapons: [WEAPONS.shadowStrike],
-    upgrades: [[shadowStrike2], [shadowStrike3]],
+    abilities: [
+      { icon: '🌀', name: '连环刃', desc: '斩击同时命中目标周围一圈，波及 60% 伤害', weapons: [shadowStrike2] },
+      { icon: '☠️', name: '处决', desc: '目标血量低于 35% 时，斩击伤害翻倍', weapons: [shadowStrike3] },
+    ],
     orbit: 0.5,
   },
   beaver: {
@@ -133,7 +180,10 @@ export const CHARACTERS = {
     name: '河狸工程师',
     desc: '自己不动手，定期在脚下架起自动开火的弩塔',
     weapons: [WEAPONS.woodTurret],
-    upgrades: [[woodTurret2], [woodTurret3]],
+    abilities: [
+      { icon: '🏗️', name: '扩建工地', desc: '同时在场的弩塔上限 +1', weapons: [woodTurret2] },
+      { icon: '🎯', name: '三连弩', desc: '弩塔每次开火改为 3 发扇形连射', weapons: [woodTurret3] },
+    ],
     orbit: -0.3,
   },
   queenBee: {
@@ -141,7 +191,10 @@ export const CHARACTERS = {
     name: '蜂后',
     desc: '统领一小群蜜蜂，蜂群自主追击撞刺敌人',
     weapons: [WEAPONS.beeSwarm],
-    upgrades: [[beeSwarm2], [beeSwarm3]],
+    abilities: [
+      { icon: '🐝', name: '扩巢', desc: '蜂群 +1 只', weapons: [beeSwarm2] },
+      { icon: '🦠', name: '麻痹毒素', desc: '被蜇中的敌人减速 45%，持续 1.2 秒', weapons: [beeSwarm3] },
+    ],
     orbit: -0.2,
   },
   medic: {
@@ -149,7 +202,10 @@ export const CHARACTERS = {
     name: '军医',
     desc: '周期治疗附近血量最低的队友，顺手甩两支飞针',
     weapons: [WEAPONS.fieldMedkit, WEAPONS.syringeDart],
-    upgrades: [[fieldMedkit2, WEAPONS.syringeDart], [fieldMedkit3, WEAPONS.syringeDart]],
+    abilities: [
+      { icon: '🥼', name: '群体处方', desc: '治疗改为范围内全体队友回复 60% 治疗量', weapons: [fieldMedkit2, WEAPONS.syringeDart] },
+      { icon: '⚡', name: '电击起搏', desc: '范围内有阵亡队友时，优先为其减少 2 秒复活倒计时', weapons: [fieldMedkit3, WEAPONS.syringeDart] },
+    ],
     orbit: -0.8,
   },
   jellyfish: {
@@ -157,15 +213,18 @@ export const CHARACTERS = {
     name: '水母',
     desc: '电弧在敌群间弹跳传导，敌人越密越疼',
     weapons: [WEAPONS.voltArc],
-    upgrades: [[voltArc2], [voltArc3]],
+    abilities: [
+      { icon: '🔗', name: '超导传递', desc: '电弧额外弹跳数提升到 4 跳', weapons: [voltArc2] },
+      { icon: '💥', name: '过载爆裂', desc: '最后一跳落点爆出小范围电击，波及 60% 伤害', weapons: [voltArc3] },
+    ],
     orbit: 0.2,
   },
 } as const satisfies Record<string, CharacterSpec>
 
 /** 生效配装：能力卡质变 = 换持整行（一阶 → 二阶累积；未解锁用基础行） */
 export function loadoutFor(spec: CharacterSpec, tiers: AbilityTiers): readonly WeaponSpec[] {
-  if (!spec.upgrades || !tiers.a1) return spec.weapons
-  return tiers.a2 ? spec.upgrades[1] : spec.upgrades[0]
+  if (!tiers.a1) return spec.weapons
+  return tiers.a2 ? spec.abilities[1].weapons : spec.abilities[0].weapons
 }
 
 export type CharacterId = keyof typeof CHARACTERS
