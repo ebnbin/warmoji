@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { UNIT } from '../lib/units'
 import { VOID } from './void'
 import { MAPS } from './registry'
-import type { MapSpec } from './registry'
+import type { MapDef } from './registry'
 import { remapPoint, remapVector } from '../screen/remap'
 import { fitAspectRect, ghostImages, torusDelta, torusDist2, wrapCoord } from './void'
 import { Rng } from '../lib/rng'
@@ -91,7 +91,7 @@ export class VoidArenaScene extends BaseArenaScene {
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       count++
-      const radius = enemyOf(e).spec.radius
+      const radius = enemyOf(e).def.radius
       targets.push({ x: e.x, y: e.y, radius, ref: e })
       for (const g of ghostImages(e, this.arenaW, this.arenaH)) {
         targets.push({ x: g.x, y: g.y, radius, ref: e })
@@ -275,7 +275,7 @@ export class VoidArenaScene extends BaseArenaScene {
       const mp = { x: m.image.x, y: m.image.y }
       for (const e of this.enemies.getChildren() as ImageObj[]) {
         if (!e.active) continue
-        const rr = m.hurtRadius + enemyOf(e).spec.radius
+        const rr = m.hurtRadius + enemyOf(e).def.radius
         if (torusDist2(mp, e, W, H) <= rr * rr) this.onMemberTouched(m, e)
       }
       for (const s of this.enemyProjectiles.getChildren() as ImageObj[]) {
@@ -297,7 +297,7 @@ export class VoidArenaScene extends BaseArenaScene {
 
     const W = this.arenaW
     const H = this.arenaH
-    const mapSpec: MapSpec = MAPS[this.run.mapId]
+    const mapDef: MapDef = MAPS[this.run.mapId]
 
     // 深空地板（中心朝亮的多层软渐变，避免硬边椭圆的「盘子感」）
     const gFloor = this.add.graphics().setDepth(0)
@@ -315,16 +315,16 @@ export class VoidArenaScene extends BaseArenaScene {
     this.staticVisuals.push(gFloor)
 
     // 星空点缀（种子固定：同局重建不变）
-    const spec = mapSpec.decor
+    const def = mapDef.decor
     const rng = new Rng(this.run.decorSeed)
     const cells = (W / UNIT) * (H / UNIT)
-    const density = spec.density[0] + rng.next() * (spec.density[1] - spec.density[0])
+    const density = def.density[0] + rng.next() * (def.density[1] - def.density[0])
     const count = Math.round(cells * density)
     for (let i = 0; i < count; i++) {
-      const emoji = spec.emojis[Math.floor(rng.next() * spec.emojis.length)]!
-      const sizeU = spec.sizeU[0] + rng.next() * (spec.sizeU[1] - spec.sizeU[0])
+      const emoji = def.emojis[Math.floor(rng.next() * def.emojis.length)]!
+      const sizeU = def.sizeU[0] + rng.next() * (def.sizeU[1] - def.sizeU[0])
       const img = emojiImage(this, rng.next() * W, rng.next() * H, emoji, sizeU * UNIT, 'player')
-        .setAlpha(spec.alpha[0] + rng.next() * (spec.alpha[1] - spec.alpha[0]))
+        .setAlpha(def.alpha[0] + rng.next() * (def.alpha[1] - def.alpha[0]))
         .setRotation((rng.next() * 2 - 1) * Math.PI)
         .setDepth(0.5)
       this.staticVisuals.push(img)

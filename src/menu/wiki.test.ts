@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CAPTAINS, CHARACTERS } from '../characters/registry'
-import { BLOB, BOAR, ENEMY_SPECS, INVADER, MUSHROOM } from '../enemies/registry'
+import { BLOB, BOAR, ENEMY_DEFS, INVADER, MUSHROOM } from '../enemies/registry'
 import { codepointsToEmoji, emojiCodepoints } from '../emoji/codepoints'
 import { ITEMS } from '../items/registry'
 import { enemyStatLines, usedEmojiSet, wikiEntryByEmoji, wikiGroups } from './wiki'
@@ -11,7 +11,7 @@ describe('图鉴分组', () => {
     expect(groups.map((g) => g.title)).toEqual(['角色', '队长', '敌人', '能力', '道具'])
     expect(groups[0]!.entries).toHaveLength(Object.keys(CHARACTERS).length)
     expect(groups[1]!.entries).toHaveLength(Object.keys(CAPTAINS).length)
-    expect(groups[2]!.entries).toHaveLength(ENEMY_SPECS.length)
+    expect(groups[2]!.entries).toHaveLength(ENEMY_DEFS.length)
     expect(groups[4]!.entries).toHaveLength(Object.keys(ITEMS).length)
     for (const g of groups) {
       for (const e of g.entries) {

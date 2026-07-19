@@ -1,7 +1,7 @@
 import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
-import { sectorHitIndices } from './spec'
-import type { SweepSpec } from './spec'
+import { sectorHitIndices } from './defs'
+import type { SweepDef } from './defs'
 import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
@@ -16,41 +16,41 @@ export class SweepAbility implements AbilityRuntime {
   private tween?: Phaser.Tweens.Tween
 
   constructor(
-    private spec: SweepSpec,
+    private def: SweepDef,
     private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
-    this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline).setDepth(13)
+    this.image = emojiImage(ctx.scene, 0, 0, def.held.emoji, def.held.size, ctx.ownerOutline).setDepth(13)
     this.cooldown = initialCooldownMs
   }
 
   update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
-    const angle = this.aim + (this.sweep.t * this.spec.arcDeg * DEG2RAD) / 2
-    const dist = this.spec.held.restOffset
+    const angle = this.aim + (this.sweep.t * this.def.arcDeg * DEG2RAD) / 2
+    const dist = this.def.held.restOffset
     this.image.setPosition(owner.x + Math.cos(angle) * dist, owner.y + Math.sin(angle) * dist)
-    this.image.setRotation(angle + this.spec.held.rotationOffsetDeg * DEG2RAD)
+    this.image.setRotation(angle + this.def.held.rotationOffsetDeg * DEG2RAD)
 
     if (this.cooldown > 0) return
     const targets = this.ctx.targets()
     const aim = nearestAngle(owner, targets)
     if (aim === null) return
     this.aim = aim
-    this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
+    this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
 
     this.ctx.sfx('whoosh')
-    const damage = Math.round(this.spec.damage * this.ctx.damageMul())
+    const damage = Math.round(this.def.damage * this.ctx.damageMul())
     for (const i of sectorHitIndices(
       { x: owner.x, y: owner.y },
       this.aim,
-      this.spec.arcDeg * DEG2RAD,
-      this.spec.radius,
+      this.def.arcDeg * DEG2RAD,
+      this.def.radius,
       targets,
     )) {
-      this.ctx.damageTarget(targets[i]!.ref, damage, this.spec.knockback, owner.x, owner.y)
+      this.ctx.damageTarget(targets[i]!.ref, damage, this.def.knockback, owner.x, owner.y)
       // 震慑余波：被扫中的敌人限时减速
-      if (this.spec.slowOnHit) {
-        this.ctx.slowTarget(targets[i]!.ref, this.spec.slowOnHit.factor, this.spec.slowOnHit.durationMs)
+      if (this.def.slowOnHit) {
+        this.ctx.slowTarget(targets[i]!.ref, this.def.slowOnHit.factor, this.def.slowOnHit.durationMs)
       }
     }
 
@@ -59,7 +59,7 @@ export class SweepAbility implements AbilityRuntime {
     this.tween = this.ctx.scene.tweens.add({
       targets: this.sweep,
       t: 1,
-      duration: this.spec.sweepMs,
+      duration: this.def.sweepMs,
       ease: 'Sine.easeInOut',
     })
   }

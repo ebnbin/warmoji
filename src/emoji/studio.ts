@@ -383,7 +383,7 @@ export function fxSteam(opts: {
 
 // ── 动画资源格式：原始 SVG + 动画参数 = 可存储/校验/热加载的数据资产 ──
 // fx 用「生成器名 + 参数」声明（函数无法序列化），加载时经注册表还原成渲染函数。
-// 资源文件：src/core/animations.json（format 版本化；spec 为缺省播放规格）。
+// 资源文件：src/core/animations.json（format 版本化；def 为缺省播放规格）。
 // v2 起一个 emoji 是一组具名 clip（idle 待机循环、attack 攻击周期…）：
 // clip 只是纯相位空间的资产，播放时长/触发时机全由玩法侧决定——
 // kind='cycle' 的契约是「相位 0..1 = 一个完整行为周期、出手时刻锚在相位终点」，
@@ -400,7 +400,7 @@ export interface FxDecl {
 
 export type AnimClipKind = 'loop' | 'cycle'
 
-/** 单个 clip 的资源形态：省略 kind 视为 loop；frames 缺省用全局 spec */
+/** 单个 clip 的资源形态：省略 kind 视为 loop；frames 缺省用全局 def */
 export interface AnimClipEntry {
   readonly kind?: AnimClipKind
   readonly frames?: number
@@ -419,7 +419,7 @@ export interface AnimResourceEntry {
 
 export interface AnimResource {
   readonly format: string
-  readonly spec: { readonly frames: number; readonly durMs: number }
+  readonly def: { readonly frames: number; readonly durMs: number }
   /** key = emoji 的 codepoints（与 public/emoji 下的 SVG 文件名一致） */
   readonly animations: Readonly<Record<string, AnimResourceEntry>>
 }
@@ -462,8 +462,8 @@ export function validateAnimResource(data: AnimResource): void {
   if (data.format !== ANIM_FORMAT) {
     throw new Error(`动画资源格式不符：期望 ${ANIM_FORMAT}，得到 ${String(data.format)}`)
   }
-  if (!(data.spec.frames >= 2) || !(data.spec.durMs > 0)) {
-    throw new Error('动画资源 spec 非法：frames 需 ≥2，durMs 需 >0')
+  if (!(data.def.frames >= 2) || !(data.def.durMs > 0)) {
+    throw new Error('动画资源 def 非法：frames 需 ≥2，durMs 需 >0')
   }
   for (const [key, entry] of Object.entries(data.animations)) {
     const at = `animations.${key}`
@@ -548,7 +548,7 @@ export function loadAnimSets(data: AnimResource): AnimSet[] {
     clips: Object.entries(entry.clips).map(([id, clip]) => ({
       id,
       kind: clip.kind ?? 'loop',
-      frames: clip.frames ?? data.spec.frames,
+      frames: clip.frames ?? data.def.frames,
       emoji: entry.emoji,
       name: entry.name,
       desc: entry.desc,
@@ -563,7 +563,7 @@ export function loadAnimSets(data: AnimResource): AnimSet[] {
 const RESOURCE = animationsJson as unknown as AnimResource
 
 /** 缺省播放规格（clip 未自带 frames 时用；durMs 是 loop 类 clip 的标准时长） */
-export const ANIM_SPEC: { readonly frames: number; readonly durMs: number } = RESOURCE.spec
+export const ANIM_DEF: { readonly frames: number; readonly durMs: number } = RESOURCE.def
 
 /** 动画花名册：从资源文件加载（坏数据在此即抛错，dev/测试期暴露） */
 export const ANIM_SETS: readonly AnimSet[] = loadAnimSets(RESOURCE)

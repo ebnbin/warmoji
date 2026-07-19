@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { GroundEffectSpec } from '../abilities/spec'
+import type { GroundEffectDef } from '../abilities/defs'
 import type { BaseArenaScene, ImageObj } from './BaseArenaScene'
 
 // 地面效果（阵营中立）：留在地面的持续区，敌我同构——team 放的烧敌人、
@@ -32,26 +32,26 @@ export function spawnGroundEffect(
   scene: BaseArenaScene,
   x: number,
   y: number,
-  spec: GroundEffectSpec,
+  def: GroundEffectDef,
   owner: GroundEffectOwner,
 ): void {
   const gfx = scene.add.graphics().setDepth(2)
-  gfx.fillStyle(spec.color, spec.fillAlpha)
-  gfx.fillCircle(0, 0, spec.radius)
-  gfx.lineStyle(2, spec.color, spec.lineAlpha)
-  gfx.strokeCircle(0, 0, spec.radius)
+  gfx.fillStyle(def.color, def.fillAlpha)
+  gfx.fillCircle(0, 0, def.radius)
+  gfx.lineStyle(2, def.color, def.lineAlpha)
+  gfx.strokeCircle(0, 0, def.radius)
   gfx.setPosition(x, y)
   gfx.setScale(0.3)
-  scene.tweens.add({ targets: gfx, scale: 1, duration: spec.enterMs, ease: 'Back.easeOut' })
+  scene.tweens.add({ targets: gfx, scale: 1, duration: def.enterMs, ease: 'Back.easeOut' })
   scene.groundEffects.push({
     x,
     y,
-    r2: spec.radius * spec.radius,
+    r2: def.radius * def.radius,
     faction: owner.faction,
-    until: scene.elapsedMs + spec.durationMs,
-    tickMs: spec.tickMs,
-    damage: spec.damage,
-    nextTickAt: scene.elapsedMs + spec.tickMs,
+    until: scene.elapsedMs + def.durationMs,
+    tickMs: def.tickMs,
+    damage: def.damage,
+    nextTickAt: scene.elapsedMs + def.tickMs,
     srcSlot: owner.faction === 'team' ? owner.srcSlot : -1,
     srcName: owner.faction === 'enemy' ? owner.srcName : '',
     gfx,

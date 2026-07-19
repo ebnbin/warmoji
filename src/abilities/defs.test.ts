@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { circleHitIndices, sectorHitIndices, sweepFirstHitIndex, thrustHitIndices, wrapAngle } from './spec'
+import { circleHitIndices, sectorHitIndices, sweepFirstHitIndex, thrustHitIndices, wrapAngle } from './defs'
 
 describe('thrustHitIndices', () => {
   const origin = { x: 0, y: 0 }

@@ -1,7 +1,7 @@
 import { UNIT } from '../lib/units'
 import type Phaser from 'phaser'
 import { ACQUIRE } from './registry'
-import type { GroundEffectSpec, ProjectileSpec } from './spec'
+import type { GroundEffectDef, ProjectileDef } from './defs'
 import type { SfxId } from '../audio/sfx'
 import type { OutlineKind } from '../emoji/svg'
 
@@ -42,7 +42,7 @@ export interface AbilityContext {
     srcY?: number,
   ): void
   /** 发弹：阵营由 ctx 实现注入（Projectile 结构本身敌我同构） */
-  spawnProjectile(x: number, y: number, angle: number, spec: ProjectileSpec, damage: number): void
+  spawnProjectile(x: number, y: number, angle: number, def: ProjectileDef, damage: number): void
   /** 我方锚点（光环类能力的圆心；队伍 ctx = 队伍中心） */
   anchor(): { x: number; y: number }
   /** 登记一个仅本帧生效的减速区域（光环每帧重新登记），叠乘敌对方移速 */
@@ -50,7 +50,7 @@ export interface AbilityContext {
   /** 给单个目标施加限时减速（factor=0 即冻结），到时自动恢复 */
   slowTarget(target: Phaser.GameObjects.Image, factor: number, durationMs: number): void
   /** 在地面生成持续效果区：周期性烧伤区域内的敌对方（阵营与归属由实现注入） */
-  spawnGroundEffect(x: number, y: number, spec: GroundEffectSpec): void
+  spawnGroundEffect(x: number, y: number, def: GroundEffectDef): void
   /** 治疗我方：all=false 治范围内血量比例最低的一名、true 范围内全体；
    * 返回实际被治疗的数量（满血者不计） */
   heal(x: number, y: number, range: number, amount: number, all: boolean): number

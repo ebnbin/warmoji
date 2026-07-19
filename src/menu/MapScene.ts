@@ -171,12 +171,12 @@ export class MapScene extends Phaser.Scene {
     const D = this.layout.detail
     const dx = this.origin.x + D.x
     const dy = this.origin.y + D.y
-    const spec = MAPS[this.selectedId]
+    const def = MAPS[this.selectedId]
 
     this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, spec.emoji, 85),
+      emojiImage(this, dx + 58, dy + 56, def.emoji, 85),
       this.add
-        .text(dx + 104, dy + 42, spec.name, {
+        .text(dx + 104, dy + 42, def.name, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -226,12 +226,12 @@ export class MapScene extends Phaser.Scene {
     }
 
     group('🗺️', '主题')
-    line(spec.desc)
+    line(def.desc)
     cursor += 14
     group('🌿', '地面装饰')
     // 装饰 emoji 预览行（与战斗内同款黑描边）
     let px = dx + 62 + 16
-    for (const e of spec.decor.emojis) {
+    for (const e of def.decor.emojis) {
       this.detailObjs.push(emojiImage(this, px, cursor + 10, e, 45, 'player'))
       px += 46
     }

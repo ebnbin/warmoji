@@ -12,7 +12,7 @@ import {
   itemPrice,
   stackCount,
 } from '../items/registry'
-import type { ItemId, ItemSpec } from '../items/registry'
+import type { ItemId, ItemDef } from '../items/registry'
 import { arenaSceneFor } from '../maps/registry'
 import { randomPalette } from '../lib/palette'
 import type { Palette } from '../lib/palette'
@@ -434,7 +434,7 @@ export class ShopScene extends Phaser.Scene {
     const isCaptain = this.focusedId === 'captain'
     const idx = this.focusedIndex()
     const owned = this.ownedFor(idx)
-    const spec = isCaptain ? CAPTAINS[this.captainId] : CHARACTERS[this.focusedId as CharacterId]
+    const def = isCaptain ? CAPTAINS[this.captainId] : CHARACTERS[this.focusedId as CharacterId]
     let subtitle: { text: string; color: string }
     if (isCaptain) {
       subtitle = { text: '队长 · 提供团队增益，不参与战斗', color: '#b9b9c6' }
@@ -449,9 +449,9 @@ export class ShopScene extends Phaser.Scene {
     }
 
     this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, spec.emoji, 85, 'player'),
+      emojiImage(this, dx + 58, dy + 56, def.emoji, 85, 'player'),
       this.add
-        .text(dx + 104, dy + 44, spec.name, {
+        .text(dx + 104, dy + 44, def.name, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -554,7 +554,7 @@ export class ShopScene extends Phaser.Scene {
     this.detailObjs.push(card)
 
     if (offer) {
-      const item: ItemSpec = ITEMS[offer]
+      const item: ItemDef = ITEMS[offer]
       const held = stackCount(owned, offer)
       const stackNote =
         item.maxStacks === undefined

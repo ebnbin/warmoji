@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { computeViewport } from './viewport'
-import type { ViewportSpec } from './viewport'
+import type { Viewport } from './viewport'
 
 export const VIEWPORT_CHANGED = 'viewport-changed'
 
@@ -43,7 +43,7 @@ function cssSize(): { w: number; h: number } {
 }
 
 const initial = cssSize()
-export let viewport: ViewportSpec = computeViewport(
+export let viewport: Viewport = computeViewport(
   initial.w,
   initial.h,
   window.devicePixelRatio,

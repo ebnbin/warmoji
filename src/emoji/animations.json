@@ -1,6 +1,6 @@
 {
  "format": "warmoji-anim@2",
- "spec": {
+ "def": {
   "frames": 10,
   "durMs": 1000
  },

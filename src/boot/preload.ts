@@ -1,25 +1,25 @@
 import { CAPTAINS, CHARACTERS } from '../characters/registry'
-import type { CaptainSpec, CharacterSpec } from '../characters/registry'
+import type { CaptainDef, CharacterDef } from '../characters/registry'
 import type { OutlineKind } from '../emoji/svg'
-import { BOSS, ENEMY_SPECS, SPAWN } from '../enemies/registry'
+import { BOSS, ENEMY_DEFS, SPAWN } from '../enemies/registry'
 import { CHEST } from '../run/chest'
 import { COIN } from '../items/registry'
 import { ITEMS } from '../items/registry'
 import { MAPS } from '../maps/registry'
-import type { MapSpec } from '../maps/registry'
+import type { MapDef } from '../maps/registry'
 import { SETTING_DEFS } from '../run/settings'
 
 // 启动预载清单：独立于 config——它聚合 items/maps/settings 等下游模块，
 // 放 config 里会形成「config ⇄ items」的顶层求值环（items 侧引用 abilities
 // 的能力文案，abilities 又依赖 config）。此处是唯一的聚合点。
 
-const roster: readonly CharacterSpec[] = Object.values(CHARACTERS)
+const roster: readonly CharacterDef[] = Object.values(CHARACTERS)
 
 // 描边变体按阵营分组预载：玩家侧黑、敌人紫、敌方子弹红
 export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   player: [
     ...roster.map((c) => c.emoji),
-    ...Object.values<CaptainSpec>(CAPTAINS).map((c) => c.emoji),
+    ...Object.values<CaptainDef>(CAPTAINS).map((c) => c.emoji),
     ...roster.flatMap((c) =>
       c.abilities.flatMap((w) => [
         ...('held' in w && w.held ? [w.held.emoji] : []),
@@ -37,22 +37,22 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     '🫘',
     // 地图地面装饰 + 河流水面漂浮物：与玩家侧同款黑描边（低透明度贴地/浮水）
     ...new Set(
-      Object.values<MapSpec>(MAPS).flatMap((m) => [...m.decor.emojis, ...(m.drift ?? [])]),
+      Object.values<MapDef>(MAPS).flatMap((m) => [...m.decor.emojis, ...(m.drift ?? [])]),
     ),
   ],
   // 敌方阵营含变形替身（仙子魔尘的绵羊顶替原形象，沿用同阵营描边）
-  enemy: [...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()])],
+  enemy: [...new Set([...ENEMY_DEFS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()])],
   enemyProjectile: [...new Set(armedShotEmojis())],
   // 精英变体（含 Boss）：金边；持械精英的能力视觉同沾金边
   elite: [
-    ...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()]),
+    ...new Set([...ENEMY_DEFS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()]),
     BOSS.emoji,
   ],
 }
 
 /** 持械敌人的能力视觉（持有物/塔体/召唤物）：随敌人本体阵营描边 */
 function armedBodyEmojis(): string[] {
-  return [...ENEMY_SPECS, BOSS].flatMap((e) =>
+  return [...ENEMY_DEFS, BOSS].flatMap((e) =>
     (e.abilities ?? []).flatMap((w) => [
       ...('held' in w && w.held ? [w.held.emoji] : []),
       ...(w.kind === 'turret' ? [w.turret.emoji] : []),
@@ -63,7 +63,7 @@ function armedBodyEmojis(): string[] {
 
 /** 持械敌人的弹体：入敌弹组，红描边 */
 function armedShotEmojis(): string[] {
-  return [...ENEMY_SPECS, BOSS].flatMap((e) =>
+  return [...ENEMY_DEFS, BOSS].flatMap((e) =>
     (e.abilities ?? []).flatMap((w) =>
       w.kind === 'projectile' || w.kind === 'turret' ? [w.projectile.emoji] : [],
     ),

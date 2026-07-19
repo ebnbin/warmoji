@@ -119,13 +119,13 @@ function scheduleHit(ctx: BaseAudioContext, out: AudioNode, h: BgmHit, when: num
 }
 
 /** 建回声链（送出增益 → 延迟 → 反馈环 → 湿声并入 out），返回送出节点 */
-function buildEcho(ctx: BaseAudioContext, out: AudioNode, spec: NonNullable<BgmScore['echo']>): GainNode {
+function buildEcho(ctx: BaseAudioContext, out: AudioNode, def: NonNullable<BgmScore['echo']>): GainNode {
   const send = ctx.createGain()
-  send.gain.value = spec.level
+  send.gain.value = def.level
   const delay = ctx.createDelay(2)
-  delay.delayTime.value = spec.delaySec
+  delay.delayTime.value = def.delaySec
   const feedback = ctx.createGain()
-  feedback.gain.value = spec.feedback
+  feedback.gain.value = def.feedback
   send.connect(delay)
   delay.connect(feedback)
   feedback.connect(delay)

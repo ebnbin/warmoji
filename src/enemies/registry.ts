@@ -1,10 +1,10 @@
-import type { AbilitySpec, GroundEffectSpec } from '../abilities/spec'
+import type { AbilityDef, GroundEffectDef } from '../abilities/defs'
 
 // 敌人 = 基础三围 + 移动方式（locomotion）+ 能力列表 + 死亡效果列表。
 // 多样性用数据组合表达：加一种敌人 = 组合现有模块的一行数据；
 // 运行时按 locomotion.kind 分发转向（battle/steer.ts）、能力经敌方 ctx
 // 逐帧驱动（battle/enemyAbilities.ts）、死亡时跑效果模块（killEnemy）。
-export interface EnemyProjectileSpec {
+export interface EnemyProjectileDef {
   readonly emoji: string
   readonly size: number
   readonly radius: number
@@ -38,7 +38,7 @@ export interface DashLocomotion {
   readonly sfx?: 'whoosh'
 }
 
-export type LocomotionSpec =
+export type LocomotionDef =
   | { readonly kind: 'chase' }
   | { readonly kind: 'wander' }
   | { readonly kind: 'flee'; readonly range: number }
@@ -47,19 +47,19 @@ export type LocomotionSpec =
 
 // ── 死亡效果 ────────────────────────────────────────────────
 /** 死亡留毒：参数即地面效果（battle/groundEffects 以敌方阵营生成） */
-export interface DeathPoisonSpec extends GroundEffectSpec {
+export interface DeathPoisonDef extends GroundEffectDef {
   readonly kind: 'poison'
 }
 
-export interface DeathSplitSpec {
+export interface DeathSplitDef {
   readonly kind: 'split'
-  readonly into: EnemySpec
+  readonly into: EnemyDef
   readonly count: number
 }
 
-export type DeathEffectSpec = DeathPoisonSpec | DeathSplitSpec
+export type DeathEffectDef = DeathPoisonDef | DeathSplitDef
 
-export interface EnemySpec {
+export interface EnemyDef {
   readonly kind:
     | 'zombie'
     | 'ghost'
@@ -82,15 +82,15 @@ export interface EnemySpec {
   // 经验击杀即得；金币落地需拾取（波次结束未拾取的消失）
   readonly xp: number
   readonly coins: number
-  readonly locomotion: LocomotionSpec
+  readonly locomotion: LocomotionDef
   /** 持械（阵营中立能力行；battle/enemyAbilities 以敌方 ctx 装配驱动）——
    * 敌人的远程攻击全部经能力表达（原 periodicShot/ringBarrage 积木已并入） */
-  readonly abilities?: readonly AbilitySpec[]
-  readonly onDeath?: readonly DeathEffectSpec[]
+  readonly abilities?: readonly AbilityDef[]
+  readonly onDeath?: readonly DeathEffectDef[]
   readonly kbImmune?: boolean
 }
 
-export const ZOMBIE: EnemySpec = {
+export const ZOMBIE: EnemyDef = {
   kind: 'zombie',
   locomotion: { kind: 'chase' },
   emoji: '🧟',
@@ -105,7 +105,7 @@ export const ZOMBIE: EnemySpec = {
   coins: 2,
 }
 
-export const GHOST: EnemySpec = {
+export const GHOST: EnemyDef = {
   kind: 'ghost',
   locomotion: { kind: 'chase' },
   emoji: '👻',
@@ -121,7 +121,7 @@ export const GHOST: EnemySpec = {
 }
 
 /** 游荡射手：不索敌，慢速乱逛，周期性朝自己移动方向放一发慢弹（弹幕污染走位空间） */
-export const INVADER: EnemySpec = {
+export const INVADER: EnemyDef = {
   kind: 'invader',
   locomotion: { kind: 'wander' },
   emoji: '👾',
@@ -150,7 +150,7 @@ export const INVADER: EnemySpec = {
 }
 
 /** 突刺怪：探测圈内锁定蓄力方向 → 短延迟 → 直线冲刺一段距离（横向位移可躲） */
-export const BOAR: EnemySpec = {
+export const BOAR: EnemyDef = {
   kind: 'boar',
   emoji: '🐗',
   name: '野猪',
@@ -176,7 +176,7 @@ export const BOAR: EnemySpec = {
 }
 
 /** 逃跑射手：见人就拉开距离，周期性朝人吐慢速毒弹（制造追不追的抉择） */
-export const SNAKE: EnemySpec = {
+export const SNAKE: EnemyDef = {
   kind: 'snake',
   emoji: '🐍',
   name: '毒蛇',
@@ -206,7 +206,7 @@ export const SNAKE: EnemySpec = {
 }
 
 /** 毒爆怪：慢速近战，死亡原地留毒液池（别在自己的风筝路线上打爆它） */
-export const MUSHROOM: EnemySpec = {
+export const MUSHROOM: EnemyDef = {
   kind: 'mushroom',
   locomotion: { kind: 'chase' },
   emoji: '🍄',
@@ -235,7 +235,7 @@ export const MUSHROOM: EnemySpec = {
 }
 
 /** 偷金币鼠：不理玩家，直奔地上最近的金币吃掉；击杀吐回吃掉的 + 1 枚利息 */
-export const RAT: EnemySpec = {
+export const RAT: EnemyDef = {
   kind: 'rat',
   locomotion: { kind: 'coinThief' },
   emoji: '🐀',
@@ -250,7 +250,7 @@ export const RAT: EnemySpec = {
   coins: 2,
 }
 
-export const BLOBLING: EnemySpec = {
+export const BLOBLING: EnemyDef = {
   kind: 'blobling',
   locomotion: { kind: 'chase' },
   emoji: '🫧',
@@ -266,7 +266,7 @@ export const BLOBLING: EnemySpec = {
 }
 
 /** 分裂怪：死亡分裂成 2 只更小更快的迷你泡泡 */
-export const BLOB: EnemySpec = {
+export const BLOB: EnemyDef = {
   kind: 'blob',
   locomotion: { kind: 'chase' },
   emoji: '🫧',
@@ -282,7 +282,7 @@ export const BLOB: EnemySpec = {
   onDeath: [{ kind: 'split', into: BLOBLING, count: 2 }],
 }
 
-export const ENEMY_SPECS: readonly EnemySpec[] = [
+export const ENEMY_DEFS: readonly EnemyDef[] = [
   ZOMBIE,
   GHOST,
   INVADER,
@@ -351,7 +351,7 @@ export const SURGE = {
 // 终局 Boss（末波）：与普通敌人同一套组合数据——定时突刺移动 + 环形弹幕
 // 攻击模块 + 击退免疫；血量固定不吃时间成长曲线（按满编 18 波队伍粗校准），
 // 击败或撑满时长皆通关。特殊性只剩引擎侧的通关判定与 HUD 血条（boss 标记）。
-export const BOSS: EnemySpec = {
+export const BOSS: EnemyDef = {
   kind: 'boss',
   emoji: '👹',
   name: '赤鬼',
@@ -396,7 +396,7 @@ export const BOSS: EnemySpec = {
 /** 终波常规刷怪减压倍率（间隔 ×N）：把火力焦点留给 Boss */
 export const BOSS_SPAWN_RELIEF = 2
 
-const BY_KIND: Record<(typeof ENEMY_MIX)[number]['kind'], EnemySpec> = {
+const BY_KIND: Record<(typeof ENEMY_MIX)[number]['kind'], EnemyDef> = {
   zombie: ZOMBIE,
   ghost: GHOST,
   invader: INVADER,
@@ -408,27 +408,27 @@ const BY_KIND: Record<(typeof ENEMY_MIX)[number]['kind'], EnemySpec> = {
 }
 
 export interface EnemyMixEntry {
-  spec: EnemySpec
+  def: EnemyDef
   weight: number
 }
 
 /** 某一波的出场配比（已按 sinceWave 过滤、权重夹在上下限之间） */
 export function enemyMixAt(wave: number): EnemyMixEntry[] {
   return ENEMY_MIX.filter((m) => wave >= m.sinceWave).map((m) => ({
-    spec: BY_KIND[m.kind],
+    def: BY_KIND[m.kind],
     weight: Math.min(m.max, Math.max(m.min, m.base + m.perWave * (wave - m.sinceWave))),
   }))
 }
 
 /** 按权重随机抽一种敌人 */
-export function pickEnemy(mix: readonly EnemyMixEntry[], rand: () => number): EnemySpec {
+export function pickEnemy(mix: readonly EnemyMixEntry[], rand: () => number): EnemyDef {
   const total = mix.reduce((s, m) => s + m.weight, 0)
   let roll = rand() * total
   for (const m of mix) {
     roll -= m.weight
-    if (roll < 0) return m.spec
+    if (roll < 0) return m.def
   }
-  return mix[mix.length - 1]!.spec
+  return mix[mix.length - 1]!.def
 }
 
 /** 逃离转向：贴近地图边缘时叠加向内分量，沿墙滑行绕开而不是顶着边界冲 */

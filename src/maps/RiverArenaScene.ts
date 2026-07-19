@@ -5,7 +5,7 @@ import { UNIT } from '../lib/units'
 import { RIVER } from './river'
 import { INFINITE } from './world'
 import { MAPS } from './registry'
-import type { MapSpec } from './registry'
+import type { MapDef } from './registry'
 import { isHorizontal, remapPoint, remapVector } from '../screen/remap'
 import { clampToRiver, driftProfile, flowVector, pastDownstream, riverRect } from './river'
 import type { RiverRect } from './river'
@@ -130,8 +130,8 @@ export class RiverArenaScene extends BaseArenaScene {
     return { x: Math.min(Math.max(p.x, r.x + radius), r.x + r.w - radius), y: p.y }
   }
 
-  protected postSteerEnemy(e: ImageObj, body: ArcadeBody, spec: { radius: number }): void {
-    this.applyFlowAndBankClamp(e, body, spec.radius)
+  protected postSteerEnemy(e: ImageObj, body: ArcadeBody, def: { radius: number }): void {
+    this.applyFlowAndBankClamp(e, body, def.radius)
   }
 
   protected postSteerBoss(e: ImageObj, body: ArcadeBody): void {
@@ -377,8 +377,8 @@ export class RiverArenaScene extends BaseArenaScene {
     }
 
     // 岸上静态植被：沿长轴等距掷点（种子固定），只落在岸带内
-    const mapSpec: MapSpec = MAPS[this.run.mapId]
-    const spec = mapSpec.decor
+    const mapDef: MapDef = MAPS[this.run.mapId]
+    const def = mapDef.decor
     const decorRng = new Rng(this.run.decorSeed)
     const bankBands: [number, number][] = this.horizontal
       ? [
@@ -394,8 +394,8 @@ export class RiverArenaScene extends BaseArenaScene {
       if (bandW < 0.3 * UNIT) continue
       for (let along = 0.5 * UNIT; along < alongLen; along += UNIT * (0.9 + decorRng.next() * 0.7)) {
         if (decorRng.next() > 0.7) continue
-        const emoji = spec.emojis[Math.floor(decorRng.next() * spec.emojis.length)]!
-        const sizeU = spec.sizeU[0] + decorRng.next() * (spec.sizeU[1] - spec.sizeU[0])
+        const emoji = def.emojis[Math.floor(decorRng.next() * def.emojis.length)]!
+        const sizeU = def.sizeU[0] + decorRng.next() * (def.sizeU[1] - def.sizeU[0])
         const size = Math.min(sizeU * UNIT, bandW * 0.9)
         const cross = b0 + size / 2 + decorRng.next() * Math.max(1, bandW - size)
         const img = emojiImage(
@@ -406,7 +406,7 @@ export class RiverArenaScene extends BaseArenaScene {
           size,
           'player',
         )
-          .setAlpha(spec.alpha[0] + decorRng.next() * (spec.alpha[1] - spec.alpha[0]))
+          .setAlpha(def.alpha[0] + decorRng.next() * (def.alpha[1] - def.alpha[0]))
           .setRotation((decorRng.next() * 2 - 1) * 0.6)
           .setDepth(0.8)
         this.waterObjs.push(img)
@@ -414,7 +414,7 @@ export class RiverArenaScene extends BaseArenaScene {
     }
 
     // 漂浮物（顺流循环）：初始均匀铺满，之后 updateWater 推进
-    const driftPool = mapSpec.drift ?? ['🍃']
+    const driftPool = mapDef.drift ?? ['🍃']
     for (let i = 0; i < RIVER.driftCount; i++) {
       const emoji = driftPool[Math.floor(Math.random() * driftPool.length)]!
       const img = emojiImage(this, 0, 0, emoji, (0.35 + Math.random() * 0.25) * UNIT, 'player')

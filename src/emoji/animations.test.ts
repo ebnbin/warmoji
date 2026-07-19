@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { CAPTAINS, CHARACTERS } from '../characters/registry'
-import { BOSS, ENEMY_SPECS } from '../enemies/registry'
+import { BOSS, ENEMY_DEFS } from '../enemies/registry'
 import { CHEST } from '../run/chest'
 import { COIN } from '../items/registry'
 import { emojiCodepoints } from './codepoints'
@@ -23,7 +23,7 @@ describe('实体动画覆盖', () => {
     const entities = new Set<string>([
       ...Object.values(CHARACTERS).map((c) => c.emoji),
       ...Object.values(CAPTAINS).map((c) => c.emoji),
-      ...ENEMY_SPECS.map((e) => e.emoji),
+      ...ENEMY_DEFS.map((e) => e.emoji),
       BOSS.emoji,
       '🐑', // 仙子魔尘的变形替身
       '🏹', // 河狸的弩塔装置

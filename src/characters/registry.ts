@@ -31,7 +31,7 @@ import {
   woodTurret2,
   woodTurret3,
 } from '../abilities/registry'
-import type { AbilitySpec } from '../abilities/spec'
+import type { AbilityDef } from '../abilities/defs'
 
 // 角色花名册：角色 → 能力为单向绑定（角色配装固定；能力可被复用）。
 // 两阶专属升级随角色归行：卡文案 + 解锁后的生效配装都是角色自己的属性，
@@ -42,7 +42,7 @@ export interface CharacterUpgrade {
   readonly icon: string
   readonly name: string
   readonly desc: string
-  readonly abilities: readonly AbilitySpec[]
+  readonly abilities: readonly AbilityDef[]
 }
 
 /** 已解锁的能力档位：u1 = 一阶（下标 0 的卡），u2 = 二阶（下标 1 的卡） */
@@ -51,11 +51,11 @@ export interface UpgradeTiers {
   u2: boolean
 }
 
-export interface CharacterSpec {
+export interface CharacterDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly abilities: readonly AbilitySpec[]
+  readonly abilities: readonly AbilityDef[]
   /** 两阶专属升级（商店专属卡解锁，累积生效）：[一阶, 一阶+二阶]，
    * 每档 = 卡文案 + 该档整套配装。升级 = 换持整行（abilities/registry 的
    * `2`/`3` 档位行），能力自身无升级逻辑 */
@@ -219,12 +219,12 @@ export const CHARACTERS = {
     ],
     orbit: 0.2,
   },
-} as const satisfies Record<string, CharacterSpec>
+} as const satisfies Record<string, CharacterDef>
 
 /** 生效配装：升级卡质变 = 换持整行（一阶 → 二阶累积；未解锁用基础行） */
-export function loadoutFor(spec: CharacterSpec, tiers: UpgradeTiers): readonly AbilitySpec[] {
-  if (!tiers.u1) return spec.abilities
-  return tiers.u2 ? spec.upgrades[1].abilities : spec.upgrades[0].abilities
+export function loadoutFor(def: CharacterDef, tiers: UpgradeTiers): readonly AbilityDef[] {
+  if (!tiers.u1) return def.abilities
+  return tiers.u2 ? def.upgrades[1].abilities : def.upgrades[0].abilities
 }
 
 export type CharacterId = keyof typeof CHARACTERS
@@ -242,7 +242,7 @@ export interface CaptainSkill {
 
 // 队长：不登场、无实体的团队增益提供者（emotion 表情形象）。
 // 能力先直接建模为字段，需要通用效果系统时再抽象；编制上限/经验相关能力由队长决定。
-export interface CaptainSpec {
+export interface CaptainDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
@@ -352,7 +352,7 @@ export const CAPTAINS = {
       cdMs: 30_000,
     },
   },
-} as const satisfies Record<string, CaptainSpec>
+} as const satisfies Record<string, CaptainDef>
 
 export type CaptainId = keyof typeof CAPTAINS
 export const CAPTAIN_IDS = Object.keys(CAPTAINS) as readonly CaptainId[]

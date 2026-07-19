@@ -1,6 +1,6 @@
 import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
-import type { ProjectileSpec } from './spec'
+import type { ProjectileDef } from './defs'
 import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
@@ -15,18 +15,18 @@ export class ProjectileAbility implements AbilityRuntime {
   private shots = 0
 
   constructor(
-    private spec: ProjectileSpec,
+    private def: ProjectileDef,
     private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
-    if (spec.held) {
-      this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline).setDepth(13)
+    if (def.held) {
+      this.image = emojiImage(ctx.scene, 0, 0, def.held.emoji, def.held.size, ctx.ownerOutline).setDepth(13)
     }
     this.cooldown = initialCooldownMs
   }
 
   private muzzle(owner: AbilityOwner): { x: number; y: number } {
-    const held = this.spec.held
+    const held = this.def.held
     if (!held) return { x: owner.x, y: owner.y }
     const side = held.mountSide ?? 0
     const gap = held.mountGap ?? 0
@@ -43,29 +43,29 @@ export class ProjectileAbility implements AbilityRuntime {
     if (this.image) {
       const pos = this.muzzle(owner)
       this.image.setPosition(pos.x, pos.y)
-      this.image.setRotation(this.aim + this.spec.held!.rotationOffsetDeg * DEG2RAD)
+      this.image.setRotation(this.aim + this.def.held!.rotationOffsetDeg * DEG2RAD)
     }
 
     if (this.cooldown > 0) return
-    const fullRing = this.spec.volley !== undefined && this.spec.volley.spreadDeg >= 360 - 1e-9
-    if (this.spec.aim === 'move') {
+    const fullRing = this.def.volley !== undefined && this.def.volley.spreadDeg >= 360 - 1e-9
+    if (this.def.aim === 'move') {
       const h = this.ctx.ownerHeading?.()
       if (!h) return
       this.aim = Math.atan2(h.y, h.x)
     } else if (!fullRing) {
-      const aim = nearestAngle(owner, this.ctx.targets(), this.spec.range)
+      const aim = nearestAngle(owner, this.ctx.targets(), this.def.range)
       if (aim === null) return
       this.aim = aim
     }
-    this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
+    this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
 
-    const damage = Math.round(this.spec.damage * this.ctx.damageMul())
+    const damage = Math.round(this.def.damage * this.ctx.damageMul())
     const from = this.muzzle(owner)
     this.shots++
-    const special = this.spec.everyN && this.shots % this.spec.everyN.n === 0
-    const volley = special
-      ? { count: this.spec.everyN!.count, spreadDeg: this.spec.everyN!.spreadDeg }
-      : this.spec.volley
+    const defial = this.def.everyN && this.shots % this.def.everyN.n === 0
+    const volley = defial
+      ? { count: this.def.everyN!.count, spreadDeg: this.def.everyN!.spreadDeg }
+      : this.def.volley
     if (volley && volley.count > 1) {
       const full = volley.spreadDeg >= 360 - 1e-9
       const base = full && volley.randomRotate ? (this.ctx.random?.() ?? 0) * Math.PI * 2 : this.aim
@@ -74,13 +74,13 @@ export class ProjectileAbility implements AbilityRuntime {
         const angle = full
           ? base + (i * volley.spreadDeg * DEG2RAD) / volley.count
           : this.aim + volley.spreadDeg * DEG2RAD * (i / (volley.count - 1) - 0.5)
-        this.ctx.spawnProjectile(from.x, from.y, angle, this.spec, damage)
+        this.ctx.spawnProjectile(from.x, from.y, angle, this.def, damage)
       }
-      if (this.spec.fireSfx) this.ctx.sfx(this.spec.fireSfx)
+      if (this.def.fireSfx) this.ctx.sfx(this.def.fireSfx)
       return
     }
-    this.ctx.spawnProjectile(from.x, from.y, this.aim, this.spec, damage)
-    if (this.spec.fireSfx) this.ctx.sfx(this.spec.fireSfx)
+    this.ctx.spawnProjectile(from.x, from.y, this.aim, this.def, damage)
+    if (this.def.fireSfx) this.ctx.sfx(this.def.fireSfx)
   }
 
   tickCooldown(delta: number): void {

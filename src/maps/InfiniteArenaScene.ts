@@ -148,7 +148,7 @@ export class InfiniteArenaScene extends BaseArenaScene {
     const rangeKey = `${need[0]!.cx},${need[0]!.cy}:${need[need.length - 1]!.cx},${need[need.length - 1]!.cy}`
     if (rangeKey === this.decorRangeKey) return
     this.decorRangeKey = rangeKey
-    const spec = MAPS[this.run.mapId].decor
+    const def = MAPS[this.run.mapId].decor
     const needKeys = new Set(need.map((c) => chunkKey(c.cx, c.cy)))
     for (const [key, sprites] of this.decorChunks) {
       if (needKeys.has(key)) continue
@@ -158,7 +158,7 @@ export class InfiniteArenaScene extends BaseArenaScene {
     for (const c of need) {
       const key = chunkKey(c.cx, c.cy)
       if (this.decorChunks.has(key)) continue
-      const sprites = chunkDecor(spec, this.run.decorSeed, c.cx, c.cy, cells).map((d) =>
+      const sprites = chunkDecor(def, this.run.decorSeed, c.cx, c.cy, cells).map((d) =>
         emojiImage(this, d.xU * UNIT, d.yU * UNIT, d.emoji, d.sizeU * UNIT, 'player')
           .setAlpha(d.alpha)
           .setRotation(d.rotation)

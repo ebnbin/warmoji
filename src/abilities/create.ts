@@ -1,4 +1,4 @@
-import type { AbilitySpec } from './spec'
+import type { AbilityDef } from './defs'
 import { AreaBlastAbility } from './AreaBlastAbility'
 import { AssassinateAbility } from './AssassinateAbility'
 import { BoomerangAbility } from './BoomerangAbility'
@@ -14,34 +14,34 @@ import { TurretAbility } from './TurretAbility'
 import type { AbilityContext, AbilityRuntime } from './types'
 
 export function createAbility(
-  spec: AbilitySpec,
+  def: AbilityDef,
   ctx: AbilityContext,
   initialCooldownMs: number,
 ): AbilityRuntime {
-  switch (spec.kind) {
+  switch (def.kind) {
     case 'thrust':
-      return new ThrustAbility(spec, ctx, initialCooldownMs)
+      return new ThrustAbility(def, ctx, initialCooldownMs)
     case 'projectile':
-      return new ProjectileAbility(spec, ctx, initialCooldownMs)
+      return new ProjectileAbility(def, ctx, initialCooldownMs)
     case 'sweep':
-      return new SweepAbility(spec, ctx, initialCooldownMs)
+      return new SweepAbility(def, ctx, initialCooldownMs)
     case 'areaBlast':
-      return new AreaBlastAbility(spec, ctx, initialCooldownMs)
+      return new AreaBlastAbility(def, ctx, initialCooldownMs)
     case 'boomerang':
-      return new BoomerangAbility(spec, ctx, initialCooldownMs)
+      return new BoomerangAbility(def, ctx, initialCooldownMs)
     case 'laser':
-      return new LaserAbility(spec, ctx, initialCooldownMs)
+      return new LaserAbility(def, ctx, initialCooldownMs)
     case 'slowAura':
-      return new SlowAuraAbility(spec, ctx, initialCooldownMs)
+      return new SlowAuraAbility(def, ctx, initialCooldownMs)
     case 'assassinate':
-      return new AssassinateAbility(spec, ctx, initialCooldownMs)
+      return new AssassinateAbility(def, ctx, initialCooldownMs)
     case 'turret':
-      return new TurretAbility(spec, ctx, initialCooldownMs)
+      return new TurretAbility(def, ctx, initialCooldownMs)
     case 'summon':
-      return new SummonAbility(spec, ctx, initialCooldownMs)
+      return new SummonAbility(def, ctx, initialCooldownMs)
     case 'heal':
-      return new HealAbility(spec, ctx, initialCooldownMs)
+      return new HealAbility(def, ctx, initialCooldownMs)
     case 'chainArc':
-      return new ChainArcAbility(spec, ctx, initialCooldownMs)
+      return new ChainArcAbility(def, ctx, initialCooldownMs)
   }
 }

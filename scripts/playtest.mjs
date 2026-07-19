@@ -93,7 +93,7 @@ async function snapshot() {
       .getChildren()
       .filter((e) => e.active)
       .map((e) => {
-        const k = e.getData('spec').kind
+        const k = e.getData('enemy').def.kind
         return { x: e.x, y: e.y, fast: k === 'ghost' || k === 'boar' || k === 'blobling' }
       })
     // 敌弹与毒液池也参与避让打分

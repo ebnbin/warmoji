@@ -6,7 +6,7 @@ import type { Member } from './members'
 import type { Enemy } from './enemies'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
 
-// 敌人移动策略注册表：按 spec.locomotion.kind 分发，镜像 abilities/create.ts。
+// 敌人移动策略注册表：按 def.locomotion.kind 分发，镜像 abilities/create.ts。
 // 每个策略只负责逐帧速度决策与状态机推进；攻击在 battle/enemyAttacks.ts、
 // 死亡效果在 battle/deathEffects.ts、公共帧留守 BaseArenaScene.steerEnemies。
 // 世界差异经场景钩子（wanderDir/fleeDir）。
@@ -25,19 +25,19 @@ type Steerer = (ctx: SteerCtx) => void
 const chase: Steerer = ({ scene, a, body, slow, target }) => {
   const d = scene.worldDelta(a.image, target.image)
   const dir = norm(d.x, d.y)
-  body.setVelocity(dir.x * a.spec.speed * slow, dir.y * a.spec.speed * slow)
+  body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
 }
 
 const wander: Steerer = ({ scene, a, body, slow }) => {
   const dir = scene.wanderDir(a)
-  body.setVelocity(dir.x * a.spec.speed * slow, dir.y * a.spec.speed * slow)
+  body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
 }
 
 /** 统一冲刺：探测触发（野猪）与定时触发（Boss）同一状态机——
  * 蓄力（定身颤动）→ 冲刺（锁定方向直线冲）→ 冷却/回到 idle 移动 */
 const dash: Steerer = (ctx) => {
   const { scene, a, body, slow, now, target } = ctx
-  const lm = a.spec.locomotion
+  const lm = a.def.locomotion
   if (lm.kind !== 'dash') return
   const e = a.image
   if (a.state === 'windup') {
@@ -93,10 +93,10 @@ const dash: Steerer = (ctx) => {
     const to = lm.aim === 'teamCenter' ? scene.center : target.image
     const d = scene.worldDelta(e, to)
     const dir = norm(d.x, d.y)
-    body.setVelocity(dir.x * a.spec.speed * slow, dir.y * a.spec.speed * slow)
+    body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
   } else {
     const dir = scene.wanderDir(a)
-    body.setVelocity(dir.x * a.spec.speed * slow, dir.y * a.spec.speed * slow)
+    body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
   }
 }
 
@@ -109,7 +109,7 @@ function lockDashDir({ scene, a, target }: SteerCtx, aim: 'nearest' | 'teamCente
 }
 
 const flee: Steerer = ({ scene, a, body, slow, target }) => {
-  const lm = a.spec.locomotion
+  const lm = a.def.locomotion
   if (lm.kind !== 'flee') return
   const e = a.image
   const d = scene.worldDelta(e, target.image)
@@ -118,15 +118,15 @@ const flee: Steerer = ({ scene, a, body, slow, target }) => {
     // 逃离方向经世界钩子修正（有界图贴边沿墙滑行）
     const away = norm(-d.x, -d.y)
     const dir = scene.fleeDir(a, away)
-    body.setVelocity(dir.x * a.spec.speed * slow, dir.y * a.spec.speed * slow)
+    body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
   } else {
     const dir = scene.wanderDir(a)
-    body.setVelocity(dir.x * a.spec.speed * 0.4 * slow, dir.y * a.spec.speed * 0.4 * slow)
+    body.setVelocity(dir.x * a.def.speed * 0.4 * slow, dir.y * a.def.speed * 0.4 * slow)
   }
 }
 
 const coinThief: Steerer = ({ scene, a, body, slow }) => {
-  const spec = a.spec
+  const def = a.def
   const e = a.image
   // 直奔最近的金币（宝箱吃不动，不偷）；没金币就慢速游荡
   let coin: ImageObj | undefined
@@ -141,22 +141,22 @@ const coinThief: Steerer = ({ scene, a, body, slow }) => {
     }
   }
   if (coin) {
-    const eatR = spec.radius + COIN.radius * UNIT
+    const eatR = def.radius + COIN.radius * UNIT
     if (bestD <= eatR * eatR) {
       coin.destroy()
       a.eaten += 1
     } else {
       const d = scene.worldDelta(e, coin)
       const dir = norm(d.x, d.y)
-      body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
+      body.setVelocity(dir.x * def.speed * slow, dir.y * def.speed * slow)
     }
   } else {
     const dir = scene.wanderDir(a)
-    body.setVelocity(dir.x * spec.speed * 0.3 * slow, dir.y * spec.speed * 0.3 * slow)
+    body.setVelocity(dir.x * def.speed * 0.3 * slow, dir.y * def.speed * 0.3 * slow)
   }
 }
 
-export const STEERERS: Record<Enemy['spec']['locomotion']['kind'], Steerer> = {
+export const STEERERS: Record<Enemy['def']['locomotion']['kind'], Steerer> = {
   chase,
   wander,
   dash,

@@ -1,7 +1,7 @@
 import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
-import { thrustHitIndices } from './spec'
-import type { LaserSpec } from './spec'
+import { thrustHitIndices } from './defs'
+import type { LaserDef } from './defs'
 import { emojiImage } from '../emoji/textures'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
@@ -17,18 +17,18 @@ export class LaserAbility implements AbilityRuntime {
   private clock = 0
 
   constructor(
-    private spec: LaserSpec,
+    private def: LaserDef,
     private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
-    this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline).setDepth(13)
+    this.image = emojiImage(ctx.scene, 0, 0, def.held.emoji, def.held.size, ctx.ownerOutline).setDepth(13)
     this.cooldown = initialCooldownMs
   }
 
   update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
     this.clock += delta
-    const held = this.spec.held
+    const held = this.def.held
     this.image.setPosition(
       owner.x + Math.cos(this.aim) * held.restOffset,
       owner.y + Math.sin(this.aim) * held.restOffset,
@@ -37,7 +37,7 @@ export class LaserAbility implements AbilityRuntime {
 
     // 全域扫射：按时序逐束兑现（跟随角色实时位置）
     if (this.radialQueue.length > 0 && !this.hidden) {
-      const ratio = this.spec.radial?.ratio ?? 1
+      const ratio = this.def.radial?.ratio ?? 1
       while (this.radialQueue.length > 0 && this.radialQueue[0]!.at <= this.clock) {
         const shot = this.radialQueue.shift()!
         this.aim = shot.angle
@@ -60,13 +60,13 @@ export class LaserAbility implements AbilityRuntime {
         aim = Math.atan2(dy, dx)
       }
     }
-    if (aim === null || best > this.spec.range * this.spec.range) return
+    if (aim === null || best > this.def.range * this.def.range) return
     this.aim = aim
-    this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
+    this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
 
-    if (this.spec.radial) {
+    if (this.def.radial) {
       // 出手变为绕一周的序列扫射：从瞄准角起步，逐束旋转铺满 360°
-      const { beams, stepMs } = this.spec.radial
+      const { beams, stepMs } = this.def.radial
       for (let k = 0; k < beams; k++) {
         this.radialQueue.push({ angle: aim + (k * 2 * Math.PI) / beams, at: this.clock + k * stepMs })
       }
@@ -75,29 +75,29 @@ export class LaserAbility implements AbilityRuntime {
 
     this.fireBeam(owner, aim, 1)
     // 双联光束：正后方补一道
-    if (this.spec.backBeam) this.fireBeam(owner, aim + Math.PI, 1)
+    if (this.def.backBeam) this.fireBeam(owner, aim + Math.PI, 1)
   }
 
   /** 发射一束：胶囊判定 + 特效（ratio 折损用于扫射分束） */
   private fireBeam(owner: AbilityOwner, angle: number, ratio: number): void {
     this.ctx.sfx('zap')
-    const damage = Math.max(1, Math.round(this.spec.damage * this.ctx.damageMul() * ratio))
+    const damage = Math.max(1, Math.round(this.def.damage * this.ctx.damageMul() * ratio))
     const origin = { x: owner.x, y: owner.y }
     const targets = this.ctx.targets()
-    for (const i of thrustHitIndices(origin, angle, this.spec.range, this.spec.beamRadius, targets)) {
-      this.ctx.damageTarget(targets[i]!.ref, damage, this.spec.knockback, origin.x, origin.y)
+    for (const i of thrustHitIndices(origin, angle, this.def.range, this.def.beamRadius, targets)) {
+      this.ctx.damageTarget(targets[i]!.ref, damage, this.def.knockback, origin.x, origin.y)
     }
     this.beamEffect(origin.x, origin.y, angle)
   }
 
   private beamEffect(x: number, y: number, angle: number): void {
     const beam = this.ctx.scene.add
-      .rectangle(x, y, this.spec.range, this.spec.beamRadius * 2, this.spec.color, 0.55)
+      .rectangle(x, y, this.def.range, this.def.beamRadius * 2, this.def.color, 0.55)
       .setOrigin(0, 0.5)
       .setRotation(angle)
       .setDepth(7)
     const core = this.ctx.scene.add
-      .rectangle(x, y, this.spec.range, this.spec.beamRadius * 0.7, 0xffffff, 0.95)
+      .rectangle(x, y, this.def.range, this.def.beamRadius * 0.7, 0xffffff, 0.95)
       .setOrigin(0, 0.5)
       .setRotation(angle)
       .setDepth(8)

@@ -17,11 +17,11 @@ import { STEERERS } from './steer'
 import { runDeathEffects } from './deathEffects'
 import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, TEAM, loadoutFor } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
-import type { CharacterId, CharacterSpec } from '../characters/registry'
+import type { CharacterId, CharacterDef } from '../characters/registry'
 import { SKILL } from '../characters/skill'
 import { STRESS } from '../debug/dev'
 import { BOSS, BOSS_SPAWN_RELIEF, ELITE, SPAWN, SURGE } from '../enemies/registry'
-import type { EnemySpec } from '../enemies/registry'
+import type { EnemyDef } from '../enemies/registry'
 import { UNIT } from '../lib/units'
 import { WAVE } from '../run/waves'
 import { KNOCKBACK } from '../abilities/registry'
@@ -40,7 +40,7 @@ import {
   aggregateCharacterEffects,
   aggregateTeamEffects,
   CRIT_MUL,
-  resolveAbilitySpec,
+  resolveAbilityDef,
 } from '../items/registry'
 import type { TeamEffects } from '../items/registry'
 import { currentFormation, getRun, guardOrder, isTeamFull, promoteStep, waveStartHp } from '../run/state'
@@ -54,7 +54,7 @@ import { Rng } from '../lib/rng'
 import { isWithinActive } from '../maps/world'
 import { norm } from '../lib/vec'
 import type { Point } from '../lib/vec'
-import { ANIM_SPEC } from '../emoji/studio'
+import { ANIM_DEF } from '../emoji/studio'
 import { isBossWave, isEliteWave, isFinalWave, waveAt, waveDurationMs } from '../run/waves'
 import { gainXp, waveBonusXp, xpToNext } from '../run/xp'
 import { Animator } from '../emoji/animator'
@@ -121,7 +121,7 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
 }
 
 export abstract class BaseArenaScene extends Phaser.Scene {
-  protected lineup: readonly CharacterSpec[] = []
+  protected lineup: readonly CharacterDef[] = []
   members: Member[] = []
   protected memberGroup!: Phaser.GameObjects.Group
   center = { x: 0, y: 0 }
@@ -144,7 +144,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     ownerOutline: 'player',
     targets: () => this.frameTargets,
     damageTarget: (e, d, kb, sx, sy) => this.applyDamage(e as ImageObj, d, kb, sx, sy),
-    spawnProjectile: (x, y, angle, spec, damage) => spawnProjectile(this, x, y, angle, spec, damage),
+    spawnProjectile: (x, y, angle, def, damage) => spawnProjectile(this, x, y, angle, def, damage),
     anchor: () => this.center,
     targetHp: (ref) => enemyOf(ref as ImageObj).hp,
     targetMaxHp: (ref) => enemyOf(ref as ImageObj).maxHp,
@@ -155,7 +155,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       a.abilitySlowMul = factor
       a.abilitySlowUntil = this.elapsedMs + durationMs
     },
-    spawnGroundEffect: (x, y, spec) => spawnGroundEffect(this, x, y, spec, { faction: 'team', srcSlot: -1 }),
+    spawnGroundEffect: (x, y, def) => spawnGroundEffect(this, x, y, def, { faction: 'team', srcSlot: -1 }),
     attractCoins: (x, y, radius) => this.frameAttractors.push({ x, y, r2: radius * radius }),
     // 基座 ctx 无「本人」概念：无敌授予/本体动画由 memberCtx 按槽位覆写
     playOwnerClip: () => {},
@@ -245,7 +245,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       awake++
-      targets.push({ x: e.x, y: e.y, radius: enemyOf(e).spec.radius, ref: e })
+      targets.push({ x: e.x, y: e.y, radius: enemyOf(e).def.radius, ref: e })
     }
     this.awakeCount = awake
     this.dormantCount = 0
@@ -335,10 +335,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     return away
   }
   /** 普通敌人速度定稿后的世界后处理（河流：加水流 + 跨向钳岸） */
-  protected postSteerEnemy(_e: ImageObj, _body: ArcadeBody, _spec: EnemySpec): void {
+  protected postSteerEnemy(_e: ImageObj, _body: ArcadeBody, _def: EnemyDef): void {
     void _e
     void _body
-    void _spec
+    void _def
   }
   /** Boss 速度定稿后的世界后处理（河流：加水流 + 钳河道） */
   protected postSteerBoss(_e: ImageObj, _body: ArcadeBody): void {
@@ -405,7 +405,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       }
       if (within) {
         awake++
-        targets.push({ x: e.x, y: e.y, radius: a.spec.radius, ref: e })
+        targets.push({ x: e.x, y: e.y, radius: a.def.radius, ref: e })
       } else {
         dormant++
       }
@@ -465,8 +465,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.rng = new Rng(Date.now() >>> 0)
     this.run = getRun()
     // 地图即关卡：色板固定按所选地图，不再逐局随机
-    const mapSpec = MAPS[this.run.mapId]
-    this.palette = mapSpec.palette
+    const mapDef = MAPS[this.run.mapId]
+    this.palette = mapDef.palette
     applyBackground(this.palette)
     this.stress = isStress()
     this.settings = loadSettings(browserStorage())
@@ -744,8 +744,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   }
 
   private createMember(id: CharacterId, slot: number): Member {
-    const spec = CHARACTERS[id]
-    const emoji = spec.emoji
+    const def = CHARACTERS[id]
+    const emoji = def.emoji
     const post = this.postBySlot[slot] ?? slot
     const off = this.currentPosts()[post] ?? { x: 0, y: 0 }
     const image = emojiImage(
@@ -801,10 +801,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           crit,
         )
       },
-      spawnProjectile: (x, y, angle, pSpec, damage) =>
-        spawnProjectile(this, x, y, angle, pSpec, damage, slot),
-      spawnGroundEffect: (x, y, spec) =>
-        spawnGroundEffect(this, x, y, spec, { faction: 'team', srcSlot: slot }),
+      spawnProjectile: (x, y, angle, pDef, damage) =>
+        spawnProjectile(this, x, y, angle, pDef, damage, slot),
+      spawnGroundEffect: (x, y, def) =>
+        spawnGroundEffect(this, x, y, def, { faction: 'team', srcSlot: slot }),
       // 刺客出手帧：把「上次受击时刻」推到未来，等效授予 ms 无敌
       grantOwnerInvuln: (ms) => {
         const mm = this.members[slot]
@@ -822,15 +822,15 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 部件动画：idle 常驻翻帧（slot 错开相位），帧烘焙是惰性的，就绪前保持静态
     const anim = new Animator(image)
     anim.register('idle', clipFramesLive(this, emoji, 'idle', 'player'))
-    anim.setIdle('idle', ANIM_SPEC.durMs, slot * 173)
+    anim.setIdle('idle', ANIM_DEF.durMs, slot * 173)
     const member: Member = {
       emoji,
       slot,
       image,
       // 错开初始冷却，避免全队同帧齐射。
       // 生效能力 = 原始配装 → 升级卡质变注入 → 空间参数按道具缩放
-      abilities: loadoutFor(spec, tiers).map((w, i) =>
-        createAbility(toPx(resolveAbilitySpec(w, fx)), memberCtx, 300 + slot * 120 + i * 230),
+      abilities: loadoutFor(def, tiers).map((w, i) =>
+        createAbility(toPx(resolveAbilityDef(w, fx)), memberCtx, 300 + slot * 120 + i * 230),
       ),
       handle,
       visualOffset,
@@ -1068,7 +1068,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (a.morphUntil > this.elapsedMs) return
     if (!m.alive || this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
-    this.hurtMember(m, Math.round(a.spec.damage * a.dmgMul), 0xff7777, a.spec.name)
+    this.hurtMember(m, Math.round(a.def.damage * a.dmgMul), 0xff7777, a.def.name)
     // 荆棘背心：接触反伤（与受击同帧、同吃无敌帧节流；击杀归属穿刺者）
     if (m.thorns > 0 && enemy.active) {
       this.applyDamage(enemy, m.thorns, 0, undefined, undefined, m.slot)
@@ -1260,12 +1260,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.run.kills++
     playSfx('kill')
     const a = enemyOf(enemy)
-    const spec = a.spec
+    const def = a.def
     const elite = a.elite
     const isBoss = a.boss
     // 敌情明细：按敌人名计击杀，精英另计总数
     const st = this.run.stats
-    st.enemyKills[spec.name] = (st.enemyKills[spec.name] ?? 0) + 1
+    st.enemyKills[def.name] = (st.enemyKills[def.name] ?? 0) + 1
     if (elite) st.eliteKills += 1
     // 吸血獠牙：击杀者回血
     const killer = this.members[srcSlot]
@@ -1275,10 +1275,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 经验击杀即得（队长倍率 × 四叶草团队倍率，精英有额外倍率）；金币落地等待拾取
     const xpMul =
       CAPTAINS[this.run.captainId].xpGainMul * this.teamFx.xpGainMul * (elite ? ELITE.xpMul : 1)
-    this.gainTeamXp(Math.round(spec.xp * xpMul))
+    this.gainTeamXp(Math.round(def.xp * xpMul))
     // 偷金币鼠：吐回吃掉的金币 + 1 枚利息
     const eaten = a.eaten
-    const baseCoins = spec.coins * (elite ? ELITE.coinsMul : 1)
+    const baseCoins = def.coins * (elite ? ELITE.coinsMul : 1)
     const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? baseCoins : 0
     spawnCoins(this, enemy.x, enemy.y, baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0))
     // 宝箱：极小概率掉落（精英更高）；Boss 击杀即通关，掉了也来不及捡，不掉
@@ -1347,13 +1347,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   }
 
   private spawnOne(hpMultiplier: number, forceElite = false): void {
-    const spec = toPx(pickEnemy(this.enemyMix, () => this.rng.next()))
+    const def = toPx(pickEnemy(this.enemyMix, () => this.rng.next()))
     // 精英怪：到波数后按概率强化出场（血量刷怪时算入，移速/伤害走敌身标记）
     const elite =
       !this.stress &&
       (forceElite ||
         (this.run.wave >= ELITE.fromWave && this.rng.next() < ELITE.chance))
-    const hp = Math.round(spec.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
+    const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
     const pos = this.spawnPoint()
 
     // 预告标记闪烁后敌人才落地；预告期间无碰撞。
@@ -1375,7 +1375,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       mark.destroy()
       this.pendingSpawns--
       this.pendingMarks = this.pendingMarks.filter((x) => x !== entry)
-      if (!this.over) this.materializeEnemy(spec, pos.x, pos.y, hp, elite)
+      if (!this.over) this.materializeEnemy(def, pos.x, pos.y, hp, elite)
     })
   }
 
@@ -1393,8 +1393,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.pendingMarks = this.pendingMarks.filter((x) => x !== entry)
       if (this.over) return
       // Boss 与普通敌人同一条 materialize 管线（boss 标记：金边/深度/入场演出/HUD 血条）
-      const spec = toPx(BOSS)
-      this.materializeEnemy(spec, pos.x, pos.y, spec.hp, false, true)
+      const def = toPx(BOSS)
+      this.materializeEnemy(def, pos.x, pos.y, def.hp, false, true)
       playSfx('boom')
     })
   }
@@ -1409,19 +1409,19 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
   }
 
-  materializeEnemy(spec: EnemySpec, x: number, y: number, hp: number, elite = false, boss = false): void {
+  materializeEnemy(def: EnemyDef, x: number, y: number, hp: number, elite = false, boss = false): void {
     // 落点经世界钩子兜底（有界钳制/河流钳跨向/虚空回绕；分裂溅出等边缘情况）
-    const pos = this.constrainEnemyPos({ x, y }, spec.radius)
+    const pos = this.constrainEnemyPos({ x, y }, def.radius)
     const enemy = emojiImage(
       this,
       pos.x,
       pos.y,
-      spec.emoji,
-      spec.size * (elite ? ELITE.sizeMul : 1),
+      def.emoji,
+      def.size * (elite ? ELITE.sizeMul : 1),
       elite || boss ? 'elite' : 'enemy',
     ).setDepth(boss ? 7 : 5)
     this.physics.add.existing(enemy)
-    circleBody(enemy, spec.radius)
+    circleBody(enemy, def.radius)
     if (boss) this.configureBossBody(enemy)
     else this.configureEnemyBody(enemy)
     // 行走摇摆的随机相位：同屏大量敌人不齐步摆；
@@ -1432,16 +1432,16 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const fireAt = this.elapsedMs + 900 + this.rng.next() * 1500
     const ph = this.rng.next() * Math.PI * 2
     const anim = new Animator(enemy)
-    anim.register('idle', clipFramesLive(this, spec.emoji, 'idle', elite || boss ? 'elite' : 'enemy'))
-    anim.setIdle('idle', ANIM_SPEC.durMs, (ph / (Math.PI * 2)) * ANIM_SPEC.durMs)
+    anim.register('idle', clipFramesLive(this, def.emoji, 'idle', elite || boss ? 'elite' : 'enemy'))
+    anim.setIdle('idle', ANIM_DEF.durMs, (ph / (Math.PI * 2)) * ANIM_DEF.durMs)
     // 定时型冲刺的首轮延迟
-    const lm = spec.locomotion
+    const lm = def.locomotion
     const nextDashAt =
       lm.kind === 'dash' && lm.intervalMs !== undefined ? this.elapsedMs + (lm.firstDelayMs ?? lm.intervalMs) : 0
-    const a = attachEnemy(enemy, spec, hp, {
+    const a = attachEnemy(enemy, def, hp, {
       elite,
       boss,
-      kbImmune: spec.kbImmune ?? false,
+      kbImmune: def.kbImmune ?? false,
       state: lm.kind === 'dash' && lm.idle === 'chase' ? 'chase' : 'wander',
       spMul: elite ? ELITE.speedMul : 1,
       dmgMul: elite ? ELITE.damageMul : 1,
@@ -1483,7 +1483,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     a.morphVuln = hex.vulnMul ?? 1
     if (!a.morphed) {
       a.morphed = true
-      const size = a.spec.size * (a.elite ? ELITE.sizeMul : 1)
+      const size = a.def.size * (a.elite ? ELITE.sizeMul : 1)
       const outline = a.elite ? ('elite' as const) : ('enemy' as const)
       enemy.setTexture(emojiKey(hex.morphEmoji, outline))
       enemy.setDisplaySize(size, size)
@@ -1503,11 +1503,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     a.morphUntil = 0
     a.morphVuln = 1
     a.morphed = false
-    const size = a.spec.size * (a.elite ? ELITE.sizeMul : 1)
+    const size = a.def.size * (a.elite ? ELITE.sizeMul : 1)
     const outline = a.elite ? ('elite' as const) : ('enemy' as const)
-    enemy.setTexture(emojiKey(a.spec.emoji, outline))
+    enemy.setTexture(emojiKey(a.def.emoji, outline))
     enemy.setDisplaySize(size, size)
-    a.anim?.register('idle', clipFramesLive(this, a.spec.emoji, 'idle', outline))
+    a.anim?.register('idle', clipFramesLive(this, a.def.emoji, 'idle', outline))
     // 出手后延，避免恢复瞬间齐射
     if (a.abilities) for (const w of a.abilities) w.postponeFire?.(700)
     this.puffBurst.explode(6, enemy.x, enemy.y)
@@ -1559,7 +1559,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       if (!e.active) continue
       const a = enemyOf(e)
       if (a.dormant) continue
-      const spec = a.spec
+      const def = a.def
       const body = e.body as ArcadeBody
       // 部件动画翻帧（先于任何 continue 分支：跳舞/变形期间照常呼吸）
       a.anim?.update(now)
@@ -1580,7 +1580,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           e.setRotation(Math.sin(now / 80 + a.ph) * 0.3)
           this.decayKnockback(a, body, delta)
           if (a.boss) this.postSteerBoss(e, body)
-          else this.postSteerEnemy(e, body, spec)
+          else this.postSteerEnemy(e, body, def)
           // 压制期只走冷却不开火（时间表语义：舞会结束冷却已尽者立即出手）
           if (a.abilities) for (const w of a.abilities) w.tickCooldown?.(delta)
           continue
@@ -1596,9 +1596,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         if (now < a.morphUntil) {
           const slowM = this.slowFactorFor(a)
           const dir = this.wanderDir(a)
-          body.setVelocity(dir.x * spec.speed * 0.5 * slowM, dir.y * spec.speed * 0.5 * slowM)
+          body.setVelocity(dir.x * def.speed * 0.5 * slowM, dir.y * def.speed * 0.5 * slowM)
           this.decayKnockback(a, body, delta)
-          this.postSteerEnemy(e, body, spec)
+          this.postSteerEnemy(e, body, def)
           if (a.abilities) for (const w of a.abilities) w.tickCooldown?.(delta)
           continue
         }
@@ -1608,7 +1608,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       const slow = this.slowFactorFor(a)
       const target = this.nearestAlive(e.x, e.y)!
 
-      STEERERS[spec.locomotion.kind]({ scene: this, a, body, slow, now, target })
+      STEERERS[def.locomotion.kind]({ scene: this, a, body, slow, now, target })
 
       // 持械敌人：能力实例逐帧驱动（跳舞/变形不到达此处；休眠已跳过）
       if (a.abilities) for (const w of a.abilities) w.update(delta, a.abilityOwner!)
@@ -1618,7 +1618,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
       // 世界后处理：河流在此叠加水流并钳跨向（Boss 走专属钩子）
       if (a.boss) this.postSteerBoss(e, body)
-      else this.postSteerEnemy(e, body, spec)
+      else this.postSteerEnemy(e, body, def)
 
       // 行走动画：恒摇摆 + 按移动方向翻转（twemoji 默认朝左）；
       // 蓄力有自己的颤动，冲刺改为朝冲刺方向前倾

@@ -1,7 +1,7 @@
 import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
-import { circleHitIndices, thrustHitIndices } from './spec'
-import type { ThrustSpec } from './spec'
+import { circleHitIndices, thrustHitIndices } from './defs'
+import type { ThrustDef } from './defs'
 import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
@@ -18,27 +18,27 @@ export class ThrustAbility implements AbilityRuntime {
   private comboIn = 0
 
   constructor(
-    private spec: ThrustSpec,
+    private def: ThrustDef,
     private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
-    if (spec.held) {
-      this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline).setDepth(13)
+    if (def.held) {
+      this.image = emojiImage(ctx.scene, 0, 0, def.held.emoji, def.held.size, ctx.ownerOutline).setDepth(13)
     }
     this.cooldown = initialCooldownMs
   }
 
   update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
-    if (this.spec.held && this.image) {
+    if (this.def.held && this.image) {
       const dist =
-        this.spec.held.restOffset + this.lunge.t * (this.spec.reach - this.spec.held.restOffset)
+        this.def.held.restOffset + this.lunge.t * (this.def.reach - this.def.held.restOffset)
       this.image.setPosition(owner.x + Math.cos(this.aim) * dist, owner.y + Math.sin(this.aim) * dist)
-      this.image.setRotation(this.aim + this.spec.held.rotationOffsetDeg * DEG2RAD)
+      this.image.setRotation(this.aim + this.def.held.rotationOffsetDeg * DEG2RAD)
     } else {
       owner.setVisualOffset(
-        Math.cos(this.aim) * this.lunge.t * this.spec.lungeDist,
-        Math.sin(this.aim) * this.lunge.t * this.spec.lungeDist,
+        Math.cos(this.aim) * this.lunge.t * this.def.lungeDist,
+        Math.sin(this.aim) * this.lunge.t * this.def.lungeDist,
       )
     }
 
@@ -52,9 +52,9 @@ export class ThrustAbility implements AbilityRuntime {
     if (this.cooldown > 0) return
     const targets = this.ctx.targets()
     if (nearestAngle(owner, targets) === null) return
-    this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
+    this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
     this.strike(owner)
-    if (this.spec.combo) this.comboIn = this.spec.combo.delayMs
+    if (this.def.combo) this.comboIn = this.def.combo.delayMs
   }
 
   /** 单段突刺：索敌 → 胶囊判定 → 终点震波（能力）→ 挥出动画 */
@@ -65,21 +65,21 @@ export class ThrustAbility implements AbilityRuntime {
     this.aim = aim
 
     this.ctx.sfx('whoosh')
-    const damage = Math.round(this.spec.damage * this.ctx.damageMul())
+    const damage = Math.round(this.def.damage * this.ctx.damageMul())
     for (const i of thrustHitIndices(
       { x: owner.x, y: owner.y },
       this.aim,
-      this.spec.reach,
-      this.spec.hitRadius,
+      this.def.reach,
+      this.def.hitRadius,
       targets,
     )) {
-      this.ctx.damageTarget(targets[i]!.ref, damage, this.spec.knockback, owner.x, owner.y)
+      this.ctx.damageTarget(targets[i]!.ref, damage, this.def.knockback, owner.x, owner.y)
     }
 
-    const burst = this.spec.tipBurst
+    const burst = this.def.tipBurst
     if (burst) {
-      const tipX = owner.x + Math.cos(this.aim) * this.spec.reach
-      const tipY = owner.y + Math.sin(this.aim) * this.spec.reach
+      const tipX = owner.x + Math.cos(this.aim) * this.def.reach
+      const tipY = owner.y + Math.sin(this.aim) * this.def.reach
       const burstDamage = Math.max(1, Math.round(damage * burst.ratio))
       for (const i of circleHitIndices({ x: tipX, y: tipY }, burst.radius, targets)) {
         this.ctx.damageTarget(targets[i]!.ref, burstDamage, burst.knockback, tipX, tipY)
@@ -104,7 +104,7 @@ export class ThrustAbility implements AbilityRuntime {
     this.tween = this.ctx.scene.tweens.add({
       targets: this.lunge,
       t: 1,
-      duration: this.spec.thrustMs / 2,
+      duration: this.def.thrustMs / 2,
       yoyo: true,
       ease: 'Sine.easeOut',
     })

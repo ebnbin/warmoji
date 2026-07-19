@@ -7,7 +7,7 @@ import { Rng } from '../lib/rng'
 import { setSvgSize } from '../emoji/svg'
 import {
   ANIM_RECIPES,
-  ANIM_SPEC,
+  ANIM_DEF,
   ANIM_TEMPLATES,
   animSetOf,
   animTemplateOf,
@@ -998,8 +998,8 @@ export class StudioScene extends Phaser.Scene {
     this.animTimer = undefined
     if (this.paused || this.frameKeys.length === 0) return
     this.animTimer = this.time.addEvent({
-      // 周期总时长恒为 spec.durMs，帧多的 clip 单帧更短
-      delay: Math.max(30, ANIM_SPEC.durMs / this.frameKeys.length / SPEEDS[this.speedIdx]!),
+      // 周期总时长恒为 def.durMs，帧多的 clip 单帧更短
+      delay: Math.max(30, ANIM_DEF.durMs / this.frameKeys.length / SPEEDS[this.speedIdx]!),
       loop: true,
       callback: () => {
         this.frameIdx = (this.frameIdx + 1) % this.frameKeys.length
@@ -1008,11 +1008,11 @@ export class StudioScene extends Phaser.Scene {
     })
   }
 
-  /** 烘焙配方帧并进入播放（keyPrefix 缺省按配方 emoji 命名；frames 缺省用全局 spec） */
+  /** 烘焙配方帧并进入播放（keyPrefix 缺省按配方 emoji 命名；frames 缺省用全局 def） */
   private startBake(recipe: AnimRecipe, size: number, keyPrefix?: string, frames?: number): void {
     const gen = ++this.jobGen
     this.previewState = 'loading'
-    void this.bakeAnimTextures(recipe, keyPrefix, frames ?? ANIM_SPEC.frames)
+    void this.bakeAnimTextures(recipe, keyPrefix, frames ?? ANIM_DEF.frames)
       .then((keys) => {
         if (gen !== this.jobGen || !this.previewImg) return
         this.previewState = 'ready'

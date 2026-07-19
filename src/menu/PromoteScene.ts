@@ -641,13 +641,13 @@ export class PromoteScene extends Phaser.Scene {
     const dx = this.origin.x + D.x
     const dy = this.origin.y + D.y
     const slot = this.run.roster.indexOf(center)
-    const spec = CHARACTERS[center]
+    const def = CHARACTERS[center]
     const items = this.run.memberItems[slot] ?? []
 
     this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, spec.emoji, 85, 'player'),
+      emojiImage(this, dx + 58, dy + 56, def.emoji, 85, 'player'),
       this.add
-        .text(dx + 104, dy + 44, `${spec.name} · 受保护的中心`, {
+        .text(dx + 104, dy + 44, `${def.name} · 受保护的中心`, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -706,14 +706,14 @@ export class PromoteScene extends Phaser.Scene {
     }
 
     const id = this.selectedKey as CharacterId
-    const spec = CHARACTERS[id]
+    const def = CHARACTERS[id]
     const state = this.cardState(id)
     const tag = state === 'taken' ? ' · 已入队' : this.picked.includes(id) ? ' · 已选' : ''
     const tagColor = state === 'taken' ? '#a5d6a7' : '#81d4fa'
     this.detailObjs.push(
-      emojiImage(this, dx + 46, dy + 48, spec.emoji, 74, 'player'),
+      emojiImage(this, dx + 46, dy + 48, def.emoji, 74, 'player'),
       this.add
-        .text(dx + 90, dy + 36, spec.name + tag, {
+        .text(dx + 90, dy + 36, def.name + tag, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -722,7 +722,7 @@ export class PromoteScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5),
       this.add
-        .text(dx + 90, dy + 70, spec.desc, {
+        .text(dx + 90, dy + 70, def.desc, {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           color: '#b9b9c6',

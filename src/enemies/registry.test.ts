@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { BLOB, ENEMY_SPECS, MUSHROOM, ZOMBIE } from './registry'
+import { BLOB, ENEMY_DEFS, MUSHROOM, ZOMBIE } from './registry'
 import { enemyMixAt, fleeSteer, pickEnemy } from './registry'
 import { Rng } from '../lib/rng'
 
 describe('敌人规格', () => {
   it('每种敌人字段合法：血量/速度/经验为正，尺寸大于判定半径', () => {
-    for (const e of ENEMY_SPECS) {
+    for (const e of ENEMY_DEFS) {
       expect(e.hp).toBeGreaterThan(0)
       expect(e.speed).toBeGreaterThan(0)
       expect(e.xp).toBeGreaterThan(0)
@@ -29,10 +29,10 @@ describe('敌人规格', () => {
 
 describe('出场配比', () => {
   it('第 1 波只有僵尸+幽灵；新怪按波次渐入；第 5 波全员到齐', () => {
-    expect(enemyMixAt(1).map((m) => m.spec.kind).sort()).toEqual(['ghost', 'zombie'])
-    expect(enemyMixAt(2).some((m) => m.spec.kind === 'invader')).toBe(true)
-    expect(enemyMixAt(2).some((m) => m.spec.kind === 'boar')).toBe(false)
-    expect(enemyMixAt(5).map((m) => m.spec.kind).sort()).toEqual(
+    expect(enemyMixAt(1).map((m) => m.def.kind).sort()).toEqual(['ghost', 'zombie'])
+    expect(enemyMixAt(2).some((m) => m.def.kind === 'invader')).toBe(true)
+    expect(enemyMixAt(2).some((m) => m.def.kind === 'boar')).toBe(false)
+    expect(enemyMixAt(5).map((m) => m.def.kind).sort()).toEqual(
       ['blob', 'boar', 'ghost', 'invader', 'mushroom', 'rat', 'snake', 'zombie'],
     )
   })
@@ -40,7 +40,7 @@ describe('出场配比', () => {
   it('僵尸始终是主体（权重最高且有下限）', () => {
     for (const wave of [1, 5, 10, 20, 40]) {
       const mix = enemyMixAt(wave)
-      const zombie = mix.find((m) => m.spec === ZOMBIE)!
+      const zombie = mix.find((m) => m.def === ZOMBIE)!
       for (const m of mix) expect(zombie.weight).toBeGreaterThanOrEqual(m.weight)
       expect(zombie.weight).toBeGreaterThanOrEqual(40)
     }
@@ -57,7 +57,7 @@ describe('出场配比', () => {
     expect(counts.size).toBe(mix.length)
     const total = mix.reduce((s, m) => s + m.weight, 0)
     for (const m of mix) {
-      const got = (counts.get(m.spec.kind) ?? 0) / 8000
+      const got = (counts.get(m.def.kind) ?? 0) / 8000
       expect(Math.abs(got - m.weight / total)).toBeLessThan(0.03)
     }
   })

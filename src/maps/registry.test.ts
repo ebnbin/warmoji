@@ -57,24 +57,24 @@ describe('地图定义', () => {
 })
 
 describe('装饰散布 rollDecor', () => {
-  const spec = MAPS.forest.decor
+  const def = MAPS.forest.decor
 
   it('数量围绕 密度×格数×噪声均值 波动；全部落在地图内、数值在配置范围内', () => {
     const rng = new Rng(42)
-    const out = rollDecor(spec, () => rng.next(), 25, 25)
+    const out = rollDecor(def, () => rng.next(), 25, 25)
     // density [0.09,0.13] × 625 × 噪声均值≈0.76 ≈ 43~62 期望；噪声场加宽波动，放宽界
     expect(out.length).toBeGreaterThan(15)
     expect(out.length).toBeLessThan(110)
     for (const d of out) {
-      expect(spec.emojis).toContain(d.emoji)
+      expect(def.emojis).toContain(d.emoji)
       expect(d.xU).toBeGreaterThanOrEqual(0)
       expect(d.xU).toBeLessThanOrEqual(25)
       expect(d.yU).toBeGreaterThanOrEqual(0)
       expect(d.yU).toBeLessThanOrEqual(25)
-      expect(d.sizeU).toBeGreaterThanOrEqual(spec.sizeU[0])
-      expect(d.sizeU).toBeLessThanOrEqual(spec.sizeU[1])
-      expect(d.alpha).toBeGreaterThanOrEqual(spec.alpha[0])
-      expect(d.alpha).toBeLessThanOrEqual(spec.alpha[1])
+      expect(d.sizeU).toBeGreaterThanOrEqual(def.sizeU[0])
+      expect(d.sizeU).toBeLessThanOrEqual(def.sizeU[1])
+      expect(d.alpha).toBeGreaterThanOrEqual(def.alpha[0])
+      expect(d.alpha).toBeLessThanOrEqual(def.alpha[1])
       expect(Math.abs(d.rotation)).toBeLessThanOrEqual(Math.PI)
     }
   })
@@ -82,7 +82,7 @@ describe('装饰散布 rollDecor', () => {
   it('确定性：同种子同摆放（一局一景的基础），不同种子不同摆放', () => {
     const roll = (seed: number): string => {
       const rng = new Rng(seed)
-      return JSON.stringify(rollDecor(spec, () => rng.next(), 25, 25))
+      return JSON.stringify(rollDecor(def, () => rng.next(), 25, 25))
     }
     expect(roll(7)).toBe(roll(7))
     expect(roll(7)).not.toBe(roll(8))
@@ -90,7 +90,7 @@ describe('装饰散布 rollDecor', () => {
 
   it('中心钳制：装饰不会探出地图边缘（含半径）', () => {
     const rng = new Rng(3)
-    for (const d of rollDecor(spec, () => rng.next(), 25, 25)) {
+    for (const d of rollDecor(def, () => rng.next(), 25, 25)) {
       expect(d.xU - d.sizeU / 2).toBeGreaterThanOrEqual(-1e-9)
       expect(d.xU + d.sizeU / 2).toBeLessThanOrEqual(25 + 1e-9)
       expect(d.yU - d.sizeU / 2).toBeGreaterThanOrEqual(-1e-9)

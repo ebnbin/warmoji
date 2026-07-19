@@ -50,19 +50,19 @@ describe('花名册', () => {
 describe('升级卡换持档位行', () => {
   it('未购升级卡持基础行；每个角色都有两档且逐档配装实际变化', () => {
     for (const id of IDS) {
-      const spec = CHARACTERS[id]
-      expect(loadoutFor(spec, NONE)).toBe(spec.abilities)
-      expect(spec.upgrades).toHaveLength(2)
-      for (const a of spec.upgrades) {
+      const def = CHARACTERS[id]
+      expect(loadoutFor(def, NONE)).toBe(def.abilities)
+      expect(def.upgrades).toHaveLength(2)
+      for (const a of def.upgrades) {
         expect(a.icon.length).toBeGreaterThan(0)
         expect(a.name.length).toBeGreaterThan(0)
         expect(a.desc.length).toBeGreaterThan(0)
       }
-      expect(loadoutFor(spec, T1)).not.toEqual(spec.abilities)
-      expect(loadoutFor(spec, T2)).not.toEqual(loadoutFor(spec, T1))
+      expect(loadoutFor(def, T1)).not.toEqual(def.abilities)
+      expect(loadoutFor(def, T2)).not.toEqual(loadoutFor(def, T1))
       // 换持不增减能力数量
-      expect(loadoutFor(spec, T1)).toHaveLength(spec.abilities.length)
-      expect(loadoutFor(spec, T2)).toHaveLength(spec.abilities.length)
+      expect(loadoutFor(def, T1)).toHaveLength(def.abilities.length)
+      expect(loadoutFor(def, T2)).toHaveLength(def.abilities.length)
     }
   })
 

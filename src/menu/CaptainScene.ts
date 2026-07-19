@@ -178,12 +178,12 @@ export class CaptainScene extends Phaser.Scene {
     const D = this.layout.detail
     const dx = this.origin.x + D.x
     const dy = this.origin.y + D.y
-    const spec = CAPTAINS[this.selectedId]
+    const def = CAPTAINS[this.selectedId]
 
     this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, spec.emoji, 85, 'player'),
+      emojiImage(this, dx + 58, dy + 56, def.emoji, 85, 'player'),
       this.add
-        .text(dx + 104, dy + 42, spec.name, {
+        .text(dx + 104, dy + 42, def.name, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -203,7 +203,7 @@ export class CaptainScene extends Phaser.Scene {
 
     // 行距按内容收紧：加入主动技能组后，横竖屏详情面板都要装得下三组
     let cursor = dy + 122
-    for (const group of captainStatGroups(spec)) {
+    for (const group of captainStatGroups(def)) {
       this.detailObjs.push(
         emojiImage(this, dx + 42, cursor, group.icon, 35),
         this.add

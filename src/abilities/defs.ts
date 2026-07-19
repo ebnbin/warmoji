@@ -2,12 +2,12 @@ import type { Point } from '../lib/vec'
 import type { SfxId } from '../audio/sfx'
 
 // 能力 = 独立于角色的攻击行为单元；held 缺省时行为主体是角色本体。
-// 新增能力类型：在此加 kind 与 Spec，src/abilities/ 加对应运行时类并注册 create.ts。
+// 新增能力类型：在此加 kind 与 Def，src/abilities/ 加对应运行时类并注册 create.ts。
 
 /** 地面效果参数：留在地面的持续区（灼烧/毒液/…）。阵营与伤害归属由
  * 生成方注入（能力经 ctx、死亡效果在引擎侧直调）；跳伤施加语义按目标
  * 阵营分流（battle/groundEffects.ts）。radius 为格值，进战斗经 toPx */
-export interface GroundEffectSpec {
+export interface GroundEffectDef {
   readonly radius: number
   readonly durationMs: number
   readonly tickMs: number
@@ -32,7 +32,7 @@ export interface HeldVisual {
   readonly mountGap?: number
 }
 
-export interface ThrustSpec {
+export interface ThrustDef {
   readonly kind: 'thrust'
   readonly name: string
   /** 属性面板等 UI 的展示图标 */
@@ -60,7 +60,7 @@ export interface ThrustSpec {
   }
 }
 
-export interface ProjectileSpec {
+export interface ProjectileDef {
   readonly kind: 'projectile'
   readonly name: string
   readonly icon: string
@@ -101,7 +101,7 @@ export interface ProjectileSpec {
   readonly hex?: { readonly durationMs: number; readonly morphEmoji: string; readonly vulnMul?: number }
 }
 
-export interface SweepSpec {
+export interface SweepDef {
   readonly kind: 'sweep'
   readonly name: string
   readonly icon: string
@@ -119,7 +119,7 @@ export interface SweepSpec {
   readonly slowOnHit?: { readonly factor: number; readonly durationMs: number }
 }
 
-export interface AreaBlastSpec {
+export interface AreaBlastDef {
   readonly kind: 'areaBlast'
   readonly name: string
   readonly icon: string
@@ -134,12 +134,12 @@ export interface AreaBlastSpec {
   readonly color: number
   // ── 能力字段 ──
   /** 灼烧地面：爆心留下持续伤害区域 */
-  readonly burn?: GroundEffectSpec
+  readonly burn?: GroundEffectDef
   /** 连锁：延迟 delayMs 后向随机敌人追加一次 ratio × 伤害的轰炸 */
   readonly echo?: { readonly delayMs: number; readonly ratio: number }
 }
 
-export interface BoomerangSpec {
+export interface BoomerangDef {
   readonly kind: 'boomerang'
   readonly name: string
   readonly icon: string
@@ -163,7 +163,7 @@ export interface BoomerangSpec {
   readonly coinMagnetRadius?: number
 }
 
-export interface LaserSpec {
+export interface LaserDef {
   readonly kind: 'laser'
   readonly name: string
   readonly icon: string
@@ -182,7 +182,7 @@ export interface LaserSpec {
   readonly radial?: { readonly beams: number; readonly ratio: number; readonly stepMs: number }
 }
 
-export interface SlowAuraSpec {
+export interface SlowAuraDef {
   readonly kind: 'slowAura'
   readonly name: string
   readonly icon: string
@@ -198,7 +198,7 @@ export interface SlowAuraSpec {
   readonly freeze?: { readonly intervalMs: number; readonly durationMs: number }
 }
 
-export interface AssassinateSpec {
+export interface AssassinateDef {
   readonly kind: 'assassinate'
   readonly name: string
   readonly icon: string
@@ -219,7 +219,7 @@ export interface AssassinateSpec {
   readonly execute?: { readonly hpRatio: number; readonly mul: number }
 }
 
-export interface TurretSpec {
+export interface TurretDef {
   readonly kind: 'turret'
   readonly name: string
   readonly icon: string
@@ -245,7 +245,7 @@ export interface TurretSpec {
   readonly burst?: { readonly count: number; readonly spreadDeg: number }
 }
 
-export interface SummonSpec {
+export interface SummonDef {
   readonly kind: 'summon'
   readonly name: string
   readonly icon: string
@@ -261,7 +261,7 @@ export interface SummonSpec {
   readonly sting?: { readonly slowFactor: number; readonly slowMs: number }
 }
 
-export interface HealSpec {
+export interface HealDef {
   readonly kind: 'heal'
   readonly name: string
   readonly icon: string
@@ -276,7 +276,7 @@ export interface HealSpec {
   readonly defib?: { readonly reviveCutMs: number }
 }
 
-export interface ChainArcSpec {
+export interface ChainArcDef {
   readonly kind: 'chainArc'
   readonly name: string
   readonly icon: string
@@ -297,19 +297,19 @@ export interface ChainArcSpec {
   readonly burstEnd?: { readonly radius: number; readonly ratio: number }
 }
 
-export type AbilitySpec =
-  | ThrustSpec
-  | ProjectileSpec
-  | SweepSpec
-  | AreaBlastSpec
-  | BoomerangSpec
-  | LaserSpec
-  | SlowAuraSpec
-  | AssassinateSpec
-  | TurretSpec
-  | SummonSpec
-  | HealSpec
-  | ChainArcSpec
+export type AbilityDef =
+  | ThrustDef
+  | ProjectileDef
+  | SweepDef
+  | AreaBlastDef
+  | BoomerangDef
+  | LaserDef
+  | SlowAuraDef
+  | AssassinateDef
+  | TurretDef
+  | SummonDef
+  | HealDef
+  | ChainArcDef
 
 export interface HitTarget {
   x: number

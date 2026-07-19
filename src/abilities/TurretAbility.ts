@@ -1,7 +1,7 @@
 import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
-import type { ProjectileSpec, TurretSpec } from './spec'
-import { ANIM_SPEC } from '../emoji/studio'
+import type { ProjectileDef, TurretDef } from './defs'
+import { ANIM_DEF } from '../emoji/studio'
 import { Animator } from '../emoji/animator'
 import { clipFramesLive } from '../emoji/animTextures'
 import { emojiImage } from '../emoji/textures'
@@ -21,8 +21,8 @@ interface Turret {
 export class TurretAbility implements AbilityRuntime {
   private turrets: Turret[] = []
   private placeCd: number
-  /** 弩塔子弹走通用投射物管线的合成 spec */
-  private boltSpec: ProjectileSpec
+  /** 弩塔子弹走通用投射物管线的合成 def */
+  private boltDef: ProjectileDef
   /** 动画帧活数组（惰性烘焙，未就绪前弩塔保持静态形象） */
   private idleFrames: string[]
   private attackFrames: string[]
@@ -30,51 +30,51 @@ export class TurretAbility implements AbilityRuntime {
   private clock = 0
 
   constructor(
-    private spec: TurretSpec,
+    private def: TurretDef,
     private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     this.placeCd = initialCooldownMs
-    this.boltSpec = {
+    this.boltDef = {
       kind: 'projectile',
-      name: spec.name,
-      icon: spec.icon,
-      damage: spec.damage,
-      cooldownMs: spec.fireIntervalMs,
-      knockback: spec.knockback,
-      projectile: spec.projectile,
+      name: def.name,
+      icon: def.icon,
+      damage: def.damage,
+      cooldownMs: def.fireIntervalMs,
+      knockback: def.knockback,
+      projectile: def.projectile,
     }
-    this.idleFrames = clipFramesLive(ctx.scene, spec.turret.emoji, 'idle', ctx.ownerOutline)
-    this.attackFrames = clipFramesLive(ctx.scene, spec.turret.emoji, 'attack', ctx.ownerOutline)
+    this.idleFrames = clipFramesLive(ctx.scene, def.turret.emoji, 'idle', ctx.ownerOutline)
+    this.attackFrames = clipFramesLive(ctx.scene, def.turret.emoji, 'attack', ctx.ownerOutline)
   }
 
   update(delta: number, owner: AbilityOwner): void {
     this.clock += delta
     this.placeCd -= delta
     if (this.placeCd <= 0) {
-      this.placeCd = this.spec.placeIntervalMs * this.ctx.cooldownMul()
+      this.placeCd = this.def.placeIntervalMs * this.ctx.cooldownMul()
       this.place(owner)
     }
-    const interval = this.spec.fireIntervalMs * this.ctx.cooldownMul()
+    const interval = this.def.fireIntervalMs * this.ctx.cooldownMul()
     for (const t of this.turrets) {
       t.fireCd -= delta
       if (t.fireCd > 0) continue
       const targets = this.ctx.targets()
-      const aim = nearestAngle({ x: t.img.x, y: t.img.y, setVisualOffset: () => {} }, targets, this.spec.range)
+      const aim = nearestAngle({ x: t.img.x, y: t.img.y, setVisualOffset: () => {} }, targets, this.def.range)
       if (aim === null) continue
       t.fireCd = interval
       t.img.setRotation(aim - Math.PI / 4)
       // 一次开火 = 一遍拉弓动画，时长恰为下次开火间隔（攻速绑定的核心一行）
       t.anim.play('attack', { durMs: interval })
-      const damage = Math.round(this.spec.damage * this.ctx.damageMul())
-      const burst = this.spec.burst
+      const damage = Math.round(this.def.damage * this.ctx.damageMul())
+      const burst = this.def.burst
       if (burst && burst.count > 1) {
         for (let i = 0; i < burst.count; i++) {
           const a = aim + burst.spreadDeg * DEG2RAD * (i / (burst.count - 1) - 0.5)
-          this.ctx.spawnProjectile(t.img.x, t.img.y, a, this.boltSpec, damage)
+          this.ctx.spawnProjectile(t.img.x, t.img.y, a, this.boltDef, damage)
         }
       } else {
-        this.ctx.spawnProjectile(t.img.x, t.img.y, aim, this.boltSpec, damage)
+        this.ctx.spawnProjectile(t.img.x, t.img.y, aim, this.boltDef, damage)
       }
       this.ctx.sfx('shoot')
     }
@@ -83,17 +83,17 @@ export class TurretAbility implements AbilityRuntime {
 
   /** 在建造者脚下架一座；超编拆最旧 */
   private place(owner: AbilityOwner): void {
-    const img = emojiImage(this.ctx.scene, owner.x, owner.y + 6, this.spec.turret.emoji, this.spec.turret.size, this.ctx.ownerOutline).setDepth(5)
+    const img = emojiImage(this.ctx.scene, owner.x, owner.y + 6, this.def.turret.emoji, this.def.turret.size, this.ctx.ownerOutline).setDepth(5)
     const base = img.scaleX
     img.setScale(base * 0.2)
     this.ctx.scene.tweens.add({ targets: img, scale: base, duration: 220, ease: 'Back.easeOut' })
     const anim = new Animator(img)
     anim.register('idle', this.idleFrames)
     anim.register('attack', this.attackFrames)
-    anim.setIdle('idle', ANIM_SPEC.durMs, this.turrets.length * 311)
+    anim.setIdle('idle', ANIM_DEF.durMs, this.turrets.length * 311)
     this.turrets.push({ img, fireCd: 200, anim })
     this.ctx.sfx('recruit')
-    while (this.turrets.length > this.spec.maxTurrets) {
+    while (this.turrets.length > this.def.maxTurrets) {
       const old = this.turrets.shift()!
       this.ctx.scene.tweens.add({
         targets: old.img,

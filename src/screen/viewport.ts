@@ -1,6 +1,6 @@
 import { VIEW } from '../lib/units'
 
-export interface ViewportSpec {
+export interface Viewport {
   cssWidth: number
   cssHeight: number
   /** 设备像素比，钳制在 [1, 3]（iPhone 普遍为 3；再高收益小、填充率代价大） */
@@ -13,7 +13,7 @@ export interface ViewportSpec {
   logicalHeight: number
 }
 
-export function computeViewport(cssWidth: number, cssHeight: number, dpr = 1): ViewportSpec {
+export function computeViewport(cssWidth: number, cssHeight: number, dpr = 1): Viewport {
   const w = Math.max(1, cssWidth)
   const h = Math.max(1, cssHeight)
   const d = Math.min(3, Math.max(1, dpr || 1))

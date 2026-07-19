@@ -85,7 +85,7 @@ describe('hash01 / worldNoise', () => {
 })
 
 describe('chunkDecor（分块装饰）', () => {
-  const spec: MapDecor = {
+  const def: MapDecor = {
     emojis: ['🌾', '🪨'],
     sizeU: [0.3, 0.6],
     alpha: [0.15, 0.25],
@@ -93,11 +93,11 @@ describe('chunkDecor（分块装饰）', () => {
   }
 
   it('同 (种子, 块) 完全确定；不同块/种子不同摆放', () => {
-    const a1 = chunkDecor(spec, 42, 3, -2, 8)
-    const a2 = chunkDecor(spec, 42, 3, -2, 8)
+    const a1 = chunkDecor(def, 42, 3, -2, 8)
+    const a2 = chunkDecor(def, 42, 3, -2, 8)
     expect(a1).toEqual(a2)
-    const b = chunkDecor(spec, 42, 4, -2, 8)
-    const c = chunkDecor(spec, 43, 3, -2, 8)
+    const b = chunkDecor(def, 42, 4, -2, 8)
+    const c = chunkDecor(def, 43, 3, -2, 8)
     expect(JSON.stringify(b)).not.toBe(JSON.stringify(a1))
     expect(JSON.stringify(c)).not.toBe(JSON.stringify(a1))
   })
@@ -106,14 +106,14 @@ describe('chunkDecor（分块装饰）', () => {
     let total = 0
     for (let cx = -3; cx < 3; cx++) {
       for (let cy = -3; cy < 3; cy++) {
-        const list = chunkDecor(spec, 7, cx, cy, 8)
+        const list = chunkDecor(def, 7, cx, cy, 8)
         total += list.length
         for (const d of list) {
           expect(d.xU).toBeGreaterThanOrEqual(cx * 8 - 1.1)
           expect(d.xU).toBeLessThanOrEqual(cx * 8 + 8 + 1.1)
           expect(d.yU).toBeGreaterThanOrEqual(cy * 8 - 1.1)
           expect(d.yU).toBeLessThanOrEqual(cy * 8 + 8 + 1.1)
-          expect(spec.emojis).toContain(d.emoji)
+          expect(def.emojis).toContain(d.emoji)
         }
       }
     }
@@ -124,19 +124,19 @@ describe('chunkDecor（分块装饰）', () => {
 })
 
 describe('zoneRadiusAt（缩圈曲线）', () => {
-  const spec = { r0: 120, rMin: 40, holdMs: 6000, shrinkEndMs: 38_000 }
+  const def = { r0: 120, rMin: 40, holdMs: 6000, shrinkEndMs: 38_000 }
 
   it('观察期恒 r0，收缩期单调递减，到底恒 rMin', () => {
-    expect(zoneRadiusAt(0, spec)).toBe(120)
-    expect(zoneRadiusAt(6000, spec)).toBe(120)
-    const mid = zoneRadiusAt(22_000, spec)
+    expect(zoneRadiusAt(0, def)).toBe(120)
+    expect(zoneRadiusAt(6000, def)).toBe(120)
+    const mid = zoneRadiusAt(22_000, def)
     expect(mid).toBeLessThan(120)
     expect(mid).toBeGreaterThan(40)
-    expect(zoneRadiusAt(38_000, spec)).toBe(40)
-    expect(zoneRadiusAt(45_000, spec)).toBe(40)
+    expect(zoneRadiusAt(38_000, def)).toBe(40)
+    expect(zoneRadiusAt(45_000, def)).toBe(40)
     let prev = Infinity
     for (let t = 0; t <= 45_000; t += 1000) {
-      const r = zoneRadiusAt(t, spec)
+      const r = zoneRadiusAt(t, def)
       expect(r).toBeLessThanOrEqual(prev + 1e-9)
       prev = r
     }

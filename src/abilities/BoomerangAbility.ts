@@ -1,6 +1,6 @@
 import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
-import type { BoomerangSpec } from './spec'
+import type { BoomerangDef } from './defs'
 import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
@@ -30,12 +30,12 @@ export class BoomerangAbility implements AbilityRuntime {
   private damage = 0
 
   constructor(
-    private spec: BoomerangSpec,
+    private def: BoomerangDef,
     private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     const makeFlyer = (visible: boolean): Flyer => ({
-      image: emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline)
+      image: emojiImage(ctx.scene, 0, 0, def.held.emoji, def.held.size, ctx.ownerOutline)
         .setDepth(13)
         .setVisible(visible),
       phase: 'idle',
@@ -47,7 +47,7 @@ export class BoomerangAbility implements AbilityRuntime {
       hitSet: new Set(),
     })
     // 主镖兼作持有物视觉；双子镖只在飞行中可见
-    this.flyers = spec.twin ? [makeFlyer(true), makeFlyer(false)] : [makeFlyer(true)]
+    this.flyers = def.twin ? [makeFlyer(true), makeFlyer(false)] : [makeFlyer(true)]
     this.cooldown = initialCooldownMs
   }
 
@@ -60,10 +60,10 @@ export class BoomerangAbility implements AbilityRuntime {
       this.cooldown -= delta
       const main = this.flyers[0]!
       main.image.setPosition(
-        owner.x + Math.cos(this.aim) * this.spec.held.restOffset,
-        owner.y + Math.sin(this.aim) * this.spec.held.restOffset,
+        owner.x + Math.cos(this.aim) * this.def.held.restOffset,
+        owner.y + Math.sin(this.aim) * this.def.held.restOffset,
       )
-      main.image.setRotation(this.aim + this.spec.held.rotationOffsetDeg * DEG2RAD)
+      main.image.setRotation(this.aim + this.def.held.rotationOffsetDeg * DEG2RAD)
 
       if (this.cooldown > 0) return
       const aim = nearestAngle(owner, this.ctx.targets())
@@ -78,14 +78,14 @@ export class BoomerangAbility implements AbilityRuntime {
       this.updateFlyer(f, delta, owner)
     }
     // 全部接住 → 开始计冷却
-    if (this.idle) this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
+    if (this.idle) this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
   }
 
   private updateFlyer(f: Flyer, delta: number, owner: AbilityOwner): void {
     // 自旋 + 途中判伤 + 磁力吸币（能力）
-    f.image.rotation += (this.spec.spinDegPerSec * DEG2RAD * delta) / 1000
+    f.image.rotation += (this.def.spinDegPerSec * DEG2RAD * delta) / 1000
     if (f.phase === 'out') {
-      f.flightT = Math.min(1, f.flightT + delta / this.spec.outMs)
+      f.flightT = Math.min(1, f.flightT + delta / this.def.outMs)
       const ease = Math.sin((f.flightT * Math.PI) / 2)
       f.image.setPosition(
         f.launchX + (f.destX - f.launchX) * ease,
@@ -99,7 +99,7 @@ export class BoomerangAbility implements AbilityRuntime {
       const dx = owner.x - f.image.x
       const dy = owner.y - f.image.y
       const dist = Math.hypot(dx, dy)
-      const step = (this.spec.returnSpeed * delta) / 1000
+      const step = (this.def.returnSpeed * delta) / 1000
       if (dist <= Math.max(step, 20)) {
         f.phase = 'idle'
         f.hitSet.clear()
@@ -110,24 +110,24 @@ export class BoomerangAbility implements AbilityRuntime {
       f.image.setPosition(f.image.x + (dx / dist) * step, f.image.y + (dy / dist) * step)
     }
 
-    if (this.spec.coinMagnetRadius) {
-      this.ctx.attractCoins?.(f.image.x, f.image.y, this.spec.coinMagnetRadius)
+    if (this.def.coinMagnetRadius) {
+      this.ctx.attractCoins?.(f.image.x, f.image.y, this.def.coinMagnetRadius)
     }
     for (const t of this.ctx.targets()) {
       if (f.hitSet.has(t.ref)) continue
       const dx = t.x - f.image.x
       const dy = t.y - f.image.y
-      const rr = this.spec.hitRadius + t.radius
+      const rr = this.def.hitRadius + t.radius
       if (dx * dx + dy * dy <= rr * rr) {
         f.hitSet.add(t.ref)
-        this.ctx.damageTarget(t.ref, this.damage, this.spec.knockback, f.image.x, f.image.y)
+        this.ctx.damageTarget(t.ref, this.damage, this.def.knockback, f.image.x, f.image.y)
       }
     }
   }
 
   private launch(owner: AbilityOwner): void {
     this.ctx.sfx('whoosh')
-    this.damage = Math.round(this.spec.damage * this.ctx.damageMul())
+    this.damage = Math.round(this.def.damage * this.ctx.damageMul())
     this.flyers.forEach((f, i) => {
       // 双子镖朝正反两个方向出手
       const angle = this.aim + i * Math.PI
@@ -136,8 +136,8 @@ export class BoomerangAbility implements AbilityRuntime {
       f.hitSet.clear()
       f.launchX = owner.x
       f.launchY = owner.y
-      f.destX = owner.x + Math.cos(angle) * this.spec.range
-      f.destY = owner.y + Math.sin(angle) * this.spec.range
+      f.destX = owner.x + Math.cos(angle) * this.def.range
+      f.destY = owner.y + Math.sin(angle) * this.def.range
       f.image.setVisible(true).setPosition(owner.x, owner.y)
     })
   }
@@ -150,7 +150,7 @@ export class BoomerangAbility implements AbilityRuntime {
         f.hitSet.clear()
       }
     })
-    if (!on) this.cooldown = this.spec.cooldownMs
+    if (!on) this.cooldown = this.def.cooldownMs
   }
 
   destroy(): void {

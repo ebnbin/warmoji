@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CHARACTERS } from '../characters/registry'
 import { ABILITIES } from '../abilities/registry'
-import type { ItemRarity, ItemSpec } from './registry'
+import type { ItemRarity, ItemDef } from './registry'
 import {
   UPGRADE_GATE,
   upgradeCardAvailable,
@@ -17,7 +17,7 @@ import {
   RARITY_ORDER,
   rarityWeights,
   reachedStackLimit,
-  resolveAbilitySpec,
+  resolveAbilityDef,
   rollItem,
 } from './registry'
 
@@ -44,8 +44,8 @@ describe('道具定义', () => {
         (id) => ITEMS[id].pool === 'upgrade' && ITEMS[id].forCharacter === cid,
       )
       expect(cards).toHaveLength(2)
-      const first = cards.find((id) => (ITEMS[id] as ItemSpec).abilityIndex === 0)!
-      const second = cards.find((id) => (ITEMS[id] as ItemSpec).abilityIndex === 1)!
+      const first = cards.find((id) => (ITEMS[id] as ItemDef).abilityIndex === 0)!
+      const second = cards.find((id) => (ITEMS[id] as ItemDef).abilityIndex === 1)!
       expect(ITEMS[first].rarity).toBe('rare')
       expect(ITEMS[second].rarity).toBe('epic')
       expect(ITEMS[second].price).toBeGreaterThan(ITEMS[first].price)
@@ -118,8 +118,8 @@ describe('道具池推导', () => {
 
   it('每个角色的池至少有通用道具数量', () => {
     const genericCount = ITEM_IDS.filter((id) => ITEMS[id].pool === 'all').length
-    for (const [cid, spec] of Object.entries(CHARACTERS)) {
-      expect(characterPool(cid as keyof typeof CHARACTERS, spec).length).toBeGreaterThanOrEqual(genericCount)
+    for (const [cid, def] of Object.entries(CHARACTERS)) {
+      expect(characterPool(cid as keyof typeof CHARACTERS, def).length).toBeGreaterThanOrEqual(genericCount)
     }
   })
 })
@@ -211,7 +211,7 @@ describe('效果叠加', () => {
 describe('能力参数修正', () => {
   it('rangeMul 缩放空间参数，不动伤害/冷却', () => {
     const fx = { ...aggregateCharacterEffects([]), rangeMul: 1.5 }
-    const blast = resolveAbilitySpec(ABILITIES.arcaneBlast, fx)
+    const blast = resolveAbilityDef(ABILITIES.arcaneBlast, fx)
     if (blast.kind !== 'areaBlast') throw new Error('kind 不变')
     expect(blast.blastRadius).toBeCloseTo(ABILITIES.arcaneBlast.blastRadius * 1.5)
     expect(blast.detectRange).toBeCloseTo(ABILITIES.arcaneBlast.detectRange * 1.5)
@@ -221,7 +221,7 @@ describe('能力参数修正', () => {
 
   it('projSpeedMul 只作用于弹速', () => {
     const fx = { ...aggregateCharacterEffects([]), projSpeedMul: 1.25 }
-    const pistol = resolveAbilitySpec(ABILITIES.pistolLeft, fx)
+    const pistol = resolveAbilityDef(ABILITIES.pistolLeft, fx)
     if (pistol.kind !== 'projectile') throw new Error('kind 不变')
     expect(pistol.projectile.speed).toBeCloseTo(ABILITIES.pistolLeft.projectile.speed * 1.25)
     expect(pistol.projectile.radius).toBe(ABILITIES.pistolLeft.projectile.radius)

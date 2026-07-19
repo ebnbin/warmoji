@@ -17,7 +17,7 @@ export interface MapDecor {
   readonly density: readonly [number, number]
 }
 
-export interface MapSpec {
+export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
@@ -112,7 +112,7 @@ export const MAPS = {
       density: [0.05, 0.08],
     },
   },
-} as const satisfies Record<string, MapSpec>
+} as const satisfies Record<string, MapDef>
 
 export type MapId = keyof typeof MAPS
 export const MAP_IDS = Object.keys(MAPS) as readonly MapId[]
@@ -175,12 +175,12 @@ function noiseField(
  * 摆放中心允许溢出到邻格（±1.1 格）而非只在本格内 jitter；
  * 中心钳制进地图，避免探出边缘 */
 export function rollDecor(
-  spec: MapDecor,
+  def: MapDecor,
   rand: () => number,
   cols: number,
   rows: number,
 ): DecorInstance[] {
-  const density = spec.density[0] + rand() * (spec.density[1] - spec.density[0])
+  const density = def.density[0] + rand() * (def.density[1] - def.density[0])
   const noise = noiseField(rand, cols, rows, 6)
   const out: DecorInstance[] = []
   for (let cy = 0; cy < rows; cy++) {
@@ -188,8 +188,8 @@ export function rollDecor(
       // 场值重映射：低处近乎空地、高处密聚（均值 ≈0.76，总量仍由 density 主导）
       const local = density * (0.15 + 1.7 * Math.pow(noise(cx + 0.5, cy + 0.5), 1.5))
       if (rand() >= local) continue
-      const emoji = spec.emojis[Math.min(spec.emojis.length - 1, Math.floor(rand() * spec.emojis.length))]!
-      const sizeU = spec.sizeU[0] + rand() * (spec.sizeU[1] - spec.sizeU[0])
+      const emoji = def.emojis[Math.min(def.emojis.length - 1, Math.floor(rand() * def.emojis.length))]!
+      const sizeU = def.sizeU[0] + rand() * (def.sizeU[1] - def.sizeU[0])
       const clamp = (v: number, max: number): number =>
         Math.min(Math.max(v, sizeU / 2), max - sizeU / 2)
       out.push({
@@ -197,7 +197,7 @@ export function rollDecor(
         xU: clamp(cx + 0.5 + (rand() * 2 - 1) * 1.1, cols),
         yU: clamp(cy + 0.5 + (rand() * 2 - 1) * 1.1, rows),
         sizeU,
-        alpha: spec.alpha[0] + rand() * (spec.alpha[1] - spec.alpha[0]),
+        alpha: def.alpha[0] + rand() * (def.alpha[1] - def.alpha[0]),
         // 全部 360° 随机旋转：装饰是「散落在地上的东西」，没有统一朝向才自然
         rotation: (rand() * 2 - 1) * Math.PI,
       })

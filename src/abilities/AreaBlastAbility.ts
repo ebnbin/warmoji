@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
 import { ACQUIRE } from './registry'
-import { circleHitIndices } from './spec'
-import type { AreaBlastSpec } from './spec'
+import { circleHitIndices } from './defs'
+import type { AreaBlastDef } from './defs'
 import { emojiImage } from '../emoji/textures'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
@@ -15,7 +15,7 @@ export class AreaBlastAbility implements AbilityRuntime {
   private echoDamage = 0
 
   constructor(
-    private spec: AreaBlastSpec,
+    private def: AreaBlastDef,
     private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
@@ -49,7 +49,7 @@ export class AreaBlastAbility implements AbilityRuntime {
     if (targets.length === 0) return
 
     // 侦测范围内离持有者最近的敌人为爆心
-    const detect2 = this.spec.detectRange * this.spec.detectRange
+    const detect2 = this.def.detectRange * this.def.detectRange
     let center: { x: number; y: number } | null = null
     let bestD = detect2
     for (const t of targets) {
@@ -62,24 +62,24 @@ export class AreaBlastAbility implements AbilityRuntime {
       }
     }
     if (!center) return
-    this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
+    this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
 
-    const damage = Math.round(this.spec.damage * this.ctx.damageMul())
+    const damage = Math.round(this.def.damage * this.ctx.damageMul())
     this.blastAt(center.x, center.y, damage, targets)
-    if (this.spec.echo) {
-      this.echoIn = this.spec.echo.delayMs
-      this.echoDamage = Math.max(1, Math.round(damage * this.spec.echo.ratio))
+    if (this.def.echo) {
+      this.echoIn = this.def.echo.delayMs
+      this.echoDamage = Math.max(1, Math.round(damage * this.def.echo.ratio))
     }
   }
 
   /** 一次完整爆炸：伤害 + 特效 + 灼烧地面（能力） */
   private blastAt(x: number, y: number, damage: number, targets: readonly TargetInfo[]): void {
     this.ctx.sfx('boom')
-    for (const i of circleHitIndices({ x, y }, this.spec.blastRadius, targets)) {
-      this.ctx.damageTarget(targets[i]!.ref, damage, this.spec.knockback, x, y)
+    for (const i of circleHitIndices({ x, y }, this.def.blastRadius, targets)) {
+      this.ctx.damageTarget(targets[i]!.ref, damage, this.def.knockback, x, y)
     }
-    if (this.spec.burn) {
-      this.ctx.spawnGroundEffect(x, y, this.spec.burn)
+    if (this.def.burn) {
+      this.ctx.spawnGroundEffect(x, y, this.def.burn)
     }
     this.blastEffect(x, y)
   }
@@ -88,7 +88,7 @@ export class AreaBlastAbility implements AbilityRuntime {
     const scene = this.ctx.scene
     // 白闪核心
     const flash: Phaser.GameObjects.Arc = scene.add
-      .circle(x, y, this.spec.blastRadius * 0.55, 0xffffff, 0.9)
+      .circle(x, y, this.def.blastRadius * 0.55, 0xffffff, 0.9)
       .setDepth(8)
     scene.tweens.add({
       targets: flash,
@@ -100,8 +100,8 @@ export class AreaBlastAbility implements AbilityRuntime {
     })
     // 冲击环
     const ring: Phaser.GameObjects.Arc = scene.add
-      .circle(x, y, this.spec.blastRadius, this.spec.color, 0.4)
-      .setStrokeStyle(6, this.spec.color, 1)
+      .circle(x, y, this.def.blastRadius, this.def.color, 0.4)
+      .setStrokeStyle(6, this.def.color, 1)
       .setDepth(7)
       .setScale(0.25)
     scene.tweens.add({
@@ -113,7 +113,7 @@ export class AreaBlastAbility implements AbilityRuntime {
       onComplete: () => ring.destroy(),
     })
     // 💥 爆裂
-    const boom = emojiImage(scene, x, y, '💥', this.spec.blastRadius * 1.5).setDepth(9)
+    const boom = emojiImage(scene, x, y, '💥', this.def.blastRadius * 1.5).setDepth(9)
     const full = boom.scale
     boom.setScale(full * 0.4).setRotation((Math.random() - 0.5) * 0.8)
     scene.tweens.add({

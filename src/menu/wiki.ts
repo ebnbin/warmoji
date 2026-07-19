@@ -1,11 +1,11 @@
 import { CAPTAINS, CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
-import { ENEMY_SPECS } from '../enemies/registry'
-import type { EnemySpec } from '../enemies/registry'
+import { ENEMY_DEFS } from '../enemies/registry'
+import type { EnemyDef } from '../enemies/registry'
 import { COIN } from '../items/registry'
 import { ABILITIES } from '../abilities/registry'
 import { ITEMS, RARITIES } from '../items/registry'
-import type { ItemSpec } from '../items/registry'
+import type { ItemDef } from '../items/registry'
 import { captainStatGroups, characterStatGroups, ABILITY_KIND_LABEL, abilityStatLines } from './stats'
 
 // 图鉴：零维护成本地聚合各注册表——新增 entity 自动出现在图鉴里。
@@ -30,7 +30,7 @@ function grid(units: number): string {
   return `${+units.toFixed(1)}格`
 }
 
-const LOCOMOTION_LABEL: Record<EnemySpec['locomotion']['kind'], string> = {
+const LOCOMOTION_LABEL: Record<EnemyDef['locomotion']['kind'], string> = {
   chase: '追击',
   wander: '游荡',
   dash: '蓄力突刺',
@@ -38,7 +38,7 @@ const LOCOMOTION_LABEL: Record<EnemySpec['locomotion']['kind'], string> = {
   coinThief: '偷金币',
 }
 
-export function enemyStatLines(e: EnemySpec): string[] {
+export function enemyStatLines(e: EnemyDef): string[] {
   const lines = [
     `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
     `行为 ${LOCOMOTION_LABEL[e.locomotion.kind]}${(e.abilities ?? []).some((w) => w.kind === 'projectile' && !(w.volley && w.volley.spreadDeg >= 360)) ? '放枪' : ''} · 经验 ${e.xp} · 金币 ${e.coins}`,
@@ -88,7 +88,7 @@ export function wikiGroups(): WikiGroup[] {
     {
       icon: '🧟',
       title: '敌人',
-      entries: ENEMY_SPECS.map((e) => ({
+      entries: ENEMY_DEFS.map((e) => ({
         emoji: e.emoji,
         name: e.name,
         desc: e.desc,
@@ -108,7 +108,7 @@ export function wikiGroups(): WikiGroup[] {
     {
       icon: '🛡️',
       title: '道具',
-      entries: Object.values<ItemSpec>(ITEMS).map((i) => ({
+      entries: Object.values<ItemDef>(ITEMS).map((i) => ({
         emoji: i.emoji,
         name: i.name,
         desc: i.desc,
@@ -151,7 +151,7 @@ export function usedEmojiSet(): Set<string> {
       if (w.kind === 'projectile') used.add(w.projectile.emoji)
     }
   }
-  for (const e of ENEMY_SPECS)
+  for (const e of ENEMY_DEFS)
     for (const w of e.abilities ?? []) if (w.kind === 'projectile') used.add(w.projectile.emoji)
   used.add(COIN.emoji)
   return used

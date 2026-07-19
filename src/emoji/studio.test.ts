@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ANIM_FORMAT,
   ANIM_RECIPES,
-  ANIM_SPEC,
+  ANIM_DEF,
   ANIM_TEMPLATES,
   animRecipeOf,
   animTemplateOf,
@@ -203,7 +203,7 @@ describe('动画资源格式（v2：具名 clips）', () => {
   const resource = (clipPatch: object, entryPatch: object = {}): AnimResource =>
     ({
       format: ANIM_FORMAT,
-      spec: { frames: 10, durMs: 1000 },
+      def: { frames: 10, durMs: 1000 },
       animations: {
         '1f9ea': {
           emoji: '🧪',
@@ -228,7 +228,7 @@ describe('动画资源格式（v2：具名 clips）', () => {
     expect(sets[0]!.clips[0]!.fx![0]!.render(0.8)).toContain('<path')
   })
 
-  it('clip 缺省 kind=loop、frames 用全局 spec；显式声明则覆盖', () => {
+  it('clip 缺省 kind=loop、frames 用全局 def；显式声明则覆盖', () => {
     const sets = loadAnimSets(
       resource({}, {
         clips: {
@@ -347,9 +347,9 @@ describe('clipFrameIndex（播放进度 → 帧下标）', () => {
 })
 
 describe('动画花名册（从资源文件加载）', () => {
-  it('统一播放规格来自资源 spec', () => {
-    expect(ANIM_SPEC.frames).toBeGreaterThanOrEqual(2)
-    expect(ANIM_SPEC.durMs).toBeGreaterThan(0)
+  it('统一播放规格来自资源 def', () => {
+    expect(ANIM_DEF.frames).toBeGreaterThanOrEqual(2)
+    expect(ANIM_DEF.durMs).toBeGreaterThan(0)
   })
 
   it('全部配方可烘焙出合法帧（闭环等约束已由加载期校验器把关）', () => {
@@ -378,7 +378,7 @@ describe('通用动画模板', () => {
       const recipe = applyTemplate(tpl, '🧪', SVG3)
       validateAnimResource({
         format: ANIM_FORMAT,
-        spec: { frames: 10, durMs: 1000 },
+        def: { frames: 10, durMs: 1000 },
         animations: {
           test: {
             emoji: recipe.emoji,

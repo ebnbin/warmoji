@@ -1,8 +1,8 @@
 import { DEG2RAD } from '../lib/units'
 import { playSfx } from '../audio/sfx'
 import { emojiImage } from '../emoji/textures'
-import { circleHitIndices, sweepFirstHitIndex } from '../abilities/spec'
-import type { ProjectileSpec } from '../abilities/spec'
+import { circleHitIndices, sweepFirstHitIndex } from '../abilities/defs'
+import type { ProjectileDef } from '../abilities/defs'
 import { circleBody } from './arcade'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
 
@@ -64,35 +64,35 @@ export function spawnProjectile(
   x: number,
   y: number,
   angle: number,
-  spec: ProjectileSpec,
+  def: ProjectileDef,
   damage: number,
   srcSlot = -1,
 ): void {
-  const p = emojiImage(scene, x, y, spec.projectile.emoji, spec.projectile.size, 'player')
+  const p = emojiImage(scene, x, y, def.projectile.emoji, def.projectile.size, 'player')
     .setDepth(8)
-    .setRotation(angle + spec.projectile.rotationOffsetDeg * DEG2RAD)
+    .setRotation(angle + def.projectile.rotationOffsetDeg * DEG2RAD)
   scene.physics.add.existing(p)
-  circleBody(p, spec.projectile.radius)
+  circleBody(p, def.projectile.radius)
   ;(p.body as ArcadeBody).setVelocity(
-    Math.cos(angle) * spec.projectile.speed,
-    Math.sin(angle) * spec.projectile.speed,
+    Math.cos(angle) * def.projectile.speed,
+    Math.sin(angle) * def.projectile.speed,
   )
   playSfx('shoot')
   attachProjectile(p, 'team', {
     srcSlot,
     damage,
-    radius: spec.projectile.radius,
-    kb: spec.knockback,
+    radius: def.projectile.radius,
+    kb: def.knockback,
     prevX: x,
     prevY: y,
     // 环面世界的子弹永不出屏：按寿命回收（其余图为 0，不按寿命回收）
     dieAt: scene.projectileTtlMs !== null ? scene.elapsedMs + scene.projectileTtlMs : 0,
     // 能力字段：贯穿余量 + 溅射/变形参数（sweepProjectiles 消费）
-    pierce: spec.pierce ?? 0,
-    splash: spec.splash,
-    hex: spec.hex,
+    pierce: def.pierce ?? 0,
+    splash: def.splash,
+    hex: def.hex,
     // 对称投掷物（无指向修正角）飞行中自旋；有指向的（飞刀类）保持箭头朝向
-    spin: spec.projectile.rotationOffsetDeg === 0 ? 9 : 0,
+    spin: def.projectile.rotationOffsetDeg === 0 ? 9 : 0,
   })
   scene.projectiles.add(p)
 }

@@ -1,5 +1,5 @@
 import { emojiImage } from '../emoji/textures'
-import type { EnemyProjectileSpec } from '../enemies/registry'
+import type { EnemyProjectileDef } from '../enemies/registry'
 import { circleBody } from './arcade'
 import { attachProjectile, projectileOf } from './projectiles'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
@@ -12,7 +12,7 @@ export function spawnEnemyProjectile(
   x: number,
   y: number,
   angle: number,
-  projectile: EnemyProjectileSpec,
+  projectile: EnemyProjectileDef,
   srcName: string,
   dmgMul = 1,
 ): void {

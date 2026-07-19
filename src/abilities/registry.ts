@@ -1,17 +1,17 @@
 import type {
-  AreaBlastSpec,
-  AssassinateSpec,
-  BoomerangSpec,
-  ChainArcSpec,
-  HealSpec,
-  LaserSpec,
-  ProjectileSpec,
-  SlowAuraSpec,
-  SummonSpec,
-  SweepSpec,
-  ThrustSpec,
-  TurretSpec,
-} from './spec'
+  AreaBlastDef,
+  AssassinateDef,
+  BoomerangDef,
+  ChainArcDef,
+  HealDef,
+  LaserDef,
+  ProjectileDef,
+  SlowAuraDef,
+  SummonDef,
+  SweepDef,
+  ThrustDef,
+  TurretDef,
+} from './defs'
 
 // 击退：命中冲量按指数衰减（时间常数 tauMs），实际位移 ≈ 冲量 × tauMs/1000；
 // 多次命中冲量叠加但合速度不超过 maxSpeed。
@@ -43,7 +43,7 @@ const pistol = {
     // twemoji 1f4a7 水滴尖端朝上
     rotationOffsetDeg: 90,
   },
-} satisfies ProjectileSpec
+} satisfies ProjectileDef
 
 export const ABILITIES = {
   tomatoThrow: {
@@ -60,7 +60,7 @@ export const ABILITIES = {
       speed: 12,
       rotationOffsetDeg: 0,
     },
-  } satisfies ProjectileSpec,
+  } satisfies ProjectileDef,
   hornThrust: {
     kind: 'thrust',
     name: '独角突刺',
@@ -72,7 +72,7 @@ export const ABILITIES = {
     hitRadius: 0.5,
     thrustMs: 220,
     lungeDist: 0.7,
-  } satisfies ThrustSpec,
+  } satisfies ThrustDef,
   axeSweep: {
     kind: 'sweep',
     name: '巨斧横扫',
@@ -90,17 +90,17 @@ export const ABILITIES = {
       // twemoji 1fa93 斧刃朝左上
       rotationOffsetDeg: 135,
     },
-  } satisfies SweepSpec,
+  } satisfies SweepDef,
   pistolLeft: {
     ...pistol,
     name: '左轮水枪·左',
     held: { ...pistol.held, mountSide: -1 },
-  } satisfies ProjectileSpec,
+  } satisfies ProjectileDef,
   pistolRight: {
     ...pistol,
     name: '左轮水枪·右',
     held: { ...pistol.held, mountSide: 1 },
-  } satisfies ProjectileSpec,
+  } satisfies ProjectileDef,
   arcaneBlast: {
     kind: 'areaBlast',
     name: '奥术轰炸',
@@ -111,7 +111,7 @@ export const ABILITIES = {
     detectRange: 6,
     blastRadius: 1.3,
     color: 0x9575cd,
-  } satisfies AreaBlastSpec,
+  } satisfies AreaBlastDef,
   laserBeam: {
     kind: 'laser',
     name: '贯穿激光',
@@ -129,7 +129,7 @@ export const ABILITIES = {
       // twemoji 1f526 灯头朝左下
       rotationOffsetDeg: 135,
     },
-  } satisfies LaserSpec,
+  } satisfies LaserDef,
   frostAura: {
     kind: 'slowAura',
     name: '寒气光环',
@@ -137,7 +137,7 @@ export const ABILITIES = {
     radius: 3,
     slowFactor: 0.5,
     color: 0x81d4fa,
-  } satisfies SlowAuraSpec,
+  } satisfies SlowAuraDef,
   boomerang: {
     kind: 'boomerang',
     name: '回旋镖',
@@ -156,7 +156,7 @@ export const ABILITIES = {
       restOffset: 0.5,
       rotationOffsetDeg: 0,
     },
-  } satisfies BoomerangSpec,
+  } satisfies BoomerangDef,
   sparkleBolt: {
     kind: 'projectile',
     name: '魔尘弹',
@@ -173,7 +173,7 @@ export const ABILITIES = {
     },
     // 变形替身：受害者顶着绵羊形象缓速游荡，失去一切伤害能力
     hex: { durationMs: 2500, morphEmoji: '🐑' },
-  } satisfies ProjectileSpec,
+  } satisfies ProjectileDef,
   shadowStrike: {
     kind: 'assassinate',
     name: '影袭',
@@ -191,7 +191,7 @@ export const ABILITIES = {
       // twemoji 1f5e1 刀尖朝左下
       rotationOffsetDeg: 135,
     },
-  } satisfies AssassinateSpec,
+  } satisfies AssassinateDef,
   woodTurret: {
     kind: 'turret',
     name: '林木弩塔',
@@ -210,7 +210,7 @@ export const ABILITIES = {
       speed: 11,
       rotationOffsetDeg: 0,
     },
-  } satisfies TurretSpec,
+  } satisfies TurretDef,
   beeSwarm: {
     kind: 'summon',
     name: '蜂群',
@@ -220,7 +220,7 @@ export const ABILITIES = {
     damage: 11,
     knockback: 2,
     hitCooldownMs: 900,
-  } satisfies SummonSpec,
+  } satisfies SummonDef,
   fieldMedkit: {
     kind: 'heal',
     name: '战地医疗',
@@ -228,7 +228,7 @@ export const ABILITIES = {
     amount: 14,
     cooldownMs: 2400,
     range: 4,
-  } satisfies HealSpec,
+  } satisfies HealDef,
   syringeDart: {
     kind: 'projectile',
     name: '飞针',
@@ -244,7 +244,7 @@ export const ABILITIES = {
       // twemoji 1f489 针头朝左下
       rotationOffsetDeg: 135,
     },
-  } satisfies ProjectileSpec,
+  } satisfies ProjectileDef,
   voltArc: {
     kind: 'chainArc',
     name: '感电触须',
@@ -257,7 +257,7 @@ export const ABILITIES = {
     bounces: 2,
     decay: 0.75,
     color: 0x40c4ff,
-  } satisfies ChainArcSpec,
+  } satisfies ChainArcDef,
 } as const
 
 // ── 升级卡档位行：升级 = 换持整行 ────────────────────────────
@@ -268,146 +268,146 @@ export const ABILITIES = {
 export const tomatoThrow2 = {
   ...ABILITIES.tomatoThrow,
   volley: { count: 3, spreadDeg: 18 },
-} satisfies ProjectileSpec
+} satisfies ProjectileDef
 /** 爆浆番茄 */
 export const tomatoThrow3 = {
   ...tomatoThrow2,
   splash: { radius: 0.9, ratio: 0.6 },
-} satisfies ProjectileSpec
+} satisfies ProjectileDef
 
 /** 二连突刺 */
 export const hornThrust2 = {
   ...ABILITIES.hornThrust,
   combo: { delayMs: 170 },
-} satisfies ThrustSpec
+} satisfies ThrustDef
 /** 虹光震波 */
 export const hornThrust3 = {
   ...hornThrust2,
   tipBurst: { radius: 1.1, ratio: 0.6, knockback: 11.25, color: 0xff8ad8 },
-} satisfies ThrustSpec
+} satisfies ThrustDef
 
 /** 全周横扫（整圈更慢一拍） */
 export const axeSweep2 = {
   ...ABILITIES.axeSweep,
   arcDeg: 360,
   sweepMs: Math.round(ABILITIES.axeSweep.sweepMs * 1.35),
-} satisfies SweepSpec
+} satisfies SweepDef
 /** 震慑余波 */
 export const axeSweep3 = {
   ...axeSweep2,
   slowOnHit: { factor: 0.55, durationMs: 1200 },
-} satisfies SweepSpec
+} satisfies SweepDef
 
 /** 贯穿弹 */
-export const pistolLeft2 = { ...ABILITIES.pistolLeft, pierce: 2 } satisfies ProjectileSpec
-export const pistolRight2 = { ...ABILITIES.pistolRight, pierce: 2 } satisfies ProjectileSpec
+export const pistolLeft2 = { ...ABILITIES.pistolLeft, pierce: 2 } satisfies ProjectileDef
+export const pistolRight2 = { ...ABILITIES.pistolRight, pierce: 2 } satisfies ProjectileDef
 /** 左轮风暴 */
 export const pistolLeft3 = {
   ...pistolLeft2,
   everyN: { n: 4, count: 5, spreadDeg: 32 },
-} satisfies ProjectileSpec
+} satisfies ProjectileDef
 export const pistolRight3 = {
   ...pistolRight2,
   everyN: { n: 4, count: 5, spreadDeg: 32 },
-} satisfies ProjectileSpec
+} satisfies ProjectileDef
 
 /** 余烬秘火 */
 export const arcaneBlast2 = {
   ...ABILITIES.arcaneBlast,
   burn: { radius: 1.4, durationMs: 3000, tickMs: 400, damage: 3, color: 0xff7043, fillAlpha: 0.18, lineAlpha: 0.55, enterMs: 200 },
-} satisfies AreaBlastSpec
+} satisfies AreaBlastDef
 /** 连锁轰炸 */
 export const arcaneBlast3 = {
   ...arcaneBlast2,
   echo: { delayMs: 250, ratio: 0.75 },
-} satisfies AreaBlastSpec
+} satisfies AreaBlastDef
 
 /** 双子回旋 */
-export const boomerang2 = { ...ABILITIES.boomerang, twin: true } satisfies BoomerangSpec
+export const boomerang2 = { ...ABILITIES.boomerang, twin: true } satisfies BoomerangDef
 /** 磁力巨镖（镖体与判定同步 ×1.4） */
 export const boomerang3 = {
   ...boomerang2,
   hitRadius: ABILITIES.boomerang.hitRadius * 1.4,
   held: { ...ABILITIES.boomerang.held, size: ABILITIES.boomerang.held.size * 1.4 },
   coinMagnetRadius: 1.6,
-} satisfies BoomerangSpec
+} satisfies BoomerangDef
 
 /** 双联光束 */
-export const laserBeam2 = { ...ABILITIES.laserBeam, backBeam: true } satisfies LaserSpec
+export const laserBeam2 = { ...ABILITIES.laserBeam, backBeam: true } satisfies LaserDef
 /** 全域扫射 */
 export const laserBeam3 = {
   ...laserBeam2,
   radial: { beams: 8, ratio: 0.6, stepMs: 60 },
-} satisfies LaserSpec
+} satisfies LaserDef
 
 /** 冻伤 */
-export const frostAura2 = { ...ABILITIES.frostAura, dps: 6 } satisfies SlowAuraSpec
+export const frostAura2 = { ...ABILITIES.frostAura, dps: 6 } satisfies SlowAuraDef
 /** 凛冬降临 */
 export const frostAura3 = {
   ...frostAura2,
   freeze: { intervalMs: 5000, durationMs: 700 },
-} satisfies SlowAuraSpec
+} satisfies SlowAuraDef
 
 /** 持久变形（带贯穿） */
 export const sparkleBolt2 = {
   ...ABILITIES.sparkleBolt,
   pierce: 1,
   hex: { ...ABILITIES.sparkleBolt.hex, durationMs: 4000 },
-} satisfies ProjectileSpec
+} satisfies ProjectileDef
 /** 脆弱诅咒 */
 export const sparkleBolt3 = {
   ...sparkleBolt2,
   hex: { ...sparkleBolt2.hex, vulnMul: 1.4 },
-} satisfies ProjectileSpec
+} satisfies ProjectileDef
 
 /** 连环刃 */
 export const shadowStrike2 = {
   ...ABILITIES.shadowStrike,
   cleave: { radius: 1.0, ratio: 0.6 },
-} satisfies AssassinateSpec
+} satisfies AssassinateDef
 /** 处决 */
 export const shadowStrike3 = {
   ...shadowStrike2,
   execute: { hpRatio: 0.35, mul: 2 },
-} satisfies AssassinateSpec
+} satisfies AssassinateDef
 
 /** 扩建工地 */
 export const woodTurret2 = {
   ...ABILITIES.woodTurret,
   maxTurrets: ABILITIES.woodTurret.maxTurrets + 1,
-} satisfies TurretSpec
+} satisfies TurretDef
 /** 三连弩 */
 export const woodTurret3 = {
   ...woodTurret2,
   burst: { count: 3, spreadDeg: 17 },
-} satisfies TurretSpec
+} satisfies TurretDef
 
 /** 扩巢 */
 export const beeSwarm2 = {
   ...ABILITIES.beeSwarm,
   count: ABILITIES.beeSwarm.count + 1,
-} satisfies SummonSpec
+} satisfies SummonDef
 /** 麻痹毒素 */
 export const beeSwarm3 = {
   ...beeSwarm2,
   sting: { slowFactor: 0.55, slowMs: 1200 },
-} satisfies SummonSpec
+} satisfies SummonDef
 
 /** 群体处方 */
-export const fieldMedkit2 = { ...ABILITIES.fieldMedkit, aoe: { ratio: 0.6 } } satisfies HealSpec
+export const fieldMedkit2 = { ...ABILITIES.fieldMedkit, aoe: { ratio: 0.6 } } satisfies HealDef
 /** 电击起搏 */
 export const fieldMedkit3 = {
   ...fieldMedkit2,
   defib: { reviveCutMs: 2000 },
-} satisfies HealSpec
+} satisfies HealDef
 
 /** 超导传递 */
-export const voltArc2 = { ...ABILITIES.voltArc, bounces: 4 } satisfies ChainArcSpec
+export const voltArc2 = { ...ABILITIES.voltArc, bounces: 4 } satisfies ChainArcDef
 /** 过载爆裂 */
 export const voltArc3 = {
   ...voltArc2,
   burstEnd: { radius: 0.9, ratio: 0.6 },
-} satisfies ChainArcSpec
+} satisfies ChainArcDef
 
 // 能力索敌上限：超出此距离的敌人不作为开火/瞄准目标。12 单位略大于
 // 屏幕中心到角落（≈11.5U），可见敌必打、屏外远敌不追——索敌逻辑必须

@@ -8,7 +8,7 @@ import {
   aggregateTeamEffects,
   COIN,
   ITEMS,
-  resolveAbilitySpec,
+  resolveAbilityDef,
 } from '../items/registry'
 import { UNIT } from '../lib/units'
 import { norm } from '../lib/vec'
@@ -166,7 +166,7 @@ function refreshMemberItems(scene: BaseArenaScene, slot: number): void {
   m.killHeal = fx.killHeal
   for (const w of m.abilities) w.destroy()
   m.abilities = loadoutFor(CHARACTERS[id], upgradeTiers(id, owned)).map((w, i) =>
-    createAbility(toPx(resolveAbilitySpec(w, m.fx)), m.ctx, 200 + i * 230),
+    createAbility(toPx(resolveAbilityDef(w, m.fx)), m.ctx, 200 + i * 230),
   )
   if (!m.alive) for (const w of m.abilities) w.setVisible(false)
 }

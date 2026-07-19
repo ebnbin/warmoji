@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
-import type { SummonSpec } from './spec'
+import type { SummonDef } from './defs'
 import { ACQUIRE } from './registry'
-import { ANIM_SPEC } from '../emoji/studio'
+import { ANIM_DEF } from '../emoji/studio'
 import { Animator } from '../emoji/animator'
 import { clipFramesLive } from '../emoji/animTextures'
 import { emojiImage } from '../emoji/textures'
@@ -25,20 +25,20 @@ export class SummonAbility implements AbilityRuntime {
   private clock = 0
 
   constructor(
-    private spec: SummonSpec,
+    private def: SummonDef,
     private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
-    const frames = clipFramesLive(ctx.scene, spec.minion.emoji, 'idle', ctx.ownerOutline)
-    for (let i = 0; i < spec.count; i++) {
-      const img = emojiImage(ctx.scene, 0, 0, spec.minion.emoji, spec.minion.size, ctx.ownerOutline).setDepth(12)
+    const frames = clipFramesLive(ctx.scene, def.minion.emoji, 'idle', ctx.ownerOutline)
+    for (let i = 0; i < def.count; i++) {
+      const img = emojiImage(ctx.scene, 0, 0, def.minion.emoji, def.minion.size, ctx.ownerOutline).setDepth(12)
       const anim = new Animator(img)
       anim.register('idle', frames)
-      anim.setIdle('idle', ANIM_SPEC.durMs, (i * ANIM_SPEC.durMs) / spec.count)
+      anim.setIdle('idle', ANIM_DEF.durMs, (i * ANIM_DEF.durMs) / def.count)
       this.minions.push({
         img,
         hitCd: initialCooldownMs + i * 150,
-        phase: (i * Math.PI * 2) / spec.count,
+        phase: (i * Math.PI * 2) / def.count,
         anim,
       })
     }
@@ -62,7 +62,7 @@ export class SummonAbility implements AbilityRuntime {
   update(delta: number, owner: AbilityOwner): void {
     this.clock += delta
     const dt = Math.min(delta, 50) / 1000
-    const speed = this.spec.minion.speed
+    const speed = this.def.minion.speed
     for (const m of this.minions) {
       m.anim.update(this.clock)
       m.hitCd -= delta
@@ -84,17 +84,17 @@ export class SummonAbility implements AbilityRuntime {
       m.img.setFlipX(dx < 0)
 
       if (target) {
-        const rr = target.radius + this.spec.minion.size * 0.35
+        const rr = target.radius + this.def.minion.size * 0.35
         const tx = target.x - m.img.x
         const ty = target.y - m.img.y
         if (tx * tx + ty * ty <= rr * rr) {
-          const damage = Math.round(this.spec.damage * this.ctx.damageMul())
-          this.ctx.damageTarget(target.ref, damage, this.spec.knockback, m.img.x, m.img.y)
-          if (this.spec.sting) {
-            this.ctx.slowTarget(target.ref, this.spec.sting.slowFactor, this.spec.sting.slowMs)
+          const damage = Math.round(this.def.damage * this.ctx.damageMul())
+          this.ctx.damageTarget(target.ref, damage, this.def.knockback, m.img.x, m.img.y)
+          if (this.def.sting) {
+            this.ctx.slowTarget(target.ref, this.def.sting.slowFactor, this.def.sting.slowMs)
           }
           this.ctx.sfx('hit')
-          m.hitCd = this.spec.hitCooldownMs * this.ctx.cooldownMul()
+          m.hitCd = this.def.hitCooldownMs * this.ctx.cooldownMul()
         }
       }
     }

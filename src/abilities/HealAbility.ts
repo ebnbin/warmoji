@@ -1,4 +1,4 @@
-import type { HealSpec } from './spec'
+import type { HealDef } from './defs'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 治疗型：周期治疗范围内血量比例最低的队友（对友军索敌）。
@@ -9,7 +9,7 @@ export class HealAbility implements AbilityRuntime {
   private cooldown: number
 
   constructor(
-    private spec: HealSpec,
+    private def: HealDef,
     private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
@@ -21,19 +21,19 @@ export class HealAbility implements AbilityRuntime {
     if (this.cooldown > 0) return
 
     // 电击起搏优先：救倒下的比奶站着的更急
-    if (this.spec.defib && this.ctx.cutReviveTimer?.(owner.x, owner.y, this.spec.range, this.spec.defib.reviveCutMs)) {
-      this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
+    if (this.def.defib && this.ctx.cutReviveTimer?.(owner.x, owner.y, this.def.range, this.def.defib.reviveCutMs)) {
+      this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
       this.pulse(owner, 0xfff176)
       this.ctx.sfx('zap')
       return
     }
 
-    const amount = Math.max(1, Math.round(this.spec.amount * this.ctx.damageMul()))
-    const healed = this.spec.aoe
-      ? this.ctx.heal(owner.x, owner.y, this.spec.range, Math.max(1, Math.round(amount * this.spec.aoe.ratio)), true)
-      : this.ctx.heal(owner.x, owner.y, this.spec.range, amount, false)
+    const amount = Math.max(1, Math.round(this.def.amount * this.ctx.damageMul()))
+    const healed = this.def.aoe
+      ? this.ctx.heal(owner.x, owner.y, this.def.range, Math.max(1, Math.round(amount * this.def.aoe.ratio)), true)
+      : this.ctx.heal(owner.x, owner.y, this.def.range, amount, false)
     if (healed > 0) {
-      this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
+      this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
       this.pulse(owner, 0x81c784)
       this.ctx.sfx('upgrade')
     } else {
@@ -45,7 +45,7 @@ export class HealAbility implements AbilityRuntime {
   /** 治疗脉冲环 */
   private pulse(owner: AbilityOwner, color: number): void {
     const ring = this.ctx.scene.add
-      .circle(owner.x, owner.y, this.spec.range, color, 0.08)
+      .circle(owner.x, owner.y, this.def.range, color, 0.08)
       .setStrokeStyle(3, color, 0.7)
       .setDepth(6)
       .setScale(0.25)

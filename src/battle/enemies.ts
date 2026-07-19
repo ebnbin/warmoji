@@ -1,4 +1,4 @@
-import type { EnemySpec } from '../enemies/registry'
+import type { EnemyDef } from '../enemies/registry'
 import type { AbilityOwner, AbilityRuntime } from '../abilities/types'
 import type { Animator } from '../emoji/animator'
 import type { ImageObj } from './BaseArenaScene'
@@ -14,7 +14,7 @@ export type EnemyState = 'wander' | 'chase' | 'windup' | 'dash' | 'cool'
 export interface Enemy {
   readonly image: ImageObj
   /** px 化规格（Boss 为公共字段合成的规格） */
-  spec: EnemySpec
+  def: EnemyDef
   hp: number
   maxHp: number
   elite: boolean
@@ -51,16 +51,16 @@ export interface Enemy {
   /** 摇摆/动画随机相位 */
   ph: number
   anim?: Animator
-  /** 持械（spec.abilities 有行时 materialize 装配；死亡随体销毁） */
+  /** 持械（def.abilities 有行时 materialize 装配；死亡随体销毁） */
   abilities?: AbilityRuntime[]
   abilityOwner?: AbilityOwner
 }
 
 /** 建结构体并挂到精灵上（唯一写入点） */
-export function attachEnemy(image: ImageObj, spec: EnemySpec, hp: number, init?: Partial<Enemy>): Enemy {
+export function attachEnemy(image: ImageObj, def: EnemyDef, hp: number, init?: Partial<Enemy>): Enemy {
   const a: Enemy = {
     image,
-    spec,
+    def,
     hp,
     maxHp: hp,
     elite: false,

@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { SlowAuraSpec } from './spec'
+import type { SlowAuraDef } from './defs'
 import type { AbilityContext, AbilityRuntime } from './types'
 
 /** 寒气光环：以队伍中心为圆心持续减速（角色只是来源；角色阵亡光环随之消失）。
@@ -13,16 +13,16 @@ export class SlowAuraAbility implements AbilityRuntime {
   private freezeIn: number
 
   constructor(
-    private spec: SlowAuraSpec,
+    private def: SlowAuraDef,
     private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     // 光环持续生效，无冷却概念
     void initialCooldownMs
-    this.freezeIn = spec.freeze?.intervalMs ?? 0
+    this.freezeIn = def.freeze?.intervalMs ?? 0
     this.ring = ctx.scene.add
-      .circle(0, 0, spec.radius, spec.color, 0.08)
-      .setStrokeStyle(2, spec.color, 0.35)
+      .circle(0, 0, def.radius, def.color, 0.08)
+      .setStrokeStyle(2, def.color, 0.35)
       .setDepth(2)
   }
 
@@ -30,17 +30,17 @@ export class SlowAuraAbility implements AbilityRuntime {
     if (this.hidden) return
     const c = this.ctx.anchor()
     this.ring.setPosition(c.x, c.y)
-    this.ctx.applySlow(c.x, c.y, this.spec.radius, this.spec.slowFactor)
+    this.ctx.applySlow(c.x, c.y, this.def.radius, this.def.slowFactor)
 
-    const r2 = this.spec.radius * this.spec.radius
+    const r2 = this.def.radius * this.def.radius
     // 冻伤：周期性对光环内敌人跳伤
-    if (this.spec.dps) {
+    if (this.def.dps) {
       this.tickIn -= delta
       if (this.tickIn <= 0) {
         this.tickIn += SlowAuraAbility.TICK_MS
         const damage = Math.max(
           1,
-          Math.round(((this.spec.dps * SlowAuraAbility.TICK_MS) / 1000) * this.ctx.damageMul()),
+          Math.round(((this.def.dps * SlowAuraAbility.TICK_MS) / 1000) * this.ctx.damageMul()),
         )
         for (const t of this.ctx.targets()) {
           const dx = t.x - c.x
@@ -51,18 +51,18 @@ export class SlowAuraAbility implements AbilityRuntime {
     }
 
     // 凛冬降临：周期脉冲冻结光环内敌人
-    if (this.spec.freeze) {
+    if (this.def.freeze) {
       this.freezeIn -= delta
       if (this.freezeIn <= 0) {
-        this.freezeIn += this.spec.freeze.intervalMs
+        this.freezeIn += this.def.freeze.intervalMs
         for (const t of this.ctx.targets()) {
           const dx = t.x - c.x
           const dy = t.y - c.y
-          if (dx * dx + dy * dy <= r2) this.ctx.slowTarget(t.ref, 0, this.spec.freeze.durationMs)
+          if (dx * dx + dy * dy <= r2) this.ctx.slowTarget(t.ref, 0, this.def.freeze.durationMs)
         }
         const pulse = this.ctx.scene.add
-          .circle(c.x, c.y, this.spec.radius, 0xffffff, 0.18)
-          .setStrokeStyle(4, this.spec.color, 0.9)
+          .circle(c.x, c.y, this.def.radius, 0xffffff, 0.18)
+          .setStrokeStyle(4, this.def.color, 0.9)
           .setDepth(7)
           .setScale(0.2)
         this.ctx.scene.tweens.add({

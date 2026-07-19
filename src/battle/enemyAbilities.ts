@@ -9,20 +9,20 @@ import { memberOf } from './members'
 import type { Enemy } from './enemies'
 import type { BaseArenaScene, ImageObj } from './BaseArenaScene'
 
-// 敌人持械：spec.abilities 有行即装配能力实例（能力类阵营中立，
+// 敌人持械：def.abilities 有行即装配能力实例（能力类阵营中立，
 // abilities/types.ts）。此处提供敌方视角的 ctx 实现：targets = 队员快照、
 // 伤害走队员受击结算（吃无敌帧）、发弹入敌弹组、治疗作用于敌群。
-// 注意：spec 随父级 toPx 深换算进场，此处直接实例化，勿二次换算。
+// 注意：def 随父级 toPx 深换算进场，此处直接实例化，勿二次换算。
 // 敌弹机制暂不带贯穿/溅射载荷；队员个体减速机制未建——两者都等
 // 首个需要它们的敌械行落地时再扩展。
 
-/** 敌方能力弹药的缺省寿命（spec.lifeMs 可覆写；敌弹必须按寿命回收） */
+/** 敌方能力弹药的缺省寿命（def.lifeMs 可覆写；敌弹必须按寿命回收） */
 const BULLET_LIFE_MS = 3000
 
 /** fireDelayMs：首发延迟基线（materialize 的随机开火抽取喂入，保持攻击
- * 积木时代的首发分布与 rng 流位次）；spec.firstDelayMs 优先 */
+ * 积木时代的首发分布与 rng 流位次）；def.firstDelayMs 优先 */
 export function armEnemy(scene: BaseArenaScene, a: Enemy, fireDelayMs?: number): void {
-  const rows = a.spec.abilities
+  const rows = a.def.abilities
   if (!rows || rows.length === 0) return
   const e = a.image
   const outline = a.elite || a.boss ? 'elite' : 'enemy'
@@ -49,17 +49,17 @@ export function armEnemy(scene: BaseArenaScene, a: Enemy, fireDelayMs?: number):
       if (scene.over || !m.alive) return
       if (scene.elapsedMs - m.lastHitMs < m.iframesMs) return
       m.lastHitMs = scene.elapsedMs
-      scene.hurtMember(m, damage, 0xff7777, a.spec.name)
+      scene.hurtMember(m, damage, 0xff7777, a.def.name)
     },
-    spawnProjectile: (x, y, angle, pSpec, damage) => {
-      const p = pSpec.projectile
+    spawnProjectile: (x, y, angle, pDef, damage) => {
+      const p = pDef.projectile
       spawnEnemyProjectile(
         scene,
         x,
         y,
         angle,
-        { emoji: p.emoji, size: p.size, radius: p.radius, speed: p.speed, damage, lifeMs: pSpec.lifeMs ?? BULLET_LIFE_MS },
-        a.spec.name,
+        { emoji: p.emoji, size: p.size, radius: p.radius, speed: p.speed, damage, lifeMs: pDef.lifeMs ?? BULLET_LIFE_MS },
+        a.def.name,
       )
     },
     // aim:'move' 弹的朝向 = 物理速度方向（速度为零时朝右，与原攻击积木一致）
@@ -71,15 +71,15 @@ export function armEnemy(scene: BaseArenaScene, a: Enemy, fireDelayMs?: number):
     anchor: () => ({ x: e.x, y: e.y }),
     applySlow: () => {},
     slowTarget: () => {},
-    spawnGroundEffect: (x, y, spec) =>
-      spawnGroundEffect(scene, x, y, spec, { faction: 'enemy', srcName: a.spec.name }),
+    spawnGroundEffect: (x, y, def) =>
+      spawnGroundEffect(scene, x, y, def, { faction: 'enemy', srcName: a.def.name }),
     heal: (x, y, range, amount, all) => healEnemies(scene, x, y, range, amount, all),
     damageMul: () => a.dmgMul,
     cooldownMul: () => 1,
     sfx: (id) => playSfx(id),
     playOwnerClip: (clipId, durMs) => {
       if (!a.anim) return
-      a.anim.register(clipId, clipFramesLive(scene, a.spec.emoji, clipId, outline))
+      a.anim.register(clipId, clipFramesLive(scene, a.def.emoji, clipId, outline))
       a.anim.play(clipId, { durMs })
     },
     // 可选能力（吸金币/无敌帧/复活缩时）是队员专属概念：缺席

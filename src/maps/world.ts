@@ -7,7 +7,7 @@ import type { Point } from '../lib/vec'
 // 可以成为无限地图的子集——活跃判定/装饰分块对有界世界同样成立（只是
 // 永不触发/被矩形裁剪），消费方通过这里的函数问世界问题，不自己算几何。
 
-export interface WorldSpec {
+export interface WorldDef {
   readonly kind: 'infinite' | 'bounded'
   /** bounded 时的矩形尺寸（infinite 忽略） */
   readonly width?: number
@@ -91,7 +91,7 @@ export function chunkKey(cx: number, cy: number): string {
  * 密度成簇、允许溢出邻格；密度基准由种子一次性决定（全图统一）。
  * 完全确定：同 (seed, 块) 任何时刻重建结果一致 */
 export function chunkDecor(
-  spec: MapDecor,
+  def: MapDecor,
   seed: number,
   cx: number,
   cy: number,
@@ -99,7 +99,7 @@ export function chunkDecor(
 ): DecorInstance[] {
   // 全图统一的密度基准：与格无关，只由种子决定
   const densityRoll = hash01(seed, 0x5eed, 0x5eed)
-  const density = spec.density[0] + densityRoll * (spec.density[1] - spec.density[0])
+  const density = def.density[0] + densityRoll * (def.density[1] - def.density[0])
   const out: DecorInstance[] = []
   const x0 = cx * chunkCells
   const y0 = cy * chunkCells
@@ -113,14 +113,14 @@ export function chunkDecor(
         density * (0.15 + 1.7 * Math.pow(worldNoise(seed, xU + 0.5, yU + 0.5, 6), 1.5))
       if (rng.next() >= local) continue
       const emoji =
-        spec.emojis[Math.min(spec.emojis.length - 1, Math.floor(rng.next() * spec.emojis.length))]!
-      const sizeU = spec.sizeU[0] + rng.next() * (spec.sizeU[1] - spec.sizeU[0])
+        def.emojis[Math.min(def.emojis.length - 1, Math.floor(rng.next() * def.emojis.length))]!
+      const sizeU = def.sizeU[0] + rng.next() * (def.sizeU[1] - def.sizeU[0])
       out.push({
         emoji,
         xU: xU + 0.5 + (rng.next() * 2 - 1) * 1.1,
         yU: yU + 0.5 + (rng.next() * 2 - 1) * 1.1,
         sizeU,
-        alpha: spec.alpha[0] + rng.next() * (spec.alpha[1] - spec.alpha[0]),
+        alpha: def.alpha[0] + rng.next() * (def.alpha[1] - def.alpha[0]),
         rotation: (rng.next() * 2 - 1) * Math.PI,
       })
     }
@@ -130,7 +130,7 @@ export function chunkDecor(
 
 // ── 终波缩圈 ────────────────────────────────────────────────
 
-export interface ZoneSpec {
+export interface ZoneDef {
   readonly r0: number
   readonly rMin: number
   readonly holdMs: number
@@ -138,11 +138,11 @@ export interface ZoneSpec {
 }
 
 /** 缩圈半径曲线：观察期恒 r0 → 线性收缩 → 到底后恒 rMin */
-export function zoneRadiusAt(tMs: number, spec: ZoneSpec): number {
-  if (tMs <= spec.holdMs) return spec.r0
-  if (tMs >= spec.shrinkEndMs) return spec.rMin
-  const k = (tMs - spec.holdMs) / (spec.shrinkEndMs - spec.holdMs)
-  return spec.r0 + (spec.rMin - spec.r0) * k
+export function zoneRadiusAt(tMs: number, def: ZoneDef): number {
+  if (tMs <= def.holdMs) return def.r0
+  if (tMs >= def.shrinkEndMs) return def.rMin
+  const k = (tMs - def.holdMs) / (def.shrinkEndMs - def.holdMs)
+  return def.r0 + (def.rMin - def.r0) * k
 }
 
 /** 点是否在圈外（圈伤判定） */

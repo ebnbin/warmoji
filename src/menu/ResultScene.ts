@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { CAPTAINS, CHARACTERS } from '../characters/registry'
-import { BOSS, ENEMY_SPECS } from '../enemies/registry'
+import { BOSS, ENEMY_DEFS } from '../enemies/registry'
 import { COIN } from '../items/registry'
 import { WAVE } from '../run/waves'
 import { submitScore } from '../run/highscore'
@@ -203,10 +203,10 @@ export class ResultScene extends Phaser.Scene {
 
     this.run.roster.forEach((id, slot) => {
       const cy = y + headerH + rowH * slot + rowH / 2
-      const spec = CHARACTERS[id]
-      emojiImage(this, x + 46, cy, spec.emoji, Math.min(58, rowH - 8), 'player')
+      const def = CHARACTERS[id]
+      emojiImage(this, x + 46, cy, def.emoji, Math.min(58, rowH - 8), 'player')
       this.add
-        .text(x + 82, cy, spec.name, {
+        .text(x + 82, cy, def.name, {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           fontStyle: 'bold',
@@ -290,7 +290,7 @@ export class ResultScene extends Phaser.Scene {
     }
 
     const emojiByName = new Map<string, string>([
-      ...ENEMY_SPECS.map((e) => [e.name, e.emoji] as const),
+      ...ENEMY_DEFS.map((e) => [e.name, e.emoji] as const),
       [BOSS.name, BOSS.emoji],
     ])
     const names = [...new Set([...Object.keys(st.enemyKills), ...Object.keys(st.enemyDamage)])]

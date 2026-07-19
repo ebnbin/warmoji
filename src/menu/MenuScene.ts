@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { CHARACTERS } from '../characters/registry'
-import { ENEMY_SPECS } from '../enemies/registry'
+import { ENEMY_DEFS } from '../enemies/registry'
 import { loadHighScore } from '../run/highscore'
 import { randomPalette } from '../lib/palette'
 import type { Palette } from '../lib/palette'
@@ -196,9 +196,9 @@ export class MenuScene extends Phaser.Scene {
   /** 背景漂浮暗纹：低透明度的敌人/能力 emoji 缓慢浮动旋转，增加画面纵深 */
   private createBackdrop(w: number, h: number, rng: Rng): void {
     const decor: { emoji: string; outline: 'enemy' | 'player' }[] = [
-      { emoji: ENEMY_SPECS[1]!.emoji, outline: 'enemy' },
-      { emoji: ENEMY_SPECS[2]!.emoji, outline: 'enemy' },
-      { emoji: ENEMY_SPECS[4]!.emoji, outline: 'enemy' },
+      { emoji: ENEMY_DEFS[1]!.emoji, outline: 'enemy' },
+      { emoji: ENEMY_DEFS[2]!.emoji, outline: 'enemy' },
+      { emoji: ENEMY_DEFS[4]!.emoji, outline: 'enemy' },
       { emoji: '🪓', outline: 'player' },
       { emoji: '🪃', outline: 'player' },
       { emoji: '🍅', outline: 'player' },
@@ -303,7 +303,7 @@ export class MenuScene extends Phaser.Scene {
         delay: i * 140,
       })
     })
-    const enemies = ENEMY_SPECS.slice(0, 3).map((s) => s.emoji)
+    const enemies = ENEMY_DEFS.slice(0, 3).map((s) => s.emoji)
     enemies.forEach((emoji, i) => {
       const img = emojiImage(this, cx + 80 + i * 90, cy, emoji, 70, 'enemy')
       this.tweens.add({

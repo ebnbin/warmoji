@@ -1,7 +1,7 @@
 import { CHARACTERS } from '../characters/registry'
 import type { UpgradeTiers } from '../characters/registry'
-import type { CharacterId, CharacterSpec } from '../characters/registry'
-import type { AbilitySpec } from '../abilities/spec'
+import type { CharacterId, CharacterDef } from '../characters/registry'
+import type { AbilityDef } from '../abilities/defs'
 
 // 道具 = 一组属性修正（可带负面副作用，数值上保证净增益）。
 // 只开放少量通用属性轴，不逐能力参数开洞；乘法轴叠乘、加法轴叠加。
@@ -68,9 +68,9 @@ export function rarityWeights(wave: number): Record<ItemRarity, number> {
   return { common: 1 - rare - epic, rare, epic }
 }
 
-export type ItemPool = 'all' | 'team' | 'upgrade' | AbilitySpec['kind']
+export type ItemPool = 'all' | 'team' | 'upgrade' | AbilityDef['kind']
 
-export interface ItemSpec {
+export interface ItemDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
@@ -89,7 +89,7 @@ export interface ItemSpec {
 export const UPGRADE_GATE = { normalsForFirst: 2 } as const
 
 /** 角色专属升级卡条目（文案/图标取自角色行的两阶能力定义） */
-function upgradeCard(cid: CharacterId, index: 0 | 1, price: number): ItemSpec {
+function upgradeCard(cid: CharacterId, index: 0 | 1, price: number): ItemDef {
   const a = CHARACTERS[cid].upgrades[index]
   return {
     emoji: a.icon,
@@ -439,7 +439,7 @@ export const ITEMS = {
   upgradeMedic2: upgradeCard('medic', 1, 150),
   upgradeJellyfish1: upgradeCard('jellyfish', 0, 80),
   upgradeJellyfish2: upgradeCard('jellyfish', 1, 150),
-} as const satisfies Record<string, ItemSpec>
+} as const satisfies Record<string, ItemDef>
 
 export type ItemId = keyof typeof ITEMS
 export const ITEM_IDS = Object.keys(ITEMS) as readonly ItemId[]
@@ -447,10 +447,10 @@ export const ITEM_IDS = Object.keys(ITEMS) as readonly ItemId[]
 // ── 池推导 ──────────────────────────────────────────────────
 
 /** 角色池 = 通用道具 + 与其能力形态匹配的形态道具 + 自己的两张升级卡 */
-export function characterPool(id: CharacterId, spec: CharacterSpec): ItemId[] {
-  const kinds = new Set<string>(spec.abilities.map((w) => w.kind))
+export function characterPool(id: CharacterId, def: CharacterDef): ItemId[] {
+  const kinds = new Set<string>(def.abilities.map((w) => w.kind))
   return ITEM_IDS.filter((iid) => {
-    const item: ItemSpec = ITEMS[iid]
+    const item: ItemDef = ITEMS[iid]
     if (item.pool === 'upgrade') return item.forCharacter === id
     return item.pool === 'all' || kinds.has(item.pool)
   })
@@ -460,7 +460,7 @@ export function characterPool(id: CharacterId, spec: CharacterSpec): ItemId[] {
 export function upgradeTiers(id: CharacterId, owned: readonly ItemId[]): UpgradeTiers {
   const has = (index: 0 | 1): boolean =>
     owned.some((iid) => {
-      const item: ItemSpec = ITEMS[iid]
+      const item: ItemDef = ITEMS[iid]
       return item.pool === 'upgrade' && item.forCharacter === id && item.abilityIndex === index
     })
   return { u1: has(0), u2: has(1) }
@@ -468,10 +468,10 @@ export function upgradeTiers(id: CharacterId, owned: readonly ItemId[]): Upgrade
 
 /** 升级卡的上架资格：一阶要求已购普通道具达标，二阶要求已持有一阶 */
 export function upgradeCardAvailable(id: ItemId, owned: readonly ItemId[]): boolean {
-  const item: ItemSpec = ITEMS[id]
+  const item: ItemDef = ITEMS[id]
   if (item.pool !== 'upgrade' || item.forCharacter === undefined) return true
   if (item.abilityIndex === 1) return upgradeTiers(item.forCharacter, owned).u1
-  const normals = owned.filter((iid) => (ITEMS[iid] as ItemSpec).pool !== 'upgrade').length
+  const normals = owned.filter((iid) => (ITEMS[iid] as ItemDef).pool !== 'upgrade').length
   return normals >= UPGRADE_GATE.normalsForFirst
 }
 
@@ -486,8 +486,8 @@ export function stackCount(owned: readonly ItemId[], id: ItemId): number {
 }
 
 export function reachedStackLimit(owned: readonly ItemId[], id: ItemId): boolean {
-  const spec: ItemSpec = ITEMS[id]
-  return spec.maxStacks !== undefined && stackCount(owned, id) >= spec.maxStacks
+  const def: ItemDef = ITEMS[id]
+  return def.maxStacks !== undefined && stackCount(owned, id) >= def.maxStacks
 }
 
 /** 从池中随机上架一件未达上限的道具；全部达上限返回 null。
@@ -597,9 +597,9 @@ export function aggregateTeamEffects(owned: readonly ItemId[]): TeamEffects {
 
 // ── 能力参数修正 ────────────────────────────────────────────
 
-/** 按修正预算出「生效 spec」：只缩放空间参数与弹速；
+/** 按修正预算出「生效 def」：只缩放空间参数与弹速；
  * 伤害/冷却由运行时 ctx 倍率处理（避免双重生效） */
-export function resolveAbilitySpec(w: AbilitySpec, fx: CharacterEffects): AbilitySpec {
+export function resolveAbilityDef(w: AbilityDef, fx: CharacterEffects): AbilityDef {
   const r = fx.rangeMul
   switch (w.kind) {
     case 'thrust':

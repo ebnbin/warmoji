@@ -5,7 +5,7 @@
 
 type Wave = 'square' | 'sawtooth' | 'triangle' | 'sine' | 'noise'
 
-interface SfxSpec {
+interface SfxDef {
   wave: Wave
   /** 起始频率 Hz（noise 时为低通滤波截止频率） */
   freq: number
@@ -60,7 +60,7 @@ export const SFX = {
   recruit: { wave: 'square', freq: 440, duration: 0.24, volume: 0.22, steps: [1, 1.26, 1.6], throttleMs: 120 },
   /** 通用 UI 点击 */
   click: { wave: 'square', freq: 760, freqEnd: 660, duration: 0.035, volume: 0.12, throttleMs: 40 },
-} as const satisfies Record<string, SfxSpec>
+} as const satisfies Record<string, SfxDef>
 
 export type SfxId = keyof typeof SFX
 
@@ -76,24 +76,24 @@ let active = 0
 const stats = { baked: 0, played: 0 }
 
 /** 手写采样合成：波形 + 频率滑移/琶音 + 起音-衰减包络；噪声走一阶低通（种子固定可复现） */
-function render(audio: AudioContext, spec: SfxSpec): AudioBuffer {
-  const n = Math.max(1, Math.round(spec.duration * SAMPLE_RATE))
+function render(audio: AudioContext, def: SfxDef): AudioBuffer {
+  const n = Math.max(1, Math.round(def.duration * SAMPLE_RATE))
   const buf = audio.createBuffer(1, n, SAMPLE_RATE)
   const data = buf.getChannelData(0)
-  const attack = Math.max(1, (spec.attack ?? 0.005) * SAMPLE_RATE)
-  const decayPow = spec.decayPow ?? 1.6
+  const attack = Math.max(1, (def.attack ?? 0.005) * SAMPLE_RATE)
+  const decayPow = def.decayPow ?? 1.6
   let phase = 0
   let seed = 1234567
   let lp = 0
   for (let i = 0; i < n; i++) {
     const t = i / n
-    let f = spec.freq + (spec.freqEnd !== undefined ? (spec.freqEnd - spec.freq) * t : 0)
-    if (spec.steps) {
-      f *= spec.steps[Math.min(spec.steps.length - 1, Math.floor(t * spec.steps.length))]!
+    let f = def.freq + (def.freqEnd !== undefined ? (def.freqEnd - def.freq) * t : 0)
+    if (def.steps) {
+      f *= def.steps[Math.min(def.steps.length - 1, Math.floor(t * def.steps.length))]!
     }
     phase += f / SAMPLE_RATE
     let s: number
-    switch (spec.wave) {
+    switch (def.wave) {
       case 'square':
         s = phase % 1 < 0.5 ? 1 : -1
         break
@@ -118,7 +118,7 @@ function render(audio: AudioContext, spec: SfxSpec): AudioBuffer {
       }
     }
     const env = i < attack ? i / attack : Math.pow(1 - (i - attack) / Math.max(1, n - attack), decayPow)
-    data[i] = Math.max(-1, Math.min(1, s * env * spec.volume))
+    data[i] = Math.max(-1, Math.min(1, s * env * def.volume))
   }
   return buf
 }
@@ -132,8 +132,8 @@ export function ensureAudio(): AudioContext | undefined {
       master = ctx.createGain()
       master.gain.value = 0.5
       master.connect(ctx.destination)
-      for (const [id, spec] of Object.entries(SFX) as [SfxId, SfxSpec][]) {
-        buffers.set(id, render(ctx, spec))
+      for (const [id, def] of Object.entries(SFX) as [SfxId, SfxDef][]) {
+        buffers.set(id, render(ctx, def))
         stats.baked++
       }
     }
@@ -173,16 +173,16 @@ export function playSfx(id: SfxId): void {
     void ctx.resume()
     return
   }
-  const spec: SfxSpec = SFX[id]
+  const def: SfxDef = SFX[id]
   const now = performance.now()
-  if (now - (lastPlayed.get(id) ?? -Infinity) < (spec.throttleMs ?? 0)) return
+  if (now - (lastPlayed.get(id) ?? -Infinity) < (def.throttleMs ?? 0)) return
   if (active >= MAX_VOICES) return
   const buffer = buffers.get(id)
   if (!buffer) return
   lastPlayed.set(id, now)
   const src = ctx.createBufferSource()
   src.buffer = buffer
-  if (spec.jitter) src.playbackRate.value = 1 + (Math.random() * 2 - 1) * spec.jitter
+  if (def.jitter) src.playbackRate.value = 1 + (Math.random() * 2 - 1) * def.jitter
   src.connect(master)
   active++
   src.onended = (): void => {
