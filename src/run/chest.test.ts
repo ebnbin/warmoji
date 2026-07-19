@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { chestCandidates, chestDropped, rollChestLoot } from './chest'
-import { CHEST } from './chest'
+import { CHEST_LOOT } from './chest'
 import type { ItemId } from '../items/registry'
 import { ITEMS } from '../items/registry'
 import { Rng } from '../lib/rng'
 
 describe('chest 掉落判定', () => {
   it('普通怪按 chance、精英按更高的 eliteChance', () => {
-    expect(CHEST.eliteChance).toBeGreaterThan(CHEST.chance)
-    expect(chestDropped(false, () => CHEST.chance - 0.0001)).toBe(true)
-    expect(chestDropped(false, () => CHEST.chance)).toBe(false)
-    expect(chestDropped(true, () => CHEST.eliteChance - 0.0001)).toBe(true)
-    expect(chestDropped(true, () => CHEST.eliteChance)).toBe(false)
+    expect(CHEST_LOOT.eliteChance).toBeGreaterThan(CHEST_LOOT.chance)
+    expect(chestDropped(false, () => CHEST_LOOT.chance - 0.0001)).toBe(true)
+    expect(chestDropped(false, () => CHEST_LOOT.chance)).toBe(false)
+    expect(chestDropped(true, () => CHEST_LOOT.eliteChance - 0.0001)).toBe(true)
+    expect(chestDropped(true, () => CHEST_LOOT.eliteChance)).toBe(false)
   })
 })
 

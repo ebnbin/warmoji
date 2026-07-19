@@ -2,7 +2,7 @@ import { CAPTAINS, CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
 import { ENEMY_DEFS } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
-import { COIN } from '../items/registry'
+import { PICKUPS } from '../pickups/registry'
 import { ABILITIES } from '../abilities/registry'
 import { ITEMS, RARITIES } from '../items/registry'
 import type { ItemDef } from '../items/registry'
@@ -153,6 +153,6 @@ export function usedEmojiSet(): Set<string> {
   }
   for (const e of ENEMY_DEFS)
     for (const w of e.abilities ?? []) if (w.kind === 'projectile') used.add(w.projectile.emoji)
-  used.add(COIN.emoji)
+  used.add(PICKUPS.coin.emoji)
   return used
 }

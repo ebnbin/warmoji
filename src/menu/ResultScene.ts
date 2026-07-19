@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { CAPTAINS, CHARACTERS } from '../characters/registry'
 import { BOSS, ENEMY_DEFS } from '../enemies/registry'
-import { COIN } from '../items/registry'
+import { PICKUPS } from '../pickups/registry'
 import { WAVE } from '../run/waves'
 import { submitScore } from '../run/highscore'
 import { ITEMS, stackCount } from '../items/registry'
@@ -127,7 +127,7 @@ export class ResultScene extends Phaser.Scene {
       .text(
         cx,
         oy + L.subY,
-        `${captain.emoji} ${captain.name} · ${waveText} · 击杀 ${this.run.kills} · ${COIN.emoji}${this.run.coins} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
+        `${captain.emoji} ${captain.name} · ${waveText} · 击杀 ${this.run.kills} · ${PICKUPS.coin.emoji}${this.run.coins} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
         { fontFamily: UI_FONT, fontSize: FONT.head, color: '#e8e8f0', resolution: res },
       )
       .setOrigin(0.5)

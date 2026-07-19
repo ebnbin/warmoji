@@ -291,15 +291,5 @@ export function resolveAbilityDef(w: AbilityDef, fx: CharacterEffects): AbilityD
   }
 }
 
-// 金币拾取是团队能力：磁吸与入账都以队伍中心为基点（拾取范围类道具挂队长）
-export const COIN = {
-  emoji: '🪙',
-  size: 0.6,
-  radius: 0.22,
-  magnetRadius: 2.25,
-  magnetSpeed: 8,
-  collectRadius: 0.5,
-} as const
-
 // 商店：每个上架位可付费重新随机（队长可提供免费次数）
 export const SHOP = { refreshPrice: 2 } as const

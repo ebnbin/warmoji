@@ -2,8 +2,7 @@ import { CAPTAINS, CHARACTERS } from '../characters/registry'
 import type { CaptainDef, CharacterDef } from '../characters/registry'
 import type { OutlineKind } from '../emoji/svg'
 import { BOSS, ENEMY_DEFS, SPAWN } from '../enemies/registry'
-import { CHEST } from '../run/chest'
-import { COIN } from '../items/registry'
+import { PICKUPS } from '../pickups/registry'
 import { ITEMS } from '../items/registry'
 import { MAPS } from '../maps/registry'
 import type { MapDef } from '../maps/registry'
@@ -28,8 +27,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
         ...(w.kind === 'summon' ? [w.minion.emoji] : []),
       ]),
     ),
-    COIN.emoji,
-    CHEST.emoji,
+    ...Object.values(PICKUPS).map((p) => p.emoji),
     '➕',
     '💀',
     // 财迷「天降横财」的金袋投掷物 + HUD 能量豆

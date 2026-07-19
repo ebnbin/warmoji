@@ -1,5 +1,5 @@
 import { playSfx } from '../audio/sfx'
-import { COIN } from '../items/registry'
+import { PICKUPS } from '../pickups/registry'
 import { UNIT } from '../lib/units'
 import { norm } from '../lib/vec'
 import type { Member } from './members'
@@ -141,7 +141,7 @@ const coinThief: Steerer = ({ scene, a, body, slow }) => {
     }
   }
   if (coin) {
-    const eatR = def.radius + COIN.radius * UNIT
+    const eatR = def.radius + PICKUPS.coin.radius * UNIT
     if (bestD <= eatR * eatR) {
       coin.destroy()
       a.eaten += 1

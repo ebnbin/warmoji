@@ -15,7 +15,7 @@ export interface ChestLoot {
 
 /** 击杀是否掉落宝箱 */
 export function chestDropped(elite: boolean, rand: () => number): boolean {
-  return rand() < (elite ? CHEST.eliteChance : CHEST.chance)
+  return rand() < (elite ? CHEST_LOOT.eliteChance : CHEST_LOOT.chance)
 }
 
 /** 全部候选条目（导出供测试校验覆盖面） */
@@ -49,26 +49,21 @@ export function rollChestLoot(
   const entries = chestCandidates(roster, memberItems, captainItems)
   if (entries.length === 0) return null
   let total = 0
-  for (const e of entries) total += CHEST.rarityWeights[ITEMS[e.itemId].rarity]
+  for (const e of entries) total += CHEST_LOOT.rarityWeights[ITEMS[e.itemId].rarity]
   let t = rand() * total
   for (const e of entries) {
-    const w = CHEST.rarityWeights[ITEMS[e.itemId].rarity]
+    const w = CHEST_LOOT.rarityWeights[ITEMS[e.itemId].rarity]
     if (t < w) return e
     t -= w
   }
   return entries[entries.length - 1]!
 }
 
-// 宝箱：击杀极小概率掉落（精英显著更高），拾取开出 1 件免费随机道具，
-// 立即生效。抽取范围与权重见 本文件；与金币同磁吸，波末未拾取消失
-export const CHEST = {
-  emoji: '🎁',
-  size: 0.8,
-  radius: 0.3,
+// 宝箱掉落经济旋钮：击杀极小概率掉落（精英显著更高），拾取开出 1 件
+// 免费随机道具立即生效。宝箱实体本身（emoji/尺寸）在 pickups/registry
+export const CHEST_LOOT = {
   chance: 0.008,
   eliteChance: 0.08,
   /** 开箱稀有度权重：越稀有越难开出 */
   rarityWeights: { common: 1, rare: 0.3, epic: 0.08 },
-  /** 兜底金币：全队所有道具池都抽无可抽时（几乎不可能）宝箱改吐金币 */
-  fallbackCoins: 10,
 } as const

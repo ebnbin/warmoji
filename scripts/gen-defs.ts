@@ -4,6 +4,7 @@ import { CHARACTERS, CAPTAINS } from '../defs/characters.ts'
 import { ENEMIES, BOSS, ENEMY_MIX } from '../defs/enemies.ts'
 import { ITEMS } from '../defs/items.ts'
 import { MAPS } from '../defs/maps.ts'
+import { PICKUPS } from '../defs/pickups.ts'
 import type { ItemDef } from '../src/items/registry'
 import type { CharacterDef } from '../src/characters/registry'
 
@@ -124,6 +125,15 @@ for (const [id, m] of Object.entries(MAPS)) {
   pure(p, m)
 }
 
+// ── pickups ──
+for (const [id, pk] of Object.entries(PICKUPS)) {
+  const p = `pickups.${id}`
+  str(`${p}.emoji`, pk.emoji)
+  num(`${p}.size`, pk.size, 0.01)
+  num(`${p}.radius`, pk.radius, 0.01)
+  pure(p, pk)
+}
+
 if (errors.length > 0) {
   console.error(`gen-defs 校验失败（${errors.length} 条）：`)
   for (const e of errors) console.error('  ' + e)
@@ -138,4 +148,5 @@ write('characters', { characters: CHARACTERS, captains: CAPTAINS })
 write('enemies', { enemies: ENEMIES, boss: BOSS, mix: ENEMY_MIX })
 write('items', ITEMS)
 write('maps', MAPS)
-console.log('gen-defs：5 张表校验通过，已生成 src/gen/*.json')
+write('pickups', PICKUPS)
+console.log('gen-defs：6 张表校验通过，已生成 src/gen/*.json')

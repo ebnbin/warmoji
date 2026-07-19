@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { CAPTAINS } from '../characters/registry'
 import { SKILL } from '../characters/skill'
-import { COIN } from '../items/registry'
+import { PICKUPS } from '../pickups/registry'
 import { formatTime } from '../lib/format'
 import { RARITIES } from '../items/registry'
 import type { ItemRarity } from '../items/registry'
@@ -125,7 +125,7 @@ export class UIScene extends Phaser.Scene {
     this.killsText = this.add
       .text(w - sR - 46, sT + 10, '0', { ...hudText, fontSize: FONT.head })
       .setOrigin(1, 0)
-    emojiImage(this, w - sR - 26, sT + 64, COIN.emoji, 35, 'player')
+    emojiImage(this, w - sR - 26, sT + 64, PICKUPS.coin.emoji, 35, 'player')
     this.coinsText = this.add
       .text(w - sR - 46, sT + 48, '0', { ...hudText, fontSize: FONT.head })
       .setOrigin(1, 0)
@@ -625,7 +625,7 @@ export class UIScene extends Phaser.Scene {
 
     const lineStyle = { fontFamily: UI_FONT, fontSize: FONT.head, color: '#ffffff', resolution: res }
     iconLabel(this, cx - 140, cy + 12, '💀', 37, `击杀 ${s.kills}`, lineStyle).setDepth(231)
-    iconLabel(this, cx + 140, cy + 12, COIN.emoji, 37, `金币 +${s.coins}`, lineStyle).setDepth(231)
+    iconLabel(this, cx + 140, cy + 12, PICKUPS.coin.emoji, 37, `金币 +${s.coins}`, lineStyle).setDepth(231)
     if (s.levels > 0) {
       iconLabel(this, cx, cy + 72, '🫘', 35, `能量豆 +${s.levels}（队长技能弹药）`, {
         ...lineStyle,

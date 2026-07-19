@@ -7,7 +7,7 @@ emoji 幸存者 web 游戏：Phaser 3 + Vite + TypeScript。纯 vibe coding 个�
 - `main` 直接 push 即上线（无 PR、不开分支，Vercel 自动部署 → https://warmoji.ebnbin.dev）；页面右下角 `#build-badge` 显示构建的 commit 短 hash
 - 无 CI（用户要求删除 workflows，勿加回）：质量验证 = 本地 `npm run check`
 - 不改 package.json 的 version，版本以 commit hash 为准（用户要求）
-- src 按业务域分包：boot/lib/screen/emoji/audio/characters/enemies/abilities/items/maps/run/battle/menu/debug；纯逻辑与表现文件同包不同文件，import phaser 仅限 eslint 白名单（eslint.config.js；DOM/WebAudio 越界靠约定），单测只测纯文件、与被测同居
+- src 按业务域分包：boot/lib/screen/emoji/audio/characters/enemies/abilities/items/pickups/maps/run/battle/menu/debug；纯逻辑与表现文件同包不同文件，import phaser 仅限 eslint 白名单（eslint.config.js；DOM/WebAudio 越界靠约定），单测只测纯文件、与被测同居
 - 纯逻辑文件间的包级值依赖必须无环（`*Scene.ts` 是读一切状态的展示汇点，其产生的反向边豁免）；纯类型循环无害不禁
 - 内容管线：实体数据行（Def）在 `defs/` 创作层用 TS 书写（展开/派生/注释合法，不进 bundle），`npm run gen`（dev/build/typecheck/test 的 pre 钩子自动跑）执行 `scripts/gen-defs.ts` 校验并生成 `src/gen/*.json`（gitignore，勿手改）打包进运行时；运行时注册表只做一次类型断言直读 JSON，零校验——合法性由构建期保证。调实体数值去 defs/
 - 旋钮常量不走管线，随包持有（KNOCKBACK/ACQUIRE/SPAWN/ELITE/TEAM/VOID…）；全局锚定 VIEW/UNIT/TAP_SLOP 在 `src/lib/units.ts`

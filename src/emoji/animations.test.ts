@@ -2,8 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { CAPTAINS, CHARACTERS } from '../characters/registry'
 import { BOSS, ENEMY_DEFS } from '../enemies/registry'
-import { CHEST } from '../run/chest'
-import { COIN } from '../items/registry'
+import { PICKUPS } from '../pickups/registry'
 import { emojiCodepoints } from './codepoints'
 import { packSvg, parseEmojiPack } from './pack'
 import { ANIM_SETS, animClipOf, animSetOf, bakeAnimFrame, splitSvg } from './studio'
@@ -34,8 +33,7 @@ describe('实体动画覆盖', () => {
       expect(set!.clips.length, `${emoji} 没有任何 clip`).toBeGreaterThan(0)
       expect(set!.clips[0]!.id, `${emoji} 首个 clip 应为 idle（待机/代表作约定）`).toBe('idle')
     }
-    void COIN
-    void CHEST
+    void PICKUPS
   })
 
   it('弩塔有独立的 attack 周期 clip（攻速绑定的旗舰用例）', () => {

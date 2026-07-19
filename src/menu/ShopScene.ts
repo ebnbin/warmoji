@@ -1,7 +1,8 @@
 import Phaser from 'phaser'
 import { CAPTAINS, CHARACTERS } from '../characters/registry'
 import type { CaptainId, CharacterId } from '../characters/registry'
-import { COIN, SHOP } from '../items/registry'
+import { SHOP } from '../items/registry'
+import { PICKUPS } from '../pickups/registry'
 import {
   aggregateCharacterEffects,
   captainPool,
@@ -189,7 +190,7 @@ export class ShopScene extends Phaser.Scene {
     }
     this.events.on(Phaser.Scenes.Events.WAKE, this.onWake, this)
 
-    emojiImage(this, w / 2 - 28, oy + L.coinsY, COIN.emoji, 42, 'player')
+    emojiImage(this, w / 2 - 28, oy + L.coinsY, PICKUPS.coin.emoji, 42, 'player')
     this.coinsText = this.add
       .text(w / 2 - 4, oy + L.coinsY, `${this.run.coins}`, {
         fontFamily: UI_FONT,

@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { MEMBER, TEAM } from '../characters/registry'
 import { SPAWN } from '../enemies/registry'
-import { COIN } from '../items/registry'
+import { PICKUPS } from '../pickups/registry'
 import { UNIT } from '../lib/units'
 import { MAP } from './registry'
 import { fleeSteer } from '../enemies/registry'
@@ -107,8 +107,8 @@ export class ArenaScene extends BaseArenaScene {
 
   constrainCoinPos(p: Point): Point {
     return {
-      x: Phaser.Math.Clamp(p.x, COIN.radius, MAPW - COIN.radius),
-      y: Phaser.Math.Clamp(p.y, COIN.radius, MAPH - COIN.radius),
+      x: Phaser.Math.Clamp(p.x, PICKUPS.coin.radius, MAPW - PICKUPS.coin.radius),
+      y: Phaser.Math.Clamp(p.y, PICKUPS.coin.radius, MAPH - PICKUPS.coin.radius),
     }
   }
 

@@ -6,13 +6,13 @@ import {
   upgradeTiers,
   aggregateCharacterEffects,
   aggregateTeamEffects,
-  COIN,
   ITEMS,
   resolveAbilityDef,
 } from '../items/registry'
 import { UNIT } from '../lib/units'
 import { norm } from '../lib/vec'
-import { CHEST, rollChestLoot } from '../run/chest'
+import { rollChestLoot } from '../run/chest'
+import { PICKUP, PICKUPS } from '../pickups/registry'
 import { createAbility } from '../abilities/create'
 import { KNOCKBACK } from '../abilities/registry'
 import { circleBody } from './arcade'
@@ -29,9 +29,9 @@ export function spawnCoins(scene: BaseArenaScene, x: number, y: number, count: n
     const jx = count > 1 ? (scene.rng.next() - 0.5) * 0.6 * UNIT : 0
     const jy = count > 1 ? (scene.rng.next() - 0.5) * 0.6 * UNIT : 0
     const pos = scene.constrainCoinPos({ x: x + jx, y: y + jy })
-    const coin = emojiImage(scene, pos.x, pos.y, COIN.emoji, COIN.size * UNIT, 'player').setDepth(3)
+    const coin = emojiImage(scene, pos.x, pos.y, PICKUPS.coin.emoji, PICKUPS.coin.size * UNIT, 'player').setDepth(3)
     scene.physics.add.existing(coin)
-    circleBody(coin, COIN.radius * UNIT)
+    circleBody(coin, PICKUPS.coin.radius * UNIT)
     scene.coins.add(coin)
     // 掉落弹出
     const base = coin.scaleX
@@ -43,9 +43,9 @@ export function spawnCoins(scene: BaseArenaScene, x: number, y: number, count: n
 export function magnetCoins(scene: BaseArenaScene): void {
   // 金币拾取是团队能力：以队伍中心为基点磁吸并入账（成员碰到也能捡，见 overlap）。
   // 磁力回旋镖（frameAttractors）优先：镖旁的金币直接入账，省去飞回中心的路程
-  const magnetRadius = COIN.magnetRadius * UNIT * scene.teamFx.magnetMul
+  const magnetRadius = PICKUP.magnetRadius * UNIT * scene.teamFx.magnetMul
   const r2 = magnetRadius * magnetRadius
-  const collect2 = COIN.collectRadius * UNIT * (COIN.collectRadius * UNIT)
+  const collect2 = PICKUP.collectRadius * UNIT * (PICKUP.collectRadius * UNIT)
   const idle = scene.coinIdleVelocity()
   for (const c of scene.coins.getChildren() as ImageObj[]) {
     if (!c.active) continue
@@ -75,7 +75,7 @@ export function magnetCoins(scene: BaseArenaScene): void {
     const body = c.body as ArcadeBody
     if (dist < r2) {
       const dir = norm(d.x, d.y)
-      body.setVelocity(dir.x * COIN.magnetSpeed * UNIT + idle.x, dir.y * COIN.magnetSpeed * UNIT + idle.y)
+      body.setVelocity(dir.x * PICKUP.magnetSpeed * UNIT + idle.x, dir.y * PICKUP.magnetSpeed * UNIT + idle.y)
     } else {
       body.setVelocity(idle.x, idle.y)
     }
@@ -97,10 +97,10 @@ export function collectCoin(scene: BaseArenaScene, coin: ImageObj): void {
 /** 宝箱走金币的磁吸/回收/拾取管线（同组 + data 标记分流） */
 export function spawnChest(scene: BaseArenaScene, x: number, y: number): void {
   const pos = scene.constrainCoinPos({ x, y })
-  const chest = emojiImage(scene, pos.x, pos.y, CHEST.emoji, CHEST.size * UNIT, 'player').setDepth(4)
+  const chest = emojiImage(scene, pos.x, pos.y, PICKUPS.chest.emoji, PICKUPS.chest.size * UNIT, 'player').setDepth(4)
   chest.setData('chest', true)
   scene.physics.add.existing(chest)
-  circleBody(chest, CHEST.radius * UNIT)
+  circleBody(chest, PICKUPS.chest.radius * UNIT)
   scene.coins.add(chest)
   const base = chest.scaleX
   chest.setScale(base * 0.3)
@@ -120,7 +120,7 @@ function openChest(scene: BaseArenaScene, chest: ImageObj): void {
     () => scene.rng.next(),
   )
   if (!loot) {
-    scene.run.coins += CHEST.fallbackCoins
+    scene.run.coins += PICKUPS.chest.fallbackCoins ?? 0
     return
   }
   let owner: string
