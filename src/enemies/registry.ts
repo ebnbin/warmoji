@@ -1,7 +1,8 @@
 
-// 敌人：behavior 决定战斗内行为分支（ArenaScene 按此分派）。
-// chase 直追最近队员；wanderFire 游荡+朝移动方向放枪；dash 探测→蓄力→直线突刺；
-// fleeFire 见人就逃+朝人冷枪；coinThief 抢地上的金币，击杀吐回+利息。
+// 敌人 = 基础三围 + 移动方式（locomotion）+ 攻击模块列表 + 死亡效果列表。
+// 多样性用数据组合表达：加一种敌人 = 组合现有模块的一行数据；
+// 运行时按 locomotion.kind 分发转向（battle/steer.ts）、逐帧跑攻击模块
+//（battle/enemyAttacks.ts）、死亡时跑效果模块（killEnemy）。
 export interface EnemyBulletSpec {
   readonly emoji: string
   readonly size: number
@@ -11,7 +12,86 @@ export interface EnemyBulletSpec {
   readonly lifeMs: number
 }
 
-interface EnemyBase {
+// ── 移动方式 ────────────────────────────────────────────────
+export interface DashLocomotion {
+  readonly kind: 'dash'
+  readonly windupMs: number
+  readonly dashSpeed: number
+  /** 触发：探测圈（野猪）或定时循环（Boss），二选一 */
+  readonly detectRange?: number
+  readonly intervalMs?: number
+  /** 冲刺长度：距离制（野猪）或时长制（Boss），二选一 */
+  readonly dashDist?: number
+  readonly durationMs?: number
+  /** 探测型冲刺后的冷却；定时型由 intervalMs 驱动下一轮 */
+  readonly cooldownMs?: number
+  /** 非冲刺期的移动 */
+  readonly idle: 'wander' | 'chase'
+  /** 瞄准：最近队员（野猪）或队伍中心（Boss） */
+  readonly aim: 'nearest' | 'teamCenter'
+  /** 方向锁定时机：进蓄力即锁（可预判横躲）或起跑瞬间锁（追踪到最后一刻） */
+  readonly lockAt: 'windup' | 'launch'
+  /** 定时型首次触发延迟 */
+  readonly firstDelayMs?: number
+  /** 起跑音效 */
+  readonly sfx?: 'whoosh'
+}
+
+export type LocomotionSpec =
+  | { readonly kind: 'chase' }
+  | { readonly kind: 'wander' }
+  | { readonly kind: 'flee'; readonly range: number }
+  | { readonly kind: 'coinThief' }
+  | DashLocomotion
+
+// ── 攻击模块 ────────────────────────────────────────────────
+export interface PeriodicShotSpec {
+  readonly kind: 'periodicShot'
+  readonly intervalMs: number
+  readonly bullet: EnemyBulletSpec
+  /** 瞄准：move 朝移动方向（外星怪）/ team 朝最近队员（毒蛇） */
+  readonly aim: 'move' | 'team'
+}
+
+export interface RingBarrageSpec {
+  readonly kind: 'ringBarrage'
+  readonly count: number
+  readonly intervalMs: number
+  readonly bullet: EnemyBulletSpec
+  readonly firstDelayMs?: number
+}
+
+export type EnemyAttackSpec = PeriodicShotSpec | RingBarrageSpec
+
+// ── 死亡效果 ────────────────────────────────────────────────
+export interface DeathPoisonSpec {
+  readonly kind: 'poison'
+  readonly radius: number
+  readonly durationMs: number
+  readonly tickMs: number
+  readonly damage: number
+}
+
+export interface DeathSplitSpec {
+  readonly kind: 'split'
+  readonly into: EnemySpec
+  readonly count: number
+}
+
+export type DeathEffectSpec = DeathPoisonSpec | DeathSplitSpec
+
+export interface EnemySpec {
+  readonly kind:
+    | 'zombie'
+    | 'ghost'
+    | 'mushroom'
+    | 'blob'
+    | 'blobling'
+    | 'invader'
+    | 'boar'
+    | 'snake'
+    | 'rat'
+    | 'boss'
   readonly emoji: string
   readonly name: string
   readonly desc: string
@@ -23,62 +103,15 @@ interface EnemyBase {
   // 经验击杀即得；金币落地需拾取（波次结束未拾取的消失）
   readonly xp: number
   readonly coins: number
+  readonly locomotion: LocomotionSpec
+  readonly attacks?: readonly EnemyAttackSpec[]
+  readonly onDeath?: readonly DeathEffectSpec[]
+  readonly kbImmune?: boolean
 }
 
-export interface ChaseEnemySpec extends EnemyBase {
-  readonly kind: 'zombie' | 'ghost' | 'mushroom' | 'blob' | 'blobling'
-  readonly behavior: 'chase'
-  /** 死亡在原地留毒液池（玩家踩入按 tick 掉血） */
-  readonly poison?: {
-    readonly radius: number
-    readonly durationMs: number
-    readonly tickMs: number
-    readonly damage: number
-  }
-  /** 死亡分裂出迷你体 */
-  readonly split?: { readonly into: ChaseEnemySpec; readonly count: number }
-}
-
-export interface WanderFireEnemySpec extends EnemyBase {
-  readonly kind: 'invader'
-  readonly behavior: 'wanderFire'
-  readonly fireIntervalMs: number
-  readonly bullet: EnemyBulletSpec
-}
-
-export interface DashEnemySpec extends EnemyBase {
-  readonly kind: 'boar'
-  readonly behavior: 'dash'
-  readonly detectRange: number
-  readonly windupMs: number
-  readonly dashSpeed: number
-  readonly dashDist: number
-  readonly cooldownMs: number
-}
-
-export interface FleeFireEnemySpec extends EnemyBase {
-  readonly kind: 'snake'
-  readonly behavior: 'fleeFire'
-  readonly fleeRange: number
-  readonly fireIntervalMs: number
-  readonly bullet: EnemyBulletSpec
-}
-
-export interface CoinThiefEnemySpec extends EnemyBase {
-  readonly kind: 'rat'
-  readonly behavior: 'coinThief'
-}
-
-export type EnemySpec =
-  | ChaseEnemySpec
-  | WanderFireEnemySpec
-  | DashEnemySpec
-  | FleeFireEnemySpec
-  | CoinThiefEnemySpec
-
-export const ZOMBIE: ChaseEnemySpec = {
+export const ZOMBIE: EnemySpec = {
   kind: 'zombie',
-  behavior: 'chase',
+  locomotion: { kind: 'chase' },
   emoji: '🧟',
   name: '僵尸',
   desc: '缓慢但成群，最基础的追击者',
@@ -91,9 +124,9 @@ export const ZOMBIE: ChaseEnemySpec = {
   coins: 2,
 }
 
-export const GHOST: ChaseEnemySpec = {
+export const GHOST: EnemySpec = {
   kind: 'ghost',
-  behavior: 'chase',
+  locomotion: { kind: 'chase' },
   emoji: '👻',
   name: '幽灵',
   desc: '飘得很快的追击者，血薄',
@@ -107,9 +140,9 @@ export const GHOST: ChaseEnemySpec = {
 }
 
 /** 游荡射手：不索敌，慢速乱逛，周期性朝自己移动方向放一发慢弹（弹幕污染走位空间） */
-export const INVADER: WanderFireEnemySpec = {
+export const INVADER: EnemySpec = {
   kind: 'invader',
-  behavior: 'wanderFire',
+  locomotion: { kind: 'wander' },
   emoji: '👾',
   name: '外星怪',
   desc: '不追人，游荡途中朝前方吐慢速弹',
@@ -120,14 +153,19 @@ export const INVADER: WanderFireEnemySpec = {
   damage: 6,
   xp: 4,
   coins: 3,
-  fireIntervalMs: 2800,
-  bullet: { emoji: '🔴', size: 0.4, radius: 0.14, speed: 3, damage: 6, lifeMs: 4500 },
+  attacks: [
+    {
+      kind: 'periodicShot',
+      intervalMs: 2800,
+      aim: 'move',
+      bullet: { emoji: '🔴', size: 0.4, radius: 0.14, speed: 3, damage: 6, lifeMs: 4500 },
+    },
+  ],
 }
 
 /** 突刺怪：探测圈内锁定蓄力方向 → 短延迟 → 直线冲刺一段距离（横向位移可躲） */
-export const BOAR: DashEnemySpec = {
+export const BOAR: EnemySpec = {
   kind: 'boar',
-  behavior: 'dash',
   emoji: '🐗',
   name: '野猪',
   desc: '发现猎物后蓄力直线突刺，横向可躲',
@@ -138,17 +176,22 @@ export const BOAR: DashEnemySpec = {
   damage: 10,
   xp: 5,
   coins: 3,
-  detectRange: 4,
-  windupMs: 550,
-  dashSpeed: 8,
-  dashDist: 3.5,
-  cooldownMs: 1800,
+  locomotion: {
+    kind: 'dash',
+    detectRange: 4,
+    windupMs: 550,
+    dashSpeed: 8,
+    dashDist: 3.5,
+    cooldownMs: 1800,
+    idle: 'wander',
+    aim: 'nearest',
+    lockAt: 'windup',
+  },
 }
 
 /** 逃跑射手：见人就拉开距离，周期性朝人吐慢速毒弹（制造追不追的抉择） */
-export const SNAKE: FleeFireEnemySpec = {
+export const SNAKE: EnemySpec = {
   kind: 'snake',
-  behavior: 'fleeFire',
   emoji: '🐍',
   name: '毒蛇',
   desc: '见人就溜，边逃边回头吐毒弹',
@@ -159,15 +202,21 @@ export const SNAKE: FleeFireEnemySpec = {
   damage: 5,
   xp: 4,
   coins: 3,
-  fleeRange: 5,
-  fireIntervalMs: 2600,
-  bullet: { emoji: '🟢', size: 0.4, radius: 0.14, speed: 3.2, damage: 5, lifeMs: 4500 },
+  locomotion: { kind: 'flee', range: 5 },
+  attacks: [
+    {
+      kind: 'periodicShot',
+      intervalMs: 2600,
+      aim: 'team',
+      bullet: { emoji: '🟢', size: 0.4, radius: 0.14, speed: 3.2, damage: 5, lifeMs: 4500 },
+    },
+  ],
 }
 
 /** 毒爆怪：慢速近战，死亡原地留毒液池（别在自己的风筝路线上打爆它） */
-export const MUSHROOM: ChaseEnemySpec = {
+export const MUSHROOM: EnemySpec = {
   kind: 'mushroom',
-  behavior: 'chase',
+  locomotion: { kind: 'chase' },
   emoji: '🍄',
   name: '毒蘑菇',
   desc: '死亡时在原地留下一片毒液',
@@ -178,13 +227,13 @@ export const MUSHROOM: ChaseEnemySpec = {
   damage: 6,
   xp: 4,
   coins: 3,
-  poison: { radius: 1.6, durationMs: 3000, tickMs: 500, damage: 4 },
+  onDeath: [{ kind: 'poison', radius: 1.6, durationMs: 3000, tickMs: 500, damage: 4 }],
 }
 
 /** 偷金币鼠：不理玩家，直奔地上最近的金币吃掉；击杀吐回吃掉的 + 1 枚利息 */
-export const RAT: CoinThiefEnemySpec = {
+export const RAT: EnemySpec = {
   kind: 'rat',
-  behavior: 'coinThief',
+  locomotion: { kind: 'coinThief' },
   emoji: '🐀',
   name: '偷币鼠',
   desc: '专偷地上的金币，击杀可全额讨回并有利息',
@@ -197,9 +246,9 @@ export const RAT: CoinThiefEnemySpec = {
   coins: 2,
 }
 
-export const BLOBLING: ChaseEnemySpec = {
+export const BLOBLING: EnemySpec = {
   kind: 'blobling',
-  behavior: 'chase',
+  locomotion: { kind: 'chase' },
   emoji: '🫧',
   name: '小泡泡',
   desc: '泡泡分裂出的迷你体，快而脆',
@@ -213,9 +262,9 @@ export const BLOBLING: ChaseEnemySpec = {
 }
 
 /** 分裂怪：死亡分裂成 2 只更小更快的迷你泡泡 */
-export const BLOB: ChaseEnemySpec = {
+export const BLOB: EnemySpec = {
   kind: 'blob',
-  behavior: 'chase',
+  locomotion: { kind: 'chase' },
   emoji: '🫧',
   name: '泡泡',
   desc: '被击破时分裂成两只小泡泡',
@@ -226,7 +275,7 @@ export const BLOB: ChaseEnemySpec = {
   damage: 6,
   xp: 4,
   coins: 3,
-  split: { into: BLOBLING, count: 2 },
+  onDeath: [{ kind: 'split', into: BLOBLING, count: 2 }],
 }
 
 export const ENEMY_SPECS: readonly EnemySpec[] = [
@@ -295,30 +344,47 @@ export const SURGE = {
   spreadMs: 2600,
 } as const
 
-// 终局 Boss（末波）：大体型 + 周期环形弹幕 + 蓄力突刺；击退免疫。
-// 血量固定不吃时间成长曲线（按满编 18 波队伍粗校准），击败或撑满时长皆通关
-export const BOSS = {
+// 终局 Boss（末波）：与普通敌人同一套组合数据——定时突刺移动 + 环形弹幕
+// 攻击模块 + 击退免疫；血量固定不吃时间成长曲线（按满编 18 波队伍粗校准），
+// 击败或撑满时长皆通关。特殊性只剩引擎侧的通关判定与 HUD 血条（boss 标记）。
+export const BOSS: EnemySpec = {
+  kind: 'boss',
   emoji: '👹',
   name: '赤鬼',
+  desc: '终波头目：环形弹幕与蓄力突刺，击退免疫',
   size: 3.2,
   radius: 1.05,
   hp: 6000,
-  /** 平时缓速逼近队伍中心 */
   speed: 1.4,
   damage: 20,
   xp: 60,
   coins: 60,
-  /** 环形弹幕：周期性向四周均匀发射（带随机整体旋转） */
-  ring: {
-    count: 12,
-    intervalMs: 2800,
-    bullet: { emoji: '🟣', size: 0.45, radius: 0.16, speed: 2.4, damage: 8, lifeMs: 6000 },
+  kbImmune: true,
+  locomotion: {
+    kind: 'dash',
+    intervalMs: 5600,
+    windupMs: 750,
+    dashSpeed: 8,
+    durationMs: 450,
+    idle: 'chase',
+    aim: 'teamCenter',
+    lockAt: 'launch',
+    firstDelayMs: 3600,
+    sfx: 'whoosh',
   },
-  /** 突刺循环：蓄力提示后朝队伍中心猛冲 */
-  dash: { intervalMs: 5600, windupMs: 750, speed: 8, durationMs: 450 },
-  /** 终波常规刷怪减压倍率（间隔 ×N）：把火力焦点留给 Boss */
-  spawnRelief: 2,
-} as const
+  attacks: [
+    {
+      kind: 'ringBarrage',
+      count: 12,
+      intervalMs: 2800,
+      firstDelayMs: 1800,
+      bullet: { emoji: '🟣', size: 0.45, radius: 0.16, speed: 2.4, damage: 8, lifeMs: 6000 },
+    },
+  ],
+}
+
+/** 终波常规刷怪减压倍率（间隔 ×N）：把火力焦点留给 Boss */
+export const BOSS_SPAWN_RELIEF = 2
 
 const BY_KIND: Record<(typeof ENEMY_MIX)[number]['kind'], EnemySpec> = {
   zombie: ZOMBIE,

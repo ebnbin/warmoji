@@ -5,15 +5,17 @@ import { attachEnemy, enemyOf } from './actors'
 import type { Enemy } from './actors'
 import { circleBody } from './arcade'
 import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from './pickups'
-import { spawnBurnZone, spawnEnemyShot, spawnPoisonPool, updateBurnZones, updateEnemyShots, updatePoisonPools } from './hazards'
+import { spawnBurnZone, updateBurnZones, updateEnemyShots, updatePoisonPools } from './hazards'
 import { spawnProjectile, sweepProjectiles } from './projectiles'
 import { STEERERS } from './steer'
+import { runEnemyAttacks } from './enemyAttacks'
+import { runDeathEffects } from './deathEffects'
 import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, TEAM } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import type { CharacterId, CharacterSpec } from '../characters/registry'
 import { SKILL } from '../characters/skill'
 import { STRESS } from '../debug/dev'
-import { BOSS, ELITE, SPAWN, SURGE } from '../enemies/registry'
+import { BOSS, BOSS_SPAWN_RELIEF, ELITE, SPAWN, SURGE } from '../enemies/registry'
 import type { EnemySpec } from '../enemies/registry'
 import { UNIT } from '../lib/units'
 import { WAVE } from '../run/waves'
@@ -160,8 +162,6 @@ export interface Member {
   /** 本帧探测范围内是否有敌人（orbit 倾向输入 + 游移门控） */
   hasThreat: boolean
 }
-
-const BOSS_PX = toPx(BOSS)
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
@@ -504,7 +504,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       remainMs: Math.max(0, waveDurationMs(this.run.wave) - this.elapsedMs),
       over: this.over,
       bossHp: this.boss?.active ? enemyOf(this.boss).hp : null,
-      bossMaxHp: BOSS_PX.hp,
+      bossMaxHp: BOSS.hp,
     }
   }
 
@@ -593,7 +593,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.time.delayedCall(600, () => {
         if (this.over) return
         this.events.emit('wave-warning', {
-          title: `☠️ ${BOSS_PX.name}出现`,
+          title: `☠️ ${BOSS.name}出现`,
           sub: this.finalWaveWarningSub(),
         })
         this.spawnBoss()
@@ -1343,22 +1343,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         if (!this.over) this.endWave()
       })
     }
-    // 特殊死亡：蘑菇留毒液池；泡泡分裂出迷你体
-    if (spec.behavior === 'chase' && spec.poison) {
-      spawnPoisonPool(this, enemy.x, enemy.y, spec.poison, spec.name)
-    }
-    if (spec.behavior === 'chase' && spec.split && !this.over) {
-      const hpMul = waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier
-      for (let i = 0; i < spec.split.count; i++) {
-        const a = this.rng.next() * Math.PI * 2
-        this.materializeEnemy(
-          spec.split.into,
-          enemy.x + Math.cos(a) * 0.5 * UNIT,
-          enemy.y + Math.sin(a) * 0.5 * UNIT,
-          Math.round(spec.split.into.hp * hpMul),
-        )
-      }
-    }
+    // 死亡效果模块（蘑菇留毒/泡泡分裂等）
+    runDeathEffects(this, a)
     enemy.setActive(false)
     ;(enemy.body as ArcadeBody).enable = false
     this.deathBurst.explode(6, enemy.x, enemy.y)
@@ -1396,7 +1382,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // Boss 波常规刷怪减压：焦点让给 Boss，避免「满速杂兵 + 精英 + Boss」三重压力叠满
     const wave = waveAt((this.run.combatMs + this.elapsedMs) / 1000)
     const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * this.members.length
-    const relief = !this.stress && isBossWave(this.run.wave) ? BOSS_PX.spawnRelief : 1
+    const relief = !this.stress && isBossWave(this.run.wave) ? BOSS_SPAWN_RELIEF : 1
     this.spawnCooldownMs = this.stress
       ? STRESS.spawnIntervalMs
       : (wave.spawnIntervalMs * relief) / teamFactor
@@ -1454,87 +1440,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.pendingSpawns--
       this.pendingMarks = this.pendingMarks.filter((x) => x !== entry)
       if (this.over) return
-      const enemy = emojiImage(this, pos.x, pos.y, BOSS_PX.emoji, BOSS_PX.size, 'elite').setDepth(7)
-      this.physics.add.existing(enemy)
-      circleBody(enemy, BOSS_PX.radius)
-      this.configureBossBody(enemy)
-      // Boss 的运行时规格只消费公共字段（伤害/掉落/名字等），行为走专属状态机
-      const bossSpec = {
-        behavior: 'boss',
-        emoji: BOSS_PX.emoji,
-        name: BOSS_PX.name,
-        size: BOSS_PX.size,
-        radius: BOSS_PX.radius,
-        hp: BOSS_PX.hp,
-        speed: BOSS_PX.speed,
-        damage: BOSS_PX.damage,
-        xp: BOSS_PX.xp,
-        coins: BOSS_PX.coins,
-      } as unknown as EnemySpec
-      const anim = new Animator(enemy)
-      anim.register('idle', clipFramesLive(this, BOSS_PX.emoji, 'idle', 'elite'))
-      anim.setIdle('idle', ANIM_SPEC.durMs)
-      attachEnemy(enemy, bossSpec, BOSS_PX.hp, {
-        boss: true,
-        kbImmune: true,
-        state: 'chase',
-        nextRingAt: this.elapsedMs + 1800,
-        nextDashAt: this.elapsedMs + 3600,
-        anim,
-      })
-      this.enemies.add(enemy)
-      this.boss = enemy
+      // Boss 与普通敌人同一条 materialize 管线（boss 标记：金边/深度/入场演出/HUD 血条）
+      const spec = toPx(BOSS)
+      this.materializeEnemy(spec, pos.x, pos.y, spec.hp, false, true)
       playSfx('boom')
-      const targetScale = enemy.scale
-      enemy.setScale(targetScale * 0.2).setAlpha(0.2)
-      this.tweens.add({ targets: enemy, scale: targetScale, alpha: 1, duration: 320, ease: 'Back.easeOut' })
     })
-  }
-
-  /** Boss 状态机：缓速逼近；周期环形弹幕；周期蓄力 → 朝队伍中心突刺 */
-  private steerBoss(a: Enemy, body: ArcadeBody, slow: number, now: number): void {
-    const e = a.image
-    if (now >= a.nextRingAt) {
-      a.nextRingAt = now + BOSS_PX.ring.intervalMs
-      const rot = this.rng.next() * Math.PI * 2
-      for (let i = 0; i < BOSS_PX.ring.count; i++) {
-        spawnEnemyShot(this, e.x, e.y, rot + (i * 2 * Math.PI) / BOSS_PX.ring.count, BOSS_PX.ring.bullet, BOSS_PX.name)
-      }
-      playSfx('boom')
-    }
-    if (a.state === 'windup') {
-      body.setVelocity(0, 0)
-      e.setRotation(Math.sin(now / 26) * 0.12)
-      if (now >= a.windupUntil) {
-        const d = this.worldDelta(e, this.center)
-        const dir = norm(d.x, d.y)
-        a.state = 'dash'
-        a.dashUntil = now + BOSS_PX.dash.durationMs
-        a.dirX = dir.x
-        a.dirY = dir.y
-        e.setRotation(0)
-        e.clearTint()
-        playSfx('whoosh')
-      }
-      return
-    }
-    if (a.state === 'dash') {
-      body.setVelocity(a.dirX * BOSS_PX.dash.speed * slow, a.dirY * BOSS_PX.dash.speed * slow)
-      if (now >= a.dashUntil) {
-        a.state = 'chase'
-        a.nextDashAt = now + BOSS_PX.dash.intervalMs
-      }
-      return
-    }
-    if (now >= a.nextDashAt) {
-      a.state = 'windup'
-      a.windupUntil = now + BOSS_PX.dash.windupMs
-      e.setTint(0xffb74d)
-      return
-    }
-    const d = this.worldDelta(e, this.center)
-    const dir = norm(d.x, d.y)
-    body.setVelocity(dir.x * BOSS_PX.speed * slow, dir.y * BOSS_PX.speed * slow)
   }
 
   /** 敌人潮：一段时间内密集落地一批敌人（含保底精英） */
@@ -1547,7 +1457,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
   }
 
-  materializeEnemy(spec: EnemySpec, x: number, y: number, hp: number, elite = false): void {
+  materializeEnemy(spec: EnemySpec, x: number, y: number, hp: number, elite = false, boss = false): void {
     // 落点经世界钩子兜底（有界钳制/河流钳跨向/虚空回绕；分裂溅出等边缘情况）
     const pos = this.constrainEnemyPos({ x, y }, spec.radius)
     const enemy = emojiImage(
@@ -1556,11 +1466,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       pos.y,
       spec.emoji,
       spec.size * (elite ? ELITE.sizeMul : 1),
-      elite ? 'elite' : 'enemy',
-    ).setDepth(5)
+      elite || boss ? 'elite' : 'enemy',
+    ).setDepth(boss ? 7 : 5)
     this.physics.add.existing(enemy)
     circleBody(enemy, spec.radius)
-    this.configureEnemyBody(enemy)
+    if (boss) this.configureBossBody(enemy)
+    else this.configureEnemyBody(enemy)
     // 行走摇摆的随机相位：同屏大量敌人不齐步摆；
     // 部件动画 idle 常驻，相位偏移复用摇摆随机相（不额外消耗 rng 流）
     const dirX = Math.cos(this.rng.next() * Math.PI * 2)
@@ -1569,26 +1480,45 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const fireAt = this.elapsedMs + 900 + this.rng.next() * 1500
     const ph = this.rng.next() * Math.PI * 2
     const anim = new Animator(enemy)
-    anim.register('idle', clipFramesLive(this, spec.emoji, 'idle', elite ? 'elite' : 'enemy'))
+    anim.register('idle', clipFramesLive(this, spec.emoji, 'idle', elite || boss ? 'elite' : 'enemy'))
     anim.setIdle('idle', ANIM_SPEC.durMs, (ph / (Math.PI * 2)) * ANIM_SPEC.durMs)
+    // 攻击模块计时：有 firstDelay 用之；否则沿用随机开火抽取（保持 rng 流位次）
+    const attackNextAt = (spec.attacks ?? []).map((atk) =>
+      'firstDelayMs' in atk && atk.firstDelayMs !== undefined ? this.elapsedMs + atk.firstDelayMs : fireAt,
+    )
+    // 定时型冲刺的首轮延迟
+    const lm = spec.locomotion
+    const nextDashAt =
+      lm.kind === 'dash' && lm.intervalMs !== undefined ? this.elapsedMs + (lm.firstDelayMs ?? lm.intervalMs) : 0
     attachEnemy(enemy, spec, hp, {
       elite,
+      boss,
+      kbImmune: spec.kbImmune ?? false,
+      state: lm.kind === 'dash' && lm.idle === 'chase' ? 'chase' : 'wander',
       spMul: elite ? ELITE.speedMul : 1,
       dmgMul: elite ? ELITE.damageMul : 1,
-      // 行为状态：游荡方向/换向与开火计时（elapsedMs 时基，暂停安全）
+      // 行为状态：游荡方向/换向计时（elapsedMs 时基，暂停安全）
       dirX,
       dirY,
       turnAt,
-      fireAt,
+      attackNextAt,
+      nextDashAt,
       ph,
       anim,
       // 舞会窗口内落地：跟着跳（全场蹦迪对新敌同样生效）
       danceUntil: this.elapsedMs < this.danceEndsAt ? this.danceEndsAt : 0,
     })
     this.enemies.add(enemy)
+    if (boss) this.boss = enemy
     const targetScale = enemy.scale
-    enemy.setScale(targetScale * 0.3).setAlpha(0.3)
-    this.tweens.add({ targets: enemy, scale: targetScale, alpha: 1, duration: 130 })
+    enemy.setScale(targetScale * (boss ? 0.2 : 0.3)).setAlpha(boss ? 0.2 : 0.3)
+    this.tweens.add({
+      targets: enemy,
+      scale: targetScale,
+      alpha: 1,
+      duration: boss ? 320 : 130,
+      ease: boss ? 'Back.easeOut' : 'Linear',
+    })
   }
 
   // ── 仙子魔尘：变形/缴械 ─────────────────────────────────────
@@ -1630,7 +1560,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     enemy.setTexture(emojiKey(a.spec.emoji, outline))
     enemy.setDisplaySize(size, size)
     a.anim?.register('idle', clipFramesLive(this, a.spec.emoji, 'idle', outline))
-    a.fireAt = this.elapsedMs + 700
+    // 攻击计时后延，避免恢复瞬间齐射
+    a.attackNextAt = a.attackNextAt.map(() => this.elapsedMs + 700)
     this.puffBurst.explode(6, enemy.x, enemy.y)
   }
 
@@ -1726,20 +1657,17 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       const slow = this.slowFactorFor(a)
       const target = this.nearestAlive(e.x, e.y)!
 
-      // 终波 Boss：专属状态机（缓速逼近 + 环形弹幕 + 蓄力突刺）
-      if (a.boss) {
-        this.steerBoss(a, body, slow, now)
-        this.postSteerBoss(e, body)
-        continue
-      }
+      STEERERS[spec.locomotion.kind]({ scene: this, a, body, slow, now, target })
 
-      STEERERS[spec.behavior]({ scene: this, a, body, slow, now, target })
+      // 攻击模块（周期射击/环形弹幕）：紧随移动决策，跳舞/变形分支不会到达这里
+      runEnemyAttacks(this, a, body, now, target)
 
       // 击退：临时冲量叠加进行为速度并指数衰减（不打断行为状态机）
       this.decayKnockback(a, body, delta)
 
-      // 世界后处理：河流在此叠加水流并钳跨向
-      this.postSteerEnemy(e, body, spec)
+      // 世界后处理：河流在此叠加水流并钳跨向（Boss 走专属钩子）
+      if (a.boss) this.postSteerBoss(e, body)
+      else this.postSteerEnemy(e, body, spec)
 
       // 行走动画：恒摇摆 + 按移动方向翻转（twemoji 默认朝左）；
       // 蓄力有自己的颤动，冲刺改为朝冲刺方向前倾

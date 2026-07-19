@@ -44,8 +44,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   enemy: [...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis()])],
   enemyShot: [
     ...new Set([
-      ...ENEMY_SPECS.flatMap((e) => ('bullet' in e ? [e.bullet.emoji] : [])),
-      BOSS.ring.bullet.emoji,
+      ...[...ENEMY_SPECS, BOSS].flatMap((e) => (e.attacks ?? []).map((atk) => atk.bullet.emoji)),
     ]),
   ],
   // 精英变体（含 Boss）：金边

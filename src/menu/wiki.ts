@@ -30,25 +30,30 @@ function grid(units: number): string {
   return `${+units.toFixed(1)}格`
 }
 
-const ENEMY_BEHAVIOR_LABEL: Record<EnemySpec['behavior'], string> = {
+const LOCOMOTION_LABEL: Record<EnemySpec['locomotion']['kind'], string> = {
   chase: '追击',
-  wanderFire: '游荡射击',
+  wander: '游荡',
   dash: '蓄力突刺',
-  fleeFire: '逃跑冷枪',
+  flee: '逃跑',
   coinThief: '偷金币',
 }
 
 export function enemyStatLines(e: EnemySpec): string[] {
   const lines = [
     `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
-    `行为 ${ENEMY_BEHAVIOR_LABEL[e.behavior]} · 经验 ${e.xp} · 金币 ${e.coins}`,
+    `行为 ${LOCOMOTION_LABEL[e.locomotion.kind]}${(e.attacks ?? []).some((a) => a.kind === 'periodicShot') ? '放枪' : ''} · 经验 ${e.xp} · 金币 ${e.coins}`,
   ]
-  if ('bullet' in e) lines.push(`子弹伤害 ${e.bullet.damage} · 弹速 ${grid(e.bullet.speed)}/秒`)
-  if (e.behavior === 'dash') lines.push(`探测 ${grid(e.detectRange)} · 突刺 ${grid(e.dashDist)}`)
-  if (e.behavior === 'chase' && e.poison) {
-    lines.push(`死亡留毒 ${grid(e.poison.radius)} · 每 ${e.poison.tickMs / 1000} 秒 ${e.poison.damage} 伤`)
+  for (const atk of e.attacks ?? []) {
+    lines.push(`子弹伤害 ${atk.bullet.damage} · 弹速 ${grid(atk.bullet.speed)}/秒`)
   }
-  if (e.behavior === 'chase' && e.split) lines.push(`死亡分裂 ${e.split.count} 只${e.split.into.name}`)
+  const lm = e.locomotion
+  if (lm.kind === 'dash' && lm.detectRange !== undefined && lm.dashDist !== undefined) {
+    lines.push(`探测 ${grid(lm.detectRange)} · 突刺 ${grid(lm.dashDist)}`)
+  }
+  for (const fx of e.onDeath ?? []) {
+    if (fx.kind === 'poison') lines.push(`死亡留毒 ${grid(fx.radius)} · 每 ${fx.tickMs / 1000} 秒 ${fx.damage} 伤`)
+    if (fx.kind === 'split') lines.push(`死亡分裂 ${fx.count} 只${fx.into.name}`)
+  }
   return lines
 }
 
@@ -146,7 +151,7 @@ export function usedEmojiSet(): Set<string> {
       if (w.kind === 'projectile') used.add(w.projectile.emoji)
     }
   }
-  for (const e of ENEMY_SPECS) if ('bullet' in e) used.add(e.bullet.emoji)
+  for (const e of ENEMY_SPECS) for (const atk of e.attacks ?? []) used.add(atk.bullet.emoji)
   used.add(COIN.emoji)
   return used
 }

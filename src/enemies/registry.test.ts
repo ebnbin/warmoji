@@ -16,10 +16,14 @@ describe('敌人规格', () => {
   })
 
   it('特殊死亡配置：蘑菇留毒、泡泡分裂为迷你体且迷你体不再分裂', () => {
-    expect(MUSHROOM.poison!.durationMs).toBeGreaterThan(0)
-    expect(BLOB.split!.count).toBe(2)
-    expect(BLOB.split!.into.split).toBeUndefined()
-    expect(BLOB.split!.into.hp).toBeLessThan(BLOB.hp)
+    const poison = MUSHROOM.onDeath!.find((d) => d.kind === 'poison')!
+    if (poison.kind !== 'poison') throw new Error('蘑菇应有留毒效果')
+    expect(poison.durationMs).toBeGreaterThan(0)
+    const split = BLOB.onDeath!.find((d) => d.kind === 'split')!
+    if (split.kind !== 'split') throw new Error('泡泡应有分裂效果')
+    expect(split.count).toBe(2)
+    expect(split.into.onDeath).toBeUndefined()
+    expect(split.into.hp).toBeLessThan(BLOB.hp)
   })
 })
 

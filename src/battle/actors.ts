@@ -25,13 +25,13 @@ export interface Enemy {
   dirX: number
   dirY: number
   turnAt: number
-  fireAt: number
   windupUntil: number
   dashUntil: number
   coolUntil: number
-  /** Boss 专属：环形弹幕与突刺循环计时 */
-  nextRingAt: number
+  /** 定时型冲刺的下一轮触发时刻 */
   nextDashAt: number
+  /** 攻击模块计时（与 spec.attacks 同下标） */
+  attackNextAt: number[]
   danceUntil: number
   flashUntil: number
   morphUntil: number
@@ -69,12 +69,11 @@ export function attachEnemy(image: ImageObj, spec: EnemySpec, hp: number, init?:
     dirX: 0,
     dirY: 0,
     turnAt: 0,
-    fireAt: 0,
     windupUntil: 0,
     dashUntil: 0,
     coolUntil: 0,
-    nextRingAt: 0,
     nextDashAt: 0,
+    attackNextAt: [],
     danceUntil: 0,
     flashUntil: 0,
     morphUntil: 0,

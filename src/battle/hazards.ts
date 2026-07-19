@@ -1,5 +1,5 @@
 import { emojiImage } from '../emoji/textures'
-import type { ChaseEnemySpec, EnemyBulletSpec } from '../enemies/registry'
+import type { DeathPoisonSpec, EnemyBulletSpec } from '../enemies/registry'
 import { circleBody } from './arcade'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
 
@@ -40,7 +40,7 @@ export function spawnPoisonPool(
   scene: BaseArenaScene,
   x: number,
   y: number,
-  poison: NonNullable<ChaseEnemySpec['poison']>,
+  poison: Pick<DeathPoisonSpec, 'radius' | 'durationMs' | 'tickMs' | 'damage'>,
   srcName: string,
 ): void {
   const gfx = scene.add.graphics().setDepth(2)
