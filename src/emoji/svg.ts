@@ -63,7 +63,7 @@ export const OUTLINE = {
   colors: {
     player: '#000000',
     enemy: '#8e24aa',
-    enemyShot: '#d32f2f',
+    enemyProjectile: '#d32f2f',
     elite: '#ffb300',
   },
 } as const

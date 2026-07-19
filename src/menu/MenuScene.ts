@@ -326,7 +326,7 @@ export class MenuScene extends Phaser.Scene {
       repeat: -1,
       repeatDelay: 260,
     })
-    const shot = emojiImage(this, cx + 42, cy + 22, '🔴', 30, 'enemyShot')
+    const shot = emojiImage(this, cx + 42, cy + 22, '🔴', 30, 'enemyProjectile')
     this.tweens.add({
       targets: shot,
       x: cx - 34,

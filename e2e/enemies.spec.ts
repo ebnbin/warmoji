@@ -70,8 +70,8 @@ test('状态机行为：野猪蓄力→突刺→冷却；毒蛇放冷枪且拉�
   // 毒蛇投放在逃跑圈内（3 格 < fleeRange 5 格）：应放出敌弹，且与队伍拉开距离
   const shotCount = async (): Promise<number> =>
     page.evaluate(() => {
-      const game = window.__game as { scene: { keys: Record<string, { enemyShots: { getChildren(): { active: boolean }[] } }> } }
-      return game.scene.keys['arena']!.enemyShots.getChildren().filter((s) => s.active).length
+      const game = window.__game as { scene: { keys: Record<string, { enemyProjectiles: { getChildren(): { active: boolean }[] } }> } }
+      return game.scene.keys['arena']!.enemyProjectiles.getChildren().filter((s) => s.active).length
     })
   const shotsBefore = await shotCount()
   const snakeDist = async (): Promise<number> =>
@@ -105,8 +105,8 @@ test('状态机行为：野猪蓄力→突刺→冷却；毒蛇放冷枪且拉�
   // 蛇要么已被队伍击杀（-1），要么在逃：距离应显著增大；同时冷枪应已出弹
   await page.waitForFunction(
     (before) => {
-      const game = window.__game as { scene: { keys: Record<string, { enemyShots: { getChildren(): { active: boolean }[] } }> } }
-      const shots = game.scene.keys['arena']!.enemyShots.getChildren().filter((s) => s.active).length
+      const game = window.__game as { scene: { keys: Record<string, { enemyProjectiles: { getChildren(): { active: boolean }[] } }> } }
+      const shots = game.scene.keys['arena']!.enemyProjectiles.getChildren().filter((s) => s.active).length
       return shots > before || (window.__warmoji?.elapsed ?? 0) > 25
     },
     shotsBefore,
@@ -202,7 +202,7 @@ test('持械敌人：敌方 ctx 驱动能力朝队员开火，敌弹入组并命
   await startRun(page)
   await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 1)
 
-  // 首波自然刷怪（僵尸/幽灵）无任何射手：enemyShots 增长只能来自持械投放
+  // 首波自然刷怪（僵尸/幽灵）无任何射手：enemyProjectiles 增长只能来自持械投放
   const hpBefore = await page.evaluate(() => {
     const game = window.__game as { scene: { keys: Record<string, { members: { alive: boolean; hp: number }[] }> } }
     return game.scene.keys['arena']!.members.filter((m) => m.alive).reduce((s, m) => s + m.hp, 0)
@@ -212,8 +212,8 @@ test('持械敌人：敌方 ctx 驱动能力朝队员开火，敌弹入组并命
   await page.waitForFunction(
     () => {
       try {
-        const game = window.__game as { scene: { keys: Record<string, { enemyShots: { getLength(): number } }> } }
-        return game.scene.keys['arena']!.enemyShots.getLength() > 0
+        const game = window.__game as { scene: { keys: Record<string, { enemyProjectiles: { getLength(): number } }> } }
+        return game.scene.keys['arena']!.enemyProjectiles.getLength() > 0
       } catch {
         return false
       }
@@ -242,8 +242,8 @@ test('持械敌人：敌方 ctx 驱动能力朝队员开火，敌弹入组并命
   await page.waitForFunction(
     () => {
       try {
-        const game = window.__game as { scene: { keys: Record<string, { enemyShots: { getLength(): number } }> } }
-        return game.scene.keys['arena']!.enemyShots.getLength() === 0
+        const game = window.__game as { scene: { keys: Record<string, { enemyProjectiles: { getLength(): number } }> } }
+        return game.scene.keys['arena']!.enemyProjectiles.getLength() === 0
       } catch {
         return false
       }
@@ -255,8 +255,8 @@ test('持械敌人：敌方 ctx 驱动能力朝队员开火，敌弹入组并命
   await page.waitForFunction(
     () => {
       try {
-        const game = window.__game as { scene: { keys: Record<string, { enemyShots: { getLength(): number } }> } }
-        return game.scene.keys['arena']!.enemyShots.getLength() > 0
+        const game = window.__game as { scene: { keys: Record<string, { enemyProjectiles: { getLength(): number } }> } }
+        return game.scene.keys['arena']!.enemyProjectiles.getLength() > 0
       } catch {
         return false
       }

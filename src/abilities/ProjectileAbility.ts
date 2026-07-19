@@ -73,12 +73,12 @@ export class ProjectileAbility implements AbilityRuntime {
         const angle = full
           ? base + (i * volley.spreadRad) / volley.count
           : this.aim + volley.spreadRad * (i / (volley.count - 1) - 0.5)
-        this.ctx.spawnBullet(from.x, from.y, angle, this.spec, damage)
+        this.ctx.spawnProjectile(from.x, from.y, angle, this.spec, damage)
       }
       if (this.spec.fireSfx) this.ctx.sfx(this.spec.fireSfx)
       return
     }
-    this.ctx.spawnBullet(from.x, from.y, this.aim, this.spec, damage)
+    this.ctx.spawnProjectile(from.x, from.y, this.aim, this.spec, damage)
     if (this.spec.fireSfx) this.ctx.sfx(this.spec.fireSfx)
   }
 

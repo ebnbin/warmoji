@@ -3,11 +3,60 @@ import { emojiImage } from '../emoji/textures'
 import { circleHitIndices, sweepFirstHitIndex } from '../abilities/spec'
 import type { ProjectileSpec } from '../abilities/spec'
 import { circleBody } from './arcade'
-import { attachBullet, bulletOf } from './bullets'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
 
-// 玩家侧弹道：生成、线段扫掠命中（低帧率防穿模）、溅射、回收。
-// 能力字段（pierce/splash/hex）经 data 随弹携带，扫掠时消费。
+// 弹药的类型化状态（敌我同构，faction 区分）：原精灵数据袋收拢为结构体，
+// 经 image.getData('projectile') 单键反查（与敌人的 'enemy' 同一模式）。
+// 玩家弹走线段扫掠命中（pierce/splash/hex 能力字段随弹携带）；
+// 敌弹走物理 overlap + 寿命回收。
+
+export interface Projectile {
+  readonly image: ImageObj
+  readonly faction: 'team' | 'enemy'
+  damage: number
+  radius: number
+  /** 上一帧位置（玩家弹扫掠起点；视口重映射时同步改写） */
+  prevX: number
+  prevY: number
+  /** 寿命回收时刻（0 = 不按寿命回收） */
+  dieAt: number
+  /** 玩家弹：伤害归属槽位 / 击退 / 自旋 / 能力字段 */
+  srcSlot: number
+  kb: number
+  spin: number
+  pierce: number
+  splash?: { radius: number; ratio: number }
+  hex?: { durationMs: number; morphEmoji: string; vulnMul?: number }
+  hitRefs?: Set<ImageObj>
+  /** 敌弹：伤害来源名（战报归属） */
+  srcName?: string
+}
+
+export function attachProjectile(image: ImageObj, faction: Projectile['faction'], init: Partial<Projectile>): Projectile {
+  const b: Projectile = {
+    image,
+    faction,
+    damage: 0,
+    radius: 0,
+    prevX: image.x,
+    prevY: image.y,
+    dieAt: 0,
+    srcSlot: -1,
+    kb: 0,
+    spin: 0,
+    pierce: 0,
+    ...init,
+  }
+  image.setData('projectile', b)
+  return b
+}
+
+export function projectileOf(image: ImageObj): Projectile {
+  return image.getData('projectile') as Projectile
+}
+
+// 玩家侧弹道机器：生成、线段扫掠命中（低帧率防穿模）、溅射、回收；
+// 敌方弹道机器在 battle/hazards.ts（物理 overlap + 寿命回收）。
 
 export function spawnProjectile(
   scene: BaseArenaScene,
@@ -28,7 +77,7 @@ export function spawnProjectile(
     Math.sin(angle) * spec.projectile.speed,
   )
   playSfx('shoot')
-  attachBullet(p, 'team', {
+  attachProjectile(p, 'team', {
     srcSlot,
     damage,
     radius: spec.projectile.radius,
@@ -52,7 +101,7 @@ export function spawnProjectile(
 export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
   for (const p of scene.projectiles.getChildren() as ImageObj[]) {
     if (!p.active) continue
-    const b = bulletOf(p)
+    const b = projectileOf(p)
     const prev = { x: b.prevX, y: b.prevY }
     // 贯穿弹跳过已命中的敌人（否则下一帧会再撞同一个）
     const hitRefs = b.hitRefs

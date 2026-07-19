@@ -4,7 +4,7 @@ import type { AbilitySpec } from '../abilities/spec'
 // 多样性用数据组合表达：加一种敌人 = 组合现有模块的一行数据；
 // 运行时按 locomotion.kind 分发转向（battle/steer.ts）、能力经敌方 ctx
 // 逐帧驱动（battle/enemyAbilities.ts）、死亡时跑效果模块（killEnemy）。
-export interface EnemyBulletSpec {
+export interface EnemyProjectileSpec {
   readonly emoji: string
   readonly size: number
   readonly radius: number

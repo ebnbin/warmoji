@@ -1,39 +1,39 @@
 import { emojiImage } from '../emoji/textures'
-import type { DeathPoisonSpec, EnemyBulletSpec } from '../enemies/registry'
+import type { DeathPoisonSpec, EnemyProjectileSpec } from '../enemies/registry'
 import { circleBody } from './arcade'
-import { attachBullet, bulletOf } from './bullets'
+import { attachProjectile, projectileOf } from './projectiles'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
 
 // 敌方危害物：敌弹、毒液池、灼烧地面——三对 spawn/update 自治循环。
-// 敌弹按寿命与世界钩子（cullEnemyShot）回收；毒液池按 tick 烧队员；
+// 敌弹按寿命与世界钩子（cullEnemyProjectile）回收；毒液池按 tick 烧队员；
 // 灼烧地面（余烬秘火）按 tick 烧敌人，伤害归属出招角色（srcSlot）。
 
-export function spawnEnemyShot(
+export function spawnEnemyProjectile(
   scene: BaseArenaScene,
   x: number,
   y: number,
   angle: number,
-  bullet: EnemyBulletSpec,
+  projectile: EnemyProjectileSpec,
   srcName: string,
   dmgMul = 1,
 ): void {
-  const shot = emojiImage(scene, x, y, bullet.emoji, bullet.size, 'enemyShot').setDepth(6)
+  const shot = emojiImage(scene, x, y, projectile.emoji, projectile.size, 'enemyProjectile').setDepth(6)
   scene.physics.add.existing(shot)
-  circleBody(shot, bullet.radius)
-  ;(shot.body as ArcadeBody).setVelocity(Math.cos(angle) * bullet.speed, Math.sin(angle) * bullet.speed)
-  attachBullet(shot, 'enemy', {
-    damage: Math.round(bullet.damage * dmgMul),
+  circleBody(shot, projectile.radius)
+  ;(shot.body as ArcadeBody).setVelocity(Math.cos(angle) * projectile.speed, Math.sin(angle) * projectile.speed)
+  attachProjectile(shot, 'enemy', {
+    damage: Math.round(projectile.damage * dmgMul),
     srcName,
-    radius: bullet.radius,
-    dieAt: scene.elapsedMs + bullet.lifeMs,
+    radius: projectile.radius,
+    dieAt: scene.elapsedMs + projectile.lifeMs,
   })
-  scene.enemyShots.add(shot)
+  scene.enemyProjectiles.add(shot)
 }
 
-export function updateEnemyShots(scene: BaseArenaScene): void {
-  for (const s of scene.enemyShots.getChildren() as ImageObj[]) {
+export function updateEnemyProjectiles(scene: BaseArenaScene): void {
+  for (const s of scene.enemyProjectiles.getChildren() as ImageObj[]) {
     if (!s.active) continue
-    if (scene.elapsedMs >= bulletOf(s).dieAt || scene.cullEnemyShot(s)) {
+    if (scene.elapsedMs >= projectileOf(s).dieAt || scene.cullEnemyProjectile(s)) {
       s.destroy()
     }
   }

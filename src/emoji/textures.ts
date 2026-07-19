@@ -65,7 +65,7 @@ export function emojiCacheStats(scene: Phaser.Scene): { textures: number; pinned
 const KIND_SUFFIX: Record<OutlineKind, string> = {
   player: '-ol',
   enemy: '-ole',
-  enemyShot: '-olr',
+  enemyProjectile: '-olr',
   elite: '-olg',
 }
 

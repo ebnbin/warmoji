@@ -41,8 +41,8 @@ export interface AbilityContext {
     srcX?: number,
     srcY?: number,
   ): void
-  /** 发弹：阵营由 ctx 实现注入（Bullet 结构本身敌我同构） */
-  spawnBullet(x: number, y: number, angle: number, spec: ProjectileSpec, damage: number): void
+  /** 发弹：阵营由 ctx 实现注入（Projectile 结构本身敌我同构） */
+  spawnProjectile(x: number, y: number, angle: number, spec: ProjectileSpec, damage: number): void
   /** 我方锚点（光环类能力的圆心；队伍 ctx = 队伍中心） */
   anchor(): { x: number; y: number }
   /** 登记一个仅本帧生效的减速区域（光环每帧重新登记），叠乘敌对方移速 */

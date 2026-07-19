@@ -15,7 +15,7 @@ import { emojiImage } from '../emoji/textures'
 import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
 import { enemyOf } from '../battle/enemies'
-import { bulletOf } from '../battle/bullets'
+import { projectileOf } from '../battle/projectiles'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 
 // 河流竞技场（kind='river'）：单屏世界——相机静止，世界 = 逻辑视口 × 1.2
@@ -211,13 +211,13 @@ export class RiverArenaScene extends BaseArenaScene {
       a.kvx = kv.x
       a.kvy = kv.y
     }
-    for (const s of this.enemyShots.getChildren() as ImageObj[]) {
+    for (const s of this.enemyProjectiles.getChildren() as ImageObj[]) {
       if (s.active) remapBody(s)
     }
     for (const p of this.projectiles.getChildren() as ImageObj[]) {
       if (!p.active) continue
       remapBody(p)
-      const b = bulletOf(p)
+      const b = projectileOf(p)
       b.prevX = p.x
       b.prevY = p.y
     }

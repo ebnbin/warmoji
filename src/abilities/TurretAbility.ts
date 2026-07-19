@@ -70,10 +70,10 @@ export class TurretAbility implements AbilityRuntime {
       if (burst && burst.count > 1) {
         for (let i = 0; i < burst.count; i++) {
           const a = aim + burst.spreadRad * (i / (burst.count - 1) - 0.5)
-          this.ctx.spawnBullet(t.img.x, t.img.y, a, this.boltSpec, damage)
+          this.ctx.spawnProjectile(t.img.x, t.img.y, a, this.boltSpec, damage)
         }
       } else {
-        this.ctx.spawnBullet(t.img.x, t.img.y, aim, this.boltSpec, damage)
+        this.ctx.spawnProjectile(t.img.x, t.img.y, aim, this.boltSpec, damage)
       }
       this.ctx.sfx('shoot')
     }

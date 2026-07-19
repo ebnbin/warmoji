@@ -2,7 +2,7 @@ import { playSfx } from '../audio/sfx'
 import { clipFramesLive } from '../emoji/animTextures'
 import { createAbility } from '../abilities/create'
 import type { AbilityContext, AbilityOwner } from '../abilities/types'
-import { spawnEnemyShot, spawnPoisonPool } from './hazards'
+import { spawnEnemyProjectile, spawnPoisonPool } from './hazards'
 import { enemyOf } from './enemies'
 import { memberOf } from './members'
 import type { Enemy } from './enemies'
@@ -50,9 +50,9 @@ export function armEnemy(scene: BaseArenaScene, a: Enemy, fireDelayMs?: number):
       m.lastHitMs = scene.elapsedMs
       scene.hurtMember(m, damage, 0xff7777, a.spec.name)
     },
-    spawnBullet: (x, y, angle, pSpec, damage) => {
+    spawnProjectile: (x, y, angle, pSpec, damage) => {
       const p = pSpec.projectile
-      spawnEnemyShot(
+      spawnEnemyProjectile(
         scene,
         x,
         y,

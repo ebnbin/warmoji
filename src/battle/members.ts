@@ -4,7 +4,7 @@ import type { CharacterEffects } from '../items/registry'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from '../abilities/types'
 import type { ImageObj } from './BaseArenaScene'
 
-// 队员的类型化运行时状态：与 battle/enemies.ts（敌人）、battle/bullets.ts
+// 队员的类型化运行时状态：与 battle/enemies.ts（敌人）、battle/projectiles.ts
 //（弹药）同一模式，经 image.getData('member') 单键反查。结构体在场景
 // create 时装配（血条/阵亡文本等 UI 对象随身建），此处收拢类型与反查。
 

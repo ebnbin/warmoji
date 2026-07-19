@@ -16,7 +16,7 @@ const RASTER = 256
 const OUTLINE_SUFFIX: Record<OutlineKind, string> = {
   player: '-ol',
   enemy: '-ole',
-  enemyShot: '-olr',
+  enemyProjectile: '-olr',
   elite: '-olg',
 }
 

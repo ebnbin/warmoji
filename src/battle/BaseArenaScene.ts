@@ -6,10 +6,10 @@ import type { Enemy } from './enemies'
 import { armEnemy } from './enemyAbilities'
 import { attachMember, memberOf } from './members'
 import type { Member } from './members'
-import { bulletOf } from './bullets'
+import { projectileOf } from './projectiles'
 import { circleBody } from './arcade'
 import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from './pickups'
-import { spawnBurnZone, updateBurnZones, updateEnemyShots, updatePoisonPools } from './hazards'
+import { spawnBurnZone, updateBurnZones, updateEnemyProjectiles, updatePoisonPools } from './hazards'
 import { spawnProjectile, sweepProjectiles } from './projectiles'
 import { STEERERS } from './steer'
 import { runDeathEffects } from './deathEffects'
@@ -126,7 +126,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   protected centerObj!: Phaser.GameObjects.Zone
   enemies!: Phaser.GameObjects.Group
   projectiles!: Phaser.GameObjects.Group
-  enemyShots!: Phaser.GameObjects.Group
+  enemyProjectiles!: Phaser.GameObjects.Group
   coins!: Phaser.GameObjects.Group
   /** 毒液池（蘑菇死亡遗留），波末随场景销毁 */
   poisonPools: { x: number; y: number; r2: number; until: number; tickMs: number; damage: number; srcName: string; gfx: Phaser.GameObjects.Graphics }[] = []
@@ -153,7 +153,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     ownerOutline: 'player',
     targets: () => this.frameTargets,
     damageTarget: (e, d, kb, sx, sy) => this.applyDamage(e as ImageObj, d, kb, sx, sy),
-    spawnBullet: (x, y, angle, spec, damage) => spawnProjectile(this, x, y, angle, spec, damage),
+    spawnProjectile: (x, y, angle, spec, damage) => spawnProjectile(this, x, y, angle, spec, damage),
     anchor: () => this.center,
     targetHp: (ref) => enemyOf(ref as ImageObj).hp,
     targetMaxHp: (ref) => enemyOf(ref as ImageObj).maxHp,
@@ -300,7 +300,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.physics.add.overlap(this.memberGroup, this.enemies, (m, e) => {
       this.onMemberTouched(memberOf(m as unknown as ImageObj), e as unknown as ImageObj)
     })
-    this.physics.add.overlap(this.memberGroup, this.enemyShots, (m, s) => {
+    this.physics.add.overlap(this.memberGroup, this.enemyProjectiles, (m, s) => {
       this.onMemberShot(memberOf(m as unknown as ImageObj), s as unknown as ImageObj)
     })
     this.physics.add.overlap(this.memberGroup, this.coins, (_m, c) =>
@@ -355,7 +355,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     void _body
   }
   /** 敌弹的额外回收条件（有界图出地图即灭；寿命回收在基座） */
-  cullEnemyShot(_s: ImageObj): boolean {
+  cullEnemyProjectile(_s: ImageObj): boolean {
     void _s
     return false
   }
@@ -533,7 +533,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
     this.enemies = this.add.group()
     this.projectiles = this.add.group()
-    this.enemyShots = this.add.group()
+    this.enemyProjectiles = this.add.group()
     this.coins = this.add.group()
     // 压测按后期混编出怪；正常局按当前波次配比
     this.enemyMix = enemyMixAt(this.stress ? 10 : this.run.wave)
@@ -629,7 +629,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.touchStep()
     this.spawn(delta)
     this.steerEnemies(delta)
-    updateEnemyShots(this)
+    updateEnemyProjectiles(this)
     updatePoisonPools(this)
     updateBurnZones(this)
     magnetCoins(this)
@@ -812,7 +812,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           crit,
         )
       },
-      spawnBullet: (x, y, angle, pSpec, damage) =>
+      spawnProjectile: (x, y, angle, pSpec, damage) =>
         spawnProjectile(this, x, y, angle, pSpec, damage, slot),
       spawnBurnZone: (x, y, radius, dps, durationMs) =>
         spawnBurnZone(this, x, y, radius, dps, durationMs, slot),
@@ -1089,7 +1089,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   protected onMemberShot(m: Member, shot: ImageObj): void {
     if (this.over || !shot.active) return
     if (!m.alive) return
-    const { damage, srcName } = bulletOf(shot)
+    const { damage, srcName } = projectileOf(shot)
     shot.destroy()
     // 子弹命中吃无敌帧：帧内先中弹则后续接触伤害被同一层保护挡下
     if (this.elapsedMs - m.lastHitMs < m.iframesMs) return
