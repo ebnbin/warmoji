@@ -68,7 +68,7 @@ import { playSfx } from '../audio/sfx'
 import { UI_FONT } from '../lib/fonts'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../screen/apply'
 import { createWeapon } from '../weapons/create'
-import type { EnemyTarget, WeaponContext, WeaponOwner } from '../weapons/types'
+import type { TargetInfo, WeaponContext, WeaponOwner } from '../weapons/types'
 import type { UIScene } from './UIScene'
 
 // 竞技场基座：四张地图（有界/无界/河流/虚空）共享的战斗引擎——队伍与
@@ -132,7 +132,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   /** 毒液池（蘑菇死亡遗留），波末随场景销毁 */
   poisonPools: { x: number; y: number; r2: number; until: number; tickMs: number; damage: number; srcName: string; gfx: Phaser.GameObjects.Graphics }[] = []
   private enemyMix: EnemyMixEntry[] = []
-  frameTargets: EnemyTarget[] = []
+  frameTargets: TargetInfo[] = []
   private frameSlowZones: { x: number; y: number; r2: number; factor: number }[] = []
   /** 仅本帧生效的金币吸取点（磁力回旋镖沿途登记） */
   frameAttractors: { x: number; y: number; r2: number }[] = []
@@ -149,15 +149,16 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   }[] = []
   private weaponCtx: WeaponContext = {
     scene: this,
-    enemyTargets: () => this.frameTargets,
-    damageEnemy: (e, d, kb, sx, sy) => this.applyDamage(e as ImageObj, d, kb, sx, sy),
-    spawnProjectile: (x, y, angle, spec, damage) => spawnProjectile(this, x, y, angle, spec, damage),
-    teamCenter: () => this.center,
-    enemyHp: (ref) => enemyOf(ref as ImageObj).hp,
-    enemyMaxHp: (ref) => enemyOf(ref as ImageObj).maxHp,
+    ownerOutline: 'player',
+    targets: () => this.frameTargets,
+    damageTarget: (e, d, kb, sx, sy) => this.applyDamage(e as ImageObj, d, kb, sx, sy),
+    spawnBullet: (x, y, angle, spec, damage) => spawnProjectile(this, x, y, angle, spec, damage),
+    anchor: () => this.center,
+    targetHp: (ref) => enemyOf(ref as ImageObj).hp,
+    targetMaxHp: (ref) => enemyOf(ref as ImageObj).maxHp,
     applySlow: (x, y, radius, factor) =>
       this.frameSlowZones.push({ x, y, r2: radius * radius, factor }),
-    slowEnemy: (enemy, factor, durationMs) => {
+    slowTarget: (enemy, factor, durationMs) => {
       const a = enemyOf(enemy as ImageObj)
       a.abilitySlowMul = factor
       a.abilitySlowUntil = this.elapsedMs + durationMs
@@ -165,9 +166,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     spawnBurnZone: (x, y, radius, dps, durationMs) => spawnBurnZone(this, x, y, radius, dps, durationMs),
     attractCoins: (x, y, radius) => this.frameAttractors.push({ x, y, r2: radius * radius }),
     // 基座 ctx 无「本人」概念：无敌授予/本体动画由 memberCtx 按槽位覆写
-    grantMemberInvuln: () => {},
     playOwnerClip: () => {},
-    healAllies: (x, y, range, amount, all) => this.healAllies(x, y, range, amount, all),
+    heal: (x, y, range, amount, all) => this.healAllies(x, y, range, amount, all),
     cutReviveTimer: (x, y, range, ms) => this.cutReviveTimer(x, y, range, ms),
     damageMul: () => this.stats.damageMul,
     cooldownMul: () => this.stats.cooldownMul,
@@ -249,7 +249,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   /** 本帧攻击目标 + 活跃计数（无界/河流剔除休眠者；虚空附加镜像坐标） */
   protected buildFrameTargets(): void {
     let awake = 0
-    const targets: EnemyTarget[] = []
+    const targets: TargetInfo[] = []
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       awake++
@@ -385,7 +385,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   protected dormancyFrameTargets(activeHalf: number): void {
     let awake = 0
     let dormant = 0
-    const targets: EnemyTarget[] = []
+    const targets: TargetInfo[] = []
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       const a = enemyOf(e)
@@ -789,7 +789,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       cooldownMul: () => this.stats.cooldownMul * fx.cooldownMul,
       // 伤害/子弹带上来源槽位：结算页按角色统计输出与击杀。
       // 暴击/击退倍率在这里收口：所有武器伤害路径统一生效，无需逐武器改造
-      damageEnemy: (e, d, kb, sx, sy) => {
+      damageTarget: (e, d, kb, sx, sy) => {
         const crit = fx.critChance > 0 && this.rng.next() < fx.critChance
         this.applyDamage(
           e as ImageObj,
@@ -801,12 +801,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           crit,
         )
       },
-      spawnProjectile: (x, y, angle, pSpec, damage) =>
+      spawnBullet: (x, y, angle, pSpec, damage) =>
         spawnProjectile(this, x, y, angle, pSpec, damage, slot),
       spawnBurnZone: (x, y, radius, dps, durationMs) =>
         spawnBurnZone(this, x, y, radius, dps, durationMs, slot),
       // 刺客出手帧：把「上次受击时刻」推到未来，等效授予 ms 无敌
-      grantMemberInvuln: (ms) => {
+      grantOwnerInvuln: (ms) => {
         const mm = this.members[slot]
         if (mm) mm.lastHitMs = this.elapsedMs + ms - mm.iframesMs
       },

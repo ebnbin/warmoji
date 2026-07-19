@@ -22,7 +22,7 @@ export class ThrustWeapon implements WeaponRuntime {
     initialCooldownMs: number,
   ) {
     if (spec.held) {
-      this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, 'player').setDepth(13)
+      this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline).setDepth(13)
     }
     this.cooldown = initialCooldownMs
   }
@@ -49,7 +49,7 @@ export class ThrustWeapon implements WeaponRuntime {
     }
 
     if (this.cooldown > 0) return
-    const targets = this.ctx.enemyTargets()
+    const targets = this.ctx.targets()
     if (nearestAngle(owner, targets) === null) return
     this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
     this.strike(owner)
@@ -58,7 +58,7 @@ export class ThrustWeapon implements WeaponRuntime {
 
   /** 单段突刺：索敌 → 胶囊判定 → 终点震波（能力）→ 挥出动画 */
   private strike(owner: WeaponOwner): void {
-    const targets = this.ctx.enemyTargets()
+    const targets = this.ctx.targets()
     const aim = nearestAngle(owner, targets)
     if (aim === null) return
     this.aim = aim
@@ -72,7 +72,7 @@ export class ThrustWeapon implements WeaponRuntime {
       this.spec.hitRadius,
       targets,
     )) {
-      this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, owner.x, owner.y)
+      this.ctx.damageTarget(targets[i]!.ref, damage, this.spec.knockback, owner.x, owner.y)
     }
 
     const burst = this.spec.tipBurst
@@ -81,7 +81,7 @@ export class ThrustWeapon implements WeaponRuntime {
       const tipY = owner.y + Math.sin(this.aim) * this.spec.reach
       const burstDamage = Math.max(1, Math.round(damage * burst.ratio))
       for (const i of circleHitIndices({ x: tipX, y: tipY }, burst.radius, targets)) {
-        this.ctx.damageEnemy(targets[i]!.ref, burstDamage, burst.knockback, tipX, tipY)
+        this.ctx.damageTarget(targets[i]!.ref, burstDamage, burst.knockback, tipX, tipY)
       }
       const ring = this.ctx.scene.add
         .circle(tipX, tipY, burst.radius, burst.color, 0.3)

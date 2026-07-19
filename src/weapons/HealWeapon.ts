@@ -21,7 +21,7 @@ export class HealWeapon implements WeaponRuntime {
     if (this.cooldown > 0) return
 
     // 电击起搏优先：救倒下的比奶站着的更急
-    if (this.spec.defib && this.ctx.cutReviveTimer(owner.x, owner.y, this.spec.range, this.spec.defib.reviveCutMs)) {
+    if (this.spec.defib && this.ctx.cutReviveTimer?.(owner.x, owner.y, this.spec.range, this.spec.defib.reviveCutMs)) {
       this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
       this.pulse(owner, 0xfff176)
       this.ctx.sfx('zap')
@@ -30,8 +30,8 @@ export class HealWeapon implements WeaponRuntime {
 
     const amount = Math.max(1, Math.round(this.spec.amount * this.ctx.damageMul()))
     const healed = this.spec.aoe
-      ? this.ctx.healAllies(owner.x, owner.y, this.spec.range, Math.max(1, Math.round(amount * this.spec.aoe.ratio)), true)
-      : this.ctx.healAllies(owner.x, owner.y, this.spec.range, amount, false)
+      ? this.ctx.heal(owner.x, owner.y, this.spec.range, Math.max(1, Math.round(amount * this.spec.aoe.ratio)), true)
+      : this.ctx.heal(owner.x, owner.y, this.spec.range, amount, false)
     if (healed > 0) {
       this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
       this.pulse(owner, 0x81c784)

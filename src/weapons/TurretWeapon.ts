@@ -43,8 +43,8 @@ export class TurretWeapon implements WeaponRuntime {
       knockback: spec.knockback,
       projectile: spec.projectile,
     }
-    this.idleFrames = clipFramesLive(ctx.scene, spec.turret.emoji, 'idle', 'player')
-    this.attackFrames = clipFramesLive(ctx.scene, spec.turret.emoji, 'attack', 'player')
+    this.idleFrames = clipFramesLive(ctx.scene, spec.turret.emoji, 'idle', ctx.ownerOutline)
+    this.attackFrames = clipFramesLive(ctx.scene, spec.turret.emoji, 'attack', ctx.ownerOutline)
   }
 
   update(delta: number, owner: WeaponOwner): void {
@@ -58,7 +58,7 @@ export class TurretWeapon implements WeaponRuntime {
     for (const t of this.turrets) {
       t.fireCd -= delta
       if (t.fireCd > 0) continue
-      const targets = this.ctx.enemyTargets()
+      const targets = this.ctx.targets()
       const aim = nearestAngle({ x: t.img.x, y: t.img.y, setVisualOffset: () => {} }, targets, this.spec.range)
       if (aim === null) continue
       t.fireCd = interval
@@ -70,10 +70,10 @@ export class TurretWeapon implements WeaponRuntime {
       if (burst && burst.count > 1) {
         for (let i = 0; i < burst.count; i++) {
           const a = aim + burst.spreadRad * (i / (burst.count - 1) - 0.5)
-          this.ctx.spawnProjectile(t.img.x, t.img.y, a, this.boltSpec, damage)
+          this.ctx.spawnBullet(t.img.x, t.img.y, a, this.boltSpec, damage)
         }
       } else {
-        this.ctx.spawnProjectile(t.img.x, t.img.y, aim, this.boltSpec, damage)
+        this.ctx.spawnBullet(t.img.x, t.img.y, aim, this.boltSpec, damage)
       }
       this.ctx.sfx('shoot')
     }
@@ -82,7 +82,7 @@ export class TurretWeapon implements WeaponRuntime {
 
   /** 在建造者脚下架一座；超编拆最旧 */
   private place(owner: WeaponOwner): void {
-    const img = emojiImage(this.ctx.scene, owner.x, owner.y + 6, this.spec.turret.emoji, this.spec.turret.size, 'player').setDepth(5)
+    const img = emojiImage(this.ctx.scene, owner.x, owner.y + 6, this.spec.turret.emoji, this.spec.turret.size, this.ctx.ownerOutline).setDepth(5)
     const base = img.scaleX
     img.setScale(base * 0.2)
     this.ctx.scene.tweens.add({ targets: img, scale: base, duration: 220, ease: 'Back.easeOut' })

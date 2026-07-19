@@ -5,7 +5,7 @@ import { ANIM_SPEC } from '../emoji/studio'
 import { Animator } from '../emoji/animator'
 import { clipFramesLive } from '../emoji/animTextures'
 import { emojiImage } from '../emoji/textures'
-import type { EnemyTarget, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { TargetInfo, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
 interface Minion {
   img: Phaser.GameObjects.Image
@@ -29,9 +29,9 @@ export class SummonWeapon implements WeaponRuntime {
     private ctx: WeaponContext,
     initialCooldownMs: number,
   ) {
-    const frames = clipFramesLive(ctx.scene, spec.minion.emoji, 'idle', 'player')
+    const frames = clipFramesLive(ctx.scene, spec.minion.emoji, 'idle', ctx.ownerOutline)
     for (let i = 0; i < spec.count; i++) {
-      const img = emojiImage(ctx.scene, 0, 0, spec.minion.emoji, spec.minion.size, 'player').setDepth(12)
+      const img = emojiImage(ctx.scene, 0, 0, spec.minion.emoji, spec.minion.size, ctx.ownerOutline).setDepth(12)
       const anim = new Animator(img)
       anim.register('idle', frames)
       anim.setIdle('idle', ANIM_SPEC.durMs, (i * ANIM_SPEC.durMs) / spec.count)
@@ -44,10 +44,10 @@ export class SummonWeapon implements WeaponRuntime {
     }
   }
 
-  private nearestTarget(x: number, y: number): EnemyTarget | null {
-    let best: EnemyTarget | null = null
+  private nearestTarget(x: number, y: number): TargetInfo | null {
+    let best: TargetInfo | null = null
     let bestD = ACQUIRE.range * ACQUIRE.range
-    for (const t of this.ctx.enemyTargets()) {
+    for (const t of this.ctx.targets()) {
       const dx = t.x - x
       const dy = t.y - y
       const d = dx * dx + dy * dy
@@ -89,9 +89,9 @@ export class SummonWeapon implements WeaponRuntime {
         const ty = target.y - m.img.y
         if (tx * tx + ty * ty <= rr * rr) {
           const damage = Math.round(this.spec.damage * this.ctx.damageMul())
-          this.ctx.damageEnemy(target.ref, damage, this.spec.knockback, m.img.x, m.img.y)
+          this.ctx.damageTarget(target.ref, damage, this.spec.knockback, m.img.x, m.img.y)
           if (this.spec.sting) {
-            this.ctx.slowEnemy(target.ref, this.spec.sting.slowFactor, this.spec.sting.slowMs)
+            this.ctx.slowTarget(target.ref, this.spec.sting.slowFactor, this.spec.sting.slowMs)
           }
           this.ctx.sfx('hit')
           m.hitCd = this.spec.hitCooldownMs * this.ctx.cooldownMul()

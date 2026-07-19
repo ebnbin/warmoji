@@ -1,6 +1,6 @@
 import { circleHitIndices } from './spec'
 import type { ChainArcSpec } from './spec'
-import type { EnemyTarget, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { TargetInfo, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
 /** 连锁型：电弧命中最近敌人后在敌群间弹跳传导，每跳伤害衰减——
  * 敌人越密越强。能力：bounces 提升；burstEnd 末跳落点小范围爆裂 */
@@ -15,10 +15,10 @@ export class ChainArcWeapon implements WeaponRuntime {
     this.cooldown = initialCooldownMs
   }
 
-  private nearestWithin(x: number, y: number, range: number, exclude: Set<unknown>): EnemyTarget | null {
-    let best: EnemyTarget | null = null
+  private nearestWithin(x: number, y: number, range: number, exclude: Set<unknown>): TargetInfo | null {
+    let best: TargetInfo | null = null
     let bestD = range * range
-    for (const t of this.ctx.enemyTargets()) {
+    for (const t of this.ctx.targets()) {
       if (exclude.has(t.ref)) continue
       const dx = t.x - x
       const dy = t.y - y
@@ -43,12 +43,12 @@ export class ChainArcWeapon implements WeaponRuntime {
     // 逐跳传导：伤害递减，路径记折线
     const points: { x: number; y: number }[] = [{ x: owner.x, y: owner.y }]
     let damage = this.spec.damage * this.ctx.damageMul()
-    let cur: EnemyTarget | null = first
-    let last: EnemyTarget = first
+    let cur: TargetInfo | null = first
+    let last: TargetInfo = first
     for (let hop = 0; hop <= this.spec.bounces && cur; hop++) {
       visited.add(cur.ref)
       points.push({ x: cur.x, y: cur.y })
-      this.ctx.damageEnemy(cur.ref, Math.max(1, Math.round(damage)), this.spec.knockback, points[points.length - 2]!.x, points[points.length - 2]!.y)
+      this.ctx.damageTarget(cur.ref, Math.max(1, Math.round(damage)), this.spec.knockback, points[points.length - 2]!.x, points[points.length - 2]!.y)
       last = cur
       damage *= this.spec.decay
       cur = this.nearestWithin(cur.x, cur.y, this.spec.arcRange, visited)
@@ -56,12 +56,12 @@ export class ChainArcWeapon implements WeaponRuntime {
 
     const burst = this.spec.burstEnd
     if (burst) {
-      const targets = this.ctx.enemyTargets()
+      const targets = this.ctx.targets()
       const burstDamage = Math.max(1, Math.round(damage * burst.ratio))
       for (const i of circleHitIndices({ x: last.x, y: last.y }, burst.radius, targets)) {
         const t = targets[i]!
         if (visited.has(t.ref)) continue
-        this.ctx.damageEnemy(t.ref, burstDamage, this.spec.knockback * 0.6, last.x, last.y)
+        this.ctx.damageTarget(t.ref, burstDamage, this.spec.knockback * 0.6, last.x, last.y)
       }
       const ring = this.ctx.scene.add
         .circle(last.x, last.y, burst.radius, this.spec.color, 0.25)

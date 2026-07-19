@@ -7,7 +7,7 @@ import { remapPoint, remapVector } from '../screen/remap'
 import { fitAspectRect, ghostImages, torusDelta, torusDist2, wrapCoord } from './void'
 import { Rng } from '../lib/rng'
 import type { Point } from '../lib/vec'
-import type { EnemyTarget } from '../weapons/types'
+import type { TargetInfo } from '../weapons/types'
 import { emojiImage } from '../emoji/textures'
 import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
@@ -86,7 +86,7 @@ export class VoidArenaScene extends BaseArenaScene {
 
   /** 索敌目标：真身 + 三镜像（武器隔门瞄准的关键） */
   protected buildFrameTargets(): void {
-    const targets: EnemyTarget[] = []
+    const targets: TargetInfo[] = []
     let count = 0
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue

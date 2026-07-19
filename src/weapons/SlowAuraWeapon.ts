@@ -28,7 +28,7 @@ export class SlowAuraWeapon implements WeaponRuntime {
 
   update(delta: number): void {
     if (this.hidden) return
-    const c = this.ctx.teamCenter()
+    const c = this.ctx.anchor()
     this.ring.setPosition(c.x, c.y)
     this.ctx.applySlow(c.x, c.y, this.spec.radius, this.spec.slowFactor)
 
@@ -42,10 +42,10 @@ export class SlowAuraWeapon implements WeaponRuntime {
           1,
           Math.round(((this.spec.dps * SlowAuraWeapon.TICK_MS) / 1000) * this.ctx.damageMul()),
         )
-        for (const t of this.ctx.enemyTargets()) {
+        for (const t of this.ctx.targets()) {
           const dx = t.x - c.x
           const dy = t.y - c.y
-          if (dx * dx + dy * dy <= r2) this.ctx.damageEnemy(t.ref, damage)
+          if (dx * dx + dy * dy <= r2) this.ctx.damageTarget(t.ref, damage)
         }
       }
     }
@@ -55,10 +55,10 @@ export class SlowAuraWeapon implements WeaponRuntime {
       this.freezeIn -= delta
       if (this.freezeIn <= 0) {
         this.freezeIn += this.spec.freeze.intervalMs
-        for (const t of this.ctx.enemyTargets()) {
+        for (const t of this.ctx.targets()) {
           const dx = t.x - c.x
           const dy = t.y - c.y
-          if (dx * dx + dy * dy <= r2) this.ctx.slowEnemy(t.ref, 0, this.spec.freeze.durationMs)
+          if (dx * dx + dy * dy <= r2) this.ctx.slowTarget(t.ref, 0, this.spec.freeze.durationMs)
         }
         const pulse = this.ctx.scene.add
           .circle(c.x, c.y, this.spec.radius, 0xffffff, 0.18)

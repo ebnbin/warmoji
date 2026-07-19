@@ -2,7 +2,7 @@ import type Phaser from 'phaser'
 import { circleHitIndices } from './spec'
 import type { AssassinateSpec } from './spec'
 import { emojiImage } from '../emoji/textures'
-import type { EnemyTarget, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { TargetInfo, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
 /** 瞬袭型：冷却好时瞬移到索敌范围内血量最高的敌人背后重斩，短暂停留
  * （期间本体无敌）后闪回原位。位移走 visualOffset（与队伍布局叠加，物理体
@@ -21,21 +21,21 @@ export class AssassinateWeapon implements WeaponRuntime {
     initialCooldownMs: number,
   ) {
     if (spec.held) {
-      this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, 'player').setDepth(13)
+      this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline).setDepth(13)
     }
     this.cooldown = initialCooldownMs
   }
 
   /** 索敌：范围内血量最高者（精英/厚血怪优先挨刀） */
-  private pickTarget(owner: WeaponOwner): EnemyTarget | null {
+  private pickTarget(owner: WeaponOwner): TargetInfo | null {
     const r2 = this.spec.range * this.spec.range
-    let best: EnemyTarget | null = null
+    let best: TargetInfo | null = null
     let bestHp = -1
-    for (const t of this.ctx.enemyTargets()) {
+    for (const t of this.ctx.targets()) {
       const dx = t.x - owner.x
       const dy = t.y - owner.y
       if (dx * dx + dy * dy > r2) continue
-      const hp = this.ctx.enemyHp(t.ref)
+      const hp = this.ctx.targetHp(t.ref)
       if (hp > bestHp) {
         bestHp = hp
         best = t
@@ -81,7 +81,7 @@ export class AssassinateWeapon implements WeaponRuntime {
     this.offset = { x: landX - owner.x + this.offset.x, y: landY - owner.y + this.offset.y }
     owner.setVisualOffset(this.offset.x, this.offset.y)
     this.strikeLeft = this.spec.strikeMs
-    this.ctx.grantMemberInvuln(this.spec.strikeMs + 200)
+    this.ctx.grantOwnerInvuln?.(this.spec.strikeMs + 200)
     this.ctx.sfx('whoosh')
     this.flash(landX, landY)
 
@@ -89,19 +89,19 @@ export class AssassinateWeapon implements WeaponRuntime {
     let damage = Math.round(this.spec.damage * this.ctx.damageMul())
     const exec = this.spec.execute
     if (exec) {
-      const hp = this.ctx.enemyHp(target.ref)
-      const maxHp = this.ctx.enemyMaxHp(target.ref)
+      const hp = this.ctx.targetHp(target.ref)
+      const maxHp = this.ctx.targetMaxHp(target.ref)
       if (maxHp > 0 && hp / maxHp <= exec.hpRatio) damage = Math.round(damage * exec.mul)
     }
-    this.ctx.damageEnemy(target.ref, damage, this.spec.knockback, landX, landY)
+    this.ctx.damageTarget(target.ref, damage, this.spec.knockback, landX, landY)
     const cleave = this.spec.cleave
     if (cleave) {
-      const targets = this.ctx.enemyTargets()
+      const targets = this.ctx.targets()
       const splash = Math.max(1, Math.round(damage * cleave.ratio))
       for (const i of circleHitIndices({ x: target.x, y: target.y }, cleave.radius, targets)) {
         const t = targets[i]!
         if (t.ref === target.ref) continue
-        this.ctx.damageEnemy(t.ref, splash, this.spec.knockback * 0.6, target.x, target.y)
+        this.ctx.damageTarget(t.ref, splash, this.spec.knockback * 0.6, target.x, target.y)
       }
     }
     this.slash(target.x, target.y)

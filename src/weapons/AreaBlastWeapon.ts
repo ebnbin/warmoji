@@ -3,7 +3,7 @@ import { ACQUIRE } from './registry'
 import { circleHitIndices } from './spec'
 import type { AreaBlastSpec } from './spec'
 import { emojiImage } from '../emoji/textures'
-import type { EnemyTarget, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { TargetInfo, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
 /** 远程范围轰炸：在侦测范围内以最近敌人为爆心，对爆心圆形区域内所有敌人各一次伤害。
  * 能力：burn 爆心留灼烧地面；echo 延迟向随机敌人追加一次折损轰炸 */
@@ -30,7 +30,7 @@ export class AreaBlastWeapon implements WeaponRuntime {
     if (this.echoIn > 0) {
       this.echoIn -= delta
       if (this.echoIn <= 0) {
-        const targets = this.ctx.enemyTargets()
+        const targets = this.ctx.targets()
         const max2 = ACQUIRE.range * ACQUIRE.range
         const near = targets.filter((t) => {
           const dx = t.x - owner.x
@@ -45,7 +45,7 @@ export class AreaBlastWeapon implements WeaponRuntime {
     }
 
     if (this.cooldown > 0) return
-    const targets = this.ctx.enemyTargets()
+    const targets = this.ctx.targets()
     if (targets.length === 0) return
 
     // 侦测范围内离持有者最近的敌人为爆心
@@ -73,10 +73,10 @@ export class AreaBlastWeapon implements WeaponRuntime {
   }
 
   /** 一次完整爆炸：伤害 + 特效 + 灼烧地面（能力） */
-  private blastAt(x: number, y: number, damage: number, targets: readonly EnemyTarget[]): void {
+  private blastAt(x: number, y: number, damage: number, targets: readonly TargetInfo[]): void {
     this.ctx.sfx('boom')
     for (const i of circleHitIndices({ x, y }, this.spec.blastRadius, targets)) {
-      this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, x, y)
+      this.ctx.damageTarget(targets[i]!.ref, damage, this.spec.knockback, x, y)
     }
     if (this.spec.burn) {
       this.ctx.spawnBurnZone(x, y, this.spec.burn.radius, this.spec.burn.dps, this.spec.burn.durationMs)

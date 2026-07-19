@@ -19,7 +19,7 @@ export class SweepWeapon implements WeaponRuntime {
     private ctx: WeaponContext,
     initialCooldownMs: number,
   ) {
-    this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, 'player').setDepth(13)
+    this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline).setDepth(13)
     this.cooldown = initialCooldownMs
   }
 
@@ -31,7 +31,7 @@ export class SweepWeapon implements WeaponRuntime {
     this.image.setRotation(angle + this.spec.held.rotationOffsetRad)
 
     if (this.cooldown > 0) return
-    const targets = this.ctx.enemyTargets()
+    const targets = this.ctx.targets()
     const aim = nearestAngle(owner, targets)
     if (aim === null) return
     this.aim = aim
@@ -46,10 +46,10 @@ export class SweepWeapon implements WeaponRuntime {
       this.spec.radius,
       targets,
     )) {
-      this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, owner.x, owner.y)
+      this.ctx.damageTarget(targets[i]!.ref, damage, this.spec.knockback, owner.x, owner.y)
       // 震慑余波：被扫中的敌人限时减速
       if (this.spec.slowOnHit) {
-        this.ctx.slowEnemy(targets[i]!.ref, this.spec.slowOnHit.factor, this.spec.slowOnHit.durationMs)
+        this.ctx.slowTarget(targets[i]!.ref, this.spec.slowOnHit.factor, this.spec.slowOnHit.durationMs)
       }
     }
 

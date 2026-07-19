@@ -34,7 +34,7 @@ export class BoomerangWeapon implements WeaponRuntime {
     initialCooldownMs: number,
   ) {
     const makeFlyer = (visible: boolean): Flyer => ({
-      image: emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, 'player')
+      image: emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline)
         .setDepth(13)
         .setVisible(visible),
       phase: 'idle',
@@ -65,7 +65,7 @@ export class BoomerangWeapon implements WeaponRuntime {
       main.image.setRotation(this.aim + this.spec.held.rotationOffsetRad)
 
       if (this.cooldown > 0) return
-      const aim = nearestAngle(owner, this.ctx.enemyTargets())
+      const aim = nearestAngle(owner, this.ctx.targets())
       if (aim === null) return
       this.aim = aim
       this.launch(owner)
@@ -110,16 +110,16 @@ export class BoomerangWeapon implements WeaponRuntime {
     }
 
     if (this.spec.coinMagnetRadius) {
-      this.ctx.attractCoins(f.image.x, f.image.y, this.spec.coinMagnetRadius)
+      this.ctx.attractCoins?.(f.image.x, f.image.y, this.spec.coinMagnetRadius)
     }
-    for (const t of this.ctx.enemyTargets()) {
+    for (const t of this.ctx.targets()) {
       if (f.hitSet.has(t.ref)) continue
       const dx = t.x - f.image.x
       const dy = t.y - f.image.y
       const rr = this.spec.hitRadius + t.radius
       if (dx * dx + dy * dy <= rr * rr) {
         f.hitSet.add(t.ref)
-        this.ctx.damageEnemy(t.ref, this.damage, this.spec.knockback, f.image.x, f.image.y)
+        this.ctx.damageTarget(t.ref, this.damage, this.spec.knockback, f.image.x, f.image.y)
       }
     }
   }

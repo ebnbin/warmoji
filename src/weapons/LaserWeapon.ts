@@ -20,7 +20,7 @@ export class LaserWeapon implements WeaponRuntime {
     private ctx: WeaponContext,
     initialCooldownMs: number,
   ) {
-    this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, 'player').setDepth(13)
+    this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline).setDepth(13)
     this.cooldown = initialCooldownMs
   }
 
@@ -46,7 +46,7 @@ export class LaserWeapon implements WeaponRuntime {
     }
 
     if (this.cooldown > 0 || this.hidden) return
-    const targets = this.ctx.enemyTargets()
+    const targets = this.ctx.targets()
     // 最近敌人在射程内才开火
     let best = Infinity
     let aim: number | null = null
@@ -82,9 +82,9 @@ export class LaserWeapon implements WeaponRuntime {
     this.ctx.sfx('zap')
     const damage = Math.max(1, Math.round(this.spec.damage * this.ctx.damageMul() * ratio))
     const origin = { x: owner.x, y: owner.y }
-    const targets = this.ctx.enemyTargets()
+    const targets = this.ctx.targets()
     for (const i of thrustHitIndices(origin, angle, this.spec.range, this.spec.beamRadius, targets)) {
-      this.ctx.damageEnemy(targets[i]!.ref, damage, this.spec.knockback, origin.x, origin.y)
+      this.ctx.damageTarget(targets[i]!.ref, damage, this.spec.knockback, origin.x, origin.y)
     }
     this.beamEffect(origin.x, origin.y, angle)
   }

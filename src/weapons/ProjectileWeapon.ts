@@ -18,7 +18,7 @@ export class ProjectileWeapon implements WeaponRuntime {
     initialCooldownMs: number,
   ) {
     if (spec.held) {
-      this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, 'player').setDepth(13)
+      this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline).setDepth(13)
     }
     this.cooldown = initialCooldownMs
   }
@@ -45,7 +45,7 @@ export class ProjectileWeapon implements WeaponRuntime {
     }
 
     if (this.cooldown > 0) return
-    const targets = this.ctx.enemyTargets()
+    const targets = this.ctx.targets()
     const aim = nearestAngle(owner, targets)
     if (aim === null) return
     this.aim = aim
@@ -61,11 +61,11 @@ export class ProjectileWeapon implements WeaponRuntime {
     if (volley && volley.count > 1) {
       for (let i = 0; i < volley.count; i++) {
         const angle = this.aim + volley.spreadRad * (i / (volley.count - 1) - 0.5)
-        this.ctx.spawnProjectile(from.x, from.y, angle, this.spec, damage)
+        this.ctx.spawnBullet(from.x, from.y, angle, this.spec, damage)
       }
       return
     }
-    this.ctx.spawnProjectile(from.x, from.y, this.aim, this.spec, damage)
+    this.ctx.spawnBullet(from.x, from.y, this.aim, this.spec, damage)
   }
 
   setVisible(on: boolean): void {
