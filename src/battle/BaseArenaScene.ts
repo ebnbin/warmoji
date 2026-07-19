@@ -7,6 +7,7 @@ import { circleBody } from './arcade'
 import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from './pickups'
 import { spawnBurnZone, spawnEnemyShot, spawnPoisonPool, updateBurnZones, updateEnemyShots, updatePoisonPools } from './hazards'
 import { spawnProjectile, sweepProjectiles } from './projectiles'
+import { STEERERS } from './steer'
 import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, TEAM } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import type { CharacterId, CharacterSpec } from '../characters/registry'
@@ -14,7 +15,6 @@ import { SKILL } from '../characters/skill'
 import { STRESS } from '../debug/dev'
 import { BOSS, ELITE, SPAWN, SURGE } from '../enemies/registry'
 import type { EnemySpec } from '../enemies/registry'
-import { COIN } from '../items/registry'
 import { UNIT } from '../lib/units'
 import { WAVE } from '../run/waves'
 import { KNOCKBACK } from '../weapons/registry'
@@ -369,7 +369,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     return p
   }
   /** 游荡方向（有界图撞边折返版在子类） */
-  protected wanderDir(a: Enemy): Point {
+  wanderDir(a: Enemy): Point {
     if (this.elapsedMs >= a.turnAt) {
       const ang = this.rng.next() * Math.PI * 2
       a.dirX = Math.cos(ang)
@@ -379,7 +379,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     return { x: a.dirX, y: a.dirY }
   }
   /** 逃跑方向修正（有界图贴边沿墙滑行） */
-  protected fleeDir(_a: Enemy, away: Point): Point {
+  fleeDir(_a: Enemy, away: Point): Point {
     return away
   }
   /** 普通敌人速度定稿后的世界后处理（河流：加水流 + 跨向钳岸） */
@@ -1733,106 +1733,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         continue
       }
 
-      switch (spec.behavior) {
-        case 'chase': {
-          const d = this.worldDelta(e, target.image)
-          const dir = norm(d.x, d.y)
-          body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
-          break
-        }
-        case 'wanderFire': {
-          const dir = this.wanderDir(a)
-          body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
-          if (now >= a.fireAt) {
-            a.fireAt = now + spec.fireIntervalMs
-            spawnEnemyShot(this, e.x, e.y, Math.atan2(dir.y, dir.x), spec.bullet, spec.name, a.dmgMul)
-          }
-          break
-        }
-        case 'dash': {
-          const d = this.worldDelta(e, target.image)
-          const dist2 = d.x * d.x + d.y * d.y
-          if (a.state === 'windup') {
-            body.setVelocity(0, 0)
-            // 蓄力颤动提示
-            e.setRotation(Math.sin(now / 28) * 0.14)
-            if (now >= a.windupUntil) {
-              a.state = 'dash'
-              a.dashUntil = now + (spec.dashDist / spec.dashSpeed) * 1000
-              e.setRotation(0)
-              e.clearTint()
-            }
-          } else if (a.state === 'dash') {
-            body.setVelocity(a.dirX * spec.dashSpeed * slow, a.dirY * spec.dashSpeed * slow)
-            if (now >= a.dashUntil) {
-              a.state = 'cool'
-              a.coolUntil = now + spec.cooldownMs
-            }
-          } else if (a.state !== 'cool' && dist2 <= spec.detectRange * spec.detectRange) {
-            // 进入探测圈：锁定当前方向蓄力（横向位移可躲）
-            const dir = norm(d.x, d.y)
-            a.state = 'windup'
-            a.windupUntil = now + spec.windupMs
-            a.dirX = dir.x
-            a.dirY = dir.y
-            e.setTint(0xffb74d)
-          } else {
-            if (a.state === 'cool' && now >= a.coolUntil) {
-              a.state = 'wander'
-            }
-            const dir = this.wanderDir(a)
-            body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
-          }
-          break
-        }
-        case 'fleeFire': {
-          const d = this.worldDelta(e, target.image)
-          const dist2 = d.x * d.x + d.y * d.y
-          if (dist2 <= spec.fleeRange * spec.fleeRange) {
-            // 逃离方向经世界钩子修正（有界图贴边沿墙滑行）
-            const away = norm(-d.x, -d.y)
-            const dir = this.fleeDir(a, away)
-            body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
-          } else {
-            const dir = this.wanderDir(a)
-            body.setVelocity(dir.x * spec.speed * 0.4 * slow, dir.y * spec.speed * 0.4 * slow)
-          }
-          if (now >= a.fireAt) {
-            a.fireAt = now + spec.fireIntervalMs
-            spawnEnemyShot(this, e.x, e.y, Math.atan2(d.y, d.x), spec.bullet, spec.name, a.dmgMul)
-          }
-          break
-        }
-        case 'coinThief': {
-          // 直奔最近的金币（宝箱吃不动，不偷）；没金币就慢速游荡
-          let coin: ImageObj | undefined
-          let bestD = Infinity
-          for (const c of this.coins.getChildren() as ImageObj[]) {
-            if (!c.active || c.getData('chest')) continue
-            const d = this.worldDelta(e, c)
-            const dist = d.x * d.x + d.y * d.y
-            if (dist < bestD) {
-              bestD = dist
-              coin = c
-            }
-          }
-          if (coin) {
-            const eatR = spec.radius + COIN.radius * UNIT
-            if (bestD <= eatR * eatR) {
-              coin.destroy()
-              a.eaten += 1
-            } else {
-              const d = this.worldDelta(e, coin)
-              const dir = norm(d.x, d.y)
-              body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
-            }
-          } else {
-            const dir = this.wanderDir(a)
-            body.setVelocity(dir.x * spec.speed * 0.3 * slow, dir.y * spec.speed * 0.3 * slow)
-          }
-          break
-        }
-      }
+      STEERERS[spec.behavior]({ scene: this, a, body, slow, now, target })
 
       // 击退：临时冲量叠加进行为速度并指数衰减（不打断行为状态机）
       this.decayKnockback(a, body, delta)

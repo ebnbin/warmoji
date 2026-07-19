@@ -120,7 +120,7 @@ export class ArenaScene extends BaseArenaScene {
   }
 
   /** 游荡撞边折返：接近地图边缘时翻转对应方向分量 */
-  protected wanderDir(a: Enemy): Point {
+  wanderDir(a: Enemy): Point {
     if (this.elapsedMs >= a.turnAt) {
       const ang = this.rng.next() * Math.PI * 2
       a.dirX = Math.cos(ang)
@@ -139,7 +139,7 @@ export class ArenaScene extends BaseArenaScene {
   }
 
   /** 逃离方向贴边时沿墙滑行，不顶出地图 */
-  protected fleeDir(a: Enemy, away: Point): Point {
+  fleeDir(a: Enemy, away: Point): Point {
     return fleeSteer(a.image.x, a.image.y, away.x, away.y, MAPW, MAPH, 1.5 * UNIT)
   }
 
