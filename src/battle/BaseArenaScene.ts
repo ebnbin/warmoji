@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { castCaptainSkill } from './skills'
+import { toPx } from './px'
 import { circleBody } from './arcade'
 import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from './pickups'
 import { spawnBurnZone, spawnEnemyShot, spawnPoisonPool, updateBurnZones, updateEnemyShots, updatePoisonPools } from './hazards'
@@ -157,6 +158,8 @@ export interface Member {
   /** 本帧探测范围内是否有敌人（orbit 倾向输入 + 游移门控） */
   hasThreat: boolean
 }
+
+const BOSS_PX = toPx(BOSS)
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
@@ -498,7 +501,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       remainMs: Math.max(0, waveDurationMs(this.run.wave) - this.elapsedMs),
       over: this.over,
       bossHp: this.boss?.active ? (this.boss.getData('hp') as number) : null,
-      bossMaxHp: BOSS.hp,
+      bossMaxHp: BOSS_PX.hp,
     }
   }
 
@@ -515,7 +518,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.stats = {
       damageMul: 1,
       cooldownMul: this.stress ? STRESS.cooldownMul : 1,
-      moveSpeed: TEAM.moveSpeed,
+      moveSpeed: TEAM.moveSpeed * UNIT,
       maxHp: this.stress ? STRESS.maxHp : MEMBER.maxHp,
     }
     this.elapsedMs = 0
@@ -556,7 +559,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.driverPost = -1
     // 队长道具：团队修正（移速/磁吸/掉落/全队伤害）
     this.teamFx = aggregateTeamEffects(this.run.captainItems)
-    this.stats.moveSpeed = TEAM.moveSpeed * this.teamFx.moveSpeedMul
+    this.stats.moveSpeed = TEAM.moveSpeed * UNIT * this.teamFx.moveSpeedMul
     this.waveBaseKills = this.run.kills
     this.waveBaseCoins = this.run.coins
     this.waveBaseLevel = this.run.xp.level
@@ -587,7 +590,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.time.delayedCall(600, () => {
         if (this.over) return
         this.events.emit('wave-warning', {
-          title: `☠️ ${BOSS.name}出现`,
+          title: `☠️ ${BOSS_PX.name}出现`,
           sub: this.finalWaveWarningSub(),
         })
         this.spawnBoss()
@@ -796,7 +799,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.center.x + off.x,
       this.center.y + off.y,
       emoji,
-      MEMBER.size,
+      MEMBER.size * UNIT,
       'player',
       // 重叠时靠下的角色遮挡靠上的，聚团更自然
     ).setDepth(10 + off.y / UNIT)
@@ -873,7 +876,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       // 错开初始冷却，避免全队同帧齐射。
       // 生效武器 = 原始配装 → 能力卡质变注入 → 空间参数按道具缩放
       weapons: applyAbilities(id, tiers, spec.weapons).map((w, i) =>
-        createWeapon(resolveWeaponSpec(w, fx), memberCtx, 300 + slot * 120 + i * 230),
+        createWeapon(toPx(resolveWeaponSpec(w, fx)), memberCtx, 300 + slot * 120 + i * 230),
       ),
       handle,
       visualOffset,
@@ -959,7 +962,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (this.members.length === 0) return
     const formation = this.activeFormation()
     const n = this.lineup.length
-    const range = ORBIT.detectRange
+    const range = ORBIT.detectRange * UNIT
     const rangeSq = range * range
     const wants = new Array<number>(this.members.length).fill(0)
     let rotatable = false
@@ -1094,7 +1097,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (Math.abs(ratio - m.shownHpRatio) < 0.005) return
     m.shownHpRatio = ratio
     const w = 0.8 * UNIT
-    const y = MEMBER.size * 0.62
+    const y = MEMBER.size * UNIT * 0.62
     const g = m.hpBar
     g.clear()
     g.fillStyle(0x000000, 0.45)
@@ -1388,7 +1391,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // Boss 波常规刷怪减压：焦点让给 Boss，避免「满速杂兵 + 精英 + Boss」三重压力叠满
     const wave = waveAt((this.run.combatMs + this.elapsedMs) / 1000)
     const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * this.members.length
-    const relief = !this.stress && isBossWave(this.run.wave) ? BOSS.spawnRelief : 1
+    const relief = !this.stress && isBossWave(this.run.wave) ? BOSS_PX.spawnRelief : 1
     this.spawnCooldownMs = this.stress
       ? STRESS.spawnIntervalMs
       : (wave.spawnIntervalMs * relief) / teamFactor
@@ -1401,7 +1404,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   }
 
   private spawnOne(hpMultiplier: number, forceElite = false): void {
-    const spec = pickEnemy(this.enemyMix, () => this.rng.next())
+    const spec = toPx(pickEnemy(this.enemyMix, () => this.rng.next()))
     // 精英怪：到波数后按概率强化出场（血量刷怪时算入，移速/伤害走敌身标记）
     const elite =
       !this.stress &&
@@ -1413,7 +1416,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 预告标记闪烁后敌人才落地；预告期间无碰撞。
     // pos 对象登记进注册表：固定相机图旋转重映射时原位改写，落地点自动跟随
     this.pendingSpawns++
-    const mark = emojiImage(this, pos.x, pos.y, SPAWN.markEmoji, SPAWN.markSize)
+    const mark = emojiImage(this, pos.x, pos.y, SPAWN.markEmoji, SPAWN.markSize * UNIT)
       .setDepth(4)
       .setAlpha(0)
     const entry = { pos, mark }
@@ -1437,7 +1440,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   private spawnBoss(): void {
     const pos = this.bossSpawnPoint()
     this.pendingSpawns++
-    const mark = emojiImage(this, pos.x, pos.y, SPAWN.markEmoji, SPAWN.markSize * 2).setDepth(4).setAlpha(0)
+    const mark = emojiImage(this, pos.x, pos.y, SPAWN.markEmoji, SPAWN.markSize * UNIT * 2).setDepth(4).setAlpha(0)
     const entry = { pos, mark }
     this.pendingMarks.push(entry)
     this.tweens.add({ targets: mark, alpha: 1, duration: SPAWN.telegraphMs / 4, yoyo: true, repeat: 3 })
@@ -1446,25 +1449,25 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.pendingSpawns--
       this.pendingMarks = this.pendingMarks.filter((x) => x !== entry)
       if (this.over) return
-      const enemy = emojiImage(this, pos.x, pos.y, BOSS.emoji, BOSS.size, 'elite').setDepth(7)
+      const enemy = emojiImage(this, pos.x, pos.y, BOSS_PX.emoji, BOSS_PX.size, 'elite').setDepth(7)
       this.physics.add.existing(enemy)
-      circleBody(enemy, BOSS.radius)
+      circleBody(enemy, BOSS_PX.radius)
       this.configureBossBody(enemy)
       // Boss 的运行时规格只消费公共字段（伤害/掉落/名字等），行为走专属状态机
       const bossSpec = {
         behavior: 'boss',
-        emoji: BOSS.emoji,
-        name: BOSS.name,
-        size: BOSS.size,
-        radius: BOSS.radius,
-        hp: BOSS.hp,
-        speed: BOSS.speed,
-        damage: BOSS.damage,
-        xp: BOSS.xp,
-        coins: BOSS.coins,
+        emoji: BOSS_PX.emoji,
+        name: BOSS_PX.name,
+        size: BOSS_PX.size,
+        radius: BOSS_PX.radius,
+        hp: BOSS_PX.hp,
+        speed: BOSS_PX.speed,
+        damage: BOSS_PX.damage,
+        xp: BOSS_PX.xp,
+        coins: BOSS_PX.coins,
       } as unknown as EnemySpec
-      enemy.setData('hp', BOSS.hp)
-      enemy.setData('maxHp', BOSS.hp)
+      enemy.setData('hp', BOSS_PX.hp)
+      enemy.setData('maxHp', BOSS_PX.hp)
       enemy.setData('spec', bossSpec)
       enemy.setData('boss', true)
       enemy.setData('kbImmune', true)
@@ -1474,7 +1477,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       enemy.setData('nextRingAt', this.elapsedMs + 1800)
       enemy.setData('nextDashAt', this.elapsedMs + 3600)
       const anim = new Animator(enemy)
-      anim.register('idle', clipFramesLive(this, BOSS.emoji, 'idle', 'elite'))
+      anim.register('idle', clipFramesLive(this, BOSS_PX.emoji, 'idle', 'elite'))
       anim.setIdle('idle', ANIM_SPEC.durMs)
       enemy.setData('anim', anim)
       this.enemies.add(enemy)
@@ -1490,10 +1493,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   private steerBoss(e: ImageObj, body: ArcadeBody, slow: number, now: number): void {
     const state = e.getData('state') as string
     if (now >= (e.getData('nextRingAt') as number)) {
-      e.setData('nextRingAt', now + BOSS.ring.intervalMs)
+      e.setData('nextRingAt', now + BOSS_PX.ring.intervalMs)
       const rot = this.rng.next() * Math.PI * 2
-      for (let i = 0; i < BOSS.ring.count; i++) {
-        spawnEnemyShot(this, e.x, e.y, rot + (i * 2 * Math.PI) / BOSS.ring.count, BOSS.ring.bullet, BOSS.name)
+      for (let i = 0; i < BOSS_PX.ring.count; i++) {
+        spawnEnemyShot(this, e.x, e.y, rot + (i * 2 * Math.PI) / BOSS_PX.ring.count, BOSS_PX.ring.bullet, BOSS_PX.name)
       }
       playSfx('boom')
     }
@@ -1504,7 +1507,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         const d = this.worldDelta(e, this.center)
         const dir = norm(d.x, d.y)
         e.setData('state', 'dash')
-        e.setData('dashUntil', now + BOSS.dash.durationMs)
+        e.setData('dashUntil', now + BOSS_PX.dash.durationMs)
         e.setData('dirX', dir.x)
         e.setData('dirY', dir.y)
         e.setRotation(0)
@@ -1516,22 +1519,22 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (state === 'dash') {
       const dx = e.getData('dirX') as number
       const dy = e.getData('dirY') as number
-      body.setVelocity(dx * BOSS.dash.speed * slow, dy * BOSS.dash.speed * slow)
+      body.setVelocity(dx * BOSS_PX.dash.speed * slow, dy * BOSS_PX.dash.speed * slow)
       if (now >= (e.getData('dashUntil') as number)) {
         e.setData('state', 'chase')
-        e.setData('nextDashAt', now + BOSS.dash.intervalMs)
+        e.setData('nextDashAt', now + BOSS_PX.dash.intervalMs)
       }
       return
     }
     if (now >= (e.getData('nextDashAt') as number)) {
       e.setData('state', 'windup')
-      e.setData('windupUntil', now + BOSS.dash.windupMs)
+      e.setData('windupUntil', now + BOSS_PX.dash.windupMs)
       e.setTint(0xffb74d)
       return
     }
     const d = this.worldDelta(e, this.center)
     const dir = norm(d.x, d.y)
-    body.setVelocity(dir.x * BOSS.speed * slow, dir.y * BOSS.speed * slow)
+    body.setVelocity(dir.x * BOSS_PX.speed * slow, dir.y * BOSS_PX.speed * slow)
   }
 
   /** 敌人潮：一段时间内密集落地一批敌人（含保底精英） */
@@ -1843,7 +1846,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
             }
           }
           if (coin) {
-            const eatR = spec.radius + COIN.radius
+            const eatR = spec.radius + COIN.radius * UNIT
             if (bestD <= eatR * eatR) {
               coin.destroy()
               e.setData('eaten', ((e.getData('eaten') as number) ?? 0) + 1)

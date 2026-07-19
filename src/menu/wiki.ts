@@ -3,7 +3,6 @@ import type { CharacterId } from '../characters/registry'
 import { ENEMY_SPECS } from '../enemies/registry'
 import type { EnemySpec } from '../enemies/registry'
 import { COIN } from '../items/registry'
-import { UNIT } from '../lib/units'
 import { WEAPONS } from '../weapons/registry'
 import { ITEMS, RARITIES } from '../items/registry'
 import type { ItemSpec } from '../items/registry'
@@ -27,8 +26,8 @@ export interface WikiGroup {
   readonly entries: readonly WikiEntry[]
 }
 
-function grid(px: number): string {
-  return `${+(px / UNIT).toFixed(1)}格`
+function grid(units: number): string {
+  return `${+units.toFixed(1)}格`
 }
 
 const ENEMY_BEHAVIOR_LABEL: Record<EnemySpec['behavior'], string> = {

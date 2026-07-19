@@ -106,7 +106,7 @@ export class RiverArenaScene extends BaseArenaScene {
 
   /** 休眠：同无限图机制（32 格，屏内永不触发） */
   protected buildFrameTargets(): void {
-    this.dormancyFrameTargets(INFINITE.activeHalf)
+    this.dormancyFrameTargets(INFINITE.activeHalf * UNIT)
   }
 
   /** 自主移动 + 水流漂移，然后钳入河道（挂机会被推到下游边并卡住） */
@@ -138,7 +138,7 @@ export class RiverArenaScene extends BaseArenaScene {
 
   /** 漂出下游边界外一段距离：河水冲走（玩家钳在屏内，永远追不回） */
   cullCoin(c: ImageObj): boolean {
-    return pastDownstream(c, this.viewW, this.viewH, RIVER.coinCullPad)
+    return pastDownstream(c, this.viewW, this.viewH, RIVER.coinCullPad * UNIT)
   }
 
   /** 不在磁吸范围：纯随波逐流 */
@@ -257,8 +257,8 @@ export class RiverArenaScene extends BaseArenaScene {
     cam.setZoom(viewport.renderScale / RIVER.viewScale)
     cam.centerOn(this.viewW / 2, this.viewH / 2)
     this.horizontal = isHorizontal(this.viewW, this.viewH)
-    this.river = riverRect(this.viewW, this.viewH, RIVER.width)
-    this.flow = flowVector(this.horizontal, RIVER.flow)
+    this.river = riverRect(this.viewW, this.viewH, RIVER.width * UNIT)
+    this.flow = flowVector(this.horizontal, RIVER.flow * UNIT)
   }
 
   // ── 水流与钳制 ──────────────────────────────────────────────
@@ -371,8 +371,8 @@ export class RiverArenaScene extends BaseArenaScene {
     this.ensureWaveTexture()
     const texKey = this.horizontal ? 'river-wave-h' : 'river-wave-v'
     for (const [alpha, speed] of [
-      [0.1, RIVER.waveSlow],
-      [0.16, RIVER.waveFast],
+      [0.1, RIVER.waveSlow * UNIT],
+      [0.16, RIVER.waveFast * UNIT],
     ] as const) {
       const tile = this.add
         .tileSprite(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h, texKey)
@@ -496,7 +496,7 @@ export class RiverArenaScene extends BaseArenaScene {
     const alongLen = this.horizontal ? this.viewW : this.viewH
     const margin = UNIT
     for (const d of this.drifts) {
-      d.uPx += RIVER.flow * d.speedMul * dt
+      d.uPx += RIVER.flow * UNIT * d.speedMul * dt
       if (d.uPx > alongLen + margin) {
         // 漂出下游 → 回上游重新进场（换个横位/速度）
         d.uPx = -margin

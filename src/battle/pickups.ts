@@ -17,6 +17,7 @@ import { CHEST, rollChestLoot } from '../run/chest'
 import { createWeapon } from '../weapons/create'
 import { KNOCKBACK } from '../weapons/registry'
 import { circleBody } from './arcade'
+import { toPx } from './px'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
 
 // 拾取经济：金币/宝箱的生成、磁吸、入账与开箱即时生效，外加击杀碎裂的
@@ -29,9 +30,9 @@ export function spawnCoins(scene: BaseArenaScene, x: number, y: number, count: n
     const jx = count > 1 ? (scene.rng.next() - 0.5) * 0.6 * UNIT : 0
     const jy = count > 1 ? (scene.rng.next() - 0.5) * 0.6 * UNIT : 0
     const pos = scene.constrainCoinPos({ x: x + jx, y: y + jy })
-    const coin = emojiImage(scene, pos.x, pos.y, COIN.emoji, COIN.size, 'player').setDepth(3)
+    const coin = emojiImage(scene, pos.x, pos.y, COIN.emoji, COIN.size * UNIT, 'player').setDepth(3)
     scene.physics.add.existing(coin)
-    circleBody(coin, COIN.radius)
+    circleBody(coin, COIN.radius * UNIT)
     scene.coins.add(coin)
     // 掉落弹出
     const base = coin.scaleX
@@ -43,9 +44,9 @@ export function spawnCoins(scene: BaseArenaScene, x: number, y: number, count: n
 export function magnetCoins(scene: BaseArenaScene): void {
   // 金币拾取是团队能力：以队伍中心为基点磁吸并入账（成员碰到也能捡，见 overlap）。
   // 磁力回旋镖（frameAttractors）优先：镖旁的金币直接入账，省去飞回中心的路程
-  const magnetRadius = COIN.magnetRadius * scene.teamFx.magnetMul
+  const magnetRadius = COIN.magnetRadius * UNIT * scene.teamFx.magnetMul
   const r2 = magnetRadius * magnetRadius
-  const collect2 = COIN.collectRadius * COIN.collectRadius
+  const collect2 = COIN.collectRadius * UNIT * (COIN.collectRadius * UNIT)
   const idle = scene.coinIdleVelocity()
   for (const c of scene.coins.getChildren() as ImageObj[]) {
     if (!c.active) continue
@@ -75,7 +76,7 @@ export function magnetCoins(scene: BaseArenaScene): void {
     const body = c.body as ArcadeBody
     if (dist < r2) {
       const dir = norm(d.x, d.y)
-      body.setVelocity(dir.x * COIN.magnetSpeed + idle.x, dir.y * COIN.magnetSpeed + idle.y)
+      body.setVelocity(dir.x * COIN.magnetSpeed * UNIT + idle.x, dir.y * COIN.magnetSpeed * UNIT + idle.y)
     } else {
       body.setVelocity(idle.x, idle.y)
     }
@@ -97,10 +98,10 @@ export function collectCoin(scene: BaseArenaScene, coin: ImageObj): void {
 /** 宝箱走金币的磁吸/回收/拾取管线（同组 + data 标记分流） */
 export function spawnChest(scene: BaseArenaScene, x: number, y: number): void {
   const pos = scene.constrainCoinPos({ x, y })
-  const chest = emojiImage(scene, pos.x, pos.y, CHEST.emoji, CHEST.size, 'player').setDepth(4)
+  const chest = emojiImage(scene, pos.x, pos.y, CHEST.emoji, CHEST.size * UNIT, 'player').setDepth(4)
   chest.setData('chest', true)
   scene.physics.add.existing(chest)
-  circleBody(chest, CHEST.radius)
+  circleBody(chest, CHEST.radius * UNIT)
   scene.coins.add(chest)
   const base = chest.scaleX
   chest.setScale(base * 0.3)
@@ -128,7 +129,7 @@ function openChest(scene: BaseArenaScene, chest: ImageObj): void {
     scene.run.captainItems.push(loot.itemId)
     // 队长道具全部经 teamFx 实时读取，重算即生效
     scene.teamFx = aggregateTeamEffects(scene.run.captainItems)
-    scene.stats.moveSpeed = TEAM.moveSpeed * scene.teamFx.moveSpeedMul
+    scene.stats.moveSpeed = TEAM.moveSpeed * UNIT * scene.teamFx.moveSpeedMul
     owner = `队长${CAPTAINS[scene.run.captainId].name}`
   } else {
     scene.run.memberItems[loot.slot]?.push(loot.itemId)
@@ -166,7 +167,7 @@ function refreshMemberItems(scene: BaseArenaScene, slot: number): void {
   m.killHeal = fx.killHeal
   for (const w of m.weapons) w.destroy()
   m.weapons = applyAbilities(id, abilityTiers(id, owned), CHARACTERS[id].weapons).map((w, i) =>
-    createWeapon(resolveWeaponSpec(w, m.fx), m.ctx, 200 + i * 230),
+    createWeapon(toPx(resolveWeaponSpec(w, m.fx)), m.ctx, 200 + i * 230),
   )
   if (!m.alive) for (const w of m.weapons) w.setVisible(false)
 }

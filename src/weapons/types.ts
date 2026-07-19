@@ -1,3 +1,4 @@
+import { UNIT } from '../lib/units'
 import type Phaser from 'phaser'
 import { ACQUIRE } from './registry'
 import type { ProjectileSpec } from './spec'
@@ -69,7 +70,7 @@ export interface WeaponRuntime {
 export function nearestAngle(
   owner: WeaponOwner,
   targets: readonly EnemyTarget[],
-  maxRange = ACQUIRE.range,
+  maxRange = ACQUIRE.range * UNIT,
 ): number | null {
   let best = maxRange * maxRange
   let angle: number | null = null

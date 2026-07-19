@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { arenaSceneFor, MAP, MAP_IDS, MAPS, rollDecor, sanitizeMapId } from './registry'
-import { UNIT } from '../lib/units'
 import { Rng } from '../lib/rng'
 
 describe('地图定义', () => {
@@ -102,7 +101,7 @@ describe('装饰散布 rollDecor', () => {
 
 describe('有界地图尺寸', () => {
   it('地图 25×25 单位', () => {
-    expect(MAP.width).toBe(25 * UNIT)
-    expect(MAP.height).toBe(25 * UNIT)
+    expect(MAP.width).toBe(25)
+    expect(MAP.height).toBe(25)
   })
 })

@@ -1,4 +1,3 @@
-import { UNIT } from '../lib/units'
 import { WEAPONS } from '../weapons/registry'
 import type { WeaponSpec } from '../weapons/spec'
 
@@ -246,20 +245,20 @@ export const CAPTAIN_IDS = Object.keys(CAPTAINS) as readonly CaptainId[]
 // 队伍：玩家操控队伍中心点，角色按队形岗位随行；除此之外角色是完全独立的单位。
 // 队形几何在 battle/formation.ts；满员后可在整编页切换队形与互换站位。
 export const TEAM = {
-  ringRadius: 0.8 * UNIT,
+  ringRadius: 0.8,
   /** 3 人环收紧的小半径（人少时更像一个整体）；≥4 人用 ringRadius */
-  smallRingRadius: 0.58 * UNIT,
+  smallRingRadius: 0.58,
   /** 2 人阵的左右圆心距（紧凑贴身，允许轻微视觉重叠）；1~2 人不环绕 */
-  pairGap: 1.1 * UNIT,
-  moveSpeed: 5.5 * UNIT,
+  pairGap: 1.1,
+  moveSpeed: 5.5,
   reviveMs: 10_000,
   /** N 保 1 中心的受击判定半径系数：被保护的实际收益（碰撞圆减半更难被摸到） */
   guardCenterHurtboxMul: 0.5,
 } as const
 
 export const MEMBER = {
-  size: 1.2 * UNIT,
-  radius: 0.45 * UNIT,
+  size: 1.2,
+  radius: 0.45,
   maxHp: 100,
   // 波次制要求整波存活，受击间隔放宽让「蹭到怪」是磨损而非速死
   iframesMs: 700,

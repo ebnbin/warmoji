@@ -1,3 +1,4 @@
+import { UNIT } from '../lib/units'
 import { TEAM } from '../characters/registry'
 import type { Point } from '../lib/vec'
 
@@ -18,7 +19,7 @@ export function slotOffset(slot: number, count: number, radius: number): Point {
 
 /** 环形阵按人数取半径：3 人小环更紧凑 */
 function ringRadius(count: number): number {
-  return count === 3 ? TEAM.smallRingRadius : TEAM.ringRadius
+  return (count === 3 ? TEAM.smallRingRadius : TEAM.ringRadius) * UNIT
 }
 
 /** 岗位在「可旋转环」上的基准角（不含相位）：环形 ≥3 人全员上环；
@@ -45,14 +46,14 @@ export function formationPosts(id: FormationId, count: number, ringPhase = 0): P
       const base = ringPostAngle('guard', post, count)
       if (base === null) return { x: 0, y: 0 }
       const a = base + ringPhase
-      return { x: Math.cos(a) * TEAM.ringRadius, y: Math.sin(a) * TEAM.ringRadius }
+      return { x: Math.cos(a) * TEAM.ringRadius * UNIT, y: Math.sin(a) * TEAM.ringRadius * UNIT }
     })
   }
   if (count <= 1) return Array.from({ length: count }, () => ({ x: 0, y: 0 }))
   if (count === 2) {
     return [
-      { x: -TEAM.pairGap / 2, y: 0 },
-      { x: TEAM.pairGap / 2, y: 0 },
+      { x: (-TEAM.pairGap / 2) * UNIT, y: 0 },
+      { x: (TEAM.pairGap / 2) * UNIT, y: 0 },
     ]
   }
   const r = ringRadius(count)

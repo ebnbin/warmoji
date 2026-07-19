@@ -1,4 +1,3 @@
-import { UNIT } from '../lib/units'
 import { isHorizontal } from '../screen/remap'
 import type { Point } from '../lib/vec'
 
@@ -61,17 +60,17 @@ export const RIVER = {
    * （世界尺寸 = 逻辑视口 × viewScale，实体相应显小） */
   viewScale: 1.2,
   /** 河道宽度（跨流向恒定）：最小屏短边 13.5 格，留出两岸各 0.75 格 */
-  width: 12 * UNIT,
+  width: 12,
   /** 流速：恒定漂移速度（队伍移速 5.5 格/秒 → 顺流 6.5、逆流 4.5，
    * 挂机 20 秒漂完整条河，站位压力明显但可对抗） */
-  flow: 1 * UNIT,
+  flow: 1,
   /** 金币漂出下游边界这一距离后清理（玩家钳在屏内，永远追不回） */
-  coinCullPad: 2 * UNIT,
+  coinCullPad: 2,
   /** 水面漂浮物数量（🍃🌸🫧 顺流循环，流向的直白提示） */
   driftCount: 18,
   /** 漂浮物个体速度倍率区间（再乘河心快近岸慢的剖面） */
   driftSpeedMul: [0.75, 1.3],
   /** 双层水纹滚动速度（视差；只是贴图偏移，与实体漂移无关，约为流速的 0.6/1.2 倍） */
-  waveSlow: 0.6 * UNIT,
-  waveFast: 1.2 * UNIT,
+  waveSlow: 0.6,
+  waveFast: 1.2,
 } as const

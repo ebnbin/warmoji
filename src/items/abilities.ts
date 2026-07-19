@@ -1,5 +1,4 @@
 import type { CharacterId } from '../characters/registry'
-import { UNIT } from '../lib/units'
 import type { WeaponSpec } from '../weapons/spec'
 
 // 角色特殊能力：一阶/二阶两档，靠购买角色专属能力卡解锁（core/items.ts 的
@@ -94,7 +93,7 @@ export function applyAbilities(
         return {
           ...w,
           volley: { count: 3, spreadRad: 0.32 },
-          ...(a2 ? { splash: { radius: 0.9 * UNIT, ratio: 0.6 } } : {}),
+          ...(a2 ? { splash: { radius: 0.9, ratio: 0.6 } } : {}),
         }
       case 'unicorn':
         if (w.kind !== 'thrust') return w
@@ -103,7 +102,7 @@ export function applyAbilities(
           combo: { delayMs: 170 },
           ...(a2
             ? {
-                tipBurst: { radius: 1.1 * UNIT, ratio: 0.6, knockback: 720, color: 0xff8ad8 },
+                tipBurst: { radius: 1.1, ratio: 0.6, knockback: 11.25, color: 0xff8ad8 },
               }
             : {}),
         }
@@ -126,7 +125,7 @@ export function applyAbilities(
         if (w.kind !== 'areaBlast') return w
         return {
           ...w,
-          burn: { radius: 1.4 * UNIT, dps: 8, durationMs: 3000 },
+          burn: { radius: 1.4, dps: 8, durationMs: 3000 },
           ...(a2 ? { echo: { delayMs: 250, ratio: 0.75 } } : {}),
         }
       case 'kangaroo':
@@ -138,7 +137,7 @@ export function applyAbilities(
             ? {
                 hitRadius: w.hitRadius * 1.4,
                 held: { ...w.held, size: w.held.size * 1.4 },
-                coinMagnetRadius: 1.6 * UNIT,
+                coinMagnetRadius: 1.6,
               }
             : {}),
         }
@@ -171,7 +170,7 @@ export function applyAbilities(
         if (w.kind !== 'assassinate') return w
         return {
           ...w,
-          cleave: { radius: 1.0 * UNIT, ratio: 0.6 },
+          cleave: { radius: 1.0, ratio: 0.6 },
           ...(a2 ? { execute: { hpRatio: 0.35, mul: 2 } } : {}),
         }
       case 'beaver':
@@ -200,7 +199,7 @@ export function applyAbilities(
         return {
           ...w,
           bounces: 4,
-          ...(a2 ? { burstEnd: { radius: 0.9 * UNIT, ratio: 0.6 } } : {}),
+          ...(a2 ? { burstEnd: { radius: 0.9, ratio: 0.6 } } : {}),
         }
     }
   })

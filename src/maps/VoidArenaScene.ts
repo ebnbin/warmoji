@@ -167,8 +167,8 @@ export class VoidArenaScene extends BaseArenaScene {
    * 条带相机取景对侧溢出——跨缝实体两侧同时可见（渲染层的幽灵分身） */
   private setupCameras(): void {
     const landscape = viewport.logicalWidth >= viewport.logicalHeight
-    this.arenaW = landscape ? VOID.arenaLong : VOID.arenaShort
-    this.arenaH = landscape ? VOID.arenaShort : VOID.arenaLong
+    this.arenaW = (landscape ? VOID.arenaLong : VOID.arenaShort) * UNIT
+    this.arenaH = (landscape ? VOID.arenaShort : VOID.arenaLong) * UNIT
     const cw = Math.round(viewport.cssWidth * viewport.dpr)
     const ch = Math.round(viewport.cssHeight * viewport.dpr)
     const rect = fitAspectRect(cw, ch, this.arenaW, this.arenaH)
@@ -180,7 +180,7 @@ export class VoidArenaScene extends BaseArenaScene {
 
     for (const c of this.stripCams) this.cameras.remove(c)
     this.stripCams = []
-    const s = VOID.strip
+    const s = VOID.strip * UNIT
     const sPx = Math.max(2, Math.round(s * zoom))
     const x0 = Math.round(rect.x)
     const y0 = Math.round(rect.y)
@@ -317,7 +317,7 @@ export class VoidArenaScene extends BaseArenaScene {
 
     // 传送门门框：流动虚线光带（TileSprite 滚动）+ 脉动描边
     this.ensureDashTexture()
-    const f = VOID.frame
+    const f = VOID.frame * UNIT
     const mkTile = (
       x: number,
       y: number,
@@ -352,7 +352,7 @@ export class VoidArenaScene extends BaseArenaScene {
   /** 门框虚线贴图（横/竖两个变体，一次生成） */
   private ensureDashTexture(): void {
     const size = 64
-    const th = Math.round(VOID.frame)
+    const th = Math.round(VOID.frame * UNIT)
     for (const [key, vertical] of [
       ['void-dash-h', false],
       ['void-dash-v', true],

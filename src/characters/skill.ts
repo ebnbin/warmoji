@@ -1,4 +1,3 @@
-import { UNIT } from '../lib/units'
 import { CAPTAINS } from './registry'
 import type { CaptainId } from './registry'
 
@@ -37,7 +36,7 @@ export const SKILL = {
    * 挡接触与敌弹；毒液池/毒雾是独立计时通道，不受无敌保护） */
   angel: { healRatio: 0.5, invulnMs: 2000 },
   /** 天降横财：砸最近 targets 个敌人，每袋伤害/击退/落地金币数 */
-  moneybags: { targets: 8, damage: 60, knockback: 10 * UNIT, coinsPerHit: 1 },
+  moneybags: { targets: 8, damage: 60, knockback: 10, coinsPerHit: 1 },
   /** 全场蹦迪：全场敌人（含 Boss）定身跳舞时长 */
   party: { danceMs: 3500 },
   /** 弱点讲义：全队伤害倍率 + 持续时长（不跨波） */

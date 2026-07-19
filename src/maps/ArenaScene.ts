@@ -15,6 +15,11 @@ import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 
+// 使用侧换算：MAP 数值为格值（项目约定）
+const MAPW = MAP.width * UNIT
+const MAPH = MAP.height * UNIT
+const MARGIN = MAP.cameraMargin * UNIT
+
 // 有界竞技场（kind='bounded'）：25×25 格矩形地图 + 相机跟随。
 // 世界规则：四周硬墙——队伍/敌人/Boss 钳制在图内，游荡撞边折返、
 // 逃跑贴边沿墙滑行，敌弹与金币不出图。战斗引擎全在 BaseArenaScene。
@@ -24,16 +29,16 @@ export class ArenaScene extends BaseArenaScene {
   }
 
   protected createWorld(): void {
-    this.physics.world.setBounds(0, 0, MAP.width, MAP.height)
+    this.physics.world.setBounds(0, 0, MAPW, MAPH)
     this.drawFloor()
     this.drawDecor()
     const cam = this.cameras.main
     cam.setZoom(viewport.renderScale)
     cam.setBounds(
-      -MAP.cameraMargin,
-      -MAP.cameraMargin,
-      MAP.width + MAP.cameraMargin * 2,
-      MAP.height + MAP.cameraMargin * 2,
+      -MARGIN,
+      -MARGIN,
+      MAPW + MARGIN * 2,
+      MAPH + MARGIN * 2,
     )
   }
 
@@ -42,28 +47,28 @@ export class ArenaScene extends BaseArenaScene {
   }
 
   protected spawnCenter(): Point {
-    return { x: MAP.width / 2, y: MAP.height / 2 }
+    return { x: MAPW / 2, y: MAPH / 2 }
   }
 
   protected spawnPoint(): Point {
     return randomMapPoint(
       this.rng,
-      MAP.width,
-      MAP.height,
-      SPAWN.edgeInset,
+      MAPW,
+      MAPH,
+      SPAWN.edgeInset * UNIT,
       this.center,
-      SPAWN.minPlayerDist,
+      SPAWN.minPlayerDist * UNIT,
     )
   }
 
   protected bossSpawnPoint(): Point {
     return randomMapPoint(
       this.rng,
-      MAP.width,
-      MAP.height,
+      MAPW,
+      MAPH,
       2 * UNIT,
       this.center,
-      SPAWN.minPlayerDist * 1.6,
+      SPAWN.minPlayerDist * UNIT * 1.6,
     )
   }
 
@@ -79,8 +84,8 @@ export class ArenaScene extends BaseArenaScene {
   protected constrainTeam(next: Point): Point {
     const clampMin = TEAM.ringRadius + MEMBER.radius
     return {
-      x: Phaser.Math.Clamp(next.x, clampMin, MAP.width - clampMin),
-      y: Phaser.Math.Clamp(next.y, clampMin, MAP.height - clampMin),
+      x: Phaser.Math.Clamp(next.x, clampMin, MAPW - clampMin),
+      y: Phaser.Math.Clamp(next.y, clampMin, MAPH - clampMin),
     }
   }
 
@@ -94,22 +99,22 @@ export class ArenaScene extends BaseArenaScene {
 
   protected constrainEnemyPos(p: Point): Point {
     return {
-      x: Phaser.Math.Clamp(p.x, 0, MAP.width),
-      y: Phaser.Math.Clamp(p.y, 0, MAP.height),
+      x: Phaser.Math.Clamp(p.x, 0, MAPW),
+      y: Phaser.Math.Clamp(p.y, 0, MAPH),
     }
   }
 
   constrainCoinPos(p: Point): Point {
     return {
-      x: Phaser.Math.Clamp(p.x, COIN.radius, MAP.width - COIN.radius),
-      y: Phaser.Math.Clamp(p.y, COIN.radius, MAP.height - COIN.radius),
+      x: Phaser.Math.Clamp(p.x, COIN.radius, MAPW - COIN.radius),
+      y: Phaser.Math.Clamp(p.y, COIN.radius, MAPH - COIN.radius),
     }
   }
 
   constrainShardTarget(p: Point): Point {
     return {
-      x: Phaser.Math.Clamp(p.x, 0, MAP.width),
-      y: Phaser.Math.Clamp(p.y, 0, MAP.height),
+      x: Phaser.Math.Clamp(p.x, 0, MAPW),
+      y: Phaser.Math.Clamp(p.y, 0, MAPH),
     }
   }
 
@@ -124,8 +129,8 @@ export class ArenaScene extends BaseArenaScene {
     let dx = e.getData('dirX') as number
     let dy = e.getData('dirY') as number
     const margin = 0.6 * UNIT
-    if ((e.x < margin && dx < 0) || (e.x > MAP.width - margin && dx > 0)) dx = -dx
-    if ((e.y < margin && dy < 0) || (e.y > MAP.height - margin && dy > 0)) dy = -dy
+    if ((e.x < margin && dx < 0) || (e.x > MAPW - margin && dx > 0)) dx = -dx
+    if ((e.y < margin && dy < 0) || (e.y > MAPH - margin && dy > 0)) dy = -dy
     e.setData('dirX', dx)
     e.setData('dirY', dy)
     return { x: dx, y: dy }
@@ -133,11 +138,11 @@ export class ArenaScene extends BaseArenaScene {
 
   /** 逃离方向贴边时沿墙滑行，不顶出地图 */
   protected fleeDir(e: ImageObj, away: Point): Point {
-    return fleeSteer(e.x, e.y, away.x, away.y, MAP.width, MAP.height, 1.5 * UNIT)
+    return fleeSteer(e.x, e.y, away.x, away.y, MAPW, MAPH, 1.5 * UNIT)
   }
 
   cullEnemyShot(s: ImageObj): boolean {
-    return s.x < -UNIT || s.x > MAP.width + UNIT || s.y < -UNIT || s.y > MAP.height + UNIT
+    return s.x < -UNIT || s.x > MAPW + UNIT || s.y < -UNIT || s.y > MAPH + UNIT
   }
 
   /** 地面 = 纯色面 + 右下阴影；地表纹理交给 emoji 装饰层（不再画网格线） */
@@ -145,17 +150,17 @@ export class ArenaScene extends BaseArenaScene {
     const g = this.add.graphics()
     const shadowOffset = 0.25 * UNIT
     g.fillStyle(this.palette.shadow, 1)
-    g.fillRect(shadowOffset, shadowOffset, MAP.width, MAP.height)
+    g.fillRect(shadowOffset, shadowOffset, MAPW, MAPH)
     g.fillStyle(this.palette.map, 1)
-    g.fillRect(0, 0, MAP.width, MAP.height)
+    g.fillRect(0, 0, MAPW, MAPH)
   }
 
   /** 地图装饰：按 run 内种子随机散布的低透明度 emoji（一局一景，同局各波不变）。
    * 静态贴地（depth 1）：在地面/网格之上、毒液池（2）与所有战斗实体之下 */
   private drawDecor(): void {
     const rng = new Rng(this.run.decorSeed)
-    const cols = Math.round(MAP.width / UNIT)
-    const rows = Math.round(MAP.height / UNIT)
+    const cols = Math.round(MAPW / UNIT)
+    const rows = Math.round(MAPH / UNIT)
     for (const d of rollDecor(MAPS[this.run.mapId].decor, () => rng.next(), cols, rows)) {
       emojiImage(this, d.xU * UNIT, d.yU * UNIT, d.emoji, d.sizeU * UNIT, 'player')
         .setAlpha(d.alpha)

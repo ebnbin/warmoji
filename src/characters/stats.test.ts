@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { UNIT } from '../lib/units'
 import { WEAPONS } from '../weapons/registry'
 import { CAPTAINS, CHARACTERS } from './registry'
 import type { CharacterId } from './registry'
@@ -51,7 +50,7 @@ describe('角色属性面板模型', () => {
   it('数值换算：px→格、ms→秒、弧度→角度', () => {
     const thrust = weaponStatLines(WEAPONS.hornThrust)
     expect(thrust[0]).toBe('伤害 26 · 冷却 0.9秒 · 击退 0.9格')
-    expect(thrust[1]).toContain(`触及 ${WEAPONS.hornThrust.reach / UNIT}格`)
+    expect(thrust[1]).toContain(`触及 ${WEAPONS.hornThrust.reach}格`)
     const sweep = weaponStatLines(WEAPONS.axeSweep)
     expect(sweep[1]).toContain('弧宽 150°')
     const blast = weaponStatLines(WEAPONS.arcaneBlast)

@@ -1,4 +1,3 @@
-import { UNIT } from '../lib/units'
 import type { Point } from '../lib/vec'
 
 // 虚空地图（环面世界）的纯几何（禁 phaser/DOM）。
@@ -60,13 +59,13 @@ export function fitAspectRect(
 // 没有任何墙。索敌/AI/磁吸全部用环面最短差（本文件）
 export const VOID = {
   /** 竞技场长边（16:9 的 16 → 24 格，与河流同款 1.2 视野密度） */
-  arenaLong: 24 * UNIT,
+  arenaLong: 24,
   /** 竞技场短边（13.5 格） */
-  arenaShort: 13.5 * UNIT,
+  arenaShort: 13.5,
   /** 条带相机宽度：四缝各一条 + 四角，渲染实体跨缝时的对侧分身 */
-  strip: 1.5 * UNIT,
+  strip: 1.5,
   /** 玩家子弹寿命：环面上永远飞不出屏幕，必须按时限回收 */
   projectileLifeMs: 1500,
   /** 传送门门框光带厚度 */
-  frame: 0.3 * UNIT,
+  frame: 0.3,
 } as const

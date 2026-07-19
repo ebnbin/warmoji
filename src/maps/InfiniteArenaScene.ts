@@ -68,7 +68,7 @@ export class InfiniteArenaScene extends BaseArenaScene {
 
   /** 环带随机点；终波把落点收进当前圈内（圈外刷怪毫无意义） */
   protected spawnPoint(): Point {
-    const p = ringPoint(this.rng, this.center, INFINITE.spawnRingMin, INFINITE.spawnRingMax)
+    const p = ringPoint(this.rng, this.center, INFINITE.spawnRingMin * UNIT, INFINITE.spawnRingMax * UNIT)
     if (this.zoneCenter) {
       const limit = this.zoneRadius - UNIT
       if (limit > 0 && outsideZone(p, this.zoneCenter, limit)) {
@@ -91,7 +91,7 @@ export class InfiniteArenaScene extends BaseArenaScene {
   /** 终波：缩圈以此刻队伍位置为圆心张开 */
   protected onFinalWaveSetup(): void {
     this.zoneCenter = { x: this.center.x, y: this.center.y }
-    this.zoneRadius = ZONE.r0
+    this.zoneRadius = ZONE.r0 * UNIT
     this.zoneGfx = this.add.graphics().setDepth(2)
     this.zoneVignette = this.add
       .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, 0xd32f2f, 0)
@@ -102,7 +102,7 @@ export class InfiniteArenaScene extends BaseArenaScene {
 
   /** 休眠分区：冻结/唤醒 + 活跃计数 + 本帧攻击目标（休眠怪不可被索敌） */
   protected buildFrameTargets(): void {
-    this.dormancyFrameTargets(INFINITE.activeHalf)
+    this.dormancyFrameTargets(INFINITE.activeHalf * UNIT)
   }
 
   protected updateWorld(_delta: number): void {
@@ -173,7 +173,7 @@ export class InfiniteArenaScene extends BaseArenaScene {
   private updateZone(): void {
     const center = this.zoneCenter
     if (!center || !this.zoneGfx) return
-    this.zoneRadius = zoneRadiusAt(this.elapsedMs, ZONE)
+    this.zoneRadius = zoneRadiusAt(this.elapsedMs, ZONE) * UNIT
     // 圈渲染：亮边界环 + 内侧安全提示描边
     const g = this.zoneGfx
     g.clear()

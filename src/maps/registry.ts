@@ -1,4 +1,3 @@
-import { UNIT } from '../lib/units'
 import type { Palette } from '../lib/palette'
 import { hslToInt } from '../lib/palette'
 
@@ -208,8 +207,8 @@ export function rollDecor(
 }
 
 export const MAP = {
-  width: 25 * UNIT,
-  height: 25 * UNIT,
+  width: 25,
+  height: 25,
   // 相机滚动范围 = 地图四周外扩这一圈
-  cameraMargin: 2 * UNIT,
+  cameraMargin: 2,
 } as const

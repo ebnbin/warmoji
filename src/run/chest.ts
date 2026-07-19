@@ -1,4 +1,3 @@
-import { UNIT } from '../lib/units'
 import { CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
 import type { ItemId } from '../items/registry'
@@ -64,8 +63,8 @@ export function rollChestLoot(
 // 立即生效。抽取范围与权重见 本文件；与金币同磁吸，波末未拾取消失
 export const CHEST = {
   emoji: '🎁',
-  size: 0.8 * UNIT,
-  radius: 0.3 * UNIT,
+  size: 0.8,
+  radius: 0.3,
   chance: 0.008,
   eliteChance: 0.08,
   /** 开箱稀有度权重：越稀有越难开出 */

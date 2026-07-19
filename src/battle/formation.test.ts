@@ -1,3 +1,4 @@
+import { UNIT } from '../lib/units'
 import { describe, expect, it } from 'vitest'
 import { TEAM } from '../characters/registry'
 import { formationPosts, ringPostAngle, slotOffset } from './formation'
@@ -43,8 +44,8 @@ describe('环形阵按人数取形', () => {
 
   it('2 人：紧凑左右并肩，相位不起作用（不环绕）', () => {
     const posts = formationPosts('ring', 2)
-    expect(posts[0]!.x).toBeCloseTo(-TEAM.pairGap / 2)
-    expect(posts[1]!.x).toBeCloseTo(TEAM.pairGap / 2)
+    expect(posts[0]!.x).toBeCloseTo((-TEAM.pairGap / 2) * UNIT)
+    expect(posts[1]!.x).toBeCloseTo((TEAM.pairGap / 2) * UNIT)
     expect(posts[0]!.y).toBeCloseTo(0)
     expect(posts[1]!.y).toBeCloseTo(0)
     expect(formationPosts('ring', 2, 1.3)).toEqual(posts)
@@ -54,7 +55,7 @@ describe('环形阵按人数取形', () => {
 
   it('3 人：小半径环（比标准环紧凑）', () => {
     const posts = formationPosts('ring', 3)
-    for (const p of posts) expect(Math.hypot(p.x, p.y)).toBeCloseTo(TEAM.smallRingRadius)
+    for (const p of posts) expect(Math.hypot(p.x, p.y)).toBeCloseTo(TEAM.smallRingRadius * UNIT)
     expect(TEAM.smallRingRadius).toBeLessThan(TEAM.ringRadius)
   })
 
@@ -62,7 +63,7 @@ describe('环形阵按人数取形', () => {
     for (const n of [4, 5, 6, 8]) {
       const posts = formationPosts('ring', n)
       expect(posts).toHaveLength(n)
-      for (const p of posts) expect(Math.hypot(p.x, p.y)).toBeCloseTo(TEAM.ringRadius)
+      for (const p of posts) expect(Math.hypot(p.x, p.y)).toBeCloseTo(TEAM.ringRadius * UNIT)
     }
   })
 
@@ -78,7 +79,7 @@ describe('formationPosts / ringPostAngle', () => {
   it('环形（≥4 人）= slotOffset 原样', () => {
     const posts = formationPosts('ring', 5)
     for (let i = 0; i < 5; i++) {
-      const ref = slotOffset(i, 5, TEAM.ringRadius)
+      const ref = slotOffset(i, 5, TEAM.ringRadius * UNIT)
       expect(posts[i]!.x).toBeCloseTo(ref.x)
       expect(posts[i]!.y).toBeCloseTo(ref.y)
     }
@@ -89,7 +90,7 @@ describe('formationPosts / ringPostAngle', () => {
     expect(posts).toHaveLength(5)
     expect(Math.hypot(posts[0]!.x, posts[0]!.y)).toBeCloseTo(0)
     for (let i = 1; i < 5; i++) {
-      expect(Math.hypot(posts[i]!.x, posts[i]!.y)).toBeCloseTo(TEAM.ringRadius)
+      expect(Math.hypot(posts[i]!.x, posts[i]!.y)).toBeCloseTo(TEAM.ringRadius * UNIT)
     }
   })
 
@@ -98,8 +99,8 @@ describe('formationPosts / ringPostAngle', () => {
     const ring = formationPosts('ring', 4, phase)
     for (let i = 0; i < 4; i++) {
       const a = (ringPostAngle('ring', i, 4) ?? 0) + phase
-      expect(ring[i]!.x).toBeCloseTo(Math.cos(a) * TEAM.ringRadius)
-      expect(ring[i]!.y).toBeCloseTo(Math.sin(a) * TEAM.ringRadius)
+      expect(ring[i]!.x).toBeCloseTo(Math.cos(a) * TEAM.ringRadius * UNIT)
+      expect(ring[i]!.y).toBeCloseTo(Math.sin(a) * TEAM.ringRadius * UNIT)
     }
     const guard = formationPosts('guard', 5, phase)
     expect(Math.hypot(guard[0]!.x, guard[0]!.y)).toBeCloseTo(0)

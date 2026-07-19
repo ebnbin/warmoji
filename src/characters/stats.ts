@@ -1,6 +1,5 @@
 import { ABILITIES, applyAbilities } from '../items/abilities'
 import { COIN } from '../items/registry'
-import { UNIT } from '../lib/units'
 import { KNOCKBACK } from '../weapons/registry'
 import { CHARACTERS, MEMBER, TEAM } from './registry'
 import type { CaptainSpec, CharacterId } from './registry'
@@ -43,8 +42,8 @@ export const WEAPON_KIND_LABEL: Record<WeaponSpec['kind'], string> = {
 }
 
 /** px → 格 */
-function grid(px: number): string {
-  return `${+(px / UNIT).toFixed(1)}格`
+function grid(units: number): string {
+  return `${+units.toFixed(1)}格`
 }
 
 function sec(ms: number): string {

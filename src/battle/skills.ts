@@ -54,7 +54,7 @@ function skillAngel(scene: BaseArenaScene): void {
     })
   }
   const ring = scene.add
-    .circle(scene.center.x, scene.center.y, TEAM.ringRadius + MEMBER.radius, 0xfff59d, 0.3)
+    .circle(scene.center.x, scene.center.y, (TEAM.ringRadius + MEMBER.radius) * UNIT, 0xfff59d, 0.3)
     .setStrokeStyle(4, 0xffe082, 0.9)
     .setDepth(20)
     .setScale(0.4)
@@ -96,7 +96,7 @@ function skillMoneybags(scene: BaseArenaScene): void {
         scene.coinBurst.explode(6, e.x, e.y)
         playSfx('coin')
         spawnCoins(scene, e.x, e.y, SKILL.moneybags.coinsPerHit)
-        scene.applyDamage(e, SKILL.moneybags.damage, SKILL.moneybags.knockback, scene.center.x, scene.center.y)
+        scene.applyDamage(e, SKILL.moneybags.damage, SKILL.moneybags.knockback * UNIT, scene.center.x, scene.center.y)
       },
     })
   })
