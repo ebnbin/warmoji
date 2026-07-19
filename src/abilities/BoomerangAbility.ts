@@ -1,3 +1,4 @@
+import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
 import type { BoomerangSpec } from './spec'
 import { emojiImage } from '../emoji/textures'
@@ -62,7 +63,7 @@ export class BoomerangAbility implements AbilityRuntime {
         owner.x + Math.cos(this.aim) * this.spec.held.restOffset,
         owner.y + Math.sin(this.aim) * this.spec.held.restOffset,
       )
-      main.image.setRotation(this.aim + this.spec.held.rotationOffsetRad)
+      main.image.setRotation(this.aim + this.spec.held.rotationOffsetDeg * DEG2RAD)
 
       if (this.cooldown > 0) return
       const aim = nearestAngle(owner, this.ctx.targets())
@@ -82,7 +83,7 @@ export class BoomerangAbility implements AbilityRuntime {
 
   private updateFlyer(f: Flyer, delta: number, owner: AbilityOwner): void {
     // 自旋 + 途中判伤 + 磁力吸币（能力）
-    f.image.rotation += (this.spec.spinRadPerSec * delta) / 1000
+    f.image.rotation += (this.spec.spinDegPerSec * DEG2RAD * delta) / 1000
     if (f.phase === 'out') {
       f.flightT = Math.min(1, f.flightT + delta / this.spec.outMs)
       const ease = Math.sin((f.flightT * Math.PI) / 2)

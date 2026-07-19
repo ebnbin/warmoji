@@ -1,3 +1,4 @@
+import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
 import { circleHitIndices, thrustHitIndices } from './spec'
 import type { ThrustSpec } from './spec'
@@ -33,7 +34,7 @@ export class ThrustAbility implements AbilityRuntime {
       const dist =
         this.spec.held.restOffset + this.lunge.t * (this.spec.reach - this.spec.held.restOffset)
       this.image.setPosition(owner.x + Math.cos(this.aim) * dist, owner.y + Math.sin(this.aim) * dist)
-      this.image.setRotation(this.aim + this.spec.held.rotationOffsetRad)
+      this.image.setRotation(this.aim + this.spec.held.rotationOffsetDeg * DEG2RAD)
     } else {
       owner.setVisualOffset(
         Math.cos(this.aim) * this.lunge.t * this.spec.lungeDist,

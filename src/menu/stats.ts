@@ -79,7 +79,7 @@ export function abilityStatLines(w: AbilitySpec): string[] {
     case 'thrust':
       return [base, `触及 ${grid(w.reach)} · 判定 ${grid(w.hitRadius)} · 前冲 ${grid(w.lungeDist)}`]
     case 'sweep':
-      return [base, `半径 ${grid(w.radius)} · 弧宽 ${Math.round((w.arcRad * 180) / Math.PI)}°`]
+      return [base, `半径 ${grid(w.radius)} · 弧宽 ${w.arcDeg}°`]
     case 'areaBlast':
       return [base, `侦测 ${grid(w.detectRange)} · 爆炸半径 ${grid(w.blastRadius)}`]
     case 'boomerang':

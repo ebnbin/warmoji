@@ -41,7 +41,7 @@ const LOCOMOTION_LABEL: Record<EnemySpec['locomotion']['kind'], string> = {
 export function enemyStatLines(e: EnemySpec): string[] {
   const lines = [
     `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
-    `行为 ${LOCOMOTION_LABEL[e.locomotion.kind]}${(e.abilities ?? []).some((w) => w.kind === 'projectile' && !(w.volley && w.volley.spreadRad >= Math.PI * 2)) ? '放枪' : ''} · 经验 ${e.xp} · 金币 ${e.coins}`,
+    `行为 ${LOCOMOTION_LABEL[e.locomotion.kind]}${(e.abilities ?? []).some((w) => w.kind === 'projectile' && !(w.volley && w.volley.spreadDeg >= 360)) ? '放枪' : ''} · 经验 ${e.xp} · 金币 ${e.coins}`,
   ]
   for (const w of e.abilities ?? []) {
     if (w.kind === 'projectile') lines.push(`子弹伤害 ${w.damage} · 弹速 ${grid(w.projectile.speed)}/秒`)

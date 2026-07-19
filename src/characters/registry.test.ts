@@ -80,7 +80,7 @@ describe('升级卡换持档位行', () => {
   it('巨魔：一阶弧宽变整圈；牛仔双枪都获得贯穿', () => {
     const [sweep] = loadoutFor(CHARACTERS.troll, T1)
     if (sweep?.kind !== 'sweep') throw new Error('kind 不变')
-    expect(sweep.arcRad).toBeCloseTo(Math.PI * 2)
+    expect(sweep.arcDeg).toBe(360)
     const pistols = loadoutFor(CHARACTERS.cowboy, T1)
     expect(pistols).toHaveLength(2)
     for (const p of pistols) {

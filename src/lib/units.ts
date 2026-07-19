@@ -7,3 +7,6 @@ export const UNIT = VIEW.minLong / 20
 /** 点击容差（逻辑 px）：按下到抬起位移小于它仍算点击。手机 fitScale≈0.5，
  * 20 逻辑 px ≈ 10 CSS px——快速拇指点按的晃动上限（实测 10 逻辑 px 大量吃点击） */
 export const TAP_SLOP = 20
+
+/** 角度数值参数一律为度（0–360），引擎侧做三角运算时就地 ×DEG2RAD 换算 */
+export const DEG2RAD = Math.PI / 180

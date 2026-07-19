@@ -1,3 +1,4 @@
+import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
 import type { ProjectileSpec, TurretSpec } from './spec'
 import { ANIM_SPEC } from '../emoji/studio'
@@ -69,7 +70,7 @@ export class TurretAbility implements AbilityRuntime {
       const burst = this.spec.burst
       if (burst && burst.count > 1) {
         for (let i = 0; i < burst.count; i++) {
-          const a = aim + burst.spreadRad * (i / (burst.count - 1) - 0.5)
+          const a = aim + burst.spreadDeg * DEG2RAD * (i / (burst.count - 1) - 0.5)
           this.ctx.spawnProjectile(t.img.x, t.img.y, a, this.boltSpec, damage)
         }
       } else {

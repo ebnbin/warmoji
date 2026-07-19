@@ -144,7 +144,7 @@ export const INVADER: EnemySpec = {
       knockback: 0,
       aim: 'move',
       lifeMs: 4500,
-      projectile: { emoji: '🔴', size: 0.4, radius: 0.14, speed: 3, rotationOffsetRad: 0 },
+      projectile: { emoji: '🔴', size: 0.4, radius: 0.14, speed: 3, rotationOffsetDeg: 0 },
     },
   ],
 }
@@ -200,7 +200,7 @@ export const SNAKE: EnemySpec = {
       // 沿用攻击积木的「任意距离都开火」：覆写索敌上限到远超全图对角
       range: 99,
       lifeMs: 4500,
-      projectile: { emoji: '🟢', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetRad: 0 },
+      projectile: { emoji: '🟢', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
     },
   ],
 }
@@ -387,8 +387,8 @@ export const BOSS: EnemySpec = {
       firstDelayMs: 1800,
       lifeMs: 6000,
       fireSfx: 'boom',
-      volley: { count: 12, spreadRad: Math.PI * 2, randomRotate: true },
-      projectile: { emoji: '🟣', size: 0.45, radius: 0.16, speed: 2.4, rotationOffsetRad: 0 },
+      volley: { count: 12, spreadDeg: 360, randomRotate: true },
+      projectile: { emoji: '🟣', size: 0.45, radius: 0.16, speed: 2.4, rotationOffsetDeg: 0 },
     },
   ],
 }

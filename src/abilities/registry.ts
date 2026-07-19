@@ -32,7 +32,7 @@ const pistol = {
     size: 0.75,
     restOffset: 0.45,
     // twemoji 1f52b 枪口朝左
-    rotationOffsetRad: Math.PI,
+    rotationOffsetDeg: 180,
     mountGap: 0.32,
   },
   projectile: {
@@ -41,7 +41,7 @@ const pistol = {
     radius: 0.15,
     speed: 13,
     // twemoji 1f4a7 水滴尖端朝上
-    rotationOffsetRad: Math.PI / 2,
+    rotationOffsetDeg: 90,
   },
 } satisfies ProjectileSpec
 
@@ -58,7 +58,7 @@ export const ABILITIES = {
       size: 0.55,
       radius: 0.18,
       speed: 12,
-      rotationOffsetRad: 0,
+      rotationOffsetDeg: 0,
     },
   } satisfies ProjectileSpec,
   hornThrust: {
@@ -81,14 +81,14 @@ export const ABILITIES = {
     cooldownMs: 1200,
     knockback: 7,
     radius: 1.5,
-    arcRad: (150 * Math.PI) / 180,
+    arcDeg: 150,
     sweepMs: 260,
     held: {
       emoji: '🪓',
       size: 0.85,
       restOffset: 0.6,
       // twemoji 1fa93 斧刃朝左上
-      rotationOffsetRad: (3 * Math.PI) / 4,
+      rotationOffsetDeg: 135,
     },
   } satisfies SweepSpec,
   pistolLeft: {
@@ -127,7 +127,7 @@ export const ABILITIES = {
       size: 0.75,
       restOffset: 0.45,
       // twemoji 1f526 灯头朝左下
-      rotationOffsetRad: (3 * Math.PI) / 4,
+      rotationOffsetDeg: 135,
     },
   } satisfies LaserSpec,
   frostAura: {
@@ -149,12 +149,12 @@ export const ABILITIES = {
     outMs: 500,
     returnSpeed: 10,
     hitRadius: 0.5,
-    spinRadPerSec: 14,
+    spinDegPerSec: 800,
     held: {
       emoji: '🪃',
       size: 0.75,
       restOffset: 0.5,
-      rotationOffsetRad: 0,
+      rotationOffsetDeg: 0,
     },
   } satisfies BoomerangSpec,
   sparkleBolt: {
@@ -169,7 +169,7 @@ export const ABILITIES = {
       size: 0.5,
       radius: 0.17,
       speed: 11,
-      rotationOffsetRad: 0,
+      rotationOffsetDeg: 0,
     },
     // 变形替身：受害者顶着绵羊形象缓速游荡，失去一切伤害能力
     hex: { durationMs: 2500, morphEmoji: '🐑' },
@@ -189,7 +189,7 @@ export const ABILITIES = {
       size: 0.7,
       restOffset: 0.42,
       // twemoji 1f5e1 刀尖朝左下
-      rotationOffsetRad: (3 * Math.PI) / 4,
+      rotationOffsetDeg: 135,
     },
   } satisfies AssassinateSpec,
   woodTurret: {
@@ -208,7 +208,7 @@ export const ABILITIES = {
       size: 0.42,
       radius: 0.15,
       speed: 11,
-      rotationOffsetRad: 0,
+      rotationOffsetDeg: 0,
     },
   } satisfies TurretSpec,
   beeSwarm: {
@@ -242,7 +242,7 @@ export const ABILITIES = {
       radius: 0.15,
       speed: 12,
       // twemoji 1f489 针头朝左下
-      rotationOffsetRad: (3 * Math.PI) / 4,
+      rotationOffsetDeg: 135,
     },
   } satisfies ProjectileSpec,
   voltArc: {
@@ -267,7 +267,7 @@ export const ABILITIES = {
 /** 三重抛掷 */
 export const tomatoThrow2 = {
   ...ABILITIES.tomatoThrow,
-  volley: { count: 3, spreadRad: 0.32 },
+  volley: { count: 3, spreadDeg: 18 },
 } satisfies ProjectileSpec
 /** 爆浆番茄 */
 export const tomatoThrow3 = {
@@ -289,7 +289,7 @@ export const hornThrust3 = {
 /** 全周横扫（整圈更慢一拍） */
 export const axeSweep2 = {
   ...ABILITIES.axeSweep,
-  arcRad: Math.PI * 2,
+  arcDeg: 360,
   sweepMs: Math.round(ABILITIES.axeSweep.sweepMs * 1.35),
 } satisfies SweepSpec
 /** 震慑余波 */
@@ -304,11 +304,11 @@ export const pistolRight2 = { ...ABILITIES.pistolRight, pierce: 2 } satisfies Pr
 /** 左轮风暴 */
 export const pistolLeft3 = {
   ...pistolLeft2,
-  everyN: { n: 4, count: 5, spreadRad: 0.55 },
+  everyN: { n: 4, count: 5, spreadDeg: 32 },
 } satisfies ProjectileSpec
 export const pistolRight3 = {
   ...pistolRight2,
-  everyN: { n: 4, count: 5, spreadRad: 0.55 },
+  everyN: { n: 4, count: 5, spreadDeg: 32 },
 } satisfies ProjectileSpec
 
 /** 余烬秘火 */
@@ -379,7 +379,7 @@ export const woodTurret2 = {
 /** 三连弩 */
 export const woodTurret3 = {
   ...woodTurret2,
-  burst: { count: 3, spreadRad: 0.3 },
+  burst: { count: 3, spreadDeg: 17 },
 } satisfies TurretSpec
 
 /** 扩巢 */

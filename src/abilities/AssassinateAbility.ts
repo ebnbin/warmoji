@@ -1,3 +1,4 @@
+import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
 import { circleHitIndices } from './spec'
 import type { AssassinateSpec } from './spec'
@@ -49,7 +50,7 @@ export class AssassinateAbility implements AbilityRuntime {
     if (this.image && this.spec.held) {
       const dist = this.spec.held.restOffset
       this.image.setPosition(owner.x + Math.cos(this.aim) * dist, owner.y + Math.sin(this.aim) * dist)
-      this.image.setRotation(this.aim + this.spec.held.rotationOffsetRad)
+      this.image.setRotation(this.aim + this.spec.held.rotationOffsetDeg * DEG2RAD)
     }
 
     if (this.strikeLeft > 0) {

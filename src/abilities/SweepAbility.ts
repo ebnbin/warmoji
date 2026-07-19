@@ -1,3 +1,4 @@
+import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
 import { sectorHitIndices } from './spec'
 import type { SweepSpec } from './spec'
@@ -25,10 +26,10 @@ export class SweepAbility implements AbilityRuntime {
 
   update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
-    const angle = this.aim + (this.sweep.t * this.spec.arcRad) / 2
+    const angle = this.aim + (this.sweep.t * this.spec.arcDeg * DEG2RAD) / 2
     const dist = this.spec.held.restOffset
     this.image.setPosition(owner.x + Math.cos(angle) * dist, owner.y + Math.sin(angle) * dist)
-    this.image.setRotation(angle + this.spec.held.rotationOffsetRad)
+    this.image.setRotation(angle + this.spec.held.rotationOffsetDeg * DEG2RAD)
 
     if (this.cooldown > 0) return
     const targets = this.ctx.targets()
@@ -42,7 +43,7 @@ export class SweepAbility implements AbilityRuntime {
     for (const i of sectorHitIndices(
       { x: owner.x, y: owner.y },
       this.aim,
-      this.spec.arcRad,
+      this.spec.arcDeg * DEG2RAD,
       this.spec.radius,
       targets,
     )) {

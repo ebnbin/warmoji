@@ -1,3 +1,4 @@
+import { DEG2RAD } from '../lib/units'
 import { playSfx } from '../audio/sfx'
 import { emojiImage } from '../emoji/textures'
 import { circleHitIndices, sweepFirstHitIndex } from '../abilities/spec'
@@ -69,7 +70,7 @@ export function spawnProjectile(
 ): void {
   const p = emojiImage(scene, x, y, spec.projectile.emoji, spec.projectile.size, 'player')
     .setDepth(8)
-    .setRotation(angle + spec.projectile.rotationOffsetRad)
+    .setRotation(angle + spec.projectile.rotationOffsetDeg * DEG2RAD)
   scene.physics.add.existing(p)
   circleBody(p, spec.projectile.radius)
   ;(p.body as ArcadeBody).setVelocity(
@@ -91,7 +92,7 @@ export function spawnProjectile(
     splash: spec.splash,
     hex: spec.hex,
     // 对称投掷物（无指向修正角）飞行中自旋；有指向的（飞刀类）保持箭头朝向
-    spin: spec.projectile.rotationOffsetRad === 0 ? 9 : 0,
+    spin: spec.projectile.rotationOffsetDeg === 0 ? 9 : 0,
   })
   scene.projectiles.add(p)
 }

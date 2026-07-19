@@ -25,8 +25,8 @@ export interface HeldVisual {
   readonly size: number
   /** 静止时距角色中心的距离 */
   readonly restOffset: number
-  /** emoji 素材的原始朝向补偿 */
-  readonly rotationOffsetRad: number
+  /** emoji 素材的原始朝向补偿（度） */
+  readonly rotationOffsetDeg: number
   /** 左/右手横向挂载（垂直于瞄准方向偏移 mountGap） */
   readonly mountSide?: -1 | 1
   readonly mountGap?: number
@@ -83,15 +83,15 @@ export interface ProjectileSpec {
     readonly size: number
     readonly radius: number
     readonly speed: number
-    readonly rotationOffsetRad: number
+    readonly rotationOffsetDeg: number
   }
   // ── 能力字段 ──
-  /** 齐射：每次出手发射 count 枚，扇形均匀散开 spreadRad；
-   * spreadRad ≥ 2π 为整圈（按 count 均分步进不重叠端点，无需目标），
+  /** 齐射：每次出手发射 count 枚，扇形均匀散开 spreadDeg（度）；
+   * spreadDeg ≥ 360 为整圈（按 count 均分步进不重叠端点，无需目标），
    * randomRotate 每轮随机整体旋转（经 ctx.random，Boss 环形弹幕） */
-  readonly volley?: { readonly count: number; readonly spreadRad: number; readonly randomRotate?: boolean }
+  readonly volley?: { readonly count: number; readonly spreadDeg: number; readonly randomRotate?: boolean }
   /** 每第 n 次出手改为一轮特殊齐射 */
-  readonly everyN?: { readonly n: number; readonly count: number; readonly spreadRad: number }
+  readonly everyN?: { readonly n: number; readonly count: number; readonly spreadDeg: number }
   /** 贯穿：命中后继续飞行，可再命中的额外敌人数 */
   readonly pierce?: number
   /** 溅射：命中点圆形爆裂（ratio × 伤害） */
@@ -110,7 +110,8 @@ export interface SweepSpec {
   readonly knockback: number
   /** 扇形判定半径与弧宽 */
   readonly radius: number
-  readonly arcRad: number
+  /** 扫掠弧宽（度） */
+  readonly arcDeg: number
   readonly sweepMs: number
   readonly held: HeldVisual
   // ── 能力字段 ──
@@ -152,7 +153,8 @@ export interface BoomerangSpec {
   /** 回程追踪角色实时位置的速度 */
   readonly returnSpeed: number
   readonly hitRadius: number
-  readonly spinRadPerSec: number
+  /** 飞行自旋角速度（度/秒） */
+  readonly spinDegPerSec: number
   readonly held: HeldVisual
   // ── 能力字段 ──
   /** 双镖：同时向反方向掷出第二枚 */
@@ -236,11 +238,11 @@ export interface TurretSpec {
     readonly size: number
     readonly radius: number
     readonly speed: number
-    readonly rotationOffsetRad: number
+    readonly rotationOffsetDeg: number
   }
   // ── 能力字段 ──
   /** 三连弩：每次开火改为扇形连发 */
-  readonly burst?: { readonly count: number; readonly spreadRad: number }
+  readonly burst?: { readonly count: number; readonly spreadDeg: number }
 }
 
 export interface SummonSpec {

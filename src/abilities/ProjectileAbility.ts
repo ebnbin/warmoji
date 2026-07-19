@@ -1,3 +1,4 @@
+import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
 import type { ProjectileSpec } from './spec'
 import { emojiImage } from '../emoji/textures'
@@ -42,11 +43,11 @@ export class ProjectileAbility implements AbilityRuntime {
     if (this.image) {
       const pos = this.muzzle(owner)
       this.image.setPosition(pos.x, pos.y)
-      this.image.setRotation(this.aim + this.spec.held!.rotationOffsetRad)
+      this.image.setRotation(this.aim + this.spec.held!.rotationOffsetDeg * DEG2RAD)
     }
 
     if (this.cooldown > 0) return
-    const fullRing = this.spec.volley !== undefined && this.spec.volley.spreadRad >= Math.PI * 2 - 1e-9
+    const fullRing = this.spec.volley !== undefined && this.spec.volley.spreadDeg >= 360 - 1e-9
     if (this.spec.aim === 'move') {
       const h = this.ctx.ownerHeading?.()
       if (!h) return
@@ -63,16 +64,16 @@ export class ProjectileAbility implements AbilityRuntime {
     this.shots++
     const special = this.spec.everyN && this.shots % this.spec.everyN.n === 0
     const volley = special
-      ? { count: this.spec.everyN!.count, spreadRad: this.spec.everyN!.spreadRad }
+      ? { count: this.spec.everyN!.count, spreadDeg: this.spec.everyN!.spreadDeg }
       : this.spec.volley
     if (volley && volley.count > 1) {
-      const full = volley.spreadRad >= Math.PI * 2 - 1e-9
+      const full = volley.spreadDeg >= 360 - 1e-9
       const base = full && volley.randomRotate ? (this.ctx.random?.() ?? 0) * Math.PI * 2 : this.aim
       for (let i = 0; i < volley.count; i++) {
         // 整圈按 count 均分步进（端点不重叠）；扇形沿瞄准方向对称散开
         const angle = full
-          ? base + (i * volley.spreadRad) / volley.count
-          : this.aim + volley.spreadRad * (i / (volley.count - 1) - 0.5)
+          ? base + (i * volley.spreadDeg * DEG2RAD) / volley.count
+          : this.aim + volley.spreadDeg * DEG2RAD * (i / (volley.count - 1) - 0.5)
         this.ctx.spawnProjectile(from.x, from.y, angle, this.spec, damage)
       }
       if (this.spec.fireSfx) this.ctx.sfx(this.spec.fireSfx)

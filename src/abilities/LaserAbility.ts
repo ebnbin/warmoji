@@ -1,3 +1,4 @@
+import { DEG2RAD } from '../lib/units'
 import type Phaser from 'phaser'
 import { thrustHitIndices } from './spec'
 import type { LaserSpec } from './spec'
@@ -32,7 +33,7 @@ export class LaserAbility implements AbilityRuntime {
       owner.x + Math.cos(this.aim) * held.restOffset,
       owner.y + Math.sin(this.aim) * held.restOffset,
     )
-    this.image.setRotation(this.aim + held.rotationOffsetRad)
+    this.image.setRotation(this.aim + held.rotationOffsetDeg * DEG2RAD)
 
     // 全域扫射：按时序逐束兑现（跟随角色实时位置）
     if (this.radialQueue.length > 0 && !this.hidden) {
