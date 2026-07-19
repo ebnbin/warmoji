@@ -23,6 +23,8 @@ export interface WeaponContext {
   scene: Phaser.Scene
   /** 当前帧的存活敌人快照（每帧重建一次，武器间共享） */
   enemyTargets(): readonly EnemyTarget[]
+  /** 目标当前血量（瞬袭索敌用；实时读，不吃帧快照） */
+  enemyHp(ref: EnemyTarget['ref']): number
   /** knockback：击退冲量（px/秒），方向 = 源点 (srcX, srcY) 指向敌人中心 */
   damageEnemy(
     enemy: Phaser.GameObjects.Image,

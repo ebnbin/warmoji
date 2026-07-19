@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-import type { EnemySpec } from '../enemies/registry'
 import { UNIT } from '../lib/units'
 import { VOID } from './void'
 import { MAPS } from './registry'
@@ -12,6 +11,7 @@ import type { EnemyTarget } from '../weapons/types'
 import { emojiImage } from '../emoji/textures'
 import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
+import { enemyOf } from '../battle/actors'
 import type { ArcadeBody, ImageObj, Member } from '../battle/BaseArenaScene'
 
 // 虚空竞技场（kind='void'）：环面世界。世界规则：
@@ -89,7 +89,7 @@ export class VoidArenaScene extends BaseArenaScene {
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       count++
-      const radius = (e.getData('spec') as EnemySpec).radius
+      const radius = enemyOf(e).spec.radius
       targets.push({ x: e.x, y: e.y, radius, ref: e })
       for (const g of ghostImages(e, this.arenaW, this.arenaH)) {
         targets.push({ x: g.x, y: g.y, radius, ref: e })
@@ -259,8 +259,7 @@ export class VoidArenaScene extends BaseArenaScene {
       const mp = { x: m.image.x, y: m.image.y }
       for (const e of this.enemies.getChildren() as ImageObj[]) {
         if (!e.active) continue
-        const spec = e.getData('spec') as EnemySpec
-        const rr = m.hurtRadius + spec.radius
+        const rr = m.hurtRadius + enemyOf(e).spec.radius
         if (torusDist2(mp, e, W, H) <= rr * rr) this.onMemberTouched(m, e)
       }
       for (const s of this.enemyShots.getChildren() as ImageObj[]) {
@@ -428,18 +427,13 @@ export class VoidArenaScene extends BaseArenaScene {
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       remapBody(e)
-      const dx = e.getData('dirX') as number | undefined
-      if (dx !== undefined) {
-        const d = rot({ x: dx, y: e.getData('dirY') as number })
-        e.setData('dirX', d.x)
-        e.setData('dirY', d.y)
-      }
-      const kvx = e.getData('kvx') as number | undefined
-      if (kvx !== undefined) {
-        const kv = rot({ x: kvx, y: e.getData('kvy') as number })
-        e.setData('kvx', kv.x)
-        e.setData('kvy', kv.y)
-      }
+      const a = enemyOf(e)
+      const d = rot({ x: a.dirX, y: a.dirY })
+      a.dirX = d.x
+      a.dirY = d.y
+      const kv = rot({ x: a.kvx, y: a.kvy })
+      a.kvx = kv.x
+      a.kvy = kv.y
     }
     for (const s of this.enemyShots.getChildren() as ImageObj[]) {
       if (s.active) remapBody(s)

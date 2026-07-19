@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import { castCaptainSkill } from './skills'
 import { toPx } from './px'
+import { attachEnemy, enemyOf } from './actors'
+import type { Enemy } from './actors'
 import { circleBody } from './arcade'
 import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from './pickups'
 import { spawnBurnZone, spawnEnemyShot, spawnPoisonPool, updateBurnZones, updateEnemyShots, updatePoisonPools } from './hazards'
@@ -199,11 +201,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     damageEnemy: (e, d, kb, sx, sy) => this.applyDamage(e as ImageObj, d, kb, sx, sy),
     spawnProjectile: (x, y, angle, spec, damage) => spawnProjectile(this, x, y, angle, spec, damage),
     teamCenter: () => this.center,
+    enemyHp: (ref) => enemyOf(ref as ImageObj).hp,
     applySlow: (x, y, radius, factor) =>
       this.frameSlowZones.push({ x, y, r2: radius * radius, factor }),
     slowEnemy: (enemy, factor, durationMs) => {
-      enemy.setData('abilitySlowMul', factor)
-      enemy.setData('abilitySlowUntil', this.elapsedMs + durationMs)
+      const a = enemyOf(enemy as ImageObj)
+      a.abilitySlowMul = factor
+      a.abilitySlowUntil = this.elapsedMs + durationMs
     },
     spawnBurnZone: (x, y, radius, dps, durationMs) => spawnBurnZone(this, x, y, radius, dps, durationMs),
     attractCoins: (x, y, radius) => this.frameAttractors.push({ x, y, r2: radius * radius }),
@@ -296,7 +300,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       awake++
-      targets.push({ x: e.x, y: e.y, radius: (e.getData('spec') as EnemySpec).radius, ref: e })
+      targets.push({ x: e.x, y: e.y, radius: enemyOf(e).spec.radius, ref: e })
     }
     this.awakeCount = awake
     this.dormantCount = 0
@@ -365,17 +369,17 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     return p
   }
   /** 游荡方向（有界图撞边折返版在子类） */
-  protected wanderDir(e: ImageObj): Point {
-    if (this.elapsedMs >= (e.getData('turnAt') as number)) {
-      const a = this.rng.next() * Math.PI * 2
-      e.setData('dirX', Math.cos(a))
-      e.setData('dirY', Math.sin(a))
-      e.setData('turnAt', this.elapsedMs + 800 + this.rng.next() * 1200)
+  protected wanderDir(a: Enemy): Point {
+    if (this.elapsedMs >= a.turnAt) {
+      const ang = this.rng.next() * Math.PI * 2
+      a.dirX = Math.cos(ang)
+      a.dirY = Math.sin(ang)
+      a.turnAt = this.elapsedMs + 800 + this.rng.next() * 1200
     }
-    return { x: e.getData('dirX') as number, y: e.getData('dirY') as number }
+    return { x: a.dirX, y: a.dirY }
   }
   /** 逃跑方向修正（有界图贴边沿墙滑行） */
-  protected fleeDir(_e: ImageObj, away: Point): Point {
+  protected fleeDir(_a: Enemy, away: Point): Point {
     return away
   }
   /** 普通敌人速度定稿后的世界后处理（河流：加水流 + 跨向钳岸） */
@@ -433,24 +437,23 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const targets: EnemyTarget[] = []
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
-      const within =
-        !!e.getData('boss') || isWithinActive(e.x - this.center.x, e.y - this.center.y, activeHalf)
-      const wasDormant = !!e.getData('dormant')
-      if (within === wasDormant) {
+      const a = enemyOf(e)
+      const within = a.boss || isWithinActive(e.x - this.center.x, e.y - this.center.y, activeHalf)
+      if (within === a.dormant) {
         // 状态翻转（含首帧）：入睡关体清速度，唤醒开体（AI 下帧自然接管）
         const body = e.body as ArcadeBody
         if (within) {
-          e.setData('dormant', false)
+          a.dormant = false
           body.enable = true
         } else {
-          e.setData('dormant', true)
+          a.dormant = true
           body.setVelocity(0, 0)
           body.enable = false
         }
       }
       if (within) {
         awake++
-        targets.push({ x: e.x, y: e.y, radius: (e.getData('spec') as EnemySpec).radius, ref: e })
+        targets.push({ x: e.x, y: e.y, radius: a.spec.radius, ref: e })
       } else {
         dormant++
       }
@@ -500,7 +503,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       seconds: Math.floor(this.elapsedMs / 1000),
       remainMs: Math.max(0, waveDurationMs(this.run.wave) - this.elapsedMs),
       over: this.over,
-      bossHp: this.boss?.active ? (this.boss.getData('hp') as number) : null,
+      bossHp: this.boss?.active ? enemyOf(this.boss).hp : null,
       bossMaxHp: BOSS_PX.hp,
     }
   }
@@ -1107,14 +1110,14 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   }
 
   protected onMemberTouched(m: Member, enemy: ImageObj): void {
-    if (this.over || !enemy.active || enemy.getData('dormant')) return
+    if (this.over || !enemy.active) return
+    const a = enemyOf(enemy)
+    if (a.dormant) return
     // 变形中的敌人无害：接触不造成伤害（荆棘也不触发）
-    if (((enemy.getData('morphUntil') as number | undefined) ?? 0) > this.elapsedMs) return
+    if (a.morphUntil > this.elapsedMs) return
     if (!m.alive || this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
-    const spec = enemy.getData('spec') as EnemySpec
-    const dmgMul = (enemy.getData('dmgMul') as number | undefined) ?? 1
-    this.hurtMember(m, Math.round(spec.damage * dmgMul), 0xff7777, spec.name)
+    this.hurtMember(m, Math.round(a.spec.damage * a.dmgMul), 0xff7777, a.spec.name)
     // 荆棘背心：接触反伤（与受击同帧、同吃无敌帧节流；击杀归属穿刺者）
     if (m.thorns > 0 && enemy.active) {
       this.applyDamage(enemy, m.thorns, 0, undefined, undefined, m.slot)
@@ -1253,13 +1256,14 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     srcSlot = -1,
     crit = false,
   ): void {
-    if (!enemy.active || enemy.getData('dormant')) return
+    if (!enemy.active) return
+    const a = enemyOf(enemy)
+    if (a.dormant) return
     // 脆弱诅咒：变形中的敌人受伤加深
-    const vuln = (enemy.getData('morphVuln') as number | undefined) ?? 1
-    if (vuln !== 1 && ((enemy.getData('morphUntil') as number | undefined) ?? 0) > this.elapsedMs) {
-      damage = Math.round(damage * vuln)
+    if (a.morphVuln !== 1 && a.morphUntil > this.elapsedMs) {
+      damage = Math.round(damage * a.morphVuln)
     }
-    const hpBefore = enemy.getData('hp') as number
+    const hpBefore = a.hp
     const hp = hpBefore - damage
     // 结算统计：按伤害来源槽位累计有效伤害与击杀（压测阵容槽位越界则跳过）
     const st = this.run.stats
@@ -1269,7 +1273,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
     this.floatDamage(enemy.x, enemy.y, damage, crit)
     // Boss 体格击退免疫：不吃冲量也不被致死击飞
-    if (enemy.getData('kbImmune')) knockback = 0
+    if (a.kbImmune) knockback = 0
     if (hp <= 0) {
       // 致死一击：敌人失去自身动力，击退不再衰减——尸体被匀速击飞
       if (knockback > 0 && srcX !== undefined && srcY !== undefined) {
@@ -1280,24 +1284,24 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         this.killEnemy(enemy, 0, 0, srcSlot)
       }
     } else {
-      enemy.setData('hp', hp)
+      a.hp = hp
       playSfx('hit')
       // 受击纯白闪光：时间戳驱动（steerEnemies 里恢复），高频命中不堆 timer/tween
-      enemy.setData('flashUntil', this.elapsedMs + 70)
+      a.flashUntil = this.elapsedMs + 70
       enemy.setTintFill(0xffffff)
       // 击退冲量：从伤害源指向敌人，叠加进敌人临时速度（steerEnemies 合成并衰减）
       if (knockback > 0 && srcX !== undefined && srcY !== undefined) {
         const d = this.worldDelta({ x: srcX, y: srcY }, enemy)
         const dir = norm(d.x, d.y)
-        let kvx = ((enemy.getData('kvx') as number) ?? 0) + dir.x * knockback
-        let kvy = ((enemy.getData('kvy') as number) ?? 0) + dir.y * knockback
+        let kvx = a.kvx + dir.x * knockback
+        let kvy = a.kvy + dir.y * knockback
         const len = Math.hypot(kvx, kvy)
         if (len > KNOCKBACK.maxSpeed) {
           kvx = (kvx / len) * KNOCKBACK.maxSpeed
           kvy = (kvy / len) * KNOCKBACK.maxSpeed
         }
-        enemy.setData('kvx', kvx)
-        enemy.setData('kvy', kvy)
+        a.kvx = kvx
+        a.kvy = kvy
       }
     }
   }
@@ -1305,9 +1309,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   private killEnemy(enemy: ImageObj, flingVx = 0, flingVy = 0, srcSlot = -1): void {
     this.run.kills++
     playSfx('kill')
-    const spec = enemy.getData('spec') as EnemySpec
-    const elite = !!enemy.getData('elite')
-    const isBoss = !!enemy.getData('boss')
+    const a = enemyOf(enemy)
+    const spec = a.spec
+    const elite = a.elite
+    const isBoss = a.boss
     // 敌情明细：按敌人名计击杀，精英另计总数
     const st = this.run.stats
     st.enemyKills[spec.name] = (st.enemyKills[spec.name] ?? 0) + 1
@@ -1322,7 +1327,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       CAPTAINS[this.run.captainId].xpGainMul * this.teamFx.xpGainMul * (elite ? ELITE.xpMul : 1)
     this.gainTeamXp(Math.round(spec.xp * xpMul))
     // 偷金币鼠：吐回吃掉的金币 + 1 枚利息
-    const eaten = (enemy.getData('eaten') as number) || 0
+    const eaten = a.eaten
     const baseCoins = spec.coins * (elite ? ELITE.coinsMul : 1)
     const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? baseCoins : 0
     spawnCoins(this, enemy.x, enemy.y, baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0))
@@ -1466,20 +1471,17 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         xp: BOSS_PX.xp,
         coins: BOSS_PX.coins,
       } as unknown as EnemySpec
-      enemy.setData('hp', BOSS_PX.hp)
-      enemy.setData('maxHp', BOSS_PX.hp)
-      enemy.setData('spec', bossSpec)
-      enemy.setData('boss', true)
-      enemy.setData('kbImmune', true)
-      enemy.setData('eaten', 0)
-      enemy.setData('ph', 0)
-      enemy.setData('state', 'chase')
-      enemy.setData('nextRingAt', this.elapsedMs + 1800)
-      enemy.setData('nextDashAt', this.elapsedMs + 3600)
       const anim = new Animator(enemy)
       anim.register('idle', clipFramesLive(this, BOSS_PX.emoji, 'idle', 'elite'))
       anim.setIdle('idle', ANIM_SPEC.durMs)
-      enemy.setData('anim', anim)
+      attachEnemy(enemy, bossSpec, BOSS_PX.hp, {
+        boss: true,
+        kbImmune: true,
+        state: 'chase',
+        nextRingAt: this.elapsedMs + 1800,
+        nextDashAt: this.elapsedMs + 3600,
+        anim,
+      })
       this.enemies.add(enemy)
       this.boss = enemy
       playSfx('boom')
@@ -1490,45 +1492,43 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   }
 
   /** Boss 状态机：缓速逼近；周期环形弹幕；周期蓄力 → 朝队伍中心突刺 */
-  private steerBoss(e: ImageObj, body: ArcadeBody, slow: number, now: number): void {
-    const state = e.getData('state') as string
-    if (now >= (e.getData('nextRingAt') as number)) {
-      e.setData('nextRingAt', now + BOSS_PX.ring.intervalMs)
+  private steerBoss(a: Enemy, body: ArcadeBody, slow: number, now: number): void {
+    const e = a.image
+    if (now >= a.nextRingAt) {
+      a.nextRingAt = now + BOSS_PX.ring.intervalMs
       const rot = this.rng.next() * Math.PI * 2
       for (let i = 0; i < BOSS_PX.ring.count; i++) {
         spawnEnemyShot(this, e.x, e.y, rot + (i * 2 * Math.PI) / BOSS_PX.ring.count, BOSS_PX.ring.bullet, BOSS_PX.name)
       }
       playSfx('boom')
     }
-    if (state === 'windup') {
+    if (a.state === 'windup') {
       body.setVelocity(0, 0)
       e.setRotation(Math.sin(now / 26) * 0.12)
-      if (now >= (e.getData('windupUntil') as number)) {
+      if (now >= a.windupUntil) {
         const d = this.worldDelta(e, this.center)
         const dir = norm(d.x, d.y)
-        e.setData('state', 'dash')
-        e.setData('dashUntil', now + BOSS_PX.dash.durationMs)
-        e.setData('dirX', dir.x)
-        e.setData('dirY', dir.y)
+        a.state = 'dash'
+        a.dashUntil = now + BOSS_PX.dash.durationMs
+        a.dirX = dir.x
+        a.dirY = dir.y
         e.setRotation(0)
         e.clearTint()
         playSfx('whoosh')
       }
       return
     }
-    if (state === 'dash') {
-      const dx = e.getData('dirX') as number
-      const dy = e.getData('dirY') as number
-      body.setVelocity(dx * BOSS_PX.dash.speed * slow, dy * BOSS_PX.dash.speed * slow)
-      if (now >= (e.getData('dashUntil') as number)) {
-        e.setData('state', 'chase')
-        e.setData('nextDashAt', now + BOSS_PX.dash.intervalMs)
+    if (a.state === 'dash') {
+      body.setVelocity(a.dirX * BOSS_PX.dash.speed * slow, a.dirY * BOSS_PX.dash.speed * slow)
+      if (now >= a.dashUntil) {
+        a.state = 'chase'
+        a.nextDashAt = now + BOSS_PX.dash.intervalMs
       }
       return
     }
-    if (now >= (e.getData('nextDashAt') as number)) {
-      e.setData('state', 'windup')
-      e.setData('windupUntil', now + BOSS_PX.dash.windupMs)
+    if (now >= a.nextDashAt) {
+      a.state = 'windup'
+      a.windupUntil = now + BOSS_PX.dash.windupMs
       e.setTint(0xffb74d)
       return
     }
@@ -1558,34 +1558,33 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       spec.size * (elite ? ELITE.sizeMul : 1),
       elite ? 'elite' : 'enemy',
     ).setDepth(5)
-    if (elite) {
-      enemy.setData('elite', true)
-      enemy.setData('spMul', ELITE.speedMul)
-      enemy.setData('dmgMul', ELITE.damageMul)
-    }
     this.physics.add.existing(enemy)
     circleBody(enemy, spec.radius)
     this.configureEnemyBody(enemy)
-    enemy.setData('hp', hp)
-    enemy.setData('maxHp', hp)
-    enemy.setData('spec', spec)
-    // 行为状态：游荡方向/换向与开火计时（elapsedMs 时基，暂停安全）
-    enemy.setData('state', 'wander')
-    enemy.setData('dirX', Math.cos(this.rng.next() * Math.PI * 2))
-    enemy.setData('dirY', Math.sin(this.rng.next() * Math.PI * 2))
-    enemy.setData('turnAt', this.elapsedMs + 600 + this.rng.next() * 900)
-    enemy.setData('fireAt', this.elapsedMs + 900 + this.rng.next() * 1500)
-    enemy.setData('eaten', 0)
-    // 行走摇摆的随机相位：同屏大量敌人不齐步摆
+    // 行走摇摆的随机相位：同屏大量敌人不齐步摆；
+    // 部件动画 idle 常驻，相位偏移复用摇摆随机相（不额外消耗 rng 流）
+    const dirX = Math.cos(this.rng.next() * Math.PI * 2)
+    const dirY = Math.sin(this.rng.next() * Math.PI * 2)
+    const turnAt = this.elapsedMs + 600 + this.rng.next() * 900
+    const fireAt = this.elapsedMs + 900 + this.rng.next() * 1500
     const ph = this.rng.next() * Math.PI * 2
-    enemy.setData('ph', ph)
-    // 部件动画：idle 常驻，相位偏移复用摇摆随机相（不额外消耗 rng 流）
     const anim = new Animator(enemy)
     anim.register('idle', clipFramesLive(this, spec.emoji, 'idle', elite ? 'elite' : 'enemy'))
     anim.setIdle('idle', ANIM_SPEC.durMs, (ph / (Math.PI * 2)) * ANIM_SPEC.durMs)
-    enemy.setData('anim', anim)
-    // 舞会窗口内落地：跟着跳（全场蹦迪对新敌同样生效）
-    if (this.elapsedMs < this.danceEndsAt) enemy.setData('danceUntil', this.danceEndsAt)
+    attachEnemy(enemy, spec, hp, {
+      elite,
+      spMul: elite ? ELITE.speedMul : 1,
+      dmgMul: elite ? ELITE.damageMul : 1,
+      // 行为状态：游荡方向/换向与开火计时（elapsedMs 时基，暂停安全）
+      dirX,
+      dirY,
+      turnAt,
+      fireAt,
+      ph,
+      anim,
+      // 舞会窗口内落地：跟着跳（全场蹦迪对新敌同样生效）
+      danceUntil: this.elapsedMs < this.danceEndsAt ? this.danceEndsAt : 0,
+    })
     this.enemies.add(enemy)
     const targetScale = enemy.scale
     enemy.setScale(targetScale * 0.3).setAlpha(0.3)
@@ -1600,66 +1599,61 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     enemy: ImageObj,
     hex: { durationMs: number; morphEmoji: string; vulnMul?: number },
   ): void {
-    if (enemy.getData('boss')) return
-    enemy.setData('morphUntil', this.elapsedMs + hex.durationMs)
-    enemy.setData('morphVuln', hex.vulnMul ?? 1)
-    if (!enemy.getData('morphed')) {
-      enemy.setData('morphed', true)
-      const spec = enemy.getData('spec') as EnemySpec
-      const size = spec.size * (enemy.getData('elite') ? ELITE.sizeMul : 1)
-      const outline = enemy.getData('elite') ? ('elite' as const) : ('enemy' as const)
+    const a = enemyOf(enemy)
+    if (a.boss) return
+    a.morphUntil = this.elapsedMs + hex.durationMs
+    a.morphVuln = hex.vulnMul ?? 1
+    if (!a.morphed) {
+      a.morphed = true
+      const size = a.spec.size * (a.elite ? ELITE.sizeMul : 1)
+      const outline = a.elite ? ('elite' as const) : ('enemy' as const)
       enemy.setTexture(emojiKey(hex.morphEmoji, outline))
       enemy.setDisplaySize(size, size)
       // 动画播放器整套换成替身的 idle 帧（未烘焙则停留静态替身形象）
-      ;(enemy.getData('anim') as Animator | undefined)?.register(
-        'idle',
-        clipFramesLive(this, hex.morphEmoji, 'idle', outline),
-      )
+      a.anim?.register('idle', clipFramesLive(this, hex.morphEmoji, 'idle', outline))
       // 蓄力中被变形：中间状态一并打断
-      if (enemy.getData('state') === 'windup') enemy.clearTint()
-      enemy.setData('state', 'wander')
+      if (a.state === 'windup') enemy.clearTint()
+      a.state = 'wander'
       enemy.setRotation(0)
       this.puffBurst.explode(8, enemy.x, enemy.y)
     }
   }
 
   /** 变形到期：恢复原形与行为（开火计时后延，避免恢复瞬间齐射） */
-  private restoreMorph(enemy: ImageObj, spec: EnemySpec): void {
-    enemy.setData('morphUntil', undefined)
-    enemy.setData('morphVuln', 1)
-    enemy.setData('morphed', undefined)
-    const size = spec.size * (enemy.getData('elite') ? ELITE.sizeMul : 1)
-    const outline = enemy.getData('elite') ? ('elite' as const) : ('enemy' as const)
-    enemy.setTexture(emojiKey(spec.emoji, outline))
+  private restoreMorph(a: Enemy): void {
+    const enemy = a.image
+    a.morphUntil = 0
+    a.morphVuln = 1
+    a.morphed = false
+    const size = a.spec.size * (a.elite ? ELITE.sizeMul : 1)
+    const outline = a.elite ? ('elite' as const) : ('enemy' as const)
+    enemy.setTexture(emojiKey(a.spec.emoji, outline))
     enemy.setDisplaySize(size, size)
-    ;(enemy.getData('anim') as Animator | undefined)?.register(
-      'idle',
-      clipFramesLive(this, spec.emoji, 'idle', outline),
-    )
-    enemy.setData('fireAt', this.elapsedMs + 700)
+    a.anim?.register('idle', clipFramesLive(this, a.spec.emoji, 'idle', outline))
+    a.fireAt = this.elapsedMs + 700
     this.puffBurst.explode(6, enemy.x, enemy.y)
   }
 
   /** 敌人速度倍率 = 减速区叠乘（寒气光环等，带冷色调提示）× 精英加速标记 */
-  private slowFactorFor(e: ImageObj): number {
+  private slowFactorFor(a: Enemy): number {
+    const e = a.image
     let factor = 1
     for (const z of this.frameSlowZones) {
       const d = this.worldDelta(z, e)
       if (d.x * d.x + d.y * d.y <= z.r2) factor *= z.factor
     }
     const slowed = factor < 1
-    if (slowed !== (e.getData('slowed') as boolean | undefined)) {
-      e.setData('slowed', slowed)
+    if (slowed !== a.slowed) {
+      a.slowed = slowed
       if (slowed) e.setTint(0xa5d8ff)
       else e.clearTint()
     }
     // 能力施加的限时减速/冻结（震慑余波、凛冬降临）：到时自动失效
-    const abilityUntil = e.getData('abilitySlowUntil') as number | undefined
-    if (abilityUntil !== undefined && this.elapsedMs < abilityUntil) {
-      factor *= (e.getData('abilitySlowMul') as number) ?? 1
+    if (a.abilitySlowUntil !== 0 && this.elapsedMs < a.abilitySlowUntil) {
+      factor *= a.abilitySlowMul
     }
     // 时之沙的全局减速与精英加速同为「体质」倍率，不参与光环减速的染色判定
-    return factor * ((e.getData('spMul') as number | undefined) ?? 1) * this.teamFx.enemySlowMul
+    return factor * a.spMul * this.teamFx.enemySlowMul
   }
 
   private nearestAlive(x: number, y: number): Member | undefined {
@@ -1683,59 +1677,58 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (alive.length === 0) return
     const now = this.elapsedMs
     for (const e of this.enemies.getChildren() as ImageObj[]) {
-      if (!e.active || e.getData('dormant')) continue
-      const spec = e.getData('spec') as EnemySpec
+      if (!e.active) continue
+      const a = enemyOf(e)
+      if (a.dormant) continue
+      const spec = a.spec
       const body = e.body as ArcadeBody
       // 部件动画翻帧（先于任何 continue 分支：跳舞/变形期间照常呼吸）
-      ;(e.getData('anim') as Animator | undefined)?.update(now)
+      a.anim?.update(now)
       // 受击白闪到时恢复：清 tint 并让减速色下一帧重新生效
-      const flashUntil = e.getData('flashUntil') as number | undefined
-      if (flashUntil !== undefined && now >= flashUntil) {
-        e.setData('flashUntil', undefined)
+      if (a.flashUntil !== 0 && now >= a.flashUntil) {
+        a.flashUntil = 0
         e.clearTint()
-        e.setData('slowed', undefined)
-        if (e.getData('state') === 'windup') e.setTint(0xffb74d)
+        a.slowed = false
+        if (a.state === 'windup') e.setTint(0xffb74d)
       }
 
       // 全场蹦迪：定身摇摆（行为状态机暂停），击退与世界后处理（水流/钳制）照常。
       // 粉染色每帧重设：受击白闪到期 clearTint 后下一帧自动恢复
-      const danceUntil = e.getData('danceUntil') as number | undefined
-      if (danceUntil !== undefined) {
-        if (now < danceUntil) {
+      if (a.danceUntil !== 0) {
+        if (now < a.danceUntil) {
           body.setVelocity(0, 0)
           e.setTint(0xff9ff3)
-          e.setRotation(Math.sin(now / 80 + ((e.getData('ph') as number) ?? 0)) * 0.3)
-          this.decayKnockback(e, body, delta)
-          if (e.getData('boss')) this.postSteerBoss(e, body)
+          e.setRotation(Math.sin(now / 80 + a.ph) * 0.3)
+          this.decayKnockback(a, body, delta)
+          if (a.boss) this.postSteerBoss(e, body)
           else this.postSteerEnemy(e, body, spec)
           continue
         }
-        e.setData('danceUntil', undefined)
+        a.danceUntil = 0
         e.clearTint()
         e.setRotation(0)
       }
 
       // 仙子魔尘：变形期间失去本职行为（不开火/不突刺/不偷币），
       // 顶着绵羊形象缓速游荡；到期恢复原形
-      const morphUntil = e.getData('morphUntil') as number | undefined
-      if (morphUntil !== undefined) {
-        if (now < morphUntil) {
-          const slowM = this.slowFactorFor(e)
-          const dir = this.wanderDir(e)
+      if (a.morphUntil !== 0) {
+        if (now < a.morphUntil) {
+          const slowM = this.slowFactorFor(a)
+          const dir = this.wanderDir(a)
           body.setVelocity(dir.x * spec.speed * 0.5 * slowM, dir.y * spec.speed * 0.5 * slowM)
-          this.decayKnockback(e, body, delta)
+          this.decayKnockback(a, body, delta)
           this.postSteerEnemy(e, body, spec)
           continue
         }
-        this.restoreMorph(e, spec)
+        this.restoreMorph(a)
       }
 
-      const slow = this.slowFactorFor(e)
+      const slow = this.slowFactorFor(a)
       const target = this.nearestAlive(e.x, e.y)!
 
       // 终波 Boss：专属状态机（缓速逼近 + 环形弹幕 + 蓄力突刺）
-      if (e.getData('boss')) {
-        this.steerBoss(e, body, slow, now)
+      if (a.boss) {
+        this.steerBoss(a, body, slow, now)
         this.postSteerBoss(e, body)
         continue
       }
@@ -1748,60 +1741,46 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           break
         }
         case 'wanderFire': {
-          const dir = this.wanderDir(e)
+          const dir = this.wanderDir(a)
           body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
-          if (now >= (e.getData('fireAt') as number)) {
-            e.setData('fireAt', now + spec.fireIntervalMs)
-            spawnEnemyShot(
-              this,
-              e.x,
-              e.y,
-              Math.atan2(dir.y, dir.x),
-              spec.bullet,
-              spec.name,
-              (e.getData('dmgMul') as number | undefined) ?? 1,
-            )
+          if (now >= a.fireAt) {
+            a.fireAt = now + spec.fireIntervalMs
+            spawnEnemyShot(this, e.x, e.y, Math.atan2(dir.y, dir.x), spec.bullet, spec.name, a.dmgMul)
           }
           break
         }
         case 'dash': {
-          const state = e.getData('state') as string
           const d = this.worldDelta(e, target.image)
           const dist2 = d.x * d.x + d.y * d.y
-          if (state === 'windup') {
+          if (a.state === 'windup') {
             body.setVelocity(0, 0)
             // 蓄力颤动提示
             e.setRotation(Math.sin(now / 28) * 0.14)
-            if (now >= (e.getData('windupUntil') as number)) {
-              e.setData('state', 'dash')
-              e.setData('dashUntil', now + (spec.dashDist / spec.dashSpeed) * 1000)
+            if (now >= a.windupUntil) {
+              a.state = 'dash'
+              a.dashUntil = now + (spec.dashDist / spec.dashSpeed) * 1000
               e.setRotation(0)
               e.clearTint()
             }
-          } else if (state === 'dash') {
-            const dx = e.getData('dirX') as number
-            const dy = e.getData('dirY') as number
-            body.setVelocity(dx * spec.dashSpeed * slow, dy * spec.dashSpeed * slow)
-            if (now >= (e.getData('dashUntil') as number)) {
-              e.setData('state', 'cool')
-              e.setData('coolUntil', now + spec.cooldownMs)
+          } else if (a.state === 'dash') {
+            body.setVelocity(a.dirX * spec.dashSpeed * slow, a.dirY * spec.dashSpeed * slow)
+            if (now >= a.dashUntil) {
+              a.state = 'cool'
+              a.coolUntil = now + spec.cooldownMs
             }
-          } else if (
-            state !== 'cool' &&
-            dist2 <= spec.detectRange * spec.detectRange
-          ) {
+          } else if (a.state !== 'cool' && dist2 <= spec.detectRange * spec.detectRange) {
             // 进入探测圈：锁定当前方向蓄力（横向位移可躲）
             const dir = norm(d.x, d.y)
-            e.setData('state', 'windup')
-            e.setData('windupUntil', now + spec.windupMs)
-            e.setData('dirX', dir.x)
-            e.setData('dirY', dir.y)
+            a.state = 'windup'
+            a.windupUntil = now + spec.windupMs
+            a.dirX = dir.x
+            a.dirY = dir.y
             e.setTint(0xffb74d)
           } else {
-            if (state === 'cool' && now >= (e.getData('coolUntil') as number)) {
-              e.setData('state', 'wander')
+            if (a.state === 'cool' && now >= a.coolUntil) {
+              a.state = 'wander'
             }
-            const dir = this.wanderDir(e)
+            const dir = this.wanderDir(a)
             body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
           }
           break
@@ -1812,23 +1791,15 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           if (dist2 <= spec.fleeRange * spec.fleeRange) {
             // 逃离方向经世界钩子修正（有界图贴边沿墙滑行）
             const away = norm(-d.x, -d.y)
-            const dir = this.fleeDir(e, away)
+            const dir = this.fleeDir(a, away)
             body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
           } else {
-            const dir = this.wanderDir(e)
+            const dir = this.wanderDir(a)
             body.setVelocity(dir.x * spec.speed * 0.4 * slow, dir.y * spec.speed * 0.4 * slow)
           }
-          if (now >= (e.getData('fireAt') as number)) {
-            e.setData('fireAt', now + spec.fireIntervalMs)
-            spawnEnemyShot(
-              this,
-              e.x,
-              e.y,
-              Math.atan2(d.y, d.x),
-              spec.bullet,
-              spec.name,
-              (e.getData('dmgMul') as number | undefined) ?? 1,
-            )
+          if (now >= a.fireAt) {
+            a.fireAt = now + spec.fireIntervalMs
+            spawnEnemyShot(this, e.x, e.y, Math.atan2(d.y, d.x), spec.bullet, spec.name, a.dmgMul)
           }
           break
         }
@@ -1849,14 +1820,14 @@ export abstract class BaseArenaScene extends Phaser.Scene {
             const eatR = spec.radius + COIN.radius * UNIT
             if (bestD <= eatR * eatR) {
               coin.destroy()
-              e.setData('eaten', ((e.getData('eaten') as number) ?? 0) + 1)
+              a.eaten += 1
             } else {
               const d = this.worldDelta(e, coin)
               const dir = norm(d.x, d.y)
               body.setVelocity(dir.x * spec.speed * slow, dir.y * spec.speed * slow)
             }
           } else {
-            const dir = this.wanderDir(e)
+            const dir = this.wanderDir(a)
             body.setVelocity(dir.x * spec.speed * 0.3 * slow, dir.y * spec.speed * 0.3 * slow)
           }
           break
@@ -1864,19 +1835,18 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       }
 
       // 击退：临时冲量叠加进行为速度并指数衰减（不打断行为状态机）
-      this.decayKnockback(e, body, delta)
+      this.decayKnockback(a, body, delta)
 
       // 世界后处理：河流在此叠加水流并钳跨向
       this.postSteerEnemy(e, body, spec)
 
       // 行走动画：恒摇摆 + 按移动方向翻转（twemoji 默认朝左）；
       // 蓄力有自己的颤动，冲刺改为朝冲刺方向前倾
-      const state = e.getData('state') as string
-      if (state === 'dash') {
-        e.setRotation((e.getData('dirX') as number) * 0.3)
-        e.setFlipX((e.getData('dirX') as number) > 0)
-      } else if (state !== 'windup') {
-        e.setRotation(Math.sin(now / 95 + (e.getData('ph') as number)) * 0.1)
+      if (a.state === 'dash') {
+        e.setRotation(a.dirX * 0.3)
+        e.setFlipX(a.dirX > 0)
+      } else if (a.state !== 'windup') {
+        e.setRotation(Math.sin(now / 95 + a.ph) * 0.1)
         const vx = body.velocity.x
         if (Math.abs(vx) > 8) e.setFlipX(vx > 0)
       }
@@ -1884,19 +1854,17 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   }
 
   /** 击退冲量：叠加进当前速度并指数衰减（行为分支与蹦迪定身共用） */
-  private decayKnockback(e: ImageObj, body: ArcadeBody, delta: number): void {
-    const kvx = e.getData('kvx') as number | undefined
-    if (kvx === undefined) return
-    const kvy = e.getData('kvy') as number
-    body.velocity.x += kvx
-    body.velocity.y += kvy
+  private decayKnockback(a: Enemy, body: ArcadeBody, delta: number): void {
+    if (a.kvx === 0 && a.kvy === 0) return
+    body.velocity.x += a.kvx
+    body.velocity.y += a.kvy
     const decay = Math.exp(-delta / KNOCKBACK.tauMs)
-    if ((kvx * kvx + kvy * kvy) * decay * decay < 100) {
-      e.setData('kvx', undefined)
-      e.setData('kvy', undefined)
+    if ((a.kvx * a.kvx + a.kvy * a.kvy) * decay * decay < 100) {
+      a.kvx = 0
+      a.kvy = 0
     } else {
-      e.setData('kvx', kvx * decay)
-      e.setData('kvy', kvy * decay)
+      a.kvx *= decay
+      a.kvy *= decay
     }
   }
 

@@ -14,6 +14,7 @@ import { emojiImage } from '../emoji/textures'
 import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
+import type { Enemy } from '../battle/actors'
 
 // 使用侧换算：MAP 数值为格值（项目约定）
 const MAPW = MAP.width * UNIT
@@ -119,26 +120,27 @@ export class ArenaScene extends BaseArenaScene {
   }
 
   /** 游荡撞边折返：接近地图边缘时翻转对应方向分量 */
-  protected wanderDir(e: ImageObj): Point {
-    if (this.elapsedMs >= (e.getData('turnAt') as number)) {
-      const a = this.rng.next() * Math.PI * 2
-      e.setData('dirX', Math.cos(a))
-      e.setData('dirY', Math.sin(a))
-      e.setData('turnAt', this.elapsedMs + 800 + this.rng.next() * 1200)
+  protected wanderDir(a: Enemy): Point {
+    if (this.elapsedMs >= a.turnAt) {
+      const ang = this.rng.next() * Math.PI * 2
+      a.dirX = Math.cos(ang)
+      a.dirY = Math.sin(ang)
+      a.turnAt = this.elapsedMs + 800 + this.rng.next() * 1200
     }
-    let dx = e.getData('dirX') as number
-    let dy = e.getData('dirY') as number
+    const e = a.image
+    let dx = a.dirX
+    let dy = a.dirY
     const margin = 0.6 * UNIT
     if ((e.x < margin && dx < 0) || (e.x > MAPW - margin && dx > 0)) dx = -dx
     if ((e.y < margin && dy < 0) || (e.y > MAPH - margin && dy > 0)) dy = -dy
-    e.setData('dirX', dx)
-    e.setData('dirY', dy)
+    a.dirX = dx
+    a.dirY = dy
     return { x: dx, y: dy }
   }
 
   /** 逃离方向贴边时沿墙滑行，不顶出地图 */
-  protected fleeDir(e: ImageObj, away: Point): Point {
-    return fleeSteer(e.x, e.y, away.x, away.y, MAPW, MAPH, 1.5 * UNIT)
+  protected fleeDir(a: Enemy, away: Point): Point {
+    return fleeSteer(a.image.x, a.image.y, away.x, away.y, MAPW, MAPH, 1.5 * UNIT)
   }
 
   cullEnemyShot(s: ImageObj): boolean {

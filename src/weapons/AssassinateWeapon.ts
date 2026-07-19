@@ -35,7 +35,7 @@ export class AssassinateWeapon implements WeaponRuntime {
       const dx = t.x - owner.x
       const dy = t.y - owner.y
       if (dx * dx + dy * dy > r2) continue
-      const hp = (t.ref.getData('hp') as number) || 0
+      const hp = this.ctx.enemyHp(t.ref)
       if (hp > bestHp) {
         bestHp = hp
         best = t
@@ -89,7 +89,7 @@ export class AssassinateWeapon implements WeaponRuntime {
     let damage = Math.round(this.spec.damage * this.ctx.damageMul())
     const exec = this.spec.execute
     if (exec) {
-      const hp = (target.ref.getData('hp') as number) || 0
+      const hp = this.ctx.enemyHp(target.ref)
       const maxHp = (target.ref.getData('maxHp') as number) || hp
       if (maxHp > 0 && hp / maxHp <= exec.hpRatio) damage = Math.round(damage * exec.mul)
     }

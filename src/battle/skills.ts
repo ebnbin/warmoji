@@ -6,6 +6,7 @@ import { UNIT } from '../lib/units'
 import { waveAt } from '../run/waves'
 import { viewport } from '../screen/apply'
 import type { BaseArenaScene, ImageObj } from './BaseArenaScene'
+import { enemyOf } from './actors'
 import { spawnCoins } from './pickups'
 
 // 队长主动技能的战斗内实现：castCaptainSkill 收口就绪/弹药校验、扣豆、分派；
@@ -72,7 +73,7 @@ function skillAngel(scene: BaseArenaScene): void {
  * 每袋落地掉金币（砸死的敌人尸体照常掉落，两份都拿） */
 function skillMoneybags(scene: BaseArenaScene): void {
   const nearest = (scene.enemies.getChildren() as ImageObj[])
-    .filter((e) => e.active && !e.getData('dormant'))
+    .filter((e) => e.active && !enemyOf(e).dormant)
     .map((e) => {
       const d = scene.worldDelta(scene.center, e)
       return { e, d2: d.x * d.x + d.y * d.y }
@@ -109,10 +110,10 @@ function skillParty(scene: BaseArenaScene): void {
   scene.danceEndsAt = scene.elapsedMs + SKILL.party.danceMs
   for (const e of scene.enemies.getChildren() as ImageObj[]) {
     if (!e.active) continue
-    e.setData('danceUntil', scene.danceEndsAt)
-    const state = e.getData('state') as string | undefined
-    if (state === 'windup' || state === 'dash') {
-      e.setData('state', e.getData('boss') ? 'chase' : 'wander')
+    const a = enemyOf(e)
+    a.danceUntil = scene.danceEndsAt
+    if (a.state === 'windup' || a.state === 'dash') {
+      a.state = a.boss ? 'chase' : 'wander'
       e.clearTint()
     }
   }
@@ -142,7 +143,9 @@ function skillProdigy(scene: BaseArenaScene): void {
   playSfx('boom')
   // 击杀会边遍历边销毁，先复制快照
   for (const e of [...(scene.enemies.getChildren() as ImageObj[])]) {
-    if (!e.active || e.getData('dormant')) continue
-    scene.applyDamage(e, prodigyDamage(hpMul, !!e.getData('boss')), 0)
+    if (!e.active) continue
+    const a = enemyOf(e)
+    if (a.dormant) continue
+    scene.applyDamage(e, prodigyDamage(hpMul, a.boss), 0)
   }
 }

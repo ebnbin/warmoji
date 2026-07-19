@@ -14,6 +14,7 @@ import type { Point } from '../lib/vec'
 import { emojiImage } from '../emoji/textures'
 import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
+import { enemyOf } from '../battle/actors'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 
 // 河流竞技场（kind='river'）：单屏世界——相机静止，世界 = 逻辑视口 × 1.2
@@ -201,18 +202,13 @@ export class RiverArenaScene extends BaseArenaScene {
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       remapBody(e)
-      const dx = e.getData('dirX') as number | undefined
-      if (dx !== undefined) {
-        const d = rot({ x: dx, y: e.getData('dirY') as number })
-        e.setData('dirX', d.x)
-        e.setData('dirY', d.y)
-      }
-      const kvx = e.getData('kvx') as number | undefined
-      if (kvx !== undefined) {
-        const kv = rot({ x: kvx, y: e.getData('kvy') as number })
-        e.setData('kvx', kv.x)
-        e.setData('kvy', kv.y)
-      }
+      const a = enemyOf(e)
+      const d = rot({ x: a.dirX, y: a.dirY })
+      a.dirX = d.x
+      a.dirY = d.y
+      const kv = rot({ x: a.kvx, y: a.kvy })
+      a.kvx = kv.x
+      a.kvy = kv.y
     }
     for (const s of this.enemyShots.getChildren() as ImageObj[]) {
       if (s.active) remapBody(s)
