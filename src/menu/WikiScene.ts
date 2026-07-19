@@ -15,7 +15,7 @@ import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../screen/appl
 import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { VirtualEmojiGrid } from '../emoji/virtualGrid'
 
-// 图鉴：单排类别 tab——角色/队长/敌人/武器/道具（条目列表+详情）与
+// 图鉴：单排类别 tab——角色/队长/敌人/能力/道具（条目列表+详情）与
 // 「全部」（twemoji 基础形态完整网格）平级，「全部」排最后。
 // 「全部」页 = VirtualEmojiGrid feed 流组件：无前置构建，滚到哪个格子
 // 哪个格子按需光栅化（页内缓存、滚回零等待），退出图鉴全量释放内存。
@@ -163,7 +163,7 @@ export class WikiScene extends Phaser.Scene {
 
   // ── 类别横向 tab ────────────────────────────────────────────
 
-  /** 类别横向 tab：角色/队长/敌人/武器/道具 + 「全部」（完整 emoji 网格）平级排在最后；
+  /** 类别横向 tab：角色/队长/敌人/能力/道具 + 「全部」（完整 emoji 网格）平级排在最后；
    * 横屏单行，竖屏拆两行（720 宽放不下一行） */
   private createCategoryTabs(res: number): void {
     const L = this.layout

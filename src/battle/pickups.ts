@@ -3,18 +3,18 @@ import { CAPTAINS, CHARACTERS, MEMBER, TEAM, loadoutFor } from '../characters/re
 import { memberMaxHp } from '../characters/stats'
 import { emojiImage } from '../emoji/textures'
 import {
-  abilityTiers,
+  upgradeTiers,
   aggregateCharacterEffects,
   aggregateTeamEffects,
   COIN,
   ITEMS,
-  resolveWeaponSpec,
+  resolveAbilitySpec,
 } from '../items/registry'
 import { UNIT } from '../lib/units'
 import { norm } from '../lib/vec'
 import { CHEST, rollChestLoot } from '../run/chest'
-import { createWeapon } from '../weapons/create'
-import { KNOCKBACK } from '../weapons/registry'
+import { createAbility } from '../abilities/create'
+import { KNOCKBACK } from '../abilities/registry'
 import { circleBody } from './arcade'
 import { toPx } from './px'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
@@ -144,7 +144,7 @@ function openChest(scene: BaseArenaScene, chest: ImageObj): void {
   })
 }
 
-/** 开箱即时生效：按最新道具重算派生属性并热重建武器（能力卡质变/
+/** 开箱即时生效：按最新道具重算派生属性并热重建能力（升级卡质变/
  * 射程弹速类立即可见）。每波开局 createMember 整体重建，这里只覆盖本波剩余 */
 function refreshMemberItems(scene: BaseArenaScene, slot: number): void {
   const m = scene.members[slot]
@@ -152,7 +152,7 @@ function refreshMemberItems(scene: BaseArenaScene, slot: number): void {
   if (!m || !id) return
   const owned = scene.run.memberItems[slot] ?? []
   const fx = aggregateCharacterEffects(owned)
-  // 原地覆写：武器 ctx 闭包读的就是这个对象（伤害/攻速/暴击/击退实时生效）
+  // 原地覆写：能力 ctx 闭包读的就是这个对象（伤害/攻速/暴击/击退实时生效）
   Object.assign(m.fx, fx)
   const maxHp = memberMaxHp(fx.hpAdd)
   if (m.alive) m.hp = Math.max(1, Math.min(maxHp, m.hp + Math.max(0, maxHp - m.maxHp)))
@@ -164,11 +164,11 @@ function refreshMemberItems(scene: BaseArenaScene, slot: number): void {
   m.regenPerSec = fx.regenPerSec
   m.thorns = fx.thorns
   m.killHeal = fx.killHeal
-  for (const w of m.weapons) w.destroy()
-  m.weapons = loadoutFor(CHARACTERS[id], abilityTiers(id, owned)).map((w, i) =>
-    createWeapon(toPx(resolveWeaponSpec(w, m.fx)), m.ctx, 200 + i * 230),
+  for (const w of m.abilities) w.destroy()
+  m.abilities = loadoutFor(CHARACTERS[id], upgradeTiers(id, owned)).map((w, i) =>
+    createAbility(toPx(resolveAbilitySpec(w, m.fx)), m.ctx, 200 + i * 230),
   )
-  if (!m.alive) for (const w of m.weapons) w.setVisible(false)
+  if (!m.alive) for (const w of m.abilities) w.setVisible(false)
 }
 
 /** 击杀碎裂：敌人纹理四分为碎片抛散淡出（对象池复用，见 scene.shardPool） */

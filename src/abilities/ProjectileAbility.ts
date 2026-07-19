@@ -2,12 +2,12 @@ import type Phaser from 'phaser'
 import type { ProjectileSpec } from './spec'
 import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
-import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 发射型：held 时持有物定身指向目标（可带左右手挂载位）；无 held 时角色本体出弹。
  * 瞄准：nearest 最近目标 / move 持有者移动方向（无需目标）；整圈 volley 也无需目标。
  * 能力：volley 恒定齐射（≥2π 为整圈，可随机旋转）；everyN 每第 n 次特殊齐射 */
-export class ProjectileWeapon implements WeaponRuntime {
+export class ProjectileAbility implements AbilityRuntime {
   private image?: Phaser.GameObjects.Image
   private cooldown: number
   private aim = 0
@@ -15,7 +15,7 @@ export class ProjectileWeapon implements WeaponRuntime {
 
   constructor(
     private spec: ProjectileSpec,
-    private ctx: WeaponContext,
+    private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     if (spec.held) {
@@ -24,7 +24,7 @@ export class ProjectileWeapon implements WeaponRuntime {
     this.cooldown = initialCooldownMs
   }
 
-  private muzzle(owner: WeaponOwner): { x: number; y: number } {
+  private muzzle(owner: AbilityOwner): { x: number; y: number } {
     const held = this.spec.held
     if (!held) return { x: owner.x, y: owner.y }
     const side = held.mountSide ?? 0
@@ -37,7 +37,7 @@ export class ProjectileWeapon implements WeaponRuntime {
     }
   }
 
-  update(delta: number, owner: WeaponOwner): void {
+  update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
     if (this.image) {
       const pos = this.muzzle(owner)

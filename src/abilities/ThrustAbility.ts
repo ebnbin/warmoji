@@ -3,11 +3,11 @@ import { circleHitIndices, thrustHitIndices } from './spec'
 import type { ThrustSpec } from './spec'
 import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
-import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 突刺型：held 时持有物挥出收回；无 held 时角色本体前冲收回。胶囊判定内每敌一次伤害。
  * 能力：combo 出手后短暂延迟重新索敌再刺一段；tipBurst 突刺终点圆形震波 */
-export class ThrustWeapon implements WeaponRuntime {
+export class ThrustAbility implements AbilityRuntime {
   private image?: Phaser.GameObjects.Image
   private cooldown: number
   private aim = 0
@@ -18,7 +18,7 @@ export class ThrustWeapon implements WeaponRuntime {
 
   constructor(
     private spec: ThrustSpec,
-    private ctx: WeaponContext,
+    private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     if (spec.held) {
@@ -27,7 +27,7 @@ export class ThrustWeapon implements WeaponRuntime {
     this.cooldown = initialCooldownMs
   }
 
-  update(delta: number, owner: WeaponOwner): void {
+  update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
     if (this.spec.held && this.image) {
       const dist =
@@ -57,7 +57,7 @@ export class ThrustWeapon implements WeaponRuntime {
   }
 
   /** 单段突刺：索敌 → 胶囊判定 → 终点震波（能力）→ 挥出动画 */
-  private strike(owner: WeaponOwner): void {
+  private strike(owner: AbilityOwner): void {
     const targets = this.ctx.targets()
     const aim = nearestAngle(owner, targets)
     if (aim === null) return

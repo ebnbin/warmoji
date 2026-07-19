@@ -5,7 +5,7 @@ import { Animator } from '../emoji/animator'
 import { clipFramesLive } from '../emoji/animTextures'
 import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
-import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 interface Turret {
   img: Phaser.GameObjects.Image
@@ -17,7 +17,7 @@ interface Turret {
  * 建造者）。同时在场有上限，超出拆最旧的。能力：burst 三连弩扇形连射。
  * 动画绑定示范：开火即播 attack cycle clip，durMs = 本次开火间隔——
  * 攻速（cooldownMul）越快拉弓越快，一次攻击恰好一遍动画 */
-export class TurretWeapon implements WeaponRuntime {
+export class TurretAbility implements AbilityRuntime {
   private turrets: Turret[] = []
   private placeCd: number
   /** 弩塔子弹走通用投射物管线的合成 spec */
@@ -30,7 +30,7 @@ export class TurretWeapon implements WeaponRuntime {
 
   constructor(
     private spec: TurretSpec,
-    private ctx: WeaponContext,
+    private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     this.placeCd = initialCooldownMs
@@ -47,7 +47,7 @@ export class TurretWeapon implements WeaponRuntime {
     this.attackFrames = clipFramesLive(ctx.scene, spec.turret.emoji, 'attack', ctx.ownerOutline)
   }
 
-  update(delta: number, owner: WeaponOwner): void {
+  update(delta: number, owner: AbilityOwner): void {
     this.clock += delta
     this.placeCd -= delta
     if (this.placeCd <= 0) {
@@ -81,7 +81,7 @@ export class TurretWeapon implements WeaponRuntime {
   }
 
   /** 在建造者脚下架一座；超编拆最旧 */
-  private place(owner: WeaponOwner): void {
+  private place(owner: AbilityOwner): void {
     const img = emojiImage(this.ctx.scene, owner.x, owner.y + 6, this.spec.turret.emoji, this.spec.turret.size, this.ctx.ownerOutline).setDepth(5)
     const base = img.scaleX
     img.setScale(base * 0.2)

@@ -1,10 +1,10 @@
 import type { Point } from '../lib/vec'
 import type { SfxId } from '../audio/sfx'
 
-// 武器 = 独立于角色的攻击行为单元；held 缺省时行为主体是角色本体。
-// 新增武器类型：在此加 kind 与 Spec，src/weapons/ 加对应运行时类并注册 create.ts。
+// 能力 = 独立于角色的攻击行为单元；held 缺省时行为主体是角色本体。
+// 新增能力类型：在此加 kind 与 Spec，src/abilities/ 加对应运行时类并注册 create.ts。
 
-/** 持有物视觉：挂在角色身上的武器 emoji */
+/** 持有物视觉：挂在角色身上的能力 emoji */
 export interface HeldVisual {
   readonly emoji: string
   readonly size: number
@@ -280,7 +280,7 @@ export interface ChainArcSpec {
   readonly burstEnd?: { readonly radius: number; readonly ratio: number }
 }
 
-export type WeaponSpec =
+export type AbilitySpec =
   | ThrustSpec
   | ProjectileSpec
   | SweepSpec

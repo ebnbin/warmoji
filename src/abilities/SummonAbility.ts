@@ -5,7 +5,7 @@ import { ANIM_SPEC } from '../emoji/studio'
 import { Animator } from '../emoji/animator'
 import { clipFramesLive } from '../emoji/animTextures'
 import { emojiImage } from '../emoji/textures'
-import type { TargetInfo, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 interface Minion {
   img: Phaser.GameObjects.Image
@@ -19,14 +19,14 @@ interface Minion {
 /** 召唤型：常驻一小群独立 AI 的召唤物——追击最近的敌人，撞上即造成伤害，
  * 之后短暂退回主人身边再出击。无敌人时绕主人盘旋。
  * 能力：sting 蜇中减速 */
-export class SummonWeapon implements WeaponRuntime {
+export class SummonAbility implements AbilityRuntime {
   private minions: Minion[] = []
   /** 动画时钟：delta 累积（暂停即停帧） */
   private clock = 0
 
   constructor(
     private spec: SummonSpec,
-    private ctx: WeaponContext,
+    private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     const frames = clipFramesLive(ctx.scene, spec.minion.emoji, 'idle', ctx.ownerOutline)
@@ -59,7 +59,7 @@ export class SummonWeapon implements WeaponRuntime {
     return best
   }
 
-  update(delta: number, owner: WeaponOwner): void {
+  update(delta: number, owner: AbilityOwner): void {
     this.clock += delta
     const dt = Math.min(delta, 50) / 1000
     const speed = this.spec.minion.speed

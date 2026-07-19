@@ -3,11 +3,11 @@ import { ACQUIRE } from './registry'
 import { circleHitIndices } from './spec'
 import type { AreaBlastSpec } from './spec'
 import { emojiImage } from '../emoji/textures'
-import type { TargetInfo, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 远程范围轰炸：在侦测范围内以最近敌人为爆心，对爆心圆形区域内所有敌人各一次伤害。
  * 能力：burn 爆心留灼烧地面；echo 延迟向随机敌人追加一次折损轰炸 */
-export class AreaBlastWeapon implements WeaponRuntime {
+export class AreaBlastAbility implements AbilityRuntime {
   private cooldown: number
   private hidden = false
   /** 连锁轰炸倒计时；≤0 无待发 */
@@ -16,13 +16,13 @@ export class AreaBlastWeapon implements WeaponRuntime {
 
   constructor(
     private spec: AreaBlastSpec,
-    private ctx: WeaponContext,
+    private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     this.cooldown = initialCooldownMs
   }
 
-  update(delta: number, owner: WeaponOwner): void {
+  update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
     if (this.hidden) return
 

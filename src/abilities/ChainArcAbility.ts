@@ -1,15 +1,15 @@
 import { circleHitIndices } from './spec'
 import type { ChainArcSpec } from './spec'
-import type { TargetInfo, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 连锁型：电弧命中最近敌人后在敌群间弹跳传导，每跳伤害衰减——
  * 敌人越密越强。能力：bounces 提升；burstEnd 末跳落点小范围爆裂 */
-export class ChainArcWeapon implements WeaponRuntime {
+export class ChainArcAbility implements AbilityRuntime {
   private cooldown: number
 
   constructor(
     private spec: ChainArcSpec,
-    private ctx: WeaponContext,
+    private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     this.cooldown = initialCooldownMs
@@ -31,7 +31,7 @@ export class ChainArcWeapon implements WeaponRuntime {
     return best
   }
 
-  update(delta: number, owner: WeaponOwner): void {
+  update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
     if (this.cooldown > 0) return
     const visited = new Set<unknown>()

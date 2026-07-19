@@ -1,18 +1,18 @@
 import { COIN } from '../items/registry'
-import { KNOCKBACK } from '../weapons/registry'
+import { KNOCKBACK } from '../abilities/registry'
 import { memberMaxHp } from '../characters/stats'
 import { CHARACTERS, MEMBER, TEAM, loadoutFor } from '../characters/registry'
 import type { CaptainSpec, CharacterId } from '../characters/registry'
 import {
-  abilityTiers,
+  upgradeTiers,
   aggregateCharacterEffects,
   aggregateTeamEffects,
-  resolveWeaponSpec,
+  resolveAbilitySpec,
 } from '../items/registry'
 import type { ItemId } from '../items/registry'
-import type { WeaponSpec } from '../weapons/spec'
+import type { AbilitySpec } from '../abilities/spec'
 
-// 角色属性面板的展示模型：把异构的角色/武器参数组织成统一的「属性组」。
+// 角色属性面板的展示模型：把异构的角色/能力参数组织成统一的「属性组」。
 // 距离统一换算为「格」（1 格 = 1 单位 = 地图网格边长），时间换算为秒。
 // 未来道具系统在此挂修正器：groups 由 spec + 已购道具共同计算。
 export interface StatGroup {
@@ -21,7 +21,7 @@ export interface StatGroup {
   readonly lines: readonly string[]
 }
 
-export const WEAPON_KIND_LABEL: Record<WeaponSpec['kind'], string> = {
+export const ABILITY_KIND_LABEL: Record<AbilitySpec['kind'], string> = {
   projectile: '投掷',
   thrust: '突刺',
   sweep: '横扫',
@@ -45,7 +45,7 @@ function sec(ms: number): string {
   return `${+(ms / 1000).toFixed(2)}秒`
 }
 
-export function weaponStatLines(w: WeaponSpec): string[] {
+export function abilityStatLines(w: AbilitySpec): string[] {
   // slowAura/heal/summon/turret 无常规「伤害·冷却」首行语义，各自定制
   if (w.kind === 'slowAura') {
     return [
@@ -94,11 +94,11 @@ export function weaponStatLines(w: WeaponSpec): string[] {
 }
 
 /** 角色面板：数值为道具修正后的生效值（伤害/冷却在展示层套倍率），
- * 武器行数取「能力注入后」的生效 spec（如全周横扫的 360° 弧宽）+ 特殊能力组 */
+ * 能力行数取「能力注入后」的生效 spec（如全周横扫的 360° 弧宽）+ 专属升级组 */
 export function characterStatGroups(id: CharacterId, items: readonly ItemId[] = []): StatGroup[] {
   const spec = CHARACTERS[id]
   const fx = aggregateCharacterEffects(items)
-  const tiers = abilityTiers(id, items)
+  const tiers = upgradeTiers(id, items)
   const dmgMul = fx.damageMul
   const cdMul = fx.cooldownMul
   const baseLines = [
@@ -118,25 +118,25 @@ export function characterStatGroups(id: CharacterId, items: readonly ItemId[] = 
     },
     {
       icon: '⭐',
-      title: '特殊能力（商店专属卡解锁）',
-      lines: spec.abilities.map((a, i) => {
-        const unlocked = i === 0 ? tiers.a1 : tiers.a2
+      title: '专属升级（商店专属卡解锁）',
+      lines: spec.upgrades.map((a, i) => {
+        const unlocked = i === 0 ? tiers.u1 : tiers.u2
         return `${a.icon}「${a.name}」${a.desc}${unlocked ? '' : '（未解锁）'}`
       }),
     },
     ...loadoutFor(spec, tiers).map((w) => {
-      const display = displaySpec(resolveWeaponSpec(w, fx), dmgMul, cdMul, fx.knockbackMul)
+      const display = displaySpec(resolveAbilitySpec(w, fx), dmgMul, cdMul, fx.knockbackMul)
       return {
         icon: w.icon,
-        title: `${w.name}（${WEAPON_KIND_LABEL[w.kind]}）`,
-        lines: weaponStatLines(display),
+        title: `${w.name}（${ABILITY_KIND_LABEL[w.kind]}）`,
+        lines: abilityStatLines(display),
       }
     }),
   ]
 }
 
 /** 展示用生效值：把伤害/冷却/击退倍率套进各 kind 自己的对应字段 */
-function displaySpec(w: WeaponSpec, dmgMul: number, cdMul: number, kbMul: number): WeaponSpec {
+function displaySpec(w: AbilitySpec, dmgMul: number, cdMul: number, kbMul: number): AbilitySpec {
   switch (w.kind) {
     case 'slowAura':
       return w

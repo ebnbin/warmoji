@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { CHARACTERS } from '../characters/registry'
-import { WEAPONS } from '../weapons/registry'
+import { ABILITIES } from '../abilities/registry'
 import type { ItemRarity, ItemSpec } from './registry'
 import {
-  ABILITY_GATE,
-  abilityCardAvailable,
-  abilityTiers,
+  UPGRADE_GATE,
+  upgradeCardAvailable,
+  upgradeTiers,
   itemPrice,
   PRICE,
   aggregateCharacterEffects,
@@ -17,19 +17,19 @@ import {
   RARITY_ORDER,
   rarityWeights,
   reachedStackLimit,
-  resolveWeaponSpec,
+  resolveAbilitySpec,
   rollItem,
 } from './registry'
 
 describe('道具定义', () => {
-  it('每件道具有 emoji/名字/介绍/正价格；能力卡效果走武器质变，其余至少一条效果', () => {
+  it('每件道具有 emoji/名字/介绍/正价格；升级卡效果走能力质变，其余至少一条效果', () => {
     for (const id of ITEM_IDS) {
       const item = ITEMS[id]
       expect(item.emoji.length).toBeGreaterThan(0)
       expect(item.name.length).toBeGreaterThan(0)
       expect(item.desc.length).toBeGreaterThan(0)
       expect(item.price).toBeGreaterThan(0)
-      if (item.pool === 'ability') {
+      if (item.pool === 'upgrade') {
         expect(item.forCharacter).toBeDefined()
         expect(item.maxStacks).toBe(1)
       } else {
@@ -38,10 +38,10 @@ describe('道具定义', () => {
     }
   })
 
-  it('每个角色恰好两张能力卡：一阶稀有、二阶史诗', () => {
+  it('每个角色恰好两张升级卡：一阶稀有、二阶史诗', () => {
     for (const cid of Object.keys(CHARACTERS)) {
       const cards = ITEM_IDS.filter(
-        (id) => ITEMS[id].pool === 'ability' && ITEMS[id].forCharacter === cid,
+        (id) => ITEMS[id].pool === 'upgrade' && ITEMS[id].forCharacter === cid,
       )
       expect(cards).toHaveLength(2)
       const first = cards.find((id) => (ITEMS[id] as ItemSpec).abilityIndex === 0)!
@@ -96,13 +96,13 @@ describe('稀有度', () => {
 })
 
 describe('道具池推导', () => {
-  it('角色池 = 通用 + 匹配武器形态 + 自己的能力卡；不含队长道具与他人能力卡', () => {
+  it('角色池 = 通用 + 匹配能力形态 + 自己的升级卡；不含队长道具与他人升级卡', () => {
     const magePool = characterPool('mage', CHARACTERS.mage)
     expect(magePool).toContain('gemHeart')
     expect(magePool).toContain('blastPowder')
-    expect(magePool).toContain('abilityMage1')
-    expect(magePool).toContain('abilityMage2')
-    expect(magePool).not.toContain('abilityTroll1')
+    expect(magePool).toContain('upgradeMage1')
+    expect(magePool).toContain('upgradeMage2')
+    expect(magePool).not.toContain('upgradeTroll1')
     expect(magePool).not.toContain('scope')
     expect(magePool).not.toContain('marchFlag')
     const cowboyPool = characterPool('cowboy', CHARACTERS.cowboy)
@@ -124,31 +124,31 @@ describe('道具池推导', () => {
   })
 })
 
-describe('能力卡解锁门控', () => {
+describe('升级卡解锁门控', () => {
   it('一阶卡：普通道具购满门槛才可上架；二阶卡：需已持有一阶', () => {
-    expect(abilityCardAvailable('abilityMage1', [])).toBe(false)
-    const normals = Array<'gemHeart'>(ABILITY_GATE.normalsForFirst).fill('gemHeart')
-    expect(abilityCardAvailable('abilityMage1', normals.slice(0, 1))).toBe(false)
-    expect(abilityCardAvailable('abilityMage1', normals)).toBe(true)
-    // 能力卡本身不计入普通道具数
-    expect(abilityCardAvailable('abilityMage2', normals)).toBe(false)
-    expect(abilityCardAvailable('abilityMage2', [...normals, 'abilityMage1'])).toBe(true)
-    // 非能力卡永远可上架
-    expect(abilityCardAvailable('gemHeart', [])).toBe(true)
+    expect(upgradeCardAvailable('upgradeMage1', [])).toBe(false)
+    const normals = Array<'gemHeart'>(UPGRADE_GATE.normalsForFirst).fill('gemHeart')
+    expect(upgradeCardAvailable('upgradeMage1', normals.slice(0, 1))).toBe(false)
+    expect(upgradeCardAvailable('upgradeMage1', normals)).toBe(true)
+    // 升级卡本身不计入普通道具数
+    expect(upgradeCardAvailable('upgradeMage2', normals)).toBe(false)
+    expect(upgradeCardAvailable('upgradeMage2', [...normals, 'upgradeMage1'])).toBe(true)
+    // 非升级卡永远可上架
+    expect(upgradeCardAvailable('gemHeart', [])).toBe(true)
   })
 
-  it('rollItem 过滤未达门槛的能力卡；达标后可抽出', () => {
-    expect(rollItem(['abilityMage1'], [], () => 0, 5)).toBe(null)
+  it('rollItem 过滤未达门槛的升级卡；达标后可抽出', () => {
+    expect(rollItem(['upgradeMage1'], [], () => 0, 5)).toBe(null)
     const owned = ['gemHeart', 'gemHeart'] as const
-    expect(rollItem(['abilityMage1'], [...owned], () => 0, 5)).toBe('abilityMage1')
+    expect(rollItem(['upgradeMage1'], [...owned], () => 0, 5)).toBe('upgradeMage1')
   })
 
-  it('abilityTiers 由已购卡推导', () => {
-    expect(abilityTiers('mage', [])).toEqual({ a1: false, a2: false })
-    expect(abilityTiers('mage', ['abilityMage1'])).toEqual({ a1: true, a2: false })
-    expect(abilityTiers('mage', ['abilityMage1', 'abilityMage2'])).toEqual({ a1: true, a2: true })
+  it('upgradeTiers 由已购卡推导', () => {
+    expect(upgradeTiers('mage', [])).toEqual({ u1: false, u2: false })
+    expect(upgradeTiers('mage', ['upgradeMage1'])).toEqual({ u1: true, u2: false })
+    expect(upgradeTiers('mage', ['upgradeMage1', 'upgradeMage2'])).toEqual({ u1: true, u2: true })
     // 别人的卡不算
-    expect(abilityTiers('mage', ['abilityTroll1'])).toEqual({ a1: false, a2: false })
+    expect(upgradeTiers('mage', ['upgradeTroll1'])).toEqual({ u1: false, u2: false })
   })
 })
 
@@ -208,23 +208,23 @@ describe('效果叠加', () => {
   })
 })
 
-describe('武器参数修正', () => {
+describe('能力参数修正', () => {
   it('rangeMul 缩放空间参数，不动伤害/冷却', () => {
     const fx = { ...aggregateCharacterEffects([]), rangeMul: 1.5 }
-    const blast = resolveWeaponSpec(WEAPONS.arcaneBlast, fx)
+    const blast = resolveAbilitySpec(ABILITIES.arcaneBlast, fx)
     if (blast.kind !== 'areaBlast') throw new Error('kind 不变')
-    expect(blast.blastRadius).toBeCloseTo(WEAPONS.arcaneBlast.blastRadius * 1.5)
-    expect(blast.detectRange).toBeCloseTo(WEAPONS.arcaneBlast.detectRange * 1.5)
-    expect(blast.damage).toBe(WEAPONS.arcaneBlast.damage)
-    expect(blast.cooldownMs).toBe(WEAPONS.arcaneBlast.cooldownMs)
+    expect(blast.blastRadius).toBeCloseTo(ABILITIES.arcaneBlast.blastRadius * 1.5)
+    expect(blast.detectRange).toBeCloseTo(ABILITIES.arcaneBlast.detectRange * 1.5)
+    expect(blast.damage).toBe(ABILITIES.arcaneBlast.damage)
+    expect(blast.cooldownMs).toBe(ABILITIES.arcaneBlast.cooldownMs)
   })
 
   it('projSpeedMul 只作用于弹速', () => {
     const fx = { ...aggregateCharacterEffects([]), projSpeedMul: 1.25 }
-    const pistol = resolveWeaponSpec(WEAPONS.pistolLeft, fx)
+    const pistol = resolveAbilitySpec(ABILITIES.pistolLeft, fx)
     if (pistol.kind !== 'projectile') throw new Error('kind 不变')
-    expect(pistol.projectile.speed).toBeCloseTo(WEAPONS.pistolLeft.projectile.speed * 1.25)
-    expect(pistol.projectile.radius).toBe(WEAPONS.pistolLeft.projectile.radius)
+    expect(pistol.projectile.speed).toBeCloseTo(ABILITIES.pistolLeft.projectile.speed * 1.25)
+    expect(pistol.projectile.radius).toBe(ABILITIES.pistolLeft.projectile.radius)
   })
 })
 

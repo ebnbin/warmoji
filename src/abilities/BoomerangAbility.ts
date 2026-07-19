@@ -2,7 +2,7 @@ import type Phaser from 'phaser'
 import type { BoomerangSpec } from './spec'
 import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
-import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 单枚镖的飞行状态 */
 interface Flyer {
@@ -22,7 +22,7 @@ interface Flyer {
  * 全部接住后才开始计冷却。
  * 能力：twin 同时向反方向掷出第二枚；coinMagnetRadius 飞行途中吸取金币。
  */
-export class BoomerangWeapon implements WeaponRuntime {
+export class BoomerangAbility implements AbilityRuntime {
   private flyers: Flyer[]
   private cooldown: number
   private aim = 0
@@ -30,7 +30,7 @@ export class BoomerangWeapon implements WeaponRuntime {
 
   constructor(
     private spec: BoomerangSpec,
-    private ctx: WeaponContext,
+    private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     const makeFlyer = (visible: boolean): Flyer => ({
@@ -54,7 +54,7 @@ export class BoomerangWeapon implements WeaponRuntime {
     return this.flyers.every((f) => f.phase === 'idle')
   }
 
-  update(delta: number, owner: WeaponOwner): void {
+  update(delta: number, owner: AbilityOwner): void {
     if (this.idle) {
       this.cooldown -= delta
       const main = this.flyers[0]!
@@ -80,7 +80,7 @@ export class BoomerangWeapon implements WeaponRuntime {
     if (this.idle) this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
   }
 
-  private updateFlyer(f: Flyer, delta: number, owner: WeaponOwner): void {
+  private updateFlyer(f: Flyer, delta: number, owner: AbilityOwner): void {
     // 自旋 + 途中判伤 + 磁力吸币（能力）
     f.image.rotation += (this.spec.spinRadPerSec * delta) / 1000
     if (f.phase === 'out') {
@@ -124,7 +124,7 @@ export class BoomerangWeapon implements WeaponRuntime {
     }
   }
 
-  private launch(owner: WeaponOwner): void {
+  private launch(owner: AbilityOwner): void {
     this.ctx.sfx('whoosh')
     this.damage = Math.round(this.spec.damage * this.ctx.damageMul())
     this.flyers.forEach((f, i) => {

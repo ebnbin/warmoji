@@ -1,23 +1,23 @@
 import { CHARACTERS } from '../characters/registry'
-import type { AbilityTiers } from '../characters/registry'
+import type { UpgradeTiers } from '../characters/registry'
 import type { CharacterId, CharacterSpec } from '../characters/registry'
-import type { WeaponSpec } from '../weapons/spec'
+import type { AbilitySpec } from '../abilities/spec'
 
 // 道具 = 一组属性修正（可带负面副作用，数值上保证净增益）。
-// 只开放少量通用属性轴，不逐武器参数开洞；乘法轴叠乘、加法轴叠加。
-// 池归属用 tag：'all' 进所有角色池，武器 kind 进对应角色池（按配装自动推导），
-// 'team' 进队长池，'ability' 为角色专属能力卡（只进 forCharacter 的池）。
+// 只开放少量通用属性轴，不逐能力参数开洞；乘法轴叠乘、加法轴叠加。
+// 池归属用 tag：'all' 进所有角色池，能力 kind 进对应角色池（按配装自动推导），
+// 'team' 进队长池，'upgrade' 为角色专属升级卡（只进 forCharacter 的池）。
 // 稀有度三档：越稀有越贵（价格档严格递增，金币后期才买得起大件），
 // 上架时先按波次权重抽稀有度档、再在档内均匀抽取——前期以普通为主，史诗第 5 波起解锁。
-// 能力卡是角色质变的唯一来源：一阶卡要求先给该角色买过几张普通道具
-//（ABILITY_GATE），二阶卡要求已持有一阶卡——升阶节奏由此涌现。
+// 升级卡是角色质变的唯一来源：一阶卡要求先给该角色买过几张普通道具
+//（UPGRADE_GATE），二阶卡要求已持有一阶卡——升阶节奏由此涌现。
 
 export interface CharacterEffects {
   hpAdd: number
   damageMul: number
   /** 冷却倍率，<1 攻速更快 */
   cooldownMul: number
-  /** 武器空间参数（触及/半径/射程/爆炸半径等）统一倍率 */
+  /** 能力空间参数（触及/半径/射程/爆炸半径等）统一倍率 */
   rangeMul: number
   projSpeedMul: number
   iframesAddMs: number
@@ -28,9 +28,9 @@ export interface CharacterEffects {
   thorns: number
   /** 本角色击杀敌人时回复生命（加法叠加） */
   killHeal: number
-  /** 武器伤害暴击概率（加法叠加，封顶 0.5），暴击 = 伤害 ×CRIT_MUL */
+  /** 能力伤害暴击概率（加法叠加，封顶 0.5），暴击 = 伤害 ×CRIT_MUL */
   critChance: number
-  /** 武器击退倍率（乘法叠乘） */
+  /** 能力击退倍率（乘法叠乘） */
   knockbackMul: number
 }
 
@@ -68,7 +68,7 @@ export function rarityWeights(wave: number): Record<ItemRarity, number> {
   return { common: 1 - rare - epic, rare, epic }
 }
 
-export type ItemPool = 'all' | 'team' | 'ability' | WeaponSpec['kind']
+export type ItemPool = 'all' | 'team' | 'upgrade' | AbilitySpec['kind']
 
 export interface ItemSpec {
   readonly emoji: string
@@ -79,18 +79,18 @@ export interface ItemSpec {
   /** 单一持有者的购买上限；缺省无限堆叠 */
   readonly maxStacks?: number
   readonly pool: ItemPool
-  /** 能力卡专属：归属角色 + 档位（0 一阶 / 1 二阶） */
+  /** 升级卡专属：归属角色 + 档位（0 一阶 / 1 二阶） */
   readonly forCharacter?: CharacterId
   readonly abilityIndex?: 0 | 1
   readonly effects: Partial<CharacterEffects & TeamEffects>
 }
 
-/** 能力卡解锁门槛：一阶卡上架前该角色需已购的普通道具数 */
-export const ABILITY_GATE = { normalsForFirst: 2 } as const
+/** 升级卡解锁门槛：一阶卡上架前该角色需已购的普通道具数 */
+export const UPGRADE_GATE = { normalsForFirst: 2 } as const
 
-/** 角色专属能力卡条目（文案/图标取自角色行的两阶能力定义） */
-function abilityCard(cid: CharacterId, index: 0 | 1, price: number): ItemSpec {
-  const a = CHARACTERS[cid].abilities[index]
+/** 角色专属升级卡条目（文案/图标取自角色行的两阶能力定义） */
+function upgradeCard(cid: CharacterId, index: 0 | 1, price: number): ItemSpec {
+  const a = CHARACTERS[cid].upgrades[index]
   return {
     emoji: a.icon,
     name: a.name,
@@ -98,7 +98,7 @@ function abilityCard(cid: CharacterId, index: 0 | 1, price: number): ItemSpec {
     rarity: index === 0 ? 'rare' : 'epic',
     price,
     maxStacks: 1,
-    pool: 'ability',
+    pool: 'upgrade',
     forCharacter: cid,
     abilityIndex: index,
     effects: {},
@@ -209,7 +209,7 @@ export const ITEMS = {
   hammerWeight: {
     emoji: '🔨',
     name: '重锤配重',
-    desc: '武器击退 +35%',
+    desc: '能力击退 +35%',
     rarity: 'rare',
     price: 40,
     maxStacks: 2,
@@ -247,7 +247,7 @@ export const ITEMS = {
     pool: 'all',
     effects: { iframesAddMs: 400 },
   },
-  // ── 武器形态专属池（普通） ──
+  // ── 能力形态专属池（普通） ──
   blastPowder: {
     emoji: '💥',
     name: '扩爆火药',
@@ -410,35 +410,35 @@ export const ITEMS = {
     pool: 'team',
     effects: { teamDamageMul: 1.2 },
   },
-  // ── 角色专属能力卡（一阶 稀有 / 二阶 史诗；价格高一档，质变值这个价）──
-  abilityJuggler1: abilityCard('juggler', 0, 80),
-  abilityJuggler2: abilityCard('juggler', 1, 150),
-  abilityUnicorn1: abilityCard('unicorn', 0, 80),
-  abilityUnicorn2: abilityCard('unicorn', 1, 150),
-  abilityTroll1: abilityCard('troll', 0, 80),
-  abilityTroll2: abilityCard('troll', 1, 150),
-  abilityCowboy1: abilityCard('cowboy', 0, 80),
-  abilityCowboy2: abilityCard('cowboy', 1, 150),
-  abilityMage1: abilityCard('mage', 0, 80),
-  abilityMage2: abilityCard('mage', 1, 150),
-  abilityKangaroo1: abilityCard('kangaroo', 0, 80),
-  abilityKangaroo2: abilityCard('kangaroo', 1, 150),
-  abilityRobot1: abilityCard('robot', 0, 80),
-  abilityRobot2: abilityCard('robot', 1, 150),
-  abilitySnowman1: abilityCard('snowman', 0, 80),
-  abilitySnowman2: abilityCard('snowman', 1, 150),
-  abilityFairy1: abilityCard('fairy', 0, 80),
-  abilityFairy2: abilityCard('fairy', 1, 150),
-  abilityAssassin1: abilityCard('assassin', 0, 80),
-  abilityAssassin2: abilityCard('assassin', 1, 150),
-  abilityBeaver1: abilityCard('beaver', 0, 80),
-  abilityBeaver2: abilityCard('beaver', 1, 150),
-  abilityQueenBee1: abilityCard('queenBee', 0, 80),
-  abilityQueenBee2: abilityCard('queenBee', 1, 150),
-  abilityMedic1: abilityCard('medic', 0, 80),
-  abilityMedic2: abilityCard('medic', 1, 150),
-  abilityJellyfish1: abilityCard('jellyfish', 0, 80),
-  abilityJellyfish2: abilityCard('jellyfish', 1, 150),
+  // ── 角色专属升级卡（一阶 稀有 / 二阶 史诗；价格高一档，质变值这个价）──
+  upgradeJuggler1: upgradeCard('juggler', 0, 80),
+  upgradeJuggler2: upgradeCard('juggler', 1, 150),
+  upgradeUnicorn1: upgradeCard('unicorn', 0, 80),
+  upgradeUnicorn2: upgradeCard('unicorn', 1, 150),
+  upgradeTroll1: upgradeCard('troll', 0, 80),
+  upgradeTroll2: upgradeCard('troll', 1, 150),
+  upgradeCowboy1: upgradeCard('cowboy', 0, 80),
+  upgradeCowboy2: upgradeCard('cowboy', 1, 150),
+  upgradeMage1: upgradeCard('mage', 0, 80),
+  upgradeMage2: upgradeCard('mage', 1, 150),
+  upgradeKangaroo1: upgradeCard('kangaroo', 0, 80),
+  upgradeKangaroo2: upgradeCard('kangaroo', 1, 150),
+  upgradeRobot1: upgradeCard('robot', 0, 80),
+  upgradeRobot2: upgradeCard('robot', 1, 150),
+  upgradeSnowman1: upgradeCard('snowman', 0, 80),
+  upgradeSnowman2: upgradeCard('snowman', 1, 150),
+  upgradeFairy1: upgradeCard('fairy', 0, 80),
+  upgradeFairy2: upgradeCard('fairy', 1, 150),
+  upgradeAssassin1: upgradeCard('assassin', 0, 80),
+  upgradeAssassin2: upgradeCard('assassin', 1, 150),
+  upgradeBeaver1: upgradeCard('beaver', 0, 80),
+  upgradeBeaver2: upgradeCard('beaver', 1, 150),
+  upgradeQueenBee1: upgradeCard('queenBee', 0, 80),
+  upgradeQueenBee2: upgradeCard('queenBee', 1, 150),
+  upgradeMedic1: upgradeCard('medic', 0, 80),
+  upgradeMedic2: upgradeCard('medic', 1, 150),
+  upgradeJellyfish1: upgradeCard('jellyfish', 0, 80),
+  upgradeJellyfish2: upgradeCard('jellyfish', 1, 150),
 } as const satisfies Record<string, ItemSpec>
 
 export type ItemId = keyof typeof ITEMS
@@ -446,33 +446,33 @@ export const ITEM_IDS = Object.keys(ITEMS) as readonly ItemId[]
 
 // ── 池推导 ──────────────────────────────────────────────────
 
-/** 角色池 = 通用道具 + 与其武器形态匹配的形态道具 + 自己的两张能力卡 */
+/** 角色池 = 通用道具 + 与其能力形态匹配的形态道具 + 自己的两张升级卡 */
 export function characterPool(id: CharacterId, spec: CharacterSpec): ItemId[] {
-  const kinds = new Set<string>(spec.weapons.map((w) => w.kind))
+  const kinds = new Set<string>(spec.abilities.map((w) => w.kind))
   return ITEM_IDS.filter((iid) => {
     const item: ItemSpec = ITEMS[iid]
-    if (item.pool === 'ability') return item.forCharacter === id
+    if (item.pool === 'upgrade') return item.forCharacter === id
     return item.pool === 'all' || kinds.has(item.pool)
   })
 }
 
 /** 已购道具推导的能力档位（一二阶各最多一张，二阶依赖一阶） */
-export function abilityTiers(id: CharacterId, owned: readonly ItemId[]): AbilityTiers {
+export function upgradeTiers(id: CharacterId, owned: readonly ItemId[]): UpgradeTiers {
   const has = (index: 0 | 1): boolean =>
     owned.some((iid) => {
       const item: ItemSpec = ITEMS[iid]
-      return item.pool === 'ability' && item.forCharacter === id && item.abilityIndex === index
+      return item.pool === 'upgrade' && item.forCharacter === id && item.abilityIndex === index
     })
-  return { a1: has(0), a2: has(1) }
+  return { u1: has(0), u2: has(1) }
 }
 
-/** 能力卡的上架资格：一阶要求已购普通道具达标，二阶要求已持有一阶 */
-export function abilityCardAvailable(id: ItemId, owned: readonly ItemId[]): boolean {
+/** 升级卡的上架资格：一阶要求已购普通道具达标，二阶要求已持有一阶 */
+export function upgradeCardAvailable(id: ItemId, owned: readonly ItemId[]): boolean {
   const item: ItemSpec = ITEMS[id]
-  if (item.pool !== 'ability' || item.forCharacter === undefined) return true
-  if (item.abilityIndex === 1) return abilityTiers(item.forCharacter, owned).a1
-  const normals = owned.filter((iid) => (ITEMS[iid] as ItemSpec).pool !== 'ability').length
-  return normals >= ABILITY_GATE.normalsForFirst
+  if (item.pool !== 'upgrade' || item.forCharacter === undefined) return true
+  if (item.abilityIndex === 1) return upgradeTiers(item.forCharacter, owned).u1
+  const normals = owned.filter((iid) => (ITEMS[iid] as ItemSpec).pool !== 'upgrade').length
+  return normals >= UPGRADE_GATE.normalsForFirst
 }
 
 export function captainPool(): ItemId[] {
@@ -499,7 +499,7 @@ export function rollItem(
   rand: () => number,
   wave = 1,
 ): ItemId | null {
-  const avail = pool.filter((id) => !reachedStackLimit(owned, id) && abilityCardAvailable(id, owned))
+  const avail = pool.filter((id) => !reachedStackLimit(owned, id) && upgradeCardAvailable(id, owned))
   if (avail.length === 0) return null
   const weights = rarityWeights(wave)
   const buckets = RARITY_ORDER.map((r) => ({
@@ -595,11 +595,11 @@ export function aggregateTeamEffects(owned: readonly ItemId[]): TeamEffects {
   return fx
 }
 
-// ── 武器参数修正 ────────────────────────────────────────────
+// ── 能力参数修正 ────────────────────────────────────────────
 
 /** 按修正预算出「生效 spec」：只缩放空间参数与弹速；
  * 伤害/冷却由运行时 ctx 倍率处理（避免双重生效） */
-export function resolveWeaponSpec(w: WeaponSpec, fx: CharacterEffects): WeaponSpec {
+export function resolveAbilitySpec(w: AbilitySpec, fx: CharacterEffects): AbilitySpec {
   const r = fx.rangeMul
   switch (w.kind) {
     case 'thrust':

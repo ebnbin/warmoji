@@ -191,7 +191,7 @@ interface Window {
   __addXp?: (n: number) => void
   __setWave?: (n: number) => void
   __spawnEnemy?: (kind: string, dxU?: number, dyU?: number) => void
-  __spawnArmedEnemy?: (weaponId: string, dxU?: number, dyU?: number) => void
+  __spawnArmedEnemy?: (abilityId: string, dxU?: number, dyU?: number) => void
   __dropCoins?: (n: number, dxU?: number, dyU?: number) => void
   __sfxStats?: () => { baked: number; played: number }
   __bgmProbe?: (

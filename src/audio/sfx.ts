@@ -28,7 +28,7 @@ interface SfxSpec {
 }
 
 export const SFX = {
-  /** 投掷/射击（子弹类武器出手） */
+  /** 投掷/射击（子弹类能力出手） */
   shoot: { wave: 'square', freq: 900, freqEnd: 430, duration: 0.07, volume: 0.16, decayPow: 1.4, throttleMs: 45, jitter: 0.12 },
   /** 激光 */
   zap: { wave: 'sawtooth', freq: 1500, freqEnd: 280, duration: 0.12, volume: 0.15, throttleMs: 70, jitter: 0.08 },

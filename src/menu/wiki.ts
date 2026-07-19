@@ -3,10 +3,10 @@ import type { CharacterId } from '../characters/registry'
 import { ENEMY_SPECS } from '../enemies/registry'
 import type { EnemySpec } from '../enemies/registry'
 import { COIN } from '../items/registry'
-import { WEAPONS } from '../weapons/registry'
+import { ABILITIES } from '../abilities/registry'
 import { ITEMS, RARITIES } from '../items/registry'
 import type { ItemSpec } from '../items/registry'
-import { captainStatGroups, characterStatGroups, WEAPON_KIND_LABEL, weaponStatLines } from './stats'
+import { captainStatGroups, characterStatGroups, ABILITY_KIND_LABEL, abilityStatLines } from './stats'
 
 // 图鉴：零维护成本地聚合各注册表——新增 entity 自动出现在图鉴里。
 // 完整 emoji 列表的清单由构建期生成（public/emoji/<版本>/manifest.json），
@@ -41,9 +41,9 @@ const LOCOMOTION_LABEL: Record<EnemySpec['locomotion']['kind'], string> = {
 export function enemyStatLines(e: EnemySpec): string[] {
   const lines = [
     `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
-    `行为 ${LOCOMOTION_LABEL[e.locomotion.kind]}${(e.weapons ?? []).some((w) => w.kind === 'projectile' && !(w.volley && w.volley.spreadRad >= Math.PI * 2)) ? '放枪' : ''} · 经验 ${e.xp} · 金币 ${e.coins}`,
+    `行为 ${LOCOMOTION_LABEL[e.locomotion.kind]}${(e.abilities ?? []).some((w) => w.kind === 'projectile' && !(w.volley && w.volley.spreadRad >= Math.PI * 2)) ? '放枪' : ''} · 经验 ${e.xp} · 金币 ${e.coins}`,
   ]
-  for (const w of e.weapons ?? []) {
+  for (const w of e.abilities ?? []) {
     if (w.kind === 'projectile') lines.push(`子弹伤害 ${w.damage} · 弹速 ${grid(w.projectile.speed)}/秒`)
   }
   const lm = e.locomotion
@@ -67,7 +67,7 @@ export function wikiGroups(): WikiGroup[] {
     {
       icon: '🤹',
       title: '角色',
-      // 图鉴按素体视角展示（能力卡解锁状态见商店/属性面板）
+      // 图鉴按素体视角展示（升级卡解锁状态见商店/属性面板）
       entries: (Object.keys(CHARACTERS) as CharacterId[]).map((id) => ({
         emoji: CHARACTERS[id].emoji,
         name: CHARACTERS[id].name,
@@ -97,12 +97,12 @@ export function wikiGroups(): WikiGroup[] {
     },
     {
       icon: '⚔️',
-      title: '武器',
-      entries: Object.values(WEAPONS).map((w) => ({
+      title: '能力',
+      entries: Object.values(ABILITIES).map((w) => ({
         emoji: w.icon,
         name: w.name,
-        desc: `${WEAPON_KIND_LABEL[w.kind]}形态`,
-        lines: weaponStatLines(w),
+        desc: `${ABILITY_KIND_LABEL[w.kind]}形态`,
+        lines: abilityStatLines(w),
       })),
     },
     {
@@ -119,9 +119,9 @@ export function wikiGroups(): WikiGroup[] {
               ? '通用'
               : i.pool === 'team'
                 ? '队长'
-                : i.pool === 'ability'
-                  ? `${i.forCharacter ? CHARACTERS[i.forCharacter].name : ''}专属能力卡`
-                  : WEAPON_KIND_LABEL[i.pool]
+                : i.pool === 'upgrade'
+                  ? `${i.forCharacter ? CHARACTERS[i.forCharacter].name : ''}专属升级卡`
+                  : ABILITY_KIND_LABEL[i.pool]
           }`,
         ],
       })),
@@ -146,13 +146,13 @@ export function usedEmojiSet(): Set<string> {
   for (const g of wikiGroups()) for (const e of g.entries) used.add(e.emoji)
   // 图鉴条目之外的战斗实体：持有物/弹体/金币/敌方子弹
   for (const c of Object.values(CHARACTERS)) {
-    for (const w of c.weapons) {
+    for (const w of c.abilities) {
       if ('held' in w && w.held) used.add(w.held.emoji)
       if (w.kind === 'projectile') used.add(w.projectile.emoji)
     }
   }
   for (const e of ENEMY_SPECS)
-    for (const w of e.weapons ?? []) if (w.kind === 'projectile') used.add(w.projectile.emoji)
+    for (const w of e.abilities ?? []) if (w.kind === 'projectile') used.add(w.projectile.emoji)
   used.add(COIN.emoji)
   return used
 }

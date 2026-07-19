@@ -24,6 +24,6 @@ export const STRESS = {
   spawnIntervalMs: 80,
   spawnBatch: 5,
   maxAlive: 800,
-  // 所有武器冷却乘数（0.1 = 十倍攻速）
+  // 所有能力冷却乘数（0.1 = 十倍攻速）
   cooldownMul: 0.1,
 } as const

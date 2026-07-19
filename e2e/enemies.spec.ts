@@ -194,7 +194,7 @@ test('死亡效果与偷币：蘑菇留毒、泡泡分裂、偷币鼠吃币后�
   expect(errors).toEqual([])
 })
 
-test('持械敌人：敌方 ctx 驱动武器朝队员开火，敌弹入组并命中，死亡随体销毁', async ({ page }) => {
+test('持械敌人：敌方 ctx 驱动能力朝队员开火，敌弹入组并命中，死亡随体销毁', async ({ page }) => {
   test.setTimeout(240_000)
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(String(err)))
@@ -235,7 +235,7 @@ test('持械敌人：敌方 ctx 驱动武器朝队员开火，敌弹入组并命
     hpBefore,
     { timeout: 30_000 },
   )
-  // 击杀持械者：武器实例随体销毁，流程无报错
+  // 击杀持械者：能力实例随体销毁，流程无报错
   await killKind(page, 'zombie')
   // 敌弹按寿命排空后，投放外星怪：aim:'move'（朝移动方向、无需目标）路径专项——
   // 此后敌弹组再增长只能来自它

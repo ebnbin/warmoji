@@ -10,7 +10,7 @@ import { enemyOf } from './enemies'
 import { spawnCoins } from './pickups'
 
 // 队长主动技能的战斗内实现：castCaptainSkill 收口就绪/弹药校验、扣豆、分派；
-// 五个效果函数各自为政——每加一个队长在此长一段（与武器运行时同种的内容形状）。
+// 五个效果函数各自为政——每加一个队长在此长一段（与能力运行时同种的内容形状）。
 // 宿主就是 BaseArenaScene（仅类型引用；效果读写场景的公开战斗状态）。
 
 /** 释放主动技能（UIScene 按钮/E 键触发） */
@@ -119,7 +119,7 @@ function skillParty(scene: BaseArenaScene): void {
   }
 }
 
-/** 弱点讲义：限时全队增伤（经 stats.damageMul 流入所有武器伤害链） */
+/** 弱点讲义：限时全队增伤（经 stats.damageMul 流入所有能力伤害链） */
 function skillScholar(scene: BaseArenaScene): void {
   scene.stats.damageMul = SKILL.scholar.damageMul
   scene.skillBuffUntil = scene.elapsedMs + SKILL.scholar.durationMs

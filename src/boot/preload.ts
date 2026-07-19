@@ -21,7 +21,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     ...roster.map((c) => c.emoji),
     ...Object.values<CaptainSpec>(CAPTAINS).map((c) => c.emoji),
     ...roster.flatMap((c) =>
-      c.weapons.flatMap((w) => [
+      c.abilities.flatMap((w) => [
         ...('held' in w && w.held ? [w.held.emoji] : []),
         ...(w.kind === 'projectile' || w.kind === 'turret' ? [w.projectile.emoji] : []),
         ...(w.kind === 'turret' ? [w.turret.emoji] : []),
@@ -43,17 +43,17 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   // 敌方阵营含变形替身（仙子魔尘的绵羊顶替原形象，沿用同阵营描边）
   enemy: [...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()])],
   enemyShot: [...new Set(armedShotEmojis())],
-  // 精英变体（含 Boss）：金边；持械精英的武器视觉同沾金边
+  // 精英变体（含 Boss）：金边；持械精英的能力视觉同沾金边
   elite: [
     ...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()]),
     BOSS.emoji,
   ],
 }
 
-/** 持械敌人的武器视觉（持有物/塔体/召唤物）：随敌人本体阵营描边 */
+/** 持械敌人的能力视觉（持有物/塔体/召唤物）：随敌人本体阵营描边 */
 function armedBodyEmojis(): string[] {
   return [...ENEMY_SPECS, BOSS].flatMap((e) =>
-    (e.weapons ?? []).flatMap((w) => [
+    (e.abilities ?? []).flatMap((w) => [
       ...('held' in w && w.held ? [w.held.emoji] : []),
       ...(w.kind === 'turret' ? [w.turret.emoji] : []),
       ...(w.kind === 'summon' ? [w.minion.emoji] : []),
@@ -64,7 +64,7 @@ function armedBodyEmojis(): string[] {
 /** 持械敌人的弹体：入敌弹组，红描边 */
 function armedShotEmojis(): string[] {
   return [...ENEMY_SPECS, BOSS].flatMap((e) =>
-    (e.weapons ?? []).flatMap((w) =>
+    (e.abilities ?? []).flatMap((w) =>
       w.kind === 'projectile' || w.kind === 'turret' ? [w.projectile.emoji] : [],
     ),
   )
@@ -73,15 +73,15 @@ function armedShotEmojis(): string[] {
 /** 全部魔尘变形替身形象（从角色配装聚合） */
 function morphEmojis(): string[] {
   return roster.flatMap((c) =>
-    c.weapons.flatMap((w) => (w.kind === 'projectile' && w.hex ? [w.hex.morphEmoji] : [])),
+    c.abilities.flatMap((w) => (w.kind === 'projectile' && w.hex ? [w.hex.morphEmoji] : [])),
   )
 }
 
 // 启动时预载的 emoji（含 UI 图标）；其余全集按需加载（ui/emoji.ts ensureEmoji）
 export const PRELOAD_EMOJIS: readonly string[] = [
   ...Object.values(OUTLINED_EMOJIS).flat(),
-  // 属性面板的武器/基础组图标 + 商店道具图标
-  ...roster.flatMap((c) => c.weapons.map((w) => w.icon)),
+  // 属性面板的能力/基础组图标 + 商店道具图标
+  ...roster.flatMap((c) => c.abilities.map((w) => w.icon)),
   ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),
   // 地图图标（选择页素体）+ 地图详情组图标；装饰的描边变体在 OUTLINED_EMOJIS.player
   ...Object.values(MAPS).map((m) => m.emoji),
@@ -89,7 +89,7 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '🚧',
   ...SETTING_DEFS.map((d) => d.icon),
   SPAWN.markEmoji,
-  // 属性面板「特殊能力」组图标
+  // 属性面板「专属升级」组图标
   '⭐',
   '⚙️',
   '📖',

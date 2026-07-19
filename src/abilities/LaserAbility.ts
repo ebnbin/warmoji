@@ -2,11 +2,11 @@ import type Phaser from 'phaser'
 import { thrustHitIndices } from './spec'
 import type { LaserSpec } from './spec'
 import { emojiImage } from '../emoji/textures'
-import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 贯穿激光：向最近的敌人方向发射光束，线段胶囊判定命中直线上的所有敌人。
  * 能力：backBeam 向正后方补一道；radial 出手变为绕一周的多向序列扫射（取代单束） */
-export class LaserWeapon implements WeaponRuntime {
+export class LaserAbility implements AbilityRuntime {
   private image: Phaser.GameObjects.Image
   private cooldown: number
   private aim = 0
@@ -17,14 +17,14 @@ export class LaserWeapon implements WeaponRuntime {
 
   constructor(
     private spec: LaserSpec,
-    private ctx: WeaponContext,
+    private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline).setDepth(13)
     this.cooldown = initialCooldownMs
   }
 
-  update(delta: number, owner: WeaponOwner): void {
+  update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
     this.clock += delta
     const held = this.spec.held
@@ -78,7 +78,7 @@ export class LaserWeapon implements WeaponRuntime {
   }
 
   /** 发射一束：胶囊判定 + 特效（ratio 折损用于扫射分束） */
-  private fireBeam(owner: WeaponOwner, angle: number, ratio: number): void {
+  private fireBeam(owner: AbilityOwner, angle: number, ratio: number): void {
     this.ctx.sfx('zap')
     const damage = Math.max(1, Math.round(this.spec.damage * this.ctx.damageMul() * ratio))
     const origin = { x: owner.x, y: owner.y }

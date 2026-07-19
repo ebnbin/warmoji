@@ -29,7 +29,7 @@ export function torusDist2(a: Point, b: Point, w: number, h: number): number {
 
 /** 目标的三个镜像坐标（半平面覆盖）：镜像取「更近的那半边」的平移，
  * 任意观察者眼中的最近镜像必在 {真身, 这三个} 之中。
- * 把它们和真身一起喂给武器索敌，武器零改动即可隔着传送门瞄准 */
+ * 把它们和真身一起喂给能力索敌，能力零改动即可隔着传送门瞄准 */
 export function ghostImages(p: Point, w: number, h: number): Point[] {
   const dx = p.x < w / 2 ? w : -w
   const dy = p.y < h / 2 ? h : -h

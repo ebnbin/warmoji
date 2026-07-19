@@ -3,7 +3,7 @@ import { castCaptainSkill } from './skills'
 import { toPx } from './px'
 import { attachEnemy, enemyOf } from './enemies'
 import type { Enemy } from './enemies'
-import { armEnemy } from './enemyWeapons'
+import { armEnemy } from './enemyAbilities'
 import { attachMember, memberOf } from './members'
 import type { Member } from './members'
 import { bulletOf } from './bullets'
@@ -22,7 +22,7 @@ import { BOSS, BOSS_SPAWN_RELIEF, ELITE, SPAWN, SURGE } from '../enemies/registr
 import type { EnemySpec } from '../enemies/registry'
 import { UNIT } from '../lib/units'
 import { WAVE } from '../run/waves'
-import { KNOCKBACK } from '../weapons/registry'
+import { KNOCKBACK } from '../abilities/registry'
 import { FOLLOW, HIT_SHAKE, WANDER } from './config'
 import { ORBIT } from './orbit'
 import { enemyMixAt, pickEnemy } from '../enemies/registry'
@@ -34,11 +34,11 @@ import type { OrbitThreat } from './orbit'
 import { browserStorage } from '../lib/storage'
 import { chestDropped } from '../run/chest'
 import {
-  abilityTiers,
+  upgradeTiers,
   aggregateCharacterEffects,
   aggregateTeamEffects,
   CRIT_MUL,
-  resolveWeaponSpec,
+  resolveAbilitySpec,
 } from '../items/registry'
 import type { TeamEffects } from '../items/registry'
 import { currentFormation, getRun, guardOrder, isTeamFull, promoteStep, waveStartHp } from '../run/state'
@@ -66,12 +66,12 @@ import { burstEmitter } from './fx'
 import { playSfx } from '../audio/sfx'
 import { UI_FONT } from '../lib/fonts'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../screen/apply'
-import { createWeapon } from '../weapons/create'
-import type { TargetInfo, WeaponContext, WeaponOwner } from '../weapons/types'
+import { createAbility } from '../abilities/create'
+import type { TargetInfo, AbilityContext, AbilityOwner } from '../abilities/types'
 import type { UIScene } from './UIScene'
 
 // 竞技场基座：四张地图（有界/无界/河流/虚空）共享的战斗引擎——队伍与
-// 武器装配、伤害与击杀结算、刷怪节奏、敌人行为状态机、地面区域、金币、
+// 能力装配、伤害与击杀结算、刷怪节奏、敌人行为状态机、地面区域、金币、
 // 波次与结算、HUD/调试契约。世界差异全部收敛为下方的「世界规则钩子」：
 // 几何（worldDelta）、活跃分区（buildFrameTargets）、钳制/回绕（constrain*）、
 // 落点（spawnPoint/bossSpawnPoint）、逐帧附加力（teamDrift/postSteer*）、
@@ -132,7 +132,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   poisonPools: { x: number; y: number; r2: number; until: number; tickMs: number; damage: number; srcName: string; gfx: Phaser.GameObjects.Graphics }[] = []
   private enemyMix: EnemyMixEntry[] = []
   frameTargets: TargetInfo[] = []
-  /** 敌方武器的索敌快照：存活队员（虚空图含镜像坐标），每帧重建 */
+  /** 敌方能力的索敌快照：存活队员（虚空图含镜像坐标），每帧重建 */
   frameMemberTargets: TargetInfo[] = []
   private frameSlowZones: { x: number; y: number; r2: number; factor: number }[] = []
   /** 仅本帧生效的金币吸取点（磁力回旋镖沿途登记） */
@@ -148,7 +148,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     srcSlot: number
     gfx: Phaser.GameObjects.Graphics
   }[] = []
-  private weaponCtx: WeaponContext = {
+  private abilityCtx: AbilityContext = {
     scene: this,
     ownerOutline: 'player',
     targets: () => this.frameTargets,
@@ -260,7 +260,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.dormantCount = 0
     this.frameTargets = targets
   }
-  /** 敌方武器的索敌目标：存活队员快照（虚空图附加镜像坐标） */
+  /** 敌方能力的索敌目标：存活队员快照（虚空图附加镜像坐标） */
   protected buildMemberTargets(): TargetInfo[] {
     const targets: TargetInfo[] = []
     for (const m of this.members) {
@@ -777,7 +777,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 不允许物理引擎把位移回写到图片（否则与手动定位叠加产生抖动）
     ;(image.body as ArcadeBody).moves = false
     const visualOffset = { x: 0, y: 0 }
-    const handle: WeaponOwner = {
+    const handle: AbilityOwner = {
       get x() {
         return image.x
       },
@@ -789,17 +789,17 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         visualOffset.y = dy
       },
     }
-    // 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效武器参数；
-    // 特殊能力来自已购的角色专属能力卡（压测阵容无道具 = 素体）
+    // 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效能力参数；
+    // 专属升级来自已购的角色专属升级卡（压测阵容无道具 = 素体）
     const owned = this.stress ? [] : (this.run.memberItems[slot] ?? [])
     const fx = aggregateCharacterEffects(owned)
-    const tiers = abilityTiers(id, owned)
-    const memberCtx: WeaponContext = {
-      ...this.weaponCtx,
+    const tiers = upgradeTiers(id, owned)
+    const memberCtx: AbilityContext = {
+      ...this.abilityCtx,
       damageMul: () => this.stats.damageMul * fx.damageMul * this.teamFx.teamDamageMul,
       cooldownMul: () => this.stats.cooldownMul * fx.cooldownMul,
       // 伤害/子弹带上来源槽位：结算页按角色统计输出与击杀。
-      // 暴击/击退倍率在这里收口：所有武器伤害路径统一生效，无需逐武器改造
+      // 暴击/击退倍率在这里收口：所有能力伤害路径统一生效，无需逐能力改造
       damageTarget: (e, d, kb, sx, sy) => {
         const crit = fx.critChance > 0 && this.rng.next() < fx.critChance
         this.applyDamage(
@@ -839,9 +839,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       slot,
       image,
       // 错开初始冷却，避免全队同帧齐射。
-      // 生效武器 = 原始配装 → 能力卡质变注入 → 空间参数按道具缩放
-      weapons: loadoutFor(spec, tiers).map((w, i) =>
-        createWeapon(toPx(resolveWeaponSpec(w, fx)), memberCtx, 300 + slot * 120 + i * 230),
+      // 生效能力 = 原始配装 → 升级卡质变注入 → 空间参数按道具缩放
+      abilities: loadoutFor(spec, tiers).map((w, i) =>
+        createAbility(toPx(resolveAbilitySpec(w, fx)), memberCtx, 300 + slot * 120 + i * 230),
       ),
       handle,
       visualOffset,
@@ -1027,7 +1027,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         }
         this.animateMember(m, moving, delta)
         this.drawMemberHp(m)
-        for (const w of m.weapons) w.update(delta, m.handle)
+        for (const w of m.abilities) w.update(delta, m.handle)
       } else {
         if (this.elapsedMs >= m.reviveAt) {
           this.reviveMember(m)
@@ -1166,7 +1166,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     m.deadText.setVisible(true)
     m.visualOffset.x = 0
     m.visualOffset.y = 0
-    for (const w of m.weapons) w.setVisible(false)
+    for (const w of m.abilities) w.setVisible(false)
     if (this.members.every((x) => !x.alive)) this.gameOver()
   }
 
@@ -1180,7 +1180,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     m.image.setAlpha(1).clearTint()
     m.hpBar.setVisible(true)
     m.deadText.setVisible(false)
-    for (const w of m.weapons) w.setVisible(true)
+    for (const w of m.abilities) w.setVisible(true)
     m.animLockUntil = this.elapsedMs + 220
     m.image.setScale(m.baseScale * 0.3)
     this.tweens.add({ targets: m.image, scale: m.baseScale, duration: 200, ease: 'Back.easeOut' })
@@ -1308,8 +1308,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     runDeathEffects(this, a)
     enemy.setActive(false)
     ;(enemy.body as ArcadeBody).enable = false
-    // 持械敌人：武器实例（持有物/塔/召唤物视觉）随体销毁
-    if (a.weapons) for (const w of a.weapons) w.destroy()
+    // 持械敌人：能力实例（持有物/塔/召唤物视觉）随体销毁
+    if (a.abilities) for (const w of a.abilities) w.destroy()
     this.deathBurst.explode(6, enemy.x, enemy.y)
     this.tweens.killTweensOf(enemy)
     // 本体裂成 4 个象限碎片：继承致死击退速度（不衰减）+ 象限散开 + 自旋 + 淡出
@@ -1520,7 +1520,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     enemy.setDisplaySize(size, size)
     a.anim?.register('idle', clipFramesLive(this, a.spec.emoji, 'idle', outline))
     // 出手后延，避免恢复瞬间齐射
-    if (a.weapons) for (const w of a.weapons) w.postponeFire?.(700)
+    if (a.abilities) for (const w of a.abilities) w.postponeFire?.(700)
     this.puffBurst.explode(6, enemy.x, enemy.y)
   }
 
@@ -1593,7 +1593,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           if (a.boss) this.postSteerBoss(e, body)
           else this.postSteerEnemy(e, body, spec)
           // 压制期只走冷却不开火（时间表语义：舞会结束冷却已尽者立即出手）
-          if (a.weapons) for (const w of a.weapons) w.tickCooldown?.(delta)
+          if (a.abilities) for (const w of a.abilities) w.tickCooldown?.(delta)
           continue
         }
         a.danceUntil = 0
@@ -1610,7 +1610,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           body.setVelocity(dir.x * spec.speed * 0.5 * slowM, dir.y * spec.speed * 0.5 * slowM)
           this.decayKnockback(a, body, delta)
           this.postSteerEnemy(e, body, spec)
-          if (a.weapons) for (const w of a.weapons) w.tickCooldown?.(delta)
+          if (a.abilities) for (const w of a.abilities) w.tickCooldown?.(delta)
           continue
         }
         this.restoreMorph(a)
@@ -1621,8 +1621,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
       STEERERS[spec.locomotion.kind]({ scene: this, a, body, slow, now, target })
 
-      // 持械敌人：武器实例逐帧驱动（跳舞/变形不到达此处；休眠已跳过）
-      if (a.weapons) for (const w of a.weapons) w.update(delta, a.weaponOwner!)
+      // 持械敌人：能力实例逐帧驱动（跳舞/变形不到达此处；休眠已跳过）
+      if (a.abilities) for (const w of a.abilities) w.update(delta, a.abilityOwner!)
 
       // 击退：临时冲量叠加进行为速度并指数衰减（不打断行为状态机）
       this.decayKnockback(a, body, delta)

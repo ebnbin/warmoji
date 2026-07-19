@@ -6,7 +6,7 @@ import type { Member } from './members'
 import type { Enemy } from './enemies'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
 
-// 敌人移动策略注册表：按 spec.locomotion.kind 分发，镜像 weapons/create.ts。
+// 敌人移动策略注册表：按 spec.locomotion.kind 分发，镜像 abilities/create.ts。
 // 每个策略只负责逐帧速度决策与状态机推进；攻击在 battle/enemyAttacks.ts、
 // 死亡效果在 battle/deathEffects.ts、公共帧留守 BaseArenaScene.steerEnemies。
 // 世界差异经场景钩子（wanderDir/fleeDir）。

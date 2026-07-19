@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
 import type { Animator } from '../emoji/animator'
 import type { CharacterEffects } from '../items/registry'
-import type { WeaponContext, WeaponOwner, WeaponRuntime } from '../weapons/types'
+import type { AbilityContext, AbilityOwner, AbilityRuntime } from '../abilities/types'
 import type { ImageObj } from './BaseArenaScene'
 
 // 队员的类型化运行时状态：与 battle/enemies.ts（敌人）、battle/bullets.ts
@@ -12,13 +12,13 @@ export interface Member {
   emoji: string
   slot: number
   image: ImageObj
-  weapons: WeaponRuntime[]
-  handle: WeaponOwner
+  abilities: AbilityRuntime[]
+  handle: AbilityOwner
   visualOffset: { x: number; y: number }
-  /** 道具聚合效果：武器 ctx 闭包实时读它，开箱时原地更新即全线生效 */
+  /** 道具聚合效果：能力 ctx 闭包实时读它，开箱时原地更新即全线生效 */
   fx: CharacterEffects
-  /** 本角色的武器上下文：开箱热重建武器时复用 */
-  ctx: WeaponContext
+  /** 本角色的能力上下文：开箱热重建能力时复用 */
+  ctx: AbilityContext
   // 道具修正后的个体生效值
   maxHp: number
   /** 受击判定圆半径（守护中心减半；虚空图手写接触判定复用） */

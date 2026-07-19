@@ -7,7 +7,7 @@ import { remapPoint, remapVector } from '../screen/remap'
 import { fitAspectRect, ghostImages, torusDelta, torusDist2, wrapCoord } from './void'
 import { Rng } from '../lib/rng'
 import type { Point } from '../lib/vec'
-import type { TargetInfo } from '../weapons/types'
+import type { TargetInfo } from '../abilities/types'
 import { emojiImage } from '../emoji/textures'
 import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
@@ -19,7 +19,7 @@ import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 // 虚空竞技场（kind='void'）：环面世界。世界规则：
 // · 环面：固定 16:9 竞技场（横屏 24×13.5 格，竖屏互换），四边两两粘合成
 //   传送门——没有任何墙，所有实体（玩家/敌人/Boss/子弹/金币）坐标按模回绕
-// · 几何环面化：索敌喂「真身 + 三个镜像坐标」（武器零改动即隔门瞄准）；
+// · 几何环面化：索敌喂「真身 + 三个镜像坐标」（能力零改动即隔门瞄准）；
 //   AI 追击/磁吸/接触判定全用环面最短差；面积效果的判定半径远小于半场，
 //   镜像永不重复命中同一真身
 // · 碰撞不走物理 overlap：队员×敌人/敌弹改为手写环面圆-圆判定，缝上精确；
@@ -84,7 +84,7 @@ export class VoidArenaScene extends BaseArenaScene {
     return torusDelta(from, to, this.arenaW, this.arenaH)
   }
 
-  /** 索敌目标：真身 + 三镜像（武器隔门瞄准的关键） */
+  /** 索敌目标：真身 + 三镜像（能力隔门瞄准的关键） */
   protected buildFrameTargets(): void {
     const targets: TargetInfo[] = []
     let count = 0
@@ -102,7 +102,7 @@ export class VoidArenaScene extends BaseArenaScene {
     this.frameTargets = targets
   }
 
-  /** 敌方武器的索敌目标：真身 + 三镜像（持械敌人隔门瞄准队员） */
+  /** 敌方能力的索敌目标：真身 + 三镜像（持械敌人隔门瞄准队员） */
   protected buildMemberTargets(): TargetInfo[] {
     const targets: TargetInfo[] = []
     for (const m of this.members) {

@@ -1,20 +1,20 @@
 import type Phaser from 'phaser'
 import type { SlowAuraSpec } from './spec'
-import type { WeaponContext, WeaponRuntime } from './types'
+import type { AbilityContext, AbilityRuntime } from './types'
 
 /** 寒气光环：以队伍中心为圆心持续减速（角色只是来源；角色阵亡光环随之消失）。
  * 能力：dps 光环内持续掉血（雪人的输出手段）；freeze 周期脉冲冻结 */
-export class SlowAuraWeapon implements WeaponRuntime {
+export class SlowAuraAbility implements AbilityRuntime {
   private ring: Phaser.GameObjects.Arc
   private hidden = false
   /** 冻伤跳伤间隔（半秒一跳，dps 折半） */
   private static readonly TICK_MS = 500
-  private tickIn = SlowAuraWeapon.TICK_MS
+  private tickIn = SlowAuraAbility.TICK_MS
   private freezeIn: number
 
   constructor(
     private spec: SlowAuraSpec,
-    private ctx: WeaponContext,
+    private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     // 光环持续生效，无冷却概念
@@ -37,10 +37,10 @@ export class SlowAuraWeapon implements WeaponRuntime {
     if (this.spec.dps) {
       this.tickIn -= delta
       if (this.tickIn <= 0) {
-        this.tickIn += SlowAuraWeapon.TICK_MS
+        this.tickIn += SlowAuraAbility.TICK_MS
         const damage = Math.max(
           1,
-          Math.round(((this.spec.dps * SlowAuraWeapon.TICK_MS) / 1000) * this.ctx.damageMul()),
+          Math.round(((this.spec.dps * SlowAuraAbility.TICK_MS) / 1000) * this.ctx.damageMul()),
         )
         for (const t of this.ctx.targets()) {
           const dx = t.x - c.x

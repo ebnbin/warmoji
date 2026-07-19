@@ -1,22 +1,22 @@
 import type { HealSpec } from './spec'
-import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 治疗型：周期治疗范围内血量比例最低的队友（对友军索敌）。
  * 能力：aoe 群体处方（范围全体按比例回复）；defib 电击起搏
  *（范围内有阵亡队友时优先减其复活倒计时）。治疗量吃伤害倍率——
  * 磨刀石对军医同样有意义 */
-export class HealWeapon implements WeaponRuntime {
+export class HealAbility implements AbilityRuntime {
   private cooldown: number
 
   constructor(
     private spec: HealSpec,
-    private ctx: WeaponContext,
+    private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     this.cooldown = initialCooldownMs
   }
 
-  update(delta: number, owner: WeaponOwner): void {
+  update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
     if (this.cooldown > 0) return
 
@@ -43,7 +43,7 @@ export class HealWeapon implements WeaponRuntime {
   }
 
   /** 治疗脉冲环 */
-  private pulse(owner: WeaponOwner, color: number): void {
+  private pulse(owner: AbilityOwner, color: number): void {
     const ring = this.ctx.scene.add
       .circle(owner.x, owner.y, this.spec.range, color, 0.08)
       .setStrokeStyle(3, color, 0.7)

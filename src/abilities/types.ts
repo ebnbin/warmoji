@@ -13,21 +13,21 @@ export interface TargetInfo {
   ref: Phaser.GameObjects.Image
 }
 
-/** 武器的行为主体：位置 + 视觉偏移（自体攻击类武器用它驱动角色本体动作） */
-export interface WeaponOwner {
+/** 能力的行为主体：位置 + 视觉偏移（自体攻击类能力用它驱动角色本体动作） */
+export interface AbilityOwner {
   readonly x: number
   readonly y: number
   setVisualOffset(dx: number, dy: number): void
 }
 
-/** 战场为武器提供的能力面板，阵营中立：武器只知道「我方/敌对方」，
- * 谁持有武器由 ctx 实现决定（队伍 ctx 由 ArenaScene 装配；敌方 ctx 未来同构）。
+/** 战场为能力提供的能力面板，阵营中立：能力只知道「我方/敌对方」，
+ * 谁持有能力由 ctx 实现决定（队伍 ctx 由 ArenaScene 装配；敌方 ctx 未来同构）。
  * 必选能力双阵营同义；可选能力是阵营特有概念，实现可缺席（调用侧 ?. 容错） */
-export interface WeaponContext {
+export interface AbilityContext {
   scene: Phaser.Scene
   /** 持有方的 emoji 描边风格（持有物/召唤物视觉） */
   readonly ownerOutline: OutlineKind
-  /** 敌对方的本帧存活快照（每帧重建一次，武器间共享） */
+  /** 敌对方的本帧存活快照（每帧重建一次，能力间共享） */
   targets(): readonly TargetInfo[]
   /** 目标当前血量（瞬袭索敌用；实时读，不吃帧快照） */
   targetHp(ref: TargetInfo['ref']): number
@@ -43,7 +43,7 @@ export interface WeaponContext {
   ): void
   /** 发弹：阵营由 ctx 实现注入（Bullet 结构本身敌我同构） */
   spawnBullet(x: number, y: number, angle: number, spec: ProjectileSpec, damage: number): void
-  /** 我方锚点（光环类武器的圆心；队伍 ctx = 队伍中心） */
+  /** 我方锚点（光环类能力的圆心；队伍 ctx = 队伍中心） */
   anchor(): { x: number; y: number }
   /** 登记一个仅本帧生效的减速区域（光环每帧重新登记），叠乘敌对方移速 */
   applySlow(x: number, y: number, radius: number, factor: number): void
@@ -56,7 +56,7 @@ export interface WeaponContext {
   heal(x: number, y: number, range: number, amount: number, all: boolean): number
   damageMul(): number
   cooldownMul(): number
-  /** 出手/爆炸等武器音效（内部已节流） */
+  /** 出手/爆炸等能力音效（内部已节流） */
   sfx(id: SfxId): void
   /** 播放持有者本体的一次性动画 clip：durMs 传行为的真实间隔（攻速越快
    * 动画越快的绑定入口）。clip 未落地/未烘焙时静默保持静态 */
@@ -74,9 +74,9 @@ export interface WeaponContext {
   cutReviveTimer?(x: number, y: number, range: number, ms: number): boolean
 }
 
-/** 武器运行时：每（持有者×武器）一个实例，自管冷却/视觉/攻击行为 */
-export interface WeaponRuntime {
-  update(delta: number, owner: WeaponOwner): void
+/** 能力运行时：每（持有者×能力）一个实例，自管冷却/视觉/攻击行为 */
+export interface AbilityRuntime {
+  update(delta: number, owner: AbilityOwner): void
   /** 压制窗口（跳舞/变形）只走冷却不开火：保持敌侧攻击的时间表语义
    *（窗口结束若冷却已耗尽则立即出手，与原攻击积木行为一致） */
   tickCooldown?(delta: number): void
@@ -89,7 +89,7 @@ export interface WeaponRuntime {
 /** 瞄准索敌上限内离 owner 最近的目标；无目标或全部超出上限返回 null。
  * 上限缺省 ACQUIRE.range——索敌必须有界，无限地图上不能瞄到无穷远 */
 export function nearestAngle(
-  owner: WeaponOwner,
+  owner: AbilityOwner,
   targets: readonly TargetInfo[],
   maxRange = ACQUIRE.range * UNIT,
 ): number | null {

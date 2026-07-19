@@ -19,7 +19,7 @@ import type {
 // 击退速度匀速飞出 deathSlideMs 后消失（位移 = 冲量 × deathSlideMs/1000）
 export const KNOCKBACK = { tauMs: 100, maxSpeed: 1300, deathSlideMs: 300 } as const
 
-// 武器库（可被不同角色复用；held 缺省 = 行为主体是角色本体）
+// 能力库（可被不同角色复用；held 缺省 = 行为主体是角色本体）
 const pistol = {
   kind: 'projectile',
   name: '左轮水枪',
@@ -45,7 +45,7 @@ const pistol = {
   },
 } satisfies ProjectileSpec
 
-export const WEAPONS = {
+export const ABILITIES = {
   tomatoThrow: {
     kind: 'projectile',
     name: '番茄连投',
@@ -260,13 +260,13 @@ export const WEAPONS = {
   } satisfies ChainArcSpec,
 } as const
 
-// ── 能力卡档位行：升级 = 换持整行 ────────────────────────────
-// 每个有能力卡的角色武器两档：`2` = 一阶卡、`3` = 一阶+二阶（累积生效）。
+// ── 升级卡档位行：升级 = 换持整行 ────────────────────────────
+// 每个有升级卡的角色能力两档：`2` = 一阶卡、`3` = 一阶+二阶（累积生效）。
 // 展开基础行/低档行，只覆写质变字段；派生值保持表达式，调基础数值单点生效
 
 /** 三重抛掷 */
 export const tomatoThrow2 = {
-  ...WEAPONS.tomatoThrow,
+  ...ABILITIES.tomatoThrow,
   volley: { count: 3, spreadRad: 0.32 },
 } satisfies ProjectileSpec
 /** 爆浆番茄 */
@@ -277,7 +277,7 @@ export const tomatoThrow3 = {
 
 /** 二连突刺 */
 export const hornThrust2 = {
-  ...WEAPONS.hornThrust,
+  ...ABILITIES.hornThrust,
   combo: { delayMs: 170 },
 } satisfies ThrustSpec
 /** 虹光震波 */
@@ -288,9 +288,9 @@ export const hornThrust3 = {
 
 /** 全周横扫（整圈更慢一拍） */
 export const axeSweep2 = {
-  ...WEAPONS.axeSweep,
+  ...ABILITIES.axeSweep,
   arcRad: Math.PI * 2,
-  sweepMs: Math.round(WEAPONS.axeSweep.sweepMs * 1.35),
+  sweepMs: Math.round(ABILITIES.axeSweep.sweepMs * 1.35),
 } satisfies SweepSpec
 /** 震慑余波 */
 export const axeSweep3 = {
@@ -299,8 +299,8 @@ export const axeSweep3 = {
 } satisfies SweepSpec
 
 /** 贯穿弹 */
-export const pistolLeft2 = { ...WEAPONS.pistolLeft, pierce: 2 } satisfies ProjectileSpec
-export const pistolRight2 = { ...WEAPONS.pistolRight, pierce: 2 } satisfies ProjectileSpec
+export const pistolLeft2 = { ...ABILITIES.pistolLeft, pierce: 2 } satisfies ProjectileSpec
+export const pistolRight2 = { ...ABILITIES.pistolRight, pierce: 2 } satisfies ProjectileSpec
 /** 左轮风暴 */
 export const pistolLeft3 = {
   ...pistolLeft2,
@@ -313,7 +313,7 @@ export const pistolRight3 = {
 
 /** 余烬秘火 */
 export const arcaneBlast2 = {
-  ...WEAPONS.arcaneBlast,
+  ...ABILITIES.arcaneBlast,
   burn: { radius: 1.4, dps: 8, durationMs: 3000 },
 } satisfies AreaBlastSpec
 /** 连锁轰炸 */
@@ -323,17 +323,17 @@ export const arcaneBlast3 = {
 } satisfies AreaBlastSpec
 
 /** 双子回旋 */
-export const boomerang2 = { ...WEAPONS.boomerang, twin: true } satisfies BoomerangSpec
+export const boomerang2 = { ...ABILITIES.boomerang, twin: true } satisfies BoomerangSpec
 /** 磁力巨镖（镖体与判定同步 ×1.4） */
 export const boomerang3 = {
   ...boomerang2,
-  hitRadius: WEAPONS.boomerang.hitRadius * 1.4,
-  held: { ...WEAPONS.boomerang.held, size: WEAPONS.boomerang.held.size * 1.4 },
+  hitRadius: ABILITIES.boomerang.hitRadius * 1.4,
+  held: { ...ABILITIES.boomerang.held, size: ABILITIES.boomerang.held.size * 1.4 },
   coinMagnetRadius: 1.6,
 } satisfies BoomerangSpec
 
 /** 双联光束 */
-export const laserBeam2 = { ...WEAPONS.laserBeam, backBeam: true } satisfies LaserSpec
+export const laserBeam2 = { ...ABILITIES.laserBeam, backBeam: true } satisfies LaserSpec
 /** 全域扫射 */
 export const laserBeam3 = {
   ...laserBeam2,
@@ -341,7 +341,7 @@ export const laserBeam3 = {
 } satisfies LaserSpec
 
 /** 冻伤 */
-export const frostAura2 = { ...WEAPONS.frostAura, dps: 6 } satisfies SlowAuraSpec
+export const frostAura2 = { ...ABILITIES.frostAura, dps: 6 } satisfies SlowAuraSpec
 /** 凛冬降临 */
 export const frostAura3 = {
   ...frostAura2,
@@ -350,9 +350,9 @@ export const frostAura3 = {
 
 /** 持久变形（带贯穿） */
 export const sparkleBolt2 = {
-  ...WEAPONS.sparkleBolt,
+  ...ABILITIES.sparkleBolt,
   pierce: 1,
-  hex: { ...WEAPONS.sparkleBolt.hex, durationMs: 4000 },
+  hex: { ...ABILITIES.sparkleBolt.hex, durationMs: 4000 },
 } satisfies ProjectileSpec
 /** 脆弱诅咒 */
 export const sparkleBolt3 = {
@@ -362,7 +362,7 @@ export const sparkleBolt3 = {
 
 /** 连环刃 */
 export const shadowStrike2 = {
-  ...WEAPONS.shadowStrike,
+  ...ABILITIES.shadowStrike,
   cleave: { radius: 1.0, ratio: 0.6 },
 } satisfies AssassinateSpec
 /** 处决 */
@@ -373,8 +373,8 @@ export const shadowStrike3 = {
 
 /** 扩建工地 */
 export const woodTurret2 = {
-  ...WEAPONS.woodTurret,
-  maxTurrets: WEAPONS.woodTurret.maxTurrets + 1,
+  ...ABILITIES.woodTurret,
+  maxTurrets: ABILITIES.woodTurret.maxTurrets + 1,
 } satisfies TurretSpec
 /** 三连弩 */
 export const woodTurret3 = {
@@ -384,8 +384,8 @@ export const woodTurret3 = {
 
 /** 扩巢 */
 export const beeSwarm2 = {
-  ...WEAPONS.beeSwarm,
-  count: WEAPONS.beeSwarm.count + 1,
+  ...ABILITIES.beeSwarm,
+  count: ABILITIES.beeSwarm.count + 1,
 } satisfies SummonSpec
 /** 麻痹毒素 */
 export const beeSwarm3 = {
@@ -394,7 +394,7 @@ export const beeSwarm3 = {
 } satisfies SummonSpec
 
 /** 群体处方 */
-export const fieldMedkit2 = { ...WEAPONS.fieldMedkit, aoe: { ratio: 0.6 } } satisfies HealSpec
+export const fieldMedkit2 = { ...ABILITIES.fieldMedkit, aoe: { ratio: 0.6 } } satisfies HealSpec
 /** 电击起搏 */
 export const fieldMedkit3 = {
   ...fieldMedkit2,
@@ -402,14 +402,14 @@ export const fieldMedkit3 = {
 } satisfies HealSpec
 
 /** 超导传递 */
-export const voltArc2 = { ...WEAPONS.voltArc, bounces: 4 } satisfies ChainArcSpec
+export const voltArc2 = { ...ABILITIES.voltArc, bounces: 4 } satisfies ChainArcSpec
 /** 过载爆裂 */
 export const voltArc3 = {
   ...voltArc2,
   burstEnd: { radius: 0.9, ratio: 0.6 },
 } satisfies ChainArcSpec
 
-// 武器索敌上限：超出此距离的敌人不作为开火/瞄准目标。12 单位略大于
+// 能力索敌上限：超出此距离的敌人不作为开火/瞄准目标。12 单位略大于
 // 屏幕中心到角落（≈11.5U），可见敌必打、屏外远敌不追——索敌逻辑必须
 // 有界（无限地图防御）。激光用自身更短的 range 门槛，不受此值影响
 export const ACQUIRE = { range: 12 } as const

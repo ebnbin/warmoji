@@ -1,9 +1,9 @@
-import type { WeaponSpec } from '../weapons/spec'
+import type { AbilitySpec } from '../abilities/spec'
 
-// 敌人 = 基础三围 + 移动方式（locomotion）+ 武器列表 + 死亡效果列表。
+// 敌人 = 基础三围 + 移动方式（locomotion）+ 能力列表 + 死亡效果列表。
 // 多样性用数据组合表达：加一种敌人 = 组合现有模块的一行数据；
-// 运行时按 locomotion.kind 分发转向（battle/steer.ts）、武器经敌方 ctx
-// 逐帧驱动（battle/enemyWeapons.ts）、死亡时跑效果模块（killEnemy）。
+// 运行时按 locomotion.kind 分发转向（battle/steer.ts）、能力经敌方 ctx
+// 逐帧驱动（battle/enemyAbilities.ts）、死亡时跑效果模块（killEnemy）。
 export interface EnemyBulletSpec {
   readonly emoji: string
   readonly size: number
@@ -86,9 +86,9 @@ export interface EnemySpec {
   readonly xp: number
   readonly coins: number
   readonly locomotion: LocomotionSpec
-  /** 持械（阵营中立武器行；battle/enemyWeapons 以敌方 ctx 装配驱动）——
-   * 敌人的远程攻击全部经武器表达（原 periodicShot/ringBarrage 积木已并入） */
-  readonly weapons?: readonly WeaponSpec[]
+  /** 持械（阵营中立能力行；battle/enemyAbilities 以敌方 ctx 装配驱动）——
+   * 敌人的远程攻击全部经能力表达（原 periodicShot/ringBarrage 积木已并入） */
+  readonly abilities?: readonly AbilitySpec[]
   readonly onDeath?: readonly DeathEffectSpec[]
   readonly kbImmune?: boolean
 }
@@ -137,7 +137,7 @@ export const INVADER: EnemySpec = {
   damage: 6,
   xp: 4,
   coins: 3,
-  weapons: [
+  abilities: [
     {
       kind: 'projectile',
       name: '慢速弹',
@@ -192,7 +192,7 @@ export const SNAKE: EnemySpec = {
   xp: 4,
   coins: 3,
   locomotion: { kind: 'flee', range: 5 },
-  weapons: [
+  abilities: [
     {
       kind: 'projectile',
       name: '毒弹',
@@ -367,7 +367,7 @@ export const BOSS: EnemySpec = {
     firstDelayMs: 3600,
     sfx: 'whoosh',
   },
-  weapons: [
+  abilities: [
     {
       kind: 'projectile',
       name: '环形弹幕',

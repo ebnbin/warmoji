@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { startRun } from './helpers'
 
-test('开局后自动战斗：出怪、武器自动击杀、计时推进、无控制台错误', async ({ page }) => {
+test('开局后自动战斗：出怪、能力自动击杀、计时推进、无控制台错误', async ({ page }) => {
   test.setTimeout(180_000)
   const errors: string[] = []
   page.on('console', (msg) => {
@@ -23,7 +23,7 @@ test('开局后自动战斗：出怪、武器自动击杀、计时推进、无�
     timeout: 15_000,
   })
 
-  // 玩家不动，武器自动索敌应产生击杀（随机首发可能是慢输出角色，窗口放宽）
+  // 玩家不动，能力自动索敌应产生击杀（随机首发可能是慢输出角色，窗口放宽）
   await page.waitForFunction(() => (window.__warmoji?.kills ?? 0) >= 1, undefined, {
     timeout: 120_000,
   })

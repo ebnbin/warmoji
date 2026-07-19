@@ -2,12 +2,12 @@ import type Phaser from 'phaser'
 import { circleHitIndices } from './spec'
 import type { AssassinateSpec } from './spec'
 import { emojiImage } from '../emoji/textures'
-import type { TargetInfo, WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 瞬袭型：冷却好时瞬移到索敌范围内血量最高的敌人背后重斩，短暂停留
  * （期间本体无敌）后闪回原位。位移走 visualOffset（与队伍布局叠加，物理体
  * 随视觉走）。能力：cleave 斩击波及目标周围小圈；execute 低血目标伤害翻倍 */
-export class AssassinateWeapon implements WeaponRuntime {
+export class AssassinateAbility implements AbilityRuntime {
   private image?: Phaser.GameObjects.Image
   private cooldown: number
   private aim = 0
@@ -17,7 +17,7 @@ export class AssassinateWeapon implements WeaponRuntime {
 
   constructor(
     private spec: AssassinateSpec,
-    private ctx: WeaponContext,
+    private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     if (spec.held) {
@@ -27,7 +27,7 @@ export class AssassinateWeapon implements WeaponRuntime {
   }
 
   /** 索敌：范围内血量最高者（精英/厚血怪优先挨刀） */
-  private pickTarget(owner: WeaponOwner): TargetInfo | null {
+  private pickTarget(owner: AbilityOwner): TargetInfo | null {
     const r2 = this.spec.range * this.spec.range
     let best: TargetInfo | null = null
     let bestHp = -1
@@ -44,7 +44,7 @@ export class AssassinateWeapon implements WeaponRuntime {
     return best
   }
 
-  update(delta: number, owner: WeaponOwner): void {
+  update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
     if (this.image && this.spec.held) {
       const dist = this.spec.held.restOffset

@@ -16,24 +16,24 @@ describe('chest 掉落判定', () => {
 })
 
 describe('chest 候选池：上场角色池 ∪ 队长池', () => {
-  it('无道具时含通用/形态/队长道具，不含未解锁的能力卡', () => {
+  it('无道具时含通用/形态/队长道具，不含未解锁的升级卡', () => {
     const entries = chestCandidates(['juggler'], [[]], [])
     const ids = entries.map((e) => e.itemId)
     expect(ids).toContain('gemHeart') // 通用池
     expect(ids).toContain('marchFlag') // 队长池
-    expect(ids).not.toContain('abilityJuggler1') // 门槛未达
-    expect(ids).not.toContain('abilityMage1') // 不在场角色的专属卡
+    expect(ids).not.toContain('upgradeJuggler1') // 门槛未达
+    expect(ids).not.toContain('upgradeMage1') // 不在场角色的专属卡
     // 归属：队长道具 slot -1，角色道具 slot 0
     expect(entries.find((e) => e.itemId === 'marchFlag')!.slot).toBe(-1)
     expect(entries.find((e) => e.itemId === 'gemHeart')!.slot).toBe(0)
   })
 
-  it('能力卡沿用商店门槛：2 张普通卡解锁一阶，持有一阶解锁二阶', () => {
+  it('升级卡沿用商店门槛：2 张普通卡解锁一阶，持有一阶解锁二阶', () => {
     const gated = chestCandidates(['juggler'], [['gemHeart', 'whetstone']], [])
-    expect(gated.map((e) => e.itemId)).toContain('abilityJuggler1')
-    expect(gated.map((e) => e.itemId)).not.toContain('abilityJuggler2')
-    const tier2 = chestCandidates(['juggler'], [['gemHeart', 'whetstone', 'abilityJuggler1']], [])
-    expect(tier2.map((e) => e.itemId)).toContain('abilityJuggler2')
+    expect(gated.map((e) => e.itemId)).toContain('upgradeJuggler1')
+    expect(gated.map((e) => e.itemId)).not.toContain('upgradeJuggler2')
+    const tier2 = chestCandidates(['juggler'], [['gemHeart', 'whetstone', 'upgradeJuggler1']], [])
+    expect(tier2.map((e) => e.itemId)).toContain('upgradeJuggler2')
   })
 
   it('堆叠上限的道具不再入围（角色与队长两侧都生效）', () => {

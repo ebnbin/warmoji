@@ -44,7 +44,7 @@ export class MenuScene extends Phaser.Scene {
     this.createLogo(w, h * 0.22, res)
 
     this.add
-      .text(w / 2, h * 0.34, 'emoji 幸存者 · 走位躲避，武器全自动', {
+      .text(w / 2, h * 0.34, 'emoji 幸存者 · 走位躲避，能力全自动', {
         fontFamily: UI_FONT,
         fontSize: FONT.strong,
         color: '#8888aa',
@@ -193,7 +193,7 @@ export class MenuScene extends Phaser.Scene {
     })
   }
 
-  /** 背景漂浮暗纹：低透明度的敌人/武器 emoji 缓慢浮动旋转，增加画面纵深 */
+  /** 背景漂浮暗纹：低透明度的敌人/能力 emoji 缓慢浮动旋转，增加画面纵深 */
   private createBackdrop(w: number, h: number, rng: Rng): void {
     const decor: { emoji: string; outline: 'enemy' | 'player' }[] = [
       { emoji: ENEMY_SPECS[1]!.emoji, outline: 'enemy' },

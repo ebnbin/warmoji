@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { WEAPONS } from '../weapons/registry'
+import { ABILITIES } from '../abilities/registry'
 import { CAPTAINS, CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
-import { captainStatGroups, characterStatGroups, weaponStatLines } from './stats'
+import { captainStatGroups, characterStatGroups, abilityStatLines } from './stats'
 
 const IDS = Object.keys(CHARACTERS) as CharacterId[]
 
 describe('角色属性面板模型', () => {
-  it('每个角色 = 基础组 + 特殊能力组 + 每把武器一组，组内均有内容', () => {
+  it('每个角色 = 基础组 + 专属升级组 + 每个能力一组，组内均有内容', () => {
     for (const id of IDS) {
       const groups = characterStatGroups(id)
-      expect(groups).toHaveLength(2 + CHARACTERS[id].weapons.length)
+      expect(groups).toHaveLength(2 + CHARACTERS[id].abilities.length)
       expect(groups[0]!.title).toBe('基础')
-      expect(groups[1]!.title).toContain('特殊能力')
+      expect(groups[1]!.title).toContain('专属升级')
       for (const g of groups) {
         expect(g.icon.length).toBeGreaterThan(0)
         expect(g.title.length).toBeGreaterThan(0)
@@ -22,43 +22,43 @@ describe('角色属性面板模型', () => {
     }
   })
 
-  it('特殊能力组：无卡标注未解锁，持一阶解锁第一条，双卡全解锁', () => {
+  it('专属升级组：无卡标注未解锁，持一阶解锁第一条，双卡全解锁', () => {
     const locked = characterStatGroups('troll', [])[1]!
     expect(locked.lines[0]).toContain('未解锁')
     expect(locked.lines[1]).toContain('未解锁')
-    const t1 = characterStatGroups('troll', ['abilityTroll1'])[1]!
+    const t1 = characterStatGroups('troll', ['upgradeTroll1'])[1]!
     expect(t1.lines[0]).not.toContain('未解锁')
     expect(t1.lines[1]).toContain('未解锁')
-    const t2 = characterStatGroups('troll', ['abilityTroll1', 'abilityTroll2'])[1]!
+    const t2 = characterStatGroups('troll', ['upgradeTroll1', 'upgradeTroll2'])[1]!
     for (const line of t2.lines) expect(line).not.toContain('未解锁')
   })
 
-  it('武器组标题含名称与类型标签；双持两把名称可区分', () => {
+  it('能力组标题含名称与类型标签；双持两把名称可区分', () => {
     const cowboy = characterStatGroups('cowboy')
     expect(cowboy[2]!.title).toBe('左轮水枪·左（投掷）')
     expect(cowboy[3]!.title).toBe('左轮水枪·右（投掷）')
     expect(characterStatGroups('mage')[2]!.title).toBe('奥术轰炸（轰炸）')
   })
 
-  it('能力注入反映在武器展示：巨魔持一阶卡弧宽变 360°', () => {
+  it('能力注入反映在能力展示：巨魔持一阶卡弧宽变 360°', () => {
     const bare = characterStatGroups('troll', [])[2]!
-    const carded = characterStatGroups('troll', ['abilityTroll1'])[2]!
+    const carded = characterStatGroups('troll', ['upgradeTroll1'])[2]!
     expect(bare.lines[1]).toContain('弧宽 150°')
     expect(carded.lines[1]).toContain('弧宽 360°')
   })
 
   it('数值换算：px→格、ms→秒、弧度→角度', () => {
-    const thrust = weaponStatLines(WEAPONS.hornThrust)
+    const thrust = abilityStatLines(ABILITIES.hornThrust)
     expect(thrust[0]).toBe('伤害 26 · 冷却 0.9秒 · 击退 0.9格')
-    expect(thrust[1]).toContain(`触及 ${WEAPONS.hornThrust.reach}格`)
-    const sweep = weaponStatLines(WEAPONS.axeSweep)
+    expect(thrust[1]).toContain(`触及 ${ABILITIES.hornThrust.reach}格`)
+    const sweep = abilityStatLines(ABILITIES.axeSweep)
     expect(sweep[1]).toContain('弧宽 150°')
-    const blast = weaponStatLines(WEAPONS.arcaneBlast)
+    const blast = abilityStatLines(ABILITIES.arcaneBlast)
     expect(blast[1]).toBe('侦测 6格 · 爆炸半径 1.3格')
   })
 
-  it('每把武器都有非空展示名与图标', () => {
-    for (const w of Object.values(WEAPONS)) {
+  it('每个能力都有非空展示名与图标', () => {
+    for (const w of Object.values(ABILITIES)) {
       expect(w.name.length).toBeGreaterThan(0)
       expect(w.icon.length).toBeGreaterThan(0)
     }
@@ -84,7 +84,7 @@ describe('角色属性面板模型', () => {
     }
   })
 
-  it('道具修正展示：磨刀石提升武器伤害行，生命宝石提升基础行', () => {
+  it('道具修正展示：磨刀石提升能力伤害行，生命宝石提升基础行', () => {
     const bare = characterStatGroups('troll', [])
     const dmg = characterStatGroups('troll', ['whetstone'])
     const hp = characterStatGroups('troll', ['gemHeart'])

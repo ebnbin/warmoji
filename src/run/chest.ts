@@ -1,11 +1,11 @@
 import { CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
 import type { ItemId } from '../items/registry'
-import { abilityCardAvailable, captainPool, characterPool, ITEMS, reachedStackLimit } from '../items/registry'
+import { upgradeCardAvailable, captainPool, characterPool, ITEMS, reachedStackLimit } from '../items/registry'
 
 // 宝箱开箱抽取：候选 = 各上场角色的道具池 ∪ 队长道具池，即「本局当前阵容
 // 用得上的道具」。同一道具进多个角色的池 = 多个候选条目，抽中哪条归谁；
-// 尊重堆叠上限与能力卡解锁门槛（和商店同规则），按稀有度权重加权抽取。
+// 尊重堆叠上限与升级卡解锁门槛（和商店同规则），按稀有度权重加权抽取。
 
 /** 开箱战利品：道具 + 归属（slot = 角色槽位；-1 = 队长/团队道具） */
 export interface ChestLoot {
@@ -29,7 +29,7 @@ export function chestCandidates(
     const owned = memberItems[slot] ?? []
     for (const itemId of characterPool(id, CHARACTERS[id])) {
       if (reachedStackLimit(owned, itemId)) continue
-      if (!abilityCardAvailable(itemId, owned)) continue
+      if (!upgradeCardAvailable(itemId, owned)) continue
       entries.push({ itemId, slot })
     }
   })

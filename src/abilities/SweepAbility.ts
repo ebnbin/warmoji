@@ -3,10 +3,10 @@ import { sectorHitIndices } from './spec'
 import type { SweepSpec } from './spec'
 import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
-import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
+import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 横扫型：持有物绕角色扫过一段圆弧，扇形判定内每敌一次伤害 */
-export class SweepWeapon implements WeaponRuntime {
+export class SweepAbility implements AbilityRuntime {
   private image: Phaser.GameObjects.Image
   private cooldown: number
   private aim = 0
@@ -16,14 +16,14 @@ export class SweepWeapon implements WeaponRuntime {
 
   constructor(
     private spec: SweepSpec,
-    private ctx: WeaponContext,
+    private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
     this.image = emojiImage(ctx.scene, 0, 0, spec.held.emoji, spec.held.size, ctx.ownerOutline).setDepth(13)
     this.cooldown = initialCooldownMs
   }
 
-  update(delta: number, owner: WeaponOwner): void {
+  update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
     const angle = this.aim + (this.sweep.t * this.spec.arcRad) / 2
     const dist = this.spec.held.restOffset
