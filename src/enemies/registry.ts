@@ -1,5 +1,6 @@
 import enemiesJson from '../gen/enemies.json'
-import type { AbilityDef, GroundEffectDef } from '../abilities/defs'
+import type { AbilityDef } from '../abilities/defs'
+import type { GroundEffectDef } from '../groundEffects/defs'
 
 // 敌人 = 基础三围 + 移动方式（locomotion）+ 能力列表 + 死亡效果列表。
 // 多样性用数据组合表达：加一种敌人 = 组合现有模块的一行数据；

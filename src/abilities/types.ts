@@ -1,7 +1,8 @@
 import { UNIT } from '../lib/units'
 import type Phaser from 'phaser'
 import { ACQUIRE } from './registry'
-import type { GroundEffectDef, ProjectileDef } from './defs'
+import type { ProjectileDef } from './defs'
+import type { GroundEffectDef } from '../groundEffects/defs'
 import type { SfxId } from '../audio/sfx'
 import type { OutlineKind } from '../emoji/svg'
 

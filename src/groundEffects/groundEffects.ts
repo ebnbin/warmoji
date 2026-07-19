@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
-import type { GroundEffectDef } from '../abilities/defs'
-import type { BaseArenaScene, ImageObj } from './BaseArenaScene'
+import type { GroundEffectDef } from './defs'
+import type { BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
 // 地面效果（阵营中立）：留在地面的持续区，敌我同构——team 放的烧敌人、
 // enemy 放的烧队员（同 PoE ground effect 的阵营规则）。跳伤施加语义按
