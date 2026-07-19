@@ -1,0 +1,67 @@
+{
+  "specs": {
+    "zombie": {
+      "kind": "zombie", "behavior": "chase", "emoji": "🧟", "name": "僵尸", "desc": "缓慢但成群，最基础的追击者",
+      "size": "1.35u", "radius": "0.5u", "hp": 60, "speed": "1.375u", "damage": 8, "xp": 3, "coins": 2
+    },
+    "ghost": {
+      "kind": "ghost", "behavior": "chase", "emoji": "👻", "name": "幽灵", "desc": "飘得很快的追击者，血薄",
+      "size": "1.2u", "radius": "0.45u", "hp": 25, "speed": "2.875u", "damage": 5, "xp": 2, "coins": 2
+    },
+    "invader": {
+      "kind": "invader", "behavior": "wanderFire", "emoji": "👾", "name": "外星怪", "desc": "不追人，游荡途中朝前方吐慢速弹",
+      "size": "1.25u", "radius": "0.48u", "hp": 40, "speed": "0.9u", "damage": 6, "xp": 4, "coins": 3,
+      "fireIntervalMs": 2800,
+      "bullet": { "emoji": "🔴", "size": "0.4u", "radius": "0.14u", "speed": "3u", "damage": 6, "lifeMs": 4500 }
+    },
+    "boar": {
+      "kind": "boar", "behavior": "dash", "emoji": "🐗", "name": "野猪", "desc": "发现猎物后蓄力直线突刺，横向可躲",
+      "size": "1.4u", "radius": "0.52u", "hp": 80, "speed": "1.1u", "damage": 10, "xp": 5, "coins": 3,
+      "detectRange": "4u", "windupMs": 550, "dashSpeed": "8u", "dashDist": "3.5u", "cooldownMs": 1800
+    },
+    "snake": {
+      "kind": "snake", "behavior": "fleeFire", "emoji": "🐍", "name": "毒蛇", "desc": "见人就溜，边逃边回头吐毒弹",
+      "size": "1.25u", "radius": "0.45u", "hp": 35, "speed": "2.4u", "damage": 5, "xp": 4, "coins": 3,
+      "fleeRange": "5u", "fireIntervalMs": 2600,
+      "bullet": { "emoji": "🟢", "size": "0.4u", "radius": "0.14u", "speed": "3.2u", "damage": 5, "lifeMs": 4500 }
+    },
+    "mushroom": {
+      "kind": "mushroom", "behavior": "chase", "emoji": "🍄", "name": "毒蘑菇", "desc": "死亡时在原地留下一片毒液",
+      "size": "1.25u", "radius": "0.46u", "hp": 50, "speed": "1u", "damage": 6, "xp": 4, "coins": 3,
+      "poison": { "radius": "1.6u", "durationMs": 3000, "tickMs": 500, "damage": 4 }
+    },
+    "rat": {
+      "kind": "rat", "behavior": "coinThief", "emoji": "🐀", "name": "偷币鼠", "desc": "专偷地上的金币，击杀可全额讨回并有利息",
+      "size": "1.05u", "radius": "0.4u", "hp": 30, "speed": "3.2u", "damage": 3, "xp": 3, "coins": 2
+    },
+    "blobling": {
+      "kind": "blobling", "behavior": "chase", "emoji": "🫧", "name": "小泡泡", "desc": "泡泡分裂出的迷你体，快而脆",
+      "size": "0.75u", "radius": "0.28u", "hp": 18, "speed": "2.6u", "damage": 4, "xp": 1, "coins": 0
+    },
+    "blob": {
+      "kind": "blob", "behavior": "chase", "emoji": "🫧", "name": "泡泡", "desc": "被击破时分裂成两只小泡泡",
+      "size": "1.55u", "radius": "0.55u", "hp": 70, "speed": "1.2u", "damage": 6, "xp": 4, "coins": 3,
+      "split": { "into": "blobling", "count": 2 }
+    }
+  },
+  "mix": [
+    { "kind": "zombie", "sinceWave": 1, "base": 80, "perWave": -2, "min": 40, "max": 80 },
+    { "kind": "ghost", "sinceWave": 1, "base": 15, "perWave": 1, "min": 15, "max": 32 },
+    { "kind": "invader", "sinceWave": 2, "base": 8, "perWave": 0.3, "min": 0, "max": 12 },
+    { "kind": "boar", "sinceWave": 3, "base": 8, "perWave": 0.4, "min": 0, "max": 16 },
+    { "kind": "snake", "sinceWave": 4, "base": 7, "perWave": 0.3, "min": 0, "max": 10 },
+    { "kind": "mushroom", "sinceWave": 4, "base": 7, "perWave": 0.4, "min": 0, "max": 14 },
+    { "kind": "rat", "sinceWave": 5, "base": 5, "perWave": 0.3, "min": 0, "max": 10 },
+    { "kind": "blob", "sinceWave": 5, "base": 7, "perWave": 0.4, "min": 0, "max": 14 }
+  ],
+  "boss": {
+    "emoji": "👹", "name": "赤鬼", "size": "3.2u", "radius": "1.05u", "hp": 6000,
+    "speed": "1.4u", "damage": 20, "xp": 60, "coins": 60,
+    "ring": {
+      "count": 12, "intervalMs": 2800,
+      "bullet": { "emoji": "🟣", "size": "0.45u", "radius": "0.16u", "speed": "2.4u", "damage": 8, "lifeMs": 6000 }
+    },
+    "dash": { "intervalMs": 5600, "windupMs": 750, "speed": "8u", "durationMs": 450 },
+    "spawnRelief": 2
+  }
+}

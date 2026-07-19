@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { BLOB, ENEMY_SPECS, MUSHROOM, ZOMBIE } from './registry'
+import { BLOB, BLOBLING, BOSS, ENEMY_SPECS, MUSHROOM, ZOMBIE } from './registry'
 import { enemyMixAt, fleeSteer, pickEnemy } from './registry'
 import { Rng } from '../lib/rng'
+import { UNIT } from '../lib/units'
 
 describe('敌人规格', () => {
   it('每种敌人字段合法：血量/速度/经验为正，尺寸大于判定半径', () => {
@@ -84,5 +85,18 @@ describe('逃离转向（fleeSteer）', () => {
   it('角落完全抵消时走切线，永不返回零向量', () => {
     const d = fleeSteer(0, 800, -2, 0, W, H, M)
     expect(Math.hypot(d.x, d.y)).toBeCloseTo(1)
+  })
+})
+
+describe('数据水合等值', () => {
+  it('格值换算与旧 px 逐位相等（抽查）', () => {
+    expect(ZOMBIE.speed).toBe(1.375 * UNIT)
+    expect(BLOB.radius).toBe(0.55 * UNIT)
+    expect(BOSS.ring.bullet.speed).toBe(2.4 * UNIT)
+  })
+
+  it('分裂 ID 已解析为 spec 对象引用', () => {
+    expect(BLOB.split?.into).toBe(BLOBLING)
+    expect(BLOB.split?.count).toBe(2)
   })
 })

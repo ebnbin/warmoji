@@ -1,0 +1,67 @@
+{
+  "angel": {
+    "emoji": "😇",
+    "name": "天使",
+    "desc": "每次进入商店，全体队员复活并恢复满血",
+    "teamSize": 5,
+    "startWave": 1,
+    "startCoins": 0,
+    "xpGainMul": 1,
+    "reviveInShop": true,
+    "freeRefreshes": 0,
+    "firstWaveShop": false,
+    "skill": { "name": "圣光降临", "desc": "阵亡队员满血复活，存活队员回复 50% 生命，全队无敌 2 秒", "cdMs": 35000 }
+  },
+  "moneybags": {
+    "emoji": "🤑",
+    "name": "财迷",
+    "desc": "每次进入商店，前 3 次道具刷新免费",
+    "teamSize": 5,
+    "startWave": 1,
+    "startCoins": 0,
+    "xpGainMul": 1,
+    "reviveInShop": false,
+    "freeRefreshes": 3,
+    "firstWaveShop": false,
+    "skill": { "name": "天降横财", "desc": "金袋砸向最近的 8 个敌人：伤害与强击退，每袋落地掉 1 枚金币", "cdMs": 20000 }
+  },
+  "party": {
+    "emoji": "🥳",
+    "name": "派对之星",
+    "desc": "气氛组拉满，编制上限 6 人",
+    "teamSize": 6,
+    "startWave": 1,
+    "startCoins": 0,
+    "xpGainMul": 1,
+    "reviveInShop": false,
+    "freeRefreshes": 0,
+    "firstWaveShop": false,
+    "skill": { "name": "全场蹦迪", "desc": "全场敌人（含 Boss）被音乐感染，跳舞 3.5 秒不能动弹", "cdMs": 30000 }
+  },
+  "prodigy": {
+    "emoji": "🤓",
+    "name": "神童",
+    "desc": "天资聪颖，自选阵容直接满编开局，能量豆拉满、自带启动资金（测试直通车）",
+    "teamSize": 5,
+    "startWave": 15,
+    "startCoins": 500,
+    "xpGainMul": 1,
+    "reviveInShop": false,
+    "freeRefreshes": 0,
+    "firstWaveShop": true,
+    "skill": { "name": "降维打击", "desc": "一道灵光扫过全场，所有敌人受到大额伤害（随波次增强），Boss 承伤减半", "cdMs": 45000 }
+  },
+  "scholar": {
+    "emoji": "🧐",
+    "name": "学者",
+    "desc": "带队有方，全队经验获取 +25%",
+    "teamSize": 5,
+    "startWave": 1,
+    "startCoins": 0,
+    "xpGainMul": 1.25,
+    "reviveInShop": false,
+    "freeRefreshes": 0,
+    "firstWaveShop": false,
+    "skill": { "name": "弱点讲义", "desc": "划出敌人弱点，8 秒内全队伤害 ×1.6", "cdMs": 30000 }
+  }
+}

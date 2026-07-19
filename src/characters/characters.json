@@ -1,0 +1,16 @@
+{
+  "juggler": { "emoji": "🤹", "name": "杂耍演员", "desc": "向最近的敌人连续抛掷番茄", "weapons": ["tomatoThrow"], "orbit": -0.5 },
+  "unicorn": { "emoji": "🦄", "name": "独角兽", "desc": "独角向前突刺，穿透沿途敌人", "weapons": ["hornThrust"], "orbit": 0.8 },
+  "troll": { "emoji": "🧌", "name": "巨魔", "desc": "挥舞巨斧，横扫身前扇形范围", "weapons": ["axeSweep"], "orbit": 1 },
+  "cowboy": { "emoji": "🤠", "name": "牛仔", "desc": "左右双枪齐发，射出高速水弹", "weapons": ["pistolLeft", "pistolRight"], "orbit": -0.7 },
+  "mage": { "emoji": "🧙", "name": "法师", "desc": "在远处敌人脚下引爆奥术轰炸", "weapons": ["arcaneBlast"], "orbit": -1 },
+  "kangaroo": { "emoji": "🦘", "name": "袋鼠", "desc": "掷出回旋镖，去程回程皆可伤敌", "weapons": ["boomerang"], "orbit": 0.4 },
+  "robot": { "emoji": "🤖", "name": "机器人", "desc": "手持激光器，灼穿一条直线上的所有敌人", "weapons": ["laserBeam"], "orbit": -0.6 },
+  "snowman": { "emoji": "⛄", "name": "雪人", "desc": "以队伍中心散发寒气，持续减速范围内的敌人", "weapons": ["frostAura"], "orbit": 0 },
+  "fairy": { "emoji": "🧚", "name": "仙子", "desc": "魔尘弹把敌人变形成无害的绵羊，变形期间不能伤人", "weapons": ["sparkleBolt"], "orbit": -0.6 },
+  "assassin": { "emoji": "🥷", "name": "刺客", "desc": "瞬移到范围内血最厚的敌人背后重斩一刀，再闪回原位；出手瞬间无敌", "weapons": ["shadowStrike"], "orbit": 0.5 },
+  "beaver": { "emoji": "🦫", "name": "河狸工程师", "desc": "自己不动手，定期在脚下架起自动开火的弩塔", "weapons": ["woodTurret"], "orbit": -0.3 },
+  "queenBee": { "emoji": "🐝", "name": "蜂后", "desc": "统领一小群蜜蜂，蜂群自主追击撞刺敌人", "weapons": ["beeSwarm"], "orbit": -0.2 },
+  "medic": { "emoji": "🧑‍⚕️", "name": "军医", "desc": "周期治疗附近血量最低的队友，顺手甩两支飞针", "weapons": ["fieldMedkit", "syringeDart"], "orbit": -0.8 },
+  "jellyfish": { "emoji": "🪼", "name": "水母", "desc": "电弧在敌群间弹跳传导，敌人越密越疼", "weapons": ["voltArc"], "orbit": 0.2 }
+}

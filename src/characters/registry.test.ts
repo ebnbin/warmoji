@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CHARACTERS } from './registry'
+import { WEAPONS } from '../weapons/registry'
 
 describe('花名册', () => {
   it('emoji 不重复，每人有名字、介绍且至少 1 把武器', () => {
@@ -38,5 +39,13 @@ describe('花名册', () => {
     // 仙子的魔尘弹自带变形载荷（新引擎能力的数据入口）
     const bolt = CHARACTERS.fairy.weapons[0]!
     expect(bolt.kind === 'projectile' && bolt.hex?.morphEmoji).toBe('🐑')
+  })
+})
+
+describe('武器 ID 解析', () => {
+  it('角色武器是注册表 spec 的同一对象引用（非拷贝）', () => {
+    expect(CHARACTERS.cowboy.weapons[0]).toBe(WEAPONS.pistolLeft)
+    expect(CHARACTERS.cowboy.weapons[1]).toBe(WEAPONS.pistolRight)
+    expect(CHARACTERS.medic.weapons[0]).toBe(WEAPONS.fieldMedkit)
   })
 })
