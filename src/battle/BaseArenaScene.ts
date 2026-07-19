@@ -9,7 +9,9 @@ import type { Member } from './members'
 import { projectileOf } from './projectiles'
 import { circleBody } from './arcade'
 import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from './pickups'
-import { spawnBurnZone, updateBurnZones, updateEnemyProjectiles, updatePoisonPools } from './hazards'
+import { updateEnemyProjectiles } from './hazards'
+import { spawnGroundEffect, updateGroundEffects } from './groundEffects'
+import type { GroundEffect } from './groundEffects'
 import { spawnProjectile, sweepProjectiles } from './projectiles'
 import { STEERERS } from './steer'
 import { runDeathEffects } from './deathEffects'
@@ -128,8 +130,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   projectiles!: Phaser.GameObjects.Group
   enemyProjectiles!: Phaser.GameObjects.Group
   coins!: Phaser.GameObjects.Group
-  /** 毒液池（蘑菇死亡遗留），波末随场景销毁 */
-  poisonPools: { x: number; y: number; r2: number; until: number; tickMs: number; damage: number; srcName: string; gfx: Phaser.GameObjects.Graphics }[] = []
+  /** 地面效果（毒液/灼烧等，敌我同构），波末随场景销毁 */
+  groundEffects: GroundEffect[] = []
   private enemyMix: EnemyMixEntry[] = []
   frameTargets: TargetInfo[] = []
   /** 敌方能力的索敌快照：存活队员（虚空图含镜像坐标），每帧重建 */
@@ -137,17 +139,6 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   private frameSlowZones: { x: number; y: number; r2: number; factor: number }[] = []
   /** 仅本帧生效的金币吸取点（磁力回旋镖沿途登记） */
   frameAttractors: { x: number; y: number; r2: number }[] = []
-  /** 灼烧地面（余烬秘火）：周期烧伤区域内敌人，伤害归属 srcSlot */
-  burnZones: {
-    x: number
-    y: number
-    r2: number
-    until: number
-    tickDamage: number
-    nextTickAt: number
-    srcSlot: number
-    gfx: Phaser.GameObjects.Graphics
-  }[] = []
   private abilityCtx: AbilityContext = {
     scene: this,
     ownerOutline: 'player',
@@ -164,7 +155,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       a.abilitySlowMul = factor
       a.abilitySlowUntil = this.elapsedMs + durationMs
     },
-    spawnBurnZone: (x, y, radius, dps, durationMs) => spawnBurnZone(this, x, y, radius, dps, durationMs),
+    spawnGroundEffect: (x, y, spec) => spawnGroundEffect(this, x, y, spec, { faction: 'team', srcSlot: -1 }),
     attractCoins: (x, y, radius) => this.frameAttractors.push({ x, y, r2: radius * radius }),
     // 基座 ctx 无「本人」概念：无敌授予/本体动画由 memberCtx 按槽位覆写
     playOwnerClip: () => {},
@@ -489,9 +480,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.spawnCooldownMs = 300
     this.pendingSpawns = 0
     this.over = false
-    this.poisonPools = []
     // 场景 restart 已销毁全部显示对象，这里只需重置引用
-    this.burnZones = []
+    this.groundEffects = []
     this.frameAttractors = []
     this.awakeCount = 0
     this.dormantCount = 0
@@ -630,8 +620,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.spawn(delta)
     this.steerEnemies(delta)
     updateEnemyProjectiles(this)
-    updatePoisonPools(this)
-    updateBurnZones(this)
+    updateGroundEffects(this)
     magnetCoins(this)
     sweepProjectiles(this, delta)
     this.cullProjectiles()
@@ -814,8 +803,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       },
       spawnProjectile: (x, y, angle, pSpec, damage) =>
         spawnProjectile(this, x, y, angle, pSpec, damage, slot),
-      spawnBurnZone: (x, y, radius, dps, durationMs) =>
-        spawnBurnZone(this, x, y, radius, dps, durationMs, slot),
+      spawnGroundEffect: (x, y, spec) =>
+        spawnGroundEffect(this, x, y, spec, { faction: 'team', srcSlot: slot }),
       // 刺客出手帧：把「上次受击时刻」推到未来，等效授予 ms 无敌
       grantOwnerInvuln: (ms) => {
         const mm = this.members[slot]
@@ -861,7 +850,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       alive: true,
       reviveAt: 0,
       lastHitMs: -Infinity,
-      lastPoisonMs: -Infinity,
+      lastGroundHitMs: -Infinity,
       hpBar: this.add.graphics().setDepth(11),
       shownHpRatio: -1,
       deadText: this.add

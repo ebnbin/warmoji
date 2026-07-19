@@ -314,7 +314,7 @@ export const pistolRight3 = {
 /** 余烬秘火 */
 export const arcaneBlast2 = {
   ...ABILITIES.arcaneBlast,
-  burn: { radius: 1.4, dps: 8, durationMs: 3000 },
+  burn: { radius: 1.4, durationMs: 3000, tickMs: 400, damage: 3, color: 0xff7043, fillAlpha: 0.18, lineAlpha: 0.55, enterMs: 200 },
 } satisfies AreaBlastSpec
 /** 连锁轰炸 */
 export const arcaneBlast3 = {

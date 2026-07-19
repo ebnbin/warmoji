@@ -33,8 +33,8 @@ export interface Member {
   alive: boolean
   reviveAt: number
   lastHitMs: number
-  /** 毒液池独立于接触伤害的跳伤计时 */
-  lastPoisonMs: number
+  /** 地面效果跳伤的按受害者节流时计（独立于接触伤害的无敌帧） */
+  lastGroundHitMs: number
   hpBar: Phaser.GameObjects.Graphics
   shownHpRatio: number
   deadText: Phaser.GameObjects.Text

@@ -79,7 +79,7 @@ export class AreaBlastAbility implements AbilityRuntime {
       this.ctx.damageTarget(targets[i]!.ref, damage, this.spec.knockback, x, y)
     }
     if (this.spec.burn) {
-      this.ctx.spawnBurnZone(x, y, this.spec.burn.radius, this.spec.burn.dps, this.spec.burn.durationMs)
+      this.ctx.spawnGroundEffect(x, y, this.spec.burn)
     }
     this.blastEffect(x, y)
   }

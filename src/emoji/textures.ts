@@ -9,7 +9,7 @@ import { EMOJI_PAD, outlineSvg, padSvg, setSvgSize } from './svg'
 // twemoji 全集打包资源（构建期由 sync-emoji.mjs 生成 index.json + pack.txt，
 // 图形 CC-BY 4.0）：全库仅两个请求，之后任意 emoji 的 SVG 文本同步可取。
 // 纹理管线：SVG 文本 → core/svg.ts 纯函数改写 → 光栅化 → Phaser 纹理；
-// 描边按阵营配色（player 黑 / enemy 紫 / enemyShot 红），每色一个纹理变体。
+// 描边按阵营配色（player 黑 / enemy 紫 / enemyProjectile 红），每色一个纹理变体。
 // 启动只预载 PRELOAD_EMOJIS，其余按需 ensureEmoji，超 LRU 上限淘汰最久未用。
 const RASTER = 256
 const LRU_LIMIT = 256

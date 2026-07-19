@@ -1,4 +1,4 @@
-import type { AbilitySpec } from '../abilities/spec'
+import type { AbilitySpec, GroundEffectSpec } from '../abilities/spec'
 
 // 敌人 = 基础三围 + 移动方式（locomotion）+ 能力列表 + 死亡效果列表。
 // 多样性用数据组合表达：加一种敌人 = 组合现有模块的一行数据；
@@ -46,12 +46,9 @@ export type LocomotionSpec =
   | DashLocomotion
 
 // ── 死亡效果 ────────────────────────────────────────────────
-export interface DeathPoisonSpec {
+/** 死亡留毒：参数即地面效果（battle/groundEffects 以敌方阵营生成） */
+export interface DeathPoisonSpec extends GroundEffectSpec {
   readonly kind: 'poison'
-  readonly radius: number
-  readonly durationMs: number
-  readonly tickMs: number
-  readonly damage: number
 }
 
 export interface DeathSplitSpec {
@@ -222,7 +219,19 @@ export const MUSHROOM: EnemySpec = {
   damage: 6,
   xp: 4,
   coins: 3,
-  onDeath: [{ kind: 'poison', radius: 1.6, durationMs: 3000, tickMs: 500, damage: 4 }],
+  onDeath: [
+    {
+      kind: 'poison',
+      radius: 1.6,
+      durationMs: 3000,
+      tickMs: 500,
+      damage: 4,
+      color: 0x7cb342,
+      fillAlpha: 0.22,
+      lineAlpha: 0.5,
+      enterMs: 220,
+    },
+  ],
 }
 
 /** 偷金币鼠：不理玩家，直奔地上最近的金币吃掉；击杀吐回吃掉的 + 1 枚利息 */

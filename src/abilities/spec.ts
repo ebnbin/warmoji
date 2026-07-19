@@ -4,6 +4,21 @@ import type { SfxId } from '../audio/sfx'
 // 能力 = 独立于角色的攻击行为单元；held 缺省时行为主体是角色本体。
 // 新增能力类型：在此加 kind 与 Spec，src/abilities/ 加对应运行时类并注册 create.ts。
 
+/** 地面效果参数：留在地面的持续区（灼烧/毒液/…）。阵营与伤害归属由
+ * 生成方注入（能力经 ctx、死亡效果在引擎侧直调）；跳伤施加语义按目标
+ * 阵营分流（battle/groundEffects.ts）。radius 为格值，进战斗经 toPx */
+export interface GroundEffectSpec {
+  readonly radius: number
+  readonly durationMs: number
+  readonly tickMs: number
+  readonly damage: number
+  /** 视觉：主色 + 填充/描边透明度 + 入场缩放时长 */
+  readonly color: number
+  readonly fillAlpha: number
+  readonly lineAlpha: number
+  readonly enterMs: number
+}
+
 /** 持有物视觉：挂在角色身上的能力 emoji */
 export interface HeldVisual {
   readonly emoji: string
@@ -118,7 +133,7 @@ export interface AreaBlastSpec {
   readonly color: number
   // ── 能力字段 ──
   /** 灼烧地面：爆心留下持续伤害区域 */
-  readonly burn?: { readonly radius: number; readonly dps: number; readonly durationMs: number }
+  readonly burn?: GroundEffectSpec
   /** 连锁：延迟 delayMs 后向随机敌人追加一次 ratio × 伤害的轰炸 */
   readonly echo?: { readonly delayMs: number; readonly ratio: number }
 }

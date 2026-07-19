@@ -135,8 +135,8 @@ test('死亡效果与偷币：蘑菇留毒、泡泡分裂、偷币鼠吃币后�
   })
   await killKind(page, 'mushroom')
   const pools = await page.evaluate(() => {
-    const game = window.__game as { scene: { keys: Record<string, { poisonPools: unknown[] }> } }
-    return game.scene.keys['arena']!.poisonPools.length
+    const game = window.__game as { scene: { keys: Record<string, { groundEffects: unknown[] }> } }
+    return game.scene.keys['arena']!.groundEffects.length
   })
   expect(pools).toBeGreaterThan(0)
 

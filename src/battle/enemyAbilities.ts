@@ -2,7 +2,8 @@ import { playSfx } from '../audio/sfx'
 import { clipFramesLive } from '../emoji/animTextures'
 import { createAbility } from '../abilities/create'
 import type { AbilityContext, AbilityOwner } from '../abilities/types'
-import { spawnEnemyProjectile, spawnPoisonPool } from './hazards'
+import { spawnEnemyProjectile } from './hazards'
+import { spawnGroundEffect } from './groundEffects'
 import { enemyOf } from './enemies'
 import { memberOf } from './members'
 import type { Enemy } from './enemies'
@@ -70,15 +71,8 @@ export function armEnemy(scene: BaseArenaScene, a: Enemy, fireDelayMs?: number):
     anchor: () => ({ x: e.x, y: e.y }),
     applySlow: () => {},
     slowTarget: () => {},
-    // 灼烧敌对方的地面区 = 敌方视角的毒液池（同一机制，dps 按 tick 换算）
-    spawnBurnZone: (x, y, radius, dps, durationMs) =>
-      spawnPoisonPool(
-        scene,
-        x,
-        y,
-        { radius, durationMs, tickMs: 400, damage: Math.max(1, Math.round(dps * 0.4)) },
-        a.spec.name,
-      ),
+    spawnGroundEffect: (x, y, spec) =>
+      spawnGroundEffect(scene, x, y, spec, { faction: 'enemy', srcName: a.spec.name }),
     heal: (x, y, range, amount, all) => healEnemies(scene, x, y, range, amount, all),
     damageMul: () => a.dmgMul,
     cooldownMul: () => 1,

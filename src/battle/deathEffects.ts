@@ -1,6 +1,6 @@
 import { waveAt } from '../run/waves'
 import { UNIT } from '../lib/units'
-import { spawnPoisonPool } from './hazards'
+import { spawnGroundEffect } from './groundEffects'
 import type { Enemy } from './enemies'
 import type { BaseArenaScene } from './BaseArenaScene'
 
@@ -14,7 +14,7 @@ export function runDeathEffects(scene: BaseArenaScene, a: Enemy): void {
   for (const fx of effects) {
     switch (fx.kind) {
       case 'poison':
-        spawnPoisonPool(scene, e.x, e.y, fx, a.spec.name)
+        spawnGroundEffect(scene, e.x, e.y, fx, { faction: 'enemy', srcName: a.spec.name })
         break
       case 'split': {
         if (scene.over) break

@@ -464,17 +464,11 @@ export class VoidArenaScene extends BaseArenaScene {
     for (const coin of this.coins.getChildren() as ImageObj[]) {
       if (coin.active) remapBody(coin)
     }
-    for (const pool of this.poisonPools) {
-      const p = map(pool)
-      pool.x = p.x
-      pool.y = p.y
-      pool.gfx.setPosition(p.x, p.y)
-    }
-    for (const z of this.burnZones) {
-      const p = map(z)
-      z.x = p.x
-      z.y = p.y
-      z.gfx.setPosition(p.x, p.y)
+    for (const g of this.groundEffects) {
+      const p = map(g)
+      g.x = p.x
+      g.y = p.y
+      g.gfx.setPosition(p.x, p.y)
     }
     for (const pm of this.pendingMarks) {
       const p = map(pm.pos)

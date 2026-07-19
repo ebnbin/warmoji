@@ -1,7 +1,7 @@
 import { UNIT } from '../lib/units'
 import type Phaser from 'phaser'
 import { ACQUIRE } from './registry'
-import type { ProjectileSpec } from './spec'
+import type { GroundEffectSpec, ProjectileSpec } from './spec'
 import type { SfxId } from '../audio/sfx'
 import type { OutlineKind } from '../emoji/svg'
 
@@ -49,8 +49,8 @@ export interface AbilityContext {
   applySlow(x: number, y: number, radius: number, factor: number): void
   /** 给单个目标施加限时减速（factor=0 即冻结），到时自动恢复 */
   slowTarget(target: Phaser.GameObjects.Image, factor: number, durationMs: number): void
-  /** 在地面生成灼烧区：期间内周期性烧伤区域内的敌对方（伤害归属持有者） */
-  spawnBurnZone(x: number, y: number, radius: number, dps: number, durationMs: number): void
+  /** 在地面生成持续效果区：周期性烧伤区域内的敌对方（阵营与归属由实现注入） */
+  spawnGroundEffect(x: number, y: number, spec: GroundEffectSpec): void
   /** 治疗我方：all=false 治范围内血量比例最低的一名、true 范围内全体；
    * 返回实际被治疗的数量（满血者不计） */
   heal(x: number, y: number, range: number, amount: number, all: boolean): number
