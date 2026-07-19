@@ -1,6 +1,7 @@
 import { emojiImage } from '../emoji/textures'
 import type { DeathPoisonSpec, EnemyBulletSpec } from '../enemies/registry'
 import { circleBody } from './arcade'
+import { attachBullet, bulletOf } from './bullets'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
 
 // 敌方危害物：敌弹、毒液池、灼烧地面——三对 spawn/update 自治循环。
@@ -20,17 +21,19 @@ export function spawnEnemyShot(
   scene.physics.add.existing(shot)
   circleBody(shot, bullet.radius)
   ;(shot.body as ArcadeBody).setVelocity(Math.cos(angle) * bullet.speed, Math.sin(angle) * bullet.speed)
-  shot.setData('damage', Math.round(bullet.damage * dmgMul))
-  shot.setData('srcName', srcName)
-  shot.setData('radius', bullet.radius)
-  shot.setData('dieAt', scene.elapsedMs + bullet.lifeMs)
+  attachBullet(shot, 'enemy', {
+    damage: Math.round(bullet.damage * dmgMul),
+    srcName,
+    radius: bullet.radius,
+    dieAt: scene.elapsedMs + bullet.lifeMs,
+  })
   scene.enemyShots.add(shot)
 }
 
 export function updateEnemyShots(scene: BaseArenaScene): void {
   for (const s of scene.enemyShots.getChildren() as ImageObj[]) {
     if (!s.active) continue
-    if (scene.elapsedMs >= (s.getData('dieAt') as number) || scene.cullEnemyShot(s)) {
+    if (scene.elapsedMs >= bulletOf(s).dieAt || scene.cullEnemyShot(s)) {
       s.destroy()
     }
   }

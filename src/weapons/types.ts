@@ -25,6 +25,8 @@ export interface WeaponContext {
   enemyTargets(): readonly EnemyTarget[]
   /** 目标当前血量（瞬袭索敌用；实时读，不吃帧快照） */
   enemyHp(ref: EnemyTarget['ref']): number
+  /** 目标血量上限（处决阈值判定用） */
+  enemyMaxHp(ref: EnemyTarget['ref']): number
   /** knockback：击退冲量（px/秒），方向 = 源点 (srcX, srcY) 指向敌人中心 */
   damageEnemy(
     enemy: Phaser.GameObjects.Image,

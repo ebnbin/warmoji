@@ -3,6 +3,7 @@ import { castCaptainSkill } from './skills'
 import { toPx } from './px'
 import { attachEnemy, enemyOf } from './actors'
 import type { Enemy } from './actors'
+import { bulletOf } from './bullets'
 import { circleBody } from './arcade'
 import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from './pickups'
 import { spawnBurnZone, updateBurnZones, updateEnemyShots, updatePoisonPools } from './hazards'
@@ -202,6 +203,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     spawnProjectile: (x, y, angle, spec, damage) => spawnProjectile(this, x, y, angle, spec, damage),
     teamCenter: () => this.center,
     enemyHp: (ref) => enemyOf(ref as ImageObj).hp,
+    enemyMaxHp: (ref) => enemyOf(ref as ImageObj).maxHp,
     applySlow: (x, y, radius, factor) =>
       this.frameSlowZones.push({ x, y, r2: radius * radius, factor }),
     slowEnemy: (enemy, factor, durationMs) => {
@@ -1127,8 +1129,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   protected onMemberShot(m: Member, shot: ImageObj): void {
     if (this.over || !shot.active) return
     if (!m.alive) return
-    const damage = shot.getData('damage') as number
-    const srcName = shot.getData('srcName') as string | undefined
+    const { damage, srcName } = bulletOf(shot)
     shot.destroy()
     // 子弹命中吃无敌帧：帧内先中弹则后续接触伤害被同一层保护挡下
     if (this.elapsedMs - m.lastHitMs < m.iframesMs) return

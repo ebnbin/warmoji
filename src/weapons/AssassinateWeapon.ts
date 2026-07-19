@@ -90,7 +90,7 @@ export class AssassinateWeapon implements WeaponRuntime {
     const exec = this.spec.execute
     if (exec) {
       const hp = this.ctx.enemyHp(target.ref)
-      const maxHp = (target.ref.getData('maxHp') as number) || hp
+      const maxHp = this.ctx.enemyMaxHp(target.ref)
       if (maxHp > 0 && hp / maxHp <= exec.hpRatio) damage = Math.round(damage * exec.mul)
     }
     this.ctx.damageEnemy(target.ref, damage, this.spec.knockback, landX, landY)

@@ -12,6 +12,7 @@ import { emojiImage } from '../emoji/textures'
 import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
 import { enemyOf } from '../battle/actors'
+import { bulletOf } from '../battle/bullets'
 import type { ArcadeBody, ImageObj, Member } from '../battle/BaseArenaScene'
 
 // 虚空竞技场（kind='void'）：环面世界。世界规则：
@@ -142,7 +143,7 @@ export class VoidArenaScene extends BaseArenaScene {
   /** 子弹按寿命回收（环面上永远飞不出屏幕，位置回收不适用） */
   protected cullProjectiles(): void {
     for (const p of this.projectiles.getChildren() as ImageObj[]) {
-      if (p.active && this.elapsedMs >= (p.getData('dieAt') as number)) p.destroy()
+      if (p.active && this.elapsedMs >= bulletOf(p).dieAt) p.destroy()
     }
   }
 
@@ -239,8 +240,9 @@ export class VoidArenaScene extends BaseArenaScene {
       if (!p.active) continue
       // 回绕帧重置扫掠线段起点：否则线段会横贯全图产生假命中
       if (this.wrapBody(p)) {
-        p.setData('px', p.x)
-        p.setData('py', p.y)
+        const b = bulletOf(p)
+        b.prevX = p.x
+        b.prevY = p.y
       }
     }
     for (const c of this.coins.getChildren() as ImageObj[]) {
@@ -264,7 +266,7 @@ export class VoidArenaScene extends BaseArenaScene {
       }
       for (const s of this.enemyShots.getChildren() as ImageObj[]) {
         if (!s.active) continue
-        const rr = m.hurtRadius + ((s.getData('radius') as number) ?? 0.2 * UNIT)
+        const rr = m.hurtRadius + bulletOf(s).radius
         if (torusDist2(mp, s, W, H) <= rr * rr) this.onMemberShot(m, s)
       }
     }
@@ -441,8 +443,9 @@ export class VoidArenaScene extends BaseArenaScene {
     for (const p of this.projectiles.getChildren() as ImageObj[]) {
       if (!p.active) continue
       remapBody(p)
-      p.setData('px', p.x)
-      p.setData('py', p.y)
+      const b = bulletOf(p)
+      b.prevX = p.x
+      b.prevY = p.y
     }
     for (const coin of this.coins.getChildren() as ImageObj[]) {
       if (coin.active) remapBody(coin)

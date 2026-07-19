@@ -3,6 +3,7 @@ import { emojiImage } from '../emoji/textures'
 import { circleHitIndices, sweepFirstHitIndex } from '../weapons/spec'
 import type { ProjectileSpec } from '../weapons/spec'
 import { circleBody } from './arcade'
+import { attachBullet, bulletOf } from './bullets'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
 
 // 玩家侧弹道：生成、线段扫掠命中（低帧率防穿模）、溅射、回收。
@@ -27,20 +28,22 @@ export function spawnProjectile(
     Math.sin(angle) * spec.projectile.speed,
   )
   playSfx('shoot')
-  p.setData('srcSlot', srcSlot)
-  p.setData('damage', damage)
-  p.setData('radius', spec.projectile.radius)
-  p.setData('kb', spec.knockback)
-  p.setData('px', x)
-  p.setData('py', y)
-  // 环面世界的子弹永不出屏：按寿命回收（其余图为 null，不设）
-  if (scene.projectileTtlMs !== null) p.setData('dieAt', scene.elapsedMs + scene.projectileTtlMs)
-  // 能力字段：贯穿余量 + 溅射/变形参数（sweepProjectiles 消费）
-  if (spec.pierce) p.setData('pierce', spec.pierce)
-  if (spec.splash) p.setData('splash', spec.splash)
-  if (spec.hex) p.setData('hex', spec.hex)
-  // 对称投掷物（无指向修正角）飞行中自旋；有指向的（飞刀类）保持箭头朝向
-  p.setData('spin', spec.projectile.rotationOffsetRad === 0 ? 9 : 0)
+  attachBullet(p, 'team', {
+    srcSlot,
+    damage,
+    radius: spec.projectile.radius,
+    kb: spec.knockback,
+    prevX: x,
+    prevY: y,
+    // 环面世界的子弹永不出屏：按寿命回收（其余图为 0，不按寿命回收）
+    dieAt: scene.projectileTtlMs !== null ? scene.elapsedMs + scene.projectileTtlMs : 0,
+    // 能力字段：贯穿余量 + 溅射/变形参数（sweepProjectiles 消费）
+    pierce: spec.pierce ?? 0,
+    splash: spec.splash,
+    hex: spec.hex,
+    // 对称投掷物（无指向修正角）飞行中自旋；有指向的（飞刀类）保持箭头朝向
+    spin: spec.projectile.rotationOffsetRad === 0 ? 9 : 0,
+  })
   scene.projectiles.add(p)
 }
 
@@ -49,19 +52,17 @@ export function spawnProjectile(
 export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
   for (const p of scene.projectiles.getChildren() as ImageObj[]) {
     if (!p.active) continue
-    const prev = { x: p.getData('px') as number, y: p.getData('py') as number }
+    const b = bulletOf(p)
+    const prev = { x: b.prevX, y: b.prevY }
     // 贯穿弹跳过已命中的敌人（否则下一帧会再撞同一个）
-    const hitRefs = p.getData('hitRefs') as Set<ImageObj> | undefined
+    const hitRefs = b.hitRefs
     const targets = hitRefs ? scene.frameTargets.filter((t) => !hitRefs.has(t.ref as ImageObj)) : scene.frameTargets
-    const hit = sweepFirstHitIndex(prev, { x: p.x, y: p.y }, p.getData('radius') as number, targets)
+    const hit = sweepFirstHitIndex(prev, { x: p.x, y: p.y }, b.radius, targets)
     if (hit >= 0) {
       const target = targets[hit]!
-      const damage = p.getData('damage') as number
-      const kb = p.getData('kb') as number
-      const srcSlot = (p.getData('srcSlot') as number) ?? -1
+      const { damage, kb, srcSlot, splash, hex } = b
       // 爆浆溅射：命中点小圈内其余敌人吃折损伤害（同真身的镜像间距 ≥ 半场，
       // 远大于溅射半径，不会经镜像重复命中）
-      const splash = p.getData('splash') as { radius: number; ratio: number } | undefined
       if (splash) {
         const splashDamage = Math.max(1, Math.round(damage * splash.ratio))
         for (const i of circleHitIndices({ x: target.x, y: target.y }, splash.radius, scene.frameTargets)) {
@@ -71,16 +72,11 @@ export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
         }
         splashEffect(scene, target.x, target.y, splash.radius)
       }
-      // 魔尘载荷必须在 destroy 前读出（销毁即拆数据管理器）
-      const hex = p.getData('hex') as
-        | { durationMs: number; morphEmoji: string; vulnMul?: number }
-        | undefined
-      const pierceLeft = (p.getData('pierce') as number | undefined) ?? 0
-      if (pierceLeft > 0) {
-        p.setData('pierce', pierceLeft - 1)
+      if (b.pierce > 0) {
+        b.pierce -= 1
         const set = hitRefs ?? new Set<ImageObj>()
         set.add(target.ref as ImageObj)
-        p.setData('hitRefs', set)
+        b.hitRefs = set
       } else {
         p.destroy()
       }
@@ -90,10 +86,9 @@ export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
       if (hex && (target.ref as ImageObj).active) scene.applyHex(target.ref as ImageObj, hex)
       if (!p.active) continue
     }
-    const spin = p.getData('spin') as number
-    if (spin > 0) p.rotation += (spin * delta) / 1000
-    p.setData('px', p.x)
-    p.setData('py', p.y)
+    if (b.spin > 0) p.rotation += (b.spin * delta) / 1000
+    b.prevX = p.x
+    b.prevY = p.y
   }
 }
 
