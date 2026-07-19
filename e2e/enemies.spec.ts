@@ -14,14 +14,14 @@ async function killKind(page: Page, kind: string): Promise<void> {
         keys: Record<
           string,
           {
-            enemies: { getChildren(): { active: boolean; getData(key: string): { spec: { kind: string } } }[] }
+            enemies: { getChildren(): { active: boolean; getData(key: string): { def: { kind: string } } }[] }
             applyDamage(e: unknown, dmg: number): void
           }
         >
       }
     }
     const arena = game.scene.keys['arena']!
-    const target = arena.enemies.getChildren().find((e) => e.active && e.getData('enemy').spec.kind === k)
+    const target = arena.enemies.getChildren().find((e) => e.active && e.getData('enemy').def.kind === k)
     if (target) arena.applyDamage(target, 999_999)
   }, kind)
 }
@@ -41,12 +41,12 @@ test('状态机行为：野猪蓄力→突刺→冷却；毒蛇放冷枪且拉�
   await page.waitForFunction(
     () => {
       const game = window.__game as {
-        scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { spec: { kind: string }; state: string } }[] } }> }
+        scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { def: { kind: string }; state: string } }[] } }> }
       }
       return game.scene.keys['arena']!.enemies.getChildren().some((e) => {
         if (!e.active) return false
         const a = e.getData('enemy')
-        return a.spec.kind === 'boar' && a.state === 'windup'
+        return a.def.kind === 'boar' && a.state === 'windup'
       })
     },
     undefined,
@@ -55,12 +55,12 @@ test('状态机行为：野猪蓄力→突刺→冷却；毒蛇放冷枪且拉�
   await page.waitForFunction(
     () => {
       const game = window.__game as {
-        scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { spec: { kind: string }; state: string } }[] } }> }
+        scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { def: { kind: string }; state: string } }[] } }> }
       }
       return game.scene.keys['arena']!.enemies.getChildren().some((e) => {
         if (!e.active) return false
         const a = e.getData('enemy')
-        return a.spec.kind === 'boar' && (a.state === 'dash' || a.state === 'cool')
+        return a.def.kind === 'boar' && (a.state === 'dash' || a.state === 'cool')
       })
     },
     undefined,
@@ -82,13 +82,13 @@ test('状态机行为：野猪蓄力→突刺→冷却；毒蛇放冷枪且拉�
             string,
             {
               center: { x: number; y: number }
-              enemies: { getChildren(): { active: boolean; x: number; y: number; getData(k: string): { spec: { kind: string } } }[] }
+              enemies: { getChildren(): { active: boolean; x: number; y: number; getData(k: string): { def: { kind: string } } }[] }
             }
           >
         }
       }
       const arena = game.scene.keys['arena']!
-      const s = arena.enemies.getChildren().find((e) => e.active && e.getData('enemy').spec.kind === 'snake')
+      const s = arena.enemies.getChildren().find((e) => e.active && e.getData('enemy').def.kind === 'snake')
       if (!s) return -1
       const dx = s.x - arena.center.x
       const dy = s.y - arena.center.y
@@ -97,9 +97,9 @@ test('状态机行为：野猪蓄力→突刺→冷却；毒蛇放冷枪且拉�
   await page.evaluate(() => window.__spawnEnemy!('snake', 3, 0))
   await page.waitForFunction(() => {
     const game = window.__game as {
-      scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { spec: { kind: string } } }[] } }> }
+      scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { def: { kind: string } } }[] } }> }
     }
-    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('enemy').spec.kind === 'snake')
+    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('enemy').def.kind === 'snake')
   })
   const d0 = await snakeDist()
   // 蛇要么已被队伍击杀（-1），要么在逃：距离应显著增大；同时冷枪应已出弹
@@ -129,9 +129,9 @@ test('死亡效果与偷币：蘑菇留毒、泡泡分裂、偷币鼠吃币后�
   await page.evaluate(() => window.__spawnEnemy!('mushroom', 6, 0))
   await page.waitForFunction(() => {
     const game = window.__game as {
-      scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { spec: { kind: string } } }[] } }> }
+      scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { def: { kind: string } } }[] } }> }
     }
-    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('enemy').spec.kind === 'mushroom')
+    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('enemy').def.kind === 'mushroom')
   })
   await killKind(page, 'mushroom')
   const pools = await page.evaluate(() => {
@@ -144,17 +144,17 @@ test('死亡效果与偷币：蘑菇留毒、泡泡分裂、偷币鼠吃币后�
   await page.evaluate(() => window.__spawnEnemy!('blob', 6, 2))
   await page.waitForFunction(() => {
     const game = window.__game as {
-      scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { spec: { kind: string } } }[] } }> }
+      scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { def: { kind: string } } }[] } }> }
     }
-    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('enemy').spec.kind === 'blob')
+    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('enemy').def.kind === 'blob')
   })
   await killKind(page, 'blob')
   await page.waitForFunction(
     () => {
       const game = window.__game as {
-        scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { spec: { kind: string } } }[] } }> }
+        scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { def: { kind: string } } }[] } }> }
       }
-      const n = game.scene.keys['arena']!.enemies.getChildren().filter((e) => e.active && e.getData('enemy').spec.kind === 'blobling').length
+      const n = game.scene.keys['arena']!.enemies.getChildren().filter((e) => e.active && e.getData('enemy').def.kind === 'blobling').length
       return n >= 2
     },
     undefined,
@@ -167,12 +167,12 @@ test('死亡效果与偷币：蘑菇留毒、泡泡分裂、偷币鼠吃币后�
   await page.waitForFunction(
     () => {
       const game = window.__game as {
-        scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { spec: { kind: string }; eaten: number } }[] } }> }
+        scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { def: { kind: string }; eaten: number } }[] } }> }
       }
       return game.scene.keys['arena']!.enemies.getChildren().some((e) => {
         if (!e.active) return false
         const a = e.getData('enemy')
-        return a.spec.kind === 'rat' && a.eaten > 0
+        return a.def.kind === 'rat' && a.eaten > 0
       })
     },
     undefined,
