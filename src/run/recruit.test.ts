@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ROSTER_IDS } from '../characters/registry'
 import { RECRUIT } from './recruit'
-import type { StringStorage } from '../lib/storage'
+import type { StringStorage } from '../core/storage'
 import { drawRecruitPool, recruitSeed, refreshRecruitSeed, unlockAt, unlockedCount } from './recruit'
 
 function memStorage(): StringStorage {

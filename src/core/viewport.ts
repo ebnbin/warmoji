@@ -1,4 +1,4 @@
-import { VIEW } from '../lib/units'
+import { VIEW } from './units'
 
 export interface Viewport {
   cssWidth: number

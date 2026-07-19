@@ -2,15 +2,15 @@ import Phaser from 'phaser'
 import { CAPTAINS } from '../captains/registry'
 import { SKILL } from '../captains/skill'
 import { PICKUPS } from '../pickups/registry'
-import { formatTime } from '../lib/format'
+import { formatTime } from '../core/format'
 import { RARITIES } from '../items/registry'
 import type { ItemRarity } from '../items/registry'
 import { endRun, getRun } from '../run/state'
 import { isDevOpen, isStress, setDevOpen, setStress } from '../debug/dev'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../debug/diagnostics'
 import { emojiCacheStats, emojiImage, iconLabel } from '../emoji/textures'
-import { FONT, UI_FONT } from '../lib/fonts'
-import { Joystick } from './Joystick'
+import { FONT, UI_FONT } from '../core/fonts'
+import { Joystick } from '../core/Joystick'
 import { playSfx } from '../audio/sfx'
 import {
   applyCamera,
@@ -19,7 +19,7 @@ import {
   textRes,
   viewport,
   VIEWPORT_CHANGED,
-} from '../screen/apply'
+} from '../core/apply'
 import type { BaseArenaScene, HudSnapshot, WaveSummary } from './BaseArenaScene'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。

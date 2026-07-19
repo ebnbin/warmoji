@@ -1,4 +1,4 @@
-import type { Point } from '../lib/vec'
+import type { Point } from '../core/vec'
 import type { SfxId } from '../audio/sfx'
 import type { GroundEffectDef } from '../groundEffects/defs'
 

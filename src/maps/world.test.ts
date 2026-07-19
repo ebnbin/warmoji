@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MapDecor } from './registry'
-import { Rng } from '../lib/rng'
+import { Rng } from '../core/rng'
 import {
   chunkDecor,
   chunkKey,

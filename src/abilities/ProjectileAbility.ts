@@ -1,4 +1,4 @@
-import { DEG2RAD } from '../lib/units'
+import { DEG2RAD } from '../core/units'
 import type Phaser from 'phaser'
 import type { ProjectileDef } from './defs'
 import { emojiImage } from '../emoji/textures'

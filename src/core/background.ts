@@ -1,4 +1,4 @@
-import type { Palette } from '../lib/palette'
+import type { Palette } from './palette'
 
 /** 屏幕锚定的渐变背景：画在 canvas 之下的页面层，天然不随相机移动。
  * 同步更新 theme-color：iOS Safari 竖屏无法把网页画进状态栏区域（viewport-fit=cover

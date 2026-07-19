@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { loadHighScore, submitScore } from './highscore'
-import type { StringStorage } from '../lib/storage'
+import type { StringStorage } from '../core/storage'
 
 function fakeStorage(initial?: Record<string, string>): StringStorage {
   const data = new Map(Object.entries(initial ?? {}))

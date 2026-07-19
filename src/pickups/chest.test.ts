@@ -3,7 +3,7 @@ import { chestCandidates, chestDropped, rollChestLoot } from './chest'
 import { CHEST_LOOT } from './chest'
 import type { ItemId } from '../items/registry'
 import { ITEMS } from '../items/registry'
-import { Rng } from '../lib/rng'
+import { Rng } from '../core/rng'
 
 describe('chest 掉落判定', () => {
   it('普通怪按 chance、精英按更高的 eliteChance', () => {

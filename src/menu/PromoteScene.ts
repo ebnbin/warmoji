@@ -5,10 +5,10 @@ import type { CharacterId } from '../characters/registry'
 import { formationPosts } from '../characters/formation'
 import type { ItemId } from '../items/registry'
 import { arenaSceneFor } from '../maps/registry'
-import { randomPalette } from '../lib/palette'
-import type { Palette } from '../lib/palette'
+import { randomPalette } from '../core/palette'
+import type { Palette } from '../core/palette'
 import { unlockAt } from '../run/recruit'
-import { Rng } from '../lib/rng'
+import { Rng } from '../core/rng'
 import {
   endRun,
   getRun,
@@ -24,13 +24,13 @@ import {
 } from '../run/state'
 import type { RunState } from '../run/state'
 import { characterStatGroups } from './stats'
-import { applyBackground } from '../screen/background'
+import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
 import { emojiImage } from '../emoji/textures'
 import { EmojiGrid } from './grid'
-import { FONT, UI_FONT } from '../lib/fonts'
+import { FONT, UI_FONT } from '../core/fonts'
 import { playSfx } from '../audio/sfx'
-import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../screen/apply'
+import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
 
 // 整编页：每波战斗前的强制招募 + 阵型页。开局组队与波末整编完全复用本页：
 // 队长确认后进来招首发（可返回重选队长），此后每波结束按名额招人直到满编

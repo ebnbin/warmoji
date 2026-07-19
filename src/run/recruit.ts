@@ -1,7 +1,7 @@
 import type { CaptainId } from '../captains/registry'
 import type { CharacterId } from '../characters/registry'
-import type { StringStorage } from '../lib/storage'
-import { Rng } from '../lib/rng'
+import type { StringStorage } from '../core/storage'
+import { Rng } from '../core/rng'
 
 // 命定卡池的随机源：种子绑队长、本地持久化。存储值 0 = 「未初始化」哨兵，
 // 第一次真正取用时以当前时间戳初始化并落盘（0 永远不会被当作实际种子）。

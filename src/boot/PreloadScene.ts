@@ -3,7 +3,7 @@ import emojiIndexUrl from '../assets/emoji/index.json?url'
 import emojiPackUrl from '../assets/emoji/pack.txt?url'
 import { loadEmojiTextures, primeEmojiPack } from '../emoji/textures'
 import type { EmojiIndex } from '../emoji/pack'
-import { FONT, UI_FONT } from '../lib/fonts'
+import { FONT, UI_FONT } from '../core/fonts'
 import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from './preload'
 
 // 资源门禁：emoji 包（索引 + SVG 正文）是游戏的全部视觉素材，经 Phaser

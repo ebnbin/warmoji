@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Rng } from '../lib/rng'
+import { Rng } from '../core/rng'
 import { randomMapPoint } from './spawn'
 
 describe('randomMapPoint', () => {

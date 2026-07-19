@@ -1,4 +1,4 @@
-import { UNIT } from '../lib/units'
+import { UNIT } from '../core/units'
 import { describe, expect, it } from 'vitest'
 import { TEAM } from '../characters/registry'
 import { formationPosts, ringPostAngle, slotOffset } from './formation'

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { arenaSceneFor, MAP, MAP_IDS, MAPS, rollDecor, sanitizeMapId } from './registry'
-import { Rng } from '../lib/rng'
+import { Rng } from '../core/rng'
 
 describe('地图定义', () => {
   it('四张图齐备且玩法互不相同：图标/名字/描述/形态/固定色板/装饰规则', () => {

@@ -1,4 +1,4 @@
-import type { Point } from '../lib/vec'
+import type { Point } from './vec'
 
 // 视口横竖切换的通用矩形重映射（河流图 / 虚空图共用）。
 // 本项目视口按「长短边保底」适配：同一设备旋转后长边=长边、短边=短边，

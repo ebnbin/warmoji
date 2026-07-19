@@ -1,4 +1,4 @@
-import { hslToInt } from '../src/lib/palette.ts'
+import { hslToInt } from '../src/core/palette.ts'
 import type { MapDef } from '../src/maps/registry'
 
 // 创作层（不进运行时 bundle）：地图数据行（调色板以 HSL 书写，生成时算成 int）。

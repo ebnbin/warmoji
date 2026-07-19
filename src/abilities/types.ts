@@ -1,4 +1,4 @@
-import { UNIT } from '../lib/units'
+import { UNIT } from '../core/units'
 import type Phaser from 'phaser'
 import { ACQUIRE } from './registry'
 import type { ProjectileDef } from './defs'

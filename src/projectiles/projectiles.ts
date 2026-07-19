@@ -1,10 +1,10 @@
-import { DEG2RAD } from '../lib/units'
+import { DEG2RAD } from '../core/units'
 import { playSfx } from '../audio/sfx'
 import { emojiImage } from '../emoji/textures'
 import { circleHitIndices, sweepFirstHitIndex } from '../abilities/defs'
 import type { ProjectileDef } from '../abilities/defs'
 import type { EnemyProjectileDef } from '../enemies/registry'
-import { circleBody } from '../lib/arcade'
+import { circleBody } from '../core/arcade'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
 // 弹药的类型化状态（敌我同构，faction 区分）：原精灵数据袋收拢为结构体，

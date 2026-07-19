@@ -15,16 +15,16 @@ export default tseslint.config(
       'src/boot/PreloadScene.ts',
       'src/battle/BaseArenaScene.ts',
       'src/battle/UIScene.ts',
-      'src/battle/Joystick.ts',
-      'src/battle/damageFont.ts',
-      'src/battle/fx.ts',
+      'src/core/Joystick.ts',
+      'src/core/damageFont.ts',
+      'src/core/fx.ts',
       'src/maps/*Scene.ts',
       'src/menu/*Scene.ts',
       'src/menu/grid.ts',
       'src/emoji/textures.ts',
       'src/emoji/thumbs.ts',
       'src/emoji/virtualGrid.ts',
-      'src/screen/apply.ts',
+      'src/core/apply.ts',
       'src/debug/diagnostics.ts',
     ],
     rules: {
@@ -36,6 +36,24 @@ export default tseslint.config(
               name: 'phaser',
               message: '纯逻辑文件禁 import phaser；确属表现层则把文件加进 eslint.config.js 白名单',
               allowTypeImports: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // core 是地基：任何游戏都会用到的通用层，可依赖 Phaser，不得依赖业务包
+  //（类型引用也不行——换一个游戏要能整目录原样带走）
+  {
+    files: ['src/core/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../*'],
+              message: 'core 不得 import src 中 core 以外的包（地基不向上引用）',
             },
           ],
         },

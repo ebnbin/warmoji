@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
 import { codepointsToEmoji, emojiCodepoints } from '../emoji/codepoints'
 import { packBaseKeys } from '../emoji/pack'
-import { randomPalette } from '../lib/palette'
-import type { Palette } from '../lib/palette'
-import { Rng } from '../lib/rng'
+import { randomPalette } from '../core/palette'
+import type { Palette } from '../core/palette'
+import { Rng } from '../core/rng'
 import { setSvgSize } from '../emoji/svg'
 import {
   ANIM_RECIPES,
@@ -18,14 +18,14 @@ import {
   parseSvgTree,
 } from '../emoji/studio'
 import type { AnimClip, AnimRecipe, SvgTree, TreeRow } from '../emoji/studio'
-import { applyBackground } from '../screen/background'
+import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
 import { emojiImage, emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
 import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
-import { FONT, UI_FONT } from '../lib/fonts'
-import { TAP_SLOP } from '../lib/units'
+import { FONT, UI_FONT } from '../core/fonts'
+import { TAP_SLOP } from '../core/units'
 import { VirtualEmojiGrid } from '../emoji/virtualGrid'
-import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../screen/apply'
+import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
 
 // Emoji Studio：twemoji 部件动画的游戏内工作台，三个 tab——
 // 🎬 配方 = animations.json 里的精修动画预览；🧩 模板 = 任选 emoji × 通用

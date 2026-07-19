@@ -1,6 +1,6 @@
-import type { Rng } from '../lib/rng'
-import { dist2 } from '../lib/vec'
-import type { Point } from '../lib/vec'
+import type { Rng } from '../core/rng'
+import { dist2 } from '../core/vec'
+import type { Point } from '../core/vec'
 
 /**
  * 地图内随机刷怪点：距边缘 ≥ inset，距 avoid（玩家）≥ minDist；

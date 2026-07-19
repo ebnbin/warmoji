@@ -1,4 +1,4 @@
-import type { StringStorage } from '../lib/storage'
+import type { StringStorage } from '../core/storage'
 
 export interface HighScore {
   bestWave: number

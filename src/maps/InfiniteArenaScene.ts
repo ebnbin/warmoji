@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
-import { UNIT } from '../lib/units'
+import { UNIT } from '../core/units'
 import { INFINITE, ZONE } from './world'
 import { MAPS } from './registry'
-import { norm } from '../lib/vec'
-import type { Point } from '../lib/vec'
+import { norm } from '../core/vec'
+import type { Point } from '../core/vec'
 import {
   chunkDecor,
   chunkKey,
@@ -13,7 +13,7 @@ import {
   zoneRadiusAt,
 } from './world'
 import { emojiImage } from '../emoji/textures'
-import { viewport } from '../screen/apply'
+import { viewport } from '../core/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
 import type { ImageObj } from '../battle/BaseArenaScene'
 

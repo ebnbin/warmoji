@@ -1,6 +1,6 @@
-import { UNIT } from '../lib/units'
+import { UNIT } from '../core/units'
 import { TEAM } from './registry'
-import type { Point } from '../lib/vec'
+import type { Point } from '../core/vec'
 
 // 队形系统（已简化为唯一策略）：满员前按人数取形，满员后自动列成「N 保 1」——
 // N−1 人外圈、1 人居中受保护，玩家唯一的决策是保谁（首次满员自动展示一次

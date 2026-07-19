@@ -1,5 +1,5 @@
-import { isHorizontal } from '../screen/remap'
-import type { Point } from '../lib/vec'
+import { isHorizontal } from '../core/remap'
+import type { Point } from '../core/vec'
 
 // 河流地图的世界模型（纯逻辑，禁 phaser/DOM）。
 // 世界 = 逻辑视口（相机静止）；河道沿长轴、跨短轴居中、宽度恒定。

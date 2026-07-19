@@ -10,13 +10,13 @@ import {
   ITEMS,
   resolveAbilityDef,
 } from '../items/registry'
-import { UNIT } from '../lib/units'
-import { norm } from '../lib/vec'
+import { UNIT } from '../core/units'
+import { norm } from '../core/vec'
 import { rollChestLoot } from './chest'
 import { PICKUP, PICKUPS } from './registry'
 import { createAbility } from '../abilities/create'
 import { KNOCKBACK } from '../abilities/registry'
-import { circleBody } from '../lib/arcade'
+import { circleBody } from '../core/arcade'
 import { toPx } from '../battle/px'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 

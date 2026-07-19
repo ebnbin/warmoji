@@ -1,4 +1,4 @@
-import { DEG2RAD } from '../lib/units'
+import { DEG2RAD } from '../core/units'
 import type Phaser from 'phaser'
 import { sectorHitIndices } from './defs'
 import type { SweepDef } from './defs'

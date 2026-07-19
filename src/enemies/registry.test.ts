@@ -5,7 +5,7 @@ import { enemyMixAt, fleeSteer, pickEnemy } from './registry'
 const ZOMBIE = ENEMY_DEFS.find((e) => e.kind === 'zombie')!
 const MUSHROOM = ENEMY_DEFS.find((e) => e.kind === 'mushroom')!
 const BLOB = ENEMY_DEFS.find((e) => e.kind === 'blob')!
-import { Rng } from '../lib/rng'
+import { Rng } from '../core/rng'
 
 describe('敌人规格', () => {
   it('每种敌人字段合法：血量/速度/经验为正，尺寸大于判定半径', () => {

@@ -1,5 +1,5 @@
 import { waveAt } from '../run/waves'
-import { UNIT } from '../lib/units'
+import { UNIT } from '../core/units'
 import { spawnGroundEffect } from '../groundEffects/groundEffects'
 import type { Enemy } from './enemies'
 import type { BaseArenaScene } from '../battle/BaseArenaScene'
