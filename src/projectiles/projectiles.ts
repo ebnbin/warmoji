@@ -3,13 +3,14 @@ import { playSfx } from '../audio/sfx'
 import { emojiImage } from '../emoji/textures'
 import { circleHitIndices, sweepFirstHitIndex } from '../abilities/defs'
 import type { ProjectileDef } from '../abilities/defs'
-import { circleBody } from './arcade'
-import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
+import type { EnemyProjectileDef } from '../enemies/registry'
+import { circleBody } from '../lib/arcade'
+import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
 // 弹药的类型化状态（敌我同构，faction 区分）：原精灵数据袋收拢为结构体，
 // 经 image.getData('projectile') 单键反查（与敌人的 'enemy' 同一模式）。
 // 玩家弹走线段扫掠命中（pierce/splash/hex 能力字段随弹携带）；
-// 敌弹走物理 overlap + 寿命回收。
+// 敌弹走物理 overlap + 寿命与世界钩子（cullEnemyProjectile）回收。
 
 export interface Projectile {
   readonly image: ImageObj
@@ -57,7 +58,7 @@ export function projectileOf(image: ImageObj): Projectile {
 }
 
 // 玩家侧弹道机器：生成、线段扫掠命中（低帧率防穿模）、溅射、回收；
-// 敌方弹道机器在 battle/hazards.ts（物理 overlap + 寿命回收）。
+// 敌方弹道机器在文件尾（物理 overlap + 寿命回收）。
 
 export function spawnProjectile(
   scene: BaseArenaScene,
@@ -157,4 +158,37 @@ function splashEffect(scene: BaseArenaScene, x: number, y: number, radius: numbe
     ease: 'Cubic.easeOut',
     onComplete: () => ring.destroy(),
   })
+}
+
+// ── 敌方弹道机器：物理 overlap + 按寿命与世界钩子回收 ──────────
+
+export function spawnEnemyProjectile(
+  scene: BaseArenaScene,
+  x: number,
+  y: number,
+  angle: number,
+  projectile: EnemyProjectileDef,
+  srcName: string,
+  dmgMul = 1,
+): void {
+  const shot = emojiImage(scene, x, y, projectile.emoji, projectile.size, 'enemyProjectile').setDepth(6)
+  scene.physics.add.existing(shot)
+  circleBody(shot, projectile.radius)
+  ;(shot.body as ArcadeBody).setVelocity(Math.cos(angle) * projectile.speed, Math.sin(angle) * projectile.speed)
+  attachProjectile(shot, 'enemy', {
+    damage: Math.round(projectile.damage * dmgMul),
+    srcName,
+    radius: projectile.radius,
+    dieAt: scene.elapsedMs + projectile.lifeMs,
+  })
+  scene.enemyProjectiles.add(shot)
+}
+
+export function updateEnemyProjectiles(scene: BaseArenaScene): void {
+  for (const s of scene.enemyProjectiles.getChildren() as ImageObj[]) {
+    if (!s.active) continue
+    if (scene.elapsedMs >= projectileOf(s).dieAt || scene.cullEnemyProjectile(s)) {
+      s.destroy()
+    }
+  }
 }

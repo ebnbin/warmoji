@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CAPTAINS, CHARACTERS } from '../characters/registry'
+import { CAPTAINS } from '../captains/registry'
+import { CHARACTERS } from '../characters/registry'
 import { BOSS, ENEMY_DEFS } from '../enemies/registry'
 import { PICKUPS } from '../pickups/registry'
 import { emojiCodepoints } from './codepoints'

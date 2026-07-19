@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
-import { CAPTAINS, CHARACTERS } from '../characters/registry'
-import type { CaptainId, CharacterId } from '../characters/registry'
+import { CAPTAINS } from '../captains/registry'
+import { CHARACTERS } from '../characters/registry'
+import type { CaptainId } from '../captains/registry'
+import type { CharacterId } from '../characters/registry'
 import { SHOP } from '../items/registry'
 import { PICKUPS } from '../pickups/registry'
 import {

@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { ABILITIES } from '../defs/abilities.ts'
-import { CHARACTERS, CAPTAINS } from '../defs/characters.ts'
+import { CHARACTERS } from '../defs/characters.ts'
+import { CAPTAINS } from '../defs/captains.ts'
 import { ENEMIES, BOSS, ENEMY_MIX } from '../defs/enemies.ts'
 import { ITEMS } from '../defs/items.ts'
 import { MAPS } from '../defs/maps.ts'
@@ -144,9 +145,10 @@ mkdirSync('src/gen', { recursive: true })
 const write = (name: string, data: unknown): void =>
   writeFileSync(`src/gen/${name}.json`, JSON.stringify(data, null, 1) + '\n')
 write('abilities', ABILITIES)
-write('characters', { characters: CHARACTERS, captains: CAPTAINS })
+write('characters', CHARACTERS)
+write('captains', CAPTAINS)
 write('enemies', { enemies: ENEMIES, boss: BOSS, mix: ENEMY_MIX })
 write('items', ITEMS)
 write('maps', MAPS)
 write('pickups', PICKUPS)
-console.log('gen-defs：6 张表校验通过，已生成 src/gen/*.json')
+console.log('gen-defs：7 张表校验通过，已生成 src/gen/*.json')

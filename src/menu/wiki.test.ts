@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CAPTAINS, CHARACTERS } from '../characters/registry'
+import { CAPTAINS } from '../captains/registry'
+import { CHARACTERS } from '../characters/registry'
 import { ENEMY_DEFS } from '../enemies/registry'
 const BLOB = ENEMY_DEFS.find((e) => e.kind === 'blob')!
 const BOAR = ENEMY_DEFS.find((e) => e.kind === 'boar')!

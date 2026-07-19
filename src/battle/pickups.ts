@@ -1,5 +1,6 @@
 import { playSfx } from '../audio/sfx'
-import { CAPTAINS, CHARACTERS, MEMBER, TEAM, loadoutFor } from '../characters/registry'
+import { CAPTAINS } from '../captains/registry'
+import { CHARACTERS, MEMBER, TEAM, loadoutFor } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import { emojiImage } from '../emoji/textures'
 import {
@@ -15,7 +16,7 @@ import { rollChestLoot } from '../run/chest'
 import { PICKUP, PICKUPS } from '../pickups/registry'
 import { createAbility } from '../abilities/create'
 import { KNOCKBACK } from '../abilities/registry'
-import { circleBody } from './arcade'
+import { circleBody } from '../lib/arcade'
 import { toPx } from './px'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
 

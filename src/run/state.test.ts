@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { CAPTAINS, MEMBER, ROSTER_IDS } from '../characters/registry'
-import { SKILL } from '../characters/skill'
+import { CAPTAINS } from '../captains/registry'
+import { MEMBER, ROSTER_IDS } from '../characters/registry'
+import { SKILL } from '../captains/skill'
 import { RECRUIT } from './recruit'
 import { WAVE } from './waves'
 import {

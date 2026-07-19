@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { CAPTAINS, CHARACTERS } from '../characters/registry'
+import { CAPTAINS } from '../captains/registry'
+import { CHARACTERS } from '../characters/registry'
 import { BOSS, ENEMY_DEFS } from '../enemies/registry'
 import { PICKUPS } from '../pickups/registry'
 import { WAVE } from '../run/waves'

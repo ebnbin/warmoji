@@ -12,8 +12,8 @@ import { emojiImage } from '../emoji/textures'
 import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
 import { enemyOf } from '../battle/enemies'
-import { projectileOf } from '../battle/projectiles'
-import type { Member } from '../battle/members'
+import { projectileOf } from '../projectiles/projectiles'
+import type { Member } from '../characters/members'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 
 // 虚空竞技场（kind='void'）：环面世界。世界规则：

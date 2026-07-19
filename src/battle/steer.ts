@@ -2,7 +2,7 @@ import { playSfx } from '../audio/sfx'
 import { PICKUPS } from '../pickups/registry'
 import { UNIT } from '../lib/units'
 import { norm } from '../lib/vec'
-import type { Member } from './members'
+import type { Member } from '../characters/members'
 import type { Enemy } from './enemies'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from './BaseArenaScene'
 

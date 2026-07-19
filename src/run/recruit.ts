@@ -1,4 +1,5 @@
-import type { CaptainId, CharacterId } from '../characters/registry'
+import type { CaptainId } from '../captains/registry'
+import type { CharacterId } from '../characters/registry'
 import type { StringStorage } from '../lib/storage'
 import { Rng } from '../lib/rng'
 

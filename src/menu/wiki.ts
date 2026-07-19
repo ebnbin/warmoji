@@ -1,4 +1,5 @@
-import { CAPTAINS, CHARACTERS } from '../characters/registry'
+import { CAPTAINS } from '../captains/registry'
+import { CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
 import { ENEMY_DEFS } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'

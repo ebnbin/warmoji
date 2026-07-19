@@ -1,4 +1,4 @@
-import type { ArcadeBody, ImageObj } from './BaseArenaScene'
+import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 
 // 碰撞圆按逻辑半径换算回源纹理坐标（body 随对象缩放）
 export function circleBody(obj: ImageObj, radius: number): void {

@@ -2,7 +2,8 @@ import { PICKUP } from '../pickups/registry'
 import { KNOCKBACK } from '../abilities/registry'
 import { memberMaxHp } from '../characters/stats'
 import { CHARACTERS, MEMBER, TEAM, loadoutFor } from '../characters/registry'
-import type { CaptainDef, CharacterId } from '../characters/registry'
+import type { CaptainDef } from '../captains/registry'
+import type { CharacterId } from '../characters/registry'
 import {
   upgradeTiers,
   aggregateCharacterEffects,

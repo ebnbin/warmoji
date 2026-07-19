@@ -15,7 +15,7 @@ import { emojiImage } from '../emoji/textures'
 import { viewport } from '../screen/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
 import { enemyOf } from '../battle/enemies'
-import { projectileOf } from '../battle/projectiles'
+import { projectileOf } from '../projectiles/projectiles'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 
 // 河流竞技场（kind='river'）：单屏世界——相机静止，世界 = 逻辑视口 × 1.2

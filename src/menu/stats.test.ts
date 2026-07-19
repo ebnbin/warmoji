@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ABILITIES } from '../abilities/registry'
-import { CAPTAINS, CHARACTERS } from '../characters/registry'
+import { CAPTAINS } from '../captains/registry'
+import { CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
 import { captainStatGroups, characterStatGroups, abilityStatLines } from './stats'
 

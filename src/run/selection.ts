@@ -1,5 +1,5 @@
-import { CAPTAINS, CAPTAIN_IDS } from '../characters/registry'
-import type { CaptainId } from '../characters/registry'
+import { CAPTAINS, CAPTAIN_IDS } from '../captains/registry'
+import type { CaptainId } from '../captains/registry'
 import type { StringStorage } from '../lib/storage'
 import type { MapId } from '../maps/registry'
 import { sanitizeMapId } from '../maps/registry'

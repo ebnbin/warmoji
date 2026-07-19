@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import { CAPTAINS } from '../characters/registry'
-import { SKILL } from '../characters/skill'
+import { CAPTAINS } from '../captains/registry'
+import { SKILL } from '../captains/skill'
 import { PICKUPS } from '../pickups/registry'
 import { formatTime } from '../lib/format'
 import { RARITIES } from '../items/registry'
