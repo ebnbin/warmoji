@@ -15,10 +15,12 @@ import type { BaseArenaScene, ImageObj } from './BaseArenaScene'
 // 敌弹机制暂不带贯穿/溅射载荷；队员个体减速机制未建——两者都等
 // 首个需要它们的敌械行落地时再扩展。
 
-/** 敌方武器弹药的寿命（武器 spec 无 lifeMs 概念，敌弹必须按寿命回收） */
+/** 敌方武器弹药的缺省寿命（spec.lifeMs 可覆写；敌弹必须按寿命回收） */
 const BULLET_LIFE_MS = 3000
 
-export function armEnemy(scene: BaseArenaScene, a: Enemy): void {
+/** fireDelayMs：首发延迟基线（materialize 的随机开火抽取喂入，保持攻击
+ * 积木时代的首发分布与 rng 流位次）；spec.firstDelayMs 优先 */
+export function armEnemy(scene: BaseArenaScene, a: Enemy, fireDelayMs?: number): void {
   const rows = a.spec.weapons
   if (!rows || rows.length === 0) return
   const e = a.image
@@ -55,10 +57,16 @@ export function armEnemy(scene: BaseArenaScene, a: Enemy): void {
         x,
         y,
         angle,
-        { emoji: p.emoji, size: p.size, radius: p.radius, speed: p.speed, damage, lifeMs: BULLET_LIFE_MS },
+        { emoji: p.emoji, size: p.size, radius: p.radius, speed: p.speed, damage, lifeMs: pSpec.lifeMs ?? BULLET_LIFE_MS },
         a.spec.name,
       )
     },
+    // aim:'move' 弹的朝向 = 物理速度方向（速度为零时朝右，与原攻击积木一致）
+    ownerHeading: () => {
+      const body = e.body as { velocity?: { x: number; y: number } } | null
+      return { x: body?.velocity?.x ?? 0, y: body?.velocity?.y ?? 0 }
+    },
+    random: () => scene.rng.next(),
     anchor: () => ({ x: e.x, y: e.y }),
     applySlow: () => {},
     slowTarget: () => {},
@@ -83,7 +91,13 @@ export function armEnemy(scene: BaseArenaScene, a: Enemy): void {
     // 可选能力（吸金币/无敌帧/复活缩时）是队员专属概念：缺席
   }
   a.weaponOwner = owner
-  a.weapons = rows.map((w, i) => createWeapon(w, ctx, 600 + i * 230))
+  a.weapons = rows.map((w, i) =>
+    createWeapon(
+      w,
+      ctx,
+      (w.kind === 'projectile' ? w.firstDelayMs : undefined) ?? fireDelayMs ?? 600 + i * 230,
+    ),
+  )
 }
 
 /** 治疗敌群：all=false 只治血量比例最低的一只；满血者不计，返回被治数量 */

@@ -1,4 +1,5 @@
 import type { Point } from '../lib/vec'
+import type { SfxId } from '../audio/sfx'
 
 // 武器 = 独立于角色的攻击行为单元；held 缺省时行为主体是角色本体。
 // 新增武器类型：在此加 kind 与 Spec，src/weapons/ 加对应运行时类并注册 create.ts。
@@ -51,6 +52,16 @@ export interface ProjectileSpec {
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
+  /** 瞄准：nearest 最近目标（缺省）/ move 持有者移动方向（无需目标，ctx 供朝向） */
+  readonly aim?: 'nearest' | 'move'
+  /** 索敌上限覆写（缺省 ACQUIRE.range；敌械行可给大值表达「任意距离开火」） */
+  readonly range?: number
+  /** 弹药寿命（敌械弹按寿命回收；队伍弹走出屏/TTL 机制，字段不参与） */
+  readonly lifeMs?: number
+  /** 首发延迟覆写（敌械用；缺省由装配方给错峰值） */
+  readonly firstDelayMs?: number
+  /** 每次出手的音效（敌械弹幕用；队伍弹的 shoot 音效在引擎发弹处） */
+  readonly fireSfx?: SfxId
   readonly held?: HeldVisual
   readonly projectile: {
     readonly emoji: string
@@ -60,8 +71,10 @@ export interface ProjectileSpec {
     readonly rotationOffsetRad: number
   }
   // ── 能力字段 ──
-  /** 齐射：每次出手发射 count 枚，扇形均匀散开 spreadRad */
-  readonly volley?: { readonly count: number; readonly spreadRad: number }
+  /** 齐射：每次出手发射 count 枚，扇形均匀散开 spreadRad；
+   * spreadRad ≥ 2π 为整圈（按 count 均分步进不重叠端点，无需目标），
+   * randomRotate 每轮随机整体旋转（经 ctx.random，Boss 环形弹幕） */
+  readonly volley?: { readonly count: number; readonly spreadRad: number; readonly randomRotate?: boolean }
   /** 每第 n 次出手改为一轮特殊齐射 */
   readonly everyN?: { readonly n: number; readonly count: number; readonly spreadRad: number }
   /** 贯穿：命中后继续飞行，可再命中的额外敌人数 */

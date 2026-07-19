@@ -12,7 +12,6 @@ import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from '.
 import { spawnBurnZone, updateBurnZones, updateEnemyShots, updatePoisonPools } from './hazards'
 import { spawnProjectile, sweepProjectiles } from './projectiles'
 import { STEERERS } from './steer'
-import { runEnemyAttacks } from './enemyAttacks'
 import { runDeathEffects } from './deathEffects'
 import { CAPTAINS, CHARACTERS, MEMBER, ROSTER_IDS, TEAM, loadoutFor } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
@@ -1446,10 +1445,6 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const anim = new Animator(enemy)
     anim.register('idle', clipFramesLive(this, spec.emoji, 'idle', elite || boss ? 'elite' : 'enemy'))
     anim.setIdle('idle', ANIM_SPEC.durMs, (ph / (Math.PI * 2)) * ANIM_SPEC.durMs)
-    // 攻击模块计时：有 firstDelay 用之；否则沿用随机开火抽取（保持 rng 流位次）
-    const attackNextAt = (spec.attacks ?? []).map((atk) =>
-      'firstDelayMs' in atk && atk.firstDelayMs !== undefined ? this.elapsedMs + atk.firstDelayMs : fireAt,
-    )
     // 定时型冲刺的首轮延迟
     const lm = spec.locomotion
     const nextDashAt =
@@ -1465,14 +1460,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       dirX,
       dirY,
       turnAt,
-      attackNextAt,
       nextDashAt,
       ph,
       anim,
       // 舞会窗口内落地：跟着跳（全场蹦迪对新敌同样生效）
       danceUntil: this.elapsedMs < this.danceEndsAt ? this.danceEndsAt : 0,
     })
-    armEnemy(this, a)
+    armEnemy(this, a, fireAt - this.elapsedMs)
     this.enemies.add(enemy)
     if (boss) this.boss = enemy
     const targetScale = enemy.scale
@@ -1525,8 +1519,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     enemy.setTexture(emojiKey(a.spec.emoji, outline))
     enemy.setDisplaySize(size, size)
     a.anim?.register('idle', clipFramesLive(this, a.spec.emoji, 'idle', outline))
-    // 攻击计时后延，避免恢复瞬间齐射
-    a.attackNextAt = a.attackNextAt.map(() => this.elapsedMs + 700)
+    // 出手后延，避免恢复瞬间齐射
+    if (a.weapons) for (const w of a.weapons) w.postponeFire?.(700)
     this.puffBurst.explode(6, enemy.x, enemy.y)
   }
 
@@ -1598,6 +1592,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           this.decayKnockback(a, body, delta)
           if (a.boss) this.postSteerBoss(e, body)
           else this.postSteerEnemy(e, body, spec)
+          // 压制期只走冷却不开火（时间表语义：舞会结束冷却已尽者立即出手）
+          if (a.weapons) for (const w of a.weapons) w.tickCooldown?.(delta)
           continue
         }
         a.danceUntil = 0
@@ -1614,6 +1610,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           body.setVelocity(dir.x * spec.speed * 0.5 * slowM, dir.y * spec.speed * 0.5 * slowM)
           this.decayKnockback(a, body, delta)
           this.postSteerEnemy(e, body, spec)
+          if (a.weapons) for (const w of a.weapons) w.tickCooldown?.(delta)
           continue
         }
         this.restoreMorph(a)
@@ -1623,9 +1620,6 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       const target = this.nearestAlive(e.x, e.y)!
 
       STEERERS[spec.locomotion.kind]({ scene: this, a, body, slow, now, target })
-
-      // 攻击模块（周期射击/环形弹幕）：紧随移动决策，跳舞/变形分支不会到达这里
-      runEnemyAttacks(this, a, body, now, target)
 
       // 持械敌人：武器实例逐帧驱动（跳舞/变形不到达此处；休眠已跳过）
       if (a.weapons) for (const w of a.weapons) w.update(delta, a.weaponOwner!)

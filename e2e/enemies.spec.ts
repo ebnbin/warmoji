@@ -237,6 +237,32 @@ test('持械敌人：敌方 ctx 驱动武器朝队员开火，敌弹入组并命
   )
   // 击杀持械者：武器实例随体销毁，流程无报错
   await killKind(page, 'zombie')
-  await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 3)
+  // 敌弹按寿命排空后，投放外星怪：aim:'move'（朝移动方向、无需目标）路径专项——
+  // 此后敌弹组再增长只能来自它
+  await page.waitForFunction(
+    () => {
+      try {
+        const game = window.__game as { scene: { keys: Record<string, { enemyShots: { getLength(): number } }> } }
+        return game.scene.keys['arena']!.enemyShots.getLength() === 0
+      } catch {
+        return false
+      }
+    },
+    undefined,
+    { timeout: 30_000 },
+  )
+  await page.evaluate(() => window.__spawnEnemy!('invader', -5, 0))
+  await page.waitForFunction(
+    () => {
+      try {
+        const game = window.__game as { scene: { keys: Record<string, { enemyShots: { getLength(): number } }> } }
+        return game.scene.keys['arena']!.enemyShots.getLength() > 0
+      } catch {
+        return false
+      }
+    },
+    undefined,
+    { timeout: 30_000 },
+  )
   expect(errors).toEqual([])
 })

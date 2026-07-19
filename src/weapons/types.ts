@@ -62,6 +62,10 @@ export interface WeaponContext {
    * 动画越快的绑定入口）。clip 未落地/未烘焙时静默保持静态 */
   playOwnerClip(clipId: string, durMs: number): void
   // ── 可选能力（阵营特有概念，实现可缺席）──
+  /** 持有者当前朝向（aim:'move' 弹用；敌方 ctx 取物理速度方向） */
+  ownerHeading?(): { x: number; y: number }
+  /** 持有方的确定性随机流（volley.randomRotate 用；敌方 ctx 接 scene.rng） */
+  random?(): number
   /** 登记一个仅本帧生效的金币吸取点（回旋镖沿途收币；金币是玩家资源） */
   attractCoins?(x: number, y: number, radius: number): void
   /** 给持有者授予短暂无敌（刺客出手帧；敌方无无敌帧概念） */
@@ -73,6 +77,11 @@ export interface WeaponContext {
 /** 武器运行时：每（持有者×武器）一个实例，自管冷却/视觉/攻击行为 */
 export interface WeaponRuntime {
   update(delta: number, owner: WeaponOwner): void
+  /** 压制窗口（跳舞/变形）只走冷却不开火：保持敌侧攻击的时间表语义
+   *（窗口结束若冷却已耗尽则立即出手，与原攻击积木行为一致） */
+  tickCooldown?(delta: number): void
+  /** 把下一次出手至少推迟 ms（变形恢复的缓冲，避免恢复瞬间齐射） */
+  postponeFire?(ms: number): void
   setVisible(on: boolean): void
   destroy(): void
 }

@@ -5,7 +5,8 @@ import { nearestAngle } from './types'
 import type { WeaponContext, WeaponOwner, WeaponRuntime } from './types'
 
 /** 发射型：held 时持有物定身指向目标（可带左右手挂载位）；无 held 时角色本体出弹。
- * 能力：volley 恒定齐射；everyN 每第 n 次出手改为特殊齐射（左轮风暴） */
+ * 瞄准：nearest 最近目标 / move 持有者移动方向（无需目标）；整圈 volley 也无需目标。
+ * 能力：volley 恒定齐射（≥2π 为整圈，可随机旋转）；everyN 每第 n 次特殊齐射 */
 export class ProjectileWeapon implements WeaponRuntime {
   private image?: Phaser.GameObjects.Image
   private cooldown: number
@@ -45,10 +46,16 @@ export class ProjectileWeapon implements WeaponRuntime {
     }
 
     if (this.cooldown > 0) return
-    const targets = this.ctx.targets()
-    const aim = nearestAngle(owner, targets)
-    if (aim === null) return
-    this.aim = aim
+    const fullRing = this.spec.volley !== undefined && this.spec.volley.spreadRad >= Math.PI * 2 - 1e-9
+    if (this.spec.aim === 'move') {
+      const h = this.ctx.ownerHeading?.()
+      if (!h) return
+      this.aim = Math.atan2(h.y, h.x)
+    } else if (!fullRing) {
+      const aim = nearestAngle(owner, this.ctx.targets(), this.spec.range)
+      if (aim === null) return
+      this.aim = aim
+    }
     this.cooldown = this.spec.cooldownMs * this.ctx.cooldownMul()
 
     const damage = Math.round(this.spec.damage * this.ctx.damageMul())
@@ -59,13 +66,28 @@ export class ProjectileWeapon implements WeaponRuntime {
       ? { count: this.spec.everyN!.count, spreadRad: this.spec.everyN!.spreadRad }
       : this.spec.volley
     if (volley && volley.count > 1) {
+      const full = volley.spreadRad >= Math.PI * 2 - 1e-9
+      const base = full && volley.randomRotate ? (this.ctx.random?.() ?? 0) * Math.PI * 2 : this.aim
       for (let i = 0; i < volley.count; i++) {
-        const angle = this.aim + volley.spreadRad * (i / (volley.count - 1) - 0.5)
+        // 整圈按 count 均分步进（端点不重叠）；扇形沿瞄准方向对称散开
+        const angle = full
+          ? base + (i * volley.spreadRad) / volley.count
+          : this.aim + volley.spreadRad * (i / (volley.count - 1) - 0.5)
         this.ctx.spawnBullet(from.x, from.y, angle, this.spec, damage)
       }
+      if (this.spec.fireSfx) this.ctx.sfx(this.spec.fireSfx)
       return
     }
     this.ctx.spawnBullet(from.x, from.y, this.aim, this.spec, damage)
+    if (this.spec.fireSfx) this.ctx.sfx(this.spec.fireSfx)
+  }
+
+  tickCooldown(delta: number): void {
+    this.cooldown -= delta
+  }
+
+  postponeFire(ms: number): void {
+    this.cooldown = Math.max(this.cooldown, ms)
   }
 
   setVisible(on: boolean): void {

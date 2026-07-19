@@ -41,10 +41,10 @@ const LOCOMOTION_LABEL: Record<EnemySpec['locomotion']['kind'], string> = {
 export function enemyStatLines(e: EnemySpec): string[] {
   const lines = [
     `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
-    `行为 ${LOCOMOTION_LABEL[e.locomotion.kind]}${(e.attacks ?? []).some((a) => a.kind === 'periodicShot') ? '放枪' : ''} · 经验 ${e.xp} · 金币 ${e.coins}`,
+    `行为 ${LOCOMOTION_LABEL[e.locomotion.kind]}${(e.weapons ?? []).some((w) => w.kind === 'projectile' && !(w.volley && w.volley.spreadRad >= Math.PI * 2)) ? '放枪' : ''} · 经验 ${e.xp} · 金币 ${e.coins}`,
   ]
-  for (const atk of e.attacks ?? []) {
-    lines.push(`子弹伤害 ${atk.bullet.damage} · 弹速 ${grid(atk.bullet.speed)}/秒`)
+  for (const w of e.weapons ?? []) {
+    if (w.kind === 'projectile') lines.push(`子弹伤害 ${w.damage} · 弹速 ${grid(w.projectile.speed)}/秒`)
   }
   const lm = e.locomotion
   if (lm.kind === 'dash' && lm.detectRange !== undefined && lm.dashDist !== undefined) {
@@ -151,7 +151,8 @@ export function usedEmojiSet(): Set<string> {
       if (w.kind === 'projectile') used.add(w.projectile.emoji)
     }
   }
-  for (const e of ENEMY_SPECS) for (const atk of e.attacks ?? []) used.add(atk.bullet.emoji)
+  for (const e of ENEMY_SPECS)
+    for (const w of e.weapons ?? []) if (w.kind === 'projectile') used.add(w.projectile.emoji)
   used.add(COIN.emoji)
   return used
 }

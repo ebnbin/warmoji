@@ -31,8 +31,6 @@ export interface Enemy {
   coolUntil: number
   /** 定时型冲刺的下一轮触发时刻 */
   nextDashAt: number
-  /** 攻击模块计时（与 spec.attacks 同下标） */
-  attackNextAt: number[]
   danceUntil: number
   flashUntil: number
   morphUntil: number
@@ -77,7 +75,6 @@ export function attachEnemy(image: ImageObj, spec: EnemySpec, hp: number, init?:
     dashUntil: 0,
     coolUntil: 0,
     nextDashAt: 0,
-    attackNextAt: [],
     danceUntil: 0,
     flashUntil: 0,
     morphUntil: 0,

@@ -1,9 +1,9 @@
 import type { WeaponSpec } from '../weapons/spec'
 
-// 敌人 = 基础三围 + 移动方式（locomotion）+ 攻击模块列表 + 死亡效果列表。
+// 敌人 = 基础三围 + 移动方式（locomotion）+ 武器列表 + 死亡效果列表。
 // 多样性用数据组合表达：加一种敌人 = 组合现有模块的一行数据；
-// 运行时按 locomotion.kind 分发转向（battle/steer.ts）、逐帧跑攻击模块
-//（battle/enemyAttacks.ts）、死亡时跑效果模块（killEnemy）。
+// 运行时按 locomotion.kind 分发转向（battle/steer.ts）、武器经敌方 ctx
+// 逐帧驱动（battle/enemyWeapons.ts）、死亡时跑效果模块（killEnemy）。
 export interface EnemyBulletSpec {
   readonly emoji: string
   readonly size: number
@@ -44,25 +44,6 @@ export type LocomotionSpec =
   | { readonly kind: 'flee'; readonly range: number }
   | { readonly kind: 'coinThief' }
   | DashLocomotion
-
-// ── 攻击模块 ────────────────────────────────────────────────
-export interface PeriodicShotSpec {
-  readonly kind: 'periodicShot'
-  readonly intervalMs: number
-  readonly bullet: EnemyBulletSpec
-  /** 瞄准：move 朝移动方向（外星怪）/ team 朝最近队员（毒蛇） */
-  readonly aim: 'move' | 'team'
-}
-
-export interface RingBarrageSpec {
-  readonly kind: 'ringBarrage'
-  readonly count: number
-  readonly intervalMs: number
-  readonly bullet: EnemyBulletSpec
-  readonly firstDelayMs?: number
-}
-
-export type EnemyAttackSpec = PeriodicShotSpec | RingBarrageSpec
 
 // ── 死亡效果 ────────────────────────────────────────────────
 export interface DeathPoisonSpec {
@@ -105,8 +86,8 @@ export interface EnemySpec {
   readonly xp: number
   readonly coins: number
   readonly locomotion: LocomotionSpec
-  readonly attacks?: readonly EnemyAttackSpec[]
-  /** 持械（阵营中立武器行；battle/enemyWeapons 以敌方 ctx 装配驱动） */
+  /** 持械（阵营中立武器行；battle/enemyWeapons 以敌方 ctx 装配驱动）——
+   * 敌人的远程攻击全部经武器表达（原 periodicShot/ringBarrage 积木已并入） */
   readonly weapons?: readonly WeaponSpec[]
   readonly onDeath?: readonly DeathEffectSpec[]
   readonly kbImmune?: boolean
@@ -156,12 +137,17 @@ export const INVADER: EnemySpec = {
   damage: 6,
   xp: 4,
   coins: 3,
-  attacks: [
+  weapons: [
     {
-      kind: 'periodicShot',
-      intervalMs: 2800,
+      kind: 'projectile',
+      name: '慢速弹',
+      icon: '🔴',
+      damage: 6,
+      cooldownMs: 2800,
+      knockback: 0,
       aim: 'move',
-      bullet: { emoji: '🔴', size: 0.4, radius: 0.14, speed: 3, damage: 6, lifeMs: 4500 },
+      lifeMs: 4500,
+      projectile: { emoji: '🔴', size: 0.4, radius: 0.14, speed: 3, rotationOffsetRad: 0 },
     },
   ],
 }
@@ -206,12 +192,18 @@ export const SNAKE: EnemySpec = {
   xp: 4,
   coins: 3,
   locomotion: { kind: 'flee', range: 5 },
-  attacks: [
+  weapons: [
     {
-      kind: 'periodicShot',
-      intervalMs: 2600,
-      aim: 'team',
-      bullet: { emoji: '🟢', size: 0.4, radius: 0.14, speed: 3.2, damage: 5, lifeMs: 4500 },
+      kind: 'projectile',
+      name: '毒弹',
+      icon: '🟢',
+      damage: 5,
+      cooldownMs: 2600,
+      knockback: 0,
+      // 沿用攻击积木的「任意距离都开火」：覆写索敌上限到远超全图对角
+      range: 99,
+      lifeMs: 4500,
+      projectile: { emoji: '🟢', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetRad: 0 },
     },
   ],
 }
@@ -375,13 +367,19 @@ export const BOSS: EnemySpec = {
     firstDelayMs: 3600,
     sfx: 'whoosh',
   },
-  attacks: [
+  weapons: [
     {
-      kind: 'ringBarrage',
-      count: 12,
-      intervalMs: 2800,
+      kind: 'projectile',
+      name: '环形弹幕',
+      icon: '🟣',
+      damage: 8,
+      cooldownMs: 2800,
+      knockback: 0,
       firstDelayMs: 1800,
-      bullet: { emoji: '🟣', size: 0.45, radius: 0.16, speed: 2.4, damage: 8, lifeMs: 6000 },
+      lifeMs: 6000,
+      fireSfx: 'boom',
+      volley: { count: 12, spreadRad: Math.PI * 2, randomRotate: true },
+      projectile: { emoji: '🟣', size: 0.45, radius: 0.16, speed: 2.4, rotationOffsetRad: 0 },
     },
   ],
 }

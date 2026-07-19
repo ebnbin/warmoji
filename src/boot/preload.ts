@@ -42,12 +42,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   ],
   // 敌方阵营含变形替身（仙子魔尘的绵羊顶替原形象，沿用同阵营描边）
   enemy: [...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()])],
-  enemyShot: [
-    ...new Set([
-      ...[...ENEMY_SPECS, BOSS].flatMap((e) => (e.attacks ?? []).map((atk) => atk.bullet.emoji)),
-      ...armedShotEmojis(),
-    ]),
-  ],
+  enemyShot: [...new Set(armedShotEmojis())],
   // 精英变体（含 Boss）：金边；持械精英的武器视觉同沾金边
   elite: [
     ...new Set([...ENEMY_SPECS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()]),
