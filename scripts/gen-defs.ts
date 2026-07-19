@@ -7,7 +7,7 @@ import { ITEMS } from '../defs/items.ts'
 import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import type { ItemDef } from '../src/items/registry'
-import type { CharacterDef } from '../src/characters/registry'
+import type { CharacterSource } from '../src/characters/registry'
 
 // 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json。
 // 校验全部在此完成（形状/数值/交叉引用/可序列化），运行时零校验直读。
@@ -46,6 +46,16 @@ function checkAbility(path: string, a: Record<string, unknown>): void {
   str(`${path}.icon`, a.icon)
 }
 
+const abilityIds = new Set(Object.keys(ABILITIES))
+/** 能力 id 引用校验：持有方（角色配装/升级/队长技能）引的 id 必须在能力表中 */
+function checkRef(path: string, id: unknown): boolean {
+  if (typeof id !== 'string' || !abilityIds.has(id)) {
+    bad(path, `引用了不存在的能力：${String(id)}`)
+    return false
+  }
+  return true
+}
+
 // ── abilities ──
 for (const [id, a] of Object.entries(ABILITIES)) {
   checkAbility(`abilities.${id}`, a as unknown as Record<string, unknown>)
@@ -53,7 +63,7 @@ for (const [id, a] of Object.entries(ABILITIES)) {
 }
 
 // ── characters + captains ──
-for (const [id, c] of Object.entries<CharacterDef>(CHARACTERS as Record<string, CharacterDef>)) {
+for (const [id, c] of Object.entries<CharacterSource>(CHARACTERS as Record<string, CharacterSource>)) {
   const p = `characters.${id}`
   str(`${p}.emoji`, c.emoji)
   str(`${p}.name`, c.name)
@@ -62,9 +72,9 @@ for (const [id, c] of Object.entries<CharacterDef>(CHARACTERS as Record<string, 
   for (const [ti, u] of c.upgrades.entries()) {
     str(`${p}.upgrades[${ti}].name`, u.name)
     if (u.abilities.length !== c.abilities.length) bad(`${p}.upgrades[${ti}]`, '换持不得增减能力数量')
-    for (const [ai, a] of u.abilities.entries()) checkAbility(`${p}.upgrades[${ti}].abilities[${ai}]`, a as unknown as Record<string, unknown>)
+    for (const [ai, a] of u.abilities.entries()) checkRef(`${p}.upgrades[${ti}].abilities[${ai}]`, a)
   }
-  for (const [ai, a] of c.abilities.entries()) checkAbility(`${p}.abilities[${ai}]`, a as unknown as Record<string, unknown>)
+  for (const [ai, a] of c.abilities.entries()) checkRef(`${p}.abilities[${ai}]`, a)
   pure(p, c)
 }
 for (const [id, c] of Object.entries(CAPTAINS)) {
@@ -75,8 +85,10 @@ for (const [id, c] of Object.entries(CAPTAINS)) {
   if ((c.skill.abilities as readonly unknown[]).length === 0) bad(`${p}.skill`, '主动技能缺效果载荷行')
   for (const [ai, a] of c.skill.abilities.entries()) {
     const ap = `${p}.skill.abilities[${ai}]`
-    checkAbility(ap, a as unknown as Record<string, unknown>)
-    if (!CASTABLE_KINDS.has(a.kind)) bad(ap, `kind ${a.kind} 未实现 castNow，不能作主动技能载荷`)
+    if (checkRef(ap, a)) {
+      const kind = (ABILITIES as Record<string, { kind: string }>)[a]!.kind
+      if (!CASTABLE_KINDS.has(kind)) bad(ap, `kind ${kind} 未实现 castNow，不能作主动技能载荷`)
+    }
   }
   pure(p, c)
 }

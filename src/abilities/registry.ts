@@ -8,7 +8,7 @@ import type { AbilityDef } from './defs'
 export const KNOCKBACK = { tauMs: 100, maxSpeed: 1300, deathSlideMs: 300 } as const
 
 // 能力库：数据行在 defs/abilities.ts（创作层），npm run gen 校验并生成
-// src/gen/abilities.json 打包进运行时——构建期保证合法，此处一次断言收口
+// src/assets/abilities.json 打包进运行时——构建期保证合法，此处一次断言收口
 export type AbilityId = keyof typeof abilitiesJson
 export const ABILITIES = abilitiesJson as unknown as Record<AbilityId, AbilityDef>
 

@@ -48,7 +48,9 @@ const pistol = {
   },
 } satisfies ProjectileDef
 
-export const ABILITIES = {
+// 基础能力行的组合库（内部；档位靠 spread 基础行省重复）。
+// 对外只导出末尾汇总的平级全表 ABILITIES。
+const BASE = {
   tomatoThrow: {
     kind: 'projectile',
     name: '番茄连投',
@@ -317,7 +319,7 @@ export const ABILITIES = {
 
 /** 三重抛掷 */
 export const tomatoThrow2 = {
-  ...ABILITIES.tomatoThrow,
+  ...BASE.tomatoThrow,
   volley: { count: 3, spreadDeg: 18 },
 } satisfies ProjectileDef
 /** 爆浆番茄 */
@@ -328,7 +330,7 @@ export const tomatoThrow3 = {
 
 /** 二连突刺 */
 export const hornThrust2 = {
-  ...ABILITIES.hornThrust,
+  ...BASE.hornThrust,
   combo: { delayMs: 170 },
 } satisfies ThrustDef
 /** 虹光震波 */
@@ -339,9 +341,9 @@ export const hornThrust3 = {
 
 /** 全周横扫（整圈更慢一拍） */
 export const axeSweep2 = {
-  ...ABILITIES.axeSweep,
+  ...BASE.axeSweep,
   arcDeg: 360,
-  sweepMs: Math.round(ABILITIES.axeSweep.sweepMs * 1.35),
+  sweepMs: Math.round(BASE.axeSweep.sweepMs * 1.35),
 } satisfies SweepDef
 /** 震慑余波 */
 export const axeSweep3 = {
@@ -350,8 +352,8 @@ export const axeSweep3 = {
 } satisfies SweepDef
 
 /** 贯穿弹 */
-export const pistolLeft2 = { ...ABILITIES.pistolLeft, pierce: 2 } satisfies ProjectileDef
-export const pistolRight2 = { ...ABILITIES.pistolRight, pierce: 2 } satisfies ProjectileDef
+export const pistolLeft2 = { ...BASE.pistolLeft, pierce: 2 } satisfies ProjectileDef
+export const pistolRight2 = { ...BASE.pistolRight, pierce: 2 } satisfies ProjectileDef
 /** 左轮风暴 */
 export const pistolLeft3 = {
   ...pistolLeft2,
@@ -364,7 +366,7 @@ export const pistolRight3 = {
 
 /** 余烬秘火 */
 export const arcaneBlast2 = {
-  ...ABILITIES.arcaneBlast,
+  ...BASE.arcaneBlast,
   burn: { radius: 1.4, durationMs: 3000, tickMs: 400, damage: 3, color: 0xff7043, fillAlpha: 0.18, lineAlpha: 0.55, enterMs: 200 },
 } satisfies AreaBlastDef
 /** 连锁轰炸 */
@@ -374,17 +376,17 @@ export const arcaneBlast3 = {
 } satisfies AreaBlastDef
 
 /** 双子回旋 */
-export const boomerang2 = { ...ABILITIES.boomerang, twin: true } satisfies BoomerangDef
+export const boomerang2 = { ...BASE.boomerang, twin: true } satisfies BoomerangDef
 /** 磁力巨镖（镖体与判定同步 ×1.4） */
 export const boomerang3 = {
   ...boomerang2,
-  hitRadius: ABILITIES.boomerang.hitRadius * 1.4,
-  held: { ...ABILITIES.boomerang.held, size: ABILITIES.boomerang.held.size * 1.4 },
+  hitRadius: BASE.boomerang.hitRadius * 1.4,
+  held: { ...BASE.boomerang.held, size: BASE.boomerang.held.size * 1.4 },
   coinMagnetRadius: 1.6,
 } satisfies BoomerangDef
 
 /** 双联光束 */
-export const laserBeam2 = { ...ABILITIES.laserBeam, backBeam: true } satisfies LaserDef
+export const laserBeam2 = { ...BASE.laserBeam, backBeam: true } satisfies LaserDef
 /** 全域扫射 */
 export const laserBeam3 = {
   ...laserBeam2,
@@ -392,7 +394,7 @@ export const laserBeam3 = {
 } satisfies LaserDef
 
 /** 冻伤 */
-export const frostAura2 = { ...ABILITIES.frostAura, dps: 6 } satisfies SlowAuraDef
+export const frostAura2 = { ...BASE.frostAura, dps: 6 } satisfies SlowAuraDef
 /** 凛冬降临 */
 export const frostAura3 = {
   ...frostAura2,
@@ -401,9 +403,9 @@ export const frostAura3 = {
 
 /** 持久变形（带贯穿） */
 export const sparkleBolt2 = {
-  ...ABILITIES.sparkleBolt,
+  ...BASE.sparkleBolt,
   pierce: 1,
-  hex: { ...ABILITIES.sparkleBolt.hex, durationMs: 4000 },
+  hex: { ...BASE.sparkleBolt.hex, durationMs: 4000 },
 } satisfies ProjectileDef
 /** 脆弱诅咒 */
 export const sparkleBolt3 = {
@@ -413,7 +415,7 @@ export const sparkleBolt3 = {
 
 /** 连环刃 */
 export const shadowStrike2 = {
-  ...ABILITIES.shadowStrike,
+  ...BASE.shadowStrike,
   cleave: { radius: 1.0, ratio: 0.6 },
 } satisfies AssassinateDef
 /** 处决 */
@@ -424,8 +426,8 @@ export const shadowStrike3 = {
 
 /** 扩建工地 */
 export const woodTurret2 = {
-  ...ABILITIES.woodTurret,
-  maxTurrets: ABILITIES.woodTurret.maxTurrets + 1,
+  ...BASE.woodTurret,
+  maxTurrets: BASE.woodTurret.maxTurrets + 1,
 } satisfies TurretDef
 /** 三连弩 */
 export const woodTurret3 = {
@@ -435,8 +437,8 @@ export const woodTurret3 = {
 
 /** 扩巢 */
 export const beeSwarm2 = {
-  ...ABILITIES.beeSwarm,
-  count: ABILITIES.beeSwarm.count + 1,
+  ...BASE.beeSwarm,
+  count: BASE.beeSwarm.count + 1,
 } satisfies SummonDef
 /** 麻痹毒素 */
 export const beeSwarm3 = {
@@ -445,7 +447,7 @@ export const beeSwarm3 = {
 } satisfies SummonDef
 
 /** 群体处方 */
-export const fieldMedkit2 = { ...ABILITIES.fieldMedkit, aoe: { ratio: 0.6 } } satisfies HealDef
+export const fieldMedkit2 = { ...BASE.fieldMedkit, aoe: { ratio: 0.6 } } satisfies HealDef
 /** 电击起搏 */
 export const fieldMedkit3 = {
   ...fieldMedkit2,
@@ -453,10 +455,67 @@ export const fieldMedkit3 = {
 } satisfies HealDef
 
 /** 超导传递 */
-export const voltArc2 = { ...ABILITIES.voltArc, bounces: 4 } satisfies ChainArcDef
+export const voltArc2 = { ...BASE.voltArc, bounces: 4 } satisfies ChainArcDef
 /** 过载爆裂 */
 export const voltArc3 = {
   ...voltArc2,
   burstEnd: { radius: 0.9, ratio: 0.6 },
 } satisfies ChainArcDef
+
+// 能力全表：基础行与档位行一律平级——不同档位就是不同的武器，各自独立成行。
+// 运行时（abilities/registry）、图鉴、gen 都消费这张表；上面的 BASE 与档位 const
+// 只是书写用的组合库，产物在此汇成一张扁平表（档位紧随其基础武器）。
+export const ABILITIES = {
+  tomatoThrow: BASE.tomatoThrow,
+  tomatoThrow2,
+  tomatoThrow3,
+  hornThrust: BASE.hornThrust,
+  hornThrust2,
+  hornThrust3,
+  axeSweep: BASE.axeSweep,
+  axeSweep2,
+  axeSweep3,
+  pistolLeft: BASE.pistolLeft,
+  pistolLeft2,
+  pistolLeft3,
+  pistolRight: BASE.pistolRight,
+  pistolRight2,
+  pistolRight3,
+  arcaneBlast: BASE.arcaneBlast,
+  arcaneBlast2,
+  arcaneBlast3,
+  laserBeam: BASE.laserBeam,
+  laserBeam2,
+  laserBeam3,
+  frostAura: BASE.frostAura,
+  frostAura2,
+  frostAura3,
+  boomerang: BASE.boomerang,
+  boomerang2,
+  boomerang3,
+  sparkleBolt: BASE.sparkleBolt,
+  sparkleBolt2,
+  sparkleBolt3,
+  shadowStrike: BASE.shadowStrike,
+  shadowStrike2,
+  shadowStrike3,
+  woodTurret: BASE.woodTurret,
+  woodTurret2,
+  woodTurret3,
+  beeSwarm: BASE.beeSwarm,
+  beeSwarm2,
+  beeSwarm3,
+  fieldMedkit: BASE.fieldMedkit,
+  fieldMedkit2,
+  fieldMedkit3,
+  syringeDart: BASE.syringeDart,
+  voltArc: BASE.voltArc,
+  voltArc2,
+  voltArc3,
+  holyLight: BASE.holyLight,
+  goldRain: BASE.goldRain,
+  discoFever: BASE.discoFever,
+  weaknessLecture: BASE.weaknessLecture,
+  dimensionStrike: BASE.dimensionStrike,
+} as const
 
