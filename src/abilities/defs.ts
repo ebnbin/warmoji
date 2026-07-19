@@ -297,6 +297,73 @@ export interface ChainArcDef {
   readonly burstEnd?: { readonly radius: number; readonly ratio: number }
 }
 
+// ── 单发型能力（castNow）：队长主动技能的效果载荷，也可作角色自动能力 ──
+
+export interface RallyDef {
+  readonly kind: 'rally'
+  readonly name: string
+  readonly icon: string
+  readonly cooldownMs: number
+  /** 存活我方按生命上限比例回复；阵亡者满血复活（rallyTeam 语义） */
+  readonly healRatio: number
+  /** 全队短暂无敌时长 */
+  readonly invulnMs: number
+  /** 冲击环视觉半径 */
+  readonly ringRadius: number
+  readonly color: number
+}
+
+export interface StrikeDef {
+  readonly kind: 'strike'
+  readonly name: string
+  readonly icon: string
+  readonly damage: number
+  readonly cooldownMs: number
+  readonly knockback: number
+  /** 点名打击离锚点最近的 N 个目标 */
+  readonly targets: number
+  /** 每次命中落地掉落的金币数 */
+  readonly coinsPerHit?: number
+  /** 坠物视觉：从目标上方 fromAbove 处砸落，逐个错峰 staggerMs */
+  readonly drop: {
+    readonly emoji: string
+    readonly size: number
+    readonly fromAbove: number
+    readonly dropMs: number
+    readonly staggerMs: number
+  }
+}
+
+export interface DanceDef {
+  readonly kind: 'dance'
+  readonly name: string
+  readonly icon: string
+  readonly cooldownMs: number
+  /** 敌对方全体跳舞定身时长（含休眠者与窗口内新登场者） */
+  readonly durationMs: number
+}
+
+export interface BuffDef {
+  readonly kind: 'buff'
+  readonly name: string
+  readonly icon: string
+  readonly cooldownMs: number
+  /** 限时全队伤害倍率（到期自动复原） */
+  readonly damageMul: number
+  readonly durationMs: number
+}
+
+export interface NukeDef {
+  readonly kind: 'nuke'
+  readonly name: string
+  readonly icon: string
+  /** 基准伤害 × 当前波次威胁倍率（ctx.waveScale，与敌人成长同步） */
+  readonly damage: number
+  readonly cooldownMs: number
+  /** Boss 承伤比例 */
+  readonly bossRatio: number
+}
+
 export type AbilityDef =
   | ThrustDef
   | ProjectileDef
@@ -310,6 +377,11 @@ export type AbilityDef =
   | SummonDef
   | HealDef
   | ChainArcDef
+  | RallyDef
+  | StrikeDef
+  | DanceDef
+  | BuffDef
+  | NukeDef
 
 export interface HitTarget {
   x: number

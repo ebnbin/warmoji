@@ -25,6 +25,8 @@ const SPATIAL = new Set([
   'dashSpeed',
   'dashDist',
   'fleeRange',
+  'ringRadius',
+  'fromAbove',
 ])
 
 const cache = new WeakMap<object, unknown>()

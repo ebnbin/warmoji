@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-import { castCaptainSkill } from './skills'
 import { toPx } from './px'
 import { attachEnemy, enemyOf } from './enemies'
 import type { Enemy } from './enemies'
@@ -69,7 +68,7 @@ import { playSfx } from '../audio/sfx'
 import { UI_FONT } from '../lib/fonts'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../screen/apply'
 import { createAbility } from '../abilities/create'
-import type { TargetInfo, AbilityContext, AbilityOwner } from '../abilities/types'
+import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from '../abilities/types'
 import type { UIScene } from './UIScene'
 
 // 竞技场基座：四张地图（有界/无界/河流/虚空）共享的战斗引擎——队伍与
@@ -161,6 +160,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     playOwnerClip: () => {},
     heal: (x, y, range, amount, all) => this.healAllies(x, y, range, amount, all),
     cutReviveTimer: (x, y, range, ms) => this.cutReviveTimer(x, y, range, ms),
+    rallyTeam: (healRatio, invulnMs) => this.rallyTeam(healRatio, invulnMs),
+    danceTargets: (durationMs) => this.danceTargets(durationMs),
+    buffTeamDamage: (mul, durationMs) => this.buffTeamDamage(mul, durationMs),
+    spawnCoins: (x, y, count) => this.spawnRewardCoins(x, y, count),
+    waveScale: () => (this.stress ? 1 : waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier),
+    isBossTarget: (ref) => enemyOf(ref as ImageObj).boss,
     damageMul: () => this.stats.damageMul,
     cooldownMul: () => this.stats.cooldownMul,
     sfx: (id) => playSfx(id),
@@ -210,10 +215,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   protected pendingMarks: { pos: Point; mark: ImageObj }[] = []
   /** 玩家子弹寿命上限（null = 不按寿命回收；虚空图必须设——环面上永不出屏） */
   projectileTtlMs: number | null = null
-  /** 学者「弱点讲义」的增伤到期时刻（不跨波；到期把 stats.damageMul 拨回 1） */
+  /** 增益能力的全队增伤到期时刻（不跨波；到期把 stats.damageMul 拨回 1） */
   skillBuffUntil = 0
-  /** 派对「全场蹦迪」的舞会结束时刻：窗口内新落地的敌人也要跳 */
+  /** 群舞能力的舞会结束时刻：窗口内新落地的敌人也要跳 */
   danceEndsAt = 0
+  /** 队长主动技能的效果载荷：标准能力行实例，castNow 单发（不走 update 自转） */
+  private captainAbilities: AbilityRuntime[] = []
+  private captainHandle: AbilityOwner = { x: 0, y: 0, setVisualOffset: () => {} }
 
   // ── 世界规则钩子：子类只实现自己那一列差异 ───────────────────
 
@@ -519,6 +527,23 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.waveBaseLevel = this.run.xp.level
     this.members = rosterIds.map((id, slot) => this.createMember(id, slot))
 
+    // 队长主动技能：效果载荷 = 标准能力行（数据在 CAPTAINS[id].skill.abilities），
+    // 行为主体锚在队伍中心（center 对象本局稳定，位移是原地改写）；
+    // 不进 update 循环——只经 castSkill 手动单发
+    const center = this.center
+    this.captainHandle = {
+      get x() {
+        return center.x
+      },
+      get y() {
+        return center.y
+      },
+      setVisualOffset: () => {},
+    }
+    this.captainAbilities = this.stress
+      ? []
+      : CAPTAINS[this.run.captainId].skill.abilities.map((a) => createAbility(toPx(a), this.abilityCtx, 0))
+
     this.attachCamera(this.centerObj)
 
     this.enemies = this.add.group()
@@ -691,9 +716,71 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
   }
 
-  /** 释放主动技能（UIScene 按钮/E 键触发）；实现见 battle/skills.ts */
+  /** 释放主动技能（UIScene 按钮/E 键触发）。这里只是触发策略：就绪/弹药
+   * 校验、扣豆、重置跨波 CD；效果本体是队长持有的标准能力行，逐个单发 */
   castSkill(): boolean {
-    return castCaptainSkill(this)
+    if (this.over || this.stress || this.run.skillCdMs > 0 || this.run.beans <= 0) return false
+    const s = CAPTAINS[this.run.captainId].skill
+    this.run.beans -= 1
+    this.run.skillCdMs = s.cdMs
+    playSfx('levelup')
+    this.events.emit('skill-cast', s.name)
+    for (const a of this.captainAbilities) a.castNow?.(this.captainHandle)
+    return true
+  }
+
+  // ── 团队级能力口子（ctx 实现：集结/群舞/增益/掉币都是队伍侧概念） ──
+
+  /** 全队集结：阵亡者满血复活、存活者按上限比例回复、全队短暂无敌。
+   * 无敌走受击无敌帧通道（把「上次受击」推到未来），挡接触与敌弹；
+   * 毒液池/毒雾走独立计时，不受无敌保护 */
+  private rallyTeam(healRatio: number, invulnMs: number): void {
+    for (const m of this.members) {
+      if (!m.alive) this.reviveMember(m)
+      else m.hp = Math.min(m.maxHp, m.hp + m.maxHp * healRatio)
+      m.lastHitMs = this.elapsedMs + invulnMs - m.iframesMs
+      m.image.setTint(0xffe082)
+      this.time.delayedCall(320, () => {
+        if (m.alive) m.image.clearTint()
+      })
+    }
+  }
+
+  /** 全场敌人（含 Boss）定身跳舞；正在蓄力/冲刺的直接打断；舞会窗口内
+   * 新落地的敌人也要跳（materializeEnemy 补标）。逐帧表现（速度清零 +
+   * 摇摆 + 粉染色）在 steerEnemies 的舞蹈分支 */
+  private danceTargets(durationMs: number): void {
+    this.danceEndsAt = this.elapsedMs + durationMs
+    for (const e of this.enemies.getChildren() as ImageObj[]) {
+      if (!e.active) continue
+      const a = enemyOf(e)
+      a.danceUntil = this.danceEndsAt
+      if (a.state === 'windup' || a.state === 'dash') {
+        a.state = a.boss ? 'chase' : 'wander'
+        e.clearTint()
+      }
+    }
+  }
+
+  /** 限时全队增伤（经 stats.damageMul 流入所有能力伤害链，update 到期复原） */
+  private buffTeamDamage(mul: number, durationMs: number): void {
+    this.stats.damageMul = mul
+    this.skillBuffUntil = this.elapsedMs + durationMs
+    for (const m of this.members) {
+      if (!m.alive) continue
+      m.image.setTint(0x80d8ff)
+      this.time.delayedCall(350, () => {
+        if (m.alive) m.image.clearTint()
+      })
+    }
+  }
+
+  /** 战场掉落金币（拾取爆点视觉 + 音效；波末结算期不再入场） */
+  private spawnRewardCoins(x: number, y: number, count: number): void {
+    if (this.over) return
+    this.coinBurst.explode(6, x, y)
+    playSfx('coin')
+    spawnCoins(this, x, y, count)
   }
 
   /** 波次结束：快照队伍状态进 run；打满最后一波直接进胜利结算 */

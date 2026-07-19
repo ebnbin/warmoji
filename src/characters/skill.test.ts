@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { CAPTAINS, CAPTAIN_IDS } from './registry'
 import { SKILL } from './skill'
 import { beginRun, endRun } from '../run/state'
-import { prodigyDamage, skillCharge, skillReady, tickSkillCd } from './skill'
+import { skillCharge, skillReady, tickSkillCd } from './skill'
 
 describe('技能冷却', () => {
   it('逐帧递减到 0 为止，不会为负', () => {
@@ -25,12 +25,17 @@ describe('技能冷却', () => {
     expect(skillCharge(cd * 2, 'angel')).toBe(0)
   })
 
-  it('每位队长都配了技能：名字/描述非空，CD 为正', () => {
+  it('每位队长都配了技能：名字/描述非空，CD 为正，效果载荷是标准能力行', () => {
     for (const id of CAPTAIN_IDS) {
       const s = CAPTAINS[id].skill
       expect(s.name.length).toBeGreaterThan(0)
       expect(s.desc.length).toBeGreaterThan(0)
       expect(s.cdMs).toBeGreaterThan(0)
+      expect(s.abilities.length).toBeGreaterThan(0)
+      for (const a of s.abilities) {
+        expect(a.name.length).toBeGreaterThan(0)
+        expect(a.icon.length).toBeGreaterThan(0)
+      }
     }
   })
 
@@ -43,17 +48,5 @@ describe('技能冷却', () => {
       )
       endRun()
     }
-  })
-})
-
-describe('降维打击伤害', () => {
-  it('随波次血量倍率缩放，Boss 折减', () => {
-    expect(prodigyDamage(1, false)).toBe(SKILL.prodigy.damage)
-    expect(prodigyDamage(3, false)).toBe(SKILL.prodigy.damage * 3)
-    expect(prodigyDamage(1, true)).toBe(Math.round(SKILL.prodigy.damage * SKILL.prodigy.bossRatio))
-  })
-
-  it('至少 1 点伤害', () => {
-    expect(prodigyDamage(0.001, true)).toBeGreaterThanOrEqual(1)
   })
 })

@@ -31,7 +31,12 @@ function pure(path: string, v: unknown): void {
 const ABILITY_KINDS = new Set([
   'projectile', 'thrust', 'sweep', 'areaBlast', 'boomerang', 'laser',
   'slowAura', 'assassinate', 'turret', 'summon', 'heal', 'chainArc',
+  'rally', 'strike', 'dance', 'buff', 'nuke',
 ])
+
+/** 实现了 castNow（手动单发）的 kind——队长主动技能载荷只能用这些（与
+ * src/abilities 各运行时类同步维护） */
+const CASTABLE_KINDS = new Set(['rally', 'strike', 'dance', 'buff', 'nuke'])
 
 function checkAbility(path: string, a: Record<string, unknown>): void {
   if (!ABILITY_KINDS.has(a.kind as string)) bad(path, `未知 kind：${String(a.kind)}`)
@@ -65,6 +70,12 @@ for (const [id, c] of Object.entries(CAPTAINS)) {
   str(`${p}.emoji`, c.emoji)
   num(`${p}.teamSize`, c.teamSize, 1)
   num(`${p}.skill.cdMs`, c.skill.cdMs, 1)
+  if ((c.skill.abilities as readonly unknown[]).length === 0) bad(`${p}.skill`, '主动技能缺效果载荷行')
+  for (const [ai, a] of c.skill.abilities.entries()) {
+    const ap = `${p}.skill.abilities[${ai}]`
+    checkAbility(ap, a as unknown as Record<string, unknown>)
+    if (!CASTABLE_KINDS.has(a.kind)) bad(ap, `kind ${a.kind} 未实现 castNow，不能作主动技能载荷`)
+  }
   pure(p, c)
 }
 

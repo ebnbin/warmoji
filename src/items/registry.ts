@@ -281,6 +281,13 @@ export function resolveAbilityDef(w: AbilityDef, fx: CharacterEffects): AbilityD
       return { ...w, range: w.range * r }
     case 'chainArc':
       return { ...w, range: w.range * r, arcRange: w.arcRange * r }
+    // 单发型载荷无空间索敌参数（点名全场/全域生效），rangeMul 不适用
+    case 'rally':
+    case 'strike':
+    case 'dance':
+    case 'buff':
+    case 'nuke':
+      return w
   }
 }
 

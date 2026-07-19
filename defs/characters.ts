@@ -208,6 +208,7 @@ export const CAPTAINS = {
       name: '圣光降临',
       desc: '阵亡队员满血复活，存活队员回复 50% 生命，全队无敌 2 秒',
       cdMs: 35_000,
+      abilities: [ABILITIES.holyLight],
     },
   },
   moneybags: {
@@ -225,6 +226,7 @@ export const CAPTAINS = {
       name: '天降横财',
       desc: '金袋砸向最近的 8 个敌人：伤害与强击退，每袋落地掉 1 枚金币',
       cdMs: 20_000,
+      abilities: [ABILITIES.goldRain],
     },
   },
   party: {
@@ -242,6 +244,7 @@ export const CAPTAINS = {
       name: '全场蹦迪',
       desc: '全场敌人（含 Boss）被音乐感染，跳舞 3.5 秒不能动弹',
       cdMs: 30_000,
+      abilities: [ABILITIES.discoFever],
     },
   },
   prodigy: {
@@ -259,6 +262,7 @@ export const CAPTAINS = {
       name: '降维打击',
       desc: '一道灵光扫过全场，所有敌人受到大额伤害（随波次增强），Boss 承伤减半',
       cdMs: 45_000,
+      abilities: [ABILITIES.dimensionStrike],
     },
   },
   scholar: {
@@ -276,6 +280,7 @@ export const CAPTAINS = {
       name: '弱点讲义',
       desc: '划出敌人弱点，8 秒内全队伤害 ×1.6',
       cdMs: 30_000,
+      abilities: [ABILITIES.weaknessLecture],
     },
   },
 } as const satisfies Record<string, CaptainDef>

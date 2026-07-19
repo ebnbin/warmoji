@@ -48,16 +48,18 @@ export function loadoutFor(def: CharacterDef, tiers: UpgradeTiers): readonly Abi
 
 // 队长主动技能：每位队长一个，跨波 CD——剩余冷却存在 run 上、只按战斗
 // 时钟推进（商店/整编不走表），上一波攒的进度带进下一波。左下角按钮或
-// E 键释放；效果逻辑按队长 id 在 BaseArenaScene.castSkill 分派，效果参数
-// 见下方 SKILL 常量（与「能力先直接建模为字段」同一约定，不做通用效果系统）
+// E 键释放。触发策略（豆子弹药/CD/按钮）与效果解耦：效果本体是标准
+// 能力行，同一行放进角色配装即是普通自动能力
 export interface CaptainSkill {
   readonly name: string
   readonly desc: string
   readonly cdMs: number
+  /** 效果载荷：标准能力行，释放 = 逐个 castNow 单发（场景 castSkill） */
+  readonly abilities: readonly AbilityDef[]
 }
 
 // 队长：不登场、无实体的团队增益提供者（emotion 表情形象）。
-// 能力先直接建模为字段，需要通用效果系统时再抽象；编制上限/经验相关能力由队长决定。
+// 被动增益先直接建模为字段（编制上限/经验倍率等），主动技能的效果走能力系统。
 export interface CaptainDef {
   readonly emoji: string
   readonly name: string

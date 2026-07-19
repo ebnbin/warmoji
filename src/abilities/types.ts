@@ -72,11 +72,26 @@ export interface AbilityContext {
   grantOwnerInvuln?(ms: number): void
   /** 电击起搏：给范围内复活倒计时最长的阵亡队友减 ms；无阵亡者返回 false */
   cutReviveTimer?(x: number, y: number, range: number, ms: number): boolean
+  /** 全队集结：阵亡者满血复活、存活者按上限比例回复、全队短暂无敌 */
+  rallyTeam?(healRatio: number, invulnMs: number): void
+  /** 敌对方全体跳舞定身（含休眠者与窗口内新登场者；打断蓄力/冲刺） */
+  danceTargets?(durationMs: number): void
+  /** 限时全队伤害倍率（到期自动复原，不叠加直接覆写） */
+  buffTeamDamage?(mul: number, durationMs: number): void
+  /** 战场掉落金币（含拾取爆点视觉与音效；金币是玩家资源，敌方 ctx 缺席） */
+  spawnCoins?(x: number, y: number, count: number): void
+  /** 当前波次威胁倍率（随敌人成长缩放的效果用） */
+  waveScale?(): number
+  /** 目标是否 Boss（承伤折减类效果用） */
+  isBossTarget?(ref: TargetInfo['ref']): boolean
 }
 
 /** 能力运行时：每（持有者×能力）一个实例，自管冷却/视觉/攻击行为 */
 export interface AbilityRuntime {
   update(delta: number, owner: AbilityOwner): void
+  /** 手动触发：无视冷却立即施放一次（队长主动技能通道；持有者不调 update
+   * 即为纯手动模式）。未实现的 kind 不能作技能载荷——gen 校验把关 */
+  castNow?(owner: AbilityOwner): void
   /** 压制窗口（跳舞/变形）只走冷却不开火：保持敌侧攻击的时间表语义
    *（窗口结束若冷却已耗尽则立即出手，与原攻击积木行为一致） */
   tickCooldown?(delta: number): void

@@ -2,11 +2,16 @@ import type {
   AreaBlastDef,
   AssassinateDef,
   BoomerangDef,
+  BuffDef,
   ChainArcDef,
+  DanceDef,
   HealDef,
   LaserDef,
+  NukeDef,
   ProjectileDef,
+  RallyDef,
   SlowAuraDef,
+  StrikeDef,
   SummonDef,
   SweepDef,
   ThrustDef,
@@ -256,6 +261,54 @@ export const ABILITIES = {
     decay: 0.75,
     color: 0x40c4ff,
   } satisfies ChainArcDef,
+
+  // ── 队长主动技能的效果载荷（castNow 单发；cooldownMs 供角色自动持有
+  // 时用，数值对齐技能跨波 CD）──
+  holyLight: {
+    kind: 'rally',
+    name: '圣光降临',
+    icon: '✨',
+    cooldownMs: 35_000,
+    healRatio: 0.5,
+    invulnMs: 2000,
+    // 冲击环起始半径 = 队伍环半径 + 队员判定半径（TEAM.ringRadius + MEMBER.radius）
+    ringRadius: 1.25,
+    color: 0xffe082,
+  } satisfies RallyDef,
+  goldRain: {
+    kind: 'strike',
+    name: '天降横财',
+    icon: '💰',
+    damage: 60,
+    cooldownMs: 20_000,
+    knockback: 10,
+    targets: 8,
+    coinsPerHit: 1,
+    drop: { emoji: '💰', size: 0.75, fromAbove: 3, dropMs: 180, staggerMs: 60 },
+  } satisfies StrikeDef,
+  discoFever: {
+    kind: 'dance',
+    name: '全场蹦迪',
+    icon: '🪩',
+    cooldownMs: 30_000,
+    durationMs: 3500,
+  } satisfies DanceDef,
+  weaknessLecture: {
+    kind: 'buff',
+    name: '弱点讲义',
+    icon: '📖',
+    cooldownMs: 30_000,
+    damageMul: 1.6,
+    durationMs: 8000,
+  } satisfies BuffDef,
+  dimensionStrike: {
+    kind: 'nuke',
+    name: '降维打击',
+    icon: '🌠',
+    damage: 70,
+    cooldownMs: 45_000,
+    bossRatio: 0.5,
+  } satisfies NukeDef,
 } as const
 
 // ── 升级卡档位行：升级 = 换持整行 ────────────────────────────

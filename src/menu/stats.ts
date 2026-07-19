@@ -34,6 +34,11 @@ export const ABILITY_KIND_LABEL: Record<AbilityDef['kind'], string> = {
   summon: '召唤',
   heal: '治疗',
   chainArc: '连锁',
+  rally: '集结',
+  strike: '空袭',
+  dance: '跳舞',
+  buff: '鼓舞',
+  nuke: '天罚',
 }
 
 /** px → 格 */
@@ -69,6 +74,31 @@ export function abilityStatLines(w: AbilityDef): string[] {
     return [
       `弩塔 ${w.maxTurrets} 座 · 每 ${sec(w.placeIntervalMs)} 架设一座`,
       `塔伤害 ${w.damage} · 射速 ${sec(w.fireIntervalMs)} · 射程 ${grid(w.range)}`,
+    ]
+  }
+  // 单发型载荷（队长主动技能）：各自定制，无常规首行
+  if (w.kind === 'rally') {
+    return [
+      `阵亡队员满血复活 · 存活队员回复 ${Math.round(w.healRatio * 100)}%`,
+      `全队无敌 ${sec(w.invulnMs)}`,
+    ]
+  }
+  if (w.kind === 'strike') {
+    return [
+      `伤害 ${w.damage} · 击退 ${grid((w.knockback * KNOCKBACK.tauMs) / 1000)} · 砸向最近 ${w.targets} 个敌人`,
+      w.coinsPerHit ? `每次命中落地掉 ${w.coinsPerHit} 枚金币` : '被砸死的照常掉落',
+    ]
+  }
+  if (w.kind === 'dance') {
+    return [`全场敌人（含 Boss）跳舞定身 ${sec(w.durationMs)}`]
+  }
+  if (w.kind === 'buff') {
+    return [`全队伤害 ×${w.damageMul} · 持续 ${sec(w.durationMs)}`]
+  }
+  if (w.kind === 'nuke') {
+    return [
+      `基准伤害 ${w.damage} × 当前波次强度`,
+      `全场生效 · Boss 承伤 ${Math.round(w.bossRatio * 100)}%`,
     ]
   }
   // 击退展示为大致位移距离（冲量 × 衰减时间常数）
@@ -139,7 +169,12 @@ export function characterStatGroups(id: CharacterId, items: readonly ItemId[] = 
 function displayDef(w: AbilityDef, dmgMul: number, cdMul: number, kbMul: number): AbilityDef {
   switch (w.kind) {
     case 'slowAura':
+    case 'rally':
+    case 'dance':
+    case 'buff':
       return w
+    case 'nuke':
+      return { ...w, damage: Math.round(w.damage * dmgMul), cooldownMs: w.cooldownMs * cdMul }
     case 'heal':
       return { ...w, amount: Math.round(w.amount * dmgMul), cooldownMs: w.cooldownMs * cdMul }
     case 'turret':
@@ -188,7 +223,10 @@ export function captainStatGroups(def: CaptainDef, items: readonly ItemId[] = []
     {
       icon: '⚡',
       title: `主动技能 · ${def.skill.name}`,
-      lines: [`${def.skill.desc}（冷却 ${Math.round(def.skill.cdMs / 1000)} 秒，跨波累计）`],
+      lines: [
+        `${def.skill.desc}（冷却 ${Math.round(def.skill.cdMs / 1000)} 秒，跨波累计）`,
+        ...def.skill.abilities.flatMap((w) => abilityStatLines(w)),
+      ],
     },
     { icon: '👟', title: '团队', lines: [...lines, '经验每升一级 = 1 颗能量豆（技能弹药，上限 3）'] },
   ]
