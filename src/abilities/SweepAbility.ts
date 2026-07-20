@@ -2,9 +2,10 @@ import { DEG2RAD } from '../core/units'
 import type Phaser from 'phaser'
 import { sectorHitIndices } from './defs'
 import type { SweepDef } from './defs'
+import { applyEffects } from './effects'
 import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
-import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
+import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 横扫型：持有物绕角色扫过一段圆弧，扇形判定内每敌一次伤害 */
 export class SweepAbility implements AbilityRuntime {
@@ -40,6 +41,7 @@ export class SweepAbility implements AbilityRuntime {
 
     this.ctx.sfx('whoosh')
     const damage = Math.round(this.def.damage * this.ctx.damageMul())
+    const hitRefs: TargetInfo['ref'][] = []
     for (const i of sectorHitIndices(
       { x: owner.x, y: owner.y },
       this.aim,
@@ -48,11 +50,10 @@ export class SweepAbility implements AbilityRuntime {
       targets,
     )) {
       this.ctx.damageTarget(targets[i]!.ref, damage, this.def.knockback, owner.x, owner.y)
-      // 震慑余波：被扫中的敌人限时减速
-      if (this.def.slowOnHit) {
-        this.ctx.slowTarget(targets[i]!.ref, this.def.slowOnHit.factor, this.def.slowOnHit.durationMs)
-      }
+      hitRefs.push(targets[i]!.ref)
     }
+    // 命中效果（震慑减速等）：逐被扫中目标施加
+    applyEffects(this.ctx, this.def.onHit, { center: { x: owner.x, y: owner.y }, baseDamage: damage, targets: hitRefs })
 
     this.tween?.remove()
     this.sweep.t = -1

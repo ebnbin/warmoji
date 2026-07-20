@@ -55,7 +55,7 @@ export class ChainArcAbility implements AbilityRuntime {
     }
 
     if (this.def.onHit) {
-      applyEffects(this.ctx, this.def.onHit, { x: last.x, y: last.y }, damage, visited)
+      applyEffects(this.ctx, this.def.onHit, { center: { x: last.x, y: last.y }, baseDamage: damage, exclude: visited })
     }
 
     this.drawArc(points)

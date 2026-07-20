@@ -1,5 +1,6 @@
 import type Phaser from 'phaser'
 import type { SummonDef } from './defs'
+import { applyEffects } from './effects'
 import { ACQUIRE } from './registry'
 import { ANIM_DEF } from '../emoji/studio'
 import { Animator } from '../emoji/animator'
@@ -90,9 +91,8 @@ export class SummonAbility implements AbilityRuntime {
         if (tx * tx + ty * ty <= rr * rr) {
           const damage = Math.round(this.def.damage * this.ctx.damageMul())
           this.ctx.damageTarget(target.ref, damage, this.def.knockback, m.img.x, m.img.y)
-          if (this.def.sting) {
-            this.ctx.slowTarget(target.ref, this.def.sting.slowFactor, this.def.sting.slowMs)
-          }
+          // 命中效果（麻痹减速等）：施加到被蜇目标
+          applyEffects(this.ctx, this.def.onHit, { center: { x: target.x, y: target.y }, baseDamage: damage, targets: [target.ref] })
           this.ctx.sfx('hit')
           m.hitCd = this.def.hitCooldownMs * this.ctx.cooldownMul()
         }

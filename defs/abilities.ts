@@ -350,7 +350,7 @@ export const axeSweep2 = {
 /** 震慑余波 */
 export const axeSweep3 = {
   ...axeSweep2,
-  slowOnHit: { factor: 0.55, durationMs: 1200 },
+  onHit: [{ kind: 'slow', factor: 0.55, durationMs: 1200 }],
 } satisfies SweepDef
 
 /** 贯穿弹 */
@@ -445,7 +445,7 @@ export const beeSwarm2 = {
 /** 麻痹毒素 */
 export const beeSwarm3 = {
   ...beeSwarm2,
-  sting: { slowFactor: 0.55, slowMs: 1200 },
+  onHit: [{ kind: 'slow', factor: 0.55, durationMs: 1200 }],
 } satisfies SummonDef
 
 /** 群体处方 */

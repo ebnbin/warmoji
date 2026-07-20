@@ -42,7 +42,14 @@ export interface BlastEffect {
   readonly ring?: BlastRing
 }
 
-export type Effect = BlastEffect
+/** 逐目标限时减速（factor=0 即冻结），到时自动恢复 */
+export interface SlowEffect {
+  readonly kind: 'slow'
+  readonly factor: number
+  readonly durationMs: number
+}
+
+export type Effect = BlastEffect | SlowEffect
 
 export interface ThrustDef {
   readonly kind: 'thrust'
@@ -122,8 +129,8 @@ export interface SweepDef {
   readonly sweepMs: number
   readonly held: HeldVisual
   // ── 能力字段 ──
-  /** 命中减速：被扫中的敌人临时减速 */
-  readonly slowOnHit?: { readonly factor: number; readonly durationMs: number }
+  /** 命中效果：被扫中的敌人施加的 onHit 效果（震慑减速等，逐目标） */
+  readonly onHit?: readonly Effect[]
 }
 
 export interface AreaBlastDef {
@@ -264,8 +271,8 @@ export interface SummonDef {
   /** 单只命中后的再攻间隔（撞完弹开一小段） */
   readonly hitCooldownMs: number
   // ── 能力字段 ──
-  /** 麻痹毒素：蜇中的敌人临时减速 */
-  readonly sting?: { readonly slowFactor: number; readonly slowMs: number }
+  /** 命中效果：蜇中的敌人施加的 onHit 效果（麻痹减速等，逐目标） */
+  readonly onHit?: readonly Effect[]
 }
 
 export interface HealDef {

@@ -80,7 +80,7 @@ export class ThrustAbility implements AbilityRuntime {
     if (this.def.onHit) {
       const tipX = owner.x + Math.cos(this.aim) * this.def.reach
       const tipY = owner.y + Math.sin(this.aim) * this.def.reach
-      applyEffects(this.ctx, this.def.onHit, { x: tipX, y: tipY }, damage)
+      applyEffects(this.ctx, this.def.onHit, { center: { x: tipX, y: tipY }, baseDamage: damage })
     }
 
     this.tween?.remove()

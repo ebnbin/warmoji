@@ -96,7 +96,12 @@ export class AssassinateAbility implements AbilityRuntime {
     }
     this.ctx.damageTarget(target.ref, damage, this.def.knockback, landX, landY)
     if (this.def.onHit) {
-      applyEffects(this.ctx, this.def.onHit, { x: target.x, y: target.y }, damage, new Set([target.ref]))
+      applyEffects(this.ctx, this.def.onHit, {
+        center: { x: target.x, y: target.y },
+        baseDamage: damage,
+        targets: [target.ref],
+        exclude: new Set([target.ref]),
+      })
     }
     this.slash(target.x, target.y)
   }

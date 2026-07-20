@@ -1,6 +1,6 @@
 import { circleHitIndices } from './defs'
 import type { BlastRing, Effect } from './defs'
-import type { AbilityContext } from './types'
+import type { AbilityContext, TargetInfo } from './types'
 
 // 能力效果层（阵营中立）：命中/覆盖后施加的可复用效果，与「投送方式」正交——
 // 任何投送（突刺/弹道/连锁/轰炸…）都经此施加同一套效果，消除各能力类里
@@ -48,20 +48,28 @@ export function blastRing(
   })
 }
 
-/** 在锚点求值一串 onHit 效果。center = 效果锚点（投送方定义：突刺终点/斩击
- * 目标/末跳落点…）；baseDamage = 本次命中的伤害基准；exclude 跳过的目标。 */
+/** 一次命中的上下文：锚点类效果（blast）作用于 center；逐目标类效果（slow）
+ * 作用于 targets（本次直接命中的敌对方真身）。exclude 供 blast 跳过主目标/已命中。 */
+export interface HitContext {
+  readonly center: { readonly x: number; readonly y: number }
+  readonly baseDamage: number
+  readonly targets?: readonly TargetInfo['ref'][]
+  readonly exclude?: ReadonlySet<unknown>
+}
+
+/** 在一次命中上求值一串 onHit 效果：blast 打 center 圆内，slow 施加到 targets。 */
 export function applyEffects(
   ctx: AbilityContext,
   effects: readonly Effect[] | undefined,
-  center: { readonly x: number; readonly y: number },
-  baseDamage: number,
-  exclude?: ReadonlySet<unknown>,
+  hit: HitContext,
 ): void {
   if (!effects) return
   for (const e of effects) {
     if (e.kind === 'blast') {
-      applyBlast(ctx, center, Math.max(1, Math.round(baseDamage * e.ratio)), e.radius, e.knockback, exclude)
-      if (e.ring) blastRing(ctx, center.x, center.y, e.radius, e.ring)
+      applyBlast(ctx, hit.center, Math.max(1, Math.round(hit.baseDamage * e.ratio)), e.radius, e.knockback, hit.exclude)
+      if (e.ring) blastRing(ctx, hit.center.x, hit.center.y, e.radius, e.ring)
+    } else if (e.kind === 'slow') {
+      if (hit.targets) for (const ref of hit.targets) ctx.slowTarget(ref, e.factor, e.durationMs)
     }
   }
 }
