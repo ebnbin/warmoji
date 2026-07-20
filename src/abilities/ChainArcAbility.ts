@@ -3,7 +3,7 @@ import { applyEffects } from './effects'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 连锁型：电弧命中最近敌人后在敌群间弹跳传导，每跳伤害衰减——
- * 敌人越密越强。能力：bounces 提升；burstEnd 末跳落点小范围爆裂 */
+ * 敌人越密越强。能力：bounces 提升；onHit 末跳落点命中效果（过载爆裂等） */
 export class ChainArcAbility implements AbilityRuntime {
   private cooldown: number
 

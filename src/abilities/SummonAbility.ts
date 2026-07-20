@@ -19,7 +19,7 @@ interface Minion {
 
 /** 召唤型：常驻一小群独立 AI 的召唤物——追击最近的敌人，撞上即造成伤害，
  * 之后短暂退回主人身边再出击。无敌人时绕主人盘旋。
- * 能力：sting 蜇中减速 */
+ * 能力：onHit 蜇中命中效果（麻痹减速等） */
 export class SummonAbility implements AbilityRuntime {
   private minions: Minion[] = []
   /** 动画时钟：delta 累积（暂停即停帧） */

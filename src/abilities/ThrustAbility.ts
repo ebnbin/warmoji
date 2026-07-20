@@ -8,7 +8,7 @@ import { nearestAngle } from './types'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 突刺型：held 时持有物挥出收回；无 held 时角色本体前冲收回。胶囊判定内每敌一次伤害。
- * 能力：combo 出手后短暂延迟重新索敌再刺一段；tipBurst 突刺终点圆形震波 */
+ * 能力：combo 出手后短暂延迟重新索敌再刺一段；onHit 突刺终点命中效果（枪尖震波等） */
 export class ThrustAbility implements AbilityRuntime {
   private image?: Phaser.GameObjects.Image
   private cooldown: number
