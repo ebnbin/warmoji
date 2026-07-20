@@ -5,6 +5,16 @@ import type { GroundEffectDef } from '../groundEffects/defs'
 // 能力 = 独立于角色的攻击行为单元；held 缺省时行为主体是角色本体。
 // 新增能力类型：在此加 kind 与 Def，src/abilities/ 加对应运行时类并注册 create.ts。
 
+/** 弹丸视觉规格（能力弹与死亡冷枪共用）：飞行体的形象与运动学，与「谁发、
+ * 何时发、带什么命中效果」无关——后者由能力触发机器/命中效果链各自承载 */
+export interface ProjectileSpec {
+  readonly emoji: string
+  readonly size: number
+  readonly radius: number
+  readonly speed: number
+  readonly rotationOffsetDeg: number
+}
+
 /** 持有物视觉：挂在角色身上的能力 emoji */
 export interface HeldVisual {
   readonly emoji: string
@@ -64,7 +74,33 @@ export interface MorphEffect {
   readonly vulnMul?: number
 }
 
-export type Effect = BlastEffect | SlowEffect | GroundZone | MorphEffect
+/** 发弹：在锚点朝最近敌对方发一枚弹（aim=nearest）。复用弹丸投送机器与
+ * ProjectileSpec——「冷却触发的能力发弹」与「死亡触发的冷枪」是同一动作、不同触发。
+ * 阵营由 ctx 注入（目前仅敌方死亡冷枪在用；玩家 onHit 不含此 kind） */
+export interface SpawnProjectileEffect {
+  readonly kind: 'spawnProjectile'
+  readonly projectile: ProjectileSpec
+  readonly damage: number
+  readonly lifeMs: number
+  readonly aim: 'nearest'
+}
+
+/** 治疗我方范围内单位：与军医能力同一个 ctx.heal 动作，阵营由 ctx 注入。
+ * all 缺省 true（范围全体）；死亡触发时由执行器排除正在死亡的自己 */
+export interface HealEffect {
+  readonly kind: 'heal'
+  readonly range: number
+  readonly amount: number
+  readonly all?: boolean
+}
+
+export type Effect =
+  | BlastEffect
+  | SlowEffect
+  | GroundZone
+  | MorphEffect
+  | SpawnProjectileEffect
+  | HealEffect
 
 export interface ThrustDef {
   readonly kind: 'thrust'
@@ -102,13 +138,7 @@ export interface ProjectileDef {
   /** 每次出手的音效（敌械弹幕用；队伍弹的 shoot 音效在引擎发弹处） */
   readonly fireSfx?: SfxId
   readonly held?: HeldVisual
-  readonly projectile: {
-    readonly emoji: string
-    readonly size: number
-    readonly radius: number
-    readonly speed: number
-    readonly rotationOffsetDeg: number
-  }
+  readonly projectile: ProjectileSpec
   // ── 能力字段 ──
   /** 齐射：每次出手发射 count 枚，扇形均匀散开 spreadDeg（度）；
    * spreadDeg ≥ 360 为整圈（按 count 均分步进不重叠端点，无需目标），
@@ -242,13 +272,7 @@ export interface TurretDef {
   readonly knockback: number
   /** 弩塔索敌半径 */
   readonly range: number
-  readonly projectile: {
-    readonly emoji: string
-    readonly size: number
-    readonly radius: number
-    readonly speed: number
-    readonly rotationOffsetDeg: number
-  }
+  readonly projectile: ProjectileSpec
   // ── 能力字段 ──
   /** 三连弩：每次开火改为扇形连发 */
   readonly burst?: { readonly count: number; readonly spreadDeg: number }

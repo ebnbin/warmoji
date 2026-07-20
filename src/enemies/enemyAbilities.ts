@@ -63,7 +63,19 @@ export function buildEnemyCtx(scene: BaseArenaScene, a: Enemy): AbilityContext {
     slowTarget: () => {},
     spawnGroundEffect: (x, y, def) =>
       spawnGroundEffect(scene, x, y, def, { faction: 'enemy', srcName: a.def.name }),
-    heal: (x, y, range, amount, all) => healEnemies(scene, x, y, range, amount, all),
+    heal: (x, y, range, amount, all, exclude) =>
+      healEnemies(scene, x, y, range, amount, all, exclude ? enemyOf(exclude as ImageObj) : undefined),
+    // 效果触发的一次性冷枪：走敌弹机器，dmgMul 与本体挂钩（精英冷枪更痛）
+    spawnBullet: (x, y, angle, spec, damage, lifeMs) =>
+      spawnEnemyProjectile(
+        scene,
+        x,
+        y,
+        angle,
+        { emoji: spec.emoji, size: spec.size, radius: spec.radius, speed: spec.speed, damage, lifeMs },
+        a.def.name,
+        a.dmgMul,
+      ),
     damageMul: () => a.dmgMul,
     cooldownMul: () => 1,
     sfx: (id) => playSfx(id),

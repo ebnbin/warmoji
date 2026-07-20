@@ -1,7 +1,7 @@
 import { UNIT } from '../core/units'
 import type Phaser from 'phaser'
 import { ACQUIRE } from './registry'
-import type { ProjectileDef } from './defs'
+import type { ProjectileDef, ProjectileSpec } from './defs'
 import type { GroundEffectDef } from '../groundEffects/defs'
 import type { SfxId } from '../audio/sfx'
 import type { OutlineKind } from '../emoji/svg'
@@ -42,7 +42,8 @@ export interface AbilityContext {
     srcX?: number,
     srcY?: number,
   ): void
-  /** 发弹：阵营由 ctx 实现注入（Projectile 结构本身敌我同构） */
+  /** 发弹（能力触发）：完整能力弹，携带 pierce/onHit/齐射等由能力机器处理；
+   * 阵营由 ctx 实现注入（Projectile 结构本身敌我同构） */
   spawnProjectile(x: number, y: number, angle: number, def: ProjectileDef, damage: number): void
   /** 我方锚点（光环类能力的圆心；队伍 ctx = 队伍中心） */
   anchor(): { x: number; y: number }
@@ -53,8 +54,9 @@ export interface AbilityContext {
   /** 在地面生成持续效果区：周期性烧伤区域内的敌对方（阵营与归属由实现注入） */
   spawnGroundEffect(x: number, y: number, def: GroundEffectDef): void
   /** 治疗我方：all=false 治范围内血量比例最低的一名、true 范围内全体；
-   * 返回实际被治疗的数量（满血者不计） */
-  heal(x: number, y: number, range: number, amount: number, all: boolean): number
+   * 返回实际被治疗的数量（满血者不计）。exclude 排除某一单位（死亡触发时排除
+   * 正在死亡的自己；队伍侧无此需求，实现可少收该参） */
+  heal(x: number, y: number, range: number, amount: number, all: boolean, exclude?: TargetInfo['ref']): number
   damageMul(): number
   cooldownMul(): number
   /** 出手/爆炸等能力音效（内部已节流） */
@@ -87,6 +89,9 @@ export interface AbilityContext {
   isBossTarget?(ref: TargetInfo['ref']): boolean
   /** 变形命中目标为无害替身（魔尘 morph 效果；敌方无此机制，缺席即 no-op） */
   morphTarget?(ref: TargetInfo['ref'], spec: { durationMs: number; morphEmoji: string; vulnMul?: number }): void
+  /** 发弹（效果触发的一次性冷枪）：只带 ProjectileSpec 与伤害/寿命，无 pierce/齐射；
+   * 复用弹丸投送机器。目前仅敌方死亡冷枪在用，队伍侧缺席（onHit 不含 spawnProjectile） */
+  spawnBullet?(x: number, y: number, angle: number, spec: ProjectileSpec, damage: number, lifeMs: number): void
 }
 
 /** 能力运行时：每（持有者×能力）一个实例，自管冷却/视觉/攻击行为 */

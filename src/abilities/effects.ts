@@ -50,16 +50,19 @@ export function blastRing(
   })
 }
 
-/** 一次命中的上下文：锚点类效果（blast）作用于 center；逐目标类效果（slow）
- * 作用于 targets（本次直接命中的敌对方真身）。exclude 供 blast 跳过主目标/已命中。 */
+/** 一次触发的上下文：锚点类效果（blast/ground/spawnProjectile/heal）作用于 center；
+ * 逐目标类效果（slow/morph）作用于 targets（本次直接命中的敌对方真身）。
+ * exclude 供 blast 跳过主目标/已命中；source 为触发者本身（死亡触发时供 heal 排除自己）。 */
 export interface HitContext {
   readonly center: { readonly x: number; readonly y: number }
   readonly baseDamage: number
   readonly targets?: readonly TargetInfo['ref'][]
   readonly exclude?: ReadonlySet<unknown>
+  readonly source?: TargetInfo['ref']
 }
 
-/** 在一次命中上求值一串 onHit 效果：blast 打 center 圆内，slow 施加到 targets。 */
+/** 求值一串效果（命中触发 onHit / 死亡触发 onDeath 共用）：blast 打 center 圆内、
+ * slow/morph 施加到 targets、ground 留地面区、heal 治我方、spawnProjectile 朝最近敌对方发弹。 */
 export function applyEffects(
   ctx: AbilityContext,
   effects: readonly Effect[] | undefined,
@@ -76,6 +79,30 @@ export function applyEffects(
       ctx.spawnGroundEffect(hit.center.x, hit.center.y, e.def)
     } else if (e.kind === 'morph') {
       if (hit.targets) for (const ref of hit.targets) ctx.morphTarget?.(ref, e)
+    } else if (e.kind === 'heal') {
+      ctx.heal(hit.center.x, hit.center.y, e.range, e.amount, e.all ?? true, hit.source)
+    } else if (e.kind === 'spawnProjectile') {
+      const angle = nearestAngleTo(hit.center, ctx.targets())
+      if (angle !== null) ctx.spawnBullet?.(hit.center.x, hit.center.y, angle, e.projectile, e.damage, e.lifeMs)
     }
   }
+}
+
+/** 锚点到最近敌对方的角度（不设索敌上限——死亡冷枪是任意距离的临终一击）；无目标返回 null */
+function nearestAngleTo(
+  center: { readonly x: number; readonly y: number },
+  targets: readonly TargetInfo[],
+): number | null {
+  let best = Infinity
+  let angle: number | null = null
+  for (const t of targets) {
+    const dx = t.x - center.x
+    const dy = t.y - center.y
+    const d = dx * dx + dy * dy
+    if (d < best) {
+      best = d
+      angle = Math.atan2(dy, dx)
+    }
+  }
+  return angle
 }
