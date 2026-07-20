@@ -52,7 +52,7 @@ export function enemyStatLines(e: EnemyDef): string[] {
     lines.push(`探测 ${grid(lm.detectRange)} · 突刺 ${grid(lm.dashDist)}`)
   }
   for (const fx of e.onDeath ?? []) {
-    if (fx.kind === 'poison') lines.push(`死亡留毒 ${grid(fx.radius)} · 每 ${fx.tickMs / 1000} 秒 ${fx.damage} 伤`)
+    if (fx.kind === 'ground') lines.push(`死亡留毒 ${grid(fx.def.radius)} · 每 ${fx.def.tickMs / 1000} 秒 ${fx.def.damage} 伤`)
     if (fx.kind === 'split') lines.push(`死亡分裂 ${fx.count} 只${fx.into.name}`)
   }
   return lines

@@ -175,25 +175,34 @@ function checkEnemy(path: string, e: (typeof ENEMIES)[string]): void {
   num(`${path}.speed`, e.speed)
   num(`${path}.radius`, e.radius)
   for (const [i, a] of (e.abilities ?? []).entries()) checkAbility(`${path}.abilities[${i}]`, a as unknown as Record<string, unknown>)
+  // 亡语（onDeath）：组合式 Effect（ground/heal/spawnProjectile）+ 生成实体类（split/decoy）。
+  // 命中专属的 blast/slow/morph 不允许作亡语（无 baseDamage/targets），落到 else 报错。
   for (const [i, fx] of (e.onDeath ?? []).entries()) {
     const dp = `${path}.onDeath[${i}]`
-    if (fx.kind === 'split') checkEnemy(`${dp}.into`, fx.into)
-    else if (fx.kind === 'poison') num(`${dp}.damage`, fx.damage, 1)
-    else if (fx.kind === 'deathBullet') {
-      const pj = fx.projectile
-      str(`${dp}.projectile.emoji`, pj.emoji)
-      num(`${dp}.projectile.size`, pj.size, 0.01)
-      num(`${dp}.projectile.radius`, pj.radius, 0.01)
-      num(`${dp}.projectile.speed`, pj.speed, 0.01)
-      num(`${dp}.projectile.damage`, pj.damage, 1)
-      num(`${dp}.projectile.lifeMs`, pj.lifeMs, 1)
-    } else if (fx.kind === 'deathHeal') {
-      num(`${dp}.range`, fx.range, 0.01)
-      num(`${dp}.amount`, fx.amount, 1)
+    if (fx.kind === 'split') {
+      checkEnemy(`${dp}.into`, fx.into)
+      num(`${dp}.count`, fx.count, 1)
     } else if (fx.kind === 'decoy') {
       num(`${dp}.hp`, fx.hp, 1)
       num(`${dp}.durationMs`, fx.durationMs, 1)
       num(`${dp}.alpha`, fx.alpha, 0)
+    } else if (fx.kind === 'ground') {
+      num(`${dp}.def.radius`, fx.def.radius, 0.01)
+      num(`${dp}.def.damage`, fx.def.damage, 1)
+      num(`${dp}.def.durationMs`, fx.def.durationMs, 1)
+      num(`${dp}.def.tickMs`, fx.def.tickMs, 1)
+    } else if (fx.kind === 'heal') {
+      num(`${dp}.range`, fx.range, 0.01)
+      num(`${dp}.amount`, fx.amount, 1)
+    } else if (fx.kind === 'spawnProjectile') {
+      str(`${dp}.projectile.emoji`, fx.projectile.emoji)
+      num(`${dp}.projectile.size`, fx.projectile.size, 0.01)
+      num(`${dp}.projectile.radius`, fx.projectile.radius, 0.01)
+      num(`${dp}.projectile.speed`, fx.projectile.speed, 0.01)
+      num(`${dp}.damage`, fx.damage, 1)
+      num(`${dp}.lifeMs`, fx.lifeMs, 1)
+    } else {
+      bad(dp, `不允许作亡语的 effect kind：${String(fx.kind)}`)
     }
   }
 }

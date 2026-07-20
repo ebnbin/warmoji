@@ -1,6 +1,5 @@
 import enemiesJson from '../assets/enemies.json'
-import type { AbilityDef } from '../abilities/defs'
-import type { GroundEffectDef } from '../groundEffects/defs'
+import type { AbilityDef, Effect } from '../abilities/defs'
 
 // 敌人 = 基础三围 + 移动方式（locomotion）+ 能力列表 + 死亡效果列表。
 // 多样性用数据组合表达：加一种敌人 = 组合现有模块的一行数据；
@@ -47,47 +46,29 @@ export type LocomotionDef =
   | { readonly kind: 'coinThief' }
   | DashLocomotion
 
-// ── 死亡效果 ────────────────────────────────────────────────
-/** 死亡留毒：参数即地面效果（battle/groundEffects 以敌方阵营生成） */
-export interface DeathPoisonDef extends GroundEffectDef {
-  readonly kind: 'poison'
-}
+// ── 死亡效果（亡语）─────────────────────────────────────────
+// 亡语 = 死亡触发的一串效果，与命中触发 onHit 复用同一套组合式 Effect
+//（留毒 = ground、治疗 = heal、冷枪 = spawnProjectile），经敌方 ctx 求值
+//（deathEffects.ts）。生成实体类（分裂/诱饵）需引 EnemyDef，为避免与 abilities
+// 循环依赖留在本模块，与 Effect 并入同一 onDeath 联合。
 
-export interface DeathSplitDef {
+/** 分裂：生成 count 个指定敌人（血量吃当前波次成长曲线，随机散开） */
+export interface SplitEffect {
   readonly kind: 'split'
   readonly into: EnemyDef
   readonly count: number
 }
 
-/** 死亡放冷枪：朝死亡那一刻最近队员的方向发一枚弹（复用敌弹机器） */
-export interface DeathBulletDef {
-  readonly kind: 'deathBullet'
-  readonly projectile: EnemyProjectileDef
-}
-
-/** 死亡治疗：治疗自身周围范围内的受伤敌人（复用 enemyAbilities.healEnemies） */
-export interface DeathHealDef {
-  readonly kind: 'deathHeal'
-  readonly range: number
-  readonly amount: number
-  /** true 治范围内全部受伤者；false 只治血量比例最低的一只（默认 true） */
-  readonly all?: boolean
-}
-
-/** 死亡替身：原地留下半透明尸壳（无伤害/无行为，吸引火力），到时静默消失 */
-export interface DeathDecoyDef {
+/** 诱饵尸壳：原地留一具由自身退化的半透明替身（无伤害/无行为，吸火力），到时消失 */
+export interface DecoyEffect {
   readonly kind: 'decoy'
   readonly hp: number
   readonly durationMs: number
   readonly alpha: number
 }
 
-export type DeathEffectDef =
-  | DeathPoisonDef
-  | DeathSplitDef
-  | DeathBulletDef
-  | DeathHealDef
-  | DeathDecoyDef
+/** 亡语效果：组合式 Effect（ground/heal/spawnProjectile…）+ 生成实体类（split/decoy） */
+export type DeathEffect = Effect | SplitEffect | DecoyEffect
 
 export interface EnemyDef {
   readonly kind:
@@ -116,7 +97,7 @@ export interface EnemyDef {
   /** 持械（阵营中立能力行；battle/enemyAbilities 以敌方 ctx 装配驱动）——
    * 敌人的远程攻击全部经能力表达（原 periodicShot/ringBarrage 积木已并入） */
   readonly abilities?: readonly AbilityDef[]
-  readonly onDeath?: readonly DeathEffectDef[]
+  readonly onDeath?: readonly DeathEffect[]
   readonly kbImmune?: boolean
 }
 

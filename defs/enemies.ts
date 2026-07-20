@@ -32,7 +32,7 @@ export const GHOST: EnemyDef = {
   xp: 2,
   coins: 2,
   // 亡语：临终把生气渡给周围受伤的同伴（先集火它反而奶了一片）
-  onDeath: [{ kind: 'deathHeal', range: 3, amount: 12, all: true }],
+  onDeath: [{ kind: 'heal', range: 3, amount: 12, all: true }],
 }
 
 /** 游荡射手：不索敌，慢速乱逛，周期性朝自己移动方向放一发慢弹（弹幕污染走位空间） */
@@ -62,7 +62,13 @@ export const INVADER: EnemyDef = {
   ],
   // 亡语：朝断气那一刻最近队员的方向补一发慢速冷枪（击杀后仍要走位）
   onDeath: [
-    { kind: 'deathBullet', projectile: { emoji: '🛸', size: 0.6, radius: 0.2, speed: 1.5, damage: 8, lifeMs: 6000 } },
+    {
+      kind: 'spawnProjectile',
+      aim: 'nearest',
+      damage: 8,
+      lifeMs: 6000,
+      projectile: { emoji: '🛸', size: 0.6, radius: 0.2, speed: 1.5, rotationOffsetDeg: 0 },
+    },
   ],
 }
 
@@ -138,15 +144,17 @@ export const MUSHROOM: EnemyDef = {
   coins: 3,
   onDeath: [
     {
-      kind: 'poison',
-      radius: 1.6,
-      durationMs: 3000,
-      tickMs: 500,
-      damage: 4,
-      color: 0x7cb342,
-      fillAlpha: 0.22,
-      lineAlpha: 0.5,
-      enterMs: 220,
+      kind: 'ground',
+      def: {
+        radius: 1.6,
+        durationMs: 3000,
+        tickMs: 500,
+        damage: 4,
+        color: 0x7cb342,
+        fillAlpha: 0.22,
+        lineAlpha: 0.5,
+        enterMs: 220,
+      },
     },
   ],
 }
