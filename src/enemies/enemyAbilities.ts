@@ -94,21 +94,23 @@ export function armEnemy(scene: BaseArenaScene, a: Enemy, fireDelayMs?: number):
   )
 }
 
-/** 治疗敌群：all=false 只治血量比例最低的一只；满血者不计，返回被治数量 */
-function healEnemies(
+/** 治疗敌群：all=false 只治血量比例最低的一只；满血者不计，返回被治数量。
+ * exclude 排除某一只（幽灵亡语治疗时排除正在死亡的自己） */
+export function healEnemies(
   scene: BaseArenaScene,
   x: number,
   y: number,
   range: number,
   amount: number,
   all: boolean,
+  exclude?: Enemy,
 ): number {
   const r2 = range * range
   const hurt: Enemy[] = []
   for (const img of scene.enemies.getChildren() as ImageObj[]) {
     if (!img.active) continue
     const a = enemyOf(img)
-    if (a.hp >= a.maxHp) continue
+    if (a === exclude || a.hp >= a.maxHp) continue
     const dx = img.x - x
     const dy = img.y - y
     if (dx * dx + dy * dy <= r2) hurt.push(a)

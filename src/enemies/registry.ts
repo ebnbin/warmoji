@@ -59,7 +59,35 @@ export interface DeathSplitDef {
   readonly count: number
 }
 
-export type DeathEffectDef = DeathPoisonDef | DeathSplitDef
+/** 死亡放冷枪：朝死亡那一刻最近队员的方向发一枚弹（复用敌弹机器） */
+export interface DeathBulletDef {
+  readonly kind: 'deathBullet'
+  readonly projectile: EnemyProjectileDef
+}
+
+/** 死亡治疗：治疗自身周围范围内的受伤敌人（复用 enemyAbilities.healEnemies） */
+export interface DeathHealDef {
+  readonly kind: 'deathHeal'
+  readonly range: number
+  readonly amount: number
+  /** true 治范围内全部受伤者；false 只治血量比例最低的一只（默认 true） */
+  readonly all?: boolean
+}
+
+/** 死亡替身：原地留下半透明尸壳（无伤害/无行为，吸引火力），到时静默消失 */
+export interface DeathDecoyDef {
+  readonly kind: 'decoy'
+  readonly hp: number
+  readonly durationMs: number
+  readonly alpha: number
+}
+
+export type DeathEffectDef =
+  | DeathPoisonDef
+  | DeathSplitDef
+  | DeathBulletDef
+  | DeathHealDef
+  | DeathDecoyDef
 
 export interface EnemyDef {
   readonly kind:

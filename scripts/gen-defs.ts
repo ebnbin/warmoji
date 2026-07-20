@@ -176,8 +176,25 @@ function checkEnemy(path: string, e: (typeof ENEMIES)[string]): void {
   num(`${path}.radius`, e.radius)
   for (const [i, a] of (e.abilities ?? []).entries()) checkAbility(`${path}.abilities[${i}]`, a as unknown as Record<string, unknown>)
   for (const [i, fx] of (e.onDeath ?? []).entries()) {
-    if (fx.kind === 'split') checkEnemy(`${path}.onDeath[${i}].into`, fx.into)
-    if (fx.kind === 'poison') num(`${path}.onDeath[${i}].damage`, fx.damage, 1)
+    const dp = `${path}.onDeath[${i}]`
+    if (fx.kind === 'split') checkEnemy(`${dp}.into`, fx.into)
+    else if (fx.kind === 'poison') num(`${dp}.damage`, fx.damage, 1)
+    else if (fx.kind === 'deathBullet') {
+      const pj = fx.projectile
+      str(`${dp}.projectile.emoji`, pj.emoji)
+      num(`${dp}.projectile.size`, pj.size, 0.01)
+      num(`${dp}.projectile.radius`, pj.radius, 0.01)
+      num(`${dp}.projectile.speed`, pj.speed, 0.01)
+      num(`${dp}.projectile.damage`, pj.damage, 1)
+      num(`${dp}.projectile.lifeMs`, pj.lifeMs, 1)
+    } else if (fx.kind === 'deathHeal') {
+      num(`${dp}.range`, fx.range, 0.01)
+      num(`${dp}.amount`, fx.amount, 1)
+    } else if (fx.kind === 'decoy') {
+      num(`${dp}.hp`, fx.hp, 1)
+      num(`${dp}.durationMs`, fx.durationMs, 1)
+      num(`${dp}.alpha`, fx.alpha, 0)
+    }
   }
 }
 for (const [kind, e] of Object.entries(ENEMIES)) {

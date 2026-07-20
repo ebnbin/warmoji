@@ -48,6 +48,10 @@ export interface Enemy {
   kvy: number
   /** 偷币鼠吃下的金币数 */
   eaten: number
+  /** 亡语替身：无伤害/无行为的诱饵尸壳（接触不伤人，专供吸引火力） */
+  decoy: boolean
+  /** 定时消失时刻（0 = 不消失）：替身到时静默移除，不走死亡结算 */
+  despawnAt: number
   /** 摇摆/动画随机相位 */
   ph: number
   anim?: Animator
@@ -88,6 +92,8 @@ export function attachEnemy(image: ImageObj, def: EnemyDef, hp: number, init?: P
     kvx: 0,
     kvy: 0,
     eaten: 0,
+    decoy: false,
+    despawnAt: 0,
     ph: 0,
     anim: undefined,
     ...init,

@@ -23,7 +23,7 @@ export const GHOST: EnemyDef = {
   locomotion: { kind: 'chase' },
   emoji: '👻',
   name: '幽灵',
-  desc: '飘得很快的追击者，血薄',
+  desc: '飘得很快的追击者，血薄，死亡时治疗周围同伴',
   size: 1.2,
   radius: 0.45,
   hp: 25,
@@ -31,6 +31,8 @@ export const GHOST: EnemyDef = {
   damage: 5,
   xp: 2,
   coins: 2,
+  // 亡语：临终把生气渡给周围受伤的同伴（先集火它反而奶了一片）
+  onDeath: [{ kind: 'deathHeal', range: 3, amount: 12, all: true }],
 }
 
 /** 游荡射手：不索敌，慢速乱逛，周期性朝自己移动方向放一发慢弹（弹幕污染走位空间） */
@@ -39,7 +41,7 @@ export const INVADER: EnemyDef = {
   locomotion: { kind: 'wander' },
   emoji: '👾',
   name: '外星怪',
-  desc: '不追人，游荡途中朝前方吐慢速弹',
+  desc: '不追人，游荡途中朝前方吐慢速弹，死亡放一记冷枪',
   size: 1.25,
   radius: 0.48,
   hp: 40,
@@ -58,6 +60,10 @@ export const INVADER: EnemyDef = {
       projectile: { emoji: '🔴', size: 0.4, radius: 0.14, speed: 3, rotationOffsetDeg: 0 },
     },
   ],
+  // 亡语：朝断气那一刻最近队员的方向补一发慢速冷枪（击杀后仍要走位）
+  onDeath: [
+    { kind: 'deathBullet', projectile: { emoji: '🛸', size: 0.6, radius: 0.2, speed: 1.5, damage: 8, lifeMs: 6000 } },
+  ],
 }
 
 /** 突刺怪：探测圈内锁定蓄力方向 → 短延迟 → 直线冲刺一段距离（横向位移可躲） */
@@ -65,7 +71,7 @@ export const BOAR: EnemyDef = {
   kind: 'boar',
   emoji: '🐗',
   name: '野猪',
-  desc: '发现猎物后蓄力直线突刺，横向可躲',
+  desc: '发现猎物后蓄力直线突刺，横向可躲，死亡留半透明尸壳诱骗火力',
   size: 1.4,
   radius: 0.52,
   hp: 80,
@@ -84,6 +90,8 @@ export const BOAR: EnemyDef = {
     aim: 'nearest',
     lockAt: 'windup',
   },
+  // 亡语：原地化作半透明尸壳，无伤害无行为但能吸引火力，3 秒后消散
+  onDeath: [{ kind: 'decoy', hp: 40, durationMs: 3000, alpha: 0.5 }],
 }
 
 /** 逃跑射手：见人就拉开距离，周期性朝人吐慢速毒弹（制造追不追的抉择） */

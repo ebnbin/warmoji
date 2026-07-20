@@ -1151,6 +1151,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (this.over || !enemy.active) return
     const a = enemyOf(enemy)
     if (a.dormant) return
+    // 亡语替身：无害尸壳，接触不造成伤害（荆棘也不触发）
+    if (a.decoy) return
     // 变形中的敌人无害：接触不造成伤害（荆棘也不触发）
     if (a.morphUntil > this.elapsedMs) return
     if (!m.alive || this.elapsedMs - m.lastHitMs < m.iframesMs) return
@@ -1393,6 +1395,17 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     enemy.destroy()
   }
 
+  /** 静默移除：替身尸壳到时消失——不计击杀、不掉落、不跑死亡效果，只留一缕烟 */
+  private despawnEnemy(enemy: ImageObj): void {
+    const a = enemyOf(enemy)
+    enemy.setActive(false)
+    ;(enemy.body as ArcadeBody).enable = false
+    if (a.abilities) for (const w of a.abilities) w.destroy()
+    this.puffBurst.explode(8, enemy.x, enemy.y)
+    this.tweens.killTweensOf(enemy)
+    enemy.destroy()
+  }
+
   /** 敌人纹理的四象限碎片：frame 每种纹理只注册一次；碎片来自共享对象池 */
   private floatDamage(x: number, y: number, amount: number, crit = false): void {
     if (!this.settings.damageNumbers) return
@@ -1496,7 +1509,15 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
   }
 
-  materializeEnemy(def: EnemyDef, x: number, y: number, hp: number, elite = false, boss = false): void {
+  materializeEnemy(
+    def: EnemyDef,
+    x: number,
+    y: number,
+    hp: number,
+    elite = false,
+    boss = false,
+    alpha = 1,
+  ): Enemy {
     // 落点经世界钩子兜底（有界钳制/河流钳跨向/虚空回绕；分裂溅出等边缘情况）
     const pos = this.constrainEnemyPos({ x, y }, def.radius)
     const enemy = emojiImage(
@@ -1550,10 +1571,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.tweens.add({
       targets: enemy,
       scale: targetScale,
-      alpha: 1,
+      alpha,
       duration: boss ? 320 : 130,
       ease: boss ? 'Back.easeOut' : 'Linear',
     })
+    return a
   }
 
   // ── 仙子魔尘：变形/缴械 ─────────────────────────────────────
@@ -1646,6 +1668,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       if (!e.active) continue
       const a = enemyOf(e)
       if (a.dormant) continue
+      // 亡语替身：到时静默消失（不走死亡结算/掉落，只留一缕烟）
+      if (a.despawnAt !== 0 && now >= a.despawnAt) {
+        this.despawnEnemy(e)
+        continue
+      }
       const def = a.def
       const body = e.body as ArcadeBody
       // 部件动画翻帧（先于任何 continue 分支：跳舞/变形期间照常呼吸）
