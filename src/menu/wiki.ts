@@ -55,6 +55,9 @@ export function enemyStatLines(e: EnemyDef): string[] {
     if (fx.kind === 'ground') lines.push(`死亡留毒 ${grid(fx.def.radius)} · 每 ${fx.def.tickMs / 1000} 秒 ${fx.def.damage} 伤`)
     if (fx.kind === 'split') lines.push(`死亡分裂 ${fx.count} 只${fx.into.name}`)
   }
+  if (e.contactSlow) {
+    lines.push(`接触附黏：命中队员攻击冷却 ×${e.contactSlow.mul}，持续 ${e.contactSlow.durationMs / 1000} 秒`)
+  }
   return lines
 }
 

@@ -35,6 +35,9 @@ export interface Member {
   lastHitMs: number
   /** 地面效果跳伤的按受害者节流时计（独立于接触伤害的无敌帧） */
   lastGroundHitMs: number
+  /** 黏滞减速：限时攻速惩罚（能力 cooldownMul 叠乘 >1 = 更慢），到时自动恢复（0 = 无） */
+  atkSlowUntil: number
+  atkSlowMul: number
   hpBar: Phaser.GameObjects.Graphics
   shownHpRatio: number
   deadText: Phaser.GameObjects.Text

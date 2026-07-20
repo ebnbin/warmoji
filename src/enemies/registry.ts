@@ -81,6 +81,7 @@ export interface EnemyDef {
     | 'boar'
     | 'snake'
     | 'rat'
+    | 'slime'
     | 'boss'
   readonly emoji: string
   readonly name: string
@@ -98,6 +99,8 @@ export interface EnemyDef {
    * 敌人的远程攻击全部经能力表达（原 periodicShot/ringBarrage 积木已并入） */
   readonly abilities?: readonly AbilityDef[]
   readonly onDeath?: readonly DeathEffect[]
+  /** 接触附带效果：蹭到队员时除伤害外，再挂一层限时攻速惩罚（黏黏怪） */
+  readonly contactSlow?: { readonly mul: number; readonly durationMs: number }
   readonly kbImmune?: boolean
 }
 

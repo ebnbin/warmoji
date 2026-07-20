@@ -175,6 +175,23 @@ export const RAT: EnemyDef = {
   coins: 2,
 }
 
+/** 黏黏怪：缓慢肉盾，蹭到队员会糊一层黏液——该队员攻击冷却大增数秒（别让它贴脸磨输出） */
+export const SLIME: EnemyDef = {
+  kind: 'slime',
+  locomotion: { kind: 'chase' },
+  emoji: '🐌',
+  name: '黏黏怪',
+  desc: '缓慢肉盾，蹭到的队员会被黏住，攻速大降数秒',
+  size: 1.3,
+  radius: 0.5,
+  hp: 55,
+  speed: 1.1,
+  damage: 5,
+  xp: 4,
+  coins: 3,
+  contactSlow: { mul: 1.6, durationMs: 3000 },
+}
+
 export const BLOBLING: EnemyDef = {
   kind: 'blobling',
   locomotion: { kind: 'chase' },
@@ -215,6 +232,7 @@ export const ENEMY_DEFS: readonly EnemyDef[] = [
   SNAKE,
   MUSHROOM,
   RAT,
+  SLIME,
   BLOB,
   BLOBLING,
 ]
@@ -230,6 +248,7 @@ export const ENEMY_MIX = [
   { kind: 'mushroom', sinceWave: 4, base: 7, perWave: 0.4, min: 0, max: 14 },
   { kind: 'rat', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
   { kind: 'blob', sinceWave: 5, base: 7, perWave: 0.4, min: 0, max: 14 },
+  { kind: 'slime', sinceWave: 6, base: 6, perWave: 0.3, min: 0, max: 12 },
 ] as const
 
 export const BOSS: EnemyDef = {

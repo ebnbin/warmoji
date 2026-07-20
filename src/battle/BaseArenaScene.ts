@@ -873,7 +873,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const memberCtx: AbilityContext = {
       ...this.abilityCtx,
       damageMul: () => this.stats.damageMul * fx.damageMul * this.teamFx.teamDamageMul,
-      cooldownMul: () => this.stats.cooldownMul * fx.cooldownMul,
+      // 黏滞减速：被黏黏怪蹭到的队员攻速惩罚（叠乘进冷却，到时自动失效）
+      cooldownMul: () => {
+        const mm = this.members[slot]
+        const atk = mm && mm.atkSlowUntil > this.elapsedMs ? mm.atkSlowMul : 1
+        return this.stats.cooldownMul * fx.cooldownMul * atk
+      },
       // 伤害/子弹带上来源槽位：结算页按角色统计输出与击杀。
       // 暴击/击退倍率在这里收口：所有能力伤害路径统一生效，无需逐能力改造
       damageTarget: (e, d, kb, sx, sy) => {
@@ -938,6 +943,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       reviveAt: 0,
       lastHitMs: -Infinity,
       lastGroundHitMs: -Infinity,
+      atkSlowUntil: 0,
+      atkSlowMul: 1,
       hpBar: this.add.graphics().setDepth(11),
       shownHpRatio: -1,
       deadText: this.add
@@ -1101,6 +1108,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         if (m.regenPerSec > 0 && m.hp < m.maxHp) {
           m.hp = Math.min(m.maxHp, m.hp + (m.regenPerSec * delta) / 1000)
         }
+        // 黏滞减速：生效期间附着黏液色，到时清除（0 哨兵确保只清一次）
+        if (m.atkSlowUntil > this.elapsedMs) {
+          m.image.setTint(0x9ccc65)
+        } else if (m.atkSlowUntil !== 0) {
+          m.atkSlowUntil = 0
+          m.image.clearTint()
+        }
         this.animateMember(m, moving, delta)
         this.drawMemberHp(m)
         for (const w of m.abilities) w.update(delta, m.handle)
@@ -1158,6 +1172,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (!m.alive || this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
     this.hurtMember(m, Math.round(a.def.damage * a.dmgMul), 0xff7777, a.def.name)
+    // 黏黏怪：蹭到即给该队员挂限时攻速惩罚（接触触发的第 2 个效果占用者，除伤害外）
+    const cs = a.def.contactSlow
+    if (cs) {
+      m.atkSlowUntil = this.elapsedMs + cs.durationMs
+      m.atkSlowMul = cs.mul
+    }
     // 荆棘背心：接触反伤（与受击同帧、同吃无敌帧节流；击杀归属穿刺者）
     if (m.thorns > 0 && enemy.active) {
       this.applyDamage(enemy, m.thorns, 0, undefined, undefined, m.slot)

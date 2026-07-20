@@ -266,3 +266,32 @@ test('持械敌人：敌方 ctx 驱动能力朝队员开火，敌弹入组并命
   )
   expect(errors).toEqual([])
 })
+
+test('黏黏怪：接触给队员挂限时攻速惩罚（接触触发的第二个效果占用者）', async ({ page }) => {
+  test.setTimeout(120_000)
+  const errors: string[] = []
+  page.on('pageerror', (err) => errors.push(String(err)))
+  await page.goto('/')
+  await startRun(page)
+  await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 1)
+  // 队伍中心近旁围一圈黏黏怪：贴脸蹭到某队员（多只保证在被清掉前先触发）→ atkSlowUntil 被置将来时刻
+  await page.evaluate(() => {
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2
+      window.__spawnEnemy!('slime', Math.cos(a) * 0.9, Math.sin(a) * 0.9)
+    }
+  })
+  await page.waitForFunction(
+    () => {
+      try {
+        const game = window.__game as { scene: { keys: Record<string, { members: { atkSlowUntil: number }[] }> } }
+        return game.scene.keys['arena']!.members.some((m) => m.atkSlowUntil > 0)
+      } catch {
+        return false
+      }
+    },
+    undefined,
+    { timeout: 60_000 },
+  )
+  expect(errors).toEqual([])
+})
