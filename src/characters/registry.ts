@@ -2,6 +2,7 @@ import charactersJson from '../assets/characters.json'
 import { ABILITIES } from '../abilities/registry'
 import type { AbilityId } from '../abilities/registry'
 import type { AbilityDef } from '../abilities/defs'
+import type { AbilityTier, WeaponId } from '../weapons/registry'
 
 // 角色花名册：角色 → 能力为单向绑定（角色配装固定；能力可被复用）。
 // 两阶专属升级随角色归行：卡文案 + 解锁后的生效配装都是角色自己的属性，
@@ -28,7 +29,26 @@ interface CharacterOf<A> {
   readonly orbit: number
 }
 
-/** 创作层书写形态：能力以 id 引用（defs/characters.ts satisfies 此形，gen 校验引用存在） */
+/** 徒手能力（角色自带、无实体武器）：与武器并列的另一种攻击来源，自带升级路径 */
+export interface InnateSource {
+  readonly name: string
+  readonly icon: string
+  readonly base: AbilityId
+  readonly upgrades: readonly AbilityTier[]
+}
+
+/** 角色创作层形态：一个角色可同时承载「持有的武器」与「自带的徒手能力」两类攻击来源。
+ * gen 把两类载体展平回运行时的 abilities/upgrades（见 defs/characters.ts flatten）。 */
+export interface CharacterAuthoring {
+  readonly emoji: string
+  readonly name: string
+  readonly desc: string
+  readonly orbit: number
+  readonly weapons: readonly WeaponId[]
+  readonly innate: readonly InnateSource[]
+}
+
+/** 运行时磁盘形态（characters.json）：能力以 id 引用（gen 由载体展平生成） */
 export type CharacterSource = CharacterOf<AbilityId>
 /** 运行时形态：能力 id 已解析为 def */
 export type CharacterUpgrade = UpgradeOf<AbilityDef>

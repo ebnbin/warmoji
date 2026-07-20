@@ -1,13 +1,13 @@
-import { CHARACTERS } from './characters.ts'
+import { CHARACTERS, characterCard } from './characters.ts'
 import type { CharacterId } from '../src/characters/registry'
 import type { ItemDef } from '../src/items/registry'
 
-// 创作层（不进运行时 bundle）：道具数据行；升级卡文案在生成时从角色行
-// 取值内联（运行时不再反向读 CHARACTERS）。生成 src/gen/items.json。
+// 创作层（不进运行时 bundle）：道具数据行；升级卡文案在生成时从角色载体的
+// 档位派生（多载体同档去重）。生成 src/assets/items.json。
 
-/** 角色专属升级卡条目（文案/图标取自角色行的两阶能力定义） */
+/** 角色专属升级卡条目（文案/图标取自角色该档升级卡） */
 function upgradeCard(cid: CharacterId, index: 0 | 1, price: number): ItemDef {
-  const a = CHARACTERS[cid].upgrades[index]
+  const a = characterCard(CHARACTERS[cid], index)
   return {
     emoji: a.icon,
     name: a.name,

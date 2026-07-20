@@ -1,161 +1,274 @@
-import type { CharacterSource } from '../src/characters/registry'
+import { WEAPONS } from './weapons.ts'
+import type { WeaponSource } from '../src/weapons/registry'
+import type { CharacterAuthoring, InnateSource } from '../src/characters/registry'
 
-// 创作层（不进运行时 bundle）：角色数据行。生成 src/assets/characters.json。
-// 能力（基础配装与各档位升级）以 id 引用能力表；gen 校验引用存在，运行时解析成 def。
+// 创作层（不进运行时 bundle）：角色数据行。一个角色由两类攻击来源组成——
+// 「持有的武器」（weapons，引用 defs/weapons.ts 的实体武器）与「自带的徒手
+// 能力」（innate，无实体武器，直接引用能力）。二者都自带升级路径。
+// gen 把两类载体展平回旧的 abilities/upgrades 形态生成 characters.json，
+// 运行时（本阶段）契约不变；升级卡文案由各载体的档位派生（多载体去重）。
 
 export const CHARACTERS = {
   juggler: {
     emoji: '🤹',
     name: '杂耍演员',
     desc: '向最近的敌人连续抛掷番茄',
-    abilities: ['tomatoThrow'],
-    upgrades: [
-      { icon: '🍅', name: '三重抛掷', desc: '每次投掷同时抛出 3 枚番茄，扇形散开', abilities: ['tomatoThrow2'] },
-      { icon: '💥', name: '爆浆番茄', desc: '番茄命中后爆裂，对周围敌人造成 60% 溅射伤害', abilities: ['tomatoThrow3'] },
-    ],
     orbit: -0.5,
+    weapons: [],
+    innate: [
+      {
+        name: '番茄连投',
+        icon: '🍅',
+        base: 'tomatoThrow',
+        upgrades: [
+          { ability: 'tomatoThrow2', card: { icon: '🍅', name: '三重抛掷', desc: '每次投掷同时抛出 3 枚番茄，扇形散开' } },
+          { ability: 'tomatoThrow3', card: { icon: '💥', name: '爆浆番茄', desc: '番茄命中后爆裂，对周围敌人造成 60% 溅射伤害' } },
+        ],
+      },
+    ],
   },
   unicorn: {
     emoji: '🦄',
     name: '独角兽',
     desc: '独角向前突刺，穿透沿途敌人',
-    abilities: ['hornThrust'],
-    upgrades: [
-      { icon: '⚡', name: '二连突刺', desc: '每次出手连刺两段，第二段重新索敌', abilities: ['hornThrust2'] },
-      { icon: '🌈', name: '虹光震波', desc: '突刺终点爆发冲击波：60% 范围伤害并强力击退', abilities: ['hornThrust3'] },
-    ],
     orbit: 0.8,
+    weapons: [],
+    innate: [
+      {
+        name: '独角突刺',
+        icon: '⚔️',
+        base: 'hornThrust',
+        upgrades: [
+          { ability: 'hornThrust2', card: { icon: '⚡', name: '二连突刺', desc: '每次出手连刺两段，第二段重新索敌' } },
+          { ability: 'hornThrust3', card: { icon: '🌈', name: '虹光震波', desc: '突刺终点爆发冲击波：60% 范围伤害并强力击退' } },
+        ],
+      },
+    ],
   },
   troll: {
     emoji: '🧌',
     name: '巨魔',
     desc: '挥舞巨斧，横扫身前扇形范围',
-    abilities: ['axeSweep'],
-    upgrades: [
-      { icon: '🌀', name: '全周横扫', desc: '巨斧扫过整整一圈，攻击四面八方的敌人', abilities: ['axeSweep2'] },
-      { icon: '🥶', name: '震慑余波', desc: '被横扫命中的敌人减速 45%，持续 1.2 秒', abilities: ['axeSweep3'] },
-    ],
     orbit: 1,
+    weapons: ['axe'],
+    innate: [],
   },
   cowboy: {
     emoji: '🤠',
     name: '牛仔',
     desc: '左右双枪齐发，射出高速水弹',
-    abilities: ['pistolLeft', 'pistolRight'],
-    upgrades: [
-      { icon: '🎯', name: '贯穿弹', desc: '水弹贯穿敌人，沿途最多命中 3 名', abilities: ['pistolLeft2', 'pistolRight2'] },
-      { icon: '🔫', name: '左轮风暴', desc: '每把枪每第 4 次射击变为 5 发扇形弹幕', abilities: ['pistolLeft3', 'pistolRight3'] },
-    ],
     orbit: -0.7,
+    weapons: ['pistolLeft', 'pistolRight'],
+    innate: [],
   },
   mage: {
     emoji: '🧙',
     name: '法师',
     desc: '在远处敌人脚下引爆奥术轰炸',
-    abilities: ['arcaneBlast'],
-    upgrades: [
-      { icon: '🔥', name: '余烬秘火', desc: '轰炸在爆心留下灼烧地面，3 秒内持续烧伤敌人', abilities: ['arcaneBlast2'] },
-      { icon: '✨', name: '连锁轰炸', desc: '轰炸后 0.25 秒向随机敌人追加一次 75% 伤害的轰炸', abilities: ['arcaneBlast3'] },
-    ],
     orbit: -1,
+    weapons: [],
+    innate: [
+      {
+        name: '奥术轰炸',
+        icon: '💥',
+        base: 'arcaneBlast',
+        upgrades: [
+          { ability: 'arcaneBlast2', card: { icon: '🔥', name: '余烬秘火', desc: '轰炸在爆心留下灼烧地面，3 秒内持续烧伤敌人' } },
+          { ability: 'arcaneBlast3', card: { icon: '✨', name: '连锁轰炸', desc: '轰炸后 0.25 秒向随机敌人追加一次 75% 伤害的轰炸' } },
+        ],
+      },
+    ],
   },
   kangaroo: {
     emoji: '🦘',
     name: '袋鼠',
     desc: '掷出回旋镖，去程回程皆可伤敌',
-    abilities: ['boomerang'],
-    upgrades: [
-      { icon: '🪃', name: '双子回旋', desc: '同时向相反方向掷出第二枚回旋镖', abilities: ['boomerang2'] },
-      { icon: '🧲', name: '磁力巨镖', desc: '回旋镖增大 40%，并沿途吸取金币', abilities: ['boomerang3'] },
-    ],
     orbit: 0.4,
+    weapons: ['boomerang'],
+    innate: [],
   },
   robot: {
     emoji: '🤖',
     name: '机器人',
     desc: '手持激光器，灼穿一条直线上的所有敌人',
-    abilities: ['laserBeam'],
-    upgrades: [
-      { icon: '🔭', name: '双联光束', desc: '开火时向正后方同步射出第二道光束', abilities: ['laserBeam2'] },
-      { icon: '📡', name: '全域扫射', desc: '光束改为绕自身一周的 8 向扫射，每束 60% 伤害', abilities: ['laserBeam3'] },
-    ],
     orbit: -0.6,
+    weapons: ['laserBeam'],
+    innate: [],
   },
   snowman: {
     emoji: '⛄',
     name: '雪人',
     desc: '以队伍中心散发寒气，持续减速范围内的敌人',
-    abilities: ['frostAura'],
-    upgrades: [
-      { icon: '🩹', name: '冻伤', desc: '寒气光环每秒对范围内敌人造成 6 点伤害', abilities: ['frostAura2'] },
-      { icon: '🌨️', name: '凛冬降临', desc: '每 5 秒光环脉冲一次，冻结范围内敌人 0.7 秒', abilities: ['frostAura3'] },
-    ],
     orbit: 0,
+    weapons: [],
+    innate: [
+      {
+        name: '寒气光环',
+        icon: '❄️',
+        base: 'frostAura',
+        upgrades: [
+          { ability: 'frostAura2', card: { icon: '🩹', name: '冻伤', desc: '寒气光环每秒对范围内敌人造成 6 点伤害' } },
+          { ability: 'frostAura3', card: { icon: '🌨️', name: '凛冬降临', desc: '每 5 秒光环脉冲一次，冻结范围内敌人 0.7 秒' } },
+        ],
+      },
+    ],
   },
   fairy: {
     emoji: '🧚',
     name: '仙子',
     desc: '魔尘弹把敌人变形成无害的绵羊，变形期间不能伤人',
-    abilities: ['sparkleBolt'],
-    upgrades: [
-      { icon: '🐑', name: '持久变形', desc: '变形时长延长到 4 秒，魔尘弹可贯穿 1 名敌人', abilities: ['sparkleBolt2'] },
-      { icon: '💔', name: '脆弱诅咒', desc: '被变形的敌人受到的所有伤害提高 40%', abilities: ['sparkleBolt3'] },
-    ],
     orbit: -0.6,
+    weapons: [],
+    innate: [
+      {
+        name: '魔尘弹',
+        icon: '🪄',
+        base: 'sparkleBolt',
+        upgrades: [
+          { ability: 'sparkleBolt2', card: { icon: '🐑', name: '持久变形', desc: '变形时长延长到 4 秒，魔尘弹可贯穿 1 名敌人' } },
+          { ability: 'sparkleBolt3', card: { icon: '💔', name: '脆弱诅咒', desc: '被变形的敌人受到的所有伤害提高 40%' } },
+        ],
+      },
+    ],
   },
   assassin: {
     emoji: '🥷',
     name: '刺客',
     desc: '瞬移到范围内血最厚的敌人背后重斩一刀，再闪回原位；出手瞬间无敌',
-    abilities: ['shadowStrike'],
-    upgrades: [
-      { icon: '🌀', name: '连环刃', desc: '斩击同时命中目标周围一圈，波及 60% 伤害', abilities: ['shadowStrike2'] },
-      { icon: '☠️', name: '处决', desc: '目标血量低于 35% 时，斩击伤害翻倍', abilities: ['shadowStrike3'] },
-    ],
     orbit: 0.5,
+    weapons: ['dagger'],
+    innate: [],
   },
   beaver: {
     emoji: '🦫',
     name: '河狸工程师',
     desc: '自己不动手，定期在脚下架起自动开火的弩塔',
-    abilities: ['woodTurret'],
-    upgrades: [
-      { icon: '🏗️', name: '扩建工地', desc: '同时在场的弩塔上限 +1', abilities: ['woodTurret2'] },
-      { icon: '🎯', name: '三连弩', desc: '弩塔每次开火改为 3 发扇形连射', abilities: ['woodTurret3'] },
-    ],
     orbit: -0.3,
+    weapons: [],
+    innate: [
+      {
+        name: '林木弩塔',
+        icon: '🏹',
+        base: 'woodTurret',
+        upgrades: [
+          { ability: 'woodTurret2', card: { icon: '🏗️', name: '扩建工地', desc: '同时在场的弩塔上限 +1' } },
+          { ability: 'woodTurret3', card: { icon: '🎯', name: '三连弩', desc: '弩塔每次开火改为 3 发扇形连射' } },
+        ],
+      },
+    ],
   },
   queenBee: {
     emoji: '🐝',
     name: '蜂后',
     desc: '统领一小群蜜蜂，蜂群自主追击撞刺敌人',
-    abilities: ['beeSwarm'],
-    upgrades: [
-      { icon: '🐝', name: '扩巢', desc: '蜂群 +1 只', abilities: ['beeSwarm2'] },
-      { icon: '🦠', name: '麻痹毒素', desc: '被蜇中的敌人减速 45%，持续 1.2 秒', abilities: ['beeSwarm3'] },
-    ],
     orbit: -0.2,
+    weapons: [],
+    innate: [
+      {
+        name: '蜂群',
+        icon: '🐝',
+        base: 'beeSwarm',
+        upgrades: [
+          { ability: 'beeSwarm2', card: { icon: '🐝', name: '扩巢', desc: '蜂群 +1 只' } },
+          { ability: 'beeSwarm3', card: { icon: '🦠', name: '麻痹毒素', desc: '被蜇中的敌人减速 45%，持续 1.2 秒' } },
+        ],
+      },
+    ],
   },
   medic: {
     emoji: '🧑‍⚕️',
     name: '军医',
     desc: '周期治疗附近血量最低的队友，顺手甩两支飞针',
-    abilities: ['fieldMedkit', 'syringeDart'],
-    upgrades: [
-      { icon: '🥼', name: '群体处方', desc: '治疗改为范围内全体队友回复 60% 治疗量', abilities: ['fieldMedkit2', 'syringeDart'] },
-      { icon: '⚡', name: '电击起搏', desc: '范围内有阵亡队友时，优先为其减少 2 秒复活倒计时', abilities: ['fieldMedkit3', 'syringeDart'] },
-    ],
     orbit: -0.8,
+    weapons: [],
+    innate: [
+      {
+        name: '战地医疗',
+        icon: '💊',
+        base: 'fieldMedkit',
+        upgrades: [
+          { ability: 'fieldMedkit2', card: { icon: '🥼', name: '群体处方', desc: '治疗改为范围内全体队友回复 60% 治疗量' } },
+          { ability: 'fieldMedkit3', card: { icon: '⚡', name: '电击起搏', desc: '范围内有阵亡队友时，优先为其减少 2 秒复活倒计时' } },
+        ],
+      },
+      { name: '飞针', icon: '💉', base: 'syringeDart', upgrades: [] },
+    ],
   },
   jellyfish: {
     emoji: '🪼',
     name: '水母',
     desc: '电弧在敌群间弹跳传导，敌人越密越疼',
-    abilities: ['voltArc'],
-    upgrades: [
-      { icon: '🔗', name: '超导传递', desc: '电弧额外弹跳数提升到 4 跳', abilities: ['voltArc2'] },
-      { icon: '💥', name: '过载爆裂', desc: '最后一跳落点爆出小范围电击，波及 60% 伤害', abilities: ['voltArc3'] },
-    ],
     orbit: 0.2,
+    weapons: [],
+    innate: [
+      {
+        name: '感电触须',
+        icon: '⚡',
+        base: 'voltArc',
+        upgrades: [
+          { ability: 'voltArc2', card: { icon: '🔗', name: '超导传递', desc: '电弧额外弹跳数提升到 4 跳' } },
+          { ability: 'voltArc3', card: { icon: '💥', name: '过载爆裂', desc: '最后一跳落点爆出小范围电击，波及 60% 伤害' } },
+        ],
+      },
+    ],
   },
-} as const satisfies Record<string, CharacterSource>
+} as const satisfies Record<string, CharacterAuthoring>
+
+// ── 载体展平：把 weapons + innate 两类载体按档位展平回旧的 abilities/upgrades ──
+
+const WEAPON_MAP = WEAPONS as Record<string, WeaponSource>
+
+/** 一个载体（武器或徒手能力）的档位视图：base + 各升级档 */
+interface Carrier {
+  readonly base: string
+  readonly upgrades: InnateSource['upgrades']
+}
+
+function carriersOf(c: CharacterAuthoring): Carrier[] {
+  return [
+    ...c.weapons.map((wid) => {
+      const w = WEAPON_MAP[wid]!
+      return { base: w.base, upgrades: w.upgrades }
+    }),
+    ...c.innate.map((i) => ({ base: i.base, upgrades: i.upgrades })),
+  ]
+}
+
+/** 载体在指定档位（1/2）的行为：无该档则停留 base（如军医飞针无升级） */
+function tierAbility(cr: Carrier, tier: number): string {
+  return cr.upgrades[tier - 1]?.ability ?? cr.base
+}
+
+/** 角色在指定档位的升级卡（多载体同档取首个有升级的载体；gen 校验同档卡一致） */
+export function characterCard(c: CharacterAuthoring, index: 0 | 1): { icon: string; name: string; desc: string } {
+  for (const cr of carriersOf(c)) {
+    const u = cr.upgrades[index]
+    if (u) return u.card
+  }
+  throw new Error('角色缺升级档')
+}
+
+/** 载体形态 → 旧运行时形态（abilities + 两档 upgrades），保持 characters.json 契约不变 */
+export function flattenCharacter(c: CharacterAuthoring): unknown {
+  const carriers = carriersOf(c)
+  return {
+    emoji: c.emoji,
+    name: c.name,
+    desc: c.desc,
+    abilities: carriers.map((cr) => cr.base),
+    upgrades: ([0, 1] as const).map((k) => {
+      const card = characterCard(c, k)
+      return {
+        icon: card.icon,
+        name: card.name,
+        desc: card.desc,
+        abilities: carriers.map((cr) => tierAbility(cr, k + 1)),
+      }
+    }),
+    orbit: c.orbit,
+  }
+}
+
+export function flattenCharacters(): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(CHARACTERS).map(([id, c]) => [id, flattenCharacter(c)]))
+}

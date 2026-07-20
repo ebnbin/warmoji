@@ -1,13 +1,13 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { ABILITIES } from '../defs/abilities.ts'
-import { CHARACTERS } from '../defs/characters.ts'
+import { CHARACTERS, flattenCharacters } from '../defs/characters.ts'
+import { WEAPONS } from '../defs/weapons.ts'
 import { CAPTAINS } from '../defs/captains.ts'
 import { ENEMIES, BOSS, ENEMY_MIX } from '../defs/enemies.ts'
 import { ITEMS } from '../defs/items.ts'
 import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import type { ItemDef } from '../src/items/registry'
-import type { CharacterSource } from '../src/characters/registry'
 
 // 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json。
 // 校验全部在此完成（形状/数值/交叉引用/可序列化），运行时零校验直读。
@@ -99,19 +99,58 @@ for (const [id, a] of Object.entries(ABILITIES)) {
   pure(`abilities.${id}`, a)
 }
 
-// ── characters + captains ──
-for (const [id, c] of Object.entries<CharacterSource>(CHARACTERS as Record<string, CharacterSource>)) {
+// ── weapons（实体载体：base + 各升级档，能力以 id 引用）──
+function checkTier(path: string, t: { ability: unknown; card: { icon: unknown; name: unknown; desc: unknown } }): void {
+  checkRef(`${path}.ability`, t.ability)
+  str(`${path}.card.icon`, t.card.icon)
+  str(`${path}.card.name`, t.card.name)
+  str(`${path}.card.desc`, t.card.desc)
+}
+for (const [id, w] of Object.entries(WEAPONS)) {
+  const p = `weapons.${id}`
+  str(`${p}.name`, w.name)
+  str(`${p}.emoji`, w.emoji)
+  checkRef(`${p}.base`, w.base)
+  for (const [ti, t] of w.upgrades.entries()) checkTier(`${p}.upgrades[${ti}]`, t)
+  pure(p, w)
+}
+
+// ── characters（载体形态；gen 展平回 abilities/upgrades 写 characters.json）+ captains ──
+const weaponReg = WEAPONS as Record<string, { upgrades: readonly { card: { name: string } }[] }>
+function cardsAtTier(c: { weapons: readonly string[]; innate: readonly { upgrades: readonly { card: { name: string } }[] }[] }, k: number): { name: string }[] {
+  const cards: { name: string }[] = []
+  for (const wid of c.weapons) {
+    const u = weaponReg[wid]?.upgrades[k]
+    if (u) cards.push(u.card)
+  }
+  for (const inn of c.innate) {
+    const u = inn.upgrades[k]
+    if (u) cards.push(u.card)
+  }
+  return cards
+}
+for (const [id, c] of Object.entries(CHARACTERS)) {
   const p = `characters.${id}`
   str(`${p}.emoji`, c.emoji)
   str(`${p}.name`, c.name)
-  if (c.abilities.length === 0) bad(p, '基础配装为空')
-  if (c.upgrades.length !== 2) bad(p, '升级档位必须恰为 2')
-  for (const [ti, u] of c.upgrades.entries()) {
-    str(`${p}.upgrades[${ti}].name`, u.name)
-    if (u.abilities.length !== c.abilities.length) bad(`${p}.upgrades[${ti}]`, '换持不得增减能力数量')
-    for (const [ai, a] of u.abilities.entries()) checkRef(`${p}.upgrades[${ti}].abilities[${ai}]`, a)
+  str(`${p}.desc`, c.desc)
+  if (c.weapons.length + c.innate.length === 0) bad(p, '无任何攻击来源（weapons/innate 皆空）')
+  for (const [wi, wid] of c.weapons.entries()) {
+    if (!(wid in WEAPONS)) bad(`${p}.weapons[${wi}]`, `引用了不存在的武器：${String(wid)}`)
   }
-  for (const [ai, a] of c.abilities.entries()) checkRef(`${p}.abilities[${ai}]`, a)
+  for (const [ii, inn] of c.innate.entries()) {
+    const ip = `${p}.innate[${ii}]`
+    str(`${ip}.name`, inn.name)
+    str(`${ip}.icon`, inn.icon)
+    checkRef(`${ip}.base`, inn.base)
+    for (const [ti, t] of inn.upgrades.entries()) checkTier(`${ip}.upgrades[${ti}]`, t)
+  }
+  // 每档必须可达（至少一个载体在该档有升级）且多载体同档卡文案一致（展平去重要求）
+  for (const k of [0, 1]) {
+    const cards = cardsAtTier(c, k)
+    if (cards.length === 0) bad(p, `缺第 ${k + 1} 档升级卡`)
+    else if (new Set(cards.map((cd) => cd.name)).size > 1) bad(p, `第 ${k + 1} 档多载体升级卡文案不一致`)
+  }
   pure(p, c)
 }
 for (const [id, c] of Object.entries(CAPTAINS)) {
@@ -194,10 +233,11 @@ mkdirSync('src/assets', { recursive: true })
 const write = (name: string, data: unknown): void =>
   writeFileSync(`src/assets/${name}.json`, JSON.stringify(data, null, 1) + '\n')
 write('abilities', ABILITIES)
-write('characters', CHARACTERS)
+write('weapons', WEAPONS)
+write('characters', flattenCharacters())
 write('captains', CAPTAINS)
 write('enemies', { enemies: ENEMIES, boss: BOSS, mix: ENEMY_MIX })
 write('items', ITEMS)
 write('maps', MAPS)
 write('pickups', PICKUPS)
-console.log('gen-defs：7 张表校验通过，已生成 src/assets/*.json')
+console.log('gen-defs：8 张表校验通过，已生成 src/assets/*.json')

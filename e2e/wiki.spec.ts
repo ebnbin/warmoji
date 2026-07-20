@@ -26,7 +26,7 @@ test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚
   // 默认类别为角色；「全部」与其余类别平级排在最后
   let w = await page.evaluate(() => window.__warmoji!.wiki!)
   expect(w.category).toBe('角色')
-  expect(w.categories.map((c) => c.title)).toEqual(['角色', '队长', '敌人', '能力', '道具', '全部'])
+  expect(w.categories.map((c) => c.title)).toEqual(['角色', '队长', '敌人', '能力', '武器', '道具', '全部'])
   expect(w.entryCount).toBe(14)
 
   // 切到敌人类别：条目数与聚焦跟随

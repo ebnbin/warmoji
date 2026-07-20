@@ -5,6 +5,7 @@ import { ENEMY_DEFS } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
 import { PICKUPS } from '../pickups/registry'
 import { ABILITIES } from '../abilities/registry'
+import { WEAPONS } from '../weapons/registry'
 import { ITEMS, RARITIES } from '../items/registry'
 import type { ItemDef } from '../items/registry'
 import { captainStatGroups, characterStatGroups, ABILITY_KIND_LABEL, abilityStatLines } from './stats'
@@ -104,6 +105,17 @@ export function wikiGroups(): WikiGroup[] {
         name: w.name,
         desc: `${ABILITY_KIND_LABEL[w.kind]}形态`,
         lines: abilityStatLines(w),
+      })),
+    },
+    {
+      icon: '🗡️',
+      title: '武器',
+      // 武器 = 包装能力的实体载体（有手持视觉，被角色持有）；徒手能力在角色详情里看
+      entries: Object.values(WEAPONS).map((w) => ({
+        emoji: w.emoji,
+        name: w.name,
+        desc: `${ABILITY_KIND_LABEL[w.base.kind]} · 升级：${w.upgrades.map((u) => u.card.name).join(' → ')}`,
+        lines: abilityStatLines(w.base),
       })),
     },
     {
