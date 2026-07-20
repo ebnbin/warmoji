@@ -369,7 +369,9 @@ export const pistolRight3 = {
 /** 余烬秘火 */
 export const arcaneBlast2 = {
   ...BASE.arcaneBlast,
-  burn: { radius: 1.4, durationMs: 3000, tickMs: 400, damage: 3, color: 0xff7043, fillAlpha: 0.18, lineAlpha: 0.55, enterMs: 200 },
+  onHit: [
+    { kind: 'ground', def: { radius: 1.4, durationMs: 3000, tickMs: 400, damage: 3, color: 0xff7043, fillAlpha: 0.18, lineAlpha: 0.55, enterMs: 200 } },
+  ],
 } satisfies AreaBlastDef
 /** 连锁轰炸 */
 export const arcaneBlast3 = {

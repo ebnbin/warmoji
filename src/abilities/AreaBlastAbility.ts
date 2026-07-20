@@ -1,12 +1,12 @@
 import type Phaser from 'phaser'
 import { ACQUIRE } from './registry'
 import type { AreaBlastDef } from './defs'
-import { applyBlast } from './effects'
+import { applyBlast, applyEffects } from './effects'
 import { emojiImage } from '../emoji/textures'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 远程范围轰炸：在侦测范围内以最近敌人为爆心，对爆心圆形区域内所有敌人各一次伤害。
- * 能力：burn 爆心留灼烧地面；echo 延迟向随机敌人追加一次折损轰炸 */
+ * 能力：onHit 爆心施加命中效果（灼烧地面等）；echo 延迟向随机敌人追加一次折损轰炸 */
 export class AreaBlastAbility implements AbilityRuntime {
   private cooldown: number
   private hidden = false
@@ -76,9 +76,7 @@ export class AreaBlastAbility implements AbilityRuntime {
   private blastAt(x: number, y: number, damage: number): void {
     this.ctx.sfx('boom')
     applyBlast(this.ctx, { x, y }, damage, this.def.blastRadius, this.def.knockback)
-    if (this.def.burn) {
-      this.ctx.spawnGroundEffect(x, y, this.def.burn)
-    }
+    applyEffects(this.ctx, this.def.onHit, { center: { x, y }, baseDamage: damage })
     this.blastEffect(x, y)
   }
 

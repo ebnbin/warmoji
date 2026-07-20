@@ -70,6 +70,8 @@ export function applyEffects(
       if (e.ring) blastRing(ctx, hit.center.x, hit.center.y, e.radius, e.ring)
     } else if (e.kind === 'slow') {
       if (hit.targets) for (const ref of hit.targets) ctx.slowTarget(ref, e.factor, e.durationMs)
+    } else if (e.kind === 'ground') {
+      ctx.spawnGroundEffect(hit.center.x, hit.center.y, e.def)
     }
   }
 }

@@ -41,7 +41,7 @@ const ABILITY_KINDS = new Set([
 const CASTABLE_KINDS = new Set(['rally', 'strike', 'dance', 'buff', 'nuke'])
 
 /** onHit 命中效果的合法 kind（与 src/abilities/effects.ts 的 applyEffects 分支同步） */
-const EFFECT_KINDS = new Set(['blast', 'slow'])
+const EFFECT_KINDS = new Set(['blast', 'slow', 'ground'])
 
 /** 命中效果链校验：kind 合法 + 数值字段成形 */
 function checkEffects(path: string, effects: unknown): void {
@@ -63,6 +63,12 @@ function checkEffects(path: string, effects: unknown): void {
     } else if (e.kind === 'slow') {
       num(`${ep}.factor`, e.factor, 0)
       num(`${ep}.durationMs`, e.durationMs, 0)
+    } else if (e.kind === 'ground') {
+      const g = e.def as Record<string, unknown> | undefined
+      num(`${ep}.def.radius`, g?.radius, 0.01)
+      num(`${ep}.def.damage`, g?.damage, 1)
+      num(`${ep}.def.durationMs`, g?.durationMs, 1)
+      num(`${ep}.def.tickMs`, g?.tickMs, 1)
     }
   }
 }

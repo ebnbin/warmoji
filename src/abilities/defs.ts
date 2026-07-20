@@ -49,7 +49,13 @@ export interface SlowEffect {
   readonly durationMs: number
 }
 
-export type Effect = BlastEffect | SlowEffect
+/** 命中锚点处留下持续地面效果区（灼烧/毒等）；任意投送都能挂，阵营由 ctx 注入 */
+export interface GroundZone {
+  readonly kind: 'ground'
+  readonly def: GroundEffectDef
+}
+
+export type Effect = BlastEffect | SlowEffect | GroundZone
 
 export interface ThrustDef {
   readonly kind: 'thrust'
@@ -147,8 +153,8 @@ export interface AreaBlastDef {
   /** 特效环颜色 */
   readonly color: number
   // ── 能力字段 ──
-  /** 灼烧地面：爆心留下持续伤害区域 */
-  readonly burn?: GroundEffectDef
+  /** 命中效果：爆心施加的 onHit 效果（灼烧地面等） */
+  readonly onHit?: readonly Effect[]
   /** 连锁：延迟 delayMs 后向随机敌人追加一次 ratio × 伤害的轰炸 */
   readonly echo?: { readonly delayMs: number; readonly ratio: number }
 }
