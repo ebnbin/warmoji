@@ -11,6 +11,7 @@ import { reportDebug } from '../debug/debug'
 import { emojiImage, emojiKey, ensureEmoji, loadEmojiPack } from '../emoji/textures'
 import { EmojiGrid } from './grid'
 import { FONT, UI_FONT } from '../core/fonts'
+import { TAP_SLOP } from '../core/units'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
 import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { VirtualEmojiGrid } from '../emoji/virtualGrid'
@@ -79,7 +80,16 @@ export class WikiScene extends Phaser.Scene {
   private listScroll = 0
   private gridScroll = 0
   private pool?: DetailPool
+  // 类别行：单排 tab 放进容器，超宽横向滚动。catRects 存的是容器内局部 x
   private catRects: { title: string; x: number; y: number; w: number; h: number }[] = []
+  private catContainer?: Phaser.GameObjects.Container
+  private catScroll = 0
+  private catScrollMax = 0
+  private catRowRect = { x: 0, y: 0, w: 0, h: 0 }
+  private catDragging = false
+  private catDragMoved = false
+  private catDragStartX = 0
+  private catDragStartScroll = 0
   private backRect = { x: 0, y: 0, w: 0, h: 0 }
   private reportAt = 0
 
@@ -105,6 +115,7 @@ export class WikiScene extends Phaser.Scene {
       this.allSelected = null
       this.listScroll = 0
       this.gridScroll = 0
+      this.catScroll = 0
     }
     this.entryGrid = undefined
     this.allGrid = undefined
@@ -161,13 +172,12 @@ export class WikiScene extends Phaser.Scene {
     return (this.entryGrid?.wasDragged ?? false) || (this.allGrid?.wasDragged ?? false)
   }
 
-  // ── 类别横向 tab ────────────────────────────────────────────
+  // ── 类别横向 tab（单排，可横向滚动） ─────────────────────────
 
-  /** 类别横向 tab：角色/队长/敌人/能力/道具 + 「全部」（完整 emoji 网格）平级排在最后；
-   * 横屏单行，竖屏拆两行（720 宽放不下一行） */
+  /** 类别 tab：角色/队长/敌人/能力/道具 + 「全部」平级排最后。单排放进带遮罩的
+   * 容器：放得下就居中，放不下就拖动/滚轮左右滑（同一行，绝不换行） */
   private createCategoryTabs(res: number): void {
     const L = this.layout
-    const w = viewport.logicalWidth
     this.catRects = []
     const ch = 48
     const gap = 10
@@ -176,49 +186,104 @@ export class WikiScene extends Phaser.Scene {
       { icon: '🌐', label: '全部', title: '全部' },
     ]
     const widths = defs.map((d) => 44 + d.label.length * 22 + 20)
-    const half = Math.ceil(defs.length / 2)
-    const rows = this.layout === PORTRAIT ? [defs.slice(0, half), defs.slice(half)] : [defs]
-    rows.forEach((rowDefs, r) => {
-      const offset = r === 0 ? 0 : half
-      const rowWidths = rowDefs.map((_, j) => widths[offset + j]!)
-      const total = rowWidths.reduce((s, x) => s + x, 0) + gap * (rowDefs.length - 1)
-      let x = w / 2 - total / 2
-      const y = this.origin.y + L.catsY - ch / 2 + r * (ch + 10)
-      rowDefs.forEach((d, j) => {
-        const i = offset + j
-        const cw = rowWidths[j]!
-        const on = this.category === i
-        const bg = this.add.graphics()
-        bg.fillStyle(on ? 0xffffff : 0x000000, on ? 0.2 : 0.22)
-        bg.fillRoundedRect(x, y, cw, ch, ch / 2)
-        bg.lineStyle(on ? 2 : 1, 0xffffff, on ? 0.85 : 0.1)
-        bg.strokeRoundedRect(x, y, cw, ch, ch / 2)
-        emojiImage(this, x + 28, y + ch / 2, d.icon, 35)
-        this.add
-          .text(x + 46, y + ch / 2, d.label, {
-            fontFamily: UI_FONT,
-            fontSize: FONT.small,
-            fontStyle: on ? 'bold' : 'normal',
-            color: on ? '#ffffff' : '#b9b9c6',
-            resolution: res,
-          })
-          .setOrigin(0, 0.5)
-        this.add
-          .zone(x, y, cw, ch)
-          .setOrigin(0)
-          .setInteractive({ useHandCursor: true })
-          .on('pointerup', () => {
-            if (this.wasDragged() || this.category === i) return
-            this.category = i
-            this.focusedKey = ''
-            this.listScroll = 0
-            this.preserveOnRestart = true
-            this.scene.restart()
-          })
-        this.catRects.push({ title: d.title, x, y, w: cw, h: ch })
-        x += cw + gap
-      })
+    const total = widths.reduce((s, x) => s + x, 0) + gap * (defs.length - 1)
+
+    // 行可视区 = 内容宽减两侧留白；tab 单排装进容器，超宽横向滚动
+    const margin = this.layout === PORTRAIT ? 24 : 40
+    const rowW = L.content.w - margin * 2
+    const rowX = this.origin.x + margin
+    const rowY = this.origin.y + L.catsY - ch / 2
+    this.catRowRect = { x: rowX, y: rowY, w: rowW, h: ch }
+    this.catScrollMax = Math.max(0, total - rowW)
+    this.catScroll = Math.max(0, Math.min(this.catScrollMax, this.catScroll))
+    // 放得下就居中不滚；放不下则从头左对齐、可滚
+    const startX = this.catScrollMax > 0 ? 0 : (rowW - total) / 2
+
+    const container = (this.catContainer = this.add.container(rowX - this.catScroll, rowY))
+    const mask = this.add.graphics().setVisible(false)
+    mask.fillStyle(0xffffff, 1)
+    mask.fillRect(rowX, rowY, rowW, ch)
+    container.setMask(mask.createGeometryMask())
+
+    let x = startX
+    defs.forEach((d, i) => {
+      const cw = widths[i]!
+      const on = this.category === i
+      const bg = this.add.graphics()
+      bg.fillStyle(on ? 0xffffff : 0x000000, on ? 0.2 : 0.22)
+      bg.fillRoundedRect(x, 0, cw, ch, ch / 2)
+      bg.lineStyle(on ? 2 : 1, 0xffffff, on ? 0.85 : 0.1)
+      bg.strokeRoundedRect(x, 0, cw, ch, ch / 2)
+      const icon = emojiImage(this, x + 28, ch / 2, d.icon, 35)
+      const label = this.add
+        .text(x + 46, ch / 2, d.label, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.small,
+          fontStyle: on ? 'bold' : 'normal',
+          color: on ? '#ffffff' : '#b9b9c6',
+          resolution: res,
+        })
+        .setOrigin(0, 0.5)
+      container.add([bg, icon, label])
+      this.catRects.push({ title: d.title, x, y: 0, w: cw, h: ch })
+      x += cw + gap
     })
+
+    // 单一命中区盖住行可视区：点选按指针 x 反解出 tab，拖动/滚轮横向滚
+    //（几何遮罩只裁绘制不裁输入，所以不给每个 tab 挂 zone，避免滚出屏外仍拦点击）
+    this.add
+      .zone(rowX, rowY, rowW, ch)
+      .setOrigin(0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', (p: Phaser.Input.Pointer) => this.onCatTap(p))
+    this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, dx: number, dy: number) => {
+      if (this.catContains(p)) {
+        this.catScrollTo(this.catScroll + (Math.abs(dx) > Math.abs(dy) ? dx : dy) * 0.6)
+      }
+    })
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      this.catDragMoved = false
+      this.catDragging = this.catContains(p)
+      if (this.catDragging) {
+        this.catDragStartX = p.worldX
+        this.catDragStartScroll = this.catScroll
+      }
+    })
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (!this.catDragging || !p.isDown) return
+      const dx = p.worldX - this.catDragStartX
+      if (this.catScrollMax > 0 && Math.abs(dx) > TAP_SLOP) this.catDragMoved = true
+      if (this.catDragMoved) this.catScrollTo(this.catDragStartScroll - dx)
+    })
+    const release = (): void => {
+      this.catDragging = false
+    }
+    this.input.on('pointerup', release)
+    this.input.on('pointerupoutside', release)
+  }
+
+  private catContains(p: Phaser.Input.Pointer): boolean {
+    const r = this.catRowRect
+    return p.worldX >= r.x && p.worldX <= r.x + r.w && p.worldY >= r.y && p.worldY <= r.y + r.h
+  }
+
+  private catScrollTo(v: number): void {
+    this.catScroll = Math.max(0, Math.min(this.catScrollMax, v))
+    this.catContainer?.setX(this.catRowRect.x - this.catScroll)
+    if (this.time.now - this.reportAt > 120) this.reportWiki()
+  }
+
+  /** 命中区反解：按指针 x（含滚动偏移）找到所在 tab，非拖动即切类别 */
+  private onCatTap(p: Phaser.Input.Pointer): void {
+    if (this.wasDragged() || this.catDragMoved) return
+    const localX = p.worldX - this.catRowRect.x + this.catScroll
+    const i = this.catRects.findIndex((c) => localX >= c.x && localX < c.x + c.w)
+    if (i < 0 || this.category === i) return
+    this.category = i
+    this.focusedKey = ''
+    this.listScroll = 0
+    this.preserveOnRestart = true
+    this.scene.restart()
   }
 
   private isAllPage(): boolean {
@@ -528,10 +593,11 @@ export class WikiScene extends Phaser.Scene {
           w: this.layout.list.w,
           h: this.layout.list.h,
         },
+        // 上报屏幕中心（含横向滚动偏移），供 e2e 点击落点
         categories: this.catRects.map((c) => ({
           title: c.title,
-          x: c.x + c.w / 2,
-          y: c.y + c.h / 2,
+          x: this.catRowRect.x - this.catScroll + c.x + c.w / 2,
+          y: this.catRowRect.y + c.y + c.h / 2,
           w: c.w,
           h: c.h,
         })),
