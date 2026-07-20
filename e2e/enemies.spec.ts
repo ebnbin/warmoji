@@ -321,3 +321,46 @@ test('虫巢：周期生成小飞虫（非死亡触发的生成实体）', async
   )
   expect(errors).toEqual([])
 })
+
+test('虫巢：击退免疫（带击退的武器推不动固定巢穴）', async ({ page }) => {
+  test.setTimeout(90_000)
+  const errors: string[] = []
+  page.on('pageerror', (err) => errors.push(String(err)))
+  await page.goto('/')
+  await startRun(page)
+  await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 1)
+  await page.evaluate(() => window.__spawnEnemy!('hive', 6, 0))
+  await page.waitForFunction(() => {
+    const game = window.__game as {
+      scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { def: { kind: string } } }[] } }> }
+    }
+    return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('enemy').def.kind === 'hive')
+  })
+  // 记录巢穴位置 → 从左侧连发大击退（damage 小，打不死）→ 位置应几乎不动
+  const p0 = await page.evaluate(() => {
+    const game = window.__game as {
+      scene: { keys: Record<string, {
+        enemies: { getChildren(): { active: boolean; x: number; y: number; getData(k: string): { def: { kind: string } } }[] }
+        applyDamage(e: unknown, dmg: number, kb: number, sx: number, sy: number): void
+      }> }
+    }
+    const arena = game.scene.keys['arena']!
+    const hive = arena.enemies.getChildren().find((e) => e.active && e.getData('enemy').def.kind === 'hive')!
+    const x0 = hive.x
+    const y0 = hive.y
+    for (let i = 0; i < 5; i++) arena.applyDamage(hive, 1, 2000, x0 - 200, y0)
+    return { x0, y0 }
+  })
+  await page.waitForTimeout(400)
+  const delta = await page.evaluate((p) => {
+    const game = window.__game as {
+      scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; x: number; y: number; getData(k: string): { def: { kind: string } } }[] } }> }
+    }
+    const hive = game.scene.keys['arena']!.enemies.getChildren().find((e) => e.active && e.getData('enemy').def.kind === 'hive')
+    return hive ? { dx: Math.abs(hive.x - p.x0), dy: Math.abs(hive.y - p.y0) } : null
+  }, p0)
+  expect(delta).not.toBeNull()
+  expect(delta!.dx).toBeLessThan(1)
+  expect(delta!.dy).toBeLessThan(1)
+  expect(errors).toEqual([])
+})

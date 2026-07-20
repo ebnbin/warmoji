@@ -254,6 +254,8 @@ export const HIVE: EnemyDef = {
   damage: 4,
   xp: 8,
   coins: 6,
+  // 固定装置：不但移速为零，击退也免疫（否则带击退的武器能把巢穴推走）
+  kbImmune: true,
   spawner: { into: LARVA, intervalMs: 4000, count: 2, firstDelayMs: 2000 },
 }
 
