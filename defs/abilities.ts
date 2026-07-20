@@ -336,7 +336,9 @@ export const hornThrust2 = {
 /** 虹光震波 */
 export const hornThrust3 = {
   ...hornThrust2,
-  tipBurst: { radius: 1.1, ratio: 0.6, knockback: 11.25, color: 0xff8ad8 },
+  onHit: [
+    { kind: 'blast', radius: 1.1, ratio: 0.6, knockback: 11.25, ring: { color: 0xff8ad8, fillAlpha: 0.3, lineWidth: 4, lineAlpha: 0.9, durMs: 260 } },
+  ],
 } satisfies ThrustDef
 
 /** 全周横扫（整圈更慢一拍） */
@@ -413,10 +415,10 @@ export const sparkleBolt3 = {
   hex: { ...sparkleBolt2.hex, vulnMul: 1.4 },
 } satisfies ProjectileDef
 
-/** 连环刃 */
+/** 连环刃（击退取主斩 0.6×） */
 export const shadowStrike2 = {
   ...BASE.shadowStrike,
-  cleave: { radius: 1.0, ratio: 0.6 },
+  onHit: [{ kind: 'blast', radius: 1.0, ratio: 0.6, knockback: 3.6 }],
 } satisfies AssassinateDef
 /** 处决 */
 export const shadowStrike3 = {
@@ -456,10 +458,12 @@ export const fieldMedkit3 = {
 
 /** 超导传递 */
 export const voltArc2 = { ...BASE.voltArc, bounces: 4 } satisfies ChainArcDef
-/** 过载爆裂 */
+/** 过载爆裂（击退取本体 0.6×） */
 export const voltArc3 = {
   ...voltArc2,
-  burstEnd: { radius: 0.9, ratio: 0.6 },
+  onHit: [
+    { kind: 'blast', radius: 0.9, ratio: 0.6, knockback: 1.5, ring: { color: 0x40c4ff, fillAlpha: 0.25, lineWidth: 3, lineAlpha: 0.9, durMs: 240 } },
+  ],
 } satisfies ChainArcDef
 
 // 能力全表：基础行与档位行一律平级——不同档位就是不同的武器，各自独立成行。

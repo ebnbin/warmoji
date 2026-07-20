@@ -1,5 +1,5 @@
 import type { ChainArcDef } from './defs'
-import { applyBlast } from './effects'
+import { applyEffects } from './effects'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 连锁型：电弧命中最近敌人后在敌群间弹跳传导，每跳伤害衰减——
@@ -54,22 +54,8 @@ export class ChainArcAbility implements AbilityRuntime {
       cur = this.nearestWithin(cur.x, cur.y, this.def.arcRange, visited)
     }
 
-    const burst = this.def.burstEnd
-    if (burst) {
-      applyBlast(this.ctx, { x: last.x, y: last.y }, Math.max(1, Math.round(damage * burst.ratio)), burst.radius, this.def.knockback * 0.6, visited)
-      const ring = this.ctx.scene.add
-        .circle(last.x, last.y, burst.radius, this.def.color, 0.25)
-        .setStrokeStyle(3, this.def.color, 0.9)
-        .setDepth(7)
-        .setScale(0.3)
-      this.ctx.scene.tweens.add({
-        targets: ring,
-        scale: 1,
-        alpha: 0,
-        duration: 240,
-        ease: 'Cubic.easeOut',
-        onComplete: () => ring.destroy(),
-      })
+    if (this.def.onHit) {
+      applyEffects(this.ctx, this.def.onHit, { x: last.x, y: last.y }, damage, visited)
     }
 
     this.drawArc(points)

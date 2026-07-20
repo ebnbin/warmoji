@@ -2,7 +2,7 @@ import { DEG2RAD } from '../core/units'
 import type Phaser from 'phaser'
 import { thrustHitIndices } from './defs'
 import type { ThrustDef } from './defs'
-import { applyBlast } from './effects'
+import { applyEffects } from './effects'
 import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
@@ -77,24 +77,10 @@ export class ThrustAbility implements AbilityRuntime {
       this.ctx.damageTarget(targets[i]!.ref, damage, this.def.knockback, owner.x, owner.y)
     }
 
-    const burst = this.def.tipBurst
-    if (burst) {
+    if (this.def.onHit) {
       const tipX = owner.x + Math.cos(this.aim) * this.def.reach
       const tipY = owner.y + Math.sin(this.aim) * this.def.reach
-      applyBlast(this.ctx, { x: tipX, y: tipY }, Math.max(1, Math.round(damage * burst.ratio)), burst.radius, burst.knockback)
-      const ring = this.ctx.scene.add
-        .circle(tipX, tipY, burst.radius, burst.color, 0.3)
-        .setStrokeStyle(4, burst.color, 0.9)
-        .setDepth(7)
-        .setScale(0.3)
-      this.ctx.scene.tweens.add({
-        targets: ring,
-        scale: 1,
-        alpha: 0,
-        duration: 260,
-        ease: 'Cubic.easeOut',
-        onComplete: () => ring.destroy(),
-      })
+      applyEffects(this.ctx, this.def.onHit, { x: tipX, y: tipY }, damage)
     }
 
     this.tween?.remove()

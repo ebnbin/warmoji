@@ -40,10 +40,35 @@ const ABILITY_KINDS = new Set([
  * src/abilities 各运行时类同步维护） */
 const CASTABLE_KINDS = new Set(['rally', 'strike', 'dance', 'buff', 'nuke'])
 
+/** onHit 命中效果的合法 kind（与 src/abilities/effects.ts 的 applyEffects 分支同步） */
+const EFFECT_KINDS = new Set(['blast'])
+
+/** 命中效果链校验：kind 合法 + 数值字段成形 */
+function checkEffects(path: string, effects: unknown): void {
+  if (!Array.isArray(effects)) {
+    bad(`${path}.onHit`, '需为数组')
+    return
+  }
+  for (const [i, raw] of (effects as unknown[]).entries()) {
+    const ep = `${path}.onHit[${i}]`
+    const e = raw as Record<string, unknown>
+    if (!EFFECT_KINDS.has(e.kind as string)) {
+      bad(ep, `未知 effect kind：${String(e.kind)}`)
+      continue
+    }
+    if (e.kind === 'blast') {
+      num(`${ep}.radius`, e.radius, 0.01)
+      num(`${ep}.ratio`, e.ratio, 0)
+      num(`${ep}.knockback`, e.knockback)
+    }
+  }
+}
+
 function checkAbility(path: string, a: Record<string, unknown>): void {
   if (!ABILITY_KINDS.has(a.kind as string)) bad(path, `未知 kind：${String(a.kind)}`)
   str(`${path}.name`, a.name)
   str(`${path}.icon`, a.icon)
+  if (a.onHit !== undefined) checkEffects(path, a.onHit)
 }
 
 const abilityIds = new Set(Object.keys(ABILITIES))

@@ -18,6 +18,32 @@ export interface HeldVisual {
   readonly mountGap?: number
 }
 
+// ── 命中效果层（可组合，阵营中立；求值见 abilities/effects.ts）─────────
+// 「投送方式」（突刺/弹道/连锁…）与「命中后做什么」正交：后者收拢为一组
+// onHit 效果，任意投送都能挂同一套。新增效果类型：在此加 kind 与接口、
+// 扩 Effect 联合，并在 effects.ts 的 applyEffects 里加分支、gen-defs 加校验。
+
+/** 命中环 VFX：从锚点扩张淡出的一圈（纯表现，参数随效果自带） */
+export interface BlastRing {
+  readonly color: number
+  readonly fillAlpha: number
+  readonly lineWidth: number
+  readonly lineAlpha: number
+  readonly durMs: number
+}
+
+/** 圆形范围伤害：对锚点圈内敌对方各造成 ratio×基准伤害；ring 缺省无环 */
+export interface BlastEffect {
+  readonly kind: 'blast'
+  readonly radius: number
+  readonly ratio: number
+  /** 击退冲量（px/秒，方向从锚点指向目标） */
+  readonly knockback: number
+  readonly ring?: BlastRing
+}
+
+export type Effect = BlastEffect
+
 export interface ThrustDef {
   readonly kind: 'thrust'
   readonly name: string
@@ -37,13 +63,8 @@ export interface ThrustDef {
   // ── 能力字段（core/abilities.ts 按角色等级注入） ──
   /** 二连突：出手后隔 delayMs 重新索敌再刺一段 */
   readonly combo?: { readonly delayMs: number }
-  /** 枪尖震波：突刺终点圆形爆发（ratio × 伤害 + 强击退） */
-  readonly tipBurst?: {
-    readonly radius: number
-    readonly ratio: number
-    readonly knockback: number
-    readonly color: number
-  }
+  /** 命中效果：突刺终点（reach 末端）施加的 onHit 效果（枪尖震波等） */
+  readonly onHit?: readonly Effect[]
 }
 
 export interface ProjectileDef {
@@ -199,8 +220,8 @@ export interface AssassinateDef {
   readonly strikeMs: number
   readonly held?: HeldVisual
   // ── 能力字段 ──
-  /** 连环刃：斩击同时命中目标周围小圈（ratio × 伤害） */
-  readonly cleave?: { readonly radius: number; readonly ratio: number }
+  /** 命中效果：斩击目标处施加的 onHit 效果（连环刃等，排除主目标） */
+  readonly onHit?: readonly Effect[]
   /** 处决：目标血量低于 hpRatio 时伤害 ×mul */
   readonly execute?: { readonly hpRatio: number; readonly mul: number }
 }
@@ -279,8 +300,8 @@ export interface ChainArcDef {
   readonly decay: number
   readonly color: number
   // ── 能力字段 ──
-  /** 过载：末跳落点爆出小范围电击（ratio × 伤害） */
-  readonly burstEnd?: { readonly radius: number; readonly ratio: number }
+  /** 命中效果：末跳落点施加的 onHit 效果（过载爆裂等，排除已弹跳目标） */
+  readonly onHit?: readonly Effect[]
 }
 
 // ── 单发型能力（castNow）：队长主动技能的效果载荷，也可作角色自动能力 ──
