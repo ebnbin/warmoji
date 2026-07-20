@@ -11,7 +11,7 @@ describe('角色属性面板模型', () => {
   it('每个角色 = 基础组 + 专属升级组 + 每个能力一组，组内均有内容', () => {
     for (const id of IDS) {
       const groups = characterStatGroups(id)
-      expect(groups).toHaveLength(2 + CHARACTERS[id].abilities.length)
+      expect(groups).toHaveLength(2 + CHARACTERS[id].carriers.length)
       expect(groups[0]!.title).toBe('基础')
       expect(groups[1]!.title).toContain('专属升级')
       for (const g of groups) {

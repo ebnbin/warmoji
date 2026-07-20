@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHARACTERS, loadoutFor } from './registry'
+import { CHARACTERS, loadoutFor, baseLoadout, upgradeCardsFor } from './registry'
 import type { CharacterId } from './registry'
 
 const IDS = Object.keys(CHARACTERS) as CharacterId[]
@@ -8,18 +8,18 @@ const T1 = { u1: true, u2: false }
 const T2 = { u1: true, u2: true }
 
 describe('花名册', () => {
-  it('emoji 不重复，每人有名字、介绍且至少 1 把能力', () => {
+  it('emoji 不重复，每人有名字、介绍且至少 1 个攻击来源', () => {
     const roster = Object.values(CHARACTERS)
     expect(new Set(roster.map((c) => c.emoji)).size).toBe(roster.length)
     for (const c of roster) {
       expect(c.name.length).toBeGreaterThan(0)
       expect(c.desc.length).toBeGreaterThan(0)
-      expect(c.abilities.length).toBeGreaterThan(0)
+      expect(c.carriers.length).toBeGreaterThan(0)
     }
   })
 
   it('覆盖全部攻击形态（含新机制型能力）', () => {
-    const kinds = Object.values(CHARACTERS).flatMap((c) => c.abilities.map((w) => w.kind))
+    const kinds = Object.values(CHARACTERS).flatMap((c) => baseLoadout(c).map((w) => w.kind))
     expect(new Set(kinds)).toEqual(
       new Set([
         'projectile',
@@ -36,13 +36,14 @@ describe('花名册', () => {
         'chainArc',
       ]),
     )
-    // 双持：牛仔两把能力；军医 = 治疗 + 保底飞针
-    expect(CHARACTERS.cowboy.abilities.length).toBe(2)
-    expect(CHARACTERS.medic.abilities.map((w) => w.kind)).toEqual(['heal', 'projectile'])
+    // 双持：牛仔两件武器；军医 = 治疗 + 保底飞针（两个徒手载体）
+    expect(CHARACTERS.cowboy.carriers.length).toBe(2)
+    expect(baseLoadout(CHARACTERS.medic).map((w) => w.kind)).toEqual(['heal', 'projectile'])
     // 自体攻击（无持有物）：杂耍者与独角兽
-    expect('held' in CHARACTERS.juggler.abilities[0]! && CHARACTERS.juggler.abilities[0].held).toBeFalsy()
+    const jugglerBase = baseLoadout(CHARACTERS.juggler)[0]!
+    expect('held' in jugglerBase && jugglerBase.held).toBeFalsy()
     // 仙子的魔尘弹自带变形载荷（新引擎能力的数据入口）
-    const bolt = CHARACTERS.fairy.abilities[0]!
+    const bolt = baseLoadout(CHARACTERS.fairy)[0]!
     if (bolt.kind !== 'projectile') throw new Error('kind 不变')
     const morph = bolt.onHit?.find((e) => e.kind === 'morph')
     if (morph?.kind !== 'morph') throw new Error('缺 morph 效果')
@@ -54,18 +55,20 @@ describe('升级卡换持档位行', () => {
   it('未购升级卡持基础行；每个角色都有两档且逐档配装实际变化', () => {
     for (const id of IDS) {
       const def = CHARACTERS[id]
-      expect(loadoutFor(def, NONE)).toBe(def.abilities)
-      expect(def.upgrades).toHaveLength(2)
-      for (const a of def.upgrades) {
+      const base = baseLoadout(def)
+      expect(loadoutFor(def, NONE)).toEqual(base)
+      const cards = upgradeCardsFor(def)
+      expect(cards).toHaveLength(2)
+      for (const a of cards) {
         expect(a.icon.length).toBeGreaterThan(0)
         expect(a.name.length).toBeGreaterThan(0)
         expect(a.desc.length).toBeGreaterThan(0)
       }
-      expect(loadoutFor(def, T1)).not.toEqual(def.abilities)
+      expect(loadoutFor(def, T1)).not.toEqual(base)
       expect(loadoutFor(def, T2)).not.toEqual(loadoutFor(def, T1))
-      // 换持不增减能力数量
-      expect(loadoutFor(def, T1)).toHaveLength(def.abilities.length)
-      expect(loadoutFor(def, T2)).toHaveLength(def.abilities.length)
+      // 换持不增减载体数量
+      expect(loadoutFor(def, T1)).toHaveLength(base.length)
+      expect(loadoutFor(def, T2)).toHaveLength(base.length)
     }
   })
 
@@ -120,7 +123,7 @@ describe('升级卡换持档位行', () => {
     if (med2?.kind !== 'heal') throw new Error('kind 不变')
     expect(med2.aoe?.ratio).toBeCloseTo(0.6)
     expect(med2.defib?.reviveCutMs).toBe(2000)
-    // JSON 化后档位行内联为拷贝：断言同值而非同一对象
-    expect(dart2).toEqual(CHARACTERS.medic.abilities[1])
+    // 飞针载体无升级：各档恒为基础行
+    expect(dart2).toEqual(baseLoadout(CHARACTERS.medic)[1])
   })
 })

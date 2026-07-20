@@ -1,4 +1,5 @@
 import itemsJson from '../assets/items.json'
+import { baseLoadout } from '../characters/registry'
 import type { UpgradeTiers } from '../characters/registry'
 import type { CharacterId, CharacterDef } from '../characters/registry'
 import type { AbilityDef } from '../abilities/defs'
@@ -99,7 +100,7 @@ export const ITEM_IDS = Object.keys(ITEMS) as readonly ItemId[]
 
 /** 角色池 = 通用道具 + 与其能力形态匹配的形态道具 + 自己的两张升级卡 */
 export function characterPool(id: CharacterId, def: CharacterDef): ItemId[] {
-  const kinds = new Set<string>(def.abilities.map((w) => w.kind))
+  const kinds = new Set<string>(baseLoadout(def).map((w) => w.kind))
   return ITEM_IDS.filter((iid) => {
     const item: ItemDef = ITEMS[iid]
     if (item.pool === 'upgrade') return item.forCharacter === id

@@ -1,5 +1,5 @@
 import { CAPTAINS } from '../captains/registry'
-import { CHARACTERS } from '../characters/registry'
+import { CHARACTERS, baseLoadout } from '../characters/registry'
 import type { CaptainDef } from '../captains/registry'
 import type { CharacterDef } from '../characters/registry'
 import type { OutlineKind } from '../emoji/svg'
@@ -22,7 +22,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     ...roster.map((c) => c.emoji),
     ...Object.values<CaptainDef>(CAPTAINS).map((c) => c.emoji),
     ...roster.flatMap((c) =>
-      c.abilities.flatMap((w) => [
+      baseLoadout(c).flatMap((w) => [
         ...('held' in w && w.held ? [w.held.emoji] : []),
         ...(w.kind === 'projectile' || w.kind === 'turret' ? [w.projectile.emoji] : []),
         ...(w.kind === 'turret' ? [w.turret.emoji] : []),
@@ -73,7 +73,7 @@ function armedShotEmojis(): string[] {
 /** 全部魔尘变形替身形象（从角色配装的 onHit 效果聚合） */
 function morphEmojis(): string[] {
   return roster.flatMap((c) =>
-    c.abilities.flatMap((w) =>
+    baseLoadout(c).flatMap((w) =>
       w.kind === 'projectile' && w.onHit
         ? w.onHit.flatMap((e) => (e.kind === 'morph' ? [e.morphEmoji] : []))
         : [],
@@ -85,7 +85,7 @@ function morphEmojis(): string[] {
 export const PRELOAD_EMOJIS: readonly string[] = [
   ...Object.values(OUTLINED_EMOJIS).flat(),
   // 属性面板的能力/基础组图标 + 商店道具图标
-  ...roster.flatMap((c) => c.abilities.map((w) => w.icon)),
+  ...roster.flatMap((c) => c.carriers.map((cr) => cr.icon)),
   ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),
   // 地图图标（选择页素体）+ 地图详情组图标；装饰的描边变体在 OUTLINED_EMOJIS.player
   ...Object.values(MAPS).map((m) => m.emoji),

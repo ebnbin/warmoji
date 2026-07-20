@@ -4,9 +4,9 @@ import type { CharacterAuthoring, InnateSource } from '../src/characters/registr
 
 // 创作层（不进运行时 bundle）：角色数据行。一个角色由两类攻击来源组成——
 // 「持有的武器」（weapons，引用 defs/weapons.ts 的实体武器）与「自带的徒手
-// 能力」（innate，无实体武器，直接引用能力）。二者都自带升级路径。
-// gen 把两类载体展平回旧的 abilities/upgrades 形态生成 characters.json，
-// 运行时（本阶段）契约不变；升级卡文案由各载体的档位派生（多载体去重）。
+// 能力」（innate，无实体武器，直接引用能力）。二者都自带升级路径（base + 各档）。
+// gen 直接写出载体形态的 characters.json，运行时统一成 Carrier 消费；
+// 商店升级卡文案（defs/items.ts）由 characterCard 从各载体档位派生（多载体去重）。
 
 export const CHARACTERS = {
   juggler: {
@@ -234,11 +234,6 @@ function carriersOf(c: CharacterAuthoring): Carrier[] {
   ]
 }
 
-/** 载体在指定档位（1/2）的行为：无该档则停留 base（如军医飞针无升级） */
-function tierAbility(cr: Carrier, tier: number): string {
-  return cr.upgrades[tier - 1]?.ability ?? cr.base
-}
-
 /** 角色在指定档位的升级卡（多载体同档取首个有升级的载体；gen 校验同档卡一致） */
 export function characterCard(c: CharacterAuthoring, index: 0 | 1): { icon: string; name: string; desc: string } {
   for (const cr of carriersOf(c)) {
@@ -246,29 +241,4 @@ export function characterCard(c: CharacterAuthoring, index: 0 | 1): { icon: stri
     if (u) return u.card
   }
   throw new Error('角色缺升级档')
-}
-
-/** 载体形态 → 旧运行时形态（abilities + 两档 upgrades），保持 characters.json 契约不变 */
-export function flattenCharacter(c: CharacterAuthoring): unknown {
-  const carriers = carriersOf(c)
-  return {
-    emoji: c.emoji,
-    name: c.name,
-    desc: c.desc,
-    abilities: carriers.map((cr) => cr.base),
-    upgrades: ([0, 1] as const).map((k) => {
-      const card = characterCard(c, k)
-      return {
-        icon: card.icon,
-        name: card.name,
-        desc: card.desc,
-        abilities: carriers.map((cr) => tierAbility(cr, k + 1)),
-      }
-    }),
-    orbit: c.orbit,
-  }
-}
-
-export function flattenCharacters(): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(CHARACTERS).map(([id, c]) => [id, flattenCharacter(c)]))
 }

@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { ABILITIES } from '../defs/abilities.ts'
-import { CHARACTERS, flattenCharacters } from '../defs/characters.ts'
+import { CHARACTERS } from '../defs/characters.ts'
 import { WEAPONS } from '../defs/weapons.ts'
 import { CAPTAINS } from '../defs/captains.ts'
 import { ENEMIES, BOSS, ENEMY_MIX } from '../defs/enemies.ts'
@@ -234,7 +234,7 @@ const write = (name: string, data: unknown): void =>
   writeFileSync(`src/assets/${name}.json`, JSON.stringify(data, null, 1) + '\n')
 write('abilities', ABILITIES)
 write('weapons', WEAPONS)
-write('characters', flattenCharacters())
+write('characters', CHARACTERS)
 write('captains', CAPTAINS)
 write('enemies', { enemies: ENEMIES, boss: BOSS, mix: ENEMY_MIX })
 write('items', ITEMS)

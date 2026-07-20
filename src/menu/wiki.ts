@@ -1,5 +1,5 @@
 import { CAPTAINS } from '../captains/registry'
-import { CHARACTERS } from '../characters/registry'
+import { CHARACTERS, baseLoadout } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
 import { ENEMY_DEFS } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
@@ -159,7 +159,7 @@ export function usedEmojiSet(): Set<string> {
   for (const g of wikiGroups()) for (const e of g.entries) used.add(e.emoji)
   // 图鉴条目之外的战斗实体：持有物/弹体/金币/敌方子弹
   for (const c of Object.values(CHARACTERS)) {
-    for (const w of c.abilities) {
+    for (const w of baseLoadout(c)) {
       if ('held' in w && w.held) used.add(w.held.emoji)
       if (w.kind === 'projectile') used.add(w.projectile.emoji)
     }

@@ -1,7 +1,7 @@
 import { PICKUP } from '../pickups/registry'
 import { KNOCKBACK } from '../abilities/registry'
 import { memberMaxHp } from '../characters/stats'
-import { CHARACTERS, MEMBER, TEAM, loadoutFor } from '../characters/registry'
+import { CHARACTERS, MEMBER, TEAM, loadoutFor, upgradeCardsFor } from '../characters/registry'
 import type { CaptainDef } from '../captains/registry'
 import type { CharacterId } from '../characters/registry'
 import {
@@ -130,6 +130,7 @@ export function characterStatGroups(id: CharacterId, items: readonly ItemId[] = 
   const def = CHARACTERS[id]
   const fx = aggregateCharacterEffects(items)
   const tiers = upgradeTiers(id, items)
+  const loadout = loadoutFor(def, tiers)
   const dmgMul = fx.damageMul
   const cdMul = fx.cooldownMul
   const baseLines = [
@@ -150,16 +151,17 @@ export function characterStatGroups(id: CharacterId, items: readonly ItemId[] = 
     {
       icon: '⭐',
       title: '专属升级（商店专属卡解锁）',
-      lines: def.upgrades.map((a, i) => {
+      lines: upgradeCardsFor(def).map((card, i) => {
         const unlocked = i === 0 ? tiers.u1 : tiers.u2
-        return `${a.icon}「${a.name}」${a.desc}${unlocked ? '' : '（未解锁）'}`
+        return `${card.icon}「${card.name}」${card.desc}${unlocked ? '' : '（未解锁）'}`
       }),
     },
-    ...loadoutFor(def, tiers).map((w) => {
-      const display = displayDef(resolveAbilityDef(w, fx), dmgMul, cdMul, fx.knockbackMul)
+    // 攻击来源逐载体展示：名字/图标取自载体（武器/徒手能力），数值取该载体当前档位能力
+    ...def.carriers.map((carrier, i) => {
+      const display = displayDef(resolveAbilityDef(loadout[i]!, fx), dmgMul, cdMul, fx.knockbackMul)
       return {
-        icon: w.icon,
-        title: `${w.name}（${ABILITY_KIND_LABEL[w.kind]}）`,
+        icon: carrier.icon,
+        title: `${carrier.name}（${ABILITY_KIND_LABEL[display.kind]}）`,
         lines: abilityStatLines(display),
       }
     }),

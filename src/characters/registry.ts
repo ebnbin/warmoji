@@ -2,32 +2,14 @@ import charactersJson from '../assets/characters.json'
 import { ABILITIES } from '../abilities/registry'
 import type { AbilityId } from '../abilities/registry'
 import type { AbilityDef } from '../abilities/defs'
-import type { AbilityTier, WeaponId } from '../weapons/registry'
+import { WEAPONS } from '../weapons/registry'
+import type { AbilityTier, UpgradeCard, WeaponId } from '../weapons/registry'
 
-// 角色花名册：角色 → 能力为单向绑定（角色配装固定；能力可被复用）。
-// 两阶专属升级随角色归行：卡文案 + 解锁后的生效配装都是角色自己的属性，
-// 商店升级卡条目（items/registry upgradeCard）从这里取文案。
-// 磁盘形态（characters.json）里能力以 id 引用，加载时对能力表解析成 def 一次，
-// 下游拿到的是解析后的 def（形状与旧版一致）。
-
-/** 角色的一阶专属升级：商店卡文案 + 解锁后的生效配装（换持整行） */
-interface UpgradeOf<A> {
-  readonly icon: string
-  readonly name: string
-  readonly desc: string
-  readonly abilities: readonly A[]
-}
-interface CharacterOf<A> {
-  readonly emoji: string
-  readonly name: string
-  readonly desc: string
-  readonly abilities: readonly A[]
-  /** 两阶专属升级（商店专属卡解锁，累积生效）：[一阶, 一阶+二阶]，
-   * 每档 = 卡文案 + 该档整套配装。升级 = 换持整行，能力自身无升级逻辑 */
-  readonly upgrades: readonly [UpgradeOf<A>, UpgradeOf<A>]
-  /** 环形阵移动秉性：>0 沿环迎敌滑动，<0 避敌滑动，0 安分（被推才动）；见 characters/orbit.ts */
-  readonly orbit: number
-}
+// 角色花名册：一个角色由若干「攻击来源」（载体）组成——持有的武器（weapons，
+// 引用实体武器）与自带的徒手能力（innate，无实体武器，直接引用能力）。
+// 每个载体自带升级路径（base + 各档）。运行时把两类载体统一成 Carrier 视图，
+// loadoutFor 按当前档位取各载体的生效能力（换持整行）。能力可被复用，身份/升级
+// 路径归载体。磁盘形态（characters.json）能力以 id 引用，加载时解析成 def 一次。
 
 /** 徒手能力（角色自带、无实体武器）：与武器并列的另一种攻击来源，自带升级路径 */
 export interface InnateSource {
@@ -37,8 +19,7 @@ export interface InnateSource {
   readonly upgrades: readonly AbilityTier[]
 }
 
-/** 角色创作层形态：一个角色可同时承载「持有的武器」与「自带的徒手能力」两类攻击来源。
- * gen 把两类载体展平回运行时的 abilities/upgrades（见 defs/characters.ts flatten）。 */
+/** 角色磁盘/创作层形态：持有的武器 + 自带的徒手能力两类攻击来源 */
 export interface CharacterAuthoring {
   readonly emoji: string
   readonly name: string
@@ -48,11 +29,24 @@ export interface CharacterAuthoring {
   readonly innate: readonly InnateSource[]
 }
 
-/** 运行时磁盘形态（characters.json）：能力以 id 引用（gen 由载体展平生成） */
-export type CharacterSource = CharacterOf<AbilityId>
-/** 运行时形态：能力 id 已解析为 def */
-export type CharacterUpgrade = UpgradeOf<AbilityDef>
-export type CharacterDef = CharacterOf<AbilityDef>
+/** 运行时载体：武器与徒手能力统一视图。tiers = [base, 一阶, 二阶]（军医飞针只有 base）；
+ * cards = [一阶卡, 二阶卡]（无该档为 null）。weaponId 存在即表示这是一件实体武器。 */
+export interface Carrier {
+  readonly name: string
+  readonly icon: string
+  readonly weaponId?: WeaponId
+  readonly tiers: readonly AbilityDef[]
+  readonly cards: readonly (UpgradeCard | null)[]
+}
+
+/** 运行时角色：攻击来源统一为有序的载体列表 */
+export interface CharacterDef {
+  readonly emoji: string
+  readonly name: string
+  readonly desc: string
+  readonly orbit: number
+  readonly carriers: readonly Carrier[]
+}
 
 /** 已解锁的能力档位：u1 = 一阶（下标 0 的卡），u2 = 二阶（下标 1 的卡） */
 export interface UpgradeTiers {
@@ -63,31 +57,74 @@ export interface UpgradeTiers {
 // 数据行在 defs/characters.ts（创作层），npm run gen 生成 characters.json
 export type CharacterId = keyof typeof charactersJson
 
-const resolveAbilities = (ids: readonly AbilityId[]): AbilityDef[] => ids.map((id) => ABILITIES[id]!)
+function tierLevel(tiers: UpgradeTiers): 0 | 1 | 2 {
+  return tiers.u2 ? 2 : tiers.u1 ? 1 : 0
+}
 
-/** id 引用 → def：加载时一次性解析（能力表由 gen 校验，此处断言收口） */
-function hydrateCharacter(src: CharacterSource): CharacterDef {
+function weaponCarrier(wid: WeaponId): Carrier {
+  const w = WEAPONS[wid]
   return {
-    ...src,
-    abilities: resolveAbilities(src.abilities),
-    upgrades: [
-      { ...src.upgrades[0], abilities: resolveAbilities(src.upgrades[0].abilities) },
-      { ...src.upgrades[1], abilities: resolveAbilities(src.upgrades[1].abilities) },
-    ],
+    name: w.name,
+    icon: w.emoji,
+    weaponId: wid,
+    tiers: [w.base, ...w.upgrades.map((u) => u.ability)],
+    cards: [w.upgrades[0]?.card ?? null, w.upgrades[1]?.card ?? null],
+  }
+}
+
+function innateCarrier(i: InnateSource): Carrier {
+  return {
+    name: i.name,
+    icon: i.icon,
+    tiers: [ABILITIES[i.base], ...i.upgrades.map((u) => ABILITIES[u.ability])],
+    cards: [i.upgrades[0]?.card ?? null, i.upgrades[1]?.card ?? null],
+  }
+}
+
+/** id 引用 → def：加载时一次性解析（能力表/武器表由 gen 校验，此处断言收口） */
+function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
+  return {
+    emoji: src.emoji,
+    name: src.name,
+    desc: src.desc,
+    orbit: src.orbit,
+    carriers: [...src.weapons.map(weaponCarrier), ...src.innate.map(innateCarrier)],
   }
 }
 
 export const CHARACTERS = Object.fromEntries(
-  Object.entries(charactersJson as unknown as Record<CharacterId, CharacterSource>).map(
+  Object.entries(charactersJson as unknown as Record<CharacterId, CharacterAuthoring>).map(
     ([id, src]) => [id, hydrateCharacter(src)],
   ),
 ) as Record<CharacterId, CharacterDef>
 export const ROSTER_IDS = Object.keys(CHARACTERS) as readonly CharacterId[]
 
-/** 生效配装：升级卡质变 = 换持整行（一阶 → 二阶累积；未解锁用基础行） */
+/** 载体在指定档位的生效能力（无该档停留最高档，如军医飞针无升级恒 base） */
+function carrierAbility(c: Carrier, level: 0 | 1 | 2): AbilityDef {
+  return c.tiers[Math.min(level, c.tiers.length - 1)]!
+}
+
+/** 生效配装：各载体在当前档位的能力（升级卡质变 = 换持整行；未解锁用基础行） */
 export function loadoutFor(def: CharacterDef, tiers: UpgradeTiers): readonly AbilityDef[] {
-  if (!tiers.u1) return def.abilities
-  return tiers.u2 ? def.upgrades[1].abilities : def.upgrades[0].abilities
+  const level = tierLevel(tiers)
+  return def.carriers.map((c) => carrierAbility(c, level))
+}
+
+/** 基础配装（0 档全体载体）：道具池推导 / 资源预载用 */
+export function baseLoadout(def: CharacterDef): readonly AbilityDef[] {
+  return def.carriers.map((c) => c.tiers[0]!)
+}
+
+/** 角色两档升级卡（多载体同档取首个有升级的载体，gen 已校验同档一致） */
+export function upgradeCardsFor(def: CharacterDef): readonly [UpgradeCard, UpgradeCard] {
+  const pick = (k: 0 | 1): UpgradeCard => {
+    for (const c of def.carriers) {
+      const card = c.cards[k]
+      if (card) return card
+    }
+    throw new Error('角色缺升级档')
+  }
+  return [pick(0), pick(1)]
 }
 
 // 队伍：玩家操控队伍中心点，角色按队形岗位随行；除此之外角色是完全独立的单位。
