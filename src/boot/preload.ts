@@ -42,7 +42,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   ],
   // 敌方阵营含变形替身（仙子魔尘的绵羊顶替原形象，沿用同阵营描边）
   enemy: [...new Set([...ENEMY_DEFS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()])],
-  enemyProjectile: [...new Set(armedShotEmojis())],
+  enemyProjectile: [...new Set([...armedShotEmojis(), ...deathShotEmojis()])],
   // 精英变体（含 Boss）：金边；持械精英的能力视觉同沾金边
   elite: [
     ...new Set([...ENEMY_DEFS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()]),
@@ -67,6 +67,14 @@ function armedShotEmojis(): string[] {
     (e.abilities ?? []).flatMap((w) =>
       w.kind === 'projectile' || w.kind === 'turret' ? [w.projectile.emoji] : [],
     ),
+  )
+}
+
+/** 亡语冷枪的弹体（onDeath 的 spawnProjectile）：同样入敌弹组，红描边——
+ * 与持械弹分开收集，否则外星怪等死亡冷枪的弹体贴图漏预载（现形为缺失贴图） */
+function deathShotEmojis(): string[] {
+  return [...ENEMY_DEFS, BOSS].flatMap((e) =>
+    (e.onDeath ?? []).flatMap((fx) => (fx.kind === 'spawnProjectile' ? [fx.projectile.emoji] : [])),
   )
 }
 

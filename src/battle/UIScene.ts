@@ -173,6 +173,9 @@ export class UIScene extends Phaser.Scene {
       arenaEvents.off('skill-cast', this.onSkillCast, this)
       arenaEvents.off('chest-open', this.onChestOpen, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
+      // devText 在 SHUTDOWN 里随场景对象一起销毁；清引用，否则关闭 dev 后
+      // restart 不重建面板，update 仍对已销毁的 Text 调 setText → 渲染撞空 → 卡死
+      this.devText = undefined
     })
 
     // 视口变化会重启本场景：恢复暂停浮层
