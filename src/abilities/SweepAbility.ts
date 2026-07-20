@@ -4,7 +4,7 @@ import { sectorHitIndices } from './defs'
 import type { SweepDef } from './defs'
 import { applyEffects } from './effects'
 import { emojiImage } from '../emoji/textures'
-import { nearestAngle } from './types'
+import { nearestAngle } from './targeting'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 横扫型：持有物绕角色扫过一段圆弧，扇形判定内每敌一次伤害 */

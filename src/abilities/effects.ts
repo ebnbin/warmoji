@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import { circleHitIndices } from './defs'
 import type { BlastRing, Effect } from './defs'
+import { angleToNearest } from './targeting'
 import type { AbilityContext, TargetInfo } from './types'
 
 // 能力效果层（阵营中立）：命中/覆盖后施加的可复用效果，与「投送方式」正交——
@@ -82,27 +83,8 @@ export function applyEffects(
     } else if (e.kind === 'heal') {
       ctx.heal(hit.center.x, hit.center.y, e.range, e.amount, e.all ?? true, hit.source)
     } else if (e.kind === 'spawnProjectile') {
-      const angle = nearestAngleTo(hit.center, ctx.targets())
+      const angle = angleToNearest(hit.center.x, hit.center.y, ctx.targets())
       if (angle !== null) ctx.spawnBullet?.(hit.center.x, hit.center.y, angle, e.projectile, e.damage, e.lifeMs)
     }
   }
-}
-
-/** 锚点到最近敌对方的角度（不设索敌上限——死亡冷枪是任意距离的临终一击）；无目标返回 null */
-function nearestAngleTo(
-  center: { readonly x: number; readonly y: number },
-  targets: readonly TargetInfo[],
-): number | null {
-  let best = Infinity
-  let angle: number | null = null
-  for (const t of targets) {
-    const dx = t.x - center.x
-    const dy = t.y - center.y
-    const d = dx * dx + dy * dy
-    if (d < best) {
-      best = d
-      angle = Math.atan2(dy, dx)
-    }
-  }
-  return angle
 }

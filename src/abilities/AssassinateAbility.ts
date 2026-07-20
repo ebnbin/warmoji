@@ -2,8 +2,9 @@ import { DEG2RAD } from '../core/units'
 import type Phaser from 'phaser'
 import type { AssassinateDef } from './defs'
 import { applyEffects } from './effects'
+import { strongestTarget } from './targeting'
 import { emojiImage } from '../emoji/textures'
-import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
+import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 瞬袭型：冷却好时瞬移到索敌范围内血量最高的敌人背后重斩，短暂停留
  * （期间本体无敌）后闪回原位。位移走 visualOffset（与队伍布局叠加，物理体
@@ -25,24 +26,6 @@ export class AssassinateAbility implements AbilityRuntime {
       this.image = emojiImage(ctx.scene, 0, 0, def.held.emoji, def.held.size, ctx.ownerOutline).setDepth(13)
     }
     this.cooldown = initialCooldownMs
-  }
-
-  /** 索敌：范围内血量最高者（精英/厚血怪优先挨刀） */
-  private pickTarget(owner: AbilityOwner): TargetInfo | null {
-    const r2 = this.def.range * this.def.range
-    let best: TargetInfo | null = null
-    let bestHp = -1
-    for (const t of this.ctx.targets()) {
-      const dx = t.x - owner.x
-      const dy = t.y - owner.y
-      if (dx * dx + dy * dy > r2) continue
-      const hp = this.ctx.targetHp(t.ref)
-      if (hp > bestHp) {
-        bestHp = hp
-        best = t
-      }
-    }
-    return best
   }
 
   update(delta: number, owner: AbilityOwner): void {
@@ -67,7 +50,10 @@ export class AssassinateAbility implements AbilityRuntime {
     }
 
     if (this.cooldown > 0) return
-    const target = this.pickTarget(owner)
+    // 索敌：范围内血量最高者（精英/厚血怪优先挨刀）
+    const target = strongestTarget(owner.x, owner.y, this.ctx.targets(), this.def.range, (ref) =>
+      this.ctx.targetHp(ref),
+    )
     if (!target) return
     this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
 

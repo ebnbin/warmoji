@@ -2,6 +2,7 @@ import type Phaser from 'phaser'
 import { ACQUIRE } from './registry'
 import type { AreaBlastDef } from './defs'
 import { applyBlast, applyEffects } from './effects'
+import { nearestTarget, targetsWithin } from './targeting'
 import { emojiImage } from '../emoji/textures'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
@@ -30,13 +31,7 @@ export class AreaBlastAbility implements AbilityRuntime {
     if (this.echoIn > 0) {
       this.echoIn -= delta
       if (this.echoIn <= 0) {
-        const targets = this.ctx.targets()
-        const max2 = ACQUIRE.range * ACQUIRE.range
-        const near = targets.filter((t) => {
-          const dx = t.x - owner.x
-          const dy = t.y - owner.y
-          return dx * dx + dy * dy <= max2
-        })
+        const near = targetsWithin(owner.x, owner.y, this.ctx.targets(), ACQUIRE.range)
         if (near.length > 0) {
           const t = near[Math.floor(Math.random() * near.length)]!
           this.blastAt(t.x, t.y, this.echoDamage)
@@ -45,22 +40,8 @@ export class AreaBlastAbility implements AbilityRuntime {
     }
 
     if (this.cooldown > 0) return
-    const targets = this.ctx.targets()
-    if (targets.length === 0) return
-
     // 侦测范围内离持有者最近的敌人为爆心
-    const detect2 = this.def.detectRange * this.def.detectRange
-    let center: { x: number; y: number } | null = null
-    let bestD = detect2
-    for (const t of targets) {
-      const dx = t.x - owner.x
-      const dy = t.y - owner.y
-      const d = dx * dx + dy * dy
-      if (d <= bestD) {
-        bestD = d
-        center = { x: t.x, y: t.y }
-      }
-    }
+    const center = nearestTarget(owner.x, owner.y, this.ctx.targets(), this.def.detectRange)
     if (!center) return
     this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
 

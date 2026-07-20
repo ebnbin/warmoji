@@ -1,5 +1,6 @@
 import type { ChainArcDef } from './defs'
 import { applyEffects } from './effects'
+import { nearestTarget } from './targeting'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 连锁型：电弧命中最近敌人后在敌群间弹跳传导，每跳伤害衰减——
@@ -15,27 +16,11 @@ export class ChainArcAbility implements AbilityRuntime {
     this.cooldown = initialCooldownMs
   }
 
-  private nearestWithin(x: number, y: number, range: number, exclude: Set<unknown>): TargetInfo | null {
-    let best: TargetInfo | null = null
-    let bestD = range * range
-    for (const t of this.ctx.targets()) {
-      if (exclude.has(t.ref)) continue
-      const dx = t.x - x
-      const dy = t.y - y
-      const d = dx * dx + dy * dy
-      if (d < bestD) {
-        bestD = d
-        best = t
-      }
-    }
-    return best
-  }
-
   update(delta: number, owner: AbilityOwner): void {
     this.cooldown -= delta
     if (this.cooldown > 0) return
     const visited = new Set<unknown>()
-    const first = this.nearestWithin(owner.x, owner.y, this.def.range, visited)
+    const first = nearestTarget(owner.x, owner.y, this.ctx.targets(), this.def.range, visited)
     if (!first) return
     this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
     this.ctx.sfx('zap')
@@ -51,7 +36,7 @@ export class ChainArcAbility implements AbilityRuntime {
       this.ctx.damageTarget(cur.ref, Math.max(1, Math.round(damage)), this.def.knockback, points[points.length - 2]!.x, points[points.length - 2]!.y)
       last = cur
       damage *= this.def.decay
-      cur = this.nearestWithin(cur.x, cur.y, this.def.arcRange, visited)
+      cur = nearestTarget(cur.x, cur.y, this.ctx.targets(), this.def.arcRange, visited)
     }
 
     if (this.def.onHit) {

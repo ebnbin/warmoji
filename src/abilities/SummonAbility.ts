@@ -6,7 +6,8 @@ import { ANIM_DEF } from '../emoji/studio'
 import { Animator } from '../emoji/animator'
 import { clipFramesLive } from '../emoji/animTextures'
 import { emojiImage } from '../emoji/textures'
-import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
+import { nearestTarget } from './targeting'
+import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 interface Minion {
   img: Phaser.GameObjects.Image
@@ -45,21 +46,6 @@ export class SummonAbility implements AbilityRuntime {
     }
   }
 
-  private nearestTarget(x: number, y: number): TargetInfo | null {
-    let best: TargetInfo | null = null
-    let bestD = ACQUIRE.range * ACQUIRE.range
-    for (const t of this.ctx.targets()) {
-      const dx = t.x - x
-      const dy = t.y - y
-      const d = dx * dx + dy * dy
-      if (d < bestD) {
-        bestD = d
-        best = t
-      }
-    }
-    return best
-  }
-
   update(delta: number, owner: AbilityOwner): void {
     this.clock += delta
     const dt = Math.min(delta, 50) / 1000
@@ -68,7 +54,7 @@ export class SummonAbility implements AbilityRuntime {
       m.anim.update(this.clock)
       m.hitCd -= delta
       m.phase += dt * 2.4
-      const target = m.hitCd <= 0 ? this.nearestTarget(m.img.x, m.img.y) : null
+      const target = m.hitCd <= 0 ? nearestTarget(m.img.x, m.img.y, this.ctx.targets(), ACQUIRE.range) : null
       // 目的地：出击 = 敌人；否则回主人身边的盘旋位
       const dest = target
         ? { x: target.x, y: target.y }

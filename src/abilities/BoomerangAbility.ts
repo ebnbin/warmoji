@@ -2,7 +2,7 @@ import { DEG2RAD } from '../core/units'
 import type Phaser from 'phaser'
 import type { BoomerangDef } from './defs'
 import { emojiImage } from '../emoji/textures'
-import { nearestAngle } from './types'
+import { nearestAngle } from './targeting'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 单枚镖的飞行状态 */

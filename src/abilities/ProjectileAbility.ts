@@ -2,7 +2,7 @@ import { DEG2RAD } from '../core/units'
 import type Phaser from 'phaser'
 import type { ProjectileDef } from './defs'
 import { emojiImage } from '../emoji/textures'
-import { nearestAngle } from './types'
+import { nearestAngle } from './targeting'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 发射型：held 时持有物定身指向目标（可带左右手挂载位）；无 held 时角色本体出弹。

@@ -3,6 +3,7 @@ import type Phaser from 'phaser'
 import { thrustHitIndices } from './defs'
 import type { LaserDef } from './defs'
 import { emojiImage } from '../emoji/textures'
+import { nearestAngle } from './targeting'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 贯穿激光：向最近的敌人方向发射光束，线段胶囊判定命中直线上的所有敌人。
@@ -47,20 +48,9 @@ export class LaserAbility implements AbilityRuntime {
     }
 
     if (this.cooldown > 0 || this.hidden) return
-    const targets = this.ctx.targets()
     // 最近敌人在射程内才开火
-    let best = Infinity
-    let aim: number | null = null
-    for (const t of targets) {
-      const dx = t.x - owner.x
-      const dy = t.y - owner.y
-      const d = dx * dx + dy * dy
-      if (d < best) {
-        best = d
-        aim = Math.atan2(dy, dx)
-      }
-    }
-    if (aim === null || best > this.def.range * this.def.range) return
+    const aim = nearestAngle(owner, this.ctx.targets(), this.def.range)
+    if (aim === null) return
     this.aim = aim
     this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
 

@@ -4,7 +4,7 @@ import { thrustHitIndices } from './defs'
 import type { ThrustDef } from './defs'
 import { applyEffects } from './effects'
 import { emojiImage } from '../emoji/textures'
-import { nearestAngle } from './types'
+import { nearestAngle } from './targeting'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 突刺型：held 时持有物挥出收回；无 held 时角色本体前冲收回。胶囊判定内每敌一次伤害。
