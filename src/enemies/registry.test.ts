@@ -38,7 +38,7 @@ describe('出场配比', () => {
     expect(enemyMixAt(2).some((m) => m.def.kind === 'invader')).toBe(true)
     expect(enemyMixAt(2).some((m) => m.def.kind === 'boar')).toBe(false)
     expect(enemyMixAt(5).map((m) => m.def.kind).sort()).toEqual(
-      ['blob', 'boar', 'ghost', 'invader', 'mushroom', 'rat', 'snake', 'zombie'],
+      ['blob', 'boar', 'ghost', 'invader', 'mushroom', 'rat', 'slime', 'snake', 'zombie'],
     )
   })
 
