@@ -78,8 +78,6 @@ function checkEffects(path: string, effects: unknown): void {
 
 function checkAbility(path: string, a: Record<string, unknown>): void {
   if (!ABILITY_KINDS.has(a.kind as string)) bad(path, `未知 kind：${String(a.kind)}`)
-  str(`${path}.name`, a.name)
-  str(`${path}.icon`, a.icon)
   if (a.onHit !== undefined) checkEffects(path, a.onHit)
 }
 

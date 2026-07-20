@@ -12,14 +12,14 @@ import { WEAPONS } from '../weapons/registry'
 import { enemyStatLines, usedEmojiSet, wikiEntryByEmoji, wikiGroups } from './wiki'
 
 describe('图鉴分组', () => {
-  it('六个分组齐全，条目数与注册表一致，条目字段非空', () => {
+  it('五个分组齐全，条目数与注册表一致，条目字段非空', () => {
     const groups = wikiGroups()
-    expect(groups.map((g) => g.title)).toEqual(['角色', '队长', '敌人', '能力', '武器', '道具'])
+    expect(groups.map((g) => g.title)).toEqual(['角色', '队长', '敌人', '武器', '道具'])
     expect(groups[0]!.entries).toHaveLength(Object.keys(CHARACTERS).length)
     expect(groups[1]!.entries).toHaveLength(Object.keys(CAPTAINS).length)
     expect(groups[2]!.entries).toHaveLength(ENEMY_DEFS.length)
-    expect(groups[4]!.entries).toHaveLength(Object.keys(WEAPONS).length)
-    expect(groups[5]!.entries).toHaveLength(Object.keys(ITEMS).length)
+    expect(groups[3]!.entries).toHaveLength(Object.keys(WEAPONS).length)
+    expect(groups[4]!.entries).toHaveLength(Object.keys(ITEMS).length)
     for (const g of groups) {
       for (const e of g.entries) {
         expect(e.emoji.length).toBeGreaterThan(0)
@@ -56,7 +56,7 @@ describe('emoji 反查', () => {
   it('已收录 emoji 能查到类别与条目', () => {
     const map = wikiEntryByEmoji()
     expect(map.get('🤠')).toMatchObject({ category: '角色', entry: { name: '牛仔' } })
-    expect(map.get('🪓')).toMatchObject({ category: '能力', entry: { name: '巨斧横扫' } })
+    expect(map.get('🪓')).toMatchObject({ category: '武器', entry: { name: '巨斧横扫' } })
     expect(map.get('🐗')).toMatchObject({ category: '敌人', entry: { name: '野猪' } })
     expect(map.has('🦖')).toBe(false)
   })

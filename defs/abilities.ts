@@ -25,8 +25,6 @@ import type {
 // 能力库（可被不同角色复用；held 缺省 = 行为主体是角色本体）
 const pistol = {
   kind: 'projectile',
-  name: '左轮水枪',
-  icon: '🔫',
   damage: 16,
   cooldownMs: 600,
   knockback: 3,
@@ -53,8 +51,6 @@ const pistol = {
 const BASE = {
   tomatoThrow: {
     kind: 'projectile',
-    name: '番茄连投',
-    icon: '🍅',
     damage: 22,
     cooldownMs: 450,
     knockback: 3.5,
@@ -68,8 +64,6 @@ const BASE = {
   } satisfies ProjectileDef,
   hornThrust: {
     kind: 'thrust',
-    name: '独角突刺',
-    icon: '⚔️',
     damage: 26,
     cooldownMs: 900,
     knockback: 9,
@@ -80,8 +74,6 @@ const BASE = {
   } satisfies ThrustDef,
   axeSweep: {
     kind: 'sweep',
-    name: '巨斧横扫',
-    icon: '🪓',
     damage: 30,
     cooldownMs: 1200,
     knockback: 7,
@@ -98,18 +90,14 @@ const BASE = {
   } satisfies SweepDef,
   pistolLeft: {
     ...pistol,
-    name: '左轮水枪·左',
     held: { ...pistol.held, mountSide: -1 },
   } satisfies ProjectileDef,
   pistolRight: {
     ...pistol,
-    name: '左轮水枪·右',
     held: { ...pistol.held, mountSide: 1 },
   } satisfies ProjectileDef,
   arcaneBlast: {
     kind: 'areaBlast',
-    name: '奥术轰炸',
-    icon: '💥',
     damage: 22,
     cooldownMs: 1300,
     knockback: 12,
@@ -119,8 +107,6 @@ const BASE = {
   } satisfies AreaBlastDef,
   laserBeam: {
     kind: 'laser',
-    name: '贯穿激光',
-    icon: '🔦',
     damage: 14,
     cooldownMs: 900,
     knockback: 2.5,
@@ -137,16 +123,12 @@ const BASE = {
   } satisfies LaserDef,
   frostAura: {
     kind: 'slowAura',
-    name: '寒气光环',
-    icon: '❄️',
     radius: 3,
     slowFactor: 0.5,
     color: 0x81d4fa,
   } satisfies SlowAuraDef,
   boomerang: {
     kind: 'boomerang',
-    name: '回旋镖',
-    icon: '🪃',
     damage: 18,
     cooldownMs: 1200,
     knockback: 4.5,
@@ -164,8 +146,6 @@ const BASE = {
   } satisfies BoomerangDef,
   sparkleBolt: {
     kind: 'projectile',
-    name: '魔尘弹',
-    icon: '🪄',
     damage: 10,
     cooldownMs: 1000,
     knockback: 2,
@@ -181,8 +161,6 @@ const BASE = {
   } satisfies ProjectileDef,
   shadowStrike: {
     kind: 'assassinate',
-    name: '影袭',
-    icon: '🗡️',
     damage: 85,
     cooldownMs: 3600,
     knockback: 6,
@@ -199,8 +177,6 @@ const BASE = {
   } satisfies AssassinateDef,
   woodTurret: {
     kind: 'turret',
-    name: '林木弩塔',
-    icon: '🏹',
     placeIntervalMs: 4200,
     maxTurrets: 2,
     turret: { emoji: '🏹', size: 0.95 },
@@ -218,8 +194,6 @@ const BASE = {
   } satisfies TurretDef,
   beeSwarm: {
     kind: 'summon',
-    name: '蜂群',
-    icon: '🐝',
     count: 3,
     minion: { emoji: '🐝', size: 0.55, speed: 7.5 },
     damage: 11,
@@ -228,16 +202,12 @@ const BASE = {
   } satisfies SummonDef,
   fieldMedkit: {
     kind: 'heal',
-    name: '战地医疗',
-    icon: '💊',
     amount: 14,
     cooldownMs: 2400,
     range: 4,
   } satisfies HealDef,
   syringeDart: {
     kind: 'projectile',
-    name: '飞针',
-    icon: '💉',
     damage: 8,
     cooldownMs: 800,
     knockback: 2,
@@ -252,8 +222,6 @@ const BASE = {
   } satisfies ProjectileDef,
   voltArc: {
     kind: 'chainArc',
-    name: '感电触须',
-    icon: '⚡',
     damage: 20,
     cooldownMs: 1100,
     knockback: 2.5,
@@ -268,8 +236,6 @@ const BASE = {
   // 时用，数值对齐技能跨波 CD）──
   holyLight: {
     kind: 'rally',
-    name: '圣光降临',
-    icon: '✨',
     cooldownMs: 35_000,
     healRatio: 0.5,
     invulnMs: 2000,
@@ -279,8 +245,6 @@ const BASE = {
   } satisfies RallyDef,
   goldRain: {
     kind: 'strike',
-    name: '天降横财',
-    icon: '💰',
     damage: 60,
     cooldownMs: 20_000,
     knockback: 10,
@@ -290,23 +254,17 @@ const BASE = {
   } satisfies StrikeDef,
   discoFever: {
     kind: 'dance',
-    name: '全场蹦迪',
-    icon: '🪩',
     cooldownMs: 30_000,
     durationMs: 3500,
   } satisfies DanceDef,
   weaknessLecture: {
     kind: 'buff',
-    name: '弱点讲义',
-    icon: '📖',
     cooldownMs: 30_000,
     damageMul: 1.6,
     durationMs: 8000,
   } satisfies BuffDef,
   dimensionStrike: {
     kind: 'nuke',
-    name: '降维打击',
-    icon: '🌠',
     damage: 70,
     cooldownMs: 45_000,
     bossRatio: 0.5,

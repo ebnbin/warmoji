@@ -4,7 +4,6 @@ import type { CharacterId } from '../characters/registry'
 import { ENEMY_DEFS } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
 import { PICKUPS } from '../pickups/registry'
-import { ABILITIES } from '../abilities/registry'
 import { WEAPONS } from '../weapons/registry'
 import { ITEMS, RARITIES } from '../items/registry'
 import type { ItemDef } from '../items/registry'
@@ -98,19 +97,10 @@ export function wikiGroups(): WikiGroup[] {
       })),
     },
     {
-      icon: '⚔️',
-      title: '能力',
-      entries: Object.values(ABILITIES).map((w) => ({
-        emoji: w.icon,
-        name: w.name,
-        desc: `${ABILITY_KIND_LABEL[w.kind]}形态`,
-        lines: abilityStatLines(w),
-      })),
-    },
-    {
       icon: '🗡️',
       title: '武器',
-      // 武器 = 包装能力的实体载体（有手持视觉，被角色持有）；徒手能力在角色详情里看
+      // 武器 = 包装能力的实体载体（有手持视觉，被角色持有）；抽象能力不进图鉴，
+      // 徒手能力在角色详情里看
       entries: Object.values(WEAPONS).map((w) => ({
         emoji: w.emoji,
         name: w.name,
@@ -157,8 +147,9 @@ export function wikiEntryByEmoji(): Map<string, { category: string; entry: WikiE
 export function usedEmojiSet(): Set<string> {
   const used = new Set<string>()
   for (const g of wikiGroups()) for (const e of g.entries) used.add(e.emoji)
-  // 图鉴条目之外的战斗实体：持有物/弹体/金币/敌方子弹
+  // 图鉴条目之外的战斗实体：载体图标（武器/徒手能力，角色详情展示）+ 持有物/弹体
   for (const c of Object.values(CHARACTERS)) {
+    for (const carrier of c.carriers) used.add(carrier.icon)
     for (const w of baseLoadout(c)) {
       if ('held' in w && w.held) used.add(w.held.emoji)
       if (w.kind === 'projectile') used.add(w.projectile.emoji)

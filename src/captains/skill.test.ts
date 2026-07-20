@@ -32,10 +32,8 @@ describe('技能冷却', () => {
       expect(s.desc.length).toBeGreaterThan(0)
       expect(s.cdMs).toBeGreaterThan(0)
       expect(s.abilities.length).toBeGreaterThan(0)
-      for (const a of s.abilities) {
-        expect(a.name.length).toBeGreaterThan(0)
-        expect(a.icon.length).toBeGreaterThan(0)
-      }
+      // 效果载荷是纯行为能力行（身份归队长技能本身，能力无 name/icon）
+      for (const a of s.abilities) expect(a.kind.length).toBeGreaterThan(0)
     }
   })
 

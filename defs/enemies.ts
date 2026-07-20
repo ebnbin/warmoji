@@ -50,8 +50,6 @@ export const INVADER: EnemyDef = {
   abilities: [
     {
       kind: 'projectile',
-      name: '慢速弹',
-      icon: '🔴',
       damage: 6,
       cooldownMs: 2800,
       knockback: 0,
@@ -105,8 +103,6 @@ export const SNAKE: EnemyDef = {
   abilities: [
     {
       kind: 'projectile',
-      name: '毒弹',
-      icon: '🟢',
       damage: 5,
       cooldownMs: 2600,
       knockback: 0,
@@ -248,8 +244,6 @@ export const BOSS: EnemyDef = {
   abilities: [
     {
       kind: 'projectile',
-      name: '环形弹幕',
-      icon: '🟣',
       damage: 8,
       cooldownMs: 2800,
       knockback: 0,

@@ -68,9 +68,6 @@ export type Effect = BlastEffect | SlowEffect | GroundZone | MorphEffect
 
 export interface ThrustDef {
   readonly kind: 'thrust'
-  readonly name: string
-  /** 属性面板等 UI 的展示图标 */
-  readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
   /** 命中击退冲量（px/秒，方向从伤害源指向敌人；位移 ≈ 冲量 × KNOCKBACK.tauMs/1000） */
@@ -91,8 +88,6 @@ export interface ThrustDef {
 
 export interface ProjectileDef {
   readonly kind: 'projectile'
-  readonly name: string
-  readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
@@ -131,8 +126,6 @@ export interface ProjectileDef {
 
 export interface SweepDef {
   readonly kind: 'sweep'
-  readonly name: string
-  readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
@@ -149,8 +142,6 @@ export interface SweepDef {
 
 export interface AreaBlastDef {
   readonly kind: 'areaBlast'
-  readonly name: string
-  readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
@@ -169,8 +160,6 @@ export interface AreaBlastDef {
 
 export interface BoomerangDef {
   readonly kind: 'boomerang'
-  readonly name: string
-  readonly icon: string
   readonly damage: number
   /** 接住后才开始计冷却 */
   readonly cooldownMs: number
@@ -193,8 +182,6 @@ export interface BoomerangDef {
 
 export interface LaserDef {
   readonly kind: 'laser'
-  readonly name: string
-  readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
@@ -212,8 +199,6 @@ export interface LaserDef {
 
 export interface SlowAuraDef {
   readonly kind: 'slowAura'
-  readonly name: string
-  readonly icon: string
   /** 光环以队伍中心为圆心持续生效（角色只是来源），无伤害无冷却 */
   readonly radius: number
   /** 敌人移速乘数 */
@@ -228,8 +213,6 @@ export interface SlowAuraDef {
 
 export interface AssassinateDef {
   readonly kind: 'assassinate'
-  readonly name: string
-  readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
@@ -249,8 +232,6 @@ export interface AssassinateDef {
 
 export interface TurretDef {
   readonly kind: 'turret'
-  readonly name: string
-  readonly icon: string
   /** 布置间隔；本体无攻击，输出全部来自弩塔 */
   readonly placeIntervalMs: number
   /** 同时在场上限，超出拆最旧的 */
@@ -275,8 +256,6 @@ export interface TurretDef {
 
 export interface SummonDef {
   readonly kind: 'summon'
-  readonly name: string
-  readonly icon: string
   /** 召唤物数量（独立 AI：追击最近敌人，撞击伤害） */
   readonly count: number
   readonly minion: { readonly emoji: string; readonly size: number; readonly speed: number }
@@ -291,8 +270,6 @@ export interface SummonDef {
 
 export interface HealDef {
   readonly kind: 'heal'
-  readonly name: string
-  readonly icon: string
   /** 周期治疗范围内血量比例最低的队友 */
   readonly amount: number
   readonly cooldownMs: number
@@ -306,8 +283,6 @@ export interface HealDef {
 
 export interface ChainArcDef {
   readonly kind: 'chainArc'
-  readonly name: string
-  readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
@@ -329,8 +304,6 @@ export interface ChainArcDef {
 
 export interface RallyDef {
   readonly kind: 'rally'
-  readonly name: string
-  readonly icon: string
   readonly cooldownMs: number
   /** 存活我方按生命上限比例回复；阵亡者满血复活（rallyTeam 语义） */
   readonly healRatio: number
@@ -343,8 +316,6 @@ export interface RallyDef {
 
 export interface StrikeDef {
   readonly kind: 'strike'
-  readonly name: string
-  readonly icon: string
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
@@ -364,8 +335,6 @@ export interface StrikeDef {
 
 export interface DanceDef {
   readonly kind: 'dance'
-  readonly name: string
-  readonly icon: string
   readonly cooldownMs: number
   /** 敌对方全体跳舞定身时长（含休眠者与窗口内新登场者） */
   readonly durationMs: number
@@ -373,8 +342,6 @@ export interface DanceDef {
 
 export interface BuffDef {
   readonly kind: 'buff'
-  readonly name: string
-  readonly icon: string
   readonly cooldownMs: number
   /** 限时全队伤害倍率（到期自动复原） */
   readonly damageMul: number
@@ -383,8 +350,6 @@ export interface BuffDef {
 
 export interface NukeDef {
   readonly kind: 'nuke'
-  readonly name: string
-  readonly icon: string
   /** 基准伤害 × 当前波次威胁倍率（ctx.waveScale，与敌人成长同步） */
   readonly damage: number
   readonly cooldownMs: number

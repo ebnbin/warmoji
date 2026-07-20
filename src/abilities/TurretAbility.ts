@@ -37,8 +37,6 @@ export class TurretAbility implements AbilityRuntime {
     this.placeCd = initialCooldownMs
     this.boltDef = {
       kind: 'projectile',
-      name: def.name,
-      icon: def.icon,
       damage: def.damage,
       cooldownMs: def.fireIntervalMs,
       knockback: def.knockback,

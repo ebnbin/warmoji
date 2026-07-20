@@ -60,13 +60,6 @@ describe('角色属性面板模型', () => {
     expect(blast[1]).toBe('侦测 6格 · 爆炸半径 1.3格')
   })
 
-  it('每个能力都有非空展示名与图标', () => {
-    for (const w of Object.values(ABILITIES)) {
-      expect(w.name.length).toBeGreaterThan(0)
-      expect(w.icon.length).toBeGreaterThan(0)
-    }
-  })
-
   it('团队属性归队长面板，角色基础组不再含移速', () => {
     for (const id of IDS) {
       const base = characterStatGroups(id)[0]!
