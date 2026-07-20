@@ -11,7 +11,8 @@ describe('敌人规格', () => {
   it('每种敌人字段合法：血量/速度/经验为正，尺寸大于判定半径', () => {
     for (const e of ENEMY_DEFS) {
       expect(e.hp).toBeGreaterThan(0)
-      expect(e.speed).toBeGreaterThan(0)
+      // 原地怪（巢穴）速度恒零，其余必须有正移速
+      if (e.locomotion.kind !== 'static') expect(e.speed).toBeGreaterThan(0)
       expect(e.xp).toBeGreaterThan(0)
       expect(e.damage).toBeGreaterThan(0)
       expect(e.size).toBeGreaterThan(e.radius)

@@ -224,6 +224,39 @@ export const BLOB: EnemyDef = {
   onDeath: [{ kind: 'split', into: BLOBLING, count: 2 }],
 }
 
+/** 小飞虫：虫巢吐出的迷你飞虫，血极薄、飞得快，成群骚扰（不进自然刷怪，只由虫巢生成） */
+export const LARVA: EnemyDef = {
+  kind: 'larva',
+  locomotion: { kind: 'chase' },
+  emoji: '🦟',
+  name: '小飞虫',
+  desc: '虫巢吐出的迷你飞虫，血薄但快，成群骚扰',
+  size: 0.7,
+  radius: 0.26,
+  hp: 12,
+  speed: 2.8,
+  damage: 3,
+  xp: 1,
+  coins: 0,
+}
+
+/** 虫巢：原地不动的肉盾巢穴，每隔几秒吐出小飞虫——不拆掉就一直刷，得优先清巢 */
+export const HIVE: EnemyDef = {
+  kind: 'hive',
+  locomotion: { kind: 'static' },
+  emoji: '🪺',
+  name: '虫巢',
+  desc: '原地不动的巢穴，每隔几秒吐出小飞虫，不拆掉就一直刷',
+  size: 1.5,
+  radius: 0.6,
+  hp: 140,
+  speed: 0,
+  damage: 4,
+  xp: 8,
+  coins: 6,
+  spawner: { into: LARVA, intervalMs: 4000, count: 2, firstDelayMs: 2000 },
+}
+
 export const ENEMY_DEFS: readonly EnemyDef[] = [
   ZOMBIE,
   GHOST,
@@ -235,6 +268,8 @@ export const ENEMY_DEFS: readonly EnemyDef[] = [
   SLIME,
   BLOB,
   BLOBLING,
+  HIVE,
+  LARVA,
 ]
 
 // 出场配比：新怪按波次渐入（sinceWave），僵尸/幽灵始终是主体；
@@ -249,6 +284,7 @@ export const ENEMY_MIX = [
   { kind: 'rat', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
   { kind: 'blob', sinceWave: 5, base: 7, perWave: 0.4, min: 0, max: 14 },
   { kind: 'slime', sinceWave: 6, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'hive', sinceWave: 7, base: 3, perWave: 0.15, min: 0, max: 6 },
 ] as const
 
 export const BOSS: EnemyDef = {

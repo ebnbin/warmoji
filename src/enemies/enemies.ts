@@ -31,6 +31,8 @@ export interface Enemy {
   coolUntil: number
   /** 定时型冲刺的下一轮触发时刻 */
   nextDashAt: number
+  /** 巢穴的下一轮生成时刻（0 = 非巢穴） */
+  nextSpawnAt: number
   danceUntil: number
   flashUntil: number
   morphUntil: number
@@ -79,6 +81,7 @@ export function attachEnemy(image: ImageObj, def: EnemyDef, hp: number, init?: P
     dashUntil: 0,
     coolUntil: 0,
     nextDashAt: 0,
+    nextSpawnAt: 0,
     danceUntil: 0,
     flashUntil: 0,
     morphUntil: 0,

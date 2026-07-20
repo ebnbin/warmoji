@@ -42,6 +42,7 @@ export interface DashLocomotion {
 export type LocomotionDef =
   | { readonly kind: 'chase' }
   | { readonly kind: 'wander' }
+  | { readonly kind: 'static' }
   | { readonly kind: 'flee'; readonly range: number }
   | { readonly kind: 'coinThief' }
   | DashLocomotion
@@ -82,6 +83,8 @@ export interface EnemyDef {
     | 'snake'
     | 'rat'
     | 'slime'
+    | 'hive'
+    | 'larva'
     | 'boss'
   readonly emoji: string
   readonly name: string
@@ -101,6 +104,13 @@ export interface EnemyDef {
   readonly onDeath?: readonly DeathEffect[]
   /** 接触附带效果：蹭到队员时除伤害外，再挂一层限时攻速惩罚（黏黏怪） */
   readonly contactSlow?: { readonly mul: number; readonly durationMs: number }
+  /** 巢穴：周期性生成子敌（非死亡触发的生成实体；into 随父深度 px 化）——不打掉就一直刷 */
+  readonly spawner?: {
+    readonly into: EnemyDef
+    readonly intervalMs: number
+    readonly count: number
+    readonly firstDelayMs?: number
+  }
   readonly kbImmune?: boolean
 }
 

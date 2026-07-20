@@ -34,6 +34,7 @@ function grid(units: number): string {
 const LOCOMOTION_LABEL: Record<EnemyDef['locomotion']['kind'], string> = {
   chase: '追击',
   wander: '游荡',
+  static: '原地不动',
   dash: '蓄力突刺',
   flee: '逃跑',
   coinThief: '偷金币',
@@ -57,6 +58,9 @@ export function enemyStatLines(e: EnemyDef): string[] {
   }
   if (e.contactSlow) {
     lines.push(`接触附黏：命中队员攻击冷却 ×${e.contactSlow.mul}，持续 ${e.contactSlow.durationMs / 1000} 秒`)
+  }
+  if (e.spawner) {
+    lines.push(`巢穴：每 ${e.spawner.intervalMs / 1000} 秒生成 ${e.spawner.count} 只${e.spawner.into.name}`)
   }
   return lines
 }

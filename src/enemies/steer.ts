@@ -33,6 +33,11 @@ const wander: Steerer = ({ scene, a, body, slow }) => {
   body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
 }
 
+/** 原地不动（巢穴/固定装置）：速度恒零，行为全在其他机制（spawner 等） */
+const staticSteer: Steerer = ({ body }) => {
+  body.setVelocity(0, 0)
+}
+
 /** 统一冲刺：探测触发（野猪）与定时触发（Boss）同一状态机——
  * 蓄力（定身颤动）→ 冲刺（锁定方向直线冲）→ 冷却/回到 idle 移动 */
 const dash: Steerer = (ctx) => {
@@ -159,6 +164,7 @@ const coinThief: Steerer = ({ scene, a, body, slow }) => {
 export const STEERERS: Record<Enemy['def']['locomotion']['kind'], Steerer> = {
   chase,
   wander,
+  static: staticSteer,
   dash,
   flee,
   coinThief,

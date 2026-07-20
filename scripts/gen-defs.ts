@@ -179,6 +179,11 @@ function checkEnemy(path: string, e: (typeof ENEMIES)[string]): void {
     num(`${path}.contactSlow.mul`, e.contactSlow.mul, 0.01)
     num(`${path}.contactSlow.durationMs`, e.contactSlow.durationMs, 1)
   }
+  if (e.spawner) {
+    checkEnemy(`${path}.spawner.into`, e.spawner.into)
+    num(`${path}.spawner.intervalMs`, e.spawner.intervalMs, 1)
+    num(`${path}.spawner.count`, e.spawner.count, 1)
+  }
   // 亡语（onDeath）：组合式 Effect（ground/heal/spawnProjectile）+ 生成实体类（split/decoy）。
   // 命中专属的 blast/slow/morph 不允许作亡语（无 baseDamage/targets），落到 else 报错。
   for (const [i, fx] of (e.onDeath ?? []).entries()) {

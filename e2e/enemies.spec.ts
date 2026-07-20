@@ -295,3 +295,29 @@ test('黏黏怪：接触给队员挂限时攻速惩罚（接触触发的第二�
   )
   expect(errors).toEqual([])
 })
+
+test('虫巢：周期生成小飞虫（非死亡触发的生成实体）', async ({ page }) => {
+  test.setTimeout(120_000)
+  const errors: string[] = []
+  page.on('pageerror', (err) => errors.push(String(err)))
+  await page.goto('/')
+  await startRun(page)
+  await page.waitForFunction(() => (window.__warmoji?.elapsed ?? 0) > 1)
+  // 远点投放虫巢（不被顺手秒掉）：过首轮延迟后应吐出小飞虫（kind=larva）
+  await page.evaluate(() => window.__spawnEnemy!('hive', 6, 0))
+  await page.waitForFunction(
+    () => {
+      try {
+        const game = window.__game as {
+          scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { def: { kind: string } } }[] } }> }
+        }
+        return game.scene.keys['arena']!.enemies.getChildren().some((e) => e.active && e.getData('enemy').def.kind === 'larva')
+      } catch {
+        return false
+      }
+    },
+    undefined,
+    { timeout: 30_000 },
+  )
+  expect(errors).toEqual([])
+})

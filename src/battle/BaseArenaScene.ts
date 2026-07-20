@@ -1432,6 +1432,23 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     enemy.destroy()
   }
 
+  /** 虫巢生成：在巢穴周围撒 count 只子敌（血量吃当前波次成长曲线）。不设每巢上限
+   *（不打掉就持续施压是设计意图），仅在逼近全局在场上限时让路，避免压垮引擎 */
+  private spawnFromNest(a: Enemy, spawner: NonNullable<EnemyDef['spawner']>): void {
+    if (this.over || this.enemies.countActive(true) >= SPAWN.maxAlive) return
+    const hpMul = waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier
+    const e = a.image
+    for (let i = 0; i < spawner.count; i++) {
+      const ang = this.rng.next() * Math.PI * 2
+      this.materializeEnemy(
+        spawner.into,
+        e.x + Math.cos(ang) * 0.6 * UNIT,
+        e.y + Math.sin(ang) * 0.6 * UNIT,
+        Math.round(spawner.into.hp * hpMul),
+      )
+    }
+  }
+
   /** 静默移除：替身尸壳到时消失——不计击杀、不掉落、不跑死亡效果，只留一缕烟 */
   private despawnEnemy(enemy: ImageObj): void {
     const a = enemyOf(enemy)
@@ -1583,6 +1600,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const lm = def.locomotion
     const nextDashAt =
       lm.kind === 'dash' && lm.intervalMs !== undefined ? this.elapsedMs + (lm.firstDelayMs ?? lm.intervalMs) : 0
+    const nextSpawnAt = def.spawner ? this.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
     const a = attachEnemy(enemy, def, hp, {
       elite,
       boss,
@@ -1595,6 +1613,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       dirY,
       turnAt,
       nextDashAt,
+      nextSpawnAt,
       ph,
       anim,
       // 舞会窗口内落地：跟着跳（全场蹦迪对新敌同样生效）
@@ -1763,6 +1782,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
       // 持械敌人：能力实例逐帧驱动（跳舞/变形不到达此处；休眠已跳过）
       if (a.abilities) for (const w of a.abilities) w.update(delta, a.abilityOwner!)
+
+      // 虫巢：周期生成子敌（非死亡触发的生成实体——生成动作的第 2 个触发点）
+      if (def.spawner && now >= a.nextSpawnAt) {
+        this.spawnFromNest(a, def.spawner)
+        a.nextSpawnAt = now + def.spawner.intervalMs
+      }
 
       // 击退：临时冲量叠加进行为速度并指数衰减（不打断行为状态机）
       this.decayKnockback(a, body, delta)
