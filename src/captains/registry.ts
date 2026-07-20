@@ -29,6 +29,14 @@ interface CaptainOf<A> {
   readonly skill: CaptainSkillOf<A>
   /** 编制上限：可招募的角色总数 */
   readonly teamSize: number
+  /** 队伍移动速度（格/秒，每队长自己的绝对基线；道具 moveSpeedMul 叠乘其上） */
+  readonly moveSpeed: number
+  /** 金币拾取磁吸半径（格，绝对基线；道具 magnetMul 叠乘） */
+  readonly coinMagnet: number
+  /** 全队生命上限乘数：血量基数由队员层定（MEMBER.maxHp + 道具），队长按此缩放 */
+  readonly hpMul: number
+  /** 复活时间乘数（作用于 TEAM.reviveMs 基线；<1 更快复活） */
+  readonly reviveMul: number
   /** 开局波次（通常 1）；>1 时跳过之前的波次，难度时钟按被跳过的
    * 波次时长预推进——敌人配比与强度都是该波的真实水平，且能量豆拉满；
    * 阵容仍从零起步，由玩家在整编页逐个自选招满（core/run.ts beginRun） */

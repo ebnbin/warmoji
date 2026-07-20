@@ -44,7 +44,7 @@ export function spawnCoins(scene: BaseArenaScene, x: number, y: number, count: n
 export function magnetCoins(scene: BaseArenaScene): void {
   // 金币拾取是团队能力：以队伍中心为基点磁吸并入账（成员碰到也能捡，见 overlap）。
   // 磁力回旋镖（frameAttractors）优先：镖旁的金币直接入账，省去飞回中心的路程
-  const magnetRadius = PICKUP.magnetRadius * UNIT * scene.teamFx.magnetMul
+  const magnetRadius = CAPTAINS[scene.run.captainId].coinMagnet * UNIT * scene.teamFx.magnetMul
   const r2 = magnetRadius * magnetRadius
   const collect2 = PICKUP.collectRadius * UNIT * (PICKUP.collectRadius * UNIT)
   const idle = scene.coinIdleVelocity()
@@ -129,7 +129,7 @@ function openChest(scene: BaseArenaScene, chest: ImageObj): void {
     scene.run.captainItems.push(loot.itemId)
     // 队长道具全部经 teamFx 实时读取，重算即生效
     scene.teamFx = aggregateTeamEffects(scene.run.captainItems)
-    scene.stats.moveSpeed = TEAM.moveSpeed * UNIT * scene.teamFx.moveSpeedMul
+    scene.stats.moveSpeed = CAPTAINS[scene.run.captainId].moveSpeed * UNIT * scene.teamFx.moveSpeedMul
     owner = `队长${CAPTAINS[scene.run.captainId].name}`
   } else {
     scene.run.memberItems[loot.slot]?.push(loot.itemId)
@@ -155,13 +155,13 @@ function refreshMemberItems(scene: BaseArenaScene, slot: number): void {
   const fx = aggregateCharacterEffects(owned)
   // 原地覆写：能力 ctx 闭包读的就是这个对象（伤害/攻速/暴击/击退实时生效）
   Object.assign(m.fx, fx)
-  const maxHp = memberMaxHp(fx.hpAdd)
+  const maxHp = memberMaxHp(fx.hpAdd, CAPTAINS[scene.run.captainId].hpMul)
   if (m.alive) m.hp = Math.max(1, Math.min(maxHp, m.hp + Math.max(0, maxHp - m.maxHp)))
   else m.hp = Math.min(m.hp, maxHp)
   m.maxHp = maxHp
   m.shownHpRatio = -1
   m.iframesMs = MEMBER.iframesMs + fx.iframesAddMs
-  m.reviveMs = Math.max(1000, TEAM.reviveMs + fx.reviveAddMs)
+  m.reviveMs = Math.max(1000, TEAM.reviveMs * CAPTAINS[scene.run.captainId].reviveMul + fx.reviveAddMs)
   m.regenPerSec = fx.regenPerSec
   m.thorns = fx.thorns
   m.killHeal = fx.killHeal

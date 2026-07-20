@@ -1,4 +1,3 @@
-import { PICKUP } from '../pickups/registry'
 import { KNOCKBACK } from '../abilities/registry'
 import { memberMaxHp } from '../characters/stats'
 import { CHARACTERS, MEMBER, TEAM, loadoutFor, upgradeCardsFor } from '../characters/registry'
@@ -212,8 +211,10 @@ export function captainStatGroups(def: CaptainDef, items: readonly ItemId[] = []
     `编制上限 ${def.teamSize} 人 · 每波结束固定招募 1 人` +
       (def.startWave > 1 ? ` · 从第 ${def.startWave} 波开始` : '') +
       (def.startCoins > 0 ? ` · 开局 ${def.startCoins} 金币` : ''),
-    `移速 ${grid(TEAM.moveSpeed * fx.moveSpeedMul)}/秒 · 金币拾取 ${grid(PICKUP.magnetRadius * fx.magnetMul)}`,
+    `移速 ${grid(def.moveSpeed * fx.moveSpeedMul)}/秒 · 金币拾取 ${grid(def.coinMagnet * fx.magnetMul)}`,
   ]
+  if (def.hpMul !== 1) lines.push(`全队生命 ×${+def.hpMul.toFixed(2)}`)
+  if (def.reviveMul !== 1) lines.push(`复活时间 ×${+def.reviveMul.toFixed(2)}`)
   const xpMul = def.xpGainMul * fx.xpGainMul
   if (xpMul !== 1) lines.push(`经验获取 ×${+xpMul.toFixed(2)}`)
   if (fx.teamDamageMul !== 1) lines.push(`全队伤害 ×${+fx.teamDamageMul.toFixed(2)}`)

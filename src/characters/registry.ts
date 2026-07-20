@@ -135,7 +135,7 @@ export const TEAM = {
   smallRingRadius: 0.58,
   /** 2 人阵的左右圆心距（紧凑贴身，允许轻微视觉重叠）；1~2 人不环绕 */
   pairGap: 1.1,
-  moveSpeed: 5.5,
+  // 移速已下放到各队长（CaptainDef.moveSpeed）；复活基线仍在此，队长按 reviveMul 缩放
   reviveMs: 10_000,
   /** N 保 1 中心的受击判定半径系数：被保护的实际收益（碰撞圆减半更难被摸到） */
   guardCenterHurtboxMul: 0.5,

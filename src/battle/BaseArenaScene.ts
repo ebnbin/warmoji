@@ -481,7 +481,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.stats = {
       damageMul: 1,
       cooldownMul: this.stress ? STRESS.cooldownMul : 1,
-      moveSpeed: TEAM.moveSpeed * UNIT,
+      moveSpeed: CAPTAINS[this.run.captainId].moveSpeed * UNIT,
       maxHp: this.stress ? STRESS.maxHp : MEMBER.maxHp,
     }
     this.elapsedMs = 0
@@ -521,7 +521,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.driverPost = -1
     // 队长道具：团队修正（移速/磁吸/掉落/全队伤害）
     this.teamFx = aggregateTeamEffects(this.run.captainItems)
-    this.stats.moveSpeed = TEAM.moveSpeed * UNIT * this.teamFx.moveSpeedMul
+    this.stats.moveSpeed = CAPTAINS[this.run.captainId].moveSpeed * UNIT * this.teamFx.moveSpeedMul
     this.waveBaseKills = this.run.kills
     this.waveBaseCoins = this.run.coins
     this.waveBaseLevel = this.run.xp.level
@@ -910,7 +910,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         mm.anim.play(clipId, { durMs })
       },
     }
-    const maxHp = this.stress ? this.stats.maxHp : memberMaxHp(fx.hpAdd)
+    const maxHp = this.stress ? this.stats.maxHp : memberMaxHp(fx.hpAdd, CAPTAINS[this.run.captainId].hpMul)
     // 部件动画：idle 常驻翻帧（slot 错开相位），帧烘焙是惰性的，就绪前保持静态
     const anim = new Animator(image)
     anim.register('idle', clipFramesLive(this, emoji, 'idle', 'player'))
@@ -931,7 +931,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       maxHp,
       hurtRadius,
       iframesMs: MEMBER.iframesMs + fx.iframesAddMs,
-      reviveMs: Math.max(1000, TEAM.reviveMs + fx.reviveAddMs),
+      reviveMs: Math.max(1000, TEAM.reviveMs * CAPTAINS[this.run.captainId].reviveMul + fx.reviveAddMs),
       regenPerSec: fx.regenPerSec,
       thorns: fx.thorns,
       killHeal: fx.killHeal,

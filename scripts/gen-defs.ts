@@ -155,6 +155,10 @@ for (const [id, c] of Object.entries(CAPTAINS)) {
   const p = `captains.${id}`
   str(`${p}.emoji`, c.emoji)
   num(`${p}.teamSize`, c.teamSize, 1)
+  num(`${p}.moveSpeed`, c.moveSpeed, 0.01)
+  num(`${p}.coinMagnet`, c.coinMagnet, 0.01)
+  num(`${p}.hpMul`, c.hpMul, 0.01)
+  num(`${p}.reviveMul`, c.reviveMul, 0.01)
   num(`${p}.skill.cdMs`, c.skill.cdMs, 1)
   if ((c.skill.abilities as readonly unknown[]).length === 0) bad(`${p}.skill`, '主动技能缺效果载荷行')
   for (const [ai, a] of c.skill.abilities.entries()) {
