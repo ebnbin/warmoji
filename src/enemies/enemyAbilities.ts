@@ -21,23 +21,13 @@ const BULLET_LIFE_MS = 3000
 
 /** fireDelayMs：首发延迟基线（materialize 的随机开火抽取喂入，保持攻击
  * 积木时代的首发分布与 rng 流位次）；def.firstDelayMs 优先 */
-export function armEnemy(scene: BaseArenaScene, a: Enemy, fireDelayMs?: number): void {
-  const rows = a.def.abilities
-  if (!rows || rows.length === 0) return
+/** 敌方视角的阵营中立 ctx：targets = 队员快照、伤害走队员受击结算、发弹入敌弹组、
+ * 治疗作用于敌群。持械（armEnemy）与死亡效果（deathEffects）共用同一份实现——
+ * 二者都是「敌人在某处触发一串动作」，只是触发时机不同。 */
+export function buildEnemyCtx(scene: BaseArenaScene, a: Enemy): AbilityContext {
   const e = a.image
   const outline = a.elite || a.boss ? 'elite' : 'enemy'
-  const owner: AbilityOwner = {
-    get x() {
-      return e.x
-    },
-    get y() {
-      return e.y
-    },
-    // 敌人位置主权在物理/移动策略，不做弹性偏移：
-    // 自体动作类能力在敌人身上只有判定，身体动画走 held 视觉或 clip
-    setVisualOffset() {},
-  }
-  const ctx: AbilityContext = {
+  return {
     scene,
     ownerOutline: outline,
     targets: () => scene.frameMemberTargets,
@@ -84,6 +74,24 @@ export function armEnemy(scene: BaseArenaScene, a: Enemy, fireDelayMs?: number):
     },
     // 可选能力（吸金币/无敌帧/复活缩时）是队员专属概念：缺席
   }
+}
+
+export function armEnemy(scene: BaseArenaScene, a: Enemy, fireDelayMs?: number): void {
+  const rows = a.def.abilities
+  if (!rows || rows.length === 0) return
+  const e = a.image
+  const owner: AbilityOwner = {
+    get x() {
+      return e.x
+    },
+    get y() {
+      return e.y
+    },
+    // 敌人位置主权在物理/移动策略，不做弹性偏移：
+    // 自体动作类能力在敌人身上只有判定，身体动画走 held 视觉或 clip
+    setVisualOffset() {},
+  }
+  const ctx = buildEnemyCtx(scene, a)
   a.abilityOwner = owner
   a.abilities = rows.map((w, i) =>
     createAbility(
