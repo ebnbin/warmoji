@@ -24,22 +24,11 @@ export function runDeathEffects(scene: BaseArenaScene, a: Enemy): void {
   }
 }
 
-/** 分裂：生成 count 个迷你体，血量吃当前波次成长曲线，随机散开半格 */
+/** 分裂：随机散开半格生成 count 个迷你体（血量吃波次曲线）。
+ * 父 def 进场时已深度 px 化，split.into 随之——直接用，勿二次换算 */
 function spawnSplit(scene: BaseArenaScene, a: Enemy, fx: SplitEffect): void {
   if (scene.over) return
-  const e = a.image
-  const hpMul = waveAt((scene.run.combatMs + scene.elapsedMs) / 1000).hpMultiplier
-  // 父 def 进场时已深度 px 化，split.into 随之——直接用，勿二次换算
-  const into = fx.into
-  for (let i = 0; i < fx.count; i++) {
-    const ang = scene.rng.next() * Math.PI * 2
-    scene.materializeEnemy(
-      into,
-      e.x + Math.cos(ang) * 0.5 * UNIT,
-      e.y + Math.sin(ang) * 0.5 * UNIT,
-      Math.round(into.hp * hpMul),
-    )
-  }
+  scene.spawnBrood(fx.into, fx.count, a.image.x, a.image.y, 0.5 * UNIT)
 }
 
 /** 诱饵尸壳：原地留一具由自身退化的半透明替身——无伤害、无移动、无攻击、

@@ -1432,21 +1432,26 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     enemy.destroy()
   }
 
-  /** 虫巢生成：在巢穴周围撒 count 只子敌（血量吃当前波次成长曲线）。不设每巢上限
-   *（不打掉就持续施压是设计意图），仅在逼近全局在场上限时让路，避免压垮引擎 */
-  private spawnFromNest(a: Enemy, spawner: NonNullable<EnemyDef['spawner']>): void {
-    if (this.over || this.enemies.countActive(true) >= SPAWN.maxAlive) return
+  /** 成群生成子敌：(cx,cy) 周围按 scatter(px) 半径随机撒 count 只，血量吃当前波次
+   * 成长曲线。分裂（死亡触发）与虫巢（周期触发）共用这一个生成动作 */
+  spawnBrood(into: EnemyDef, count: number, cx: number, cy: number, scatter: number): void {
     const hpMul = waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier
-    const e = a.image
-    for (let i = 0; i < spawner.count; i++) {
+    for (let i = 0; i < count; i++) {
       const ang = this.rng.next() * Math.PI * 2
       this.materializeEnemy(
-        spawner.into,
-        e.x + Math.cos(ang) * 0.6 * UNIT,
-        e.y + Math.sin(ang) * 0.6 * UNIT,
-        Math.round(spawner.into.hp * hpMul),
+        into,
+        cx + Math.cos(ang) * scatter,
+        cy + Math.sin(ang) * scatter,
+        Math.round(into.hp * hpMul),
       )
     }
+  }
+
+  /** 虫巢周期生成：达全局在场上限时让路（避免压垮引擎），其余交给共用的 spawnBrood。
+   * 不设每巢上限——不打掉就持续施压是设计意图 */
+  private spawnFromNest(a: Enemy, spawner: NonNullable<EnemyDef['spawner']>): void {
+    if (this.over || this.enemies.countActive(true) >= SPAWN.maxAlive) return
+    this.spawnBrood(spawner.into, spawner.count, a.image.x, a.image.y, 0.6 * UNIT)
   }
 
   /** 静默移除：替身尸壳到时消失——不计击杀、不掉落、不跑死亡效果，只留一缕烟 */
