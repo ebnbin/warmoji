@@ -2,6 +2,7 @@ import type Phaser from 'phaser'
 import type { SummonDef } from './defs'
 import { applyEffects } from './effects'
 import { ACQUIRE } from './registry'
+import { UNIT } from '../core/units'
 import { ANIM_DEF } from '../emoji/studio'
 import { Animator } from '../emoji/animator'
 import { clipFramesLive } from '../emoji/animTextures'
@@ -54,7 +55,7 @@ export class SummonAbility implements AbilityRuntime {
       m.anim.update(this.clock)
       m.hitCd -= delta
       m.phase += dt * 2.4
-      const target = m.hitCd <= 0 ? nearestTarget(m.img.x, m.img.y, this.ctx.targets(), ACQUIRE.range) : null
+      const target = m.hitCd <= 0 ? nearestTarget(m.img.x, m.img.y, this.ctx.targets(), ACQUIRE.range * UNIT) : null
       // 目的地：出击 = 敌人；否则回主人身边的盘旋位
       const dest = target
         ? { x: target.x, y: target.y }

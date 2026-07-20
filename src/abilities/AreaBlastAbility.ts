@@ -1,5 +1,6 @@
 import type Phaser from 'phaser'
 import { ACQUIRE } from './registry'
+import { UNIT } from '../core/units'
 import type { AreaBlastDef } from './defs'
 import { applyBlast, applyEffects } from './effects'
 import { nearestTarget, targetsWithin } from './targeting'
@@ -31,7 +32,7 @@ export class AreaBlastAbility implements AbilityRuntime {
     if (this.echoIn > 0) {
       this.echoIn -= delta
       if (this.echoIn <= 0) {
-        const near = targetsWithin(owner.x, owner.y, this.ctx.targets(), ACQUIRE.range)
+        const near = targetsWithin(owner.x, owner.y, this.ctx.targets(), ACQUIRE.range * UNIT)
         if (near.length > 0) {
           const t = near[Math.floor(Math.random() * near.length)]!
           this.blastAt(t.x, t.y, this.echoDamage)
