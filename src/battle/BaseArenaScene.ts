@@ -18,7 +18,7 @@ import { memberMaxHp } from '../characters/stats'
 import type { CharacterId, CharacterDef } from '../characters/registry'
 import { SKILL } from '../captains/skill'
 import { STRESS } from '../debug/dev'
-import { BOSS, BOSS_SPAWN_RELIEF, ELITE, SPAWN, SURGE } from '../enemies/registry'
+import { BOSS, BOSS_SPAWN_RELIEF, DEFAULT_CONTACT, ELITE, SPAWN, SURGE } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
 import { UNIT } from '../core/units'
 import { WAVE } from '../run/waves'
@@ -1171,12 +1171,15 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (a.morphUntil > this.elapsedMs) return
     if (!m.alive || this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
-    this.hurtMember(m, Math.round(a.def.damage * a.dmgMul), 0xff7777, a.def.name)
-    // 黏黏怪：蹭到即给该队员挂限时攻速惩罚（接触触发的第 2 个效果占用者，除伤害外）
-    const cs = a.def.contactSlow
-    if (cs) {
-      m.atkSlowUntil = this.elapsedMs + cs.durationMs
-      m.atkSlowMul = cs.mul
+    // 接触触发：逐条求值敌人的接触效果（缺省一发伤害）。无敌帧由触发本身掌管，
+    // 与命中/死亡触发同为组合式，但攻速减益是敌→队员专属，故用敌方本地 ContactEffect
+    for (const fx of a.def.onContact ?? DEFAULT_CONTACT) {
+      if (fx.kind === 'damage') {
+        this.hurtMember(m, Math.round(a.def.damage * a.dmgMul), 0xff7777, a.def.name)
+      } else {
+        m.atkSlowUntil = this.elapsedMs + fx.durationMs
+        m.atkSlowMul = fx.mul
+      }
     }
     // 荆棘背心：接触反伤（与受击同帧、同吃无敌帧节流；击杀归属穿刺者）
     if (m.thorns > 0 && enemy.active) {

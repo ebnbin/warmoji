@@ -189,7 +189,7 @@ export const SLIME: EnemyDef = {
   damage: 5,
   xp: 4,
   coins: 3,
-  contactSlow: { mul: 1.6, durationMs: 3000 },
+  onContact: [{ kind: 'damage' }, { kind: 'attackSlow', mul: 1.6, durationMs: 3000 }],
 }
 
 export const BLOBLING: EnemyDef = {

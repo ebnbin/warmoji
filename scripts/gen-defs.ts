@@ -175,9 +175,14 @@ function checkEnemy(path: string, e: (typeof ENEMIES)[string]): void {
   num(`${path}.speed`, e.speed)
   num(`${path}.radius`, e.radius)
   for (const [i, a] of (e.abilities ?? []).entries()) checkAbility(`${path}.abilities[${i}]`, a as unknown as Record<string, unknown>)
-  if (e.contactSlow) {
-    num(`${path}.contactSlow.mul`, e.contactSlow.mul, 0.01)
-    num(`${path}.contactSlow.durationMs`, e.contactSlow.durationMs, 1)
+  for (const [i, fx] of (e.onContact ?? []).entries()) {
+    const cp = `${path}.onContact[${i}]`
+    if (fx.kind === 'attackSlow') {
+      num(`${cp}.mul`, fx.mul, 0.01)
+      num(`${cp}.durationMs`, fx.durationMs, 1)
+    } else if (fx.kind !== 'damage') {
+      bad(cp, `未知 onContact kind：${String((fx as { kind?: unknown }).kind)}`)
+    }
   }
   if (e.spawner) {
     checkEnemy(`${path}.spawner.into`, e.spawner.into)
