@@ -1345,52 +1345,69 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
   }
 
+  // 击杀 = 一串按序发生的钩子：计数/击杀者触发/掉落/Boss 通关/亡语/清体。
+  // 各步拆成命名方法（原本是一坨），触发时机清晰、rng 取用顺序严格不可乱动。
   private killEnemy(enemy: ImageObj, flingVx = 0, flingVy = 0, srcSlot = -1): void {
+    const a = enemyOf(enemy)
     this.run.kills++
     playSfx('kill')
-    const a = enemyOf(enemy)
-    const def = a.def
-    const elite = a.elite
-    const isBoss = a.boss
-    // 敌情明细：按敌人名计击杀，精英另计总数
+    this.recordKillStats(a)
+    this.runOnKill(srcSlot)
+    this.grantKillRewards(a, enemy)
+    if (a.boss) this.onBossDown(enemy)
+    // 亡语（死者视角）：蘑菇留毒/泡泡分裂/幽灵治疗等，走组合式效果
+    runDeathEffects(this, a)
+    this.despawnKilled(enemy, a, flingVx, flingVy)
+  }
+
+  /** 敌情明细：按敌人名计击杀，精英另计总数 */
+  private recordKillStats(a: Enemy): void {
     const st = this.run.stats
-    st.enemyKills[def.name] = (st.enemyKills[def.name] ?? 0) + 1
-    if (elite) st.eliteKills += 1
-    // 吸血獠牙：击杀者回血
+    st.enemyKills[a.def.name] = (st.enemyKills[a.def.name] ?? 0) + 1
+    if (a.elite) st.eliteKills += 1
+  }
+
+  /** 击杀触发（击杀者视角）：目前仅吸血獠牙回血；未来的击杀连锁/击杀爆炸等在此挂载 */
+  private runOnKill(srcSlot: number): void {
     const killer = this.members[srcSlot]
     if (killer?.alive && killer.killHeal > 0) {
       killer.hp = Math.min(killer.maxHp, killer.hp + killer.killHeal)
     }
-    // 经验击杀即得（队长倍率 × 四叶草团队倍率，精英有额外倍率）；金币落地等待拾取
+  }
+
+  /** 击杀掉落：经验即得（队长×四叶草×精英倍率），金币落地待拾（偷币鼠吐回吃掉的+利息），
+   * 极小概率掉宝箱（精英更高；压测/Boss 不掉）。rng 取用顺序固定，勿调整语句次序 */
+  private grantKillRewards(a: Enemy, enemy: ImageObj): void {
+    const def = a.def
+    const elite = a.elite
     const xpMul =
       CAPTAINS[this.run.captainId].xpGainMul * this.teamFx.xpGainMul * (elite ? ELITE.xpMul : 1)
     this.gainTeamXp(Math.round(def.xp * xpMul))
-    // 偷金币鼠：吐回吃掉的金币 + 1 枚利息
     const eaten = a.eaten
     const baseCoins = def.coins * (elite ? ELITE.coinsMul : 1)
     const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? baseCoins : 0
     spawnCoins(this, enemy.x, enemy.y, baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0))
-    // 宝箱：极小概率掉落（精英更高）；Boss 击杀即通关，掉了也来不及捡，不掉
-    if (!this.stress && !isBoss && chestDropped(elite, () => this.rng.next())) {
+    if (!this.stress && !a.boss && chestDropped(elite, () => this.rng.next())) {
       spawnChest(this, enemy.x, enemy.y)
     }
-    // 击败终波 Boss：稍候（碎块飞散可见）直接提前通关
-    if (isBoss) {
-      this.boss = undefined
-      this.deathBurst.explode(24, enemy.x, enemy.y)
-      this.time.delayedCall(700, () => {
-        if (!this.over) this.endWave()
-      })
-    }
-    // 死亡效果模块（蘑菇留毒/泡泡分裂等）
-    runDeathEffects(this, a)
+  }
+
+  /** 击败终波 Boss：稍候（碎块飞散可见）直接提前通关 */
+  private onBossDown(enemy: ImageObj): void {
+    this.boss = undefined
+    this.deathBurst.explode(24, enemy.x, enemy.y)
+    this.time.delayedCall(700, () => {
+      if (!this.over) this.endWave()
+    })
+  }
+
+  /** 清体：停用 + 拆械 + 死亡爆点 + 四象限碎片（继承致死击退速度不衰减）+ 销毁 */
+  private despawnKilled(enemy: ImageObj, a: Enemy, flingVx: number, flingVy: number): void {
     enemy.setActive(false)
     ;(enemy.body as ArcadeBody).enable = false
-    // 持械敌人：能力实例（持有物/塔/召唤物视觉）随体销毁
     if (a.abilities) for (const w of a.abilities) w.destroy()
     this.deathBurst.explode(6, enemy.x, enemy.y)
     this.tweens.killTweensOf(enemy)
-    // 本体裂成 4 个象限碎片：继承致死击退速度（不衰减）+ 象限散开 + 自旋 + 淡出
     spawnShards(this, enemy, flingVx, flingVy)
     enemy.destroy()
   }
