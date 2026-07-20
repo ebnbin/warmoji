@@ -1,9 +1,9 @@
 import type Phaser from 'phaser'
 import { ACQUIRE } from './registry'
-import { circleHitIndices } from './defs'
 import type { AreaBlastDef } from './defs'
+import { applyBlast } from './effects'
 import { emojiImage } from '../emoji/textures'
-import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
+import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 远程范围轰炸：在侦测范围内以最近敌人为爆心，对爆心圆形区域内所有敌人各一次伤害。
  * 能力：burn 爆心留灼烧地面；echo 延迟向随机敌人追加一次折损轰炸 */
@@ -39,7 +39,7 @@ export class AreaBlastAbility implements AbilityRuntime {
         })
         if (near.length > 0) {
           const t = near[Math.floor(Math.random() * near.length)]!
-          this.blastAt(t.x, t.y, this.echoDamage, targets)
+          this.blastAt(t.x, t.y, this.echoDamage)
         }
       }
     }
@@ -65,7 +65,7 @@ export class AreaBlastAbility implements AbilityRuntime {
     this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
 
     const damage = Math.round(this.def.damage * this.ctx.damageMul())
-    this.blastAt(center.x, center.y, damage, targets)
+    this.blastAt(center.x, center.y, damage)
     if (this.def.echo) {
       this.echoIn = this.def.echo.delayMs
       this.echoDamage = Math.max(1, Math.round(damage * this.def.echo.ratio))
@@ -73,11 +73,9 @@ export class AreaBlastAbility implements AbilityRuntime {
   }
 
   /** 一次完整爆炸：伤害 + 特效 + 灼烧地面（能力） */
-  private blastAt(x: number, y: number, damage: number, targets: readonly TargetInfo[]): void {
+  private blastAt(x: number, y: number, damage: number): void {
     this.ctx.sfx('boom')
-    for (const i of circleHitIndices({ x, y }, this.def.blastRadius, targets)) {
-      this.ctx.damageTarget(targets[i]!.ref, damage, this.def.knockback, x, y)
-    }
+    applyBlast(this.ctx, { x, y }, damage, this.def.blastRadius, this.def.knockback)
     if (this.def.burn) {
       this.ctx.spawnGroundEffect(x, y, this.def.burn)
     }

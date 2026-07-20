@@ -1,7 +1,8 @@
 import { DEG2RAD } from '../core/units'
 import type Phaser from 'phaser'
-import { circleHitIndices, thrustHitIndices } from './defs'
+import { thrustHitIndices } from './defs'
 import type { ThrustDef } from './defs'
+import { applyBlast } from './effects'
 import { emojiImage } from '../emoji/textures'
 import { nearestAngle } from './types'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
@@ -80,10 +81,7 @@ export class ThrustAbility implements AbilityRuntime {
     if (burst) {
       const tipX = owner.x + Math.cos(this.aim) * this.def.reach
       const tipY = owner.y + Math.sin(this.aim) * this.def.reach
-      const burstDamage = Math.max(1, Math.round(damage * burst.ratio))
-      for (const i of circleHitIndices({ x: tipX, y: tipY }, burst.radius, targets)) {
-        this.ctx.damageTarget(targets[i]!.ref, burstDamage, burst.knockback, tipX, tipY)
-      }
+      applyBlast(this.ctx, { x: tipX, y: tipY }, Math.max(1, Math.round(damage * burst.ratio)), burst.radius, burst.knockback)
       const ring = this.ctx.scene.add
         .circle(tipX, tipY, burst.radius, burst.color, 0.3)
         .setStrokeStyle(4, burst.color, 0.9)

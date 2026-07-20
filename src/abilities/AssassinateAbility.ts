@@ -1,7 +1,7 @@
 import { DEG2RAD } from '../core/units'
 import type Phaser from 'phaser'
-import { circleHitIndices } from './defs'
 import type { AssassinateDef } from './defs'
+import { applyBlast } from './effects'
 import { emojiImage } from '../emoji/textures'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
@@ -97,13 +97,14 @@ export class AssassinateAbility implements AbilityRuntime {
     this.ctx.damageTarget(target.ref, damage, this.def.knockback, landX, landY)
     const cleave = this.def.cleave
     if (cleave) {
-      const targets = this.ctx.targets()
-      const splash = Math.max(1, Math.round(damage * cleave.ratio))
-      for (const i of circleHitIndices({ x: target.x, y: target.y }, cleave.radius, targets)) {
-        const t = targets[i]!
-        if (t.ref === target.ref) continue
-        this.ctx.damageTarget(t.ref, splash, this.def.knockback * 0.6, target.x, target.y)
-      }
+      applyBlast(
+        this.ctx,
+        { x: target.x, y: target.y },
+        Math.max(1, Math.round(damage * cleave.ratio)),
+        cleave.radius,
+        this.def.knockback * 0.6,
+        new Set([target.ref]),
+      )
     }
     this.slash(target.x, target.y)
   }
