@@ -177,7 +177,7 @@ const BASE = {
       rotationOffsetDeg: 0,
     },
     // 变形替身：受害者顶着绵羊形象缓速游荡，失去一切伤害能力
-    hex: { durationMs: 2500, morphEmoji: '🐑' },
+    onHit: [{ kind: 'morph', durationMs: 2500, morphEmoji: '🐑' }],
   } satisfies ProjectileDef,
   shadowStrike: {
     kind: 'assassinate',
@@ -322,10 +322,12 @@ export const tomatoThrow2 = {
   ...BASE.tomatoThrow,
   volley: { count: 3, spreadDeg: 18 },
 } satisfies ProjectileDef
-/** 爆浆番茄 */
+/** 爆浆番茄（溅射不吃暴击、无击退，与弹丸主伤一致） */
 export const tomatoThrow3 = {
   ...tomatoThrow2,
-  splash: { radius: 0.9, ratio: 0.6 },
+  onHit: [
+    { kind: 'blast', radius: 0.9, ratio: 0.6, knockback: 0, ring: { color: 0xef5350, fillAlpha: 0.25, lineWidth: 3, lineAlpha: 0.8, durMs: 220 } },
+  ],
 } satisfies ProjectileDef
 
 /** 二连突刺 */
@@ -409,12 +411,12 @@ export const frostAura3 = {
 export const sparkleBolt2 = {
   ...BASE.sparkleBolt,
   pierce: 1,
-  hex: { ...BASE.sparkleBolt.hex, durationMs: 4000 },
+  onHit: [{ kind: 'morph', durationMs: 4000, morphEmoji: '🐑' }],
 } satisfies ProjectileDef
 /** 脆弱诅咒 */
 export const sparkleBolt3 = {
   ...sparkleBolt2,
-  hex: { ...sparkleBolt2.hex, vulnMul: 1.4 },
+  onHit: [{ kind: 'morph', durationMs: 4000, morphEmoji: '🐑', vulnMul: 1.4 }],
 } satisfies ProjectileDef
 
 /** 连环刃（击退取主斩 0.6×） */

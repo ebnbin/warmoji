@@ -55,7 +55,16 @@ export interface GroundZone {
   readonly def: GroundEffectDef
 }
 
-export type Effect = BlastEffect | SlowEffect | GroundZone
+/** 变形：把命中目标变成无害替身（形象顶替、失去一切伤害，到期恢复；Boss 免疫）。
+ * vulnMul 为变形期间的受伤倍率（脆弱诅咒）。逐目标施加，敌方无此机制（缺席即 no-op） */
+export interface MorphEffect {
+  readonly kind: 'morph'
+  readonly durationMs: number
+  readonly morphEmoji: string
+  readonly vulnMul?: number
+}
+
+export type Effect = BlastEffect | SlowEffect | GroundZone | MorphEffect
 
 export interface ThrustDef {
   readonly kind: 'thrust'
@@ -114,11 +123,10 @@ export interface ProjectileDef {
   readonly everyN?: { readonly n: number; readonly count: number; readonly spreadDeg: number }
   /** 贯穿：命中后继续飞行，可再命中的额外敌人数 */
   readonly pierce?: number
-  /** 溅射：命中点圆形爆裂（ratio × 伤害） */
-  readonly splash?: { readonly radius: number; readonly ratio: number }
-  /** 魔尘：命中把敌人变形成无害替身（失去一切伤害能力，形象顶替，
-   * 到期恢复；Boss 免疫）。vulnMul 为变形期间的受伤倍率（脆弱诅咒） */
-  readonly hex?: { readonly durationMs: number; readonly morphEmoji: string; readonly vulnMul?: number }
+  /** 命中效果：弹丸命中点施加的 onHit 效果（溅射 blast、魔尘 morph 等）。
+   * 在弹道机器（projectiles.ts）里落地——与角色能力同走 ctx 不同，弹丸伤害
+   * 不吃暴击（与弹丸主伤一致）。 */
+  readonly onHit?: readonly Effect[]
 }
 
 export interface SweepDef {

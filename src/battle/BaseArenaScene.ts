@@ -165,6 +165,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     spawnCoins: (x, y, count) => this.spawnRewardCoins(x, y, count),
     waveScale: () => (this.stress ? 1 : waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier),
     isBossTarget: (ref) => enemyOf(ref as ImageObj).boss,
+    morphTarget: (ref, spec) => this.applyHex(ref as ImageObj, spec),
     damageMul: () => this.stats.damageMul,
     cooldownMul: () => this.stats.cooldownMul,
     sfx: (id) => playSfx(id),

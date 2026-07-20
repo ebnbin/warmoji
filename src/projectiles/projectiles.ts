@@ -2,14 +2,16 @@ import { DEG2RAD } from '../core/units'
 import { playSfx } from '../audio/sfx'
 import { emojiImage } from '../emoji/textures'
 import { circleHitIndices, sweepFirstHitIndex } from '../abilities/defs'
-import type { ProjectileDef } from '../abilities/defs'
+import type { Effect, ProjectileDef } from '../abilities/defs'
+import type { TargetInfo } from '../abilities/types'
+import { blastRing } from '../abilities/effects'
 import type { EnemyProjectileDef } from '../enemies/registry'
 import { circleBody } from '../core/arcade'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
 // 弹药的类型化状态（敌我同构，faction 区分）：原精灵数据袋收拢为结构体，
 // 经 image.getData('projectile') 单键反查（与敌人的 'enemy' 同一模式）。
-// 玩家弹走线段扫掠命中（pierce/splash/hex 能力字段随弹携带）；
+// 玩家弹走线段扫掠命中（pierce 与 onHit 命中效果链随弹携带）；
 // 敌弹走物理 overlap + 寿命与世界钩子（cullEnemyProjectile）回收。
 
 export interface Projectile {
@@ -27,8 +29,8 @@ export interface Projectile {
   kb: number
   spin: number
   pierce: number
-  splash?: { radius: number; ratio: number }
-  hex?: { durationMs: number; morphEmoji: string; vulnMul?: number }
+  /** 命中效果链（溅射 blast / 魔尘 morph 等）；弹道机器在命中点求值 */
+  onHit?: readonly Effect[]
   hitRefs?: Set<ImageObj>
   /** 敌弹：伤害来源名（战报归属） */
   srcName?: string
@@ -88,10 +90,9 @@ export function spawnProjectile(
     prevY: y,
     // 环面世界的子弹永不出屏：按寿命回收（其余图为 0，不按寿命回收）
     dieAt: scene.projectileTtlMs !== null ? scene.elapsedMs + scene.projectileTtlMs : 0,
-    // 能力字段：贯穿余量 + 溅射/变形参数（sweepProjectiles 消费）
+    // 能力字段：贯穿余量 + 命中效果链（sweepProjectiles 命中点求值）
     pierce: def.pierce ?? 0,
-    splash: def.splash,
-    hex: def.hex,
+    onHit: def.onHit,
     // 对称投掷物（无指向修正角）飞行中自旋；有指向的（飞刀类）保持箭头朝向
     spin: def.projectile.rotationOffsetDeg === 0 ? 9 : 0,
   })
@@ -99,7 +100,7 @@ export function spawnProjectile(
 }
 
 /** 逐帧对每颗子弹做上一帧位置 → 当前位置的线段扫掠命中。
- * 能力：pierce 命中后不销毁继续飞（跳过已命中敌人）；splash 命中点溅射 */
+ * 能力：pierce 命中后不销毁继续飞（跳过已命中敌人）；onHit 命中点效果 */
 export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
   for (const p of scene.projectiles.getChildren() as ImageObj[]) {
     if (!p.active) continue
@@ -111,18 +112,7 @@ export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
     const hit = sweepFirstHitIndex(prev, { x: p.x, y: p.y }, b.radius, targets)
     if (hit >= 0) {
       const target = targets[hit]!
-      const { damage, kb, srcSlot, splash, hex } = b
-      // 爆浆溅射：命中点小圈内其余敌人吃折损伤害（同真身的镜像间距 ≥ 半场，
-      // 远大于溅射半径，不会经镜像重复命中）
-      if (splash) {
-        const splashDamage = Math.max(1, Math.round(damage * splash.ratio))
-        for (const i of circleHitIndices({ x: target.x, y: target.y }, splash.radius, scene.frameTargets)) {
-          const other = scene.frameTargets[i]!
-          if (other.ref === target.ref) continue
-          scene.applyDamage(other.ref as ImageObj, splashDamage, 0, undefined, undefined, srcSlot)
-        }
-        splashEffect(scene, target.x, target.y, splash.radius)
-      }
+      const { damage, kb, srcSlot } = b
       if (b.pierce > 0) {
         b.pierce -= 1
         const set = hitRefs ?? new Set<ImageObj>()
@@ -133,8 +123,8 @@ export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
       }
       // 击退源取上一帧位置：方向即子弹飞行方向
       scene.applyDamage(target.ref as ImageObj, damage, kb, prev.x, prev.y, srcSlot)
-      // 魔尘：命中即变形（无害绵羊；死者不变形，Boss 免疫由 applyHex 拒绝）
-      if (hex && (target.ref as ImageObj).active) scene.applyHex(target.ref as ImageObj, hex)
+      // 命中效果（溅射 blast / 魔尘 morph 等）：命中点求值，紧随主伤后施加
+      applyProjectileHit(scene, b.onHit, target, damage, srcSlot)
       if (!p.active) continue
     }
     if (b.spin > 0) p.rotation += (b.spin * delta) / 1000
@@ -143,21 +133,32 @@ export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
   }
 }
 
-/** 爆浆番茄的溅射视觉：小号红色冲击环 */
-function splashEffect(scene: BaseArenaScene, x: number, y: number, radius: number): void {
-  const ring = scene.add
-    .circle(x, y, radius, 0xef5350, 0.25)
-    .setStrokeStyle(3, 0xef5350, 0.8)
-    .setDepth(7)
-    .setScale(0.3)
-  scene.tweens.add({
-    targets: ring,
-    scale: 1,
-    alpha: 0,
-    duration: 220,
-    ease: 'Cubic.easeOut',
-    onComplete: () => ring.destroy(),
-  })
+/** 弹丸命中效果：命中点求值 onHit（溅射 blast / 魔尘 morph）。弹道机器无 ctx——
+ * blast 走 scene.applyDamage（不吃暴击，与弹丸主伤一致），morph 走 scene.applyHex。
+ * blast 只打命中点小圈内的「其余」敌人（排除主目标；镜像间距 ≥ 半场 ≫ 效果半径，
+ * 不会经镜像重复命中）。 */
+function applyProjectileHit(
+  scene: BaseArenaScene,
+  effects: readonly Effect[] | undefined,
+  target: TargetInfo,
+  baseDamage: number,
+  srcSlot: number,
+): void {
+  if (!effects) return
+  for (const e of effects) {
+    if (e.kind === 'blast') {
+      const dmg = Math.max(1, Math.round(baseDamage * e.ratio))
+      for (const i of circleHitIndices({ x: target.x, y: target.y }, e.radius, scene.frameTargets)) {
+        const other = scene.frameTargets[i]!
+        if (other.ref === target.ref) continue
+        scene.applyDamage(other.ref as ImageObj, dmg, e.knockback, undefined, undefined, srcSlot)
+      }
+      if (e.ring) blastRing(scene, target.x, target.y, e.radius, e.ring)
+    } else if (e.kind === 'morph') {
+      // 死者不变形；Boss 免疫由 applyHex 拒绝
+      if ((target.ref as ImageObj).active) scene.applyHex(target.ref as ImageObj, e)
+    }
+  }
 }
 
 // ── 敌方弹道机器：物理 overlap + 按寿命与世界钩子回收 ──────────

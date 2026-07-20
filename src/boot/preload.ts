@@ -70,10 +70,14 @@ function armedShotEmojis(): string[] {
   )
 }
 
-/** 全部魔尘变形替身形象（从角色配装聚合） */
+/** 全部魔尘变形替身形象（从角色配装的 onHit 效果聚合） */
 function morphEmojis(): string[] {
   return roster.flatMap((c) =>
-    c.abilities.flatMap((w) => (w.kind === 'projectile' && w.hex ? [w.hex.morphEmoji] : [])),
+    c.abilities.flatMap((w) =>
+      w.kind === 'projectile' && w.onHit
+        ? w.onHit.flatMap((e) => (e.kind === 'morph' ? [e.morphEmoji] : []))
+        : [],
+    ),
   )
 }
 

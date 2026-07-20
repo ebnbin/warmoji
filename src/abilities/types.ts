@@ -85,6 +85,8 @@ export interface AbilityContext {
   waveScale?(): number
   /** 目标是否 Boss（承伤折减类效果用） */
   isBossTarget?(ref: TargetInfo['ref']): boolean
+  /** 变形命中目标为无害替身（魔尘 morph 效果；敌方无此机制，缺席即 no-op） */
+  morphTarget?(ref: TargetInfo['ref'], spec: { durationMs: number; morphEmoji: string; vulnMul?: number }): void
 }
 
 /** 能力运行时：每（持有者×能力）一个实例，自管冷却/视觉/攻击行为 */

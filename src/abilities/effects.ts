@@ -1,3 +1,4 @@
+import type Phaser from 'phaser'
 import { circleHitIndices } from './defs'
 import type { BlastRing, Effect } from './defs'
 import type { AbilityContext, TargetInfo } from './types'
@@ -25,20 +26,21 @@ export function applyBlast(
   }
 }
 
-/** 命中环 VFX：从锚点扩张淡出的一圈（纯表现，参数随效果自带）。 */
+/** 命中环 VFX：从锚点扩张淡出的一圈（纯表现，参数随效果自带）。
+ * 取 scene（非 ctx）——弹道机器无 ctx 也能复用。 */
 export function blastRing(
-  ctx: AbilityContext,
+  scene: Phaser.Scene,
   x: number,
   y: number,
   radius: number,
   ring: BlastRing,
 ): void {
-  const g = ctx.scene.add
+  const g = scene.add
     .circle(x, y, radius, ring.color, ring.fillAlpha)
     .setStrokeStyle(ring.lineWidth, ring.color, ring.lineAlpha)
     .setDepth(7)
     .setScale(0.3)
-  ctx.scene.tweens.add({
+  scene.tweens.add({
     targets: g,
     scale: 1,
     alpha: 0,
@@ -67,11 +69,13 @@ export function applyEffects(
   for (const e of effects) {
     if (e.kind === 'blast') {
       applyBlast(ctx, hit.center, Math.max(1, Math.round(hit.baseDamage * e.ratio)), e.radius, e.knockback, hit.exclude)
-      if (e.ring) blastRing(ctx, hit.center.x, hit.center.y, e.radius, e.ring)
+      if (e.ring) blastRing(ctx.scene, hit.center.x, hit.center.y, e.radius, e.ring)
     } else if (e.kind === 'slow') {
       if (hit.targets) for (const ref of hit.targets) ctx.slowTarget(ref, e.factor, e.durationMs)
     } else if (e.kind === 'ground') {
       ctx.spawnGroundEffect(hit.center.x, hit.center.y, e.def)
+    } else if (e.kind === 'morph') {
+      if (hit.targets) for (const ref of hit.targets) ctx.morphTarget?.(ref, e)
     }
   }
 }

@@ -43,7 +43,10 @@ describe('花名册', () => {
     expect('held' in CHARACTERS.juggler.abilities[0]! && CHARACTERS.juggler.abilities[0].held).toBeFalsy()
     // 仙子的魔尘弹自带变形载荷（新引擎能力的数据入口）
     const bolt = CHARACTERS.fairy.abilities[0]!
-    expect(bolt.kind === 'projectile' && bolt.hex?.morphEmoji).toBe('🐑')
+    if (bolt.kind !== 'projectile') throw new Error('kind 不变')
+    const morph = bolt.onHit?.find((e) => e.kind === 'morph')
+    if (morph?.kind !== 'morph') throw new Error('缺 morph 效果')
+    expect(morph.morphEmoji).toBe('🐑')
   })
 })
 
@@ -70,11 +73,13 @@ describe('升级卡换持档位行', () => {
     const [w3] = loadoutFor(CHARACTERS.juggler, T1)
     if (w3?.kind !== 'projectile') throw new Error('kind 不变')
     expect(w3.volley?.count).toBe(3)
-    expect(w3.splash).toBeUndefined()
+    expect(w3.onHit).toBeUndefined()
     const [w6] = loadoutFor(CHARACTERS.juggler, T2)
     if (w6?.kind !== 'projectile') throw new Error('kind 不变')
     expect(w6.volley?.count).toBe(3)
-    expect(w6.splash?.ratio).toBeCloseTo(0.6)
+    const blast = w6.onHit?.find((e) => e.kind === 'blast')
+    if (blast?.kind !== 'blast') throw new Error('缺 blast 效果')
+    expect(blast.ratio).toBeCloseTo(0.6)
   })
 
   it('巨魔：一阶弧宽变整圈；牛仔双枪都获得贯穿', () => {
