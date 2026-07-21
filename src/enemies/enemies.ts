@@ -3,10 +3,7 @@ import type { AbilityOwner, AbilityRuntime } from '../abilities/types'
 import type { Animator } from '../emoji/animator'
 import type { ImageObj } from '../battle/BaseArenaScene'
 
-// 敌方实体的类型化状态：原先散落在精灵数据袋（getData/setData 字符串键 +
-// 逐处强转）的全部战斗状态收拢为一个结构体。精灵仍由 Phaser Group 持有
-//（物理/池化不变），结构体经 image.getData('enemy') 单键反查——全项目
-// 唯一的一次强转收口在 enemyOf。时间戳字段一律 0 哨兵 = 未生效。
+// 时间戳字段一律 0 哨兵 = 未生效。
 
 /** 行为状态机：wander 游荡 / chase 追击 / windup 蓄力 / dash 冲刺 / cool 冷却 */
 export type EnemyState = 'wander' | 'chase' | 'windup' | 'dash' | 'cool'

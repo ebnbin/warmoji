@@ -9,8 +9,6 @@ import type { EnemyProjectileDef } from '../enemies/registry'
 import { circleBody } from '../core/arcade'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
-// 弹药的类型化状态（敌我同构，faction 区分）：原精灵数据袋收拢为结构体，
-// 经 image.getData('projectile') 单键反查（与敌人的 'enemy' 同一模式）。
 // 玩家弹走线段扫掠命中（pierce 与 onHit 命中效果链随弹携带）；
 // 敌弹走物理 overlap + 寿命与世界钩子（cullEnemyProjectile）回收。
 

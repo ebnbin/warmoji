@@ -72,10 +72,7 @@ import type { UIScene } from './UIScene'
 
 // 竞技场基座：四张地图（有界/无界/河流/虚空）共享的战斗引擎——队伍与
 // 能力装配、伤害与击杀结算、刷怪节奏、敌人行为状态机、地面区域、金币、
-// 波次与结算、HUD/调试契约。世界差异全部收敛为下方的「世界规则钩子」：
-// 几何（worldDelta）、活跃分区（buildFrameTargets）、钳制/回绕（constrain*）、
-// 落点（spawnPoint/bossSpawnPoint）、逐帧附加力（teamDrift/postSteer*）、
-// 相机与视觉（createWorld）、回收（cull*）等。子类只写自己那一列差异。
+// 波次与结算、HUD/调试契约。
 // ⚠️ 基座的任何改动同时作用于四张图——改前跑四图回归（e2e + 探针）。
 
 interface TeamStats {

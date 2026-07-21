@@ -19,9 +19,6 @@ export interface AbilityOwner {
   setVisualOffset(dx: number, dy: number): void
 }
 
-/** 战场为能力提供的能力面板，阵营中立：能力只知道「我方/敌对方」，
- * 谁持有能力由 ctx 实现决定（队伍 ctx 由 ArenaScene 装配；敌方 ctx 未来同构）。
- * 必选能力双阵营同义；可选能力是阵营特有概念，实现可缺席（调用侧 ?. 容错） */
 export interface AbilityContext {
   scene: Phaser.Scene
   /** 持有方的 emoji 描边风格（持有物/召唤物视觉） */
@@ -62,7 +59,6 @@ export interface AbilityContext {
   /** 播放持有者本体的一次性动画 clip：durMs 传行为的真实间隔（攻速越快
    * 动画越快的绑定入口）。clip 未落地/未烘焙时静默保持静态 */
   playOwnerClip(clipId: string, durMs: number): void
-  // ── 可选能力（阵营特有概念，实现可缺席）──
   /** 持有者当前朝向（aim:'move' 弹用；敌方 ctx 取物理速度方向） */
   ownerHeading?(): { x: number; y: number }
   /** 持有方的确定性随机流（volley.randomRotate 用；敌方 ctx 接 scene.rng） */
