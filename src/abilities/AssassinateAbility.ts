@@ -2,7 +2,7 @@ import { DEG2RAD } from '../core/units'
 import type Phaser from 'phaser'
 import type { AssassinateDef } from './defs'
 import { applyEffects } from './effects'
-import { circleCue } from './cues'
+import { circleCue, slashCue } from './cues'
 import { strongestTarget } from './targeting'
 import { emojiImage } from '../emoji/textures'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
@@ -90,7 +90,7 @@ export class AssassinateAbility implements AbilityRuntime {
         exclude: new Set([target.ref]),
       })
     }
-    this.slash(target.x, target.y)
+    slashCue(this.ctx.scene, target.x, target.y, this.aim, 34)
   }
 
   /** 瞬移端点的残影闪光 */
@@ -102,21 +102,6 @@ export class AssassinateAbility implements AbilityRuntime {
       toScale: 1.8,
       durationMs: 240,
       depth: 14,
-    })
-  }
-
-  /** 斩击弧光 */
-  private slash(x: number, y: number): void {
-    const g = this.ctx.scene.add.graphics().setDepth(14)
-    g.lineStyle(5, 0xffffff, 0.9)
-    g.beginPath()
-    g.arc(x, y, 34, this.aim - 1.1, this.aim + 1.1)
-    g.strokePath()
-    this.ctx.scene.tweens.add({
-      targets: g,
-      alpha: 0,
-      duration: 220,
-      onComplete: () => g.destroy(),
     })
   }
 

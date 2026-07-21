@@ -3,6 +3,7 @@ import type Phaser from 'phaser'
 import { thrustHitIndices } from './defs'
 import type { LaserDef } from './defs'
 import { emojiImage } from '../emoji/textures'
+import { beamCue } from './cues'
 import { nearestAngle } from './targeting'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
@@ -77,31 +78,7 @@ export class LaserAbility implements AbilityRuntime {
     for (const i of thrustHitIndices(origin, angle, this.def.range, this.def.beamRadius, targets)) {
       this.ctx.damageTarget(targets[i]!.ref, damage, this.def.knockback, origin.x, origin.y)
     }
-    this.beamEffect(origin.x, origin.y, angle)
-  }
-
-  private beamEffect(x: number, y: number, angle: number): void {
-    const beam = this.ctx.scene.add
-      .rectangle(x, y, this.def.range, this.def.beamRadius * 2, this.def.color, 0.55)
-      .setOrigin(0, 0.5)
-      .setRotation(angle)
-      .setDepth(7)
-    const core = this.ctx.scene.add
-      .rectangle(x, y, this.def.range, this.def.beamRadius * 0.7, 0xffffff, 0.95)
-      .setOrigin(0, 0.5)
-      .setRotation(angle)
-      .setDepth(8)
-    this.ctx.scene.tweens.add({
-      targets: [beam, core],
-      alpha: 0,
-      scaleY: 0.15,
-      duration: 200,
-      ease: 'Cubic.easeIn',
-      onComplete: () => {
-        beam.destroy()
-        core.destroy()
-      },
-    })
+    beamCue(this.ctx.scene, origin.x, origin.y, angle, this.def.range, this.def.beamRadius, this.def.color)
   }
 
   setVisible(on: boolean): void {

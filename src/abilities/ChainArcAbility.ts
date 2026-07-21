@@ -1,5 +1,6 @@
 import type { ChainArcDef } from './defs'
 import { applyEffects } from './effects'
+import { lightningCue } from './cues'
 import { nearestTarget } from './targeting'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
@@ -43,31 +44,7 @@ export class ChainArcAbility implements AbilityRuntime {
       applyEffects(this.ctx, this.def.onHit, { center: { x: last.x, y: last.y }, baseDamage: damage, exclude: visited })
     }
 
-    this.drawArc(points)
-  }
-
-  /** 锯齿闪电折线：每段拆几截并加垂直抖动，短暂淡出 */
-  private drawArc(points: { x: number; y: number }[]): void {
-    if (points.length < 2) return
-    const g = this.ctx.scene.add.graphics().setDepth(14)
-    g.lineStyle(3, this.def.color, 0.95)
-    g.beginPath()
-    for (let i = 1; i < points.length; i++) {
-      const a = points[i - 1]!
-      const b = points[i]!
-      const segs = 4
-      g.moveTo(a.x, a.y)
-      for (let s = 1; s <= segs; s++) {
-        const t = s / segs
-        const nx = -(b.y - a.y)
-        const ny = b.x - a.x
-        const len = Math.hypot(nx, ny) || 1
-        const jitter = s === segs ? 0 : (Math.random() - 0.5) * 18
-        g.lineTo(a.x + (b.x - a.x) * t + (nx / len) * jitter, a.y + (b.y - a.y) * t + (ny / len) * jitter)
-      }
-    }
-    g.strokePath()
-    this.ctx.scene.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() })
+    lightningCue(this.ctx.scene, points, this.def.color)
   }
 
   setVisible(_on: boolean): void {

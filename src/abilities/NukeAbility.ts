@@ -1,4 +1,5 @@
 import type { NukeDef } from './defs'
+import { screenFlashCue } from './cues'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 全域打击型：全场活跃目标各吃一次大额伤害 + 全屏白闪。伤害随当前波次
@@ -24,12 +25,7 @@ export class NukeAbility implements AbilityRuntime {
 
   castNow(_owner: AbilityOwner): void {
     void _owner
-    const scene = this.ctx.scene
-    const flash = scene.add
-      .rectangle(scene.scale.width / 2, scene.scale.height / 2, 6000, 6000, 0xffffff, 0.55)
-      .setScrollFactor(0)
-      .setDepth(200)
-    scene.tweens.add({ targets: flash, alpha: 0, duration: 380, onComplete: () => flash.destroy() })
+    screenFlashCue(this.ctx.scene, 0xffffff, 0.55, 380)
     this.ctx.sfx('boom')
     const scale = this.ctx.waveScale?.() ?? 1
     const mul = this.ctx.damageMul()

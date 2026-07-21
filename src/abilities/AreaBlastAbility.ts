@@ -2,9 +2,8 @@ import { ACQUIRE } from './registry'
 import { UNIT } from '../core/units'
 import type { AreaBlastDef } from './defs'
 import { applyBlast, applyEffects } from './effects'
-import { circleCue } from './cues'
+import { boomCue, circleCue } from './cues'
 import { nearestTarget, targetsWithin } from './targeting'
-import { emojiImage } from '../emoji/textures'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 远程范围轰炸：在侦测范围内以最近敌人为爆心，对爆心圆形区域内所有敌人各一次伤害。
@@ -86,17 +85,7 @@ export class AreaBlastAbility implements AbilityRuntime {
       depth: 7,
     })
     // 💥 爆裂
-    const boom = emojiImage(scene, x, y, '💥', this.def.blastRadius * 1.5).setDepth(9)
-    const full = boom.scale
-    boom.setScale(full * 0.4).setRotation((Math.random() - 0.5) * 0.8)
-    scene.tweens.add({
-      targets: boom,
-      scale: full,
-      alpha: 0,
-      duration: 340,
-      ease: 'Back.easeOut',
-      onComplete: () => boom.destroy(),
-    })
+    boomCue(scene, x, y, this.def.blastRadius * 1.5)
   }
 
   setVisible(on: boolean): void {
