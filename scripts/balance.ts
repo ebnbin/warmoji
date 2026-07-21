@@ -1,4 +1,6 @@
 import { ABILITIES } from '../defs/abilities.ts'
+import { CHARACTERS } from '../defs/characters.ts'
+import { WEAPONS } from '../defs/weapons.ts'
 import { BUDGET, COMBAT_KINDS } from '../defs/budget.ts'
 import { abilityDps } from './dps.ts'
 
@@ -77,3 +79,26 @@ for (const kind of COMBAT_KINDS) {
 }
 
 console.log(`\n${flagged === 0 ? '✓ 全部战斗能力（含各档）落在设计带宽内' : `⚠ ${flagged} 个档位越界`}`)
+
+// 按角色的账：真正的平衡镜头——每个角色的基础输出总量 + 定位。DPS 从 0 铺到高位
+// 是故意的角色分层（输出位高、控制/支援位低），组队混搭；跨角色不追求等强。
+const ROLE: Record<string, string> = {
+  cowboy: '输出·单体', juggler: '输出·单体', unicorn: '输出·穿透',
+  beaver: '输出·驻守并发', queenBee: '输出·召唤并发',
+  troll: '范围·近战', jellyfish: '范围·连锁', mage: '范围·远程', kangaroo: '范围·往返', robot: '范围·贯穿',
+  assassin: '爆发·点杀厚血',
+  fairy: '控制·变形', snowman: '控制·减速', medic: '支援·治疗',
+}
+const chars = CHARACTERS as unknown as Record<string, { emoji: string; name: string; weapons: readonly string[]; innate: readonly { base: string }[] }>
+const weaps = WEAPONS as unknown as Record<string, { base: string }>
+const charRows = Object.entries(chars)
+  .map(([id, c]) => {
+    const bases = [...c.weapons.map((w) => weaps[w]!.base), ...c.innate.map((i) => i.base)]
+    const dps = bases.reduce((s, b) => s + abilityDps(all[b]!), 0)
+    return { id, label: `${c.emoji} ${c.name}`, dps, kinds: bases.map((b) => String(all[b]!.kind)).join('+') }
+  })
+  .sort((a, b) => b.dps - a.dps)
+console.log('\n== 按角色（基础档输出总量，降序）==')
+for (const r of charRows) {
+  console.log(`${r.label.padEnd(10)}${r.dps.toFixed(0).padStart(4)}  ${(ROLE[r.id] ?? '').padEnd(14)}${r.kinds}`)
+}
