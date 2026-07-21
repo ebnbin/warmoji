@@ -94,6 +94,20 @@ export interface HealEffect {
   readonly all?: boolean
 }
 
+/** 逐目标直伤：对本次命中/接触的每个目标造成 ratio×基准伤害（缺省 1）。无敌帧节流由 ctx
+ * 决定——接触触发在触发点节流、此处裸施伤；远程命中则 ctx.damageTarget 侧节流 */
+export interface DamageEffect {
+  readonly kind: 'damage'
+  readonly ratio?: number
+}
+
+/** 攻速减益（敌→队员专属）：ctx 实现注入，其余阵营缺席即 no-op（同 morph/spawnBullet 的可选式） */
+export interface AttackSlowEffect {
+  readonly kind: 'attackSlow'
+  readonly mul: number
+  readonly durationMs: number
+}
+
 export type Effect =
   | BlastEffect
   | SlowEffect
@@ -101,6 +115,8 @@ export type Effect =
   | MorphEffect
   | SpawnProjectileEffect
   | HealEffect
+  | DamageEffect
+  | AttackSlowEffect
 
 export interface ThrustDef {
   readonly kind: 'thrust'

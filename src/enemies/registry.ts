@@ -71,14 +71,8 @@ export interface DecoyEffect {
 /** 亡语效果：组合式 Effect（ground/heal/spawnProjectile…）+ 生成实体类（split/decoy） */
 export type DeathEffect = Effect | SplitEffect | DecoyEffect
 
-/** 接触触发效果（敌→队员；接触本身掌管无敌帧节流）：伤害 / 攻速减益。
- * 与命中/死亡的组合式 Effect 分开——攻速减益是敌→队员专属，接触的节流语义也不同 */
-export type ContactEffect =
-  | { readonly kind: 'damage' }
-  | { readonly kind: 'attackSlow'; readonly mul: number; readonly durationMs: number }
-
 /** 缺省接触效果：一发接触伤害（未显式配 onContact 的敌人都用它，共享一份不重复分配） */
-export const DEFAULT_CONTACT: readonly ContactEffect[] = [{ kind: 'damage' }]
+export const DEFAULT_CONTACT: readonly Effect[] = [{ kind: 'damage' }]
 
 export interface EnemyDef {
   readonly kind:
@@ -112,7 +106,7 @@ export interface EnemyDef {
   readonly abilities?: readonly AbilityDef[]
   readonly onDeath?: readonly DeathEffect[]
   /** 接触触发效果：蹭到队员时逐条施加（缺省 = 一发接触伤害，见 DEFAULT_CONTACT） */
-  readonly onContact?: readonly ContactEffect[]
+  readonly onContact?: readonly Effect[]
   /** 巢穴：周期性生成子敌（非死亡触发的生成实体；into 随父深度 px 化）——不打掉就一直刷 */
   readonly spawner?: {
     readonly into: EnemyDef

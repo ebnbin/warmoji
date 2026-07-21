@@ -46,6 +46,8 @@ export interface EffectCtx {
   /** 发弹（效果触发的一次性冷枪）：只带 ProjectileSpec 与伤害/寿命，无 pierce/齐射；
    * 复用弹丸投送机器。目前仅敌方死亡冷枪在用，队伍侧缺席（onHit 不含 spawnProjectile） */
   spawnBullet?(x: number, y: number, angle: number, spec: ProjectileSpec, damage: number, lifeMs: number): void
+  /** 队员攻速减益（接触触发的 attackSlow 效果；敌方 ctx 实现，其余缺席即 no-op） */
+  attackSlowMember?(ref: TargetInfo['ref'], mul: number, durationMs: number): void
 }
 
 /** 持有者面板 = 效果执行面（EffectCtx）+ 持有者侧接线（索敌/瞄准/冷却倍率/

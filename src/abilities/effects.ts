@@ -84,6 +84,10 @@ export function applyEffects(
     } else if (e.kind === 'spawnProjectile') {
       const angle = angleToNearest(hit.center.x, hit.center.y, ctx.targets())
       if (angle !== null) ctx.spawnBullet?.(hit.center.x, hit.center.y, angle, e.projectile, e.damage, e.lifeMs)
+    } else if (e.kind === 'damage') {
+      if (hit.targets) for (const ref of hit.targets) ctx.damageTarget(ref, Math.max(1, Math.round(hit.baseDamage * (e.ratio ?? 1))))
+    } else if (e.kind === 'attackSlow') {
+      if (hit.targets) for (const ref of hit.targets) ctx.attackSlowMember?.(ref, e.mul, e.durationMs)
     }
   }
 }

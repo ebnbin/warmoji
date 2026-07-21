@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { toPx } from './px'
 import { attachEnemy, enemyOf } from '../enemies/enemies'
 import type { Enemy } from '../enemies/enemies'
-import { armEnemy } from '../enemies/enemyAbilities'
+import { armEnemy, healEnemies } from '../enemies/enemyAbilities'
 import { attachMember, memberOf } from '../characters/members'
 import type { Member } from '../characters/members'
 import { projectileOf, spawnProjectile, sweepProjectiles, updateEnemyProjectiles } from '../projectiles/projectiles'
@@ -190,6 +190,28 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 死者不变形（子弹主伤可能已致死）；Boss 免疫由 applyHex 拒绝
     morphTarget: (ref, spec) => {
       if ((ref as ImageObj).active) this.applyHex(ref as ImageObj, spec)
+    },
+  }
+  // 接触触发的场景级 enemy ctx：敌人蹭队员的 onContact 效果复用统一 applyEffects。
+  // 无敌帧节流在 onMemberTouched 掌管，故 damageTarget 裸施伤（区别于远程命中的敌方 ctx）
+  private contactSrcName = ''
+  private contactTargets: TargetInfo['ref'][] = []
+  private enemyContactCtx: EffectCtx = {
+    scene: this,
+    targets: () => this.frameMemberTargets,
+    damageTarget: (ref, damage) => {
+      const m = memberOf(ref as ImageObj)
+      if (m.alive) this.hurtMember(m, damage, 0xff7777, this.contactSrcName)
+    },
+    slowTarget: () => {},
+    spawnGroundEffect: (x, y, def) =>
+      spawnGroundEffect(this, x, y, def, { faction: 'enemy', srcName: this.contactSrcName }),
+    heal: (x, y, range, amount, all, exclude) =>
+      healEnemies(this, x, y, range, amount, all, exclude ? enemyOf(exclude as ImageObj) : undefined),
+    attackSlowMember: (ref, mul, durationMs) => {
+      const m = memberOf(ref as ImageObj)
+      m.atkSlowUntil = this.elapsedMs + durationMs
+      m.atkSlowMul = mul
     },
   }
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
@@ -1193,16 +1215,14 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (a.morphUntil > this.elapsedMs) return
     if (!m.alive || this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
-    // 接触触发：逐条求值敌人的接触效果（缺省一发伤害）。无敌帧由触发本身掌管，
-    // 与命中/死亡触发同为组合式，但攻速减益是敌→队员专属，故用敌方本地 ContactEffect
-    for (const fx of a.def.onContact ?? DEFAULT_CONTACT) {
-      if (fx.kind === 'damage') {
-        this.hurtMember(m, Math.round(a.def.damage * a.dmgMul), 0xff7777, a.def.name)
-      } else {
-        m.atkSlowUntil = this.elapsedMs + fx.durationMs
-        m.atkSlowMul = fx.mul
-      }
-    }
+    // 接触效果走统一 Effect 执行器（无敌帧节流已在上方掌管；srcName/伤害基准注入 ctx）
+    this.contactSrcName = a.def.name
+    this.contactTargets[0] = m.image
+    applyEffects(this.enemyContactCtx, a.def.onContact ?? DEFAULT_CONTACT, {
+      center: { x: m.image.x, y: m.image.y },
+      baseDamage: a.def.damage * a.dmgMul,
+      targets: this.contactTargets,
+    })
     // 荆棘背心：接触反伤（与受击同帧、同吃无敌帧节流；击杀归属穿刺者）
     if (m.thorns > 0 && enemy.active) {
       this.applyDamage(enemy, m.thorns, 0, undefined, undefined, m.slot)
