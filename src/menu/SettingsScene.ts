@@ -7,7 +7,7 @@ import { loadSettings, saveSettings, SETTING_DEFS } from '../run/settings'
 import type { Settings } from '../run/settings'
 import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
-import { emojiImage } from '../emoji/textures'
+import { emojiImage, emojiText } from '../emoji/textures'
 import { FONT, UI_FONT } from '../core/fonts'
 import { setBgmEnabled } from '../audio/bgm'
 import { playSfx, setSfxEnabled } from '../audio/sfx'
@@ -87,15 +87,20 @@ export class SettingsScene extends Phaser.Scene {
     }
     this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
 
-    this.add
-      .text(w / 2, oy + L.headerY, '⚙️ 设置', {
+    emojiText(
+      this,
+      w / 2,
+      oy + L.headerY,
+      '{2699} 设置',
+      {
         fontFamily: UI_FONT,
         fontSize: FONT.title,
         fontStyle: 'bold',
         color: '#f5f5f5',
         resolution: res,
-      })
-      .setOrigin(0.5)
+      },
+      { origin: 0.5 },
+    )
 
     // 开关列表（居中单列；选项多了再做分组/滚动）
     const S = L.list

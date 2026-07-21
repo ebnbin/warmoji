@@ -1,10 +1,5 @@
 import { execSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vitest/config'
-
-const twemojiVersion = (
-  JSON.parse(readFileSync('node_modules/twemoji-svg/package.json', 'utf8')) as { version: string }
-).version
 
 // 构建版本号：Vercel/CI 环境取平台注入的 commit SHA，本地取 git HEAD，兜底 'dev'。
 function commitHash(): string {
@@ -27,7 +22,6 @@ export default defineConfig({
   define: {
     __BUILD_HASH__: JSON.stringify(commitHash()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'),
-    __TWEMOJI_VERSION__: JSON.stringify(twemojiVersion),
   },
   test: {
     include: ['src/**/*.test.ts'],

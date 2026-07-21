@@ -75,7 +75,7 @@ function flatten(groups: readonly { title: string; lines: readonly string[] }[])
 export function wikiGroups(): WikiGroup[] {
   return [
     {
-      icon: '🤹',
+      icon: '1f939',
       title: '角色',
       // 图鉴按素体视角展示（升级卡解锁状态见商店/属性面板）
       entries: (Object.keys(CHARACTERS) as CharacterId[]).map((id) => ({
@@ -86,7 +86,7 @@ export function wikiGroups(): WikiGroup[] {
       })),
     },
     {
-      icon: '😇',
+      icon: '1f607',
       title: '队长',
       entries: Object.values(CAPTAINS).map((c) => ({
         emoji: c.emoji,
@@ -96,7 +96,7 @@ export function wikiGroups(): WikiGroup[] {
       })),
     },
     {
-      icon: '🧟',
+      icon: '1f9df',
       title: '敌人',
       entries: ENEMY_DEFS.map((e) => ({
         emoji: e.emoji,
@@ -106,7 +106,7 @@ export function wikiGroups(): WikiGroup[] {
       })),
     },
     {
-      icon: '🗡️',
+      icon: '1f5e1',
       title: '武器',
       // 武器 = 包装能力的实体载体（有手持视觉，被角色持有）；抽象能力不进图鉴，
       // 徒手能力在角色详情里看
@@ -118,7 +118,7 @@ export function wikiGroups(): WikiGroup[] {
       })),
     },
     {
-      icon: '🛡️',
+      icon: '1f6e1',
       title: '道具',
       entries: Object.values<ItemDef>(ITEMS).map((i) => ({
         emoji: i.emoji,

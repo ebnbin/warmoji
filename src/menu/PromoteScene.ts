@@ -445,15 +445,15 @@ export class PromoteScene extends Phaser.Scene {
   /** 十卡三态：已解锁按角色亮牌（入队 ✔️ / 本轮已选 ✅），未解锁 ❓ 盖牌 */
   private buildItems(): { key: string; emoji: string; outline?: 'player'; badge?: string }[] {
     return this.pool.map((id, i) => {
-      if (i >= this.unlocked) return { key: `lock-${i}`, emoji: '❓' }
+      if (i >= this.unlocked) return { key: `lock-${i}`, emoji: '2753' }
       return {
         key: id,
         emoji: CHARACTERS[id].emoji,
         outline: 'player' as const,
         ...(this.run.roster.includes(id)
-          ? { badge: '🎖️' }
+          ? { badge: '1f396' }
           : this.picked.includes(id)
-            ? { badge: '✅' }
+            ? { badge: '2705' }
             : {}),
       }
     })
@@ -683,7 +683,7 @@ export class PromoteScene extends Phaser.Scene {
     if (this.selectedKey.startsWith('lock-')) {
       const idx = Number(this.selectedKey.slice(5))
       this.detailObjs.push(
-        emojiImage(this, dx + 46, dy + 48, '❓', 74),
+        emojiImage(this, dx + 46, dy + 48, '2753', 74),
         this.add
           .text(dx + 90, dy + 36, '命运牌 · 未解锁', {
             fontFamily: UI_FONT,
@@ -854,7 +854,7 @@ export class PromoteScene extends Phaser.Scene {
             dash.strokePath()
           }
           c.add(dash)
-          const plus = emojiImage(this, 0, 0, '➕', 20)
+          const plus = emojiImage(this, 0, 0, '2795', 20)
           plus.setAlpha(0.4)
           c.add(plus)
         }

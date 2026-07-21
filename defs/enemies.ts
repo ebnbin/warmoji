@@ -6,7 +6,7 @@ import type { EnemyDef } from '../src/enemies/registry'
 export const ZOMBIE: EnemyDef = {
   kind: 'zombie',
   locomotion: { kind: 'chase' },
-  emoji: '🧟',
+  emoji: '1f9df',
   name: '僵尸',
   desc: '缓慢但成群，最基础的追击者',
   size: 1.35,
@@ -21,7 +21,7 @@ export const ZOMBIE: EnemyDef = {
 export const GHOST: EnemyDef = {
   kind: 'ghost',
   locomotion: { kind: 'chase' },
-  emoji: '👻',
+  emoji: '1f47b',
   name: '幽灵',
   desc: '飘得很快的追击者，血薄，死亡时治疗周围同伴',
   size: 1.2,
@@ -39,7 +39,7 @@ export const GHOST: EnemyDef = {
 export const INVADER: EnemyDef = {
   kind: 'invader',
   locomotion: { kind: 'wander' },
-  emoji: '👾',
+  emoji: '1f47e',
   name: '外星怪',
   desc: '不追人，游荡途中朝前方吐慢速弹，死亡放一记冷枪',
   size: 1.25,
@@ -57,7 +57,7 @@ export const INVADER: EnemyDef = {
       knockback: 0,
       aim: 'move',
       lifeMs: 4500,
-      projectile: { emoji: '🔴', size: 0.4, radius: 0.14, speed: 3, rotationOffsetDeg: 0 },
+      projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3, rotationOffsetDeg: 0 },
     },
   ],
   // 亡语：朝断气那一刻最近队员的方向补一发慢速冷枪（击杀后仍要走位）
@@ -67,7 +67,7 @@ export const INVADER: EnemyDef = {
       aim: 'nearest',
       damage: 8,
       lifeMs: 6000,
-      projectile: { emoji: '🛸', size: 0.6, radius: 0.2, speed: 1.5, rotationOffsetDeg: 0 },
+      projectile: { emoji: '1f6f8', size: 0.6, radius: 0.2, speed: 1.5, rotationOffsetDeg: 0 },
     },
   ],
 }
@@ -75,7 +75,7 @@ export const INVADER: EnemyDef = {
 /** 突刺怪：探测圈内锁定蓄力方向 → 短延迟 → 直线冲刺一段距离（横向位移可躲） */
 export const BOAR: EnemyDef = {
   kind: 'boar',
-  emoji: '🐗',
+  emoji: '1f417',
   name: '野猪',
   desc: '发现猎物后蓄力直线突刺，横向可躲，死亡留半透明尸壳诱骗火力',
   size: 1.4,
@@ -103,7 +103,7 @@ export const BOAR: EnemyDef = {
 /** 逃跑射手：见人就拉开距离，周期性朝人吐慢速毒弹（制造追不追的抉择） */
 export const SNAKE: EnemyDef = {
   kind: 'snake',
-  emoji: '🐍',
+  emoji: '1f40d',
   name: '毒蛇',
   desc: '见人就溜，边逃边回头吐毒弹',
   size: 1.25,
@@ -123,7 +123,7 @@ export const SNAKE: EnemyDef = {
       // 沿用攻击积木的「任意距离都开火」：覆写索敌上限到远超全图对角
       range: 99,
       lifeMs: 4500,
-      projectile: { emoji: '🟢', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
+      projectile: { emoji: '1f7e2', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
     },
   ],
 }
@@ -132,7 +132,7 @@ export const SNAKE: EnemyDef = {
 export const MUSHROOM: EnemyDef = {
   kind: 'mushroom',
   locomotion: { kind: 'chase' },
-  emoji: '🍄',
+  emoji: '1f344',
   name: '毒蘑菇',
   desc: '死亡时在原地留下一片毒液',
   size: 1.25,
@@ -163,7 +163,7 @@ export const MUSHROOM: EnemyDef = {
 export const RAT: EnemyDef = {
   kind: 'rat',
   locomotion: { kind: 'coinThief' },
-  emoji: '🐀',
+  emoji: '1f400',
   name: '偷币鼠',
   desc: '专偷地上的金币，击杀可全额讨回并有利息',
   size: 1.05,
@@ -179,7 +179,7 @@ export const RAT: EnemyDef = {
 export const SLIME: EnemyDef = {
   kind: 'slime',
   locomotion: { kind: 'chase' },
-  emoji: '🐌',
+  emoji: '1f40c',
   name: '黏黏怪',
   desc: '缓慢肉盾，蹭到的队员会被黏住，攻速大降数秒',
   size: 1.3,
@@ -195,7 +195,7 @@ export const SLIME: EnemyDef = {
 export const BLOBLING: EnemyDef = {
   kind: 'blobling',
   locomotion: { kind: 'chase' },
-  emoji: '🫧',
+  emoji: '1fae7',
   name: '小泡泡',
   desc: '泡泡分裂出的迷你体，快而脆',
   size: 0.75,
@@ -211,7 +211,7 @@ export const BLOBLING: EnemyDef = {
 export const BLOB: EnemyDef = {
   kind: 'blob',
   locomotion: { kind: 'chase' },
-  emoji: '🫧',
+  emoji: '1fae7',
   name: '泡泡',
   desc: '被击破时分裂成两只小泡泡',
   size: 1.55,
@@ -228,7 +228,7 @@ export const BLOB: EnemyDef = {
 export const LARVA: EnemyDef = {
   kind: 'larva',
   locomotion: { kind: 'chase' },
-  emoji: '🦟',
+  emoji: '1f99f',
   name: '小飞虫',
   desc: '虫巢吐出的迷你飞虫，血薄但快，成群骚扰',
   size: 0.7,
@@ -244,7 +244,7 @@ export const LARVA: EnemyDef = {
 export const HIVE: EnemyDef = {
   kind: 'hive',
   locomotion: { kind: 'static' },
-  emoji: '🪺',
+  emoji: '1faba',
   name: '虫巢',
   desc: '原地不动的巢穴，每隔几秒吐出小飞虫，不拆掉就一直刷',
   size: 1.5,
@@ -291,7 +291,7 @@ export const ENEMY_MIX = [
 
 export const BOSS: EnemyDef = {
   kind: 'boss',
-  emoji: '👹',
+  emoji: '1f479',
   name: '赤鬼',
   desc: '终波头目：环形弹幕与蓄力突刺，击退免疫',
   size: 3.2,
@@ -324,7 +324,7 @@ export const BOSS: EnemyDef = {
       lifeMs: 6000,
       fireSfx: 'boom',
       volley: { count: 12, spreadDeg: 360, randomRotate: true },
-      projectile: { emoji: '🟣', size: 0.45, radius: 0.16, speed: 2.4, rotationOffsetDeg: 0 },
+      projectile: { emoji: '1f7e3', size: 0.45, radius: 0.16, speed: 2.4, rotationOffsetDeg: 0 },
     },
   ],
 }

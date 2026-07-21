@@ -6,7 +6,6 @@ const BLOB = ENEMY_DEFS.find((e) => e.kind === 'blob')!
 const BOAR = ENEMY_DEFS.find((e) => e.kind === 'boar')!
 const INVADER = ENEMY_DEFS.find((e) => e.kind === 'invader')!
 const MUSHROOM = ENEMY_DEFS.find((e) => e.kind === 'mushroom')!
-import { codepointsToEmoji, emojiCodepoints } from '../emoji/codepoints'
 import { ITEMS } from '../items/registry'
 import { WEAPONS } from '../weapons/registry'
 import { enemyStatLines, usedEmojiSet, wikiEntryByEmoji, wikiGroups } from './wiki'
@@ -39,33 +38,25 @@ describe('图鉴分组', () => {
 })
 
 describe('已收录集合', () => {
-  it('覆盖角色/队长/敌人/能力图标/道具/弹体/金币', () => {
+  it('覆盖角色/队长/敌人/能力图标/道具/弹体/金币（以 ordering ID 标识）', () => {
     const used = usedEmojiSet()
-    expect(used.has('🤠')).toBe(true)
-    expect(used.has('😇')).toBe(true)
-    expect(used.has('🐍')).toBe(true)
-    expect(used.has('🪓')).toBe(true)
-    expect(used.has('🧲')).toBe(true)
-    expect(used.has('💧')).toBe(true)
-    expect(used.has('🪙')).toBe(true)
+    expect(used.has('1f920')).toBe(true) // 🤠 牛仔
+    expect(used.has('1f607')).toBe(true) // 😇 天使
+    expect(used.has('1f40d')).toBe(true) // 🐍 毒蛇
+    expect(used.has('1fa93')).toBe(true) // 🪓 巨斧
+    expect(used.has('1f9f2')).toBe(true) // 🧲 磁铁
+    expect(used.has('1f4a7')).toBe(true) // 💧 水滴
+    expect(used.has('1fa99')).toBe(true) // 🪙 金币
     expect(used.size).toBeGreaterThanOrEqual(40)
   })
 })
 
 describe('emoji 反查', () => {
-  it('已收录 emoji 能查到类别与条目', () => {
+  it('已收录 emoji ID 能查到类别与条目', () => {
     const map = wikiEntryByEmoji()
-    expect(map.get('🤠')).toMatchObject({ category: '角色', entry: { name: '牛仔' } })
-    expect(map.get('🪓')).toMatchObject({ category: '武器', entry: { name: '巨斧横扫' } })
-    expect(map.get('🐗')).toMatchObject({ category: '敌人', entry: { name: '野猪' } })
-    expect(map.has('🦖')).toBe(false)
-  })
-})
-
-describe('codepoint 往返', () => {
-  it('文件名 → emoji → 文件名 稳定（含 ZWJ 序列与旗帜）', () => {
-    for (const cp of ['1f600', '1f468-200d-1f469-200d-1f467', '1f1e6-1f1e8', '26f0']) {
-      expect(emojiCodepoints(codepointsToEmoji(cp))).toBe(cp)
-    }
+    expect(map.get('1f920')).toMatchObject({ category: '角色', entry: { name: '牛仔' } })
+    expect(map.get('1fa93')).toMatchObject({ category: '武器', entry: { name: '巨斧横扫' } })
+    expect(map.get('1f417')).toMatchObject({ category: '敌人', entry: { name: '野猪' } })
+    expect(map.has('1f996')).toBe(false) // 🦖 未收录
   })
 })

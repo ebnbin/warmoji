@@ -558,7 +558,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.time.delayedCall(600, () => {
         if (this.over) return
         this.events.emit('wave-warning', {
-          title: '⚠️ 精英来袭',
+          title: '精英来袭',
           sub: '敌人潮涌来，小心金边强敌！',
         })
         this.spawnSurge()
@@ -569,7 +569,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.time.delayedCall(600, () => {
         if (this.over) return
         this.events.emit('wave-warning', {
-          title: `☠️ ${BOSS.name}出现`,
+          title: `${BOSS.name}出现`,
           sub: this.finalWaveWarningSub(),
         })
         this.spawnBoss()

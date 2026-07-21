@@ -47,7 +47,7 @@ describe('花名册', () => {
     if (bolt.kind !== 'projectile') throw new Error('kind 不变')
     const morph = bolt.onHit?.find((e) => e.kind === 'morph')
     if (morph?.kind !== 'morph') throw new Error('缺 morph 效果')
-    expect(morph.morphEmoji).toBe('🐑')
+    expect(morph.morphEmoji).toBe('1f411')
   })
 })
 

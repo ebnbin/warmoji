@@ -5,7 +5,7 @@ import type { CaptainSource } from '../src/captains/registry'
 
 export const CAPTAINS = {
   angel: {
-    emoji: '😇',
+    emoji: '1f607',
     name: '天使',
     desc: '每次进入商店，全体队员复活并恢复满血',
     teamSize: 5,
@@ -27,7 +27,7 @@ export const CAPTAINS = {
     },
   },
   moneybags: {
-    emoji: '🤑',
+    emoji: '1f911',
     name: '财迷',
     desc: '每次进入商店，前 3 次道具刷新免费',
     teamSize: 5,
@@ -49,7 +49,7 @@ export const CAPTAINS = {
     },
   },
   party: {
-    emoji: '🥳',
+    emoji: '1f973',
     name: '派对之星',
     desc: '气氛组拉满，编制上限 6 人',
     teamSize: 6,
@@ -71,7 +71,7 @@ export const CAPTAINS = {
     },
   },
   prodigy: {
-    emoji: '🤓',
+    emoji: '1f913',
     name: '神童',
     desc: '天资聪颖，自选阵容直接满编开局，能量豆拉满、自带启动资金（测试直通车）',
     teamSize: 5,
@@ -93,7 +93,7 @@ export const CAPTAINS = {
     },
   },
   scholar: {
-    emoji: '🧐',
+    emoji: '1f9d0',
     name: '学者',
     desc: '带队有方，全队经验获取 +25%',
     teamSize: 5,

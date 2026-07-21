@@ -14,14 +14,13 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run e2e",
-    "gen": "node scripts/sync-emoji.mjs && node scripts/gen-defs.ts",
+    "gen": "node scripts/gen-defs.ts",
     "balance": "node scripts/balance.ts",
     "pretypecheck": "npm run gen",
     "pretest": "npm run gen"
   },
   "dependencies": {
-    "phaser": "^3.90.0",
-    "twemoji-svg": "17.0.2"
+    "phaser": "^3.90.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

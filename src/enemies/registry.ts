@@ -151,7 +151,7 @@ export const SPAWN = {
   teamFactorPerMember: 0.13,
   // 地图内随机刷怪：先显示预告标记再落地
   telegraphMs: 900,
-  markEmoji: '⚠️',
+  markEmoji: '26a0',
   markSize: 1.0,
   minPlayerDist: 3,
   edgeInset: 0.5,

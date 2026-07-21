@@ -1,14 +1,13 @@
 import Phaser from 'phaser'
-import { codepointsToEmoji } from '../emoji/codepoints'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
-import { packBaseKeys } from '../emoji/pack'
+import { allEmojiIds } from '../emoji/pack'
 import { usedEmojiSet, wikiEntryByEmoji, wikiGroups } from './wiki'
 import type { WikiEntry, WikiGroup } from './wiki'
 import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
-import { emojiImage, emojiKey, ensureEmoji, loadEmojiPack } from '../emoji/textures'
+import { emojiImage, emojiKey, emojiText, ensureEmoji, loadEmojiPack } from '../emoji/textures'
 import { EmojiGrid } from './grid'
 import { FONT, UI_FONT } from '../core/fonts'
 import { TAP_SLOP } from '../core/units'
@@ -143,15 +142,20 @@ export class WikiScene extends Phaser.Scene {
     this.backRect = { x: back.x, y: back.y - back.height / 2, w: back.width, h: back.height }
     this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
 
-    this.add
-      .text(w / 2, oy + L.headerY, '📖 图鉴', {
+    emojiText(
+      this,
+      w / 2,
+      oy + L.headerY,
+      '{1f4d6} 图鉴',
+      {
         fontFamily: UI_FONT,
         fontSize: FONT.title,
         fontStyle: 'bold',
         color: '#f5f5f5',
         resolution: res,
-      })
-      .setOrigin(0.5)
+      },
+      { origin: 0.5 },
+    )
 
     this.createCategoryTabs(res)
     if (this.isAllPage()) this.createAllView()
@@ -183,7 +187,7 @@ export class WikiScene extends Phaser.Scene {
     const gap = 10
     const defs = [
       ...this.groups.map((g) => ({ icon: g.icon, label: `${g.title} ${g.entries.length}`, title: g.title })),
-      { icon: '🌐', label: '全部', title: '全部' },
+      { icon: '1f310', label: '全部', title: '全部' },
     ]
     const widths = defs.map((d) => 44 + d.label.length * 22 + 20)
     const total = widths.reduce((s, x) => s + x, 0) + gap * (defs.length - 1)
@@ -480,7 +484,7 @@ export class WikiScene extends Phaser.Scene {
       { x: lx, y: ly, w: L.w, h: L.h },
       {
         initialScroll: this.gridScroll,
-        alphaOf: (cp): number => (this.used.has(codepointsToEmoji(cp)) ? 1 : 0.26),
+        alphaOf: (cp): number => (this.used.has(cp) ? 1 : 0.26),
       },
     ))
     grid.onTap = (cp): void => {
@@ -498,7 +502,7 @@ export class WikiScene extends Phaser.Scene {
 
     void this.loadManifest().then(() => {
       if (!this.scene.isActive('wiki') || !this.isAllPage()) return
-      this.manifestUsed = this.manifest.filter((cp) => this.used.has(codepointsToEmoji(cp))).length
+      this.manifestUsed = this.manifest.filter((cp) => this.used.has(cp)).length
       grid.setItems(this.manifest)
       grid.setSelected(this.allSelected)
       this.renderAllDetail()
@@ -509,8 +513,8 @@ export class WikiScene extends Phaser.Scene {
   private async loadManifest(): Promise<void> {
     if (this.manifest.length > 0) return
     try {
-      // 基础形态清单来自打包资源索引（CLDR 标准顺序，剔除肤色变体）
-      this.manifest = packBaseKeys(await loadEmojiPack())
+      // 全量清单来自打包资源（ordering 顺序，以 ordering 为准，肤色/component 一律保留）
+      this.manifest = [...allEmojiIds(await loadEmojiPack())]
     } catch (err) {
       console.error(`emoji 清单加载失败: ${String(err)}`)
     }
@@ -519,7 +523,7 @@ export class WikiScene extends Phaser.Scene {
   /** 完整列表页的详情面板：收录进度 + 选中项详情（已收录展示类别与属性） */
   private renderAllDetail(): void {
     const P = this.ensurePool()
-    const selected = this.allSelected ? codepointsToEmoji(this.allSelected) : null
+    const selected = this.allSelected
     const hit = selected ? this.entryLookup.get(selected) : undefined
     if (selected && hit) {
       this.renderDetailCard(hit.category, hit.entry)

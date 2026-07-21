@@ -104,7 +104,6 @@ window.addEventListener('orientationchange', () => {
 
 // 供临时验证脚本注入状态
 window.__game = game
-window.__twemojiVersion = __TWEMOJI_VERSION__
 
 window.__setStress = (on: boolean): void => {
   setStress(on)

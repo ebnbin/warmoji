@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-import { codepointsToEmoji } from './codepoints'
 import { setSvgSize } from './svg'
 import { emojiSvgText, svgToImage } from './textures'
 
@@ -49,7 +48,7 @@ export function requestEmojiThumb(scene: Phaser.Scene, cp: string): Promise<stri
   const size = thumbSize
   const p = (async (): Promise<string | null> => {
     try {
-      const svg = await emojiSvgText(codepointsToEmoji(cp))
+      const svg = await emojiSvgText(cp)
       const img = await svgToImage(setSvgSize(svg, size))
       if (gen !== generation) return null
       const key = keyOf(cp)

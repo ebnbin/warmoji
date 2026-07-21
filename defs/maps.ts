@@ -5,7 +5,7 @@ import type { MapDef } from '../src/maps/registry'
 
 export const MAPS = {
   forest: {
-    emoji: '🌲',
+    emoji: '1f332',
     name: '黑森林',
     desc: '苍郁密林，落叶与蕨草铺满林间空地',
     kind: 'bounded',
@@ -16,14 +16,14 @@ export const MAPS = {
       shadow: 0x000000,
     },
     decor: {
-      emojis: ['🌲', '🌳', '🌿', '🍂', '🍃', '🪨'],
+      emojis: ['1f332', '1f333', '1f33f', '1f342', '1f343', '1faa8'],
       sizeU: [0.35, 0.95],
       alpha: [0.14, 0.26],
       density: [0.1, 0.14],
     },
   },
   desert: {
-    emoji: '🏜️',
+    emoji: '1f3dc',
     name: '荒漠',
     desc: '无边的大漠，可朝任意方向走到天涯；终波赤鬼降临时毒雾收拢成圈',
     kind: 'infinite',
@@ -34,7 +34,7 @@ export const MAPS = {
       shadow: 0x000000,
     },
     decor: {
-      emojis: ['🌵', '🪨', '🦴', '💀', '🥀'],
+      emojis: ['1f335', '1faa8', '1f9b4', '1f480', '1f940'],
       sizeU: [0.35, 0.9],
       alpha: [0.14, 0.26],
       // 荒漠刻意更稀疏
@@ -42,7 +42,7 @@ export const MAPS = {
     },
   },
   river: {
-    emoji: '🌊',
+    emoji: '1f30a',
     name: '奔流',
     desc: '一条永不停歇的大河，万物皆随波逐流；两岸静看你逆流而战',
     kind: 'river',
@@ -56,15 +56,15 @@ export const MAPS = {
     },
     decor: {
       // 岸上静态植被（战斗区外，透明度可比战斗区装饰略高）
-      emojis: ['🌾', '🌿', '🪨', '🌳', '🍄'],
+      emojis: ['1f33e', '1f33f', '1faa8', '1f333', '1f344'],
       sizeU: [0.4, 0.8],
       alpha: [0.3, 0.45],
       density: [0.1, 0.14],
     },
-    drift: ['🍃', '🌸', '🫧', '🍂'],
+    drift: ['1f343', '1f338', '1fae7', '1f342'],
   },
   void: {
-    emoji: '🌀',
+    emoji: '1f300',
     name: '虚空',
     desc: '悬浮虚空的一方战场，四边皆是传送门——穿出此缘，即现彼缘',
     kind: 'void',
@@ -77,7 +77,7 @@ export const MAPS = {
     },
     decor: {
       // 星空点缀（静态散布，低透明度）
-      emojis: ['✨', '⭐', '💫', '🪐', '☄️'],
+      emojis: ['2728', '2b50', '1f4ab', '1fa90', '2604'],
       sizeU: [0.2, 0.65],
       alpha: [0.18, 0.34],
       density: [0.05, 0.08],

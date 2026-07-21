@@ -8,7 +8,7 @@ import type { ItemRarity } from '../items/registry'
 import { endRun, getRun } from '../run/state'
 import { isDevOpen, isStress, setDevOpen, setStress } from '../debug/dev'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../debug/diagnostics'
-import { emojiCacheStats, emojiImage, iconLabel } from '../emoji/textures'
+import { emojiCacheStats, emojiImage, emojiText, iconLabel } from '../emoji/textures'
 import { FONT, UI_FONT } from '../core/fonts'
 import { Joystick } from '../core/Joystick'
 import { playSfx } from '../audio/sfx'
@@ -116,12 +116,12 @@ export class UIScene extends Phaser.Scene {
       resolution: res,
     }
     // 能量豆计数放在经验条下方（经验条 = 下一颗豆的攒取进度）
-    emojiImage(this, sL + 24, sT + 44, '🫘', 30, 'player')
+    emojiImage(this, sL + 24, sT + 44, '1fad8', 30, 'player')
     this.levelText = this.add.text(sL + 40, sT + 32, '0/3', { ...hudText, fontSize: FONT.body })
     this.timeText = this.add
       .text(w / 2, sT + 10, '', { ...hudText, fontSize: FONT.lead })
       .setOrigin(0.5, 0)
-    emojiImage(this, w - sR - 26, sT + 26, '💀', 35, 'player')
+    emojiImage(this, w - sR - 26, sT + 26, '1f480', 35, 'player')
     this.killsText = this.add
       .text(w - sR - 46, sT + 10, '0', { ...hudText, fontSize: FONT.head })
       .setOrigin(1, 0)
@@ -131,7 +131,7 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(1, 0)
 
     // 暂停：按钮或 ESC；已暂停或已结算时按钮行为由 togglePause 把关
-    emojiImage(this, w - sR - 26, sT + 112, '⏸️', 48)
+    emojiImage(this, w - sR - 26, sT + 112, '23f8', 48)
       .setDepth(300)
       .setAlpha(0.85)
       .setInteractive({ useHandCursor: true })
@@ -145,7 +145,7 @@ export class UIScene extends Phaser.Scene {
       this,
       w - sR - 12,
       viewport.logicalHeight - safeInsets.bottom - 26,
-      '🔧',
+      '1f527',
       40,
     )
       .setOrigin(1, 1)
@@ -483,22 +483,22 @@ export class UIScene extends Phaser.Scene {
    * 连开多箱（精英潮 AOE）按在场横幅数逐条下移，不互相糊字 */
   private onChestOpen(loot: { emoji: string; name: string; rarity: ItemRarity; owner: string }): void {
     this.chestBanners += 1
-    const t = this.add
-      .text(
-        viewport.logicalWidth / 2,
-        viewport.logicalHeight * 0.46 + (this.chestBanners - 1) * 44,
-        `🎁 ${loot.emoji} ${loot.name} → ${loot.owner}`,
-        {
-          fontFamily: UI_FONT,
-          fontSize: FONT.lead,
-          fontStyle: 'bold',
-          color: RARITIES[loot.rarity].color,
-          stroke: '#000000',
-          strokeThickness: 5,
-          resolution: textRes(),
-        },
-      )
-      .setOrigin(0.5)
+    const t = emojiText(
+      this,
+      viewport.logicalWidth / 2,
+      viewport.logicalHeight * 0.46 + (this.chestBanners - 1) * 44,
+      `{${loot.emoji}} ${loot.name} → ${loot.owner}`,
+      {
+        fontFamily: UI_FONT,
+        fontSize: FONT.lead,
+        fontStyle: 'bold',
+        color: RARITIES[loot.rarity].color,
+        stroke: '#000000',
+        strokeThickness: 5,
+        resolution: textRes(),
+      },
+      { origin: 0.5 },
+    )
       .setDepth(226)
       .setScale(0.6)
     this.tweens.add({ targets: t, scale: 1, duration: 220, ease: 'Back.easeOut' })
@@ -516,8 +516,12 @@ export class UIScene extends Phaser.Scene {
 
   /** 技能释放横幅：技能名短暂弹出（比波次警示小一号、更快收场） */
   private onSkillCast(name: string): void {
-    const t = this.add
-      .text(viewport.logicalWidth / 2, viewport.logicalHeight * 0.36, `⚡ ${name}`, {
+    const t = emojiText(
+      this,
+      viewport.logicalWidth / 2,
+      viewport.logicalHeight * 0.36,
+      `{26a1} ${name}`,
+      {
         fontFamily: UI_FONT,
         fontSize: FONT.head,
         fontStyle: 'bold',
@@ -525,8 +529,9 @@ export class UIScene extends Phaser.Scene {
         stroke: '#000000',
         strokeThickness: 5,
         resolution: textRes(),
-      })
-      .setOrigin(0.5)
+      },
+      { origin: 0.5 },
+    )
       .setDepth(226)
       .setScale(0.6)
     this.tweens.add({ targets: t, scale: 1, duration: 220, ease: 'Back.easeOut' })
@@ -627,10 +632,10 @@ export class UIScene extends Phaser.Scene {
     this.tweens.add({ targets: title, scale: 1, duration: 320, ease: 'Back.easeOut' })
 
     const lineStyle = { fontFamily: UI_FONT, fontSize: FONT.head, color: '#ffffff', resolution: res }
-    iconLabel(this, cx - 140, cy + 12, '💀', 37, `击杀 ${s.kills}`, lineStyle).setDepth(231)
+    iconLabel(this, cx - 140, cy + 12, '1f480', 37, `击杀 ${s.kills}`, lineStyle).setDepth(231)
     iconLabel(this, cx + 140, cy + 12, PICKUPS.coin.emoji, 37, `金币 +${s.coins}`, lineStyle).setDepth(231)
     if (s.levels > 0) {
-      iconLabel(this, cx, cy + 72, '🫘', 35, `能量豆 +${s.levels}（队长技能弹药）`, {
+      iconLabel(this, cx, cy + 72, '1fad8', 35, `能量豆 +${s.levels}（队长技能弹药）`, {
         ...lineStyle,
         fontSize: FONT.body,
         color: '#b3e5fc',

@@ -29,7 +29,7 @@ const pistol = {
   cooldownMs: 600,
   knockback: 3,
   held: {
-    emoji: '🔫',
+    emoji: '1f52b',
     size: 0.75,
     restOffset: 0.45,
     // twemoji 1f52b 枪口朝左
@@ -37,7 +37,7 @@ const pistol = {
     mountGap: 0.32,
   },
   projectile: {
-    emoji: '💧',
+    emoji: '1f4a7',
     size: 0.45,
     radius: 0.15,
     speed: 13,
@@ -55,7 +55,7 @@ const BASE = {
     cooldownMs: 450,
     knockback: 3.5,
     projectile: {
-      emoji: '🍅',
+      emoji: '1f345',
       size: 0.55,
       radius: 0.18,
       speed: 12,
@@ -81,7 +81,7 @@ const BASE = {
     arcDeg: 150,
     sweepMs: 260,
     held: {
-      emoji: '🪓',
+      emoji: '1fa93',
       size: 0.85,
       restOffset: 0.6,
       // twemoji 1fa93 斧刃朝左上
@@ -114,7 +114,7 @@ const BASE = {
     beamRadius: 0.22,
     color: 0xff5252,
     held: {
-      emoji: '🔦',
+      emoji: '1f526',
       size: 0.75,
       restOffset: 0.45,
       // twemoji 1f526 灯头朝左下
@@ -138,7 +138,7 @@ const BASE = {
     hitRadius: 0.5,
     spinDegPerSec: 800,
     held: {
-      emoji: '🪃',
+      emoji: '1fa83',
       size: 0.75,
       restOffset: 0.5,
       rotationOffsetDeg: 0,
@@ -150,14 +150,14 @@ const BASE = {
     cooldownMs: 1000,
     knockback: 2,
     projectile: {
-      emoji: '✨',
+      emoji: '2728',
       size: 0.5,
       radius: 0.17,
       speed: 11,
       rotationOffsetDeg: 0,
     },
     // 变形替身：受害者顶着绵羊形象缓速游荡，失去一切伤害能力
-    onHit: [{ kind: 'morph', durationMs: 2500, morphEmoji: '🐑' }],
+    onHit: [{ kind: 'morph', durationMs: 2500, morphEmoji: '1f411' }],
   } satisfies ProjectileDef,
   shadowStrike: {
     kind: 'assassinate',
@@ -168,7 +168,7 @@ const BASE = {
     behindDist: 0.6,
     strikeMs: 400,
     held: {
-      emoji: '🗡️',
+      emoji: '1f5e1',
       size: 0.7,
       restOffset: 0.42,
       // twemoji 1f5e1 刀尖朝左下
@@ -179,13 +179,13 @@ const BASE = {
     kind: 'turret',
     placeIntervalMs: 4200,
     maxTurrets: 2,
-    turret: { emoji: '🏹', size: 0.95 },
+    turret: { emoji: '1f3f9', size: 0.95 },
     fireIntervalMs: 650,
     damage: 13,
     knockback: 2.5,
     range: 5.5,
     projectile: {
-      emoji: '🪵',
+      emoji: '1fab5',
       size: 0.42,
       radius: 0.15,
       speed: 11,
@@ -195,7 +195,7 @@ const BASE = {
   beeSwarm: {
     kind: 'summon',
     count: 3,
-    minion: { emoji: '🐝', size: 0.55, speed: 7.5 },
+    minion: { emoji: '1f41d', size: 0.55, speed: 7.5 },
     damage: 11,
     knockback: 2,
     hitCooldownMs: 900,
@@ -212,7 +212,7 @@ const BASE = {
     cooldownMs: 800,
     knockback: 2,
     projectile: {
-      emoji: '💉',
+      emoji: '1f489',
       size: 0.48,
       radius: 0.15,
       speed: 12,
@@ -250,7 +250,7 @@ const BASE = {
     knockback: 10,
     targets: 8,
     coinsPerHit: 1,
-    drop: { emoji: '💰', size: 0.75, fromAbove: 3, dropMs: 180, staggerMs: 60 },
+    drop: { emoji: '1f4b0', size: 0.75, fromAbove: 3, dropMs: 180, staggerMs: 60 },
   } satisfies StrikeDef,
   discoFever: {
     kind: 'dance',
@@ -369,12 +369,12 @@ export const frostAura3 = {
 export const sparkleBolt2 = {
   ...BASE.sparkleBolt,
   pierce: 1,
-  onHit: [{ kind: 'morph', durationMs: 4000, morphEmoji: '🐑' }],
+  onHit: [{ kind: 'morph', durationMs: 4000, morphEmoji: '1f411' }],
 } satisfies ProjectileDef
 /** 脆弱诅咒 */
 export const sparkleBolt3 = {
   ...sparkleBolt2,
-  onHit: [{ kind: 'morph', durationMs: 4000, morphEmoji: '🐑', vulnMul: 1.4 }],
+  onHit: [{ kind: 'morph', durationMs: 4000, morphEmoji: '1f411', vulnMul: 1.4 }],
 } satisfies ProjectileDef
 
 /** 连环刃（击退取主斩 0.6×） */

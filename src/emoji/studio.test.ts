@@ -88,7 +88,7 @@ describe('lerpKeyframes', () => {
 
 describe('bakeAnimFrame', () => {
   const recipe = {
-    emoji: '🧪',
+    emoji: '1f9ea',
     name: '试验体',
     desc: '',
     anatomy: '',
@@ -137,7 +137,7 @@ describe('bakeAnimFrame', () => {
 
 describe('fx 程序化效果层', () => {
   const fxRecipe = {
-    emoji: '🧪',
+    emoji: '1f9ea',
     name: '试验体',
     desc: '',
     anatomy: '',
@@ -206,7 +206,7 @@ describe('动画资源格式（v2：具名 clips）', () => {
       def: { frames: 10, durMs: 1000 },
       animations: {
         '1f9ea': {
-          emoji: '🧪',
+          emoji: '1f9ea',
           name: '试验体',
           desc: '',
           anatomy: '',
@@ -362,8 +362,8 @@ describe('动画花名册（从资源文件加载）', () => {
   })
 
   it('按 emoji 查配方', () => {
-    expect(animRecipeOf('🤖')?.name).toBe('机器人')
-    expect(animRecipeOf('🀄')).toBeUndefined()
+    expect(animRecipeOf('1f916')?.name).toBe('机器人')
+    expect(animRecipeOf('1f004')).toBeUndefined()
   })
 })
 
@@ -375,7 +375,7 @@ describe('通用动画模板', () => {
 
   it('模板关键帧闭环 + fx 声明合法（借用资源校验器把关）', () => {
     for (const tpl of ANIM_TEMPLATES) {
-      const recipe = applyTemplate(tpl, '🧪', SVG3)
+      const recipe = applyTemplate(tpl, '1f9ea', SVG3)
       validateAnimResource({
         format: ANIM_FORMAT,
         def: { frames: 10, durMs: 1000 },
@@ -394,14 +394,14 @@ describe('通用动画模板', () => {
 
   it('applyTemplate 把 whole 展开为全体元素下标', () => {
     const tpl = animTemplateOf('breathe')!
-    const recipe = applyTemplate(tpl, '🧪', SVG3)
+    const recipe = applyTemplate(tpl, '1f9ea', SVG3)
     expect(recipe.parts[0]!.indices).toEqual([0, 1, 2])
-    expect(recipe.emoji).toBe('🧪')
+    expect(recipe.emoji).toBe('1f9ea')
   })
 
   it('纯 fx 模板无 parts，烘焙出的帧包含 fx 内容', () => {
     const tpl = animTemplateOf('sparkle')!
-    const recipe = applyTemplate(tpl, '🧪', SVG3)
+    const recipe = applyTemplate(tpl, '1f9ea', SVG3)
     expect(recipe.parts).toHaveLength(0)
     const frame = bakeAnimFrame(SVG3, recipe, 0.8)
     expect(frame).toContain('<path fill="#FFFFFF"')

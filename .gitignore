@@ -6,6 +6,11 @@ playtest-out/
 .vercel/
 *.log
 .DS_Store
-public/emoji/
-src/assets/
-scripts/data/
+
+# gen-defs 产物（构建期由 scripts/gen-defs.ts 生成，不进 git）
+src/assets/*
+# emoji 打包资源：从 Emoji Studio 引入、随代码提交（避免每次构建重新获取）
+!src/assets/emoji/
+src/assets/emoji/*
+!src/assets/emoji/ordering.txt
+!src/assets/emoji/twemoji.txt

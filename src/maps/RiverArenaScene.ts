@@ -414,7 +414,7 @@ export class RiverArenaScene extends BaseArenaScene {
     }
 
     // 漂浮物（顺流循环）：初始均匀铺满，之后 updateWater 推进
-    const driftPool = mapDef.drift ?? ['🍃']
+    const driftPool = mapDef.drift ?? ['1f343']
     for (let i = 0; i < RIVER.driftCount; i++) {
       const emoji = driftPool[Math.floor(Math.random() * driftPool.length)]!
       const img = emojiImage(this, 0, 0, emoji, (0.35 + Math.random() * 0.25) * UNIT, 'player')

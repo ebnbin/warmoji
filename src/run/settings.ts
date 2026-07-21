@@ -30,10 +30,10 @@ export interface SettingDef {
 }
 
 export const SETTING_DEFS: readonly SettingDef[] = [
-  { key: 'sound', icon: '🔊', label: '音效', desc: '战斗与界面的合成音效' },
-  { key: 'bgm', icon: '🎵', label: '背景音乐', desc: '按地图生成的程序化配乐' },
-  { key: 'damageNumbers', icon: '🔢', label: '伤害数字', desc: '敌人受击时飘出伤害数值' },
-  { key: 'hitShake', icon: '📳', label: '受击震屏', desc: '队员受到伤害时轻微抖动画面' },
+  { key: 'sound', icon: '1f50a', label: '音效', desc: '战斗与界面的合成音效' },
+  { key: 'bgm', icon: '1f3b5', label: '背景音乐', desc: '按地图生成的程序化配乐' },
+  { key: 'damageNumbers', icon: '1f522', label: '伤害数字', desc: '敌人受击时飘出伤害数值' },
+  { key: 'hitShake', icon: '1f4f3', label: '受击震屏', desc: '队员受到伤害时轻微抖动画面' },
 ]
 
 const KEY = 'warmoji.settings.v1'

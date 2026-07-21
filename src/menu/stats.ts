@@ -143,16 +143,16 @@ export function characterStatGroups(id: CharacterId, items: readonly ItemId[] = 
   if (fx.critChance > 0) baseLines.push(`暴击率 ${Math.round(fx.critChance * 100)}%（伤害 ×2）`)
   return [
     {
-      icon: '❤️',
+      icon: '2764',
       title: '基础',
       lines: baseLines,
     },
     {
-      icon: '⭐',
+      icon: '2b50',
       title: '专属升级（商店专属卡解锁）',
       lines: upgradeCardsFor(def).map((card, i) => {
         const unlocked = i === 0 ? tiers.u1 : tiers.u2
-        return `${card.icon}「${card.name}」${card.desc}${unlocked ? '' : '（未解锁）'}`
+        return `「${card.name}」${card.desc}${unlocked ? '' : '（未解锁）'}`
       }),
     },
     // 攻击来源逐载体展示：名字/图标取自载体（武器/徒手能力），数值取该载体当前档位能力
@@ -223,15 +223,15 @@ export function captainStatGroups(def: CaptainDef, items: readonly ItemId[] = []
   if (fx.waveHealRatio > 0) lines.push(`波末全队回复 ${Math.round(fx.waveHealRatio * 100)}% 生命`)
   if (fx.waveCoins > 0) lines.push(`波末分红 +${fx.waveCoins} 金币`)
   return [
-    { icon: '👑', title: '队长能力', lines: [def.desc] },
+    { icon: '1f451', title: '队长能力', lines: [def.desc] },
     {
-      icon: '⚡',
+      icon: '26a1',
       title: `主动技能 · ${def.skill.name}`,
       lines: [
         `${def.skill.desc}（冷却 ${Math.round(def.skill.cdMs / 1000)} 秒，跨波累计）`,
         ...def.skill.abilities.flatMap((w) => abilityStatLines(w)),
       ],
     },
-    { icon: '👟', title: '团队', lines: [...lines, '经验每升一级 = 1 颗能量豆（技能弹药，上限 3）'] },
+    { icon: '1f45f', title: '团队', lines: [...lines, '经验每升一级 = 1 颗能量豆（技能弹药，上限 3）'] },
   ]
 }

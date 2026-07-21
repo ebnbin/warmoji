@@ -1,83 +1,47 @@
-// emoji 打包资源的解析层（纯逻辑，禁 DOM）。资源由 scripts/sync-emoji.mjs
-// 构建期生成：index.json（Unicode 官方 CLDR 顺序 ∩ twemoji 的索引与元数据）
-// + pack.txt（每行一个去 header 的 SVG 正文，行序 = 索引序）。
-// 运行时全库仅两个请求；任意 emoji 的完整 SVG = 统一 header + 行正文 + 闭合。
+// emoji 打包资源的解析层（纯逻辑，禁 DOM）。资源是从 Emoji Studio 直接引入、
+// 随代码提交的两份「行对齐」文件（src/assets/emoji/，Unicode 官方 CLDR 顺序）：
+//   ordering.txt —— 每行一个 emoji 的 ordering ID（= 全项目唯一标识）
+//   twemoji.txt  —— 每行一个去 header 的 twemoji SVG 正文，行序 = ordering 行序
+// 运行时全库仅两份文本；任意 emoji 的完整 SVG = 统一 header + 对应行正文 + 闭合。
+// emoji 在本项目里永不作为「字符/字体」使用，只作为符号，其唯一 ID 即 ordering 行。
 
-export const EMOJI_PACK_FORMAT = 'warmoji-emoji@1'
-
-export interface EmojiIndexEntry {
-  /** twemoji key（码点小写连字符，无 ZWJ 序列已去 FE0F）——与 emojiCodepoints 输出一致 */
-  readonly c: string
-  /** fully-qualified emoji 字符 */
-  readonly e: string
-  /** Unicode 官方英文名 */
-  readonly n: string
-  /** groups 下标 */
-  readonly g: number
-}
-
-export interface EmojiIndex {
-  readonly format: string
-  readonly unicodeVersion: string
-  readonly twemojiVersion: string
-  readonly header: string
-  readonly groups: readonly string[]
-  readonly emojis: readonly EmojiIndexEntry[]
-}
+export const EMOJI_HEADER = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">'
 
 export interface EmojiPack {
-  readonly header: string
-  readonly unicodeVersion: string
-  readonly twemojiVersion: string
-  readonly groups: readonly string[]
-  /** CLDR 顺序的全部条目 */
-  readonly entries: readonly EmojiIndexEntry[]
-  readonly bodyByKey: ReadonlyMap<string, string>
+  /** ordering 顺序的全部 ID */
+  readonly ids: readonly string[]
+  /** ID → 去 header 的 SVG 正文 */
+  readonly bodyById: ReadonlyMap<string, string>
 }
 
-/** 解析并校验打包资源；格式/对齐不符即抛错（加载期暴露，不进运行时） */
-export function parseEmojiPack(index: EmojiIndex, packText: string): EmojiPack {
-  if (index.format !== EMOJI_PACK_FORMAT) {
-    throw new Error(`emoji 资源格式不符：期望 ${EMOJI_PACK_FORMAT}，得到 ${String(index.format)}`)
+/** 解析并校验两份行对齐资源；行数不齐 / ID 重复 / 空正文即抛错（加载期暴露，不进运行时） */
+export function parseEmojiPack(orderingText: string, twemojiText: string): EmojiPack {
+  const ids = orderingText.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (ids.length === 0) throw new Error('emoji ordering 为空')
+  const bodies = twemojiText.split('\n')
+  // 容许文件尾的单个空行
+  if (bodies.length === ids.length + 1 && bodies[bodies.length - 1] === '') bodies.pop()
+  if (bodies.length !== ids.length) {
+    throw new Error(`emoji 资源错位：ordering ${ids.length} 行 vs twemoji ${bodies.length} 行`)
   }
-  if (!index.header.startsWith('<svg ') || !index.header.endsWith('>')) {
-    throw new Error('emoji 资源 header 非法')
-  }
-  const lines = packText.split('\n')
-  if (lines.length === 1 && lines[0] === '') {
-    throw new Error('emoji 打包文件为空')
-  }
-  if (lines.length !== index.emojis.length) {
-    throw new Error(`emoji 资源错位：索引 ${index.emojis.length} 条 vs 打包 ${lines.length} 行`)
-  }
-  const bodyByKey = new Map<string, string>()
-  index.emojis.forEach((entry, i) => {
-    if (bodyByKey.has(entry.c)) throw new Error(`emoji 资源 key 重复：${entry.c}`)
-    bodyByKey.set(entry.c, lines[i]!)
+  const bodyById = new Map<string, string>()
+  ids.forEach((id, i) => {
+    if (bodyById.has(id)) throw new Error(`emoji 资源 ID 重复：${id}`)
+    const body = bodies[i]!
+    if (body.length === 0) throw new Error(`emoji 资源正文为空：${id}`)
+    bodyById.set(id, body)
   })
-  return {
-    header: index.header,
-    unicodeVersion: index.unicodeVersion,
-    twemojiVersion: index.twemojiVersion,
-    groups: index.groups,
-    entries: index.emojis,
-    bodyByKey,
-  }
+  return { ids, bodyById }
 }
 
-/** key → 完整 SVG 文本（统一 header + 正文 + 闭合）；不在库中返回 null */
-export function packSvg(pack: EmojiPack, key: string): string | null {
-  const body = pack.bodyByKey.get(key)
+/** ID → 完整 SVG 文本（统一 header + 正文 + 闭合）；不在库中返回 null */
+export function packSvg(pack: EmojiPack, id: string): string | null {
+  const body = pack.bodyById.get(id)
   if (body === undefined) return null
-  return `${pack.header}${body}</svg>`
+  return `${EMOJI_HEADER}${body}</svg>`
 }
 
-// 肤色修饰符 1F3FB..1F3FF：含任一段即视为肤色变体
-const TONES = new Set(['1f3fb', '1f3fc', '1f3fd', '1f3fe', '1f3ff'])
-
-/** 图鉴「全部」页清单：剔除肤色变体的基础形态 key（保持 CLDR 顺序） */
-export function packBaseKeys(pack: EmojiPack): string[] {
-  return pack.entries
-    .map((e) => e.c)
-    .filter((key) => !key.split('-').some((seg) => TONES.has(seg)))
+/** 图鉴「全部」页清单：ordering 全量 ID（保持顺序）。以 ordering 为准，肤色/component 一律保留 */
+export function allEmojiIds(pack: EmojiPack): readonly string[] {
+  return pack.ids
 }

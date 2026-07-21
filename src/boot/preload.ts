@@ -30,11 +30,11 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
       ]),
     ),
     ...Object.values(PICKUPS).map((p) => p.emoji),
-    '➕',
-    '💀',
+    '2795',
+    '1f480',
     // 财迷「天降横财」的金袋投掷物 + HUD 能量豆
-    '💰',
-    '🫘',
+    '1f4b0',
+    '1fad8',
     // 地图地面装饰 + 河流水面漂浮物：与玩家侧同款黑描边（低透明度贴地/浮水）
     ...new Set(
       Object.values<MapDef>(MAPS).flatMap((m) => [...m.decor.emojis, ...(m.drift ?? [])]),
@@ -97,29 +97,39 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),
   // 地图图标（选择页素体）+ 地图详情组图标；装饰的描边变体在 OUTLINED_EMOJIS.player
   ...Object.values(MAPS).map((m) => m.emoji),
-  '🗺️',
-  '🚧',
+  '1f5fa',
+  '1f6a7',
   ...SETTING_DEFS.map((d) => d.icon),
   SPAWN.markEmoji,
   // 属性面板「专属升级」组图标
-  '⭐',
-  '⚙️',
-  '📖',
-  '🌐',
-  '➕',
-  '⬆️',
-  '⚔️',
+  '2b50',
+  '2699',
+  '1f4d6',
+  '1f310',
+  '2795',
+  '2b06',
+  '2694',
   // 命定卡池：盖牌 + 已入队角标
-  '❓',
-  '🎖️',
-  '🏆',
-  '⚡',
-  '👟',
-  '❤️',
-  '🔧',
-  '✅',
-  '⏸️',
-  '👑',
+  '2753',
+  '1f396',
+  '1f3c6',
+  '26a1',
+  '1f45f',
+  '2764',
+  '1f527',
+  '2705',
+  '23f8',
+  '1f451',
   // 主菜单 Emoji Studio 入口图标（studio 页内素材按需加载）
-  '🧪',
+  '1f9ea',
+  // Studio 内部 UI 图标（tab / clip / 媒体控制 / 眼睛开关）——同步渲染需预载
+  '1f3ac', // 🎬 配方
+  '1f9e9', // 🧩 模板
+  '1f52c', // 🔬 解剖
+  '1f9d8', // 🧘 待机
+  '23ee', // ⏮ 上一帧
+  '25b6', // ▶ 播放
+  '23ed', // ⏭ 下一帧
+  '1f441', // 👁 可见
+  '1f648', // 🙈 隐藏
 ]

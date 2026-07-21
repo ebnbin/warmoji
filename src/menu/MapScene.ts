@@ -225,10 +225,10 @@ export class MapScene extends Phaser.Scene {
       cursor += Math.max(36, t.height + 8)
     }
 
-    group('🗺️', '主题')
+    group('1f5fa', '主题')
     line(def.desc)
     cursor += 14
-    group('🌿', '地面装饰')
+    group('1f33f', '地面装饰')
     // 装饰 emoji 预览行（与战斗内同款黑描边）
     let px = dx + 62 + 16
     for (const e of def.decor.emojis) {
@@ -238,7 +238,7 @@ export class MapScene extends Phaser.Scene {
     cursor += 44
     line('战斗中以低透明度随机成簇散布，一局一景', '#9a9aa8')
     cursor += 14
-    group('🚧', '差异')
+    group('1f6a7', '差异')
     line('目前各地图仅主题不同；难度、专属怪物与增益后续开放', '#9a9aa8')
   }
 

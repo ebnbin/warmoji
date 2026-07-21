@@ -35,7 +35,7 @@ export function circleCue(scene: Phaser.Scene, x: number, y: number, radius: num
 
 /** 💥 爆裂：emoji 从缩小随机微转弹出到全尺寸并淡出（轰炸命中点）。 */
 export function boomCue(scene: Phaser.Scene, x: number, y: number, size: number): void {
-  const boom = emojiImage(scene, x, y, '💥', size).setDepth(9)
+  const boom = emojiImage(scene, x, y, '1f4a5', size).setDepth(9)
   const full = boom.scale
   boom.setScale(full * 0.4).setRotation((Math.random() - 0.5) * 0.8)
   scene.tweens.add({

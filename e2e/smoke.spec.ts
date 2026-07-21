@@ -29,11 +29,8 @@ test('页面可加载：canvas 渲染、版本徽章存在、无控制台错误'
   expect((await manifest.json()).display).toBe('fullscreen')
   expect((await page.request.get('/icons/icon-512.png')).ok()).toBeTruthy()
 
-  // twemoji 全集已部署：抽查一个未预载的 emoji（😀）
-  const ver = await page.evaluate(() => window.__twemojiVersion)
-  const dynamicSvg = await page.request.get(`/emoji/${ver}/1f600.svg`)
-  expect(dynamicSvg.ok()).toBeTruthy()
-  expect(await dynamicSvg.text()).toContain('<svg')
+  // 进入 menu 已证明 emoji 打包资源（ordering.txt + twemoji.txt）加载并解析成功
+  // （PreloadScene 门禁：拿不到或解析不了就停在预载页，不会到达 menu）
 
   // 跑几帧，暴露启动后才出现的运行时错误
   await page.waitForTimeout(800)

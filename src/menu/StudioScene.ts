@@ -1,6 +1,5 @@
 import Phaser from 'phaser'
-import { codepointsToEmoji, emojiCodepoints } from '../emoji/codepoints'
-import { packBaseKeys } from '../emoji/pack'
+import { allEmojiIds } from '../emoji/pack'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -20,7 +19,7 @@ import {
 import type { AnimClip, AnimRecipe, SvgTree, TreeRow } from '../emoji/studio'
 import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
-import { emojiImage, emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
+import { emojiImage, emojiKey, emojiSvgText, emojiText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
 import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { FONT, UI_FONT } from '../core/fonts'
 import { TAP_SLOP } from '../core/units'
@@ -86,7 +85,7 @@ interface AnatUi {
 }
 
 /** 模板/解剖页的默认素材（任意 emoji 皆可选，这里只是进场的起点） */
-const DEFAULT_SUBJECT = '🤹'
+const DEFAULT_SUBJECT = '1f939'
 
 export class StudioScene extends Phaser.Scene {
   private preserveOnRestart = false
@@ -198,15 +197,20 @@ export class StudioScene extends Phaser.Scene {
       h: backText.height,
     }
     this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
-    this.add
-      .text(w / 2, this.origin.y + L.headerY, '🧪 Emoji Studio', {
+    emojiText(
+      this,
+      w / 2,
+      this.origin.y + L.headerY,
+      '{1f9ea} Emoji Studio',
+      {
         fontFamily: UI_FONT,
         fontSize: FONT.title,
         fontStyle: 'bold',
         color: '#f5f5f5',
         resolution: res,
-      })
-      .setOrigin(0.5)
+      },
+      { origin: 0.5 },
+    )
 
     const frames = this.add.graphics()
     frames.fillStyle(0x000000, 0.18)
@@ -254,7 +258,7 @@ export class StudioScene extends Phaser.Scene {
       Promise.all([...need].map((e) => ensureEmoji(this, e).catch(() => ''))),
       loadEmojiPack()
         .then((p) => {
-          this.allKeys = packBaseKeys(p)
+          this.allKeys = [...allEmojiIds(p)]
         })
         .catch((err) => console.error(`emoji 清单加载失败: ${String(err)}`)),
     ]).then(() => {
@@ -289,9 +293,9 @@ export class StudioScene extends Phaser.Scene {
 
   private buildTabs(res: number): void {
     const defs: { id: Tab; label: string }[] = [
-      { id: 'recipes', label: '🎬 配方' },
-      { id: 'templates', label: '🧩 模板' },
-      { id: 'anatomy', label: '🔬 解剖' },
+      { id: 'recipes', label: '{1f3ac} 配方' },
+      { id: 'templates', label: '{1f9e9} 模板' },
+      { id: 'anatomy', label: '{1f52c} 解剖' },
     ]
     for (const o of this.tabObjs) o.destroy()
     this.tabObjs = []
@@ -309,15 +313,19 @@ export class StudioScene extends Phaser.Scene {
       bg.fillRoundedRect(x, y - chipH / 2, chipW, chipH, chipH / 2)
       bg.lineStyle(2, 0xffffff, active ? 0.9 : 0.12)
       bg.strokeRoundedRect(x, y - chipH / 2, chipW, chipH, chipH / 2)
-      const label = this.add
-        .text(x + chipW / 2, y, d.label, {
+      const label = emojiText(
+        this,
+        x + chipW / 2,
+        y,
+        d.label,
+        {
           fontFamily: UI_FONT,
           fontSize: FONT.strong,
           color: '#ffffff',
           resolution: res,
-        })
-        .setOrigin(0.5)
-        .setAlpha(active ? 1 : 0.62)
+        },
+        { origin: 0.5 },
+      ).setAlpha(active ? 1 : 0.62)
       const zone = this.add
         .zone(x, y - chipH / 2, chipW, chipH)
         .setOrigin(0)
@@ -340,11 +348,11 @@ export class StudioScene extends Phaser.Scene {
     const grid = this.grid
     if (grid) {
       if (this.tab === 'recipes') {
-        grid.setItems(ANIM_RECIPES.map((r) => emojiCodepoints(r.emoji)))
-        grid.setSelected(emojiCodepoints(this.recipeSel))
+        grid.setItems(ANIM_RECIPES.map((r) => r.emoji))
+        grid.setSelected(this.recipeSel)
       } else {
         grid.setItems(this.allKeys)
-        grid.setSelected(emojiCodepoints(this.tab === 'templates' ? this.tplEmoji : this.anatEmoji))
+        grid.setSelected(this.tab === 'templates' ? this.tplEmoji : this.anatEmoji)
       }
       grid.ensureVisible()
     }
@@ -356,22 +364,20 @@ export class StudioScene extends Phaser.Scene {
 
   private onGridTap(cp: string): void {
     if (this.tab === 'recipes') {
-      const recipe = ANIM_RECIPES.find((r) => emojiCodepoints(r.emoji) === cp)
+      const recipe = ANIM_RECIPES.find((r) => r.emoji === cp)
       if (!recipe || recipe.emoji === this.recipeSel) return
       this.recipeSel = recipe.emoji
       this.clipSel = animSetOf(recipe.emoji)?.clips[0]?.id ?? 'idle'
       this.grid?.setSelected(cp)
       this.buildRecipeDetail()
     } else if (this.tab === 'templates') {
-      const emoji = codepointsToEmoji(cp)
-      if (emoji === this.tplEmoji) return
-      this.tplEmoji = emoji
+      if (cp === this.tplEmoji) return
+      this.tplEmoji = cp
       this.grid?.setSelected(cp)
       this.buildTemplateDetail()
     } else {
-      const emoji = codepointsToEmoji(cp)
-      if (emoji === this.anatEmoji) return
-      this.anatEmoji = emoji
+      if (cp === this.anatEmoji) return
+      this.anatEmoji = cp
       this.resetAnatState()
       this.grid?.setSelected(cp)
       this.buildAnatomyDetail()
@@ -422,7 +428,7 @@ export class StudioScene extends Phaser.Scene {
     y = this.buildControls(cx, y, res) + 18
     const recipe = clip
     const name = this.add
-      .text(cx, y, `${recipe.emoji} ${recipe.name}`, {
+      .text(cx, y, recipe.name, {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
         fontStyle: 'bold',
@@ -444,7 +450,7 @@ export class StudioScene extends Phaser.Scene {
       .setOrigin(0.5, 0)
     y += desc.height + 14
     const anatomy = this.add
-      .text(cx, y, `🔬 ${recipe.anatomy}`, {
+      .text(cx, y, recipe.anatomy, {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         color: '#aab6cc',
@@ -458,7 +464,7 @@ export class StudioScene extends Phaser.Scene {
     this.startBake(
       clip,
       previewSize,
-      `studio-anim-${emojiCodepoints(set.emoji)}-${clip.id}`,
+      `studio-anim-${set.emoji}-${clip.id}`,
       clip.frames,
     )
   }
@@ -471,7 +477,7 @@ export class StudioScene extends Phaser.Scene {
     y: number,
     res: number,
   ): number {
-    const labels: Record<string, string> = { idle: '🧘 待机', attack: '⚔️ 攻击' }
+    const labels: Record<string, string> = { idle: '{1f9d8} 待机', attack: '{2694} 攻击' }
     const chipH = 46
     const gap = 10
     const chipW = Math.min(170, (this.detailRect().w - 48 - (set.clips.length - 1) * gap) / set.clips.length)
@@ -483,15 +489,19 @@ export class StudioScene extends Phaser.Scene {
       bg.fillRoundedRect(x, y, chipW, chipH, 12)
       bg.lineStyle(active ? 2 : 1, 0xffffff, active ? 0.9 : 0.12)
       bg.strokeRoundedRect(x, y, chipW, chipH, 12)
-      const label = this.add
-        .text(x + chipW / 2, y + chipH / 2, labels[c.id] ?? c.id, {
+      const label = emojiText(
+        this,
+        x + chipW / 2,
+        y + chipH / 2,
+        labels[c.id] ?? c.id,
+        {
           fontFamily: UI_FONT,
           fontSize: FONT.body,
           color: '#ffffff',
           resolution: res,
-        })
-        .setOrigin(0.5)
-        .setAlpha(active ? 1 : 0.7)
+        },
+        { origin: 0.5 },
+      ).setAlpha(active ? 1 : 0.7)
       const zone = this.add
         .zone(x, y, chipW, chipH)
         .setOrigin(0)
@@ -581,7 +591,7 @@ export class StudioScene extends Phaser.Scene {
       .then((svg) => {
         if (gen !== this.jobGen) return
         const recipe = applyTemplate(tpl, emoji, svg)
-        this.startBake(recipe, previewSize, `studio-tpl-${emojiCodepoints(emoji)}-${tpl.id}`)
+        this.startBake(recipe, previewSize, `studio-tpl-${emoji}-${tpl.id}`)
       })
       .catch((err) => {
         console.error(`模板套用失败: ${String(err)}`)
@@ -600,7 +610,7 @@ export class StudioScene extends Phaser.Scene {
     this.previewState = 'loading'
 
     const title = this.add
-      .text(d.x + 24, d.y + 14, `${emoji} 结构树 · 点行显/隐`, {
+      .text(d.x + 24, d.y + 14, '结构树 · 点行显/隐', {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         color: '#aab6cc',
@@ -633,7 +643,7 @@ export class StudioScene extends Phaser.Scene {
         if (gen !== this.jobGen) return
         const tree = parseSvgTree(svg)
         // 完整大图纹理：每 emoji 只烘一次
-        const fullKey = `studio-anat-full-${emojiCodepoints(emoji)}`
+        const fullKey = `studio-anat-full-${emoji}`
         if (!this.textures.exists(fullKey)) {
           const img = await svgToImage(setSvgSize(svg, RASTER))
           if (!this.textures.exists(fullKey)) {
@@ -783,13 +793,7 @@ export class StudioScene extends Phaser.Scene {
       if (row.paints) {
         // 眼睛是行状态指示（整行都是显/隐开关，不是独立按钮）
         parts.push(
-          this.add
-            .text(x, y + ANAT_ROW / 2, this.anatHidden.has(row.path) ? '🙈' : '👁', {
-              fontFamily: UI_FONT,
-              fontSize: FONT.strong,
-              resolution: a.res,
-            })
-            .setOrigin(0, 0.5)
+          emojiImage(this, x + 16, y + ANAT_ROW / 2, this.anatHidden.has(row.path) ? '1f648' : '1f441', 32)
             .setAlpha(dim && !this.anatHidden.has(row.path) ? 0.4 : 1),
         )
         x += 48
@@ -906,31 +910,23 @@ export class StudioScene extends Phaser.Scene {
       .catch((err) => console.warn(`预览加载失败 ${emoji}: ${String(err)}`))
   }
 
-  /** 播放控制条：⏮ ⏯ ⏭ 速度；返回控制条底部 y */
+  /** 播放控制条：⏮ ⏯ ⏭ 速度（媒体控制图标走 SVG 纹理，速度是文字）；返回控制条底部 y */
   private buildControls(cx: number, y: number, res: number): number {
-    const defs: { id: string; label: () => string; onTap: () => void }[] = [
-      {
-        id: 'prev',
-        label: () => '⏮',
-        onTap: () => this.stepFrame(-1),
-      },
+    // icon 为媒体控制 emoji 的 ordering ID（预载）；speed 为纯文字
+    const defs: { id: string; icon?: () => string; onTap: () => void }[] = [
+      { id: 'prev', icon: () => '23ee', onTap: () => this.stepFrame(-1) },
       {
         id: 'toggle',
-        label: () => (this.paused ? '▶️' : '⏸'),
+        icon: () => (this.paused ? '25b6' : '23f8'),
         onTap: () => {
           this.paused = !this.paused
           this.restartTimer()
           this.refreshControls()
         },
       },
-      {
-        id: 'next',
-        label: () => '⏭',
-        onTap: () => this.stepFrame(1),
-      },
+      { id: 'next', icon: () => '23ed', onTap: () => this.stepFrame(1) },
       {
         id: 'speed',
-        label: () => `${SPEEDS[this.speedIdx]}×`,
         onTap: () => {
           this.speedIdx = (this.speedIdx + 1) % SPEEDS.length
           this.restartTimer()
@@ -942,21 +938,31 @@ export class StudioScene extends Phaser.Scene {
     const btnH = 46
     const gap = 12
     let x = cx - (defs.length * btnW + (defs.length - 1) * gap) / 2
-    this.controlLabels = {}
+    this.controlToggle = undefined
+    this.controlSpeed = undefined
     for (const def of defs) {
       const bg = this.add.graphics()
       bg.fillStyle(0x000000, 0.28)
       bg.fillRoundedRect(x, y, btnW, btnH, 12)
       bg.lineStyle(1, 0xffffff, 0.15)
       bg.strokeRoundedRect(x, y, btnW, btnH, 12)
-      const label = this.add
-        .text(x + btnW / 2, y + btnH / 2, def.label(), {
-          fontFamily: UI_FONT,
-          fontSize: FONT.head,
-          color: '#ffffff',
-          resolution: res,
-        })
-        .setOrigin(0.5)
+      let obj: Phaser.GameObjects.GameObject
+      if (def.icon) {
+        const icon = emojiImage(this, x + btnW / 2, y + btnH / 2, def.icon(), 32)
+        if (def.id === 'toggle') this.controlToggle = icon
+        obj = icon
+      } else {
+        const speed = this.add
+          .text(x + btnW / 2, y + btnH / 2, `${SPEEDS[this.speedIdx]}×`, {
+            fontFamily: UI_FONT,
+            fontSize: FONT.head,
+            color: '#ffffff',
+            resolution: res,
+          })
+          .setOrigin(0.5)
+        this.controlSpeed = speed
+        obj = speed
+      }
       const zone = this.add
         .zone(x, y, btnW, btnH)
         .setOrigin(0)
@@ -966,17 +972,18 @@ export class StudioScene extends Phaser.Scene {
           def.onTap()
         })
       this.controlRects[def.id] = { x, y, w: btnW, h: btnH }
-      this.controlLabels[def.id] = { label, render: def.label }
-      this.detailObjs.push(bg, label, zone)
+      this.detailObjs.push(bg, obj, zone)
       x += btnW + gap
     }
     return y + btnH
   }
 
-  private controlLabels: Record<string, { label: Phaser.GameObjects.Text; render: () => string }> = {}
+  private controlToggle?: Phaser.GameObjects.Image
+  private controlSpeed?: Phaser.GameObjects.Text
 
   private refreshControls(): void {
-    for (const { label, render } of Object.values(this.controlLabels)) label.setText(render())
+    this.controlToggle?.setTexture(emojiKey(this.paused ? '25b6' : '23f8'))
+    this.controlSpeed?.setText(`${SPEEDS[this.speedIdx]}×`)
     this.report()
   }
 
@@ -1031,7 +1038,7 @@ export class StudioScene extends Phaser.Scene {
 
   private async bakeAnimTextures(recipe: AnimRecipe, keyPrefix: string | undefined, frames: number): Promise<string[]> {
     const svg = await emojiSvgText(recipe.emoji)
-    const prefix = keyPrefix ?? `studio-anim-${emojiCodepoints(recipe.emoji)}`
+    const prefix = keyPrefix ?? `studio-anim-${recipe.emoji}`
     const keys: string[] = []
     for (let k = 0; k < frames; k++) {
       const key = `${prefix}-${k}`

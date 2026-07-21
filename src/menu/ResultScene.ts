@@ -15,7 +15,7 @@ import type { RunState } from '../run/state'
 import { browserStorage } from '../core/storage'
 import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
-import { emojiImage } from '../emoji/textures'
+import { emojiImage, emojiText } from '../emoji/textures'
 import { burstEmitter } from '../core/fx'
 import { FONT, UI_FONT } from '../core/fonts'
 import { playSfx } from '../audio/sfx'
@@ -99,15 +99,20 @@ export class ResultScene extends Phaser.Scene {
     const cx = w / 2
 
     // 标题（胜利带弹跳与彩带粒子）
-    const title = this.add
-      .text(cx, oy + L.titleY, this.win ? '🏆 通关胜利！' : '💀 全军覆没', {
+    const title = emojiText(
+      this,
+      cx,
+      oy + L.titleY,
+      this.win ? '{1f3c6} 通关胜利！' : '{1f480} 全军覆没',
+      {
         fontFamily: UI_FONT,
         fontSize: FONT.display,
         fontStyle: 'bold',
         color: this.win ? '#ffd54f' : '#ef9a9a',
         resolution: res,
-      })
-      .setOrigin(0.5)
+      },
+      { origin: 0.5 },
+    )
     title.setScale(0.6)
     this.tweens.add({ targets: title, scale: 1, duration: 380, ease: 'Back.easeOut' })
     if (this.win && !preserved) {
@@ -124,21 +129,21 @@ export class ResultScene extends Phaser.Scene {
     const waveText = this.win
       ? `${WAVE.totalWaves} 波全部打完`
       : `止步第 ${this.run.wave} 波`
-    this.add
-      .text(
-        cx,
-        oy + L.subY,
-        `${captain.emoji} ${captain.name} · ${waveText} · 击杀 ${this.run.kills} · ${PICKUPS.coin.emoji}${this.run.coins} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
-        { fontFamily: UI_FONT, fontSize: FONT.head, color: '#e8e8f0', resolution: res },
-      )
-      .setOrigin(0.5)
+    emojiText(
+      this,
+      cx,
+      oy + L.subY,
+      `{${captain.emoji}} ${captain.name} · ${waveText} · 击杀 ${this.run.kills} · {${PICKUPS.coin.emoji}}${this.run.coins} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
+      { fontFamily: UI_FONT, fontSize: FONT.head, color: '#e8e8f0', resolution: res },
+      { origin: 0.5 },
+    )
     this.add
       .text(
         cx,
         oy + L.bestY,
         this.best.newBest
-          ? '🏅 新纪录！'
-          : `🏅 最佳：第 ${this.best.bestWave} 波 · 击杀 ${this.best.bestKills}`,
+          ? '新纪录！'
+          : `最佳：第 ${this.best.bestWave} 波 · 击杀 ${this.best.bestKills}`,
         { fontFamily: UI_FONT, fontSize: FONT.strong, color: '#d4b106', resolution: res },
       )
       .setOrigin(0.5)
@@ -270,24 +275,34 @@ export class ResultScene extends Phaser.Scene {
     panel.strokeRoundedRect(x, y, w, h, 14)
 
     const st = this.run.stats
-    this.add
-      .text(x + 20, y + 24, '⚔️ 敌情', {
+    emojiText(
+      this,
+      x + 20,
+      y + 24,
+      '{2694} 敌情',
+      {
         fontFamily: UI_FONT,
         fontSize: FONT.strong,
         fontStyle: 'bold',
         color: '#ffffff',
         resolution: res,
-      })
-      .setOrigin(0, 0.5)
+      },
+      { origin: 0 },
+    )
     if (st.eliteKills > 0) {
-      this.add
-        .text(x + w - 20, y + 24, `⭐ 精英 ×${st.eliteKills}`, {
+      emojiText(
+        this,
+        x + w - 20,
+        y + 24,
+        `{2b50} 精英 ×${st.eliteKills}`,
+        {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           color: '#ffd54f',
           resolution: res,
-        })
-        .setOrigin(1, 0.5)
+        },
+        { origin: 1 },
+      )
     }
 
     const emojiByName = new Map<string, string>([

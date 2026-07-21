@@ -2,7 +2,6 @@
 
 declare const __BUILD_HASH__: string
 declare const __BUILD_TIME__: string
-declare const __TWEMOJI_VERSION__: string
 
 // e2e 读取的运行时状态（src/ui/debug.ts 写入）
 interface WarmojiPromoteDebug {
@@ -185,7 +184,6 @@ interface WarmojiDebug {
 interface Window {
   __warmoji?: WarmojiDebug
   __game?: unknown
-  __twemojiVersion?: string
   __setStress?: (on: boolean) => void
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void

@@ -1,36 +1,24 @@
-import { readFileSync, readdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { emojiCodepoints } from './codepoints'
+import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../boot/preload'
+import { ANIM_SETS } from './studio'
 
-// 扫描对象是整个 src（本文件在 src/emoji/ 下，向上一级）
-const srcDir = join(dirname(fileURLToPath(import.meta.url)), '..')
+// emoji 缺失守卫：游戏引用的每个 emoji ID 都必须在 ordering 全集里
+//（ordering.txt 是唯一 SSOT）。PRELOAD_EMOJIS + OUTLINED_EMOJIS 已聚合全部
+// 游戏内容 emoji（角色/队长/敌人/道具/地图/武器/拾取/UI 图标/Studio 图标 +
+// 各阵营描边变体 + 变形替身 + 亡语弹体），动画集补上被动画的实体。
+const ordering = new Set(
+  readFileSync('src/assets/emoji/ordering.txt', 'utf8').split('\n').map((l) => l.trim()).filter(Boolean),
+)
 
-function tsFiles(dir: string): string[] {
-  const out: string[] = []
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const p = join(dir, entry.name)
-    if (entry.isDirectory()) out.push(...tsFiles(p))
-    else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) out.push(p)
-  }
-  return out
-}
-
-describe('twemoji 资产完整性', () => {
-  it('源码用到的每个 emoji 在 twemoji-svg 全集中都有对应文件', () => {
-    const emojiRe = new RegExp('\\p{RGI_Emoji}', 'gv')
-    const used = new Set<string>()
-    for (const file of tsFiles(srcDir)) {
-      for (const m of readFileSync(file, 'utf8').matchAll(emojiRe)) {
-        used.add(emojiCodepoints(m[0]))
-      }
-    }
-    const available = new Set(
-      readdirSync(join(srcDir, '../node_modules/twemoji-svg/dist'))
-        .filter((f) => f.endsWith('.svg'))
-        .map((f) => f.replace('.svg', '')),
-    )
-    expect([...used].filter((c) => !available.has(c)).sort()).toEqual([])
+describe('emoji ID 完整性', () => {
+  it('预载 / 描边 / 动画引用的每个 emoji ID 都在 ordering 全集中', () => {
+    const ids = new Set<string>([
+      ...PRELOAD_EMOJIS,
+      ...Object.values(OUTLINED_EMOJIS).flat(),
+      ...ANIM_SETS.map((s) => s.emoji),
+    ])
+    const missing = [...ids].filter((id) => !ordering.has(id)).sort()
+    expect(missing, `以下 emoji ID 不在 ordering 中：${missing.join(' ')}`).toEqual([])
   })
 })

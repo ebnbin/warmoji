@@ -86,7 +86,7 @@ describe('hash01 / worldNoise', () => {
 
 describe('chunkDecor（分块装饰）', () => {
   const def: MapDecor = {
-    emojis: ['🌾', '🪨'],
+    emojis: ['1f33e', '1faa8'],
     sizeU: [0.3, 0.6],
     alpha: [0.15, 0.25],
     density: [0.1, 0.14],

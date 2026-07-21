@@ -25,7 +25,7 @@ function upgradeCard(cid: CharacterId, index: 0 | 1, price: number): ItemDef {
 export const ITEMS = {
   // ── 通用池 · 普通（15~35）──
   gemHeart: {
-    emoji: '❤️',
+    emoji: '2764',
     name: '生命宝石',
     desc: '生命上限 +25',
     rarity: 'common',
@@ -34,7 +34,7 @@ export const ITEMS = {
     effects: { hpAdd: 25 },
   },
   shellArmor: {
-    emoji: '🛡️',
+    emoji: '1f6e1',
     name: '硬壳护甲',
     desc: '生命上限 +60 · 攻速 -10%',
     rarity: 'common',
@@ -44,7 +44,7 @@ export const ITEMS = {
     effects: { hpAdd: 60, cooldownMul: 1.1 },
   },
   stimulant: {
-    emoji: '⚡',
+    emoji: '26a1',
     name: '兴奋剂',
     desc: '攻速 +15% · 生命上限 -10',
     rarity: 'common',
@@ -54,7 +54,7 @@ export const ITEMS = {
     effects: { cooldownMul: 0.87, hpAdd: -10 },
   },
   whetstone: {
-    emoji: '🗡️',
+    emoji: '1f5e1',
     name: '磨刀石',
     desc: '伤害 +12%',
     rarity: 'common',
@@ -63,7 +63,7 @@ export const ITEMS = {
     effects: { damageMul: 1.12 },
   },
   rageBracer: {
-    emoji: '💪',
+    emoji: '1f4aa',
     name: '狂暴护腕',
     desc: '伤害 +25% · 生命上限 -20',
     rarity: 'common',
@@ -73,7 +73,7 @@ export const ITEMS = {
     effects: { damageMul: 1.25, hpAdd: -20 },
   },
   padHelmet: {
-    emoji: '⛑️',
+    emoji: '26d1',
     name: '缓冲头盔',
     desc: '受击无敌 +0.15 秒',
     rarity: 'common',
@@ -83,7 +83,7 @@ export const ITEMS = {
     effects: { iframesAddMs: 150 },
   },
   reviveWatch: {
-    emoji: '⏱️',
+    emoji: '23f1',
     name: '复活怀表',
     desc: '复活时间 -2 秒',
     rarity: 'common',
@@ -94,7 +94,7 @@ export const ITEMS = {
   },
   // ── 通用池 · 稀有（40~55）──
   regenRing: {
-    emoji: '💍',
+    emoji: '1f48d',
     name: '再生戒指',
     desc: '每秒回复 2 生命',
     rarity: 'rare',
@@ -104,7 +104,7 @@ export const ITEMS = {
     effects: { regenPerSec: 2 },
   },
   thornVest: {
-    emoji: '🌵',
+    emoji: '1f335',
     name: '荆棘背心',
     desc: '敌人接触时受到 14 反伤',
     rarity: 'rare',
@@ -114,7 +114,7 @@ export const ITEMS = {
     effects: { thorns: 14 },
   },
   vampFang: {
-    emoji: '🧛',
+    emoji: '1f9db',
     name: '吸血獠牙',
     desc: '击杀敌人回复 3 生命',
     rarity: 'rare',
@@ -124,7 +124,7 @@ export const ITEMS = {
     effects: { killHeal: 3 },
   },
   hammerWeight: {
-    emoji: '🔨',
+    emoji: '1f528',
     name: '重锤配重',
     desc: '能力击退 +35%',
     rarity: 'rare',
@@ -135,7 +135,7 @@ export const ITEMS = {
   },
   // ── 通用池 · 史诗（90~130）──
   fateDice: {
-    emoji: '🎲',
+    emoji: '1f3b2',
     name: '命运骰子',
     desc: '20% 概率暴击，伤害翻倍',
     rarity: 'epic',
@@ -145,7 +145,7 @@ export const ITEMS = {
     effects: { critChance: 0.2 },
   },
   giantHeart: {
-    emoji: '🫀',
+    emoji: '1fac0',
     name: '巨人心脏',
     desc: '生命上限 +150',
     rarity: 'epic',
@@ -155,7 +155,7 @@ export const ITEMS = {
     effects: { hpAdd: 150 },
   },
   phaseCloak: {
-    emoji: '🌫️',
+    emoji: '1f32b',
     name: '相位披风',
     desc: '受击无敌 +0.4 秒',
     rarity: 'epic',
@@ -166,7 +166,7 @@ export const ITEMS = {
   },
   // ── 能力形态专属池（普通） ──
   blastPowder: {
-    emoji: '💥',
+    emoji: '1f4a5',
     name: '扩爆火药',
     desc: '轰炸范围 +20%',
     rarity: 'common',
@@ -176,7 +176,7 @@ export const ITEMS = {
     effects: { rangeMul: 1.2 },
   },
   scope: {
-    emoji: '🎯',
+    emoji: '1f3af',
     name: '瞄准镜',
     desc: '弹速 +25%',
     rarity: 'common',
@@ -186,7 +186,7 @@ export const ITEMS = {
     effects: { projSpeedMul: 1.25 },
   },
   powerCell: {
-    emoji: '🔋',
+    emoji: '1f50b',
     name: '高能电池',
     desc: '激光范围 +20%',
     rarity: 'common',
@@ -196,7 +196,7 @@ export const ITEMS = {
     effects: { rangeMul: 1.2 },
   },
   longHaft: {
-    emoji: '🌪️',
+    emoji: '1f32a',
     name: '长柄套件',
     desc: '横扫范围 +15% · 攻速 -5%',
     rarity: 'common',
@@ -206,7 +206,7 @@ export const ITEMS = {
     effects: { rangeMul: 1.15, cooldownMul: 1.05 },
   },
   lance: {
-    emoji: '🦯',
+    emoji: '1f9af',
     name: '加长枪杆',
     desc: '突刺范围 +20%',
     rarity: 'common',
@@ -216,7 +216,7 @@ export const ITEMS = {
     effects: { rangeMul: 1.2 },
   },
   returnString: {
-    emoji: '🧵',
+    emoji: '1f9f5',
     name: '回力丝线',
     desc: '回旋镖范围 +20%',
     rarity: 'common',
@@ -226,7 +226,7 @@ export const ITEMS = {
     effects: { rangeMul: 1.2 },
   },
   frostCore: {
-    emoji: '🧊',
+    emoji: '1f9ca',
     name: '深寒结晶',
     desc: '光环范围 +20%',
     rarity: 'common',
@@ -237,7 +237,7 @@ export const ITEMS = {
   },
   // ── 队长池 · 普通 ──
   marchFlag: {
-    emoji: '👟',
+    emoji: '1f45f',
     name: '疾行军旗',
     desc: '全队移速 +8%',
     rarity: 'common',
@@ -247,7 +247,7 @@ export const ITEMS = {
     effects: { moveSpeedMul: 1.08 },
   },
   magnetCoil: {
-    emoji: '🧲',
+    emoji: '1f9f2',
     name: '磁力线圈',
     desc: '金币拾取范围 +25%',
     rarity: 'common',
@@ -256,7 +256,7 @@ export const ITEMS = {
     effects: { magnetMul: 1.25 },
   },
   luckyCoin: {
-    emoji: '💰',
+    emoji: '1f4b0',
     name: '幸运硬币',
     desc: '15% 概率掉落双倍金币',
     rarity: 'common',
@@ -266,7 +266,7 @@ export const ITEMS = {
     effects: { doubleCoinChance: 0.15 },
   },
   heavyArms: {
-    emoji: '🏋️',
+    emoji: '1f3cb',
     name: '沉重军备',
     desc: '全队伤害 +10% · 移速 -5%',
     rarity: 'common',
@@ -277,7 +277,7 @@ export const ITEMS = {
   },
   // ── 队长池 · 稀有 ──
   clover: {
-    emoji: '🍀',
+    emoji: '1f340',
     name: '幸运四叶草',
     desc: '全队经验 +15%',
     rarity: 'rare',
@@ -287,7 +287,7 @@ export const ITEMS = {
     effects: { xpGainMul: 1.15 },
   },
   fieldKitchen: {
-    emoji: '🥘',
+    emoji: '1f958',
     name: '战地大锅',
     desc: '每波结束全队回复 25% 生命上限',
     rarity: 'rare',
@@ -297,7 +297,7 @@ export const ITEMS = {
     effects: { waveHealRatio: 0.25 },
   },
   warBond: {
-    emoji: '🏦',
+    emoji: '1f3e6',
     name: '战争债券',
     desc: '每波结束额外 +10 金币',
     rarity: 'rare',
@@ -308,7 +308,7 @@ export const ITEMS = {
   },
   // ── 队长池 · 史诗 ──
   timeSand: {
-    emoji: '⏳',
+    emoji: '23f3',
     name: '时之沙',
     desc: '全体敌人移速 -12%',
     rarity: 'epic',
@@ -318,7 +318,7 @@ export const ITEMS = {
     effects: { enemySlowMul: 0.88 },
   },
   legionBanner: {
-    emoji: '🚩',
+    emoji: '1f6a9',
     name: '军团战旗',
     desc: '全队伤害 +20%',
     rarity: 'epic',

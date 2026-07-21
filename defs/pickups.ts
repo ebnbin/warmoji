@@ -4,12 +4,12 @@ import type { PickupDef } from '../src/pickups/registry'
 
 export const PICKUPS = {
   coin: {
-    emoji: '🪙',
+    emoji: '1fa99',
     size: 0.6,
     radius: 0.22,
   },
   chest: {
-    emoji: '🎁',
+    emoji: '1f381',
     size: 0.8,
     radius: 0.3,
     fallbackCoins: 10,

@@ -621,7 +621,7 @@ export interface AnimTemplate {
 export const ANIM_TEMPLATES: readonly AnimTemplate[] = [
   {
     id: 'breathe',
-    icon: '😮‍💨',
+    icon: '1f62e_200d_1f4a8',
     name: '呼吸',
     desc: '整体缓慢地鼓起又收回，安静的活物感。',
     whole: {
@@ -636,7 +636,7 @@ export const ANIM_TEMPLATES: readonly AnimTemplate[] = [
   },
   {
     id: 'sway',
-    icon: '🌾',
+    icon: '1f33e',
     name: '摇摆',
     desc: '绕底部左右摆动，像被风吹着。',
     whole: {
@@ -651,7 +651,7 @@ export const ANIM_TEMPLATES: readonly AnimTemplate[] = [
   },
   {
     id: 'bounce',
-    icon: '🏀',
+    icon: '1f3c0',
     name: '弹跳',
     desc: '蹲身蓄力、跃起、落地压扁回弹——完整的挤压拉伸循环。',
     whole: {
@@ -669,7 +669,7 @@ export const ANIM_TEMPLATES: readonly AnimTemplate[] = [
   },
   {
     id: 'float',
-    icon: '🎈',
+    icon: '1f388',
     name: '悬浮',
     desc: '轻轻上下漂浮并微微倾侧，幽灵与气球的质感。',
     whole: {
@@ -686,7 +686,7 @@ export const ANIM_TEMPLATES: readonly AnimTemplate[] = [
   },
   {
     id: 'shiver',
-    icon: '🥶',
+    icon: '1f976',
     name: '战栗',
     desc: '高频左右哆嗦，受惊或冻僵的样子。',
     whole: {
@@ -706,7 +706,7 @@ export const ANIM_TEMPLATES: readonly AnimTemplate[] = [
   },
   {
     id: 'pulse',
-    icon: '💓',
+    icon: '1f493',
     name: '心跳',
     desc: '咚-咚两连跳后歇一拍，心脏与警报的节奏。',
     whole: {
@@ -724,7 +724,7 @@ export const ANIM_TEMPLATES: readonly AnimTemplate[] = [
   },
   {
     id: 'ignite',
-    icon: '🔥',
+    icon: '1f525',
     name: '燃烧',
     desc: '轻微摇曳，火星从身后升起——着火了。',
     whole: {
@@ -755,7 +755,7 @@ export const ANIM_TEMPLATES: readonly AnimTemplate[] = [
   },
   {
     id: 'sparkle',
-    icon: '✨',
+    icon: '2728',
     name: '闪耀',
     desc: '周身三颗星光错相闪烁，稀有物品的光泽。',
     fx: [
@@ -773,7 +773,7 @@ export const ANIM_TEMPLATES: readonly AnimTemplate[] = [
   },
   {
     id: 'steaming',
-    icon: '♨️',
+    icon: '2668',
     name: '蒸腾',
     desc: '头顶两缕热气袅袅升起，刚出锅或怒气值拉满。',
     fx: [
@@ -791,7 +791,7 @@ export const ANIM_TEMPLATES: readonly AnimTemplate[] = [
   },
   {
     id: 'electrified',
-    icon: '⚡',
+    icon: '26a1',
     name: '触电',
     desc: '细微高频抖动，三道电弧在周身错时炸开。',
     whole: {
