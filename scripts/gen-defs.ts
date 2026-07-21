@@ -1,5 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { ABILITIES } from '../defs/abilities.ts'
+import { BUDGET } from '../defs/budget.ts'
+import { abilityDps } from './dps.ts'
 import { CHARACTERS } from '../defs/characters.ts'
 import { WEAPONS } from '../defs/weapons.ts'
 import { CAPTAINS } from '../defs/captains.ts'
@@ -16,6 +18,18 @@ import type { ItemDef } from '../src/items/registry'
 const errors: string[] = []
 function bad(path: string, msg: string): void {
   errors.push(`${path}: ${msg}`)
+}
+// 软护栏（数值预算）：越界只告警、不计入 errors、不阻断构建（见文末打印）
+const warnings: string[] = []
+const BUDGETS = BUDGET as Record<string, { role: string; dps: readonly [number, number] }>
+/** 战斗能力生效 DPS 落在设计带宽外即提示（描述式，当前应零告警） */
+function checkBudget(id: string, a: Record<string, unknown>): void {
+  const b = BUDGETS[String(a.kind)]
+  if (!b) return
+  const d = abilityDps(a)
+  if (d < b.dps[0] || d > b.dps[1]) {
+    warnings.push(`abilities.${id}（${String(a.kind)}）生效 DPS ${d.toFixed(1)} 越界 [${b.dps[0]},${b.dps[1]}]：${b.role}`)
+  }
 }
 function num(path: string, v: unknown, min = 0): void {
   if (typeof v !== 'number' || !Number.isFinite(v) || v < min) bad(path, `需为 ≥${min} 的有限数，得到 ${String(v)}`)
@@ -94,6 +108,7 @@ function checkRef(path: string, id: unknown): boolean {
 // ── abilities ──
 for (const [id, a] of Object.entries(ABILITIES)) {
   checkAbility(`abilities.${id}`, a as unknown as Record<string, unknown>)
+  checkBudget(id, a as unknown as Record<string, unknown>)
   pure(`abilities.${id}`, a)
 }
 
@@ -263,6 +278,11 @@ for (const [id, pk] of Object.entries(PICKUPS)) {
   num(`${p}.size`, pk.size, 0.01)
   num(`${p}.radius`, pk.radius, 0.01)
   pure(p, pk)
+}
+
+if (warnings.length > 0) {
+  console.warn(`数值软护栏：${warnings.length} 条能力生效 DPS 越界（仅提示，不阻断）：`)
+  for (const wn of warnings) console.warn('  ⚠ ' + wn)
 }
 
 if (errors.length > 0) {
