@@ -1,4 +1,5 @@
 import type { HealDef } from './defs'
+import { circleCue } from './cues'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 治疗型：周期治疗范围内血量比例最低的队友（对友军索敌）。
@@ -44,18 +45,16 @@ export class HealAbility implements AbilityRuntime {
 
   /** 治疗脉冲环 */
   private pulse(owner: AbilityOwner, color: number): void {
-    const ring = this.ctx.scene.add
-      .circle(owner.x, owner.y, this.def.range, color, 0.08)
-      .setStrokeStyle(3, color, 0.7)
-      .setDepth(6)
-      .setScale(0.25)
-    this.ctx.scene.tweens.add({
-      targets: ring,
-      scale: 1,
-      alpha: 0,
-      duration: 420,
-      ease: 'Cubic.easeOut',
-      onComplete: () => ring.destroy(),
+    circleCue(this.ctx.scene, owner.x, owner.y, this.def.range, {
+      fill: color,
+      fillAlpha: 0.08,
+      stroke: color,
+      lineWidth: 3,
+      lineAlpha: 0.7,
+      fromScale: 0.25,
+      toScale: 1,
+      durationMs: 420,
+      depth: 6,
     })
   }
 

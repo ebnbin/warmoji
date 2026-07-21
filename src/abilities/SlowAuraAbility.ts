@@ -1,5 +1,6 @@
 import type Phaser from 'phaser'
 import type { SlowAuraDef } from './defs'
+import { circleCue } from './cues'
 import type { AbilityContext, AbilityRuntime } from './types'
 
 /** 寒气光环：以队伍中心为圆心持续减速（角色只是来源；角色阵亡光环随之消失）。
@@ -60,18 +61,16 @@ export class SlowAuraAbility implements AbilityRuntime {
           const dy = t.y - c.y
           if (dx * dx + dy * dy <= r2) this.ctx.slowTarget(t.ref, 0, this.def.freeze.durationMs)
         }
-        const pulse = this.ctx.scene.add
-          .circle(c.x, c.y, this.def.radius, 0xffffff, 0.18)
-          .setStrokeStyle(4, this.def.color, 0.9)
-          .setDepth(7)
-          .setScale(0.2)
-        this.ctx.scene.tweens.add({
-          targets: pulse,
-          scale: 1,
-          alpha: 0,
-          duration: 420,
-          ease: 'Cubic.easeOut',
-          onComplete: () => pulse.destroy(),
+        circleCue(this.ctx.scene, c.x, c.y, this.def.radius, {
+          fill: 0xffffff,
+          fillAlpha: 0.18,
+          stroke: this.def.color,
+          lineWidth: 4,
+          lineAlpha: 0.9,
+          fromScale: 0.2,
+          toScale: 1,
+          durationMs: 420,
+          depth: 7,
         })
       }
     }

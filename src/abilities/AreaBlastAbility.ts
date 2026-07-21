@@ -1,8 +1,8 @@
-import type Phaser from 'phaser'
 import { ACQUIRE } from './registry'
 import { UNIT } from '../core/units'
 import type { AreaBlastDef } from './defs'
 import { applyBlast, applyEffects } from './effects'
+import { circleCue } from './cues'
 import { nearestTarget, targetsWithin } from './targeting'
 import { emojiImage } from '../emoji/textures'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
@@ -65,30 +65,25 @@ export class AreaBlastAbility implements AbilityRuntime {
   private blastEffect(x: number, y: number): void {
     const scene = this.ctx.scene
     // 白闪核心
-    const flash: Phaser.GameObjects.Arc = scene.add
-      .circle(x, y, this.def.blastRadius * 0.55, 0xffffff, 0.9)
-      .setDepth(8)
-    scene.tweens.add({
-      targets: flash,
-      scale: 1.7,
-      alpha: 0,
-      duration: 170,
-      ease: 'Cubic.easeOut',
-      onComplete: () => flash.destroy(),
+    circleCue(scene, x, y, this.def.blastRadius * 0.55, {
+      fill: 0xffffff,
+      fillAlpha: 0.9,
+      fromScale: 1,
+      toScale: 1.7,
+      durationMs: 170,
+      depth: 8,
     })
     // 冲击环
-    const ring: Phaser.GameObjects.Arc = scene.add
-      .circle(x, y, this.def.blastRadius, this.def.color, 0.4)
-      .setStrokeStyle(6, this.def.color, 1)
-      .setDepth(7)
-      .setScale(0.25)
-    scene.tweens.add({
-      targets: ring,
-      scale: 1.08,
-      alpha: 0,
-      duration: 400,
-      ease: 'Cubic.easeOut',
-      onComplete: () => ring.destroy(),
+    circleCue(scene, x, y, this.def.blastRadius, {
+      fill: this.def.color,
+      fillAlpha: 0.4,
+      stroke: this.def.color,
+      lineWidth: 6,
+      lineAlpha: 1,
+      fromScale: 0.25,
+      toScale: 1.08,
+      durationMs: 400,
+      depth: 7,
     })
     // 💥 爆裂
     const boom = emojiImage(scene, x, y, '💥', this.def.blastRadius * 1.5).setDepth(9)

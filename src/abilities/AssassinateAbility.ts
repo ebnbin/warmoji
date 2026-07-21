@@ -2,6 +2,7 @@ import { DEG2RAD } from '../core/units'
 import type Phaser from 'phaser'
 import type { AssassinateDef } from './defs'
 import { applyEffects } from './effects'
+import { circleCue } from './cues'
 import { strongestTarget } from './targeting'
 import { emojiImage } from '../emoji/textures'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
@@ -94,14 +95,13 @@ export class AssassinateAbility implements AbilityRuntime {
 
   /** 瞬移端点的残影闪光 */
   private flash(x: number, y: number): void {
-    const c = this.ctx.scene.add.circle(x, y, 26, 0xb388ff, 0.4).setDepth(14)
-    this.ctx.scene.tweens.add({
-      targets: c,
-      scale: 1.8,
-      alpha: 0,
-      duration: 240,
-      ease: 'Cubic.easeOut',
-      onComplete: () => c.destroy(),
+    circleCue(this.ctx.scene, x, y, 26, {
+      fill: 0xb388ff,
+      fillAlpha: 0.4,
+      fromScale: 1,
+      toScale: 1.8,
+      durationMs: 240,
+      depth: 14,
     })
   }
 

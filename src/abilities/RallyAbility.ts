@@ -1,4 +1,5 @@
 import type { RallyDef } from './defs'
+import { circleCue } from './cues'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 集结型：阵亡我方满血复活、存活者按上限比例回复、全队短暂无敌，
@@ -25,18 +26,16 @@ export class RallyAbility implements AbilityRuntime {
     void _owner
     this.ctx.rallyTeam?.(this.def.healRatio, this.def.invulnMs)
     const { x, y } = this.ctx.anchor()
-    const ring = this.ctx.scene.add
-      .circle(x, y, this.def.ringRadius, this.def.color, 0.3)
-      .setStrokeStyle(4, this.def.color, 0.9)
-      .setDepth(20)
-      .setScale(0.4)
-    this.ctx.scene.tweens.add({
-      targets: ring,
-      scale: 3,
-      alpha: 0,
-      duration: 550,
-      ease: 'Cubic.easeOut',
-      onComplete: () => ring.destroy(),
+    circleCue(this.ctx.scene, x, y, this.def.ringRadius, {
+      fill: this.def.color,
+      fillAlpha: 0.3,
+      stroke: this.def.color,
+      lineWidth: 4,
+      lineAlpha: 0.9,
+      fromScale: 0.4,
+      toScale: 3,
+      durationMs: 550,
+      depth: 20,
     })
   }
 

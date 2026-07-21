@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import { circleHitIndices } from './defs'
 import type { BlastRing, Effect } from './defs'
+import { circleCue } from './cues'
 import { angleToNearest } from './targeting'
 import type { AbilityContext, TargetInfo } from './types'
 
@@ -36,18 +37,16 @@ export function blastRing(
   radius: number,
   ring: BlastRing,
 ): void {
-  const g = scene.add
-    .circle(x, y, radius, ring.color, ring.fillAlpha)
-    .setStrokeStyle(ring.lineWidth, ring.color, ring.lineAlpha)
-    .setDepth(7)
-    .setScale(0.3)
-  scene.tweens.add({
-    targets: g,
-    scale: 1,
-    alpha: 0,
-    duration: ring.durMs,
-    ease: 'Cubic.easeOut',
-    onComplete: () => g.destroy(),
+  circleCue(scene, x, y, radius, {
+    fill: ring.color,
+    fillAlpha: ring.fillAlpha,
+    stroke: ring.color,
+    lineWidth: ring.lineWidth,
+    lineAlpha: ring.lineAlpha,
+    fromScale: 0.3,
+    toScale: 1,
+    durationMs: ring.durMs,
+    depth: 7,
   })
 }
 
