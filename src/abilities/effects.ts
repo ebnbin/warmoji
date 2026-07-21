@@ -3,7 +3,7 @@ import { circleHitIndices } from './defs'
 import type { BlastRing, Effect } from './defs'
 import { circleCue } from './cues'
 import { angleToNearest } from './targeting'
-import type { AbilityContext, TargetInfo } from './types'
+import type { EffectCtx, TargetInfo } from './types'
 
 // 能力效果层（阵营中立）：命中/覆盖后施加的可复用效果，与「投送方式」正交——
 // 任何投送（突刺/弹道/连锁/轰炸…）都经此施加同一套效果，消除各能力类里
@@ -13,7 +13,7 @@ import type { AbilityContext, TargetInfo } from './types'
  * exclude 跳过指定目标（主目标/已命中，避免二次计伤）。溅射/终点震波/连环刃
  * /轰炸共用此一处判定。 */
 export function applyBlast(
-  ctx: AbilityContext,
+  ctx: EffectCtx,
   center: { readonly x: number; readonly y: number },
   damage: number,
   radius: number,
@@ -64,7 +64,7 @@ export interface HitContext {
 /** 求值一串效果（命中触发 onHit / 死亡触发 onDeath 共用）：blast 打 center 圆内、
  * slow/morph 施加到 targets、ground 留地面区、heal 治我方、spawnProjectile 朝最近敌对方发弹。 */
 export function applyEffects(
-  ctx: AbilityContext,
+  ctx: EffectCtx,
   effects: readonly Effect[] | undefined,
   hit: HitContext,
 ): void {

@@ -19,16 +19,12 @@ export interface AbilityOwner {
   setVisualOffset(dx: number, dy: number): void
 }
 
-export interface AbilityContext {
+/** 效果执行面（阵营中立）：applyEffects 施加一串 Effect 所需的动作集。能力持有者
+ * ctx（AbilityContext）是其超集；子弹/亡语/接触等触发点用场景级实现复用同一执行器。 */
+export interface EffectCtx {
   scene: Phaser.Scene
-  /** 持有方的 emoji 描边风格（持有物/召唤物视觉） */
-  readonly ownerOutline: OutlineKind
   /** 敌对方的本帧存活快照（每帧重建一次，能力间共享） */
   targets(): readonly TargetInfo[]
-  /** 目标当前血量（瞬袭索敌用；实时读，不吃帧快照） */
-  targetHp(ref: TargetInfo['ref']): number
-  /** 目标血量上限（处决阈值判定用） */
-  targetMaxHp(ref: TargetInfo['ref']): number
   /** knockback：击退冲量（px/秒），方向 = 源点 (srcX, srcY) 指向目标中心 */
   damageTarget(
     target: Phaser.GameObjects.Image,
@@ -37,13 +33,6 @@ export interface AbilityContext {
     srcX?: number,
     srcY?: number,
   ): void
-  /** 发弹（能力触发）：完整能力弹，携带 pierce/onHit/齐射等由能力机器处理；
-   * 阵营由 ctx 实现注入（Projectile 结构本身敌我同构） */
-  spawnProjectile(x: number, y: number, angle: number, def: ProjectileDef, damage: number): void
-  /** 我方锚点（光环类能力的圆心；队伍 ctx = 队伍中心） */
-  anchor(): { x: number; y: number }
-  /** 登记一个仅本帧生效的减速区域（光环每帧重新登记），叠乘敌对方移速 */
-  applySlow(x: number, y: number, radius: number, factor: number): void
   /** 给单个目标施加限时减速（factor=0 即冻结），到时自动恢复 */
   slowTarget(target: Phaser.GameObjects.Image, factor: number, durationMs: number): void
   /** 在地面生成持续效果区：周期性烧伤区域内的敌对方（阵营与归属由实现注入） */
@@ -52,6 +41,29 @@ export interface AbilityContext {
    * 返回实际被治疗的数量（满血者不计）。exclude 排除某一单位（死亡触发时排除
    * 正在死亡的自己；队伍侧无此需求，实现可少收该参） */
   heal(x: number, y: number, range: number, amount: number, all: boolean, exclude?: TargetInfo['ref']): number
+  /** 变形命中目标为无害替身（魔尘 morph 效果；敌方无此机制，缺席即 no-op） */
+  morphTarget?(ref: TargetInfo['ref'], spec: { durationMs: number; morphEmoji: string; vulnMul?: number }): void
+  /** 发弹（效果触发的一次性冷枪）：只带 ProjectileSpec 与伤害/寿命，无 pierce/齐射；
+   * 复用弹丸投送机器。目前仅敌方死亡冷枪在用，队伍侧缺席（onHit 不含 spawnProjectile） */
+  spawnBullet?(x: number, y: number, angle: number, spec: ProjectileSpec, damage: number, lifeMs: number): void
+}
+
+/** 持有者面板 = 效果执行面（EffectCtx）+ 持有者侧接线（索敌/瞄准/冷却倍率/
+ * 自体动画/队伍操作）。阵营中立，谁持有由 ctx 实现决定。 */
+export interface AbilityContext extends EffectCtx {
+  /** 持有方的 emoji 描边风格（持有物/召唤物视觉） */
+  readonly ownerOutline: OutlineKind
+  /** 目标当前血量（瞬袭索敌用；实时读，不吃帧快照） */
+  targetHp(ref: TargetInfo['ref']): number
+  /** 目标血量上限（处决阈值判定用） */
+  targetMaxHp(ref: TargetInfo['ref']): number
+  /** 发弹（能力触发）：完整能力弹，携带 pierce/onHit/齐射等由能力机器处理；
+   * 阵营由 ctx 实现注入（Projectile 结构本身敌我同构） */
+  spawnProjectile(x: number, y: number, angle: number, def: ProjectileDef, damage: number): void
+  /** 我方锚点（光环类能力的圆心；队伍 ctx = 队伍中心） */
+  anchor(): { x: number; y: number }
+  /** 登记一个仅本帧生效的减速区域（光环每帧重新登记），叠乘敌对方移速 */
+  applySlow(x: number, y: number, radius: number, factor: number): void
   damageMul(): number
   cooldownMul(): number
   /** 出手/爆炸等能力音效（内部已节流） */
@@ -81,11 +93,6 @@ export interface AbilityContext {
   waveScale?(): number
   /** 目标是否 Boss（承伤折减类效果用） */
   isBossTarget?(ref: TargetInfo['ref']): boolean
-  /** 变形命中目标为无害替身（魔尘 morph 效果；敌方无此机制，缺席即 no-op） */
-  morphTarget?(ref: TargetInfo['ref'], spec: { durationMs: number; morphEmoji: string; vulnMul?: number }): void
-  /** 发弹（效果触发的一次性冷枪）：只带 ProjectileSpec 与伤害/寿命，无 pierce/齐射；
-   * 复用弹丸投送机器。目前仅敌方死亡冷枪在用，队伍侧缺席（onHit 不含 spawnProjectile） */
-  spawnBullet?(x: number, y: number, angle: number, spec: ProjectileSpec, damage: number, lifeMs: number): void
 }
 
 /** 能力运行时：每（持有者×能力）一个实例，自管冷却/视觉/攻击行为 */

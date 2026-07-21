@@ -68,7 +68,9 @@ import { playSfx } from '../audio/sfx'
 import { UI_FONT } from '../core/fonts'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
 import { createAbility } from '../abilities/create'
-import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from '../abilities/types'
+import { applyEffects } from '../abilities/effects'
+import type { Effect } from '../abilities/defs'
+import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime, EffectCtx } from '../abilities/types'
 import type { UIScene } from './UIScene'
 
 // 竞技场基座：四张地图（有界/无界/河流/虚空）共享的战斗引擎——队伍与
@@ -167,6 +169,28 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     damageMul: () => this.stats.damageMul,
     cooldownMul: () => this.stats.cooldownMul,
     sfx: (id) => playSfx(id),
+  }
+  // 效果触发的场景级 team ctx：子弹/命中效果复用统一 applyEffects，归属靠 teamEffectSlot
+  // 逐帧改写（子弹可能比发射者活得久，故场景级而非持有者级）
+  private teamEffectSlot = -1
+  private teamEffectExclude = new Set<TargetInfo['ref']>()
+  private teamEffectCtx: EffectCtx = {
+    scene: this,
+    targets: () => this.frameTargets,
+    damageTarget: (ref, damage, kb, sx, sy) =>
+      this.applyDamage(ref as ImageObj, damage, kb ?? 0, sx, sy, this.teamEffectSlot),
+    slowTarget: (enemy, factor, durationMs) => {
+      const a = enemyOf(enemy as ImageObj)
+      a.abilitySlowMul = factor
+      a.abilitySlowUntil = this.elapsedMs + durationMs
+    },
+    spawnGroundEffect: (x, y, def) =>
+      spawnGroundEffect(this, x, y, def, { faction: 'team', srcSlot: this.teamEffectSlot }),
+    heal: (x, y, range, amount, all) => this.healAllies(x, y, range, amount, all),
+    // 死者不变形（子弹主伤可能已致死）；Boss 免疫由 applyHex 拒绝
+    morphTarget: (ref, spec) => {
+      if ((ref as ImageObj).active) this.applyHex(ref as ImageObj, spec)
+    },
   }
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -1365,6 +1389,20 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         a.kvy = kvy
       }
     }
+  }
+
+  /** 子弹命中效果：走统一 Effect 执行器（阵营=team，归属=srcSlot；主目标不再入 blast 圈） */
+  runProjectileHit(onHit: readonly Effect[] | undefined, target: TargetInfo, baseDamage: number, srcSlot: number): void {
+    if (!onHit) return
+    this.teamEffectSlot = srcSlot
+    this.teamEffectExclude.clear()
+    this.teamEffectExclude.add(target.ref)
+    applyEffects(this.teamEffectCtx, onHit, {
+      center: { x: target.x, y: target.y },
+      baseDamage,
+      targets: [target.ref],
+      exclude: this.teamEffectExclude,
+    })
   }
 
   // 击杀 = 一串按序发生的钩子：计数/击杀者触发/掉落/Boss 通关/亡语/清体。

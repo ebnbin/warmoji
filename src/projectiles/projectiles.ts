@@ -1,10 +1,8 @@
 import { DEG2RAD } from '../core/units'
 import { playSfx } from '../audio/sfx'
 import { emojiKey } from '../emoji/textures'
-import { circleHitIndices, sweepFirstHitIndex } from '../abilities/defs'
+import { sweepFirstHitIndex } from '../abilities/defs'
 import type { Effect, ProjectileDef } from '../abilities/defs'
-import type { TargetInfo } from '../abilities/types'
-import { blastRing } from '../abilities/effects'
 import type { EnemyProjectileDef } from '../enemies/registry'
 import { acquirePooled, releasePooled } from '../core/pool'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
@@ -117,41 +115,13 @@ export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
       }
       // 击退源取上一帧位置：方向即子弹飞行方向
       scene.applyDamage(target.ref as ImageObj, damage, kb, prev.x, prev.y, srcSlot)
-      // 命中效果（溅射 blast / 魔尘 morph 等）：命中点求值，紧随主伤后施加
-      applyProjectileHit(scene, b.onHit, target, damage, srcSlot)
+      // 命中效果（溅射 blast / 魔尘 morph 等）：命中点求值，紧随主伤后施加（统一执行器）
+      scene.runProjectileHit(b.onHit, target, damage, srcSlot)
       if (!p.active) continue
     }
     if (b.spin > 0) p.rotation += (b.spin * delta) / 1000
     b.prevX = p.x
     b.prevY = p.y
-  }
-}
-
-/** 弹丸命中效果：命中点求值 onHit（溅射 blast / 魔尘 morph）。弹道机器无 ctx——
- * blast 走 scene.applyDamage（不吃暴击，与弹丸主伤一致），morph 走 scene.applyHex。
- * blast 只打命中点小圈内的「其余」敌人（排除主目标；镜像间距 ≥ 半场 ≫ 效果半径，
- * 不会经镜像重复命中）。 */
-function applyProjectileHit(
-  scene: BaseArenaScene,
-  effects: readonly Effect[] | undefined,
-  target: TargetInfo,
-  baseDamage: number,
-  srcSlot: number,
-): void {
-  if (!effects) return
-  for (const e of effects) {
-    if (e.kind === 'blast') {
-      const dmg = Math.max(1, Math.round(baseDamage * e.ratio))
-      for (const i of circleHitIndices({ x: target.x, y: target.y }, e.radius, scene.frameTargets)) {
-        const other = scene.frameTargets[i]!
-        if (other.ref === target.ref) continue
-        scene.applyDamage(other.ref as ImageObj, dmg, e.knockback, undefined, undefined, srcSlot)
-      }
-      if (e.ring) blastRing(scene, target.x, target.y, e.radius, e.ring)
-    } else if (e.kind === 'morph') {
-      // 死者不变形；Boss 免疫由 applyHex 拒绝
-      if ((target.ref as ImageObj).active) scene.applyHex(target.ref as ImageObj, e)
-    }
   }
 }
 
