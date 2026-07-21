@@ -63,6 +63,7 @@ import { reportDebug } from '../debug/debug'
 import { isStress } from '../debug/dev'
 import { emojiImage, emojiKey } from '../emoji/textures'
 import { burstEmitter } from '../core/fx'
+import { acquirePooled, releasePooled } from '../core/pool'
 import { playSfx } from '../audio/sfx'
 import { UI_FONT } from '../core/fonts'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
@@ -437,8 +438,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const wave = waveAt(totalSec)
     return {
       enemies: this.awakeCount,
-      projectiles: this.projectiles.getLength(),
-      coins: this.coins.getLength(),
+      projectiles: this.projectiles.countActive(true),
+      coins: this.coins.countActive(true),
       pending: this.pendingSpawns,
       objects: this.children.list.length,
       bodies: this.physics.world.bodies.size,
@@ -1188,7 +1189,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (this.over || !shot.active) return
     if (!m.alive) return
     const { damage, srcName } = projectileOf(shot)
-    shot.destroy()
+    releasePooled(shot)
     // 子弹命中吃无敌帧：帧内先中弹则后续接触伤害被同一层保护挡下
     if (this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
@@ -1295,13 +1296,14 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const view = this.cameras.main.worldView
     const slack = 4 * UNIT
     for (const p of this.projectiles.getChildren() as ImageObj[]) {
+      if (!p.active) continue
       if (
         p.x < view.x - slack ||
         p.x > view.right + slack ||
         p.y < view.y - slack ||
         p.y > view.bottom + slack
       ) {
-        p.destroy()
+        releasePooled(p)
       }
     }
   }
@@ -1423,13 +1425,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   /** 清体：停用 + 拆械 + 死亡爆点 + 四象限碎片（继承致死击退速度不衰减）+ 销毁 */
   private despawnKilled(enemy: ImageObj, a: Enemy, flingVx: number, flingVy: number): void {
-    enemy.setActive(false)
-    ;(enemy.body as ArcadeBody).enable = false
     if (a.abilities) for (const w of a.abilities) w.destroy()
     this.deathBurst.explode(6, enemy.x, enemy.y)
-    this.tweens.killTweensOf(enemy)
     spawnShards(this, enemy, flingVx, flingVy)
-    enemy.destroy()
+    releasePooled(enemy)
   }
 
   /** 成群生成子敌：(cx,cy) 周围按 scatter(px) 半径随机撒 count 只，血量吃当前波次
@@ -1457,12 +1456,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   /** 静默移除：替身尸壳到时消失——不计击杀、不掉落、不跑死亡效果，只留一缕烟 */
   private despawnEnemy(enemy: ImageObj): void {
     const a = enemyOf(enemy)
-    enemy.setActive(false)
-    ;(enemy.body as ArcadeBody).enable = false
     if (a.abilities) for (const w of a.abilities) w.destroy()
     this.puffBurst.explode(8, enemy.x, enemy.y)
-    this.tweens.killTweensOf(enemy)
-    enemy.destroy()
+    releasePooled(enemy)
   }
 
   /** 敌人纹理的四象限碎片：frame 每种纹理只注册一次；碎片来自共享对象池 */
@@ -1579,16 +1575,17 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   ): Enemy {
     // 落点经世界钩子兜底（有界钳制/河流钳跨向/虚空回绕；分裂溅出等边缘情况）
     const pos = this.constrainEnemyPos({ x, y }, def.radius)
-    const enemy = emojiImage(
+    const outline = elite || boss ? 'elite' : 'enemy'
+    const enemy = acquirePooled(
       this,
+      this.enemies,
       pos.x,
       pos.y,
-      def.emoji,
+      emojiKey(def.emoji, outline),
       def.size * (elite ? ELITE.sizeMul : 1),
-      elite || boss ? 'elite' : 'enemy',
-    ).setDepth(boss ? 7 : 5)
-    this.physics.add.existing(enemy)
-    circleBody(enemy, def.radius)
+      def.radius,
+    )
+    enemy.setDepth(boss ? 7 : 5)
     if (boss) this.configureBossBody(enemy)
     else this.configureEnemyBody(enemy)
     // 行走摇摆的随机相位：同屏大量敌人不齐步摆；
@@ -1625,7 +1622,6 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       danceUntil: this.elapsedMs < this.danceEndsAt ? this.danceEndsAt : 0,
     })
     armEnemy(this, a, fireAt - this.elapsedMs)
-    this.enemies.add(enemy)
     if (boss) this.boss = enemy
     const targetScale = enemy.scale
     enemy.setScale(targetScale * (boss ? 0.2 : 0.3)).setAlpha(boss ? 0.2 : 0.3)

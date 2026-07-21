@@ -2,6 +2,7 @@ import { playSfx } from '../audio/sfx'
 import { PICKUPS } from '../pickups/registry'
 import { UNIT } from '../core/units'
 import { norm } from '../core/vec'
+import { releasePooled } from '../core/pool'
 import type { Member } from '../characters/members'
 import type { Enemy } from './enemies'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
@@ -148,7 +149,7 @@ const coinThief: Steerer = ({ scene, a, body, slow }) => {
   if (coin) {
     const eatR = def.radius + PICKUPS.coin.radius * UNIT
     if (bestD <= eatR * eatR) {
-      coin.destroy()
+      releasePooled(coin)
       a.eaten += 1
     } else {
       const d = scene.worldDelta(e, coin)

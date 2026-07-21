@@ -2,7 +2,7 @@ import { playSfx } from '../audio/sfx'
 import { CAPTAINS } from '../captains/registry'
 import { CHARACTERS, MEMBER, TEAM, loadoutFor } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
-import { emojiImage } from '../emoji/textures'
+import { emojiKey } from '../emoji/textures'
 import {
   upgradeTiers,
   aggregateCharacterEffects,
@@ -16,7 +16,7 @@ import { rollChestLoot } from './chest'
 import { PICKUP, PICKUPS } from './registry'
 import { createAbility } from '../abilities/create'
 import { KNOCKBACK } from '../abilities/registry'
-import { circleBody } from '../core/arcade'
+import { acquirePooled, releasePooled } from '../core/pool'
 import { toPx } from '../battle/px'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
@@ -30,10 +30,8 @@ export function spawnCoins(scene: BaseArenaScene, x: number, y: number, count: n
     const jx = count > 1 ? (scene.rng.next() - 0.5) * 0.6 * UNIT : 0
     const jy = count > 1 ? (scene.rng.next() - 0.5) * 0.6 * UNIT : 0
     const pos = scene.constrainCoinPos({ x: x + jx, y: y + jy })
-    const coin = emojiImage(scene, pos.x, pos.y, PICKUPS.coin.emoji, PICKUPS.coin.size * UNIT, 'player').setDepth(3)
-    scene.physics.add.existing(coin)
-    circleBody(coin, PICKUPS.coin.radius * UNIT)
-    scene.coins.add(coin)
+    const coin = acquirePooled(scene, scene.coins, pos.x, pos.y, emojiKey(PICKUPS.coin.emoji, 'player'), PICKUPS.coin.size * UNIT, PICKUPS.coin.radius * UNIT)
+    coin.setDepth(3).setData('chest', false)
     // 掉落弹出
     const base = coin.scaleX
     coin.setScale(base * 0.3)
@@ -52,7 +50,7 @@ export function magnetCoins(scene: BaseArenaScene): void {
     if (!c.active) continue
     // 世界回收（河流：漂出下游即被冲走）
     if (scene.cullCoin(c)) {
-      c.destroy()
+      releasePooled(c)
       continue
     }
     if (scene.frameAttractors.length > 0) {
@@ -91,18 +89,15 @@ export function collectCoin(scene: BaseArenaScene, coin: ImageObj): void {
   }
   scene.coinBurst.explode(4, coin.x, coin.y)
   playSfx('coin')
-  coin.destroy()
+  releasePooled(coin)
   scene.run.coins += 1
 }
 
 /** 宝箱走金币的磁吸/回收/拾取管线（同组 + data 标记分流） */
 export function spawnChest(scene: BaseArenaScene, x: number, y: number): void {
   const pos = scene.constrainCoinPos({ x, y })
-  const chest = emojiImage(scene, pos.x, pos.y, PICKUPS.chest.emoji, PICKUPS.chest.size * UNIT, 'player').setDepth(4)
-  chest.setData('chest', true)
-  scene.physics.add.existing(chest)
-  circleBody(chest, PICKUPS.chest.radius * UNIT)
-  scene.coins.add(chest)
+  const chest = acquirePooled(scene, scene.coins, pos.x, pos.y, emojiKey(PICKUPS.chest.emoji, 'player'), PICKUPS.chest.size * UNIT, PICKUPS.chest.radius * UNIT)
+  chest.setDepth(4).setData('chest', true)
   const base = chest.scaleX
   chest.setScale(base * 0.3)
   scene.tweens.add({ targets: chest, scale: base, duration: 220, ease: 'Back.easeOut' })
@@ -111,7 +106,7 @@ export function spawnChest(scene: BaseArenaScene, x: number, y: number): void {
 /** 开箱：抽 1 件当前阵容用得上的道具，免费入包并立即生效 */
 function openChest(scene: BaseArenaScene, chest: ImageObj): void {
   const { x, y } = chest
-  chest.destroy()
+  releasePooled(chest)
   scene.coinBurst.explode(12, x, y)
   playSfx('levelup')
   const loot = rollChestLoot(

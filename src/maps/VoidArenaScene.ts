@@ -13,6 +13,7 @@ import { viewport } from '../core/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
 import { enemyOf } from '../enemies/enemies'
 import { projectileOf } from '../projectiles/projectiles'
+import { releasePooled } from '../core/pool'
 import type { Member } from '../characters/members'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 
@@ -157,7 +158,7 @@ export class VoidArenaScene extends BaseArenaScene {
   /** 子弹按寿命回收（环面上永远飞不出屏幕，位置回收不适用） */
   protected cullProjectiles(): void {
     for (const p of this.projectiles.getChildren() as ImageObj[]) {
-      if (p.active && this.elapsedMs >= projectileOf(p).dieAt) p.destroy()
+      if (p.active && this.elapsedMs >= projectileOf(p).dieAt) releasePooled(p)
     }
   }
 

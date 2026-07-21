@@ -212,8 +212,8 @@ test('持械敌人：敌方 ctx 驱动能力朝队员开火，敌弹入组并命
   await page.waitForFunction(
     () => {
       try {
-        const game = window.__game as { scene: { keys: Record<string, { enemyProjectiles: { getLength(): number } }> } }
-        return game.scene.keys['arena']!.enemyProjectiles.getLength() > 0
+        const game = window.__game as { scene: { keys: Record<string, { enemyProjectiles: { getChildren(): { active: boolean }[] } }> } }
+        return game.scene.keys['arena']!.enemyProjectiles.getChildren().filter((s) => s.active).length > 0
       } catch {
         return false
       }
@@ -242,8 +242,8 @@ test('持械敌人：敌方 ctx 驱动能力朝队员开火，敌弹入组并命
   await page.waitForFunction(
     () => {
       try {
-        const game = window.__game as { scene: { keys: Record<string, { enemyProjectiles: { getLength(): number } }> } }
-        return game.scene.keys['arena']!.enemyProjectiles.getLength() === 0
+        const game = window.__game as { scene: { keys: Record<string, { enemyProjectiles: { getChildren(): { active: boolean }[] } }> } }
+        return game.scene.keys['arena']!.enemyProjectiles.getChildren().filter((s) => s.active).length === 0
       } catch {
         return false
       }
@@ -255,8 +255,8 @@ test('持械敌人：敌方 ctx 驱动能力朝队员开火，敌弹入组并命
   await page.waitForFunction(
     () => {
       try {
-        const game = window.__game as { scene: { keys: Record<string, { enemyProjectiles: { getLength(): number } }> } }
-        return game.scene.keys['arena']!.enemyProjectiles.getLength() > 0
+        const game = window.__game as { scene: { keys: Record<string, { enemyProjectiles: { getChildren(): { active: boolean }[] } }> } }
+        return game.scene.keys['arena']!.enemyProjectiles.getChildren().filter((s) => s.active).length > 0
       } catch {
         return false
       }

@@ -1,12 +1,12 @@
 import { DEG2RAD } from '../core/units'
 import { playSfx } from '../audio/sfx'
-import { emojiImage } from '../emoji/textures'
+import { emojiKey } from '../emoji/textures'
 import { circleHitIndices, sweepFirstHitIndex } from '../abilities/defs'
 import type { Effect, ProjectileDef } from '../abilities/defs'
 import type { TargetInfo } from '../abilities/types'
 import { blastRing } from '../abilities/effects'
 import type { EnemyProjectileDef } from '../enemies/registry'
-import { circleBody } from '../core/arcade'
+import { acquirePooled, releasePooled } from '../core/pool'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
 // 玩家弹走线段扫掠命中（pierce 与 onHit 命中效果链随弹携带）；
@@ -69,11 +69,8 @@ export function spawnProjectile(
   damage: number,
   srcSlot = -1,
 ): void {
-  const p = emojiImage(scene, x, y, def.projectile.emoji, def.projectile.size, 'player')
-    .setDepth(8)
-    .setRotation(angle + def.projectile.rotationOffsetDeg * DEG2RAD)
-  scene.physics.add.existing(p)
-  circleBody(p, def.projectile.radius)
+  const p = acquirePooled(scene, scene.projectiles, x, y, emojiKey(def.projectile.emoji, 'player'), def.projectile.size, def.projectile.radius)
+  p.setDepth(8).setRotation(angle + def.projectile.rotationOffsetDeg * DEG2RAD)
   ;(p.body as ArcadeBody).setVelocity(
     Math.cos(angle) * def.projectile.speed,
     Math.sin(angle) * def.projectile.speed,
@@ -94,7 +91,6 @@ export function spawnProjectile(
     // 对称投掷物（无指向修正角）飞行中自旋；有指向的（飞刀类）保持箭头朝向
     spin: def.projectile.rotationOffsetDeg === 0 ? 9 : 0,
   })
-  scene.projectiles.add(p)
 }
 
 /** 逐帧对每颗子弹做上一帧位置 → 当前位置的线段扫掠命中。
@@ -117,7 +113,7 @@ export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
         set.add(target.ref as ImageObj)
         b.hitRefs = set
       } else {
-        p.destroy()
+        releasePooled(p)
       }
       // 击退源取上一帧位置：方向即子弹飞行方向
       scene.applyDamage(target.ref as ImageObj, damage, kb, prev.x, prev.y, srcSlot)
@@ -170,9 +166,8 @@ export function spawnEnemyProjectile(
   srcName: string,
   dmgMul = 1,
 ): void {
-  const shot = emojiImage(scene, x, y, projectile.emoji, projectile.size, 'enemyProjectile').setDepth(6)
-  scene.physics.add.existing(shot)
-  circleBody(shot, projectile.radius)
+  const shot = acquirePooled(scene, scene.enemyProjectiles, x, y, emojiKey(projectile.emoji, 'enemyProjectile'), projectile.size, projectile.radius)
+  shot.setDepth(6)
   ;(shot.body as ArcadeBody).setVelocity(Math.cos(angle) * projectile.speed, Math.sin(angle) * projectile.speed)
   attachProjectile(shot, 'enemy', {
     damage: Math.round(projectile.damage * dmgMul),
@@ -180,14 +175,13 @@ export function spawnEnemyProjectile(
     radius: projectile.radius,
     dieAt: scene.elapsedMs + projectile.lifeMs,
   })
-  scene.enemyProjectiles.add(shot)
 }
 
 export function updateEnemyProjectiles(scene: BaseArenaScene): void {
   for (const s of scene.enemyProjectiles.getChildren() as ImageObj[]) {
     if (!s.active) continue
     if (scene.elapsedMs >= projectileOf(s).dieAt || scene.cullEnemyProjectile(s)) {
-      s.destroy()
+      releasePooled(s)
     }
   }
 }
