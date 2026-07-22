@@ -9,8 +9,13 @@ import type { CaptainId } from '../captains/registry'
 // 以下为当前选择状态（模块级，跨场景重启保留）。
 
 const enemies = new Set<string>()
-let roster: CharacterId[] = [...ROSTER_IDS.slice(0, 3)]
+// 默认 1 人：最少 1、最多 = 测试队长编制（8）
+let roster: CharacterId[] = [...ROSTER_IDS.slice(0, 1)]
 let panelOpen = true
+
+/** 角色等级：统一作用于全部角色的升级档（0 基础 / 1 一阶 / 2 二阶，对应升级卡 u1/u2） */
+export type LabLevel = 0 | 1 | 2
+let level: LabLevel = 0
 
 // 无敌血量（够高即事实上打不死）——替代原压测的 maxHp
 export const INVINCIBLE_HP = 10_000_000
@@ -58,9 +63,24 @@ export function isLabCharacterOn(id: CharacterId): boolean {
   return roster.includes(id)
 }
 
-/** 点选切换某角色是否入队（改动后由调用方 beginRun + 重启应用） */
+/** 点选切换某角色是否入队（最少 1、最多测试队长编制 8；改动后由调用方 beginRun + 重启应用） */
 export function toggleLabCharacter(id: CharacterId): void {
-  roster = roster.includes(id) ? roster.filter((x) => x !== id) : [...roster, id]
+  if (roster.includes(id)) {
+    if (roster.length <= 1) return // 最少 1 人
+    roster = roster.filter((x) => x !== id)
+  } else {
+    if (roster.length >= CAPTAINS[TEST_CAPTAIN].teamSize) return // 最多 8 人
+    roster = [...roster, id]
+  }
+}
+
+/** 角色等级（统一改全部；作用于建队员时的配装档位） */
+export function labLevel(): LabLevel {
+  return level
+}
+
+export function setLabLevel(lv: LabLevel): void {
+  level = lv
 }
 
 // ── 队长（固定测试专用队长，不可更改） ─────────────────────

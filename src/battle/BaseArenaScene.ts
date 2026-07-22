@@ -25,6 +25,7 @@ import {
   labEnemySet,
   labFireRate,
   labInvincible,
+  labLevel,
 } from '../run/lab'
 import { BOSS_SPAWN_RELIEF, DEFAULT_CONTACT, ELITE, ENEMIES, SPAWN, SURGE } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
@@ -920,10 +921,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       },
     }
     // 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效能力参数；
-    // 专属升级来自已购的角色专属升级卡（压测阵容无道具 = 素体）
+    // 专属升级来自已购的角色专属升级卡（测试模式无道具 = 素体）
     const owned = this.testMode ? [] : (this.run.memberItems[slot] ?? [])
     const fx = aggregateCharacterEffects(owned)
-    const tiers = upgradeTiers(id, owned)
+    // 测试模式：档位由「角色等级」旋钮统一给定（免买卡）；正常局按已购升级卡推导
+    const tiers = this.testMode
+      ? { u1: labLevel() >= 1, u2: labLevel() >= 2 }
+      : upgradeTiers(id, owned)
     const memberCtx: AbilityContext = {
       ...this.abilityCtx,
       damageMul: () => this.stats.damageMul * fx.damageMul * this.teamFx.teamDamageMul,

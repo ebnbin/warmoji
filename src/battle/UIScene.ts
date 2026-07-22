@@ -20,16 +20,18 @@ import {
   labDifficulty,
   labFireRate,
   labInvincible,
+  labLevel,
   labStarters,
   setLabDensity,
   setLabDifficulty,
   setLabFireRate,
   setLabInvincible,
+  setLabLevel,
   setLabPanelOpen,
   toggleLabCharacter,
   toggleLabEnemy,
 } from '../run/lab'
-import type { LabDensity, LabMul } from '../run/lab'
+import type { LabDensity, LabLevel, LabMul } from '../run/lab'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../debug/diagnostics'
 import { emojiCacheStats, emojiImage, emojiText, iconLabel } from '../emoji/textures'
 import { FONT, UI_FONT } from '../core/fonts'
@@ -628,12 +630,26 @@ export class UIScene extends Phaser.Scene {
         chip.setBackgroundColor(isLabEnemyOn(d.kind) ? UIScene.CHIP_ON : UIScene.CHIP_OFF)
       },
     })))
-    y = this.labSection('角色（改后重建队伍）', gx, y + 8, 4, 84, Object.entries(CHARACTERS).map(([id, c]) => ({
+    y = this.labSection('角色 · 最少1最多8（改后重建队伍）', gx, y + 8, 4, 84, Object.entries(CHARACTERS).map(([id, c]) => ({
       label: c.name,
       on: () => isLabCharacterOn(id as CharacterId),
       tap: () => {
         toggleLabCharacter(id as CharacterId)
         applyTeam()
+      },
+    })))
+    // 角色等级：统一改全部角色的升级档（改后重建队伍——配装在建队员时定）
+    const levels: { lv: LabLevel; label: string }[] = [
+      { lv: 0, label: '基础' },
+      { lv: 1, label: '一阶' },
+      { lv: 2, label: '二阶' },
+    ]
+    y = this.labSection('角色等级（改后重建队伍）', gx, y + 8, 3, 62, levels.map((l) => ({
+      label: l.label,
+      on: () => labLevel() === l.lv,
+      tap: () => {
+        setLabLevel(l.lv)
+        this.arena.scene.restart()
       },
     })))
     // 旋钮实时生效（密度/难度/攻速由 arena 每帧现读，无敌见下）：只重渲本面板刷新选中态，

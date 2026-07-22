@@ -10,9 +10,9 @@ test('测试模式入口：地图页勾选后确认即直接进入该图的沙�
   await enterLab(page, 'forest')
   // 落在所选真实地图的竞技场（未经队长/组队/商店）
   await page.waitForFunction(() => window.__warmoji?.mapId === 'forest')
-  // 队伍来自场内勾选阵容（默认 3 角色），而非正常流程的招募队——验证跳过组队且角色选择生效
+  // 队伍来自场内勾选阵容（默认 1 角色），而非正常流程的招募队——验证跳过组队且角色选择生效
   const alive = await page.evaluate(() => window.__warmoji!.alive)
-  expect(alive).toBe(3)
+  expect(alive).toBe(1)
 })
 
 test('测试模式：只出勾选的敌人、玩家免死无时限', async ({ page }) => {
