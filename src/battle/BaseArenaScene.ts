@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { toPx } from './px'
 import { attachEnemy, enemyOf } from '../enemies/enemies'
 import type { Enemy } from '../enemies/enemies'
-import { armEnemy, healEnemies } from '../enemies/enemyAbilities'
+import { armEnemy, buildEnemyCtx, healEnemies } from '../enemies/enemyAbilities'
 import { attachMember, memberOf } from '../characters/members'
 import type { Member } from '../characters/members'
 import { projectileOf, spawnProjectile, sweepProjectiles, updateEnemyProjectiles } from '../projectiles/projectiles'
@@ -68,7 +68,7 @@ import { playSfx } from '../audio/sfx'
 import { UI_FONT } from '../core/fonts'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
 import { createAbility } from '../abilities/create'
-import { applyEffects } from '../abilities/effects'
+import { applyBlast, applyEffects, blastRing } from '../abilities/effects'
 import type { Effect } from '../abilities/defs'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime, EffectCtx } from '../abilities/types'
 import type { UIScene } from './UIScene'
@@ -1437,6 +1437,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (a.boss) this.onBossDown(enemy)
     // 亡语（死者视角）：蘑菇留毒/泡泡分裂/幽灵治疗等，走组合式效果
     runDeathEffects(this, a)
+    // 拆巢：名下护巢子敌暴走（须在 despawnKilled 释放本体前，否则 owner 反查失效）
+    if (a.def.spawner) this.orphanBrood(a)
     this.despawnKilled(enemy, a, flingVx, flingVy)
   }
 
@@ -1491,24 +1493,72 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   /** 成群生成子敌：(cx,cy) 周围按 scatter(px) 半径随机撒 count 只，血量吃当前波次
    * 成长曲线。分裂（死亡触发）与虫巢（周期触发）共用这一个生成动作 */
-  spawnBrood(into: EnemyDef, count: number, cx: number, cy: number, scatter: number): void {
+  spawnBrood(into: EnemyDef, count: number, cx: number, cy: number, scatter: number, owner?: Enemy): void {
     const hpMul = waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier
     for (let i = 0; i < count; i++) {
       const ang = this.rng.next() * Math.PI * 2
-      this.materializeEnemy(
+      const child = this.materializeEnemy(
         into,
         cx + Math.cos(ang) * scatter,
         cy + Math.sin(ang) * scatter,
         Math.round(into.hp * hpMul),
       )
+      // 护巢子敌记住自己的巢：绕巢锚点 + 计入本巢在场上限（拆巢时 orphanBrood 清空触发暴走）
+      if (owner) child.owner = owner
     }
   }
 
-  /** 虫巢周期生成：达全局在场上限时让路（避免压垮引擎），其余交给共用的 spawnBrood。
-   * 不设每巢上限——不打掉就持续施压是设计意图 */
+  /** 本巢名下在场子敌数（owner 反查） */
+  private broodCount(nest: Enemy): number {
+    let n = 0
+    for (const e of this.enemies.getChildren() as ImageObj[]) {
+      if (e.active && enemyOf(e).owner === nest) n++
+    }
+    return n
+  }
+
+  /** 虫巢周期生成：达全局在场上限让路（避免压垮引擎）；再按本巢上限只补到 maxAlive——
+   * 满了就停生，子敌被清掉后续生，巢自身被拆才彻底停 */
   private spawnFromNest(a: Enemy, spawner: NonNullable<EnemyDef['spawner']>): void {
     if (this.over || this.enemies.countActive(true) >= SPAWN.maxAlive) return
-    this.spawnBrood(spawner.into, spawner.count, a.image.x, a.image.y, 0.6 * UNIT)
+    const room = spawner.maxAlive - this.broodCount(a)
+    if (room <= 0) return
+    this.spawnBrood(spawner.into, Math.min(spawner.count, room), a.image.x, a.image.y, 0.6 * UNIT, a)
+  }
+
+  /** 拆巢：名下所有护巢子敌失去锚点——按各自 orphan 倍率暴走（速度/攻击）并转为直扑玩家。
+   * owner 清空即双属性档位切换：baseOrbit steerer 见 owner 空即走暴走分支 */
+  private orphanBrood(nest: Enemy): void {
+    for (const e of this.enemies.getChildren() as ImageObj[]) {
+      if (!e.active) continue
+      const c = enemyOf(e)
+      if (c.owner !== nest) continue
+      c.owner = undefined
+      const lm = c.def.locomotion
+      if (lm.kind === 'baseOrbit') {
+        c.spMul *= lm.orphanSpeedMul
+        c.dmgMul *= lm.orphanDamageMul
+      }
+    }
+  }
+
+  /** 自爆怪引爆：以本体为心对圈内玩家群伤 + 震波表现，随后静默自毁（不结算击杀奖励）。
+   * 蓄力完由 detonate steerer 触发——蓄力前被打死则走正常死亡、不引爆 */
+  detonate(a: Enemy): void {
+    const lm = a.def.locomotion
+    if (lm.kind !== 'detonate') return
+    const e = a.image
+    const ctx = buildEnemyCtx(this, a)
+    applyBlast(ctx, { x: e.x, y: e.y }, Math.round(lm.blastDamage * a.dmgMul), lm.blastRadius, lm.knockback)
+    blastRing(this, e.x, e.y, lm.blastRadius, {
+      color: 0xff5252,
+      fillAlpha: 0.35,
+      lineWidth: 3,
+      lineAlpha: 0.9,
+      durMs: 300,
+    })
+    playSfx('boom')
+    this.despawnEnemy(e)
   }
 
   /** 静默移除：替身尸壳到时消失——不计击杀、不掉落、不跑死亡效果，只留一缕烟 */
@@ -1840,6 +1890,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       const target = this.nearestAlive(e.x, e.y)!
 
       STEERERS[def.locomotion.kind]({ scene: this, a, body, slow, now, target })
+      // 自爆怪等策略内自毁：本体已被释放，跳过后续帧内处理
+      if (!e.active) continue
 
       // 持械敌人：能力实例逐帧驱动（跳舞/变形不到达此处；休眠已跳过）
       if (a.abilities) for (const w of a.abilities) w.update(delta, a.abilityOwner!)

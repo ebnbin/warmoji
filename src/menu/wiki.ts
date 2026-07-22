@@ -38,6 +38,9 @@ const LOCOMOTION_LABEL: Record<EnemyDef['locomotion']['kind'], string> = {
   dash: '蓄力突刺',
   flee: '逃跑',
   coinThief: '偷金币',
+  standoff: '定距吐弹',
+  detonate: '自爆冲锋',
+  baseOrbit: '护巢环绕',
 }
 
 export function enemyStatLines(e: EnemyDef): string[] {

@@ -17,6 +17,7 @@ const DEFAULT_MIX: readonly EnemyMixRow[] = [
   { kind: 'blob', sinceWave: 5, base: 7, perWave: 0.4, min: 0, max: 14 },
   { kind: 'slime', sinceWave: 2, base: 16, perWave: 0.4, min: 0, max: 28 },
   { kind: 'hive', sinceWave: 7, base: 3, perWave: 0.15, min: 0, max: 6 },
+  { kind: 'creeper', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
 ]
 
 export const MAPS = {

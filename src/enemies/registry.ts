@@ -43,12 +43,51 @@ export interface DashLocomotion {
   readonly sfx?: 'whoosh'
 }
 
+/** 定距风筝：在玩家外维持一个固定距离环——detectRange 内才咬人，贴到 standoffDist
+ * 就停手站定吐弹，太近则边逃边打。几百只会在玩家四周围成一圈。 */
+export interface StandoffLocomotion {
+  readonly kind: 'standoff'
+  /** 咬住玩家的探测半径（此外只游荡） */
+  readonly detectRange: number
+  /** 站位距离：贴到此距离即停止靠近，更近则后退 */
+  readonly standoffDist: number
+}
+
+/** 自爆冲锋：追玩家，进 triggerRange 就定身蓄力，蓄力完必定原地引爆（AoE 伤玩家后自毁）。
+ * 引爆走 scene.detonate（非亡语）——蓄力前被打死则不炸。 */
+export interface DetonateLocomotion {
+  readonly kind: 'detonate'
+  /** 进入此距离即开始拆弹（定身蓄力） */
+  readonly triggerRange: number
+  readonly windupMs: number
+  readonly blastRadius: number
+  readonly blastDamage: number
+  readonly knockback: number
+}
+
+/** 护巢环绕：绕生成自己的巢（owner）盘旋；玩家逼近巢即扑向玩家。巢被拆后失去锚点，
+ * 按 orphan 倍率强化速度/攻击并转为直扑玩家（双属性档位切换）。 */
+export interface BaseOrbitLocomotion {
+  readonly kind: 'baseOrbit'
+  /** 绕巢半径 */
+  readonly orbitRadius: number
+  /** 玩家逼近巢多近即触发护巢扑击（判定基准是巢，不是本体） */
+  readonly aggroRange: number
+  /** 巢被拆后的暴走速度倍率 */
+  readonly orphanSpeedMul: number
+  /** 巢被拆后的暴走攻击倍率 */
+  readonly orphanDamageMul: number
+}
+
 export type LocomotionDef =
   | { readonly kind: 'chase' }
   | { readonly kind: 'wander' }
   | { readonly kind: 'static' }
   | { readonly kind: 'flee'; readonly range: number }
   | { readonly kind: 'coinThief' }
+  | StandoffLocomotion
+  | DetonateLocomotion
+  | BaseOrbitLocomotion
   | DashLocomotion
 
 // ── 死亡效果（亡语）─────────────────────────────────────────
@@ -92,6 +131,7 @@ export interface EnemyDef {
     | 'slime'
     | 'hive'
     | 'larva'
+    | 'creeper'
     | 'boss'
   readonly emoji: string
   readonly name: string
@@ -116,6 +156,8 @@ export interface EnemyDef {
     readonly into: EnemyDef
     readonly intervalMs: number
     readonly count: number
+    /** 本巢在场子敌上限：达上限即停生，被清掉一部分后续生（见 spawnFromNest） */
+    readonly maxAlive: number
     readonly firstDelayMs?: number
   }
   readonly kbImmune?: boolean

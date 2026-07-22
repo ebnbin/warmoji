@@ -34,7 +34,7 @@ test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: enemyCat.x, y: enemyCat.y }) })
   await page.waitForFunction(() => window.__warmoji?.wiki?.category === '敌人')
   w = await page.evaluate(() => window.__warmoji!.wiki!)
-  expect(w.entryCount).toBe(12)
+  expect(w.entryCount).toBe(13)
   expect(w.focused.startsWith('敌人:')).toBe(true)
 
   // 点另一个条目切换详情

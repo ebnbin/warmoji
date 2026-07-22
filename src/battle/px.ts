@@ -27,6 +27,10 @@ const SPATIAL = new Set([
   'fleeRange',
   'ringRadius',
   'fromAbove',
+  'standoffDist',
+  'triggerRange',
+  'orbitRadius',
+  'aggroRange',
 ])
 
 const cache = new WeakMap<object, unknown>()

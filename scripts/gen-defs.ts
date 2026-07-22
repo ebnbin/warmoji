@@ -207,6 +207,7 @@ function checkEnemy(path: string, e: (typeof ENEMIES)[string]): void {
     checkEnemy(`${path}.spawner.into`, e.spawner.into)
     num(`${path}.spawner.intervalMs`, e.spawner.intervalMs, 1)
     num(`${path}.spawner.count`, e.spawner.count, 1)
+    num(`${path}.spawner.maxAlive`, e.spawner.maxAlive, 1)
   }
   // 亡语（onDeath）：组合式 Effect（ground/heal/spawnProjectile）+ 生成实体类（split/decoy）。
   // 命中专属的 blast/slow/morph 不允许作亡语（无 baseDamage/targets），落到 else 报错。

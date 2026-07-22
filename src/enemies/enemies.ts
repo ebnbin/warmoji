@@ -51,6 +51,9 @@ export interface Enemy {
   eaten: number
   /** 亡语替身：无伤害/无行为的诱饵尸壳（接触不伤人，专供吸引火力） */
   decoy: boolean
+  /** 属主（巢）：护巢子敌指向生成自己的巢——绕巢/护巢的锚点 + 计入本巢在场上限。
+   * 巢被拆时由 orphanBrood 清空并触发暴走（见 baseOrbit steerer） */
+  owner?: Enemy
   /** 定时消失时刻（0 = 不消失）：替身到时静默移除，不走死亡结算 */
   despawnAt: number
   /** 摇摆/动画随机相位 */

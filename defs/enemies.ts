@@ -99,12 +99,13 @@ export const BOAR: EnemyDef = {
   onDeath: [{ kind: 'decoy', hp: 40, durationMs: 3000, alpha: 0.5 }],
 }
 
-/** 逃跑射手：见人就拉开距离，周期性朝人吐慢速毒弹（制造追不追的抉择） */
+/** 定距射手：在玩家外维持固定站位环，够不着就凑近、太近才后退，站定吐慢速毒弹
+ * （几百只会在玩家四周围成一圈，玩家一动整体重新贴距离） */
 export const SNAKE: EnemyDef = {
   kind: 'snake',
   emoji: '1f40d',
   name: '毒蛇',
-  desc: '见人就溜，边逃边回头吐毒弹',
+  desc: '围着玩家维持定距，站定吐毒弹，太近才后退',
   size: 1.25,
   radius: 0.45,
   hp: 35,
@@ -112,15 +113,15 @@ export const SNAKE: EnemyDef = {
   damage: 5,
   xp: 4,
   coins: 3,
-  locomotion: { kind: 'flee', range: 5 },
+  locomotion: { kind: 'standoff', detectRange: 8, standoffDist: 5 },
   abilities: [
     {
       kind: 'projectile',
       damage: 5,
       cooldownMs: 2600,
       knockback: 0,
-      // 沿用攻击积木的「任意距离都开火」：覆写索敌上限到远超全图对角
-      range: 99,
+      // 索敌上限略大于站位距离：站定时也够得着玩家开火
+      range: 8,
       lifeMs: 4500,
       projectile: { emoji: '1f7e2', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
     },
@@ -223,13 +224,20 @@ export const BLOB: EnemyDef = {
   onDeath: [{ kind: 'split', into: BLOBLING, count: 2 }],
 }
 
-/** 小飞虫：虫巢吐出的迷你飞虫，血极薄、飞得快，成群骚扰（不进自然刷怪，只由虫巢生成） */
+/** 小飞虫：虫巢吐出的护巢飞虫——绕巢盘旋、玩家逼近巢即扑击；巢被拆后失锚暴走
+ * （提速 + 加攻并直扑玩家，双属性档位切换）。不进自然刷怪，只由虫巢生成 */
 export const LARVA: EnemyDef = {
   kind: 'larva',
-  locomotion: { kind: 'chase' },
+  locomotion: {
+    kind: 'baseOrbit',
+    orbitRadius: 2.5,
+    aggroRange: 6,
+    orphanSpeedMul: 1.7,
+    orphanDamageMul: 2.5,
+  },
   emoji: '1f99f',
   name: '小飞虫',
-  desc: '虫巢吐出的迷你飞虫，血薄但快，成群骚扰',
+  desc: '绕着虫巢盘旋守卫，玩家逼近巢就扑击；巢被拆后暴走直扑玩家',
   size: 0.7,
   radius: 0.26,
   hp: 12,
@@ -255,7 +263,32 @@ export const HIVE: EnemyDef = {
   coins: 6,
   // 固定装置：不但移速为零，击退也免疫（否则带击退的武器能把巢穴推走）
   kbImmune: true,
-  spawner: { into: LARVA, intervalMs: 4000, count: 2, firstDelayMs: 2000 },
+  // 每巢在场至多 6 只护巢飞虫：满则停生，被清掉后续生，巢被拆才彻底停
+  spawner: { into: LARVA, intervalMs: 4000, count: 2, maxAlive: 6, firstDelayMs: 2000 },
+}
+
+/** 自爆怪：径直扑向玩家，贴身即定身蓄力，蓄力完原地引爆 AoE（蓄力前击杀可拆弹） */
+export const CREEPER: EnemyDef = {
+  kind: 'creeper',
+  emoji: '1f4a3',
+  name: '自爆怪',
+  desc: '径直扑向玩家，贴身后定身蓄力随即原地引爆，蓄力前击杀可拆弹',
+  size: 1.3,
+  radius: 0.5,
+  hp: 55,
+  speed: 1.6,
+  // 威胁全在自爆；接触仅象征性蹭伤（通常蓄力引爆先于贴脸）
+  damage: 6,
+  xp: 6,
+  coins: 4,
+  locomotion: {
+    kind: 'detonate',
+    triggerRange: 1.6,
+    windupMs: 800,
+    blastRadius: 2.6,
+    blastDamage: 32,
+    knockback: 5,
+  },
 }
 
 export const ENEMY_DEFS: readonly EnemyDef[] = [
@@ -271,6 +304,7 @@ export const ENEMY_DEFS: readonly EnemyDef[] = [
   BLOBLING,
   HIVE,
   LARVA,
+  CREEPER,
 ]
 
 // Boss 就是 role:'boss' 的普通条目——折进 ENEMIES 目录（出怪表 mix 已移到各 Map）
