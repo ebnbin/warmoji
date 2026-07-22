@@ -646,9 +646,10 @@ export class UIScene extends Phaser.Scene {
         applyTeam()
       },
     })))
-    // 旋钮改后重开竞技场以完整生效（攻速/无敌建场时定；密度/难度虽实时读，重开也顺带刷新画面）
+    // 旋钮实时生效（密度/难度/攻速由 arena 每帧现读，无敌见下）：只重渲本面板刷新选中态，
+    // 不重开竞技场、不清场——观察不被打断
     const applyKnob = (): void => {
-      this.arena.scene.restart()
+      this.scene.restart()
     }
     const densities: { k: LabDensity; label: string }[] = [
       { k: 'low', label: '低' },
@@ -681,9 +682,15 @@ export class UIScene extends Phaser.Scene {
         applyKnob()
       },
     })))
+    // 无敌切换即时改写全队血量上限（arena.applyTestInvincible），再重渲面板
+    const applyInvincible = (on: boolean): void => {
+      setLabInvincible(on)
+      this.arena.applyTestInvincible()
+      this.scene.restart()
+    }
     this.labSection('无敌', gx, y + 8, 2, 62, [
-      { label: '开', on: () => labInvincible(), tap: () => { setLabInvincible(true); applyKnob() } },
-      { label: '关', on: () => !labInvincible(), tap: () => { setLabInvincible(false); applyKnob() } },
+      { label: '开', on: () => labInvincible(), tap: () => applyInvincible(true) },
+      { label: '关', on: () => !labInvincible(), tap: () => applyInvincible(false) },
     ])
   }
 

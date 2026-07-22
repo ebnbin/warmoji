@@ -174,7 +174,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     isBossTarget: (ref) => enemyOf(ref as ImageObj).boss,
     morphTarget: (ref, spec) => this.applyHex(ref as ImageObj, spec),
     damageMul: () => this.stats.damageMul,
-    cooldownMul: () => this.stats.cooldownMul,
+    // 测试模式攻速旋钮实时生效：冷却按 labFireRate 现算（每帧读，改档即生效不重开）
+    cooldownMul: () => this.stats.cooldownMul * this.testFireFactor(),
     sfx: (id) => playSfx(id),
   }
   // 效果触发的场景级 team ctx：子弹/命中效果复用统一 applyEffects，归属靠 teamEffectSlot
@@ -534,7 +535,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.stats = {
       damageMul: 1,
       // 测试模式的攻速旋钮：冷却 ÷ 倍率（×10 = 十倍攻速，重现旧压测手感）
-      cooldownMul: this.testMode ? 1 / labFireRate() : 1,
+      cooldownMul: 1,
       moveSpeed: CAPTAINS[this.run.captainId].moveSpeed * UNIT,
       maxHp: this.testMode && labInvincible() ? INVINCIBLE_HP : MEMBER.maxHp,
     }
@@ -928,7 +929,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       cooldownMul: () => {
         const mm = this.members[slot]
         const atk = mm && mm.atkSlowUntil > this.elapsedMs ? mm.atkSlowMul : 1
-        return this.stats.cooldownMul * fx.cooldownMul * atk
+        return this.stats.cooldownMul * fx.cooldownMul * atk * this.testFireFactor()
       },
       // 伤害/子弹带上来源槽位：结算页按角色统计输出与击杀。
       // 暴击/击退倍率在这里收口：所有能力伤害路径统一生效，无需逐能力改造
@@ -1625,6 +1626,21 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       const raw = ENEMIES[kinds[Math.floor(this.rng.next() * kinds.length)]!]!
       const def = toPx(raw)
       this.spawnTelegraphed(def, Math.round(def.hp * hpMul), false, def.role === 'boss')
+    }
+  }
+
+  /** 测试模式攻速倍率（我方冷却 ÷ 此值）：每帧现读，攻速旋钮改档即生效 */
+  private testFireFactor(): number {
+    return this.testMode ? 1 / labFireRate() : 1
+  }
+
+  /** 测试模式「无敌」旋钮实时生效：即时改写全队血量上限（开则回满），无需重开竞技场 */
+  applyTestInvincible(): void {
+    const mh = labInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
+    this.stats.maxHp = mh
+    for (const m of this.members) {
+      m.maxHp = mh
+      m.hp = labInvincible() ? mh : Math.min(m.hp, mh)
     }
   }
 
