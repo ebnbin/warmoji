@@ -190,14 +190,15 @@ window.__spawnCarrier = (polarity: Polarity = 'buff', id?: string): void => {
     sc.materializeEnemy(px, sc.center.x + 2 * UNIT, sc.center.y, px.hp, false, false, 1, def)
   }
 }
-// e2e：直接在队伍中心掉一枚地面拾取（下一帧即被走位判定收取），验证拾取→限时效果链
-window.__spawnFieldPickup = (polarity: Polarity = 'buff', id?: string): void => {
+// e2e：掉一枚地面拾取（默认落在队伍中心，下一帧即被走位判定收取——验证拾取→限时效果链；
+// 给出格偏移则落在远处静置，可观察地面待拾贴图/光圈）
+window.__spawnFieldPickup = (polarity: Polarity = 'buff', id?: string, dxU = 0, dyU = 0): void => {
   for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
     if (!game.scene.isActive(key)) continue
     const sc = game.scene.getScene(key) as BaseArenaScene
     const pool = fieldPickupsFor(sc.run.mapId).filter((p) => p.polarity === polarity)
     const def = (id ? FIELD_PICKUPS[id] : undefined) ?? pool[Math.floor(Math.random() * pool.length)]
-    if (def) spawnFieldPickup(sc, sc.center.x, sc.center.y, def)
+    if (def) spawnFieldPickup(sc, sc.center.x + dxU * UNIT, sc.center.y + dyU * UNIT, def)
   }
 }
 window.__sfxStats = (): { baked: number; played: number } => sfxStats()

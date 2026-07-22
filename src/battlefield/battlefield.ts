@@ -112,6 +112,13 @@ function collectFieldPickup(scene: BaseArenaScene, p: FieldPickupEntity): void {
   p.image.destroy()
   p.ring.destroy()
   applyFieldPickup(scene, p.def)
+  // 到手横幅：告诉玩家拿到了什么（名字 + 效果说明 + 极性），UIScene 渲染
+  scene.events.emit('field-collected', {
+    emoji: p.def.emoji,
+    name: p.def.name,
+    desc: p.def.desc,
+    polarity: p.def.polarity,
+  })
   // 到手反馈：全队闪一下极性色
   for (const m of scene.members) {
     if (!m.alive) continue

@@ -5,6 +5,7 @@ import type { CharacterDef } from '../characters/registry'
 import type { OutlineKind } from '../emoji/svg'
 import { BOSSES, ENEMY_DEFS, SPAWN } from '../enemies/registry'
 import { PICKUPS } from '../pickups/registry'
+import { FIELD_PICKUPS } from '../battlefield/registry'
 import { ITEMS } from '../items/registry'
 import { MAPS } from '../maps/registry'
 import type { MapDef } from '../maps/registry'
@@ -30,6 +31,8 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
       ]),
     ),
     ...Object.values(PICKUPS).map((p) => p.emoji),
+    // 战场拾取（地面待拾实体 + HUD 激活效果图标，皆玩家侧黑描边）
+    ...Object.values(FIELD_PICKUPS).map((p) => p.emoji),
     '2795',
     '1f480',
     // 财迷「天降横财」的金袋投掷物 + HUD 能量豆

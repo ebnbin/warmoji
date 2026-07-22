@@ -194,12 +194,14 @@ export class UIScene extends Phaser.Scene {
     arenaEvents.on('wave-warning', this.onWaveWarning, this)
     arenaEvents.on('skill-cast', this.onSkillCast, this)
     arenaEvents.on('chest-collected', this.onChestOpen, this)
+    arenaEvents.on('field-collected', this.onFieldCollected, this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       arenaEvents.off('wave-complete', this.onWaveComplete, this)
       arenaEvents.off('wave-warning', this.onWaveWarning, this)
       arenaEvents.off('skill-cast', this.onSkillCast, this)
       arenaEvents.off('chest-collected', this.onChestOpen, this)
+      arenaEvents.off('field-collected', this.onFieldCollected, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       // devText 在 SHUTDOWN 里随场景对象一起销毁；清引用，否则关闭 dev 后
       // restart 不重建面板，update 仍对已销毁的 Text 调 setText → 渲染撞空 → 卡死
@@ -563,6 +565,62 @@ export class UIScene extends Phaser.Scene {
       .setScale(0.6)
     this.tweens.add({ targets: t, scale: 1, duration: 220, ease: 'Back.easeOut' })
     this.tweens.add({ targets: t, alpha: 0, delay: 900, duration: 400, onComplete: () => t.destroy() })
+  }
+
+  /** 拾取战场增益/减益的到手横幅：名字 + 极性 + 效果说明（绿=增益/红=减益），
+   * 让玩家明确知道刚拿到了什么、持续多久（HUD 左上图标是之后的常驻提醒） */
+  private onFieldCollected(fx: {
+    emoji: string
+    name: string
+    desc: string
+    polarity: 'buff' | 'debuff'
+  }): void {
+    const res = textRes()
+    const buff = fx.polarity === 'buff'
+    const cx = viewport.logicalWidth / 2
+    const cy = viewport.logicalHeight * 0.42
+    const title = emojiText(
+      this,
+      cx,
+      cy,
+      `{${fx.emoji}} ${fx.name}`,
+      {
+        fontFamily: UI_FONT,
+        fontSize: FONT.lead,
+        fontStyle: 'bold',
+        color: buff ? '#b9f6ca' : '#ff9e9e',
+        stroke: '#000000',
+        strokeThickness: 5,
+        resolution: res,
+      },
+      { origin: 0.5 },
+    )
+      .setDepth(226)
+      .setScale(0.6)
+    const sub = this.add
+      .text(cx, cy + 32, `${buff ? '增益' : '减益'} · ${fx.desc}`, {
+        fontFamily: UI_FONT,
+        fontSize: FONT.body,
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 3,
+        align: 'center',
+        wordWrap: { width: viewport.logicalWidth - 80 },
+        resolution: res,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(226)
+    this.tweens.add({ targets: title, scale: 1, duration: 220, ease: 'Back.easeOut' })
+    this.tweens.add({
+      targets: [title, sub],
+      alpha: 0,
+      delay: 1600,
+      duration: 450,
+      onComplete: () => {
+        title.destroy()
+        sub.destroy()
+      },
+    })
   }
 
   private onViewportChanged(): void {

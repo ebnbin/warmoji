@@ -237,7 +237,7 @@ interface Window {
   __spawnArmedEnemy?: (abilityId: string, dxU?: number, dyU?: number) => void
   __dropCoins?: (n: number, dxU?: number, dyU?: number) => void
   __spawnCarrier?: (polarity?: 'buff' | 'debuff', id?: string) => void
-  __spawnFieldPickup?: (polarity?: 'buff' | 'debuff', id?: string) => void
+  __spawnFieldPickup?: (polarity?: 'buff' | 'debuff', id?: string, dxU?: number, dyU?: number) => void
   __sfxStats?: () => { baked: number; played: number }
   __bgmProbe?: (
     id: 'lobby' | 'forest' | 'desert' | 'river' | 'void',
