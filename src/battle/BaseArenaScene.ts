@@ -49,7 +49,7 @@ import {
   resolveAbilityDef,
 } from '../items/registry'
 import type { TeamEffects } from '../items/registry'
-import { currentFormation, getRun, guardOrder, isTeamFull, promoteStep, waveStartHp } from '../run/state'
+import { currentFormation, getRun, guardOrder, hasCenter, promoteStep, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
 import { tickSkillCd } from '../captains/skill'
 import { DEFAULT_SETTINGS, loadSettings } from '../run/settings'
@@ -564,9 +564,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 阵容来自 run（正常局招募制；测试模式即地图页勾选进入时的场内勾选角色）
     const rosterIds = this.run.roster
     this.lineup = rosterIds.map((id) => CHARACTERS[id])
-    // 槽位 → 队形岗位：满员 N 保 1 按 guardOrder（0 号岗 = 受保护中心，
-    // 互换中心不影响其他人的岗位）；未满员/压测为环形，槽位即岗位
-    const order = this.testMode || !isTeamFull(this.run) ? null : guardOrder(this.run)
+    // 槽位 → 队形岗位：达 5 人后 N 保 1 按 guardOrder（0 号岗 = 受保护中心，
+    // 互换中心不影响其他人的岗位）；未达门槛/测试模式为环形，槽位即岗位
+    const order = this.testMode || !hasCenter(this.run) ? null : guardOrder(this.run)
     this.postBySlot = rosterIds.map((id, slot) => {
       if (!order) return slot
       const post = order.indexOf(id)

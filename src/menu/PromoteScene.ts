@@ -14,7 +14,7 @@ import {
   getRun,
   guardCenter,
   guardOrder,
-  isTeamFull,
+  hasCenter,
   promoteStep,
   recruitCandidates,
   recruitDueCount,
@@ -381,7 +381,7 @@ export class PromoteScene extends Phaser.Scene {
     if (this.fromShop) return 'formation'
     const step = promoteStep(this.run)
     if (step) return step
-    if (isTeamFull(this.run) && !this.run.formationIntroduced) return 'formation'
+    if (hasCenter(this.run) && !this.run.formationIntroduced) return 'formation'
     return null
   }
 

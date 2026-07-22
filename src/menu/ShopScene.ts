@@ -20,7 +20,7 @@ import { arenaSceneFor } from '../maps/registry'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
-import { endRun, getRun, isTeamFull, waveStartHp } from '../run/state'
+import { endRun, getRun, hasCenter, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
 import { captainStatGroups, characterStatGroups } from './stats'
 import { memberMaxHp } from '../characters/stats'
@@ -172,9 +172,9 @@ export class ShopScene extends Phaser.Scene {
       })
     })
 
-    // 阵型入口：满员后常驻——商店睡眠等待，从阵型页返回时货架原样保留
+    // 阵型入口：达 5 人后常驻——商店睡眠等待，从阵型页返回时货架原样保留
     this.formationRect = null
-    if (isTeamFull(this.run)) {
+    if (hasCenter(this.run)) {
       const fm = this.add
         .text(this.origin.x + L.content.w - 40, oy + L.titleY, '⛨ 队形', {
           fontFamily: UI_FONT,

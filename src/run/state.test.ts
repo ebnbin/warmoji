@@ -12,6 +12,7 @@ import {
   getRun,
   guardCenter,
   guardOrder,
+  hasCenter,
   isTeamFull,
   promoteStep,
   recruitCandidates,
@@ -194,6 +195,33 @@ describe('队形状态：满员自动 N 保 1，唯一决策是保谁', () => {
     const outsider = recruitCandidates(run)[0]
     if (outsider) expect(setGuardCenter(run, outsider)).toBe(false)
     expect(run.formationIntroduced).toBe(false)
+    endRun()
+  })
+
+  it('达 5 人即可编排中心（大编队长未满员也行）；第 6 人加入后中心不被冲掉、只补外圈', () => {
+    // 派对之星编制 6：招到 5 人时未满员，但已达「有中心」门槛
+    const run = beginRun('party', ['cowboy'])
+    while (run.roster.length < 5) {
+      run.wave = run.roster.length + 1
+      recruitMember(run, recruitCandidates(run)[0]!)
+    }
+    expect(run.roster.length).toBe(5)
+    expect(isTeamFull(run)).toBe(false)
+    expect(hasCenter(run)).toBe(true)
+    expect(currentFormation(run)).toBe('guard')
+    // 选第 3 人居中
+    const center = run.roster[2]!
+    expect(setGuardCenter(run, center)).toBe(true)
+    expect(guardCenter(run)).toBe(center)
+    // 招募第 6 人 → 中心保持不变，新人接到外圈末尾
+    run.wave = 6
+    const sixth = recruitCandidates(run)[0]!
+    recruitMember(run, sixth)
+    expect(run.roster.length).toBe(6)
+    expect(guardCenter(run)).toBe(center)
+    const order = guardOrder(run)
+    expect(order[0]).toBe(center)
+    expect(order[order.length - 1]).toBe(sixth)
     endRun()
   })
 

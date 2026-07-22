@@ -178,37 +178,48 @@ export function isTeamFull(run: RunState): boolean {
   return run.roster.length >= rosterCap(run)
 }
 
-/** 满员后自动 N 保 1，未满员固定环形（阵型不可选） */
+/** 出现「受保护中心」（可编排）所需的最少队员数：首次满此数即可选一人居中，
+ * 之后新入队者只补外圈——与 teamSize 脱钩（未来 8 人队长也在 5 人时定中心） */
+export const GUARD_MIN = 5
+
+/** 是否已达「有中心」门槛（roster ≥ GUARD_MIN）：驱动战斗阵型、编排首秀与商店阵型入口 */
+export function hasCenter(run: RunState): boolean {
+  return run.roster.length >= GUARD_MIN
+}
+
+/** 达 5 人后自动 N 保 1，未达则固定环形（阵型不可选） */
 export function currentFormation(run: RunState): FormationId {
-  return isTeamFull(run) ? 'guard' : 'ring'
+  return hasCenter(run) ? 'guard' : 'ring'
 }
 
-/** 满员时懒初始化岗位次序（默认 = 花名册顺序，1 号位居中） */
+/** 懒同步岗位次序：增量保序——保留现有次序（含 0 号中心）、剔除已离队者、
+ * 新入队者接到外圈末尾（roster 从 5 涨到 6/7/8 时中心不被冲掉） */
 function ensureGuardOrder(run: RunState): void {
-  if (!isTeamFull(run)) return
-  const valid =
-    run.guardOrder.length === run.roster.length &&
-    run.roster.every((id) => run.guardOrder.includes(id))
-  if (!valid) run.guardOrder = [...run.roster]
+  if (!hasCenter(run)) return
+  const kept = run.guardOrder.filter((id) => run.roster.includes(id))
+  const added = run.roster.filter((id) => !kept.includes(id))
+  // 无增减即已同步，避免无谓改写
+  if (added.length === 0 && kept.length === run.guardOrder.length) return
+  run.guardOrder = [...kept, ...added]
 }
 
-/** N 保 1 的岗位次序快照：0 号中心、1.. 外圈；未满员按花名册顺序（环形用） */
+/** N 保 1 的岗位次序快照：0 号中心、1.. 外圈；未达门槛按花名册顺序（环形用） */
 export function guardOrder(run: RunState): CharacterId[] {
-  if (!isTeamFull(run)) return [...run.roster]
+  if (!hasCenter(run)) return [...run.roster]
   ensureGuardOrder(run)
   return [...run.guardOrder]
 }
 
-/** 受保护中心（岗位 0）；未满员无中心 */
+/** 受保护中心（岗位 0）；未达门槛无中心 */
 export function guardCenter(run: RunState): CharacterId | null {
-  if (!isTeamFull(run)) return null
+  if (!hasCenter(run)) return null
   ensureGuardOrder(run)
   return run.guardOrder[0] ?? null
 }
 
 /** 设置受保护中心：只交换新旧中心两人的岗位，外圈其他人保持原位 */
 export function setGuardCenter(run: RunState, id: CharacterId): boolean {
-  if (!isTeamFull(run) || !run.roster.includes(id)) return false
+  if (!hasCenter(run) || !run.roster.includes(id)) return false
   ensureGuardOrder(run)
   const idx = run.guardOrder.indexOf(id)
   if (idx < 0) return false
