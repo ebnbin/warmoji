@@ -179,6 +179,26 @@ export async function clickFormationMember(page: Page, id: string): Promise<void
   await page.waitForFunction((cid) => window.__warmoji?.promote?.formation?.center === cid, id)
 }
 
+/** 若当前在升级抽卡页，逐次选第一张候选，直到抽完离开。
+ * 不在抽卡页则为空操作——供跨波流程透明穿过战斗后的升级抽卡页 */
+export async function drainCards(page: Page): Promise<void> {
+  for (let i = 0; i < 40; i++) {
+    const scene = await page.evaluate(() => window.__warmoji?.scene)
+    if (scene !== 'cards') return
+    const c = await page.evaluate(() => window.__warmoji!.cards!)
+    const before = c.remaining
+    const ch = c.choices[0]
+    if (!ch) return
+    await page
+      .locator('#game canvas')
+      .click({ position: await cssPoint(page, { x: ch.x + ch.w / 2, y: ch.y + ch.h / 2 }) })
+    await page.waitForFunction(
+      (b) => window.__warmoji?.scene !== 'cards' || (window.__warmoji?.cards?.remaining ?? 0) < b,
+      before,
+    )
+  }
+}
+
 /** 若当前在开箱页，把所有宝箱开完（有可用角色就应用第一个，否则丢弃），直到离开。
  * 不在开箱页则为空操作——供跨波流程透明穿过战斗后新增的开箱页 */
 export async function drainChests(page: Page): Promise<void> {

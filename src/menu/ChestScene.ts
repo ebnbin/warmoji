@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-import { CAPTAINS } from '../captains/registry'
 import { CHARACTERS } from '../characters/registry'
 import { ITEMS, RARITIES, itemPrice } from '../items/registry'
 import { chestTargets } from '../pickups/chest'
@@ -87,7 +86,7 @@ export class ChestScene extends Phaser.Scene {
 
     const itemId = this.run.chests[0]!
     const item = ITEMS[itemId]
-    this.targets = chestTargets(this.run.roster, this.run.memberItems, this.run.captainItems, itemId)
+    this.targets = chestTargets(this.run.roster, this.run.memberItems, itemId)
     const refund = Math.floor(itemPrice(itemId, this.run.wave) / 2)
 
     this.add
@@ -170,10 +169,8 @@ export class ChestScene extends Phaser.Scene {
     this.grid.setItems(
       this.targets.map((slot) => ({
         key: String(slot),
-        emoji: slot < 0 ? CAPTAINS[this.run.captainId].emoji : CHARACTERS[this.run.roster[slot]!].emoji,
+        emoji: CHARACTERS[this.run.roster[slot]!].emoji,
         outline: 'player' as const,
-        // 队长道具用皇冠角标区分「队长」这个特殊目标
-        ...(slot < 0 ? { badge: '1f451' } : {}),
       })),
     )
 
@@ -221,13 +218,12 @@ export class ChestScene extends Phaser.Scene {
     })
   }
 
-  /** 应用当前宝箱道具到某目标（slot=-1 队长，否则角色槽位），下一波建队时重算生效 */
+  /** 应用当前宝箱道具到某角色槽位，下一波建队时重算生效 */
   private apply(slot: number): void {
     if (this.grid.wasDragged) return
     const itemId = this.run.chests[0]
     if (itemId === undefined) return
-    if (slot < 0) this.run.captainItems.push(itemId)
-    else (this.run.memberItems[slot] ??= []).push(itemId)
+    ;(this.run.memberItems[slot] ??= []).push(itemId)
     playSfx('recruit')
     this.advance()
   }

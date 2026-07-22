@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { ArenaScene } from './maps/ArenaScene'
 import { CaptainScene } from './menu/CaptainScene'
+import { CardScene } from './menu/CardScene'
 import { ChestScene } from './menu/ChestScene'
 import { InfiniteArenaScene } from './maps/InfiniteArenaScene'
 import { MapScene } from './menu/MapScene'
@@ -61,7 +62,7 @@ const game = new Phaser.Game({
   // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
   physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, ChestScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, UIScene, ResultScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ChestScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, UIScene, ResultScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {
@@ -72,7 +73,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
   }
   // 场景 → BGM：大厅页共用一首，战斗页按本局地图配曲。
   // 挂在场景 START 上（restart 重入时 playBgm 幂等不重开）
-  const lobby = ['menu', 'map', 'wiki', 'studio', 'settings', 'captain', 'promote', 'chests', 'shop', 'result']
+  const lobby = ['menu', 'map', 'wiki', 'studio', 'settings', 'captain', 'promote', 'cards', 'chests', 'shop', 'result']
   const arenas = ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']
   for (const scene of game.scene.getScenes(false)) {
     const key = scene.scene.key
@@ -133,7 +134,7 @@ window.__addChest = (itemId?: string): void => {
     run.chests.push(itemId as ItemId)
     return
   }
-  const loot = rollChestLoot(run.roster, run.memberItems, run.captainItems, () => Math.random())
+  const loot = rollChestLoot(run.roster, run.memberItems, () => Math.random())
   if (loot) run.chests.push(loot.itemId)
 }
 // e2e 快进到指定波（在商店/整编期间调用，下次开战即该波）

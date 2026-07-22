@@ -132,11 +132,9 @@ export function wikiGroups(): WikiGroup[] {
           `池归属 ${
             i.pool === 'all'
               ? '通用'
-              : i.pool === 'team'
-                ? '队长'
-                : i.pool === 'upgrade'
-                  ? `${i.forCharacter ? CHARACTERS[i.forCharacter].name : ''}专属升级卡`
-                  : ABILITY_KIND_LABEL[i.pool]
+              : i.pool === 'upgrade'
+                ? `${i.forCharacter ? CHARACTERS[i.forCharacter].name : ''}专属升级卡`
+                : ABILITY_KIND_LABEL[i.pool]
           }`,
         ],
       })),

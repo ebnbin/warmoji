@@ -10,6 +10,7 @@ import {
   clickShopSlot,
   completePromote,
   confirmCaptain,
+  drainCards,
   drainChests,
   enterCaptain,
   startRun,
@@ -39,8 +40,8 @@ test('波次循环：波末固定招募 1 人 → 商店购物 → 下一波扩�
   const KEYS = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'] as const
   for (let i = 0; i < 55; i++) {
     const scene = await page.evaluate(() => window.__warmoji?.scene)
-    // 波末可能先落在开箱页（本波偶发掉宝箱），也算离开战斗
-    if (scene === 'promote' || scene === 'shop' || scene === 'chests') break
+    // 波末先落在升级抽卡页 / 开箱页（本波必升级、偶发掉宝箱），都算离开战斗
+    if (scene === 'promote' || scene === 'shop' || scene === 'cards' || scene === 'chests') break
     expect(scene, '波次中途不应全灭或离开战斗').toBe('arena')
     const key = KEYS[i % 4]!
     await page.keyboard.down(key)
@@ -48,7 +49,8 @@ test('波次循环：波末固定招募 1 人 → 商店购物 → 下一波扩�
     await page.keyboard.up(key)
   }
 
-  // 若掉了宝箱先把开箱页开完，再进整编页
+  // 波末先抽完升级卡、再开完宝箱，才进整编页
+  await drainCards(page)
   await drainChests(page)
   // 波末必进整编页：本波 1 个招募名额；第 2 波解锁 6 张、1 张已入队
   await page.waitForFunction(() => window.__warmoji?.scene === 'promote', undefined, {
@@ -69,12 +71,14 @@ test('波次循环：波末固定招募 1 人 → 商店购物 → 下一波扩�
   await page.screenshot({ path: 'test-results/promote-done.png' })
   await clickPromoteConfirm(page)
 
-  // 名额用完直接进商店：上架位 = 队长 + 2 名队员，新队员在列
+  // 名额用完直接进商店：上架位 = 2 名队员（团队增益已迁到升级卡，商店只卖角色装备）
   await page.waitForFunction(() => window.__warmoji?.scene === 'shop' && !!window.__warmoji.shop)
   const shop = await page.evaluate(() => window.__warmoji!.shop!)
   expect(shop.wave).toBe(2)
-  expect(shop.freeRefreshes).toBe(3)
-  expect(shop.slots).toHaveLength(3)
+  // 免费刷新 = 财迷基础 3（+ 可能抽到的调货卡）；用相对量断言，不写死
+  const baseRefreshes = shop.freeRefreshes
+  expect(baseRefreshes).toBeGreaterThanOrEqual(3)
+  expect(shop.slots).toHaveLength(2)
   expect(shop.slots.map((s) => s.id)).toContain(recruitId)
   expect(shop.slots[1]!.offer).not.toBeNull()
 
@@ -83,7 +87,7 @@ test('波次循环：波末固定招募 1 人 → 商店购物 → 下一波扩�
   await clickShopSlot(page, recruitId)
   await page.waitForFunction((id) => window.__warmoji?.shop?.focusedId === id, recruitId)
   await clickShopRefresh(page) // 免费刷新一次触发重绘同步金币
-  await page.waitForFunction(() => window.__warmoji?.shop?.freeRefreshes === 2)
+  await page.waitForFunction((n) => window.__warmoji?.shop?.freeRefreshes === n, baseRefreshes - 1)
   const before = await page.evaluate(() => window.__warmoji!.shop!)
   const slot = before.slots.find((s) => s.id === recruitId)!
   expect(before.buy.enabled).toBe(true)
@@ -96,7 +100,7 @@ test('波次循环：波末固定招募 1 人 → 商店购物 → 下一波扩�
   await page.screenshot({ path: 'test-results/shop.png' })
 
   // 用完剩余免费刷新（不扣钱），再刷新一次转为付费
-  for (let n = 2; n > 0; n--) {
+  for (let n = baseRefreshes - 1; n > 0; n--) {
     await clickShopRefresh(page)
     await page.waitForFunction((exp) => window.__warmoji?.shop?.freeRefreshes === exp, n - 1)
   }

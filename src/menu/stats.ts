@@ -3,12 +3,7 @@ import { memberMaxHp } from '../characters/stats'
 import { CHARACTERS, MEMBER, TEAM, loadoutFor, upgradeCardsFor } from '../characters/registry'
 import type { CaptainDef } from '../captains/registry'
 import type { CharacterId } from '../characters/registry'
-import {
-  upgradeTiers,
-  aggregateCharacterEffects,
-  aggregateTeamEffects,
-  resolveAbilityDef,
-} from '../items/registry'
+import { upgradeTiers, aggregateCharacterEffects, resolveAbilityDef } from '../items/registry'
 import type { ItemId } from '../items/registry'
 import type { AbilityDef } from '../abilities/defs'
 
@@ -204,34 +199,27 @@ function displayDef(w: AbilityDef, dmgMul: number, cdMul: number, kbMul: number)
   }
 }
 
-/** 队长面板：能力描述 + 团队属性（移速/金币拾取/经验等团队级数值都归队长，含道具修正） */
-export function captainStatGroups(def: CaptainDef, items: readonly ItemId[] = []): StatGroup[] {
-  const fx = aggregateTeamEffects(items)
+/** 队长面板：doctrine（起始团队被动 + 编制）+ 主动技能。团队增益改由经验升级卡提供 */
+export function captainStatGroups(def: CaptainDef): StatGroup[] {
   const lines = [
     `编制上限 ${def.teamSize} 人 · 每波结束固定招募 1 人` +
       (def.startWave > 1 ? ` · 从第 ${def.startWave} 波开始` : '') +
       (def.startCoins > 0 ? ` · 开局 ${def.startCoins} 金币` : ''),
-    `移速 ${grid(def.moveSpeed * fx.moveSpeedMul)}/秒 · 金币拾取 ${grid(def.coinMagnet * fx.magnetMul)}`,
+    `移速 ${grid(def.moveSpeed)}/秒 · 金币拾取 ${grid(def.coinMagnet)}`,
   ]
   if (def.hpMul !== 1) lines.push(`全队生命 ×${+def.hpMul.toFixed(2)}`)
   if (def.reviveMul !== 1) lines.push(`复活时间 ×${+def.reviveMul.toFixed(2)}`)
-  const xpMul = def.xpGainMul * fx.xpGainMul
-  if (xpMul !== 1) lines.push(`经验获取 ×${+xpMul.toFixed(2)}`)
-  if (fx.teamDamageMul !== 1) lines.push(`全队伤害 ×${+fx.teamDamageMul.toFixed(2)}`)
-  if (fx.doubleCoinChance > 0) lines.push(`双倍金币概率 ${Math.round(fx.doubleCoinChance * 100)}%`)
-  if (fx.enemySlowMul < 1) lines.push(`全体敌人减速 ${Math.round((1 - fx.enemySlowMul) * 100)}%`)
-  if (fx.waveHealRatio > 0) lines.push(`波末全队回复 ${Math.round(fx.waveHealRatio * 100)}% 生命`)
-  if (fx.waveCoins > 0) lines.push(`波末分红 +${fx.waveCoins} 金币`)
+  if (def.xpGainMul !== 1) lines.push(`经验获取 ×${+def.xpGainMul.toFixed(2)}`)
   return [
     { icon: '1f451', title: '队长能力', lines: [def.desc] },
     {
       icon: '26a1',
       title: `主动技能 · ${def.skill.name}`,
       lines: [
-        `${def.skill.desc}（冷却 ${Math.round(def.skill.cdMs / 1000)} 秒，跨波累计）`,
+        `${def.skill.desc}（冷却 ${Math.round(def.skill.cdMs / 1000)} 秒，仅 CD 门槛）`,
         ...def.skill.abilities.flatMap((w) => abilityStatLines(w)),
       ],
     },
-    { icon: '1f45f', title: '团队', lines: [...lines, '经验每升一级 = 1 颗能量豆（技能弹药，上限 3）'] },
+    { icon: '1f45f', title: '团队', lines: [...lines, '团队增益来自战斗后的经验升级卡（三选一）'] },
   ]
 }

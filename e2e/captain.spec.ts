@@ -4,7 +4,7 @@ import { clickCaptain, clickShopNext, completePromote, confirmCaptain, enterCapt
 test.describe('队长选择', () => {
   test.use({ viewport: { width: 1280, height: 720 } })
 
-  test('队长可选；神童自选满编 + 满豆 + 启动资金，直接从第 15 波开战', async ({ page }) => {
+  test('队长可选；神童自选满编 + 技能就绪 + 启动资金，直接从第 15 波开战', async ({ page }) => {
     await page.goto('/')
     await enterCaptain(page)
 
@@ -26,9 +26,10 @@ test.describe('队长选择', () => {
     await page.waitForFunction(() => window.__warmoji?.alive === 5)
     const st = await page.evaluate(() => ({
       wave: window.__warmoji!.wave,
-      beans: window.__warmoji!.skill?.beans,
+      ready: window.__warmoji!.skill?.ready,
     }))
     expect(st.wave).toBe(15)
-    expect(st.beans).toBe(3)
+    // 纯 CD 门槛：开局技能即就绪
+    expect(st.ready).toBe(true)
   })
 })

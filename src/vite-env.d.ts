@@ -50,6 +50,24 @@ interface WarmojiShopDebug {
   formation: { x: number; y: number; w: number; h: number } | null
 }
 
+interface WarmojiCardsDebug {
+  /** 待抽次数（含当前这次） */
+  remaining: number
+  /** 已持团队卡（cardId → 等级），供验证选卡生效 */
+  owned: Record<string, number>
+  /** 当前三选一的候选卡：id + 现等级/上限 + 稀有度 + 命中矩形 */
+  choices: {
+    id: string
+    level: number
+    maxLevel: number
+    rarity: 'common' | 'rare' | 'epic'
+    x: number
+    y: number
+    w: number
+    h: number
+  }[]
+}
+
 interface WarmojiChestsDebug {
   /** 待开箱数（含当前正在开的这个） */
   remaining: number
@@ -156,7 +174,7 @@ interface WarmojiResultDebug {
 }
 
 interface WarmojiDebug {
-  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'promote' | 'chests' | 'shop' | 'arena' | 'result'
+  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'promote' | 'cards' | 'chests' | 'shop' | 'arena' | 'result'
   elapsed: number
   hp: number
   alive: number
@@ -181,8 +199,8 @@ interface WarmojiDebug {
   dormant?: number
   /** 无限地图终波：当前缩圈半径（未开圈为 undefined） */
   zoneRadius?: number
-  /** arena：队长主动技能状态 */
-  skill?: { remainMs: number; beans: number; ready: boolean }
+  /** arena：队长主动技能状态（纯 CD 门槛） */
+  skill?: { remainMs: number; ready: boolean }
   menu?: WarmojiMenuDebug
   map?: WarmojiMapDebug
   wiki?: WarmojiWikiDebug
@@ -190,6 +208,7 @@ interface WarmojiDebug {
   settings?: WarmojiSettingsDebug
   captain?: WarmojiCaptainDebug
   promote?: WarmojiPromoteDebug
+  cards?: WarmojiCardsDebug
   chests?: WarmojiChestsDebug
   shop?: WarmojiShopDebug
   result?: WarmojiResultDebug

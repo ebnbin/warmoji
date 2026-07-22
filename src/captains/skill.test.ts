@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { CAPTAINS, CAPTAIN_IDS } from './registry'
-import { SKILL } from './skill'
 import { beginRun, endRun } from '../run/state'
 import { skillCharge, skillReady, tickSkillCd } from './skill'
 
@@ -37,13 +36,10 @@ describe('技能冷却', () => {
     }
   })
 
-  it('开局 CD 即就绪、0 颗豆（神童拉满 3 颗）——首放卡在挣豆上', () => {
+  it('开局 CD 即就绪——纯 CD 门槛，可立即首放', () => {
     for (const id of CAPTAIN_IDS) {
       const run = beginRun(id, [])
       expect(run.skillCdMs).toBe(0)
-      expect(run.beans).toBe(
-        CAPTAINS[id].startWave > 1 ? SKILL.maxBeans : 0,
-      )
       endRun()
     }
   })

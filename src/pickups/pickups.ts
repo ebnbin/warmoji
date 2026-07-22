@@ -100,12 +100,7 @@ function openChest(scene: BaseArenaScene, chest: ImageObj): void {
   releasePooled(chest)
   scene.coinBurst.explode(12, x, y)
   playSfx('levelup')
-  const loot = rollChestLoot(
-    scene.run.roster,
-    scene.run.memberItems,
-    scene.run.captainItems,
-    () => scene.rng.next(),
-  )
+  const loot = rollChestLoot(scene.run.roster, scene.run.memberItems, () => scene.rng.next())
   if (!loot) {
     scene.run.coins += PICKUPS.chest.fallbackCoins ?? 0
     return

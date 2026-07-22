@@ -21,9 +21,5 @@ export function skillCharge(remainMs: number, captainId: CaptainId): number {
   return Math.min(1, Math.max(0, 1 - remainMs / cd))
 }
 
-// 释放门槛 = CD 就绪 且 至少 1 颗能量豆（经验每升一级得 1 颗，见 run/xp.ts）；
-// 开局 CD 即就绪、0 颗豆——首放卡在挣第一颗豆上
-export const SKILL = {
-  /** 能量豆持有上限：满豆时经验冻结（不再增长），消耗后恢复 */
-  maxBeans: 3,
-} as const
+// 释放门槛 = 纯 CD 就绪（不再依赖能量豆）：开局 CD 即就绪，可立即首放；
+// 冷却时长可被团队升级卡的 skillCdMul 缩短（见 cards/registry.ts）

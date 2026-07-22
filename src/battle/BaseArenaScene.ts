@@ -16,7 +16,7 @@ import { CAPTAINS } from '../captains/registry'
 import { CHARACTERS, MEMBER, TEAM, loadoutFor } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import type { CharacterId, CharacterDef } from '../characters/registry'
-import { SKILL } from '../captains/skill'
+import { aggregateTeamCards } from '../cards/registry'
 import {
   DENSITY_PARAMS,
   INVINCIBLE_HP,
@@ -45,7 +45,7 @@ import { chestDropped } from '../pickups/chest'
 import {
   upgradeTiers,
   aggregateCharacterEffects,
-  aggregateTeamEffects,
+  foldTeamEffects,
   CRIT_MUL,
   resolveAbilityDef,
 } from '../items/registry'
@@ -100,8 +100,6 @@ export interface HudSnapshot {
   xp: number
   xpNext: number
   level: number
-  /** 当前可用能量豆（HUD 计数 + 满豆提示） */
-  beans: number
   kills: number
   coins: number
   wave: number
@@ -229,7 +227,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   rng = new Rng(1)
   protected palette!: Palette
   stats!: TeamStats
-  teamFx: TeamEffects = aggregateTeamEffects([])
+  teamFx: TeamEffects = foldTeamEffects([])
   private settings: Settings = DEFAULT_SETTINGS
   run!: RunState
   private damagePool: Phaser.GameObjects.BitmapText[] = []
@@ -511,7 +509,6 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       xp: this.run.xp.xp,
       xpNext: xpToNext(this.run.xp.level),
       level: this.run.xp.level,
-      beans: this.run.beans,
       kills: this.run.kills,
       coins: this.run.coins,
       wave: this.run.wave,
@@ -576,7 +573,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.orbitPhase = 0
     this.driverPost = -1
     // 队长道具：团队修正（移速/磁吸/掉落/全队伤害）
-    this.teamFx = aggregateTeamEffects(this.run.captainItems)
+    this.teamFx = aggregateTeamCards(this.run.teamCards)
     this.stats.moveSpeed = CAPTAINS[this.run.captainId].moveSpeed * UNIT * this.teamFx.moveSpeedMul
     this.waveBaseKills = this.run.kills
     this.waveBaseCoins = this.run.coins
@@ -676,9 +673,6 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (this.over) return
     this.elapsedMs += delta
 
-    // 测试模式（测试专用队长）：永远满豆，队长技能随时可放
-    if (this.testMode) this.run.beans = SKILL.maxBeans
-
     // 波次时间到 → 结算/商店（测试模式无尽，便于性能观测）
     if (!this.testMode && this.elapsedMs >= waveDurationMs(this.run.wave)) {
       this.endWave()
@@ -733,8 +727,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       mapId: this.run.mapId,
       skill: {
         remainMs: Math.round(this.run.skillCdMs),
-        beans: this.run.beans,
-        ready: this.run.skillCdMs <= 0 && this.run.beans > 0,
+        ready: this.run.skillCdMs <= 0,
       },
       ...this.debugExtras(),
     })
@@ -742,42 +735,38 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   // ── 队长主动技能 ────────────────────────────────────────────
 
-  /** UIScene 轮询的技能状态 */
+  /** UIScene 轮询的技能状态（纯 CD 门槛，无弹药） */
   skillSnapshot(): {
     name: string
     remainMs: number
     cdMs: number
-    beans: number
     ready: boolean
   } {
     const s = CAPTAINS[this.run.captainId].skill
     return {
       name: s.name,
       remainMs: this.run.skillCdMs,
-      cdMs: s.cdMs,
-      beans: this.run.beans,
-      ready: this.run.skillCdMs <= 0 && this.run.beans > 0,
+      cdMs: s.cdMs * this.teamFx.skillCdMul,
+      ready: this.run.skillCdMs <= 0,
     }
   }
 
-  /** 经验统一入口：满豆冻结（不涨条不升级）；升级即得豆（钳上限） */
+  /** 经验统一入口：升级不冻结；每升 1 级累积 1 次团队升级抽卡（战斗后开卡页发放） */
   private gainTeamXp(amount: number): void {
-    if (this.run.beans >= SKILL.maxBeans) return
     const gained = gainXp(this.run.xp, amount)
     this.run.xp = gained.state
     if (gained.levelsGained > 0) {
-      this.run.beans = Math.min(SKILL.maxBeans, this.run.beans + gained.levelsGained)
+      this.run.cardDraws += gained.levelsGained
       playSfx('levelup')
     }
   }
 
-  /** 释放主动技能（UIScene 按钮/E 键触发）。这里只是触发策略：就绪/弹药
-   * 校验、扣豆、重置跨波 CD；效果本体是队长持有的标准能力行，逐个单发 */
+  /** 释放主动技能（UIScene 按钮/E 键触发）：纯 CD 门槛，就绪即放、重置跨波 CD
+   * （CD 时长受团队 skillCdMul 缩短）；效果本体是队长持有的标准能力行，逐个单发 */
   castSkill(): boolean {
-    if (this.over || this.run.skillCdMs > 0 || this.run.beans <= 0) return false
+    if (this.over || this.run.skillCdMs > 0) return false
     const s = CAPTAINS[this.run.captainId].skill
-    this.run.beans -= 1
-    this.run.skillCdMs = s.cdMs
+    this.run.skillCdMs = s.cdMs * this.teamFx.skillCdMul
     playSfx('levelup')
     this.events.emit('skill-cast', s.name)
     for (const a of this.captainAbilities) a.castNow?.(this.captainHandle)
@@ -844,7 +833,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.physics.pause()
     playSfx('wave')
     const finished = isFinalWave(this.run.wave)
-    // 波末保底经验：躲避流杀得少也有基本豆收入（队长倍率 × 四叶草团队倍率）
+    // 波末保底经验：躲避流杀得少也有基本收入（队长倍率 × 团队经验卡倍率）
     const xpMul = CAPTAINS[this.run.captainId].xpGainMul * this.teamFx.xpGainMul
     this.gainTeamXp(Math.round(waveBonusXp(this.run.wave) * xpMul))
     // 团队道具的波末结算：大锅回复在血量快照前生效，债券分红计入本波金币小结
@@ -869,6 +858,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 再按有无招募名额进整编页（首次满员顺带阵型页）或直进商店
     this.time.delayedCall(WAVE.summaryMs, () => {
       if (finished) this.scene.start('result', { win: true })
+      // 本波升级 → 团队升级抽卡页；再拾宝箱 → 开箱页；再招募 → 整编页；否则商店
+      else if (this.run.cardDraws > 0) this.scene.start('cards')
       else if (this.run.chests.length > 0) this.scene.start('chests')
       else this.scene.start(promoteStep(this.run) ? 'promote' : 'shop')
     })
@@ -936,12 +927,15 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       cooldownMul: () => {
         const mm = this.members[slot]
         const atk = mm && mm.atkSlowUntil > this.elapsedMs ? mm.atkSlowMul : 1
-        return this.stats.cooldownMul * fx.cooldownMul * atk * this.testFireFactor()
+        return (
+          this.stats.cooldownMul * fx.cooldownMul * this.teamFx.teamCooldownMul * atk * this.testFireFactor()
+        )
       },
       // 伤害/子弹带上来源槽位：结算页按角色统计输出与击杀。
       // 暴击/击退倍率在这里收口：所有能力伤害路径统一生效，无需逐能力改造
       damageTarget: (e, d, kb, sx, sy) => {
-        const crit = fx.critChance > 0 && this.rng.next() < fx.critChance
+        const critChance = Math.min(0.5, fx.critChance + this.teamFx.critAdd)
+        const crit = critChance > 0 && this.rng.next() < critChance
         this.applyDamage(
           e as ImageObj,
           crit ? Math.round(d * CRIT_MUL) : d,
@@ -969,7 +963,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         mm.anim.play(clipId, { durMs })
       },
     }
-    const maxHp = this.testMode ? this.stats.maxHp : memberMaxHp(fx.hpAdd, CAPTAINS[this.run.captainId].hpMul)
+    const maxHp = this.testMode
+      ? this.stats.maxHp
+      : Math.round(memberMaxHp(fx.hpAdd, CAPTAINS[this.run.captainId].hpMul) * this.teamFx.teamHpMul)
     // 部件动画：idle 常驻翻帧（slot 错开相位），帧烘焙是惰性的，就绪前保持静态
     const anim = new Animator(image)
     anim.register('idle', clipFramesLive(this, emoji, 'idle', 'player'))
@@ -990,7 +986,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       maxHp,
       hurtRadius,
       iframesMs: MEMBER.iframesMs + fx.iframesAddMs,
-      reviveMs: Math.max(1000, TEAM.reviveMs * CAPTAINS[this.run.captainId].reviveMul + fx.reviveAddMs),
+      reviveMs: Math.max(
+        1000,
+        TEAM.reviveMs * CAPTAINS[this.run.captainId].reviveMul * this.teamFx.reviveMul + fx.reviveAddMs,
+      ),
       regenPerSec: fx.regenPerSec,
       thorns: fx.thorns,
       killHeal: fx.killHeal,
@@ -1484,7 +1483,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const baseCoins = def.coins * (elite ? ELITE.coinsMul : 1)
     const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? baseCoins : 0
     spawnCoins(this, enemy.x, enemy.y, baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0))
-    if (!this.testMode && !a.boss && chestDropped(elite, () => this.rng.next())) {
+    if (!this.testMode && !a.boss && chestDropped(elite, () => this.rng.next(), this.teamFx.chestChanceMul)) {
       spawnChest(this, enemy.x, enemy.y)
     }
   }

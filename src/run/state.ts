@@ -2,11 +2,11 @@ import { CAPTAINS } from '../captains/registry'
 import { CHARACTERS, MEMBER, ROSTER_IDS } from '../characters/registry'
 import type { CaptainId } from '../captains/registry'
 import type { CharacterId } from '../characters/registry'
-import { SKILL } from '../captains/skill'
 import { WAVE } from './waves'
 import type { FormationId } from '../characters/formation'
 import { browserStorage } from '../core/storage'
 import type { ItemId } from '../items/registry'
+import type { CardId } from '../cards/registry'
 import type { MapId } from '../maps/registry'
 import { MAP_IDS } from '../maps/registry'
 import { drawRecruitPool, recruitSeed, refreshRecruitSeed, unlockedCount } from './recruit'
@@ -31,11 +31,13 @@ export interface RunState {
   wave: number
   coins: number
   kills: number
-  /** 经验进度：level = 生涯已获得的豆数（驱动下一颗豆的价格曲线），
-   * xp = 当前豆的攒取进度；满豆时冻结（见 SKILL.maxBeans） */
+  /** 经验进度：level = 生涯已升的级数（驱动升级抽卡次数），xp = 当前级的攒取进度。
+   * 每升 1 级 = 1 次团队升级抽卡（cardDraws），无上限、不冻结 */
   xp: XpState
-  /** 当前可用能量豆（0..SKILL.maxBeans）：释放队长技能消耗 1 颗 */
-  beans: number
+  /** 待抽的团队升级卡次数（每升 1 级 +1；战斗后开卡页逐次三选一） */
+  cardDraws: number
+  /** 已获得的团队升级卡（cardId → 等级）：聚合成 teamFx，替代原队长道具那套 */
+  teamCards: Partial<Record<CardId, number>>
   /** 已完成波次的累计战斗时长，驱动难度曲线跨波递增 */
   combatMs: number
   /** 命定卡池：开局按队长种子抽定的可招募范围（顺序即卡位，整局固定；
@@ -47,7 +49,6 @@ export interface RunState {
   memberHp: number[]
   /** 按槽位的已购道具（重复 = 堆叠） */
   memberItems: ItemId[][]
-  captainItems: ItemId[]
   /** 战斗中拾取、尚未开启的宝箱：每个存一件掉落时抽定的道具（对玩家保密到开箱），
    * 战斗结束后在开箱页由玩家逐个决定归属或丢弃返半价，开完才进招募/商店 */
   chests: ItemId[]
@@ -99,12 +100,12 @@ export function beginRun(
     coins: captain.startCoins,
     kills: 0,
     xp: { level: 1, xp: 0 },
-    beans: captain.startWave > 1 ? SKILL.maxBeans : 0,
+    cardDraws: 0,
+    teamCards: {},
     combatMs: skippedMs,
     roster,
     memberHp: roster.map(() => MEMBER.maxHp),
     memberItems: roster.map(() => []),
-    captainItems: [],
     chests: [],
     freeRefreshes: 0,
     // 开局 CD 即就绪：首放只卡在挣第一颗豆上
@@ -252,10 +253,10 @@ export function grantCoins(n: number): void {
   if (current) current.coins += n
 }
 
-/** 调试/e2e 注入：给进行中的一局加经验（走正常升豆结算，含满豆冻结） */
+/** 调试/e2e 注入：给进行中的一局加经验（升级即累积团队升级抽卡次数） */
 export function grantXp(n: number): void {
-  if (!current || current.beans >= SKILL.maxBeans) return
+  if (!current) return
   const gained = gainXp(current.xp, n)
   current.xp = gained.state
-  current.beans = Math.min(SKILL.maxBeans, current.beans + gained.levelsGained)
+  current.cardDraws += gained.levelsGained
 }

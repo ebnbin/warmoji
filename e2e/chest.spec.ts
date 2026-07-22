@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { completePromote, startRun } from './helpers'
+import { completePromote, drainCards, startRun } from './helpers'
 
 // 存活到波末受随机刷怪影响，慢渲染环境下偶发全灭，允许重试（同 wave.spec）
 test.describe.configure({ retries: 2 })
@@ -28,14 +28,14 @@ test('宝箱：战斗后进开箱页，可应用给角色或丢弃返半价，�
   await page.goto('/')
   await startRun(page)
 
-  // 战斗中塞两个已知宝箱：gemHeart（通用，应用给角色）+ marchFlag（团队，丢弃返金币）。
+  // 战斗中塞两个已知宝箱（都是角色装备）：gemHeart 应用给角色 + whetstone 丢弃返金币。
   // 拾取只收集不生效——战斗结束才进开箱页
   await page.evaluate(() => {
     window.__addChest!('gemHeart')
-    window.__addChest!('marchFlag')
+    window.__addChest!('whetstone')
   })
 
-  // 走位撑到波末：拾了宝箱 → 波末进开箱页（而非直接整编）
+  // 走位撑到波末：拾了宝箱 → 波末先升级抽卡、再进开箱页
   const KEYS = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'] as const
   for (let i = 0; i < 55; i++) {
     const scene = await page.evaluate(() => window.__warmoji?.scene)
@@ -45,11 +45,13 @@ test('宝箱：战斗后进开箱页，可应用给角色或丢弃返半价，�
     await page.waitForTimeout(1400)
     await page.keyboard.up(key)
   }
+  // 先抽完升级卡，再落到开箱页
+  await drainCards(page)
   await page.waitForFunction(() => window.__warmoji?.scene === 'chests', undefined, {
     timeout: 15_000,
   })
 
-  // 第一个宝箱 = gemHeart：通用道具，全部角色可选（含槽位 0），不含队长
+  // 第一个宝箱 = gemHeart：通用道具，全部角色可选（含槽位 0），只列角色（无 -1）
   let c = await page.evaluate(() => window.__warmoji!.chests!)
   expect(c.item).toBe('gemHeart')
   expect(c.targets.some((t) => t.slot === 0)).toBe(true)
@@ -60,10 +62,9 @@ test('宝箱：战斗后进开箱页，可应用给角色或丢弃返半价，�
   await clickLogical(page, t0.x + t0.w / 2, t0.y + t0.h / 2)
   await page.waitForFunction((r) => (window.__warmoji?.chests?.remaining ?? 0) < r, remain0)
 
-  // 第二个宝箱 = marchFlag：团队道具，只有队长(-1)可选；丢弃返当前波次价一半
+  // 第二个宝箱 = whetstone：丢弃返当前波次价一半金币
   c = await page.evaluate(() => window.__warmoji!.chests!)
-  expect(c.item).toBe('marchFlag')
-  expect(c.targets.map((t) => t.slot)).toEqual([-1])
+  expect(c.item).toBe('whetstone')
   const coinsBefore = await page.evaluate(() => window.__warmoji!.coins!)
   const refund = c.discard.refund
   expect(refund).toBeGreaterThan(0)

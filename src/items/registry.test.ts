@@ -9,8 +9,6 @@ import {
   itemPrice,
   PRICE,
   aggregateCharacterEffects,
-  aggregateTeamEffects,
-  captainPool,
   characterPool,
   ITEM_IDS,
   ITEMS,
@@ -104,16 +102,9 @@ describe('道具池推导', () => {
     expect(magePool).toContain('upgradeMage2')
     expect(magePool).not.toContain('upgradeTroll1')
     expect(magePool).not.toContain('scope')
-    expect(magePool).not.toContain('marchFlag')
     const cowboyPool = characterPool('cowboy', CHARACTERS.cowboy)
     expect(cowboyPool).toContain('scope')
     expect(cowboyPool).not.toContain('blastPowder')
-  })
-
-  it('队长池只含团队道具', () => {
-    const pool = captainPool()
-    expect(pool.length).toBeGreaterThan(0)
-    for (const id of pool) expect(ITEMS[id].pool).toBe('team')
   })
 
   it('每个角色的池至少有通用道具数量', () => {
@@ -171,14 +162,6 @@ describe('效果叠加', () => {
     expect(fx.hpAdd).toBe(-30)
   })
 
-  it('团队效果：双倍金币概率加法叠加且封顶', () => {
-    const fx = aggregateTeamEffects(['luckyCoin', 'luckyCoin', 'marchFlag', 'heavyArms'])
-    expect(fx.doubleCoinChance).toBeCloseTo(0.3)
-    expect(fx.moveSpeedMul).toBeCloseTo(1.08 * 0.95)
-    expect(fx.teamDamageMul).toBeCloseTo(1.1)
-    expect(aggregateTeamEffects(Array(10).fill('luckyCoin')).doubleCoinChance).toBe(0.9)
-  })
-
   it('新角色轴：回复/反伤/击杀回血加法叠加，暴击封顶 0.5，击退叠乘', () => {
     const fx = aggregateCharacterEffects([
       'regenRing',
@@ -195,16 +178,6 @@ describe('效果叠加', () => {
     expect(fx.critChance).toBeCloseTo(0.4)
     expect(fx.knockbackMul).toBeCloseTo(1.35)
     expect(aggregateCharacterEffects(Array(5).fill('fateDice')).critChance).toBe(0.5)
-  })
-
-  it('新团队轴：经验叠乘、敌速有保底、波末回复封顶、分红叠加', () => {
-    const fx = aggregateTeamEffects(['clover', 'fieldKitchen', 'warBond', 'warBond', 'timeSand'])
-    expect(fx.xpGainMul).toBeCloseTo(1.15)
-    expect(fx.enemySlowMul).toBeCloseTo(0.88)
-    expect(fx.waveHealRatio).toBeCloseTo(0.25)
-    expect(fx.waveCoins).toBe(20)
-    expect(aggregateTeamEffects(Array(8).fill('timeSand')).enemySlowMul).toBe(0.6)
-    expect(aggregateTeamEffects(Array(8).fill('fieldKitchen')).waveHealRatio).toBe(0.6)
   })
 })
 

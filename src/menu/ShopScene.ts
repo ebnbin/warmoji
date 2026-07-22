@@ -7,7 +7,6 @@ import { SHOP } from '../items/registry'
 import { PICKUPS } from '../pickups/registry'
 import {
   aggregateCharacterEffects,
-  captainPool,
   characterPool,
   ITEMS,
   RARITIES,
@@ -16,13 +15,15 @@ import {
   stackCount,
 } from '../items/registry'
 import type { ItemId, ItemDef } from '../items/registry'
+import { aggregateTeamCards } from '../cards/registry'
+import type { TeamEffects } from '../items/registry'
 import { arenaSceneFor } from '../maps/registry'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import { endRun, getRun, hasCenter, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
-import { captainStatGroups, characterStatGroups } from './stats'
+import { characterStatGroups } from './stats'
 import { memberMaxHp } from '../characters/stats'
 import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
@@ -65,10 +66,8 @@ const PORTRAIT: ShopLayout = {
   btn: { y: 1162, w: 360, h: 72 },
 }
 
-// 上架位：队长固定占第一位（'captain' 哨兵），队员按阵容槽位排列。
+// 上架位：每个出战角色一个，按阵容槽位排列（团队增益已迁到升级卡，商店只卖角色装备）。
 // 招募/升级已拆分到整编页（PromoteScene），商店只管道具购物
-type SlotId = 'captain' | CharacterId
-
 export class ShopScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色/焦点/上架结果等页面状态
   private preserveOnRestart = false
@@ -76,8 +75,10 @@ export class ShopScene extends Phaser.Scene {
   private run!: RunState
   private captainId: CaptainId = 'angel'
   private lineup: CharacterId[] = []
-  private focusedId: SlotId = 'captain'
+  private focusedId: CharacterId = 'juggler'
   private offers: (ItemId | null)[] = []
+  /** 团队升级卡效果（本局）：商店折扣 / 额外免费刷新 从这里取 */
+  private teamFx!: TeamEffects
   private layout!: ShopLayout
   private origin = { x: 0, y: 0 }
   private grid!: EmojiGrid
@@ -117,16 +118,17 @@ export class ShopScene extends Phaser.Scene {
     this.run = getRun()
     this.captainId = this.run.captainId
     this.lineup = [...this.run.roster]
+    this.teamFx = aggregateTeamCards(this.run.teamCards)
     if (!preserved) {
-      // 进店结算：天使复活满血；免费刷新次数按队长重置；全部上架位重新随机
+      // 进店结算：天使复活满血；免费刷新次数按队长重置（+团队调货卡）；全部上架位重新随机
       if (CAPTAINS[this.captainId].reviveInShop) {
         this.run.memberHp = this.run.memberHp.map((_, slot) => this.slotMaxHp(slot))
       }
-      this.run.freeRefreshes = CAPTAINS[this.captainId].freeRefreshes
-      this.offers = Array.from({ length: this.lineup.length + 1 }, (_, i) =>
-        rollItem(this.poolFor(i), this.ownedFor(i), Math.random, this.run.wave),
+      this.run.freeRefreshes = CAPTAINS[this.captainId].freeRefreshes + this.teamFx.freeRerolls
+      this.offers = this.lineup.map((_, slot) =>
+        rollItem(this.poolFor(slot), this.ownedFor(slot), Math.random, this.run.wave),
       )
-      this.focusedId = 'captain'
+      this.focusedId = this.lineup[0] ?? this.focusedId
     }
     this.detailObjs = []
     this.quitArmed = false
@@ -326,20 +328,23 @@ export class ShopScene extends Phaser.Scene {
 
   // ── 上架/购买 ───────────────────────────────────────────────
 
-  private poolFor(index: number): ItemId[] {
-    if (index === 0) return captainPool()
-    return characterPool(this.lineup[index - 1]!, CHARACTERS[this.lineup[index - 1]!])
+  private poolFor(slot: number): ItemId[] {
+    const id = this.lineup[slot]!
+    return characterPool(id, CHARACTERS[id])
   }
 
-  private ownedFor(index: number): ItemId[] {
-    if (index === 0) return this.run.captainItems
-    return (this.run.memberItems[index - 1] ??= [])
+  private ownedFor(slot: number): ItemId[] {
+    return (this.run.memberItems[slot] ??= [])
   }
 
-  /** 0 = 队长，1.. = 队员槽位+1 */
+  /** 当前聚焦角色的阵容槽位（-1 = 无效） */
   private focusedIndex(): number {
-    if (this.focusedId === 'captain') return 0
-    return this.lineup.indexOf(this.focusedId) + 1
+    return this.lineup.indexOf(this.focusedId)
+  }
+
+  /** 折后价：基础波次价 × 团队砍价卡倍率（四舍五入，至少 1） */
+  private price(offer: ItemId): number {
+    return Math.max(1, Math.round(itemPrice(offer, this.run.wave) * this.teamFx.shopDiscountMul))
   }
 
   private buyFocused(): void {
@@ -347,7 +352,7 @@ export class ShopScene extends Phaser.Scene {
     if (idx < 0) return
     const offer = this.offers[idx]
     if (!offer) return
-    const price = itemPrice(offer, this.run.wave)
+    const price = this.price(offer)
     if (this.run.coins < price) return
     this.run.coins -= price
     playSfx('buy')
@@ -374,31 +379,22 @@ export class ShopScene extends Phaser.Scene {
     return memberMaxHp(aggregateCharacterEffects(this.run.memberItems[slot] ?? []).hpAdd)
   }
 
-  // ── 上架位网格（队长 + 队员 + 招募；形象即含义，角标 = 当前上架道具） ──
+  // ── 上架位网格（每个出战角色一个；形象即含义，角标 = 当前上架道具） ──
 
-  /** 网格条目：id 即 key；角标显示该位当前上架道具，队员带血条 */
+  /** 网格条目：id 即 key；角标显示该位当前上架道具，带血条 */
   private buildSlotItems(): { key: string; emoji: string; outline: 'player'; badge?: string; hpRatio?: number }[] {
-    const items: { key: string; emoji: string; outline: 'player'; badge?: string; hpRatio?: number }[] = [
-      {
-        key: 'captain',
-        emoji: CAPTAINS[this.captainId].emoji,
-        outline: 'player',
-        badge: this.offers[0] ? ITEMS[this.offers[0]].emoji : undefined,
-      },
-    ]
-    this.lineup.forEach((id, i) => {
-      const max = this.slotMaxHp(i)
-      const hp = waveStartHp(this.run.memberHp[i] ?? max, max)
-      const offer = this.offers[i + 1]
-      items.push({
+    return this.lineup.map((id, slot) => {
+      const max = this.slotMaxHp(slot)
+      const hp = waveStartHp(this.run.memberHp[slot] ?? max, max)
+      const offer = this.offers[slot]
+      return {
         key: id,
         emoji: CHARACTERS[id].emoji,
-        outline: 'player',
+        outline: 'player' as const,
         badge: offer ? ITEMS[offer].emoji : undefined,
         hpRatio: hp / max,
-      })
+      }
     })
-    return items
   }
 
   private createSlots(): void {
@@ -411,7 +407,7 @@ export class ShopScene extends Phaser.Scene {
     this.grid.onTap = (key): void => {
       if (this.focusedId !== key) this.statsScroll = 0
       playSfx('click')
-      this.focusedId = key as SlotId
+      this.focusedId = key as CharacterId
       this.refresh()
     }
     this.grid.onScroll = (): void => {
@@ -444,21 +440,14 @@ export class ShopScene extends Phaser.Scene {
     const dx = this.origin.x + D.x
     const dy = this.origin.y + D.y
 
-    const isCaptain = this.focusedId === 'captain'
     const idx = this.focusedIndex()
     const owned = this.ownedFor(idx)
-    const def = isCaptain ? CAPTAINS[this.captainId] : CHARACTERS[this.focusedId as CharacterId]
-    let subtitle: { text: string; color: string }
-    if (isCaptain) {
-      subtitle = { text: '队长 · 提供团队增益，不参与战斗', color: '#b9b9c6' }
-    } else {
-      const slot = idx - 1
-      const max = this.slotMaxHp(slot)
-      const hp = waveStartHp(this.run.memberHp[slot] ?? max, max)
-      subtitle = {
-        text: `生命 ${hp}/${max}（下一波开局）`,
-        color: hp / max > 0.5 ? '#9ccc9c' : '#ffb74d',
-      }
+    const def = CHARACTERS[this.focusedId]
+    const max = this.slotMaxHp(idx)
+    const hp = waveStartHp(this.run.memberHp[idx] ?? max, max)
+    const subtitle = {
+      text: `生命 ${hp}/${max}（下一波开局）`,
+      color: hp / max > 0.5 ? '#9ccc9c' : '#ffb74d',
     }
 
     this.detailObjs.push(
@@ -513,9 +502,7 @@ export class ShopScene extends Phaser.Scene {
       cursor += 40
     }
 
-    const groups = isCaptain
-      ? captainStatGroups(CAPTAINS[this.captainId], owned)
-      : characterStatGroups(this.focusedId as CharacterId, owned)
+    const groups = characterStatGroups(this.focusedId, owned)
     for (const group of groups) {
       statObjs.push(
         emojiImage(this, dx + 42, cursor, group.icon, 35),
@@ -633,8 +620,8 @@ export class ShopScene extends Phaser.Scene {
       )
     }
 
-    // 购买按钮
-    const canBuy = offer !== null && this.run.coins >= itemPrice(offer, this.run.wave)
+    // 购买按钮（价格已含团队砍价折扣）
+    const canBuy = offer !== null && this.run.coins >= this.price(offer)
     const bb = this.buyRect
     const buyBg = this.add.graphics()
     buyBg.fillStyle(canBuy ? 0xffd54f : 0xffffff, canBuy ? 1 : 0.1)
@@ -642,7 +629,7 @@ export class ShopScene extends Phaser.Scene {
     this.detailObjs.push(
       buyBg,
       this.add
-        .text(bb.x + bb.w / 2, bb.y + bb.h / 2, offer ? `购买 ${itemPrice(offer, this.run.wave)}` : '购买', {
+        .text(bb.x + bb.w / 2, bb.y + bb.h / 2, offer ? `购买 ${this.price(offer)}` : '购买', {
           fontFamily: UI_FONT,
           fontSize: FONT.body,
           fontStyle: 'bold',
@@ -743,8 +730,8 @@ export class ShopScene extends Phaser.Scene {
         freeRefreshes: this.run.freeRefreshes,
         level: this.run.xp.level,
         slots: this.grid.cellRects().map((r) => {
-          const id = r.key as SlotId
-          const index = id === 'captain' ? 0 : this.lineup.indexOf(id) + 1
+          const id = r.key as CharacterId
+          const index = this.lineup.indexOf(id)
           return {
             id,
             x: r.x,
@@ -752,7 +739,7 @@ export class ShopScene extends Phaser.Scene {
             w: r.w,
             h: r.h,
             offer: this.offers[index] ?? null,
-            price: this.offers[index] ? itemPrice(this.offers[index]!, this.run.wave) : null,
+            price: this.offers[index] ? this.price(this.offers[index]!) : null,
             owned: this.ownedFor(index).length,
           }
         }),
@@ -761,7 +748,7 @@ export class ShopScene extends Phaser.Scene {
           y: this.buyRect.y + this.buyRect.h / 2,
           w: this.buyRect.w,
           h: this.buyRect.h,
-          enabled: offer !== null && this.run.coins >= itemPrice(offer, this.run.wave),
+          enabled: offer !== null && this.run.coins >= this.price(offer),
         },
         refresh: {
           x: this.refreshRect.x + this.refreshRect.w / 2,

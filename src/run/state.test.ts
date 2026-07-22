@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CAPTAINS } from '../captains/registry'
 import { MEMBER, ROSTER_IDS } from '../characters/registry'
-import { SKILL } from '../captains/skill'
 import { RECRUIT } from './recruit'
 import { WAVE } from './waves'
 import {
@@ -25,11 +24,12 @@ import {
 } from './state'
 
 describe('run 生命周期', () => {
-  it('beginRun 按首发初始化：0 豆、技能 CD 就绪、经验从头攒', () => {
+  it('beginRun 按首发初始化：0 抽卡、技能 CD 就绪、经验从头攒', () => {
     const run = beginRun('angel', ['cowboy'])
     expect(run.wave).toBe(1)
     expect(run.xp).toEqual({ level: 1, xp: 0 })
-    expect(run.beans).toBe(0)
+    expect(run.cardDraws).toBe(0)
+    expect(run.teamCards).toEqual({})
     expect(run.skillCdMs).toBe(0)
     expect(run.roster).toEqual(['cowboy'])
     expect(run.memberHp).toEqual([MEMBER.maxHp])
@@ -57,13 +57,12 @@ describe('run 生命周期', () => {
     endRun()
   })
 
-  it('神童跳波开局：空阵容自选招满 + 满豆 + 开局金币 + 难度时钟预推进', () => {
+  it('神童跳波开局：空阵容自选招满 + 开局金币 + 难度时钟预推进', () => {
     const run = beginRun('prodigy', [])
     expect(run.wave).toBe(CAPTAINS.prodigy.startWave)
     // 阵容不代填：整编页一次给足名额（波次 ≥ 编制），玩家逐个自选
     expect(run.roster).toEqual([])
     expect(promoteStep(run)).toBe('recruit')
-    expect(run.beans).toBe(SKILL.maxBeans)
     expect(run.coins).toBe(CAPTAINS.prodigy.startCoins)
     // 被跳过波次的时长按表累加进难度时钟
     const skipped =

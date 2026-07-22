@@ -49,6 +49,45 @@ export interface TeamEffects {
   waveHealRatio: number
   /** 波末额外金币（加法叠加） */
   waveCoins: number
+  /** 全队冷却倍率（乘法叠乘，<1 攻速更快） */
+  teamCooldownMul: number
+  /** 全队暴击概率加成（加法，最终与角色暴击相加后封顶 0.5） */
+  critAdd: number
+  /** 全队生命上限倍率（乘法叠乘） */
+  teamHpMul: number
+  /** 全队复活时间倍率（乘法叠乘，<1 更快，保底 0.3） */
+  reviveMul: number
+  /** 队长技能冷却倍率（乘法叠乘，<1 更快，保底 0.3） */
+  skillCdMul: number
+  /** 商店价格倍率（乘法叠乘，<1 更便宜，保底 0.4） */
+  shopDiscountMul: number
+  /** 每次进店额外免费刷新次数（加法） */
+  freeRerolls: number
+  /** 宝箱掉落概率倍率（乘法叠乘） */
+  chestChanceMul: number
+  /** 升级抽卡每次额外候选数（加法，3 + draftSize 选 1） */
+  draftSize: number
+}
+
+/** 团队效果的单位元（无卡时的默认值），也是叠加的起点 */
+export const TEAM_FX_IDENTITY: TeamEffects = {
+  moveSpeedMul: 1,
+  magnetMul: 1,
+  doubleCoinChance: 0,
+  teamDamageMul: 1,
+  xpGainMul: 1,
+  enemySlowMul: 1,
+  waveHealRatio: 0,
+  waveCoins: 0,
+  teamCooldownMul: 1,
+  critAdd: 0,
+  teamHpMul: 1,
+  reviveMul: 1,
+  skillCdMul: 1,
+  shopDiscountMul: 1,
+  freeRerolls: 0,
+  chestChanceMul: 1,
+  draftSize: 0,
 }
 
 /** 暴击伤害倍率 */
@@ -69,7 +108,7 @@ export function rarityWeights(wave: number): Record<ItemRarity, number> {
   return { common: 1 - rare - epic, rare, epic }
 }
 
-export type ItemPool = 'all' | 'team' | 'upgrade' | AbilityDef['kind']
+export type ItemPool = 'all' | 'upgrade' | AbilityDef['kind']
 
 export interface ItemDef {
   readonly emoji: string
@@ -83,7 +122,7 @@ export interface ItemDef {
   /** 升级卡专属：归属角色 + 档位（0 一阶 / 1 二阶） */
   readonly forCharacter?: CharacterId
   readonly abilityIndex?: 0 | 1
-  readonly effects: Partial<CharacterEffects & TeamEffects>
+  readonly effects: Partial<CharacterEffects>
 }
 
 /** 升级卡解锁门槛：一阶卡上架前该角色需已购的普通道具数 */
@@ -125,10 +164,6 @@ export function upgradeCardAvailable(id: ItemId, owned: readonly ItemId[]): bool
   if (item.abilityIndex === 1) return upgradeTiers(item.forCharacter, owned).u1
   const normals = owned.filter((iid) => (ITEMS[iid] as ItemDef).pool !== 'upgrade').length
   return normals >= UPGRADE_GATE.normalsForFirst
-}
-
-export function captainPool(): ItemId[] {
-  return ITEM_IDS.filter((id) => ITEMS[id].pool === 'team')
 }
 
 // ── 持有与购买 ──────────────────────────────────────────────
@@ -219,19 +254,11 @@ export function aggregateCharacterEffects(owned: readonly ItemId[]): CharacterEf
   return fx
 }
 
-export function aggregateTeamEffects(owned: readonly ItemId[]): TeamEffects {
-  const fx: TeamEffects = {
-    moveSpeedMul: 1,
-    magnetMul: 1,
-    doubleCoinChance: 0,
-    teamDamageMul: 1,
-    xpGainMul: 1,
-    enemySlowMul: 1,
-    waveHealRatio: 0,
-    waveCoins: 0,
-  }
-  for (const id of owned) {
-    const e = ITEMS[id].effects as Partial<TeamEffects>
+/** 把一列团队效果片段叠加成整份 TeamEffects（乘区相乘、加区相加，末尾统一封顶）。
+ * 供升级卡系统聚合（team card → teamFx）；起点为 TEAM_FX_IDENTITY */
+export function foldTeamEffects(parts: readonly Partial<TeamEffects>[]): TeamEffects {
+  const fx: TeamEffects = { ...TEAM_FX_IDENTITY }
+  for (const e of parts) {
     fx.moveSpeedMul *= e.moveSpeedMul ?? 1
     fx.magnetMul *= e.magnetMul ?? 1
     fx.doubleCoinChance += e.doubleCoinChance ?? 0
@@ -240,10 +267,26 @@ export function aggregateTeamEffects(owned: readonly ItemId[]): TeamEffects {
     fx.enemySlowMul *= e.enemySlowMul ?? 1
     fx.waveHealRatio += e.waveHealRatio ?? 0
     fx.waveCoins += e.waveCoins ?? 0
+    fx.teamCooldownMul *= e.teamCooldownMul ?? 1
+    fx.critAdd += e.critAdd ?? 0
+    fx.teamHpMul *= e.teamHpMul ?? 1
+    fx.reviveMul *= e.reviveMul ?? 1
+    fx.skillCdMul *= e.skillCdMul ?? 1
+    fx.shopDiscountMul *= e.shopDiscountMul ?? 1
+    fx.freeRerolls += e.freeRerolls ?? 0
+    fx.chestChanceMul *= e.chestChanceMul ?? 1
+    fx.draftSize += e.draftSize ?? 0
   }
+  // 封顶/保底：极端叠加也不失控
   fx.doubleCoinChance = Math.min(0.9, fx.doubleCoinChance)
   fx.enemySlowMul = Math.max(0.6, fx.enemySlowMul)
-  fx.waveHealRatio = Math.min(0.6, fx.waveHealRatio)
+  fx.waveHealRatio = Math.min(0.6, Math.max(0, fx.waveHealRatio))
+  fx.critAdd = Math.min(0.5, Math.max(0, fx.critAdd))
+  fx.reviveMul = Math.max(0.3, fx.reviveMul)
+  fx.skillCdMul = Math.max(0.3, fx.skillCdMul)
+  fx.shopDiscountMul = Math.max(0.4, fx.shopDiscountMul)
+  fx.teamHpMul = Math.max(0.3, fx.teamHpMul)
+  fx.teamCooldownMul = Math.max(0.4, fx.teamCooldownMul)
   return fx
 }
 
