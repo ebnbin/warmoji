@@ -6,6 +6,7 @@ import type { OutlineKind } from '../emoji/svg'
 import { BOSSES, ENEMY_DEFS, SPAWN } from '../enemies/registry'
 import { PICKUPS } from '../pickups/registry'
 import { FIELD_PICKUPS } from '../battlefield/registry'
+import { CARDS } from '../cards/registry'
 import { ITEMS } from '../items/registry'
 import { MAPS } from '../maps/registry'
 import type { MapDef } from '../maps/registry'
@@ -97,6 +98,8 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   // 属性面板的能力/基础组图标 + 商店道具图标
   ...roster.flatMap((c) => c.carriers.map((cr) => cr.icon)),
   ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),
+  // 团队升级卡图标（升级抽卡页 CardScene 无描边渲染）
+  ...Object.values(CARDS).map((c) => c.emoji),
   // 地图图标（选择页素体）+ 地图详情组图标；装饰的描边变体在 OUTLINED_EMOJIS.player
   ...Object.values(MAPS).map((m) => m.emoji),
   '1f5fa',
