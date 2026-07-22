@@ -185,6 +185,7 @@ interface Window {
   __warmoji?: WarmojiDebug
   __game?: unknown
   __setStress?: (on: boolean) => void
+  __setLab?: (kinds: string[]) => void
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
   __setWave?: (n: number) => void

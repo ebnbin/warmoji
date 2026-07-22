@@ -6,7 +6,8 @@ import { formatTime } from '../core/format'
 import { RARITIES } from '../items/registry'
 import type { ItemRarity } from '../items/registry'
 import { endRun, getRun } from '../run/state'
-import { isDevOpen, isStress, setDevOpen, setStress } from '../debug/dev'
+import { getMode, isDevOpen, isLab, isLabEnemyOn, isStress, setDevOpen, setMode, toggleLabEnemy } from '../debug/dev'
+import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../debug/diagnostics'
 import { emojiCacheStats, emojiImage, emojiText, iconLabel } from '../emoji/textures'
 import { FONT, UI_FONT } from '../core/fonts'
@@ -275,7 +276,7 @@ export class UIScene extends Phaser.Scene {
     const lastRemainSec = Math.ceil(this.last.remainMs / 1000)
     if (s.wave !== this.last.wave || remainSec !== lastRemainSec || s.seconds !== this.last.seconds) {
       this.timeText.setText(
-        isStress() ? formatTime(s.seconds) : `第${s.wave}波 ${formatTime(remainSec)}`,
+        isStress() || isLab() ? formatTime(s.seconds) : `第${s.wave}波 ${formatTime(remainSec)}`,
       )
     }
     if (s.bossHp !== this.last.bossHp) this.drawBossBar(s)
@@ -549,24 +550,33 @@ export class UIScene extends Phaser.Scene {
     this.fpsWindowStart = 0
     this.devRefreshedAt = 0
     const h = viewport.logicalHeight
-    const stressBtn = this.add
-      .text(safeInsets.left + 12, h - safeInsets.bottom - 12, `压测模式：${isStress() ? '开' : '关'}（点击切换）`, {
-        fontFamily: UI_FONT,
-        fontSize: FONT.caption,
-        color: '#ffffff',
-        backgroundColor: isStress() ? '#2e7d32' : '#c62828',
-        padding: { x: 10, y: 6 },
-        resolution: textRes(),
+    const btnY = h - safeInsets.bottom - 12
+    // 模式互斥切换：再点当前模式回到普通
+    const makeModeBtn = (label: string, m: 'stress' | 'lab', x: number): Phaser.GameObjects.Text => {
+      const on = getMode() === m
+      const btn = this.add
+        .text(x, btnY, `${label}：${on ? '开' : '关'}`, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.caption,
+          color: '#ffffff',
+          backgroundColor: on ? '#2e7d32' : '#c62828',
+          padding: { x: 10, y: 6 },
+          resolution: textRes(),
+        })
+        .setOrigin(0, 1)
+        .setDepth(300)
+        .setInteractive({ useHandCursor: true })
+      btn.on('pointerdown', () => {
+        setMode(on ? 'normal' : m)
+        this.arena.scene.restart()
       })
-      .setOrigin(0, 1)
-      .setDepth(300)
-      .setInteractive({ useHandCursor: true })
-    stressBtn.on('pointerdown', () => {
-      setStress(!isStress())
-      this.arena.scene.restart()
-    })
+      return btn
+    }
+    const stressBtn = makeModeBtn('压测', 'stress', safeInsets.left + 12)
+    makeModeBtn('试炼场', 'lab', safeInsets.left + 12 + stressBtn.width + 8)
+    if (isLab()) this.createLabPicker()
     this.devText = this.add
-      .text(safeInsets.left + 12, h - safeInsets.bottom - 12 - stressBtn.height - 8, '', {
+      .text(safeInsets.left + 12, btnY - stressBtn.height - 8, '', {
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
         fontSize: '16px',
         color: '#ffffff',
@@ -578,6 +588,49 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(0, 1)
       .setDepth(300)
       .setAlpha(0.88)
+  }
+
+  /** 试炼场敌人选择网格（左上角）：点选切换出场，实时生效不重启（arena 每帧读勾选集）*/
+  private createLabPicker(): void {
+    const all = [...ENEMY_DEFS, ...BOSSES]
+    const cols = 4
+    const chipW = 88
+    const chipH = 30
+    const gap = 5
+    const gx = safeInsets.left + 12
+    const gy = safeInsets.top + 96
+    this.add
+      .text(gx, gy - 24, '试炼场 · 点选出场敌人', {
+        fontFamily: UI_FONT,
+        fontSize: FONT.caption,
+        fontStyle: 'bold',
+        color: '#ffd54f',
+        stroke: '#000000',
+        strokeThickness: 3,
+        resolution: textRes(),
+      })
+      .setDepth(300)
+    all.forEach((def, i) => {
+      const col = i % cols
+      const row = Math.floor(i / cols)
+      const chip = this.add
+        .text(gx + col * (chipW + gap), gy + row * (chipH + gap), def.name, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.caption,
+          color: '#ffffff',
+          backgroundColor: isLabEnemyOn(def.kind) ? '#2e7d32' : '#555555',
+          padding: { x: 4, y: 5 },
+          fixedWidth: chipW,
+          align: 'center',
+          resolution: textRes(),
+        })
+        .setDepth(300)
+        .setInteractive({ useHandCursor: true })
+      chip.on('pointerdown', () => {
+        toggleLabEnemy(def.kind)
+        chip.setBackgroundColor(isLabEnemyOn(def.kind) ? '#2e7d32' : '#555555')
+      })
+    })
   }
 
   private updateDevPanel(time: number): void {

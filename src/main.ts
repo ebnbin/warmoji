@@ -27,7 +27,7 @@ import type { BaseArenaScene } from './battle/BaseArenaScene'
 import { loadSettings } from './run/settings'
 import { bgmState, initBgm, playBgm, renderBgmOffline, setBgmEnabled } from './audio/bgm'
 import type { BgmId } from './audio/music'
-import { setStress } from './debug/dev'
+import { setLabEnemies, setMode, setStress } from './debug/dev'
 import { initSfx, setSfxEnabled, sfxStats } from './audio/sfx'
 import { isStandalone, nudgeIosViewport, refreshViewport, viewport } from './core/apply'
 
@@ -107,6 +107,15 @@ window.__game = game
 
 window.__setStress = (on: boolean): void => {
   setStress(on)
+  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
+    if (game.scene.isActive(key)) game.scene.getScene(key).scene.restart()
+  }
+}
+
+// 试炼场：进入 lab 模式并设定出场敌人（kind 列表），随即重开当前竞技场
+window.__setLab = (kinds: string[]): void => {
+  setMode('lab')
+  setLabEnemies(kinds)
   for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
     if (game.scene.isActive(key)) game.scene.getScene(key).scene.restart()
   }
