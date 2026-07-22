@@ -1,8 +1,16 @@
 import { expect, test } from '@playwright/test'
-import { startRun } from './helpers'
+import { enterLab, enterMap, startRun } from './helpers'
 
 type LabEnemy = { active: boolean; getData(k: string): { def: { kind: string } } }
 type LabGame = { scene: { keys: Record<string, { enemies: { getChildren(): LabEnemy[] } }> } }
+
+test('试炼场入口：选地图即直接进入沙盒（跳过队长/组队）', async ({ page }) => {
+  await page.goto('/')
+  await enterMap(page)
+  await enterLab(page)
+  // 直接落在竞技场，且是试炼场地图（未经队长/组队/商店）
+  await page.waitForFunction(() => window.__warmoji?.mapId === 'lab')
+})
 
 test('试炼场：只出勾选的敌人、玩家免死无时限', async ({ page }) => {
   test.setTimeout(120_000)

@@ -6,8 +6,23 @@ import { formatTime } from '../core/format'
 import { RARITIES } from '../items/registry'
 import type { ItemRarity } from '../items/registry'
 import { endRun, getRun } from '../run/state'
-import { getMode, isDevOpen, isLab, isLabEnemyOn, isStress, setDevOpen, setMode, toggleLabEnemy } from '../debug/dev'
+import { isDevOpen, isStress, setDevOpen, setStress } from '../debug/dev'
 import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
+import { CHARACTERS } from '../characters/registry'
+import type { CharacterId } from '../characters/registry'
+import type { CaptainId } from '../captains/registry'
+import { beginRun } from '../run/state'
+import {
+  isLabCharacterOn,
+  isLabEnemyOn,
+  isLabPanelOpen,
+  labCaptain,
+  labStarters,
+  setLabCaptain,
+  setLabPanelOpen,
+  toggleLabCharacter,
+  toggleLabEnemy,
+} from '../run/lab'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../debug/diagnostics'
 import { emojiCacheStats, emojiImage, emojiText, iconLabel } from '../emoji/textures'
 import { FONT, UI_FONT } from '../core/fonts'
@@ -159,6 +174,7 @@ export class UIScene extends Phaser.Scene {
       this.scene.restart()
     })
     if (isDevOpen()) this.createDevPanel(res)
+    if (this.arena.lab) this.createLabControls()
 
     this.createSkillButton(res)
 
@@ -276,7 +292,7 @@ export class UIScene extends Phaser.Scene {
     const lastRemainSec = Math.ceil(this.last.remainMs / 1000)
     if (s.wave !== this.last.wave || remainSec !== lastRemainSec || s.seconds !== this.last.seconds) {
       this.timeText.setText(
-        isStress() || isLab() ? formatTime(s.seconds) : `第${s.wave}波 ${formatTime(remainSec)}`,
+        isStress() || this.arena.lab ? formatTime(s.seconds) : `第${s.wave}波 ${formatTime(remainSec)}`,
       )
     }
     if (s.bossHp !== this.last.bossHp) this.drawBossBar(s)
@@ -551,30 +567,22 @@ export class UIScene extends Phaser.Scene {
     this.devRefreshedAt = 0
     const h = viewport.logicalHeight
     const btnY = h - safeInsets.bottom - 12
-    // 模式互斥切换：再点当前模式回到普通
-    const makeModeBtn = (label: string, m: 'stress' | 'lab', x: number): Phaser.GameObjects.Text => {
-      const on = getMode() === m
-      const btn = this.add
-        .text(x, btnY, `${label}：${on ? '开' : '关'}`, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.caption,
-          color: '#ffffff',
-          backgroundColor: on ? '#2e7d32' : '#c62828',
-          padding: { x: 10, y: 6 },
-          resolution: textRes(),
-        })
-        .setOrigin(0, 1)
-        .setDepth(300)
-        .setInteractive({ useHandCursor: true })
-      btn.on('pointerdown', () => {
-        setMode(on ? 'normal' : m)
-        this.arena.scene.restart()
+    const stressBtn = this.add
+      .text(safeInsets.left + 12, btnY, `压测模式：${isStress() ? '开' : '关'}（点击切换）`, {
+        fontFamily: UI_FONT,
+        fontSize: FONT.caption,
+        color: '#ffffff',
+        backgroundColor: isStress() ? '#2e7d32' : '#c62828',
+        padding: { x: 10, y: 6 },
+        resolution: textRes(),
       })
-      return btn
-    }
-    const stressBtn = makeModeBtn('压测', 'stress', safeInsets.left + 12)
-    makeModeBtn('试炼场', 'lab', safeInsets.left + 12 + stressBtn.width + 8)
-    if (isLab()) this.createLabPicker()
+      .setOrigin(0, 1)
+      .setDepth(300)
+      .setInteractive({ useHandCursor: true })
+    stressBtn.on('pointerdown', () => {
+      setStress(!isStress())
+      this.arena.scene.restart()
+    })
     this.devText = this.add
       .text(safeInsets.left + 12, btnY - stressBtn.height - 8, '', {
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
@@ -590,17 +598,78 @@ export class UIScene extends Phaser.Scene {
       .setAlpha(0.88)
   }
 
-  /** 试炼场敌人选择网格（左上角）：点选切换出场，实时生效不重启（arena 每帧读勾选集）*/
-  private createLabPicker(): void {
-    const all = [...ENEMY_DEFS, ...BOSSES]
-    const cols = 4
-    const chipW = 88
-    const chipH = 30
-    const gap = 5
+  private static readonly CHIP_ON = '#2e7d32'
+  private static readonly CHIP_OFF = '#555555'
+
+  /** 试炼场控制面板（左上角）：🎯 按钮开合，内含 敌人/角色/队长 三段勾选。
+   * 敌人实时生效不重启；角色/队长改动后重开竞技场（重建队伍）——重开也会重渲本面板 */
+  private createLabControls(): void {
     const gx = safeInsets.left + 12
-    const gy = safeInsets.top + 96
+    const top = safeInsets.top + 62
+    const open = isLabPanelOpen()
     this.add
-      .text(gx, gy - 24, '试炼场 · 点选出场敌人', {
+      .text(gx, top, `试炼场设置：${open ? '收起' : '展开'}`, {
+        fontFamily: UI_FONT,
+        fontSize: FONT.caption,
+        fontStyle: 'bold',
+        color: '#ffffff',
+        backgroundColor: '#3949ab',
+        padding: { x: 10, y: 6 },
+        resolution: textRes(),
+      })
+      .setDepth(300)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        setLabPanelOpen(!isLabPanelOpen())
+        this.scene.restart()
+      })
+    if (!open) return
+
+    // 角色/队长改动：用当前勾选阵容重开竞技场（其 shutdown→create 会重启本 UI，面板自动重渲）
+    const applyTeam = (): void => {
+      beginRun(labCaptain(), labStarters(), 'lab')
+      this.arena.scene.restart()
+    }
+    let y = top + 34
+    y = this.labSection('敌人（实时）', gx, y, 4, 84, [...ENEMY_DEFS, ...BOSSES].map((d) => ({
+      label: d.name,
+      on: () => isLabEnemyOn(d.kind),
+      tap: (chip) => {
+        toggleLabEnemy(d.kind)
+        chip.setBackgroundColor(isLabEnemyOn(d.kind) ? UIScene.CHIP_ON : UIScene.CHIP_OFF)
+      },
+    })))
+    y = this.labSection('角色（改后重建队伍）', gx, y + 8, 4, 84, Object.entries(CHARACTERS).map(([id, c]) => ({
+      label: c.name,
+      on: () => isLabCharacterOn(id as CharacterId),
+      tap: () => {
+        toggleLabCharacter(id as CharacterId)
+        applyTeam()
+      },
+    })))
+    this.labSection('队长（改后重建队伍）', gx, y + 8, 3, 112, Object.entries(CAPTAINS).map(([id, cap]) => ({
+      label: cap.name,
+      on: () => labCaptain() === (id as CaptainId),
+      tap: () => {
+        setLabCaptain(id as CaptainId)
+        applyTeam()
+      },
+    })))
+  }
+
+  /** 一段带标题的 chip 网格：返回网格底部 y（供下一段接着排） */
+  private labSection(
+    title: string,
+    gx: number,
+    gy: number,
+    cols: number,
+    chipW: number,
+    items: { label: string; on: () => boolean; tap: (chip: Phaser.GameObjects.Text) => void }[],
+  ): number {
+    const chipH = 28
+    const gap = 5
+    this.add
+      .text(gx, gy, title, {
         fontFamily: UI_FONT,
         fontSize: FONT.caption,
         fontStyle: 'bold',
@@ -610,15 +679,16 @@ export class UIScene extends Phaser.Scene {
         resolution: textRes(),
       })
       .setDepth(300)
-    all.forEach((def, i) => {
+    const y0 = gy + 22
+    items.forEach((it, i) => {
       const col = i % cols
       const row = Math.floor(i / cols)
       const chip = this.add
-        .text(gx + col * (chipW + gap), gy + row * (chipH + gap), def.name, {
+        .text(gx + col * (chipW + gap), y0 + row * (chipH + gap), it.label, {
           fontFamily: UI_FONT,
           fontSize: FONT.caption,
           color: '#ffffff',
-          backgroundColor: isLabEnemyOn(def.kind) ? '#2e7d32' : '#555555',
+          backgroundColor: it.on() ? UIScene.CHIP_ON : UIScene.CHIP_OFF,
           padding: { x: 4, y: 5 },
           fixedWidth: chipW,
           align: 'center',
@@ -626,11 +696,9 @@ export class UIScene extends Phaser.Scene {
         })
         .setDepth(300)
         .setInteractive({ useHandCursor: true })
-      chip.on('pointerdown', () => {
-        toggleLabEnemy(def.kind)
-        chip.setBackgroundColor(isLabEnemyOn(def.kind) ? '#2e7d32' : '#555555')
-      })
+      chip.on('pointerdown', () => it.tap(chip))
     })
+    return y0 + Math.ceil(items.length / cols) * (chipH + gap)
   }
 
   private updateDevPanel(time: number): void {

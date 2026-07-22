@@ -17,7 +17,8 @@ import { CHARACTERS, MEMBER, ROSTER_IDS, TEAM, loadoutFor } from '../characters/
 import { memberMaxHp } from '../characters/stats'
 import type { CharacterId, CharacterDef } from '../characters/registry'
 import { SKILL } from '../captains/skill'
-import { LAB, STRESS } from '../debug/dev'
+import { STRESS } from '../debug/dev'
+import { LAB, labEnemySet } from '../run/lab'
 import { BOSS_SPAWN_RELIEF, DEFAULT_CONTACT, ELITE, ENEMIES, SPAWN, SURGE } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
 import { UNIT } from '../core/units'
@@ -60,7 +61,7 @@ import { clipFramesLive } from '../emoji/animTextures'
 import { applyBackground } from '../core/background'
 import { DAMAGE_FONT, ensureDamageFont } from '../core/damageFont'
 import { reportDebug } from '../debug/debug'
-import { getLabEnemies, isLab, isStress } from '../debug/dev'
+import { isStress } from '../debug/dev'
 import { emojiImage, emojiKey } from '../emoji/textures'
 import { burstEmitter } from '../core/fx'
 import { acquirePooled, releasePooled } from '../core/pool'
@@ -526,7 +527,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.palette = mapDef.palette
     applyBackground(this.palette)
     this.flood = isStress()
-    this.lab = isLab()
+    // 试炼场是一张特殊地图：进图即沙盒（免死无时限 + 场内切敌人/角色/队长）
+    this.lab = this.run.mapId === 'lab'
     this.sandbox = this.flood || this.lab
     this.settings = loadSettings(browserStorage())
     this.stats = {
@@ -1622,7 +1624,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
    * boss 用 Boss 待遇生成；larva 直接生成即无属主 → 走暴走档。免死/无时限由 sandbox 提供 */
   private spawnLab(): void {
     this.spawnCooldownMs = LAB.spawnIntervalMs
-    const kinds = [...getLabEnemies()].filter((k) => k in ENEMIES)
+    const kinds = [...labEnemySet()].filter((k) => k in ENEMIES)
     if (kinds.length === 0) return
     if (this.spawnCapCount() + this.pendingSpawns >= LAB.targetAlive) return
     const raw = ENEMIES[kinds[Math.floor(this.rng.next() * kinds.length)]!]!

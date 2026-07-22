@@ -7,7 +7,7 @@ import type { MapId } from '../maps/registry'
 // 战斗曲按地图配：BgmId 直接复用 MapId，'lobby' 盖住全部非战斗页面。
 
 export type BgmId = 'lobby' | MapId
-export const BGM_IDS: readonly BgmId[] = ['lobby', 'forest', 'desert', 'river', 'void']
+export const BGM_IDS: readonly BgmId[] = ['lobby', 'forest', 'desert', 'river', 'void', 'lab']
 
 export interface BgmNote {
   /** 循环内起始秒 */
@@ -395,6 +395,8 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   desert: buildDesert,
   river: buildRiver,
   void: buildVoid,
+  // 试炼场：沿用大厅曲（沙盒页面，不需专属战斗曲）
+  lab: buildLobby,
 }
 
 const cache = new Map<BgmId, BgmScore>()

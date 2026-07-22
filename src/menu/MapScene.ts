@@ -1,7 +1,9 @@
 import Phaser from 'phaser'
 import { browserStorage } from '../core/storage'
 import type { MapId } from '../maps/registry'
-import { MAP_IDS, MAPS } from '../maps/registry'
+import { arenaSceneFor, MAP_IDS, MAPS } from '../maps/registry'
+import { beginRun } from '../run/state'
+import { labCaptain, labStarters } from '../run/lab'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -51,6 +53,7 @@ export class MapScene extends Phaser.Scene {
   private grid!: EmojiGrid
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
+  private confirmLabel!: Phaser.GameObjects.Text
 
   constructor() {
     super('map')
@@ -124,7 +127,7 @@ export class MapScene extends Phaser.Scene {
     const btnBg = this.add.graphics()
     btnBg.fillStyle(0xffd54f, 1)
     btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
-    this.add
+    this.confirmLabel = this.add
       .text(w / 2, oy + L.btn.y, '选择队长', {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
@@ -135,6 +138,12 @@ export class MapScene extends Phaser.Scene {
       .setOrigin(0.5)
     const confirm = (): void => {
       playSfx('click')
+      // 试炼场：跳过队长/组队/商店，用当前勾选阵容直接开局进有界竞技场
+      if (this.selectedId === 'lab') {
+        beginRun(labCaptain(), labStarters(), 'lab')
+        this.scene.start(arenaSceneFor('lab'))
+        return
+      }
       this.scene.start('captain')
     }
     this.add
@@ -244,6 +253,7 @@ export class MapScene extends Phaser.Scene {
 
   private refresh(): void {
     this.grid.setSelected(this.selectedId)
+    this.confirmLabel.setText(this.selectedId === 'lab' ? '进入试炼场' : '选择队长')
     this.renderDetail(textRes())
     this.reportMap()
   }

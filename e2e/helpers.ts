@@ -37,6 +37,14 @@ export async function confirmMap(page: Page): Promise<void> {
   )
 }
 
+/** 地图页 → 选试炼场 → 确认直接进入沙盒竞技场（跳过队长/组队） */
+export async function enterLab(page: Page): Promise<void> {
+  await clickMap(page, 'lab')
+  const s = await page.evaluate(() => window.__warmoji!.map!.start)
+  await page.locator('#game canvas').click({ position: await cssPoint(page, { x: s.x, y: s.y }) })
+  await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
+}
+
 /** 标题页 → 地图确认（沿用记忆选择）→ 队长选择页 */
 export async function enterCaptain(page: Page): Promise<void> {
   await enterMap(page)
