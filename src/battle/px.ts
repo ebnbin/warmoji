@@ -23,7 +23,7 @@ const SPATIAL = new Set([
   'mountGap',
   'coinMagnetRadius',
   'dashSpeed',
-  'dashDist',
+  'dist',
   'fleeRange',
   'ringRadius',
   'fromAbove',

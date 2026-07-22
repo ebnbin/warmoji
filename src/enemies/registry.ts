@@ -15,26 +15,30 @@ export interface EnemyProjectileDef {
 }
 
 // ── 移动方式 ────────────────────────────────────────────────
+/** 冲刺触发：探测圈（进圈即冲、冲后冷却）或定时循环（按节拍冲）——各带专属参数，互斥由类型强制 */
+export type DashTrigger =
+  | { readonly kind: 'detect'; readonly range: number; readonly cooldownMs: number }
+  | { readonly kind: 'timer'; readonly intervalMs: number; readonly firstDelayMs?: number }
+
+/** 冲刺长度：距离制（冲固定格数）或时长制（冲固定时长）——互斥由类型强制 */
+export type DashLength =
+  | { readonly kind: 'dist'; readonly dist: number }
+  | { readonly kind: 'time'; readonly durationMs: number }
+
 export interface DashLocomotion {
   readonly kind: 'dash'
   readonly windupMs: number
   readonly dashSpeed: number
-  /** 触发：探测圈（野猪）或定时循环（Boss），二选一 */
-  readonly detectRange?: number
-  readonly intervalMs?: number
-  /** 冲刺长度：距离制（野猪）或时长制（Boss），二选一 */
-  readonly dashDist?: number
-  readonly durationMs?: number
-  /** 探测型冲刺后的冷却；定时型由 intervalMs 驱动下一轮 */
-  readonly cooldownMs?: number
+  /** 触发方式（探测/定时）与其专属参数 */
+  readonly trigger: DashTrigger
+  /** 冲刺长度（距离/时长）与其专属参数 */
+  readonly length: DashLength
   /** 非冲刺期的移动 */
   readonly idle: 'wander' | 'chase'
-  /** 瞄准：最近队员（野猪）或队伍中心（Boss） */
+  /** 瞄准：最近队员或队伍中心 */
   readonly aim: 'nearest' | 'teamCenter'
   /** 方向锁定时机：进蓄力即锁（可预判横躲）或起跑瞬间锁（追踪到最后一刻） */
   readonly lockAt: 'windup' | 'launch'
-  /** 定时型首次触发延迟 */
-  readonly firstDelayMs?: number
   /** 起跑音效 */
   readonly sfx?: 'whoosh'
 }

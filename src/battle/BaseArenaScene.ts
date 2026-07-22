@@ -1659,7 +1659,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 定时型冲刺的首轮延迟
     const lm = def.locomotion
     const nextDashAt =
-      lm.kind === 'dash' && lm.intervalMs !== undefined ? this.elapsedMs + (lm.firstDelayMs ?? lm.intervalMs) : 0
+      lm.kind === 'dash' && lm.trigger.kind === 'timer'
+        ? this.elapsedMs + (lm.trigger.firstDelayMs ?? lm.trigger.intervalMs)
+        : 0
     const nextSpawnAt = def.spawner ? this.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
     const a = attachEnemy(enemy, def, hp, {
       elite,
@@ -1855,12 +1857,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       if (a.boss) this.postSteerBoss(e, body)
       else this.postSteerEnemy(e, body, def)
 
-      // 行走动画：恒摇摆 + 按移动方向翻转（twemoji 默认朝左）；
-      // 蓄力有自己的颤动，冲刺改为朝冲刺方向前倾
-      if (a.state === 'dash') {
-        e.setRotation(a.dirX * 0.3)
-        e.setFlipX(a.dirX > 0)
-      } else if (a.state !== 'windup') {
+      // 行走动画：恒摇摆 + 按移动方向翻转（twemoji 默认朝左）。
+      // 脚本化姿态（蓄力颤动/冲刺前倾）由各 locomotion 策略自管（见 steer.ts），
+      // 主循环此处只管非脚本姿态的环境摇摆——不再耦合 dash 的内部状态名
+      if (!a.posed) {
         e.setRotation(Math.sin(now / 95 + a.ph) * 0.1)
         const vx = body.velocity.x
         if (Math.abs(vx) > 8) e.setFlipX(vx > 0)

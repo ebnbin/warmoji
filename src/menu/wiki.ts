@@ -49,8 +49,8 @@ export function enemyStatLines(e: EnemyDef): string[] {
     if (w.kind === 'projectile') lines.push(`子弹伤害 ${w.damage} · 弹速 ${grid(w.projectile.speed)}/秒`)
   }
   const lm = e.locomotion
-  if (lm.kind === 'dash' && lm.detectRange !== undefined && lm.dashDist !== undefined) {
-    lines.push(`探测 ${grid(lm.detectRange)} · 突刺 ${grid(lm.dashDist)}`)
+  if (lm.kind === 'dash' && lm.trigger.kind === 'detect' && lm.length.kind === 'dist') {
+    lines.push(`探测 ${grid(lm.trigger.range)} · 突刺 ${grid(lm.length.dist)}`)
   }
   for (const fx of e.onDeath ?? []) {
     if (fx.kind === 'ground') lines.push(`死亡留毒 ${grid(fx.def.radius)} · 每 ${fx.def.tickMs / 1000} 秒 ${fx.def.damage} 伤`)

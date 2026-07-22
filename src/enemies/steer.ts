@@ -47,13 +47,14 @@ const dash: Steerer = (ctx) => {
   if (lm.kind !== 'dash') return
   const e = a.image
   if (a.state === 'windup') {
+    // 脚本化姿态：本体自管旋转（蓄力颤动），主循环跳过环境摇摆
+    a.posed = true
     body.setVelocity(0, 0)
-    // 蓄力颤动提示
     e.setRotation(Math.sin(now / 28) * 0.14)
     if (now >= a.windupUntil) {
       if (lm.lockAt === 'launch') lockDashDir(ctx, lm.aim)
       a.state = 'dash'
-      a.dashUntil = now + (lm.durationMs ?? (lm.dashDist! / lm.dashSpeed) * 1000)
+      a.dashUntil = now + (lm.length.kind === 'time' ? lm.length.durationMs : (lm.length.dist / lm.dashSpeed) * 1000)
       e.setRotation(0)
       e.clearTint()
       if (lm.sfx) playSfx(lm.sfx)
@@ -61,21 +62,26 @@ const dash: Steerer = (ctx) => {
     return
   }
   if (a.state === 'dash') {
+    // 脚本化姿态：本体前倾并按冲刺方向翻转（原在主循环渲染分支，收回本策略自管）
+    a.posed = true
     body.setVelocity(a.dirX * lm.dashSpeed * slow, a.dirY * lm.dashSpeed * slow)
+    e.setRotation(a.dirX * 0.3)
+    e.setFlipX(a.dirX > 0)
     if (now >= a.dashUntil) {
-      if (lm.intervalMs !== undefined) {
+      if (lm.trigger.kind === 'timer') {
         a.state = 'chase'
-        a.nextDashAt = now + lm.intervalMs
+        a.nextDashAt = now + lm.trigger.intervalMs
       } else {
         a.state = 'cool'
-        a.coolUntil = now + (lm.cooldownMs ?? 0)
+        a.coolUntil = now + lm.trigger.cooldownMs
       }
     }
     return
   }
   // 触发判定
-  if (lm.intervalMs !== undefined) {
+  if (lm.trigger.kind === 'timer') {
     if (now >= a.nextDashAt) {
+      a.posed = true
       a.state = 'windup'
       a.windupUntil = now + lm.windupMs
       e.setTint(0xffb74d)
@@ -84,9 +90,10 @@ const dash: Steerer = (ctx) => {
   } else {
     const d = scene.worldDelta(e, target.image)
     const dist2 = d.x * d.x + d.y * d.y
-    if (a.state !== 'cool' && dist2 <= lm.detectRange! * lm.detectRange!) {
+    if (a.state !== 'cool' && dist2 <= lm.trigger.range * lm.trigger.range) {
       // 进入探测圈：锁定当前方向蓄力（横向位移可躲）
       if (lm.lockAt === 'windup') lockDashDir(ctx, lm.aim)
+      a.posed = true
       a.state = 'windup'
       a.windupUntil = now + lm.windupMs
       e.setTint(0xffb74d)
@@ -94,7 +101,8 @@ const dash: Steerer = (ctx) => {
     }
     if (a.state === 'cool' && now >= a.coolUntil) a.state = 'wander'
   }
-  // idle 移动：追击目标跟随 aim（Boss 逼近队伍中心，而非最近队员）
+  // idle 移动（非脚本姿态，交还主循环做环境摇摆）：追击目标跟随 aim（Boss 逼近队伍中心，而非最近队员）
+  a.posed = false
   if (lm.idle === 'chase') {
     const to = lm.aim === 'teamCenter' ? scene.center : target.image
     const d = scene.worldDelta(e, to)

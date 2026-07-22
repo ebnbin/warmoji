@@ -19,6 +19,8 @@ export interface Enemy {
   dormant: boolean
   kbImmune: boolean
   state: EnemyState
+  /** 脚本化姿态中（蓄力/冲刺）：本体自管旋转朝向，主循环跳过环境摇摆 */
+  posed: boolean
   /** 游荡/冲刺方向（锁定时写入） */
   dirX: number
   dirY: number
@@ -71,6 +73,7 @@ export function attachEnemy(image: ImageObj, def: EnemyDef, hp: number, init?: P
     dormant: false,
     kbImmune: false,
     state: 'wander',
+    posed: false,
     dirX: 0,
     dirY: 0,
     turnAt: 0,
