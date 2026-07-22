@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CAPTAINS, CAPTAIN_IDS } from '../captains/registry'
+import { CAPTAINS, PICKABLE_CAPTAIN_IDS } from '../captains/registry'
 import type { CaptainId } from '../captains/registry'
 import { browserStorage } from '../core/storage'
 import { randomPalette } from '../core/palette'
@@ -47,7 +47,7 @@ export class CaptainScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色等页面状态
   private preserveOnRestart = false
   private palette?: Palette
-  private selectedId: CaptainId = CAPTAIN_IDS[0]!
+  private selectedId: CaptainId = PICKABLE_CAPTAIN_IDS[0]!
   private layout!: CaptainLayout
   private origin = { x: 0, y: 0 }
   private grid!: EmojiGrid
@@ -104,7 +104,7 @@ export class CaptainScene extends Phaser.Scene {
       this.refresh()
     }
     this.grid.setItems(
-      CAPTAIN_IDS.map((id) => ({ key: id, emoji: CAPTAINS[id].emoji, outline: 'player' as const })),
+      PICKABLE_CAPTAIN_IDS.map((id) => ({ key: id, emoji: CAPTAINS[id].emoji, outline: 'player' as const })),
     )
 
     // 详情面板底板

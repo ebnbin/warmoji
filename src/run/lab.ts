@@ -1,15 +1,15 @@
-import { CAPTAINS } from '../captains/registry'
+import { CAPTAINS, TEST_CAPTAIN } from '../captains/registry'
 import { ROSTER_IDS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
 import type { CaptainId } from '../captains/registry'
 
 // 测试模式（地图页勾选进入，run.testMode = true）：免死无时限的沙盒，
-// 敌人 / 角色 / 队长 + 密度 / 难度 / 攻速 / 无敌 都能在场内自由切换。
+// 敌人 / 角色 + 密度 / 难度 / 攻速 / 无敌 都能在场内自由切换。
+// 队长固定为测试专用队长（编制 8、无限金币、永远满豆、无增益），不可更改。
 // 以下为当前选择状态（模块级，跨场景重启保留）。
 
 const enemies = new Set<string>()
 let roster: CharacterId[] = [...ROSTER_IDS.slice(0, 3)]
-let captain: CaptainId = 'angel'
 let panelOpen = true
 
 // 无敌血量（够高即事实上打不死）——替代原压测的 maxHp
@@ -63,13 +63,9 @@ export function toggleLabCharacter(id: CharacterId): void {
   roster = roster.includes(id) ? roster.filter((x) => x !== id) : [...roster, id]
 }
 
-// ── 队长 ──────────────────────────────────────────────────
+// ── 队长（固定测试专用队长，不可更改） ─────────────────────
 export function labCaptain(): CaptainId {
-  return captain
-}
-
-export function setLabCaptain(id: CaptainId): void {
-  captain = id
+  return TEST_CAPTAIN
 }
 
 // ── 旋钮：密度 / 难度 / 攻速 / 无敌（arena 每帧实时读取，改动即时生效不重启）──
@@ -106,9 +102,9 @@ export function setLabInvincible(on: boolean): void {
 }
 
 // ── 开局 ──────────────────────────────────────────────────
-/** 进入测试模式的开局阵容：勾选角色截到队长队伍上限，至少留 1 人兜底 */
+/** 进入测试模式的开局阵容：勾选角色截到测试队长编制上限（8），至少留 1 人兜底 */
 export function labStarters(): CharacterId[] {
-  const r = roster.slice(0, CAPTAINS[captain].teamSize)
+  const r = roster.slice(0, CAPTAINS[TEST_CAPTAIN].teamSize)
   return r.length > 0 ? r : [ROSTER_IDS[0]!]
 }
 

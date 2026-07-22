@@ -675,18 +675,20 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (this.over) return
     this.elapsedMs += delta
 
-    // 波次时间到 → 结算/商店（压测模式无尽，便于性能观测）
+    // 测试模式（测试专用队长）：永远满豆，队长技能随时可放
+    if (this.testMode) this.run.beans = SKILL.maxBeans
+
+    // 波次时间到 → 结算/商店（测试模式无尽，便于性能观测）
     if (!this.testMode && this.elapsedMs >= waveDurationMs(this.run.wave)) {
       this.endWave()
       return
     }
 
-    // 队长技能：冷却按战斗时钟推进（存 run 上，天然跨波）；增伤 buff 到期复原
-    if (!this.testMode) {
-      this.run.skillCdMs = tickSkillCd(this.run.skillCdMs, delta)
-      if (this.stats.damageMul !== 1 && this.elapsedMs >= this.skillBuffUntil) {
-        this.stats.damageMul = 1
-      }
+    // 队长技能：冷却按战斗时钟推进（存 run 上，天然跨波）；增伤 buff 到期复原。
+    // 测试模式同样推进——技能可用（满豆 + 冷却照走），便于测试
+    this.run.skillCdMs = tickSkillCd(this.run.skillCdMs, delta)
+    if (this.stats.damageMul !== 1 && this.elapsedMs >= this.skillBuffUntil) {
+      this.stats.damageMul = 1
     }
 
     this.frameSlowZones.length = 0

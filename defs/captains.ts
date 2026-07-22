@@ -114,4 +114,28 @@ export const CAPTAINS = {
       abilities: ['weaknessLecture'],
     },
   },
+  // 测试专用队长（不进正常队长选择页；测试模式固定用它）：编制 8、无限金币、
+  // 永远满豆，其余全中性无增益。技能只是测试便利（定身全场便于观察），非增益
+  tester: {
+    emoji: '1f9ea',
+    name: '测试员',
+    desc: '测试专用：编制 8、无限金币、永远满豆，无任何增益',
+    teamSize: 8,
+    moveSpeed: 5.5,
+    coinMagnet: 2.25,
+    hpMul: 1,
+    reviveMul: 1,
+    startWave: 1,
+    startCoins: 999_999,
+    xpGainMul: 1,
+    reviveInShop: false,
+    freeRefreshes: 0,
+    firstWaveShop: false,
+    skill: {
+      name: '定格观察',
+      desc: '全场敌人定身数秒，便于观察（测试便利，非增益）',
+      cdMs: 1000,
+      abilities: ['discoFever'],
+    },
+  },
 } as const satisfies Record<string, CaptainSource>

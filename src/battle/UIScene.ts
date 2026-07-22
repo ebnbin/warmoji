@@ -10,7 +10,6 @@ import { isDevOpen, setDevOpen } from '../debug/dev'
 import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
 import { CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
-import type { CaptainId } from '../captains/registry'
 import { beginRun } from '../run/state'
 import {
   isLabCharacterOn,
@@ -22,7 +21,6 @@ import {
   labFireRate,
   labInvincible,
   labStarters,
-  setLabCaptain,
   setLabDensity,
   setLabDifficulty,
   setLabFireRate,
@@ -635,14 +633,6 @@ export class UIScene extends Phaser.Scene {
       on: () => isLabCharacterOn(id as CharacterId),
       tap: () => {
         toggleLabCharacter(id as CharacterId)
-        applyTeam()
-      },
-    })))
-    y = this.labSection('队长（改后重建队伍）', gx, y + 8, 3, 112, Object.entries(CAPTAINS).map(([id, cap]) => ({
-      label: cap.name,
-      on: () => labCaptain() === (id as CaptainId),
-      tap: () => {
-        setLabCaptain(id as CaptainId)
         applyTeam()
       },
     })))

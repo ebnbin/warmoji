@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CAPTAINS } from '../captains/registry'
+import { CAPTAINS, PICKABLE_CAPTAIN_IDS } from '../captains/registry'
 import { CHARACTERS } from '../characters/registry'
 import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
 import { PICKUPS } from '../pickups/registry'
@@ -19,7 +19,8 @@ describe('实体动画覆盖', () => {
   it('全部实体（角色/队长/敌人/Boss/变形羊/弩塔）都有专属动画', () => {
     const entities = new Set<string>([
       ...Object.values(CHARACTERS).map((c) => c.emoji),
-      ...Object.values(CAPTAINS).map((c) => c.emoji),
+      // 测试专用队长不进正常选择页，无需专属动画
+      ...PICKABLE_CAPTAIN_IDS.map((id) => CAPTAINS[id].emoji),
       ...ENEMY_DEFS.map((e) => e.emoji),
       ...BOSSES.map((e) => e.emoji),
       '1f411', // 🐑 仙子魔尘的变形替身
