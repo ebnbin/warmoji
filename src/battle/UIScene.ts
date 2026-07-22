@@ -6,7 +6,7 @@ import { formatTime } from '../core/format'
 import { RARITIES } from '../items/registry'
 import type { ItemRarity } from '../items/registry'
 import { endRun, getRun } from '../run/state'
-import { isDevOpen, isStress, setDevOpen, setStress } from '../debug/dev'
+import { isDevOpen, setDevOpen } from '../debug/dev'
 import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
 import { CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
@@ -17,12 +17,21 @@ import {
   isLabEnemyOn,
   isLabPanelOpen,
   labCaptain,
+  labDensity,
+  labDifficulty,
+  labFireRate,
+  labInvincible,
   labStarters,
   setLabCaptain,
+  setLabDensity,
+  setLabDifficulty,
+  setLabFireRate,
+  setLabInvincible,
   setLabPanelOpen,
   toggleLabCharacter,
   toggleLabEnemy,
 } from '../run/lab'
+import type { LabDensity, LabMul } from '../run/lab'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../debug/diagnostics'
 import { emojiCacheStats, emojiImage, emojiText, iconLabel } from '../emoji/textures'
 import { FONT, UI_FONT } from '../core/fonts'
@@ -174,7 +183,7 @@ export class UIScene extends Phaser.Scene {
       this.scene.restart()
     })
     if (isDevOpen()) this.createDevPanel(res)
-    if (this.arena.lab) this.createLabControls()
+    if (this.arena.testMode) this.createLabControls()
 
     this.createSkillButton(res)
 
@@ -287,12 +296,12 @@ export class UIScene extends Phaser.Scene {
     }
     if (s.kills !== this.last.kills) this.killsText.setText(String(s.kills))
     if (s.coins !== this.last.coins) this.coinsText.setText(String(s.coins))
-    // 常规显示本波倒计时；压测模式无波次限时，显示已进行时间
+    // 常规显示本波倒计时；测试模式无波次限时，显示已进行时间
     const remainSec = Math.ceil(s.remainMs / 1000)
     const lastRemainSec = Math.ceil(this.last.remainMs / 1000)
     if (s.wave !== this.last.wave || remainSec !== lastRemainSec || s.seconds !== this.last.seconds) {
       this.timeText.setText(
-        isStress() || this.arena.lab ? formatTime(s.seconds) : `第${s.wave}波 ${formatTime(remainSec)}`,
+        this.arena.testMode ? formatTime(s.seconds) : `第${s.wave}波 ${formatTime(remainSec)}`,
       )
     }
     if (s.bossHp !== this.last.bossHp) this.drawBossBar(s)
@@ -360,8 +369,6 @@ export class UIScene extends Phaser.Scene {
   // ── 队长主动技能按钮（左下角）────────────────────────────────
 
   private createSkillButton(res: number): void {
-    // 压测模式无技能（阵容不来自 run），不渲染按钮
-    if (!this.arena.skillSnapshot()) return
     const r = 55
     const cx = safeInsets.left + r + 24
     const cy = viewport.logicalHeight - safeInsets.bottom - r - 24
@@ -567,24 +574,8 @@ export class UIScene extends Phaser.Scene {
     this.devRefreshedAt = 0
     const h = viewport.logicalHeight
     const btnY = h - safeInsets.bottom - 12
-    const stressBtn = this.add
-      .text(safeInsets.left + 12, btnY, `压测模式：${isStress() ? '开' : '关'}（点击切换）`, {
-        fontFamily: UI_FONT,
-        fontSize: FONT.caption,
-        color: '#ffffff',
-        backgroundColor: isStress() ? '#2e7d32' : '#c62828',
-        padding: { x: 10, y: 6 },
-        resolution: textRes(),
-      })
-      .setOrigin(0, 1)
-      .setDepth(300)
-      .setInteractive({ useHandCursor: true })
-    stressBtn.on('pointerdown', () => {
-      setStress(!isStress())
-      this.arena.scene.restart()
-    })
     this.devText = this.add
-      .text(safeInsets.left + 12, btnY - stressBtn.height - 8, '', {
+      .text(safeInsets.left + 12, btnY, '', {
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
         fontSize: '16px',
         color: '#ffffff',
@@ -625,9 +616,9 @@ export class UIScene extends Phaser.Scene {
       })
     if (!open) return
 
-    // 角色/队长改动：用当前勾选阵容重开竞技场（其 shutdown→create 会重启本 UI，面板自动重渲）
+    // 角色/队长改动：用当前勾选阵容在当前地图上重开竞技场（shutdown→create 会重启本 UI，面板自动重渲）
     const applyTeam = (): void => {
-      beginRun(labCaptain(), labStarters(), 'lab')
+      beginRun(labCaptain(), labStarters(), this.arena.run.mapId, true)
       this.arena.scene.restart()
     }
     let y = top + 34
@@ -647,7 +638,7 @@ export class UIScene extends Phaser.Scene {
         applyTeam()
       },
     })))
-    this.labSection('队长（改后重建队伍）', gx, y + 8, 3, 112, Object.entries(CAPTAINS).map(([id, cap]) => ({
+    y = this.labSection('队长（改后重建队伍）', gx, y + 8, 3, 112, Object.entries(CAPTAINS).map(([id, cap]) => ({
       label: cap.name,
       on: () => labCaptain() === (id as CaptainId),
       tap: () => {
@@ -655,6 +646,45 @@ export class UIScene extends Phaser.Scene {
         applyTeam()
       },
     })))
+    // 旋钮改后重开竞技场以完整生效（攻速/无敌建场时定；密度/难度虽实时读，重开也顺带刷新画面）
+    const applyKnob = (): void => {
+      this.arena.scene.restart()
+    }
+    const densities: { k: LabDensity; label: string }[] = [
+      { k: 'low', label: '低' },
+      { k: 'mid', label: '中' },
+      { k: 'high', label: '高' },
+      { k: 'max', label: '爆满' },
+    ]
+    y = this.labSection('密度', gx, y + 8, 4, 62, densities.map((d) => ({
+      label: d.label,
+      on: () => labDensity() === d.k,
+      tap: () => {
+        setLabDensity(d.k)
+        applyKnob()
+      },
+    })))
+    const muls: LabMul[] = [1, 3, 10]
+    y = this.labSection('难度（敌人血量）', gx, y + 8, 3, 62, muls.map((m) => ({
+      label: `×${m}`,
+      on: () => labDifficulty() === m,
+      tap: () => {
+        setLabDifficulty(m)
+        applyKnob()
+      },
+    })))
+    y = this.labSection('攻速（我方）', gx, y + 8, 3, 62, muls.map((m) => ({
+      label: `×${m}`,
+      on: () => labFireRate() === m,
+      tap: () => {
+        setLabFireRate(m)
+        applyKnob()
+      },
+    })))
+    this.labSection('无敌', gx, y + 8, 2, 62, [
+      { label: '开', on: () => labInvincible(), tap: () => { setLabInvincible(true); applyKnob() } },
+      { label: '关', on: () => !labInvincible(), tap: () => { setLabInvincible(false); applyKnob() } },
+    ])
   }
 
   /** 一段带标题的 chip 网格：返回网格底部 y（供下一段接着排） */

@@ -13,12 +13,19 @@ import type { GroundEffect } from '../groundEffects/groundEffects'
 import { STEERERS } from '../enemies/steer'
 import { runDeathEffects } from '../enemies/deathEffects'
 import { CAPTAINS } from '../captains/registry'
-import { CHARACTERS, MEMBER, ROSTER_IDS, TEAM, loadoutFor } from '../characters/registry'
+import { CHARACTERS, MEMBER, TEAM, loadoutFor } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import type { CharacterId, CharacterDef } from '../characters/registry'
 import { SKILL } from '../captains/skill'
-import { STRESS } from '../debug/dev'
-import { LAB, labEnemySet } from '../run/lab'
+import {
+  DENSITY_PARAMS,
+  INVINCIBLE_HP,
+  labDensity,
+  labDifficulty,
+  labEnemySet,
+  labFireRate,
+  labInvincible,
+} from '../run/lab'
 import { BOSS_SPAWN_RELIEF, DEFAULT_CONTACT, ELITE, ENEMIES, SPAWN, SURGE } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
 import { UNIT } from '../core/units'
@@ -61,7 +68,6 @@ import { clipFramesLive } from '../emoji/animTextures'
 import { applyBackground } from '../core/background'
 import { DAMAGE_FONT, ensureDamageFont } from '../core/damageFont'
 import { reportDebug } from '../debug/debug'
-import { isStress } from '../debug/dev'
 import { emojiImage, emojiKey } from '../emoji/textures'
 import { burstEmitter } from '../core/fx'
 import { acquirePooled, releasePooled } from '../core/pool'
@@ -164,7 +170,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     danceTargets: (durationMs) => this.danceTargets(durationMs),
     buffTeamDamage: (mul, durationMs) => this.buffTeamDamage(mul, durationMs),
     spawnCoins: (x, y, count) => this.spawnRewardCoins(x, y, count),
-    waveScale: () => (this.sandbox ? 1 : waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier),
+    waveScale: () => (this.testMode ? 1 : waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier),
     isBossTarget: (ref) => enemyOf(ref as ImageObj).boss,
     morphTarget: (ref, spec) => this.applyHex(ref as ImageObj, spec),
     damageMul: () => this.stats.damageMul,
@@ -246,12 +252,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   elapsedMs = 0
   private spawnCooldownMs = 0
   private pendingSpawns = 0
-  // 沙盒骨架（免死/无时限/无进度/无精英Boss波/满编环形）：压测与试炼场共享
-  sandbox = false
-  // 压测专属（洪水刷怪 + 10×攻速）——与试炼场区分开
-  flood = false
-  // 试炼场：只出勾选的敌人，维持小在场池，真实冷却
-  lab = false
+  // 测试模式（地图页勾选进入）：免死/无时限/无进度/无精英Boss波/满编环形的沙盒；
+  // 出怪来自场内勾选，密度/难度/攻速/无敌由场内旋钮控制
+  testMode = false
   over = false
   // 本波战果基线（结算横幅展示增量用）
   private waveBaseKills = 0
@@ -496,7 +499,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       objects: this.children.list.length,
       bodies: this.physics.world.bodies.size,
       combatSec: Math.floor(totalSec),
-      spawnIntervalMs: Math.round(this.flood ? STRESS.spawnIntervalMs : wave.spawnIntervalMs),
+      spawnIntervalMs: Math.round(this.testMode ? DENSITY_PARAMS[labDensity()].intervalMs : wave.spawnIntervalMs),
       hpMultiplier: wave.hpMultiplier,
     }
   }
@@ -526,16 +529,14 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const mapDef = MAPS[this.run.mapId]
     this.palette = mapDef.palette
     applyBackground(this.palette)
-    this.flood = isStress()
-    // 试炼场是一张特殊地图：进图即沙盒（免死无时限 + 场内切敌人/角色/队长）
-    this.lab = this.run.mapId === 'lab'
-    this.sandbox = this.flood || this.lab
+    this.testMode = this.run.testMode
     this.settings = loadSettings(browserStorage())
     this.stats = {
       damageMul: 1,
-      cooldownMul: this.flood ? STRESS.cooldownMul : 1,
+      // 测试模式的攻速旋钮：冷却 ÷ 倍率（×10 = 十倍攻速，重现旧压测手感）
+      cooldownMul: this.testMode ? 1 / labFireRate() : 1,
       moveSpeed: CAPTAINS[this.run.captainId].moveSpeed * UNIT,
-      maxHp: this.sandbox ? STRESS.maxHp : MEMBER.maxHp,
+      maxHp: this.testMode && labInvincible() ? INVINCIBLE_HP : MEMBER.maxHp,
     }
     this.elapsedMs = 0
     this.spawnCooldownMs = 300
@@ -559,12 +560,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.centerObj = this.add.zone(this.center.x, this.center.y, 1, 1)
 
     this.memberGroup = this.add.group()
-    // 压测固定 5 人满编便于跑分对比；正常局/试炼场阵容来自 run（试炼场即场内勾选的角色）
-    const rosterIds = this.flood ? ROSTER_IDS.slice(0, 5) : this.run.roster
+    // 阵容来自 run（正常局招募制；测试模式即地图页勾选进入时的场内勾选角色）
+    const rosterIds = this.run.roster
     this.lineup = rosterIds.map((id) => CHARACTERS[id])
     // 槽位 → 队形岗位：满员 N 保 1 按 guardOrder（0 号岗 = 受保护中心，
     // 互换中心不影响其他人的岗位）；未满员/压测为环形，槽位即岗位
-    const order = this.sandbox || !isTeamFull(this.run) ? null : guardOrder(this.run)
+    const order = this.testMode || !isTeamFull(this.run) ? null : guardOrder(this.run)
     this.postBySlot = rosterIds.map((id, slot) => {
       if (!order) return slot
       const post = order.indexOf(id)
@@ -593,10 +594,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       },
       setVisualOffset: () => {},
     }
-    // 压测不装队长技能（省开销）；正常局/试炼场都装——试炼场靠它测队长主动技能
-    this.captainAbilities = this.flood
-      ? []
-      : CAPTAINS[this.run.captainId].skill.abilities.map((a) => createAbility(toPx(a), this.abilityCtx, 0))
+    this.captainAbilities = CAPTAINS[this.run.captainId].skill.abilities.map((a) =>
+      createAbility(toPx(a), this.abilityCtx, 0),
+    )
 
     this.attachCamera(this.centerObj)
 
@@ -604,11 +604,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.projectiles = this.add.group()
     this.enemyProjectiles = this.add.group()
     this.coins = this.add.group()
-    // 压测按后期混编出怪；正常局按当前波次配比
-    this.enemyMix = enemyMixAt(MAPS[this.run.mapId].mix, this.sandbox ? 10 : this.run.wave)
+    // 正常局按当前波次配比出怪；测试模式不走出怪表（改由 spawnTest 从场内勾选出怪），此值备用
+    this.enemyMix = enemyMixAt(MAPS[this.run.mapId].mix, this.testMode ? 10 : this.run.wave)
 
     // 节点波：精英波敌潮与末波 Boss，开场警示横幅后兑现
-    if (!this.sandbox && isEliteWave(this.run.wave)) {
+    if (!this.testMode && isEliteWave(this.run.wave)) {
       this.time.delayedCall(600, () => {
         if (this.over) return
         this.events.emit('wave-warning', {
@@ -618,7 +618,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         this.spawnSurge()
       })
     }
-    if (!this.sandbox && isBossWave(this.run.wave)) {
+    if (!this.testMode && isBossWave(this.run.wave)) {
       this.onFinalWaveSetup()
       this.time.delayedCall(600, () => {
         if (this.over) return
@@ -675,13 +675,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.elapsedMs += delta
 
     // 波次时间到 → 结算/商店（压测模式无尽，便于性能观测）
-    if (!this.sandbox && this.elapsedMs >= waveDurationMs(this.run.wave)) {
+    if (!this.testMode && this.elapsedMs >= waveDurationMs(this.run.wave)) {
       this.endWave()
       return
     }
 
     // 队长技能：冷却按战斗时钟推进（存 run 上，天然跨波）；增伤 buff 到期复原
-    if (!this.sandbox) {
+    if (!this.testMode) {
       this.run.skillCdMs = tickSkillCd(this.run.skillCdMs, delta)
       if (this.stats.damageMul !== 1 && this.elapsedMs >= this.skillBuffUntil) {
         this.stats.damageMul = 1
@@ -727,28 +727,25 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       camY: cam.worldView.centerY,
       formation: this.activeFormation(),
       mapId: this.run.mapId,
-      skill: this.flood
-        ? undefined
-        : {
-            remainMs: Math.round(this.run.skillCdMs),
-            beans: this.run.beans,
-            ready: this.run.skillCdMs <= 0 && this.run.beans > 0,
-          },
+      skill: {
+        remainMs: Math.round(this.run.skillCdMs),
+        beans: this.run.beans,
+        ready: this.run.skillCdMs <= 0 && this.run.beans > 0,
+      },
       ...this.debugExtras(),
     })
   }
 
   // ── 队长主动技能 ────────────────────────────────────────────
 
-  /** UIScene 轮询的技能状态（压测模式无技能 → null，不渲染按钮） */
+  /** UIScene 轮询的技能状态 */
   skillSnapshot(): {
     name: string
     remainMs: number
     cdMs: number
     beans: number
     ready: boolean
-  } | null {
-    if (this.flood) return null
+  } {
     const s = CAPTAINS[this.run.captainId].skill
     return {
       name: s.name,
@@ -773,7 +770,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   /** 释放主动技能（UIScene 按钮/E 键触发）。这里只是触发策略：就绪/弹药
    * 校验、扣豆、重置跨波 CD；效果本体是队长持有的标准能力行，逐个单发 */
   castSkill(): boolean {
-    if (this.over || this.flood || this.run.skillCdMs > 0 || this.run.beans <= 0) return false
+    if (this.over || this.run.skillCdMs > 0 || this.run.beans <= 0) return false
     const s = CAPTAINS[this.run.captainId].skill
     this.run.beans -= 1
     this.run.skillCdMs = s.cdMs
@@ -874,9 +871,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   // ── 队伍 ────────────────────────────────────────────────────
 
-  /** 生效队形：满员自动 N 保 1（压测阵容不来自 run，固定环形） */
+  /** 生效队形：满员自动 N 保 1（测试模式固定环形） */
   protected activeFormation(): FormationId {
-    return this.sandbox ? 'ring' : currentFormation(this.run)
+    return this.testMode ? 'ring' : currentFormation(this.run)
   }
 
   /** 当前队形的全部岗位偏移（环形全员/N 保 1 外圈含主力驱动的共享相位） */
@@ -921,7 +918,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
     // 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效能力参数；
     // 专属升级来自已购的角色专属升级卡（压测阵容无道具 = 素体）
-    const owned = this.sandbox ? [] : (this.run.memberItems[slot] ?? [])
+    const owned = this.testMode ? [] : (this.run.memberItems[slot] ?? [])
     const fx = aggregateCharacterEffects(owned)
     const tiers = upgradeTiers(id, owned)
     const memberCtx: AbilityContext = {
@@ -964,7 +961,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         mm.anim.play(clipId, { durMs })
       },
     }
-    const maxHp = this.sandbox ? this.stats.maxHp : memberMaxHp(fx.hpAdd, CAPTAINS[this.run.captainId].hpMul)
+    const maxHp = this.testMode ? this.stats.maxHp : memberMaxHp(fx.hpAdd, CAPTAINS[this.run.captainId].hpMul)
     // 部件动画：idle 常驻翻帧（slot 错开相位），帧烘焙是惰性的，就绪前保持静态
     const anim = new Animator(image)
     anim.register('idle', clipFramesLive(this, emoji, 'idle', 'player'))
@@ -990,7 +987,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       thorns: fx.thorns,
       killHeal: fx.killHeal,
       // 血量跨波保留；上一波阵亡者低血量复活（压测模式不走 run 状态）
-      hp: this.sandbox
+      hp: this.testMode
         ? this.stats.maxHp
         : waveStartHp(this.run.memberHp[slot] ?? MEMBER.maxHp, maxHp),
       alive: true,
@@ -1479,7 +1476,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const baseCoins = def.coins * (elite ? ELITE.coinsMul : 1)
     const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? baseCoins : 0
     spawnCoins(this, enemy.x, enemy.y, baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0))
-    if (!this.sandbox && !a.boss && chestDropped(elite, () => this.rng.next())) {
+    if (!this.testMode && !a.boss && chestDropped(elite, () => this.rng.next())) {
       spawnChest(this, enemy.x, enemy.y)
     }
   }
@@ -1603,41 +1600,39 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   private spawn(delta: number): void {
     this.spawnCooldownMs -= delta
     if (this.spawnCooldownMs > 0) return
-    // 试炼场：只补勾选的敌人（免死/无时限由 sandbox 提供），与常规/压测刷怪分道
-    if (this.lab) return this.spawnLab()
+    // 测试模式：只补勾选的敌人，密度/难度由场内旋钮控制，与常规刷怪分道
+    if (this.testMode) return this.spawnTest()
     // 难度按跨波累计战斗时长递增；刷怪供给随在场人数缩放（单人首发不会被满编压力淹没）；
     // Boss 波常规刷怪减压：焦点让给 Boss，避免「满速杂兵 + 精英 + Boss」三重压力叠满
     const wave = waveAt((this.run.combatMs + this.elapsedMs) / 1000)
     const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * this.members.length
-    const relief = !this.flood && isBossWave(this.run.wave) ? BOSS_SPAWN_RELIEF : 1
-    this.spawnCooldownMs = this.flood
-      ? STRESS.spawnIntervalMs
-      : (wave.spawnIntervalMs * relief) / teamFactor
-    const cap = this.flood ? STRESS.maxAlive : SPAWN.maxAlive
-    const batch = this.flood ? STRESS.spawnBatch : 1
-    for (let i = 0; i < batch; i++) {
-      if (this.spawnCapCount() + this.pendingSpawns >= cap) return
-      this.spawnOne(wave.hpMultiplier)
-    }
+    const relief = isBossWave(this.run.wave) ? BOSS_SPAWN_RELIEF : 1
+    this.spawnCooldownMs = (wave.spawnIntervalMs * relief) / teamFactor
+    if (this.spawnCapCount() + this.pendingSpawns >= SPAWN.maxAlive) return
+    this.spawnOne(wave.hpMultiplier)
   }
 
-  /** 试炼场补场：从勾选敌人里随机取一只，维持一个小在场池（死一只补一只）。
-   * boss 用 Boss 待遇生成；larva 直接生成即无属主 → 走暴走档。免死/无时限由 sandbox 提供 */
-  private spawnLab(): void {
-    this.spawnCooldownMs = LAB.spawnIntervalMs
+  /** 测试模式补场：从勾选敌人里随机取，密度（间隔/上限/每批）与难度（血量倍率）走场内旋钮。
+   * boss 用 Boss 待遇生成；larva 直接生成即无属主 → 走暴走档。免死/无时限由测试模式提供 */
+  private spawnTest(): void {
+    const d = DENSITY_PARAMS[labDensity()]
+    this.spawnCooldownMs = d.intervalMs
     const kinds = [...labEnemySet()].filter((k) => k in ENEMIES)
     if (kinds.length === 0) return
-    if (this.spawnCapCount() + this.pendingSpawns >= LAB.targetAlive) return
-    const raw = ENEMIES[kinds[Math.floor(this.rng.next() * kinds.length)]!]!
-    const def = toPx(raw)
-    this.spawnTelegraphed(def, def.hp, false, def.role === 'boss')
+    const hpMul = labDifficulty()
+    for (let i = 0; i < d.batch; i++) {
+      if (this.spawnCapCount() + this.pendingSpawns >= d.cap) return
+      const raw = ENEMIES[kinds[Math.floor(this.rng.next() * kinds.length)]!]!
+      const def = toPx(raw)
+      this.spawnTelegraphed(def, Math.round(def.hp * hpMul), false, def.role === 'boss')
+    }
   }
 
   private spawnOne(hpMultiplier: number, forceElite = false): void {
     const def = toPx(pickEnemy(this.enemyMix, () => this.rng.next()))
     // 精英怪：到波数后按概率强化出场（血量刷怪时算入，移速/伤害走敌身标记）
     const elite =
-      !this.sandbox &&
+      !this.testMode &&
       (forceElite ||
         (this.run.wave >= ELITE.fromWave && this.rng.next() < ELITE.chance))
     const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))

@@ -132,6 +132,7 @@ interface WarmojiMapDebug {
   selected: string
   items: { id: string; x: number; y: number; w: number; h: number }[]
   start: { x: number; y: number; w: number; h: number }
+  test: { x: number; y: number; on: boolean }
 }
 
 interface WarmojiResultDebug {
@@ -168,7 +169,7 @@ interface WarmojiDebug {
   dormant?: number
   /** 无限地图终波：当前缩圈半径（未开圈为 undefined） */
   zoneRadius?: number
-  /** arena：队长主动技能状态（压测模式无技能） */
+  /** arena：队长主动技能状态 */
   skill?: { remainMs: number; beans: number; ready: boolean }
   menu?: WarmojiMenuDebug
   map?: WarmojiMapDebug
@@ -184,8 +185,7 @@ interface WarmojiDebug {
 interface Window {
   __warmoji?: WarmojiDebug
   __game?: unknown
-  __setStress?: (on: boolean) => void
-  __setLab?: (kinds: string[]) => void
+  __setLab?: (kinds: string[], mapId?: string) => void
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
   __setWave?: (n: number) => void

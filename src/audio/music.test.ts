@@ -39,9 +39,7 @@ describe('bgm 乐谱', () => {
   })
 
   it('曲子之间差异明显：速度/调性/事件序列两两不同', () => {
-    // 试炼场沙盒图沿用大厅曲，不参与「战斗曲两两不同」的判定
-    const tracks = BGM_IDS.filter((id) => id !== 'lab')
-    const sigs = tracks.map((id) => {
+    const sigs = BGM_IDS.map((id) => {
       const s = bgmScore(id)
       const noteSig = s.notes
         .slice(0, 40)
@@ -49,7 +47,7 @@ describe('bgm 乐谱', () => {
         .join(',')
       return `${s.bpm}|${s.loopSec.toFixed(1)}|${noteSig}`
     })
-    expect(new Set(sigs).size).toBe(tracks.length)
+    expect(new Set(sigs).size).toBe(BGM_IDS.length)
   })
 
   it('回声只配给需要的曲子（虚空），参数合法', () => {

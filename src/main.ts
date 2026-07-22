@@ -27,10 +27,9 @@ import type { BaseArenaScene } from './battle/BaseArenaScene'
 import { loadSettings } from './run/settings'
 import { bgmState, initBgm, playBgm, renderBgmOffline, setBgmEnabled } from './audio/bgm'
 import type { BgmId } from './audio/music'
-import { setStress } from './debug/dev'
 import { labCaptain, labStarters, setLabEnemies } from './run/lab'
 import { beginRun } from './run/state'
-import { arenaSceneFor } from './maps/registry'
+import { arenaSceneFor, sanitizeMapId } from './maps/registry'
 import { initSfx, setSfxEnabled, sfxStats } from './audio/sfx'
 import { isStandalone, nudgeIosViewport, refreshViewport, viewport } from './core/apply'
 
@@ -108,18 +107,12 @@ window.addEventListener('orientationchange', () => {
 // 供临时验证脚本注入状态
 window.__game = game
 
-window.__setStress = (on: boolean): void => {
-  setStress(on)
-  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
-    if (game.scene.isActive(key)) game.scene.getScene(key).scene.restart()
-  }
-}
-
-// 试炼场：设定出场敌人（kind 列表）并用当前勾选阵容开局进入试炼场地图（有界竞技场）
-window.__setLab = (kinds: string[]): void => {
+// 测试模式：设定出场敌人（kind 列表），用当前勾选阵容在某张真实地图上开测试模式
+window.__setLab = (kinds: string[], mapId = 'forest'): void => {
   setLabEnemies(kinds)
-  beginRun(labCaptain(), labStarters(), 'lab')
-  const target = arenaSceneFor('lab')
+  const m = sanitizeMapId(mapId)
+  beginRun(labCaptain(), labStarters(), m, true)
+  const target = arenaSceneFor(m)
   // 已在目标竞技场则原子重开（避免同帧 stop+start 竞态）；否则停掉别的竞技场再启动它
   for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
     if (key !== target && game.scene.isActive(key)) game.scene.stop(key)

@@ -3,11 +3,8 @@ import { arenaSceneFor, MAP, MAP_IDS, MAPS, rollDecor, sanitizeMapId } from './r
 import { Rng } from '../core/rng'
 
 describe('地图定义', () => {
-  it('四张玩法图齐备且互不相同 + 试炼场沙盒图：图标/名字/描述/形态/固定色板/装饰规则', () => {
-    // 四张玩法图 + 试炼场（特殊沙盒图，形态复用有界竞技场）
-    const gameplay = MAP_IDS.filter((id) => id !== 'lab')
-    expect(gameplay.length).toBe(4)
-    expect(MAP_IDS).toContain('lab')
+  it('四张图齐备且玩法互不相同：图标/名字/描述/形态/固定色板/装饰规则', () => {
+    expect(MAP_IDS.length).toBe(4)
     for (const id of MAP_IDS) {
       const m = MAPS[id]
       expect(m.emoji.length).toBeGreaterThan(0)
@@ -16,8 +13,8 @@ describe('地图定义', () => {
       expect(m.palette.bgFrom).toContain('hsl')
       expect(m.decor.emojis.length).toBeGreaterThan(0)
     }
-    // 一种玩法一个主题：四张玩法图世界形态两两不同
-    expect(gameplay.map((id) => MAPS[id].kind).sort()).toEqual([
+    // 一种玩法一个主题：世界形态两两不同
+    expect(MAP_IDS.map((id) => MAPS[id].kind).sort()).toEqual([
       'bounded',
       'infinite',
       'river',
@@ -27,7 +24,6 @@ describe('地图定义', () => {
     expect(MAPS.desert.kind).toBe('infinite')
     expect(MAPS.river.kind).toBe('river')
     expect(MAPS.void.kind).toBe('void')
-    expect(MAPS.lab.kind).toBe('bounded')
     // 河流图必须有水面漂浮物池
     expect(MAPS.river.drift!.length).toBeGreaterThan(0)
   })

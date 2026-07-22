@@ -54,6 +54,8 @@ export class MapScene extends Phaser.Scene {
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private confirmLabel!: Phaser.GameObjects.Text
+  private testChk!: Phaser.GameObjects.Text
+  private testMode = false
 
   constructor() {
     super('map')
@@ -136,12 +138,29 @@ export class MapScene extends Phaser.Scene {
         resolution: res,
       })
       .setOrigin(0.5)
+    // 测试模式勾选框（在确认按钮上方）：勾上则跳过队长/组队，直接进该图的沙盒
+    this.testChk = this.add
+      .text(w / 2, b.y - 20, '', {
+        fontFamily: UI_FONT,
+        fontSize: FONT.body,
+        color: '#ffffff',
+        backgroundColor: '#00000055',
+        padding: { x: 10, y: 5 },
+        resolution: res,
+      })
+      .setOrigin(0.5, 1)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => {
+        playSfx('click')
+        this.testMode = !this.testMode
+        this.refresh()
+      })
     const confirm = (): void => {
       playSfx('click')
-      // 试炼场：跳过队长/组队/商店，用当前勾选阵容直接开局进有界竞技场
-      if (this.selectedId === 'lab') {
-        beginRun(labCaptain(), labStarters(), 'lab')
-        this.scene.start(arenaSceneFor('lab'))
+      // 测试模式：跳过队长/组队/商店，用当前勾选阵容在该图上开沙盒
+      if (this.testMode) {
+        beginRun(labCaptain(), labStarters(), this.selectedId, true)
+        this.scene.start(arenaSceneFor(this.selectedId))
         return
       }
       this.scene.start('captain')
@@ -253,7 +272,10 @@ export class MapScene extends Phaser.Scene {
 
   private refresh(): void {
     this.grid.setSelected(this.selectedId)
-    this.confirmLabel.setText(this.selectedId === 'lab' ? '进入试炼场' : '选择队长')
+    this.testChk.setText(`测试模式（免死沙盒·跳过组队）：${this.testMode ? '开' : '关'}`)
+    this.testChk.setColor(this.testMode ? '#ffd54f' : '#c8c8d4')
+    this.testChk.setBackgroundColor(this.testMode ? '#2e7d32' : '#00000055')
+    this.confirmLabel.setText(this.testMode ? '进入测试模式' : '选择队长')
     this.renderDetail(textRes())
     this.reportMap()
   }
@@ -283,6 +305,11 @@ export class MapScene extends Phaser.Scene {
           y: this.btnRect.y + this.btnRect.h / 2,
           w: this.btnRect.w,
           h: this.btnRect.h,
+        },
+        test: {
+          x: Math.round(this.testChk.x),
+          y: Math.round(this.testChk.getBounds().centerY),
+          on: this.testMode,
         },
       },
     })

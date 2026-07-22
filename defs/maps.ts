@@ -108,27 +108,4 @@ export const MAPS = {
     mix: DEFAULT_MIX,
     boss: 'boss',
   },
-  // 试炼场：有界竞技场骨架，选图即直接进入（免死无时限，场内自由切敌人/角色/队长）。
-  // mix/boss 是占位（试炼场不走出怪表，只出场内勾选的敌人），仅为通过校验
-  lab: {
-    emoji: '1f3af',
-    name: '试炼场',
-    desc: '免死无时限的测试沙盒：进图后可自由切换出场敌人、我方角色与队长',
-    kind: 'bounded',
-    palette: {
-      bgFrom: 'hsl(220 12% 16%)',
-      bgTo: 'hsl(220 16% 9%)',
-      // 中性深灰地板：不抢戏，专注观察实体表现
-      map: hslToInt(220, 0.08, 0.17),
-      shadow: 0x000000,
-    },
-    decor: {
-      emojis: ['25fb', '25ab'],
-      sizeU: [0.2, 0.4],
-      alpha: [0.06, 0.12],
-      density: [0.03, 0.05],
-    },
-    mix: DEFAULT_MIX,
-    boss: 'boss',
-  },
 } as const satisfies Record<string, MapDef>

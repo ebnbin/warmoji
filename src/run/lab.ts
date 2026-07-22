@@ -3,19 +3,34 @@ import { ROSTER_IDS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
 import type { CaptainId } from '../captains/registry'
 
-// 试炼场 = 一张特殊地图（mapId === 'lab'）：选图即直接进入，免死无时限的沙盒，
-// 敌人 / 角色 / 队长都能在场内自由切换。以下为当前勾选状态（模块级，跨场景重启保留）。
+// 测试模式（地图页勾选进入，run.testMode = true）：免死无时限的沙盒，
+// 敌人 / 角色 / 队长 + 密度 / 难度 / 攻速 / 无敌 都能在场内自由切换。
+// 以下为当前选择状态（模块级，跨场景重启保留）。
 
 const enemies = new Set<string>()
 let roster: CharacterId[] = [...ROSTER_IDS.slice(0, 3)]
 let captain: CaptainId = 'angel'
 let panelOpen = true
 
-// 低速补场、维持一个小在场池——用真实冷却看敌人真实表现（区别于压测的 10× 攻速）
-export const LAB = {
-  spawnIntervalMs: 700,
-  targetAlive: 10,
-} as const
+// 无敌血量（够高即事实上打不死）——替代原压测的 maxHp
+export const INVINCIBLE_HP = 10_000_000
+
+// 密度档位：出怪间隔 / 在场上限 / 每批数量。「爆满」= 旧压测级（满屏敌人跑分）
+export type LabDensity = 'low' | 'mid' | 'high' | 'max'
+export const DENSITY_PARAMS: Record<LabDensity, { intervalMs: number; cap: number; batch: number }> = {
+  low: { intervalMs: 1100, cap: 6, batch: 1 },
+  mid: { intervalMs: 700, cap: 12, batch: 1 },
+  high: { intervalMs: 240, cap: 60, batch: 2 },
+  max: { intervalMs: 80, cap: 800, batch: 5 },
+}
+
+/** 倍率档位：难度作用于敌人血量、攻速作用于我方冷却（÷倍率） */
+export type LabMul = 1 | 3 | 10
+
+let density: LabDensity = 'mid'
+let difficulty: LabMul = 1
+let fireRate: LabMul = 1
+let invincible = true
 
 // ── 敌人 ──────────────────────────────────────────────────
 export function labEnemySet(): ReadonlySet<string> {
@@ -57,8 +72,41 @@ export function setLabCaptain(id: CaptainId): void {
   captain = id
 }
 
+// ── 旋钮：密度 / 难度 / 攻速 / 无敌（arena 每帧实时读取，改动即时生效不重启）──
+export function labDensity(): LabDensity {
+  return density
+}
+
+export function setLabDensity(d: LabDensity): void {
+  density = d
+}
+
+export function labDifficulty(): LabMul {
+  return difficulty
+}
+
+export function setLabDifficulty(m: LabMul): void {
+  difficulty = m
+}
+
+export function labFireRate(): LabMul {
+  return fireRate
+}
+
+export function setLabFireRate(m: LabMul): void {
+  fireRate = m
+}
+
+export function labInvincible(): boolean {
+  return invincible
+}
+
+export function setLabInvincible(on: boolean): void {
+  invincible = on
+}
+
 // ── 开局 ──────────────────────────────────────────────────
-/** 进入试炼场的开局阵容：勾选角色截到队长队伍上限，至少留 1 人兜底 */
+/** 进入测试模式的开局阵容：勾选角色截到队长队伍上限，至少留 1 人兜底 */
 export function labStarters(): CharacterId[] {
   const r = roster.slice(0, CAPTAINS[captain].teamSize)
   return r.length > 0 ? r : [ROSTER_IDS[0]!]

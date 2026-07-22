@@ -4,18 +4,18 @@ import { enterLab, enterMap, startRun } from './helpers'
 type LabEnemy = { active: boolean; getData(k: string): { def: { kind: string } } }
 type LabGame = { scene: { keys: Record<string, { enemies: { getChildren(): LabEnemy[] } }> } }
 
-test('试炼场入口：选地图即直接进入沙盒（跳过队长/组队）', async ({ page }) => {
+test('测试模式入口：地图页勾选后确认即直接进入该图的沙盒（跳过队长/组队）', async ({ page }) => {
   await page.goto('/')
   await enterMap(page)
-  await enterLab(page)
-  // 直接落在竞技场，且是试炼场地图（未经队长/组队/商店）
-  await page.waitForFunction(() => window.__warmoji?.mapId === 'lab')
-  // 队伍来自试炼场勾选阵容（默认 3 角色），而非压测的固定 5 人——验证角色选择生效
+  await enterLab(page, 'forest')
+  // 落在所选真实地图的竞技场（未经队长/组队/商店）
+  await page.waitForFunction(() => window.__warmoji?.mapId === 'forest')
+  // 队伍来自场内勾选阵容（默认 3 角色），而非正常流程的招募队——验证跳过组队且角色选择生效
   const alive = await page.evaluate(() => window.__warmoji!.alive)
   expect(alive).toBe(3)
 })
 
-test('试炼场：只出勾选的敌人、玩家免死无时限', async ({ page }) => {
+test('测试模式：只出勾选的敌人、玩家免死无时限', async ({ page }) => {
   test.setTimeout(120_000)
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(String(err)))
@@ -54,7 +54,7 @@ test('试炼场：只出勾选的敌人、玩家免死无时限', async ({ page 
   expect(kinds.length).toBeGreaterThan(0)
   expect([...new Set(kinds)]).toEqual(['snake'])
 
-  // 玩家免死（与压测同一套 sandbox 免死骨架，血量拉满）
+  // 玩家免死（测试模式默认「无敌」开，血量拉满）
   const s = await page.evaluate(() => window.__warmoji!)
   expect(s.hp).toBeGreaterThan(100_000)
 
