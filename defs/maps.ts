@@ -1,7 +1,23 @@
 import { hslToInt } from '../src/core/palette.ts'
 import type { MapDef } from '../src/maps/registry'
+import type { EnemyMixRow } from '../src/enemies/registry'
 
 // 创作层（不进运行时 bundle）：地图数据行（调色板以 HSL 书写，生成时算成 int）。
+
+// 出场配比（暂四图共用，日后各图可分化）：新怪按波次渐入，僵尸/幽灵为主体，
+// zombie 有下限兜底。编排属于地图——同一份表展开进每张图，运行时各存一份
+const DEFAULT_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 80, perWave: -2, min: 40, max: 80 },
+  { kind: 'ghost', sinceWave: 1, base: 15, perWave: 1, min: 15, max: 32 },
+  { kind: 'invader', sinceWave: 2, base: 8, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'boar', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'snake', sinceWave: 4, base: 7, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'mushroom', sinceWave: 4, base: 7, perWave: 0.4, min: 0, max: 14 },
+  { kind: 'rat', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'blob', sinceWave: 5, base: 7, perWave: 0.4, min: 0, max: 14 },
+  { kind: 'slime', sinceWave: 2, base: 16, perWave: 0.4, min: 0, max: 28 },
+  { kind: 'hive', sinceWave: 7, base: 3, perWave: 0.15, min: 0, max: 6 },
+]
 
 export const MAPS = {
   forest: {
@@ -21,6 +37,8 @@ export const MAPS = {
       alpha: [0.14, 0.26],
       density: [0.1, 0.14],
     },
+    mix: DEFAULT_MIX,
+    boss: 'boss',
   },
   desert: {
     emoji: '1f3dc',
@@ -40,6 +58,8 @@ export const MAPS = {
       // 荒漠刻意更稀疏
       density: [0.08, 0.11],
     },
+    mix: DEFAULT_MIX,
+    boss: 'boss',
   },
   river: {
     emoji: '1f30a',
@@ -62,6 +82,8 @@ export const MAPS = {
       density: [0.1, 0.14],
     },
     drift: ['1f343', '1f338', '1fae7', '1f342'],
+    mix: DEFAULT_MIX,
+    boss: 'boss',
   },
   void: {
     emoji: '1f300',
@@ -82,5 +104,7 @@ export const MAPS = {
       alpha: [0.18, 0.34],
       density: [0.05, 0.08],
     },
+    mix: DEFAULT_MIX,
+    boss: 'boss',
   },
 } as const satisfies Record<string, MapDef>

@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { CAPTAINS } from '../captains/registry'
 import { CHARACTERS } from '../characters/registry'
-import { BOSS, ENEMY_DEFS } from '../enemies/registry'
+import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
 import { PICKUPS } from '../pickups/registry'
 import { WAVE } from '../run/waves'
 import { submitScore } from '../run/highscore'
@@ -307,7 +307,7 @@ export class ResultScene extends Phaser.Scene {
 
     const emojiByName = new Map<string, string>([
       ...ENEMY_DEFS.map((e) => [e.name, e.emoji] as const),
-      [BOSS.name, BOSS.emoji],
+      ...BOSSES.map((e) => [e.name, e.emoji] as const),
     ])
     const names = [...new Set([...Object.keys(st.enemyKills), ...Object.keys(st.enemyDamage)])]
       .sort((a, b) => (st.enemyKills[b] ?? 0) - (st.enemyKills[a] ?? 0))
@@ -341,9 +341,10 @@ export class ResultScene extends Phaser.Scene {
     const top = y + headerH + 22
     const rowH = Math.min(42, (h - headerH - 34) / names.length)
     const fmt = (v: number): string => (v >= 10000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`)
+    const bossNames = new Set(BOSSES.map((e) => e.name))
     names.forEach((name, i) => {
       const cy = top + rowH * i + rowH / 2
-      const isBoss = name === BOSS.name
+      const isBoss = bossNames.has(name)
       const emoji = emojiByName.get(name)
       if (emoji) emojiImage(this, x + 34, cy, emoji, Math.min(40, rowH - 5), isBoss ? 'elite' : 'enemy')
       this.add

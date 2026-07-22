@@ -5,7 +5,7 @@ import { abilityDps } from './dps.ts'
 import { CHARACTERS } from '../defs/characters.ts'
 import { WEAPONS } from '../defs/weapons.ts'
 import { CAPTAINS } from '../defs/captains.ts'
-import { ENEMIES, BOSS, ENEMY_MIX } from '../defs/enemies.ts'
+import { ENEMIES } from '../defs/enemies.ts'
 import { ITEMS } from '../defs/items.ts'
 import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
@@ -244,12 +244,6 @@ for (const [kind, e] of Object.entries(ENEMIES)) {
   checkEnemy(`enemies.${kind}`, e)
   pure(`enemies.${kind}`, e)
 }
-checkEnemy('boss', BOSS)
-pure('boss', BOSS)
-for (const m of ENEMY_MIX) {
-  if (!(m.kind in ENEMIES)) bad(`mix.${m.kind}`, '引用了不存在的敌人 kind')
-}
-
 // ── items ──
 const characterIds = new Set(Object.keys(CHARACTERS))
 for (const [id, it] of Object.entries<ItemDef>(ITEMS as Record<string, ItemDef>)) {
@@ -268,6 +262,12 @@ for (const [id, m] of Object.entries(MAPS)) {
   const p = `maps.${id}`
   str(`${p}.emoji`, m.emoji)
   if (!['bounded', 'infinite', 'river', 'void'].includes(m.kind)) bad(p, `未知 kind：${m.kind}`)
+  for (const mx of m.mix) {
+    if (!(mx.kind in ENEMIES)) bad(`${p}.mix`, `引用了不存在的敌人 kind：${mx.kind}`)
+    else if (ENEMIES[mx.kind]?.role === 'boss') bad(`${p}.mix`, `mix 里不能出现 Boss：${mx.kind}`)
+  }
+  if (!(m.boss in ENEMIES)) bad(`${p}.boss`, `引用了不存在的敌人 kind：${m.boss}`)
+  else if (ENEMIES[m.boss]?.role !== 'boss') bad(`${p}.boss`, `boss 必须指向 role:'boss' 的条目：${m.boss}`)
   pure(p, m)
 }
 
@@ -298,7 +298,7 @@ write('abilities', ABILITIES)
 write('weapons', WEAPONS)
 write('characters', CHARACTERS)
 write('captains', CAPTAINS)
-write('enemies', { enemies: ENEMIES, boss: BOSS, mix: ENEMY_MIX })
+write('enemies', { enemies: ENEMIES })
 write('items', ITEMS)
 write('maps', MAPS)
 write('pickups', PICKUPS)

@@ -1,10 +1,9 @@
 import Phaser from 'phaser'
 import { MEMBER, TEAM } from '../characters/registry'
-import { BOSS } from '../enemies/registry'
 import { UNIT } from '../core/units'
 import { RIVER } from './river'
 import { INFINITE } from './world'
-import { MAPS } from './registry'
+import { MAPS, bossFor } from './registry'
 import type { MapDef } from './registry'
 import { isHorizontal, remapPoint, remapVector } from '../core/remap'
 import { clampToRiver, driftProfile, flowVector, pastDownstream, riverRect } from './river'
@@ -280,7 +279,7 @@ export class RiverArenaScene extends BaseArenaScene {
   private applyFlowAndClampBoss(e: ImageObj, body: ArcadeBody): void {
     body.velocity.x += this.flow.x
     body.velocity.y += this.flow.y
-    const pad = BOSS.radius
+    const pad = bossFor(this.run.mapId).radius
     const r = this.river
     if (e.x <= r.x + pad && body.velocity.x < 0) body.velocity.x = 0
     if (e.x >= r.x + r.w - pad && body.velocity.x > 0) body.velocity.x = 0

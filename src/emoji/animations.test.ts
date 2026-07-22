@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { CAPTAINS } from '../captains/registry'
 import { CHARACTERS } from '../characters/registry'
-import { BOSS, ENEMY_DEFS } from '../enemies/registry'
+import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
 import { PICKUPS } from '../pickups/registry'
 import { packSvg, parseEmojiPack } from './pack'
 import { ANIM_SETS, animClipOf, animSetOf, bakeAnimFrame, splitSvg } from './studio'
@@ -21,7 +21,7 @@ describe('实体动画覆盖', () => {
       ...Object.values(CHARACTERS).map((c) => c.emoji),
       ...Object.values(CAPTAINS).map((c) => c.emoji),
       ...ENEMY_DEFS.map((e) => e.emoji),
-      BOSS.emoji,
+      ...BOSSES.map((e) => e.emoji),
       '1f411', // 🐑 仙子魔尘的变形替身
       '1f3f9', // 🏹 河狸的弩塔装置
     ])

@@ -3,7 +3,7 @@ import { CHARACTERS, baseLoadout } from '../characters/registry'
 import type { CaptainDef } from '../captains/registry'
 import type { CharacterDef } from '../characters/registry'
 import type { OutlineKind } from '../emoji/svg'
-import { BOSS, ENEMY_DEFS, SPAWN } from '../enemies/registry'
+import { BOSSES, ENEMY_DEFS, SPAWN } from '../enemies/registry'
 import { PICKUPS } from '../pickups/registry'
 import { ITEMS } from '../items/registry'
 import { MAPS } from '../maps/registry'
@@ -45,14 +45,13 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   enemyProjectile: [...new Set([...armedShotEmojis(), ...deathShotEmojis()])],
   // 精英变体（含 Boss）：金边；持械精英的能力视觉同沾金边
   elite: [
-    ...new Set([...ENEMY_DEFS.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()]),
-    BOSS.emoji,
+    ...new Set([...ENEMY_DEFS.map((e) => e.emoji), ...BOSSES.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()]),
   ],
 }
 
 /** 持械敌人的能力视觉（持有物/塔体/召唤物）：随敌人本体阵营描边 */
 function armedBodyEmojis(): string[] {
-  return [...ENEMY_DEFS, BOSS].flatMap((e) =>
+  return [...ENEMY_DEFS, ...BOSSES].flatMap((e) =>
     (e.abilities ?? []).flatMap((w) => [
       ...('held' in w && w.held ? [w.held.emoji] : []),
       ...(w.kind === 'turret' ? [w.turret.emoji] : []),
@@ -63,7 +62,7 @@ function armedBodyEmojis(): string[] {
 
 /** 持械敌人的弹体：入敌弹组，红描边 */
 function armedShotEmojis(): string[] {
-  return [...ENEMY_DEFS, BOSS].flatMap((e) =>
+  return [...ENEMY_DEFS, ...BOSSES].flatMap((e) =>
     (e.abilities ?? []).flatMap((w) =>
       w.kind === 'projectile' || w.kind === 'turret' ? [w.projectile.emoji] : [],
     ),
@@ -73,7 +72,7 @@ function armedShotEmojis(): string[] {
 /** 亡语冷枪的弹体（onDeath 的 spawnProjectile）：同样入敌弹组，红描边——
  * 与持械弹分开收集，否则外星怪等死亡冷枪的弹体贴图漏预载（现形为缺失贴图） */
 function deathShotEmojis(): string[] {
-  return [...ENEMY_DEFS, BOSS].flatMap((e) =>
+  return [...ENEMY_DEFS, ...BOSSES].flatMap((e) =>
     (e.onDeath ?? []).flatMap((fx) => (fx.kind === 'spawnProjectile' ? [fx.projectile.emoji] : [])),
   )
 }

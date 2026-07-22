@@ -274,23 +274,10 @@ export const ENEMY_DEFS: readonly EnemyDef[] = [
   LARVA,
 ]
 
-// 出场配比：新怪按波次渐入（sinceWave），僵尸/幽灵始终是主体；
-// 权重随波次线性微调，zombie 有下限兜底（见 本文件 enemyMixAt）
-export const ENEMY_MIX = [
-  { kind: 'zombie', sinceWave: 1, base: 80, perWave: -2, min: 40, max: 80 },
-  { kind: 'ghost', sinceWave: 1, base: 15, perWave: 1, min: 15, max: 32 },
-  { kind: 'invader', sinceWave: 2, base: 8, perWave: 0.3, min: 0, max: 12 },
-  { kind: 'boar', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'snake', sinceWave: 4, base: 7, perWave: 0.3, min: 0, max: 10 },
-  { kind: 'mushroom', sinceWave: 4, base: 7, perWave: 0.4, min: 0, max: 14 },
-  { kind: 'rat', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
-  { kind: 'blob', sinceWave: 5, base: 7, perWave: 0.4, min: 0, max: 14 },
-  { kind: 'slime', sinceWave: 2, base: 16, perWave: 0.4, min: 0, max: 28 },
-  { kind: 'hive', sinceWave: 7, base: 3, perWave: 0.15, min: 0, max: 6 },
-] as const
-
-export const BOSS: EnemyDef = {
+// Boss 就是 role:'boss' 的普通条目——折进 ENEMIES 目录（出怪表 mix 已移到各 Map）
+const BOSS: EnemyDef = {
   kind: 'boss',
+  role: 'boss',
   emoji: '1f479',
   name: '赤鬼',
   desc: '终波头目：环形弹幕与蓄力突刺，击退免疫',
@@ -331,4 +318,4 @@ export const BOSS: EnemyDef = {
 
 
 /** 生成用：kind → 定义（顺序即 ENEMY_DEFS 展示顺序） */
-export const ENEMIES = Object.fromEntries(ENEMY_DEFS.map((e) => [e.kind, e])) as Record<string, EnemyDef>
+export const ENEMIES = Object.fromEntries([...ENEMY_DEFS, BOSS].map((e) => [e.kind, e])) as Record<string, EnemyDef>

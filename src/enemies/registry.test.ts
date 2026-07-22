@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { ENEMY_DEFS } from './registry'
 import { enemyMixAt, fleeSteer, pickEnemy } from './registry'
+import { MAPS } from '../maps/registry'
 
 const ZOMBIE = ENEMY_DEFS.find((e) => e.kind === 'zombie')!
 const MUSHROOM = ENEMY_DEFS.find((e) => e.kind === 'mushroom')!
 const BLOB = ENEMY_DEFS.find((e) => e.kind === 'blob')!
+const MIX = MAPS.forest.mix
 import { Rng } from '../core/rng'
 
 describe('敌人规格', () => {
@@ -34,17 +36,17 @@ describe('敌人规格', () => {
 
 describe('出场配比', () => {
   it('第 1 波只有僵尸+幽灵；新怪按波次渐入；第 5 波全员到齐', () => {
-    expect(enemyMixAt(1).map((m) => m.def.kind).sort()).toEqual(['ghost', 'zombie'])
-    expect(enemyMixAt(2).some((m) => m.def.kind === 'invader')).toBe(true)
-    expect(enemyMixAt(2).some((m) => m.def.kind === 'boar')).toBe(false)
-    expect(enemyMixAt(5).map((m) => m.def.kind).sort()).toEqual(
+    expect(enemyMixAt(MIX, 1).map((m) => m.def.kind).sort()).toEqual(['ghost', 'zombie'])
+    expect(enemyMixAt(MIX, 2).some((m) => m.def.kind === 'invader')).toBe(true)
+    expect(enemyMixAt(MIX, 2).some((m) => m.def.kind === 'boar')).toBe(false)
+    expect(enemyMixAt(MIX, 5).map((m) => m.def.kind).sort()).toEqual(
       ['blob', 'boar', 'ghost', 'invader', 'mushroom', 'rat', 'slime', 'snake', 'zombie'],
     )
   })
 
   it('僵尸始终是主体（权重最高且有下限）', () => {
     for (const wave of [1, 5, 10, 20, 40]) {
-      const mix = enemyMixAt(wave)
+      const mix = enemyMixAt(MIX, wave)
       const zombie = mix.find((m) => m.def === ZOMBIE)!
       for (const m of mix) expect(zombie.weight).toBeGreaterThanOrEqual(m.weight)
       expect(zombie.weight).toBeGreaterThanOrEqual(40)
@@ -52,7 +54,7 @@ describe('出场配比', () => {
   })
 
   it('加权抽取覆盖全部在场种类且比例大致符合权重', () => {
-    const mix = enemyMixAt(6)
+    const mix = enemyMixAt(MIX, 6)
     const rng = new Rng(42)
     const counts = new Map<string, number>()
     for (let i = 0; i < 8000; i++) {

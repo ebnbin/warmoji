@@ -18,7 +18,7 @@ import { memberMaxHp } from '../characters/stats'
 import type { CharacterId, CharacterDef } from '../characters/registry'
 import { SKILL } from '../captains/skill'
 import { STRESS } from '../debug/dev'
-import { BOSS, BOSS_SPAWN_RELIEF, DEFAULT_CONTACT, ELITE, SPAWN, SURGE } from '../enemies/registry'
+import { BOSS_SPAWN_RELIEF, DEFAULT_CONTACT, ELITE, SPAWN, SURGE } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
 import { UNIT } from '../core/units'
 import { WAVE } from '../run/waves'
@@ -46,7 +46,7 @@ import type { RunState } from '../run/state'
 import { tickSkillCd } from '../captains/skill'
 import { DEFAULT_SETTINGS, loadSettings } from '../run/settings'
 import type { Settings } from '../run/settings'
-import { MAPS } from '../maps/registry'
+import { MAPS, bossFor } from '../maps/registry'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import { isWithinActive } from '../maps/world'
@@ -508,7 +508,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       remainMs: Math.max(0, waveDurationMs(this.run.wave) - this.elapsedMs),
       over: this.over,
       bossHp: this.boss?.active ? enemyOf(this.boss).hp : null,
-      bossMaxHp: BOSS.hp,
+      bossMaxHp: bossFor(this.run.mapId).hp,
     }
   }
 
@@ -595,7 +595,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.enemyProjectiles = this.add.group()
     this.coins = this.add.group()
     // 压测按后期混编出怪；正常局按当前波次配比
-    this.enemyMix = enemyMixAt(this.stress ? 10 : this.run.wave)
+    this.enemyMix = enemyMixAt(MAPS[this.run.mapId].mix, this.stress ? 10 : this.run.wave)
 
     // 节点波：精英波敌潮与末波 Boss，开场警示横幅后兑现
     if (!this.stress && isEliteWave(this.run.wave)) {
@@ -613,7 +613,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.time.delayedCall(600, () => {
         if (this.over) return
         this.events.emit('wave-warning', {
-          title: `${BOSS.name}出现`,
+          title: `${bossFor(this.run.mapId).name}出现`,
           sub: this.finalWaveWarningSub(),
         })
         this.spawnBoss()
@@ -1606,7 +1606,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.pendingMarks = this.pendingMarks.filter((x) => x !== entry)
       if (this.over) return
       // Boss 与普通敌人同一条 materialize 管线（boss 标记：金边/深度/入场演出/HUD 血条）
-      const def = toPx(BOSS)
+      const def = toPx(bossFor(this.run.mapId))
       this.materializeEnemy(def, pos.x, pos.y, def.hp, false, true)
       playSfx('boom')
     })

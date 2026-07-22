@@ -115,13 +115,20 @@ export interface EnemyDef {
     readonly firstDelayMs?: number
   }
   readonly kbImmune?: boolean
+  /** 角色：缺省 enemy；boss 由引擎侧特判（通关判定 + HUD 血条），并由 map.boss 引用 */
+  readonly role?: 'enemy' | 'boss'
 }
 
 // 数据行在 defs/enemies.ts（创作层），npm run gen 生成 enemies.json；
-// split.into 已内联为自包含数据。构建期已校验，此处一次断言收口
-export const ENEMY_DEFS = Object.values(enemiesJson.enemies) as unknown as readonly EnemyDef[]
-export const BOSS = enemiesJson.boss as unknown as EnemyDef
-interface EnemyMixRow {
+// split.into 已内联为自包含数据。构建期已校验，此处一次断言收口。
+// Boss 就是 role:'boss' 的普通条目：ENEMIES 全量按 kind 反查、ENEMY_DEFS 只含常规怪、BOSSES 只含 Boss
+export const ENEMIES = enemiesJson.enemies as unknown as Record<string, EnemyDef>
+const ALL_ENEMIES = Object.values(ENEMIES)
+export const ENEMY_DEFS = ALL_ENEMIES.filter((e) => e.role !== 'boss')
+export const BOSSES = ALL_ENEMIES.filter((e) => e.role === 'boss')
+
+/** 出怪表的一行（数据归各 Map；kind + 波次权重曲线） */
+export interface EnemyMixRow {
   readonly kind: string
   readonly sinceWave: number
   readonly base: number
@@ -129,7 +136,6 @@ interface EnemyMixRow {
   readonly min: number
   readonly max: number
 }
-const ENEMY_MIX = enemiesJson.mix as unknown as readonly EnemyMixRow[]
 
 // 刷怪节奏（波次制）：第 1 波基础火力可稳过，随跨波累计战斗时长持续加压，
 // 后期压力超出基础火力，由商店成长补差
@@ -178,17 +184,15 @@ export const SURGE = {
 /** 终波常规刷怪减压倍率（间隔 ×N）：把火力焦点留给 Boss */
 export const BOSS_SPAWN_RELIEF = 2
 
-const BY_KIND = enemiesJson.enemies as unknown as Record<string, EnemyDef>
-
 export interface EnemyMixEntry {
   def: EnemyDef
   weight: number
 }
 
 /** 某一波的出场配比（已按 sinceWave 过滤、权重夹在上下限之间） */
-export function enemyMixAt(wave: number): EnemyMixEntry[] {
-  return ENEMY_MIX.filter((m) => wave >= m.sinceWave).map((m) => ({
-    def: BY_KIND[m.kind]!,
+export function enemyMixAt(mix: readonly EnemyMixRow[], wave: number): EnemyMixEntry[] {
+  return mix.filter((m) => wave >= m.sinceWave).map((m) => ({
+    def: ENEMIES[m.kind]!,
     weight: Math.min(m.max, Math.max(m.min, m.base + m.perWave * (wave - m.sinceWave))),
   }))
 }

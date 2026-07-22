@@ -1,5 +1,7 @@
 import mapsJson from '../assets/maps.json'
 import type { Palette } from '../core/palette'
+import { ENEMIES } from '../enemies/registry'
+import type { EnemyDef, EnemyMixRow } from '../enemies/registry'
 
 // 地图 = 关卡：一种玩法一个主题——黑森林（有界竞技场）、荒漠（无限世界
 // + 终波缩圈）、奔流（单屏河流 + 水流漂移），每张图都是不同的世界规则。
@@ -29,7 +31,10 @@ export interface MapDef {
   readonly decor: MapDecor
   /** 河流图：水面漂浮物池（顺流循环，区别于岸上静态 decor） */
   readonly drift?: readonly string[]
-  // 未来扩展位：难度曲线 / 专属怪物表 / 开局 buff 等字段后续追加
+  /** 本图出怪表（波次配比——编排属于地图，不属于敌人） */
+  readonly mix: readonly EnemyMixRow[]
+  /** 本图终波 Boss：引用 enemies 里某个 role:'boss' 的 kind */
+  readonly boss: string
 }
 
 // 地图表：数据行在 defs/maps.ts（创作层），npm run gen 生成 maps.json
@@ -50,6 +55,11 @@ export function arenaSceneFor(id: MapId): 'arena' | 'arenaInfinite' | 'arenaRive
   if (kind === 'river') return 'arenaRiver'
   if (kind === 'void') return 'arenaVoid'
   return 'arena'
+}
+
+/** 本图终波 Boss 定义（按 map.boss 引用 enemies 目录） */
+export function bossFor(id: MapId): EnemyDef {
+  return ENEMIES[MAPS[id].boss]!
 }
 
 // ── 装饰散布 ────────────────────────────────────────────────
