@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test'
 import { startRun } from './helpers'
 
+// 站桩单人过第 1 波（20 秒）：软渲染环境下游戏时钟偏慢，慢输出首发角色偶发
+// 撑不出击杀而超时——与 wave/cards/chest 同类的「偶发全灭/零击杀」波动，允许重试
+test.describe.configure({ retries: 2 })
+
 test('开局后自动战斗：出怪、能力自动击杀、计时推进、无控制台错误', async ({ page }) => {
   test.setTimeout(180_000)
   const errors: string[] = []

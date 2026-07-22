@@ -80,6 +80,15 @@ interface WarmojiChestsDebug {
   discard: { x: number; y: number; w: number; h: number; refund: number }
 }
 
+interface WarmojiFieldDebug {
+  /** 地面待拾的拾取（不磁吸，需走位拾取） */
+  pickups: { id: string; polarity: 'buff' | 'debuff'; x: number; y: number }[]
+  /** 已激活的限时效果（拾取后短时生效） */
+  active: { id: string; polarity: 'buff' | 'debuff'; remainMs: number }[]
+  /** 在场携带者数（带极性光环的敌人） */
+  carriers: number
+}
+
 interface WarmojiMenuDebug {
   start: { x: number; y: number; w: number; h: number }
   settings: { x: number; y: number; w: number; h: number }
@@ -201,6 +210,8 @@ interface WarmojiDebug {
   zoneRadius?: number
   /** arena：队长主动技能状态（纯 CD 门槛） */
   skill?: { remainMs: number; ready: boolean }
+  /** arena：战场拾取（地面待拾 + 已激活效果 + 携带者数） */
+  field?: WarmojiFieldDebug
   menu?: WarmojiMenuDebug
   map?: WarmojiMapDebug
   wiki?: WarmojiWikiDebug
@@ -225,6 +236,8 @@ interface Window {
   __spawnEnemy?: (kind: string, dxU?: number, dyU?: number) => void
   __spawnArmedEnemy?: (abilityId: string, dxU?: number, dyU?: number) => void
   __dropCoins?: (n: number, dxU?: number, dyU?: number) => void
+  __spawnCarrier?: (polarity?: 'buff' | 'debuff', id?: string) => void
+  __spawnFieldPickup?: (polarity?: 'buff' | 'debuff', id?: string) => void
   __sfxStats?: () => { baked: number; played: number }
   __bgmProbe?: (
     id: 'lobby' | 'forest' | 'desert' | 'river' | 'void',

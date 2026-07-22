@@ -81,6 +81,10 @@ export class UIScene extends Phaser.Scene {
   private skillWasReady = false
   private skillShownSec = -1
   private skillShownRatio = -1
+  // 战场拾取效果指示（左上，经验条下方竖排）：图标随激活集变动重建，剩余时间条每帧重绘
+  private fxIcons: Phaser.GameObjects.Image[] = []
+  private fxBars?: Phaser.GameObjects.Graphics
+  private fxKey = ''
 
   /** 当前战斗场景 key：四套竞技场（有界/无界/河流/虚空）互斥运行，本场景只跟随其一 */
   private arenaKey: 'arena' | 'arenaInfinite' | 'arenaRiver' | 'arenaVoid' = 'arena'
@@ -124,6 +128,7 @@ export class UIScene extends Phaser.Scene {
       over: false,
       bossHp: null,
       bossMaxHp: 1,
+      battleFx: [],
     }
 
     this.joystick = new Joystick(this)
@@ -182,6 +187,7 @@ export class UIScene extends Phaser.Scene {
     if (this.arena.testMode) this.createLabControls()
 
     this.createSkillButton(res)
+    this.createFxIndicators()
 
     const arenaEvents = this.arena.events
     arenaEvents.on('wave-complete', this.onWaveComplete, this)
@@ -285,6 +291,7 @@ export class UIScene extends Phaser.Scene {
     if (this.devText) this.updateDevPanel(time)
     this.updateSkillButton()
     const s = this.arena.hudSnapshot()
+    this.updateFxIndicators(s.battleFx)
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.drawXpBar(s)
     if (s.kills !== this.last.kills) this.killsText.setText(String(s.kills))
     if (s.coins !== this.last.coins) this.coinsText.setText(String(s.coins))
@@ -458,6 +465,41 @@ export class UIScene extends Phaser.Scene {
       bump(this.skillEmoji, this.skillEmojiScale)
     }
     this.skillRing?.setAlpha(0.5 + 0.4 * Math.sin(this.time.now / 240))
+  }
+
+  // ── 战场拾取效果指示（左上角，经验条下方竖排）───────────────
+
+  private createFxIndicators(): void {
+    this.fxIcons = []
+    this.fxKey = ''
+    this.fxBars = this.add.graphics().setDepth(121)
+  }
+
+  /** 激活集变动才重建图标（低频）；剩余时间条每帧重绘（绿=增益/红=减益） */
+  private updateFxIndicators(list: HudSnapshot['battleFx']): void {
+    const x = safeInsets.left + 26
+    const y0 = safeInsets.top + 52
+    const step = 40
+    const key = list.map((f) => `${f.emoji}${f.polarity}`).join(',')
+    if (key !== this.fxKey) {
+      this.fxKey = key
+      for (const o of this.fxIcons) o.destroy()
+      this.fxIcons = list.map((f, i) =>
+        emojiImage(this, x, y0 + i * step, f.emoji, 34, 'player').setDepth(121),
+      )
+    }
+    const g = this.fxBars
+    if (!g) return
+    g.clear()
+    const barW = 34
+    list.forEach((f, i) => {
+      const by = y0 + i * step + 20
+      const ratio = f.totalMs > 0 ? Math.max(0, Math.min(1, f.remainMs / f.totalMs)) : 0
+      g.fillStyle(0x000000, 0.5)
+      g.fillRoundedRect(x - barW / 2, by, barW, 5, 2)
+      g.fillStyle(f.polarity === 'buff' ? 0x66bb6a : 0xef5350, 1)
+      g.fillRoundedRect(x - barW / 2 + 0.5, by + 0.5, Math.max(2, (barW - 1) * ratio), 4, 2)
+    })
   }
 
   /** 拾取宝箱横幅：只提示「获得宝箱」，道具内容保密到战斗后的开箱页。

@@ -10,6 +10,16 @@ import { circleBody } from '../core/arcade'
 import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from '../pickups/pickups'
 import { spawnGroundEffect, updateGroundEffects } from '../groundEffects/groundEffects'
 import type { GroundEffect } from '../groundEffects/groundEffects'
+import {
+  attachCarrierAura,
+  detachCarrierAura,
+  refoldBattleFx,
+  spawnFieldPickup,
+  updateFieldPickups,
+} from '../battlefield/battlefield'
+import type { BattleMod, FieldPickupEntity } from '../battlefield/battlefield'
+import { BATTLE_FX_IDENTITY, rollWaveCarriers } from '../battlefield/registry'
+import type { BattleEffects, FieldPickupDef, Polarity } from '../battlefield/registry'
 import { STEERERS } from '../enemies/steer'
 import { runDeathEffects } from '../enemies/deathEffects'
 import { CAPTAINS } from '../captains/registry'
@@ -109,6 +119,8 @@ export interface HudSnapshot {
   /** 终波 Boss 在场时的血量（null = 无 Boss） */
   bossHp: number | null
   bossMaxHp: number
+  /** 已激活的战场拾取效果（HUD 图标 + 剩余计时） */
+  battleFx: { emoji: string; polarity: Polarity; remainMs: number; totalMs: number }[]
 }
 
 /** 波末结算横幅的战果（本波增量） */
@@ -228,6 +240,14 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   protected palette!: Palette
   stats!: TeamStats
   teamFx: TeamEffects = foldTeamEffects([])
+  /** 战场拾取：地面待拾实体（不磁吸，需走位拾取） */
+  fieldPickups: FieldPickupEntity[] = []
+  /** 已激活的限时战斗效果（拾取后短时生效，逐个到期） */
+  battleMods: BattleMod[] = []
+  /** 当前生效的限时战斗层（与 teamFx 并行相乘，逐帧按 battleMods 重折） */
+  battleFx: BattleEffects = { ...BATTLE_FX_IDENTITY }
+  /** 在场携带者数（带极性光环的敌人）：调试/HUD 用 */
+  carrierCount = 0
   private settings: Settings = DEFAULT_SETTINGS
   run!: RunState
   private damagePool: Phaser.GameObjects.BitmapText[] = []
@@ -517,6 +537,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       over: this.over,
       bossHp: this.boss?.active ? enemyOf(this.boss).hp : null,
       bossMaxHp: bossFor(this.run.mapId).hp,
+      battleFx: this.battleMods.map((m) => ({
+        emoji: m.emoji,
+        polarity: m.polarity,
+        remainMs: Math.max(0, Math.round(m.until - this.elapsedMs)),
+        totalMs: m.totalMs,
+      })),
     }
   }
 
@@ -550,6 +576,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.pendingMarks = []
     this.skillBuffUntil = 0
     this.danceEndsAt = 0
+    // 战场拾取层：显示对象随 scene.restart 销毁，这里只需复位引用
+    this.fieldPickups = []
+    this.battleMods = []
+    this.battleFx = { ...BATTLE_FX_IDENTITY }
+    this.carrierCount = 0
     this.resetWorldFields()
 
     // 世界：物理边界/相机/地面/装饰（各图自理内部顺序）
@@ -605,6 +636,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.coins = this.add.group()
     // 正常局按当前波次配比出怪；测试模式不走出怪表（改由 spawnTest 从场内勾选出怪），此值备用
     this.enemyMix = enemyMixAt(MAPS[this.run.mapId].mix, this.testMode ? 10 : this.run.wave)
+    // 战场拾取：本波按预算铺开固定数量的携带者（本图池抽定 buff/debuff）
+    if (!this.testMode) this.scheduleCarriers()
 
     // 节点波：精英波敌潮与末波 Boss，开场警示横幅后兑现
     if (!this.testMode && isEliteWave(this.run.wave)) {
@@ -685,6 +718,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (this.stats.damageMul !== 1 && this.elapsedMs >= this.skillBuffUntil) {
       this.stats.damageMul = 1
     }
+    // 战场拾取的限时层：剔除到期项后重折（乘区实时，先于移动/攻击/敌速消费）
+    refoldBattleFx(this)
 
     this.frameSlowZones.length = 0
     this.frameAttractors.length = 0
@@ -699,6 +734,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     updateEnemyProjectiles(this)
     updateGroundEffects(this)
     magnetCoins(this)
+    updateFieldPickups(this)
     sweepProjectiles(this, delta)
     this.cullProjectiles()
     this.updateWorld(delta)
@@ -728,6 +764,20 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       skill: {
         remainMs: Math.round(this.run.skillCdMs),
         ready: this.run.skillCdMs <= 0,
+      },
+      field: {
+        pickups: this.fieldPickups.map((p) => ({
+          id: p.def.id,
+          polarity: p.def.polarity,
+          x: p.x,
+          y: p.y,
+        })),
+        active: this.battleMods.map((m) => ({
+          id: m.id,
+          polarity: m.polarity,
+          remainMs: Math.max(0, Math.round(m.until - this.elapsedMs)),
+        })),
+        carriers: this.carrierCount,
       },
       ...this.debugExtras(),
     })
@@ -922,19 +972,25 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       : upgradeTiers(id, owned)
     const memberCtx: AbilityContext = {
       ...this.abilityCtx,
-      damageMul: () => this.stats.damageMul * fx.damageMul * this.teamFx.teamDamageMul,
+      damageMul: () =>
+        this.stats.damageMul * fx.damageMul * this.teamFx.teamDamageMul * this.battleFx.teamDamageMul,
       // 黏滞减速：被黏黏怪蹭到的队员攻速惩罚（叠乘进冷却，到时自动失效）
       cooldownMul: () => {
         const mm = this.members[slot]
         const atk = mm && mm.atkSlowUntil > this.elapsedMs ? mm.atkSlowMul : 1
         return (
-          this.stats.cooldownMul * fx.cooldownMul * this.teamFx.teamCooldownMul * atk * this.testFireFactor()
+          this.stats.cooldownMul *
+          fx.cooldownMul *
+          this.teamFx.teamCooldownMul *
+          this.battleFx.teamCooldownMul *
+          atk *
+          this.testFireFactor()
         )
       },
       // 伤害/子弹带上来源槽位：结算页按角色统计输出与击杀。
       // 暴击/击退倍率在这里收口：所有能力伤害路径统一生效，无需逐能力改造
       damageTarget: (e, d, kb, sx, sy) => {
-        const critChance = Math.min(0.5, fx.critChance + this.teamFx.critAdd)
+        const critChance = Math.min(0.5, fx.critChance + this.teamFx.critAdd + this.battleFx.critAdd)
         const crit = critChance > 0 && this.rng.next() < critChance
         this.applyDamage(
           e as ImageObj,
@@ -1048,7 +1104,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const ui = this.scene.get('ui') as UIScene
     const dir = kx !== 0 || ky !== 0 ? norm(kx, ky) : ui.joystickVector
     this.teamDir = dir
-    const step = (this.stats.moveSpeed * delta) / 1000
+    const step = (this.stats.moveSpeed * this.battleFx.moveSpeedMul * delta) / 1000
     const drift = this.teamDrift(delta)
     const next = this.constrainTeam({
       x: this.center.x + dir.x * step + drift.x,
@@ -1448,6 +1504,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.recordKillStats(a)
     this.runOnKill(srcSlot)
     this.grantKillRewards(a, enemy)
+    // 战场拾取携带者：在原地掉下所背拾取（不磁吸，待走位拾取）
+    if (a.carries) spawnFieldPickup(this, enemy.x, enemy.y, a.carries)
     if (a.boss) this.onBossDown(enemy)
     // 亡语（死者视角）：蘑菇留毒/泡泡分裂/幽灵治疗等，走组合式效果
     runDeathEffects(this, a)
@@ -1499,6 +1557,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   /** 清体：停用 + 拆械 + 死亡爆点 + 四象限碎片（继承致死击退速度不衰减）+ 销毁 */
   private despawnKilled(enemy: ImageObj, a: Enemy, flingVx: number, flingVy: number): void {
+    detachCarrierAura(this, a)
     if (a.abilities) for (const w of a.abilities) w.destroy()
     this.deathBurst.explode(6, enemy.x, enemy.y)
     spawnShards(this, enemy, flingVx, flingVy)
@@ -1578,6 +1637,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   /** 静默移除：替身尸壳到时消失——不计击杀、不掉落、不跑死亡效果，只留一缕烟 */
   private despawnEnemy(enemy: ImageObj): void {
     const a = enemyOf(enemy)
+    detachCarrierAura(this, a)
     if (a.abilities) for (const w of a.abilities) w.destroy()
     this.puffBurst.explode(8, enemy.x, enemy.y)
     releasePooled(enemy)
@@ -1663,7 +1723,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   /** 预告标记闪烁 → 落地：常规刷怪与试炼场共用（boss 用更大更久的预告，走 Boss 落点）。
    * 预告期间无碰撞；pos 登记进注册表，固定相机图旋转重映射时原位改写、落点自动跟随 */
-  private spawnTelegraphed(def: EnemyDef, hp: number, elite: boolean, boss: boolean): void {
+  private spawnTelegraphed(
+    def: EnemyDef,
+    hp: number,
+    elite: boolean,
+    boss: boolean,
+    carries?: FieldPickupDef,
+  ): void {
     const pos = boss ? this.bossSpawnPoint() : this.spawnPoint()
     this.pendingSpawns++
     const mark = emojiImage(this, pos.x, pos.y, SPAWN.markEmoji, SPAWN.markSize * UNIT * (boss ? 2 : 1))
@@ -1682,7 +1748,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       mark.destroy()
       this.pendingSpawns--
       this.pendingMarks = this.pendingMarks.filter((x) => x !== entry)
-      if (!this.over) this.materializeEnemy(def, pos.x, pos.y, hp, elite, boss)
+      if (!this.over) this.materializeEnemy(def, pos.x, pos.y, hp, elite, boss, 1, carries)
     })
   }
 
@@ -1706,6 +1772,33 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     })
   }
 
+  /** 战场拾取携带者：本波按预算（rollWaveCarriers）铺开固定数量的携带者，
+   * 均匀撒在本波中前段（留出波末结算空档）。每名携带者背 1 件本图拾取，
+   * 是从出怪表随机取的普通敌人 + 极性光环，死亡即在原地掉拾取 */
+  private scheduleCarriers(): void {
+    // 第 1 波是纯净战斗开场（单人起步、约 20 秒）：先让玩家熟悉走位与自动战斗，
+    // 战场拾取从第 2 波起——此时已招到首名队员，能真正做趋避走位（预算表其余档位不变）
+    if (this.run.wave < 2) return
+    const isBoss = isBossWave(this.run.wave)
+    const carriers = rollWaveCarriers(this.run.mapId, this.run.wave, isBoss, () => this.rng.next())
+    if (carriers.length === 0) return
+    const dur = waveDurationMs(this.run.wave)
+    carriers.forEach((pickup, i) => {
+      const at = dur * 0.12 + (dur * 0.7 * i) / carriers.length
+      this.time.delayedCall(at, () => {
+        if (!this.over) this.spawnCarrier(pickup)
+      })
+    })
+  }
+
+  /** 落一名携带者（从当前出怪表取普通怪 + carries 载荷；场上过挤则本次跳过） */
+  private spawnCarrier(pickup: FieldPickupDef): void {
+    if (this.spawnCapCount() + this.pendingSpawns >= SPAWN.maxAlive) return
+    const def = toPx(pickEnemy(this.enemyMix, () => this.rng.next()))
+    const hp = Math.round(def.hp * waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier)
+    this.spawnTelegraphed(def, hp, false, false, pickup)
+  }
+
   /** 敌人潮：一段时间内密集落地一批敌人（含保底精英） */
   private spawnSurge(): void {
     const hpMul = waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier
@@ -1724,6 +1817,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     elite = false,
     boss = false,
     alpha = 1,
+    carries?: FieldPickupDef,
   ): Enemy {
     // 落点经世界钩子兜底（有界钳制/河流钳跨向/虚空回绕；分裂溅出等边缘情况）
     const pos = this.constrainEnemyPos({ x, y }, def.radius)
@@ -1774,8 +1868,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       anim,
       // 舞会窗口内落地：跟着跳（全场蹦迪对新敌同样生效）
       danceUntil: this.elapsedMs < this.danceEndsAt ? this.danceEndsAt : 0,
+      carries,
     })
     armEnemy(this, a, fireAt - this.elapsedMs)
+    // 携带者：挂极性光环（死亡时在原地掉拾取，见 killEnemy）
+    if (carries) a.aura = attachCarrierAura(this, enemy, carries.polarity)
     if (boss) this.boss = enemy
     const targetScale = enemy.scale
     enemy.setScale(targetScale * (boss ? 0.2 : 0.3)).setAlpha(boss ? 0.2 : 0.3)
@@ -1852,7 +1949,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       factor *= a.abilitySlowMul
     }
     // 时之沙的全局减速与精英加速同为「体质」倍率，不参与光环减速的染色判定
-    return factor * a.spMul * this.teamFx.enemySlowMul
+    return factor * a.spMul * this.teamFx.enemySlowMul * this.battleFx.enemySlowMul
   }
 
   private nearestAlive(x: number, y: number): Member | undefined {
@@ -1878,6 +1975,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       const a = enemyOf(e)
+      // 携带者光环随敌跟位（休眠者原地不动，位置已同步，无需再更新）
+      if (a.aura) a.aura.setPosition(e.x, e.y)
       if (a.dormant) continue
       // 亡语替身：到时静默消失（不走死亡结算/掉落，只留一缕烟）
       if (a.despawnAt !== 0 && now >= a.despawnAt) {

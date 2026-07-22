@@ -1,7 +1,9 @@
+import type Phaser from 'phaser'
 import type { EnemyDef } from './registry'
 import type { AbilityOwner, AbilityRuntime } from '../abilities/types'
 import type { Animator } from '../emoji/animator'
 import type { ImageObj } from '../battle/BaseArenaScene'
+import type { FieldPickupDef } from '../battlefield/registry'
 
 // 时间戳字段一律 0 哨兵 = 未生效。
 
@@ -56,6 +58,10 @@ export interface Enemy {
   owner?: Enemy
   /** 定时消失时刻（0 = 不消失）：替身到时静默移除，不走死亡结算 */
   despawnAt: number
+  /** 战场拾取携带者：非空即死亡时在原地掉此拾取（带极性光环 aura） */
+  carries?: FieldPickupDef
+  /** 携带者的极性光环 GameObject（随敌跟位，离场即销毁） */
+  aura?: Phaser.GameObjects.Arc
   /** 摇摆/动画随机相位 */
   ph: number
   anim?: Animator

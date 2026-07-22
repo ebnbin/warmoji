@@ -24,6 +24,9 @@ import { toPx } from './battle/px'
 import { ABILITIES } from './abilities/registry'
 import type { AbilityDef } from './abilities/defs'
 import { spawnCoins } from './pickups/pickups'
+import { spawnFieldPickup } from './battlefield/battlefield'
+import { FIELD_PICKUPS, fieldPickupsFor } from './battlefield/registry'
+import type { Polarity } from './battlefield/registry'
 import { rollChestLoot } from './pickups/chest'
 import type { ItemId } from './items/registry'
 import { UNIT } from './core/units'
@@ -171,6 +174,30 @@ window.__dropCoins = (n: number, dxU = 2, dyU = 0): void => {
     if (!game.scene.isActive(key)) continue
     const sc = game.scene.getScene(key) as BaseArenaScene
     spawnCoins(sc, sc.center.x + dxU * UNIT, sc.center.y + dyU * UNIT, n)
+  }
+}
+// e2e：投放一名战场拾取携带者（本图池按极性随机取，或指定 id）——带极性光环，死亡掉拾取
+window.__spawnCarrier = (polarity: Polarity = 'buff', id?: string): void => {
+  const base = ENEMY_DEFS.find((s) => s.kind === 'zombie')
+  if (!base) return
+  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
+    if (!game.scene.isActive(key)) continue
+    const sc = game.scene.getScene(key) as BaseArenaScene
+    const pool = fieldPickupsFor(sc.run.mapId).filter((p) => p.polarity === polarity)
+    const def = (id ? FIELD_PICKUPS[id] : undefined) ?? pool[Math.floor(Math.random() * pool.length)]
+    if (!def) continue
+    const px = toPx(base)
+    sc.materializeEnemy(px, sc.center.x + 2 * UNIT, sc.center.y, px.hp, false, false, 1, def)
+  }
+}
+// e2e：直接在队伍中心掉一枚地面拾取（下一帧即被走位判定收取），验证拾取→限时效果链
+window.__spawnFieldPickup = (polarity: Polarity = 'buff', id?: string): void => {
+  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
+    if (!game.scene.isActive(key)) continue
+    const sc = game.scene.getScene(key) as BaseArenaScene
+    const pool = fieldPickupsFor(sc.run.mapId).filter((p) => p.polarity === polarity)
+    const def = (id ? FIELD_PICKUPS[id] : undefined) ?? pool[Math.floor(Math.random() * pool.length)]
+    if (def) spawnFieldPickup(sc, sc.center.x, sc.center.y, def)
   }
 }
 window.__sfxStats = (): { baked: number; played: number } => sfxStats()
