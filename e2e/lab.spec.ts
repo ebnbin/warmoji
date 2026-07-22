@@ -10,6 +10,9 @@ test('试炼场入口：选地图即直接进入沙盒（跳过队长/组队）'
   await enterLab(page)
   // 直接落在竞技场，且是试炼场地图（未经队长/组队/商店）
   await page.waitForFunction(() => window.__warmoji?.mapId === 'lab')
+  // 队伍来自试炼场勾选阵容（默认 3 角色），而非压测的固定 5 人——验证角色选择生效
+  const alive = await page.evaluate(() => window.__warmoji!.alive)
+  expect(alive).toBe(3)
 })
 
 test('试炼场：只出勾选的敌人、玩家免死无时限', async ({ page }) => {

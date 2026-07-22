@@ -559,8 +559,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.centerObj = this.add.zone(this.center.x, this.center.y, 1, 1)
 
     this.memberGroup = this.add.group()
-    // 压测固定 5 人满编便于跑分对比；正常局阵容来自 run（招募制，逐波扩编）
-    const rosterIds = this.sandbox ? ROSTER_IDS.slice(0, 5) : this.run.roster
+    // 压测固定 5 人满编便于跑分对比；正常局/试炼场阵容来自 run（试炼场即场内勾选的角色）
+    const rosterIds = this.flood ? ROSTER_IDS.slice(0, 5) : this.run.roster
     this.lineup = rosterIds.map((id) => CHARACTERS[id])
     // 槽位 → 队形岗位：满员 N 保 1 按 guardOrder（0 号岗 = 受保护中心，
     // 互换中心不影响其他人的岗位）；未满员/压测为环形，槽位即岗位
@@ -593,7 +593,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       },
       setVisualOffset: () => {},
     }
-    this.captainAbilities = this.sandbox
+    // 压测不装队长技能（省开销）；正常局/试炼场都装——试炼场靠它测队长主动技能
+    this.captainAbilities = this.flood
       ? []
       : CAPTAINS[this.run.captainId].skill.abilities.map((a) => createAbility(toPx(a), this.abilityCtx, 0))
 
@@ -726,7 +727,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       camY: cam.worldView.centerY,
       formation: this.activeFormation(),
       mapId: this.run.mapId,
-      skill: this.sandbox
+      skill: this.flood
         ? undefined
         : {
             remainMs: Math.round(this.run.skillCdMs),
@@ -747,7 +748,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     beans: number
     ready: boolean
   } | null {
-    if (this.sandbox) return null
+    if (this.flood) return null
     const s = CAPTAINS[this.run.captainId].skill
     return {
       name: s.name,
@@ -772,7 +773,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   /** 释放主动技能（UIScene 按钮/E 键触发）。这里只是触发策略：就绪/弹药
    * 校验、扣豆、重置跨波 CD；效果本体是队长持有的标准能力行，逐个单发 */
   castSkill(): boolean {
-    if (this.over || this.sandbox || this.run.skillCdMs > 0 || this.run.beans <= 0) return false
+    if (this.over || this.flood || this.run.skillCdMs > 0 || this.run.beans <= 0) return false
     const s = CAPTAINS[this.run.captainId].skill
     this.run.beans -= 1
     this.run.skillCdMs = s.cdMs
