@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { chestCandidates, chestDropped, rollChestLoot } from './chest'
+import { chestCandidates, chestDropped, chestTargets, rollChestLoot } from './chest'
 import { CHEST_LOOT } from './chest'
+import type { CharacterId } from '../characters/registry'
 import type { ItemId } from '../items/registry'
 import { ITEMS } from '../items/registry'
 import { Rng } from '../core/rng'
@@ -77,5 +78,37 @@ describe('chest 开箱抽取：越稀有概率越低', () => {
     // 稀有/史诗抽得到（不是零概率）
     expect(byRarity.rare).toBeGreaterThan(0)
     expect(byRarity.epic).toBeGreaterThan(0)
+  })
+})
+
+// 开箱页据此列出「这件道具此刻能给谁」（slot=-1 队长）
+describe('chestTargets 某道具的可应用目标', () => {
+  const roster = ['juggler', 'unicorn', 'troll'] as CharacterId[]
+  const empty: ItemId[][] = [[], [], []]
+
+  it('通用道具人人可用：返回全部角色槽位，不含队长', () => {
+    expect(chestTargets(roster, empty, [], 'gemHeart' as ItemId)).toEqual([0, 1, 2])
+  })
+
+  it('团队道具只有队长可选：返回 [-1]', () => {
+    expect(chestTargets(roster, empty, [], 'marchFlag' as ItemId)).toEqual([-1])
+  })
+
+  it('某角色满层则排除该槽位', () => {
+    const items: ItemId[][] = [[], ['vampFang', 'vampFang'] as ItemId[], []] // vampFang max=2
+    expect(chestTargets(roster, items, [], 'vampFang' as ItemId)).toEqual([0, 2])
+  })
+
+  it('队长团队道具满层后连队长也排除，返回空（只能丢弃）', () => {
+    const capMaxed = ['clover', 'clover'] as ItemId[] // clover team max=2
+    expect(chestTargets(roster, empty, capMaxed, 'clover' as ItemId)).toEqual([])
+  })
+
+  it('升级卡仅归属角色、且需先满足解锁门槛', () => {
+    expect(chestTargets(roster, empty, [], 'upgradeJuggler1' as ItemId)).toEqual([])
+    const gated: ItemId[][] = [['gemHeart', 'whetstone'] as ItemId[], [], []]
+    expect(chestTargets(roster, gated, [], 'upgradeJuggler1' as ItemId)).toEqual([0])
+    const other: ItemId[][] = [[], ['gemHeart', 'whetstone'] as ItemId[], []]
+    expect(chestTargets(roster, other, [], 'upgradeJuggler1' as ItemId)).toEqual([])
   })
 })

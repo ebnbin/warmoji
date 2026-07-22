@@ -48,6 +48,9 @@ export interface RunState {
   /** 按槽位的已购道具（重复 = 堆叠） */
   memberItems: ItemId[][]
   captainItems: ItemId[]
+  /** 战斗中拾取、尚未开启的宝箱：每个存一件掉落时抽定的道具（对玩家保密到开箱），
+   * 战斗结束后在开箱页由玩家逐个决定归属或丢弃返半价，开完才进招募/商店 */
+  chests: ItemId[]
   /** 本次商店剩余的免费刷新次数（进店时按队长能力重置） */
   freeRefreshes: number
   /** 队长主动技能的剩余冷却：跨波持久，战斗内实时递减（商店/整编不走表） */
@@ -102,6 +105,7 @@ export function beginRun(
     memberHp: roster.map(() => MEMBER.maxHp),
     memberItems: roster.map(() => []),
     captainItems: [],
+    chests: [],
     freeRefreshes: 0,
     // 开局 CD 即就绪：首放只卡在挣第一颗豆上
     skillCdMs: 0,

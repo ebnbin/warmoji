@@ -3,11 +3,12 @@ import type { CharacterId } from '../characters/registry'
 import type { ItemId } from '../items/registry'
 import { upgradeCardAvailable, captainPool, characterPool, ITEMS, reachedStackLimit } from '../items/registry'
 
-// 宝箱开箱抽取：候选 = 各上场角色的道具池 ∪ 队长道具池，即「本局当前阵容
-// 用得上的道具」。同一道具进多个角色的池 = 多个候选条目，抽中哪条归谁；
-// 尊重堆叠上限与升级卡解锁门槛（和商店同规则），按稀有度权重加权抽取。
+// 宝箱掉落抽取：候选 = 各上场角色的道具池 ∪ 队长道具池，即「本局当前阵容
+// 用得上的道具」。同一道具进多个角色的池 = 多个候选条目，抽中哪条只取其道具
+// （归属留给战斗后的开箱页由玩家选）；尊重堆叠上限与升级卡解锁门槛（和商店同规则），
+// 按稀有度权重加权抽取。开箱页再用 chestTargets 现算某道具此刻能给谁。
 
-/** 开箱战利品：道具 + 归属（slot = 角色槽位；-1 = 队长/团队道具） */
+/** 掉落抽取结果：道具 + 一个可用归属（slot = 角色槽位；-1 = 队长/团队道具） */
 export interface ChestLoot {
   itemId: ItemId
   slot: number
@@ -39,6 +40,19 @@ export function chestCandidates(
   return entries
 }
 
+/** 某道具此刻可应用的槽位（-1 = 队长）：开箱页据此列出可选角色。
+ * 与掉落同规则（池匹配 + 堆叠上限 + 升级卡门槛），空数组 = 只能丢弃 */
+export function chestTargets(
+  roster: readonly CharacterId[],
+  memberItems: readonly (readonly ItemId[])[],
+  captainItems: readonly ItemId[],
+  itemId: ItemId,
+): number[] {
+  return chestCandidates(roster, memberItems, captainItems)
+    .filter((c) => c.itemId === itemId)
+    .map((c) => c.slot)
+}
+
 /** 开箱：稀有度加权随机抽 1 件；全无候选（池全部抽满）返回 null */
 export function rollChestLoot(
   roster: readonly CharacterId[],
@@ -59,8 +73,8 @@ export function rollChestLoot(
   return entries[entries.length - 1]!
 }
 
-// 宝箱掉落经济旋钮：击杀极小概率掉落（精英显著更高），拾取开出 1 件
-// 免费随机道具立即生效。宝箱实体本身（emoji/尺寸）在 pickups/registry
+// 宝箱掉落经济旋钮：击杀极小概率掉落（精英显著更高）。拾取只收集不开，
+// 战斗后统一进开箱页。宝箱实体本身（emoji/尺寸）在 pickups/registry
 export const CHEST_LOOT = {
   chance: 0.008,
   eliteChance: 0.08,

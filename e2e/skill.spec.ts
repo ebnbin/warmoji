@@ -5,6 +5,7 @@ import {
   clickShopNext,
   completePromote,
   confirmCaptain,
+  drainChests,
   enterCaptain,
 } from './helpers'
 
@@ -63,6 +64,7 @@ test('队长主动技能：开局无豆不可放、攒豆后释放进入冷却�
     }
     if (st.scene === 'promote') await completePromote(page)
     else if (st.scene === 'shop') await clickShopNext(page)
+    else if (st.scene === 'chests') await drainChests(page)
     else if (st.scene === 'arena') await kiteStep(page, i)
     else await page.waitForTimeout(400)
   }
@@ -93,6 +95,7 @@ test('队长主动技能：开局无豆不可放、攒豆后释放进入冷却�
     if (scene === 'arena') break
     if (scene === 'promote') await completePromote(page)
     else if (scene === 'shop') await clickShopNext(page)
+    else if (scene === 'chests') await drainChests(page)
     else await page.waitForTimeout(400)
   }
   await page.waitForFunction(

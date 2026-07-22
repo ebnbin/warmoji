@@ -3,8 +3,6 @@ import { CAPTAINS } from '../captains/registry'
 import { SKILL } from '../captains/skill'
 import { PICKUPS } from '../pickups/registry'
 import { formatTime } from '../core/format'
-import { RARITIES } from '../items/registry'
-import type { ItemRarity } from '../items/registry'
 import { endRun, getRun } from '../run/state'
 import { isDevOpen, setDevOpen } from '../debug/dev'
 import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
@@ -196,13 +194,13 @@ export class UIScene extends Phaser.Scene {
     arenaEvents.on('wave-complete', this.onWaveComplete, this)
     arenaEvents.on('wave-warning', this.onWaveWarning, this)
     arenaEvents.on('skill-cast', this.onSkillCast, this)
-    arenaEvents.on('chest-open', this.onChestOpen, this)
+    arenaEvents.on('chest-collected', this.onChestOpen, this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       arenaEvents.off('wave-complete', this.onWaveComplete, this)
       arenaEvents.off('wave-warning', this.onWaveWarning, this)
       arenaEvents.off('skill-cast', this.onSkillCast, this)
-      arenaEvents.off('chest-open', this.onChestOpen, this)
+      arenaEvents.off('chest-collected', this.onChestOpen, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       // devText 在 SHUTDOWN 里随场景对象一起销毁；清引用，否则关闭 dev 后
       // restart 不重建面板，update 仍对已销毁的 Text 调 setText → 渲染撞空 → 卡死
@@ -513,20 +511,20 @@ export class UIScene extends Phaser.Scene {
     this.skillRing?.setAlpha(0.5 + 0.4 * Math.sin(this.time.now / 240))
   }
 
-  /** 开箱横幅：道具名按稀有度着色 + 归属；位置比技能横幅低一档避免叠字。
-   * 连开多箱（精英潮 AOE）按在场横幅数逐条下移，不互相糊字 */
-  private onChestOpen(loot: { emoji: string; name: string; rarity: ItemRarity; owner: string }): void {
+  /** 拾取宝箱横幅：只提示「获得宝箱」，道具内容保密到战斗后的开箱页。
+   * 连拾多箱（精英潮 AOE）按在场横幅数逐条下移，不互相糊字 */
+  private onChestOpen(): void {
     this.chestBanners += 1
     const t = emojiText(
       this,
       viewport.logicalWidth / 2,
       viewport.logicalHeight * 0.46 + (this.chestBanners - 1) * 44,
-      `{${loot.emoji}} ${loot.name} → ${loot.owner}`,
+      `{${PICKUPS.chest.emoji}} 获得宝箱`,
       {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
         fontStyle: 'bold',
-        color: RARITIES[loot.rarity].color,
+        color: '#ffd54f',
         stroke: '#000000',
         strokeThickness: 5,
         align: 'center',

@@ -865,10 +865,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       coins: this.run.coins - this.waveBaseCoins,
       levels: this.run.xp.level - this.waveBaseLevel,
     } satisfies WaveSummary)
-    // 通关 → 胜利结算；否则有待结算点数才进整编页（首次满员顺带阵型页），
-    // 没点数直进商店——阵型调整的常驻入口在商店
+    // 通关 → 胜利结算；否则本波拾到宝箱先进开箱页（玩家逐个决定归属/丢弃），
+    // 再按有无招募名额进整编页（首次满员顺带阵型页）或直进商店
     this.time.delayedCall(WAVE.summaryMs, () => {
       if (finished) this.scene.start('result', { win: true })
+      else if (this.run.chests.length > 0) this.scene.start('chests')
       else this.scene.start(promoteStep(this.run) ? 'promote' : 'shop')
     })
   }

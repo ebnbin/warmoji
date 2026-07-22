@@ -1,28 +1,18 @@
 import { playSfx } from '../audio/sfx'
 import { CAPTAINS } from '../captains/registry'
-import { CHARACTERS, MEMBER, TEAM, loadoutFor } from '../characters/registry'
-import { memberMaxHp } from '../characters/stats'
 import { emojiKey } from '../emoji/textures'
-import {
-  upgradeTiers,
-  aggregateCharacterEffects,
-  aggregateTeamEffects,
-  ITEMS,
-  resolveAbilityDef,
-} from '../items/registry'
 import { UNIT } from '../core/units'
 import { norm } from '../core/vec'
 import { rollChestLoot } from './chest'
 import { PICKUP, PICKUPS } from './registry'
-import { createAbility } from '../abilities/create'
 import { KNOCKBACK } from '../abilities/registry'
 import { acquirePooled, releasePooled } from '../core/pool'
-import { toPx } from '../battle/px'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
-// 拾取经济：金币/宝箱的生成、磁吸、入账与开箱即时生效，外加击杀碎裂的
-// 经验珠视觉。宝箱与金币同组同管线（data 标记分流）；世界差异（钳制/
-// 回收/闲置漂移）全部经场景钩子（constrainCoinPos/cullCoin/coinIdleVelocity）。
+// 拾取经济：金币/宝箱的生成、磁吸、入账，外加击杀碎裂的经验珠视觉。
+// 宝箱拾取只收集（存进 run.chests，战斗后开箱页统一开），不立即生效、不定归属。
+// 宝箱与金币同组同管线（data 标记分流）；世界差异（钳制/回收/闲置漂移）
+// 全部经场景钩子（constrainCoinPos/cullCoin/coinIdleVelocity）。
 
 export function spawnCoins(scene: BaseArenaScene, x: number, y: number, count: number): void {
   for (let i = 0; i < count; i++) {
@@ -103,7 +93,8 @@ export function spawnChest(scene: BaseArenaScene, x: number, y: number): void {
   scene.tweens.add({ targets: chest, scale: base, duration: 220, ease: 'Back.easeOut' })
 }
 
-/** 开箱：抽 1 件当前阵容用得上的道具，免费入包并立即生效 */
+/** 拾取宝箱：抽定 1 件本局阵容用得上的道具存进 run.chests（保密到开箱），
+ * 只收集不生效、不定归属——战斗结束后进开箱页由玩家决定。全池抽满则补底金币 */
 function openChest(scene: BaseArenaScene, chest: ImageObj): void {
   const { x, y } = chest
   releasePooled(chest)
@@ -119,52 +110,8 @@ function openChest(scene: BaseArenaScene, chest: ImageObj): void {
     scene.run.coins += PICKUPS.chest.fallbackCoins ?? 0
     return
   }
-  let owner: string
-  if (loot.slot < 0) {
-    scene.run.captainItems.push(loot.itemId)
-    // 队长道具全部经 teamFx 实时读取，重算即生效
-    scene.teamFx = aggregateTeamEffects(scene.run.captainItems)
-    scene.stats.moveSpeed = CAPTAINS[scene.run.captainId].moveSpeed * UNIT * scene.teamFx.moveSpeedMul
-    owner = `队长${CAPTAINS[scene.run.captainId].name}`
-  } else {
-    scene.run.memberItems[loot.slot]?.push(loot.itemId)
-    refreshMemberItems(scene, loot.slot)
-    owner = CHARACTERS[scene.run.roster[loot.slot]!]?.name ?? ''
-  }
-  const item = ITEMS[loot.itemId]
-  scene.events.emit('chest-open', {
-    emoji: item.emoji,
-    name: item.name,
-    rarity: item.rarity,
-    owner,
-  })
-}
-
-/** 开箱即时生效：按最新道具重算派生属性并热重建能力（升级卡质变/
- * 射程弹速类立即可见）。每波开局 createMember 整体重建，这里只覆盖本波剩余 */
-function refreshMemberItems(scene: BaseArenaScene, slot: number): void {
-  const m = scene.members[slot]
-  const id = scene.run.roster[slot]
-  if (!m || !id) return
-  const owned = scene.run.memberItems[slot] ?? []
-  const fx = aggregateCharacterEffects(owned)
-  // 原地覆写：能力 ctx 闭包读的就是这个对象（伤害/攻速/暴击/击退实时生效）
-  Object.assign(m.fx, fx)
-  const maxHp = memberMaxHp(fx.hpAdd, CAPTAINS[scene.run.captainId].hpMul)
-  if (m.alive) m.hp = Math.max(1, Math.min(maxHp, m.hp + Math.max(0, maxHp - m.maxHp)))
-  else m.hp = Math.min(m.hp, maxHp)
-  m.maxHp = maxHp
-  m.shownHpRatio = -1
-  m.iframesMs = MEMBER.iframesMs + fx.iframesAddMs
-  m.reviveMs = Math.max(1000, TEAM.reviveMs * CAPTAINS[scene.run.captainId].reviveMul + fx.reviveAddMs)
-  m.regenPerSec = fx.regenPerSec
-  m.thorns = fx.thorns
-  m.killHeal = fx.killHeal
-  for (const w of m.abilities) w.destroy()
-  m.abilities = loadoutFor(CHARACTERS[id], upgradeTiers(id, owned)).map((w, i) =>
-    createAbility(toPx(resolveAbilityDef(w, m.fx)), m.ctx, 200 + i * 230),
-  )
-  if (!m.alive) for (const w of m.abilities) w.setVisible(false)
+  scene.run.chests.push(loot.itemId)
+  scene.events.emit('chest-collected')
 }
 
 /** 击杀碎裂：敌人纹理四分为碎片抛散淡出（对象池复用，见 scene.shardPool） */

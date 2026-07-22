@@ -179,6 +179,24 @@ export async function clickFormationMember(page: Page, id: string): Promise<void
   await page.waitForFunction((cid) => window.__warmoji?.promote?.formation?.center === cid, id)
 }
 
+/** 若当前在开箱页，把所有宝箱开完（有可用角色就应用第一个，否则丢弃），直到离开。
+ * 不在开箱页则为空操作——供跨波流程透明穿过战斗后新增的开箱页 */
+export async function drainChests(page: Page): Promise<void> {
+  for (let i = 0; i < 20; i++) {
+    const scene = await page.evaluate(() => window.__warmoji?.scene)
+    if (scene !== 'chests') return
+    const c = await page.evaluate(() => window.__warmoji!.chests!)
+    const before = c.remaining
+    const t = c.targets[0]
+    const pt = t ? { x: t.x + t.w / 2, y: t.y + t.h / 2 } : { x: c.discard.x, y: c.discard.y }
+    await page.locator('#game canvas').click({ position: await cssPoint(page, pt) })
+    await page.waitForFunction(
+      (b) => window.__warmoji?.scene !== 'chests' || (window.__warmoji?.chests?.remaining ?? 0) < b,
+      before,
+    )
+  }
+}
+
 /** 商店页点击「开始第 N 波」进入下一波 */
 export async function clickShopNext(page: Page): Promise<void> {
   const s = await page.evaluate(() => window.__warmoji!.shop!.start)

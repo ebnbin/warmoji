@@ -50,6 +50,18 @@ interface WarmojiShopDebug {
   formation: { x: number; y: number; w: number; h: number } | null
 }
 
+interface WarmojiChestsDebug {
+  /** 待开箱数（含当前正在开的这个） */
+  remaining: number
+  /** 当前宝箱里的道具 id（无则 null） */
+  item: string | null
+  rarity: 'common' | 'rare' | 'epic' | null
+  /** 可应用的目标：slot=-1 队长，否则角色槽位 */
+  targets: { slot: number; x: number; y: number; w: number; h: number }[]
+  /** 丢弃按钮 + 返还金币 */
+  discard: { x: number; y: number; w: number; h: number; refund: number }
+}
+
 interface WarmojiMenuDebug {
   start: { x: number; y: number; w: number; h: number }
   settings: { x: number; y: number; w: number; h: number }
@@ -144,7 +156,7 @@ interface WarmojiResultDebug {
 }
 
 interface WarmojiDebug {
-  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'promote' | 'shop' | 'arena' | 'result'
+  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'promote' | 'chests' | 'shop' | 'arena' | 'result'
   elapsed: number
   hp: number
   alive: number
@@ -178,6 +190,7 @@ interface WarmojiDebug {
   settings?: WarmojiSettingsDebug
   captain?: WarmojiCaptainDebug
   promote?: WarmojiPromoteDebug
+  chests?: WarmojiChestsDebug
   shop?: WarmojiShopDebug
   result?: WarmojiResultDebug
 }
@@ -188,6 +201,7 @@ interface Window {
   __setLab?: (kinds: string[], mapId?: string) => void
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
+  __addChest?: (itemId?: string) => void
   __setWave?: (n: number) => void
   __spawnEnemy?: (kind: string, dxU?: number, dyU?: number) => void
   __spawnArmedEnemy?: (abilityId: string, dxU?: number, dyU?: number) => void
