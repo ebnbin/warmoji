@@ -9,6 +9,7 @@ import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
 import { emojiImage, emojiKey, emojiText, ensureEmoji, loadEmojiPack } from '../emoji/textures'
 import { EmojiGrid } from './grid'
+import { ScrollView } from './scroll'
 import { FONT, UI_FONT } from '../core/fonts'
 import { TAP_SLOP } from '../core/units'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
@@ -48,7 +49,7 @@ const PORTRAIT: WikiLayout = {
 /** 详情卡对象池：Text 只创建一次，切换条目仅 setText——
  * 点击时批量 创建+销毁 文本会触发成串的 canvas 光栅化与 GPU 纹理增删（真机掉帧主因） */
 interface DetailPool {
-  panel: Phaser.GameObjects.Graphics
+  view: ScrollView
   icon: Phaser.GameObjects.Image
   badge: Phaser.GameObjects.Text
   name: Phaser.GameObjects.Text
@@ -330,7 +331,8 @@ export class WikiScene extends Phaser.Scene {
     this.reportWiki()
   }
 
-  /** 详情卡对象池：所有 Text/Image 只创建一次，之后仅 setText/setTexture 复用 */
+  /** 详情卡对象池：所有 Text/Image 只创建一次，之后仅 setText/setTexture 复用。
+   * 正文（名称/介绍/属性分段）装进可滚动容器——分段数不再封顶 6、内容也不再被硬截断 */
   private ensurePool(): DetailPool {
     if (this.pool) return this.pool
     const res = textRes()
@@ -344,8 +346,11 @@ export class WikiScene extends Phaser.Scene {
     panel.lineStyle(1, 0xffffff, 0.1)
     panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
 
+    // 底部留 40px 给固定页脚（收录进度），正文滚动区在其之上
+    const view = new ScrollView(this, { x: dx, y: dy, w: D.w, h: D.h - 40 })
+
     const badge = this.add
-      .text(dx + D.w - 20, dy + 30, '', {
+      .text(D.w - 20, 30, '', {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         fontStyle: 'bold',
@@ -356,9 +361,9 @@ export class WikiScene extends Phaser.Scene {
       })
       .setOrigin(1, 0.5)
       .setVisible(false)
-    const icon = this.add.image(dx + 66, dy + 70, '__DEFAULT').setVisible(false)
+    const icon = this.add.image(66, 70, '__DEFAULT').setVisible(false)
     const name = this.add
-      .text(dx + 122, dy + 52, '', {
+      .text(122, 52, '', {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
         fontStyle: 'bold',
@@ -368,7 +373,7 @@ export class WikiScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setVisible(false)
     const desc = this.add
-      .text(dx + 122, dy + 92, '', {
+      .text(122, 76, '', {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         color: '#b9b9c6',
@@ -376,9 +381,30 @@ export class WikiScene extends Phaser.Scene {
         lineSpacing: 6,
         resolution: res,
       })
-      .setOrigin(0, 0.5)
+      .setOrigin(0, 0)
       .setVisible(false)
-    const sections = Array.from({ length: 6 }, () => ({
+    view.add([badge, icon, name, desc])
+    const footer = this.add
+      .text(dx + 28, dy + D.h - 24, '', {
+        fontFamily: UI_FONT,
+        fontSize: FONT.caption,
+        color: '#8f8f9a',
+        resolution: res,
+      })
+      .setOrigin(0, 1)
+      .setVisible(false)
+    this.pool = { view, icon, badge, name, desc, sections: [], footer }
+    return this.pool
+  }
+
+  /** 取第 i 个属性分段（不足则新建并加入滚动内容，分段数不封顶） */
+  private sectionAt(i: number): { title: Phaser.GameObjects.Text; body: Phaser.GameObjects.Text } {
+    const P = this.pool!
+    let s = P.sections[i]
+    if (s) return s
+    const res = textRes()
+    const D = this.layout.detail
+    s = {
       title: this.add
         .text(0, 0, '', {
           fontFamily: UI_FONT,
@@ -400,18 +426,10 @@ export class WikiScene extends Phaser.Scene {
         })
         .setOrigin(0, 0)
         .setVisible(false),
-    }))
-    const footer = this.add
-      .text(dx + 28, dy + D.h - 24, '', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.caption,
-        color: '#8f8f9a',
-        resolution: res,
-      })
-      .setOrigin(0, 1)
-      .setVisible(false)
-    this.pool = { panel, icon, badge, name, desc, sections, footer }
-    return this.pool
+    }
+    P.view.add([s.title, s.body])
+    P.sections.push(s)
+    return s
   }
 
   /** 池化的 emoji 图标：纹理未就绪时异步拉取，回填前校验仍是同一目标 */
@@ -429,12 +447,9 @@ export class WikiScene extends Phaser.Scene {
     })
   }
 
-  /** 详情卡（图鉴页与完整列表页共用）：类别 + 名称 + 介绍 + 属性分段 */
+  /** 详情卡（图鉴页与完整列表页共用）：类别 + 名称 + 介绍 + 属性分段（全部可滚动） */
   private renderDetailCard(category: string, e: WikiEntry): void {
     const P = this.ensurePool()
-    const D = this.layout.detail
-    const dx = this.origin.x + D.x
-    const dy = this.origin.y + D.y
 
     P.badge.setText(category).setVisible(true)
     this.setPoolIcon(P.icon, e.emoji, 100)
@@ -449,23 +464,29 @@ export class WikiScene extends Phaser.Scene {
       else if (segments.length === 0) segments.push({ title: '', body: [line] })
       else segments[segments.length - 1]!.body.push(line)
     }
-    let cursor = dy + 138
-    P.sections.forEach((s, i) => {
+    // 属性从介绍文字实际底部之后排起（不再固定 y，长介绍不会压住第一段）
+    let cursor = Math.max(138, P.desc.y + P.desc.height + 14)
+    const used = Math.max(segments.length, P.sections.length)
+    for (let i = 0; i < used; i++) {
       const seg = segments[i]
-      if (!seg || cursor > dy + D.h - 56) {
+      if (!seg) {
+        const s = P.sections[i]!
         s.title.setVisible(false)
         s.body.setVisible(false)
-        return
+        continue
       }
+      const s = this.sectionAt(i)
       if (seg.title) {
-        s.title.setPosition(dx + 28, cursor).setText(seg.title).setVisible(true)
+        s.title.setPosition(28, cursor).setText(seg.title).setVisible(true)
         cursor += 38
       } else {
         s.title.setVisible(false)
       }
-      s.body.setPosition(dx + 28, cursor).setText(seg.body.join('\n')).setVisible(true)
+      s.body.setPosition(28, cursor).setText(seg.body.join('\n')).setVisible(true)
       cursor += s.body.height + 12
-    })
+    }
+    P.view.scrollTo(0)
+    P.view.setContentHeight(cursor + 12)
   }
 
   // ── 全部 emoji 视图：懒加载清单 + feed 流虚拟网格组件 ───────
@@ -545,6 +566,8 @@ export class WikiScene extends Phaser.Scene {
         P.name.setText('全部 emoji').setColor('#ffffff').setVisible(true)
         P.desc.setText('点击任意格子查看详情').setVisible(true)
       }
+      P.view.scrollTo(0)
+      P.view.setContentHeight(P.desc.y + P.desc.height + 24)
     }
     P.footer
       .setText(

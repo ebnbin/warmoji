@@ -8,6 +8,8 @@ import type { Settings } from '../run/settings'
 import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
 import { emojiImage, emojiText } from '../emoji/textures'
+import { ScrollView } from './scroll'
+import type { ScrollRect } from './scroll'
 import { FONT, UI_FONT } from '../core/fonts'
 import { setBgmEnabled } from '../audio/bgm'
 import { playSfx, setSfxEnabled } from '../audio/sfx'
@@ -35,8 +37,8 @@ const PORTRAIT: SettingsLayout = {
 
 interface Row {
   key: keyof Settings
-  x: number
-  y: number
+  /** 行内 y（相对滚动内容顶），世界坐标 = listRect.y + localY - scrollY */
+  localY: number
   toggle: Phaser.GameObjects.Graphics
 }
 
@@ -47,6 +49,8 @@ export class SettingsScene extends Phaser.Scene {
   private settings!: Settings
   private layout!: SettingsLayout
   private rows: Row[] = []
+  private list!: ScrollView
+  private listRect: ScrollRect = { x: 0, y: 0, w: 0, h: 0 }
   private backRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
@@ -102,46 +106,32 @@ export class SettingsScene extends Phaser.Scene {
       { origin: 0.5 },
     )
 
-    // 开关列表（居中单列；选项多了再做分组/滚动）
+    // 开关列表：居中单列，装进可滚动容器——选项定义表（SETTING_DEFS）只增不减，
+    // 行数超出可视高度即滚动，不再从第 5 项起跑出屏外
     const S = L.list
     const lx = (w - S.w) / 2
+    const listTop = oy + S.y
+    const listH = L.content.h - S.y - 40
+    this.listRect = { x: lx, y: listTop, w: S.w, h: listH }
+    this.list = new ScrollView(this, this.listRect)
     SETTING_DEFS.forEach((def, i) => {
-      const y = oy + S.y + i * (S.rowH + S.gap)
+      const y = i * (S.rowH + S.gap)
       const bg = this.add.graphics()
       bg.fillStyle(0x000000, 0.22)
-      bg.fillRoundedRect(lx, y, S.w, S.rowH, 16)
+      bg.fillRoundedRect(0, y, S.w, S.rowH, 16)
       bg.lineStyle(1, 0xffffff, 0.1)
-      bg.strokeRoundedRect(lx, y, S.w, S.rowH, 16)
-
-      emojiImage(this, lx + 50, y + S.rowH / 2, def.icon, 58)
-      this.add
-        .text(lx + 92, y + S.rowH / 2 - 18, def.label, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.head,
-          fontStyle: 'bold',
-          color: '#ffffff',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5)
-      this.add
-        .text(lx + 92, y + S.rowH / 2 + 20, def.desc, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          color: '#b9b9c6',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5)
+      bg.strokeRoundedRect(0, y, S.w, S.rowH, 16)
 
       const toggle = this.add.graphics()
-      const row: Row = { key: def.key, x: lx, y, toggle }
+      const row: Row = { key: def.key, localY: y, toggle }
       this.rows.push(row)
-      this.drawToggle(row)
 
-      this.add
-        .zone(lx, y, S.w, S.rowH)
+      const zone = this.add
+        .zone(0, y, S.w, S.rowH)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
         .on('pointerup', () => {
+          if (this.list.wasDragged) return
           this.settings[def.key] = !this.settings[def.key]
           saveSettings(browserStorage(), this.settings)
           // 音效/BGM 开关即时生效；开启瞬间用一声 click 给听感反馈
@@ -151,7 +141,35 @@ export class SettingsScene extends Phaser.Scene {
           this.drawToggle(row)
           this.reportSettings()
         })
+
+      this.list.add([
+        bg,
+        emojiImage(this, 50, y + S.rowH / 2, def.icon, 58),
+        this.add
+          .text(92, y + S.rowH / 2 - 18, def.label, {
+            fontFamily: UI_FONT,
+            fontSize: FONT.head,
+            fontStyle: 'bold',
+            color: '#ffffff',
+            resolution: res,
+          })
+          .setOrigin(0, 0.5),
+        this.add
+          .text(92, y + S.rowH / 2 + 20, def.desc, {
+            fontFamily: UI_FONT,
+            fontSize: FONT.small,
+            color: '#b9b9c6',
+            resolution: res,
+          })
+          .setOrigin(0, 0.5),
+        toggle,
+        zone,
+      ])
+      this.drawToggle(row)
     })
+    this.list.setContentHeight(
+      SETTING_DEFS.length * (S.rowH + S.gap) - S.gap,
+    )
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -161,14 +179,14 @@ export class SettingsScene extends Phaser.Scene {
     this.reportSettings()
   }
 
-  /** 开关胶囊：开 = 琥珀色右侧圆钮，关 = 灰底左侧圆钮 */
+  /** 开关胶囊：开 = 琥珀色右侧圆钮，关 = 灰底左侧圆钮（坐标相对滚动内容） */
   private drawToggle(row: Row): void {
     const on = this.settings[row.key]
     const S = this.layout.list
     const tw = 76
     const th = 42
-    const tx = row.x + S.w - 24 - tw
-    const ty = row.y + S.rowH / 2 - th / 2
+    const tx = S.w - 24 - tw
+    const ty = row.localY + S.rowH / 2 - th / 2
     const g = row.toggle
     g.clear()
     g.fillStyle(on ? 0xffd54f : 0xffffff, on ? 1 : 0.16)
@@ -198,8 +216,8 @@ export class SettingsScene extends Phaser.Scene {
       settings: {
         items: this.rows.map((r) => ({
           id: r.key,
-          x: r.x,
-          y: r.y,
+          x: this.listRect.x,
+          y: this.listRect.y + r.localY - this.list.scrollY,
           w: S.w,
           h: S.rowH,
           on: this.settings[r.key],

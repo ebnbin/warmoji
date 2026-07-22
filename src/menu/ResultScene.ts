@@ -17,6 +17,7 @@ import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
 import { emojiImage, emojiText } from '../emoji/textures'
 import { burstEmitter } from '../core/fx'
+import { ScrollView } from './scroll'
 import { FONT, UI_FONT } from '../core/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
@@ -189,41 +190,47 @@ export class ResultScene extends Phaser.Scene {
 
     const n = this.run.roster.length
     const headerH = 46
-    const rowH = Math.min(64, (h - headerH - 16) / Math.max(1, n))
+    // 固定行高 + 可滚动：队伍编制变大（现已达 8）也逐行清晰，不再被 area/count 压成一坨
+    const rowH = 64
     const label = (tx: number, ty: number, text: string, color = '#9d9dad'): void => {
       this.add
         .text(tx, ty, text, { fontFamily: UI_FONT, fontSize: FONT.small, color, resolution: res })
         .setOrigin(0.5)
     }
-    // 列布局（相对表宽的比例，横竖屏通吃）
-    const colDamage = x + w * 0.43
-    const colTaken = x + w * 0.55
-    const colKills = x + w * 0.65
-    const colDeaths = x + w * 0.75
-    const colItems = x + w * 0.88
-    label(colDamage, y + headerH / 2 + 4, '伤害')
-    label(colTaken, y + headerH / 2 + 4, '承伤')
-    label(colKills, y + headerH / 2 + 4, '击杀')
-    label(colDeaths, y + headerH / 2 + 4, '阵亡')
-    label(colItems, y + headerH / 2 + 4, '道具')
+    // 列布局（相对表宽的比例，横竖屏通吃）；表头用绝对坐标固定，数据行用内容内局部坐标
+    label(x + w * 0.43, y + headerH / 2 + 4, '伤害')
+    label(x + w * 0.55, y + headerH / 2 + 4, '承伤')
+    label(x + w * 0.65, y + headerH / 2 + 4, '击杀')
+    label(x + w * 0.75, y + headerH / 2 + 4, '阵亡')
+    label(x + w * 0.88, y + headerH / 2 + 4, '道具')
 
+    const colDamage = w * 0.43
+    const colTaken = w * 0.55
+    const colKills = w * 0.65
+    const colDeaths = w * 0.75
+    const colItems = w * 0.88
+    const rows = new ScrollView(this, { x, y: y + headerH, w, h: h - headerH - 10 })
     this.run.roster.forEach((id, slot) => {
-      const cy = y + headerH + rowH * slot + rowH / 2
+      const cy = rowH * slot + rowH / 2
       const def = CHARACTERS[id]
-      emojiImage(this, x + 46, cy, def.emoji, Math.min(58, rowH - 8), 'player')
-      this.add
-        .text(x + 82, cy, def.name, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          fontStyle: 'bold',
-          color: '#ffffff',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5)
-      const cell = (tx: number, text: string, color = '#e4e4ec'): void => {
+      rows.add(emojiImage(this, 46, cy, def.emoji, Math.min(58, rowH - 8), 'player'))
+      rows.add(
         this.add
-          .text(tx, cy, text, { fontFamily: UI_FONT, fontSize: FONT.body, color, resolution: res })
-          .setOrigin(0.5)
+          .text(82, cy, def.name, {
+            fontFamily: UI_FONT,
+            fontSize: FONT.small,
+            fontStyle: 'bold',
+            color: '#ffffff',
+            resolution: res,
+          })
+          .setOrigin(0, 0.5),
+      )
+      const cell = (tx: number, text: string, color = '#e4e4ec'): void => {
+        rows.add(
+          this.add
+            .text(tx, cy, text, { fontFamily: UI_FONT, fontSize: FONT.body, color, resolution: res })
+            .setOrigin(0.5),
+        )
       }
       const fmt = (v: number): string => (v >= 10000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`)
       cell(colDamage, fmt(this.run.stats.damage[slot] ?? 0))
@@ -238,32 +245,37 @@ export class ResultScene extends Phaser.Scene {
       const shown = unique.slice(0, 2)
       shown.forEach((item, i) => {
         const ix = colItems - ((shown.length - 1) / 2 - i) * 38
-        emojiImage(this, ix, cy, ITEMS[item].emoji, 35)
+        rows.add(emojiImage(this, ix, cy, ITEMS[item].emoji, 35))
         const stacks = stackCount(owned, item)
         if (stacks > 1) {
-          this.add
-            .text(ix + 12, cy + 10, `${stacks}`, {
-              fontFamily: UI_FONT,
-              fontSize: FONT.caption,
-              fontStyle: 'bold',
-              color: '#ffd54f',
-              resolution: res,
-            })
-            .setOrigin(0.5)
+          rows.add(
+            this.add
+              .text(ix + 12, cy + 10, `${stacks}`, {
+                fontFamily: UI_FONT,
+                fontSize: FONT.caption,
+                fontStyle: 'bold',
+                color: '#ffd54f',
+                resolution: res,
+              })
+              .setOrigin(0.5),
+          )
         }
       })
       if (unique.length > 2) {
-        this.add
-          .text(colItems + 52, cy, `+${unique.length - 2}`, {
-            fontFamily: UI_FONT,
-            fontSize: FONT.caption,
-            color: '#9d9dad',
-            resolution: res,
-          })
-          .setOrigin(0.5)
+        rows.add(
+          this.add
+            .text(colItems + 52, cy, `+${unique.length - 2}`, {
+              fontFamily: UI_FONT,
+              fontSize: FONT.caption,
+              color: '#9d9dad',
+              resolution: res,
+            })
+            .setOrigin(0.5),
+        )
       }
       if (unique.length === 0) cell(colItems, '—', '#6f6f7d')
     })
+    rows.setContentHeight(rowH * n)
   }
 
   /** 敌情面板：按敌人类型的我方击杀数与其对我方造成的伤害（按击杀降序） */
@@ -339,31 +351,40 @@ export class ResultScene extends Phaser.Scene {
     label(colKills, '击杀')
     label(colDmg, '对我方伤害')
     const top = y + headerH + 22
-    const rowH = Math.min(42, (h - headerH - 34) / names.length)
+    // 固定行高 + 可滚动：敌人种类只增不减，行多了滚动查看，不再压成重叠的细行
+    const rowH = 42
     const fmt = (v: number): string => (v >= 10000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`)
     const bossNames = new Set(BOSSES.map((e) => e.name))
+    const colKillsL = colKills - x
+    const colDmgL = colDmg - x
+    const rows = new ScrollView(this, { x, y: top, w, h: y + h - top - 12 })
     names.forEach((name, i) => {
-      const cy = top + rowH * i + rowH / 2
+      const cy = rowH * i + rowH / 2
       const isBoss = bossNames.has(name)
       const emoji = emojiByName.get(name)
-      if (emoji) emojiImage(this, x + 34, cy, emoji, Math.min(40, rowH - 5), isBoss ? 'elite' : 'enemy')
-      this.add
-        .text(x + 58, cy, name, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.body,
-          color: isBoss ? '#ffd54f' : '#e4e4ec',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5)
-      const cell = (tx: number, text: string, color = '#e4e4ec'): void => {
+      if (emoji) rows.add(emojiImage(this, 34, cy, emoji, Math.min(40, rowH - 5), isBoss ? 'elite' : 'enemy'))
+      rows.add(
         this.add
-          .text(tx, cy, text, { fontFamily: UI_FONT, fontSize: FONT.body, color, resolution: res })
-          .setOrigin(0.5)
+          .text(58, cy, name, {
+            fontFamily: UI_FONT,
+            fontSize: FONT.body,
+            color: isBoss ? '#ffd54f' : '#e4e4ec',
+            resolution: res,
+          })
+          .setOrigin(0, 0.5),
+      )
+      const cell = (tx: number, text: string, color = '#e4e4ec'): void => {
+        rows.add(
+          this.add
+            .text(tx, cy, text, { fontFamily: UI_FONT, fontSize: FONT.body, color, resolution: res })
+            .setOrigin(0.5),
+        )
       }
-      cell(colKills, `${st.enemyKills[name] ?? 0}`)
+      cell(colKillsL, `${st.enemyKills[name] ?? 0}`)
       const dmg = st.enemyDamage[name] ?? 0
-      cell(colDmg, dmg > 0 ? fmt(dmg) : '—', dmg > 0 ? '#ffab91' : '#6f6f7d')
+      cell(colDmgL, dmg > 0 ? fmt(dmg) : '—', dmg > 0 ? '#ffab91' : '#6f6f7d')
     })
+    rows.setContentHeight(rowH * names.length)
   }
 
   private drawButton(

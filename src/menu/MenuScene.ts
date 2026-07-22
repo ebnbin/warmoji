@@ -195,10 +195,14 @@ export class MenuScene extends Phaser.Scene {
 
   /** 背景漂浮暗纹：低透明度的敌人/能力 emoji 缓慢浮动旋转，增加画面纵深 */
   private createBackdrop(w: number, h: number, rng: Rng): void {
+    // 敌人暗纹按比例在敌表里取样，避免写死下标——roster 增删/重排都不会取错或越界崩溃
+    const uniqEnemies = [...new Set(ENEMY_DEFS.map((e) => e.emoji))]
+    const enemyDecor = [0.2, 0.45, 0.75]
+      .map((f) => uniqEnemies[Math.min(uniqEnemies.length - 1, Math.floor(f * uniqEnemies.length))])
+      .filter((e): e is string => e !== undefined)
+      .map((emoji) => ({ emoji, outline: 'enemy' as const }))
     const decor: { emoji: string; outline: 'enemy' | 'player' }[] = [
-      { emoji: ENEMY_DEFS[1]!.emoji, outline: 'enemy' },
-      { emoji: ENEMY_DEFS[2]!.emoji, outline: 'enemy' },
-      { emoji: ENEMY_DEFS[4]!.emoji, outline: 'enemy' },
+      ...enemyDecor,
       { emoji: '1fa93', outline: 'player' },
       { emoji: '1fa83', outline: 'player' },
       { emoji: '1f345', outline: 'player' },

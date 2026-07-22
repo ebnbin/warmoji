@@ -21,6 +21,7 @@ import {
   labFireRate,
   labInvincible,
   labLevel,
+  labPanelScroll,
   labStarters,
   setLabDensity,
   setLabDifficulty,
@@ -28,12 +29,14 @@ import {
   setLabInvincible,
   setLabLevel,
   setLabPanelOpen,
+  setLabPanelScroll,
   toggleLabCharacter,
   toggleLabEnemy,
 } from '../run/lab'
 import type { LabDensity, LabLevel, LabMul } from '../run/lab'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../debug/diagnostics'
 import { emojiCacheStats, emojiImage, emojiText, iconLabel } from '../emoji/textures'
+import { ScrollView } from '../menu/scroll'
 import { FONT, UI_FONT } from '../core/fonts'
 import { Joystick } from '../core/Joystick'
 import { playSfx } from '../audio/sfx'
@@ -67,6 +70,8 @@ export class UIScene extends Phaser.Scene {
   private pauseObjs: Phaser.GameObjects.GameObject[] = []
   /** 在场的开箱横幅数：连开多箱时逐条下移错位 */
   private chestBanners = 0
+  /** 试炼场控制面板的可滚动容器（敌人/角色列表随内容增长，不再堆出屏外） */
+  private labView?: ScrollView
   // 队长技能按钮（左下角）：底圆 + 队长头像 + 冷却扇形暗罩 + 秒数 + 就绪光圈
   private skillBase?: Phaser.GameObjects.Arc
   private skillEmoji?: Phaser.GameObjects.Image
@@ -329,6 +334,7 @@ export class UIScene extends Phaser.Scene {
     const cx = viewport.logicalWidth / 2
     const cy = viewport.logicalHeight * 0.3
     playSfx('over')
+    const wrapW = viewport.logicalWidth - 80
     const title = this.add
       .text(cx, cy, w.title, {
         fontFamily: UI_FONT,
@@ -337,6 +343,8 @@ export class UIScene extends Phaser.Scene {
         color: '#ff8a80',
         stroke: '#2b0000',
         strokeThickness: 6,
+        align: 'center',
+        wordWrap: { width: wrapW },
         resolution: res,
       })
       .setOrigin(0.5)
@@ -348,6 +356,8 @@ export class UIScene extends Phaser.Scene {
         color: '#ffd54f',
         stroke: '#000000',
         strokeThickness: 4,
+        align: 'center',
+        wordWrap: { width: wrapW },
         resolution: res,
       })
       .setOrigin(0.5)
@@ -519,6 +529,8 @@ export class UIScene extends Phaser.Scene {
         color: RARITIES[loot.rarity].color,
         stroke: '#000000',
         strokeThickness: 5,
+        align: 'center',
+        wordWrap: { width: viewport.logicalWidth - 80 },
         resolution: textRes(),
       },
       { origin: 0.5 },
@@ -552,6 +564,8 @@ export class UIScene extends Phaser.Scene {
         color: '#ffd54f',
         stroke: '#000000',
         strokeThickness: 5,
+        align: 'center',
+        wordWrap: { width: viewport.logicalWidth - 80 },
         resolution: textRes(),
       },
       { origin: 0.5 },
@@ -592,8 +606,9 @@ export class UIScene extends Phaser.Scene {
   private static readonly CHIP_ON = '#2e7d32'
   private static readonly CHIP_OFF = '#555555'
 
-  /** 试炼场控制面板（左上角）：🎯 按钮开合，内含 敌人/角色/队长 三段勾选。
-   * 敌人实时生效不重启；角色/队长改动后重开竞技场（重建队伍）——重开也会重渲本面板 */
+  /** 试炼场控制面板（左上角）：🎯 按钮开合，内含 敌人/角色/等级/旋钮 多段勾选。
+   * 敌人实时生效不重启；角色/等级改动后重开竞技场（重建队伍）——重开也会重渲本面板。
+   * 各段勾选项随内容增长（敌人/角色只增不减），装进可滚动容器，绝不再堆出屏外 */
   private createLabControls(): void {
     const gx = safeInsets.left + 12
     const top = safeInsets.top + 62
@@ -616,13 +631,24 @@ export class UIScene extends Phaser.Scene {
       })
     if (!open) return
 
+    // 面板从标题下方一直排到技能按钮上方；内容超出即滚动
+    const viewTop = top + 34
+    const skillTop = viewport.logicalHeight - safeInsets.bottom - 55 * 2 - 24
+    const view = (this.labView = new ScrollView(
+      this,
+      { x: gx, y: viewTop, w: 372, h: Math.max(120, skillTop - viewTop - 12) },
+      { initialScroll: labPanelScroll() },
+    ))
+    view.setDepth(300)
+    view.onScroll = (): void => setLabPanelScroll(view.scrollY)
+
     // 角色/队长改动：用当前勾选阵容在当前地图上重开竞技场（shutdown→create 会重启本 UI，面板自动重渲）
     const applyTeam = (): void => {
       beginRun(labCaptain(), labStarters(), this.arena.run.mapId, true)
       this.arena.scene.restart()
     }
-    let y = top + 34
-    y = this.labSection('敌人（实时）', gx, y, 4, 84, [...ENEMY_DEFS, ...BOSSES].map((d) => ({
+    let y = 0
+    y = this.labSection('敌人（实时）', y, [...ENEMY_DEFS, ...BOSSES].map((d) => ({
       label: d.name,
       on: () => isLabEnemyOn(d.kind),
       tap: (chip) => {
@@ -630,7 +656,7 @@ export class UIScene extends Phaser.Scene {
         chip.setBackgroundColor(isLabEnemyOn(d.kind) ? UIScene.CHIP_ON : UIScene.CHIP_OFF)
       },
     })))
-    y = this.labSection('角色 · 最少1最多8（改后重建队伍）', gx, y + 8, 4, 84, Object.entries(CHARACTERS).map(([id, c]) => ({
+    y = this.labSection('角色 · 最少1最多8（改后重建队伍）', y + 8, Object.entries(CHARACTERS).map(([id, c]) => ({
       label: c.name,
       on: () => isLabCharacterOn(id as CharacterId),
       tap: () => {
@@ -644,7 +670,7 @@ export class UIScene extends Phaser.Scene {
       { lv: 1, label: '一阶' },
       { lv: 2, label: '二阶' },
     ]
-    y = this.labSection('角色等级（改后重建队伍）', gx, y + 8, 3, 62, levels.map((l) => ({
+    y = this.labSection('角色等级（改后重建队伍）', y + 8, levels.map((l) => ({
       label: l.label,
       on: () => labLevel() === l.lv,
       tap: () => {
@@ -663,7 +689,7 @@ export class UIScene extends Phaser.Scene {
       { k: 'high', label: '高' },
       { k: 'max', label: '爆满' },
     ]
-    y = this.labSection('密度', gx, y + 8, 4, 62, densities.map((d) => ({
+    y = this.labSection('密度', y + 8, densities.map((d) => ({
       label: d.label,
       on: () => labDensity() === d.k,
       tap: () => {
@@ -672,7 +698,7 @@ export class UIScene extends Phaser.Scene {
       },
     })))
     const muls: LabMul[] = [1, 3, 10]
-    y = this.labSection('难度（敌人血量）', gx, y + 8, 3, 62, muls.map((m) => ({
+    y = this.labSection('难度（敌人血量）', y + 8, muls.map((m) => ({
       label: `×${m}`,
       on: () => labDifficulty() === m,
       tap: () => {
@@ -680,7 +706,7 @@ export class UIScene extends Phaser.Scene {
         applyKnob()
       },
     })))
-    y = this.labSection('攻速（我方）', gx, y + 8, 3, 62, muls.map((m) => ({
+    y = this.labSection('攻速（我方）', y + 8, muls.map((m) => ({
       label: `×${m}`,
       on: () => labFireRate() === m,
       tap: () => {
@@ -694,25 +720,25 @@ export class UIScene extends Phaser.Scene {
       this.arena.applyTestInvincible()
       this.scene.restart()
     }
-    this.labSection('无敌', gx, y + 8, 2, 62, [
+    y = this.labSection('无敌', y + 8, [
       { label: '开', on: () => labInvincible(), tap: () => applyInvincible(true) },
       { label: '关', on: () => !labInvincible(), tap: () => applyInvincible(false) },
     ])
+    view.setContentHeight(y + 8)
   }
 
-  /** 一段带标题的 chip 网格：返回网格底部 y（供下一段接着排） */
+  /** 一段带标题的 chip 流式布局（装进 labView，坐标相对内容顶）：chip 按内容宽自适应、
+   * 排满一行自动换行——名字再长也不会横向溢出。返回本段底部 localY（供下一段接着排） */
   private labSection(
     title: string,
-    gx: number,
     gy: number,
-    cols: number,
-    chipW: number,
     items: { label: string; on: () => boolean; tap: (chip: Phaser.GameObjects.Text) => void }[],
   ): number {
-    const chipH = 28
+    const view = this.labView!
+    const maxW = view.viewport.w - 14
     const gap = 5
-    this.add
-      .text(gx, gy, title, {
+    view.add(
+      this.add.text(0, gy, title, {
         fontFamily: UI_FONT,
         fontSize: FONT.caption,
         fontStyle: 'bold',
@@ -720,28 +746,37 @@ export class UIScene extends Phaser.Scene {
         stroke: '#000000',
         strokeThickness: 3,
         resolution: textRes(),
-      })
-      .setDepth(300)
-    const y0 = gy + 22
-    items.forEach((it, i) => {
-      const col = i % cols
-      const row = Math.floor(i / cols)
+      }),
+    )
+    let cx = 0
+    let cy = gy + 22
+    let rowH = 0
+    for (const it of items) {
       const chip = this.add
-        .text(gx + col * (chipW + gap), y0 + row * (chipH + gap), it.label, {
+        .text(0, 0, it.label, {
           fontFamily: UI_FONT,
           fontSize: FONT.caption,
           color: '#ffffff',
           backgroundColor: it.on() ? UIScene.CHIP_ON : UIScene.CHIP_OFF,
-          padding: { x: 4, y: 5 },
-          fixedWidth: chipW,
-          align: 'center',
+          padding: { x: 8, y: 5 },
           resolution: textRes(),
         })
-        .setDepth(300)
         .setInteractive({ useHandCursor: true })
-      chip.on('pointerdown', () => it.tap(chip))
-    })
-    return y0 + Math.ceil(items.length / cols) * (chipH + gap)
+      if (cx > 0 && cx + chip.width > maxW) {
+        cx = 0
+        cy += rowH + gap
+        rowH = 0
+      }
+      chip.setPosition(cx, cy)
+      view.add(chip)
+      chip.on('pointerup', () => {
+        if (view.wasDragged) return
+        it.tap(chip)
+      })
+      cx += chip.width + gap
+      rowH = Math.max(rowH, chip.height)
+    }
+    return cy + rowH + gap
   }
 
   private updateDevPanel(time: number): void {

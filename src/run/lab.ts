@@ -128,11 +128,22 @@ export function labStarters(): CharacterId[] {
   return r.length > 0 ? r : [ROSTER_IDS[0]!]
 }
 
-// ── 面板开合（跨重启保留） ─────────────────────────────────
+// ── 面板开合 / 滚动位置（跨重启保留） ─────────────────────
 export function isLabPanelOpen(): boolean {
   return panelOpen
 }
 
 export function setLabPanelOpen(on: boolean): void {
   panelOpen = on
+}
+
+// 控制面板滚动位置：勾选项常触发场景重启，保留位置才不会每次跳回顶部
+let panelScroll = 0
+
+export function labPanelScroll(): number {
+  return panelScroll
+}
+
+export function setLabPanelScroll(v: number): void {
+  panelScroll = v
 }

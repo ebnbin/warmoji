@@ -12,6 +12,7 @@ import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
 import { emojiImage } from '../emoji/textures'
 import { EmojiGrid } from './grid'
+import { ScrollView } from './scroll'
 import { FONT, UI_FONT } from '../core/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
@@ -51,7 +52,7 @@ export class MapScene extends Phaser.Scene {
   private layout!: MapLayout
   private origin = { x: 0, y: 0 }
   private grid!: EmojiGrid
-  private detailObjs: Phaser.GameObjects.GameObject[] = []
+  private detailView!: ScrollView
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private confirmLabel!: Phaser.GameObjects.Text
   private testChk!: Phaser.GameObjects.Text
@@ -68,7 +69,6 @@ export class MapScene extends Phaser.Scene {
     if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
     applyBackground(this.palette)
     if (!preserved) this.selectedId = loadMap(browserStorage())
-    this.detailObjs = []
 
     const w = viewport.logicalWidth
     const h = viewport.logicalHeight
@@ -117,6 +117,8 @@ export class MapScene extends Phaser.Scene {
     panel.fillRoundedRect(dx, dy, D.w, D.h, 14)
     panel.lineStyle(1, 0xffffff, 0.1)
     panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
+    // 地图介绍/装饰预览是变长内容，装进可滚动容器
+    this.detailView = new ScrollView(this, { x: dx, y: dy, w: D.w, h: D.h })
 
     // 确认按钮
     this.btnRect = {
@@ -194,17 +196,15 @@ export class MapScene extends Phaser.Scene {
   }
 
   private renderDetail(res: number): void {
-    for (const o of this.detailObjs) o.destroy()
-    this.detailObjs = []
+    // 内容坐标以详情面板左上为原点（0,0），滚动交给 ScrollView
+    this.detailView.clear()
     const D = this.layout.detail
-    const dx = this.origin.x + D.x
-    const dy = this.origin.y + D.y
     const def = MAPS[this.selectedId]
 
-    this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, def.emoji, 85),
+    this.detailView.add([
+      emojiImage(this, 58, 56, def.emoji, 85),
       this.add
-        .text(dx + 104, dy + 42, def.name, {
+        .text(104, 42, def.name, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -213,21 +213,21 @@ export class MapScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5),
       this.add
-        .text(dx + 104, dy + 76, '地图 · 决定战场的主题与景观', {
+        .text(104, 76, '地图 · 决定战场的主题与景观', {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           color: '#b9b9c6',
           resolution: res,
         })
         .setOrigin(0, 0.5),
-    )
+    ])
 
-    let cursor = dy + 132
+    let cursor = 132
     const group = (icon: string, title: string): void => {
-      this.detailObjs.push(
-        emojiImage(this, dx + 42, cursor, icon, 35),
+      this.detailView.add([
+        emojiImage(this, 42, cursor, icon, 35),
         this.add
-          .text(dx + 62, cursor, title, {
+          .text(62, cursor, title, {
             fontFamily: UI_FONT,
             fontSize: FONT.strong,
             fontStyle: 'bold',
@@ -235,12 +235,12 @@ export class MapScene extends Phaser.Scene {
             resolution: res,
           })
           .setOrigin(0, 0.5),
-      )
+      ])
       cursor += 40
     }
     const line = (text: string, color = '#d0d0d8'): void => {
       const t = this.add
-        .text(dx + 62, cursor, text, {
+        .text(62, cursor, text, {
           fontFamily: UI_FONT,
           fontSize: FONT.body,
           color,
@@ -249,7 +249,7 @@ export class MapScene extends Phaser.Scene {
           resolution: res,
         })
         .setOrigin(0, 0)
-      this.detailObjs.push(t)
+      this.detailView.add(t)
       cursor += Math.max(36, t.height + 8)
     }
 
@@ -257,17 +257,27 @@ export class MapScene extends Phaser.Scene {
     line(def.desc)
     cursor += 14
     group('1f33f', '地面装饰')
-    // 装饰 emoji 预览行（与战斗内同款黑描边）
-    let px = dx + 62 + 16
+    // 装饰 emoji 预览：按面板宽自动换行，装饰再多也不会横向溢出
+    const startX = 62 + 16
+    const pitch = 46
+    const perRow = Math.max(1, Math.floor((D.w - startX - 16) / pitch))
+    let px = startX
+    let placed = 0
     for (const e of def.decor.emojis) {
-      this.detailObjs.push(emojiImage(this, px, cursor + 10, e, 45, 'player'))
-      px += 46
+      if (placed > 0 && placed % perRow === 0) {
+        px = startX
+        cursor += pitch
+      }
+      this.detailView.add(emojiImage(this, px, cursor + 10, e, 45, 'player'))
+      px += pitch
+      placed++
     }
     cursor += 44
     line('战斗中以低透明度随机成簇散布，一局一景', '#9a9aa8')
     cursor += 14
     group('1f6a7', '差异')
     line('目前各地图仅主题不同；难度、专属怪物与增益后续开放', '#9a9aa8')
+    this.detailView.setContentHeight(cursor + 12)
   }
 
   private refresh(): void {

@@ -21,6 +21,7 @@ export default tseslint.config(
       'src/maps/*Scene.ts',
       'src/menu/*Scene.ts',
       'src/menu/grid.ts',
+      'src/menu/scroll.ts',
       'src/emoji/textures.ts',
       'src/emoji/thumbs.ts',
       'src/emoji/virtualGrid.ts',

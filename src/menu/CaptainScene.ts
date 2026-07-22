@@ -12,6 +12,7 @@ import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
 import { emojiImage } from '../emoji/textures'
 import { EmojiGrid } from './grid'
+import { ScrollView } from './scroll'
 import { FONT, UI_FONT } from '../core/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
@@ -51,7 +52,7 @@ export class CaptainScene extends Phaser.Scene {
   private layout!: CaptainLayout
   private origin = { x: 0, y: 0 }
   private grid!: EmojiGrid
-  private detailObjs: Phaser.GameObjects.GameObject[] = []
+  private detailView!: ScrollView
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
@@ -65,7 +66,6 @@ export class CaptainScene extends Phaser.Scene {
     if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
     applyBackground(this.palette)
     if (!preserved) this.selectedId = loadCaptain(browserStorage())
-    this.detailObjs = []
 
     const w = viewport.logicalWidth
     const h = viewport.logicalHeight
@@ -116,6 +116,8 @@ export class CaptainScene extends Phaser.Scene {
     panel.fillRoundedRect(dx, dy, D.w, D.h, 14)
     panel.lineStyle(1, 0xffffff, 0.1)
     panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
+    // 队长增益/主动技能是变长文案，装进可滚动容器，绝不再靠收紧行距硬塞
+    this.detailView = new ScrollView(this, { x: dx, y: dy, w: D.w, h: D.h })
 
     // 确认按钮
     this.btnRect = {
@@ -173,17 +175,15 @@ export class CaptainScene extends Phaser.Scene {
   }
 
   private renderDetail(res: number): void {
-    for (const o of this.detailObjs) o.destroy()
-    this.detailObjs = []
+    // 内容坐标以详情面板左上为原点（0,0），滚动由 ScrollView 负责
+    this.detailView.clear()
     const D = this.layout.detail
-    const dx = this.origin.x + D.x
-    const dy = this.origin.y + D.y
     const def = CAPTAINS[this.selectedId]
 
-    this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, def.emoji, 85, 'player'),
+    this.detailView.add([
+      emojiImage(this, 58, 56, def.emoji, 85, 'player'),
       this.add
-        .text(dx + 104, dy + 42, def.name, {
+        .text(104, 42, def.name, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -192,22 +192,21 @@ export class CaptainScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5),
       this.add
-        .text(dx + 104, dy + 76, '队长 · 提供团队增益，不参与战斗', {
+        .text(104, 76, '队长 · 提供团队增益，不参与战斗', {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           color: '#b9b9c6',
           resolution: res,
         })
         .setOrigin(0, 0.5),
-    )
+    ])
 
-    // 行距按内容收紧：加入主动技能组后，横竖屏详情面板都要装得下三组
-    let cursor = dy + 122
+    let cursor = 122
     for (const group of captainStatGroups(def)) {
-      this.detailObjs.push(
-        emojiImage(this, dx + 42, cursor, group.icon, 35),
+      this.detailView.add([
+        emojiImage(this, 42, cursor, group.icon, 35),
         this.add
-          .text(dx + 62, cursor, group.title, {
+          .text(62, cursor, group.title, {
             fontFamily: UI_FONT,
             fontSize: FONT.strong,
             fontStyle: 'bold',
@@ -215,11 +214,11 @@ export class CaptainScene extends Phaser.Scene {
             resolution: res,
           })
           .setOrigin(0, 0.5),
-      )
+      ])
       cursor += 36
       for (const line of group.lines) {
         const t = this.add
-          .text(dx + 62, cursor, line, {
+          .text(62, cursor, line, {
             fontFamily: UI_FONT,
             fontSize: FONT.body,
             color: '#d0d0d8',
@@ -228,11 +227,12 @@ export class CaptainScene extends Phaser.Scene {
             resolution: res,
           })
           .setOrigin(0, 0)
-        this.detailObjs.push(t)
+        this.detailView.add(t)
         cursor += Math.max(34, t.height + 6)
       }
       cursor += 10
     }
+    this.detailView.setContentHeight(cursor + 12)
   }
 
   private refresh(): void {

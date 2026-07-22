@@ -28,6 +28,7 @@ import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
 import { emojiImage } from '../emoji/textures'
 import { EmojiGrid } from './grid'
+import { ScrollView } from './scroll'
 import { FONT, UI_FONT } from '../core/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
@@ -81,6 +82,8 @@ export class ShopScene extends Phaser.Scene {
   private origin = { x: 0, y: 0 }
   private grid!: EmojiGrid
   private detailObjs: Phaser.GameObjects.GameObject[] = []
+  /** 上架道具卡的介绍文字区（变长）——固定卡高装不下就在卡内滚动，不再压到购买/刷新键 */
+  private offerDescView!: ScrollView
   private coinsText!: Phaser.GameObjects.Text
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private buyRect = { x: 0, y: 0, w: 0, h: 0 }
@@ -242,6 +245,13 @@ export class ShopScene extends Phaser.Scene {
       .on('pointerup', () => {
         if (!this.dragMoved && !this.grid.wasDragged) this.refreshFocused()
       })
+
+    // 卡内介绍滚动区（图标右侧、刷新键左侧的一条带）——只创建一次，renderOfferCard 复用
+    this.offerDescView = new ScrollView(
+      this,
+      { x: dx + 88, y: cardY + 42, w: this.refreshRect.x - (dx + 88) - 12, h: 52 },
+      { scrollbar: true },
+    )
 
     // 详情属性区滚动（上架位网格的滚动由 EmojiGrid 自理）
     this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy2: number) => {
@@ -476,10 +486,12 @@ export class ShopScene extends Phaser.Scene {
     const statObjs: Phaser.GameObjects.GameObject[] = []
     let cursor = this.statsTop + 16
     if (owned.length > 0) {
-      let x = dx + 42
+      // 已购道具行：按面板宽自动换行，道具再多也不会横向溢出（纵向靠属性区滚动）
+      const startX = dx + 42
+      const maxX = dx + D.w - 42
+      let x = startX
       const uniq = [...new Set(owned)]
-      for (const id of uniq.slice(0, 10)) {
-        statObjs.push(emojiImage(this, x, cursor, ITEMS[id].emoji, 35))
+      for (const id of uniq) {
         const n = stackCount(owned, id)
         const t = this.add
           .text(x + 17, cursor + 3, `×${n}`, {
@@ -489,8 +501,14 @@ export class ShopScene extends Phaser.Scene {
             resolution: res,
           })
           .setOrigin(0, 0.5)
-        statObjs.push(t)
-        x += 40 + t.width
+        const cellW = 40 + t.width
+        if (x > startX && x + cellW > maxX) {
+          x = startX
+          cursor += 40
+          t.setPosition(x + 17, cursor + 3)
+        }
+        statObjs.push(emojiImage(this, x, cursor, ITEMS[id].emoji, 35), t)
+        x += cellW
       }
       cursor += 40
     }
@@ -585,17 +603,24 @@ export class ShopScene extends Phaser.Scene {
             resolution: res,
           })
           .setOrigin(0, 0.5),
-        this.add
-          .text(dx + 88, cardY + 64, `${item.desc}${stackNote}`, {
-            fontFamily: UI_FONT,
-            fontSize: FONT.caption,
-            color: '#b9b9c6',
-            wordWrap: { width: this.refreshRect.x - (dx + 88) - 12 },
-            resolution: res,
-          })
-          .setOrigin(0, 0.5),
       )
+      // 介绍文字装进卡内滚动区：再长也不会撑破卡片、压住购买/刷新键
+      this.offerDescView.clear()
+      const desc = this.add
+        .text(0, 0, `${item.desc}${stackNote}`, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.caption,
+          color: '#b9b9c6',
+          wordWrap: { width: this.offerDescView.viewport.w - 8 },
+          lineSpacing: 4,
+          resolution: res,
+        })
+        .setOrigin(0, 0)
+      this.offerDescView.add(desc)
+      this.offerDescView.scrollTo(0)
+      this.offerDescView.setContentHeight(desc.height)
     } else {
+      this.offerDescView.clear()
       this.detailObjs.push(
         this.add
           .text(dx + 52, cardY + 48, '道具池已购罄，可刷新其他位', {

@@ -28,6 +28,8 @@ import { applyBackground } from '../core/background'
 import { reportDebug } from '../debug/debug'
 import { emojiImage } from '../emoji/textures'
 import { EmojiGrid } from './grid'
+import { ScrollView } from './scroll'
+import type { ScrollRect } from './scroll'
 import { FONT, UI_FONT } from '../core/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
@@ -78,6 +80,18 @@ const PORTRAIT: PromoteLayout = {
 /** 阵型预览外圈的缓慢顺时针环绕转速（rad/s，纯装饰） */
 const PREVIEW_SPIN = 0.18
 
+/** 按各站位实际间距收缩图标尺寸：队伍变大（最多 8）时相邻不再重叠 */
+function fitIconSize(posts: readonly { x: number; y: number }[], scale: number, base: number): number {
+  let minD = Infinity
+  for (let i = 0; i < posts.length; i++) {
+    for (let j = i + 1; j < posts.length; j++) {
+      minD = Math.min(minD, Math.hypot(posts[i]!.x - posts[j]!.x, posts[i]!.y - posts[j]!.y))
+    }
+  }
+  if (!Number.isFinite(minD)) return base
+  return Math.max(24, Math.min(base, minD * scale * 0.92))
+}
+
 export class PromoteScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色/选中等页面状态
   private preserveOnRestart = false
@@ -99,11 +113,15 @@ export class PromoteScene extends Phaser.Scene {
   private layout!: PromoteLayout
   private origin = { x: 0, y: 0 }
   private grid?: EmojiGrid
-  private detailObjs: Phaser.GameObjects.GameObject[] = []
+  /** 详情文字区（招募：detailText 子区；阵型：整块 detail）——变长属性装进可滚动容器 */
+  private detailView!: ScrollView
+  private detailRect: ScrollRect = { x: 0, y: 0, w: 0, h: 0 }
   private formationObjs: Phaser.GameObjects.GameObject[] = []
   private memberImgs: Phaser.GameObjects.Image[] = []
   private memberZones: Phaser.GameObjects.Zone[] = []
   private memberRects: { id: string; x: number; y: number; w: number; h: number }[] = []
+  /** 阵型预览的当前图标尺寸（按人数收缩，layout 逐帧摆位时复用其半径） */
+  private formationIconSize = 80
   /** 预览外圈的环绕相位与几何（update 逐帧推进） */
   private previewPhase = 0
   private previewGeom = { cx: 0, cy: 0, scale: 1 }
@@ -134,7 +152,6 @@ export class PromoteScene extends Phaser.Scene {
     if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
     applyBackground(this.palette)
     this.run = getRun()
-    this.detailObjs = []
     this.formationObjs = []
     this.previewTokens = []
     this.previewObjs = []
@@ -272,6 +289,12 @@ export class PromoteScene extends Phaser.Scene {
     panel.fillRoundedRect(dx, dy, D.w, D.h, 14)
     panel.lineStyle(1, 0xffffff, 0.1)
     panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
+
+    // 详情文字区：招募模式占详情面板一角（detailText），阵型模式占整块 detail。
+    // 角色属性（携带/升级卡/被动）是变长文案，装进可滚动容器，不再静默截断
+    const T = this.mode === 'formation' ? L.detail : L.detailText
+    this.detailRect = { x: this.origin.x + T.x, y: oy + T.y, w: T.w, h: T.h }
+    this.detailView = new ScrollView(this, this.detailRect)
 
     if (this.mode !== 'formation') {
       // 预览区与文字详情区之间的细分隔线
@@ -523,6 +546,9 @@ export class PromoteScene extends Phaser.Scene {
     const cy = ly + L.h / 2
     const scale = Math.min(2.4, (Math.min(L.w, L.h) / 2 - 76) / maxR)
     this.previewGeom = { cx, cy, scale }
+    const size = fitIconSize(posts, scale, 80)
+    this.formationIconSize = size
+    const half = size / 2
 
     posts.forEach((p, post) => {
       const id = ids[post]
@@ -533,20 +559,20 @@ export class PromoteScene extends Phaser.Scene {
         // 受保护中心：琥珀色光环标注（中心不随外圈环绕）
         const ring = this.add.graphics()
         ring.lineStyle(3, 0xffca28, 0.95)
-        ring.strokeCircle(px, py, 44)
+        ring.strokeCircle(px, py, half + 4)
         this.formationObjs.push(ring)
       }
-      const img = emojiImage(this, px, py, CHARACTERS[id].emoji, 80, 'player')
+      const img = emojiImage(this, px, py, CHARACTERS[id].emoji, size, 'player')
       this.formationObjs.push(img)
       this.memberImgs[post] = img
       const zone = this.add
-        .zone(px - 40, py - 40, 80, 80)
+        .zone(px - half, py - half, size, size)
         .setOrigin(0)
         .setInteractive({ useHandCursor: post !== 0 })
         .on('pointerup', () => this.onMemberTap(post))
       this.formationObjs.push(zone)
       this.memberZones[post] = zone
-      this.memberRects[post] = { id, x: px - 40, y: py - 40, w: 80, h: 80 }
+      this.memberRects[post] = { id, x: px - half, y: py - half, w: size, h: size }
     })
 
     this.formationObjs.push(
@@ -570,6 +596,7 @@ export class PromoteScene extends Phaser.Scene {
     const ids = this.postIds()
     const posts = formationPosts('guard', ids.length, this.previewPhase)
     const { cx, cy, scale } = this.previewGeom
+    const half = this.formationIconSize / 2
     posts.forEach((p, post) => {
       if (post === 0) return // 中心不动
       const img = this.memberImgs[post]
@@ -579,9 +606,9 @@ export class PromoteScene extends Phaser.Scene {
       const px = cx + p.x * scale
       const py = cy + p.y * scale
       img.setPosition(px, py)
-      zone.setPosition(px - 40, py - 40)
-      rect.x = px - 40
-      rect.y = py - 40
+      zone.setPosition(px - half, py - half)
+      rect.x = px - half
+      rect.y = py - half
     })
   }
 
@@ -634,21 +661,30 @@ export class PromoteScene extends Phaser.Scene {
 
   /** 详情区展示当前中心角色（复用招募/升级的属性版式） */
   private renderCenterDetail(res: number): void {
-    for (const o of this.detailObjs) o.destroy()
-    this.detailObjs = []
+    this.detailView.clear()
     const center = guardCenter(this.run)
-    if (!center) return
-    const D = this.layout.detail
-    const dx = this.origin.x + D.x
-    const dy = this.origin.y + D.y
+    if (!center) {
+      this.detailView.setContentHeight(0)
+      return
+    }
+    const D = this.detailRect
     const slot = this.run.roster.indexOf(center)
     const def = CHARACTERS[center]
     const items = this.run.memberItems[slot] ?? []
 
-    this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, def.emoji, 85, 'player'),
+    const subtitle = this.add
+      .text(104, 80, '站在队伍正中，受击判定减半，更少被敌人摸到', {
+        fontFamily: UI_FONT,
+        fontSize: FONT.small,
+        color: '#b9b9c6',
+        wordWrap: { width: D.w - 130, useAdvancedWrap: true },
+        resolution: res,
+      })
+      .setOrigin(0, 0)
+    this.detailView.add([
+      emojiImage(this, 58, 56, def.emoji, 85, 'player'),
       this.add
-        .text(dx + 104, dy + 44, `${def.name} · 受保护的中心`, {
+        .text(104, 44, `${def.name} · 受保护的中心`, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -656,36 +692,30 @@ export class PromoteScene extends Phaser.Scene {
           resolution: res,
         })
         .setOrigin(0, 0.5),
-      this.add
-        .text(dx + 104, dy + 80, '站在队伍正中，受击判定减半，更少被敌人摸到', {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          color: '#b9b9c6',
-          wordWrap: { width: D.w - 130, useAdvancedWrap: true },
-          resolution: res,
-        })
-        .setOrigin(0, 0.5),
-    )
-    this.renderStatGroups(center, items, res)
+      subtitle,
+    ])
+    const start = Math.max(128, 80 + subtitle.height + 12)
+    const end = this.renderStatGroups(center, items, res, start)
+    this.detailView.setContentHeight(end + 12)
   }
 
   // ── 详情（招募模式：文字详情区，预览占掉面板一角） ──────────
 
   private renderDetail(res: number): void {
-    for (const o of this.detailObjs) o.destroy()
-    this.detailObjs = []
-    if (!this.selectedKey) return
-    const D = this.layout.detailText
-    const dx = this.origin.x + D.x
-    const dy = this.origin.y + D.y
+    this.detailView.clear()
+    if (!this.selectedKey) {
+      this.detailView.setContentHeight(0)
+      return
+    }
+    const D = this.detailRect
 
     // 盖牌：不透露身份，只提示揭晓条件
     if (this.selectedKey.startsWith('lock-')) {
       const idx = Number(this.selectedKey.slice(5))
-      this.detailObjs.push(
-        emojiImage(this, dx + 46, dy + 48, '2753', 74),
+      this.detailView.add([
+        emojiImage(this, 46, 48, '2753', 74),
         this.add
-          .text(dx + 90, dy + 36, '命运牌 · 未解锁', {
+          .text(90, 36, '命运牌 · 未解锁', {
             fontFamily: UI_FONT,
             fontSize: FONT.lead,
             fontStyle: 'bold',
@@ -694,15 +724,16 @@ export class PromoteScene extends Phaser.Scene {
           })
           .setOrigin(0, 0.5),
         this.add
-          .text(dx + 90, dy + 70, `队伍规模达到 ${unlockAt(idx)} 人时揭晓这张牌的真身`, {
+          .text(90, 70, `队伍规模达到 ${unlockAt(idx)} 人时揭晓这张牌的真身`, {
             fontFamily: UI_FONT,
             fontSize: FONT.small,
             color: '#b9b9c6',
             wordWrap: { width: D.w - 110 },
             resolution: res,
           })
-          .setOrigin(0, 0.5),
-      )
+          .setOrigin(0, 0),
+      ])
+      this.detailView.setContentHeight(150)
       return
     }
 
@@ -711,10 +742,19 @@ export class PromoteScene extends Phaser.Scene {
     const state = this.cardState(id)
     const tag = state === 'taken' ? ' · 已入队' : this.picked.includes(id) ? ' · 已选' : ''
     const tagColor = state === 'taken' ? '#a5d6a7' : '#81d4fa'
-    this.detailObjs.push(
-      emojiImage(this, dx + 46, dy + 48, def.emoji, 74, 'player'),
+    const desc = this.add
+      .text(90, 70, def.desc, {
+        fontFamily: UI_FONT,
+        fontSize: FONT.small,
+        color: '#b9b9c6',
+        wordWrap: { width: D.w - 110 },
+        resolution: res,
+      })
+      .setOrigin(0, 0)
+    this.detailView.add([
+      emojiImage(this, 46, 48, def.emoji, 74, 'player'),
       this.add
-        .text(dx + 90, dy + 36, def.name + tag, {
+        .text(90, 36, def.name + tag, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -722,35 +762,22 @@ export class PromoteScene extends Phaser.Scene {
           resolution: res,
         })
         .setOrigin(0, 0.5),
-      this.add
-        .text(dx + 90, dy + 70, def.desc, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          color: '#b9b9c6',
-          wordWrap: { width: D.w - 110 },
-          resolution: res,
-        })
-        .setOrigin(0, 0.5),
-    )
-    this.renderStatGroups(id, [], res, D, dy + 112)
+      desc,
+    ])
+    const start = Math.max(112, 70 + desc.height + 10)
+    const end = this.renderStatGroups(id, [], res, start)
+    this.detailView.setContentHeight(end + 12)
   }
 
-  /** 属性组列表（招募/阵型详情共用；rect/startY 由两种模式各自指定） */
-  private renderStatGroups(
-    id: CharacterId,
-    items: ItemId[],
-    res: number,
-    D = this.layout.detail,
-    startY = this.origin.y + this.layout.detail.y + 128,
-  ): void {
-    const dx = this.origin.x + D.x
-    const dy = this.origin.y + D.y
+  /** 属性组列表（招募/阵型详情共用）：渲染进 detailView，返回排完的内容底端 */
+  private renderStatGroups(id: CharacterId, items: ItemId[], res: number, startY: number): number {
+    const wrap = this.detailRect.w - 104
     let cursor = startY
     for (const group of characterStatGroups(id, items)) {
-      this.detailObjs.push(
-        emojiImage(this, dx + 42, cursor, group.icon, 35),
+      this.detailView.add([
+        emojiImage(this, 42, cursor, group.icon, 35),
         this.add
-          .text(dx + 62, cursor, group.title, {
+          .text(62, cursor, group.title, {
             fontFamily: UI_FONT,
             fontSize: FONT.strong,
             fontStyle: 'bold',
@@ -758,25 +785,25 @@ export class PromoteScene extends Phaser.Scene {
             resolution: res,
           })
           .setOrigin(0, 0.5),
-      )
+      ])
       cursor += 38
       for (const line of group.lines) {
         const t = this.add
-          .text(dx + 62, cursor, line, {
+          .text(62, cursor, line, {
             fontFamily: UI_FONT,
             fontSize: FONT.body,
             color: '#d0d0d8',
-            wordWrap: { width: D.w - 104 },
+            wordWrap: { width: wrap },
             lineSpacing: 6,
             resolution: res,
           })
           .setOrigin(0, 0)
-        this.detailObjs.push(t)
+        this.detailView.add(t)
         cursor += Math.max(34, t.height + 8)
       }
       cursor += 10
-      if (cursor > dy + D.h - 60) break
     }
+    return cursor
   }
 
   private refresh(): void {
@@ -805,9 +832,11 @@ export class PromoteScene extends Phaser.Scene {
     if (total === 0) return
     const posts = formationPosts('ring', total, this.previewPhase)
     const maxR = Math.max(...posts.map((p) => Math.hypot(p.x, p.y)), 1)
-    const size = Math.min(P.w, P.h) >= 240 ? 58 : 50
-    const fit = Math.min(P.w, P.h) / 2 - size / 2 - 24
+    const base = Math.min(P.w, P.h) >= 240 ? 58 : 50
+    const fit = Math.min(P.w, P.h) / 2 - base / 2 - 24
     const scale = Math.min(2.2, fit / maxR)
+    // 环上人越多相邻越挤，按实际间距收缩图标，避免 total 变大时糊成一坨
+    const size = fitIconSize(posts, scale, base)
     const cx = px + P.w / 2
     const cy = py + P.h / 2 - 6
     this.previewGeom = { cx, cy, scale }

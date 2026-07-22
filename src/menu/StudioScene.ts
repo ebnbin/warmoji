@@ -24,6 +24,7 @@ import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumb
 import { FONT, UI_FONT } from '../core/fonts'
 import { TAP_SLOP } from '../core/units'
 import { VirtualEmojiGrid } from '../emoji/virtualGrid'
+import { ScrollView } from './scroll'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
 
 // Emoji Studio：twemoji 部件动画的游戏内工作台，三个 tab——
@@ -141,6 +142,8 @@ export class StudioScene extends Phaser.Scene {
   private ownedKeys = new Set<string>()
   /** 详情面板动态内容（切换选择时整组销毁重建） */
   private detailObjs: Phaser.GameObjects.GameObject[] = []
+  /** 详情面板下半部（模板 chips / 配方文案）的可滚动区，随每次重建重定位 */
+  private detailScroll!: ScrollView
   private tabObjs: Phaser.GameObjects.GameObject[] = []
   private tabRects: { id: Tab; x: number; y: number; w: number; h: number }[] = []
   private tplRects: { id: string; x: number; y: number; w: number; h: number }[] = []
@@ -218,6 +221,8 @@ export class StudioScene extends Phaser.Scene {
     const G = this.listRect()
     frames.fillRoundedRect(D.x - 8, D.y - 8, D.w + 16, D.h + 16, 14)
     frames.fillRoundedRect(G.x - 8, G.y - 8, G.w + 16, G.h + 16, 14)
+    // 详情下半部滚动区（模板 chips / 配方文案）：初始占位，各页构建时 setViewport 重定位
+    this.detailScroll = new ScrollView(this, { x: D.x, y: D.y, w: D.w, h: D.h })
 
     this.buildTabs(res)
     const grid = (this.grid = new VirtualEmojiGrid(this, G))
@@ -401,6 +406,7 @@ export class StudioScene extends Phaser.Scene {
     this.anatSplitGen++
     for (const o of this.detailObjs) o.destroy()
     this.detailObjs = []
+    this.detailScroll?.clear()
     this.previewImg = undefined
     this.frameKeys = []
     this.tplRects = []
@@ -427,8 +433,12 @@ export class StudioScene extends Phaser.Scene {
     if (set.clips.length > 1) y = this.buildClipChips(set, clip, cx, y, res) + 12
     y = this.buildControls(cx, y, res) + 18
     const recipe = clip
+    // 名称/描述/拆解为变长文案：装进可滚动区（配方文字再长也不会顶出面板）
+    const view = this.detailScroll
+    view.setViewport({ x: d.x, y, w: d.w, h: d.y + d.h - y - 8 })
+    let ly = 0
     const name = this.add
-      .text(cx, y, recipe.name, {
+      .text(d.w / 2, ly, recipe.name, {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
         fontStyle: 'bold',
@@ -436,9 +446,9 @@ export class StudioScene extends Phaser.Scene {
         resolution: res,
       })
       .setOrigin(0.5, 0)
-    y += 50
+    ly += 50
     const desc = this.add
-      .text(cx, y, recipe.desc, {
+      .text(d.w / 2, ly, recipe.desc, {
         fontFamily: UI_FONT,
         fontSize: FONT.body,
         color: '#e8e8f2',
@@ -448,9 +458,9 @@ export class StudioScene extends Phaser.Scene {
         lineSpacing: 8,
       })
       .setOrigin(0.5, 0)
-    y += desc.height + 14
+    ly += desc.height + 14
     const anatomy = this.add
-      .text(cx, y, recipe.anatomy, {
+      .text(d.w / 2, ly, recipe.anatomy, {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         color: '#aab6cc',
@@ -460,7 +470,8 @@ export class StudioScene extends Phaser.Scene {
         lineSpacing: 6,
       })
       .setOrigin(0.5, 0)
-    this.detailObjs.push(name, desc, anatomy)
+    view.add([name, desc, anatomy])
+    view.setContentHeight(ly + anatomy.height + 8)
     this.startBake(
       clip,
       previewSize,
@@ -531,24 +542,28 @@ export class StudioScene extends Phaser.Scene {
     y += previewSize + 14
     y = this.buildControls(cx, y, res) + 16
 
-    // 模板 chips：两行网格，点选即换装
+    // 模板 chips + 说明：装进可滚动区（模板数增长也不会顶出详情面板底部）。
+    // 坐标相对滚动区顶（viewport 从 chips 起始 y 到面板底），点击命中读世界坐标供 e2e
+    const chipsTop = y
+    const view = this.detailScroll
+    view.setViewport({ x: d.x, y: chipsTop, w: d.w, h: d.y + d.h - chipsTop - 8 })
     const cols = portrait ? 5 : 5
     const chipW = (d.w - 40 - (cols - 1) * 10) / cols
     const chipH = 62
     ANIM_TEMPLATES.forEach((t, i) => {
       const col = i % cols
       const row = Math.floor(i / cols)
-      const x = d.x + 20 + col * (chipW + 10)
-      const cy = y + row * (chipH + 10)
+      const lx = 20 + col * (chipW + 10)
+      const lcy = row * (chipH + 10)
       const active = t.id === this.tplId
       const bg = this.add.graphics()
       bg.fillStyle(active ? 0xffffff : 0x000000, active ? 0.18 : 0.25)
-      bg.fillRoundedRect(x, cy, chipW, chipH, 12)
+      bg.fillRoundedRect(lx, lcy, chipW, chipH, 12)
       bg.lineStyle(active ? 2 : 1, 0xffffff, active ? 0.9 : 0.1)
-      bg.strokeRoundedRect(x, cy, chipW, chipH, 12)
-      const icon = emojiImage(this, x + chipW / 2, cy + 22, t.icon, 35)
+      bg.strokeRoundedRect(lx, lcy, chipW, chipH, 12)
+      const icon = emojiImage(this, lx + chipW / 2, lcy + 22, t.icon, 35)
       const label = this.add
-        .text(x + chipW / 2, cy + chipH - 15, t.name, {
+        .text(lx + chipW / 2, lcy + chipH - 15, t.name, {
           fontFamily: UI_FONT,
           fontSize: FONT.caption,
           color: '#ffffff',
@@ -557,21 +572,21 @@ export class StudioScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setAlpha(active ? 1 : 0.65)
       const zone = this.add
-        .zone(x, cy, chipW, chipH)
+        .zone(lx, lcy, chipW, chipH)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
         .on('pointerup', () => {
-          if (this.grid?.wasDragged || this.tplId === t.id) return
+          if (this.grid?.wasDragged || view.wasDragged || this.tplId === t.id) return
           this.tplId = t.id
           this.buildTemplateDetail()
           this.report()
         })
-      this.tplRects.push({ id: t.id, x, y: cy, w: chipW, h: chipH })
-      this.detailObjs.push(bg, icon, label, zone)
+      view.add([bg, icon, label, zone])
+      this.tplRects.push({ id: t.id, x: d.x + lx, y: chipsTop + lcy, w: chipW, h: chipH })
     })
-    y += Math.ceil(ANIM_TEMPLATES.length / cols) * (chipH + 10) + 8
+    let ly = Math.ceil(ANIM_TEMPLATES.length / cols) * (chipH + 10) + 8
     const desc = this.add
-      .text(cx, y, `${tpl.name}：${tpl.desc}`, {
+      .text(d.w / 2, ly, `${tpl.name}：${tpl.desc}`, {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         color: '#e8e8f2',
@@ -581,7 +596,9 @@ export class StudioScene extends Phaser.Scene {
         lineSpacing: 6,
       })
       .setOrigin(0.5, 0)
-    this.detailObjs.push(desc)
+    view.add(desc)
+    ly += desc.height + 8
+    view.setContentHeight(ly)
 
     // 套用模板需要目标 SVG 的元素数：异步取文本后构配方烘焙
     const emoji = this.tplEmoji
