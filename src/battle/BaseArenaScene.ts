@@ -85,6 +85,7 @@ import { burstEmitter } from '../core/fx'
 import { acquirePooled, releasePooled } from '../core/pool'
 import { playSfx } from '../audio/sfx'
 import { UI_FONT } from '../core/fonts'
+import { TIMESTOP, timeScaleFor } from './timeStop'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
 import { createAbility } from '../abilities/create'
 import { applyBlast, applyEffects, blastRing } from '../abilities/effects'
@@ -136,19 +137,6 @@ export interface WaveSummary {
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
 }
-
-// 时停（队长「时停」技能）：生效期间敌方一切时间以 freezeScale 近乎凝固——
-// 敌人移动/开火/在途敌弹/刷怪全乘之，玩家走位与开火恒常速。屏幕固定冷雾示意。
-const TIMESTOP = {
-  /** 敌方时间流速下限（近乎凝固，不做成 0：留一丝蠕动感、且避免边界特例） */
-  freezeScale: 0.05,
-  /** 冷雾遮罩最大不透明度（压暗整屏，明确读出「时停」） */
-  chillMaxAlpha: 0.5,
-  /** 冷雾颜色（近黑冷调，压暗整屏 = 通用可读的「时停」信号，不与任何图底色撞色） */
-  chillColor: 0x040814,
-  /** 冷雾淡入淡出时间常数（ms） */
-  fadeMs: 140,
-} as const
 
 export abstract class BaseArenaScene extends Phaser.Scene {
   protected lineup: readonly CharacterDef[] = []
@@ -287,9 +275,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   elapsedMs = 0
   private spawnCooldownMs = 0
   private pendingSpawns = 0
-  /** 时停剩余时长（真实时钟毫秒，队长「时停」技能置位）：>0 期间全世界时间近乎凝固。
-   * 必须用真实时钟计（不能用被缩放的 elapsedMs），否则时停会把自己拖成数分钟 */
+  /** 时停技能剩余「世界时长」（毫秒，ctx.timeStop 置位）：>0 期间世界时标随移动放缩。
+   * 按世界时长排空（用 wdelta 扣，不是真实时钟）——时间变慢时这 15 秒也一起变慢 */
   timeStopMsLeft = 0
+  /** 本帧队伍移动量 0..1（键盘=1、摇杆取模长）：时停窗口内的世界时标据此放缩 */
+  protected moveInputRaw = 0
+  /** 平滑后的移动量 0..1（低通，避免时标逐帧抖动），喂给 timeScaleFor */
+  private chrono = 0
   /** 上一帧时停是否生效（用于结束当帧把弹体速度恢复满速的一次性收尾） */
   private timeStopWasActive = false
   /** 时停冷雾遮罩（屏幕固定，任意地图通用）+ 其当前不透明度（平滑淡入淡出） */
@@ -465,22 +457,22 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   }
   /** 终波开场的世界准备（无界图：缩圈初始化） */
   protected onFinalWaveSetup(): void {}
-  /** 世界时间流速倍率（1=常速）：时停技能生效期间近乎凝固。作用面 = 整个世界——
-   * 敌人移动（并入 slowFactorFor）、双方攻速与在途弹体、刷怪、以及 elapsedMs
-   * 本身（波次倒计时随之冻结）；唯独玩家走位与呼吸恒实时（在冻结的时间里穿行走位）。
-   * 任意地图通用（不与地图形态绑定） */
+  /** 世界时间流速倍率（1=常速）。时停技能窗口内 = 随队伍移动量放缩（移动则恢复常速、
+   * 静止则降到 floor 近乎凝固）；窗口外恒 1。作用面 = 整个世界——敌人移动（并入
+   * slowFactorFor）、双方攻速与在途弹体、刷怪、以及 elapsedMs 本身（波次倒计时随之
+   * 放慢）；唯玩家走位与呼吸恒实时（可随时移动把时间「拨」回来）。任意地图通用 */
   worldTimeScale(): number {
-    return this.timeStopMsLeft > 0 ? TIMESTOP.freezeScale : 1
+    return this.timeStopMsLeft > 0 ? timeScaleFor(this.chrono) : 1
   }
 
-  /** 队长「时停」技能：接下来 durationMs（真实时钟）内全世界时间近乎凝固（ctx.timeStop 触发） */
+  /** 队长「时停」技能：接下来 durationMs（世界时长）内进入「动则时行、静则时停」（ctx.timeStop 触发） */
   startTimeStop(durationMs: number): void {
     this.timeStopMsLeft = durationMs
   }
 
-  /** 时停冷雾遮罩：生效期压暗整屏、结束平滑淡出（实时 delta，任意地图通用） */
+  /** 时停冷雾遮罩：窗口内越静越浓、移动则淡去，窗口外清空（实时 delta，任意地图通用） */
   private updateTimeStopFx(delta: number, active: boolean): void {
-    const target = active ? TIMESTOP.chillMaxAlpha : 0
+    const target = active ? (1 - this.chrono) * TIMESTOP.chillMaxAlpha : 0
     const rate = Math.min(1, delta / TIMESTOP.fadeMs)
     this.timeStopFxAlpha += (target - this.timeStopFxAlpha) * rate
     this.timeStopFx?.setFillStyle(TIMESTOP.chillColor, this.timeStopFxAlpha)
@@ -620,6 +612,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.skillBuffUntil = 0
     this.danceEndsAt = 0
     this.timeStopMsLeft = 0
+    this.moveInputRaw = 0
+    this.chrono = 0
     this.timeStopWasActive = false
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
@@ -757,12 +751,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (this.over) return
-    // 时停：真实时钟倒计时（不受缩放影响，保证 15 秒就是 15 秒），得出世界时间流速。
-    // 世界侧一切用 wdelta（近乎凝固），唯玩家走位/呼吸/技能冷却用真实 delta。
-    if (this.timeStopMsLeft > 0) this.timeStopMsLeft = Math.max(0, this.timeStopMsLeft - delta)
+    // 时停窗口内 = 世界时标随队伍移动量放缩（动则时行、静则时停）；窗口按世界时长排空
+    //（时间变慢时这 15 秒也一起变慢）。世界侧一切用 wdelta，唯玩家走位/呼吸/技能 CD 用实时 delta。
     const tsActive = this.timeStopMsLeft > 0
     const scale = this.worldTimeScale()
     const wdelta = delta * scale
+    if (tsActive) this.timeStopMsLeft = Math.max(0, this.timeStopMsLeft - wdelta)
     this.elapsedMs += wdelta
 
     // 波次时间到 → 结算/商店（测试模式无尽，便于性能观测）
@@ -785,6 +779,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.frameMemberTargets = this.buildMemberTargets()
     this.updateOrbit(delta)
     this.moveTeam(delta)
+    // 移动量低通平滑（实时 delta）：moveTeam 已写好 moveInputRaw，供下一帧 worldTimeScale 读取
+    this.chrono += (this.moveInputRaw - this.chrono) * Math.min(1, delta / TIMESTOP.easeMs)
     this.updateMembers(delta, wdelta)
     this.touchStep()
     this.spawn(wdelta)
@@ -1164,6 +1160,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const ui = this.scene.get('ui') as UIScene
     const dir = kx !== 0 || ky !== 0 ? norm(kx, ky) : ui.joystickVector
     this.teamDir = dir
+    // 移动量（键盘满推=1、摇杆取模长）：时停窗口内的世界时标据此放缩（下一帧 update 消费）
+    this.moveInputRaw =
+      kx !== 0 || ky !== 0 ? 1 : Math.min(1, Math.hypot(ui.joystickVector.x, ui.joystickVector.y))
     const step = (this.stats.moveSpeed * this.battleFx.moveSpeedMul * delta) / 1000
     const drift = this.teamDrift(delta)
     const next = this.constrainTeam({

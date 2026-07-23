@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test'
 import { enterLab, enterMap } from './helpers'
 
-// 慢渲染环境下敌人刷新有抖动，允许重试
+// 慢渲染环境下移动量平滑/敌人刷新有抖动，允许重试
 test.describe.configure({ retries: 2 })
 
-// 时停技能引擎侧：worldTimeScale 开关 + 全世界近乎凝固（敌人/倒计时冻结），唯玩家走位如常
-test('时停：整个世界近乎静止（敌人+倒计时冻结），玩家仍能走位', async ({ page }) => {
+// 时停技能 = 「秒针」机制窗口化：窗口内动则时行、静则时停；窗口外恒常速
+test('时停：窗口内静则冻结、动则恢复；窗口外常速', async ({ page }) => {
   test.setTimeout(120_000)
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(String(e)))
@@ -20,57 +20,38 @@ test('时停：整个世界近乎静止（敌人+倒计时冻结），玩家仍�
 
   const scale = (): Promise<number> =>
     page.evaluate(() => (window.__arena() as { worldTimeScale: () => number }).worldTimeScale())
-  const elapsed = (): Promise<number> => page.evaluate(() => window.__warmoji!.elapsed)
-  const snap = (): Promise<{ x: number; y: number }[]> =>
-    page.evaluate(() =>
-      (window.__arena() as { enemies: { getChildren: () => { active: boolean; x: number; y: number }[] } })
-        .enemies.getChildren()
-        .filter((e) => e.active)
-        .map((e) => ({ x: e.x, y: e.y })),
-    )
-  const avgMove = (a: { x: number; y: number }[], b: { x: number; y: number }[]): number => {
-    if (b.length === 0) return 0
-    let sum = 0
-    for (const p of b) {
-      let best = Infinity
-      for (const q of a) best = Math.min(best, Math.hypot(p.x - q.x, p.y - q.y))
-      sum += best
-    }
-    return sum / b.length
-  }
+  const startTS = (ms: number): Promise<void> =>
+    page.evaluate((d) => (window.__arena() as { startTimeStop: (ms: number) => void }).startTimeStop(d), ms)
 
   for (let i = 0; i < 5; i++) await page.evaluate(() => window.__spawnEnemy!('zombie', 8, 0))
-  await page.waitForTimeout(600)
+  await page.waitForTimeout(400)
 
-  // 基线（未时停）：敌人追人会动，倒计时正常推进
+  // 窗口外：恒常速（即便静止不动）
   expect(await scale()).toBe(1)
-  const be0 = await elapsed()
-  const bs0 = await snap()
-  await page.waitForTimeout(1000)
-  const baseElapsed = (await elapsed()) - be0
-  const baseMove = avgMove(bs0, await snap())
+  await page.waitForTimeout(800)
+  expect(await scale()).toBe(1)
 
-  // 时停：世界时标立刻落到 freezeScale
-  await page.evaluate(() => (window.__arena() as { startTimeStop: (ms: number) => void }).startTimeStop(60_000))
-  expect(await scale()).toBeLessThan(0.2)
-  const fe0 = await elapsed()
-  const fs0 = await snap()
-  await page.waitForTimeout(1000)
-  const frozenElapsed = (await elapsed()) - fe0
-  const frozenMove = avgMove(fs0, await snap())
+  // 开启 15（世界）秒时停窗口，用很长的世界时长确保静止时窗口几乎不排空
+  await startTS(600_000)
 
-  // 敌人几乎不动 + 倒计时几乎不走（世界时间凝固）
-  expect(frozenMove).toBeLessThan(baseMove * 0.34)
-  expect(frozenMove).toBeLessThan(6)
-  expect(frozenElapsed).toBeLessThan(baseElapsed * 0.34)
+  // 静止：世界时标降到近乎凝固
+  await page.waitForTimeout(1500)
+  const stillScale = await scale()
+  expect(stillScale).toBeLessThan(0.2)
 
-  // 但玩家仍能在冻结的时间里走位：按住方向键，队伍中心位移明显
+  // 移动：世界时标回升（动则时行），队伍中心明显位移
   const px0 = await page.evaluate(() => window.__warmoji!.playerX)
   await page.keyboard.down('ArrowRight')
-  await page.waitForTimeout(700)
-  await page.keyboard.up('ArrowRight')
+  await page.waitForTimeout(2000)
+  const moveScale = await scale()
   const px1 = await page.evaluate(() => window.__warmoji!.playerX)
+  await page.keyboard.up('ArrowRight')
+  expect(moveScale).toBeGreaterThan(0.7)
   expect(px1 - px0).toBeGreaterThan(20)
+
+  // 松手回到静止：世界再次凝固
+  await page.waitForTimeout(1800)
+  expect(await scale()).toBeLessThan(0.3)
 
   expect(errors, `控制台/页面错误：\n${errors.join('\n')}`).toHaveLength(0)
 })
