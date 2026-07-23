@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { arenaSceneFor, MAP, MAP_IDS, MAPS, rollDecor, sanitizeMapId } from './registry'
+import { arenaSceneFor, bossFor, MAP, MAP_IDS, MAPS, mapEnemyRoster, rollDecor, sanitizeMapId } from './registry'
+import { BOSSES } from '../enemies/registry'
 import { Rng } from '../core/rng'
 
 describe('地图定义', () => {
@@ -56,6 +57,44 @@ describe('地图定义', () => {
     expect(arenaSceneFor('river')).toBe('arenaRiver')
     expect(arenaSceneFor('void')).toBe('arenaVoid')
     expect(arenaSceneFor('ruins')).toBe('arenaRuins')
+  })
+})
+
+describe('测试模式敌人名录按图裁剪', () => {
+  it('每图名录 = 本图波次怪 + 终波 Boss + 衍生子代，无他图敌人混入', () => {
+    for (const id of MAP_IDS) {
+      const roster = mapEnemyRoster(id)
+      const kinds = new Set<string>(roster.map((e) => e.kind))
+      const mixKinds = new Set<string>(MAPS[id].mix.map((r) => r.kind))
+      const boss = bossFor(id)
+
+      // 本图 Boss 必在；其它图的 Boss 一律不得出现
+      expect(kinds.has(boss.kind)).toBe(true)
+      for (const b of BOSSES) {
+        if (b.kind !== boss.kind) expect(kinds.has(b.kind)).toBe(false)
+      }
+      // 波次编排里的怪一个不落
+      for (const k of mixKinds) expect(kinds.has(k)).toBe(true)
+      // 名录里每一项要么在 mix、要么是本图 Boss、要么是某在册者的衍生子代
+      for (const e of roster) {
+        const fromMixOrBoss = mixKinds.has(e.kind) || e.kind === boss.kind
+        const asChild = roster.some(
+          (p) =>
+            p.spawner?.into.kind === e.kind ||
+            (p.onDeath ?? []).some((fx) => fx.kind === 'split' && fx.into.kind === e.kind),
+        )
+        expect(fromMixOrBoss || asChild).toBe(true)
+      }
+      // 去重
+      expect(kinds.size).toBe(roster.length)
+    }
+  })
+
+  it('衍生子代随亲代入册：泡泡→小泡泡（河流）、虫巢→小飞虫（工厂）', () => {
+    const river = new Set(mapEnemyRoster('river').map((e) => e.kind))
+    expect(river.has('blob') && river.has('blobling')).toBe(true)
+    const factory = new Set(mapEnemyRoster('void').map((e) => e.kind))
+    expect(factory.has('hive') && factory.has('larva')).toBe(true)
   })
 })
 

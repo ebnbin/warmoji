@@ -66,7 +66,7 @@ import type { RunState } from '../run/state'
 import { tickSkillCd } from '../captains/skill'
 import { DEFAULT_SETTINGS, loadSettings } from '../run/settings'
 import type { Settings } from '../run/settings'
-import { MAPS, bossFor } from '../maps/registry'
+import { MAPS, bossFor, mapEnemyRoster } from '../maps/registry'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
 import { isWithinActive } from '../maps/world'
@@ -1786,7 +1786,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   private spawnTest(): void {
     const d = DENSITY_PARAMS[labDensity()]
     this.spawnCooldownMs = d.intervalMs
-    const kinds = [...labEnemySet()].filter((k) => k in ENEMIES)
+    // 勾选集跨图保留，但只生成本图会出现的敌人——他图残留的勾选在此图不出场
+    const roster = new Set<string>(mapEnemyRoster(this.run.mapId).map((e) => e.kind))
+    const kinds = [...labEnemySet()].filter((k) => k in ENEMIES && roster.has(k))
     if (kinds.length === 0) return
     const hpMul = labDifficulty()
     for (let i = 0; i < d.batch; i++) {

@@ -74,6 +74,27 @@ export function bossFor(id: MapId): EnemyDef {
   return ENEMIES[MAPS[id].boss]!
 }
 
+/** 本图会实际出现的全部敌人：波次编排的常规怪 + 终波 Boss + 它们衍生的子代
+ * （巢穴生成 / 死亡分裂，如泡泡→小泡泡、虫巢→小飞虫）。按出现序去重，子代紧随亲代、
+ * Boss 末位。测试模式的敌人清单据此按图裁剪，只列本图有的敌人。 */
+export function mapEnemyRoster(id: MapId): EnemyDef[] {
+  const seen = new Set<string>()
+  const out: EnemyDef[] = []
+  const add = (def: EnemyDef): void => {
+    if (seen.has(def.kind)) return
+    seen.add(def.kind)
+    out.push(def)
+    if (def.spawner) add(def.spawner.into)
+    for (const fx of def.onDeath ?? []) if (fx.kind === 'split') add(fx.into)
+  }
+  for (const row of MAPS[id].mix) {
+    const def = ENEMIES[row.kind]
+    if (def) add(def)
+  }
+  add(bossFor(id))
+  return out
+}
+
 // ── 装饰散布 ────────────────────────────────────────────────
 
 /** 一个装饰实例（格坐标，渲染层再乘 UNIT） */

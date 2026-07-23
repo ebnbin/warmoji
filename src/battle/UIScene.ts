@@ -5,10 +5,9 @@ import { formatTime } from '../core/format'
 import { endRun, getRun } from '../run/state'
 // 能量豆已移除：技能纯 CD 门槛（见 captains/skill.ts）
 import { isDevOpen, setDevOpen } from '../debug/dev'
-import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
 import { CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
-import { ARENA_SCENE_KEYS } from '../maps/registry'
+import { ARENA_SCENE_KEYS, mapEnemyRoster } from '../maps/registry'
 import type { ArenaSceneKey } from '../maps/registry'
 import { beginRun } from '../run/state'
 import {
@@ -656,7 +655,8 @@ export class UIScene extends Phaser.Scene {
       this.arena.scene.restart()
     }
     let y = 0
-    y = this.labSection('敌人（实时）', y, [...ENEMY_DEFS, ...BOSSES].map((d) => ({
+    // 只列本图会出现的敌人（波次编排 + 终波 Boss + 衍生子代），不混入他图的怪
+    y = this.labSection('敌人（实时）', y, mapEnemyRoster(this.arena.run.mapId).map((d) => ({
       label: d.name,
       on: () => isLabEnemyOn(d.kind),
       tap: (chip) => {

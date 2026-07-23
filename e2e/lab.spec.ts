@@ -26,10 +26,10 @@ test('测试模式：只出勾选的敌人、玩家免死无时限', async ({ pa
   await page.goto('/')
   await startRun(page)
 
-  // 进入试炼场，只勾选毒蛇
-  await page.evaluate(() => window.__setLab!(['snake']))
+  // 进入试炼场（默认黑森林），只勾选森林里的僵尸
+  await page.evaluate(() => window.__setLab!(['zombie']))
 
-  // 试炼场维持一个小在场池：毒蛇会成群补到场
+  // 试炼场维持一个小在场池：僵尸会成群补到场
   await page.waitForFunction(
     () => {
       try {
@@ -52,21 +52,21 @@ test('测试模式：只出勾选的敌人、玩家免死无时限', async ({ pa
       .map((e) => e.getData('enemy').def.kind)
   })
   expect(kinds.length).toBeGreaterThan(0)
-  expect([...new Set(kinds)]).toEqual(['snake'])
+  expect([...new Set(kinds)]).toEqual(['zombie'])
 
   // 玩家免死（测试模式默认「无敌」开，血量拉满）
   const s = await page.evaluate(() => window.__warmoji!)
   expect(s.hp).toBeGreaterThan(100_000)
 
-  // 切换勾选实时生效：改成自爆怪后，新出场的应含自爆怪
-  await page.evaluate(() => window.__setLab!(['creeper']))
+  // 切换勾选实时生效：改成野猪后，新出场的应含野猪
+  await page.evaluate(() => window.__setLab!(['boar']))
   await page.waitForFunction(
     () => {
       try {
         const g = window.__game as LabGame
         return g.scene.keys['arena']!.enemies
           .getChildren()
-          .some((e) => e.active && e.getData('enemy').def.kind === 'creeper')
+          .some((e) => e.active && e.getData('enemy').def.kind === 'boar')
       } catch {
         return false
       }
