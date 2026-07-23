@@ -116,7 +116,7 @@ export const CHARACTERS = {
   fairy: {
     emoji: '1f9da',
     name: '仙子',
-    desc: '魔尘弹把敌人变形成无害的绵羊，变形期间不能伤人',
+    desc: '魔尘弹把敌人整个变成一只无能力的绵羊——暂时失去攻击、被动与亡语，只保留血量，一段时间后恢复；同一敌人变羊有冷却',
     orbit: -0.6,
     weapons: [],
     innate: [

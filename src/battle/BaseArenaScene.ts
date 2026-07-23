@@ -138,6 +138,9 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
 }
 
+/** 变羊恢复后同一敌人的再变冷却（ms）：防同一目标被永久变羊 */
+const MORPH_RECAST_CD = 5000
+
 export abstract class BaseArenaScene extends Phaser.Scene {
   protected lineup: readonly CharacterDef[] = []
   members: Member[] = []
@@ -1542,8 +1545,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       if (hp <= 0) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
     }
     this.floatDamage(enemy.x, enemy.y, damage, crit)
-    // Boss 体格击退免疫：不吃冲量也不被致死击飞
-    if (a.kbImmune) knockback = 0
+    // Boss 体格击退免疫：不吃冲量也不被致死击飞（但变羊中的巢/Boss 除外——羊没有免疫，会被推动）
+    if (a.kbImmune && !a.morphed) knockback = 0
     if (hp <= 0) {
       // 致死一击：敌人失去自身动力，击退不再衰减——尸体被匀速击飞
       if (knockback > 0 && srcX !== undefined && srcY !== undefined) {
@@ -1602,10 +1605,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 战场拾取携带者：在原地掉下所背拾取（不磁吸，待走位拾取）
     if (a.carries) spawnFieldPickup(this, enemy.x, enemy.y, a.carries)
     if (a.boss) this.onBossDown(enemy)
-    // 亡语（死者视角）：蘑菇留毒/泡泡分裂/幽灵治疗等，走组合式效果
-    runDeathEffects(this, a)
-    // 拆巢：名下护巢子敌暴走（须在 despawnKilled 释放本体前，否则 owner 反查失效）
-    if (a.def.spawner) this.orphanBrood(a)
+    // 变羊中的敌人 = 一只无能力的羊：死亡不触发任何亡语/拆巢（彻底失去自身机制）
+    if (!a.morphed) {
+      // 亡语（死者视角）：蘑菇留毒/泡泡分裂/幽灵治疗等，走组合式效果
+      runDeathEffects(this, a)
+      // 拆巢：名下护巢子敌暴走（须在 despawnKilled 释放本体前，否则 owner 反查失效）
+      if (a.def.spawner) this.orphanBrood(a)
+    }
     this.despawnKilled(enemy, a, flingVx, flingVy)
   }
 
@@ -1991,8 +1997,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     hex: { durationMs: number; morphEmoji: string; vulnMul?: number },
   ): void {
     const a = enemyOf(enemy)
-    if (a.boss) return
+    // Boss 免疫；同一敌人变羊有冷却（morphCdUntil 覆盖变形期 + 恢复后 MORPH_RECAST_CD 秒）
+    if (a.boss || this.elapsedMs < a.morphCdUntil) return
     a.morphUntil = this.elapsedMs + hex.durationMs
+    a.morphCdUntil = a.morphUntil + MORPH_RECAST_CD
     a.morphVuln = hex.vulnMul ?? 1
     if (!a.morphed) {
       a.morphed = true

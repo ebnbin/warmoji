@@ -39,6 +39,8 @@ export interface Enemy {
   morphUntil: number
   morphVuln: number
   morphed: boolean
+  /** 变羊冷却到期时刻：变羊结束后一段时间内同一敌人不可再被变（防永久变羊） */
+  morphCdUntil: number
   slowed: boolean
   /** 能力施加的限时减速/冻结（0 = 无） */
   abilitySlowUntil: number
@@ -106,6 +108,7 @@ export function attachEnemy(image: ImageObj, def: EnemyDef, hp: number, init?: P
     morphUntil: 0,
     morphVuln: 1,
     morphed: false,
+    morphCdUntil: 0,
     slowed: false,
     abilitySlowUntil: 0,
     abilitySlowMul: 1,
