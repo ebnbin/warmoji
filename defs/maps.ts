@@ -39,12 +39,12 @@ export const MAPS = {
       density: [0.1, 0.14],
     },
     mix: DEFAULT_MIX,
-    boss: 'boss',
+    boss: 'treant',
   },
   desert: {
     emoji: '1f3dc',
     name: '荒漠',
-    desc: '无边的大漠，可朝任意方向走到天涯；终波赤鬼降临时毒雾收拢成圈',
+    desc: '无边的大漠，可朝任意方向走到天涯；终波蝎王降临时毒雾收拢成圈',
     kind: 'infinite',
     palette: {
       bgFrom: 'hsl(30 42% 36%)',
@@ -60,7 +60,7 @@ export const MAPS = {
       density: [0.08, 0.11],
     },
     mix: DEFAULT_MIX,
-    boss: 'boss',
+    boss: 'scorpion',
   },
   river: {
     emoji: '1f30a',
@@ -84,7 +84,7 @@ export const MAPS = {
     },
     drift: ['1f343', '1f338', '1fae7', '1f342'],
     mix: DEFAULT_MIX,
-    boss: 'boss',
+    boss: 'croc',
   },
   void: {
     emoji: '1f3ed',
@@ -106,7 +106,8 @@ export const MAPS = {
       density: [0.05, 0.09],
     },
     mix: DEFAULT_MIX,
-    boss: 'boss',
+    // 工厂专属 Boss：母机核心——激光环扫 + 液压重锤
+    boss: 'mecha',
   },
   ruins: {
     emoji: '1f3da',

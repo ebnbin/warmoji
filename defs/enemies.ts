@@ -309,27 +309,64 @@ export const ENEMY_DEFS: readonly EnemyDef[] = [
   CREEPER,
 ]
 
-// Boss 就是 role:'boss' 的普通条目——折进 ENEMIES 目录（出怪表 mix 已移到各 Map）
-const BOSS: EnemyDef = {
-  kind: 'boss',
+// Boss 就是 role:'boss' 的普通条目——每张地图一只专属 Boss，技能贴合该图主题与玩法。
+// 出怪表 mix 移到各 Map；此处只给 Boss 本体（map.boss 按 kind 引用）。
+
+/** 黑森林专属 Boss——树妖：召唤毒菌蔓生战场（spawner→毒蘑菇，死亡留毒液池），
+ * 喷吐孢子弹幕封走位。缓慢厚重的召唤者/控场型，逼玩家优先清菌再近身。 */
+const FOREST_BOSS: EnemyDef = {
+  kind: 'treant',
   role: 'boss',
-  emoji: '1f479',
-  name: '赤鬼',
-  desc: '终波头目：环形弹幕与蓄力突刺，击退免疫',
+  emoji: '1f333',
+  name: '树妖',
+  desc: '黑森林头目：召唤毒菌蔓生战场，喷吐孢子扇幕，缓慢厚重，击退免疫',
+  size: 3.4,
+  radius: 1.1,
+  hp: 6500,
+  speed: 1.0,
+  damage: 20,
+  xp: 60,
+  coins: 60,
+  kbImmune: true,
+  locomotion: { kind: 'chase' },
+  // 育菌：周期从根须育出毒蘑菇（亡语留毒液池），不清就越滚越多
+  spawner: { into: MUSHROOM, intervalMs: 5200, count: 2, maxAlive: 6, firstDelayMs: 3000 },
+  abilities: [
+    {
+      kind: 'projectile',
+      damage: 8,
+      cooldownMs: 3200,
+      knockback: 0,
+      firstDelayMs: 2000,
+      lifeMs: 6000,
+      volley: { count: 7, spreadDeg: 160 },
+      projectile: { emoji: '1f7e2', size: 0.42, radius: 0.15, speed: 2.4, rotationOffsetDeg: 0 },
+    },
+  ],
+}
+
+/** 荒漠专属 Boss——蝎王：掘沙尾刺猛扑（dash 突袭）+ 毒液扇射。无边大漠里高机动
+ * 逼近型，突袭配远程毒幕，逼玩家横向拉扯躲刺。 */
+const DESERT_BOSS: EnemyDef = {
+  kind: 'scorpion',
+  role: 'boss',
+  emoji: '1f982',
+  name: '蝎王',
+  desc: '荒漠头目：掘沙尾刺猛扑突袭，喷射毒液扇幕，击退免疫',
   size: 3.2,
   radius: 1.05,
   hp: 6000,
-  speed: 1.4,
-  damage: 20,
+  speed: 1.5,
+  damage: 22,
   xp: 60,
   coins: 60,
   kbImmune: true,
   locomotion: {
     kind: 'dash',
-    trigger: { kind: 'timer', intervalMs: 5600, firstDelayMs: 3600 },
-    length: { kind: 'time', durationMs: 450 },
-    windupMs: 750,
-    dashSpeed: 8,
+    trigger: { kind: 'timer', intervalMs: 5000, firstDelayMs: 3500 },
+    length: { kind: 'time', durationMs: 500 },
+    windupMs: 650,
+    dashSpeed: 11,
     idle: 'chase',
     aim: 'teamCenter',
     lockAt: 'launch',
@@ -339,13 +376,95 @@ const BOSS: EnemyDef = {
     {
       kind: 'projectile',
       damage: 8,
-      cooldownMs: 2800,
+      cooldownMs: 3000,
       knockback: 0,
       firstDelayMs: 1800,
+      lifeMs: 5000,
+      aim: 'nearest',
+      volley: { count: 5, spreadDeg: 70 },
+      projectile: { emoji: '1f7e3', size: 0.42, radius: 0.15, speed: 3.2, rotationOffsetDeg: 0 },
+    },
+  ],
+}
+
+/** 奔流专属 Boss——巨鳄：喷吐水弹扇幕 + 掀起水柱自天砸落（strike）。潜伏河道的
+ * 远程+范围压制型，水柱无视走位天降，逼玩家在水流漂移里不停换位。 */
+const RIVER_BOSS: EnemyDef = {
+  kind: 'croc',
+  role: 'boss',
+  emoji: '1f40a',
+  name: '巨鳄',
+  desc: '奔流头目：喷吐水弹扇幕，掀起水柱自天砸落，击退免疫',
+  size: 3.4,
+  radius: 1.1,
+  hp: 6200,
+  speed: 1.3,
+  damage: 20,
+  xp: 60,
+  coins: 60,
+  kbImmune: true,
+  locomotion: { kind: 'chase' },
+  abilities: [
+    {
+      kind: 'projectile',
+      damage: 9,
+      cooldownMs: 3200,
+      knockback: 0,
+      firstDelayMs: 1800,
+      lifeMs: 5000,
+      aim: 'nearest',
+      volley: { count: 6, spreadDeg: 90 },
+      projectile: { emoji: '1f4a7', size: 0.5, radius: 0.18, speed: 2.6, rotationOffsetDeg: 0 },
+    },
+    {
+      kind: 'strike',
+      damage: 22,
+      cooldownMs: 5000,
+      knockback: 0,
+      targets: 4,
+      drop: { emoji: '1f4a7', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+    },
+  ],
+}
+
+/** 工厂专属 Boss——母机核心：激光点射穿插整圈环扫（everyN 每三发一轮环射，
+ * 环面地图上绕圈回卷）+ 液压重锤自天砸落（strike）。远程弹幕+范围压制型。 */
+const FACTORY_BOSS: EnemyDef = {
+  kind: 'mecha',
+  role: 'boss',
+  emoji: '1f916',
+  name: '母机核心',
+  desc: '工厂头目：激光点射与整圈环扫，液压重锤自天砸落，击退免疫',
+  size: 3.4,
+  radius: 1.1,
+  hp: 6500,
+  speed: 1.2,
+  damage: 20,
+  xp: 60,
+  coins: 60,
+  kbImmune: true,
+  locomotion: { kind: 'chase' },
+  abilities: [
+    {
+      kind: 'projectile',
+      damage: 8,
+      cooldownMs: 2400,
+      knockback: 0,
+      firstDelayMs: 1600,
       lifeMs: 6000,
+      aim: 'nearest',
       fireSfx: 'boom',
-      volley: { count: 12, spreadDeg: 360, randomRotate: true },
-      projectile: { emoji: '1f7e3', size: 0.45, radius: 0.16, speed: 2.4, rotationOffsetDeg: 0 },
+      // 每三发一轮整圈激光环扫，其余为点射
+      everyN: { n: 3, count: 12, spreadDeg: 360 },
+      projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
+    },
+    {
+      kind: 'strike',
+      damage: 24,
+      cooldownMs: 4800,
+      knockback: 0,
+      targets: 5,
+      drop: { emoji: '1f528', size: 1.1, fromAbove: 4, dropMs: 220, staggerMs: 80 },
     },
   ],
 }
@@ -394,5 +513,7 @@ const RUINS_BOSS: EnemyDef = {
   ],
 }
 
-/** 生成用：kind → 定义（顺序即 ENEMY_DEFS 展示顺序） */
-export const ENEMIES = Object.fromEntries([...ENEMY_DEFS, BOSS, RUINS_BOSS].map((e) => [e.kind, e])) as Record<string, EnemyDef>
+/** 生成用：kind → 定义（顺序即展示顺序；Boss 按地图顺序排在常规怪之后） */
+export const ENEMIES = Object.fromEntries(
+  [...ENEMY_DEFS, FOREST_BOSS, DESERT_BOSS, RIVER_BOSS, FACTORY_BOSS, RUINS_BOSS].map((e) => [e.kind, e]),
+) as Record<string, EnemyDef>

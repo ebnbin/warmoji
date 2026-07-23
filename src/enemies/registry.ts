@@ -132,8 +132,11 @@ export interface EnemyDef {
     | 'hive'
     | 'larva'
     | 'creeper'
-    | 'boss'
     | 'rhino'
+    | 'treant'
+    | 'scorpion'
+    | 'croc'
+    | 'mecha'
   readonly emoji: string
   readonly name: string
   readonly desc: string
