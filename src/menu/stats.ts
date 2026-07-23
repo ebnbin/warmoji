@@ -162,13 +162,21 @@ export function characterStatGroups(
       }),
     })
   }
-  // 攻击来源逐载体展示：名字/图标取自载体（武器/徒手能力），数值取该载体当前档位能力
+  // 攻击来源逐载体展示：名字/图标取自载体（武器/徒手能力），数值取该载体当前档位能力。
+  // 已解锁的升级档位在此列出「质变特性」（升级卡文案），使各等级面板不只是数值差异——
+  // 而是逐条讲清该级武器/能力真正解锁了什么（贯穿弹 / 全周横扫 / 处决 …）。
+  const tier = tiers.u2 ? 2 : tiers.u1 ? 1 : 0
   for (const [i, carrier] of def.carriers.entries()) {
     const display = displayDef(resolveAbilityDef(loadout[i]!, fx), dmgMul, cdMul, fx.knockbackMul)
+    const traits: string[] = []
+    for (let k = 0; k < tier; k += 1) {
+      const card = carrier.cards[k]
+      if (card) traits.push(`「${card.name}」${card.desc}`)
+    }
     groups.push({
       icon: carrier.icon,
       title: `${carrier.name}（${ABILITY_KIND_LABEL[display.kind]}）`,
-      lines: abilityStatLines(display),
+      lines: [...traits, ...abilityStatLines(display)],
     })
   }
   return groups

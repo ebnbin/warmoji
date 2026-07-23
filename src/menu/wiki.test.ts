@@ -38,9 +38,14 @@ describe('图鉴分组', () => {
       expect(e.levels).toHaveLength(3)
       expect(e.levels!.map((l) => l.label)).toEqual(['1 级', '2 级', '3 级'])
     }
-    // 独角兽 3 级解锁「虹光震波」（突刺终点爆发范围伤害）——2 级尚无
+    // 各级独立列出解锁的能力特性：独角兽 2 级「二连突刺」、3 级再加「虹光震波」
     const unicorn = chars.entries.find((e) => e.name === '独角兽')!
-    expect(unicorn.levels![2]!.lines.join(' ')).not.toEqual(unicorn.levels![1]!.lines.join(' '))
+    const lv = (i: number) => unicorn.levels![i]!.lines.join(' ')
+    expect(lv(0)).not.toContain('二连突刺')
+    expect(lv(1)).toContain('二连突刺')
+    expect(lv(1)).not.toContain('虹光震波')
+    expect(lv(2)).toContain('虹光震波')
+    expect(lv(2)).not.toEqual(lv(1))
   })
 
   it('敌人属性行覆盖特殊机制：放枪/突刺/毒液/分裂', () => {

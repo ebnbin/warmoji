@@ -385,7 +385,7 @@ export class WikiScene extends Phaser.Scene {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         color: '#b9b9c6',
-        wordWrap: { width: D.w - 150 },
+        wordWrap: { width: D.w - 150, useAdvancedWrap: true },
         lineSpacing: 6,
         resolution: res,
       })
@@ -449,7 +449,8 @@ export class WikiScene extends Phaser.Scene {
           fontFamily: UI_FONT,
           fontSize: FONT.body,
           color: '#d0d0d8',
-          wordWrap: { width: D.w - 56 },
+          // 升级特性是纯中文长句（无空格），需按字断行，否则超宽被面板裁掉
+          wordWrap: { width: D.w - 56, useAdvancedWrap: true },
           lineSpacing: 8,
           resolution: res,
         })

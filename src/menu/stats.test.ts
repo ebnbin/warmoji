@@ -41,11 +41,28 @@ describe('角色属性面板模型', () => {
     expect(characterStatGroups('mage')[2]!.title).toBe('奥术轰炸（轰炸）')
   })
 
-  it('能力注入反映在能力展示：巨魔 2 级弧宽变 360°', () => {
+  it('能力注入反映在能力展示：巨魔 2 级弧宽变 360°，并列出升级特性', () => {
     const bare = characterStatGroups('troll', [], 1)[2]!
     const leveled = characterStatGroups('troll', [], 2)[2]!
-    expect(bare.lines[1]).toContain('弧宽 150°')
-    expect(leveled.lines[1]).toContain('弧宽 360°')
+    expect(bare.lines.join(' ')).toContain('弧宽 150°')
+    expect(bare.lines.join(' ')).not.toContain('全周横扫')
+    expect(leveled.lines.join(' ')).toContain('弧宽 360°')
+    // 质变特性行排在数值前，讲清该级武器解锁了什么
+    expect(leveled.lines[0]).toContain('全周横扫')
+  })
+
+  it('分级面板逐级列出解锁的武器/能力特性（不只是数值变化）', () => {
+    const lv1 = characterStatGroups('cowboy', [], 1, { path: false })[1]!
+    const lv2 = characterStatGroups('cowboy', [], 2, { path: false })[1]!
+    const lv3 = characterStatGroups('cowboy', [], 3, { path: false })[1]!
+    const j = (g: { lines: readonly string[] }) => g.lines.join('\n')
+    expect(j(lv1)).not.toContain('贯穿弹')
+    expect(j(lv2)).toContain('贯穿弹')
+    expect(j(lv3)).toContain('贯穿弹')
+    expect(j(lv3)).toContain('左轮风暴')
+    // 三级各不相同（此前仅数值微调，几乎无法区分）
+    expect(j(lv1)).not.toBe(j(lv2))
+    expect(j(lv2)).not.toBe(j(lv3))
   })
 
   it('数值换算：px→格、ms→秒、弧度→角度', () => {
