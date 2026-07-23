@@ -1,9 +1,9 @@
 import type { TimeStopDef } from './defs'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 时停型（队长主动技能载荷）：释放后 durationMs 内敌方时间近乎凝固——
- * 敌人移动/攻速/在途敌弹/刷怪全放慢，队伍走位与开火照常。逐帧凝固在
- * 场景 enemyTimeScale 侧统一处理，本能力只负责按下开关。 */
+/** 时停型（队长主动技能载荷）：释放后 durationMs 内整个世界时间近乎凝固——
+ * 敌人、双方弹体、双方攻速、刷怪、波次倒计时全冻结，唯玩家走位如常。逐帧凝固在
+ * 场景 worldTimeScale 侧统一处理，本能力只负责按下开关。 */
 export class TimeStopAbility implements AbilityRuntime {
   private cooldown: number
 

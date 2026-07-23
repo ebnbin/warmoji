@@ -131,7 +131,7 @@ export const CAPTAINS = {
     firstWaveShop: false,
     skill: {
       name: '时停',
-      desc: '按下秒表：15 秒内全场敌人与敌弹几乎凝固，队伍照常走位与开火，尽情收割',
+      desc: '按下秒表：15 秒内整个世界近乎静止——敌人、弹幕、连你的枪火与倒计时都凝住，唯有你能在冻结的时间里自由走位、重新布阵',
       cdMs: 45_000,
       abilities: ['timeFreeze'],
     },

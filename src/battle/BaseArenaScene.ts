@@ -287,9 +287,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   elapsedMs = 0
   private spawnCooldownMs = 0
   private pendingSpawns = 0
-  /** 时停生效截止时刻（队长「时停」技能置位）：此刻前敌方时间近乎凝固 */
-  timeStopUntil = 0
-  /** 上一帧时停是否生效（用于结束当帧把敌弹速度恢复满速的一次性收尾） */
+  /** 时停剩余时长（真实时钟毫秒，队长「时停」技能置位）：>0 期间全世界时间近乎凝固。
+   * 必须用真实时钟计（不能用被缩放的 elapsedMs），否则时停会把自己拖成数分钟 */
+  timeStopMsLeft = 0
+  /** 上一帧时停是否生效（用于结束当帧把弹体速度恢复满速的一次性收尾） */
   private timeStopWasActive = false
   /** 时停冷雾遮罩（屏幕固定，任意地图通用）+ 其当前不透明度（平滑淡入淡出） */
   private timeStopFx?: Phaser.GameObjects.Rectangle
@@ -464,16 +465,17 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   }
   /** 终波开场的世界准备（无界图：缩圈初始化） */
   protected onFinalWaveSetup(): void {}
-  /** 敌方时间流速倍率（1=常速）：时停技能生效期间近乎凝固。作用面仅限敌方——
-   * 敌人移动（并入 slowFactorFor）、敌方攻速、在途敌弹、刷怪；玩家走位/开火/
-   * 波次计时恒常速。任意地图通用（不与地图形态绑定） */
-  enemyTimeScale(): number {
-    return this.elapsedMs < this.timeStopUntil ? TIMESTOP.freezeScale : 1
+  /** 世界时间流速倍率（1=常速）：时停技能生效期间近乎凝固。作用面 = 整个世界——
+   * 敌人移动（并入 slowFactorFor）、双方攻速与在途弹体、刷怪、以及 elapsedMs
+   * 本身（波次倒计时随之冻结）；唯独玩家走位与呼吸恒实时（在冻结的时间里穿行走位）。
+   * 任意地图通用（不与地图形态绑定） */
+  worldTimeScale(): number {
+    return this.timeStopMsLeft > 0 ? TIMESTOP.freezeScale : 1
   }
 
-  /** 队长「时停」技能：接下来 durationMs 内敌方时间近乎凝固（ctx.timeStop 触发） */
+  /** 队长「时停」技能：接下来 durationMs（真实时钟）内全世界时间近乎凝固（ctx.timeStop 触发） */
   startTimeStop(durationMs: number): void {
-    this.timeStopUntil = this.elapsedMs + durationMs
+    this.timeStopMsLeft = durationMs
   }
 
   /** 时停冷雾遮罩：生效期压暗整屏、结束平滑淡出（实时 delta，任意地图通用） */
@@ -617,7 +619,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.pendingMarks = []
     this.skillBuffUntil = 0
     this.danceEndsAt = 0
-    this.timeStopUntil = 0
+    this.timeStopMsLeft = 0
     this.timeStopWasActive = false
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
@@ -755,7 +757,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (this.over) return
-    this.elapsedMs += delta
+    // 时停：真实时钟倒计时（不受缩放影响，保证 15 秒就是 15 秒），得出世界时间流速。
+    // 世界侧一切用 wdelta（近乎凝固），唯玩家走位/呼吸/技能冷却用真实 delta。
+    if (this.timeStopMsLeft > 0) this.timeStopMsLeft = Math.max(0, this.timeStopMsLeft - delta)
+    const tsActive = this.timeStopMsLeft > 0
+    const scale = this.worldTimeScale()
+    const wdelta = delta * scale
+    this.elapsedMs += wdelta
 
     // 波次时间到 → 结算/商店（测试模式无尽，便于性能观测）
     if (!this.testMode && this.elapsedMs >= waveDurationMs(this.run.wave)) {
@@ -763,8 +771,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       return
     }
 
-    // 队长技能：冷却按战斗时钟推进（存 run 上，天然跨波）；增伤 buff 到期复原。
-    // 测试模式同样推进——技能可用（满豆 + 冷却照走），便于测试
+    // 队长技能：冷却按真实时钟推进（时停不额外拖长 CD，玩家可预期）；增伤 buff 到期复原
     this.run.skillCdMs = tickSkillCd(this.run.skillCdMs, delta)
     if (this.stats.damageMul !== 1 && this.elapsedMs >= this.skillBuffUntil) {
       this.stats.damageMul = 1
@@ -772,27 +779,24 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 战场拾取的限时层：剔除到期项后重折（乘区实时，先于移动/攻击/敌速消费）
     refoldBattleFx(this)
 
-    // 时停：敌方时间流速（生效期近乎凝固）。玩家侧一切用实时 delta，敌方侧乘 escale
-    const escale = this.enemyTimeScale()
     this.frameSlowZones.length = 0
     this.frameAttractors.length = 0
     this.buildFrameTargets()
     this.frameMemberTargets = this.buildMemberTargets()
     this.updateOrbit(delta)
     this.moveTeam(delta)
-    this.updateMembers(delta)
+    this.updateMembers(delta, wdelta)
     this.touchStep()
-    this.spawn(delta * escale)
-    this.steerEnemies(delta, escale)
+    this.spawn(wdelta)
+    this.steerEnemies(wdelta)
     updateEnemyProjectiles(this)
     updateGroundEffects(this)
     magnetCoins(this)
     updateFieldPickups(this)
-    sweepProjectiles(this, delta)
+    sweepProjectiles(this, wdelta)
     this.cullProjectiles()
-    // 时停：在途敌弹逐帧按 escale 重设速度（凝在半空）；结束当帧恢复满速
-    const tsActive = escale !== 1
-    if (tsActive || this.timeStopWasActive) this.applyEnemyProjectileTimeScale(escale)
+    // 时停：双方在途弹体逐帧按 scale 重设速度（凝在半空）；结束当帧恢复满速
+    if (tsActive || this.timeStopWasActive) this.applyProjectileTimeScale(scale)
     this.timeStopWasActive = tsActive
     this.updateTimeStopFx(delta, tsActive)
     this.updateWorld(delta)
@@ -1270,13 +1274,14 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
   }
 
-  private updateMembers(delta: number): void {
+  // delta = 真实帧长（呼吸/动画恒实时）；wdelta = 世界时长（回复/攻速冷却，时停期近乎凝固）
+  private updateMembers(delta: number, wdelta: number): void {
     const moving = this.teamDir.x !== 0 || this.teamDir.y !== 0
     for (const m of this.members) {
       if (m.alive) {
-        // 再生戒指：持续回复（hp 允许小数，展示与快照处各自取整）
+        // 再生戒指：持续回复（hp 允许小数，展示与快照处各自取整；时停期随世界冻结）
         if (m.regenPerSec > 0 && m.hp < m.maxHp) {
-          m.hp = Math.min(m.maxHp, m.hp + (m.regenPerSec * delta) / 1000)
+          m.hp = Math.min(m.maxHp, m.hp + (m.regenPerSec * wdelta) / 1000)
         }
         // 黏滞减速：生效期间附着黏液色，到时清除（0 哨兵确保只清一次）
         if (m.atkSlowUntil > this.elapsedMs) {
@@ -1287,7 +1292,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         }
         this.animateMember(m, moving, delta)
         this.drawMemberHp(m)
-        for (const w of m.abilities) w.update(delta, m.handle)
+        // 自动开火冷却走世界时长：时停期队伍的枪也一并凝住（真正的时间静止）
+        for (const w of m.abilities) w.update(wdelta, m.handle)
       } else {
         if (this.elapsedMs >= m.reviveAt) {
           this.reviveMember(m)
@@ -2006,20 +2012,22 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       factor *= a.abilitySlowMul
     }
     // 时之沙的全局减速与精英加速同为「体质」倍率，不参与光环减速的染色判定。
-    // 时停的敌方时标（生效期近乎凝固）在此并入敌速——敌人由物理按实时积分速度，
+    // 时停的世界时标（生效期近乎凝固）在此并入敌速——敌人由物理按实时积分速度，
     // 折进速度倍率即等价于时间放缩（不参与冷色染色，那是光环减速的语义）
     return (
-      factor * a.spMul * this.teamFx.enemySlowMul * this.battleFx.enemySlowMul * this.enemyTimeScale()
+      factor * a.spMul * this.teamFx.enemySlowMul * this.battleFx.enemySlowMul * this.worldTimeScale()
     )
   }
 
-  /** 时停：逐帧把在途敌弹速度重设为 满速基准×escale（凝在半空）；escale=1 即恢复满速。
-   * 只作用敌弹——玩家弹恒常速（弹道由物理按实时积分，故须逐帧改写速度而非改 delta） */
-  private applyEnemyProjectileTimeScale(scale: number): void {
-    for (const p of this.enemyProjectiles.getChildren() as ImageObj[]) {
-      if (!p.active) continue
-      const b = projectileOf(p)
-      ;(p.body as ArcadeBody).setVelocity(b.bvx * scale, b.bvy * scale)
+  /** 时停：逐帧把双方在途弹体速度重设为 满速基准×scale（凝在半空）；scale=1 即恢复满速。
+   * 弹道由物理按实时积分，故须逐帧改写速度而非改 delta——敌弹与玩家弹一并凝住 */
+  private applyProjectileTimeScale(scale: number): void {
+    for (const group of [this.projectiles, this.enemyProjectiles]) {
+      for (const p of group.getChildren() as ImageObj[]) {
+        if (!p.active) continue
+        const b = projectileOf(p)
+        ;(p.body as ArcadeBody).setVelocity(b.bvx * scale, b.bvy * scale)
+      }
     }
   }
 
@@ -2039,12 +2047,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     return best
   }
 
-  private steerEnemies(delta: number, escale = 1): void {
+  // delta 已是世界时长（update 传入 wdelta）：敌人移动由 slowFactorFor 折入时标，
+  // 攻速/状态机随此 delta 一并放慢——时停期敌人冷却几乎不走
+  private steerEnemies(delta: number): void {
     const alive = this.aliveMembers()
     if (alive.length === 0) return
     const now = this.elapsedMs
-    // 敌方攻速走敌方时标：时停生效期敌人冷却几乎不走（移动由 slowFactorFor 另行凝固）
-    const fdelta = delta * escale
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       const a = enemyOf(e)
@@ -2079,7 +2087,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           if (a.boss) this.postSteerBoss(e, body)
           else this.postSteerEnemy(e, body, def)
           // 压制期只走冷却不开火（时间表语义：舞会结束冷却已尽者立即出手）
-          if (a.abilities) for (const w of a.abilities) w.tickCooldown?.(fdelta)
+          if (a.abilities) for (const w of a.abilities) w.tickCooldown?.(delta)
           continue
         }
         a.danceUntil = 0
@@ -2096,7 +2104,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
           body.setVelocity(dir.x * def.speed * 0.5 * slowM, dir.y * def.speed * 0.5 * slowM)
           this.decayKnockback(a, body, delta)
           this.postSteerEnemy(e, body, def)
-          if (a.abilities) for (const w of a.abilities) w.tickCooldown?.(fdelta)
+          if (a.abilities) for (const w of a.abilities) w.tickCooldown?.(delta)
           continue
         }
         this.restoreMorph(a)
@@ -2110,7 +2118,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       if (!e.active) continue
 
       // 持械敌人：能力实例逐帧驱动（跳舞/变形不到达此处；休眠已跳过）
-      if (a.abilities) for (const w of a.abilities) w.update(fdelta, a.abilityOwner!)
+      if (a.abilities) for (const w of a.abilities) w.update(delta, a.abilityOwner!)
 
       // 虫巢：周期生成子敌（非死亡触发的生成实体——生成动作的第 2 个触发点）
       if (def.spawner && now >= a.nextSpawnAt) {

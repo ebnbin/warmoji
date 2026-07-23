@@ -4,8 +4,8 @@ import { enterLab, enterMap } from './helpers'
 // 慢渲染环境下敌人刷新有抖动，允许重试
 test.describe.configure({ retries: 2 })
 
-// 时停技能的引擎侧：enemyTimeScale 开关 + 生效期敌人几乎不动（任意地图通用，此处走测试模式）
-test('时停：敌方时标凝固，敌人近乎静止', async ({ page }) => {
+// 时停技能引擎侧：worldTimeScale 开关 + 全世界近乎凝固（敌人/倒计时冻结），唯玩家走位如常
+test('时停：整个世界近乎静止（敌人+倒计时冻结），玩家仍能走位', async ({ page }) => {
   test.setTimeout(120_000)
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(String(e)))
@@ -14,9 +14,13 @@ test('时停：敌方时标凝固，敌人近乎静止', async ({ page }) => {
   await enterMap(page)
   await enterLab(page, 'forest')
   await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
+  await page.evaluate(() => {
+    window.__arena = () => (window.__game as { scene: { getScene: (k: string) => unknown } }).scene.getScene('arena')
+  })
 
-  const timeScale = (): Promise<number> =>
-    page.evaluate(() => (window.__arena() as { enemyTimeScale: () => number }).enemyTimeScale())
+  const scale = (): Promise<number> =>
+    page.evaluate(() => (window.__arena() as { worldTimeScale: () => number }).worldTimeScale())
+  const elapsed = (): Promise<number> => page.evaluate(() => window.__warmoji!.elapsed)
   const snap = (): Promise<{ x: number; y: number }[]> =>
     page.evaluate(() =>
       (window.__arena() as { enemies: { getChildren: () => { active: boolean; x: number; y: number }[] } })
@@ -35,31 +39,39 @@ test('时停：敌方时标凝固，敌人近乎静止', async ({ page }) => {
     return sum / b.length
   }
 
-  // 暴露活跃竞技场句柄（测试模式为有界图 'arena'）
-  await page.evaluate(() => {
-    window.__arena = () => (window.__game as { scene: { getScene: (k: string) => unknown } }).scene.getScene('arena')
-  })
-
-  // 铺一些会追人的敌人
   for (let i = 0; i < 5; i++) await page.evaluate(() => window.__spawnEnemy!('zombie', 8, 0))
   await page.waitForTimeout(600)
 
-  // 基线：未时停，敌人追人会移动
-  expect(await timeScale()).toBe(1)
-  const b0 = await snap()
+  // 基线（未时停）：敌人追人会动，倒计时正常推进
+  expect(await scale()).toBe(1)
+  const be0 = await elapsed()
+  const bs0 = await snap()
   await page.waitForTimeout(1000)
-  const baseMove = avgMove(b0, await snap())
+  const baseElapsed = (await elapsed()) - be0
+  const baseMove = avgMove(bs0, await snap())
 
-  // 时停：开关立刻落到 freezeScale，敌人几乎不动
+  // 时停：世界时标立刻落到 freezeScale
   await page.evaluate(() => (window.__arena() as { startTimeStop: (ms: number) => void }).startTimeStop(60_000))
-  expect(await timeScale()).toBeLessThan(0.2)
-  const f0 = await snap()
+  expect(await scale()).toBeLessThan(0.2)
+  const fe0 = await elapsed()
+  const fs0 = await snap()
   await page.waitForTimeout(1000)
-  const frozenMove = avgMove(f0, await snap())
+  const frozenElapsed = (await elapsed()) - fe0
+  const frozenMove = avgMove(fs0, await snap())
 
-  // 时停期位移远小于基线，且绝对值很小（近乎凝固）
+  // 敌人几乎不动 + 倒计时几乎不走（世界时间凝固）
   expect(frozenMove).toBeLessThan(baseMove * 0.34)
   expect(frozenMove).toBeLessThan(6)
+  expect(frozenElapsed).toBeLessThan(baseElapsed * 0.34)
+
+  // 但玩家仍能在冻结的时间里走位：按住方向键，队伍中心位移明显
+  const px0 = await page.evaluate(() => window.__warmoji!.playerX)
+  await page.keyboard.down('ArrowRight')
+  await page.waitForTimeout(700)
+  await page.keyboard.up('ArrowRight')
+  const px1 = await page.evaluate(() => window.__warmoji!.playerX)
+  expect(px1 - px0).toBeGreaterThan(20)
+
   expect(errors, `控制台/页面错误：\n${errors.join('\n')}`).toHaveLength(0)
 })
 

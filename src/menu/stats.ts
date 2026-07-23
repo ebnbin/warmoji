@@ -100,7 +100,7 @@ export function abilityStatLines(w: AbilityDef): string[] {
     ]
   }
   if (w.kind === 'timeStop') {
-    return [`全场敌人与敌弹几乎凝固 ${sec(w.durationMs)}`, '期间队伍照常走位与开火']
+    return [`整个世界近乎静止 ${sec(w.durationMs)}（敌人/弹幕/我方枪火/倒计时全凝住）`, '期间唯有队伍走位如常，可自由重新布阵']
   }
   // 击退展示为大致位移距离（冲量 × 衰减时间常数）
   const base = `伤害 ${w.damage} · 冷却 ${sec(w.cooldownMs)} · 击退 ${grid((w.knockback * KNOCKBACK.tauMs) / 1000)}`
