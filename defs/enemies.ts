@@ -294,6 +294,134 @@ export const CREEPER: EnemyDef = {
   },
 }
 
+/** 林祭司：唯一的「敌方治疗者」——周期群体治疗周围受伤的同伴（绿脉冲示警）。
+ * 不清掉它，怪潮会被源源不断奶回来，逼玩家优先点它。 */
+export const ELF: EnemyDef = {
+  kind: 'elf',
+  locomotion: { kind: 'chase' },
+  emoji: '1f9dd',
+  name: '林祭司',
+  desc: '林间祭司，每隔几秒群体治疗周围受伤的同伴——不先清它，怪潮就一直被奶回来',
+  size: 1.3,
+  radius: 0.5,
+  hp: 65,
+  speed: 1.3,
+  damage: 5,
+  xp: 5,
+  coins: 4,
+  abilities: [{ kind: 'heal', amount: 13, cooldownMs: 2600, range: 3.5, aoe: { ratio: 1 } }],
+}
+
+/** 炮龟：缓慢重甲的远程攻城位——缩在硬壳里朝队伍抛一串硬壳弹，免疫击退，血厚难推。 */
+export const TURTLE: EnemyDef = {
+  kind: 'turtle',
+  locomotion: { kind: 'chase' },
+  emoji: '1f422',
+  name: '炮龟',
+  desc: '缓慢的重甲龟，边逼近边朝队伍抛射一串硬壳弹，血厚、免疫击退',
+  size: 1.5,
+  radius: 0.6,
+  hp: 130,
+  speed: 0.8,
+  damage: 8,
+  xp: 7,
+  coins: 5,
+  kbImmune: true,
+  abilities: [
+    {
+      kind: 'projectile',
+      damage: 7,
+      cooldownMs: 3000,
+      knockback: 0,
+      aim: 'nearest',
+      firstDelayMs: 1500,
+      lifeMs: 5000,
+      volley: { count: 3, spreadDeg: 36 },
+      projectile: { emoji: '1faa8', size: 0.4, radius: 0.15, speed: 2.6, rotationOffsetDeg: 0 },
+    },
+  ],
+}
+
+/** 跳蝗：成群的蝗虫，一蹦一蹦地扑向队伍（高频短冲刺）——脆但难缠，专啃走位空间。 */
+export const LOCUST: EnemyDef = {
+  kind: 'locust',
+  emoji: '1f997',
+  name: '跳蝗',
+  desc: '成群蝗虫一蹦一蹦地扑来，脆皮但高频跳突，专挤压走位空间',
+  size: 0.9,
+  radius: 0.35,
+  hp: 20,
+  speed: 1.0,
+  damage: 4,
+  xp: 2,
+  coins: 1,
+  locomotion: {
+    kind: 'dash',
+    trigger: { kind: 'timer', intervalMs: 1400, firstDelayMs: 600 },
+    length: { kind: 'dist', dist: 2.2 },
+    windupMs: 200,
+    dashSpeed: 7,
+    idle: 'chase',
+    aim: 'nearest',
+    lockAt: 'launch',
+  },
+}
+
+/** 石像鬼：沉重的石像守卫——血极厚、移速慢、免疫击退，硬生生压过来堵路吸火力。 */
+export const GARGOYLE: EnemyDef = {
+  kind: 'gargoyle',
+  locomotion: { kind: 'chase' },
+  emoji: '1f5ff',
+  name: '石像鬼',
+  desc: '沉重的石像守卫，血极厚、移速慢、免疫击退，硬生生压上来堵路吸火力',
+  size: 1.6,
+  radius: 0.62,
+  hp: 200,
+  speed: 0.85,
+  damage: 12,
+  xp: 8,
+  coins: 6,
+  kbImmune: true,
+}
+
+/** 毒河豚：鼓胀的毒气球——贴身鼓爆一团毒气冲击（自爆）；被戳破则炸开一大片毒云残留。 */
+export const PUFFER: EnemyDef = {
+  kind: 'puffer',
+  emoji: '1f421',
+  name: '毒河豚',
+  desc: '鼓胀的毒河豚，贴身即鼓爆一团毒气冲击；被戳破则炸开一大片残留毒云，别在走位线上戳它',
+  size: 1.3,
+  radius: 0.5,
+  hp: 45,
+  speed: 1.2,
+  damage: 5,
+  xp: 5,
+  coins: 4,
+  locomotion: {
+    kind: 'detonate',
+    triggerRange: 2.0,
+    windupMs: 700,
+    blastRadius: 2.8,
+    blastDamage: 22,
+    knockback: 4,
+  },
+  onDeath: [
+    {
+      kind: 'ground',
+      def: {
+        radius: 2.2,
+        durationMs: 3200,
+        tickMs: 500,
+        damage: 5,
+        color: 0x8bc34a,
+        fillAlpha: 0.24,
+        lineAlpha: 0.5,
+        enterMs: 220,
+      },
+    },
+  ],
+}
+
 export const ENEMY_DEFS: readonly EnemyDef[] = [
   ZOMBIE,
   GHOST,
@@ -308,6 +436,11 @@ export const ENEMY_DEFS: readonly EnemyDef[] = [
   HIVE,
   LARVA,
   CREEPER,
+  ELF,
+  TURTLE,
+  LOCUST,
+  GARGOYLE,
+  PUFFER,
 ]
 
 // Boss 就是 role:'boss' 的普通条目——每张地图一只专属 Boss，技能贴合该图主题与玩法。

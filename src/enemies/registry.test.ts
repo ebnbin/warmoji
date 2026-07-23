@@ -35,12 +35,12 @@ describe('敌人规格', () => {
 })
 
 describe('出场配比', () => {
-  it('第 1 波只有僵尸+幽灵；新怪按波次渐入；第 5 波全员到齐', () => {
+  it('第 1 波只有僵尸+幽灵；新怪按波次渐入；第 5 波全员到齐（黑森林图专属出怪表）', () => {
     expect(enemyMixAt(MIX, 1).map((m) => m.def.kind).sort()).toEqual(['ghost', 'zombie'])
-    expect(enemyMixAt(MIX, 2).some((m) => m.def.kind === 'invader')).toBe(true)
+    expect(enemyMixAt(MIX, 2).some((m) => m.def.kind === 'locust')).toBe(true)
     expect(enemyMixAt(MIX, 2).some((m) => m.def.kind === 'boar')).toBe(false)
     expect(enemyMixAt(MIX, 5).map((m) => m.def.kind).sort()).toEqual(
-      ['blob', 'boar', 'creeper', 'ghost', 'invader', 'mushroom', 'rat', 'slime', 'snake', 'zombie'],
+      ['boar', 'elf', 'ghost', 'locust', 'mushroom', 'slime', 'zombie'],
     )
   })
 

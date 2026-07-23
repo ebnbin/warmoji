@@ -137,6 +137,11 @@ export interface EnemyDef {
     | 'scorpion'
     | 'croc'
     | 'mecha'
+    | 'elf'
+    | 'turtle'
+    | 'locust'
+    | 'gargoyle'
+    | 'puffer'
   readonly emoji: string
   readonly name: string
   readonly desc: string

@@ -4,20 +4,63 @@ import type { EnemyMixRow } from '../src/enemies/registry'
 
 // 创作层（不进运行时 bundle）：地图数据行（调色板以 HSL 书写，生成时算成 int）。
 
-// 出场配比（暂四图共用，日后各图可分化）：新怪按波次渐入，僵尸/幽灵为主体，
-// zombie 有下限兜底。编排属于地图——同一份表展开进每张图，运行时各存一份
-const DEFAULT_MIX: readonly EnemyMixRow[] = [
+// 出场配比：编排属于地图——每张图一份专属出怪表，基础怪（zombie 等）跨图复用，
+// 专精怪错开分布，让每张图的怪潮手感各不相同。新怪按波次渐入，zombie 有下限兜底。
+
+/** 黑森林：幽林追击 + 蝗群挤压 + 林祭司群奶（专精：ghost/locust/mushroom/elf） */
+const FOREST_MIX: readonly EnemyMixRow[] = [
   { kind: 'zombie', sinceWave: 1, base: 80, perWave: -2, min: 40, max: 80 },
-  { kind: 'ghost', sinceWave: 1, base: 15, perWave: 1, min: 15, max: 32 },
-  { kind: 'invader', sinceWave: 2, base: 8, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'ghost', sinceWave: 1, base: 15, perWave: 1, min: 12, max: 30 },
+  { kind: 'locust', sinceWave: 2, base: 14, perWave: 0.6, min: 0, max: 28 },
+  { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
   { kind: 'boar', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
-  { kind: 'snake', sinceWave: 4, base: 7, perWave: 0.3, min: 0, max: 10 },
-  { kind: 'mushroom', sinceWave: 4, base: 7, perWave: 0.4, min: 0, max: 14 },
-  { kind: 'rat', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
-  { kind: 'blob', sinceWave: 5, base: 7, perWave: 0.4, min: 0, max: 14 },
-  { kind: 'slime', sinceWave: 2, base: 16, perWave: 0.4, min: 0, max: 28 },
-  { kind: 'hive', sinceWave: 7, base: 3, perWave: 0.15, min: 0, max: 6 },
+  { kind: 'mushroom', sinceWave: 4, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'elf', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
+]
+
+/** 荒漠：蝗灾 + 突刺野猪 + 偷币鼠 + 炮龟攻城（专精：locust/rat/turtle/creeper） */
+const DESERT_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 78, perWave: -2, min: 38, max: 78 },
+  { kind: 'locust', sinceWave: 1, base: 16, perWave: 0.8, min: 12, max: 32 },
+  { kind: 'boar', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
+  { kind: 'rat', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
   { kind: 'creeper', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'turtle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
+/** 奔流：泡泡分裂 + 定距毒蛇 + 炮龟 + 毒河豚（专精：blob/turtle/puffer） */
+const RIVER_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 78, perWave: -2, min: 38, max: 78 },
+  { kind: 'ghost', sinceWave: 1, base: 14, perWave: 0.8, min: 10, max: 28 },
+  { kind: 'blob', sinceWave: 2, base: 12, perWave: 0.5, min: 0, max: 22 },
+  { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
+  { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
+  { kind: 'puffer', sinceWave: 4, base: 6, perWave: 0.4, min: 0, max: 13 },
+  { kind: 'turtle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
+/** 工厂：外星游射 + 自爆怪 + 虫巢产线 + 石像哨兵 + 毒河豚（专精：invader/hive/gargoyle/puffer） */
+const FACTORY_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'invader', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
+  { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
+  { kind: 'creeper', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'rat', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'gargoyle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 11 },
+  { kind: 'puffer', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 11 },
+  { kind: 'hive', sinceWave: 7, base: 3, perWave: 0.15, min: 0, max: 6 },
+]
+
+/** 残垣：穿墙幽灵 + 石像鬼 + 林祭司群奶 + 自爆怪（专精：ghost/gargoyle/elf/mushroom） */
+const RUINS_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 78, perWave: -2, min: 38, max: 78 },
+  { kind: 'ghost', sinceWave: 1, base: 18, perWave: 1, min: 14, max: 34 },
+  { kind: 'mushroom', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 15 },
+  { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
+  { kind: 'creeper', sinceWave: 4, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'elf', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
 ]
 
 export const MAPS = {
@@ -38,7 +81,7 @@ export const MAPS = {
       alpha: [0.14, 0.26],
       density: [0.1, 0.14],
     },
-    mix: DEFAULT_MIX,
+    mix: FOREST_MIX,
     boss: 'treant',
   },
   desert: {
@@ -59,7 +102,7 @@ export const MAPS = {
       // 荒漠刻意更稀疏
       density: [0.08, 0.11],
     },
-    mix: DEFAULT_MIX,
+    mix: DESERT_MIX,
     boss: 'scorpion',
   },
   river: {
@@ -83,7 +126,7 @@ export const MAPS = {
       density: [0.1, 0.14],
     },
     drift: ['1f343', '1f338', '1fae7', '1f342'],
-    mix: DEFAULT_MIX,
+    mix: RIVER_MIX,
     boss: 'croc',
   },
   void: {
@@ -105,7 +148,7 @@ export const MAPS = {
       alpha: [0.14, 0.26],
       density: [0.05, 0.09],
     },
-    mix: DEFAULT_MIX,
+    mix: FACTORY_MIX,
     // 工厂专属 Boss：母机核心——激光环扫 + 液压重锤
     boss: 'mecha',
   },
@@ -128,7 +171,7 @@ export const MAPS = {
       alpha: [0.12, 0.22],
       density: [0.05, 0.08],
     },
-    mix: DEFAULT_MIX,
+    mix: RUINS_MIX,
     // 残垣专属 Boss：拆迁鬼——犀角冲撞碾墙 + 落石无视遮挡
     boss: 'rhino',
   },

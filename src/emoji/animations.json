@@ -848,6 +848,86 @@
     }
    }
   },
+  "1f9dd": {
+   "emoji": "1f9dd",
+   "name": "林祭司",
+   "desc": "长袍随呼吸沉沉起伏，闭目垂睫默诵祝祷——林间治疗者的待机。",
+   "anatomy": "长袍 path 呼吸缩放；眼睛 path 绕自身收放（垂睫）。",
+   "clips": {
+    "idle": {
+     "parts": [
+      { "indices": [1], "cx": 18, "cy": 30, "keyframes": [
+        { "t": 0, "scale": 1 }, { "t": 0.5, "scale": 1.02 }, { "t": 1, "scale": 1 } ] },
+      { "indices": [7], "cx": 14, "cy": 17, "keyframes": [
+        { "t": 0, "scale": 1 }, { "t": 0.4, "scale": 0.5 }, { "t": 0.55, "scale": 1.1 }, { "t": 0.7, "scale": 1 }, { "t": 1, "scale": 1 } ] }
+     ]
+    }
+   }
+  },
+  "1f422": {
+   "emoji": "1f422",
+   "name": "炮龟",
+   "desc": "厚甲随呼吸微微起伏，独眼一开一合冷冷张望——重甲龟的待机。",
+   "anatomy": "龟壳 path 呼吸缩放；眼睛圆点绕自身收放（眨眼）。",
+   "clips": {
+    "idle": {
+     "parts": [
+      { "indices": [2], "cx": 18, "cy": 23, "keyframes": [
+        { "t": 0, "scale": 1 }, { "t": 0.5, "scale": 1.02 }, { "t": 1, "scale": 1 } ] },
+      { "indices": [3], "cx": 5, "cy": 18, "keyframes": [
+        { "t": 0, "scale": 1 }, { "t": 0.4, "scale": 0.4 }, { "t": 0.55, "scale": 1.1 }, { "t": 0.7, "scale": 1 }, { "t": 1, "scale": 1 } ] }
+     ]
+    }
+   }
+  },
+  "1f997": {
+   "emoji": "1f997",
+   "name": "跳蝗",
+   "desc": "薄翅一张一合簌簌颤动，身子一鼓一鼓蓄势欲蹦——跳蝗的待机。",
+   "anatomy": "翅 path 竖向缩放（振翅）；身躯 path 呼吸缩放。",
+   "clips": {
+    "idle": {
+     "parts": [
+      { "indices": [6], "cx": 29, "cy": 20, "keyframes": [
+        { "t": 0, "scaleY": 1 }, { "t": 0.5, "scaleY": 0.88 }, { "t": 1, "scaleY": 1 } ] },
+      { "indices": [0], "cx": 18, "cy": 22, "keyframes": [
+        { "t": 0, "scale": 1 }, { "t": 0.5, "scale": 1.02 }, { "t": 1, "scale": 1 } ] }
+     ]
+    }
+   }
+  },
+  "1f5ff": {
+   "emoji": "1f5ff",
+   "name": "石像鬼",
+   "desc": "沉沉石面若有若无地起伏，眉眼一凝一张透出压迫——石像鬼的待机威压。",
+   "anatomy": "石面 path 极缓呼吸缩放；眉眼 path 绕自身收放（凝视）。",
+   "clips": {
+    "idle": {
+     "parts": [
+      { "indices": [1], "cx": 18, "cy": 30, "keyframes": [
+        { "t": 0, "scale": 1 }, { "t": 0.5, "scale": 1.015 }, { "t": 1, "scale": 1 } ] },
+      { "indices": [3], "cx": 18, "cy": 20, "keyframes": [
+        { "t": 0, "scale": 1 }, { "t": 0.5, "scale": 1.05 }, { "t": 1, "scale": 1 } ] }
+     ]
+    }
+   }
+  },
+  "1f421": {
+   "emoji": "1f421",
+   "name": "毒河豚",
+   "desc": "圆滚身子一鼓一鼓地充气，尾鳍左右轻摆——鼓胀毒河豚的待机。",
+   "anatomy": "身躯 path 鼓胀缩放（充气）；尾鳍 path 绕鳍根左右摆动。",
+   "clips": {
+    "idle": {
+     "parts": [
+      { "indices": [0], "cx": 15, "cy": 16, "keyframes": [
+        { "t": 0, "scale": 1 }, { "t": 0.5, "scale": 1.04 }, { "t": 1, "scale": 1 } ] },
+      { "indices": [3], "cx": 30, "cy": 17, "keyframes": [
+        { "t": 0, "rotate": 0 }, { "t": 0.25, "rotate": 6 }, { "t": 0.5, "rotate": 0 }, { "t": 0.75, "rotate": -6 }, { "t": 1, "rotate": 0 } ] }
+     ]
+    }
+   }
+  },
   "1f333": {
    "emoji": "1f333",
    "name": "树妖",
