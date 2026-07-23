@@ -104,7 +104,7 @@ export class MenuScene extends Phaser.Scene {
     btnBg.fillStyle(0xffd54f, 1)
     btnBg.fillRoundedRect(-btn.w / 2, -btn.h / 2, btn.w, btn.h, btn.h / 2)
     const btnText = this.add
-      .text(0, 0, '组建队伍', {
+      .text(0, 0, '开始战斗', {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
         fontStyle: 'bold',

@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { browserStorage } from '../core/storage'
 import type { MapId } from '../maps/registry'
-import { arenaSceneFor, MAP_IDS, MAPS } from '../maps/registry'
+import { arenaSceneFor, bossFor, MAP_IDS, MAPS } from '../maps/registry'
 import { beginRun } from '../run/state'
 import { labCaptain, labStarters } from '../run/lab'
 import { randomPalette } from '../core/palette'
@@ -18,8 +18,18 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
 
 // 地图选择页 = 开始游戏第一步（主菜单 → 选地图 → 选队长 → 组队 → 战斗）。
-// 地图即关卡：当前只有主题（色板 + 地面装饰）差异，难度/专属机制后续扩展。
+// 地图即关卡：各图有专属世界规则、出怪表与终波 Boss（详情页「玩法」段展示）。
 // 布局沿用方向约定：竖屏「上」= 横屏「左」（详情），列表在下/右。
+
+/** 各图世界规则一句话（地图详情「玩法」段） */
+const MAP_PLAY_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> = {
+  bounded: '有界竞技场：25×25 方场，边界围合',
+  infinite: '无限世界：可朝任意方向走到天涯，终波毒雾收拢成圈',
+  river: '奔流河道：万物随水流漂移，逆流而战',
+  void: '环面战场：四壁皆传送门，出这头即现那头',
+  ruins: '断壁废墟：墙挡人 / 挡弹 / 挡视线，靠掩体与探头作战',
+}
+
 interface MapLayout {
   content: { w: number; h: number }
   headerY: number
@@ -202,21 +212,13 @@ export class MapScene extends Phaser.Scene {
     const def = MAPS[this.selectedId]
 
     this.detailView.add([
-      emojiImage(this, 58, 56, def.emoji, 85),
+      emojiImage(this, 58, 58, def.emoji, 85),
       this.add
-        .text(104, 42, def.name, {
+        .text(104, 58, def.name, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
           color: '#ffffff',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5),
-      this.add
-        .text(104, 76, '地图 · 决定战场的主题与景观', {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          color: '#b9b9c6',
           resolution: res,
         })
         .setOrigin(0, 0.5),
@@ -273,10 +275,9 @@ export class MapScene extends Phaser.Scene {
       placed++
     }
     cursor += 44
-    line('战斗中以低透明度随机成簇散布，一局一景', '#9a9aa8')
-    cursor += 14
-    group('1f6a7', '差异')
-    line('目前各地图仅主题不同；难度、专属怪物与增益后续开放', '#9a9aa8')
+    group('1f579', '玩法')
+    line(MAP_PLAY_LABEL[def.kind])
+    line(`终波头目 ${bossFor(this.selectedId).name}`, '#9a9aa8')
     this.detailView.setContentHeight(cursor + 12)
   }
 

@@ -101,10 +101,10 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),
   // 团队升级卡图标（升级抽卡页 CardScene 无描边渲染）
   ...Object.values(CARDS).map((c) => c.emoji),
-  // 地图图标（选择页素体）+ 地图详情组图标；装饰的描边变体在 OUTLINED_EMOJIS.player
+  // 地图图标（选择页素体）+ 地图详情组图标（主题 🗺 / 玩法 🕹）；装饰描边变体在 OUTLINED_EMOJIS.player
   ...Object.values(MAPS).map((m) => m.emoji),
   '1f5fa',
-  '1f6a7',
+  '1f579',
   ...SETTING_DEFS.map((d) => d.icon),
   SPAWN.markEmoji,
   // 属性面板「专属升级」组图标

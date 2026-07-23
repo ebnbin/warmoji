@@ -411,10 +411,7 @@ export class PromoteScene extends Phaser.Scene {
 
   private stepBanner(): string {
     if (this.mode === 'recruit') {
-      const base = `命定卡池已揭晓 ${this.unlocked}/${this.pool.length} 张`
-      return this.due > 1
-        ? `${base} · 本波选 ${this.due} 名，点满全部空位才能出发`
-        : `${base} · 必须选一名新队员入队`
+      return this.due > 1 ? `本波招募 ${this.due} 名，点满空位后出发` : '招募一名新队员'
     }
     if (this.fromShop) return '点选一名队员，与中心互换'
     return '满员自动列阵 N 保 1 · 点选队员设为受保护的中心'
@@ -774,7 +771,8 @@ export class PromoteScene extends Phaser.Scene {
   private renderStatGroups(id: CharacterId, items: ItemId[], res: number, startY: number): number {
     const wrap = this.detailRect.w - 104
     let cursor = startY
-    for (const group of characterStatGroups(id, items)) {
+    // 选角色只描述当前（本级）属性与能力，不列跨级升级路径
+    for (const group of characterStatGroups(id, items, 1, { path: false })) {
       this.detailView.add([
         emojiImage(this, 42, cursor, group.icon, 35),
         this.add

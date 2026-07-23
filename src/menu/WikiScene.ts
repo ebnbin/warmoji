@@ -622,9 +622,7 @@ export class WikiScene extends Phaser.Scene {
         // 未收录：展示 emoji 本体与待收录状态
         this.setPoolIcon(P.icon, selected, 85)
         P.name.setText('未收录').setColor('#9a9aa8').setVisible(true)
-        P.desc
-          .setText('这个 emoji 还没有成为游戏实体。\n随版本迭代，目标是把它们全部做进游戏。')
-          .setVisible(true)
+        P.desc.setText('这个 emoji 还没有成为游戏实体').setVisible(true)
       } else {
         P.icon.setVisible(false)
         P.name.setText('全部 emoji').setColor('#ffffff').setVisible(true)
