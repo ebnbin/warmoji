@@ -13,7 +13,7 @@ import type { BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 import type { Enemy } from '../enemies/enemies'
 
 // 战场拾取运行时：地面待拾实体（不磁吸，靠走位拾取）+ 已激活的限时战斗层
-// （battleMods → battleFx，逐帧重折）+ 携带者极性光环。金币/宝箱在 pickups/，
+// （battleMods → battleFx，逐帧重折）+ 携带者极性光环。金币在 pickups/，
 // 与此分道：那两者磁吸入账（永久经济），此处不磁吸、短时、可趋可避（战术层）。
 
 /** 地面待拾实体：光圈 + 图标，队伍中心进入 grabRadius 即收 */

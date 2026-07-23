@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { SPAWN } from '../enemies/registry'
 import { WAVE } from './waves'
 import { cycleWave, isBossWave, isEliteWave, isFinalWave, waveAt, waveDurationMs } from './waves'
-import { COIN_ECON, killCoinScale, waveCoinStipend } from './waves'
+import { COIN_ECON, coinDropChance } from './waves'
 
 describe('waves', () => {
   it('开局为初始刷怪间隔、无强化', () => {
@@ -71,18 +71,11 @@ describe('waves', () => {
     expect(isFinalWave(WAVE.totalWaves)).toBe(true)
   })
 
-  it('金币压平：波末津贴前期高、随波递减到 0（托底前期）', () => {
-    expect(waveCoinStipend(1)).toBe(COIN_ECON.stipendBase)
-    expect(waveCoinStipend(1)).toBeGreaterThan(waveCoinStipend(5))
-    expect(waveCoinStipend(5)).toBeGreaterThan(waveCoinStipend(9))
-    expect(waveCoinStipend(30)).toBe(0)
-  })
-
-  it('金币压平：每杀系数从 1 单调下探到 killScaleMin（压后期滚雪球）', () => {
-    expect(killCoinScale(0)).toBeCloseTo(1)
-    expect(killCoinScale(120)).toBeLessThan(killCoinScale(0))
-    expect(killCoinScale(600)).toBeLessThan(killCoinScale(120))
-    expect(killCoinScale(100000)).toBeGreaterThanOrEqual(COIN_ECON.killScaleMin)
-    expect(killCoinScale(100000)).toBeCloseTo(COIN_ECON.killScaleMin, 1)
+  it('金币压平：每杀掉钱概率从 1 单调下探到 dropChanceMin（压后期滚雪球）', () => {
+    expect(coinDropChance(0)).toBeCloseTo(1)
+    expect(coinDropChance(120)).toBeLessThan(coinDropChance(0))
+    expect(coinDropChance(600)).toBeLessThan(coinDropChance(120))
+    expect(coinDropChance(100000)).toBeGreaterThanOrEqual(COIN_ECON.dropChanceMin)
+    expect(coinDropChance(100000)).toBeCloseTo(COIN_ECON.dropChanceMin, 1)
   })
 })

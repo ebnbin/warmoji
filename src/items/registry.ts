@@ -62,8 +62,6 @@ export interface TeamEffects {
   shopDiscountMul: number
   /** 每次进店额外免费刷新次数（加法） */
   freeRerolls: number
-  /** 宝箱掉落概率倍率（乘法叠乘） */
-  chestChanceMul: number
   /** 升级抽卡每次额外候选数（加法，3 + draftSize 选 1） */
   draftSize: number
 }
@@ -85,7 +83,6 @@ export const TEAM_FX_IDENTITY: TeamEffects = {
   skillCdMul: 1,
   shopDiscountMul: 1,
   freeRerolls: 0,
-  chestChanceMul: 1,
   draftSize: 0,
 }
 
@@ -156,6 +153,14 @@ export function stackCount(owned: readonly ItemId[], id: ItemId): number {
   return owned.filter((x) => x === id).length
 }
 
+/** 角色专属经验 = 该角色当前装备的全部道具的 upgradeXp 之和（与获得来源无关：
+ * 商店购买 / 未来任何途径塞进 memberItems 的道具都计入）。等级由此纯函数推导 */
+export function characterXp(owned: readonly ItemId[]): number {
+  let xp = 0
+  for (const id of owned) xp += ITEMS[id].upgradeXp
+  return xp
+}
+
 export function reachedStackLimit(owned: readonly ItemId[], id: ItemId): boolean {
   const def: ItemDef = ITEMS[id]
   return def.maxStacks !== undefined && stackCount(owned, id) >= def.maxStacks
@@ -195,12 +200,15 @@ export function rollItem(
   return pickList[Math.min(pickList.length - 1, Math.floor(rand() * pickList.length))]!
 }
 
-/** 商店价格通胀：随波次上浮（金币掉落同步在涨，后期大件才有分量）。
- * 展示与扣款都走 itemPrice，ITEMS.price 是第 1 波基准价 */
-export const PRICE = { perWave: 0.06 } as const
+/** 商店价格：基准价随波次通胀上浮 × 前期折扣（前期金币少，先把货压便宜，
+ * 到 earlyFadeWaves 波线性消退）。展示与扣款都走 itemPrice，ITEMS.price 是基准价 */
+export const PRICE = { perWave: 0.06, earlyDiscount: 0.4, earlyFadeWaves: 6 } as const
 
 export function itemPrice(id: ItemId, wave: number): number {
-  return Math.round(ITEMS[id].price * (1 + PRICE.perWave * Math.max(0, wave - 1)))
+  const inflate = 1 + PRICE.perWave * Math.max(0, wave - 1)
+  // 第 1 波打 (1-earlyDiscount)，之后线性消退到 earlyFadeWaves 波归零折扣
+  const disc = 1 - PRICE.earlyDiscount * Math.max(0, 1 - Math.max(0, wave - 1) / PRICE.earlyFadeWaves)
+  return Math.max(1, Math.round(ITEMS[id].price * inflate * disc))
 }
 
 // ── 效果叠加 ────────────────────────────────────────────────
@@ -265,7 +273,6 @@ export function foldTeamEffects(parts: readonly Partial<TeamEffects>[]): TeamEff
     fx.skillCdMul *= e.skillCdMul ?? 1
     fx.shopDiscountMul *= e.shopDiscountMul ?? 1
     fx.freeRerolls += e.freeRerolls ?? 0
-    fx.chestChanceMul *= e.chestChanceMul ?? 1
     fx.draftSize += e.draftSize ?? 0
   }
   // 封顶/保底：极端叠加也不失控

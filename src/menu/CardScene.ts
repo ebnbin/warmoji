@@ -165,8 +165,7 @@ export class CardScene extends Phaser.Scene {
     this.scene.restart()
   }
 
-  private nextScene(): 'chests' | 'promote' | 'shop' {
-    if (this.run.chests.length > 0) return 'chests'
+  private nextScene(): 'promote' | 'shop' {
     return promoteStep(this.run) ? 'promote' : 'shop'
   }
 

@@ -65,24 +65,17 @@ export const WAVE = {
 } as const
 
 // 金币经济压平：前期 DPS/怪少 → 穷；后期 DPS/怪多 → 每局大几千，曲线两头失衡。
-// 双管：① 波末保底津贴（前期托底、随波递减到 0）；② 每杀金币随难度（累计战斗时长）
-// 递减（压后期滚雪球）。初值先给，后续靠 scripts/balance.ts + 试玩校准。
+// 双管：① 金币掉落「概率」随难度（累计战斗时长）递减——前期几乎必掉、后期只有一部分
+// 击杀掉钱，压后期滚雪球；② 前期道具降价（见 items/registry.ts itemPrice），让前期
+// 本就不多的金币更经花。初值先给，后续靠 scripts/balance.ts + 试玩校准。
 export const COIN_ECON = {
-  /** 波末津贴基数（第 1 波）与每波递减：wave1≈28、wave10≈1、wave11+ 归 0 */
-  stipendBase: 28,
-  stipendPerWave: 3,
-  /** 每杀金币的难度衰减：系数从 1 平滑下探到 killScaleMin，halfLifeSec 控制衰减速度 */
-  killScaleMin: 0.5,
-  killScaleHalfLifeSec: 260,
+  /** 每杀掉金币的概率随难度从 1 平滑下探到 dropChanceMin；halfLifeSec 控制衰减速度 */
+  dropChanceMin: 0.35,
+  dropChanceHalfLifeSec: 220,
 } as const
 
-/** 波末保底津贴（前期托底，随波递减到 0） */
-export function waveCoinStipend(wave: number): number {
-  return Math.max(0, Math.round(COIN_ECON.stipendBase - COIN_ECON.stipendPerWave * (wave - 1)))
-}
-
-/** 每杀金币的难度衰减系数（1 → killScaleMin，按累计战斗时长指数衰减） */
-export function killCoinScale(combatSec: number): number {
-  const t = Math.exp(-Math.max(0, combatSec) / COIN_ECON.killScaleHalfLifeSec)
-  return COIN_ECON.killScaleMin + (1 - COIN_ECON.killScaleMin) * t
+/** 每杀掉金币的概率（1 → dropChanceMin，按累计战斗时长指数衰减） */
+export function coinDropChance(combatSec: number): number {
+  const t = Math.exp(-Math.max(0, combatSec) / COIN_ECON.dropChanceHalfLifeSec)
+  return COIN_ECON.dropChanceMin + (1 - COIN_ECON.dropChanceMin) * t
 }

@@ -8,6 +8,7 @@ import { PICKUPS } from '../pickups/registry'
 import {
   aggregateCharacterEffects,
   characterPoolFor,
+  characterXp,
   ITEMS,
   RARITIES,
   rollItem,
@@ -331,9 +332,9 @@ export class ShopScene extends Phaser.Scene {
 
   // ── 上架/购买 ───────────────────────────────────────────────
 
-  /** 该槽位角色当前等级（由专属经验推导） */
+  /** 该槽位角色当前等级：由已装备道具的 upgradeXp 之和推导（来源无关） */
   private levelOf(slot: number): number {
-    return characterLevel(this.run.memberXp[slot] ?? 0)
+    return characterLevel(characterXp(this.run.memberItems[slot] ?? []))
   }
 
   private poolFor(slot: number): ItemId[] {
@@ -364,11 +365,10 @@ export class ShopScene extends Phaser.Scene {
     if (this.run.coins < price) return
     this.run.coins -= price
     playSfx('buy')
+    const beforeLevel = this.levelOf(idx)
     const owned = this.ownedFor(idx)
     owned.push(offer)
-    // 角色专属经验累加：跨阈值即自动质变升级（免费）
-    const beforeLevel = this.levelOf(idx)
-    this.run.memberXp[idx] = (this.run.memberXp[idx] ?? 0) + ITEMS[offer].upgradeXp
+    // 装备道具即累加该角色专属经验（等级由 memberItems 纯函数推导）；跨阈值即自动质变升级
     const afterLevel = this.levelOf(idx)
     // 购买后自动补货：用新等级的池 + 概率
     this.offers[idx] = rollItem(this.poolFor(idx), owned, Math.random, this.run.wave, afterLevel)
@@ -460,7 +460,7 @@ export class ShopScene extends Phaser.Scene {
     const owned = this.ownedFor(idx)
     const def = CHARACTERS[this.focusedId]
     const level = this.levelOf(idx)
-    const prog = levelProgress(this.run.memberXp[idx] ?? 0)
+    const prog = levelProgress(characterXp(this.run.memberItems[idx] ?? []))
     const max = this.slotMaxHp(idx)
     const hp = waveStartHp(this.run.memberHp[idx] ?? max, max)
     const subtitle = {
@@ -887,7 +887,7 @@ export class ShopScene extends Phaser.Scene {
         freeRefreshes: this.run.freeRefreshes,
         level: this.run.xp.level,
         focusedLevel: idx >= 0 ? this.levelOf(idx) : 1,
-        focusedXp: idx >= 0 ? (this.run.memberXp[idx] ?? 0) : 0,
+        focusedXp: idx >= 0 ? characterXp(this.run.memberItems[idx] ?? []) : 0,
         slots: this.grid.cellRects().map((r) => {
           const id = r.key as CharacterId
           const index = this.lineup.indexOf(id)

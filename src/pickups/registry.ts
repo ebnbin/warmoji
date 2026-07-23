@@ -1,15 +1,12 @@
 import pickupsJson from '../assets/pickups.json'
 
-// 拾取物（pickup）：战场上等待拾取的掉落实体（金币/宝箱）。同组同管线
-// 磁吸与拾取（battle/pickups.ts，data 标记分流）；掉率/开箱抽取是掉落
-// 经济逻辑，在 run/chest.ts。数据行在 defs/pickups.ts（创作层）。
+// 拾取物（pickup）：战场上等待拾取的掉落实体（金币）。磁吸与拾取在 pickups/pickups.ts。
+// 数据行在 defs/pickups.ts（创作层）。
 
 export interface PickupDef {
   readonly emoji: string
   readonly size: number
   readonly radius: number
-  /** 宝箱兜底金币：全队所有道具池都抽无可抽时（几乎不可能）改吐金币 */
-  readonly fallbackCoins?: number
 }
 
 export type PickupId = keyof typeof pickupsJson

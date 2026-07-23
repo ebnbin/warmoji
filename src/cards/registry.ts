@@ -95,10 +95,6 @@ export const CARDS = {
     emoji: '1f0cf', name: '广纳', desc: '每次升级抽卡多 1 张候选',
     rarity: 'epic', tags: ['meta'], maxLevel: 2, effects: { draftSize: 1 },
   },
-  fortune: {
-    emoji: '1f381', name: '福运', desc: '宝箱掉落概率 +50%',
-    rarity: 'rare', tags: ['loot'], maxLevel: 2, effects: { chestChanceMul: 1.5 },
-  },
   // ── 队长技能专属 ──────────────────────────────────────
   overclock: {
     emoji: '23f1', name: '超频', desc: '队长技能冷却 -15%',

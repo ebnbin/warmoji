@@ -65,8 +65,6 @@ export class UIScene extends Phaser.Scene {
   private devRefreshedAt = 0
   private paused = false
   private pauseObjs: Phaser.GameObjects.GameObject[] = []
-  /** 在场的开箱横幅数：连开多箱时逐条下移错位 */
-  private chestBanners = 0
   /** 试炼场控制面板的可滚动容器（敌人/角色列表随内容增长，不再堆出屏外） */
   private labView?: ScrollView
   // 队长技能按钮（左下角）：底圆 + 队长头像 + 冷却扇形暗罩 + 秒数 + 就绪光圈
@@ -193,14 +191,12 @@ export class UIScene extends Phaser.Scene {
     arenaEvents.on('wave-complete', this.onWaveComplete, this)
     arenaEvents.on('wave-warning', this.onWaveWarning, this)
     arenaEvents.on('skill-cast', this.onSkillCast, this)
-    arenaEvents.on('chest-collected', this.onChestOpen, this)
     arenaEvents.on('field-collected', this.onFieldCollected, this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       arenaEvents.off('wave-complete', this.onWaveComplete, this)
       arenaEvents.off('wave-warning', this.onWaveWarning, this)
       arenaEvents.off('skill-cast', this.onSkillCast, this)
-      arenaEvents.off('chest-collected', this.onChestOpen, this)
       arenaEvents.off('field-collected', this.onFieldCollected, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       // devText 在 SHUTDOWN 里随场景对象一起销毁；清引用，否则关闭 dev 后
@@ -501,43 +497,6 @@ export class UIScene extends Phaser.Scene {
       g.fillRoundedRect(x - barW / 2, by, barW, 5, 2)
       g.fillStyle(f.polarity === 'buff' ? 0x66bb6a : 0xef5350, 1)
       g.fillRoundedRect(x - barW / 2 + 0.5, by + 0.5, Math.max(2, (barW - 1) * ratio), 4, 2)
-    })
-  }
-
-  /** 拾取宝箱横幅：只提示「获得宝箱」，道具内容保密到战斗后的开箱页。
-   * 连拾多箱（精英潮 AOE）按在场横幅数逐条下移，不互相糊字 */
-  private onChestOpen(): void {
-    this.chestBanners += 1
-    const t = emojiText(
-      this,
-      viewport.logicalWidth / 2,
-      viewport.logicalHeight * 0.46 + (this.chestBanners - 1) * 44,
-      `{${PICKUPS.chest.emoji}} 获得宝箱`,
-      {
-        fontFamily: UI_FONT,
-        fontSize: FONT.lead,
-        fontStyle: 'bold',
-        color: '#ffd54f',
-        stroke: '#000000',
-        strokeThickness: 5,
-        align: 'center',
-        wordWrap: { width: viewport.logicalWidth - 80 },
-        resolution: textRes(),
-      },
-      { origin: 0.5 },
-    )
-      .setDepth(226)
-      .setScale(0.6)
-    this.tweens.add({ targets: t, scale: 1, duration: 220, ease: 'Back.easeOut' })
-    this.tweens.add({
-      targets: t,
-      alpha: 0,
-      delay: 1500,
-      duration: 400,
-      onComplete: () => {
-        t.destroy()
-        this.chestBanners = Math.max(0, this.chestBanners - 1)
-      },
     })
   }
 

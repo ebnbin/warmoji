@@ -2,7 +2,6 @@ import Phaser from 'phaser'
 import { ArenaScene } from './maps/ArenaScene'
 import { CaptainScene } from './menu/CaptainScene'
 import { CardScene } from './menu/CardScene'
-import { ChestScene } from './menu/ChestScene'
 import { InfiniteArenaScene } from './maps/InfiniteArenaScene'
 import { MapScene } from './menu/MapScene'
 import { MenuScene } from './menu/MenuScene'
@@ -27,8 +26,6 @@ import { spawnCoins } from './pickups/pickups'
 import { spawnFieldPickup } from './battlefield/battlefield'
 import { FIELD_PICKUPS, fieldPickupsFor } from './battlefield/registry'
 import type { Polarity } from './battlefield/registry'
-import { rollChestLoot } from './pickups/chest'
-import { characterLevel } from './run/charLevel'
 import type { ItemId } from './items/registry'
 import { UNIT } from './core/units'
 import type { BaseArenaScene } from './battle/BaseArenaScene'
@@ -66,7 +63,7 @@ const game = new Phaser.Game({
   // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
   physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ChestScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, UIScene, ResultScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, UIScene, ResultScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {
@@ -77,7 +74,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
   }
   // 场景 → BGM：大厅页共用一首，战斗页按本局地图配曲。
   // 挂在场景 START 上（restart 重入时 playBgm 幂等不重开）
-  const lobby = ['menu', 'map', 'wiki', 'studio', 'settings', 'captain', 'promote', 'cards', 'chests', 'shop', 'result']
+  const lobby = ['menu', 'map', 'wiki', 'studio', 'settings', 'captain', 'promote', 'cards', 'shop', 'result']
   const arenas = ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']
   for (const scene of game.scene.getScenes(false)) {
     const key = scene.scene.key
@@ -131,25 +128,13 @@ window.__setLab = (kinds: string[], mapId = 'forest'): void => {
 
 window.__addCoins = (n: number): void => grantCoins(n)
 window.__addXp = (n: number): void => grantXp(n)
-// e2e：往待开箱列表塞一个宝箱（指定道具或按当前阵容随机抽），战斗结束即进开箱页
-window.__addChest = (itemId?: string): void => {
+// e2e：直接给某槽位角色装备道具（模拟「任意来源获得道具」，来源无关地累积专属经验、
+// 推动质变升级）。默认槽位 0、数量 1
+window.__addMemberItem = (itemId: string, slot = 0, count = 1): void => {
   const run = getRun()
-  if (itemId) {
-    run.chests.push(itemId as ItemId)
-    return
-  }
-  const loot = rollChestLoot(
-    run.roster,
-    run.memberItems,
-    run.memberXp.map(characterLevel),
-    () => Math.random(),
-  )
-  if (loot) run.chests.push(loot.itemId)
-}
-// e2e：给某槽位角色加专属经验（推动质变升级；默认槽位 0）
-window.__addCharXp = (amount: number, slot = 0): void => {
-  const run = getRun()
-  if (slot >= 0 && slot < run.memberXp.length) run.memberXp[slot]! += amount
+  const items = run.memberItems[slot]
+  if (!items) return
+  for (let i = 0; i < count; i++) items.push(itemId as ItemId)
 }
 // e2e 快进到指定波（在商店/整编期间调用，下次开战即该波）
 window.__setWave = (n: number): void => {

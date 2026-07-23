@@ -146,11 +146,11 @@ const flee: Steerer = ({ scene, a, body, slow, target }) => {
 const coinThief: Steerer = ({ scene, a, body, slow }) => {
   const def = a.def
   const e = a.image
-  // 直奔最近的金币（宝箱吃不动，不偷）；没金币就慢速游荡
+  // 直奔最近的金币；没金币就慢速游荡
   let coin: ImageObj | undefined
   let bestD = Infinity
   for (const c of scene.coins.getChildren() as ImageObj[]) {
-    if (!c.active || c.getData('chest')) continue
+    if (!c.active) continue
     const d = scene.worldDelta(e, c)
     const dist = d.x * d.x + d.y * d.y
     if (dist < bestD) {

@@ -11,7 +11,6 @@ import {
   completePromote,
   confirmCaptain,
   drainCards,
-  drainChests,
   enterCaptain,
   startRun,
 } from './helpers'
@@ -40,8 +39,8 @@ test('波次循环：波末固定招募 1 人 → 商店购物 → 下一波扩�
   const KEYS = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'] as const
   for (let i = 0; i < 55; i++) {
     const scene = await page.evaluate(() => window.__warmoji?.scene)
-    // 波末先落在升级抽卡页 / 开箱页（本波必升级、偶发掉宝箱），都算离开战斗
-    if (scene === 'promote' || scene === 'shop' || scene === 'cards' || scene === 'chests') break
+    // 波末先落在升级抽卡页（本波必升级），都算离开战斗
+    if (scene === 'promote' || scene === 'shop' || scene === 'cards') break
     expect(scene, '波次中途不应全灭或离开战斗').toBe('arena')
     const key = KEYS[i % 4]!
     await page.keyboard.down(key)
@@ -49,9 +48,8 @@ test('波次循环：波末固定招募 1 人 → 商店购物 → 下一波扩�
     await page.keyboard.up(key)
   }
 
-  // 波末先抽完升级卡、再开完宝箱，才进整编页
+  // 波末先抽完升级卡，才进整编页
   await drainCards(page)
-  await drainChests(page)
   // 波末必进整编页：本波 1 个招募名额；第 2 波解锁 6 张、1 张已入队
   await page.waitForFunction(() => window.__warmoji?.scene === 'promote', undefined, {
     timeout: 15_000,

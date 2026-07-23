@@ -8,10 +8,4 @@ export const PICKUPS = {
     size: 0.6,
     radius: 0.22,
   },
-  chest: {
-    emoji: '1f381',
-    size: 0.8,
-    radius: 0.3,
-    fallbackCoins: 10,
-  },
 } as const satisfies Record<string, PickupDef>

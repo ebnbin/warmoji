@@ -6,7 +6,6 @@ import {
   completePromote,
   confirmCaptain,
   drainCards,
-  drainChests,
   enterCaptain,
 } from './helpers'
 
@@ -78,7 +77,6 @@ test('队长主动技能：纯 CD 门槛，开局即可放、释放进入冷却�
     const scene = await page.evaluate(() => window.__warmoji?.scene)
     if (scene === 'arena') break
     if (scene === 'cards') await drainCards(page)
-    else if (scene === 'chests') await drainChests(page)
     else if (scene === 'promote') await completePromote(page)
     else if (scene === 'shop') await clickShopNext(page)
     else await page.waitForTimeout(400)

@@ -7,7 +7,7 @@ import { attachMember, memberOf } from '../characters/members'
 import type { Member } from '../characters/members'
 import { projectileOf, spawnProjectile, sweepProjectiles, updateEnemyProjectiles } from '../projectiles/projectiles'
 import { circleBody } from '../core/arcade'
-import { collectCoin, magnetCoins, spawnChest, spawnCoins, spawnShards } from '../pickups/pickups'
+import { collectCoin, magnetCoins, spawnCoins, spawnShards } from '../pickups/pickups'
 import { spawnGroundEffect, updateGroundEffects } from '../groundEffects/groundEffects'
 import type { GroundEffect } from '../groundEffects/groundEffects'
 import {
@@ -51,9 +51,9 @@ import type { FormationId } from '../characters/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../characters/orbit'
 import type { OrbitThreat } from '../characters/orbit'
 import { browserStorage } from '../core/storage'
-import { chestDropped } from '../pickups/chest'
 import {
   aggregateCharacterEffects,
+  characterXp,
   foldTeamEffects,
   CRIT_MUL,
   resolveAbilityDef,
@@ -73,7 +73,7 @@ import { isWithinActive } from '../maps/world'
 import { norm } from '../core/vec'
 import type { Point } from '../core/vec'
 import { ANIM_DEF } from '../emoji/studio'
-import { isBossWave, isEliteWave, isFinalWave, waveAt, waveDurationMs, killCoinScale, waveCoinStipend } from '../run/waves'
+import { isBossWave, isEliteWave, isFinalWave, waveAt, waveDurationMs, coinDropChance } from '../run/waves'
 import { gainXp, waveBonusXp, xpToNext } from '../run/xp'
 import { Animator } from '../emoji/animator'
 import { clipFramesLive } from '../emoji/animTextures'
@@ -894,8 +894,6 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       }
     }
     if (this.teamFx.waveCoins > 0) this.run.coins += this.teamFx.waveCoins
-    // 金币压平：波末保底津贴（前期托底，随波递减到 0）
-    this.run.coins += waveCoinStipend(this.run.wave)
     this.run.combatMs += this.elapsedMs
     this.run.wave += 1
     this.run.memberHp = this.members.map((m) => (m.alive ? Math.round(m.hp) : 0))
@@ -907,13 +905,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       coins: this.run.coins - this.waveBaseCoins,
       levels: this.run.xp.level - this.waveBaseLevel,
     } satisfies WaveSummary)
-    // 通关 → 胜利结算；否则本波拾到宝箱先进开箱页（玩家逐个决定归属/丢弃），
-    // 再按有无招募名额进整编页（首次满员顺带阵型页）或直进商店
+    // 通关 → 胜利结算；否则本波升级 → 团队升级抽卡页；再按有无招募名额进整编页
+    //（首次满员顺带阵型页）或直进商店
     this.time.delayedCall(WAVE.summaryMs, () => {
       if (finished) this.scene.start('result', { win: true })
-      // 本波升级 → 团队升级抽卡页；再拾宝箱 → 开箱页；再招募 → 整编页；否则商店
       else if (this.run.cardDraws > 0) this.scene.start('cards')
-      else if (this.run.chests.length > 0) this.scene.start('chests')
       else this.scene.start(promoteStep(this.run) ? 'promote' : 'shop')
     })
   }
@@ -970,7 +966,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const owned = this.testMode ? [] : (this.run.memberItems[slot] ?? [])
     // 角色等级：测试模式由「角色等级」旋钮给定（labLevel 0/1/2 → 1/2/3 级）；
     // 正常局由该角色累计的专属经验推导。等级同时决定能力档位与基础属性质变。
-    const level = this.testMode ? labLevel() + 1 : characterLevel(this.run.memberXp[slot] ?? 0)
+    const level = this.testMode ? labLevel() + 1 : characterLevel(characterXp(owned))
     const fx = aggregateCharacterEffects(owned, levelStatsFor(id, level))
     const tiers = tiersForLevel(level)
     const memberCtx: AbilityContext = {
@@ -1532,8 +1528,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
   }
 
-  /** 击杀掉落：经验即得（队长×四叶草×精英倍率），金币落地待拾（偷币鼠吐回吃掉的+利息），
-   * 极小概率掉宝箱（精英更高；压测/Boss 不掉）。rng 取用顺序固定，勿调整语句次序 */
+  /** 击杀掉落：经验即得（队长×四叶草×精英倍率），金币落地待拾（偷币鼠吐回吃掉的+利息）。
+   * 金币压平：掉钱是「概率」事件，概率随累计战斗时长递减（压后期滚雪球）；偷币鼠吐回的
+   * 币不受概率影响。rng 每杀固定取两次（掉落判定 + 双倍判定），勿调整取用次序 */
   private grantKillRewards(a: Enemy, enemy: ImageObj): void {
     const def = a.def
     const elite = a.elite
@@ -1541,14 +1538,12 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       CAPTAINS[this.run.captainId].xpGainMul * this.teamFx.xpGainMul * (elite ? ELITE.xpMul : 1)
     this.gainTeamXp(Math.round(def.xp * xpMul))
     const eaten = a.eaten
-    // 金币压平：每杀金币随累计战斗时长衰减（压后期滚雪球），保底 1
-    const coinScale = killCoinScale((this.run.combatMs + this.elapsedMs) / 1000)
-    const baseCoins = Math.max(1, Math.round(def.coins * (elite ? ELITE.coinsMul : 1) * coinScale))
-    const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? baseCoins : 0
+    const dropRoll = this.rng.next()
+    const doubleRoll = this.rng.next()
+    const dropped = dropRoll < coinDropChance((this.run.combatMs + this.elapsedMs) / 1000)
+    const baseCoins = dropped ? Math.round(def.coins * (elite ? ELITE.coinsMul : 1)) : 0
+    const doubled = baseCoins > 0 && doubleRoll < this.teamFx.doubleCoinChance ? baseCoins : 0
     spawnCoins(this, enemy.x, enemy.y, baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0))
-    if (!this.testMode && !a.boss && chestDropped(elite, () => this.rng.next(), this.teamFx.chestChanceMul)) {
-      spawnChest(this, enemy.x, enemy.y)
-    }
   }
 
   /** 击败终波 Boss：稍候（碎块飞散可见）直接提前通关 */

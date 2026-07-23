@@ -3,17 +3,13 @@ import { CAPTAINS } from '../captains/registry'
 import { emojiKey } from '../emoji/textures'
 import { UNIT } from '../core/units'
 import { norm } from '../core/vec'
-import { rollChestLoot } from './chest'
-import { characterLevel } from '../run/charLevel'
 import { PICKUP, PICKUPS } from './registry'
 import { KNOCKBACK } from '../abilities/registry'
 import { acquirePooled, releasePooled } from '../core/pool'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
-// 拾取经济：金币/宝箱的生成、磁吸、入账，外加击杀碎裂的经验珠视觉。
-// 宝箱拾取只收集（存进 run.chests，战斗后开箱页统一开），不立即生效、不定归属。
-// 宝箱与金币同组同管线（data 标记分流）；世界差异（钳制/回收/闲置漂移）
-// 全部经场景钩子（constrainCoinPos/cullCoin/coinIdleVelocity）。
+// 拾取经济：金币的生成、磁吸、入账，外加击杀碎裂的经验珠视觉。
+// 世界差异（钳制/回收/闲置漂移）全部经场景钩子（constrainCoinPos/cullCoin/coinIdleVelocity）。
 
 export function spawnCoins(scene: BaseArenaScene, x: number, y: number, count: number): void {
   for (let i = 0; i < count; i++) {
@@ -22,7 +18,7 @@ export function spawnCoins(scene: BaseArenaScene, x: number, y: number, count: n
     const jy = count > 1 ? (scene.rng.next() - 0.5) * 0.6 * UNIT : 0
     const pos = scene.constrainCoinPos({ x: x + jx, y: y + jy })
     const coin = acquirePooled(scene, scene.coins, pos.x, pos.y, emojiKey(PICKUPS.coin.emoji, 'player'), PICKUPS.coin.size * UNIT, PICKUPS.coin.radius * UNIT)
-    coin.setDepth(3).setData('chest', false)
+    coin.setDepth(3)
     // 掉落弹出
     const base = coin.scaleX
     coin.setScale(base * 0.3)
@@ -74,45 +70,10 @@ export function magnetCoins(scene: BaseArenaScene): void {
 
 export function collectCoin(scene: BaseArenaScene, coin: ImageObj): void {
   if (!coin.active) return
-  if (coin.getData('chest')) {
-    openChest(scene, coin)
-    return
-  }
   scene.coinBurst.explode(4, coin.x, coin.y)
   playSfx('coin')
   releasePooled(coin)
   scene.run.coins += 1
-}
-
-/** 宝箱走金币的磁吸/回收/拾取管线（同组 + data 标记分流） */
-export function spawnChest(scene: BaseArenaScene, x: number, y: number): void {
-  const pos = scene.constrainCoinPos({ x, y })
-  const chest = acquirePooled(scene, scene.coins, pos.x, pos.y, emojiKey(PICKUPS.chest.emoji, 'player'), PICKUPS.chest.size * UNIT, PICKUPS.chest.radius * UNIT)
-  chest.setDepth(4).setData('chest', true)
-  const base = chest.scaleX
-  chest.setScale(base * 0.3)
-  scene.tweens.add({ targets: chest, scale: base, duration: 220, ease: 'Back.easeOut' })
-}
-
-/** 拾取宝箱：抽定 1 件本局阵容用得上的道具存进 run.chests（保密到开箱），
- * 只收集不生效、不定归属——战斗结束后进开箱页由玩家决定。全池抽满则补底金币 */
-function openChest(scene: BaseArenaScene, chest: ImageObj): void {
-  const { x, y } = chest
-  releasePooled(chest)
-  scene.coinBurst.explode(12, x, y)
-  playSfx('levelup')
-  const loot = rollChestLoot(
-    scene.run.roster,
-    scene.run.memberItems,
-    scene.run.memberXp.map(characterLevel),
-    () => scene.rng.next(),
-  )
-  if (!loot) {
-    scene.run.coins += PICKUPS.chest.fallbackCoins ?? 0
-    return
-  }
-  scene.run.chests.push(loot.itemId)
-  scene.events.emit('chest-collected')
 }
 
 /** 击杀碎裂：敌人纹理四分为碎片抛散淡出（对象池复用，见 scene.shardPool） */

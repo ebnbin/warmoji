@@ -176,9 +176,13 @@ describe('能力参数修正', () => {
   })
 })
 
-describe('价格通胀', () => {
-  it('第 1 波为基准价，随波次线性上浮并取整', () => {
-    expect(itemPrice('gemHeart', 1)).toBe(ITEMS.gemHeart.price)
+describe('价格：前期折扣 + 随波通胀', () => {
+  it('第 1 波打前期折扣（便宜）；折扣到 earlyFadeWaves 波归零，此后为纯通胀', () => {
+    expect(itemPrice('gemHeart', 1)).toBe(
+      Math.round(ITEMS.gemHeart.price * (1 - PRICE.earlyDiscount)),
+    )
+    expect(itemPrice('gemHeart', 1)).toBeLessThan(ITEMS.gemHeart.price)
+    // 折扣消退后（wave 11 > earlyFadeWaves）= 纯通胀
     expect(itemPrice('gemHeart', 11)).toBe(Math.round(ITEMS.gemHeart.price * (1 + PRICE.perWave * 10)))
     expect(itemPrice('gemHeart', 15)).toBeGreaterThan(itemPrice('gemHeart', 5))
   })
