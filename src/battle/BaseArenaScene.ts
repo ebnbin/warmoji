@@ -430,6 +430,17 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   fleeDir(_a: Enemy, away: Point): Point {
     return away
   }
+  /** 追击方向（默认径直朝目标）：残垣图覆写为流场绕墙寻路。其余图恒直线，零改动 */
+  chaseDir(from: Point, to: Point): Point {
+    const d = this.worldDelta(from, to)
+    return norm(d.x, d.y)
+  }
+  /** 视线 a→b 首个撞墙点（默认无墙 → null）：残垣图覆写。用于索敌视线遮挡与子弹裁墙 */
+  wallHit(_a: Point, _b: Point): Point | null {
+    void _a
+    void _b
+    return null
+  }
   /** 普通敌人速度定稿后的世界后处理（河流：加水流 + 跨向钳岸） */
   protected postSteerEnemy(_e: ImageObj, _body: ArcadeBody, _def: EnemyDef): void {
     void _e

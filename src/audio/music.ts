@@ -7,7 +7,7 @@ import type { MapId } from '../maps/registry'
 // 战斗曲按地图配：BgmId 直接复用 MapId，'lobby' 盖住全部非战斗页面。
 
 export type BgmId = 'lobby' | MapId
-export const BGM_IDS: readonly BgmId[] = ['lobby', 'forest', 'desert', 'river', 'void']
+export const BGM_IDS: readonly BgmId[] = ['lobby', 'forest', 'desert', 'river', 'void', 'ruins']
 
 export interface BgmNote {
   /** 循环内起始秒 */
@@ -389,12 +389,61 @@ function buildVoid(): BgmScore {
   )
 }
 
+/** 残垣：暗沉废墟氛围——弗里几亚属和声 + 稀疏滴水琶音 + 幽远主题（84 BPM，45.7 秒循环） */
+function buildRuins(): BgmScore {
+  const chords = [0, 6, 3, 5, 0, 6, 4, 5, 3, 6, 0, 5, 4, 6, 3, 0]
+  return track(
+    'ruins',
+    {
+      bpm: 84,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 47,
+      scale: PHRYGIAN_DOM,
+      echo: { delaySec: (60 / 84) * 0.75, feedback: 0.4, level: 0.4 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.2, attack: 0.02, release: 0.14, octave: -1 }
+      const pad: Voice = { wave: 'square', vol: 0.028, attack: 0.3, release: 0.9, octave: 0 }
+      const lead: Voice = { wave: 'triangle', vol: 0.1, attack: 0.01, release: 0.12, octave: 1, echo: true }
+      // 滴水琶音：稀疏正弦点滴，垫出废墟空旷回响
+      const drip: Voice = { wave: 'sine', vol: 0.03, attack: 0.004, release: 0.07, octave: 2 }
+      b.bass(bass, chords, 'r.......')
+      b.pad(pad, chords, [0, 1, 2], 0.006)
+      b.arp(drip, chords, [0, 4, 2, 4], 0, 16)
+      b.line(lead, [
+        [0, 0, 0, 4],
+        [1, 4, 1, 2],
+        [2, 0, 3, 3],
+        [3, 2, 4, 4],
+        [4, 0, 3, 2], [4, 4, 1, 2],
+        [5, 0, 0, 4],
+        [6, 4, 6, 3],
+        [7, 0, 4, 4],
+        [8, 0, 3, 2], [8, 6, 4, 1],
+        [9, 4, 6, 3],
+        [10, 0, 5, 4],
+        [11, 0, 4, 2], [11, 4, 3, 2],
+        [12, 0, 1, 4],
+        [13, 0, 3, 4],
+        [14, 0, 0, 6],
+        // 第 16 小节全休止：回声尾巴留白
+      ])
+      b.drums('kick', 'x.......', 0, 16, 0.22)
+      b.drums('hat', '....x...', 0, 16, 0.04)
+      b.drums('tom', '......x.', 8, 16, 0.1)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
   desert: buildDesert,
   river: buildRiver,
   void: buildVoid,
+  ruins: buildRuins,
 }
 
 const cache = new Map<BgmId, BgmScore>()

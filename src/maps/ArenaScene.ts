@@ -25,8 +25,9 @@ const MARGIN = MAP.cameraMargin * UNIT
 // 世界规则：四周硬墙——队伍/敌人/Boss 钳制在图内，游荡撞边折返、
 // 逃跑贴边沿墙滑行，敌弹与金币不出图。战斗引擎全在 BaseArenaScene。
 export class ArenaScene extends BaseArenaScene {
-  constructor() {
-    super('arena')
+  // 场景键可覆写：残垣图复用整套有界世界规则（盒子边界/相机/落点），只叠加断壁机制
+  constructor(key = 'arena') {
+    super(key)
   }
 
   protected createWorld(): void {

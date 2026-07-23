@@ -110,6 +110,16 @@ export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
     const hitRefs = b.hitRefs
     const targets = hitRefs ? scene.frameTargets.filter((t) => !hitRefs.has(t.ref as ImageObj)) : scene.frameTargets
     const hit = sweepFirstHitIndex(prev, { x: p.x, y: p.y }, b.radius, targets)
+    // 残垣图：子弹撞墙即销毁（墙比命中点更近时，命中作废）——其余图 wallHit 恒 null
+    const wall = scene.wallHit(prev, { x: p.x, y: p.y })
+    if (wall !== null) {
+      const dw = (wall.x - prev.x) ** 2 + (wall.y - prev.y) ** 2
+      const t = hit >= 0 ? targets[hit]! : undefined
+      if (!t || dw <= (t.x - prev.x) ** 2 + (t.y - prev.y) ** 2) {
+        releasePooled(p)
+        continue
+      }
+    }
     if (hit >= 0) {
       const target = targets[hit]!
       const { damage, kb, srcSlot } = b

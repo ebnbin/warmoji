@@ -92,6 +92,14 @@ const POOLS: Record<MapId, readonly FieldPickupDef[]> = {
     { id: 'void_entropy', emoji: '1f300', name: '熵增紊乱', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
     { id: 'void_drift', emoji: '26ab', name: '空间坍缩', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.72 } },
   ],
+  // 残垣：伏击/夯墙/尘幕（增益），碎砾/塌方（减益）——呼应「废墟掩体」主题
+  ruins: [
+    { id: 'ruins_ambush', emoji: '1f3f9', name: '断壁伏击', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { critAdd: 0.18 } },
+    { id: 'ruins_rampart', emoji: '1f9f1', name: '残垣回响', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { teamDamageMul: 1.35 } },
+    { id: 'ruins_dust', emoji: '1f32b', name: '尘幕蔽敌', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemySlowMul: 0.65 } },
+    { id: 'ruins_rubble', emoji: '1faa8', name: '碎砾绊足', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.72 } },
+    { id: 'ruins_collapse', emoji: '1f4a8', name: '塌方扬尘', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
+  ],
 }
 
 /** 全部拾取按 id 索引（携带者掉落/注入器按 id 反查） */

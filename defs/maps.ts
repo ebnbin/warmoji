@@ -108,4 +108,26 @@ export const MAPS = {
     mix: DEFAULT_MIX,
     boss: 'boss',
   },
+  ruins: {
+    emoji: '1f3da',
+    name: '残垣',
+    desc: '断壁残垣的废墟回廊——墙挡人、挡弹、也挡视线；靠掩体、卡口与探头作战',
+    kind: 'ruins',
+    palette: {
+      bgFrom: 'hsl(35 16% 28%)',
+      bgTo: 'hsl(28 18% 12%)',
+      // map 色即石质地面（暖灰褐；断壁由地面色压暗而来，读成同一石料）
+      map: hslToInt(38, 0.12, 0.62),
+      shadow: 0x000000,
+    },
+    decor: {
+      // 瓦砾 / 碎砖 / 枯草：断壁之间的废墟碎屑，稀疏（墙才是主体）
+      emojis: ['1faa8', '1f9f1', '1f940', '1f33f'],
+      sizeU: [0.3, 0.7],
+      alpha: [0.12, 0.22],
+      density: [0.05, 0.08],
+    },
+    mix: DEFAULT_MIX,
+    boss: 'boss',
+  },
 } as const satisfies Record<string, MapDef>
