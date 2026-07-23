@@ -132,6 +132,7 @@ export function characterStatGroups(
   id: CharacterId,
   items: readonly ItemId[] = [],
   level = 1,
+  opts: { path?: boolean } = {},
 ): StatGroup[] {
   const def = CHARACTERS[id]
   const fx = aggregateCharacterEffects(items, levelStatsFor(id, level))
@@ -148,13 +149,10 @@ export function characterStatGroups(
   if (fx.killHeal > 0) baseLines.push(`击杀回复 ${fx.killHeal} 生命`)
   if (fx.thorns > 0) baseLines.push(`敌人接触反伤 ${fx.thorns}`)
   if (fx.critChance > 0) baseLines.push(`暴击率 ${Math.round(fx.critChance * 100)}%（伤害 ×2）`)
-  return [
-    {
-      icon: '2764',
-      title: '基础',
-      lines: baseLines,
-    },
-    {
+  const groups: StatGroup[] = [{ icon: '2764', title: '基础', lines: baseLines }]
+  // 升级路径组（跨等级视角）：默认展示；per-level 独立视角（图鉴 / 角色选择）关掉它
+  if (opts.path !== false) {
+    groups.push({
       icon: '2b50',
       title: `升级路径（当前 ${level} 级 · 角色经验自动解锁）`,
       lines: upgradeCardsFor(def).map((card, i) => {
@@ -162,17 +160,18 @@ export function characterStatGroups(
         const reached = level >= atLevel
         return `Lv${atLevel}「${card.name}」${card.desc}${reached ? ' ✓已获得' : `（Lv${atLevel} 解锁）`}`
       }),
-    },
-    // 攻击来源逐载体展示：名字/图标取自载体（武器/徒手能力），数值取该载体当前档位能力
-    ...def.carriers.map((carrier, i) => {
-      const display = displayDef(resolveAbilityDef(loadout[i]!, fx), dmgMul, cdMul, fx.knockbackMul)
-      return {
-        icon: carrier.icon,
-        title: `${carrier.name}（${ABILITY_KIND_LABEL[display.kind]}）`,
-        lines: abilityStatLines(display),
-      }
-    }),
-  ]
+    })
+  }
+  // 攻击来源逐载体展示：名字/图标取自载体（武器/徒手能力），数值取该载体当前档位能力
+  for (const [i, carrier] of def.carriers.entries()) {
+    const display = displayDef(resolveAbilityDef(loadout[i]!, fx), dmgMul, cdMul, fx.knockbackMul)
+    groups.push({
+      icon: carrier.icon,
+      title: `${carrier.name}（${ABILITY_KIND_LABEL[display.kind]}）`,
+      lines: abilityStatLines(display),
+    })
+  }
+  return groups
 }
 
 /** 展示用生效值：把伤害/冷却/击退倍率套进各 kind 自己的对应字段 */

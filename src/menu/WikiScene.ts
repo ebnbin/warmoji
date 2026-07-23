@@ -54,6 +54,8 @@ interface DetailPool {
   badge: Phaser.GameObjects.Text
   name: Phaser.GameObjects.Text
   desc: Phaser.GameObjects.Text
+  /** 分级子标签（角色 1/2/3 级切换）：随详情内容滚动，点选切换当前展示等级 */
+  levelTabs: Phaser.GameObjects.Text[]
   sections: { title: Phaser.GameObjects.Text; body: Phaser.GameObjects.Text }[]
   footer: Phaser.GameObjects.Text
 }
@@ -65,6 +67,10 @@ export class WikiScene extends Phaser.Scene {
   /** 0..groups.length-1 = 分组条目；groups.length = 「全部」网格页 */
   private category = 0
   private focusedKey = ''
+  /** 当前详情条目的分级子标签选中项（角色 0/1/2 = 1/2/3 级）；切换条目/类别时归零 */
+  private levelSel = 0
+  private currentCategory = ''
+  private currentEntry?: WikiEntry
   private allSelected: string | null = null
   private manifest: string[] = []
   private used = new Set<string>()
@@ -286,6 +292,7 @@ export class WikiScene extends Phaser.Scene {
     if (i < 0 || this.category === i) return
     this.category = i
     this.focusedKey = ''
+    this.levelSel = 0
     this.listScroll = 0
     this.preserveOnRestart = true
     this.scene.restart()
@@ -310,6 +317,7 @@ export class WikiScene extends Phaser.Scene {
     )
     this.entryGrid.onTap = (key): void => {
       this.focusedKey = key
+      this.levelSel = 0
       this.refreshEntries()
     }
     this.entryGrid.onScroll = (): void => {
@@ -384,6 +392,27 @@ export class WikiScene extends Phaser.Scene {
       .setOrigin(0, 0)
       .setVisible(false)
     view.add([badge, icon, name, desc])
+    // 分级子标签（Lv1/2/3）：随内容滚动，点选切换当前展示等级（拖动时不误触）
+    const levelTabs = [0, 1, 2].map((i) => {
+      const t = this.add
+        .text(0, 0, '', {
+          fontFamily: UI_FONT,
+          fontSize: FONT.small,
+          fontStyle: 'bold',
+          color: '#ffffff',
+          backgroundColor: '#00000055',
+          padding: { x: 14, y: 6 },
+          resolution: res,
+        })
+        .setOrigin(0, 0)
+        .setVisible(false)
+        .setInteractive({ useHandCursor: true })
+      t.on('pointerup', () => {
+        if (!view.wasDragged) this.selectLevel(i)
+      })
+      return t
+    })
+    view.add(levelTabs)
     const footer = this.add
       .text(dx + 28, dy + D.h - 24, '', {
         fontFamily: UI_FONT,
@@ -393,7 +422,7 @@ export class WikiScene extends Phaser.Scene {
       })
       .setOrigin(0, 1)
       .setVisible(false)
-    this.pool = { view, icon, badge, name, desc, sections: [], footer }
+    this.pool = { view, icon, badge, name, desc, levelTabs, sections: [], footer }
     return this.pool
   }
 
@@ -448,8 +477,17 @@ export class WikiScene extends Phaser.Scene {
   }
 
   /** 详情卡（图鉴页与完整列表页共用）：类别 + 名称 + 介绍 + 属性分段（全部可滚动） */
+  /** 分级子标签点选：切换当前展示等级并重绘详情 */
+  private selectLevel(i: number): void {
+    if (this.levelSel === i || !this.currentEntry) return
+    this.levelSel = i
+    this.renderDetailCard(this.currentCategory, this.currentEntry)
+  }
+
   private renderDetailCard(category: string, e: WikiEntry): void {
     const P = this.ensurePool()
+    this.currentCategory = category
+    this.currentEntry = e
 
     P.badge.setText(category).setVisible(true)
     this.setPoolIcon(P.icon, e.emoji, 100)
@@ -457,15 +495,40 @@ export class WikiScene extends Phaser.Scene {
     P.desc.setText(e.desc).setVisible(true)
     P.footer.setVisible(false)
 
+    // 属性从介绍文字实际底部之后排起（不再固定 y，长介绍不会压住第一段）
+    let cursor = Math.max(138, P.desc.y + P.desc.height + 14)
+
+    // 分级子标签（角色）：在介绍下方排一行 Lv 芯片；选中项高亮，用其对应等级的属性行
+    const lvls = e.levels
+    if (lvls && lvls.length > 0) {
+      const sel = Math.min(this.levelSel, lvls.length - 1)
+      let cx = 28
+      P.levelTabs.forEach((t, i) => {
+        if (i >= lvls.length) {
+          t.setVisible(false)
+          return
+        }
+        const on = i === sel
+        t.setText(lvls[i]!.label)
+          .setPosition(cx, cursor)
+          .setColor(on ? '#25262e' : '#dcdce4')
+          .setBackgroundColor(on ? '#ffd54f' : '#00000055')
+          .setVisible(true)
+        cx += t.width + 10
+      })
+      cursor += 46
+    } else {
+      for (const t of P.levelTabs) t.setVisible(false)
+    }
+
     // 属性行分段：◆ 标题 + 后续内容合并为一个多行 Text（少量对象、单次光栅化）
+    const lines = lvls && lvls.length > 0 ? lvls[Math.min(this.levelSel, lvls.length - 1)]!.lines : e.lines
     const segments: { title: string; body: string[] }[] = []
-    for (const line of e.lines) {
+    for (const line of lines) {
       if (line.startsWith('◆')) segments.push({ title: line, body: [] })
       else if (segments.length === 0) segments.push({ title: '', body: [line] })
       else segments[segments.length - 1]!.body.push(line)
     }
-    // 属性从介绍文字实际底部之后排起（不再固定 y，长介绍不会压住第一段）
-    let cursor = Math.max(138, P.desc.y + P.desc.height + 14)
     const used = Math.max(segments.length, P.sections.length)
     for (let i = 0; i < used; i++) {
       const seg = segments[i]
@@ -510,6 +573,7 @@ export class WikiScene extends Phaser.Scene {
     ))
     grid.onTap = (cp): void => {
       this.allSelected = cp
+      this.levelSel = 0
       grid.setSelected(cp)
       this.renderAllDetail()
       this.reportWiki()
