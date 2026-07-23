@@ -11,6 +11,9 @@ import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaSc
 /** 定距风筝的站位滞回带（避免恰好卡在 standoffDist 上抖动） */
 const STANDOFF_BAND = 0.5 * UNIT
 
+/** 偷币鼠吞币冷却（ms）：短，但保证一枚一枚地偷，不会一帧扫光一堆 */
+const COINTHIEF_EAT_CD = 650
+
 // 敌人移动策略注册表：按 def.locomotion.kind 分发，镜像 abilities/create.ts。
 // 每个策略只负责逐帧速度决策与状态机推进；攻击在 enemyAbilities.ts、
 // 死亡效果在 battle/deathEffects.ts、公共帧留守 BaseArenaScene.steerEnemies。
@@ -145,7 +148,7 @@ const flee: Steerer = ({ scene, a, body, slow, target }) => {
   }
 }
 
-const coinThief: Steerer = ({ scene, a, body, slow }) => {
+const coinThief: Steerer = ({ scene, a, body, slow, now }) => {
   const def = a.def
   const e = a.image
   // 直奔最近的金币；没金币就慢速游荡
@@ -162,9 +165,15 @@ const coinThief: Steerer = ({ scene, a, body, slow }) => {
   }
   if (coin) {
     const eatR = def.radius + PICKUPS.coin.radius * UNIT
-    if (bestD <= eatR * eatR) {
+    const onCoin = bestD <= eatR * eatR
+    // 偷币要过冷却：贴到金币也得等 COINTHIEF_EAT_CD 才吞一枚，不能一帧扫光一堆
+    if (onCoin && now >= a.nextEatAt) {
       releasePooled(coin)
       a.eaten += 1
+      a.nextEatAt = now + COINTHIEF_EAT_CD
+    } else if (onCoin) {
+      // 贴着金币但在偷币冷却中：原地守着等下一口
+      body.setVelocity(0, 0)
     } else {
       const d = scene.worldDelta(e, coin)
       const dir = norm(d.x, d.y)

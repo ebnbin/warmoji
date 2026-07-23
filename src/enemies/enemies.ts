@@ -51,6 +51,8 @@ export interface Enemy {
   kvy: number
   /** 偷币鼠吃下的金币数 */
   eaten: number
+  /** 偷币鼠下一次可吃金币的时刻（偷币冷却，防一帧扫光一片） */
+  nextEatAt: number
   /** 亡语替身：无伤害/无行为的诱饵尸壳（接触不伤人，专供吸引火力） */
   decoy: boolean
   /** 属主（巢）：护巢子敌指向生成自己的巢——绕巢/护巢的锚点 + 计入本巢在场上限。
@@ -104,6 +106,7 @@ export function attachEnemy(image: ImageObj, def: EnemyDef, hp: number, init?: P
     kvx: 0,
     kvy: 0,
     eaten: 0,
+    nextEatAt: 0,
     decoy: false,
     despawnAt: 0,
     ph: 0,

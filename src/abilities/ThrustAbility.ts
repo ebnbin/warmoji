@@ -52,16 +52,22 @@ export class ThrustAbility implements AbilityRuntime {
 
     if (this.cooldown > 0) return
     const targets = this.ctx.targets()
-    if (nearestAngle(owner, targets) === null) return
+    // 侦测门槛：射程内无敌人就不出手（不空刺）——上限 = 突刺长度 + 判定半径
+    if (nearestAngle(owner, targets, this.range()) === null) return
     this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
     this.strike(owner)
     if (this.def.combo) this.comboIn = this.def.combo.delayMs
   }
 
+  /** 攻击索敌上限（像素）：只打得到射程内的敌人才挥 */
+  private range(): number {
+    return this.def.reach + this.def.hitRadius
+  }
+
   /** 单段突刺：索敌 → 胶囊判定 → 终点震波（能力）→ 挥出动画 */
   private strike(owner: AbilityOwner): void {
     const targets = this.ctx.targets()
-    const aim = nearestAngle(owner, targets)
+    const aim = nearestAngle(owner, targets, this.range())
     if (aim === null) return
     this.aim = aim
 

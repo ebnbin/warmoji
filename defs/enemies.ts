@@ -285,9 +285,10 @@ export const CREEPER: EnemyDef = {
   coins: 4,
   locomotion: {
     kind: 'detonate',
-    triggerRange: 1.6,
+    // 触发距离与爆炸半径都调大：贴脸才炸→提前进圈就蓄力，爆开范围更唬人（更难躲）
+    triggerRange: 2.6,
     windupMs: 800,
-    blastRadius: 2.6,
+    blastRadius: 3.8,
     blastDamage: 32,
     knockback: 5,
   },

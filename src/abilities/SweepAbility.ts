@@ -34,7 +34,8 @@ export class SweepAbility implements AbilityRuntime {
 
     if (this.cooldown > 0) return
     const targets = this.ctx.targets()
-    const aim = nearestAngle(owner, targets)
+    // 侦测门槛：扇形半径内无敌人就不出手（不空挥）
+    const aim = nearestAngle(owner, targets, this.def.radius)
     if (aim === null) return
     this.aim = aim
     this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
