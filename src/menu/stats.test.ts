@@ -13,7 +13,7 @@ describe('角色属性面板模型', () => {
       const groups = characterStatGroups(id)
       expect(groups).toHaveLength(2 + CHARACTERS[id].carriers.length)
       expect(groups[0]!.title).toBe('基础')
-      expect(groups[1]!.title).toContain('专属升级')
+      expect(groups[1]!.title).toContain('升级路径')
       for (const g of groups) {
         expect(g.icon.length).toBeGreaterThan(0)
         expect(g.title.length).toBeGreaterThan(0)
@@ -23,15 +23,15 @@ describe('角色属性面板模型', () => {
     }
   })
 
-  it('专属升级组：无卡标注未解锁，持一阶解锁第一条，双卡全解锁', () => {
-    const locked = characterStatGroups('troll', [])[1]!
-    expect(locked.lines[0]).toContain('未解锁')
-    expect(locked.lines[1]).toContain('未解锁')
-    const t1 = characterStatGroups('troll', ['upgradeTroll1'])[1]!
-    expect(t1.lines[0]).not.toContain('未解锁')
-    expect(t1.lines[1]).toContain('未解锁')
-    const t2 = characterStatGroups('troll', ['upgradeTroll1', 'upgradeTroll2'])[1]!
-    for (const line of t2.lines) expect(line).not.toContain('未解锁')
+  it('升级路径组：未达等级标注解锁条件，达到即标已获得', () => {
+    const l1 = characterStatGroups('troll', [], 1)[1]!
+    expect(l1.lines[0]).toContain('Lv2 解锁')
+    expect(l1.lines[1]).toContain('Lv3 解锁')
+    const l2 = characterStatGroups('troll', [], 2)[1]!
+    expect(l2.lines[0]).toContain('✓已获得')
+    expect(l2.lines[1]).toContain('Lv3 解锁')
+    const l3 = characterStatGroups('troll', [], 3)[1]!
+    for (const line of l3.lines) expect(line).toContain('✓已获得')
   })
 
   it('能力组标题含名称与类型标签；双持两把名称可区分', () => {
@@ -41,11 +41,11 @@ describe('角色属性面板模型', () => {
     expect(characterStatGroups('mage')[2]!.title).toBe('奥术轰炸（轰炸）')
   })
 
-  it('能力注入反映在能力展示：巨魔持一阶卡弧宽变 360°', () => {
-    const bare = characterStatGroups('troll', [])[2]!
-    const carded = characterStatGroups('troll', ['upgradeTroll1'])[2]!
+  it('能力注入反映在能力展示：巨魔 2 级弧宽变 360°', () => {
+    const bare = characterStatGroups('troll', [], 1)[2]!
+    const leveled = characterStatGroups('troll', [], 2)[2]!
     expect(bare.lines[1]).toContain('弧宽 150°')
-    expect(carded.lines[1]).toContain('弧宽 360°')
+    expect(leveled.lines[1]).toContain('弧宽 360°')
   })
 
   it('数值换算：px→格、ms→秒、弧度→角度', () => {

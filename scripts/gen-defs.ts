@@ -246,15 +246,12 @@ for (const [kind, e] of Object.entries(ENEMIES)) {
   pure(`enemies.${kind}`, e)
 }
 // ── items ──
-const characterIds = new Set(Object.keys(CHARACTERS))
 for (const [id, it] of Object.entries<ItemDef>(ITEMS as Record<string, ItemDef>)) {
   const p = `items.${id}`
   str(`${p}.emoji`, it.emoji)
   str(`${p}.name`, it.name)
   num(`${p}.price`, it.price, 1)
-  if (it.forCharacter !== undefined && !characterIds.has(it.forCharacter)) {
-    bad(p, `forCharacter 引用了不存在的角色：${it.forCharacter}`)
-  }
+  num(`${p}.upgradeXp`, it.upgradeXp, 1)
   pure(p, it)
 }
 

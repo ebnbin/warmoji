@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { CHARACTERS } from '../characters/registry'
 import { ITEMS, RARITIES, itemPrice } from '../items/registry'
 import { chestTargets } from '../pickups/chest'
+import { characterLevel } from '../run/charLevel'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -86,7 +87,12 @@ export class ChestScene extends Phaser.Scene {
 
     const itemId = this.run.chests[0]!
     const item = ITEMS[itemId]
-    this.targets = chestTargets(this.run.roster, this.run.memberItems, itemId)
+    this.targets = chestTargets(
+      this.run.roster,
+      this.run.memberItems,
+      this.run.memberXp.map(characterLevel),
+      itemId,
+    )
     const refund = Math.floor(itemPrice(itemId, this.run.wave) / 2)
 
     this.add

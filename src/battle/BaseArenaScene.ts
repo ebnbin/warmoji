@@ -53,12 +53,13 @@ import type { OrbitThreat } from '../characters/orbit'
 import { browserStorage } from '../core/storage'
 import { chestDropped } from '../pickups/chest'
 import {
-  upgradeTiers,
   aggregateCharacterEffects,
   foldTeamEffects,
   CRIT_MUL,
   resolveAbilityDef,
 } from '../items/registry'
+import { characterLevel, tiersForLevel } from '../run/charLevel'
+import { levelStatsFor } from '../characters/levels'
 import type { TeamEffects } from '../items/registry'
 import { currentFormation, getRun, guardOrder, hasCenter, promoteStep, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
@@ -72,7 +73,7 @@ import { isWithinActive } from '../maps/world'
 import { norm } from '../core/vec'
 import type { Point } from '../core/vec'
 import { ANIM_DEF } from '../emoji/studio'
-import { isBossWave, isEliteWave, isFinalWave, waveAt, waveDurationMs } from '../run/waves'
+import { isBossWave, isEliteWave, isFinalWave, waveAt, waveDurationMs, killCoinScale, waveCoinStipend } from '../run/waves'
 import { gainXp, waveBonusXp, xpToNext } from '../run/xp'
 import { Animator } from '../emoji/animator'
 import { clipFramesLive } from '../emoji/animTextures'
@@ -893,6 +894,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       }
     }
     if (this.teamFx.waveCoins > 0) this.run.coins += this.teamFx.waveCoins
+    // 金币压平：波末保底津贴（前期托底，随波递减到 0）
+    this.run.coins += waveCoinStipend(this.run.wave)
     this.run.combatMs += this.elapsedMs
     this.run.wave += 1
     this.run.memberHp = this.members.map((m) => (m.alive ? Math.round(m.hp) : 0))
@@ -965,11 +968,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效能力参数；
     // 专属升级来自已购的角色专属升级卡（测试模式无道具 = 素体）
     const owned = this.testMode ? [] : (this.run.memberItems[slot] ?? [])
-    const fx = aggregateCharacterEffects(owned)
-    // 测试模式：档位由「角色等级」旋钮统一给定（免买卡）；正常局按已购升级卡推导
-    const tiers = this.testMode
-      ? { u1: labLevel() >= 1, u2: labLevel() >= 2 }
-      : upgradeTiers(id, owned)
+    // 角色等级：测试模式由「角色等级」旋钮给定（labLevel 0/1/2 → 1/2/3 级）；
+    // 正常局由该角色累计的专属经验推导。等级同时决定能力档位与基础属性质变。
+    const level = this.testMode ? labLevel() + 1 : characterLevel(this.run.memberXp[slot] ?? 0)
+    const fx = aggregateCharacterEffects(owned, levelStatsFor(id, level))
+    const tiers = tiersForLevel(level)
     const memberCtx: AbilityContext = {
       ...this.abilityCtx,
       damageMul: () =>
@@ -1538,7 +1541,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       CAPTAINS[this.run.captainId].xpGainMul * this.teamFx.xpGainMul * (elite ? ELITE.xpMul : 1)
     this.gainTeamXp(Math.round(def.xp * xpMul))
     const eaten = a.eaten
-    const baseCoins = def.coins * (elite ? ELITE.coinsMul : 1)
+    // 金币压平：每杀金币随累计战斗时长衰减（压后期滚雪球），保底 1
+    const coinScale = killCoinScale((this.run.combatMs + this.elapsedMs) / 1000)
+    const baseCoins = Math.max(1, Math.round(def.coins * (elite ? ELITE.coinsMul : 1) * coinScale))
     const doubled = this.rng.next() < this.teamFx.doubleCoinChance ? baseCoins : 0
     spawnCoins(this, enemy.x, enemy.y, baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0))
     if (!this.testMode && !a.boss && chestDropped(elite, () => this.rng.next(), this.teamFx.chestChanceMul)) {

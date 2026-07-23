@@ -1,26 +1,9 @@
-import { CHARACTERS, characterCard } from './characters.ts'
-import type { CharacterId } from '../src/characters/registry'
 import type { ItemDef } from '../src/items/registry'
 
-// 创作层（不进运行时 bundle）：道具数据行；升级卡文案在生成时从角色载体的
-// 档位派生（多载体同档去重）。生成 src/assets/items.json。
-
-/** 角色专属升级卡条目（文案/图标取自角色该档升级卡） */
-function upgradeCard(cid: CharacterId, index: 0 | 1, price: number): ItemDef {
-  const a = characterCard(CHARACTERS[cid], index)
-  return {
-    emoji: a.icon,
-    name: a.name,
-    desc: a.desc,
-    rarity: index === 0 ? 'rare' : 'epic',
-    price,
-    maxStacks: 1,
-    pool: 'upgrade',
-    forCharacter: cid,
-    abilityIndex: index,
-    effects: {},
-  }
-}
+// 创作层（不进运行时 bundle）：道具数据行。角色质变不再靠买升级卡——每张卡自带
+// upgradeXp（购买即给该角色累加专属经验，攒满档位自动质变）。高端货可设 minLevel
+// （仅高等级角色形态才上架）。生成 src/assets/items.json。
+// upgradeXp 与稀有度/价格松相关但逐卡微调：普通 ~10-15、稀有 ~24-28、史诗 ~52-56。
 
 export const ITEMS = {
   // ── 通用池 · 普通（15~35）──
@@ -31,6 +14,7 @@ export const ITEMS = {
     rarity: 'common',
     price: 15,
     pool: 'all',
+    upgradeXp: 10,
     effects: { hpAdd: 25 },
   },
   shellArmor: {
@@ -41,6 +25,7 @@ export const ITEMS = {
     price: 20,
     maxStacks: 3,
     pool: 'all',
+    upgradeXp: 12,
     effects: { hpAdd: 60, cooldownMul: 1.1 },
   },
   stimulant: {
@@ -51,6 +36,7 @@ export const ITEMS = {
     price: 25,
     maxStacks: 5,
     pool: 'all',
+    upgradeXp: 13,
     effects: { cooldownMul: 0.87, hpAdd: -10 },
   },
   whetstone: {
@@ -60,6 +46,7 @@ export const ITEMS = {
     rarity: 'common',
     price: 25,
     pool: 'all',
+    upgradeXp: 13,
     effects: { damageMul: 1.12 },
   },
   rageBracer: {
@@ -70,6 +57,7 @@ export const ITEMS = {
     price: 30,
     maxStacks: 3,
     pool: 'all',
+    upgradeXp: 15,
     effects: { damageMul: 1.25, hpAdd: -20 },
   },
   padHelmet: {
@@ -80,6 +68,7 @@ export const ITEMS = {
     price: 18,
     maxStacks: 3,
     pool: 'all',
+    upgradeXp: 11,
     effects: { iframesAddMs: 150 },
   },
   reviveWatch: {
@@ -90,6 +79,7 @@ export const ITEMS = {
     price: 22,
     maxStacks: 3,
     pool: 'all',
+    upgradeXp: 12,
     effects: { reviveAddMs: -2000 },
   },
   // ── 通用池 · 稀有（40~55）──
@@ -101,6 +91,7 @@ export const ITEMS = {
     price: 45,
     maxStacks: 3,
     pool: 'all',
+    upgradeXp: 26,
     effects: { regenPerSec: 2 },
   },
   thornVest: {
@@ -111,6 +102,7 @@ export const ITEMS = {
     price: 45,
     maxStacks: 3,
     pool: 'all',
+    upgradeXp: 26,
     effects: { thorns: 14 },
   },
   vampFang: {
@@ -121,6 +113,7 @@ export const ITEMS = {
     price: 50,
     maxStacks: 2,
     pool: 'all',
+    upgradeXp: 28,
     effects: { killHeal: 3 },
   },
   hammerWeight: {
@@ -131,9 +124,10 @@ export const ITEMS = {
     price: 40,
     maxStacks: 2,
     pool: 'all',
+    upgradeXp: 24,
     effects: { knockbackMul: 1.35 },
   },
-  // ── 通用池 · 史诗（90~130）──
+  // ── 通用池 · 史诗（90~130；minLevel 高端货，需升级解锁）──
   fateDice: {
     emoji: '1f3b2',
     name: '命运骰子',
@@ -142,6 +136,8 @@ export const ITEMS = {
     price: 95,
     maxStacks: 2,
     pool: 'all',
+    upgradeXp: 55,
+    minLevel: 2,
     effects: { critChance: 0.2 },
   },
   giantHeart: {
@@ -152,6 +148,8 @@ export const ITEMS = {
     price: 90,
     maxStacks: 2,
     pool: 'all',
+    upgradeXp: 52,
+    minLevel: 3,
     effects: { hpAdd: 150 },
   },
   phaseCloak: {
@@ -162,6 +160,8 @@ export const ITEMS = {
     price: 100,
     maxStacks: 2,
     pool: 'all',
+    upgradeXp: 56,
+    minLevel: 2,
     effects: { iframesAddMs: 400 },
   },
   // ── 能力形态专属池（普通） ──
@@ -173,6 +173,7 @@ export const ITEMS = {
     price: 25,
     maxStacks: 3,
     pool: 'areaBlast',
+    upgradeXp: 12,
     effects: { rangeMul: 1.2 },
   },
   scope: {
@@ -183,6 +184,7 @@ export const ITEMS = {
     price: 20,
     maxStacks: 2,
     pool: 'projectile',
+    upgradeXp: 11,
     effects: { projSpeedMul: 1.25 },
   },
   powerCell: {
@@ -193,6 +195,7 @@ export const ITEMS = {
     price: 22,
     maxStacks: 3,
     pool: 'laser',
+    upgradeXp: 11,
     effects: { rangeMul: 1.2 },
   },
   longHaft: {
@@ -203,6 +206,7 @@ export const ITEMS = {
     price: 22,
     maxStacks: 3,
     pool: 'sweep',
+    upgradeXp: 12,
     effects: { rangeMul: 1.15, cooldownMul: 1.05 },
   },
   lance: {
@@ -213,6 +217,7 @@ export const ITEMS = {
     price: 20,
     maxStacks: 3,
     pool: 'thrust',
+    upgradeXp: 11,
     effects: { rangeMul: 1.2 },
   },
   returnString: {
@@ -223,6 +228,7 @@ export const ITEMS = {
     price: 20,
     maxStacks: 3,
     pool: 'boomerang',
+    upgradeXp: 11,
     effects: { rangeMul: 1.2 },
   },
   frostCore: {
@@ -233,36 +239,9 @@ export const ITEMS = {
     price: 24,
     maxStacks: 3,
     pool: 'slowAura',
+    upgradeXp: 12,
     effects: { rangeMul: 1.2 },
   },
-  // 团队增益已从「队长道具」迁移到经验升级卡（见 cards/registry.ts），商店只卖角色装备
-  // ── 角色专属升级卡（一阶 稀有 / 二阶 史诗；价格高一档，质变值这个价）──
-  upgradeJuggler1: upgradeCard('juggler', 0, 80),
-  upgradeJuggler2: upgradeCard('juggler', 1, 150),
-  upgradeUnicorn1: upgradeCard('unicorn', 0, 80),
-  upgradeUnicorn2: upgradeCard('unicorn', 1, 150),
-  upgradeTroll1: upgradeCard('troll', 0, 80),
-  upgradeTroll2: upgradeCard('troll', 1, 150),
-  upgradeCowboy1: upgradeCard('cowboy', 0, 80),
-  upgradeCowboy2: upgradeCard('cowboy', 1, 150),
-  upgradeMage1: upgradeCard('mage', 0, 80),
-  upgradeMage2: upgradeCard('mage', 1, 150),
-  upgradeKangaroo1: upgradeCard('kangaroo', 0, 80),
-  upgradeKangaroo2: upgradeCard('kangaroo', 1, 150),
-  upgradeRobot1: upgradeCard('robot', 0, 80),
-  upgradeRobot2: upgradeCard('robot', 1, 150),
-  upgradeSnowman1: upgradeCard('snowman', 0, 80),
-  upgradeSnowman2: upgradeCard('snowman', 1, 150),
-  upgradeFairy1: upgradeCard('fairy', 0, 80),
-  upgradeFairy2: upgradeCard('fairy', 1, 150),
-  upgradeAssassin1: upgradeCard('assassin', 0, 80),
-  upgradeAssassin2: upgradeCard('assassin', 1, 150),
-  upgradeBeaver1: upgradeCard('beaver', 0, 80),
-  upgradeBeaver2: upgradeCard('beaver', 1, 150),
-  upgradeQueenBee1: upgradeCard('queenBee', 0, 80),
-  upgradeQueenBee2: upgradeCard('queenBee', 1, 150),
-  upgradeMedic1: upgradeCard('medic', 0, 80),
-  upgradeMedic2: upgradeCard('medic', 1, 150),
-  upgradeJellyfish1: upgradeCard('jellyfish', 0, 80),
-  upgradeJellyfish2: upgradeCard('jellyfish', 1, 150),
+  // 团队增益在经验升级卡（cards/registry.ts）；角色质变靠专属经验（每卡 upgradeXp）自动升级，
+  // 商店只卖角色装备、不再出售升级卡
 } as const satisfies Record<string, ItemDef>

@@ -1,17 +1,16 @@
 import itemsJson from '../assets/items.json'
-import { baseLoadout } from '../characters/registry'
-import type { UpgradeTiers } from '../characters/registry'
-import type { CharacterId, CharacterDef } from '../characters/registry'
+import { loadoutFor } from '../characters/registry'
+import type { UpgradeTiers, CharacterDef } from '../characters/registry'
 import type { AbilityDef } from '../abilities/defs'
 
 // 道具 = 一组属性修正（可带负面副作用，数值上保证净增益）。
 // 只开放少量通用属性轴，不逐能力参数开洞；乘法轴叠乘、加法轴叠加。
-// 池归属用 tag：'all' 进所有角色池，能力 kind 进对应角色池（按配装自动推导），
-// 'team' 进队长池，'upgrade' 为角色专属升级卡（只进 forCharacter 的池）。
-// 稀有度三档：越稀有越贵（价格档严格递增，金币后期才买得起大件），
-// 上架时先按波次权重抽稀有度档、再在档内均匀抽取——前期以普通为主，史诗第 5 波起解锁。
-// 升级卡是角色质变的唯一来源：一阶卡要求先给该角色买过几张普通道具
-//（UPGRADE_GATE），二阶卡要求已持有一阶卡——升阶节奏由此涌现。
+// 池归属用 tag：'all' 进所有角色池，能力 kind 进对应角色池（按配装自动推导）。
+// 稀有度三档：越稀有越贵（价格档严格递增，金币后期才买得起大件）。
+// 角色质变不再花钱买升级卡：每张道具自带「角色经验值」（upgradeXp），为某角色
+// 购买道具即累加它的专属经验，攒满档位自动免费升级（换整套能力 + 基础属性质变）。
+// 每个角色等级是独立形态：拥有各自的道具池（characterPoolFor）与稀有度概率
+//（rarityWeights 按等级抬升），越高级越能刷出高端货。
 
 export interface CharacterEffects {
   hpAdd: number
@@ -101,14 +100,19 @@ export const RARITIES: Record<ItemRarity, { label: string; color: string }> = {
   epic: { label: '史诗', color: '#ce93d8' },
 }
 
-/** 上架稀有度权重：随波次向稀有倾斜；史诗第 5 波起解锁，两档各有封顶 */
-export function rarityWeights(wave: number): Record<ItemRarity, number> {
-  const rare = Math.min(0.3, 0.06 + 0.02 * wave)
-  const epic = wave < 5 ? 0 : Math.min(0.2, 0.025 * (wave - 4))
-  return { common: 1 - rare - epic, rare, epic }
+/** 上架稀有度权重：随波次向稀有倾斜 + 随「角色等级」独立抬升——每个等级形态一套
+ * 独立概率，越高级越常刷出稀有/史诗（史诗常规第 5 波起解锁，但 2 级起角色即便早波
+ * 也能刷出）。返回的是相对权重（rollItem 内部归一），无需严格和为 1 */
+export function rarityWeights(wave: number, level = 1): Record<ItemRarity, number> {
+  const lv = Math.max(0, level - 1)
+  const rare = Math.min(0.5, 0.06 + 0.02 * wave + 0.14 * lv)
+  const epicBase = wave < 5 ? 0 : Math.min(0.2, 0.025 * (wave - 4))
+  const epic = Math.min(0.42, epicBase + 0.13 * lv + (lv > 0 ? 0.05 : 0))
+  const common = Math.max(0.05, 1 - rare - epic)
+  return { common, rare, epic }
 }
 
-export type ItemPool = 'all' | 'upgrade' | AbilityDef['kind']
+export type ItemPool = 'all' | AbilityDef['kind']
 
 export interface ItemDef {
   readonly emoji: string
@@ -119,51 +123,31 @@ export interface ItemDef {
   /** 单一持有者的购买上限；缺省无限堆叠 */
   readonly maxStacks?: number
   readonly pool: ItemPool
-  /** 升级卡专属：归属角色 + 档位（0 一阶 / 1 二阶） */
-  readonly forCharacter?: CharacterId
-  readonly abilityIndex?: 0 | 1
+  /** 购买本卡给该角色累加的专属经验点（攒满档位自动质变升级） */
+  readonly upgradeXp: number
+  /** 最低可上架的角色等级（1/2/3，缺省 1）：高等级形态才解锁的高端货 */
+  readonly minLevel?: 1 | 2 | 3
   readonly effects: Partial<CharacterEffects>
 }
-
-/** 升级卡解锁门槛：一阶卡上架前该角色需已购的普通道具数 */
-export const UPGRADE_GATE = { normalsForFirst: 2 } as const
 
 // 道具表：数据行在 defs/items.ts（创作层），npm run gen 生成 items.json
 export type ItemId = keyof typeof itemsJson
 export const ITEMS = itemsJson as unknown as Record<ItemId, ItemDef>
 
-
 export const ITEM_IDS = Object.keys(ITEMS) as readonly ItemId[]
 
-// ── 池推导 ──────────────────────────────────────────────────
+// ── 池推导（每个角色等级一套独立的池 + 概率）──────────────────
 
-/** 角色池 = 通用道具 + 与其能力形态匹配的形态道具 + 自己的两张升级卡 */
-export function characterPool(id: CharacterId, def: CharacterDef): ItemId[] {
-  const kinds = new Set<string>(baseLoadout(def).map((w) => w.kind))
+/** 某等级角色的道具池 = 通用道具 + 匹配该等级能力形态的形态道具，且满足最低等级门槛。
+ * 升级 = 换了整套能力形态 + 解锁更高端的货架，故池随等级独立变化。 */
+export function characterPoolFor(def: CharacterDef, level: number): ItemId[] {
+  const tiers: UpgradeTiers = { u1: level >= 2, u2: level >= 3 }
+  const kinds = new Set<string>(loadoutFor(def, tiers).map((w) => w.kind))
   return ITEM_IDS.filter((iid) => {
     const item: ItemDef = ITEMS[iid]
-    if (item.pool === 'upgrade') return item.forCharacter === id
+    if ((item.minLevel ?? 1) > level) return false
     return item.pool === 'all' || kinds.has(item.pool)
   })
-}
-
-/** 已购道具推导的能力档位（一二阶各最多一张，二阶依赖一阶） */
-export function upgradeTiers(id: CharacterId, owned: readonly ItemId[]): UpgradeTiers {
-  const has = (index: 0 | 1): boolean =>
-    owned.some((iid) => {
-      const item: ItemDef = ITEMS[iid]
-      return item.pool === 'upgrade' && item.forCharacter === id && item.abilityIndex === index
-    })
-  return { u1: has(0), u2: has(1) }
-}
-
-/** 升级卡的上架资格：一阶要求已购普通道具达标，二阶要求已持有一阶 */
-export function upgradeCardAvailable(id: ItemId, owned: readonly ItemId[]): boolean {
-  const item: ItemDef = ITEMS[id]
-  if (item.pool !== 'upgrade' || item.forCharacter === undefined) return true
-  if (item.abilityIndex === 1) return upgradeTiers(item.forCharacter, owned).u1
-  const normals = owned.filter((iid) => (ITEMS[iid] as ItemDef).pool !== 'upgrade').length
-  return normals >= UPGRADE_GATE.normalsForFirst
 }
 
 // ── 持有与购买 ──────────────────────────────────────────────
@@ -185,10 +169,11 @@ export function rollItem(
   owned: readonly ItemId[],
   rand: () => number,
   wave = 1,
+  level = 1,
 ): ItemId | null {
-  const avail = pool.filter((id) => !reachedStackLimit(owned, id) && upgradeCardAvailable(id, owned))
+  const avail = pool.filter((id) => !reachedStackLimit(owned, id))
   if (avail.length === 0) return null
-  const weights = rarityWeights(wave)
+  const weights = rarityWeights(wave, level)
   const buckets = RARITY_ORDER.map((r) => ({
     items: avail.filter((id) => ITEMS[id].rarity === r),
     w: weights[r],
@@ -220,7 +205,12 @@ export function itemPrice(id: ItemId, wave: number): number {
 
 // ── 效果叠加 ────────────────────────────────────────────────
 
-export function aggregateCharacterEffects(owned: readonly ItemId[]): CharacterEffects {
+/** 聚合角色有效属性：已购道具 effects + 额外片段（如「角色等级形态」的基础属性质变）。
+ * 乘区相乘、加区相加，暴击封顶。extra 让升级的基础属性质变与道具走同一条叠加管线 */
+export function aggregateCharacterEffects(
+  owned: readonly ItemId[],
+  extra: readonly Partial<CharacterEffects>[] = [],
+): CharacterEffects {
   const fx: CharacterEffects = {
     hpAdd: 0,
     damageMul: 1,
@@ -235,8 +225,7 @@ export function aggregateCharacterEffects(owned: readonly ItemId[]): CharacterEf
     critChance: 0,
     knockbackMul: 1,
   }
-  for (const id of owned) {
-    const e = ITEMS[id].effects as Partial<CharacterEffects>
+  const apply = (e: Partial<CharacterEffects>): void => {
     fx.hpAdd += e.hpAdd ?? 0
     fx.damageMul *= e.damageMul ?? 1
     fx.cooldownMul *= e.cooldownMul ?? 1
@@ -250,6 +239,8 @@ export function aggregateCharacterEffects(owned: readonly ItemId[]): CharacterEf
     fx.critChance += e.critChance ?? 0
     fx.knockbackMul *= e.knockbackMul ?? 1
   }
+  for (const id of owned) apply(ITEMS[id].effects)
+  for (const e of extra) apply(e)
   fx.critChance = Math.min(0.5, fx.critChance)
   return fx
 }

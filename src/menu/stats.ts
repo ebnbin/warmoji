@@ -3,7 +3,9 @@ import { memberMaxHp } from '../characters/stats'
 import { CHARACTERS, MEMBER, TEAM, loadoutFor, upgradeCardsFor } from '../characters/registry'
 import type { CaptainDef } from '../captains/registry'
 import type { CharacterId } from '../characters/registry'
-import { upgradeTiers, aggregateCharacterEffects, resolveAbilityDef } from '../items/registry'
+import { aggregateCharacterEffects, resolveAbilityDef } from '../items/registry'
+import { tiersForLevel } from '../run/charLevel'
+import { levelStatsFor } from '../characters/levels'
 import type { ItemId } from '../items/registry'
 import type { AbilityDef } from '../abilities/defs'
 
@@ -120,10 +122,14 @@ export function abilityStatLines(w: AbilityDef): string[] {
 
 /** 角色面板：数值为道具修正后的生效值（伤害/冷却在展示层套倍率），
  * 能力行数取「能力注入后」的生效 def（如全周横扫的 360° 弧宽）+ 专属升级组 */
-export function characterStatGroups(id: CharacterId, items: readonly ItemId[] = []): StatGroup[] {
+export function characterStatGroups(
+  id: CharacterId,
+  items: readonly ItemId[] = [],
+  level = 1,
+): StatGroup[] {
   const def = CHARACTERS[id]
-  const fx = aggregateCharacterEffects(items)
-  const tiers = upgradeTiers(id, items)
+  const fx = aggregateCharacterEffects(items, levelStatsFor(id, level))
+  const tiers = tiersForLevel(level)
   const loadout = loadoutFor(def, tiers)
   const dmgMul = fx.damageMul
   const cdMul = fx.cooldownMul
@@ -144,10 +150,11 @@ export function characterStatGroups(id: CharacterId, items: readonly ItemId[] = 
     },
     {
       icon: '2b50',
-      title: '专属升级（商店专属卡解锁）',
+      title: `升级路径（当前 ${level} 级 · 角色经验自动解锁）`,
       lines: upgradeCardsFor(def).map((card, i) => {
-        const unlocked = i === 0 ? tiers.u1 : tiers.u2
-        return `「${card.name}」${card.desc}${unlocked ? '' : '（未解锁）'}`
+        const atLevel = i + 2
+        const reached = level >= atLevel
+        return `Lv${atLevel}「${card.name}」${card.desc}${reached ? ' ✓已获得' : `（Lv${atLevel} 解锁）`}`
       }),
     },
     // 攻击来源逐载体展示：名字/图标取自载体（武器/徒手能力），数值取该载体当前档位能力

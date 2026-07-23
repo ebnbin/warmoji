@@ -49,6 +49,9 @@ export interface RunState {
   memberHp: number[]
   /** 按槽位的已购道具（重复 = 堆叠） */
   memberItems: ItemId[][]
+  /** 按槽位的角色专属经验：商店为该角色买道具即累加（每卡 upgradeXp），攒满档位
+   * 自动质变升级。与团队战斗经验（xp/cardDraws）完全独立；只增不减、跨波持久 */
+  memberXp: number[]
   /** 战斗中拾取、尚未开启的宝箱：每个存一件掉落时抽定的道具（对玩家保密到开箱），
    * 战斗结束后在开箱页由玩家逐个决定归属或丢弃返半价，开完才进招募/商店 */
   chests: ItemId[]
@@ -106,6 +109,7 @@ export function beginRun(
     roster,
     memberHp: roster.map(() => MEMBER.maxHp),
     memberItems: roster.map(() => []),
+    memberXp: roster.map(() => 0),
     chests: [],
     freeRefreshes: 0,
     // 开局 CD 即就绪：首放只卡在挣第一颗豆上
@@ -172,6 +176,7 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   run.roster.push(id)
   run.memberHp.push(MEMBER.maxHp)
   run.memberItems.push([])
+  run.memberXp.push(0)
   run.stats.damage.push(0)
   run.stats.kills.push(0)
   run.stats.deaths.push(0)

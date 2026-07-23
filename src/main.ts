@@ -28,6 +28,7 @@ import { spawnFieldPickup } from './battlefield/battlefield'
 import { FIELD_PICKUPS, fieldPickupsFor } from './battlefield/registry'
 import type { Polarity } from './battlefield/registry'
 import { rollChestLoot } from './pickups/chest'
+import { characterLevel } from './run/charLevel'
 import type { ItemId } from './items/registry'
 import { UNIT } from './core/units'
 import type { BaseArenaScene } from './battle/BaseArenaScene'
@@ -137,8 +138,18 @@ window.__addChest = (itemId?: string): void => {
     run.chests.push(itemId as ItemId)
     return
   }
-  const loot = rollChestLoot(run.roster, run.memberItems, () => Math.random())
+  const loot = rollChestLoot(
+    run.roster,
+    run.memberItems,
+    run.memberXp.map(characterLevel),
+    () => Math.random(),
+  )
   if (loot) run.chests.push(loot.itemId)
+}
+// e2e：给某槽位角色加专属经验（推动质变升级；默认槽位 0）
+window.__addCharXp = (amount: number, slot = 0): void => {
+  const run = getRun()
+  if (slot >= 0 && slot < run.memberXp.length) run.memberXp[slot]! += amount
 }
 // e2e 快进到指定波（在商店/整编期间调用，下次开战即该波）
 window.__setWave = (n: number): void => {

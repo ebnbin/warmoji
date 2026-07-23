@@ -33,6 +33,9 @@ interface WarmojiShopDebug {
   focusedId: string
   freeRefreshes: number
   level: number
+  /** 聚焦角色的专属等级（1/2/3）与累计经验 */
+  focusedLevel: number
+  focusedXp: number
   slots: {
     id: string
     x: number
@@ -42,6 +45,8 @@ interface WarmojiShopDebug {
     offer: string | null
     price: number | null
     owned: number
+    /** 该角色专属等级（1/2/3） */
+    level: number
   }[]
   buy: { x: number; y: number; w: number; h: number; enabled: boolean }
   refresh: { x: number; y: number; w: number; h: number; enabled: boolean }
@@ -232,6 +237,7 @@ interface Window {
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
   __addChest?: (itemId?: string) => void
+  __addCharXp?: (amount: number, slot?: number) => void
   __setWave?: (n: number) => void
   __spawnEnemy?: (kind: string, dxU?: number, dyU?: number) => void
   __spawnArmedEnemy?: (abilityId: string, dxU?: number, dyU?: number) => void

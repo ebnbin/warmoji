@@ -129,13 +129,7 @@ export function wikiGroups(): WikiGroup[] {
         desc: i.desc,
         lines: [
           `${RARITIES[i.rarity].label} · 价格 ${i.price} 金币 · ${i.maxStacks === undefined ? '无限堆叠' : `上限 ${i.maxStacks} 件`}`,
-          `池归属 ${
-            i.pool === 'all'
-              ? '通用'
-              : i.pool === 'upgrade'
-                ? `${i.forCharacter ? CHARACTERS[i.forCharacter].name : ''}专属升级卡`
-                : ABILITY_KIND_LABEL[i.pool]
-          }`,
+          `池归属 ${i.pool === 'all' ? '通用' : ABILITY_KIND_LABEL[i.pool]} · 角色经验 +${i.upgradeXp}${i.minLevel && i.minLevel > 1 ? ` · ${i.minLevel} 级解锁` : ''}`,
         ],
       })),
     },
@@ -157,9 +151,12 @@ export function wikiEntryByEmoji(): Map<string, { category: string; entry: WikiE
 export function usedEmojiSet(): Set<string> {
   const used = new Set<string>()
   for (const g of wikiGroups()) for (const e of g.entries) used.add(e.emoji)
-  // 图鉴条目之外的战斗实体：载体图标（武器/徒手能力，角色详情展示）+ 持有物/弹体
+  // 图鉴条目之外的战斗实体：载体图标（武器/徒手能力）+ 各档升级卡图标（升级路径/升级弹窗展示）+ 持有物/弹体
   for (const c of Object.values(CHARACTERS)) {
-    for (const carrier of c.carriers) used.add(carrier.icon)
+    for (const carrier of c.carriers) {
+      used.add(carrier.icon)
+      for (const card of carrier.cards) if (card) used.add(card.icon)
+    }
     for (const w of baseLoadout(c)) {
       if ('held' in w && w.held) used.add(w.held.emoji)
       if (w.kind === 'projectile') used.add(w.projectile.emoji)

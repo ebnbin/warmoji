@@ -7,14 +7,17 @@ import { SHOP } from '../items/registry'
 import { PICKUPS } from '../pickups/registry'
 import {
   aggregateCharacterEffects,
-  characterPool,
+  characterPoolFor,
   ITEMS,
   RARITIES,
   rollItem,
   itemPrice,
   stackCount,
 } from '../items/registry'
-import type { ItemId, ItemDef } from '../items/registry'
+import type { ItemId, ItemDef, CharacterEffects } from '../items/registry'
+import { characterLevel, levelProgress } from '../run/charLevel'
+import { levelStatsFor, LEVEL_STATS } from '../characters/levels'
+import { upgradeCardsFor } from '../characters/registry'
 import { aggregateTeamCards } from '../cards/registry'
 import type { TeamEffects } from '../items/registry'
 import { arenaSceneFor } from '../maps/registry'
@@ -126,7 +129,7 @@ export class ShopScene extends Phaser.Scene {
       }
       this.run.freeRefreshes = CAPTAINS[this.captainId].freeRefreshes + this.teamFx.freeRerolls
       this.offers = this.lineup.map((_, slot) =>
-        rollItem(this.poolFor(slot), this.ownedFor(slot), Math.random, this.run.wave),
+        rollItem(this.poolFor(slot), this.ownedFor(slot), Math.random, this.run.wave, this.levelOf(slot)),
       )
       this.focusedId = this.lineup[0] ?? this.focusedId
     }
@@ -328,9 +331,14 @@ export class ShopScene extends Phaser.Scene {
 
   // ── 上架/购买 ───────────────────────────────────────────────
 
+  /** 该槽位角色当前等级（由专属经验推导） */
+  private levelOf(slot: number): number {
+    return characterLevel(this.run.memberXp[slot] ?? 0)
+  }
+
   private poolFor(slot: number): ItemId[] {
     const id = this.lineup[slot]!
-    return characterPool(id, CHARACTERS[id])
+    return characterPoolFor(CHARACTERS[id], this.levelOf(slot))
   }
 
   private ownedFor(slot: number): ItemId[] {
@@ -358,9 +366,15 @@ export class ShopScene extends Phaser.Scene {
     playSfx('buy')
     const owned = this.ownedFor(idx)
     owned.push(offer)
-    // 购买后自动补货下一件
-    this.offers[idx] = rollItem(this.poolFor(idx), owned, Math.random, this.run.wave)
+    // 角色专属经验累加：跨阈值即自动质变升级（免费）
+    const beforeLevel = this.levelOf(idx)
+    this.run.memberXp[idx] = (this.run.memberXp[idx] ?? 0) + ITEMS[offer].upgradeXp
+    const afterLevel = this.levelOf(idx)
+    // 购买后自动补货：用新等级的池 + 概率
+    this.offers[idx] = rollItem(this.poolFor(idx), owned, Math.random, this.run.wave, afterLevel)
     this.refresh()
+    // 升级弹窗在刷新之后（盖在最上层）；跨多级则以最终等级为准
+    if (afterLevel > beforeLevel) this.showLevelUp(idx, afterLevel)
   }
 
   private refreshFocused(): void {
@@ -371,12 +385,14 @@ export class ShopScene extends Phaser.Scene {
     if (free) this.run.freeRefreshes -= 1
     else this.run.coins -= SHOP.refreshPrice
     playSfx('click')
-    this.offers[idx] = rollItem(this.poolFor(idx), this.ownedFor(idx), Math.random, this.run.wave)
+    this.offers[idx] = rollItem(this.poolFor(idx), this.ownedFor(idx), Math.random, this.run.wave, this.levelOf(idx))
     this.refresh()
   }
 
   private slotMaxHp(slot: number): number {
-    return memberMaxHp(aggregateCharacterEffects(this.run.memberItems[slot] ?? []).hpAdd)
+    const id = this.lineup[slot]!
+    const owned = this.run.memberItems[slot] ?? []
+    return memberMaxHp(aggregateCharacterEffects(owned, levelStatsFor(id, this.levelOf(slot))).hpAdd)
   }
 
   // ── 上架位网格（每个出战角色一个；形象即含义，角标 = 当前上架道具） ──
@@ -443,6 +459,8 @@ export class ShopScene extends Phaser.Scene {
     const idx = this.focusedIndex()
     const owned = this.ownedFor(idx)
     const def = CHARACTERS[this.focusedId]
+    const level = this.levelOf(idx)
+    const prog = levelProgress(this.run.memberXp[idx] ?? 0)
     const max = this.slotMaxHp(idx)
     const hp = waveStartHp(this.run.memberHp[idx] ?? max, max)
     const subtitle = {
@@ -450,10 +468,20 @@ export class ShopScene extends Phaser.Scene {
       color: hp / max > 0.5 ? '#9ccc9c' : '#ffb74d',
     }
 
+    // 角色专属经验进度条：进店即见、每次购买当场推进（满档在购买瞬间弹升级窗）
+    const barX = dx + 104
+    const barW = dx + D.w - 24 - barX
+    const barY = dy + 92
+    const xpBar = this.add.graphics()
+    xpBar.fillStyle(0x000000, 0.4)
+    xpBar.fillRoundedRect(barX, barY, barW, 9, 4)
+    xpBar.fillStyle(prog.maxed ? 0xffd54f : 0x7cc5ff, 1)
+    xpBar.fillRoundedRect(barX + 1, barY + 1, Math.max(2, (barW - 2) * prog.ratio), 7, 3)
+
     this.detailObjs.push(
-      emojiImage(this, dx + 58, dy + 56, def.emoji, 85, 'player'),
+      emojiImage(this, dx + 58, dy + 52, def.emoji, 85, 'player'),
       this.add
-        .text(dx + 104, dy + 44, def.name, {
+        .text(dx + 104, dy + 40, def.name, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -462,13 +490,28 @@ export class ShopScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5),
       this.add
-        .text(dx + 104, dy + 80, subtitle.text, {
+        .text(
+          dx + D.w - 24,
+          dy + 40,
+          prog.maxed ? `Lv ${level} · 满级` : `Lv ${level} · 经验 ${prog.cur}/${prog.need}`,
+          {
+            fontFamily: UI_FONT,
+            fontSize: FONT.small,
+            fontStyle: 'bold',
+            color: '#ffd54f',
+            resolution: res,
+          },
+        )
+        .setOrigin(1, 0.5),
+      this.add
+        .text(dx + 104, dy + 70, subtitle.text, {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           color: subtitle.color,
           resolution: res,
         })
         .setOrigin(0, 0.5),
+      xpBar,
     )
 
     // 属性区（可滚动）：已购道具行 + 属性组
@@ -502,7 +545,7 @@ export class ShopScene extends Phaser.Scene {
       cursor += 40
     }
 
-    const groups = characterStatGroups(this.focusedId, owned)
+    const groups = characterStatGroups(this.focusedId, owned, level)
     for (const group of groups) {
       statObjs.push(
         emojiImage(this, dx + 42, cursor, group.icon, 35),
@@ -668,6 +711,120 @@ export class ShopScene extends Phaser.Scene {
     )
   }
 
+  /** 效果片段 → 人读串（升级弹窗展示基础属性质变，只列有变化的轴） */
+  private formatEffects(fx: Partial<CharacterEffects>): string {
+    const parts: string[] = []
+    if (fx.hpAdd) parts.push(`生命 ${fx.hpAdd > 0 ? '+' : ''}${fx.hpAdd}`)
+    if (fx.damageMul && fx.damageMul !== 1) parts.push(`伤害 ×${+fx.damageMul.toFixed(2)}`)
+    if (fx.cooldownMul && fx.cooldownMul !== 1) parts.push(`攻速 ×${+(1 / fx.cooldownMul).toFixed(2)}`)
+    if (fx.critChance) parts.push(`暴击 +${Math.round(fx.critChance * 100)}%`)
+    if (fx.rangeMul && fx.rangeMul !== 1) parts.push(`范围 ×${+fx.rangeMul.toFixed(2)}`)
+    return parts.join(' · ')
+  }
+
+  /** 质变升级弹窗：购买跨阈值当场弹出——新等级 + 新能力 + 基础属性质变。
+   * 点任意处或 ~3.4 秒后淡出；盖在最上层，期间挡住购买误触 */
+  private showLevelUp(slot: number, level: number): void {
+    playSfx('levelup')
+    const res = textRes()
+    const cx = viewport.logicalWidth / 2
+    const cy = viewport.logicalHeight / 2
+    const id = this.lineup[slot]!
+    const def = CHARACTERS[id]
+    const card = upgradeCardsFor(def)[level - 2]
+    const statLine = level >= 2 ? this.formatEffects(LEVEL_STATS[id][level - 2]!) : ''
+    const pw = Math.min(560, viewport.logicalWidth - 60)
+    const ph = 300
+
+    const overlay = this.add.rectangle(cx, cy, 6000, 6000, 0x000000, 0.55).setDepth(400)
+    const panel = this.add.graphics()
+    panel.fillStyle(0x2a2540, 0.98)
+    panel.fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 20)
+    panel.lineStyle(3, 0xffd54f, 0.9)
+    panel.strokeRoundedRect(-pw / 2, -ph / 2, pw, ph, 20)
+    const items: Phaser.GameObjects.GameObject[] = [
+      panel,
+      this.add
+        .text(0, -ph / 2 + 34, '升级！', {
+          fontFamily: UI_FONT,
+          fontSize: FONT.title,
+          fontStyle: 'bold',
+          color: '#ffd54f',
+          resolution: res,
+        })
+        .setOrigin(0.5),
+      emojiImage(this, -pw / 2 + 74, -34, def.emoji, 92, 'player'),
+      this.add
+        .text(-pw / 2 + 132, -52, def.name, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.lead,
+          fontStyle: 'bold',
+          color: '#ffffff',
+          resolution: res,
+        })
+        .setOrigin(0, 0.5),
+      this.add
+        .text(-pw / 2 + 132, -18, `Lv ${level - 1} → Lv ${level}`, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.strong,
+          fontStyle: 'bold',
+          color: '#7cc5ff',
+          resolution: res,
+        })
+        .setOrigin(0, 0.5),
+    ]
+    if (card) {
+      items.push(
+        this.add
+          .text(0, 34, `新能力 · ${card.name}`, {
+            fontFamily: UI_FONT,
+            fontSize: FONT.strong,
+            fontStyle: 'bold',
+            color: '#ce93d8',
+            align: 'center',
+            wordWrap: { width: pw - 48 },
+            resolution: res,
+          })
+          .setOrigin(0.5),
+        this.add
+          .text(0, 66, card.desc, {
+            fontFamily: UI_FONT,
+            fontSize: FONT.body,
+            color: '#d0d0d8',
+            align: 'center',
+            wordWrap: { width: pw - 48 },
+            resolution: res,
+          })
+          .setOrigin(0.5, 0),
+      )
+    }
+    if (statLine) {
+      items.push(
+        this.add
+          .text(0, ph / 2 - 28, statLine, {
+            fontFamily: UI_FONT,
+            fontSize: FONT.body,
+            color: '#9ccc9c',
+            align: 'center',
+            wordWrap: { width: pw - 48 },
+            resolution: res,
+          })
+          .setOrigin(0.5),
+      )
+    }
+    const box = this.add.container(cx, cy, items).setDepth(401)
+    box.setScale(0.7)
+    this.tweens.add({ targets: box, scale: 1, duration: 280, ease: 'Back.easeOut' })
+    const dismiss = (): void => {
+      overlay.destroy()
+      box.destroy()
+    }
+    overlay.setInteractive().on('pointerup', dismiss)
+    this.time.delayedCall(3400, () => {
+      if (box.active) dismiss()
+    })
+  }
+
   private refresh(): void {
     this.coinsText.setText(`${this.run.coins}`)
     // 购买/刷新会换上架、升级/招募会变血条：整格重建 + 选中态
@@ -729,6 +886,8 @@ export class ShopScene extends Phaser.Scene {
         focusedId: this.focusedId,
         freeRefreshes: this.run.freeRefreshes,
         level: this.run.xp.level,
+        focusedLevel: idx >= 0 ? this.levelOf(idx) : 1,
+        focusedXp: idx >= 0 ? (this.run.memberXp[idx] ?? 0) : 0,
         slots: this.grid.cellRects().map((r) => {
           const id = r.key as CharacterId
           const index = this.lineup.indexOf(id)
@@ -741,6 +900,7 @@ export class ShopScene extends Phaser.Scene {
             offer: this.offers[index] ?? null,
             price: this.offers[index] ? this.price(this.offers[index]!) : null,
             owned: this.ownedFor(index).length,
+            level: this.levelOf(index),
           }
         }),
         buy: {

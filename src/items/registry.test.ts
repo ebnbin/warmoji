@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { CHARACTERS } from '../characters/registry'
 import { ABILITIES } from '../abilities/registry'
-import type { ItemRarity, ItemDef } from './registry'
+import type { ItemRarity } from './registry'
 import {
-  UPGRADE_GATE,
-  upgradeCardAvailable,
-  upgradeTiers,
   itemPrice,
   PRICE,
   aggregateCharacterEffects,
-  characterPool,
+  characterPoolFor,
   ITEM_IDS,
   ITEMS,
   RARITY_ORDER,
@@ -20,34 +17,25 @@ import {
 } from './registry'
 
 describe('道具定义', () => {
-  it('每件道具有 emoji/名字/介绍/正价格；升级卡效果走能力质变，其余至少一条效果', () => {
+  it('每件道具有 emoji/名字/介绍/正价格/正经验值/至少一条效果', () => {
     for (const id of ITEM_IDS) {
       const item = ITEMS[id]
       expect(item.emoji.length).toBeGreaterThan(0)
       expect(item.name.length).toBeGreaterThan(0)
       expect(item.desc.length).toBeGreaterThan(0)
       expect(item.price).toBeGreaterThan(0)
-      if (item.pool === 'upgrade') {
-        expect(item.forCharacter).toBeDefined()
-        expect(item.maxStacks).toBe(1)
-      } else {
-        expect(Object.keys(item.effects).length).toBeGreaterThan(0)
-      }
+      expect(item.upgradeXp).toBeGreaterThan(0)
+      expect(Object.keys(item.effects).length).toBeGreaterThan(0)
     }
   })
 
-  it('每个角色恰好两张升级卡：一阶稀有、二阶史诗', () => {
-    for (const cid of Object.keys(CHARACTERS)) {
-      const cards = ITEM_IDS.filter(
-        (id) => ITEMS[id].pool === 'upgrade' && ITEMS[id].forCharacter === cid,
-      )
-      expect(cards).toHaveLength(2)
-      const first = cards.find((id) => (ITEMS[id] as ItemDef).abilityIndex === 0)!
-      const second = cards.find((id) => (ITEMS[id] as ItemDef).abilityIndex === 1)!
-      expect(ITEMS[first].rarity).toBe('rare')
-      expect(ITEMS[second].rarity).toBe('epic')
-      expect(ITEMS[second].price).toBeGreaterThan(ITEMS[first].price)
+  it('经验值与稀有度松相关：史诗均值 > 稀有均值 > 普通均值', () => {
+    const avg = (r: ItemRarity): number => {
+      const xs = ITEM_IDS.filter((id) => ITEMS[id].rarity === r).map((id) => ITEMS[id].upgradeXp)
+      return xs.reduce((a, b) => a + b, 0) / xs.length
     }
+    expect(avg('common')).toBeLessThan(avg('rare'))
+    expect(avg('rare')).toBeLessThan(avg('epic'))
   })
 })
 
@@ -67,79 +55,57 @@ describe('稀有度', () => {
     }
   })
 
-  it('权重曲线：和为 1、非负；史诗第 5 波前为 0，档位权重随波次单调不减且有封顶', () => {
+  it('权重非负；史诗常规第 5 波前为 0；角色等级独立抬升稀有/史诗（2 级即便早波也解锁史诗）', () => {
     for (let w = 1; w <= 15; w++) {
-      const wt = rarityWeights(w)
-      expect(wt.common + wt.rare + wt.epic).toBeCloseTo(1)
-      expect(Math.min(wt.common, wt.rare, wt.epic)).toBeGreaterThanOrEqual(0)
+      for (let lv = 1; lv <= 3; lv++) {
+        const wt = rarityWeights(w, lv)
+        expect(Math.min(wt.common, wt.rare, wt.epic)).toBeGreaterThanOrEqual(0)
+      }
     }
-    expect(rarityWeights(1).epic).toBe(0)
-    expect(rarityWeights(4).epic).toBe(0)
-    expect(rarityWeights(5).epic).toBeGreaterThan(0)
-    expect(rarityWeights(12).rare).toBeCloseTo(0.3)
-    expect(rarityWeights(15).epic).toBeCloseTo(0.2)
-    expect(rarityWeights(15).rare).toBeGreaterThan(rarityWeights(1).rare)
+    // 1 级：史诗随波次解锁
+    expect(rarityWeights(1, 1).epic).toBe(0)
+    expect(rarityWeights(4, 1).epic).toBe(0)
+    expect(rarityWeights(5, 1).epic).toBeGreaterThan(0)
+    // 等级独立解锁：2 级角色第 1 波就能刷史诗，且稀有权重随等级抬升
+    expect(rarityWeights(1, 2).epic).toBeGreaterThan(0)
+    expect(rarityWeights(1, 3).epic).toBeGreaterThan(rarityWeights(1, 2).epic)
+    expect(rarityWeights(6, 3).rare).toBeGreaterThan(rarityWeights(6, 1).rare)
   })
 
-  it('第 1 波抽不到史诗；后期高随机数落入史诗档', () => {
+  it('第 1 波（1 级）抽不到史诗；后期高随机数落入史诗档', () => {
     const pool = ['gemHeart', 'fateDice'] as const
-    // rand 恒 0.99：第 1 波史诗权重 0 → 只能抽普通；第 15 波 → 落入档尾（史诗）
-    expect(rollItem([...pool], [], () => 0.99, 1)).toBe('gemHeart')
-    expect(rollItem([...pool], [], () => 0.99, 15)).toBe('fateDice')
+    expect(rollItem([...pool], [], () => 0.99, 1, 1)).toBe('gemHeart')
+    expect(rollItem([...pool], [], () => 0.99, 15, 1)).toBe('fateDice')
   })
 
   it('空档权重归拢：池里只剩史诗而史诗未解锁时仍可上架（兜底不空货）', () => {
-    expect(rollItem(['fateDice'], [], () => 0.99, 1)).toBe('fateDice')
+    expect(rollItem(['fateDice'], [], () => 0.99, 1, 1)).toBe('fateDice')
   })
 })
 
-describe('道具池推导', () => {
-  it('角色池 = 通用 + 匹配能力形态 + 自己的升级卡；不含队长道具与他人升级卡', () => {
-    const magePool = characterPool('mage', CHARACTERS.mage)
-    expect(magePool).toContain('gemHeart')
-    expect(magePool).toContain('blastPowder')
-    expect(magePool).toContain('upgradeMage1')
-    expect(magePool).toContain('upgradeMage2')
-    expect(magePool).not.toContain('upgradeTroll1')
-    expect(magePool).not.toContain('scope')
-    const cowboyPool = characterPool('cowboy', CHARACTERS.cowboy)
-    expect(cowboyPool).toContain('scope')
-    expect(cowboyPool).not.toContain('blastPowder')
+describe('道具池推导（每等级独立）', () => {
+  it('角色池 = 通用 + 匹配能力形态；不含不匹配的形态道具；minLevel 高端货按等级解锁', () => {
+    const mage1 = characterPoolFor(CHARACTERS.mage, 1)
+    expect(mage1).toContain('gemHeart')
+    expect(mage1).toContain('blastPowder')
+    expect(mage1).not.toContain('scope')
+    // fateDice minLevel 2、giantHeart minLevel 3：1 级不上架
+    expect(mage1).not.toContain('fateDice')
+    expect(mage1).not.toContain('giantHeart')
+    expect(characterPoolFor(CHARACTERS.mage, 2)).toContain('fateDice')
+    expect(characterPoolFor(CHARACTERS.mage, 3)).toContain('giantHeart')
+    const cowboy1 = characterPoolFor(CHARACTERS.cowboy, 1)
+    expect(cowboy1).toContain('scope')
+    expect(cowboy1).not.toContain('blastPowder')
   })
 
-  it('每个角色的池至少有通用道具数量', () => {
-    const genericCount = ITEM_IDS.filter((id) => ITEMS[id].pool === 'all').length
-    for (const [cid, def] of Object.entries(CHARACTERS)) {
-      expect(characterPool(cid as keyof typeof CHARACTERS, def).length).toBeGreaterThanOrEqual(genericCount)
+  it('每个角色 1 级池至少含 1 级可上架的通用道具数', () => {
+    const genericL1 = ITEM_IDS.filter(
+      (id) => ITEMS[id].pool === 'all' && (ITEMS[id].minLevel ?? 1) <= 1,
+    ).length
+    for (const def of Object.values(CHARACTERS)) {
+      expect(characterPoolFor(def, 1).length).toBeGreaterThanOrEqual(genericL1)
     }
-  })
-})
-
-describe('升级卡解锁门控', () => {
-  it('一阶卡：普通道具购满门槛才可上架；二阶卡：需已持有一阶', () => {
-    expect(upgradeCardAvailable('upgradeMage1', [])).toBe(false)
-    const normals = Array<'gemHeart'>(UPGRADE_GATE.normalsForFirst).fill('gemHeart')
-    expect(upgradeCardAvailable('upgradeMage1', normals.slice(0, 1))).toBe(false)
-    expect(upgradeCardAvailable('upgradeMage1', normals)).toBe(true)
-    // 升级卡本身不计入普通道具数
-    expect(upgradeCardAvailable('upgradeMage2', normals)).toBe(false)
-    expect(upgradeCardAvailable('upgradeMage2', [...normals, 'upgradeMage1'])).toBe(true)
-    // 非升级卡永远可上架
-    expect(upgradeCardAvailable('gemHeart', [])).toBe(true)
-  })
-
-  it('rollItem 过滤未达门槛的升级卡；达标后可抽出', () => {
-    expect(rollItem(['upgradeMage1'], [], () => 0, 5)).toBe(null)
-    const owned = ['gemHeart', 'gemHeart'] as const
-    expect(rollItem(['upgradeMage1'], [...owned], () => 0, 5)).toBe('upgradeMage1')
-  })
-
-  it('upgradeTiers 由已购卡推导', () => {
-    expect(upgradeTiers('mage', [])).toEqual({ u1: false, u2: false })
-    expect(upgradeTiers('mage', ['upgradeMage1'])).toEqual({ u1: true, u2: false })
-    expect(upgradeTiers('mage', ['upgradeMage1', 'upgradeMage2'])).toEqual({ u1: true, u2: true })
-    // 别人的卡不算
-    expect(upgradeTiers('mage', ['upgradeTroll1'])).toEqual({ u1: false, u2: false })
   })
 })
 
@@ -147,7 +113,6 @@ describe('堆叠与上架', () => {
   it('达到上限的道具不再上架；全部达上限返回 null', () => {
     expect(reachedStackLimit(['scope'], 'scope')).toBe(false)
     expect(reachedStackLimit(['scope', 'scope'], 'scope')).toBe(true)
-    // 无上限道具永不封顶
     expect(reachedStackLimit(Array(50).fill('gemHeart'), 'gemHeart')).toBe(false)
     expect(rollItem(['scope'], ['scope', 'scope'], () => 0)).toBeNull()
     expect(rollItem(['scope', 'gemHeart'], ['scope', 'scope'], () => 0)).toBe('gemHeart')
@@ -160,6 +125,12 @@ describe('效果叠加', () => {
     expect(fx.damageMul).toBeCloseTo(1.12 * 1.12 * 1.25)
     expect(fx.cooldownMul).toBeCloseTo(0.87)
     expect(fx.hpAdd).toBe(-30)
+  })
+
+  it('extra 片段（角色等级形态基础质变）与道具走同一叠加管线', () => {
+    const fx = aggregateCharacterEffects(['whetstone'], [{ damageMul: 1.5, hpAdd: 40 }])
+    expect(fx.damageMul).toBeCloseTo(1.12 * 1.5)
+    expect(fx.hpAdd).toBe(40)
   })
 
   it('新角色轴：回复/反伤/击杀回血加法叠加，暴击封顶 0.5，击退叠乘', () => {

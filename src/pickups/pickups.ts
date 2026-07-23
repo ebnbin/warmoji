@@ -4,6 +4,7 @@ import { emojiKey } from '../emoji/textures'
 import { UNIT } from '../core/units'
 import { norm } from '../core/vec'
 import { rollChestLoot } from './chest'
+import { characterLevel } from '../run/charLevel'
 import { PICKUP, PICKUPS } from './registry'
 import { KNOCKBACK } from '../abilities/registry'
 import { acquirePooled, releasePooled } from '../core/pool'
@@ -100,7 +101,12 @@ function openChest(scene: BaseArenaScene, chest: ImageObj): void {
   releasePooled(chest)
   scene.coinBurst.explode(12, x, y)
   playSfx('levelup')
-  const loot = rollChestLoot(scene.run.roster, scene.run.memberItems, () => scene.rng.next())
+  const loot = rollChestLoot(
+    scene.run.roster,
+    scene.run.memberItems,
+    scene.run.memberXp.map(characterLevel),
+    () => scene.rng.next(),
+  )
   if (!loot) {
     scene.run.coins += PICKUPS.chest.fallbackCoins ?? 0
     return

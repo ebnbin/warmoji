@@ -1,13 +1,12 @@
 import { CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
 import type { ItemId } from '../items/registry'
-import { upgradeCardAvailable, characterPool, ITEMS, reachedStackLimit } from '../items/registry'
+import { characterPoolFor, ITEMS, reachedStackLimit } from '../items/registry'
 
-// 宝箱掉落抽取：候选 = 各上场角色的道具池，即「本局当前阵容用得上的道具」。
+// 宝箱掉落抽取：候选 = 各上场角色「当前等级」的道具池，即本局此刻用得上的道具。
 // 同一道具进多个角色的池 = 多个候选条目，抽中哪条只取其道具（归属留给战斗后的
-// 开箱页由玩家选）；尊重堆叠上限与升级卡解锁门槛（和商店同规则），按稀有度权重
-// 加权抽取。开箱页再用 chestTargets 现算某道具此刻能给谁。团队增益已迁到升级卡，
-// 宝箱只掉角色装备。
+// 开箱页由玩家选）；尊重堆叠上限（和商店同规则），按稀有度权重加权抽取。开箱页
+// 再用 chestTargets 现算某道具此刻能给谁。团队增益已迁到升级卡，宝箱只掉角色装备。
 
 /** 掉落抽取结果：道具 + 一个可用归属（slot = 角色槽位） */
 export interface ChestLoot {
@@ -20,17 +19,18 @@ export function chestDropped(elite: boolean, rand: () => number, chanceMul = 1):
   return rand() < (elite ? CHEST_LOOT.eliteChance : CHEST_LOOT.chance) * chanceMul
 }
 
-/** 全部候选条目（导出供测试校验覆盖面） */
+/** 全部候选条目（导出供测试校验覆盖面）：按各角色当前等级的池 */
 export function chestCandidates(
   roster: readonly CharacterId[],
   memberItems: readonly (readonly ItemId[])[],
+  memberLevels: readonly number[],
 ): ChestLoot[] {
   const entries: ChestLoot[] = []
   roster.forEach((id, slot) => {
     const owned = memberItems[slot] ?? []
-    for (const itemId of characterPool(id, CHARACTERS[id])) {
+    const level = memberLevels[slot] ?? 1
+    for (const itemId of characterPoolFor(CHARACTERS[id], level)) {
       if (reachedStackLimit(owned, itemId)) continue
-      if (!upgradeCardAvailable(itemId, owned)) continue
       entries.push({ itemId, slot })
     }
   })
@@ -38,13 +38,14 @@ export function chestCandidates(
 }
 
 /** 某道具此刻可应用的槽位：开箱页据此列出可选角色。
- * 与掉落同规则（池匹配 + 堆叠上限 + 升级卡门槛），空数组 = 只能丢弃 */
+ * 与掉落同规则（当前等级池匹配 + 堆叠上限），空数组 = 只能丢弃 */
 export function chestTargets(
   roster: readonly CharacterId[],
   memberItems: readonly (readonly ItemId[])[],
+  memberLevels: readonly number[],
   itemId: ItemId,
 ): number[] {
-  return chestCandidates(roster, memberItems)
+  return chestCandidates(roster, memberItems, memberLevels)
     .filter((c) => c.itemId === itemId)
     .map((c) => c.slot)
 }
@@ -53,9 +54,10 @@ export function chestTargets(
 export function rollChestLoot(
   roster: readonly CharacterId[],
   memberItems: readonly (readonly ItemId[])[],
+  memberLevels: readonly number[],
   rand: () => number,
 ): ChestLoot | null {
-  const entries = chestCandidates(roster, memberItems)
+  const entries = chestCandidates(roster, memberItems, memberLevels)
   if (entries.length === 0) return null
   let total = 0
   for (const e of entries) total += CHEST_LOOT.rarityWeights[ITEMS[e.itemId].rarity]
