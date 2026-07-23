@@ -27,14 +27,14 @@ test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚
   let w = await page.evaluate(() => window.__warmoji!.wiki!)
   expect(w.category).toBe('地图')
   expect(w.categories.map((c) => c.title)).toEqual(['地图', '队长', '角色', '敌人', '道具', '全部'])
-  expect(w.entryCount).toBe(6)
+  expect(w.entryCount).toBe(7)
 
   // 切到敌人类别：条目数与聚焦跟随（含 Boss）
   const enemyCat = w.categories.find((c) => c.title === '敌人')!
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: enemyCat.x, y: enemyCat.y }) })
   await page.waitForFunction(() => window.__warmoji?.wiki?.category === '敌人')
   w = await page.evaluate(() => window.__warmoji!.wiki!)
-  expect(w.entryCount).toBe(24)
+  expect(w.entryCount).toBe(28)
   expect(w.focused.startsWith('敌人:')).toBe(true)
 
   // 点另一个条目切换详情

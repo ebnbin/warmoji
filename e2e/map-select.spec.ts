@@ -1,16 +1,16 @@
 import { expect, test } from '@playwright/test'
 import { clickMap, completePromote, confirmMap, enterMap } from './helpers'
 
-test('地图选择：六张玩法图、选择持久化、开局进入所选地图', async ({ page }) => {
+test('地图选择：七张玩法图、选择持久化、开局进入所选地图', async ({ page }) => {
   await page.goto('/')
   await enterMap(page)
 
-  // 六张图齐备（一种玩法一个主题），默认选中首图
+  // 七张图齐备（一种玩法一个主题），默认选中首图
   const info = await page.evaluate(() => ({
     items: window.__warmoji!.map!.items.map((i) => i.id),
     selected: window.__warmoji!.map!.selected,
   }))
-  expect(info.items).toEqual(['forest', 'desert', 'river', 'void', 'ruins', 'daynight'])
+  expect(info.items).toEqual(['forest', 'desert', 'river', 'void', 'ruins', 'daynight', 'space'])
   expect(info.selected).toBe('forest')
 
   // 选荒漠 → 持久化 → 刷新页面后仍记住

@@ -108,6 +108,14 @@ const POOLS: Record<MapId, readonly FieldPickupDef[]> = {
     { id: 'daynight_nightfall', emoji: '1f30c', name: '夜幕低垂', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.72 } },
     { id: 'daynight_darkmoon', emoji: '1f311', name: '晦月蚀袭', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
   ],
+  // 深空：星能/曲速/引力弹弓（增益），黑洞拖曳/失重打滑（减益）——呼应太空/天体主题
+  space: [
+    { id: 'space_starfuel', emoji: '1f31f', name: '星能灌注', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { teamDamageMul: 1.35 } },
+    { id: 'space_warp', emoji: '1f4ab', name: '曲速跃迁', desc: '全队攻速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { teamCooldownMul: 0.77 } },
+    { id: 'space_slingshot', emoji: '2604', name: '引力弹弓', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { critAdd: 0.18 } },
+    { id: 'space_drag', emoji: '1f300', name: '黑洞拖曳', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.7 } },
+    { id: 'space_weightless', emoji: '1fa90', name: '失重打滑', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
+  ],
 }
 
 /** 全部拾取按 id 索引（携带者掉落/注入器按 id 反查） */

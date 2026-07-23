@@ -13,6 +13,7 @@ import { RiverArenaScene } from './maps/RiverArenaScene'
 import { RuinsArenaScene } from './maps/RuinsArenaScene'
 import { SettingsScene } from './menu/SettingsScene'
 import { ShopScene } from './menu/ShopScene'
+import { SpaceArenaScene } from './maps/SpaceArenaScene'
 import { StudioScene } from './menu/StudioScene'
 import { UIScene } from './battle/UIScene'
 import { VoidArenaScene } from './maps/VoidArenaScene'
@@ -66,7 +67,7 @@ const game = new Phaser.Game({
   // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
   physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, RuinsArenaScene, DayNightArenaScene, UIScene, ResultScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, RuinsArenaScene, DayNightArenaScene, SpaceArenaScene, UIScene, ResultScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {

@@ -422,6 +422,75 @@ export const PUFFER: EnemyDef = {
   ],
 }
 
+/** 飞碟：悬停的碟形来客，绕队伍维持定距、站定俯射能量弹（太空图专精 · 定距远程） */
+const UFO: EnemyDef = {
+  kind: 'ufo',
+  emoji: '1f6f8',
+  name: '飞碟',
+  desc: '悬停的碟形来客，绕着队伍维持定距，站定俯射能量弹',
+  size: 1.35,
+  radius: 0.5,
+  hp: 55,
+  speed: 1.8,
+  damage: 6,
+  xp: 5,
+  coins: 4,
+  locomotion: { kind: 'standoff', detectRange: 9, standoffDist: 6 },
+  abilities: [
+    {
+      kind: 'projectile',
+      damage: 6,
+      cooldownMs: 2400,
+      knockback: 0,
+      range: 9,
+      lifeMs: 4500,
+      projectile: { emoji: '1f4ab', size: 0.45, radius: 0.15, speed: 3.4, rotationOffsetDeg: 0 },
+    },
+  ],
+}
+
+/** 小灰人：成群逼近的灰皮异星客，脆但快，贴身骚扰（太空图专精 · 快速脆皮） */
+const ALIEN: EnemyDef = {
+  kind: 'alien',
+  emoji: '1f47d',
+  name: '小灰人',
+  desc: '成群逼近的灰皮异星客，脆但快，贴身骚扰',
+  size: 1.1,
+  radius: 0.42,
+  hp: 26,
+  speed: 3.4,
+  damage: 7,
+  xp: 4,
+  coins: 2,
+  locomotion: { kind: 'chase' },
+}
+
+/** 流星：拖着尾焰蓄势，锁定后直线疾冲，横向可躲（太空图专精 · 突刺） */
+const COMET: EnemyDef = {
+  kind: 'comet',
+  emoji: '2604',
+  name: '流星',
+  desc: '拖着尾焰蓄势，锁定后直线疾冲，横向可躲',
+  size: 1.3,
+  radius: 0.5,
+  hp: 30,
+  speed: 1.4,
+  damage: 12,
+  xp: 5,
+  coins: 3,
+  locomotion: {
+    kind: 'dash',
+    windupMs: 240,
+    dashSpeed: 8,
+    trigger: { kind: 'detect', range: 5, cooldownMs: 1600 },
+    length: { kind: 'dist', dist: 2.8 },
+    idle: 'chase',
+    aim: 'nearest',
+    lockAt: 'launch',
+    sfx: 'whoosh',
+  },
+}
+
 export const ENEMY_DEFS: readonly EnemyDef[] = [
   ZOMBIE,
   GHOST,
@@ -441,6 +510,9 @@ export const ENEMY_DEFS: readonly EnemyDef[] = [
   LOCUST,
   GARGOYLE,
   PUFFER,
+  UFO,
+  ALIEN,
+  COMET,
 ]
 
 // Boss 就是 role:'boss' 的普通条目——每张地图一只专属 Boss，技能贴合该图主题与玩法。
@@ -690,7 +762,50 @@ const DAYNIGHT_BOSS: EnemyDef = {
   ],
 }
 
+/** 太空图专属 Boss——奇点：类黑洞天体。进场即张开「禁锢力场」（越靠边缘、向外的阻力越大，
+ * 到边缘 100%——场内所有实体谁也逃不出去，规则在 SpaceArenaScene）；两招——吸积盘环爆
+ * （整圈能量弹幕）+ 奇点坍缩（点名队员的引力坠击）。贴身追击、击退免疫。 */
+const SPACE_BOSS: EnemyDef = {
+  kind: 'blackhole',
+  role: 'boss',
+  emoji: '1f300',
+  name: '奇点',
+  desc: '太空头目：张开禁锢力场令谁也逃不出，吸积盘环爆 + 奇点坍缩坠击，击退免疫',
+  size: 3.4,
+  radius: 1.1,
+  hp: 6600,
+  speed: 1.15,
+  damage: 20,
+  xp: 60,
+  coins: 60,
+  kbImmune: true,
+  locomotion: { kind: 'chase' },
+  abilities: [
+    // 吸积盘环爆：整圈能量弹幕
+    {
+      kind: 'projectile',
+      damage: 8,
+      cooldownMs: 2800,
+      knockback: 0,
+      firstDelayMs: 1600,
+      lifeMs: 5000,
+      aim: 'nearest',
+      volley: { count: 16, spreadDeg: 360 },
+      projectile: { emoji: '1f4ab', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 },
+    },
+    // 奇点坍缩：点名最近 4 名队员，引力坠击自天砸下
+    {
+      kind: 'strike',
+      damage: 22,
+      cooldownMs: 4600,
+      knockback: 0,
+      targets: 4,
+      drop: { emoji: '1f311', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+    },
+  ],
+}
+
 /** 生成用：kind → 定义（顺序即展示顺序；Boss 按地图顺序排在常规怪之后） */
 export const ENEMIES = Object.fromEntries(
-  [...ENEMY_DEFS, FOREST_BOSS, DESERT_BOSS, RIVER_BOSS, FACTORY_BOSS, RUINS_BOSS, DAYNIGHT_BOSS].map((e) => [e.kind, e]),
+  [...ENEMY_DEFS, FOREST_BOSS, DESERT_BOSS, RIVER_BOSS, FACTORY_BOSS, RUINS_BOSS, DAYNIGHT_BOSS, SPACE_BOSS].map((e) => [e.kind, e]),
 ) as Record<string, EnemyDef>

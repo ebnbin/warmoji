@@ -7,7 +7,7 @@ import type { MapId } from '../maps/registry'
 // 战斗曲按地图配：BgmId 直接复用 MapId，'lobby' 盖住全部非战斗页面。
 
 export type BgmId = 'lobby' | MapId
-export const BGM_IDS: readonly BgmId[] = ['lobby', 'forest', 'desert', 'river', 'void', 'ruins', 'daynight']
+export const BGM_IDS: readonly BgmId[] = ['lobby', 'forest', 'desert', 'river', 'void', 'ruins', 'daynight', 'space']
 
 export interface BgmNote {
   /** 循环内起始秒 */
@@ -489,6 +489,57 @@ function buildDayNight(): BgmScore {
   )
 }
 
+/** 深空：A 小调空灵慢板——低频脉冲垫底、稀疏正弦星点飘浮、长回声拖尾，营造宇宙的
+ * 空旷与失重；72 BPM 循环 */
+function buildSpace(): BgmScore {
+  const chords = [0, 5, 3, 6, 0, 4, 5, 3, 6, 2, 5, 3, 0, 5, 6, 4]
+  return track(
+    'space',
+    {
+      bpm: 72,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 45,
+      scale: AEOLIAN,
+      echo: { delaySec: (60 / 72) * 0.75, feedback: 0.46, level: 0.44 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.2, attack: 0.06, release: 0.3, octave: -1 }
+      const pad: Voice = { wave: 'triangle', vol: 0.03, attack: 0.5, release: 1.2, octave: 0 }
+      // 星点：稀疏高频正弦，长回声拖成一串飘浮的光点
+      const star: Voice = { wave: 'sine', vol: 0.035, attack: 0.004, release: 0.1, octave: 2, echo: true }
+      const lead: Voice = { wave: 'triangle', vol: 0.075, attack: 0.02, release: 0.2, octave: 1, echo: true }
+      b.bass(bass, chords, 'r.......')
+      b.pad(pad, chords, [0, 2, 4], 0.006)
+      b.arp(star, chords, [0, 4, 2, 4, 0, 5], 0, 16)
+      b.line(lead, [
+        // A 段：漂向深空（缓缓上行）
+        [0, 0, 0, 4], [0, 4, 4, 4],
+        [1, 0, 5, 6], [1, 6, 4, 2],
+        [2, 0, 3, 4], [2, 4, 2, 4],
+        [3, 0, 5, 8],
+        [4, 0, 0, 4], [4, 4, 3, 4],
+        [5, 0, 4, 6], [5, 6, 5, 2],
+        [6, 0, 7, 4], [6, 4, 6, 4],
+        [7, 0, 4, 8],
+        // B 段：登临星海之巅（上八度悬停）
+        [8, 0, 9, 4], [8, 4, 7, 4],
+        [9, 0, 8, 6], [9, 6, 6, 2],
+        [10, 0, 7, 4], [10, 4, 5, 4],
+        [11, 0, 6, 8],
+        // A' 沉降回环
+        [12, 0, 4, 4], [12, 4, 2, 4],
+        [13, 0, 3, 6], [13, 6, 2, 2],
+        [14, 0, 4, 4], [14, 4, 5, 4],
+        [15, 0, 0, 8],
+      ])
+      b.drums('kick', 'x.......', 0, 16, 0.16)
+      b.drums('hat', '....x...', 0, 16, 0.03)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -497,6 +548,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   void: buildVoid,
   ruins: buildRuins,
   daynight: buildDayNight,
+  space: buildSpace,
 }
 
 const cache = new Map<BgmId, BgmScore>()

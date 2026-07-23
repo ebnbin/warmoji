@@ -82,6 +82,16 @@ const NIGHT_MIX: readonly EnemyMixRow[] = [
   { kind: 'rat', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 11 },
 ]
 
+/** 深空：外星游射 + 小灰人快扑 + 流星突刺 + 飞碟定距 + 石像哨兵（专精：invader/alien/comet/ufo） */
+const SPACE_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 36, max: 74 },
+  { kind: 'invader', sinceWave: 1, base: 16, perWave: 0.7, min: 12, max: 30 },
+  { kind: 'alien', sinceWave: 2, base: 14, perWave: 0.6, min: 0, max: 26 },
+  { kind: 'comet', sinceWave: 3, base: 9, perWave: 0.4, min: 0, max: 17 },
+  { kind: 'ufo', sinceWave: 4, base: 7, perWave: 0.4, min: 0, max: 14 },
+  { kind: 'gargoyle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 11 },
+]
+
 export const MAPS = {
   forest: {
     emoji: '1f332',
@@ -222,5 +232,29 @@ export const MAPS = {
     nightMix: NIGHT_MIX,
     // 晨昏原野专属 Boss：晦明——日冕环爆 + 月华坠
     boss: 'eclipse',
+  },
+  space: {
+    emoji: '1f30c',
+    name: '深空',
+    desc: '无垠星海，可朝任意方向漂向深空；天体不时拖着直线横扫战场（敌我通吃），终波奇点降临、张开禁锢场令谁也逃不出',
+    kind: 'space',
+    palette: {
+      // 页面底色取深空靛蓝→近黑
+      bgFrom: 'hsl(245 45% 14%)',
+      bgTo: 'hsl(255 55% 4%)',
+      // map 色即深空底（极暗蓝黑，亮色实体高对比浮现）
+      map: hslToInt(246, 0.45, 0.09),
+      shadow: 0x000000,
+    },
+    decor: {
+      // 星点（深底上可略亮）：星星 / 闪耀 / 亮星 / 星尘
+      emojis: ['2b50', '2728', '1f31f', '1f4ab'],
+      sizeU: [0.3, 0.7],
+      alpha: [0.16, 0.32],
+      density: [0.06, 0.1],
+    },
+    mix: SPACE_MIX,
+    // 深空专属 Boss：奇点——吸积盘环爆 + 奇点坍缩坠击 + 禁锢力场
+    boss: 'blackhole',
   },
 } as const satisfies Record<string, MapDef>

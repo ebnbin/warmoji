@@ -4434,6 +4434,147 @@
      ]
     }
    }
+  },
+  "1f6f8": {
+   "emoji": "1f6f8",
+   "name": "飞碟",
+   "desc": "碟穹一鼓一瘪地微微起伏，腹下一圈灯珠明灭轮转——悬停待命的碟形来客。",
+   "anatomy": "碟穹 ellipse[4,5,6] 呼吸缩放；腹下灯珠 circle[8,9,10] 明灭闪烁。",
+   "clips": {
+    "idle": {
+     "parts": [
+      {
+       "indices": [
+        4,
+        5,
+        6
+       ],
+       "cx": 18,
+       "cy": 11,
+       "keyframes": [
+        { "t": 0, "scale": 1 },
+        { "t": 0.5, "scale": 1.06 },
+        { "t": 1, "scale": 1 }
+       ]
+      },
+      {
+       "indices": [
+        8,
+        9,
+        10
+       ],
+       "cx": 24,
+       "cy": 19,
+       "keyframes": [
+        { "t": 0, "scale": 1 },
+        { "t": 0.4, "scale": 1.3 },
+        { "t": 0.7, "scale": 0.7 },
+        { "t": 1, "scale": 1 }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  "1f47d": {
+   "emoji": "1f47d",
+   "name": "小灰人",
+   "desc": "灰皮小脑袋一鼓一瘪地轻晃，黑亮巨眼一张一缩——贴脸窥探的异星客。",
+   "anatomy": "头 path[0] 呼吸缩放 + 上下轻浮；巨眼五官 path[1] 收放。",
+   "clips": {
+    "idle": {
+     "parts": [
+      {
+       "indices": [
+        0
+       ],
+       "cx": 18,
+       "cy": 18,
+       "keyframes": [
+        { "t": 0, "scale": 1, "ty": 0 },
+        { "t": 0.5, "scale": 1.03, "ty": 0.5 },
+        { "t": 1, "scale": 1, "ty": 0 }
+       ]
+      },
+      {
+       "indices": [
+        1
+       ],
+       "cx": 14,
+       "cy": 16,
+       "keyframes": [
+        { "t": 0, "scale": 1 },
+        { "t": 0.5, "scale": 1.1 },
+        { "t": 1, "scale": 1 }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  "2604": {
+   "emoji": "2604",
+   "name": "流星",
+   "desc": "炽白核心一搏一搏地脉动，尾焰一阵微颤——拖焰待发的疾冲之星。",
+   "anatomy": "核心 path[3] 脉动缩放；尾焰 path[0,1] 微颤缩放 + 轻转。",
+   "clips": {
+    "idle": {
+     "parts": [
+      {
+       "indices": [
+        3
+       ],
+       "cx": 8,
+       "cy": 26,
+       "keyframes": [
+        { "t": 0, "scale": 1 },
+        { "t": 0.35, "scale": 1.16 },
+        { "t": 0.65, "scale": 0.9 },
+        { "t": 1, "scale": 1 }
+       ]
+      },
+      {
+       "indices": [
+        0,
+        1
+       ],
+       "cx": 24,
+       "cy": 8,
+       "keyframes": [
+        { "t": 0, "scale": 1, "rotate": 0 },
+        { "t": 0.5, "scale": 1.05, "rotate": 3 },
+        { "t": 1, "scale": 1, "rotate": 0 }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  "1f300": {
+   "emoji": "1f300",
+   "name": "奇点",
+   "desc": "螺旋星涡缓缓自转、一涨一缩地吞吐——沉在星海深处的坍缩之眼。",
+   "anatomy": "整涡 path[0] 缓转摆动 + 吞吐缩放（单元素旋涡，绕心自旋）。",
+   "clips": {
+    "idle": {
+     "parts": [
+      {
+       "indices": [
+        0
+       ],
+       "cx": 18,
+       "cy": 18,
+       "keyframes": [
+        { "t": 0, "rotate": 0, "scale": 1 },
+        { "t": 0.25, "rotate": 12, "scale": 1.05 },
+        { "t": 0.5, "rotate": 0, "scale": 1 },
+        { "t": 0.75, "rotate": -12, "scale": 0.97 },
+        { "t": 1, "rotate": 0, "scale": 1 }
+       ]
+      }
+     ]
+    }
+   }
   }
  }
 }

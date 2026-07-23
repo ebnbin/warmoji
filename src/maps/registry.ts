@@ -26,8 +26,9 @@ export interface MapDef {
   /** 世界形态：bounded = 25×25 有界竞技场；infinite = 无边界（终波缩圈）；
    * river = 单屏固定相机 + 恒定水流；void = 固定 16:9 环面（四边传送门）；
    * ruins = 有界竞技场 + 断壁（挡移动/子弹/视线，流场寻路）；
-   * daynight = 有界竞技场 + 昼夜循环（相机随时刻涨落、夜幕起迷雾） */
-  readonly kind: 'bounded' | 'infinite' | 'river' | 'void' | 'ruins' | 'daynight'
+   * daynight = 有界竞技场 + 昼夜循环（相机随时刻涨落、夜幕起迷雾）；
+   * space = 无限世界 + 天体横扫危险物 + 黑洞禁锢场（终波） */
+  readonly kind: 'bounded' | 'infinite' | 'river' | 'void' | 'ruins' | 'daynight' | 'space'
   /** 有界图尺寸（格）：缺省用 MAP.width/height（25×25）；昼夜图放大到 30×30 */
   readonly size?: { readonly w: number; readonly h: number }
   /** 固定色板：战斗场景不再逐局随机 */
@@ -65,6 +66,7 @@ export const ARENA_SCENE_KEYS = [
   'arenaVoid',
   'arenaRuins',
   'arenaDayNight',
+  'arenaSpace',
 ] as const
 export type ArenaSceneKey = (typeof ARENA_SCENE_KEYS)[number]
 
@@ -76,6 +78,7 @@ export function arenaSceneFor(id: MapId): ArenaSceneKey {
   if (kind === 'void') return 'arenaVoid'
   if (kind === 'ruins') return 'arenaRuins'
   if (kind === 'daynight') return 'arenaDayNight'
+  if (kind === 'space') return 'arenaSpace'
   return 'arena'
 }
 

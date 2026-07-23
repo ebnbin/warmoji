@@ -55,6 +55,7 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
   void: '环面竞技场（四壁传送门，出这头即现那头）',
   ruins: '断壁废墟（墙挡人 / 挡弹 / 挡视线）',
   daynight: '昼夜原野（30×30；视野随晨昏涨落，夜幕四合起迷雾）',
+  space: '深空星海（无限世界；天体直线横扫敌我通吃，终波奇点禁锢场谁也逃不出）',
 }
 
 export function enemyStatLines(e: EnemyDef): string[] {

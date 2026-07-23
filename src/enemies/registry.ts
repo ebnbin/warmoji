@@ -143,6 +143,10 @@ export interface EnemyDef {
     | 'gargoyle'
     | 'puffer'
     | 'eclipse'
+    | 'ufo'
+    | 'alien'
+    | 'comet'
+    | 'blackhole'
   readonly emoji: string
   readonly name: string
   readonly desc: string

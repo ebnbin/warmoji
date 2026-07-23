@@ -37,8 +37,9 @@ export class InfiniteArenaScene extends BaseArenaScene {
   private zoneVignette?: Phaser.GameObjects.Rectangle
   private nextZoneTickAt = 0
 
-  constructor() {
-    super('arenaInfinite')
+  // 场景键可覆写：深空图复用整套无限世界规则（相机/分块/休眠/环带刷怪），叠加太空机制
+  constructor(key = 'arenaInfinite') {
+    super(key)
   }
 
   protected resetWorldFields(): void {

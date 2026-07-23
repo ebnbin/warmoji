@@ -263,7 +263,7 @@ for (const [id, it] of Object.entries<ItemDef>(ITEMS as Record<string, ItemDef>)
 for (const [id, m] of Object.entries(MAPS)) {
   const p = `maps.${id}`
   str(`${p}.emoji`, m.emoji)
-  if (!['bounded', 'infinite', 'river', 'void', 'ruins', 'daynight'].includes(m.kind)) bad(p, `未知 kind：${m.kind}`)
+  if (!['bounded', 'infinite', 'river', 'void', 'ruins', 'daynight', 'space'].includes(m.kind)) bad(p, `未知 kind：${m.kind}`)
   for (const mx of m.mix) {
     if (!(mx.kind in ENEMIES)) bad(`${p}.mix`, `引用了不存在的敌人 kind：${mx.kind}`)
     else if (ENEMIES[mx.kind]?.role === 'boss') bad(`${p}.mix`, `mix 里不能出现 Boss：${mx.kind}`)

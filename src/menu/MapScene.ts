@@ -29,6 +29,7 @@ const MAP_PLAY_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
   void: '环面战场：四壁皆传送门，出这头即现那头',
   ruins: '断壁废墟：墙挡人 / 挡弹 / 挡视线，靠掩体与探头作战',
   daynight: '昼夜原野：30×30 有界，视野随时间涨落——正午纵览全场、午夜相机收窄并四合迷雾；昼夜各出一批怪',
+  space: '深空星海：无限世界，天体不时沿直线横扫（敌我通吃、有预警可躲）；终波奇点张开禁锢场，越往外阻力越大、谁也逃不出',
 }
 
 interface MapLayout {
