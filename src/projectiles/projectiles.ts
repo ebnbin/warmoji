@@ -74,11 +74,10 @@ export function spawnProjectile(
 ): void {
   const p = acquirePooled(scene, scene.projectiles, x, y, emojiKey(def.projectile.emoji, 'player'), def.projectile.size, def.projectile.radius)
   p.setDepth(8).setRotation(angle + def.projectile.rotationOffsetDeg * DEG2RAD)
-  // 满速基准 + 出膛即按当前世界时标缩放（常速图 scale=1，行为不变）
-  const bvx = Math.cos(angle) * def.projectile.speed
-  const bvy = Math.sin(angle) * def.projectile.speed
-  const scale = scene.worldTimeScale()
-  ;(p.body as ArcadeBody).setVelocity(bvx * scale, bvy * scale)
+  ;(p.body as ArcadeBody).setVelocity(
+    Math.cos(angle) * def.projectile.speed,
+    Math.sin(angle) * def.projectile.speed,
+  )
   playSfx('shoot')
   attachProjectile(p, 'team', {
     srcSlot,
@@ -87,8 +86,6 @@ export function spawnProjectile(
     kb: def.knockback,
     prevX: x,
     prevY: y,
-    bvx,
-    bvy,
     // 环面世界的子弹永不出屏：按寿命回收（其余图为 0，不按寿命回收）
     dieAt: scene.projectileTtlMs !== null ? scene.elapsedMs + scene.projectileTtlMs : 0,
     // 能力字段：贯穿余量 + 命中效果链（sweepProjectiles 命中点求值）
@@ -146,9 +143,10 @@ export function spawnEnemyProjectile(
 ): void {
   const shot = acquirePooled(scene, scene.enemyProjectiles, x, y, emojiKey(projectile.emoji, 'enemyProjectile'), projectile.size, projectile.radius)
   shot.setDepth(6)
+  // 满速基准 + 出膛即按敌方时标缩放（时停期敌弹一出膛就凝住）
   const bvx = Math.cos(angle) * projectile.speed
   const bvy = Math.sin(angle) * projectile.speed
-  const scale = scene.worldTimeScale()
+  const scale = scene.enemyTimeScale()
   ;(shot.body as ArcadeBody).setVelocity(bvx * scale, bvy * scale)
   attachProjectile(shot, 'enemy', {
     damage: Math.round(projectile.damage * dmgMul),

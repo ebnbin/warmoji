@@ -329,6 +329,7 @@ export function resolveAbilityDef(w: AbilityDef, fx: CharacterEffects): AbilityD
     case 'dance':
     case 'buff':
     case 'nuke':
+    case 'timeStop':
       return w
   }
 }

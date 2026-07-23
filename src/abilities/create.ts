@@ -15,6 +15,7 @@ import { StrikeAbility } from './StrikeAbility'
 import { SummonAbility } from './SummonAbility'
 import { SweepAbility } from './SweepAbility'
 import { ThrustAbility } from './ThrustAbility'
+import { TimeStopAbility } from './TimeStopAbility'
 import { TurretAbility } from './TurretAbility'
 import type { AbilityContext, AbilityRuntime } from './types'
 
@@ -58,5 +59,7 @@ export function createAbility(
       return new BuffAbility(def, ctx, initialCooldownMs)
     case 'nuke':
       return new NukeAbility(def, ctx, initialCooldownMs)
+    case 'timeStop':
+      return new TimeStopAbility(def, ctx, initialCooldownMs)
   }
 }

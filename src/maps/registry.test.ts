@@ -3,8 +3,8 @@ import { arenaSceneFor, MAP, MAP_IDS, MAPS, rollDecor, sanitizeMapId } from './r
 import { Rng } from '../core/rng'
 
 describe('地图定义', () => {
-  it('五张图齐备且玩法互不相同：图标/名字/描述/形态/固定色板/装饰规则', () => {
-    expect(MAP_IDS.length).toBe(5)
+  it('四张图齐备且玩法互不相同：图标/名字/描述/形态/固定色板/装饰规则', () => {
+    expect(MAP_IDS.length).toBe(4)
     for (const id of MAP_IDS) {
       const m = MAPS[id]
       expect(m.emoji.length).toBeGreaterThan(0)
@@ -17,7 +17,6 @@ describe('地图定义', () => {
     expect(MAP_IDS.map((id) => MAPS[id].kind).sort()).toEqual([
       'bounded',
       'infinite',
-      'metronome',
       'river',
       'void',
     ])
@@ -25,7 +24,6 @@ describe('地图定义', () => {
     expect(MAPS.desert.kind).toBe('infinite')
     expect(MAPS.river.kind).toBe('river')
     expect(MAPS.void.kind).toBe('void')
-    expect(MAPS.metronome.kind).toBe('metronome')
     // 河流图必须有水面漂浮物池
     expect(MAPS.river.drift!.length).toBeGreaterThan(0)
   })
@@ -55,7 +53,6 @@ describe('地图定义', () => {
     expect(arenaSceneFor('desert')).toBe('arenaInfinite')
     expect(arenaSceneFor('river')).toBe('arenaRiver')
     expect(arenaSceneFor('void')).toBe('arenaVoid')
-    expect(arenaSceneFor('metronome')).toBe('arenaMetronome')
   })
 })
 

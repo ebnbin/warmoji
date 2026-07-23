@@ -36,6 +36,7 @@ export const ABILITY_KIND_LABEL: Record<AbilityDef['kind'], string> = {
   dance: '跳舞',
   buff: '鼓舞',
   nuke: '天罚',
+  timeStop: '时停',
 }
 
 /** px → 格 */
@@ -97,6 +98,9 @@ export function abilityStatLines(w: AbilityDef): string[] {
       `基准伤害 ${w.damage} × 当前波次强度`,
       `全场生效 · Boss 承伤 ${Math.round(w.bossRatio * 100)}%`,
     ]
+  }
+  if (w.kind === 'timeStop') {
+    return [`全场敌人与敌弹几乎凝固 ${sec(w.durationMs)}`, '期间队伍照常走位与开火']
   }
   // 击退展示为大致位移距离（冲量 × 衰减时间常数）
   const base = `伤害 ${w.damage} · 冷却 ${sec(w.cooldownMs)} · 击退 ${grid((w.knockback * KNOCKBACK.tauMs) / 1000)}`
@@ -176,6 +180,7 @@ function displayDef(w: AbilityDef, dmgMul: number, cdMul: number, kbMul: number)
     case 'rally':
     case 'dance':
     case 'buff':
+    case 'timeStop':
       return w
     case 'nuke':
       return { ...w, damage: Math.round(w.damage * dmgMul), cooldownMs: w.cooldownMs * cdMul }

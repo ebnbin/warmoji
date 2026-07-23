@@ -114,6 +114,28 @@ export const CAPTAINS = {
       abilities: ['weaknessLecture'],
     },
   },
+  chrono: {
+    emoji: '1f976',
+    name: '定格',
+    desc: '时间的主人：阵亡队员被「倒带」召回，复活更快',
+    teamSize: 5,
+    moveSpeed: 5.8,
+    coinMagnet: 2.4,
+    hpMul: 1,
+    reviveMul: 0.6,
+    startWave: 1,
+    startCoins: 0,
+    xpGainMul: 1,
+    reviveInShop: false,
+    freeRefreshes: 0,
+    firstWaveShop: false,
+    skill: {
+      name: '时停',
+      desc: '按下秒表：15 秒内全场敌人与敌弹几乎凝固，队伍照常走位与开火，尽情收割',
+      cdMs: 45_000,
+      abilities: ['timeFreeze'],
+    },
+  },
   // 测试专用队长（不进正常队长选择页；测试模式固定用它）：编制 8、无限金币、
   // 永远满豆，其余全中性无增益。技能只是测试便利（定身全场便于观察），非增益
   tester: {

@@ -87,6 +87,8 @@ export interface AbilityContext extends EffectCtx {
   rallyTeam?(healRatio: number, invulnMs: number): void
   /** 敌对方全体跳舞定身（含休眠者与窗口内新登场者；打断蓄力/冲刺） */
   danceTargets?(durationMs: number): void
+  /** 时停：接下来 durationMs 内敌方时间近乎凝固（移动/攻速/在途敌弹/刷怪），队伍照常 */
+  timeStop?(durationMs: number): void
   /** 限时全队伤害倍率（到期自动复原，不叠加直接覆写） */
   buffTeamDamage?(mul: number, durationMs: number): void
   /** 战场掉落金币（含拾取爆点视觉与音效；金币是玩家资源，敌方 ctx 缺席） */

@@ -24,9 +24,8 @@ export interface MapDef {
   readonly name: string
   readonly desc: string
   /** 世界形态：bounded = 25×25 有界竞技场；infinite = 无边界（终波缩圈）；
-   * river = 单屏固定相机 + 恒定水流；void = 固定 16:9 环面（四边传送门）；
-   * metronome = 有界竞技场 + 世界时间随队伍移动量放缩（静则近乎时停） */
-  readonly kind: 'bounded' | 'infinite' | 'river' | 'void' | 'metronome'
+   * river = 单屏固定相机 + 恒定水流；void = 固定 16:9 环面（四边传送门） */
+  readonly kind: 'bounded' | 'infinite' | 'river' | 'void'
   /** 固定色板：战斗场景不再逐局随机 */
   readonly palette: Palette
   readonly decor: MapDecor
@@ -50,13 +49,7 @@ export function sanitizeMapId(id: unknown): MapId {
 }
 
 /** 全部竞技场场景键（每种世界形态一套独立场景实现）：注册/路由/探针共用同一份 */
-export const ARENA_SCENE_KEYS = [
-  'arena',
-  'arenaInfinite',
-  'arenaRiver',
-  'arenaVoid',
-  'arenaMetronome',
-] as const
+export const ARENA_SCENE_KEYS = ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid'] as const
 export type ArenaSceneKey = (typeof ARENA_SCENE_KEYS)[number]
 
 /** 该地图应进入的竞技场场景（每种世界形态一套独立场景实现，按图路由） */
@@ -65,7 +58,6 @@ export function arenaSceneFor(id: MapId): ArenaSceneKey {
   if (kind === 'infinite') return 'arenaInfinite'
   if (kind === 'river') return 'arenaRiver'
   if (kind === 'void') return 'arenaVoid'
-  if (kind === 'metronome') return 'arenaMetronome'
   return 'arena'
 }
 

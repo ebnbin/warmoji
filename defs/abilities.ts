@@ -15,6 +15,7 @@ import type {
   SummonDef,
   SweepDef,
   ThrustDef,
+  TimeStopDef,
   TurretDef,
 } from '../src/abilities/defs'
 
@@ -269,6 +270,11 @@ const BASE = {
     cooldownMs: 45_000,
     bossRatio: 0.5,
   } satisfies NukeDef,
+  timeFreeze: {
+    kind: 'timeStop',
+    cooldownMs: 45_000,
+    durationMs: 15_000,
+  } satisfies TimeStopDef,
 } as const
 
 // ── 升级卡档位行：升级 = 换持整行 ────────────────────────────
@@ -483,5 +489,6 @@ export const ABILITIES = {
   discoFever: BASE.discoFever,
   weaknessLecture: BASE.weaknessLecture,
   dimensionStrike: BASE.dimensionStrike,
+  timeFreeze: BASE.timeFreeze,
 } as const
 

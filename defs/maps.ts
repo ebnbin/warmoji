@@ -108,26 +108,4 @@ export const MAPS = {
     mix: DEFAULT_MIX,
     boss: 'boss',
   },
-  metronome: {
-    emoji: '23f1',
-    name: '秒针',
-    desc: '静则时凝，动则时行——你的每一步都在拨动世界的秒针；驻足即近乎时停，读盘后再精准突进',
-    kind: 'metronome',
-    palette: {
-      bgFrom: 'hsl(230 30% 24%)',
-      bgTo: 'hsl(245 42% 9%)',
-      // map 色即冷钢地板（偏亮冷蓝，衬托被「按住」的战场读性）
-      map: hslToInt(220, 0.22, 0.66),
-      shadow: 0x000000,
-    },
-    decor: {
-      // 计时器主题：闹钟 / 沙漏 / 座钟，低透明度散落
-      emojis: ['23f0', '231b', '23f3', '1f570'],
-      sizeU: [0.3, 0.85],
-      alpha: [0.12, 0.24],
-      density: [0.06, 0.09],
-    },
-    mix: DEFAULT_MIX,
-    boss: 'boss',
-  },
 } as const satisfies Record<string, MapDef>

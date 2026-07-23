@@ -397,6 +397,13 @@ export interface NukeDef {
   readonly bossRatio: number
 }
 
+export interface TimeStopDef {
+  readonly kind: 'timeStop'
+  readonly cooldownMs: number
+  /** 时停时长：期间敌方时间近乎凝固（移动/攻速/在途敌弹/刷怪），队伍照常 */
+  readonly durationMs: number
+}
+
 export type AbilityDef =
   | ThrustDef
   | ProjectileDef
@@ -415,6 +422,7 @@ export type AbilityDef =
   | DanceDef
   | BuffDef
   | NukeDef
+  | TimeStopDef
 
 export interface HitTarget {
   x: number

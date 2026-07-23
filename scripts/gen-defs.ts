@@ -47,12 +47,12 @@ function pure(path: string, v: unknown): void {
 const ABILITY_KINDS = new Set([
   'projectile', 'thrust', 'sweep', 'areaBlast', 'boomerang', 'laser',
   'slowAura', 'assassinate', 'turret', 'summon', 'heal', 'chainArc',
-  'rally', 'strike', 'dance', 'buff', 'nuke',
+  'rally', 'strike', 'dance', 'buff', 'nuke', 'timeStop',
 ])
 
 /** 实现了 castNow（手动单发）的 kind——队长主动技能载荷只能用这些（与
  * src/abilities 各运行时类同步维护） */
-const CASTABLE_KINDS = new Set(['rally', 'strike', 'dance', 'buff', 'nuke'])
+const CASTABLE_KINDS = new Set(['rally', 'strike', 'dance', 'buff', 'nuke', 'timeStop'])
 
 /** onHit 命中效果的合法 kind（与 src/abilities/effects.ts 的 applyEffects 分支同步） */
 const EFFECT_KINDS = new Set(['blast', 'slow', 'ground', 'morph'])
@@ -259,7 +259,7 @@ for (const [id, it] of Object.entries<ItemDef>(ITEMS as Record<string, ItemDef>)
 for (const [id, m] of Object.entries(MAPS)) {
   const p = `maps.${id}`
   str(`${p}.emoji`, m.emoji)
-  if (!['bounded', 'infinite', 'river', 'void', 'metronome'].includes(m.kind)) bad(p, `未知 kind：${m.kind}`)
+  if (!['bounded', 'infinite', 'river', 'void'].includes(m.kind)) bad(p, `未知 kind：${m.kind}`)
   for (const mx of m.mix) {
     if (!(mx.kind in ENEMIES)) bad(`${p}.mix`, `引用了不存在的敌人 kind：${mx.kind}`)
     else if (ENEMIES[mx.kind]?.role === 'boss') bad(`${p}.mix`, `mix 里不能出现 Boss：${mx.kind}`)
