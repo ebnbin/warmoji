@@ -160,17 +160,17 @@ export const CHARACTERS = {
   queenBee: {
     emoji: '1f41d',
     name: '蜂后',
-    desc: '统领一小群蜜蜂，蜂群自主追击撞刺敌人',
+    desc: '每隔一阵放出一群小蜂，自主寻路蜇敌施毒后自毁，优先扑向未中毒的目标',
     orbit: -0.2,
     weapons: [],
     innate: [
       {
-        name: '蜂群',
+        name: '毒蜂群',
         icon: '1f41d',
         base: 'beeSwarm',
         upgrades: [
-          { ability: 'beeSwarm2', card: { icon: '1f41d', name: '扩巢', desc: '蜂群 +1 只' } },
-          { ability: 'beeSwarm3', card: { icon: '1f9a0', name: '麻痹毒素', desc: '被蜇中的敌人减速 45%，持续 1.2 秒' } },
+          { ability: 'beeSwarm2', card: { icon: '1f41d', name: '扩巢', desc: '每波小蜂 +1 只' } },
+          { ability: 'beeSwarm3', card: { icon: '1f9a0', name: '剧毒麻痹', desc: '毒素更烈，蜇中附带 45% 减速 1.2 秒' } },
         ],
       },
     ],

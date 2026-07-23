@@ -221,6 +221,7 @@ interface Window {
   __warmoji?: WarmojiDebug
   __game?: unknown
   __setLab?: (kinds: string[], mapId?: string) => void
+  __labTeam?: (ids: string[], mapId?: string) => void
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
   __addMemberItem?: (itemId: string, slot?: number, count?: number) => void

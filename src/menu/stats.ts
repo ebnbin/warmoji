@@ -63,9 +63,11 @@ export function abilityStatLines(w: AbilityDef): string[] {
     ]
   }
   if (w.kind === 'summon') {
+    let poison = ''
+    for (const e of w.onHit ?? []) if (e.kind === 'poison') poison = ` · 毒 ${e.damage}/秒×${sec(e.durationMs)}`
     return [
-      `蜂群 ${w.count} 只 · 每击 ${w.damage} 伤害`,
-      `蜂速 ${grid(w.minion.speed)}/秒 · 再攻间隔 ${sec(w.hitCooldownMs)}`,
+      `每波 ${w.count} 只 · 每隔 ${sec(w.intervalMs)} 放一波`,
+      `撞击 ${w.damage}，蜇中自毁${poison}`,
     ]
   }
   if (w.kind === 'turret') {
@@ -198,7 +200,7 @@ function displayDef(w: AbilityDef, dmgMul: number, cdMul: number, kbMul: number)
       return {
         ...w,
         damage: Math.round(w.damage * dmgMul),
-        hitCooldownMs: w.hitCooldownMs * cdMul,
+        intervalMs: w.intervalMs * cdMul,
         knockback: w.knockback * kbMul,
       }
     default:

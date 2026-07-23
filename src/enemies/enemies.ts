@@ -43,6 +43,14 @@ export interface Enemy {
   /** 能力施加的限时减速/冻结（0 = 无） */
   abilitySlowUntil: number
   abilitySlowMul: number
+  /** 中毒 DoT（小蜜蜂毒针等）：0 = 未中毒。到期解毒 */
+  poisonUntil: number
+  /** 下一次毒素跳伤的时刻 */
+  poisonNextTick: number
+  /** 每跳毒伤 / 跳间隔（ms）/ 伤害归属槽位 */
+  poisonDmg: number
+  poisonTickMs: number
+  poisonSlot: number
   /** 精英体质倍率 */
   spMul: number
   dmgMul: number
@@ -101,6 +109,11 @@ export function attachEnemy(image: ImageObj, def: EnemyDef, hp: number, init?: P
     slowed: false,
     abilitySlowUntil: 0,
     abilitySlowMul: 1,
+    poisonUntil: 0,
+    poisonNextTick: 0,
+    poisonDmg: 0,
+    poisonTickMs: 1000,
+    poisonSlot: -1,
     spMul: 1,
     dmgMul: 1,
     kvx: 0,

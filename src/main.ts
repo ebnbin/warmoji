@@ -33,7 +33,8 @@ import type { BaseArenaScene } from './battle/BaseArenaScene'
 import { loadSettings } from './run/settings'
 import { bgmState, initBgm, playBgm, renderBgmOffline, setBgmEnabled } from './audio/bgm'
 import type { BgmId } from './audio/music'
-import { labCaptain, labStarters, setLabEnemies } from './run/lab'
+import { labCaptain, labStarters, setLabEnemies, setLabRoster } from './run/lab'
+import type { CharacterId } from './characters/registry'
 import { beginRun } from './run/state'
 import { ARENA_SCENE_KEYS, arenaSceneFor, sanitizeMapId } from './maps/registry'
 import { initSfx, setSfxEnabled, sfxStats } from './audio/sfx'
@@ -113,6 +114,11 @@ window.addEventListener('orientationchange', () => {
 // 供临时验证脚本注入状态
 window.__game = game
 
+// 调试探针：设定试炼场阵容（角色 id 列表）后在某图开测试模式——供 e2e 单测某角色
+window.__labTeam = (ids: string[], mapId = 'forest'): void => {
+  setLabRoster(ids as CharacterId[])
+  window.__setLab!([], mapId)
+}
 // 测试模式：设定出场敌人（kind 列表），用当前勾选阵容在某张真实地图上开测试模式
 window.__setLab = (kinds: string[], mapId = 'forest'): void => {
   setLabEnemies(kinds)

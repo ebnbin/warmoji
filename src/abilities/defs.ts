@@ -59,6 +59,14 @@ export interface SlowEffect {
   readonly durationMs: number
 }
 
+/** 逐目标中毒 DoT：命中后每 tickMs 造成 damage 点伤害，持续 durationMs（毒针）。刷新不叠加 */
+export interface PoisonEffect {
+  readonly kind: 'poison'
+  readonly damage: number
+  readonly tickMs: number
+  readonly durationMs: number
+}
+
 /** 命中锚点处留下持续地面效果区（灼烧/毒等）；任意投送都能挂，阵营由 ctx 注入 */
 export interface GroundZone {
   readonly kind: 'ground'
@@ -111,6 +119,7 @@ export interface AttackSlowEffect {
 export type Effect =
   | BlastEffect
   | SlowEffect
+  | PoisonEffect
   | GroundZone
   | MorphEffect
   | SpawnProjectileEffect
@@ -298,15 +307,18 @@ export interface TurretDef {
 
 export interface SummonDef {
   readonly kind: 'summon'
-  /** 召唤物数量（独立 AI：追击最近敌人，撞击伤害） */
+  /** 每波放出的小蜂数量（各自独立寻路，优先扑向未中毒的敌人） */
   readonly count: number
   readonly minion: { readonly emoji: string; readonly size: number; readonly speed: number }
+  /** 撞击直伤（小，威胁主要在毒） */
   readonly damage: number
   readonly knockback: number
-  /** 单只命中后的再攻间隔（撞完弹开一小段） */
-  readonly hitCooldownMs: number
+  /** 放蜂波次间隔（ms）：每隔一段时间放出一波 count 只 */
+  readonly intervalMs: number
+  /** 单只寿命（ms）：撞到敌人施毒即自毁；一直没撞到则到寿命消散 */
+  readonly lifeMs: number
   // ── 能力字段 ──
-  /** 命中效果：蜇中的敌人施加的 onHit 效果（麻痹减速等，逐目标） */
+  /** 命中效果：蜇中的敌人施加的 onHit 效果（毒 DoT、麻痹减速等，逐目标） */
   readonly onHit?: readonly Effect[]
 }
 

@@ -7,92 +7,137 @@ import { ANIM_DEF } from '../emoji/studio'
 import { Animator } from '../emoji/animator'
 import { clipFramesLive } from '../emoji/animTextures'
 import { emojiImage } from '../emoji/textures'
-import { nearestTarget } from './targeting'
-import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
+import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-interface Minion {
+interface Bee {
   img: Phaser.GameObjects.Image
-  /** 命中后的再攻间隔；>0 时退回主人身边盘旋 */
-  hitCd: number
-  /** 待机盘旋相位（各只错开） */
-  phase: number
   anim: Animator
+  age: number
+  phase: number
+  dead: boolean
 }
 
-/** 召唤型：常驻一小群独立 AI 的召唤物——追击最近的敌人，撞上即造成伤害，
- * 之后短暂退回主人身边再出击。无敌人时绕主人盘旋。
- * 能力：onHit 蜇中命中效果（麻痹减速等） */
+/** 放蜂型（蜂后）：每隔 intervalMs 放出一波 count 只小蜂——各自寻路扑向最近的敌人
+ * （优先未中毒者，好把毒摊开），撞上即造成撞击直伤 + onHit 毒素随即自毁；一直没撞到
+ * 则到寿命(lifeMs)消散。毒 = onHit 的 poison 效果（每秒一跳、持续数秒的 DoT）。 */
 export class SummonAbility implements AbilityRuntime {
-  private minions: Minion[] = []
+  private bees: Bee[] = []
   /** 动画时钟：delta 累积（暂停即停帧） */
   private clock = 0
+  /** 距下一波放蜂的倒计时 */
+  private waveCd: number
+  private readonly frames: string[]
+  private visible = true
 
   constructor(
     private def: SummonDef,
     private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
-    const frames = clipFramesLive(ctx.scene, def.minion.emoji, 'idle', ctx.ownerOutline)
-    for (let i = 0; i < def.count; i++) {
-      const img = emojiImage(ctx.scene, 0, 0, def.minion.emoji, def.minion.size, ctx.ownerOutline).setDepth(12)
+    this.frames = clipFramesLive(ctx.scene, def.minion.emoji, 'idle', ctx.ownerOutline)
+    this.waveCd = initialCooldownMs
+  }
+
+  private spawnWave(owner: AbilityOwner): void {
+    for (let i = 0; i < this.def.count; i++) {
+      const img = emojiImage(this.ctx.scene, owner.x, owner.y, this.def.minion.emoji, this.def.minion.size, this.ctx.ownerOutline)
+        .setDepth(12)
+        .setVisible(this.visible)
       const anim = new Animator(img)
-      anim.register('idle', frames)
-      anim.setIdle('idle', ANIM_DEF.durMs, (i * ANIM_DEF.durMs) / def.count)
-      this.minions.push({
-        img,
-        hitCd: initialCooldownMs + i * 150,
-        phase: (i * Math.PI * 2) / def.count,
-        anim,
-      })
+      anim.register('idle', this.frames)
+      anim.setIdle('idle', ANIM_DEF.durMs, (i * ANIM_DEF.durMs) / this.def.count)
+      this.bees.push({ img, anim, age: 0, phase: (i * Math.PI * 2) / this.def.count, dead: false })
     }
+  }
+
+  /** 优先未中毒的最近敌人；没有未中毒者则退而求其次取最近敌人 */
+  private pickTarget(bx: number, by: number): TargetInfo | null {
+    const targets = this.ctx.targets()
+    const max = ACQUIRE.range * UNIT
+    let bestFresh: TargetInfo | null = null
+    let bestFreshD = max * max
+    let bestAny: TargetInfo | null = null
+    let bestAnyD = max * max
+    const isPoisoned = this.ctx.isPoisoned
+    for (const t of targets) {
+      const dx = t.x - bx
+      const dy = t.y - by
+      const d = dx * dx + dy * dy
+      if (d < bestAnyD) {
+        bestAnyD = d
+        bestAny = t
+      }
+      if (!isPoisoned?.(t.ref) && d < bestFreshD) {
+        bestFreshD = d
+        bestFresh = t
+      }
+    }
+    return bestFresh ?? bestAny
   }
 
   update(delta: number, owner: AbilityOwner): void {
     this.clock += delta
     const dt = Math.min(delta, 50) / 1000
     const speed = this.def.minion.speed
-    for (const m of this.minions) {
-      m.anim.update(this.clock)
-      m.hitCd -= delta
-      m.phase += dt * 2.4
-      const target = m.hitCd <= 0 ? nearestTarget(m.img.x, m.img.y, this.ctx.targets(), ACQUIRE.range * UNIT) : null
-      // 目的地：出击 = 敌人；否则回主人身边的盘旋位
+
+    this.waveCd -= delta
+    if (this.waveCd <= 0) {
+      this.spawnWave(owner)
+      this.waveCd = this.def.intervalMs * this.ctx.cooldownMul()
+    }
+
+    for (const b of this.bees) {
+      b.anim.update(this.clock)
+      b.age += delta
+      if (b.age >= this.def.lifeMs) {
+        b.dead = true
+        b.img.destroy()
+        continue
+      }
+
+      const target = this.pickTarget(b.img.x, b.img.y)
+      b.phase += dt * 3
+      // 有目标就扑过去；没目标就在主人身边打转候敌
       const dest = target
         ? { x: target.x, y: target.y }
-        : {
-            x: owner.x + Math.cos(m.phase) * 46,
-            y: owner.y + Math.sin(m.phase) * 46 - 10,
-          }
-      const dx = dest.x - m.img.x
-      const dy = dest.y - m.img.y
+        : { x: owner.x + Math.cos(b.phase) * 40, y: owner.y + Math.sin(b.phase) * 40 - 8 }
+      const dx = dest.x - b.img.x
+      const dy = dest.y - b.img.y
       const d = Math.hypot(dx, dy)
       const step = speed * dt
-      if (d <= step) m.img.setPosition(dest.x, dest.y)
-      else m.img.setPosition(m.img.x + (dx / d) * step, m.img.y + (dy / d) * step)
-      m.img.setFlipX(dx < 0)
+      if (d > step) b.img.setPosition(b.img.x + (dx / d) * step, b.img.y + (dy / d) * step)
+      else b.img.setPosition(dest.x, dest.y)
+      b.img.setFlipX(dx < 0)
 
       if (target) {
         const rr = target.radius + this.def.minion.size * 0.35
-        const tx = target.x - m.img.x
-        const ty = target.y - m.img.y
+        const tx = target.x - b.img.x
+        const ty = target.y - b.img.y
         if (tx * tx + ty * ty <= rr * rr) {
+          // 撞上：撞击直伤 + 施毒(onHit)，随即自毁
           const damage = Math.round(this.def.damage * this.ctx.damageMul())
-          this.ctx.damageTarget(target.ref, damage, this.def.knockback, m.img.x, m.img.y)
-          // 命中效果（麻痹减速等）：施加到被蜇目标
-          applyEffects(this.ctx, this.def.onHit, { center: { x: target.x, y: target.y }, baseDamage: damage, targets: [target.ref] })
+          this.ctx.damageTarget(target.ref, damage, this.def.knockback, b.img.x, b.img.y)
+          applyEffects(this.ctx, this.def.onHit, {
+            center: { x: target.x, y: target.y },
+            baseDamage: damage,
+            targets: [target.ref],
+          })
           this.ctx.sfx('hit')
-          m.hitCd = this.def.hitCooldownMs * this.ctx.cooldownMul()
+          b.dead = true
+          b.img.destroy()
         }
       }
     }
+    if (this.bees.some((b) => b.dead)) this.bees = this.bees.filter((b) => !b.dead)
   }
 
   setVisible(on: boolean): void {
-    for (const m of this.minions) m.img.setVisible(on)
+    this.visible = on
+    for (const b of this.bees) b.img.setVisible(on)
   }
 
   destroy(): void {
-    for (const m of this.minions) m.img.destroy()
-    this.minions = []
+    for (const b of this.bees) b.img.destroy()
+    this.bees = []
   }
 }

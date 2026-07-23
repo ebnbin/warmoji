@@ -35,6 +35,8 @@ export interface EffectCtx {
   ): void
   /** 给单个目标施加限时减速（factor=0 即冻结），到时自动恢复 */
   slowTarget(target: Phaser.GameObjects.Image, factor: number, durationMs: number): void
+  /** 给单个目标挂中毒 DoT：每 tickMs 造成 damage 点伤害，持续 durationMs（毒针）。敌方 ctx 缺席即 no-op */
+  poisonTarget?(target: Phaser.GameObjects.Image, damage: number, tickMs: number, durationMs: number): void
   /** 在地面生成持续效果区：周期性烧伤区域内的敌对方（阵营与归属由实现注入） */
   spawnGroundEffect(x: number, y: number, def: GroundEffectDef): void
   /** 治疗我方：all=false 治范围内血量比例最低的一名、true 范围内全体；
@@ -97,6 +99,8 @@ export interface AbilityContext extends EffectCtx {
   waveScale?(): number
   /** 目标是否 Boss（承伤折减类效果用） */
   isBossTarget?(ref: TargetInfo['ref']): boolean
+  /** 目标是否已中毒（小蜂优先扑未中毒的敌人；无此机制的 ctx 缺席即恒 false） */
+  isPoisoned?(ref: TargetInfo['ref']): boolean
 }
 
 /** 能力运行时：每（持有者×能力）一个实例，自管冷却/视觉/攻击行为 */

@@ -173,6 +173,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       a.abilitySlowMul = factor
       a.abilitySlowUntil = this.elapsedMs + durationMs
     },
+    poisonTarget: (enemy, dmg, tickMs, durationMs) =>
+      this.poisonEnemy(enemy as ImageObj, dmg, tickMs, durationMs, -1),
+    isPoisoned: (ref) => enemyOf(ref as ImageObj).poisonUntil > this.elapsedMs,
     spawnGroundEffect: (x, y, def) => spawnGroundEffect(this, x, y, def, { faction: 'team', srcSlot: -1 }),
     attractCoins: (x, y, radius) => this.frameAttractors.push({ x, y, r2: radius * radius }),
     // 基座 ctx 无「本人」概念：无敌授予/本体动画由 memberCtx 按槽位覆写
@@ -206,6 +209,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       a.abilitySlowMul = factor
       a.abilitySlowUntil = this.elapsedMs + durationMs
     },
+    poisonTarget: (enemy, dmg, tickMs, durationMs) =>
+      this.poisonEnemy(enemy as ImageObj, dmg, tickMs, durationMs, this.teamEffectSlot),
     spawnGroundEffect: (x, y, def) =>
       spawnGroundEffect(this, x, y, def, { faction: 'team', srcSlot: this.teamEffectSlot }),
     heal: (x, y, range, amount, all) => this.healAllies(x, y, range, amount, all),
@@ -1084,6 +1089,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       },
       spawnProjectile: (x, y, angle, pDef, damage) =>
         spawnProjectile(this, x, y, angle, pDef, damage, slot),
+      // 毒素伤害归属发起该攻击的队员槽位（结算页击杀/输出计入蜂后）
+      poisonTarget: (enemy, dmg, tickMs, durationMs) =>
+        this.poisonEnemy(enemy as ImageObj, dmg, tickMs, durationMs, slot),
       spawnGroundEffect: (x, y, def) =>
         spawnGroundEffect(this, x, y, def, { faction: 'team', srcSlot: slot }),
       // 刺客出手帧：把「上次受击时刻」推到未来，等效授予 ms 无敌
@@ -2044,6 +2052,18 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     )
   }
 
+  /** 给敌人挂中毒 DoT（毒针）：刷新持续时间与每跳伤害，不叠加。steerEnemies 逐帧跳伤 */
+  private poisonEnemy(enemy: ImageObj, dmg: number, tickMs: number, durationMs: number, slot: number): void {
+    if (!enemy.active) return
+    const a = enemyOf(enemy)
+    if (a.dormant) return
+    a.poisonDmg = dmg
+    a.poisonTickMs = tickMs
+    a.poisonUntil = this.elapsedMs + durationMs
+    a.poisonNextTick = this.elapsedMs + tickMs
+    a.poisonSlot = slot
+  }
+
   /** 时停：逐帧把双方在途弹体速度重设为 满速基准×scale（凝在半空）；scale=1 即恢复满速。
    * 弹道由物理按实时积分，故须逐帧改写速度而非改 delta——敌弹与玩家弹一并凝住 */
   private applyProjectileTimeScale(scale: number): void {
@@ -2099,6 +2119,21 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         e.clearTint()
         a.slowed = false
         if (a.state === 'windup') e.setTint(0xffb74d)
+      }
+
+      // 中毒 DoT：每 poisonTickMs 一跳、期间染毒绿；到期解毒（跳伤可能致死→本体已释放即跳出）
+      if (a.poisonUntil !== 0) {
+        if (now >= a.poisonUntil) {
+          a.poisonUntil = 0
+          if (a.flashUntil === 0 && !a.slowed) e.clearTint()
+        } else {
+          if (now >= a.poisonNextTick) {
+            a.poisonNextTick += a.poisonTickMs
+            this.applyDamage(e, a.poisonDmg, 0, undefined, undefined, a.poisonSlot)
+            if (!e.active) continue
+          }
+          if (a.flashUntil === 0) e.setTint(0x7bff5a) // 毒绿
+        }
       }
 
       // 全场蹦迪：定身摇摆（行为状态机暂停），击退与世界后处理（水流/钳制）照常。

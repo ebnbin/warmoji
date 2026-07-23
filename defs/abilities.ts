@@ -198,10 +198,13 @@ const BASE = {
   beeSwarm: {
     kind: 'summon',
     count: 3,
-    minion: { emoji: '1f41d', size: 0.55, speed: 7.5 },
-    damage: 11,
+    minion: { emoji: '1f41d', size: 0.5, speed: 8 },
+    // 撞击直伤小，威胁全在毒：命中挂每秒一跳、共 5 跳的毒 DoT
+    damage: 5,
     knockback: 2,
-    hitCooldownMs: 900,
+    intervalMs: 2600,
+    lifeMs: 4000,
+    onHit: [{ kind: 'poison', damage: 8, tickMs: 1000, durationMs: 5000 }],
   } satisfies SummonDef,
   fieldMedkit: {
     kind: 'heal',
@@ -412,10 +415,13 @@ export const beeSwarm2 = {
   ...BASE.beeSwarm,
   count: BASE.beeSwarm.count + 1,
 } satisfies SummonDef
-/** 麻痹毒素 */
+/** 剧毒麻痹：毒更烈，且蜇中附带短暂麻痹减速 */
 export const beeSwarm3 = {
   ...beeSwarm2,
-  onHit: [{ kind: 'slow', factor: 0.55, durationMs: 1200 }],
+  onHit: [
+    { kind: 'poison', damage: 13, tickMs: 1000, durationMs: 5000 },
+    { kind: 'slow', factor: 0.55, durationMs: 1200 },
+  ],
 } satisfies SummonDef
 
 /** 群体处方 */

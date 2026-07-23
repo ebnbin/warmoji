@@ -13,8 +13,15 @@ export function abilityDps(v: Ability): number {
   const dmg = num(v, 'damage')
   const cd = num(v, 'cooldownMs') / 1000
   switch (v.kind) {
-    case 'summon':
-      return (num(v, 'count') * dmg) / (num(v, 'hitCooldownMs') / 1000)
+    case 'summon': {
+      // 每只小蜂 = 撞击直伤 + 毒素总伤（damage/tick × 跳数）；按每波并发折算
+      const onHit = Array.isArray(v.onHit) ? (v.onHit as Ability[]) : []
+      let per = dmg
+      for (const e of onHit) {
+        if (e.kind === 'poison') per += num(e, 'damage') * (num(e, 'durationMs') / Math.max(1, num(e, 'tickMs')))
+      }
+      return (num(v, 'count') * per) / (num(v, 'intervalMs') / 1000)
+    }
     case 'turret':
       return (num(v, 'maxTurrets') * dmg) / (num(v, 'fireIntervalMs') / 1000)
     case 'chainArc': {
