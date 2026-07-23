@@ -17,7 +17,7 @@ import { releasePooled } from '../core/pool'
 import type { Member } from '../characters/members'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 
-// 虚空竞技场（kind='void'）：环面世界。世界规则：
+// 工厂竞技场（kind='void' 环面世界，主题=自动化车间）：世界规则：
 // · 环面：固定 16:9 竞技场（横屏 24×13.5 格，竖屏互换），四边两两粘合成
 //   传送门——没有任何墙，所有实体（玩家/敌人/Boss/子弹/金币）坐标按模回绕
 // · 几何环面化：索敌喂「真身 + 三个镜像坐标」（能力零改动即隔门瞄准）；
@@ -28,13 +28,13 @@ import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 // · 子弹按寿命回收（环面上永远飞不出屏幕）；扫掠线段在回绕帧重置起点
 // · 渲染分身：主相机视口裁剪出屏幕内最大居中 16:9（余量留空白），四缝
 //   + 四角各挂一个条带相机取景对侧溢出——实体跨缝时两侧同时可见，
-//   全体实体/血条/粒子零逐实体管理；地板/门框/星空在条带相机中忽略
+//   全体实体/血条/粒子零逐实体管理；地板/门框/零件在条带相机中忽略
 // · 传送门：四边流光门框（顺时针流动的虚线光带 + 脉动）
 export class VoidArenaScene extends BaseArenaScene {
   private arenaW = 0
   private arenaH = 0
   private stripCams: Phaser.Cameras.Scene2D.Camera[] = []
-  // 静态视觉层（地板/星空/门框）：条带相机忽略，只画一份
+  // 静态视觉层（地板/零件/门框）：条带相机忽略，只画一份
   private staticVisuals: Phaser.GameObjects.GameObject[] = []
   private frameTiles: { tile: Phaser.GameObjects.TileSprite; dx: number; dy: number }[] = []
   private frameGlow?: Phaser.GameObjects.Graphics
@@ -77,7 +77,7 @@ export class VoidArenaScene extends BaseArenaScene {
   }
 
   protected finalWaveWarningSub(): string {
-    return '环形战场无处可退，正面迎战！'
+    return '环形厂区无处可退，正面迎战！'
   }
 
   /** 索敌/追击/磁吸的几何基元：环面最短差 */
@@ -287,7 +287,7 @@ export class VoidArenaScene extends BaseArenaScene {
     }
   }
 
-  // ── 虚空视觉：深空地板 + 星空 + 传送门流光门框 ────────────────
+  // ── 工厂视觉：钢板地面 + 散落零件 + 传送闸口流光门框 ──────────────
 
   /** 静态视觉整体重建（create 与视口变化时）；随后刷新条带相机忽略表 */
   private buildVoidVisuals(): void {
@@ -300,7 +300,7 @@ export class VoidArenaScene extends BaseArenaScene {
     const H = this.arenaH
     const mapDef: MapDef = MAPS[this.run.mapId]
 
-    // 深空地板（中心朝亮的多层软渐变，避免硬边椭圆的「盘子感」）
+    // 钢板厂房地面（中心朝亮的顶灯软渐变，避免硬边椭圆的「盘子感」）
     const gFloor = this.add.graphics().setDepth(0)
     gFloor.fillStyle(this.palette.map, 1)
     gFloor.fillRect(0, 0, W, H)
@@ -315,7 +315,7 @@ export class VoidArenaScene extends BaseArenaScene {
     }
     this.staticVisuals.push(gFloor)
 
-    // 星空点缀（种子固定：同局重建不变）
+    // 散落零件点缀（种子固定：同局重建不变）
     const def = mapDef.decor
     const rng = new Rng(this.run.decorSeed)
     const cells = (W / UNIT) * (H / UNIT)
@@ -348,7 +348,8 @@ export class VoidArenaScene extends BaseArenaScene {
         .setOrigin(0)
         .setDepth(3.5)
         .setAlpha(0.42)
-        .setTint(0x7de8ff)
+        // 传送闸口：琥珀色警示光带顺时针流动（工业危险边界读性）
+        .setTint(0xffb300)
       this.frameTiles.push({ tile, dx, dy })
       this.staticVisuals.push(tile)
     }
@@ -399,9 +400,9 @@ export class VoidArenaScene extends BaseArenaScene {
     const W = this.arenaW
     const H = this.arenaH
     g.clear()
-    g.lineStyle(3, 0xb388ff, pulse)
+    g.lineStyle(3, 0xff8f00, pulse)
     g.strokeRect(1.5, 1.5, W - 3, H - 3)
-    g.lineStyle(1.5, 0xe1f5fe, Math.min(1, pulse + 0.25))
+    g.lineStyle(1.5, 0xffe082, Math.min(1, pulse + 0.25))
     g.strokeRect(4, 4, W - 8, H - 8)
   }
 

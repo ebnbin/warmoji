@@ -87,23 +87,23 @@ export const MAPS = {
     boss: 'boss',
   },
   void: {
-    emoji: '1f300',
-    name: '虚空',
-    desc: '悬浮虚空的一方战场，四边皆是传送门——穿出此缘，即现彼缘',
+    emoji: '1f3ed',
+    name: '工厂',
+    desc: '轰鸣的自动化车间，四壁皆是传送闸口——出这头即现那头',
     kind: 'void',
     palette: {
-      bgFrom: 'hsl(258 32% 14%)',
-      bgTo: 'hsl(240 45% 7%)',
-      // map 色即虚空地板（深邃暗紫，实体与星光在其上高对比）
-      map: hslToInt(252, 0.28, 0.15),
+      bgFrom: 'hsl(210 16% 20%)',
+      bgTo: 'hsl(214 22% 8%)',
+      // map 色即钢板厂房地面（冷调钢灰，零件与实体在其上高对比）
+      map: hslToInt(210, 0.08, 0.34),
       shadow: 0x000000,
     },
     decor: {
-      // 星空点缀（静态散布，低透明度）
-      emojis: ['2728', '2b50', '1f4ab', '1fa90', '2604'],
-      sizeU: [0.2, 0.65],
-      alpha: [0.18, 0.34],
-      density: [0.05, 0.08],
+      // 散落厂房地面的齿轮/扳手/螺栓/油桶/料箱/工具（低透明度贴地，不抢战场读性）
+      emojis: ['2699', '1f527', '1f529', '1f6e2', '1f4e6', '1f6e0'],
+      sizeU: [0.3, 0.7],
+      alpha: [0.14, 0.26],
+      density: [0.05, 0.09],
     },
     mix: DEFAULT_MIX,
     boss: 'boss',

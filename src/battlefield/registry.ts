@@ -84,13 +84,13 @@ const POOLS: Record<MapId, readonly FieldPickupDef[]> = {
     { id: 'river_under', emoji: '1f531', name: '逆流阻滞', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.7 } },
     { id: 'river_whirl', emoji: '1fae7', name: '漩涡搅扰', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
   ],
-  // 虚空：相位/星能/熵增
+  // 工厂：齿轮咬滞/涡轮增压/精密校准（增益），传动卡壳/油污黏脚（减益）——呼应「自动化车间」主题
   void: [
-    { id: 'void_phase', emoji: '1f30c', name: '相位滞留', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemySlowMul: 0.65 } },
-    { id: 'void_star', emoji: '1f4ab', name: '星能灌注', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { teamDamageMul: 1.35 } },
-    { id: 'void_focus', emoji: '1f52e', name: '虚空敏锐', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { critAdd: 0.18 } },
-    { id: 'void_entropy', emoji: '1f300', name: '熵增紊乱', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
-    { id: 'void_drift', emoji: '26ab', name: '空间坍缩', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.72 } },
+    { id: 'factory_grind', emoji: '2699', name: '齿轮咬滞', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemySlowMul: 0.65 } },
+    { id: 'factory_turbo', emoji: '26a1', name: '涡轮增压', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { teamDamageMul: 1.35 } },
+    { id: 'factory_calibrate', emoji: '1f527', name: '精密校准', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { critAdd: 0.18 } },
+    { id: 'factory_jam', emoji: '1f529', name: '传动卡壳', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
+    { id: 'factory_oil', emoji: '1f6e2', name: '油污黏脚', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.72 } },
   ],
   // 残垣：伏击/夯墙/尘幕（增益），碎砾/塌方（减益）——呼应「废墟掩体」主题
   ruins: [
