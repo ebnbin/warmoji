@@ -5,6 +5,7 @@ import { CardScene } from './menu/CardScene'
 import { InfiniteArenaScene } from './maps/InfiniteArenaScene'
 import { MapScene } from './menu/MapScene'
 import { MenuScene } from './menu/MenuScene'
+import { MetronomeArenaScene } from './maps/MetronomeArenaScene'
 import { PreloadScene } from './boot/PreloadScene'
 import { PromoteScene } from './menu/PromoteScene'
 import { ResultScene } from './menu/ResultScene'
@@ -34,7 +35,7 @@ import { bgmState, initBgm, playBgm, renderBgmOffline, setBgmEnabled } from './a
 import type { BgmId } from './audio/music'
 import { labCaptain, labStarters, setLabEnemies } from './run/lab'
 import { beginRun } from './run/state'
-import { arenaSceneFor, sanitizeMapId } from './maps/registry'
+import { ARENA_SCENE_KEYS, arenaSceneFor, sanitizeMapId } from './maps/registry'
 import { initSfx, setSfxEnabled, sfxStats } from './audio/sfx'
 import { isStandalone, nudgeIosViewport, refreshViewport, viewport } from './core/apply'
 
@@ -63,7 +64,7 @@ const game = new Phaser.Game({
   // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
   physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, UIScene, ResultScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, MetronomeArenaScene, UIScene, ResultScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {
@@ -75,7 +76,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
   // 场景 → BGM：大厅页共用一首，战斗页按本局地图配曲。
   // 挂在场景 START 上（restart 重入时 playBgm 幂等不重开）
   const lobby = ['menu', 'map', 'wiki', 'studio', 'settings', 'captain', 'promote', 'cards', 'shop', 'result']
-  const arenas = ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']
+  const arenas: readonly string[] = ARENA_SCENE_KEYS
   for (const scene of game.scene.getScenes(false)) {
     const key = scene.scene.key
     if (lobby.includes(key)) {
@@ -119,7 +120,7 @@ window.__setLab = (kinds: string[], mapId = 'forest'): void => {
   beginRun(labCaptain(), labStarters(), m, true)
   const target = arenaSceneFor(m)
   // 已在目标竞技场则原子重开（避免同帧 stop+start 竞态）；否则停掉别的竞技场再启动它
-  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
+  for (const key of ARENA_SCENE_KEYS) {
     if (key !== target && game.scene.isActive(key)) game.scene.stop(key)
   }
   if (game.scene.isActive(target)) game.scene.getScene(target).scene.restart()
@@ -144,7 +145,7 @@ window.__setWave = (n: number): void => {
 window.__spawnEnemy = (kind: string, dxU = 3, dyU = 0): void => {
   const def = ENEMY_DEFS.find((s) => s.kind === kind)
   if (!def) return
-  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
+  for (const key of ARENA_SCENE_KEYS) {
     if (!game.scene.isActive(key)) continue
     const sc = game.scene.getScene(key) as BaseArenaScene
     const px = toPx(def)
@@ -156,7 +157,7 @@ window.__spawnArmedEnemy = (abilityId: string, dxU = 3, dyU = 0): void => {
   const w = (ABILITIES as Record<string, AbilityDef>)[abilityId]
   const base = ENEMY_DEFS.find((s) => s.kind === 'zombie')
   if (!w || !base) return
-  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
+  for (const key of ARENA_SCENE_KEYS) {
     if (!game.scene.isActive(key)) continue
     const sc = game.scene.getScene(key) as BaseArenaScene
     const px = toPx({ ...base, abilities: [w] })
@@ -166,7 +167,7 @@ window.__spawnArmedEnemy = (abilityId: string, dxU = 3, dyU = 0): void => {
 }
 // e2e 行为探针：在队伍中心附近撒落地金币（偷币鼠用例）
 window.__dropCoins = (n: number, dxU = 2, dyU = 0): void => {
-  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
+  for (const key of ARENA_SCENE_KEYS) {
     if (!game.scene.isActive(key)) continue
     const sc = game.scene.getScene(key) as BaseArenaScene
     spawnCoins(sc, sc.center.x + dxU * UNIT, sc.center.y + dyU * UNIT, n)
@@ -176,7 +177,7 @@ window.__dropCoins = (n: number, dxU = 2, dyU = 0): void => {
 window.__spawnCarrier = (polarity: Polarity = 'buff', id?: string): void => {
   const base = ENEMY_DEFS.find((s) => s.kind === 'zombie')
   if (!base) return
-  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
+  for (const key of ARENA_SCENE_KEYS) {
     if (!game.scene.isActive(key)) continue
     const sc = game.scene.getScene(key) as BaseArenaScene
     const pool = fieldPickupsFor(sc.run.mapId).filter((p) => p.polarity === polarity)
@@ -189,7 +190,7 @@ window.__spawnCarrier = (polarity: Polarity = 'buff', id?: string): void => {
 // e2e：掉一枚地面拾取（默认落在队伍中心，下一帧即被走位判定收取——验证拾取→限时效果链；
 // 给出格偏移则落在远处静置，可观察地面待拾贴图/光圈）
 window.__spawnFieldPickup = (polarity: Polarity = 'buff', id?: string, dxU = 0, dyU = 0): void => {
-  for (const key of ['arena', 'arenaInfinite', 'arenaRiver', 'arenaVoid']) {
+  for (const key of ARENA_SCENE_KEYS) {
     if (!game.scene.isActive(key)) continue
     const sc = game.scene.getScene(key) as BaseArenaScene
     const pool = fieldPickupsFor(sc.run.mapId).filter((p) => p.polarity === polarity)

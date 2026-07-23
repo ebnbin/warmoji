@@ -18,6 +18,9 @@ export interface Projectile {
   /** 上一帧位置（玩家弹扫掠起点；视口重映射时同步改写） */
   prevX: number
   prevY: number
+  /** 满速基准速度（秒针图逐帧按世界时标重设 velocity = base×scale；常速图恒等于出膛速度） */
+  bvx: number
+  bvy: number
   /** 寿命回收时刻（0 = 不按寿命回收） */
   dieAt: number
   /** 玩家弹：伤害归属槽位 / 击退 / 自旋 / 能力字段 */
@@ -40,6 +43,8 @@ export function attachProjectile(image: ImageObj, faction: Projectile['faction']
     radius: 0,
     prevX: image.x,
     prevY: image.y,
+    bvx: 0,
+    bvy: 0,
     dieAt: 0,
     srcSlot: -1,
     kb: 0,
@@ -69,10 +74,11 @@ export function spawnProjectile(
 ): void {
   const p = acquirePooled(scene, scene.projectiles, x, y, emojiKey(def.projectile.emoji, 'player'), def.projectile.size, def.projectile.radius)
   p.setDepth(8).setRotation(angle + def.projectile.rotationOffsetDeg * DEG2RAD)
-  ;(p.body as ArcadeBody).setVelocity(
-    Math.cos(angle) * def.projectile.speed,
-    Math.sin(angle) * def.projectile.speed,
-  )
+  // 满速基准 + 出膛即按当前世界时标缩放（常速图 scale=1，行为不变）
+  const bvx = Math.cos(angle) * def.projectile.speed
+  const bvy = Math.sin(angle) * def.projectile.speed
+  const scale = scene.worldTimeScale()
+  ;(p.body as ArcadeBody).setVelocity(bvx * scale, bvy * scale)
   playSfx('shoot')
   attachProjectile(p, 'team', {
     srcSlot,
@@ -81,6 +87,8 @@ export function spawnProjectile(
     kb: def.knockback,
     prevX: x,
     prevY: y,
+    bvx,
+    bvy,
     // 环面世界的子弹永不出屏：按寿命回收（其余图为 0，不按寿命回收）
     dieAt: scene.projectileTtlMs !== null ? scene.elapsedMs + scene.projectileTtlMs : 0,
     // 能力字段：贯穿余量 + 命中效果链（sweepProjectiles 命中点求值）
@@ -138,12 +146,17 @@ export function spawnEnemyProjectile(
 ): void {
   const shot = acquirePooled(scene, scene.enemyProjectiles, x, y, emojiKey(projectile.emoji, 'enemyProjectile'), projectile.size, projectile.radius)
   shot.setDepth(6)
-  ;(shot.body as ArcadeBody).setVelocity(Math.cos(angle) * projectile.speed, Math.sin(angle) * projectile.speed)
+  const bvx = Math.cos(angle) * projectile.speed
+  const bvy = Math.sin(angle) * projectile.speed
+  const scale = scene.worldTimeScale()
+  ;(shot.body as ArcadeBody).setVelocity(bvx * scale, bvy * scale)
   attachProjectile(shot, 'enemy', {
     damage: Math.round(projectile.damage * dmgMul),
     srcName,
     radius: projectile.radius,
     dieAt: scene.elapsedMs + projectile.lifeMs,
+    bvx,
+    bvy,
   })
 }
 

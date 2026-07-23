@@ -7,7 +7,7 @@ import type { MapId } from '../maps/registry'
 // 战斗曲按地图配：BgmId 直接复用 MapId，'lobby' 盖住全部非战斗页面。
 
 export type BgmId = 'lobby' | MapId
-export const BGM_IDS: readonly BgmId[] = ['lobby', 'forest', 'desert', 'river', 'void']
+export const BGM_IDS: readonly BgmId[] = ['lobby', 'forest', 'desert', 'river', 'void', 'metronome']
 
 export interface BgmNote {
   /** 循环内起始秒 */
@@ -389,12 +389,62 @@ function buildVoid(): BgmScore {
   )
 }
 
+/** 秒针：冷峻钟摆——齿轮八分琶音 + 稳定「滴答」贯穿全曲，机械感旋律在其上明灭（100 BPM，38.4 秒循环） */
+function buildMetronome(): BgmScore {
+  const chords = [0, 3, 4, 0, 5, 3, 4, 4, 0, 3, 6, 4, 5, 3, 4, 0]
+  return track(
+    'metronome',
+    {
+      bpm: 100,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 50,
+      scale: DORIAN,
+      echo: { delaySec: (60 / 100) * 0.5, feedback: 0.3, level: 0.35 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'triangle', vol: 0.18, attack: 0.01, release: 0.08, octave: -2 }
+      const pad: Voice = { wave: 'square', vol: 0.03, attack: 0.2, release: 0.6, octave: -1 }
+      const lead: Voice = { wave: 'square', vol: 0.08, attack: 0.005, release: 0.06, octave: 1, echo: true }
+      // 齿轮琶音：八分音符不停运转的「机芯」（正弦、低音量，垫在滴答与旋律之下）
+      const gear: Voice = { wave: 'sine', vol: 0.035, attack: 0.004, release: 0.05, octave: 2 }
+      b.bass(bass, chords, 'r...r...')
+      b.pad(pad, chords, [0, 2])
+      b.arp(gear, chords, [0, 2, 4, 2], 0, 16)
+      b.line(lead, [
+        [0, 0, 0, 2], [0, 4, 2, 2],
+        [1, 0, 4, 2], [1, 4, 2, 2],
+        [2, 0, 3, 4],
+        [3, 0, 4, 2], [3, 4, 5, 2],
+        [4, 0, 7, 2], [4, 4, 5, 2],
+        [5, 0, 4, 2], [5, 4, 2, 2],
+        [6, 0, 3, 4],
+        [7, 0, 0, 4],
+        [8, 0, 4, 2], [8, 4, 5, 2],
+        [9, 0, 7, 2], [9, 4, 9, 2],
+        [10, 0, 7, 4],
+        [11, 0, 5, 4],
+        [12, 0, 4, 2], [12, 4, 3, 2],
+        [13, 0, 2, 2], [13, 4, 4, 2],
+        [14, 0, 0, 6],
+        // 第 16 小节留白换气
+      ])
+      // 钟摆滴答：八分音符稳定贯穿（招牌音色）+ 座钟报点 + 后半段脚踏
+      b.drums('hat', 'x.x.x.x.', 0, 16, 0.09)
+      b.drums('tom', 'x.......', 0, 16, 0.12)
+      b.drums('kick', 'x...x...', 8, 16, 0.16)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
   desert: buildDesert,
   river: buildRiver,
   void: buildVoid,
+  metronome: buildMetronome,
 }
 
 const cache = new Map<BgmId, BgmScore>()

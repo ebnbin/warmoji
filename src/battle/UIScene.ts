@@ -8,6 +8,8 @@ import { isDevOpen, setDevOpen } from '../debug/dev'
 import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
 import { CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
+import { ARENA_SCENE_KEYS } from '../maps/registry'
+import type { ArenaSceneKey } from '../maps/registry'
 import { beginRun } from '../run/state'
 import {
   isLabCharacterOn,
@@ -84,8 +86,8 @@ export class UIScene extends Phaser.Scene {
   private fxBars?: Phaser.GameObjects.Graphics
   private fxKey = ''
 
-  /** 当前战斗场景 key：四套竞技场（有界/无界/河流/虚空）互斥运行，本场景只跟随其一 */
-  private arenaKey: 'arena' | 'arenaInfinite' | 'arenaRiver' | 'arenaVoid' = 'arena'
+  /** 当前战斗场景 key：多套竞技场（有界/无界/河流/虚空/秒针）互斥运行，本场景只跟随其一 */
+  private arenaKey: ArenaSceneKey = 'arena'
 
   constructor() {
     super('ui')
@@ -94,7 +96,7 @@ export class UIScene extends Phaser.Scene {
   /** 启动时探测哪个竞技场在跑（含暂停中——视口变化会带着暂停态重启本场景）。
    * 用运行状态而非 launch 传参：场景 data 会跨局残留，探测永不脏 */
   init(): void {
-    const running = (['arenaInfinite', 'arenaRiver', 'arenaVoid'] as const).find(
+    const running = ARENA_SCENE_KEYS.filter((k) => k !== 'arena').find(
       (k) => this.scene.isActive(k) || this.scene.isPaused(k),
     )
     this.arenaKey = running ?? 'arena'

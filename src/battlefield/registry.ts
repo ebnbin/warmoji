@@ -92,6 +92,14 @@ const POOLS: Record<MapId, readonly FieldPickupDef[]> = {
     { id: 'void_entropy', emoji: '1f300', name: '熵增紊乱', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
     { id: 'void_drift', emoji: '26ab', name: '空间坍缩', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.72 } },
   ],
+  // 秒针：快进/狂涌/凝滞（增益），时滞/流沙（减益）——皆呼应「时间」主题
+  metronome: [
+    { id: 'metro_haste', emoji: '23e9', name: '快进', desc: '全队攻速 +33%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { teamCooldownMul: 0.75 } },
+    { id: 'metro_surge', emoji: '26a1', name: '秒针狂涌', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { teamDamageMul: 1.35 } },
+    { id: 'metro_still', emoji: '23f8', name: '凝滞领域', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemySlowMul: 0.65 } },
+    { id: 'metro_lag', emoji: '23ea', name: '时滞倒拨', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
+    { id: 'metro_drag', emoji: '231b', name: '流沙滞步', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.72 } },
+  ],
 }
 
 /** 全部拾取按 id 索引（携带者掉落/注入器按 id 反查） */
