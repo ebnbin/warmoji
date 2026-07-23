@@ -63,6 +63,25 @@ const RUINS_MIX: readonly EnemyMixRow[] = [
   { kind: 'elf', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
 ]
 
+/** 晨昏原野·白天：见得远的正面怪，密集扑来（专精：boar/locust/slime/invader） */
+const DAY_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 70, perWave: -2, min: 34, max: 70 },
+  { kind: 'boar', sinceWave: 1, base: 18, perWave: 0.8, min: 12, max: 34 },
+  { kind: 'locust', sinceWave: 1, base: 16, perWave: 0.8, min: 12, max: 32 },
+  { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
+  { kind: 'invader', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
+]
+
+/** 晨昏原野·黑夜：稀疏潜袭怪，雾里贴脸才现形（专精：ghost/gargoyle/snake/creeper/rat） */
+const NIGHT_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 40, perWave: -1, min: 20, max: 40 },
+  { kind: 'ghost', sinceWave: 1, base: 16, perWave: 1, min: 12, max: 30 },
+  { kind: 'gargoyle', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
+  { kind: 'creeper', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'rat', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 11 },
+]
+
 export const MAPS = {
   forest: {
     emoji: '1f332',
@@ -174,5 +193,34 @@ export const MAPS = {
     mix: RUINS_MIX,
     // 残垣专属 Boss：拆迁鬼——犀角冲撞碾墙 + 落石无视遮挡
     boss: 'rhino',
+  },
+  daynight: {
+    emoji: '1f304',
+    name: '晨昏原野',
+    desc: '随昼夜轮转的旷野：正午视野纵览全场，午夜相机收窄、四合起以身为心的迷雾；昼夜各出一批怪',
+    kind: 'daynight',
+    // 有界 30×30：正午拉远能纵览大半张图，午夜收窄成一小圈
+    size: { w: 30, h: 30 },
+    palette: {
+      // 页面底色取暮色靛蓝→深夜紫（暗示昼夜过渡）
+      bgFrom: 'hsl(245 30% 28%)',
+      bgTo: 'hsl(258 34% 11%)',
+      // map 色即旷野草地（暮色柔绿；白昼明亮，夜幕由迷雾另行压暗）
+      map: hslToInt(150, 0.2, 0.6),
+      shadow: 0x000000,
+    },
+    decor: {
+      // 旷野植被：麦穗 / 蕨草 / 向日葵 / 雏菊 / 卵石（低透明度贴地）
+      emojis: ['1f33e', '1f33f', '1f33b', '1f33c', '1faa8'],
+      sizeU: [0.35, 0.9],
+      alpha: [0.14, 0.26],
+      density: [0.09, 0.13],
+    },
+    // mix = 昼夜两批并集（供图鉴/名录/兜底）；实际出怪由 dayMix/nightMix 按相位切换
+    mix: [...DAY_MIX, ...NIGHT_MIX],
+    dayMix: DAY_MIX,
+    nightMix: NIGHT_MIX,
+    // 晨昏原野专属 Boss：晦明——日冕环爆 + 月华坠
+    boss: 'eclipse',
   },
 } as const satisfies Record<string, MapDef>

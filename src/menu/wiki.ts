@@ -54,6 +54,7 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
   river: '单屏河道（万物随水流漂移）',
   void: '环面竞技场（四壁传送门，出这头即现那头）',
   ruins: '断壁废墟（墙挡人 / 挡弹 / 挡视线）',
+  daynight: '昼夜原野（30×30；视野随晨昏涨落，夜幕四合起迷雾）',
 }
 
 export function enemyStatLines(e: EnemyDef): string[] {

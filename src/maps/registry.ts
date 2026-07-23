@@ -25,15 +25,23 @@ export interface MapDef {
   readonly desc: string
   /** 世界形态：bounded = 25×25 有界竞技场；infinite = 无边界（终波缩圈）；
    * river = 单屏固定相机 + 恒定水流；void = 固定 16:9 环面（四边传送门）；
-   * ruins = 有界竞技场 + 断壁（挡移动/子弹/视线，流场寻路） */
-  readonly kind: 'bounded' | 'infinite' | 'river' | 'void' | 'ruins'
+   * ruins = 有界竞技场 + 断壁（挡移动/子弹/视线，流场寻路）；
+   * daynight = 有界竞技场 + 昼夜循环（相机随时刻涨落、夜幕起迷雾） */
+  readonly kind: 'bounded' | 'infinite' | 'river' | 'void' | 'ruins' | 'daynight'
+  /** 有界图尺寸（格）：缺省用 MAP.width/height（25×25）；昼夜图放大到 30×30 */
+  readonly size?: { readonly w: number; readonly h: number }
   /** 固定色板：战斗场景不再逐局随机 */
   readonly palette: Palette
   readonly decor: MapDecor
   /** 河流图：水面漂浮物池（顺流循环，区别于岸上静态 decor） */
   readonly drift?: readonly string[]
-  /** 本图出怪表（波次配比——编排属于地图，不属于敌人） */
+  /** 本图出怪表（波次配比——编排属于地图，不属于敌人）。
+   * 昼夜图另有 dayMix/nightMix 分相位出怪；此处存两批并集，供图鉴/名录/兜底用 */
   readonly mix: readonly EnemyMixRow[]
+  /** 昼夜图专用：白天出怪表（密集正面怪） */
+  readonly dayMix?: readonly EnemyMixRow[]
+  /** 昼夜图专用：黑夜出怪表（稀疏潜袭怪） */
+  readonly nightMix?: readonly EnemyMixRow[]
   /** 本图终波 Boss：引用 enemies 里某个 role:'boss' 的 kind */
   readonly boss: string
 }
@@ -56,6 +64,7 @@ export const ARENA_SCENE_KEYS = [
   'arenaRiver',
   'arenaVoid',
   'arenaRuins',
+  'arenaDayNight',
 ] as const
 export type ArenaSceneKey = (typeof ARENA_SCENE_KEYS)[number]
 
@@ -66,6 +75,7 @@ export function arenaSceneFor(id: MapId): ArenaSceneKey {
   if (kind === 'river') return 'arenaRiver'
   if (kind === 'void') return 'arenaVoid'
   if (kind === 'ruins') return 'arenaRuins'
+  if (kind === 'daynight') return 'arenaDayNight'
   return 'arena'
 }
 

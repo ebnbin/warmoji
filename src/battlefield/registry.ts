@@ -100,6 +100,14 @@ const POOLS: Record<MapId, readonly FieldPickupDef[]> = {
     { id: 'ruins_rubble', emoji: '1faa8', name: '碎砾绊足', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.72 } },
     { id: 'ruins_collapse', emoji: '1f4a8', name: '塌方扬尘', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
   ],
+  // 晨昏原野：破晓/烈阳/流星（增益，白昼），夜幕/晦月（减益，暗夜）——呼应昼夜轮替主题
+  daynight: [
+    { id: 'daynight_dawn', emoji: '1f305', name: '破晓锋芒', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { teamDamageMul: 1.35 } },
+    { id: 'daynight_sun', emoji: '2600', name: '烈阳灼敌', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemySlowMul: 0.65 } },
+    { id: 'daynight_meteor', emoji: '1f320', name: '流星贯注', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { critAdd: 0.18 } },
+    { id: 'daynight_nightfall', emoji: '1f30c', name: '夜幕低垂', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.72 } },
+    { id: 'daynight_darkmoon', emoji: '1f311', name: '晦月蚀袭', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
+  ],
 }
 
 /** 全部拾取按 id 索引（携带者掉落/注入器按 id 反查） */

@@ -4,8 +4,8 @@ import { BOSSES } from '../enemies/registry'
 import { Rng } from '../core/rng'
 
 describe('地图定义', () => {
-  it('五张图齐备且玩法互不相同：图标/名字/描述/形态/固定色板/装饰规则', () => {
-    expect(MAP_IDS.length).toBe(5)
+  it('六张图齐备且玩法互不相同：图标/名字/描述/形态/固定色板/装饰规则', () => {
+    expect(MAP_IDS.length).toBe(6)
     for (const id of MAP_IDS) {
       const m = MAPS[id]
       expect(m.emoji.length).toBeGreaterThan(0)
@@ -17,6 +17,7 @@ describe('地图定义', () => {
     // 一种玩法一个主题：世界形态两两不同
     expect(MAP_IDS.map((id) => MAPS[id].kind).sort()).toEqual([
       'bounded',
+      'daynight',
       'infinite',
       'river',
       'ruins',
@@ -27,6 +28,9 @@ describe('地图定义', () => {
     expect(MAPS.river.kind).toBe('river')
     expect(MAPS.void.kind).toBe('void')
     expect(MAPS.ruins.kind).toBe('ruins')
+    expect(MAPS.daynight.kind).toBe('daynight')
+    // 昼夜图有界放大到 30×30
+    expect(MAPS.daynight.size).toEqual({ w: 30, h: 30 })
     // 河流图必须有水面漂浮物池
     expect(MAPS.river.drift!.length).toBeGreaterThan(0)
   })
@@ -57,6 +61,7 @@ describe('地图定义', () => {
     expect(arenaSceneFor('river')).toBe('arenaRiver')
     expect(arenaSceneFor('void')).toBe('arenaVoid')
     expect(arenaSceneFor('ruins')).toBe('arenaRuins')
+    expect(arenaSceneFor('daynight')).toBe('arenaDayNight')
   })
 })
 

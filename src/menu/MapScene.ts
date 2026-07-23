@@ -28,6 +28,7 @@ const MAP_PLAY_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
   river: '奔流河道：万物随水流漂移，逆流而战',
   void: '环面战场：四壁皆传送门，出这头即现那头',
   ruins: '断壁废墟：墙挡人 / 挡弹 / 挡视线，靠掩体与探头作战',
+  daynight: '昼夜原野：30×30 有界，视野随时间涨落——正午纵览全场、午夜相机收窄并四合迷雾；昼夜各出一批怪',
 }
 
 interface MapLayout {

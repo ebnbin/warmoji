@@ -647,7 +647,50 @@ const RUINS_BOSS: EnemyDef = {
   ],
 }
 
+/** 晨昏原野专属 Boss——晦明：半明半暗的月相之主。阳面喷洒「日冕环爆」（整圈日芒弹幕，
+ * 白昼里看得最清、压迫最盛），阴面召落「月华坠」（点名队员的月光坠击，夜雾里防不胜防）。
+ * 昼夜循环里两套招式随光影此消彼长；贴身追击、击退免疫。 */
+const DAYNIGHT_BOSS: EnemyDef = {
+  kind: 'eclipse',
+  role: 'boss',
+  emoji: '1f317',
+  name: '晦明',
+  desc: '晨昏原野头目：阳面喷洒日冕环爆，阴面召落月华坠，昼夜轮替、击退免疫',
+  size: 3.4,
+  radius: 1.1,
+  hp: 6300,
+  speed: 1.25,
+  damage: 20,
+  xp: 60,
+  coins: 60,
+  kbImmune: true,
+  locomotion: { kind: 'chase' },
+  abilities: [
+    // 日冕环爆：整圈日芒弹幕（阳面之力）
+    {
+      kind: 'projectile',
+      damage: 8,
+      cooldownMs: 3000,
+      knockback: 0,
+      firstDelayMs: 1600,
+      lifeMs: 5000,
+      aim: 'nearest',
+      volley: { count: 14, spreadDeg: 360 },
+      projectile: { emoji: '1f31f', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 },
+    },
+    // 月华坠：点名最近 4 名队员，月光自天坠落（阴面之力）
+    {
+      kind: 'strike',
+      damage: 22,
+      cooldownMs: 4600,
+      knockback: 0,
+      targets: 4,
+      drop: { emoji: '1f319', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+    },
+  ],
+}
+
 /** 生成用：kind → 定义（顺序即展示顺序；Boss 按地图顺序排在常规怪之后） */
 export const ENEMIES = Object.fromEntries(
-  [...ENEMY_DEFS, FOREST_BOSS, DESERT_BOSS, RIVER_BOSS, FACTORY_BOSS, RUINS_BOSS].map((e) => [e.kind, e]),
+  [...ENEMY_DEFS, FOREST_BOSS, DESERT_BOSS, RIVER_BOSS, FACTORY_BOSS, RUINS_BOSS, DAYNIGHT_BOSS].map((e) => [e.kind, e]),
 ) as Record<string, EnemyDef>

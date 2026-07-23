@@ -153,7 +153,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   coins!: Phaser.GameObjects.Group
   /** 地面效果（毒液/灼烧等，敌我同构），波末随场景销毁 */
   groundEffects: GroundEffect[] = []
-  private enemyMix: EnemyMixEntry[] = []
+  protected enemyMix: EnemyMixEntry[] = []
   frameTargets: TargetInfo[] = []
   /** 敌方能力的索敌快照：存活队员（虚空图含镜像坐标），每帧重建 */
   frameMemberTargets: TargetInfo[] = []
@@ -337,6 +337,14 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   /** 相机跟随挂接（跟随式相机的图在此 startFollow；固定相机图空实现） */
   protected attachCamera(_target: Phaser.GameObjects.Zone): void {
     void _target
+  }
+  /** 当前波次的出怪权重表：默认取本图 mix；昼夜图按相位覆写为白天/黑夜两套之一 */
+  protected buildEnemyMix(): EnemyMixEntry[] {
+    return enemyMixAt(MAPS[this.run.mapId].mix, this.testMode ? 10 : this.run.wave)
+  }
+  /** 出怪间隔倍率（<1 更密、>1 更疏）：默认 1；昼夜图白天更密、夜晚更疏 */
+  protected spawnIntervalScale(): number {
+    return 1
   }
   /** 差向量 from→to：索敌/追击/磁吸的几何基元（虚空图换环面最短差） */
   worldDelta(from: Point, to: Point): Point {
@@ -714,7 +722,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.enemyProjectiles = this.add.group()
     this.coins = this.add.group()
     // 正常局按当前波次配比出怪；测试模式不走出怪表（改由 spawnTest 从场内勾选出怪），此值备用
-    this.enemyMix = enemyMixAt(MAPS[this.run.mapId].mix, this.testMode ? 10 : this.run.wave)
+    this.enemyMix = this.buildEnemyMix()
     // 战场拾取：本波按预算铺开固定数量的携带者（本图池抽定 buff/debuff）
     if (!this.testMode) this.scheduleCarriers()
 
@@ -1776,7 +1784,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const wave = waveAt((this.run.combatMs + this.elapsedMs) / 1000)
     const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * this.members.length
     const relief = isBossWave(this.run.wave) ? BOSS_SPAWN_RELIEF : 1
-    this.spawnCooldownMs = (wave.spawnIntervalMs * relief) / teamFactor
+    this.spawnCooldownMs = (wave.spawnIntervalMs * relief * this.spawnIntervalScale()) / teamFactor
     if (this.spawnCapCount() + this.pendingSpawns >= SPAWN.maxAlive) return
     this.spawnOne(wave.hpMultiplier)
   }

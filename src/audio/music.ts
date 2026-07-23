@@ -7,7 +7,7 @@ import type { MapId } from '../maps/registry'
 // 战斗曲按地图配：BgmId 直接复用 MapId，'lobby' 盖住全部非战斗页面。
 
 export type BgmId = 'lobby' | MapId
-export const BGM_IDS: readonly BgmId[] = ['lobby', 'forest', 'desert', 'river', 'void', 'ruins']
+export const BGM_IDS: readonly BgmId[] = ['lobby', 'forest', 'desert', 'river', 'void', 'ruins', 'daynight']
 
 export interface BgmNote {
   /** 循环内起始秒 */
@@ -437,6 +437,58 @@ function buildRuins(): BgmScore {
   )
 }
 
+/** 晨昏原野：D 大调开阔谣——A 段拂晓上行（视野渐开），B 段暮色沉降（夜幕四合），
+ * 尾段回到拂晓，正合昼夜轮转（108 BPM 循环） */
+function buildDayNight(): BgmScore {
+  const chords = [0, 4, 5, 3, 0, 4, 1, 5, 6, 3, 4, 5, 0, 4, 5, 0]
+  return track(
+    'daynight',
+    {
+      bpm: 108,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 50,
+      scale: MAJOR,
+      echo: { delaySec: (60 / 108) * 0.5, feedback: 0.3, level: 0.3 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'triangle', vol: 0.14, attack: 0.01, release: 0.08, octave: -1 }
+      const pad: Voice = { wave: 'sine', vol: 0.03, attack: 0.25, release: 0.8, octave: 0 }
+      const arp: Voice = { wave: 'triangle', vol: 0.06, attack: 0.006, release: 0.06, octave: 1 }
+      const lead: Voice = { wave: 'square', vol: 0.1, attack: 0.01, release: 0.08, octave: 1, echo: true }
+      b.bass(bass, chords, 'r...r...')
+      b.pad(pad, chords, [0, 2, 4], 0.005)
+      b.arp(arp, chords, [0, 2, 4, 2])
+      b.line(lead, [
+        // A 段：拂晓上行（视野渐开）
+        [0, 0, 0, 2], [0, 2, 2, 2], [0, 4, 4, 4],
+        [1, 0, 4, 2], [1, 2, 5, 2], [1, 4, 7, 4],
+        [2, 0, 7, 2], [2, 2, 6, 2], [2, 4, 4, 4],
+        [3, 0, 5, 4], [3, 4, 2, 4],
+        [4, 0, 0, 2], [4, 2, 2, 2], [4, 4, 4, 4],
+        [5, 0, 4, 2], [5, 2, 7, 2], [5, 4, 9, 4],
+        [6, 0, 7, 2], [6, 2, 6, 2], [6, 4, 5, 4],
+        [7, 0, 4, 6], [7, 6, 5, 2],
+        // B 段：暮色沉降（视野收窄、夜幕四合）
+        [8, 0, 7, 2], [8, 2, 6, 2], [8, 4, 4, 4],
+        [9, 0, 5, 2], [9, 2, 4, 2], [9, 4, 2, 4],
+        [10, 0, 4, 2], [10, 2, 2, 2], [10, 4, 0, 4],
+        [11, 0, 2, 6],
+        // A' 收束回到拂晓
+        [12, 0, 0, 2], [12, 2, 2, 2], [12, 4, 4, 4],
+        [13, 0, 4, 2], [13, 2, 5, 2], [13, 4, 7, 4],
+        [14, 0, 7, 2], [14, 2, 5, 2], [14, 4, 4, 4],
+        [15, 0, 2, 2], [15, 2, 0, 6],
+      ])
+      b.drums('kick', 'x...x...', 0, 16, 0.26)
+      b.drums('snare', '....x...', 0, 16, 0.16)
+      b.drums('hat', 'x.x.x.x.', 0, 16, 0.05)
+      b.drums('snare', '....x.xx', 15, 16, 0.15)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -444,6 +496,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   river: buildRiver,
   void: buildVoid,
   ruins: buildRuins,
+  daynight: buildDayNight,
 }
 
 const cache = new Map<BgmId, BgmScore>()

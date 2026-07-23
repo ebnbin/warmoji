@@ -142,6 +142,7 @@ export interface EnemyDef {
     | 'locust'
     | 'gargoyle'
     | 'puffer'
+    | 'eclipse'
   readonly emoji: string
   readonly name: string
   readonly desc: string
