@@ -29,7 +29,7 @@ type Steerer = (ctx: SteerCtx) => void
 
 const chase: Steerer = ({ scene, a, body, slow, target }) => {
   // 追击方向经世界钩子（残垣图走流场绕墙；其余图 = 径直 norm(worldDelta)）
-  const dir = scene.chaseDir(a.image, target.image)
+  const dir = scene.chaseDir(a, target.image)
   body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
 }
 
@@ -71,6 +71,8 @@ const dash: Steerer = (ctx) => {
     body.setVelocity(a.dirX * lm.dashSpeed * slow, a.dirY * lm.dashSpeed * slow)
     e.setRotation(a.dirX * 0.3)
     e.setFlipX(a.dirX > 0)
+    // 冲刺碾墙（残垣图拆迁 Boss）：沿途碾碎断壁，只在冲刺态生效
+    if (a.def.breaksWalls) scene.smashWallAt(e.x, e.y)
     if (now >= a.dashUntil) {
       if (lm.trigger.kind === 'timer') {
         a.state = 'chase'
@@ -110,7 +112,7 @@ const dash: Steerer = (ctx) => {
   if (lm.idle === 'chase') {
     const to = lm.aim === 'teamCenter' ? scene.center : target.image
     // 逼近走位经世界钩子（残垣图流场绕墙；冲刺本身仍锁直线，撞墙即「被引进墙」）
-    const dir = scene.chaseDir(e, to)
+    const dir = scene.chaseDir(a, to)
     body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
   } else {
     const dir = scene.wanderDir(a)
@@ -220,7 +222,7 @@ const detonate: Steerer = ({ scene, a, body, slow, now, target }) => {
     return
   }
   // 逼近走位经世界钩子（残垣图绕墙寻路）
-  const dir = scene.chaseDir(e, target.image)
+  const dir = scene.chaseDir(a, target.image)
   body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
 }
 
@@ -233,7 +235,7 @@ const baseOrbit: Steerer = ({ scene, a, body, slow, target }) => {
   const sp = a.def.speed * slow
   const chasePlayer = (): void => {
     // 扑向玩家经世界钩子（残垣图绕墙寻路）
-    const dir = scene.chaseDir(e, target.image)
+    const dir = scene.chaseDir(a, target.image)
     body.setVelocity(dir.x * sp, dir.y * sp)
   }
   // 巢失效（被拆 / 被对象池回收顶替）→ 暴走直扑（暴走倍率已由 orphanBrood 在拆巢时施加）

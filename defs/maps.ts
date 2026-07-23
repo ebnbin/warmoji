@@ -128,6 +128,7 @@ export const MAPS = {
       density: [0.05, 0.08],
     },
     mix: DEFAULT_MIX,
-    boss: 'boss',
+    // 残垣专属 Boss：拆迁鬼——犀角冲撞碾墙 + 落石无视遮挡
+    boss: 'rhino',
   },
 } as const satisfies Record<string, MapDef>

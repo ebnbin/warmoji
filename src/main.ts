@@ -19,7 +19,7 @@ import { WikiScene } from './menu/WikiScene'
 import { WAVE } from './run/waves'
 import { browserStorage } from './core/storage'
 import { getRun, grantCoins, grantXp } from './run/state'
-import { ENEMY_DEFS } from './enemies/registry'
+import { BOSSES, ENEMY_DEFS } from './enemies/registry'
 import { toPx } from './battle/px'
 import { ABILITIES } from './abilities/registry'
 import type { AbilityDef } from './abilities/defs'
@@ -141,15 +141,17 @@ window.__addMemberItem = (itemId: string, slot = 0, count = 1): void => {
 window.__setWave = (n: number): void => {
   getRun().wave = Math.max(1, Math.min(WAVE.totalWaves, Math.round(n)))
 }
-// e2e 行为探针：向活跃战场按 kind 投放一只敌人（相对队伍中心的格偏移落点）
+// e2e 行为探针：向活跃战场按 kind 投放一只敌人（相对队伍中心的格偏移落点）。
+// 也支持 Boss kind（走 Boss 落地管线：金边 + HUD 血条），供 Boss 行为探测/取景
 window.__spawnEnemy = (kind: string, dxU = 3, dyU = 0): void => {
-  const def = ENEMY_DEFS.find((s) => s.kind === kind)
+  const boss = BOSSES.find((s) => s.kind === kind)
+  const def = ENEMY_DEFS.find((s) => s.kind === kind) ?? boss
   if (!def) return
   for (const key of ARENA_SCENE_KEYS) {
     if (!game.scene.isActive(key)) continue
     const sc = game.scene.getScene(key) as BaseArenaScene
     const px = toPx(def)
-    sc.materializeEnemy(px, sc.center.x + dxU * UNIT, sc.center.y + dyU * UNIT, px.hp)
+    sc.materializeEnemy(px, sc.center.x + dxU * UNIT, sc.center.y + dyU * UNIT, px.hp, false, !!boss)
   }
 }
 // e2e 行为探针：投放一只持械敌人（僵尸三围 + 指定能力行；敌方 ctx 验证用）

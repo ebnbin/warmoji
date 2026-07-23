@@ -53,13 +53,14 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   ],
 }
 
-/** 持械敌人的能力视觉（持有物/塔体/召唤物）：随敌人本体阵营描边 */
+/** 持械敌人的能力视觉（持有物/塔体/召唤物/点名坠物）：随敌人本体阵营描边 */
 function armedBodyEmojis(): string[] {
   return [...ENEMY_DEFS, ...BOSSES].flatMap((e) =>
     (e.abilities ?? []).flatMap((w) => [
       ...('held' in w && w.held ? [w.held.emoji] : []),
       ...(w.kind === 'turret' ? [w.turret.emoji] : []),
       ...(w.kind === 'summon' ? [w.minion.emoji] : []),
+      ...(w.kind === 'strike' ? [w.drop.emoji] : []),
     ]),
   )
 }

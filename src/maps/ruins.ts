@@ -13,9 +13,18 @@ export class WallGrid {
     readonly cols: number,
     readonly rows: number,
     readonly cellPx: number,
-    /** 行优先 blocked[y*cols+x] */
-    readonly blocked: readonly boolean[],
+    /** 行优先 blocked[y*cols+x]（可变：拆迁 Boss 冲刺碾墙时置 false） */
+    readonly blocked: boolean[],
   ) {}
+
+  /** 改写某格阻挡态（破墙/垒墙）。越界忽略。返回是否真的发生了变化 */
+  setBlocked(cx: number, cy: number, value: boolean): boolean {
+    if (cx < 0 || cx >= this.cols || cy < 0 || cy >= this.rows) return false
+    const i = cy * this.cols + cx
+    if (this.blocked[i] === value) return false
+    this.blocked[i] = value
+    return true
+  }
 
   cellX(worldX: number): number {
     return Math.floor(worldX / this.cellPx)

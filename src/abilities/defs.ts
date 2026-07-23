@@ -241,6 +241,8 @@ export interface LaserDef {
   readonly backBeam?: boolean
   /** 全域扫射：出手变为绕一周的多向序列光束（每束 ratio × 伤害），取代常规单束 */
   readonly radial?: { readonly beams: number; readonly ratio: number; readonly stepMs: number }
+  /** 穿墙索敌 + 攻击（机器人激光）：残垣图里无视断壁遮挡索敌，命中扫描本就贯穿 */
+  readonly piercesWalls?: boolean
 }
 
 export interface SlowAuraDef {
@@ -423,6 +425,11 @@ export type AbilityDef =
   | BuffDef
   | NukeDef
   | TimeStopDef
+
+/** 该武器是否穿墙攻击（残垣图：索敌不被断壁遮挡）。缺省即不穿墙 */
+export function abilityPiercesWalls(def: AbilityDef): boolean {
+  return 'piercesWalls' in def && def.piercesWalls === true
+}
 
 export interface HitTarget {
   x: number

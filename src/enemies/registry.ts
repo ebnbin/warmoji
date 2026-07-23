@@ -133,6 +133,7 @@ export interface EnemyDef {
     | 'larva'
     | 'creeper'
     | 'boss'
+    | 'rhino'
   readonly emoji: string
   readonly name: string
   readonly desc: string
@@ -161,6 +162,10 @@ export interface EnemyDef {
     readonly firstDelayMs?: number
   }
   readonly kbImmune?: boolean
+  /** 穿墙移动（残垣图）：无视断壁直线穿行、不吃墙体碰撞（幽灵）——「墙挡不住它」 */
+  readonly phasesWalls?: boolean
+  /** 冲刺破墙（残垣图）：冲刺途中碾碎沿途断壁（拆迁 Boss）；非冲刺期照常绕墙 */
+  readonly breaksWalls?: boolean
   /** 角色：缺省 enemy；boss 由引擎侧特判（通关判定 + HUD 血条），并由 map.boss 引用 */
   readonly role?: 'enemy' | 'boss'
 }

@@ -89,7 +89,7 @@ import { TIMESTOP, timeScaleFor } from './timeStop'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
 import { createAbility } from '../abilities/create'
 import { applyBlast, applyEffects, blastRing } from '../abilities/effects'
-import type { Effect } from '../abilities/defs'
+import type { AbilityDef, Effect } from '../abilities/defs'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime, EffectCtx } from '../abilities/types'
 import type { UIScene } from './UIScene'
 
@@ -430,9 +430,10 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   fleeDir(_a: Enemy, away: Point): Point {
     return away
   }
-  /** 追击方向（默认径直朝目标）：残垣图覆写为流场绕墙寻路。其余图恒直线，零改动 */
-  chaseDir(from: Point, to: Point): Point {
-    const d = this.worldDelta(from, to)
+  /** 追击方向（默认径直朝目标）：残垣图覆写为流场绕墙寻路（穿墙敌人仍走直线）。
+   * 其余图恒直线，零改动。传入敌人以便按其属性（穿墙）分流 */
+  chaseDir(a: Enemy, to: Point): Point {
+    const d = this.worldDelta(a.image, to)
     return norm(d.x, d.y)
   }
   /** 视线 a→b 首个撞墙点（默认无墙 → null）：残垣图覆写。用于索敌视线遮挡与子弹裁墙 */
@@ -440,6 +441,18 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     void _a
     void _b
     return null
+  }
+  /** 破墙（默认无墙 → 空操作）：残垣图覆写，碾碎 (x,y) 处的断壁（拆迁 Boss 冲刺沿途调用） */
+  smashWallAt(_x: number, _y: number): void {
+    void _x
+    void _y
+  }
+  /** 按武器给队员能力 ctx 套「穿墙攻击」分流（默认无墙 → 恒等，老图零改动）：
+   * 残垣图覆写——非穿墙武器索敌受断壁遮挡，穿墙武器（机器人激光）沿用全体索敌 */
+  protected wallAwareCtx(_def: AbilityDef, base: AbilityContext, _slot: number): AbilityContext {
+    void _def
+    void _slot
+    return base
   }
   /** 普通敌人速度定稿后的世界后处理（河流：加水流 + 跨向钳岸） */
   protected postSteerEnemy(_e: ImageObj, _body: ArcadeBody, _def: EnemyDef): void {
@@ -1099,9 +1112,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       image,
       // 错开初始冷却，避免全队同帧齐射。
       // 生效能力 = 原始配装 → 升级卡质变注入 → 空间参数按道具缩放
-      abilities: loadoutFor(def, tiers).map((w, i) =>
-        createAbility(toPx(resolveAbilityDef(w, fx)), memberCtx, 300 + slot * 120 + i * 230),
-      ),
+      abilities: loadoutFor(def, tiers).map((w, i) => {
+        // 穿墙攻击按武器分流（残垣图生效，老图恒等）：ctx 索敌可能被断壁遮挡
+        const px = toPx(resolveAbilityDef(w, fx))
+        return createAbility(px, this.wallAwareCtx(px, memberCtx, slot), 300 + slot * 120 + i * 230)
+      }),
       handle,
       visualOffset,
       fx,

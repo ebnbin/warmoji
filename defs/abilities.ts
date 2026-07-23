@@ -114,6 +114,8 @@ const BASE = {
     range: 8,
     beamRadius: 0.22,
     color: 0xff5252,
+    // 激光穿墙：残垣图里无视断壁索敌并灼穿墙后敌人（命中扫描本就贯穿直线）
+    piercesWalls: true,
     held: {
       emoji: '1f526',
       size: 0.75,

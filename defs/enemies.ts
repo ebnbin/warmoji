@@ -23,7 +23,9 @@ export const GHOST: EnemyDef = {
   locomotion: { kind: 'chase' },
   emoji: '1f47b',
   name: '幽灵',
-  desc: '飘得很快的追击者，血薄，死亡时治疗周围同伴',
+  // 穿墙：无视断壁直线飘向队伍——残垣图里墙挡不住它（专治猥琐龟缩）
+  phasesWalls: true,
+  desc: '飘得很快的追击者，血薄，能穿墙直取队伍，死亡时治疗周围同伴',
   size: 1.2,
   radius: 0.45,
   hp: 25,
@@ -349,5 +351,48 @@ const BOSS: EnemyDef = {
 }
 
 
+/** 残垣图专属 Boss——拆迁鬼：犀角冲撞碾碎沿途断壁（breaksWalls），把回廊拆成开阔地；
+ * 第二技能「落石」从天砸向最近队员，无视断壁遮挡（残垣崩落，猥琐龟缩也躲不掉）。
+ * 冲撞只在冲刺态破墙（steer.ts），非冲刺期照常走流场绕墙逼近队伍中心。 */
+const RUINS_BOSS: EnemyDef = {
+  kind: 'rhino',
+  role: 'boss',
+  emoji: '1f98f',
+  name: '拆迁鬼',
+  desc: '残垣头目：犀角冲撞碾碎沿途断壁，落石从天砸下无视遮挡，击退免疫',
+  size: 3.2,
+  radius: 1.05,
+  hp: 6000,
+  speed: 1.4,
+  damage: 20,
+  xp: 60,
+  coins: 60,
+  kbImmune: true,
+  // 冲撞破墙：非冲刺期走流场绕墙逼近，冲刺态锁定队伍中心直线冲、沿途碾碎断壁
+  breaksWalls: true,
+  locomotion: {
+    kind: 'dash',
+    trigger: { kind: 'timer', intervalMs: 5000, firstDelayMs: 3200 },
+    length: { kind: 'time', durationMs: 600 },
+    windupMs: 700,
+    dashSpeed: 10,
+    idle: 'chase',
+    aim: 'teamCenter',
+    lockAt: 'launch',
+    sfx: 'whoosh',
+  },
+  abilities: [
+    // 落石：点名最近 5 名队员，巨石自天而降砸下——坠物从上方落地，天然无视断壁遮挡
+    {
+      kind: 'strike',
+      damage: 24,
+      cooldownMs: 4500,
+      knockback: 0,
+      targets: 5,
+      drop: { emoji: '1faa8', size: 1.1, fromAbove: 4, dropMs: 240, staggerMs: 90 },
+    },
+  ],
+}
+
 /** 生成用：kind → 定义（顺序即 ENEMY_DEFS 展示顺序） */
-export const ENEMIES = Object.fromEntries([...ENEMY_DEFS, BOSS].map((e) => [e.kind, e])) as Record<string, EnemyDef>
+export const ENEMIES = Object.fromEntries([...ENEMY_DEFS, BOSS, RUINS_BOSS].map((e) => [e.kind, e])) as Record<string, EnemyDef>

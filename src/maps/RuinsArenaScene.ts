@@ -5,9 +5,11 @@ import { UNIT } from '../core/units'
 import { Rng } from '../core/rng'
 import { FlowField, WallGrid, generateRuins, reachableCells } from './ruins'
 import { enemyOf } from '../enemies/enemies'
+import { abilityPiercesWalls } from '../abilities/defs'
 import type { Point } from '../core/vec'
 import type { Enemy } from '../enemies/enemies'
-import type { TargetInfo } from '../abilities/types'
+import type { AbilityDef } from '../abilities/defs'
+import type { AbilityContext } from '../abilities/types'
 import type { ImageObj } from '../battle/BaseArenaScene'
 
 const COLS = MAP.width
@@ -35,6 +37,8 @@ export class RuinsArenaScene extends ArenaScene {
   /** 可刷怪的通行格索引（从中心 4 连通可达） */
   private spawnCells: number[] = []
   private wallGroup?: Phaser.Physics.Arcade.StaticGroup
+  /** 逐格断壁的显示/碰撞对象（cellIndex → [填充, 顶沿, 碰撞 zone]），供单格碾碎 */
+  private readonly wallTiles = new Map<number, Phaser.GameObjects.GameObject[]>()
 
   constructor() {
     super('arenaRuins')
@@ -48,6 +52,7 @@ export class RuinsArenaScene extends ArenaScene {
     this.reflowAcc = 0
     this.spawnCells = []
     this.wallGroup = undefined
+    this.wallTiles.clear()
   }
 
   protected createWorld(): void {
@@ -69,31 +74,56 @@ export class RuinsArenaScene extends ArenaScene {
 
   protected postCreate(): void {
     super.postCreate()
-    // 敌人 × 断壁：物理硬碰撞兜底（流场不会指向墙，此处防击退/游荡把敌人挤进墙）
-    if (this.wallGroup) this.physics.add.collider(this.enemies, this.wallGroup)
+    // 敌人 × 断壁：物理硬碰撞兜底（流场不会指向墙，此处防击退/游荡把敌人挤进墙）。
+    // 穿墙（幽灵）/破墙（拆迁 Boss）敌人不吃墙碰撞——processCallback 放行它们穿过
+    if (this.wallGroup) {
+      this.physics.add.collider(this.enemies, this.wallGroup, undefined, (e) => {
+        const a = enemyOf(e as ImageObj)
+        return !a.def.phasesWalls && !a.def.breaksWalls
+      })
+    }
   }
 
-  /** 画断壁：填充石块（清晰的「实心阻挡」读性）+ 顶沿提亮假高度 + 静态碰撞体 */
+  /** 画断壁：逐格填充石块（清晰「实心阻挡」读性）+ 顶沿提亮假高度 + 静态碰撞体。
+   * 逐格存引用（wallTiles），供拆迁 Boss 碾墙时单格销毁 */
   private drawWalls(blocked: readonly boolean[]): void {
-    const g = this.add.graphics().setDepth(2)
     const base = Phaser.Display.Color.IntegerToColor(this.palette.map).darken(38).color
     const top = Phaser.Display.Color.IntegerToColor(this.palette.map).darken(18).color
+    const capH = Math.max(3, UNIT * 0.22)
     this.wallGroup = this.physics.add.staticGroup()
     for (let cy = 0; cy < ROWS; cy++) {
       for (let cx = 0; cx < COLS; cx++) {
         if (!blocked[cy * COLS + cx]) continue
-        const x = cx * UNIT
-        const y = cy * UNIT
-        g.fillStyle(base, 1)
-        g.fillRect(x + 1, y + 1, UNIT - 2, UNIT - 2)
-        // 顶部一条提亮，读出「墙有厚度/立在地上」
-        g.fillStyle(top, 1)
-        g.fillRect(x + 1, y + 1, UNIT - 2, Math.max(3, UNIT * 0.22))
-        // 静态碰撞体（zone 不可见，视觉交给上面的填充）
-        const z = this.add.zone(x + UNIT / 2, y + UNIT / 2, UNIT, UNIT)
+        const cxp = cx * UNIT + UNIT / 2
+        const cyp = cy * UNIT + UNIT / 2
+        const body = this.add.rectangle(cxp, cyp, UNIT - 2, UNIT - 2, base).setDepth(2)
+        const cap = this.add.rectangle(cxp, cy * UNIT + 1 + capH / 2, UNIT - 2, capH, top).setDepth(2.1)
+        const z = this.add.zone(cxp, cyp, UNIT, UNIT)
         this.wallGroup.add(z)
+        this.wallTiles.set(cy * COLS + cx, [body, cap, z])
       }
     }
+  }
+
+  /** 碾碎 (x,y) 处断壁：网格置通行 + 拆视觉/碰撞体 + 扬尘 + 逼流场下帧重算 */
+  smashWallAt(x: number, y: number): void {
+    const cx = this.grid.cellX(x)
+    const cy = this.grid.cellY(y)
+    if (!this.grid.isBlockedCell(cx, cy)) return
+    this.grid.setBlocked(cx, cy, false)
+    const idx = cy * COLS + cx
+    const objs = this.wallTiles.get(idx)
+    if (objs) {
+      for (const o of objs) o.destroy()
+      this.wallTiles.delete(idx)
+    }
+    this.dust((cx + 0.5) * UNIT, (cy + 0.5) * UNIT)
+    this.flowCellX = -1 // 拓扑变了：逼下帧重算流场
+  }
+
+  private dust(x: number, y: number): void {
+    const c = this.add.circle(x, y, UNIT * 0.4, 0xbcae95, 0.6).setDepth(5)
+    this.tweens.add({ targets: c, scale: 1.8, alpha: 0, duration: 320, onComplete: () => c.destroy() })
   }
 
   // ── 世界规则覆写 ────────────────────────────────────────────
@@ -138,11 +168,12 @@ export class RuinsArenaScene extends ArenaScene {
     return { x: (cx + 0.5) * UNIT, y: (cy + 0.5) * UNIT }
   }
 
-  /** 追击方向：流场绕墙寻路；不可达时回退直线（基类实现） */
-  chaseDir(from: Point, to: Point): Point {
-    const dir = this.flow?.sampleDir(from.x, from.y)
+  /** 追击方向：穿墙敌人（幽灵）直线穿行；其余走流场绕墙寻路，不可达回退直线 */
+  chaseDir(a: Enemy, to: Point): Point {
+    if (a.def.phasesWalls) return super.chaseDir(a, to)
+    const dir = this.flow?.sampleDir(a.image.x, a.image.y)
     if (dir && (dir.x !== 0 || dir.y !== 0)) return dir
-    return super.chaseDir(from, to)
+    return super.chaseDir(a, to)
   }
 
   /** 游荡撞墙折返：盒子折返基础上，前方是墙就掉头 */
@@ -168,20 +199,21 @@ export class RuinsArenaScene extends ArenaScene {
     return super.cullEnemyProjectile(s) || this.grid.pointBlocked(s.x, s.y)
   }
 
-  /** 索敌视线遮挡：被断壁挡住的敌人不进玩家索敌候选（探头才打得到） */
-  protected buildFrameTargets(): void {
-    let awake = 0
-    const targets: TargetInfo[] = []
-    const c = this.center
-    for (const e of this.enemies.getChildren() as ImageObj[]) {
-      if (!e.active) continue
-      awake++
-      if (this.grid.segmentHit(c.x, c.y, e.x, e.y) !== null) continue // 墙后不可索敌
-      targets.push({ x: e.x, y: e.y, radius: enemyOf(e).def.radius, ref: e })
+  /** 穿墙攻击按武器分流：非穿墙武器索敌受断壁遮挡（只能打到与本队员之间无墙的敌人，
+   * 探头才打得到）；穿墙武器（机器人激光）沿用全体索敌，命中扫描本就贯穿直线。
+   * 帧索敌快照（frameTargets）保持全体不变，遮挡只在各能力 ctx 局部按本队员位置裁剪 */
+  protected wallAwareCtx(def: AbilityDef, base: AbilityContext, slot: number): AbilityContext {
+    if (abilityPiercesWalls(def)) return base
+    return {
+      ...base,
+      targets: () => {
+        const m = this.members[slot]
+        const all = base.targets()
+        if (!m) return all
+        const from = m.image
+        return all.filter((t) => this.grid.segmentHit(from.x, from.y, t.x, t.y) === null)
+      },
     }
-    this.awakeCount = awake
-    this.dormantCount = 0
-    this.frameTargets = targets
   }
 
   /** 逐帧低频重算流场（队伍格变了 / 到点就重算） */
