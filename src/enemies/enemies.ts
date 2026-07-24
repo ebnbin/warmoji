@@ -10,6 +10,14 @@ import type { FieldPickupDef } from '../battlefield/registry'
 /** 行为状态机：wander 游荡 / chase 追击 / windup 蓄力 / dash 冲刺 / cool 冷却 */
 export type EnemyState = 'wander' | 'chase' | 'windup' | 'dash' | 'cool'
 
+/** 偷币组件（用到才挂）：仅偷币鼠 locomotion 装配——吃下的金币数 + 偷币冷却，死亡时吐回 */
+export interface ThiefState {
+  /** 已吃下的金币数 */
+  eaten: number
+  /** 下一次可吃金币的时刻（偷币冷却，防一帧扫光一片） */
+  nextEatAt: number
+}
+
 /** 能力施加的限时减速/冻结组件（用到才挂）：present + 未到期时按 mul 缩放移速（震慑余波、凛冬降临） */
 export interface SlowState {
   /** 减速到期时刻 */
@@ -82,10 +90,8 @@ export interface Enemy {
   /** 击退冲量（指数衰减，0 = 无） */
   kvx: number
   kvy: number
-  /** 偷币鼠吃下的金币数 */
-  eaten: number
-  /** 偷币鼠下一次可吃金币的时刻（偷币冷却，防一帧扫光一片） */
-  nextEatAt: number
+  /** 偷币（用到才挂）：仅偷币鼠 locomotion 装配，死亡时吐回吃下的金币 */
+  thief?: ThiefState
   /** 亡语替身：无伤害/无行为的诱饵尸壳（接触不伤人，专供吸引火力） */
   decoy: boolean
   /** 属主（巢）：护巢子敌指向生成自己的巢——绕巢/护巢的锚点 + 计入本巢在场上限。
@@ -134,8 +140,6 @@ export function attachEnemy(image: ImageObj, def: EnemyDef, hp: number, init?: P
     dmgMul: 1,
     kvx: 0,
     kvy: 0,
-    eaten: 0,
-    nextEatAt: 0,
     decoy: false,
     despawnAt: 0,
     ph: 0,

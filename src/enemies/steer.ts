@@ -167,10 +167,11 @@ const coinThief: Steerer = ({ scene, a, body, slow, now }) => {
     const eatR = def.radius + PICKUPS.coin.radius * UNIT
     const onCoin = bestD <= eatR * eatR
     // 偷币要过冷却：贴到金币也得等 COINTHIEF_EAT_CD 才吞一枚，不能一帧扫光一堆
-    if (onCoin && now >= a.nextEatAt) {
+    const thief = (a.thief ??= { eaten: 0, nextEatAt: 0 })
+    if (onCoin && now >= thief.nextEatAt) {
       releasePooled(coin)
-      a.eaten += 1
-      a.nextEatAt = now + COINTHIEF_EAT_CD
+      thief.eaten += 1
+      thief.nextEatAt = now + COINTHIEF_EAT_CD
     } else if (onCoin) {
       // 贴着金币但在偷币冷却中：原地守着等下一口
       body.setVelocity(0, 0)

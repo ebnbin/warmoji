@@ -167,12 +167,12 @@ test('死亡效果与偷币：蘑菇留毒、泡泡分裂、偷币鼠吃币后�
   await page.waitForFunction(
     () => {
       const game = window.__game as {
-        scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { def: { kind: string }; eaten: number } }[] } }> }
+        scene: { keys: Record<string, { enemies: { getChildren(): { active: boolean; getData(k: string): { def: { kind: string }; thief?: { eaten: number } } }[] } }> }
       }
       return game.scene.keys['arena']!.enemies.getChildren().some((e) => {
         if (!e.active) return false
         const a = e.getData('enemy')
-        return a.def.kind === 'rat' && a.eaten > 0
+        return a.def.kind === 'rat' && (a.thief?.eaten ?? 0) > 0
       })
     },
     undefined,

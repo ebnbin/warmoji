@@ -1650,7 +1650,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const xpMul =
       CAPTAINS[this.run.captainId].xpGainMul * this.teamFx.xpGainMul * (elite ? ELITE.xpMul : 1)
     this.gainTeamXp(Math.round(def.xp * xpMul))
-    const eaten = a.eaten
+    const eaten = a.thief?.eaten ?? 0
     const dropRoll = this.rng.next()
     const doubleRoll = this.rng.next()
     const dropped = dropRoll < coinDropChance((this.run.combatMs + this.elapsedMs) / 1000)
