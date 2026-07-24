@@ -92,6 +92,17 @@ const SPACE_MIX: readonly EnemyMixRow[] = [
   { kind: 'gargoyle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 11 },
 ]
 
+/** 浮冰：突刺野猪（冰上滑更远、好骗招）+ 泡泡分裂 + 幽灵 + 定距毒蛇 + 炮龟 + 自爆怪（专精：boar/blob/turtle） */
+const ICE_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 78, perWave: -2, min: 38, max: 78 },
+  { kind: 'boar', sinceWave: 1, base: 16, perWave: 0.8, min: 12, max: 32 },
+  { kind: 'ghost', sinceWave: 2, base: 12, perWave: 0.5, min: 0, max: 24 },
+  { kind: 'blob', sinceWave: 2, base: 12, perWave: 0.5, min: 0, max: 22 },
+  { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
+  { kind: 'turtle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'creeper', sinceWave: 5, base: 6, perWave: 0.3, min: 0, max: 12 },
+]
+
 export const MAPS = {
   forest: {
     emoji: '1f332',
@@ -256,5 +267,29 @@ export const MAPS = {
     mix: SPACE_MIX,
     // 深空专属 Boss：奇点——吸积盘环爆 + 奇点坍缩坠击 + 禁锢力场
     boss: 'blackhole',
+  },
+  ice: {
+    emoji: '2744',
+    name: '浮冰',
+    desc: '脚下是打滑的浮冰——不跟手、刹不住、会过冲；四周刺骨寒水，滑出冰面就掉血、越游越慢（敌我通吃）。低摩擦让击退格外突出，把敌人推下水淹死是这里的活路',
+    kind: 'ice',
+    palette: {
+      // 页面底色取寒夜冰蓝
+      bgFrom: 'hsl(205 45% 20%)',
+      bgTo: 'hsl(215 55% 6%)',
+      // map 色即浮冰面（很亮的冰蓝白，深色寒水上高对比浮现）
+      map: hslToInt(198, 0.32, 0.82),
+      shadow: 0x0a1f33,
+    },
+    decor: {
+      // 冰面点缀：雪花 / 冰块（低透明、贴地）
+      emojis: ['2744', '1f9ca'],
+      sizeU: [0.3, 0.7],
+      alpha: [0.14, 0.28],
+      density: [0.05, 0.09],
+    },
+    mix: ICE_MIX,
+    // 占位 Boss：暂借巨鳄（半水生），建议后续做个冰主题 Boss（海象/北极熊/破冰船）
+    boss: 'croc',
   },
 } as const satisfies Record<string, MapDef>

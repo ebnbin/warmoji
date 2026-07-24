@@ -56,6 +56,7 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
   ruins: '断壁废墟（墙挡人 / 挡弹 / 挡视线）',
   daynight: '昼夜原野（30×30；视野随晨昏涨落，夜幕四合起迷雾）',
   space: '深空星海（无限世界；天体直线横扫敌我通吃，终波奇点禁锢场谁也逃不出）',
+  ice: '浮冰（25×25 方形浮冰；全局打滑不跟手，滑出冰面落水掉血·敌我通吃，相机永远跟随）',
 }
 
 export function enemyStatLines(e: EnemyDef): string[] {
