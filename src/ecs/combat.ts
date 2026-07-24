@@ -79,6 +79,7 @@ export function killEnemy(sim: Sim, eid: number): void {
   playSfx('kill')
   const def = enemyDef[eid]
   const elite = Elite.v[eid] === 1
+  if (Boss.v[eid]) sim.bossDown = true // 终波 Boss 被击败 → 场景侧走通关结算
   if (def) grantKillRewards(sim, eid, def, elite) // 经验即得 + 金币落地待拾
   // 亡语快照(实体即将移除:先记死亡点/体质,场景侧 runDeathEffects 重放)
   if (def?.onDeath) {

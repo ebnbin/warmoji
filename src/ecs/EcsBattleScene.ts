@@ -29,10 +29,10 @@ import { updateEnemyAbilities } from './ability/enemyWire'
 import { runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
 import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
-import { spawnStep } from './spawn'
+import { spawnBossEcs, spawnStep } from './spawn'
 import { initialLayout, stepSim } from './sim'
 import { settleWave } from './wave'
-import { waveDurationMs, WAVE } from '../run/waves'
+import { isBossWave, waveDurationMs, WAVE } from '../run/waves'
 import type { Sim } from './sim'
 import { toPx } from '../battle/px'
 import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
@@ -130,6 +130,12 @@ export class EcsBattleScene extends Phaser.Scene {
     for (let i = 0; i < this.sim.members.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
+    }
+    // 正常模式 Boss 波开场:预告后投放本图 Boss(镜像 setup 的 isBossWave 分支)
+    if (!run.testMode && isBossWave(run.wave)) {
+      this.time.delayedCall(600, () => {
+        if (this.sim && !this.sim.over) spawnBossEcs(this.sim, atlas)
+      })
     }
     this.ready = true
     hint.destroy()
@@ -250,6 +256,7 @@ export class EcsBattleScene extends Phaser.Scene {
       return best >= 0 && Morph.until[best] !== 0 && sim.elapsedMs < Morph.until[best]!
     }
     window.__ecsGroundZones = (): number => groundZoneCount()
+    window.__ecsBossDown = (): boolean => this.sim?.bossDown ?? false
     // e2e/性能探针:一次性铺 count 只敌人(网格散布,验证上千 entity 单批绘制)
     window.__ecsStress = (count = 1000, kind = 'zombie'): void => {
       const sim = this.sim
@@ -399,6 +406,12 @@ export class EcsBattleScene extends Phaser.Scene {
     if (this.atlas) updateSpawners(sim, this.atlas)
     // 刷怪节奏
     if (this.atlas) spawnStep(sim, this.atlas, delta)
+    // 终波 Boss 被击败 → 通关结算(镜像 onBossDown → endWave)
+    if (!this.testMode && sim.bossDown) {
+      const finished = settleWave(sim)
+      this.scheduleWaveEnd(finished)
+      return
+    }
     // 全队阵亡 → 失败结算(测试模式不结算,便于反复观测)
     if (!this.testMode && sim.over) {
       this.ending = true

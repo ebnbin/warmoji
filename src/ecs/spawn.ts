@@ -1,6 +1,8 @@
 import { query } from 'bitecs'
 import { UNIT } from '../core/units'
 import { toPx } from '../battle/px'
+import { playSfx } from '../audio/sfx'
+import { bossFor } from '../maps/registry'
 import { waveAt, isBossWave } from '../run/waves'
 import {
   BOSS_SPAWN_RELIEF,
@@ -30,6 +32,16 @@ function spawnOne(sim: Sim, hpMultiplier: number): void {
   const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
   const pos = spawnPoint(sim)
   sim.pendingSpawns.push({ def, x: pos.x, y: pos.y, hp, elite, boss: false, at: sim.elapsedMs + SPAWN.telegraphMs })
+}
+
+/** 生成本图 Boss(镜像 spawnBoss:同一 materialize 管线,boss 标记金边/深度/HUD 血条)。
+ * 正常模式的 Boss 波开场调用;测试模式经 __ecsSpawnEnemy(bossKind) 直投 */
+export function spawnBossEcs(sim: Sim, atlas: EcsAtlas): void {
+  if (sim.over) return
+  const def = toPx(bossFor(sim.mapId))
+  const pos = spawnPoint(sim)
+  spawnEnemy(sim, atlas, def, pos.x, pos.y, def.hp, false, true)
+  playSfx('boom')
 }
 
 /** 每帧:预告落地 + 刷怪冷却推进(镜像 spawn) */
