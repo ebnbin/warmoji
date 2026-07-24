@@ -53,6 +53,8 @@ export interface Sim {
   over: boolean
   /** 终波 Boss 被击败(场景侧据此走通关结算) */
   bossDown: boolean
+  /** 队员受击累计次数(场景侧据增量触发受击震屏) */
+  memberHitCount: number
   /** 本帧敌方存活快照(能力索敌共享;wire 每帧重建) */
   enemyTargets: TargetInfo[]
   /** 本帧队员存活快照(敌方能力索敌共享;enemyWire 每帧重建) */

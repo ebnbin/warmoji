@@ -2,6 +2,9 @@ import Phaser from 'phaser'
 import { viewport } from '../core/apply'
 import { UNIT } from '../core/units'
 import { MEMBER } from '../characters/registry'
+import { HIT_SHAKE } from '../battle/config'
+import { loadSettings } from '../run/settings'
+import { browserStorage } from '../core/storage'
 import { UI_FONT, FONT } from '../core/fonts'
 import { norm } from '../core/vec'
 import { Rng } from '../core/rng'
@@ -55,6 +58,9 @@ export class EcsBattleScene extends Phaser.Scene {
   /** 队员血条(逐帧跟位 + 按血量比例重绘;镜像 drawMemberHp) */
   private hpBars: Phaser.GameObjects.Graphics[] = []
   private shownHp: number[] = []
+  /** 受击震屏:设置开关 + 已消费的受击计数(据增量抖屏,镜像 hitShake) */
+  private hitShakeOn = false
+  private seenHitCount = 0
   private centerObj!: Phaser.GameObjects.Zone
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -124,6 +130,7 @@ export class EcsBattleScene extends Phaser.Scene {
     new EcsSpriteBatch(this, this.world, atlas)
     this.spawnDecor(run, atlas)
     this.testMode = run.testMode
+    this.hitShakeOn = loadSettings(browserStorage()).hitShake
     this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
     initialLayout(this.sim)
     armTeam(this.sim, this, atlas, run, run.testMode)
@@ -425,6 +432,11 @@ export class EcsBattleScene extends Phaser.Scene {
       return
     }
     this.centerObj.setPosition(sim.center.x, sim.center.y)
+    // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtMember 的 cameras.shake)
+    if (sim.memberHitCount > this.seenHitCount) {
+      this.seenHitCount = sim.memberHitCount
+      if (this.hitShakeOn) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
+    }
     this.updateHpBars()
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,

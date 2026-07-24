@@ -148,6 +148,7 @@ export function spawnTeam(
     kills: 0,
     over: false,
     bossDown: false,
+    memberHitCount: 0,
     enemyTargets: [],
     memberTargets: [],
     pendingDeaths: [],

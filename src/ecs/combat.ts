@@ -195,6 +195,7 @@ export function hurtMember(sim: Sim, eid: number, damage: number): void {
   const hp = Math.max(0, MHp.hp[eid]! - damage)
   MHp.hp[eid] = hp
   playSfx('hurt')
+  sim.memberHitCount++ // 场景侧据增量触发受击震屏
   MFlash.until[eid] = sim.elapsedMs + 120
   Tint.color[eid] = 0xff7777 // 受击红闪
   Tint.effect[eid] = 0
