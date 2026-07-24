@@ -40,6 +40,7 @@ import {
   enemyFireDelayMs,
   enemyNest,
   enemyNextSpawnAt,
+  enemyPhase,
   enemyVelX,
   enemyVelY,
   thiefEaten,
@@ -133,6 +134,8 @@ export function spawnEnemy(
   ETurn.at[eid] = sim.elapsedMs + AI.wander.spawnTurnMinMs + sim.rng.next() * AI.wander.spawnTurnJitterMs
   // 首发延迟(镜像 materializeEnemy 的 fireAt;lazy-arm 时喂入能力初始冷却)
   enemyFireDelayMs[eid] = 900 + sim.rng.next() * 1500
+  // 行走摇摆随机相位(镜像 materializeEnemy 的 ph)
+  enemyPhase[eid] = sim.rng.next() * Math.PI * 2
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   Sprite.flipX[eid] = 0
   Tint.color[eid] = 0xffffff
@@ -550,5 +553,11 @@ export function steerEnemies(sim: Sim, delta: number): void {
     }
     Transform.x[eid] = clamp(tx, 0, sim.mapW)
     Transform.y[eid] = clamp(ty, 0, sim.mapH)
+    // 非脚本姿态的行走动画:环境摇摆(轻微旋转)+ 按移动方向翻转(twemoji 默认朝左)。
+    // 蓄力/冲刺(EState 2/3)与变形由各自状态机/形象自管,此处不覆盖
+    if (EState.v[eid] !== 2 && EState.v[eid] !== 3 && Morph.until[eid] === 0) {
+      Transform.rot[eid] = Math.sin(now / 95 + enemyPhase[eid]!) * 0.1
+      if (Math.abs(enemyVelX[eid]!) > 8) Sprite.flipX[eid] = enemyVelX[eid]! > 0 ? 1 : 0
+    }
   }
 }
