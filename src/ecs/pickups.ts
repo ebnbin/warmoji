@@ -93,8 +93,9 @@ function nearAliveMember(sim: Sim, x: number, y: number, collect2: number): bool
   return false
 }
 
-/** 入账一枚(镜像 collectCoin:音效 + run.coins+1;拾取爆点 P6) */
+/** 入账一枚(镜像 collectCoin:拾取金爆 + 音效 + run.coins+1) */
 function collectCoinEcs(sim: Sim, eid: number): void {
+  sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 4, kind: 'coin' })
   playSfx('coin')
   sim.run.coins += 1
   removeEntity(sim.world, eid)

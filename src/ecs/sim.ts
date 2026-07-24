@@ -71,6 +71,8 @@ export interface Sim {
   pendingDeaths: PendingDeath[]
   /** 本帧敌人受伤的飘字事件(场景侧 drainDamageNumbers 排空) */
   pendingDamageNumbers: DamageNumber[]
+  /** 本帧粒子爆点(死亡/拾币;场景侧 drainBursts 排空,按 kind 分发发射器) */
+  pendingBursts: Burst[]
   /** 队伍侧共享效果执行面(抛射物 onHit 命中链复用;armTeam 后由场景注入) */
   effectCtx?: EffectCtx
   /** run 状态引用(金币/经验/抽卡入账;与旧场景同口径直改 run) */
@@ -118,6 +120,14 @@ export interface DamageNumber {
   x: number
   y: number
   amount: number
+}
+
+/** 粒子爆点(kind 选发射器:death 紫爆 / coin 金爆) */
+export interface Burst {
+  x: number
+  y: number
+  count: number
+  kind: 'death' | 'coin'
 }
 
 /** 死亡快照(带亡语的敌人;实体已移除,死亡效果按此在死亡点重放) */

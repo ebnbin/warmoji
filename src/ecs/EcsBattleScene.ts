@@ -4,6 +4,7 @@ import { UNIT } from '../core/units'
 import { MEMBER } from '../characters/registry'
 import { HIT_SHAKE } from '../battle/config'
 import { DAMAGE_FONT, ensureDamageFont } from '../core/damageFont'
+import { burstEmitter } from '../core/fx'
 import { loadSettings } from '../run/settings'
 import { browserStorage } from '../core/storage'
 import { UI_FONT, FONT } from '../core/fonts'
@@ -66,6 +67,9 @@ export class EcsBattleScene extends Phaser.Scene {
   private damageNumbersOn = false
   private damagePool: Phaser.GameObjects.BitmapText[] = []
   private damageIdx = 0
+  /** 粒子爆点发射器(死亡紫爆 / 拾币金爆) */
+  private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
+  private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private centerObj!: Phaser.GameObjects.Zone
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -142,6 +146,9 @@ export class EcsBattleScene extends Phaser.Scene {
     this.damagePool = Array.from({ length: 64 }, () =>
       this.add.bitmapText(0, 0, DAMAGE_FONT).setFontSize(24).setOrigin(0.5).setDepth(50).setVisible(false),
     )
+    // 粒子爆点(镜像 deathBurst/coinBurst 的配色与速度)
+    this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
+    this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
     this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
     initialLayout(this.sim)
     armTeam(this.sim, this, atlas, run, run.testMode)
@@ -339,6 +346,14 @@ export class EcsBattleScene extends Phaser.Scene {
     return best
   }
 
+  /** 排空本帧粒子爆点:按 kind 分发到死亡/拾币发射器(镜像 deathBurst/coinBurst.explode) */
+  private drainBursts(): void {
+    const q = this.sim!.pendingBursts
+    if (q.length === 0) return
+    for (const b of q) (b.kind === 'coin' ? this.coinBurst : this.deathBurst).explode(b.count, b.x, b.y)
+    q.length = 0
+  }
+
   /** 排空本帧敌人受伤飘字(镜像 floatDamage:池化 BitmapText 上浮淡出);关则弃字 */
   private drainDamageNumbers(): void {
     const q = this.sim!.pendingDamageNumbers
@@ -462,6 +477,7 @@ export class EcsBattleScene extends Phaser.Scene {
     }
     this.centerObj.setPosition(sim.center.x, sim.center.y)
     this.drainDamageNumbers()
+    this.drainBursts()
     // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtMember 的 cameras.shake)
     if (sim.memberHitCount > this.seenHitCount) {
       this.seenHitCount = sim.memberHitCount
