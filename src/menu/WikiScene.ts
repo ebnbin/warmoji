@@ -2,7 +2,9 @@ import Phaser from 'phaser'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
-import { allEmojiIds } from '../emoji/pack'
+import { visibleEmojiIds } from '../emoji/pack'
+import { browserStorage } from '../core/storage'
+import { loadSettings } from '../run/settings'
 import { usedEmojiSet, wikiEntryByEmoji, wikiGroups } from './wiki'
 import type { WikiEntry, WikiGroup } from './wiki'
 import { applyBackground } from '../core/background'
@@ -599,8 +601,9 @@ export class WikiScene extends Phaser.Scene {
   private async loadManifest(): Promise<void> {
     if (this.manifest.length > 0) return
     try {
-      // 全量清单来自打包资源（ordering 顺序，以 ordering 为准，肤色/component 一律保留）
-      this.manifest = [...allEmojiIds(await loadEmojiPack())]
+      // 全量清单来自打包资源（ordering 顺序）；按「显示肤色」开关过滤肤色变体（component 不受影响）
+      const showSkinTone = loadSettings(browserStorage()).showSkinTone
+      this.manifest = [...visibleEmojiIds(await loadEmojiPack(), showSkinTone)]
     } catch (err) {
       console.error(`emoji 清单加载失败: ${String(err)}`)
     }

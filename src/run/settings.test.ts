@@ -11,8 +11,14 @@ function memStorage(): StringStorage {
 }
 
 describe('settings', () => {
-  it('默认全开；无存储/损坏数据回退默认', () => {
-    expect(DEFAULT_SETTINGS).toEqual({ damageNumbers: true, hitShake: true, sound: true, bgm: true })
+  it('默认值（肤色默认关，其余开）；无存储/损坏数据回退默认', () => {
+    expect(DEFAULT_SETTINGS).toEqual({
+      damageNumbers: true,
+      hitShake: true,
+      sound: true,
+      bgm: true,
+      showSkinTone: false,
+    })
     expect(loadSettings(undefined)).toEqual(DEFAULT_SETTINGS)
     const s = memStorage()
     s.setItem('warmoji.settings.v1', '{oops')
@@ -25,15 +31,17 @@ describe('settings', () => {
       hitShake: true,
       sound: true,
       bgm: true,
+      showSkinTone: false,
     })
     expect(sanitizeSettings({ hitShake: 'yes' })).toEqual(DEFAULT_SETTINGS)
   })
 
   it('保存后可读回', () => {
     const s = memStorage()
-    const off = { damageNumbers: false, hitShake: false, sound: false, bgm: false }
-    saveSettings(s, off)
-    expect(loadSettings(s)).toEqual(off)
+    // showSkinTone 取非默认值（true），验证新字段确实被持久化并读回
+    const saved = { damageNumbers: false, hitShake: false, sound: false, bgm: false, showSkinTone: true }
+    saveSettings(s, saved)
+    expect(loadSettings(s)).toEqual(saved)
   })
 
   it('定义表覆盖全部设置项且不重复（页面按此渲染）', () => {

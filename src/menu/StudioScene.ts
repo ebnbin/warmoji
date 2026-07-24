@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
-import { allEmojiIds } from '../emoji/pack'
+import { visibleEmojiIds } from '../emoji/pack'
+import { browserStorage } from '../core/storage'
+import { loadSettings } from '../run/settings'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -263,7 +265,7 @@ export class StudioScene extends Phaser.Scene {
       Promise.all([...need].map((e) => ensureEmoji(this, e).catch(() => ''))),
       loadEmojiPack()
         .then((p) => {
-          this.allKeys = [...allEmojiIds(p)]
+          this.allKeys = [...visibleEmojiIds(p, loadSettings(browserStorage()).showSkinTone)]
         })
         .catch((err) => console.error(`emoji 清单加载失败: ${String(err)}`)),
     ]).then(() => {

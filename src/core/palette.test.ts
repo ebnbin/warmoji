@@ -23,10 +23,10 @@ describe('randomPalette', () => {
     expect(randomPalette(new Rng(7))).toEqual(randomPalette(new Rng(7)))
   })
 
-  it('背景为合法 CSS hsl 字符串，地图为 24 位数值色', () => {
+  it('背景为固定中性色 #292f33，地图为 24 位数值色', () => {
     const p = randomPalette(new Rng(42))
-    expect(p.bgFrom).toMatch(/^hsl\(\d+ 28% 34%\)$/)
-    expect(p.bgTo).toMatch(/^hsl\(\d+ 28% 20%\)$/)
+    expect(p.bgFrom).toBe('#292f33')
+    expect(p.bgTo).toBe('#292f33')
     expect(p.map).toBeGreaterThanOrEqual(0)
     expect(p.map).toBeLessThanOrEqual(0xffffff)
   })

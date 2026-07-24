@@ -45,3 +45,15 @@ export function packSvg(pack: EmojiPack, id: string): string | null {
 export function allEmojiIds(pack: EmojiPack): readonly string[] {
   return pack.ids
 }
+
+/** 肤色变体：ID 里带下划线连接的肤色修饰符（1f3fb..1f3ff）。
+ * 独立的 component（肤色修饰符/发型本体，如 1f3fb、1f9b0）不含下划线，不算变体、不受此判据影响。 */
+export function isSkinToneVariant(id: string): boolean {
+  return /_1f3f[b-f]/.test(id)
+}
+
+/** 全库清单按「显示肤色」开关过滤：关时剔除肤色变体，component 不受影响 */
+export function visibleEmojiIds(pack: EmojiPack, showSkinTone: boolean): readonly string[] {
+  const ids = allEmojiIds(pack)
+  return showSkinTone ? ids : ids.filter((id) => !isSkinToneVariant(id))
+}

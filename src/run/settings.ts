@@ -11,6 +11,8 @@ export interface Settings {
   sound: boolean
   /** 程序化生成的场景配乐 */
   bgm: boolean
+  /** 图鉴 / Studio 全部页展示含肤色的 emoji 变体（component 不受影响） */
+  showSkinTone: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -18,6 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hitShake: true,
   sound: true,
   bgm: true,
+  showSkinTone: false,
 }
 
 export type SettingKey = keyof Settings
@@ -34,6 +37,7 @@ export const SETTING_DEFS: readonly SettingDef[] = [
   { key: 'bgm', icon: '1f3b5', label: '背景音乐', desc: '按地图生成的程序化配乐' },
   { key: 'damageNumbers', icon: '1f522', label: '伤害数字', desc: '敌人受击时飘出伤害数值' },
   { key: 'hitShake', icon: '1f4f3', label: '受击震屏', desc: '队员受到伤害时轻微抖动画面' },
+  { key: 'showSkinTone', icon: '1f44b_1f3fd', label: '肤色 emoji', desc: '图鉴与 Studio 全部页展示含肤色的 emoji 变体' },
 ]
 
 const KEY = 'warmoji.settings.v1'
@@ -48,6 +52,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     hitShake: pick('hitShake'),
     sound: pick('sound'),
     bgm: pick('bgm'),
+    showSkinTone: pick('showSkinTone'),
   }
 }
 
