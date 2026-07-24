@@ -128,6 +128,21 @@ export interface RiverConfig {
   readonly waveFast: number
 }
 
+/** 环面/传送门特性（可选）：固定 16:9 环面世界（四边传送门，出这头即现那头）+ 跨缝分身相机。
+ * 目前仅工厂图配置；数据模型上任何图都可组合本特性 */
+export interface TorusConfig {
+  /** 竞技场长边（格） */
+  readonly arenaLong: number
+  /** 竞技场短边（格） */
+  readonly arenaShort: number
+  /** 条带相机宽度（格）：渲染实体跨缝时的对侧分身 */
+  readonly strip: number
+  /** 玩家子弹寿命（ms）：环面上永远飞不出屏幕，必须按时限回收 */
+  readonly projectileLifeMs: number
+  /** 传送门门框光带厚度（格） */
+  readonly frame: number
+}
+
 export interface MapDef {
   readonly emoji: string
   readonly name: string
@@ -163,6 +178,8 @@ export interface MapDef {
   readonly space?: SpaceConfig
   /** 奔流/水流特性（可选）：配置即启用单屏固定相机 + 河道 + 顺流漂移（当前仅奔流图使用） */
   readonly river?: RiverConfig
+  /** 环面/传送门特性（可选）：配置即启用环面世界 + 四边传送门 + 分身相机（当前仅工厂图使用） */
+  readonly torus?: TorusConfig
   /** 本图终波 Boss：引用 enemies 里某个 role:'boss' 的 kind */
   readonly boss: string
 }

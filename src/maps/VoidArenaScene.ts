@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { UNIT } from '../core/units'
-import { VOID } from './void'
+import type { TorusConfig } from './registry'
 import { MAPS } from './registry'
 import type { MapDef } from './registry'
 import { remapPoint, remapVector } from '../core/remap'
@@ -41,11 +41,16 @@ export class VoidArenaScene extends BaseArenaScene {
 
   constructor() {
     super('arenaVoid')
-    // 环面上子弹永不出屏：按寿命回收（基座 spawnProjectile 消费）
-    this.projectileTtlMs = VOID.projectileLifeMs
+  }
+
+  /** 环面/传送门特性配置（来自 MapDef 数据；工厂图必配 torus） */
+  private get torusCfg(): TorusConfig {
+    return MAPS[this.run.mapId].torus!
   }
 
   protected resetWorldFields(): void {
+    // 环面上子弹永不出屏：按寿命回收（基座 spawnProjectile 消费）。this.run 此时已就绪
+    this.projectileTtlMs = this.torusCfg.projectileLifeMs
     this.staticVisuals = []
     this.frameTiles = []
     this.frameGlow = undefined
@@ -183,8 +188,8 @@ export class VoidArenaScene extends BaseArenaScene {
    * 条带相机取景对侧溢出——跨缝实体两侧同时可见（渲染层的幽灵分身） */
   private setupCameras(): void {
     const landscape = viewport.logicalWidth >= viewport.logicalHeight
-    this.arenaW = (landscape ? VOID.arenaLong : VOID.arenaShort) * UNIT
-    this.arenaH = (landscape ? VOID.arenaShort : VOID.arenaLong) * UNIT
+    this.arenaW = (landscape ? this.torusCfg.arenaLong : this.torusCfg.arenaShort) * UNIT
+    this.arenaH = (landscape ? this.torusCfg.arenaShort : this.torusCfg.arenaLong) * UNIT
     const cw = Math.round(viewport.cssWidth * viewport.dpr)
     const ch = Math.round(viewport.cssHeight * viewport.dpr)
     const rect = fitAspectRect(cw, ch, this.arenaW, this.arenaH)
@@ -196,7 +201,7 @@ export class VoidArenaScene extends BaseArenaScene {
 
     for (const c of this.stripCams) this.cameras.remove(c)
     this.stripCams = []
-    const s = VOID.strip * UNIT
+    const s = this.torusCfg.strip * UNIT
     const sPx = Math.max(2, Math.round(s * zoom))
     const x0 = Math.round(rect.x)
     const y0 = Math.round(rect.y)
@@ -333,7 +338,7 @@ export class VoidArenaScene extends BaseArenaScene {
 
     // 传送门门框：流动虚线光带（TileSprite 滚动）+ 脉动描边
     this.ensureDashTexture()
-    const f = VOID.frame * UNIT
+    const f = this.torusCfg.frame * UNIT
     const mkTile = (
       x: number,
       y: number,
@@ -369,7 +374,7 @@ export class VoidArenaScene extends BaseArenaScene {
   /** 门框虚线贴图（横/竖两个变体，一次生成） */
   private ensureDashTexture(): void {
     const size = 64
-    const th = Math.round(VOID.frame * UNIT)
+    const th = Math.round(this.torusCfg.frame * UNIT)
     for (const [key, vertical] of [
       ['void-dash-h', false],
       ['void-dash-v', true],

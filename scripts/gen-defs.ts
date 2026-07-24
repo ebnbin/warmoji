@@ -339,6 +339,14 @@ for (const [id, m] of Object.entries(MAPS)) {
     num(`${p}.river.waveSlow`, rv.waveSlow, 0)
     num(`${p}.river.waveFast`, rv.waveFast, 0)
   }
+  const to = (m as MapDef).torus
+  if (to) {
+    num(`${p}.torus.arenaLong`, to.arenaLong, 1)
+    num(`${p}.torus.arenaShort`, to.arenaShort, 1)
+    num(`${p}.torus.strip`, to.strip, 0.01)
+    num(`${p}.torus.projectileLifeMs`, to.projectileLifeMs, 1)
+    num(`${p}.torus.frame`, to.frame, 0)
+  }
   pure(p, m)
 }
 

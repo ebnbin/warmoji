@@ -200,6 +200,14 @@ export const MAPS = {
       density: [0.05, 0.09],
     },
     mix: FACTORY_MIX,
+    // 环面/传送门特性：固定 16:9 环面（24×13.5 格）+ 四边传送门 + 跨缝分身相机
+    torus: {
+      arenaLong: 24,
+      arenaShort: 13.5,
+      strip: 1.5,
+      projectileLifeMs: 1500,
+      frame: 0.3,
+    },
     // 工厂专属 Boss：母机核心——激光环扫 + 液压重锤
     boss: 'mecha',
   },
