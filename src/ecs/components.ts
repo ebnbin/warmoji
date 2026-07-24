@@ -114,6 +114,9 @@ export const Poison = { until: f32(), nextTick: f32(), dmg: f32(), tickMs: f32()
 /** 冲刺/自爆状态机(dash/detonate locomotion):蓄力/冲刺/冷却结束时刻 + 定时型下轮触发时刻 */
 export const Charge = { windupUntil: f32(), dashUntil: f32(), coolUntil: f32(), nextDashAt: f32() }
 
+/** 定时静默移除时刻(0=不移除):亡语诱饵尸壳到时自毁(镜像 despawnAt) */
+export const Despawn = { at: f32() }
+
 /** 敌人移动查询集(最小:位姿 + 速度 + 血) */
 export const ENEMY_SET = [Enemy, Transform, Speed, Hp] as const
 

@@ -4,7 +4,9 @@ import { playSfx } from '../audio/sfx'
 import { KNOCKBACK } from '../abilities/registry'
 import {
   Alive,
+  Boss,
   DmgMul,
+  Elite,
   ENEMY_SET,
   Flash,
   Hp,
@@ -62,10 +64,22 @@ export function applyDamage(
   }
 }
 
-/** 击杀(P3b:计数 + 清体;掉落/亡语/死亡效果在后续增量) */
+/** 击杀(计数 + 亡语入队 + 清体;掉落/结算在 P4) */
 export function killEnemy(sim: Sim, eid: number): void {
   sim.kills++
   playSfx('kill')
+  const def = enemyDef[eid]
+  // 亡语快照(实体即将移除:先记死亡点/体质,场景侧 runDeathEffects 重放)
+  if (def?.onDeath) {
+    sim.pendingDeaths.push({
+      def,
+      x: Transform.x[eid]!,
+      y: Transform.y[eid]!,
+      elite: Elite.v[eid] === 1,
+      boss: Boss.v[eid] === 1,
+      dmgMul: DmgMul.v[eid]!,
+    })
+  }
   enemyDef[eid] = undefined
   enemyRef[eid] = undefined
   removeEntity(sim.world, eid)
@@ -106,6 +120,7 @@ export function memberContact(sim: Sim): void {
       if (dx * dx + dy * dy > rr * rr) continue
       const def = enemyDef[eid]
       if (!def) continue
+      if (def.damage <= 0) continue // 亡语诱饵尸壳(damage=0)无害:接触不伤(镜像 a.decoy 跳过)
       Iframe.last[m] = now
       hurtMember(sim, m, def.damage * DmgMul.v[eid]!)
       break // 一帧一员只吃一次(无敌帧掌管其余)

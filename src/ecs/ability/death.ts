@@ -1,0 +1,108 @@
+import type Phaser from 'phaser'
+import { UNIT } from '../../core/units'
+import { waveAt } from '../../run/waves'
+import { applyEffects } from '../../abilities/effects'
+import type { EffectCtx, TargetInfo } from '../../abilities/types'
+import type { DecoyEffect, SplitEffect } from '../../enemies/registry'
+import { Alive, Despawn, Iframe, Tint } from '../components'
+import { hurtMember } from '../combat'
+import { spawnEnemy } from '../enemy'
+import { spawnEnemyProjectileEcs } from '../projectile'
+import { healEnemiesEcs } from './enemyCtx'
+import type { PendingDeath, Sim } from '../sim'
+import type { EcsAtlas } from '../render/atlas'
+
+// 亡语(onDeath):死亡触发的一串效果。与命中触发 onHit 复用同一套组合式 Effect 与执行器
+// (applyEffects),经死亡点的临时 ctx 求值——留毒走 ground(暂 stub)、治疗走 heal、
+// 冷枪走 spawnBullet。需引擎侧生成敌人实体的两类(分裂/诱饵)本地处理。
+
+interface Ref {
+  __eid: number
+}
+const eidOf = (ref: TargetInfo['ref']): number => (ref as unknown as Ref).__eid
+
+/** 死亡点的临时效果 ctx(阵营=敌方):体质倍率取死者快照,索敌=队员快照 */
+function makeDeathCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, d: PendingDeath): EffectCtx {
+  return {
+    scene,
+    targets: () => sim.memberTargets,
+    damageTarget: (ref, damage) => {
+      const m = eidOf(ref)
+      if (sim.over || !Alive.v[m]) return
+      if (sim.elapsedMs - Iframe.last[m]! < Iframe.ms[m]!) return
+      Iframe.last[m] = sim.elapsedMs
+      hurtMember(sim, m, damage)
+    },
+    slowTarget: () => {},
+    spawnGroundEffect: () => {}, // 地面效果 P 后续
+    heal: (x, y, range, amount, all, exclude) =>
+      healEnemiesEcs(sim, x, y, range, amount, all, exclude ? eidOf(exclude) : undefined),
+    spawnBullet: (x, y, angle, spec, damage, lifeMs) =>
+      spawnEnemyProjectileEcs(sim, atlas, x, y, angle, {
+        emoji: spec.emoji,
+        size: spec.size,
+        radius: spec.radius,
+        speed: spec.speed,
+        damage: Math.round(damage * d.dmgMul),
+        lifeMs,
+      }),
+  }
+}
+
+/** 分裂:随机散开半格生成 count 个迷你体(血量吃波次曲线;into 已随父深 px 化) */
+function spawnSplit(sim: Sim, atlas: EcsAtlas, d: PendingDeath, fx: SplitEffect, hpMul: number): void {
+  if (sim.over) return
+  const scatter = 0.5 * UNIT
+  for (let i = 0; i < fx.count; i++) {
+    const ang = sim.rng.next() * Math.PI * 2
+    spawnEnemy(
+      sim,
+      atlas,
+      fx.into,
+      d.x + Math.cos(ang) * scatter,
+      d.y + Math.sin(ang) * scatter,
+      Math.round(fx.into.hp * hpMul),
+      false,
+      false,
+    )
+  }
+}
+
+/** 诱饵尸壳:原地留一具由自身退化的半透明替身——无伤害/移动/攻击/亡语,到时静默移除 */
+function spawnDecoy(sim: Sim, atlas: EcsAtlas, d: PendingDeath, fx: DecoyEffect, hpMul: number): void {
+  if (sim.over) return
+  const husk = {
+    ...d.def,
+    damage: 0,
+    speed: 0,
+    xp: 0,
+    coins: 0,
+    locomotion: { kind: 'wander' as const },
+    abilities: undefined,
+    onDeath: undefined,
+    kbImmune: true,
+  }
+  const eid = spawnEnemy(sim, atlas, husk, d.x, d.y, Math.round(fx.hp * hpMul), false, false)
+  Tint.alpha[eid] = fx.alpha
+  Despawn.at[eid] = sim.elapsedMs + fx.durationMs
+}
+
+/** 排空本帧死亡队列:逐个死者在死亡点重放其亡语(镜像 runDeathEffects) */
+export function runDeathEffects(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas): void {
+  if (sim.pendingDeaths.length === 0) return
+  const hpMul = waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier
+  for (const d of sim.pendingDeaths) {
+    const effects = d.def.onDeath
+    if (!effects) continue
+    let ctx: EffectCtx | undefined
+    for (const fx of effects) {
+      if (fx.kind === 'split') spawnSplit(sim, atlas, d, fx, hpMul)
+      else if (fx.kind === 'decoy') spawnDecoy(sim, atlas, d, fx, hpMul)
+      else {
+        ctx ??= makeDeathCtx(sim, scene, atlas, d)
+        applyEffects(ctx, [fx], { center: { x: d.x, y: d.y }, baseDamage: 0 })
+      }
+    }
+  }
+  sim.pendingDeaths.length = 0
+}

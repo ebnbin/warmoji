@@ -11,6 +11,7 @@ import {
   Boss,
   Charge,
   Depth,
+  Despawn,
   DmgMul,
   EDir,
   Elite,
@@ -68,6 +69,7 @@ export function spawnEnemy(
   addComponent(world, eid, Slow)
   addComponent(world, eid, Poison)
   addComponent(world, eid, Charge)
+  addComponent(world, eid, Despawn)
   addComponent(world, eid, EDir)
   addComponent(world, eid, ETurn)
   addComponent(world, eid, Sprite)
@@ -90,6 +92,7 @@ export function spawnEnemy(
     lm.kind === 'dash' && lm.trigger.kind === 'timer'
       ? sim.elapsedMs + (lm.trigger.firstDelayMs ?? lm.trigger.intervalMs)
       : 0
+  Despawn.at[eid] = 0
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
   Radius.v[eid] = def.radius
@@ -313,6 +316,11 @@ export function steerEnemies(sim: Sim, delta: number): void {
   const now = sim.elapsedMs
   const decay = Math.exp(-delta / KNOCKBACK.tauMs) // forest knockbackTauMul=1
   for (const eid of eids) {
+    // 亡语诱饵尸壳到时静默移除(不计击杀、不掉落、不放死亡效果)
+    if (Despawn.at[eid] !== 0 && now >= Despawn.at[eid]!) {
+      despawnEnemy(sim, eid)
+      continue
+    }
     // 受击白闪到时恢复
     if (Flash.until[eid] !== 0 && now >= Flash.until[eid]!) {
       Flash.until[eid] = 0

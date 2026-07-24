@@ -62,6 +62,8 @@ export interface Sim {
   /** 刷怪冷却 + 预告中待落地的敌人(telegraph 延迟) */
   spawnCooldownMs: number
   pendingSpawns: PendingSpawn[]
+  /** 本帧内死亡且带亡语的敌人快照(场景侧 runDeathEffects 逐帧排空) */
+  pendingDeaths: PendingDeath[]
   /** 队伍侧共享效果执行面(抛射物 onHit 命中链复用;armTeam 后由场景注入) */
   effectCtx?: EffectCtx
 }
@@ -75,6 +77,16 @@ export interface PendingSpawn {
   elite: boolean
   boss: boolean
   at: number
+}
+
+/** 死亡快照(带亡语的敌人;实体已移除,死亡效果按此在死亡点重放) */
+export interface PendingDeath {
+  def: import('../enemies/registry').EnemyDef
+  x: number
+  y: number
+  elite: boolean
+  boss: boolean
+  dmgMul: number
 }
 
 /** 队伍活感·探测与轨道(镜像 updateOrbit):逐员判定探测范围内有无敌人 + 环上主力驱动共享相位 */

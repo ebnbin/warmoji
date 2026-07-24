@@ -23,6 +23,7 @@ import { spawnTeam } from './team'
 import { spawnEnemy } from './enemy'
 import { armTeam, updateMemberAbilities } from './ability/wire'
 import { updateEnemyAbilities } from './ability/enemyWire'
+import { runDeathEffects } from './ability/death'
 import { spawnStep } from './spawn'
 import { initialLayout, stepSim } from './sim'
 import type { Sim } from './sim'
@@ -259,6 +260,8 @@ export class EcsBattleScene extends Phaser.Scene {
     updateMemberAbilities(sim, delta)
     // 敌人能力驱动(持械射击/治疗/落石;lazy-arm + 死亡清理)
     if (this.atlas) updateEnemyAbilities(sim, this, this.atlas, delta)
+    // 亡语重放(分裂/诱饵/治疗/冷枪:本帧内所有死亡的敌人在死亡点触发)
+    if (this.atlas) runDeathEffects(sim, this, this.atlas)
     // 刷怪节奏
     if (this.atlas) spawnStep(sim, this.atlas, delta)
     this.centerObj.setPosition(sim.center.x, sim.center.y)
