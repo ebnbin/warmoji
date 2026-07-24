@@ -14,7 +14,7 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query } from 'bitecs'
-import { Alive, Enemy, MHp, Projectile, Transform } from './components'
+import { Alive, Enemy, MHp, Projectile, Slow, Transform } from './components'
 import { applyDamage } from './combat'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch } from './render/spriteBatch'
@@ -139,6 +139,26 @@ export class EcsBattleScene extends Phaser.Scene {
         }
       }
       if (best >= 0) applyDamage(sim, best, dmg, kb, sim.center.x, sim.center.y)
+    }
+    // e2e 探针:对最近队伍中心的敌人施加限时减速(验证 slow 状态)
+    window.__ecsSlowEnemy = (factor = 0.3, durMs = 3000): void => {
+      const sim = this.sim
+      if (!sim) return
+      let best = -1
+      let bestD = Infinity
+      for (const eid of query(this.world, [Enemy])) {
+        const dx = Transform.x[eid]! - sim.center.x
+        const dy = Transform.y[eid]! - sim.center.y
+        const d = dx * dx + dy * dy
+        if (d < bestD) {
+          bestD = d
+          best = eid
+        }
+      }
+      if (best >= 0) {
+        Slow.until[best] = sim.elapsedMs + durMs
+        Slow.mul[best] = factor
+      }
     }
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,

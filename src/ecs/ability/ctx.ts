@@ -2,7 +2,7 @@ import type Phaser from 'phaser'
 import { playSfx } from '../../audio/sfx'
 import type { AbilityContext, TargetInfo } from '../../abilities/types'
 import type { CharacterEffects, TeamEffects } from '../../items/registry'
-import { Alive, Hp, Iframe, MHp, Transform } from '../components'
+import { Alive, Hp, Iframe, MHp, Slow, Transform } from '../components'
 import { applyDamage } from '../combat'
 import { spawnProjectileEcs } from '../projectile'
 import type { Sim } from '../sim'
@@ -66,7 +66,11 @@ export function makeTeamCtx(
     ownerOutline: 'player',
     targets: () => sim.enemyTargets,
     damageTarget: (ref, dmg, kb, sx, sy) => applyDamage(sim, eidOf(ref), dmg, kb ?? 0, sx, sy),
-    slowTarget: () => {}, // P3d
+    slowTarget: (ref, factor, durationMs) => {
+      const eid = eidOf(ref)
+      Slow.until[eid] = sim.elapsedMs + durationMs
+      Slow.mul[eid] = factor
+    },
     spawnGroundEffect: () => {}, // P3d
     heal: (x, y, range, amount, all) => healMembers(sim, x, y, range, amount, all),
     targetHp: (ref) => Hp.v[eidOf(ref)] ?? 0,

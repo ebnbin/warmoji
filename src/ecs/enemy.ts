@@ -19,6 +19,7 @@ import {
   Hp,
   Kv,
   Radius,
+  Slow,
   Speed,
   Sprite,
   Tint,
@@ -60,6 +61,7 @@ export function spawnEnemy(
   addComponent(world, eid, DmgMul)
   addComponent(world, eid, Kv)
   addComponent(world, eid, Flash)
+  addComponent(world, eid, Slow)
   addComponent(world, eid, EDir)
   addComponent(world, eid, ETurn)
   addComponent(world, eid, Sprite)
@@ -82,6 +84,8 @@ export function spawnEnemy(
   Kv.x[eid] = 0
   Kv.y[eid] = 0
   Flash.until[eid] = 0
+  Slow.until[eid] = 0
+  Slow.mul[eid] = 1
   // 游荡初始方向 + 首次换向(镜像 materializeEnemy 的随机相/换向计时)
   const ang = sim.rng.next() * Math.PI * 2
   EDir.x[eid] = Math.cos(ang)
@@ -160,7 +164,9 @@ export function steerEnemies(sim: Sim, delta: number): void {
     let tx = Transform.x[eid]!
     let ty = Transform.y[eid]!
     const kind = enemyDef[eid]?.locomotion.kind ?? 'chase'
-    const speed = Speed.v[eid]!
+    // 限时减速/冻结(能力施加;到期自动失效)
+    const slow = now < Slow.until[eid]! ? Slow.mul[eid]! : 1
+    const speed = Speed.v[eid]! * slow
     if (kind === 'static') {
       // 原地不动
     } else if (kind === 'wander') {
