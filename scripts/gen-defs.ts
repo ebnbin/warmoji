@@ -10,8 +10,10 @@ import { ITEMS } from '../defs/items.ts'
 import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
+import { DIFFICULTY } from '../defs/difficulty.ts'
 import type { ItemDef } from '../src/items/registry'
 import type { Progression } from '../src/run/waves'
+import type { Difficulty } from '../src/enemies/registry'
 
 // 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json。
 // 校验全部在此完成（形状/数值/交叉引用/可序列化），运行时零校验直读。
@@ -304,6 +306,39 @@ for (const [id, pk] of Object.entries(PICKUPS)) {
   pure(p, g)
 }
 
+// ── difficulty（难度 / 敌潮 / 精英 / 终波减压）──
+{
+  const p = 'difficulty'
+  const d: Difficulty = DIFFICULTY
+  const s = d.spawn
+  num(`${p}.spawn.startIntervalMs`, s.startIntervalMs, 1)
+  num(`${p}.spawn.minIntervalMs`, s.minIntervalMs, 1)
+  if (s.minIntervalMs > s.startIntervalMs) bad(`${p}.spawn.minIntervalMs`, '不能大于 startIntervalMs')
+  num(`${p}.spawn.rampSeconds`, s.rampSeconds, 0.01)
+  num(`${p}.spawn.hpGrowthPerMin`, s.hpGrowthPerMin, 0)
+  num(`${p}.spawn.maxAlive`, s.maxAlive, 1)
+  num(`${p}.spawn.teamFactorBase`, s.teamFactorBase, 0)
+  num(`${p}.spawn.teamFactorPerMember`, s.teamFactorPerMember, 0)
+  num(`${p}.spawn.telegraphMs`, s.telegraphMs, 0)
+  str(`${p}.spawn.markEmoji`, s.markEmoji)
+  num(`${p}.spawn.markSize`, s.markSize, 0.01)
+  num(`${p}.spawn.minPlayerDist`, s.minPlayerDist, 0)
+  num(`${p}.spawn.edgeInset`, s.edgeInset, 0)
+  const e = d.elite
+  num(`${p}.elite.fromWave`, e.fromWave, 1)
+  num(`${p}.elite.chance`, e.chance, 0)
+  if (e.chance > 1) bad(`${p}.elite.chance`, '需为 0..1 的概率')
+  for (const k of ['hpMul', 'speedMul', 'damageMul', 'sizeMul', 'xpMul', 'coinsMul'] as const) {
+    num(`${p}.elite.${k}`, e[k], 0.01)
+  }
+  num(`${p}.surge.count`, d.surge.count, 1)
+  num(`${p}.surge.elites`, d.surge.elites, 0)
+  if (d.surge.elites > d.surge.count) bad(`${p}.surge.elites`, '不能多于 surge.count')
+  num(`${p}.surge.spreadMs`, d.surge.spreadMs, 0)
+  num(`${p}.bossSpawnRelief`, d.bossSpawnRelief, 0.01)
+  pure(p, d)
+}
+
 if (warnings.length > 0) {
   console.warn(`数值软护栏：${warnings.length} 条能力生效 DPS 越界（仅提示，不阻断）：`)
   for (const wn of warnings) console.warn('  ⚠ ' + wn)
@@ -327,4 +362,5 @@ write('items', ITEMS)
 write('maps', MAPS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
-console.log('gen-defs：9 张表校验通过，已生成 src/assets/*.json')
+write('difficulty', DIFFICULTY)
+console.log('gen-defs：10 张表校验通过，已生成 src/assets/*.json')

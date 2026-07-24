@@ -1,4 +1,5 @@
 import enemiesJson from '../assets/enemies.json'
+import difficultyJson from '../assets/difficulty.json'
 import type { AbilityDef, Effect } from '../abilities/defs'
 
 // 敌人 = 基础三围 + 移动方式（locomotion）+ 能力列表 + 死亡效果列表。
@@ -201,52 +202,54 @@ export interface EnemyMixRow {
   readonly max: number
 }
 
-// 刷怪节奏（波次制）：第 1 波基础火力可稳过，随跨波累计战斗时长持续加压，
-// 后期压力超出基础火力，由商店成长补差
-export const SPAWN = {
-  startIntervalMs: 450,
-  minIntervalMs: 80,
-  rampSeconds: 300,
-  hpGrowthPerMin: 0.5,
-  maxAlive: 400,
-  // 刷怪供给随在场人数缩放：factor = base + perMember×人数（5 人 = 1.0），
-  // 让单人首发的第 1 波与满编后期压力手感一致
-  teamFactorBase: 0.35,
-  teamFactorPerMember: 0.13,
-  // 地图内随机刷怪：先显示预告标记再落地
-  telegraphMs: 900,
-  markEmoji: '26a0',
-  markSize: 1.0,
-  minPlayerDist: 3,
-  edgeInset: 0.5,
-} as const
+// 难度/敌潮/精英/终波减压的「设计数值」形状：数据行在 defs/difficulty.ts（创作层），
+// npm run gen 校验后产出 difficulty.json；本文件只从中派生出以下惯用导出，形状与数值不变。
+export interface Difficulty {
+  /** 刷怪节奏（波次制）：随跨波累计战斗时长持续加压 */
+  readonly spawn: {
+    readonly startIntervalMs: number
+    readonly minIntervalMs: number
+    readonly rampSeconds: number
+    readonly hpGrowthPerMin: number
+    readonly maxAlive: number
+    /** 刷怪供给随在场人数缩放：factor = base + perMember×人数 */
+    readonly teamFactorBase: number
+    readonly teamFactorPerMember: number
+    /** 地图内随机刷怪：先显示预告标记再落地 */
+    readonly telegraphMs: number
+    readonly markEmoji: string
+    readonly markSize: number
+    readonly minPlayerDist: number
+    readonly edgeInset: number
+  }
+  /** 精英怪：第 fromWave 波起按概率出现——金色描边 + 三围强化乘数 */
+  readonly elite: {
+    readonly fromWave: number
+    readonly chance: number
+    readonly hpMul: number
+    readonly speedMul: number
+    readonly damageMul: number
+    readonly sizeMul: number
+    readonly xpMul: number
+    readonly coinsMul: number
+  }
+  /** 敌人潮：精英波开局一波密集冲锋（含保底精英） */
+  readonly surge: {
+    readonly count: number
+    readonly elites: number
+    /** 潮水在这段时间内陆续落地 */
+    readonly spreadMs: number
+  }
+  /** 终波常规刷怪减压倍率（间隔 ×N）：把火力焦点留给 Boss */
+  readonly bossSpawnRelief: number
+}
 
-// 精英怪：第 fromWave 波起按概率出现——金色描边 + 三围强化，掉更多经验金币。
-// 强化走乘数（血量在刷怪时算入，移速/伤害在运行时按敌身上的标记生效）
-export const ELITE = {
-  fromWave: 10,
-  chance: 0.15,
-  hpMul: 4,
-  speedMul: 1.25,
-  damageMul: 2,
-  sizeMul: 1.2,
-  xpMul: 4,
-  coinsMul: 3,
-} as const
+const DIFF = difficultyJson as unknown as Difficulty
 
-// 敌人潮：精英波（WAVE.eliteWaves）开局的一波密集冲锋（含保底精英），配警示横幅
-export const SURGE = {
-  count: 14,
-  elites: 3,
-  /** 潮水在这段时间内陆续落地 */
-  spreadMs: 2600,
-} as const
-
-// 终局 Boss（末波）：与普通敌人同一套组合数据——定时突刺移动 + 环形弹幕
-// 攻击模块 + 击退免疫；血量固定不吃时间成长曲线（按满编 18 波队伍粗校准），
-// 击败或撑满时长皆通关。特殊性只剩引擎侧的通关判定与 HUD 血条（boss 标记）。
-/** 终波常规刷怪减压倍率（间隔 ×N）：把火力焦点留给 Boss */
-export const BOSS_SPAWN_RELIEF = 2
+export const SPAWN = DIFF.spawn
+export const ELITE = DIFF.elite
+export const SURGE = DIFF.surge
+export const BOSS_SPAWN_RELIEF = DIFF.bossSpawnRelief
 
 export interface EnemyMixEntry {
   def: EnemyDef
