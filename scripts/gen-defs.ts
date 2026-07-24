@@ -7,6 +7,7 @@ import { WEAPONS } from '../defs/weapons.ts'
 import { CAPTAINS } from '../defs/captains.ts'
 import { ENEMIES } from '../defs/enemies.ts'
 import { ITEMS } from '../defs/items.ts'
+import { CARDS } from '../defs/cards.ts'
 import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
@@ -18,6 +19,7 @@ import { FEEL } from '../defs/feel.ts'
 import { ECONOMY } from '../defs/economy.ts'
 import type { ItemDef } from '../src/items/registry'
 import type { Economy } from '../src/items/registry'
+import type { CardDef } from '../src/cards/registry'
 import type { Progression } from '../src/run/waves'
 import type { Difficulty } from '../src/enemies/registry'
 import type { TeamBaseline } from '../src/characters/registry'
@@ -68,6 +70,18 @@ const ABILITY_KINDS = new Set([
 /** 实现了 castNow（手动单发）的 kind——队长主动技能载荷只能用这些（与
  * src/abilities 各运行时类同步维护） */
 const CASTABLE_KINDS = new Set(['rally', 'strike', 'dance', 'buff', 'nuke', 'timeStop'])
+
+/** 卡面合法标签（与 src/cards/registry.ts 的 CardTag 同步） */
+const CARD_TAGS = new Set([
+  'economy', 'tempo', 'offense', 'defense', 'meta', 'skill', 'loot', 'trade', 'curse',
+])
+
+/** 团队效果的合法轴（与 src/items/registry.ts 的 TeamEffects 键同步）：卡面 effects 只能落在这些键上 */
+const TEAM_EFFECT_KEYS = new Set([
+  'moveSpeedMul', 'magnetMul', 'doubleCoinChance', 'teamDamageMul', 'xpGainMul',
+  'enemySlowMul', 'waveHealRatio', 'waveCoins', 'teamCooldownMul', 'critAdd',
+  'teamHpMul', 'reviveMul', 'skillCdMul', 'shopDiscountMul', 'freeRerolls', 'draftSize',
+])
 
 /** onHit 命中效果的合法 kind（与 src/abilities/effects.ts 的 applyEffects 分支同步） */
 const EFFECT_KINDS = new Set(['blast', 'slow', 'poison', 'ground', 'morph'])
@@ -272,6 +286,26 @@ for (const [id, it] of Object.entries<ItemDef>(ITEMS as Record<string, ItemDef>)
   num(`${p}.price`, it.price, 1)
   num(`${p}.upgradeXp`, it.upgradeXp, 1)
   pure(p, it)
+}
+
+// ── cards（团队升级卡：卡面数据 + 效果轴合法性）──
+for (const [id, c] of Object.entries<CardDef>(CARDS as Record<string, CardDef>)) {
+  const p = `cards.${id}`
+  str(`${p}.emoji`, c.emoji)
+  str(`${p}.name`, c.name)
+  str(`${p}.desc`, c.desc)
+  if (!['common', 'rare', 'epic'].includes(c.rarity)) bad(`${p}.rarity`, `未知稀有度：${c.rarity}`)
+  num(`${p}.maxLevel`, c.maxLevel, 1)
+  if (!Array.isArray(c.tags) || c.tags.length === 0) bad(`${p}.tags`, '需为非空数组')
+  else for (const t of c.tags) if (!CARD_TAGS.has(t)) bad(`${p}.tags`, `未知标签：${t}`)
+  const eff = c.effects as Record<string, unknown>
+  const keys = Object.keys(eff)
+  if (keys.length === 0) bad(`${p}.effects`, '至少要有一个效果轴')
+  for (const k of keys) {
+    if (!TEAM_EFFECT_KEYS.has(k)) bad(`${p}.effects`, `未知效果轴：${k}`)
+    else num(`${p}.effects.${k}`, eff[k], Number.NEGATIVE_INFINITY)
+  }
+  pure(p, c)
 }
 
 // ── maps ──
@@ -538,6 +572,7 @@ write('characters', CHARACTERS)
 write('captains', CAPTAINS)
 write('enemies', { enemies: ENEMIES })
 write('items', ITEMS)
+write('cards', CARDS)
 write('maps', MAPS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
@@ -547,4 +582,4 @@ write('team', TEAM_BASELINE)
 write('combat', COMBAT)
 write('feel', FEEL)
 write('economy', ECONOMY)
-console.log('gen-defs：15 张表校验通过，已生成 src/assets/*.json')
+console.log('gen-defs：16 张表校验通过，已生成 src/assets/*.json')
