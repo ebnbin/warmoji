@@ -14,7 +14,7 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query } from 'bitecs'
-import { Alive, Enemy, MHp, Projectile, Slow, Transform } from './components'
+import { Alive, Enemy, Hp, MHp, Poison, Projectile, Slow, Transform } from './components'
 import { applyDamage } from './combat'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch } from './render/spriteBatch'
@@ -159,6 +159,45 @@ export class EcsBattleScene extends Phaser.Scene {
         Slow.until[best] = sim.elapsedMs + durMs
         Slow.mul[best] = factor
       }
+    }
+    // e2e 探针:给最近敌人挂中毒 DoT + 读其血量
+    window.__ecsPoisonEnemy = (dmg = 5, tickMs = 300, durMs = 3000): void => {
+      const sim = this.sim
+      if (!sim) return
+      let best = -1
+      let bestD = Infinity
+      for (const eid of query(this.world, [Enemy])) {
+        const dx = Transform.x[eid]! - sim.center.x
+        const dy = Transform.y[eid]! - sim.center.y
+        const d = dx * dx + dy * dy
+        if (d < bestD) {
+          bestD = d
+          best = eid
+        }
+      }
+      if (best >= 0) {
+        Poison.until[best] = sim.elapsedMs + durMs
+        Poison.nextTick[best] = sim.elapsedMs + tickMs
+        Poison.dmg[best] = dmg
+        Poison.tickMs[best] = tickMs
+        Poison.slot[best] = -1
+      }
+    }
+    window.__ecsNearestEnemyHp = (): number => {
+      const sim = this.sim
+      if (!sim) return -1
+      let best = -1
+      let bestD = Infinity
+      for (const eid of query(this.world, [Enemy])) {
+        const dx = Transform.x[eid]! - sim.center.x
+        const dy = Transform.y[eid]! - sim.center.y
+        const d = dx * dx + dy * dy
+        if (d < bestD) {
+          bestD = d
+          best = eid
+        }
+      }
+      return best >= 0 ? Hp.v[best]! : -1
     }
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,

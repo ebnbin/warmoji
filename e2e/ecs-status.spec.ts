@@ -36,3 +36,30 @@ test('ECS 状态：减速冻结（factor=0）令敌人定住', async ({ page }) 
   // 冻结期间几乎不动
   expect(Math.hypot(p1.x - p0.x, p1.y - p0.y)).toBeLessThan(4)
 })
+
+test('ECS 状态：中毒 DoT 持续掉血', async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem(
+        'warmoji.settings.v1',
+        JSON.stringify({ damageNumbers: true, hitShake: true, sound: false, bgm: false, showSkinTone: false, ecs: true }),
+      )
+    } catch {
+      /* ignore */
+    }
+  })
+  await page.goto('/')
+  await page.evaluate(() => window.__ecsLabRoster!(['troll'])) // 近战单人：远处虫巢不被打
+  await enterMap(page)
+  await startTestBattle(page, 'forest')
+  await page.waitForFunction(() => (window as unknown as { __ecs?: EcsDbg }).__ecs?.ready === true, undefined, {
+    timeout: 20_000,
+  })
+
+  // 远处虫巢(static、高血、不动、够不着)：挂毒后血量应持续下降
+  await page.evaluate(() => window.__ecsSpawnEnemy!('hive', 7, 0))
+  await page.waitForFunction(() => (window as unknown as { __ecs: EcsDbg }).__ecs.enemies === 1)
+  await page.evaluate(() => window.__ecsPoisonEnemy!(6, 300, 6000))
+  const hp0 = await page.evaluate(() => window.__ecsNearestEnemyHp!())
+  await page.waitForFunction((h) => window.__ecsNearestEnemyHp!() < h - 20, hp0, { timeout: 8000 })
+})

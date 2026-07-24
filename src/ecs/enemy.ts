@@ -18,6 +18,7 @@ import {
   Flash,
   Hp,
   Kv,
+  Poison,
   Radius,
   Slow,
   Speed,
@@ -62,6 +63,7 @@ export function spawnEnemy(
   addComponent(world, eid, Kv)
   addComponent(world, eid, Flash)
   addComponent(world, eid, Slow)
+  addComponent(world, eid, Poison)
   addComponent(world, eid, EDir)
   addComponent(world, eid, ETurn)
   addComponent(world, eid, Sprite)
@@ -86,6 +88,7 @@ export function spawnEnemy(
   Flash.until[eid] = 0
   Slow.until[eid] = 0
   Slow.mul[eid] = 1
+  Poison.until[eid] = 0
   // 游荡初始方向 + 首次换向(镜像 materializeEnemy 的随机相/换向计时)
   const ang = sim.rng.next() * Math.PI * 2
   EDir.x[eid] = Math.cos(ang)

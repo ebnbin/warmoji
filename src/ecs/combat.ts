@@ -13,6 +13,7 @@ import {
   Kv,
   MFlash,
   MHp,
+  Poison,
   Radius,
   Revive,
   Tint,
@@ -68,6 +69,23 @@ export function killEnemy(sim: Sim, eid: number): void {
   enemyDef[eid] = undefined
   enemyRef[eid] = undefined
   removeEntity(sim.world, eid)
+}
+
+/** 中毒 DoT:每 tickMs 一跳,到期解毒(镜像 steerEnemies 的毒逻辑核心) */
+export function tickPoison(sim: Sim): void {
+  const enemies = query(sim.world, ENEMY_SET as unknown as object[])
+  const now = sim.elapsedMs
+  for (const eid of enemies) {
+    if (Poison.until[eid] === 0) continue
+    if (now >= Poison.until[eid]!) {
+      Poison.until[eid] = 0
+      continue
+    }
+    if (now >= Poison.nextTick[eid]!) {
+      Poison.nextTick[eid] = Poison.nextTick[eid]! + Poison.tickMs[eid]!
+      applyDamage(sim, eid, Poison.dmg[eid]!)
+    }
+  }
 }
 
 /** 队员接触敌人的伤害结算(镜像 onMemberTouched 的无敌帧节流 + 基础伤害) */

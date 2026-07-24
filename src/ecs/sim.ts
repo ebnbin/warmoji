@@ -9,7 +9,7 @@ import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '.
 import type { OrbitThreat } from '../characters/orbit'
 import { Alive, Depth, Follow, Threat, Transform, Wander } from './components'
 import { steerEnemies, updateFrameTargets } from './enemy'
-import { memberContact, memberVisual, reviveMembers } from './combat'
+import { memberContact, memberVisual, reviveMembers, tickPoison } from './combat'
 import { updateProjectiles } from './projectile'
 import type { EcsWorld } from './world'
 import type { Point } from '../core/vec'
@@ -197,6 +197,7 @@ export function stepSim(sim: Sim, delta: number): void {
   updateOrbit(sim, delta)
   moveTeam(sim, delta)
   reviveMembers(sim)
+  tickPoison(sim)
   steerEnemies(sim, delta)
   updateProjectiles(sim, delta)
   memberContact(sim)
