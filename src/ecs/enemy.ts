@@ -232,7 +232,38 @@ function steerDash(sim: Sim, eid: number, slow: number): { vx: number; vy: numbe
   return { vx: dir.x * speed, vy: dir.y * speed }
 }
 
-/** 敌人转向:按 locomotion 分发(chase/wander/static/dash;detonate/standoff/coinThief/baseOrbit
+/** 定距风筝(镜像 standoff steerer):太远贴近、太近后退、站位带内停手 */
+function steerStandoff(sim: Sim, eid: number, slow: number): { vx: number; vy: number } {
+  const lm = enemyDef[eid]!.locomotion
+  if (lm.kind !== 'standoff') return { vx: 0, vy: 0 }
+  const sp = Speed.v[eid]! * slow
+  const ex = Transform.x[eid]!
+  const ey = Transform.y[eid]!
+  const target = nearestAlive(sim, ex, ey)
+  if (!target) {
+    const d = wanderDir(sim, eid)
+    return { vx: d.x * sp * 0.5, vy: d.y * sp * 0.5 }
+  }
+  const dx = target.x - ex
+  const dy = target.y - ey
+  const dist = Math.hypot(dx, dy)
+  const band = AI.standoffBandU * UNIT
+  if (dist > lm.detectRange) {
+    const d = wanderDir(sim, eid)
+    return { vx: d.x * sp * 0.5, vy: d.y * sp * 0.5 }
+  }
+  if (dist > lm.standoffDist + band) {
+    const d = norm(dx, dy)
+    return { vx: d.x * sp, vy: d.y * sp }
+  }
+  if (dist < lm.standoffDist - band) {
+    const d = norm(-dx, -dy) // 后退(贴边滑行 fleeDir 在 P5 补)
+    return { vx: d.x * sp, vy: d.y * sp }
+  }
+  return { vx: 0, vy: 0 } // 站位带内停手(射击由能力驱动)
+}
+
+/** 敌人转向:按 locomotion 分发(chase/wander/static/dash/standoff;detonate/coinThief/baseOrbit
  * 暂回落 chase,后续补)+ 击退衰减 + 受击白闪恢复。delta 为真实帧长(ms) */
 export function steerEnemies(sim: Sim, delta: number): void {
   const eids = query(sim.world, ENEMY_SET as unknown as object[])
@@ -261,6 +292,10 @@ export function steerEnemies(sim: Sim, delta: number): void {
       ty += d.y * speed * dt
     } else if (kind === 'dash') {
       const v = steerDash(sim, eid, slow)
+      tx += v.vx * dt
+      ty += v.vy * dt
+    } else if (kind === 'standoff') {
+      const v = steerStandoff(sim, eid, slow)
       tx += v.vx * dt
       ty += v.vy * dt
     } else {

@@ -58,3 +58,25 @@ test('ECS locomotion：外星怪(wander)游荡、不 beeline 追人', async ({ p
   // 未 beeline：仍与出生距离同量级（chase 会显著缩短）
   expect(nowDist).toBeGreaterThan(startDist * 0.5)
 })
+
+test('ECS locomotion：毒蛇(standoff)定距风筝——贴近到站位距离后不再逼近', async ({ page }) => {
+  await boot(page)
+  // 探测范围外投放（8 格）：会贴近到 standoffDist≈5 格(320px) 后停手，不会贴脸
+  await page.evaluate(() => window.__ecsSpawnEnemy!('snake', 8, 0))
+  await page.waitForFunction(() => (window as unknown as { __ecs: EcsDbg }).__ecs.enemies === 1)
+  // 贴近：距离下降到 400px 以内
+  await page.waitForFunction(
+    () => {
+      const d = (window as unknown as { __ecs: EcsDbg }).__ecs
+      const e = d.enemyPos[0]!
+      return Math.hypot(e.x - d.centerX, e.y - d.centerY) < 400
+    },
+    undefined,
+    { timeout: 12_000 },
+  )
+  // 定距：不会像 chase 那样贴脸（保持在站位距离附近，远大于接触半径）
+  await page.waitForTimeout(2000)
+  const d = await page.evaluate(dbg)
+  const dist = Math.hypot(d.enemyPos[0]!.x - d.centerX, d.enemyPos[0]!.y - d.centerY)
+  expect(dist).toBeGreaterThan(220)
+})
