@@ -141,7 +141,12 @@ export class IceArenaScene extends BaseArenaScene {
     return { x: this.center.x + this.tvx * dt, y: this.center.y + this.tvy * dt }
   }
 
-  /** 敌人打滑：同一套低通作用到敌人速度（含被击退后的速度），冰上滑、水中迟滞限速 */
+  /** 低摩擦让击退持久（衰减更慢）→ 敌人被击退滑得远、格外突出 */
+  protected knockbackTauMul(): number {
+    return ICE.knockbackTauMul
+  }
+
+  /** 敌人打滑：行为速度走低通（追击也滑/过冲），冰上滑、水中迟滞限速 */
   protected postSteerEnemy(e: ImageObj, body: ArcadeBody): void {
     this.slideEntity(e, body)
   }
@@ -160,12 +165,17 @@ export class IceArenaScene extends BaseArenaScene {
       sv = { x: 0, y: 0 }
       this.slide.set(a, sv)
     }
+    // 击退冲量本帧已被基类叠进 body.velocity。把它拆出来单独处理：击退不进低通——
+    // 要脆、要即时（否则慢低通会把击退峰值吃掉，看不出效果）；只对"行为速度"打滑平滑。
+    // 击退靠 knockbackTauMul 持久，叠加后滑得又快又远。
+    const kx = a.kvx
+    const ky = a.kvy
     const ice = onFloe(e.x, e.y, this.floePx)
     const tau = ice ? ICE.enemyTauIce : ICE.teamTauWater
     const mul = ice ? 1 : ICE.waterSpeedMul
-    sv.x = approach(sv.x, body.velocity.x * mul, dt, tau)
-    sv.y = approach(sv.y, body.velocity.y * mul, dt, tau)
-    body.setVelocity(sv.x, sv.y)
+    sv.x = approach(sv.x, (body.velocity.x - kx) * mul, dt, tau)
+    sv.y = approach(sv.y, (body.velocity.y - ky) * mul, dt, tau)
+    body.setVelocity(sv.x + kx, sv.y + ky)
   }
 
   /** 金币钳在浮冰内（否则漂进水里，隔着掉血区捡不回） */
