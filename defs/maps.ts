@@ -281,6 +281,7 @@ export const MAPS = {
       daySpawnScale: 0.68,
       nightSpawnScale: 1.55,
     },
+    finalWaveSub: '击败它，或撑过头目波——注意昼夜轮替，夜幕里它更难缠！',
     // 晨昏原野专属 Boss：晦明——日冕环爆 + 月华坠
     boss: 'eclipse',
   },

@@ -216,6 +216,8 @@ export interface MapDef {
   readonly infinite?: InfiniteConfig
   /** 终波缩圈特性（可选）：无限图 Boss 战边界（当前仅荒漠使用） */
   readonly shrinkRing?: ShrinkRingConfig
+  /** 终波警示横幅副标题（可选）：缺省用「击败它，或撑过 N 秒！」 */
+  readonly finalWaveSub?: string
   /** 本图终波 Boss：引用 enemies 里某个 role:'boss' 的 kind */
   readonly boss: string
 }

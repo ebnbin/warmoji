@@ -289,6 +289,7 @@ for (const [id, m] of Object.entries(MAPS)) {
     num(`${p}.walls.spawnMinCellDist`, w.spawnMinCellDist, 0)
     num(`${p}.walls.reflowMs`, w.reflowMs, 0)
   }
+  if ((m as MapDef).finalWaveSub !== undefined) str(`${p}.finalWaveSub`, (m as MapDef).finalWaveSub)
   const dn = (m as MapDef).dayNight
   if (dn) {
     num(`${p}.dayNight.cycleSec`, dn.cycleSec, 1)
