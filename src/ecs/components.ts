@@ -92,8 +92,11 @@ export const Boss = { v: u8() }
 /** 碰撞半径(世界像素) */
 export const Radius = { v: f32() }
 
-/** 敌人伤害倍率(精英体质) */
+/** 敌人伤害倍率(精英体质;护巢子敌暴走再叠) */
 export const DmgMul = { v: f32() }
+
+/** 敌人移速倍率(精英加速 ELITE.speedMul;护巢子敌暴走 orphanSpeedMul 再叠) */
+export const SpMul = { v: f32() }
 
 /** 击退冲量(指数衰减,0=无) */
 export const Kv = { x: f32(), y: f32() }

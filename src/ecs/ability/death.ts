@@ -6,7 +6,7 @@ import type { EffectCtx, TargetInfo } from '../../abilities/types'
 import type { DecoyEffect, SplitEffect } from '../../enemies/registry'
 import { Alive, Despawn, Iframe, Tint } from '../components'
 import { hurtMember } from '../combat'
-import { spawnEnemy } from '../enemy'
+import { spawnBrood, spawnEnemy } from '../enemy'
 import { spawnEnemyProjectileEcs } from '../projectile'
 import { healEnemiesEcs } from './enemyCtx'
 import type { PendingDeath, Sim } from '../sim'
@@ -49,23 +49,10 @@ function makeDeathCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, d: Pending
   }
 }
 
-/** 分裂:随机散开半格生成 count 个迷你体(血量吃波次曲线;into 已随父深 px 化) */
-function spawnSplit(sim: Sim, atlas: EcsAtlas, d: PendingDeath, fx: SplitEffect, hpMul: number): void {
+/** 分裂:随机散开半格生成 count 个迷你体(无巢;血量吃波次曲线;into 已随父深 px 化) */
+function spawnSplit(sim: Sim, atlas: EcsAtlas, d: PendingDeath, fx: SplitEffect): void {
   if (sim.over) return
-  const scatter = 0.5 * UNIT
-  for (let i = 0; i < fx.count; i++) {
-    const ang = sim.rng.next() * Math.PI * 2
-    spawnEnemy(
-      sim,
-      atlas,
-      fx.into,
-      d.x + Math.cos(ang) * scatter,
-      d.y + Math.sin(ang) * scatter,
-      Math.round(fx.into.hp * hpMul),
-      false,
-      false,
-    )
-  }
+  spawnBrood(sim, atlas, fx.into, fx.count, d.x, d.y, 0.5 * UNIT, -1)
 }
 
 /** 诱饵尸壳:原地留一具由自身退化的半透明替身——无伤害/移动/攻击/亡语,到时静默移除 */
@@ -96,7 +83,7 @@ export function runDeathEffects(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas):
     if (!effects) continue
     let ctx: EffectCtx | undefined
     for (const fx of effects) {
-      if (fx.kind === 'split') spawnSplit(sim, atlas, d, fx, hpMul)
+      if (fx.kind === 'split') spawnSplit(sim, atlas, d, fx)
       else if (fx.kind === 'decoy') spawnDecoy(sim, atlas, d, fx, hpMul)
       else {
         ctx ??= makeDeathCtx(sim, scene, atlas, d)

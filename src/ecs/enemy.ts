@@ -1,8 +1,9 @@
 import { addComponent, addEntity, query } from 'bitecs'
 import { norm } from '../core/vec'
-import { AI, ELITE } from '../enemies/registry'
+import { AI, ELITE, SPAWN } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
 import { KNOCKBACK } from '../abilities/registry'
+import { waveAt } from '../run/waves'
 import { UNIT } from '../core/units'
 import { playSfx } from '../audio/sfx'
 import { despawnEnemy, hurtMember } from './combat'
@@ -26,11 +27,12 @@ import {
   Radius,
   Slow,
   Speed,
+  SpMul,
   Sprite,
   Tint,
   Transform,
 } from './components'
-import { enemyDef, enemyFireDelayMs, enemyVelX, enemyVelY } from './store'
+import { enemyDef, enemyFireDelayMs, enemyNest, enemyNextSpawnAt, enemyVelX, enemyVelY } from './store'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
 import type { Point } from '../core/vec'
@@ -64,6 +66,7 @@ export function spawnEnemy(
   addComponent(world, eid, Boss)
   addComponent(world, eid, Radius)
   addComponent(world, eid, DmgMul)
+  addComponent(world, eid, SpMul)
   addComponent(world, eid, Kv)
   addComponent(world, eid, Flash)
   addComponent(world, eid, Slow)
@@ -97,6 +100,9 @@ export function spawnEnemy(
   Boss.v[eid] = boss ? 1 : 0
   Radius.v[eid] = def.radius
   DmgMul.v[eid] = elite ? ELITE.damageMul : 1
+  SpMul.v[eid] = elite ? ELITE.speedMul : 1
+  enemyNest[eid] = -1 // 非护巢子敌(spawnBrood 会覆盖为巢 eid)
+  enemyNextSpawnAt[eid] = def.spawner ? sim.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
   Kv.x[eid] = 0
   Kv.y[eid] = 0
   Flash.until[eid] = 0
@@ -307,8 +313,100 @@ function steerDetonate(sim: Sim, eid: number, slow: number): { vx: number; vy: n
   return { vx: dir.x * sp, vy: dir.y * sp }
 }
 
-/** 敌人转向:按 locomotion 分发(chase/wander/static/dash/standoff/detonate;coinThief/baseOrbit
- * 暂回落 chase,后续补)+ 击退衰减 + 受击白闪恢复。delta 为真实帧长(ms) */
+/** 护巢环绕(镜像 baseOrbit steerer):绕巢盘旋,玩家逼近巢即扑向玩家;巢被拆(enemyNest=-1)
+ * 后直扑玩家(暴走档,倍率已由 orphanBrood 施加)。返回本帧速度 */
+function steerBaseOrbit(sim: Sim, eid: number, slow: number): { vx: number; vy: number } {
+  const lm = enemyDef[eid]!.locomotion
+  if (lm.kind !== 'baseOrbit') return { vx: 0, vy: 0 }
+  const sp = Speed.v[eid]! * slow
+  const ex = Transform.x[eid]!
+  const ey = Transform.y[eid]!
+  const chasePlayer = (): { vx: number; vy: number } => {
+    const t = nearestAlive(sim, ex, ey)
+    if (!t) return { vx: 0, vy: 0 }
+    const dir = norm(t.x - ex, t.y - ey)
+    return { vx: dir.x * sp, vy: dir.y * sp }
+  }
+  const nest = enemyNest[eid]!
+  // 巢失效(被拆/被清)→ 暴走直扑
+  if (nest < 0 || enemyDef[nest] === undefined) return chasePlayer()
+  const nx = Transform.x[nest]!
+  const ny = Transform.y[nest]!
+  // 护巢判定基准是巢的位置:玩家逼近巢即扑击
+  const target = nearestAlive(sim, nx, ny)
+  if (target) {
+    const tdx = target.x - nx
+    const tdy = target.y - ny
+    if (tdx * tdx + tdy * tdy <= lm.aggroRange * lm.aggroRange) return chasePlayer()
+  }
+  // 绕巢:切向环绕 + 半径回正(r<orbitRadius 外扩、r>orbitRadius 内收)
+  const rx = ex - nx
+  const ry = ey - ny
+  const r = Math.hypot(rx, ry) || 1
+  const radial = (lm.orbitRadius - r) / lm.orbitRadius
+  const dir = norm(-ry / r + (rx / r) * radial * 1.5, rx / r + (ry / r) * radial * 1.5)
+  return { vx: dir.x * sp, vy: dir.y * sp }
+}
+
+/** 本巢名下在场子敌数(enemyNest 反查) */
+function broodCount(sim: Sim, nestEid: number): number {
+  let n = 0
+  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+    if (enemyNest[eid] === nestEid) n++
+  }
+  return n
+}
+
+/** 生成一窝子敌(镜像 spawnBrood):随机散开 scatter 生成 count 只,血量吃波次曲线。
+ * ownerEid≥0 时记为护巢子敌(计入本巢上限 + baseOrbit 绕巢);分裂用 -1(无巢) */
+export function spawnBrood(
+  sim: Sim,
+  atlas: EcsAtlas,
+  into: EnemyDef,
+  count: number,
+  cx: number,
+  cy: number,
+  scatter: number,
+  ownerEid: number,
+): void {
+  const hpMul = waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier
+  for (let i = 0; i < count; i++) {
+    const ang = sim.rng.next() * Math.PI * 2
+    const child = spawnEnemy(
+      sim,
+      atlas,
+      into,
+      cx + Math.cos(ang) * scatter,
+      cy + Math.sin(ang) * scatter,
+      Math.round(into.hp * hpMul),
+      false,
+      false,
+    )
+    if (ownerEid >= 0) enemyNest[child] = ownerEid
+  }
+}
+
+/** 虫巢周期生成(镜像 spawnFromNest):全局在场上限让路 + 本巢上限只补到 maxAlive。
+ * 场景侧驱动(需 atlas);敌人已死清腾出名额自然续生,巢被拆彻底停 */
+export function updateSpawners(sim: Sim, atlas: EcsAtlas): void {
+  if (sim.over) return
+  const now = sim.elapsedMs
+  const eids = query(sim.world, ENEMY_SET as unknown as object[])
+  const active = eids.length
+  for (const eid of eids) {
+    const spawner = enemyDef[eid]?.spawner
+    if (!spawner) continue
+    if (now < enemyNextSpawnAt[eid]!) continue
+    enemyNextSpawnAt[eid] = now + spawner.intervalMs
+    if (active >= SPAWN.maxAlive) continue
+    const room = spawner.maxAlive - broodCount(sim, eid)
+    if (room <= 0) continue
+    spawnBrood(sim, atlas, spawner.into, Math.min(spawner.count, room), Transform.x[eid]!, Transform.y[eid]!, 0.6 * UNIT, eid)
+  }
+}
+
+/** 敌人转向:按 locomotion 分发(chase/wander/static/dash/standoff/detonate/baseOrbit;
+ * coinThief 待拾取系统)+ 击退衰减 + 受击白闪恢复。delta 为真实帧长(ms) */
 export function steerEnemies(sim: Sim, delta: number): void {
   const eids = query(sim.world, ENEMY_SET as unknown as object[])
   if (eids.length === 0) return
@@ -330,8 +428,8 @@ export function steerEnemies(sim: Sim, delta: number): void {
     let tx = Transform.x[eid]!
     let ty = Transform.y[eid]!
     const kind = enemyDef[eid]?.locomotion.kind ?? 'chase'
-    // 限时减速/冻结(能力施加;到期自动失效)
-    const slow = now < Slow.until[eid]! ? Slow.mul[eid]! : 1
+    // 速度倍率:能力限时减速/冻结 × 体质(精英加速/护巢暴走)。teamFx/battleFx/时停时标 = 1(森林)
+    const slow = (now < Slow.until[eid]! ? Slow.mul[eid]! : 1) * SpMul.v[eid]!
     const speed = Speed.v[eid]! * slow
     if (kind === 'static') {
       // 原地不动
@@ -349,6 +447,10 @@ export function steerEnemies(sim: Sim, delta: number): void {
       ty += v.vy * dt
     } else if (kind === 'detonate') {
       const v = steerDetonate(sim, eid, slow)
+      tx += v.vx * dt
+      ty += v.vy * dt
+    } else if (kind === 'baseOrbit') {
+      const v = steerBaseOrbit(sim, eid, slow)
       tx += v.vx * dt
       ty += v.vy * dt
     } else {

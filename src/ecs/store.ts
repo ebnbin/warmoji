@@ -39,3 +39,9 @@ export const enemyVelY = new Float32Array(MAX_ENTITIES)
 
 /** 敌人首发延迟(spawn 时抽取 900+rng*1500;lazy-arm 喂入 createAbility) */
 export const enemyFireDelayMs = new Float32Array(MAX_ENTITIES)
+
+/** 护巢子敌的巢 eid(baseOrbit 绕巢锚点 + 计入本巢在场上限;拆巢时清空触发暴走),0=无巢 */
+export const enemyNest = new Int32Array(MAX_ENTITIES).fill(-1)
+
+/** 虫巢下次生成时刻(0=非 spawner) */
+export const enemyNextSpawnAt = new Float32Array(MAX_ENTITIES)

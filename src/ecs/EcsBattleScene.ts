@@ -20,7 +20,8 @@ import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch } from './render/spriteBatch'
 import { spawnSprite } from './entities'
 import { spawnTeam } from './team'
-import { spawnEnemy } from './enemy'
+import { spawnEnemy, updateSpawners } from './enemy'
+import { enemyNest } from './store'
 import { armTeam, updateMemberAbilities } from './ability/wire'
 import { updateEnemyAbilities } from './ability/enemyWire'
 import { runDeathEffects } from './ability/death'
@@ -262,6 +263,8 @@ export class EcsBattleScene extends Phaser.Scene {
     if (this.atlas) updateEnemyAbilities(sim, this, this.atlas, delta)
     // 亡语重放(分裂/诱饵/治疗/冷枪:本帧内所有死亡的敌人在死亡点触发)
     if (this.atlas) runDeathEffects(sim, this, this.atlas)
+    // 虫巢周期生成子敌(护巢子敌绕巢;拆巢暴走)
+    if (this.atlas) updateSpawners(sim, this.atlas)
     // 刷怪节奏
     if (this.atlas) spawnStep(sim, this.atlas, delta)
     this.centerObj.setPosition(sim.center.x, sim.center.y)
@@ -279,6 +282,8 @@ export class EcsBattleScene extends Phaser.Scene {
       elapsed: sim.elapsedMs,
       memberPos: sim.members.map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
       enemies: query(this.world, [Enemy]).length,
+      // 护巢子敌数(enemyNest>=0):虫巢生成的子敌带巢引用,自然刷怪的敌人恒 -1,借此隔离测量
+      broods: Array.from(query(this.world, [Enemy]), (eid) => enemyNest[eid]!).filter((n) => n >= 0).length,
       enemyPos: Array.from(query(this.world, [Enemy]), (eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
       kills: sim.kills,
       projectiles: query(this.world, [Projectile]).length,

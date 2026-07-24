@@ -18,10 +18,11 @@ import {
   Poison,
   Radius,
   Revive,
+  SpMul,
   Tint,
   Transform,
 } from './components'
-import { enemyDef, enemyRef } from './store'
+import { enemyDef, enemyNest, enemyRef } from './store'
 import type { Sim } from './sim'
 
 // 战斗(P3b):敌人受伤/致死/击退,队员接触伤害/死亡/复活/受击闪光。
@@ -80,9 +81,24 @@ export function killEnemy(sim: Sim, eid: number): void {
       dmgMul: DmgMul.v[eid]!,
     })
   }
+  if (def?.spawner) orphanBrood(sim, eid) // 拆巢:名下护巢子敌暴走 + 转直扑
   enemyDef[eid] = undefined
   enemyRef[eid] = undefined
   removeEntity(sim.world, eid)
+}
+
+/** 拆巢(镜像 orphanBrood):名下护巢子敌失去锚点——baseOrbit 按各自 orphan 倍率暴走
+ * (速度/攻击)并转直扑玩家(enemyNest=-1 即触发 baseOrbit steerer 的暴走分支) */
+export function orphanBrood(sim: Sim, nestEid: number): void {
+  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+    if (enemyNest[eid] !== nestEid) continue
+    enemyNest[eid] = -1
+    const lm = enemyDef[eid]?.locomotion
+    if (lm?.kind === 'baseOrbit') {
+      SpMul.v[eid] = SpMul.v[eid]! * lm.orphanSpeedMul
+      DmgMul.v[eid] = DmgMul.v[eid]! * lm.orphanDamageMul
+    }
+  }
 }
 
 /** 中毒 DoT:每 tickMs 一跳,到期解毒(镜像 steerEnemies 的毒逻辑核心) */
@@ -130,6 +146,7 @@ export function memberContact(sim: Sim): void {
 
 /** 敌人静默移除(自爆/替身到时:不计击杀、不掉落、不放死亡效果) */
 export function despawnEnemy(sim: Sim, eid: number): void {
+  if (enemyDef[eid]?.spawner) orphanBrood(sim, eid)
   enemyDef[eid] = undefined
   enemyRef[eid] = undefined
   removeEntity(sim.world, eid)
