@@ -110,9 +110,6 @@ export class RiverArenaScene extends BaseArenaScene {
     return pos
   }
 
-  protected finalWaveWarningSub(): string {
-    return '大河没有退路，正面迎战！'
-  }
 
   /** 休眠：同无限图机制（32 格，屏内永不触发） */
   protected buildFrameTargets(): void {

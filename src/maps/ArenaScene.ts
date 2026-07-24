@@ -17,7 +17,6 @@ import type { AbilityContext } from '../abilities/types'
 import { Rng } from '../core/rng'
 import { randomMapPoint } from '../enemies/spawn'
 import type { Point } from '../core/vec'
-import { waveDurationMs } from '../run/waves'
 import { emojiImage } from '../emoji/textures'
 import { viewport } from '../core/apply'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
@@ -156,13 +155,6 @@ export class ArenaScene extends BaseArenaScene {
       2 * UNIT,
       this.center,
       SPAWN.minPlayerDist * UNIT * 1.6,
-    )
-  }
-
-  protected finalWaveWarningSub(): string {
-    return (
-      this.mapDef.finalWaveSub ??
-      `击败它，或撑过 ${Math.round(waveDurationMs(this.run.wave) / 1000)} 秒！`
     )
   }
 

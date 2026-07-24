@@ -81,9 +81,6 @@ export class VoidArenaScene extends BaseArenaScene {
     return pos
   }
 
-  protected finalWaveWarningSub(): string {
-    return '环形厂区无处可退，正面迎战！'
-  }
 
   /** 索敌/追击/磁吸的几何基元：环面最短差 */
   worldDelta(from: Point, to: Point): Point {

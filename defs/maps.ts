@@ -143,6 +143,7 @@ export const MAPS = {
       density: [0.08, 0.11],
     },
     mix: DESERT_MIX,
+    finalWaveSub: '毒雾收拢成圈，圈外持续掉血——别想苟！',
     // 无限世界：无边界 + 活跃方形休眠（半边 32 格）+ 环带刷怪 + 分块装饰
     infinite: { activeHalf: 32, spawnRingMin: 4, spawnRingMax: 16, chunkCells: 8, chunkPad: 1 },
     // 终波缩圈：Boss 战边界，先停留 6 秒再缓缩到 12 格，圈外掉血
@@ -171,6 +172,7 @@ export const MAPS = {
     },
     drift: ['1f343', '1f338', '1fae7', '1f342'],
     mix: RIVER_MIX,
+    finalWaveSub: '大河没有退路，正面迎战！',
     // 奔流/水流特性：单屏固定相机（放大 1.2）+ 12 格河道 + 恒定顺流漂移
     river: {
       viewScale: 1.2,
@@ -206,6 +208,7 @@ export const MAPS = {
       density: [0.05, 0.09],
     },
     mix: FACTORY_MIX,
+    finalWaveSub: '环形厂区无处可退，正面迎战！',
     // 环面/传送门特性：固定 16:9 环面（24×13.5 格）+ 四边传送门 + 跨缝分身相机
     torus: {
       arenaLong: 24,
@@ -306,6 +309,7 @@ export const MAPS = {
       density: [0.06, 0.1],
     },
     mix: SPACE_MIX,
+    finalWaveSub: '奇点降临——禁锢星域内已无处可逃，正面迎战！',
     // 深空特性：黑洞禁锢场（半径 12.5 格 ≈ 内切圆）+ 天体横扫危险物（敌我通吃）
     space: {
       blackholeRadiusU: 12.5,

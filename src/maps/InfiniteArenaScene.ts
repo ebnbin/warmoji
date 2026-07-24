@@ -95,9 +95,6 @@ export class InfiniteArenaScene extends BaseArenaScene {
     return ringPoint(this.rng, this.zoneCenter ?? this.center, 6 * UNIT, 8 * UNIT)
   }
 
-  protected finalWaveWarningSub(): string {
-    return '毒雾收拢成圈，圈外持续掉血——别想苟！'
-  }
 
   /** 终波：缩圈以此刻队伍位置为圆心张开 */
   protected onFinalWaveSetup(): void {

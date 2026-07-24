@@ -5,7 +5,6 @@ import { PICKUPS } from '../pickups/registry'
 import { MAPS, rollDecor } from './registry'
 import { Rng } from '../core/rng'
 import { randomMapPoint } from '../enemies/spawn'
-import { waveDurationMs } from '../run/waves'
 import { emojiImage } from '../emoji/textures'
 import { viewport } from '../core/apply'
 import { enemyOf } from '../enemies/enemies'
@@ -117,9 +116,6 @@ export class IceArenaScene extends BaseArenaScene {
     )
   }
 
-  protected finalWaveWarningSub(): string {
-    return `击败它，或撑过 ${Math.round(waveDurationMs(this.run.wave) / 1000)} 秒！`
-  }
 
   /** 刷怪上限按实时活跃数（本图无休眠，全场敌人都算） */
   protected spawnCapCount(): number {

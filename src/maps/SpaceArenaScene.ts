@@ -83,9 +83,6 @@ export class SpaceArenaScene extends InfiniteArenaScene {
     this.cameras.main.setBounds(this.fieldCx - half, this.fieldCy - half, half * 2, half * 2)
   }
 
-  protected finalWaveWarningSub(): string {
-    return '奇点降临——禁锢星域内已无处可逃，正面迎战！'
-  }
 
   /** 终波无专属变化：禁锢圈本就全程常驻（覆盖基类的毒雾缩圈，避免叠一层毒圈） */
   protected onFinalWaveSetup(): void {}

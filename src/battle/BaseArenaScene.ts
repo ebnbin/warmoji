@@ -327,8 +327,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   protected abstract spawnPoint(): Point
   /** 终波 Boss 落点 */
   protected abstract bossSpawnPoint(): Point
-  /** 终波警示横幅副标题 */
-  protected abstract finalWaveWarningSub(): string
+  /** 终波警示横幅副标题：取自 MapDef.finalWaveSub 数据，缺省用「击败它，或撑过 N 秒！」 */
+  protected finalWaveWarningSub(): string {
+    return (
+      MAPS[this.run.mapId].finalWaveSub ??
+      `击败它，或撑过 ${Math.round(waveDurationMs(this.run.wave) / 1000)} 秒！`
+    )
+  }
 
   /** 世界私有字段的开局重置（scene.restart 复用实例） */
   protected resetWorldFields(): void {}
