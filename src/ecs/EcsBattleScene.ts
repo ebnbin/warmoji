@@ -14,7 +14,7 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query } from 'bitecs'
-import { Alive, Enemy, EnemyProj, EState, Hp, MHp, Morph, Poison, Projectile, Slow, Transform } from './components'
+import { Alive, Coin, Enemy, EnemyProj, EState, Hp, MHp, Morph, Poison, Projectile, Slow, Transform } from './components'
 import { applyDamage } from './combat'
 import { applyMorph } from './morph'
 import { EcsAtlas } from './render/atlas'
@@ -27,6 +27,7 @@ import { armTeam, updateMemberAbilities } from './ability/wire'
 import { updateEnemyAbilities } from './ability/enemyWire'
 import { runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
+import { drainPendingCoins, magnetCoinsEcs } from './pickups'
 import { spawnStep } from './spawn'
 import { initialLayout, stepSim } from './sim'
 import type { Sim } from './sim'
@@ -300,6 +301,9 @@ export class EcsBattleScene extends Phaser.Scene {
     if (this.atlas) runDeathEffects(sim, this, this.atlas)
     // 地面效果(灼烧/毒液区):team 脉冲烧敌 / enemy 节流烧队员 + 到期淡出
     updateGroundEffectsEcs(sim, this)
+    // 金币:死亡掉落落地 + 磁吸入账
+    if (this.atlas) drainPendingCoins(sim, this.atlas)
+    magnetCoinsEcs(sim, delta)
     // 虫巢周期生成子敌(护巢子敌绕巢;拆巢暴走)
     if (this.atlas) updateSpawners(sim, this.atlas)
     // 刷怪节奏
@@ -323,6 +327,9 @@ export class EcsBattleScene extends Phaser.Scene {
       broods: Array.from(query(this.world, [Enemy]), (eid) => enemyNest[eid]!).filter((n) => n >= 0).length,
       enemyPos: Array.from(query(this.world, [Enemy]), (eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
       kills: sim.kills,
+      coins: sim.run.coins,
+      xpLevel: sim.run.xp.level,
+      liveCoins: query(this.world, [Coin]).length,
       projectiles: query(this.world, [Projectile]).length,
       eprojectiles: query(this.world, [EnemyProj]).length,
       over: sim.over,

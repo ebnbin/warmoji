@@ -152,5 +152,12 @@ export function spawnTeam(
     combatMs: run.combatMs,
     spawnCooldownMs: 300,
     pendingSpawns: [],
+    run,
+    reward: {
+      captainXpMul: captain.xpGainMul * teamFx.xpGainMul,
+      doubleCoinChance: teamFx.doubleCoinChance,
+      magnetRadius: captain.coinMagnet * UNIT * teamFx.magnetMul,
+    },
+    pendingCoins: [],
   }
 }

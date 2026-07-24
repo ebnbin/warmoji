@@ -159,3 +159,11 @@ export const EProj = { damage: f32(), radius: f32(), dieAt: f32() }
 
 /** 敌弹查询集 */
 export const EPROJ_SET = [EnemyProj, Transform, Vel, EProj] as const
+
+// ── 拾取物·金币(P4)────────────────────────────────────────
+
+/** 金币标记(落地待拾;磁吸向队伍中心,入账半径内 +1 币) */
+export const Coin = {}
+
+/** 金币查询集(磁吸/拾取:位姿 + 速度) */
+export const COIN_SET = [Coin, Transform, Vel] as const

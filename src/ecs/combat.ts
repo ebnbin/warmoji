@@ -1,6 +1,10 @@
 import { query, removeEntity } from 'bitecs'
 import { norm } from '../core/vec'
 import { playSfx } from '../audio/sfx'
+import { gainXp } from '../run/xp'
+import { coinDropChance } from '../run/waves'
+import { ELITE } from '../enemies/registry'
+import type { EnemyDef } from '../enemies/registry'
 import { KNOCKBACK } from '../abilities/registry'
 import {
   Alive,
@@ -69,18 +73,20 @@ export function applyDamage(
   }
 }
 
-/** 击杀(计数 + 亡语入队 + 清体;掉落/结算在 P4) */
+/** 击杀(计数 + 掉落结算 + 亡语入队 + 清体) */
 export function killEnemy(sim: Sim, eid: number): void {
   sim.kills++
   playSfx('kill')
   const def = enemyDef[eid]
+  const elite = Elite.v[eid] === 1
+  if (def) grantKillRewards(sim, eid, def, elite) // 经验即得 + 金币落地待拾
   // 亡语快照(实体即将移除:先记死亡点/体质,场景侧 runDeathEffects 重放)
   if (def?.onDeath) {
     sim.pendingDeaths.push({
       def,
       x: Transform.x[eid]!,
       y: Transform.y[eid]!,
-      elite: Elite.v[eid] === 1,
+      elite,
       boss: Boss.v[eid] === 1,
       dmgMul: DmgMul.v[eid]!,
     })
@@ -89,6 +95,31 @@ export function killEnemy(sim: Sim, eid: number): void {
   enemyDef[eid] = undefined
   enemyRef[eid] = undefined
   removeEntity(sim.world, eid)
+}
+
+/** 经验统一入口(镜像 gainTeamXp):升级累计抽卡,不冻结 */
+function gainTeamXp(sim: Sim, amount: number): void {
+  const gained = gainXp(sim.run.xp, amount)
+  sim.run.xp = gained.state
+  if (gained.levelsGained > 0) {
+    sim.run.cardDraws += gained.levelsGained
+    playSfx('levelup')
+  }
+}
+
+/** 击杀掉落(镜像 grantKillRewards):经验即得(队长×道具×精英),金币按概率落地待拾。
+ * rng 每杀固定取两次(掉落判定 + 双倍判定),勿调整取用次序 */
+function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean): void {
+  const xpMul = sim.reward.captainXpMul * (elite ? ELITE.xpMul : 1)
+  gainTeamXp(sim, Math.round(def.xp * xpMul))
+  const dropRoll = sim.rng.next()
+  const doubleRoll = sim.rng.next()
+  const dropped = dropRoll < coinDropChance((sim.combatMs + sim.elapsedMs) / 1000)
+  const baseCoins = dropped ? Math.round(def.coins * (elite ? ELITE.coinsMul : 1)) : 0
+  const doubled = baseCoins > 0 && doubleRoll < sim.reward.doubleCoinChance ? baseCoins : 0
+  // 偷币鼠吐回(eaten)待 coinThief 落地(依赖金币系统);此处暂计 0
+  const total = baseCoins + doubled
+  if (total > 0) sim.pendingCoins.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: total })
 }
 
 /** 拆巢(镜像 orphanBrood):名下护巢子敌失去锚点——baseOrbit 按各自 orphan 倍率暴走

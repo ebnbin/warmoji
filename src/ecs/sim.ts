@@ -13,6 +13,7 @@ import { memberContact, memberVisual, reviveMembers, tickPoison } from './combat
 import { updateEnemyProjectiles, updateProjectiles } from './projectile'
 import type { EcsWorld } from './world'
 import type { Point } from '../core/vec'
+import type { RunState } from '../run/state'
 import type { EffectCtx, TargetInfo } from '../abilities/types'
 
 // ECS 战斗仿真状态 + 系统(纯逻辑,禁 phaser)。数学逐行镜像旧 BaseArenaScene 的
@@ -66,6 +67,29 @@ export interface Sim {
   pendingDeaths: PendingDeath[]
   /** 队伍侧共享效果执行面(抛射物 onHit 命中链复用;armTeam 后由场景注入) */
   effectCtx?: EffectCtx
+  /** run 状态引用(金币/经验/抽卡入账;与旧场景同口径直改 run) */
+  run: RunState
+  /** 掉落/入账乘区(队长×道具,开局定;精英倍率逐杀叠) */
+  reward: RewardConfig
+  /** 本帧内死亡敌人待落地的金币(场景侧 drainPendingCoins 排空,需 atlas) */
+  pendingCoins: PendingCoins[]
+}
+
+/** 掉落/拾取乘区(镜像 grantKillRewards / magnetCoins 的乘区来源) */
+export interface RewardConfig {
+  /** 经验乘区(队长 xpGainMul × 道具 xpGainMul;精英 ELITE.xpMul 逐杀再叠) */
+  captainXpMul: number
+  /** 双倍金币概率(道具) */
+  doubleCoinChance: number
+  /** 磁吸半径(px:队长 coinMagnet × 道具 magnetMul) */
+  magnetRadius: number
+}
+
+/** 待落地金币(死亡点 + 枚数) */
+export interface PendingCoins {
+  x: number
+  y: number
+  count: number
 }
 
 /** 预告中待落地的敌人 */
