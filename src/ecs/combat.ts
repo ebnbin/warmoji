@@ -27,7 +27,7 @@ import {
   Tint,
   Transform,
 } from './components'
-import { enemyDef, enemyNest, enemyRef } from './store'
+import { enemyDef, enemyNest, enemyRef, thiefEaten } from './store'
 import type { Sim } from './sim'
 
 // 战斗(P3b):敌人受伤/致死/击退,队员接触伤害/死亡/复活/受击闪光。
@@ -117,8 +117,9 @@ function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean):
   const dropped = dropRoll < coinDropChance((sim.combatMs + sim.elapsedMs) / 1000)
   const baseCoins = dropped ? Math.round(def.coins * (elite ? ELITE.coinsMul : 1)) : 0
   const doubled = baseCoins > 0 && doubleRoll < sim.reward.doubleCoinChance ? baseCoins : 0
-  // 偷币鼠吐回(eaten)待 coinThief 落地(依赖金币系统);此处暂计 0
-  const total = baseCoins + doubled
+  // 偷币鼠吐回吞掉的币 + 1 枚利息(镜像 grantKillRewards 的 eaten 项)
+  const eaten = thiefEaten[eid]!
+  const total = baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0)
   if (total > 0) sim.pendingCoins.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: total })
 }
 

@@ -22,12 +22,12 @@ import { EcsSpriteBatch } from './render/spriteBatch'
 import { spawnSprite } from './entities'
 import { spawnTeam } from './team'
 import { spawnEnemy, updateSpawners } from './enemy'
-import { enemyNest } from './store'
+import { enemyNest, thiefEaten } from './store'
 import { armTeam, updateMemberAbilities } from './ability/wire'
 import { updateEnemyAbilities } from './ability/enemyWire'
 import { runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
-import { drainPendingCoins, magnetCoinsEcs } from './pickups'
+import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
 import { spawnStep } from './spawn'
 import { initialLayout, stepSim } from './sim'
 import type { Sim } from './sim'
@@ -236,6 +236,18 @@ export class EcsBattleScene extends Phaser.Scene {
       return best >= 0 && Morph.until[best] !== 0 && sim.elapsedMs < Morph.until[best]!
     }
     window.__ecsGroundZones = (): number => groundZoneCount()
+    // e2e 探针:在队伍中心相对格偏移处落金币(测偷币鼠)
+    window.__ecsSpawnCoinsAt = (dxU = 8, dyU = 0, count = 3): void => {
+      const sim = this.sim
+      if (!sim || !this.atlas) return
+      spawnCoinsEcs(sim, this.atlas, sim.center.x + dxU * UNIT, sim.center.y + dyU * UNIT, count)
+    }
+    // e2e 探针:全场敌人已吞金币数的最大值(隔离偷币鼠,不受自然刷怪干扰)
+    window.__ecsMaxEaten = (): number => {
+      let max = 0
+      for (const eid of query(this.world, [Enemy])) if (thiefEaten[eid]! > max) max = thiefEaten[eid]!
+      return max
+    }
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
       pages: atlas.pageCount,

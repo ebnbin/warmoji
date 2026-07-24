@@ -1,8 +1,9 @@
-import { addComponent, addEntity, query } from 'bitecs'
+import { addComponent, addEntity, query, removeEntity } from 'bitecs'
 import { norm } from '../core/vec'
 import { AI, ELITE, SPAWN } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
 import { KNOCKBACK } from '../abilities/registry'
+import { PICKUPS } from '../pickups/registry'
 import { waveAt } from '../run/waves'
 import { UNIT } from '../core/units'
 import { playSfx } from '../audio/sfx'
@@ -11,6 +12,7 @@ import {
   Alive,
   Boss,
   Charge,
+  COIN_SET,
   Depth,
   Despawn,
   DmgMul,
@@ -33,7 +35,16 @@ import {
   Tint,
   Transform,
 } from './components'
-import { enemyDef, enemyFireDelayMs, enemyNest, enemyNextSpawnAt, enemyVelX, enemyVelY } from './store'
+import {
+  enemyDef,
+  enemyFireDelayMs,
+  enemyNest,
+  enemyNextSpawnAt,
+  enemyVelX,
+  enemyVelY,
+  thiefEaten,
+  thiefNextEatAt,
+} from './store'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
 import type { Point } from '../core/vec'
@@ -101,6 +112,8 @@ export function spawnEnemy(
   Morph.until[eid] = 0
   Morph.vuln[eid] = 1
   Morph.cdUntil[eid] = 0
+  thiefEaten[eid] = 0
+  thiefNextEatAt[eid] = 0
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
   Radius.v[eid] = def.radius
@@ -353,6 +366,45 @@ function steerBaseOrbit(sim: Sim, eid: number, slow: number): { vx: number; vy: 
   return { vx: dir.x * sp, vy: dir.y * sp }
 }
 
+/** 偷币鼠(镜像 coinThief steerer):直奔最近金币,贴上按冷却逐枚吞(偷走不入账);
+ * 没金币慢速游荡。吞下的币死亡时吐回(+利息),见 grantKillRewards */
+function steerCoinThief(sim: Sim, eid: number, slow: number): { vx: number; vy: number } {
+  const def = enemyDef[eid]!
+  const ex = Transform.x[eid]!
+  const ey = Transform.y[eid]!
+  let coin = -1
+  let bestD = Infinity
+  for (const c of query(sim.world, COIN_SET as unknown as object[])) {
+    const dx = Transform.x[c]! - ex
+    const dy = Transform.y[c]! - ey
+    const d = dx * dx + dy * dy
+    if (d < bestD) {
+      bestD = d
+      coin = c
+    }
+  }
+  if (coin < 0) {
+    // 没金币:慢速游荡
+    const d = wanderDir(sim, eid)
+    const sp = def.speed * 0.3 * slow
+    return { vx: d.x * sp, vy: d.y * sp }
+  }
+  const eatR = def.radius + PICKUPS.coin.radius * UNIT
+  const onCoin = bestD <= eatR * eatR
+  if (onCoin) {
+    // 贴上金币:过冷却才吞一枚(偷走,不入账)
+    if (sim.elapsedMs >= thiefNextEatAt[eid]!) {
+      removeEntity(sim.world, coin)
+      thiefEaten[eid] = thiefEaten[eid]! + 1
+      thiefNextEatAt[eid] = sim.elapsedMs + AI.coinThiefEatCdMs
+    }
+    return { vx: 0, vy: 0 }
+  }
+  const dir = norm(Transform.x[coin]! - ex, Transform.y[coin]! - ey)
+  const sp = def.speed * slow
+  return { vx: dir.x * sp, vy: dir.y * sp }
+}
+
 /** 本巢名下在场子敌数(enemyNest 反查) */
 function broodCount(sim: Sim, nestEid: number): number {
   let n = 0
@@ -461,6 +513,10 @@ export function steerEnemies(sim: Sim, delta: number): void {
       ty += v.vy * dt
     } else if (kind === 'baseOrbit') {
       const v = steerBaseOrbit(sim, eid, slow)
+      tx += v.vx * dt
+      ty += v.vy * dt
+    } else if (kind === 'coinThief') {
+      const v = steerCoinThief(sim, eid, slow)
       tx += v.vx * dt
       ty += v.vy * dt
     } else {

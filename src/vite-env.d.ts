@@ -232,6 +232,8 @@ interface Window {
   __ecsMorphEnemy?: (durMs?: number, vulnMul?: number) => void
   __ecsNearestEnemyMorphed?: () => boolean
   __ecsGroundZones?: () => number
+  __ecsSpawnCoinsAt?: (dxU?: number, dyU?: number, count?: number) => void
+  __ecsMaxEaten?: () => number
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
   __addMemberItem?: (itemId: string, slot?: number, count?: number) => void
