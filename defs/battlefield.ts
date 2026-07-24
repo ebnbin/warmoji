@@ -71,4 +71,13 @@ export const BATTLEFIELD = {
   },
   // 拾取管线旋钮（格值，进战斗乘 UNIT）：拾取半径 / 地面停留 / 携带者光环半径。
   field: { grabRadiusU: 0.9, groundMs: 9000, auraRadiusU: 0.85 },
+  // 本波携带者预算（固定数量，非概率）：Boss 波偏减益施压；常规波按波次分档，超档兜底。
+  carrierBudget: {
+    boss: { buff: 1, debuff: 2 },
+    waveTiers: [
+      { upToWave: 3, buff: 2, debuff: 1 },
+      { upToWave: 8, buff: 2, debuff: 2 },
+    ],
+    fallback: { buff: 3, debuff: 3 },
+  },
 } as const satisfies BattlefieldTuning

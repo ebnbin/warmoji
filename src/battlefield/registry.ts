@@ -76,6 +76,19 @@ export interface BattlefieldTuning {
     /** 携带者光环半径 */
     readonly auraRadiusU: number
   }
+  /** 本波携带者预算（固定数量，非概率）：随波次上探，Boss 波偏减益施压 */
+  readonly carrierBudget: {
+    /** Boss 波预算 */
+    readonly boss: { readonly buff: number; readonly debuff: number }
+    /** 常规波按波次分档：命中首个 wave ≤ upToWave 的档 */
+    readonly waveTiers: readonly {
+      readonly upToWave: number
+      readonly buff: number
+      readonly debuff: number
+    }[]
+    /** 超出所有档的兜底预算 */
+    readonly fallback: { readonly buff: number; readonly debuff: number }
+  }
 }
 
 const BF = battlefieldJson as unknown as BattlefieldTuning
@@ -97,12 +110,12 @@ export function fieldPickupsFor(mapId: MapId): readonly FieldPickupDef[] {
   return POOLS[mapId]
 }
 
-/** 本波携带者预算（固定数量，非概率）：随波次上探，Boss 波偏减益施压 */
+/** 本波携带者预算（固定数量，非概率）：随波次上探，Boss 波偏减益施压。分档表见 battlefield 数据 */
 export function waveCarrierBudget(wave: number, isBoss: boolean): { buff: number; debuff: number } {
-  if (isBoss) return { buff: 1, debuff: 2 }
-  if (wave <= 3) return { buff: 2, debuff: 1 }
-  if (wave <= 8) return { buff: 2, debuff: 2 }
-  return { buff: 3, debuff: 3 }
+  const cb = BF.carrierBudget
+  if (isBoss) return { buff: cb.boss.buff, debuff: cb.boss.debuff }
+  for (const t of cb.waveTiers) if (wave <= t.upToWave) return { buff: t.buff, debuff: t.debuff }
+  return { buff: cb.fallback.buff, debuff: cb.fallback.debuff }
 }
 
 function pickPolarity(

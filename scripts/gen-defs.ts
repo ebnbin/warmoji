@@ -358,6 +358,24 @@ for (const [id, c] of Object.entries<CardDef>(CARDS as Record<string, CardDef>))
   num('battlefield.field.grabRadiusU', bf.field.grabRadiusU, 0.01)
   num('battlefield.field.groundMs', bf.field.groundMs, 1)
   num('battlefield.field.auraRadiusU', bf.field.auraRadiusU, 0.01)
+  const cb = bf.carrierBudget
+  num('battlefield.carrierBudget.boss.buff', cb.boss.buff, 0)
+  num('battlefield.carrierBudget.boss.debuff', cb.boss.debuff, 0)
+  num('battlefield.carrierBudget.fallback.buff', cb.fallback.buff, 0)
+  num('battlefield.carrierBudget.fallback.debuff', cb.fallback.debuff, 0)
+  if (!Array.isArray(cb.waveTiers) || cb.waveTiers.length === 0) {
+    bad('battlefield.carrierBudget.waveTiers', '需为非空数组')
+  } else {
+    let prev = 0
+    cb.waveTiers.forEach((t, i) => {
+      const tp = `battlefield.carrierBudget.waveTiers[${i}]`
+      num(`${tp}.upToWave`, t.upToWave, 1)
+      if (t.upToWave <= prev) bad(`${tp}.upToWave`, `分档需按波次严格递增（前档 ${prev}）`)
+      prev = t.upToWave
+      num(`${tp}.buff`, t.buff, 0)
+      num(`${tp}.debuff`, t.debuff, 0)
+    })
+  }
   pure('battlefield', bf)
 }
 
