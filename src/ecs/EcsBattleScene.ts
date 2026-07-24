@@ -13,13 +13,17 @@ import { MAP, MAPS, rollDecor } from '../maps/registry'
 import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
-import { Transform } from './components'
+import { query } from 'bitecs'
+import { Enemy, Transform } from './components'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch } from './render/spriteBatch'
 import { spawnSprite } from './entities'
 import { spawnTeam } from './team'
+import { spawnEnemy } from './enemy'
 import { initialLayout, stepSim } from './sim'
 import type { Sim } from './sim'
+import { toPx } from '../battle/px'
+import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
 
 // ECS 实验战斗场景(宿主壳):Phaser 只做画布/相机/输入/音频宿主;战斗世界(实体+系统+
 // 自绘渲染)全在 ECS。P2:有界森林图 + 队伍编队/orbit/游移/跟随弹簧 + 键盘/相机跟随。
@@ -104,6 +108,17 @@ export class EcsBattleScene extends Phaser.Scene {
     initialLayout(this.sim)
     this.ready = true
     hint.destroy()
+
+    // e2e 探针:按 kind 在队伍中心附近投放一只敌人(相对格偏移)
+    window.__ecsSpawnEnemy = (kind: string, dxU = 3, dyU = 0): void => {
+      const sim = this.sim
+      if (!sim || !this.atlas) return
+      const boss = BOSSES.find((s) => s.kind === kind)
+      const raw = ENEMY_DEFS.find((s) => s.kind === kind) ?? boss
+      if (!raw) return
+      const px = toPx(raw)
+      spawnEnemy(this.world, this.atlas, px, sim.center.x + dxU * UNIT, sim.center.y + dyU * UNIT, px.hp, false, !!boss)
+    }
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
       pages: atlas.pageCount,
@@ -157,6 +172,8 @@ export class EcsBattleScene extends Phaser.Scene {
       moveSpeed: sim.moveSpeed,
       elapsed: sim.elapsedMs,
       memberPos: sim.members.map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
+      enemies: query(this.world, [Enemy]).length,
+      enemyPos: query(this.world, [Enemy]).map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
     }
   }
 }

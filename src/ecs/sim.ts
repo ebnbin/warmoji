@@ -7,6 +7,7 @@ import type { FormationId } from '../characters/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../characters/orbit'
 import type { OrbitThreat } from '../characters/orbit'
 import { Alive, Depth, Follow, Threat, Transform, Wander } from './components'
+import { steerEnemies, updateFrameTargets } from './enemy'
 import type { EcsWorld } from './world'
 import type { Point } from '../core/vec'
 
@@ -156,9 +157,12 @@ export function initialLayout(sim: Sim): void {
   layout(sim, 0)
 }
 
-/** 一帧仿真(镜像 update 的 updateOrbit→moveTeam 次序);delta 为真实帧长(ms) */
+/** 一帧仿真(镜像 update 的 updateOrbit→moveTeam→steerEnemies 次序);delta 为真实帧长(ms) */
 export function stepSim(sim: Sim, delta: number): void {
   sim.elapsedMs += delta
+  // 敌人位置汇入 frameTargets(队伍 orbit/游移门控据此),先于 orbit
+  updateFrameTargets(sim)
   updateOrbit(sim, delta)
   moveTeam(sim, delta)
+  steerEnemies(sim, delta)
 }

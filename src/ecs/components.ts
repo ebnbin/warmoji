@@ -63,3 +63,24 @@ export const Threat = { v: u8() }
 
 /** 队员移动/布局查询集 */
 export const MEMBER_SET = [Member, Slot, Post, OrbitBias, Follow, Wander, Alive, Threat, Transform] as const
+
+// ── 敌人(P3)──────────────────────────────────────────────
+
+/** 敌人标记 */
+export const Enemy = {}
+
+/** 血量 */
+export const Hp = { v: f32(), max: f32() }
+
+/** 移速(世界像素/秒,px 化 def.speed) */
+export const Speed = { v: f32() }
+
+/** 行为状态机:0 wander / 1 chase / 2 windup / 3 dash / 4 cool(与旧 EnemyState 对应) */
+export const EState = { v: u8() }
+
+/** 精英/Boss 标记(渲染描边 elite;体质倍率等后续叠) */
+export const Elite = { v: u8() }
+export const Boss = { v: u8() }
+
+/** 敌人移动查询集(最小:位姿 + 速度 + 血) */
+export const ENEMY_SET = [Enemy, Transform, Speed, Hp] as const

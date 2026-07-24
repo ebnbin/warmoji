@@ -223,6 +223,7 @@ interface Window {
   __setLab?: (kinds: string[], mapId?: string) => void
   __labTeam?: (ids: string[], mapId?: string) => void
   __ecsLabRoster?: (ids: string[]) => void
+  __ecsSpawnEnemy?: (kind: string, dxU?: number, dyU?: number) => void
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
   __addMemberItem?: (itemId: string, slot?: number, count?: number) => void
