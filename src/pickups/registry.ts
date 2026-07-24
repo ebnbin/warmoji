@@ -9,13 +9,23 @@ export interface PickupDef {
   readonly radius: number
 }
 
-export type PickupId = keyof typeof pickupsJson
-export const PICKUPS = pickupsJson as unknown as Record<PickupId, PickupDef>
+/** 拾取管线旋钮：磁吸与入账以队伍中心为基点，对全部拾取物统一生效
+ *（磁吸范围下放到各队长 CaptainDef.coinMagnet，经 teamFx.magnetMul 叠乘） */
+export interface PickupPipeline {
+  /** 磁吸飞行速度（格/秒） */
+  readonly magnetSpeed: number
+  /** 入账半径（格） */
+  readonly collectRadius: number
+}
 
-// 拾取管线旋钮：磁吸与入账以队伍中心为基点，对全部拾取物统一生效
-//（拾取范围类道具挂队长，经 teamFx.magnetMul 叠乘）
-export const PICKUP = {
-  // 磁吸半径已下放到各队长（CaptainDef.coinMagnet）；此处仅留飞行/入账参数
-  magnetSpeed: 8,
-  collectRadius: 0.5,
-} as const
+/** pickups.json 的整表形状：内容行 + 管线旋钮 */
+export interface PickupTable {
+  readonly defs: Record<string, PickupDef>
+  readonly pipeline: PickupPipeline
+}
+
+const PT = pickupsJson as unknown as PickupTable
+
+export type PickupId = keyof typeof pickupsJson.defs
+export const PICKUPS = PT.defs as Record<PickupId, PickupDef>
+export const PICKUP = PT.pipeline

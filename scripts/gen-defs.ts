@@ -497,14 +497,17 @@ for (const [id, m] of Object.entries(MAPS)) {
   pure(p, m)
 }
 
-// ── pickups ──
-for (const [id, pk] of Object.entries(PICKUPS)) {
-  const p = `pickups.${id}`
+// ── pickups（拾取物内容 + 管线旋钮）──
+for (const [id, pk] of Object.entries(PICKUPS.defs)) {
+  const p = `pickups.defs.${id}`
   str(`${p}.emoji`, pk.emoji)
   num(`${p}.size`, pk.size, 0.01)
   num(`${p}.radius`, pk.radius, 0.01)
   pure(p, pk)
 }
+num('pickups.pipeline.magnetSpeed', PICKUPS.pipeline.magnetSpeed, 0.01)
+num('pickups.pipeline.collectRadius', PICKUPS.pipeline.collectRadius, 0.01)
+pure('pickups.pipeline', PICKUPS.pipeline)
 
 // ── progression（关卡进程 + 经济）──
 {
