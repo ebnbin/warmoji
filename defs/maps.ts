@@ -280,6 +280,20 @@ export const MAPS = {
       density: [0.06, 0.1],
     },
     mix: SPACE_MIX,
+    // 深空特性：黑洞禁锢场（半径 12.5 格 ≈ 内切圆）+ 天体横扫危险物（敌我通吃）
+    space: {
+      blackholeRadiusU: 12.5,
+      meteor: {
+        intervalMs: 15000,
+        intervalJitterMs: 5000,
+        warnMs: 1500,
+        radiusU: 2.6,
+        speedU: 14,
+        travelU: 30,
+        offsetU: 7,
+        damage: 30,
+      },
+    },
     // 深空专属 Boss：奇点——吸积盘环爆 + 奇点坍缩坠击 + 禁锢力场
     boss: 'blackhole',
   },

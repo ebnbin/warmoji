@@ -1,11 +1,12 @@
 import Phaser from 'phaser'
 import { UNIT } from '../core/units'
 import { InfiniteArenaScene } from './InfiniteArenaScene'
-import { MAP } from './registry'
+import { MAP, MAPS } from './registry'
+import type { SpaceConfig } from './registry'
 import { INFINITE, ringPoint } from './world'
 import { emojiImage } from '../emoji/textures'
 import { enemyOf } from '../enemies/enemies'
-import { BLACKHOLE, METEOR, clampToDisc, confineVelocity, meteorSweep } from './space'
+import { clampToDisc, confineVelocity, meteorSweep } from './space'
 import type { Point } from '../core/vec'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 
@@ -28,7 +29,7 @@ interface Meteor {
 
 // 深空（kind='space'）：整张地图 = 一个固定的圆形禁锢星域（黑洞引力场），从第一波起常驻。
 // 复用无限世界的底层（相机跟随 / 分块星海 / 环带刷怪），但一切都被困在圆内：
-// · 禁锢圈：以地图中心为圆心、半径 BLACKHOLE.fieldRadiusU（12.5 格，直径 25 ≈ 标准方形内切圆）。
+// · 禁锢圈：以地图中心为圆心、半径 this.spaceCfg.blackholeRadiusU（12.5 格，直径 25 ≈ 标准方形内切圆）。
 //   越靠边缘、向外的运动阻力越大（中心 0、边缘 100%），再加硬边界兜底——队员/敌人/Boss 谁也逃不出去；
 //   玩家与敌人全在圈内生成。相机跟随队伍、bounds 钳在圆的外接框内。
 // · 天体横扫：平均每 ~15 秒，一颗球形天体先给出直线预警轨迹，随后沿该线匀速划过战场，
@@ -43,6 +44,11 @@ export class SpaceArenaScene extends InfiniteArenaScene {
 
   constructor() {
     super('arenaSpace')
+  }
+
+  /** 深空特性配置（来自 MapDef 数据；深空图必配 space） */
+  private get spaceCfg(): SpaceConfig {
+    return MAPS[this.run.mapId].space!
   }
 
   protected resetWorldFields(): void {
@@ -61,7 +67,7 @@ export class SpaceArenaScene extends InfiniteArenaScene {
     const c = this.spawnCenter()
     this.fieldCx = c.x
     this.fieldCy = c.y
-    this.fieldR = BLACKHOLE.fieldRadiusU * UNIT
+    this.fieldR = this.spaceCfg.blackholeRadiusU * UNIT
     // 禁锢边界：亮紫环 + 内侧渐隐提示（静态，一次绘制，世界坐标）
     const g = this.add.graphics().setDepth(2)
     g.lineStyle(5, 0x9c6bff, 0.7)
@@ -149,18 +155,18 @@ export class SpaceArenaScene extends InfiniteArenaScene {
     }
     // 划行：沿预警直线匀速推进，压到的实体敌我通吃
     const len = Math.hypot(m.ex - m.sx, m.ey - m.sy) || 1
-    m.t += ((METEOR.speedU * UNIT) * (delta / 1000)) / len
+    m.t += ((this.spaceCfg.meteor.speedU * UNIT) * (delta / 1000)) / len
     const x = m.sx + (m.ex - m.sx) * m.t
     const y = m.sy + (m.ey - m.sy) * m.t
     if (m.sphere) {
       m.sphere.setPosition(x, y)
       m.sphere.rotation += (delta / 1000) * 1.4
     }
-    const rr = METEOR.radiusU * UNIT
+    const rr = this.spaceCfg.meteor.radiusU * UNIT
     for (const mem of this.members) {
       if (!mem.alive || m.hit.has(mem)) continue
       if (Math.hypot(mem.image.x - x, mem.image.y - y) < rr) {
-        this.hurtMember(mem, METEOR.damage, 0xffaa33, '天体')
+        this.hurtMember(mem, this.spaceCfg.meteor.damage, 0xffaa33, '天体')
         m.hit.add(mem)
       }
     }
@@ -169,7 +175,7 @@ export class SpaceArenaScene extends InfiniteArenaScene {
       const a = enemyOf(e)
       if (a.dormant) continue
       if (Math.hypot(e.x - x, e.y - y) < rr) {
-        this.applyDamage(e, METEOR.damage)
+        this.applyDamage(e, this.spaceCfg.meteor.damage)
         m.hit.add(e)
       }
     }
@@ -178,25 +184,25 @@ export class SpaceArenaScene extends InfiniteArenaScene {
 
   private startMeteorWarn(): void {
     const angle = this.rng.next() * Math.PI * 2
-    const offset = (this.rng.next() * 2 - 1) * METEOR.offsetU * UNIT
-    const half = (METEOR.travelU * UNIT) / 2
+    const offset = (this.rng.next() * 2 - 1) * this.spaceCfg.meteor.offsetU * UNIT
+    const half = (this.spaceCfg.meteor.travelU * UNIT) / 2
     const s = meteorSweep(this.center.x, this.center.y, angle, offset, half)
     const tele = this.add.graphics().setDepth(3)
     // 危险车道：宽半透明带 + 亮芯线 + 入口标记（球体从此侧划入）
-    const bandW = METEOR.radiusU * 2 * UNIT
+    const bandW = this.spaceCfg.meteor.radiusU * 2 * UNIT
     tele.lineStyle(bandW, 0xff5252, 0.16)
     tele.lineBetween(s.sx, s.sy, s.ex, s.ey)
     tele.lineStyle(3, 0xff8a80, 0.8)
     tele.lineBetween(s.sx, s.sy, s.ex, s.ey)
     tele.fillStyle(0xff5252, 0.35)
-    tele.fillCircle(s.sx, s.sy, METEOR.radiusU * UNIT)
+    tele.fillCircle(s.sx, s.sy, this.spaceCfg.meteor.radiusU * UNIT)
     this.meteor = {
       phase: 'warn',
       sx: s.sx,
       sy: s.sy,
       ex: s.ex,
       ey: s.ey,
-      until: this.elapsedMs + METEOR.warnMs,
+      until: this.elapsedMs + this.spaceCfg.meteor.warnMs,
       t: 0,
       tele,
       hit: new Set(),
@@ -206,7 +212,7 @@ export class SpaceArenaScene extends InfiniteArenaScene {
   private launchMeteor(m: Meteor): void {
     m.phase = 'travel'
     m.t = 0
-    m.sphere = emojiImage(this, m.sx, m.sy, '1fa90', METEOR.radiusU * 2 * UNIT).setDepth(60)
+    m.sphere = emojiImage(this, m.sx, m.sy, '1fa90', this.spaceCfg.meteor.radiusU * 2 * UNIT).setDepth(60)
     m.tele.setAlpha(0.22) // 划行期间轨迹淡下去，只留车道感
   }
 
@@ -216,6 +222,6 @@ export class SpaceArenaScene extends InfiniteArenaScene {
     this.meteor = undefined
     // 下一颗：平均 15 秒，±5 秒抖动
     this.nextMeteorAt =
-      this.elapsedMs + METEOR.intervalMs + (this.rng.next() * 2 - 1) * METEOR.intervalJitterMs
+      this.elapsedMs + this.spaceCfg.meteor.intervalMs + (this.rng.next() * 2 - 1) * this.spaceCfg.meteor.intervalJitterMs
   }
 }

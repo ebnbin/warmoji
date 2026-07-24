@@ -82,6 +82,32 @@ export interface IceConfig {
   readonly waterTickMs: number
 }
 
+/** 深空特性（可选）：黑洞禁锢场（向外阻力随距圆心增大）+ 天体横扫危险物（敌我通吃）。
+ * 目前仅深空图配置；数据模型上任何图都可组合本特性 */
+export interface SpaceConfig {
+  /** 黑洞禁锢场半径（格）：整张图即此圈，圆心固定在地图中心 */
+  readonly blackholeRadiusU: number
+  /** 天体横扫危险物 */
+  readonly meteor: {
+    /** 平均间隔（ms） */
+    readonly intervalMs: number
+    /** 间隔随机抖动（±ms） */
+    readonly intervalJitterMs: number
+    /** 出现前预警时长（ms） */
+    readonly warnMs: number
+    /** 球体半径（格） */
+    readonly radiusU: number
+    /** 划过速度（格/秒） */
+    readonly speedU: number
+    /** 直线全长（格） */
+    readonly travelU: number
+    /** 相对队伍中心的垂直随机偏移上限（格） */
+    readonly offsetU: number
+    /** 压到的伤害（队员/敌人/Boss 一律照打） */
+    readonly damage: number
+  }
+}
+
 export interface MapDef {
   readonly emoji: string
   readonly name: string
@@ -113,6 +139,8 @@ export interface MapDef {
   readonly dayNight?: DayNightConfig
   /** 浮冰/打滑特性（可选）：配置即启用打滑 + 落水掉血（当前仅浮冰图使用） */
   readonly ice?: IceConfig
+  /** 深空特性（可选）：配置即启用黑洞禁锢场 + 天体横扫（当前仅深空图使用） */
+  readonly space?: SpaceConfig
   /** 本图终波 Boss：引用 enemies 里某个 role:'boss' 的 kind */
   readonly boss: string
 }

@@ -314,6 +314,19 @@ for (const [id, m] of Object.entries(MAPS)) {
     num(`${p}.ice.waterEnemyDps`, ic.waterEnemyDps, 0)
     num(`${p}.ice.waterTickMs`, ic.waterTickMs, 1)
   }
+  const sp = (m as MapDef).space
+  if (sp) {
+    num(`${p}.space.blackholeRadiusU`, sp.blackholeRadiusU, 0.01)
+    const mt = sp.meteor
+    num(`${p}.space.meteor.intervalMs`, mt.intervalMs, 1)
+    num(`${p}.space.meteor.intervalJitterMs`, mt.intervalJitterMs, 0)
+    num(`${p}.space.meteor.warnMs`, mt.warnMs, 0)
+    num(`${p}.space.meteor.radiusU`, mt.radiusU, 0.01)
+    num(`${p}.space.meteor.speedU`, mt.speedU, 0.01)
+    num(`${p}.space.meteor.travelU`, mt.travelU, 0.01)
+    num(`${p}.space.meteor.offsetU`, mt.offsetU, 0)
+    num(`${p}.space.meteor.damage`, mt.damage, 0)
+  }
   pure(p, m)
 }
 
