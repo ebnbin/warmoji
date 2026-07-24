@@ -4,6 +4,8 @@ import { AI, ELITE } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
 import { KNOCKBACK } from '../abilities/registry'
 import { UNIT } from '../core/units'
+import { playSfx } from '../audio/sfx'
+import { despawnEnemy, hurtMember } from './combat'
 import {
   Alive,
   Boss,
@@ -263,7 +265,45 @@ function steerStandoff(sim: Sim, eid: number, slow: number): { vx: number; vy: n
   return { vx: 0, vy: 0 } // 站位带内停手(射击由能力驱动)
 }
 
-/** 敌人转向:按 locomotion 分发(chase/wander/static/dash/standoff;detonate/coinThief/baseOrbit
+/** 自爆冲锋(镜像 detonate steerer + scene.detonate):追玩家→进 triggerRange 定身蓄力→
+ * 蓄力完必引爆(群伤范围内队员 + 自毁)。返回本帧速度 */
+function steerDetonate(sim: Sim, eid: number, slow: number): { vx: number; vy: number } {
+  const lm = enemyDef[eid]!.locomotion
+  if (lm.kind !== 'detonate') return { vx: 0, vy: 0 }
+  const now = sim.elapsedMs
+  const ex = Transform.x[eid]!
+  const ey = Transform.y[eid]!
+  if (EState.v[eid] === 2) {
+    // 定身拆弹;到时引爆
+    if (now >= Charge.windupUntil[eid]!) {
+      const dmg = Math.round(lm.blastDamage * DmgMul.v[eid]!)
+      const r2 = lm.blastRadius * lm.blastRadius
+      for (const m of sim.members) {
+        if (!Alive.v[m]) continue
+        const dx = Transform.x[m]! - ex
+        const dy = Transform.y[m]! - ey
+        if (dx * dx + dy * dy <= r2) hurtMember(sim, m, dmg)
+      }
+      playSfx('boom')
+      despawnEnemy(sim, eid)
+    }
+    return { vx: 0, vy: 0 }
+  }
+  const target = nearestAlive(sim, ex, ey)
+  if (!target) return { vx: 0, vy: 0 }
+  const dx = target.x - ex
+  const dy = target.y - ey
+  if (dx * dx + dy * dy <= lm.triggerRange * lm.triggerRange) {
+    EState.v[eid] = 2
+    Charge.windupUntil[eid] = now + lm.windupMs
+    return { vx: 0, vy: 0 }
+  }
+  const dir = norm(dx, dy)
+  const sp = Speed.v[eid]! * slow
+  return { vx: dir.x * sp, vy: dir.y * sp }
+}
+
+/** 敌人转向:按 locomotion 分发(chase/wander/static/dash/standoff/detonate;coinThief/baseOrbit
  * 暂回落 chase,后续补)+ 击退衰减 + 受击白闪恢复。delta 为真实帧长(ms) */
 export function steerEnemies(sim: Sim, delta: number): void {
   const eids = query(sim.world, ENEMY_SET as unknown as object[])
@@ -296,6 +336,10 @@ export function steerEnemies(sim: Sim, delta: number): void {
       ty += v.vy * dt
     } else if (kind === 'standoff') {
       const v = steerStandoff(sim, eid, slow)
+      tx += v.vx * dt
+      ty += v.vy * dt
+    } else if (kind === 'detonate') {
+      const v = steerDetonate(sim, eid, slow)
       tx += v.vx * dt
       ty += v.vy * dt
     } else {

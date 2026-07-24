@@ -113,8 +113,15 @@ export function memberContact(sim: Sim): void {
   }
 }
 
-/** 队员受伤(镜像 hurtMember + killMember) */
-function hurtMember(sim: Sim, eid: number, damage: number): void {
+/** 敌人静默移除(自爆/替身到时:不计击杀、不掉落、不放死亡效果) */
+export function despawnEnemy(sim: Sim, eid: number): void {
+  enemyDef[eid] = undefined
+  enemyRef[eid] = undefined
+  removeEntity(sim.world, eid)
+}
+
+/** 队员受伤(镜像 hurtMember + killMember);blast/接触等外部命中点直接调用(无敌帧由调用方掌管) */
+export function hurtMember(sim: Sim, eid: number, damage: number): void {
   const hp = Math.max(0, MHp.hp[eid]! - damage)
   MHp.hp[eid] = hp
   playSfx('hurt')
