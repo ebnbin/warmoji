@@ -38,9 +38,10 @@ import { spawnBossEcs, spawnStep } from './spawn'
 import { initialLayout, stepSim } from './sim'
 import { settleWave } from './wave'
 import { isBossWave, waveDurationMs, WAVE } from '../run/waves'
-import type { Sim } from './sim'
+import type { PendingSpawn, Sim } from './sim'
+import { emojiImage } from '../emoji/textures'
 import { toPx } from '../battle/px'
-import { BOSSES, ELITE, ENEMY_DEFS } from '../enemies/registry'
+import { BOSSES, ELITE, ENEMY_DEFS, SPAWN } from '../enemies/registry'
 
 // ECS 实验战斗场景(宿主壳):Phaser 只做画布/相机/输入/音频宿主;战斗世界(实体+系统+
 // 自绘渲染)全在 ECS。P2:有界森林图 + 队伍编队/orbit/游移/跟随弹簧 + 键盘/相机跟随。
@@ -67,6 +68,8 @@ export class EcsBattleScene extends Phaser.Scene {
   private damageNumbersOn = false
   private damagePool: Phaser.GameObjects.BitmapText[] = []
   private damageIdx = 0
+  /** 刷怪预告标记(按 pendingSpawn 对帐:出现即挂脉冲⚠,落地即销毁) */
+  private spawnMarks = new Map<PendingSpawn, Phaser.GameObjects.Image>()
   /** 粒子爆点发射器(死亡紫爆 / 拾币金爆 / 灰烟) */
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -348,6 +351,32 @@ export class EcsBattleScene extends Phaser.Scene {
     return best
   }
 
+  /** 刷怪预告标记对帐(镜像 spawnTelegraphed 的⚠脉冲):新 pending 挂脉冲标记,落地即销毁 */
+  private updateTelegraphs(): void {
+    const sim = this.sim!
+    const live = new Set<PendingSpawn>(sim.pendingSpawns)
+    for (const [p, mark] of this.spawnMarks) {
+      if (live.has(p)) continue
+      this.tweens.killTweensOf(mark)
+      mark.destroy()
+      this.spawnMarks.delete(p)
+    }
+    for (const p of sim.pendingSpawns) {
+      if (this.spawnMarks.has(p)) continue
+      const mark = emojiImage(this, p.x, p.y, SPAWN.markEmoji, SPAWN.markSize * UNIT * (p.boss ? 2 : 1))
+        .setDepth(4)
+        .setAlpha(0)
+      this.tweens.add({
+        targets: mark,
+        alpha: 1,
+        duration: SPAWN.telegraphMs / (p.boss ? 4 : 6),
+        yoyo: true,
+        repeat: -1,
+      })
+      this.spawnMarks.set(p, mark)
+    }
+  }
+
   /** 排空本帧粒子爆点:按 kind 分发到死亡/拾币发射器(镜像 deathBurst/coinBurst.explode) */
   private drainBursts(): void {
     const q = this.sim!.pendingBursts
@@ -468,6 +497,7 @@ export class EcsBattleScene extends Phaser.Scene {
     if (this.atlas) updateSpawners(sim, this.atlas)
     // 刷怪节奏
     if (this.atlas) spawnStep(sim, this.atlas, delta)
+    this.updateTelegraphs()
     // 终波 Boss 被击败 → 通关结算(镜像 onBossDown → endWave)
     if (!this.testMode && sim.bossDown) {
       const finished = settleWave(sim)
