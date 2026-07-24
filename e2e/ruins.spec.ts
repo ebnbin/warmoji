@@ -24,14 +24,14 @@ test('残垣：断壁成型，敌人绕墙寻路摸到队伍', async ({ page }) 
 
   // 断壁确实生成了（有阻挡格）、且出生连通区非空
   const world = await page.evaluate(() => {
-    const s = window.__ruins() as { grid: { blocked: boolean[] }; spawnCells: number[] }
-    return { walls: s.grid.blocked.filter(Boolean).length, spawnCells: s.spawnCells.length }
+    const s = window.__ruins() as { wallGrid: { blocked: boolean[] }; spawnCells: number[] }
+    return { walls: s.wallGrid.blocked.filter(Boolean).length, spawnCells: s.spawnCells.length }
   })
   expect(world.walls).toBeGreaterThan(10) // 铺了断壁
   expect(world.spawnCells).toBeGreaterThan(200) // 中心可达区宽敞（25×25=625 格）
 
   // 远处铺一批僵尸，它们应绕墙寻路摸到队伍（最近敌人距中心降到接触级）
-  const UNIT = await page.evaluate(() => (window.__ruins() as { grid: { cellPx: number } }).grid.cellPx)
+  const UNIT = await page.evaluate(() => (window.__ruins() as { wallGrid: { cellPx: number } }).wallGrid.cellPx)
   for (let i = 0; i < 8; i++) await page.evaluate(() => window.__spawnEnemy!('zombie', 9, 0))
   const minDist = (): Promise<number> =>
     page.evaluate(() => {

@@ -7,8 +7,13 @@ import { UNIT } from '../core/units'
 import { MAP } from './registry'
 import { fleeSteer } from '../enemies/registry'
 import { MAPS, rollDecor } from './registry'
-import type { DayNightConfig } from './registry'
+import type { DayNightConfig, WallsConfig } from './registry'
 import { fogAlphaAt, fogRadiusAt, hourAt, isDayAt, visionGridsAt } from './daynight'
+import { FlowField, WallGrid, generateRuins, reachableCells } from './ruins'
+import { enemyOf } from '../enemies/enemies'
+import { abilityPiercesWalls } from '../abilities/defs'
+import type { AbilityDef } from '../abilities/defs'
+import type { AbilityContext } from '../abilities/types'
 import { Rng } from '../core/rng'
 import { randomMapPoint } from '../enemies/spawn'
 import type { Point } from '../core/vec'
@@ -35,6 +40,18 @@ export class ArenaScene extends BaseArenaScene {
   private fogMaskShape?: Phaser.GameObjects.Graphics
   private lastDay = true
 
+  // 断壁/流场（仅当地图配置了 walls 特性时创建）
+  private wallGrid?: WallGrid
+  private flow?: FlowField
+  private flowCellX = -1
+  private flowCellY = -1
+  private reflowAcc = 0
+  private spawnCells: number[] = []
+  private wallGroup?: Phaser.Physics.Arcade.StaticGroup
+  private readonly wallTiles = new Map<number, Phaser.GameObjects.GameObject[]>()
+  private wallCols = 0
+  private wallRows = 0
+
   // 场景键可覆写：残垣图复用整套有界世界规则（盒子边界/相机/落点），只叠加断壁机制
   constructor(key = 'arena') {
     super(key)
@@ -47,6 +64,10 @@ export class ArenaScene extends BaseArenaScene {
   /** 昼夜特性配置：存在即启用昼夜相机/迷雾/两批怪（可挂到任意有界图） */
   private get dayNight(): DayNightConfig | undefined {
     return this.mapDef.dayNight
+  }
+  /** 断壁特性配置：存在即启用墙 + 流场寻路（可挂到任意有界图） */
+  private get wallsCfg(): WallsConfig | undefined {
+    return this.mapDef.walls
   }
 
   // 地图尺寸按图取（map.size 缺省用 MAP.width/height=25×25；昼夜图 30×30）——
@@ -74,12 +95,33 @@ export class ArenaScene extends BaseArenaScene {
       this.mapH + this.margin * 2,
     )
     if (this.dayNight) this.createFog()
+    if (this.wallsCfg) this.createWalls()
+  }
+
+  protected postCreate(): void {
+    super.postCreate()
+    // 敌人 × 断壁：物理硬碰撞兜底（流场不会指向墙，此处防击退/游荡把敌人挤进墙）。
+    // 穿墙（幽灵）/破墙（拆迁 Boss）敌人不吃墙碰撞——processCallback 放行它们穿过
+    if (this.wallGroup) {
+      this.physics.add.collider(this.enemies, this.wallGroup, undefined, (e) => {
+        const a = enemyOf(e as ImageObj)
+        return !a.def.phasesWalls && !a.def.breaksWalls
+      })
+    }
   }
 
   protected resetWorldFields(): void {
     this.fogRect = undefined
     this.fogMaskShape = undefined
     this.lastDay = true
+    this.wallGrid = undefined
+    this.flow = undefined
+    this.flowCellX = -1
+    this.flowCellY = -1
+    this.reflowAcc = 0
+    this.spawnCells = []
+    this.wallGroup = undefined
+    this.wallTiles.clear()
   }
 
   protected attachCamera(target: Phaser.GameObjects.Zone): void {
@@ -91,6 +133,9 @@ export class ArenaScene extends BaseArenaScene {
   }
 
   protected spawnPoint(): Point {
+    // 断壁特性：只在可达通行格刷怪，且离队伍中心足够远
+    const cfg = this.wallsCfg
+    if (cfg) return this.pickSpawn(cfg.spawnMinCellDist)
     return randomMapPoint(
       this.rng,
       this.mapW,
@@ -102,6 +147,8 @@ export class ArenaScene extends BaseArenaScene {
   }
 
   protected bossSpawnPoint(): Point {
+    const cfg = this.wallsCfg
+    if (cfg) return this.pickSpawn(cfg.spawnMinCellDist + 2)
     return randomMapPoint(
       this.rng,
       this.mapW,
@@ -154,20 +201,21 @@ export class ArenaScene extends BaseArenaScene {
     return dn ? (isDayAt(this.clockHour()) ? dn.daySpawnScale : dn.nightSpawnScale) : 1
   }
 
-  protected updateWorld(_delta: number): void {
-    void _delta
+  protected updateWorld(delta: number): void {
     const dn = this.dayNight
-    if (!dn) return
-    const hour = this.clockHour()
-    // 相机随时刻平滑缩放：视野 V 格 → zoom = 标准 ×(visionMid/V)
-    this.cameras.main.setZoom((viewport.renderScale * dn.visionMid) / visionGridsAt(hour, dn))
-    this.updateFog(hour)
-    // 昼夜翻转：改写出怪表（白天/黑夜两批），波内也能实时换批
-    const day = isDayAt(hour)
-    if (day !== this.lastDay) {
-      this.lastDay = day
-      this.enemyMix = this.buildEnemyMix()
+    if (dn) {
+      const hour = this.clockHour()
+      // 相机随时刻平滑缩放：视野 V 格 → zoom = 标准 ×(visionMid/V)
+      this.cameras.main.setZoom((viewport.renderScale * dn.visionMid) / visionGridsAt(hour, dn))
+      this.updateFog(hour)
+      // 昼夜翻转：改写出怪表（白天/黑夜两批），波内也能实时换批
+      const day = isDayAt(hour)
+      if (day !== this.lastDay) {
+        this.lastDay = day
+        this.enemyMix = this.buildEnemyMix()
+      }
     }
+    this.reflowWalls(delta)
   }
 
   private updateFog(hour: number): void {
@@ -187,6 +235,142 @@ export class ArenaScene extends BaseArenaScene {
     rect.setPosition(this.center.x, this.center.y).setFillStyle(FOG_COLOR, alpha).setVisible(true)
   }
 
+  // ── walls 特性（仅当 map.walls 存在时生效）：断壁网格 + 流场寻路 ─────
+
+  private createWalls(): void {
+    const cfg = this.wallsCfg!
+    this.wallCols = Math.round(this.mapW / UNIT)
+    this.wallRows = Math.round(this.mapH / UNIT)
+    const rng = new Rng(this.run.decorSeed ^ 0x5eed)
+    const blocked = generateRuins(() => rng.next(), this.wallCols, this.wallRows, {
+      blocks: cfg.blocks,
+      maxLen: cfg.maxLen,
+      centerClearU: cfg.centerClearU,
+    })
+    this.wallGrid = new WallGrid(this.wallCols, this.wallRows, UNIT, blocked)
+    // 只在「从中心可达」的通行格刷怪，保证敌人总能寻路到队伍
+    const midCx = Math.floor(this.wallCols / 2)
+    const midCy = Math.floor(this.wallRows / 2)
+    this.spawnCells = [...reachableCells(this.wallGrid, midCx, midCy)]
+    this.drawWalls(blocked)
+  }
+
+  /** 画断壁：逐格填充石块 + 顶沿提亮假高度 + 静态碰撞体；逐格存引用供碾墙单格销毁 */
+  private drawWalls(blocked: readonly boolean[]): void {
+    const cols = this.wallCols
+    const rows = this.wallRows
+    const base = Phaser.Display.Color.IntegerToColor(this.palette.map).darken(38).color
+    const top = Phaser.Display.Color.IntegerToColor(this.palette.map).darken(18).color
+    const capH = Math.max(3, UNIT * 0.22)
+    this.wallGroup = this.physics.add.staticGroup()
+    for (let cy = 0; cy < rows; cy++) {
+      for (let cx = 0; cx < cols; cx++) {
+        if (!blocked[cy * cols + cx]) continue
+        const cxp = cx * UNIT + UNIT / 2
+        const cyp = cy * UNIT + UNIT / 2
+        const body = this.add.rectangle(cxp, cyp, UNIT - 2, UNIT - 2, base).setDepth(2)
+        const cap = this.add.rectangle(cxp, cy * UNIT + 1 + capH / 2, UNIT - 2, capH, top).setDepth(2.1)
+        const z = this.add.zone(cxp, cyp, UNIT, UNIT)
+        this.wallGroup.add(z)
+        this.wallTiles.set(cy * cols + cx, [body, cap, z])
+      }
+    }
+  }
+
+  /** 碾碎 (x,y) 处断壁：网格置通行 + 拆视觉/碰撞体 + 扬尘 + 逼流场下帧重算 */
+  smashWallAt(x: number, y: number): void {
+    const grid = this.wallGrid
+    if (!grid) return
+    const cx = grid.cellX(x)
+    const cy = grid.cellY(y)
+    if (!grid.isBlockedCell(cx, cy)) return
+    grid.setBlocked(cx, cy, false)
+    const idx = cy * this.wallCols + cx
+    const objs = this.wallTiles.get(idx)
+    if (objs) {
+      for (const o of objs) o.destroy()
+      this.wallTiles.delete(idx)
+    }
+    this.dust((cx + 0.5) * UNIT, (cy + 0.5) * UNIT)
+    this.flowCellX = -1 // 拓扑变了：逼下帧重算流场
+  }
+
+  private dust(x: number, y: number): void {
+    const c = this.add.circle(x, y, UNIT * 0.4, 0xbcae95, 0.6).setDepth(5)
+    this.tweens.add({ targets: c, scale: 1.8, alpha: 0, duration: 320, onComplete: () => c.destroy() })
+  }
+
+  private pickSpawn(minCellDist: number): Point {
+    const grid = this.wallGrid!
+    if (this.spawnCells.length === 0) return this.spawnCenter()
+    const ccx = grid.cellX(this.center.x)
+    const ccy = grid.cellY(this.center.y)
+    const min2 = minCellDist * minCellDist
+    let fallback = this.cellCenter(this.spawnCells[0]!)
+    for (let i = 0; i < 24; i++) {
+      const idx = this.spawnCells[Math.floor(this.rng.next() * this.spawnCells.length)]!
+      const cx = idx % this.wallCols
+      const cy = Math.floor(idx / this.wallCols)
+      const p = this.cellCenter(idx)
+      fallback = p
+      const dx = cx - ccx
+      const dy = cy - ccy
+      if (dx * dx + dy * dy >= min2) return p
+    }
+    return fallback
+  }
+
+  private cellCenter(idx: number): Point {
+    const cx = idx % this.wallCols
+    const cy = Math.floor(idx / this.wallCols)
+    return { x: (cx + 0.5) * UNIT, y: (cy + 0.5) * UNIT }
+  }
+
+  /** 追击方向：穿墙敌人（幽灵）直线穿行；其余走流场绕墙寻路，不可达回退直线 */
+  chaseDir(a: Enemy, to: Point): Point {
+    const grid = this.wallGrid
+    if (!grid || a.def.phasesWalls) return super.chaseDir(a, to)
+    const dir = this.flow?.sampleDir(a.image.x, a.image.y)
+    if (dir && (dir.x !== 0 || dir.y !== 0)) return dir
+    return super.chaseDir(a, to)
+  }
+
+  /** 视线遮挡：线段撞墙点（索敌 + 子弹裁墙共用） */
+  wallHit(a: Point, b: Point): Point | null {
+    return this.wallGrid?.segmentHit(a.x, a.y, b.x, b.y) ?? null
+  }
+
+  /** 穿墙攻击按武器分流：非穿墙武器索敌受断壁遮挡（探头才打得到） */
+  protected wallAwareCtx(def: AbilityDef, base: AbilityContext, slot: number): AbilityContext {
+    const grid = this.wallGrid
+    if (!grid || abilityPiercesWalls(def)) return base
+    return {
+      ...base,
+      targets: () => {
+        const m = this.members[slot]
+        const all = base.targets()
+        if (!m) return all
+        const from = m.image
+        return all.filter((t) => grid.segmentHit(from.x, from.y, t.x, t.y) === null)
+      },
+    }
+  }
+
+  /** 逐帧低频重算流场（队伍格变了 / 到点就重算） */
+  private reflowWalls(delta: number): void {
+    const grid = this.wallGrid
+    if (!grid) return
+    this.reflowAcc += delta
+    const cx = grid.cellX(this.center.x)
+    const cy = grid.cellY(this.center.y)
+    if (cx !== this.flowCellX || cy !== this.flowCellY || this.reflowAcc >= this.wallsCfg!.reflowMs) {
+      this.flow = new FlowField(grid, cx, cy)
+      this.flowCellX = cx
+      this.flowCellY = cy
+      this.reflowAcc = 0
+    }
+  }
+
   /** 刷怪上限按实时活跃数（有界图无休眠，全场敌人都算） */
   protected spawnCapCount(): number {
     return this.enemies.countActive(true)
@@ -194,10 +378,12 @@ export class ArenaScene extends BaseArenaScene {
 
   protected constrainTeam(next: Point): Point {
     const clampMin = TEAM.ringRadius + MEMBER.radius
-    return {
+    const box = {
       x: Phaser.Math.Clamp(next.x, clampMin, this.mapW - clampMin),
       y: Phaser.Math.Clamp(next.y, clampMin, this.mapH - clampMin),
     }
+    // 断壁特性：先按盒子钳制，再对断壁贴墙滑动
+    return this.wallGrid ? this.wallGrid.resolveMove(this.center.x, this.center.y, box.x, box.y) : box
   }
 
   protected configureEnemyBody(enemy: ImageObj): void {
@@ -245,6 +431,13 @@ export class ArenaScene extends BaseArenaScene {
     if ((e.y < margin && dy < 0) || (e.y > this.mapH - margin && dy > 0)) dy = -dy
     a.dirX = dx
     a.dirY = dy
+    // 断壁特性：盒子折返基础上，前方是墙就掉头
+    const grid = this.wallGrid
+    if (grid && grid.pointBlocked(e.x + dx * 0.8 * UNIT, e.y + dy * 0.8 * UNIT)) {
+      a.dirX = -dx
+      a.dirY = -dy
+      return { x: -dx, y: -dy }
+    }
     return { x: dx, y: dy }
   }
 
@@ -254,7 +447,9 @@ export class ArenaScene extends BaseArenaScene {
   }
 
   cullEnemyProjectile(s: ImageObj): boolean {
-    return s.x < -UNIT || s.x > this.mapW + UNIT || s.y < -UNIT || s.y > this.mapH + UNIT
+    const off = s.x < -UNIT || s.x > this.mapW + UNIT || s.y < -UNIT || s.y > this.mapH + UNIT
+    // 断壁特性：出界回收之外，进墙也销毁
+    return off || (this.wallGrid ? this.wallGrid.pointBlocked(s.x, s.y) : false)
   }
 
   /** 地面 = 纯色面 + 右下阴影；地表纹理交给 emoji 装饰层（不再画网格线） */
