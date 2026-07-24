@@ -1,4 +1,5 @@
 import mapsJson from '../assets/maps.json'
+import mapDefaultsJson from '../assets/mapdefaults.json'
 import type { Palette } from '../core/palette'
 import { ENEMIES } from '../enemies/registry'
 import type { EnemyDef, EnemyMixRow } from '../enemies/registry'
@@ -361,9 +362,14 @@ export function rollDecor(
   return out
 }
 
-export const MAP = {
-  width: 25,
-  height: 25,
-  // 相机滚动范围 = 地图四周外扩这一圈
-  cameraMargin: 2,
-} as const
+// 有界地图缺省几何（格）：缺省尺寸 + 相机滚动外扩圈。数据行在 defs/mapdefaults.ts（创作层）。
+export interface MapDefaults {
+  /** 有界图缺省宽（格），每图 size.w 可覆盖 */
+  readonly width: number
+  /** 有界图缺省高（格），每图 size.h 可覆盖 */
+  readonly height: number
+  /** 相机滚动范围 = 地图四周外扩这一圈（格） */
+  readonly cameraMargin: number
+}
+
+export const MAP = mapDefaultsJson as unknown as MapDefaults

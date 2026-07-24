@@ -11,6 +11,7 @@ import { CARDS } from '../defs/cards.ts'
 import { BATTLEFIELD } from '../defs/battlefield.ts'
 import { SFX } from '../defs/sfx.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
+import { MAP_DEFAULTS } from '../defs/mapdefaults.ts'
 import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
@@ -26,6 +27,7 @@ import type { CardDef } from '../src/cards/registry'
 import type { BattlefieldTuning } from '../src/battlefield/registry'
 import type { SfxDef } from '../src/audio/sfx'
 import type { TimeStopTuning } from '../src/battle/timeStop'
+import type { MapDefaults } from '../src/maps/registry'
 import type { Progression } from '../src/run/waves'
 import type { Difficulty } from '../src/enemies/registry'
 import type { TeamBaseline } from '../src/characters/registry'
@@ -382,6 +384,16 @@ for (const [id, c] of Object.entries<CardDef>(CARDS as Record<string, CardDef>))
   }
 }
 
+// ── mapdefaults（有界地图缺省几何）──
+{
+  const p = 'mapdefaults'
+  const d: MapDefaults = MAP_DEFAULTS
+  num(`${p}.width`, d.width, 1)
+  num(`${p}.height`, d.height, 1)
+  num(`${p}.cameraMargin`, d.cameraMargin, 0)
+  pure(p, d)
+}
+
 // ── timestop（时停技能：时标 + 冷雾表现）──
 {
   const p = 'timestop'
@@ -671,6 +683,7 @@ write('cards', CARDS)
 write('battlefield', BATTLEFIELD)
 write('sfx', SFX)
 write('timestop', TIMESTOP)
+write('mapdefaults', MAP_DEFAULTS)
 write('maps', MAPS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
@@ -680,4 +693,4 @@ write('team', TEAM_BASELINE)
 write('combat', COMBAT)
 write('feel', FEEL)
 write('economy', ECONOMY)
-console.log('gen-defs：19 张表校验通过，已生成 src/assets/*.json')
+console.log('gen-defs：20 张表校验通过，已生成 src/assets/*.json')
