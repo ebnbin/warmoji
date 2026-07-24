@@ -7,7 +7,7 @@ import { formationPosts, ringPostAngle } from '../characters/formation'
 import type { FormationId } from '../characters/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../characters/orbit'
 import type { OrbitThreat } from '../characters/orbit'
-import { Alive, Depth, Follow, Threat, Transform, Wander } from './components'
+import { Alive, Breath, Depth, Follow, Sprite, Threat, Transform, Wander } from './components'
 import { steerEnemies, updateFrameTargets } from './enemy'
 import { memberContact, memberVisual, reviveMembers, tickPoison } from './combat'
 import { updateEnemyProjectiles, updateProjectiles } from './projectile'
@@ -184,6 +184,7 @@ function layout(sim: Sim, delta: number): void {
   const moving = sim.teamDir.x !== 0 || sim.teamDir.y !== 0
   const dt = Math.min(delta, 50) / 1000
   const tSec = sim.elapsedMs / 1000
+  const memberSize = MEMBER.size * UNIT
   for (let slot = 0; slot < sim.members.length; slot++) {
     const eid = sim.members[slot]!
     const idx = sim.postBySlot[slot] ?? slot
@@ -225,6 +226,15 @@ function layout(sim: Sim, delta: number): void {
     Transform.y[eid] = fy
     const guarded = sim.formation === 'guard' && idx === 0
     Depth.z[eid] = guarded ? 8.5 : 10 + (fy - sim.center.y) / UNIT
+    // 程序化小动画(镜像 animateMember):呼吸挤压拉伸 + 朝移动方向翻转(仅活着的)
+    if (Alive.v[eid]) {
+      const bp = Breath.phase[eid]! + delta / (moving ? 85 : 140)
+      Breath.phase[eid] = bp
+      const s = Math.sin(bp) * (moving ? 0.13 : 0.09)
+      Transform.w[eid] = memberSize * (1 - s * 0.6)
+      Transform.h[eid] = memberSize * (1 + s)
+      if (Math.abs(sim.teamDir.x) > 0.2) Sprite.flipX[eid] = sim.teamDir.x > 0 ? 1 : 0
+    }
   }
 }
 

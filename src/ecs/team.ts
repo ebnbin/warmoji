@@ -12,6 +12,7 @@ import { currentFormation, guardOrder, hasCenter } from '../run/state'
 import type { RunState } from '../run/state'
 import {
   Alive,
+  Breath,
   Depth,
   Follow,
   Hurt,
@@ -79,6 +80,7 @@ export function spawnTeam(
     addComponent(world, eid, OrbitBias)
     addComponent(world, eid, Follow)
     addComponent(world, eid, Wander)
+    addComponent(world, eid, Breath)
     addComponent(world, eid, Alive)
     addComponent(world, eid, Threat)
     addComponent(world, eid, MHp)
@@ -100,6 +102,7 @@ export function spawnTeam(
     Follow.k[eid] = FOLLOW.kBase * (1 + FOLLOW.kJitter * Math.sin(slot * 12.9898))
     Wander.seed[eid] = slot * 2.399
     Wander.amp[eid] = 0
+    Breath.phase[eid] = slot * 1.3
     Alive.v[eid] = 1
     Threat.v[eid] = 0
     MHp.hp[eid] = maxHp

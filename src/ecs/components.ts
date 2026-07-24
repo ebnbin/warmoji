@@ -57,6 +57,9 @@ export const Follow = { x: f32(), y: f32(), vx: f32(), vy: f32(), k: f32() }
 /** 待机游移:相位种子 + 幅度(0..1 淡入) */
 export const Wander = { seed: f32(), amp: f32() }
 
+/** 呼吸相位(挤压拉伸小动画:移动更快;slot 初相错开) */
+export const Breath = { phase: f32() }
+
 /** 存活 + 本帧探测范围内是否有敌(游移门控/orbit 输入) */
 export const Alive = { v: u8() }
 export const Threat = { v: u8() }
