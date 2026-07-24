@@ -250,6 +250,21 @@ export class EcsBattleScene extends Phaser.Scene {
       return best >= 0 && Morph.until[best] !== 0 && sim.elapsedMs < Morph.until[best]!
     }
     window.__ecsGroundZones = (): number => groundZoneCount()
+    // e2e/性能探针:一次性铺 count 只敌人(网格散布,验证上千 entity 单批绘制)
+    window.__ecsStress = (count = 1000, kind = 'zombie'): void => {
+      const sim = this.sim
+      if (!sim || !this.atlas) return
+      const raw = ENEMY_DEFS.find((s) => s.kind === kind)
+      if (!raw) return
+      const px = toPx(raw)
+      const cols = Math.ceil(Math.sqrt(count))
+      const gap = 0.5 * UNIT
+      for (let i = 0; i < count; i++) {
+        const gx = (i % cols) - cols / 2
+        const gy = Math.floor(i / cols) - cols / 2
+        spawnEnemy(sim, this.atlas, px, sim.center.x + gx * gap, sim.center.y + gy * gap, px.hp, false, false)
+      }
+    }
     // e2e 探针:结算本波(仅回写 run,不过场),返回结算后波次号
     window.__ecsSettleWave = (): number => {
       const sim = this.sim
