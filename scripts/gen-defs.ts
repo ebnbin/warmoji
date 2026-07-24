@@ -9,7 +9,9 @@ import { ENEMIES } from '../defs/enemies.ts'
 import { ITEMS } from '../defs/items.ts'
 import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
+import { PROGRESSION } from '../defs/progression.ts'
 import type { ItemDef } from '../src/items/registry'
+import type { Progression } from '../src/run/waves'
 
 // 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json。
 // 校验全部在此完成（形状/数值/交叉引用/可序列化），运行时零校验直读。
@@ -282,6 +284,26 @@ for (const [id, pk] of Object.entries(PICKUPS)) {
   pure(p, pk)
 }
 
+// ── progression（关卡进程 + 经济）──
+{
+  const p = 'progression'
+  // 按 Progression 类型看待（宽化字面量），使形状/数值守卫对任意数据成立
+  const g: Progression = PROGRESSION
+  if (!Array.isArray(g.waveDurationsSec) || g.waveDurationsSec.length === 0) {
+    bad(`${p}.waveDurationsSec`, '需为非空数组')
+  } else {
+    g.waveDurationsSec.forEach((v, i) => num(`${p}.waveDurationsSec[${i}]`, v, 1))
+  }
+  g.eliteWaves.forEach((v, i) => num(`${p}.eliteWaves[${i}]`, v, 1))
+  num(`${p}.loopFrom`, g.loopFrom, 1)
+  if (g.loopFrom > g.waveDurationsSec.length) bad(`${p}.loopFrom`, `不能超过总波数 ${g.waveDurationsSec.length}`)
+  num(`${p}.reviveHpRatio`, g.reviveHpRatio, 0)
+  num(`${p}.summaryMs`, g.summaryMs, 0)
+  num(`${p}.coinDropChanceMin`, g.coinDropChanceMin, 0)
+  num(`${p}.coinDropChanceHalfLifeSec`, g.coinDropChanceHalfLifeSec, 0.01)
+  pure(p, g)
+}
+
 if (warnings.length > 0) {
   console.warn(`数值软护栏：${warnings.length} 条能力生效 DPS 越界（仅提示，不阻断）：`)
   for (const wn of warnings) console.warn('  ⚠ ' + wn)
@@ -304,4 +326,5 @@ write('enemies', { enemies: ENEMIES })
 write('items', ITEMS)
 write('maps', MAPS)
 write('pickups', PICKUPS)
-console.log('gen-defs：8 张表校验通过，已生成 src/assets/*.json')
+write('progression', PROGRESSION)
+console.log('gen-defs：9 张表校验通过，已生成 src/assets/*.json')
