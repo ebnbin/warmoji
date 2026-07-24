@@ -477,10 +477,11 @@ export function steerEnemies(sim: Sim, delta: number): void {
       continue
     }
     // 受击白闪到时恢复
-    if (Flash.until[eid] !== 0 && now >= Flash.until[eid]!) {
-      Flash.until[eid] = 0
+    if (Flash.until[eid] !== 0 && now >= Flash.until[eid]!) Flash.until[eid] = 0
+    // 非白闪期的常驻染色:中毒染毒绿,否则常态白(镜像 steerEnemies 的毒绿染色)
+    if (Flash.until[eid] === 0) {
       Tint.effect[eid] = 0
-      Tint.color[eid] = 0xffffff
+      Tint.color[eid] = now < Poison.until[eid]! ? 0x7bff5a : 0xffffff
     }
     let tx = Transform.x[eid]!
     let ty = Transform.y[eid]!
