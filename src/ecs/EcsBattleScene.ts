@@ -3,6 +3,7 @@ import { viewport } from '../core/apply'
 import { UNIT } from '../core/units'
 import { MEMBER } from '../characters/registry'
 import { HIT_SHAKE } from '../battle/config'
+import { DAMAGE_FONT, ensureDamageFont } from '../core/damageFont'
 import { loadSettings } from '../run/settings'
 import { browserStorage } from '../core/storage'
 import { UI_FONT, FONT } from '../core/fonts'
@@ -61,6 +62,10 @@ export class EcsBattleScene extends Phaser.Scene {
   /** 受击震屏:设置开关 + 已消费的受击计数(据增量抖屏,镜像 hitShake) */
   private hitShakeOn = false
   private seenHitCount = 0
+  /** 伤害飘字:开关 + BitmapText 对象池(镜像 floatDamage) */
+  private damageNumbersOn = false
+  private damagePool: Phaser.GameObjects.BitmapText[] = []
+  private damageIdx = 0
   private centerObj!: Phaser.GameObjects.Zone
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -130,7 +135,13 @@ export class EcsBattleScene extends Phaser.Scene {
     new EcsSpriteBatch(this, this.world, atlas)
     this.spawnDecor(run, atlas)
     this.testMode = run.testMode
-    this.hitShakeOn = loadSettings(browserStorage()).hitShake
+    const settings = loadSettings(browserStorage())
+    this.hitShakeOn = settings.hitShake
+    this.damageNumbersOn = settings.damageNumbers
+    ensureDamageFont(this)
+    this.damagePool = Array.from({ length: 64 }, () =>
+      this.add.bitmapText(0, 0, DAMAGE_FONT).setFontSize(24).setOrigin(0.5).setDepth(50).setVisible(false),
+    )
     this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
     initialLayout(this.sim)
     armTeam(this.sim, this, atlas, run, run.testMode)
@@ -328,6 +339,24 @@ export class EcsBattleScene extends Phaser.Scene {
     return best
   }
 
+  /** 排空本帧敌人受伤飘字(镜像 floatDamage:池化 BitmapText 上浮淡出);关则弃字 */
+  private drainDamageNumbers(): void {
+    const q = this.sim!.pendingDamageNumbers
+    if (q.length === 0) return
+    if (this.damageNumbersOn) for (const d of q) this.floatDamage(d.x, d.y, d.amount)
+    q.length = 0
+  }
+
+  private floatDamage(x: number, y: number, amount: number): void {
+    const t = this.damagePool[this.damageIdx]
+    if (!t) return
+    this.damageIdx = (this.damageIdx + 1) % this.damagePool.length
+    this.tweens.killTweensOf(t)
+    t.setFontSize(24).setTint(0xffffff)
+    t.setText(String(amount)).setPosition(x, y - 14).setAlpha(1).setVisible(true)
+    this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 350, onComplete: () => t.setVisible(false) })
+  }
+
   /** 逐帧队员血条:跟位 + 比例变化才重绘(镜像 drawMemberHp);阵亡隐藏、复活自动恢复 */
   private updateHpBars(): void {
     const sim = this.sim!
@@ -432,6 +461,7 @@ export class EcsBattleScene extends Phaser.Scene {
       return
     }
     this.centerObj.setPosition(sim.center.x, sim.center.y)
+    this.drainDamageNumbers()
     // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtMember 的 cameras.shake)
     if (sim.memberHitCount > this.seenHitCount) {
       this.seenHitCount = sim.memberHitCount

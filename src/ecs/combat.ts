@@ -46,6 +46,8 @@ export function applyDamage(
   const morphed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
   // 变形期受伤倍率(魔尘诅咒 vulnMul):放大变羊敌人所受伤害
   const dmg = morphed && Morph.vuln[eid] !== 1 ? Math.round(damage * Morph.vuln[eid]!) : damage
+  // 受伤飘字(镜像 floatDamage,在致死判定前:致死一击也飘字)
+  sim.pendingDamageNumbers.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, amount: dmg })
   const hp = Hp.v[eid]! - dmg
   if (hp <= 0) {
     killEnemy(sim, eid)

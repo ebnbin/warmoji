@@ -152,6 +152,7 @@ export function spawnTeam(
     enemyTargets: [],
     memberTargets: [],
     pendingDeaths: [],
+    pendingDamageNumbers: [],
     rng: new Rng(run.decorSeed ^ 0x9e37),
     wave: run.wave,
     combatMs: run.combatMs,

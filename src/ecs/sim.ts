@@ -69,6 +69,8 @@ export interface Sim {
   pendingSpawns: PendingSpawn[]
   /** 本帧内死亡且带亡语的敌人快照(场景侧 runDeathEffects 逐帧排空) */
   pendingDeaths: PendingDeath[]
+  /** 本帧敌人受伤的飘字事件(场景侧 drainDamageNumbers 排空) */
+  pendingDamageNumbers: DamageNumber[]
   /** 队伍侧共享效果执行面(抛射物 onHit 命中链复用;armTeam 后由场景注入) */
   effectCtx?: EffectCtx
   /** run 状态引用(金币/经验/抽卡入账;与旧场景同口径直改 run) */
@@ -109,6 +111,13 @@ export interface PendingSpawn {
   elite: boolean
   boss: boolean
   at: number
+}
+
+/** 敌人受伤飘字(死亡点/命中点 + 数值) */
+export interface DamageNumber {
+  x: number
+  y: number
+  amount: number
 }
 
 /** 死亡快照(带亡语的敌人;实体已移除,死亡效果按此在死亡点重放) */
