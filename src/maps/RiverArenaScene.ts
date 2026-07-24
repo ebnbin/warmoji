@@ -1,8 +1,7 @@
 import Phaser from 'phaser'
 import { MEMBER, TEAM } from '../characters/registry'
 import { UNIT } from '../core/units'
-import type { RiverConfig } from './registry'
-import { INFINITE } from './world'
+import type { RiverConfig, InfiniteConfig } from './registry'
 import { MAPS, bossFor } from './registry'
 import type { MapDef } from './registry'
 import { isHorizontal, remapPoint, remapVector } from '../core/remap'
@@ -69,6 +68,11 @@ export class RiverArenaScene extends BaseArenaScene {
     return MAPS[this.run.mapId].river!
   }
 
+  /** 无限世界特性配置（奔流借用其休眠活跃半边长） */
+  private get infCfg(): InfiniteConfig {
+    return MAPS[this.run.mapId].infinite!
+  }
+
   protected resetWorldFields(): void {
     this.waterObjs = []
     this.waveTiles = []
@@ -112,7 +116,7 @@ export class RiverArenaScene extends BaseArenaScene {
 
   /** 休眠：同无限图机制（32 格，屏内永不触发） */
   protected buildFrameTargets(): void {
-    this.dormancyFrameTargets(INFINITE.activeHalf * UNIT)
+    this.dormancyFrameTargets(this.infCfg.activeHalf * UNIT)
   }
 
   /** 自主移动 + 水流漂移，然后钳入河道（挂机会被推到下游边并卡住） */

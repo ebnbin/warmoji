@@ -143,6 +143,38 @@ export interface TorusConfig {
   readonly frame: number
 }
 
+/** 无限世界特性（可选）：无边界 + 活跃方形休眠 + 环带刷怪 + 分块装饰。
+ * 无限/深空/奔流（借用休眠）等图配置；数据模型上任何图都可组合本特性 */
+export interface InfiniteConfig {
+  /** 活跃方形半边长（格）：超出的敌人休眠（冻结 AI/物理/不占刷怪上限） */
+  readonly activeHalf: number
+  /** 刷怪环带内环（格，以队伍中心为圆心） */
+  readonly spawnRingMin: number
+  /** 刷怪环带外环（格） */
+  readonly spawnRingMax: number
+  /** 装饰分块边长（格） */
+  readonly chunkCells: number
+  /** 装饰活跃范围 = 相机视野外扩的块数 */
+  readonly chunkPad: number
+}
+
+/** 终波缩圈特性（可选）：无限图 Boss 战边界，半径先停留再缓缩到 rMin，圈外队员按 tick 掉血。
+ * 目前仅无限图（荒漠）配置；数据模型上任何图都可组合本特性 */
+export interface ShrinkRingConfig {
+  /** 初始半径（格） */
+  readonly r0: number
+  /** 收缩到底的半径（格） */
+  readonly rMin: number
+  /** 开圈后静止观察期（ms） */
+  readonly holdMs: number
+  /** 收缩结束时刻（ms，此后维持 rMin 到波末） */
+  readonly shrinkEndMs: number
+  /** 圈外掉血结算间隔（ms） */
+  readonly tickMs: number
+  /** 圈外每跳掉血 */
+  readonly tickDamage: number
+}
+
 export interface MapDef {
   readonly emoji: string
   readonly name: string
@@ -180,6 +212,10 @@ export interface MapDef {
   readonly river?: RiverConfig
   /** 环面/传送门特性（可选）：配置即启用环面世界 + 四边传送门 + 分身相机（当前仅工厂图使用） */
   readonly torus?: TorusConfig
+  /** 无限世界特性（可选）：无边界 + 休眠 + 环带刷怪 + 分块装饰（无限/深空/奔流使用） */
+  readonly infinite?: InfiniteConfig
+  /** 终波缩圈特性（可选）：无限图 Boss 战边界（当前仅荒漠使用） */
+  readonly shrinkRing?: ShrinkRingConfig
   /** 本图终波 Boss：引用 enemies 里某个 role:'boss' 的 kind */
   readonly boss: string
 }

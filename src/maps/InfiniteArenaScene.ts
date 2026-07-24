@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { UNIT } from '../core/units'
-import { INFINITE, ZONE } from './world'
 import { MAPS } from './registry'
+import type { InfiniteConfig, ShrinkRingConfig } from './registry'
 import { norm } from '../core/vec'
 import type { Point } from '../core/vec'
 import {
@@ -21,9 +21,9 @@ import type { ImageObj } from '../battle/BaseArenaScene'
 // 世界规则：
 // · 地面：相机锁定的满屏底色；装饰按 8×8 格分块随视野滚动增删（core/world.ts
 //   纯函数按种子重建同一摆放，回头看到的景不变）
-// · 休眠：以队伍中心为锚的活跃方形（按轴距离，半边长 INFINITE.activeHalf），
+// · 休眠：以队伍中心为锚的活跃方形（按轴距离，半边长 this.infCfg.activeHalf），
 //   出界敌人冻结（关物理体、不索敌、不占刷怪上限），回到范围自动唤醒
-// · 刷怪：队伍中心外的环带（INFINITE.spawnRingMin~Max）随机落点
+// · 刷怪：队伍中心外的环带（this.infCfg.spawnRingMin~Max）随机落点
 // · 终波缩圈：以进波瞬间队伍位置为心，16 格缓缩到 12 格停（防风筝 Boss），
 //   圈外队员按 tick 掉血 + 满屏红渐晕警示
 export class InfiniteArenaScene extends BaseArenaScene {
@@ -40,6 +40,16 @@ export class InfiniteArenaScene extends BaseArenaScene {
   // 场景键可覆写：深空图复用整套无限世界规则（相机/分块/休眠/环带刷怪），叠加太空机制
   constructor(key = 'arenaInfinite') {
     super(key)
+  }
+
+  /** 无限世界特性配置（来自 MapDef 数据；无限/深空图必配 infinite）。protected 供深空子类复用 */
+  protected get infCfg(): InfiniteConfig {
+    return MAPS[this.run.mapId].infinite!
+  }
+
+  /** 终波缩圈配置（来自 MapDef 数据；荒漠图必配 shrinkRing） */
+  private get ringCfg(): ShrinkRingConfig {
+    return MAPS[this.run.mapId].shrinkRing!
   }
 
   protected resetWorldFields(): void {
@@ -69,7 +79,7 @@ export class InfiniteArenaScene extends BaseArenaScene {
 
   /** 环带随机点；终波把落点收进当前圈内（圈外刷怪毫无意义） */
   protected spawnPoint(): Point {
-    const p = ringPoint(this.rng, this.center, INFINITE.spawnRingMin * UNIT, INFINITE.spawnRingMax * UNIT)
+    const p = ringPoint(this.rng, this.center, this.infCfg.spawnRingMin * UNIT, this.infCfg.spawnRingMax * UNIT)
     if (this.zoneCenter) {
       const limit = this.zoneRadius - UNIT
       if (limit > 0 && outsideZone(p, this.zoneCenter, limit)) {
@@ -92,18 +102,18 @@ export class InfiniteArenaScene extends BaseArenaScene {
   /** 终波：缩圈以此刻队伍位置为圆心张开 */
   protected onFinalWaveSetup(): void {
     this.zoneCenter = { x: this.center.x, y: this.center.y }
-    this.zoneRadius = ZONE.r0 * UNIT
+    this.zoneRadius = this.ringCfg.r0 * UNIT
     this.zoneGfx = this.add.graphics().setDepth(2)
     this.zoneVignette = this.add
       .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, 0xd32f2f, 0)
       .setScrollFactor(0)
       .setDepth(90)
-    this.nextZoneTickAt = ZONE.tickMs
+    this.nextZoneTickAt = this.ringCfg.tickMs
   }
 
   /** 休眠分区：冻结/唤醒 + 活跃计数 + 本帧攻击目标（休眠怪不可被索敌） */
   protected buildFrameTargets(): void {
-    this.dormancyFrameTargets(INFINITE.activeHalf * UNIT)
+    this.dormancyFrameTargets(this.infCfg.activeHalf * UNIT)
   }
 
   protected updateWorld(_delta: number): void {
@@ -137,14 +147,14 @@ export class InfiniteArenaScene extends BaseArenaScene {
    * 种子重建同一摆放；块整组建/销毁，软渲染下避免逐帧细碎增删） */
   private ensureChunks(): void {
     const view = this.cameras.main.worldView
-    const cells = INFINITE.chunkCells
+    const cells = this.infCfg.chunkCells
     const need = chunksInRect(
       view.x / UNIT,
       view.y / UNIT,
       view.right / UNIT,
       view.bottom / UNIT,
       cells,
-      INFINITE.chunkPad,
+      this.infCfg.chunkPad,
     )
     const rangeKey = `${need[0]!.cx},${need[0]!.cy}:${need[need.length - 1]!.cx},${need[need.length - 1]!.cy}`
     if (rangeKey === this.decorRangeKey) return
@@ -174,7 +184,7 @@ export class InfiniteArenaScene extends BaseArenaScene {
   private updateZone(): void {
     const center = this.zoneCenter
     if (!center || !this.zoneGfx) return
-    this.zoneRadius = zoneRadiusAt(this.elapsedMs, ZONE) * UNIT
+    this.zoneRadius = zoneRadiusAt(this.elapsedMs, this.ringCfg) * UNIT
     // 圈渲染：亮边界环 + 内侧安全提示描边
     const g = this.zoneGfx
     g.clear()
@@ -191,12 +201,12 @@ export class InfiniteArenaScene extends BaseArenaScene {
       this.zoneVignette.setFillStyle(0xd32f2f, anyOutside ? pulse : 0)
     }
     if (this.elapsedMs >= this.nextZoneTickAt) {
-      this.nextZoneTickAt = this.elapsedMs + ZONE.tickMs
+      this.nextZoneTickAt = this.elapsedMs + this.ringCfg.tickMs
       if (anyOutside) {
         for (const m of this.members) {
           if (!m.alive) continue
           if (outsideZone({ x: m.image.x, y: m.image.y }, center, this.zoneRadius)) {
-            this.hurtMember(m, ZONE.tickDamage, 0xef5350, '毒雾')
+            this.hurtMember(m, this.ringCfg.tickDamage, 0xef5350, '毒雾')
           }
         }
       }

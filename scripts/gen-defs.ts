@@ -347,6 +347,26 @@ for (const [id, m] of Object.entries(MAPS)) {
     num(`${p}.torus.projectileLifeMs`, to.projectileLifeMs, 1)
     num(`${p}.torus.frame`, to.frame, 0)
   }
+  const inf = (m as MapDef).infinite
+  if (inf) {
+    num(`${p}.infinite.activeHalf`, inf.activeHalf, 1)
+    num(`${p}.infinite.spawnRingMin`, inf.spawnRingMin, 0)
+    num(`${p}.infinite.spawnRingMax`, inf.spawnRingMax, 0)
+    if (inf.spawnRingMin > inf.spawnRingMax) bad(`${p}.infinite.spawnRingMin`, '不能大于 spawnRingMax')
+    num(`${p}.infinite.chunkCells`, inf.chunkCells, 1)
+    num(`${p}.infinite.chunkPad`, inf.chunkPad, 0)
+  }
+  const sr = (m as MapDef).shrinkRing
+  if (sr) {
+    num(`${p}.shrinkRing.r0`, sr.r0, 0.01)
+    num(`${p}.shrinkRing.rMin`, sr.rMin, 0.01)
+    if (sr.rMin > sr.r0) bad(`${p}.shrinkRing.rMin`, '不能大于 r0')
+    num(`${p}.shrinkRing.holdMs`, sr.holdMs, 0)
+    num(`${p}.shrinkRing.shrinkEndMs`, sr.shrinkEndMs, 0)
+    if (sr.shrinkEndMs < sr.holdMs) bad(`${p}.shrinkRing.shrinkEndMs`, '不能早于 holdMs')
+    num(`${p}.shrinkRing.tickMs`, sr.tickMs, 1)
+    num(`${p}.shrinkRing.tickDamage`, sr.tickDamage, 0)
+  }
   pure(p, m)
 }
 

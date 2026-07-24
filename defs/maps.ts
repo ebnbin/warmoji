@@ -143,6 +143,10 @@ export const MAPS = {
       density: [0.08, 0.11],
     },
     mix: DESERT_MIX,
+    // 无限世界：无边界 + 活跃方形休眠（半边 32 格）+ 环带刷怪 + 分块装饰
+    infinite: { activeHalf: 32, spawnRingMin: 4, spawnRingMax: 16, chunkCells: 8, chunkPad: 1 },
+    // 终波缩圈：Boss 战边界，先停留 6 秒再缓缩到 12 格，圈外掉血
+    shrinkRing: { r0: 16, rMin: 12, holdMs: 6000, shrinkEndMs: 38000, tickMs: 500, tickDamage: 6 },
     boss: 'scorpion',
   },
   river: {
@@ -178,6 +182,8 @@ export const MAPS = {
       waveSlow: 0.6,
       waveFast: 1.2,
     },
+    // 奔流借用无限世界的休眠活跃半边长（远离队伍的敌人休眠）
+    infinite: { activeHalf: 32, spawnRingMin: 4, spawnRingMax: 16, chunkCells: 8, chunkPad: 1 },
     boss: 'croc',
   },
   void: {
@@ -313,6 +319,8 @@ export const MAPS = {
         damage: 30,
       },
     },
+    // 深空基于无限世界模型（无边界 + 休眠 + 环带刷怪 + 分块装饰）
+    infinite: { activeHalf: 32, spawnRingMin: 4, spawnRingMax: 16, chunkCells: 8, chunkPad: 1 },
     // 深空专属 Boss：奇点——吸积盘环爆 + 奇点坍缩坠击 + 禁锢力场
     boss: 'blackhole',
   },

@@ -3,7 +3,7 @@ import { UNIT } from '../core/units'
 import { InfiniteArenaScene } from './InfiniteArenaScene'
 import { MAP, MAPS } from './registry'
 import type { SpaceConfig } from './registry'
-import { INFINITE, ringPoint } from './world'
+import { ringPoint } from './world'
 import { emojiImage } from '../emoji/textures'
 import { enemyOf } from '../enemies/enemies'
 import { clampToDisc, confineVelocity, meteorSweep } from './space'
@@ -92,7 +92,7 @@ export class SpaceArenaScene extends InfiniteArenaScene {
 
   /** 出怪落点收进圈内（环带随机点，超出即投影到圈边内侧） */
   protected spawnPoint(): Point {
-    const p = ringPoint(this.rng, this.center, INFINITE.spawnRingMin * UNIT, INFINITE.spawnRingMax * UNIT)
+    const p = ringPoint(this.rng, this.center, this.infCfg.spawnRingMin * UNIT, this.infCfg.spawnRingMax * UNIT)
     return clampToDisc(p.x, p.y, this.fieldCx, this.fieldCy, this.fieldR - UNIT)
   }
 
