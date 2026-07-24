@@ -223,7 +223,8 @@ interface Window {
   __setLab?: (kinds: string[], mapId?: string) => void
   __labTeam?: (ids: string[], mapId?: string) => void
   __ecsLabRoster?: (ids: string[]) => void
-  __ecsSpawnEnemy?: (kind: string, dxU?: number, dyU?: number) => void
+  __ecsSpawnEnemy?: (kind: string, dxU?: number, dyU?: number, elite?: boolean) => void
+  __ecsNearestEnemySize?: () => number
   __ecsHurtEnemy?: (dmg?: number, kb?: number) => void
   __ecsSlowEnemy?: (factor?: number, durMs?: number) => void
   __ecsPoisonEnemy?: (dmg?: number, tickMs?: number, durMs?: number) => void

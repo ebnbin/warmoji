@@ -35,7 +35,7 @@ import { settleWave } from './wave'
 import { isBossWave, waveDurationMs, WAVE } from '../run/waves'
 import type { Sim } from './sim'
 import { toPx } from '../battle/px'
-import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
+import { BOSSES, ELITE, ENEMY_DEFS } from '../enemies/registry'
 
 // ECS 实验战斗场景(宿主壳):Phaser 只做画布/相机/输入/音频宿主;战斗世界(实体+系统+
 // 自绘渲染)全在 ECS。P2:有界森林图 + 队伍编队/orbit/游移/跟随弹簧 + 键盘/相机跟随。
@@ -140,15 +140,21 @@ export class EcsBattleScene extends Phaser.Scene {
     this.ready = true
     hint.destroy()
 
-    // e2e 探针:按 kind 在队伍中心附近投放一只敌人(相对格偏移)
-    window.__ecsSpawnEnemy = (kind: string, dxU = 3, dyU = 0): void => {
+    // e2e 探针:按 kind 在队伍中心附近投放一只敌人(相对格偏移;elite=金边精英体质)
+    window.__ecsSpawnEnemy = (kind: string, dxU = 3, dyU = 0, elite = false): void => {
       const sim = this.sim
       if (!sim || !this.atlas) return
       const boss = BOSSES.find((s) => s.kind === kind)
       const raw = ENEMY_DEFS.find((s) => s.kind === kind) ?? boss
       if (!raw) return
       const px = toPx(raw)
-      spawnEnemy(sim, this.atlas, px, sim.center.x + dxU * UNIT, sim.center.y + dyU * UNIT, px.hp, false, !!boss)
+      const hp = Math.round(px.hp * (elite && !boss ? ELITE.hpMul : 1))
+      spawnEnemy(sim, this.atlas, px, sim.center.x + dxU * UNIT, sim.center.y + dyU * UNIT, hp, elite && !boss, !!boss)
+    }
+    // e2e 探针:最近敌人的显示尺寸(px)——验证精英体型放大
+    window.__ecsNearestEnemySize = (): number => {
+      const best = this.nearestEnemyToCenter()
+      return best >= 0 ? Transform.w[best]! : -1
     }
     // e2e 探针:对最近队伍中心的敌人施加伤害(+击退,源在队伍中心)
     window.__ecsHurtEnemy = (dmg = 20, kb = 0): void => {
