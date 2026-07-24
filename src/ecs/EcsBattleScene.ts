@@ -2,22 +2,42 @@ import Phaser from 'phaser'
 import { viewport } from '../core/apply'
 import { UNIT } from '../core/units'
 import { UI_FONT, FONT } from '../core/fonts'
+import { norm } from '../core/vec'
+import { Rng } from '../core/rng'
+import { applyBackground } from '../core/background'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS } from '../boot/preload'
+import { getRun } from '../run/state'
+import type { RunState } from '../run/state'
+import { MAP, MAPS, rollDecor } from '../maps/registry'
 import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
+import { Transform } from './components'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch } from './render/spriteBatch'
 import { spawnSprite } from './entities'
+import { spawnTeam } from './team'
+import { initialLayout, stepSim } from './sim'
+import type { Sim } from './sim'
 
-// ECS 实验战斗场景(宿主壳):Phaser 只做画布/相机/输入/音频宿主,战斗世界全在 ECS。
-// P1:建 emoji 图集 + 自绘批量渲染管线;spawn 一组已知实体验证位姿/翻转/tint/深度/相机。
-// 后续阶段在此挂各系统,逐步复刻旧战斗全部效果。
+// ECS 实验战斗场景(宿主壳):Phaser 只做画布/相机/输入/音频宿主;战斗世界(实体+系统+
+// 自绘渲染)全在 ECS。P2:有界森林图 + 队伍编队/orbit/游移/跟随弹簧 + 键盘/相机跟随。
+
+function held(key?: Phaser.Input.Keyboard.Key): boolean {
+  return key?.isDown ?? false
+}
+
 export class EcsBattleScene extends Phaser.Scene {
   private world!: EcsWorld
   private atlas?: EcsAtlas
+  private sim?: Sim
   private ready = false
+  private centerObj!: Phaser.GameObjects.Zone
+  private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
+  private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
+  private mapW = 0
+  private mapH = 0
 
   constructor() {
     super(ECS_SCENE_KEY)
@@ -28,66 +48,115 @@ export class EcsBattleScene extends Phaser.Scene {
     this.world = makeWorld()
     ;(window as unknown as { __ecsWorld?: EcsWorld }).__ecsWorld = this.world
 
+    const run = getRun()
+    const mapDef = MAPS[run.mapId]
+    applyBackground(mapDef.palette)
+    this.mapW = (mapDef.size?.w ?? MAP.width) * UNIT
+    this.mapH = (mapDef.size?.h ?? MAP.height) * UNIT
+    const margin = MAP.cameraMargin * UNIT
+
+    // 地面:纯色面 + 右下阴影(镜像 ArenaScene.drawFloor)
+    const g = this.add.graphics().setDepth(-1)
+    const so = 0.25 * UNIT
+    g.fillStyle(mapDef.palette.shadow, 1)
+    g.fillRect(so, so, this.mapW, this.mapH)
+    g.fillStyle(mapDef.palette.map, 1)
+    g.fillRect(0, 0, this.mapW, this.mapH)
+
     const cam = this.cameras.main
     cam.setZoom(viewport.renderScale)
-    cam.centerOn(viewport.logicalWidth / 2, viewport.logicalHeight / 2)
-    cam.setBackgroundColor('#12161c')
+    cam.setBounds(-margin, -margin, this.mapW + margin * 2, this.mapH + margin * 2)
 
-    const cx = viewport.logicalWidth / 2
-    const cy = viewport.logicalHeight / 2
+    const center = { x: this.mapW / 2, y: this.mapH / 2 }
+    this.centerObj = this.add.zone(center.x, center.y, 1, 1)
+    cam.startFollow(this.centerObj)
+
+    this.cursors = this.input.keyboard?.createCursorKeys()
+    this.wasd = this.input.keyboard?.addKeys('W,A,S,D') as
+      | Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
+      | undefined
+
     const hint = this.add
-      .text(cx, 40, 'ECS 实验 · 构建图集…', { fontFamily: UI_FONT, fontSize: FONT.small, color: '#8fa1b5' })
+      .text(viewport.logicalWidth / 2, 40, 'ECS 实验 · 构建图集…', {
+        fontFamily: UI_FONT,
+        fontSize: FONT.small,
+        color: '#8fa1b5',
+      })
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(1000)
 
-    void this.boot(hint, cx, cy)
+    void this.boot(run, center, hint)
 
-    const toMenu = (): void => {
+    this.input.keyboard?.on('keydown-ESC', () => {
       playSfx('click')
       this.scene.start('menu')
-    }
-    this.input.keyboard?.on('keydown-ESC', toMenu)
+    })
   }
 
-  private async boot(hint: Phaser.GameObjects.Text, cx: number, cy: number): Promise<void> {
+  private async boot(run: RunState, center: { x: number; y: number }, hint: Phaser.GameObjects.Text): Promise<void> {
     const atlas = await EcsAtlas.build(this, OUTLINED_EMOJIS)
     if (!this.scene.isActive()) return
     this.atlas = atlas
     new EcsSpriteBatch(this, this.world, atlas)
-    this.spawnDemo(cx, cy)
-    hint.setText(`ECS 图集就绪 · ${atlas.pageCount} 页 · P1 渲染验证`)
+    this.spawnDecor(run, atlas)
+    this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
+    initialLayout(this.sim)
     this.ready = true
-    ;(window as unknown as { __ecs?: { ready: boolean; pages: number } }).__ecs = {
+    hint.destroy()
+    ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
       pages: atlas.pageCount,
     }
   }
 
-  /** P1 演示:一排已知实体,分别验证 位姿/旋转/翻转/tint 相乘/纯色填充/半透明/深度叠压 */
-  private spawnDemo(cx: number, cy: number): void {
-    const atlas = this.atlas!
-    const P = OUTLINED_EMOJIS.player
-    const E = OUTLINED_EMOJIS.enemy
-    const L = OUTLINED_EMOJIS.elite
-    const s = 2 * UNIT
-    const gap = 2.4 * UNIT
-    // 正常(居中,作相机对齐基准)
-    spawnSprite(this.world, atlas, { id: P[0]!, outline: 'player', x: cx, y: cy, size: s })
-    // 旋转 30°
-    spawnSprite(this.world, atlas, { id: P[1] ?? P[0]!, outline: 'player', x: cx - gap, y: cy, size: s, rot: Math.PI / 6 })
-    // 水平翻转
-    spawnSprite(this.world, atlas, { id: E[0]!, outline: 'enemy', x: cx + gap, y: cy, size: s, flipX: true })
-    // 金色系(elite 描边本身金) + 深度叠压演示:两枚重叠,z 大者在上
-    spawnSprite(this.world, atlas, { id: L[0]!, outline: 'elite', x: cx - gap, y: cy + gap, size: s, z: 0 })
-    spawnSprite(this.world, atlas, { id: P[0]!, outline: 'player', x: cx - gap + 0.8 * UNIT, y: cy + gap, size: s, z: 1 })
-    // 纯色填充(闪白)
-    spawnSprite(this.world, atlas, { id: E[0]!, outline: 'enemy', x: cx, y: cy + gap, size: s, color: 0xffffff, effect: 1 })
-    // 半透明
-    spawnSprite(this.world, atlas, { id: P[0]!, outline: 'player', x: cx + gap, y: cy + gap, size: s, alpha: 0.4 })
+  /** 地图装饰:按 run 种子随机散布的低透明度 emoji(镜像 ArenaScene.drawDecor),作 ECS 静态实体 */
+  private spawnDecor(run: RunState, atlas: EcsAtlas): void {
+    const rng = new Rng(run.decorSeed)
+    const cols = Math.round(this.mapW / UNIT)
+    const rows = Math.round(this.mapH / UNIT)
+    for (const d of rollDecor(MAPS[run.mapId].decor, () => rng.next(), cols, rows)) {
+      spawnSprite(this.world, atlas, {
+        id: d.emoji,
+        outline: 'player',
+        x: d.xU * UNIT,
+        y: d.yU * UNIT,
+        size: d.sizeU * UNIT,
+        rot: d.rotation,
+        alpha: d.alpha,
+        z: 1,
+      })
+    }
   }
 
-  get isReady(): boolean {
-    return this.ready
+  update(_time: number, delta: number): void {
+    const sim = this.sim
+    if (!this.ready || !sim) return
+    const kx =
+      (held(this.cursors?.left) || held(this.wasd?.A) ? -1 : 0) +
+      (held(this.cursors?.right) || held(this.wasd?.D) ? 1 : 0)
+    const ky =
+      (held(this.cursors?.up) || held(this.wasd?.W) ? -1 : 0) +
+      (held(this.cursors?.down) || held(this.wasd?.S) ? 1 : 0)
+    // P2:键盘驱动(摇杆随 HUD 在 P4 接入)
+    sim.teamDir = kx !== 0 || ky !== 0 ? norm(kx, ky) : { x: 0, y: 0 }
+    sim.moveInputRaw = kx !== 0 || ky !== 0 ? 1 : 0
+
+    stepSim(sim, delta)
+    this.centerObj.setPosition(sim.center.x, sim.center.y)
+    ;(window as unknown as { __ecs?: object }).__ecs = {
+      ready: true,
+      pages: this.atlas?.pageCount ?? 0,
+      centerX: sim.center.x,
+      centerY: sim.center.y,
+      members: sim.members.length,
+      mapW: this.mapW,
+      mapH: this.mapH,
+      dirX: sim.teamDir.x,
+      dirY: sim.teamDir.y,
+      moveSpeed: sim.moveSpeed,
+      elapsed: sim.elapsedMs,
+      memberPos: sim.members.map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
+    }
   }
 }

@@ -124,6 +124,10 @@ window.__labTeam = (ids: string[], mapId = 'forest'): void => {
   setLabRoster(ids as CharacterId[])
   window.__setLab!([], mapId)
 }
+// 调试探针（ECS 实验）：只设定试炼场阵容、不启动场景——供 e2e 随后经地图页测试模式进入 ECS
+window.__ecsLabRoster = (ids: string[]): void => {
+  setLabRoster(ids as CharacterId[])
+}
 // 测试模式：设定出场敌人（kind 列表），用当前勾选阵容在某张真实地图上开测试模式
 window.__setLab = (kinds: string[], mapId = 'forest'): void => {
   setLabEnemies(kinds)

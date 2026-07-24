@@ -38,3 +38,28 @@ export const Depth = {
 
 /** 渲染所需组件集(查询用):四者齐备即可被 spriteBatch 画出 */
 export const RENDERABLE = [Transform, Sprite, Tint, Depth] as const
+
+// ── 队员/移动(P2)──────────────────────────────────────────
+
+/** 队员标记 */
+export const Member = {}
+
+/** 槽位(招募次序)与队形岗位(座次) */
+export const Slot = { v: i32() }
+export const Post = { v: i32() }
+
+/** 环上避敌/迎敌秉性(lineup[slot].orbit);null 岗位不参与主力竞争由 Post/formation 决定 */
+export const OrbitBias = { v: f32() }
+
+/** 跟随惯性:欠阻尼弹簧位置/速度 + 每人略异刚度 */
+export const Follow = { x: f32(), y: f32(), vx: f32(), vy: f32(), k: f32() }
+
+/** 待机游移:相位种子 + 幅度(0..1 淡入) */
+export const Wander = { seed: f32(), amp: f32() }
+
+/** 存活 + 本帧探测范围内是否有敌(游移门控/orbit 输入) */
+export const Alive = { v: u8() }
+export const Threat = { v: u8() }
+
+/** 队员移动/布局查询集 */
+export const MEMBER_SET = [Member, Slot, Post, OrbitBias, Follow, Wander, Alive, Threat, Transform] as const
