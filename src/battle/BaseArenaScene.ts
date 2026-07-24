@@ -751,7 +751,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
     // 爆发型粒子发射器（复用，explode 触发；速度为 px/秒，UNIT=64）
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
-    this.coinBurst = burstEmitter(this, [0xffb300, 0xffd54f, 0xfff8e1], 150, 340)
+    this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
 
     // 伤害数字对象池：复用固定数量 BitmapText（见 ui/damageFont.ts）
@@ -1761,7 +1761,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.damagePoolIdx = (this.damagePoolIdx + 1) % this.damagePool.length
     this.tweens.killTweensOf(t)
     // 暴击金色放大；池对象复用，普通伤害要复位样式
-    t.setFontSize(crit ? 34 : 24).setTint(crit ? 0xffd54f : 0xffffff)
+    t.setFontSize(crit ? 34 : 24).setTint(crit ? 0xffdc5d : 0xffffff)
     t.setText(String(amount)).setPosition(x, y - 14).setAlpha(1).setVisible(true)
     this.tweens.add({
       targets: t,

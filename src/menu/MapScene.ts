@@ -141,7 +141,7 @@ export class MapScene extends Phaser.Scene {
     }
     const b = this.btnRect
     const btnBg = this.add.graphics()
-    btnBg.fillStyle(0xffd54f, 1)
+    btnBg.fillStyle(0xffdc5d, 1)
     btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
     this.confirmLabel = this.add
       .text(w / 2, oy + L.btn.y, '选择队长', {
@@ -286,7 +286,7 @@ export class MapScene extends Phaser.Scene {
   private refresh(): void {
     this.grid.setSelected(this.selectedId)
     this.testChk.setText(`测试模式（免死沙盒·跳过组队）：${this.testMode ? '开' : '关'}`)
-    this.testChk.setColor(this.testMode ? '#ffd54f' : '#c8c8d4')
+    this.testChk.setColor(this.testMode ? '#ffdc5d' : '#c8c8d4')
     this.testChk.setBackgroundColor(this.testMode ? '#2e7d32' : '#00000055')
     this.confirmLabel.setText(this.testMode ? '进入测试模式' : '选择队长')
     this.renderDetail(textRes())

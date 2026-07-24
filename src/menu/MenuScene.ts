@@ -101,7 +101,7 @@ export class MenuScene extends Phaser.Scene {
     const btn = { x: w / 2 - 170, y: h * 0.82 - 36, w: 340, h: 72 }
     this.menuBtn = btn
     const btnBg = this.add.graphics()
-    btnBg.fillStyle(0xffd54f, 1)
+    btnBg.fillStyle(0xffdc5d, 1)
     btnBg.fillRoundedRect(-btn.w / 2, -btn.h / 2, btn.w, btn.h, btn.h / 2)
     const btnText = this.add
       .text(0, 0, '开始战斗', {
@@ -236,9 +236,9 @@ export class MenuScene extends Phaser.Scene {
   /** 分字母两色 logo：War 琥珀 + Moji 白，逐字错相弹跳；两侧⚔️摇摆 */
   private createLogo(w: number, y: number, res: number): void {
     const letters: { ch: string; color: string }[] = [
-      { ch: 'W', color: '#ffd54f' },
-      { ch: 'a', color: '#ffd54f' },
-      { ch: 'r', color: '#ffd54f' },
+      { ch: 'W', color: '#ffdc5d' },
+      { ch: 'a', color: '#ffdc5d' },
+      { ch: 'r', color: '#ffdc5d' },
       { ch: 'M', color: '#f5f5f5' },
       { ch: 'o', color: '#f5f5f5' },
       { ch: 'j', color: '#f5f5f5' },

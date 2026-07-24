@@ -285,7 +285,7 @@ export class VirtualEmojiGrid {
     if (index < 0) return
     const x = (index % this.cols) * CELL
     const y = Math.floor(index / this.cols) * CELL
-    this.ring.lineStyle(3, 0xffd54f, 0.95)
+    this.ring.lineStyle(3, 0xffdc5d, 0.95)
     this.ring.strokeRoundedRect(x + 4, y + 4, CELL - 8, CELL - 8, 12)
   }
 }

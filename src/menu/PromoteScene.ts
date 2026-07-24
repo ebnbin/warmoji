@@ -686,7 +686,7 @@ export class PromoteScene extends Phaser.Scene {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
-          color: '#ffd54f',
+          color: '#ffdc5d',
           resolution: res,
         })
         .setOrigin(0, 0.5),

@@ -109,7 +109,7 @@ export class ResultScene extends Phaser.Scene {
         fontFamily: UI_FONT,
         fontSize: FONT.display,
         fontStyle: 'bold',
-        color: this.win ? '#ffd54f' : '#ef9a9a',
+        color: this.win ? '#ffdc5d' : '#ef9a9a',
         resolution: res,
       },
       { origin: 0.5 },
@@ -117,7 +117,7 @@ export class ResultScene extends Phaser.Scene {
     title.setScale(0.6)
     this.tweens.add({ targets: title, scale: 1, duration: 380, ease: 'Back.easeOut' })
     if (this.win && !preserved) {
-      const confetti = burstEmitter(this, [0xffd54f, 0x81d4fa, 0xef9a9a, 0xa5d6a7], 420, 900)
+      const confetti = burstEmitter(this, [0xffdc5d, 0x81d4fa, 0xef9a9a, 0xa5d6a7], 420, 900)
       confetti.setDepth(5)
       this.time.delayedCall(120, () => confetti.explode(26, cx - 180, oy + L.titleY))
       this.time.delayedCall(320, () => confetti.explode(26, cx + 180, oy + L.titleY))
@@ -254,7 +254,7 @@ export class ResultScene extends Phaser.Scene {
                 fontFamily: UI_FONT,
                 fontSize: FONT.caption,
                 fontStyle: 'bold',
-                color: '#ffd54f',
+                color: '#ffdc5d',
                 resolution: res,
               })
               .setOrigin(0.5),
@@ -310,7 +310,7 @@ export class ResultScene extends Phaser.Scene {
         {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
-          color: '#ffd54f',
+          color: '#ffdc5d',
           resolution: res,
         },
         { origin: 1 },
@@ -368,7 +368,7 @@ export class ResultScene extends Phaser.Scene {
           .text(58, cy, name, {
             fontFamily: UI_FONT,
             fontSize: FONT.body,
-            color: isBoss ? '#ffd54f' : '#e4e4ec',
+            color: isBoss ? '#ffdc5d' : '#e4e4ec',
             resolution: res,
           })
           .setOrigin(0, 0.5),
@@ -396,7 +396,7 @@ export class ResultScene extends Phaser.Scene {
   ): void {
     const g = this.add.graphics()
     if (filled) {
-      g.fillStyle(0xffd54f, 1)
+      g.fillStyle(0xffdc5d, 1)
       g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, rect.h / 2)
     } else {
       g.fillStyle(0xffffff, 0.12)

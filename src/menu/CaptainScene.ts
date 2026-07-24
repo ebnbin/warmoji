@@ -128,7 +128,7 @@ export class CaptainScene extends Phaser.Scene {
     }
     const b = this.btnRect
     const btnBg = this.add.graphics()
-    btnBg.fillStyle(0xffd54f, 1)
+    btnBg.fillStyle(0xffdc5d, 1)
     btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
     this.add
       .text(w / 2, oy + L.btn.y, '组建队伍', {

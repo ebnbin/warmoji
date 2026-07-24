@@ -240,7 +240,7 @@ export class UIScene extends Phaser.Scene {
       const rect = { x: cx - 150, y: y - 36, w: 300, h: 72 }
       const g = this.add.graphics().setDepth(251)
       if (filled) {
-        g.fillStyle(0xffd54f, 1)
+        g.fillStyle(0xffdc5d, 1)
         g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 36)
       } else {
         g.fillStyle(0xffffff, 0.12)
@@ -346,7 +346,7 @@ export class UIScene extends Phaser.Scene {
       .text(cx, cy + 58, w.sub, {
         fontFamily: UI_FONT,
         fontSize: FONT.head,
-        color: '#ffd54f',
+        color: '#ffdc5d',
         stroke: '#000000',
         strokeThickness: 4,
         align: 'center',
@@ -400,7 +400,7 @@ export class UIScene extends Phaser.Scene {
       .setDepth(303)
     this.skillRing = this.add
       .circle(cx, cy, r + 6, 0x000000, 0)
-      .setStrokeStyle(3, 0xffd54f, 0.9)
+      .setStrokeStyle(3, 0xffdc5d, 0.9)
       .setDepth(303)
       .setVisible(false)
     this.add
@@ -512,7 +512,7 @@ export class UIScene extends Phaser.Scene {
         fontFamily: UI_FONT,
         fontSize: FONT.head,
         fontStyle: 'bold',
-        color: '#ffd54f',
+        color: '#ffdc5d',
         stroke: '#000000',
         strokeThickness: 5,
         align: 'center',
@@ -750,7 +750,7 @@ export class UIScene extends Phaser.Scene {
         fontFamily: UI_FONT,
         fontSize: FONT.caption,
         fontStyle: 'bold',
-        color: '#ffd54f',
+        color: '#ffdc5d',
         stroke: '#000000',
         strokeThickness: 3,
         resolution: textRes(),
@@ -830,7 +830,7 @@ export class UIScene extends Phaser.Scene {
         fontFamily: UI_FONT,
         fontSize: FONT.banner,
         fontStyle: 'bold',
-        color: '#ffd54f',
+        color: '#ffdc5d',
         resolution: res,
       })
       .setOrigin(0.5)

@@ -188,7 +188,7 @@ export class ShopScene extends Phaser.Scene {
         .text(this.origin.x + L.content.w - 40, oy + L.titleY, '⛨ 队形', {
           fontFamily: UI_FONT,
           fontSize: FONT.strong,
-          color: '#ffd54f',
+          color: '#ffdc5d',
           resolution: res,
         })
         .setOrigin(1, 0.5)
@@ -207,7 +207,7 @@ export class ShopScene extends Phaser.Scene {
         fontFamily: UI_FONT,
         fontSize: FONT.head,
         fontStyle: 'bold',
-        color: '#ffd54f',
+        color: '#ffdc5d',
         resolution: res,
       })
       .setOrigin(0, 0.5)
@@ -290,7 +290,7 @@ export class ShopScene extends Phaser.Scene {
     }
     const b = this.btnRect
     const btnBg = this.add.graphics()
-    btnBg.fillStyle(0xffd54f, 1)
+    btnBg.fillStyle(0xffdc5d, 1)
     btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
     this.add
       .text(w / 2, oy + L.btn.y, `开始第 ${this.run.wave} 波`, {
@@ -475,7 +475,7 @@ export class ShopScene extends Phaser.Scene {
     const xpBar = this.add.graphics()
     xpBar.fillStyle(0x000000, 0.4)
     xpBar.fillRoundedRect(barX, barY, barW, 9, 4)
-    xpBar.fillStyle(prog.maxed ? 0xffd54f : 0x7cc5ff, 1)
+    xpBar.fillStyle(prog.maxed ? 0xffdc5d : 0x7cc5ff, 1)
     xpBar.fillRoundedRect(barX + 1, barY + 1, Math.max(2, (barW - 2) * prog.ratio), 7, 3)
 
     this.detailObjs.push(
@@ -498,7 +498,7 @@ export class ShopScene extends Phaser.Scene {
             fontFamily: UI_FONT,
             fontSize: FONT.small,
             fontStyle: 'bold',
-            color: '#ffd54f',
+            color: '#ffdc5d',
             resolution: res,
           },
         )
@@ -600,7 +600,7 @@ export class ShopScene extends Phaser.Scene {
     card.fillStyle(0xffffff, 0.07)
     card.fillRoundedRect(dx + 14, cardY, D.w - 28, 96, 12)
     if (offer && rarity !== 'common') card.lineStyle(2, rarityColor, 0.8)
-    else card.lineStyle(1, 0xffd54f, 0.35)
+    else card.lineStyle(1, 0xffdc5d, 0.35)
     card.strokeRoundedRect(dx + 14, cardY, D.w - 28, 96, 12)
     this.detailObjs.push(card)
 
@@ -667,7 +667,7 @@ export class ShopScene extends Phaser.Scene {
     const canBuy = offer !== null && this.run.coins >= this.price(offer)
     const bb = this.buyRect
     const buyBg = this.add.graphics()
-    buyBg.fillStyle(canBuy ? 0xffd54f : 0xffffff, canBuy ? 1 : 0.1)
+    buyBg.fillStyle(canBuy ? 0xffdc5d : 0xffffff, canBuy ? 1 : 0.1)
     buyBg.fillRoundedRect(bb.x, bb.y, bb.w, bb.h, 27)
     this.detailObjs.push(
       buyBg,
@@ -740,7 +740,7 @@ export class ShopScene extends Phaser.Scene {
     const panel = this.add.graphics()
     panel.fillStyle(0x2a2540, 0.98)
     panel.fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 20)
-    panel.lineStyle(3, 0xffd54f, 0.9)
+    panel.lineStyle(3, 0xffdc5d, 0.9)
     panel.strokeRoundedRect(-pw / 2, -ph / 2, pw, ph, 20)
     const items: Phaser.GameObjects.GameObject[] = [
       panel,
@@ -749,7 +749,7 @@ export class ShopScene extends Phaser.Scene {
           fontFamily: UI_FONT,
           fontSize: FONT.title,
           fontStyle: 'bold',
-          color: '#ffd54f',
+          color: '#ffdc5d',
           resolution: res,
         })
         .setOrigin(0.5),

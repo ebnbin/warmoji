@@ -78,7 +78,7 @@ export class CardScene extends Phaser.Scene {
         fontFamily: UI_FONT,
         fontSize: FONT.body,
         fontStyle: 'bold',
-        color: '#ffd54f',
+        color: '#ffdc5d',
         resolution: res,
       })
       .setOrigin(0.5)

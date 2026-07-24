@@ -28,13 +28,14 @@ export function hslToInt(h: number, s: number, l: number): number {
   return (to255(r) << 16) | (to255(g) << 8) | to255(b)
 }
 
-/** 每局随机的低饱和度配色：暗色渐变背景 + 同色相粉彩地图面 */
+/** 菜单（game scope）固定中性背景 #292f33；地图面保持一个中性值。
+ * rng 已不再使用（背景固定），保留签名以兼容各场景调用点 */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function randomPalette(rng: Rng): Palette {
-  const h = rng.int(0, 359)
   return {
-    bgFrom: `hsl(${h} 28% 34%)`,
-    bgTo: `hsl(${(h + 40) % 360} 28% 20%)`,
-    map: hslToInt(h, 0.35, 0.72),
+    bgFrom: '#292f33',
+    bgTo: '#292f33',
+    map: hslToInt(205, 0.06, 0.42),
     shadow: 0x000000,
   }
 }

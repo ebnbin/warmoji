@@ -363,7 +363,7 @@ export class WikiScene extends Phaser.Scene {
         fontSize: FONT.small,
         fontStyle: 'bold',
         color: '#25262e',
-        backgroundColor: '#ffd54f',
+        backgroundColor: '#ffdc5d',
         padding: { x: 12, y: 5 },
         resolution: res,
       })
@@ -439,7 +439,7 @@ export class WikiScene extends Phaser.Scene {
           fontFamily: UI_FONT,
           fontSize: FONT.body,
           fontStyle: 'bold',
-          color: '#ffd54f',
+          color: '#ffdc5d',
           resolution: res,
         })
         .setOrigin(0, 0)
@@ -513,7 +513,7 @@ export class WikiScene extends Phaser.Scene {
         t.setText(lvls[i]!.label)
           .setPosition(cx, cursor)
           .setColor(on ? '#25262e' : '#dcdce4')
-          .setBackgroundColor(on ? '#ffd54f' : '#00000055')
+          .setBackgroundColor(on ? '#ffdc5d' : '#00000055')
           .setVisible(true)
         cx += t.width + 10
       })

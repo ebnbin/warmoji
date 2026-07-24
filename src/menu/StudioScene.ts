@@ -638,7 +638,7 @@ export class StudioScene extends Phaser.Scene {
       .text(d.x + d.w - 24, d.y + 14, '↺ 复位', {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
-        color: '#ffd54f',
+        color: '#ffdc5d',
         resolution: res,
       })
       .setOrigin(1, 0)

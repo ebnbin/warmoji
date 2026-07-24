@@ -189,7 +189,7 @@ export class SettingsScene extends Phaser.Scene {
     const ty = row.localY + S.rowH / 2 - th / 2
     const g = row.toggle
     g.clear()
-    g.fillStyle(on ? 0xffd54f : 0xffffff, on ? 1 : 0.16)
+    g.fillStyle(on ? 0xffdc5d : 0xffffff, on ? 1 : 0.16)
     g.fillRoundedRect(tx, ty, tw, th, th / 2)
     g.fillStyle(on ? 0x25262e : 0xc0c0cc, 1)
     g.fillCircle(on ? tx + tw - th / 2 : tx + th / 2, ty + th / 2, th / 2 - 5)
