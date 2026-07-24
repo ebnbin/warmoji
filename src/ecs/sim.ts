@@ -9,8 +9,10 @@ import type { OrbitThreat } from '../characters/orbit'
 import { Alive, Depth, Follow, Threat, Transform, Wander } from './components'
 import { steerEnemies, updateFrameTargets } from './enemy'
 import { memberContact, memberVisual, reviveMembers } from './combat'
+import { updateProjectiles } from './projectile'
 import type { EcsWorld } from './world'
 import type { Point } from '../core/vec'
+import type { TargetInfo } from '../abilities/types'
 
 // ECS 战斗仿真状态 + 系统(纯逻辑,禁 phaser)。数学逐行镜像旧 BaseArenaScene 的
 // updateOrbit / moveTeam / layoutTeam,常量与公式不变,只把「读写精灵」换成「读写组件」。
@@ -46,6 +48,8 @@ export interface Sim {
   kills: number
   /** 全队阵亡(游戏结束标记;结算页在 P4) */
   over: boolean
+  /** 本帧敌方存活快照(能力索敌共享;wire 每帧重建) */
+  enemyTargets: TargetInfo[]
 }
 
 /** 队伍活感·探测与轨道(镜像 updateOrbit):逐员判定探测范围内有无敌人 + 环上主力驱动共享相位 */
@@ -171,6 +175,7 @@ export function stepSim(sim: Sim, delta: number): void {
   moveTeam(sim, delta)
   reviveMembers(sim)
   steerEnemies(sim, delta)
+  updateProjectiles(sim, delta)
   memberContact(sim)
   memberVisual(sim)
 }

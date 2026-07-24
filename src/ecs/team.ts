@@ -142,5 +142,6 @@ export function spawnTeam(
     frameTargets: [],
     kills: 0,
     over: false,
+    enemyTargets: [],
   }
 }

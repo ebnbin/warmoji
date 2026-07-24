@@ -103,3 +103,25 @@ export const Flash = { until: f32() }
 
 /** 敌人移动查询集(最小:位姿 + 速度 + 血) */
 export const ENEMY_SET = [Enemy, Transform, Speed, Hp] as const
+
+// ── 抛射物(P3c)──────────────────────────────────────────
+
+/** 抛射物标记 */
+export const Projectile = {}
+
+/** 速度(世界像素/秒) */
+export const Vel = { x: f32(), y: f32() }
+
+/** 抛射物属性:伤害/半径/击退/来源槽位/贯穿余量/自旋(rad/s)/寿命回收时刻(0=不按寿命) */
+export const Proj = {
+  damage: f32(),
+  radius: f32(),
+  kb: f32(),
+  srcSlot: i32(),
+  pierce: i32(),
+  spin: f32(),
+  dieAt: f32(),
+}
+
+/** 抛射物查询集 */
+export const PROJ_SET = [Projectile, Transform, Vel, Proj] as const

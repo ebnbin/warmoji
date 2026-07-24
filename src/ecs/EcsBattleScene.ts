@@ -14,13 +14,14 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query } from 'bitecs'
-import { Alive, Enemy, MHp, Transform } from './components'
+import { Alive, Enemy, MHp, Projectile, Transform } from './components'
 import { applyDamage } from './combat'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch } from './render/spriteBatch'
 import { spawnSprite } from './entities'
 import { spawnTeam } from './team'
 import { spawnEnemy } from './enemy'
+import { armTeam, updateMemberAbilities } from './ability/wire'
 import { initialLayout, stepSim } from './sim'
 import type { Sim } from './sim'
 import { toPx } from '../battle/px'
@@ -107,6 +108,7 @@ export class EcsBattleScene extends Phaser.Scene {
     this.spawnDecor(run, atlas)
     this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
     initialLayout(this.sim)
+    armTeam(this.sim, this, atlas, run, run.testMode)
     this.ready = true
     hint.destroy()
 
@@ -176,6 +178,8 @@ export class EcsBattleScene extends Phaser.Scene {
     sim.moveInputRaw = kx !== 0 || ky !== 0 ? 1 : 0
 
     stepSim(sim, delta)
+    // 队员能力驱动(wdelta=真实帧长;时停时标在 P4)
+    updateMemberAbilities(sim, delta)
     this.centerObj.setPosition(sim.center.x, sim.center.y)
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
@@ -193,6 +197,7 @@ export class EcsBattleScene extends Phaser.Scene {
       enemies: query(this.world, [Enemy]).length,
       enemyPos: Array.from(query(this.world, [Enemy]), (eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
       kills: sim.kills,
+      projectiles: query(this.world, [Projectile]).length,
       over: sim.over,
       alive: sim.members.filter((eid) => Alive.v[eid]).length,
       memberHp: sim.members.map((eid) => MHp.hp[eid]!),

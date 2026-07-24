@@ -18,7 +18,7 @@ import {
   Tint,
   Transform,
 } from './components'
-import { enemyDef } from './store'
+import { enemyDef, enemyRef } from './store'
 import type { Sim } from './sim'
 
 // 战斗(P3b):敌人受伤/致死/击退,队员接触伤害/死亡/复活/受击闪光。
@@ -66,6 +66,7 @@ export function killEnemy(sim: Sim, eid: number): void {
   sim.kills++
   playSfx('kill')
   enemyDef[eid] = undefined
+  enemyRef[eid] = undefined
   removeEntity(sim.world, eid)
 }
 
