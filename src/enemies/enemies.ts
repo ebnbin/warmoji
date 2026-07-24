@@ -10,6 +10,18 @@ import type { FieldPickupDef } from '../battlefield/registry'
 /** 行为状态机：wander 游荡 / chase 追击 / windup 蓄力 / dash 冲刺 / cool 冷却 */
 export type EnemyState = 'wander' | 'chase' | 'windup' | 'dash' | 'cool'
 
+/** 冲刺/自爆状态机组件（用到才挂）：仅 dash/detonate locomotion 装配——蓄力/冲刺/冷却/下轮计时 */
+export interface ChargeState {
+  /** 蓄力结束（进入冲刺/自爆）时刻 */
+  windupUntil: number
+  /** 冲刺结束时刻 */
+  dashUntil: number
+  /** 冷却结束（恢复游荡）时刻 */
+  coolUntil: number
+  /** 定时型冲刺的下一轮触发时刻 */
+  nextDashAt: number
+}
+
 /** 偷币组件（用到才挂）：仅偷币鼠 locomotion 装配——吃下的金币数 + 偷币冷却，死亡时吐回 */
 export interface ThiefState {
   /** 已吃下的金币数 */
@@ -66,11 +78,8 @@ export interface Enemy {
   dirX: number
   dirY: number
   turnAt: number
-  windupUntil: number
-  dashUntil: number
-  coolUntil: number
-  /** 定时型冲刺的下一轮触发时刻 */
-  nextDashAt: number
+  /** 冲刺/自爆状态机（用到才挂）：dash/detonate 敌人的蓄力/冲刺/冷却/下轮计时 */
+  charge?: ChargeState
   /** 巢穴的下一轮生成时刻（0 = 非巢穴） */
   nextSpawnAt: number
   danceUntil: number
@@ -127,10 +136,6 @@ export function attachEnemy(image: ImageObj, def: EnemyDef, hp: number, init?: P
     dirX: 0,
     dirY: 0,
     turnAt: 0,
-    windupUntil: 0,
-    dashUntil: 0,
-    coolUntil: 0,
-    nextDashAt: 0,
     nextSpawnAt: 0,
     danceUntil: 0,
     flashUntil: 0,

@@ -1964,12 +1964,20 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const anim = new Animator(enemy)
     anim.register('idle', clipFramesLive(this, def.emoji, 'idle', elite || boss ? 'elite' : 'enemy'))
     anim.setIdle('idle', ANIM_DEF.durMs, (ph / (Math.PI * 2)) * ANIM_DEF.durMs)
-    // 定时型冲刺的首轮延迟
+    // 冲刺/自爆状态机（用到才挂）：仅 dash/detonate 敌人装配；定时型冲刺带首轮延迟
     const lm = def.locomotion
-    const nextDashAt =
-      lm.kind === 'dash' && lm.trigger.kind === 'timer'
-        ? this.elapsedMs + (lm.trigger.firstDelayMs ?? lm.trigger.intervalMs)
-        : 0
+    const charge =
+      lm.kind === 'dash' || lm.kind === 'detonate'
+        ? {
+            windupUntil: 0,
+            dashUntil: 0,
+            coolUntil: 0,
+            nextDashAt:
+              lm.kind === 'dash' && lm.trigger.kind === 'timer'
+                ? this.elapsedMs + (lm.trigger.firstDelayMs ?? lm.trigger.intervalMs)
+                : 0,
+          }
+        : undefined
     const nextSpawnAt = def.spawner ? this.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
     const a = attachEnemy(enemy, def, hp, {
       elite,
@@ -1982,7 +1990,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       dirX,
       dirY,
       turnAt,
-      nextDashAt,
+      charge,
       nextSpawnAt,
       ph,
       anim,

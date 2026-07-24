@@ -53,15 +53,16 @@ const dash: Steerer = (ctx) => {
   const lm = a.def.locomotion
   if (lm.kind !== 'dash') return
   const e = a.image
+  const c = (a.charge ??= { windupUntil: 0, dashUntil: 0, coolUntil: 0, nextDashAt: 0 })
   if (a.state === 'windup') {
     // 脚本化姿态：本体自管旋转（蓄力颤动），主循环跳过环境摇摆
     a.posed = true
     body.setVelocity(0, 0)
     e.setRotation(Math.sin(now / 28) * 0.14)
-    if (now >= a.windupUntil) {
+    if (now >= c.windupUntil) {
       if (lm.lockAt === 'launch') lockDashDir(ctx, lm.aim)
       a.state = 'dash'
-      a.dashUntil = now + (lm.length.kind === 'time' ? lm.length.durationMs : (lm.length.dist / lm.dashSpeed) * 1000)
+      c.dashUntil = now + (lm.length.kind === 'time' ? lm.length.durationMs : (lm.length.dist / lm.dashSpeed) * 1000)
       e.setRotation(0)
       e.clearTint()
       if (lm.sfx) playSfx(lm.sfx)
@@ -76,23 +77,23 @@ const dash: Steerer = (ctx) => {
     e.setFlipX(a.dirX > 0)
     // 冲刺碾墙（残垣图拆迁 Boss）：沿途碾碎断壁，只在冲刺态生效
     if (a.def.breaksWalls) scene.smashWallAt(e.x, e.y)
-    if (now >= a.dashUntil) {
+    if (now >= c.dashUntil) {
       if (lm.trigger.kind === 'timer') {
         a.state = 'chase'
-        a.nextDashAt = now + lm.trigger.intervalMs
+        c.nextDashAt = now + lm.trigger.intervalMs
       } else {
         a.state = 'cool'
-        a.coolUntil = now + lm.trigger.cooldownMs
+        c.coolUntil = now + lm.trigger.cooldownMs
       }
     }
     return
   }
   // 触发判定
   if (lm.trigger.kind === 'timer') {
-    if (now >= a.nextDashAt) {
+    if (now >= c.nextDashAt) {
       a.posed = true
       a.state = 'windup'
-      a.windupUntil = now + lm.windupMs
+      c.windupUntil = now + lm.windupMs
       e.setTint(0xffb74d)
       return
     }
@@ -104,11 +105,11 @@ const dash: Steerer = (ctx) => {
       if (lm.lockAt === 'windup') lockDashDir(ctx, lm.aim)
       a.posed = true
       a.state = 'windup'
-      a.windupUntil = now + lm.windupMs
+      c.windupUntil = now + lm.windupMs
       e.setTint(0xffb74d)
       return
     }
-    if (a.state === 'cool' && now >= a.coolUntil) a.state = 'wander'
+    if (a.state === 'cool' && now >= c.coolUntil) a.state = 'wander'
   }
   // idle 移动（非脚本姿态，交还主循环做环境摇摆）：追击目标跟随 aim（Boss 逼近队伍中心，而非最近队员）
   a.posed = false
@@ -216,18 +217,19 @@ const detonate: Steerer = ({ scene, a, body, slow, now, target }) => {
   const lm = a.def.locomotion
   if (lm.kind !== 'detonate') return
   const e = a.image
+  const c = (a.charge ??= { windupUntil: 0, dashUntil: 0, coolUntil: 0, nextDashAt: 0 })
   if (a.state === 'windup') {
     // 脚本化姿态：定身拆弹，红白脉冲示警
     a.posed = true
     body.setVelocity(0, 0)
     e.setTint(now % 240 < 120 ? 0xffffff : 0xff5252)
-    if (now >= a.windupUntil) scene.detonate(a)
+    if (now >= c.windupUntil) scene.detonate(a)
     return
   }
   const d = scene.worldDelta(e, target.image)
   if (d.x * d.x + d.y * d.y <= lm.triggerRange * lm.triggerRange) {
     a.state = 'windup'
-    a.windupUntil = now + lm.windupMs
+    c.windupUntil = now + lm.windupMs
     a.posed = true
     return
   }
