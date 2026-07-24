@@ -23,6 +23,9 @@ export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
   // WebGLRenderer.render 渲染每个子对象前会读 child.blendMode 设混合模式;
   // 裸 GameObject 无 BlendMode 组件,显式给正常混合,否则 setBlendMode(undefined) 报错。
   blendMode = Phaser.BlendModes.NORMAL
+  // DisplayList 按 .depth 排序:全场实体作为一整个对象居于地面效果(2)之上、血条(11)之下,
+  // 保证毒液/灼烧区在脚下、血条压在头顶(裸 GameObject 无 Depth 组件,显式给定值参与排序)。
+  depth = 5
 
   constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas) {
     super(scene, 'EcsSpriteBatch')

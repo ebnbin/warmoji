@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { viewport } from '../core/apply'
 import { UNIT } from '../core/units'
+import { MEMBER } from '../characters/registry'
 import { UI_FONT, FONT } from '../core/fonts'
 import { norm } from '../core/vec'
 import { Rng } from '../core/rng'
@@ -51,6 +52,9 @@ export class EcsBattleScene extends Phaser.Scene {
   private testMode = false
   /** 过场已排程(波末结算/全灭):置位后 update 早退,避免重复触发 */
   private ending = false
+  /** 队员血条(逐帧跟位 + 按血量比例重绘;镜像 drawMemberHp) */
+  private hpBars: Phaser.GameObjects.Graphics[] = []
+  private shownHp: number[] = []
   private centerObj!: Phaser.GameObjects.Zone
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -123,6 +127,10 @@ export class EcsBattleScene extends Phaser.Scene {
     this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
     initialLayout(this.sim)
     armTeam(this.sim, this, atlas, run, run.testMode)
+    for (let i = 0; i < this.sim.members.length; i++) {
+      this.hpBars.push(this.add.graphics().setDepth(11))
+      this.shownHp.push(-1)
+    }
     this.ready = true
     hint.destroy()
 
@@ -285,6 +293,32 @@ export class EcsBattleScene extends Phaser.Scene {
     return best
   }
 
+  /** 逐帧队员血条:跟位 + 比例变化才重绘(镜像 drawMemberHp);阵亡隐藏、复活自动恢复 */
+  private updateHpBars(): void {
+    const sim = this.sim!
+    for (let i = 0; i < sim.members.length; i++) {
+      const m = sim.members[i]!
+      const g = this.hpBars[i]
+      if (!g) continue
+      if (!Alive.v[m]) {
+        g.setVisible(false)
+        this.shownHp[i] = -1
+        continue
+      }
+      g.setVisible(true).setPosition(Transform.x[m]!, Transform.y[m]!)
+      const ratio = Math.max(0, MHp.hp[m]! / MHp.max[m]!)
+      if (Math.abs(ratio - this.shownHp[i]!) < 0.005) continue
+      this.shownHp[i] = ratio
+      const w = 0.8 * UNIT
+      const y = MEMBER.size * UNIT * 0.62
+      g.clear()
+      g.fillStyle(0x000000, 0.45)
+      g.fillRect(-w / 2, y, w, 6)
+      g.fillStyle(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffdc5d : 0xef5350, 1)
+      g.fillRect(-w / 2 + 1, y + 1, (w - 2) * ratio, 4)
+    }
+  }
+
   /** 波末过场(镜像 endWave 尾段):停留结算横幅时长后按 run 状态进结算/抽卡/整编/商店 */
   private scheduleWaveEnd(finished: boolean): void {
     this.ending = true
@@ -357,6 +391,7 @@ export class EcsBattleScene extends Phaser.Scene {
       return
     }
     this.centerObj.setPosition(sim.center.x, sim.center.y)
+    this.updateHpBars()
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
       pages: this.atlas?.pageCount ?? 0,
