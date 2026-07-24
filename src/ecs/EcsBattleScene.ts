@@ -22,6 +22,7 @@ import { spawnSprite } from './entities'
 import { spawnTeam } from './team'
 import { spawnEnemy } from './enemy'
 import { armTeam, updateMemberAbilities } from './ability/wire'
+import { spawnStep } from './spawn'
 import { initialLayout, stepSim } from './sim'
 import type { Sim } from './sim'
 import { toPx } from '../battle/px'
@@ -180,6 +181,8 @@ export class EcsBattleScene extends Phaser.Scene {
     stepSim(sim, delta)
     // 队员能力驱动(wdelta=真实帧长;时停时标在 P4)
     updateMemberAbilities(sim, delta)
+    // 刷怪节奏
+    if (this.atlas) spawnStep(sim, this.atlas, delta)
     this.centerObj.setPosition(sim.center.x, sim.center.y)
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,

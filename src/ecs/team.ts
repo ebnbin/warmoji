@@ -137,6 +137,7 @@ export function spawnTeam(
     postBySlot,
     lineupOrbit: lineup.map((c) => c.orbit),
     members,
+    mapId: run.mapId,
     mapW,
     mapH,
     elapsedMs: 0,
@@ -145,5 +146,9 @@ export function spawnTeam(
     over: false,
     enemyTargets: [],
     rng: new Rng(run.decorSeed ^ 0x9e37),
+    wave: run.wave,
+    combatMs: run.combatMs,
+    spawnCooldownMs: 300,
+    pendingSpawns: [],
   }
 }

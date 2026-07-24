@@ -40,6 +40,7 @@ export interface Sim {
   lineupOrbit: number[]
   /** eid,按槽位序(稳定迭代) */
   members: number[]
+  mapId: import('../maps/registry').MapId
   mapW: number
   mapH: number
   elapsedMs: number
@@ -53,6 +54,23 @@ export interface Sim {
   enemyTargets: TargetInfo[]
   /** 敌人行为随机源(游荡换向/生成等;按 run 种子确定) */
   rng: Rng
+  /** 波次/累计战斗时长(难度曲线) */
+  wave: number
+  combatMs: number
+  /** 刷怪冷却 + 预告中待落地的敌人(telegraph 延迟) */
+  spawnCooldownMs: number
+  pendingSpawns: PendingSpawn[]
+}
+
+/** 预告中待落地的敌人 */
+export interface PendingSpawn {
+  def: import('../enemies/registry').EnemyDef
+  x: number
+  y: number
+  hp: number
+  elite: boolean
+  boss: boolean
+  at: number
 }
 
 /** 队伍活感·探测与轨道(镜像 updateOrbit):逐员判定探测范围内有无敌人 + 环上主力驱动共享相位 */
