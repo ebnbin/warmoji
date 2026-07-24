@@ -13,6 +13,7 @@ import { PROGRESSION } from '../defs/progression.ts'
 import { DIFFICULTY } from '../defs/difficulty.ts'
 import { TEAM_BASELINE } from '../defs/team.ts'
 import { COMBAT } from '../defs/combat.ts'
+import { FEEL } from '../defs/feel.ts'
 import { ECONOMY } from '../defs/economy.ts'
 import type { ItemDef } from '../src/items/registry'
 import type { Economy } from '../src/items/registry'
@@ -20,6 +21,7 @@ import type { Progression } from '../src/run/waves'
 import type { Difficulty } from '../src/enemies/registry'
 import type { TeamBaseline } from '../src/characters/registry'
 import type { CombatTuning } from '../src/abilities/registry'
+import type { FeelTuning } from '../src/battle/config'
 import type { MapDef } from '../src/maps/registry'
 
 // 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json。
@@ -460,6 +462,23 @@ for (const [id, pk] of Object.entries(PICKUPS)) {
   pure(p, c)
 }
 
+// ── feel（战斗手感：跟随弹簧 / 待机游移 / 受击抖屏）──
+{
+  const p = 'feel'
+  const f: FeelTuning = FEEL
+  num(`${p}.follow.kBase`, f.follow.kBase, 0.01)
+  num(`${p}.follow.kJitter`, f.follow.kJitter, 0)
+  num(`${p}.follow.zeta`, f.follow.zeta, 0.01)
+  num(`${p}.follow.maxLag`, f.follow.maxLag, 0)
+  num(`${p}.wander.radius`, f.wander.radius, 0)
+  num(`${p}.wander.freqX`, f.wander.freqX, 0)
+  num(`${p}.wander.freqY`, f.wander.freqY, 0)
+  num(`${p}.wander.rampMs`, f.wander.rampMs, 0.01)
+  num(`${p}.hitShake.durationMs`, f.hitShake.durationMs, 0)
+  num(`${p}.hitShake.intensity`, f.hitShake.intensity, 0)
+  pure(p, f)
+}
+
 // ── economy（暴击 / 商店定价）──
 {
   const p = 'economy'
@@ -499,5 +518,6 @@ write('progression', PROGRESSION)
 write('difficulty', DIFFICULTY)
 write('team', TEAM_BASELINE)
 write('combat', COMBAT)
+write('feel', FEEL)
 write('economy', ECONOMY)
-console.log('gen-defs：13 张表校验通过，已生成 src/assets/*.json')
+console.log('gen-defs：14 张表校验通过，已生成 src/assets/*.json')
