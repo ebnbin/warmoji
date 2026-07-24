@@ -26,6 +26,7 @@ import { enemyNest } from './store'
 import { armTeam, updateMemberAbilities } from './ability/wire'
 import { updateEnemyAbilities } from './ability/enemyWire'
 import { runDeathEffects } from './ability/death'
+import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
 import { spawnStep } from './spawn'
 import { initialLayout, stepSim } from './sim'
 import type { Sim } from './sim'
@@ -109,6 +110,7 @@ export class EcsBattleScene extends Phaser.Scene {
     const atlas = await EcsAtlas.build(this, OUTLINED_EMOJIS)
     if (!this.scene.isActive()) return
     this.atlas = atlas
+    clearGroundEffectsEcs() // 开局清上一局遗留的地面效果(模块级列表)
     new EcsSpriteBatch(this, this.world, atlas)
     this.spawnDecor(run, atlas)
     this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
@@ -232,6 +234,7 @@ export class EcsBattleScene extends Phaser.Scene {
       const best = this.nearestEnemyToCenter()
       return best >= 0 && Morph.until[best] !== 0 && sim.elapsedMs < Morph.until[best]!
     }
+    window.__ecsGroundZones = (): number => groundZoneCount()
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
       pages: atlas.pageCount,
@@ -295,6 +298,8 @@ export class EcsBattleScene extends Phaser.Scene {
     if (this.atlas) updateEnemyAbilities(sim, this, this.atlas, delta)
     // 亡语重放(分裂/诱饵/治疗/冷枪:本帧内所有死亡的敌人在死亡点触发)
     if (this.atlas) runDeathEffects(sim, this, this.atlas)
+    // 地面效果(灼烧/毒液区):team 脉冲烧敌 / enemy 节流烧队员 + 到期淡出
+    updateGroundEffectsEcs(sim, this)
     // 虫巢周期生成子敌(护巢子敌绕巢;拆巢暴走)
     if (this.atlas) updateSpawners(sim, this.atlas)
     // 刷怪节奏

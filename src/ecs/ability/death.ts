@@ -7,6 +7,7 @@ import type { DecoyEffect, SplitEffect } from '../../enemies/registry'
 import { Alive, Despawn, Iframe, Tint } from '../components'
 import { hurtMember } from '../combat'
 import { spawnBrood, spawnEnemy } from '../enemy'
+import { spawnGroundEffectEcs } from '../groundEffects'
 import { spawnEnemyProjectileEcs } from '../projectile'
 import { healEnemiesEcs } from './enemyCtx'
 import type { PendingDeath, Sim } from '../sim'
@@ -34,7 +35,7 @@ function makeDeathCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, d: Pending
       hurtMember(sim, m, damage)
     },
     slowTarget: () => {},
-    spawnGroundEffect: () => {}, // 地面效果 P 后续
+    spawnGroundEffect: (x, y, def) => spawnGroundEffectEcs(sim, scene, x, y, def, 'enemy'),
     heal: (x, y, range, amount, all, exclude) =>
       healEnemiesEcs(sim, x, y, range, amount, all, exclude ? eidOf(exclude) : undefined),
     spawnBullet: (x, y, angle, spec, damage, lifeMs) =>

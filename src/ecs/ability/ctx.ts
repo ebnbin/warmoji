@@ -6,6 +6,7 @@ import { Alive, Hp, Iframe, MHp, Poison, Slow, Transform } from '../components'
 import { applyDamage } from '../combat'
 import { applyMorph } from '../morph'
 import { enemyDef } from '../store'
+import { spawnGroundEffectEcs } from '../groundEffects'
 import { spawnProjectileEcs } from '../projectile'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
@@ -85,7 +86,7 @@ export function makeTeamCtx(
       const eid = eidOf(ref)
       if (enemyDef[eid] !== undefined) applyMorph(sim, atlas, eid, spec) // 死者不变形
     },
-    spawnGroundEffect: () => {}, // P3d
+    spawnGroundEffect: (x, y, def) => spawnGroundEffectEcs(sim, scene, x, y, def, 'team'),
     heal: (x, y, range, amount, all) => healMembers(sim, x, y, range, amount, all),
     targetHp: (ref) => Hp.v[eidOf(ref)] ?? 0,
     targetMaxHp: (ref) => Hp.max[eidOf(ref)] ?? 0,

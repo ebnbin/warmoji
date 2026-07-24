@@ -4,6 +4,7 @@ import { playSfx } from '../../audio/sfx'
 import type { AbilityContext, TargetInfo } from '../../abilities/types'
 import { Alive, Boss, DmgMul, Elite, ENEMY_SET, Hp, Iframe, MHp, Transform } from '../components'
 import { hurtMember } from '../combat'
+import { spawnGroundEffectEcs } from '../groundEffects'
 import { spawnEnemyProjectileEcs } from '../projectile'
 import { enemyVelX, enemyVelY, memberRef } from '../store'
 import type { Sim } from '../sim'
@@ -96,7 +97,7 @@ export function makeEnemyCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, eid
       hurtMember(sim, m, damage)
     },
     slowTarget: () => {},
-    spawnGroundEffect: () => {}, // 地面效果 P 后续
+    spawnGroundEffect: (x, y, def) => spawnGroundEffectEcs(sim, scene, x, y, def, 'enemy'),
     heal: (x, y, range, amount, all, exclude) =>
       healEnemiesEcs(sim, x, y, range, amount, all, exclude ? eidOf(exclude) : undefined),
     spawnProjectile: (x, y, angle, pDef, damage) => {
