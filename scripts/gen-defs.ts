@@ -12,10 +12,12 @@ import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
 import { DIFFICULTY } from '../defs/difficulty.ts'
 import { TEAM_BASELINE } from '../defs/team.ts'
+import { COMBAT } from '../defs/combat.ts'
 import type { ItemDef } from '../src/items/registry'
 import type { Progression } from '../src/run/waves'
 import type { Difficulty } from '../src/enemies/registry'
 import type { TeamBaseline } from '../src/characters/registry'
+import type { CombatTuning } from '../src/abilities/registry'
 
 // 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json。
 // 校验全部在此完成（形状/数值/交叉引用/可序列化），运行时零校验直读。
@@ -357,6 +359,17 @@ for (const [id, pk] of Object.entries(PICKUPS)) {
   pure(p, t)
 }
 
+// ── combat（战斗手感：击退 / 索敌）──
+{
+  const p = 'combat'
+  const c: CombatTuning = COMBAT
+  num(`${p}.knockback.tauMs`, c.knockback.tauMs, 0.01)
+  num(`${p}.knockback.maxSpeed`, c.knockback.maxSpeed, 1)
+  num(`${p}.knockback.deathSlideMs`, c.knockback.deathSlideMs, 0)
+  num(`${p}.acquire.range`, c.acquire.range, 0.01)
+  pure(p, c)
+}
+
 if (warnings.length > 0) {
   console.warn(`数值软护栏：${warnings.length} 条能力生效 DPS 越界（仅提示，不阻断）：`)
   for (const wn of warnings) console.warn('  ⚠ ' + wn)
@@ -382,4 +395,5 @@ write('pickups', PICKUPS)
 write('progression', PROGRESSION)
 write('difficulty', DIFFICULTY)
 write('team', TEAM_BASELINE)
-console.log('gen-defs：11 张表校验通过，已生成 src/assets/*.json')
+write('combat', COMBAT)
+console.log('gen-defs：12 张表校验通过，已生成 src/assets/*.json')
