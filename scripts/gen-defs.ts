@@ -10,6 +10,7 @@ import { ITEMS } from '../defs/items.ts'
 import { CARDS } from '../defs/cards.ts'
 import { BATTLEFIELD } from '../defs/battlefield.ts'
 import { SFX } from '../defs/sfx.ts'
+import { TIMESTOP } from '../defs/timestop.ts'
 import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
@@ -24,6 +25,7 @@ import type { Economy } from '../src/items/registry'
 import type { CardDef } from '../src/cards/registry'
 import type { BattlefieldTuning } from '../src/battlefield/registry'
 import type { SfxDef } from '../src/audio/sfx'
+import type { TimeStopTuning } from '../src/battle/timeStop'
 import type { Progression } from '../src/run/waves'
 import type { Difficulty } from '../src/enemies/registry'
 import type { TeamBaseline } from '../src/characters/registry'
@@ -380,6 +382,20 @@ for (const [id, c] of Object.entries<CardDef>(CARDS as Record<string, CardDef>))
   }
 }
 
+// ── timestop（时停技能：时标 + 冷雾表现）──
+{
+  const p = 'timestop'
+  const t: TimeStopTuning = TIMESTOP
+  num(`${p}.floor`, t.floor, 0)
+  if (t.floor > 1) bad(`${p}.floor`, '时间流速下限需 ≤1')
+  num(`${p}.easeMs`, t.easeMs, 0)
+  num(`${p}.chillMaxAlpha`, t.chillMaxAlpha, 0)
+  if (t.chillMaxAlpha > 1) bad(`${p}.chillMaxAlpha`, '不透明度需 ≤1')
+  num(`${p}.chillColor`, t.chillColor, 0)
+  num(`${p}.fadeMs`, t.fadeMs, 0.01)
+  pure(p, t)
+}
+
 // ── maps ──
 for (const [id, m] of Object.entries(MAPS)) {
   const p = `maps.${id}`
@@ -651,6 +667,7 @@ write('items', ITEMS)
 write('cards', CARDS)
 write('battlefield', BATTLEFIELD)
 write('sfx', SFX)
+write('timestop', TIMESTOP)
 write('maps', MAPS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
@@ -660,4 +677,4 @@ write('team', TEAM_BASELINE)
 write('combat', COMBAT)
 write('feel', FEEL)
 write('economy', ECONOMY)
-console.log('gen-defs：18 张表校验通过，已生成 src/assets/*.json')
+console.log('gen-defs：19 张表校验通过，已生成 src/assets/*.json')
