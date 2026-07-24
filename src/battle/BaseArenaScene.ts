@@ -173,8 +173,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.frameSlowZones.push({ x, y, r2: radius * radius, factor }),
     slowTarget: (enemy, factor, durationMs) => {
       const a = enemyOf(enemy as ImageObj)
-      a.abilitySlowMul = factor
-      a.abilitySlowUntil = this.elapsedMs + durationMs
+      a.abilitySlow = { mul: factor, until: this.elapsedMs + durationMs }
     },
     poisonTarget: (enemy, dmg, tickMs, durationMs) =>
       this.poisonEnemy(enemy as ImageObj, dmg, tickMs, durationMs, -1),
@@ -209,8 +208,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       this.applyDamage(ref as ImageObj, damage, kb ?? 0, sx, sy, this.teamEffectSlot),
     slowTarget: (enemy, factor, durationMs) => {
       const a = enemyOf(enemy as ImageObj)
-      a.abilitySlowMul = factor
-      a.abilitySlowUntil = this.elapsedMs + durationMs
+      a.abilitySlow = { mul: factor, until: this.elapsedMs + durationMs }
     },
     poisonTarget: (enemy, dmg, tickMs, durationMs) =>
       this.poisonEnemy(enemy as ImageObj, dmg, tickMs, durationMs, this.teamEffectSlot),
@@ -1393,7 +1391,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 亡语替身：无害尸壳，接触不造成伤害（荆棘也不触发）
     if (a.decoy) return
     // 变形中的敌人无害：接触不造成伤害（荆棘也不触发）
-    if (a.morphUntil > this.elapsedMs) return
+    if ((a.morph?.until ?? 0) > this.elapsedMs) return
     if (!m.alive || this.elapsedMs - m.lastHitMs < m.iframesMs) return
     m.lastHitMs = this.elapsedMs
     // 接触效果走统一 Effect 执行器（无敌帧节流已在上方掌管；srcName/伤害基准注入 ctx）
@@ -1546,8 +1544,8 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const a = enemyOf(enemy)
     if (a.dormant) return
     // 脆弱诅咒：变形中的敌人受伤加深
-    if (a.morphVuln !== 1 && a.morphUntil > this.elapsedMs) {
-      damage = Math.round(damage * a.morphVuln)
+    if ((a.morph?.vuln ?? 1) !== 1 && (a.morph?.until ?? 0) > this.elapsedMs) {
+      damage = Math.round(damage * a.morph!.vuln)
     }
     const hpBefore = a.hp
     const hp = hpBefore - damage
@@ -1559,7 +1557,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     }
     this.floatDamage(enemy.x, enemy.y, damage, crit)
     // Boss 体格击退免疫：不吃冲量也不被致死击飞（但变羊中的巢/Boss 除外——羊没有免疫，会被推动）
-    if (a.kbImmune && !a.morphed) knockback = 0
+    if (a.kbImmune && a.morph === undefined) knockback = 0
     if (hp <= 0) {
       // 致死一击：敌人失去自身动力，击退不再衰减——尸体被匀速击飞
       if (knockback > 0 && srcX !== undefined && srcY !== undefined) {
@@ -1619,7 +1617,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (a.carries) spawnFieldPickup(this, enemy.x, enemy.y, a.carries)
     if (a.boss) this.onBossDown(enemy)
     // 变羊中的敌人 = 一只无能力的羊：死亡不触发任何亡语/拆巢（彻底失去自身机制）
-    if (!a.morphed) {
+    if (a.morph === undefined) {
       // 亡语（死者视角）：蘑菇留毒/泡泡分裂/幽灵治疗等，走组合式效果
       runDeathEffects(this, a)
       // 拆巢：名下护巢子敌暴走（须在 despawnKilled 释放本体前，否则 owner 反查失效）
@@ -2014,11 +2012,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     const a = enemyOf(enemy)
     // Boss 免疫；同一敌人变羊有冷却（morphCdUntil 覆盖变形期 + 恢复后 MORPH_RECAST_CD 秒）
     if (a.boss || this.elapsedMs < a.morphCdUntil) return
-    a.morphUntil = this.elapsedMs + hex.durationMs
-    a.morphCdUntil = a.morphUntil + MORPH_RECAST_CD
-    a.morphVuln = hex.vulnMul ?? 1
-    if (!a.morphed) {
-      a.morphed = true
+    const wasMorphed = a.morph !== undefined
+    const until = this.elapsedMs + hex.durationMs
+    a.morphCdUntil = until + MORPH_RECAST_CD
+    a.morph = { until, vuln: hex.vulnMul ?? 1 }
+    if (!wasMorphed) {
       const size = a.def.size * (a.elite ? ELITE.sizeMul : 1)
       const outline = a.elite ? ('elite' as const) : ('enemy' as const)
       enemy.setTexture(emojiKey(hex.morphEmoji, outline))
@@ -2036,9 +2034,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
   /** 变形到期：恢复原形与行为（开火计时后延，避免恢复瞬间齐射） */
   private restoreMorph(a: Enemy): void {
     const enemy = a.image
-    a.morphUntil = 0
-    a.morphVuln = 1
-    a.morphed = false
+    a.morph = undefined
     const size = a.def.size * (a.elite ? ELITE.sizeMul : 1)
     const outline = a.elite ? ('elite' as const) : ('enemy' as const)
     enemy.setTexture(emojiKey(a.def.emoji, outline))
@@ -2064,8 +2060,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       else e.clearTint()
     }
     // 能力施加的限时减速/冻结（震慑余波、凛冬降临）：到时自动失效
-    if (a.abilitySlowUntil !== 0 && this.elapsedMs < a.abilitySlowUntil) {
-      factor *= a.abilitySlowMul
+    const aslow = a.abilitySlow
+    if (aslow !== undefined && this.elapsedMs < aslow.until) {
+      factor *= aslow.mul
     }
     // 时之沙的全局减速与精英加速同为「体质」倍率，不参与光环减速的染色判定。
     // 时停的世界时标（生效期近乎凝固）在此并入敌速——敌人由物理按实时积分速度，
@@ -2183,8 +2180,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
 
       // 仙子魔尘：变形期间失去本职行为（不开火/不突刺/不偷币），
       // 顶着绵羊形象缓速游荡；到期恢复原形
-      if (a.morphUntil !== 0) {
-        if (now < a.morphUntil) {
+      const morph = a.morph
+      if (morph) {
+        if (now < morph.until) {
           const slowM = this.slowFactorFor(a)
           const dir = this.wanderDir(a)
           body.setVelocity(dir.x * def.speed * 0.5 * slowM, dir.y * def.speed * 0.5 * slowM)

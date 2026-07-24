@@ -10,6 +10,23 @@ import type { FieldPickupDef } from '../battlefield/registry'
 /** 行为状态机：wander 游荡 / chase 追击 / windup 蓄力 / dash 冲刺 / cool 冷却 */
 export type EnemyState = 'wander' | 'chase' | 'windup' | 'dash' | 'cool'
 
+/** 能力施加的限时减速/冻结组件（用到才挂）：present + 未到期时按 mul 缩放移速（震慑余波、凛冬降临） */
+export interface SlowState {
+  /** 减速到期时刻 */
+  until: number
+  /** 移速缩放（<1 减速；0 冻结） */
+  mul: number
+}
+
+/** 变羊组件（用到才挂）：present ↔ 变形中；恢复原形 = 置空。防永久变羊的冷却 morphCdUntil
+ * 需在变形结束后仍持续，故独立于本组件、留作平铺字段 */
+export interface MorphState {
+  /** 恢复原形的时刻 */
+  until: number
+  /** 变形期易伤倍率（1 = 无） */
+  vuln: number
+}
+
 /** 中毒 DoT 组件（用到才挂）：非空即中毒；到期解毒 = 置空。小蜜蜂毒针等施加 */
 export interface PoisonState {
   /** 解毒时刻 */
@@ -50,15 +67,13 @@ export interface Enemy {
   nextSpawnAt: number
   danceUntil: number
   flashUntil: number
-  morphUntil: number
-  morphVuln: number
-  morphed: boolean
-  /** 变羊冷却到期时刻：变羊结束后一段时间内同一敌人不可再被变（防永久变羊） */
+  /** 变羊（用到才挂）：present ↔ 变形中；到期恢复原形 = 置空 */
+  morph?: MorphState
+  /** 变羊冷却到期时刻：变羊结束后一段时间内同一敌人不可再被变（防永久变羊；持久，独立于 morph） */
   morphCdUntil: number
   slowed: boolean
-  /** 能力施加的限时减速/冻结（0 = 无） */
-  abilitySlowUntil: number
-  abilitySlowMul: number
+  /** 能力施加的限时减速/冻结（用到才挂）：震慑余波/凛冬降临等；到期自动失效 */
+  abilitySlow?: SlowState
   /** 中毒 DoT（用到才挂）：非空即中毒，到期解毒 = poison 置空 */
   poison?: PoisonState
   /** 精英体质倍率 */
@@ -113,13 +128,8 @@ export function attachEnemy(image: ImageObj, def: EnemyDef, hp: number, init?: P
     nextSpawnAt: 0,
     danceUntil: 0,
     flashUntil: 0,
-    morphUntil: 0,
-    morphVuln: 1,
-    morphed: false,
     morphCdUntil: 0,
     slowed: false,
-    abilitySlowUntil: 0,
-    abilitySlowMul: 1,
     spMul: 1,
     dmgMul: 1,
     kvx: 0,
