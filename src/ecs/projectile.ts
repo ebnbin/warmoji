@@ -15,8 +15,10 @@ import {
   Transform,
   Vel,
 } from './components'
+import { applyEffects } from '../abilities/effects'
+import type { TargetInfo } from '../abilities/types'
 import { applyDamage } from './combat'
-import { projHitEids, projOnHit } from './store'
+import { enemyRef, projHitEids, projOnHit } from './store'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
 
@@ -111,10 +113,23 @@ export function updateProjectiles(sim: Sim, delta: number): void {
     }
     found.sort((p, q) => p.t - q.t)
     let dead = false
+    const onHit = projOnHit[eid]
     for (const f of found) {
       if (Hp.v[f.enemy] === undefined) continue
       hit.add(f.enemy)
+      const hx = Transform.x[f.enemy]!
+      const hy = Transform.y[f.enemy]!
       applyDamage(sim, f.enemy, Proj.damage[eid]!, Proj.kb[eid]!, ax, ay)
+      // 命中效果链(溅射/减速/毒/变羊…):复用 applyEffects,主目标排除出溅射圈
+      if (onHit && onHit.length > 0 && sim.effectCtx) {
+        const ref = enemyRef[f.enemy] as TargetInfo['ref'] | undefined
+        applyEffects(sim.effectCtx, onHit, {
+          center: { x: hx, y: hy },
+          baseDamage: Proj.damage[eid]!,
+          targets: ref ? [ref] : [],
+          exclude: ref ? new Set([ref]) : undefined,
+        })
+      }
       if (Proj.pierce[eid]! <= 0) {
         dead = true
         break

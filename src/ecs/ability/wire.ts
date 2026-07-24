@@ -34,6 +34,8 @@ export function armTeam(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, run: Run
   memberAbilities.length = 0
   memberHandle.length = 0
   const teamFx = aggregateTeamCards(run.teamCards)
+  // 抛射物 onHit 命中链的共享效果执行面(阵营=队伍,效果作用于敌方,与具体持有者无关)
+  sim.effectCtx = makeTeamCtx(sim, scene, atlas, -1, aggregateCharacterEffects([], []), teamFx)
   for (let slot = 0; slot < run.roster.length; slot++) {
     const id = run.roster[slot]!
     const def = CHARACTERS[id]

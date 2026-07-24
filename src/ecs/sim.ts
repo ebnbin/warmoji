@@ -13,7 +13,7 @@ import { memberContact, memberVisual, reviveMembers } from './combat'
 import { updateProjectiles } from './projectile'
 import type { EcsWorld } from './world'
 import type { Point } from '../core/vec'
-import type { TargetInfo } from '../abilities/types'
+import type { EffectCtx, TargetInfo } from '../abilities/types'
 
 // ECS 战斗仿真状态 + 系统(纯逻辑,禁 phaser)。数学逐行镜像旧 BaseArenaScene 的
 // updateOrbit / moveTeam / layoutTeam,常量与公式不变,只把「读写精灵」换成「读写组件」。
@@ -60,6 +60,8 @@ export interface Sim {
   /** 刷怪冷却 + 预告中待落地的敌人(telegraph 延迟) */
   spawnCooldownMs: number
   pendingSpawns: PendingSpawn[]
+  /** 队伍侧共享效果执行面(抛射物 onHit 命中链复用;armTeam 后由场景注入) */
+  effectCtx?: EffectCtx
 }
 
 /** 预告中待落地的敌人 */
