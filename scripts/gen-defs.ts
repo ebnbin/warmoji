@@ -8,6 +8,7 @@ import { CAPTAINS } from '../defs/captains.ts'
 import { ENEMIES } from '../defs/enemies.ts'
 import { ITEMS } from '../defs/items.ts'
 import { CARDS } from '../defs/cards.ts'
+import { BATTLEFIELD } from '../defs/battlefield.ts'
 import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
@@ -20,6 +21,7 @@ import { ECONOMY } from '../defs/economy.ts'
 import type { ItemDef } from '../src/items/registry'
 import type { Economy } from '../src/items/registry'
 import type { CardDef } from '../src/cards/registry'
+import type { BattlefieldTuning } from '../src/battlefield/registry'
 import type { Progression } from '../src/run/waves'
 import type { Difficulty } from '../src/enemies/registry'
 import type { TeamBaseline } from '../src/characters/registry'
@@ -74,6 +76,11 @@ const CASTABLE_KINDS = new Set(['rally', 'strike', 'dance', 'buff', 'nuke', 'tim
 /** 卡面合法标签（与 src/cards/registry.ts 的 CardTag 同步） */
 const CARD_TAGS = new Set([
   'economy', 'tempo', 'offense', 'defense', 'meta', 'skill', 'loot', 'trade', 'curse',
+])
+
+/** 限时战斗层的合法轴（与 src/battlefield/registry.ts 的 BattleEffects 键同步）：战场拾取 fx 只能落在这些键上 */
+const BATTLE_EFFECT_KEYS = new Set([
+  'moveSpeedMul', 'teamDamageMul', 'teamCooldownMul', 'critAdd', 'enemySlowMul',
 ])
 
 /** 团队效果的合法轴（与 src/items/registry.ts 的 TeamEffects 键同步）：卡面 effects 只能落在这些键上 */
@@ -306,6 +313,46 @@ for (const [id, c] of Object.entries<CardDef>(CARDS as Record<string, CardDef>))
     else num(`${p}.effects.${k}`, eff[k], Number.NEGATIVE_INFINITY)
   }
   pure(p, c)
+}
+
+// ── battlefield（战场拾取：各图池内容 + 拾取旋钮）──
+{
+  const bf: BattlefieldTuning = BATTLEFIELD
+  const seenIds = new Set<string>()
+  for (const mapId of Object.keys(MAPS)) {
+    const pool = bf.pools[mapId as keyof typeof bf.pools]
+    const pp = `battlefield.pools.${mapId}`
+    if (!Array.isArray(pool) || pool.length === 0) {
+      bad(pp, '每图需有非空拾取池')
+      continue
+    }
+    let buffs = 0
+    let debuffs = 0
+    for (const d of pool) {
+      const dp = `${pp}.${d.id}`
+      if (seenIds.has(d.id)) bad(dp, `拾取 id 重复：${d.id}`)
+      seenIds.add(d.id)
+      str(`${dp}.emoji`, d.emoji)
+      str(`${dp}.name`, d.name)
+      str(`${dp}.desc`, d.desc)
+      if (d.polarity !== 'buff' && d.polarity !== 'debuff') bad(`${dp}.polarity`, `未知极性：${d.polarity}`)
+      else if (d.polarity === 'buff') buffs++
+      else debuffs++
+      num(`${dp}.durationMs`, d.durationMs, 1)
+      const fx = d.fx as Record<string, unknown>
+      const keys = Object.keys(fx)
+      if (keys.length === 0) bad(`${dp}.fx`, '至少要有一个效果轴')
+      for (const k of keys) {
+        if (!BATTLE_EFFECT_KEYS.has(k)) bad(`${dp}.fx`, `未知效果轴：${k}`)
+        else num(`${dp}.fx.${k}`, fx[k], Number.NEGATIVE_INFINITY)
+      }
+    }
+    if (buffs === 0 || debuffs === 0) bad(pp, `每图至少 1 增益 + 1 减益（现 ${buffs} 增 ${debuffs} 减）`)
+  }
+  num('battlefield.field.grabRadiusU', bf.field.grabRadiusU, 0.01)
+  num('battlefield.field.groundMs', bf.field.groundMs, 1)
+  num('battlefield.field.auraRadiusU', bf.field.auraRadiusU, 0.01)
+  pure('battlefield', bf)
 }
 
 // ── maps ──
@@ -577,6 +624,7 @@ write('captains', CAPTAINS)
 write('enemies', { enemies: ENEMIES })
 write('items', ITEMS)
 write('cards', CARDS)
+write('battlefield', BATTLEFIELD)
 write('maps', MAPS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
@@ -586,4 +634,4 @@ write('team', TEAM_BASELINE)
 write('combat', COMBAT)
 write('feel', FEEL)
 write('economy', ECONOMY)
-console.log('gen-defs：16 张表校验通过，已生成 src/assets/*.json')
+console.log('gen-defs：17 张表校验通过，已生成 src/assets/*.json')
