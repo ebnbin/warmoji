@@ -12,6 +12,7 @@ import { BATTLEFIELD } from '../defs/battlefield.ts'
 import { SFX } from '../defs/sfx.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { MAP_DEFAULTS } from '../defs/mapdefaults.ts'
+import { LEVEL_STATS } from '../defs/levels.ts'
 import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
@@ -87,6 +88,12 @@ const CARD_TAGS = new Set([
 /** 限时战斗层的合法轴（与 src/battlefield/registry.ts 的 BattleEffects 键同步）：战场拾取 fx 只能落在这些键上 */
 const BATTLE_EFFECT_KEYS = new Set([
   'moveSpeedMul', 'teamDamageMul', 'teamCooldownMul', 'critAdd', 'enemySlowMul',
+])
+
+/** 角色效果的合法轴（与 src/items/registry.ts 的 CharacterEffects 键同步）：等级形态片段只能落在这些键上 */
+const CHARACTER_EFFECT_KEYS = new Set([
+  'hpAdd', 'damageMul', 'cooldownMul', 'rangeMul', 'projSpeedMul', 'iframesAddMs',
+  'reviveAddMs', 'regenPerSec', 'thorns', 'killHeal', 'critChance', 'knockbackMul',
 ])
 
 /** 团队效果的合法轴（与 src/items/registry.ts 的 TeamEffects 键同步）：卡面 effects 只能落在这些键上 */
@@ -230,6 +237,33 @@ for (const [id, c] of Object.entries(CAPTAINS)) {
     }
   }
   pure(p, c)
+}
+
+// ── levels（角色等级形态的基础属性质变：每角色 2 档完整片段）──
+{
+  const ls = LEVEL_STATS as Record<string, readonly Partial<Record<string, unknown>>[]>
+  const charIds = new Set(Object.keys(CHARACTERS))
+  for (const id of Object.keys(ls)) {
+    if (!charIds.has(id)) bad(`levels.${id}`, `未知角色：${id}`)
+  }
+  for (const id of charIds) {
+    const p = `levels.${id}`
+    const tiers = ls[id]
+    if (!Array.isArray(tiers) || tiers.length !== 2) {
+      bad(p, '需为恰好 2 档（2/3 级形态）')
+      continue
+    }
+    tiers.forEach((tier, k) => {
+      const tp = `${p}[${k}]`
+      const keys = Object.keys(tier)
+      if (keys.length === 0) bad(tp, '等级形态片段不能为空')
+      for (const key of keys) {
+        if (!CHARACTER_EFFECT_KEYS.has(key)) bad(tp, `未知效果轴：${key}`)
+        else num(`${tp}.${key}`, tier[key], Number.NEGATIVE_INFINITY)
+      }
+    })
+    pure(p, tiers)
+  }
 }
 
 // ── enemies ──
@@ -694,6 +728,7 @@ const write = (name: string, data: unknown): void =>
 write('abilities', ABILITIES)
 write('weapons', WEAPONS)
 write('characters', CHARACTERS)
+write('levels', LEVEL_STATS)
 write('captains', CAPTAINS)
 write('enemies', { enemies: ENEMIES })
 write('items', ITEMS)
@@ -711,4 +746,4 @@ write('team', TEAM_BASELINE)
 write('combat', COMBAT)
 write('feel', FEEL)
 write('economy', ECONOMY)
-console.log('gen-defs：20 张表校验通过，已生成 src/assets/*.json')
+console.log('gen-defs：21 张表校验通过，已生成 src/assets/*.json')
