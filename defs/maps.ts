@@ -167,6 +167,17 @@ export const MAPS = {
     },
     drift: ['1f343', '1f338', '1fae7', '1f342'],
     mix: RIVER_MIX,
+    // 奔流/水流特性：单屏固定相机（放大 1.2）+ 12 格河道 + 恒定顺流漂移
+    river: {
+      viewScale: 1.2,
+      width: 12,
+      flow: 1,
+      coinCullPad: 2,
+      driftCount: 18,
+      driftSpeedMul: [0.75, 1.3],
+      waveSlow: 0.6,
+      waveFast: 1.2,
+    },
     boss: 'croc',
   },
   void: {

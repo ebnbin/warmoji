@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { MEMBER, TEAM } from '../characters/registry'
 import { UNIT } from '../core/units'
-import { RIVER } from './river'
+import type { RiverConfig } from './registry'
 import { INFINITE } from './world'
 import { MAPS, bossFor } from './registry'
 import type { MapDef } from './registry'
@@ -19,7 +19,7 @@ import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 
 // 河流竞技场（kind='river'）：单屏世界——相机静止，世界 = 逻辑视口 × 1.2
 // （viewScale 经相机 zoom 实现，实体速度/尺寸全不变）。世界规则：
-// · 河道沿长轴居中、宽恒 RIVER.width，短边余量为两岸暗带（不可进入）
+// · 河道沿长轴居中、宽恒 this.riverCfg.width，短边余量为两岸暗带（不可进入）
 // · 水流：恒定漂移矢量（横屏右→左，竖屏上→下）逐帧加在所有实体上
 //   （子弹除外）——顺流快/逆流慢/挂机漂向下游全部由此自然涌现
 // · 钳制：队伍中心与 Boss 被钳在河道内；敌人只钳跨向（不能上岸），
@@ -62,6 +62,11 @@ export class RiverArenaScene extends BaseArenaScene {
 
   constructor() {
     super('arenaRiver')
+  }
+
+  /** 奔流特性配置（来自 MapDef 数据；奔流图必配 river） */
+  private get riverCfg(): RiverConfig {
+    return MAPS[this.run.mapId].river!
   }
 
   protected resetWorldFields(): void {
@@ -139,7 +144,7 @@ export class RiverArenaScene extends BaseArenaScene {
 
   /** 漂出下游边界外一段距离：河水冲走（玩家钳在屏内，永远追不回） */
   cullCoin(c: ImageObj): boolean {
-    return pastDownstream(c, this.viewW, this.viewH, RIVER.coinCullPad * UNIT)
+    return pastDownstream(c, this.viewW, this.viewH, this.riverCfg.coinCullPad * UNIT)
   }
 
   /** 不在磁吸范围：纯随波逐流 */
@@ -242,14 +247,14 @@ export class RiverArenaScene extends BaseArenaScene {
 
   /** 静止相机 + 河流图专属视野倍率，并同步派生的世界几何 */
   private setupCamera(): void {
-    this.viewW = viewport.logicalWidth * RIVER.viewScale
-    this.viewH = viewport.logicalHeight * RIVER.viewScale
+    this.viewW = viewport.logicalWidth * this.riverCfg.viewScale
+    this.viewH = viewport.logicalHeight * this.riverCfg.viewScale
     const cam = this.cameras.main
-    cam.setZoom(viewport.renderScale / RIVER.viewScale)
+    cam.setZoom(viewport.renderScale / this.riverCfg.viewScale)
     cam.centerOn(this.viewW / 2, this.viewH / 2)
     this.horizontal = isHorizontal(this.viewW, this.viewH)
-    this.river = riverRect(this.viewW, this.viewH, RIVER.width * UNIT)
-    this.flow = flowVector(this.horizontal, RIVER.flow * UNIT)
+    this.river = riverRect(this.viewW, this.viewH, this.riverCfg.width * UNIT)
+    this.flow = flowVector(this.horizontal, this.riverCfg.flow * UNIT)
   }
 
   // ── 水流与钳制 ──────────────────────────────────────────────
@@ -362,8 +367,8 @@ export class RiverArenaScene extends BaseArenaScene {
     this.ensureWaveTexture()
     const texKey = this.horizontal ? 'river-wave-h' : 'river-wave-v'
     for (const [alpha, speed] of [
-      [0.1, RIVER.waveSlow * UNIT],
-      [0.16, RIVER.waveFast * UNIT],
+      [0.1, this.riverCfg.waveSlow * UNIT],
+      [0.16, this.riverCfg.waveFast * UNIT],
     ] as const) {
       const tile = this.add
         .tileSprite(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h, texKey)
@@ -414,7 +419,7 @@ export class RiverArenaScene extends BaseArenaScene {
 
     // 漂浮物（顺流循环）：初始均匀铺满，之后 updateWater 推进
     const driftPool = mapDef.drift ?? ['1f343']
-    for (let i = 0; i < RIVER.driftCount; i++) {
+    for (let i = 0; i < this.riverCfg.driftCount; i++) {
       const emoji = driftPool[Math.floor(Math.random() * driftPool.length)]!
       const img = emojiImage(this, 0, 0, emoji, (0.35 + Math.random() * 0.25) * UNIT, 'player')
         .setAlpha(0.5)
@@ -430,7 +435,7 @@ export class RiverArenaScene extends BaseArenaScene {
       }
       d.speedMul =
         driftProfile(d.baseCross / ((r.horizontal ? r.h : r.w) / 2)) *
-        (RIVER.driftSpeedMul[0] + Math.random() * (RIVER.driftSpeedMul[1] - RIVER.driftSpeedMul[0]))
+        (this.riverCfg.driftSpeedMul[0] + Math.random() * (this.riverCfg.driftSpeedMul[1] - this.riverCfg.driftSpeedMul[0]))
       this.drifts.push(d)
       this.placeDrift(d)
     }
@@ -487,7 +492,7 @@ export class RiverArenaScene extends BaseArenaScene {
     const alongLen = this.horizontal ? this.viewW : this.viewH
     const margin = UNIT
     for (const d of this.drifts) {
-      d.uPx += RIVER.flow * UNIT * d.speedMul * dt
+      d.uPx += this.riverCfg.flow * UNIT * d.speedMul * dt
       if (d.uPx > alongLen + margin) {
         // 漂出下游 → 回上游重新进场（换个横位/速度）
         d.uPx = -margin
@@ -495,7 +500,7 @@ export class RiverArenaScene extends BaseArenaScene {
         d.baseCross = (Math.random() * 2 - 1) * halfCross * 0.92
         d.speedMul =
           driftProfile(d.baseCross / halfCross) *
-          (RIVER.driftSpeedMul[0] + Math.random() * (RIVER.driftSpeedMul[1] - RIVER.driftSpeedMul[0]))
+          (this.riverCfg.driftSpeedMul[0] + Math.random() * (this.riverCfg.driftSpeedMul[1] - this.riverCfg.driftSpeedMul[0]))
       }
       d.image.rotation += d.spin * dt
       this.placeDrift(d)

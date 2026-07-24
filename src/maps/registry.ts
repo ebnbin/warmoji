@@ -108,6 +108,26 @@ export interface SpaceConfig {
   }
 }
 
+/** 奔流/水流特性（可选）：单屏固定相机 + 河道 + 恒定顺流漂移（万物随波逐流）。
+ * 目前仅奔流图配置；数据模型上任何图都可组合本特性 */
+export interface RiverConfig {
+  /** 视野倍率：单屏固定相机下放大逻辑视口（世界尺寸 = 逻辑视口 × viewScale） */
+  readonly viewScale: number
+  /** 河道宽度（格，跨流向恒定） */
+  readonly width: number
+  /** 流速（格/秒，恒定漂移） */
+  readonly flow: number
+  /** 金币漂出下游边界这一距离后清理（格） */
+  readonly coinCullPad: number
+  /** 水面漂浮物数量 */
+  readonly driftCount: number
+  /** 漂浮物个体速度倍率区间 */
+  readonly driftSpeedMul: readonly [number, number]
+  /** 双层水纹滚动速度（视差贴图偏移，约为流速的倍数） */
+  readonly waveSlow: number
+  readonly waveFast: number
+}
+
 export interface MapDef {
   readonly emoji: string
   readonly name: string
@@ -141,6 +161,8 @@ export interface MapDef {
   readonly ice?: IceConfig
   /** 深空特性（可选）：配置即启用黑洞禁锢场 + 天体横扫（当前仅深空图使用） */
   readonly space?: SpaceConfig
+  /** 奔流/水流特性（可选）：配置即启用单屏固定相机 + 河道 + 顺流漂移（当前仅奔流图使用） */
+  readonly river?: RiverConfig
   /** 本图终波 Boss：引用 enemies 里某个 role:'boss' 的 kind */
   readonly boss: string
 }

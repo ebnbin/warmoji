@@ -327,6 +327,18 @@ for (const [id, m] of Object.entries(MAPS)) {
     num(`${p}.space.meteor.offsetU`, mt.offsetU, 0)
     num(`${p}.space.meteor.damage`, mt.damage, 0)
   }
+  const rv = (m as MapDef).river
+  if (rv) {
+    num(`${p}.river.viewScale`, rv.viewScale, 0.01)
+    num(`${p}.river.width`, rv.width, 0.01)
+    num(`${p}.river.flow`, rv.flow, 0)
+    num(`${p}.river.coinCullPad`, rv.coinCullPad, 0)
+    num(`${p}.river.driftCount`, rv.driftCount, 0)
+    if (!Array.isArray(rv.driftSpeedMul) || rv.driftSpeedMul.length !== 2) bad(`${p}.river.driftSpeedMul`, '需为 [min,max]')
+    else rv.driftSpeedMul.forEach((v, i) => num(`${p}.river.driftSpeedMul[${i}]`, v, 0))
+    num(`${p}.river.waveSlow`, rv.waveSlow, 0)
+    num(`${p}.river.waveFast`, rv.waveFast, 0)
+  }
   pure(p, m)
 }
 
