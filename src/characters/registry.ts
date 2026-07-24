@@ -1,4 +1,5 @@
 import charactersJson from '../assets/characters.json'
+import teamJson from '../assets/team.json'
 import { ABILITIES } from '../abilities/registry'
 import type { AbilityId } from '../abilities/registry'
 import type { AbilityDef } from '../abilities/defs'
@@ -129,22 +130,30 @@ export function upgradeCardsFor(def: CharacterDef): readonly [UpgradeCard, Upgra
 
 // 队伍：玩家操控队伍中心点，角色按队形岗位随行；除此之外角色是完全独立的单位。
 // 队形几何在 characters/formation.ts；满员后可在整编页切换队形与互换站位。
-export const TEAM = {
-  ringRadius: 0.8,
-  /** 3 人环收紧的小半径（人少时更像一个整体）；≥4 人用 ringRadius */
-  smallRingRadius: 0.58,
-  /** 2 人阵的左右圆心距（紧凑贴身，允许轻微视觉重叠）；1~2 人不环绕 */
-  pairGap: 1.1,
-  // 移速已下放到各队长（CaptainDef.moveSpeed）；复活基线仍在此，队长按 reviveMul 缩放
-  reviveMs: 10_000,
-  /** N 保 1 中心的受击判定半径系数：被保护的实际收益（碰撞圆减半更难被摸到） */
-  guardCenterHurtboxMul: 0.5,
-} as const
+// 队伍/角色基线的「设计数值」形状：数据行在 defs/team.ts（创作层），gen 校验产出 team.json；
+// 本文件只从中派生惯用导出 TEAM/MEMBER，形状与数值不变。
+export interface TeamBaseline {
+  readonly team: {
+    /** 角色环绕队形半径（≥4 人） */
+    readonly ringRadius: number
+    /** 3 人环收紧的小半径（人少时更像一个整体） */
+    readonly smallRingRadius: number
+    /** 2 人阵的左右圆心距（紧凑贴身；1~2 人不环绕） */
+    readonly pairGap: number
+    /** 复活基线时长（队长按 reviveMul 缩放；移速已下放到 CaptainDef.moveSpeed） */
+    readonly reviveMs: number
+    /** N 保 1 中心的受击判定半径系数（碰撞圆减半更难被摸到） */
+    readonly guardCenterHurtboxMul: number
+  }
+  readonly member: {
+    readonly size: number
+    readonly radius: number
+    readonly maxHp: number
+    /** 受击无敌间隔：让「蹭到怪」是磨损而非速死 */
+    readonly iframesMs: number
+  }
+}
 
-export const MEMBER = {
-  size: 1.2,
-  radius: 0.45,
-  maxHp: 100,
-  // 波次制要求整波存活，受击间隔放宽让「蹭到怪」是磨损而非速死
-  iframesMs: 700,
-} as const
+const TB = teamJson as unknown as TeamBaseline
+export const TEAM = TB.team
+export const MEMBER = TB.member

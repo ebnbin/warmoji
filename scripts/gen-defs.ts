@@ -11,9 +11,11 @@ import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
 import { DIFFICULTY } from '../defs/difficulty.ts'
+import { TEAM_BASELINE } from '../defs/team.ts'
 import type { ItemDef } from '../src/items/registry'
 import type { Progression } from '../src/run/waves'
 import type { Difficulty } from '../src/enemies/registry'
+import type { TeamBaseline } from '../src/characters/registry'
 
 // 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json。
 // 校验全部在此完成（形状/数值/交叉引用/可序列化），运行时零校验直读。
@@ -339,6 +341,22 @@ for (const [id, pk] of Object.entries(PICKUPS)) {
   pure(p, d)
 }
 
+// ── team（队伍/角色基线）──
+{
+  const p = 'team'
+  const t: TeamBaseline = TEAM_BASELINE
+  num(`${p}.team.ringRadius`, t.team.ringRadius, 0.01)
+  num(`${p}.team.smallRingRadius`, t.team.smallRingRadius, 0.01)
+  num(`${p}.team.pairGap`, t.team.pairGap, 0.01)
+  num(`${p}.team.reviveMs`, t.team.reviveMs, 0)
+  num(`${p}.team.guardCenterHurtboxMul`, t.team.guardCenterHurtboxMul, 0)
+  num(`${p}.member.size`, t.member.size, 0.01)
+  num(`${p}.member.radius`, t.member.radius, 0.01)
+  num(`${p}.member.maxHp`, t.member.maxHp, 1)
+  num(`${p}.member.iframesMs`, t.member.iframesMs, 0)
+  pure(p, t)
+}
+
 if (warnings.length > 0) {
   console.warn(`数值软护栏：${warnings.length} 条能力生效 DPS 越界（仅提示，不阻断）：`)
   for (const wn of warnings) console.warn('  ⚠ ' + wn)
@@ -363,4 +381,5 @@ write('maps', MAPS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
 write('difficulty', DIFFICULTY)
-console.log('gen-defs：10 张表校验通过，已生成 src/assets/*.json')
+write('team', TEAM_BASELINE)
+console.log('gen-defs：11 张表校验通过，已生成 src/assets/*.json')
