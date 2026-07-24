@@ -212,6 +212,8 @@ export const MAPS = {
       density: [0.05, 0.08],
     },
     mix: RUINS_MIX,
+    // 断壁/地形特性：块数 / 单块最大长度 / 中心留空 / 刷怪最小格距 / 流场重算节流
+    walls: { blocks: 15, maxLen: 4, centerClearU: 3.5, spawnMinCellDist: 5, reflowMs: 120 },
     // 残垣专属 Boss：拆迁鬼——犀角冲撞碾墙 + 落石无视遮挡
     boss: 'rhino',
   },

@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { ArenaScene } from './ArenaScene'
-import { MAP } from './registry'
+import { MAP, MAPS } from './registry'
+import type { WallsConfig } from './registry'
 import { UNIT } from '../core/units'
 import { Rng } from '../core/rng'
 import { FlowField, WallGrid, generateRuins, reachableCells } from './ruins'
@@ -14,17 +15,6 @@ import type { ImageObj } from '../battle/BaseArenaScene'
 
 const COLS = MAP.width
 const ROWS = MAP.height
-
-// 布局参数 + 视觉
-const RUINS = {
-  blocks: 15,
-  maxLen: 4,
-  centerClearU: 3.5,
-  /** 刷怪点离队伍中心的最小格距（别贴脸刷） */
-  spawnMinCellDist: 5,
-  /** 流场重算节流（ms）：队伍格没变就不重算 */
-  reflowMs: 120,
-} as const
 
 // 残垣（kind='ruins'）：有界竞技场里铺断壁——墙同时挡移动 / 挡子弹 / 挡索敌视线。
 // 复用 ArenaScene 整套盒子世界规则，叠加：断壁网格（WallGrid）+ 流场寻路（FlowField）。
@@ -44,6 +34,11 @@ export class RuinsArenaScene extends ArenaScene {
     super('arenaRuins')
   }
 
+  /** 断壁特性配置（来自 MapDef 数据；残垣图必配 walls） */
+  private get walls(): WallsConfig {
+    return MAPS[this.run.mapId].walls!
+  }
+
   protected resetWorldFields(): void {
     super.resetWorldFields()
     this.flow = undefined
@@ -59,10 +54,11 @@ export class RuinsArenaScene extends ArenaScene {
     super.createWorld() // 盒子边界 + 相机 + 地面 + 装饰
     // 逐局按种子铺断壁
     const rng = new Rng(this.run.decorSeed ^ 0x5eed)
+    const walls = this.walls
     const blocked = generateRuins(() => rng.next(), COLS, ROWS, {
-      blocks: RUINS.blocks,
-      maxLen: RUINS.maxLen,
-      centerClearU: RUINS.centerClearU,
+      blocks: walls.blocks,
+      maxLen: walls.maxLen,
+      centerClearU: walls.centerClearU,
     })
     this.grid = new WallGrid(COLS, ROWS, UNIT, blocked)
     // 只在「从中心可达」的通行格刷怪，保证敌人总能寻路到队伍
@@ -136,11 +132,11 @@ export class RuinsArenaScene extends ArenaScene {
 
   /** 只在可达通行格刷怪，且离队伍中心足够远 */
   protected spawnPoint(): Point {
-    return this.pickSpawn(RUINS.spawnMinCellDist)
+    return this.pickSpawn(this.walls.spawnMinCellDist)
   }
 
   protected bossSpawnPoint(): Point {
-    return this.pickSpawn(RUINS.spawnMinCellDist + 2)
+    return this.pickSpawn(this.walls.spawnMinCellDist + 2)
   }
 
   private pickSpawn(minCellDist: number): Point {
@@ -222,7 +218,7 @@ export class RuinsArenaScene extends ArenaScene {
     this.reflowAcc += delta
     const cx = this.grid.cellX(this.center.x)
     const cy = this.grid.cellY(this.center.y)
-    if (cx !== this.flowCellX || cy !== this.flowCellY || this.reflowAcc >= RUINS.reflowMs) {
+    if (cx !== this.flowCellX || cy !== this.flowCellY || this.reflowAcc >= this.walls.reflowMs) {
       this.flow = new FlowField(this.grid, cx, cy)
       this.flowCellX = cx
       this.flowCellY = cy

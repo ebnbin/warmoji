@@ -19,6 +19,21 @@ export interface MapDecor {
   readonly density: readonly [number, number]
 }
 
+/** 断壁/地形特性（可选）：挂在有界图上即启用墙——挡移动/子弹/视线 + 流场寻路。
+ * 目前仅残垣图配置；数据模型上任何有界图都可通过配置本字段获得该玩法（组合式地图特性） */
+export interface WallsConfig {
+  /** 断壁块数 */
+  readonly blocks: number
+  /** 单块最大长度（格） */
+  readonly maxLen: number
+  /** 中心留空半径（格） */
+  readonly centerClearU: number
+  /** 刷怪点离队伍中心的最小格距（别贴脸刷） */
+  readonly spawnMinCellDist: number
+  /** 流场重算节流（ms）：队伍格没变就不重算 */
+  readonly reflowMs: number
+}
+
 export interface MapDef {
   readonly emoji: string
   readonly name: string
@@ -44,6 +59,8 @@ export interface MapDef {
   readonly dayMix?: readonly EnemyMixRow[]
   /** 昼夜图专用：黑夜出怪表（稀疏潜袭怪） */
   readonly nightMix?: readonly EnemyMixRow[]
+  /** 断壁/地形特性（可选）：配置即启用墙 + 流场寻路（当前仅残垣图使用） */
+  readonly walls?: WallsConfig
   /** 本图终波 Boss：引用 enemies 里某个 role:'boss' 的 kind */
   readonly boss: string
 }

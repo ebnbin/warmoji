@@ -20,6 +20,7 @@ import type { Progression } from '../src/run/waves'
 import type { Difficulty } from '../src/enemies/registry'
 import type { TeamBaseline } from '../src/characters/registry'
 import type { CombatTuning } from '../src/abilities/registry'
+import type { MapDef } from '../src/maps/registry'
 
 // 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json。
 // 校验全部在此完成（形状/数值/交叉引用/可序列化），运行时零校验直读。
@@ -280,6 +281,14 @@ for (const [id, m] of Object.entries(MAPS)) {
   }
   if (!(m.boss in ENEMIES)) bad(`${p}.boss`, `引用了不存在的敌人 kind：${m.boss}`)
   else if (ENEMIES[m.boss]?.role !== 'boss') bad(`${p}.boss`, `boss 必须指向 role:'boss' 的条目：${m.boss}`)
+  const w = (m as MapDef).walls
+  if (w) {
+    num(`${p}.walls.blocks`, w.blocks, 1)
+    num(`${p}.walls.maxLen`, w.maxLen, 1)
+    num(`${p}.walls.centerClearU`, w.centerClearU, 0)
+    num(`${p}.walls.spawnMinCellDist`, w.spawnMinCellDist, 0)
+    num(`${p}.walls.reflowMs`, w.reflowMs, 0)
+  }
   pure(p, m)
 }
 
