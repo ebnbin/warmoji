@@ -116,6 +116,14 @@ const POOLS: Record<MapId, readonly FieldPickupDef[]> = {
     { id: 'space_drag', emoji: '1f300', name: '黑洞拖曳', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.7 } },
     { id: 'space_weightless', emoji: '1fa90', name: '失重打滑', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
   ],
+  // 浮冰：疾滑/冰棱/寒霜（增益），薄冰失足/霜冻僵手（减益）——呼应打滑与寒水主题
+  ice: [
+    { id: 'ice_glide', emoji: '26f8', name: '疾滑突进', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { moveSpeedMul: 1.3 } },
+    { id: 'ice_shard', emoji: '2744', name: '冰棱贯穿', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { teamDamageMul: 1.35 } },
+    { id: 'ice_frost', emoji: '1f9ca', name: '寒霜锁敌', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemySlowMul: 0.65 } },
+    { id: 'ice_thin', emoji: '1f4a6', name: '薄冰失足', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.72 } },
+    { id: 'ice_numb', emoji: '1f976', name: '霜冻僵手', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
+  ],
 }
 
 /** 全部拾取按 id 索引（携带者掉落/注入器按 id 反查） */

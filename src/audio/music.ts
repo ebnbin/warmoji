@@ -549,6 +549,8 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   ruins: buildRuins,
   daynight: buildDayNight,
   space: buildSpace,
+  // 浮冰：暂借深空的空灵飘浮曲（冷调、稀疏，占位），建议后续单独作一支寒冰主题曲
+  ice: buildSpace,
 }
 
 const cache = new Map<BgmId, BgmScore>()

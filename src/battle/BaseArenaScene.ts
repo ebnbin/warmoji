@@ -481,6 +481,11 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     void _e
     void _body
   }
+  /** 击退冲量衰减时间常数的倍率（默认 1）。地面摩擦越小该值越大——
+   * 击退速度衰减越慢、滑得越远（浮冰图借此让击退格外突出） */
+  protected knockbackTauMul(): number {
+    return 1
+  }
   /** 敌弹的额外回收条件（有界图出地图即灭；寿命回收在基座） */
   cullEnemyProjectile(_s: ImageObj): boolean {
     void _s
@@ -2227,7 +2232,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (a.kvx === 0 && a.kvy === 0) return
     body.velocity.x += a.kvx
     body.velocity.y += a.kvy
-    const decay = Math.exp(-delta / KNOCKBACK.tauMs)
+    const decay = Math.exp(-delta / (KNOCKBACK.tauMs * this.knockbackTauMul()))
     if ((a.kvx * a.kvx + a.kvy * a.kvy) * decay * decay < 100) {
       a.kvx = 0
       a.kvy = 0

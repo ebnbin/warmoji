@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { confineVelocity, meteorSweep } from './space'
+import { clampToDisc, confineVelocity, meteorSweep } from './space'
 
 describe('黑洞禁锢场', () => {
   const R = 10
@@ -33,6 +33,27 @@ describe('黑洞禁锢场', () => {
     const v = confineVelocity(10, 0, 0, 0, 4, 3, R)
     expect(v.x).toBeCloseTo(0)
     expect(v.y).toBeCloseTo(3)
+  })
+})
+
+describe('禁锢圈硬边界钳制', () => {
+  const R = 10
+  it('圈内原样返回（不动）', () => {
+    expect(clampToDisc(3, 4, 0, 0, R)).toEqual({ x: 3, y: 4 }) // d=5 < 10
+  })
+  it('恰在圈上：原样返回', () => {
+    expect(clampToDisc(10, 0, 0, 0, R)).toEqual({ x: 10, y: 0 })
+  })
+  it('圈外投影到圆边（保持方向、距圆心=R）', () => {
+    const c = clampToDisc(30, 40, 0, 0, R) // d=50 → 缩到 R=10
+    expect(Math.hypot(c.x, c.y)).toBeCloseTo(R)
+    expect(c.x).toBeCloseTo(6) // 30 * 10/50
+    expect(c.y).toBeCloseTo(8) // 40 * 10/50
+  })
+  it('偏心圆心：相对圆心投影', () => {
+    const c = clampToDisc(25, 5, 5, 5, R) // 相对(5,5)偏移(20,0),d=20→缩到10
+    expect(c.x).toBeCloseTo(15)
+    expect(c.y).toBeCloseTo(5)
   })
 })
 

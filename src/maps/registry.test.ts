@@ -4,8 +4,8 @@ import { BOSSES } from '../enemies/registry'
 import { Rng } from '../core/rng'
 
 describe('地图定义', () => {
-  it('七张图齐备且玩法互不相同：图标/名字/描述/形态/固定色板/装饰规则', () => {
-    expect(MAP_IDS.length).toBe(7)
+  it('八张图齐备且玩法互不相同：图标/名字/描述/形态/固定色板/装饰规则', () => {
+    expect(MAP_IDS.length).toBe(8)
     for (const id of MAP_IDS) {
       const m = MAPS[id]
       expect(m.emoji.length).toBeGreaterThan(0)
@@ -18,6 +18,7 @@ describe('地图定义', () => {
     expect(MAP_IDS.map((id) => MAPS[id].kind).sort()).toEqual([
       'bounded',
       'daynight',
+      'ice',
       'infinite',
       'river',
       'ruins',
@@ -31,6 +32,7 @@ describe('地图定义', () => {
     expect(MAPS.ruins.kind).toBe('ruins')
     expect(MAPS.daynight.kind).toBe('daynight')
     expect(MAPS.space.kind).toBe('space')
+    expect(MAPS.ice.kind).toBe('ice')
     // 昼夜图有界放大到 30×30
     expect(MAPS.daynight.size).toEqual({ w: 30, h: 30 })
     // 河流图必须有水面漂浮物池

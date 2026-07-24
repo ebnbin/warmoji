@@ -2,8 +2,9 @@
 // 与单位无关（传 px 或格皆可，只要一致）；场景侧乘 UNIT 后调用。
 
 export const BLACKHOLE = {
-  /** 禁锢场半径（格）：Boss 波张开。越靠边缘、向外的阻力越大，到边缘 100%——谁也逃不出去 */
-  fieldRadiusU: 9,
+  /** 禁锢场半径（格）：整张地图即此圈，从第一波起常驻、圆心固定在地图中心。
+   * 直径 25 ≈ 标准 25×25 方形图的内切圆。越靠边缘、向外的阻力越大，到边缘 100%——谁也逃不出去 */
+  fieldRadiusU: 12.5,
 } as const
 
 export const METEOR = {
@@ -48,6 +49,17 @@ export function confineVelocity(
   const keep = Math.max(0, 1 - d / r) // 向外保留比例：中心 1、边缘 0
   const delta = radial * (keep - 1) // ≤ 0，抵消掉的向外分量
   return { x: vx + ux * delta, y: vy + uy * delta }
+}
+
+/** 硬边界钳制：把点钳回以 (cx,cy) 为心、半径 r 的圆盘内。
+ * 引力削速（confineVelocity）之外的兜底——防击退/冲刺把实体一帧怼出圈。圈内原样返回。 */
+export function clampToDisc(px: number, py: number, cx: number, cy: number, r: number): { x: number; y: number } {
+  const dx = px - cx
+  const dy = py - cy
+  const d = Math.hypot(dx, dy)
+  if (d <= r || d < 1e-6) return { x: px, y: py }
+  const k = r / d
+  return { x: cx + dx * k, y: cy + dy * k }
 }
 
 /** 天体横扫的直线：以队伍中心为参照，按角度 + 垂直偏移取一条过其附近的线，
