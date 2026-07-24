@@ -24,6 +24,22 @@ export interface Progression {
   readonly coinDropChanceMin: number
   /** 金币掉落概率衰减半衰期（秒） */
   readonly coinDropChanceHalfLifeSec: number
+  /** 队伍经验：前快后慢的等比升级曲线 + 波末保底 */
+  readonly xp: {
+    /** 1 级门槛（后续 ×growth^(level-1)） */
+    readonly base: number
+    /** 等比公比（>1 前快后慢） */
+    readonly growth: number
+    /** 波末保底经验 = base + perWave×波次 */
+    readonly waveBonusBase: number
+    readonly waveBonusPerWave: number
+  }
+  /** 命定卡池招募：开局按队长种子抽 poolSize 张，按开放编制数解锁可选张数 */
+  readonly recruit: {
+    readonly poolSize: number
+    /** 下标 = 开放编制数 - 1；越界取末位 */
+    readonly unlocks: readonly number[]
+  }
 }
 
 const P = progressionJson as unknown as Progression

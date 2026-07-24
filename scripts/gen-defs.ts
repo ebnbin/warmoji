@@ -401,6 +401,16 @@ for (const [id, pk] of Object.entries(PICKUPS)) {
   num(`${p}.summaryMs`, g.summaryMs, 0)
   num(`${p}.coinDropChanceMin`, g.coinDropChanceMin, 0)
   num(`${p}.coinDropChanceHalfLifeSec`, g.coinDropChanceHalfLifeSec, 0.01)
+  num(`${p}.xp.base`, g.xp.base, 1)
+  num(`${p}.xp.growth`, g.xp.growth, 1)
+  num(`${p}.xp.waveBonusBase`, g.xp.waveBonusBase, 0)
+  num(`${p}.xp.waveBonusPerWave`, g.xp.waveBonusPerWave, 0)
+  num(`${p}.recruit.poolSize`, g.recruit.poolSize, 1)
+  if (!Array.isArray(g.recruit.unlocks) || g.recruit.unlocks.length === 0) {
+    bad(`${p}.recruit.unlocks`, '需为非空数组')
+  } else {
+    g.recruit.unlocks.forEach((v, i) => num(`${p}.recruit.unlocks[${i}]`, v, 1))
+  }
   pure(p, g)
 }
 

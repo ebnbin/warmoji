@@ -18,4 +18,9 @@ export const PROGRESSION = {
   coinDropChanceMin: 0.35,
   // 金币掉落概率衰减半衰期（秒）
   coinDropChanceHalfLifeSec: 220,
+  // 队伍经验：等比升级曲线（前快后慢，无上限）+ 波末保底。校准目标（15 波制）：
+  // 第 1 波结束 2~3 级，无经验加成队长通关约 22~24 级；加波次/拉长时长不用动曲线。
+  xp: { base: 80, growth: 1.15, waveBonusBase: 40, waveBonusPerWave: 36 },
+  // 命定卡池：开局用队长种子一次抽 poolSize 张角色牌（整局固定），按已开放编制数查表解锁可选张数
+  recruit: { poolSize: 10, unlocks: [4, 6, 8, 9, 10] },
 } as const satisfies Progression
