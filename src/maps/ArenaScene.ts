@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { MEMBER, TEAM } from '../characters/registry'
-import { SPAWN, enemyMixAt } from '../enemies/registry'
+import { AI, SPAWN, enemyMixAt } from '../enemies/registry'
 import type { EnemyMixEntry } from '../enemies/registry'
 import { PICKUPS } from '../pickups/registry'
 import { UNIT } from '../core/units'
@@ -413,7 +413,7 @@ export class ArenaScene extends BaseArenaScene {
       const ang = this.rng.next() * Math.PI * 2
       a.dirX = Math.cos(ang)
       a.dirY = Math.sin(ang)
-      a.turnAt = this.elapsedMs + 800 + this.rng.next() * 1200
+      a.turnAt = this.elapsedMs + AI.wander.turnMinMs + this.rng.next() * AI.wander.turnJitterMs
     }
     const e = a.image
     let dx = a.dirX

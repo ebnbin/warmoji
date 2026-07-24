@@ -1,5 +1,6 @@
 import { playSfx } from '../audio/sfx'
 import { PICKUPS } from '../pickups/registry'
+import { AI } from './registry'
 import { UNIT } from '../core/units'
 import { norm } from '../core/vec'
 import { releasePooled } from '../core/pool'
@@ -9,10 +10,10 @@ import type { Enemy } from './enemies'
 import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
 
 /** 定距风筝的站位滞回带（避免恰好卡在 standoffDist 上抖动） */
-const STANDOFF_BAND = 0.5 * UNIT
+const STANDOFF_BAND = AI.standoffBandU * UNIT
 
 /** 偷币鼠吞币冷却（ms）：短，但保证一枚一枚地偷，不会一帧扫光一堆 */
-const COINTHIEF_EAT_CD = 650
+const COINTHIEF_EAT_CD = AI.coinThiefEatCdMs
 
 // 敌人移动策略注册表：按 def.locomotion.kind 分发，镜像 abilities/create.ts。
 // 每个策略只负责逐帧速度决策与状态机推进；攻击在 enemyAbilities.ts、
@@ -145,7 +146,7 @@ const flee: Steerer = ({ scene, a, body, slow, target }) => {
     body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
   } else {
     const dir = scene.wanderDir(a)
-    body.setVelocity(dir.x * a.def.speed * 0.4 * slow, dir.y * a.def.speed * 0.4 * slow)
+    body.setVelocity(dir.x * a.def.speed * AI.fleeIdleSpeedMul * slow, dir.y * a.def.speed * AI.fleeIdleSpeedMul * slow)
   }
 }
 

@@ -37,7 +37,7 @@ import {
   labInvincible,
   labLevel,
 } from '../run/lab'
-import { BOSS_SPAWN_RELIEF, DEFAULT_CONTACT, ELITE, ENEMIES, SPAWN, SURGE } from '../enemies/registry'
+import { AI, BOSS_SPAWN_RELIEF, DEFAULT_CONTACT, ELITE, ENEMIES, SPAWN, SURGE } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
 import { UNIT } from '../core/units'
 import { WAVE } from '../run/waves'
@@ -441,7 +441,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       const ang = this.rng.next() * Math.PI * 2
       a.dirX = Math.cos(ang)
       a.dirY = Math.sin(ang)
-      a.turnAt = this.elapsedMs + 800 + this.rng.next() * 1200
+      a.turnAt = this.elapsedMs + AI.wander.turnMinMs + this.rng.next() * AI.wander.turnJitterMs
     }
     return { x: a.dirX, y: a.dirY }
   }
@@ -1958,7 +1958,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     // 部件动画 idle 常驻，相位偏移复用摇摆随机相（不额外消耗 rng 流）
     const dirX = Math.cos(this.rng.next() * Math.PI * 2)
     const dirY = Math.sin(this.rng.next() * Math.PI * 2)
-    const turnAt = this.elapsedMs + 600 + this.rng.next() * 900
+    const turnAt = this.elapsedMs + AI.wander.spawnTurnMinMs + this.rng.next() * AI.wander.spawnTurnJitterMs
     const fireAt = this.elapsedMs + 900 + this.rng.next() * 1500
     const ph = this.rng.next() * Math.PI * 2
     const anim = new Animator(enemy)

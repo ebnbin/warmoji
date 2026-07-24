@@ -1,5 +1,6 @@
 import enemiesJson from '../assets/enemies.json'
 import difficultyJson from '../assets/difficulty.json'
+import aiJson from '../assets/ai.json'
 import type { AbilityDef, Effect } from '../abilities/defs'
 
 // 敌人 = 基础三围 + 移动方式（locomotion）+ 能力列表 + 死亡效果列表。
@@ -250,6 +251,27 @@ export const SPAWN = DIFF.spawn
 export const ELITE = DIFF.elite
 export const SURGE = DIFF.surge
 export const BOSS_SPAWN_RELIEF = DIFF.bossSpawnRelief
+
+// 敌人 AI 手感（与难度正交）：游荡换向节奏、风筝滞回带、偷币冷却、逃兵脱战限速。
+// 数据行在 defs/ai.ts（创作层），gen 校验产出 ai.json；本文件只派生同名导出。
+export interface AiTuning {
+  /** 游荡换向节奏：每次换向后随机等 [min, min+jitter) ms 再换；spawn* 为出生后首次换向的更短区间 */
+  readonly wander: {
+    readonly turnMinMs: number
+    readonly turnJitterMs: number
+    readonly spawnTurnMinMs: number
+    readonly spawnTurnJitterMs: number
+  }
+  /** 定距风筝的站位滞回带（单位）：避免恰好卡在 standoffDist 上抖动 */
+  readonly standoffBandU: number
+  /** 偷币鼠吞币冷却（ms）：一枚一枚地偷，不会一帧扫光一堆 */
+  readonly coinThiefEatCdMs: number
+  /** 逃兵脱战时的游荡限速倍率（贴脸才全速逃，远离时慢速晃） */
+  readonly fleeIdleSpeedMul: number
+}
+
+const AITUNE = aiJson as unknown as AiTuning
+export const AI = AITUNE
 
 export interface EnemyMixEntry {
   def: EnemyDef

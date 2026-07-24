@@ -11,6 +11,7 @@ import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
 import { DIFFICULTY } from '../defs/difficulty.ts'
+import { AI } from '../defs/ai.ts'
 import { TEAM_BASELINE } from '../defs/team.ts'
 import { COMBAT } from '../defs/combat.ts'
 import { FEEL } from '../defs/feel.ts'
@@ -22,6 +23,7 @@ import type { Difficulty } from '../src/enemies/registry'
 import type { TeamBaseline } from '../src/characters/registry'
 import type { CombatTuning } from '../src/abilities/registry'
 import type { FeelTuning } from '../src/battle/config'
+import type { AiTuning } from '../src/enemies/registry'
 import type { MapDef } from '../src/maps/registry'
 
 // 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json。
@@ -462,6 +464,20 @@ for (const [id, pk] of Object.entries(PICKUPS)) {
   pure(p, c)
 }
 
+// ── ai（敌人 AI 手感：游荡换向 / 风筝滞回 / 偷币冷却 / 逃兵限速）──
+{
+  const p = 'ai'
+  const g: AiTuning = AI
+  num(`${p}.wander.turnMinMs`, g.wander.turnMinMs, 0)
+  num(`${p}.wander.turnJitterMs`, g.wander.turnJitterMs, 0)
+  num(`${p}.wander.spawnTurnMinMs`, g.wander.spawnTurnMinMs, 0)
+  num(`${p}.wander.spawnTurnJitterMs`, g.wander.spawnTurnJitterMs, 0)
+  num(`${p}.standoffBandU`, g.standoffBandU, 0)
+  num(`${p}.coinThiefEatCdMs`, g.coinThiefEatCdMs, 0)
+  num(`${p}.fleeIdleSpeedMul`, g.fleeIdleSpeedMul, 0)
+  pure(p, g)
+}
+
 // ── feel（战斗手感：跟随弹簧 / 待机游移 / 受击抖屏）──
 {
   const p = 'feel'
@@ -516,8 +532,9 @@ write('maps', MAPS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
 write('difficulty', DIFFICULTY)
+write('ai', AI)
 write('team', TEAM_BASELINE)
 write('combat', COMBAT)
 write('feel', FEEL)
 write('economy', ECONOMY)
-console.log('gen-defs：14 张表校验通过，已生成 src/assets/*.json')
+console.log('gen-defs：15 张表校验通过，已生成 src/assets/*.json')
