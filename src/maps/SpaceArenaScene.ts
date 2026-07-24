@@ -1,9 +1,11 @@
 import Phaser from 'phaser'
 import { UNIT } from '../core/units'
 import { InfiniteArenaScene } from './InfiniteArenaScene'
+import { MAP } from './registry'
+import { INFINITE, ringPoint } from './world'
 import { emojiImage } from '../emoji/textures'
 import { enemyOf } from '../enemies/enemies'
-import { BLACKHOLE, METEOR, confineVelocity, meteorSweep } from './space'
+import { BLACKHOLE, METEOR, clampToDisc, confineVelocity, meteorSweep } from './space'
 import type { Point } from '../core/vec'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 
@@ -24,15 +26,17 @@ interface Meteor {
   hit: Set<object>
 }
 
-// 深空（kind='space'）：复用无限世界（相机跟随/分块装饰/休眠/环带刷怪），叠加两套太空机制：
+// 深空（kind='space'）：整张地图 = 一个固定的圆形禁锢星域（黑洞引力场），从第一波起常驻。
+// 复用无限世界的底层（相机跟随 / 分块星海 / 环带刷怪），但一切都被困在圆内：
+// · 禁锢圈：以地图中心为圆心、半径 BLACKHOLE.fieldRadiusU（12.5 格，直径 25 ≈ 标准方形内切圆）。
+//   越靠边缘、向外的运动阻力越大（中心 0、边缘 100%），再加硬边界兜底——队员/敌人/Boss 谁也逃不出去；
+//   玩家与敌人全在圈内生成。相机跟随队伍、bounds 钳在圆的外接框内。
 // · 天体横扫：平均每 ~15 秒，一颗球形天体先给出直线预警轨迹，随后沿该线匀速划过战场，
 //   压到（进入球体半径）的所有实体——队员 / 敌人 / Boss 一律照打（敌我通吃）。
-// · 黑洞禁锢场（终波）：以进波瞬间队伍位置为心张开半径 R 的力场；越靠边缘、向外的运动
-//   阻力越大（按速度百分比，中心 0、边缘 100%），场内所有实体谁也逃不出去。
 export class SpaceArenaScene extends InfiniteArenaScene {
   private nextMeteorAt = 0
   private meteor?: Meteor
-  private fieldActive = false
+  // 禁锢圈（全程常驻）：圆心 = 地图中心，半径固定
   private fieldCx = 0
   private fieldCy = 0
   private fieldR = 0
@@ -46,23 +50,19 @@ export class SpaceArenaScene extends InfiniteArenaScene {
     // 首颗天体来得早一点（~7 秒），确保玩家第一波就见识到横扫
     this.nextMeteorAt = 7000
     this.meteor = undefined
-    this.fieldActive = false
     this.fieldCx = 0
     this.fieldCy = 0
     this.fieldR = 0
   }
 
-  protected finalWaveWarningSub(): string {
-    return '奇点降临，禁锢力场四合——越往外越挣不动，谁也逃不出去！'
-  }
-
-  /** 终波：以此刻队伍位置为心张开黑洞禁锢场（替代无限图的毒雾缩圈） */
-  protected onFinalWaveSetup(): void {
-    this.fieldActive = true
-    this.fieldCx = this.center.x
-    this.fieldCy = this.center.y
+  /** 创建世界：复用无限世界地基（星海/底色/缩放），再张开常驻禁锢圈（居中、全程生效） */
+  protected createWorld(): void {
+    super.createWorld()
+    const c = this.spawnCenter()
+    this.fieldCx = c.x
+    this.fieldCy = c.y
     this.fieldR = BLACKHOLE.fieldRadiusU * UNIT
-    // 禁锢边界：亮紫环 + 内侧渐隐提示（静态，一次绘制）
+    // 禁锢边界：亮紫环 + 内侧渐隐提示（静态，一次绘制，世界坐标）
     const g = this.add.graphics().setDepth(2)
     g.lineStyle(5, 0x9c6bff, 0.7)
     g.strokeCircle(this.fieldCx, this.fieldCy, this.fieldR)
@@ -70,24 +70,58 @@ export class SpaceArenaScene extends InfiniteArenaScene {
     g.strokeCircle(this.fieldCx, this.fieldCy, this.fieldR - 9)
   }
 
-  /** 队伍移动的禁锢：向外分量按到中心距离衰减（边缘 100% → 出不去） */
+  /** 相机：跟随队伍，但 bounds 钳在圆的外接框内（圆是有界的，别飘到圈外空白） */
+  protected attachCamera(target: Phaser.GameObjects.Zone): void {
+    this.cameras.main.startFollow(target)
+    const half = this.fieldR + MAP.cameraMargin * UNIT
+    this.cameras.main.setBounds(this.fieldCx - half, this.fieldCy - half, half * 2, half * 2)
+  }
+
+  protected finalWaveWarningSub(): string {
+    return '奇点降临——禁锢星域内已无处可逃，正面迎战！'
+  }
+
+  /** 终波无专属变化：禁锢圈本就全程常驻（覆盖基类的毒雾缩圈，避免叠一层毒圈） */
+  protected onFinalWaveSetup(): void {}
+
+  /** 出怪落点收进圈内（环带随机点，超出即投影到圈边内侧） */
+  protected spawnPoint(): Point {
+    const p = ringPoint(this.rng, this.center, INFINITE.spawnRingMin * UNIT, INFINITE.spawnRingMax * UNIT)
+    return clampToDisc(p.x, p.y, this.fieldCx, this.fieldCy, this.fieldR - UNIT)
+  }
+
+  /** Boss 落在圈内、圆心附近的环带上 */
+  protected bossSpawnPoint(): Point {
+    const p = ringPoint(this.rng, { x: this.fieldCx, y: this.fieldCy }, 6 * UNIT, 8 * UNIT)
+    return clampToDisc(p.x, p.y, this.fieldCx, this.fieldCy, this.fieldR - UNIT)
+  }
+
+  /** 队伍移动的禁锢：向外分量按到中心距离衰减（边缘 100%），再硬钳进圆内兜底 */
   protected constrainTeam(next: Point): Point {
-    if (!this.fieldActive) return next
     const dx = next.x - this.center.x
     const dy = next.y - this.center.y
     const v = confineVelocity(this.center.x, this.center.y, this.fieldCx, this.fieldCy, dx, dy, this.fieldR)
-    return { x: this.center.x + v.x, y: this.center.y + v.y }
+    return clampToDisc(this.center.x + v.x, this.center.y + v.y, this.fieldCx, this.fieldCy, this.fieldR)
+  }
+
+  /** 敌人生成/落点钳进圈内（留出敌人半径，别探出圈边） */
+  protected constrainEnemyPos(p: Point, radius: number): Point {
+    return clampToDisc(p.x, p.y, this.fieldCx, this.fieldCy, this.fieldR - radius)
+  }
+
+  /** 金币掉落钳进圈内（否则圈边的掉落隔着禁锢边界捡不到） */
+  constrainCoinPos(p: Point): Point {
+    return clampToDisc(p.x, p.y, this.fieldCx, this.fieldCy, this.fieldR - UNIT * 0.5)
   }
 
   protected updateWorld(delta: number): void {
-    super.updateWorld(delta) // 无限世界：装饰分块流式增删（无毒雾 zone）
+    super.updateWorld(delta) // 无限世界地基：星海分块流式增删（毒雾 zone 未启用，早退）
     this.updateMeteor(delta)
     this.applyFieldDrag()
   }
 
-  /** 敌人 / Boss 的禁锢：同样削掉向外的速度分量（在 steerEnemies 之后、物理步之前生效） */
+  /** 敌人 / Boss 的禁锢：削掉向外的速度分量（在 steerEnemies 之后、物理步之前生效） */
   private applyFieldDrag(): void {
-    if (!this.fieldActive) return
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       const a = enemyOf(e)
