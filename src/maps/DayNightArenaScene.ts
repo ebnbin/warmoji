@@ -5,14 +5,8 @@ import { MAPS } from './registry'
 import { ArenaScene } from './ArenaScene'
 import { enemyMixAt } from '../enemies/registry'
 import type { EnemyMixEntry } from '../enemies/registry'
-import {
-  DAYNIGHT,
-  fogAlphaAt,
-  fogRadiusAt,
-  hourAt,
-  isDayAt,
-  visionGridsAt,
-} from './daynight'
+import { fogAlphaAt, fogRadiusAt, hourAt, isDayAt, visionGridsAt } from './daynight'
+import type { DayNightConfig } from './registry'
 
 // 迷雾覆盖层：以队伍为心的圆内清明、圈外昏暗（几何遮罩反相实现），世界坐标随相机缩放
 const FOG_COLOR = 0x0a0a1a
@@ -35,6 +29,11 @@ export class DayNightArenaScene extends ArenaScene {
     super('arenaDayNight')
   }
 
+  /** 昼夜特性配置（来自 MapDef 数据；晨昏原野必配 dayNight） */
+  private get dn(): DayNightConfig {
+    return MAPS[this.run.mapId].dayNight!
+  }
+
   protected resetWorldFields(): void {
     this.fogRect = undefined
     this.fogMaskShape = undefined
@@ -54,11 +53,11 @@ export class DayNightArenaScene extends ArenaScene {
     mask.invertAlpha = true
     this.fogRect.setMask(mask)
     // 相位基线：据开场时刻定，供 updateWorld 检测昼夜翻转
-    this.lastDay = isDayAt(hourAt(this.run.combatMs / 1000))
+    this.lastDay = isDayAt(hourAt(this.run.combatMs / 1000, this.dn))
   }
 
   private clockHour(): number {
-    return hourAt((this.run.combatMs + this.elapsedMs) / 1000)
+    return hourAt((this.run.combatMs + this.elapsedMs) / 1000, this.dn)
   }
 
   /** 出怪表按相位取白天/黑夜两批之一（缺相位数据兜底走并集 mix） */
@@ -70,14 +69,14 @@ export class DayNightArenaScene extends ArenaScene {
 
   /** 白天更密、夜晚更疏（夜里视野小+迷雾遮，稀疏也不轻松） */
   protected spawnIntervalScale(): number {
-    return isDayAt(this.clockHour()) ? DAYNIGHT.daySpawnScale : DAYNIGHT.nightSpawnScale
+    return isDayAt(this.clockHour()) ? this.dn.daySpawnScale : this.dn.nightSpawnScale
   }
 
   protected updateWorld(_delta: number): void {
     void _delta
     const hour = this.clockHour()
     // 相机随时刻平滑缩放：视野 V 格 → zoom = 标准 ×(20/V)
-    const zoom = (viewport.renderScale * DAYNIGHT.visionMid) / visionGridsAt(hour)
+    const zoom = (viewport.renderScale * this.dn.visionMid) / visionGridsAt(hour, this.dn)
     this.cameras.main.setZoom(zoom)
     this.updateFog(hour)
     // 昼夜翻转：改写出怪表（白天/黑夜两批），波内也能实时换批
@@ -92,12 +91,12 @@ export class DayNightArenaScene extends ArenaScene {
     const rect = this.fogRect
     const shape = this.fogMaskShape
     if (!rect || !shape) return
-    const alpha = fogAlphaAt(hour)
+    const alpha = fogAlphaAt(hour, this.dn)
     if (alpha <= 0.001) {
       rect.setVisible(false)
       return
     }
-    const r = fogRadiusAt(hour) * UNIT
+    const r = fogRadiusAt(hour, this.dn) * UNIT
     shape.clear()
     shape.fillStyle(0xffffff)
     shape.fillCircle(this.center.x, this.center.y, r)

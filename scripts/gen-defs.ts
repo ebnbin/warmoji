@@ -289,6 +289,19 @@ for (const [id, m] of Object.entries(MAPS)) {
     num(`${p}.walls.spawnMinCellDist`, w.spawnMinCellDist, 0)
     num(`${p}.walls.reflowMs`, w.reflowMs, 0)
   }
+  const dn = (m as MapDef).dayNight
+  if (dn) {
+    num(`${p}.dayNight.cycleSec`, dn.cycleSec, 1)
+    num(`${p}.dayNight.startHour`, dn.startHour, 0)
+    num(`${p}.dayNight.visionMax`, dn.visionMax, 1)
+    num(`${p}.dayNight.visionMid`, dn.visionMid, 1)
+    num(`${p}.dayNight.visionMin`, dn.visionMin, 1)
+    num(`${p}.dayNight.fogRadiusDusk`, dn.fogRadiusDusk, 0)
+    num(`${p}.dayNight.fogRadiusMidnight`, dn.fogRadiusMidnight, 0)
+    num(`${p}.dayNight.fogAlphaMax`, dn.fogAlphaMax, 0)
+    num(`${p}.dayNight.daySpawnScale`, dn.daySpawnScale, 0.01)
+    num(`${p}.dayNight.nightSpawnScale`, dn.nightSpawnScale, 0.01)
+  }
   pure(p, m)
 }
 

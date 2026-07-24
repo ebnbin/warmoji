@@ -243,6 +243,19 @@ export const MAPS = {
     mix: [...DAY_MIX, ...NIGHT_MIX],
     dayMix: DAY_MIX,
     nightMix: NIGHT_MIX,
+    // 昼夜循环特性：48 秒一整天，从黎明 06:00 起；相机随时刻余弦缩放、夜幕迷雾圈、昼夜两批怪
+    dayNight: {
+      cycleSec: 48,
+      startHour: 6,
+      visionMax: 30,
+      visionMid: 20,
+      visionMin: 10,
+      fogRadiusDusk: 11,
+      fogRadiusMidnight: 3.5,
+      fogAlphaMax: 0.9,
+      daySpawnScale: 0.68,
+      nightSpawnScale: 1.55,
+    },
     // 晨昏原野专属 Boss：晦明——日冕环爆 + 月华坠
     boss: 'eclipse',
   },

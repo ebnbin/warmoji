@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DAYNIGHT,
-  fogAlphaAt,
-  fogRadiusAt,
-  hourAt,
+  fogAlphaAt as _fogAlphaAt,
+  fogRadiusAt as _fogRadiusAt,
+  hourAt as _hourAt,
   isDayAt,
   nightDepthAt,
-  visionGridsAt,
+  visionGridsAt as _visionGridsAt,
 } from './daynight'
+import { MAPS } from './registry'
+
+// 昼夜设计参数取自地图数据（晨昏原野）；纯函数按此 cfg 求值
+const cfg = MAPS.daynight.dayNight!
+const hourAt = (s: number): number => _hourAt(s, cfg)
+const visionGridsAt = (h: number): number => _visionGridsAt(h, cfg)
+const fogRadiusAt = (h: number): number => _fogRadiusAt(h, cfg)
+const fogAlphaAt = (h: number): number => _fogAlphaAt(h, cfg)
 
 describe('昼夜时钟与视野', () => {
   it('主时钟：wave1 从黎明 06:00 起，48 秒回卷一整天', () => {
@@ -21,11 +28,11 @@ describe('昼夜时钟与视野', () => {
   })
 
   it('视野曲线：正午 30、黄昏/黎明 20、午夜 10，且平滑单峰', () => {
-    expect(visionGridsAt(12)).toBeCloseTo(DAYNIGHT.visionMax) // 30
-    expect(visionGridsAt(6)).toBeCloseTo(DAYNIGHT.visionMid) // 20
-    expect(visionGridsAt(18)).toBeCloseTo(DAYNIGHT.visionMid) // 20
-    expect(visionGridsAt(0)).toBeCloseTo(DAYNIGHT.visionMin) // 10
-    expect(visionGridsAt(24)).toBeCloseTo(DAYNIGHT.visionMin)
+    expect(visionGridsAt(12)).toBeCloseTo(cfg.visionMax) // 30
+    expect(visionGridsAt(6)).toBeCloseTo(cfg.visionMid) // 20
+    expect(visionGridsAt(18)).toBeCloseTo(cfg.visionMid) // 20
+    expect(visionGridsAt(0)).toBeCloseTo(cfg.visionMin) // 10
+    expect(visionGridsAt(24)).toBeCloseTo(cfg.visionMin)
     // 上午单调升、下午单调降
     expect(visionGridsAt(9)).toBeGreaterThan(visionGridsAt(7))
     expect(visionGridsAt(15)).toBeGreaterThan(visionGridsAt(17))
@@ -50,9 +57,9 @@ describe('昼夜时钟与视野', () => {
     expect(fogAlphaAt(18)).toBeCloseTo(0)
     // 午夜：夜深 1、迷雾最浓最小
     expect(nightDepthAt(0)).toBeCloseTo(1)
-    expect(fogAlphaAt(0)).toBeCloseTo(DAYNIGHT.fogAlphaMax)
-    expect(fogRadiusAt(0)).toBeCloseTo(DAYNIGHT.fogRadiusMidnight)
-    expect(fogRadiusAt(18)).toBeCloseTo(DAYNIGHT.fogRadiusDusk)
+    expect(fogAlphaAt(0)).toBeCloseTo(cfg.fogAlphaMax)
+    expect(fogRadiusAt(0)).toBeCloseTo(cfg.fogRadiusMidnight)
+    expect(fogRadiusAt(18)).toBeCloseTo(cfg.fogRadiusDusk)
     // 越接近午夜，圈越小
     expect(fogRadiusAt(1)).toBeLessThan(fogRadiusAt(3))
   })

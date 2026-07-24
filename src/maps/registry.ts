@@ -34,6 +34,31 @@ export interface WallsConfig {
   readonly reflowMs: number
 }
 
+/** 昼夜循环特性（可选）：挂在有界图上即启用昼夜——相机随时刻余弦缩放 + 夜幕迷雾圈 +
+ * 昼夜两批怪（dayMix/nightMix）。目前仅晨昏原野配置；数据模型上任何有界图都可组合本特性 */
+export interface DayNightConfig {
+  /** 一整天 = 多少秒（白天→黑夜→白天一个完整周期） */
+  readonly cycleSec: number
+  /** wave 1 起始时刻（0..24） */
+  readonly startHour: number
+  /** 正午视野（格）——相机拉最远 */
+  readonly visionMax: number
+  /** 黄昏/黎明视野（格）——标准视野 */
+  readonly visionMid: number
+  /** 午夜视野（格）——相机拉最近 */
+  readonly visionMin: number
+  /** 迷雾圈半径（格）：黄昏/黎明够大到基本不挡 */
+  readonly fogRadiusDusk: number
+  /** 迷雾圈半径（格）：午夜收成一小圈 */
+  readonly fogRadiusMidnight: number
+  /** 午夜迷雾最浓时的不透明度 */
+  readonly fogAlphaMax: number
+  /** 出怪密度：白天间隔倍率（<1 更密） */
+  readonly daySpawnScale: number
+  /** 出怪密度：夜晚间隔倍率（>1 更疏） */
+  readonly nightSpawnScale: number
+}
+
 export interface MapDef {
   readonly emoji: string
   readonly name: string
@@ -61,6 +86,8 @@ export interface MapDef {
   readonly nightMix?: readonly EnemyMixRow[]
   /** 断壁/地形特性（可选）：配置即启用墙 + 流场寻路（当前仅残垣图使用） */
   readonly walls?: WallsConfig
+  /** 昼夜循环特性（可选）：配置即启用昼夜相机/迷雾/两批怪（当前仅晨昏原野使用） */
+  readonly dayNight?: DayNightConfig
   /** 本图终波 Boss：引用 enemies 里某个 role:'boss' 的 kind */
   readonly boss: string
 }
