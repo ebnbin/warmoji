@@ -13,7 +13,9 @@ import { PROGRESSION } from '../defs/progression.ts'
 import { DIFFICULTY } from '../defs/difficulty.ts'
 import { TEAM_BASELINE } from '../defs/team.ts'
 import { COMBAT } from '../defs/combat.ts'
+import { ECONOMY } from '../defs/economy.ts'
 import type { ItemDef } from '../src/items/registry'
+import type { Economy } from '../src/items/registry'
 import type { Progression } from '../src/run/waves'
 import type { Difficulty } from '../src/enemies/registry'
 import type { TeamBaseline } from '../src/characters/registry'
@@ -370,6 +372,19 @@ for (const [id, pk] of Object.entries(PICKUPS)) {
   pure(p, c)
 }
 
+// ── economy（暴击 / 商店定价）──
+{
+  const p = 'economy'
+  const ec: Economy = ECONOMY
+  num(`${p}.critMul`, ec.critMul, 0.01)
+  num(`${p}.price.perWave`, ec.price.perWave, 0)
+  num(`${p}.price.earlyDiscount`, ec.price.earlyDiscount, 0)
+  if (ec.price.earlyDiscount > 1) bad(`${p}.price.earlyDiscount`, '需为 0..1 的折扣')
+  num(`${p}.price.earlyFadeWaves`, ec.price.earlyFadeWaves, 0.01)
+  num(`${p}.shop.refreshPrice`, ec.shop.refreshPrice, 0)
+  pure(p, ec)
+}
+
 if (warnings.length > 0) {
   console.warn(`数值软护栏：${warnings.length} 条能力生效 DPS 越界（仅提示，不阻断）：`)
   for (const wn of warnings) console.warn('  ⚠ ' + wn)
@@ -396,4 +411,5 @@ write('progression', PROGRESSION)
 write('difficulty', DIFFICULTY)
 write('team', TEAM_BASELINE)
 write('combat', COMBAT)
-console.log('gen-defs：12 张表校验通过，已生成 src/assets/*.json')
+write('economy', ECONOMY)
+console.log('gen-defs：13 张表校验通过，已生成 src/assets/*.json')

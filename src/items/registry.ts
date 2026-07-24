@@ -1,4 +1,5 @@
 import itemsJson from '../assets/items.json'
+import economyJson from '../assets/economy.json'
 import { loadoutFor } from '../characters/registry'
 import type { UpgradeTiers, CharacterDef } from '../characters/registry'
 import type { AbilityDef } from '../abilities/defs'
@@ -86,8 +87,25 @@ export const TEAM_FX_IDENTITY: TeamEffects = {
   draftSize: 0,
 }
 
+// 经济/暴击的「设计数值」形状：数据行在 defs/economy.ts（创作层），gen 校验产出 economy.json；
+// 本文件只从中派生惯用导出 CRIT_MUL/PRICE/SHOP，形状与数值不变。
+export interface Economy {
+  /** 暴击伤害倍率 */
+  readonly critMul: number
+  /** 商店价格：基准价随波次通胀上浮 × 前期折扣（到 earlyFadeWaves 波线性消退） */
+  readonly price: {
+    readonly perWave: number
+    readonly earlyDiscount: number
+    readonly earlyFadeWaves: number
+  }
+  /** 商店上架位付费重随价格（队长可提供免费次数） */
+  readonly shop: { readonly refreshPrice: number }
+}
+
+const ECON = economyJson as unknown as Economy
+
 /** 暴击伤害倍率 */
-export const CRIT_MUL = 2
+export const CRIT_MUL = ECON.critMul
 
 export type ItemRarity = 'common' | 'rare' | 'epic'
 export const RARITY_ORDER: readonly ItemRarity[] = ['common', 'rare', 'epic']
@@ -201,8 +219,8 @@ export function rollItem(
 }
 
 /** 商店价格：基准价随波次通胀上浮 × 前期折扣（前期金币少，先把货压便宜，
- * 到 earlyFadeWaves 波线性消退）。展示与扣款都走 itemPrice，ITEMS.price 是基准价 */
-export const PRICE = { perWave: 0.06, earlyDiscount: 0.4, earlyFadeWaves: 6 } as const
+ * 到 earlyFadeWaves 波线性消退）。展示与扣款都走 itemPrice，ITEMS.price 是基准价。设计值见 defs/economy.ts */
+export const PRICE = ECON.price
 
 export function itemPrice(id: ItemId, wave: number): number {
   const inflate = 1 + PRICE.perWave * Math.max(0, wave - 1)
@@ -334,5 +352,5 @@ export function resolveAbilityDef(w: AbilityDef, fx: CharacterEffects): AbilityD
   }
 }
 
-// 商店：每个上架位可付费重新随机（队长可提供免费次数）
-export const SHOP = { refreshPrice: 2 } as const
+// 商店：每个上架位可付费重新随机（队长可提供免费次数）。设计值见 defs/economy.ts
+export const SHOP = ECON.shop
