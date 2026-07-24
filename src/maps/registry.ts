@@ -59,6 +59,29 @@ export interface DayNightConfig {
   readonly nightSpawnScale: number
 }
 
+/** 浮冰/打滑特性（可选）：方形浮冰 + 全局打滑（速度低通趋近目标）+ 四周水域（落水掉血·敌我通吃）。
+ * 目前仅浮冰图配置；数据模型上任何图都可组合本特性 */
+export interface IceConfig {
+  /** 方形浮冰边长（格）：战斗区 = [0,floeU]²，其外皆是水 */
+  readonly floeU: number
+  /** 队伍冰上速度响应时间常数（秒）——打滑程度主参数，越大越滑 */
+  readonly teamTauIce: number
+  /** 队伍水中速度响应时间常数（秒） */
+  readonly teamTauWater: number
+  /** 敌人冰上速度响应时间常数（秒） */
+  readonly enemyTauIce: number
+  /** 击退衰减时间常数倍率（低摩擦让击退滑得远） */
+  readonly knockbackTauMul: number
+  /** 水中速度倍率（玩家/敌人同用） */
+  readonly waterSpeedMul: number
+  /** 玩家落水每秒掉血 */
+  readonly waterTeamDps: number
+  /** 敌人落水每秒掉血 */
+  readonly waterEnemyDps: number
+  /** 落水掉血结算间隔（ms） */
+  readonly waterTickMs: number
+}
+
 export interface MapDef {
   readonly emoji: string
   readonly name: string
@@ -88,6 +111,8 @@ export interface MapDef {
   readonly walls?: WallsConfig
   /** 昼夜循环特性（可选）：配置即启用昼夜相机/迷雾/两批怪（当前仅晨昏原野使用） */
   readonly dayNight?: DayNightConfig
+  /** 浮冰/打滑特性（可选）：配置即启用打滑 + 落水掉血（当前仅浮冰图使用） */
+  readonly ice?: IceConfig
   /** 本图终波 Boss：引用 enemies 里某个 role:'boss' 的 kind */
   readonly boss: string
 }

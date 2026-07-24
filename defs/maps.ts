@@ -304,6 +304,18 @@ export const MAPS = {
       density: [0.05, 0.09],
     },
     mix: ICE_MIX,
+    // 浮冰/打滑特性：25 格方形浮冰 + 全局打滑（各 tau）+ 四周水域（落水掉血·敌我通吃）
+    ice: {
+      floeU: 25,
+      teamTauIce: 1.2,
+      teamTauWater: 0.12,
+      enemyTauIce: 0.85,
+      knockbackTauMul: 8,
+      waterSpeedMul: 0.45,
+      waterTeamDps: 16,
+      waterEnemyDps: 32,
+      waterTickMs: 250,
+    },
     // 占位 Boss：暂借巨鳄（半水生），建议后续做个冰主题 Boss（海象/北极熊/破冰船）
     boss: 'croc',
   },

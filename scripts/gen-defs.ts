@@ -302,6 +302,18 @@ for (const [id, m] of Object.entries(MAPS)) {
     num(`${p}.dayNight.daySpawnScale`, dn.daySpawnScale, 0.01)
     num(`${p}.dayNight.nightSpawnScale`, dn.nightSpawnScale, 0.01)
   }
+  const ic = (m as MapDef).ice
+  if (ic) {
+    num(`${p}.ice.floeU`, ic.floeU, 1)
+    num(`${p}.ice.teamTauIce`, ic.teamTauIce, 0)
+    num(`${p}.ice.teamTauWater`, ic.teamTauWater, 0)
+    num(`${p}.ice.enemyTauIce`, ic.enemyTauIce, 0)
+    num(`${p}.ice.knockbackTauMul`, ic.knockbackTauMul, 0.01)
+    num(`${p}.ice.waterSpeedMul`, ic.waterSpeedMul, 0)
+    num(`${p}.ice.waterTeamDps`, ic.waterTeamDps, 0)
+    num(`${p}.ice.waterEnemyDps`, ic.waterEnemyDps, 0)
+    num(`${p}.ice.waterTickMs`, ic.waterTickMs, 1)
+  }
   pure(p, m)
 }
 

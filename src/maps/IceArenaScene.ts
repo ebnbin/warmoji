@@ -9,7 +9,8 @@ import { waveDurationMs } from '../run/waves'
 import { emojiImage } from '../emoji/textures'
 import { viewport } from '../core/apply'
 import { enemyOf } from '../enemies/enemies'
-import { ICE, approach, onFloe } from './ice'
+import { approach, onFloe } from './ice'
+import type { IceConfig } from './registry'
 import { BaseArenaScene } from '../battle/BaseArenaScene'
 import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 import type { Enemy } from '../enemies/enemies'
@@ -21,7 +22,7 @@ const WATER_COLOR = 0x0b2a45
 // 浮冰（kind='ice'）：一块 25×25 的方形浮冰，四周是水；相机永远跟随玩家、无边界。
 // 世界规则：
 // · 全局打滑——队伍与所有敌人的移动都走一阶低通（ice.ts），不跟手、刹不住、会过冲；
-//   低摩擦令击退滑得更远（速度衰减慢）。打滑程度由 ICE.teamTauIce 一个参数控制。
+//   低摩擦令击退滑得更远（速度衰减慢）。打滑程度由 this.iceCfg.teamTauIce 一个参数控制。
 // · 出浮冰即落水：水里每秒较快掉血（敌我通吃）+ 移动被拖慢（难游回）；掉出去谁都跑不掉惩罚。
 //   因此"把敌人击退下水淹死"成为这张图的签名打法。
 // · 相机只管跟人：滑进水里/滑到旁边，视角照旧跟随（别的图掉出去没意义，这张图有意义）。
@@ -40,16 +41,21 @@ export class IceArenaScene extends BaseArenaScene {
     super('arenaIce')
   }
 
-  /** 浮冰为固定 25×25 方形，世界像素边长 */
+  /** 浮冰特性配置（来自 MapDef 数据；浮冰图必配 ice） */
+  private get iceCfg(): IceConfig {
+    return MAPS[this.run.mapId].ice!
+  }
+
+  /** 浮冰为方形，世界像素边长 */
   private get floePx(): number {
-    return ICE.floeU * UNIT
+    return this.iceCfg.floeU * UNIT
   }
 
   protected resetWorldFields(): void {
     this.tvx = 0
     this.tvy = 0
     this.frameDt = 16
-    this.nextWaterTickAt = ICE.waterTickMs
+    this.nextWaterTickAt = this.iceCfg.waterTickMs
     this.slide = new WeakMap()
     this.waterVignette = undefined
   }
@@ -134,8 +140,8 @@ export class IceArenaScene extends BaseArenaScene {
     const desVx = (next.x - this.center.x) / dt
     const desVy = (next.y - this.center.y) / dt
     const ice = onFloe(this.center.x, this.center.y, this.floePx)
-    const tau = ice ? ICE.teamTauIce : ICE.teamTauWater
-    const mul = ice ? 1 : ICE.waterSpeedMul
+    const tau = ice ? this.iceCfg.teamTauIce : this.iceCfg.teamTauWater
+    const mul = ice ? 1 : this.iceCfg.waterSpeedMul
     this.tvx = approach(this.tvx, desVx * mul, dt, tau)
     this.tvy = approach(this.tvy, desVy * mul, dt, tau)
     return { x: this.center.x + this.tvx * dt, y: this.center.y + this.tvy * dt }
@@ -143,7 +149,7 @@ export class IceArenaScene extends BaseArenaScene {
 
   /** 低摩擦让击退持久（衰减更慢）→ 敌人被击退滑得远、格外突出 */
   protected knockbackTauMul(): number {
-    return ICE.knockbackTauMul
+    return this.iceCfg.knockbackTauMul
   }
 
   /** 敌人打滑：行为速度走低通（追击也滑/过冲），冰上滑、水中迟滞限速 */
@@ -171,8 +177,8 @@ export class IceArenaScene extends BaseArenaScene {
     const kx = a.kvx
     const ky = a.kvy
     const ice = onFloe(e.x, e.y, this.floePx)
-    const tau = ice ? ICE.enemyTauIce : ICE.teamTauWater
-    const mul = ice ? 1 : ICE.waterSpeedMul
+    const tau = ice ? this.iceCfg.enemyTauIce : this.iceCfg.teamTauWater
+    const mul = ice ? 1 : this.iceCfg.waterSpeedMul
     sv.x = approach(sv.x, (body.velocity.x - kx) * mul, dt, tau)
     sv.y = approach(sv.y, (body.velocity.y - ky) * mul, dt, tau)
     body.setVelocity(sv.x + kx, sv.y + ky)
@@ -206,13 +212,13 @@ export class IceArenaScene extends BaseArenaScene {
       this.waterVignette.setFillStyle(0x1e6fd0, a)
     }
     if (this.elapsedMs < this.nextWaterTickAt) return
-    this.nextWaterTickAt = this.elapsedMs + ICE.waterTickMs
-    const frac = ICE.waterTickMs / 1000
+    this.nextWaterTickAt = this.elapsedMs + this.iceCfg.waterTickMs
+    const frac = this.iceCfg.waterTickMs / 1000
     if (teamInWater) {
-      const dmg = Math.round(ICE.waterTeamDps * frac)
+      const dmg = Math.round(this.iceCfg.waterTeamDps * frac)
       for (const m of this.members) if (m.alive) this.hurtMember(m, dmg, 0x4fc3f7, '寒水')
     }
-    const edmg = Math.round(ICE.waterEnemyDps * frac)
+    const edmg = Math.round(this.iceCfg.waterEnemyDps * frac)
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       const a = enemyOf(e)
@@ -224,7 +230,7 @@ export class IceArenaScene extends BaseArenaScene {
   /** 浮冰装饰：按 run 内种子随机散布的低透明度 emoji（只铺在冰面上） */
   private drawDecor(): void {
     const rng = new Rng(this.run.decorSeed)
-    for (const d of rollDecor(MAPS[this.run.mapId].decor, () => rng.next(), ICE.floeU, ICE.floeU)) {
+    for (const d of rollDecor(MAPS[this.run.mapId].decor, () => rng.next(), this.iceCfg.floeU, this.iceCfg.floeU)) {
       emojiImage(this, d.xU * UNIT, d.yU * UNIT, d.emoji, d.sizeU * UNIT, 'player')
         .setAlpha(d.alpha)
         .setRotation(d.rotation)
