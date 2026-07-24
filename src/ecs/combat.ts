@@ -209,6 +209,8 @@ export function hurtMember(sim: Sim, eid: number, damage: number): void {
     Revive.at[eid] = sim.elapsedMs + Revive.ms[eid]!
     Tint.color[eid] = 0x888888
     Tint.alpha[eid] = 0.35
+    // 阵亡灰烟(镜像 killMember 的 puffBurst)
+    sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
     if (sim.members.every((x) => !Alive.v[x])) sim.over = true
   }
 }

@@ -67,9 +67,10 @@ export class EcsBattleScene extends Phaser.Scene {
   private damageNumbersOn = false
   private damagePool: Phaser.GameObjects.BitmapText[] = []
   private damageIdx = 0
-  /** 粒子爆点发射器(死亡紫爆 / 拾币金爆) */
+  /** 粒子爆点发射器(死亡紫爆 / 拾币金爆 / 灰烟) */
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
+  private puffBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private centerObj!: Phaser.GameObjects.Zone
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -149,6 +150,7 @@ export class EcsBattleScene extends Phaser.Scene {
     // 粒子爆点(镜像 deathBurst/coinBurst 的配色与速度)
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
     this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
+    this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
     this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
     initialLayout(this.sim)
     armTeam(this.sim, this, atlas, run, run.testMode)
@@ -350,7 +352,10 @@ export class EcsBattleScene extends Phaser.Scene {
   private drainBursts(): void {
     const q = this.sim!.pendingBursts
     if (q.length === 0) return
-    for (const b of q) (b.kind === 'coin' ? this.coinBurst : this.deathBurst).explode(b.count, b.x, b.y)
+    for (const b of q) {
+      const emitter = b.kind === 'coin' ? this.coinBurst : b.kind === 'puff' ? this.puffBurst : this.deathBurst
+      emitter.explode(b.count, b.x, b.y)
+    }
     q.length = 0
   }
 

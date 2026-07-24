@@ -122,12 +122,12 @@ export interface DamageNumber {
   amount: number
 }
 
-/** 粒子爆点(kind 选发射器:death 紫爆 / coin 金爆) */
+/** 粒子爆点(kind 选发射器:death 紫爆 / coin 金爆 / puff 灰烟) */
 export interface Burst {
   x: number
   y: number
   count: number
-  kind: 'death' | 'coin'
+  kind: 'death' | 'coin' | 'puff'
 }
 
 /** 死亡快照(带亡语的敌人;实体已移除,死亡效果按此在死亡点重放) */
