@@ -9,6 +9,7 @@ import { ENEMIES } from '../defs/enemies.ts'
 import { ITEMS } from '../defs/items.ts'
 import { CARDS } from '../defs/cards.ts'
 import { BATTLEFIELD } from '../defs/battlefield.ts'
+import { SFX } from '../defs/sfx.ts'
 import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
@@ -22,6 +23,7 @@ import type { ItemDef } from '../src/items/registry'
 import type { Economy } from '../src/items/registry'
 import type { CardDef } from '../src/cards/registry'
 import type { BattlefieldTuning } from '../src/battlefield/registry'
+import type { SfxDef } from '../src/audio/sfx'
 import type { Progression } from '../src/run/waves'
 import type { Difficulty } from '../src/enemies/registry'
 import type { TeamBaseline } from '../src/characters/registry'
@@ -355,6 +357,29 @@ for (const [id, c] of Object.entries<CardDef>(CARDS as Record<string, CardDef>))
   pure('battlefield', bf)
 }
 
+// ── sfx（程序化音效参数）──
+{
+  const waves = new Set(['square', 'sawtooth', 'triangle', 'sine', 'noise'])
+  for (const [id, s] of Object.entries<SfxDef>(SFX as Record<string, SfxDef>)) {
+    const p = `sfx.${id}`
+    if (!waves.has(s.wave)) bad(`${p}.wave`, `未知波形：${s.wave}`)
+    num(`${p}.freq`, s.freq, 1)
+    if (s.freqEnd !== undefined) num(`${p}.freqEnd`, s.freqEnd, 1)
+    num(`${p}.duration`, s.duration, 0.001)
+    num(`${p}.volume`, s.volume, 0)
+    if (s.volume > 1) bad(`${p}.volume`, '峰值音量需 ≤1')
+    if (s.attack !== undefined) num(`${p}.attack`, s.attack, 0)
+    if (s.decayPow !== undefined) num(`${p}.decayPow`, s.decayPow, 0.01)
+    if (s.throttleMs !== undefined) num(`${p}.throttleMs`, s.throttleMs, 0)
+    if (s.jitter !== undefined) num(`${p}.jitter`, s.jitter, 0)
+    if (s.steps !== undefined) {
+      if (!Array.isArray(s.steps) || s.steps.length === 0) bad(`${p}.steps`, '需为非空数组')
+      else s.steps.forEach((v, i) => num(`${p}.steps[${i}]`, v, 0.001))
+    }
+    pure(p, s)
+  }
+}
+
 // ── maps ──
 for (const [id, m] of Object.entries(MAPS)) {
   const p = `maps.${id}`
@@ -625,6 +650,7 @@ write('enemies', { enemies: ENEMIES })
 write('items', ITEMS)
 write('cards', CARDS)
 write('battlefield', BATTLEFIELD)
+write('sfx', SFX)
 write('maps', MAPS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
@@ -634,4 +660,4 @@ write('team', TEAM_BASELINE)
 write('combat', COMBAT)
 write('feel', FEEL)
 write('economy', ECONOMY)
-console.log('gen-defs：17 张表校验通过，已生成 src/assets/*.json')
+console.log('gen-defs：18 张表校验通过，已生成 src/assets/*.json')

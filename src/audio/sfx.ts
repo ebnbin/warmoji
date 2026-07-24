@@ -3,9 +3,11 @@
 // 离线合成为 AudioBuffer（一次性，毫秒级）；战斗中播放只是 BufferSource 回放。
 // 高频事件靠节流 + 随机音高抖动避免机关枪感，全局并发上限防爆音。
 
-type Wave = 'square' | 'sawtooth' | 'triangle' | 'sine' | 'noise'
+import sfxJson from '../assets/sfx.json'
 
-interface SfxDef {
+export type Wave = 'square' | 'sawtooth' | 'triangle' | 'sine' | 'noise'
+
+export interface SfxDef {
   wave: Wave
   /** 起始频率 Hz（noise 时为低通滤波截止频率） */
   freq: number
@@ -27,42 +29,9 @@ interface SfxDef {
   jitter?: number
 }
 
-export const SFX = {
-  /** 投掷/射击（子弹类能力出手） */
-  shoot: { wave: 'square', freq: 900, freqEnd: 430, duration: 0.07, volume: 0.16, decayPow: 1.4, throttleMs: 45, jitter: 0.12 },
-  /** 激光 */
-  zap: { wave: 'sawtooth', freq: 1500, freqEnd: 280, duration: 0.12, volume: 0.15, throttleMs: 70, jitter: 0.08 },
-  /** 突刺/横扫/回旋镖挥出 */
-  whoosh: { wave: 'noise', freq: 1400, freqEnd: 240, duration: 0.12, volume: 0.3, throttleMs: 60, jitter: 0.15 },
-  /** 轰炸爆炸 */
-  boom: { wave: 'noise', freq: 420, freqEnd: 45, duration: 0.34, volume: 0.55, decayPow: 2, throttleMs: 90, jitter: 0.1 },
-  /** 敌人受击 */
-  hit: { wave: 'square', freq: 320, freqEnd: 160, duration: 0.045, volume: 0.12, throttleMs: 50, jitter: 0.2 },
-  /** 敌人死亡（碎裂 pop） */
-  kill: { wave: 'triangle', freq: 560, freqEnd: 70, duration: 0.16, volume: 0.3, throttleMs: 40, jitter: 0.15 },
-  /** 金币拾取（双音 ding） */
-  coin: { wave: 'square', freq: 988, duration: 0.09, volume: 0.14, steps: [1, 1.498], throttleMs: 35, jitter: 0.06 },
-  /** 队员受伤 */
-  hurt: { wave: 'square', freq: 200, freqEnd: 90, duration: 0.2, volume: 0.32, throttleMs: 150 },
-  /** 队员复活（上行扫频） */
-  revive: { wave: 'sine', freq: 280, freqEnd: 880, duration: 0.28, volume: 0.3, attack: 0.05 },
-  /** 队伍升级（上行琶音） */
-  levelup: { wave: 'square', freq: 523, duration: 0.34, volume: 0.22, steps: [1, 1.26, 1.5, 2], throttleMs: 200 },
-  /** 波次完成小号角 */
-  wave: { wave: 'square', freq: 392, duration: 0.5, volume: 0.24, steps: [1, 1.26, 1.5, 2, 1.5, 2] },
-  /** 游戏结束（下行） */
-  over: { wave: 'sawtooth', freq: 392, freqEnd: 80, duration: 0.7, volume: 0.26, decayPow: 1.2 },
-  /** 购买道具 */
-  buy: { wave: 'square', freq: 660, duration: 0.11, volume: 0.2, steps: [1, 1.33], throttleMs: 80 },
-  /** 角色升级 */
-  upgrade: { wave: 'square', freq: 523, duration: 0.16, volume: 0.2, steps: [1, 1.5], throttleMs: 80 },
-  /** 招募入队 */
-  recruit: { wave: 'square', freq: 440, duration: 0.24, volume: 0.22, steps: [1, 1.26, 1.6], throttleMs: 120 },
-  /** 通用 UI 点击 */
-  click: { wave: 'square', freq: 760, freqEnd: 660, duration: 0.035, volume: 0.12, throttleMs: 40 },
-} as const satisfies Record<string, SfxDef>
-
-export type SfxId = keyof typeof SFX
+// 音效表：数据行在 defs/sfx.ts（创作层），npm run gen 校验并生成 sfx.json
+export type SfxId = keyof typeof sfxJson
+export const SFX = sfxJson as unknown as Record<SfxId, SfxDef>
 
 const SAMPLE_RATE = 22050
 const MAX_VOICES = 14
