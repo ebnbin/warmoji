@@ -2,7 +2,7 @@ import type Phaser from 'phaser'
 import { playSfx } from '../../audio/sfx'
 import type { AbilityContext, TargetInfo } from '../../abilities/types'
 import type { CharacterEffects, TeamEffects } from '../../items/registry'
-import { Alive, Hp, Iframe, MHp, Poison, Slow, Transform } from '../components'
+import { Alive, Hp, Iframe, MAtkSlow, MHp, Poison, Slow, Transform } from '../components'
 import { applyDamage } from '../combat'
 import { applyMorph } from '../morph'
 import { enemyDef } from '../store'
@@ -94,7 +94,12 @@ export function makeTeamCtx(
     anchor: () => sim.center,
     applySlow: () => {}, // P3d
     damageMul: () => fx.damageMul * teamFx.teamDamageMul,
-    cooldownMul: () => fx.cooldownMul * teamFx.teamCooldownMul,
+    // 黏黏怪攻速惩罚:被蹭到的队员攻速变慢(叠乘进冷却,到时自动失效)
+    cooldownMul: () => {
+      const m = sim.members[slot]
+      const atk = m !== undefined && MAtkSlow.until[m]! > sim.elapsedMs ? MAtkSlow.mul[m]! : 1
+      return fx.cooldownMul * teamFx.teamCooldownMul * atk
+    },
     sfx: (id) => playSfx(id),
     playOwnerClip: () => {}, // P6 动画
     ownerHeading: () => sim.teamDir,

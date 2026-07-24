@@ -20,7 +20,7 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query } from 'bitecs'
-import { Alive, Coin, Enemy, EnemyProj, EState, Hp, MHp, Morph, Poison, Projectile, Slow, Transform } from './components'
+import { Alive, Coin, Enemy, EnemyProj, EState, Hp, MAtkSlow, MHp, Morph, Poison, Projectile, Slow, Transform } from './components'
 import { applyDamage } from './combat'
 import { applyMorph } from './morph'
 import { EcsAtlas } from './render/atlas'
@@ -293,6 +293,12 @@ export class EcsBattleScene extends Phaser.Scene {
     }
     window.__ecsGroundZones = (): number => groundZoneCount()
     window.__ecsBossDown = (): boolean => this.sim?.bossDown ?? false
+    // e2e 探针:队员 0 是否处于黏黏怪攻速惩罚中
+    window.__ecsMemberAtkSlowed = (): boolean => {
+      const sim = this.sim
+      const m = sim?.members[0]
+      return sim !== undefined && m !== undefined && MAtkSlow.until[m]! > sim.elapsedMs
+    }
     // e2e/性能探针:一次性铺 count 只敌人(网格散布,验证上千 entity 单批绘制)
     window.__ecsStress = (count = 1000, kind = 'zombie'): void => {
       const sim = this.sim

@@ -70,6 +70,9 @@ export const Threat = { v: u8() }
 /** 队员移动/布局查询集 */
 export const MEMBER_SET = [Member, Slot, Post, OrbitBias, Follow, Wander, Alive, Threat, Transform] as const
 
+/** 队员攻速惩罚(黏黏怪接触:until 到期时刻 + mul 冷却倍率;期间攻速变慢 + 黏液绿) */
+export const MAtkSlow = { until: f32(), mul: f32() }
+
 /** 队员血量 + 无敌帧 + 复活 + 受击判定半径 + 受击闪光恢复时刻 */
 export const MHp = { hp: f32(), max: f32() }
 export const Iframe = { ms: f32(), last: f32() }

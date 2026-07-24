@@ -17,6 +17,7 @@ import {
   Hurt,
   Iframe,
   Kv,
+  MAtkSlow,
   MFlash,
   MHp,
   Morph,
@@ -183,6 +184,12 @@ export function memberContact(sim: Sim): void {
       if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue // 变形期无害:接触不伤
       Iframe.last[m] = now
       hurtMember(sim, m, def.damage * DmgMul.v[eid]!)
+      // onContact 附加效果(黏黏怪攻速惩罚:镜像 attackSlow 接触积木;默认接触仅 damage)
+      const atkSlow = def.onContact?.find((e) => e.kind === 'attackSlow')
+      if (atkSlow && atkSlow.kind === 'attackSlow') {
+        MAtkSlow.until[m] = now + atkSlow.durationMs
+        MAtkSlow.mul[m] = atkSlow.mul
+      }
       break // 一帧一员只吃一次(无敌帧掌管其余)
     }
   }
@@ -234,14 +241,14 @@ export function reviveMembers(sim: Sim): void {
   }
 }
 
-/** 队员受击红闪到时恢复(仅活着的) */
+/** 队员染色恢复(仅活着的):受击红闪到时恢复;非红闪期按黏滞态染色(黏液绿/常态白) */
 export function memberVisual(sim: Sim): void {
   const now = sim.elapsedMs
   for (const m of sim.members) {
     if (!Alive.v[m]) continue
-    if (MFlash.until[m] !== 0 && now >= MFlash.until[m]!) {
-      MFlash.until[m] = 0
-      Tint.color[m] = 0xffffff
-    }
+    const flashing = MFlash.until[m] !== 0 && now < MFlash.until[m]!
+    if (MFlash.until[m] !== 0 && now >= MFlash.until[m]!) MFlash.until[m] = 0
+    // 非受击红闪期:黏黏怪攻速惩罚期间染黏液绿,否则常态白(镜像 atkSlowUntil 染色)
+    if (!flashing) Tint.color[m] = MAtkSlow.until[m]! > now ? 0x9ccc65 : 0xffffff
   }
 }

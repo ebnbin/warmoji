@@ -18,6 +18,7 @@ import {
   Pop,
   Hurt,
   Iframe,
+  MAtkSlow,
   MFlash,
   MHp,
   Member,
@@ -86,6 +87,7 @@ export function spawnTeam(
     addComponent(world, eid, Alive)
     addComponent(world, eid, Threat)
     addComponent(world, eid, MHp)
+    addComponent(world, eid, MAtkSlow)
     addComponent(world, eid, Iframe)
     addComponent(world, eid, Revive)
     addComponent(world, eid, Hurt)
@@ -110,6 +112,8 @@ export function spawnTeam(
     Threat.v[eid] = 0
     MHp.hp[eid] = maxHp
     MHp.max[eid] = maxHp
+    MAtkSlow.until[eid] = 0
+    MAtkSlow.mul[eid] = 1
     Iframe.ms[eid] = MEMBER.iframesMs
     Iframe.last[eid] = -1e9
     Revive.ms[eid] = reviveMs
