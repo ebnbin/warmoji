@@ -8,6 +8,7 @@ import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '.
 import type { OrbitThreat } from '../characters/orbit'
 import { Alive, Depth, Follow, Threat, Transform, Wander } from './components'
 import { steerEnemies, updateFrameTargets } from './enemy'
+import { memberContact, memberVisual, reviveMembers } from './combat'
 import type { EcsWorld } from './world'
 import type { Point } from '../core/vec'
 
@@ -39,8 +40,12 @@ export interface Sim {
   mapW: number
   mapH: number
   elapsedMs: number
-  /** 本帧威胁点(敌人位置;P2 为空) */
+  /** 本帧威胁点(敌人位置) */
   frameTargets: Point[]
+  /** 累计击杀 */
+  kills: number
+  /** 全队阵亡(游戏结束标记;结算页在 P4) */
+  over: boolean
 }
 
 /** 队伍活感·探测与轨道(镜像 updateOrbit):逐员判定探测范围内有无敌人 + 环上主力驱动共享相位 */
@@ -164,5 +169,8 @@ export function stepSim(sim: Sim, delta: number): void {
   updateFrameTargets(sim)
   updateOrbit(sim, delta)
   moveTeam(sim, delta)
+  reviveMembers(sim)
   steerEnemies(sim, delta)
+  memberContact(sim)
+  memberVisual(sim)
 }

@@ -3,7 +3,8 @@ import { UNIT } from '../core/units'
 import { FOLLOW } from '../battle/config'
 import { CAPTAINS } from '../captains/registry'
 import { CHARACTERS } from '../characters/registry'
-import { MEMBER } from '../characters/registry'
+import { MEMBER, TEAM } from '../characters/registry'
+import { memberMaxHp } from '../characters/stats'
 import { formationPosts } from '../characters/formation'
 import { aggregateTeamCards } from '../cards/registry'
 import { currentFormation, guardOrder, hasCenter } from '../run/state'
@@ -12,9 +13,14 @@ import {
   Alive,
   Depth,
   Follow,
+  Hurt,
+  Iframe,
+  MFlash,
+  MHp,
   Member,
   OrbitBias,
   Post,
+  Revive,
   Slot,
   Sprite,
   Threat,
@@ -50,7 +56,11 @@ export function spawnTeam(
     return post >= 0 ? post : slot
   })
   const teamFx = aggregateTeamCards(run.teamCards)
-  const moveSpeed = CAPTAINS[run.captainId].moveSpeed * UNIT * teamFx.moveSpeedMul
+  const captain = CAPTAINS[run.captainId]
+  const moveSpeed = captain.moveSpeed * UNIT * teamFx.moveSpeedMul
+  // 队员血量/复活基线(P3b:测试模式素体;正常局的道具个体差异在 P4 细化)
+  const maxHp = testMode ? MEMBER.maxHp : Math.round(memberMaxHp(0, captain.hpMul) * teamFx.teamHpMul)
+  const reviveMs = Math.max(1000, TEAM.reviveMs * captain.reviveMul * teamFx.reviveMul)
 
   const posts = formationPosts(formation, count, 0)
   const size = MEMBER.size * UNIT
@@ -70,6 +80,11 @@ export function spawnTeam(
     addComponent(world, eid, Wander)
     addComponent(world, eid, Alive)
     addComponent(world, eid, Threat)
+    addComponent(world, eid, MHp)
+    addComponent(world, eid, Iframe)
+    addComponent(world, eid, Revive)
+    addComponent(world, eid, Hurt)
+    addComponent(world, eid, MFlash)
     addComponent(world, eid, Transform)
     addComponent(world, eid, Sprite)
     addComponent(world, eid, Tint)
@@ -86,6 +101,14 @@ export function spawnTeam(
     Wander.amp[eid] = 0
     Alive.v[eid] = 1
     Threat.v[eid] = 0
+    MHp.hp[eid] = maxHp
+    MHp.max[eid] = maxHp
+    Iframe.ms[eid] = MEMBER.iframesMs
+    Iframe.last[eid] = -1e9
+    Revive.ms[eid] = reviveMs
+    Revive.at[eid] = 0
+    Hurt.radius[eid] = MEMBER.radius * UNIT
+    MFlash.until[eid] = 0
     Transform.x[eid] = x
     Transform.y[eid] = y
     Transform.rot[eid] = 0
@@ -117,5 +140,7 @@ export function spawnTeam(
     mapH,
     elapsedMs: 0,
     frameTargets: [],
+    kills: 0,
+    over: false,
   }
 }

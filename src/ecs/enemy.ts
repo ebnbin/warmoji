@@ -2,15 +2,20 @@ import { addComponent, addEntity, query } from 'bitecs'
 import { norm } from '../core/vec'
 import { ELITE } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
+import { KNOCKBACK } from '../abilities/registry'
 import {
   Alive,
   Boss,
   Depth,
+  DmgMul,
   Elite,
   Enemy,
   ENEMY_SET,
   EState,
+  Flash,
   Hp,
+  Kv,
+  Radius,
   Speed,
   Sprite,
   Tint,
@@ -48,6 +53,10 @@ export function spawnEnemy(
   addComponent(world, eid, EState)
   addComponent(world, eid, Elite)
   addComponent(world, eid, Boss)
+  addComponent(world, eid, Radius)
+  addComponent(world, eid, DmgMul)
+  addComponent(world, eid, Kv)
+  addComponent(world, eid, Flash)
   addComponent(world, eid, Sprite)
   addComponent(world, eid, Tint)
   addComponent(world, eid, Depth)
@@ -63,6 +72,11 @@ export function spawnEnemy(
   EState.v[eid] = lm.kind === 'dash' && lm.idle === 'chase' ? 1 : 0
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
+  Radius.v[eid] = def.radius
+  DmgMul.v[eid] = elite ? ELITE.damageMul : 1
+  Kv.x[eid] = 0
+  Kv.y[eid] = 0
+  Flash.until[eid] = 0
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   Sprite.flipX[eid] = 0
   Tint.color[eid] = 0xffffff
@@ -98,17 +112,44 @@ export function updateFrameTargets(sim: Sim): void {
   sim.frameTargets = out
 }
 
-/** 敌人转向(P3a:chase)——直奔最近活着的队员,有界钳制。delta 为真实帧长(ms) */
+/** 敌人转向(P3a:chase + 击退衰减 + 受击白闪恢复)——直奔最近活着的队员,有界钳制。delta 为真实帧长(ms) */
 export function steerEnemies(sim: Sim, delta: number): void {
   const eids = query(sim.world, ENEMY_SET as unknown as object[])
   if (eids.length === 0) return
   const dt = delta / 1000
+  const now = sim.elapsedMs
+  const decay = Math.exp(-delta / KNOCKBACK.tauMs) // forest knockbackTauMul=1
   for (const eid of eids) {
-    const target = nearestAlive(sim, Transform.x[eid]!, Transform.y[eid]!)
-    if (!target) continue
-    const dir = norm(target.x - Transform.x[eid]!, target.y - Transform.y[eid]!)
-    const step = Speed.v[eid]! * dt
-    Transform.x[eid] = clamp(Transform.x[eid]! + dir.x * step, 0, sim.mapW)
-    Transform.y[eid] = clamp(Transform.y[eid]! + dir.y * step, 0, sim.mapH)
+    // 受击白闪到时恢复
+    if (Flash.until[eid] !== 0 && now >= Flash.until[eid]!) {
+      Flash.until[eid] = 0
+      Tint.effect[eid] = 0
+      Tint.color[eid] = 0xffffff
+    }
+    let tx = Transform.x[eid]!
+    let ty = Transform.y[eid]!
+    const target = nearestAlive(sim, tx, ty)
+    if (target) {
+      const dir = norm(target.x - tx, target.y - ty)
+      const step = Speed.v[eid]! * dt
+      tx += dir.x * step
+      ty += dir.y * step
+    }
+    // 击退冲量:叠进位移后指数衰减(镜像 decayKnockback)
+    const kvx = Kv.x[eid]!
+    const kvy = Kv.y[eid]!
+    if (kvx !== 0 || kvy !== 0) {
+      tx += kvx * dt
+      ty += kvy * dt
+      if ((kvx * kvx + kvy * kvy) * decay * decay < 100) {
+        Kv.x[eid] = 0
+        Kv.y[eid] = 0
+      } else {
+        Kv.x[eid] = kvx * decay
+        Kv.y[eid] = kvy * decay
+      }
+    }
+    Transform.x[eid] = clamp(tx, 0, sim.mapW)
+    Transform.y[eid] = clamp(ty, 0, sim.mapH)
   }
 }

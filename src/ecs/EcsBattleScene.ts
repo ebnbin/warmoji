@@ -14,7 +14,8 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query } from 'bitecs'
-import { Enemy, Transform } from './components'
+import { Alive, Enemy, MHp, Transform } from './components'
+import { applyDamage } from './combat'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch } from './render/spriteBatch'
 import { spawnSprite } from './entities'
@@ -119,6 +120,23 @@ export class EcsBattleScene extends Phaser.Scene {
       const px = toPx(raw)
       spawnEnemy(this.world, this.atlas, px, sim.center.x + dxU * UNIT, sim.center.y + dyU * UNIT, px.hp, false, !!boss)
     }
+    // e2e 探针:对最近队伍中心的敌人施加伤害(+击退,源在队伍中心)
+    window.__ecsHurtEnemy = (dmg = 20, kb = 0): void => {
+      const sim = this.sim
+      if (!sim) return
+      let best = -1
+      let bestD = Infinity
+      for (const eid of query(this.world, [Enemy])) {
+        const dx = Transform.x[eid]! - sim.center.x
+        const dy = Transform.y[eid]! - sim.center.y
+        const d = dx * dx + dy * dy
+        if (d < bestD) {
+          bestD = d
+          best = eid
+        }
+      }
+      if (best >= 0) applyDamage(sim, best, dmg, kb, sim.center.x, sim.center.y)
+    }
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
       pages: atlas.pageCount,
@@ -173,7 +191,11 @@ export class EcsBattleScene extends Phaser.Scene {
       elapsed: sim.elapsedMs,
       memberPos: sim.members.map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
       enemies: query(this.world, [Enemy]).length,
-      enemyPos: query(this.world, [Enemy]).map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
+      enemyPos: Array.from(query(this.world, [Enemy]), (eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
+      kills: sim.kills,
+      over: sim.over,
+      alive: sim.members.filter((eid) => Alive.v[eid]).length,
+      memberHp: sim.members.map((eid) => MHp.hp[eid]!),
     }
   }
 }

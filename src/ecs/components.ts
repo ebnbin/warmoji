@@ -64,6 +64,13 @@ export const Threat = { v: u8() }
 /** 队员移动/布局查询集 */
 export const MEMBER_SET = [Member, Slot, Post, OrbitBias, Follow, Wander, Alive, Threat, Transform] as const
 
+/** 队员血量 + 无敌帧 + 复活 + 受击判定半径 + 受击闪光恢复时刻 */
+export const MHp = { hp: f32(), max: f32() }
+export const Iframe = { ms: f32(), last: f32() }
+export const Revive = { ms: f32(), at: f32() }
+export const Hurt = { radius: f32() }
+export const MFlash = { until: f32() }
+
 // ── 敌人(P3)──────────────────────────────────────────────
 
 /** 敌人标记 */
@@ -81,6 +88,18 @@ export const EState = { v: u8() }
 /** 精英/Boss 标记(渲染描边 elite;体质倍率等后续叠) */
 export const Elite = { v: u8() }
 export const Boss = { v: u8() }
+
+/** 碰撞半径(世界像素) */
+export const Radius = { v: f32() }
+
+/** 敌人伤害倍率(精英体质) */
+export const DmgMul = { v: f32() }
+
+/** 击退冲量(指数衰减,0=无) */
+export const Kv = { x: f32(), y: f32() }
+
+/** 受击白闪恢复时刻(0=无) */
+export const Flash = { until: f32() }
 
 /** 敌人移动查询集(最小:位姿 + 速度 + 血) */
 export const ENEMY_SET = [Enemy, Transform, Speed, Hp] as const
