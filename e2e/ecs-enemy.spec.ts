@@ -28,7 +28,8 @@ test('ECS 敌人：投放僵尸，直奔队伍中心（chase）', async ({ page 
     }
   })
   await page.goto('/')
-  await page.evaluate(() => window.__ecsLabRoster!(['juggler', 'unicorn', 'troll', 'cowboy']))
+  // 单人近战队（troll）：远处僵尸能自由追近一段再进入近战射程被击（避免被远程秒掉）
+  await page.evaluate(() => window.__ecsLabRoster!(['troll']))
   await enterMap(page)
   await startTestBattle(page, 'forest')
   await page.waitForFunction(() => (window as unknown as { __ecs?: EcsDbg }).__ecs?.ready === true, undefined, {
@@ -43,9 +44,12 @@ test('ECS 敌人：投放僵尸，直奔队伍中心（chase）', async ({ page 
   const startX = start.enemyPos[0]!.x
   expect(startX).toBeGreaterThan(start.centerX + 200) // 5*UNIT=320 右侧
 
-  // 追击：等敌人 x 向中心逼近至少 150px（用 waitForFunction 规避 headless rAF 节流）
+  // 追击：等敌人 x 向中心逼近至少 90px（近战队，进射程前已自由追近一段）
   await page.waitForFunction(
-    (sx) => (window as unknown as { __ecs: EcsDbg }).__ecs.enemyPos[0]!.x < sx - 150,
+    (sx) => {
+      const e = (window as unknown as { __ecs: EcsDbg }).__ecs.enemyPos[0]
+      return !!e && e.x < sx - 90
+    },
     startX,
     { timeout: 12_000 },
   )

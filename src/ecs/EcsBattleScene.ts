@@ -120,7 +120,7 @@ export class EcsBattleScene extends Phaser.Scene {
       const raw = ENEMY_DEFS.find((s) => s.kind === kind) ?? boss
       if (!raw) return
       const px = toPx(raw)
-      spawnEnemy(this.world, this.atlas, px, sim.center.x + dxU * UNIT, sim.center.y + dyU * UNIT, px.hp, false, !!boss)
+      spawnEnemy(sim, this.atlas, px, sim.center.x + dxU * UNIT, sim.center.y + dyU * UNIT, px.hp, false, !!boss)
     }
     // e2e 探针:对最近队伍中心的敌人施加伤害(+击退,源在队伍中心)
     window.__ecsHurtEnemy = (dmg = 20, kb = 0): void => {

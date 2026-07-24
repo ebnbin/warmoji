@@ -101,6 +101,10 @@ export const Kv = { x: f32(), y: f32() }
 /** 受击白闪恢复时刻(0=无) */
 export const Flash = { until: f32() }
 
+/** 游荡方向 + 换向时刻(wander/游荡类 locomotion) */
+export const EDir = { x: f32(), y: f32() }
+export const ETurn = { at: f32() }
+
 /** 敌人移动查询集(最小:位姿 + 速度 + 血) */
 export const ENEMY_SET = [Enemy, Transform, Speed, Hp] as const
 

@@ -1,4 +1,5 @@
 import { UNIT } from '../core/units'
+import type { Rng } from '../core/rng'
 import { FOLLOW, WANDER } from '../battle/config'
 import { ORBIT } from '../characters/orbit'
 import { TEAM, MEMBER } from '../characters/registry'
@@ -50,6 +51,8 @@ export interface Sim {
   over: boolean
   /** 本帧敌方存活快照(能力索敌共享;wire 每帧重建) */
   enemyTargets: TargetInfo[]
+  /** 敌人行为随机源(游荡换向/生成等;按 run 种子确定) */
+  rng: Rng
 }
 
 /** 队伍活感·探测与轨道(镜像 updateOrbit):逐员判定探测范围内有无敌人 + 环上主力驱动共享相位 */

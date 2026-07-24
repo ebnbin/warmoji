@@ -4,7 +4,6 @@ import { enterMap, startTestBattle } from './helpers'
 // P3c：队员能力自动开火 → 抛射物命中 → 敌人死亡（kills 递增）。
 
 type EcsDbg = { ready: boolean; enemies: number; kills: number; projectiles: number }
-const dbg = () => (window as unknown as { __ecs: EcsDbg }).__ecs
 
 test('ECS 能力：队员自动开火，抛射物击杀来袭敌人', async ({ page }) => {
   const errors: string[] = []
