@@ -21,6 +21,7 @@ import {
   MHp,
   Morph,
   Poison,
+  Pop,
   Radius,
   Revive,
   SpMul,
@@ -229,6 +230,7 @@ export function reviveMembers(sim: Sim): void {
     Tint.color[m] = 0xffffff
     Tint.alpha[m] = 1
     Tint.effect[m] = 0
+    Pop.until[m] = now + 200 // 复活弹入(镜像 reviveMember 的 scale 弹)
   }
 }
 

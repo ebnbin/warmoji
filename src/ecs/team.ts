@@ -15,6 +15,7 @@ import {
   Breath,
   Depth,
   Follow,
+  Pop,
   Hurt,
   Iframe,
   MFlash,
@@ -81,6 +82,7 @@ export function spawnTeam(
     addComponent(world, eid, Follow)
     addComponent(world, eid, Wander)
     addComponent(world, eid, Breath)
+    addComponent(world, eid, Pop)
     addComponent(world, eid, Alive)
     addComponent(world, eid, Threat)
     addComponent(world, eid, MHp)
@@ -103,6 +105,7 @@ export function spawnTeam(
     Wander.seed[eid] = slot * 2.399
     Wander.amp[eid] = 0
     Breath.phase[eid] = slot * 1.3
+    Pop.until[eid] = 0
     Alive.v[eid] = 1
     Threat.v[eid] = 0
     MHp.hp[eid] = maxHp

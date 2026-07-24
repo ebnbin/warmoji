@@ -60,6 +60,9 @@ export const Wander = { seed: f32(), amp: f32() }
 /** 呼吸相位(挤压拉伸小动画:移动更快;slot 初相错开) */
 export const Breath = { phase: f32() }
 
+/** 复活弹入动画结束时刻(0=非弹入;期间用弹入缩放覆盖呼吸,镜像 reviveMember 的 scale 弹) */
+export const Pop = { until: f32() }
+
 /** 存活 + 本帧探测范围内是否有敌(游移门控/orbit 输入) */
 export const Alive = { v: u8() }
 export const Threat = { v: u8() }

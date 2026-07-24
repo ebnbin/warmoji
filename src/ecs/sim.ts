@@ -7,7 +7,7 @@ import { formationPosts, ringPostAngle } from '../characters/formation'
 import type { FormationId } from '../characters/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../characters/orbit'
 import type { OrbitThreat } from '../characters/orbit'
-import { Alive, Breath, Depth, Follow, Sprite, Threat, Transform, Wander } from './components'
+import { Alive, Breath, Depth, Follow, Pop, Sprite, Threat, Transform, Wander } from './components'
 import { steerEnemies, updateFrameTargets } from './enemy'
 import { memberContact, memberVisual, reviveMembers, tickPoison } from './combat'
 import { updateEnemyProjectiles, updateProjectiles } from './projectile'
@@ -199,6 +199,14 @@ function moveTeam(sim: Sim, delta: number): void {
   layout(sim, delta)
 }
 
+/** Back.easeOut(Phaser 默认过冲量):复活弹入用,末段轻微过冲再回落 */
+function backEaseOut(t: number): number {
+  const c1 = 1.70158
+  const c3 = c1 + 1
+  const u = t - 1
+  return 1 + c3 * u * u * u + c1 * u * u
+}
+
 /** 逐员:岗位偏移 + 待机游移 + 跟随弹簧 → 写 Transform/Depth(镜像 layoutTeam) */
 function layout(sim: Sim, delta: number): void {
   const posts = formationPosts(sim.formation, sim.count, sim.orbitPhase)
@@ -247,13 +255,21 @@ function layout(sim: Sim, delta: number): void {
     Transform.y[eid] = fy
     const guarded = sim.formation === 'guard' && idx === 0
     Depth.z[eid] = guarded ? 8.5 : 10 + (fy - sim.center.y) / UNIT
-    // 程序化小动画(镜像 animateMember):呼吸挤压拉伸 + 朝移动方向翻转(仅活着的)
+    // 程序化小动画(镜像 animateMember):呼吸挤压拉伸 + 朝移动方向翻转(仅活着的)。
+    // 复活弹入期(Pop)用弹入缩放覆盖呼吸(镜像 reviveMember 的 Back.easeOut scale 弹)
     if (Alive.v[eid]) {
-      const bp = Breath.phase[eid]! + delta / (moving ? 85 : 140)
-      Breath.phase[eid] = bp
-      const s = Math.sin(bp) * (moving ? 0.13 : 0.09)
-      Transform.w[eid] = memberSize * (1 - s * 0.6)
-      Transform.h[eid] = memberSize * (1 + s)
+      if (Pop.until[eid]! > sim.elapsedMs) {
+        const t = 1 - (Pop.until[eid]! - sim.elapsedMs) / 200
+        const pop = memberSize * (0.3 + 0.7 * backEaseOut(t))
+        Transform.w[eid] = pop
+        Transform.h[eid] = pop
+      } else {
+        const bp = Breath.phase[eid]! + delta / (moving ? 85 : 140)
+        Breath.phase[eid] = bp
+        const s = Math.sin(bp) * (moving ? 0.13 : 0.09)
+        Transform.w[eid] = memberSize * (1 - s * 0.6)
+        Transform.h[eid] = memberSize * (1 + s)
+      }
       if (Math.abs(sim.teamDir.x) > 0.2) Sprite.flipX[eid] = sim.teamDir.x > 0 ? 1 : 0
     }
   }
