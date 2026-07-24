@@ -18,6 +18,7 @@ describe('settings', () => {
       sound: true,
       bgm: true,
       showSkinTone: false,
+      ecs: false,
     })
     expect(loadSettings(undefined)).toEqual(DEFAULT_SETTINGS)
     const s = memStorage()
@@ -32,14 +33,15 @@ describe('settings', () => {
       sound: true,
       bgm: true,
       showSkinTone: false,
+      ecs: false,
     })
     expect(sanitizeSettings({ hitShake: 'yes' })).toEqual(DEFAULT_SETTINGS)
   })
 
   it('保存后可读回', () => {
     const s = memStorage()
-    // showSkinTone 取非默认值（true），验证新字段确实被持久化并读回
-    const saved = { damageNumbers: false, hitShake: false, sound: false, bgm: false, showSkinTone: true }
+    // showSkinTone / ecs 取非默认值（true），验证新字段确实被持久化并读回
+    const saved = { damageNumbers: false, hitShake: false, sound: false, bgm: false, showSkinTone: true, ecs: true }
     saveSettings(s, saved)
     expect(loadSettings(s)).toEqual(saved)
   })

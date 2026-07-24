@@ -17,6 +17,8 @@ import { ShopScene } from './menu/ShopScene'
 import { SpaceArenaScene } from './maps/SpaceArenaScene'
 import { StudioScene } from './menu/StudioScene'
 import { UIScene } from './battle/UIScene'
+import { EcsBattleScene } from './ecs/EcsBattleScene'
+import { ECS_SCENE_KEY } from './ecs/keys'
 import { VoidArenaScene } from './maps/VoidArenaScene'
 import { WikiScene } from './menu/WikiScene'
 import { WAVE } from './run/waves'
@@ -68,7 +70,7 @@ const game = new Phaser.Game({
   // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
   physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, RuinsArenaScene, DayNightArenaScene, SpaceArenaScene, IceArenaScene, UIScene, ResultScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, RuinsArenaScene, DayNightArenaScene, SpaceArenaScene, IceArenaScene, EcsBattleScene, UIScene, ResultScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {
@@ -85,7 +87,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
     const key = scene.scene.key
     if (lobby.includes(key)) {
       scene.events.on(Phaser.Scenes.Events.START, () => playBgm('lobby'))
-    } else if (arenas.includes(key)) {
+    } else if (arenas.includes(key) || key === ECS_SCENE_KEY) {
       scene.events.on(Phaser.Scenes.Events.START, () => playBgm(getRun().mapId))
     }
   }

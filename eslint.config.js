@@ -20,6 +20,9 @@ export default tseslint.config(
       'src/core/fx.ts',
       'src/maps/*Scene.ts',
       'src/menu/*Scene.ts',
+      // ECS 实验：宿主场景 + 自绘渲染层触碰 Phaser/WebGL（表现层）；ECS 逻辑文件仍禁 phaser
+      'src/ecs/EcsBattleScene.ts',
+      'src/ecs/render/**/*.ts',
       'src/menu/grid.ts',
       'src/menu/scroll.ts',
       'src/emoji/textures.ts',

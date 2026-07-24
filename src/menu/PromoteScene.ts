@@ -4,7 +4,8 @@ import { CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
 import { formationPosts } from '../characters/formation'
 import type { ItemId } from '../items/registry'
-import { arenaSceneFor } from '../maps/registry'
+import { battleSceneFor } from '../ecs/route'
+import type { EcsSceneKey } from '../ecs/keys'
 import type { ArenaSceneKey } from '../maps/registry'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
@@ -392,9 +393,9 @@ export class PromoteScene extends Phaser.Scene {
   }
 
   /** 点数花完后的去向：开局看队长 firstWaveShop（默认直接开战），波末必进商店 */
-  private nextScene(): ArenaSceneKey | 'shop' {
+  private nextScene(): ArenaSceneKey | EcsSceneKey | 'shop' {
     if (this.isInitial() && !CAPTAINS[this.run.captainId].firstWaveShop) {
-      return arenaSceneFor(this.run.mapId)
+      return battleSceneFor(this.run.mapId)
     }
     return 'shop'
   }

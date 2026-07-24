@@ -1,7 +1,8 @@
 import Phaser from 'phaser'
 import { browserStorage } from '../core/storage'
 import type { MapId } from '../maps/registry'
-import { arenaSceneFor, bossFor, MAP_IDS, MAPS } from '../maps/registry'
+import { bossFor, MAP_IDS, MAPS } from '../maps/registry'
+import { battleSceneFor } from '../ecs/route'
 import { beginRun } from '../run/state'
 import { labCaptain, labStarters } from '../run/lab'
 import { randomPalette } from '../core/palette'
@@ -175,7 +176,7 @@ export class MapScene extends Phaser.Scene {
       // 测试模式：跳过队长/组队/商店，用当前勾选阵容在该图上开沙盒
       if (this.testMode) {
         beginRun(labCaptain(), labStarters(), this.selectedId, true)
-        this.scene.start(arenaSceneFor(this.selectedId))
+        this.scene.start(battleSceneFor(this.selectedId))
         return
       }
       this.scene.start('captain')

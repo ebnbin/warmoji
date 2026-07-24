@@ -37,16 +37,21 @@ export async function confirmMap(page: Page): Promise<void> {
   )
 }
 
-/** 地图页 → 勾选「测试模式」→ 确认，用该图直接进入沙盒竞技场（跳过队长/组队） */
-export async function enterLab(page: Page, mapId = 'forest'): Promise<void> {
+/** 地图页 → 勾选「测试模式」→ 确认开战（不等待具体场景——arena 或 ecsArena 由 A/B 开关决定） */
+export async function startTestBattle(page: Page, mapId = 'forest'): Promise<void> {
   await clickMap(page, mapId)
   // 勾上测试模式勾选框
   const chk = await page.evaluate(() => window.__warmoji!.map!.test)
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: chk.x, y: chk.y }) })
   await page.waitForFunction(() => window.__warmoji?.map?.test.on === true)
-  // 确认 → 直接进竞技场
+  // 确认 → 直接开战
   const s = await page.evaluate(() => window.__warmoji!.map!.start)
   await page.locator('#game canvas').click({ position: await cssPoint(page, { x: s.x, y: s.y }) })
+}
+
+/** 地图页 → 测试模式直接进入旧沙盒竞技场（跳过队长/组队） */
+export async function enterLab(page: Page, mapId = 'forest'): Promise<void> {
+  await startTestBattle(page, mapId)
   await page.waitForFunction(() => window.__warmoji?.scene === 'arena')
 }
 

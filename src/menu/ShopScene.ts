@@ -21,7 +21,7 @@ import { levelStatsFor, LEVEL_STATS } from '../characters/levels'
 import { upgradeCardsFor } from '../characters/registry'
 import { aggregateTeamCards } from '../cards/registry'
 import type { TeamEffects } from '../items/registry'
-import { arenaSceneFor } from '../maps/registry'
+import { battleSceneFor } from '../ecs/route'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { Rng } from '../core/rng'
@@ -837,7 +837,7 @@ export class ShopScene extends Phaser.Scene {
 
   private nextWave(): void {
     playSfx('click')
-    this.scene.start(arenaSceneFor(this.run.mapId))
+    this.scene.start(battleSceneFor(this.run.mapId))
   }
 
   /** 打开阵型页（本场景睡眠，返回时唤醒，货架/金币/免费刷新原样保留）。
