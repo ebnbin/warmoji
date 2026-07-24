@@ -178,7 +178,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     },
     poisonTarget: (enemy, dmg, tickMs, durationMs) =>
       this.poisonEnemy(enemy as ImageObj, dmg, tickMs, durationMs, -1),
-    isPoisoned: (ref) => enemyOf(ref as ImageObj).poisonUntil > this.elapsedMs,
+    isPoisoned: (ref) => (enemyOf(ref as ImageObj).poison?.until ?? 0) > this.elapsedMs,
     spawnGroundEffect: (x, y, def) => spawnGroundEffect(this, x, y, def, { faction: 'team', srcSlot: -1 }),
     attractCoins: (x, y, radius) => this.frameAttractors.push({ x, y, r2: radius * radius }),
     // 基座 ctx 无「本人」概念：无敌授予/本体动画由 memberCtx 按槽位覆写
@@ -2080,11 +2080,13 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     if (!enemy.active) return
     const a = enemyOf(enemy)
     if (a.dormant) return
-    a.poisonDmg = dmg
-    a.poisonTickMs = tickMs
-    a.poisonUntil = this.elapsedMs + durationMs
-    a.poisonNextTick = this.elapsedMs + tickMs
-    a.poisonSlot = slot
+    a.poison = {
+      dmg,
+      tickMs,
+      until: this.elapsedMs + durationMs,
+      nextTick: this.elapsedMs + tickMs,
+      slot,
+    }
   }
 
   /** 时停：逐帧把双方在途弹体速度重设为 满速基准×scale（凝在半空）；scale=1 即恢复满速。
@@ -2144,15 +2146,16 @@ export abstract class BaseArenaScene extends Phaser.Scene {
         if (a.state === 'windup') e.setTint(0xffb74d)
       }
 
-      // 中毒 DoT：每 poisonTickMs 一跳、期间染毒绿；到期解毒（跳伤可能致死→本体已释放即跳出）
-      if (a.poisonUntil !== 0) {
-        if (now >= a.poisonUntil) {
-          a.poisonUntil = 0
+      // 中毒 DoT：每 tickMs 一跳、期间染毒绿；到期解毒（跳伤可能致死→本体已释放即跳出）
+      const poison = a.poison
+      if (poison) {
+        if (now >= poison.until) {
+          a.poison = undefined
           if (a.flashUntil === 0 && !a.slowed) e.clearTint()
         } else {
-          if (now >= a.poisonNextTick) {
-            a.poisonNextTick += a.poisonTickMs
-            this.applyDamage(e, a.poisonDmg, 0, undefined, undefined, a.poisonSlot)
+          if (now >= poison.nextTick) {
+            poison.nextTick += poison.tickMs
+            this.applyDamage(e, poison.dmg, 0, undefined, undefined, poison.slot)
             if (!e.active) continue
           }
           if (a.flashUntil === 0) e.setTint(0x7bff5a) // 毒绿

@@ -10,6 +10,20 @@ import type { FieldPickupDef } from '../battlefield/registry'
 /** 行为状态机：wander 游荡 / chase 追击 / windup 蓄力 / dash 冲刺 / cool 冷却 */
 export type EnemyState = 'wander' | 'chase' | 'windup' | 'dash' | 'cool'
 
+/** 中毒 DoT 组件（用到才挂）：非空即中毒；到期解毒 = 置空。小蜜蜂毒针等施加 */
+export interface PoisonState {
+  /** 解毒时刻 */
+  until: number
+  /** 下一次毒素跳伤的时刻 */
+  nextTick: number
+  /** 每跳毒伤 */
+  dmg: number
+  /** 跳间隔（ms） */
+  tickMs: number
+  /** 伤害归属槽位 */
+  slot: number
+}
+
 export interface Enemy {
   readonly image: ImageObj
   /** px 化规格（Boss 为公共字段合成的规格） */
@@ -45,14 +59,8 @@ export interface Enemy {
   /** 能力施加的限时减速/冻结（0 = 无） */
   abilitySlowUntil: number
   abilitySlowMul: number
-  /** 中毒 DoT（小蜜蜂毒针等）：0 = 未中毒。到期解毒 */
-  poisonUntil: number
-  /** 下一次毒素跳伤的时刻 */
-  poisonNextTick: number
-  /** 每跳毒伤 / 跳间隔（ms）/ 伤害归属槽位 */
-  poisonDmg: number
-  poisonTickMs: number
-  poisonSlot: number
+  /** 中毒 DoT（用到才挂）：非空即中毒，到期解毒 = poison 置空 */
+  poison?: PoisonState
   /** 精英体质倍率 */
   spMul: number
   dmgMul: number
@@ -112,11 +120,6 @@ export function attachEnemy(image: ImageObj, def: EnemyDef, hp: number, init?: P
     slowed: false,
     abilitySlowUntil: 0,
     abilitySlowMul: 1,
-    poisonUntil: 0,
-    poisonNextTick: 0,
-    poisonDmg: 0,
-    poisonTickMs: 1000,
-    poisonSlot: -1,
     spMul: 1,
     dmgMul: 1,
     kvx: 0,
