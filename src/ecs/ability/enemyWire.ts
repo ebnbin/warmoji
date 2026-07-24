@@ -2,8 +2,9 @@ import type Phaser from 'phaser'
 import { query } from 'bitecs'
 import { createAbility } from '../../abilities/create'
 import type { AbilityOwner, TargetInfo } from '../../abilities/types'
-import { Alive, ENEMY_SET, Hurt, Transform } from '../components'
+import { Alive, ENEMY_SET, Hurt, Morph, Transform } from '../components'
 import { enemyAbilities, enemyDef, enemyFireDelayMs, enemyOwner } from '../store'
+import { restoreMorphVisual } from '../morph'
 import { makeEnemyCtx, memberRefOf } from './enemyCtx'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
@@ -49,15 +50,27 @@ export function updateEnemyAbilities(sim: Sim, scene: Phaser.Scene, atlas: EcsAt
   }
   sim.memberTargets = targets
 
+  const now = sim.elapsedMs
   const alive = new Set<number>()
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     alive.add(eid)
+    // 魔尘变形到期:复形 + 缴械后延(避免复形瞬间齐射,镜像 restoreMorph 的 postponeFire)
+    if (Morph.until[eid] !== 0 && now >= Morph.until[eid]!) {
+      restoreMorphVisual(atlas, eid)
+      const ab = enemyAbilities[eid]
+      if (ab) for (const w of ab) w.postponeFire?.(700)
+    }
     if (!enemyDef[eid]?.abilities?.length) continue
     if (!enemyAbilities[eid]) armEnemyEcs(sim, scene, atlas, eid)
     const abilities = enemyAbilities[eid]
     const owner = enemyOwner[eid]
     if (!abilities || !owner) continue
-    for (const w of abilities) w.update(delta, owner)
+    // 变形期缴械:只推进冷却不开火(时间表语义:复形后冷却已尽者随即出手,已被 postponeFire 后延)
+    if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) {
+      for (const w of abilities) w.tickCooldown?.(delta)
+    } else {
+      for (const w of abilities) w.update(delta, owner)
+    }
   }
   // 死亡清理:能力仍挂但敌人已不在(击杀/自毁)→ 销毁并清空(释放持械视觉)
   for (const eid of armedEids) {

@@ -4,6 +4,8 @@ import type { AbilityContext, TargetInfo } from '../../abilities/types'
 import type { CharacterEffects, TeamEffects } from '../../items/registry'
 import { Alive, Hp, Iframe, MHp, Poison, Slow, Transform } from '../components'
 import { applyDamage } from '../combat'
+import { applyMorph } from '../morph'
+import { enemyDef } from '../store'
 import { spawnProjectileEcs } from '../projectile'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
@@ -78,6 +80,10 @@ export function makeTeamCtx(
       Poison.dmg[eid] = damage
       Poison.tickMs[eid] = tickMs
       Poison.slot[eid] = slot
+    },
+    morphTarget: (ref, spec) => {
+      const eid = eidOf(ref)
+      if (enemyDef[eid] !== undefined) applyMorph(sim, atlas, eid, spec) // 死者不变形
     },
     spawnGroundEffect: () => {}, // P3d
     heal: (x, y, range, amount, all) => healMembers(sim, x, y, range, amount, all),

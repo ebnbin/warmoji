@@ -14,6 +14,7 @@ import {
   Depth,
   Despawn,
   DmgMul,
+  Morph,
   EDir,
   Elite,
   Enemy,
@@ -73,6 +74,7 @@ export function spawnEnemy(
   addComponent(world, eid, Poison)
   addComponent(world, eid, Charge)
   addComponent(world, eid, Despawn)
+  addComponent(world, eid, Morph)
   addComponent(world, eid, EDir)
   addComponent(world, eid, ETurn)
   addComponent(world, eid, Sprite)
@@ -96,6 +98,9 @@ export function spawnEnemy(
       ? sim.elapsedMs + (lm.trigger.firstDelayMs ?? lm.trigger.intervalMs)
       : 0
   Despawn.at[eid] = 0
+  Morph.until[eid] = 0
+  Morph.vuln[eid] = 1
+  Morph.cdUntil[eid] = 0
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
   Radius.v[eid] = def.radius
@@ -431,7 +436,12 @@ export function steerEnemies(sim: Sim, delta: number): void {
     // 速度倍率:能力限时减速/冻结 × 体质(精英加速/护巢暴走)。teamFx/battleFx/时停时标 = 1(森林)
     const slow = (now < Slow.until[eid]! ? Slow.mul[eid]! : 1) * SpMul.v[eid]!
     const speed = Speed.v[eid]! * slow
-    if (kind === 'static') {
+    // 魔尘变形期:失去本职行为,顶绵羊形象缓速游荡(半速)。缴械/无害/复形在能力层与战斗层
+    if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) {
+      const d = wanderDir(sim, eid)
+      tx += d.x * speed * 0.5 * dt
+      ty += d.y * speed * 0.5 * dt
+    } else if (kind === 'static') {
       // 原地不动
     } else if (kind === 'wander') {
       const d = wanderDir(sim, eid)

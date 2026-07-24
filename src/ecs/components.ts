@@ -120,6 +120,10 @@ export const Charge = { windupUntil: f32(), dashUntil: f32(), coolUntil: f32(), 
 /** 定时静默移除时刻(0=不移除):亡语诱饵尸壳到时自毁(镜像 despawnAt) */
 export const Despawn = { at: f32() }
 
+/** 魔尘变形(仙子 morph):until 变形结束时刻(0=未变形);vuln 变形期受伤倍率;
+ * cdUntil 变形+复形冷却结束时刻(期间免疫再变)。变形期无害/缴械/缓速游荡/绵羊形象 */
+export const Morph = { until: f32(), vuln: f32(), cdUntil: f32() }
+
 /** 敌人移动查询集(最小:位姿 + 速度 + 血) */
 export const ENEMY_SET = [Enemy, Transform, Speed, Hp] as const
 

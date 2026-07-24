@@ -14,8 +14,9 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query } from 'bitecs'
-import { Alive, Enemy, EnemyProj, EState, Hp, MHp, Poison, Projectile, Slow, Transform } from './components'
+import { Alive, Enemy, EnemyProj, EState, Hp, MHp, Morph, Poison, Projectile, Slow, Transform } from './components'
 import { applyDamage } from './combat'
+import { applyMorph } from './morph'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch } from './render/spriteBatch'
 import { spawnSprite } from './entities'
@@ -218,10 +219,41 @@ export class EcsBattleScene extends Phaser.Scene {
       }
       return best >= 0 ? EState.v[best]! : -1
     }
+    // e2e 探针:变形最近敌人(魔尘)+ 读其是否变形中
+    window.__ecsMorphEnemy = (durMs = 2500, vulnMul = 1): void => {
+      const sim = this.sim
+      if (!sim || !this.atlas) return
+      const best = this.nearestEnemyToCenter()
+      if (best >= 0) applyMorph(sim, this.atlas, best, { durationMs: durMs, morphEmoji: '1f411', vulnMul })
+    }
+    window.__ecsNearestEnemyMorphed = (): boolean => {
+      const sim = this.sim
+      if (!sim) return false
+      const best = this.nearestEnemyToCenter()
+      return best >= 0 && Morph.until[best] !== 0 && sim.elapsedMs < Morph.until[best]!
+    }
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
       pages: atlas.pageCount,
     }
+  }
+
+  /** 最近队伍中心的敌人 eid(探针共用),无敌人返回 -1 */
+  private nearestEnemyToCenter(): number {
+    const sim = this.sim
+    if (!sim) return -1
+    let best = -1
+    let bestD = Infinity
+    for (const eid of query(this.world, [Enemy])) {
+      const dx = Transform.x[eid]! - sim.center.x
+      const dy = Transform.y[eid]! - sim.center.y
+      const d = dx * dx + dy * dy
+      if (d < bestD) {
+        bestD = d
+        best = eid
+      }
+    }
+    return best
   }
 
   /** 地图装饰:按 run 种子随机散布的低透明度 emoji(镜像 ArenaScene.drawDecor),作 ECS 静态实体 */

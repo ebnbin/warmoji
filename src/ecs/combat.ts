@@ -15,6 +15,7 @@ import {
   Kv,
   MFlash,
   MHp,
+  Morph,
   Poison,
   Radius,
   Revive,
@@ -38,7 +39,10 @@ export function applyDamage(
   srcX?: number,
   srcY?: number,
 ): void {
-  const hp = Hp.v[eid]! - damage
+  const morphed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
+  // 变形期受伤倍率(魔尘诅咒 vulnMul):放大变羊敌人所受伤害
+  const dmg = morphed && Morph.vuln[eid] !== 1 ? Math.round(damage * Morph.vuln[eid]!) : damage
+  const hp = Hp.v[eid]! - dmg
   if (hp <= 0) {
     killEnemy(sim, eid)
     return
@@ -50,7 +54,7 @@ export function applyDamage(
   Tint.color[eid] = 0xffffff
   const def = enemyDef[eid]
   let kb = knockback
-  if (def?.kbImmune) kb = 0
+  if (def?.kbImmune && !morphed) kb = 0 // 变形期免疫击退失效(绵羊可被击退)
   if (kb > 0 && srcX !== undefined && srcY !== undefined) {
     const dir = norm(Transform.x[eid]! - srcX, Transform.y[eid]! - srcY)
     let kvx = Kv.x[eid]! + dir.x * kb
@@ -137,6 +141,7 @@ export function memberContact(sim: Sim): void {
       const def = enemyDef[eid]
       if (!def) continue
       if (def.damage <= 0) continue // 亡语诱饵尸壳(damage=0)无害:接触不伤(镜像 a.decoy 跳过)
+      if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue // 变形期无害:接触不伤
       Iframe.last[m] = now
       hurtMember(sim, m, def.damage * DmgMul.v[eid]!)
       break // 一帧一员只吃一次(无敌帧掌管其余)

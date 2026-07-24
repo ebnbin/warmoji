@@ -229,6 +229,8 @@ interface Window {
   __ecsPoisonEnemy?: (dmg?: number, tickMs?: number, durMs?: number) => void
   __ecsNearestEnemyHp?: () => number
   __ecsNearestEnemyState?: () => number
+  __ecsMorphEnemy?: (durMs?: number, vulnMul?: number) => void
+  __ecsNearestEnemyMorphed?: () => boolean
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
   __addMemberItem?: (itemId: string, slot?: number, count?: number) => void
