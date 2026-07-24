@@ -59,7 +59,7 @@ export class MenuScene extends Phaser.Scene {
       iconLabel(this, w / 2, h * 0.66, '1f3c6', 35, `最佳：第 ${best.bestWave} 波 · 击杀 ${best.bestKills}`, {
         fontFamily: UI_FONT,
         fontSize: FONT.body,
-        color: '#d4b106',
+        color: '#ffdc5d',
         resolution: res,
       })
     }

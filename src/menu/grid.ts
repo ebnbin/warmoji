@@ -156,7 +156,7 @@ export class EmojiGrid {
         bar.fillStyle(0x000000, 0.45)
         bar.fillRect(relX + 14, relY + this.cell - 16, bw, 7)
         const r = item.hpRatio
-        bar.fillStyle(r > 0.5 ? 0x66bb6a : r > 0.3 ? 0xffb300 : 0xef5350, 1)
+        bar.fillStyle(r > 0.5 ? 0x66bb6a : r > 0.3 ? 0xffdc5d : 0xef5350, 1)
         bar.fillRect(relX + 15, relY + this.cell - 15, (bw - 2) * r, 5)
         this.container.add(bar)
       }

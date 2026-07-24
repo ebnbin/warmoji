@@ -145,7 +145,7 @@ export class ResultScene extends Phaser.Scene {
         this.best.newBest
           ? '新纪录！'
           : `最佳：第 ${this.best.bestWave} 波 · 击杀 ${this.best.bestKills}`,
-        { fontFamily: UI_FONT, fontSize: FONT.strong, color: '#d4b106', resolution: res },
+        { fontFamily: UI_FONT, fontSize: FONT.strong, color: '#ffdc5d', resolution: res },
       )
       .setOrigin(0.5)
 

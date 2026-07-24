@@ -1382,7 +1382,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     g.clear()
     g.fillStyle(0x000000, 0.45)
     g.fillRect(-w / 2, y, w, 6)
-    g.fillStyle(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffb300 : 0xef5350, 1)
+    g.fillStyle(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffdc5d : 0xef5350, 1)
     g.fillRect(-w / 2 + 1, y + 1, (w - 2) * ratio, 4)
   }
 

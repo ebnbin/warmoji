@@ -556,7 +556,7 @@ export class PromoteScene extends Phaser.Scene {
       if (post === 0) {
         // 受保护中心：琥珀色光环标注（中心不随外圈环绕）
         const ring = this.add.graphics()
-        ring.lineStyle(3, 0xffca28, 0.95)
+        ring.lineStyle(3, 0xffdc5d, 0.95)
         ring.strokeCircle(px, py, half + 4)
         this.formationObjs.push(ring)
       }
