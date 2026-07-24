@@ -75,7 +75,7 @@ export interface Sim {
   pendingCoins: PendingCoins[]
 }
 
-/** 掉落/拾取乘区(镜像 grantKillRewards / magnetCoins 的乘区来源) */
+/** 掉落/拾取乘区(镜像 grantKillRewards / magnetCoins / endWave 的乘区来源) */
 export interface RewardConfig {
   /** 经验乘区(队长 xpGainMul × 道具 xpGainMul;精英 ELITE.xpMul 逐杀再叠) */
   captainXpMul: number
@@ -83,6 +83,10 @@ export interface RewardConfig {
   doubleCoinChance: number
   /** 磁吸半径(px:队长 coinMagnet × 道具 magnetMul) */
   magnetRadius: number
+  /** 波末回复比例(团队道具:大锅) */
+  waveHealRatio: number
+  /** 波末金币分红(团队道具:债券) */
+  waveCoins: number
 }
 
 /** 待落地金币(死亡点 + 枚数) */

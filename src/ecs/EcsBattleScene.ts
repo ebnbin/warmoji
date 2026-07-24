@@ -7,7 +7,7 @@ import { Rng } from '../core/rng'
 import { applyBackground } from '../core/background'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS } from '../boot/preload'
-import { getRun } from '../run/state'
+import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { MAP, MAPS, rollDecor } from '../maps/registry'
 import { ECS_SCENE_KEY } from './keys'
@@ -30,6 +30,8 @@ import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from '
 import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
 import { spawnStep } from './spawn'
 import { initialLayout, stepSim } from './sim'
+import { settleWave } from './wave'
+import { waveDurationMs, WAVE } from '../run/waves'
 import type { Sim } from './sim'
 import { toPx } from '../battle/px'
 import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
@@ -46,6 +48,9 @@ export class EcsBattleScene extends Phaser.Scene {
   private atlas?: EcsAtlas
   private sim?: Sim
   private ready = false
+  private testMode = false
+  /** 过场已排程(波末结算/全灭):置位后 update 早退,避免重复触发 */
+  private ending = false
   private centerObj!: Phaser.GameObjects.Zone
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -114,6 +119,7 @@ export class EcsBattleScene extends Phaser.Scene {
     clearGroundEffectsEcs() // 开局清上一局遗留的地面效果(模块级列表)
     new EcsSpriteBatch(this, this.world, atlas)
     this.spawnDecor(run, atlas)
+    this.testMode = run.testMode
     this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
     initialLayout(this.sim)
     armTeam(this.sim, this, atlas, run, run.testMode)
@@ -236,6 +242,13 @@ export class EcsBattleScene extends Phaser.Scene {
       return best >= 0 && Morph.until[best] !== 0 && sim.elapsedMs < Morph.until[best]!
     }
     window.__ecsGroundZones = (): number => groundZoneCount()
+    // e2e 探针:结算本波(仅回写 run,不过场),返回结算后波次号
+    window.__ecsSettleWave = (): number => {
+      const sim = this.sim
+      if (!sim) return -1
+      settleWave(sim)
+      return sim.run.wave
+    }
     // e2e 探针:在队伍中心相对格偏移处落金币(测偷币鼠)
     window.__ecsSpawnCoinsAt = (dxU = 8, dyU = 0, count = 3): void => {
       const sim = this.sim
@@ -272,6 +285,17 @@ export class EcsBattleScene extends Phaser.Scene {
     return best
   }
 
+  /** 波末过场(镜像 endWave 尾段):停留结算横幅时长后按 run 状态进结算/抽卡/整编/商店 */
+  private scheduleWaveEnd(finished: boolean): void {
+    this.ending = true
+    const run = this.sim!.run
+    this.time.delayedCall(WAVE.summaryMs, () => {
+      if (finished) this.scene.start('result', { win: true })
+      else if (run.cardDraws > 0) this.scene.start('cards')
+      else this.scene.start(promoteStep(run) ? 'promote' : 'shop')
+    })
+  }
+
   /** 地图装饰:按 run 种子随机散布的低透明度 emoji(镜像 ArenaScene.drawDecor),作 ECS 静态实体 */
   private spawnDecor(run: RunState, atlas: EcsAtlas): void {
     const rng = new Rng(run.decorSeed)
@@ -293,7 +317,13 @@ export class EcsBattleScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     const sim = this.sim
-    if (!this.ready || !sim) return
+    if (!this.ready || !sim || this.ending) return
+    // 波次时间到 → 结算 + 过场(测试模式无尽,便于性能观测)。用上一帧 elapsedMs 判定(晚 1 帧无碍)
+    if (!this.testMode && sim.elapsedMs >= waveDurationMs(sim.run.wave)) {
+      const finished = settleWave(sim)
+      this.scheduleWaveEnd(finished)
+      return
+    }
     const kx =
       (held(this.cursors?.left) || held(this.wasd?.A) ? -1 : 0) +
       (held(this.cursors?.right) || held(this.wasd?.D) ? 1 : 0)
@@ -320,6 +350,12 @@ export class EcsBattleScene extends Phaser.Scene {
     if (this.atlas) updateSpawners(sim, this.atlas)
     // 刷怪节奏
     if (this.atlas) spawnStep(sim, this.atlas, delta)
+    // 全队阵亡 → 失败结算(测试模式不结算,便于反复观测)
+    if (!this.testMode && sim.over) {
+      this.ending = true
+      this.time.delayedCall(900, () => this.scene.start('result', { win: false }))
+      return
+    }
     this.centerObj.setPosition(sim.center.x, sim.center.y)
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
@@ -339,6 +375,7 @@ export class EcsBattleScene extends Phaser.Scene {
       broods: Array.from(query(this.world, [Enemy]), (eid) => enemyNest[eid]!).filter((n) => n >= 0).length,
       enemyPos: Array.from(query(this.world, [Enemy]), (eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
       kills: sim.kills,
+      wave: sim.run.wave,
       coins: sim.run.coins,
       xpLevel: sim.run.xp.level,
       liveCoins: query(this.world, [Coin]).length,

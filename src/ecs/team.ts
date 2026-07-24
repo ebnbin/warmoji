@@ -157,6 +157,8 @@ export function spawnTeam(
       captainXpMul: captain.xpGainMul * teamFx.xpGainMul,
       doubleCoinChance: teamFx.doubleCoinChance,
       magnetRadius: captain.coinMagnet * UNIT * teamFx.magnetMul,
+      waveHealRatio: teamFx.waveHealRatio,
+      waveCoins: teamFx.waveCoins,
     },
     pendingCoins: [],
   }
