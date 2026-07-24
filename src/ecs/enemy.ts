@@ -7,6 +7,7 @@ import { UNIT } from '../core/units'
 import {
   Alive,
   Boss,
+  Charge,
   Depth,
   DmgMul,
   EDir,
@@ -64,6 +65,7 @@ export function spawnEnemy(
   addComponent(world, eid, Flash)
   addComponent(world, eid, Slow)
   addComponent(world, eid, Poison)
+  addComponent(world, eid, Charge)
   addComponent(world, eid, EDir)
   addComponent(world, eid, ETurn)
   addComponent(world, eid, Sprite)
@@ -79,6 +81,13 @@ export function spawnEnemy(
   Hp.max[eid] = hp
   const lm = def.locomotion
   EState.v[eid] = lm.kind === 'dash' && lm.idle === 'chase' ? 1 : 0
+  Charge.windupUntil[eid] = 0
+  Charge.dashUntil[eid] = 0
+  Charge.coolUntil[eid] = 0
+  Charge.nextDashAt[eid] =
+    lm.kind === 'dash' && lm.trigger.kind === 'timer'
+      ? sim.elapsedMs + (lm.trigger.firstDelayMs ?? lm.trigger.intervalMs)
+      : 0
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
   Radius.v[eid] = def.radius
@@ -149,8 +158,82 @@ function wanderDir(sim: Sim, eid: number): Point {
   return { x: dx, y: dy }
 }
 
-/** 敌人转向:按 locomotion 分发(chase/wander/static;dash/detonate/standoff/coinThief/baseOrbit
- * 暂回落 chase,P3e 补)+ 击退衰减 + 受击白闪恢复。delta 为真实帧长(ms) */
+/** 锁定冲刺方向(朝最近队员或队伍中心) */
+function lockDashDir(sim: Sim, eid: number, aim: 'nearest' | 'teamCenter'): void {
+  const to = aim === 'teamCenter' ? sim.center : nearestAlive(sim, Transform.x[eid]!, Transform.y[eid]!)
+  if (!to) return
+  const dir = norm(to.x - Transform.x[eid]!, to.y - Transform.y[eid]!)
+  EDir.x[eid] = dir.x
+  EDir.y[eid] = dir.y
+}
+
+/** 统一冲刺状态机(镜像 dash steerer):蓄力→冲刺(锁向直冲)→冷却/回到 idle 移动。
+ * 返回本帧速度(px/s);脚本化姿态(颤动/前倾/tint)为视觉,P6 补 */
+function steerDash(sim: Sim, eid: number, slow: number): { vx: number; vy: number } {
+  const lm = enemyDef[eid]!.locomotion
+  if (lm.kind !== 'dash') return { vx: 0, vy: 0 }
+  const now = sim.elapsedMs
+  const state = EState.v[eid]!
+  const ex = Transform.x[eid]!
+  const ey = Transform.y[eid]!
+  if (state === 2) {
+    // windup:定身;到时进冲刺
+    if (now >= Charge.windupUntil[eid]!) {
+      if (lm.lockAt === 'launch') lockDashDir(sim, eid, lm.aim)
+      EState.v[eid] = 3
+      Charge.dashUntil[eid] =
+        now + (lm.length.kind === 'time' ? lm.length.durationMs : (lm.length.dist / lm.dashSpeed) * 1000)
+    }
+    return { vx: 0, vy: 0 }
+  }
+  if (state === 3) {
+    // dash:锁向直冲;到时冷却/回追
+    if (now >= Charge.dashUntil[eid]!) {
+      if (lm.trigger.kind === 'timer') {
+        EState.v[eid] = 1
+        Charge.nextDashAt[eid] = now + lm.trigger.intervalMs
+      } else {
+        EState.v[eid] = 4
+        Charge.coolUntil[eid] = now + lm.trigger.cooldownMs
+      }
+    }
+    return { vx: EDir.x[eid]! * lm.dashSpeed * slow, vy: EDir.y[eid]! * lm.dashSpeed * slow }
+  }
+  // 触发判定
+  if (lm.trigger.kind === 'timer') {
+    if (now >= Charge.nextDashAt[eid]!) {
+      EState.v[eid] = 2
+      Charge.windupUntil[eid] = now + lm.windupMs
+      return { vx: 0, vy: 0 }
+    }
+  } else {
+    const target = nearestAlive(sim, ex, ey)
+    if (target) {
+      const dx = target.x - ex
+      const dy = target.y - ey
+      if (state !== 4 && dx * dx + dy * dy <= lm.trigger.range * lm.trigger.range) {
+        if (lm.lockAt === 'windup') lockDashDir(sim, eid, lm.aim)
+        EState.v[eid] = 2
+        Charge.windupUntil[eid] = now + lm.windupMs
+        return { vx: 0, vy: 0 }
+      }
+    }
+    if (state === 4 && now >= Charge.coolUntil[eid]!) EState.v[eid] = 0
+  }
+  // idle 移动
+  const speed = Speed.v[eid]! * slow
+  if (lm.idle === 'chase') {
+    const to = lm.aim === 'teamCenter' ? sim.center : nearestAlive(sim, ex, ey)
+    if (!to) return { vx: 0, vy: 0 }
+    const dir = norm(to.x - ex, to.y - ey)
+    return { vx: dir.x * speed, vy: dir.y * speed }
+  }
+  const dir = wanderDir(sim, eid)
+  return { vx: dir.x * speed, vy: dir.y * speed }
+}
+
+/** 敌人转向:按 locomotion 分发(chase/wander/static/dash;detonate/standoff/coinThief/baseOrbit
+ * 暂回落 chase,后续补)+ 击退衰减 + 受击白闪恢复。delta 为真实帧长(ms) */
 export function steerEnemies(sim: Sim, delta: number): void {
   const eids = query(sim.world, ENEMY_SET as unknown as object[])
   if (eids.length === 0) return
@@ -176,6 +259,10 @@ export function steerEnemies(sim: Sim, delta: number): void {
       const d = wanderDir(sim, eid)
       tx += d.x * speed * dt
       ty += d.y * speed * dt
+    } else if (kind === 'dash') {
+      const v = steerDash(sim, eid, slow)
+      tx += v.vx * dt
+      ty += v.vy * dt
     } else {
       // chase + 回落:直奔最近活着队员
       const target = nearestAlive(sim, tx, ty)

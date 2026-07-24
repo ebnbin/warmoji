@@ -14,7 +14,7 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query } from 'bitecs'
-import { Alive, Enemy, Hp, MHp, Poison, Projectile, Slow, Transform } from './components'
+import { Alive, Enemy, EState, Hp, MHp, Poison, Projectile, Slow, Transform } from './components'
 import { applyDamage } from './combat'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch } from './render/spriteBatch'
@@ -198,6 +198,22 @@ export class EcsBattleScene extends Phaser.Scene {
         }
       }
       return best >= 0 ? Hp.v[best]! : -1
+    }
+    window.__ecsNearestEnemyState = (): number => {
+      const sim = this.sim
+      if (!sim) return -1
+      let best = -1
+      let bestD = Infinity
+      for (const eid of query(this.world, [Enemy])) {
+        const dx = Transform.x[eid]! - sim.center.x
+        const dy = Transform.y[eid]! - sim.center.y
+        const d = dx * dx + dy * dy
+        if (d < bestD) {
+          bestD = d
+          best = eid
+        }
+      }
+      return best >= 0 ? EState.v[best]! : -1
     }
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,

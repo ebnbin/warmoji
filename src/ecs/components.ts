@@ -111,6 +111,9 @@ export const Slow = { until: f32(), mul: f32() }
 /** 中毒 DoT:until 解毒时刻(0=无毒);nextTick 下次跳伤时刻;dmg 每跳;tickMs 间隔;slot 伤害归属 */
 export const Poison = { until: f32(), nextTick: f32(), dmg: f32(), tickMs: f32(), slot: i32() }
 
+/** 冲刺/自爆状态机(dash/detonate locomotion):蓄力/冲刺/冷却结束时刻 + 定时型下轮触发时刻 */
+export const Charge = { windupUntil: f32(), dashUntil: f32(), coolUntil: f32(), nextDashAt: f32() }
+
 /** 敌人移动查询集(最小:位姿 + 速度 + 血) */
 export const ENEMY_SET = [Enemy, Transform, Speed, Hp] as const
 
