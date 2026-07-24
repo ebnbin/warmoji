@@ -10,7 +10,7 @@ import type { OrbitThreat } from '../characters/orbit'
 import { Alive, Depth, Follow, Threat, Transform, Wander } from './components'
 import { steerEnemies, updateFrameTargets } from './enemy'
 import { memberContact, memberVisual, reviveMembers, tickPoison } from './combat'
-import { updateProjectiles } from './projectile'
+import { updateEnemyProjectiles, updateProjectiles } from './projectile'
 import type { EcsWorld } from './world'
 import type { Point } from '../core/vec'
 import type { EffectCtx, TargetInfo } from '../abilities/types'
@@ -52,6 +52,8 @@ export interface Sim {
   over: boolean
   /** 本帧敌方存活快照(能力索敌共享;wire 每帧重建) */
   enemyTargets: TargetInfo[]
+  /** 本帧队员存活快照(敌方能力索敌共享;enemyWire 每帧重建) */
+  memberTargets: TargetInfo[]
   /** 敌人行为随机源(游荡换向/生成等;按 run 种子确定) */
   rng: Rng
   /** 波次/累计战斗时长(难度曲线) */
@@ -200,6 +202,7 @@ export function stepSim(sim: Sim, delta: number): void {
   tickPoison(sim)
   steerEnemies(sim, delta)
   updateProjectiles(sim, delta)
+  updateEnemyProjectiles(sim, delta)
   memberContact(sim)
   memberVisual(sim)
 }

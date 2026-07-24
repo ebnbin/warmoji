@@ -23,3 +23,19 @@ export const memberHandle: (AbilityOwner | undefined)[] = []
 
 /** 敌人的稳定目标引用(按 eid;能力跨帧追踪 ref 用),killEnemy 时置空 */
 export const enemyRef: (object | undefined)[] = new Array<object | undefined>(MAX_ENTITIES)
+
+// ── 敌人能力(按 eid 索引;P3e)──
+/** 敌人持械能力运行时(projectile/strike/heal;每帧驱动,死亡时销毁) */
+export const enemyAbilities: (AbilityRuntime[] | undefined)[] = new Array<AbilityRuntime[] | undefined>(MAX_ENTITIES)
+/** 敌人能力持有者句柄(读实时位置) */
+export const enemyOwner: (AbilityOwner | undefined)[] = new Array<AbilityOwner | undefined>(MAX_ENTITIES)
+
+/** 队员的稳定目标引用(按 eid;敌方能力索敌/追踪用) */
+export const memberRef: (object | undefined)[] = new Array<object | undefined>(MAX_ENTITIES)
+
+/** 敌人本帧移动朝向(steerEnemies 写;敌方 aim:'move' 弹的 ownerHeading 读) */
+export const enemyVelX = new Float32Array(MAX_ENTITIES)
+export const enemyVelY = new Float32Array(MAX_ENTITIES)
+
+/** 敌人首发延迟(spawn 时抽取 900+rng*1500;lazy-arm 喂入 createAbility) */
+export const enemyFireDelayMs = new Float32Array(MAX_ENTITIES)

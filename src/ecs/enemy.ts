@@ -29,7 +29,7 @@ import {
   Tint,
   Transform,
 } from './components'
-import { enemyDef } from './store'
+import { enemyDef, enemyFireDelayMs, enemyVelX, enemyVelY } from './store'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
 import type { Point } from '../core/vec'
@@ -101,10 +101,11 @@ export function spawnEnemy(
   Slow.mul[eid] = 1
   Poison.until[eid] = 0
   // 游荡初始方向 + 首次换向(镜像 materializeEnemy 的随机相/换向计时)
-  const ang = sim.rng.next() * Math.PI * 2
-  EDir.x[eid] = Math.cos(ang)
-  EDir.y[eid] = Math.sin(ang)
+  EDir.x[eid] = Math.cos(sim.rng.next() * Math.PI * 2)
+  EDir.y[eid] = Math.sin(sim.rng.next() * Math.PI * 2)
   ETurn.at[eid] = sim.elapsedMs + AI.wander.spawnTurnMinMs + sim.rng.next() * AI.wander.spawnTurnJitterMs
+  // 首发延迟(镜像 materializeEnemy 的 fireAt;lazy-arm 时喂入能力初始冷却)
+  enemyFireDelayMs[eid] = 900 + sim.rng.next() * 1500
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   Sprite.flipX[eid] = 0
   Tint.color[eid] = 0xffffff
@@ -350,6 +351,11 @@ export function steerEnemies(sim: Sim, delta: number): void {
         tx += dir.x * speed * dt
         ty += dir.y * speed * dt
       }
+    }
+    // 记录本帧移动朝向(击退前的移动分量;敌方 aim:'move' 弹的 ownerHeading 读)
+    if (dt > 0) {
+      enemyVelX[eid] = (tx - Transform.x[eid]!) / dt
+      enemyVelY[eid] = (ty - Transform.y[eid]!) / dt
     }
     // 击退冲量:叠进位移后指数衰减(镜像 decayKnockback)
     const kvx = Kv.x[eid]!

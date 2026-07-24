@@ -11,7 +11,7 @@ import { labLevel } from '../../run/lab'
 import type { RunState } from '../../run/state'
 import type { AbilityOwner, TargetInfo } from '../../abilities/types'
 import { Alive, ENEMY_SET, Radius, Transform } from '../components'
-import { enemyRef, memberAbilities, memberHandle } from '../store'
+import { enemyDef, enemyRef, memberAbilities, memberHandle } from '../store'
 import { makeTeamCtx } from './ctx'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
@@ -19,11 +19,17 @@ import type { EcsAtlas } from '../render/atlas'
 // 队员装备能力(镜像 createMember 的配装/等级/道具 fx 生效链)+ 每帧驱动。
 // 复用 createAbility 造出的能力运行时,不重写任何能力逻辑。
 
-/** 敌人稳定引用({__eid});killEnemy 清空后按 eid 复用会重建 */
+/** 敌人稳定引用({__eid} + active 存活探针);killEnemy 清空后按 eid 复用会重建。
+ * active 供能力(核弹/落石等)剔除已死目标——读 enemyDef(死亡/自毁时清空) */
 function refOf(eid: number): TargetInfo['ref'] {
   let r = enemyRef[eid]
   if (!r) {
-    r = { __eid: eid }
+    r = {
+      __eid: eid,
+      get active() {
+        return enemyDef[eid] !== undefined
+      },
+    }
     enemyRef[eid] = r
   }
   return r as unknown as TargetInfo['ref']

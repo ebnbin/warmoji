@@ -3,9 +3,15 @@ import { DEG2RAD, UNIT } from '../core/units'
 import { playSfx } from '../audio/sfx'
 import type { ProjectileDef } from '../abilities/defs'
 import {
+  Alive,
   Depth,
   ENEMY_SET,
+  EnemyProj,
+  EPROJ_SET,
+  EProj,
   Hp,
+  Hurt,
+  Iframe,
   Proj,
   Projectile,
   PROJ_SET,
@@ -17,7 +23,7 @@ import {
 } from './components'
 import { applyEffects } from '../abilities/effects'
 import type { TargetInfo } from '../abilities/types'
-import { applyDamage } from './combat'
+import { applyDamage, hurtMember } from './combat'
 import { enemyRef, projHitEids, projOnHit } from './store'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
@@ -153,4 +159,100 @@ function cull(sim: Sim, eid: number): void {
   projOnHit[eid] = undefined
   projHitEids[eid] = undefined
   removeEntity(sim.world, eid)
+}
+
+// ── 敌弹(P3e):物理 overlap 命中队员 + 按寿命/出界回收(镜像 spawnEnemyProjectile)──
+
+/** 敌弹描述(能力侧 spawnProjectile 归约后的基本载荷) */
+export interface EnemyShotSpec {
+  emoji: string
+  size: number
+  radius: number
+  speed: number
+  damage: number
+  lifeMs: number
+}
+
+/** 发射一枚敌弹(镜像 spawnEnemyProjectile;伤害已含 dmgMul,不再二次乘) */
+export function spawnEnemyProjectileEcs(
+  sim: Sim,
+  atlas: EcsAtlas,
+  x: number,
+  y: number,
+  angle: number,
+  spec: EnemyShotSpec,
+): void {
+  const eid = addEntity(sim.world)
+  addComponent(sim.world, eid, EnemyProj)
+  addComponent(sim.world, eid, Transform)
+  addComponent(sim.world, eid, Vel)
+  addComponent(sim.world, eid, EProj)
+  addComponent(sim.world, eid, Sprite)
+  addComponent(sim.world, eid, Tint)
+  addComponent(sim.world, eid, Depth)
+  Transform.x[eid] = x
+  Transform.y[eid] = y
+  Transform.rot[eid] = 0
+  Transform.w[eid] = spec.size
+  Transform.h[eid] = spec.size
+  Vel.x[eid] = Math.cos(angle) * spec.speed
+  Vel.y[eid] = Math.sin(angle) * spec.speed
+  EProj.damage[eid] = Math.round(spec.damage)
+  EProj.radius[eid] = spec.radius
+  EProj.dieAt[eid] = sim.elapsedMs + spec.lifeMs
+  Sprite.frame[eid] = atlas.index(spec.emoji, 'enemyProjectile')
+  Sprite.flipX[eid] = 0
+  Tint.color[eid] = 0xffffff
+  Tint.effect[eid] = 0
+  Tint.alpha[eid] = 1
+  Depth.z[eid] = 6
+}
+
+/** 逐帧推进敌弹 + 与队员圆-圆命中(吃无敌帧)+ 寿命/出界回收 */
+export function updateEnemyProjectiles(sim: Sim, delta: number): void {
+  const shots = query(sim.world, EPROJ_SET as unknown as object[])
+  if (shots.length === 0) return
+  const dt = delta / 1000
+  const now = sim.elapsedMs
+  const slack = 4 * UNIT
+  for (const eid of shots) {
+    const x = Transform.x[eid]! + Vel.x[eid]! * dt
+    const y = Transform.y[eid]! + Vel.y[eid]! * dt
+    Transform.x[eid] = x
+    Transform.y[eid] = y
+    // 命中队员:圆-圆(敌弹半径 + 队员受击半径),吃无敌帧节流
+    let hitMember = false
+    const pr = EProj.radius[eid]!
+    if (!sim.over) {
+      for (const m of sim.members) {
+        if (!Alive.v[m]) continue
+        const rr = pr + Hurt.radius[m]!
+        const dx = Transform.x[m]! - x
+        const dy = Transform.y[m]! - y
+        if (dx * dx + dy * dy > rr * rr) continue
+        if (now - Iframe.last[m]! < Iframe.ms[m]!) {
+          hitMember = true // 命中但被无敌帧挡下:敌弹照常销毁
+          break
+        }
+        Iframe.last[m] = now
+        hurtMember(sim, m, EProj.damage[eid]!)
+        hitMember = true
+        break
+      }
+    }
+    if (hitMember) {
+      removeEntity(sim.world, eid)
+      continue
+    }
+    // 寿命/出界回收
+    if (
+      now >= EProj.dieAt[eid]! ||
+      x < -slack ||
+      x > sim.mapW + slack ||
+      y < -slack ||
+      y > sim.mapH + slack
+    ) {
+      removeEntity(sim.world, eid)
+    }
+  }
 }

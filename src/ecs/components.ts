@@ -138,3 +138,14 @@ export const Proj = {
 
 /** 抛射物查询集 */
 export const PROJ_SET = [Projectile, Transform, Vel, Proj] as const
+
+// ── 敌弹(P3e)──────────────────────────────────────────────
+
+/** 敌弹标记(命中队员;不带贯穿/溅射载荷,镜像旧 spawnEnemyProjectile) */
+export const EnemyProj = {}
+
+/** 敌弹属性:伤害/半径/寿命回收时刻 */
+export const EProj = { damage: f32(), radius: f32(), dieAt: f32() }
+
+/** 敌弹查询集 */
+export const EPROJ_SET = [EnemyProj, Transform, Vel, EProj] as const

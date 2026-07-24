@@ -48,12 +48,15 @@ test('ECS 队伍：编队生成、键盘右移、相机跟随、有界钳制', a
 
   await page.screenshot({ path: 'test-results/ecs-p2-team.png' })
 
-  // 键盘右移：中心 x 增大
+  // 键盘右移：中心 x 增大（用 waitForFunction 探阈值——headless rAF 节流下游戏时约
+  // 为墙钟 1/3，固定等待易卡在边界值，改等「已右移 100px」）
   await page.locator('#game canvas').click()
   await page.keyboard.down('ArrowRight')
-  await page.waitForTimeout(1000)
-  const moved = await page.evaluate(dbg)
-  expect(moved.centerX).toBeGreaterThan(init.centerX + 100)
+  await page.waitForFunction(
+    (x0) => (window as unknown as { __ecs: { centerX: number } }).__ecs.centerX > x0 + 100,
+    init.centerX,
+    { timeout: 8000 },
+  )
 
   // 持续右推到边界：中心 x 收敛到 mapW - clampMin（clampMin=(0.8+0.45)*UNIT=1.25*64=80）
   await page.waitForTimeout(3000)
