@@ -25,6 +25,17 @@ export interface FeelTuning {
   }
   /** 角色受击时的相机震动 */
   readonly hitShake: { readonly durationMs: number; readonly intensity: number }
+  /** 环形阵轨道动力学：队员按秉性 × 探测范围内敌情沿环滑动避敌/迎敌 */
+  readonly orbit: {
+    /** 敌人进入该距离（单位，从角色自身量起）才产生移动倾向 */
+    readonly detectRange: number
+    /** 沿环最大角速度（rad/s） */
+    readonly maxSpeed: number
+    /** 避敌倾向增益 */
+    readonly avoidGain: number
+    /** 迎敌倾向增益 */
+    readonly seekGain: number
+  }
 }
 
 const FEEL = feelJson as unknown as FeelTuning

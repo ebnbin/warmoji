@@ -536,6 +536,10 @@ for (const [id, pk] of Object.entries(PICKUPS)) {
   num(`${p}.wander.rampMs`, f.wander.rampMs, 0.01)
   num(`${p}.hitShake.durationMs`, f.hitShake.durationMs, 0)
   num(`${p}.hitShake.intensity`, f.hitShake.intensity, 0)
+  num(`${p}.orbit.detectRange`, f.orbit.detectRange, 0.01)
+  num(`${p}.orbit.maxSpeed`, f.orbit.maxSpeed, 0.01)
+  num(`${p}.orbit.avoidGain`, f.orbit.avoidGain, 0)
+  num(`${p}.orbit.seekGain`, f.orbit.seekGain, 0)
   pure(p, f)
 }
 

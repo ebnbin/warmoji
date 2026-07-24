@@ -11,4 +11,6 @@ export const FEEL = {
   wander: { radius: 6, freqX: 0.8, freqY: 1.13, rampMs: 350 },
   // 角色受击时的相机震动（durationMs 时长、intensity 强度）。
   hitShake: { durationMs: 60, intensity: 0.0012 },
+  // 环形阵轨道动力学：队员按秉性 × 探测范围内敌情沿环滑动（detectRange 单位、maxSpeed rad/s ≈ 每 3 秒一整圈、避敌/迎敌增益）。
+  orbit: { detectRange: 4.5, maxSpeed: 2, avoidGain: 3.2, seekGain: 2.6 },
 } as const satisfies FeelTuning
