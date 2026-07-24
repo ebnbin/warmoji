@@ -34,6 +34,7 @@ export function applyMorph(
     }
     EState.v[eid] = 0
     Transform.rot[eid] = 0
+    sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' }) // 魔尘灰烟
   }
 }
 

@@ -57,6 +57,7 @@ export function updateEnemyAbilities(sim: Sim, scene: Phaser.Scene, atlas: EcsAt
     // 魔尘变形到期:复形 + 缴械后延(避免复形瞬间齐射,镜像 restoreMorph 的 postponeFire)
     if (Morph.until[eid] !== 0 && now >= Morph.until[eid]!) {
       restoreMorphVisual(atlas, eid)
+      sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'puff' }) // 复形灰烟
       const ab = enemyAbilities[eid]
       if (ab) for (const w of ab) w.postponeFire?.(700)
     }
