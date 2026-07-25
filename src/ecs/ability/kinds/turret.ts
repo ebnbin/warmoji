@@ -30,6 +30,8 @@ export function castTurrets(sim: Sim, dt: number): void {
 /** 在建造者脚下架一座；超编把最老的一座标记退场 */
 function place(sim: Sim, e: number, def: TurretDef): void {
   const outline = Faction.v[e] === FACTION.enemy ? 'enemy' : 'player'
+  // 在役数须先数：新座建出来就带 Emplacement，晚数会把自己也算进去
+  const live = liveOnes(sim, e)
   const t = spawnSprite(sim.world, sim.frames, {
     id: def.turret.emoji,
     outline,
@@ -47,7 +49,6 @@ function place(sim: Sim, e: number, def: TurretDef): void {
   Minion.dieAt[t] = 0
   Minion.cd[t] = 200
   Minion.size[t] = def.turret.size
-  const live = liveOnes(sim, e)
   armIdle(t, def.turret.emoji, outline, Sprite.frame[t]!, live.length * 311)
   playSfx('recruit')
   // 超编拆最旧（不含刚架的这座）

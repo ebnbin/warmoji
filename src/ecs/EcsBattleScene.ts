@@ -65,6 +65,7 @@ import { armCaptain, armEnemies, armTeam } from './ability/arm'
 import { refreshEnemyTargets, refreshMemberTargets } from './ability/targets'
 import { clearAbilityDefs } from './ability/defs'
 import { requestCast } from './ability/equip'
+import { Minion } from './ability/components'
 import { stepAbilities } from './ability/run'
 import { replayDeath, runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, groundZoneCount, spawnGroundEffectEcs, updateGroundEffectsEcs } from './groundEffects'
@@ -1738,8 +1739,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       camX: this.cameras.main.scrollX + this.cameras.main.width / 2,
       camY: this.cameras.main.scrollY + this.cameras.main.height / 2,
       zoneR: sim.zone?.r ?? 0,
-      // 本帧减速区数(寒气光环等每帧重新登记)
+      // 本帧减速区数(寒气光环等每帧重新登记;不清零会逐帧堆积,故这也是泄漏哨兵)
       slowZones: sim.frameSlowZones.length,
+      // 在场的能力子实体数(弩塔 + 小蜂):验证同时在场上限与逐个退场
+      minions: query(this.world, [Minion]).length,
       logicalW: viewport.logicalWidth,
       logicalH: viewport.logicalHeight,
       // 残垣:阻挡格数 + 可达刷怪格数(验证断壁成型与连通)

@@ -20,9 +20,17 @@ import { tickCooldowns } from './systems/cooldown'
 import { followTeamCenter, updateAbilityGates } from './systems/gates'
 import type { Sim } from '../sim'
 
-// 一帧的能力推进：闸门 → 冷却 → 逐 kind 施放。每一条都是独立系统，次序即语义。
+// 一帧的能力推进：清帧表 → 闸门 → 冷却 → 逐 kind 施放。每一条都是独立系统，次序即语义。
+
+/** 本帧登记表清零：能力系统是唯一生产者，消费方（steerEnemies / magnetCoins / 光环圈）
+ * 读最近一次。少了这一步登记项会逐帧堆积——光环圈会叠成一片白，敌速会被反复叠乘冻死 */
+function clearFrameRegisters(sim: Sim): void {
+  sim.frameSlowZones.length = 0
+  sim.frameAttractors.length = 0
+}
 
 export function stepAbilities(sim: Sim, dt: number): void {
+  clearFrameRegisters(sim)
   followTeamCenter(sim)
   updateAbilityGates(sim)
   tickCooldowns(sim, dt)

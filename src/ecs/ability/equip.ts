@@ -20,6 +20,7 @@ import {
   Followup,
   Frozen,
   Gear,
+  Pulse,
   Radial,
   Shots,
   Manual,
@@ -63,7 +64,7 @@ export function equipAbility(
   const world = sim.world
   const e = addEntity(world)
   // prettier-ignore
-  addComponents(world, e, Ability, AbilityRef, Owner, Faction, Cooldown, Amp, Frozen, Disarmed, Followup, WallBlocked, Aim, Swing, Gear, Shots, Radial, Blink, tag)
+  addComponents(world, e, Ability, AbilityRef, Owner, Faction, Cooldown, Amp, Frozen, Disarmed, Followup, WallBlocked, Aim, Swing, Gear, Shots, Radial, Blink, Pulse, tag)
   if (manual) addComponent(world, e, Manual)
   AbilityRef.def[e] = internAbilityDef(def)
   Owner.eid[e] = ownerEid
@@ -82,6 +83,8 @@ export function equipAbility(
   Aim.rad[e] = 0
   Shots.n[e] = 0
   Radial.left[e] = 0
+  Pulse.dps[e] = 0
+  Pulse.freeze[e] = 0
   Blink.x[e] = 0
   Blink.y[e] = 0
   Swing.startMs[e] = 0

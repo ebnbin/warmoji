@@ -49,6 +49,10 @@ export const Swing = { startMs: f32(), durMs: f32() }
  * 子实体自带 Transform/Sprite/Tint/Depth，随批绘一起画，不是游离的 GameObject */
 export const Gear = { eid: i32() }
 
+/** 光环的两个自走节拍：dps 跳伤与冻结脉冲各自倒计时。
+ * 光环没有冷却概念（每帧都要重新登记减速区），故不能借 Cooldown 当计时器 */
+export const Pulse = { dps: f32(), freeze: f32() }
+
 /** 后手：这条能力还欠一发（连锁轰炸的追击 / 二连突的第二段）。left>0 即在途，
  * 与冷却一样只在未冻结时推进；damage 是那一发的伤害快照 */
 export const Followup = { left: f32(), damage: f32() }
