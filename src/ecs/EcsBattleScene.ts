@@ -656,10 +656,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       for (const eid of query(this.world, [Enemy])) if (thiefEaten[eid]! > max) max = thiefEaten[eid]!
       return max
     }
-    ;(window as unknown as { __ecs?: object }).__ecs = {
-      ready: true,
-      pages: atlas.pageCount,
-    }
+    // 注:探针不在这里发半份({ready,pages} 而无其余字段)——update 下一帧会发完整的一份。
+    // 早发半份会让 e2e 在 ready 之后读到 undefined 字段(跨场景那几条尤其容易撞上)
   }
 
   /** 最近队伍中心的敌人 eid(探针共用),无敌人返回 -1 */
