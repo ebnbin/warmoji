@@ -747,6 +747,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       broods: Array.from(query(this.world, [Enemy]), (eid) => enemyNest[eid]!).filter((n) => n >= 0).length,
       enemyPos: Array.from(query(this.world, [Enemy]), (eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
       kills: sim.run.kills,
+      stats: { damage: [...sim.run.stats.damage], kills: [...sim.run.stats.kills], damageTaken: [...sim.run.stats.damageTaken] },
       wave: sim.run.wave,
       coins: sim.run.coins,
       xpLevel: sim.run.xp.level,

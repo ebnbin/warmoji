@@ -8,6 +8,9 @@ import { MEMBER, TEAM } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import { formationPosts } from '../characters/formation'
 import { aggregateTeamCards } from '../cards/registry'
+import { aggregateCharacterEffects, characterXp } from '../items/registry'
+import { levelStatsFor } from '../characters/levels'
+import { characterLevel } from '../run/charLevel'
 import { BATTLE_FX_IDENTITY } from '../battlefield/registry'
 import { currentFormation, guardOrder, hasCenter } from '../run/state'
 import type { RunState } from '../run/state'
@@ -22,6 +25,7 @@ import {
   MAtkSlow,
   MFlash,
   MHp,
+  MPerk,
   Member,
   OrbitBias,
   Post,
@@ -89,6 +93,7 @@ export function spawnTeam(
     addComponent(world, eid, Threat)
     addComponent(world, eid, MHp)
     addComponent(world, eid, MAtkSlow)
+    addComponent(world, eid, MPerk)
     addComponent(world, eid, Iframe)
     addComponent(world, eid, Revive)
     addComponent(world, eid, Hurt)
@@ -115,6 +120,12 @@ export function spawnTeam(
     MHp.max[eid] = maxHp
     MAtkSlow.until[eid] = 0
     MAtkSlow.mul[eid] = 1
+    // 道具属性(荆棘/吸血):正常局按该槽位已持道具聚合,测试模式素体
+    const perk = testMode
+      ? { thorns: 0, killHeal: 0 }
+      : aggregateCharacterEffects(run.memberItems[slot] ?? [], levelStatsFor(rosterIds[slot]!, characterLevel(characterXp(run.memberItems[slot] ?? []))))
+    MPerk.thorns[eid] = perk.thorns
+    MPerk.killHeal[eid] = perk.killHeal
     Iframe.ms[eid] = MEMBER.iframesMs
     Iframe.last[eid] = -1e9
     Revive.ms[eid] = reviveMs

@@ -70,6 +70,9 @@ export const Threat = { v: u8() }
 /** 队员移动/布局查询集 */
 export const MEMBER_SET = [Member, Slot, Post, OrbitBias, Follow, Wander, Alive, Threat, Transform] as const
 
+/** 队员道具属性:荆棘反伤(接触反弹)与击杀回血(吸血獠牙) */
+export const MPerk = { thorns: f32(), killHeal: f32() }
+
 /** 队员攻速惩罚(黏黏怪接触:until 到期时刻 + mul 冷却倍率;期间攻速变慢 + 黏液绿) */
 export const MAtkSlow = { until: f32(), mul: f32() }
 

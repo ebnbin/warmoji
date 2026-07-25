@@ -21,10 +21,12 @@ import {
   MFlash,
   MHp,
   Morph,
+  MPerk,
   Poison,
   Pop,
   Radius,
   Revive,
+  Slot,
   SpMul,
   Tint,
   Transform,
@@ -44,6 +46,7 @@ export function applyDamage(
   knockback = 0,
   srcX?: number,
   srcY?: number,
+  srcSlot = -1,
   crit = false,
 ): void {
   const morphed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
@@ -52,8 +55,13 @@ export function applyDamage(
   // 受伤飘字(镜像 floatDamage,在致死判定前:致死一击也飘字)
   sim.pendingDamageNumbers.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, amount: dmg, crit })
   const hp = Hp.v[eid]! - dmg
+  // 结算统计:按伤害来源槽位累计有效伤害(压测阵容槽位越界则跳过,镜像 applyDamage)
+  const st = sim.run.stats
+  if (srcSlot >= 0 && srcSlot < st.damage.length) {
+    st.damage[srcSlot] = (st.damage[srcSlot] ?? 0) + Math.min(dmg, Math.max(0, Hp.v[eid]!))
+  }
   if (hp <= 0) {
-    killEnemy(sim, eid)
+    killEnemy(sim, eid, srcSlot)
     return
   }
   Hp.v[eid] = hp
@@ -79,8 +87,15 @@ export function applyDamage(
 }
 
 /** 击杀(计数 + 掉落结算 + 亡语入队 + 清体) */
-export function killEnemy(sim: Sim, eid: number): void {
+export function killEnemy(sim: Sim, eid: number, srcSlot = -1): void {
   sim.run.kills++ // 击杀计数落在 run 上(与旧一致):HUD 顶栏、波末小结、结算页都读它
+  const st = sim.run.stats
+  if (srcSlot >= 0 && srcSlot < st.kills.length) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
+  // 击杀触发(镜像 runOnKill):吸血獠牙回血
+  const killer = sim.members[srcSlot]
+  if (killer !== undefined && Alive.v[killer] && MPerk.killHeal[killer]! > 0) {
+    MHp.hp[killer] = Math.min(MHp.max[killer]!, MHp.hp[killer]! + MPerk.killHeal[killer]!)
+  }
   playSfx('kill')
   const def = enemyDef[eid]
   const elite = Elite.v[eid] === 1
@@ -164,7 +179,7 @@ export function tickPoison(sim: Sim): void {
     }
     if (now >= Poison.nextTick[eid]!) {
       Poison.nextTick[eid] = Poison.nextTick[eid]! + Poison.tickMs[eid]!
-      applyDamage(sim, eid, Poison.dmg[eid]!)
+      applyDamage(sim, eid, Poison.dmg[eid]!, 0, undefined, undefined, Poison.slot[eid]!)
     }
   }
 }
@@ -190,7 +205,11 @@ export function memberContact(sim: Sim): void {
       if (def.damage <= 0) continue // 亡语诱饵尸壳(damage=0)无害:接触不伤(镜像 a.decoy 跳过)
       if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue // 变形期无害:接触不伤
       Iframe.last[m] = now
-      hurtMember(sim, m, def.damage * DmgMul.v[eid]!)
+      hurtMember(sim, m, def.damage * DmgMul.v[eid]!, def.name)
+      // 荆棘背心:接触反伤(与受击同帧、同吃无敌帧节流;击杀归属穿刺者)
+      if (MPerk.thorns[m]! > 0 && enemyDef[eid] !== undefined) {
+        applyDamage(sim, eid, MPerk.thorns[m]!, 0, undefined, undefined, Slot.v[m]!)
+      }
       // onContact 附加效果(黏黏怪攻速惩罚:镜像 attackSlow 接触积木;默认接触仅 damage)
       const atkSlow = def.onContact?.find((e) => e.kind === 'attackSlow')
       if (atkSlow && atkSlow.kind === 'attackSlow') {
@@ -212,7 +231,14 @@ export function despawnEnemy(sim: Sim, eid: number): void {
 }
 
 /** 队员受伤(镜像 hurtMember + killMember);blast/接触等外部命中点直接调用(无敌帧由调用方掌管) */
-export function hurtMember(sim: Sim, eid: number, damage: number): void {
+export function hurtMember(sim: Sim, eid: number, damage: number, srcName?: string): void {
+  // 敌情明细:承伤按人累计 + 按敌人名归属(镜像 hurtMember)
+  const st = sim.run.stats
+  const slot = Slot.v[eid]!
+  if (slot >= 0 && slot < st.damageTaken.length) {
+    st.damageTaken[slot] = (st.damageTaken[slot] ?? 0) + damage
+  }
+  if (srcName) st.enemyDamage[srcName] = (st.enemyDamage[srcName] ?? 0) + damage
   const hp = Math.max(0, MHp.hp[eid]! - damage)
   MHp.hp[eid] = hp
   playSfx('hurt')

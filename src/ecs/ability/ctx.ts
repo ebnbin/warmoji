@@ -78,7 +78,8 @@ export function makeTeamCtx(
     damageTarget: (ref, dmg, kb, sx, sy) => {
       const critChance = Math.min(0.5, fx.critChance + teamFx.critAdd + sim.battleFx.critAdd)
       const crit = critChance > 0 && sim.rng.next() < critChance
-      applyDamage(sim, eidOf(ref), crit ? Math.round(dmg * CRIT_MUL) : dmg, (kb ?? 0) * fx.knockbackMul, sx, sy, crit)
+      const d = crit ? Math.round(dmg * CRIT_MUL) : dmg
+      applyDamage(sim, eidOf(ref), d, (kb ?? 0) * fx.knockbackMul, sx, sy, slot, crit)
     },
     slowTarget: (ref, factor, durationMs) => {
       const eid = eidOf(ref)

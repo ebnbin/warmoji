@@ -125,7 +125,7 @@ export function updateProjectiles(sim: Sim, delta: number): void {
       hit.add(f.enemy)
       const hx = Transform.x[f.enemy]!
       const hy = Transform.y[f.enemy]!
-      applyDamage(sim, f.enemy, Proj.damage[eid]!, Proj.kb[eid]!, ax, ay)
+      applyDamage(sim, f.enemy, Proj.damage[eid]!, Proj.kb[eid]!, ax, ay, Proj.srcSlot[eid]!)
       // 命中效果链(溅射/减速/毒/变羊…):复用 applyEffects,主目标排除出溅射圈
       if (onHit && onHit.length > 0 && sim.effectCtx) {
         const ref = enemyRef[f.enemy] as TargetInfo['ref'] | undefined
