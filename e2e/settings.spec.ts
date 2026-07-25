@@ -29,14 +29,26 @@ async function toggleItem(page: Page, id: string): Promise<void> {
   )
 }
 
-test('设置页：入口可达、开关默认全开、切换即时持久化、返回与旋转保持', async ({ page }) => {
+test('设置页：入口可达、默认值符合定义表、切换即时持久化、返回与旋转保持', async ({ page }) => {
   await page.goto('/')
   await enterSettings(page)
 
-  // 默认全部选项都开启
+  // 默认：四项体验开关开启，肤色 emoji 与 ECS 实验默认关闭
   const items = await page.evaluate(() => window.__warmoji!.settings!.items)
-  expect(items.map((i) => i.id).sort()).toEqual(['bgm', 'damageNumbers', 'hitShake', 'sound'])
-  expect(items.every((i) => i.on)).toBe(true)
+  expect(items.map((i) => i.id).sort()).toEqual([
+    'bgm',
+    'damageNumbers',
+    'ecs',
+    'hitShake',
+    'showSkinTone',
+    'sound',
+  ])
+  expect(
+    items
+      .filter((i) => i.on)
+      .map((i) => i.id)
+      .sort(),
+  ).toEqual(['bgm', 'damageNumbers', 'hitShake', 'sound'])
   await page.screenshot({ path: 'test-results/settings.png' })
 
   // 关掉全部开关

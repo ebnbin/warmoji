@@ -27,7 +27,7 @@ test('图鉴：类别横向 tab、条目详情、全部 emoji 网格点选与滚
   let w = await page.evaluate(() => window.__warmoji!.wiki!)
   expect(w.category).toBe('地图')
   expect(w.categories.map((c) => c.title)).toEqual(['地图', '队长', '角色', '敌人', '道具', '全部'])
-  expect(w.entryCount).toBe(7)
+  expect(w.entryCount).toBe(8)
 
   // 切到敌人类别：条目数与聚焦跟随（含 Boss）
   const enemyCat = w.categories.find((c) => c.title === '敌人')!
