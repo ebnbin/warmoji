@@ -20,7 +20,7 @@ import {
 } from '../emoji/studio'
 import type { AnimClip, AnimRecipe, SvgTree, TreeRow } from '../emoji/studio'
 import { applyBackground } from '../core/background'
-import { reportDebug } from '../core/debug'
+import { reportDebug } from '../debug'
 import { emojiImage, emojiKey, emojiSvgText, emojiText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
 import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { FONT, UI_FONT } from '../core/fonts'

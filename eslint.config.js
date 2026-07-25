@@ -9,12 +9,12 @@ export default tseslint.config(
   // 表现层文件显式白名单；新增 Phaser 文件必须在此登记——这道摩擦是有意的。
   // 边界的完整定义是「能在 node 的 vitest 里 import」，DOM/WebAudio 越界靠约定与单测把守。
   // 实现隔离护栏：两套并列的战斗实现（src/arcade/ 旧框架、src/ecs/ 实验）都只能经
-  // src/experiments/battleExperiment.ts 这一个 facade 接入主干，各自包内自由互引。
+  // src/battle.ts 这一个 facade 接入主干，各自包内自由互引。
   // 用基础规则（非 @typescript-eslint 版）以免覆盖上面那条 phaser 规则；type import 一并禁——
   // 类型耦合虽然编译期擦除，但删某一侧时照样让主干编译不过，对「一步拆干净」是同等障碍。
   {
     files: ['src/**/*.ts', 'e2e/**/*.ts'],
-    ignores: ['src/ecs/**/*.ts', 'src/arcade/**/*.ts', 'src/experiments/**'],
+    ignores: ['src/ecs/**/*.ts', 'src/arcade/**/*.ts', 'src/battle.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -27,7 +27,7 @@ export default tseslint.config(
                 'bitecs',
               ],
               message:
-                '战斗实现（src/arcade/ 与 src/ecs/）是两套可互相替换的并列分支：一律经 src/experiments/battleExperiment.ts 调用，不要直接 import（这样两侧的耦合面才数得清、淘汰其一时能一步拆干净）',
+                '战斗实现（src/arcade/ 与 src/ecs/）是两套可互相替换的并列分支：一律经 src/battle.ts 调用，不要直接 import（这样两侧的耦合面才数得清、淘汰其一时能一步拆干净）',
             },
           ],
         },
@@ -59,7 +59,7 @@ export default tseslint.config(
                 'bitecs',
               ],
               message:
-                '战斗实现（src/arcade/ 与 src/ecs/）一律经 src/experiments/battleExperiment.ts 调用',
+                '战斗实现（src/arcade/ 与 src/ecs/）一律经 src/battle.ts 调用',
             },
           ],
         },
@@ -100,12 +100,11 @@ export default tseslint.config(
       // ECS 实验：宿主场景 + 自绘渲染层触碰 Phaser/WebGL（表现层）；ECS 逻辑文件仍禁 phaser
       'src/ecs/EcsBattleScene.ts',
       'src/ecs/render/**/*.ts',
-      'src/experiments/*.ts',
+      'src/battle.ts',
       // ui 整包是通用控件层（Phaser 容器/图形/输入）
       'src/ui/**/*.ts',
       'src/emoji/textures.ts',
       'src/emoji/thumbs.ts',
-      'src/emoji/virtualGrid.ts',
       'src/core/apply.ts',
       'src/war/diagnostics.ts',
     ],
@@ -142,11 +141,11 @@ export default tseslint.config(
                 '../war/*', '../war/**',
                 '../arcade/*', '../arcade/**',
                 '../ecs/*', '../ecs/**',
-                '../experiments/*', '../experiments/**',
+                '../battle',
                 '../run/*', '../run/**',
                 '../menu/*', '../menu/**',
                 '../boot/*', '../boot/**',
-                '../debug/*', '../debug/**',
+                '../debug', '../manifest',
                 '../emoji/*', '../emoji/**',
                 '../audio/*', '../audio/**',
               ],
@@ -176,7 +175,7 @@ export default tseslint.config(
                 '../src/war/*', '../src/war/**',
                 '../src/arcade/*', '../src/arcade/**',
                 '../src/ecs/*', '../src/ecs/**',
-                '../src/experiments/*', '../src/experiments/**',
+                '../src/battle', '../src/debug', '../src/manifest',
                 '../src/run/*', '../src/run/**',
                 '../src/menu/*', '../src/menu/**',
                 '../src/boot/*', '../src/boot/**',

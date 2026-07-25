@@ -3,7 +3,7 @@ import emojiOrderingUrl from '../assets/emoji/ordering.txt?url'
 import emojiBundleUrl from '../assets/emoji/twemoji.txt?url'
 import { loadEmojiTextures, primeEmojiPack } from '../emoji/textures'
 import { FONT, UI_FONT } from '../core/fonts'
-import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../emoji/manifest'
+import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../manifest'
 
 // 资源门禁：emoji 包（ordering.txt 顺序/ID + twemoji.txt SVG 正文）是游戏的
 // 全部视觉素材，经 Phaser loader 预加载，拿不到或解析不了就停在本页——没有
