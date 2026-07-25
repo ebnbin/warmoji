@@ -64,17 +64,18 @@ function spawnOne(sim: Sim, hpMultiplier: number, forceElite = false): void {
   sim.pendingSpawns.push({ def, x: pos.x, y: pos.y, hp, elite, boss: false, at: sim.elapsedMs + SPAWN.telegraphMs })
 }
 
-/** 精英波敌潮(镜像 spawnSurge):一口气排 SURGE.count 只,前 SURGE.elites 只强制金边;
- * 落地时刻在 spreadMs 内均摊铺开(用预告时刻表达,无需场景侧计时器) */
+/** 精英波敌潮(镜像 spawnSurge):在 spreadMs 内均摊排 SURGE.count 只,前 SURGE.elites 只强制金边。
+ * 只排「何时出」,落点与出怪表留到各自时刻才现算——镜像旧实现把整个 spawnOne 塞进 delayedCall:
+ * 敌潮会追着移动中的队伍铺开,⚠ 预告也一个个亮起,而非开场一次性算死 14 个落点 */
 export function spawnSurgeEcs(sim: Sim): void {
   if (sim.over) return
   const hpMul = waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier
-  const base = sim.elapsedMs + SPAWN.telegraphMs
   for (let i = 0; i < SURGE.count; i++) {
-    const before = sim.pendingSpawns.length
-    spawnOne(sim, hpMul, i < SURGE.elites)
-    const p = sim.pendingSpawns[before]
-    if (p) p.at = base + (i * SURGE.spreadMs) / SURGE.count
+    sim.pendingSurges.push({
+      at: sim.elapsedMs + (i * SURGE.spreadMs) / SURGE.count,
+      hpMul,
+      forceElite: i < SURGE.elites,
+    })
   }
 }
 
@@ -145,6 +146,15 @@ function spawnTest(sim: Sim): void {
 /** 每帧:预告落地 + 刷怪冷却推进(镜像 spawn) */
 export function spawnStep(sim: Sim, atlas: EcsAtlas, delta: number): void {
   const now = sim.elapsedMs
+  // 敌潮排期到点:此刻才求落点/出怪表并挂预告(镜像 spawnSurge 的 delayedCall)
+  if (sim.pendingSurges.length > 0) {
+    const rest: typeof sim.pendingSurges = []
+    for (const s of sim.pendingSurges) {
+      if (now >= s.at) spawnOne(sim, s.hpMul, s.forceElite)
+      else rest.push(s)
+    }
+    sim.pendingSurges = rest
+  }
   if (sim.pendingSpawns.length > 0) {
     const remain: typeof sim.pendingSpawns = []
     for (const p of sim.pendingSpawns) {

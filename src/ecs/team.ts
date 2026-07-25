@@ -189,6 +189,7 @@ export function spawnTeam(
     view: { x: 0, y: 0, right: mapW, bottom: mapH },
     elapsedMs: 0,
     fxMs: 0,
+    effectSlot: -1,
     frameTargets: [],
     over: false,
     bossDown: false,
@@ -215,6 +216,7 @@ export function spawnTeam(
     combatMs: run.combatMs,
     spawnCooldownMs: 300,
     pendingSpawns: [],
+    pendingSurges: [],
     run,
     reward: {
       captainXpMul: captain.xpGainMul * teamFx.xpGainMul,

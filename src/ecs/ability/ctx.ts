@@ -4,7 +4,7 @@ import { playSfx } from '../../audio/sfx'
 import { waveAt } from '../../run/waves'
 import { CRIT_MUL } from '../../items/registry'
 import { labFireRate } from '../../run/lab'
-import type { AbilityContext, TargetInfo } from '../../abilities/types'
+import type { AbilityContext, EffectCtx, TargetInfo } from '../../abilities/types'
 import type { CharacterEffects, TeamEffects } from '../../items/registry'
 import { Alive, Boss, ENEMY_SET, EState, Hp, Iframe, MAtkSlow, MFlash, MHp, Poison, Revive, Slow, Tint, Transform } from '../components'
 import { applyDamage, reviveMember } from '../combat'
@@ -61,7 +61,39 @@ function healMembers(sim: Sim, x: number, y: number, range: number, amount: numb
   return 1
 }
 
-/** 造一个队伍侧能力上下文(按槽位) */
+/** 抛射物 onHit 命中链的效果执行面(镜像旧 teamEffectCtx):归属槽位由 sim.effectSlot 逐次命中
+ * 改写——子弹可能比发射者活得久,故挂在 sim 上而非闭包里。与 makeTeamCtx 的关键差别:
+ * 不掷暴击、不乘击退倍率(溅射只是主伤的附带,不再单独走一遍暴击/加成) */
+export function makeEffectCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas): EffectCtx {
+  return {
+    scene,
+    targets: () => sim.enemyTargets,
+    damageTarget: (ref, dmg, kb, sx, sy) => applyDamage(sim, eidOf(ref), dmg, kb ?? 0, sx, sy, sim.effectSlot),
+    slowTarget: (ref, factor, durationMs) => {
+      const eid = eidOf(ref)
+      Slow.until[eid] = sim.elapsedMs + durationMs
+      Slow.mul[eid] = factor
+    },
+    poisonTarget: (ref, damage, tickMs, durationMs) => {
+      const eid = eidOf(ref)
+      Poison.until[eid] = sim.elapsedMs + durationMs
+      Poison.nextTick[eid] = sim.elapsedMs + tickMs
+      Poison.dmg[eid] = damage
+      Poison.tickMs[eid] = tickMs
+      Poison.slot[eid] = sim.effectSlot
+    },
+    spawnGroundEffect: (x, y, def) => spawnGroundEffectEcs(sim, scene, x, y, def, 'team', sim.effectSlot),
+    heal: (x, y, range, amount, all) => healMembers(sim, x, y, range, amount, all),
+    // 死者不变形(子弹主伤可能已致死)
+    morphTarget: (ref, spec) => {
+      const eid = eidOf(ref)
+      if (enemyDef[eid] !== undefined) applyMorph(sim, atlas, eid, spec)
+    },
+  }
+}
+
+/** 造一个队伍侧能力上下文(按槽位)。bare=队长技能载荷用的「基座」:
+ * 不掷暴击、不乘击退倍率,伤害乘区只含技能限时增伤(镜像旧 abilityCtx 与 memberCtx 的分野) */
 export function makeTeamCtx(
   sim: Sim,
   scene: Phaser.Scene,
@@ -70,6 +102,7 @@ export function makeTeamCtx(
   fx: CharacterEffects,
   teamFx: TeamEffects,
   testMode = false,
+  bare = false,
 ): AbilityContext {
   // 测试模式攻速旋钮:冷却按 labFireRate 现算(每帧读,改档即生效不重开)
   const fireFactor = (): number => (testMode ? 1 / labFireRate() : 1)
@@ -79,6 +112,10 @@ export function makeTeamCtx(
     targets: () => sim.enemyTargets,
     // 暴击/击退倍率在此收口:所有能力伤害路径统一生效,无需逐能力改造(镜像 memberCtx.damageTarget)
     damageTarget: (ref, dmg, kb, sx, sy) => {
+      if (bare) {
+        applyDamage(sim, eidOf(ref), dmg, kb ?? 0, sx, sy, slot)
+        return
+      }
       const critChance = Math.min(0.5, fx.critChance + teamFx.critAdd + sim.battleFx.critAdd)
       const crit = critChance > 0 && sim.rng.next() < critChance
       const d = crit ? Math.round(dmg * CRIT_MUL) : dmg
@@ -116,7 +153,8 @@ export function makeTeamCtx(
     applySlow: (x, y, radius, factor) => sim.frameSlowZones.push({ x, y, r2: radius * radius, factor }),
     attractCoins: (x, y, radius) => sim.frameAttractors.push({ x, y, r2: radius * radius }),
     // 队长技能的限时增伤(弱点讲义)叠进队伍伤害乘区,到期由 stepSim 复原
-    damageMul: () => fx.damageMul * teamFx.teamDamageMul * sim.battleFx.teamDamageMul * sim.skillDamageMul,
+    damageMul: () =>
+      bare ? sim.skillDamageMul : fx.damageMul * teamFx.teamDamageMul * sim.battleFx.teamDamageMul * sim.skillDamageMul,
     // 黏黏怪攻速惩罚:被蹭到的队员攻速变慢(叠乘进冷却,到时自动失效)
     cooldownMul: () => {
       const m = sim.members[slot]

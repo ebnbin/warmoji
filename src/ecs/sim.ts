@@ -114,6 +114,8 @@ export interface Sim {
   /** 刷怪冷却 + 预告中待落地的敌人(telegraph 延迟) */
   spawnCooldownMs: number
   pendingSpawns: PendingSpawn[]
+  /** 精英波敌潮的延迟排期(到点才求落点,镜像 spawnSurge 的 delayedCall) */
+  pendingSurges: { at: number; hpMul: number; forceElite: boolean }[]
   /** 本帧内死亡且带亡语的敌人快照(场景侧 runDeathEffects 逐帧排空) */
   pendingDeaths: PendingDeath[]
   /** 本帧敌人受伤的飘字事件(场景侧 drainDamageNumbers 排空) */
@@ -124,6 +126,11 @@ export interface Sim {
   pendingRings: { x: number; y: number; radius: number }[]
   /** 队伍侧共享效果执行面(抛射物 onHit 命中链复用;armTeam 后由场景注入) */
   effectCtx?: EffectCtx
+  /** 抛射物 onHit 效果链的归属槽位:每次命中前改写成该子弹的 srcSlot(镜像 teamEffectSlot) */
+  effectSlot: number
+  /** 亡语同步重放(场景侧注入,需 scene/atlas):挂上即在 killEnemy 内当场跑,
+   * 未挂则回落到 pendingDeaths 帧末排空 */
+  onDeathFx?: (d: PendingDeath) => void
   /** run 状态引用(金币/经验/抽卡入账;与旧场景同口径直改 run) */
   run: RunState
   /** 掉落/入账乘区(队长×道具,开局定;精英倍率逐杀叠) */

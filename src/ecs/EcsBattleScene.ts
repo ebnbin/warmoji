@@ -62,7 +62,7 @@ import { spawnEnemy, updateSpawners } from './enemy'
 import { clearEcsStore, enemyNest, thiefEaten } from './store'
 import { armCaptain, armTeam, refreshEnemyTargets, updateMemberAbilities } from './ability/wire'
 import { clearEnemyWire, updateEnemyAbilities } from './ability/enemyWire'
-import { runDeathEffects } from './ability/death'
+import { replayDeath, runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
 import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
 import { spawnBossEcs, spawnCarrierEcs, spawnStep, spawnSurgeEcs } from './spawn'
@@ -421,6 +421,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const walls = MAPS[run.mapId].walls
     if (walls) this.createWalls(this.sim, walls)
     this.sim.hooks.onStart(this.sim)
+    // 亡语同步重放:killEnemy 内当场跑(同帧先死者的治疗要救得到同伴)
+    const simRef = this.sim
+    simRef.onDeathFx = (d) => replayDeath(simRef, this, atlas, d)
     armTeam(this.sim, this, atlas, run, run.testMode)
     const captain = armCaptain(this.sim, this, atlas, run)
     this.captainAbilities = captain.abilities

@@ -75,22 +75,27 @@ function spawnDecoy(sim: Sim, atlas: EcsAtlas, d: PendingDeath, fx: DecoyEffect,
   Despawn.at[eid] = sim.elapsedMs + fx.durationMs
 }
 
-/** 排空本帧死亡队列:逐个死者在死亡点重放其亡语(镜像 runDeathEffects) */
-export function runDeathEffects(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas): void {
-  if (sim.pendingDeaths.length === 0) return
+/** 在死亡点重放一名死者的亡语(镜像 runDeathEffects 的循环体)。
+ * killEnemy 经 sim.onDeathFx 同步调用——同帧先死者的治疗要能救到同伴,
+ * 攒到帧末重放会让幽灵群「互相续命」失效 */
+export function replayDeath(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, d: PendingDeath): void {
+  const effects = d.def.onDeath
+  if (!effects) return
   const hpMul = waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier
-  for (const d of sim.pendingDeaths) {
-    const effects = d.def.onDeath
-    if (!effects) continue
-    let ctx: EffectCtx | undefined
-    for (const fx of effects) {
-      if (fx.kind === 'split') spawnSplit(sim, atlas, d, fx)
-      else if (fx.kind === 'decoy') spawnDecoy(sim, atlas, d, fx, hpMul)
-      else {
-        ctx ??= makeDeathCtx(sim, scene, atlas, d)
-        applyEffects(ctx, [fx], { center: { x: d.x, y: d.y }, baseDamage: 0 })
-      }
+  let ctx: EffectCtx | undefined
+  for (const fx of effects) {
+    if (fx.kind === 'split') spawnSplit(sim, atlas, d, fx)
+    else if (fx.kind === 'decoy') spawnDecoy(sim, atlas, d, fx, hpMul)
+    else {
+      ctx ??= makeDeathCtx(sim, scene, atlas, d)
+      applyEffects(ctx, [fx], { center: { x: d.x, y: d.y }, baseDamage: 0 })
     }
   }
+}
+
+/** 排空死亡队列:仅作兜底(onDeathFx 未挂时,如 headless 仿真) */
+export function runDeathEffects(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas): void {
+  if (sim.pendingDeaths.length === 0) return
+  for (const d of sim.pendingDeaths) replayDeath(sim, scene, atlas, d)
   sim.pendingDeaths.length = 0
 }

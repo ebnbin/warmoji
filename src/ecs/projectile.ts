@@ -159,6 +159,7 @@ export function updateProjectiles(sim: Sim, delta: number): void {
       applyDamage(sim, f.enemy, Proj.damage[eid]!, Proj.kb[eid]!, sx, sy, Proj.srcSlot[eid]!)
       // 命中效果链(溅射/减速/毒/变羊…):复用 applyEffects,主目标排除出溅射圈
       if (onHit && onHit.length > 0 && sim.effectCtx) {
+        sim.effectSlot = Proj.srcSlot[eid]! // 溅射/毒/地面区归属发射者(镜像 teamEffectSlot 逐次改写)
         const ref = enemyRef[f.enemy] as TargetInfo['ref'] | undefined
         applyEffects(sim.effectCtx, onHit, {
           center: { x: hx, y: hy },

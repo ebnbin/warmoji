@@ -132,14 +132,10 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
   const hexed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
   // 亡语快照(实体即将移除:先记死亡点/体质,场景侧 runDeathEffects 重放)
   if (!hexed && def?.onDeath) {
-    sim.pendingDeaths.push({
-      def,
-      x: Transform.x[eid]!,
-      y: Transform.y[eid]!,
-      elite,
-      boss,
-      dmgMul: DmgMul.v[eid]!,
-    })
+    const snap = { def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: DmgMul.v[eid]! }
+    // 当场重放(清体之前,镜像 killEnemy 内的 runDeathEffects);无重放钩子时回落到帧末排空
+    if (sim.onDeathFx) sim.onDeathFx(snap)
+    else sim.pendingDeaths.push(snap)
   }
   if (!hexed && def?.spawner) orphanBrood(sim, eid) // 拆巢:名下护巢子敌暴走 + 转直扑
   // 携带者:死亡即在原地掉下所携拾取(镜像 killEnemy 的 spawnFieldPickup)

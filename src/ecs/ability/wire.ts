@@ -15,7 +15,7 @@ import type { RunState } from '../../run/state'
 import type { AbilityContext, AbilityOwner, AbilityRuntime, TargetInfo } from '../../abilities/types'
 import { Alive, Dormant, ENEMY_SET, Radius, Transform, VisOff } from '../components'
 import { enemyDef, enemyRef, memberAbilities, memberHandle } from '../store'
-import { makeTeamCtx } from './ctx'
+import { makeEffectCtx, makeTeamCtx } from './ctx'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
 
@@ -49,7 +49,7 @@ export function armTeam(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, run: Run
   shownAlive.length = 0
   const teamFx = aggregateTeamCards(run.teamCards)
   // 抛射物 onHit 命中链的共享效果执行面(阵营=队伍,效果作用于敌方,与具体持有者无关)
-  sim.effectCtx = makeTeamCtx(sim, scene, atlas, -1, aggregateCharacterEffects([], []), teamFx)
+  sim.effectCtx = makeEffectCtx(sim, scene, atlas)
   for (let slot = 0; slot < run.roster.length; slot++) {
     const id = run.roster[slot]!
     const def = CHARACTERS[id]
@@ -106,7 +106,7 @@ export function armCaptain(
   run: RunState,
 ): { abilities: AbilityRuntime[]; handle: AbilityOwner } {
   const teamFx = aggregateTeamCards(run.teamCards)
-  const ctx = makeTeamCtx(sim, scene, atlas, -1, aggregateCharacterEffects([], []), teamFx)
+  const ctx = makeTeamCtx(sim, scene, atlas, -1, aggregateCharacterEffects([], []), teamFx, false, true)
   const handle: AbilityOwner = {
     get x() {
       return sim.center.x
