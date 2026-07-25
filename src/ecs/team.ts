@@ -143,9 +143,8 @@ export function spawnTeam(
     Iframe.last[eid] = -1e9
     Revive.ms[eid] = Math.max(1000, TEAM.reviveMs * captain.reviveMul * teamFx.reviveMul + fx.reviveAddMs)
     Revive.at[eid] = 0
-    // 受击判定圆:MEMBER.radius 直取格值(与旧 circleBody 逐位一致,故实际是 ~0.45px 的点判定);
-    // N 保 1 中心的被保护收益:半径减半,更难被敌人/敌弹摸到
-    Hurt.radius[eid] = MEMBER.radius * (formation === 'guard' && post === 0 ? TEAM.guardCenterHurtboxMul : 1)
+    // 受击判定圆(格值需 ×UNIT 换算成 px);N 保 1 中心的被保护收益:半径减半,更难被敌人/敌弹摸到
+    Hurt.radius[eid] = MEMBER.radius * UNIT * (formation === 'guard' && post === 0 ? TEAM.guardCenterHurtboxMul : 1)
     MFlash.until[eid] = 0
     Transform.x[eid] = x
     Transform.y[eid] = y

@@ -1048,7 +1048,7 @@ export abstract class BaseArenaScene extends Phaser.Scene {
     this.physics.add.existing(image)
     // N 保 1 中心的被保护收益：受击判定圆减半，更难被敌人/敌弹摸到
     const guarded = this.activeFormation() === 'guard' && post === 0
-    const hurtRadius = guarded ? MEMBER.radius * TEAM.guardCenterHurtboxMul : MEMBER.radius
+    const hurtRadius = MEMBER.radius * UNIT * (guarded ? TEAM.guardCenterHurtboxMul : 1)
     circleBody(image, hurtRadius)
     // 角色是纯随队走位的运动学对象：body 只跟随图片用于碰撞，
     // 不允许物理引擎把位移回写到图片（否则与手动定位叠加产生抖动）

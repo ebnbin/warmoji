@@ -101,10 +101,9 @@ const bounded: WorldHooks = {
   teamDrift() {
     return ZERO
   },
-  // 注:clampMin 直取格值常量当 px 用(≈1.25px,实际近乎不钳),与旧 ArenaScene.constrainTeam
-  // 逐位一致——本实验以旧实现为准,不在此处「顺手修正」量纲
   constrainTeam(sim, next) {
-    const clampMin = TEAM.ringRadius + MEMBER.radius
+    // 钳制边距 = 队伍环半径 + 队员判定半径,整环都留在图内(格值需 ×UNIT 换算成 px)
+    const clampMin = (TEAM.ringRadius + MEMBER.radius) * UNIT
     return {
       x: Math.min(Math.max(next.x, clampMin), sim.mapW - clampMin),
       y: Math.min(Math.max(next.y, clampMin), sim.mapH - clampMin),
@@ -554,7 +553,7 @@ const river: WorldHooks = {
   },
   /** 自主移动 + 水流漂移后钳入河道(挂机会被推到下游边并卡住) */
   constrainTeam(sim, next) {
-    return clampToRiver(next, riverOf(sim), TEAM.ringRadius + MEMBER.radius)
+    return clampToRiver(next, riverOf(sim), (TEAM.ringRadius + MEMBER.radius) * UNIT)
   },
   /** 落点跨向钳入河道(分裂怪贴岸溅出等边缘情况兜底);沿流向不钳 */
   constrainEnemy(sim, eid, x, y) {

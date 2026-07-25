@@ -371,7 +371,8 @@ export class ArenaScene extends BaseArenaScene {
   }
 
   protected constrainTeam(next: Point): Point {
-    const clampMin = TEAM.ringRadius + MEMBER.radius
+    // 钳制边距 = 队伍环半径 + 队员判定半径，整环都留在图内（格值需 ×UNIT 换算成 px）
+    const clampMin = (TEAM.ringRadius + MEMBER.radius) * UNIT
     const box = {
       x: Phaser.Math.Clamp(next.x, clampMin, this.mapW - clampMin),
       y: Phaser.Math.Clamp(next.y, clampMin, this.mapH - clampMin),

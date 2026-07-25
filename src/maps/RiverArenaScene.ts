@@ -118,7 +118,7 @@ export class RiverArenaScene extends BaseArenaScene {
 
   /** 自主移动 + 水流漂移，然后钳入河道（挂机会被推到下游边并卡住） */
   protected constrainTeam(next: Point): Point {
-    return clampToRiver(next, this.river, TEAM.ringRadius + MEMBER.radius)
+    return clampToRiver(next, this.river, (TEAM.ringRadius + MEMBER.radius) * UNIT)
   }
 
   protected teamDrift(delta: number): Point {
