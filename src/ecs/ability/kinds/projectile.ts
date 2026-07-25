@@ -8,6 +8,7 @@ import { enemyDef, enemyVelX, enemyVelY } from '../../store'
 import { attributionSlot, damageMul, ownerX, ownerY } from '../amp'
 import { Ability, AbilityRef, Aim, FACTION, Faction, Frozen, Gear, Owner, Shots } from '../components'
 import { abilityDefAt } from '../defs'
+import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindProjectile } from '../tags'
 import { nearestAngle, targetsOf } from '../targets'
@@ -27,7 +28,7 @@ export function castProjectiles(sim: Sim): void {
       const h = headingOf(sim, e)
       Aim.rad[e] = Math.atan2(h.y, h.x)
     } else if (!fullRing) {
-      const aim = nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, e), def.range)
+      const aim = nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, sourceOf(sim, e)), def.range)
       if (aim === null) return false
       Aim.rad[e] = aim
     }

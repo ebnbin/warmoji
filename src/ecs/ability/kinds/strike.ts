@@ -7,6 +7,7 @@ import { enemyDef } from '../../store'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { AbilityRef, Drop, FACTION, Faction, Owner } from '../components'
 import { abilityDefAt } from '../defs'
+import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindStrike } from '../tags'
 import { targetsOf } from '../targets'
@@ -18,10 +19,11 @@ import type { Sim } from '../../sim'
 export function castStrikes(sim: Sim): void {
   updateDrops(sim)
   castScan<StrikeDef>(sim, KindStrike, (e, def) => {
+    const src = sourceOf(sim, e)
     const ox = ownerX(e)
     const oy = ownerY(e)
     const seen = new Set<number>()
-    const nearest = targetsOf(sim, e)
+    const nearest = targetsOf(sim, src)
       .map((t) => ({ t, d2: (t.x - ox) ** 2 + (t.y - oy) ** 2 }))
       .sort((a, b) => a.d2 - b.d2)
       .filter(({ t }) => !seen.has(t.eid) && (seen.add(t.eid), true))
@@ -74,10 +76,11 @@ function land(sim: Sim, d: number): void {
   const target = Drop.target[d]!
   const team = Faction.v[e] === FACTION.team
   if (team ? enemyDef[target] === undefined : !Alive.v[target]) return
+  const src = sourceOf(sim, e)
   const def = abilityDefAt(AbilityRef.def[e]!) as StrikeDef
   if (team && def.coinsPerHit) spawnCoins(sim, Transform.x[d]!, Drop.toY[d]!, def.coinsPerHit)
   const damage = Math.max(1, Math.round(def.damage * damageMul(sim, e)))
-  damageTarget(sim, e, target, damage, def.knockback, ownerX(e), ownerY(e))
+  damageTarget(sim, src, target, damage, def.knockback, ownerX(e), ownerY(e))
 }
 
 /** 战场掉币：落地待拾，音效与爆点随拾取管线 */

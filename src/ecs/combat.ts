@@ -37,7 +37,7 @@ import {
   Tint,
   Transform,
 } from './components'
-import { enemyCarries, enemyDef, enemyNest, enemyRef, thiefEaten } from './store'
+import { enemyCarries, enemyDef, enemyNest, thiefEaten } from './store'
 import { unequipAbilities } from './ability/equip'
 import type { Sim } from './sim'
 
@@ -158,7 +158,6 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
     flingVy,
   )
   enemyDef[eid] = undefined
-  enemyRef[eid] = undefined
   unequipAbilities(sim, eid)
   removeEntity(sim.world, eid)
 }
@@ -264,7 +263,6 @@ export function despawnEnemy(sim: Sim, eid: number): void {
   if (enemyDef[eid]?.spawner) orphanBrood(sim, eid)
   enemyCarries[eid] = undefined
   enemyDef[eid] = undefined
-  enemyRef[eid] = undefined
   unequipAbilities(sim, eid)
   removeEntity(sim.world, eid)
 }

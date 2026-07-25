@@ -61,8 +61,7 @@ import { remapSim } from './remap'
 import { spawnTeam } from './team'
 import { spawnEnemy, updateSpawners } from './enemy'
 import { clearEcsStore, enemyNest, thiefEaten } from './store'
-import { armCaptain, armTeam, updateMemberAbilities } from './ability/wire'
-import { clearEnemyWire, updateEnemyAbilities } from './ability/enemyWire'
+import { armCaptain, armEnemies, armTeam } from './ability/arm'
 import { refreshEnemyTargets, refreshMemberTargets } from './ability/targets'
 import { clearAbilityDefs } from './ability/defs'
 import { requestCast } from './ability/equip'
@@ -81,7 +80,6 @@ import { CAPTAINS } from '../data/captains'
 import { aggregateTeamCards } from '../data/cards'
 import type { TeamEffects } from '../data/items'
 import { DENSITY_PARAMS, INVINCIBLE_HP, labDensity, labInvincible } from '../run/lab'
-import type { AbilityOwner, AbilityRuntime } from '../war/abilities/types'
 import { tickSkillCd } from '../war/skill'
 import { setActiveHudHost } from '../war/hudHost'
 import type { HudHost } from '../war/hudHost'
@@ -140,10 +138,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   run!: RunState
   /** 团队卡牌聚合乘区（技能 CD 等；与 spawnTeam 内同源，开局定） */
   private teamFx!: TeamEffects
-  /** 队长主动技能载荷（不进 update 循环，只经 castSkill 单发）+ 锚在队伍中心的行为主体 */
-  private captainAbilities: AbilityRuntime[] = []
-  private captainHandle: AbilityOwner = { x: 0, y: 0, setVisualOffset: () => {} }
-  /** 队伍锚点实体：ECS 化的队长技能载荷挂在它名下 */
+  /** 队伍锚点实体：队长技能载荷挂在它名下（不进自动扫描，只等 castSkill 的施放请求） */
   private captainAnchor = -1
   /** 过场已排程(波末结算/全灭):置位后 update 早退,避免重复触发 */
   private ending = false
@@ -223,8 +218,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.sim = undefined
     this.ready = false
     this.ending = false
-    this.captainAbilities = []
-    this.captainHandle = { x: 0, y: 0, setVisualOffset: () => {} }
     this.captainAnchor = -1
     this.auraRings = []
     this.waveBaseKills = 0
@@ -414,7 +407,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     clearGroundEffectsEcs()
     clearFieldEcs()
     clearEcsStore()
-    clearEnemyWire()
     clearAbilityDefs()
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
     this.spawnDecor(run, atlas)
@@ -437,12 +429,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.sim.hooks.onStart(this.sim)
     // 亡语同步重放:killEnemy 内当场跑(同帧先死者的治疗要救得到同伴)
     const simRef = this.sim
-    simRef.onDeathFx = (d) => replayDeath(simRef, this, atlas, d)
-    armTeam(this.sim, this, atlas, run, run.testMode)
-    const captain = armCaptain(this.sim, this, atlas, run)
-    this.captainAbilities = captain.abilities
-    this.captainHandle = captain.handle
-    this.captainAnchor = captain.anchor
+    simRef.onDeathFx = (d) => replayDeath(simRef, d)
+    armTeam(this.sim, run, run.testMode)
+    this.captainAnchor = armCaptain(this.sim, run)
     for (let i = 0; i < this.sim.members.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
@@ -953,7 +942,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.run.skillCdMs = s.cdMs * this.teamFx.skillCdMul
     playSfx('levelup')
     this.events.emit('skill-cast', s.name)
-    for (const a of this.captainAbilities) a.castNow?.(this.captainHandle)
     if (this.captainAnchor >= 0) requestCast(sim, this.captainAnchor)
     return true
   }
@@ -1639,16 +1627,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     stepSim(sim, delta, wdelta)
     // 队员快照重建:敌方能力索敌读它,须先于任何敌方出手
     refreshMemberTargets(sim)
-    // 队员能力驱动(世界时长:时停期队伍的枪也一并凝住)
-    updateMemberAbilities(sim, wdelta)
-    // 能力系统(敌我共用一套:闸门 → 冷却 → 逐 kind 施放)
+    // 新登场的持械敌人装配 + 魔尘复形
+    armEnemies(sim)
+    // 能力系统(敌我共用一套:闸门 → 冷却 → 逐 kind 施放;世界时长,时停期队伍的枪也一并凝住)
     stepAbilities(sim, wdelta)
     // 部件动画:把时钟翻算成帧下标(帧惰性烘焙,未就绪保持静态帧)
     if (this.atlas) updateAnims(sim, this.atlas)
-    // 敌人能力驱动(持械射击/治疗/落石;lazy-arm + 死亡清理)
-    if (this.atlas) updateEnemyAbilities(sim, this, this.atlas, wdelta)
     // 亡语重放(分裂/诱饵/治疗/冷枪:本帧内所有死亡的敌人在死亡点触发)
-    if (this.atlas) runDeathEffects(sim, this, this.atlas)
+    runDeathEffects(sim)
     // 地面效果(灼烧/毒液区):能力入队的先铺开,再 team 脉冲烧敌 / enemy 节流烧队员 + 到期淡出
     for (const g of sim.pendingGrounds) spawnGroundEffectEcs(sim, this, g.x, g.y, g.def, g.faction, g.srcSlot, g.srcName)
     sim.pendingGrounds.length = 0

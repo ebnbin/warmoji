@@ -7,6 +7,7 @@ import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { Ability, AbilityRef, Aim, Blink, Followup, Frozen, Gear, Owner } from '../components'
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects } from '../effects'
+import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindAssassinate } from '../tags'
 import { targetsOf } from '../targets'
@@ -20,9 +21,10 @@ export function castAssassinates(sim: Sim, dt: number): void {
   tickStrikeStay(sim, dt)
   castScan<AssassinateDef>(sim, KindAssassinate, (e, def) => {
     if (Followup.left[e]! > 0) return false // 停留帧内不另起
+    const src = sourceOf(sim, e)
     const ox = ownerX(e)
     const oy = ownerY(e)
-    const target = strongestTarget(ox, oy, targetsOf(sim, e), def.range)
+    const target = strongestTarget(ox, oy, targetsOf(sim, src), def.range)
     if (!target) return false
 
     // 落点：目标背面（沿本体→目标方向再往前越过目标）
@@ -51,8 +53,8 @@ export function castAssassinates(sim: Sim, dt: number): void {
       const maxHp = Hp.max[target.eid] ?? 0
       if (maxHp > 0 && hp / maxHp <= exec.hpRatio) damage = Math.round(damage * exec.mul)
     }
-    damageTarget(sim, e, target.eid, damage, def.knockback, landX, landY)
-    applyAbilityEffects(sim, e, def.onHit, {
+    damageTarget(sim, src, target.eid, damage, def.knockback, landX, landY)
+    applyAbilityEffects(sim, src, def.onHit, {
       x: target.x,
       y: target.y,
       baseDamage: damage,

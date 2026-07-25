@@ -9,6 +9,7 @@ import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { Ability, AbilityRef, Aim, Frozen, Gear, Swing } from '../components'
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects } from '../effects'
+import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindSweep } from '../tags'
 import { nearestAngle, targetsOf } from '../targets'
@@ -18,9 +19,10 @@ import type { Sim } from '../../sim'
 export function castSweeps(sim: Sim): void {
   placeSweepGear(sim)
   castScan<SweepDef>(sim, KindSweep, (e, def) => {
+    const src = sourceOf(sim, e)
     const ox = ownerX(e)
     const oy = ownerY(e)
-    const list = targetsOf(sim, e)
+    const list = targetsOf(sim, src)
     // 侦测门槛：扇形半径内无敌人就不出手（不空挥）
     const aim = nearestAngle(ox, oy, list, def.radius)
     if (aim === null) return false
@@ -29,10 +31,10 @@ export function castSweeps(sim: Sim): void {
     const damage = Math.round(def.damage * damageMul(sim, e))
     const hits: number[] = []
     for (const i of sectorHitIndices({ x: ox, y: oy }, aim, def.arcDeg * DEG2RAD, def.radius, list)) {
-      damageTarget(sim, e, list[i]!.eid, damage, def.knockback, ox, oy)
+      damageTarget(sim, src, list[i]!.eid, damage, def.knockback, ox, oy)
       hits.push(list[i]!.eid)
     }
-    applyAbilityEffects(sim, e, def.onHit, { x: ox, y: oy, baseDamage: damage, targets: hits })
+    applyAbilityEffects(sim, src, def.onHit, { x: ox, y: oy, baseDamage: damage, targets: hits })
     Swing.startMs[e] = sim.fxMs
     Swing.durMs[e] = def.sweepMs
     return true

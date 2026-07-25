@@ -7,6 +7,7 @@ import { damageMul, ownerX, ownerY } from '../amp'
 import { Ability, AbilityRef, Followup, Frozen } from '../components'
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects, applyBlast } from '../effects'
+import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindAreaBlast } from '../tags'
 import { nearestTarget, targetsOf, targetsWithin } from '../targets'
@@ -17,7 +18,8 @@ import type { Sim } from '../../sim'
 export function castAreaBlasts(sim: Sim, dt: number): void {
   tickEchoes(sim, dt)
   castScan<AreaBlastDef>(sim, KindAreaBlast, (e, def) => {
-    const center = nearestTarget(ownerX(e), ownerY(e), targetsOf(sim, e), def.detectRange)
+    const src = sourceOf(sim, e)
+    const center = nearestTarget(ownerX(e), ownerY(e), targetsOf(sim, src), def.detectRange)
     if (!center) return false // 侦测范围内无敌人就不出手
     const damage = Math.round(def.damage * damageMul(sim, e))
     blastAt(sim, e, def, center.x, center.y, damage)
@@ -37,7 +39,7 @@ function tickEchoes(sim: Sim, dt: number): void {
     if (Followup.left[e]! > 0) continue
     Followup.left[e] = 0
     // 落点取索敌上限内的随机敌人：无限地图上不能轰到无穷远
-    const near = targetsWithin(ownerX(e), ownerY(e), targetsOf(sim, e), ACQUIRE.range * UNIT)
+    const near = targetsWithin(ownerX(e), ownerY(e), targetsOf(sim, sourceOf(sim, e)), ACQUIRE.range * UNIT)
     if (near.length === 0) continue
     const t = near[Math.floor(Math.random() * near.length)]!
     blastAt(sim, e, abilityDefAt(AbilityRef.def[e]!) as AreaBlastDef, t.x, t.y, Followup.damage[e]!)
@@ -46,9 +48,10 @@ function tickEchoes(sim: Sim, dt: number): void {
 
 /** 一次完整爆炸：伤害 + 命中效果 + 白闪核心/冲击环/爆裂 */
 function blastAt(sim: Sim, e: number, def: AreaBlastDef, x: number, y: number, damage: number): void {
+  const src = sourceOf(sim, e)
   playSfx('boom')
-  applyBlast(sim, e, x, y, damage, def.blastRadius, def.knockback)
-  applyAbilityEffects(sim, e, def.onHit, { x, y, baseDamage: damage })
+  applyBlast(sim, src, x, y, damage, def.blastRadius, def.knockback)
+  applyAbilityEffects(sim, src, def.onHit, { x, y, baseDamage: damage })
   sim.pendingCues.push(
     {
       kind: 'circle',

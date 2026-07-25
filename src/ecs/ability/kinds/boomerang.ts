@@ -8,6 +8,7 @@ import { flyerHits } from '../../store'
 import { cooldownMul, damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { Ability, AbilityRef, Aim, Cooldown, FACTION, Faction, Flyer, Frozen, Gear, Owner } from '../components'
 import { abilityDefAt } from '../defs'
+import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindBoomerang } from '../tags'
 import { nearestAngle, targetsOf } from '../targets'
@@ -23,7 +24,7 @@ export function castBoomerangs(sim: Sim, dt: number): void {
   placeBoomerangGear(sim)
   castScan<BoomerangDef>(sim, KindBoomerang, (e, def) => {
     if (airborne(sim, e) > 0) return false // 还没接住：不另起，也不消耗冷却
-    const aim = nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, e))
+    const aim = nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, sourceOf(sim, e)))
     if (aim === null) return false
     Aim.rad[e] = aim
     launch(sim, e, def, aim)
@@ -120,14 +121,15 @@ function updateFlyers(sim: Sim, dt: number): void {
       sim.frameAttractors.push({ x: Transform.x[f]!, y: Transform.y[f]!, r2: r * r })
     }
     const hits = flyerHits[f]!
-    for (const t of targetsOf(sim, e)) {
+    const src = sourceOf(sim, e)
+    for (const t of targetsOf(sim, src)) {
       if (hits.has(t.eid)) continue
       const dx = t.x - Transform.x[f]!
       const dy = t.y - Transform.y[f]!
       const rr = def.hitRadius + t.radius
       if (dx * dx + dy * dy > rr * rr) continue
       hits.add(t.eid)
-      damageTarget(sim, e, t.eid, Flyer.damage[f]!, def.knockback, Transform.x[f]!, Transform.y[f]!)
+      damageTarget(sim, src, t.eid, Flyer.damage[f]!, def.knockback, Transform.x[f]!, Transform.y[f]!)
     }
   }
 }

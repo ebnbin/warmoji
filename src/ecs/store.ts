@@ -2,7 +2,6 @@ import { MAX_ENTITIES } from './world'
 import type { EnemyDef } from '../data/enemies'
 import type { FieldPickupDef } from '../data/battlefield'
 import type { Effect } from '../data/abilityDefs'
-import type { AbilityOwner, AbilityRuntime } from '../war/abilities/types'
 
 // 富数据伴随存储(按 eid 索引):bitECS 组件只存数值,def 引用等复杂对象放这里。
 // spawn 时写、removeEntity 前不必清(下次 spawn 覆盖;eid 复用后新 def 覆盖旧)。
@@ -20,23 +19,8 @@ export const projHitEids: (Set<number> | undefined)[] = new Array<Set<number> | 
 /** 在途回旋镖本程已命中的 eid(去程/回程各判一次,同程内每敌最多一次) */
 export const flyerHits: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(MAX_ENTITIES)
 
-// ── 队员能力(按槽位索引)──
-/** 每槽位的能力运行时实例 */
-export const memberAbilities: AbilityRuntime[][] = []
-/** 每槽位的能力持有者句柄 */
-export const memberHandle: (AbilityOwner | undefined)[] = []
-
-/** 敌人的稳定目标引用(按 eid;能力跨帧追踪 ref 用),killEnemy 时置空 */
-export const enemyRef: (object | undefined)[] = new Array<object | undefined>(MAX_ENTITIES)
-
-// ── 敌人能力(按 eid 索引;P3e)──
-/** 敌人持械能力运行时(projectile/strike/heal;每帧驱动,死亡时销毁) */
-export const enemyAbilities: (AbilityRuntime[] | undefined)[] = new Array<AbilityRuntime[] | undefined>(MAX_ENTITIES)
-/** 敌人能力持有者句柄(读实时位置) */
-export const enemyOwner: (AbilityOwner | undefined)[] = new Array<AbilityOwner | undefined>(MAX_ENTITIES)
-
-/** 队员的稳定目标引用(按 eid;敌方能力索敌/追踪用) */
-export const memberRef: (object | undefined)[] = new Array<object | undefined>(MAX_ENTITIES)
+/** 该敌人是否已装配过能力(eid 复用后由 spawnEnemy 清零,新实体重新装配) */
+export const enemyArmed = new Uint8Array(MAX_ENTITIES)
 
 /** 敌人本帧移动朝向(steerEnemies 写;敌方 aim:'move' 弹的 ownerHeading 读) */
 export const enemyVelX = new Float32Array(MAX_ENTITIES)
@@ -76,13 +60,8 @@ export function clearEcsStore(): void {
   projOnHit.fill(undefined)
   projHitEids.fill(undefined)
   flyerHits.fill(undefined)
-  enemyRef.fill(undefined)
-  enemyAbilities.fill(undefined)
-  enemyOwner.fill(undefined)
-  memberRef.fill(undefined)
   enemyCarries.fill(undefined)
-  memberAbilities.length = 0
-  memberHandle.length = 0
+  enemyArmed.fill(0)
   animId.length = 0
   animOutline.length = 0
   eprojSrcName.length = 0

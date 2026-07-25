@@ -2,6 +2,7 @@ import type { SlowAuraDef } from '../../../data/abilityDefs'
 import { Slow } from '../../components'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { Cooldown, Followup } from '../components'
+import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindSlowAura } from '../tags'
 import { targetsOf } from '../targets'
@@ -14,6 +15,7 @@ const TICK_MS = 500
  * dps 光环内持续掉血；freeze 周期脉冲冻结。持有者倒下光环随之消失（闸门管） */
 export function castSlowAuras(sim: Sim, dt: number): void {
   castScan<SlowAuraDef>(sim, KindSlowAura, (e, def) => {
+    const src = sourceOf(sim, e)
     const x = ownerX(e)
     const y = ownerY(e)
     // 本帧减速区（消费方 steerEnemies 读最近一次；ring 供场景侧画光环圈）
@@ -24,10 +26,10 @@ export function castSlowAuras(sim: Sim, dt: number): void {
       if (Cooldown.left[e]! <= 0) {
         Cooldown.left[e] = Cooldown.left[e]! + TICK_MS
         const damage = Math.max(1, Math.round(((def.dps * TICK_MS) / 1000) * damageMul(sim, e)))
-        for (const t of targetsOf(sim, e)) {
+        for (const t of targetsOf(sim, src)) {
           const dx = t.x - x
           const dy = t.y - y
-          if (dx * dx + dy * dy <= r2) damageTarget(sim, e, t.eid, damage)
+          if (dx * dx + dy * dy <= r2) damageTarget(sim, src, t.eid, damage)
         }
       }
     }
@@ -35,7 +37,7 @@ export function castSlowAuras(sim: Sim, dt: number): void {
       Followup.left[e] = Followup.left[e]! - dt
       if (Followup.left[e]! <= 0) {
         Followup.left[e] = Followup.left[e]! + def.freeze.intervalMs
-        for (const t of targetsOf(sim, e)) {
+        for (const t of targetsOf(sim, src)) {
           const dx = t.x - x
           const dy = t.y - y
           if (dx * dx + dy * dy > r2) continue

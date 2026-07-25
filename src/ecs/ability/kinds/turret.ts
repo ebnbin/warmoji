@@ -10,6 +10,7 @@ import { spawnProjectileEcs } from '../../projectile'
 import { attributionSlot, cooldownMul, damageMul, ownerX, ownerY } from '../amp'
 import { AbilityRef, Cooldown, Emplacement, FACTION, Faction, Frozen, Minion, Owner, Retiring } from '../components'
 import { abilityDefAt } from '../defs'
+import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindTurret } from '../tags'
 import { nearestAngle, targetsOf } from '../targets'
@@ -108,7 +109,7 @@ function updateEmplacements(sim: Sim, dt: number): void {
     Tint.alpha[t] = 1
     Minion.cd[t] = Minion.cd[t]! - dt
     if (Minion.cd[t]! > 0) continue
-    const aim = nearestAngle(Transform.x[t]!, Transform.y[t]!, targetsOf(sim, e), def.range)
+    const aim = nearestAngle(Transform.x[t]!, Transform.y[t]!, targetsOf(sim, sourceOf(sim, e)), def.range)
     if (aim === null) continue
     const interval = def.fireIntervalMs * cooldownMul(sim, e)
     Minion.cd[t] = interval

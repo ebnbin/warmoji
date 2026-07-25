@@ -1,9 +1,8 @@
 import type { AbilityDef } from '../../data/abilityDefs'
 
 // 每种能力一个 tag 组件：施放系统靠 tag 取自己那一批实体，不在一个循环里 switch kind。
-//
-// 过渡期：KIND_TAG 里登记过的 kind 走 ECS 系统，没登记的仍由 war/abilities/ 的旧运行时
-// 驱动（见 equip.ts 的回落）。随重写推进逐条搬空，全部登记后旧运行时即可整体删除。
+// 一条能力归不归某系统管，只看它身上有没有那个 tag——与持有者是谁无关。
+// 新增 kind：在此加 tag、登记进 KIND_TAG，再写一个 kinds/ 下的施放系统。
 
 export const KindRally = {}
 export const KindDance = {}

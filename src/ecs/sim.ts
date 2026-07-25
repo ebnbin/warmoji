@@ -8,7 +8,18 @@ import type { FormationId } from '../data/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../war/orbit'
 import type { OrbitThreat } from '../war/orbit'
 import { Alive, Breath, Depth, Follow, Pop, Sprite, Threat, Transform, VisOff, Wander } from './components'
-import { steerEnemies, updateFrameTargets } from './enemy'
+import {
+  animateEnemies,
+  applyKnockback,
+  applySlowZones,
+  commitEnemySteps,
+  despawnExpired,
+  fadeEnemyFlash,
+  popInEnemies,
+  steerEnemies,
+  tintEnemies,
+  updateFrameTargets,
+} from './enemy'
 import { memberContact, memberVisual, regenMembers, reviveMembers, tickPoison } from './combat'
 import { updateEnemyProjectiles, updateProjectiles } from './projectile'
 import { backEaseOut } from './ease'
@@ -20,7 +31,6 @@ import type { EcsWorld } from './world'
 import type { WorldHooks } from './worlds'
 import type { Point } from '../core/vec'
 import type { RunState } from '../run/state'
-import type { EffectCtx, TargetInfo } from '../war/abilities/types'
 import type { Cue } from './ability/cues'
 import type { Target } from './ability/targets'
 import type { FrameIndex } from './frames'
@@ -108,9 +118,6 @@ export interface Sim {
   /** 本帧两侧存活快照(能力索敌共享;targets.ts 每帧重建,含环面镜像坐标) */
   enemyTargets: Target[]
   memberTargets: Target[]
-  /** 同上的 ref 版(尚未 ECS 化的旧能力运行时用;随旧运行时一并消失) */
-  enemyRefs: TargetInfo[]
-  memberRefs: TargetInfo[]
   /** 帧索引表:纯逻辑系统据此建带贴图的实体(开局注入) */
   frames: FrameIndex
   /** 敌人行为随机源(游荡换向/生成等;按 run 种子确定) */
@@ -137,10 +144,6 @@ export interface Sim {
   pendingCues: Cue[]
   /** 本帧待铺的地面效果区(视觉需 scene 建 graphics,故经队列;场景侧同帧排空) */
   pendingGrounds: PendingGround[]
-  /** 队伍侧共享效果执行面(抛射物 onHit 命中链复用;armTeam 后由场景注入) */
-  effectCtx?: EffectCtx
-  /** 抛射物 onHit 效果链的归属槽位:每次命中前改写成该子弹的 srcSlot(镜像 teamEffectSlot) */
-  effectSlot: number
   /** 亡语同步重放(场景侧注入,需 scene/atlas):挂上即在 killEnemy 内当场跑,
    * 未挂则回落到 pendingDeaths 帧末排空 */
   onDeathFx?: (d: PendingDeath) => void
@@ -439,8 +442,17 @@ export function stepSim(sim: Sim, delta: number, wdelta: number = delta): void {
   reviveMembers(sim)
   regenMembers(sim, wdelta)
   tickPoison(sim)
-  // 以下为世界侧:时停期整体放慢(敌人移速/弹体位移都按 wdelta 积分,无需另乘时标)
-  steerEnemies(sim, wdelta, delta)
+  // 以下为世界侧:时停期整体放慢(敌人移速/弹体位移都按 wdelta 积分,无需另乘时标)。
+  // 敌人一帧走这条流水线,每一步都是单一职责的独立系统,次序即语义
+  popInEnemies(sim)
+  despawnExpired(sim)
+  fadeEnemyFlash(sim)
+  applySlowZones(sim)
+  tintEnemies(sim)
+  steerEnemies(sim, wdelta)
+  applyKnockback(sim, wdelta, delta)
+  commitEnemySteps(sim)
+  animateEnemies(sim, wdelta)
   updateProjectiles(sim, wdelta)
   // 接触须先于敌弹:同帧两者争同一层无敌帧时旧实现是接触先手(overlap 注册序),
   // 否则贴脸接触的伤害/黏滞/荆棘反伤会被敌弹吃掉的无敌帧一并挡下

@@ -4,10 +4,11 @@ import { MAtkSlow, Poison, Slow } from '../components'
 import { applyMorph } from '../morph'
 import { spawnEnemyProjectileEcs } from '../projectile'
 import { enemyDef } from '../store'
-import { attributionSlot, damageTarget } from './amp'
-import { FACTION, Faction, Owner } from './components'
+import { damageTarget } from './amp'
+import { FACTION } from './components'
 import { healEnemies, healMembers } from './heal'
 import { nearestAngle, targetsOf } from './targets'
+import type { Source } from './source'
 import type { Sim } from '../sim'
 
 // 命中效果层（阵营中立）：「投送方式」与「命中后做什么」正交——任何投送都经此施加
@@ -30,7 +31,7 @@ export interface HitCtx {
 /** 锚点圆内各造成一次伤害（击退方向从锚点指向目标）；溅射/终点震波/连环刃/轰炸共用 */
 export function applyBlast(
   sim: Sim,
-  e: number,
+  src: Source,
   x: number,
   y: number,
   damage: number,
@@ -38,28 +39,28 @@ export function applyBlast(
   knockback: number,
   exclude?: ReadonlySet<number>,
 ): void {
-  const list = targetsOf(sim, e)
+  const list = targetsOf(sim, src)
   for (const i of circleHitIndices({ x, y }, radius, list)) {
     const t = list[i]!
     if (exclude?.has(t.eid)) continue
-    damageTarget(sim, e, t.eid, damage, knockback, x, y)
+    damageTarget(sim, src, t.eid, damage, knockback, x, y)
   }
 }
 
 /** 求值一串效果（命中触发 onHit 共用）。缺席某侧机制的效果在该阵营下静默跳过 */
 export function applyAbilityEffects(
   sim: Sim,
-  e: number,
+  src: Source,
   effects: readonly Effect[] | undefined,
   hit: HitCtx,
 ): void {
   if (!effects) return
-  const team = Faction.v[e] === FACTION.team
+  const team = src.faction === FACTION.team
   const now = sim.elapsedMs
   for (const fx of effects) {
     if (fx.kind === 'blast') {
       const dmg = Math.max(1, Math.round(hit.baseDamage * fx.ratio))
-      applyBlast(sim, e, hit.x, hit.y, dmg, fx.radius, fx.knockback, hit.exclude)
+      applyBlast(sim, src, hit.x, hit.y, dmg, fx.radius, fx.knockback, hit.exclude)
       if (fx.ring) {
         sim.pendingCues.push({
           kind: 'circle',
@@ -81,7 +82,7 @@ export function applyAbilityEffects(
       }
     } else if (fx.kind === 'damage') {
       const dmg = Math.max(1, Math.round(hit.baseDamage * (fx.ratio ?? 1)))
-      for (const t of hit.targets ?? []) damageTarget(sim, e, t, dmg)
+      for (const t of hit.targets ?? []) damageTarget(sim, src, t, dmg)
     } else if (fx.kind === 'slow') {
       if (!team) continue // 队员无减速机制
       for (const t of hit.targets ?? []) {
@@ -90,7 +91,7 @@ export function applyAbilityEffects(
       }
     } else if (fx.kind === 'poison') {
       if (!team) continue // 队员无中毒机制
-      const slot = attributionSlot(e)
+      const slot = src.slot
       for (const t of hit.targets ?? []) {
         Poison.until[t] = now + fx.durationMs
         Poison.nextTick[t] = now + fx.tickMs
@@ -115,8 +116,8 @@ export function applyAbilityEffects(
         y: hit.y,
         def: fx.def,
         faction: team ? 'team' : 'enemy',
-        srcSlot: attributionSlot(e),
-        srcName: team ? '' : (enemyDef[Owner.eid[e]!]?.name ?? ''),
+        srcSlot: src.slot,
+        srcName: team ? '' : (src.name ?? ''),
       })
     } else if (fx.kind === 'heal') {
       const all = fx.all ?? true
@@ -124,16 +125,16 @@ export function applyAbilityEffects(
       else healEnemies(sim, hit.x, hit.y, fx.range, fx.amount, all, hit.source)
     } else if (fx.kind === 'spawnProjectile') {
       if (team) continue // 目前只有敌方死亡冷枪在用
-      const angle = nearestAngle(hit.x, hit.y, targetsOf(sim, e), Infinity)
+      const angle = nearestAngle(hit.x, hit.y, targetsOf(sim, src), Infinity)
       if (angle === null) continue
       spawnEnemyProjectileEcs(sim, sim.frames, hit.x, hit.y, angle, {
         emoji: fx.projectile.emoji,
         size: fx.projectile.size,
         radius: fx.projectile.radius,
         speed: fx.projectile.speed,
-        damage: fx.damage,
+        damage: Math.round(fx.damage * src.dmgMul),
         lifeMs: fx.lifeMs,
-        srcName: enemyDef[Owner.eid[e]!]?.name,
+        srcName: src.name,
       })
     }
   }

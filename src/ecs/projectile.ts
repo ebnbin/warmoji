@@ -21,10 +21,10 @@ import {
   Transform,
   Vel,
 } from './components'
-import { applyEffects } from '../war/abilities/effects'
-import type { TargetInfo } from '../war/abilities/types'
+import { applyAbilityEffects } from './ability/effects'
+import { boltSource } from './ability/source'
 import { applyDamage, hurtMember } from './combat'
-import { enemyDef, enemyRef, eprojSrcName, projHitEids, projOnHit } from './store'
+import { enemyDef, eprojSrcName, projHitEids, projOnHit } from './store'
 import type { Sim } from './sim'
 import type { FrameIndex } from './frames'
 
@@ -157,15 +157,15 @@ export function updateProjectiles(sim: Sim, delta: number): void {
       const hx = Transform.x[f.enemy]!
       const hy = Transform.y[f.enemy]!
       applyDamage(sim, f.enemy, Proj.damage[eid]!, Proj.kb[eid]!, sx, sy, Proj.srcSlot[eid]!)
-      // 命中效果链(溅射/减速/毒/变羊…):复用 applyEffects,主目标排除出溅射圈
-      if (onHit && onHit.length > 0 && sim.effectCtx) {
-        sim.effectSlot = Proj.srcSlot[eid]! // 溅射/毒/地面区归属发射者(镜像 teamEffectSlot 逐次改写)
-        const ref = enemyRef[f.enemy] as TargetInfo['ref'] | undefined
-        applyEffects(sim.effectCtx, onHit, {
-          center: { x: hx, y: hy },
+      // 命中效果链(溅射/减速/毒/变羊…):主目标排除出溅射圈。
+      // 归属随弹丸走——子弹常比发射者活得久,故来源是一份值而非能力实体
+      if (onHit && onHit.length > 0) {
+        applyAbilityEffects(sim, boltSource(Proj.srcSlot[eid]!), onHit, {
+          x: hx,
+          y: hy,
           baseDamage: Proj.damage[eid]!,
-          targets: ref ? [ref] : [],
-          exclude: ref ? new Set([ref]) : undefined,
+          targets: [f.enemy],
+          exclude: new Set([f.enemy]),
         })
       }
       if (Proj.pierce[eid]! <= 0) dead = true

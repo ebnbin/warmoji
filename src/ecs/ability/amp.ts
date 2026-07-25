@@ -3,8 +3,8 @@ import { waveAt } from '../../data/waves'
 import { labFireRate } from '../../run/lab'
 import { Alive, DmgMul, Iframe, MAtkSlow, Slot, Transform } from '../components'
 import { applyDamage, hurtMember } from '../combat'
-import { enemyDef } from '../store'
 import { Amp, FACTION, Faction, Owner } from './components'
+import type { Source } from './source'
 import type { Sim } from '../sim'
 
 // 出手乘区与施伤：所有能力的伤害/冷却/暴击/击退在此收口，各 kind 的施放系统只管
@@ -47,26 +47,26 @@ export function attributionSlot(e: number): number {
   return Faction.v[e] === FACTION.enemy ? -1 : Slot.v[Owner.eid[e]!]!
 }
 
-/** 能力施伤的唯一入口：阵营决定落点——队伍侧打敌人（暴击掷点 + 击退倍率在此生效），
+/** 施伤的唯一入口：阵营决定落点——队伍侧打敌人（暴击掷点 + 击退倍率在此生效），
  * 敌方侧打队员（吃无敌帧节流；队员无击退机制，击退参数忽略） */
 export function damageTarget(
   sim: Sim,
-  e: number,
+  src: Source,
   target: number,
   damage: number,
   knockback = 0,
   srcX?: number,
   srcY?: number,
 ): void {
-  if (Faction.v[e] === FACTION.enemy) {
+  if (src.faction === FACTION.enemy) {
     if (sim.over || !Alive.v[target]) return
     if (sim.elapsedMs - Iframe.last[target]! < Iframe.ms[target]!) return
     Iframe.last[target] = sim.elapsedMs
-    hurtMember(sim, target, damage, enemyDef[Owner.eid[e]!]?.name)
+    hurtMember(sim, target, damage, src.name)
     return
   }
-  const chance = Math.min(0.5, Amp.crit[e]! + (Amp.battle[e] ? sim.battleFx.critAdd : 0))
+  const chance = Math.min(0.5, src.crit)
   const crit = chance > 0 && sim.rng.next() < chance
   const dmg = crit ? Math.round(damage * CRIT_MUL) : damage
-  applyDamage(sim, target, dmg, knockback * Amp.kb[e]!, srcX, srcY, attributionSlot(e), crit)
+  applyDamage(sim, target, dmg, knockback * src.kb, srcX, srcY, src.slot, crit)
 }

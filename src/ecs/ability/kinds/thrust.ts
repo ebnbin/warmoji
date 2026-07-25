@@ -9,6 +9,7 @@ import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { Ability, AbilityRef, Aim, Followup, Frozen, Gear, Owner, Swing } from '../components'
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects } from '../effects'
+import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindThrust } from '../tags'
 import { nearestAngle, targetsOf } from '../targets'
@@ -22,7 +23,8 @@ export function castThrusts(sim: Sim, dt: number): void {
   castScan<ThrustDef>(sim, KindThrust, (e, def) => {
     if (Followup.left[e]! > 0) return false // 二连突在途：本轮不另起
     // 侦测门槛：射程内无敌人就不出手（不空刺）
-    if (nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, e), reachOf(def)) === null) return false
+    const src = sourceOf(sim, e)
+    if (nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, src), reachOf(def)) === null) return false
     strike(sim, e, def)
     if (def.combo) Followup.left[e] = def.combo.delayMs
     return true
@@ -47,18 +49,19 @@ function tickCombos(sim: Sim, dt: number): void {
 
 /** 单段突刺：索敌 → 胶囊判定 → 终点命中效果 → 起一段挥击动画 */
 function strike(sim: Sim, e: number, def: ThrustDef): void {
+  const src = sourceOf(sim, e)
   const ox = ownerX(e)
   const oy = ownerY(e)
-  const list = targetsOf(sim, e)
+  const list = targetsOf(sim, src)
   const aim = nearestAngle(ox, oy, list, reachOf(def))
   if (aim === null) return
   Aim.rad[e] = aim
   playSfx('whoosh')
   const damage = Math.round(def.damage * damageMul(sim, e))
   for (const i of thrustHitIndices({ x: ox, y: oy }, aim, def.reach, def.hitRadius, list)) {
-    damageTarget(sim, e, list[i]!.eid, damage, def.knockback, ox, oy)
+    damageTarget(sim, src, list[i]!.eid, damage, def.knockback, ox, oy)
   }
-  applyAbilityEffects(sim, e, def.onHit, {
+  applyAbilityEffects(sim, src, def.onHit, {
     x: ox + Math.cos(aim) * def.reach,
     y: oy + Math.sin(aim) * def.reach,
     baseDamage: damage,

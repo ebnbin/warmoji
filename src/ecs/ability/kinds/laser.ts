@@ -7,6 +7,7 @@ import { Tint, Transform } from '../../components'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { Ability, AbilityRef, Aim, Frozen, Gear, Radial } from '../components'
 import { abilityDefAt } from '../defs'
+import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindLaser } from '../tags'
 import { nearestAngle, targetsOf } from '../targets'
@@ -19,7 +20,7 @@ export function castLasers(sim: Sim): void {
   fireRadials(sim)
   castScan<LaserDef>(sim, KindLaser, (e, def) => {
     if (Radial.left[e]! > 0) return false // 扫射在途：本轮不另起
-    const aim = nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, e), def.range)
+    const aim = nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, sourceOf(sim, e)), def.range)
     if (aim === null) return false // 最近敌人在射程内才开火
     Aim.rad[e] = aim
     if (def.radial) {
@@ -58,13 +59,14 @@ function fireRadials(sim: Sim): void {
 
 /** 发射一束：胶囊判定 + 光束特效（ratio 折损用于扫射分束） */
 function fireBeam(sim: Sim, e: number, def: LaserDef, angle: number, ratio: number): void {
+  const src = sourceOf(sim, e)
   playSfx('zap')
   const damage = Math.max(1, Math.round(def.damage * damageMul(sim, e) * ratio))
   const ox = ownerX(e)
   const oy = ownerY(e)
-  const list = targetsOf(sim, e)
+  const list = targetsOf(sim, src)
   for (const i of thrustHitIndices({ x: ox, y: oy }, angle, def.range, def.beamRadius, list)) {
-    damageTarget(sim, e, list[i]!.eid, damage, def.knockback, ox, oy)
+    damageTarget(sim, src, list[i]!.eid, damage, def.knockback, ox, oy)
   }
   sim.pendingCues.push({
     kind: 'beam',

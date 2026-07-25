@@ -117,6 +117,13 @@ export const SpMul = { v: f32() }
 /** 击退冲量(指数衰减,0=无) */
 export const Kv = { x: f32(), y: f32() }
 
+/** 本帧待提交的位移(行为 + 击退,尚未过世界禁锢/约束):
+ * 转向系统写行为分量、击退系统叠冲量分量、提交系统落到 Transform,朝向翻转也读它 */
+export const Step = { x: f32(), y: f32() }
+
+/** 本帧减速区叠乘出来的移速乘区(1=未被减速):转向系统与染色系统共读一份,不各算一遍 */
+export const ZoneSlow = { v: f32() }
+
 /** 受击白闪恢复时刻(0=无) */
 export const Flash = { until: f32() }
 

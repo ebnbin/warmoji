@@ -47,12 +47,8 @@ export interface AmpInit {
 
 export const NEUTRAL_AMP: AmpInit = { dmg: 1, cd: 1, crit: 0, kb: 1, battle: false }
 
-/** 该 kind 是否已 ECS 化（否则调用方回落到 war/abilities/ 的旧运行时） */
-export function ecsAbilityKind(kind: AbilityDef['kind']): boolean {
-  return KIND_TAG[kind] !== undefined
-}
-
-/** 把一条定义物化成能力实体，挂到持有者名下。kind 尚未 ECS 化则返回 -1（不建实体） */
+/** 把一条定义物化成能力实体，挂到持有者名下。返回 eid（未登记 tag 的 kind 返回 -1，
+ * 不建实体——gen 校验保证不会走到这里） */
 export function equipAbility(
   sim: Sim,
   ownerEid: number,

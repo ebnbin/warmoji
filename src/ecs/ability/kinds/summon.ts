@@ -11,10 +11,12 @@ import { cooldownMul, damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { AbilityRef, Cooldown, FACTION, Faction, Frozen, Minion, Owner, Swarmer } from '../components'
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects } from '../effects'
+import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindSummon } from '../tags'
 import { targetsOf } from '../targets'
 import type { Target } from '../targets'
+import type { Source } from '../source'
 import type { Sim } from '../../sim'
 
 /** 放蜂：每隔一段放出一波小蜂，各自寻路扑向最近的敌人（优先未中毒者，好把毒摊开），
@@ -68,7 +70,8 @@ function updateMinions(sim: Sim, dt: number): void {
     }
     const bx = Transform.x[b]!
     const by = Transform.y[b]!
-    const target = pickTarget(sim, e, bx, by)
+    const src = sourceOf(sim, e)
+    const target = pickTarget(sim, src, bx, by)
     Minion.phase[b] = Minion.phase[b]! + (Math.min(dt, 50) / 1000) * 3
     // 有目标就扑过去；没目标就在主人身边打转候敌
     const destX = target ? target.x : ownerX(e) + Math.cos(Minion.phase[b]!) * 40
@@ -92,21 +95,21 @@ function updateMinions(sim: Sim, dt: number): void {
     if (tx * tx + ty * ty > rr * rr) continue
     // 撞上：撞击直伤 + 施毒（onHit），随即自毁
     const damage = Math.round(def.damage * damageMul(sim, e))
-    damageTarget(sim, e, target.eid, damage, def.knockback, Transform.x[b]!, Transform.y[b]!)
-    applyAbilityEffects(sim, e, def.onHit, { x: target.x, y: target.y, baseDamage: damage, targets: [target.eid] })
+    damageTarget(sim, src, target.eid, damage, def.knockback, Transform.x[b]!, Transform.y[b]!)
+    applyAbilityEffects(sim, src, def.onHit, { x: target.x, y: target.y, baseDamage: damage, targets: [target.eid] })
     playSfx('hit')
     removeEntity(sim.world, b)
   }
 }
 
 /** 优先未中毒的最近敌人；没有未中毒者则退而求其次取最近的 */
-function pickTarget(sim: Sim, e: number, bx: number, by: number): Target | null {
+function pickTarget(sim: Sim, src: Source, bx: number, by: number): Target | null {
   const max = ACQUIRE.range * UNIT
   let bestFresh: Target | null = null
   let bestFreshD = max * max
   let bestAny: Target | null = null
   let bestAnyD = max * max
-  for (const t of targetsOf(sim, e)) {
+  for (const t of targetsOf(sim, src)) {
     const dx = t.x - bx
     const dy = t.y - by
     const d = dx * dx + dy * dy

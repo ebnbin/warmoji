@@ -4,6 +4,7 @@ import { playSfx } from '../../../audio/sfx'
 import { Boss, Dormant, ENEMY_SET } from '../../components'
 import { enemyDef } from '../../store'
 import { damageTarget, damageMul, waveScale } from '../amp'
+import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindNuke } from '../tags'
 import type { Sim } from '../../sim'
@@ -12,6 +13,7 @@ import type { Sim } from '../../sim'
  *（与敌人血量成长同源），Boss 按比例折减；休眠者不在活跃集内，天然豁免 */
 export function castNukes(sim: Sim): void {
   castScan<NukeDef>(sim, KindNuke, (e, def) => {
+    const src = sourceOf(sim, e)
     sim.pendingCues.push({ kind: 'screenFlash', color: 0xffffff, alpha: 0.55, durationMs: 380 })
     playSfx('boom')
     const scale = waveScale(sim, e)
@@ -20,7 +22,7 @@ export function castNukes(sim: Sim): void {
     for (const t of [...query(sim.world, ENEMY_SET as unknown as object[])]) {
       if (Dormant.v[t] || enemyDef[t] === undefined) continue
       const damage = Math.max(1, Math.round(def.damage * scale * mul * (Boss.v[t] ? def.bossRatio : 1)))
-      damageTarget(sim, e, t, damage)
+      damageTarget(sim, src, t, damage)
     }
   })
 }
