@@ -2,7 +2,6 @@ node_modules/
 dist/
 test-results/
 playwright-report/
-playtest-out/
 .vercel/
 *.log
 .DS_Store

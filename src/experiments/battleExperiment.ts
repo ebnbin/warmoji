@@ -37,11 +37,10 @@ import type { EcsSceneKey } from '../ecs/keys'
 //
 // 淘汰其中一侧时的完整清单（两侧各实测删过一遍：src/ 编译与 lint 均通过，无残留引用）：
 //   1. 删该侧目录（e2e 探针的 window 声明就在包内的 globals.d.ts，随包一起走）
-//   2. 删该侧的 e2e：ECS 侧 = `e2e/ecs-*.spec.ts`；arcade 侧 = 用旧探针的那几个
-//      （enemies / lab / map-daynight / map-ice / map-space / pickups）。两边互不沾
-//   3. 本文件删掉该侧的 import 与它在 BATTLE_SCENES / BATTLE_SCENE_KEYS / battleSceneFor /
-//      installBattleProbes 里的那一半；删 ECS 侧再删 settings 的 `ecs` 字段（含 settings.test.ts 断言）
-//   4. eslint.config.js 去掉该侧的护栏与白名单；删 ECS 侧一并删 package.json 的 bitecs
+//   2. 本文件删掉该侧的 import 与它在 BATTLE_SCENES / BATTLE_SCENE_KEYS / battleSceneFor /
+//      installBattleProbes 里的那一半；删 ECS 侧再删 settings 的 `ecs` 字段
+//   3. eslint.config.js 去掉该侧的护栏与白名单；删 ECS 侧一并删 package.json 的 bitecs
+//   （e2e 已收敛为 smoke + gameplay 两条底线守卫，不绑任一侧实现，故无需增删）
 //
 // 删后共享层不会留下死文件——每个共享文件都还有别的使用方。留在 war/ 里只服务单侧的导出
 // 也一并可删：arcade 侧 hit.ts::sweepFirstHitIndex、world/void.ts::wrapCoord、
