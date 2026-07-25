@@ -17,9 +17,11 @@ import { OUTLINED_EMOJIS } from '../boot/preload'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAP, MAPS, rollDecor } from '../maps/registry'
+import type { WallsConfig } from '../maps/registry'
 import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from '../maps/daynight'
 import { onFloe } from '../maps/ice'
 import { chunkDecor, chunkKey, chunksInRect, outsideZone } from '../maps/world'
+import { WallGrid, generateRuins, reachableCells } from '../maps/ruins'
 import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
@@ -140,6 +142,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private zoneVignette?: Phaser.GameObjects.Rectangle
   /** 深空图天体横扫的视觉：与 sim.meteor 对帐（新一次即建预警轨迹，起划即挂球体，结束即销毁） */
   private meteorFx?: { of: Meteor; tele: Phaser.GameObjects.Graphics; sphere?: Phaser.GameObjects.Image }
+  /** 残垣图断壁：格索引 → 该格的石块/顶沿视觉（碾墙时单格销毁） */
+  private wallTiles = new Map<number, Phaser.GameObjects.Rectangle[]>()
   /** 无限图装饰分块：块键 → 该块的装饰实体 eid；视野块集合变化才增删 */
   private decorChunks = new Map<string, number[]>()
   private decorRangeKey = ''
@@ -302,6 +306,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
     this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
     initialLayout(this.sim)
+    const walls = MAPS[run.mapId].walls
+    if (walls) this.createWalls(this.sim, walls)
     this.sim.hooks.onStart(this.sim)
     armTeam(this.sim, this, atlas, run, run.testMode)
     const captain = armCaptain(this.sim, this, atlas, run)
@@ -797,6 +803,56 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     rect.setFillStyle(WATER_VIGNETTE, inWater ? 0.18 + 0.06 * Math.sin(sim.elapsedMs / 140) : 0)
   }
 
+  /** 断壁世界建场(镜像 ArenaScene.createWalls):按种子铺断壁 → 网格 + 可达刷怪格 → 逐格画石块。
+   * 网格/流场是纯逻辑(sim.walls),此处只负责视觉与回填 */
+  private createWalls(sim: Sim, cfg: WallsConfig): void {
+    const cols = Math.round(this.mapW / UNIT)
+    const rows = Math.round(this.mapH / UNIT)
+    const rng = new Rng(this.run.decorSeed ^ 0x5eed)
+    const blocked = generateRuins(() => rng.next(), cols, rows, {
+      blocks: cfg.blocks,
+      maxLen: cfg.maxLen,
+      centerClearU: cfg.centerClearU,
+    })
+    const grid = new WallGrid(cols, rows, UNIT, blocked)
+    // 只在「从中心可达」的通行格刷怪,保证敌人总能寻路到队伍
+    const cells = [...reachableCells(grid, Math.floor(cols / 2), Math.floor(rows / 2))]
+    sim.walls = { grid, flowCellX: -1, flowCellY: -1, reflowAcc: 0, spawnCells: cells, smashed: [] }
+    // 逐格填充石块 + 顶沿提亮假高度(逐格存引用供碾墙单格销毁)
+    const palette = MAPS[this.run.mapId].palette
+    const base = Phaser.Display.Color.IntegerToColor(palette.map).darken(38).color
+    const top = Phaser.Display.Color.IntegerToColor(palette.map).darken(18).color
+    const capH = Math.max(3, UNIT * 0.22)
+    for (let cy = 0; cy < rows; cy++) {
+      for (let cx = 0; cx < cols; cx++) {
+        if (!blocked[cy * cols + cx]) continue
+        const px = cx * UNIT + UNIT / 2
+        const py = cy * UNIT + UNIT / 2
+        this.wallTiles.set(cy * cols + cx, [
+          this.add.rectangle(px, py, UNIT - 2, UNIT - 2, base).setDepth(2),
+          this.add.rectangle(px, cy * UNIT + 1 + capH / 2, UNIT - 2, capH, top).setDepth(2.1),
+        ])
+      }
+    }
+  }
+
+  /** 排空本帧被碾碎的断壁(镜像 smashWallAt 的视觉部分):拆石块 + 扬尘 */
+  private drainSmashedWalls(sim: Sim): void {
+    const w = sim.walls
+    if (!w || w.smashed.length === 0) return
+    for (const idx of w.smashed) {
+      const objs = this.wallTiles.get(idx)
+      if (!objs) continue
+      for (const o of objs) o.destroy()
+      this.wallTiles.delete(idx)
+      const x = ((idx % w.grid.cols) + 0.5) * UNIT
+      const y = (Math.floor(idx / w.grid.cols) + 0.5) * UNIT
+      const c = this.add.circle(x, y, UNIT * 0.4, 0xbcae95, 0.6).setDepth(5)
+      this.tweens.add({ targets: c, scale: 1.8, alpha: 0, duration: 320, onComplete: () => c.destroy() })
+    }
+    w.smashed.length = 0
+  }
+
   /** 无限世界装饰分块滚动(镜像 InfiniteArenaScene.ensureChunks):视野覆盖的块集合变化时
    * 整组增删 ECS 静态实体。摆放由 chunkDecor 按 (种子, 块) 纯函数重建——回头看到的景不变 */
   private ensureChunks(atlas: EcsAtlas): void {
@@ -1021,6 +1077,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.updateWaterVignette(sim)
     this.updateZone(sim)
     this.updateMeteorFx(sim)
+    this.drainSmashedWalls(sim)
     // 无限世界:相机走到哪,装饰分块跟到哪(块集合不变则整段免算)
     if (this.infinite && this.atlas) this.ensureChunks(this.atlas)
     // 冷雾浓度跟随时停态（越静越浓），淡入淡出走实时 delta
@@ -1075,6 +1132,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       camX: this.cameras.main.scrollX + this.cameras.main.width / 2,
       camY: this.cameras.main.scrollY + this.cameras.main.height / 2,
       zoneR: sim.zone?.r ?? 0,
+      // 残垣:阻挡格数 + 可达刷怪格数(验证断壁成型与连通)
+      walls: sim.walls ? sim.walls.grid.blocked.filter(Boolean).length : 0,
+      spawnCells: sim.walls?.spawnCells.length ?? 0,
       // 深空:天体横扫态(null=不在途)
       meteor: sim.meteor ? { travelling: sim.meteor.travelling, t: sim.meteor.t } : null,
     }

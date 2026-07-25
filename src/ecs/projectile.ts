@@ -120,6 +120,16 @@ export function updateProjectiles(sim: Sim, delta: number): void {
       found.push({ enemy: en, t: dpx * dpx + dpy * dpy })
     }
     found.sort((p, q) => p.t - q.t)
+    // 残垣图:子弹撞墙即销毁(墙比最近命中点更近时,本帧命中作废)——无墙图 wallHit 恒 null
+    const wall = sim.hooks.wallHit(sim, ax, ay, bx, by)
+    if (wall !== null) {
+      const dw = (wall.x - ax) ** 2 + (wall.y - ay) ** 2
+      const first = found[0]
+      if (!first || dw <= first.t) {
+        cull(sim, eid)
+        continue
+      }
+    }
     let dead = false
     const onHit = projOnHit[eid]
     for (const f of found) {

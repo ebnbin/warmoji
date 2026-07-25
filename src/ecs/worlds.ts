@@ -1,4 +1,5 @@
 import { UNIT } from '../core/units'
+import { norm } from '../core/vec'
 import { TEAM, MEMBER } from '../characters/registry'
 import { SPAWN } from '../enemies/registry'
 import { randomMapPoint } from '../enemies/spawn'
@@ -10,6 +11,8 @@ import { clampToDisc, confineVelocity, meteorSweep } from '../maps/space'
 import { PICKUPS } from '../pickups/registry'
 import { query } from 'bitecs'
 import { Alive, Boss, Dormant, ENEMY_SET, Slide, Transform } from './components'
+import { enemyDef } from './store'
+import { FlowField } from '../maps/ruins'
 import { applyDamage, hurtMember } from './combat'
 import type { Sim } from './sim'
 import type { Point } from '../core/vec'
@@ -24,8 +27,14 @@ export interface WorldHooks {
   /** 队伍位移约束:有界钳制 / 冰面动量积分 / 环面回绕 / 圆盘禁锢。
    * next = 本帧输入想走到的位置;返回实际落点 */
   constrainTeam(sim: Sim, next: Point, delta: number): Point
-  /** 敌人落点约束(有界钳制;无界世界原样放行) */
-  constrainEnemy(sim: Sim, x: number, y: number): Point
+  /** 敌人落点约束(有界钳制 + 断壁贴墙滑动;无界世界原样放行) */
+  constrainEnemy(sim: Sim, eid: number, x: number, y: number): Point
+  /** 追击方向:残垣图走流场绕墙(穿墙敌人除外);其余图径直朝目标 */
+  chaseDir(sim: Sim, eid: number, tx: number, ty: number): Point
+  /** 视线遮挡:线段 a→b 的首个撞墙点(索敌 + 子弹裁墙共用);无墙图恒 null */
+  wallHit(sim: Sim, ax: number, ay: number, bx: number, by: number): Point | null
+  /** 碾碎该处断壁(拆迁 Boss 冲刺);无墙图空转 */
+  smashWall(sim: Sim, x: number, y: number): void
   /** 游荡方向修正:有界图撞边折返(残垣图另加撞墙掉头);无界世界原样放行 */
   wanderDir(sim: Sim, eid: number, dx: number, dy: number): Point
   /** 敌人行为速度的后处理(冰面打滑低通 / 河流漂移);默认原样返回。
@@ -58,12 +67,19 @@ const bounded: WorldHooks = {
       y: Math.min(Math.max(next.y, clampMin), sim.mapH - clampMin),
     }
   },
-  constrainEnemy(sim, x, y) {
+  constrainEnemy(sim, _eid, x, y) {
     return {
       x: x < 0 ? 0 : x > sim.mapW ? sim.mapW : x,
       y: y < 0 ? 0 : y > sim.mapH ? sim.mapH : y,
     }
   },
+  chaseDir(_sim, eid, tx, ty) {
+    return norm(tx - Transform.x[eid]!, ty - Transform.y[eid]!)
+  },
+  wallHit() {
+    return null
+  },
+  smashWall() {},
   /** 撞边折返:接近地图边缘时翻转对应方向分量(镜像 ArenaScene.wanderDir) */
   wanderDir(sim, eid, dx, dy) {
     const margin = 0.6 * UNIT
@@ -80,8 +96,12 @@ const bounded: WorldHooks = {
   knockbackTauMul() {
     return 1
   },
-  constrainCoin(_sim, x, y) {
-    return { x, y }
+  constrainCoin(sim, x, y) {
+    const r = PICKUPS.coin.radius
+    return {
+      x: Math.min(Math.max(x, r), sim.mapW - r),
+      y: Math.min(Math.max(y, r), sim.mapH - r),
+    }
   },
   cullEnemyProjectile(sim, x, y) {
     return x < -UNIT || x > sim.mapW + UNIT || y < -UNIT || y > sim.mapH + UNIT
@@ -135,7 +155,7 @@ const ice: WorldHooks = {
     return { x: sim.center.x + sim.teamVx * dt, y: sim.center.y + sim.teamVy * dt }
   },
   // 无界:敌人不钳制(滑出浮冰照常,落水自有掉血结算);游荡也不折返(冰缘不是墙)
-  constrainEnemy(_sim, x, y) {
+  constrainEnemy(_sim, _eid, x, y) {
     return { x, y }
   },
   wanderDir(_sim, _eid, dx, dy) {
@@ -188,6 +208,102 @@ const ice: WorldHooks = {
   },
 }
 
+// ── 残垣(ruins:有界 + 断壁)─────────────────────────────────
+
+/** 断壁世界:有界竞技场叠断壁——挡移动(队伍贴墙滑、敌人贴墙滑)、挡子弹、挡视线,
+ * 敌人走流场绕墙包抄(穿墙的幽灵直线穿行、破墙的拆迁 Boss 冲刺碾墙);
+ * 只在「从中心可达」的通行格刷怪,保证敌人总能寻到队伍 */
+const ruins: WorldHooks = {
+  ...bounded,
+  constrainTeam(sim, next, delta) {
+    const box = bounded.constrainTeam(sim, next, delta)
+    const w = sim.walls
+    return w ? w.grid.resolveMove(sim.center.x, sim.center.y, box.x, box.y) : box
+  },
+  constrainEnemy(sim, eid, x, y) {
+    const box = bounded.constrainEnemy(sim, eid, x, y)
+    const w = sim.walls
+    // 穿墙(幽灵)/破墙(拆迁 Boss)不吃墙碰撞;其余贴墙滑动兜底,防击退/游荡把敌人挤进墙
+    const def = enemyDef[eid]
+    if (!w || def?.phasesWalls || def?.breaksWalls) return box
+    return w.grid.resolveMove(Transform.x[eid]!, Transform.y[eid]!, box.x, box.y)
+  },
+  /** 追击:穿墙敌人直线穿行;其余走流场绕墙,不可达回退直线 */
+  chaseDir(sim, eid, tx, ty) {
+    const w = sim.walls
+    if (!w || enemyDef[eid]?.phasesWalls) return bounded.chaseDir(sim, eid, tx, ty)
+    const dir = w.flow?.sampleDir(Transform.x[eid]!, Transform.y[eid]!)
+    if (dir && (dir.x !== 0 || dir.y !== 0)) return dir
+    return bounded.chaseDir(sim, eid, tx, ty)
+  },
+  /** 游荡:盒子折返基础上,前方是墙就掉头 */
+  wanderDir(sim, eid, dx, dy) {
+    const d = bounded.wanderDir(sim, eid, dx, dy)
+    const w = sim.walls
+    if (!w) return d
+    const ahead = 0.8 * UNIT
+    if (w.grid.pointBlocked(Transform.x[eid]! + d.x * ahead, Transform.y[eid]! + d.y * ahead)) {
+      return { x: -d.x, y: -d.y }
+    }
+    return d
+  },
+  wallHit(sim, ax, ay, bx, by) {
+    return sim.walls?.grid.segmentHit(ax, ay, bx, by) ?? null
+  },
+  /** 碾碎该格:网格置通行 + 排进待拆队列(场景侧拆视觉/扬尘)+ 逼流场下帧重算 */
+  smashWall(sim, x, y) {
+    const w = sim.walls
+    if (!w) return
+    const cx = w.grid.cellX(x)
+    const cy = w.grid.cellY(y)
+    if (!w.grid.isBlockedCell(cx, cy)) return
+    w.grid.setBlocked(cx, cy, false)
+    w.smashed.push(cy * w.grid.cols + cx)
+    w.flowCellX = -1
+  },
+  /** 只在从中心可达的通行格刷怪,且离队伍中心足够远(镜像 pickSpawn) */
+  spawnPoint(sim, boss) {
+    const w = sim.walls
+    if (!w || w.spawnCells.length === 0) return bounded.spawnPoint(sim, boss)
+    const cfg = MAPS[sim.mapId].walls!
+    const minCellDist = cfg.spawnMinCellDist + (boss ? 2 : 0)
+    const ccx = w.grid.cellX(sim.center.x)
+    const ccy = w.grid.cellY(sim.center.y)
+    const min2 = minCellDist * minCellDist
+    const cellCenter = (idx: number): Point => ({
+      x: ((idx % w.grid.cols) + 0.5) * UNIT,
+      y: (Math.floor(idx / w.grid.cols) + 0.5) * UNIT,
+    })
+    let fallback = cellCenter(w.spawnCells[0]!)
+    for (let i = 0; i < 24; i++) {
+      const idx = w.spawnCells[Math.floor(sim.rng.next() * w.spawnCells.length)]!
+      const p = cellCenter(idx)
+      fallback = p
+      const dx = (idx % w.grid.cols) - ccx
+      const dy = Math.floor(idx / w.grid.cols) - ccy
+      if (dx * dx + dy * dy >= min2) return p
+    }
+    return fallback
+  },
+  /** 敌弹:出界回收之外,进墙也销毁 */
+  cullEnemyProjectile(sim, x, y) {
+    return bounded.cullEnemyProjectile(sim, x, y) || (sim.walls?.grid.pointBlocked(x, y) ?? false)
+  },
+  /** 逐帧低频重算流场(队伍格变了 / 到点就重算) */
+  tick(sim, delta) {
+    const w = sim.walls
+    if (!w) return
+    w.reflowAcc += delta
+    const cx = w.grid.cellX(sim.center.x)
+    const cy = w.grid.cellY(sim.center.y)
+    if (cx === w.flowCellX && cy === w.flowCellY && w.reflowAcc < MAPS[sim.mapId].walls!.reflowMs) return
+    w.flow = new FlowField(w.grid, cx, cy)
+    w.flowCellX = cx
+    w.flowCellY = cy
+    w.reflowAcc = 0
+  },
+}
+
 // ── 无限世界(infinite:荒漠)────────────────────────────────
 
 function infCfg(sim: Sim): InfiniteConfig {
@@ -206,7 +322,7 @@ const infinite: WorldHooks = {
   constrainTeam(_sim, next) {
     return next
   },
-  constrainEnemy(_sim, x, y) {
+  constrainEnemy(_sim, _eid, x, y) {
     return { x, y }
   },
   // 世界没有边,游荡不折返、敌弹也只按寿命回收
@@ -273,7 +389,7 @@ const space: WorldHooks = {
     const v = confineVelocity(sim.center.x, sim.center.y, 0, 0, next.x - sim.center.x, next.y - sim.center.y, r)
     return clampToDisc(sim.center.x + v.x, sim.center.y + v.y, 0, 0, r)
   },
-  constrainEnemy(sim, x, y) {
+  constrainEnemy(sim, _eid, x, y) {
     return clampToDisc(x, y, 0, 0, fieldR(sim))
   },
   /** 敌人禁锢:削掉向外的速度分量(镜像 applyFieldDrag) */
@@ -342,6 +458,7 @@ const space: WorldHooks = {
 export function worldFor(mapId: MapId): WorldHooks {
   const def = MAPS[mapId]
   if (def.ice) return ice
+  if (def.walls) return ruins
   if (def.kind === 'space') return space
   if (def.kind === 'infinite') return infinite
   return bounded

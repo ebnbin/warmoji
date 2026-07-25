@@ -233,6 +233,8 @@ function steerDash(sim: Sim, eid: number, slow: number): { vx: number; vy: numbe
         Charge.coolUntil[eid] = now + lm.trigger.cooldownMs
       }
     }
+    // 冲刺碾墙(残垣图拆迁 Boss):沿途碾碎断壁,只在冲刺态生效
+    if (enemyDef[eid]?.breaksWalls) sim.hooks.smashWall(sim, ex, ey)
     return { vx: EDir.x[eid]! * lm.dashSpeed * slow, vy: EDir.y[eid]! * lm.dashSpeed * slow }
   }
   // 触发判定
@@ -256,12 +258,12 @@ function steerDash(sim: Sim, eid: number, slow: number): { vx: number; vy: numbe
     }
     if (state === 4 && now >= Charge.coolUntil[eid]!) EState.v[eid] = 0
   }
-  // idle 移动
+  // idle 移动:逼近走位经世界钩子(残垣图流场绕墙;冲刺本身仍锁直线)
   const speed = Speed.v[eid]! * slow
   if (lm.idle === 'chase') {
     const to = lm.aim === 'teamCenter' ? sim.center : nearestAlive(sim, ex, ey)
     if (!to) return { vx: 0, vy: 0 }
-    const dir = norm(to.x - ex, to.y - ey)
+    const dir = sim.hooks.chaseDir(sim, eid, to.x, to.y)
     return { vx: dir.x * speed, vy: dir.y * speed }
   }
   const dir = wanderDir(sim, eid)
@@ -332,7 +334,7 @@ function steerDetonate(sim: Sim, eid: number, slow: number): { vx: number; vy: n
     Charge.windupUntil[eid] = now + lm.windupMs
     return { vx: 0, vy: 0 }
   }
-  const dir = norm(dx, dy)
+  const dir = sim.hooks.chaseDir(sim, eid, target.x, target.y)
   const sp = Speed.v[eid]! * slow
   return { vx: dir.x * sp, vy: dir.y * sp }
 }
@@ -348,7 +350,8 @@ function steerBaseOrbit(sim: Sim, eid: number, slow: number): { vx: number; vy: 
   const chasePlayer = (): { vx: number; vy: number } => {
     const t = nearestAlive(sim, ex, ey)
     if (!t) return { vx: 0, vy: 0 }
-    const dir = norm(t.x - ex, t.y - ey)
+    // 扑向玩家经世界钩子(残垣图绕墙寻路)
+    const dir = sim.hooks.chaseDir(sim, eid, t.x, t.y)
     return { vx: dir.x * sp, vy: dir.y * sp }
   }
   const nest = enemyNest[eid]!
@@ -541,10 +544,10 @@ export function steerEnemies(sim: Sim, delta: number): void {
       bvx = v.vx
       bvy = v.vy
     } else {
-      // chase + 回落:直奔最近活着队员
+      // chase + 回落:奔向最近活着队员(方向经世界钩子——残垣图走流场绕墙)
       const target = nearestAlive(sim, tx, ty)
       if (target) {
-        const dir = norm(target.x - tx, target.y - ty)
+        const dir = sim.hooks.chaseDir(sim, eid, target.x, target.y)
         bvx = dir.x * speed
         bvy = dir.y * speed
       }
@@ -573,7 +576,7 @@ export function steerEnemies(sim: Sim, delta: number): void {
         Kv.y[eid] = kvy * decay
       }
     }
-    const fixed = sim.hooks.constrainEnemy(sim, tx, ty)
+    const fixed = sim.hooks.constrainEnemy(sim, eid, tx, ty)
     Transform.x[eid] = fixed.x
     Transform.y[eid] = fixed.y
     // 非脚本姿态的行走动画:环境摇摆(轻微旋转)+ 按移动方向翻转(twemoji 默认朝左)。

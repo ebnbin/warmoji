@@ -7,10 +7,12 @@ import { levelStatsFor } from '../../characters/levels'
 import { characterLevel } from '../../run/charLevel'
 import { aggregateTeamCards } from '../../cards/registry'
 import { createAbility } from '../../abilities/create'
+import { abilityPiercesWalls } from '../../abilities/defs'
+import type { AbilityDef } from '../../abilities/defs'
 import { toPx } from '../../battle/px'
 import { labLevel } from '../../run/lab'
 import type { RunState } from '../../run/state'
-import type { AbilityOwner, AbilityRuntime, TargetInfo } from '../../abilities/types'
+import type { AbilityContext, AbilityOwner, AbilityRuntime, TargetInfo } from '../../abilities/types'
 import { Alive, Dormant, ENEMY_SET, Radius, Transform } from '../components'
 import { enemyDef, enemyRef, memberAbilities, memberHandle } from '../store'
 import { makeTeamCtx } from './ctx'
@@ -61,9 +63,27 @@ export function armTeam(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, run: Run
       setVisualOffset() {},
     }
     memberHandle[slot] = handle
-    memberAbilities[slot] = loadoutFor(def, tiers).map((w, i) =>
-      createAbility(toPx(resolveAbilityDef(w, fx)), ctx, 300 + slot * 120 + i * 230),
-    )
+    memberAbilities[slot] = loadoutFor(def, tiers).map((w, i) => {
+      const px = toPx(resolveAbilityDef(w, fx))
+      return createAbility(px, wallAwareCtx(sim, px, ctx, slot), 300 + slot * 120 + i * 230)
+    })
+  }
+}
+
+/** 断壁遮挡分流(镜像 wallAwareCtx):非穿墙能力的索敌受断壁遮挡——探头才打得到。
+ * 无墙图 wallHit 恒 null,原样返回基座 ctx */
+function wallAwareCtx(sim: Sim, def: AbilityDef, base: AbilityContext, slot: number): AbilityContext {
+  if (abilityPiercesWalls(def)) return base
+  return {
+    ...base,
+    targets: () => {
+      const m = sim.members[slot]
+      const all = base.targets()
+      if (m === undefined) return all
+      const fx = Transform.x[m]!
+      const fy = Transform.y[m]!
+      return all.filter((t) => sim.hooks.wallHit(sim, fx, fy, t.x, t.y) === null)
+    },
   }
 }
 
