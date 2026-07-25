@@ -17,7 +17,9 @@ import { OUTLINED_EMOJIS } from '../boot/preload'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAP, MAPS, rollDecor } from '../maps/registry'
-import type { WallsConfig } from '../maps/registry'
+import type { MapDef, RiverConfig, WallsConfig } from '../maps/registry'
+import { driftProfile, riverRect } from '../maps/river'
+import type { RiverRect } from '../maps/river'
 import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from '../maps/daynight'
 import { onFloe } from '../maps/ice'
 import { chunkDecor, chunkKey, chunksInRect, outsideZone } from '../maps/world'
@@ -89,6 +91,28 @@ const FOG_SPAN = 9000
 // 浮冰图:深水底色 + 落水蓝渐晕(与 IceArenaScene 同值)
 const WATER_COLOR = 0x0b2a45
 const WATER_VIGNETTE = 0x1e6fd0
+// 奔流图:两岸大地/树干棕(与浅蓝河水强对比,与 RiverArenaScene 同值)
+const BANK_COLOR = 0x54402a
+const BANK_FAR_COLOR = 0x40301f
+
+/** 一片顺流漂浮物(纯视觉):沿流向进度 + 跨向基准偏移 + 摇摆/自旋 */
+interface Drift {
+  image: Phaser.GameObjects.Image
+  uPx: number
+  baseCross: number
+  speedMul: number
+  swayPhase: number
+  swayAmp: number
+  spin: number
+}
+
+/** 颜色明暗缩放(河水跨向渐变用) */
+function shade(color: number, mul: number): number {
+  const r = Math.min(255, Math.round(((color >> 16) & 0xff) * mul))
+  const g = Math.min(255, Math.round(((color >> 8) & 0xff) * mul))
+  const b = Math.min(255, Math.round((color & 0xff) * mul))
+  return (r << 16) | (g << 8) | b
+}
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
@@ -142,6 +166,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private zoneVignette?: Phaser.GameObjects.Rectangle
   /** 深空图天体横扫的视觉：与 sim.meteor 对帐（新一次即建预警轨迹，起划即挂球体，结束即销毁） */
   private meteorFx?: { of: Meteor; tele: Phaser.GameObjects.Graphics; sphere?: Phaser.GameObjects.Image }
+  /** 奔流图水面动效：双层水纹贴图 + 顺流漂浮物（纯视觉，不进 ECS 批绘） */
+  private waveTiles: { tile: Phaser.GameObjects.TileSprite; speed: number }[] = []
+  private drifts: Drift[] = []
   /** 残垣图断壁：格索引 → 该格的石块/顶沿视觉（碾墙时单格销毁） */
   private wallTiles = new Map<number, Phaser.GameObjects.Rectangle[]>()
   /** 无限图装饰分块：块键 → 该块的装饰实体 eid；视野块集合变化才增删 */
@@ -174,9 +201,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.teamFx = aggregateTeamCards(run.teamCards)
     const mapDef = MAPS[run.mapId]
     applyBackground(mapDef.palette)
-    // 浮冰图的「地图」即那块方形浮冰(其外皆水),故尺寸取 floeU
-    this.mapW = (mapDef.ice?.floeU ?? mapDef.size?.w ?? MAP.width) * UNIT
-    this.mapH = (mapDef.ice?.floeU ?? mapDef.size?.h ?? MAP.height) * UNIT
+    // 浮冰图的「地图」即那块方形浮冰(其外皆水),故尺寸取 floeU;
+    // 奔流是单屏世界:世界 = 逻辑视口 × viewScale
+    const rc = mapDef.river
+    this.mapW = rc ? viewport.logicalWidth * rc.viewScale : (mapDef.ice?.floeU ?? mapDef.size?.w ?? MAP.width) * UNIT
+    this.mapH = rc ? viewport.logicalHeight * rc.viewScale : (mapDef.ice?.floeU ?? mapDef.size?.h ?? MAP.height) * UNIT
     const margin = MAP.cameraMargin * UNIT
 
     // 浮冰图:深水底色铺满屏(相机锁定;世界无边界,看到哪都是水)
@@ -189,7 +218,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     // 地面:无限世界没有边、也就没有影子边缘——相机锁定的满屏底色即地面;
     // 有界图为纯色面 + 右下阴影(镜像 drawFloor),浮冰图另描冰缘读得出边界
-    if (this.infinite) {
+    if (rc) {
+      this.buildRiverVisuals(mapDef, rc)
+    } else if (this.infinite) {
       this.add
         .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, mapDef.palette.map)
         .setScrollFactor(0)
@@ -225,7 +256,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
 
     const cam = this.cameras.main
-    cam.setZoom(viewport.renderScale)
+    cam.setZoom(rc ? viewport.renderScale / rc.viewScale : viewport.renderScale)
     // 浮冰/无限无边界:相机只管跟人(滑进水里、走到天边也跟着走);
     // 深空的圆是有界的,bounds 钳在其外接框内;有界图照旧外扩一圈
     if (fieldR > 0) {
@@ -250,10 +281,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       .setScrollFactor(0)
       .setDepth(88)
 
-    // 出生点:无限世界出生在原点(负坐标合法),有界图在图心
+    // 出生点:无限世界出生在原点(负坐标合法),有界/单屏图在图心
     const center = this.infinite ? { x: 0, y: 0 } : { x: this.mapW / 2, y: this.mapH / 2 }
     this.centerObj = this.add.zone(center.x, center.y, 1, 1)
-    cam.startFollow(this.centerObj)
+    // 奔流是固定相机的单屏世界:居中锁死,不跟随
+    if (rc) cam.centerOn(this.mapW / 2, this.mapH / 2)
+    else cam.startFollow(this.centerObj)
 
     this.cursors = this.input.keyboard?.createCursorKeys()
     this.wasd = this.input.keyboard?.addKeys('W,A,S,D') as
@@ -803,6 +836,200 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     rect.setFillStyle(WATER_VIGNETTE, inWater ? 0.18 + 0.06 * Math.sin(sim.elapsedMs / 140) : 0)
   }
 
+
+  /** 奔流水面视觉层(镜像 RiverArenaScene.buildRiverVisuals):两岸暗带 + 河水跨向渐变 +
+   * 岸线浪花 + 双层滚动水纹 + 岸上静态植被 + 顺流漂浮物。全为纯 Phaser 视觉,不进 ECS 批绘 */
+  private buildRiverVisuals(mapDef: MapDef, cfg: RiverConfig): void {
+    const vw = this.mapW
+    const vh = this.mapH
+    const r = riverRect(vw, vh, cfg.width * UNIT)
+    const horizontal = r.horizontal
+
+    // 两岸暗带(河道以外的跨轴余量),外缘更暗给一点纵深
+    const gBank = this.add.graphics().setDepth(0)
+    gBank.fillStyle(BANK_COLOR, 1)
+    gBank.fillRect(0, 0, vw, vh)
+    gBank.fillStyle(BANK_FAR_COLOR, 1)
+    if (horizontal) {
+      if (r.y > 24) gBank.fillRect(0, 0, vw, Math.max(0, r.y - 18))
+      gBank.fillRect(0, Math.min(vh, r.y + r.h + 18), vw, vh)
+    } else {
+      if (r.x > 24) gBank.fillRect(0, 0, Math.max(0, r.x - 18), vh)
+      gBank.fillRect(Math.min(vw, r.x + r.w + 18), 0, vw, vh)
+    }
+
+    // 河水:跨向「岸暗心亮」的两段渐变
+    const gWater = this.add.graphics().setDepth(0.2)
+    const edge = shade(mapDef.palette.map, 0.78)
+    const mid = shade(mapDef.palette.map, 1.12)
+    if (horizontal) {
+      gWater.fillGradientStyle(edge, edge, mid, mid, 1)
+      gWater.fillRect(r.x, r.y, r.w, r.h / 2)
+      gWater.fillGradientStyle(mid, mid, edge, edge, 1)
+      gWater.fillRect(r.x, r.y + r.h / 2, r.w, r.h / 2)
+    } else {
+      gWater.fillGradientStyle(edge, mid, edge, mid, 1)
+      gWater.fillRect(r.x, r.y, r.w / 2, r.h)
+      gWater.fillGradientStyle(mid, edge, mid, edge, 1)
+      gWater.fillRect(r.x + r.w / 2, r.y, r.w / 2, r.h)
+    }
+
+    // 岸线浪花:贴岸白线 + 断续泡点(种子固定,同局重建不变)
+    const gFoam = this.add.graphics().setDepth(0.4)
+    gFoam.lineStyle(2, 0xffffff, 0.3)
+    const foamRng = new Rng(this.run.decorSeed ^ 0xf0a8)
+    const alongLen = horizontal ? r.w : r.h
+    for (const e of horizontal ? [r.y, r.y + r.h] : [r.x, r.x + r.w]) {
+      if (horizontal) gFoam.lineBetween(0, e, vw, e)
+      else gFoam.lineBetween(e, 0, e, vh)
+      let along = foamRng.next() * 40
+      while (along < alongLen) {
+        const size = 1.5 + foamRng.next() * 2.5
+        const off = (foamRng.next() - 0.5) * 6
+        gFoam.fillStyle(0xffffff, 0.14 + foamRng.next() * 0.14)
+        if (horizontal) gFoam.fillCircle(along, e + off, size)
+        else gFoam.fillCircle(e + off, along, size)
+        along += 24 + foamRng.next() * 60
+      }
+    }
+
+    // 双层水纹(视差滚动)
+    const texKey = this.ensureWaveTexture(horizontal)
+    for (const [alpha, speed] of [
+      [0.1, cfg.waveSlow * UNIT],
+      [0.16, cfg.waveFast * UNIT],
+    ] as const) {
+      const tile = this.add
+        .tileSprite(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h, texKey)
+        .setAlpha(alpha)
+        .setDepth(0.6)
+      tile.tilePositionX = Math.random() * 256
+      tile.tilePositionY = Math.random() * 256
+      this.waveTiles.push({ tile, speed })
+    }
+
+    // 岸上静态植被:沿长轴等距掷点(种子固定),只落在岸带内
+    const def = mapDef.decor
+    const decorRng = new Rng(this.run.decorSeed)
+    const bands: [number, number][] = horizontal
+      ? [
+          [0, r.y],
+          [r.y + r.h, vh],
+        ]
+      : [
+          [0, r.x],
+          [r.x + r.w, vw],
+        ]
+    for (const [b0, b1] of bands) {
+      const bandW = b1 - b0
+      if (bandW < 0.3 * UNIT) continue
+      for (let along = 0.5 * UNIT; along < alongLen; along += UNIT * (0.9 + decorRng.next() * 0.7)) {
+        if (decorRng.next() > 0.7) continue
+        const emoji = def.emojis[Math.floor(decorRng.next() * def.emojis.length)]!
+        const sizeU = def.sizeU[0] + decorRng.next() * (def.sizeU[1] - def.sizeU[0])
+        const size = Math.min(sizeU * UNIT, bandW * 0.9)
+        const cross = b0 + size / 2 + decorRng.next() * Math.max(1, bandW - size)
+        emojiImage(this, horizontal ? along : cross, horizontal ? cross : along, emoji, size, 'player')
+          .setAlpha(def.alpha[0] + decorRng.next() * (def.alpha[1] - def.alpha[0]))
+          .setRotation((decorRng.next() * 2 - 1) * 0.6)
+          .setDepth(0.8)
+      }
+    }
+
+    // 漂浮物(顺流循环):初始均匀铺满,之后 updateRiver 推进
+    const pool = mapDef.drift ?? ['1f343']
+    const halfCross = (horizontal ? r.h : r.w) / 2
+    for (let i = 0; i < cfg.driftCount; i++) {
+      const emoji = pool[Math.floor(Math.random() * pool.length)]!
+      const d: Drift = {
+        image: emojiImage(this, 0, 0, emoji, (0.35 + Math.random() * 0.25) * UNIT, 'player')
+          .setAlpha(0.5)
+          .setDepth(1.5),
+        uPx: Math.random() * alongLen,
+        baseCross: (Math.random() * 2 - 1) * halfCross * 0.92,
+        speedMul: 1,
+        swayPhase: Math.random() * Math.PI * 2,
+        swayAmp: (0.06 + Math.random() * 0.12) * UNIT,
+        spin: (Math.random() * 2 - 1) * 0.5,
+      }
+      d.speedMul = this.driftSpeed(d.baseCross / halfCross, cfg)
+      this.drifts.push(d)
+      this.placeDrift(d, r, 0)
+    }
+  }
+
+  private driftSpeed(crossFrac: number, cfg: RiverConfig): number {
+    return (
+      driftProfile(crossFrac) *
+      (cfg.driftSpeedMul[0] + Math.random() * (cfg.driftSpeedMul[1] - cfg.driftSpeedMul[0]))
+    )
+  }
+
+  /** 无缝水纹贴图(按朝向各生成一次):沿流向的白色弧形流痕 */
+  private ensureWaveTexture(horizontal: boolean): string {
+    const key = horizontal ? 'river-wave-h' : 'river-wave-v'
+    if (this.textures.exists(key)) return key
+    const size = 256
+    const canvas = this.textures.createCanvas(key, size, size)
+    if (!canvas) return key
+    const ctx = canvas.getContext()
+    ctx.clearRect(0, 0, size, size)
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+    ctx.lineCap = 'round'
+    const rng = new Rng(0x5117e5)
+    for (let i = 0; i < 14; i++) {
+      const cx = 20 + rng.next() * (size - 40)
+      const cy = 20 + rng.next() * (size - 40)
+      const len = 20 + rng.next() * 36
+      const bow = 3 + rng.next() * 5
+      ctx.lineWidth = 1.5 + rng.next() * 1.5
+      ctx.beginPath()
+      if (horizontal) {
+        ctx.moveTo(cx - len / 2, cy)
+        ctx.quadraticCurveTo(cx, cy - bow, cx + len / 2, cy)
+      } else {
+        ctx.moveTo(cx, cy - len / 2)
+        ctx.quadraticCurveTo(cx + bow, cy, cx, cy + len / 2)
+      }
+      ctx.stroke()
+    }
+    canvas.refresh()
+    return key
+  }
+
+  private placeDrift(d: Drift, r: RiverRect, elapsedMs: number): void {
+    const cross =
+      (r.horizontal ? r.y + r.h / 2 : r.x + r.w / 2) + d.baseCross + Math.sin(elapsedMs / 1250 + d.swayPhase) * d.swayAmp
+    if (r.horizontal) d.image.setPosition(this.mapW - d.uPx, cross)
+    else d.image.setPosition(cross, d.uPx)
+  }
+
+  /** 水面动效逐帧推进(镜像 updateWater):水纹贴图偏移 + 漂浮物顺流/摇摆/自旋 */
+  private updateRiver(sim: Sim, delta: number): void {
+    const cfg = MAPS[this.run.mapId].river
+    if (!cfg) return
+    const dt = delta / 1000
+    const r = riverRect(this.mapW, this.mapH, cfg.width * UNIT)
+    for (const w of this.waveTiles) {
+      if (r.horizontal) w.tile.tilePositionX += w.speed * dt
+      else w.tile.tilePositionY -= w.speed * dt
+    }
+    const alongLen = r.horizontal ? this.mapW : this.mapH
+    const margin = UNIT
+    const halfCross = (r.horizontal ? r.h : r.w) / 2
+    for (const d of this.drifts) {
+      d.uPx += cfg.flow * UNIT * d.speedMul * dt
+      if (d.uPx > alongLen + margin) {
+        // 漂出下游 → 回上游重新进场(换个横位/速度)
+        d.uPx = -margin
+        d.baseCross = (Math.random() * 2 - 1) * halfCross * 0.92
+        d.speedMul = this.driftSpeed(d.baseCross / halfCross, cfg)
+      }
+      d.image.rotation += d.spin * dt
+      this.placeDrift(d, r, sim.elapsedMs)
+    }
+  }
+
   /** 断壁世界建场(镜像 ArenaScene.createWalls):按种子铺断壁 → 网格 + 可达刷怪格 → 逐格画石块。
    * 网格/流场是纯逻辑(sim.walls),此处只负责视觉与回填 */
   private createWalls(sim: Sim, cfg: WallsConfig): void {
@@ -986,6 +1213,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
    * 无限世界改走分块滚动(见 ensureChunks):世界没有边,不能一次铺完 */
   private spawnDecor(run: RunState, atlas: EcsAtlas): void {
     if (this.infinite) return this.ensureChunks(atlas)
+    if (MAPS[run.mapId].river) return // 奔流的岸上植被随水面视觉层一并铺,不走全图散布
     const rng = new Rng(run.decorSeed)
     const cols = Math.round(this.mapW / UNIT)
     const rows = Math.round(this.mapH / UNIT)
@@ -1078,6 +1306,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.updateZone(sim)
     this.updateMeteorFx(sim)
     this.drainSmashedWalls(sim)
+    this.updateRiver(sim, delta)
     // 无限世界:相机走到哪,装饰分块跟到哪(块集合不变则整段免算)
     if (this.infinite && this.atlas) this.ensureChunks(this.atlas)
     // 冷雾浓度跟随时停态（越静越浓），淡入淡出走实时 delta

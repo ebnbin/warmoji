@@ -76,11 +76,17 @@ export function magnetCoinsEcs(sim: Sim, delta: number): void {
       Vel.x[eid] = dir.x * speed
       Vel.y[eid] = dir.y * speed
     } else {
-      Vel.x[eid] = 0
-      Vel.y[eid] = 0
+      // 闲置速度交给世界钩子(奔流:随波逐流;其余图静止)
+      const idle = sim.hooks.coinIdleVelocity(sim)
+      Vel.x[eid] = idle.x
+      Vel.y[eid] = idle.y
     }
-    Transform.x[eid] = x + Vel.x[eid]! * dt
-    Transform.y[eid] = y + Vel.y[eid]! * dt
+    const nx = x + Vel.x[eid]! * dt
+    const ny = y + Vel.y[eid]! * dt
+    Transform.x[eid] = nx
+    Transform.y[eid] = ny
+    // 世界回收(奔流:漂出下游即被河水冲走)
+    if (sim.hooks.cullCoin(sim, nx, ny)) removeEntity(sim.world, eid)
   }
 }
 

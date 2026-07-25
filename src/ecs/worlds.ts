@@ -4,13 +4,16 @@ import { TEAM, MEMBER } from '../characters/registry'
 import { SPAWN } from '../enemies/registry'
 import { randomMapPoint } from '../enemies/spawn'
 import { MAPS } from '../maps/registry'
-import type { IceConfig, InfiniteConfig, MapId, ShrinkRingConfig, SpaceConfig } from '../maps/registry'
+import type { IceConfig, InfiniteConfig, MapId, RiverConfig, ShrinkRingConfig, SpaceConfig } from '../maps/registry'
 import { approach, onFloe } from '../maps/ice'
 import { outsideZone, ringPoint, zoneRadiusAt } from '../maps/world'
 import { clampToDisc, confineVelocity, meteorSweep } from '../maps/space'
+import { clampToRiver, flowVector, pastDownstream, riverRect } from '../maps/river'
+import type { RiverRect } from '../maps/river'
+import { isHorizontal } from '../core/remap'
 import { PICKUPS } from '../pickups/registry'
 import { query } from 'bitecs'
-import { Alive, Boss, Dormant, ENEMY_SET, Slide, Transform } from './components'
+import { Alive, Boss, Dormant, ENEMY_SET, Radius, Slide, Transform } from './components'
 import { enemyDef } from './store'
 import { FlowField } from '../maps/ruins'
 import { applyDamage, hurtMember } from './combat'
@@ -23,8 +26,12 @@ import type { Point } from '../core/vec'
 // 各图只覆写自己不同的那几项(bounded 作基,展开后改写)。
 // 只收「行为」钩子;地图专属视觉(水面/缩圈/传送门)仍在场景侧。
 
+const ZERO: Point = { x: 0, y: 0 }
+
 export interface WorldHooks {
-  /** 队伍位移约束:有界钳制 / 冰面动量积分 / 环面回绕 / 圆盘禁锢。
+  /** 队伍的世界漂移(奔流恒定顺流);默认无。加在本帧输入位移之上,再过 constrainTeam */
+  teamDrift(sim: Sim, delta: number): Point
+  /** 队伍位移约束:有界钳制 / 冰面动量积分 / 河道钳制 / 圆盘禁锢。
    * next = 本帧输入想走到的位置;返回实际落点 */
   constrainTeam(sim: Sim, next: Point, delta: number): Point
   /** 敌人落点约束(有界钳制 + 断壁贴墙滑动;无界世界原样放行) */
@@ -44,6 +51,10 @@ export interface WorldHooks {
   knockbackTauMul(sim: Sim): number
   /** 金币落点约束(冰面钳进浮冰,免得漂进水里隔着掉血区捡不回) */
   constrainCoin(sim: Sim, x: number, y: number): Point
+  /** 金币的闲置速度(不在磁吸范围时;奔流 = 随波逐流);默认静止 */
+  coinIdleVelocity(sim: Sim): Point
+  /** 金币的额外回收条件(奔流:漂出下游即被冲走);默认不回收 */
+  cullCoin(sim: Sim, x: number, y: number): boolean
   /** 敌弹的额外回收条件(有界图出地图即灭;无界世界只按寿命回收) */
   cullEnemyProjectile(sim: Sim, x: number, y: number): boolean
   /** 刷怪落点(有界:图内随机;无限:队伍中心外的环带) */
@@ -60,8 +71,13 @@ export interface WorldHooks {
 
 /** 有界世界(森林/晨昏/浮冰共基线):中心钳在盒内、敌人钳在图内、图内随机刷怪、不休眠 */
 const bounded: WorldHooks = {
+  teamDrift() {
+    return ZERO
+  },
+  // 注:clampMin 直取格值常量当 px 用(≈1.25px,实际近乎不钳),与旧 ArenaScene.constrainTeam
+  // 逐位一致——本实验以旧实现为准,不在此处「顺手修正」量纲
   constrainTeam(sim, next) {
-    const clampMin = (TEAM.ringRadius + MEMBER.radius) * UNIT
+    const clampMin = TEAM.ringRadius + MEMBER.radius
     return {
       x: Math.min(Math.max(next.x, clampMin), sim.mapW - clampMin),
       y: Math.min(Math.max(next.y, clampMin), sim.mapH - clampMin),
@@ -102,6 +118,12 @@ const bounded: WorldHooks = {
       x: Math.min(Math.max(x, r), sim.mapW - r),
       y: Math.min(Math.max(y, r), sim.mapH - r),
     }
+  },
+  coinIdleVelocity() {
+    return ZERO
+  },
+  cullCoin() {
+    return false
   },
   cullEnemyProjectile(sim, x, y) {
     return x < -UNIT || x > sim.mapW + UNIT || y < -UNIT || y > sim.mapH + UNIT
@@ -454,11 +476,110 @@ const space: WorldHooks = {
   },
 }
 
+// ── 奔流(river)────────────────────────────────────────────
+
+function riverCfg(sim: Sim): RiverConfig {
+  return MAPS[sim.mapId].river!
+}
+
+/** 河道矩形:世界 = 逻辑视口 × viewScale(场景侧写进 mapW/mapH),河道沿长轴贯穿、跨轴居中 */
+function riverOf(sim: Sim): RiverRect {
+  return riverRect(sim.mapW, sim.mapH, riverCfg(sim).width * UNIT)
+}
+
+function flowOf(sim: Sim): Point {
+  return flowVector(isHorizontal(sim.mapW, sim.mapH), riverCfg(sim).flow * UNIT)
+}
+
+/** 奔流:单屏固定相机 + 恒定水流——万物随波逐流(子弹除外)。
+ * 只有队伍与 Boss 被钳在河道内;普通敌人跨向不能上岸、沿流向可漂出屏外(借无限图休眠);
+ * 金币纯随波逐流,漂出下游即被冲走 */
+const river: WorldHooks = {
+  ...bounded,
+  teamDrift(sim, delta) {
+    const f = flowOf(sim)
+    const dt = delta / 1000
+    return { x: f.x * dt, y: f.y * dt }
+  },
+  /** 自主移动 + 水流漂移后钳入河道(挂机会被推到下游边并卡住) */
+  constrainTeam(sim, next) {
+    return clampToRiver(next, riverOf(sim), TEAM.ringRadius + MEMBER.radius)
+  },
+  /** 落点跨向钳入河道(分裂怪贴岸溅出等边缘情况兜底);沿流向不钳 */
+  constrainEnemy(sim, eid, x, y) {
+    const r = riverOf(sim)
+    const rad = Radius.v[eid]!
+    if (r.horizontal) return { x, y: Math.min(Math.max(y, r.y + rad), r.y + r.h - rad) }
+    return { x: Math.min(Math.max(x, r.x + rad), r.x + r.w - rad), y }
+  },
+  /** 敌人:行为速度叠水流,再钳住跨向速度(不能上岸);Boss 两轴都钳(与玩家同款) */
+  postSteerEnemy(sim, eid, vx, vy) {
+    const f = flowOf(sim)
+    const r = riverOf(sim)
+    let ox = vx + f.x
+    let oy = vy + f.y
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    const rad = Boss.v[eid] === 1 ? Radius.v[eid]! : 0
+    if (Boss.v[eid] === 1 || !r.horizontal) {
+      if (x <= r.x + rad && ox < 0) ox = 0
+      if (x >= r.x + r.w - rad && ox > 0) ox = 0
+    }
+    if (Boss.v[eid] === 1 || r.horizontal) {
+      const lo = r.y + (Boss.v[eid] === 1 ? rad : Radius.v[eid]!)
+      const hi = r.y + r.h - (Boss.v[eid] === 1 ? rad : Radius.v[eid]!)
+      if (y <= lo && oy < 0) oy = 0
+      if (y >= hi && oy > 0) oy = 0
+    }
+    return { vx: ox, vy: oy }
+  },
+  // 沿流向漂出屏外是设计的一部分:游荡不折返、敌弹也只按寿命回收
+  wanderDir(_sim, _eid, dx, dy) {
+    return { x: dx, y: dy }
+  },
+  cullEnemyProjectile() {
+    return false
+  },
+  /** 河道内均匀随机(贴边留半格);Boss 另取距队伍 ≥5 格的点 */
+  spawnPoint(sim, boss) {
+    const r = riverOf(sim)
+    const pad = 0.5 * UNIT
+    const pick = (): Point => ({
+      x: r.x + pad + sim.rng.next() * (r.w - pad * 2),
+      y: r.y + pad + sim.rng.next() * (r.h - pad * 2),
+    })
+    let pos = pick()
+    if (!boss) return pos
+    for (let i = 0; i < 24; i++) {
+      pos = pick()
+      const dx = pos.x - sim.center.x
+      const dy = pos.y - sim.center.y
+      if (dx * dx + dy * dy >= 5 * UNIT * (5 * UNIT)) break
+    }
+    return pos
+  },
+  // 金币随波逐流、不钳;休眠同无限图(屏内永不触发,漂出屏外的敌人冻结)
+  constrainCoin(_sim, x, y) {
+    return { x, y }
+  },
+  activeHalf(sim) {
+    return MAPS[sim.mapId].infinite!.activeHalf * UNIT
+  },
+  // 不在磁吸范围的金币纯随波逐流,漂出下游一段即被冲走(玩家钳在屏内,永远追不回)
+  coinIdleVelocity(sim) {
+    return flowOf(sim)
+  },
+  cullCoin(sim, x, y) {
+    return pastDownstream({ x, y }, sim.mapW, sim.mapH, riverCfg(sim).coinCullPad * UNIT)
+  },
+}
+
 /** 按地图取世界钩子;未特化的图一律走有界基线 */
 export function worldFor(mapId: MapId): WorldHooks {
   const def = MAPS[mapId]
   if (def.ice) return ice
   if (def.walls) return ruins
+  if (def.kind === 'river') return river
   if (def.kind === 'space') return space
   if (def.kind === 'infinite') return infinite
   return bounded

@@ -258,7 +258,12 @@ function updateOrbit(sim: Sim, delta: number): void {
 function moveTeam(sim: Sim, delta: number): void {
   const dir = sim.teamDir
   const step = (sim.moveSpeed * sim.battleFx.moveSpeedMul * delta) / 1000
-  const next = sim.hooks.constrainTeam(sim, { x: sim.center.x + dir.x * step, y: sim.center.y + dir.y * step }, delta)
+  const drift = sim.hooks.teamDrift(sim, delta)
+  const next = sim.hooks.constrainTeam(
+    sim,
+    { x: sim.center.x + dir.x * step + drift.x, y: sim.center.y + dir.y * step + drift.y },
+    delta,
+  )
   sim.center.x = next.x
   sim.center.y = next.y
   layout(sim, delta)
