@@ -29,8 +29,14 @@ export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
   private readonly calc = new Phaser.GameObjects.Components.TransformMatrix()
   /** 深度排序用的 eid 缓冲（避免每帧分配） */
   private order: number[] = []
-  /** batch() 每次会往里写 alphaStrategy 并与当前 shader 配置比对，必须是复用的持久对象 */
-  private readonly renderOptions = {} as Phaser.Types.Renderer.WebGL.RenderNodes.BatchHandlerQuadRenderOptions
+  /** batch() 每次会往里写 alphaStrategy 并与当前 shader 配置比对，必须是复用的持久对象。
+   * multiTexturing 必须显式开：BatchHandlerQuad 只读 `!!renderOptions.multiTexturing`，
+   * 缺省即单纹理模式——图集一换页就 pushCurrentBatchEntry 切一刀，且因核心的
+   * SubmitterQuad 恒传 true，我们传 false 会与之逐帧互相翻转、反复替换 TexCount/TEXTURE
+   * 两处 shader addition。跟核心保持一致即可一次批完（页数 3 ≪ maxTexturesPerBatch 16）。 */
+  private readonly renderOptions = {
+    multiTexturing: true,
+  } as Phaser.Types.Renderer.WebGL.RenderNodes.BatchHandlerQuadRenderOptions
   // WebGLRenderer.render 渲染每个子对象前会读 child.blendMode 设混合模式;
   // 裸 GameObject 无 BlendMode 组件，显式给正常混合，否则 setBlendMode(undefined) 报错。
   blendMode = Phaser.BlendModes.NORMAL
@@ -70,11 +76,13 @@ export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
     for (let i = 0; i < n; i++) order[i] = eids[i]!
     order.sort((a, b) => Depth.z[a]! - Depth.z[b]! || a - b)
 
-    // v4 的视图矩阵已含 scroll（有滤镜时用 matrix、否则 matrixCombined，由 getViewMatrix 决定）
-    const camMatrix = self.camMatrix.copyFrom(camera.getViewMatrix())
+    // v4 的视图矩阵已含 scroll。实参与核心各 Transformer 一致（!useCanvas）：
+    // WebGL 路径取 matrix（相机在屏幕上的位移由 DrawingContext 的 viewport 负责），
+    // 缺省实参会拿到 matrixCombined（把 camera.x/y 又叠一遍）——本作相机恒在 (0,0)
+    // 故当前无差别，但相机一旦带 viewport 偏移就会整体错位。
+    const camMatrix = self.camMatrix.copyFrom(camera.getViewMatrix(!drawingContext.useCanvas))
     const spriteMatrix = self.spriteMatrix
     const calc = self.calc
-    const camAlpha = camera.alpha
 
     for (let i = 0; i < n; i++) {
       const eid = order[i]!
@@ -104,7 +112,9 @@ export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
       const u1 = self.uv[2]!
       const v1 = self.uv[3]!
 
-      const tint = getTintAppendFloatAlpha(Tint.color[eid]!, Tint.alpha[eid]! * camAlpha)
+      // 不再乘 camera.alpha：v4 在合成阶段统一施加相机透明度（核心的 SubmitterQuad /
+      // TransformerImage 同样不碰它），v3 那样逐顶点再乘一次会双重变淡
+      const tint = getTintAppendFloatAlpha(Tint.color[eid]!, Tint.alpha[eid]!)
       // Tint.effect 的 0/1 与 v4 的 TintModes.MULTIPLY/FILL 同值同义
       const tintMode = Tint.effect[eid]!
       const tex = self.atlas.pageGlTexture(self.atlas.page(frame))
