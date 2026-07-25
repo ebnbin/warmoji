@@ -66,8 +66,9 @@ test('ECS 批绘制：数百实体跨多张图集页仍近似一次批完', asyn
   // 场景确实铺开了（几百实体、图集确实不止一页，否则这测试没在测东西）
   expect(stats.entities).toBeGreaterThan(200)
   expect(stats.pages).toBeGreaterThan(1)
-  // 关键断言：切批次数与实体数无关，维持在个位数（修复前是 30，修复后是 2）
-  expect(stats.cutsPerFrame).toBeLessThan(8)
+  // 关键断言：切批次数与实体数无关，只与「深度带数」相关（修复前 30，multiTexturing 修好后 2；
+  // 后来按 SPRITE_BANDS 拆成 6 个批绘对象以复刻旧实现的分层，故上限放宽到带数的量级）
+  expect(stats.cutsPerFrame).toBeLessThan(16)
 
   expect(errors).toEqual([])
 })

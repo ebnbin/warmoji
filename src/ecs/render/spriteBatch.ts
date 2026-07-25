@@ -20,6 +20,18 @@ import type { EcsAtlas } from './atlas'
 
 const { getTintAppendFloatAlpha } = Phaser.Renderer.WebGL.Utils
 
+/** 批绘的深度分带:[zMin, zMax) 的实体归入一个 Phaser depth。
+ * depth 值逐个对齐旧实现该类实体的 setDepth,好让非批绘的地面效果(2)/断壁(2、2.1)/
+ * 拾取光圈(3)/预告标记与携带者光环(4)/拾取图标(6)/命中环(7)/血条(11) 前后关系不变 */
+export const SPRITE_BANDS: readonly { depth: number; zMin: number; zMax: number }[] = [
+  { depth: 1, zMin: -Infinity, zMax: 2 }, // 装饰
+  { depth: 3, zMin: 2, zMax: 4 }, // 金币
+  { depth: 5, zMin: 4, zMax: 6 }, // 敌人
+  { depth: 6, zMin: 6, zMax: 7 }, // 敌弹 / 死亡碎片
+  { depth: 7, zMin: 7, zMax: 8 }, // Boss
+  { depth: 8, zMin: 8, zMax: Infinity }, // 我方弹 / 被保护中心 / 队员
+]
+
 export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
   private readonly world: EcsWorld
   private readonly atlas: EcsAtlas
@@ -40,14 +52,21 @@ export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
   // WebGLRenderer.render 渲染每个子对象前会读 child.blendMode 设混合模式;
   // 裸 GameObject 无 BlendMode 组件，显式给正常混合，否则 setBlendMode(undefined) 报错。
   blendMode = Phaser.BlendModes.NORMAL
-  // DisplayList 按 .depth 排序：全场实体作为一整个对象居于地面效果(2)之上、血条(11)之下，
-  // 保证毒液/灼烧区在脚下、血条压在头顶（裸 GameObject 无 Depth 组件，显式给定值参与排序）。
-  depth = 5
+  // DisplayList 按 .depth 排序。批绘对象按「深度带」拆成若干个（见 SPRITE_BANDS）：
+  // 单个对象会把全场实体压成一层，与地面效果/断壁/预告标记/命中环这些非批绘的
+  // Phaser 图元的前后关系整体错乱，故每带一个对象、depth 取旧实现该层的值。
+  depth: number
+  /** 本对象只画 Depth.z ∈ [zMin, zMax) 的实体 */
+  private readonly zMin: number
+  private readonly zMax: number
 
-  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas) {
+  constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number) {
     super(scene, 'EcsSpriteBatch')
     this.world = world
     this.atlas = atlas
+    this.depth = depth
+    this.zMin = zMin
+    this.zMax = zMax
     scene.add.existing(this)
   }
 
@@ -62,18 +81,21 @@ export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
     if (!camera) return
 
     const eids = query(self.world, RENDERABLE as unknown as object[])
-    const n = eids.length
-    if (n === 0) return
+    if (eids.length === 0) return
 
     const node = renderer.renderNodes.getNode(
       'BatchHandlerQuad',
     ) as Phaser.Renderer.WebGL.RenderNodes.BatchHandlerQuad | null
     if (!node) return
 
-    // 深度排序：z 小者先画（压在下层），稳定于 eid
+    // 只取本深度带的实体，再按 z 小者先画（压在下层），稳定于 eid
     const order = self.order
-    order.length = n
-    for (let i = 0; i < n; i++) order[i] = eids[i]!
+    order.length = 0
+    for (const eid of eids) {
+      const z = Depth.z[eid]!
+      if (z >= self.zMin && z < self.zMax) order.push(eid)
+    }
+    if (order.length === 0) return
     order.sort((a, b) => Depth.z[a]! - Depth.z[b]! || a - b)
 
     // v4 的视图矩阵已含 scroll。实参与核心各 Transformer 一致（!useCanvas）：
@@ -84,7 +106,7 @@ export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
     const spriteMatrix = self.spriteMatrix
     const calc = self.calc
 
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < order.length; i++) {
       const eid = order[i]!
       const frame = Sprite.frame[eid]!
       if (frame < 0) continue

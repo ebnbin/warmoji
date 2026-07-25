@@ -29,6 +29,8 @@ const NO_CLIP = { base: -1, frames: 0 }
 
 /** 图集实例序号:页纹理键按实例唯一——跨局重建时新旧图集不会争同一个纹理键 */
 let atlasSerial = 0
+/** 跨局复用的图集单例(清单恒定,一个进程建一次即可) */
+let shared: EcsAtlas | undefined
 
 export class EcsAtlas {
   /** frame*4 → u0,v0,u1,v1 */
@@ -46,13 +48,17 @@ export class EcsAtlas {
   /** 场景已关闭:在途的惰性烘焙就此作废(纹理管理器已归新一局所有) */
   private disposed = false
 
-  /** 场景关闭时调用:停掉在途烘焙的落格与刷新,并把页纹理从(游戏级的)纹理管理器摘掉。
-   * 图集每局重建,不摘就是每局泄漏若干张 2048² 纹理 */
+  /** 场景关闭时调用:挂起在途烘焙的落格与刷新。图集本体跨局复用(见 build 的模块级缓存),
+   * 页纹理与 clip 缓存都留着——旧路径的 emoji 纹理由 PreloadScene 一次性 pin、
+   * clip 帧存在模块级 liveFrames 里,同样跨局有效 */
   dispose(): void {
     this.disposed = true
-    const scene = this.scene
-    if (scene?.textures) for (const p of this.pages) scene.textures.remove(p.key)
-    this.pages.length = 0
+  }
+
+  /** 新一局接手:重新指向当前场景并解除挂起(页纹理挂在游戏级 TextureManager 上,天然还在) */
+  private rebind(scene: Phaser.Scene): void {
+    this.scene = scene
+    this.disposed = false
   }
   /** clip → 帧基址与帧数;帧数 0 表示该 emoji 无此 clip(问过一次就不再问) */
   private readonly clips = new Map<string, { base: number; frames: number }>()
@@ -184,6 +190,12 @@ export class EcsAtlas {
     scene: Phaser.Scene,
     outlined: Record<OutlineKind, readonly string[]>,
   ): Promise<EcsAtlas> {
+    // 清单恒定(OUTLINED_EMOJIS),故一个进程只建一次:跨局复用页纹理与已烘好的 clip 帧,
+    // 既不每局泄漏 2048² 纹理,第 2 波起也不必重烘部件动画(否则会短暂回落静态帧)
+    if (shared) {
+      shared.rebind(scene)
+      return shared
+    }
     // 收集去重后的全部变体(id,outline)
     const variants: { id: string; outline: OutlineKind }[] = []
     const seen = new Set<string>()
@@ -218,6 +230,7 @@ export class EcsAtlas {
       if (scene.textures.exists(key)) scene.textures.remove(key)
       atlas.pages.push(scene.textures.addCanvas(key, atlas.canvases[p]!)!)
     }
+    shared = atlas
     return atlas
   }
 }

@@ -53,7 +53,7 @@ import {
 import { applyDamage } from './combat'
 import { applyMorph } from './morph'
 import { EcsAtlas } from './render/atlas'
-import { EcsSpriteBatch } from './render/spriteBatch'
+import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { spawnSprite } from './entities'
 import { updateAnims } from './anim'
 import { remapSim } from './remap'
@@ -402,7 +402,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     clearFieldEcs()
     clearEcsStore()
     clearEnemyWire()
-    new EcsSpriteBatch(this, this.world, atlas)
+    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
     this.spawnDecor(run, atlas)
     this.testMode = run.testMode
     const settings = loadSettings(browserStorage())
