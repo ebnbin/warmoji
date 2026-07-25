@@ -1,7 +1,7 @@
 import enemiesJson from '../assets/enemies.json'
 import difficultyJson from '../assets/difficulty.json'
 import aiJson from '../assets/ai.json'
-import type { AbilityDef, Effect } from '../abilities/defs'
+import type { AbilityDef, Effect } from './abilityDefs'
 
 // 敌人 = 基础三围 + 移动方式（locomotion）+ 能力列表 + 死亡效果列表。
 // 多样性用数据组合表达：加一种敌人 = 组合现有模块的一行数据；

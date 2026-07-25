@@ -1,6 +1,6 @@
 import { playSfx } from '../../audio/sfx'
-import { PICKUPS } from '../../pickups/registry'
-import { AI } from '../../enemies/registry'
+import { PICKUPS } from '../../data/pickups'
+import { AI } from '../../data/enemies'
 import { UNIT } from '../../core/units'
 import { norm } from '../../core/vec'
 import { releasePooled } from '../pool'

@@ -1,5 +1,5 @@
 import battlefieldJson from '../assets/battlefield.json'
-import type { MapId } from '../maps/registry'
+import type { MapId } from './maps'
 
 // 战场拾取（第三支柱：绑定地图，短时·战术·走位）：金币→队员(永久)，
 // 经验→团队(永久)，战场拾取→战场(短时/位置/可趋可避)。每张地图有固定池，

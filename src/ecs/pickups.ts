@@ -2,7 +2,7 @@ import { addComponent, addEntity, query, removeEntity } from 'bitecs'
 import { UNIT } from '../core/units'
 import { norm } from '../core/vec'
 import { playSfx } from '../audio/sfx'
-import { PICKUP, PICKUPS } from '../pickups/registry'
+import { PICKUP, PICKUPS } from '../data/pickups'
 import {
   Alive,
   Coin,

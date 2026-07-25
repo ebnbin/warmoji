@@ -1,4 +1,4 @@
-import type { PickupTable } from '../src/pickups/registry'
+import type { PickupTable } from '../src/data/pickups'
 
 // 创作层（不进运行时 bundle）：拾取物内容行 + 拾取管线旋钮。生成 src/assets/pickups.json。
 export const PICKUPS = {

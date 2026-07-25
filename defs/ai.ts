@@ -1,4 +1,4 @@
-import type { AiTuning } from '../src/enemies/registry'
+import type { AiTuning } from '../src/data/enemies'
 
 // 敌人 AI 手感常量（创作层·与难度正交）：游荡换向节奏、定距风筝滞回带、偷币冷却、逃兵脱战限速。
 // 逻辑在 steer.ts 与战斗引擎；这里只放设计数值，经 gen 校验产出 ai.json。

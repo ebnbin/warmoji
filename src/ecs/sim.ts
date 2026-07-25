@@ -2,9 +2,9 @@ import { UNIT } from '../core/units'
 import type { Rng } from '../core/rng'
 import { FOLLOW, WANDER } from '../war/config'
 import { ORBIT } from '../war/orbit'
-import { MEMBER } from '../characters/registry'
-import { formationPosts, ringPostAngle } from '../characters/formation'
-import type { FormationId } from '../characters/formation'
+import { MEMBER } from '../data/characters'
+import { formationPosts, ringPostAngle } from '../data/formation'
+import type { FormationId } from '../data/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../war/orbit'
 import type { OrbitThreat } from '../war/orbit'
 import { Alive, Breath, Depth, Follow, Pop, Sprite, Threat, Transform, VisOff, Wander } from './components'
@@ -22,10 +22,10 @@ import type { Point } from '../core/vec'
 import type { RunState } from '../run/state'
 import type { EffectCtx, TargetInfo } from '../war/abilities/types'
 import { TIMESTOP, timeScaleFor } from '../war/timeStop'
-import { BATTLE_FX_IDENTITY, foldBattleEffects } from '../battlefield/registry'
-import type { BattleEffects } from '../battlefield/registry'
-import type { BattleMod } from '../battlefield/registry'
-import type { FieldPickupDef } from '../battlefield/registry'
+import { BATTLE_FX_IDENTITY, foldBattleEffects } from '../data/battlefield'
+import type { BattleEffects } from '../data/battlefield'
+import type { BattleMod } from '../data/battlefield'
+import type { FieldPickupDef } from '../data/battlefield'
 
 // ECS 战斗仿真状态 + 系统(纯逻辑,禁 phaser)。数学逐行镜像旧 ArcadeBattleScene 的
 // updateOrbit / moveTeam / layoutTeam,常量与公式不变,只把「读写精灵」换成「读写组件」。
@@ -52,7 +52,7 @@ export interface Sim {
   lineupOrbit: number[]
   /** eid,按槽位序(稳定迭代) */
   members: number[]
-  mapId: import('../maps/registry').MapId
+  mapId: import('../data/maps').MapId
   mapW: number
   mapH: number
   /** 本图世界钩子(位移约束/打滑/落水结算…):开局按 mapId 取一份,系统在拐弯处调它 */
@@ -196,7 +196,7 @@ export interface PendingCoins {
 
 /** 预告中待落地的敌人 */
 export interface PendingSpawn {
-  def: import('../enemies/registry').EnemyDef
+  def: import('../data/enemies').EnemyDef
   x: number
   y: number
   hp: number
@@ -225,7 +225,7 @@ export interface Burst {
 
 /** 死亡快照(带亡语的敌人;实体已移除,死亡效果按此在死亡点重放) */
 export interface PendingDeath {
-  def: import('../enemies/registry').EnemyDef
+  def: import('../data/enemies').EnemyDef
   x: number
   y: number
   elite: boolean

@@ -7,9 +7,9 @@ import {
   foldBattleEffects,
   rollWaveCarriers,
   waveCarrierBudget,
-} from './registry'
-import type { BattleEffects } from './registry'
-import { MAP_IDS } from '../maps/registry'
+} from './battlefield'
+import type { BattleEffects } from './battlefield'
+import { MAP_IDS } from './maps'
 import { Rng } from '../core/rng'
 
 const FX_KEYS: (keyof BattleEffects)[] = [

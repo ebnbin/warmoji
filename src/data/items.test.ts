@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { CHARACTERS } from '../characters/registry'
-import { ABILITIES } from '../abilities/registry'
-import type { ItemRarity } from './registry'
+import { CHARACTERS } from './characters'
+import { ABILITIES } from './abilities'
+import type { ItemRarity } from './items'
 import {
   itemPrice,
   PRICE,
@@ -14,7 +14,7 @@ import {
   reachedStackLimit,
   resolveAbilityDef,
   rollItem,
-} from './registry'
+} from './items'
 
 describe('道具定义', () => {
   it('每件道具有 emoji/名字/介绍/正价格/正经验值/至少一条效果', () => {

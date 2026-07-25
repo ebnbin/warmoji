@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { ABILITIES } from '../abilities/registry'
-import { CAPTAINS } from '../captains/registry'
-import { CHARACTERS } from '../characters/registry'
-import type { CharacterId } from '../characters/registry'
+import { ABILITIES } from '../data/abilities'
+import { CAPTAINS } from '../data/captains'
+import { CHARACTERS } from '../data/characters'
+import type { CharacterId } from '../data/characters'
 import { captainStatGroups, characterStatGroups, abilityStatLines } from './stats'
 
 const IDS = Object.keys(CHARACTERS) as CharacterId[]

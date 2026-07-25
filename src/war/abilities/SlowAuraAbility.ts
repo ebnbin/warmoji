@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { SlowAuraDef } from '../../abilities/defs'
+import type { SlowAuraDef } from '../../data/abilityDefs'
 import { circleCue } from './cues'
 import type { AbilityContext, AbilityRuntime } from './types'
 

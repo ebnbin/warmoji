@@ -1,4 +1,4 @@
-import type { CardDef } from '../src/cards/registry'
+import type { CardDef } from '../src/data/cards'
 
 // 团队升级卡（创作层·游戏内容）：经验升级的战利品，构成「小队层」。
 // 每张卡 = 一组团队效果片段（作用于 TeamEffects → teamFx），可升级（maxLevel）。

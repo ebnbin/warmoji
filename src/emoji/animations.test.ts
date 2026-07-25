@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CAPTAINS, PICKABLE_CAPTAIN_IDS } from '../captains/registry'
-import { CHARACTERS } from '../characters/registry'
-import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
-import { PICKUPS } from '../pickups/registry'
+import { CAPTAINS, PICKABLE_CAPTAIN_IDS } from '../data/captains'
+import { CHARACTERS } from '../data/characters'
+import { BOSSES, ENEMY_DEFS } from '../data/enemies'
+import { PICKUPS } from '../data/pickups'
 import { packSvg, parseEmojiPack } from './pack'
 import { ANIM_SETS, animClipOf, animSetOf, bakeAnimFrame, splitSvg } from './studio'
 

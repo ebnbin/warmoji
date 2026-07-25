@@ -1,5 +1,5 @@
-import type { CharacterId } from '../src/characters/registry'
-import type { CharacterEffects } from '../src/items/registry'
+import type { CharacterId } from '../src/data/characters'
+import type { CharacterEffects } from '../src/data/items'
 
 // 角色各等级形态的「基础属性质变」（创作层·内容）：与能力换行并列的另一半质变。
 // 语义是整体替换而非叠加：[0] = 2 级形态相对基础队员的完整加成，[1] = 3 级形态的完整加成

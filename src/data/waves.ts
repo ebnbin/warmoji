@@ -1,4 +1,4 @@
-import { SPAWN } from '../enemies/registry'
+import { SPAWN } from './enemies'
 import progressionJson from '../assets/progression.json'
 
 // 难度曲线随跨波累计战斗时长走；出什么怪由 core/enemies.ts 的按波配比决定

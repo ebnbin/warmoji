@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { UNIT } from '../../core/units'
-import { MAPS } from '../../maps/registry'
-import type { InfiniteConfig, ShrinkRingConfig } from '../../maps/registry'
+import { MAPS } from '../../data/maps'
+import type { InfiniteConfig, ShrinkRingConfig } from '../../data/maps'
 import { norm } from '../../core/vec'
 import type { Point } from '../../core/vec'
 import {

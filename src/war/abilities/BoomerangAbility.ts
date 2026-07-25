@@ -1,6 +1,6 @@
 import { DEG2RAD } from '../../core/units'
 import type Phaser from 'phaser'
-import type { BoomerangDef } from '../../abilities/defs'
+import type { BoomerangDef } from '../../data/abilityDefs'
 import { emojiImage } from '../../emoji/textures'
 import { nearestAngle } from './targeting'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'

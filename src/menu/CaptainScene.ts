@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import { CAPTAINS, PICKABLE_CAPTAIN_IDS } from '../captains/registry'
-import type { CaptainId } from '../captains/registry'
+import { CAPTAINS, PICKABLE_CAPTAIN_IDS } from '../data/captains'
+import type { CaptainId } from '../data/captains'
 import { browserStorage } from '../core/storage'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'

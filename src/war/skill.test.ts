@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CAPTAINS, CAPTAIN_IDS } from '../captains/registry'
+import { CAPTAINS, CAPTAIN_IDS } from '../data/captains'
 import { beginRun, endRun } from '../run/state'
 import { skillCharge, skillReady, tickSkillCd } from './skill'
 

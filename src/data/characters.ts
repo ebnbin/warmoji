@@ -1,10 +1,10 @@
 import charactersJson from '../assets/characters.json'
 import teamJson from '../assets/team.json'
-import { ABILITIES } from '../abilities/registry'
-import type { AbilityId } from '../abilities/registry'
-import type { AbilityDef } from '../abilities/defs'
-import { WEAPONS } from '../weapons/registry'
-import type { AbilityTier, UpgradeCard, WeaponId } from '../weapons/registry'
+import { ABILITIES } from './abilities'
+import type { AbilityId } from './abilities'
+import type { AbilityDef } from './abilityDefs'
+import { WEAPONS } from './weapons'
+import type { AbilityTier, UpgradeCard, WeaponId } from './weapons'
 
 // 角色花名册：一个角色由若干「攻击来源」（载体）组成——持有的武器（weapons，
 // 引用实体武器）与自带的徒手能力（innate，无实体武器，直接引用能力）。

@@ -1,4 +1,4 @@
-import type { BattlefieldTuning } from '../src/battlefield/registry'
+import type { BattlefieldTuning } from '../src/data/battlefield'
 
 // 战场拾取（创作层·游戏内容 + 手感旋钮）：绑定地图的短时·战术·走位拾取。
 // 携带者敌人带极性光环（绿=增益/红=减益），死亡掉在地面，队伍走位拾取（不磁吸），

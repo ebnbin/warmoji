@@ -1,10 +1,10 @@
 import { playSfx } from '../audio/sfx'
-import { CAPTAINS } from '../captains/registry'
+import { CAPTAINS } from '../data/captains'
 import { emojiKey } from '../emoji/textures'
 import { UNIT } from '../core/units'
 import { norm } from '../core/vec'
-import { PICKUP, PICKUPS } from '../pickups/registry'
-import { KNOCKBACK } from '../abilities/registry'
+import { PICKUP, PICKUPS } from '../data/pickups'
+import { KNOCKBACK } from '../data/abilities'
 import { acquirePooled, releasePooled } from './pool'
 import type { ArcadeBody, ArcadeBattleScene, ImageObj } from './ArcadeBattleScene'
 

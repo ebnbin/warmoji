@@ -1,4 +1,4 @@
-import type { Economy } from '../src/items/registry'
+import type { Economy } from '../src/data/items'
 
 // 经济/暴击（创作层·不进运行时 bundle）：暴击伤害倍率、商店定价曲线、上架位重随价。
 // 定价/扣款逻辑（itemPrice）与暴击结算在 src/items 与战斗引擎；这里只放设计数值，

@@ -1,5 +1,5 @@
 import { UNIT } from '../../core/units'
-import { ACQUIRE } from '../../abilities/registry'
+import { ACQUIRE } from '../../data/abilities'
 import type { AbilityOwner, TargetInfo } from './types'
 
 // 索敌层（阵营中立）：从本帧敌对方快照里挑选攻击对象的可复用挑选器，与

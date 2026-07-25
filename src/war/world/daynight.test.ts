@@ -7,7 +7,7 @@ import {
   nightDepthAt,
   visionGridsAt as _visionGridsAt,
 } from './daynight'
-import { MAPS } from '../../maps/registry'
+import { MAPS } from '../../data/maps'
 
 // 昼夜设计参数取自地图数据（晨昏原野）；纯函数按此 cfg 求值
 const cfg = MAPS.daynight.dayNight!

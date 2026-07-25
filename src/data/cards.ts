@@ -1,6 +1,6 @@
 import cardsJson from '../assets/cards.json'
-import { foldTeamEffects, rarityWeights } from '../items/registry'
-import type { ItemRarity, TeamEffects } from '../items/registry'
+import { foldTeamEffects, rarityWeights } from './items'
+import type { ItemRarity, TeamEffects } from './items'
 
 // 团队升级卡：经验升级的战利品，构成「小队层」（原队长道具那套的替代）。
 // 每张卡是一组团队效果片段（作用于 TeamEffects → teamFx），可升级（maxLevel）。

@@ -1,7 +1,7 @@
 import captainsJson from '../assets/captains.json'
-import { ABILITIES } from '../abilities/registry'
-import type { AbilityId } from '../abilities/registry'
-import type { AbilityDef } from '../abilities/defs'
+import { ABILITIES } from './abilities'
+import type { AbilityId } from './abilities'
+import type { AbilityDef } from './abilityDefs'
 
 // 队长：不登场、无实体的团队增益提供者（emotion 表情形象）。
 // 被动增益先直接建模为字段（编制上限/经验倍率等），主动技能的效果走能力系统。

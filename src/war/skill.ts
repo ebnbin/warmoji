@@ -1,5 +1,5 @@
-import { CAPTAINS } from '../captains/registry'
-import type { CaptainId } from '../captains/registry'
+import { CAPTAINS } from '../data/captains'
+import type { CaptainId } from '../data/captains'
 
 // 队长主动技能的触发策略（纯逻辑）：冷却推进/就绪/充能进度 + 弹药上限。
 // 效果本体是标准能力行（CAPTAINS[id].skill.abilities，场景 castSkill 单发），

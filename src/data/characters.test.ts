@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CHARACTERS, loadoutFor, baseLoadout, upgradeCardsFor } from './registry'
-import type { CharacterId } from './registry'
+import { CHARACTERS, loadoutFor, baseLoadout, upgradeCardsFor } from './characters'
+import type { CharacterId } from './characters'
 
 const IDS = Object.keys(CHARACTERS) as CharacterId[]
 const NONE = { u1: false, u2: false }

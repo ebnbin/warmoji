@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { MapDecor } from '../../maps/registry'
+import type { MapDecor } from '../../data/maps'
 import { Rng } from '../../core/rng'
 import {
   chunkDecor,

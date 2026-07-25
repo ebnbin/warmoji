@@ -7,8 +7,8 @@ import {
   FIELD,
   POLARITY_COLOR,
   foldBattleEffects,
-} from '../battlefield/registry'
-import type { FieldPickupDef, Polarity } from '../battlefield/registry'
+} from '../data/battlefield'
+import type { FieldPickupDef, Polarity } from '../data/battlefield'
 import type { ArcadeBattleScene, ImageObj } from './ArcadeBattleScene'
 import type { Enemy } from './enemy/enemies'
 

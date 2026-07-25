@@ -1,8 +1,8 @@
 import mapsJson from '../assets/maps.json'
 import mapDefaultsJson from '../assets/mapdefaults.json'
 import type { Palette } from '../core/palette'
-import { ENEMIES } from '../enemies/registry'
-import type { EnemyDef, EnemyMixRow } from '../enemies/registry'
+import { ENEMIES } from './enemies'
+import type { EnemyDef, EnemyMixRow } from './enemies'
 
 // 地图 = 关卡：一种玩法一个主题——黑森林（有界竞技场）、荒漠（无限世界
 // + 终波缩圈）、奔流（单屏河流 + 水流漂移），每张图都是不同的世界规则。

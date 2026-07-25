@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CARDS, CARD_IDS, aggregateTeamCards, cardAtMax, rollCardChoices } from './registry'
-import { TEAM_FX_IDENTITY, foldTeamEffects } from '../items/registry'
+import { CARDS, CARD_IDS, aggregateTeamCards, cardAtMax, rollCardChoices } from './cards'
+import { TEAM_FX_IDENTITY, foldTeamEffects } from './items'
 import { Rng } from '../core/rng'
 
 describe('团队卡定义', () => {

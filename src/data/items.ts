@@ -1,8 +1,8 @@
 import itemsJson from '../assets/items.json'
 import economyJson from '../assets/economy.json'
-import { loadoutFor } from '../characters/registry'
-import type { UpgradeTiers, CharacterDef } from '../characters/registry'
-import type { AbilityDef } from '../abilities/defs'
+import { loadoutFor } from './characters'
+import type { UpgradeTiers, CharacterDef } from './characters'
+import type { AbilityDef } from './abilityDefs'
 
 // 道具 = 一组属性修正（可带负面副作用，数值上保证净增益）。
 // 只开放少量通用属性轴，不逐能力参数开洞；乘法轴叠乘、加法轴叠加。

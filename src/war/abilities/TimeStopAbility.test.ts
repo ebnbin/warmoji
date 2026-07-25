@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { TimeStopAbility } from './TimeStopAbility'
-import { CAPTAINS } from '../../captains/registry'
+import { CAPTAINS } from '../../data/captains'
 import type { AbilityContext, AbilityOwner } from './types'
-import type { TimeStopDef } from '../../abilities/defs'
+import type { TimeStopDef } from '../../data/abilityDefs'
 
 const DEF: TimeStopDef = { kind: 'timeStop', cooldownMs: 45_000, durationMs: 15_000 }
 const owner = {} as AbilityOwner

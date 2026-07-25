@@ -1,6 +1,6 @@
 import abilitiesJson from '../assets/abilities.json'
 import combatJson from '../assets/combat.json'
-import type { AbilityDef } from './defs'
+import type { AbilityDef } from './abilityDefs'
 
 // 战斗手感常量的「设计数值」形状：数据行在 defs/combat.ts（创作层），gen 校验产出 combat.json；
 // 本文件只从中派生惯用导出 KNOCKBACK/ACQUIRE，形状与数值不变。

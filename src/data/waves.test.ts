@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SPAWN } from '../enemies/registry'
+import { SPAWN } from './enemies'
 import { WAVE } from './waves'
 import { cycleWave, isBossWave, isEliteWave, isFinalWave, waveAt, waveDurationMs } from './waves'
 import { COIN_ECON, coinDropChance } from './waves'

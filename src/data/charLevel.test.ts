@@ -6,9 +6,9 @@ import {
   levelProgress,
   tiersForLevel,
 } from './charLevel'
-import { LEVEL_STATS, levelStatsFor } from '../characters/levels'
-import { CHARACTERS } from '../characters/registry'
-import type { CharacterId } from '../characters/registry'
+import { LEVEL_STATS, levelStatsFor } from './levels'
+import { CHARACTERS } from './characters'
+import type { CharacterId } from './characters'
 
 const [T1, T2] = CHAR_XP_THRESHOLDS
 

@@ -1,5 +1,5 @@
 import { UNIT } from '../core/units'
-import { TEAM } from './registry'
+import { TEAM } from './characters'
 import type { Point } from '../core/vec'
 
 // 队形系统（已简化为唯一策略）：满员前按人数取形，满员后自动列成「N 保 1」——

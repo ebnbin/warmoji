@@ -1,4 +1,4 @@
-import type { ItemDef } from '../src/items/registry'
+import type { ItemDef } from '../src/data/items'
 
 // 创作层（不进运行时 bundle）：道具数据行。角色质变不再靠买升级卡——每张卡自带
 // upgradeXp（购买即给该角色累加专属经验，攒满档位自动质变）。高端货可设 minLevel

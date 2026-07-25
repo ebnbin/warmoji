@@ -1,6 +1,6 @@
 import levelsJson from '../assets/levels.json'
-import type { CharacterId } from './registry'
-import type { CharacterEffects } from '../items/registry'
+import type { CharacterId } from './characters'
+import type { CharacterEffects } from './items'
 
 // 角色各等级形态的「基础属性质变」（与能力换行并列的另一半质变）。
 // 语义是整体替换而非叠加：LEVEL_STATS[id][0] = 2 级形态相对基础队员的完整加成，

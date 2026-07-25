@@ -1,7 +1,7 @@
-import { CAPTAINS, TEST_CAPTAIN } from '../captains/registry'
-import { ROSTER_IDS } from '../characters/registry'
-import type { CharacterId } from '../characters/registry'
-import type { CaptainId } from '../captains/registry'
+import { CAPTAINS, TEST_CAPTAIN } from '../data/captains'
+import { ROSTER_IDS } from '../data/characters'
+import type { CharacterId } from '../data/characters'
+import type { CaptainId } from '../data/captains'
 
 // 测试模式（地图页勾选进入，run.testMode = true）：免死无时限的沙盒，
 // 敌人 / 角色 + 密度 / 难度 / 攻速 / 无敌 都能在场内自由切换。

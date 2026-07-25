@@ -105,6 +105,39 @@ export default tseslint.config(
       ],
     },
   },
+  // data 是内容层：各张游戏数据表（读 src/assets/*.json）+ 其类型 + 对表的纯查询。
+  // 它是叶子——只许向下依赖 core 与 assets（外加 audio 的 SfxId 类型），不得依赖任何
+  // 业务包。一旦 data 反向引用 war/run/menu，「内容与玩法分离」就名存实亡。
+  {
+    files: ['src/data/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              // 显式列出禁止的业务包：no-restricted-imports 的 group 不支持 '!' negation
+              //（试过 ['../*', '!../core/*'] —— 负向被忽略，连 core 一起拦），故只能正向枚举。
+              // 新增顶层包时记得同步这张表。
+              group: [
+                '../war/*', '../war/**',
+                '../arcade/*', '../arcade/**',
+                '../ecs/*', '../ecs/**',
+                '../experiments/*', '../experiments/**',
+                '../run/*', '../run/**',
+                '../menu/*', '../menu/**',
+                '../boot/*', '../boot/**',
+                '../debug/*', '../debug/**',
+                '../emoji/*', '../emoji/**',
+                '../audio/bgm', '../audio/music',
+              ],
+              message: 'data 是内容叶子层：只可依赖 core / assets（及 audio 的 SfxId 类型），不得反向依赖业务包',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // core 是地基：任何游戏都会用到的通用层，可依赖 Phaser，不得依赖业务包
   //（类型引用也不行——换一个游戏要能整目录原样带走）
   {

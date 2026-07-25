@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { ENEMY_DEFS } from './registry'
-import { enemyMixAt, fleeSteer, pickEnemy } from './registry'
-import { MAPS } from '../maps/registry'
+import { ENEMY_DEFS } from './enemies'
+import { enemyMixAt, fleeSteer, pickEnemy } from './enemies'
+import { MAPS } from './maps'
 
 const ZOMBIE = ENEMY_DEFS.find((e) => e.kind === 'zombie')!
 const MUSHROOM = ENEMY_DEFS.find((e) => e.kind === 'mushroom')!

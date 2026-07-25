@@ -1,4 +1,4 @@
-import type { AbilityDef } from '../../abilities/defs'
+import type { AbilityDef } from '../../data/abilityDefs'
 import { AreaBlastAbility } from './AreaBlastAbility'
 import { AssassinateAbility } from './AssassinateAbility'
 import { BoomerangAbility } from './BoomerangAbility'

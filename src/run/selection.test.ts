@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { CAPTAIN_IDS } from '../captains/registry'
+import { CAPTAIN_IDS } from '../data/captains'
 import type { StringStorage } from '../core/storage'
-import { MAP_IDS } from '../maps/registry'
+import { MAP_IDS } from '../data/maps'
 import { loadCaptain, loadMap, sanitizeCaptain, saveCaptain, saveMap } from './selection'
 
 function memStorage(): StringStorage {

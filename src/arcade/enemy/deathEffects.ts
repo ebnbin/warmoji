@@ -1,9 +1,9 @@
-import { waveAt } from '../../run/waves'
+import { waveAt } from '../../data/waves'
 import { UNIT } from '../../core/units'
 import { applyEffects } from '../../war/abilities/effects'
 import { buildEnemyCtx } from './abilities'
 import type { Enemy } from './enemies'
-import type { EnemyDef, SplitEffect, DecoyEffect } from '../../enemies/registry'
+import type { EnemyDef, SplitEffect, DecoyEffect } from '../../data/enemies'
 import type { ArcadeBattleScene } from '../ArcadeBattleScene'
 
 // 亡语（onDeath）：死亡触发的一串效果。与命中触发 onHit 复用同一套组合式 Effect

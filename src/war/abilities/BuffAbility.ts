@@ -1,4 +1,4 @@
-import type { BuffDef } from '../../abilities/defs'
+import type { BuffDef } from '../../data/abilityDefs'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 增益型：限时全队伤害倍率（经 stats.damageMul 流入所有能力伤害链，

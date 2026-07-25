@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { CAPTAINS } from '../captains/registry'
-import { CHARACTERS } from '../characters/registry'
-import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
+import { CAPTAINS } from '../data/captains'
+import { CHARACTERS } from '../data/characters'
+import { BOSSES, ENEMY_DEFS } from '../data/enemies'
 const BLOB = ENEMY_DEFS.find((e) => e.kind === 'blob')!
 const BOAR = ENEMY_DEFS.find((e) => e.kind === 'boar')!
 const INVADER = ENEMY_DEFS.find((e) => e.kind === 'invader')!
 const MUSHROOM = ENEMY_DEFS.find((e) => e.kind === 'mushroom')!
-import { ITEMS } from '../items/registry'
-import { CARDS } from '../cards/registry'
-import { MAP_IDS } from '../maps/registry'
+import { ITEMS } from '../data/items'
+import { CARDS } from '../data/cards'
+import { MAP_IDS } from '../data/maps'
 import { enemyStatLines, usedEmojiSet, wikiEntryByEmoji, wikiGroups } from './wiki'
 
 describe('图鉴分组', () => {

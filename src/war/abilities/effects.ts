@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
-import { circleHitIndices } from '../../abilities/defs'
-import type { BlastRing, Effect } from '../../abilities/defs'
+import { circleHitIndices } from './hit'
+import type { BlastRing, Effect } from '../../data/abilityDefs'
 import { circleCue } from './cues'
 import { angleToNearest } from './targeting'
 import type { EffectCtx, TargetInfo } from './types'

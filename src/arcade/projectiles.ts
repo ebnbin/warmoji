@@ -1,9 +1,9 @@
 import { DEG2RAD } from '../core/units'
 import { playSfx } from '../audio/sfx'
 import { emojiKey } from '../emoji/textures'
-import { sweepFirstHitIndex } from '../abilities/defs'
-import type { Effect, ProjectileDef } from '../abilities/defs'
-import type { EnemyProjectileDef } from '../enemies/registry'
+import { sweepFirstHitIndex } from '../war/abilities/hit'
+import type { Effect, ProjectileDef } from '../data/abilityDefs'
+import type { EnemyProjectileDef } from '../data/enemies'
 import { acquirePooled, releasePooled } from './pool'
 import type { ArcadeBody, ArcadeBattleScene, ImageObj } from './ArcadeBattleScene'
 

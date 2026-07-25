@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { bossFor, MAP, MAP_IDS, MAPS, mapEnemyRoster, rollDecor, sanitizeMapId } from './registry'
-import { BOSSES } from '../enemies/registry'
+import { bossFor, MAP, MAP_IDS, MAPS, mapEnemyRoster, rollDecor, sanitizeMapId } from './maps'
+import { BOSSES } from './enemies'
 import { Rng } from '../core/rng'
 
 describe('地图定义', () => {

@@ -1,4 +1,4 @@
-import type { TimeStopDef } from '../../abilities/defs'
+import type { TimeStopDef } from '../../data/abilityDefs'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 时停型（队长主动技能载荷）：释放后 durationMs 内整个世界时间近乎凝固——

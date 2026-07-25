@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { CAPTAINS } from '../captains/registry'
-import { MEMBER, ROSTER_IDS } from '../characters/registry'
+import { CAPTAINS } from '../data/captains'
+import { MEMBER, ROSTER_IDS } from '../data/characters'
 import { RECRUIT } from './recruit'
-import { WAVE } from './waves'
+import { WAVE } from '../data/waves'
 import {
   beginRun,
   canRecruit,

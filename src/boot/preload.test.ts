@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from './preload'
-import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
-import { CARDS } from '../cards/registry'
-import { FIELD_PICKUPS } from '../battlefield/registry'
-import { ITEMS } from '../items/registry'
+import { BOSSES, ENEMY_DEFS } from '../data/enemies'
+import { CARDS } from '../data/cards'
+import { FIELD_PICKUPS } from '../data/battlefield'
+import { ITEMS } from '../data/items'
 
 // emojiImage 只引用纹理键、不烘焙——内容 emoji 漏进预载清单即渲染成缺失贴图（绿框），
 // 且 e2e 对未预载 emoji 不报控制台错误、逮不到。故此处按「渲染变体」守住各内容表：

@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { GroundEffectDef } from '../groundEffects/defs'
+import type { GroundEffectDef } from '../data/groundEffects'
 import type { ArcadeBattleScene, ImageObj } from './ArcadeBattleScene'
 
 // 地面效果（阵营中立）：留在地面的持续区，敌我同构——team 放的烧敌人、

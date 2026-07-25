@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
 import type { RunState } from '../run/state'
-import type { Polarity } from '../battlefield/registry'
+import type { Polarity } from '../data/battlefield'
 
 // HUD 宿主契约：UIScene 需要从「当前战斗场景」读到的全部东西，仅此而已。
 // 旧的 ArcadeBattleScene 与 ECS 实验的 EcsBattleScene 都按结构满足它，UIScene 因此

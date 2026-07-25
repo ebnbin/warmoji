@@ -1,6 +1,6 @@
 import { DEG2RAD } from '../../core/units'
 import type Phaser from 'phaser'
-import type { AssassinateDef } from '../../abilities/defs'
+import type { AssassinateDef } from '../../data/abilityDefs'
 import { applyEffects } from './effects'
 import { circleCue, slashCue } from './cues'
 import { strongestTarget } from './targeting'

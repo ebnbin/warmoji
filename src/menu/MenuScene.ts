@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import { CHARACTERS } from '../characters/registry'
-import { ENEMY_DEFS } from '../enemies/registry'
+import { CHARACTERS } from '../data/characters'
+import { ENEMY_DEFS } from '../data/enemies'
 import { loadHighScore } from '../run/highscore'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'

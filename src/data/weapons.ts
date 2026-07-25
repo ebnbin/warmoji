@@ -1,7 +1,7 @@
 import weaponsJson from '../assets/weapons.json'
-import { ABILITIES } from '../abilities/registry'
-import type { AbilityId } from '../abilities/registry'
-import type { AbilityDef } from '../abilities/defs'
+import { ABILITIES } from './abilities'
+import type { AbilityId } from './abilities'
+import type { AbilityDef } from './abilityDefs'
 
 // 武器 = 包装了 Ability 的实体载体（有身份：名字/图标/手持视觉，进图鉴「武器」栏）。
 // 一把武器自带升级路径：base + 若干档（每档 = 一张升级卡文案 + 该档的行为 Ability）。

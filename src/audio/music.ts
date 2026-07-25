@@ -1,4 +1,4 @@
-import type { MapId } from '../maps/registry'
+import type { MapId } from '../data/maps'
 
 // 程序化 BGM 乐谱层：纯数据/纯函数，输出扁平音符事件表，播放在 ui/bgm.ts。
 // 写谱模型：每曲 = 调式 + 逐小节和弦进行 + 若干声部（低音/琶音/和弦垫/主旋律）

@@ -1,4 +1,4 @@
-import type { ChainArcDef } from '../../abilities/defs'
+import type { ChainArcDef } from '../../data/abilityDefs'
 import { applyEffects } from './effects'
 import { lightningCue } from './cues'
 import { nearestTarget } from './targeting'

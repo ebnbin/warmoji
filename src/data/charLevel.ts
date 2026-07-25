@@ -1,4 +1,4 @@
-import type { UpgradeTiers } from '../characters/registry'
+import type { UpgradeTiers } from './characters'
 
 // 角色专属经验（与团队战斗经验完全独立）：只在商店为某角色购买道具时累积
 //（每张卡自带 upgradeXp）。攒满档位即自动、免费升级——每次升级是「换一个更强的

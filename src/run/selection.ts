@@ -1,8 +1,8 @@
-import { CAPTAINS, CAPTAIN_IDS } from '../captains/registry'
-import type { CaptainId } from '../captains/registry'
+import { CAPTAINS, CAPTAIN_IDS } from '../data/captains'
+import type { CaptainId } from '../data/captains'
 import type { StringStorage } from '../core/storage'
-import type { MapId } from '../maps/registry'
-import { sanitizeMapId } from '../maps/registry'
+import type { MapId } from '../data/maps'
+import { sanitizeMapId } from '../data/maps'
 
 // 跨局持久化的只有地图与队长选择；阵容不再持久化——开局招募与波末整编
 // 走同一套强制流程（PromoteScene），每局从空阵容按点数现招。

@@ -1,6 +1,6 @@
-import { ACQUIRE } from '../../abilities/registry'
+import { ACQUIRE } from '../../data/abilities'
 import { UNIT } from '../../core/units'
-import type { AreaBlastDef } from '../../abilities/defs'
+import type { AreaBlastDef } from '../../data/abilityDefs'
 import { applyBlast, applyEffects } from './effects'
 import { boomCue, circleCue } from './cues'
 import { nearestTarget, targetsWithin } from './targeting'

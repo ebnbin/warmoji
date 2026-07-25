@@ -1,8 +1,8 @@
 import { query } from 'bitecs'
 import { toPx } from '../war/px'
 import { playSfx } from '../audio/sfx'
-import { bossFor } from '../maps/registry'
-import { waveAt, isBossWave } from '../run/waves'
+import { bossFor } from '../data/maps'
+import { waveAt, isBossWave } from '../data/waves'
 import {
   BOSS_SPAWN_RELIEF,
   ELITE,
@@ -11,16 +11,16 @@ import {
   SURGE,
   enemyMixAt,
   pickEnemy,
-} from '../enemies/registry'
+} from '../data/enemies'
 import { DENSITY_PARAMS, labDensity, labDifficulty, labEnemySet } from '../run/lab'
-import { MAPS, mapEnemyRoster } from '../maps/registry'
-import type { MapDef } from '../maps/registry'
+import { MAPS, mapEnemyRoster } from '../data/maps'
+import type { MapDef } from '../data/maps'
 import { hourAt, isDayAt } from '../war/world/daynight'
 import { Dormant, ENEMY_SET } from './components'
 import { spawnEnemy } from './enemy'
 import { enemyCarries } from './store'
 import type { Sim } from './sim'
-import type { FieldPickupDef } from '../battlefield/registry'
+import type { FieldPickupDef } from '../data/battlefield'
 import type { EcsAtlas } from './render/atlas'
 
 // 刷怪节奏(常规波次制):随跨波累计战斗时长递增难度,供给随在场人数缩放,Boss 波减压;

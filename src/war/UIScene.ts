@@ -1,13 +1,13 @@
 import Phaser from 'phaser'
-import { CAPTAINS } from '../captains/registry'
-import { PICKUPS } from '../pickups/registry'
+import { CAPTAINS } from '../data/captains'
+import { PICKUPS } from '../data/pickups'
 import { formatTime } from '../core/format'
 import { endRun, getRun } from '../run/state'
 // 能量豆已移除：技能纯 CD 门槛（见 captains/skill.ts）
 import { isDevOpen, setDevOpen } from '../debug/dev'
-import { CHARACTERS } from '../characters/registry'
-import type { CharacterId } from '../characters/registry'
-import { mapEnemyRoster } from '../maps/registry'
+import { CHARACTERS } from '../data/characters'
+import type { CharacterId } from '../data/characters'
+import { mapEnemyRoster } from '../data/maps'
 import { beginRun } from '../run/state'
 import {
   isLabCharacterOn,

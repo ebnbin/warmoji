@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
 import { query } from 'bitecs'
-import type { GroundEffectDef } from '../groundEffects/defs'
+import type { GroundEffectDef } from '../data/groundEffects'
 import { Alive, ENEMY_SET, Transform } from './components'
 import { applyDamage, hurtMember } from './combat'
 import type { Sim } from './sim'
