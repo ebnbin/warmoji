@@ -27,6 +27,9 @@ function clipKey(id: string, outline: OutlineKind, clipId: string): string {
 
 const NO_CLIP = { base: -1, frames: 0 }
 
+/** 图集实例序号:页纹理键按实例唯一——跨局重建时新旧图集不会争同一个纹理键 */
+let atlasSerial = 0
+
 export class EcsAtlas {
   /** frame*4 → u0,v0,u1,v1 */
   private readonly uv: Float32Array
@@ -39,6 +42,14 @@ export class EcsAtlas {
   /** 下一个空闲格位(静态变体铺完后即动画帧的起点) */
   private cursor = 0
   private scene?: Phaser.Scene
+  private readonly serial = atlasSerial++
+  /** 场景已关闭:在途的惰性烘焙就此作废(纹理管理器已归新一局所有) */
+  private disposed = false
+
+  /** 场景关闭时调用:停掉在途烘焙的落格与刷新 */
+  dispose(): void {
+    this.disposed = true
+  }
   /** clip → 帧基址与帧数;帧数 0 表示该 emoji 无此 clip(问过一次就不再问) */
   private readonly clips = new Map<string, { base: number; frames: number }>()
   /** 正在烘焙中的 clip(去重) */
@@ -65,7 +76,7 @@ export class EcsAtlas {
     this.ctxs.push(cv.getContext('2d')!)
     const scene = this.scene
     if (!scene) return // build 期先建画布,末尾统一登记纹理
-    const key = `ecs-atlas-${this.pages.length}`
+    const key = `ecs-atlas-${this.serial}-${this.pages.length}`
     if (scene.textures.exists(key)) scene.textures.remove(key)
     this.pages.push(scene.textures.addCanvas(key, cv)!)
   }
@@ -94,16 +105,24 @@ export class EcsAtlas {
     if (hit) return hit
     if (!this.baking.has(key)) {
       this.baking.add(key)
-      void this.bakeClip(id, outline, clipId, key)
+      void this.bakeClip(id, outline, clipId, key).catch(() => {
+        // 光栅化失败(取字形/解码出错):记为「无此 clip」,实体保持静态帧,不再反复重试
+        this.clips.set(key, NO_CLIP)
+      })
     }
     return NO_CLIP
+  }
+
+  /** 还能放下这么多帧吗(格位上限兜底:满了就不再烘,实体保持静态帧) */
+  private hasRoom(n: number): boolean {
+    return this.cursor + n <= MAX_FRAMES
   }
 
   /** 惰性烘焙:整套帧连续落格(必要时增页),完成后刷新受影响的页纹理 */
   private async bakeClip(id: string, outline: OutlineKind, clipId: string, key: string): Promise<void> {
     const clip = animClipOf(id, clipId)
     const scene = this.scene
-    if (!clip || !scene) {
+    if (!clip || !scene || this.disposed || !this.hasRoom(clip.frames)) {
       this.clips.set(key, NO_CLIP)
       return
     }
@@ -115,8 +134,8 @@ export class EcsAtlas {
         return svgToImage(setSvgSize(svg, CELL))
       }),
     )
-    // 光栅化是异步的:场景可能已切换,此时静默丢弃
-    if (!scene.textures) return
+    // 光栅化是异步的:场景可能已切换、或期间格位被别的 clip 占满,此时静默丢弃
+    if (this.disposed || !scene.textures || !this.hasRoom(imgs.length)) return
     const base = this.cursor
     const touched = new Set<number>()
     for (const img of imgs) {
@@ -191,7 +210,7 @@ export class EcsAtlas {
     // 页纹理统一登记(此后 scene 就位,增页即时登记)
     atlas.scene = scene
     for (let p = 0; p < atlas.canvases.length; p++) {
-      const key = `ecs-atlas-${p}`
+      const key = `ecs-atlas-${atlas.serial}-${p}`
       if (scene.textures.exists(key)) scene.textures.remove(key)
       atlas.pages.push(scene.textures.addCanvas(key, atlas.canvases[p]!)!)
     }

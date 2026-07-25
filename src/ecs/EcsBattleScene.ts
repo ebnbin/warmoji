@@ -335,6 +335,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.scene.launch('ui')
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scene.stop('ui')
+      this.atlas?.dispose() // 停掉在途的惰性烘焙:纹理管理器即将归下一局所有
       for (const c of this.stripCams) this.cameras.remove(c)
       this.stripCams = []
     })
@@ -1495,18 +1496,18 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 刷怪节奏
     if (this.atlas) spawnStep(sim, this.atlas, wdelta)
     this.updateTelegraphs()
+    // 排空本帧视觉事件:须先于下面的过场判定——否则致死那一帧的死亡爆点/飘字会被 return 吞掉
+    this.drainDamageNumbers()
+    this.drainBursts()
+    this.drainRings()
     // 终波 Boss 被击败 → 通关结算(镜像 onBossDown → endWave)
     if (!this.testMode && sim.bossDown) {
-      // 稍候片刻让碎块飞散可见,再走通关结算(镜像 onBossDown 的 700ms)
+      // 稍候片刻让碎块飞散可见,再走通关结算(镜像 onBossDown 的 700ms)。
+      // 这 700ms 世界照常运转(不置 ending),否则碎块凝住、爆点也放不出来
       sim.bossDown = false
-      this.ending = true
       this.time.delayedCall(700, () => {
-        if (!this.sim) return
-        this.ending = false
-        const finished = settleWave(this.sim)
-        this.scheduleWaveEnd(finished)
+        if (this.sim && !this.ending) this.scheduleWaveEnd(settleWave(this.sim))
       })
-      return
     }
     // 全队阵亡 → 失败结算(测试模式不结算,便于反复观测)
     if (!this.testMode && sim.over) {
@@ -1529,9 +1530,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
     this.timeStopFx?.setFillStyle(TIMESTOP.chillColor, this.timeStopFxAlpha)
-    this.drainDamageNumbers()
-    this.drainBursts()
-    this.drainRings()
     // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtMember 的 cameras.shake)
     if (sim.memberHitCount > this.seenHitCount) {
       this.seenHitCount = sim.memberHitCount
@@ -1579,6 +1577,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       camX: this.cameras.main.scrollX + this.cameras.main.width / 2,
       camY: this.cameras.main.scrollY + this.cameras.main.height / 2,
       zoneR: sim.zone?.r ?? 0,
+      // 本帧减速区数(寒气光环等每帧重新登记)
+      slowZones: sim.frameSlowZones.length,
       // 残垣:阻挡格数 + 可达刷怪格数(验证断壁成型与连通)
       walls: sim.walls ? sim.walls.grid.blocked.filter(Boolean).length : 0,
       spawnCells: sim.walls?.spawnCells.length ?? 0,

@@ -5,7 +5,7 @@ import { playSfx } from '../audio/sfx'
 import { FIELD, POLARITY_COLOR } from '../battlefield/registry'
 import type { FieldPickupDef } from '../battlefield/registry'
 import { foldBattleEffects } from '../battlefield/registry'
-import { Alive, Tint, Transform } from './components'
+import { Alive, MFlash, Tint, Transform } from './components'
 import { enemyDef } from './store'
 import type { Sim } from './sim'
 
@@ -140,12 +140,12 @@ function collect(sim: Sim, scene: Phaser.Scene, p: FieldEntity): void {
     polarity: p.def.polarity,
   })
   // 到手反馈:全队闪一下极性色
+  // 走受击闪光同一通道:否则 memberVisual 每帧把染色抹回常态,只闪得到一帧
   for (const m of sim.members) {
     if (!Alive.v[m]) continue
+    MFlash.until[m] = sim.elapsedMs + 300
     Tint.color[m] = color
-    scene.time.delayedCall(300, () => {
-      if (Alive.v[m]) Tint.color[m] = 0xffffff
-    })
+    Tint.effect[m] = 0
   }
 }
 

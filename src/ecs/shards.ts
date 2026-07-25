@@ -16,7 +16,6 @@ export function spawnShardsEcs(
   h: number,
   frame: number,
   flipX: number,
-  z: number,
   flingVx: number,
   flingVy: number,
 ): void {
@@ -48,7 +47,7 @@ export function spawnShardsEcs(
     Tint.color[eid] = 0xffffff
     Tint.effect[eid] = 0
     Tint.alpha[eid] = 1
-    Depth.z[eid] = z
+    Depth.z[eid] = 6 // 与旧 shardPool 同深度(压在地面效果之上、血条之下)
     Shard.vx[eid] = flingVx + dir.x * scatter
     Shard.vy[eid] = flingVy + dir.y * scatter
     Shard.startMs[eid] = now

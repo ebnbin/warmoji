@@ -10,7 +10,6 @@ import { spawnShardsEcs } from './shards'
 import {
   Alive,
   Boss,
-  Depth,
   DmgMul,
   Dormant,
   Elite,
@@ -56,6 +55,7 @@ export function applyDamage(
   // 已离场(同帧内被先一颗子弹打死)或休眠(无限世界远处冻结)即早退:
   // 镜像 !enemy.active / a.dormant 的通用守卫,防重复计击杀/掉落
   if (enemyDef[eid] === undefined || Dormant.v[eid]) return
+  const def = enemyDef[eid]
   const morphed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
   // 变形期受伤倍率(魔尘诅咒 vulnMul):放大变羊敌人所受伤害
   const dmg = morphed && Morph.vuln[eid] !== 1 ? Math.round(damage * Morph.vuln[eid]!) : damage
@@ -67,11 +67,15 @@ export function applyDamage(
   if (srcSlot >= 0 && srcSlot < st.damage.length) {
     st.damage[srcSlot] = (st.damage[srcSlot] ?? 0) + Math.min(dmg, Math.max(0, Hp.v[eid]!))
   }
+  // 击退免疫在变形期失效(绵羊可被击退):致死与非致死分支同口径
+  const kbImmune = def?.kbImmune === true && !morphed
   if (hp <= 0) {
     let flingVx = 0
     let flingVy = 0
-    if (knockback > 0 && srcX !== undefined && srcY !== undefined && !enemyDef[eid]?.kbImmune) {
-      const dir = norm(Transform.x[eid]! - srcX, Transform.y[eid]! - srcY)
+    if (knockback > 0 && srcX !== undefined && srcY !== undefined && !kbImmune) {
+      // 方向走世界差(环面上跨缝命中不会把尸体甩向长的那一边)
+      const d = sim.hooks.worldDelta(sim, srcX, srcY, Transform.x[eid]!, Transform.y[eid]!)
+      const dir = norm(d.x, d.y)
       flingVx = dir.x * knockback
       flingVy = dir.y * knockback
     }
@@ -83,11 +87,10 @@ export function applyDamage(
   Flash.until[eid] = sim.elapsedMs + 70
   Tint.effect[eid] = 1 // 纯白填充
   Tint.color[eid] = 0xffffff
-  const def = enemyDef[eid]
-  let kb = knockback
-  if (def?.kbImmune && !morphed) kb = 0 // 变形期免疫击退失效(绵羊可被击退)
+  const kb = kbImmune ? 0 : knockback
   if (kb > 0 && srcX !== undefined && srcY !== undefined) {
-    const dir = norm(Transform.x[eid]! - srcX, Transform.y[eid]! - srcY)
+    const d = sim.hooks.worldDelta(sim, srcX, srcY, Transform.x[eid]!, Transform.y[eid]!)
+    const dir = norm(d.x, d.y)
     let kvx = Kv.x[eid]! + dir.x * kb
     let kvy = Kv.y[eid]! + dir.y * kb
     const len = Math.hypot(kvx, kvy)
@@ -151,7 +154,6 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
     Transform.h[eid]!,
     Sprite.frame[eid]!,
     Sprite.flipX[eid]!,
-    Depth.z[eid]!,
     flingVx,
     flingVy,
   )
@@ -221,6 +223,7 @@ export function tickPoison(sim: Sim): void {
 export function memberContact(sim: Sim): void {
   const enemies = query(sim.world, ENEMY_SET as unknown as object[])
   if (enemies.length === 0) return
+  if (sim.over) return
   const now = sim.elapsedMs
   for (const m of sim.members) {
     if (!Alive.v[m]) continue
@@ -229,6 +232,7 @@ export function memberContact(sim: Sim): void {
     const my = Transform.y[m]!
     const hr = Hurt.radius[m]!
     for (const eid of enemies) {
+      if (Dormant.v[eid]) continue // 休眠怪不参与接触判定
       const rr = hr + Radius.v[eid]!
       const d = sim.hooks.worldDelta(sim, mx, my, Transform.x[eid]!, Transform.y[eid]!)
       if (d.x * d.x + d.y * d.y > rr * rr) continue

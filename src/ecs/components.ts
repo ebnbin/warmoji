@@ -65,7 +65,7 @@ export const Breath = { phase: f32() }
 
 /** 弹入动画:until 结束时刻(0=无);ms 总时长;size 目标尺寸;back 是否 Back.easeOut(否则线性)。
  * 队员复活弹入沿用 until(尺寸走呼吸链路);敌人/金币入场由各自系统按 size 插值 */
-export const Pop = { until: f32(), ms: f32(), size: f32(), back: u8() }
+export const Pop = { until: f32(), ms: f32(), size: f32(), back: u8(), alpha: f32() }
 
 /** 存活 + 本帧探测范围内是否有敌(游移门控/orbit 输入) */
 export const Alive = { v: u8() }

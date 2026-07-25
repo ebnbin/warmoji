@@ -72,6 +72,8 @@ export function spawnEnemy(
   hp: number,
   elite: boolean,
   boss: boolean,
+  /** 目标透明度(亡语诱饵尸壳半透明;入场弹入收敛到它而非恒 1) */
+  alpha = 1,
 ): number {
   const world = sim.world
   const outline = elite || boss ? 'elite' : 'enemy'
@@ -157,11 +159,12 @@ export function spawnEnemy(
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (enemyPhase[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
   Tint.color[eid] = 0xffffff
   Tint.effect[eid] = 0
-  Tint.alpha[eid] = boss ? 0.2 : 0.3
+  Tint.alpha[eid] = alpha * (boss ? 0.2 : 0.3)
   Pop.until[eid] = sim.elapsedMs + (boss ? 320 : 130)
   Pop.ms[eid] = boss ? 320 : 130
   Pop.size[eid] = size
   Pop.back[eid] = boss ? 1 : 0
+  Pop.alpha[eid] = alpha
   Depth.z[eid] = boss ? 7 : 5
   Quad.v[eid] = 0
   enemyDef[eid] = def
@@ -525,7 +528,7 @@ export function steerEnemies(sim: Sim, delta: number): void {
         Pop.until[eid] = 0
         Transform.w[eid] = Pop.size[eid]!
         Transform.h[eid] = Pop.size[eid]!
-        Tint.alpha[eid] = 1
+        Tint.alpha[eid] = Pop.alpha[eid]!
       } else {
         const raw = 1 - left / Pop.ms[eid]!
         const t = Pop.back[eid] ? backEaseOut(raw) : raw
@@ -533,7 +536,7 @@ export function steerEnemies(sim: Sim, delta: number): void {
         const k = Pop.size[eid]! * (from + (1 - from) * t)
         Transform.w[eid] = k
         Transform.h[eid] = k
-        Tint.alpha[eid] = from + (1 - from) * raw
+        Tint.alpha[eid] = Pop.alpha[eid]! * (from + (1 - from) * raw)
       }
     }
     if (Dormant.v[eid]) continue // 休眠:冻结 AI 与位移,状态原样保留,回到活跃范围自然接管

@@ -13,7 +13,7 @@ import { levelStatsFor } from '../characters/levels'
 import { characterLevel } from '../run/charLevel'
 import { BATTLE_FX_IDENTITY } from '../battlefield/registry'
 import { currentFormation, guardOrder, hasCenter, waveStartHp } from '../run/state'
-import { INVINCIBLE_HP, labInvincible } from '../run/lab'
+import { INVINCIBLE_HP, labInvincible, labLevel } from '../run/lab'
 import { armIdle } from './anim'
 import { worldFor } from './worlds'
 import type { RunState } from '../run/state'
@@ -129,7 +129,9 @@ export function spawnTeam(
     MAtkSlow.mul[eid] = 1
     // 道具属性:正常局按该槽位已持道具 + 专属等级聚合,测试模式素体
     const owned = testMode ? [] : (run.memberItems[slot] ?? [])
-    const fx = aggregateCharacterEffects(owned, testMode ? [] : levelStatsFor(rosterIds[slot]!, characterLevel(characterXp(owned))))
+    // 等级与能力侧同源(测试模式走场内旋钮档位),否则旋钮只改能力不改属性
+    const level = testMode ? labLevel() + 1 : characterLevel(characterXp(owned))
+    const fx = aggregateCharacterEffects(owned, levelStatsFor(rosterIds[slot]!, level))
     const maxHp = testMode ? labHp : Math.round(memberMaxHp(fx.hpAdd, captain.hpMul) * teamFx.teamHpMul)
     // 血量跨波保留;上一波阵亡者低血量复活(测试模式素体满血)
     MHp.hp[eid] = testMode ? labHp : waveStartHp(run.memberHp[slot] ?? MEMBER.maxHp, maxHp)

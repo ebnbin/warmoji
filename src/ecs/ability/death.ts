@@ -4,7 +4,7 @@ import { waveAt } from '../../run/waves'
 import { applyEffects } from '../../abilities/effects'
 import type { EffectCtx, TargetInfo } from '../../abilities/types'
 import type { DecoyEffect, SplitEffect } from '../../enemies/registry'
-import { Alive, Despawn, Iframe, Tint } from '../components'
+import { Alive, Despawn, Iframe } from '../components'
 import { hurtMember } from '../combat'
 import { spawnBrood, spawnEnemy } from '../enemy'
 import { spawnGroundEffectEcs } from '../groundEffects'
@@ -71,8 +71,7 @@ function spawnDecoy(sim: Sim, atlas: EcsAtlas, d: PendingDeath, fx: DecoyEffect,
     onDeath: undefined,
     kbImmune: true,
   }
-  const eid = spawnEnemy(sim, atlas, husk, d.x, d.y, Math.round(fx.hp * hpMul), false, false)
-  Tint.alpha[eid] = fx.alpha
+  const eid = spawnEnemy(sim, atlas, husk, d.x, d.y, Math.round(fx.hp * hpMul), false, false, fx.alpha)
   Despawn.at[eid] = sim.elapsedMs + fx.durationMs
 }
 
