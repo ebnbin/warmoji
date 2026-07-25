@@ -13,6 +13,8 @@ import {
 } from '../enemies/registry'
 import { randomMapPoint } from '../enemies/spawn'
 import { MAPS } from '../maps/registry'
+import type { MapDef } from '../maps/registry'
+import { hourAt, isDayAt } from '../maps/daynight'
 import { ENEMY_SET } from './components'
 import { spawnEnemy } from './enemy'
 import { enemyCarries } from './store'
@@ -23,13 +25,34 @@ import type { EcsAtlas } from './render/atlas'
 // 刷怪节奏(P3e,常规波次制):随跨波累计战斗时长递增难度,供给随在场人数缩放,Boss 波减压;
 // 预告(telegraph)以「延迟落地」建模(视觉标记 P6 补)。测试模式的勾选敌人补场 P4 细化。
 
+/** 当前时钟小时(昼夜图用;非昼夜图恒 undefined) */
+function dayNightOf(sim: Sim): { cfg: NonNullable<MapDef['dayNight']>; hour: number } | undefined {
+  const cfg = MAPS[sim.mapId].dayNight
+  if (!cfg) return undefined
+  return { cfg, hour: hourAt((sim.combatMs + sim.elapsedMs) / 1000, cfg) }
+}
+
+/** 本图当前出怪表(昼夜图按时刻在 dayMix/nightMix 间切换,波内也实时换批) */
+export function currentMix(sim: Sim): ReturnType<typeof enemyMixAt> {
+  const m = MAPS[sim.mapId]
+  const dn = dayNightOf(sim)
+  const rows = dn ? ((isDayAt(dn.hour) ? m.dayMix : m.nightMix) ?? m.mix) : m.mix
+  return enemyMixAt(rows, sim.wave)
+}
+
+/** 刷怪间隔缩放(昼夜图白天更密、夜晚更疏;其余图恒 1) */
+function spawnIntervalScale(sim: Sim): number {
+  const dn = dayNightOf(sim)
+  return dn ? (isDayAt(dn.hour) ? dn.cfg.daySpawnScale : dn.cfg.nightSpawnScale) : 1
+}
+
 function spawnPoint(sim: Sim): { x: number; y: number } {
   return randomMapPoint(sim.rng, sim.mapW, sim.mapH, SPAWN.edgeInset * UNIT, sim.center, SPAWN.minPlayerDist * UNIT)
 }
 
 /** 挑一只敌人排入预告(镜像 spawnOne→spawnTelegraphed) */
 function spawnOne(sim: Sim, hpMultiplier: number): void {
-  const def = toPx(pickEnemy(enemyMixAt(MAPS[sim.mapId].mix, sim.wave), () => sim.rng.next()))
+  const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
   const elite = sim.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance
   const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
   const pos = spawnPoint(sim)
@@ -52,7 +75,7 @@ export function spawnCarrierEcs(sim: Sim, pickup: FieldPickupDef): void {
   if (sim.over) return
   const active = query(sim.world, ENEMY_SET as unknown as object[]).length
   if (active + sim.pendingSpawns.length >= SPAWN.maxAlive) return
-  const def = toPx(pickEnemy(enemyMixAt(MAPS[sim.mapId].mix, sim.wave), () => sim.rng.next()))
+  const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
   const hp = Math.round(def.hp * waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier)
   const pos = spawnPoint(sim)
   sim.pendingSpawns.push({
@@ -89,7 +112,7 @@ export function spawnStep(sim: Sim, atlas: EcsAtlas, delta: number): void {
   const wave = waveAt((sim.combatMs + sim.elapsedMs) / 1000)
   const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * sim.members.length
   const relief = isBossWave(sim.wave) ? BOSS_SPAWN_RELIEF : 1
-  sim.spawnCooldownMs = (wave.spawnIntervalMs * relief) / teamFactor // spawnIntervalScale=1(无昼夜)
+  sim.spawnCooldownMs = (wave.spawnIntervalMs * relief * spawnIntervalScale(sim)) / teamFactor
   const active = query(sim.world, ENEMY_SET as unknown as object[]).length
   if (active + sim.pendingSpawns.length >= SPAWN.maxAlive) return
   spawnOne(sim, wave.hpMultiplier)

@@ -17,6 +17,7 @@ import { OUTLINED_EMOJIS } from '../boot/preload'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAP, MAPS, rollDecor } from '../maps/registry'
+import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from '../maps/daynight'
 import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
@@ -75,6 +76,11 @@ import { BOSSES, ELITE, ENEMY_DEFS, SPAWN } from '../enemies/registry'
 // ECS 实验战斗场景(宿主壳):Phaser 只做画布/相机/输入/音频宿主;战斗世界(实体+系统+
 // 自绘渲染)全在 ECS。P2:有界森林图 + 队伍编队/orbit/游移/跟随弹簧 + 键盘/相机跟随。
 
+// 夜雾:整块暗幕的颜色/深度/尺寸(与 ArenaScene 同值)
+const FOG_COLOR = 0x0a0a1a
+const FOG_DEPTH = 90
+const FOG_SPAN = 9000
+
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
 }
@@ -114,6 +120,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private puffBurst!: Phaser.GameObjects.Particles.ParticleEmitter
+  /** 昼夜图夜雾：整块暗色矩形 + 反相圆遮罩在其上「挖洞」露出队伍周围 */
+  private fogRect?: Phaser.GameObjects.Rectangle
+  private fogMaskShape?: Phaser.GameObjects.Graphics
   /** 时停冷雾遮罩：屏幕固定的大矩形，alpha 由时停态逐帧驱动（越静越浓） */
   private timeStopFx?: Phaser.GameObjects.Rectangle
   private timeStopFxAlpha = 0
@@ -153,6 +162,15 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const cam = this.cameras.main
     cam.setZoom(viewport.renderScale)
     cam.setBounds(-margin, -margin, this.mapW + margin * 2, this.mapH + margin * 2)
+
+    // 昼夜图夜雾（镜像 ArenaScene.createFog）：反相 Mask filter 在暗幕上挖出视野洞。
+    // Phaser 4 的 GeometryMask 在 WebGL 无实现，故与旧路径一样走 filters.internal.addMask(shape, true)
+    if (mapDef.dayNight) {
+      this.fogRect = this.add.rectangle(0, 0, FOG_SPAN, FOG_SPAN, FOG_COLOR, 0).setDepth(FOG_DEPTH).setVisible(false)
+      this.fogMaskShape = this.add.graphics().setVisible(false)
+      this.fogRect.enableFilters()
+      this.fogRect.filters?.internal.addMask(this.fogMaskShape, true)
+    }
 
     // 时停冷雾遮罩（镜像 BaseArenaScene：屏幕固定大矩形，任意地图通用）
     this.timeStopFx = this.add
@@ -639,6 +657,28 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
   }
 
+  /** 昼夜世界步进(镜像 ArenaScene.updateWorld 的 dayNight 分支):相机随时刻平滑缩放 +
+   * 夜幕迷雾开合。出怪表/刷怪间隔的昼夜切换在纯逻辑侧(spawn.ts)按时钟自算 */
+  private updateDayNight(sim: Sim): void {
+    const dn = MAPS[this.run.mapId].dayNight
+    if (!dn) return
+    const hour = hourAt((this.run.combatMs + sim.elapsedMs) / 1000, dn)
+    // 视野 V 格 → zoom = 标准 ×(visionMid/V)
+    this.cameras.main.setZoom((viewport.renderScale * dn.visionMid) / visionGridsAt(hour, dn))
+    const rect = this.fogRect
+    const shape = this.fogMaskShape
+    if (!rect || !shape) return
+    const alpha = fogAlphaAt(hour, dn)
+    if (alpha <= 0.001) {
+      rect.setVisible(false)
+      return
+    }
+    shape.clear()
+    shape.fillStyle(0xffffff)
+    shape.fillCircle(sim.center.x, sim.center.y, fogRadiusAt(hour, dn) * UNIT)
+    rect.setPosition(sim.center.x, sim.center.y).setFillStyle(FOG_COLOR, alpha).setVisible(true)
+  }
+
   /** 本波携带者排期(镜像 scheduleCarriers):按预算铺开,均匀撒在本波中前段(留出波末空档)。
    * 第 1 波是纯净开场,不出战场拾取 */
   private scheduleCarriers(): void {
@@ -749,6 +789,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       return
     }
     this.centerObj.setPosition(sim.center.x, sim.center.y)
+    this.updateDayNight(sim)
     // 冷雾浓度跟随时停态（越静越浓），淡入淡出走实时 delta
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
