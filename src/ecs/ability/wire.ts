@@ -13,7 +13,7 @@ import { toPx } from '../../battle/px'
 import { labLevel } from '../../run/lab'
 import type { RunState } from '../../run/state'
 import type { AbilityContext, AbilityOwner, AbilityRuntime, TargetInfo } from '../../abilities/types'
-import { Alive, Dormant, ENEMY_SET, Radius, Transform } from '../components'
+import { Alive, Dormant, ENEMY_SET, Radius, Transform, VisOff } from '../components'
 import { enemyDef, enemyRef, memberAbilities, memberHandle } from '../store'
 import { makeTeamCtx } from './ctx'
 import type { Sim } from '../sim'
@@ -21,6 +21,9 @@ import type { EcsAtlas } from '../render/atlas'
 
 // 队员装备能力(镜像 createMember 的配装/等级/道具 fx 生效链)+ 每帧驱动。
 // 复用 createAbility 造出的能力运行时,不重写任何能力逻辑。
+
+/** 各槽位持械视觉的已呈现存活态(与 Alive 对帐,只在翻转时收/亮械) */
+const shownAlive: boolean[] = []
 
 /** 敌人稳定引用({__eid} + active 存活探针);killEnemy 清空后按 eid 复用会重建。
  * active 供能力(核弹/落石等)剔除已死目标——读 enemyDef(死亡/自毁时清空) */
@@ -42,6 +45,7 @@ function refOf(eid: number): TargetInfo['ref'] {
 export function armTeam(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, run: RunState, testMode: boolean): void {
   memberAbilities.length = 0
   memberHandle.length = 0
+  shownAlive.length = 0
   const teamFx = aggregateTeamCards(run.teamCards)
   // 抛射物 onHit 命中链的共享效果执行面(阵营=队伍,效果作用于敌方,与具体持有者无关)
   sim.effectCtx = makeTeamCtx(sim, scene, atlas, -1, aggregateCharacterEffects([], []), teamFx)
@@ -60,7 +64,12 @@ export function armTeam(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, run: Run
       get y() {
         return Transform.y[sim.members[slot]!]!
       },
-      setVisualOffset() {},
+      setVisualOffset(dx: number, dy: number) {
+        const m = sim.members[slot]
+        if (m === undefined) return
+        VisOff.x[m] = dx
+        VisOff.y[m] = dy
+      },
     }
     memberHandle[slot] = handle
     memberAbilities[slot] = loadoutFor(def, tiers).map((w, i) => {
@@ -112,6 +121,9 @@ export function armCaptain(
 
 /** 每帧:重建敌方存活快照 + 驱动各活着队员的能力(wdelta = 世界时长,P3c 等于真实帧长) */
 export function updateMemberAbilities(sim: Sim, wdelta: number): void {
+  // 本帧光环登记表清零:能力更新即唯一生产者,消费方(steerEnemies/magnetCoins)读最近一次
+  sim.frameSlowZones.length = 0
+  sim.frameAttractors.length = 0
   const targets: TargetInfo[] = []
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     if (Dormant.v[eid]) continue // 休眠怪不可被索敌(镜像 dormancyFrameTargets)
@@ -125,10 +137,21 @@ export function updateMemberAbilities(sim: Sim, wdelta: number): void {
   }
   sim.enemyTargets = targets
   for (let slot = 0; slot < sim.members.length; slot++) {
-    if (!Alive.v[sim.members[slot]!]) continue
+    const m = sim.members[slot]!
     const abilities = memberAbilities[slot]
     const handle = memberHandle[slot]
     if (!abilities || !handle) continue
+    // 阵亡即收械(持械视觉不该悬在尸体上)+ 清视觉偏移;复活自动亮回来
+    const alive = Alive.v[m] === 1
+    if (alive !== (shownAlive[slot] ?? true)) {
+      shownAlive[slot] = alive
+      for (const w of abilities) w.setVisible?.(alive)
+      if (!alive) {
+        VisOff.x[m] = 0
+        VisOff.y[m] = 0
+      }
+    }
+    if (!alive) continue
     for (const w of abilities) w.update(wdelta, handle)
   }
 }

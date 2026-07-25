@@ -57,3 +57,6 @@ export const enemyCarries: (FieldPickupDef | undefined)[] = new Array<FieldPicku
 export const thiefEaten = new Int32Array(MAX_ENTITIES)
 /** 偷币鼠下次可吞金币时刻(逐枚偷,不一帧扫光) */
 export const thiefNextEatAt = new Float32Array(MAX_ENTITIES)
+
+/** 敌弹的伤害来源名(结算页敌情明细按敌人名归属) */
+export const eprojSrcName: (string | undefined)[] = []

@@ -7,10 +7,11 @@ import { formationPosts, ringPostAngle } from '../characters/formation'
 import type { FormationId } from '../characters/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../characters/orbit'
 import type { OrbitThreat } from '../characters/orbit'
-import { Alive, Breath, Depth, Follow, Pop, Sprite, Threat, Transform, Wander } from './components'
+import { Alive, Breath, Depth, Follow, Pop, Sprite, Threat, Transform, VisOff, Wander } from './components'
 import { steerEnemies, updateFrameTargets } from './enemy'
-import { memberContact, memberVisual, reviveMembers, tickPoison } from './combat'
+import { memberContact, memberVisual, regenMembers, reviveMembers, tickPoison } from './combat'
 import { updateEnemyProjectiles, updateProjectiles } from './projectile'
+import { updateShards } from './shards'
 import { updateDormancy } from './worlds'
 import type { FlowField, WallGrid } from '../maps/ruins'
 import type { EcsWorld } from './world'
@@ -90,6 +91,10 @@ export interface Sim {
   battleFx: BattleEffects
   /** 团队卡的敌速乘区(开局定;与 battleFx.enemySlowMul 并行相乘) */
   enemySlowMul: number
+  /** 本帧减速区(寒气光环等每帧重新登记,叠乘敌方移速 + 冷色调提示;wire 每帧重建) */
+  frameSlowZones: { x: number; y: number; r2: number; factor: number }[]
+  /** 本帧金币吸点(磁力回旋镖:镖旁金币直接入账,省去飞回中心;wire 每帧重建) */
+  frameAttractors: { x: number; y: number; r2: number }[]
   /** 本帧敌方存活快照(能力索敌共享;wire 每帧重建) */
   enemyTargets: TargetInfo[]
   /** 本帧队员存活快照(敌方能力索敌共享;enemyWire 每帧重建) */
@@ -110,6 +115,8 @@ export interface Sim {
   pendingDamageNumbers: DamageNumber[]
   /** 本帧粒子爆点(死亡/拾币;场景侧 drainBursts 排空,按 kind 分发发射器) */
   pendingBursts: Burst[]
+  /** 本帧冲击波圈(自爆群伤示警;场景侧 drainRings 排空,走 blastRing) */
+  pendingRings: { x: number; y: number; radius: number }[]
   /** 队伍侧共享效果执行面(抛射物 onHit 命中链复用;armTeam 后由场景注入) */
   effectCtx?: EffectCtx
   /** run 状态引用(金币/经验/抽卡入账;与旧场景同口径直改 run) */
@@ -269,8 +276,8 @@ function moveTeam(sim: Sim, delta: number): void {
   layout(sim, delta)
 }
 
-/** Back.easeOut(Phaser 默认过冲量):复活弹入用,末段轻微过冲再回落 */
-function backEaseOut(t: number): number {
+/** Back.easeOut(Phaser 默认过冲量):复活/掉落弹入用,末段轻微过冲再回落 */
+export function backEaseOut(t: number): number {
   const c1 = 1.70158
   const c3 = c1 + 1
   const u = t - 1
@@ -329,8 +336,9 @@ function layout(sim: Sim, delta: number): void {
     Follow.y[eid] = fy
     Follow.vx[eid] = fvx
     Follow.vy[eid] = fvy
-    Transform.x[eid] = fx
-    Transform.y[eid] = fy
+    // 能力视觉偏移叠在跟随点之上(突刺前冲/瞬闪):只动画面,不动阵型与索敌锚点
+    Transform.x[eid] = fx + VisOff.x[eid]!
+    Transform.y[eid] = fy + VisOff.y[eid]!
     const guarded = sim.formation === 'guard' && idx === 0
     // 遮挡纵深按世界差(环面上贴缝时不跳变)
     Depth.z[eid] = guarded ? 8.5 : 10 + sim.hooks.worldDelta(sim, sim.center.x, sim.center.y, fx, fy).y / UNIT
@@ -393,6 +401,7 @@ export function stepSim(sim: Sim, delta: number, wdelta: number = delta): void {
   updateOrbit(sim, delta)
   moveTeam(sim, delta)
   reviveMembers(sim)
+  regenMembers(sim, wdelta)
   tickPoison(sim)
   // 以下为世界侧:时停期整体放慢(敌人移速/弹体位移都按 wdelta 积分,无需另乘时标)
   steerEnemies(sim, wdelta)
@@ -400,6 +409,7 @@ export function stepSim(sim: Sim, delta: number, wdelta: number = delta): void {
   updateEnemyProjectiles(sim, wdelta)
   memberContact(sim)
   memberVisual(sim)
+  updateShards(sim, wdelta)
   // 世界周期结算(落水掉血等):在位移与战斗之后,读的是本帧最终位置
   sim.hooks.tick(sim, wdelta)
 }

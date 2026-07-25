@@ -66,6 +66,8 @@ export interface WorldHooks {
   coinIdleVelocity(sim: Sim): Point
   /** 金币的额外回收条件(奔流:漂出下游即被冲走);默认不回收 */
   cullCoin(sim: Sim, x: number, y: number): boolean
+  /** 死亡碎片飞散落点(有界图不许飞出地图;环面回绕);默认原样 */
+  constrainShard(sim: Sim, x: number, y: number): Point
   /** 敌弹的额外回收条件(有界图出地图即灭;无界世界只按寿命回收) */
   cullEnemyProjectile(sim: Sim, x: number, y: number): boolean
   /** 刷怪落点(有界:图内随机;无限:队伍中心外的环带) */
@@ -148,6 +150,12 @@ const bounded: WorldHooks = {
   cullCoin() {
     return false
   },
+  constrainShard(sim, x, y) {
+    return {
+      x: x < 0 ? 0 : x > sim.mapW ? sim.mapW : x,
+      y: y < 0 ? 0 : y > sim.mapH ? sim.mapH : y,
+    }
+  },
   cullEnemyProjectile(sim, x, y) {
     return x < -UNIT || x > sim.mapW + UNIT || y < -UNIT || y > sim.mapH + UNIT
   },
@@ -205,6 +213,9 @@ const ice: WorldHooks = {
   },
   wanderDir(_sim, _eid, dx, dy) {
     return { x: dx, y: dy }
+  },
+  constrainShard(_sim, x, y) {
+    return { x, y }
   },
   postSteerEnemy(sim, eid, vx, vy, delta) {
     const cfg = iceCfg(sim)
@@ -370,12 +381,15 @@ const infinite: WorldHooks = {
   constrainEnemy(_sim, _eid, x, y) {
     return { x, y }
   },
-  // 世界没有边,游荡不折返、敌弹也只按寿命回收
+  // 世界没有边,游荡不折返、敌弹与碎片也不受边界约束
   wanderDir(_sim, _eid, dx, dy) {
     return { x: dx, y: dy }
   },
   cullEnemyProjectile() {
     return false
+  },
+  constrainShard(_sim, x, y) {
+    return { x, y }
   },
   spawnPoint(sim, boss) {
     const zone = sim.zone
@@ -611,6 +625,9 @@ const torus: WorldHooks = {
     return ghostImages({ x, y }, sim.mapW, sim.mapH)
   },
   wrap(sim, x, y) {
+    return wrapPoint({ x, y }, sim.mapW, sim.mapH)
+  },
+  constrainShard(sim, x, y) {
     return wrapPoint({ x, y }, sim.mapW, sim.mapH)
   },
   projectileLifeMs(sim) {

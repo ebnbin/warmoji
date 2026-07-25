@@ -6,6 +6,7 @@ import { HIT_SHAKE } from '../battle/config'
 import { TIMESTOP } from '../battle/timeStop'
 import { DAMAGE_FONT, ensureDamageFont } from '../core/damageFont'
 import { burstEmitter } from '../core/fx'
+import { blastRing } from '../abilities/effects'
 import { loadSettings } from '../run/settings'
 import { browserStorage } from '../core/storage'
 import { UI_FONT, FONT } from '../core/fonts'
@@ -61,12 +62,12 @@ import { updateEnemyAbilities } from './ability/enemyWire'
 import { runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
 import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
-import { spawnBossEcs, spawnCarrierEcs, spawnStep } from './spawn'
+import { spawnBossEcs, spawnCarrierEcs, spawnStep, spawnSurgeEcs } from './spawn'
 import { attachCarrierAuraEcs, clearFieldEcs, fieldCounts, spawnFieldPickupEcs, updateFieldEcs } from './field'
 import { FIELD_PICKUPS, rollWaveCarriers } from '../battlefield/registry'
 import { initialLayout, stepSim, worldTimeScale } from './sim'
 import { settleWave } from './wave'
-import { isBossWave, waveAt, waveDurationMs, WAVE } from '../run/waves'
+import { isBossWave, isEliteWave, waveAt, waveDurationMs, WAVE } from '../run/waves'
 import { xpToNext } from '../run/xp'
 import { CAPTAINS } from '../captains/registry'
 import { aggregateTeamCards } from '../cards/registry'
@@ -135,6 +136,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private captainHandle: AbilityOwner = { x: 0, y: 0, setVisualOffset: () => {} }
   /** 过场已排程(波末结算/全灭):置位后 update 早退,避免重复触发 */
   private ending = false
+  /** 本波开场基线（波末小结取增量：本波击杀/金币/升级数） */
+  private waveBaseKills = 0
+  private waveBaseCoins = 0
+  private waveBaseLevel = 1
   /** 队员血条(逐帧跟位 + 按血量比例重绘;镜像 drawMemberHp) */
   private hpBars: Phaser.GameObjects.Graphics[] = []
   private shownHp: number[] = []
@@ -388,6 +393,18 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.shownCountdown.push(-1)
     }
     if (!run.testMode) this.scheduleCarriers()
+    this.waveBaseKills = run.kills
+    this.waveBaseCoins = run.coins
+    this.waveBaseLevel = run.xp.level
+    // 精英波:开场警示横幅后放敌潮(镜像 setup 的 isEliteWave 分支)
+    if (!run.testMode && isEliteWave(run.wave)) {
+      this.time.delayedCall(600, () => {
+        const sim = this.sim
+        if (!sim || sim.over) return
+        this.events.emit('wave-warning', { title: '精英来袭', sub: '敌人潮涌来，小心金边强敌！' })
+        spawnSurgeEcs(sim)
+      })
+    }
     // 正常模式 Boss 波开场:先开世界终波机关(无限图缩圈以此刻队伍位置张开),再预告投放本图 Boss
     if (!run.testMode && isBossWave(run.wave)) {
       this.sim.hooks.onFinalWave(this.sim)
@@ -399,7 +416,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
           .setDepth(90)
       }
       this.time.delayedCall(600, () => {
-        if (this.sim && !this.sim.over) spawnBossEcs(this.sim, atlas)
+        if (!this.sim || this.sim.over) return
+        this.events.emit('wave-warning', {
+          title: `${bossFor(run.mapId).name}出现`,
+          sub:
+            MAPS[run.mapId].finalWaveSub ??
+            `击败它，或撑过 ${Math.round(waveDurationMs(run.wave) / 1000)} 秒！`,
+        })
+        spawnBossEcs(this.sim)
       })
     }
     this.ready = true
@@ -659,7 +683,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         alpha: 1,
         duration: SPAWN.telegraphMs / (p.boss ? 4 : 6),
         yoyo: true,
-        repeat: -1,
+        repeat: p.boss ? 3 : 2,
       })
       this.spawnMarks.set(p, mark)
     }
@@ -672,6 +696,16 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     for (const b of q) {
       const emitter = b.kind === 'coin' ? this.coinBurst : b.kind === 'puff' ? this.puffBurst : this.deathBurst
       emitter.explode(b.count, b.x, b.y)
+    }
+    q.length = 0
+  }
+
+  /** 排空本帧冲击波圈(自爆群伤示警:红圈从 0.3 张到满,300ms) */
+  private drainRings(): void {
+    const q = this.sim!.pendingRings
+    if (q.length === 0) return
+    for (const r of q) {
+      blastRing(this, r.x, r.y, r.radius, { color: 0xff5252, fillAlpha: 0.35, lineWidth: 3, lineAlpha: 0.9, durMs: 300 })
     }
     q.length = 0
   }
@@ -1360,6 +1394,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private scheduleWaveEnd(finished: boolean): void {
     this.ending = true
     const run = this.sim!.run
+    playSfx('wave')
+    // 先冻结战场弹结算横幅(UIScene 渲染),停留片刻再走过场
+    this.events.emit('wave-complete', {
+      wave: run.wave - 1,
+      kills: run.kills - this.waveBaseKills,
+      coins: run.coins - this.waveBaseCoins,
+      levels: run.xp.level - this.waveBaseLevel,
+    })
     this.time.delayedCall(WAVE.summaryMs, () => {
       if (finished) this.scene.start('result', { win: true })
       else if (run.cardDraws > 0) this.scene.start('cards')
@@ -1449,13 +1491,21 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.updateTelegraphs()
     // 终波 Boss 被击败 → 通关结算(镜像 onBossDown → endWave)
     if (!this.testMode && sim.bossDown) {
-      const finished = settleWave(sim)
-      this.scheduleWaveEnd(finished)
+      // 稍候片刻让碎块飞散可见,再走通关结算(镜像 onBossDown 的 700ms)
+      sim.bossDown = false
+      this.ending = true
+      this.time.delayedCall(700, () => {
+        if (!this.sim) return
+        this.ending = false
+        const finished = settleWave(this.sim)
+        this.scheduleWaveEnd(finished)
+      })
       return
     }
     // 全队阵亡 → 失败结算(测试模式不结算,便于反复观测)
     if (!this.testMode && sim.over) {
       this.ending = true
+      playSfx('over')
       this.time.delayedCall(900, () => this.scene.start('result', { win: false }))
       return
     }
@@ -1475,6 +1525,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.timeStopFx?.setFillStyle(TIMESTOP.chillColor, this.timeStopFxAlpha)
     this.drainDamageNumbers()
     this.drainBursts()
+    this.drainRings()
     // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtMember 的 cameras.shake)
     if (sim.memberHitCount > this.seenHitCount) {
       this.seenHitCount = sim.memberHitCount

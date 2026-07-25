@@ -54,14 +54,18 @@ export const OrbitBias = { v: f32() }
 /** 跟随惯性:欠阻尼弹簧位置/速度 + 每人略异刚度 */
 export const Follow = { x: f32(), y: f32(), vx: f32(), vy: f32(), k: f32() }
 
+/** 能力驱动的视觉偏移(突刺前冲 / 刺客瞬闪):画在跟随点之上,不动阵型主权 */
+export const VisOff = { x: f32(), y: f32() }
+
 /** 待机游移:相位种子 + 幅度(0..1 淡入) */
 export const Wander = { seed: f32(), amp: f32() }
 
 /** 呼吸相位(挤压拉伸小动画:移动更快;slot 初相错开) */
 export const Breath = { phase: f32() }
 
-/** 复活弹入动画结束时刻(0=非弹入;期间用弹入缩放覆盖呼吸,镜像 reviveMember 的 scale 弹) */
-export const Pop = { until: f32() }
+/** 弹入动画:until 结束时刻(0=无);ms 总时长;size 目标尺寸;back 是否 Back.easeOut(否则线性)。
+ * 队员复活弹入沿用 until(尺寸走呼吸链路);敌人/金币入场由各自系统按 size 插值 */
+export const Pop = { until: f32(), ms: f32(), size: f32(), back: u8() }
 
 /** 存活 + 本帧探测范围内是否有敌(游移门控/orbit 输入) */
 export const Alive = { v: u8() }
@@ -70,8 +74,8 @@ export const Threat = { v: u8() }
 /** 队员移动/布局查询集 */
 export const MEMBER_SET = [Member, Slot, Post, OrbitBias, Follow, Wander, Alive, Threat, Transform] as const
 
-/** 队员道具属性:荆棘反伤(接触反弹)与击杀回血(吸血獠牙) */
-export const MPerk = { thorns: f32(), killHeal: f32() }
+/** 队员道具属性:荆棘反伤(接触反弹)、击杀回血(吸血獠牙)、再生(每秒回复) */
+export const MPerk = { thorns: f32(), killHeal: f32(), regenPerSec: f32() }
 
 /** 队员攻速惩罚(黏黏怪接触:until 到期时刻 + mul 冷却倍率;期间攻速变慢 + 黏液绿) */
 export const MAtkSlow = { until: f32(), mul: f32() }
@@ -141,6 +145,14 @@ export const Slide = { x: f32(), y: f32() }
 
 /** 休眠(无限世界:出活跃方形即冻结 AI/不被索敌/不占刷怪上限;状态全保留)。Boss 永不休眠 */
 export const Dormant = { v: u8() }
+
+/** 贴图取样象限:0=整张 1..4 = 左上/右上/左下/右下(死亡碎片把本体裂成四块)。
+ * 渲染层据此把该 frame 的 UV 矩形四等分取其一 */
+export const Quad = { v: u8() }
+
+/** 死亡碎片:飞散速度 + 起止时刻 + 终旋转 + 初始尺寸(线性插值:飞散/缩小/旋转/淡出) */
+export const Shard = { vx: f32(), vy: f32(), startMs: f32(), until: f32(), rot: f32(), size: f32() }
+export const SHARD_SET = [Shard, Transform, Sprite, Tint, Depth] as const
 
 /** 敌人移动查询集(最小:位姿 + 速度 + 血) */
 export const ENEMY_SET = [Enemy, Transform, Speed, Hp] as const

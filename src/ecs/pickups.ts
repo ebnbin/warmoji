@@ -3,14 +3,29 @@ import { UNIT } from '../core/units'
 import { norm } from '../core/vec'
 import { playSfx } from '../audio/sfx'
 import { PICKUP, PICKUPS } from '../pickups/registry'
-import { Alive, Coin, COIN_SET, Depth, Sprite, Tint, Transform, Vel } from './components'
+import {
+  Alive,
+  Coin,
+  COIN_SET,
+  Depth,
+  Pop,
+  Quad,
+  Sprite,
+  Tint,
+  Transform,
+  Vel,
+} from './components'
+import { backEaseOut } from './sim'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
 
 // 拾取经济(镜像 pickups.ts):金币生成 / 磁吸 / 入账。金币是 emoji 精灵,天然走统一批绘。
 // 磁吸与入账以队伍中心为基点(队员碰到也捡);森林无闲置漂移/世界回收(coinIdleVelocity=0)。
 
-/** 生成 count 枚金币(镜像 spawnCoins:多枚散开;入场弹出为纯视觉,P6 补) */
+/** 掉落弹出时长(镜像 spawnCoins 的 tween duration) */
+const COIN_POP_MS = 160
+
+/** 生成 count 枚金币(镜像 spawnCoins:多枚散开 + 入场 Back.easeOut 弹出) */
 export function spawnCoinsEcs(sim: Sim, atlas: EcsAtlas, x: number, y: number, count: number): void {
   const size = PICKUPS.coin.size * UNIT
   const frame = atlas.index(PICKUPS.coin.emoji, 'player')
@@ -39,6 +54,8 @@ export function spawnCoinsEcs(sim: Sim, atlas: EcsAtlas, x: number, y: number, c
     Tint.effect[eid] = 0
     Tint.alpha[eid] = 1
     Depth.z[eid] = 3
+    Quad.v[eid] = 0
+    Pop.until[eid] = sim.elapsedMs + COIN_POP_MS // 掉落弹出(镜像 spawnCoins 的 Back.easeOut 缩放)
   }
 }
 
@@ -60,9 +77,33 @@ export function magnetCoinsEcs(sim: Sim, delta: number): void {
   const collect = PICKUP.collectRadius * UNIT
   const collect2 = collect * collect
   const speed = PICKUP.magnetSpeed * UNIT
+  const size = PICKUPS.coin.size * UNIT
   for (const eid of coins) {
+    // 掉落弹入:0.3 → 1 的 Back.easeOut 缩放(纯视觉,与位移无关)
+    const popLeft = Pop.until[eid]! - sim.elapsedMs
+    if (popLeft > 0) {
+      const k = size * (0.3 + 0.7 * backEaseOut(1 - popLeft / COIN_POP_MS))
+      Transform.w[eid] = k
+      Transform.h[eid] = k
+    } else if (Transform.w[eid] !== size) {
+      Transform.w[eid] = size
+      Transform.h[eid] = size
+    }
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
+    // 磁力回旋镖优先:镖旁的金币直接入账,省去飞回中心的路程
+    if (sim.frameAttractors.length > 0) {
+      let taken = false
+      for (const a of sim.frameAttractors) {
+        const ad = sim.hooks.worldDelta(sim, x, y, a.x, a.y)
+        if (ad.x * ad.x + ad.y * ad.y <= a.r2) {
+          collectCoinEcs(sim, eid)
+          taken = true
+          break
+        }
+      }
+      if (taken) continue
+    }
     // 磁吸方向/距离走世界钩子(环面取最短差:隔着传送门也吸得到)
     const w = sim.hooks.worldDelta(sim, x, y, cx, cy)
     const dx = w.x

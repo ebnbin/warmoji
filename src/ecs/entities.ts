@@ -1,5 +1,11 @@
 import { addComponent, addEntity } from 'bitecs'
-import { Depth, Sprite, Tint, Transform } from './components'
+import {
+  Depth,
+  Quad,
+  Sprite,
+  Tint,
+  Transform,
+} from './components'
 import type { EcsWorld } from './world'
 import type { EcsAtlas } from './render/atlas'
 import type { OutlineKind } from '../emoji/svg'
@@ -41,5 +47,6 @@ export function spawnSprite(world: EcsWorld, atlas: EcsAtlas, init: SpriteInit):
   Tint.effect[eid] = init.effect ?? 0
   Tint.alpha[eid] = init.alpha ?? 1
   Depth.z[eid] = init.z ?? 0
+  Quad.v[eid] = 0
   return eid
 }

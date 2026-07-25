@@ -8,6 +8,7 @@ import {
   ELITE,
   ENEMIES,
   SPAWN,
+  SURGE,
   enemyMixAt,
   pickEnemy,
 } from '../enemies/registry'
@@ -53,23 +54,45 @@ function awakeCount(sim: Sim): number {
   return n
 }
 
-/** 挑一只敌人排入预告(镜像 spawnOne→spawnTelegraphed) */
-function spawnOne(sim: Sim, hpMultiplier: number): void {
+/** 挑一只敌人排入预告(镜像 spawnOne→spawnTelegraphed);forceElite 供精英波敌潮强制出金边 */
+function spawnOne(sim: Sim, hpMultiplier: number, forceElite = false): void {
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
-  const elite = sim.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance
+  const elite = forceElite || (sim.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance)
   const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
   const pos = sim.hooks.spawnPoint(sim, false)
   sim.pendingSpawns.push({ def, x: pos.x, y: pos.y, hp, elite, boss: false, at: sim.elapsedMs + SPAWN.telegraphMs })
 }
 
+/** 精英波敌潮(镜像 spawnSurge):一口气排 SURGE.count 只,前 SURGE.elites 只强制金边;
+ * 落地时刻在 spreadMs 内均摊铺开(用预告时刻表达,无需场景侧计时器) */
+export function spawnSurgeEcs(sim: Sim): void {
+  if (sim.over) return
+  const hpMul = waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier
+  const base = sim.elapsedMs + SPAWN.telegraphMs
+  for (let i = 0; i < SURGE.count; i++) {
+    const before = sim.pendingSpawns.length
+    spawnOne(sim, hpMul, i < SURGE.elites)
+    const p = sim.pendingSpawns[before]
+    if (p) p.at = base + (i * SURGE.spreadMs) / SURGE.count
+  }
+}
+
 /** 生成本图 Boss(镜像 spawnBoss:同一 materialize 管线,boss 标记金边/深度/HUD 血条)。
  * 正常模式的 Boss 波开场调用;测试模式经 __ecsSpawnEnemy(bossKind) 直投 */
-export function spawnBossEcs(sim: Sim, atlas: EcsAtlas): void {
+export function spawnBossEcs(sim: Sim): void {
   if (sim.over) return
   const def = toPx(bossFor(sim.mapId))
   const pos = sim.hooks.spawnPoint(sim, true)
-  spawnEnemy(sim, atlas, def, pos.x, pos.y, def.hp, false, true)
-  playSfx('boom')
+  // 与普通敌人同一条预告管线,只是标记更大、预告更久(镜像 spawnBoss)
+  sim.pendingSpawns.push({
+    def,
+    x: pos.x,
+    y: pos.y,
+    hp: def.hp,
+    elite: false,
+    boss: true,
+    at: sim.elapsedMs + SPAWN.telegraphMs * 1.6,
+  })
 }
 
 /** 投放一名携带者(镜像 spawnCarrier):从当前出怪表取普通怪 + carries 载荷,走同一预告管线。
@@ -126,6 +149,7 @@ export function spawnStep(sim: Sim, atlas: EcsAtlas, delta: number): void {
     for (const p of sim.pendingSpawns) {
       if (now >= p.at) {
         const eid = spawnEnemy(sim, atlas, p.def, p.x, p.y, p.hp, p.elite, p.boss)
+        if (p.boss) playSfx('boom')
         if (p.carries) {
           enemyCarries[eid] = p.carries
           sim.pendingAuras.push({ eid, def: p.carries })

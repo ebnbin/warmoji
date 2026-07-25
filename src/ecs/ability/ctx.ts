@@ -1,11 +1,12 @@
 import type Phaser from 'phaser'
 import { query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
+import { waveAt } from '../../run/waves'
 import { CRIT_MUL } from '../../items/registry'
 import { labFireRate } from '../../run/lab'
 import type { AbilityContext, TargetInfo } from '../../abilities/types'
 import type { CharacterEffects, TeamEffects } from '../../items/registry'
-import { Alive, Boss, ENEMY_SET, EState, Hp, Iframe, MAtkSlow, MHp, Poison, Revive, Slow, Tint, Transform } from '../components'
+import { Alive, Boss, ENEMY_SET, EState, Hp, Iframe, MAtkSlow, MFlash, MHp, Poison, Revive, Slow, Tint, Transform } from '../components'
 import { applyDamage, reviveMember } from '../combat'
 import { applyMorph } from '../morph'
 import { enemyDef } from '../store'
@@ -98,13 +99,20 @@ export function makeTeamCtx(
       const eid = eidOf(ref)
       if (enemyDef[eid] !== undefined) applyMorph(sim, atlas, eid, spec) // 死者不变形
     },
-    spawnGroundEffect: (x, y, def) => spawnGroundEffectEcs(sim, scene, x, y, def, 'team'),
+    spawnGroundEffect: (x, y, def) => spawnGroundEffectEcs(sim, scene, x, y, def, 'team', slot),
     heal: (x, y, range, amount, all) => healMembers(sim, x, y, range, amount, all),
+    // 已中毒判定(召唤类索敌优先挑没中毒的目标,避免毒效重复覆盖)
+    isPoisoned: (ref) => Poison.until[eidOf(ref)]! > sim.elapsedMs,
     targetHp: (ref) => Hp.v[eidOf(ref)] ?? 0,
     targetMaxHp: (ref) => Hp.max[eidOf(ref)] ?? 0,
     spawnProjectile: (x, y, angle, def, damage) => spawnProjectileEcs(sim, atlas, x, y, angle, def, damage, slot),
     anchor: () => sim.center,
-    applySlow: () => {}, // P3d
+    // 核弹类按波次成长(与敌人血量曲线同源);Boss 另按 bossRatio 减伤
+    waveScale: () => (testMode ? 1 : waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier),
+    isBossTarget: (ref) => Boss.v[eidOf(ref)] === 1,
+    // 光环类:仅本帧生效,每帧由能力重新登记(寒气光环 / 磁力回旋镖)
+    applySlow: (x, y, radius, factor) => sim.frameSlowZones.push({ x, y, r2: radius * radius, factor }),
+    attractCoins: (x, y, radius) => sim.frameAttractors.push({ x, y, r2: radius * radius }),
     // 队长技能的限时增伤(弱点讲义)叠进队伍伤害乘区,到期由 stepSim 复原
     damageMul: () => fx.damageMul * teamFx.teamDamageMul * sim.battleFx.teamDamageMul * sim.skillDamageMul,
     // 黏黏怪攻速惩罚:被蹭到的队员攻速变慢(叠乘进冷却,到时自动失效)
@@ -129,6 +137,10 @@ export function makeTeamCtx(
         if (!Alive.v[m]) reviveMember(sim, m)
         else MHp.hp[m] = Math.min(MHp.max[m]!, MHp.hp[m]! + MHp.max[m]! * healRatio)
         Iframe.last[m] = sim.elapsedMs + invulnMs - Iframe.ms[m]!
+        // 到手反馈:全队闪一下圣光金(走受击闪光同一通道,到期由 memberVisual 复原)
+        MFlash.until[m] = sim.elapsedMs + 320
+        Tint.color[m] = 0xffe082
+        Tint.effect[m] = 0
       }
     },
     /** 全场蹦迪(镜像 danceTargets):窗口内全体敌人定身摇摆(含窗口内新登场者),
@@ -151,6 +163,12 @@ export function makeTeamCtx(
     buffTeamDamage: (mul, durationMs) => {
       sim.skillDamageMul = mul
       sim.skillBuffUntil = sim.elapsedMs + durationMs
+      for (const m of sim.members) {
+        if (!Alive.v[m]) continue
+        MFlash.until[m] = sim.elapsedMs + 350
+        Tint.color[m] = 0x80d8ff
+        Tint.effect[m] = 0
+      }
     },
     /** 战场掉币(镜像 spawnRewardCoins):落地待拾,音效与爆点随拾取管线 */
     spawnCoins: (x, y, count) => {

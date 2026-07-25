@@ -32,10 +32,10 @@ function makeDeathCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, d: Pending
       if (sim.over || !Alive.v[m]) return
       if (sim.elapsedMs - Iframe.last[m]! < Iframe.ms[m]!) return
       Iframe.last[m] = sim.elapsedMs
-      hurtMember(sim, m, damage)
+      hurtMember(sim, m, damage, d.def.name)
     },
     slowTarget: () => {},
-    spawnGroundEffect: (x, y, def) => spawnGroundEffectEcs(sim, scene, x, y, def, 'enemy'),
+    spawnGroundEffect: (x, y, def) => spawnGroundEffectEcs(sim, scene, x, y, def, 'enemy', -1, d.def.name),
     heal: (x, y, range, amount, all, exclude) =>
       healEnemiesEcs(sim, x, y, range, amount, all, exclude ? eidOf(exclude) : undefined),
     spawnBullet: (x, y, angle, spec, damage, lifeMs) =>
@@ -46,6 +46,7 @@ function makeDeathCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, d: Pending
         speed: spec.speed,
         damage: Math.round(damage * d.dmgMul),
         lifeMs,
+        srcName: d.def.name,
       }),
   }
 }

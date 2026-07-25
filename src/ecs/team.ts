@@ -12,7 +12,7 @@ import { aggregateCharacterEffects, characterXp } from '../items/registry'
 import { levelStatsFor } from '../characters/levels'
 import { characterLevel } from '../run/charLevel'
 import { BATTLE_FX_IDENTITY } from '../battlefield/registry'
-import { currentFormation, guardOrder, hasCenter } from '../run/state'
+import { currentFormation, guardOrder, hasCenter, waveStartHp } from '../run/state'
 import { INVINCIBLE_HP, labInvincible } from '../run/lab'
 import { worldFor } from './worlds'
 import type { RunState } from '../run/state'
@@ -21,16 +21,18 @@ import {
   Breath,
   Depth,
   Follow,
-  Pop,
+  VisOff,
   Hurt,
   Iframe,
   MAtkSlow,
+  Member,
   MFlash,
   MHp,
   MPerk,
-  Member,
   OrbitBias,
+  Pop,
   Post,
+  Quad,
   Revive,
   Slot,
   Sprite,
@@ -69,13 +71,8 @@ export function spawnTeam(
   const teamFx = aggregateTeamCards(run.teamCards)
   const captain = CAPTAINS[run.captainId]
   const moveSpeed = captain.moveSpeed * UNIT * teamFx.moveSpeedMul
-  // 队员血量/复活基线(镜像 makeMember:测试模式素体,「无敌」旋钮开则天量血)
-  const maxHp = testMode
-    ? labInvincible()
-      ? INVINCIBLE_HP
-      : MEMBER.maxHp
-    : Math.round(memberMaxHp(0, captain.hpMul) * teamFx.teamHpMul)
-  const reviveMs = Math.max(1000, TEAM.reviveMs * captain.reviveMul * teamFx.reviveMul)
+  // 测试模式素体血量:「无敌」旋钮开则天量血(镜像 makeMember)
+  const labHp = labInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
 
   const posts = formationPosts(formation, count, 0)
   const size = MEMBER.size * UNIT
@@ -92,6 +89,7 @@ export function spawnTeam(
     addComponent(world, eid, Post)
     addComponent(world, eid, OrbitBias)
     addComponent(world, eid, Follow)
+    addComponent(world, eid, VisOff)
     addComponent(world, eid, Wander)
     addComponent(world, eid, Breath)
     addComponent(world, eid, Pop)
@@ -115,6 +113,8 @@ export function spawnTeam(
     Follow.y[eid] = y
     Follow.vx[eid] = 0
     Follow.vy[eid] = 0
+    VisOff.x[eid] = 0
+    VisOff.y[eid] = 0
     Follow.k[eid] = FOLLOW.kBase * (1 + FOLLOW.kJitter * Math.sin(slot * 12.9898))
     Wander.seed[eid] = slot * 2.399
     Wander.amp[eid] = 0
@@ -122,21 +122,25 @@ export function spawnTeam(
     Pop.until[eid] = 0
     Alive.v[eid] = 1
     Threat.v[eid] = 0
-    MHp.hp[eid] = maxHp
-    MHp.max[eid] = maxHp
     MAtkSlow.until[eid] = 0
     MAtkSlow.mul[eid] = 1
-    // 道具属性(荆棘/吸血):正常局按该槽位已持道具聚合,测试模式素体
-    const perk = testMode
-      ? { thorns: 0, killHeal: 0 }
-      : aggregateCharacterEffects(run.memberItems[slot] ?? [], levelStatsFor(rosterIds[slot]!, characterLevel(characterXp(run.memberItems[slot] ?? []))))
-    MPerk.thorns[eid] = perk.thorns
-    MPerk.killHeal[eid] = perk.killHeal
-    Iframe.ms[eid] = MEMBER.iframesMs
+    // 道具属性:正常局按该槽位已持道具 + 专属等级聚合,测试模式素体
+    const owned = testMode ? [] : (run.memberItems[slot] ?? [])
+    const fx = aggregateCharacterEffects(owned, testMode ? [] : levelStatsFor(rosterIds[slot]!, characterLevel(characterXp(owned))))
+    const maxHp = testMode ? labHp : Math.round(memberMaxHp(fx.hpAdd, captain.hpMul) * teamFx.teamHpMul)
+    // 血量跨波保留;上一波阵亡者低血量复活(测试模式素体满血)
+    MHp.hp[eid] = testMode ? labHp : waveStartHp(run.memberHp[slot] ?? MEMBER.maxHp, maxHp)
+    MHp.max[eid] = maxHp
+    MPerk.thorns[eid] = fx.thorns
+    MPerk.killHeal[eid] = fx.killHeal
+    MPerk.regenPerSec[eid] = fx.regenPerSec
+    Iframe.ms[eid] = MEMBER.iframesMs + fx.iframesAddMs
     Iframe.last[eid] = -1e9
-    Revive.ms[eid] = reviveMs
+    Revive.ms[eid] = Math.max(1000, TEAM.reviveMs * captain.reviveMul * teamFx.reviveMul + fx.reviveAddMs)
     Revive.at[eid] = 0
-    Hurt.radius[eid] = MEMBER.radius * UNIT
+    // 受击判定圆:MEMBER.radius 直取格值(与旧 circleBody 逐位一致,故实际是 ~0.45px 的点判定);
+    // N 保 1 中心的被保护收益:半径减半,更难被敌人/敌弹摸到
+    Hurt.radius[eid] = MEMBER.radius * (formation === 'guard' && post === 0 ? TEAM.guardCenterHurtboxMul : 1)
     MFlash.until[eid] = 0
     Transform.x[eid] = x
     Transform.y[eid] = y
@@ -149,6 +153,7 @@ export function spawnTeam(
     Tint.effect[eid] = 0
     Tint.alpha[eid] = 1
     Depth.z[eid] = 10 + off.y / UNIT
+    Quad.v[eid] = 0
     members.push(eid)
   }
 
@@ -189,11 +194,14 @@ export function spawnTeam(
     battleMods: [],
     battleFx: { ...BATTLE_FX_IDENTITY },
     enemySlowMul: teamFx.enemySlowMul,
+    frameSlowZones: [],
+    frameAttractors: [],
     enemyTargets: [],
     memberTargets: [],
     pendingDeaths: [],
     pendingDamageNumbers: [],
     pendingBursts: [],
+    pendingRings: [],
     rng: new Rng(run.decorSeed ^ 0x9e37),
     testMode,
     wave: run.wave,

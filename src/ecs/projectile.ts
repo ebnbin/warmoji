@@ -7,14 +7,15 @@ import {
   Depth,
   ENEMY_SET,
   EnemyProj,
-  EPROJ_SET,
   EProj,
+  EPROJ_SET,
   Hp,
   Hurt,
   Iframe,
   Proj,
-  Projectile,
   PROJ_SET,
+  Projectile,
+  Quad,
   Radius,
   Sprite,
   Tint,
@@ -24,7 +25,7 @@ import {
 import { applyEffects } from '../abilities/effects'
 import type { TargetInfo } from '../abilities/types'
 import { applyDamage, hurtMember } from './combat'
-import { enemyRef, projHitEids, projOnHit } from './store'
+import { enemyRef, eprojSrcName, projHitEids, projOnHit } from './store'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
 
@@ -73,6 +74,7 @@ export function spawnProjectileEcs(
   Tint.effect[eid] = 0
   Tint.alpha[eid] = 1
   Depth.z[eid] = 8
+  Quad.v[eid] = 0
   projOnHit[eid] = def.onHit
   projHitEids[eid] = new Set()
   playSfx('shoot')
@@ -195,6 +197,8 @@ export interface EnemyShotSpec {
   speed: number
   damage: number
   lifeMs: number
+  /** 伤害来源名(结算页敌情明细按敌人名归属) */
+  srcName?: string
 }
 
 /** 发射一枚敌弹(镜像 spawnEnemyProjectile;伤害已含 dmgMul,不再二次乘) */
@@ -230,6 +234,8 @@ export function spawnEnemyProjectileEcs(
   Tint.effect[eid] = 0
   Tint.alpha[eid] = 1
   Depth.z[eid] = 6
+  Quad.v[eid] = 0
+  eprojSrcName[eid] = spec.srcName
 }
 
 /** 逐帧推进敌弹 + 与队员圆-圆命中(吃无敌帧)+ 寿命/出界回收 */
@@ -258,7 +264,7 @@ export function updateEnemyProjectiles(sim: Sim, delta: number): void {
           break
         }
         Iframe.last[m] = now
-        hurtMember(sim, m, EProj.damage[eid]!)
+        hurtMember(sim, m, EProj.damage[eid]!, eprojSrcName[eid])
         hitMember = true
         break
       }

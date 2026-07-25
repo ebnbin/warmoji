@@ -12,12 +12,12 @@ import {
   Alive,
   Boss,
   Charge,
+  Pop,
   COIN_SET,
   Depth,
   Despawn,
   DmgMul,
   Dormant,
-  Morph,
   EDir,
   Elite,
   Enemy,
@@ -26,8 +26,11 @@ import {
   ETurn,
   Flash,
   Hp,
+  Iframe,
   Kv,
+  Morph,
   Poison,
+  Quad,
   Radius,
   Slide,
   Slow,
@@ -49,6 +52,7 @@ import {
   thiefEaten,
   thiefNextEatAt,
 } from './store'
+import { backEaseOut } from './sim'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
 import type { Point } from '../core/vec'
@@ -97,8 +101,9 @@ export function spawnEnemy(
   Transform.x[eid] = x
   Transform.y[eid] = y
   Transform.rot[eid] = 0
-  Transform.w[eid] = size
-  Transform.h[eid] = size
+  // 入场弹入(镜像 materializeEnemy 的 scale/alpha tween):Boss 更慢更弹,普通怪快而线性
+  Transform.w[eid] = size * (boss ? 0.2 : 0.3)
+  Transform.h[eid] = Transform.w[eid]!
   Speed.v[eid] = def.speed
   Hp.v[eid] = hp
   Hp.max[eid] = hp
@@ -146,8 +151,13 @@ export function spawnEnemy(
   Sprite.flipX[eid] = 0
   Tint.color[eid] = 0xffffff
   Tint.effect[eid] = 0
-  Tint.alpha[eid] = 1
+  Tint.alpha[eid] = boss ? 0.2 : 0.3
+  Pop.until[eid] = sim.elapsedMs + (boss ? 320 : 130)
+  Pop.ms[eid] = boss ? 320 : 130
+  Pop.size[eid] = size
+  Pop.back[eid] = boss ? 1 : 0
   Depth.z[eid] = boss ? 7 : 5
+  Quad.v[eid] = 0
   enemyDef[eid] = def
   return eid
 }
@@ -219,12 +229,15 @@ function steerDash(sim: Sim, eid: number, slow: number): { vx: number; vy: numbe
   const ex = Transform.x[eid]!
   const ey = Transform.y[eid]!
   if (state === 2) {
-    // windup:定身;到时进冲刺
+    // windup:定身颤动(脚本化姿态,主循环不再叠环境摇摆);到时进冲刺
+    Transform.rot[eid] = Math.sin(now / 28) * 0.14
     if (now >= Charge.windupUntil[eid]!) {
       if (lm.lockAt === 'launch') lockDashDir(sim, eid, lm.aim)
       EState.v[eid] = 3
       Charge.dashUntil[eid] =
         now + (lm.length.kind === 'time' ? lm.length.durationMs : (lm.length.dist / lm.dashSpeed) * 1000)
+      Transform.rot[eid] = 0
+      if (lm.sfx) playSfx(lm.sfx)
     }
     return { vx: 0, vy: 0 }
   }
@@ -239,6 +252,9 @@ function steerDash(sim: Sim, eid: number, slow: number): { vx: number; vy: numbe
         Charge.coolUntil[eid] = now + lm.trigger.cooldownMs
       }
     }
+    // 脚本化姿态:本体前倾并按冲刺方向翻转
+    Transform.rot[eid] = EDir.x[eid]! * 0.3
+    Sprite.flipX[eid] = EDir.x[eid]! > 0 ? 1 : 0
     // 冲刺碾墙(残垣图拆迁 Boss):沿途碾碎断壁,只在冲刺态生效
     if (enemyDef[eid]?.breaksWalls) sim.hooks.smashWall(sim, ex, ey)
     return { vx: EDir.x[eid]! * lm.dashSpeed * slow, vy: EDir.y[eid]! * lm.dashSpeed * slow }
@@ -316,15 +332,22 @@ function steerDetonate(sim: Sim, eid: number, slow: number): { vx: number; vy: n
   const ex = Transform.x[eid]!
   const ey = Transform.y[eid]!
   if (EState.v[eid] === 2) {
-    // 定身拆弹;到时引爆
+    // 定身拆弹 + 红白脉冲示警(脚本化姿态);到时引爆
+    Tint.effect[eid] = 1
+    Tint.color[eid] = now % 240 < 120 ? 0xffffff : 0xff5252
     if (now >= Charge.windupUntil[eid]!) {
       const dmg = Math.round(lm.blastDamage * DmgMul.v[eid]!)
       const r2 = lm.blastRadius * lm.blastRadius
       for (const m of sim.members) {
         if (!Alive.v[m]) continue
         const d = sim.hooks.worldDelta(sim, ex, ey, Transform.x[m]!, Transform.y[m]!)
-        if (d.x * d.x + d.y * d.y <= r2) hurtMember(sim, m, dmg)
+        if (d.x * d.x + d.y * d.y > r2) continue
+        // 与敌方能力同口径:吃无敌帧节流并消费之(免得接触伤害与自爆同帧双吃)
+        if (now - Iframe.last[m]! < Iframe.ms[m]!) continue
+        Iframe.last[m] = now
+        hurtMember(sim, m, dmg, enemyDef[eid]?.name)
       }
+      sim.pendingRings.push({ x: ex, y: ey, radius: lm.blastRadius })
       playSfx('boom')
       despawnEnemy(sim, eid)
     }
@@ -489,6 +512,24 @@ export function steerEnemies(sim: Sim, delta: number): void {
   const now = sim.elapsedMs
   const decay = Math.exp(-delta / (KNOCKBACK.tauMs * sim.hooks.knockbackTauMul(sim)))
   for (const eid of eids) {
+    // 入场弹入:缩放/透明插值到位后清零(Boss 走 Back.easeOut 过冲,普通怪线性)
+    if (Pop.until[eid] !== 0) {
+      const left = Pop.until[eid]! - now
+      if (left <= 0) {
+        Pop.until[eid] = 0
+        Transform.w[eid] = Pop.size[eid]!
+        Transform.h[eid] = Pop.size[eid]!
+        Tint.alpha[eid] = 1
+      } else {
+        const raw = 1 - left / Pop.ms[eid]!
+        const t = Pop.back[eid] ? backEaseOut(raw) : raw
+        const from = Boss.v[eid] ? 0.2 : 0.3
+        const k = Pop.size[eid]! * (from + (1 - from) * t)
+        Transform.w[eid] = k
+        Transform.h[eid] = k
+        Tint.alpha[eid] = from + (1 - from) * raw
+      }
+    }
     if (Dormant.v[eid]) continue // 休眠:冻结 AI 与位移,状态原样保留,回到活跃范围自然接管
     // 亡语诱饵尸壳到时静默移除(不计击杀、不掉落、不放死亡效果)
     if (Despawn.at[eid] !== 0 && now >= Despawn.at[eid]!) {
@@ -500,19 +541,38 @@ export function steerEnemies(sim: Sim, delta: number): void {
     // 全场蹦迪:窗口内定身摇摆(粉染色),行为状态机暂停;击退与世界后处理照常。
     // 用 sim 级窗口表达,窗口内新登场的敌人天然跟着跳(镜像 materializeEnemy 的补标)
     const dancing = now < sim.danceEndsAt
-    // 非白闪期的常驻染色:蹦迪粉 > 中毒毒绿 > 常态白(镜像 steerEnemies 的染色优先级)
-    if (Flash.until[eid] === 0) {
-      Tint.effect[eid] = 0
-      Tint.color[eid] = dancing ? 0xff9ff3 : now < Poison.until[eid]! ? 0x7bff5a : 0xffffff
-    }
     let tx = Transform.x[eid]!
     let ty = Transform.y[eid]!
     const kind = enemyDef[eid]?.locomotion.kind ?? 'chase'
-    // 速度倍率:能力限时减速/冻结 × 体质(精英加速/护巢暴走) × 团队卡与战场拾取的敌速乘区。
+    // 本帧减速区(寒气光环等)叠乘:落在圈内即按 factor 变慢并染冷色(镜像 slowFactorFor)
+    let zoneSlow = 1
+    for (const z of sim.frameSlowZones) {
+      const d = sim.hooks.worldDelta(sim, tx, ty, z.x, z.y)
+      if (d.x * d.x + d.y * d.y <= z.r2) zoneSlow *= z.factor
+    }
+    // 速度倍率:减速区 × 能力限时减速/冻结 × 体质(精英加速/护巢暴走) × 团队卡与战场拾取的敌速乘区。
     // 时停不在此处乘——世界侧统一按 wdelta 积分已等价于时间放缩
     const slow =
-      (now < Slow.until[eid]! ? Slow.mul[eid]! : 1) * SpMul.v[eid]! * sim.enemySlowMul * sim.battleFx.enemySlowMul
+      zoneSlow *
+      (now < Slow.until[eid]! ? Slow.mul[eid]! : 1) *
+      SpMul.v[eid]! *
+      sim.enemySlowMul *
+      sim.battleFx.enemySlowMul
     const speed = Speed.v[eid]! * slow
+    // 非白闪期的常驻染色:蓄力橙 > 蹦迪粉 > 中毒毒绿 > 减速冷蓝 > 常态白(镜像 steerEnemies 的染色优先级)
+    if (Flash.until[eid] === 0) {
+      Tint.effect[eid] = 0
+      Tint.color[eid] =
+        EState.v[eid] === 2
+          ? 0xffb74d
+          : dancing
+            ? 0xff9ff3
+            : now < Poison.until[eid]!
+              ? 0x7bff5a
+              : zoneSlow < 1
+                ? 0xa5d8ff
+                : 0xffffff
+    }
     // 逐 locomotion 求本帧「行为速度」(px/s);位移在本段之后统一积分,
     // 以便世界钩子(冰面打滑/河流漂移)能在积分前改写这份速度
     let bvx = 0

@@ -8,7 +8,7 @@ import type { Sim } from './sim'
 // 地面效果(阵营中立,镜像 groundEffects.ts):留在地面的持续区,敌我同构——
 // team 放的按区域脉冲烧敌人(每 tickMs 烧区内全部)、enemy 放的按受害者节流烧队员
 //(每 tickMs 至多掉一次血)。视觉是半透明圆(非 emoji,走 Phaser graphics,场景侧管理);
-// 逻辑跳伤复用 applyDamage/hurtMember。战报归属(srcSlot/srcName)待 P4 结算落地。
+// 逻辑跳伤复用 applyDamage/hurtMember,战报归属随区携带(team 记槽位、enemy 记敌人名)。
 
 type Faction = 'team' | 'enemy'
 
@@ -17,6 +17,9 @@ interface Zone {
   y: number
   r2: number
   faction: Faction
+  /** 战报归属:team 区记出手槽位、enemy 区记敌人名 */
+  srcSlot: number
+  srcName: string
   until: number
   tickMs: number
   damage: number
@@ -47,6 +50,8 @@ export function spawnGroundEffectEcs(
   y: number,
   def: GroundEffectDef,
   faction: Faction,
+  srcSlot = -1,
+  srcName = '',
 ): void {
   const gfx = scene.add.graphics().setDepth(2)
   gfx.fillStyle(def.color, def.fillAlpha)
@@ -61,6 +66,8 @@ export function spawnGroundEffectEcs(
     y,
     r2: def.radius * def.radius,
     faction,
+    srcSlot,
+    srcName,
     until: sim.elapsedMs + def.durationMs,
     tickMs: def.tickMs,
     damage: def.damage,
@@ -91,7 +98,7 @@ export function updateGroundEffectsEcs(sim: Sim, scene: Phaser.Scene): void {
       const last = memberGroundHit.get(m) ?? -Infinity
       if (now - last >= g.tickMs) {
         memberGroundHit.set(m, now)
-        hurtMember(sim, m, g.damage)
+        hurtMember(sim, m, g.damage, g.srcName || undefined, 0xa5d86a) // 中毒/灼烧的地面伤害走毒绿闪
       }
       break
     }
@@ -104,7 +111,7 @@ export function updateGroundEffectsEcs(sim: Sim, scene: Phaser.Scene): void {
     for (const eid of enemies) {
       const dx = Transform.x[eid]! - g.x
       const dy = Transform.y[eid]! - g.y
-      if (dx * dx + dy * dy <= g.r2) applyDamage(sim, eid, g.damage)
+      if (dx * dx + dy * dy <= g.r2) applyDamage(sim, eid, g.damage, 0, undefined, undefined, g.srcSlot)
     }
   }
 }

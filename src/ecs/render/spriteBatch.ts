@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { query } from 'bitecs'
-import { Depth, Sprite, Tint, Transform, RENDERABLE } from '../components'
+import { Depth, Quad, Sprite, Tint, Transform, RENDERABLE } from '../components'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from './atlas'
 
@@ -107,10 +107,20 @@ export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
       const y3 = calc.getY(hw, hh)
 
       self.atlas.uvInto(frame, self.uv)
-      const u0 = self.uv[0]!
-      const v0 = self.uv[1]!
-      const u1 = self.uv[2]!
-      const v1 = self.uv[3]!
+      let u0 = self.uv[0]!
+      let v0 = self.uv[1]!
+      let u1 = self.uv[2]!
+      let v1 = self.uv[3]!
+      // 死亡碎片:取该 frame 的 UV 矩形四等分之一(v 轴为 GL 朝向,v0 是「上」)
+      const quad = Quad.v[eid]!
+      if (quad !== 0) {
+        const um = (u0 + u1) / 2
+        const vm = (v0 + v1) / 2
+        if (quad === 1 || quad === 3) u1 = um
+        else u0 = um
+        if (quad === 1 || quad === 2) v1 = vm
+        else v0 = vm
+      }
 
       // 不再乘 camera.alpha：v4 在合成阶段统一施加相机透明度（核心的 SubmitterQuad /
       // TransformerImage 同样不碰它），v3 那样逐顶点再乘一次会双重变淡

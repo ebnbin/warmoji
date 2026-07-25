@@ -6,7 +6,7 @@ import { Alive, Boss, DmgMul, Elite, ENEMY_SET, Hp, Iframe, MHp, Transform } fro
 import { hurtMember } from '../combat'
 import { spawnGroundEffectEcs } from '../groundEffects'
 import { spawnEnemyProjectileEcs } from '../projectile'
-import { enemyVelX, enemyVelY, memberRef } from '../store'
+import { enemyDef, enemyVelX, enemyVelY, memberRef } from '../store'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
 
@@ -81,6 +81,7 @@ export function makeEnemyCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, eid
       speed: spec.speed,
       damage,
       lifeMs,
+      srcName: enemyDef[eid]?.name,
     })
   return {
     scene,
@@ -94,10 +95,10 @@ export function makeEnemyCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, eid
       if (sim.over || !Alive.v[m]) return
       if (sim.elapsedMs - Iframe.last[m]! < Iframe.ms[m]!) return
       Iframe.last[m] = sim.elapsedMs
-      hurtMember(sim, m, damage)
+      hurtMember(sim, m, damage, enemyDef[eid]?.name)
     },
     slowTarget: () => {},
-    spawnGroundEffect: (x, y, def) => spawnGroundEffectEcs(sim, scene, x, y, def, 'enemy'),
+    spawnGroundEffect: (x, y, def) => spawnGroundEffectEcs(sim, scene, x, y, def, 'enemy', -1, enemyDef[eid]?.name ?? ''),
     heal: (x, y, range, amount, all, exclude) =>
       healEnemiesEcs(sim, x, y, range, amount, all, exclude ? eidOf(exclude) : undefined),
     spawnProjectile: (x, y, angle, pDef, damage) => {
