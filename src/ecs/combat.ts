@@ -1,5 +1,5 @@
 import { query, removeEntity } from 'bitecs'
-import { norm } from '../core/vec'
+import { norm } from '../util/vec'
 import { playSfx } from '../audio/sfx'
 import { gainXp } from '../data/xp'
 import { coinDropChance } from '../data/waves'
@@ -7,7 +7,7 @@ import { ELITE } from '../data/enemies'
 import type { EnemyDef } from '../data/enemies'
 import { KNOCKBACK } from '../data/abilities'
 import { MEMBER } from '../data/characters'
-import { UNIT } from '../core/units'
+import { UNIT } from '../util/units'
 import { spawnShardsEcs } from './shards'
 import {
   Alive,

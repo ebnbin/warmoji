@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { ANIM_DEF, clipFrameIndex } from '../emoji/studio'
+import { ANIM_DEF, clipFrameIndex } from '../emoji/anim'
 import type { OutlineKind } from '../emoji/svg'
 import { Anim, ANIM_SET, Sprite } from './components'
 import { animId, animOutline } from './store'

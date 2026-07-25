@@ -1,4 +1,4 @@
-import { DEG2RAD } from '../../core/units'
+import { DEG2RAD } from '../../util/units'
 import type Phaser from 'phaser'
 import { thrustHitIndices } from '../../war/hit'
 import type { ThrustDef } from '../../data/abilityDefs'

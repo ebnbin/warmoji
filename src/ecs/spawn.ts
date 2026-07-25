@@ -15,7 +15,7 @@ import {
 import { DENSITY_PARAMS, labDensity, labDifficulty, labEnemySet } from '../run/lab'
 import { MAPS, mapEnemyRoster } from '../data/maps'
 import type { MapDef } from '../data/maps'
-import { hourAt, isDayAt } from '../war/world/daynight'
+import { hourAt, isDayAt } from '../war/maps/daynight'
 import { Dormant, ENEMY_SET } from './components'
 import { spawnEnemy } from './enemy'
 import { enemyCarries } from './store'

@@ -1,6 +1,6 @@
 import { addComponent, addEntity } from 'bitecs'
-import { UNIT } from '../core/units'
-import { Rng } from '../core/rng'
+import { UNIT } from '../util/units'
+import { Rng } from '../util/rng'
 import { FOLLOW } from '../data/feel'
 import { CAPTAINS } from '../data/captains'
 import { CHARACTERS } from '../data/characters'

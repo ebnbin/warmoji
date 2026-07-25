@@ -1,4 +1,4 @@
-import { UNIT } from '../../core/units'
+import { UNIT } from '../../util/units'
 import { waveAt } from '../../data/waves'
 import type { DecoyEffect, SplitEffect } from '../../data/enemies'
 import { Despawn } from '../components'

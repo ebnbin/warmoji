@@ -1,6 +1,6 @@
 import { CAPTAINS, CAPTAIN_IDS } from '../data/captains'
 import type { CaptainId } from '../data/captains'
-import type { StringStorage } from '../core/storage'
+import type { StringStorage } from '../util/storage'
 import type { MapId } from '../data/maps'
 import { sanitizeMapId } from '../data/maps'
 

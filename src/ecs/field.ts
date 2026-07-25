@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import { UNIT } from '../core/units'
+import { UNIT } from '../util/units'
 import { emojiImage } from '../emoji/textures'
 import { playSfx } from '../audio/sfx'
 import { FIELD, POLARITY_COLOR } from '../data/battlefield'

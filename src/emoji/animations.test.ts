@@ -5,7 +5,7 @@ import { CHARACTERS } from '../data/characters'
 import { BOSSES, ENEMY_DEFS } from '../data/enemies'
 import { PICKUPS } from '../data/pickups'
 import { packSvg, parseEmojiPack } from './pack'
-import { ANIM_SETS, animClipOf, animSetOf, bakeAnimFrame, splitSvg } from './studio'
+import { ANIM_SETS, animClipOf, animSetOf, bakeAnimFrame, splitSvg } from './anim'
 
 // 动画资源与真实素材的对账：validateAnimResource 只能查格式，
 // 这里对着打包 SVG 查「部件下标是否越界」（bake 对越界静默输出空，必须显式测）

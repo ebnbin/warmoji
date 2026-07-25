@@ -1,5 +1,5 @@
 import { waveAt } from '../../data/waves'
-import { UNIT } from '../../core/units'
+import { UNIT } from '../../util/units'
 import { applyEffects } from '../abilities/effects'
 import { buildEnemyCtx } from './abilities'
 import type { Enemy } from './enemies'

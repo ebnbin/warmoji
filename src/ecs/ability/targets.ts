@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { UNIT } from '../../core/units'
+import { UNIT } from '../../util/units'
 import { ACQUIRE } from '../../data/abilities'
 import { Alive, Dormant, ENEMY_SET, Hurt, Radius, Transform } from '../components'
 import { FACTION } from './components'

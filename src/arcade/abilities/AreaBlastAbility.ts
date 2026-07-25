@@ -1,5 +1,5 @@
 import { ACQUIRE } from '../../data/abilities'
-import { UNIT } from '../../core/units'
+import { UNIT } from '../../util/units'
 import type { AreaBlastDef } from '../../data/abilityDefs'
 import { applyBlast, applyEffects } from './effects'
 import { boomCue, circleCue } from '../../war/cues'

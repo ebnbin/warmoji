@@ -1,7 +1,7 @@
 import type { CaptainId } from '../data/captains'
 import type { CharacterId } from '../data/characters'
-import type { StringStorage } from '../core/storage'
-import { Rng } from '../core/rng'
+import type { StringStorage } from '../util/storage'
+import { Rng } from '../util/rng'
 import progressionJson from '../assets/progression.json'
 import type { Progression } from '../data/waves'
 

@@ -1,10 +1,10 @@
 import Phaser from 'phaser'
 import { visibleEmojiIds } from '../emoji/pack'
-import { browserStorage } from '../core/storage'
-import { loadSettings } from '../run/settings'
-import { randomPalette } from '../core/palette'
-import type { Palette } from '../core/palette'
-import { Rng } from '../core/rng'
+import { browserStorage } from '../util/storage'
+import { loadSettings } from '../save/settings'
+import { randomPalette } from '../util/palette'
+import type { Palette } from '../util/palette'
+import { Rng } from '../util/rng'
 import { setSvgSize } from '../emoji/svg'
 import {
   ANIM_RECIPES,
@@ -17,18 +17,18 @@ import {
   composeSvg,
   flattenTree,
   parseSvgTree,
-} from '../emoji/studio'
-import type { AnimClip, AnimRecipe, SvgTree, TreeRow } from '../emoji/studio'
-import { applyBackground } from '../core/background'
+} from '../emoji/anim'
+import type { AnimClip, AnimRecipe, SvgTree, TreeRow } from '../emoji/anim'
+import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
 import { emojiImage, emojiKey, emojiSvgText, emojiText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
 import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
-import { FONT, UI_FONT } from '../core/fonts'
-import { TAP_SLOP } from '../core/units'
+import { FONT, UI_FONT } from '../util/fonts'
+import { TAP_SLOP } from '../util/units'
 import { VirtualEmojiGrid } from '../ui/virtualGrid'
 import { ScrollView } from '../ui/scroll'
-import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
-import { clipTo } from '../core/mask'
+import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { clipTo } from '../util/mask'
 
 // Emoji Studio：twemoji 部件动画的游戏内工作台，三个 tab——
 // 🎬 配方 = animations.json 里的精修动画预览；🧩 模板 = 任选 emoji × 通用

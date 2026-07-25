@@ -1,5 +1,5 @@
 import { addComponent, hasComponent, query, removeComponent, removeEntity } from 'bitecs'
-import { DEG2RAD } from '../../../core/units'
+import { DEG2RAD } from '../../../util/units'
 import type { BoomerangDef } from '../../../data/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { Sprite, Tint, Transform } from '../../components'

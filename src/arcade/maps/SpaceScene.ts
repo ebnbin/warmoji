@@ -1,13 +1,13 @@
 import Phaser from 'phaser'
-import { UNIT } from '../../core/units'
+import { UNIT } from '../../util/units'
 import { InfiniteScene } from './InfiniteScene'
 import { MAP, MAPS } from '../../data/maps'
 import type { SpaceConfig } from '../../data/maps'
-import { ringPoint } from '../../war/world/world'
+import { ringPoint } from '../../war/maps/world'
 import { emojiImage } from '../../emoji/textures'
 import { enemyOf } from '../enemy/enemies'
-import { clampToDisc, confineVelocity, meteorSweep } from '../../war/world/space'
-import type { Point } from '../../core/vec'
+import { clampToDisc, confineVelocity, meteorSweep } from '../../war/maps/space'
+import type { Point } from '../../util/vec'
 import type { ArcadeBody, ImageObj } from '../ArcadeBattleScene'
 
 // 天体横扫的一次实例（同一时刻至多一个）

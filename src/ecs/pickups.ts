@@ -1,6 +1,6 @@
 import { addComponent, addEntity, query, removeEntity } from 'bitecs'
-import { UNIT } from '../core/units'
-import { norm } from '../core/vec'
+import { UNIT } from '../util/units'
+import { norm } from '../util/vec'
 import { playSfx } from '../audio/sfx'
 import { PICKUP, PICKUPS } from '../data/pickups'
 import {

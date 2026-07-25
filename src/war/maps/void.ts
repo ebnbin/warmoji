@@ -1,4 +1,4 @@
-import type { Point } from '../../core/vec'
+import type { Point } from '../../util/vec'
 
 // 虚空地图（环面世界）的纯几何（禁 phaser/DOM）。
 // 竞技场是固定尺寸的环面：四边两两粘合，坐标按模运算回绕，没有墙。

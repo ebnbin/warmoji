@@ -1,4 +1,4 @@
-import { DEG2RAD } from '../../core/units'
+import { DEG2RAD } from '../../util/units'
 import type Phaser from 'phaser'
 import { sectorHitIndices } from '../../war/hit'
 import type { SweepDef } from '../../data/abilityDefs'

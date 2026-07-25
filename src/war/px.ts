@@ -1,4 +1,4 @@
-import { UNIT } from '../core/units'
+import { UNIT } from '../util/units'
 
 // 使用侧换算：注册表数值一律格值（项目约定，见 CLAUDE.md），战斗引擎在
 // 进场处调 toPx 一次性换算成运行时 px。按字段名识别空间量、深拷贝换算；

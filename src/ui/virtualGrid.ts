@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
-import { TAP_SLOP } from '../core/units'
+import { TAP_SLOP } from '../util/units'
 import { emojiThumbKey, requestEmojiThumb } from '../emoji/thumbs'
-import { clipTo } from '../core/mask'
+import { clipTo } from '../util/mask'
 
 // 全量 emoji 虚拟网格（feed 流）：环形缓冲复用固定数量 Image——
 // slot = index % poolSize，只有窗口边缘换入的格子才重绑；格子滚入视口

@@ -383,7 +383,7 @@ export function fxSteam(opts: {
 
 // ── 动画资源格式：原始 SVG + 动画参数 = 可存储/校验/热加载的数据资产 ──
 // fx 用「生成器名 + 参数」声明（函数无法序列化），加载时经注册表还原成渲染函数。
-// 资源文件：src/core/animations.json（format 版本化；def 为缺省播放规格）。
+// 资源文件：src/emoji/animations.json（format 版本化；def 为缺省播放规格）。
 // v2 起一个 emoji 是一组具名 clip（idle 待机循环、attack 攻击周期…）：
 // clip 只是纯相位空间的资产，播放时长/触发时机全由玩法侧决定——
 // kind='cycle' 的契约是「相位 0..1 = 一个完整行为周期、出手时刻锚在相位终点」，

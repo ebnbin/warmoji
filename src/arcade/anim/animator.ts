@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import { clipFrameIndex } from '../../emoji/studio'
+import { clipFrameIndex } from '../../emoji/anim'
 
 // 极简翻页动画播放器：持有一个 Image，把游戏时钟翻算成帧纹理并 setTexture。
 // 状态机只有两层——常驻 idle（循环，可带相位偏移做群体去同步）+ 一次性

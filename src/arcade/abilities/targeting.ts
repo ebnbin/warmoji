@@ -1,4 +1,4 @@
-import { UNIT } from '../../core/units'
+import { UNIT } from '../../util/units'
 import { ACQUIRE } from '../../data/abilities'
 import type { AbilityOwner, TargetInfo } from './types'
 

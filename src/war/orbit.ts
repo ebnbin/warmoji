@@ -83,6 +83,6 @@ export function stepPhase(phase: number, omega: number, dtMs: number): number {
 
 // 环形阵轨道动力学：全员按「秉性（CHARACTERS.orbit）× 探测范围内敌情」计算移动倾向，
 // 每帧力量（倾向绝对值）最大者即刻掌舵（同力随机、阵亡出局、随时换手），
-// 环是刚性同步的：主力驱动一个共享相位，全员保持均匀间距整体转动（core/orbit.ts）。
+// 环是刚性同步的：主力驱动一个共享相位，全员保持均匀间距整体转动（本文件）。
 // 数值在 defs/feel.ts（orbit 段），经 gen 校验产出 feel.json。
 export const ORBIT = (feelJson as unknown as FeelTuning).orbit

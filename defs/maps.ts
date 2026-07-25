@@ -1,4 +1,4 @@
-import { hslToInt } from '../src/core/palette.ts'
+import { hslToInt } from '../src/util/palette.ts'
 import type { MapDef } from '../src/data/maps'
 import type { EnemyMixRow } from '../src/data/enemies'
 

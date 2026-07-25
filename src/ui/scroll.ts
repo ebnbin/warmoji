@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import { TAP_SLOP } from '../core/units'
-import { clipTo, markDirty } from '../core/mask'
+import { TAP_SLOP } from '../util/units'
+import { clipTo, markDirty } from '../util/mask'
 
 // 通用可滚动容器：几何遮罩裁像素 + 滚轮/拖动 + 内容高度钳位。
 // 与 EmojiGrid 同源的手势逻辑，但装任意 GameObject（详情面板的变长文本/图标/交互控件），

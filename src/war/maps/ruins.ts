@@ -1,5 +1,5 @@
-import { norm } from '../../core/vec'
-import type { Point } from '../../core/vec'
+import { norm } from '../../util/vec'
+import type { Point } from '../../util/vec'
 
 // 残垣地图（kind='ruins'）的纯几何（禁 phaser/DOM）：
 // · WallGrid —— 断壁网格：点/线段是否撞墙（视线遮挡 + 子弹裁剪）、贴墙滑动

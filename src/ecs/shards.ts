@@ -1,5 +1,5 @@
 import { addComponent, addEntity, query, removeEntity } from 'bitecs'
-import { norm } from '../core/vec'
+import { norm } from '../util/vec'
 import { KNOCKBACK } from '../data/abilities'
 import { Depth, Quad, Shard, SHARD_SET, Sprite, Tint, Transform } from './components'
 import type { Sim } from './sim'

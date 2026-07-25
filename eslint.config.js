@@ -41,7 +41,7 @@ export default tseslint.config(
   // 故这里把 war 与两套实现的 pattern 一并给出（大厅页三者都不该碰）。
   // main.ts 不在此列：它要把战斗场景与 HUD 注册进 Phaser。
   {
-    files: ['src/menu/**/*.ts', 'src/boot/**/*.ts'],
+    files: ['src/scene/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -67,8 +67,8 @@ export default tseslint.config(
     },
   },
   // 反方向同样要拦：战斗侧不得依赖大厅页。通用控件已抽到 src/ui/，
-  // 战斗 HUD 要用滚动容器就从那里取——之前 war/UIScene 直接 import menu/scroll，
-  // 正是因为只拦了 menu → war 这一个方向才一直没被发现。
+  // 战斗 HUD 要用滚动容器就从那里取——历史上 UIScene 曾直接 import menu/scroll，
+  // 正是因为只拦了大厅页 → war 这一个方向才一直没被发现。
   {
     files: ['src/war/**/*.ts', 'src/arcade/**/*.ts', 'src/ecs/**/*.ts'],
     rules: {
@@ -77,8 +77,8 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ['../menu/*', '../menu/**', '../../menu/*', '../../menu/**'],
-              message: '战斗侧不得依赖大厅页；通用控件在 src/ui/，业务数据在 src/data/',
+              group: ['../scene/*', '../scene/**', '../../scene/*', '../../scene/**'],
+              message: '战斗侧不得依赖场景层；通用控件在 src/ui/，业务数据在 src/data/',
             },
           ],
         },
@@ -89,12 +89,10 @@ export default tseslint.config(
     files: ['src/**/*.ts'],
     ignores: [
       'src/main.ts',
-      'src/boot/PreloadScene.ts',
+      'src/scene/*Scene.ts',
       'src/war/UIScene.ts',
-      'src/war/Joystick.ts',
       'src/war/damageFont.ts',
-      'src/core/fx.ts',
-      'src/menu/*Scene.ts',
+      'src/util/fx.ts',
       // 旧框架（arcade）整包是表现层：Scene 继承 + Arcade Physics body
       'src/arcade/**/*.ts',
       // ECS 实验：宿主场景 + 自绘渲染层触碰 Phaser/WebGL（表现层）；ECS 逻辑文件仍禁 phaser
@@ -105,7 +103,7 @@ export default tseslint.config(
       'src/ui/**/*.ts',
       'src/emoji/textures.ts',
       'src/emoji/thumbs.ts',
-      'src/core/apply.ts',
+      'src/util/apply.ts',
       'src/war/diagnostics.ts',
     ],
     rules: {
@@ -124,8 +122,8 @@ export default tseslint.config(
     },
   },
   // data 是内容层：各张游戏数据表（读 src/assets/*.json）+ 其类型 + 对表的纯查询。
-  // 它是叶子——只许向下依赖 core 与 assets（外加 audio 的 SfxId 类型），不得依赖任何
-  // 业务包。一旦 data 反向引用 war/run/menu，「内容与玩法分离」就名存实亡。
+  // 它是叶子——只许向下依赖 util 与 assets，不得依赖任何业务包。
+  // 一旦 data 反向引用 war/run/scene，「内容与玩法分离」就名存实亡。
   {
     files: ['src/data/**/*.ts'],
     rules: {
@@ -135,7 +133,7 @@ export default tseslint.config(
           patterns: [
             {
               // 显式列出禁止的业务包：no-restricted-imports 的 group 不支持 '!' negation
-              //（试过 ['../*', '!../core/*'] —— 负向被忽略，连 core 一起拦），故只能正向枚举。
+              //（试过 ['../*', '!../util/*'] —— 负向被忽略，连 util 一起拦），故只能正向枚举。
               // 新增顶层包时记得同步这张表。
               group: [
                 '../war/*', '../war/**',
@@ -143,13 +141,13 @@ export default tseslint.config(
                 '../ecs/*', '../ecs/**',
                 '../battle',
                 '../run/*', '../run/**',
-                '../menu/*', '../menu/**',
-                '../boot/*', '../boot/**',
+                '../save/*', '../save/**',
+                '../scene/*', '../scene/**',
                 '../debug', '../manifest',
                 '../emoji/*', '../emoji/**',
                 '../audio/*', '../audio/**',
               ],
-              message: 'data 是内容叶子层：只可依赖 core / assets，不得反向依赖业务包',
+              message: 'data 是内容叶子层：只可依赖 util / assets，不得反向依赖业务包',
             },
           ],
         },
@@ -158,8 +156,8 @@ export default tseslint.config(
   },
   // defs 是创作层：内容与数值的手写源，经 scripts/gen-defs.ts 校验后产出 src/assets/*.json。
   // 它对 src 的依赖只该是「这张表长什么样」——即 src/data/ 里的数据类型定义；
-  // 另允许 src/core/ 的纯工具（如 palette.hslToInt，让地图配色能按 HSL 书写）。
-  // 一旦 defs 够到 war/audio/menu 等功能包，创作层就跟着玩法实现走了：
+  // 另允许 src/util/ 的纯工具（如 palette.hslToInt，让地图配色能按 HSL 书写）。
+  // 一旦 defs 够到 war/audio/scene 等功能包，创作层就跟着玩法实现走了：
   // 那些包本该反过来消费内容，删改其中任一个都会连累「内容怎么写」。
   {
     files: ['defs/**/*.ts'],
@@ -177,8 +175,8 @@ export default tseslint.config(
                 '../src/ecs/*', '../src/ecs/**',
                 '../src/battle', '../src/debug', '../src/manifest',
                 '../src/run/*', '../src/run/**',
-                '../src/menu/*', '../src/menu/**',
-                '../src/boot/*', '../src/boot/**',
+                '../src/save/*', '../src/save/**',
+                '../src/scene/*', '../src/scene/**',
                 '../src/ui/*', '../src/ui/**',
                 '../src/emoji/*', '../src/emoji/**',
                 '../src/audio/*', '../src/audio/**',
@@ -186,17 +184,19 @@ export default tseslint.config(
                 '../src/assets/*', '../src/assets/**',
               ],
               message:
-                'defs 是创作层：类型一律取自 src/data/（数据类型定义所在），纯工具可取 src/core/；不得依赖功能包。若某个类型现在住在功能包里，说明它本就该搬进 src/data/',
+                'defs 是创作层：类型一律取自 src/data/（数据类型定义所在），纯工具可取 src/util/；不得依赖功能包。若某个类型现在住在功能包里，说明它本就该搬进 src/data/',
             },
           ],
         },
       ],
     },
   },
-  // core 是地基：任何游戏都会用到的通用层，可依赖 Phaser，不得依赖业务包
-  //（类型引用也不行——换一个游戏要能整目录原样带走）
+  // util 是杂物层：一堆没有更好归处的静态方法。它**不是**干净的 infra——
+  // 里面既有真能带走的（rng / vec / storage / mask），也有纯本作专属的
+  // （units 的 UNIT 标定、fonts 字号阶、background 渐变、fx 战斗特效、format）。
+  // 唯一还成立的约束是不向上引用；别把它当"换个游戏能整目录搬走"的地基。
   {
-    files: ['src/core/**/*.ts'],
+    files: ['src/util/**/*.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
@@ -204,7 +204,7 @@ export default tseslint.config(
           patterns: [
             {
               group: ['../*'],
-              message: 'core 不得 import src 中 core 以外的包（地基不向上引用）',
+              message: 'util 不得 import src 中 util 以外的包（杂物层不向上引用）',
             },
           ],
         },

@@ -1,4 +1,4 @@
-import type { Point } from '../core/vec'
+import type { Point } from '../util/vec'
 
 // 命中几何：能力运行时判「打没打到」的纯函数（突刺线段 / 扫掠线段 / 圆 / 扇形）。
 // 与能力的数据形状（data/abilityDefs.ts）分开——那边是「这个能力长什么样」，

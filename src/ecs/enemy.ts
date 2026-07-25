@@ -1,11 +1,11 @@
 import { addComponent, addEntity, query, removeEntity } from 'bitecs'
-import { norm } from '../core/vec'
+import { norm } from '../util/vec'
 import { AI, ELITE, SPAWN } from '../data/enemies'
 import type { EnemyDef } from '../data/enemies'
 import { KNOCKBACK } from '../data/abilities'
 import { PICKUPS } from '../data/pickups'
 import { waveAt } from '../data/waves'
-import { UNIT } from '../core/units'
+import { UNIT } from '../util/units'
 import { playSfx } from '../audio/sfx'
 import { despawnEnemy, hurtMember } from './combat'
 import {
@@ -57,11 +57,11 @@ import {
   thiefNextEatAt,
 } from './store'
 import { armIdle } from './anim'
-import { ANIM_DEF } from '../emoji/studio'
+import { ANIM_DEF } from '../emoji/anim'
 import { backEaseOut } from './ease'
 import type { Sim } from './sim'
 import type { FrameIndex } from './frames'
-import type { Point } from '../core/vec'
+import type { Point } from '../util/vec'
 
 // 敌人:装配 + 转向(locomotion 状态机 + 击退 + 世界钩子后处理)。
 

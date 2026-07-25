@@ -1,7 +1,7 @@
 import { query } from 'bitecs'
 import type { AreaBlastDef } from '../../../data/abilityDefs'
 import { ACQUIRE } from '../../../data/abilities'
-import { UNIT } from '../../../core/units'
+import { UNIT } from '../../../util/units'
 import { playSfx } from '../../../audio/sfx'
 import { damageMul, ownerX, ownerY } from '../amp'
 import { Ability, AbilityRef, Followup, Frozen } from '../components'

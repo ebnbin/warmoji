@@ -1,4 +1,4 @@
-import type { StringStorage } from '../core/storage'
+import type { StringStorage } from '../util/storage'
 
 // 全局设置：跨局持久化，改动即时保存。
 // 新增选项 = Settings 加字段 + DEFAULT_SETTINGS 补默认值 + SETTING_DEFS 加一行（页面按定义表渲染）。

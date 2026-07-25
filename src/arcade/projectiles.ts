@@ -1,4 +1,4 @@
-import { DEG2RAD } from '../core/units'
+import { DEG2RAD } from '../util/units'
 import { playSfx } from '../audio/sfx'
 import { emojiKey } from '../emoji/textures'
 import { sweepFirstHitIndex } from '../war/hit'

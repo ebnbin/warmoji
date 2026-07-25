@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { UI_FONT } from '../core/fonts'
+import { UI_FONT } from '../util/fonts'
 
 // 伤害数字专用位图字体：启动时把 0-9 光栅化成一张字形图，
 // 战斗中的数字用 BitmapText 摆字形四边形——零 canvas 光栅化、零纹理分配。

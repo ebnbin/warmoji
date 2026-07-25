@@ -1,7 +1,7 @@
 import type { MapDecor } from '../../data/maps'
 import type { DecorInstance } from '../../data/maps'
-import { Rng } from '../../core/rng'
-import type { Point } from '../../core/vec'
+import { Rng } from '../../util/rng'
+import type { Point } from '../../util/vec'
 
 // 无限地图的世界模型（纯逻辑，禁 phaser/DOM）。设计原则：有限地图未来
 // 可以成为无限地图的子集——活跃判定/装饰分块对有界世界同样成立（只是

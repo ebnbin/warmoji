@@ -4,10 +4,10 @@ import { COIN_SET, EDir, ENEMY_SET, EPROJ_SET, Follow, Kv, PROJ_SET, Transform, 
 import { remapFieldEcs } from './field'
 import { remapGroundEffectsEcs } from './groundEffects'
 import type { Sim } from './sim'
-import type { Point } from '../core/vec'
+import type { Point } from '../util/vec'
 
 // 视口横竖切换/尺寸变化时的世界重映射(仅单屏图:奔流/工厂——它们的世界尺寸由视口推出)。
-// 位置按「长轴进度 + 跨轴偏移」映射,速度/朝向随坐标系旋转;几何在 core/remap,与旧图共用一份。
+// 位置按「长轴进度 + 跨轴偏移」映射,速度/朝向随坐标系旋转;几何在 war/remap,与旧图共用一份。
 
 /** 把整局仿真从旧视口尺寸搬到新视口尺寸(队伍中心/跟随点/敌人/弹体/金币/预告点) */
 export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, toH: number): void {

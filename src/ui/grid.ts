@@ -1,8 +1,8 @@
 import Phaser from 'phaser'
 import type { OutlineKind } from '../emoji/svg'
-import { TAP_SLOP } from '../core/units'
+import { TAP_SLOP } from '../util/units'
 import { emojiImage } from '../emoji/textures'
-import { clipTo } from '../core/mask'
+import { clipTo } from '../util/mask'
 
 // 可滚动 emoji 网格：形象即含义，名字/数值留给详情面板。
 // 队长/组队/商店/图鉴条目页共用——统一滚轮 + 拖动（拖过阈值不算点击）、

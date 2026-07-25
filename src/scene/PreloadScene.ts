@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import emojiOrderingUrl from '../assets/emoji/ordering.txt?url'
 import emojiBundleUrl from '../assets/emoji/twemoji.txt?url'
 import { loadEmojiTextures, primeEmojiPack } from '../emoji/textures'
-import { FONT, UI_FONT } from '../core/fonts'
+import { FONT, UI_FONT } from '../util/fonts'
 import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../manifest'
 
 // 资源门禁：emoji 包（ordering.txt 顺序/ID + twemoji.txt SVG 正文）是游戏的

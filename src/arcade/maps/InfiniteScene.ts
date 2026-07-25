@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
-import { UNIT } from '../../core/units'
+import { UNIT } from '../../util/units'
 import { MAPS } from '../../data/maps'
 import type { InfiniteConfig, ShrinkRingConfig } from '../../data/maps'
-import { norm } from '../../core/vec'
-import type { Point } from '../../core/vec'
+import { norm } from '../../util/vec'
+import type { Point } from '../../util/vec'
 import {
   chunkDecor,
   chunkKey,
@@ -11,9 +11,9 @@ import {
   outsideZone,
   ringPoint,
   zoneRadiusAt,
-} from '../../war/world/world'
+} from '../../war/maps/world'
 import { emojiImage } from '../../emoji/textures'
-import { viewport } from '../../core/apply'
+import { viewport } from '../../util/apply'
 import { ArcadeBattleScene } from '../ArcadeBattleScene'
 import type { ImageObj } from '../ArcadeBattleScene'
 

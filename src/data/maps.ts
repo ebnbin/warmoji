@@ -1,6 +1,6 @@
 import mapsJson from '../assets/maps.json'
 import mapDefaultsJson from '../assets/mapdefaults.json'
-import type { Palette } from '../core/palette'
+import type { Palette } from '../util/palette'
 import { ENEMIES } from './enemies'
 import type { EnemyDef, EnemyMixRow } from './enemies'
 

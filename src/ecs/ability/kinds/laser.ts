@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { DEG2RAD } from '../../../core/units'
+import { DEG2RAD } from '../../../util/units'
 import type { LaserDef } from '../../../data/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { thrustHitIndices } from '../../../war/hit'

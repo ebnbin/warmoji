@@ -10,7 +10,7 @@ import { CARDS } from './data/cards'
 import { ITEMS } from './data/items'
 import { MAPS } from './data/maps'
 import type { MapDef } from './data/maps'
-import { SETTING_DEFS } from './run/settings'
+import { SETTING_DEFS } from './save/settings'
 
 // 启动预载清单：独立于 config——它聚合 items/maps/settings 等下游模块，
 // 放 config 里会形成「config ⇄ items」的顶层求值环（items 侧引用 abilities

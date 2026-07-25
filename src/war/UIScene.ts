@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { CAPTAINS } from '../data/captains'
 import { PICKUPS } from '../data/pickups'
-import { formatTime } from '../core/format'
+import { formatTime } from '../util/format'
 import { endRun, getRun } from '../run/state'
 // 能量豆已移除：技能纯 CD 门槛（见 captains/skill.ts）
 import { isDevOpen, setDevOpen } from './dev'
@@ -35,8 +35,8 @@ import type { LabDensity, LabLevel, LabMul } from '../run/lab'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from './diagnostics'
 import { emojiCacheStats, emojiImage, emojiText, iconLabel } from '../emoji/textures'
 import { ScrollView } from '../ui/scroll'
-import { FONT, UI_FONT } from '../core/fonts'
-import { Joystick } from './Joystick'
+import { FONT, UI_FONT } from '../util/fonts'
+import { Joystick } from '../ui/Joystick'
 import { playSfx } from '../audio/sfx'
 import {
   applyCamera,
@@ -45,7 +45,7 @@ import {
   textRes,
   viewport,
   VIEWPORT_CHANGED,
-} from '../core/apply'
+} from '../util/apply'
 import type { HudSnapshot, WaveSummary } from './hudHost'
 import { activeHudHost } from './hudHost'
 import type { HudHost } from './hudHost'

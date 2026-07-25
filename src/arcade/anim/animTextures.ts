@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
 import { OUTLINE } from '../../emoji/svg'
 import type { OutlineKind } from '../../emoji/svg'
-import { animClipOf, bakeAnimFrame } from '../../emoji/studio'
+import { animClipOf, bakeAnimFrame } from '../../emoji/anim'
 import { outlineSvg, setSvgSize } from '../../emoji/svg'
 import { emojiSvgText, svgToImage } from '../../emoji/textures'
 

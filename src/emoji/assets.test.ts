@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../manifest'
-import { ANIM_SETS } from './studio'
+import { ANIM_SETS } from './anim'
 
 // emoji 缺失守卫：游戏引用的每个 emoji ID 都必须在 ordering 全集里
 //（ordering.txt 是唯一 SSOT）。PRELOAD_EMOJIS + OUTLINED_EMOJIS 已聚合全部
