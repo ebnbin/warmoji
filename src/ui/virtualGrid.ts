@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { TAP_SLOP } from '../core/units'
-import { emojiThumbKey, requestEmojiThumb } from './thumbs'
+import { emojiThumbKey, requestEmojiThumb } from '../emoji/thumbs'
 import { clipTo } from '../core/mask'
 
 // 全量 emoji 虚拟网格（feed 流）：环形缓冲复用固定数量 Image——

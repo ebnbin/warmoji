@@ -79,7 +79,7 @@ import { Animator } from '../war/anim/animator'
 import { clipFramesLive } from '../war/anim/animTextures'
 import { applyBackground } from '../core/background'
 import { DAMAGE_FONT, ensureDamageFont } from '../war/damageFont'
-import { reportDebug } from '../debug/debug'
+import { reportDebug } from '../core/debug'
 import { emojiImage, emojiKey } from '../emoji/textures'
 import { burstEmitter } from '../core/fx'
 import { acquirePooled, releasePooled } from './pool'
@@ -106,6 +106,7 @@ interface TeamStats {
 }
 
 import type { ArcadeBody, ImageObj } from './body'
+import { setActiveHudHost } from '../war/hudHost'
 import type { HudSnapshot, WaveSummary } from '../war/hudHost'
 export type { ArcadeBody, ImageObj } from './body'
 
@@ -761,6 +762,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     this.layoutTeam(0)
     this.postCreate()
     // UIScene 自探测当前竞技场（四图互斥运行），launch 不传参
+    setActiveHudHost(this) // 先登记再拉起 HUD：UIScene 据此找宿主，不必按场景键反查
     this.scene.launch('ui')
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)

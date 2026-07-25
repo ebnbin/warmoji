@@ -41,7 +41,7 @@ export default tseslint.config(
   // 故这里把 war 与两套实现的 pattern 一并给出（大厅页三者都不该碰）。
   // main.ts 不在此列：它要把战斗场景与 HUD 注册进 Phaser。
   {
-    files: ['src/menu/**/*.ts', 'src/boot/**/*.ts', 'src/debug/**/*.ts'],
+    files: ['src/menu/**/*.ts', 'src/boot/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -66,6 +66,25 @@ export default tseslint.config(
       ],
     },
   },
+  // 反方向同样要拦：战斗侧不得依赖大厅页。通用控件已抽到 src/ui/，
+  // 战斗 HUD 要用滚动容器就从那里取——之前 war/UIScene 直接 import menu/scroll，
+  // 正是因为只拦了 menu → war 这一个方向才一直没被发现。
+  {
+    files: ['src/war/**/*.ts', 'src/arcade/**/*.ts', 'src/ecs/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../menu/*', '../menu/**', '../../menu/*', '../../menu/**'],
+              message: '战斗侧不得依赖大厅页；通用控件在 src/ui/，业务数据在 src/data/',
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     files: ['src/**/*.ts'],
     ignores: [
@@ -82,13 +101,13 @@ export default tseslint.config(
       'src/ecs/EcsBattleScene.ts',
       'src/ecs/render/**/*.ts',
       'src/experiments/*.ts',
-      'src/menu/grid.ts',
-      'src/menu/scroll.ts',
+      // ui 整包是通用控件层（Phaser 容器/图形/输入）
+      'src/ui/**/*.ts',
       'src/emoji/textures.ts',
       'src/emoji/thumbs.ts',
       'src/emoji/virtualGrid.ts',
       'src/core/apply.ts',
-      'src/debug/diagnostics.ts',
+      'src/war/diagnostics.ts',
     ],
     rules: {
       '@typescript-eslint/no-restricted-imports': [

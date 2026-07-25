@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from './preload'
+import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../emoji/manifest'
 import { BOSSES, ENEMY_DEFS } from '../data/enemies'
 import { CARDS } from '../data/cards'
 import { FIELD_PICKUPS } from '../data/battlefield'

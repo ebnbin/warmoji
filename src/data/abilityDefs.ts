@@ -1,4 +1,4 @@
-import type { SfxId } from '../audio/sfx'
+import type { SfxId } from './sfx'
 import type { GroundEffectDef } from './groundEffects'
 
 // 能力 = 独立于角色的攻击行为单元；held 缺省时行为主体是角色本体。

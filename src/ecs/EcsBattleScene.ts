@@ -14,7 +14,7 @@ import { norm } from '../core/vec'
 import { Rng } from '../core/rng'
 import { applyBackground } from '../core/background'
 import { playSfx } from '../audio/sfx'
-import { OUTLINED_EMOJIS } from '../boot/preload'
+import { OUTLINED_EMOJIS } from '../emoji/manifest'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAP, MAPS, rollDecor } from '../data/maps'
@@ -78,6 +78,7 @@ import type { TeamEffects } from '../data/items'
 import { DENSITY_PARAMS, INVINCIBLE_HP, labDensity, labInvincible } from '../run/lab'
 import type { AbilityOwner, AbilityRuntime } from '../war/abilities/types'
 import { tickSkillCd } from '../war/skill'
+import { setActiveHudHost } from '../war/hudHost'
 import type { HudHost } from '../war/hudHost'
 import type { HudSnapshot } from '../war/hudHost'
 import type { UIScene } from '../war/UIScene'
@@ -375,6 +376,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     void this.boot(run, center, hint)
 
     // HUD：与旧竞技场同一套 UIScene（自探测当前战斗场景，launch 不传参）
+    setActiveHudHost(this) // 先登记再拉起 HUD：UIScene 据此找宿主，不必按场景键反查
     this.scene.launch('ui')
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

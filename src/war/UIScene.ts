@@ -4,7 +4,7 @@ import { PICKUPS } from '../data/pickups'
 import { formatTime } from '../core/format'
 import { endRun, getRun } from '../run/state'
 // 能量豆已移除：技能纯 CD 门槛（见 captains/skill.ts）
-import { isDevOpen, setDevOpen } from '../debug/dev'
+import { isDevOpen, setDevOpen } from './dev'
 import { CHARACTERS } from '../data/characters'
 import type { CharacterId } from '../data/characters'
 import { mapEnemyRoster } from '../data/maps'
@@ -32,9 +32,9 @@ import {
   toggleLabEnemy,
 } from '../run/lab'
 import type { LabDensity, LabLevel, LabMul } from '../run/lab'
-import { heapMB, rafHz, rendererInfo, startRafMeter } from '../debug/diagnostics'
+import { heapMB, rafHz, rendererInfo, startRafMeter } from './diagnostics'
 import { emojiCacheStats, emojiImage, emojiText, iconLabel } from '../emoji/textures'
-import { ScrollView } from '../menu/scroll'
+import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../core/fonts'
 import { Joystick } from './Joystick'
 import { playSfx } from '../audio/sfx'
@@ -47,9 +47,8 @@ import {
   VIEWPORT_CHANGED,
 } from '../core/apply'
 import type { HudSnapshot, WaveSummary } from './hudHost'
+import { activeHudHost } from './hudHost'
 import type { HudHost } from './hudHost'
-import { BATTLE_SCENE_KEYS } from '../experiments/battleExperiment'
-import type { BattleSceneKey } from '../experiments/battleExperiment'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
 // 与 BoundedScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
@@ -87,29 +86,18 @@ export class UIScene extends Phaser.Scene {
   private fxBars?: Phaser.GameObjects.Graphics
   private fxKey = ''
 
-  /** 当前战斗场景 key：多套竞技场（有界/无界/河流/虚空/秒针）互斥运行，本场景只跟随其一。
-   * ECS 实验场景是第 N+1 套，同样互斥，故一并纳入探测 */
-  private arenaKey: BattleSceneKey = 'arena'
-
   constructor() {
     super('ui')
-  }
-
-  /** 启动时探测哪个竞技场在跑（含暂停中——视口变化会带着暂停态重启本场景）。
-   * 用运行状态而非 launch 传参：场景 data 会跨局残留，探测永不脏 */
-  init(): void {
-    const candidates = BATTLE_SCENE_KEYS.filter((k) => k !== 'arena')
-    const running = candidates.find((k) => this.scene.isActive(k) || this.scene.isPaused(k))
-    this.arenaKey = running ?? 'arena'
   }
 
   get joystickVector(): { x: number; y: number } {
     return this.joystick?.vector ?? { x: 0, y: 0 }
   }
 
-  /** 当前战斗场景，按 HUD 宿主契约取用（旧竞技场与 ECS 实验场景都满足） */
+  /** 当前战斗场景，按 HUD 宿主契约取用（两套战斗实现都满足）。
+   * 宿主在自己的 create 里登记，且先于 scene.launch('ui')，故此处必然已就位 */
   private get arena(): HudHost {
-    return this.scene.get(this.arenaKey) as unknown as HudHost
+    return activeHudHost()!
   }
 
   create(): void {

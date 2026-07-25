@@ -33,6 +33,23 @@ export interface WaveSummary {
   levels: number
 }
 
+/** 当前在跑的战斗场景（唯一）。战斗场景在 create 里登记自己，UIScene 据此取宿主。
+ *
+ * 为什么不按场景键反查：那要求 UIScene 知道「有哪些战斗场景键」，而那份清单属于
+ * A/B facade（它才知道 arcade 有 8 个键、ecs 有 1 个），于是 war → experiments →
+ * arcade/ecs → war 成环，方向是反的。改成宿主主动登记后，war 不再认识任何具体实现。
+ * 也不必再担心「场景 data 跨局残留」——登记发生在 create、先于 scene.launch('ui')。
+ * 不在 shutdown 清空：视口变化会单独重启 UIScene 而战斗场景照旧，清了反而读不到。 */
+let active: HudHost | undefined
+
+export function setActiveHudHost(host: HudHost): void {
+  active = host
+}
+
+export function activeHudHost(): HudHost | undefined {
+  return active
+}
+
 export interface HudHost {
   /** 测试模式（沙盒）：HUD 据此显示实验室控件、计时改为正计时 */
   readonly testMode: boolean
