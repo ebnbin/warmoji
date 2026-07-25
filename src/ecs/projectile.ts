@@ -26,7 +26,7 @@ import type { TargetInfo } from '../war/abilities/types'
 import { applyDamage, hurtMember } from './combat'
 import { enemyDef, enemyRef, eprojSrcName, projHitEids, projOnHit } from './store'
 import type { Sim } from './sim'
-import type { EcsAtlas } from './render/atlas'
+import type { FrameIndex } from './frames'
 
 // 抛射物:装配 + 逐帧线段扫掠命中(pierce + 击退 + onHit 效果链),按视野/寿命回收。
 // 敌弹另走圆-圆命中队员(吃无敌帧),回收条件由世界钩子补充。
@@ -34,7 +34,7 @@ import type { EcsAtlas } from './render/atlas'
 /** 发射一枚玩家弹(镜像 spawnProjectile) */
 export function spawnProjectileEcs(
   sim: Sim,
-  atlas: EcsAtlas,
+  atlas: FrameIndex,
   x: number,
   y: number,
   angle: number,
@@ -207,7 +207,7 @@ export interface EnemyShotSpec {
 /** 发射一枚敌弹(镜像 spawnEnemyProjectile;伤害已含 dmgMul,不再二次乘) */
 export function spawnEnemyProjectileEcs(
   sim: Sim,
-  atlas: EcsAtlas,
+  atlas: FrameIndex,
   x: number,
   y: number,
   angle: number,

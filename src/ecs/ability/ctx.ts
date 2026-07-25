@@ -33,7 +33,7 @@ const eidOf = (ref: TargetInfo['ref']): number => (ref as unknown as Ref).__eid
 export function makeEffectCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas): EffectCtx {
   return {
     scene,
-    targets: () => sim.enemyTargets,
+    targets: () => sim.enemyRefs,
     damageTarget: (ref, dmg, kb, sx, sy) => applyDamage(sim, eidOf(ref), dmg, kb ?? 0, sx, sy, sim.effectSlot),
     slowTarget: (ref, factor, durationMs) => {
       const eid = eidOf(ref)
@@ -75,7 +75,7 @@ export function makeTeamCtx(
   return {
     scene,
     ownerOutline: 'player',
-    targets: () => sim.enemyTargets,
+    targets: () => sim.enemyRefs,
     // 暴击/击退倍率在此收口:所有能力伤害路径统一生效,无需逐能力改造(镜像 memberCtx.damageTarget)
     damageTarget: (ref, dmg, kb, sx, sy) => {
       if (bare) {

@@ -26,7 +26,7 @@ const eidOf = (ref: TargetInfo['ref']): number => (ref as unknown as Ref).__eid
 function makeDeathCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, d: PendingDeath): EffectCtx {
   return {
     scene,
-    targets: () => sim.memberTargets,
+    targets: () => sim.memberRefs,
     damageTarget: (ref, damage) => {
       const m = eidOf(ref)
       if (sim.over || !Alive.v[m]) return

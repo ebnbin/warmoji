@@ -1,13 +1,13 @@
 import type Phaser from 'phaser'
 import { query } from 'bitecs'
 import { createAbility } from '../../war/abilities/create'
-import type { AbilityOwner, TargetInfo } from '../../war/abilities/types'
-import { Alive, Dormant, ENEMY_SET, Hurt, Morph, Transform } from '../components'
+import type { AbilityOwner } from '../../war/abilities/types'
+import { Dormant, ENEMY_SET, Morph, Transform } from '../components'
 import { enemyAbilities, enemyDef, enemyFireDelayMs, enemyOwner } from '../store'
 import { restoreMorphVisual } from '../morph'
 import { FACTION } from './components'
 import { ecsAbilityKind, equipAbility, NEUTRAL_AMP, postponeAbilities } from './equip'
-import { makeEnemyCtx, memberRefOf } from './enemyCtx'
+import { makeEnemyCtx } from './enemyCtx'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
 
@@ -51,22 +51,6 @@ function armEnemyEcs(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, eid: number
     return [createAbility(w, ctx, delay)]
   })
   armedEids.add(eid)
-}
-
-/** 重建队员存活快照(敌方能力索敌共享):须先于任何敌方能力出手 */
-export function refreshMemberTargets(sim: Sim): void {
-  const targets: TargetInfo[] = []
-  for (const m of sim.members) {
-    if (!Alive.v[m]) continue
-    const x = Transform.x[m]!
-    const y = Transform.y[m]!
-    const radius = Hurt.radius[m]!
-    const ref = memberRefOf(m)
-    targets.push({ x, y, radius, ref })
-    // 环面:持械敌人隔着传送门也能瞄准队员
-    for (const g of sim.hooks.ghosts(sim, x, y)) targets.push({ x: g.x, y: g.y, radius, ref })
-  }
-  sim.memberTargets = targets
 }
 
 /** 每帧:lazy-arm/驱动各活着敌人的能力 + 清理已死敌人的能力 */

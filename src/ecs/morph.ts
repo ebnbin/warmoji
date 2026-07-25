@@ -2,7 +2,7 @@ import { Anim, Boss, Elite, EState, Morph, Sprite, Tint, Transform } from './com
 import { armIdle } from './anim'
 import { enemyDef } from './store'
 import type { Sim } from './sim'
-import type { EcsAtlas } from './render/atlas'
+import type { FrameIndex } from './frames'
 
 // 魔尘变形(仙子 morph):把敌人变成无害绵羊替身——缴械/无伤/缓速游荡,顶绵羊形象,
 // 到期复原。Boss 免疫;同一敌人有冷却(变形期 + 复形后 MORPH_RECAST_CD)。镜像 applyHex/restoreMorph。
@@ -14,7 +14,7 @@ export const MORPH_RECAST_CD = 5000
 /** 施加变形(镜像 applyHex):Boss/冷却中拒绝;换绵羊帧、打断蓄力、清旋转 */
 export function applyMorph(
   sim: Sim,
-  atlas: EcsAtlas,
+  atlas: FrameIndex,
   eid: number,
   spec: { durationMs: number; morphEmoji: string; vulnMul?: number },
 ): void {
@@ -42,7 +42,7 @@ export function applyMorph(
 }
 
 /** 复形(镜像 restoreMorph 的形象部分):换回本体帧;缴械后延由 enemyWire 掌管 */
-export function restoreMorphVisual(atlas: EcsAtlas, eid: number): void {
+export function restoreMorphVisual(atlas: FrameIndex, eid: number): void {
   const def = enemyDef[eid]
   if (!def) return
   const outline = Elite.v[eid] ? 'elite' : 'enemy'

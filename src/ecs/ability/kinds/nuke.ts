@@ -3,7 +3,7 @@ import type { NukeDef } from '../../../data/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { Boss, Dormant, ENEMY_SET } from '../../components'
 import { enemyDef } from '../../store'
-import { damageEnemy, damageMul, waveScale } from '../amp'
+import { damageTarget, damageMul, waveScale } from '../amp'
 import { castScan } from '../systems/cast'
 import { KindNuke } from '../tags'
 import type { Sim } from '../../sim'
@@ -20,7 +20,7 @@ export function castNukes(sim: Sim): void {
     for (const t of [...query(sim.world, ENEMY_SET as unknown as object[])]) {
       if (Dormant.v[t] || enemyDef[t] === undefined) continue
       const damage = Math.max(1, Math.round(def.damage * scale * mul * (Boss.v[t] ? def.bossRatio : 1)))
-      damageEnemy(sim, e, t, damage)
+      damageTarget(sim, e, t, damage)
     }
   })
 }

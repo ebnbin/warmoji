@@ -6,7 +6,7 @@ import { hurtMember } from '../combat'
 import { spawnGroundEffectEcs } from '../groundEffects'
 import { spawnEnemyProjectileEcs } from '../projectile'
 import { playClip } from '../anim'
-import { enemyDef, enemyVelX, enemyVelY, memberRef } from '../store'
+import { enemyDef, enemyVelX, enemyVelY } from '../store'
 import { healEnemies } from './heal'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
@@ -22,21 +22,6 @@ interface Ref {
   __eid: number
 }
 const eidOf = (ref: TargetInfo['ref']): number => (ref as unknown as Ref).__eid
-
-/** 队员稳定引用({__eid} + active 存活探针);敌方能力索敌/追踪用 */
-export function memberRefOf(eid: number): TargetInfo['ref'] {
-  let r = memberRef[eid]
-  if (!r) {
-    r = {
-      __eid: eid,
-      get active() {
-        return Alive.v[eid] === 1
-      },
-    }
-    memberRef[eid] = r
-  }
-  return r as unknown as TargetInfo['ref']
-}
 
 /** 敌方视角的阵营中立 ctx(按 eid) */
 export function makeEnemyCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, eid: number): AbilityContext {
@@ -54,7 +39,7 @@ export function makeEnemyCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, eid
   return {
     scene,
     ownerOutline: outline,
-    targets: () => sim.memberTargets,
+    targets: () => sim.memberRefs,
     targetHp: (ref) => MHp.hp[eidOf(ref)] ?? 0,
     targetMaxHp: (ref) => MHp.max[eidOf(ref)] ?? 0,
     // 击退参数忽略:队员无击退机制(阵型弹簧持有位置主权)。无敌帧节流本 ctx 掌管

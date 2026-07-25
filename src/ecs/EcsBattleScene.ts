@@ -7,7 +7,7 @@ import { TIMESTOP } from '../war/timeStop'
 import { DAMAGE_FONT, ensureDamageFont } from '../war/damageFont'
 import { burstEmitter } from '../core/fx'
 import { blastRing } from '../war/abilities/effects'
-import { circleCue, screenFlashCue } from '../war/abilities/cues'
+import { beamCue, boomCue, circleCue, lightningCue, screenFlashCue, slashCue } from '../war/abilities/cues'
 import { loadSettings } from '../run/settings'
 import { browserStorage } from '../core/storage'
 import { UI_FONT, FONT } from '../core/fonts'
@@ -61,13 +61,14 @@ import { remapSim } from './remap'
 import { spawnTeam } from './team'
 import { spawnEnemy, updateSpawners } from './enemy'
 import { clearEcsStore, enemyNest, thiefEaten } from './store'
-import { armCaptain, armTeam, refreshEnemyTargets, updateMemberAbilities } from './ability/wire'
-import { clearEnemyWire, refreshMemberTargets, updateEnemyAbilities } from './ability/enemyWire'
+import { armCaptain, armTeam, updateMemberAbilities } from './ability/wire'
+import { clearEnemyWire, updateEnemyAbilities } from './ability/enemyWire'
+import { refreshEnemyTargets, refreshMemberTargets } from './ability/targets'
 import { clearAbilityDefs } from './ability/defs'
 import { requestCast } from './ability/equip'
 import { stepAbilities } from './ability/run'
 import { replayDeath, runDeathEffects } from './ability/death'
-import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
+import { clearGroundEffectsEcs, groundZoneCount, spawnGroundEffectEcs, updateGroundEffectsEcs } from './groundEffects'
 import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
 import { spawnBossEcs, spawnCarrierEcs, spawnStep, spawnSurgeEcs } from './spawn'
 import { attachCarrierAuraEcs, clearFieldEcs, fieldCounts, spawnFieldPickupEcs, updateFieldEcs } from './field'
@@ -151,6 +152,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private waveBaseCoins = 0
   private waveBaseLevel = 1
   /** 队员血条(逐帧跟位 + 按血量比例重绘;镜像 drawMemberHp) */
+  /** 光环圈的复用池（按本帧登记的减速区数取用；圆形非 emoji，走不了批绘） */
+  private auraRings: Phaser.GameObjects.Arc[] = []
   private hpBars: Phaser.GameObjects.Graphics[] = []
   private shownHp: number[] = []
   /** 阵亡队员头顶的复活倒计时（秒；仅数字变化时重设文本，避免逐帧重排版） */
@@ -223,6 +226,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.captainAbilities = []
     this.captainHandle = { x: 0, y: 0, setVisualOffset: () => {} }
     this.captainAnchor = -1
+    this.auraRings = []
     this.waveBaseKills = 0
     this.waveBaseCoins = 0
     this.waveBaseLevel = 1
@@ -779,12 +783,36 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     q.length = 0
   }
 
+  /** 光环圈:寒气光环等每帧重新登记减速区,这里按登记数取一圈池化的圆跟着画 */
+  private drawAuraRings(): void {
+    const zones = this.sim!.frameSlowZones.filter((z) => z.ring !== undefined)
+    for (let i = 0; i < Math.max(zones.length, this.auraRings.length); i++) {
+      const z = zones[i]
+      let ring = this.auraRings[i]
+      if (!z) {
+        ring?.setVisible(false)
+        continue
+      }
+      if (!ring) {
+        ring = this.add.circle(0, 0, 1, 0xffffff, 0.08).setStrokeStyle(2, 0xffffff, 0.35).setDepth(2)
+        this.auraRings.push(ring)
+      }
+      ring.setVisible(true).setPosition(z.x, z.y).setRadius(z.r ?? 0)
+      ring.setFillStyle(z.ring, 0.08)
+      ring.setStrokeStyle(2, z.ring, 0.35)
+    }
+  }
+
   /** 排空本帧一次性战斗特效:能力系统只入队,绘制在此落地 */
   private drainCues(): void {
     const q = this.sim!.pendingCues
     if (q.length === 0) return
     for (const c of q) {
       if (c.kind === 'circle') circleCue(this, c.x, c.y, c.radius, c.o)
+      else if (c.kind === 'boom') boomCue(this, c.x, c.y, c.size)
+      else if (c.kind === 'lightning') lightningCue(this, c.points, c.color)
+      else if (c.kind === 'slash') slashCue(this, c.x, c.y, c.angle, c.radius)
+      else if (c.kind === 'beam') beamCue(this, c.x, c.y, c.angle, c.length, c.radius, c.color)
       else screenFlashCue(this, c.color, c.alpha, c.durationMs)
     }
     q.length = 0
@@ -1621,7 +1649,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     if (this.atlas) updateEnemyAbilities(sim, this, this.atlas, wdelta)
     // 亡语重放(分裂/诱饵/治疗/冷枪:本帧内所有死亡的敌人在死亡点触发)
     if (this.atlas) runDeathEffects(sim, this, this.atlas)
-    // 地面效果(灼烧/毒液区):team 脉冲烧敌 / enemy 节流烧队员 + 到期淡出
+    // 地面效果(灼烧/毒液区):能力入队的先铺开,再 team 脉冲烧敌 / enemy 节流烧队员 + 到期淡出
+    for (const g of sim.pendingGrounds) spawnGroundEffectEcs(sim, this, g.x, g.y, g.def, g.faction, g.srcSlot, g.srcName)
+    sim.pendingGrounds.length = 0
     updateGroundEffectsEcs(sim, this)
     // 金币:死亡掉落落地 + 磁吸入账
     if (this.atlas) drainPendingCoins(sim, this.atlas)
@@ -1642,6 +1672,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.drainBursts()
     this.drainRings()
     this.drainCues()
+    this.drawAuraRings()
     // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtMember 的 cameras.shake)。
     // 同样须先于过场判定——致死那一帧的抖屏否则被 return 吞掉且永远补不回来
     if (sim.memberHitCount > this.seenHitCount) {

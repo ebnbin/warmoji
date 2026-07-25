@@ -17,6 +17,9 @@ export const projOnHit: (readonly Effect[] | undefined)[] = new Array<readonly E
 /** 抛射物已命中的敌人 eid(贯穿去重) */
 export const projHitEids: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(MAX_ENTITIES)
 
+/** 在途回旋镖本程已命中的 eid(去程/回程各判一次,同程内每敌最多一次) */
+export const flyerHits: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(MAX_ENTITIES)
+
 // ── 队员能力(按槽位索引)──
 /** 每槽位的能力运行时实例 */
 export const memberAbilities: AbilityRuntime[][] = []
@@ -72,6 +75,7 @@ export function clearEcsStore(): void {
   enemyDef.fill(undefined)
   projOnHit.fill(undefined)
   projHitEids.fill(undefined)
+  flyerHits.fill(undefined)
   enemyRef.fill(undefined)
   enemyAbilities.fill(undefined)
   enemyOwner.fill(undefined)

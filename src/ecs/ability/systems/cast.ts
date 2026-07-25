@@ -15,7 +15,9 @@ export function castScan<D extends AbilityDef>(
   tag: object,
   cast: (eid: number, def: D) => boolean | void,
 ): void {
-  for (const e of query(sim.world, [Ability, tag])) {
+  // 取快照迭代：出手可能连带击杀持有者，进而回收它名下的能力实体（同 kind 也可能被摘掉）
+  for (const e of [...query(sim.world, [Ability, tag])]) {
+    if (!hasComponent(sim.world, e, Ability)) continue
     const def = abilityDefAt(AbilityRef.def[e]!) as D
     if (hasComponent(sim.world, e, CastRequest)) {
       removeComponent(sim.world, e, CastRequest)
@@ -24,7 +26,8 @@ export function castScan<D extends AbilityDef>(
     }
     if (hasComponent(sim.world, e, Manual)) continue
     if (Frozen.v[e] || Disarmed.v[e] || Cooldown.left[e]! > 0) continue
+    // 带冷却字段的按定义重置；无冷却概念的（光环 / 周期召唤）由 kind 自己安排下一次
     if (cast(e, def) === false) continue
-    Cooldown.left[e] = ('cooldownMs' in def ? def.cooldownMs : 0) * cooldownMul(sim, e)
+    if ('cooldownMs' in def) Cooldown.left[e] = def.cooldownMs * cooldownMul(sim, e)
   }
 }

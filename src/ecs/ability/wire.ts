@@ -1,5 +1,4 @@
 import type Phaser from 'phaser'
-import { query } from 'bitecs'
 import { CHARACTERS, loadoutFor } from '../../data/characters'
 import { CAPTAINS } from '../../data/captains'
 import { aggregateCharacterEffects, characterXp, resolveAbilityDef } from '../../data/items'
@@ -12,9 +11,9 @@ import type { AbilityDef } from '../../data/abilityDefs'
 import { toPx } from '../../war/px'
 import { labLevel } from '../../run/lab'
 import type { RunState } from '../../run/state'
-import type { AbilityContext, AbilityOwner, AbilityRuntime, TargetInfo } from '../../war/abilities/types'
-import { Alive, Dormant, ENEMY_SET, Radius, Transform, VisOff } from '../components'
-import { enemyDef, enemyRef, memberAbilities, memberHandle } from '../store'
+import type { AbilityContext, AbilityOwner, AbilityRuntime } from '../../war/abilities/types'
+import { Alive, Transform, VisOff } from '../components'
+import { memberAbilities, memberHandle } from '../store'
 import { FACTION } from './components'
 import { ecsAbilityKind, equipAbility, NEUTRAL_AMP, spawnTeamAnchor } from './equip'
 import { makeEffectCtx, makeTeamCtx } from './ctx'
@@ -27,22 +26,6 @@ import type { EcsAtlas } from '../render/atlas'
 
 /** 各槽位持械视觉的已呈现存活态(与 Alive 对帐,只在翻转时收/亮械) */
 const shownAlive: boolean[] = []
-
-/** 敌人稳定引用({__eid} + active 存活探针);killEnemy 清空后按 eid 复用会重建。
- * active 供能力(核弹/落石等)剔除已死目标——读 enemyDef(死亡/自毁时清空) */
-function refOf(eid: number): TargetInfo['ref'] {
-  let r = enemyRef[eid]
-  if (!r) {
-    r = {
-      __eid: eid,
-      get active() {
-        return enemyDef[eid] !== undefined
-      },
-    }
-    enemyRef[eid] = r
-  }
-  return r as unknown as TargetInfo['ref']
-}
 
 /** 为全队装备能力:逐槽位按已持道具 + 专属等级解析生效能力(测试模式走场内等级旋钮) */
 export function armTeam(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, run: RunState, testMode: boolean): void {
@@ -141,23 +124,6 @@ export function armCaptain(
     else abilities.push(createAbility(px, ctx, 0))
   }
   return { abilities, handle, anchor }
-}
-
-/** 重建敌方存活快照(能力索敌与抛射物 onHit 效果链共享):须先于 stepSim,
- * 否则本帧的命中效果读的是上一帧位置 */
-export function refreshEnemyTargets(sim: Sim): void {
-  const targets: TargetInfo[] = []
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Dormant.v[eid]) continue // 休眠怪不可被索敌(镜像 dormancyFrameTargets)
-    const x = Transform.x[eid]!
-    const y = Transform.y[eid]!
-    const radius = Radius.v[eid]!
-    const ref = refOf(eid)
-    targets.push({ x, y, radius, ref })
-    // 环面:真身之外再喂三个镜像,能力零改动即可隔着传送门瞄准
-    for (const g of sim.hooks.ghosts(sim, x, y)) targets.push({ x: g.x, y: g.y, radius, ref })
-  }
-  sim.enemyTargets = targets
 }
 
 /** 每帧:驱动各活着队员的能力(wdelta = 世界时长);索敌快照由 refreshEnemyTargets 先行重建 */

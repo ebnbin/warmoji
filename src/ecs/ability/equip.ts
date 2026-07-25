@@ -1,18 +1,32 @@
 import { addComponent, addComponents, addEntity, query, removeEntity } from 'bitecs'
-import type { AbilityDef } from '../../data/abilityDefs'
-import { Alive, Slot, Transform } from '../components'
+import { abilityPiercesWalls } from '../../data/abilityDefs'
+import type { AbilityDef, HeldVisual } from '../../data/abilityDefs'
+import type { OutlineKind } from '../../emoji/svg'
+import { Alive, Boss, Elite, Slot, Transform } from '../components'
+import { spawnSprite } from '../entities'
 import {
   Ability,
   AbilityRef,
+  Aim,
   Amp,
   AnchorCenter,
+  Blink,
   CastRequest,
   Cooldown,
   Disarmed,
+  Drop,
+  FACTION,
   Faction,
+  Followup,
   Frozen,
+  Gear,
+  Radial,
+  Shots,
   Manual,
+  Minion,
   Owner,
+  Swing,
+  WallBlocked,
 } from './components'
 import { internAbilityDef } from './defs'
 import { KIND_TAG } from './tags'
@@ -52,7 +66,8 @@ export function equipAbility(
   if (!tag) return -1
   const world = sim.world
   const e = addEntity(world)
-  addComponents(world, e, Ability, AbilityRef, Owner, Faction, Cooldown, Amp, Frozen, Disarmed, tag)
+  // prettier-ignore
+  addComponents(world, e, Ability, AbilityRef, Owner, Faction, Cooldown, Amp, Frozen, Disarmed, Followup, WallBlocked, Aim, Swing, Gear, Shots, Radial, Blink, tag)
   if (manual) addComponent(world, e, Manual)
   AbilityRef.def[e] = internAbilityDef(def)
   Owner.eid[e] = ownerEid
@@ -65,13 +80,46 @@ export function equipAbility(
   Amp.battle[e] = amp.battle ? 1 : 0
   Frozen.v[e] = 0
   Disarmed.v[e] = 0
+  Followup.left[e] = 0
+  Followup.damage[e] = 0
+  WallBlocked.v[e] = abilityPiercesWalls(def) ? 0 : 1
+  Aim.rad[e] = 0
+  Shots.n[e] = 0
+  Radial.left[e] = 0
+  Blink.x[e] = 0
+  Blink.y[e] = 0
+  Swing.startMs[e] = 0
+  Swing.durMs[e] = 0
+  Gear.eid[e] = 'held' in def && def.held ? spawnGear(sim, ownerEid, faction, def.held) : 0
   return e
 }
 
-/** 收走某持有者名下的全部能力实体（持有者离场时调；eid 会被回收再分配，不能留孤儿） */
+/** 持有物子实体：挂在角色身上的能力 emoji，进批绘而非游离 GameObject */
+function spawnGear(sim: Sim, ownerEid: number, faction: number, held: HeldVisual): number {
+  const outline: OutlineKind =
+    faction === FACTION.enemy ? (Elite.v[ownerEid] || Boss.v[ownerEid] ? 'elite' : 'enemy') : 'player'
+  return spawnSprite(sim.world, sim.frames, {
+    id: held.emoji,
+    outline,
+    x: Transform.x[ownerEid]!,
+    y: Transform.y[ownerEid]!,
+    size: held.size,
+    z: 13,
+  })
+}
+
+/** 收走某持有者名下的全部能力实体与它们的子实体（持有物、在途坠物）。
+ * 持有者离场时调——eid 会被回收再分配，不能留孤儿 */
 export function unequipAbilities(sim: Sim, ownerEid: number): void {
-  for (const e of query(sim.world, [Ability, Owner])) {
-    if (Owner.eid[e] === ownerEid) removeEntity(sim.world, e)
+  const world = sim.world
+  const doomed: number[] = []
+  for (const e of query(world, [Ability, Owner])) if (Owner.eid[e] === ownerEid) doomed.push(e)
+  if (doomed.length === 0) return
+  for (const d of query(world, [Drop, Owner])) if (doomed.includes(Owner.eid[d]!)) removeEntity(world, d)
+  for (const m of query(world, [Minion, Owner])) if (doomed.includes(Owner.eid[m]!)) removeEntity(world, m)
+  for (const e of doomed) {
+    if (Gear.eid[e]) removeEntity(world, Gear.eid[e]!)
+    removeEntity(world, e)
   }
 }
 

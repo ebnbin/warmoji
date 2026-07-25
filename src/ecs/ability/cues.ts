@@ -6,3 +6,21 @@ import type { CircleCue } from '../../war/abilities/cues'
 export type Cue =
   | { readonly kind: 'circle'; readonly x: number; readonly y: number; readonly radius: number; readonly o: CircleCue }
   | { readonly kind: 'screenFlash'; readonly color: number; readonly alpha: number; readonly durationMs: number }
+  | { readonly kind: 'boom'; readonly x: number; readonly y: number; readonly size: number }
+  | { readonly kind: 'lightning'; readonly points: readonly { x: number; y: number }[]; readonly color: number }
+  | {
+      readonly kind: 'beam'
+      readonly x: number
+      readonly y: number
+      readonly angle: number
+      readonly length: number
+      readonly radius: number
+      readonly color: number
+    }
+  | {
+      readonly kind: 'slash'
+      readonly x: number
+      readonly y: number
+      readonly angle: number
+      readonly radius: number
+    }

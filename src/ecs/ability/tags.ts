@@ -11,6 +11,18 @@ export const KindBuff = {}
 export const KindTimeStop = {}
 export const KindNuke = {}
 export const KindHeal = {}
+export const KindAreaBlast = {}
+export const KindChainArc = {}
+export const KindThrust = {}
+export const KindSweep = {}
+export const KindStrike = {}
+export const KindAssassinate = {}
+export const KindProjectile = {}
+export const KindBoomerang = {}
+export const KindLaser = {}
+export const KindSummon = {}
+export const KindTurret = {}
+export const KindSlowAura = {}
 
 export const KIND_TAG: Partial<Record<AbilityDef['kind'], object>> = {
   rally: KindRally,
@@ -19,4 +31,16 @@ export const KIND_TAG: Partial<Record<AbilityDef['kind'], object>> = {
   timeStop: KindTimeStop,
   nuke: KindNuke,
   heal: KindHeal,
+  areaBlast: KindAreaBlast,
+  chainArc: KindChainArc,
+  thrust: KindThrust,
+  sweep: KindSweep,
+  strike: KindStrike,
+  assassinate: KindAssassinate,
+  projectile: KindProjectile,
+  boomerang: KindBoomerang,
+  laser: KindLaser,
+  summon: KindSummon,
+  turret: KindTurret,
+  slowAura: KindSlowAura,
 }

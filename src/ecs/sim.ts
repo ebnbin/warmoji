@@ -22,6 +22,9 @@ import type { Point } from '../core/vec'
 import type { RunState } from '../run/state'
 import type { EffectCtx, TargetInfo } from '../war/abilities/types'
 import type { Cue } from './ability/cues'
+import type { Target } from './ability/targets'
+import type { FrameIndex } from './frames'
+import type { GroundEffectDef } from '../data/groundEffects'
 import { TIMESTOP, timeScaleFor } from '../war/timeStop'
 import { BATTLE_FX_IDENTITY, foldBattleEffects } from '../data/battlefield'
 import type { BattleEffects } from '../data/battlefield'
@@ -97,14 +100,19 @@ export interface Sim {
   battleFx: BattleEffects
   /** 团队卡的敌速乘区(开局定;与 battleFx.enemySlowMul 并行相乘) */
   enemySlowMul: number
-  /** 本帧减速区(寒气光环等每帧重新登记,叠乘敌方移速 + 冷色调提示;wire 每帧重建) */
-  frameSlowZones: { x: number; y: number; r2: number; factor: number }[]
+  /** 本帧减速区(寒气光环等每帧重新登记,叠乘敌方移速 + 冷色调提示;wire 每帧重建)。
+   * ring 给出时场景侧另画一圈光环视觉(半径取 r) */
+  frameSlowZones: { x: number; y: number; r2: number; factor: number; r?: number; ring?: number }[]
   /** 本帧金币吸点(磁力回旋镖:镖旁金币直接入账,省去飞回中心;wire 每帧重建) */
   frameAttractors: { x: number; y: number; r2: number }[]
-  /** 本帧敌方存活快照(能力索敌共享;wire 每帧重建) */
-  enemyTargets: TargetInfo[]
-  /** 本帧队员存活快照(敌方能力索敌共享;enemyWire 每帧重建) */
-  memberTargets: TargetInfo[]
+  /** 本帧两侧存活快照(能力索敌共享;targets.ts 每帧重建,含环面镜像坐标) */
+  enemyTargets: Target[]
+  memberTargets: Target[]
+  /** 同上的 ref 版(尚未 ECS 化的旧能力运行时用;随旧运行时一并消失) */
+  enemyRefs: TargetInfo[]
+  memberRefs: TargetInfo[]
+  /** 帧索引表:纯逻辑系统据此建带贴图的实体(开局注入) */
+  frames: FrameIndex
   /** 敌人行为随机源(游荡换向/生成等;按 run 种子确定) */
   rng: Rng
   /** 试炼场沙盒(刷怪走勾选敌人 + 场内密度/难度旋钮;免死无时限) */
@@ -127,6 +135,8 @@ export interface Sim {
   pendingRings: { x: number; y: number; radius: number }[]
   /** 本帧一次性战斗特效(能力系统只入队;场景侧 drainCues 排空,走 war/abilities/cues) */
   pendingCues: Cue[]
+  /** 本帧待铺的地面效果区(视觉需 scene 建 graphics,故经队列;场景侧同帧排空) */
+  pendingGrounds: PendingGround[]
   /** 队伍侧共享效果执行面(抛射物 onHit 命中链复用;armTeam 后由场景注入) */
   effectCtx?: EffectCtx
   /** 抛射物 onHit 效果链的归属槽位:每次命中前改写成该子弹的 srcSlot(镜像 teamEffectSlot) */
@@ -216,6 +226,16 @@ export interface DamageNumber {
   y: number
   amount: number
   crit: boolean
+}
+
+/** 待铺的地面效果区(灼烧/毒液):阵营决定烧谁,归属供战报分账 */
+export interface PendingGround {
+  x: number
+  y: number
+  def: GroundEffectDef
+  faction: 'team' | 'enemy'
+  srcSlot: number
+  srcName: string
 }
 
 /** 粒子爆点(kind 选发射器:death 紫爆 / coin 金爆 / puff 灰烟) */

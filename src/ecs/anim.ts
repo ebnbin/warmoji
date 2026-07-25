@@ -4,7 +4,7 @@ import type { OutlineKind } from '../emoji/svg'
 import { Anim, ANIM_SET, Sprite } from './components'
 import { animId, animOutline } from './store'
 import type { Sim } from './sim'
-import type { EcsAtlas } from './render/atlas'
+import type { FrameIndex } from './frames'
 
 // 部件动画(镜像 Animator):常驻 idle 循环 + 一次性覆盖 clip,把游戏时钟翻算成帧下标,
 // 写进 Sprite.frame 即换帧。帧是惰性烘焙的:未就绪时 atlas 返回 frames=0,
@@ -26,7 +26,7 @@ export function armIdle(eid: number, id: string, outline: OutlineKind, still: nu
 }
 
 /** 播一次性 clip 覆盖 idle:durMs = 本次行为的真实间隔(攻速直接驱动动画速度) */
-export function playClip(sim: Sim, atlas: EcsAtlas, eid: number, clipId: string, durMs: number): void {
+export function playClip(sim: Sim, atlas: FrameIndex, eid: number, clipId: string, durMs: number): void {
   const id = animId[eid]
   const outline = animOutline[eid]
   if (id === undefined || outline === undefined) return
@@ -39,7 +39,7 @@ export function playClip(sim: Sim, atlas: EcsAtlas, eid: number, clipId: string,
 }
 
 /** 逐帧:把时钟翻算成帧下标写进 Sprite.frame(一次性 clip 优先,播完回落 idle) */
-export function updateAnims(sim: Sim, atlas: EcsAtlas): void {
+export function updateAnims(sim: Sim, atlas: FrameIndex): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, ANIM_SET as unknown as object[])) {
     if (Anim.frames[eid]! < 0) continue // 停帧哨兵(阵亡尸体):保持死亡那一帧,不再翻帧

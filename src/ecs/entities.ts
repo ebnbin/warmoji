@@ -7,7 +7,7 @@ import {
   Transform,
 } from './components'
 import type { EcsWorld } from './world'
-import type { EcsAtlas } from './render/atlas'
+import type { FrameIndex } from './frames'
 import type { OutlineKind } from '../emoji/svg'
 
 // 实体装配(纯逻辑,仅类型引用 atlas/render)。后续阶段在此扩展各类实体的组装函数。
@@ -30,7 +30,7 @@ export interface SpriteInit {
 }
 
 /** 装配一个可渲染实体(Transform+Sprite+Tint+Depth),返回 eid */
-export function spawnSprite(world: EcsWorld, atlas: EcsAtlas, init: SpriteInit): number {
+export function spawnSprite(world: EcsWorld, atlas: FrameIndex, init: SpriteInit): number {
   const eid = addEntity(world)
   addComponent(world, eid, Transform)
   addComponent(world, eid, Sprite)
