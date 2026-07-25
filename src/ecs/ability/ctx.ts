@@ -132,6 +132,10 @@ export function makeTeamCtx(
         }
       }
     },
+    /** 时停(镜像 startTimeStop):窗口内世界时标随队伍移动量放缩,窗口按世界时长排空 */
+    timeStop: (durationMs) => {
+      sim.timeStopMsLeft = durationMs
+    },
     /** 限时全队增伤(镜像 buffTeamDamage):不叠加,直接覆写,到期 stepSim 复原 */
     buffTeamDamage: (mul, durationMs) => {
       sim.skillDamageMul = mul

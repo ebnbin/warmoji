@@ -158,6 +158,8 @@ export function spawnTeam(
     skillDamageMul: 1,
     skillBuffUntil: 0,
     danceEndsAt: 0,
+    timeStopMsLeft: 0,
+    chrono: 0,
     enemyTargets: [],
     memberTargets: [],
     pendingDeaths: [],

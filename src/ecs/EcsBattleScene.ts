@@ -3,6 +3,7 @@ import { viewport } from '../core/apply'
 import { UNIT } from '../core/units'
 import { MEMBER } from '../characters/registry'
 import { HIT_SHAKE } from '../battle/config'
+import { TIMESTOP } from '../battle/timeStop'
 import { DAMAGE_FONT, ensureDamageFont } from '../core/damageFont'
 import { burstEmitter } from '../core/fx'
 import { loadSettings } from '../run/settings'
@@ -50,7 +51,7 @@ import { runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
 import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
 import { spawnBossEcs, spawnStep } from './spawn'
-import { initialLayout, stepSim } from './sim'
+import { initialLayout, stepSim, worldTimeScale } from './sim'
 import { settleWave } from './wave'
 import { isBossWave, waveAt, waveDurationMs, WAVE } from '../run/waves'
 import { xpToNext } from '../run/xp'
@@ -107,6 +108,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private puffBurst!: Phaser.GameObjects.Particles.ParticleEmitter
+  /** 时停冷雾遮罩：屏幕固定的大矩形，alpha 由时停态逐帧驱动（越静越浓） */
+  private timeStopFx?: Phaser.GameObjects.Rectangle
+  private timeStopFxAlpha = 0
   private centerObj!: Phaser.GameObjects.Zone
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -143,6 +147,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const cam = this.cameras.main
     cam.setZoom(viewport.renderScale)
     cam.setBounds(-margin, -margin, this.mapW + margin * 2, this.mapH + margin * 2)
+
+    // 时停冷雾遮罩（镜像 BaseArenaScene：屏幕固定大矩形，任意地图通用）
+    this.timeStopFx = this.add
+      .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, TIMESTOP.chillColor, 0)
+      .setScrollFactor(0)
+      .setDepth(88)
 
     const center = { x: this.mapW / 2, y: this.mapH / 2 }
     this.centerObj = this.add.zone(center.x, center.y, 1, 1)
@@ -338,6 +348,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
     window.__ecsGroundZones = (): number => groundZoneCount()
     window.__ecsBossDown = (): boolean => this.sim?.bossDown ?? false
+    // e2e 探针:发动时停(不经队长技能,直接开窗口)+ 读当前世界时标
+    window.__ecsTimeStop = (durMs = 6000): void => {
+      if (this.sim) this.sim.timeStopMsLeft = durMs
+    }
+    window.__ecsWorldTimeScale = (): number => (this.sim ? worldTimeScale(this.sim) : 1)
     // e2e 探针:全场蹦迪窗口是否生效中
     window.__ecsDancing = (): boolean => {
       const sim = this.sim
@@ -630,11 +645,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     sim.teamDir = keyed ? norm(kx, ky) : stick
     sim.moveInputRaw = keyed ? 1 : Math.min(1, Math.hypot(stick.x, stick.y))
 
-    stepSim(sim, delta)
-    // 队员能力驱动(wdelta=真实帧长;时停时标在 P4)
-    updateMemberAbilities(sim, delta)
+    // 世界时长:时停窗口内随队伍移动量放缩(动则时行、静则近乎凝固),窗口外恒等于真实帧长。
+    // 玩家走位/呼吸/技能 CD 用实时 delta,世界侧(敌人/弹体/刷怪/攻速)一律用 wdelta
+    const wdelta = delta * worldTimeScale(sim)
+    stepSim(sim, delta, wdelta)
+    // 队员能力驱动(世界时长:时停期队伍的枪也一并凝住)
+    updateMemberAbilities(sim, wdelta)
     // 敌人能力驱动(持械射击/治疗/落石;lazy-arm + 死亡清理)
-    if (this.atlas) updateEnemyAbilities(sim, this, this.atlas, delta)
+    if (this.atlas) updateEnemyAbilities(sim, this, this.atlas, wdelta)
     // 亡语重放(分裂/诱饵/治疗/冷枪:本帧内所有死亡的敌人在死亡点触发)
     if (this.atlas) runDeathEffects(sim, this, this.atlas)
     // 地面效果(灼烧/毒液区):team 脉冲烧敌 / enemy 节流烧队员 + 到期淡出
@@ -645,7 +663,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 虫巢周期生成子敌(护巢子敌绕巢;拆巢暴走)
     if (this.atlas) updateSpawners(sim, this.atlas)
     // 刷怪节奏
-    if (this.atlas) spawnStep(sim, this.atlas, delta)
+    if (this.atlas) spawnStep(sim, this.atlas, wdelta)
     this.updateTelegraphs()
     // 终波 Boss 被击败 → 通关结算(镜像 onBossDown → endWave)
     if (!this.testMode && sim.bossDown) {
@@ -660,6 +678,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       return
     }
     this.centerObj.setPosition(sim.center.x, sim.center.y)
+    // 冷雾浓度跟随时停态（越静越浓），淡入淡出走实时 delta
+    const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
+    this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
+    this.timeStopFx?.setFillStyle(TIMESTOP.chillColor, this.timeStopFxAlpha)
     this.drainDamageNumbers()
     this.drainBursts()
     // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtMember 的 cameras.shake)

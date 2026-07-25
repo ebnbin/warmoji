@@ -15,6 +15,7 @@ import type { EcsWorld } from './world'
 import type { Point } from '../core/vec'
 import type { RunState } from '../run/state'
 import type { EffectCtx, TargetInfo } from '../abilities/types'
+import { TIMESTOP, timeScaleFor } from '../battle/timeStop'
 
 // ECS 战斗仿真状态 + 系统(纯逻辑,禁 phaser)。数学逐行镜像旧 BaseArenaScene 的
 // updateOrbit / moveTeam / layoutTeam,常量与公式不变,只把「读写精灵」换成「读写组件」。
@@ -58,6 +59,10 @@ export interface Sim {
   skillBuffUntil: number
   /** 全场蹦迪窗口结束时刻(镜像 danceEndsAt):窗口内全体敌人定身摇摆,含窗口内新登场者 */
   danceEndsAt: number
+  /** 时停剩余(世界时长):>0 时世界时标随队伍移动量放缩(动则时行、静则近乎凝固) */
+  timeStopMsLeft: number
+  /** 移动量的低通平滑值(实时 delta 推进):worldTimeScale 的输入 */
+  chrono: number
   /** 本帧敌方存活快照(能力索敌共享;wire 每帧重建) */
   enemyTargets: TargetInfo[]
   /** 本帧队员存活快照(敌方能力索敌共享;enemyWire 每帧重建) */
@@ -284,8 +289,19 @@ export function initialLayout(sim: Sim): void {
 }
 
 /** 一帧仿真(镜像 update 的 updateOrbit→moveTeam→steerEnemies 次序);delta 为真实帧长(ms) */
-export function stepSim(sim: Sim, delta: number): void {
-  sim.elapsedMs += delta
+/** 世界时间流速(镜像 worldTimeScale):时停窗口内随队伍移动量放缩,窗口外恒 1 */
+export function worldTimeScale(sim: Sim): number {
+  return sim.timeStopMsLeft > 0 ? timeScaleFor(sim.chrono) : 1
+}
+
+/** 一帧仿真。delta = 真实帧长(玩家走位/呼吸/编队用),wdelta = 世界时长(敌人/弹体/刷怪用)。
+ * 时停即「世界侧 wdelta 变慢而玩家侧 delta 照常」,故两者分开传(镜像旧 update 的 delta/wdelta) */
+export function stepSim(sim: Sim, delta: number, wdelta: number = delta): void {
+  // 世界钟按世界时长推进:波次计时/复活/无敌帧/毒跳等一并随时停放慢(与旧一致)
+  sim.elapsedMs += wdelta
+  if (sim.timeStopMsLeft > 0) sim.timeStopMsLeft = Math.max(0, sim.timeStopMsLeft - wdelta)
+  // 移动量低通平滑走实时 delta:moveTeam 会写 moveInputRaw,供下一帧 worldTimeScale 读
+  sim.chrono += (sim.moveInputRaw - sim.chrono) * Math.min(1, delta / TIMESTOP.easeMs)
   // 队长技能的限时增伤到期复原(镜像 update 里的 skillBuffUntil 判定)
   if (sim.skillDamageMul !== 1 && sim.elapsedMs >= sim.skillBuffUntil) sim.skillDamageMul = 1
   // 敌人位置汇入 frameTargets(队伍 orbit/游移门控据此),先于 orbit
@@ -294,9 +310,10 @@ export function stepSim(sim: Sim, delta: number): void {
   moveTeam(sim, delta)
   reviveMembers(sim)
   tickPoison(sim)
-  steerEnemies(sim, delta)
-  updateProjectiles(sim, delta)
-  updateEnemyProjectiles(sim, delta)
+  // 以下为世界侧:时停期整体放慢(敌人移速/弹体位移都按 wdelta 积分,无需另乘时标)
+  steerEnemies(sim, wdelta)
+  updateProjectiles(sim, wdelta)
+  updateEnemyProjectiles(sim, wdelta)
   memberContact(sim)
   memberVisual(sim)
 }
