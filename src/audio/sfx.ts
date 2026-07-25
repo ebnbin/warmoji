@@ -106,9 +106,6 @@ export function setSfxEnabled(on: boolean): void {
   enabled = on
 }
 
-export function sfxStats(): { baked: number; played: number } {
-  return { ...stats }
-}
 
 export function playSfx(id: SfxId): void {
   if (!enabled || !ctx || !master) return

@@ -38,29 +38,21 @@ import {
   Dormant,
   Enemy,
   EnemyProj,
-  EState,
-  Follow,
   Hp,
-  MAtkSlow,
   MHp,
-  Morph,
   Revive,
-  Poison,
   Projectile,
-  Slow,
   Sprite,
   Transform,
 } from './components'
-import { applyDamage } from './combat'
-import { applyMorph } from './morph'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { spawnSprite } from './entities'
 import { updateAnims } from './anim'
 import { remapSim } from './remap'
 import { spawnTeam } from './team'
-import { spawnEnemy, updateSpawners } from './enemy'
-import { clearEcsStore, enemyNest, thiefEaten } from './store'
+import { updateSpawners } from './enemy'
+import { clearEcsStore, enemyNest } from './store'
 import { armCaptain, armEnemies, armTeam } from './ability/arm'
 import { refreshEnemyTargets, refreshMemberTargets } from './ability/targets'
 import { clearAbilityDefs } from './ability/defs'
@@ -68,11 +60,11 @@ import { requestCast } from './ability/equip'
 import { Minion } from './ability/components'
 import { stepAbilities } from './ability/run'
 import { replayDeath, runDeathEffects } from './ability/death'
-import { clearGroundEffectsEcs, groundZoneCount, spawnGroundEffectEcs, updateGroundEffectsEcs } from './groundEffects'
-import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
+import { clearGroundEffectsEcs, spawnGroundEffectEcs, updateGroundEffectsEcs } from './groundEffects'
+import { drainPendingCoins, magnetCoinsEcs } from './pickups'
 import { spawnBossEcs, spawnCarrierEcs, spawnStep, spawnSurgeEcs } from './spawn'
 import { attachCarrierAuraEcs, clearFieldEcs, fieldCounts, spawnFieldPickupEcs, updateFieldEcs } from './field'
-import { FIELD_PICKUPS, rollWaveCarriers } from '../data/battlefield'
+import { rollWaveCarriers } from '../data/battlefield'
 import { initialLayout, stepFrozenVisuals, stepSim, worldTimeScale } from './sim'
 import { settleWave } from './wave'
 import { isBossWave, isEliteWave, waveAt, waveDurationMs, WAVE } from '../data/waves'
@@ -88,8 +80,7 @@ import type { HudSnapshot } from '../war/hudHost'
 import type { UIScene } from '../war/UIScene'
 import type { Meteor, PendingSpawn, Sim } from './sim'
 import { emojiImage } from '../emoji/textures'
-import { toPx } from '../war/px'
-import { BOSSES, ELITE, ENEMY_DEFS, SPAWN } from '../data/enemies'
+import { SPAWN } from '../data/enemies'
 
 // ECS 实验战斗场景(宿主壳):Phaser 只做画布/相机/输入/音频宿主;战斗世界(实体+系统+
 // 自绘渲染)全在 ECS。P2:有界森林图 + 队伍编队/orbit/游移/跟随弹簧 + 键盘/相机跟随。
@@ -489,241 +480,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
     this.ready = true
     hint.destroy()
-
-    // e2e 探针:按 kind 在队伍中心附近投放一只敌人(相对格偏移;elite=金边精英体质)
-    window.__ecsSpawnEnemy = (kind: string, dxU = 3, dyU = 0, elite = false): void => {
-      const sim = this.sim
-      if (!sim || !this.atlas) return
-      const boss = BOSSES.find((s) => s.kind === kind)
-      const raw = ENEMY_DEFS.find((s) => s.kind === kind) ?? boss
-      if (!raw) return
-      const px = toPx(raw)
-      const hp = Math.round(px.hp * (elite && !boss ? ELITE.hpMul : 1))
-      spawnEnemy(sim, this.atlas, px, sim.center.x + dxU * UNIT, sim.center.y + dyU * UNIT, hp, elite && !boss, !!boss)
-    }
-    // e2e 探针:最近敌人的显示尺寸(px)——验证精英体型放大
-    window.__ecsNearestEnemySize = (): number => {
-      const best = this.nearestEnemyToCenter()
-      return best >= 0 ? Transform.w[best]! : -1
-    }
-    // e2e 探针:对最近队伍中心的敌人施加伤害(+击退,源在队伍中心)
-    window.__ecsHurtEnemy = (dmg = 20, kb = 0): void => {
-      const sim = this.sim
-      if (!sim) return
-      let best = -1
-      let bestD = Infinity
-      for (const eid of query(this.world, [Enemy])) {
-        const dx = Transform.x[eid]! - sim.center.x
-        const dy = Transform.y[eid]! - sim.center.y
-        const d = dx * dx + dy * dy
-        if (d < bestD) {
-          bestD = d
-          best = eid
-        }
-      }
-      if (best >= 0) applyDamage(sim, best, dmg, kb, sim.center.x, sim.center.y)
-    }
-    // e2e 探针:对最近队伍中心的敌人施加限时减速(验证 slow 状态)
-    window.__ecsSlowEnemy = (factor = 0.3, durMs = 3000): void => {
-      const sim = this.sim
-      if (!sim) return
-      let best = -1
-      let bestD = Infinity
-      for (const eid of query(this.world, [Enemy])) {
-        const dx = Transform.x[eid]! - sim.center.x
-        const dy = Transform.y[eid]! - sim.center.y
-        const d = dx * dx + dy * dy
-        if (d < bestD) {
-          bestD = d
-          best = eid
-        }
-      }
-      if (best >= 0) {
-        Slow.until[best] = sim.elapsedMs + durMs
-        Slow.mul[best] = factor
-      }
-    }
-    // e2e 探针:给最近敌人挂中毒 DoT + 读其血量
-    window.__ecsPoisonEnemy = (dmg = 5, tickMs = 300, durMs = 3000): void => {
-      const sim = this.sim
-      if (!sim) return
-      let best = -1
-      let bestD = Infinity
-      for (const eid of query(this.world, [Enemy])) {
-        const dx = Transform.x[eid]! - sim.center.x
-        const dy = Transform.y[eid]! - sim.center.y
-        const d = dx * dx + dy * dy
-        if (d < bestD) {
-          bestD = d
-          best = eid
-        }
-      }
-      if (best >= 0) {
-        Poison.until[best] = sim.elapsedMs + durMs
-        Poison.nextTick[best] = sim.elapsedMs + tickMs
-        Poison.dmg[best] = dmg
-        Poison.tickMs[best] = tickMs
-        Poison.slot[best] = -1
-      }
-    }
-    window.__ecsNearestEnemyHp = (): number => {
-      const sim = this.sim
-      if (!sim) return -1
-      let best = -1
-      let bestD = Infinity
-      for (const eid of query(this.world, [Enemy])) {
-        const dx = Transform.x[eid]! - sim.center.x
-        const dy = Transform.y[eid]! - sim.center.y
-        const d = dx * dx + dy * dy
-        if (d < bestD) {
-          bestD = d
-          best = eid
-        }
-      }
-      return best >= 0 ? Hp.v[best]! : -1
-    }
-    window.__ecsNearestEnemyState = (): number => {
-      const sim = this.sim
-      if (!sim) return -1
-      let best = -1
-      let bestD = Infinity
-      for (const eid of query(this.world, [Enemy])) {
-        const dx = Transform.x[eid]! - sim.center.x
-        const dy = Transform.y[eid]! - sim.center.y
-        const d = dx * dx + dy * dy
-        if (d < bestD) {
-          bestD = d
-          best = eid
-        }
-      }
-      return best >= 0 ? EState.v[best]! : -1
-    }
-    // e2e 探针:变形最近敌人(魔尘)+ 读其是否变形中
-    window.__ecsMorphEnemy = (durMs = 2500, vulnMul = 1): void => {
-      const sim = this.sim
-      if (!sim || !this.atlas) return
-      const best = this.nearestEnemyToCenter()
-      if (best >= 0) applyMorph(sim, this.atlas, best, { durationMs: durMs, morphEmoji: '1f411', vulnMul })
-    }
-    window.__ecsNearestEnemyMorphed = (): boolean => {
-      const sim = this.sim
-      if (!sim) return false
-      const best = this.nearestEnemyToCenter()
-      return best >= 0 && Morph.until[best] !== 0 && sim.elapsedMs < Morph.until[best]!
-    }
-    window.__ecsGroundZones = (): number => groundZoneCount()
-    window.__ecsBossDown = (): boolean => this.sim?.bossDown ?? false
-    // e2e 探针:在队伍中心相对格偏移处掉一枚战场拾取
-    window.__ecsDropField = (id: string, dxU = 2, dyU = 0): void => {
-      const sim = this.sim
-      const def = FIELD_PICKUPS[id]
-      if (!sim || !def) return
-      spawnFieldPickupEcs(sim, this, sim.center.x + dxU * UNIT, sim.center.y + dyU * UNIT, toPx(def))
-    }
-    // e2e 探针:发动时停(不经队长技能,直接开窗口)+ 读当前世界时标
-    window.__ecsTimeStop = (durMs = 6000): void => {
-      if (this.sim) this.sim.timeStopMsLeft = durMs
-    }
-    window.__ecsWorldTimeScale = (): number => (this.sim ? worldTimeScale(this.sim) : 1)
-    // e2e 探针:把世界的下一次周期事件提前到此刻(深空强开天体横扫 / 落水掉血立刻结算)
-    window.__ecsForceWorldTick = (): void => {
-      if (this.sim) this.sim.worldTickAt = this.sim.elapsedMs
-    }
-    // e2e 探针:走一帧队伍位移(直调世界钩子,不依赖游戏时钟)——校验冰面打滑手感
-    window.__ecsStepTeam = (wantDx, wantDy, deltaMs = 16): { x: number; y: number } => {
-      const sim = this.sim
-      if (!sim) return { x: 0, y: 0 }
-      const next = sim.hooks.constrainTeam(sim, { x: sim.center.x + wantDx, y: sim.center.y + wantDy }, deltaMs)
-      sim.center.x = next.x
-      sim.center.y = next.y
-      return { x: next.x, y: next.y }
-    }
-    // e2e 探针:把队伍中心瞬移到格坐标(测落水掉血等按位置结算的世界规则)
-    window.__ecsTeleport = (xU, yU): void => {
-      const sim = this.sim
-      if (!sim) return
-      sim.center.x = xU * UNIT
-      sim.center.y = yU * UNIT
-      sim.teamVx = 0
-      sim.teamVy = 0
-      for (const m of sim.members) {
-        Transform.x[m] = sim.center.x
-        Transform.y[m] = sim.center.y
-        Follow.x[m] = sim.center.x
-        Follow.y[m] = sim.center.y
-        Follow.vx[m] = 0
-        Follow.vy[m] = 0
-      }
-    }
-    // e2e 探针:全场蹦迪窗口是否生效中
-    window.__ecsDancing = (): boolean => {
-      const sim = this.sim
-      return sim !== undefined && sim.elapsedMs < sim.danceEndsAt
-    }
-    // e2e 探针:队员 0 是否处于黏黏怪攻速惩罚中
-    window.__ecsMemberAtkSlowed = (): boolean => {
-      const sim = this.sim
-      const m = sim?.members[0]
-      return sim !== undefined && m !== undefined && MAtkSlow.until[m]! > sim.elapsedMs
-    }
-    // e2e/性能探针:一次性铺 count 只敌人(网格散布,验证上千 entity 单批绘制)
-    window.__ecsStress = (count = 1000, kind = 'zombie'): void => {
-      const sim = this.sim
-      if (!sim || !this.atlas) return
-      const raw = ENEMY_DEFS.find((s) => s.kind === kind)
-      if (!raw) return
-      const px = toPx(raw)
-      const cols = Math.ceil(Math.sqrt(count))
-      const gap = 0.5 * UNIT
-      for (let i = 0; i < count; i++) {
-        const gx = (i % cols) - cols / 2
-        const gy = Math.floor(i / cols) - cols / 2
-        spawnEnemy(sim, this.atlas, px, sim.center.x + gx * gap, sim.center.y + gy * gap, px.hp, false, false)
-      }
-    }
-    // e2e 探针:把局内时钟快进 ms(波末过场按 elapsedMs 判定,借此确定性地走完整条过场链路)
-    window.__ecsFastForward = (ms: number): void => {
-      if (this.sim) this.sim.elapsedMs += ms
-    }
-    // e2e 探针:结算本波(仅回写 run,不过场),返回结算后波次号
-    window.__ecsSettleWave = (): number => {
-      const sim = this.sim
-      if (!sim) return -1
-      settleWave(sim)
-      return sim.run.wave
-    }
-    // e2e 探针:在队伍中心相对格偏移处落金币(测偷币鼠)
-    window.__ecsSpawnCoinsAt = (dxU = 8, dyU = 0, count = 3): void => {
-      const sim = this.sim
-      if (!sim || !this.atlas) return
-      spawnCoinsEcs(sim, this.atlas, sim.center.x + dxU * UNIT, sim.center.y + dyU * UNIT, count)
-    }
-    // e2e 探针:全场敌人已吞金币数的最大值(隔离偷币鼠,不受自然刷怪干扰)
-    window.__ecsMaxEaten = (): number => {
-      let max = 0
-      for (const eid of query(this.world, [Enemy])) if (thiefEaten[eid]! > max) max = thiefEaten[eid]!
-      return max
-    }
-    // 注:探针不在这里发半份({ready,pages} 而无其余字段)——update 下一帧会发完整的一份。
-    // 早发半份会让 e2e 在 ready 之后读到 undefined 字段(跨场景那几条尤其容易撞上)
-  }
-
-  /** 最近队伍中心的敌人 eid(探针共用),无敌人返回 -1 */
-  private nearestEnemyToCenter(): number {
-    const sim = this.sim
-    if (!sim) return -1
-    let best = -1
-    let bestD = Infinity
-    for (const eid of query(this.world, [Enemy])) {
-      const dx = Transform.x[eid]! - sim.center.x
-      const dy = Transform.y[eid]! - sim.center.y
-      const d = dx * dx + dy * dy
-      if (d < bestD) {
-        bestD = d
-        best = eid
-      }
-    }
-    return best
   }
 
   /** 刷怪预告标记对帐(镜像 spawnTelegraphed 的⚠脉冲):新 pending 挂脉冲标记,落地即销毁 */

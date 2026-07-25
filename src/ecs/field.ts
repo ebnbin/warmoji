@@ -179,10 +179,3 @@ export function attachCarrierAuraEcs(scene: Phaser.Scene, eid: number, def: Fiel
   auras.set(eid, aura)
 }
 
-/** 携带者离场:销毁光环(死亡处掉拾取由调用方负责) */
-export function detachCarrierAuraEcs(eid: number): void {
-  const aura = auras.get(eid)
-  if (!aura) return
-  aura.destroy()
-  auras.delete(eid)
-}

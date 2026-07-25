@@ -54,4 +54,4 @@ export const WEAPONS = Object.fromEntries(
     hydrate(w),
   ]),
 ) as Record<WeaponId, WeaponDef>
-export const WEAPON_IDS = Object.keys(WEAPONS) as readonly WeaponId[]
+

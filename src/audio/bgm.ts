@@ -238,10 +238,6 @@ export function setBgmEnabled(on: boolean): void {
   startIfWanted()
 }
 
-/** 调试快照 */
-export function bgmState(): { desired: BgmId | null; playing: BgmId | null; enabled: boolean } {
-  return { desired, playing, enabled }
-}
 
 /** 离线渲染一段曲子并统计响度（探针用：验证真的出声且各曲不同） */
 export async function renderBgmOffline(

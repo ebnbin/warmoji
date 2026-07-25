@@ -103,12 +103,6 @@ export const FIELD_PICKUPS: Record<string, FieldPickupDef> = Object.fromEntries(
     .map((d) => [d.id, d]),
 )
 
-export const FIELD_PICKUP_IDS = Object.keys(FIELD_PICKUPS)
-
-/** 本图拾取池 */
-export function fieldPickupsFor(mapId: MapId): readonly FieldPickupDef[] {
-  return POOLS[mapId]
-}
 
 /** 本波携带者预算（固定数量，非概率）：随波次上探，Boss 波偏减益施压。分档表见 battlefield 数据 */
 export function waveCarrierBudget(wave: number, isBoss: boolean): { buff: number; debuff: number } {

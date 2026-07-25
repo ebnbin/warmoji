@@ -1,13 +1,10 @@
 import type Phaser from 'phaser'
 import { browserStorage } from '../core/storage'
 import { loadSettings } from '../run/settings'
-import { setLabEnemies, setLabInvincible, setLabRoster } from '../run/lab'
 import type { MapId } from '../data/maps'
-import type { CharacterId } from '../data/characters'
 // ── 旧框架（arcade）──
 import { ARENA_SCENE_KEYS, arenaSceneFor } from '../arcade/keys'
 import type { ArenaSceneKey } from '../arcade/keys'
-import { installArcadeProbes } from '../arcade/probes'
 import { BoundedScene } from '../arcade/maps/BoundedScene'
 import { InfiniteScene } from '../arcade/maps/InfiniteScene'
 import { RiverScene } from '../arcade/maps/RiverScene'
@@ -36,9 +33,9 @@ import type { EcsSceneKey } from '../ecs/keys'
 // 主干的耦合」= 本文件导出的这几项，一眼可数、不会悄悄长出新的。
 //
 // 淘汰其中一侧时的完整清单（两侧各实测删过一遍：src/ 编译与 lint 均通过，无残留引用）：
-//   1. 删该侧目录（e2e 探针的 window 声明就在包内的 globals.d.ts，随包一起走）
-//   2. 本文件删掉该侧的 import 与它在 BATTLE_SCENES / BATTLE_SCENE_KEYS / battleSceneFor /
-//      installBattleProbes 里的那一半；删 ECS 侧再删 settings 的 `ecs` 字段
+//   1. 删该侧目录
+//   2. 本文件删掉该侧的 import 与它在 BATTLE_SCENES / BATTLE_SCENE_KEYS / battleSceneFor
+//      里的那一半；删 ECS 侧再删 settings 的 `ecs` 字段
 //   3. eslint.config.js 去掉该侧的护栏与白名单；删 ECS 侧一并删 package.json 的 bitecs
 //   （e2e 已收敛为 smoke + gameplay 两条底线守卫，不绑任一侧实现，故无需增删）
 //
@@ -83,15 +80,3 @@ export function isBattleSceneKey(key: string): boolean {
   return (BATTLE_SCENE_KEYS as readonly string[]).includes(key)
 }
 
-/** 装两侧的 e2e 调试探针。各自只对本框架有效，随该侧一起消失。
- * `__ecsLabRoster` 之外的 __ecs* 由 EcsBattleScene 运行时自挂；旧框架那批在 arcade/probes.ts */
-export function installBattleProbes(game: Phaser.Game): void {
-  installArcadeProbes(game)
-  // ECS 试炼场旋钮：只设定、不启动场景——供 e2e 随后经地图页测试模式进入 ECS。
-  // 敌人勾选集默认清空（隔离测量：只出 e2e 显式投放的敌人）；无敌默认沿用试炼场缺省（开）
-  window.__ecsLabRoster = (ids: string[], enemies: string[] = [], invincible = true): void => {
-    setLabRoster(ids as CharacterId[])
-    setLabEnemies(enemies)
-    setLabInvincible(invincible)
-  }
-}

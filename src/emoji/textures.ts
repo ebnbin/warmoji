@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { OUTLINE } from './svg'
 import type { OutlineKind } from './svg'
-import { allEmojiIds, packSvg, parseEmojiPack } from './pack'
+import { packSvg, parseEmojiPack } from './pack'
 import type { EmojiPack } from './pack'
 import { EMOJI_PAD, outlineSvg, padSvg, setSvgSize } from './svg'
 
@@ -44,10 +44,6 @@ export function loadEmojiPack(): Promise<EmojiPack> {
   return packDeferred()
 }
 
-/** 全量 emoji ID 清单（ordering 顺序）——图鉴/Studio 网格用 */
-export async function loadEmojiIds(): Promise<readonly string[]> {
-  return allEmojiIds(await loadEmojiPack())
-}
 
 /** ordering ID → 完整 SVG 文本（未收录即抛错）。
  * 项目规范的唯一注入点：viewBox 统一 pad 成 48 标准（内容 36 居中 + 四周 6），

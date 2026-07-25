@@ -105,5 +105,3 @@ export const Swarmer = {}
 /** 弩塔：架在地上自主索敌开火的装置 */
 export const Emplacement = {}
 
-/** 能力实体查询集 */
-export const ABILITY_SET = [Ability, AbilityRef, Owner, Faction, Cooldown, Amp, Frozen, Disarmed] as const

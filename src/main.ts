@@ -11,15 +11,12 @@ import { ShopScene } from './menu/ShopScene'
 import { StudioScene } from './menu/StudioScene'
 import { UIScene } from './war/UIScene'
 import { WikiScene } from './menu/WikiScene'
-import { BATTLE_SCENES, installBattleProbes, isBattleSceneKey } from './experiments/battleExperiment'
-import { WAVE } from './data/waves'
+import { BATTLE_SCENES, isBattleSceneKey } from './experiments/battleExperiment'
 import { browserStorage } from './core/storage'
-import { getRun, grantCoins, grantXp } from './run/state'
-import type { ItemId } from './data/items'
+import { getRun } from './run/state'
 import { loadSettings } from './run/settings'
-import { bgmState, initBgm, playBgm, renderBgmOffline, setBgmEnabled } from './audio/bgm'
-import type { BgmId } from './audio/music'
-import { initSfx, setSfxEnabled, sfxStats } from './audio/sfx'
+import { initBgm, playBgm, setBgmEnabled } from './audio/bgm'
+import { initSfx, setSfxEnabled } from './audio/sfx'
 import { isStandalone, nudgeIosViewport, refreshViewport, viewport } from './core/apply'
 
 const badge = document.getElementById('build-badge')
@@ -95,28 +92,3 @@ window.addEventListener('orientationchange', () => {
   window.setTimeout(() => refreshViewport(game), 1000)
 })
 
-// 供临时验证脚本注入状态
-window.__game = game
-// 两套战斗实现各自的 e2e 调试探针（实现在各自包内，装配走 facade）
-installBattleProbes(game)
-
-
-window.__addCoins = (n: number): void => grantCoins(n)
-window.__addXp = (n: number): void => grantXp(n)
-// e2e：直接给某槽位角色装备道具（模拟「任意来源获得道具」，来源无关地累积专属经验、
-// 推动质变升级）。默认槽位 0、数量 1
-window.__addMemberItem = (itemId: string, slot = 0, count = 1): void => {
-  const run = getRun()
-  const items = run.memberItems[slot]
-  if (!items) return
-  for (let i = 0; i < count; i++) items.push(itemId as ItemId)
-}
-// e2e 快进到指定波（在商店/整编期间调用，下次开战即该波）
-window.__setWave = (n: number): void => {
-  getRun().wave = Math.max(1, Math.min(WAVE.totalWaves, Math.round(n)))
-}
-window.__sfxStats = (): { baked: number; played: number } => sfxStats()
-// e2e/探针：离线渲染一段 BGM 统计响度（验证真实出声、各曲差异）+ 播放状态快照
-window.__bgmProbe = (id: BgmId, seconds?: number): Promise<{ rms: number; peak: number; notes: number }> =>
-  renderBgmOffline(id, seconds)
-window.__bgmState = (): { desired: BgmId | null; playing: BgmId | null; enabled: boolean } => bgmState()

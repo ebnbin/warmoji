@@ -11,7 +11,6 @@ import type { MapId } from '../data/maps'
 import { MAP_IDS } from '../data/maps'
 import { drawRecruitPool, recruitSeed, refreshRecruitSeed, unlockedCount } from './recruit'
 import { waveDurationMs } from '../data/waves'
-import { gainXp } from '../data/xp'
 import type { XpState } from '../data/xp'
 
 // 一局（run）的跨波次状态：出发时创建，波次间经由商店传递，回组队页时丢弃。
@@ -176,9 +175,6 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   return run.roster.length - 1
 }
 
-export function isTeamFull(run: RunState): boolean {
-  return run.roster.length >= rosterCap(run)
-}
 
 /** 出现「受保护中心」（可编排）所需的最少队员数：首次满此数即可选一人居中，
  * 之后新入队者只补外圈——与 teamSize 脱钩（未来 8 人队长也在 5 人时定中心） */
@@ -245,15 +241,3 @@ export function waveStartHp(storedHp: number, maxHp: number): number {
   return Math.round(maxHp * WAVE.reviveHpRatio)
 }
 
-/** 调试/e2e 注入：给进行中的一局加金币 */
-export function grantCoins(n: number): void {
-  if (current) current.coins += n
-}
-
-/** 调试/e2e 注入：给进行中的一局加经验（升级即累积团队升级抽卡次数） */
-export function grantXp(n: number): void {
-  if (!current) return
-  const gained = gainXp(current.xp, n)
-  current.xp = gained.state
-  current.cardDraws += gained.levelsGained
-}

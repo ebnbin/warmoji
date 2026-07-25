@@ -40,10 +40,6 @@ export function remapGroundEffectsEcs(map: (x: number, y: number) => { x: number
   }
 }
 
-/** 在场地面效果区数(e2e 探针) */
-export function groundZoneCount(): number {
-  return zones.length
-}
 
 /** 开局清空(场景重建:上一局的区与节流全清) */
 export function clearGroundEffectsEcs(): void {

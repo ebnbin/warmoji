@@ -219,19 +219,4 @@ interface WarmojiDebug {
 
 interface Window {
   __warmoji?: WarmojiDebug
-  __game?: unknown
-  __addCoins?: (n: number) => void
-  __addXp?: (n: number) => void
-  __addMemberItem?: (itemId: string, slot?: number, count?: number) => void
-  __setWave?: (n: number) => void
-  __sfxStats?: () => { baked: number; played: number }
-  __bgmProbe?: (
-    id: 'lobby' | 'forest' | 'desert' | 'river' | 'void',
-    seconds?: number,
-  ) => Promise<{ rms: number; peak: number; notes: number }>
-  __bgmState?: () => {
-    desired: string | null
-    playing: string | null
-    enabled: boolean
-  }
 }

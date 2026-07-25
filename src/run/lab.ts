@@ -52,11 +52,6 @@ export function toggleLabEnemy(kind: string): void {
   else enemies.add(kind)
 }
 
-/** 整体设定勾选集（窗口调试 API / e2e 用） */
-export function setLabEnemies(kinds: readonly string[]): void {
-  enemies.clear()
-  for (const k of kinds) enemies.add(k)
-}
 
 // ── 角色 ──────────────────────────────────────────────────
 export function isLabCharacterOn(id: CharacterId): boolean {
@@ -74,10 +69,6 @@ export function toggleLabCharacter(id: CharacterId): void {
   }
 }
 
-/** 直接设定试炼场阵容（调试探针用；空则回退默认单人）。改动后由调用方 beginRun + 重启应用 */
-export function setLabRoster(ids: readonly CharacterId[]): void {
-  roster = ids.length > 0 ? [...ids] : [...ROSTER_IDS.slice(0, 1)]
-}
 
 /** 角色等级（统一改全部；作用于建队员时的配装档位） */
 export function labLevel(): LabLevel {

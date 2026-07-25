@@ -579,9 +579,6 @@ export function animClipOf(emoji: string, clipId: string): AnimClip | undefined 
   return animSetOf(emoji)?.clips.find((c) => c.id === clipId)
 }
 
-export function animRecipeOf(emoji: string): AnimRecipe | undefined {
-  return ANIM_RECIPES.find((r) => r.emoji === emoji)
-}
 
 /** 播放进度 → 帧下标（播放器与测试共用的纯函数）：
  * once 播完停在末帧；循环按相位回绕 */

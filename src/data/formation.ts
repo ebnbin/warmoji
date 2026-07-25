@@ -11,11 +11,6 @@ import type { Point } from '../core/vec'
 // 只保留待机游移。承伤差异纯几何：谁先被敌人摸到谁掉血，无数值加成。
 export type FormationId = 'ring' | 'guard'
 
-/** 槽位 slot 在环形阵型中相对中心的偏移；0 号位于正上方，顺时针均分 */
-export function slotOffset(slot: number, count: number, radius: number): Point {
-  const angle = -Math.PI / 2 + (slot * 2 * Math.PI) / count
-  return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
-}
 
 /** 环形阵按人数取半径：3 人小环更紧凑 */
 function ringRadius(count: number): number {
