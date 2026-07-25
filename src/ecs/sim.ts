@@ -11,6 +11,7 @@ import { Alive, Breath, Depth, Follow, Pop, Sprite, Threat, Transform, VisOff, W
 import { steerEnemies, updateFrameTargets } from './enemy'
 import { memberContact, memberVisual, regenMembers, reviveMembers, tickPoison } from './combat'
 import { updateEnemyProjectiles, updateProjectiles } from './projectile'
+import { backEaseOut } from './ease'
 import { updateShards } from './shards'
 import { updateDormancy } from './worlds'
 import type { FlowField, WallGrid } from '../maps/ruins'
@@ -274,14 +275,6 @@ function moveTeam(sim: Sim, delta: number): void {
   sim.center.x = next.x
   sim.center.y = next.y
   layout(sim, delta)
-}
-
-/** Back.easeOut(Phaser 默认过冲量):复活/掉落弹入用,末段轻微过冲再回落 */
-export function backEaseOut(t: number): number {
-  const c1 = 1.70158
-  const c3 = c1 + 1
-  const u = t - 1
-  return 1 + c3 * u * u * u + c1 * u * u
 }
 
 /** 逐员:岗位偏移 + 待机游移 + 跟随弹簧 → 写 Transform/Depth(镜像 layoutTeam) */

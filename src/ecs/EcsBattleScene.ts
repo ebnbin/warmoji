@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { textRes, viewport } from '../core/apply'
+import { textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
 import { UNIT } from '../core/units'
 import { MEMBER } from '../characters/registry'
 import { HIT_SHAKE } from '../battle/config'
@@ -56,11 +56,12 @@ import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch } from './render/spriteBatch'
 import { spawnSprite } from './entities'
 import { updateAnims } from './anim'
+import { remapSim } from './remap'
 import { spawnTeam } from './team'
 import { spawnEnemy, updateSpawners } from './enemy'
-import { enemyNest, thiefEaten } from './store'
+import { clearEcsStore, enemyNest, thiefEaten } from './store'
 import { armCaptain, armTeam, refreshEnemyTargets, updateMemberAbilities } from './ability/wire'
-import { updateEnemyAbilities } from './ability/enemyWire'
+import { clearEnemyWire, updateEnemyAbilities } from './ability/enemyWire'
 import { runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
 import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
@@ -178,6 +179,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private stripCams: Phaser.Cameras.Scene2D.Camera[] = []
   private frameTiles: { tile: Phaser.GameObjects.TileSprite; dx: number; dy: number }[] = []
   private frameGlow?: Phaser.GameObjects.Graphics
+  /** 单屏图（奔流/工厂）的静态视觉层：视口变化时整体重建 */
+  private worldVisuals: Phaser.GameObjects.GameObject[] = []
   /** 奔流图水面动效：双层水纹贴图 + 顺流漂浮物（纯视觉，不进 ECS 批绘） */
   private waveTiles: { tile: Phaser.GameObjects.TileSprite; speed: number }[] = []
   private drifts: Drift[] = []
@@ -333,25 +336,28 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     // HUD：与旧竞技场同一套 UIScene（自探测当前战斗场景，launch 不传参）
     this.scene.launch('ui')
+    this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.scene.stop('ui')
       this.atlas?.dispose() // 停掉在途的惰性烘焙:纹理管理器即将归下一局所有
       for (const c of this.stripCams) this.cameras.remove(c)
       this.stripCams = []
     })
 
-    this.input.keyboard?.on('keydown-ESC', () => {
-      playSfx('click')
-      this.scene.start('menu')
-    })
+    // 注:ESC = 暂停,绑定在共用的 UIScene 上(与旧竞技场同一处);此处不再另接一份,
+    // 否则同一次按键会既暂停又退出。
   }
 
   private async boot(run: RunState, center: { x: number; y: number }, hint: Phaser.GameObjects.Text): Promise<void> {
     const atlas = await EcsAtlas.build(this, OUTLINED_EMOJIS)
     if (!this.scene.isActive()) return
     this.atlas = atlas
-    clearGroundEffectsEcs() // 开局清上一局遗留的地面效果(模块级列表)
+    // 开局清上一局遗留的模块级状态(eid 从 0 重新分配,旧局引用不能留给新实体)
+    clearGroundEffectsEcs()
     clearFieldEcs()
+    clearEcsStore()
+    clearEnemyWire()
     new EcsSpriteBatch(this, this.world, atlas)
     this.spawnDecor(run, atlas)
     this.testMode = run.testMode
@@ -896,6 +902,49 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
 
 
+  /** 视口变化（旋转 / 拉窗口）：跟随式相机只需重设缩放；
+   * 单屏图（奔流/工厂）的世界尺寸是从视口推出来的，须整体重映射——
+   * 「长轴进度 + 跨轴偏移」的通用几何在 core/remap，与旧图共用一份 */
+  private onViewportChanged(): void {
+    const sim = this.sim
+    const mapDef = MAPS[this.run.mapId]
+    const rc = mapDef.river
+    const tc = mapDef.torus
+    const cam = this.cameras.main
+    if (!rc && !tc) {
+      cam.setZoom(viewport.renderScale)
+      return
+    }
+    const fromW = this.mapW
+    const fromH = this.mapH
+    const landscape = viewport.logicalWidth >= viewport.logicalHeight
+    this.mapW = tc ? (landscape ? tc.arenaLong : tc.arenaShort) * UNIT : viewport.logicalWidth * rc!.viewScale
+    this.mapH = tc ? (landscape ? tc.arenaShort : tc.arenaLong) * UNIT : viewport.logicalHeight * rc!.viewScale
+    if (tc) {
+      for (const c of this.stripCams) this.cameras.remove(c)
+      this.stripCams = []
+      this.setupTorusCameras(tc)
+    } else {
+      cam.setZoom(viewport.renderScale / rc!.viewScale)
+    }
+    cam.centerOn(this.mapW / 2, this.mapH / 2)
+    if (sim) {
+      sim.mapW = this.mapW
+      sim.mapH = this.mapH
+      remapSim(sim, fromW, fromH, this.mapW, this.mapH)
+      this.centerObj.setPosition(sim.center.x, sim.center.y)
+    }
+    // 视觉层整体重建（战斗实体不在此列：它们是 ECS 实体，坐标已随 remapSim 挪好）
+    for (const o of this.worldVisuals) o.destroy()
+    this.worldVisuals = []
+    this.waveTiles = []
+    this.drifts = []
+    this.frameTiles = []
+    this.frameGlow = undefined
+    if (tc) this.buildVoidVisuals(mapDef, tc)
+    else this.buildRiverVisuals(mapDef, rc!)
+  }
+
   /** 环面相机（镜像 VoidArenaScene.setupCameras）：主相机裁出屏内最大居中的竞技场定比矩形，
    * 四缝 + 四角各挂一台条带相机取景对侧溢出——跨缝实体两侧同时可见（渲染层的幽灵分身）。
    * ECS 侧全场实体是同一个批绘对象，条带相机各自按自己的滚动再画一遍，天然成立 */
@@ -937,7 +986,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private buildVoidVisuals(mapDef: MapDef, cfg: TorusConfig): void {
     const W = this.mapW
     const H = this.mapH
-    const statics: Phaser.GameObjects.GameObject[] = []
+    const statics = this.worldVisuals
 
     // 钢板厂房地面（中心朝亮的顶灯软渐变，避免硬边椭圆的「盘子感」）
     const gFloor = this.add.graphics().setDepth(0)
@@ -990,6 +1039,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     this.frameGlow = this.add.graphics().setDepth(3.6)
     statics.push(this.frameGlow)
+    // 静态视觉只画一份:条带相机全部忽略,否则门框/地板会在缝上重影
     for (const c of this.stripCams) c.ignore(statics)
   }
 
@@ -1041,9 +1091,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const horizontal = r.horizontal
 
     // 两岸暗带(河道以外的跨轴余量),外缘更暗给一点纵深
+    const statics = this.worldVisuals
     const gBank = this.add.graphics().setDepth(0)
     gBank.fillStyle(BANK_COLOR, 1)
     gBank.fillRect(0, 0, vw, vh)
+    statics.push(gBank)
     gBank.fillStyle(BANK_FAR_COLOR, 1)
     if (horizontal) {
       if (r.y > 24) gBank.fillRect(0, 0, vw, Math.max(0, r.y - 18))
@@ -1055,6 +1107,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     // 河水:跨向「岸暗心亮」的两段渐变
     const gWater = this.add.graphics().setDepth(0.2)
+    statics.push(gWater)
     const edge = shade(mapDef.palette.map, 0.78)
     const mid = shade(mapDef.palette.map, 1.12)
     if (horizontal) {
@@ -1071,6 +1124,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     // 岸线浪花:贴岸白线 + 断续泡点(种子固定,同局重建不变)
     const gFoam = this.add.graphics().setDepth(0.4)
+    statics.push(gFoam)
     gFoam.lineStyle(2, 0xffffff, 0.3)
     const foamRng = new Rng(this.run.decorSeed ^ 0xf0a8)
     const alongLen = horizontal ? r.w : r.h
@@ -1101,6 +1155,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       tile.tilePositionX = Math.random() * 256
       tile.tilePositionY = Math.random() * 256
       this.waveTiles.push({ tile, speed })
+      statics.push(tile)
     }
 
     // 岸上静态植被:沿长轴等距掷点(种子固定),只落在岸带内
@@ -1124,10 +1179,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         const sizeU = def.sizeU[0] + decorRng.next() * (def.sizeU[1] - def.sizeU[0])
         const size = Math.min(sizeU * UNIT, bandW * 0.9)
         const cross = b0 + size / 2 + decorRng.next() * Math.max(1, bandW - size)
-        emojiImage(this, horizontal ? along : cross, horizontal ? cross : along, emoji, size, 'player')
-          .setAlpha(def.alpha[0] + decorRng.next() * (def.alpha[1] - def.alpha[0]))
-          .setRotation((decorRng.next() * 2 - 1) * 0.6)
-          .setDepth(0.8)
+        statics.push(
+          emojiImage(this, horizontal ? along : cross, horizontal ? cross : along, emoji, size, 'player')
+            .setAlpha(def.alpha[0] + decorRng.next() * (def.alpha[1] - def.alpha[0]))
+            .setRotation((decorRng.next() * 2 - 1) * 0.6)
+            .setDepth(0.8),
+        )
       }
     }
 
@@ -1148,6 +1205,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         spin: (Math.random() * 2 - 1) * 0.5,
       }
       d.speedMul = this.driftSpeed(d.baseCross / halfCross, cfg)
+      statics.push(d.image)
       this.drifts.push(d)
       this.placeDrift(d, r, 0)
     }

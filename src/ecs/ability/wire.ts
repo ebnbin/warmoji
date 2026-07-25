@@ -21,6 +21,7 @@ import type { EcsAtlas } from '../render/atlas'
 
 // 队员装备能力(镜像 createMember 的配装/等级/道具 fx 生效链)+ 每帧驱动。
 // 复用 createAbility 造出的能力运行时,不重写任何能力逻辑。
+// 阵亡即收械、复活即亮械;断壁图的非穿墙能力索敌受遮挡(wallAwareCtx)。
 
 /** 各槽位持械视觉的已呈现存活态(与 Alive 对帐,只在翻转时收/亮械) */
 const shownAlive: boolean[] = []
@@ -41,7 +42,7 @@ function refOf(eid: number): TargetInfo['ref'] {
   return r as unknown as TargetInfo['ref']
 }
 
-/** 为全队装备能力(P3c:测试模式素体;正常局的道具个体差异 P4 细化) */
+/** 为全队装备能力:逐槽位按已持道具 + 专属等级解析生效能力(测试模式走场内等级旋钮) */
 export function armTeam(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, run: RunState, testMode: boolean): void {
   memberAbilities.length = 0
   memberHandle.length = 0

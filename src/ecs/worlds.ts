@@ -1,7 +1,7 @@
 import { UNIT } from '../core/units'
 import { norm } from '../core/vec'
 import { TEAM, MEMBER } from '../characters/registry'
-import { SPAWN } from '../enemies/registry'
+import { fleeSteer, SPAWN } from '../enemies/registry'
 import { randomMapPoint } from '../enemies/spawn'
 import { MAPS } from '../maps/registry'
 import type { IceConfig, InfiniteConfig, MapId, RiverConfig, ShrinkRingConfig, SpaceConfig } from '../maps/registry'
@@ -55,6 +55,8 @@ export interface WorldHooks {
   smashWall(sim: Sim, x: number, y: number): void
   /** 游荡方向修正:有界图撞边折返(残垣图另加撞墙掉头);无界世界原样放行 */
   wanderDir(sim: Sim, eid: number, dx: number, dy: number): Point
+  /** 逃跑方向修正:有界图贴边沿墙滑行,不顶死在边上;无界世界原样放行 */
+  fleeDir(sim: Sim, eid: number, awayX: number, awayY: number): Point
   /** 敌人行为速度的后处理(冰面打滑低通 / 河流漂移);默认原样返回。
    * 击退分量不在此列——要脆要即时,由 steerEnemies 单独叠加 */
   postSteerEnemy(sim: Sim, eid: number, vx: number, vy: number, delta: number): { vx: number; vy: number }
@@ -130,6 +132,9 @@ const bounded: WorldHooks = {
       x: (x < margin && dx < 0) || (x > sim.mapW - margin && dx > 0) ? -dx : dx,
       y: (y < margin && dy < 0) || (y > sim.mapH - margin && dy > 0) ? -dy : dy,
     }
+  },
+  fleeDir(sim, eid, awayX, awayY) {
+    return fleeSteer(Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, sim.mapW, sim.mapH, 1.5 * UNIT)
   },
   postSteerEnemy(_sim, _eid, vx, vy) {
     return { vx, vy }
@@ -216,6 +221,9 @@ const ice: WorldHooks = {
   },
   constrainShard(_sim, x, y) {
     return { x, y }
+  },
+  fleeDir(_sim, _eid, awayX, awayY) {
+    return { x: awayX, y: awayY }
   },
   postSteerEnemy(sim, eid, vx, vy, delta) {
     const cfg = iceCfg(sim)
@@ -381,14 +389,20 @@ const infinite: WorldHooks = {
   constrainEnemy(_sim, _eid, x, y) {
     return { x, y }
   },
-  // 世界没有边,游荡不折返、敌弹与碎片也不受边界约束
+  // 世界没有边:游荡不折返、逃跑不贴边、敌弹只按寿命回收、碎片与金币落点都不钳
   wanderDir(_sim, _eid, dx, dy) {
     return { x: dx, y: dy }
+  },
+  fleeDir(_sim, _eid, awayX, awayY) {
+    return { x: awayX, y: awayY }
   },
   cullEnemyProjectile() {
     return false
   },
   constrainShard(_sim, x, y) {
+    return { x, y }
+  },
+  constrainCoin(_sim, x, y) {
     return { x, y }
   },
   spawnPoint(sim, boss) {
@@ -570,12 +584,18 @@ const river: WorldHooks = {
     }
     return { vx: ox, vy: oy }
   },
-  // 沿流向漂出屏外是设计的一部分:游荡不折返、敌弹也只按寿命回收
+  // 沿流向漂出屏外是设计的一部分:游荡不折返、逃跑不贴边、敌弹只按寿命回收、碎片不钳
   wanderDir(_sim, _eid, dx, dy) {
     return { x: dx, y: dy }
   },
+  fleeDir(_sim, _eid, awayX, awayY) {
+    return { x: awayX, y: awayY }
+  },
   cullEnemyProjectile() {
     return false
+  },
+  constrainShard(_sim, x, y) {
+    return { x, y }
   },
   /** 河道内均匀随机(贴边留半格);Boss 另取距队伍 ≥5 格的点 */
   spawnPoint(sim, boss) {
@@ -646,6 +666,9 @@ const torus: WorldHooks = {
   // 环面上没有边可撞,游荡不折返;敌弹只按寿命回收
   wanderDir(_sim, _eid, dx, dy) {
     return { x: dx, y: dy }
+  },
+  fleeDir(_sim, _eid, awayX, awayY) {
+    return { x: awayX, y: awayY }
   },
   cullEnemyProjectile() {
     return false

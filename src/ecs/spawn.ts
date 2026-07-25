@@ -23,8 +23,9 @@ import type { Sim } from './sim'
 import type { FieldPickupDef } from '../battlefield/registry'
 import type { EcsAtlas } from './render/atlas'
 
-// 刷怪节奏(P3e,常规波次制):随跨波累计战斗时长递增难度,供给随在场人数缩放,Boss 波减压;
-// 预告(telegraph)以「延迟落地」建模(视觉标记 P6 补)。测试模式的勾选敌人补场 P4 细化。
+// 刷怪节奏(常规波次制):随跨波累计战斗时长递增难度,供给随在场人数缩放,Boss 波减压;
+// 预告(telegraph)以「延迟落地」建模,视觉标记由场景侧按 pendingSpawns 对帐。
+// 试炼场与常规刷怪分道:只补勾选的敌人,密度/难度走场内旋钮。
 
 /** 当前时钟小时(昼夜图用;非昼夜图恒 undefined) */
 function dayNightOf(sim: Sim): { cfg: NonNullable<MapDef['dayNight']>; hour: number } | undefined {

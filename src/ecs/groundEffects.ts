@@ -30,6 +30,16 @@ interface Zone {
 let zones: Zone[] = []
 const memberGroundHit = new Map<number, number>()
 
+/** 视口重映射(单屏图横竖切换):地面效果区随坐标系一并挪位 */
+export function remapGroundEffectsEcs(map: (x: number, y: number) => { x: number; y: number }): void {
+  for (const z of zones) {
+    const p = map(z.x, z.y)
+    z.x = p.x
+    z.y = p.y
+    z.gfx.setPosition(p.x, p.y)
+  }
+}
+
 /** 在场地面效果区数(e2e 探针) */
 export function groundZoneCount(): number {
   return zones.length

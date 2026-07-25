@@ -16,6 +16,11 @@ import type { EcsAtlas } from '../render/atlas'
 /** 已装配能力的敌人 eid 集(死亡清理只扫这一小撮,不全表扫描) */
 const armedEids = new Set<number>()
 
+/** 跨局清场:上一局的持械登记不能留给新实体(eid 从 0 重新分配) */
+export function clearEnemyWire(): void {
+  armedEids.clear()
+}
+
 /** 给单个敌人装配能力(镜像 armEnemy:首发延迟喂初始冷却;projectile.firstDelayMs 优先) */
 function armEnemyEcs(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, eid: number): void {
   const rows = enemyDef[eid]?.abilities

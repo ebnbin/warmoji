@@ -6,6 +6,7 @@ import type { AbilityOwner, AbilityRuntime } from '../abilities/types'
 
 // 富数据伴随存储(按 eid 索引):bitECS 组件只存数值,def 引用等复杂对象放这里。
 // spawn 时写、removeEntity 前不必清(下次 spawn 覆盖;eid 复用后新 def 覆盖旧)。
+// 跨局(scene.restart)必须整体清空:eid 从头再分配,上一局的引用会挂在新实体身上。
 
 /** 敌人的 px 化 def(emoji/尺寸/速度/locomotion/abilities/死亡效果…) */
 export const enemyDef: (EnemyDef | undefined)[] = new Array<EnemyDef | undefined>(MAX_ENTITIES)
@@ -64,3 +65,21 @@ export const eprojSrcName: (string | undefined)[] = []
 /** 部件动画的 emoji 与描边(帧惰性解析用;undefined = 该实体不参与动画) */
 export const animId: (string | undefined)[] = []
 export const animOutline: (import('../emoji/svg').OutlineKind | undefined)[] = []
+
+/** 跨局清场:模块级伴随存储整体清空(eid 从 0 重新分配,旧局引用不能留给新实体)。
+ * 场景 create 时与 clearGroundEffectsEcs/clearFieldEcs 一并调用 */
+export function clearEcsStore(): void {
+  enemyDef.fill(undefined)
+  projOnHit.fill(undefined)
+  projHitEids.fill(undefined)
+  enemyRef.fill(undefined)
+  enemyAbilities.fill(undefined)
+  enemyOwner.fill(undefined)
+  memberRef.fill(undefined)
+  enemyCarries.fill(undefined)
+  memberAbilities.length = 0
+  memberHandle.length = 0
+  animId.length = 0
+  animOutline.length = 0
+  eprojSrcName.length = 0
+}

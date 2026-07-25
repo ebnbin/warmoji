@@ -48,7 +48,7 @@ import type { EcsWorld } from './world'
 import type { EcsAtlas } from './render/atlas'
 
 // 组队(镜像 BaseArenaScene setup 的阵容/岗位/成员建立):建 Sim + 逐槽位装配队员实体。
-// P2 只做移动/渲染所需字段;血量/道具/能力/动画在后续阶段追加。
+// 属性逐槽位按已持道具 + 专属等级聚合;血量跨波保留(上一波阵亡者低血量复活)。
 
 /** 建立队伍:返回 Sim(含 members eid 列表),并把队员实体装进 world */
 export function spawnTeam(

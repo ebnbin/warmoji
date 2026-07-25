@@ -19,7 +19,7 @@ import type { EcsAtlas } from '../render/atlas'
 // 队伍侧能力上下文(ECS 版):把旧 memberCtx 的动作面实现到 ECS 上,让 createAbility 造出的
 // 能力运行时(ProjectileAbility 等)原样复用。目标引用用 {__eid} 包装(对能力代码不透明,
 // 只回传给 ctx 方法);held 视觉等由运行时经 ctx.scene 自建(经 emojiImage 包装,非直接 phaser)。
-// P3c:实现开火/索敌/伤害/治疗核心;减速/毒/变羊/地面/召唤等效果面 P3d 起补。
+// 暴击/击退倍率/伤害与冷却乘区在此收口:所有能力路径统一生效,无需逐能力改造。
 
 interface Ref {
   __eid: number

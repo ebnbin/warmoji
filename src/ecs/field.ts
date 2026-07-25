@@ -38,6 +38,17 @@ export function clearFieldEcs(): void {
   auras.clear()
 }
 
+/** 视口重映射(单屏图横竖切换):地面待拾物随坐标系一并挪位(携带者光环逐帧跟敌,不必管) */
+export function remapFieldEcs(map: (x: number, y: number) => { x: number; y: number }): void {
+  for (const e of entities) {
+    const p = map(e.x, e.y)
+    e.x = p.x
+    e.y = p.y
+    e.image.setPosition(p.x, p.y)
+    e.ring.setPosition(p.x, p.y)
+  }
+}
+
 /** 在场地面待拾数 / 携带者数(HUD 与 e2e 探针) */
 export function fieldCounts(): { pickups: number; carriers: number } {
   return { pickups: entities.length, carriers: auras.size }

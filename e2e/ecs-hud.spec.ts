@@ -71,3 +71,51 @@ test('ECS HUD：UIScene 挂上 ECS 场景，顶栏读数跟随战斗', async ({ 
   await page.screenshot({ path: 'test-results/ecs-hud.png' })
   expect(errors).toEqual([])
 })
+
+// 暂停（ESC）：局内时间冻结；恢复后继续推进——与旧竞技场同一处绑定（共用的 UIScene）
+test('ECS 暂停：ESC 冻结局内时钟，再按恢复', async ({ page }) => {
+  test.setTimeout(120_000)
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.stack ?? String(e)))
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
+
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem(
+        'warmoji.settings.v1',
+        JSON.stringify({ damageNumbers: true, hitShake: true, sound: false, bgm: false, showSkinTone: false, ecs: true }),
+      )
+    } catch {
+      /* ignore */
+    }
+  })
+  await page.goto('/')
+  await page.evaluate(() => window.__ecsLabRoster!(['juggler']))
+  await enterMap(page)
+  await startTestBattle(page, 'forest')
+  await page.waitForFunction(
+    () => (window as unknown as { __ecs?: { ready: boolean } }).__ecs?.ready === true,
+    undefined,
+    { timeout: 20_000 },
+  )
+
+  const elapsed = (): Promise<number> =>
+    page.evaluate(() => (window as unknown as { __ecs: { elapsed: number } }).__ecs.elapsed)
+
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  const t1 = await elapsed()
+  await page.waitForTimeout(700)
+  expect(await elapsed()).toBe(t1)
+
+  // 恢复后继续推进，且没有被顺手退回主菜单
+  await page.keyboard.press('Escape')
+  await page.waitForFunction(
+    (t) => (window as unknown as { __ecs?: { elapsed: number } }).__ecs?.elapsed ?? 0 > t,
+    t1,
+    { timeout: 15_000 },
+  )
+  expect(await page.evaluate(() => window.__warmoji?.scene)).not.toBe('menu')
+
+  expect(errors).toEqual([])
+})

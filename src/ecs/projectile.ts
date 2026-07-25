@@ -29,8 +29,8 @@ import { enemyRef, eprojSrcName, projHitEids, projOnHit } from './store'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
 
-// 玩家抛射物(P3c):装配 + 逐帧线段扫掠命中(pierce + 击退),出界回收。
-// onHit 命中效果链(溅射/毒/变羊)在 P3d 追加;敌弹在后续增量。
+// 抛射物:装配 + 逐帧线段扫掠命中(pierce + 击退 + onHit 效果链),按视野/寿命回收。
+// 敌弹另走圆-圆命中队员(吃无敌帧),回收条件由世界钩子补充。
 
 /** 发射一枚玩家弹(镜像 spawnProjectile) */
 export function spawnProjectileEcs(

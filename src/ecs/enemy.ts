@@ -55,7 +55,7 @@ import {
 } from './store'
 import { armIdle } from './anim'
 import { ANIM_DEF } from '../emoji/studio'
-import { backEaseOut } from './sim'
+import { backEaseOut } from './ease'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
 import type { Point } from '../core/vec'
@@ -229,7 +229,7 @@ function lockDashDir(sim: Sim, eid: number, aim: 'nearest' | 'teamCenter'): void
 }
 
 /** 统一冲刺状态机(镜像 dash steerer):蓄力→冲刺(锁向直冲)→冷却/回到 idle 移动。
- * 返回本帧速度(px/s);脚本化姿态(颤动/前倾/tint)为视觉,P6 补 */
+ * 返回本帧速度(px/s);脚本化姿态(蓄力颤动/冲刺前倾/橙染)在各分支自管 */
 function steerDash(sim: Sim, eid: number, slow: number): { vx: number; vy: number } {
   const lm = enemyDef[eid]!.locomotion
   if (lm.kind !== 'dash') return { vx: 0, vy: 0 }
@@ -326,7 +326,9 @@ function steerStandoff(sim: Sim, eid: number, slow: number): { vx: number; vy: n
     return { vx: d.x * sp, vy: d.y * sp }
   }
   if (dist < lm.standoffDist - band) {
-    const d = norm(-dx, -dy) // 后退(贴边滑行 fleeDir 在 P5 补)
+    // 后退:方向经世界钩子(有界图贴边沿墙滑行,不顶死在边上)
+    const away = norm(-dx, -dy)
+    const d = sim.hooks.fleeDir(sim, eid, away.x, away.y)
     return { vx: d.x * sp, vy: d.y * sp }
   }
   return { vx: 0, vy: 0 } // 站位带内停手(射击由能力驱动)

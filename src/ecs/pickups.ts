@@ -15,12 +15,12 @@ import {
   Transform,
   Vel,
 } from './components'
-import { backEaseOut } from './sim'
+import { backEaseOut } from './ease'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
 
 // 拾取经济(镜像 pickups.ts):金币生成 / 磁吸 / 入账。金币是 emoji 精灵,天然走统一批绘。
-// 磁吸与入账以队伍中心为基点(队员碰到也捡);森林无闲置漂移/世界回收(coinIdleVelocity=0)。
+// 磁吸与入账以队伍中心为基点(队员碰到也捡);闲置漂移/世界回收交由世界钩子(奔流随波逐流)。
 
 /** 掉落弹出时长(镜像 spawnCoins 的 tween duration) */
 const COIN_POP_MS = 160
@@ -114,13 +114,13 @@ export function magnetCoinsEcs(sim: Sim, delta: number): void {
       collectCoinEcs(sim, eid)
       continue
     }
+    // 闲置速度交给世界钩子(奔流:随波逐流;其余图静止);磁吸速度叠在它之上
+    const idle = sim.hooks.coinIdleVelocity(sim)
     if (dist2 < r2) {
       const dir = norm(dx, dy)
-      Vel.x[eid] = dir.x * speed
-      Vel.y[eid] = dir.y * speed
+      Vel.x[eid] = dir.x * speed + idle.x
+      Vel.y[eid] = dir.y * speed + idle.y
     } else {
-      // 闲置速度交给世界钩子(奔流:随波逐流;其余图静止)
-      const idle = sim.hooks.coinIdleVelocity(sim)
       Vel.x[eid] = idle.x
       Vel.y[eid] = idle.y
     }
