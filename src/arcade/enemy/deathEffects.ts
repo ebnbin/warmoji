@@ -1,6 +1,6 @@
 import { waveAt } from '../../run/waves'
 import { UNIT } from '../../core/units'
-import { applyEffects } from '../../abilities/effects'
+import { applyEffects } from '../../war/abilities/effects'
 import { buildEnemyCtx } from './abilities'
 import type { Enemy } from './enemies'
 import type { EnemyDef, SplitEffect, DecoyEffect } from '../../enemies/registry'

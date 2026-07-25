@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
 import { query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
-import type { AbilityContext, TargetInfo } from '../../abilities/types'
+import type { AbilityContext, TargetInfo } from '../../war/abilities/types'
 import { Alive, Boss, DmgMul, Elite, ENEMY_SET, Hp, Iframe, MHp, Transform } from '../components'
 import { hurtMember } from '../combat'
 import { spawnGroundEffectEcs } from '../groundEffects'

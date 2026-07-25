@@ -1,4 +1,4 @@
-import type { FeelTuning } from '../src/battle/config'
+import type { FeelTuning } from '../src/war/config'
 
 // 战斗表现与手感数值（创作层·不进运行时 bundle）：队员跟随弹簧、待机游移、受击抖屏。
 // 逻辑在战斗引擎（BaseArenaScene）；这里只放设计数值，经 gen 校验产出 feel.json。

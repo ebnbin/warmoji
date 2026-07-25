@@ -21,8 +21,8 @@ import {
   Transform,
   Vel,
 } from './components'
-import { applyEffects } from '../abilities/effects'
-import type { TargetInfo } from '../abilities/types'
+import { applyEffects } from '../war/abilities/effects'
+import type { TargetInfo } from '../war/abilities/types'
 import { applyDamage, hurtMember } from './combat'
 import { enemyDef, enemyRef, eprojSrcName, projHitEids, projOnHit } from './store'
 import type { Sim } from './sim'

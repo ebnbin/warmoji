@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { remapPoint, remapVector, isHorizontal } from '../core/remap'
+import { remapPoint, remapVector, isHorizontal } from '../war/remap'
 import { COIN_SET, EDir, ENEMY_SET, EPROJ_SET, Follow, Kv, PROJ_SET, Transform, Vel } from './components'
 import { remapFieldEcs } from './field'
 import { remapGroundEffectsEcs } from './groundEffects'

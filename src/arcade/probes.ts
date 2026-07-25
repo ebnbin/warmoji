@@ -5,7 +5,7 @@ import { labCaptain, labStarters, setLabEnemies, setLabRoster } from '../run/lab
 import { sanitizeMapId } from '../maps/registry'
 import { BOSSES, ENEMY_DEFS } from '../enemies/registry'
 import { ABILITIES } from '../abilities/registry'
-import { toPx } from '../battle/px'
+import { toPx } from '../war/px'
 import { FIELD_PICKUPS, fieldPickupsFor } from '../battlefield/registry'
 import { ARENA_SCENE_KEYS, arenaSceneFor } from './keys'
 import { spawnCoins } from './pickups'

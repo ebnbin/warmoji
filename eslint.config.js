@@ -34,14 +34,46 @@ export default tseslint.config(
       ],
     },
   },
+  // 战斗域边界护栏：src/war/ 是战斗场景的地基（两套实现 + HUD 共用），大厅页
+  // （菜单/图鉴/工坊/设置/商店/卡牌/整编/结算）与启动流程不得依赖它——战斗场景相对
+  // 大厅是独立的，这条边界一破，「战斗是一块可整体替换的东西」这个前提就没了。
+  // 必须排在上面那条实现隔离护栏之后：flat config 里同名规则后者整个替换前者，
+  // 故这里把 war 与两套实现的 pattern 一并给出（大厅页三者都不该碰）。
+  // main.ts 不在此列：它要把战斗场景与 HUD 注册进 Phaser。
+  {
+    files: ['src/menu/**/*.ts', 'src/boot/**/*.ts', 'src/debug/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/war', '**/war/*', '**/war/**'],
+              message:
+                'src/war/ 是战斗域地基，大厅页不该依赖它；若确实需要某份数据，说明它属于共享数据层（各 registry），应留在原包而非 war/',
+            },
+            {
+              group: [
+                '**/ecs', '**/ecs/*', '**/ecs/**',
+                '**/arcade', '**/arcade/*', '**/arcade/**',
+                'bitecs',
+              ],
+              message:
+                '战斗实现（src/arcade/ 与 src/ecs/）一律经 src/experiments/battleExperiment.ts 调用',
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     files: ['src/**/*.ts'],
     ignores: [
       'src/main.ts',
       'src/boot/PreloadScene.ts',
-      'src/battle/UIScene.ts',
-      'src/core/Joystick.ts',
-      'src/core/damageFont.ts',
+      'src/war/UIScene.ts',
+      'src/war/Joystick.ts',
+      'src/war/damageFont.ts',
       'src/core/fx.ts',
       'src/menu/*Scene.ts',
       // 旧框架（arcade）整包是表现层：Scene 继承 + Arcade Physics body

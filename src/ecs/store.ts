@@ -2,7 +2,7 @@ import { MAX_ENTITIES } from './world'
 import type { EnemyDef } from '../enemies/registry'
 import type { FieldPickupDef } from '../battlefield/registry'
 import type { Effect } from '../abilities/defs'
-import type { AbilityOwner, AbilityRuntime } from '../abilities/types'
+import type { AbilityOwner, AbilityRuntime } from '../war/abilities/types'
 
 // 富数据伴随存储(按 eid 索引):bitECS 组件只存数值,def 引用等复杂对象放这里。
 // spawn 时写、removeEntity 前不必清(下次 spawn 覆盖;eid 复用后新 def 覆盖旧)。

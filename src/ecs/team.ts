@@ -1,7 +1,7 @@
 import { addComponent, addEntity } from 'bitecs'
 import { UNIT } from '../core/units'
 import { Rng } from '../core/rng'
-import { FOLLOW } from '../battle/config'
+import { FOLLOW } from '../war/config'
 import { CAPTAINS } from '../captains/registry'
 import { CHARACTERS } from '../characters/registry'
 import { MEMBER, TEAM } from '../characters/registry'
