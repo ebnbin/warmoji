@@ -8,6 +8,7 @@ import {
   Coin,
   COIN_SET,
   Depth,
+  Hurt,
   Pop,
   Quad,
   Sprite,
@@ -99,8 +100,10 @@ export function magnetCoinsEcs(sim: Sim, delta: number): void {
     const dx = w.x
     const dy = w.y
     const dist2 = dx * dx + dy * dy
-    // 入账:近队伍中心 或 近任一活着队员(镜像 overlap)
-    if (dist2 <= collect2 || nearAliveMember(sim, x, y, collect2)) {
+    // 入账:近队伍中心(collectRadius) 或 蹭到任一活着队员的身子。
+    // 队员侧口径对齐旧 overlap(memberGroup, coins):队员受击圆 + 金币体半径的圆-圆,
+    // 故受保护中心(受击圆减半)的捡币范围也随之小一圈,与旧实现一致
+    if (dist2 <= collect2 || nearAliveMember(sim, x, y)) {
       collectCoinEcs(sim, eid)
       continue
     }
@@ -142,12 +145,14 @@ export function updateCoinPop(sim: Sim): void {
   }
 }
 
-/** 金币是否落在任一活着队员的入账半径内 */
-function nearAliveMember(sim: Sim, x: number, y: number, collect2: number): boolean {
+/** 金币是否蹭到了任一活着队员(圆-圆:队员受击圆 + 金币体半径,镜像旧 overlap) */
+function nearAliveMember(sim: Sim, x: number, y: number): boolean {
+  const cr = PICKUPS.coin.radius * UNIT
   for (const m of sim.members) {
     if (!Alive.v[m]) continue
+    const rr = Hurt.radius[m]! + cr
     const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
-    if (d.x * d.x + d.y * d.y <= collect2) return true
+    if (d.x * d.x + d.y * d.y <= rr * rr) return true
   }
   return false
 }
