@@ -340,6 +340,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.scene.stop('ui')
+      // 探针落幕:__warmoji 在 ECS 战斗期间是陈旧的(本场景不写它),e2e 只能靠这个标记
+      // 判断「战斗已收场」——否则会读到上一个菜单场景留下的旧值
+      const probe = (window as unknown as { __ecs?: { ready: boolean } }).__ecs
+      if (probe) probe.ready = false
       this.atlas?.dispose() // 停掉在途的惰性烘焙:纹理管理器即将归下一局所有
       for (const c of this.stripCams) this.cameras.remove(c)
       this.stripCams = []
@@ -628,6 +632,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         const gy = Math.floor(i / cols) - cols / 2
         spawnEnemy(sim, this.atlas, px, sim.center.x + gx * gap, sim.center.y + gy * gap, px.hp, false, false)
       }
+    }
+    // e2e 探针:把局内时钟快进 ms(波末过场按 elapsedMs 判定,借此确定性地走完整条过场链路)
+    window.__ecsFastForward = (ms: number): void => {
+      if (this.sim) this.sim.elapsedMs += ms
     }
     // e2e 探针:结算本波(仅回写 run,不过场),返回结算后波次号
     window.__ecsSettleWave = (): number => {

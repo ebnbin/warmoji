@@ -246,6 +246,7 @@ interface Window {
   __ecsStepTeam?: (wantDx: number, wantDy: number, deltaMs?: number) => { x: number; y: number }
   __ecsTeleport?: (xU: number, yU: number) => void
   __ecsForceWorldTick?: () => void
+  __ecsFastForward?: (ms: number) => void
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
   __addMemberItem?: (itemId: string, slot?: number, count?: number) => void
