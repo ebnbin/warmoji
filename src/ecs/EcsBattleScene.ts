@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { viewport } from '../core/apply'
+import { textRes, viewport } from '../core/apply'
 import { UNIT } from '../core/units'
 import { MEMBER } from '../characters/registry'
 import { HIT_SHAKE } from '../battle/config'
@@ -32,6 +32,7 @@ import {
   MAtkSlow,
   MHp,
   Morph,
+  Revive,
   Poison,
   Projectile,
   Slow,
@@ -97,6 +98,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   /** 队员血条(逐帧跟位 + 按血量比例重绘;镜像 drawMemberHp) */
   private hpBars: Phaser.GameObjects.Graphics[] = []
   private shownHp: number[] = []
+  /** 阵亡队员头顶的复活倒计时（秒；仅数字变化时重设文本，避免逐帧重排版） */
+  private deadTexts: Phaser.GameObjects.Text[] = []
+  private shownCountdown: number[] = []
   /** 受击震屏:设置开关 + 已消费的受击计数(据增量抖屏,镜像 hitShake) */
   private hitShakeOn = false
   private seenHitCount = 0
@@ -218,6 +222,22 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     for (let i = 0; i < this.sim.members.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
+      this.deadTexts.push(
+        this.add
+          .text(0, 0, '', {
+            fontFamily: UI_FONT,
+            fontSize: '26px',
+            fontStyle: 'bold',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 5,
+            resolution: textRes(),
+          })
+          .setOrigin(0.5)
+          .setDepth(12)
+          .setVisible(false),
+      )
+      this.shownCountdown.push(-1)
     }
     if (!run.testMode) this.scheduleCarriers()
     // 正常模式 Boss 波开场:预告后投放本图 Boss(镜像 setup 的 isBossWave 分支)
@@ -496,11 +516,23 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       const m = sim.members[i]!
       const g = this.hpBars[i]
       if (!g) continue
+      const dead = this.deadTexts[i]
       if (!Alive.v[m]) {
         g.setVisible(false)
         this.shownHp[i] = -1
+        // 阵亡:头顶显示复活倒计时(秒),仅整秒变化时重设文本
+        if (dead) {
+          dead.setVisible(true).setPosition(Transform.x[m]!, Transform.y[m]!)
+          const remain = Math.ceil((Revive.at[m]! - sim.elapsedMs) / 1000)
+          if (remain !== this.shownCountdown[i]) {
+            this.shownCountdown[i] = remain
+            dead.setText(String(Math.max(0, remain)))
+          }
+        }
         continue
       }
+      dead?.setVisible(false)
+      this.shownCountdown[i] = -1
       g.setVisible(true).setPosition(Transform.x[m]!, Transform.y[m]!)
       const ratio = Math.max(0, MHp.hp[m]! / MHp.max[m]!)
       if (Math.abs(ratio - this.shownHp[i]!) < 0.005) continue
