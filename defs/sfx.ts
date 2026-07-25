@@ -1,4 +1,4 @@
-import type { SfxDef } from '../src/audio/sfx'
+import type { SfxDef } from '../src/data/sfx'
 
 // 程序化音效参数表（创作层·游戏内容）：迷你 sfxr 风格合成器的逐条声音定义。
 // 合成/播放/节流逻辑在 src/audio/sfx.ts，这里只放声音参数——经 gen 校验产出 sfx.json。

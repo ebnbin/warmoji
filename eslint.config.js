@@ -148,9 +148,46 @@ export default tseslint.config(
                 '../boot/*', '../boot/**',
                 '../debug/*', '../debug/**',
                 '../emoji/*', '../emoji/**',
-                '../audio/bgm', '../audio/music',
+                '../audio/*', '../audio/**',
               ],
-              message: 'data 是内容叶子层：只可依赖 core / assets（及 audio 的 SfxId 类型），不得反向依赖业务包',
+              message: 'data 是内容叶子层：只可依赖 core / assets，不得反向依赖业务包',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // defs 是创作层：内容与数值的手写源，经 scripts/gen-defs.ts 校验后产出 src/assets/*.json。
+  // 它对 src 的依赖只该是「这张表长什么样」——即 src/data/ 里的数据类型定义；
+  // 另允许 src/core/ 的纯工具（如 palette.hslToInt，让地图配色能按 HSL 书写）。
+  // 一旦 defs 够到 war/audio/menu 等功能包，创作层就跟着玩法实现走了：
+  // 那些包本该反过来消费内容，删改其中任一个都会连累「内容怎么写」。
+  {
+    files: ['defs/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              // 同 data 那条：group 不支持 '!' negation，只能正向枚举禁止项。
+              // src/ 下新增顶层包时记得同步这张表。
+              group: [
+                '../src/war/*', '../src/war/**',
+                '../src/arcade/*', '../src/arcade/**',
+                '../src/ecs/*', '../src/ecs/**',
+                '../src/experiments/*', '../src/experiments/**',
+                '../src/run/*', '../src/run/**',
+                '../src/menu/*', '../src/menu/**',
+                '../src/boot/*', '../src/boot/**',
+                '../src/ui/*', '../src/ui/**',
+                '../src/emoji/*', '../src/emoji/**',
+                '../src/audio/*', '../src/audio/**',
+                // 产物是 defs 的下游，创作层读它就成环了
+                '../src/assets/*', '../src/assets/**',
+              ],
+              message:
+                'defs 是创作层：类型一律取自 src/data/（数据类型定义所在），纯工具可取 src/core/；不得依赖功能包。若某个类型现在住在功能包里，说明它本就该搬进 src/data/',
             },
           ],
         },
