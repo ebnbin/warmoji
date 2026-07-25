@@ -1,5 +1,6 @@
 import { MAX_ENTITIES } from './world'
 import type { EnemyDef } from '../enemies/registry'
+import type { FieldPickupDef } from '../battlefield/registry'
 import type { Effect } from '../abilities/defs'
 import type { AbilityOwner, AbilityRuntime } from '../abilities/types'
 
@@ -48,6 +49,9 @@ export const enemyNest = new Int32Array(MAX_ENTITIES).fill(-1)
 
 /** 虫巢下次生成时刻(0=非 spawner) */
 export const enemyNextSpawnAt = new Float32Array(MAX_ENTITIES)
+
+/** 敌人携带的战场拾取(携带者:死亡即在原地掉这枚拾取) */
+export const enemyCarries: (FieldPickupDef | undefined)[] = new Array<FieldPickupDef | undefined>(MAX_ENTITIES)
 
 /** 偷币鼠已吞金币数(死亡时吐回 + 利息) */
 export const thiefEaten = new Int32Array(MAX_ENTITIES)

@@ -16,6 +16,10 @@ import type { Point } from '../core/vec'
 import type { RunState } from '../run/state'
 import type { EffectCtx, TargetInfo } from '../abilities/types'
 import { TIMESTOP, timeScaleFor } from '../battle/timeStop'
+import { BATTLE_FX_IDENTITY, foldBattleEffects } from '../battlefield/registry'
+import type { BattleEffects } from '../battlefield/registry'
+import type { BattleMod } from '../battlefield/battlefield'
+import type { FieldPickupDef } from '../battlefield/registry'
 
 // ECS 战斗仿真状态 + 系统(纯逻辑,禁 phaser)。数学逐行镜像旧 BaseArenaScene 的
 // updateOrbit / moveTeam / layoutTeam,常量与公式不变,只把「读写精灵」换成「读写组件」。
@@ -63,6 +67,11 @@ export interface Sim {
   timeStopMsLeft: number
   /** 移动量的低通平滑值(实时 delta 推进):worldTimeScale 的输入 */
   chrono: number
+  /** 战场拾取施加的限时层(逐个到期)与其每帧重折的乘区(镜像 battleMods/battleFx) */
+  battleMods: BattleMod[]
+  battleFx: BattleEffects
+  /** 团队卡的敌速乘区(开局定;与 battleFx.enemySlowMul 并行相乘) */
+  enemySlowMul: number
   /** 本帧敌方存活快照(能力索敌共享;wire 每帧重建) */
   enemyTargets: TargetInfo[]
   /** 本帧队员存活快照(敌方能力索敌共享;enemyWire 每帧重建) */
@@ -89,6 +98,10 @@ export interface Sim {
   reward: RewardConfig
   /** 本帧内死亡敌人待落地的金币(场景侧 drainPendingCoins 排空,需 atlas) */
   pendingCoins: PendingCoins[]
+  /** 本帧携带者死亡处待落地的战场拾取(场景侧排空,需 scene 建光圈视觉) */
+  pendingFieldDrops: { x: number; y: number; def: FieldPickupDef }[]
+  /** 本帧新落地的携带者(场景侧给它挂极性光环) */
+  pendingAuras: { eid: number; def: FieldPickupDef }[]
 }
 
 /** 掉落/拾取乘区(镜像 grantKillRewards / magnetCoins / endWave 的乘区来源) */
@@ -121,13 +134,16 @@ export interface PendingSpawn {
   elite: boolean
   boss: boolean
   at: number
+  /** 携带者载荷(死亡即掉这枚拾取);普通刷怪为 undefined */
+  carries?: FieldPickupDef
 }
 
-/** 敌人受伤飘字(死亡点/命中点 + 数值) */
+/** 敌人受伤飘字(死亡点/命中点 + 数值;暴击金色放大) */
 export interface DamageNumber {
   x: number
   y: number
   amount: number
+  crit: boolean
 }
 
 /** 粒子爆点(kind 选发射器:death 紫爆 / coin 金爆 / puff 灰烟) */
@@ -200,7 +216,7 @@ function constrainTeam(sim: Sim, next: Point): Point {
 /** 队伍位移 + 布局(镜像 moveTeam→layoutTeam) */
 function moveTeam(sim: Sim, delta: number): void {
   const dir = sim.teamDir
-  const step = (sim.moveSpeed * delta) / 1000
+  const step = (sim.moveSpeed * sim.battleFx.moveSpeedMul * delta) / 1000
   const next = constrainTeam(sim, { x: sim.center.x + dir.x * step, y: sim.center.y + dir.y * step })
   sim.center.x = next.x
   sim.center.y = next.y
@@ -289,6 +305,15 @@ export function initialLayout(sim: Sim): void {
 }
 
 /** 一帧仿真(镜像 update 的 updateOrbit→moveTeam→steerEnemies 次序);delta 为真实帧长(ms) */
+/** 剔除到期的限时层后重折乘区(镜像 refoldBattleFx) */
+export function refoldBattleFx(sim: Sim): void {
+  if (sim.battleMods.length === 0) return
+  const live = sim.battleMods.filter((m) => m.until > sim.elapsedMs)
+  if (live.length === sim.battleMods.length && live.length > 0) return // 无变化则免折
+  sim.battleMods = live
+  sim.battleFx = live.length === 0 ? { ...BATTLE_FX_IDENTITY } : foldBattleEffects(live.map((m) => m.fx))
+}
+
 /** 世界时间流速(镜像 worldTimeScale):时停窗口内随队伍移动量放缩,窗口外恒 1 */
 export function worldTimeScale(sim: Sim): number {
   return sim.timeStopMsLeft > 0 ? timeScaleFor(sim.chrono) : 1
@@ -302,6 +327,8 @@ export function stepSim(sim: Sim, delta: number, wdelta: number = delta): void {
   if (sim.timeStopMsLeft > 0) sim.timeStopMsLeft = Math.max(0, sim.timeStopMsLeft - wdelta)
   // 移动量低通平滑走实时 delta:moveTeam 会写 moveInputRaw,供下一帧 worldTimeScale 读
   sim.chrono += (sim.moveInputRaw - sim.chrono) * Math.min(1, delta / TIMESTOP.easeMs)
+  // 限时战斗层:剔除到期项后重折(乘区实时,先于移动/攻击/敌速消费,镜像 refoldBattleFx)
+  refoldBattleFx(sim)
   // 队长技能的限时增伤到期复原(镜像 update 里的 skillBuffUntil 判定)
   if (sim.skillDamageMul !== 1 && sim.elapsedMs >= sim.skillBuffUntil) sim.skillDamageMul = 1
   // 敌人位置汇入 frameTargets(队伍 orbit/游移门控据此),先于 orbit

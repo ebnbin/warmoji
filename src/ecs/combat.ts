@@ -29,7 +29,7 @@ import {
   Tint,
   Transform,
 } from './components'
-import { enemyDef, enemyNest, enemyRef, thiefEaten } from './store'
+import { enemyCarries, enemyDef, enemyNest, enemyRef, thiefEaten } from './store'
 import type { Sim } from './sim'
 
 // 战斗(P3b):敌人受伤/致死/击退,队员接触伤害/死亡/复活/受击闪光。
@@ -44,12 +44,13 @@ export function applyDamage(
   knockback = 0,
   srcX?: number,
   srcY?: number,
+  crit = false,
 ): void {
   const morphed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
   // 变形期受伤倍率(魔尘诅咒 vulnMul):放大变羊敌人所受伤害
   const dmg = morphed && Morph.vuln[eid] !== 1 ? Math.round(damage * Morph.vuln[eid]!) : damage
   // 受伤飘字(镜像 floatDamage,在致死判定前:致死一击也飘字)
-  sim.pendingDamageNumbers.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, amount: dmg })
+  sim.pendingDamageNumbers.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, amount: dmg, crit })
   const hp = Hp.v[eid]! - dmg
   if (hp <= 0) {
     killEnemy(sim, eid)
@@ -100,6 +101,12 @@ export function killEnemy(sim: Sim, eid: number): void {
     })
   }
   if (def?.spawner) orphanBrood(sim, eid) // 拆巢:名下护巢子敌暴走 + 转直扑
+  // 携带者:死亡即在原地掉下所携拾取(镜像 killEnemy 的 spawnFieldPickup)
+  const carries = enemyCarries[eid]
+  if (carries) {
+    sim.pendingFieldDrops.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, def: carries })
+    enemyCarries[eid] = undefined
+  }
   enemyDef[eid] = undefined
   enemyRef[eid] = undefined
   removeEntity(sim.world, eid)
@@ -198,6 +205,7 @@ export function memberContact(sim: Sim): void {
 /** 敌人静默移除(自爆/替身到时:不计击杀、不掉落、不放死亡效果) */
 export function despawnEnemy(sim: Sim, eid: number): void {
   if (enemyDef[eid]?.spawner) orphanBrood(sim, eid)
+  enemyCarries[eid] = undefined
   enemyDef[eid] = undefined
   enemyRef[eid] = undefined
   removeEntity(sim.world, eid)

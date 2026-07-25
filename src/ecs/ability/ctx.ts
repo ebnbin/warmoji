@@ -1,6 +1,8 @@
 import type Phaser from 'phaser'
 import { query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
+import { CRIT_MUL } from '../../items/registry'
+import { labFireRate } from '../../run/lab'
 import type { AbilityContext, TargetInfo } from '../../abilities/types'
 import type { CharacterEffects, TeamEffects } from '../../items/registry'
 import { Alive, Boss, ENEMY_SET, EState, Hp, Iframe, MAtkSlow, MHp, Poison, Revive, Slow, Tint, Transform } from '../components'
@@ -64,12 +66,20 @@ export function makeTeamCtx(
   slot: number,
   fx: CharacterEffects,
   teamFx: TeamEffects,
+  testMode = false,
 ): AbilityContext {
+  // 测试模式攻速旋钮:冷却按 labFireRate 现算(每帧读,改档即生效不重开)
+  const fireFactor = (): number => (testMode ? 1 / labFireRate() : 1)
   return {
     scene,
     ownerOutline: 'player',
     targets: () => sim.enemyTargets,
-    damageTarget: (ref, dmg, kb, sx, sy) => applyDamage(sim, eidOf(ref), dmg, kb ?? 0, sx, sy),
+    // 暴击/击退倍率在此收口:所有能力伤害路径统一生效,无需逐能力改造(镜像 memberCtx.damageTarget)
+    damageTarget: (ref, dmg, kb, sx, sy) => {
+      const critChance = Math.min(0.5, fx.critChance + teamFx.critAdd + sim.battleFx.critAdd)
+      const crit = critChance > 0 && sim.rng.next() < critChance
+      applyDamage(sim, eidOf(ref), crit ? Math.round(dmg * CRIT_MUL) : dmg, (kb ?? 0) * fx.knockbackMul, sx, sy, crit)
+    },
     slowTarget: (ref, factor, durationMs) => {
       const eid = eidOf(ref)
       Slow.until[eid] = sim.elapsedMs + durationMs
@@ -95,12 +105,12 @@ export function makeTeamCtx(
     anchor: () => sim.center,
     applySlow: () => {}, // P3d
     // 队长技能的限时增伤(弱点讲义)叠进队伍伤害乘区,到期由 stepSim 复原
-    damageMul: () => fx.damageMul * teamFx.teamDamageMul * sim.skillDamageMul,
+    damageMul: () => fx.damageMul * teamFx.teamDamageMul * sim.battleFx.teamDamageMul * sim.skillDamageMul,
     // 黏黏怪攻速惩罚:被蹭到的队员攻速变慢(叠乘进冷却,到时自动失效)
     cooldownMul: () => {
       const m = sim.members[slot]
       const atk = m !== undefined && MAtkSlow.until[m]! > sim.elapsedMs ? MAtkSlow.mul[m]! : 1
-      return fx.cooldownMul * teamFx.teamCooldownMul * atk
+      return fx.cooldownMul * teamFx.teamCooldownMul * sim.battleFx.teamCooldownMul * atk * fireFactor()
     },
     sfx: (id) => playSfx(id),
     playOwnerClip: () => {}, // P6 动画

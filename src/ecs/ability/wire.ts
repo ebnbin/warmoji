@@ -50,7 +50,7 @@ export function armTeam(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, run: Run
     const level = testMode ? labLevel() + 1 : characterLevel(characterXp(owned))
     const tiers = { u1: level >= 2, u2: level >= 3 }
     const fx = aggregateCharacterEffects(owned, levelStatsFor(id, level))
-    const ctx = makeTeamCtx(sim, scene, atlas, slot, fx, teamFx)
+    const ctx = makeTeamCtx(sim, scene, atlas, slot, fx, teamFx, testMode)
     const handle: AbilityOwner = {
       get x() {
         return Transform.x[sim.members[slot]!]!

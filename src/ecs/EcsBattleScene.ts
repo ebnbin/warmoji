@@ -50,7 +50,9 @@ import { updateEnemyAbilities } from './ability/enemyWire'
 import { runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
 import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
-import { spawnBossEcs, spawnStep } from './spawn'
+import { spawnBossEcs, spawnCarrierEcs, spawnStep } from './spawn'
+import { attachCarrierAuraEcs, clearFieldEcs, fieldCounts, spawnFieldPickupEcs, updateFieldEcs } from './field'
+import { FIELD_PICKUPS, rollWaveCarriers } from '../battlefield/registry'
 import { initialLayout, stepSim, worldTimeScale } from './sim'
 import { settleWave } from './wave'
 import { isBossWave, waveAt, waveDurationMs, WAVE } from '../run/waves'
@@ -192,6 +194,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     if (!this.scene.isActive()) return
     this.atlas = atlas
     clearGroundEffectsEcs() // 开局清上一局遗留的地面效果(模块级列表)
+    clearFieldEcs()
     new EcsSpriteBatch(this, this.world, atlas)
     this.spawnDecor(run, atlas)
     this.testMode = run.testMode
@@ -216,6 +219,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
     }
+    if (!run.testMode) this.scheduleCarriers()
     // 正常模式 Boss 波开场:预告后投放本图 Boss(镜像 setup 的 isBossWave 分支)
     if (!run.testMode && isBossWave(run.wave)) {
       this.time.delayedCall(600, () => {
@@ -348,6 +352,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
     window.__ecsGroundZones = (): number => groundZoneCount()
     window.__ecsBossDown = (): boolean => this.sim?.bossDown ?? false
+    // e2e 探针:在队伍中心相对格偏移处掉一枚战场拾取
+    window.__ecsDropField = (id: string, dxU = 2, dyU = 0): void => {
+      const sim = this.sim
+      const def = FIELD_PICKUPS[id]
+      if (!sim || !def) return
+      spawnFieldPickupEcs(sim, this, sim.center.x + dxU * UNIT, sim.center.y + dyU * UNIT, toPx(def))
+    }
     // e2e 探针:发动时停(不经队长技能,直接开窗口)+ 读当前世界时标
     window.__ecsTimeStop = (durMs = 6000): void => {
       if (this.sim) this.sim.timeStopMsLeft = durMs
@@ -463,16 +474,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private drainDamageNumbers(): void {
     const q = this.sim!.pendingDamageNumbers
     if (q.length === 0) return
-    if (this.damageNumbersOn) for (const d of q) this.floatDamage(d.x, d.y, d.amount)
+    if (this.damageNumbersOn) for (const d of q) this.floatDamage(d.x, d.y, d.amount, d.crit)
     q.length = 0
   }
 
-  private floatDamage(x: number, y: number, amount: number): void {
+  private floatDamage(x: number, y: number, amount: number, crit: boolean): void {
     const t = this.damagePool[this.damageIdx]
     if (!t) return
     this.damageIdx = (this.damageIdx + 1) % this.damagePool.length
     this.tweens.killTweensOf(t)
-    t.setFontSize(24).setTint(0xffffff)
+    // 暴击金色放大;池对象复用,普通伤害要复位样式(镜像 floatDamage)
+    t.setFontSize(crit ? 34 : 24).setTint(crit ? 0xffdc5d : 0xffffff)
     t.setText(String(amount)).setPosition(x, y - 14).setAlpha(1).setVisible(true)
     this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 350, onComplete: () => t.setVisible(false) })
   }
@@ -522,8 +534,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       over: sim?.over ?? false,
       bossHp: boss !== undefined ? Hp.v[boss]! : null,
       bossMaxHp: bossFor(this.run.mapId).hp,
-      // 战场拾取的限时增益层尚未移植(P4 后续),恒空
-      battleFx: [],
+      // 已激活的战场拾取效果(HUD 图标 + 剩余计时)
+      battleFx: (sim?.battleMods ?? []).map((m) => ({
+        emoji: m.emoji,
+        polarity: m.polarity,
+        remainMs: Math.max(0, m.until - elapsed),
+        totalMs: m.totalMs,
+      })),
     }
   }
 
@@ -588,6 +605,22 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       MHp.max[m] = mh
       MHp.hp[m] = labInvincible() ? mh : Math.min(MHp.hp[m]!, mh)
     }
+  }
+
+  /** 本波携带者排期(镜像 scheduleCarriers):按预算铺开,均匀撒在本波中前段(留出波末空档)。
+   * 第 1 波是纯净开场,不出战场拾取 */
+  private scheduleCarriers(): void {
+    const sim = this.sim
+    if (!sim || this.run.wave < 2) return
+    const carriers = rollWaveCarriers(this.run.mapId, this.run.wave, isBossWave(this.run.wave), () => sim.rng.next())
+    if (carriers.length === 0) return
+    const dur = waveDurationMs(this.run.wave)
+    carriers.forEach((pickup, i) => {
+      const at = dur * 0.12 + (dur * 0.7 * i) / carriers.length
+      this.time.delayedCall(at, () => {
+        if (this.sim && !this.sim.over) spawnCarrierEcs(this.sim, pickup)
+      })
+    })
   }
 
   /** 波末过场(镜像 endWave 尾段):停留结算横幅时长后按 run 状态进结算/抽卡/整编/商店 */
@@ -660,6 +693,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 金币:死亡掉落落地 + 磁吸入账
     if (this.atlas) drainPendingCoins(sim, this.atlas)
     magnetCoinsEcs(sim, delta)
+    // 战场拾取:携带者死亡处落地 + 新携带者挂光环 + 走位拾取/到期淡出
+    for (const d of sim.pendingFieldDrops) spawnFieldPickupEcs(sim, this, d.x, d.y, d.def)
+    sim.pendingFieldDrops.length = 0
+    for (const a of sim.pendingAuras) attachCarrierAuraEcs(this, a.eid, a.def)
+    sim.pendingAuras.length = 0
+    updateFieldEcs(sim, this)
     // 虫巢周期生成子敌(护巢子敌绕巢;拆巢暴走)
     if (this.atlas) updateSpawners(sim, this.atlas)
     // 刷怪节奏
@@ -714,6 +753,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       liveCoins: query(this.world, [Coin]).length,
       projectiles: query(this.world, [Projectile]).length,
       eprojectiles: query(this.world, [EnemyProj]).length,
+      field: {
+        pickups: fieldCounts().pickups,
+        carriers: fieldCounts().carriers,
+        active: sim.battleMods.map((m) => ({ id: m.id, remainMs: Math.max(0, m.until - sim.elapsedMs) })),
+      },
       over: sim.over,
       alive: sim.members.filter((eid) => Alive.v[eid]).length,
       memberHp: sim.members.map((eid) => MHp.hp[eid]!),

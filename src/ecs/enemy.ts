@@ -36,6 +36,7 @@ import {
   Transform,
 } from './components'
 import {
+  enemyCarries,
   enemyDef,
   enemyFireDelayMs,
   enemyNest,
@@ -115,6 +116,7 @@ export function spawnEnemy(
   Morph.cdUntil[eid] = 0
   thiefEaten[eid] = 0
   thiefNextEatAt[eid] = 0
+  enemyCarries[eid] = undefined // 携带者由 spawnCarrier 落地后覆写
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
   Radius.v[eid] = def.radius
@@ -492,8 +494,10 @@ export function steerEnemies(sim: Sim, delta: number): void {
     let tx = Transform.x[eid]!
     let ty = Transform.y[eid]!
     const kind = enemyDef[eid]?.locomotion.kind ?? 'chase'
-    // 速度倍率:能力限时减速/冻结 × 体质(精英加速/护巢暴走)。teamFx/battleFx/时停时标 = 1(森林)
-    const slow = (now < Slow.until[eid]! ? Slow.mul[eid]! : 1) * SpMul.v[eid]!
+    // 速度倍率:能力限时减速/冻结 × 体质(精英加速/护巢暴走) × 团队卡与战场拾取的敌速乘区。
+    // 时停不在此处乘——世界侧统一按 wdelta 积分已等价于时间放缩
+    const slow =
+      (now < Slow.until[eid]! ? Slow.mul[eid]! : 1) * SpMul.v[eid]! * sim.enemySlowMul * sim.battleFx.enemySlowMul
     const speed = Speed.v[eid]! * slow
     if (dancing) {
       // 蹦迪:定身摇摆(不位移),摇摆幅度大于常态行走

@@ -8,6 +8,7 @@ import { MEMBER, TEAM } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
 import { formationPosts } from '../characters/formation'
 import { aggregateTeamCards } from '../cards/registry'
+import { BATTLE_FX_IDENTITY } from '../battlefield/registry'
 import { currentFormation, guardOrder, hasCenter } from '../run/state'
 import type { RunState } from '../run/state'
 import {
@@ -160,6 +161,9 @@ export function spawnTeam(
     danceEndsAt: 0,
     timeStopMsLeft: 0,
     chrono: 0,
+    battleMods: [],
+    battleFx: { ...BATTLE_FX_IDENTITY },
+    enemySlowMul: teamFx.enemySlowMul,
     enemyTargets: [],
     memberTargets: [],
     pendingDeaths: [],
@@ -179,5 +183,7 @@ export function spawnTeam(
       waveCoins: teamFx.waveCoins,
     },
     pendingCoins: [],
+    pendingFieldDrops: [],
+    pendingAuras: [],
   }
 }

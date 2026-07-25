@@ -15,7 +15,9 @@ import { randomMapPoint } from '../enemies/spawn'
 import { MAPS } from '../maps/registry'
 import { ENEMY_SET } from './components'
 import { spawnEnemy } from './enemy'
+import { enemyCarries } from './store'
 import type { Sim } from './sim'
+import type { FieldPickupDef } from '../battlefield/registry'
 import type { EcsAtlas } from './render/atlas'
 
 // 刷怪节奏(P3e,常规波次制):随跨波累计战斗时长递增难度,供给随在场人数缩放,Boss 波减压;
@@ -44,13 +46,40 @@ export function spawnBossEcs(sim: Sim, atlas: EcsAtlas): void {
   playSfx('boom')
 }
 
+/** 投放一名携带者(镜像 spawnCarrier):从当前出怪表取普通怪 + carries 载荷,走同一预告管线。
+ * 场上过挤则本次跳过 */
+export function spawnCarrierEcs(sim: Sim, pickup: FieldPickupDef): void {
+  if (sim.over) return
+  const active = query(sim.world, ENEMY_SET as unknown as object[]).length
+  if (active + sim.pendingSpawns.length >= SPAWN.maxAlive) return
+  const def = toPx(pickEnemy(enemyMixAt(MAPS[sim.mapId].mix, sim.wave), () => sim.rng.next()))
+  const hp = Math.round(def.hp * waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier)
+  const pos = spawnPoint(sim)
+  sim.pendingSpawns.push({
+    def,
+    x: pos.x,
+    y: pos.y,
+    hp,
+    elite: false,
+    boss: false,
+    at: sim.elapsedMs + SPAWN.telegraphMs,
+    carries: pickup,
+  })
+}
+
 /** 每帧:预告落地 + 刷怪冷却推进(镜像 spawn) */
 export function spawnStep(sim: Sim, atlas: EcsAtlas, delta: number): void {
   const now = sim.elapsedMs
   if (sim.pendingSpawns.length > 0) {
     const remain: typeof sim.pendingSpawns = []
     for (const p of sim.pendingSpawns) {
-      if (now >= p.at) spawnEnemy(sim, atlas, p.def, p.x, p.y, p.hp, p.elite, p.boss)
+      if (now >= p.at) {
+        const eid = spawnEnemy(sim, atlas, p.def, p.x, p.y, p.hp, p.elite, p.boss)
+        if (p.carries) {
+          enemyCarries[eid] = p.carries
+          sim.pendingAuras.push({ eid, def: p.carries })
+        }
+      }
       else remain.push(p)
     }
     sim.pendingSpawns = remain

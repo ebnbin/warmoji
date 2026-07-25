@@ -240,6 +240,7 @@ interface Window {
   __ecsBossDown?: () => boolean
   __ecsMemberAtkSlowed?: () => boolean
   __ecsDancing?: () => boolean
+  __ecsDropField?: (id: string, dxU?: number, dyU?: number) => void
   __ecsTimeStop?: (durMs?: number) => void
   __ecsWorldTimeScale?: () => number
   __addCoins?: (n: number) => void
