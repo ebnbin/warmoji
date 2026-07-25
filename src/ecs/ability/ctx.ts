@@ -43,15 +43,16 @@ function healMembers(sim: Sim, x: number, y: number, range: number, amount: numb
     return n
   }
   let best = -1
-  let bestHp = Infinity
+  let bestRatio = Infinity // 镜像 healAllies:挑「血量比例」最低者,不是绝对血量最低者
   for (const m of sim.members) {
     if (!Alive.v[m]) continue
     const dx = Transform.x[m]! - x
     const dy = Transform.y[m]! - y
     if (dx * dx + dy * dy > r2) continue
     if (MHp.hp[m]! >= MHp.max[m]!) continue
-    if (MHp.hp[m]! < bestHp) {
-      bestHp = MHp.hp[m]!
+    const ratio = MHp.hp[m]! / MHp.max[m]!
+    if (ratio < bestRatio) {
+      bestRatio = ratio
       best = m
     }
   }

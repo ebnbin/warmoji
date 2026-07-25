@@ -63,11 +63,13 @@ export function spawnFieldPickupEcs(
   def: FieldPickupDef,
 ): void {
   const color = POLARITY_COLOR[def.polarity]
+  // 落点先过世界钩子(浮冰:钳进冰面,免得掉进水里隔着掉血区拾不回)
+  const p = sim.hooks.constrainCoin(sim, x, y)
   const ring = scene.add
-    .circle(x, y, FIELD.grabRadiusU * UNIT, color, 0.12)
+    .circle(p.x, p.y, FIELD.grabRadiusU * UNIT, color, 0.12)
     .setStrokeStyle(3, color, 0.9)
     .setDepth(3)
-  const image = emojiImage(scene, x, y, def.emoji, 0.85 * UNIT, 'player').setDepth(6)
+  const image = emojiImage(scene, p.x, p.y, def.emoji, 0.85 * UNIT, 'player').setDepth(6)
   // 待拾脉冲:光圈呼吸 + 图标缓浮,读得出「这里有东西可拾」
   scene.tweens.add({
     targets: ring,
@@ -77,11 +79,11 @@ export function spawnFieldPickupEcs(
     yoyo: true,
     repeat: -1,
   })
-  scene.tweens.add({ targets: image, y: y - 6, duration: 620, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+  scene.tweens.add({ targets: image, y: p.y - 6, duration: 620, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
   const base = image.scaleX
   image.setScale(base * 0.3)
   scene.tweens.add({ targets: image, scale: base, duration: 180, ease: 'Back.easeOut' })
-  entities.push({ def, image, ring, x, y, until: sim.elapsedMs + FIELD.groundMs })
+  entities.push({ def, image, ring, x: p.x, y: p.y, until: sim.elapsedMs + FIELD.groundMs })
 }
 
 /** 施加一层限时效果:同 id 只刷新计时不叠加,随即重折(镜像 applyFieldPickup) */
@@ -114,9 +116,8 @@ export function updateFieldEcs(sim: Sim, scene: Phaser.Scene): void {
   const grab = FIELD.grabRadiusU * UNIT
   const grab2 = grab * grab
   entities = entities.filter((p) => {
-    const dx = p.x - sim.center.x
-    const dy = p.y - sim.center.y
-    if (dx * dx + dy * dy <= grab2) {
+    const d = sim.hooks.worldDelta(sim, p.x, p.y, sim.center.x, sim.center.y)
+    if (d.x * d.x + d.y * d.y <= grab2) {
       collect(sim, scene, p)
       return false
     }

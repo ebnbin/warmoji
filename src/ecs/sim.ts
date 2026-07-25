@@ -397,10 +397,12 @@ export function stepSim(sim: Sim, delta: number, wdelta: number = delta): void {
   regenMembers(sim, wdelta)
   tickPoison(sim)
   // 以下为世界侧:时停期整体放慢(敌人移速/弹体位移都按 wdelta 积分,无需另乘时标)
-  steerEnemies(sim, wdelta)
+  steerEnemies(sim, wdelta, delta)
   updateProjectiles(sim, wdelta)
-  updateEnemyProjectiles(sim, wdelta)
+  // 接触须先于敌弹:同帧两者争同一层无敌帧时旧实现是接触先手(overlap 注册序),
+  // 否则贴脸接触的伤害/黏滞/荆棘反伤会被敌弹吃掉的无敌帧一并挡下
   memberContact(sim)
+  updateEnemyProjectiles(sim, wdelta)
   memberVisual(sim)
   updateShards(sim, wdelta)
   // 世界周期结算(落水掉血等):在位移与战斗之后,读的是本帧最终位置

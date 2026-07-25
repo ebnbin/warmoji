@@ -150,7 +150,7 @@ export function spawnStep(sim: Sim, atlas: EcsAtlas, delta: number): void {
     for (const p of sim.pendingSpawns) {
       if (now >= p.at) {
         const eid = spawnEnemy(sim, atlas, p.def, p.x, p.y, p.hp, p.elite, p.boss)
-        if (p.boss) playSfx('boom')
+        if (p.boss && !sim.testMode) playSfx('boom') // 落地轰鸣只属于正式局 Boss(镜像 spawnBoss)
         if (p.carries) {
           enemyCarries[eid] = p.carries
           sim.pendingAuras.push({ eid, def: p.carries })

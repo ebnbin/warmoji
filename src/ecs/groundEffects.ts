@@ -102,9 +102,8 @@ export function updateGroundEffectsEcs(sim: Sim, scene: Phaser.Scene): void {
     if (!Alive.v[m]) continue
     for (const g of zones) {
       if (g.faction !== 'enemy') continue
-      const dx = g.x - Transform.x[m]!
-      const dy = g.y - Transform.y[m]!
-      if (dx * dx + dy * dy > g.r2) continue
+      const d = sim.hooks.worldDelta(sim, g.x, g.y, Transform.x[m]!, Transform.y[m]!)
+      if (d.x * d.x + d.y * d.y > g.r2) continue
       const last = memberGroundHit.get(m) ?? -Infinity
       if (now - last >= g.tickMs) {
         memberGroundHit.set(m, now)
@@ -119,9 +118,8 @@ export function updateGroundEffectsEcs(sim: Sim, scene: Phaser.Scene): void {
     if (g.faction !== 'team' || now < g.nextTickAt) continue
     g.nextTickAt = now + g.tickMs
     for (const eid of enemies) {
-      const dx = Transform.x[eid]! - g.x
-      const dy = Transform.y[eid]! - g.y
-      if (dx * dx + dy * dy <= g.r2) applyDamage(sim, eid, g.damage, 0, undefined, undefined, g.srcSlot)
+      const d = sim.hooks.worldDelta(sim, g.x, g.y, Transform.x[eid]!, Transform.y[eid]!)
+      if (d.x * d.x + d.y * d.y <= g.r2) applyDamage(sim, eid, g.damage, 0, undefined, undefined, g.srcSlot)
     }
   }
 }

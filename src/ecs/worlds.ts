@@ -262,7 +262,7 @@ const ice: WorldHooks = {
     const frac = cfg.waterTickMs / 1000
     if (!onFloe(sim.center.x, sim.center.y, px)) {
       const dmg = Math.round(cfg.waterTeamDps * frac)
-      for (const m of sim.members) if (Alive.v[m]) hurtMember(sim, m, dmg, '寒水')
+      for (const m of sim.members) if (Alive.v[m]) hurtMember(sim, m, dmg, '寒水', 0x4fc3f7)
     }
     const edmg = Math.round(cfg.waterEnemyDps * frac)
     for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
@@ -434,7 +434,7 @@ const infinite: WorldHooks = {
     for (const m of sim.members) {
       if (!Alive.v[m]) continue
       if (outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r)) {
-        hurtMember(sim, m, cfg.tickDamage, '毒雾')
+        hurtMember(sim, m, cfg.tickDamage, '毒雾', 0xef5350)
       }
     }
   },
@@ -510,7 +510,7 @@ const space: WorldHooks = {
       if (!Alive.v[mem] || m.hit.has(mem)) continue
       if (Math.hypot(Transform.x[mem]! - x, Transform.y[mem]! - y) < rr) {
         m.hit.add(mem)
-        hurtMember(sim, mem, cfg.damage, '天体')
+        hurtMember(sim, mem, cfg.damage, '天体', 0xffaa33)
       }
     }
     for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {

@@ -159,7 +159,7 @@ export function spawnEnemy(
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (enemyPhase[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
   Tint.color[eid] = 0xffffff
   Tint.effect[eid] = 0
-  Tint.alpha[eid] = alpha * (boss ? 0.2 : 0.3)
+  Tint.alpha[eid] = boss ? 0.2 : 0.3 // 起点是绝对值,不乘目标 alpha(镜像 materializeEnemy 的 setAlpha)
   Pop.until[eid] = sim.elapsedMs + (boss ? 320 : 130)
   Pop.ms[eid] = boss ? 320 : 130
   Pop.size[eid] = size
@@ -343,8 +343,8 @@ function steerDetonate(sim: Sim, eid: number, slow: number): { vx: number; vy: n
   const ex = Transform.x[eid]!
   const ey = Transform.y[eid]!
   if (EState.v[eid] === 2) {
-    // 定身拆弹 + 红白脉冲示警(脚本化姿态);到时引爆
-    Tint.effect[eid] = 1
+    // 定身拆弹 + 红白脉冲示警(脚本化姿态);到时引爆。乘算染色(白=原样、红=偏红),非纯色填充
+    Tint.effect[eid] = 0
     Tint.color[eid] = now % 240 < 120 ? 0xffffff : 0xff5252
     if (now >= Charge.windupUntil[eid]!) {
       const dmg = Math.round(lm.blastDamage * DmgMul.v[eid]!)
@@ -398,12 +398,11 @@ function steerBaseOrbit(sim: Sim, eid: number, slow: number): { vx: number; vy: 
   if (nest < 0 || enemyDef[nest] === undefined) return chasePlayer()
   const nx = Transform.x[nest]!
   const ny = Transform.y[nest]!
-  // 护巢判定基准是巢的位置:玩家逼近巢即扑击
-  const target = nearestAlive(sim, nx, ny)
+  // 护巢判定:目标是「离本体最近的队员」(与 chasePlayer 同一个人),再量他到巢的距离
+  const target = nearestAlive(sim, ex, ey)
   if (target) {
-    const tdx = target.x - nx
-    const tdy = target.y - ny
-    if (tdx * tdx + tdy * tdy <= lm.aggroRange * lm.aggroRange) return chasePlayer()
+    const td = sim.hooks.worldDelta(sim, nx, ny, target.x, target.y)
+    if (td.x * td.x + td.y * td.y <= lm.aggroRange * lm.aggroRange) return chasePlayer()
   }
   // 绕巢:切向环绕 + 半径回正(r<orbitRadius 外扩、r>orbitRadius 内收)
   const rx = ex - nx
@@ -500,26 +499,34 @@ export function updateSpawners(sim: Sim, atlas: EcsAtlas): void {
   if (sim.over) return
   const now = sim.elapsedMs
   const eids = query(sim.world, ENEMY_SET as unknown as object[])
-  const active = eids.length
+  let active = eids.length
   for (const eid of eids) {
     if (Dormant.v[eid]) continue // 休眠的巢不生子敌
     const spawner = enemyDef[eid]?.spawner
     if (!spawner) continue
+    // 压制期(全场蹦迪 / 魔尘变羊)既不产子也不推进计时——旧实现产子块在两个 continue 之后
+    if (now < sim.danceEndsAt) continue
+    if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue
     if (now < enemyNextSpawnAt[eid]!) continue
     enemyNextSpawnAt[eid] = now + spawner.intervalMs
     if (active >= SPAWN.maxAlive) continue
     const room = spawner.maxAlive - broodCount(sim, eid)
     if (room <= 0) continue
-    spawnBrood(sim, atlas, spawner.into, Math.min(spawner.count, room), Transform.x[eid]!, Transform.y[eid]!, 0.6 * UNIT, eid)
+    const n = Math.min(spawner.count, room)
+    spawnBrood(sim, atlas, spawner.into, n, Transform.x[eid]!, Transform.y[eid]!, 0.6 * UNIT, eid)
+    active += n // 实时计数:同帧后面的巢看得到前面刚产的子敌(镜像旧每次现数 countActive)
   }
 }
 
 /** 敌人转向:按 locomotion 分发(chase/wander/static/dash/standoff/detonate/baseOrbit;
- * coinThief 待拾取系统)+ 击退衰减 + 受击白闪恢复。delta 为真实帧长(ms) */
-export function steerEnemies(sim: Sim, delta: number): void {
+ * coinThief 待拾取系统)+ 击退衰减 + 受击白闪恢复。
+ * delta = 世界时长(吃时停);realDelta = 真实帧长,只给击退位移用——
+ * 旧实现把击退冲量写进 Arcade body 由物理按真实帧长积分,故时停期「打谁谁飞」照旧成立 */
+export function steerEnemies(sim: Sim, delta: number, realDelta = delta): void {
   const eids = query(sim.world, ENEMY_SET as unknown as object[])
   if (eids.length === 0) return
   const dt = delta / 1000
+  const kdt = realDelta / 1000
   const now = sim.elapsedMs
   const decay = Math.exp(-delta / (KNOCKBACK.tauMs * sim.hooks.knockbackTauMul(sim)))
   for (const eid of eids) {
@@ -538,7 +545,7 @@ export function steerEnemies(sim: Sim, delta: number): void {
         const k = Pop.size[eid]! * (from + (1 - from) * t)
         Transform.w[eid] = k
         Transform.h[eid] = k
-        Tint.alpha[eid] = Pop.alpha[eid]! * (from + (1 - from) * raw)
+        Tint.alpha[eid] = from + (Pop.alpha[eid]! - from) * t // 与 scale 共用缓动(Boss 的 Back 会过冲)
       }
     }
     if (Dormant.v[eid]) continue // 休眠:冻结 AI 与位移,状态原样保留,回到活跃范围自然接管
@@ -570,19 +577,19 @@ export function steerEnemies(sim: Sim, delta: number): void {
       sim.enemySlowMul *
       sim.battleFx.enemySlowMul
     const speed = Speed.v[eid]! * slow
-    // 非白闪期的常驻染色:蓄力橙 > 蹦迪粉 > 中毒毒绿 > 减速冷蓝 > 常态白(镜像 steerEnemies 的染色优先级)
+    // 非白闪期的常驻染色:蹦迪粉 > 中毒毒绿 > 蓄力橙 > 减速冷蓝 > 常态白。
+    // 旧实现的橙/蓝只在状态翻转那一帧写一次,毒绿却逐帧重涂,故稳态下毒绿压过橙
     if (Flash.until[eid] === 0) {
       Tint.effect[eid] = 0
-      Tint.color[eid] =
-        EState.v[eid] === 2
-          ? 0xffb74d
-          : dancing
-            ? 0xff9ff3
-            : now < Poison.until[eid]!
-              ? 0x7bff5a
-              : zoneSlow < 1
-                ? 0xa5d8ff
-                : 0xffffff
+      Tint.color[eid] = dancing
+        ? 0xff9ff3
+        : now < Poison.until[eid]!
+          ? 0x7bff5a
+          : EState.v[eid] === 2
+            ? 0xffb74d
+            : zoneSlow < 1
+              ? 0xa5d8ff
+              : 0xffffff
     }
     // 逐 locomotion 求本帧「行为速度」(px/s);位移在本段之后统一积分,
     // 以便世界钩子(冰面打滑/河流漂移)能在积分前改写这份速度
@@ -645,8 +652,8 @@ export function steerEnemies(sim: Sim, delta: number): void {
     const kvx = Kv.x[eid]!
     const kvy = Kv.y[eid]!
     if (kvx !== 0 || kvy !== 0) {
-      tx += kvx * dt
-      ty += kvy * dt
+      tx += kvx * kdt
+      ty += kvy * kdt
       if ((kvx * kvx + kvy * kvy) * decay * decay < 100) {
         Kv.x[eid] = 0
         Kv.y[eid] = 0
@@ -655,6 +662,9 @@ export function steerEnemies(sim: Sim, delta: number): void {
         Kv.y[eid] = kvy * decay
       }
     }
+    // 翻转朝向读的是「含击退」的合成速度(镜像旧 body.velocity.x):被击飞时会朝击退方向转身。
+    // enemyVelX 保持纯行为速度不动——敌方 aim:'move' 弹的 ownerHeading 依赖它
+    const flipVx = dt > 0 ? (tx - Transform.x[eid]!) / dt : 0
     const fixed = sim.hooks.constrainEnemy(sim, eid, tx, ty)
     Transform.x[eid] = fixed.x
     Transform.y[eid] = fixed.y
@@ -662,7 +672,7 @@ export function steerEnemies(sim: Sim, delta: number): void {
     // 蓄力/冲刺(EState 2/3)与变形由各自状态机/形象自管,此处不覆盖
     if (!dancing && EState.v[eid] !== 2 && EState.v[eid] !== 3 && Morph.until[eid] === 0) {
       Transform.rot[eid] = Math.sin(now / 95 + enemyPhase[eid]!) * 0.1
-      if (Math.abs(enemyVelX[eid]!) > 8) Sprite.flipX[eid] = enemyVelX[eid]! > 0 ? 1 : 0
+      if (Math.abs(flipVx) > 8) Sprite.flipX[eid] = flipVx > 0 ? 1 : 0
     }
   }
 }

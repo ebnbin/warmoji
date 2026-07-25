@@ -878,8 +878,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const totalSec = (this.run.combatMs + (sim?.elapsedMs ?? 0)) / 1000
     const wave = waveAt(totalSec)
     return {
-      enemies: query(this.world, [Enemy]).length,
-      projectiles: query(this.world, [Projectile]).length + query(this.world, [EnemyProj]).length,
+      enemies: query(this.world, [Enemy]).filter((eid) => !Dormant.v[eid]).length,
+      projectiles: query(this.world, [Projectile]).length,
       coins: query(this.world, [Coin]).length,
       pending: sim?.pendingSpawns.length ?? 0,
       objects: this.children.list.length,
@@ -894,7 +894,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
    * 效果本体是队长持有的标准能力行,逐个单发 */
   castSkill(): boolean {
     const sim = this.sim
-    if (!sim || sim.over || this.run.skillCdMs > 0) return false
+    // ending 一并挡住:波末结算横幅期间世界已冻结,此时放技能只会白白重置跨波 CD(镜像旧 over 门槛)
+    if (!sim || sim.over || this.ending || this.run.skillCdMs > 0) return false
     const s = CAPTAINS[this.run.captainId].skill
     this.run.skillCdMs = s.cdMs * this.teamFx.skillCdMul
     playSfx('levelup')
@@ -1604,6 +1605,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.drainDamageNumbers()
     this.drainBursts()
     this.drainRings()
+    // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtMember 的 cameras.shake)。
+    // 同样须先于过场判定——致死那一帧的抖屏否则被 return 吞掉且永远补不回来
+    if (sim.memberHitCount > this.seenHitCount) {
+      this.seenHitCount = sim.memberHitCount
+      if (this.hitShakeOn) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
+    }
+    this.updateHpBars()
     // 终波 Boss 被击败 → 通关结算(镜像 onBossDown → endWave)
     if (!this.testMode && sim.bossDown) {
       // 稍候片刻让碎块飞散可见,再走通关结算(镜像 onBossDown 的 700ms)。
@@ -1616,6 +1624,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 全队阵亡 → 失败结算(测试模式不结算,便于反复观测)
     if (!this.testMode && sim.over) {
       this.ending = true
+      this.run.combatMs += sim.elapsedMs // 败局也计入本波已打的时长(镜像 gameOver)
       playSfx('over')
       this.time.delayedCall(900, () => this.scene.start('result', { win: false }))
       return
@@ -1634,12 +1643,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
     this.timeStopFx?.setFillStyle(TIMESTOP.chillColor, this.timeStopFxAlpha)
-    // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtMember 的 cameras.shake)
-    if (sim.memberHitCount > this.seenHitCount) {
-      this.seenHitCount = sim.memberHitCount
-      if (this.hitShakeOn) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
-    }
-    this.updateHpBars()
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
       pages: this.atlas?.pageCount ?? 0,

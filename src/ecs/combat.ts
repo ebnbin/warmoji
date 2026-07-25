@@ -288,6 +288,9 @@ export function hurtMember(sim: Sim, eid: number, damage: number, srcName?: stri
     Revive.at[eid] = sim.elapsedMs + Revive.ms[eid]!
     Tint.color[eid] = 0x888888
     Tint.alpha[eid] = 0.35
+    // 战报「阵亡」列(镜像 killMember 的 stats.deaths 累加)
+    const deaths = sim.run.stats.deaths
+    if (slot >= 0 && slot < deaths.length) deaths[slot] = (deaths[slot] ?? 0) + 1
     // 阵亡灰烟(镜像 killMember 的 puffBurst)
     sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
     if (sim.members.every((x) => !Alive.v[x])) sim.over = true
@@ -333,9 +336,17 @@ export function memberVisual(sim: Sim): void {
   const now = sim.elapsedMs
   for (const m of sim.members) {
     if (!Alive.v[m]) continue
-    const flashing = MFlash.until[m] !== 0 && now < MFlash.until[m]!
-    if (MFlash.until[m] !== 0 && now >= MFlash.until[m]!) MFlash.until[m] = 0
-    // 非受击红闪期:黏黏怪攻速惩罚期间染黏液绿,否则常态白(镜像 atkSlowUntil 染色)
-    if (!flashing) Tint.color[m] = MAtkSlow.until[m]! > now ? 0x9ccc65 : 0xffffff
+    // 镜像旧 updateMembers 的三分支:黏滞期逐帧重涂黏液绿(压过受击红闪),
+    // 黏滞到期那帧清一次(连进行中的红闪一并抹白),其余情况由红闪自己到点转白
+    if (MAtkSlow.until[m]! > now) {
+      Tint.color[m] = 0x9ccc65
+    } else if (MAtkSlow.until[m]! !== 0) {
+      MAtkSlow.until[m] = 0
+      MFlash.until[m] = 0
+      Tint.color[m] = 0xffffff
+    } else if (MFlash.until[m] !== 0 && now >= MFlash.until[m]!) {
+      MFlash.until[m] = 0
+      Tint.color[m] = 0xffffff
+    }
   }
 }

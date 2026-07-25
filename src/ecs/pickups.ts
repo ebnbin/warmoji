@@ -124,8 +124,8 @@ export function magnetCoinsEcs(sim: Sim, delta: number): void {
       Vel.x[eid] = idle.x
       Vel.y[eid] = idle.y
     }
-    // 落点过世界钩子(环面回绕)
-    const moved = sim.hooks.constrainCoin(sim, x + Vel.x[eid]! * dt, y + Vel.y[eid]! * dt)
+    // 落点过世界钩子:只回绕不钳制——旧实现生成时钳一次,此后交物理积分自由飞
+    const moved = sim.hooks.wrap(sim, x + Vel.x[eid]! * dt, y + Vel.y[eid]! * dt)
     const nx = moved.x
     const ny = moved.y
     Transform.x[eid] = nx
