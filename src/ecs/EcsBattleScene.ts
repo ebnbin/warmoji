@@ -15,12 +15,27 @@ import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS } from '../boot/preload'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
-import { MAP, MAPS, rollDecor } from '../maps/registry'
+import { bossFor, MAP, MAPS, rollDecor } from '../maps/registry'
 import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query } from 'bitecs'
-import { Alive, Coin, Enemy, EnemyProj, EState, Hp, MAtkSlow, MHp, Morph, Poison, Projectile, Slow, Transform } from './components'
+import {
+  Alive,
+  Boss,
+  Coin,
+  Enemy,
+  EnemyProj,
+  EState,
+  Hp,
+  MAtkSlow,
+  MHp,
+  Morph,
+  Poison,
+  Projectile,
+  Slow,
+  Transform,
+} from './components'
 import { applyDamage } from './combat'
 import { applyMorph } from './morph'
 import { EcsAtlas } from './render/atlas'
@@ -37,7 +52,15 @@ import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
 import { spawnBossEcs, spawnStep } from './spawn'
 import { initialLayout, stepSim } from './sim'
 import { settleWave } from './wave'
-import { isBossWave, waveDurationMs, WAVE } from '../run/waves'
+import { isBossWave, waveAt, waveDurationMs, WAVE } from '../run/waves'
+import { xpToNext } from '../run/xp'
+import { CAPTAINS } from '../captains/registry'
+import { aggregateTeamCards } from '../cards/registry'
+import type { TeamEffects } from '../items/registry'
+import { DENSITY_PARAMS, INVINCIBLE_HP, labDensity, labInvincible } from '../run/lab'
+import type { HudHost } from '../battle/hudHost'
+import type { HudSnapshot } from '../battle/BaseArenaScene'
+import type { UIScene } from '../battle/UIScene'
 import type { PendingSpawn, Sim } from './sim'
 import { emojiImage } from '../emoji/textures'
 import { toPx } from '../battle/px'
@@ -50,12 +73,17 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
 }
 
-export class EcsBattleScene extends Phaser.Scene {
+export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private world!: EcsWorld
   private atlas?: EcsAtlas
   private sim?: Sim
   private ready = false
-  private testMode = false
+  /** HUD 宿主契约：UIScene 据此显示实验室控件、正计时 */
+  testMode = false
+  /** HUD 宿主契约：当前 run（HUD 读 mapId/金币/经验等） */
+  run!: RunState
+  /** 团队卡牌聚合乘区（技能 CD 等；与 spawnTeam 内同源，开局定） */
+  private teamFx!: TeamEffects
   /** 过场已排程(波末结算/全灭):置位后 update 早退,避免重复触发 */
   private ending = false
   /** 队员血条(逐帧跟位 + 按血量比例重绘;镜像 drawMemberHp) */
@@ -90,6 +118,9 @@ export class EcsBattleScene extends Phaser.Scene {
     ;(window as unknown as { __ecsWorld?: EcsWorld }).__ecsWorld = this.world
 
     const run = getRun()
+    this.run = run
+    this.testMode = run.testMode
+    this.teamFx = aggregateTeamCards(run.teamCards)
     const mapDef = MAPS[run.mapId]
     applyBackground(mapDef.palette)
     this.mapW = (mapDef.size?.w ?? MAP.width) * UNIT
@@ -128,6 +159,12 @@ export class EcsBattleScene extends Phaser.Scene {
       .setDepth(1000)
 
     void this.boot(run, center, hint)
+
+    // HUD：与旧竞技场同一套 UIScene（自探测当前战斗场景，launch 不传参）
+    this.scene.launch('ui')
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scene.stop('ui')
+    })
 
     this.input.keyboard?.on('keydown-ESC', () => {
       playSfx('click')
@@ -438,6 +475,85 @@ export class EcsBattleScene extends Phaser.Scene {
     }
   }
 
+  // ── HUD 宿主契约(HudHost):UIScene 从这里取全部读数 ──────────
+
+  /** 顶栏读数(镜像 BaseArenaScene.hudSnapshot) */
+  hudSnapshot(): HudSnapshot {
+    const sim = this.sim
+    const elapsed = sim?.elapsedMs ?? 0
+    const boss = sim ? query(this.world, [Enemy, Boss]).find((eid) => Boss.v[eid] === 1) : undefined
+    return {
+      xp: this.run.xp.xp,
+      xpNext: xpToNext(this.run.xp.level),
+      level: this.run.xp.level,
+      kills: this.run.kills,
+      coins: this.run.coins,
+      wave: this.run.wave,
+      seconds: Math.floor(elapsed / 1000),
+      remainMs: Math.max(0, waveDurationMs(this.run.wave) - elapsed),
+      over: sim?.over ?? false,
+      bossHp: boss !== undefined ? Hp.v[boss]! : null,
+      bossMaxHp: bossFor(this.run.mapId).hp,
+      // 战场拾取的限时增益层尚未移植(P4 后续),恒空
+      battleFx: [],
+    }
+  }
+
+  /** 主动技能读数(镜像 skillSnapshot;释放本体待 castSkill 落地) */
+  skillSnapshot(): { name: string; remainMs: number; cdMs: number; ready: boolean } {
+    const s = CAPTAINS[this.run.captainId].skill
+    return {
+      name: s.name,
+      remainMs: this.run.skillCdMs,
+      cdMs: s.cdMs * this.teamFx.skillCdMul,
+      ready: this.run.skillCdMs <= 0,
+    }
+  }
+
+  /** 性能面板读数(镜像 perfSnapshot;ECS 无物理体,bodies 恒 0) */
+  perfSnapshot(): {
+    enemies: number
+    projectiles: number
+    coins: number
+    pending: number
+    objects: number
+    bodies: number
+    combatSec: number
+    spawnIntervalMs: number
+    hpMultiplier: number
+  } {
+    const sim = this.sim
+    const totalSec = (this.run.combatMs + (sim?.elapsedMs ?? 0)) / 1000
+    const wave = waveAt(totalSec)
+    return {
+      enemies: query(this.world, [Enemy]).length,
+      projectiles: query(this.world, [Projectile]).length + query(this.world, [EnemyProj]).length,
+      coins: query(this.world, [Coin]).length,
+      pending: sim?.pendingSpawns.length ?? 0,
+      objects: this.children.list.length,
+      bodies: 0,
+      combatSec: Math.floor(totalSec),
+      spawnIntervalMs: Math.round(this.testMode ? DENSITY_PARAMS[labDensity()].intervalMs : wave.spawnIntervalMs),
+      hpMultiplier: wave.hpMultiplier,
+    }
+  }
+
+  /** 释放主动技能:队长技能载荷尚未移植到 ECS(P4 后续),恒不放出 */
+  castSkill(): boolean {
+    return false
+  }
+
+  /** 测试模式免死开关变更后重算队员血量上限(镜像 applyTestInvincible) */
+  applyTestInvincible(): void {
+    const sim = this.sim
+    if (!sim) return
+    const mh = labInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
+    for (const m of sim.members) {
+      MHp.max[m] = mh
+      MHp.hp[m] = labInvincible() ? mh : Math.min(MHp.hp[m]!, mh)
+    }
+  }
+
   /** 波末过场(镜像 endWave 尾段):停留结算横幅时长后按 run 状态进结算/抽卡/整编/商店 */
   private scheduleWaveEnd(finished: boolean): void {
     this.ending = true
@@ -483,9 +599,12 @@ export class EcsBattleScene extends Phaser.Scene {
     const ky =
       (held(this.cursors?.up) || held(this.wasd?.W) ? -1 : 0) +
       (held(this.cursors?.down) || held(this.wasd?.S) ? 1 : 0)
-    // P2:键盘驱动(摇杆随 HUD 在 P4 接入)
-    sim.teamDir = kx !== 0 || ky !== 0 ? norm(kx, ky) : { x: 0, y: 0 }
-    sim.moveInputRaw = kx !== 0 || ky !== 0 ? 1 : 0
+    // 键盘优先,否则取 HUD 摇杆向量(镜像 BaseArenaScene 的输入合流);
+    // moveInputRaw 键盘满推=1、摇杆取模长,供时停世界时标读
+    const keyed = kx !== 0 || ky !== 0
+    const stick = (this.scene.get('ui') as UIScene | undefined)?.joystickVector ?? { x: 0, y: 0 }
+    sim.teamDir = keyed ? norm(kx, ky) : stick
+    sim.moveInputRaw = keyed ? 1 : Math.min(1, Math.hypot(stick.x, stick.y))
 
     stepSim(sim, delta)
     // 队员能力驱动(wdelta=真实帧长;时停时标在 P4)
@@ -542,7 +661,7 @@ export class EcsBattleScene extends Phaser.Scene {
       // 护巢子敌数(enemyNest>=0):虫巢生成的子敌带巢引用,自然刷怪的敌人恒 -1,借此隔离测量
       broods: Array.from(query(this.world, [Enemy]), (eid) => enemyNest[eid]!).filter((n) => n >= 0).length,
       enemyPos: Array.from(query(this.world, [Enemy]), (eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
-      kills: sim.kills,
+      kills: sim.run.kills,
       wave: sim.run.wave,
       coins: sim.run.coins,
       xpLevel: sim.run.xp.level,

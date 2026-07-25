@@ -47,8 +47,6 @@ export interface Sim {
   elapsedMs: number
   /** 本帧威胁点(敌人位置) */
   frameTargets: Point[]
-  /** 累计击杀 */
-  kills: number
   /** 全队阵亡(游戏结束标记;失败结算) */
   over: boolean
   /** 终波 Boss 被击败(场景侧据此走通关结算) */

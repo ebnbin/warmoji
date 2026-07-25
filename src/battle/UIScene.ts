@@ -47,7 +47,10 @@ import {
   viewport,
   VIEWPORT_CHANGED,
 } from '../core/apply'
-import type { BaseArenaScene, HudSnapshot, WaveSummary } from './BaseArenaScene'
+import type { HudSnapshot, WaveSummary } from './BaseArenaScene'
+import type { HudHost } from './hudHost'
+import { ECS_SCENE_KEY } from '../ecs/keys'
+import type { EcsSceneKey } from '../ecs/keys'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
 // 与 ArenaScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
@@ -85,8 +88,9 @@ export class UIScene extends Phaser.Scene {
   private fxBars?: Phaser.GameObjects.Graphics
   private fxKey = ''
 
-  /** 当前战斗场景 key：多套竞技场（有界/无界/河流/虚空/秒针）互斥运行，本场景只跟随其一 */
-  private arenaKey: ArenaSceneKey = 'arena'
+  /** 当前战斗场景 key：多套竞技场（有界/无界/河流/虚空/秒针）互斥运行，本场景只跟随其一。
+   * ECS 实验场景是第 N+1 套，同样互斥，故一并纳入探测 */
+  private arenaKey: ArenaSceneKey | EcsSceneKey = 'arena'
 
   constructor() {
     super('ui')
@@ -95,9 +99,11 @@ export class UIScene extends Phaser.Scene {
   /** 启动时探测哪个竞技场在跑（含暂停中——视口变化会带着暂停态重启本场景）。
    * 用运行状态而非 launch 传参：场景 data 会跨局残留，探测永不脏 */
   init(): void {
-    const running = ARENA_SCENE_KEYS.filter((k) => k !== 'arena').find(
-      (k) => this.scene.isActive(k) || this.scene.isPaused(k),
-    )
+    const candidates: readonly (ArenaSceneKey | EcsSceneKey)[] = [
+      ...ARENA_SCENE_KEYS.filter((k) => k !== 'arena'),
+      ECS_SCENE_KEY,
+    ]
+    const running = candidates.find((k) => this.scene.isActive(k) || this.scene.isPaused(k))
     this.arenaKey = running ?? 'arena'
   }
 
@@ -105,8 +111,9 @@ export class UIScene extends Phaser.Scene {
     return this.joystick?.vector ?? { x: 0, y: 0 }
   }
 
-  private get arena(): BaseArenaScene {
-    return this.scene.get(this.arenaKey) as BaseArenaScene
+  /** 当前战斗场景，按 HUD 宿主契约取用（旧竞技场与 ECS 实验场景都满足） */
+  private get arena(): HudHost {
+    return this.scene.get(this.arenaKey) as unknown as HudHost
   }
 
   create(): void {

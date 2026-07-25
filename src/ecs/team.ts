@@ -152,7 +152,6 @@ export function spawnTeam(
     mapH,
     elapsedMs: 0,
     frameTargets: [],
-    kills: 0,
     over: false,
     bossDown: false,
     memberHitCount: 0,

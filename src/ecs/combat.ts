@@ -79,7 +79,7 @@ export function applyDamage(
 
 /** 击杀(计数 + 掉落结算 + 亡语入队 + 清体) */
 export function killEnemy(sim: Sim, eid: number): void {
-  sim.kills++
+  sim.run.kills++ // 击杀计数落在 run 上(与旧一致):HUD 顶栏、波末小结、结算页都读它
   playSfx('kill')
   const def = enemyDef[eid]
   const elite = Elite.v[eid] === 1
