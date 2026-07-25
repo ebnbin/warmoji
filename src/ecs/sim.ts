@@ -312,15 +312,16 @@ function moveTeam(sim: Sim, delta: number): void {
   sim.center.x = next.x
   sim.center.y = next.y
   layout(sim, delta)
+  animateMembers(sim, delta)
 }
 
-/** 逐员:岗位偏移 + 待机游移 + 跟随弹簧 → 写 Transform/Depth(镜像 layoutTeam) */
+/** 逐员布局:岗位偏移 + 待机游移 + 跟随弹簧 → 写 Follow/Transform/Depth(镜像 layoutTeam)。
+ * 只管人站在哪;呼吸/弹入/翻转等纯表现在 animateMembers */
 function layout(sim: Sim, delta: number): void {
   const posts = formationPosts(sim.formation, sim.count, sim.orbitPhase)
   const moving = sim.teamDir.x !== 0 || sim.teamDir.y !== 0
   const dt = Math.min(delta, 50) / 1000
   const tSec = sim.elapsedMs / 1000
-  const memberSize = MEMBER.size * UNIT
   for (let slot = 0; slot < sim.members.length; slot++) {
     const eid = sim.members[slot]!
     const idx = sim.postBySlot[slot] ?? slot
@@ -372,29 +373,36 @@ function layout(sim: Sim, delta: number): void {
     const guarded = sim.formation === 'guard' && idx === 0
     // 遮挡纵深按世界差(环面上贴缝时不跳变)
     Depth.z[eid] = guarded ? 8.5 : 10 + sim.hooks.worldDelta(sim, sim.center.x, sim.center.y, fx, fy).y / UNIT
-    // 程序化小动画(镜像 animateMember):呼吸挤压拉伸 + 朝移动方向翻转(仅活着的)。
-    // 复活弹入期(Pop)用弹入缩放覆盖呼吸(镜像 reviveMember 的 Back.easeOut scale 弹)
-    if (Alive.v[eid]) {
-      if (Pop.until[eid]! > sim.elapsedMs) {
-        const t = 1 - (Pop.until[eid]! - sim.elapsedMs) / 200
-        const pop = memberSize * (0.3 + 0.7 * backEaseOut(t))
-        Transform.w[eid] = pop
-        Transform.h[eid] = pop
-      } else {
-        const bp = Breath.phase[eid]! + delta / (moving ? 85 : 140)
-        Breath.phase[eid] = bp
-        const s = Math.sin(bp) * (moving ? 0.13 : 0.09)
-        Transform.w[eid] = memberSize * (1 - s * 0.6)
-        Transform.h[eid] = memberSize * (1 + s)
-      }
-      if (Math.abs(sim.teamDir.x) > 0.2) Sprite.flipX[eid] = sim.teamDir.x > 0 ? 1 : 0
+  }
+}
+
+/** 队员的程序化小动画(镜像 animateMember):呼吸挤压拉伸 + 朝移动方向翻转(仅活着的)。
+ * 复活弹入期(Pop)用弹入缩放覆盖呼吸(镜像 reviveMember 的 Back.easeOut scale 弹) */
+function animateMembers(sim: Sim, delta: number): void {
+  const moving = sim.teamDir.x !== 0 || sim.teamDir.y !== 0
+  const memberSize = MEMBER.size * UNIT
+  for (const eid of sim.members) {
+    if (!Alive.v[eid]) continue
+    if (Pop.until[eid]! > sim.elapsedMs) {
+      const t = 1 - (Pop.until[eid]! - sim.elapsedMs) / 200
+      const pop = memberSize * (0.3 + 0.7 * backEaseOut(t))
+      Transform.w[eid] = pop
+      Transform.h[eid] = pop
+    } else {
+      const bp = Breath.phase[eid]! + delta / (moving ? 85 : 140)
+      Breath.phase[eid] = bp
+      const s = Math.sin(bp) * (moving ? 0.13 : 0.09)
+      Transform.w[eid] = memberSize * (1 - s * 0.6)
+      Transform.h[eid] = memberSize * (1 + s)
     }
+    if (Math.abs(sim.teamDir.x) > 0.2) Sprite.flipX[eid] = sim.teamDir.x > 0 ? 1 : 0
   }
 }
 
 /** 首帧前把队员摆到岗位(镜像 setup 里的 layoutTeam(0)) */
 export function initialLayout(sim: Sim): void {
   layout(sim, 0)
+  animateMembers(sim, 0)
 }
 
 /** 一帧仿真(镜像 update 的 updateOrbit→moveTeam→steerEnemies 次序);delta 为真实帧长(ms) */
