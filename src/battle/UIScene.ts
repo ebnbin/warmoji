@@ -49,8 +49,8 @@ import {
 } from '../core/apply'
 import type { HudSnapshot, WaveSummary } from './BaseArenaScene'
 import type { HudHost } from './hudHost'
-import { ECS_SCENE_KEY } from '../ecs/keys'
-import type { EcsSceneKey } from '../ecs/keys'
+import { ECS_SCENE_KEY } from '../experiments/ecsExperiment'
+import type { EcsSceneKey } from '../experiments/ecsExperiment'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
 // 与 ArenaScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。

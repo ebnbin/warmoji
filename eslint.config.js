@@ -8,6 +8,27 @@ export default tseslint.config(
   // 纯度护栏：纯逻辑文件禁 import phaser（type import 放行——编译期擦除，无运行时依赖）。
   // 表现层文件显式白名单；新增 Phaser 文件必须在此登记——这道摩擦是有意的。
   // 边界的完整定义是「能在 node 的 vitest 里 import」，DOM/WebAudio 越界靠约定与单测把守。
+  // 实验隔离护栏：ECS 实验只能经 src/experiments/ecsExperiment.ts 这一个 facade 接入主干。
+  // 用基础规则（非 @typescript-eslint 版）以免覆盖上面那条 phaser 规则；type import 一并禁——
+  // 类型耦合虽然编译期擦除，但删实验时照样让主干编译不过，对「一步拆干净」是同等障碍。
+  {
+    files: ['src/**/*.ts', 'e2e/**/*.ts'],
+    ignores: ['src/ecs/**/*.ts', 'src/experiments/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/ecs', '**/ecs/*', '**/ecs/**', './ecs/*', '../ecs/*', 'bitecs'],
+              message:
+                'ECS 是实验代码：一律经 src/experiments/ecsExperiment.ts 调用，不要直接 import src/ecs/ 或 bitecs（这样实验的耦合面才数得清、下线时能一步拆干净）',
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     files: ['src/**/*.ts'],
     ignores: [
@@ -23,6 +44,7 @@ export default tseslint.config(
       // ECS 实验：宿主场景 + 自绘渲染层触碰 Phaser/WebGL（表现层）；ECS 逻辑文件仍禁 phaser
       'src/ecs/EcsBattleScene.ts',
       'src/ecs/render/**/*.ts',
+      'src/experiments/*.ts',
       'src/menu/grid.ts',
       'src/menu/scroll.ts',
       'src/emoji/textures.ts',

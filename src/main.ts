@@ -17,10 +17,9 @@ import { ShopScene } from './menu/ShopScene'
 import { SpaceArenaScene } from './maps/SpaceArenaScene'
 import { StudioScene } from './menu/StudioScene'
 import { UIScene } from './battle/UIScene'
-import { EcsBattleScene } from './ecs/EcsBattleScene'
-import { ECS_SCENE_KEY } from './ecs/keys'
 import { VoidArenaScene } from './maps/VoidArenaScene'
 import { WikiScene } from './menu/WikiScene'
+import { ECS_SCENES, installEcsProbes, isEcsSceneKey } from './experiments/ecsExperiment'
 import { WAVE } from './run/waves'
 import { browserStorage } from './core/storage'
 import { getRun, grantCoins, grantXp } from './run/state'
@@ -38,7 +37,7 @@ import type { BaseArenaScene } from './battle/BaseArenaScene'
 import { loadSettings } from './run/settings'
 import { bgmState, initBgm, playBgm, renderBgmOffline, setBgmEnabled } from './audio/bgm'
 import type { BgmId } from './audio/music'
-import { labCaptain, labStarters, setLabEnemies, setLabInvincible, setLabRoster } from './run/lab'
+import { labCaptain, labStarters, setLabEnemies, setLabRoster } from './run/lab'
 import type { CharacterId } from './characters/registry'
 import { beginRun } from './run/state'
 import { ARENA_SCENE_KEYS, arenaSceneFor, sanitizeMapId } from './maps/registry'
@@ -73,7 +72,7 @@ const game = new Phaser.Game({
   // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
   physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, RuinsArenaScene, DayNightArenaScene, SpaceArenaScene, IceArenaScene, EcsBattleScene, UIScene, ResultScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ShopScene, ArenaScene, InfiniteArenaScene, RiverArenaScene, VoidArenaScene, RuinsArenaScene, DayNightArenaScene, SpaceArenaScene, IceArenaScene, ...ECS_SCENES, UIScene, ResultScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {
@@ -90,7 +89,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
     const key = scene.scene.key
     if (lobby.includes(key)) {
       scene.events.on(Phaser.Scenes.Events.START, () => playBgm('lobby'))
-    } else if (arenas.includes(key) || key === ECS_SCENE_KEY) {
+    } else if (arenas.includes(key) || isEcsSceneKey(key)) {
       scene.events.on(Phaser.Scenes.Events.START, () => playBgm(getRun().mapId))
     }
   }
@@ -127,13 +126,7 @@ window.__labTeam = (ids: string[], mapId = 'forest'): void => {
   setLabRoster(ids as CharacterId[])
   window.__setLab!([], mapId)
 }
-// 调试探针（ECS 实验）：只设定试炼场旋钮、不启动场景——供 e2e 随后经地图页测试模式进入 ECS。
-// 敌人勾选集默认清空（隔离测量：只出 e2e 显式投放的敌人）；无敌默认沿用试炼场缺省（开）
-window.__ecsLabRoster = (ids: string[], enemies: string[] = [], invincible = true): void => {
-  setLabRoster(ids as CharacterId[])
-  setLabEnemies(enemies)
-  setLabInvincible(invincible)
-}
+installEcsProbes() // ECS 实验的调试探针（e2e 用），实现在 facade 里
 // 测试模式：设定出场敌人（kind 列表），用当前勾选阵容在某张真实地图上开测试模式
 window.__setLab = (kinds: string[], mapId = 'forest'): void => {
   setLabEnemies(kinds)
