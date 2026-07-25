@@ -1,14 +1,14 @@
 import Phaser from 'phaser'
-import { UNIT } from '../core/units'
-import { InfiniteArenaScene } from './InfiniteArenaScene'
-import { MAP, MAPS } from './registry'
-import type { SpaceConfig } from './registry'
-import { ringPoint } from './world'
-import { emojiImage } from '../emoji/textures'
-import { enemyOf } from '../enemies/enemies'
-import { clampToDisc, confineVelocity, meteorSweep } from './space'
-import type { Point } from '../core/vec'
-import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
+import { UNIT } from '../../core/units'
+import { InfiniteScene } from './InfiniteScene'
+import { MAP, MAPS } from '../../maps/registry'
+import type { SpaceConfig } from '../../maps/registry'
+import { ringPoint } from '../../maps/world'
+import { emojiImage } from '../../emoji/textures'
+import { enemyOf } from '../enemy/enemies'
+import { clampToDisc, confineVelocity, meteorSweep } from '../../maps/space'
+import type { Point } from '../../core/vec'
+import type { ArcadeBody, ImageObj } from '../ArcadeBattleScene'
 
 // 天体横扫的一次实例（同一时刻至多一个）
 interface Meteor {
@@ -34,7 +34,7 @@ interface Meteor {
 //   玩家与敌人全在圈内生成。相机跟随队伍、bounds 钳在圆的外接框内。
 // · 天体横扫：平均每 ~15 秒，一颗球形天体先给出直线预警轨迹，随后沿该线匀速划过战场，
 //   压到（进入球体半径）的所有实体——队员 / 敌人 / Boss 一律照打（敌我通吃）。
-export class SpaceArenaScene extends InfiniteArenaScene {
+export class SpaceScene extends InfiniteScene {
   private nextMeteorAt = 0
   private meteor?: Meteor
   // 禁锢圈（全程常驻）：圆心 = 地图中心，半径固定

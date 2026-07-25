@@ -8,7 +8,7 @@ import type { EcsAtlas } from './render/atlas'
 // 到期复原。Boss 免疫;同一敌人有冷却(变形期 + 复形后 MORPH_RECAST_CD)。镜像 applyHex/restoreMorph。
 // 变形期的移动(半速游荡)在 steerEnemies、受伤倍率/无害在 combat、缴械/复形在 enemyWire。
 
-/** 变形+复形冷却(镜像 BaseArenaScene.MORPH_RECAST_CD) */
+/** 变形+复形冷却(镜像 ArcadeBattleScene.MORPH_RECAST_CD) */
 export const MORPH_RECAST_CD = 5000
 
 /** 施加变形(镜像 applyHex):Boss/冷却中拒绝;换绵羊帧、打断蓄力、清旋转 */

@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
-import type { GroundEffectDef } from './defs'
-import type { BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
+import type { GroundEffectDef } from '../groundEffects/defs'
+import type { ArcadeBattleScene, ImageObj } from './ArcadeBattleScene'
 
 // 地面效果（阵营中立）：留在地面的持续区，敌我同构——team 放的烧敌人、
 // enemy 放的烧队员（同 PoE ground effect 的阵营规则）。跳伤施加语义按
@@ -29,7 +29,7 @@ export interface GroundEffect {
 }
 
 export function spawnGroundEffect(
-  scene: BaseArenaScene,
+  scene: ArcadeBattleScene,
   x: number,
   y: number,
   def: GroundEffectDef,
@@ -58,7 +58,7 @@ export function spawnGroundEffect(
   })
 }
 
-export function updateGroundEffects(scene: BaseArenaScene): void {
+export function updateGroundEffects(scene: ArcadeBattleScene): void {
   if (scene.groundEffects.length === 0) return
   const now = scene.elapsedMs
   scene.groundEffects = scene.groundEffects.filter((g) => {

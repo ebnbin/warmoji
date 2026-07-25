@@ -105,7 +105,7 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   ...Object.values(MAPS).map((m) => m.emoji),
   '1f5fa',
   '1f579',
-  // 深空图天体横扫的球体（无描边贴图，SpaceArenaScene 直接 emojiImage 渲染）
+  // 深空图天体横扫的球体（无描边贴图，SpaceScene 直接 emojiImage 渲染）
   '1fa90',
   ...SETTING_DEFS.map((d) => d.icon),
   SPAWN.markEmoji,

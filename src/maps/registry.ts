@@ -234,31 +234,6 @@ export function sanitizeMapId(id: unknown): MapId {
   return typeof id === 'string' && id in MAPS ? (id as MapId) : MAP_IDS[0]!
 }
 
-/** 全部竞技场场景键（每种世界形态一套独立场景实现）：注册/路由/探针共用同一份 */
-export const ARENA_SCENE_KEYS = [
-  'arena',
-  'arenaInfinite',
-  'arenaRiver',
-  'arenaVoid',
-  'arenaRuins',
-  'arenaDayNight',
-  'arenaSpace',
-  'arenaIce',
-] as const
-export type ArenaSceneKey = (typeof ARENA_SCENE_KEYS)[number]
-
-/** 该地图应进入的竞技场场景（每种世界形态一套独立场景实现，按图路由） */
-export function arenaSceneFor(id: MapId): ArenaSceneKey {
-  const kind = MAPS[id].kind
-  if (kind === 'infinite') return 'arenaInfinite'
-  if (kind === 'river') return 'arenaRiver'
-  if (kind === 'void') return 'arenaVoid'
-  if (kind === 'ruins') return 'arenaRuins'
-  if (kind === 'daynight') return 'arenaDayNight'
-  if (kind === 'space') return 'arenaSpace'
-  if (kind === 'ice') return 'arenaIce'
-  return 'arena'
-}
 
 /** 本图终波 Boss 定义（按 map.boss 引用 enemies 目录） */
 export function bossFor(id: MapId): EnemyDef {

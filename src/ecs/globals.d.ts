@@ -1,5 +1,6 @@
-// ECS 实验的 e2e 调试探针（全局 window 面）。放在实验目录下而非 vite-env.d.ts：
-// 删实验时随目录一起消失，主干的全局类型面不残留实验痕迹。
+// ECS 侧的 e2e 调试探针（全局 window 面）。放在本包内而非 vite-env.d.ts：
+// 删本包时随目录一起消失，主干的全局类型面不残留本框架的痕迹。
+// 与 arcade/globals.d.ts 对称。
 // 除 __ecsLabRoster（facade 装）外，其余都由 EcsBattleScene 在运行时挂。
 
 interface Window {

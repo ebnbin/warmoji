@@ -1,12 +1,37 @@
 import type Phaser from 'phaser'
 import type { RunState } from '../run/state'
-import type { HudSnapshot } from './BaseArenaScene'
+import type { Polarity } from '../battlefield/registry'
 
 // HUD 宿主契约：UIScene 需要从「当前战斗场景」读到的全部东西，仅此而已。
-// 旧的 BaseArenaScene 与 ECS 实验的 EcsBattleScene 都按结构满足它，UIScene 因此
+// 旧的 ArcadeBattleScene 与 ECS 实验的 EcsBattleScene 都按结构满足它，UIScene 因此
 // 不必知道自己挂在哪一套战斗实现上——这是 A/B 两条路共用同一个 HUD 的唯一接缝。
-// 抽成接口而非让 ECS 继承 BaseArenaScene：两套战斗内部结构完全不同（GameObject 阵
+// 抽成接口而非让 ECS 继承 ArcadeBattleScene：两套战斗内部结构完全不同（GameObject 阵
 // vs 组件数组），共享的只有这张「对外读数」表。
+
+export interface HudSnapshot {
+  xp: number
+  xpNext: number
+  level: number
+  kills: number
+  coins: number
+  wave: number
+  seconds: number
+  remainMs: number
+  over: boolean
+  /** 终波 Boss 在场时的血量（null = 无 Boss） */
+  bossHp: number | null
+  bossMaxHp: number
+  /** 已激活的战场拾取效果（HUD 图标 + 剩余计时） */
+  battleFx: { emoji: string; polarity: Polarity; remainMs: number; totalMs: number }[]
+}
+
+/** 波末结算横幅的战果（本波增量） */
+export interface WaveSummary {
+  wave: number
+  kills: number
+  coins: number
+  levels: number
+}
 
 export interface HudHost {
   /** 测试模式（沙盒）：HUD 据此显示实验室控件、计时改为正计时 */

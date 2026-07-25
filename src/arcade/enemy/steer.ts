@@ -1,13 +1,13 @@
-import { playSfx } from '../audio/sfx'
-import { PICKUPS } from '../pickups/registry'
-import { AI } from './registry'
-import { UNIT } from '../core/units'
-import { norm } from '../core/vec'
-import { releasePooled } from '../core/pool'
+import { playSfx } from '../../audio/sfx'
+import { PICKUPS } from '../../pickups/registry'
+import { AI } from '../../enemies/registry'
+import { UNIT } from '../../core/units'
+import { norm } from '../../core/vec'
+import { releasePooled } from '../pool'
 import { enemyOf } from './enemies'
-import type { Member } from '../characters/members'
+import type { Member } from '../member'
 import type { Enemy } from './enemies'
-import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
+import type { ArcadeBody, ArcadeBattleScene, ImageObj } from '../ArcadeBattleScene'
 
 /** 定距风筝的站位滞回带（避免恰好卡在 standoffDist 上抖动） */
 const STANDOFF_BAND = AI.standoffBandU * UNIT
@@ -17,11 +17,11 @@ const COINTHIEF_EAT_CD = AI.coinThiefEatCdMs
 
 // 敌人移动策略注册表：按 def.locomotion.kind 分发，镜像 abilities/create.ts。
 // 每个策略只负责逐帧速度决策与状态机推进；攻击在 enemyAbilities.ts、
-// 死亡效果在 battle/deathEffects.ts、公共帧留守 BaseArenaScene.steerEnemies。
+// 死亡效果在 battle/deathEffects.ts、公共帧留守 ArcadeBattleScene.steerEnemies。
 // 世界差异经场景钩子（wanderDir/fleeDir）。
 
 interface SteerCtx {
-  scene: BaseArenaScene
+  scene: ArcadeBattleScene
   a: Enemy
   body: ArcadeBody
   slow: number

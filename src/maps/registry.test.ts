@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arenaSceneFor, bossFor, MAP, MAP_IDS, MAPS, mapEnemyRoster, rollDecor, sanitizeMapId } from './registry'
+import { bossFor, MAP, MAP_IDS, MAPS, mapEnemyRoster, rollDecor, sanitizeMapId } from './registry'
 import { BOSSES } from '../enemies/registry'
 import { Rng } from '../core/rng'
 
@@ -59,15 +59,6 @@ describe('地图定义', () => {
     expect(sanitizeMapId(undefined)).toBe(MAP_IDS[0])
   })
 
-  it('arenaSceneFor：按形态路由竞技场场景', () => {
-    expect(arenaSceneFor('forest')).toBe('arena')
-    expect(arenaSceneFor('desert')).toBe('arenaInfinite')
-    expect(arenaSceneFor('river')).toBe('arenaRiver')
-    expect(arenaSceneFor('void')).toBe('arenaVoid')
-    expect(arenaSceneFor('ruins')).toBe('arenaRuins')
-    expect(arenaSceneFor('daynight')).toBe('arenaDayNight')
-    expect(arenaSceneFor('space')).toBe('arenaSpace')
-  })
 })
 
 describe('测试模式敌人名录按图裁剪', () => {

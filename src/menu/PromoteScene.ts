@@ -4,9 +4,8 @@ import { CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
 import { formationPosts } from '../characters/formation'
 import type { ItemId } from '../items/registry'
-import { battleSceneFor } from '../experiments/ecsExperiment'
-import type { EcsSceneKey } from '../experiments/ecsExperiment'
-import type { ArenaSceneKey } from '../maps/registry'
+import { battleSceneFor } from '../experiments/battleExperiment'
+import type { BattleSceneKey } from '../experiments/battleExperiment'
 import { randomPalette } from '../core/palette'
 import type { Palette } from '../core/palette'
 import { unlockAt } from '../run/recruit'
@@ -393,7 +392,7 @@ export class PromoteScene extends Phaser.Scene {
   }
 
   /** 点数花完后的去向：开局看队长 firstWaveShop（默认直接开战），波末必进商店 */
-  private nextScene(): ArenaSceneKey | EcsSceneKey | 'shop' {
+  private nextScene(): BattleSceneKey | 'shop' {
     if (this.isInitial() && !CAPTAINS[this.run.captainId].firstWaveShop) {
       return battleSceneFor(this.run.mapId)
     }

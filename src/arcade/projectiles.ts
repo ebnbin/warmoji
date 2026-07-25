@@ -4,8 +4,8 @@ import { emojiKey } from '../emoji/textures'
 import { sweepFirstHitIndex } from '../abilities/defs'
 import type { Effect, ProjectileDef } from '../abilities/defs'
 import type { EnemyProjectileDef } from '../enemies/registry'
-import { acquirePooled, releasePooled } from '../core/pool'
-import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
+import { acquirePooled, releasePooled } from './pool'
+import type { ArcadeBody, ArcadeBattleScene, ImageObj } from './ArcadeBattleScene'
 
 // 玩家弹走线段扫掠命中（pierce 与 onHit 命中效果链随弹携带）；
 // 敌弹走物理 overlap + 寿命与世界钩子（cullEnemyProjectile）回收。
@@ -64,7 +64,7 @@ export function projectileOf(image: ImageObj): Projectile {
 // 敌方弹道机器在文件尾（物理 overlap + 寿命回收）。
 
 export function spawnProjectile(
-  scene: BaseArenaScene,
+  scene: ArcadeBattleScene,
   x: number,
   y: number,
   angle: number,
@@ -101,7 +101,7 @@ export function spawnProjectile(
 
 /** 逐帧对每颗子弹做上一帧位置 → 当前位置的线段扫掠命中。
  * 能力：pierce 命中后不销毁继续飞（跳过已命中敌人）；onHit 命中点效果 */
-export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
+export function sweepProjectiles(scene: ArcadeBattleScene, delta: number): void {
   for (const p of scene.projectiles.getChildren() as ImageObj[]) {
     if (!p.active) continue
     const b = projectileOf(p)
@@ -146,7 +146,7 @@ export function sweepProjectiles(scene: BaseArenaScene, delta: number): void {
 // ── 敌方弹道机器：物理 overlap + 按寿命与世界钩子回收 ──────────
 
 export function spawnEnemyProjectile(
-  scene: BaseArenaScene,
+  scene: ArcadeBattleScene,
   x: number,
   y: number,
   angle: number,
@@ -171,7 +171,7 @@ export function spawnEnemyProjectile(
   })
 }
 
-export function updateEnemyProjectiles(scene: BaseArenaScene): void {
+export function updateEnemyProjectiles(scene: ArcadeBattleScene): void {
   for (const s of scene.enemyProjectiles.getChildren() as ImageObj[]) {
     if (!s.active) continue
     if (scene.elapsedMs >= projectileOf(s).dieAt || scene.cullEnemyProjectile(s)) {

@@ -7,10 +7,10 @@ import {
   FIELD,
   POLARITY_COLOR,
   foldBattleEffects,
-} from './registry'
-import type { BattleEffects, FieldPickupDef, Polarity } from './registry'
-import type { BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
-import type { Enemy } from '../enemies/enemies'
+} from '../battlefield/registry'
+import type { FieldPickupDef, Polarity } from '../battlefield/registry'
+import type { ArcadeBattleScene, ImageObj } from './ArcadeBattleScene'
+import type { Enemy } from './enemy/enemies'
 
 // 战场拾取运行时：地面待拾实体（不磁吸，靠走位拾取）+ 已激活的限时战斗层
 // （battleMods → battleFx，逐帧重折）+ 携带者极性光环。金币在 pickups/，
@@ -29,19 +29,10 @@ export interface FieldPickupEntity {
   grabbed: boolean
 }
 
-/** 已激活的限时效果（拾取后短时生效） */
-export interface BattleMod {
-  id: string
-  emoji: string
-  polarity: Polarity
-  until: number
-  totalMs: number
-  fx: Partial<BattleEffects>
-}
 
 /** 掉一枚地面拾取（携带者死亡处 / 注入器）：不磁吸，静置待走位拾取 */
 export function spawnFieldPickup(
-  scene: BaseArenaScene,
+  scene: ArcadeBattleScene,
   x: number,
   y: number,
   def: FieldPickupDef,
@@ -85,7 +76,7 @@ export function spawnFieldPickup(
 }
 
 /** 逐帧：拾取（队伍中心进圈即收，不磁吸）+ 地面到期淡出 */
-export function updateFieldPickups(scene: BaseArenaScene): void {
+export function updateFieldPickups(scene: ArcadeBattleScene): void {
   if (scene.fieldPickups.length === 0) return
   const now = scene.elapsedMs
   const grab2 = FIELD.grabRadiusU * UNIT * (FIELD.grabRadiusU * UNIT)
@@ -104,7 +95,7 @@ export function updateFieldPickups(scene: BaseArenaScene): void {
   })
 }
 
-function collectFieldPickup(scene: BaseArenaScene, p: FieldPickupEntity): void {
+function collectFieldPickup(scene: ArcadeBattleScene, p: FieldPickupEntity): void {
   p.grabbed = true
   const color = POLARITY_COLOR[p.def.polarity]
   scene.coinBurst.explode(10, p.x, p.y)
@@ -143,7 +134,7 @@ function fadeEntity(p: FieldPickupEntity): void {
 }
 
 /** 施加一层限时效果：同 id 只刷新计时不叠加，随即重折 battleFx */
-export function applyFieldPickup(scene: BaseArenaScene, def: FieldPickupDef): void {
+export function applyFieldPickup(scene: ArcadeBattleScene, def: FieldPickupDef): void {
   scene.battleMods = scene.battleMods.filter((m) => m.id !== def.id)
   scene.battleMods.push({
     id: def.id,
@@ -157,7 +148,7 @@ export function applyFieldPickup(scene: BaseArenaScene, def: FieldPickupDef): vo
 }
 
 /** 剔除到期项后重折 battleFx（update 开头每帧调，保证乘区实时） */
-export function refoldBattleFx(scene: BaseArenaScene): void {
+export function refoldBattleFx(scene: ArcadeBattleScene): void {
   const now = scene.elapsedMs
   const live = scene.battleMods.filter((m) => m.until > now)
   scene.battleMods = live
@@ -167,7 +158,7 @@ export function refoldBattleFx(scene: BaseArenaScene): void {
 
 /** 给携带者敌人挂极性光环（绿=增益/红=减益），随敌逐帧跟位 */
 export function attachCarrierAura(
-  scene: BaseArenaScene,
+  scene: ArcadeBattleScene,
   enemy: ImageObj,
   polarity: Polarity,
 ): Phaser.GameObjects.Arc {
@@ -189,7 +180,7 @@ export function attachCarrierAura(
 }
 
 /** 携带者离场（死亡/消散）：销毁光环并回收计数 */
-export function detachCarrierAura(scene: BaseArenaScene, a: Enemy): void {
+export function detachCarrierAura(scene: ArcadeBattleScene, a: Enemy): void {
   if (!a.aura) return
   a.aura.destroy()
   a.aura = undefined

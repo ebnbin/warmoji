@@ -8,21 +8,26 @@ export default tseslint.config(
   // 纯度护栏：纯逻辑文件禁 import phaser（type import 放行——编译期擦除，无运行时依赖）。
   // 表现层文件显式白名单；新增 Phaser 文件必须在此登记——这道摩擦是有意的。
   // 边界的完整定义是「能在 node 的 vitest 里 import」，DOM/WebAudio 越界靠约定与单测把守。
-  // 实验隔离护栏：ECS 实验只能经 src/experiments/ecsExperiment.ts 这一个 facade 接入主干。
+  // 实现隔离护栏：两套并列的战斗实现（src/arcade/ 旧框架、src/ecs/ 实验）都只能经
+  // src/experiments/battleExperiment.ts 这一个 facade 接入主干，各自包内自由互引。
   // 用基础规则（非 @typescript-eslint 版）以免覆盖上面那条 phaser 规则；type import 一并禁——
-  // 类型耦合虽然编译期擦除，但删实验时照样让主干编译不过，对「一步拆干净」是同等障碍。
+  // 类型耦合虽然编译期擦除，但删某一侧时照样让主干编译不过，对「一步拆干净」是同等障碍。
   {
     files: ['src/**/*.ts', 'e2e/**/*.ts'],
-    ignores: ['src/ecs/**/*.ts', 'src/experiments/**'],
+    ignores: ['src/ecs/**/*.ts', 'src/arcade/**/*.ts', 'src/experiments/**'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
             {
-              group: ['**/ecs', '**/ecs/*', '**/ecs/**', './ecs/*', '../ecs/*', 'bitecs'],
+              group: [
+                '**/ecs', '**/ecs/*', '**/ecs/**', './ecs/*', '../ecs/*',
+                '**/arcade', '**/arcade/*', '**/arcade/**', './arcade/*', '../arcade/*',
+                'bitecs',
+              ],
               message:
-                'ECS 是实验代码：一律经 src/experiments/ecsExperiment.ts 调用，不要直接 import src/ecs/ 或 bitecs（这样实验的耦合面才数得清、下线时能一步拆干净）',
+                '战斗实现（src/arcade/ 与 src/ecs/）是两套可互相替换的并列分支：一律经 src/experiments/battleExperiment.ts 调用，不要直接 import（这样两侧的耦合面才数得清、淘汰其一时能一步拆干净）',
             },
           ],
         },
@@ -34,13 +39,13 @@ export default tseslint.config(
     ignores: [
       'src/main.ts',
       'src/boot/PreloadScene.ts',
-      'src/battle/BaseArenaScene.ts',
       'src/battle/UIScene.ts',
       'src/core/Joystick.ts',
       'src/core/damageFont.ts',
       'src/core/fx.ts',
-      'src/maps/*Scene.ts',
       'src/menu/*Scene.ts',
+      // 旧框架（arcade）整包是表现层：Scene 继承 + Arcade Physics body
+      'src/arcade/**/*.ts',
       // ECS 实验：宿主场景 + 自绘渲染层触碰 Phaser/WebGL（表现层）；ECS 逻辑文件仍禁 phaser
       'src/ecs/EcsBattleScene.ts',
       'src/ecs/render/**/*.ts',

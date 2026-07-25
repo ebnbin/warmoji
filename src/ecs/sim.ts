@@ -24,10 +24,10 @@ import type { EffectCtx, TargetInfo } from '../abilities/types'
 import { TIMESTOP, timeScaleFor } from '../battle/timeStop'
 import { BATTLE_FX_IDENTITY, foldBattleEffects } from '../battlefield/registry'
 import type { BattleEffects } from '../battlefield/registry'
-import type { BattleMod } from '../battlefield/battlefield'
+import type { BattleMod } from '../battlefield/registry'
 import type { FieldPickupDef } from '../battlefield/registry'
 
-// ECS 战斗仿真状态 + 系统(纯逻辑,禁 phaser)。数学逐行镜像旧 BaseArenaScene 的
+// ECS 战斗仿真状态 + 系统(纯逻辑,禁 phaser)。数学逐行镜像旧 ArcadeBattleScene 的
 // updateOrbit / moveTeam / layoutTeam,常量与公式不变,只把「读写精灵」换成「读写组件」。
 
 export interface Sim {

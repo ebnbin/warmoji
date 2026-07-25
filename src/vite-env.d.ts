@@ -220,17 +220,10 @@ interface WarmojiDebug {
 interface Window {
   __warmoji?: WarmojiDebug
   __game?: unknown
-  __setLab?: (kinds: string[], mapId?: string) => void
-  __labTeam?: (ids: string[], mapId?: string) => void
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
   __addMemberItem?: (itemId: string, slot?: number, count?: number) => void
   __setWave?: (n: number) => void
-  __spawnEnemy?: (kind: string, dxU?: number, dyU?: number) => void
-  __spawnArmedEnemy?: (abilityId: string, dxU?: number, dyU?: number) => void
-  __dropCoins?: (n: number, dxU?: number, dyU?: number) => void
-  __spawnCarrier?: (polarity?: 'buff' | 'debuff', id?: string) => void
-  __spawnFieldPickup?: (polarity?: 'buff' | 'debuff', id?: string, dxU?: number, dyU?: number) => void
   __sfxStats?: () => { baked: number; played: number }
   __bgmProbe?: (
     id: 'lobby' | 'forest' | 'desert' | 'river' | 'void',

@@ -79,7 +79,7 @@ import { DENSITY_PARAMS, INVINCIBLE_HP, labDensity, labInvincible } from '../run
 import type { AbilityOwner, AbilityRuntime } from '../abilities/types'
 import { tickSkillCd } from '../captains/skill'
 import type { HudHost } from '../battle/hudHost'
-import type { HudSnapshot } from '../battle/BaseArenaScene'
+import type { HudSnapshot } from '../battle/hudHost'
 import type { UIScene } from '../battle/UIScene'
 import type { Meteor, PendingSpawn, Sim } from './sim'
 import { emojiImage } from '../emoji/textures'
@@ -89,14 +89,14 @@ import { BOSSES, ELITE, ENEMY_DEFS, SPAWN } from '../enemies/registry'
 // ECS 实验战斗场景(宿主壳):Phaser 只做画布/相机/输入/音频宿主;战斗世界(实体+系统+
 // 自绘渲染)全在 ECS。P2:有界森林图 + 队伍编队/orbit/游移/跟随弹簧 + 键盘/相机跟随。
 
-// 夜雾:整块暗幕的颜色/深度/尺寸(与 ArenaScene 同值)
+// 夜雾:整块暗幕的颜色/深度/尺寸(与 BoundedScene 同值)
 const FOG_COLOR = 0x0a0a1a
 const FOG_DEPTH = 90
 const FOG_SPAN = 9000
-// 浮冰图:深水底色 + 落水蓝渐晕(与 IceArenaScene 同值)
+// 浮冰图:深水底色 + 落水蓝渐晕(与 IceScene 同值)
 const WATER_COLOR = 0x0b2a45
 const WATER_VIGNETTE = 0x1e6fd0
-// 奔流图:两岸大地/树干棕(与浅蓝河水强对比,与 RiverArenaScene 同值)
+// 奔流图:两岸大地/树干棕(与浅蓝河水强对比,与 RiverScene 同值)
 const BANK_COLOR = 0x54402a
 const BANK_FAR_COLOR = 0x40301f
 
@@ -335,7 +335,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       cam.setBounds(-margin, -margin, this.mapW + margin * 2, this.mapH + margin * 2)
     }
 
-    // 昼夜图夜雾（镜像 ArenaScene.createFog）：反相 Mask filter 在暗幕上挖出视野洞。
+    // 昼夜图夜雾（镜像 BoundedScene.createFog）：反相 Mask filter 在暗幕上挖出视野洞。
     // Phaser 4 的 GeometryMask 在 WebGL 无实现，故与旧路径一样走 filters.internal.addMask(shape, true)
     if (mapDef.dayNight) {
       this.fogRect = this.add.rectangle(0, 0, FOG_SPAN, FOG_SPAN, FOG_COLOR, 0).setDepth(FOG_DEPTH).setVisible(false)
@@ -344,7 +344,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.fogRect.filters?.internal.addMask(this.fogMaskShape, true)
     }
 
-    // 时停冷雾遮罩（镜像 BaseArenaScene：屏幕固定大矩形，任意地图通用）
+    // 时停冷雾遮罩（镜像 ArcadeBattleScene：屏幕固定大矩形，任意地图通用）
     this.timeStopFx = this.add
       .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, TIMESTOP.chillColor, 0)
       .setScrollFactor(0)
@@ -827,7 +827,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
   // ── HUD 宿主契约(HudHost):UIScene 从这里取全部读数 ──────────
 
-  /** 顶栏读数(镜像 BaseArenaScene.hudSnapshot) */
+  /** 顶栏读数(镜像 ArcadeBattleScene.hudSnapshot) */
   hudSnapshot(): HudSnapshot {
     const sim = this.sim
     const elapsed = sim?.elapsedMs ?? 0
@@ -918,7 +918,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
   }
 
-  /** 昼夜世界步进(镜像 ArenaScene.updateWorld 的 dayNight 分支):相机随时刻平滑缩放 +
+  /** 昼夜世界步进(镜像 BoundedScene.updateWorld 的 dayNight 分支):相机随时刻平滑缩放 +
    * 夜幕迷雾开合。出怪表/刷怪间隔的昼夜切换在纯逻辑侧(spawn.ts)按时钟自算 */
   private updateDayNight(sim: Sim): void {
     const dn = MAPS[this.run.mapId].dayNight
@@ -940,7 +940,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     rect.setPosition(sim.center.x, sim.center.y).setFillStyle(FOG_COLOR, alpha).setVisible(true)
   }
 
-  /** 浮冰世界的视觉步进(镜像 IceArenaScene.updateWater 的渐晕部分):
+  /** 浮冰世界的视觉步进(镜像 IceScene.updateWater 的渐晕部分):
    * 队伍中心落水即脉冲蓝渐晕。掉血结算在纯逻辑侧(worlds.ts 的 tick) */
   private updateWaterVignette(sim: Sim): void {
     const rect = this.waterVignette
@@ -995,7 +995,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     else this.buildRiverVisuals(mapDef, rc!)
   }
 
-  /** 环面相机（镜像 VoidArenaScene.setupCameras）：主相机裁出屏内最大居中的竞技场定比矩形，
+  /** 环面相机（镜像 VoidScene.setupCameras）：主相机裁出屏内最大居中的竞技场定比矩形，
    * 四缝 + 四角各挂一台条带相机取景对侧溢出——跨缝实体两侧同时可见（渲染层的幽灵分身）。
    * ECS 侧全场实体是同一个批绘对象，条带相机各自按自己的滚动再画一遍，天然成立 */
   private setupTorusCameras(cfg: TorusConfig): void {
@@ -1132,7 +1132,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     g.strokeRect(4, 4, this.mapW - 8, this.mapH - 8)
   }
 
-  /** 奔流水面视觉层(镜像 RiverArenaScene.buildRiverVisuals):两岸暗带 + 河水跨向渐变 +
+  /** 奔流水面视觉层(镜像 RiverScene.buildRiverVisuals):两岸暗带 + 河水跨向渐变 +
    * 岸线浪花 + 双层滚动水纹 + 岸上静态植被 + 顺流漂浮物。全为纯 Phaser 视觉,不进 ECS 批绘 */
   private buildRiverVisuals(mapDef: MapDef, cfg: RiverConfig): void {
     const vw = this.mapW
@@ -1333,7 +1333,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
   }
 
-  /** 断壁世界建场(镜像 ArenaScene.createWalls):按种子铺断壁 → 网格 + 可达刷怪格 → 逐格画石块。
+  /** 断壁世界建场(镜像 BoundedScene.createWalls):按种子铺断壁 → 网格 + 可达刷怪格 → 逐格画石块。
    * 网格/流场是纯逻辑(sim.walls),此处只负责视觉与回填 */
   private createWalls(sim: Sim, cfg: WallsConfig): void {
     const cols = Math.round(this.mapW / UNIT)
@@ -1383,7 +1383,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     w.smashed.length = 0
   }
 
-  /** 无限世界装饰分块滚动(镜像 InfiniteArenaScene.ensureChunks):视野覆盖的块集合变化时
+  /** 无限世界装饰分块滚动(镜像 InfiniteScene.ensureChunks):视野覆盖的块集合变化时
    * 整组增删 ECS 静态实体。摆放由 chunkDecor 按 (种子, 块) 纯函数重建——回头看到的景不变 */
   private ensureChunks(atlas: EcsAtlas): void {
     const cfg = MAPS[this.run.mapId].infinite!
@@ -1429,7 +1429,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
   }
 
-  /** 终波缩圈的视觉(镜像 InfiniteArenaScene.updateZone;圈半径与掉血在 worlds.ts 纯逻辑侧):
+  /** 终波缩圈的视觉(镜像 InfiniteScene.updateZone;圈半径与掉血在 worlds.ts 纯逻辑侧):
    * 亮边界环 + 内侧提示描边,有队员在圈外则满屏红渐晕脉冲 */
   private updateZone(sim: Sim): void {
     const zone = sim.zone
@@ -1520,7 +1520,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     })
   }
 
-  /** 地图装饰:按 run 种子随机散布的低透明度 emoji(镜像 ArenaScene.drawDecor),作 ECS 静态实体。
+  /** 地图装饰:按 run 种子随机散布的低透明度 emoji(镜像 BoundedScene.drawDecor),作 ECS 静态实体。
    * 无限世界改走分块滚动(见 ensureChunks):世界没有边,不能一次铺完 */
   private spawnDecor(run: RunState, atlas: EcsAtlas): void {
     if (this.infinite) return this.ensureChunks(atlas)
@@ -1564,7 +1564,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const ky =
       (held(this.cursors?.up) || held(this.wasd?.W) ? -1 : 0) +
       (held(this.cursors?.down) || held(this.wasd?.S) ? 1 : 0)
-    // 键盘优先,否则取 HUD 摇杆向量(镜像 BaseArenaScene 的输入合流);
+    // 键盘优先,否则取 HUD 摇杆向量(镜像 ArcadeBattleScene 的输入合流);
     // moveInputRaw 键盘满推=1、摇杆取模长,供时停世界时标读
     // 队长技能冷却按真实时钟推进(时停不额外拖长 CD,玩家可预期)
     this.run.skillCdMs = tickSkillCd(this.run.skillCdMs, delta)

@@ -156,3 +156,13 @@ export const POLARITY_COLOR: Record<Polarity, number> = {
   buff: 0x66bb6a,
   debuff: 0xef5350,
 }
+
+/** 已激活的限时效果（拾取后短时生效） */
+export interface BattleMod {
+  id: string
+  emoji: string
+  polarity: Polarity
+  until: number
+  totalMs: number
+  fx: Partial<BattleEffects>
+}

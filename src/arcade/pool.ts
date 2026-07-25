@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
-import { circleBody } from './arcade'
-import type { ArcadeBody, ImageObj } from './arcade'
+import { circleBody } from './body'
+import type { ArcadeBody, ImageObj } from './body'
 
 // 实体对象池（Phaser 原生 Group 空位复用）：敌人/子弹/金币等高频生灭实体不再
 // create/destroy，而是从组内取「死」对象复用、回收时失活留组待用——消除逐帧

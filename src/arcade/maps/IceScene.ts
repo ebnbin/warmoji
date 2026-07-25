@@ -1,19 +1,19 @@
 import Phaser from 'phaser'
-import { UNIT } from '../core/units'
-import { SPAWN } from '../enemies/registry'
-import { PICKUPS } from '../pickups/registry'
-import { MAPS, rollDecor } from './registry'
-import { Rng } from '../core/rng'
-import { randomMapPoint } from '../enemies/spawn'
-import { emojiImage } from '../emoji/textures'
-import { viewport } from '../core/apply'
-import { enemyOf } from '../enemies/enemies'
-import { approach, onFloe } from './ice'
-import type { IceConfig } from './registry'
-import { BaseArenaScene } from '../battle/BaseArenaScene'
-import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
-import type { Enemy } from '../enemies/enemies'
-import type { Point } from '../core/vec'
+import { UNIT } from '../../core/units'
+import { SPAWN } from '../../enemies/registry'
+import { PICKUPS } from '../../pickups/registry'
+import { MAPS, rollDecor } from '../../maps/registry'
+import { Rng } from '../../core/rng'
+import { randomMapPoint } from '../../enemies/spawn'
+import { emojiImage } from '../../emoji/textures'
+import { viewport } from '../../core/apply'
+import { enemyOf } from '../enemy/enemies'
+import { approach, onFloe } from '../../maps/ice'
+import type { IceConfig } from '../../maps/registry'
+import { ArcadeBattleScene } from '../ArcadeBattleScene'
+import type { ArcadeBody, ImageObj } from '../ArcadeBattleScene'
+import type { Enemy } from '../enemy/enemies'
+import type { Point } from '../../core/vec'
 
 // 深水（浮冰四周）的底色
 const WATER_COLOR = 0x0b2a45
@@ -25,7 +25,7 @@ const WATER_COLOR = 0x0b2a45
 // · 出浮冰即落水：水里每秒较快掉血（敌我通吃）+ 移动被拖慢（难游回）；掉出去谁都跑不掉惩罚。
 //   因此"把敌人击退下水淹死"成为这张图的签名打法。
 // · 相机只管跟人：滑进水里/滑到旁边，视角照旧跟随（别的图掉出去没意义，这张图有意义）。
-export class IceArenaScene extends BaseArenaScene {
+export class IceScene extends ArcadeBattleScene {
   // 队伍滑行速度（世界像素/秒）：由 constrainTeam 的动量积分器维护
   private tvx = 0
   private tvy = 0

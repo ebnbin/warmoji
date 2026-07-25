@@ -1,27 +1,27 @@
 import Phaser from 'phaser'
-import { toPx } from './px'
-import { attachEnemy, enemyOf } from '../enemies/enemies'
-import type { Enemy } from '../enemies/enemies'
-import { armEnemy, buildEnemyCtx, healEnemies } from '../enemies/enemyAbilities'
-import { attachMember, memberOf } from '../characters/members'
-import type { Member } from '../characters/members'
-import { projectileOf, spawnProjectile, sweepProjectiles, updateEnemyProjectiles } from '../projectiles/projectiles'
-import { circleBody } from '../core/arcade'
-import { collectCoin, magnetCoins, spawnCoins, spawnShards } from '../pickups/pickups'
-import { spawnGroundEffect, updateGroundEffects } from '../groundEffects/groundEffects'
-import type { GroundEffect } from '../groundEffects/groundEffects'
+import { toPx } from '../battle/px'
+import { attachEnemy, enemyOf } from './enemy/enemies'
+import type { Enemy } from './enemy/enemies'
+import { armEnemy, buildEnemyCtx, healEnemies } from './enemy/abilities'
+import { attachMember, memberOf } from './member'
+import type { Member } from './member'
+import { projectileOf, spawnProjectile, sweepProjectiles, updateEnemyProjectiles } from './projectiles'
+import { circleBody } from './body'
+import { collectCoin, magnetCoins, spawnCoins, spawnShards } from './pickups'
+import { spawnGroundEffect, updateGroundEffects } from './groundEffects'
+import type { GroundEffect } from './groundEffects'
 import {
   attachCarrierAura,
   detachCarrierAura,
   refoldBattleFx,
   spawnFieldPickup,
   updateFieldPickups,
-} from '../battlefield/battlefield'
-import type { BattleMod, FieldPickupEntity } from '../battlefield/battlefield'
+} from './field'
+import type { FieldPickupEntity } from './field'
 import { BATTLE_FX_IDENTITY, rollWaveCarriers } from '../battlefield/registry'
-import type { BattleEffects, FieldPickupDef, Polarity } from '../battlefield/registry'
-import { STEERERS } from '../enemies/steer'
-import { runDeathEffects } from '../enemies/deathEffects'
+import type { BattleEffects, BattleMod, FieldPickupDef } from '../battlefield/registry'
+import { STEERERS } from './enemy/steer'
+import { runDeathEffects } from './enemy/deathEffects'
 import { CAPTAINS } from '../captains/registry'
 import { CHARACTERS, MEMBER, TEAM, loadoutFor } from '../characters/registry'
 import { memberMaxHp } from '../characters/stats'
@@ -42,7 +42,7 @@ import type { EnemyDef } from '../enemies/registry'
 import { UNIT } from '../core/units'
 import { WAVE } from '../run/waves'
 import { KNOCKBACK } from '../abilities/registry'
-import { FOLLOW, HIT_SHAKE, WANDER } from './config'
+import { FOLLOW, HIT_SHAKE, WANDER } from '../battle/config'
 import { ORBIT } from '../characters/orbit'
 import { enemyMixAt, pickEnemy } from '../enemies/registry'
 import type { EnemyMixEntry } from '../enemies/registry'
@@ -82,16 +82,16 @@ import { DAMAGE_FONT, ensureDamageFont } from '../core/damageFont'
 import { reportDebug } from '../debug/debug'
 import { emojiImage, emojiKey } from '../emoji/textures'
 import { burstEmitter } from '../core/fx'
-import { acquirePooled, releasePooled } from '../core/pool'
+import { acquirePooled, releasePooled } from './pool'
 import { playSfx } from '../audio/sfx'
 import { UI_FONT } from '../core/fonts'
-import { TIMESTOP, timeScaleFor } from './timeStop'
+import { TIMESTOP, timeScaleFor } from '../battle/timeStop'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
 import { createAbility } from '../abilities/create'
 import { applyBlast, applyEffects, blastRing } from '../abilities/effects'
 import type { AbilityDef, Effect } from '../abilities/defs'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime, EffectCtx } from '../abilities/types'
-import type { UIScene } from './UIScene'
+import type { UIScene } from '../battle/UIScene'
 
 // 竞技场基座：四张地图（有界/无界/河流/虚空）共享的战斗引擎——队伍与
 // 能力装配、伤害与击杀结算、刷怪节奏、敌人行为状态机、地面区域、金币、
@@ -105,33 +105,10 @@ interface TeamStats {
   maxHp: number
 }
 
-import type { ArcadeBody, ImageObj } from '../core/arcade'
-export type { ArcadeBody, ImageObj } from '../core/arcade'
+import type { ArcadeBody, ImageObj } from './body'
+import type { HudSnapshot, WaveSummary } from '../battle/hudHost'
+export type { ArcadeBody, ImageObj } from './body'
 
-export interface HudSnapshot {
-  xp: number
-  xpNext: number
-  level: number
-  kills: number
-  coins: number
-  wave: number
-  seconds: number
-  remainMs: number
-  over: boolean
-  /** 终波 Boss 在场时的血量（null = 无 Boss） */
-  bossHp: number | null
-  bossMaxHp: number
-  /** 已激活的战场拾取效果（HUD 图标 + 剩余计时） */
-  battleFx: { emoji: string; polarity: Polarity; remainMs: number; totalMs: number }[]
-}
-
-/** 波末结算横幅的战果（本波增量） */
-export interface WaveSummary {
-  wave: number
-  kills: number
-  coins: number
-  levels: number
-}
 
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
@@ -141,7 +118,7 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
 /** 变羊恢复后同一敌人的再变冷却（ms）：防同一目标被永久变羊 */
 const MORPH_RECAST_CD = 5000
 
-export abstract class BaseArenaScene extends Phaser.Scene {
+export abstract class ArcadeBattleScene extends Phaser.Scene {
   protected lineup: readonly CharacterDef[] = []
   members: Member[] = []
   protected memberGroup!: Phaser.GameObjects.Group

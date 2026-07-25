@@ -3,15 +3,15 @@ import { CAPTAINS } from '../captains/registry'
 import { emojiKey } from '../emoji/textures'
 import { UNIT } from '../core/units'
 import { norm } from '../core/vec'
-import { PICKUP, PICKUPS } from './registry'
+import { PICKUP, PICKUPS } from '../pickups/registry'
 import { KNOCKBACK } from '../abilities/registry'
-import { acquirePooled, releasePooled } from '../core/pool'
-import type { ArcadeBody, BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
+import { acquirePooled, releasePooled } from './pool'
+import type { ArcadeBody, ArcadeBattleScene, ImageObj } from './ArcadeBattleScene'
 
 // 拾取经济：金币的生成、磁吸、入账，外加击杀碎裂的经验珠视觉。
 // 世界差异（钳制/回收/闲置漂移）全部经场景钩子（constrainCoinPos/cullCoin/coinIdleVelocity）。
 
-export function spawnCoins(scene: BaseArenaScene, x: number, y: number, count: number): void {
+export function spawnCoins(scene: ArcadeBattleScene, x: number, y: number, count: number): void {
   for (let i = 0; i < count; i++) {
     // 多枚时散开一点，便于看清数量
     const jx = count > 1 ? (scene.rng.next() - 0.5) * 0.6 * UNIT : 0
@@ -26,7 +26,7 @@ export function spawnCoins(scene: BaseArenaScene, x: number, y: number, count: n
   }
 }
 
-export function magnetCoins(scene: BaseArenaScene): void {
+export function magnetCoins(scene: ArcadeBattleScene): void {
   // 金币拾取是团队能力：以队伍中心为基点磁吸并入账（成员碰到也能捡，见 overlap）。
   // 磁力回旋镖（frameAttractors）优先：镖旁的金币直接入账，省去飞回中心的路程
   const magnetRadius = CAPTAINS[scene.run.captainId].coinMagnet * UNIT * scene.teamFx.magnetMul
@@ -68,7 +68,7 @@ export function magnetCoins(scene: BaseArenaScene): void {
   }
 }
 
-export function collectCoin(scene: BaseArenaScene, coin: ImageObj): void {
+export function collectCoin(scene: ArcadeBattleScene, coin: ImageObj): void {
   if (!coin.active) return
   scene.coinBurst.explode(4, coin.x, coin.y)
   playSfx('coin')
@@ -77,7 +77,7 @@ export function collectCoin(scene: BaseArenaScene, coin: ImageObj): void {
 }
 
 /** 击杀碎裂：敌人纹理四分为碎片抛散淡出（对象池复用，见 scene.shardPool） */
-export function spawnShards(scene: BaseArenaScene, enemy: ImageObj, flingVx: number, flingVy: number): void {
+export function spawnShards(scene: ArcadeBattleScene, enemy: ImageObj, flingVx: number, flingVy: number): void {
   const tex = enemy.texture
   if (!tex.has('shard0')) {
     const sw = tex.source[0]!.width

@@ -1,27 +1,27 @@
 import Phaser from 'phaser'
-import { MEMBER, TEAM } from '../characters/registry'
-import { AI, SPAWN, enemyMixAt } from '../enemies/registry'
-import type { EnemyMixEntry } from '../enemies/registry'
-import { PICKUPS } from '../pickups/registry'
-import { UNIT } from '../core/units'
-import { MAP } from './registry'
-import { fleeSteer } from '../enemies/registry'
-import { MAPS, rollDecor } from './registry'
-import type { DayNightConfig, WallsConfig } from './registry'
-import { fogAlphaAt, fogRadiusAt, hourAt, isDayAt, visionGridsAt } from './daynight'
-import { FlowField, WallGrid, generateRuins, reachableCells } from './ruins'
-import { enemyOf } from '../enemies/enemies'
-import { abilityPiercesWalls } from '../abilities/defs'
-import type { AbilityDef } from '../abilities/defs'
-import type { AbilityContext } from '../abilities/types'
-import { Rng } from '../core/rng'
-import { randomMapPoint } from '../enemies/spawn'
-import type { Point } from '../core/vec'
-import { emojiImage } from '../emoji/textures'
-import { viewport } from '../core/apply'
-import { BaseArenaScene } from '../battle/BaseArenaScene'
-import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
-import type { Enemy } from '../enemies/enemies'
+import { MEMBER, TEAM } from '../../characters/registry'
+import { AI, SPAWN, enemyMixAt } from '../../enemies/registry'
+import type { EnemyMixEntry } from '../../enemies/registry'
+import { PICKUPS } from '../../pickups/registry'
+import { UNIT } from '../../core/units'
+import { MAP } from '../../maps/registry'
+import { fleeSteer } from '../../enemies/registry'
+import { MAPS, rollDecor } from '../../maps/registry'
+import type { DayNightConfig, WallsConfig } from '../../maps/registry'
+import { fogAlphaAt, fogRadiusAt, hourAt, isDayAt, visionGridsAt } from '../../maps/daynight'
+import { FlowField, WallGrid, generateRuins, reachableCells } from '../../maps/ruins'
+import { enemyOf } from '../enemy/enemies'
+import { abilityPiercesWalls } from '../../abilities/defs'
+import type { AbilityDef } from '../../abilities/defs'
+import type { AbilityContext } from '../../abilities/types'
+import { Rng } from '../../core/rng'
+import { randomMapPoint } from '../../enemies/spawn'
+import type { Point } from '../../core/vec'
+import { emojiImage } from '../../emoji/textures'
+import { viewport } from '../../core/apply'
+import { ArcadeBattleScene } from '../ArcadeBattleScene'
+import type { ArcadeBody, ImageObj } from '../ArcadeBattleScene'
+import type { Enemy } from '../enemy/enemies'
 
 // 夜幕迷雾覆盖层（dayNight 特性）：以队伍为心的圆内清明、圈外昏暗（几何遮罩反相）
 const FOG_COLOR = 0x0a0a1a
@@ -31,9 +31,9 @@ const FOG_SPAN = 9000
 
 // 有界竞技场（kind='bounded'）：矩形地图（缺省 25×25，按 map.size 可放大）+ 相机跟随。
 // 世界规则：四周硬墙——队伍/敌人/Boss 钳制在图内，游荡撞边折返、
-// 逃跑贴边沿墙滑行，敌弹与金币不出图。战斗引擎全在 BaseArenaScene。
+// 逃跑贴边沿墙滑行，敌弹与金币不出图。战斗引擎全在 ArcadeBattleScene。
 // 可选特性（按 MapDef 数据装配，可挂到任意有界图）：dayNight（昼夜相机/迷雾/两批怪）。
-export class ArenaScene extends BaseArenaScene {
+export class BoundedScene extends ArcadeBattleScene {
   // 夜幕迷雾层（仅当地图配置了 dayNight 特性时创建）
   private fogRect?: Phaser.GameObjects.Rectangle
   private fogMaskShape?: Phaser.GameObjects.Graphics

@@ -1,20 +1,20 @@
 import Phaser from 'phaser'
-import { MEMBER, TEAM } from '../characters/registry'
-import { UNIT } from '../core/units'
-import type { RiverConfig, InfiniteConfig } from './registry'
-import { MAPS, bossFor } from './registry'
-import type { MapDef } from './registry'
-import { isHorizontal, remapPoint, remapVector } from '../core/remap'
-import { clampToRiver, driftProfile, flowVector, pastDownstream, riverRect } from './river'
-import type { RiverRect } from './river'
-import { Rng } from '../core/rng'
-import type { Point } from '../core/vec'
-import { emojiImage } from '../emoji/textures'
-import { viewport } from '../core/apply'
-import { BaseArenaScene } from '../battle/BaseArenaScene'
-import { enemyOf } from '../enemies/enemies'
-import { projectileOf } from '../projectiles/projectiles'
-import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
+import { MEMBER, TEAM } from '../../characters/registry'
+import { UNIT } from '../../core/units'
+import type { RiverConfig, InfiniteConfig } from '../../maps/registry'
+import { MAPS, bossFor } from '../../maps/registry'
+import type { MapDef } from '../../maps/registry'
+import { isHorizontal, remapPoint, remapVector } from '../../core/remap'
+import { clampToRiver, driftProfile, flowVector, pastDownstream, riverRect } from '../../maps/river'
+import type { RiverRect } from '../../maps/river'
+import { Rng } from '../../core/rng'
+import type { Point } from '../../core/vec'
+import { emojiImage } from '../../emoji/textures'
+import { viewport } from '../../core/apply'
+import { ArcadeBattleScene } from '../ArcadeBattleScene'
+import { enemyOf } from '../enemy/enemies'
+import { projectileOf } from '../projectiles'
+import type { ArcadeBody, ImageObj } from '../ArcadeBattleScene'
 
 // 河流竞技场（kind='river'）：单屏世界——相机静止，世界 = 逻辑视口 × 1.2
 // （viewScale 经相机 zoom 实现，实体速度/尺寸全不变）。世界规则：
@@ -47,7 +47,7 @@ function shade(color: number, mul: number): number {
   return (r << 16) | (g << 8) | b
 }
 
-export class RiverArenaScene extends BaseArenaScene {
+export class RiverScene extends ArcadeBattleScene {
   // 河道世界：视口尺寸/朝向 + 河道矩形 + 流速矢量
   private viewW = 0
   private viewH = 0

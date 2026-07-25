@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
-import { UNIT } from '../core/units'
-import { MAPS } from './registry'
-import type { InfiniteConfig, ShrinkRingConfig } from './registry'
-import { norm } from '../core/vec'
-import type { Point } from '../core/vec'
+import { UNIT } from '../../core/units'
+import { MAPS } from '../../maps/registry'
+import type { InfiniteConfig, ShrinkRingConfig } from '../../maps/registry'
+import { norm } from '../../core/vec'
+import type { Point } from '../../core/vec'
 import {
   chunkDecor,
   chunkKey,
@@ -11,11 +11,11 @@ import {
   outsideZone,
   ringPoint,
   zoneRadiusAt,
-} from './world'
-import { emojiImage } from '../emoji/textures'
-import { viewport } from '../core/apply'
-import { BaseArenaScene } from '../battle/BaseArenaScene'
-import type { ImageObj } from '../battle/BaseArenaScene'
+} from '../../maps/world'
+import { emojiImage } from '../../emoji/textures'
+import { viewport } from '../../core/apply'
+import { ArcadeBattleScene } from '../ArcadeBattleScene'
+import type { ImageObj } from '../ArcadeBattleScene'
 
 // 无限竞技场（kind='infinite'）：世界没有边，出生在原点、负坐标合法。
 // 世界规则：
@@ -26,7 +26,7 @@ import type { ImageObj } from '../battle/BaseArenaScene'
 // · 刷怪：队伍中心外的环带（this.infCfg.spawnRingMin~Max）随机落点
 // · 终波缩圈：以进波瞬间队伍位置为心，16 格缓缩到 12 格停（防风筝 Boss），
 //   圈外队员按 tick 掉血 + 满屏红渐晕警示
-export class InfiniteArenaScene extends BaseArenaScene {
+export class InfiniteScene extends ArcadeBattleScene {
   // 装饰分块：活跃块 → 该块的装饰精灵；视野块范围变化才增删
   private decorChunks = new Map<string, ImageObj[]>()
   private decorRangeKey = ''

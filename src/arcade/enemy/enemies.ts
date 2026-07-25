@@ -1,9 +1,9 @@
 import type Phaser from 'phaser'
-import type { EnemyDef } from './registry'
-import type { AbilityOwner, AbilityRuntime } from '../abilities/types'
-import type { Animator } from '../emoji/animator'
-import type { ImageObj } from '../battle/BaseArenaScene'
-import type { FieldPickupDef } from '../battlefield/registry'
+import type { EnemyDef } from '../../enemies/registry'
+import type { AbilityOwner, AbilityRuntime } from '../../abilities/types'
+import type { Animator } from '../../emoji/animator'
+import type { ImageObj } from '../ArcadeBattleScene'
+import type { FieldPickupDef } from '../../battlefield/registry'
 
 // 时间戳字段一律 0 哨兵 = 未生效。
 

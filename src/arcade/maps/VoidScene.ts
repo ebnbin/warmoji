@@ -1,21 +1,21 @@
 import Phaser from 'phaser'
-import { UNIT } from '../core/units'
-import type { TorusConfig } from './registry'
-import { MAPS } from './registry'
-import type { MapDef } from './registry'
-import { remapPoint, remapVector } from '../core/remap'
-import { fitAspectRect, ghostImages, torusDelta, torusDist2, wrapCoord } from './void'
-import { Rng } from '../core/rng'
-import type { Point } from '../core/vec'
-import type { TargetInfo } from '../abilities/types'
-import { emojiImage } from '../emoji/textures'
-import { viewport } from '../core/apply'
-import { BaseArenaScene } from '../battle/BaseArenaScene'
-import { enemyOf } from '../enemies/enemies'
-import { projectileOf } from '../projectiles/projectiles'
-import { releasePooled } from '../core/pool'
-import type { Member } from '../characters/members'
-import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
+import { UNIT } from '../../core/units'
+import type { TorusConfig } from '../../maps/registry'
+import { MAPS } from '../../maps/registry'
+import type { MapDef } from '../../maps/registry'
+import { remapPoint, remapVector } from '../../core/remap'
+import { fitAspectRect, ghostImages, torusDelta, torusDist2, wrapCoord } from '../../maps/void'
+import { Rng } from '../../core/rng'
+import type { Point } from '../../core/vec'
+import type { TargetInfo } from '../../abilities/types'
+import { emojiImage } from '../../emoji/textures'
+import { viewport } from '../../core/apply'
+import { ArcadeBattleScene } from '../ArcadeBattleScene'
+import { enemyOf } from '../enemy/enemies'
+import { projectileOf } from '../projectiles'
+import { releasePooled } from '../pool'
+import type { Member } from '../member'
+import type { ArcadeBody, ImageObj } from '../ArcadeBattleScene'
 
 // 工厂竞技场（kind='void' 环面世界，主题=自动化车间）：世界规则：
 // · 环面：固定 16:9 竞技场（横屏 24×13.5 格，竖屏互换），四边两两粘合成
@@ -30,7 +30,7 @@ import type { ArcadeBody, ImageObj } from '../battle/BaseArenaScene'
 //   + 四角各挂一个条带相机取景对侧溢出——实体跨缝时两侧同时可见，
 //   全体实体/血条/粒子零逐实体管理；地板/门框/零件在条带相机中忽略
 // · 传送门：四边流光门框（顺时针流动的虚线光带 + 脉动）
-export class VoidArenaScene extends BaseArenaScene {
+export class VoidScene extends ArcadeBattleScene {
   private arenaW = 0
   private arenaH = 0
   private stripCams: Phaser.Cameras.Scene2D.Camera[] = []

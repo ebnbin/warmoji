@@ -7,8 +7,7 @@ import { endRun, getRun } from '../run/state'
 import { isDevOpen, setDevOpen } from '../debug/dev'
 import { CHARACTERS } from '../characters/registry'
 import type { CharacterId } from '../characters/registry'
-import { ARENA_SCENE_KEYS, mapEnemyRoster } from '../maps/registry'
-import type { ArenaSceneKey } from '../maps/registry'
+import { mapEnemyRoster } from '../maps/registry'
 import { beginRun } from '../run/state'
 import {
   isLabCharacterOn,
@@ -47,13 +46,13 @@ import {
   viewport,
   VIEWPORT_CHANGED,
 } from '../core/apply'
-import type { HudSnapshot, WaveSummary } from './BaseArenaScene'
+import type { HudSnapshot, WaveSummary } from './hudHost'
 import type { HudHost } from './hudHost'
-import { ECS_SCENE_KEY } from '../experiments/ecsExperiment'
-import type { EcsSceneKey } from '../experiments/ecsExperiment'
+import { BATTLE_SCENE_KEYS } from '../experiments/battleExperiment'
+import type { BattleSceneKey } from '../experiments/battleExperiment'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
-// 与 ArenaScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
+// 与 BoundedScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
 export class UIScene extends Phaser.Scene {
   private joystick?: Joystick
   private xpBar!: Phaser.GameObjects.Graphics
@@ -90,7 +89,7 @@ export class UIScene extends Phaser.Scene {
 
   /** 当前战斗场景 key：多套竞技场（有界/无界/河流/虚空/秒针）互斥运行，本场景只跟随其一。
    * ECS 实验场景是第 N+1 套，同样互斥，故一并纳入探测 */
-  private arenaKey: ArenaSceneKey | EcsSceneKey = 'arena'
+  private arenaKey: BattleSceneKey = 'arena'
 
   constructor() {
     super('ui')
@@ -99,10 +98,7 @@ export class UIScene extends Phaser.Scene {
   /** 启动时探测哪个竞技场在跑（含暂停中——视口变化会带着暂停态重启本场景）。
    * 用运行状态而非 launch 传参：场景 data 会跨局残留，探测永不脏 */
   init(): void {
-    const candidates: readonly (ArenaSceneKey | EcsSceneKey)[] = [
-      ...ARENA_SCENE_KEYS.filter((k) => k !== 'arena'),
-      ECS_SCENE_KEY,
-    ]
+    const candidates = BATTLE_SCENE_KEYS.filter((k) => k !== 'arena')
     const running = candidates.find((k) => this.scene.isActive(k) || this.scene.isPaused(k))
     this.arenaKey = running ?? 'arena'
   }

@@ -135,7 +135,7 @@ const bounded: WorldHooks = {
     return null
   },
   smashWall() {},
-  /** 撞边折返:接近地图边缘时翻转对应方向分量(镜像 ArenaScene.wanderDir) */
+  /** 撞边折返:接近地图边缘时翻转对应方向分量(镜像 BoundedScene.wanderDir) */
   wanderDir(sim, eid, dx, dy) {
     const margin = 0.6 * UNIT
     const x = Transform.x[eid]!

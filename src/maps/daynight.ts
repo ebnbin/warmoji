@@ -1,5 +1,5 @@
 // 昼夜世界规则（kind='daynight'）的纯函数：跨波次主时钟 → 时刻 → 视野/迷雾。
-// 主时钟 = 累计战斗秒（BaseArenaScene 的 combatMs + elapsed，跨波持久、非战斗不走）。
+// 主时钟 = 累计战斗秒（ArcadeBattleScene 的 combatMs + elapsed，跨波持久、非战斗不走）。
 // 视野随时刻余弦涨落，夜里额外收一层以队伍为心的迷雾圈。设计参数在 MapDef.dayNight（数据）。
 import type { DayNightConfig } from './registry'
 

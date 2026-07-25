@@ -1,13 +1,13 @@
-import { playSfx } from '../audio/sfx'
-import { clipFramesLive } from '../emoji/animTextures'
-import { createAbility } from '../abilities/create'
-import type { AbilityContext, AbilityOwner } from '../abilities/types'
-import { spawnEnemyProjectile } from '../projectiles/projectiles'
-import { spawnGroundEffect } from '../groundEffects/groundEffects'
+import { playSfx } from '../../audio/sfx'
+import { clipFramesLive } from '../../emoji/animTextures'
+import { createAbility } from '../../abilities/create'
+import type { AbilityContext, AbilityOwner } from '../../abilities/types'
+import { spawnEnemyProjectile } from '../projectiles'
+import { spawnGroundEffect } from '../groundEffects'
 import { enemyOf } from './enemies'
-import { memberOf } from '../characters/members'
+import { memberOf } from '../member'
 import type { Enemy } from './enemies'
-import type { BaseArenaScene, ImageObj } from '../battle/BaseArenaScene'
+import type { ArcadeBattleScene, ImageObj } from '../ArcadeBattleScene'
 
 // 敌人持械：def.abilities 有行即装配能力实例（能力类阵营中立，
 // abilities/types.ts）。此处提供敌方视角的 ctx 实现：targets = 队员快照、
@@ -24,7 +24,7 @@ const BULLET_LIFE_MS = 3000
 /** 敌方视角的阵营中立 ctx：targets = 队员快照、伤害走队员受击结算、发弹入敌弹组、
  * 治疗作用于敌群。持械（armEnemy）与死亡效果（deathEffects）共用同一份实现——
  * 二者都是「敌人在某处触发一串动作」，只是触发时机不同。 */
-export function buildEnemyCtx(scene: BaseArenaScene, a: Enemy): AbilityContext {
+export function buildEnemyCtx(scene: ArcadeBattleScene, a: Enemy): AbilityContext {
   const e = a.image
   const outline = a.elite || a.boss ? 'elite' : 'enemy'
   return {
@@ -88,7 +88,7 @@ export function buildEnemyCtx(scene: BaseArenaScene, a: Enemy): AbilityContext {
   }
 }
 
-export function armEnemy(scene: BaseArenaScene, a: Enemy, fireDelayMs?: number): void {
+export function armEnemy(scene: ArcadeBattleScene, a: Enemy, fireDelayMs?: number): void {
   const rows = a.def.abilities
   if (!rows || rows.length === 0) return
   const e = a.image
@@ -117,7 +117,7 @@ export function armEnemy(scene: BaseArenaScene, a: Enemy, fireDelayMs?: number):
 /** 治疗敌群：all=false 只治血量比例最低的一只；满血者不计，返回被治数量。
  * exclude 排除某一只（幽灵亡语治疗时排除正在死亡的自己） */
 export function healEnemies(
-  scene: BaseArenaScene,
+  scene: ArcadeBattleScene,
   x: number,
   y: number,
   range: number,
