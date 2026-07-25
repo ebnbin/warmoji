@@ -20,7 +20,7 @@ const OUTLINE_SUFFIX: Record<OutlineKind, string> = {
   elite: '-olg',
 }
 
-export function animFrameKey(
+function animFrameKey(
   id: string,
   clipId: string,
   outline: OutlineKind | undefined,
@@ -82,7 +82,7 @@ export function clipFramesLive(
 
 /** 确保某 emoji 某 clip 的整套帧纹理可用，返回按帧序的纹理 key 数组；
  * 该 emoji 没有这个 clip 时返回 null（调用方保持静态纹理即可） */
-export function ensureClipTextures(
+function ensureClipTextures(
   scene: Phaser.Scene,
   id: string,
   clipId: string,

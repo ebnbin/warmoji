@@ -7,13 +7,6 @@ import type { Point } from '../../core/vec'
 // 可以成为无限地图的子集——活跃判定/装饰分块对有界世界同样成立（只是
 // 永不触发/被矩形裁剪），消费方通过这里的函数问世界问题，不自己算几何。
 
-export interface WorldDef {
-  readonly kind: 'infinite' | 'bounded'
-  /** bounded 时的矩形尺寸（infinite 忽略） */
-  readonly width?: number
-  readonly height?: number
-}
-
 /** 活跃判定：按轴距离（Chebyshev 方形）。半边长取 32 格时，25×25 有界图
  * 上任意两点的轴距 ≤25，永不休眠——同一机制天然兼容有界世界 */
 export function isWithinActive(dx: number, dy: number, half: number): boolean {

@@ -14,7 +14,9 @@ export interface OrbitThreat {
   weight: number
 }
 
-export function wrapAngle(a: number): number {
+// 注:war/abilities/hit.ts 另有一份 wrapAngle（取模实现）。两者数值等价但浮点路径不同，
+// 战斗数值对逐位一致敏感，故不合并、各自模块私有
+function wrapAngle(a: number): number {
   return Math.atan2(Math.sin(a), Math.cos(a))
 }
 
