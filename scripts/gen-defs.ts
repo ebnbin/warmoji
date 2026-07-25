@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { ABILITIES } from '../defs/abilities.ts'
 import { BUDGET } from '../defs/budget.ts'
 import { abilityDps } from './dps.ts'
@@ -37,7 +37,9 @@ import type { FeelTuning } from '../src/war/config'
 import type { AiTuning } from '../src/data/enemies'
 import type { MapDef } from '../src/data/maps'
 
-// 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json。
+// 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json，
+// 并把脚本侧的原始资源（scripts/emoji/*.txt）原样拷进 src/assets/。
+// 于是 src/assets/ 整体是本脚本的产物、整体 gitignore，运行时只管读。
 // 校验全部在此完成（形状/数值/交叉引用/可序列化），运行时零校验直读。
 // 任何一条失败即退出非零，构建中止。
 
@@ -746,4 +748,12 @@ write('team', TEAM_BASELINE)
 write('combat', COMBAT)
 write('feel', FEEL)
 write('economy', ECONOMY)
-console.log('gen-defs：21 张表校验通过，已生成 src/assets/*.json')
+
+// emoji 打包资源：从 Emoji Studio 引入、随代码提交的原始数据源，不参与校验，原样拷贝。
+// 体量大且逐行对齐，任何改写都会破坏 ordering 与 twemoji 的行序对应，故只拷不动。
+mkdirSync('src/assets/emoji', { recursive: true })
+for (const name of ['ordering.txt', 'twemoji.txt']) {
+  copyFileSync(`scripts/emoji/${name}`, `src/assets/emoji/${name}`)
+}
+
+console.log('gen-defs：21 张表校验通过，已生成 src/assets/（21 张 json + emoji 原始资源）')

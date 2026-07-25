@@ -1,5 +1,6 @@
 // emoji 打包资源的解析层（纯逻辑，禁 DOM）。资源是从 Emoji Studio 直接引入、
-// 随代码提交的两份「行对齐」文件（src/assets/emoji/，Unicode 官方 CLDR 顺序）：
+// 随代码提交的两份「行对齐」文件（源在 scripts/emoji/，gen 原样拷进 src/assets/emoji/；
+// Unicode 官方 CLDR 顺序）：
 //   ordering.txt —— 每行一个 emoji 的 ordering ID（= 全项目唯一标识）
 //   twemoji.txt  —— 每行一个去 header 的 twemoji SVG 正文，行序 = ordering 行序
 // 运行时全库仅两份文本；任意 emoji 的完整 SVG = 统一 header + 对应行正文 + 闭合。

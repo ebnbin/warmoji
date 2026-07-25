@@ -5,8 +5,8 @@ import { allEmojiIds, packSvg, parseEmojiPack } from './pack'
 import type { EmojiPack } from './pack'
 import { EMOJI_PAD, outlineSvg, padSvg, setSvgSize } from './svg'
 
-// twemoji 全集打包资源（src/assets/emoji 下随代码提交的 ordering.txt + twemoji.txt，
-// 图形 CC-BY 4.0）：PreloadScene 门禁预加载后经 primeEmojiPack 注入，任意 emoji 的
+// twemoji 全集打包资源（ordering.txt + twemoji.txt，源在 scripts/emoji/，gen 拷进
+// src/assets/emoji/；图形 CC-BY 4.0）：PreloadScene 门禁预加载后经 primeEmojiPack 注入，任意 emoji 的
 // SVG 文本同步可取。emoji 全项目以 ordering ID 为唯一标识，从不作为字符/字体使用。
 // 纹理管线：SVG 文本 → svg.ts 纯函数改写 → 光栅化 → Phaser 纹理；
 // 描边按阵营配色（player 黑 / enemy 紫 / enemyProjectile 红 / elite 金），每色一个纹理变体。

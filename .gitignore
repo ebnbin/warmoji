@@ -7,10 +7,5 @@ playtest-out/
 *.log
 .DS_Store
 
-# gen-defs 产物（构建期由 scripts/gen-defs.ts 生成，不进 git）
-src/assets/*
-# emoji 打包资源：从 Emoji Studio 引入、随代码提交（避免每次构建重新获取）
-!src/assets/emoji/
-src/assets/emoji/*
-!src/assets/emoji/ordering.txt
-!src/assets/emoji/twemoji.txt
+# 资源目录整体是构建产物：由 scripts/gen-defs.ts 生成（json）或从 scripts/emoji/ 拷入（txt）
+src/assets/
