@@ -4,7 +4,18 @@ import { enterMap, startTestBattle } from './helpers'
 // P6（视口变化）：旋转/拉窗口时战斗照常。跟随式相机只需重设缩放；
 // 单屏图（奔流/工厂）的世界尺寸由视口推出，须整体重映射——队伍不能被甩出世界。
 
-type EcsDbg = { ready: boolean; centerX: number; centerY: number; mapW: number; mapH: number }
+type EcsDbg = { ready: boolean; centerX: number; centerY: number; mapW: number; mapH: number; logicalW: number; logicalH: number }
+
+/** 等视口重算落到指定朝向（软渲染下 resize→重算有延迟，用条件等待而非定时等待） */
+const settled = (page: import('@playwright/test').Page, landscape: boolean): Promise<unknown> =>
+  page.waitForFunction(
+    (want) => {
+      const d = (window as unknown as { __ecs?: EcsDbg }).__ecs
+      return d !== undefined && d.logicalW >= d.logicalH === want
+    },
+    landscape,
+    { timeout: 20_000 },
+  )
 
 const boot = async (page: import('@playwright/test').Page, map: string): Promise<void> => {
   await page.addInitScript(() => {
@@ -40,7 +51,8 @@ for (const map of ['forest', 'river', 'void']) {
 
     // 横 → 竖
     await page.setViewportSize({ width: 720, height: 1280 })
-    await page.waitForTimeout(1500)
+    await settled(page, false)
+    await page.waitForTimeout(300)
     const portrait = await page.evaluate(() => (window as unknown as { __ecs: EcsDbg }).__ecs)
     expect(portrait.centerX).toBeGreaterThanOrEqual(0)
     expect(portrait.centerX).toBeLessThanOrEqual(portrait.mapW)
@@ -49,7 +61,8 @@ for (const map of ['forest', 'river', 'void']) {
 
     // 竖 → 横（回到原朝向）
     await page.setViewportSize({ width: 1280, height: 720 })
-    await page.waitForTimeout(1500)
+    await settled(page, true)
+    await page.waitForTimeout(300)
     const back = await page.evaluate(() => (window as unknown as { __ecs: EcsDbg }).__ecs)
     expect(back.mapW).toBeCloseTo(before.mapW, 0)
     expect(back.centerX).toBeGreaterThanOrEqual(0)

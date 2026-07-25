@@ -1637,6 +1637,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       zoneR: sim.zone?.r ?? 0,
       // 本帧减速区数(寒气光环等每帧重新登记)
       slowZones: sim.frameSlowZones.length,
+      logicalW: viewport.logicalWidth,
+      logicalH: viewport.logicalHeight,
       // 残垣:阻挡格数 + 可达刷怪格数(验证断壁成型与连通)
       walls: sim.walls ? sim.walls.grid.blocked.filter(Boolean).length : 0,
       spawnCells: sim.walls?.spawnCells.length ?? 0,
