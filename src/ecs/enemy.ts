@@ -666,8 +666,15 @@ export function steerEnemies(sim: Sim, delta: number, realDelta = delta): void {
       }
     }
     // 翻转朝向读的是「含击退」的合成速度(镜像旧 body.velocity.x):被击飞时会朝击退方向转身。
-    // enemyVelX 保持纯行为速度不动——敌方 aim:'move' 弹的 ownerHeading 依赖它
+    // enemyVelX 保持纯行为速度不动——敌方 aim:'move' 弹的 ownerHeading 依赖它。
+    // 须在禁锢之前读:旧实现的 applyFieldDrag 排在 steerEnemies 之后,朝向读的是未削过的速度
     const flipVx = dt > 0 ? (tx - Transform.x[eid]!) / dt : 0
+    // 世界禁锢(深空引力井):对本帧总位移削向外分量,击退一并纳入(镜像 applyFieldDrag)
+    const ox = Transform.x[eid]!
+    const oy = Transform.y[eid]!
+    const conf = sim.hooks.confineEnemyStep(sim, eid, tx - ox, ty - oy)
+    tx = ox + conf.x
+    ty = oy + conf.y
     const fixed = sim.hooks.constrainEnemy(sim, eid, tx, ty)
     Transform.x[eid] = fixed.x
     Transform.y[eid] = fixed.y

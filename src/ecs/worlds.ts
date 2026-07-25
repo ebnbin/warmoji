@@ -63,6 +63,10 @@ export interface WorldHooks {
   /** 敌人行为速度的后处理(冰面打滑低通 / 河流漂移);默认原样返回。
    * 击退分量不在此列——要脆要即时,由 steerEnemies 单独叠加 */
   postSteerEnemy(sim: Sim, eid: number, vx: number, vy: number, delta: number): { vx: number; vy: number }
+  /** 本帧总位移的世界禁锢(深空引力井):与 postSteerEnemy 相反,**含击退**——
+   * 旧 applyFieldDrag 作用在 body.velocity 上,那时击退已叠进去了。
+   * confineVelocity 对速度线性,故作用在位移上与作用在合成速度上等价。默认原样 */
+  confineEnemyStep(sim: Sim, eid: number, dx: number, dy: number): Point
   /** 击退衰减时间常数倍率(冰面低摩擦令击退滑得更远) */
   knockbackTauMul(sim: Sim): number
   /** 金币落点约束(冰面钳进浮冰,免得漂进水里隔着掉血区捡不回) */
@@ -146,6 +150,9 @@ const bounded: WorldHooks = {
   },
   postSteerEnemy(_sim, _eid, vx, vy) {
     return { vx, vy }
+  },
+  confineEnemyStep(_sim, _eid, dx, dy) {
+    return { x: dx, y: dy }
   },
   knockbackTauMul() {
     return 1
@@ -467,7 +474,8 @@ function fieldR(sim: Sim): number {
 }
 
 /** 深空:无限世界的地基(相机跟随/分块星海/环带刷怪/休眠),但一切被困在圆形禁锢星域内——
- * 向外的运动分量按到圆心距离衰减(边缘全挡)+ 硬钳兜底,队员/敌人/Boss 谁也逃不出去;
+ * 向外的运动分量按到圆心距离衰减(边缘全挡),队员/敌人/Boss 谁也逃不出去。
+ * 队伍在引力井之外另有硬钳兜底,敌人只有引力井(镜像旧实现:硬钳只用在出生与队伍身上);
  * 另有天体横扫:预警直线 → 球体匀速划过,压到的实体敌我通吃 */
 const space: WorldHooks = {
   ...infinite,
@@ -476,16 +484,14 @@ const space: WorldHooks = {
     const v = confineVelocity(sim.center.x, sim.center.y, 0, 0, next.x - sim.center.x, next.y - sim.center.y, r)
     return clampToDisc(sim.center.x + v.x, sim.center.y + v.y, 0, 0, r)
   },
-  constrainEnemy(sim, _eid, x, y) {
-    return clampToDisc(x, y, 0, 0, fieldR(sim))
-  },
   constrainSpawn(sim, x, y, radius) {
     return clampToDisc(x, y, 0, 0, fieldR(sim) - radius)
   },
-  /** 敌人禁锢:削掉向外的速度分量(镜像 applyFieldDrag) */
-  postSteerEnemy(sim, eid, vx, vy) {
-    const v = confineVelocity(Transform.x[eid]!, Transform.y[eid]!, 0, 0, vx, vy, fieldR(sim))
-    return { vx: v.x, vy: v.y }
+  /** 敌人禁锢:削掉本帧位移里向外的分量(镜像 applyFieldDrag)。
+   * 逐帧不再硬钳位置——旧实现对敌人只有这道「引力井」,硬钳只用在出生与队伍身上;
+   * 引力井在边缘把向外分量全抵消,击退到了边上自然推不动,不需要墙 */
+  confineEnemyStep(sim, eid, dx, dy) {
+    return confineVelocity(Transform.x[eid]!, Transform.y[eid]!, 0, 0, dx, dy, fieldR(sim))
   },
   constrainCoin(sim, x, y) {
     return clampToDisc(x, y, 0, 0, fieldR(sim) - UNIT * 0.5)
