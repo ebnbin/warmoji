@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import { query } from 'bitecs'
 import { CHARACTERS, loadoutFor } from '../../characters/registry'
+import { CAPTAINS } from '../../captains/registry'
 import { aggregateCharacterEffects, characterXp, resolveAbilityDef } from '../../items/registry'
 import { levelStatsFor } from '../../characters/levels'
 import { characterLevel } from '../../run/charLevel'
@@ -9,7 +10,7 @@ import { createAbility } from '../../abilities/create'
 import { toPx } from '../../battle/px'
 import { labLevel } from '../../run/lab'
 import type { RunState } from '../../run/state'
-import type { AbilityOwner, TargetInfo } from '../../abilities/types'
+import type { AbilityOwner, AbilityRuntime, TargetInfo } from '../../abilities/types'
 import { Alive, ENEMY_SET, Radius, Transform } from '../components'
 import { enemyDef, enemyRef, memberAbilities, memberHandle } from '../store'
 import { makeTeamCtx } from './ctx'
@@ -64,6 +65,29 @@ export function armTeam(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, run: Run
       createAbility(toPx(resolveAbilityDef(w, fx)), ctx, 300 + slot * 120 + i * 230),
     )
   }
+}
+
+/** 队长主动技能的载荷(镜像 setup 的 captainAbilities/captainHandle):效果本体是标准能力行,
+ * 行为主体锚在队伍中心,不进 update 循环——只经 castSkill 手动单发 */
+export function armCaptain(
+  sim: Sim,
+  scene: Phaser.Scene,
+  atlas: EcsAtlas,
+  run: RunState,
+): { abilities: AbilityRuntime[]; handle: AbilityOwner } {
+  const teamFx = aggregateTeamCards(run.teamCards)
+  const ctx = makeTeamCtx(sim, scene, atlas, -1, aggregateCharacterEffects([], []), teamFx)
+  const handle: AbilityOwner = {
+    get x() {
+      return sim.center.x
+    },
+    get y() {
+      return sim.center.y
+    },
+    setVisualOffset() {},
+  }
+  const abilities = CAPTAINS[run.captainId].skill.abilities.map((a) => createAbility(toPx(a), ctx, 0))
+  return { abilities, handle }
 }
 
 /** 每帧:重建敌方存活快照 + 驱动各活着队员的能力(wdelta = 世界时长,P3c 等于真实帧长) */

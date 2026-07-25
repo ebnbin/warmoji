@@ -53,6 +53,11 @@ export interface Sim {
   bossDown: boolean
   /** 队员受击累计次数(场景侧据增量触发受击震屏) */
   memberHitCount: number
+  /** 队长技能的限时全队增伤(镜像 stats.damageMul + skillBuffUntil):到期由 stepSim 复原 */
+  skillDamageMul: number
+  skillBuffUntil: number
+  /** 全场蹦迪窗口结束时刻(镜像 danceEndsAt):窗口内全体敌人定身摇摆,含窗口内新登场者 */
+  danceEndsAt: number
   /** 本帧敌方存活快照(能力索敌共享;wire 每帧重建) */
   enemyTargets: TargetInfo[]
   /** 本帧队员存活快照(敌方能力索敌共享;enemyWire 每帧重建) */
@@ -281,6 +286,8 @@ export function initialLayout(sim: Sim): void {
 /** 一帧仿真(镜像 update 的 updateOrbit→moveTeam→steerEnemies 次序);delta 为真实帧长(ms) */
 export function stepSim(sim: Sim, delta: number): void {
   sim.elapsedMs += delta
+  // 队长技能的限时增伤到期复原(镜像 update 里的 skillBuffUntil 判定)
+  if (sim.skillDamageMul !== 1 && sim.elapsedMs >= sim.skillBuffUntil) sim.skillDamageMul = 1
   // 敌人位置汇入 frameTargets(队伍 orbit/游移门控据此),先于 orbit
   updateFrameTargets(sim)
   updateOrbit(sim, delta)

@@ -223,21 +223,28 @@ export function hurtMember(sim: Sim, eid: number, damage: number): void {
   }
 }
 
-/** 阵亡复活(镜像 reviveMember;全队阵亡后不复活——待结算) */
+/** 复活单个队员(镜像 reviveMember):满血起身 + 无敌帧重置 + 复原染色 + 弹入。
+ * 到点自动复活与队长技能集结(rallyTeam)共用这一处 */
+export function reviveMember(sim: Sim, eid: number): void {
+  const now = sim.elapsedMs
+  playSfx('revive')
+  Alive.v[eid] = 1
+  MHp.hp[eid] = MHp.max[eid]!
+  Iframe.last[eid] = now
+  Tint.color[eid] = 0xffffff
+  Tint.alpha[eid] = 1
+  Tint.effect[eid] = 0
+  Pop.until[eid] = now + 200 // 复活弹入(镜像 reviveMember 的 scale 弹)
+}
+
+/** 阵亡复活轮询(全队阵亡后不复活——待结算) */
 export function reviveMembers(sim: Sim): void {
   if (sim.over) return
   const now = sim.elapsedMs
   for (const m of sim.members) {
     if (Alive.v[m]) continue
     if (now < Revive.at[m]!) continue
-    playSfx('revive')
-    Alive.v[m] = 1
-    MHp.hp[m] = MHp.max[m]!
-    Iframe.last[m] = now
-    Tint.color[m] = 0xffffff
-    Tint.alpha[m] = 1
-    Tint.effect[m] = 0
-    Pop.until[m] = now + 200 // 复活弹入(镜像 reviveMember 的 scale 弹)
+    reviveMember(sim, m)
   }
 }
 

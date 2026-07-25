@@ -44,7 +44,7 @@ import { spawnSprite } from './entities'
 import { spawnTeam } from './team'
 import { spawnEnemy, updateSpawners } from './enemy'
 import { enemyNest, thiefEaten } from './store'
-import { armTeam, updateMemberAbilities } from './ability/wire'
+import { armCaptain, armTeam, updateMemberAbilities } from './ability/wire'
 import { updateEnemyAbilities } from './ability/enemyWire'
 import { runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
@@ -58,6 +58,8 @@ import { CAPTAINS } from '../captains/registry'
 import { aggregateTeamCards } from '../cards/registry'
 import type { TeamEffects } from '../items/registry'
 import { DENSITY_PARAMS, INVINCIBLE_HP, labDensity, labInvincible } from '../run/lab'
+import type { AbilityOwner, AbilityRuntime } from '../abilities/types'
+import { tickSkillCd } from '../captains/skill'
 import type { HudHost } from '../battle/hudHost'
 import type { HudSnapshot } from '../battle/BaseArenaScene'
 import type { UIScene } from '../battle/UIScene'
@@ -84,6 +86,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   run!: RunState
   /** 团队卡牌聚合乘区（技能 CD 等；与 spawnTeam 内同源，开局定） */
   private teamFx!: TeamEffects
+  /** 队长主动技能载荷（不进 update 循环，只经 castSkill 单发）+ 锚在队伍中心的行为主体 */
+  private captainAbilities: AbilityRuntime[] = []
+  private captainHandle: AbilityOwner = { x: 0, y: 0, setVisualOffset: () => {} }
   /** 过场已排程(波末结算/全灭):置位后 update 早退,避免重复触发 */
   private ending = false
   /** 队员血条(逐帧跟位 + 按血量比例重绘;镜像 drawMemberHp) */
@@ -194,6 +199,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
     initialLayout(this.sim)
     armTeam(this.sim, this, atlas, run, run.testMode)
+    const captain = armCaptain(this.sim, this, atlas, run)
+    this.captainAbilities = captain.abilities
+    this.captainHandle = captain.handle
     for (let i = 0; i < this.sim.members.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
@@ -330,6 +338,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
     window.__ecsGroundZones = (): number => groundZoneCount()
     window.__ecsBossDown = (): boolean => this.sim?.bossDown ?? false
+    // e2e 探针:全场蹦迪窗口是否生效中
+    window.__ecsDancing = (): boolean => {
+      const sim = this.sim
+      return sim !== undefined && sim.elapsedMs < sim.danceEndsAt
+    }
     // e2e 探针:队员 0 是否处于黏黏怪攻速惩罚中
     window.__ecsMemberAtkSlowed = (): boolean => {
       const sim = this.sim
@@ -538,9 +551,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
   }
 
-  /** 释放主动技能:队长技能载荷尚未移植到 ECS(P4 后续),恒不放出 */
+  /** 释放主动技能(镜像 castSkill):纯 CD 门槛,就绪即放、重置跨波 CD;
+   * 效果本体是队长持有的标准能力行,逐个单发 */
   castSkill(): boolean {
-    return false
+    const sim = this.sim
+    if (!sim || sim.over || this.run.skillCdMs > 0) return false
+    const s = CAPTAINS[this.run.captainId].skill
+    this.run.skillCdMs = s.cdMs * this.teamFx.skillCdMul
+    playSfx('levelup')
+    this.events.emit('skill-cast', s.name)
+    for (const a of this.captainAbilities) a.castNow?.(this.captainHandle)
+    return true
   }
 
   /** 测试模式免死开关变更后重算队员血量上限(镜像 applyTestInvincible) */
@@ -601,6 +622,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       (held(this.cursors?.down) || held(this.wasd?.S) ? 1 : 0)
     // 键盘优先,否则取 HUD 摇杆向量(镜像 BaseArenaScene 的输入合流);
     // moveInputRaw 键盘满推=1、摇杆取模长,供时停世界时标读
+    // 队长技能冷却按真实时钟推进(时停不额外拖长 CD,玩家可预期)
+    this.run.skillCdMs = tickSkillCd(this.run.skillCdMs, delta)
+
     const keyed = kx !== 0 || ky !== 0
     const stick = (this.scene.get('ui') as UIScene | undefined)?.joystickVector ?? { x: 0, y: 0 }
     sim.teamDir = keyed ? norm(kx, ky) : stick

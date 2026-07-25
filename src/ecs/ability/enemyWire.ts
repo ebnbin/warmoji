@@ -66,8 +66,9 @@ export function updateEnemyAbilities(sim: Sim, scene: Phaser.Scene, atlas: EcsAt
     const abilities = enemyAbilities[eid]
     const owner = enemyOwner[eid]
     if (!abilities || !owner) continue
-    // 变形期缴械:只推进冷却不开火(时间表语义:复形后冷却已尽者随即出手,已被 postponeFire 后延)
-    if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) {
+    // 压制期(蹦迪/变形)缴械:只推进冷却不开火——保持敌侧攻击的时间表语义
+    //(窗口结束若冷却已尽则立即出手,与旧一致)
+    if (now < sim.danceEndsAt || (Morph.until[eid] !== 0 && now < Morph.until[eid]!)) {
       for (const w of abilities) w.tickCooldown?.(delta)
     } else {
       for (const w of abilities) w.update(delta, owner)

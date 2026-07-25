@@ -481,10 +481,13 @@ export function steerEnemies(sim: Sim, delta: number): void {
     }
     // 受击白闪到时恢复
     if (Flash.until[eid] !== 0 && now >= Flash.until[eid]!) Flash.until[eid] = 0
-    // 非白闪期的常驻染色:中毒染毒绿,否则常态白(镜像 steerEnemies 的毒绿染色)
+    // 全场蹦迪:窗口内定身摇摆(粉染色),行为状态机暂停;击退与世界后处理照常。
+    // 用 sim 级窗口表达,窗口内新登场的敌人天然跟着跳(镜像 materializeEnemy 的补标)
+    const dancing = now < sim.danceEndsAt
+    // 非白闪期的常驻染色:蹦迪粉 > 中毒毒绿 > 常态白(镜像 steerEnemies 的染色优先级)
     if (Flash.until[eid] === 0) {
       Tint.effect[eid] = 0
-      Tint.color[eid] = now < Poison.until[eid]! ? 0x7bff5a : 0xffffff
+      Tint.color[eid] = dancing ? 0xff9ff3 : now < Poison.until[eid]! ? 0x7bff5a : 0xffffff
     }
     let tx = Transform.x[eid]!
     let ty = Transform.y[eid]!
@@ -492,8 +495,11 @@ export function steerEnemies(sim: Sim, delta: number): void {
     // 速度倍率:能力限时减速/冻结 × 体质(精英加速/护巢暴走)。teamFx/battleFx/时停时标 = 1(森林)
     const slow = (now < Slow.until[eid]! ? Slow.mul[eid]! : 1) * SpMul.v[eid]!
     const speed = Speed.v[eid]! * slow
-    // 魔尘变形期:失去本职行为,顶绵羊形象缓速游荡(半速)。缴械/无害/复形在能力层与战斗层
-    if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) {
+    if (dancing) {
+      // 蹦迪:定身摇摆(不位移),摇摆幅度大于常态行走
+      Transform.rot[eid] = Math.sin(now / 80 + enemyPhase[eid]!) * 0.3
+    } else if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) {
+      // 魔尘变形期:失去本职行为,顶绵羊形象缓速游荡(半速)。缴械/无害/复形在能力层与战斗层
       const d = wanderDir(sim, eid)
       tx += d.x * speed * 0.5 * dt
       ty += d.y * speed * 0.5 * dt
@@ -555,7 +561,7 @@ export function steerEnemies(sim: Sim, delta: number): void {
     Transform.y[eid] = clamp(ty, 0, sim.mapH)
     // 非脚本姿态的行走动画:环境摇摆(轻微旋转)+ 按移动方向翻转(twemoji 默认朝左)。
     // 蓄力/冲刺(EState 2/3)与变形由各自状态机/形象自管,此处不覆盖
-    if (EState.v[eid] !== 2 && EState.v[eid] !== 3 && Morph.until[eid] === 0) {
+    if (!dancing && EState.v[eid] !== 2 && EState.v[eid] !== 3 && Morph.until[eid] === 0) {
       Transform.rot[eid] = Math.sin(now / 95 + enemyPhase[eid]!) * 0.1
       if (Math.abs(enemyVelX[eid]!) > 8) Sprite.flipX[eid] = enemyVelX[eid]! > 0 ? 1 : 0
     }

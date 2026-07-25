@@ -1,9 +1,10 @@
 import type Phaser from 'phaser'
+import { query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
 import type { AbilityContext, TargetInfo } from '../../abilities/types'
 import type { CharacterEffects, TeamEffects } from '../../items/registry'
-import { Alive, Hp, Iframe, MAtkSlow, MHp, Poison, Slow, Transform } from '../components'
-import { applyDamage } from '../combat'
+import { Alive, Boss, ENEMY_SET, EState, Hp, Iframe, MAtkSlow, MHp, Poison, Revive, Slow, Tint, Transform } from '../components'
+import { applyDamage, reviveMember } from '../combat'
 import { applyMorph } from '../morph'
 import { enemyDef } from '../store'
 import { spawnGroundEffectEcs } from '../groundEffects'
@@ -93,7 +94,8 @@ export function makeTeamCtx(
     spawnProjectile: (x, y, angle, def, damage) => spawnProjectileEcs(sim, atlas, x, y, angle, def, damage, slot),
     anchor: () => sim.center,
     applySlow: () => {}, // P3d
-    damageMul: () => fx.damageMul * teamFx.teamDamageMul,
+    // 队长技能的限时增伤(弱点讲义)叠进队伍伤害乘区,到期由 stepSim 复原
+    damageMul: () => fx.damageMul * teamFx.teamDamageMul * sim.skillDamageMul,
     // 黏黏怪攻速惩罚:被蹭到的队员攻速变慢(叠乘进冷却,到时自动失效)
     cooldownMul: () => {
       const m = sim.members[slot]
@@ -107,6 +109,55 @@ export function makeTeamCtx(
     grantOwnerInvuln: (ms) => {
       const m = sim.members[slot]
       if (m !== undefined) Iframe.last[m] = sim.elapsedMs + ms - Iframe.ms[m]!
+    },
+    // ── 队伍级操作(队长主动技能载荷用)──────────────────────
+    /** 全队集结(镜像 rallyTeam):阵亡者满血复活、存活者按上限比例回复、全队短暂无敌。
+     * 无敌走受击无敌帧通道(把「上次受击」推到未来),挡接触与敌弹 */
+    rallyTeam: (healRatio, invulnMs) => {
+      for (const m of sim.members) {
+        if (!Alive.v[m]) reviveMember(sim, m)
+        else MHp.hp[m] = Math.min(MHp.max[m]!, MHp.hp[m]! + MHp.max[m]! * healRatio)
+        Iframe.last[m] = sim.elapsedMs + invulnMs - Iframe.ms[m]!
+      }
+    },
+    /** 全场蹦迪(镜像 danceTargets):窗口内全体敌人定身摇摆(含窗口内新登场者),
+     * 并打断蓄力/冲刺中间态。窗口用 sim 级时刻表达,故新怪天然跟着跳 */
+    danceTargets: (durationMs) => {
+      sim.danceEndsAt = sim.elapsedMs + durationMs
+      for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+        if (EState.v[eid] === 2 || EState.v[eid] === 3) {
+          EState.v[eid] = Boss.v[eid] ? 1 : 0
+          Tint.effect[eid] = 0
+          Tint.color[eid] = 0xffffff
+        }
+      }
+    },
+    /** 限时全队增伤(镜像 buffTeamDamage):不叠加,直接覆写,到期 stepSim 复原 */
+    buffTeamDamage: (mul, durationMs) => {
+      sim.skillDamageMul = mul
+      sim.skillBuffUntil = sim.elapsedMs + durationMs
+    },
+    /** 战场掉币(镜像 spawnRewardCoins):落地待拾,音效与爆点随拾取管线 */
+    spawnCoins: (x, y, count) => {
+      if (sim.over) return
+      sim.pendingBursts.push({ x, y, count: 6, kind: 'coin' })
+      playSfx('coin')
+      sim.pendingCoins.push({ x, y, count })
+    },
+    /** 电击起搏(镜像 cutReviveTimer):给范围内复活倒计时最长的阵亡队友减 ms */
+    cutReviveTimer: (x, y, range, ms) => {
+      const r2 = range * range
+      let best = -1
+      for (const m of sim.members) {
+        if (Alive.v[m]) continue
+        const dx = Transform.x[m]! - x
+        const dy = Transform.y[m]! - y
+        if (dx * dx + dy * dy > r2) continue
+        if (best < 0 || Revive.at[m]! > Revive.at[best]!) best = m
+      }
+      if (best < 0) return false
+      Revive.at[best] = Revive.at[best]! - ms
+      return true
     },
   }
 }
