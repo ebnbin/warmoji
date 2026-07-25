@@ -152,21 +152,23 @@ export function spawnEnemy(
   return eid
 }
 
-/** 最近活着的队员位置(镜像 nearestAlive) */
+/** 最近活着的队员位置(镜像 nearestAlive)。距离走世界钩子的差向量——环面上取最短差,
+ * 故返回的是「相对 (x,y) 的最近镜像」坐标:下游一律 norm(to - from),数学无需改动 */
 function nearestAlive(sim: Sim, x: number, y: number): Point | null {
-  let best = -1
+  let bestX = 0
+  let bestY = 0
   let bestD = Infinity
   for (const eid of sim.members) {
     if (!Alive.v[eid]) continue
-    const dx = Transform.x[eid]! - x
-    const dy = Transform.y[eid]! - y
-    const d = dx * dx + dy * dy
-    if (d < bestD) {
-      bestD = d
-      best = eid
+    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[eid]!, Transform.y[eid]!)
+    const d2 = d.x * d.x + d.y * d.y
+    if (d2 < bestD) {
+      bestD = d2
+      bestX = x + d.x
+      bestY = y + d.y
     }
   }
-  return best >= 0 ? { x: Transform.x[best]!, y: Transform.y[best]! } : null
+  return bestD === Infinity ? null : { x: bestX, y: bestY }
 }
 
 /** 把敌人位置汇入 frameTargets(供队伍 orbit/游移门控) */
@@ -175,7 +177,11 @@ export function updateFrameTargets(sim: Sim): void {
   const out: Point[] = []
   for (const eid of eids) {
     if (Dormant.v[eid]) continue
-    out.push({ x: Transform.x[eid]!, y: Transform.y[eid]! })
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    out.push({ x, y })
+    // 环面:真身之外再喂三个镜像,队伍 orbit/游移门控隔着传送门也成立
+    for (const g of sim.hooks.ghosts(sim, x, y)) out.push(g)
   }
   sim.frameTargets = out
 }
@@ -316,9 +322,8 @@ function steerDetonate(sim: Sim, eid: number, slow: number): { vx: number; vy: n
       const r2 = lm.blastRadius * lm.blastRadius
       for (const m of sim.members) {
         if (!Alive.v[m]) continue
-        const dx = Transform.x[m]! - ex
-        const dy = Transform.y[m]! - ey
-        if (dx * dx + dy * dy <= r2) hurtMember(sim, m, dmg)
+        const d = sim.hooks.worldDelta(sim, ex, ey, Transform.x[m]!, Transform.y[m]!)
+        if (d.x * d.x + d.y * d.y <= r2) hurtMember(sim, m, dmg)
       }
       playSfx('boom')
       despawnEnemy(sim, eid)
@@ -383,13 +388,16 @@ function steerCoinThief(sim: Sim, eid: number, slow: number): { vx: number; vy: 
   const ey = Transform.y[eid]!
   let coin = -1
   let bestD = Infinity
+  let coinX = 0
+  let coinY = 0
   for (const c of query(sim.world, COIN_SET as unknown as object[])) {
-    const dx = Transform.x[c]! - ex
-    const dy = Transform.y[c]! - ey
-    const d = dx * dx + dy * dy
+    const w = sim.hooks.worldDelta(sim, ex, ey, Transform.x[c]!, Transform.y[c]!)
+    const d = w.x * w.x + w.y * w.y
     if (d < bestD) {
       bestD = d
       coin = c
+      coinX = ex + w.x
+      coinY = ey + w.y
     }
   }
   if (coin < 0) {
@@ -409,7 +417,7 @@ function steerCoinThief(sim: Sim, eid: number, slow: number): { vx: number; vy: 
     }
     return { vx: 0, vy: 0 }
   }
-  const dir = norm(Transform.x[coin]! - ex, Transform.y[coin]! - ey)
+  const dir = norm(coinX - ex, coinY - ey)
   const sp = def.speed * slow
   return { vx: dir.x * sp, vy: dir.y * sp }
 }

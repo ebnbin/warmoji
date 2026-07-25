@@ -64,7 +64,9 @@ export function spawnProjectileEcs(
   Proj.srcSlot[eid] = srcSlot
   Proj.pierce[eid] = def.pierce ?? 0
   Proj.spin[eid] = p.rotationOffsetDeg === 0 ? 9 : 0
-  Proj.dieAt[eid] = 0
+  // 环面上子弹永远飞不出屏,只能按寿命回收(其余图恒 0 = 按视野回收)
+  const life = sim.hooks.projectileLifeMs(sim)
+  Proj.dieAt[eid] = life > 0 ? sim.elapsedMs + life : 0
   Sprite.frame[eid] = atlas.index(p.emoji, 'player')
   Sprite.flipX[eid] = 0
   Tint.color[eid] = 0xffffff
@@ -101,29 +103,39 @@ export function updateProjectiles(sim: Sim, delta: number): void {
   for (const eid of projs) {
     const ax = Transform.x[eid]!
     const ay = Transform.y[eid]!
-    const bx = ax + Vel.x[eid]! * dt
-    const by = ay + Vel.y[eid]! * dt
+    let bx = ax + Vel.x[eid]! * dt
+    let by = ay + Vel.y[eid]! * dt
+    // 环面回绕:回绕帧把扫掠线段起点一并挪过去,否则线段横贯全图产生假命中
+    const wrapped = sim.hooks.wrap(sim, bx, by)
+    const seamJump = wrapped.x !== bx || wrapped.y !== by
+    bx = wrapped.x
+    by = wrapped.y
     Transform.x[eid] = bx
     Transform.y[eid] = by
     if (Proj.spin[eid] !== 0) Transform.rot[eid] = Transform.rot[eid]! + Proj.spin[eid]! * dt
 
-    // 线段扫掠命中:收集命中(按段上距离排序),依次施伤直到贯穿耗尽
+    // 线段扫掠命中:收集命中(按段上距离排序),依次施伤直到贯穿耗尽。
+    // 回绕帧线段退化为一点(起点即落点),本帧不判命中
+    const sx = seamJump ? bx : ax
+    const sy = seamJump ? by : ay
     const hit = projHitEids[eid]!
     const pr = Proj.radius[eid]!
     const found: { enemy: number; t: number }[] = []
     for (const en of enemies) {
       if (hit.has(en)) continue
       const rr = pr + Radius.v[en]!
-      if (segDistSq(Transform.x[en]!, Transform.y[en]!, ax, ay, bx, by) > rr * rr) continue
-      const dpx = Transform.x[en]! - ax
-      const dpy = Transform.y[en]! - ay
-      found.push({ enemy: en, t: dpx * dpx + dpy * dpy })
+      // 目标位置取相对线段起点的最近镜像(环面:隔缝命中也成立)
+      const w = sim.hooks.worldDelta(sim, sx, sy, Transform.x[en]!, Transform.y[en]!)
+      const tx2 = sx + w.x
+      const ty2 = sy + w.y
+      if (segDistSq(tx2, ty2, sx, sy, bx, by) > rr * rr) continue
+      found.push({ enemy: en, t: w.x * w.x + w.y * w.y })
     }
     found.sort((p, q) => p.t - q.t)
     // 残垣图:子弹撞墙即销毁(墙比最近命中点更近时,本帧命中作废)——无墙图 wallHit 恒 null
-    const wall = sim.hooks.wallHit(sim, ax, ay, bx, by)
+    const wall = sim.hooks.wallHit(sim, sx, sy, bx, by)
     if (wall !== null) {
-      const dw = (wall.x - ax) ** 2 + (wall.y - ay) ** 2
+      const dw = (wall.x - sx) ** 2 + (wall.y - sy) ** 2
       const first = found[0]
       if (!first || dw <= first.t) {
         cull(sim, eid)
@@ -137,7 +149,7 @@ export function updateProjectiles(sim: Sim, delta: number): void {
       hit.add(f.enemy)
       const hx = Transform.x[f.enemy]!
       const hy = Transform.y[f.enemy]!
-      applyDamage(sim, f.enemy, Proj.damage[eid]!, Proj.kb[eid]!, ax, ay, Proj.srcSlot[eid]!)
+      applyDamage(sim, f.enemy, Proj.damage[eid]!, Proj.kb[eid]!, sx, sy, Proj.srcSlot[eid]!)
       // 命中效果链(溅射/减速/毒/变羊…):复用 applyEffects,主目标排除出溅射圈
       if (onHit && onHit.length > 0 && sim.effectCtx) {
         const ref = enemyRef[f.enemy] as TargetInfo['ref'] | undefined
@@ -158,12 +170,12 @@ export function updateProjectiles(sim: Sim, delta: number): void {
       cull(sim, eid)
       continue
     }
-    // 飞出视野一段即灭
-    if (bx < view.x - slack || bx > view.right + slack || by < view.y - slack || by > view.bottom + slack) {
+    // 寿命制(环面)优先;否则飞出视野一段即灭
+    if (Proj.dieAt[eid] !== 0) {
+      if (sim.elapsedMs >= Proj.dieAt[eid]!) cull(sim, eid)
+    } else if (bx < view.x - slack || bx > view.right + slack || by < view.y - slack || by > view.bottom + slack) {
       cull(sim, eid)
-      continue
     }
-    if (Proj.dieAt[eid] !== 0 && sim.elapsedMs >= Proj.dieAt[eid]!) cull(sim, eid)
   }
 }
 
@@ -227,8 +239,9 @@ export function updateEnemyProjectiles(sim: Sim, delta: number): void {
   const dt = delta / 1000
   const now = sim.elapsedMs
   for (const eid of shots) {
-    const x = Transform.x[eid]! + Vel.x[eid]! * dt
-    const y = Transform.y[eid]! + Vel.y[eid]! * dt
+    const moved = sim.hooks.wrap(sim, Transform.x[eid]! + Vel.x[eid]! * dt, Transform.y[eid]! + Vel.y[eid]! * dt)
+    const x = moved.x
+    const y = moved.y
     Transform.x[eid] = x
     Transform.y[eid] = y
     // 命中队员:圆-圆(敌弹半径 + 队员受击半径),吃无敌帧节流
@@ -238,9 +251,8 @@ export function updateEnemyProjectiles(sim: Sim, delta: number): void {
       for (const m of sim.members) {
         if (!Alive.v[m]) continue
         const rr = pr + Hurt.radius[m]!
-        const dx = Transform.x[m]! - x
-        const dy = Transform.y[m]! - y
-        if (dx * dx + dy * dy > rr * rr) continue
+        const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
+        if (d.x * d.x + d.y * d.y > rr * rr) continue
         if (now - Iframe.last[m]! < Iframe.ms[m]!) {
           hitMember = true // 命中但被无敌帧挡下:敌弹照常销毁
           break

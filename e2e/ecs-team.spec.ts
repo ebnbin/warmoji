@@ -58,12 +58,14 @@ test('ECS 队伍：编队生成、键盘右移、相机跟随、有界钳制', a
     { timeout: 8000 },
   )
 
-  // 持续右推到边界：中心 x 收敛到 mapW - clampMin（clampMin=(0.8+0.45)*UNIT=1.25*64=80）
+  // 持续右推到边界：中心 x 收敛到 mapW - clampMin。
+  // clampMin = TEAM.ringRadius + MEMBER.radius = 1.25（旧 ArenaScene.constrainTeam 直取格值当
+  // px 用，本实验逐位对齐，故是 1.25px 而非 1.25 格）
   await page.waitForTimeout(3000)
   await page.keyboard.up('ArrowRight')
   const clamped = await page.evaluate(dbg)
-  expect(clamped.centerX).toBeGreaterThan(clamped.mapW - 82)
-  expect(clamped.centerX).toBeLessThanOrEqual(clamped.mapW - 79)
+  expect(clamped.centerX).toBeGreaterThan(clamped.mapW - 2)
+  expect(clamped.centerX).toBeLessThanOrEqual(clamped.mapW - 1)
 
   expect(errors).toEqual([])
 })

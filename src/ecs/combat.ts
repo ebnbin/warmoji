@@ -197,9 +197,8 @@ export function memberContact(sim: Sim): void {
     const hr = Hurt.radius[m]!
     for (const eid of enemies) {
       const rr = hr + Radius.v[eid]!
-      const dx = Transform.x[eid]! - mx
-      const dy = Transform.y[eid]! - my
-      if (dx * dx + dy * dy > rr * rr) continue
+      const d = sim.hooks.worldDelta(sim, mx, my, Transform.x[eid]!, Transform.y[eid]!)
+      if (d.x * d.x + d.y * d.y > rr * rr) continue
       const def = enemyDef[eid]
       if (!def) continue
       if (def.damage <= 0) continue // 亡语诱饵尸壳(damage=0)无害:接触不伤(镜像 a.decoy 跳过)

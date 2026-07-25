@@ -115,7 +115,13 @@ export function updateMemberAbilities(sim: Sim, wdelta: number): void {
   const targets: TargetInfo[] = []
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     if (Dormant.v[eid]) continue // 休眠怪不可被索敌(镜像 dormancyFrameTargets)
-    targets.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, radius: Radius.v[eid]!, ref: refOf(eid) })
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    const radius = Radius.v[eid]!
+    const ref = refOf(eid)
+    targets.push({ x, y, radius, ref })
+    // 环面:真身之外再喂三个镜像,能力零改动即可隔着传送门瞄准
+    for (const g of sim.hooks.ghosts(sim, x, y)) targets.push({ x: g.x, y: g.y, radius, ref })
   }
   sim.enemyTargets = targets
   for (let slot = 0; slot < sim.members.length; slot++) {

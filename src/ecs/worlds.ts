@@ -9,6 +9,7 @@ import { approach, onFloe } from '../maps/ice'
 import { outsideZone, ringPoint, zoneRadiusAt } from '../maps/world'
 import { clampToDisc, confineVelocity, meteorSweep } from '../maps/space'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../maps/river'
+import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../maps/void'
 import type { RiverRect } from '../maps/river'
 import { isHorizontal } from '../core/remap'
 import { PICKUPS } from '../pickups/registry'
@@ -27,8 +28,18 @@ import type { Point } from '../core/vec'
 // 只收「行为」钩子;地图专属视觉(水面/缩圈/传送门)仍在场景侧。
 
 const ZERO: Point = { x: 0, y: 0 }
+const NO_GHOSTS: Point[] = []
 
 export interface WorldHooks {
+  /** 世界差向量(索敌/追击/磁吸/接触/编队的几何基元):环面取最短差(可能穿缝);默认直减。
+   * 有了它,「朝目标走」「够不够得着」这类判断在环面上自动隔门成立 */
+  worldDelta(sim: Sim, fromX: number, fromY: number, toX: number, toY: number): Point
+  /** 索敌镜像(环面:真身之外再给三个镜像坐标,能力零改动即可隔门瞄准);默认无 */
+  ghosts(sim: Sim, x: number, y: number): Point[]
+  /** 坐标回绕(环面穿缝即绕到对侧):弹体/跟随点等自由实体逐帧过一道;默认原样 */
+  wrap(sim: Sim, x: number, y: number): Point
+  /** 玩家子弹寿命(ms;环面上永远飞不出屏,只能按寿命回收);0 = 不按寿命,按视野回收 */
+  projectileLifeMs(sim: Sim): number
   /** 队伍的世界漂移(奔流恒定顺流);默认无。加在本帧输入位移之上,再过 constrainTeam */
   teamDrift(sim: Sim, delta: number): Point
   /** 队伍位移约束:有界钳制 / 冰面动量积分 / 河道钳制 / 圆盘禁锢。
@@ -71,6 +82,18 @@ export interface WorldHooks {
 
 /** 有界世界(森林/晨昏/浮冰共基线):中心钳在盒内、敌人钳在图内、图内随机刷怪、不休眠 */
 const bounded: WorldHooks = {
+  worldDelta(_sim, fromX, fromY, toX, toY) {
+    return { x: toX - fromX, y: toY - fromY }
+  },
+  ghosts() {
+    return NO_GHOSTS
+  },
+  wrap(_sim, x, y) {
+    return { x, y }
+  },
+  projectileLifeMs() {
+    return 0
+  },
   teamDrift() {
     return ZERO
   },
@@ -574,12 +597,62 @@ const river: WorldHooks = {
   },
 }
 
+// ── 环面(void:工厂)────────────────────────────────────────
+
+/** 环面竞技场:四边两两粘合,坐标按模回绕,没有墙。尺寸即 mapW/mapH(场景侧按朝向定长短边)。
+ * 一切「距离/方向」改用环面最短差——这是传送门成为真实拓扑而非装饰的关键;
+ * 索敌另喂三个镜像坐标,能力零改动即可隔门瞄准;子弹永远飞不出屏,按寿命回收 */
+const torus: WorldHooks = {
+  ...bounded,
+  worldDelta(sim, fromX, fromY, toX, toY) {
+    return torusDelta({ x: fromX, y: fromY }, { x: toX, y: toY }, sim.mapW, sim.mapH)
+  },
+  ghosts(sim, x, y) {
+    return ghostImages({ x, y }, sim.mapW, sim.mapH)
+  },
+  wrap(sim, x, y) {
+    return wrapPoint({ x, y }, sim.mapW, sim.mapH)
+  },
+  projectileLifeMs(sim) {
+    return MAPS[sim.mapId].torus!.projectileLifeMs
+  },
+  // 不钳制,穿缝回绕
+  constrainTeam(sim, next) {
+    return wrapPoint(next, sim.mapW, sim.mapH)
+  },
+  constrainEnemy(sim, _eid, x, y) {
+    return wrapPoint({ x, y }, sim.mapW, sim.mapH)
+  },
+  constrainCoin(sim, x, y) {
+    return wrapPoint({ x, y }, sim.mapW, sim.mapH)
+  },
+  // 环面上没有边可撞,游荡不折返;敌弹只按寿命回收
+  wanderDir(_sim, _eid, dx, dy) {
+    return { x: dx, y: dy }
+  },
+  cullEnemyProjectile() {
+    return false
+  },
+  /** 全场随机(环面上无所谓贴边);Boss 另取环面距队伍 ≥5 格的点 */
+  spawnPoint(sim, boss) {
+    const pick = (): Point => ({ x: sim.rng.next() * sim.mapW, y: sim.rng.next() * sim.mapH })
+    let pos = pick()
+    if (!boss) return pos
+    for (let i = 0; i < 24; i++) {
+      pos = pick()
+      if (torusDist2(pos, sim.center, sim.mapW, sim.mapH) >= 5 * UNIT * (5 * UNIT)) break
+    }
+    return pos
+  },
+}
+
 /** 按地图取世界钩子;未特化的图一律走有界基线 */
 export function worldFor(mapId: MapId): WorldHooks {
   const def = MAPS[mapId]
   if (def.ice) return ice
   if (def.walls) return ruins
   if (def.kind === 'river') return river
+  if (def.kind === 'void') return torus
   if (def.kind === 'space') return space
   if (def.kind === 'infinite') return infinite
   return bounded

@@ -17,7 +17,8 @@ import { OUTLINED_EMOJIS } from '../boot/preload'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAP, MAPS, rollDecor } from '../maps/registry'
-import type { MapDef, RiverConfig, WallsConfig } from '../maps/registry'
+import type { MapDef, RiverConfig, TorusConfig, WallsConfig } from '../maps/registry'
+import { fitAspectRect } from '../maps/void'
 import { driftProfile, riverRect } from '../maps/river'
 import type { RiverRect } from '../maps/river'
 import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from '../maps/daynight'
@@ -166,6 +167,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private zoneVignette?: Phaser.GameObjects.Rectangle
   /** 深空图天体横扫的视觉：与 sim.meteor 对帐（新一次即建预警轨迹，起划即挂球体，结束即销毁） */
   private meteorFx?: { of: Meteor; tele: Phaser.GameObjects.Graphics; sphere?: Phaser.GameObjects.Image }
+  /** 工厂图（环面）：跨缝分身的条带相机 + 传送门光带/脉动边线 */
+  private stripCams: Phaser.Cameras.Scene2D.Camera[] = []
+  private frameTiles: { tile: Phaser.GameObjects.TileSprite; dx: number; dy: number }[] = []
+  private frameGlow?: Phaser.GameObjects.Graphics
   /** 奔流图水面动效：双层水纹贴图 + 顺流漂浮物（纯视觉，不进 ECS 批绘） */
   private waveTiles: { tile: Phaser.GameObjects.TileSprite; speed: number }[] = []
   private drifts: Drift[] = []
@@ -204,8 +209,18 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 浮冰图的「地图」即那块方形浮冰(其外皆水),故尺寸取 floeU;
     // 奔流是单屏世界:世界 = 逻辑视口 × viewScale
     const rc = mapDef.river
-    this.mapW = rc ? viewport.logicalWidth * rc.viewScale : (mapDef.ice?.floeU ?? mapDef.size?.w ?? MAP.width) * UNIT
-    this.mapH = rc ? viewport.logicalHeight * rc.viewScale : (mapDef.ice?.floeU ?? mapDef.size?.h ?? MAP.height) * UNIT
+    const tc = mapDef.torus
+    const landscape = viewport.logicalWidth >= viewport.logicalHeight
+    this.mapW = tc
+      ? (landscape ? tc.arenaLong : tc.arenaShort) * UNIT
+      : rc
+        ? viewport.logicalWidth * rc.viewScale
+        : (mapDef.ice?.floeU ?? mapDef.size?.w ?? MAP.width) * UNIT
+    this.mapH = tc
+      ? (landscape ? tc.arenaShort : tc.arenaLong) * UNIT
+      : rc
+        ? viewport.logicalHeight * rc.viewScale
+        : (mapDef.ice?.floeU ?? mapDef.size?.h ?? MAP.height) * UNIT
     const margin = MAP.cameraMargin * UNIT
 
     // 浮冰图:深水底色铺满屏(相机锁定;世界无边界,看到哪都是水)
@@ -218,7 +233,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     // 地面:无限世界没有边、也就没有影子边缘——相机锁定的满屏底色即地面;
     // 有界图为纯色面 + 右下阴影(镜像 drawFloor),浮冰图另描冰缘读得出边界
-    if (rc) {
+    if (tc) {
+      this.buildVoidVisuals(mapDef, tc)
+    } else if (rc) {
       this.buildRiverVisuals(mapDef, rc)
     } else if (this.infinite) {
       this.add
@@ -257,6 +274,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     const cam = this.cameras.main
     cam.setZoom(rc ? viewport.renderScale / rc.viewScale : viewport.renderScale)
+    // 工厂：主相机视口 = 屏幕内最大居中的竞技场定比矩形（多余留空白）+ 四缝四角条带分身相机
+    if (tc) this.setupTorusCameras(tc)
     // 浮冰/无限无边界:相机只管跟人(滑进水里、走到天边也跟着走);
     // 深空的圆是有界的,bounds 钳在其外接框内;有界图照旧外扩一圈
     if (fieldR > 0) {
@@ -285,7 +304,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const center = this.infinite ? { x: 0, y: 0 } : { x: this.mapW / 2, y: this.mapH / 2 }
     this.centerObj = this.add.zone(center.x, center.y, 1, 1)
     // 奔流是固定相机的单屏世界:居中锁死,不跟随
-    if (rc) cam.centerOn(this.mapW / 2, this.mapH / 2)
+    if (rc || tc) cam.centerOn(this.mapW / 2, this.mapH / 2)
     else cam.startFollow(this.centerObj)
 
     this.cursors = this.input.keyboard?.createCursorKeys()
@@ -309,6 +328,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.scene.launch('ui')
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scene.stop('ui')
+      for (const c of this.stripCams) this.cameras.remove(c)
+      this.stripCams = []
     })
 
     this.input.keyboard?.on('keydown-ESC', () => {
@@ -837,6 +858,143 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   }
 
 
+
+  /** 环面相机（镜像 VoidArenaScene.setupCameras）：主相机裁出屏内最大居中的竞技场定比矩形，
+   * 四缝 + 四角各挂一台条带相机取景对侧溢出——跨缝实体两侧同时可见（渲染层的幽灵分身）。
+   * ECS 侧全场实体是同一个批绘对象，条带相机各自按自己的滚动再画一遍，天然成立 */
+  private setupTorusCameras(cfg: TorusConfig): void {
+    const cw = Math.round(viewport.cssWidth * viewport.dpr)
+    const ch = Math.round(viewport.cssHeight * viewport.dpr)
+    const rect = fitAspectRect(cw, ch, this.mapW, this.mapH)
+    const zoom = rect.w / this.mapW
+    const cam = this.cameras.main
+    cam.setViewport(Math.round(rect.x), Math.round(rect.y), Math.round(rect.w), Math.round(rect.h))
+    cam.setZoom(zoom)
+    const s = cfg.strip * UNIT
+    const sPx = Math.max(2, Math.round(s * zoom))
+    const x0 = Math.round(rect.x)
+    const y0 = Math.round(rect.y)
+    const w = Math.round(rect.w)
+    const h = Math.round(rect.h)
+    const W = this.mapW
+    const H = this.mapH
+    const mk = (vx: number, vy: number, vw: number, vh: number, cx: number, cy: number): void => {
+      const c = this.cameras.add(vx, vy, vw, vh)
+      c.setZoom(zoom)
+      c.centerOn(cx, cy)
+      this.stripCams.push(c)
+    }
+    // 屏幕左缘显示「越过右缝的溢出」（世界 x∈[W, W+s)），其余同理；四角为对角溢出
+    mk(x0, y0, sPx, h, W + s / 2, H / 2)
+    mk(x0 + w - sPx, y0, sPx, h, -s / 2, H / 2)
+    mk(x0, y0, w, sPx, W / 2, H + s / 2)
+    mk(x0, y0 + h - sPx, w, sPx, W / 2, -s / 2)
+    mk(x0, y0, sPx, sPx, W + s / 2, H + s / 2)
+    mk(x0 + w - sPx, y0, sPx, sPx, -s / 2, H + s / 2)
+    mk(x0, y0 + h - sPx, sPx, sPx, W + s / 2, -s / 2)
+    mk(x0 + w - sPx, y0 + h - sPx, sPx, sPx, -s / 2, -s / 2)
+  }
+
+  /** 工厂视觉（镜像 buildVoidVisuals）：钢板地面 + 散落零件 + 传送闸口流光门框。
+   * 静态视觉只画一份——条带相机全部忽略，否则门框/地板会在缝上重影 */
+  private buildVoidVisuals(mapDef: MapDef, cfg: TorusConfig): void {
+    const W = this.mapW
+    const H = this.mapH
+    const statics: Phaser.GameObjects.GameObject[] = []
+
+    // 钢板厂房地面（中心朝亮的顶灯软渐变，避免硬边椭圆的「盘子感」）
+    const gFloor = this.add.graphics().setDepth(0)
+    gFloor.fillStyle(mapDef.palette.map, 1)
+    gFloor.fillRect(0, 0, W, H)
+    const inner = Phaser.Display.Color.IntegerToColor(mapDef.palette.map).brighten(7).color
+    for (const [k, a] of [
+      [0.95, 0.1],
+      [0.75, 0.1],
+      [0.55, 0.12],
+    ] as const) {
+      gFloor.fillStyle(inner, a)
+      gFloor.fillEllipse(W / 2, H / 2, W * k, H * k)
+    }
+    statics.push(gFloor)
+
+    // 散落零件点缀（种子固定：同局重建不变）
+    const def = mapDef.decor
+    const rng = new Rng(this.run.decorSeed)
+    const cells = (W / UNIT) * (H / UNIT)
+    const density = def.density[0] + rng.next() * (def.density[1] - def.density[0])
+    for (let i = 0; i < Math.round(cells * density); i++) {
+      const emoji = def.emojis[Math.floor(rng.next() * def.emojis.length)]!
+      const sizeU = def.sizeU[0] + rng.next() * (def.sizeU[1] - def.sizeU[0])
+      statics.push(
+        emojiImage(this, rng.next() * W, rng.next() * H, emoji, sizeU * UNIT, 'player')
+          .setAlpha(def.alpha[0] + rng.next() * (def.alpha[1] - def.alpha[0]))
+          .setRotation((rng.next() * 2 - 1) * Math.PI)
+          .setDepth(0.5),
+      )
+    }
+
+    // 传送门门框：琥珀色警示光带顺时针流动（上→右→下→左）+ 脉动描边
+    this.ensureDashTexture(cfg)
+    const f = cfg.frame * UNIT
+    const mkTile = (x: number, y: number, w: number, h: number, dx: number, dy: number, vertical: boolean): void => {
+      const tile = this.add
+        .tileSprite(x, y, w, h, vertical ? 'void-dash-v' : 'void-dash-h')
+        .setOrigin(0)
+        .setDepth(3.5)
+        .setAlpha(0.42)
+        .setTint(0xffb300)
+      this.frameTiles.push({ tile, dx, dy })
+      statics.push(tile)
+    }
+    mkTile(0, 0, W, f, 1, 0, false)
+    mkTile(W - f, 0, f, H, 0, 1, true)
+    mkTile(0, H - f, W, f, -1, 0, false)
+    mkTile(0, 0, f, H, 0, -1, true)
+
+    this.frameGlow = this.add.graphics().setDepth(3.6)
+    statics.push(this.frameGlow)
+    for (const c of this.stripCams) c.ignore(statics)
+  }
+
+  /** 门框虚线贴图（横/竖两个变体，一次生成） */
+  private ensureDashTexture(cfg: TorusConfig): void {
+    const size = 64
+    const th = Math.round(cfg.frame * UNIT)
+    for (const [key, vertical] of [
+      ['void-dash-h', false],
+      ['void-dash-v', true],
+    ] as const) {
+      if (this.textures.exists(key)) continue
+      const canvas = this.textures.createCanvas(key, vertical ? th : size, vertical ? size : th)
+      if (!canvas) continue
+      const ctx = canvas.getContext()
+      ctx.clearRect(0, 0, vertical ? th : size, vertical ? size : th)
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'
+      // 一节亮虚线 + 留空（滚动后呈流动光点带）
+      if (vertical) ctx.fillRect(th * 0.3, 10, th * 0.4, 14)
+      else ctx.fillRect(10, th * 0.3, 14, th * 0.4)
+      canvas.refresh()
+    }
+  }
+
+  /** 门框逐帧动效（镜像 updatePortals）：光带顺时针流动 + 边线脉动 */
+  private updatePortals(sim: Sim, delta: number): void {
+    if (this.frameTiles.length === 0) return
+    const flow = (56 * delta) / 1000
+    for (const t of this.frameTiles) {
+      t.tile.tilePositionX += t.dx * flow
+      t.tile.tilePositionY += t.dy * flow
+    }
+    const g = this.frameGlow
+    if (!g) return
+    const pulse = 0.4 + 0.22 * Math.sin(sim.elapsedMs / 420)
+    g.clear()
+    g.lineStyle(3, 0xff8f00, pulse)
+    g.strokeRect(1.5, 1.5, this.mapW - 3, this.mapH - 3)
+    g.lineStyle(1.5, 0xffe082, Math.min(1, pulse + 0.25))
+    g.strokeRect(4, 4, this.mapW - 8, this.mapH - 8)
+  }
+
   /** 奔流水面视觉层(镜像 RiverArenaScene.buildRiverVisuals):两岸暗带 + 河水跨向渐变 +
    * 岸线浪花 + 双层滚动水纹 + 岸上静态植被 + 顺流漂浮物。全为纯 Phaser 视觉,不进 ECS 批绘 */
   private buildRiverVisuals(mapDef: MapDef, cfg: RiverConfig): void {
@@ -1213,7 +1371,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
    * 无限世界改走分块滚动(见 ensureChunks):世界没有边,不能一次铺完 */
   private spawnDecor(run: RunState, atlas: EcsAtlas): void {
     if (this.infinite) return this.ensureChunks(atlas)
-    if (MAPS[run.mapId].river) return // 奔流的岸上植被随水面视觉层一并铺,不走全图散布
+    // 奔流的岸上植被 / 工厂的散落零件随各自视觉层一并铺,不走全图散布
+    if (MAPS[run.mapId].river || MAPS[run.mapId].torus) return
     const rng = new Rng(run.decorSeed)
     const cols = Math.round(this.mapW / UNIT)
     const rows = Math.round(this.mapH / UNIT)
@@ -1307,6 +1466,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.updateMeteorFx(sim)
     this.drainSmashedWalls(sim)
     this.updateRiver(sim, delta)
+    this.updatePortals(sim, delta)
     // 无限世界:相机走到哪,装饰分块跟到哪(块集合不变则整段免算)
     if (this.infinite && this.atlas) this.ensureChunks(this.atlas)
     // 冷雾浓度跟随时停态（越静越浓），淡入淡出走实时 delta

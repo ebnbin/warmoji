@@ -294,13 +294,17 @@ function layout(sim: Sim, delta: number): void {
     Wander.amp[eid] = amp
     const wander = amp * WANDER.radius
     const seed = Wander.seed[eid]!
-    const tx = sim.center.x + p.x + Math.sin(tSec * WANDER.freqX + seed) * wander
-    const ty = sim.center.y + p.y + Math.sin(tSec * WANDER.freqY + seed * 2.3) * wander
+    const rawX = sim.center.x + p.x + Math.sin(tSec * WANDER.freqX + seed) * wander
+    const rawY = sim.center.y + p.y + Math.sin(tSec * WANDER.freqY + seed * 2.3) * wander
     // 跟随弹簧(用局部量演算,避免类型化数组元素的复合赋值歧义)
     let fx = Follow.x[eid]!
     let fy = Follow.y[eid]!
     let fvx = Follow.vx[eid]!
     let fvy = Follow.vy[eid]!
+    // 环面弹簧:目标取离当前跟随点最近的镜像——中心穿缝时队员各自走最短路穿门,阵型全程连贯
+    const td = sim.hooks.worldDelta(sim, fx, fy, rawX, rawY)
+    const tx = fx + td.x
+    const ty = fy + td.y
     if (dt > 0) {
       const k = Follow.k[eid]!
       const c = 2 * Math.sqrt(k) * FOLLOW.zeta
@@ -317,6 +321,10 @@ function layout(sim: Sim, delta: number): void {
       fx += lagX * pull
       fy += lagY * pull
     }
+    // 跟随点回绕(环面),弹簧状态始终保持在竞技场内
+    const wrapped = sim.hooks.wrap(sim, fx, fy)
+    fx = wrapped.x
+    fy = wrapped.y
     Follow.x[eid] = fx
     Follow.y[eid] = fy
     Follow.vx[eid] = fvx
@@ -324,7 +332,8 @@ function layout(sim: Sim, delta: number): void {
     Transform.x[eid] = fx
     Transform.y[eid] = fy
     const guarded = sim.formation === 'guard' && idx === 0
-    Depth.z[eid] = guarded ? 8.5 : 10 + (fy - sim.center.y) / UNIT
+    // 遮挡纵深按世界差(环面上贴缝时不跳变)
+    Depth.z[eid] = guarded ? 8.5 : 10 + sim.hooks.worldDelta(sim, sim.center.x, sim.center.y, fx, fy).y / UNIT
     // 程序化小动画(镜像 animateMember):呼吸挤压拉伸 + 朝移动方向翻转(仅活着的)。
     // 复活弹入期(Pop)用弹入缩放覆盖呼吸(镜像 reviveMember 的 Back.easeOut scale 弹)
     if (Alive.v[eid]) {

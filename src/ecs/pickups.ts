@@ -63,8 +63,10 @@ export function magnetCoinsEcs(sim: Sim, delta: number): void {
   for (const eid of coins) {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
-    const dx = cx - x
-    const dy = cy - y
+    // 磁吸方向/距离走世界钩子(环面取最短差:隔着传送门也吸得到)
+    const w = sim.hooks.worldDelta(sim, x, y, cx, cy)
+    const dx = w.x
+    const dy = w.y
     const dist2 = dx * dx + dy * dy
     // 入账:近队伍中心 或 近任一活着队员(镜像 overlap)
     if (dist2 <= collect2 || nearAliveMember(sim, x, y, collect2)) {
@@ -81,8 +83,10 @@ export function magnetCoinsEcs(sim: Sim, delta: number): void {
       Vel.x[eid] = idle.x
       Vel.y[eid] = idle.y
     }
-    const nx = x + Vel.x[eid]! * dt
-    const ny = y + Vel.y[eid]! * dt
+    // 落点过世界钩子(环面回绕)
+    const moved = sim.hooks.constrainCoin(sim, x + Vel.x[eid]! * dt, y + Vel.y[eid]! * dt)
+    const nx = moved.x
+    const ny = moved.y
     Transform.x[eid] = nx
     Transform.y[eid] = ny
     // 世界回收(奔流:漂出下游即被河水冲走)
@@ -94,9 +98,8 @@ export function magnetCoinsEcs(sim: Sim, delta: number): void {
 function nearAliveMember(sim: Sim, x: number, y: number, collect2: number): boolean {
   for (const m of sim.members) {
     if (!Alive.v[m]) continue
-    const dx = Transform.x[m]! - x
-    const dy = Transform.y[m]! - y
-    if (dx * dx + dy * dy <= collect2) return true
+    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
+    if (d.x * d.x + d.y * d.y <= collect2) return true
   }
   return false
 }

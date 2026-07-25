@@ -46,7 +46,13 @@ export function updateEnemyAbilities(sim: Sim, scene: Phaser.Scene, atlas: EcsAt
   const targets: TargetInfo[] = []
   for (const m of sim.members) {
     if (!Alive.v[m]) continue
-    targets.push({ x: Transform.x[m]!, y: Transform.y[m]!, radius: Hurt.radius[m]!, ref: memberRefOf(m) })
+    const x = Transform.x[m]!
+    const y = Transform.y[m]!
+    const radius = Hurt.radius[m]!
+    const ref = memberRefOf(m)
+    targets.push({ x, y, radius, ref })
+    // 环面:持械敌人隔着传送门也能瞄准队员
+    for (const g of sim.hooks.ghosts(sim, x, y)) targets.push({ x: g.x, y: g.y, radius, ref })
   }
   sim.memberTargets = targets
 
