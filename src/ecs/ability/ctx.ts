@@ -9,6 +9,7 @@ import type { CharacterEffects, TeamEffects } from '../../items/registry'
 import { Alive, Boss, ENEMY_SET, EState, Hp, Iframe, MAtkSlow, MFlash, MHp, Poison, Revive, Slow, Tint, Transform } from '../components'
 import { applyDamage, reviveMember } from '../combat'
 import { applyMorph } from '../morph'
+import { playClip } from '../anim'
 import { enemyDef } from '../store'
 import { spawnGroundEffectEcs } from '../groundEffects'
 import { spawnProjectileEcs } from '../projectile'
@@ -122,7 +123,11 @@ export function makeTeamCtx(
       return fx.cooldownMul * teamFx.teamCooldownMul * sim.battleFx.teamCooldownMul * atk * fireFactor()
     },
     sfx: (id) => playSfx(id),
-    playOwnerClip: () => {}, // P6 动画
+    // 本体动画:durMs = 本次行为的真实间隔(攻速直接驱动动画速度,不预测)
+    playOwnerClip: (clipId, durMs) => {
+      const m = sim.members[slot]
+      if (m !== undefined) playClip(sim, atlas, m, clipId, durMs)
+    },
     ownerHeading: () => sim.teamDir,
     random: () => Math.random(),
     grantOwnerInvuln: (ms) => {

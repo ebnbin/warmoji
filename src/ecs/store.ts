@@ -60,3 +60,7 @@ export const thiefNextEatAt = new Float32Array(MAX_ENTITIES)
 
 /** 敌弹的伤害来源名(结算页敌情明细按敌人名归属) */
 export const eprojSrcName: (string | undefined)[] = []
+
+/** 部件动画的 emoji 与描边(帧惰性解析用;undefined = 该实体不参与动画) */
+export const animId: (string | undefined)[] = []
+export const animOutline: (import('../emoji/svg').OutlineKind | undefined)[] = []

@@ -14,10 +14,12 @@ import { characterLevel } from '../run/charLevel'
 import { BATTLE_FX_IDENTITY } from '../battlefield/registry'
 import { currentFormation, guardOrder, hasCenter, waveStartHp } from '../run/state'
 import { INVINCIBLE_HP, labInvincible } from '../run/lab'
+import { armIdle } from './anim'
 import { worldFor } from './worlds'
 import type { RunState } from '../run/state'
 import {
   Alive,
+  Anim,
   Breath,
   Depth,
   Follow,
@@ -103,6 +105,7 @@ export function spawnTeam(
     addComponent(world, eid, Hurt)
     addComponent(world, eid, MFlash)
     addComponent(world, eid, Transform)
+    addComponent(world, eid, Anim)
     addComponent(world, eid, Sprite)
     addComponent(world, eid, Tint)
     addComponent(world, eid, Depth)
@@ -149,6 +152,8 @@ export function spawnTeam(
     Transform.h[eid] = size
     Sprite.frame[eid] = atlas.index(def.emoji, 'player')
     Sprite.flipX[eid] = 0
+    // 部件动画:idle 常驻翻帧,相位按槽位错开(镜像 makeMember 的 anim.setIdle)
+    armIdle(eid, def.emoji, 'player', Sprite.frame[eid]!, slot * 173)
     Tint.color[eid] = 0xffffff
     Tint.effect[eid] = 0
     Tint.alpha[eid] = 1

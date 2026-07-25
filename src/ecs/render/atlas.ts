@@ -2,6 +2,7 @@ import type Phaser from 'phaser'
 import { OUTLINE, outlineSvg, setSvgSize } from '../../emoji/svg'
 import type { OutlineKind } from '../../emoji/svg'
 import { emojiSvgText, svgToImage } from '../../emoji/textures'
+import { animClipOf, bakeAnimFrame } from '../../emoji/studio'
 
 // ECS 自绘渲染的 emoji 图集(atlas):把所有实体会用到的 emoji×描边变体一次性光栅化,
 // 网格打包进若干 POT 页纹理,记录每个变体的 UV。渲染时全场实体共享这几张页纹理,
@@ -13,10 +14,18 @@ const CELL = 256 // 单格像素(与旧 RASTER 一致,保证清晰度)
 const PAGE = 2048 // 页边长(POT)
 const COLS = PAGE / CELL // 每行格数 = 8
 const PER_PAGE = COLS * COLS // 每页格数 = 64
+// 帧位上限:静态变体 + 惰性烘焙的动画帧(按需增页,一局只烘真正登场的那几种)
+const MAX_FRAMES = 2048
 
 function variantKey(id: string, outline: OutlineKind): string {
   return `${id}|${outline}`
 }
+
+function clipKey(id: string, outline: OutlineKind, clipId: string): string {
+  return `${id}|${outline}|${clipId}`
+}
+
+const NO_CLIP = { base: -1, frames: 0 }
 
 export class EcsAtlas {
   /** frame*4 → u0,v0,u1,v1 */
@@ -25,10 +34,98 @@ export class EcsAtlas {
   private readonly pageOf: Int32Array
   private readonly keyToFrame = new Map<string, number>()
   private readonly pages: Phaser.Textures.CanvasTexture[] = []
+  private readonly canvases: HTMLCanvasElement[] = []
+  private readonly ctxs: CanvasRenderingContext2D[] = []
+  /** 下一个空闲格位(静态变体铺完后即动画帧的起点) */
+  private cursor = 0
+  private scene?: Phaser.Scene
+  /** clip → 帧基址与帧数;帧数 0 表示该 emoji 无此 clip(问过一次就不再问) */
+  private readonly clips = new Map<string, { base: number; frames: number }>()
+  /** 正在烘焙中的 clip(去重) */
+  private readonly baking = new Set<string>()
 
-  private constructor(count: number) {
-    this.uv = new Float32Array(count * 4)
-    this.pageOf = new Int32Array(count)
+  private constructor() {
+    this.uv = new Float32Array(MAX_FRAMES * 4)
+    this.pageOf = new Int32Array(MAX_FRAMES)
+  }
+
+  /** 取一个空闲格位,必要时开新页 */
+  private alloc(): number {
+    const frame = this.cursor++
+    const page = Math.floor(frame / PER_PAGE)
+    while (this.canvases.length <= page) this.addPage()
+    return frame
+  }
+
+  private addPage(): void {
+    const cv = document.createElement('canvas')
+    cv.width = PAGE
+    cv.height = PAGE
+    this.canvases.push(cv)
+    this.ctxs.push(cv.getContext('2d')!)
+    const scene = this.scene
+    if (!scene) return // build 期先建画布,末尾统一登记纹理
+    const key = `ecs-atlas-${this.pages.length}`
+    if (scene.textures.exists(key)) scene.textures.remove(key)
+    this.pages.push(scene.textures.addCanvas(key, cv)!)
+  }
+
+  /** 把一张光栅图落进某格并记 UV(V 轴按 GL 朝向,原点在下) */
+  private place(frame: number, img: HTMLImageElement | HTMLCanvasElement): void {
+    const page = Math.floor(frame / PER_PAGE)
+    const local = frame % PER_PAGE
+    const px = (local % COLS) * CELL
+    const py = Math.floor(local / COLS) * CELL
+    this.ctxs[page]!.drawImage(img, px, py, CELL, CELL)
+    const b = frame * 4
+    this.uv[b] = px / PAGE
+    this.uv[b + 1] = 1 - py / PAGE
+    this.uv[b + 2] = (px + CELL) / PAGE
+    this.uv[b + 3] = 1 - (py + CELL) / PAGE
+    this.pageOf[frame] = page
+  }
+
+  /** 某 emoji 某 clip 的帧基址与帧数(整套帧连续排布)。
+   * 首次询问即在后台烘焙,未就绪返回 frames=0——调用方保持静态帧,烘好后再问即接上
+   *(渐进增强,与旧 clipFramesLive 同策略) */
+  clip(id: string, outline: OutlineKind, clipId: string): { base: number; frames: number } {
+    const key = clipKey(id, outline, clipId)
+    const hit = this.clips.get(key)
+    if (hit) return hit
+    if (!this.baking.has(key)) {
+      this.baking.add(key)
+      void this.bakeClip(id, outline, clipId, key)
+    }
+    return NO_CLIP
+  }
+
+  /** 惰性烘焙:整套帧连续落格(必要时增页),完成后刷新受影响的页纹理 */
+  private async bakeClip(id: string, outline: OutlineKind, clipId: string, key: string): Promise<void> {
+    const clip = animClipOf(id, clipId)
+    const scene = this.scene
+    if (!clip || !scene) {
+      this.clips.set(key, NO_CLIP)
+      return
+    }
+    const raw = await emojiSvgText(id)
+    const recipe = { ...clip, viewBox: undefined }
+    const imgs = await Promise.all(
+      Array.from({ length: clip.frames }, (_, i) => {
+        const svg = outlineSvg(bakeAnimFrame(raw, recipe, i / clip.frames), OUTLINE.radius, OUTLINE.colors[outline])
+        return svgToImage(setSvgSize(svg, CELL))
+      }),
+    )
+    // 光栅化是异步的:场景可能已切换,此时静默丢弃
+    if (!scene.textures) return
+    const base = this.cursor
+    const touched = new Set<number>()
+    for (const img of imgs) {
+      const frame = this.alloc()
+      this.place(frame, img)
+      touched.add(Math.floor(frame / PER_PAGE))
+    }
+    for (const p of touched) this.pages[p]?.refresh()
+    this.clips.set(key, { base, frames: clip.frames })
   }
 
   /** 变体索引(id + 描边阵营)→ frame;未收录返回 -1 */
@@ -76,18 +173,7 @@ export class EcsAtlas {
       }
     }
 
-    const atlas = new EcsAtlas(variants.length)
-    const pageCount = Math.max(1, Math.ceil(variants.length / PER_PAGE))
-    const canvases: HTMLCanvasElement[] = []
-    const ctxs: CanvasRenderingContext2D[] = []
-    for (let p = 0; p < pageCount; p++) {
-      const cv = document.createElement('canvas')
-      cv.width = PAGE
-      cv.height = PAGE
-      canvases.push(cv)
-      ctxs.push(cv.getContext('2d')!)
-    }
-
+    const atlas = new EcsAtlas()
     // 并行光栅化,顺序落格
     const imgs = await Promise.all(
       variants.map(async ({ id, outline }) => {
@@ -96,31 +182,18 @@ export class EcsAtlas {
         return svgToImage(setSvgSize(svg, CELL))
       }),
     )
-
-    for (let frame = 0; frame < variants.length; frame++) {
-      const { id, outline } = variants[frame]!
-      const page = Math.floor(frame / PER_PAGE)
-      const local = frame % PER_PAGE
-      const col = local % COLS
-      const row = Math.floor(local / COLS)
-      const px = col * CELL
-      const py = row * CELL
-      ctxs[page]!.drawImage(imgs[frame]!, px, py, CELL, CELL)
-      const b = frame * 4
-      // V 轴按 GL 朝向（原点在下）：Phaser 4 起 TextureSource 的 flipY 默认为 true，
-      // canvas 页是自下而上上传的，沿用 v3 的左上原点算法会让整页图集上下镜像
-      atlas.uv[b] = px / PAGE
-      atlas.uv[b + 1] = 1 - py / PAGE
-      atlas.uv[b + 2] = (px + CELL) / PAGE
-      atlas.uv[b + 3] = 1 - (py + CELL) / PAGE
-      atlas.pageOf[frame] = page
+    for (let i = 0; i < variants.length; i++) {
+      const { id, outline } = variants[i]!
+      const frame = atlas.alloc()
+      atlas.place(frame, imgs[i]!)
       atlas.keyToFrame.set(variantKey(id, outline), frame)
     }
-
-    for (let p = 0; p < pageCount; p++) {
+    // 页纹理统一登记(此后 scene 就位,增页即时登记)
+    atlas.scene = scene
+    for (let p = 0; p < atlas.canvases.length; p++) {
       const key = `ecs-atlas-${p}`
       if (scene.textures.exists(key)) scene.textures.remove(key)
-      atlas.pages.push(scene.textures.addCanvas(key, canvases[p]!)!)
+      atlas.pages.push(scene.textures.addCanvas(key, atlas.canvases[p]!)!)
     }
     return atlas
   }

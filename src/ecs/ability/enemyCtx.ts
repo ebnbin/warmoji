@@ -6,6 +6,7 @@ import { Alive, Boss, DmgMul, Elite, ENEMY_SET, Hp, Iframe, MHp, Transform } fro
 import { hurtMember } from '../combat'
 import { spawnGroundEffectEcs } from '../groundEffects'
 import { spawnEnemyProjectileEcs } from '../projectile'
+import { playClip } from '../anim'
 import { enemyDef, enemyVelX, enemyVelY, memberRef } from '../store'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
@@ -111,7 +112,8 @@ export function makeEnemyCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, eid
     damageMul: () => DmgMul.v[eid]!,
     cooldownMul: () => 1,
     sfx: (id) => playSfx(id),
-    playOwnerClip: () => {}, // 敌人动画 P6
+    // 本体动画:durMs = 本次出手的真实间隔
+    playOwnerClip: (clipId, durMs) => playClip(sim, atlas, eid, clipId, durMs),
     // aim:'move' 弹朝向 = 本帧移动速度方向(速度为零时朝右,与旧攻击积木一致)
     ownerHeading: () => ({ x: enemyVelX[eid]!, y: enemyVelY[eid]! }),
     random: () => sim.rng.next(),

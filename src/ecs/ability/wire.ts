@@ -119,11 +119,9 @@ export function armCaptain(
   return { abilities, handle }
 }
 
-/** 每帧:重建敌方存活快照 + 驱动各活着队员的能力(wdelta = 世界时长,P3c 等于真实帧长) */
-export function updateMemberAbilities(sim: Sim, wdelta: number): void {
-  // 本帧光环登记表清零:能力更新即唯一生产者,消费方(steerEnemies/magnetCoins)读最近一次
-  sim.frameSlowZones.length = 0
-  sim.frameAttractors.length = 0
+/** 重建敌方存活快照(能力索敌与抛射物 onHit 效果链共享):须先于 stepSim,
+ * 否则本帧的命中效果读的是上一帧位置 */
+export function refreshEnemyTargets(sim: Sim): void {
   const targets: TargetInfo[] = []
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     if (Dormant.v[eid]) continue // 休眠怪不可被索敌(镜像 dormancyFrameTargets)
@@ -136,6 +134,13 @@ export function updateMemberAbilities(sim: Sim, wdelta: number): void {
     for (const g of sim.hooks.ghosts(sim, x, y)) targets.push({ x: g.x, y: g.y, radius, ref })
   }
   sim.enemyTargets = targets
+}
+
+/** 每帧:驱动各活着队员的能力(wdelta = 世界时长);索敌快照由 refreshEnemyTargets 先行重建 */
+export function updateMemberAbilities(sim: Sim, wdelta: number): void {
+  // 本帧光环登记表清零:能力更新即唯一生产者,消费方(steerEnemies/magnetCoins)读最近一次
+  sim.frameSlowZones.length = 0
+  sim.frameAttractors.length = 0
   for (let slot = 0; slot < sim.members.length; slot++) {
     const m = sim.members[slot]!
     const abilities = memberAbilities[slot]

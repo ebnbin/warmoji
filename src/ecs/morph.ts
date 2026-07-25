@@ -1,4 +1,5 @@
-import { Boss, Elite, EState, Morph, Sprite, Tint, Transform } from './components'
+import { Anim, Boss, Elite, EState, Morph, Sprite, Tint, Transform } from './components'
+import { armIdle } from './anim'
 import { enemyDef } from './store'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
@@ -27,6 +28,8 @@ export function applyMorph(
   if (!wasMorphed) {
     const outline = Elite.v[eid] ? 'elite' : 'enemy'
     Sprite.frame[eid] = atlas.index(spec.morphEmoji, outline)
+    // 动画整套换成替身的 idle 帧(未烘焙则停留静态替身形象)
+    armIdle(eid, spec.morphEmoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
     // 蓄力中被变形:打断状态机 + 清白闪染色 + 复位旋转
     if (EState.v[eid] === 2) {
       Tint.effect[eid] = 0
@@ -44,5 +47,6 @@ export function restoreMorphVisual(atlas: EcsAtlas, eid: number): void {
   if (!def) return
   const outline = Elite.v[eid] ? 'elite' : 'enemy'
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
+  armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
   Morph.until[eid] = 0
 }

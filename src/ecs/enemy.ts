@@ -10,6 +10,7 @@ import { playSfx } from '../audio/sfx'
 import { despawnEnemy, hurtMember } from './combat'
 import {
   Alive,
+  Anim,
   Boss,
   Charge,
   Pop,
@@ -52,6 +53,8 @@ import {
   thiefEaten,
   thiefNextEatAt,
 } from './store'
+import { armIdle } from './anim'
+import { ANIM_DEF } from '../emoji/studio'
 import { backEaseOut } from './sim'
 import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
@@ -95,6 +98,7 @@ export function spawnEnemy(
   addComponent(world, eid, Morph)
   addComponent(world, eid, EDir)
   addComponent(world, eid, ETurn)
+  addComponent(world, eid, Anim)
   addComponent(world, eid, Sprite)
   addComponent(world, eid, Tint)
   addComponent(world, eid, Depth)
@@ -149,6 +153,8 @@ export function spawnEnemy(
   enemyPhase[eid] = sim.rng.next() * Math.PI * 2
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   Sprite.flipX[eid] = 0
+  // 部件动画:idle 常驻翻帧,相位按出生随机相错开(镜像 materializeEnemy 的 anim.setIdle)
+  armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (enemyPhase[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
   Tint.color[eid] = 0xffffff
   Tint.effect[eid] = 0
   Tint.alpha[eid] = boss ? 0.2 : 0.3

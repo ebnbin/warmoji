@@ -117,8 +117,9 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
   // 敌情明细(结算页战报):按敌人名累计击杀 + 精英击杀计数
   if (def) st.enemyKills[def.name] = (st.enemyKills[def.name] ?? 0) + 1
   if (elite) st.eliteKills += 1
-  // 死亡爆点(镜像 despawnKilled/onBossDown 的 deathBurst:Boss 24、普通 6)
-  sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: boss ? 24 : 6, kind: 'death' })
+  // 死亡爆点(镜像 despawnKilled 的 6;Boss 另叠 onBossDown 的 24)
+  sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'death' })
+  if (boss) sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 24, kind: 'death' })
   if (boss) sim.bossDown = true // 终波 Boss 被击败 → 场景侧走通关结算
   if (def) grantKillRewards(sim, eid, def, elite) // 经验即得 + 金币落地待拾
   // 变形中的敌人 = 一只无能力的羊:死亡不触发任何亡语/拆巢(镜像 killEnemy 的 morph 判定)

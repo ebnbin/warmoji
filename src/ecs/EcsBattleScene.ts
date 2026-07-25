@@ -47,6 +47,7 @@ import {
   Poison,
   Projectile,
   Slow,
+  Sprite,
   Transform,
 } from './components'
 import { applyDamage } from './combat'
@@ -54,10 +55,11 @@ import { applyMorph } from './morph'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch } from './render/spriteBatch'
 import { spawnSprite } from './entities'
+import { updateAnims } from './anim'
 import { spawnTeam } from './team'
 import { spawnEnemy, updateSpawners } from './enemy'
 import { enemyNest, thiefEaten } from './store'
-import { armCaptain, armTeam, updateMemberAbilities } from './ability/wire'
+import { armCaptain, armTeam, refreshEnemyTargets, updateMemberAbilities } from './ability/wire'
 import { updateEnemyAbilities } from './ability/enemyWire'
 import { runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
@@ -1466,9 +1468,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     sim.view.y = wv.y
     sim.view.right = wv.right
     sim.view.bottom = wv.bottom
+    // 索敌快照先行重建:stepSim 内的抛射物 onHit 效果链要用本帧位置
+    refreshEnemyTargets(sim)
     stepSim(sim, delta, wdelta)
     // 队员能力驱动(世界时长:时停期队伍的枪也一并凝住)
     updateMemberAbilities(sim, wdelta)
+    // 部件动画:把时钟翻算成帧下标(帧惰性烘焙,未就绪保持静态帧)
+    if (this.atlas) updateAnims(sim, this.atlas)
     // 敌人能力驱动(持械射击/治疗/落石;lazy-arm + 死亡清理)
     if (this.atlas) updateEnemyAbilities(sim, this, this.atlas, wdelta)
     // 亡语重放(分裂/诱饵/治疗/冷枪:本帧内所有死亡的敌人在死亡点触发)
@@ -1545,6 +1551,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       moveSpeed: sim.moveSpeed,
       elapsed: sim.elapsedMs,
       memberPos: sim.members.map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
+      frames: sim.members.map((eid) => Sprite.frame[eid]!),
       enemies: query(this.world, [Enemy]).length,
       // 护巢子敌数(enemyNest>=0):虫巢生成的子敌带巢引用,自然刷怪的敌人恒 -1,借此隔离测量
       broods: Array.from(query(this.world, [Enemy]), (eid) => enemyNest[eid]!).filter((n) => n >= 0).length,

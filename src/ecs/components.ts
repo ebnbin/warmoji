@@ -140,6 +140,22 @@ export const Despawn = { at: f32() }
  * cdUntil 变形+复形冷却结束时刻(期间免疫再变)。变形期无害/缴械/缓速游荡/绵羊形象 */
 export const Morph = { until: f32(), vuln: f32(), cdUntil: f32() }
 
+/** 部件动画:常驻 idle 循环(帧基址/帧数/周期/相位偏移)+ 一次性覆盖 clip(播完回落 idle)。
+ * base<0 = 帧尚未烘好(或该 emoji 无此 clip),此时保持 still 静态帧——渐进增强,无加载闪烁 */
+export const Anim = {
+  base: i32(),
+  frames: i32(),
+  durMs: f32(),
+  offset: f32(),
+  onceBase: i32(),
+  onceFrames: i32(),
+  onceDur: f32(),
+  onceAt: f32(),
+  /** 静态回退帧(atlas 变体索引) */
+  still: i32(),
+}
+export const ANIM_SET = [Anim, Sprite] as const
+
 /** 打滑状态(浮冰世界钩子的低通积分器):行为速度的平滑值,击退不入此列 */
 export const Slide = { x: f32(), y: f32() }
 
