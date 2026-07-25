@@ -205,8 +205,48 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     return kind === 'infinite' || kind === 'space'
   }
 
-  create(): void {
+  /** 开局重置全部可变实例字段（镜像 resetWorldFields 的用意）。
+   * Phaser 跨局复用同一个 Scene 实例：不重置的话，上一波的 ending=true 会让 update 永久早退
+   *（下一波整局静止），各视觉列表也会跨局累积到已销毁的对象上 */
+  private resetSceneFields(): void {
+    this.atlas = undefined
+    this.sim = undefined
     this.ready = false
+    this.ending = false
+    this.captainAbilities = []
+    this.captainHandle = { x: 0, y: 0, setVisualOffset: () => {} }
+    this.waveBaseKills = 0
+    this.waveBaseCoins = 0
+    this.waveBaseLevel = 1
+    this.hpBars = []
+    this.shownHp = []
+    this.deadTexts = []
+    this.shownCountdown = []
+    this.seenHitCount = 0
+    this.damagePool = []
+    this.damageIdx = 0
+    this.spawnMarks = new Map()
+    this.fogRect = undefined
+    this.fogMaskShape = undefined
+    this.timeStopFx = undefined
+    this.timeStopFxAlpha = 0
+    this.waterVignette = undefined
+    this.zoneGfx = undefined
+    this.zoneVignette = undefined
+    this.meteorFx = undefined
+    this.stripCams = []
+    this.frameTiles = []
+    this.frameGlow = undefined
+    this.worldVisuals = []
+    this.waveTiles = []
+    this.drifts = []
+    this.wallTiles = new Map()
+    this.decorChunks = new Map()
+    this.decorRangeKey = ''
+  }
+
+  create(): void {
+    this.resetSceneFields()
     this.world = makeWorld()
     ;(window as unknown as { __ecsWorld?: EcsWorld }).__ecsWorld = this.world
 
