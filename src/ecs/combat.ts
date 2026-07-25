@@ -38,6 +38,7 @@ import {
   Transform,
 } from './components'
 import { enemyCarries, enemyDef, enemyNest, enemyRef, thiefEaten } from './store'
+import { unequipAbilities } from './ability/equip'
 import type { Sim } from './sim'
 
 // 战斗(P3b):敌人受伤/致死/击退,队员接触伤害/死亡/复活/受击闪光。
@@ -158,6 +159,7 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
   )
   enemyDef[eid] = undefined
   enemyRef[eid] = undefined
+  unequipAbilities(sim, eid)
   removeEntity(sim.world, eid)
 }
 
@@ -263,6 +265,7 @@ export function despawnEnemy(sim: Sim, eid: number): void {
   enemyCarries[eid] = undefined
   enemyDef[eid] = undefined
   enemyRef[eid] = undefined
+  unequipAbilities(sim, eid)
   removeEntity(sim.world, eid)
 }
 

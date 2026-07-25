@@ -15,6 +15,8 @@ import type { RunState } from '../../run/state'
 import type { AbilityContext, AbilityOwner, AbilityRuntime, TargetInfo } from '../../war/abilities/types'
 import { Alive, Dormant, ENEMY_SET, Radius, Transform, VisOff } from '../components'
 import { enemyDef, enemyRef, memberAbilities, memberHandle } from '../store'
+import { FACTION } from './components'
+import { ecsAbilityKind, equipAbility, NEUTRAL_AMP, spawnTeamAnchor } from './equip'
 import { makeEffectCtx, makeTeamCtx } from './ctx'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
@@ -73,9 +75,23 @@ export function armTeam(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, run: Run
       },
     }
     memberHandle[slot] = handle
-    memberAbilities[slot] = loadoutFor(def, tiers).map((w, i) => {
+    // 装备期乘区(道具/等级/团队卡折算):随局面变的那部分由 amp.ts 现算
+    const amp = {
+      dmg: fx.damageMul * teamFx.teamDamageMul,
+      cd: fx.cooldownMul * teamFx.teamCooldownMul,
+      crit: fx.critChance + teamFx.critAdd,
+      kb: fx.knockbackMul,
+      battle: true,
+    }
+    // 已 ECS 化的 kind 物化成能力实体,其余仍由旧运行时驱动(过渡期)
+    memberAbilities[slot] = loadoutFor(def, tiers).flatMap((w, i) => {
       const px = toPx(resolveAbilityDef(w, fx))
-      return createAbility(px, wallAwareCtx(sim, px, ctx, slot), 300 + slot * 120 + i * 230)
+      const delay = 300 + slot * 120 + i * 230
+      if (ecsAbilityKind(px.kind)) {
+        equipAbility(sim, sim.members[slot]!, px, FACTION.team, delay, amp)
+        return []
+      }
+      return [createAbility(px, wallAwareCtx(sim, px, ctx, slot), delay)]
     })
   }
 }
@@ -104,9 +120,11 @@ export function armCaptain(
   scene: Phaser.Scene,
   atlas: EcsAtlas,
   run: RunState,
-): { abilities: AbilityRuntime[]; handle: AbilityOwner } {
+): { abilities: AbilityRuntime[]; handle: AbilityOwner; anchor: number } {
   const teamFx = aggregateTeamCards(run.teamCards)
   const ctx = makeTeamCtx(sim, scene, atlas, -1, aggregateCharacterEffects([], []), teamFx, false, true)
+  // 锚点实体:队长技能没有本体,以队伍中心为行为主体
+  const anchor = spawnTeamAnchor(sim)
   const handle: AbilityOwner = {
     get x() {
       return sim.center.x
@@ -116,8 +134,13 @@ export function armCaptain(
     },
     setVisualOffset() {},
   }
-  const abilities = CAPTAINS[run.captainId].skill.abilities.map((a) => createAbility(toPx(a), ctx, 0))
-  return { abilities, handle }
+  const abilities: AbilityRuntime[] = []
+  for (const a of CAPTAINS[run.captainId].skill.abilities) {
+    const px = toPx(a)
+    if (ecsAbilityKind(px.kind)) equipAbility(sim, anchor, px, FACTION.team, 0, NEUTRAL_AMP, true)
+    else abilities.push(createAbility(px, ctx, 0))
+  }
+  return { abilities, handle, anchor }
 }
 
 /** 重建敌方存活快照(能力索敌与抛射物 onHit 效果链共享):须先于 stepSim,

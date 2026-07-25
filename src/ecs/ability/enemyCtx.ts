@@ -1,13 +1,13 @@
 import type Phaser from 'phaser'
-import { query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
 import type { AbilityContext, TargetInfo } from '../../war/abilities/types'
-import { Alive, Boss, DmgMul, Elite, ENEMY_SET, Hp, Iframe, MHp, Transform } from '../components'
+import { Alive, Boss, DmgMul, Elite, Iframe, MHp, Transform } from '../components'
 import { hurtMember } from '../combat'
 import { spawnGroundEffectEcs } from '../groundEffects'
 import { spawnEnemyProjectileEcs } from '../projectile'
 import { playClip } from '../anim'
 import { enemyDef, enemyVelX, enemyVelY, memberRef } from '../store'
+import { healEnemies } from './heal'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
 
@@ -36,39 +36,6 @@ export function memberRefOf(eid: number): TargetInfo['ref'] {
     memberRef[eid] = r
   }
   return r as unknown as TargetInfo['ref']
-}
-
-/** 治疗敌群(镜像 healEnemies):all=false 只治血量比例最低一只;满血不计;返回被治数。
- * excludeEid 排除一只(幽灵亡语治疗时排除正在死亡的自己) */
-export function healEnemiesEcs(
-  sim: Sim,
-  x: number,
-  y: number,
-  range: number,
-  amount: number,
-  all: boolean,
-  excludeEid?: number,
-): number {
-  const r2 = range * range
-  const hurt: number[] = []
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (eid === excludeEid) continue
-    if (Hp.v[eid]! >= Hp.max[eid]!) continue
-    const dx = Transform.x[eid]! - x
-    const dy = Transform.y[eid]! - y
-    if (dx * dx + dy * dy <= r2) hurt.push(eid)
-  }
-  if (hurt.length === 0) return 0
-  let targets: number[]
-  if (all) {
-    targets = hurt
-  } else {
-    let best = hurt[0]!
-    for (const eid of hurt) if (Hp.v[eid]! / Hp.max[eid]! < Hp.v[best]! / Hp.max[best]!) best = eid
-    targets = [best]
-  }
-  for (const eid of targets) Hp.v[eid] = Math.min(Hp.max[eid]!, Hp.v[eid]! + amount)
-  return targets.length
 }
 
 /** 敌方视角的阵营中立 ctx(按 eid) */
@@ -101,7 +68,7 @@ export function makeEnemyCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, eid
     slowTarget: () => {},
     spawnGroundEffect: (x, y, def) => spawnGroundEffectEcs(sim, scene, x, y, def, 'enemy', -1, enemyDef[eid]?.name ?? ''),
     heal: (x, y, range, amount, all, exclude) =>
-      healEnemiesEcs(sim, x, y, range, amount, all, exclude ? eidOf(exclude) : undefined),
+      healEnemies(sim, x, y, range, amount, all, exclude ? eidOf(exclude) : undefined),
     spawnProjectile: (x, y, angle, pDef, damage) => {
       const p = pDef.projectile
       shoot(x, y, angle, p, damage, pDef.lifeMs ?? BULLET_LIFE_MS)

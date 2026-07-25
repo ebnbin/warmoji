@@ -7,6 +7,7 @@ import { TIMESTOP } from '../war/timeStop'
 import { DAMAGE_FONT, ensureDamageFont } from '../war/damageFont'
 import { burstEmitter } from '../core/fx'
 import { blastRing } from '../war/abilities/effects'
+import { circleCue, screenFlashCue } from '../war/abilities/cues'
 import { loadSettings } from '../run/settings'
 import { browserStorage } from '../core/storage'
 import { UI_FONT, FONT } from '../core/fonts'
@@ -61,7 +62,10 @@ import { spawnTeam } from './team'
 import { spawnEnemy, updateSpawners } from './enemy'
 import { clearEcsStore, enemyNest, thiefEaten } from './store'
 import { armCaptain, armTeam, refreshEnemyTargets, updateMemberAbilities } from './ability/wire'
-import { clearEnemyWire, updateEnemyAbilities } from './ability/enemyWire'
+import { clearEnemyWire, refreshMemberTargets, updateEnemyAbilities } from './ability/enemyWire'
+import { clearAbilityDefs } from './ability/defs'
+import { requestCast } from './ability/equip'
+import { stepAbilities } from './ability/run'
 import { replayDeath, runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, groundZoneCount, updateGroundEffectsEcs } from './groundEffects'
 import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
@@ -138,6 +142,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   /** 队长主动技能载荷（不进 update 循环，只经 castSkill 单发）+ 锚在队伍中心的行为主体 */
   private captainAbilities: AbilityRuntime[] = []
   private captainHandle: AbilityOwner = { x: 0, y: 0, setVisualOffset: () => {} }
+  /** 队伍锚点实体：ECS 化的队长技能载荷挂在它名下 */
+  private captainAnchor = -1
   /** 过场已排程(波末结算/全灭):置位后 update 早退,避免重复触发 */
   private ending = false
   /** 本波开场基线（波末小结取增量：本波击杀/金币/升级数） */
@@ -216,6 +222,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.ending = false
     this.captainAbilities = []
     this.captainHandle = { x: 0, y: 0, setVisualOffset: () => {} }
+    this.captainAnchor = -1
     this.waveBaseKills = 0
     this.waveBaseCoins = 0
     this.waveBaseLevel = 1
@@ -404,6 +411,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     clearFieldEcs()
     clearEcsStore()
     clearEnemyWire()
+    clearAbilityDefs()
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
     this.spawnDecor(run, atlas)
     this.testMode = run.testMode
@@ -430,6 +438,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const captain = armCaptain(this.sim, this, atlas, run)
     this.captainAbilities = captain.abilities
     this.captainHandle = captain.handle
+    this.captainAnchor = captain.anchor
     for (let i = 0; i < this.sim.members.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
@@ -770,6 +779,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     q.length = 0
   }
 
+  /** 排空本帧一次性战斗特效:能力系统只入队,绘制在此落地 */
+  private drainCues(): void {
+    const q = this.sim!.pendingCues
+    if (q.length === 0) return
+    for (const c of q) {
+      if (c.kind === 'circle') circleCue(this, c.x, c.y, c.radius, c.o)
+      else screenFlashCue(this, c.color, c.alpha, c.durationMs)
+    }
+    q.length = 0
+  }
+
   /** 排空本帧敌人受伤飘字(镜像 floatDamage:池化 BitmapText 上浮淡出);关则弃字 */
   private drainDamageNumbers(): void {
     const q = this.sim!.pendingDamageNumbers
@@ -906,6 +926,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     playSfx('levelup')
     this.events.emit('skill-cast', s.name)
     for (const a of this.captainAbilities) a.castNow?.(this.captainHandle)
+    if (this.captainAnchor >= 0) requestCast(sim, this.captainAnchor)
     return true
   }
 
@@ -1588,8 +1609,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 索敌快照先行重建:stepSim 内的抛射物 onHit 效果链要用本帧位置
     refreshEnemyTargets(sim)
     stepSim(sim, delta, wdelta)
+    // 队员快照重建:敌方能力索敌读它,须先于任何敌方出手
+    refreshMemberTargets(sim)
     // 队员能力驱动(世界时长:时停期队伍的枪也一并凝住)
     updateMemberAbilities(sim, wdelta)
+    // 能力系统(敌我共用一套:闸门 → 冷却 → 逐 kind 施放)
+    stepAbilities(sim, wdelta)
     // 部件动画:把时钟翻算成帧下标(帧惰性烘焙,未就绪保持静态帧)
     if (this.atlas) updateAnims(sim, this.atlas)
     // 敌人能力驱动(持械射击/治疗/落石;lazy-arm + 死亡清理)
@@ -1616,6 +1641,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.drainDamageNumbers()
     this.drainBursts()
     this.drainRings()
+    this.drainCues()
     // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtMember 的 cameras.shake)。
     // 同样须先于过场判定——致死那一帧的抖屏否则被 return 吞掉且永远补不回来
     if (sim.memberHitCount > this.seenHitCount) {

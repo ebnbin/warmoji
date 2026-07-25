@@ -5,6 +5,8 @@ import type { AbilityOwner, TargetInfo } from '../../war/abilities/types'
 import { Alive, Dormant, ENEMY_SET, Hurt, Morph, Transform } from '../components'
 import { enemyAbilities, enemyDef, enemyFireDelayMs, enemyOwner } from '../store'
 import { restoreMorphVisual } from '../morph'
+import { FACTION } from './components'
+import { ecsAbilityKind, equipAbility, NEUTRAL_AMP, postponeAbilities } from './equip'
 import { makeEnemyCtx, memberRefOf } from './enemyCtx'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
@@ -39,15 +41,20 @@ function armEnemyEcs(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, eid: number
   const ctx = makeEnemyCtx(sim, scene, atlas, eid)
   const fireDelay = enemyFireDelayMs[eid]!
   enemyOwner[eid] = owner
-  enemyAbilities[eid] = rows.map((w, i) =>
-    createAbility(w, ctx, (w.kind === 'projectile' ? w.firstDelayMs : undefined) ?? fireDelay ?? 600 + i * 230),
-  )
+  // 已 ECS 化的 kind 物化成能力实体,其余仍由旧运行时驱动(过渡期)
+  enemyAbilities[eid] = rows.flatMap((w, i) => {
+    const delay = (w.kind === 'projectile' ? w.firstDelayMs : undefined) ?? fireDelay ?? 600 + i * 230
+    if (ecsAbilityKind(w.kind)) {
+      equipAbility(sim, eid, w, FACTION.enemy, delay, NEUTRAL_AMP)
+      return []
+    }
+    return [createAbility(w, ctx, delay)]
+  })
   armedEids.add(eid)
 }
 
-/** 每帧:重建队员存活快照 + lazy-arm/驱动各活着敌人的能力 + 清理已死敌人的能力 */
-export function updateEnemyAbilities(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, delta: number): void {
-  // 队员存活快照(敌方能力索敌共享)
+/** 重建队员存活快照(敌方能力索敌共享):须先于任何敌方能力出手 */
+export function refreshMemberTargets(sim: Sim): void {
   const targets: TargetInfo[] = []
   for (const m of sim.members) {
     if (!Alive.v[m]) continue
@@ -60,7 +67,10 @@ export function updateEnemyAbilities(sim: Sim, scene: Phaser.Scene, atlas: EcsAt
     for (const g of sim.hooks.ghosts(sim, x, y)) targets.push({ x: g.x, y: g.y, radius, ref })
   }
   sim.memberTargets = targets
+}
 
+/** 每帧:lazy-arm/驱动各活着敌人的能力 + 清理已死敌人的能力 */
+export function updateEnemyAbilities(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, delta: number): void {
   const now = sim.elapsedMs
   const alive = new Set<number>()
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
@@ -86,6 +96,7 @@ export function updateEnemyAbilities(sim: Sim, scene: Phaser.Scene, atlas: EcsAt
       restoreMorphVisual(atlas, eid)
       sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'puff' }) // 复形灰烟
       if (abilities) for (const w of abilities) w.postponeFire?.(700)
+      postponeAbilities(sim, eid, 700)
     }
     if (!abilities || !owner) continue
     for (const w of abilities) w.update(delta, owner)

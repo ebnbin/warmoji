@@ -80,6 +80,7 @@ export function spawnEnemy(
   const size = def.size * (elite ? ELITE.sizeMul : 1)
   const eid = addEntity(world)
   addComponent(world, eid, Enemy)
+  addComponent(world, eid, Alive)
   addComponent(world, eid, Transform)
   addComponent(world, eid, Speed)
   addComponent(world, eid, Hp)
@@ -144,6 +145,8 @@ export function spawnEnemy(
   Slide.x[eid] = 0
   Slide.y[eid] = 0
   Dormant.v[eid] = 0
+  // 敌人一并带 Alive:「持有者还在不在场上」对能力系统就此与阵营无关(队员阵亡与敌人离场同构)
+  Alive.v[eid] = 1
   Flash.until[eid] = 0
   Slow.until[eid] = 0
   Slow.mul[eid] = 1

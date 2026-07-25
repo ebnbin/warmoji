@@ -210,6 +210,7 @@ export function spawnTeam(
     pendingDamageNumbers: [],
     pendingBursts: [],
     pendingRings: [],
+    pendingCues: [],
     rng: new Rng(run.decorSeed ^ 0x9e37),
     testMode,
     wave: run.wave,

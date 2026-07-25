@@ -13,6 +13,7 @@ import { playClip } from '../anim'
 import { enemyDef } from '../store'
 import { spawnGroundEffectEcs } from '../groundEffects'
 import { spawnProjectileEcs } from '../projectile'
+import { healMembers } from './heal'
 import type { Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
 
@@ -25,41 +26,6 @@ interface Ref {
   __eid: number
 }
 const eidOf = (ref: TargetInfo['ref']): number => (ref as unknown as Ref).__eid
-
-/** 治疗范围内我方(all=全体/否则最缺血一名);返回实际被治数(满血不计) */
-function healMembers(sim: Sim, x: number, y: number, range: number, amount: number, all: boolean): number {
-  const r2 = range * range
-  if (all) {
-    let n = 0
-    for (const m of sim.members) {
-      if (!Alive.v[m]) continue
-      const dx = Transform.x[m]! - x
-      const dy = Transform.y[m]! - y
-      if (dx * dx + dy * dy > r2) continue
-      if (MHp.hp[m]! >= MHp.max[m]!) continue
-      MHp.hp[m] = Math.min(MHp.max[m]!, MHp.hp[m]! + amount)
-      n++
-    }
-    return n
-  }
-  let best = -1
-  let bestRatio = Infinity // 镜像 healAllies:挑「血量比例」最低者,不是绝对血量最低者
-  for (const m of sim.members) {
-    if (!Alive.v[m]) continue
-    const dx = Transform.x[m]! - x
-    const dy = Transform.y[m]! - y
-    if (dx * dx + dy * dy > r2) continue
-    if (MHp.hp[m]! >= MHp.max[m]!) continue
-    const ratio = MHp.hp[m]! / MHp.max[m]!
-    if (ratio < bestRatio) {
-      bestRatio = ratio
-      best = m
-    }
-  }
-  if (best < 0) return 0
-  MHp.hp[best] = Math.min(MHp.max[best]!, MHp.hp[best]! + amount)
-  return 1
-}
 
 /** 抛射物 onHit 命中链的效果执行面(镜像旧 teamEffectCtx):归属槽位由 sim.effectSlot 逐次命中
  * 改写——子弹可能比发射者活得久,故挂在 sim 上而非闭包里。与 makeTeamCtx 的关键差别:

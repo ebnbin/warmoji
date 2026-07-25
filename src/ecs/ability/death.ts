@@ -9,7 +9,7 @@ import { hurtMember } from '../combat'
 import { spawnBrood, spawnEnemy } from '../enemy'
 import { spawnGroundEffectEcs } from '../groundEffects'
 import { spawnEnemyProjectileEcs } from '../projectile'
-import { healEnemiesEcs } from './enemyCtx'
+import { healEnemies } from './heal'
 import type { PendingDeath, Sim } from '../sim'
 import type { EcsAtlas } from '../render/atlas'
 
@@ -37,7 +37,7 @@ function makeDeathCtx(sim: Sim, scene: Phaser.Scene, atlas: EcsAtlas, d: Pending
     slowTarget: () => {},
     spawnGroundEffect: (x, y, def) => spawnGroundEffectEcs(sim, scene, x, y, def, 'enemy', -1, d.def.name),
     heal: (x, y, range, amount, all, exclude) =>
-      healEnemiesEcs(sim, x, y, range, amount, all, exclude ? eidOf(exclude) : undefined),
+      healEnemies(sim, x, y, range, amount, all, exclude ? eidOf(exclude) : undefined),
     spawnBullet: (x, y, angle, spec, damage, lifeMs) =>
       spawnEnemyProjectileEcs(sim, atlas, x, y, angle, {
         emoji: spec.emoji,

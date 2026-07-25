@@ -21,6 +21,7 @@ import type { WorldHooks } from './worlds'
 import type { Point } from '../core/vec'
 import type { RunState } from '../run/state'
 import type { EffectCtx, TargetInfo } from '../war/abilities/types'
+import type { Cue } from './ability/cues'
 import { TIMESTOP, timeScaleFor } from '../war/timeStop'
 import { BATTLE_FX_IDENTITY, foldBattleEffects } from '../data/battlefield'
 import type { BattleEffects } from '../data/battlefield'
@@ -124,6 +125,8 @@ export interface Sim {
   pendingBursts: Burst[]
   /** 本帧冲击波圈(自爆群伤示警;场景侧 drainRings 排空,走 blastRing) */
   pendingRings: { x: number; y: number; radius: number }[]
+  /** 本帧一次性战斗特效(能力系统只入队;场景侧 drainCues 排空,走 war/abilities/cues) */
+  pendingCues: Cue[]
   /** 队伍侧共享效果执行面(抛射物 onHit 命中链复用;armTeam 后由场景注入) */
   effectCtx?: EffectCtx
   /** 抛射物 onHit 效果链的归属槽位:每次命中前改写成该子弹的 srcSlot(镜像 teamEffectSlot) */
