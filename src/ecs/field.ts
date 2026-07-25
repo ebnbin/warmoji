@@ -6,6 +6,7 @@ import { FIELD, POLARITY_COLOR } from '../battlefield/registry'
 import type { FieldPickupDef } from '../battlefield/registry'
 import { foldBattleEffects } from '../battlefield/registry'
 import { Alive, Tint, Transform } from './components'
+import { enemyDef } from './store'
 import type { Sim } from './sim'
 
 // 战场拾取(ECS 版,镜像 battlefield.ts):地面待拾实体(不磁吸,靠走位拾取)+ 拾取后施加的
@@ -88,9 +89,13 @@ export function applyFieldPickupEcs(sim: Sim, def: FieldPickupDef): void {
 
 /** 逐帧:拾取(队伍中心进圈即收,不磁吸)+ 地面到期淡出 + 携带者光环跟位 */
 export function updateFieldEcs(sim: Sim, scene: Phaser.Scene): void {
-  // 携带者光环跟位;敌人已离场的光环随之销毁
+  // 携带者光环跟位;携带者已离场(enemyDef 清空 = 死亡/自毁)则销毁光环,免得空圈留在原地
   for (const [eid, aura] of auras) {
-    if (Alive.v[eid] === undefined && Transform.x[eid] === undefined) continue
+    if (enemyDef[eid] === undefined) {
+      aura.destroy()
+      auras.delete(eid)
+      continue
+    }
     aura.setPosition(Transform.x[eid]!, Transform.y[eid]!)
   }
   if (entities.length === 0) return
