@@ -182,7 +182,7 @@ export class IceArenaScene extends BaseArenaScene {
 
   /** 金币钳在浮冰内（否则漂进水里，隔着掉血区捡不回） */
   constrainCoinPos(p: Point): Point {
-    const r = PICKUPS.coin.radius
+    const r = PICKUPS.coin.radius * UNIT // 格值需 ×UNIT 换算成 px
     return {
       x: Phaser.Math.Clamp(p.x, r, this.floePx - r),
       y: Phaser.Math.Clamp(p.y, r, this.floePx - r),

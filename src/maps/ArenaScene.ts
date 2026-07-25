@@ -397,9 +397,10 @@ export class ArenaScene extends BaseArenaScene {
   }
 
   constrainCoinPos(p: Point): Point {
+    const r = PICKUPS.coin.radius * UNIT // 格值需 ×UNIT 换算成 px，整枚币都留在图内
     return {
-      x: Phaser.Math.Clamp(p.x, PICKUPS.coin.radius, this.mapW - PICKUPS.coin.radius),
-      y: Phaser.Math.Clamp(p.y, PICKUPS.coin.radius, this.mapH - PICKUPS.coin.radius),
+      x: Phaser.Math.Clamp(p.x, r, this.mapW - r),
+      y: Phaser.Math.Clamp(p.y, r, this.mapH - r),
     }
   }
 

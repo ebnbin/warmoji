@@ -151,7 +151,7 @@ const bounded: WorldHooks = {
     return 1
   },
   constrainCoin(sim, x, y) {
-    const r = PICKUPS.coin.radius
+    const r = PICKUPS.coin.radius * UNIT // 格值需 ×UNIT 换算成 px,整枚币都留在图内
     return {
       x: Math.min(Math.max(x, r), sim.mapW - r),
       y: Math.min(Math.max(y, r), sim.mapH - r),
@@ -253,7 +253,7 @@ const ice: WorldHooks = {
     return iceCfg(sim).knockbackTauMul
   },
   constrainCoin(sim, x, y) {
-    const r = PICKUPS.coin.radius
+    const r = PICKUPS.coin.radius * UNIT // 格值需 ×UNIT 换算成 px
     const max = floePx(sim) - r
     return { x: Math.min(Math.max(x, r), max), y: Math.min(Math.max(y, r), max) }
   },
