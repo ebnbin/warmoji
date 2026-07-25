@@ -13,7 +13,7 @@ import { FlowField, WallGrid, generateRuins, reachableCells } from '../../war/wo
 import { enemyOf } from '../enemy/enemies'
 import { abilityPiercesWalls } from '../../data/abilityDefs'
 import type { AbilityDef } from '../../data/abilityDefs'
-import type { AbilityContext } from '../../war/abilities/types'
+import type { AbilityContext } from '../abilities/types'
 import { Rng } from '../../core/rng'
 import { randomMapPoint } from '../../war/spawn'
 import type { Point } from '../../core/vec'

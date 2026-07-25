@@ -1,6 +1,6 @@
 import { DEG2RAD } from '../../core/units'
 import type Phaser from 'phaser'
-import { thrustHitIndices } from './hit'
+import { thrustHitIndices } from '../../war/hit'
 import type { ThrustDef } from '../../data/abilityDefs'
 import { applyEffects } from './effects'
 import { emojiImage } from '../../emoji/textures'

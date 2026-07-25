@@ -1,6 +1,6 @@
 import type { ChainArcDef } from '../../data/abilityDefs'
 import { applyEffects } from './effects'
-import { lightningCue } from './cues'
+import { lightningCue } from '../../war/cues'
 import { nearestTarget } from './targeting'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 

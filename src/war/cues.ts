@@ -1,5 +1,6 @@
 import type Phaser from 'phaser'
-import { emojiImage } from '../../emoji/textures'
+import type { BlastRing } from '../data/abilityDefs'
+import { emojiImage } from '../emoji/textures'
 
 // 表现层（Cue，阵营中立）：一次性放完即弃的战斗特效——与机制正交。能力运行时类
 // 只「触发一个 cue」，不自己写 tween/draw（GAS GameplayCue 思路：机制不依赖渲染）。
@@ -114,4 +115,20 @@ export function screenFlashCue(scene: Phaser.Scene, color: number, alpha: number
     .setScrollFactor(0)
     .setDepth(200)
   scene.tweens.add({ targets: flash, alpha: 0, duration: durationMs, onComplete: () => flash.destroy() })
+}
+
+/** 命中环：从锚点扩张淡出的一圈（纯表现，参数随效果自带）。
+ * 弹道机器与能力效果链共用同一处，不各画一遍。 */
+export function blastRing(scene: Phaser.Scene, x: number, y: number, radius: number, ring: BlastRing): void {
+  circleCue(scene, x, y, radius, {
+    fill: ring.color,
+    fillAlpha: ring.fillAlpha,
+    stroke: ring.color,
+    lineWidth: ring.lineWidth,
+    lineAlpha: ring.lineAlpha,
+    fromScale: 0.3,
+    toScale: 1,
+    durationMs: ring.durMs,
+    depth: 7,
+  })
 }

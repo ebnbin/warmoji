@@ -1,7 +1,7 @@
 import { DEG2RAD } from '../core/units'
 import { playSfx } from '../audio/sfx'
 import { emojiKey } from '../emoji/textures'
-import { sweepFirstHitIndex } from '../war/abilities/hit'
+import { sweepFirstHitIndex } from '../war/hit'
 import type { Effect, ProjectileDef } from '../data/abilityDefs'
 import type { EnemyProjectileDef } from '../data/enemies'
 import { acquirePooled, releasePooled } from './pool'

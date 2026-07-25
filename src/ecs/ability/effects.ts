@@ -1,5 +1,5 @@
 import type { Effect } from '../../data/abilityDefs'
-import { circleHitIndices } from '../../war/abilities/hit'
+import { circleHitIndices } from '../../war/hit'
 import { MAtkSlow, Poison, Slow } from '../components'
 import { applyMorph } from '../morph'
 import { spawnEnemyProjectileEcs } from '../projectile'

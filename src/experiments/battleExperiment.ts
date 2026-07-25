@@ -24,10 +24,12 @@ import type { EcsSceneKey } from '../ecs/keys'
 // 战斗实现的唯一接线面（facade）。
 //
 // 本作有两套并列的战斗实现，各自成包、互不引用：
-//   · src/arcade/ —— 原框架：Phaser Scene 继承 + Arcade Physics body + 一实体一 GameObject
-//   · src/ecs/    —— 实验：bitECS 数据导向 + 自绘批量渲染管线
-// 共享层（abilities / maps 几何 / registry / emoji / run / core …）两侧都依赖，
-// 且**不反向依赖任何一侧**，故任一侧都能被整体摘除。
+//   · src/arcade/ —— 原框架：Phaser Scene 继承 + Arcade Physics body + 一实体一 GameObject，
+//                    能力是每（持有者×能力）一个运行时对象（arcade/abilities/）
+//   · src/ecs/    —— 实验：bitECS 数据导向 + 自绘批量渲染管线，能力本身就是实体，
+//                    按 kind tag 分流给各自的施放系统（ecs/ability/）
+// 共享层（data 表 / maps 几何 / 命中几何 war/hit / 绘制原语 war/cues / emoji / run / core …）
+// 两侧都依赖，且**不反向依赖任何一侧**，故任一侧都能被整体摘除。
 //
 // 约束：**本文件是全仓唯一允许 import `src/arcade/` 与 `src/ecs/`（及 bitecs）的模块**，
 // 由 eslint 的 no-restricted-imports 强制。项目代码一律经此处调用，于是「两套实现与
@@ -39,7 +41,7 @@ import type { EcsSceneKey } from '../ecs/keys'
 //      installBattleProbes 里的那一半；若删的是 ECS 侧，再删 settings 的 `ecs` 开关字段
 //   3. eslint.config.js 去掉该侧的护栏条目与白名单条目；删 ECS 侧时一并删 package.json 的 bitecs
 //
-// 由实验催生、删后可回收但不影响编译的：`src/battle/hudHost.ts`——为了一个 UIScene
+// 由实验催生、删后可回收但不影响编译的：`src/war/hudHost.ts`——为了一个 UIScene
 // 同时服务两套战斗而抽的结构化接口。只剩一个实现者时可内联回 UIScene。
 
 export type BattleSceneKey = ArenaSceneKey | EcsSceneKey

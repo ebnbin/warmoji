@@ -1,7 +1,6 @@
-import type Phaser from 'phaser'
-import { circleHitIndices } from './hit'
-import type { BlastRing, Effect } from '../../data/abilityDefs'
-import { circleCue } from './cues'
+import { blastRing } from '../../war/cues'
+import { circleHitIndices } from '../../war/hit'
+import type { Effect } from '../../data/abilityDefs'
 import { angleToNearest } from './targeting'
 import type { EffectCtx, TargetInfo } from './types'
 
@@ -26,28 +25,6 @@ export function applyBlast(
     if (exclude?.has(t.ref)) continue
     ctx.damageTarget(t.ref, damage, knockback, center.x, center.y)
   }
-}
-
-/** 命中环 VFX：从锚点扩张淡出的一圈（纯表现，参数随效果自带）。
- * 取 scene（非 ctx）——弹道机器无 ctx 也能复用。 */
-export function blastRing(
-  scene: Phaser.Scene,
-  x: number,
-  y: number,
-  radius: number,
-  ring: BlastRing,
-): void {
-  circleCue(scene, x, y, radius, {
-    fill: ring.color,
-    fillAlpha: ring.fillAlpha,
-    stroke: ring.color,
-    lineWidth: ring.lineWidth,
-    lineAlpha: ring.lineAlpha,
-    fromScale: 0.3,
-    toScale: 1,
-    durationMs: ring.durMs,
-    depth: 7,
-  })
 }
 
 /** 一次触发的上下文：锚点类效果（blast/ground/spawnProjectile/heal）作用于 center；

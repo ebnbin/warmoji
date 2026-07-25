@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
 import type { EnemyDef } from '../../data/enemies'
-import type { AbilityOwner, AbilityRuntime } from '../../war/abilities/types'
+import type { AbilityOwner, AbilityRuntime } from '../abilities/types'
 import type { Animator } from '../../war/anim/animator'
 import type { ImageObj } from '../ArcadeBattleScene'
 import type { FieldPickupDef } from '../../data/battlefield'
