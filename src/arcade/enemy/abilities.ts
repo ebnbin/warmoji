@@ -1,5 +1,5 @@
 import { playSfx } from '../../audio/sfx'
-import { clipFramesLive } from '../../war/anim/animTextures'
+import { clipFramesLive } from '../anim/animTextures'
 import { createAbility } from '../abilities/create'
 import type { AbilityContext, AbilityOwner } from '../abilities/types'
 import { spawnEnemyProjectile } from '../projectiles'

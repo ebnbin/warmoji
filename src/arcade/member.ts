@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { Animator } from '../war/anim/animator'
+import type { Animator } from './anim/animator'
 import type { CharacterEffects } from '../data/items'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './abilities/types'
 import type { ImageObj } from './ArcadeBattleScene'
