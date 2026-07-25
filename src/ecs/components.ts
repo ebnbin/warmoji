@@ -136,6 +136,12 @@ export const Despawn = { at: f32() }
  * cdUntil 变形+复形冷却结束时刻(期间免疫再变)。变形期无害/缴械/缓速游荡/绵羊形象 */
 export const Morph = { until: f32(), vuln: f32(), cdUntil: f32() }
 
+/** 打滑状态(浮冰世界钩子的低通积分器):行为速度的平滑值,击退不入此列 */
+export const Slide = { x: f32(), y: f32() }
+
+/** 休眠(无限世界:出活跃方形即冻结 AI/不被索敌/不占刷怪上限;状态全保留)。Boss 永不休眠 */
+export const Dormant = { v: u8() }
+
 /** 敌人移动查询集(最小:位姿 + 速度 + 血) */
 export const ENEMY_SET = [Enemy, Transform, Speed, Hp] as const
 

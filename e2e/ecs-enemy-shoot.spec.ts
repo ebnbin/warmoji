@@ -22,7 +22,7 @@ test('ECS 敌人持械：炮龟开火（敌弹入场）+ 队员受创', async ({
     }
   })
   await page.goto('/')
-  await page.evaluate(() => window.__ecsLabRoster!(['troll'])) // 近战单人：血厚炮龟活得够久走完首发
+  await page.evaluate(() => window.__ecsLabRoster!(['troll'], [], false)) // 近战单人：血厚炮龟活得够久走完首发；关无敌以观察中弹扣血
   await enterMap(page)
   await startTestBattle(page, 'forest')
   await page.waitForFunction(() => (window as unknown as { __ecs?: EcsDbg }).__ecs?.ready === true, undefined, {

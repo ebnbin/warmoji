@@ -1,5 +1,4 @@
 import { query } from 'bitecs'
-import { UNIT } from '../core/units'
 import { toPx } from '../battle/px'
 import { playSfx } from '../audio/sfx'
 import { bossFor } from '../maps/registry'
@@ -7,15 +6,16 @@ import { waveAt, isBossWave } from '../run/waves'
 import {
   BOSS_SPAWN_RELIEF,
   ELITE,
+  ENEMIES,
   SPAWN,
   enemyMixAt,
   pickEnemy,
 } from '../enemies/registry'
-import { randomMapPoint } from '../enemies/spawn'
-import { MAPS } from '../maps/registry'
+import { DENSITY_PARAMS, labDensity, labDifficulty, labEnemySet } from '../run/lab'
+import { MAPS, mapEnemyRoster } from '../maps/registry'
 import type { MapDef } from '../maps/registry'
 import { hourAt, isDayAt } from '../maps/daynight'
-import { ENEMY_SET } from './components'
+import { Dormant, ENEMY_SET } from './components'
 import { spawnEnemy } from './enemy'
 import { enemyCarries } from './store'
 import type { Sim } from './sim'
@@ -46,8 +46,11 @@ function spawnIntervalScale(sim: Sim): number {
   return dn ? (isDayAt(dn.hour) ? dn.cfg.daySpawnScale : dn.cfg.nightSpawnScale) : 1
 }
 
-function spawnPoint(sim: Sim): { x: number; y: number } {
-  return randomMapPoint(sim.rng, sim.mapW, sim.mapH, SPAWN.edgeInset * UNIT, sim.center, SPAWN.minPlayerDist * UNIT)
+/** 在场活跃敌人数(休眠者不占刷怪上限,镜像 spawnCapCount) */
+function awakeCount(sim: Sim): number {
+  let n = 0
+  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) if (!Dormant.v[eid]) n++
+  return n
 }
 
 /** 挑一只敌人排入预告(镜像 spawnOne→spawnTelegraphed) */
@@ -55,7 +58,7 @@ function spawnOne(sim: Sim, hpMultiplier: number): void {
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
   const elite = sim.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance
   const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
-  const pos = spawnPoint(sim)
+  const pos = sim.hooks.spawnPoint(sim, false)
   sim.pendingSpawns.push({ def, x: pos.x, y: pos.y, hp, elite, boss: false, at: sim.elapsedMs + SPAWN.telegraphMs })
 }
 
@@ -64,7 +67,7 @@ function spawnOne(sim: Sim, hpMultiplier: number): void {
 export function spawnBossEcs(sim: Sim, atlas: EcsAtlas): void {
   if (sim.over) return
   const def = toPx(bossFor(sim.mapId))
-  const pos = spawnPoint(sim)
+  const pos = sim.hooks.spawnPoint(sim, true)
   spawnEnemy(sim, atlas, def, pos.x, pos.y, def.hp, false, true)
   playSfx('boom')
 }
@@ -73,11 +76,10 @@ export function spawnBossEcs(sim: Sim, atlas: EcsAtlas): void {
  * 场上过挤则本次跳过 */
 export function spawnCarrierEcs(sim: Sim, pickup: FieldPickupDef): void {
   if (sim.over) return
-  const active = query(sim.world, ENEMY_SET as unknown as object[]).length
-  if (active + sim.pendingSpawns.length >= SPAWN.maxAlive) return
+  if (awakeCount(sim) + sim.pendingSpawns.length >= SPAWN.maxAlive) return
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
   const hp = Math.round(def.hp * waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier)
-  const pos = spawnPoint(sim)
+  const pos = sim.hooks.spawnPoint(sim, false)
   sim.pendingSpawns.push({
     def,
     x: pos.x,
@@ -88,6 +90,32 @@ export function spawnCarrierEcs(sim: Sim, pickup: FieldPickupDef): void {
     at: sim.elapsedMs + SPAWN.telegraphMs,
     carries: pickup,
   })
+}
+
+/** 测试模式补场(镜像 spawnTest):只补勾选的敌人,密度(间隔/上限/每批)与难度(血量倍率)
+ * 走场内旋钮。勾选集跨图保留,但只生成本图会出现的敌人;boss 走 Boss 待遇 */
+function spawnTest(sim: Sim): void {
+  const d = DENSITY_PARAMS[labDensity()]
+  sim.spawnCooldownMs = d.intervalMs
+  const roster = new Set<string>(mapEnemyRoster(sim.mapId).map((e) => e.kind))
+  const kinds = [...labEnemySet()].filter((k) => k in ENEMIES && roster.has(k))
+  if (kinds.length === 0) return
+  const hpMul = labDifficulty()
+  for (let i = 0; i < d.batch; i++) {
+    if (awakeCount(sim) + sim.pendingSpawns.length >= d.cap) return
+    const raw = ENEMIES[kinds[Math.floor(sim.rng.next() * kinds.length)]!]!
+    const def = toPx(raw)
+    const pos = sim.hooks.spawnPoint(sim, raw.role === 'boss')
+    sim.pendingSpawns.push({
+      def,
+      x: pos.x,
+      y: pos.y,
+      hp: Math.round(def.hp * hpMul),
+      elite: false,
+      boss: raw.role === 'boss',
+      at: sim.elapsedMs + SPAWN.telegraphMs,
+    })
+  }
 }
 
 /** 每帧:预告落地 + 刷怪冷却推进(镜像 spawn) */
@@ -109,11 +137,12 @@ export function spawnStep(sim: Sim, atlas: EcsAtlas, delta: number): void {
   }
   sim.spawnCooldownMs -= delta
   if (sim.spawnCooldownMs > 0) return
+  // 测试模式与常规刷怪分道:只补勾选的敌人,旋钮说了算
+  if (sim.testMode) return spawnTest(sim)
   const wave = waveAt((sim.combatMs + sim.elapsedMs) / 1000)
   const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * sim.members.length
   const relief = isBossWave(sim.wave) ? BOSS_SPAWN_RELIEF : 1
   sim.spawnCooldownMs = (wave.spawnIntervalMs * relief * spawnIntervalScale(sim)) / teamFactor
-  const active = query(sim.world, ENEMY_SET as unknown as object[]).length
-  if (active + sim.pendingSpawns.length >= SPAWN.maxAlive) return
+  if (awakeCount(sim) + sim.pendingSpawns.length >= SPAWN.maxAlive) return
   spawnOne(sim, wave.hpMultiplier)
 }

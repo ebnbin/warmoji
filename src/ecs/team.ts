@@ -13,6 +13,8 @@ import { levelStatsFor } from '../characters/levels'
 import { characterLevel } from '../run/charLevel'
 import { BATTLE_FX_IDENTITY } from '../battlefield/registry'
 import { currentFormation, guardOrder, hasCenter } from '../run/state'
+import { INVINCIBLE_HP, labInvincible } from '../run/lab'
+import { worldFor } from './worlds'
 import type { RunState } from '../run/state'
 import {
   Alive,
@@ -67,8 +69,12 @@ export function spawnTeam(
   const teamFx = aggregateTeamCards(run.teamCards)
   const captain = CAPTAINS[run.captainId]
   const moveSpeed = captain.moveSpeed * UNIT * teamFx.moveSpeedMul
-  // 队员血量/复活基线(P3b:测试模式素体;正常局的道具个体差异在 P4 细化)
-  const maxHp = testMode ? MEMBER.maxHp : Math.round(memberMaxHp(0, captain.hpMul) * teamFx.teamHpMul)
+  // 队员血量/复活基线(镜像 makeMember:测试模式素体,「无敌」旋钮开则天量血)
+  const maxHp = testMode
+    ? labInvincible()
+      ? INVINCIBLE_HP
+      : MEMBER.maxHp
+    : Math.round(memberMaxHp(0, captain.hpMul) * teamFx.teamHpMul)
   const reviveMs = Math.max(1000, TEAM.reviveMs * captain.reviveMul * teamFx.reviveMul)
 
   const posts = formationPosts(formation, count, 0)
@@ -162,6 +168,12 @@ export function spawnTeam(
     mapId: run.mapId,
     mapW,
     mapH,
+    hooks: worldFor(run.mapId),
+    teamVx: 0,
+    teamVy: 0,
+    worldTickAt: 0,
+    zone: null,
+    view: { x: 0, y: 0, right: mapW, bottom: mapH },
     elapsedMs: 0,
     frameTargets: [],
     over: false,
@@ -181,6 +193,7 @@ export function spawnTeam(
     pendingDamageNumbers: [],
     pendingBursts: [],
     rng: new Rng(run.decorSeed ^ 0x9e37),
+    testMode,
     wave: run.wave,
     combatMs: run.combatMs,
     spawnCooldownMs: 300,

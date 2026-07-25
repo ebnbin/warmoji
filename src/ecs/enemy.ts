@@ -16,6 +16,7 @@ import {
   Depth,
   Despawn,
   DmgMul,
+  Dormant,
   Morph,
   EDir,
   Elite,
@@ -28,6 +29,7 @@ import {
   Kv,
   Poison,
   Radius,
+  Slide,
   Slow,
   Speed,
   SpMul,
@@ -51,10 +53,7 @@ import type { Sim } from './sim'
 import type { EcsAtlas } from './render/atlas'
 import type { Point } from '../core/vec'
 
-// 敌人(P3):装配 + 转向。P3a 先做 chase(直奔最近活着的队员)+ 有界钳制;
-// 全部 locomotion/状态机/战斗/死亡效果在后续增量追加。
-
-const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
+// 敌人:装配 + 转向(locomotion 状态机 + 击退 + 世界钩子后处理)。
 
 /** 装配一个敌人实体(px 化 def),返回 eid */
 export function spawnEnemy(
@@ -82,6 +81,8 @@ export function spawnEnemy(
   addComponent(world, eid, DmgMul)
   addComponent(world, eid, SpMul)
   addComponent(world, eid, Kv)
+  addComponent(world, eid, Slide)
+  addComponent(world, eid, Dormant)
   addComponent(world, eid, Flash)
   addComponent(world, eid, Slow)
   addComponent(world, eid, Poison)
@@ -126,6 +127,9 @@ export function spawnEnemy(
   enemyNextSpawnAt[eid] = def.spawner ? sim.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
   Kv.x[eid] = 0
   Kv.y[eid] = 0
+  Slide.x[eid] = 0
+  Slide.y[eid] = 0
+  Dormant.v[eid] = 0
   Flash.until[eid] = 0
   Slow.until[eid] = 0
   Slow.mul[eid] = 1
@@ -169,11 +173,14 @@ function nearestAlive(sim: Sim, x: number, y: number): Point | null {
 export function updateFrameTargets(sim: Sim): void {
   const eids = query(sim.world, ENEMY_SET as unknown as object[])
   const out: Point[] = []
-  for (const eid of eids) out.push({ x: Transform.x[eid]!, y: Transform.y[eid]! })
+  for (const eid of eids) {
+    if (Dormant.v[eid]) continue
+    out.push({ x: Transform.x[eid]!, y: Transform.y[eid]! })
+  }
   sim.frameTargets = out
 }
 
-/** 游荡方向(镜像 ArenaScene.wanderDir:换向计时 + 撞边折返;断壁在 P5) */
+/** 游荡方向(镜像 wanderDir):换向计时 + 世界钩子的方向修正(有界撞边折返/无界直走) */
 function wanderDir(sim: Sim, eid: number): Point {
   if (sim.elapsedMs >= ETurn.at[eid]!) {
     const ang = sim.rng.next() * Math.PI * 2
@@ -181,16 +188,10 @@ function wanderDir(sim: Sim, eid: number): Point {
     EDir.y[eid] = Math.sin(ang)
     ETurn.at[eid] = sim.elapsedMs + AI.wander.turnMinMs + sim.rng.next() * AI.wander.turnJitterMs
   }
-  let dx = EDir.x[eid]!
-  let dy = EDir.y[eid]!
-  const margin = 0.6 * UNIT
-  const x = Transform.x[eid]!
-  const y = Transform.y[eid]!
-  if ((x < margin && dx < 0) || (x > sim.mapW - margin && dx > 0)) dx = -dx
-  if ((y < margin && dy < 0) || (y > sim.mapH - margin && dy > 0)) dy = -dy
-  EDir.x[eid] = dx
-  EDir.y[eid] = dy
-  return { x: dx, y: dy }
+  const d = sim.hooks.wanderDir(sim, eid, EDir.x[eid]!, EDir.y[eid]!)
+  EDir.x[eid] = d.x
+  EDir.y[eid] = d.y
+  return d
 }
 
 /** 锁定冲刺方向(朝最近队员或队伍中心) */
@@ -456,6 +457,7 @@ export function updateSpawners(sim: Sim, atlas: EcsAtlas): void {
   const eids = query(sim.world, ENEMY_SET as unknown as object[])
   const active = eids.length
   for (const eid of eids) {
+    if (Dormant.v[eid]) continue // 休眠的巢不生子敌
     const spawner = enemyDef[eid]?.spawner
     if (!spawner) continue
     if (now < enemyNextSpawnAt[eid]!) continue
@@ -474,8 +476,9 @@ export function steerEnemies(sim: Sim, delta: number): void {
   if (eids.length === 0) return
   const dt = delta / 1000
   const now = sim.elapsedMs
-  const decay = Math.exp(-delta / KNOCKBACK.tauMs) // forest knockbackTauMul=1
+  const decay = Math.exp(-delta / (KNOCKBACK.tauMs * sim.hooks.knockbackTauMul(sim)))
   for (const eid of eids) {
+    if (Dormant.v[eid]) continue // 休眠:冻结 AI 与位移,状态原样保留,回到活跃范围自然接管
     // 亡语诱饵尸壳到时静默移除(不计击杀、不掉落、不放死亡效果)
     if (Despawn.at[eid] !== 0 && now >= Despawn.at[eid]!) {
       despawnEnemy(sim, eid)
@@ -499,49 +502,58 @@ export function steerEnemies(sim: Sim, delta: number): void {
     const slow =
       (now < Slow.until[eid]! ? Slow.mul[eid]! : 1) * SpMul.v[eid]! * sim.enemySlowMul * sim.battleFx.enemySlowMul
     const speed = Speed.v[eid]! * slow
+    // 逐 locomotion 求本帧「行为速度」(px/s);位移在本段之后统一积分,
+    // 以便世界钩子(冰面打滑/河流漂移)能在积分前改写这份速度
+    let bvx = 0
+    let bvy = 0
     if (dancing) {
       // 蹦迪:定身摇摆(不位移),摇摆幅度大于常态行走
       Transform.rot[eid] = Math.sin(now / 80 + enemyPhase[eid]!) * 0.3
     } else if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) {
       // 魔尘变形期:失去本职行为,顶绵羊形象缓速游荡(半速)。缴械/无害/复形在能力层与战斗层
       const d = wanderDir(sim, eid)
-      tx += d.x * speed * 0.5 * dt
-      ty += d.y * speed * 0.5 * dt
+      bvx = d.x * speed * 0.5
+      bvy = d.y * speed * 0.5
     } else if (kind === 'static') {
       // 原地不动
     } else if (kind === 'wander') {
       const d = wanderDir(sim, eid)
-      tx += d.x * speed * dt
-      ty += d.y * speed * dt
+      bvx = d.x * speed
+      bvy = d.y * speed
     } else if (kind === 'dash') {
       const v = steerDash(sim, eid, slow)
-      tx += v.vx * dt
-      ty += v.vy * dt
+      bvx = v.vx
+      bvy = v.vy
     } else if (kind === 'standoff') {
       const v = steerStandoff(sim, eid, slow)
-      tx += v.vx * dt
-      ty += v.vy * dt
+      bvx = v.vx
+      bvy = v.vy
     } else if (kind === 'detonate') {
       const v = steerDetonate(sim, eid, slow)
-      tx += v.vx * dt
-      ty += v.vy * dt
+      bvx = v.vx
+      bvy = v.vy
     } else if (kind === 'baseOrbit') {
       const v = steerBaseOrbit(sim, eid, slow)
-      tx += v.vx * dt
-      ty += v.vy * dt
+      bvx = v.vx
+      bvy = v.vy
     } else if (kind === 'coinThief') {
       const v = steerCoinThief(sim, eid, slow)
-      tx += v.vx * dt
-      ty += v.vy * dt
+      bvx = v.vx
+      bvy = v.vy
     } else {
       // chase + 回落:直奔最近活着队员
       const target = nearestAlive(sim, tx, ty)
       if (target) {
         const dir = norm(target.x - tx, target.y - ty)
-        tx += dir.x * speed * dt
-        ty += dir.y * speed * dt
+        bvx = dir.x * speed
+        bvy = dir.y * speed
       }
     }
+    // 世界钩子:冰面打滑等把行为速度过一道低通(击退分量不参与,见 worlds.ts)
+    const post = sim.hooks.postSteerEnemy(sim, eid, bvx, bvy, delta)
+    tx += post.vx * dt
+    ty += post.vy * dt
+
     // 记录本帧移动朝向(击退前的移动分量;敌方 aim:'move' 弹的 ownerHeading 读)
     if (dt > 0) {
       enemyVelX[eid] = (tx - Transform.x[eid]!) / dt
@@ -561,8 +573,9 @@ export function steerEnemies(sim: Sim, delta: number): void {
         Kv.y[eid] = kvy * decay
       }
     }
-    Transform.x[eid] = clamp(tx, 0, sim.mapW)
-    Transform.y[eid] = clamp(ty, 0, sim.mapH)
+    const fixed = sim.hooks.constrainEnemy(sim, tx, ty)
+    Transform.x[eid] = fixed.x
+    Transform.y[eid] = fixed.y
     // 非脚本姿态的行走动画:环境摇摆(轻微旋转)+ 按移动方向翻转(twemoji 默认朝左)。
     // 蓄力/冲刺(EState 2/3)与变形由各自状态机/形象自管,此处不覆盖
     if (!dancing && EState.v[eid] !== 2 && EState.v[eid] !== 3 && Morph.until[eid] === 0) {

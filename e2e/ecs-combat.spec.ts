@@ -28,7 +28,8 @@ async function boot(page: import('@playwright/test').Page): Promise<void> {
     }
   })
   await page.goto('/')
-  await page.evaluate(() => window.__ecsLabRoster!(['juggler', 'unicorn', 'troll', 'cowboy']))
+  // 关掉试炼场「无敌」旋钮：本例要看真实扣血（缺省天量血看不出接触伤害）
+  await page.evaluate(() => window.__ecsLabRoster!(['juggler', 'unicorn', 'troll', 'cowboy'], [], false))
   await enterMap(page)
   await startTestBattle(page, 'forest')
   await page.waitForFunction(() => (window as unknown as { __ecs?: EcsDbg }).__ecs?.ready === true, undefined, {

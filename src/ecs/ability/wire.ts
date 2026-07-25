@@ -11,7 +11,7 @@ import { toPx } from '../../battle/px'
 import { labLevel } from '../../run/lab'
 import type { RunState } from '../../run/state'
 import type { AbilityOwner, AbilityRuntime, TargetInfo } from '../../abilities/types'
-import { Alive, ENEMY_SET, Radius, Transform } from '../components'
+import { Alive, Dormant, ENEMY_SET, Radius, Transform } from '../components'
 import { enemyDef, enemyRef, memberAbilities, memberHandle } from '../store'
 import { makeTeamCtx } from './ctx'
 import type { Sim } from '../sim'
@@ -94,6 +94,7 @@ export function armCaptain(
 export function updateMemberAbilities(sim: Sim, wdelta: number): void {
   const targets: TargetInfo[] = []
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+    if (Dormant.v[eid]) continue // 休眠怪不可被索敌(镜像 dormancyFrameTargets)
     targets.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, radius: Radius.v[eid]!, ref: refOf(eid) })
   }
   sim.enemyTargets = targets

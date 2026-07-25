@@ -21,7 +21,7 @@ test('ECS dash：野猪蓄力→冲刺状态机', async ({ page }) => {
     }
   })
   await page.goto('/')
-  await page.evaluate(() => window.__ecsLabRoster!(['troll'])) // 近战单人，野猪够久活着走完蓄力→冲刺
+  await page.evaluate(() => window.__ecsLabRoster!(['troll'], [], false)) // 近战单人，野猪够久活着走完蓄力→冲刺；关无敌以观察真实扣血
   await enterMap(page)
   await startTestBattle(page, 'forest')
   await page.waitForFunction(() => (window as unknown as { __ecs?: EcsDbg }).__ecs?.ready === true, undefined, {

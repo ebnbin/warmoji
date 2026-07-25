@@ -17,6 +17,8 @@ export function spawnCoinsEcs(sim: Sim, atlas: EcsAtlas, x: number, y: number, c
   for (let i = 0; i < count; i++) {
     const jx = count > 1 ? (sim.rng.next() - 0.5) * 0.6 * UNIT : 0
     const jy = count > 1 ? (sim.rng.next() - 0.5) * 0.6 * UNIT : 0
+    // 落点交给世界钩子(浮冰:钳进冰面,免得漂进水里隔着掉血区捡不回)
+    const p = sim.hooks.constrainCoin(sim, x + jx, y + jy)
     const eid = addEntity(sim.world)
     addComponent(sim.world, eid, Coin)
     addComponent(sim.world, eid, Transform)
@@ -24,8 +26,8 @@ export function spawnCoinsEcs(sim: Sim, atlas: EcsAtlas, x: number, y: number, c
     addComponent(sim.world, eid, Sprite)
     addComponent(sim.world, eid, Tint)
     addComponent(sim.world, eid, Depth)
-    Transform.x[eid] = x + jx
-    Transform.y[eid] = y + jy
+    Transform.x[eid] = p.x
+    Transform.y[eid] = p.y
     Transform.rot[eid] = 0
     Transform.w[eid] = size
     Transform.h[eid] = size

@@ -2,7 +2,7 @@ import { UNIT } from '../core/units'
 import type { Rng } from '../core/rng'
 import { FOLLOW, WANDER } from '../battle/config'
 import { ORBIT } from '../characters/orbit'
-import { TEAM, MEMBER } from '../characters/registry'
+import { MEMBER } from '../characters/registry'
 import { formationPosts, ringPostAngle } from '../characters/formation'
 import type { FormationId } from '../characters/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../characters/orbit'
@@ -11,7 +11,9 @@ import { Alive, Breath, Depth, Follow, Pop, Sprite, Threat, Transform, Wander } 
 import { steerEnemies, updateFrameTargets } from './enemy'
 import { memberContact, memberVisual, reviveMembers, tickPoison } from './combat'
 import { updateEnemyProjectiles, updateProjectiles } from './projectile'
+import { updateDormancy } from './worlds'
 import type { EcsWorld } from './world'
+import type { WorldHooks } from './worlds'
 import type { Point } from '../core/vec'
 import type { RunState } from '../run/state'
 import type { EffectCtx, TargetInfo } from '../abilities/types'
@@ -49,6 +51,17 @@ export interface Sim {
   mapId: import('../maps/registry').MapId
   mapW: number
   mapH: number
+  /** 本图世界钩子(位移约束/打滑/落水结算…):开局按 mapId 取一份,系统在拐弯处调它 */
+  hooks: WorldHooks
+  /** 队伍滑行速度(世界像素/秒):浮冰等动量世界的积分器状态,有界世界恒 0 */
+  teamVx: number
+  teamVy: number
+  /** 世界周期结算的下次时刻(落水/圈外掉血等;hooks.tick 自管) */
+  worldTickAt: number
+  /** 终波缩圈(无限图):圆心 + 当前半径(世界像素);未开圈为 null */
+  zone: { x: number; y: number; r: number } | null
+  /** 相机世界视口(场景侧每帧回填):玩家子弹飞出视野一段即回收,镜像 cullProjectiles */
+  view: { x: number; y: number; right: number; bottom: number }
   elapsedMs: number
   /** 本帧威胁点(敌人位置) */
   frameTargets: Point[]
@@ -78,6 +91,8 @@ export interface Sim {
   memberTargets: TargetInfo[]
   /** 敌人行为随机源(游荡换向/生成等;按 run 种子确定) */
   rng: Rng
+  /** 试炼场沙盒(刷怪走勾选敌人 + 场内密度/难度旋钮;免死无时限) */
+  testMode: boolean
   /** 波次/累计战斗时长(难度曲线) */
   wave: number
   combatMs: number
@@ -204,20 +219,11 @@ function updateOrbit(sim: Sim, delta: number): void {
   sim.orbitPhase = stepPhase(sim.orbitPhase, sim.driverPost >= 0 ? (wants[sim.driverPost] ?? 0) : 0, delta)
 }
 
-/** 有界世界:队伍中心钳在盒内(镜像 ArenaScene.constrainTeam;断壁/漂移等后续世界钩子再叠) */
-function constrainTeam(sim: Sim, next: Point): Point {
-  const clampMin = (TEAM.ringRadius + MEMBER.radius) * UNIT
-  return {
-    x: Math.min(Math.max(next.x, clampMin), sim.mapW - clampMin),
-    y: Math.min(Math.max(next.y, clampMin), sim.mapH - clampMin),
-  }
-}
-
-/** 队伍位移 + 布局(镜像 moveTeam→layoutTeam) */
+/** 队伍位移 + 布局(镜像 moveTeam→layoutTeam);落点交给世界钩子(有界钳制/冰面动量) */
 function moveTeam(sim: Sim, delta: number): void {
   const dir = sim.teamDir
   const step = (sim.moveSpeed * sim.battleFx.moveSpeedMul * delta) / 1000
-  const next = constrainTeam(sim, { x: sim.center.x + dir.x * step, y: sim.center.y + dir.y * step })
+  const next = sim.hooks.constrainTeam(sim, { x: sim.center.x + dir.x * step, y: sim.center.y + dir.y * step }, delta)
   sim.center.x = next.x
   sim.center.y = next.y
   layout(sim, delta)
@@ -331,6 +337,8 @@ export function stepSim(sim: Sim, delta: number, wdelta: number = delta): void {
   refoldBattleFx(sim)
   // 队长技能的限时增伤到期复原(镜像 update 里的 skillBuffUntil 判定)
   if (sim.skillDamageMul !== 1 && sim.elapsedMs >= sim.skillBuffUntil) sim.skillDamageMul = 1
+  // 休眠维护(无限世界:远离队伍的敌人冻结)——先于一切读敌人的系统
+  updateDormancy(sim)
   // 敌人位置汇入 frameTargets(队伍 orbit/游移门控据此),先于 orbit
   updateFrameTargets(sim)
   updateOrbit(sim, delta)
@@ -343,4 +351,6 @@ export function stepSim(sim: Sim, delta: number, wdelta: number = delta): void {
   updateEnemyProjectiles(sim, wdelta)
   memberContact(sim)
   memberVisual(sim)
+  // 世界周期结算(落水掉血等):在位移与战斗之后,读的是本帧最终位置
+  sim.hooks.tick(sim, wdelta)
 }

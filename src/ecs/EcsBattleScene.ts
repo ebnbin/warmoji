@@ -18,17 +18,21 @@ import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAP, MAPS, rollDecor } from '../maps/registry'
 import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from '../maps/daynight'
+import { onFloe } from '../maps/ice'
+import { chunkDecor, chunkKey, chunksInRect, outsideZone } from '../maps/world'
 import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
-import { query } from 'bitecs'
+import { query, removeEntity } from 'bitecs'
 import {
   Alive,
   Boss,
   Coin,
+  Dormant,
   Enemy,
   EnemyProj,
   EState,
+  Follow,
   Hp,
   MAtkSlow,
   MHp,
@@ -80,6 +84,9 @@ import { BOSSES, ELITE, ENEMY_DEFS, SPAWN } from '../enemies/registry'
 const FOG_COLOR = 0x0a0a1a
 const FOG_DEPTH = 90
 const FOG_SPAN = 9000
+// 浮冰图:深水底色 + 落水蓝渐晕(与 IceArenaScene 同值)
+const WATER_COLOR = 0x0b2a45
+const WATER_VIGNETTE = 0x1e6fd0
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
@@ -126,6 +133,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   /** 时停冷雾遮罩：屏幕固定的大矩形，alpha 由时停态逐帧驱动（越静越浓） */
   private timeStopFx?: Phaser.GameObjects.Rectangle
   private timeStopFxAlpha = 0
+  /** 浮冰图落水蓝渐晕：屏幕固定，队伍在水里时脉冲提示 */
+  private waterVignette?: Phaser.GameObjects.Rectangle
+  /** 无限图终波缩圈：圈线 + 圈外红渐晕（圈本体状态在 sim.zone，纯逻辑侧算） */
+  private zoneGfx?: Phaser.GameObjects.Graphics
+  private zoneVignette?: Phaser.GameObjects.Rectangle
+  /** 无限图装饰分块：块键 → 该块的装饰实体 eid；视野块集合变化才增删 */
+  private decorChunks = new Map<string, number[]>()
+  private decorRangeKey = ''
   private centerObj!: Phaser.GameObjects.Zone
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -134,6 +149,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
   constructor() {
     super(ECS_SCENE_KEY)
+  }
+
+  /** 本图是否无限世界(无边界 + 分块装饰 + 休眠 + 环带刷怪);create 早期即可读 */
+  private get infinite(): boolean {
+    return MAPS[this.run.mapId].kind === 'infinite'
   }
 
   create(): void {
@@ -147,21 +167,52 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.teamFx = aggregateTeamCards(run.teamCards)
     const mapDef = MAPS[run.mapId]
     applyBackground(mapDef.palette)
-    this.mapW = (mapDef.size?.w ?? MAP.width) * UNIT
-    this.mapH = (mapDef.size?.h ?? MAP.height) * UNIT
+    // 浮冰图的「地图」即那块方形浮冰(其外皆水),故尺寸取 floeU
+    this.mapW = (mapDef.ice?.floeU ?? mapDef.size?.w ?? MAP.width) * UNIT
+    this.mapH = (mapDef.ice?.floeU ?? mapDef.size?.h ?? MAP.height) * UNIT
     const margin = MAP.cameraMargin * UNIT
 
-    // 地面:纯色面 + 右下阴影(镜像 ArenaScene.drawFloor)
-    const g = this.add.graphics().setDepth(-1)
-    const so = 0.25 * UNIT
-    g.fillStyle(mapDef.palette.shadow, 1)
-    g.fillRect(so, so, this.mapW, this.mapH)
-    g.fillStyle(mapDef.palette.map, 1)
-    g.fillRect(0, 0, this.mapW, this.mapH)
+    // 浮冰图:深水底色铺满屏(相机锁定;世界无边界,看到哪都是水)
+    if (mapDef.ice) {
+      this.add
+        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, WATER_COLOR)
+        .setScrollFactor(0)
+        .setDepth(-2)
+    }
+
+    // 地面:无限世界没有边、也就没有影子边缘——相机锁定的满屏底色即地面;
+    // 有界图为纯色面 + 右下阴影(镜像 drawFloor),浮冰图另描冰缘读得出边界
+    if (this.infinite) {
+      this.add
+        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, mapDef.palette.map)
+        .setScrollFactor(0)
+        .setDepth(-1)
+    } else {
+      const g = this.add.graphics().setDepth(-1)
+      const so = 0.25 * UNIT
+      g.fillStyle(mapDef.palette.shadow, 1)
+      g.fillRect(so, so, this.mapW, this.mapH)
+      g.fillStyle(mapDef.palette.map, 1)
+      g.fillRect(0, 0, this.mapW, this.mapH)
+      if (mapDef.ice) {
+        g.lineStyle(3, 0xdff3ff, 0.85)
+        g.strokeRect(0, 0, this.mapW, this.mapH)
+      }
+    }
+    if (mapDef.ice) {
+      // 落水蓝渐晕(相机锁定):队伍在水里时提示
+      this.waterVignette = this.add
+        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, WATER_VIGNETTE, 0)
+        .setScrollFactor(0)
+        .setDepth(90)
+    }
 
     const cam = this.cameras.main
     cam.setZoom(viewport.renderScale)
-    cam.setBounds(-margin, -margin, this.mapW + margin * 2, this.mapH + margin * 2)
+    // 浮冰/无限无边界:相机只管跟人(滑进水里、走到天边也跟着走);有界图照旧外扩一圈
+    if (!mapDef.ice && !this.infinite) {
+      cam.setBounds(-margin, -margin, this.mapW + margin * 2, this.mapH + margin * 2)
+    }
 
     // 昼夜图夜雾（镜像 ArenaScene.createFog）：反相 Mask filter 在暗幕上挖出视野洞。
     // Phaser 4 的 GeometryMask 在 WebGL 无实现，故与旧路径一样走 filters.internal.addMask(shape, true)
@@ -178,7 +229,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       .setScrollFactor(0)
       .setDepth(88)
 
-    const center = { x: this.mapW / 2, y: this.mapH / 2 }
+    // 出生点:无限世界出生在原点(负坐标合法),有界图在图心
+    const center = this.infinite ? { x: 0, y: 0 } : { x: this.mapW / 2, y: this.mapH / 2 }
     this.centerObj = this.add.zone(center.x, center.y, 1, 1)
     cam.startFollow(this.centerObj)
 
@@ -258,8 +310,16 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.shownCountdown.push(-1)
     }
     if (!run.testMode) this.scheduleCarriers()
-    // 正常模式 Boss 波开场:预告后投放本图 Boss(镜像 setup 的 isBossWave 分支)
+    // 正常模式 Boss 波开场:先开世界终波机关(无限图缩圈以此刻队伍位置张开),再预告投放本图 Boss
     if (!run.testMode && isBossWave(run.wave)) {
+      this.sim.hooks.onFinalWave(this.sim)
+      if (this.sim.zone) {
+        this.zoneGfx = this.add.graphics().setDepth(2)
+        this.zoneVignette = this.add
+          .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, 0xd32f2f, 0)
+          .setScrollFactor(0)
+          .setDepth(90)
+      }
       this.time.delayedCall(600, () => {
         if (this.sim && !this.sim.over) spawnBossEcs(this.sim, atlas)
       })
@@ -402,6 +462,32 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       if (this.sim) this.sim.timeStopMsLeft = durMs
     }
     window.__ecsWorldTimeScale = (): number => (this.sim ? worldTimeScale(this.sim) : 1)
+    // e2e 探针:走一帧队伍位移(直调世界钩子,不依赖游戏时钟)——校验冰面打滑手感
+    window.__ecsStepTeam = (wantDx, wantDy, deltaMs = 16): { x: number; y: number } => {
+      const sim = this.sim
+      if (!sim) return { x: 0, y: 0 }
+      const next = sim.hooks.constrainTeam(sim, { x: sim.center.x + wantDx, y: sim.center.y + wantDy }, deltaMs)
+      sim.center.x = next.x
+      sim.center.y = next.y
+      return { x: next.x, y: next.y }
+    }
+    // e2e 探针:把队伍中心瞬移到格坐标(测落水掉血等按位置结算的世界规则)
+    window.__ecsTeleport = (xU, yU): void => {
+      const sim = this.sim
+      if (!sim) return
+      sim.center.x = xU * UNIT
+      sim.center.y = yU * UNIT
+      sim.teamVx = 0
+      sim.teamVy = 0
+      for (const m of sim.members) {
+        Transform.x[m] = sim.center.x
+        Transform.y[m] = sim.center.y
+        Follow.x[m] = sim.center.x
+        Follow.y[m] = sim.center.y
+        Follow.vx[m] = 0
+        Follow.vy[m] = 0
+      }
+    }
     // e2e 探针:全场蹦迪窗口是否生效中
     window.__ecsDancing = (): boolean => {
       const sim = this.sim
@@ -679,6 +765,79 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     rect.setPosition(sim.center.x, sim.center.y).setFillStyle(FOG_COLOR, alpha).setVisible(true)
   }
 
+  /** 浮冰世界的视觉步进(镜像 IceArenaScene.updateWater 的渐晕部分):
+   * 队伍中心落水即脉冲蓝渐晕。掉血结算在纯逻辑侧(worlds.ts 的 tick) */
+  private updateWaterVignette(sim: Sim): void {
+    const rect = this.waterVignette
+    if (!rect) return
+    const px = MAPS[this.run.mapId].ice!.floeU * UNIT
+    const inWater = !onFloe(sim.center.x, sim.center.y, px)
+    rect.setFillStyle(WATER_VIGNETTE, inWater ? 0.18 + 0.06 * Math.sin(sim.elapsedMs / 140) : 0)
+  }
+
+  /** 无限世界装饰分块滚动(镜像 InfiniteArenaScene.ensureChunks):视野覆盖的块集合变化时
+   * 整组增删 ECS 静态实体。摆放由 chunkDecor 按 (种子, 块) 纯函数重建——回头看到的景不变 */
+  private ensureChunks(atlas: EcsAtlas): void {
+    const cfg = MAPS[this.run.mapId].infinite!
+    const view = this.cameras.main.worldView
+    const need = chunksInRect(
+      view.x / UNIT,
+      view.y / UNIT,
+      view.right / UNIT,
+      view.bottom / UNIT,
+      cfg.chunkCells,
+      cfg.chunkPad,
+    )
+    const first = need[0]!
+    const last = need[need.length - 1]!
+    const rangeKey = `${first.cx},${first.cy}:${last.cx},${last.cy}`
+    if (rangeKey === this.decorRangeKey) return
+    this.decorRangeKey = rangeKey
+    const def = MAPS[this.run.mapId].decor
+    const needKeys = new Set(need.map((c) => chunkKey(c.cx, c.cy)))
+    for (const [key, eids] of this.decorChunks) {
+      if (needKeys.has(key)) continue
+      for (const eid of eids) removeEntity(this.world, eid)
+      this.decorChunks.delete(key)
+    }
+    for (const c of need) {
+      const key = chunkKey(c.cx, c.cy)
+      if (this.decorChunks.has(key)) continue
+      this.decorChunks.set(
+        key,
+        chunkDecor(def, this.run.decorSeed, c.cx, c.cy, cfg.chunkCells).map((d) =>
+          spawnSprite(this.world, atlas, {
+            id: d.emoji,
+            outline: 'player',
+            x: d.xU * UNIT,
+            y: d.yU * UNIT,
+            size: d.sizeU * UNIT,
+            rot: d.rotation,
+            alpha: d.alpha,
+            z: 1,
+          }),
+        ),
+      )
+    }
+  }
+
+  /** 终波缩圈的视觉(镜像 InfiniteArenaScene.updateZone;圈半径与掉血在 worlds.ts 纯逻辑侧):
+   * 亮边界环 + 内侧提示描边,有队员在圈外则满屏红渐晕脉冲 */
+  private updateZone(sim: Sim): void {
+    const zone = sim.zone
+    const g = this.zoneGfx
+    if (!zone || !g) return
+    g.clear()
+    g.lineStyle(5, 0xef5350, 0.85)
+    g.strokeCircle(zone.x, zone.y, zone.r)
+    g.lineStyle(14, 0xd32f2f, 0.16)
+    g.strokeCircle(zone.x, zone.y, zone.r + 9)
+    const anyOutside = sim.members.some(
+      (m) => Alive.v[m] && outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r),
+    )
+    this.zoneVignette?.setFillStyle(0xd32f2f, anyOutside ? 0.16 + 0.08 * Math.sin(sim.elapsedMs / 130) : 0)
+  }
+
   /** 本波携带者排期(镜像 scheduleCarriers):按预算铺开,均匀撒在本波中前段(留出波末空档)。
    * 第 1 波是纯净开场,不出战场拾取 */
   private scheduleCarriers(): void {
@@ -706,8 +865,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     })
   }
 
-  /** 地图装饰:按 run 种子随机散布的低透明度 emoji(镜像 ArenaScene.drawDecor),作 ECS 静态实体 */
+  /** 地图装饰:按 run 种子随机散布的低透明度 emoji(镜像 ArenaScene.drawDecor),作 ECS 静态实体。
+   * 无限世界改走分块滚动(见 ensureChunks):世界没有边,不能一次铺完 */
   private spawnDecor(run: RunState, atlas: EcsAtlas): void {
+    if (this.infinite) return this.ensureChunks(atlas)
     const rng = new Rng(run.decorSeed)
     const cols = Math.round(this.mapW / UNIT)
     const rows = Math.round(this.mapH / UNIT)
@@ -753,6 +914,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 世界时长:时停窗口内随队伍移动量放缩(动则时行、静则近乎凝固),窗口外恒等于真实帧长。
     // 玩家走位/呼吸/技能 CD 用实时 delta,世界侧(敌人/弹体/刷怪/攻速)一律用 wdelta
     const wdelta = delta * worldTimeScale(sim)
+    // 相机视口回填(纯逻辑侧的子弹回收按视野判定,镜像 cullProjectiles)
+    const wv = this.cameras.main.worldView
+    sim.view.x = wv.x
+    sim.view.y = wv.y
+    sim.view.right = wv.right
+    sim.view.bottom = wv.bottom
     stepSim(sim, delta, wdelta)
     // 队员能力驱动(世界时长:时停期队伍的枪也一并凝住)
     updateMemberAbilities(sim, wdelta)
@@ -790,6 +957,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
     this.centerObj.setPosition(sim.center.x, sim.center.y)
     this.updateDayNight(sim)
+    this.updateWaterVignette(sim)
+    this.updateZone(sim)
+    // 无限世界:相机走到哪,装饰分块跟到哪(块集合不变则整段免算)
+    if (this.infinite && this.atlas) this.ensureChunks(this.atlas)
     // 冷雾浓度跟随时停态（越静越浓），淡入淡出走实时 delta
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
@@ -835,6 +1006,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       over: sim.over,
       alive: sim.members.filter((eid) => Alive.v[eid]).length,
       memberHp: sim.members.map((eid) => MHp.hp[eid]!),
+      // 浮冰:队伍中心是否落水(非浮冰图恒 false)
+      inWater: this.waterVignette !== undefined && !onFloe(sim.center.x, sim.center.y, this.mapW),
+      // 无限世界:休眠敌人数 + 相机位置(验证无边界跟随)+ 终波缩圈半径
+      dormant: Array.from(query(this.world, [Enemy]), (eid) => Dormant.v[eid]!).filter((v) => v === 1).length,
+      camX: this.cameras.main.scrollX + this.cameras.main.width / 2,
+      camY: this.cameras.main.scrollY + this.cameras.main.height / 2,
+      zoneR: sim.zone?.r ?? 0,
     }
   }
 }

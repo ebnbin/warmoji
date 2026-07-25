@@ -95,7 +95,9 @@ export function updateProjectiles(sim: Sim, delta: number): void {
   if (projs.length === 0) return
   const dt = delta / 1000
   const enemies = query(sim.world, ENEMY_SET as unknown as object[])
+  // 回收按相机视野(镜像 cullProjectiles):无界世界没有地图边可依,视野才是通用口径
   const slack = 4 * UNIT
+  const view = sim.view
   for (const eid of projs) {
     const ax = Transform.x[eid]!
     const ay = Transform.y[eid]!
@@ -146,8 +148,8 @@ export function updateProjectiles(sim: Sim, delta: number): void {
       cull(sim, eid)
       continue
     }
-    // 出界回收(有界图:出地图 + slack)
-    if (bx < -slack || bx > sim.mapW + slack || by < -slack || by > sim.mapH + slack) {
+    // 飞出视野一段即灭
+    if (bx < view.x - slack || bx > view.right + slack || by < view.y - slack || by > view.bottom + slack) {
       cull(sim, eid)
       continue
     }
@@ -214,7 +216,6 @@ export function updateEnemyProjectiles(sim: Sim, delta: number): void {
   if (shots.length === 0) return
   const dt = delta / 1000
   const now = sim.elapsedMs
-  const slack = 4 * UNIT
   for (const eid of shots) {
     const x = Transform.x[eid]! + Vel.x[eid]! * dt
     const y = Transform.y[eid]! + Vel.y[eid]! * dt
@@ -244,15 +245,7 @@ export function updateEnemyProjectiles(sim: Sim, delta: number): void {
       removeEntity(sim.world, eid)
       continue
     }
-    // 寿命/出界回收
-    if (
-      now >= EProj.dieAt[eid]! ||
-      x < -slack ||
-      x > sim.mapW + slack ||
-      y < -slack ||
-      y > sim.mapH + slack
-    ) {
-      removeEntity(sim.world, eid)
-    }
+    // 寿命回收 + 世界钩子的额外回收(有界图出地图即灭;无界只按寿命)
+    if (now >= EProj.dieAt[eid]! || sim.hooks.cullEnemyProjectile(sim, x, y)) removeEntity(sim.world, eid)
   }
 }

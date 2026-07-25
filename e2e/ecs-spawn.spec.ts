@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test'
 import { enterMap, startTestBattle } from './helpers'
 
-// P3e：波次刷怪节奏——森林自动刷怪，队员迎战，敌人来了又被清（自运行战斗）。
+// P3e：试炼场刷怪节奏——按勾选敌人 + 密度旋钮自动补场，队员迎战，敌人来了又被清（自运行战斗）。
 
 type EcsDbg = { ready: boolean; enemies: number; kills: number }
 
-test('ECS 刷怪：森林自动刷怪，队员迎战并清怪', async ({ page }) => {
+test('ECS 刷怪：试炼场按勾选自动补场，队员迎战并清怪', async ({ page }) => {
   const errors: string[] = []
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
   page.on('pageerror', (e) => errors.push(e.stack ?? String(e)))
@@ -21,7 +21,8 @@ test('ECS 刷怪：森林自动刷怪，队员迎战并清怪', async ({ page })
     }
   })
   await page.goto('/')
-  await page.evaluate(() => window.__ecsLabRoster!(['juggler', 'unicorn', 'troll', 'cowboy']))
+  // 试炼场只补勾选的敌人（与旧竞技场同口径），故显式勾一只僵尸
+  await page.evaluate(() => window.__ecsLabRoster!(['juggler', 'unicorn', 'troll', 'cowboy'], ['zombie']))
   await enterMap(page)
   await startTestBattle(page, 'forest')
   await page.waitForFunction(() => (window as unknown as { __ecs?: EcsDbg }).__ecs?.ready === true, undefined, {

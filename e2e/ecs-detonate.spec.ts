@@ -21,7 +21,7 @@ test('ECS detonate：苦力怕蓄力后引爆，群伤队员并自毁', async ({
     }
   })
   await page.goto('/')
-  await page.evaluate(() => window.__ecsLabRoster!(['troll'])) // 近战单人，苦力怕能活到引爆
+  await page.evaluate(() => window.__ecsLabRoster!(['troll'], [], false)) // 近战单人，苦力怕能活到引爆；关无敌以观察群伤扣血
   await enterMap(page)
   await startTestBattle(page, 'forest')
   await page.waitForFunction(() => (window as unknown as { __ecs?: EcsDbg }).__ecs?.ready === true, undefined, {

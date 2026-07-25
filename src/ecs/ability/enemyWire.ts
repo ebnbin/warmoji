@@ -2,7 +2,7 @@ import type Phaser from 'phaser'
 import { query } from 'bitecs'
 import { createAbility } from '../../abilities/create'
 import type { AbilityOwner, TargetInfo } from '../../abilities/types'
-import { Alive, ENEMY_SET, Hurt, Morph, Transform } from '../components'
+import { Alive, Dormant, ENEMY_SET, Hurt, Morph, Transform } from '../components'
 import { enemyAbilities, enemyDef, enemyFireDelayMs, enemyOwner } from '../store'
 import { restoreMorphVisual } from '../morph'
 import { makeEnemyCtx, memberRefOf } from './enemyCtx'
@@ -54,6 +54,7 @@ export function updateEnemyAbilities(sim: Sim, scene: Phaser.Scene, atlas: EcsAt
   const alive = new Set<number>()
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     alive.add(eid)
+    if (Dormant.v[eid]) continue // 休眠:能力一并冻结(不开火、不推进冷却),回到活跃范围自然接管
     // 魔尘变形到期:复形 + 缴械后延(避免复形瞬间齐射,镜像 restoreMorph 的 postponeFire)
     if (Morph.until[eid] !== 0 && now >= Morph.until[eid]!) {
       restoreMorphVisual(atlas, eid)

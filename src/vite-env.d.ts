@@ -222,7 +222,7 @@ interface Window {
   __game?: unknown
   __setLab?: (kinds: string[], mapId?: string) => void
   __labTeam?: (ids: string[], mapId?: string) => void
-  __ecsLabRoster?: (ids: string[]) => void
+  __ecsLabRoster?: (ids: string[], enemies?: string[], invincible?: boolean) => void
   __ecsSpawnEnemy?: (kind: string, dxU?: number, dyU?: number, elite?: boolean) => void
   __ecsNearestEnemySize?: () => number
   __ecsHurtEnemy?: (dmg?: number, kb?: number) => void
@@ -243,6 +243,8 @@ interface Window {
   __ecsDropField?: (id: string, dxU?: number, dyU?: number) => void
   __ecsTimeStop?: (durMs?: number) => void
   __ecsWorldTimeScale?: () => number
+  __ecsStepTeam?: (wantDx: number, wantDy: number, deltaMs?: number) => { x: number; y: number }
+  __ecsTeleport?: (xU: number, yU: number) => void
   __addCoins?: (n: number) => void
   __addXp?: (n: number) => void
   __addMemberItem?: (itemId: string, slot?: number, count?: number) => void
