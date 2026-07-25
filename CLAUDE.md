@@ -28,5 +28,5 @@
   合并、就地从简解冲突、再 push，如此循环直到推上去（仅**网络错误**才退避重试，与 non-fast-forward 拒绝区分开）。
   不追求完美 merge——正确性不是关键，出问题事后 fix-forward 补一个 commit 即可；
   **严禁 `reset --hard` / `commit --amend` / `rebase` 已推送的 commit / `push --force`（含 `--force-with-lease`），那才会丢历史。**
-  尽量小步频繁 commit + push，缩短与 `main` 的分叉窗口。生成物 `src/assets/*.json` 已 gitignore、由 `npm run gen` 重建，天然不进版本库、不冲突。
+  尽量小步频繁 commit + push，缩短与 `main` 的分叉窗口。`src/assets/` 整目录都是产物（`npm run gen` 校验 `defs/` 产出 json，并把 `scripts/emoji/` 的原始 txt 原样拷入），已整目录 gitignore、随时可重建，天然不进版本库、不冲突。
 - 没有用户的明确允许，严禁修改本文件（CLAUDE.md）
