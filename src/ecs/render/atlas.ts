@@ -107,10 +107,12 @@ export class EcsAtlas {
       const py = row * CELL
       ctxs[page]!.drawImage(imgs[frame]!, px, py, CELL, CELL)
       const b = frame * 4
+      // V 轴按 GL 朝向（原点在下）：Phaser 4 起 TextureSource 的 flipY 默认为 true，
+      // canvas 页是自下而上上传的，沿用 v3 的左上原点算法会让整页图集上下镜像
       atlas.uv[b] = px / PAGE
-      atlas.uv[b + 1] = py / PAGE
+      atlas.uv[b + 1] = 1 - py / PAGE
       atlas.uv[b + 2] = (px + CELL) / PAGE
-      atlas.uv[b + 3] = (py + CELL) / PAGE
+      atlas.uv[b + 3] = 1 - (py + CELL) / PAGE
       atlas.pageOf[frame] = page
       atlas.keyToFrame.set(variantKey(id, outline), frame)
     }

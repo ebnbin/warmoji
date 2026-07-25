@@ -166,10 +166,12 @@ export class ArenaScene extends BaseArenaScene {
       .rectangle(0, 0, FOG_SPAN, FOG_SPAN, FOG_COLOR, 0)
       .setDepth(FOG_DEPTH)
       .setVisible(false)
-    this.fogMaskShape = this.make.graphics()
-    const mask = this.fogMaskShape.createGeometryMask()
-    mask.invertAlpha = true
-    this.fogRect.setMask(mask)
+    // 反相遮罩：雾是整块矩形，圆形遮罩在其上「挖洞」露出玩家周围。
+    // v4 的 GeometryMask 在 WebGL 无实现，改用 Mask filter 的 invert 参数；
+    // 遮罩圆每帧在 updateFog 里重画，filter 默认自动跟随更新。
+    this.fogMaskShape = this.add.graphics().setVisible(false)
+    this.fogRect.enableFilters()
+    this.fogRect.filters?.internal.addMask(this.fogMaskShape, true)
     // 相位基线：据开场时刻定，供 updateWorld 检测昼夜翻转
     this.lastDay = isDayAt(hourAt(this.run.combatMs / 1000, dn))
   }

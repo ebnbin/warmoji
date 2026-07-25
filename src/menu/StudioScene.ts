@@ -28,6 +28,7 @@ import { TAP_SLOP } from '../core/units'
 import { VirtualEmojiGrid } from '../emoji/virtualGrid'
 import { ScrollView } from './scroll'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
+import { clipTo } from '../core/mask'
 
 // Emoji Studio：twemoji 部件动画的游戏内工作台，三个 tab——
 // 🎬 配方 = animations.json 里的精修动画预览；🧩 模板 = 任选 emoji × 通用
@@ -722,7 +723,7 @@ export class StudioScene extends Phaser.Scene {
         mask.fillStyle(0xffffff, 1)
         mask.fillRect(treeArea.x, treeArea.y, treeArea.w, treeArea.h)
         const rowsBox = this.add.container(treeArea.x, treeArea.y)
-        rowsBox.setMask(mask.createGeometryMask())
+        clipTo(rowsBox, mask)
         // 树区只有这一个命中区（与可视区域等大），行/眼睛/箭头按坐标分派。
         // 行级隐形 zone 会在遮罩外照常拦截输入（遮罩不裁点击），竖屏时
         // 溢出行盖住下方素材网格、点击整块被吞——这就是"解剖页点不了网格"

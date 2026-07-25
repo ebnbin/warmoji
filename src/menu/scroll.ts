@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { TAP_SLOP } from '../core/units'
+import { clipTo, markDirty } from '../core/mask'
 
 // 通用可滚动容器：几何遮罩裁像素 + 滚轮/拖动 + 内容高度钳位。
 // 与 EmojiGrid 同源的手势逻辑，但装任意 GameObject（详情面板的变长文本/图标/交互控件），
@@ -47,6 +48,8 @@ export class ScrollView {
   private max = 0
   private contentHeight = 0
   private maskGfx: Phaser.GameObjects.Graphics
+  /** 裁剪窗遮罩：静态不逐帧重渲染，改了矩形要 markDirty */
+  private mask?: Phaser.Filters.Mask
   private bar?: Phaser.GameObjects.Graphics
   private dragging = false
   private dragMovedFlag = false
@@ -71,7 +74,7 @@ export class ScrollView {
     this.maskGfx = scene.add.graphics().setVisible(false)
     this.maskGfx.fillStyle(0xffffff, 1)
     this.maskGfx.fillRect(rect.x, rect.y, rect.w, rect.h)
-    this.content.setMask(this.maskGfx.createGeometryMask())
+    this.mask = clipTo(this.content, this.maskGfx)
 
     if (opts.scrollbar !== false) this.bar = scene.add.graphics()
 
@@ -151,6 +154,7 @@ export class ScrollView {
     this.maskGfx.clear()
     this.maskGfx.fillStyle(0xffffff, 1)
     this.maskGfx.fillRect(rect.x, rect.y, rect.w, rect.h)
+    markDirty(this.mask)
     this.content.x = rect.x
     this.max = maxScrollOf(this.contentHeight, rect.h)
     this.setScroll(this.scroll)

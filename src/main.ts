@@ -62,8 +62,11 @@ const game = new Phaser.Game({
   parent: 'game',
   // 背景渐变画在 canvas 之下的页面层，canvas 必须透明
   transparent: true,
-  // emoji 纹理为 2 次幂尺寸，mipmap 消除缩小采样的锯齿
-  render: { mipmapFilter: 'LINEAR_MIPMAP_LINEAR' },
+  // emoji 纹理为 2 次幂尺寸，mipmap 消除缩小采样的锯齿。
+  // pixelArt 显式给定：Phaser 3 的默认值是 zoom !== 1（本项目 zoom = 1/dpr，故高 DPR
+  // 真机上一直是开着的，连带 antialias=false、roundPixels=true），Phaser 4 改成恒为 false。
+  // 这里沿用 v3 的判据，避免升级后手机上的观感发生变化（桌面 dpr=1 时两版本本就一致）。
+  render: { mipmapFilter: 'LINEAR_MIPMAP_LINEAR', pixelArt: viewport.dpr !== 1 },
   width: Math.round(viewport.cssWidth * viewport.dpr),
   height: Math.round(viewport.cssHeight * viewport.dpr),
   input: { activePointers: 3 },

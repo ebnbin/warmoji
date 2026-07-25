@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { TAP_SLOP } from '../core/units'
 import { emojiThumbKey, requestEmojiThumb } from './thumbs'
+import { clipTo } from '../core/mask'
 
 // 全量 emoji 虚拟网格（feed 流）：环形缓冲复用固定数量 Image——
 // slot = index % poolSize，只有窗口边缘换入的格子才重绑；格子滚入视口
@@ -67,7 +68,7 @@ export class VirtualEmojiGrid {
     mask.fillStyle(0xffffff, 1)
     mask.fillRect(rect.x, rect.y, rect.w, rect.h)
     this.container = scene.add.container(rect.x, rect.y)
-    this.container.setMask(mask.createGeometryMask())
+    clipTo(this.container, mask)
     this.ring = scene.add.graphics()
     this.container.add(this.ring)
 

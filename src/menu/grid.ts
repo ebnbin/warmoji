@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import type { OutlineKind } from '../emoji/svg'
 import { TAP_SLOP } from '../core/units'
 import { emojiImage } from '../emoji/textures'
+import { clipTo } from '../core/mask'
 
 // 可滚动 emoji 网格：形象即含义，名字/数值留给详情面板。
 // 队长/组队/商店/图鉴条目页共用——统一滚轮 + 拖动（拖过阈值不算点击）、
@@ -67,7 +68,7 @@ export class EmojiGrid {
     const mask = scene.add.graphics().setVisible(false)
     mask.fillStyle(0xffffff, 1)
     mask.fillRect(rect.x, rect.y, rect.w, rect.h)
-    this.container.setMask(mask.createGeometryMask())
+    clipTo(this.container, mask)
 
     // 网格只有这一个命中区（与可视区域等大），格子从坐标反解。
     // 逐格 zone 会在遮罩外照常拦截输入（遮罩不裁点击），滚出视口的

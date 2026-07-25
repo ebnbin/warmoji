@@ -17,6 +17,7 @@ import { TAP_SLOP } from '../core/units'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
 import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { VirtualEmojiGrid } from '../emoji/virtualGrid'
+import { clipTo } from '../core/mask'
 
 // 图鉴：单排类别 tab——角色/队长/敌人/能力/道具（条目列表+详情）与
 // 「全部」（twemoji 基础形态完整网格）平级，「全部」排最后。
@@ -216,7 +217,7 @@ export class WikiScene extends Phaser.Scene {
     const mask = this.add.graphics().setVisible(false)
     mask.fillStyle(0xffffff, 1)
     mask.fillRect(rowX, rowY, rowW, ch)
-    container.setMask(mask.createGeometryMask())
+    clipTo(container, mask)
 
     let x = startX
     defs.forEach((d, i) => {

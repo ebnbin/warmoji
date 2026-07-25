@@ -1577,7 +1577,9 @@ export abstract class BaseArenaScene extends Phaser.Scene {
       playSfx('hit')
       // 受击纯白闪光：时间戳驱动（steerEnemies 里恢复），高频命中不堆 timer/tween
       a.flashUntil = this.elapsedMs + 70
-      enemy.setTintFill(0xffffff)
+      // v4：setTintFill 已废弃（调用只报错不生效），改为 setTint + FILL 模式；
+      // 恢复走 clearTint()（v4 的 clearTint 会一并把 tintMode 复位成 MULTIPLY）
+      enemy.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL)
       // 击退冲量：从伤害源指向敌人，叠加进敌人临时速度（steerEnemies 合成并衰减）
       if (knockback > 0 && srcX !== undefined && srcY !== undefined) {
         const d = this.worldDelta({ x: srcX, y: srcY }, enemy)

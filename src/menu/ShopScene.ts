@@ -37,6 +37,7 @@ import { ScrollView } from './scroll'
 import { FONT, UI_FONT } from '../core/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../core/apply'
+import { clipTo } from '../core/mask'
 
 // 波次间商店：左（竖屏为下）为上架位列表——队长占首位、每个出战角色一个位，
 // 各自从自己的道具池随机上架，可购买（自动补货）或付费刷新（队长可提供免费次数）；
@@ -231,7 +232,7 @@ export class ShopScene extends Phaser.Scene {
     const statsMask = this.add.graphics().setVisible(false)
     statsMask.fillStyle(0xffffff, 1)
     statsMask.fillRect(dx, this.statsTop, D.w, this.statsH)
-    this.statsContainer.setMask(statsMask.createGeometryMask())
+    clipTo(this.statsContainer, statsMask)
 
     // 上架道具卡的购买/刷新按钮命中区（内容随 refresh 重绘）
     const cardY = dy + D.h - 110
