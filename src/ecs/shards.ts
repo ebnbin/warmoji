@@ -21,7 +21,7 @@ export function spawnShardsEcs(
 ): void {
   const dw = w / 2
   const dh = h / 2
-  const now = sim.elapsedMs
+  const now = sim.fxMs // 纯视觉时钟:不吃时停、不随过场冻结(镜像旧碎片的 tween 驱动)
   for (let i = 0; i < 4; i++) {
     // 翻转的敌人纹理左半显示在右侧:碎片同步镜像,保证碎裂瞬间与本体无缝
     const col = i % 2 === 0 ? -1 : 1
@@ -62,7 +62,7 @@ export function updateShards(sim: Sim, delta: number): void {
   const eids = query(sim.world, SHARD_SET as unknown as object[])
   if (eids.length === 0) return
   const dt = delta / 1000
-  const now = sim.elapsedMs
+  const now = sim.fxMs
   for (const eid of eids) {
     const span = Shard.until[eid]! - Shard.startMs[eid]!
     const t = span > 0 ? Math.min(1, (now - Shard.startMs[eid]!) / span) : 1

@@ -42,6 +42,7 @@ export function playClip(sim: Sim, atlas: EcsAtlas, eid: number, clipId: string,
 export function updateAnims(sim: Sim, atlas: EcsAtlas): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, ANIM_SET as unknown as object[])) {
+    if (Anim.frames[eid]! < 0) continue // 停帧哨兵(阵亡尸体):保持死亡那一帧,不再翻帧
     const id = animId[eid]
     const outline = animOutline[eid]
     if (id === undefined || outline === undefined) continue

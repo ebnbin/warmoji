@@ -104,8 +104,11 @@ export function spawnEnemy(
   addComponent(world, eid, Sprite)
   addComponent(world, eid, Tint)
   addComponent(world, eid, Depth)
-  Transform.x[eid] = x
-  Transform.y[eid] = y
+  // 出生落点过世界钩子(镜像 materializeEnemy 的 constrainEnemyPos):
+  // 分裂/子敌贴岸溅出等边缘情况在出生帧就位,不必等下一帧才被拉回
+  const born = sim.hooks.constrainSpawn(sim, x, y, def.radius)
+  Transform.x[eid] = born.x
+  Transform.y[eid] = born.y
   Transform.rot[eid] = 0
   // 入场弹入(镜像 materializeEnemy 的 scale/alpha tween):Boss 更慢更弹,普通怪快而线性
   Transform.w[eid] = size * (boss ? 0.2 : 0.3)

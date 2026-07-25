@@ -47,6 +47,9 @@ export interface WorldHooks {
   constrainTeam(sim: Sim, next: Point, delta: number): Point
   /** 敌人落点约束(有界钳制 + 断壁贴墙滑动;无界世界原样放行) */
   constrainEnemy(sim: Sim, eid: number, x: number, y: number): Point
+  /** 敌人出生落点约束(镜像 constrainEnemyPos):分裂/子敌/尸壳的出生帧就位,
+   * 与逐帧的 constrainEnemy 不同——残垣图不做贴墙滑动(旧实现出生只走盒子钳制) */
+  constrainSpawn(sim: Sim, x: number, y: number, radius: number): Point
   /** 追击方向:残垣图走流场绕墙(穿墙敌人除外);其余图径直朝目标 */
   chaseDir(sim: Sim, eid: number, tx: number, ty: number): Point
   /** 视线遮挡:线段 a→b 的首个撞墙点(索敌 + 子弹裁墙共用);无墙图恒 null */
@@ -110,6 +113,12 @@ const bounded: WorldHooks = {
     }
   },
   constrainEnemy(sim, _eid, x, y) {
+    return {
+      x: x < 0 ? 0 : x > sim.mapW ? sim.mapW : x,
+      y: y < 0 ? 0 : y > sim.mapH ? sim.mapH : y,
+    }
+  },
+  constrainSpawn(sim, x, y) {
     return {
       x: x < 0 ? 0 : x > sim.mapW ? sim.mapW : x,
       y: y < 0 ? 0 : y > sim.mapH ? sim.mapH : y,
@@ -213,6 +222,9 @@ const ice: WorldHooks = {
   },
   // 无界:敌人不钳制(滑出浮冰照常,落水自有掉血结算);游荡也不折返(冰缘不是墙)
   constrainEnemy(_sim, _eid, x, y) {
+    return { x, y }
+  },
+  constrainSpawn(_sim, x, y) {
     return { x, y }
   },
   wanderDir(_sim, _eid, dx, dy) {
@@ -388,6 +400,9 @@ const infinite: WorldHooks = {
   constrainEnemy(_sim, _eid, x, y) {
     return { x, y }
   },
+  constrainSpawn(_sim, x, y) {
+    return { x, y }
+  },
   // 世界没有边:游荡不折返、逃跑不贴边、敌弹只按寿命回收、碎片与金币落点都不钳
   wanderDir(_sim, _eid, dx, dy) {
     return { x: dx, y: dy }
@@ -463,6 +478,9 @@ const space: WorldHooks = {
   },
   constrainEnemy(sim, _eid, x, y) {
     return clampToDisc(x, y, 0, 0, fieldR(sim))
+  },
+  constrainSpawn(sim, x, y, radius) {
+    return clampToDisc(x, y, 0, 0, fieldR(sim) - radius)
   },
   /** 敌人禁锢:削掉向外的速度分量(镜像 applyFieldDrag) */
   postSteerEnemy(sim, eid, vx, vy) {
@@ -562,6 +580,11 @@ const river: WorldHooks = {
     if (r.horizontal) return { x, y: Math.min(Math.max(y, r.y + rad), r.y + r.h - rad) }
     return { x: Math.min(Math.max(x, r.x + rad), r.x + r.w - rad), y }
   },
+  constrainSpawn(sim, x, y, radius) {
+    const r = riverOf(sim)
+    if (r.horizontal) return { x, y: Math.min(Math.max(y, r.y + radius), r.y + r.h - radius) }
+    return { x: Math.min(Math.max(x, r.x + radius), r.x + r.w - radius), y }
+  },
   /** 敌人:行为速度叠水流,再钳住跨向速度(不能上岸);Boss 两轴都钳(与玩家同款) */
   postSteerEnemy(sim, eid, vx, vy) {
     const f = flowOf(sim)
@@ -657,6 +680,9 @@ const torus: WorldHooks = {
     return wrapPoint(next, sim.mapW, sim.mapH)
   },
   constrainEnemy(sim, _eid, x, y) {
+    return wrapPoint({ x, y }, sim.mapW, sim.mapH)
+  },
+  constrainSpawn(sim, x, y) {
     return wrapPoint({ x, y }, sim.mapW, sim.mapH)
   },
   constrainCoin(sim, x, y) {

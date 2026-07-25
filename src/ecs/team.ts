@@ -188,6 +188,7 @@ export function spawnTeam(
     walls: null,
     view: { x: 0, y: 0, right: mapW, bottom: mapH },
     elapsedMs: 0,
+    fxMs: 0,
     frameTargets: [],
     over: false,
     bossDown: false,

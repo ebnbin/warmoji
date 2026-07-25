@@ -13,6 +13,7 @@ import { memberContact, memberVisual, regenMembers, reviveMembers, tickPoison } 
 import { updateEnemyProjectiles, updateProjectiles } from './projectile'
 import { backEaseOut } from './ease'
 import { updateShards } from './shards'
+import { updateCoinPop } from './pickups'
 import { updateDormancy } from './worlds'
 import type { FlowField, WallGrid } from '../maps/ruins'
 import type { EcsWorld } from './world'
@@ -70,6 +71,9 @@ export interface Sim {
   /** 相机世界视口(场景侧每帧回填):玩家子弹飞出视野一段即回收,镜像 cullProjectiles */
   view: { x: number; y: number; right: number; bottom: number }
   elapsedMs: number
+  /** 纯视觉时钟(真实帧长累加):碎片飞散/金币弹入等在旧实现里是 tween 驱动的,
+   * 既不吃时停时标,也不随波末过场冻结 */
+  fxMs: number
   /** 本帧威胁点(敌人位置) */
   frameTargets: Point[]
   /** 全队阵亡(游戏结束标记;失败结算) */
@@ -375,11 +379,20 @@ export function worldTimeScale(sim: Sim): number {
   return sim.timeStopMsLeft > 0 ? timeScaleFor(sim.chrono) : 1
 }
 
+/** 波末/失败过场的冻结期:世界与战斗全停,但纯视觉照旧收尾——
+ * 旧实现只 physics.pause(),碎片飞散与金币弹入是 tween,不受影响 */
+export function stepFrozenVisuals(sim: Sim, delta: number): void {
+  sim.fxMs += delta
+  updateShards(sim, delta)
+  updateCoinPop(sim)
+}
+
 /** 一帧仿真。delta = 真实帧长(玩家走位/呼吸/编队用),wdelta = 世界时长(敌人/弹体/刷怪用)。
  * 时停即「世界侧 wdelta 变慢而玩家侧 delta 照常」,故两者分开传(镜像旧 update 的 delta/wdelta) */
 export function stepSim(sim: Sim, delta: number, wdelta: number = delta): void {
   // 世界钟按世界时长推进:波次计时/复活/无敌帧/毒跳等一并随时停放慢(与旧一致)
   sim.elapsedMs += wdelta
+  sim.fxMs += delta // 纯视觉时钟走真实帧长
   if (sim.timeStopMsLeft > 0) sim.timeStopMsLeft = Math.max(0, sim.timeStopMsLeft - wdelta)
   // 移动量低通平滑走实时 delta:moveTeam 会写 moveInputRaw,供下一帧 worldTimeScale 读
   sim.chrono += (sim.moveInputRaw - sim.chrono) * Math.min(1, delta / TIMESTOP.easeMs)
@@ -404,7 +417,7 @@ export function stepSim(sim: Sim, delta: number, wdelta: number = delta): void {
   memberContact(sim)
   updateEnemyProjectiles(sim, wdelta)
   memberVisual(sim)
-  updateShards(sim, wdelta)
+  updateShards(sim, delta)
   // 世界周期结算(落水掉血等):在位移与战斗之后,读的是本帧最终位置
   sim.hooks.tick(sim, wdelta)
 }

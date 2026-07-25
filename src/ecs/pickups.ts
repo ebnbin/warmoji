@@ -55,7 +55,7 @@ export function spawnCoinsEcs(sim: Sim, atlas: EcsAtlas, x: number, y: number, c
     Tint.alpha[eid] = 1
     Depth.z[eid] = 3
     Quad.v[eid] = 0
-    Pop.until[eid] = sim.elapsedMs + COIN_POP_MS // 掉落弹出(镜像 spawnCoins 的 Back.easeOut 缩放)
+    Pop.until[eid] = sim.fxMs + COIN_POP_MS // 掉落弹出(镜像 spawnCoins 的 Back.easeOut 缩放,走视觉时钟)
   }
 }
 
@@ -77,18 +77,8 @@ export function magnetCoinsEcs(sim: Sim, delta: number): void {
   const collect = PICKUP.collectRadius * UNIT
   const collect2 = collect * collect
   const speed = PICKUP.magnetSpeed * UNIT
-  const size = PICKUPS.coin.size * UNIT
+  updateCoinPop(sim)
   for (const eid of coins) {
-    // 掉落弹入:0.3 → 1 的 Back.easeOut 缩放(纯视觉,与位移无关)
-    const popLeft = Pop.until[eid]! - sim.elapsedMs
-    if (popLeft > 0) {
-      const k = size * (0.3 + 0.7 * backEaseOut(1 - popLeft / COIN_POP_MS))
-      Transform.w[eid] = k
-      Transform.h[eid] = k
-    } else if (Transform.w[eid] !== size) {
-      Transform.w[eid] = size
-      Transform.h[eid] = size
-    }
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     // 磁力回旋镖优先:镖旁的金币直接入账,省去飞回中心的路程
@@ -132,6 +122,23 @@ export function magnetCoinsEcs(sim: Sim, delta: number): void {
     Transform.y[eid] = ny
     // 世界回收(奔流:漂出下游即被河水冲走)
     if (sim.hooks.cullCoin(sim, nx, ny)) removeEntity(sim.world, eid)
+  }
+}
+
+/** 掉落弹入:0.3 → 1 的 Back.easeOut 缩放(纯视觉,与位移无关)。
+ * 单独成函数是因为它在旧实现里是 tween——波末过场冻结期照样要播完 */
+export function updateCoinPop(sim: Sim): void {
+  const size = PICKUPS.coin.size * UNIT
+  for (const eid of query(sim.world, COIN_SET as unknown as object[])) {
+    const popLeft = Pop.until[eid]! - sim.fxMs
+    if (popLeft > 0) {
+      const k = size * (0.3 + 0.7 * backEaseOut(1 - popLeft / COIN_POP_MS))
+      Transform.w[eid] = k
+      Transform.h[eid] = k
+    } else if (Transform.w[eid] !== size) {
+      Transform.w[eid] = size
+      Transform.h[eid] = size
+    }
   }
 }
 

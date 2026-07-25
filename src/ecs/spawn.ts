@@ -58,7 +58,7 @@ function awakeCount(sim: Sim): number {
 /** 挑一只敌人排入预告(镜像 spawnOne→spawnTelegraphed);forceElite 供精英波敌潮强制出金边 */
 function spawnOne(sim: Sim, hpMultiplier: number, forceElite = false): void {
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
-  const elite = forceElite || (sim.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance)
+  const elite = !sim.testMode && (forceElite || (sim.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance))
   const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
   const pos = sim.hooks.spawnPoint(sim, false)
   sim.pendingSpawns.push({ def, x: pos.x, y: pos.y, hp, elite, boss: false, at: sim.elapsedMs + SPAWN.telegraphMs })

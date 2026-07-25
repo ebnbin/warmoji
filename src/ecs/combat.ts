@@ -6,9 +6,12 @@ import { coinDropChance } from '../run/waves'
 import { ELITE } from '../enemies/registry'
 import type { EnemyDef } from '../enemies/registry'
 import { KNOCKBACK } from '../abilities/registry'
+import { MEMBER } from '../characters/registry'
+import { UNIT } from '../core/units'
 import { spawnShardsEcs } from './shards'
 import {
   Alive,
+  Anim,
   Boss,
   DmgMul,
   Dormant,
@@ -291,6 +294,12 @@ export function hurtMember(sim: Sim, eid: number, damage: number, srcName?: stri
     // 战报「阵亡」列(镜像 killMember 的 stats.deaths 累加)
     const deaths = sim.run.stats.deaths
     if (slot >= 0 && slot < deaths.length) deaths[slot] = (deaths[slot] ?? 0) + 1
+    // 尸体定格:停帧 + 尺寸复位成基准正方(镜像 killMember 的 setRotation(0).setScale(baseScale))
+    Anim.frames[eid] = -1
+    Anim.onceFrames[eid] = 0
+    Transform.rot[eid] = 0
+    Transform.w[eid] = MEMBER.size * UNIT
+    Transform.h[eid] = MEMBER.size * UNIT
     // 阵亡灰烟(镜像 killMember 的 puffBurst)
     sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
     if (sim.members.every((x) => !Alive.v[x])) sim.over = true
@@ -303,6 +312,7 @@ export function reviveMember(sim: Sim, eid: number): void {
   const now = sim.elapsedMs
   playSfx('revive')
   Alive.v[eid] = 1
+  Anim.frames[eid] = 0 // 解除停帧哨兵(0 = 待惰性解析)
   MHp.hp[eid] = MHp.max[eid]!
   Iframe.last[eid] = now
   Tint.color[eid] = 0xffffff

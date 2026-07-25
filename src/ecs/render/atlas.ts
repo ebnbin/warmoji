@@ -46,9 +46,13 @@ export class EcsAtlas {
   /** 场景已关闭:在途的惰性烘焙就此作废(纹理管理器已归新一局所有) */
   private disposed = false
 
-  /** 场景关闭时调用:停掉在途烘焙的落格与刷新 */
+  /** 场景关闭时调用:停掉在途烘焙的落格与刷新,并把页纹理从(游戏级的)纹理管理器摘掉。
+   * 图集每局重建,不摘就是每局泄漏若干张 2048² 纹理 */
   dispose(): void {
     this.disposed = true
+    const scene = this.scene
+    if (scene?.textures) for (const p of this.pages) scene.textures.remove(p.key)
+    this.pages.length = 0
   }
   /** clip → 帧基址与帧数;帧数 0 表示该 emoji 无此 clip(问过一次就不再问) */
   private readonly clips = new Map<string, { base: number; frames: number }>()

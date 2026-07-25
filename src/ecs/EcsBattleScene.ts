@@ -68,7 +68,7 @@ import { drainPendingCoins, magnetCoinsEcs, spawnCoinsEcs } from './pickups'
 import { spawnBossEcs, spawnCarrierEcs, spawnStep, spawnSurgeEcs } from './spawn'
 import { attachCarrierAuraEcs, clearFieldEcs, fieldCounts, spawnFieldPickupEcs, updateFieldEcs } from './field'
 import { FIELD_PICKUPS, rollWaveCarriers } from '../battlefield/registry'
-import { initialLayout, stepSim, worldTimeScale } from './sim'
+import { initialLayout, stepFrozenVisuals, stepSim, worldTimeScale } from './sim'
 import { settleWave } from './wave'
 import { isBossWave, isEliteWave, waveAt, waveDurationMs, WAVE } from '../run/waves'
 import { xpToNext } from '../run/xp'
@@ -1445,7 +1445,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
   /** 天体横扫的视觉对帐(镜像 startMeteorWarn/launchMeteor/endMeteor;直线与伤害在纯逻辑侧):
    * 新一次横扫即画危险车道,预警期脉动,起划挂球体并让轨迹淡下去,结束即销毁 */
-  private updateMeteorFx(sim: Sim): void {
+  private updateMeteorFx(sim: Sim, delta: number): void {
     const m = sim.meteor
     const fx = this.meteorFx
     if (fx && fx.of !== m) {
@@ -1479,7 +1479,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       cur.tele.setAlpha(0.22) // 划行期间轨迹淡下去,只留车道感
     }
     cur.sphere.setPosition(m.sx + (m.ex - m.sx) * m.t, m.sy + (m.ey - m.sy) * m.t)
-    cur.sphere.rotation = sim.elapsedMs / 1000 * 1.4
+    cur.sphere.rotation += (delta / 1000) * 1.4 // 增量累加:入场朝向恒为 0,且不吃世界时标
   }
 
   /** 本波携带者排期(镜像 scheduleCarriers):按预算铺开,均匀撒在本波中前段(留出波末空档)。
@@ -1542,7 +1542,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
   update(_time: number, delta: number): void {
     const sim = this.sim
-    if (!this.ready || !sim || this.ending) return
+    if (!this.ready || !sim) return
+    // 过场冻结期(波末横幅/失败结算):世界与战斗全停,但碎片飞散与金币弹入照旧收尾——
+    // 旧实现只 physics.pause(),这两样是 tween 驱动的,不受冻结影响
+    if (this.ending) {
+      stepFrozenVisuals(sim, delta)
+      return
+    }
     // 波次时间到 → 结算 + 过场(测试模式无尽,便于性能观测)。用上一帧 elapsedMs 判定(晚 1 帧无碍)
     if (!this.testMode && sim.elapsedMs >= waveDurationMs(sim.run.wave)) {
       const finished = settleWave(sim)
@@ -1621,8 +1627,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         if (this.sim && !this.ending) this.scheduleWaveEnd(settleWave(this.sim))
       })
     }
-    // 全队阵亡 → 失败结算(测试模式不结算,便于反复观测)
-    if (!this.testMode && sim.over) {
+    // 全队阵亡 → 失败结算(试炼场同样结算:镜像旧 gameOver 无 testMode 门槛)
+    if (sim.over) {
       this.ending = true
       this.run.combatMs += sim.elapsedMs // 败局也计入本波已打的时长(镜像 gameOver)
       playSfx('over')
@@ -1633,7 +1639,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.updateDayNight(sim)
     this.updateWaterVignette(sim)
     this.updateZone(sim)
-    this.updateMeteorFx(sim)
+    this.updateMeteorFx(sim, delta)
     this.drainSmashedWalls(sim)
     this.updateRiver(sim, delta)
     this.updatePortals(sim, delta)

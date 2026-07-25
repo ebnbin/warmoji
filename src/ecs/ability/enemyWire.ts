@@ -66,25 +66,29 @@ export function updateEnemyAbilities(sim: Sim, scene: Phaser.Scene, atlas: EcsAt
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     alive.add(eid)
     if (Dormant.v[eid]) continue // 休眠:能力一并冻结(不开火、不推进冷却),回到活跃范围自然接管
-    // 魔尘变形到期:复形 + 缴械后延(避免复形瞬间齐射,镜像 restoreMorph 的 postponeFire)
-    if (Morph.until[eid] !== 0 && now >= Morph.until[eid]!) {
-      restoreMorphVisual(atlas, eid)
-      sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'puff' }) // 复形灰烟
-      const ab = enemyAbilities[eid]
-      if (ab) for (const w of ab) w.postponeFire?.(700)
-    }
-    if (!enemyDef[eid]?.abilities?.length) continue
-    if (!enemyAbilities[eid]) armEnemyEcs(sim, scene, atlas, eid)
+    // lazy-arm 提到压制期判定之前:压制期内新生的持械敌人冷却照常推进(旧实现在出生时就装配)
+    if (enemyDef[eid]?.abilities?.length && !enemyAbilities[eid]) armEnemyEcs(sim, scene, atlas, eid)
     const abilities = enemyAbilities[eid]
     const owner = enemyOwner[eid]
-    if (!abilities || !owner) continue
     // 压制期(蹦迪/变形)缴械:只推进冷却不开火——保持敌侧攻击的时间表语义
-    //(窗口结束若冷却已尽则立即出手,与旧一致)
-    if (now < sim.danceEndsAt || (Morph.until[eid] !== 0 && now < Morph.until[eid]!)) {
-      for (const w of abilities) w.tickCooldown?.(delta)
-    } else {
-      for (const w of abilities) w.update(delta, owner)
+    //(窗口结束若冷却已尽则立即出手,与旧一致)。整段短路,故蹦迪期连魔尘复形都不跑:
+    // 旧 steerEnemies 的蹦迪分支 continue 在复形分支之前,变形到期也得等舞会散场
+    if (now < sim.danceEndsAt) {
+      if (abilities) for (const w of abilities) w.tickCooldown?.(delta)
+      continue
     }
+    if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) {
+      if (abilities) for (const w of abilities) w.tickCooldown?.(delta)
+      continue
+    }
+    // 魔尘变形到期:复形 + 缴械后延(避免复形瞬间齐射,镜像 restoreMorph 的 postponeFire)
+    if (Morph.until[eid] !== 0) {
+      restoreMorphVisual(atlas, eid)
+      sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'puff' }) // 复形灰烟
+      if (abilities) for (const w of abilities) w.postponeFire?.(700)
+    }
+    if (!abilities || !owner) continue
+    for (const w of abilities) w.update(delta, owner)
   }
   // 死亡清理:能力仍挂但敌人已不在(击杀/自毁)→ 销毁并清空(释放持械视觉)
   for (const eid of armedEids) {
