@@ -56,10 +56,12 @@ export interface Sim {
   /** 队伍滑行速度(世界像素/秒):浮冰等动量世界的积分器状态,有界世界恒 0 */
   teamVx: number
   teamVy: number
-  /** 世界周期结算的下次时刻(落水/圈外掉血等;hooks.tick 自管) */
+  /** 世界周期结算/事件的下次时刻(落水掉血、圈外掉血、下一颗天体;hooks 自管) */
   worldTickAt: number
   /** 终波缩圈(无限图):圆心 + 当前半径(世界像素);未开圈为 null */
   zone: { x: number; y: number; r: number } | null
+  /** 天体横扫(深空图):预警/划行中的那一次;未在途为 null。场景侧据此建/毁预警轨迹与球体 */
+  meteor: Meteor | null
   /** 相机世界视口(场景侧每帧回填):玩家子弹飞出视野一段即回收,镜像 cullProjectiles */
   view: { x: number; y: number; right: number; bottom: number }
   elapsedMs: number
@@ -117,6 +119,21 @@ export interface Sim {
   pendingFieldDrops: { x: number; y: number; def: FieldPickupDef }[]
   /** 本帧新落地的携带者(场景侧给它挂极性光环) */
   pendingAuras: { eid: number; def: FieldPickupDef }[]
+}
+
+/** 一次天体横扫(深空图):预警直线两端 + 起划时刻 + 划行进度 + 本次已结算过的实体 */
+export interface Meteor {
+  /** false=预警中(到 until 起划) true=划行中 */
+  travelling: boolean
+  sx: number
+  sy: number
+  ex: number
+  ey: number
+  until: number
+  /** 划行进度 0..1 */
+  t: number
+  /** 每次横扫对同一实体只砸一次 */
+  hit: Set<number>
 }
 
 /** 掉落/拾取乘区(镜像 grantKillRewards / magnetCoins / endWave 的乘区来源) */

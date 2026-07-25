@@ -72,7 +72,7 @@ import { tickSkillCd } from '../captains/skill'
 import type { HudHost } from '../battle/hudHost'
 import type { HudSnapshot } from '../battle/BaseArenaScene'
 import type { UIScene } from '../battle/UIScene'
-import type { PendingSpawn, Sim } from './sim'
+import type { Meteor, PendingSpawn, Sim } from './sim'
 import { emojiImage } from '../emoji/textures'
 import { toPx } from '../battle/px'
 import { BOSSES, ELITE, ENEMY_DEFS, SPAWN } from '../enemies/registry'
@@ -138,6 +138,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   /** 无限图终波缩圈：圈线 + 圈外红渐晕（圈本体状态在 sim.zone，纯逻辑侧算） */
   private zoneGfx?: Phaser.GameObjects.Graphics
   private zoneVignette?: Phaser.GameObjects.Rectangle
+  /** 深空图天体横扫的视觉：与 sim.meteor 对帐（新一次即建预警轨迹，起划即挂球体，结束即销毁） */
+  private meteorFx?: { of: Meteor; tele: Phaser.GameObjects.Graphics; sphere?: Phaser.GameObjects.Image }
   /** 无限图装饰分块：块键 → 该块的装饰实体 eid；视野块集合变化才增删 */
   private decorChunks = new Map<string, number[]>()
   private decorRangeKey = ''
@@ -151,9 +153,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     super(ECS_SCENE_KEY)
   }
 
-  /** 本图是否无限世界(无边界 + 分块装饰 + 休眠 + 环带刷怪);create 早期即可读 */
+  /** 本图是否走无限世界地基(满屏底色 + 分块装饰 + 出生在原点):荒漠与深空共用 */
   private get infinite(): boolean {
-    return MAPS[this.run.mapId].kind === 'infinite'
+    const kind = MAPS[this.run.mapId].kind
+    return kind === 'infinite' || kind === 'space'
   }
 
   create(): void {
@@ -207,10 +210,24 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         .setDepth(90)
     }
 
+    // 深空图:常驻黑洞禁锢圈(圆心即出生点原点),亮紫环 + 内侧渐隐提示,一次绘制
+    const fieldR = (mapDef.space?.blackholeRadiusU ?? 0) * UNIT
+    if (fieldR > 0) {
+      const ring = this.add.graphics().setDepth(2)
+      ring.lineStyle(5, 0x9c6bff, 0.7)
+      ring.strokeCircle(0, 0, fieldR)
+      ring.lineStyle(18, 0x6a3fbf, 0.13)
+      ring.strokeCircle(0, 0, fieldR - 9)
+    }
+
     const cam = this.cameras.main
     cam.setZoom(viewport.renderScale)
-    // 浮冰/无限无边界:相机只管跟人(滑进水里、走到天边也跟着走);有界图照旧外扩一圈
-    if (!mapDef.ice && !this.infinite) {
+    // 浮冰/无限无边界:相机只管跟人(滑进水里、走到天边也跟着走);
+    // 深空的圆是有界的,bounds 钳在其外接框内;有界图照旧外扩一圈
+    if (fieldR > 0) {
+      const half = fieldR + margin
+      cam.setBounds(-half, -half, half * 2, half * 2)
+    } else if (!mapDef.ice && !this.infinite) {
       cam.setBounds(-margin, -margin, this.mapW + margin * 2, this.mapH + margin * 2)
     }
 
@@ -285,6 +302,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
     this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
     initialLayout(this.sim)
+    this.sim.hooks.onStart(this.sim)
     armTeam(this.sim, this, atlas, run, run.testMode)
     const captain = armCaptain(this.sim, this, atlas, run)
     this.captainAbilities = captain.abilities
@@ -462,6 +480,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       if (this.sim) this.sim.timeStopMsLeft = durMs
     }
     window.__ecsWorldTimeScale = (): number => (this.sim ? worldTimeScale(this.sim) : 1)
+    // e2e 探针:把世界的下一次周期事件提前到此刻(深空强开天体横扫 / 落水掉血立刻结算)
+    window.__ecsForceWorldTick = (): void => {
+      if (this.sim) this.sim.worldTickAt = this.sim.elapsedMs
+    }
     // e2e 探针:走一帧队伍位移(直调世界钩子,不依赖游戏时钟)——校验冰面打滑手感
     window.__ecsStepTeam = (wantDx, wantDy, deltaMs = 16): { x: number; y: number } => {
       const sim = this.sim
@@ -838,6 +860,45 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.zoneVignette?.setFillStyle(0xd32f2f, anyOutside ? 0.16 + 0.08 * Math.sin(sim.elapsedMs / 130) : 0)
   }
 
+  /** 天体横扫的视觉对帐(镜像 startMeteorWarn/launchMeteor/endMeteor;直线与伤害在纯逻辑侧):
+   * 新一次横扫即画危险车道,预警期脉动,起划挂球体并让轨迹淡下去,结束即销毁 */
+  private updateMeteorFx(sim: Sim): void {
+    const m = sim.meteor
+    const fx = this.meteorFx
+    if (fx && fx.of !== m) {
+      fx.sphere?.destroy()
+      fx.tele.destroy()
+      this.meteorFx = undefined
+    }
+    if (!m) return
+    const cfg = MAPS[this.run.mapId].space!.meteor
+    const rr = cfg.radiusU * UNIT
+    let cur = this.meteorFx
+    if (!cur) {
+      // 危险车道:宽半透明带 + 亮芯线 + 入口标记(球体从此侧划入)
+      const tele = this.add.graphics().setDepth(3)
+      tele.lineStyle(rr * 2, 0xff5252, 0.16)
+      tele.lineBetween(m.sx, m.sy, m.ex, m.ey)
+      tele.lineStyle(3, 0xff8a80, 0.8)
+      tele.lineBetween(m.sx, m.sy, m.ex, m.ey)
+      tele.fillStyle(0xff5252, 0.35)
+      tele.fillCircle(m.sx, m.sy, rr)
+      cur = { of: m, tele }
+      this.meteorFx = cur
+    }
+    if (!m.travelling) {
+      // 预警脉动:轨迹一明一暗,提醒「这条线要来球」
+      cur.tele.setAlpha(0.28 + 0.24 * Math.abs(Math.sin(sim.elapsedMs / 110)))
+      return
+    }
+    if (!cur.sphere) {
+      cur.sphere = emojiImage(this, m.sx, m.sy, '1fa90', rr * 2).setDepth(60)
+      cur.tele.setAlpha(0.22) // 划行期间轨迹淡下去,只留车道感
+    }
+    cur.sphere.setPosition(m.sx + (m.ex - m.sx) * m.t, m.sy + (m.ey - m.sy) * m.t)
+    cur.sphere.rotation = sim.elapsedMs / 1000 * 1.4
+  }
+
   /** 本波携带者排期(镜像 scheduleCarriers):按预算铺开,均匀撒在本波中前段(留出波末空档)。
    * 第 1 波是纯净开场,不出战场拾取 */
   private scheduleCarriers(): void {
@@ -959,6 +1020,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.updateDayNight(sim)
     this.updateWaterVignette(sim)
     this.updateZone(sim)
+    this.updateMeteorFx(sim)
     // 无限世界:相机走到哪,装饰分块跟到哪(块集合不变则整段免算)
     if (this.infinite && this.atlas) this.ensureChunks(this.atlas)
     // 冷雾浓度跟随时停态（越静越浓），淡入淡出走实时 delta
@@ -1013,6 +1075,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       camX: this.cameras.main.scrollX + this.cameras.main.width / 2,
       camY: this.cameras.main.scrollY + this.cameras.main.height / 2,
       zoneR: sim.zone?.r ?? 0,
+      // 深空:天体横扫态(null=不在途)
+      meteor: sim.meteor ? { travelling: sim.meteor.travelling, t: sim.meteor.t } : null,
     }
   }
 }

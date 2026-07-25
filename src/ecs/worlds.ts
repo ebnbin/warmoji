@@ -3,9 +3,10 @@ import { TEAM, MEMBER } from '../characters/registry'
 import { SPAWN } from '../enemies/registry'
 import { randomMapPoint } from '../enemies/spawn'
 import { MAPS } from '../maps/registry'
-import type { IceConfig, InfiniteConfig, MapId, ShrinkRingConfig } from '../maps/registry'
+import type { IceConfig, InfiniteConfig, MapId, ShrinkRingConfig, SpaceConfig } from '../maps/registry'
 import { approach, onFloe } from '../maps/ice'
 import { outsideZone, ringPoint, zoneRadiusAt } from '../maps/world'
+import { clampToDisc, confineVelocity, meteorSweep } from '../maps/space'
 import { PICKUPS } from '../pickups/registry'
 import { query } from 'bitecs'
 import { Alive, Boss, Dormant, ENEMY_SET, Slide, Transform } from './components'
@@ -40,6 +41,8 @@ export interface WorldHooks {
   spawnPoint(sim: Sim, boss: boolean): Point
   /** 休眠活跃方形的半边长(世界像素):出界的敌人冻结;Infinity = 本图不休眠 */
   activeHalf(sim: Sim): number
+  /** 开局(队伍已就位):世界初始状态,如首个周期结算/首颗天体的时刻;默认无 */
+  onStart(sim: Sim): void
   /** 终波开场(无限图在此张开缩圈);默认无 */
   onFinalWave(sim: Sim): void
   /** 世界逐帧结算(落水掉血/缩圈掉血等);默认无 */
@@ -96,6 +99,7 @@ const bounded: WorldHooks = {
   activeHalf() {
     return Infinity
   },
+  onStart() {},
   onFinalWave() {},
   tick() {},
 }
@@ -162,6 +166,9 @@ const ice: WorldHooks = {
     const m = 6 * UNIT
     const px = floePx(sim)
     return x < -m || x > px + m || y < -m || y > px + m
+  },
+  onStart(sim) {
+    sim.worldTickAt = iceCfg(sim).waterTickMs
   },
   /** 落水结算:队伍(按中心)与各敌人(按各自位置)在水里每 tick 掉血,敌我通吃 */
   tick(sim) {
@@ -245,10 +252,97 @@ const infinite: WorldHooks = {
   },
 }
 
+// ── 深空(space)────────────────────────────────────────────
+
+function spaceCfg(sim: Sim): SpaceConfig {
+  return MAPS[sim.mapId].space!
+}
+
+/** 禁锢圈:圆心固定在世界原点(= 无限世界的出生点),半径由数据给 */
+function fieldR(sim: Sim): number {
+  return spaceCfg(sim).blackholeRadiusU * UNIT
+}
+
+/** 深空:无限世界的地基(相机跟随/分块星海/环带刷怪/休眠),但一切被困在圆形禁锢星域内——
+ * 向外的运动分量按到圆心距离衰减(边缘全挡)+ 硬钳兜底,队员/敌人/Boss 谁也逃不出去;
+ * 另有天体横扫:预警直线 → 球体匀速划过,压到的实体敌我通吃 */
+const space: WorldHooks = {
+  ...infinite,
+  constrainTeam(sim, next) {
+    const r = fieldR(sim)
+    const v = confineVelocity(sim.center.x, sim.center.y, 0, 0, next.x - sim.center.x, next.y - sim.center.y, r)
+    return clampToDisc(sim.center.x + v.x, sim.center.y + v.y, 0, 0, r)
+  },
+  constrainEnemy(sim, x, y) {
+    return clampToDisc(x, y, 0, 0, fieldR(sim))
+  },
+  /** 敌人禁锢:削掉向外的速度分量(镜像 applyFieldDrag) */
+  postSteerEnemy(sim, eid, vx, vy) {
+    const v = confineVelocity(Transform.x[eid]!, Transform.y[eid]!, 0, 0, vx, vy, fieldR(sim))
+    return { vx: v.x, vy: v.y }
+  },
+  constrainCoin(sim, x, y) {
+    return clampToDisc(x, y, 0, 0, fieldR(sim) - UNIT * 0.5)
+  },
+  spawnPoint(sim, boss) {
+    const cfg = infCfg(sim)
+    const p = boss
+      ? ringPoint(sim.rng, { x: 0, y: 0 }, 6 * UNIT, 8 * UNIT)
+      : ringPoint(sim.rng, sim.center, cfg.spawnRingMin * UNIT, cfg.spawnRingMax * UNIT)
+    return clampToDisc(p.x, p.y, 0, 0, fieldR(sim) - UNIT)
+  },
+  // 禁锢圈本就全程常驻,终波不再叠一层毒雾缩圈
+  onFinalWave() {},
+  onStart(sim) {
+    sim.worldTickAt = 7000 // 首颗天体来得早一点,确保第一波就见识到横扫
+  },
+  /** 天体横扫:到点开预警 → 预警结束起划 → 沿直线匀速推进,压到的实体每次只砸一次 */
+  tick(sim, delta) {
+    const cfg = spaceCfg(sim).meteor
+    const now = sim.elapsedMs
+    const m = sim.meteor
+    if (!m) {
+      if (now < sim.worldTickAt) return
+      const angle = sim.rng.next() * Math.PI * 2
+      const offset = (sim.rng.next() * 2 - 1) * cfg.offsetU * UNIT
+      const s = meteorSweep(sim.center.x, sim.center.y, angle, offset, (cfg.travelU * UNIT) / 2)
+      sim.meteor = { travelling: false, sx: s.sx, sy: s.sy, ex: s.ex, ey: s.ey, until: now + cfg.warnMs, t: 0, hit: new Set() }
+      return
+    }
+    if (!m.travelling) {
+      if (now >= m.until) m.travelling = true
+      return
+    }
+    const len = Math.hypot(m.ex - m.sx, m.ey - m.sy) || 1
+    m.t += (cfg.speedU * UNIT * (delta / 1000)) / len
+    const x = m.sx + (m.ex - m.sx) * m.t
+    const y = m.sy + (m.ey - m.sy) * m.t
+    const rr = cfg.radiusU * UNIT
+    for (const mem of sim.members) {
+      if (!Alive.v[mem] || m.hit.has(mem)) continue
+      if (Math.hypot(Transform.x[mem]! - x, Transform.y[mem]! - y) < rr) {
+        m.hit.add(mem)
+        hurtMember(sim, mem, cfg.damage, '天体')
+      }
+    }
+    for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+      if (Dormant.v[eid] || m.hit.has(eid)) continue
+      if (Math.hypot(Transform.x[eid]! - x, Transform.y[eid]! - y) < rr) {
+        m.hit.add(eid)
+        applyDamage(sim, eid, cfg.damage)
+      }
+    }
+    if (m.t < 1) return
+    sim.meteor = null
+    sim.worldTickAt = now + cfg.intervalMs + (sim.rng.next() * 2 - 1) * cfg.intervalJitterMs
+  },
+}
+
 /** 按地图取世界钩子;未特化的图一律走有界基线 */
 export function worldFor(mapId: MapId): WorldHooks {
   const def = MAPS[mapId]
   if (def.ice) return ice
+  if (def.kind === 'space') return space
   if (def.kind === 'infinite') return infinite
   return bounded
 }

@@ -173,6 +173,7 @@ export function spawnTeam(
     teamVy: 0,
     worldTickAt: 0,
     zone: null,
+    meteor: null,
     view: { x: 0, y: 0, right: mapW, bottom: mapH },
     elapsedMs: 0,
     frameTargets: [],
