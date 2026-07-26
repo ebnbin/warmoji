@@ -250,6 +250,15 @@ export const RING_SET = [Ring, Transform, Tint] as const
 // tag 本身与 kind 注册表在 ability/tags.ts：那不是纯组件定义，而是「新增一种能力」
 // 的唯一登记点，拆散反而难找。
 
+/** 施放锚点：**从哪儿放这一下**。武器指持有者（枪口从人身上算起），
+ * 自持能力的召唤物（弩塔）指自己。与 Owner 分开：Owner 是「算谁的账、受谁的状态管」，
+ * 弩塔的账算建造者、位置却是它自己 */
+export const Anchor = { eid: i32() }
+
+/** 上次出手时刻（视觉钟）：castScan 出手成功时写入。
+ * 只有需要在「出手那一下」做事的实体才挂它（弩塔的拉弓动画） */
+export const Fired = { at: f32() }
+
 /** 能力实体标记 */
 export const Ability = {}
 
@@ -355,6 +364,10 @@ export const Flyer = {
  *（世界钟，0=不按时限）、cd 自身行为冷却、phase 候敌打转的相位、
  * size 本体尺寸（弹入插值的终值） */
 export const Minion = { bornMs: f32(), dieAt: f32(), cd: f32(), phase: f32(), size: f32() }
+
+/** 召唤物是哪件武器造的：查 def、限座数、都顺着它。
+ * 与 Owner 分开：Owner 是施放者本人（伤害归属/乘区/闸门都按他算） */
+export const Built = { by: i32() }
 
 /** 退场中：超编被拆的装置，缩小淡出到 until（视觉钟）后离场，期间不再行动。
  * 与 Minion.dieAt 分开：那个是寿命、走世界钟，这个是退场动画、走视觉钟 */

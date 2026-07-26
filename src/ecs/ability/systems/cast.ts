@@ -1,7 +1,7 @@
 import { hasComponent, query, removeComponent } from 'bitecs'
 import type { AbilityDef } from '../../../types/abilityDefs'
 import { cooldownMul } from '../amp'
-import { Ability, AbilityRef, CastRequest, Cooldown, Disarmed, Frozen, Manual } from '../../components'
+import { Ability, AbilityRef, CastRequest, Cooldown, Disarmed, Fired, Frozen, Manual } from '../../components'
 import { abilityDefAt } from '../defs'
 import type { Sim } from '../../sim'
 
@@ -28,6 +28,8 @@ export function castScan<D extends AbilityDef>(
     if (Frozen.v[e] || Disarmed.v[e] || Cooldown.left[e]! > 0) continue
     // 带冷却字段的按定义重置；无冷却概念的（光环 / 周期召唤）由 kind 自己安排下一次
     if (cast(e, def) === false) continue
+    // 出手事件：只有挂了 Fired 的才记（弩塔靠它触发拉弓动画）
+    if (hasComponent(sim.world, e, Fired)) Fired.at[e] = sim.fxMs
     if ('cooldownMs' in def) Cooldown.left[e] = def.cooldownMs * cooldownMul(sim, e)
   }
 }

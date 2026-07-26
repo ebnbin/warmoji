@@ -1,7 +1,7 @@
 import { CRIT_MUL } from '../../data/items'
 import { waveAt } from '../../data/waves'
 import { labFireRate } from '../../run/lab'
-import { Alive, DmgMul, Iframe, MAtkSlow, Slot, Transform } from '../components'
+import { Alive, Anchor, DmgMul, Iframe, MAtkSlow, Slot, Transform } from '../components'
 import { applyDamage, hurtMember } from '../combat'
 import { Amp, FACTION, Faction, Owner } from '../components'
 import type { Source } from './source'
@@ -11,13 +11,13 @@ import type { Sim } from '../sim'
 // 「打谁、打几下」，不各自重算一遍乘区。装备期定死的那部分在 Amp 上，随局面变的
 // （战场限时层、技能增伤、黏滞攻速罚、精英体质）在此现算。
 
-/** 持有者当前位置 */
+/** 施放锚点的当前位置：武器取持有者，自持能力的弩塔取它自己 */
 export function ownerX(e: number): number {
-  return Transform.x[Owner.eid[e]!]!
+  return Transform.x[Anchor.eid[e]!]!
 }
 
 export function ownerY(e: number): number {
-  return Transform.y[Owner.eid[e]!]!
+  return Transform.y[Anchor.eid[e]!]!
 }
 
 /** 本次出手的伤害乘区 */

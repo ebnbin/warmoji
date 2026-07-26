@@ -1,7 +1,10 @@
 import { addComponent, addComponents, addEntity } from 'bitecs'
 import { armIdle } from '../anim'
 import { attachDrawable } from '../drawable'
-import { Anim, FACTION, Faction, Minion, Owner, Sprite } from '../components'
+import { Anim, Built, FACTION, Faction, Fired, Minion, Owner, Sprite } from '../components'
+import { attachAbility } from '../ability/equip'
+import type { AbilityDef } from '../../types/abilityDefs'
+import type { AmpInit } from '../ability/equip'
 import type { OutlineKind } from '../../emoji/svg'
 import type { Sim } from '../sim'
 
@@ -19,7 +22,13 @@ import type { Sim } from '../sim'
 // · Emplacement 弩塔（林木弩塔）——架在地上自主索敌开火，同时在场有上限，
 //   超编拆最旧的一座。
 //
-// Owner.eid 指回造它的武器实体——伤害归属、出手乘区、主人阵亡时停摆，全顺着它走。
+// 两条归属分开：
+// · Owner.eid = 施放者本人（角色 / 敌人）——伤害算谁的账、吃谁的乘区、随谁的死活
+//   开关闸门，与武器同口径，于是所有共用机器（amp / gates / source）直接就对。
+// · Built.by  = 造它的那件武器——查 def、限座数、都顺着它。
+//
+// 召唤物可以**自持能力**（spec.ability）：挂上就进 castScan 的视野，自己索敌自己开火，
+// 不必让母武器代管。弩塔就是这么开火的——它的施放锚点是它自己，不是建造者。
 
 export interface MinionSpec {
   /** 该种召唤物的标记组件（Swarmer / Emplacement），各自的行为系统靠它取自己那一批 */
@@ -40,6 +49,8 @@ export interface MinionSpec {
   cd: number
   /** 部件动画的相位错峰（ms）；省略即保持静态帧 */
   animOffsetMs?: number
+  /** 自持能力：给出即让它自己进施放管线（弩塔自主开火）。乘区随母武器 */
+  ability?: { def: AbilityDef; amp: AmpInit; firstDelayMs: number }
 }
 
 /** 造一只召唤物，挂到造它的那件武器名下。阵营与描边随武器走 */
@@ -54,8 +65,9 @@ export function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): numb
     size: spec.size * spec.bornScale,
     z: spec.z,
   })
-  addComponents(sim.world, m, Minion, Owner, spec.tag)
-  Owner.eid[m] = weaponEid
+  addComponents(sim.world, m, Minion, Owner, Built, spec.tag)
+  Owner.eid[m] = Owner.eid[weaponEid]! // 施放者本人（武器的持有者）
+  Built.by[m] = weaponEid
   // bornMs 走视觉钟：它只服务入场弹入与「拆最旧」的比岁数，不该被时停拖慢
   Minion.bornMs[m] = sim.fxMs
   Minion.dieAt[m] = spec.lifeMs > 0 ? sim.elapsedMs + spec.lifeMs : 0
@@ -65,6 +77,17 @@ export function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): numb
   if (spec.animOffsetMs !== undefined) {
     addComponent(sim.world, m, Anim)
     armIdle(m, spec.emoji, outline, Sprite.frame[m]!, spec.animOffsetMs)
+  }
+  if (spec.ability) {
+    // 锚点是它自己：弩塔从塔上索敌、从塔上出弹，与建造者站哪儿无关
+    attachAbility(sim, m, spec.ability.def, {
+      owner: Owner.eid[m]!,
+      anchor: m,
+      faction: Faction.v[weaponEid]!,
+      cooldownMs: spec.ability.firstDelayMs,
+      amp: spec.ability.amp,
+    })
+    addComponent(sim.world, m, Fired) // 出手事件：拉弓动画靠它触发
   }
   return m
 }

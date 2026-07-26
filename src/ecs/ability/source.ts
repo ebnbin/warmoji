@@ -1,4 +1,4 @@
-import { Amp, FACTION, Faction, Owner, WallBlocked } from '../components'
+import { Amp, Anchor, FACTION, Faction, Owner, WallBlocked } from '../components'
 import { Transform } from '../components'
 import { enemyDef } from '../store'
 import { attributionSlot } from './amp'
@@ -37,7 +37,7 @@ export function sourceOf(sim: Sim, e: number): Source {
     // 无墙图与穿墙能力整条判定短路（wallHit 恒 null，白扫一遍不值当）
     sight:
       sim.walls !== null && WallBlocked.v[e] && !enemySide
-        ? { x: Transform.x[Owner.eid[e]!]!, y: Transform.y[Owner.eid[e]!]! }
+        ? { x: Transform.x[Anchor.eid[e]!]!, y: Transform.y[Anchor.eid[e]!]! }
         : undefined,
   }
 }

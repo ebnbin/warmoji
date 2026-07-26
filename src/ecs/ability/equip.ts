@@ -1,7 +1,11 @@
-import { addComponent, query, removeEntity } from 'bitecs'
+import { addComponent, addComponents, query, removeEntity } from 'bitecs'
 
-import { Ability, CastRequest, Cooldown, Drop, Flyer, Manual, Minion, Owner, Weapon } from '../components'
+import { abilityPiercesWalls } from '../../war/abilityRules'
+import { Ability, AbilityRef, Aim, Amp, Anchor, Blink, CastRequest, Cooldown, Disarmed, Drop, Faction, Flyer, Followup, Frozen, Manual, Minion, Owner, Pulse, Radial, Shots, Swing, WallBlocked, Weapon } from '../components'
+import { internAbilityDef } from './defs'
+import { KIND_TAG } from './tags'
 
+import type { AbilityDef } from '../../types/abilityDefs'
 import type { Sim } from '../sim'
 
 // 装备 = 把定义物化成一件武器实体（见 entities/weapon.ts）。此后「谁有哪些能力」
@@ -19,6 +23,59 @@ export interface AmpInit {
 
 export const NEUTRAL_AMP: AmpInit = { dmg: 1, cd: 1, crit: 0, kb: 1, battle: false }
 
+/** 挂一条能力所需的关系与初值 */
+export interface AbilityInit {
+  /** 施放者：伤害算谁的账、吃谁的乘区、随谁的死活开关闸门（武器=持有者，弩塔=建造者） */
+  owner: number
+  /** 施放锚点：从哪儿放这一下（武器=持有者，弩塔=它自己） */
+  anchor: number
+  faction: number
+  /** 首发冷却（错峰用） */
+  cooldownMs: number
+  amp: AmpInit
+  /** 只等施放请求，不进自动扫描（队长技能） */
+  manual?: boolean
+}
+
+/** 给一个实体挂上「能带一条能力」的组件包——挂完它就进 castScan 的视野。
+ *
+ * **这不是实体类型**：武器带它（entities/weapon.ts），自主开火的召唤物也带它
+ *（entities/minion.ts 的弩塔）。两者的差别只在 anchor：武器从持有者身上放，
+ * 弩塔从它自己身上放。返回 false = 该 kind 未登记 tag（不挂，gen 校验保证不会发生） */
+export function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: AbilityInit): boolean {
+  const tag = KIND_TAG[def.kind]
+  if (!tag) return false
+  const world = sim.world
+  // prettier-ignore
+  addComponents(world, eid, Ability, AbilityRef, Owner, Anchor, Faction, Cooldown, Amp, Frozen, Disarmed, Followup, WallBlocked, Aim, Swing, Shots, Radial, Blink, Pulse, tag)
+  if (init.manual) addComponent(world, eid, Manual)
+  AbilityRef.def[eid] = internAbilityDef(def)
+  Owner.eid[eid] = init.owner
+  Anchor.eid[eid] = init.anchor
+  Faction.v[eid] = init.faction
+  Cooldown.left[eid] = init.cooldownMs
+  Amp.dmg[eid] = init.amp.dmg
+  Amp.cd[eid] = init.amp.cd
+  Amp.crit[eid] = init.amp.crit
+  Amp.kb[eid] = init.amp.kb
+  Amp.battle[eid] = init.amp.battle ? 1 : 0
+  Frozen.v[eid] = 0
+  Disarmed.v[eid] = 0
+  Followup.left[eid] = 0
+  Followup.damage[eid] = 0
+  WallBlocked.v[eid] = abilityPiercesWalls(def) ? 0 : 1
+  Aim.rad[eid] = 0
+  Shots.n[eid] = 0
+  Radial.left[eid] = 0
+  Pulse.dps[eid] = 0
+  Pulse.freeze[eid] = 0
+  Blink.x[eid] = 0
+  Blink.y[eid] = 0
+  Swing.startMs[eid] = 0
+  Swing.durMs[eid] = 0
+  return true
+}
+
 /** 收走某持有者名下的全部武器与它们造出来的子实体（召唤物、坠物、在途双子镖）。
  * 持有者离场时调——eid 会被回收再分配，不能留孤儿 */
 export function unequipAbilities(sim: Sim, ownerEid: number): void {
@@ -27,7 +84,8 @@ export function unequipAbilities(sim: Sim, ownerEid: number): void {
   for (const e of query(world, [Weapon, Owner])) if (Owner.eid[e] === ownerEid) doomed.push(e)
   if (doomed.length === 0) return
   for (const d of query(world, [Drop, Owner])) if (doomed.includes(Owner.eid[d]!)) removeEntity(world, d)
-  for (const m of query(world, [Minion, Owner])) if (doomed.includes(Owner.eid[m]!)) removeEntity(world, m)
+  // 召唤物的 Owner 就是施放者本人（Built.by 才指母武器），故直接按持有者判
+  for (const m of [...query(world, [Minion, Owner])]) if (Owner.eid[m] === ownerEid) removeEntity(world, m)
   // 双子镖是武器的临时副本（主镖就是武器自己，随下面一并回收）
   for (const f of [...query(world, [Flyer])]) {
     if (f !== Flyer.of[f] && doomed.includes(Flyer.of[f]!)) removeEntity(world, f)

@@ -106,10 +106,13 @@ function placeProjectileBody(sim: Sim): void {
   for (const e of query(sim.world, [Ability, KindProjectile, Aim, Transform])) {
     const g = e
     const def = abilityDefAt(AbilityRef.def[e]!) as ProjectileDef
+    // 有身体不等于有持有物外形：弩塔也带 projectile 能力，但它的身体是塔本身，
+    // 位姿归 turret.ts 管，别在这儿按枪口摆它
+    if (!def.held) continue
     const pos = muzzle(e, def)
     Transform.x[g] = pos.x
     Transform.y[g] = pos.y
-    Transform.rot[g] = Aim.rad[e]! + def.held!.rotationOffsetDeg * DEG2RAD
+    Transform.rot[g] = Aim.rad[e]! + def.held.rotationOffsetDeg * DEG2RAD
     Tint.alpha[g] = Frozen.v[e] ? 0 : 1
   }
 }

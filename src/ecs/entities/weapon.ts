@@ -1,12 +1,10 @@
-import { addComponent, addComponents, addEntity } from 'bitecs'
-import { abilityPiercesWalls } from '../../war/abilityRules'
+import { addComponent, addEntity } from 'bitecs'
 import type { AbilityDef } from '../../types/abilityDefs'
 import type { OutlineKind } from '../../emoji/svg'
 import { attachDrawable } from '../drawable'
-import { Ability, AbilityRef, Aim, Amp, Blink, Boss, Cooldown, Disarmed, Elite, FACTION, Faction, Followup, Frozen, Manual, Owner, Pulse, Radial, Shots, Swing, Transform, WallBlocked, Weapon } from '../components'
+import { Boss, Elite, FACTION, Transform, Weapon } from '../components'
+import { attachAbility } from '../ability/equip'
 import type { AmpInit } from '../ability/equip'
-import { internAbilityDef } from '../ability/defs'
-import { KIND_TAG } from '../ability/tags'
 import type { Sim } from '../sim'
 
 // 武器实体：**一件武器就是一颗实体**，能力是挂在它身上的组件
@@ -33,36 +31,13 @@ export function spawnWeapon(
   amp: AmpInit,
   manual = false,
 ): number {
-  const tag = KIND_TAG[def.kind]
-  if (!tag) return -1
   const world = sim.world
   const e = addEntity(world)
-  // prettier-ignore
-  addComponents(world, e, Weapon, Ability, AbilityRef, Owner, Faction, Cooldown, Amp, Frozen, Disarmed, Followup, WallBlocked, Aim, Swing, Shots, Radial, Blink, Pulse, tag)
-  if (manual) addComponent(world, e, Manual)
-  AbilityRef.def[e] = internAbilityDef(def)
-  Owner.eid[e] = ownerEid
-  Faction.v[e] = faction
-  Cooldown.left[e] = initialCooldownMs
-  Amp.dmg[e] = amp.dmg
-  Amp.cd[e] = amp.cd
-  Amp.crit[e] = amp.crit
-  Amp.kb[e] = amp.kb
-  Amp.battle[e] = amp.battle ? 1 : 0
-  Frozen.v[e] = 0
-  Disarmed.v[e] = 0
-  Followup.left[e] = 0
-  Followup.damage[e] = 0
-  WallBlocked.v[e] = abilityPiercesWalls(def) ? 0 : 1
-  Aim.rad[e] = 0
-  Shots.n[e] = 0
-  Radial.left[e] = 0
-  Pulse.dps[e] = 0
-  Pulse.freeze[e] = 0
-  Blink.x[e] = 0
-  Blink.y[e] = 0
-  Swing.startMs[e] = 0
-  Swing.durMs[e] = 0
+  addComponent(world, e, Weapon)
+  // 武器的施放锚点是持有者：枪口从人身上算起（弩塔那种自持能力的锚点是它自己）
+  if (!attachAbility(sim, e, def, { owner: ownerEid, anchor: ownerEid, faction, cooldownMs: initialCooldownMs, amp, manual })) {
+    return -1
+  }
   // 有外形才长身体：描边随持有者阵营（精英/Boss 走金边）
   if ('held' in def && def.held) {
     const outline: OutlineKind =

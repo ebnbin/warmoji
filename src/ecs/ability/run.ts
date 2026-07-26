@@ -50,6 +50,6 @@ export function stepAbilities(sim: Sim, dt: number): void {
   castBoomerangs(sim, dt)
   castLasers(sim)
   castSummons(sim, dt)
-  castTurrets(sim, dt)
+  castTurrets(sim)
   castSlowAuras(sim, dt)
 }

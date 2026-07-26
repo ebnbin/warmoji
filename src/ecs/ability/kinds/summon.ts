@@ -7,7 +7,7 @@ import { playSfx } from '../../../audio/sfx'
 import { Poison, Sprite, Tint, Transform } from '../../components'
 import { spawnMinion } from '../../entities/minion'
 import { cooldownMul, damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { AbilityRef, Cooldown, Frozen, Minion, Owner, Swarmer } from '../../components'
+import { AbilityRef, Built, Cooldown, Frozen, Minion, Swarmer } from '../../components'
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects } from '../effects'
 import { sourceOf } from '../source'
@@ -47,9 +47,9 @@ function spawnBee(sim: Sim, e: number, def: SummonDef, index: number): void {
 
 /** 逐帧：寻路扑敌 / 候敌打转 → 撞上即施伤自毁 → 到寿命消散 */
 function updateBees(sim: Sim, dt: number): void {
-  for (const b of [...query(sim.world, [Swarmer, Minion, Owner, Transform])]) {
+  for (const b of [...query(sim.world, [Swarmer, Minion, Built, Transform])]) {
     if (!hasComponent(sim.world, b, Minion)) continue // 同波的前一只自毁时连带回收了它
-    const e = Owner.eid[b]!
+    const e = Built.by[b]! // 放出它的那件武器
     const def = abilityDefAt(AbilityRef.def[e]!) as SummonDef
     // 主人倒下：小蜂原地凝住并隐去，主人复活自然接着飞（镜像旧实现停更 + 收视觉）
     if (Frozen.v[e]) {
