@@ -130,7 +130,7 @@ export class BenchPanel {
       '── 帧率（fps）──',
       row('平均', m.fps.toFixed(1), '每秒实交付帧数'),
       row('1% 低', m.fpsLow1.toFixed(1), '卡顿体感'),
-      row('引擎报告', this.scene.game.loop.actualFps.toFixed(1)),
+      row('引擎报告', this.scene.game.loop.actualFps.toFixed(1), '独立口径·对照'),
       row('中位档', m.fpsMedian.toFixed(1), 'vsync 量化·勿当帧率'),
       row('屏幕上限', raf > 0 ? String(raf) : '—', 'Hz · 实测峰值'),
       // vsync 档位分布：双峰（如 1× 与 2× 各占一半）就是肉眼可见的 judder，

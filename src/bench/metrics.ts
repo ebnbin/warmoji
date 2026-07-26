@@ -11,6 +11,19 @@ import Phaser from 'phaser'
 //   PRE_RENDER → POST_RENDER 渲染提交
 // 两段之外还有浏览器合成/vsync 等待，故 update + render 通常小于 rawDelta。
 //
+// 为什么用 loop.rawDelta 而不是 loop.delta（= 场景 update(time, delta) 收到的那个）：
+// delta 被 TimeStep 加工过两道——默认 smoothStep 走 10 帧滑动平均，且一旦超过
+// minFps 对应的 200ms 就**整个丢弃真实值、拿历史值顶替**（TimeStep.smoothDelta）。
+// 那是为了让游戏逻辑在掉帧时不崩，不是给测量用的。rawDelta 才是未加工的墙钟帧间隔。
+//（副作用：真掉到 5fps 以下时游戏会进慢动作，实体行为速度都变了——那种读数没有意义）
+//
+// Phaser 自带的 fps 统计只有 game.loop.actualFps 一个，口径是「每秒实际帧数」的
+// 指数滑动平均（α=0.25，每秒更新）——与本文件的 fps（1000/平均帧时）等价。
+// 它粒度只到秒、且 α=0.25 意味着约 10 秒才收敛（初值还被播种成 targetFps 60），
+// 所以给不出分位数/分段/抖动/vsync 分档，这个采样器才有存在必要。
+// 但它是**独立实现的对照组**：两个数长期对不上就是这边算错了——
+// 「稳态 fps 误用中位数倒数」那个 bug 正是被它 35.2 对 59.9 的差距暴露出来的。
+//
 // ⚠️ 软件渲染环境（SwiftShader / 无 GPU 的 CI 容器）下**所有时间读数都不可用**：
 // 实测同一框架同一档位重复三次，更新 p50 极差 arcade 7.2ms、ECS 22.0ms（11.3→33.3），
 // 总帧 p50 极差 116ms——噪声比两套框架的差距大一个量级，读数只反映当时 CPU 争抢。
