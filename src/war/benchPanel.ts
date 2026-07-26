@@ -47,21 +47,19 @@ export class BenchPanel {
     this.chartY = this.y + 48
     this.textY = this.chartY + CHART_H + 12
 
-    this.bg = scene.add.graphics().setDepth(300).setScrollFactor(0)
+    this.bg = scene.add.graphics().setDepth(300)
     this.title = scene.add
       .text(this.x + PAD, this.y + 12, '', {
         fontFamily: UI_FONT, fontSize: FONT.strong, fontStyle: 'bold', color: '#ffdc5d', resolution: res,
       })
       .setDepth(302)
-      .setScrollFactor(0)
-    this.chart = scene.add.graphics().setDepth(301).setScrollFactor(0)
+    this.chart = scene.add.graphics().setDepth(301)
     this.scaleText = scene.add
       .text(this.x + W - PAD, this.y + 20, '', {
         fontFamily: 'ui-monospace, monospace', fontSize: '15px', color: '#8a8a99', resolution: res,
       })
       .setOrigin(1, 0)
       .setDepth(302)
-      .setScrollFactor(0)
     this.text = scene.add
       .text(this.x + PAD, this.textY, '', {
         fontFamily: 'ui-monospace, monospace', fontSize: '20px', color: '#e6e6ee',
@@ -69,7 +67,6 @@ export class BenchPanel {
         wordWrap: { width: W - PAD * 2 },
       })
       .setDepth(302)
-      .setScrollFactor(0)
   }
 
   destroy(): void {
@@ -149,6 +146,7 @@ export class BenchPanel {
     ]
 
     this.fitText(lines)
+
 
     reportBench({
       framework: benchFramework(),
