@@ -4,9 +4,9 @@ import { UNIT } from '../util/units'
 import { MEMBER } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../war/timeStop'
-import { DAMAGE_FONT, ensureDamageFont } from '../war/damageFont'
 import { burstEmitter } from '../util/fx'
 import { CueLayer } from './render/cues'
+import { DamageTextLayer } from './render/damageText'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
 import { UI_FONT, FONT } from '../util/fonts'
@@ -152,8 +152,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private seenHitCount = 0
   /** 伤害飘字:开关 + BitmapText 对象池(镜像 floatDamage) */
   private damageNumbersOn = false
-  private damagePool: Phaser.GameObjects.BitmapText[] = []
-  private damageIdx = 0
+  /** 伤害飘字层（纯数据 + 单个批绘对象，不挂 tween；见 render/damageText.ts） */
+  private damageText?: DamageTextLayer
   /** 刷怪预告标记(按 pendingSpawn 对帐:出现即挂脉冲⚠,落地即销毁) */
   private spawnMarks = new Map<PendingSpawn, Phaser.GameObjects.Image>()
   /** 粒子爆点发射器(死亡紫爆 / 拾币金爆 / 灰烟) */
@@ -222,8 +222,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.deadTexts = []
     this.shownCountdown = []
     this.seenHitCount = 0
-    this.damagePool = []
-    this.damageIdx = 0
+    this.damageText = undefined
     this.spawnMarks = new Map()
     this.fogRect = undefined
     this.fogMaskShape = undefined
@@ -386,6 +385,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       if (probe) probe.ready = false
       this.atlas?.dispose() // 停掉在途的惰性烘焙:纹理管理器即将归下一局所有
       this.cues?.destroy()
+      this.damageText?.destroy()
       for (const c of this.stripCams) this.cameras.remove(c)
       this.stripCams = []
     })
@@ -410,10 +410,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const settings = loadSettings(browserStorage())
     this.hitShakeOn = settings.hitShake
     this.damageNumbersOn = settings.damageNumbers
-    ensureDamageFont(this)
-    this.damagePool = Array.from({ length: 64 }, () =>
-      this.add.bitmapText(0, 0, DAMAGE_FONT).setFontSize(24).setOrigin(0.5).setDepth(50).setVisible(false),
-    )
+    this.damageText = new DamageTextLayer(this)
     // 粒子爆点(镜像 deathBurst/coinBurst 的配色与速度)
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
     this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
@@ -573,19 +570,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private drainDamageNumbers(): void {
     const q = this.sim!.pendingDamageNumbers
     if (q.length === 0) return
-    if (this.damageNumbersOn) for (const d of q) this.floatDamage(d.x, d.y, d.amount, d.crit)
+    if (this.damageNumbersOn) for (const d of q) this.damageText?.push(d.x, d.y, d.amount, d.crit)
     q.length = 0
-  }
-
-  private floatDamage(x: number, y: number, amount: number, crit: boolean): void {
-    const t = this.damagePool[this.damageIdx]
-    if (!t) return
-    this.damageIdx = (this.damageIdx + 1) % this.damagePool.length
-    this.tweens.killTweensOf(t)
-    // 暴击金色放大;池对象复用,普通伤害要复位样式(镜像 floatDamage)
-    t.setFontSize(crit ? 34 : 24).setTint(crit ? 0xffdc5d : 0xffffff)
-    t.setText(String(amount)).setPosition(x, y - 14).setAlpha(1).setVisible(true)
-    this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 350, onComplete: () => t.setVisible(false) })
   }
 
   /** 逐帧队员血条:跟位 + 比例变化才重绘(镜像 drawMemberHp);阵亡隐藏、复活自动恢复 */
@@ -1351,6 +1337,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     if (this.ending) {
       stepFrozenVisuals(sim, delta)
       this.cues?.step(sim.fxMs)
+      this.damageText?.step(sim.fxMs)
       return
     }
     // 波次时间到 → 结算 + 过场(测试模式无尽,便于性能观测)。用上一帧 elapsedMs 判定(晚 1 帧无碍)
@@ -1416,9 +1403,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     if (this.atlas) spawnStep(sim, this.atlas, wdelta)
     this.updateTelegraphs()
     // 排空本帧视觉事件:须先于下面的过场判定——否则致死那一帧的死亡爆点/飘字会被 return 吞掉
+    // 两个特效层先步进再排空：step 顺带把「本帧视觉钟」写进去，投放据此定起点。
+    // 反过来的话本帧新投的会拿到上一帧的时钟——开局第一帧甚至会被当场判过期丢掉
+    this.cues?.step(sim.fxMs)
+    this.damageText?.step(sim.fxMs)
     this.drainDamageNumbers()
     this.drainBursts()
-    this.cues?.step(sim.fxMs)
     this.drainRings()
     this.drainCues()
     this.drawAuraRings()
