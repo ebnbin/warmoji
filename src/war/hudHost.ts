@@ -1,6 +1,5 @@
 import type Phaser from 'phaser'
 import type { RunState } from '../run/state'
-import type { BenchSpec } from '../bench/spec'
 import type { Polarity } from '../types/battlefield'
 
 // HUD 宿主契约：UIScene 需要从「当前战斗场景」读到的全部东西，仅此而已。
@@ -76,11 +75,6 @@ export interface HudHost {
     spawnIntervalMs: number
     hpMultiplier: number
   }
-  /** 基准模式：把各类实体补足到目标数量（已够则不动）。两侧同规格投放，
-   *  否则「谁更快」的对比没有意义 */
-  benchFill(spec: BenchSpec): void
-  /** 基准模式：清空全部可清的实体（换负载/换框架前归零） */
-  benchClear(): void
   /** 释放主动技能（按钮/E 键），返回是否真的放出 */
   castSkill(): boolean
   /** 测试模式免死开关变更后重算队员血量上限 */

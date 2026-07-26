@@ -5,7 +5,7 @@ import { roundRect } from '../ui/shapes'
 import { heapMB, rafHz, rendererInfo } from './diagnostics'
 import { emojiCacheStats } from '../emoji/textures'
 import { metricsReport, recentFrameTimes } from '../bench/metrics'
-import { benchFramework, benchRefill, benchSpec, benchTotal } from '../bench/spec'
+import { benchFramework, benchProfile } from '../bench/spec'
 import { reportBench } from '../bench/probe'
 import type { HudHost } from './hudHost'
 
@@ -73,14 +73,14 @@ export class BenchPanel {
 
     const m = metricsReport()
     const p = this.host.perfSnapshot()
-    const spec = benchSpec()
+    const prof = benchProfile()
     const cache = emojiCacheStats(this.scene)
     const heap = heapMB()
     const raf = rafHz()
     const live = p.enemies + p.projectiles + p.coins
 
     this.title.setText(
-      `${benchFramework() === 'ecs' ? 'ECS' : 'arcade'}  ${live.toLocaleString()} / ${benchTotal().toLocaleString()} 实体`,
+      `${benchFramework() === 'ecs' ? 'ECS' : 'arcade'} · ${prof.label}  ${live.toLocaleString()} 实体`,
     )
 
     const ms = (v: number): string => v.toFixed(2).padStart(6)
@@ -99,22 +99,22 @@ export class BenchPanel {
       `稳态 ${m.fps.toFixed(1).padStart(6)}   1%低 ${m.fpsLow1.toFixed(1).padStart(6)}`,
       `引擎 ${this.scene.game.loop.actualFps.toFixed(1).padStart(6)}   rAF ${raf > 0 ? String(raf).padStart(5) : '    -'}`,
       '',
-      '── 在场 / 目标 ────────────',
-      `敌人 ${String(p.enemies).padStart(6)} /${String(spec.enemies).padStart(6)}`,
-      `弹体 ${String(p.projectiles).padStart(6)} /${String(spec.projectiles).padStart(6)}`,
-      `金币 ${String(p.coins).padStart(6)} /${String(spec.coins).padStart(6)}`,
+      '── 在场（真实战斗产出）────',
+      `敌人 ${String(p.enemies).padStart(6)} / 上限 ${String(prof.spawn.cap).padStart(5)}`,
+      `弹体 ${String(p.projectiles).padStart(6)}   预告 ${String(p.pending).padStart(5)}`,
+      `金币 ${String(p.coins).padStart(6)}   刷怪 ${String(p.spawnIntervalMs).padStart(4)}ms`,
       '',
       '── 引擎结构 ───────────────',
       `GameObject ${String(p.objects).padStart(6)}   物理体 ${String(p.bodies).padStart(6)}`,
       `渲染对象   ${String(m.drawCount).padStart(6)}   纹理   ${String(cache.textures).padStart(6)}`,
-      `JS 堆   ${heap === undefined ? '     —' : String(heap).padStart(6)} MB   补量 ${benchRefill() ? '开' : '关'}`,
+      `JS 堆   ${heap === undefined ? '     —' : String(heap).padStart(6)} MB  队伍 ${prof.team} 人 ×${prof.fireRate}`,
       rendererInfo(this.scene.game).slice(0, 30),
       '按 B 停止并返回配置页',
     ])
 
     reportBench({
       framework: benchFramework(),
-      spec,
+      profile: prof.id,
       live: { enemies: p.enemies, projectiles: p.projectiles, coins: p.coins },
       objects: p.objects,
       bodies: p.bodies,

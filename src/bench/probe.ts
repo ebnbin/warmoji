@@ -1,5 +1,5 @@
 import type { MetricsReport } from './metrics'
-import type { BenchFramework, BenchSpec } from './spec'
+import type { BenchFramework } from './spec'
 
 // 基准读数的对外出口：window.__bench。
 // 独立于游戏的 __warmoji 探针——后者是 HUD 状态、且 ECS 战斗期间不写；
@@ -7,7 +7,8 @@ import type { BenchFramework, BenchSpec } from './spec'
 
 export interface BenchProbe {
   framework: BenchFramework
-  spec: BenchSpec
+  /** 强度档位 id */
+  profile: string
   /** 在场实际数量（与 spec 的差值即补量滞后） */
   live: { enemies: number; projectiles: number; coins: number }
   objects: number

@@ -4,7 +4,7 @@ import { playSfx } from '../audio/sfx'
 import { bossFor } from '../data/maps'
 import { waveAt, isBossWave } from '../data/waves'
 import { BOSS_SPAWN_RELIEF, ELITE, ENEMIES, SPAWN, SURGE } from '../data/enemies'
-import { DENSITY_PARAMS, labDensity, labDifficulty, labEnemySet } from '../run/lab'
+import { densityParams, labDifficulty, labEnemySet } from '../run/lab'
 import { MAPS, mapEnemyRoster } from '../data/maps'
 import type { MapDef } from '../types/maps'
 import { hourAt, isDayAt } from '../war/maps/daynight'
@@ -113,7 +113,7 @@ export function spawnCarrierEcs(sim: Sim, pickup: FieldPickupDef): void {
 /** 测试模式补场(镜像 spawnTest):只补勾选的敌人,密度(间隔/上限/每批)与难度(血量倍率)
  * 走场内旋钮。勾选集跨图保留,但只生成本图会出现的敌人;boss 走 Boss 待遇 */
 function spawnTest(sim: Sim): void {
-  const d = DENSITY_PARAMS[labDensity()]
+  const d = densityParams()
   sim.spawnCooldownMs = d.intervalMs
   const roster = new Set<string>(mapEnemyRoster(sim.mapId).map((e) => e.kind))
   const kinds = [...labEnemySet()].filter((k) => k in ENEMIES && roster.has(k))

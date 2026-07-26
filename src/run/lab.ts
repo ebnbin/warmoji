@@ -32,6 +32,23 @@ export const DENSITY_PARAMS: Record<LabDensity, { intervalMs: number; cap: numbe
 /** 倍率档位：难度作用于敌人血量、攻速作用于我方冷却（÷倍率） */
 export type LabMul = 1 | 3 | 10
 
+/** 刷怪参数的统一出口。基准可临时覆写它把真实刷怪器开到档位之外——
+ * 覆写的仍是同一套刷怪管线（spawnStep 读它），不是旁路注入实体 */
+export interface SpawnParams {
+  readonly intervalMs: number
+  readonly cap: number
+  readonly batch: number
+}
+let densityOverride: SpawnParams | undefined
+
+export function setDensityOverride(p: SpawnParams | undefined): void {
+  densityOverride = p
+}
+
+export function densityParams(): SpawnParams {
+  return densityOverride ?? DENSITY_PARAMS[density]
+}
+
 let density: LabDensity = 'mid'
 let difficulty: LabMul = 1
 let fireRate: LabMul = 1
@@ -44,6 +61,12 @@ export function labEnemySet(): ReadonlySet<string> {
 
 export function isLabEnemyOn(kind: string): boolean {
   return enemies.has(kind)
+}
+
+/** 整体设定勾选集（基准页按预设批量设置） */
+export function setLabEnemies(kinds: readonly string[]): void {
+  enemies.clear()
+  for (const k of kinds) enemies.add(k)
 }
 
 /** 点选切换某敌人是否出场（arena 每帧实时读取，无需重启） */
@@ -66,6 +89,11 @@ export function toggleLabCharacter(id: CharacterId): void {
     if (roster.length >= CAPTAINS[TEST_CAPTAIN].teamSize) return // 最多 8 人
     roster = [...roster, id]
   }
+}
+
+/** 直接设定试炼场阵容（基准页按队伍规模批量设置）。改动后由调用方 beginRun + 重启应用 */
+export function setLabRoster(ids: readonly CharacterId[]): void {
+  roster = ids.length > 0 ? [...ids] : [...ROSTER_IDS.slice(0, 1)]
 }
 
 /** 角色等级（统一改全部；作用于建队员时的配装档位） */

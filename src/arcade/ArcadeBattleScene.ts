@@ -28,9 +28,8 @@ import { memberMaxHp } from '../data/stats'
 import type { CharacterId, CharacterDef } from '../types/characters'
 import { aggregateTeamCards } from '../data/cards'
 import {
-  DENSITY_PARAMS,
+  densityParams,
   INVINCIBLE_HP,
-  labDensity,
   labDifficulty,
   labEnemySet,
   labFireRate,
@@ -111,8 +110,6 @@ import { setActiveHudHost } from '../war/hudHost'
 import type { HudSnapshot, WaveSummary } from '../war/hudHost'
 import { rollWaveCarriers } from '../war/battleFx'
 import { enemyMixAt, pickEnemy } from '../war/enemyAi'
-import type { BenchSpec } from '../bench/spec'
-import { benchAngle, benchEnemyDef, benchOffset, benchProjectileDef } from '../bench/load'
 export type { ArcadeBody, ImageObj } from './body'
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
@@ -583,7 +580,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
       objects: this.children.list.length,
       bodies: this.physics.world.bodies.size,
       combatSec: Math.floor(totalSec),
-      spawnIntervalMs: Math.round(this.testMode ? DENSITY_PARAMS[labDensity()].intervalMs : wave.spawnIntervalMs),
+      spawnIntervalMs: Math.round(this.testMode ? densityParams().intervalMs : wave.spawnIntervalMs),
       hpMultiplier: wave.hpMultiplier,
     }
   }
@@ -899,40 +896,6 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     }
   }
 
-  // ── 性能基准 ────────────────────────────────────────────────
-  // 两侧同规格投放：不走自然刷怪，直接补足到目标数量。落点在队伍中心周围
-  // 均匀铺开（用固定序列而非随机，两次运行的空间分布一致）。
-
-  benchFill(spec: BenchSpec): void {
-    const cx = this.center.x
-    const cy = this.center.y
-    const edef = benchEnemyDef()
-    for (let i = this.awakeCount; i < spec.enemies; i++) {
-      const o = benchOffset(i)
-      this.materializeEnemy(edef, cx + o.dx * UNIT, cy + o.dy * UNIT, INVINCIBLE_HP)
-    }
-    const pdef = benchProjectileDef()
-    for (let i = this.projectiles.countActive(true); i < spec.projectiles; i++) {
-      const o = benchOffset(i)
-      spawnProjectile(this, cx + o.dx * UNIT, cy + o.dy * UNIT, benchAngle(i), pdef, 0)
-    }
-    for (let i = this.coins.countActive(true); i < spec.coins; i++) {
-      const o = benchOffset(i)
-      spawnCoins(this, cx + o.dx * UNIT, cy + o.dy * UNIT, 1)
-    }
-  }
-
-  benchClear(): void {
-    for (const g of [this.enemies, this.projectiles, this.coins]) {
-      for (const o of g.getChildren()) {
-        const s = o as Phaser.GameObjects.Sprite
-        s.setActive(false).setVisible(false)
-        const b = (s.body ?? undefined) as Phaser.Physics.Arcade.Body | undefined
-        b?.setEnable(false)
-      }
-    }
-    this.awakeCount = 0
-  }
 
   /** 释放主动技能（UIScene 按钮/E 键触发）：纯 CD 门槛，就绪即放、重置跨波 CD
    * （CD 时长受团队 skillCdMul 缩短）；效果本体是队长持有的标准能力行，逐个单发 */
@@ -1819,7 +1782,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
   /** 测试模式补场：从勾选敌人里随机取，密度（间隔/上限/每批）与难度（血量倍率）走场内旋钮。
    * boss 用 Boss 待遇生成；larva 直接生成即无属主 → 走暴走档。免死/无时限由测试模式提供 */
   private spawnTest(): void {
-    const d = DENSITY_PARAMS[labDensity()]
+    const d = densityParams()
     this.spawnCooldownMs = d.intervalMs
     // 勾选集跨图保留，但只生成本图会出现的敌人——他图残留的勾选在此图不出场
     const roster = new Set<string>(mapEnemyRoster(this.run.mapId).map((e) => e.kind))

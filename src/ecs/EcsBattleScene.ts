@@ -72,7 +72,7 @@ import { xpToNext } from '../war/xp'
 import { CAPTAINS } from '../data/captains'
 import { aggregateTeamCards } from '../data/cards'
 import type { TeamEffects } from '../types/items'
-import { DENSITY_PARAMS, INVINCIBLE_HP, labDensity, labInvincible } from '../run/lab'
+import { INVINCIBLE_HP, densityParams, labInvincible } from '../run/lab'
 import { tickSkillCd } from '../war/skill'
 import { setActiveHudHost } from '../war/hudHost'
 import type { HudHost } from '../war/hudHost'
@@ -82,11 +82,6 @@ import type { Meteor, PendingSpawn, Sim } from './sim'
 import { emojiImage } from '../emoji/textures'
 import { SPAWN } from '../data/enemies'
 import { rollWaveCarriers } from '../war/battleFx'
-import type { BenchSpec } from '../bench/spec'
-import { benchAngle, benchEnemyDef, benchOffset, benchProjectileDef } from '../bench/load'
-import { spawnEnemy } from './enemy'
-import { spawnProjectileEcs } from './projectile'
-import { spawnCoinsEcs } from './pickups'
 
 // ECS 实验战斗场景(宿主壳):Phaser 只做画布/相机/输入/音频宿主;战斗世界(实体+系统+
 // 自绘渲染)全在 ECS。P2:有界森林图 + 队伍编队/orbit/游移/跟随弹簧 + 键盘/相机跟随。
@@ -690,44 +685,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       objects: this.children.list.length,
       bodies: 0,
       combatSec: Math.floor(totalSec),
-      spawnIntervalMs: Math.round(this.testMode ? DENSITY_PARAMS[labDensity()].intervalMs : wave.spawnIntervalMs),
+      spawnIntervalMs: Math.round(this.testMode ? densityParams().intervalMs : wave.spawnIntervalMs),
       hpMultiplier: wave.hpMultiplier,
     }
   }
 
-  // ── 性能基准 ────────────────────────────────────────────────
-  // 与 arcade 侧同规格：同一份 EnemyDef / ProjectileDef、同一条黄金角螺线落点。
-
-  benchFill(spec: BenchSpec): void {
-    const sim = this.sim
-    const atlas = this.atlas
-    if (!sim || !atlas) return
-    const cx = sim.center.x
-    const cy = sim.center.y
-    const edef = benchEnemyDef()
-    const haveE = query(this.world, [Enemy]).length
-    for (let i = haveE; i < spec.enemies; i++) {
-      const o = benchOffset(i)
-      spawnEnemy(sim, atlas, edef, cx + o.dx * UNIT, cy + o.dy * UNIT, INVINCIBLE_HP, false, false)
-    }
-    const pdef = benchProjectileDef()
-    const haveP = query(this.world, [Projectile]).length
-    for (let i = haveP; i < spec.projectiles; i++) {
-      const o = benchOffset(i)
-      spawnProjectileEcs(sim, atlas, cx + o.dx * UNIT, cy + o.dy * UNIT, benchAngle(i), pdef, 0, 0)
-    }
-    const haveC = query(this.world, [Coin]).length
-    for (let i = haveC; i < spec.coins; i++) {
-      const o = benchOffset(i)
-      spawnCoinsEcs(sim, atlas, cx + o.dx * UNIT, cy + o.dy * UNIT, 1)
-    }
-  }
-
-  benchClear(): void {
-    for (const tag of [Enemy, Projectile, Coin]) {
-      for (const eid of query(this.world, [tag])) removeEntity(this.world, eid)
-    }
-  }
 
   /** 释放主动技能(镜像 castSkill):纯 CD 门槛,就绪即放、重置跨波 CD;
    * 效果本体是队长持有的标准能力行,逐个单发 */

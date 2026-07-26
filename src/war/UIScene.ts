@@ -54,7 +54,7 @@ import { roundRect } from '../ui/shapes'
 import { BenchPanel } from './benchPanel'
 import { attachMetrics, detachMetrics } from '../bench/metrics'
 import { clearBench } from '../bench/probe'
-import { benchRefill, benchSpec, isBenchActive, setBenchActive } from '../bench/spec'
+import { clearBenchProfile, isBenchActive, setBenchActive } from '../bench/spec'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
 // 与 BoundedScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
@@ -68,7 +68,6 @@ export class UIScene extends Phaser.Scene {
   private last!: HudSnapshot
   private devText?: Phaser.GameObjects.Text
   private benchPanel?: BenchPanel
-  private benchRefilledAt = 0
   private fpsWindowMin = Infinity
   private frameMaxMs = 0
   private fpsWindowStart = 0
@@ -189,6 +188,7 @@ export class UIScene extends Phaser.Scene {
       // B 键：停止基准并回配置页（面板上有提示）
       this.input.keyboard?.on('keydown-B', () => {
         setBenchActive(false)
+        clearBenchProfile()
         detachMetrics()
         clearBench()
         this.scene.stop('ui')
@@ -299,14 +299,7 @@ export class UIScene extends Phaser.Scene {
 
   update(time: number): void {
     if (this.devText) this.updateDevPanel(time)
-    if (this.benchPanel) {
-      // 逐秒把在场数补回目标：实体会自然消亡（弹体飞出、金币被吸），不补就测不到稳态
-      if (benchRefill() && time - this.benchRefilledAt > 1000) {
-        this.benchRefilledAt = time
-        this.arena.benchFill(benchSpec())
-      }
-      this.benchPanel.update(time)
-    }
+    this.benchPanel?.update(time)
     this.updateSkillButton()
     const s = this.arena.hudSnapshot()
     this.updateFxIndicators(s.battleFx)

@@ -223,10 +223,9 @@ interface WarmojiBenchDebug {
   /** 「开始基准」按钮坐标（e2e/探针点它） */
   start?: { x: number; y: number }
   framework: string
-  enemies: number
-  projectiles: number
-  coins: number
-  total: number
+  profile: string
+  team: number
+  cap: number
   /** 战斗内实时读数（基准面板同源） */
   fps?: number
   frameP50?: number
