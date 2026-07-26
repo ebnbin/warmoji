@@ -1,4 +1,4 @@
-import { query, removeEntity } from 'bitecs'
+import { hasComponent, query, removeEntity } from 'bitecs'
 import { norm } from '../util/vec'
 import { playSfx } from '../audio/sfx'
 import { gainXp } from '../war/xp'
@@ -9,13 +9,12 @@ import { KNOCKBACK } from '../data/abilities'
 import { MEMBER } from '../data/characters'
 import { UNIT } from '../util/units'
 import { spawnShardsEcs } from './entities/shard'
-import { Alive, Anim, Boss, DmgMul, Dormant, ENEMY_SET, Elite, Flash, Hp, Hurt, Iframe, Kv, MAtkSlow, MFlash, MHp, MPerk, Morph, Nest, Poison, Pop, Radius, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from './components'
+import { Alive, Anim, Boss, DmgMul, Dormant, ENEMY_SET, Elite, Flash, Hp, Hurt, Iframe, Kv, MAtkSlow, MFlash, MHp, MPerk, Morph, Nest, Orphan, Poison, Pop, Radius, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from './components'
 import { enemyCarries, enemyDef } from './store'
 import { dropCoins, dropFieldPickup } from './pickups'
 import { unequipAbilities } from './ability/equip'
 import { applyAbilityEffects } from './ability/effects'
 import { enemySource } from './ability/source'
-import type { Effect } from '../types/abilityDefs'
 import type { Sim } from './sim'
 
 // 战斗(P3b):敌人受伤/致死/击退,队员接触伤害/死亡/复活/受击闪光。
@@ -171,10 +170,10 @@ export function orphanBrood(sim: Sim, nestEid: number): void {
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     if (Nest.of[eid] !== nestEid) continue
     Nest.of[eid] = -1
-    const lm = enemyDef[eid]?.locomotion
-    if (lm?.kind === 'baseOrbit') {
-      SpMul.v[eid] = SpMul.v[eid]! * lm.orphanSpeedMul
-      DmgMul.v[eid] = DmgMul.v[eid]! * lm.orphanDamageMul
+    // 会不会暴走是子敌自己的性质（出生时挂的 Orphan），与它的 locomotion 叫什么无关
+    if (hasComponent(sim.world, eid, Orphan)) {
+      SpMul.v[eid] = SpMul.v[eid]! * Orphan.speedMul[eid]!
+      DmgMul.v[eid] = DmgMul.v[eid]! * Orphan.damageMul[eid]!
     }
   }
 }
@@ -223,12 +222,11 @@ export function memberContact(sim: Sim): void {
       if (MPerk.thorns[m]! > 0 && enemyDef[eid] !== undefined) {
         applyDamage(sim, eid, MPerk.thorns[m]!, 0, undefined, undefined, Slot.v[m]!)
       }
-      // 接触附加效果整串走效果层(黏黏怪的攻速罚只是其中一种)。
-      // damage 那条不在此列——接触伤害由上面按 def.damage 结算,自带无敌帧节流。
+      // 接触附加效果整串走效果层(黏黏怪的攻速罚只是其中一种;伤害的真相是 def.damage,
+      // 已在上面结算,故 onContact 只写伤害之外的东西——gen 校验强制)。
       // 从前这里是手挑 attackSlow 一种,别的效果写进 onContact 会被静默丢掉
-      const extra = contactExtras(def)
-      if (extra.length > 0) {
-        applyAbilityEffects(sim, enemySource(def.name, 1), extra, {
+      if (def.onContact && def.onContact.length > 0) {
+        applyAbilityEffects(sim, enemySource(def.name, 1), def.onContact, {
           x: mx,
           y: my,
           baseDamage: 0,
@@ -238,17 +236,6 @@ export function memberContact(sim: Sim): void {
       break // 一帧一员只吃一次(无敌帧掌管其余)
     }
   }
-}
-
-/** 接触时要施加的非伤害效果(按 def 记忆一次:接触每帧都在判,不能现过滤现分配) */
-const contactCache = new WeakMap<EnemyDef, readonly Effect[]>()
-function contactExtras(def: EnemyDef): readonly Effect[] {
-  let list = contactCache.get(def)
-  if (!list) {
-    list = (def.onContact ?? []).filter((e) => e.kind !== 'damage')
-    contactCache.set(def, list)
-  }
-  return list
 }
 
 /** 敌人静默移除(自爆/替身到时:不计击杀、不掉落、不放死亡效果) */

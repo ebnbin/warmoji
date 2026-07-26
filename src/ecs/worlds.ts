@@ -4,7 +4,7 @@ import { TEAM, MEMBER } from '../data/characters'
 import { SPAWN } from '../data/enemies'
 import { randomMapPoint } from '../war/spawn'
 import { MAPS } from '../data/maps'
-import type { IceConfig, InfiniteConfig, MapId, RiverConfig, ShrinkRingConfig, SpaceConfig } from '../types/maps'
+import type { IceConfig, InfiniteConfig, MapDef, MapId, RiverConfig, ShrinkRingConfig, SpaceConfig } from '../types/maps'
 import { approach, onFloe } from '../war/maps/ice'
 import { outsideZone, ringPoint, zoneRadiusAt } from '../war/maps/world'
 import { clampToDisc, confineVelocity, meteorSweep } from '../war/maps/space'
@@ -718,16 +718,26 @@ const torus: WorldHooks = {
   },
 }
 
-/** 按地图取世界钩子;未特化的图一律走有界基线 */
+/** 世界形态 → 钩子的**全映射**：MapDef 新增一种 kind 而不在此登记 = 编译不过。
+ * 从前是一串 if + 兜底 return bounded，漏一种就静默按有界图跑 */
+const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
+  bounded,
+  daynight: bounded, // 昼夜只换配色与光照，世界几何同有界基线
+  ruins: ruins,
+  ice,
+  river,
+  void: torus,
+  space,
+  infinite,
+}
+
+/** 按地图取世界钩子。ice / walls 这两条先判——它们是「本图带没带这套配置」，
+ * 与世界形态正交（残垣是 ruins 形态 + walls 配置，浮冰是 bounded 形态 + ice 配置） */
 export function worldFor(mapId: MapId): WorldHooks {
   const def = MAPS[mapId]
   if (def.ice) return ice
   if (def.walls) return ruins
-  if (def.kind === 'river') return river
-  if (def.kind === 'void') return torus
-  if (def.kind === 'space') return space
-  if (def.kind === 'infinite') return infinite
-  return bounded
+  return BY_KIND[def.kind]!
 }
 
 /** 休眠维护(无限世界):出活跃方形的敌人冻结、回来即唤醒。Boss 永不休眠 */

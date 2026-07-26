@@ -59,7 +59,8 @@ function armEnemy(sim: Sim, eid: number): void {
   if (!rows) return
   const fireDelay = EnemyArm.fireDelayMs[eid]!
   rows.forEach((w, i) => {
-    const delay = (w.kind === 'projectile' ? w.firstDelayMs : undefined) ?? fireDelay ?? 600 + i * 230
+    // 「有没有声明首发延迟」是能力自己的性质，不该问它是不是某个 kind
+    const delay = ('firstDelayMs' in w ? w.firstDelayMs : undefined) ?? fireDelay ?? 600 + i * 230
     spawnWeapon(sim, eid, w, FACTION.enemy, delay, NEUTRAL_AMP)
   })
 }

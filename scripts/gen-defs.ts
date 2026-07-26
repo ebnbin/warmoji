@@ -279,11 +279,13 @@ function checkEnemy(path: string, e: (typeof ENEMIES)[string]): void {
   for (const [i, a] of (e.abilities ?? []).entries()) checkAbility(`${path}.abilities[${i}]`, a as unknown as Record<string, unknown>)
   for (const [i, fx] of (e.onContact ?? []).entries()) {
     const cp = `${path}.onContact[${i}]`
+    // onContact 只写「接触伤害之外」的附加效果：伤害的真相是 def.damage，
+    // 再写一条 { kind:'damage' } 只会让人以为它是另一份伤害
     if (fx.kind === 'attackSlow') {
       num(`${cp}.mul`, fx.mul, 0.01)
       num(`${cp}.durationMs`, fx.durationMs, 1)
-    } else if (fx.kind !== 'damage') {
-      bad(cp, `未知 onContact kind：${String((fx as { kind?: unknown }).kind)}`)
+    } else {
+      bad(cp, `未知 onContact kind：${String((fx as { kind?: unknown }).kind)}（伤害写在 damage 字段，不写进 onContact）`)
     }
   }
   if (e.spawner) {

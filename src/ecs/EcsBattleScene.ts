@@ -63,7 +63,7 @@ import { tickSkillCd } from '../war/skill'
 import { hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import type { HudSnapshot } from '../run/hudHost'
-import type { Meteor, PendingSpawn, Sim } from './sim'
+import type { Burst, Meteor, PendingSpawn, Sim } from './sim'
 import { emojiImage } from '../emoji/textures'
 import { SPAWN } from '../data/enemies'
 import { rollWaveCarriers } from '../war/battleFx'
@@ -112,6 +112,20 @@ function liveCoins(world: EcsWorld): number {
     if (Pickup.kind[eid] === COIN) n++
   }
   return n
+}
+
+/** 哪些世界形态走「满屏底色 + 分块装饰 + 出生在原点」的无限地基。**全映射**：
+ * MapDef 新增一种 kind 而不在此登记 = 编译不过。从前是 `kind === 'infinite' || kind === 'space'`，
+ * 新增一种形态默认落在 false，是漏掉还是有意分不出来 */
+const CHUNKED_BACKDROP: Record<MapDef['kind'], boolean> = {
+  bounded: false,
+  daynight: false,
+  ruins: false,
+  ice: false,
+  void: false,
+  river: false, // 奔流虽是无限世界，但底色是滚动河面，不走分块装饰
+  infinite: true,
+  space: true,
 }
 
 export class EcsBattleScene extends Phaser.Scene implements HudHost {
@@ -194,10 +208,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     super(ECS_SCENE_KEY)
   }
 
-  /** 本图是否走无限世界地基(满屏底色 + 分块装饰 + 出生在原点):荒漠与深空共用 */
+  /** 本图是否走无限世界地基(满屏底色 + 分块装饰 + 出生在原点) */
   private get infinite(): boolean {
-    const kind = MAPS[this.run.mapId].kind
-    return kind === 'infinite' || kind === 'space'
+    return CHUNKED_BACKDROP[MAPS[this.run.mapId].kind]
   }
 
   /** 开局重置全部可变实例字段（镜像 resetWorldFields 的用意）。
@@ -526,10 +539,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private drainBursts(): void {
     const q = this.sim!.pendingBursts
     if (q.length === 0) return
-    for (const b of q) {
-      const emitter = b.kind === 'coin' ? this.coinBurst : b.kind === 'puff' ? this.puffBurst : this.deathBurst
-      emitter.explode(b.count, b.x, b.y)
+    // 全映射：Burst 新增一种 kind 而不在此登记 = 编译不过（从前的三元链末尾会把
+    // 任何没认出来的 kind 都当成死亡紫爆）
+    const byKind: Record<Burst['kind'], Phaser.GameObjects.Particles.ParticleEmitter> = {
+      death: this.deathBurst,
+      coin: this.coinBurst,
+      puff: this.puffBurst,
     }
+    for (const b of q) byKind[b.kind]!.explode(b.count, b.x, b.y)
     q.length = 0
   }
 

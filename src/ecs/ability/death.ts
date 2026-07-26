@@ -1,6 +1,7 @@
 import { UNIT } from '../../util/units'
 import { waveAt } from '../../data/waves'
-import type { DecoyEffect, SplitEffect } from '../../types/enemies'
+import type { DeathEffect, DecoyEffect, SplitEffect } from '../../types/enemies'
+import type { Effect } from '../../types/abilityDefs'
 import { Despawn } from '../components'
 import { spawnBrood, spawnEnemy } from '../entities/enemy'
 import { applyAbilityEffects } from './effects'
@@ -37,16 +38,40 @@ function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): 
 
 /** 在死亡点重放一名死者的亡语。killEnemy 经 sim.onDeathFx 同步调用——
  * 同帧先死者的治疗要能救到同伴,攒到帧末重放会让幽灵群「互相续命」失效 */
+/** 一条亡语怎么落地 */
+type DeathHandler = (sim: Sim, d: PendingDeath, fx: DeathEffect, hpMul: number) => void
+
+/** 绝大多数亡语就是一条普通命中效果，交给效果层 */
+const toEffectLayer: DeathHandler = (sim, d, fx) => {
+  applyAbilityEffects(sim, enemySource(d.def.name, d.dmgMul), [fx as Effect], {
+    x: d.x,
+    y: d.y,
+    baseDamage: 0,
+  })
+}
+
+/** 每种亡语一个处理器。**全映射**：DeathEffect 新增一种（含 Effect 新增一种）而不在此
+ * 登记 = 编译不过，逼你当场决定「它走效果层，还是要像 split/decoy 那样特殊处理」。
+ * 从前是 `split → decoy → else 全丢给效果层`，新增一种只会静默滑进 else */
+const DEATH_KINDS: Record<DeathEffect['kind'], DeathHandler> = {
+  split: (sim, d, fx) => spawnSplit(sim, d, fx as SplitEffect),
+  decoy: (sim, d, fx, hpMul) => spawnDecoy(sim, d, fx as DecoyEffect, hpMul),
+  blast: toEffectLayer,
+  damage: toEffectLayer,
+  slow: toEffectLayer,
+  poison: toEffectLayer,
+  morph: toEffectLayer,
+  attackSlow: toEffectLayer,
+  ground: toEffectLayer,
+  heal: toEffectLayer,
+  spawnProjectile: toEffectLayer,
+}
+
 export function replayDeath(sim: Sim, d: PendingDeath): void {
   const effects = d.def.onDeath
   if (!effects) return
   const hpMul = waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier
-  const src = enemySource(d.def.name, d.dmgMul)
-  for (const fx of effects) {
-    if (fx.kind === 'split') spawnSplit(sim, d, fx)
-    else if (fx.kind === 'decoy') spawnDecoy(sim, d, fx, hpMul)
-    else applyAbilityEffects(sim, src, [fx], { x: d.x, y: d.y, baseDamage: 0 })
-  }
+  for (const fx of effects) DEATH_KINDS[fx.kind]!(sim, d, fx, hpMul)
 }
 
 /** 排空死亡队列:仅作兜底(onDeathFx 未挂时,如 headless 仿真) */

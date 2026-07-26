@@ -414,5 +414,9 @@ export const EnemyPhase = { v: f32() }
  * nextSpawnAt = 巢自身的下次生成时刻（0 表示非 spawner） */
 export const Nest = { of: i32Fill(-1), nextSpawnAt: f32() }
 
+/** 拆巢暴走倍率：巢没了之后叠到自己的速度/攻击上。
+ * **有这个组件 = 这只子敌会因拆巢暴走**——拆巢时不必回头问它是不是 baseOrbit */
+export const Orphan = { speedMul: f32(), damageMul: f32() }
+
 /** 偷币鼠：eaten=已吞金币数（死亡时吐回 + 利息）；nextEatAt=下次可吞时刻（逐枚偷） */
 export const Thief = { eaten: i32(), nextEatAt: f32() }

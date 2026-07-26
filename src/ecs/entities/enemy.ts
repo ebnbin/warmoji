@@ -1,11 +1,11 @@
 import { addComponent, addEntity } from 'bitecs'
 
 import { AI, ELITE } from '../../data/enemies'
-import type { EnemyDef } from '../../types/enemies'
+import type { DashTrigger, EnemyDef, LocomotionDef } from '../../types/enemies'
 
 import { waveAt } from '../../data/waves'
 
-import { Alive, Anim, Boss, Charge, Depth, Despawn, DmgMul, Dormant, EDir, EState, ETurn, Elite, Enemy, EnemyArm, EnemyPhase, Flash, Hp, Kv, Morph, Nest, Poison, Pop, Quad, Radius, Slide, Slow, SpMul, Speed, Sprite, Thief, Tint, Transform } from '../components'
+import { Alive, Anim, Boss, Charge, Depth, Despawn, DmgMul, Dormant, EDir, EState, ETurn, Elite, Enemy, EnemyArm, EnemyPhase, Flash, Hp, Kv, Morph, Nest, Poison, Pop, Quad, Radius, Slide, Slow, SpMul, Speed, Sprite, Thief, Tint, Transform , Orphan } from '../components'
 import { enemyCarries, enemyDef } from '../store'
 import { armIdle } from '../anim'
 import { ANIM_DEF } from '../../emoji/anim'
@@ -17,7 +17,41 @@ import type { FrameIndex } from '../frames'
 // 行为/转向/回收等系统在 ../enemy.ts。
 // 敌人:装配 + 转向(locomotion 状态机 + 击退 + 世界钩子后处理)。
 
-/** 装配一个敌人实体(px 化 def),返回 eid */
+/** 某种 locomotion 出生时要额外置的状态。**全映射**：LocomotionDef 新增一种而不在此
+ * 登记 = 编译不过；null 表示「这种不用初始化」——是一个被明确写下来的决定，
+ * 不是漏掉。从前是两行 `lm.kind === 'dash' && …` 的三元，加一种要初始化的
+ * locomotion 只能靠人记得回来改 */
+type LocoInit<K extends LocomotionDef['kind']> = (
+  sim: Sim,
+  eid: number,
+  lm: Extract<LocomotionDef, { kind: K }>,
+) => void
+const LOCO_INIT: { [K in LocomotionDef['kind']]: LocoInit<K> | null } = {
+  chase: null,
+  wander: null,
+  static: null,
+  flee: null,
+  coinThief: null,
+  standoff: null,
+  detonate: null,
+  baseOrbit: (sim, eid, lm) => {
+    // 暴走倍率随子敌走：拆巢时直接叠，不必回头查它的 locomotion 是什么
+    addComponent(sim.world, eid, Orphan)
+    Orphan.speedMul[eid] = lm.orphanSpeedMul
+    Orphan.damageMul[eid] = lm.orphanDamageMul
+  },
+  dash: (sim, eid, lm) => {
+    // idle 走 chase 的从「追」态起步
+    EState.v[eid] = lm.idle === 'chase' ? 1 : 0
+    Charge.nextDashAt[eid] = (DASH_FIRST_AT[lm.trigger.kind] as (s: Sim, t: DashTrigger) => number)(sim, lm.trigger)
+  },
+}
+
+/** 定时冲刺出生即预约第一次起冲；探测式没有预约（0）。**全映射** */
+const DASH_FIRST_AT: { [K in DashTrigger['kind']]: (sim: Sim, t: Extract<DashTrigger, { kind: K }>) => number } = {
+  timer: (sim, t) => sim.elapsedMs + (t.firstDelayMs ?? t.intervalMs),
+  detect: () => 0,
+}
 
 /** 装配一个敌人实体(px 化 def),返回 eid */
 export function spawnEnemy(
@@ -74,15 +108,12 @@ export function spawnEnemy(
   Speed.v[eid] = def.speed
   Hp.v[eid] = hp
   Hp.max[eid] = hp
-  const lm = def.locomotion
-  EState.v[eid] = lm.kind === 'dash' && lm.idle === 'chase' ? 1 : 0
+  EState.v[eid] = 0
   Charge.windupUntil[eid] = 0
   Charge.dashUntil[eid] = 0
   Charge.coolUntil[eid] = 0
-  Charge.nextDashAt[eid] =
-    lm.kind === 'dash' && lm.trigger.kind === 'timer'
-      ? sim.elapsedMs + (lm.trigger.firstDelayMs ?? lm.trigger.intervalMs)
-      : 0
+  Charge.nextDashAt[eid] = 0
+  ;(LOCO_INIT[def.locomotion.kind] as LocoInit<LocomotionDef['kind']> | null)?.(sim, eid, def.locomotion)
   Despawn.at[eid] = 0
   Morph.until[eid] = 0
   Morph.vuln[eid] = 1

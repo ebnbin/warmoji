@@ -15,6 +15,7 @@ import { COIN } from './pickups'
 import { backEaseOut } from './ease'
 import { spawnBrood } from './entities/enemy'
 import type { Sim } from './sim'
+import type { BaseOrbitLocomotion, DashLength, DashLocomotion, DetonateLocomotion, LocomotionDef, StandoffLocomotion, DashTrigger } from '../types/enemies'
 import type { FrameIndex } from './frames'
 import type { Point } from '../util/vec'
 
@@ -75,11 +76,51 @@ function lockDashDir(sim: Sim, eid: number, aim: 'nearest' | 'teamCenter'): void
   EDir.y[eid] = dir.y
 }
 
+/** 冲刺时长的两种写法 → 毫秒。**全映射**：DashLength 新增一种即编译不过 */
+const DASH_MS: { [K in DashLength['kind']]: (l: Extract<DashLength, { kind: K }>, speed: number) => number } = {
+  time: (l) => l.durationMs,
+  dist: (l, speed) => (l.dist / speed) * 1000,
+}
+
+/** 冲刺触发的两种方式：一次冲完之后回到哪个状态、以及非冲刺期怎么判定起冲。
+ * **全映射**：DashTrigger 新增一种即编译不过（从前是 `if timer / else`，
+ * 第三种会被静默当成 detect） */
+interface TriggerOps<K extends DashTrigger['kind']> {
+  /** 一次冲刺结束：写回状态与下一次的计时 */
+  afterDash(sim: Sim, eid: number, t: Extract<DashTrigger, { kind: K }>): void
+  /** 非冲刺期这一帧的判定：返回 true = 进蓄力。各自的冷却/计时簿记自管 */
+  step(sim: Sim, eid: number, t: Extract<DashTrigger, { kind: K }>, state: number, x: number, y: number): boolean
+}
+const DASH_TRIGGERS: { [K in DashTrigger['kind']]: TriggerOps<K> } = {
+  timer: {
+    afterDash: (sim, eid, t) => {
+      EState.v[eid] = 1
+      Charge.nextDashAt[eid] = sim.elapsedMs + t.intervalMs
+    },
+    step: (sim, eid) => sim.elapsedMs >= Charge.nextDashAt[eid]!,
+  },
+  detect: {
+    afterDash: (sim, eid, t) => {
+      EState.v[eid] = 4
+      Charge.coolUntil[eid] = sim.elapsedMs + t.cooldownMs
+    },
+    step: (sim, eid, t, state, x, y) => {
+      const target = state !== 4 ? nearestAlive(sim, x, y) : null
+      if (target) {
+        const dx = target.x - x
+        const dy = target.y - y
+        if (dx * dx + dy * dy <= t.range * t.range) return true
+      }
+      // 冷却到点：回 idle（下一帧才可能再进圈起冲）
+      if (state === 4 && sim.elapsedMs >= Charge.coolUntil[eid]!) EState.v[eid] = 0
+      return false
+    },
+  },
+}
+
 /** 统一冲刺状态机(镜像 dash steerer):蓄力→冲刺(锁向直冲)→冷却/回到 idle 移动。
  * 返回本帧速度(px/s);脚本化姿态(蓄力颤动/冲刺前倾/橙染)在各分支自管 */
-function steerDash(sim: Sim, eid: number, slow: number): { vx: number; vy: number } {
-  const lm = enemyDef[eid]!.locomotion
-  if (lm.kind !== 'dash') return { vx: 0, vy: 0 }
+function steerDash(sim: Sim, eid: number, slow: number, lm: DashLocomotion): { vx: number; vy: number } {
   const now = sim.elapsedMs
   const state = EState.v[eid]!
   const ex = Transform.x[eid]!
@@ -91,7 +132,7 @@ function steerDash(sim: Sim, eid: number, slow: number): { vx: number; vy: numbe
       if (lm.lockAt === 'launch') lockDashDir(sim, eid, lm.aim)
       EState.v[eid] = 3
       Charge.dashUntil[eid] =
-        now + (lm.length.kind === 'time' ? lm.length.durationMs : (lm.length.dist / lm.dashSpeed) * 1000)
+        now + (DASH_MS[lm.length.kind] as (l: DashLength, s: number) => number)(lm.length, lm.dashSpeed)
       Transform.rot[eid] = 0
       if (lm.sfx) playSfx(lm.sfx)
     }
@@ -100,13 +141,7 @@ function steerDash(sim: Sim, eid: number, slow: number): { vx: number; vy: numbe
   if (state === 3) {
     // dash:锁向直冲;到时冷却/回追
     if (now >= Charge.dashUntil[eid]!) {
-      if (lm.trigger.kind === 'timer') {
-        EState.v[eid] = 1
-        Charge.nextDashAt[eid] = now + lm.trigger.intervalMs
-      } else {
-        EState.v[eid] = 4
-        Charge.coolUntil[eid] = now + lm.trigger.cooldownMs
-      }
+      ;(DASH_TRIGGERS[lm.trigger.kind].afterDash as (s: Sim, e: number, t: DashTrigger) => void)(sim, eid, lm.trigger)
     }
     // 脚本化姿态:本体前倾并按冲刺方向翻转
     Transform.rot[eid] = EDir.x[eid]! * 0.3
@@ -115,26 +150,16 @@ function steerDash(sim: Sim, eid: number, slow: number): { vx: number; vy: numbe
     if (enemyDef[eid]?.breaksWalls) sim.hooks.smashWall(sim, ex, ey)
     return { vx: EDir.x[eid]! * lm.dashSpeed * slow, vy: EDir.y[eid]! * lm.dashSpeed * slow }
   }
-  // 触发判定
-  if (lm.trigger.kind === 'timer') {
-    if (now >= Charge.nextDashAt[eid]!) {
-      EState.v[eid] = 2
-      Charge.windupUntil[eid] = now + lm.windupMs
-      return { vx: 0, vy: 0 }
-    }
-  } else {
-    const target = nearestAlive(sim, ex, ey)
-    if (target) {
-      const dx = target.x - ex
-      const dy = target.y - ey
-      if (state !== 4 && dx * dx + dy * dy <= lm.trigger.range * lm.trigger.range) {
-        if (lm.lockAt === 'windup') lockDashDir(sim, eid, lm.aim)
-        EState.v[eid] = 2
-        Charge.windupUntil[eid] = now + lm.windupMs
-        return { vx: 0, vy: 0 }
-      }
-    }
-    if (state === 4 && now >= Charge.coolUntil[eid]!) EState.v[eid] = 0
+  // 触发判定：两种 trigger 各自的簿记归 DASH_TRIGGERS，起冲的共同动作在这里
+  const ops = DASH_TRIGGERS[lm.trigger.kind] as TriggerOps<DashTrigger['kind']>
+  if (ops.step(sim, eid, lm.trigger, state, ex, ey)) {
+    // 进蓄力即锁向（可预判横躲）；'launch' 档留到起跑瞬间再锁。
+    // 从前这一句只写在 detect 分支里，timer + lockAt:'windup' 会静默不锁——
+    // 现行数据的 timer 敌人恰好都是 launch，所以看不出来
+    if (lm.lockAt === 'windup') lockDashDir(sim, eid, lm.aim)
+    EState.v[eid] = 2
+    Charge.windupUntil[eid] = now + lm.windupMs
+    return { vx: 0, vy: 0 }
   }
   // idle 移动:逼近走位经世界钩子(残垣图流场绕墙;冲刺本身仍锁直线)
   const speed = Speed.v[eid]! * slow
@@ -149,9 +174,7 @@ function steerDash(sim: Sim, eid: number, slow: number): { vx: number; vy: numbe
 }
 
 /** 定距风筝(镜像 standoff steerer):太远贴近、太近后退、站位带内停手 */
-function steerStandoff(sim: Sim, eid: number, slow: number): { vx: number; vy: number } {
-  const lm = enemyDef[eid]!.locomotion
-  if (lm.kind !== 'standoff') return { vx: 0, vy: 0 }
+function steerStandoff(sim: Sim, eid: number, slow: number, lm: StandoffLocomotion): { vx: number; vy: number } {
   const sp = Speed.v[eid]! * slow
   const ex = Transform.x[eid]!
   const ey = Transform.y[eid]!
@@ -183,9 +206,7 @@ function steerStandoff(sim: Sim, eid: number, slow: number): { vx: number; vy: n
 
 /** 自爆冲锋(镜像 detonate steerer + scene.detonate):追玩家→进 triggerRange 定身蓄力→
  * 蓄力完必引爆(群伤范围内队员 + 自毁)。返回本帧速度 */
-function steerDetonate(sim: Sim, eid: number, slow: number): { vx: number; vy: number } {
-  const lm = enemyDef[eid]!.locomotion
-  if (lm.kind !== 'detonate') return { vx: 0, vy: 0 }
+function steerDetonate(sim: Sim, eid: number, slow: number, lm: DetonateLocomotion): { vx: number; vy: number } {
   const now = sim.elapsedMs
   const ex = Transform.x[eid]!
   const ey = Transform.y[eid]!
@@ -227,9 +248,7 @@ function steerDetonate(sim: Sim, eid: number, slow: number): { vx: number; vy: n
 
 /** 护巢环绕(镜像 baseOrbit steerer):绕巢盘旋,玩家逼近巢即扑向玩家;巢被拆(Nest.of=-1)
  * 后直扑玩家(暴走档,倍率已由 orphanBrood 施加)。返回本帧速度 */
-function steerBaseOrbit(sim: Sim, eid: number, slow: number): { vx: number; vy: number } {
-  const lm = enemyDef[eid]!.locomotion
-  if (lm.kind !== 'baseOrbit') return { vx: 0, vy: 0 }
+function steerBaseOrbit(sim: Sim, eid: number, slow: number, lm: BaseOrbitLocomotion): { vx: number; vy: number } {
   const sp = Speed.v[eid]! * slow
   const ex = Transform.x[eid]!
   const ey = Transform.y[eid]!
@@ -258,6 +277,26 @@ function steerBaseOrbit(sim: Sim, eid: number, slow: number): { vx: number; vy: 
   const radial = (lm.orbitRadius - r) / lm.orbitRadius
   const dir = norm(-ry / r + (rx / r) * radial * 1.5, rx / r + (ry / r) * radial * 1.5)
   return { vx: dir.x * sp, vy: dir.y * sp }
+}
+
+/** 逃跑(镜像 arcade 的 flee steerer):队伍进 range 就背身逃开(方向经世界钩子修正,
+ * 有界图贴边沿墙滑行),否则慢速游荡 */
+function steerFlee(sim: Sim, eid: number, slow: number, lm: Extract<LocomotionDef, { kind: 'flee' }>): { vx: number; vy: number } {
+  const speed = Speed.v[eid]!
+  const ex = Transform.x[eid]!
+  const ey = Transform.y[eid]!
+  const target = nearestAlive(sim, ex, ey)
+  if (target) {
+    const d = sim.hooks.worldDelta(sim, ex, ey, target.x, target.y)
+    if (d.x * d.x + d.y * d.y <= lm.range * lm.range) {
+      const away = norm(-d.x, -d.y)
+      const dir = sim.hooks.fleeDir(sim, eid, away.x, away.y)
+      return { vx: dir.x * speed * slow, vy: dir.y * speed * slow }
+    }
+  }
+  const w = wanderDir(sim, eid)
+  const sp = speed * AI.fleeIdleSpeedMul * slow
+  return { vx: w.x * sp, vy: w.y * sp }
 }
 
 /** 偷币鼠(镜像 coinThief steerer):直奔最近金币,贴上按冷却逐枚吞(偷走不入账);
@@ -377,6 +416,44 @@ export function fadeEnemyFlash(sim: Sim): void {
   }
 }
 
+/** 一种 locomotion 的转向：返回本帧的行为速度（px/s，击退等冲量另算） */
+type Steerer<K extends LocomotionDef['kind']> = (
+  sim: Sim,
+  eid: number,
+  speed: number,
+  slow: number,
+  lm: Extract<LocomotionDef, { kind: K }>,
+) => { vx: number; vy: number }
+
+const STILL = { vx: 0, vy: 0 }
+
+/** 奔向最近活着队员（方向经世界钩子——残垣图走流场绕墙） */
+const steerChase: Steerer<'chase'> = (sim, eid, speed) => {
+  const target = nearestAlive(sim, Transform.x[eid]!, Transform.y[eid]!)
+  if (!target) return STILL
+  const dir = sim.hooks.chaseDir(sim, eid, target.x, target.y)
+  return { vx: dir.x * speed, vy: dir.y * speed }
+}
+
+/** 每种 locomotion 一个转向器。**全映射**：LocomotionDef 新增一种而不在此登记 =
+ * 编译不过。从前是一条 else-if 链外加一个兜底 else——`flee` 在类型里声明了、
+ * arcade 侧也实现了（它一直是 STEERERS 全映射表），ECS 这边却从来没写，
+ * 被那个 else 静默当成 chase 蒙了过去 */
+const STEERERS: { [K in LocomotionDef['kind']]: Steerer<K> } = {
+  chase: steerChase,
+  wander: (sim, eid, speed) => {
+    const d = wanderDir(sim, eid)
+    return { vx: d.x * speed, vy: d.y * speed }
+  },
+  static: () => STILL,
+  flee: (sim, eid, _speed, slow, lm) => steerFlee(sim, eid, slow, lm),
+  dash: (sim, eid, _speed, slow, lm) => steerDash(sim, eid, slow, lm),
+  standoff: (sim, eid, _speed, slow, lm) => steerStandoff(sim, eid, slow, lm),
+  detonate: (sim, eid, _speed, slow, lm) => steerDetonate(sim, eid, slow, lm),
+  baseOrbit: (sim, eid, _speed, slow, lm) => steerBaseOrbit(sim, eid, slow, lm),
+  coinThief: (sim, eid, _speed, slow) => steerCoinThief(sim, eid, slow),
+}
+
 /** 本帧减速区叠乘(寒气光环等):落在圈内即按 factor 变慢。转向与染色共读这一份 */
 export function applySlowZones(sim: Sim): void {
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
@@ -438,40 +515,10 @@ export function steerEnemies(sim: Sim, delta: number): void {
       const d = wanderDir(sim, eid)
       bvx = d.x * speed * 0.5
       bvy = d.y * speed * 0.5
-    } else if (kind === 'static') {
-      // 原地不动
-    } else if (kind === 'wander') {
-      const d = wanderDir(sim, eid)
-      bvx = d.x * speed
-      bvy = d.y * speed
-    } else if (kind === 'dash') {
-      const v = steerDash(sim, eid, slow)
-      bvx = v.vx
-      bvy = v.vy
-    } else if (kind === 'standoff') {
-      const v = steerStandoff(sim, eid, slow)
-      bvx = v.vx
-      bvy = v.vy
-    } else if (kind === 'detonate') {
-      const v = steerDetonate(sim, eid, slow)
-      bvx = v.vx
-      bvy = v.vy
-    } else if (kind === 'baseOrbit') {
-      const v = steerBaseOrbit(sim, eid, slow)
-      bvx = v.vx
-      bvy = v.vy
-    } else if (kind === 'coinThief') {
-      const v = steerCoinThief(sim, eid, slow)
-      bvx = v.vx
-      bvy = v.vy
     } else {
-      // chase + 回落:奔向最近活着队员(方向经世界钩子——残垣图走流场绕墙)
-      const target = nearestAlive(sim, Transform.x[eid]!, Transform.y[eid]!)
-      if (target) {
-        const dir = sim.hooks.chaseDir(sim, eid, target.x, target.y)
-        bvx = dir.x * speed
-        bvy = dir.y * speed
-      }
+      const v = (STEERERS[kind] as Steerer<LocomotionDef['kind']>)(sim, eid, speed, slow, enemyDef[eid]!.locomotion)
+      bvx = v.vx
+      bvy = v.vy
     }
     // 世界钩子:冰面打滑等把行为速度过一道低通(击退分量不参与,见 worlds.ts)
     const post = sim.hooks.postSteerEnemy(sim, eid, bvx, bvy, delta)
