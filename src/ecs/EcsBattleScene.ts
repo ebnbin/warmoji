@@ -5,7 +5,7 @@ import { MEMBER } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
 import { burstEmitter } from '../util/fx'
-import { CueLayer } from './render/cues'
+import { CueLayer, drawCues } from './render/cues'
 import { RingLayer } from './render/rings'
 import { DamageTextLayer } from './render/damageText'
 import { loadSettings } from '../save/settings'
@@ -566,17 +566,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   /** 排空本帧一次性战斗特效:能力系统只入队,绘制在此落地 */
   private drainCues(): void {
     const q = this.sim!.pendingCues
-    if (q.length === 0) return
-    for (const c of q) {
-      const fx = this.cues!
-      if (c.kind === 'circle') fx.circle(c.x, c.y, c.radius, c.o)
-      else if (c.kind === 'boom') fx.boom(c.x, c.y, c.size)
-      else if (c.kind === 'lightning') fx.lightning(c.points, c.color)
-      else if (c.kind === 'slash') fx.slash(c.x, c.y, c.angle, c.radius)
-      else if (c.kind === 'beam') fx.beam(c.x, c.y, c.angle, c.length, c.radius, c.color)
-      else fx.screenFlash(c.color, c.alpha, c.durationMs)
-    }
-    q.length = 0
+    if (q.length > 0 && this.cues) drawCues(this.cues, q)
   }
 
   /** 排空本帧敌人受伤飘字(镜像 floatDamage:池化 BitmapText 上浮淡出);关则弃字 */

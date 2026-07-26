@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import type { BlastRing } from '../../types/abilityDefs'
 import { emojiImage } from '../../emoji/textures'
 import { backEaseOut, cubicEaseIn, cubicEaseOut } from '../ease'
+import type { Cue } from '../ability/cues'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment } from './tri'
 import type { Scratch } from './tri'
 
@@ -425,4 +426,23 @@ class EcsShapeBatch extends Phaser.GameObjects.GameObject {
     if (o.i.length === 0) return
     node.batch(drawingContext, o.i, o.v, o.c, null)
   }
+}
+
+/** 每种特效怎么落到绘制层。全映射：新增一种 Cue 而不在此登记 = 编译不过
+ *（从前是场景侧一条 else-if 链，漏一种是静默什么都不画，而且末尾的 else 会把
+ * 任何没认出来的 kind 都当成全屏闪） */
+type Draw<K extends Cue['kind']> = (fx: CueLayer, c: Extract<Cue, { kind: K }>) => void
+const CUE_KINDS: { [K in Cue['kind']]: Draw<K> } = {
+  circle: (fx, c) => fx.circle(c.x, c.y, c.radius, c.o),
+  boom: (fx, c) => fx.boom(c.x, c.y, c.size),
+  lightning: (fx, c) => fx.lightning(c.points, c.color),
+  slash: (fx, c) => fx.slash(c.x, c.y, c.angle, c.radius),
+  beam: (fx, c) => fx.beam(c.x, c.y, c.angle, c.length, c.radius, c.color),
+  screenFlash: (fx, c) => fx.screenFlash(c.color, c.alpha, c.durationMs),
+}
+
+/** 排空一批特效到绘制层 */
+export function drawCues(fx: CueLayer, queue: Cue[]): void {
+  for (const c of queue) (CUE_KINDS[c.kind] as Draw<Cue['kind']>)(fx, c)
+  queue.length = 0
 }
