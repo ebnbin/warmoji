@@ -1,7 +1,6 @@
 import { addComponents, addEntity } from 'bitecs'
 import { attachDrawable } from './drawable'
 import { Drop, FACTION, Faction, Owner } from '../components'
-import type { HeldVisual } from '../../types/abilityDefs'
 import type { Sim } from '../sim'
 
 // 坠物：从目标正上方砸下来的一枚东西（天罚打击）。
@@ -15,7 +14,8 @@ import type { Sim } from '../sim'
 
 export interface DropSpec {
   /** 外形（emoji + 尺寸；沿用手持视觉那套形状描述里的两项） */
-  visual: Pick<HeldVisual, 'emoji' | 'size'>
+  emoji: string
+  size: number
   /** 锁定的目标实体 */
   target: number
   /** 落点（目标当前位置） */
@@ -33,11 +33,11 @@ export interface DropSpec {
 export function spawnDrop(sim: Sim, weaponEid: number, spec: DropSpec): number {
   const d = addEntity(sim.world)
   attachDrawable(sim.world, d, sim.frames, {
-    id: spec.visual.emoji,
+    id: spec.emoji,
     outline: Faction.v[weaponEid] === FACTION.enemy ? 'enemy' : 'player',
     x: spec.x,
     y: spec.y - spec.fromAbove,
-    size: spec.visual.size,
+    size: spec.size,
     alpha: 0,
     z: 30,
   })

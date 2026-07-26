@@ -34,6 +34,17 @@ export const enemyCarries: (FieldPickupDef | undefined)[] =
 export const pickupDef: (FieldPickupDef | undefined)[] =
   new Array<FieldPickupDef | undefined>(MAX_ENTITIES).fill(undefined)
 
+/** 能力的命中效果链(Effect[] 是数组,组件装不下;弹丸落地后另抄一份到 projOnHit) */
+export const abilityOnHit: (readonly Effect[] | undefined)[] =
+  new Array<readonly Effect[] | undefined>(MAX_ENTITIES).fill(undefined)
+
+/** 能力生成物的 emoji(弩塔/小蜂/天罚坠物):字符串装不进组件,而部件动画要靠它惰性解析 clip */
+export const abilityArtEmoji: (string | undefined)[] = new Array<string | undefined>(MAX_ENTITIES).fill(undefined)
+
+/** 能力的出手音效(敌械弹幕用;字符串,同上) */
+export const abilityFireSfx: (import('../types/sfx').SfxId | undefined)[] =
+  new Array<import('../types/sfx').SfxId | undefined>(MAX_ENTITIES).fill(undefined)
+
 /** 敌弹的伤害来源名(结算页敌情明细按敌人名归属) */
 export const eprojSrcName: (string | undefined)[] = new Array<string | undefined>(MAX_ENTITIES).fill(undefined)
 
@@ -56,6 +67,9 @@ export function clearEcsStore(): void {
   pickupDef.fill(undefined)
   animId.fill(undefined)
   animOutline.fill(undefined)
+  abilityArtEmoji.fill(undefined)
+  abilityOnHit.fill(undefined)
+  abilityFireSfx.fill(undefined)
   eprojSrcName.fill(undefined)
   zoneSrcName.fill(undefined)
 }

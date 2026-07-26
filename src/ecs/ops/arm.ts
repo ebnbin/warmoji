@@ -47,4 +47,3 @@ export function armCaptain(sim: Sim, run: RunState): void {
     spawnWeapon(sim, sim.captain, toPx(a), FACTION.team, 0, NEUTRAL_AMP, true)
   }
 }
-

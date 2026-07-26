@@ -1,11 +1,10 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
 import { pickTarget } from '../utils/summon'
-import type { SummonDef } from '../../types/abilityDefs'
 import { playSfx } from '../../audio/sfx'
-import { AbilityRef, Built, Frozen, Minion, Sprite, Swarmer, Tint, Transform } from '../components'
+import { Built, Frozen, Minion, Sprite, Summon, Swarmer, Tint, Transform } from '../components'
+import { abilityOnHit } from '../store'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { damageTarget } from '../ops/damage'
-import { abilityDefAt } from '../abilityDefs'
 import { applyAbilityEffects } from '../ops/effects'
 import { sourceOf } from '../utils/source'
 import type { Sim } from '../sim'
@@ -16,7 +15,6 @@ export function updateBees(sim: Sim): void {
   for (const b of [...query(sim.world, [Swarmer, Minion, Built, Transform])]) {
     if (!hasComponent(sim.world, b, Minion)) continue // 同波的前一只自毁时连带回收了它
     const e = Built.by[b]! // 放出它的那件武器
-    const def = abilityDefAt(AbilityRef.def[e]!) as SummonDef
     // 主人倒下：小蜂原地凝住并隐去，主人复活自然接着飞（镜像旧实现停更 + 收视觉）
     if (Frozen.v[e]) {
       Tint.alpha[b] = 0
@@ -38,7 +36,7 @@ export function updateBees(sim: Sim): void {
     const dx = destX - bx
     const dy = destY - by
     const d = Math.hypot(dx, dy)
-    const step = (def.minion.speed * Math.min(dt, 50)) / 1000
+    const step = (Summon.speed[e]! * Math.min(dt, 50)) / 1000
     if (d > step) {
       Transform.x[b] = bx + (dx / d) * step
       Transform.y[b] = by + (dy / d) * step
@@ -48,14 +46,14 @@ export function updateBees(sim: Sim): void {
     }
     Sprite.flipX[b] = dx < 0 ? 1 : 0
     if (!target) continue
-    const rr = target.radius + def.minion.size * 0.35
+    const rr = target.radius + Summon.size[e]! * 0.35
     const tx = target.x - Transform.x[b]!
     const ty = target.y - Transform.y[b]!
     if (tx * tx + ty * ty > rr * rr) continue
     // 撞上：撞击直伤 + 施毒（onHit），随即自毁
-    const damage = Math.round(def.damage * damageMul(sim, e))
-    damageTarget(sim, src, target.eid, damage, def.knockback, Transform.x[b]!, Transform.y[b]!)
-    applyAbilityEffects(sim, src, def.onHit, { x: target.x, y: target.y, baseDamage: damage, targets: [target.eid] })
+    const damage = Math.round(Summon.damage[e]! * damageMul(sim, e))
+    damageTarget(sim, src, target.eid, damage, Summon.knockback[e]!, Transform.x[b]!, Transform.y[b]!)
+    applyAbilityEffects(sim, src, abilityOnHit[e], { x: target.x, y: target.y, baseDamage: damage, targets: [target.eid] })
     playSfx('hit')
     removeEntity(sim.world, b)
   }

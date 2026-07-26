@@ -1,8 +1,6 @@
-import { } from 'bitecs'
-import type { ProjectileDef } from '../../types/abilityDefs'
-import { Faction, FACTION, Owner } from '../components'
+import { Bolt, FACTION, Faction, Owner, Shoot } from '../components'
 import { spawnEnemyProjectileEcs, spawnProjectileEcs } from '../entities/projectile'
-import { enemyDef } from '../store'
+import { abilityFireSfx, enemyDef } from '../store'
 import { attributionSlot } from '../utils/amp'
 import type { Sim } from '../sim'
 
@@ -15,19 +13,24 @@ export function random(sim: Sim, e: number): number {
 }
 
 /** 发一枚：阵营决定进哪条弹道机器（队伍弹带 pierce/onHit，敌弹按寿命回收） */
-export function shoot(sim: Sim, e: number, def: ProjectileDef, x: number, y: number, angle: number, damage: number): void {
+export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, damage: number): void {
   if (Faction.v[e] !== FACTION.enemy) {
-    spawnProjectileEcs(sim, sim.frames, x, y, angle, def, damage, attributionSlot(e))
+    spawnProjectileEcs(sim, e, x, y, angle, damage, attributionSlot(e))
     return
   }
-  const p = def.projectile
-  spawnEnemyProjectileEcs(sim, sim.frames, x, y, angle, {
-    emoji: p.emoji,
-    size: p.size,
-    radius: p.radius,
-    speed: p.speed,
+  const life = Shoot.lifeMs[e]!
+  spawnEnemyProjectileEcs(sim, x, y, angle, {
+    frame: Bolt.frame[e]!,
+    size: Bolt.size[e]!,
+    radius: Bolt.radius[e]!,
+    speed: Bolt.speed[e]!,
     damage,
-    lifeMs: def.lifeMs ?? BULLET_LIFE_MS,
+    lifeMs: life > 0 ? life : BULLET_LIFE_MS,
     srcName: enemyDef[Owner.eid[e]!]?.name,
   })
+}
+
+/** 这条能力出手时的音效（敌械弹幕用；队伍弹的 shoot 音效在发弹处） */
+export function fireSfxOf(e: number): import('../../types/sfx').SfxId | undefined {
+  return abilityFireSfx[e]
 }

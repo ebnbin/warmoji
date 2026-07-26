@@ -1,20 +1,17 @@
 import { query } from 'bitecs'
 import { blastAt } from '../ops/areaBlast'
-import type { AreaBlastDef } from '../../types/abilityDefs'
 import { ACQUIRE } from '../../data/abilities'
 import { UNIT } from '../../util/units'
 import { ownerX, ownerY } from '../utils/amp'
-import { Ability, AbilityRef, Followup, Frozen } from '../components'
-import { abilityDefAt } from '../abilityDefs'
+import { Ability, AreaBlast, Followup, Frozen } from '../components'
 import { sourceOf } from '../utils/source'
-import { KindAreaBlast } from '../registries/abilityKinds'
 import { targetsOf, targetsWithin } from '../utils/targets'
 import type { Sim } from '../sim'
 
 /** 后手轰炸的倒计时：与冷却同口径，只在未冻结时推进 */
 export function tickEchoes(sim: Sim): void {
   const dt = sim.wdtMs
-  for (const e of query(sim.world, [Ability, KindAreaBlast, Followup])) {
+  for (const e of query(sim.world, [Ability, AreaBlast, Followup])) {
     if (Followup.left[e]! <= 0 || Frozen.v[e]) continue
     Followup.left[e] = Followup.left[e]! - dt
     if (Followup.left[e]! > 0) continue
@@ -23,6 +20,6 @@ export function tickEchoes(sim: Sim): void {
     const near = targetsWithin(ownerX(e), ownerY(e), targetsOf(sim, sourceOf(sim, e)), ACQUIRE.range * UNIT)
     if (near.length === 0) continue
     const t = near[Math.floor(Math.random() * near.length)]!
-    blastAt(sim, e, abilityDefAt(AbilityRef.def[e]!) as AreaBlastDef, t.x, t.y, Followup.damage[e]!)
+    blastAt(sim, e, t.x, t.y, Followup.damage[e]!)
   }
 }

@@ -1,12 +1,9 @@
 import { hasComponent } from 'bitecs'
-import type { StrikeDef } from '../../types/abilityDefs'
 import { playSfx } from '../../audio/sfx'
 import { dropCoins } from './pickups'
-import { AbilityRef, Alive, Drop, Enemy, Faction, FACTION, Owner, Transform } from '../components'
-import { } from '../store'
+import { Alive, Drop, Enemy, FACTION, Faction, Owner, Strike, Transform } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { damageTarget } from './damage'
-import { abilityDefAt } from '../abilityDefs'
 import { sourceOf } from '../utils/source'
 import type { Sim } from '../sim'
 
@@ -17,10 +14,10 @@ export function land(sim: Sim, d: number): void {
   const team = Faction.v[e] === FACTION.team
   if (team ? !hasComponent(sim.world, target, Enemy) : !Alive.v[target]) return
   const src = sourceOf(sim, e)
-  const def = abilityDefAt(AbilityRef.def[e]!) as StrikeDef
-  if (team && def.coinsPerHit) spawnCoins(sim, Transform.x[d]!, Drop.toY[d]!, def.coinsPerHit)
-  const damage = Math.max(1, Math.round(def.damage * damageMul(sim, e)))
-  damageTarget(sim, src, target, damage, def.knockback, ownerX(e), ownerY(e))
+  const coins = Strike.coinsPerHit[e]!
+  if (team && coins > 0) spawnCoins(sim, Transform.x[d]!, Drop.toY[d]!, coins)
+  const damage = Math.max(1, Math.round(Strike.damage[e]! * damageMul(sim, e)))
+  damageTarget(sim, src, target, damage, Strike.knockback[e]!, ownerX(e), ownerY(e))
 }
 
 /** 战场掉币：落地待拾，音效与爆点随拾取管线 */

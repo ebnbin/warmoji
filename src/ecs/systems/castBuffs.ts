@@ -1,14 +1,12 @@
-import type { BuffDef } from '../../types/abilityDefs'
-import { Alive, MFlash, Tint } from '../components'
+import { Alive, Buff, MFlash, Tint } from '../components'
 import { castScan } from '../ops/castScan'
-import { KindBuff } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 限时全队增伤：不叠加，直接覆写，到期由 stepSim 复原；全队闪一下作到手反馈 */
 export function castBuffs(sim: Sim): void {
-  castScan<BuffDef>(sim, KindBuff, (_e, def) => {
-    sim.skillDamageMul = def.damageMul
-    sim.skillBuffUntil = sim.elapsedMs + def.durationMs
+  castScan(sim, Buff, (e) => {
+    sim.skillDamageMul = Buff.damageMul[e]!
+    sim.skillBuffUntil = sim.elapsedMs + Buff.durationMs[e]!
     for (const m of sim.members) {
       if (!Alive.v[m]) continue
       MFlash.until[m] = sim.elapsedMs + 350

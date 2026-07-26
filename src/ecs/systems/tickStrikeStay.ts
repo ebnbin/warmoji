@@ -1,14 +1,13 @@
 import { query } from 'bitecs'
 import { blinkFlash } from '../ops/assassinate'
-import { Ability, Blink, Followup, Frozen, Owner, VisOff } from '../components'
+import { Ability, Assassinate, Blink, Followup, Frozen, Owner, VisOff } from '../components'
 import { ownerX, ownerY } from '../utils/amp'
-import { KindAssassinate } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 停留帧推进：到点闪回原位并再闪一次残影 */
 export function tickStrikeStay(sim: Sim): void {
   const dt = sim.wdtMs
-  for (const e of query(sim.world, [Ability, KindAssassinate, Followup, Blink])) {
+  for (const e of query(sim.world, [Ability, Assassinate, Followup, Blink])) {
     if (Followup.left[e]! <= 0) continue
     const m = Owner.eid[e]!
     // 阵亡即收势：立刻结束停留（镜像旧 setVisible(false) 把停留掐到最后一帧）

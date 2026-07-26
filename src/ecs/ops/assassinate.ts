@@ -1,5 +1,3 @@
-import { } from '../components'
-import type { } from '../utils/targets'
 import type { Sim } from '../sim'
 
 /** 瞬移端点的残影闪光 */

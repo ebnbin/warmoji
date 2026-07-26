@@ -174,8 +174,8 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
     if (src.faction === FACTION.team) return
     const angle = nearestAngle(hit.x, hit.y, targetsOf(sim, src), Infinity)
     if (angle === null) return
-    spawnEnemyProjectileEcs(sim, sim.frames, hit.x, hit.y, angle, {
-      emoji: fx.projectile.emoji,
+    spawnEnemyProjectileEcs(sim, hit.x, hit.y, angle, {
+      frame: sim.frames.index(fx.projectile.emoji, 'enemyProjectile'),
       size: fx.projectile.size,
       radius: fx.projectile.radius,
       speed: fx.projectile.speed,

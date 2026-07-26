@@ -1,7 +1,7 @@
 import { addComponent, removeComponent, removeEntity } from 'bitecs'
-import type { BoomerangDef } from '../../types/abilityDefs'
 import { playSfx } from '../../audio/sfx'
-import { Flyer, Tint, Transform } from '../components'
+import { hasComponent } from 'bitecs'
+import { Boomerang, BoomerangTwin, Flyer, Tint, Transform } from '../components'
 import { spawnWeaponCopy } from '../entities/weapon'
 import { flyerHits } from '../store'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
@@ -15,12 +15,13 @@ export function catchFlyer(sim: Sim, e: number, f: number): void {
 }
 
 /** 掷出：主镖沿瞄准方向，双子镖朝正反两个方向 */
-export function launch(sim: Sim, e: number, def: BoomerangDef, aim: number): void {
+export function launch(sim: Sim, e: number, aim: number): void {
   playSfx('whoosh')
-  const damage = Math.round(def.damage * damageMul(sim, e))
+  const damage = Math.round(Boomerang.damage[e]! * damageMul(sim, e))
+  const range = Boomerang.range[e]!
   const ox = ownerX(e)
   const oy = ownerY(e)
-  const count = def.twin ? 2 : 1
+  const count = hasComponent(sim.world, e, BoomerangTwin) ? 2 : 1
   for (let i = 0; i < count; i++) {
     const angle = aim + i * Math.PI
     const f = i === 0 ? e : spawnWeaponCopy(sim, e) // 主镖就是武器自己，双子是它的分身
@@ -30,8 +31,8 @@ export function launch(sim: Sim, e: number, def: BoomerangDef, aim: number): voi
     Flyer.t[f] = 0
     Flyer.launchX[f] = ox
     Flyer.launchY[f] = oy
-    Flyer.destX[f] = ox + Math.cos(angle) * def.range
-    Flyer.destY[f] = oy + Math.sin(angle) * def.range
+    Flyer.destX[f] = ox + Math.cos(angle) * range
+    Flyer.destY[f] = oy + Math.sin(angle) * range
     Flyer.damage[f] = damage
     Transform.x[f] = ox
     Transform.y[f] = oy

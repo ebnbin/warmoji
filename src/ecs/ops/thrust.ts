@@ -1,35 +1,35 @@
 import { reachOf } from '../utils/thrust'
-import type { ThrustDef } from '../../types/abilityDefs'
 import { playSfx } from '../../audio/sfx'
 import { thrustHitIndices } from '../../war/hit'
-import { } from '../utils/ease'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { damageTarget } from './damage'
-import { Aim, Swing } from '../components'
+import { Aim, Swing, Thrust } from '../components'
+import { abilityOnHit } from '../store'
 import { applyAbilityEffects } from './effects'
 import { sourceOf } from '../utils/source'
 import { nearestAngle, targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 
 /** 单段突刺：索敌 → 胶囊判定 → 终点命中效果 → 起一段挥击动画 */
-export function strike(sim: Sim, e: number, def: ThrustDef): void {
+export function strike(sim: Sim, e: number): void {
   const src = sourceOf(sim, e)
+  const reach = Thrust.reach[e]!
   const ox = ownerX(e)
   const oy = ownerY(e)
   const list = targetsOf(sim, src)
-  const aim = nearestAngle(ox, oy, list, reachOf(def))
+  const aim = nearestAngle(ox, oy, list, reachOf(e))
   if (aim === null) return
   Aim.rad[e] = aim
   playSfx('whoosh')
-  const damage = Math.round(def.damage * damageMul(sim, e))
-  for (const i of thrustHitIndices({ x: ox, y: oy }, aim, def.reach, def.hitRadius, list)) {
-    damageTarget(sim, src, list[i]!.eid, damage, def.knockback, ox, oy)
+  const damage = Math.round(Thrust.damage[e]! * damageMul(sim, e))
+  for (const i of thrustHitIndices({ x: ox, y: oy }, aim, reach, Thrust.hitRadius[e]!, list)) {
+    damageTarget(sim, src, list[i]!.eid, damage, Thrust.knockback[e]!, ox, oy)
   }
-  applyAbilityEffects(sim, src, def.onHit, {
-    x: ox + Math.cos(aim) * def.reach,
-    y: oy + Math.sin(aim) * def.reach,
+  applyAbilityEffects(sim, src, abilityOnHit[e], {
+    x: ox + Math.cos(aim) * reach,
+    y: oy + Math.sin(aim) * reach,
     baseDamage: damage,
   })
   Swing.startMs[e] = sim.fxMs
-  Swing.durMs[e] = def.thrustMs
+  Swing.durMs[e] = Thrust.thrustMs[e]!
 }

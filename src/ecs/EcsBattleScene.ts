@@ -44,7 +44,6 @@ import { armCaptain, armTeam } from './ops/arm'
 import { armEnemies } from './systems/armEnemies'
 import { refreshEnemyTargets } from './systems/refreshEnemyTargets'
 import { refreshMemberTargets } from './systems/refreshMemberTargets'
-import { clearAbilityDefs } from './abilityDefs'
 import { requestCast } from './ops/equip'
 import { Minion } from './components'
 import { stepAbilities } from './pipeline/abilities'
@@ -413,7 +412,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.atlas = atlas
     // 开局清上一局遗留的模块级状态(eid 从 0 重新分配,旧局引用不能留给新实体)
     clearEcsStore()
-    clearAbilityDefs()
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
     this.cues = new CueLayer(this)
     this.rings = new RingLayer(this, this.world)

@@ -9,7 +9,7 @@ import type { AmpInit } from '../ops/equip'
 import type { Sim } from '../sim'
 
 // 武器实体：**一件武器就是一颗实体**，能力是挂在它身上的组件
-//（AbilityRef 是哪条能力、Cooldown 还有多久出手、Aim 朝哪、Amp 吃哪些乘区、kind tag 归谁管）。
+//（该 kind 的参数组件既标明归谁管、也装着参数；Cooldown 还有多久出手、Aim 朝哪、Amp 吃哪些乘区）。
 //
 // 有外形的自带 Held + Transform/Sprite/Tint/Depth，就是场上握在手里的那个 emoji，
 // 各 kind 的施放系统直接写它自己的位姿——不再有「能力实体 + 持有物子实体」两层。

@@ -1,6 +1,5 @@
 import { Hp } from '../components'
 import type { Target } from './targets'
-import type { } from '../sim'
 
 /** 上限内血量最高的目标（厚血怪优先挨刀） */
 export function strongestTarget(ox: number, oy: number, list: readonly Target[], maxRange: number): Target | null {

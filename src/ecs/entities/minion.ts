@@ -2,9 +2,6 @@ import { addComponent, addComponents, addEntity } from 'bitecs'
 import { armIdle } from '../ops/anim'
 import { attachDrawable } from './drawable'
 import { Anim, Built, FACTION, Faction, Fired, Minion, Owner, Sprite } from '../components'
-import { attachAbility } from '../ops/equip'
-import type { AbilityDef } from '../../types/abilityDefs'
-import type { AmpInit } from '../ops/equip'
 import type { OutlineKind } from '../../emoji/svg'
 import type { Sim } from '../sim'
 
@@ -49,8 +46,9 @@ export interface MinionSpec {
   cd: number
   /** 部件动画的相位错峰（ms）；省略即保持静态帧 */
   animOffsetMs?: number
-  /** 自持能力：给出即让它自己进施放管线（弩塔自主开火）。乘区随母武器 */
-  ability?: { def: AbilityDef; amp: AmpInit; firstDelayMs: number }
+  /** 自持能力：给出即让它自己进施放管线（弩塔自主开火）。
+   * 由建造方在回调里挂——它的参数不来自 def，而是从母武器的组件里抄 */
+  arm?: (minion: number) => void
 }
 
 /** 造一只召唤物，挂到造它的那件武器名下。阵营与描边随武器走 */
@@ -78,15 +76,8 @@ export function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): numb
     addComponent(sim.world, m, Anim)
     armIdle(m, spec.emoji, outline, Sprite.frame[m]!, spec.animOffsetMs)
   }
-  if (spec.ability) {
-    // 锚点是它自己：弩塔从塔上索敌、从塔上出弹，与建造者站哪儿无关
-    attachAbility(sim, m, spec.ability.def, {
-      owner: Owner.eid[m]!,
-      anchor: m,
-      faction: Faction.v[weaponEid]!,
-      cooldownMs: spec.ability.firstDelayMs,
-      amp: spec.ability.amp,
-    })
+  if (spec.arm) {
+    spec.arm(m)
     addComponent(sim.world, m, Fired) // 出手事件：拉弓动画靠它触发
   }
   return m

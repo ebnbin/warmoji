@@ -323,8 +323,6 @@ export const Ability = {}
  * 也带 Ability 但不是武器 */
 export const Weapon = {}
 
-/** 指回只读定义表的下标（defs.ts）：组件只存数值，嵌套的 def 本体不进组件 */
-export const AbilityRef = { def: i32() }
 
 /** 反指持有者实体（队员 / 敌人 / 队伍锚点）。子实体（炮塔、召唤物）复用同一组件 */
 export const Owner = { eid: i32() }
@@ -397,6 +395,130 @@ export const SlowAura = { radius: f32(), slowFactor: f32(), color: u32() }
 export const AuraDps = { perSec: f32() }
 /** 凛冬降临：每 intervalMs 冻结光环内敌人 durationMs */
 export const AuraFreeze = { intervalMs: f32(), durationMs: f32() }
+
+/** 突刺：沿瞄准方向的线段判定；无持有物时本体前冲 lungeDist */
+export const Thrust = {
+  damage: f32(),
+  knockback: f32(),
+  reach: f32(),
+  hitRadius: f32(),
+  thrustMs: f32(),
+  lungeDist: f32(),
+}
+/** 二连突：出手后隔 delayMs 重新索敌再刺一段 */
+export const ThrustCombo = { delayMs: f32() }
+
+/** 横扫：扇形判定 */
+export const Sweep = { damage: f32(), knockback: f32(), radius: f32(), arcDeg: f32(), sweepMs: f32() }
+
+/** 轰炸：在侦测范围内选爆心，炸一个圆 */
+export const AreaBlast = {
+  damage: f32(),
+  knockback: f32(),
+  detectRange: f32(),
+  blastRadius: f32(),
+  color: u32(),
+}
+/** 连锁轰炸：延迟 delayMs 后向随机敌人追加一次 ratio × 伤害 */
+export const BlastEcho = { delayMs: f32(), ratio: f32() }
+
+/** 连锁闪电：首跳索敌后逐跳传导，每跳衰减 */
+export const ChainArc = {
+  damage: f32(),
+  knockback: f32(),
+  range: f32(),
+  arcRange: f32(),
+  bounces: f32(),
+  decay: f32(),
+  color: u32(),
+}
+
+/** 回旋镖：去程锁点、回程追人，全部接住才开始计冷却 */
+export const Boomerang = {
+  damage: f32(),
+  knockback: f32(),
+  range: f32(),
+  outMs: f32(),
+  returnSpeed: f32(),
+  hitRadius: f32(),
+  spinDegPerSec: f32(),
+}
+/** 双镖：同时向反方向掷出第二枚 */
+export const BoomerangTwin = {}
+/** 磁力：飞行途中吸取半径内金币 */
+export const CoinMagnet = { radius: f32() }
+
+/** 瞬闪突袭：闪到目标背后斩击，停留期间无敌，结束闪回 */
+export const Assassinate = {
+  damage: f32(),
+  knockback: f32(),
+  range: f32(),
+  behindDist: f32(),
+  strikeMs: f32(),
+}
+/** 处决：目标血量低于 hpRatio 时伤害 ×mul */
+export const Execute = { hpRatio: f32(), mul: f32() }
+
+/** 天罚：点名最近的 targets 个目标，坠物砸落 */
+export const Strike = {
+  damage: f32(),
+  knockback: f32(),
+  targets: f32(),
+  coinsPerHit: f32(),
+  /** 坠物外形（emoji 在 store.abilityArtEmoji）与下落参数 */
+  size: f32(),
+  fromAbove: f32(),
+  dropMs: f32(),
+  staggerMs: f32(),
+}
+
+/** 集结号：全队回血 + 短暂无敌 + 冲击环 */
+export const Rally = { healRatio: f32(), invulnMs: f32(), ringRadius: f32(), color: u32() }
+
+/** 蹦迪：敌对方全体定身摇摆 */
+export const Dance = { durationMs: f32() }
+
+/** 弱点讲座：限时全队增伤 */
+export const Buff = { damageMul: f32(), durationMs: f32() }
+
+/** 射击：出膛一枚弹丸。range=0 表示用 ACQUIRE 的缺省索敌上限 */
+export const Shoot = { damage: f32(), knockback: f32(), range: f32(), lifeMs: f32() }
+/** 瞄准移动方向（缺省是瞄最近目标）——「有这个组件 = 不索敌，朝着走的方向打」 */
+export const AimMove = {}
+/** 弹丸外形与飞行参数（emoji 在装备那一刻已解析成 frame） */
+export const Bolt = { frame: i32(), size: f32(), radius: f32(), speed: f32(), rotOffset: f32() }
+/** 齐射：每次出手发 count 枚，扇形散开 spreadDeg（≥360 为整圈） */
+export const Volley = { count: f32(), spreadDeg: f32(), randomRotate: u8() }
+/** 每第 n 次出手改为一轮特殊齐射 */
+export const EveryN = { n: f32(), count: f32(), spreadDeg: f32() }
+/** 贯穿：命中后还能再打这么多个 */
+export const Pierce = { n: f32() }
+
+/** 召唤：每 intervalMs 放一波 count 只，各自寻路撞敌自毁 */
+export const Summon = {
+  count: f32(),
+  damage: f32(),
+  knockback: f32(),
+  intervalMs: f32(),
+  lifeMs: f32(),
+  /** 小蜂外形（emoji 在 store.abilityArtEmoji） */
+  size: f32(),
+  speed: f32(),
+}
+
+/** 架设弩塔：本体无攻击，周期在脚下架一座；超编拆最旧的 */
+export const Turret = {
+  placeIntervalMs: f32(),
+  maxTurrets: f32(),
+  fireIntervalMs: f32(),
+  damage: f32(),
+  knockback: f32(),
+  range: f32(),
+  /** 塔的外形（emoji 在 store.abilityArtEmoji） */
+  size: f32(),
+}
+/** 三连弩：每次开火改为扇形连发 */
+export const Burst = { count: f32(), spreadDeg: f32() }
 
 /** 全域打击：全场活跃敌人各吃一次大额伤害（随波次威胁倍率缩放，Boss 折减） */
 export const Nuke = { damage: f32(), bossRatio: f32() }

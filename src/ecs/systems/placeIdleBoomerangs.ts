@@ -1,12 +1,11 @@
 import { hasComponent, query } from 'bitecs'
-import { Ability, Aim, Flyer, Frozen, Held, Tint, Transform } from '../components'
+import { Ability, Aim, Boomerang, Flyer, Frozen, Held, Tint, Transform } from '../components'
 import { ownerX, ownerY } from '../utils/amp'
-import { KindBoomerang } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 摆位：不在途的镖握在角色手上 */
 export function placeIdleBoomerangs(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindBoomerang, Aim, Held, Transform])) {
+  for (const e of query(sim.world, [Ability, Boomerang, Aim, Held, Transform])) {
     if (hasComponent(sim.world, e, Flyer)) continue
     const aim = Aim.rad[e]!
     Transform.x[e] = ownerX(e) + Math.cos(aim) * Held.restOffset[e]!

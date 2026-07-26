@@ -1,15 +1,10 @@
-import type { ThrustDef } from '../../types/abilityDefs'
-import { } from '../../audio/sfx'
-import { } from '../../war/hit'
 import { sineEaseOut } from './ease'
-import { Swing } from '../components'
-import { } from '../ops/effects'
-import { } from './source'
+import { Swing, Thrust } from '../components'
 import type { Sim } from '../sim'
 
 /** 攻击索敌上限：只打得到射程内的敌人才挥 */
-export function reachOf(def: ThrustDef): number {
-  return def.reach + def.hitRadius
+export function reachOf(e: number): number {
+  return Thrust.reach[e]! + Thrust.hitRadius[e]!
 }
 
 /** 挥击进度 0→1→0：去回各半程，两程都走 Sine.easeOut（镜像 yoyo 缓动） */
