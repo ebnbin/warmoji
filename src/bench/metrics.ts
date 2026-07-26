@@ -29,6 +29,11 @@ interface Frame {
    * 中位数不可加，用 total.p50 − update.p50 − render.p50 会算出负数
    *（实测 ECS 8 千档：16.7 − 10.8 − 7.4 = −1.5，clamp 成 0 就是个假读数） */
   rest: number
+  /** 与上一帧的时长差（绝对值）——帧节奏抖动。
+   * 稳定 60fps 时接近 0；在 16.7/33.3 之间反复横跳（judder）时约等于 16.7。
+   * 这是分位数看不见的东西：p50=16.7、p95=33.3 既可能是「先顺后卡」，
+   * 也可能是「每帧都在抖」，后者才是肉眼最难受的那种，只有帧间差能区分 */
+  jitter: number
 }
 
 const CAPACITY = 1800 // 约 30 秒 @60fps；环形覆盖
@@ -46,6 +51,7 @@ let stepStart = 0
 let renderStart = 0
 let lastUpdate = 0
 let lastRender = 0
+let prevTotal = 0
 /** 渲染器统计：Canvas 渲染器有 drawCount，WebGL 没有 —— 取不到就是 undefined，
  * 别填 0 冒充读数（面板上一个假的 0 比一条「—」更误导） */
 let drawCount: number | undefined
@@ -71,7 +77,9 @@ function onPostRender(): void {
   const f: Frame = {
     total, update: lastUpdate, render: lastRender,
     rest: Math.max(0, total - lastUpdate - lastRender),
+    jitter: prevTotal > 0 ? Math.abs(total - prevTotal) : 0,
   }
+  prevTotal = total
   buf[head] = f
   head = (head + 1) % CAPACITY
   if (filled < CAPACITY) filled++
@@ -104,6 +112,7 @@ export function resetMetrics(): void {
   buf.length = 0
   head = 0
   filled = 0
+  prevTotal = 0
   warmUntil = performance.now() + WARMUP_MS
 }
 
@@ -126,10 +135,19 @@ export interface MetricsReport {
   render: { mean: number; p50: number; p95: number; max: number }
   /** 两段之外（vsync 等待/合成）的逐帧耗时（ms） */
   rest: { mean: number; p50: number; p95: number; max: number }
-  /** 由 p50 帧时换算的稳态 FPS */
+  /** 帧间时长跳变（ms）——帧节奏抖动，见 Frame.jitter */
+  jitter: { mean: number; p50: number; p95: number; max: number }
+  /** **真实平均帧率** = 1000 / 平均帧时 = 每秒实际交付的帧数 */
   fps: number
+  /** 由中位帧时换算的帧率。vsync 会把帧时量化成周期的整数倍，
+   * 双峰分布下中位数整个跳到过半的那一档——只能读作「过半的帧落在哪一档」，
+   * **不能当帧率用**（实测 ECS 8 千档：中位 59.9，真实平均只有 ~35） */
+  fpsMedian: number
   /** 1% low：最慢 1% 帧对应的 FPS（卡顿体感） */
   fpsLow1: number
+  /** vsync 档位分布：落在 1 / 2 / 3 / ≥4 个刷新周期内的帧数占比（0–1）。
+   * 双峰一眼可见——这是任何单个分位数都藏不住的 */
+  buckets: readonly number[]
   /** 最近一帧的渲染对象数；WebGL 渲染器不提供，为 undefined */
   drawCount?: number
 }
@@ -141,12 +159,23 @@ function stat(v: readonly number[]): { mean: number; p50: number; p95: number; p
   return { mean: sum / v.length, p50: percentile(s, 50), p95: percentile(s, 95), p99: percentile(s, 99), max: s[s.length - 1]! }
 }
 
-export function metricsReport(): MetricsReport {
+/** @param refreshHz 屏幕刷新率，用于把帧时按 vsync 周期分档；测不到时按 60 算 */
+export function metricsReport(refreshHz = 60): MetricsReport {
   const frames = buf.slice(0, filled)
   const total = stat(frames.map((f) => f.total))
   const update = stat(frames.map((f) => f.update))
   const render = stat(frames.map((f) => f.render))
   const rest = stat(frames.map((f) => f.rest))
+  const jitter = stat(frames.map((f) => f.jitter))
+
+  // 半个周期的容差：赶上 vsync 的帧实测会略小于整周期
+  const period = 1000 / (refreshHz > 0 ? refreshHz : 60)
+  const hist = [0, 0, 0, 0]
+  for (const f of frames) {
+    const k = Math.max(1, Math.round(f.total / period))
+    hist[Math.min(3, k - 1)]!++
+  }
+
   return {
     samples: frames.length,
     warming: performance.now() < warmUntil,
@@ -154,8 +183,12 @@ export function metricsReport(): MetricsReport {
     update,
     render,
     rest,
-    fps: total.p50 > 0 ? 1000 / total.p50 : 0,
+    jitter,
+    // 平均帧时的倒数才等于每秒实际交付帧数；中位数的倒数在双峰分布下会严重虚高
+    fps: total.mean > 0 ? 1000 / total.mean : 0,
+    fpsMedian: total.p50 > 0 ? 1000 / total.p50 : 0,
     fpsLow1: total.p99 > 0 ? 1000 / total.p99 : 0,
+    buckets: frames.length > 0 ? hist.map((c) => c / frames.length) : hist,
     drawCount,
   }
 }

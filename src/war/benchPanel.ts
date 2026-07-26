@@ -4,7 +4,7 @@ import { textRes, viewport } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { heapMB, rafHz, rendererInfo } from './diagnostics'
 import { emojiCacheStats } from '../emoji/textures'
-import { metricsReport, recentFrameTimes } from '../bench/metrics'
+import { metricsReport, recentFrameTimes, resetMetrics } from '../bench/metrics'
 import { benchFramework, benchProfile } from '../bench/spec'
 import { reportBench } from '../bench/probe'
 import type { HudHost } from './hudHost'
@@ -23,8 +23,8 @@ const CHART_H = 62
  * 而重载恰恰是本基准存在的场景 */
 const CHART_FLOOR = 40
 const PAD = 16
-/** 字号候选：放不下就往下取 */
-const SIZES = [20, 18, 16, 14, 12]
+/** 字号候选：放不下就往下取。10px 是等宽字仍能扫读的下限 */
+const SIZES = [20, 18, 16, 14, 12, 11, 10]
 
 export class BenchPanel {
   private readonly bg: Phaser.GameObjects.Graphics
@@ -38,6 +38,8 @@ export class BenchPanel {
   private readonly chartY: number
   private readonly textY: number
   private refreshedAt = 0
+  /** 是否已在满载时重采样过（见 update 里的说明） */
+  private steadyArmed = false
 
   constructor(private readonly scene: Phaser.Scene, private readonly host: HudHost) {
     const res = textRes()
@@ -83,13 +85,21 @@ export class BenchPanel {
     if (time - this.refreshedAt < 250) return
     this.refreshedAt = time
 
-    const m = metricsReport()
     const p = this.host.perfSnapshot()
     const prof = benchProfile()
     const cache = emojiCacheStats(this.scene)
     const heap = heapMB()
     const raf = rafHz()
     const live = p.enemies + p.projectiles + p.coins
+
+    // 满载后清一次采样：刷怪从 0 爬到上限的那几百帧场上没几个实体、轻松满帧，
+    // 混进来会把中位数整个拉到「赶上 vsync」那一档，读出来的稳态是假的。
+    // 一次性闩死——敌人数会在上限附近上下浮动，否则会反复清零
+    if (!this.steadyArmed && p.enemies >= prof.spawn.cap * 0.95) {
+      this.steadyArmed = true
+      resetMetrics()
+    }
+    const m = metricsReport(raf)
 
     this.title.setText(
       `${benchFramework() === 'ecs' ? 'ECS' : 'arcade'} · ${prof.label} · ${live.toLocaleString()} 实体`,
@@ -104,7 +114,7 @@ export class BenchPanel {
     const lines = [
       m.warming
         ? '预热中：前 800ms 的帧不计入统计'
-        : `已采样 ${m.samples} 帧`,
+        : `已采样 ${m.samples} 帧${this.steadyArmed ? '（满载后重采）' : '（刷怪爬坡中）'}`,
       '',
       '── 帧耗时（毫秒 · 越小越好）──',
       row('总计 p50', ms(m.total.p50)),
@@ -115,12 +125,17 @@ export class BenchPanel {
       row('· 更新', ms(m.update.p50), '场景逻辑+物理'),
       row('· 渲染', ms(m.render.p50), '渲染提交'),
       row('· 其余', ms(m.rest.p50), 'vsync/合成'),
+      row('· 帧间跳变', ms(m.jitter.p50), '节奏抖动'),
       '',
       '── 帧率（fps）──',
-      row('稳态', m.fps.toFixed(1), '由 p50 换算'),
+      row('平均', m.fps.toFixed(1), '每秒实交付帧数'),
       row('1% 低', m.fpsLow1.toFixed(1), '卡顿体感'),
       row('引擎报告', this.scene.game.loop.actualFps.toFixed(1)),
+      row('中位档', m.fpsMedian.toFixed(1), 'vsync 量化·勿当帧率'),
       row('屏幕上限', raf > 0 ? String(raf) : '—', 'Hz · 实测峰值'),
+      // vsync 档位分布：双峰（如 1× 与 2× 各占一半）就是肉眼可见的 judder，
+      // 任何单个分位数都看不出来——这正是「显示 59fps 却觉得卡」的真相
+      `vsync 档  ${m.buckets.map((b, i) => `${i === 3 ? '≥4' : i + 1}×${(b * 100).toFixed(0)}%`).join(' ')}`,
       '',
       '── 在场实体（真实战斗产出）──',
       row('敌人', n(p.enemies), `上限 ${n(prof.spawn.cap)}`),
@@ -159,23 +174,22 @@ export class BenchPanel {
     })
   }
 
-  /** 写入文本并按实测高度定框：字号逐级收缩直到装得下，最后按实际高度画背景。
-   * 这样无论内容怎么变都不会被截断——截断的读数面板比没有更糟 */
+  /** 写入文本并按实测高度定框：逐级降级直到装得下，最后按实际高度画背景。
+   *
+   * 降级是**两维**的：先在全量文本上把字号从大到小试一遍，还放不下就丢掉空行
+   * 再把字号从大到小试一遍（去掉空行比缩小字号更值——密一点仍可读，小到 10px 就不行了）。
+   * 早先只在最小字号上补试一次「去空行」，加两行读数就又溢出到视口外面去了：
+   * 单点兜底不是兜底，必须每一档都重新量。截断的读数面板比没有面板更糟——
+   * 你不知道少了什么，也不知道少了多少。 */
   private fitText(lines: readonly string[]): void {
     const avail = viewport.logicalHeight - this.textY - PAD - 8
-    let used = SIZES[SIZES.length - 1]!
-    for (const size of SIZES) {
-      this.text.setFontSize(size)
-      this.text.setText(lines as string[])
-      if (this.text.height <= avail) {
-        used = size
-        break
+    const dense = lines.filter((l) => l !== '')
+    outer: for (const variant of [lines, dense]) {
+      for (const size of SIZES) {
+        this.text.setFontSize(size)
+        this.text.setText(variant as string[])
+        if (this.text.height <= avail) break outer
       }
-    }
-    // 全部档位都放不下（极窄视口）：用最小字号，丢掉空行争取空间
-    if (this.text.height > avail) {
-      this.text.setFontSize(used)
-      this.text.setText(lines.filter((l) => l !== '') as string[])
     }
     const h = Math.min(
       viewport.logicalHeight - this.y * 2,
