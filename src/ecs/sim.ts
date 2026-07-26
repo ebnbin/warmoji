@@ -1,19 +1,30 @@
 import { UNIT } from '../util/units'
-import { FOLLOW, WANDER } from '../data/feel'
-import { ORBIT } from '../data/feel'
-import { MEMBER } from '../data/characters'
-import { formationPosts, ringPostAngle } from '../data/formation'
 import type { FormationId } from '../types/formation'
-import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../war/orbit'
-import type { OrbitThreat } from '../war/orbit'
-import { Alive, Breath, Depth, Follow, Pop, Sprite, Threat, Transform, VisOff, Wander } from './components'
-import { animateEnemies, applyKnockback, applySlowZones, commitEnemySteps, despawnExpired, fadeEnemyFlash, popInEnemies, steerEnemies, tintEnemies, updateFrameTargets } from './enemy'
-import { memberContact, memberVisual, regenMembers, reviveMembers, tickPoison } from './combat'
-import { updateEnemyProjectiles, updateProjectiles } from './projectile'
-import { backEaseOut } from './ease'
-import { updateShards } from './shards'
-import { stepPickupVisuals } from './pickups'
-import { updateDormancy } from './worlds'
+import { animateEnemies } from './systems/animateEnemies'
+import { applyKnockback } from './systems/applyKnockback'
+import { applySlowZones } from './systems/applySlowZones'
+import { commitEnemySteps } from './systems/commitEnemySteps'
+import { despawnExpired } from './systems/despawnExpired'
+import { fadeEnemyFlash } from './systems/fadeEnemyFlash'
+import { popInEnemies } from './systems/popInEnemies'
+import { steerEnemies } from './systems/steerEnemies'
+import { tintEnemies } from './systems/tintEnemies'
+import { updateFrameTargets } from './systems/updateFrameTargets'
+import { memberContact } from './systems/memberContact'
+import { memberVisual } from './systems/memberVisual'
+import { regenMembers } from './systems/regenMembers'
+import { reviveMembers } from './systems/reviveMembers'
+import { tickPoison } from './systems/tickPoison'
+import { updateProjectiles } from './systems/updateProjectiles'
+import { updateEnemyProjectiles } from './systems/updateEnemyProjectiles'
+import { updateShards } from './systems/updateShards'
+import { stepPickupVisuals } from './systems/stepPickupVisuals'
+import { updateDormancy } from './systems/updateDormancy'
+import { expireSkillBuff } from './systems/expireSkillBuff'
+import { moveTeam } from './systems/moveTeam'
+import { refoldBattleFx } from './systems/refoldBattleFx'
+import { updateOrbit } from './systems/updateOrbit'
+import { animateMembers, layout } from './teamLayout'
 import type { FlowField, WallGrid } from '../war/maps/ruins'
 import type { EcsWorld } from './world'
 import type { WorldHooks } from './worlds'
@@ -28,11 +39,9 @@ import { BATTLE_FX_IDENTITY } from '../data/battlefield'
 import type { BattleEffects } from '../types/battlefield'
 import type { BattleMod } from '../types/battlefield'
 import type { FieldPickupDef } from '../types/battlefield'
-import { foldBattleEffects } from '../war/battleFx'
 import { CAPTAINS } from '../data/captains'
 import { aggregateTeamCards } from '../data/cards'
 import { Rng } from '../util/rng'
-import { MoveSpeed } from './components'
 import { spawnCaptain } from './entities/captain'
 import { formTeam } from './entities/captain'
 import { worldFor } from './worlds'
@@ -234,148 +243,6 @@ export interface PendingDeath {
   dmgMul: number
 }
 
-/** 队伍活感·探测与轨道(镜像 updateOrbit):逐员判定探测范围内有无敌人 + 环上主力驱动共享相位 */
-function updateOrbit(sim: Sim): void {
-  const delta = sim.dtMs
-  const { count, formation } = sim
-  if (sim.members.length === 0) return
-  const range = ORBIT.detectRange * UNIT
-  const rangeSq = range * range
-  const wants = new Array<number>(sim.members.length).fill(0)
-  let rotatable = false
-  for (let slot = 0; slot < sim.members.length; slot++) {
-    const eid = sim.members[slot]!
-    Threat.v[eid] = 0
-    if (!Alive.v[eid]) continue
-    const bias = sim.lineupOrbit[slot] ?? 0
-    const idx = sim.postBySlot[slot] ?? slot
-    const base = ringPostAngle(formation, idx, count)
-    if (base !== null) rotatable = true
-    const theta = (base ?? 0) + sim.orbitPhase
-    const threats: OrbitThreat[] = []
-    for (const t of sim.frameTargets) {
-      const dx = t.x - Transform.x[eid]!
-      const dy = t.y - Transform.y[eid]!
-      const dSq = dx * dx + dy * dy
-      if (dSq >= rangeSq) continue
-      Threat.v[eid] = 1
-      if (base === null || bias === 0) break
-      threats.push({
-        diff: angleDiff(theta, Math.atan2(t.y - sim.center.y, t.x - sim.center.x)),
-        weight: threatWeight(Math.sqrt(dSq), range),
-      })
-    }
-    if (base !== null && bias !== 0) wants[idx] = orbitTendency(bias, threats)
-  }
-  if (!rotatable) return
-  sim.driverPost = pickDriver(
-    wants.map((w) => Math.abs(w)),
-    Math.random,
-  )
-  sim.orbitPhase = stepPhase(sim.orbitPhase, sim.driverPost >= 0 ? (wants[sim.driverPost] ?? 0) : 0, delta)
-}
-
-/** 队伍位移 + 布局(镜像 moveTeam→layoutTeam);落点交给世界钩子(有界钳制/冰面动量) */
-function moveTeam(sim: Sim): void {
-  const delta = sim.dtMs
-  const dir = sim.teamDir
-  const step = (MoveSpeed.v[sim.captain]! * sim.battleFx.moveSpeedMul * delta) / 1000
-  const drift = sim.hooks.teamDrift(sim, delta)
-  const next = sim.hooks.constrainTeam(
-    sim,
-    { x: sim.center.x + dir.x * step + drift.x, y: sim.center.y + dir.y * step + drift.y },
-    delta,
-  )
-  sim.center.x = next.x
-  sim.center.y = next.y
-  layout(sim, delta)
-  animateMembers(sim, delta)
-}
-
-/** 逐员布局:岗位偏移 + 待机游移 + 跟随弹簧 → 写 Follow/Transform/Depth(镜像 layoutTeam)。
- * 只管人站在哪;呼吸/弹入/翻转等纯表现在 animateMembers */
-function layout(sim: Sim, delta: number): void {
-  const posts = formationPosts(sim.formation, sim.count, sim.orbitPhase)
-  const moving = sim.teamDir.x !== 0 || sim.teamDir.y !== 0
-  const dt = Math.min(delta, 50) / 1000
-  const tSec = sim.elapsedMs / 1000
-  for (let slot = 0; slot < sim.members.length; slot++) {
-    const eid = sim.members[slot]!
-    const idx = sim.postBySlot[slot] ?? slot
-    const p = posts[idx] ?? { x: 0, y: 0 }
-    const wanderOn = Alive.v[eid]! && !moving && !Threat.v[eid]
-    let amp = Wander.amp[eid]!
-    amp += ((wanderOn ? 1 : 0) - amp) * Math.min(1, delta / WANDER.rampMs)
-    Wander.amp[eid] = amp
-    const wander = amp * WANDER.radius
-    const seed = Wander.seed[eid]!
-    const rawX = sim.center.x + p.x + Math.sin(tSec * WANDER.freqX + seed) * wander
-    const rawY = sim.center.y + p.y + Math.sin(tSec * WANDER.freqY + seed * 2.3) * wander
-    // 跟随弹簧(用局部量演算,避免类型化数组元素的复合赋值歧义)
-    let fx = Follow.x[eid]!
-    let fy = Follow.y[eid]!
-    let fvx = Follow.vx[eid]!
-    let fvy = Follow.vy[eid]!
-    // 环面弹簧:目标取离当前跟随点最近的镜像——中心穿缝时队员各自走最短路穿门,阵型全程连贯
-    const td = sim.hooks.worldDelta(sim, fx, fy, rawX, rawY)
-    const tx = fx + td.x
-    const ty = fy + td.y
-    if (dt > 0) {
-      const k = Follow.k[eid]!
-      const c = 2 * Math.sqrt(k) * FOLLOW.zeta
-      fvx += (k * (tx - fx) - c * fvx) * dt
-      fvy += (k * (ty - fy) - c * fvy) * dt
-      fx += fvx * dt
-      fy += fvy * dt
-    }
-    const lagX = tx - fx
-    const lagY = ty - fy
-    const lag = Math.hypot(lagX, lagY)
-    if (lag > FOLLOW.maxLag) {
-      const pull = 1 - FOLLOW.maxLag / lag
-      fx += lagX * pull
-      fy += lagY * pull
-    }
-    // 跟随点回绕(环面),弹簧状态始终保持在竞技场内
-    const wrapped = sim.hooks.wrap(sim, fx, fy)
-    fx = wrapped.x
-    fy = wrapped.y
-    Follow.x[eid] = fx
-    Follow.y[eid] = fy
-    Follow.vx[eid] = fvx
-    Follow.vy[eid] = fvy
-    // 能力视觉偏移叠在跟随点之上(突刺前冲/瞬闪):只动画面,不动阵型与索敌锚点
-    Transform.x[eid] = fx + VisOff.x[eid]!
-    Transform.y[eid] = fy + VisOff.y[eid]!
-    const guarded = sim.formation === 'guard' && idx === 0
-    // 遮挡纵深按世界差(环面上贴缝时不跳变)
-    Depth.z[eid] = guarded ? 8.5 : 10 + sim.hooks.worldDelta(sim, sim.center.x, sim.center.y, fx, fy).y / UNIT
-  }
-}
-
-/** 队员的程序化小动画(镜像 animateMember):呼吸挤压拉伸 + 朝移动方向翻转(仅活着的)。
- * 复活弹入期(Pop)用弹入缩放覆盖呼吸(镜像 reviveMember 的 Back.easeOut scale 弹) */
-function animateMembers(sim: Sim, delta: number): void {
-  const moving = sim.teamDir.x !== 0 || sim.teamDir.y !== 0
-  const memberSize = MEMBER.size * UNIT
-  for (const eid of sim.members) {
-    if (!Alive.v[eid]) continue
-    if (Pop.until[eid]! > sim.elapsedMs) {
-      const t = 1 - (Pop.until[eid]! - sim.elapsedMs) / 200
-      const pop = memberSize * (0.3 + 0.7 * backEaseOut(t))
-      Transform.w[eid] = pop
-      Transform.h[eid] = pop
-    } else {
-      const bp = Breath.phase[eid]! + delta / (moving ? 85 : 140)
-      Breath.phase[eid] = bp
-      const s = Math.sin(bp) * (moving ? 0.13 : 0.09)
-      Transform.w[eid] = memberSize * (1 - s * 0.6)
-      Transform.h[eid] = memberSize * (1 + s)
-    }
-    if (Math.abs(sim.teamDir.x) > 0.2) Sprite.flipX[eid] = sim.teamDir.x > 0 ? 1 : 0
-  }
-}
-
 /** 首帧前把队员摆到岗位(镜像 setup 里的 layoutTeam(0)) */
 export function initialLayout(sim: Sim): void {
   layout(sim, 0)
@@ -383,19 +250,6 @@ export function initialLayout(sim: Sim): void {
 }
 
 /** 一帧仿真(镜像 update 的 updateOrbit→moveTeam→steerEnemies 次序);delta 为真实帧长(ms) */
-/** 剔除到期的限时层后重折乘区(镜像 refoldBattleFx) */
-export function refoldBattleFx(sim: Sim): void {
-  if (sim.battleMods.length === 0) return
-  const live = sim.battleMods.filter((m) => m.until > sim.elapsedMs)
-  if (live.length === sim.battleMods.length && live.length > 0) return // 无变化则免折
-  sim.battleMods = live
-  sim.battleFx = live.length === 0 ? { ...BATTLE_FX_IDENTITY } : foldBattleEffects(live.map((m) => m.fx))
-}
-
-/** 队长技能的限时全队增伤到期复原 */
-export function expireSkillBuff(sim: Sim): void {
-  if (sim.skillDamageMul !== 1 && sim.elapsedMs >= sim.skillBuffUntil) sim.skillDamageMul = 1
-}
 
 /** 世界时间流速(镜像 worldTimeScale):时停窗口内随队伍移动量放缩,窗口外恒 1 */
 export function worldTimeScale(sim: Sim): number {

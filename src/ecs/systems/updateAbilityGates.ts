@@ -1,15 +1,6 @@
 import { query } from 'bitecs'
-import { Alive, Dormant, Morph, Transform } from '../../components'
-import { Ability, Captain, Disarmed, FACTION, Faction, Frozen, Owner } from '../../components'
-import type { Sim } from '../../sim'
-
-/** 队伍锚点跟随队伍中心：唯一职责是把队伍中心写进锚点实体的位姿 */
-export function followTeamCenter(sim: Sim): void {
-  for (const e of query(sim.world, [Captain, Transform])) {
-    Transform.x[e] = sim.center.x
-    Transform.y[e] = sim.center.y
-  }
-}
+import { Ability, Alive, Disarmed, Dormant, FACTION, Faction, Frozen, Morph, Owner } from '../components'
+import type { Sim } from '../sim'
 
 /** 由持有者状态刷新出手闸门：阵亡/休眠者冻结（连冷却都不推进），被压制者缴械
  *（推进冷却但不出手）。施放系统只读这两个标志，不各自去查持有者是什么状态 */

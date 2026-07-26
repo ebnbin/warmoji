@@ -1,0 +1,29 @@
+import { query } from 'bitecs'
+import { KNOCKBACK } from '../../data/abilities'
+import { Dormant, ENEMY_SET, Kv, Step } from '../components'
+import type { Sim } from '../sim'
+
+/** 击退:冲量叠进本帧位移后指数衰减(镜像 decayKnockback)。
+ * realDelta = 真实帧长——旧实现把冲量写进 Arcade body 由物理按真实帧长积分,
+ * 故时停期「打谁谁飞」照旧成立 */
+export function applyKnockback(sim: Sim): void {
+  const delta = sim.wdtMs
+  const realDelta = sim.dtMs
+  const kdt = realDelta / 1000
+  const decay = Math.exp(-delta / (KNOCKBACK.tauMs * sim.hooks.knockbackTauMul(sim)))
+  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+    if (Dormant.v[eid]) continue
+    const kvx = Kv.x[eid]!
+    const kvy = Kv.y[eid]!
+    if (kvx === 0 && kvy === 0) continue
+    Step.x[eid] = Step.x[eid]! + kvx * kdt
+    Step.y[eid] = Step.y[eid]! + kvy * kdt
+    if ((kvx * kvx + kvy * kvy) * decay * decay < 100) {
+      Kv.x[eid] = 0
+      Kv.y[eid] = 0
+    } else {
+      Kv.x[eid] = kvx * decay
+      Kv.y[eid] = kvy * decay
+    }
+  }
+}

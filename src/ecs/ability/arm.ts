@@ -1,4 +1,3 @@
-import { query } from 'bitecs'
 import { CHARACTERS, loadoutFor } from '../../data/characters'
 import { CAPTAINS } from '../../data/captains'
 import { aggregateCharacterEffects, characterXp, resolveAbilityDef } from '../../data/items'
@@ -8,11 +7,8 @@ import { aggregateTeamCards } from '../../data/cards'
 import { toPx } from '../../war/px'
 import { labLevel } from '../../run/lab'
 import type { RunState } from '../../run/state'
-import { Dormant, ENEMY_SET, EnemyArm, Morph, Transform } from '../components'
-import { restoreMorphVisual } from '../morph'
-import { enemyDef } from '../store'
 import { FACTION } from '../components'
-import { NEUTRAL_AMP, postponeAbilities } from './equip'
+import { NEUTRAL_AMP } from './equip'
 import { spawnWeapon } from '../entities/weapon'
 import type { Sim } from '../sim'
 
@@ -52,31 +48,3 @@ export function armCaptain(sim: Sim, run: RunState): void {
   }
 }
 
-/** 给单个敌人装配能力（首发延迟喂初始冷却；projectile.firstDelayMs 优先） */
-function armEnemy(sim: Sim, eid: number): void {
-  const rows = enemyDef[eid]?.abilities
-  EnemyArm.armed[eid] = 1
-  if (!rows) return
-  const fireDelay = EnemyArm.fireDelayMs[eid]!
-  rows.forEach((w, i) => {
-    // 「有没有声明首发延迟」是能力自己的性质，不该问它是不是某个 kind
-    const delay = ('firstDelayMs' in w ? w.firstDelayMs : undefined) ?? fireDelay ?? 600 + i * 230
-    spawnWeapon(sim, eid, w, FACTION.enemy, delay, NEUTRAL_AMP)
-  })
-}
-
-/** 每帧：给新登场的持械敌人装配 + 魔尘变形到期复形（缴械后延避免复形瞬间齐射）。
- * 出手与冷却由能力系统统一驱动，此处只管装配与形象 */
-export function armEnemies(sim: Sim): void {
-  const now = sim.elapsedMs
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Dormant.v[eid]) continue // 休眠：连装配都推迟，回到活跃范围自然接管
-    if (!EnemyArm.armed[eid]) armEnemy(sim, eid)
-    // 蹦迪期整段短路，故舞会散场前连复形都不跑（镜像旧 steerEnemies 的分支次序）
-    if (now < sim.danceEndsAt) continue
-    if (Morph.until[eid] === 0 || now < Morph.until[eid]!) continue
-    restoreMorphVisual(sim.frames, eid)
-    sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'puff' }) // 复形灰烟
-    postponeAbilities(sim, eid, 700)
-  }
-}

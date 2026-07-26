@@ -4,7 +4,7 @@ import { Alive, Revive, Transform } from '../../components'
 import { damageMul, ownerX, ownerY } from '../amp'
 import { Cooldown, FACTION, Faction } from '../../components'
 import { healEnemies, healMembers } from '../heal'
-import { castScan } from '../systems/cast'
+import { castScan } from '../castScan'
 import { KindHeal } from '../tags'
 import type { Sim } from '../../sim'
 

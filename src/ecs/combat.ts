@@ -9,12 +9,10 @@ import { KNOCKBACK } from '../data/abilities'
 import { MEMBER } from '../data/characters'
 import { UNIT } from '../util/units'
 import { spawnShardsEcs } from './entities/shard'
-import { Alive, Anim, Boss, DmgMul, Dormant, ENEMY_SET, Elite, Flash, Hp, Hurt, Iframe, Kv, MAtkSlow, MFlash, MHp, MPerk, Morph, Nest, Orphan, Poison, Pop, Radius, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from './components'
+import { Alive, Anim, Boss, DmgMul, Dormant, ENEMY_SET, Elite, Flash, Hp, Iframe, Kv, MFlash, MHp, MPerk, Morph, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from './components'
 import { enemyCarries, enemyDef } from './store'
 import { dropCoins, dropFieldPickup } from './pickups'
 import { unequipAbilities } from './ability/equip'
-import { applyAbilityEffects } from './ability/effects'
-import { enemySource } from './ability/source'
 import type { Sim } from './sim'
 
 // 战斗(P3b):敌人受伤/致死/击退,队员接触伤害/死亡/复活/受击闪光。
@@ -178,66 +176,6 @@ export function orphanBrood(sim: Sim, nestEid: number): void {
   }
 }
 
-/** 中毒 DoT:每 tickMs 一跳,到期解毒(镜像 steerEnemies 的毒逻辑核心) */
-export function tickPoison(sim: Sim): void {
-  const enemies = query(sim.world, ENEMY_SET as unknown as object[])
-  const now = sim.elapsedMs
-  for (const eid of enemies) {
-    if (Poison.until[eid] === 0) continue
-    if (now >= Poison.until[eid]!) {
-      Poison.until[eid] = 0
-      continue
-    }
-    if (now >= Poison.nextTick[eid]!) {
-      Poison.nextTick[eid] = Poison.nextTick[eid]! + Poison.tickMs[eid]!
-      applyDamage(sim, eid, Poison.dmg[eid]!, 0, undefined, undefined, Poison.slot[eid]!)
-    }
-  }
-}
-
-/** 队员接触敌人的伤害结算(镜像 onMemberTouched 的无敌帧节流 + 基础伤害) */
-export function memberContact(sim: Sim): void {
-  const enemies = query(sim.world, ENEMY_SET as unknown as object[])
-  if (enemies.length === 0) return
-  if (sim.over) return
-  const now = sim.elapsedMs
-  for (const m of sim.members) {
-    if (!Alive.v[m]) continue
-    if (now - Iframe.last[m]! < Iframe.ms[m]!) continue
-    const mx = Transform.x[m]!
-    const my = Transform.y[m]!
-    const hr = Hurt.radius[m]!
-    for (const eid of enemies) {
-      if (Dormant.v[eid]) continue // 休眠怪不参与接触判定
-      const rr = hr + Radius.v[eid]!
-      const d = sim.hooks.worldDelta(sim, mx, my, Transform.x[eid]!, Transform.y[eid]!)
-      if (d.x * d.x + d.y * d.y > rr * rr) continue
-      const def = enemyDef[eid]
-      if (!def) continue
-      if (def.damage <= 0) continue // 亡语诱饵尸壳(damage=0)无害:接触不伤(镜像 a.decoy 跳过)
-      if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue // 变形期无害:接触不伤
-      Iframe.last[m] = now
-      hurtMember(sim, m, Math.max(1, Math.round(def.damage * DmgMul.v[eid]!)), def.name)
-      // 荆棘背心:接触反伤(与受击同帧、同吃无敌帧节流;击杀归属穿刺者)
-      if (MPerk.thorns[m]! > 0 && enemyDef[eid] !== undefined) {
-        applyDamage(sim, eid, MPerk.thorns[m]!, 0, undefined, undefined, Slot.v[m]!)
-      }
-      // 接触附加效果整串走效果层(黏黏怪的攻速罚只是其中一种;伤害的真相是 def.damage,
-      // 已在上面结算,故 onContact 只写伤害之外的东西——gen 校验强制)。
-      // 从前这里是手挑 attackSlow 一种,别的效果写进 onContact 会被静默丢掉
-      if (def.onContact && def.onContact.length > 0) {
-        applyAbilityEffects(sim, enemySource(def.name, 1), def.onContact, {
-          x: mx,
-          y: my,
-          baseDamage: 0,
-          targets: [m],
-        })
-      }
-      break // 一帧一员只吃一次(无敌帧掌管其余)
-    }
-  }
-}
-
 /** 敌人静默移除(自爆/替身到时:不计击杀、不掉落、不放死亡效果) */
 export function despawnEnemy(sim: Sim, eid: number): void {
   sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
@@ -299,43 +237,3 @@ export function reviveMember(sim: Sim, eid: number): void {
   Pop.until[eid] = now + 200 // 复活弹入(镜像 reviveMember 的 scale 弹)
 }
 
-/** 阵亡复活轮询(全队阵亡后不复活——待结算) */
-export function reviveMembers(sim: Sim): void {
-  if (sim.over) return
-  const now = sim.elapsedMs
-  for (const m of sim.members) {
-    if (Alive.v[m]) continue
-    if (now < Revive.at[m]!) continue
-    reviveMember(sim, m)
-  }
-}
-
-/** 再生戒指:持续回复(hp 允许小数,展示与快照处各自取整;时停期随世界冻结) */
-export function regenMembers(sim: Sim): void {
-  const wdelta = sim.wdtMs
-  for (const m of sim.members) {
-    if (!Alive.v[m] || MPerk.regenPerSec[m]! <= 0) continue
-    if (MHp.hp[m]! >= MHp.max[m]!) continue
-    MHp.hp[m] = Math.min(MHp.max[m]!, MHp.hp[m]! + (MPerk.regenPerSec[m]! * wdelta) / 1000)
-  }
-}
-
-/** 队员染色恢复(仅活着的):受击红闪到时恢复;非红闪期按黏滞态染色(黏液绿/常态白) */
-export function memberVisual(sim: Sim): void {
-  const now = sim.elapsedMs
-  for (const m of sim.members) {
-    if (!Alive.v[m]) continue
-    // 镜像旧 updateMembers 的三分支:黏滞期逐帧重涂黏液绿(压过受击红闪),
-    // 黏滞到期那帧清一次(连进行中的红闪一并抹白),其余情况由红闪自己到点转白
-    if (MAtkSlow.until[m]! > now) {
-      Tint.color[m] = 0x9ccc65
-    } else if (MAtkSlow.until[m]! !== 0) {
-      MAtkSlow.until[m] = 0
-      MFlash.until[m] = 0
-      Tint.color[m] = 0xffffff
-    } else if (MFlash.until[m] !== 0 && now >= MFlash.until[m]!) {
-      MFlash.until[m] = 0
-      Tint.color[m] = 0xffffff
-    }
-  }
-}

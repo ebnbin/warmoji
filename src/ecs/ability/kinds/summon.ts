@@ -11,7 +11,7 @@ import { AbilityRef, Built, Cooldown, Frozen, Minion, Swarmer } from '../../comp
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects } from '../effects'
 import { sourceOf } from '../source'
-import { castScan } from '../systems/cast'
+import { castScan } from '../castScan'
 import { KindSummon } from '../tags'
 import { targetsOf } from '../targets'
 import type { Target } from '../targets'

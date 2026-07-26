@@ -6,7 +6,7 @@ import { playClip } from '../../anim'
 import { backEaseOut } from '../../ease'
 import { spawnMinion } from '../../entities/minion'
 import { cooldownMul, ownerX, ownerY } from '../amp'
-import { castScan } from '../systems/cast'
+import { castScan } from '../castScan'
 import { KindTurret } from '../tags'
 import type { Sim } from '../../sim'
 

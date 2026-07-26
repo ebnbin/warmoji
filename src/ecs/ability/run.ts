@@ -16,8 +16,9 @@ import { castSweeps } from './kinds/sweep'
 import { castThrusts } from './kinds/thrust'
 import { castTimeStops } from './kinds/timeStop'
 import { castTurrets } from './kinds/turret'
-import { tickCooldowns } from './systems/cooldown'
-import { followTeamCenter, updateAbilityGates } from './systems/gates'
+import { tickCooldowns } from '../systems/tickCooldowns'
+import { followTeamCenter } from '../systems/followTeamCenter'
+import { updateAbilityGates } from '../systems/updateAbilityGates'
 import type { Sim } from '../sim'
 
 // 一帧的能力推进：清帧表 → 锚点 → 闸门 → 冷却 → 逐 kind 施放。

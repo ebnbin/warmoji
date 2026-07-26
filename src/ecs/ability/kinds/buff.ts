@@ -1,6 +1,6 @@
 import type { BuffDef } from '../../../types/abilityDefs'
 import { Alive, MFlash, Tint } from '../../components'
-import { castScan } from '../systems/cast'
+import { castScan } from '../castScan'
 import { KindBuff } from '../tags'
 import type { Sim } from '../../sim'
 

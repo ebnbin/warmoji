@@ -74,9 +74,3 @@ export function replayDeath(sim: Sim, d: PendingDeath): void {
   for (const fx of effects) DEATH_KINDS[fx.kind]!(sim, d, fx, hpMul)
 }
 
-/** 排空死亡队列:仅作兜底(onDeathFx 未挂时,如 headless 仿真) */
-export function runDeathEffects(sim: Sim): void {
-  if (sim.pendingDeaths.length === 0) return
-  for (const d of sim.pendingDeaths) replayDeath(sim, d)
-  sim.pendingDeaths.length = 0
-}

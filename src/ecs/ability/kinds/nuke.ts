@@ -5,7 +5,7 @@ import { Boss, Dormant, ENEMY_SET } from '../../components'
 import { enemyDef } from '../../store'
 import { damageTarget, damageMul, waveScale } from '../amp'
 import { sourceOf } from '../source'
-import { castScan } from '../systems/cast'
+import { castScan } from '../castScan'
 import { KindNuke } from '../tags'
 import type { Sim } from '../../sim'
 

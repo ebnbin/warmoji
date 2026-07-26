@@ -1,6 +1,6 @@
 import { query, removeEntity } from 'bitecs'
-import { Quad, Shard, SHARD_SET, Tint, Transform } from './components'
-import type { Sim } from './sim'
+import { Quad, Shard, SHARD_SET, Tint, Transform } from '../components'
+import type { Sim } from '../sim'
 
 // 死亡碎片的逐帧推进:匀速飞散(落点过世界钩子)+ 线性缩小/旋转/淡出,到时回收。
 // 生成在 entities/shard.ts。

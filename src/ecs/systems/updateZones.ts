@@ -15,11 +15,11 @@ import {
   Zone,
   ZoneBurn,
   ZoneFollow,
-} from './components'
-import { applyDamage, hurtMember } from './combat'
-import { backEaseOut } from './ease'
-import { zoneSrcName } from './store'
-import type { Sim } from './sim'
+} from '../components'
+import { applyDamage, hurtMember } from '../combat'
+import { backEaseOut } from '../ease'
+import { zoneSrcName } from '../store'
+import type { Sim } from '../sim'
 
 // 区域管线:一条。跟位 → 开关 → 到期 → 视觉 → 跳伤。
 // 生成在 entities/zone.ts(那里写了「为什么毒圈和光环是同一种东西」)。

@@ -1,7 +1,5 @@
-import { query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { ACQUIRE } from '../../data/abilities'
-import { Alive, Dormant, ENEMY_SET, Hurt, Radius, Transform } from '../components'
 import { FACTION } from '../components'
 import type { Source } from './source'
 import type { Sim } from '../sim'
@@ -15,34 +13,6 @@ export interface Target {
   readonly x: number
   readonly y: number
   readonly radius: number
-}
-
-/** 重建敌方存活快照：须先于任何队伍侧出手（含抛射物 onHit 命中链） */
-export function refreshEnemyTargets(sim: Sim): void {
-  const list: Target[] = []
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Dormant.v[eid]) continue // 休眠怪不可被索敌
-    const x = Transform.x[eid]!
-    const y = Transform.y[eid]!
-    const radius = Radius.v[eid]!
-    list.push({ eid, x, y, radius })
-    for (const g of sim.hooks.ghosts(sim, x, y)) list.push({ eid, x: g.x, y: g.y, radius })
-  }
-  sim.enemyTargets = list
-}
-
-/** 重建队员存活快照：须先于任何敌方出手 */
-export function refreshMemberTargets(sim: Sim): void {
-  const list: Target[] = []
-  for (const m of sim.members) {
-    if (!Alive.v[m]) continue
-    const x = Transform.x[m]!
-    const y = Transform.y[m]!
-    const radius = Hurt.radius[m]!
-    list.push({ eid: m, x, y, radius })
-    for (const g of sim.hooks.ghosts(sim, x, y)) list.push({ eid: m, x: g.x, y: g.y, radius })
-  }
-  sim.memberTargets = list
 }
 
 /** 这一下该打谁：阵营决定索敌落在哪一侧；给了视点的还要探得到头（断壁遮挡） */

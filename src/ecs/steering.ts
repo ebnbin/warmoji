@@ -1,24 +1,23 @@
 import { query, removeEntity } from 'bitecs'
 import { norm } from '../util/vec'
-import { AI, SPAWN } from '../data/enemies'
+import { AI } from '../data/enemies'
 
-import { KNOCKBACK } from '../data/abilities'
 import { PICKUPS } from '../data/pickups'
 
 import { UNIT } from '../util/units'
 import { playSfx } from '../audio/sfx'
 import { despawnEnemy, hurtMember } from './combat'
-import { Alive, Boss, Charge, Despawn, DmgMul, Dormant, EDir, ENEMY_SET, EState, ETurn, EnemyPhase, EnemyVel, FACTION, Flash, Iframe, Kv, Morph, Nest, PICKUP_SET, Pickup, Poison, Pop, Slow, SpMul, Speed, Sprite, Step, Thief, Tint, Transform, Zone, ZoneChill, ZoneSlow } from './components'
+import { Alive, Charge, DmgMul, EDir, EState, ETurn, Iframe, Nest, PICKUP_SET, Pickup, Speed, Sprite, Thief, Tint, Transform } from './components'
 import { enemyDef } from './store'
 import { COIN } from './pickups'
 
-import { backEaseOut } from './ease'
-import { spawnBrood } from './entities/enemy'
 import type { Sim } from './sim'
 import type { BaseOrbitLocomotion, DashLength, DashLocomotion, DetonateLocomotion, LocomotionDef, StandoffLocomotion, DashTrigger } from '../types/enemies'
 import type { Point } from '../util/vec'
 
-// 敌人:装配 + 转向(locomotion 状态机 + 击退 + 世界钩子后处理)。
+// locomotion 转向器注册表：每种走位一个转向器，返回本帧的「行为速度」(px/s)。
+// 这不是 system——它是 steerEnemies 那个 system 查的表（与 PICKUP_KINDS / KINDS 同类）。
+// **全映射**：LocomotionDef 新增一种而不在此登记 = 编译不过。
 
 function nearestAlive(sim: Sim, x: number, y: number): Point | null {
   let bestX = 0
@@ -37,23 +36,8 @@ function nearestAlive(sim: Sim, x: number, y: number): Point | null {
   return bestD === Infinity ? null : { x: bestX, y: bestY }
 }
 
-/** 把敌人位置汇入 frameTargets(供队伍 orbit/游移门控) */
-export function updateFrameTargets(sim: Sim): void {
-  const eids = query(sim.world, ENEMY_SET as unknown as object[])
-  const out: Point[] = []
-  for (const eid of eids) {
-    if (Dormant.v[eid]) continue
-    const x = Transform.x[eid]!
-    const y = Transform.y[eid]!
-    out.push({ x, y })
-    // 环面:真身之外再喂三个镜像,队伍 orbit/游移门控隔着传送门也成立
-    for (const g of sim.hooks.ghosts(sim, x, y)) out.push(g)
-  }
-  sim.frameTargets = out
-}
-
 /** 游荡方向(镜像 wanderDir):换向计时 + 世界钩子的方向修正(有界撞边折返/无界直走) */
-function wanderDir(sim: Sim, eid: number): Point {
+export function wanderDir(sim: Sim, eid: number): Point {
   if (sim.elapsedMs >= ETurn.at[eid]!) {
     const ang = sim.rng.next() * Math.PI * 2
     EDir.x[eid] = Math.cos(ang)
@@ -341,83 +325,8 @@ function steerCoinThief(sim: Sim, eid: number, slow: number): { vx: number; vy: 
   return { vx: dir.x * sp, vy: dir.y * sp }
 }
 
-/** 本巢名下在场子敌数(Nest.of 反查) */
-function broodCount(sim: Sim, nestEid: number): number {
-  let n = 0
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Nest.of[eid] === nestEid) n++
-  }
-  return n
-}
-
-export function updateSpawners(sim: Sim): void {
-  const atlas = sim.frames
-  if (sim.over) return
-  const now = sim.elapsedMs
-  const eids = query(sim.world, ENEMY_SET as unknown as object[])
-  let active = eids.length
-  for (const eid of eids) {
-    if (Dormant.v[eid]) continue // 休眠的巢不生子敌
-    const spawner = enemyDef[eid]?.spawner
-    if (!spawner) continue
-    // 压制期(全场蹦迪 / 魔尘变羊)既不产子也不推进计时——旧实现产子块在两个 continue 之后
-    if (now < sim.danceEndsAt) continue
-    if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue
-    if (now < Nest.nextSpawnAt[eid]!) continue
-    Nest.nextSpawnAt[eid] = now + spawner.intervalMs
-    if (active >= SPAWN.maxAlive) continue
-    const room = spawner.maxAlive - broodCount(sim, eid)
-    if (room <= 0) continue
-    const n = Math.min(spawner.count, room)
-    spawnBrood(sim, atlas, spawner.into, n, Transform.x[eid]!, Transform.y[eid]!, 0.6 * UNIT, eid)
-    active += n // 实时计数:同帧后面的巢看得到前面刚产的子敌(镜像旧每次现数 countActive)
-  }
-}
-
-/** 入场弹入:缩放/透明插值到位后清零(Boss 走 Back.easeOut 过冲,普通怪线性)。
- * 休眠者也照常弹入——出生即被冻结的怪不该卡在 0.3 倍大小 */
-export function popInEnemies(sim: Sim): void {
-  const now = sim.elapsedMs
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Pop.until[eid] === 0) continue
-    const left = Pop.until[eid]! - now
-    if (left <= 0) {
-      Pop.until[eid] = 0
-      Transform.w[eid] = Pop.size[eid]!
-      Transform.h[eid] = Pop.size[eid]!
-      Tint.alpha[eid] = Pop.alpha[eid]!
-      continue
-    }
-    const raw = 1 - left / Pop.ms[eid]!
-    const t = Pop.back[eid] ? backEaseOut(raw) : raw
-    const from = Boss.v[eid] ? 0.2 : 0.3
-    const k = Pop.size[eid]! * (from + (1 - from) * t)
-    Transform.w[eid] = k
-    Transform.h[eid] = k
-    Tint.alpha[eid] = from + (Pop.alpha[eid]! - from) * t // 与 scale 共用缓动(Boss 的 Back 会过冲)
-  }
-}
-
-/** 定时静默移除:亡语诱饵尸壳到时离场(不计击杀、不掉落、不放死亡效果) */
-export function despawnExpired(sim: Sim): void {
-  const now = sim.elapsedMs
-  for (const eid of [...query(sim.world, ENEMY_SET as unknown as object[])]) {
-    if (Dormant.v[eid]) continue
-    if (Despawn.at[eid] !== 0 && now >= Despawn.at[eid]!) despawnEnemy(sim, eid)
-  }
-}
-
-/** 受击白闪到时恢复 */
-export function fadeEnemyFlash(sim: Sim): void {
-  const now = sim.elapsedMs
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Dormant.v[eid]) continue
-    if (Flash.until[eid] !== 0 && now >= Flash.until[eid]!) Flash.until[eid] = 0
-  }
-}
-
 /** 一种 locomotion 的转向：返回本帧的行为速度（px/s，击退等冲量另算） */
-type Steerer<K extends LocomotionDef['kind']> = (
+export type Steerer<K extends LocomotionDef['kind']> = (
   sim: Sim,
   eid: number,
   speed: number,
@@ -439,7 +348,7 @@ const steerChase: Steerer<'chase'> = (sim, eid, speed) => {
  * 编译不过。从前是一条 else-if 链外加一个兜底 else——`flee` 在类型里声明了、
  * arcade 侧也实现了（它一直是 STEERERS 全映射表），ECS 这边却从来没写，
  * 被那个 else 静默当成 chase 蒙了过去 */
-const STEERERS: { [K in LocomotionDef['kind']]: Steerer<K> } = {
+export const STEERERS: { [K in LocomotionDef['kind']]: Steerer<K> } = {
   chase: steerChase,
   wander: (sim, eid, speed) => {
     const d = wanderDir(sim, eid)
@@ -454,141 +363,3 @@ const STEERERS: { [K in LocomotionDef['kind']]: Steerer<K> } = {
   coinThief: (sim, eid, _speed, slow) => steerCoinThief(sim, eid, slow),
 }
 
-/** 减速区叠乘(寒气光环等):落在圈内即按 factor 变慢。转向与染色共读这一份。
- * 减速是**敌人的**属性,故折算在这里而不在 zones.ts:那边只管区自己的事 */
-export function applySlowZones(sim: Sim): void {
-  const chills = query(sim.world, [Zone, ZoneChill, Transform])
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Dormant.v[eid]) continue
-    let mul = 1
-    for (const z of chills) {
-      if (Zone.on[z] === 0 || Zone.faction[z] === FACTION.enemy) continue // 只落在对面
-      const r = Zone.radius[z]!
-      const d = sim.hooks.worldDelta(sim, Transform.x[eid]!, Transform.y[eid]!, Transform.x[z]!, Transform.y[z]!)
-      if (d.x * d.x + d.y * d.y <= r * r) mul *= ZoneChill.factor[z]!
-    }
-    ZoneSlow.v[eid] = mul
-  }
-}
-
-/** 非白闪期的常驻染色:蹦迪粉 > 中毒毒绿 > 蓄力橙 > 减速冷蓝 > 常态白。
- * 旧实现的橙/蓝只在状态翻转那一帧写一次,毒绿却逐帧重涂,故稳态下毒绿压过橙 */
-export function tintEnemies(sim: Sim): void {
-  const now = sim.elapsedMs
-  const dancing = now < sim.danceEndsAt
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Dormant.v[eid] || Flash.until[eid] !== 0) continue
-    Tint.effect[eid] = 0
-    Tint.color[eid] = dancing
-      ? 0xff9ff3
-      : now < Poison.until[eid]!
-        ? 0x7bff5a
-        : EState.v[eid] === 2
-          ? 0xffb74d
-          : ZoneSlow.v[eid]! < 1
-            ? 0xa5d8ff
-            : 0xffffff
-  }
-}
-
-/** 敌人转向:按 locomotion 求本帧「行为速度」(px/s)→ 过世界钩子(冰面打滑/河流漂移)
- * → 写进 Step。delta = 世界时长(吃时停) */
-export function steerEnemies(sim: Sim): void {
-  const delta = sim.wdtMs
-  const dt = delta / 1000
-  const now = sim.elapsedMs
-  const dancing = now < sim.danceEndsAt
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Dormant.v[eid]) continue // 休眠:冻结 AI 与位移,状态原样保留,回到活跃范围自然接管
-    // 速度倍率:减速区 × 能力限时减速/冻结 × 体质(精英加速/护巢暴走) × 团队卡与战场拾取的敌速乘区。
-    // 时停不在此处乘——世界侧统一按 wdelta 积分已等价于时间放缩
-    const slow =
-      ZoneSlow.v[eid]! *
-      (now < Slow.until[eid]! ? Slow.mul[eid]! : 1) *
-      SpMul.v[eid]! *
-      sim.enemySlowMul *
-      sim.battleFx.enemySlowMul
-    const speed = Speed.v[eid]! * slow
-    const kind = enemyDef[eid]?.locomotion.kind ?? 'chase'
-    let bvx = 0
-    let bvy = 0
-    if (dancing) {
-      // 蹦迪:定身摇摆(不位移),摇摆幅度大于常态行走
-      Transform.rot[eid] = Math.sin(now / 80 + EnemyPhase.v[eid]!) * 0.3
-    } else if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) {
-      // 魔尘变形期:失去本职行为,顶绵羊形象缓速游荡(半速)。缴械/无害/复形在能力层与战斗层
-      const d = wanderDir(sim, eid)
-      bvx = d.x * speed * 0.5
-      bvy = d.y * speed * 0.5
-    } else {
-      const v = (STEERERS[kind] as Steerer<LocomotionDef['kind']>)(sim, eid, speed, slow, enemyDef[eid]!.locomotion)
-      bvx = v.vx
-      bvy = v.vy
-    }
-    // 世界钩子:冰面打滑等把行为速度过一道低通(击退分量不参与,见 worlds.ts)
-    const post = sim.hooks.postSteerEnemy(sim, eid, bvx, bvy, delta)
-    Step.x[eid] = post.vx * dt
-    Step.y[eid] = post.vy * dt
-    // 记录本帧移动朝向(击退前的移动分量;敌方 aim:'move' 弹的 ownerHeading 读)
-    if (dt > 0) {
-      EnemyVel.x[eid] = post.vx
-      EnemyVel.y[eid] = post.vy
-    }
-  }
-}
-
-/** 击退:冲量叠进本帧位移后指数衰减(镜像 decayKnockback)。
- * realDelta = 真实帧长——旧实现把冲量写进 Arcade body 由物理按真实帧长积分,
- * 故时停期「打谁谁飞」照旧成立 */
-export function applyKnockback(sim: Sim): void {
-  const delta = sim.wdtMs
-  const realDelta = sim.dtMs
-  const kdt = realDelta / 1000
-  const decay = Math.exp(-delta / (KNOCKBACK.tauMs * sim.hooks.knockbackTauMul(sim)))
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Dormant.v[eid]) continue
-    const kvx = Kv.x[eid]!
-    const kvy = Kv.y[eid]!
-    if (kvx === 0 && kvy === 0) continue
-    Step.x[eid] = Step.x[eid]! + kvx * kdt
-    Step.y[eid] = Step.y[eid]! + kvy * kdt
-    if ((kvx * kvx + kvy * kvy) * decay * decay < 100) {
-      Kv.x[eid] = 0
-      Kv.y[eid] = 0
-    } else {
-      Kv.x[eid] = kvx * decay
-      Kv.y[eid] = kvy * decay
-    }
-  }
-}
-
-/** 提交位移:世界禁锢(深空引力井削向外分量)+ 世界约束(钳制/回绕)后落到 Transform */
-export function commitEnemySteps(sim: Sim): void {
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Dormant.v[eid]) continue
-    const ox = Transform.x[eid]!
-    const oy = Transform.y[eid]!
-    const conf = sim.hooks.confineEnemyStep(sim, eid, Step.x[eid]!, Step.y[eid]!)
-    const fixed = sim.hooks.constrainEnemy(sim, eid, ox + conf.x, oy + conf.y)
-    Transform.x[eid] = fixed.x
-    Transform.y[eid] = fixed.y
-  }
-}
-
-/** 行走动画:环境摇摆(轻微旋转)+ 按移动方向翻转(twemoji 默认朝左)。
- * 蓄力/冲刺(EState 2/3)、蹦迪与变形由各自状态机/形象自管,此处不覆盖。
- * 翻转读「含击退」的本帧位移(被击飞时会朝击退方向转身),且读的是禁锢之前的那一份 */
-export function animateEnemies(sim: Sim): void {
-  const delta = sim.wdtMs
-  const now = sim.elapsedMs
-  const dancing = now < sim.danceEndsAt
-  if (dancing) return
-  const dt = delta / 1000
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Dormant.v[eid]) continue
-    if (EState.v[eid] === 2 || EState.v[eid] === 3 || Morph.until[eid] !== 0) continue
-    Transform.rot[eid] = Math.sin(now / 95 + EnemyPhase.v[eid]!) * 0.1
-    const flipVx = dt > 0 ? Step.x[eid]! / dt : 0
-    if (Math.abs(flipVx) > 8) Sprite.flipX[eid] = flipVx > 0 ? 1 : 0
-  }
-}

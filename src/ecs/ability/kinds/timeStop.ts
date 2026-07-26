@@ -1,5 +1,5 @@
 import type { TimeStopDef } from '../../../types/abilityDefs'
-import { castScan } from '../systems/cast'
+import { castScan } from '../castScan'
 import { KindTimeStop } from '../tags'
 import type { Sim } from '../../sim'
 

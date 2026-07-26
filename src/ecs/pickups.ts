@@ -1,6 +1,5 @@
-import { addComponent, query, removeEntity } from 'bitecs'
+import { addComponent, query } from 'bitecs'
 import { UNIT } from '../util/units'
-import { norm } from '../util/vec'
 import { playSfx } from '../audio/sfx'
 import { PICKUP, PICKUPS } from '../data/pickups'
 import { FIELD, POLARITY_COLOR } from '../data/battlefield'
@@ -9,19 +8,14 @@ import {
   Alive,
   Bob,
   Enemy,
-  Grab,
-  Hurt,
-  Lifetime,
   Magnet,
   MFlash,
   PICKUP_SET,
   Pickup,
   Pop,
-  Pull,
   Ring,
   Tint,
   Transform,
-  Vel,
 } from './components'
 import { backEaseOut } from './ease'
 import { enemyCarries, pickupDef } from './store'
@@ -38,9 +32,6 @@ import type { FieldPickupDef } from '../types/battlefield'
 // 金币与战场增/减益此前是两套东西(前者 ECS 实体、后者游离的 Phaser 对象 + 模块级数组),
 // 现在只是这张表里的两行。
 
-/** 地面到期前的渐隐时长(ms) */
-const FADE_MS = 250
-
 /** 到手效果的分派键;下标即 Pickup.kind */
 export const COIN = 0
 export const FIELD_BUFF = 1
@@ -53,7 +44,7 @@ interface PickupKind {
   collect(sim: Sim, eid: number): void
 }
 
-const PICKUP_KINDS: readonly PickupKind[] = [
+export const PICKUP_KINDS: readonly PickupKind[] = [
   // ── 金币:磁吸入账,永久经济 ──
   {
     spec: (sim) => ({
@@ -151,87 +142,9 @@ function applyBattleMod(sim: Sim, def: FieldPickupDef): void {
   sim.battleFx = foldBattleEffects(sim.battleMods.map((m) => m.fx))
 }
 
-/** 逐帧:磁吸 → 拾取 → 到期回收,外加入场弹出与待拾缓浮 */
-export function updatePickups(sim: Sim): void {
-  const delta = sim.dtMs
-  const eids = query(sim.world, PICKUP_SET as unknown as object[])
-  if (eids.length === 0) return
-  const dt = delta / 1000
-  const now = sim.elapsedMs
-  const cx = sim.center.x
-  const cy = sim.center.y
-  for (const eid of eids) {
-    animate(sim, eid)
-    const x = Transform.x[eid]!
-    const y = Transform.y[eid]!
-    // 磁力回旋镖优先:镖旁的拾取物直接到手,省去飞回中心的路程
-    if (sim.frameAttractors.length > 0 && Pull.radius[eid]! > 0) {
-      let taken = false
-      for (const a of sim.frameAttractors) {
-        const ad = sim.hooks.worldDelta(sim, x, y, a.x, a.y)
-        if (ad.x * ad.x + ad.y * ad.y <= a.r2) {
-          take(sim, eid)
-          taken = true
-          break
-        }
-      }
-      if (taken) continue
-    }
-    // 方向/距离走世界钩子(环面取最短差:隔着传送门也吸得到)
-    const w = sim.hooks.worldDelta(sim, x, y, cx, cy)
-    const dist2 = w.x * w.x + w.y * w.y
-    // 到手:近队伍中心(拾取半径) 或 蹭到任一活着队员的身子(仅磁吸类——战场拾取要的就是走位)
-    const grab = Grab.radius[eid]!
-    if (dist2 <= grab * grab || (Pull.radius[eid]! > 0 && nearAliveMember(sim, x, y))) {
-      take(sim, eid)
-      continue
-    }
-    // 到期:末段渐隐再回收(圈随 Tint.alpha 一起淡,见 render/rings.ts)
-    if (Lifetime.until[eid]! > 0) {
-      const left = Lifetime.until[eid]! - now
-      if (left <= 0) {
-        removeEntity(sim.world, eid)
-        continue
-      }
-      if (left < FADE_MS) Tint.alpha[eid] = left / FADE_MS
-    }
-    if (Pull.radius[eid]! === 0) continue
-    // 闲置速度交给世界钩子(奔流:随波逐流;其余图静止);磁吸速度叠在它之上
-    const idle = sim.hooks.coinIdleVelocity(sim)
-    const pull = Pull.radius[eid]!
-    if (dist2 < pull * pull) {
-      const dir = norm(w.x, w.y)
-      Vel.x[eid] = dir.x * PICKUP.magnetSpeed * UNIT + idle.x
-      Vel.y[eid] = dir.y * PICKUP.magnetSpeed * UNIT + idle.y
-    } else {
-      Vel.x[eid] = idle.x
-      Vel.y[eid] = idle.y
-    }
-    // 落点过世界钩子:只回绕不钳制——生成时钳过一次,此后交物理积分自由飞
-    const moved = sim.hooks.wrap(sim, x + Vel.x[eid]! * dt, y + Vel.y[eid]! * dt)
-    Transform.x[eid] = moved.x
-    Transform.y[eid] = moved.y
-    // 世界回收(奔流:漂出下游即被河水冲走)
-    if (sim.hooks.cullCoin(sim, moved.x, moved.y)) removeEntity(sim.world, eid)
-  }
-}
-
-/** 到手:跑该种类的效果,然后回收 */
-function take(sim: Sim, eid: number): void {
-  PICKUP_KINDS[Pickup.kind[eid]!]!.collect(sim, eid)
-  pickupDef[eid] = undefined
-  removeEntity(sim.world, eid)
-}
-
-/** 只推进视觉(入场弹出 / 待拾缓浮),不做磁吸与拾取:波末过场冻结期用——
- * 世界停了,但已在飞的弹入动画照旧收尾(旧实现里这是 tween 天然不受冻结影响) */
-export function stepPickupVisuals(sim: Sim): void {
-  for (const eid of query(sim.world, PICKUP_SET as unknown as object[])) animate(sim, eid)
-}
-
 /** 与种类无关的两桩视觉:入场弹出(0.3 → 1 的 Back.easeOut 缩放)与待拾缓浮。
  * 都走视觉钟 sim.fxMs——波末过场冻结期照样播完 */
-function animate(sim: Sim, eid: number): void {
+export function animatePickup(sim: Sim, eid: number): void {
   const popLeft = Pop.until[eid]! - sim.fxMs
   const size = Pop.size[eid]!
   if (popLeft > 0) {
@@ -249,19 +162,6 @@ function animate(sim: Sim, eid: number): void {
     Transform.y[eid] = Bob.y0[eid]! + off
     Ring.dy[eid] = -off
   }
-}
-
-/** 是否蹭到了任一活着队员(圆-圆:队员受击圆 + 拾取物体半径,镜像旧 overlap)。
- * 受保护中心(受击圆减半)的捡币范围也随之小一圈,与旧实现一致 */
-function nearAliveMember(sim: Sim, x: number, y: number): boolean {
-  const cr = PICKUPS.coin.radius * UNIT
-  for (const m of sim.members) {
-    if (!Alive.v[m]) continue
-    const rr = Hurt.radius[m]! + cr
-    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
-    if (d.x * d.x + d.y * d.y <= rr * rr) return true
-  }
-  return false
 }
 
 /** 在场待拾数 / 携带者数(HUD 与 e2e 探针) */

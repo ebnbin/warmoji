@@ -1,16 +1,13 @@
 import { query, removeEntity } from 'bitecs'
-import { UNIT } from '../util/units'
+import { UNIT } from '../../util/units'
+import { ENEMY_SET, Proj, PROJ_SET, Radius, Transform, Vel } from '../components'
+import { applyAbilityEffects } from '../ability/effects'
+import { boltSource } from '../ability/source'
+import { applyDamage } from '../combat'
+import { enemyDef, projHitEids, projOnHit } from '../store'
+import type { Sim } from '../sim'
 
-import { Alive, ENEMY_SET, EProj, EPROJ_SET, Hurt, Iframe, Proj, PROJ_SET, Radius, Transform, Vel } from './components'
-import { applyAbilityEffects } from './ability/effects'
-import { boltSource } from './ability/source'
-import { applyDamage, hurtMember } from './combat'
-import { enemyDef, eprojSrcName, projHitEids, projOnHit } from './store'
-import type { Sim } from './sim'
-
-// 抛射物的逐帧推进:线段扫掠命中(pierce + 击退 + onHit 效果链),按视野/寿命回收。
-// 敌弹另走圆-圆命中队员(吃无敌帧)。生成在 entities/projectile.ts。
-// 敌弹另走圆-圆命中队员(吃无敌帧),回收条件由世界钩子补充。
+// 我方弹体(P3):线段扫掠命中(高速弹不穿模)+ 贯穿去重 + 出视野/寿命回收。
 
 function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax
@@ -22,6 +19,12 @@ function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, b
   const cx = ax + t * dx
   const cy = ay + t * dy
   return (px - cx) * (px - cx) + (py - cy) * (py - cy)
+}
+
+function cull(sim: Sim, eid: number): void {
+  projOnHit[eid] = undefined
+  projHitEids[eid] = undefined
+  removeEntity(sim.world, eid)
 }
 
 /** 逐帧推进抛射物 + 线段扫掠命中 + 出界回收 */
@@ -114,53 +117,5 @@ export function updateProjectiles(sim: Sim): void {
     } else if (bx < view.x - slack || bx > view.right + slack || by < view.y - slack || by > view.bottom + slack) {
       cull(sim, eid)
     }
-  }
-}
-
-function cull(sim: Sim, eid: number): void {
-  projOnHit[eid] = undefined
-  projHitEids[eid] = undefined
-  removeEntity(sim.world, eid)
-}
-
-// ── 敌弹(P3e):物理 overlap 命中队员 + 按寿命/出界回收(镜像 spawnEnemyProjectile)──
-
-export function updateEnemyProjectiles(sim: Sim): void {
-  const delta = sim.wdtMs
-  const shots = query(sim.world, EPROJ_SET as unknown as object[])
-  if (shots.length === 0) return
-  const dt = delta / 1000
-  const now = sim.elapsedMs
-  for (const eid of shots) {
-    const moved = sim.hooks.wrap(sim, Transform.x[eid]! + Vel.x[eid]! * dt, Transform.y[eid]! + Vel.y[eid]! * dt)
-    const x = moved.x
-    const y = moved.y
-    Transform.x[eid] = x
-    Transform.y[eid] = y
-    // 命中队员:圆-圆(敌弹半径 + 队员受击半径),吃无敌帧节流
-    let hitMember = false
-    const pr = EProj.radius[eid]!
-    if (!sim.over) {
-      for (const m of sim.members) {
-        if (!Alive.v[m]) continue
-        const rr = pr + Hurt.radius[m]!
-        const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
-        if (d.x * d.x + d.y * d.y > rr * rr) continue
-        if (now - Iframe.last[m]! < Iframe.ms[m]!) {
-          hitMember = true // 命中但被无敌帧挡下:敌弹照常销毁
-          break
-        }
-        Iframe.last[m] = now
-        hurtMember(sim, m, EProj.damage[eid]!, eprojSrcName[eid])
-        hitMember = true
-        break
-      }
-    }
-    if (hitMember) {
-      removeEntity(sim.world, eid)
-      continue
-    }
-    // 寿命回收 + 世界钩子的额外回收(有界图出地图即灭;无界只按寿命)
-    if (now >= EProj.dieAt[eid]! || sim.hooks.cullEnemyProjectile(sim, x, y)) removeEntity(sim.world, eid)
   }
 }
