@@ -1,13 +1,13 @@
 import { query } from 'bitecs'
-import type { NukeDef } from '../../../types/abilityDefs'
-import { playSfx } from '../../../audio/sfx'
-import { Boss, Dormant, ENEMY_SET } from '../../components'
-import { enemyDef } from '../../store'
-import { damageTarget, damageMul, waveScale } from '../amp'
-import { sourceOf } from '../source'
-import { castScan } from '../castScan'
-import { KindNuke } from '../tags'
-import type { Sim } from '../../sim'
+import type { NukeDef } from '../../types/abilityDefs'
+import { playSfx } from '../../audio/sfx'
+import { Boss, Dormant, ENEMY_SET } from '../components'
+import { enemyDef } from '../store'
+import { damageMul, damageTarget, waveScale } from '../ability/amp'
+import { sourceOf } from '../ability/source'
+import { castScan } from '../ability/castScan'
+import { KindNuke } from '../ability/tags'
+import type { Sim } from '../sim'
 
 /** 全域打击：全场活跃敌人各吃一次大额伤害 + 全屏白闪。伤害随当前波次威胁倍率缩放
  *（与敌人血量成长同源），Boss 按比例折减；休眠者不在活跃集内，天然豁免 */

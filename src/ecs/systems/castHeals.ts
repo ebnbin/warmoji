@@ -1,12 +1,11 @@
-import type { HealDef } from '../../../types/abilityDefs'
-import { playSfx } from '../../../audio/sfx'
-import { Alive, Revive, Transform } from '../../components'
-import { damageMul, ownerX, ownerY } from '../amp'
-import { Cooldown, FACTION, Faction } from '../../components'
-import { healEnemies, healMembers } from '../heal'
-import { castScan } from '../castScan'
-import { KindHeal } from '../tags'
-import type { Sim } from '../../sim'
+import type { HealDef } from '../../types/abilityDefs'
+import { playSfx } from '../../audio/sfx'
+import { Alive, Cooldown, Faction, FACTION, Revive, Transform } from '../components'
+import { damageMul, ownerX, ownerY } from '../ability/amp'
+import { healEnemies, healMembers } from '../ability/heal'
+import { castScan } from '../ability/castScan'
+import { KindHeal } from '../ability/tags'
+import type { Sim } from '../sim'
 
 /** 周期治疗：治血量比例最低的己方（aoe 则范围全体）。治疗量吃伤害乘区——磨刀石对军医同样有意义。
  * 己方是谁由阵营决定：队伍侧治队员，敌方侧治敌群 */

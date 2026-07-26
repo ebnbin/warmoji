@@ -1,12 +1,12 @@
-import type { SlowAuraDef } from '../../../types/abilityDefs'
-import { Anchor, Aura, Faction, Pulse, Slow } from '../../components'
-import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { spawnZone } from '../../entities/zone'
-import { sourceOf } from '../source'
-import { castScan } from '../castScan'
-import { KindSlowAura } from '../tags'
-import { targetsOf } from '../targets'
-import type { Sim } from '../../sim'
+import type { SlowAuraDef } from '../../types/abilityDefs'
+import { Anchor, Aura, Faction, Pulse, Slow } from '../components'
+import { damageMul, damageTarget, ownerX, ownerY } from '../ability/amp'
+import { spawnZone } from '../entities/zone'
+import { sourceOf } from '../ability/source'
+import { castScan } from '../ability/castScan'
+import { KindSlowAura } from '../ability/tags'
+import { targetsOf } from '../ability/targets'
+import type { Sim } from '../sim'
 
 /** 冻伤跳伤间隔（半秒一跳，dps 折半） */
 const TICK_MS = 500

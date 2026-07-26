@@ -1,13 +1,13 @@
-import type { ChainArcDef } from '../../../types/abilityDefs'
-import { playSfx } from '../../../audio/sfx'
-import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { applyAbilityEffects } from '../effects'
-import { sourceOf } from '../source'
-import { castScan } from '../castScan'
-import { KindChainArc } from '../tags'
-import { nearestTarget, targetsOf } from '../targets'
-import type { Target } from '../targets'
-import type { Sim } from '../../sim'
+import type { ChainArcDef } from '../../types/abilityDefs'
+import { playSfx } from '../../audio/sfx'
+import { damageMul, damageTarget, ownerX, ownerY } from '../ability/amp'
+import { applyAbilityEffects } from '../ability/effects'
+import { sourceOf } from '../ability/source'
+import { castScan } from '../ability/castScan'
+import { KindChainArc } from '../ability/tags'
+import { nearestTarget, targetsOf } from '../ability/targets'
+import type { Target } from '../ability/targets'
+import type { Sim } from '../sim'
 
 /** 连锁电弧：命中最近敌人后在敌群间弹跳传导，每跳伤害衰减——敌人越密越强。
  * onHit 施加在末跳落点，已弹跳过的目标排除在外 */

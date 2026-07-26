@@ -1,54 +1,21 @@
-import { hasComponent, query } from 'bitecs'
 import type { ThrustDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { thrustHitIndices } from '../../../war/hit'
-import { Tint, Transform, VisOff } from '../../components'
 import { sineEaseOut } from '../../ease'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, Followup, Frozen, Held, Owner, Swing } from '../../components'
-import { abilityDefAt } from '../defs'
+import { Aim, Swing } from '../../components'
 import { applyAbilityEffects } from '../effects'
 import { sourceOf } from '../source'
-import { castScan } from '../castScan'
-import { KindThrust } from '../tags'
 import { nearestAngle, targetsOf } from '../targets'
 import type { Sim } from '../../sim'
 
-/** 突刺：held 时持有物挥出收回，无 held 时角色本体前冲收回；胶囊判定内每敌一次伤害。
- * combo 二连突：主刺后隔一段重新索敌再刺一段（不吃冷却）；onHit 施加在突刺终点 */
-export function castThrusts(sim: Sim): void {
-  const dt = sim.wdtMs
-  placeThrustBody(sim)
-  tickCombos(sim, dt)
-  castScan<ThrustDef>(sim, KindThrust, (e, def) => {
-    if (Followup.left[e]! > 0) return false // 二连突在途：本轮不另起
-    // 侦测门槛：射程内无敌人就不出手（不空刺）
-    const src = sourceOf(sim, e)
-    if (nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, src), reachOf(def)) === null) return false
-    strike(sim, e, def)
-    if (def.combo) Followup.left[e] = def.combo.delayMs
-    return true
-  })
-}
-
 /** 攻击索敌上限：只打得到射程内的敌人才挥 */
-function reachOf(def: ThrustDef): number {
+export function reachOf(def: ThrustDef): number {
   return def.reach + def.hitRadius
 }
 
-/** 二连突的第二段：与冷却同口径推进，到点重新索敌再刺一次 */
-function tickCombos(sim: Sim, dt: number): void {
-  for (const e of query(sim.world, [Ability, KindThrust, Followup])) {
-    if (Followup.left[e]! <= 0 || Frozen.v[e]) continue
-    Followup.left[e] = Followup.left[e]! - dt
-    if (Followup.left[e]! > 0) continue
-    Followup.left[e] = 0
-    strike(sim, e, abilityDefAt(AbilityRef.def[e]!) as ThrustDef)
-  }
-}
-
 /** 单段突刺：索敌 → 胶囊判定 → 终点命中效果 → 起一段挥击动画 */
-function strike(sim: Sim, e: number, def: ThrustDef): void {
+export function strike(sim: Sim, e: number, def: ThrustDef): void {
   const src = sourceOf(sim, e)
   const ox = ownerX(e)
   const oy = ownerY(e)
@@ -70,37 +37,8 @@ function strike(sim: Sim, e: number, def: ThrustDef): void {
   Swing.durMs[e] = def.thrustMs
 }
 
-/** 摆位：持有物沿瞄准方向挥出收回；无持有物则改推角色本体的视觉偏移 */
-function placeThrustBody(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindThrust, Aim, Swing])) {
-    const def = abilityDefAt(AbilityRef.def[e]!) as ThrustDef
-    const frozen = Frozen.v[e] === 1
-    if (frozen) {
-      // 阵亡即收势：动画归零、二连突作废（持有视觉不该悬在尸体上）
-      Swing.durMs[e] = 0
-      Followup.left[e] = 0
-    }
-    const t = frozen ? 0 : lungeT(sim, e, def.thrustMs)
-    if (hasComponent(sim.world, e, Held)) {
-      // 有外形：武器刺出去收回来
-      const aim = Aim.rad[e]!
-      const rest = Held.restOffset[e]!
-      const dist = rest + t * (def.reach - rest)
-      Transform.x[e] = ownerX(e) + Math.cos(aim) * dist
-      Transform.y[e] = ownerY(e) + Math.sin(aim) * dist
-      Transform.rot[e] = aim + Held.rotOffset[e]!
-      Tint.alpha[e] = frozen ? 0 : 1
-      continue
-    }
-    // 无外形：角色本体前冲（独角兽的独角突刺）
-    const m = Owner.eid[e]!
-    VisOff.x[m] = Math.cos(Aim.rad[e]!) * t * def.lungeDist
-    VisOff.y[m] = Math.sin(Aim.rad[e]!) * t * def.lungeDist
-  }
-}
-
 /** 挥击进度 0→1→0：去回各半程，两程都走 Sine.easeOut（镜像 yoyo 缓动） */
-function lungeT(sim: Sim, e: number, thrustMs: number): number {
+export function lungeT(sim: Sim, e: number, thrustMs: number): number {
   const half = thrustMs / 2
   if (Swing.durMs[e] === 0 || half <= 0) return 0
   const p = (sim.fxMs - Swing.startMs[e]!) / half

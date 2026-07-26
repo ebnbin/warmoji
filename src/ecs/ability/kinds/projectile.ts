@@ -1,77 +1,29 @@
-import { hasComponent, query } from 'bitecs'
-import { DEG2RAD } from '../../../util/units'
+import { hasComponent } from 'bitecs'
 import type { ProjectileDef } from '../../../types/abilityDefs'
-import { playSfx } from '../../../audio/sfx'
-import { EnemyVel, Tint, Transform } from '../../components'
+import { Aim, EnemyVel, Faction, FACTION, Held, Owner } from '../../components'
 import { spawnEnemyProjectileEcs, spawnProjectileEcs } from '../../entities/projectile'
 import { enemyDef } from '../../store'
-import { attributionSlot, damageMul, ownerX, ownerY } from '../amp'
-import { Ability, Aim, FACTION, Faction, Frozen, Held, Owner, Shots } from '../../components'
-import { sourceOf } from '../source'
-import { castScan } from '../castScan'
-import { KindProjectile } from '../tags'
-import { nearestAngle, targetsOf } from '../targets'
+import { attributionSlot, ownerX, ownerY } from '../amp'
 import type { Sim } from '../../sim'
 
 /** 敌方能力弹药缺省寿命 */
 const BULLET_LIFE_MS = 3000
 
-/** 发射：held 时持有物定身指向目标（可带左右手挂载位），无 held 时角色本体出弹。
- * 瞄准 nearest 最近目标 / move 持有者移动方向（无需目标）；整圈齐射也无需目标。
- * volley 恒定齐射（≥360° 为整圈，可随机整体旋转）；everyN 每第 n 次改打一轮特殊齐射 */
-export function castProjectiles(sim: Sim): void {
-  placeProjectileBody(sim)
-  castScan<ProjectileDef>(sim, KindProjectile, (e, def) => {
-    const fullRing = def.volley !== undefined && def.volley.spreadDeg >= 360 - 1e-9
-    if (def.aim === 'move') {
-      const h = headingOf(sim, e)
-      Aim.rad[e] = Math.atan2(h.y, h.x)
-    } else if (!fullRing) {
-      const aim = nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, sourceOf(sim, e)), def.range)
-      if (aim === null) return false
-      Aim.rad[e] = aim
-    }
-    const aim = Aim.rad[e]!
-    const damage = Math.round(def.damage * damageMul(sim, e))
-    const from = muzzle(sim, e)
-    Shots.n[e] = Shots.n[e]! + 1
-    const special = def.everyN && Shots.n[e]! % def.everyN.n === 0
-    const volley: { count: number; spreadDeg: number; randomRotate?: boolean } | undefined = special
-      ? { count: def.everyN!.count, spreadDeg: def.everyN!.spreadDeg }
-      : def.volley
-    if (volley && volley.count > 1) {
-      const full = volley.spreadDeg >= 360 - 1e-9
-      const base = full && volley.randomRotate ? random(sim, e) * Math.PI * 2 : aim
-      for (let i = 0; i < volley.count; i++) {
-        // 整圈按 count 均分步进（端点不重叠）；扇形沿瞄准方向对称散开
-        const angle = full
-          ? base + (i * volley.spreadDeg * DEG2RAD) / volley.count
-          : aim + volley.spreadDeg * DEG2RAD * (i / (volley.count - 1) - 0.5)
-        shoot(sim, e, def, from.x, from.y, angle, damage)
-      }
-    } else {
-      shoot(sim, e, def, from.x, from.y, aim, damage)
-    }
-    if (def.fireSfx) playSfx(def.fireSfx)
-    return true
-  })
-}
-
 /** 持有者朝向（aim:'move' 用）：队伍取本帧移动方向，敌人取本帧移动速度方向 */
-function headingOf(sim: Sim, e: number): { x: number; y: number } {
+export function headingOf(sim: Sim, e: number): { x: number; y: number } {
   if (Faction.v[e] !== FACTION.enemy) return sim.teamDir
   const o = Owner.eid[e]!
   return { x: EnemyVel.x[o]!, y: EnemyVel.y[o]! }
 }
 
 /** 出手随机流：队伍侧走非确定性随机，敌方侧走 run 种子（镜像两侧 ctx 的 random） */
-function random(sim: Sim, e: number): number {
+export function random(sim: Sim, e: number): number {
   return Faction.v[e] === FACTION.enemy ? sim.rng.next() : Math.random()
 }
 
 /** 枪口：无手持外形即施放锚点本身（徒手 / 弩塔）；有则沿瞄准方向前伸 restOffset，
  * 再按左右手横向偏 gap。**「有没有外形」看有没有 Held 组件**，不去翻 def */
-function muzzle(sim: Sim, e: number): { x: number; y: number } {
+export function muzzle(sim: Sim, e: number): { x: number; y: number } {
   if (!hasComponent(sim.world, e, Held)) return { x: ownerX(e), y: ownerY(e) }
   const aim = Aim.rad[e]!
   const off = Held.restOffset[e]!
@@ -83,7 +35,7 @@ function muzzle(sim: Sim, e: number): { x: number; y: number } {
 }
 
 /** 发一枚：阵营决定进哪条弹道机器（队伍弹带 pierce/onHit，敌弹按寿命回收） */
-function shoot(sim: Sim, e: number, def: ProjectileDef, x: number, y: number, angle: number, damage: number): void {
+export function shoot(sim: Sim, e: number, def: ProjectileDef, x: number, y: number, angle: number, damage: number): void {
   if (Faction.v[e] !== FACTION.enemy) {
     spawnProjectileEcs(sim, sim.frames, x, y, angle, def, damage, attributionSlot(e))
     return
@@ -100,14 +52,3 @@ function shoot(sim: Sim, e: number, def: ProjectileDef, x: number, y: number, an
   })
 }
 
-/** 摆位：持有物定身指向瞄准方向（含左右手挂载位） */
-function placeProjectileBody(sim: Sim): void {
-  // 只摆有手持外形的：弩塔同样带 projectile 能力，但它没有 Held，自然不在这批里
-  for (const e of query(sim.world, [Ability, KindProjectile, Aim, Held, Transform])) {
-    const pos = muzzle(sim, e)
-    Transform.x[e] = pos.x
-    Transform.y[e] = pos.y
-    Transform.rot[e] = Aim.rad[e]! + Held.rotOffset[e]!
-    Tint.alpha[e] = Frozen.v[e] ? 0 : 1
-  }
-}

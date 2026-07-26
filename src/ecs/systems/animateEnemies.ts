@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { Dormant, ENEMY_SET, EState, EnemyPhase, Morph, Sprite, Step, Transform } from '../components'
+import { Dormant, ENEMY_SET, EnemyPhase, EState, Morph, Sprite, Step, Transform } from '../components'
 import type { Sim } from '../sim'
 
 /** 行走动画:环境摇摆(轻微旋转)+ 按移动方向翻转(twemoji 默认朝左)。

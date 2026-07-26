@@ -1,8 +1,8 @@
-import type { BuffDef } from '../../../types/abilityDefs'
-import { Alive, MFlash, Tint } from '../../components'
-import { castScan } from '../castScan'
-import { KindBuff } from '../tags'
-import type { Sim } from '../../sim'
+import type { BuffDef } from '../../types/abilityDefs'
+import { Alive, MFlash, Tint } from '../components'
+import { castScan } from '../ability/castScan'
+import { KindBuff } from '../ability/tags'
+import type { Sim } from '../sim'
 
 /** 限时全队增伤：不叠加，直接覆写，到期由 stepSim 复原；全队闪一下作到手反馈 */
 export function castBuffs(sim: Sim): void {

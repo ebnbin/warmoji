@@ -1,10 +1,9 @@
 import { query, removeEntity } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
-import { PICKUP } from '../../data/pickups'
-import { PICKUPS } from '../../data/pickups'
-import { Alive, Grab, Hurt, Lifetime, PICKUP_SET, Pickup, Pull, Tint, Transform, Vel } from '../components'
-import { PICKUP_KINDS, animatePickup } from '../pickups'
+import { PICKUP, PICKUPS } from '../../data/pickups'
+import { Alive, Grab, Hurt, Lifetime, Pickup, PICKUP_SET, Pull, Tint, Transform, Vel } from '../components'
+import { animatePickup, PICKUP_KINDS } from '../pickups'
 import { pickupDef } from '../store'
 import type { Sim } from '../sim'
 

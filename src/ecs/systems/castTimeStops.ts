@@ -1,7 +1,7 @@
-import type { TimeStopDef } from '../../../types/abilityDefs'
-import { castScan } from '../castScan'
-import { KindTimeStop } from '../tags'
-import type { Sim } from '../../sim'
+import type { TimeStopDef } from '../../types/abilityDefs'
+import { castScan } from '../ability/castScan'
+import { KindTimeStop } from '../ability/tags'
+import type { Sim } from '../sim'
 
 /** 时停：只负责按下开关，世界时标的放缩由 stepSim 的时停通道逐帧处理 */
 export function castTimeStops(sim: Sim): void {

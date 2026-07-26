@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { Alive, DmgMul, Dormant, ENEMY_SET, Hurt, Iframe, MPerk, Morph, Radius, Slot, Transform } from '../components'
+import { Alive, DmgMul, Dormant, ENEMY_SET, Hurt, Iframe, Morph, MPerk, Radius, Slot, Transform } from '../components'
 import { applyDamage, hurtMember } from '../combat'
 import { applyAbilityEffects } from '../ability/effects'
 import { enemySource } from '../ability/source'

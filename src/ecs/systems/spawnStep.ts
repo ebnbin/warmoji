@@ -1,6 +1,6 @@
 import { playSfx } from '../../audio/sfx'
 import { toPx } from '../../war/px'
-import { waveAt, isBossWave } from '../../data/waves'
+import { isBossWave, waveAt } from '../../data/waves'
 import { BOSS_SPAWN_RELIEF, ELITE, ENEMIES, SPAWN } from '../../data/enemies'
 import { densityParams, labDifficulty, labEnemySet } from '../../run/lab'
 import { mapEnemyRoster } from '../../data/maps'

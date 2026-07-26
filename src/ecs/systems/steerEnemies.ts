@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { Dormant, ENEMY_SET, EnemyPhase, EnemyVel, Morph, Slow, SpMul, Speed, Step, Transform, ZoneSlow } from '../components'
+import { Dormant, ENEMY_SET, EnemyPhase, EnemyVel, Morph, Slow, Speed, SpMul, Step, Transform, ZoneSlow } from '../components'
 import { STEERERS, wanderDir } from '../steering'
 import type { Steerer } from '../steering'
 import { enemyDef } from '../store'

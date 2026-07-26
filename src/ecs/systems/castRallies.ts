@@ -1,10 +1,10 @@
-import type { RallyDef } from '../../../types/abilityDefs'
-import { Alive, Iframe, MFlash, MHp, Tint } from '../../components'
-import { reviveMember } from '../../combat'
-import { ownerX, ownerY } from '../amp'
-import { castScan } from '../castScan'
-import { KindRally } from '../tags'
-import type { Sim } from '../../sim'
+import type { RallyDef } from '../../types/abilityDefs'
+import { Alive, Iframe, MFlash, MHp, Tint } from '../components'
+import { reviveMember } from '../combat'
+import { ownerX, ownerY } from '../ability/amp'
+import { castScan } from '../ability/castScan'
+import { KindRally } from '../ability/tags'
+import type { Sim } from '../sim'
 
 /** 集结：阵亡者满血复活、存活者按上限比例回复、全队短暂无敌。
  * 无敌走受击无敌帧通道（把「上次受击」推到未来），接触与敌弹一并挡下 */

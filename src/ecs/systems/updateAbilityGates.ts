@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { Ability, Alive, Disarmed, Dormant, FACTION, Faction, Frozen, Morph, Owner } from '../components'
+import { Ability, Alive, Disarmed, Dormant, Faction, FACTION, Frozen, Morph, Owner } from '../components'
 import type { Sim } from '../sim'
 
 /** 由持有者状态刷新出手闸门：阵亡/休眠者冻结（连冷却都不推进），被压制者缴械
