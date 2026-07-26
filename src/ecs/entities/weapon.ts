@@ -1,8 +1,8 @@
 import { addComponent, addEntity } from 'bitecs'
-import type { AbilityDef } from '../../types/abilityDefs'
+import type { AbilityDef, HeldVisual } from '../../types/abilityDefs'
 import type { OutlineKind } from '../../emoji/svg'
 import { attachDrawable } from '../drawable'
-import { Boss, Elite, FACTION, Transform, Weapon } from '../components'
+import { Boss, Elite, FACTION, Faction, Sprite, Transform, Weapon } from '../components'
 import { attachAbility } from '../ability/equip'
 import type { AmpInit } from '../ability/equip'
 import type { Sim } from '../sim'
@@ -52,4 +52,20 @@ export function spawnWeapon(
     })
   }
   return e
+}
+
+/** 掷出去的一枚武器副本（双子镖）：与本体同外形同变体，只在飞行期存在，接住即离场。
+ * 它不是一件武器（不带能力、不属于谁的装备），只是那把武器的一个分身 */
+export function spawnWeaponCopy(sim: Sim, weaponEid: number, held: HeldVisual): number {
+  const t = addEntity(sim.world)
+  attachDrawable(sim.world, t, sim.frames, {
+    id: held.emoji,
+    outline: Faction.v[weaponEid] === FACTION.enemy ? 'enemy' : 'player',
+    x: Transform.x[weaponEid]!,
+    y: Transform.y[weaponEid]!,
+    size: held.size,
+    z: 13,
+  })
+  Sprite.frame[t] = Sprite.frame[weaponEid]! // 与本体同一变体（描边随持有者）
+  return t
 }

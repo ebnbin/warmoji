@@ -1,9 +1,9 @@
-import { addComponent, addEntity, hasComponent, query, removeEntity } from 'bitecs'
+import { hasComponent, query, removeEntity } from 'bitecs'
 import type { StrikeDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { dropCoins } from '../../pickups'
 import { Alive, Tint, Transform } from '../../components'
-import { attachDrawable } from '../../drawable'
+import { spawnDrop } from '../../entities/drop'
 import { enemyDef } from '../../store'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { AbilityRef, Drop, FACTION, Faction, Owner } from '../../components'
@@ -12,7 +12,6 @@ import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindStrike } from '../tags'
 import { targetsOf } from '../targets'
-import type { Target } from '../targets'
 import type { Sim } from '../../sim'
 
 /** 点名打击：坠物逐个砸向离锚点最近的 N 个目标——落地才结算伤害与掉币。
@@ -29,30 +28,18 @@ export function castStrikes(sim: Sim): void {
       .sort((a, b) => a.d2 - b.d2)
       .filter(({ t }) => !seen.has(t.eid) && (seen.add(t.eid), true))
       .slice(0, def.targets)
-    nearest.forEach(({ t }, i) => spawnDrop(sim, e, def, t, i))
+    nearest.forEach(({ t }, i) =>
+      spawnDrop(sim, e, {
+        visual: def.drop,
+        target: t.eid,
+        x: t.x,
+        y: t.y,
+        fromAbove: def.drop.fromAbove,
+        dropMs: def.drop.dropMs,
+        delayMs: i * def.drop.staggerMs,
+      }),
+    )
   })
-}
-
-/** 一枚坠物：起点在目标正上方，错峰延迟后开始下落 */
-function spawnDrop(sim: Sim, e: number, def: StrikeDef, t: Target, index: number): void {
-  const d = addEntity(sim.world)
-  attachDrawable(sim.world, d, sim.frames, {
-    id: def.drop.emoji,
-    outline: Faction.v[e] === FACTION.enemy ? 'enemy' : 'player',
-    x: t.x,
-    y: t.y - def.drop.fromAbove,
-    size: def.drop.size,
-    alpha: 0,
-    z: 30,
-  })
-  addComponent(sim.world, d, Drop)
-  addComponent(sim.world, d, Owner)
-  Owner.eid[d] = e
-  Drop.startMs[d] = sim.fxMs + index * def.drop.staggerMs
-  Drop.durMs[d] = def.drop.dropMs
-  Drop.fromY[d] = t.y - def.drop.fromAbove
-  Drop.toY[d] = t.y
-  Drop.target[d] = t.eid
 }
 
 /** 坠落推进（Quad.easeIn，位置与显形同一条曲线）+ 落地结算 */

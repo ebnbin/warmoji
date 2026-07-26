@@ -1,12 +1,12 @@
-import { addComponent, addEntity, hasComponent, query, removeComponent, removeEntity } from 'bitecs'
+import { addComponent, hasComponent, query, removeComponent, removeEntity } from 'bitecs'
 import { DEG2RAD } from '../../../util/units'
 import type { BoomerangDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
-import { Sprite, Tint, Transform } from '../../components'
-import { attachDrawable } from '../../drawable'
+import { Tint, Transform } from '../../components'
+import { spawnWeaponCopy } from '../../entities/weapon'
 import { flyerHits } from '../../store'
 import { cooldownMul, damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, Cooldown, FACTION, Faction, Flyer, Frozen } from '../../components'
+import { Ability, AbilityRef, Aim, Cooldown, Flyer, Frozen } from '../../components'
 import { abilityDefAt } from '../defs'
 import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
@@ -49,7 +49,7 @@ function launch(sim: Sim, e: number, def: BoomerangDef, aim: number): void {
   const count = def.twin ? 2 : 1
   for (let i = 0; i < count; i++) {
     const angle = aim + i * Math.PI
-    const f = i === 0 ? e : spawnTwin(sim, e, def) // 主镖就是武器自己
+    const f = i === 0 ? e : spawnWeaponCopy(sim, e, def.held) // 主镖就是武器自己，双子是它的分身
     addComponent(sim.world, f, Flyer)
     Flyer.of[f] = e
     Flyer.phase[f] = 0
@@ -64,21 +64,6 @@ function launch(sim: Sim, e: number, def: BoomerangDef, aim: number): void {
     Tint.alpha[f] = 1
     flyerHits[f] = new Set()
   }
-}
-
-/** 双子镖：只在飞行中存在的第二枚 */
-function spawnTwin(sim: Sim, e: number, def: BoomerangDef): number {
-  const t = addEntity(sim.world)
-  attachDrawable(sim.world, t, sim.frames, {
-    id: def.held.emoji,
-    outline: Faction.v[e] === FACTION.enemy ? 'enemy' : 'player',
-    x: Transform.x[e]!,
-    y: Transform.y[e]!,
-    size: def.held.size,
-    z: 13,
-  })
-  Sprite.frame[t] = Sprite.frame[e]! // 与主镖同一变体（描边随持有者）
-  return t
 }
 
 /** 推进：自旋 + 去程缓动 / 回程追人 + 途中判伤 + 磁力吸币 */
