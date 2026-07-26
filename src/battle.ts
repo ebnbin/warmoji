@@ -43,8 +43,8 @@ import { benchFramework, isBenchActive } from './bench/spec'
 // 删后共享层不会留下死文件——每个共享文件都还有别的使用方。留在 war/ 里只服务单侧的导出
 // 也一并可删：arcade 侧 hit.ts::sweepFirstHitIndex、world/void.ts::wrapCoord、
 // world/world.ts::isWithinActive；ECS 侧 cues.ts::CircleCue、world/void.ts::wrapPoint。
-// 另有 `src/war/hudHost.ts`——为了一个 UIScene 同时服务两套战斗而抽的接口，
-// 只剩一个实现者时可内联回 UIScene（不影响编译）。
+// 另有 `src/run/hudHost.ts`——为了一个 UIScene 同时服务两套战斗而抽的双向接缝
+//（HudHost：HUD 读战斗；HudInput：战斗读移动输入），只剩一个实现者时可简化。
 
 export type BattleSceneKey = ArenaSceneKey | EcsSceneKey
 

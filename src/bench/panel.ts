@@ -4,12 +4,14 @@ import { textRes, viewport } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { heapMB, rafHz, rendererInfo } from './diagnostics'
 import { emojiCacheStats } from '../emoji/textures'
-import { metricsReport, recentFrameTimes, resetMetrics } from '../bench/metrics'
-import { benchFramework, benchProfile } from '../bench/spec'
-import { reportBench } from '../bench/probe'
-import type { HudHost } from './hudHost'
+import { metricsReport, recentFrameTimes, resetMetrics } from './metrics'
+import { benchFramework, benchProfile } from './spec'
+import { reportBench } from './probe'
+import type { HudHost } from '../run/hudHost'
 
 // 基准面板：战斗内常驻的实时性能读数 + 帧时曲线。
+// 与 spec/metrics/probe 同属 bench/——它存在的唯一理由就是基准模式。
+// 由 scene/UIScene 挂载，读数经 run/hudHost 的 HudHost 契约取，不认识任何战斗实现。
 //
 // 布局是**自适应**的：先把文本写进去量出真实高度，再据此画背景框。
 // 早先按「估算行数」定高，内容一多就从底部截断（渲染后端那行只剩半截）——

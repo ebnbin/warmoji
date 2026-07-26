@@ -34,11 +34,12 @@ export default tseslint.config(
       ],
     },
   },
-  // 战斗域边界护栏：src/war/ 是战斗场景的地基（两套实现 + HUD 共用），大厅页
-  // （菜单/图鉴/工坊/设置/商店/卡牌/整编/结算）与启动流程不得依赖它——战斗场景相对
-  // 大厅是独立的，这条边界一破，「战斗是一块可整体替换的东西」这个前提就没了。
+  // 战斗域边界护栏：src/war/ 只放战斗世界本身——能力/命中/特效/敌人 AI/世界几何/换算，
+  // 判据是「两套战斗实现至少有一方真的 import 它」。全部页面（含 HUD 的 UIScene）都在
+  // src/scene/，一律不得依赖 war/——战斗场景相对页面是独立的，这条边界一破，
+  // 「战斗是一块可整体替换的东西」这个前提就没了。
   // 必须排在上面那条实现隔离护栏之后：flat config 里同名规则后者整个替换前者，
-  // 故这里把 war 与两套实现的 pattern 一并给出（大厅页三者都不该碰）。
+  // 故这里把 war 与两套实现的 pattern 一并给出（页面三者都不该碰）。
   // main.ts 不在此列：它要把战斗场景与 HUD 注册进 Phaser。
   {
     files: ['src/scene/**/*.ts'],
@@ -50,7 +51,7 @@ export default tseslint.config(
             {
               group: ['**/war', '**/war/*', '**/war/**'],
               message:
-                'src/war/ 是战斗域地基，大厅页不该依赖它；若确实需要某份数据，说明它属于共享数据层（各 registry），应留在原包而非 war/',
+                'src/war/ 只放战斗世界本身，页面不该依赖它。若页面与战斗都要用，说明它是接缝（放 src/run/，如 hudHost）或共享数据（放 src/data/），不该留在 war/',
             },
             {
               group: [
@@ -66,9 +67,9 @@ export default tseslint.config(
       ],
     },
   },
-  // 反方向同样要拦：战斗侧不得依赖大厅页。通用控件已抽到 src/ui/，
-  // 战斗 HUD 要用滚动容器就从那里取——历史上 UIScene 曾直接 import menu/scroll，
-  // 正是因为只拦了大厅页 → war 这一个方向才一直没被发现。
+  // 反方向同样要拦：战斗侧不得依赖页面层。通用控件已抽到 src/ui/。
+  // 历史上这个方向漏过两次：UIScene 曾直接 import menu/scroll；两套战斗框架曾
+  // import type { UIScene } 只为读一个摇杆向量（现已收成 run/hudHost 的 HudInput 契约）。
   {
     files: ['src/war/**/*.ts', 'src/arcade/**/*.ts', 'src/ecs/**/*.ts'],
     rules: {
@@ -90,9 +91,9 @@ export default tseslint.config(
     ignores: [
       'src/main.ts',
       'src/scene/*Scene.ts',
-      'src/war/UIScene.ts',
-      'src/war/benchPanel.ts',
-      // 基准采样器要挂 Phaser 的帧阶段事件常量
+      // 基准面板/环境诊断/采样器：Phaser 帧阶段事件、渲染器信息、自绘面板
+      'src/bench/panel.ts',
+      'src/bench/diagnostics.ts',
       'src/bench/metrics.ts',
       'src/war/damageFont.ts',
       'src/util/fx.ts',
@@ -107,7 +108,6 @@ export default tseslint.config(
       'src/emoji/textures.ts',
       'src/emoji/thumbs.ts',
       'src/util/apply.ts',
-      'src/war/diagnostics.ts',
     ],
     rules: {
       '@typescript-eslint/no-restricted-imports': [

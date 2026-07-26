@@ -105,8 +105,8 @@ interface TeamStats {
 }
 
 import type { ArcadeBody, ImageObj } from './body'
-import { hudMoveVector, setActiveHudHost } from '../war/hudHost'
-import type { HudSnapshot, WaveSummary } from '../war/hudHost'
+import { hudMoveVector, setActiveHudHost } from '../run/hudHost'
+import type { HudSnapshot, WaveSummary } from '../run/hudHost'
 import { rollWaveCarriers } from '../war/battleFx'
 import { enemyMixAt, pickEnemy } from '../war/enemyAi'
 export type { ArcadeBody, ImageObj } from './body'

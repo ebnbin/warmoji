@@ -1,12 +1,19 @@
 import type Phaser from 'phaser'
-import type { RunState } from '../run/state'
+import type { RunState } from './state'
 import type { Polarity } from '../types/battlefield'
 
-// HUD 宿主契约：UIScene 需要从「当前战斗场景」读到的全部东西，仅此而已。
-// 旧的 ArcadeBattleScene 与 ECS 实验的 EcsBattleScene 都按结构满足它，UIScene 因此
-// 不必知道自己挂在哪一套战斗实现上——这是 A/B 两条路共用同一个 HUD 的唯一接缝。
+// HUD 与战斗场景之间的**双向接缝**：
+//   HudHost   战斗 → HUD：UIScene 需要从「当前战斗场景」读到的全部东西
+//   HudInput  HUD → 战斗：战斗侧需要从 HUD 读的全部东西（只有移动输入）
+//
+// 两套战斗实现（ArcadeBattleScene / EcsBattleScene）都按结构满足 HudHost，UIScene
+// 因此不必知道自己挂在哪一套实现上——这是 A/B 两条路共用同一个 HUD 的唯一接缝。
 // 抽成接口而非让 ECS 继承 ArcadeBattleScene：两套战斗内部结构完全不同（GameObject 阵
 // vs 组件数组），共享的只有这张「对外读数」表。
+//
+// 为什么住在 run/ 而不是 war/ 或 scene/：它两边都要用，而 war/ ↔ scene/ 互不可见
+//（eslint 双向拦着）。落在两边都够得到的下层才不用削弱那条边界；而「当前正在跑的
+// 战斗场景」本就是单局运行时状态，与 run/ 的其余内容同类。
 
 export interface HudSnapshot {
   xp: number

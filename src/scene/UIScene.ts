@@ -4,7 +4,6 @@ import { PICKUPS } from '../data/pickups'
 import { formatTime } from '../util/format'
 import { endRun, getRun } from '../run/state'
 // 能量豆已移除：技能纯 CD 门槛（见 captains/skill.ts）
-import { isDevOpen, setDevOpen } from './dev'
 import { CHARACTERS } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { mapEnemyRoster } from '../data/maps'
@@ -32,7 +31,7 @@ import {
   toggleLabEnemy,
 } from '../run/lab'
 import type { LabDensity, LabLevel, LabMul } from '../run/lab'
-import { heapMB, rafHz, rendererInfo, startRafMeter } from './diagnostics'
+import { heapMB, rafHz, rendererInfo, startRafMeter } from '../bench/diagnostics'
 import { emojiCacheStats, emojiImage } from '../emoji/textures'
 import { emojiText, iconLabel } from '../ui/emojiText'
 import { ScrollView } from '../ui/scroll'
@@ -47,17 +46,24 @@ import {
   viewport,
   VIEWPORT_CHANGED,
 } from '../util/apply'
-import type { HudInput, HudSnapshot, WaveSummary } from './hudHost'
-import { activeHudHost, setActiveHudInput } from './hudHost'
-import type { HudHost } from './hudHost'
+import type { HudInput, HudSnapshot, WaveSummary } from '../run/hudHost'
+import { activeHudHost, setActiveHudInput } from '../run/hudHost'
+import type { HudHost } from '../run/hudHost'
 import { roundRect } from '../ui/shapes'
-import { BenchPanel } from './benchPanel'
+import { BenchPanel } from '../bench/panel'
 import { attachMetrics, detachMetrics } from '../bench/metrics'
 import { clearBench } from '../bench/probe'
 import { clearBenchProfile, isBenchActive, setBenchActive } from '../bench/spec'
 
-// 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
-// 与 BoundedScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
+// dev 工具随线上版本常驻：游戏内 🔧 按钮开合性能面板（FPS/内存等），无需 URL 参数。
+// 状态挂模块级而非场景字段：视口变化会重启本场景，挂场景上会被一起重置。
+let devOpen = false
+
+// 屏幕层：HUD、虚拟摇杆、暂停浮层、波末横幅、试炼场面板、dev/基准面板。
+// 与战斗场景并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
+// 它是一块页面而非战斗世界，故住在 scene/ 而非 war/：对战斗的读写全经
+// run/hudHost 的两条契约（HudHost 读战斗、HudInput 供战斗读移动输入），
+// 本文件对 war/ 与两套战斗实现零依赖。
 export class UIScene extends Phaser.Scene implements HudInput {
   private joystick?: Joystick
   private xpBar!: Phaser.GameObjects.Graphics
@@ -179,10 +185,10 @@ export class UIScene extends Phaser.Scene implements HudInput {
       .setInteractive({ useHandCursor: true })
     wrench.on('pointerdown', () => {
       if (this.paused) return
-      setDevOpen(!isDevOpen())
+      devOpen = !devOpen
       this.scene.restart()
     })
-    if (isDevOpen()) this.createDevPanel(res)
+    if (devOpen) this.createDevPanel(res)
     if (isBenchActive()) {
       startRafMeter()
       attachMetrics(this.game)
