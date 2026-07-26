@@ -2,8 +2,7 @@ import type { CaptainId } from '../types/captains'
 import type { CharacterId } from '../types/characters'
 import type { StringStorage } from '../util/storage'
 import { Rng } from '../util/rng'
-import progressionJson from '../assets/progression.json'
-import type { Progression } from '../types/waves'
+import { RECRUIT } from '../data/waves'
 
 // 命定卡池的随机源：种子绑队长、本地持久化。存储值 0 = 「未初始化」哨兵，
 // 第一次真正取用时以当前时间戳初始化并落盘（0 永远不会被当作实际种子）。
@@ -92,4 +91,3 @@ export function unlockAt(index: number): number {
 // 按「已开放编制数」查表解锁可选张数——开放 1 人 4 张、2 人 6 张…封顶全开。
 // 未解锁的牌盖着（❓ 不露身份），已入队的牌保留在池中标记（本文件）。
 // poolSize/unlocks 数值在 defs/progression.ts（recruit 段），经 gen 校验产出 progression.json。
-export const RECRUIT = (progressionJson as unknown as Progression).recruit

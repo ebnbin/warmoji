@@ -23,7 +23,7 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
-import { stackCount } from './draft'
+import { stackCount } from '../run/draft'
 
 // 终局结算页：胜利（打满 WAVE.totalWaves 波）与失败（团灭）复用同一布局，
 // 只差标题/配色/庆祝粒子。展示整局逐角色战绩（伤害/击杀/阵亡/道具）与全局汇总，

@@ -47,6 +47,9 @@ export function isFinalWave(wave: number): boolean {
 /** 队伍经验曲线参数；升级/结算算法在 war/xp.ts */
 export const XP = P.xp
 
+/** 命定卡池参数；抽取逻辑与持久化在 run/recruit.ts */
+export const RECRUIT = P.recruit
+
 export const WAVE = {
   /** 每波战斗时长（秒），下标 = 波次 - 1；末波为 Boss 波（击败或撑满皆通关） */
   durationsSec: P.waveDurationsSec,

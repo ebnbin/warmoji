@@ -86,33 +86,6 @@ export default tseslint.config(
       ],
     },
   },
-  // war 是纯算法层：命中几何/寻路/曲线/换算，零常量零数据——「输入什么算什么」。
-  // 数据表（读 assets/*.json 的那种）一律归 data/，否则同一张表会被两处各读一遍
-  //（历史上 feel.json 就被 data/feel.ts 与 war/orbit.ts 各取一半字段，
-  // progression.json 更是散在三处）。这条把「表 vs 算法」从约定变成可机检的。
-  // 必须排在上一条之后：flat config 里同名规则后者整个替换前者，故这里把
-  // 场景层那条 pattern 一并重述（war/ 两条都要守）。
-  {
-    files: ['src/war/**/*.ts'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['../scene/*', '../scene/**', '../../scene/*', '../../scene/**'],
-              message: '战斗侧不得依赖场景层；通用控件在 src/ui/，业务数据在 src/data/',
-            },
-            {
-              group: ['**/assets/*.json', '**/assets/**/*.json'],
-              message:
-                'war/ 只放算法，不放表：读 assets/*.json 的模块属于 data/。把常量搬过去，算法留在这里 import 它',
-            },
-          ],
-        },
-      ],
-    },
-  },
   {
     files: ['src/**/*.ts'],
     ignores: [
@@ -255,6 +228,30 @@ export default tseslint.config(
             {
               group: ['../*'],
               message: 'util 不得 import src 中 util 以外的包（杂物层不向上引用）',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // 数据表的唯一入口：assets/*.json 只许 data/ 与 types/ 读
+  //（前者导出表，后者用 keyof typeof 派生 id 联合类型）。别处要用就 import data/ 的常量。
+  // 不设这条的下场是同一张表被多处各读一遍、各取一半字段：历史上 feel.json 被
+  // data/feel.ts 与 war/orbit.ts 瓜分，progression.json 更散在 data/waves、
+  // run/recruit、war/xp 三处——想知道「某个参数在哪」得翻遍全仓。
+  // 这条同时把「表 vs 算法」钉死：war/ 与 run/ 只放算法，表一律回 data/。
+  {
+    files: ['src/**/*.ts'],
+    ignores: ['src/data/**/*.ts', 'src/types/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/assets/*.json', '**/assets/**/*.json'],
+              message:
+                'assets/*.json 只许 data/ 与 types/ 读：把表搬进 data/ 并导出常量，这里 import 那个常量',
             },
           ],
         },

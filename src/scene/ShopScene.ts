@@ -36,7 +36,7 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
-import { characterPoolFor, levelProgress, rollItem, stackCount } from './draft'
+import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
 
 // 波次间商店：左（竖屏为下）为上架位列表——队长占首位、每个出战角色一个位，
 // 各自从自己的道具池随机上架，可购买（自动补货）或付费刷新（队长可提供免费次数）；

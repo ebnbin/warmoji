@@ -16,7 +16,7 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
-import { rollCardChoices } from './draft'
+import { rollCardChoices } from '../run/draft'
 
 // 团队升级抽卡页：战斗中每升 1 级攒 1 次抽卡（run.cardDraws），战斗后在此逐次三选一。
 // 卡 = 团队层加成（teamFx），替代原「队长道具」那套用金币买的系统。选中即升该卡等级，
