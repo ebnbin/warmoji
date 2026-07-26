@@ -11,6 +11,17 @@ export function sineEaseInOut(t: number): number {
   return 0.5 * (1 - Math.cos(Math.PI * t))
 }
 
+/** Cubic.easeOut:起步最快、末段缓收 */
+export function cubicEaseOut(t: number): number {
+  const u = 1 - t
+  return 1 - u * u * u
+}
+
+/** Cubic.easeIn:起步几乎不动、末段猛收 */
+export function cubicEaseIn(t: number): number {
+  return t * t * t
+}
+
 /** Back.easeOut(Phaser 默认过冲量):末段轻微过冲再回落 */
 export function backEaseOut(t: number): number {
   const c1 = 1.70158

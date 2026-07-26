@@ -6,8 +6,7 @@ import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../war/timeStop'
 import { DAMAGE_FONT, ensureDamageFont } from '../war/damageFont'
 import { burstEmitter } from '../util/fx'
-import { blastRing } from './render/cues'
-import { beamCue, boomCue, circleCue, lightningCue, screenFlashCue, slashCue } from './render/cues'
+import { CueLayer } from './render/cues'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
 import { UI_FONT, FONT } from '../util/fonts'
@@ -122,6 +121,8 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
 export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private world!: EcsWorld
   private atlas?: EcsAtlas
+  /** 一次性特效层（池化自绘，不挂 tween；见 render/cues.ts） */
+  private cues?: CueLayer
   private sim?: Sim
   private ready = false
   /** HUD 宿主契约：UIScene 据此显示实验室控件、正计时 */
@@ -207,6 +208,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
    *（下一波整局静止），各视觉列表也会跨局累积到已销毁的对象上 */
   private resetSceneFields(): void {
     this.atlas = undefined
+    this.cues = undefined
     this.sim = undefined
     this.ready = false
     this.ending = false
@@ -383,6 +385,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       const probe = (window as unknown as { __ecs?: { ready: boolean } }).__ecs
       if (probe) probe.ready = false
       this.atlas?.dispose() // 停掉在途的惰性烘焙:纹理管理器即将归下一局所有
+      this.cues?.destroy()
       for (const c of this.stripCams) this.cameras.remove(c)
       this.stripCams = []
     })
@@ -401,6 +404,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     clearEcsStore()
     clearAbilityDefs()
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
+    this.cues = new CueLayer(this)
     this.spawnDecor(run, atlas)
     this.testMode = run.testMode
     const settings = loadSettings(browserStorage())
@@ -524,7 +528,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const q = this.sim!.pendingRings
     if (q.length === 0) return
     for (const r of q) {
-      blastRing(this, r.x, r.y, r.radius, { color: 0xff5252, fillAlpha: 0.35, lineWidth: 3, lineAlpha: 0.9, durMs: 300 })
+      this.cues!.ring(r.x, r.y, r.radius, { color: 0xff5252, fillAlpha: 0.35, lineWidth: 3, lineAlpha: 0.9, durMs: 300 })
     }
     q.length = 0
   }
@@ -554,12 +558,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const q = this.sim!.pendingCues
     if (q.length === 0) return
     for (const c of q) {
-      if (c.kind === 'circle') circleCue(this, c.x, c.y, c.radius, c.o)
-      else if (c.kind === 'boom') boomCue(this, c.x, c.y, c.size)
-      else if (c.kind === 'lightning') lightningCue(this, c.points, c.color)
-      else if (c.kind === 'slash') slashCue(this, c.x, c.y, c.angle, c.radius)
-      else if (c.kind === 'beam') beamCue(this, c.x, c.y, c.angle, c.length, c.radius, c.color)
-      else screenFlashCue(this, c.color, c.alpha, c.durationMs)
+      const fx = this.cues!
+      if (c.kind === 'circle') fx.circle(c.x, c.y, c.radius, c.o)
+      else if (c.kind === 'boom') fx.boom(c.x, c.y, c.size)
+      else if (c.kind === 'lightning') fx.lightning(c.points, c.color)
+      else if (c.kind === 'slash') fx.slash(c.x, c.y, c.angle, c.radius)
+      else if (c.kind === 'beam') fx.beam(c.x, c.y, c.angle, c.length, c.radius, c.color)
+      else fx.screenFlash(c.color, c.alpha, c.durationMs)
     }
     q.length = 0
   }
@@ -1345,6 +1350,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 旧实现只 physics.pause(),这两样是 tween 驱动的,不受冻结影响
     if (this.ending) {
       stepFrozenVisuals(sim, delta)
+      this.cues?.step(sim.fxMs)
       return
     }
     // 波次时间到 → 结算 + 过场(测试模式无尽,便于性能观测)。用上一帧 elapsedMs 判定(晚 1 帧无碍)
@@ -1412,6 +1418,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 排空本帧视觉事件:须先于下面的过场判定——否则致死那一帧的死亡爆点/飘字会被 return 吞掉
     this.drainDamageNumbers()
     this.drainBursts()
+    this.cues?.step(sim.fxMs)
     this.drainRings()
     this.drainCues()
     this.drawAuraRings()
