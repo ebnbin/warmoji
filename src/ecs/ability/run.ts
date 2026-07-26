@@ -33,7 +33,7 @@ import type { Sim } from '../sim'
 export interface Step {
   /** 依赖引用用的名字 */
   readonly name: string
-  run(sim: Sim, dt: number): void
+  run(sim: Sim): void
   /** 必须排在这些步之后；省略即无约束 */
   readonly after?: readonly string[]
   /** 为什么——写不出理由的依赖多半是想出来的 */
@@ -47,7 +47,7 @@ function clearFrameRegisters(sim: Sim): void {
 }
 
 /** 逐 kind 的施放系统：彼此独立，只共同要求排在冷却推进之后 */
-const CASTERS: readonly { name: string; run: (sim: Sim, dt: number) => void }[] = [
+const CASTERS: readonly { name: string; run: (sim: Sim) => void }[] = [
   { name: 'rally', run: castRallies },
   { name: 'dance', run: castDances },
   { name: 'buff', run: castBuffs },
@@ -107,6 +107,6 @@ export const PIPELINE: readonly Step[] = [
   })),
 ]
 
-export function stepAbilities(sim: Sim, dt: number): void {
-  for (const step of PIPELINE) step.run(sim, dt)
+export function stepAbilities(sim: Sim): void {
+  for (const step of PIPELINE) step.run(sim)
 }

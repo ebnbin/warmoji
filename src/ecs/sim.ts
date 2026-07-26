@@ -85,6 +85,12 @@ export interface Sim {
   /** 纯视觉时钟(真实帧长累加):碎片飞散/金币弹入等在旧实现里是 tween 驱动的,
    * 既不吃时停时标,也不随波末过场冻结 */
   fxMs: number
+  /** 本帧长度,帧起点写死一次。**system 一律从这里读,不再由调用方喂**——
+   * 于是每个 system 的签名都是 (sim) => void,次序才可能被当数据编排。
+   * dtMs = 真实帧长(玩家走位/呼吸/编队/纯视觉);
+   * wdtMs = 世界时长(敌人/弹体/刷怪/攻速),时停期比 dtMs 慢 */
+  dtMs: number
+  wdtMs: number
   /** 本帧威胁点(敌人位置) */
   frameTargets: Point[]
   /** 全队阵亡(游戏结束标记;失败结算) */
@@ -229,7 +235,8 @@ export interface PendingDeath {
 }
 
 /** 队伍活感·探测与轨道(镜像 updateOrbit):逐员判定探测范围内有无敌人 + 环上主力驱动共享相位 */
-function updateOrbit(sim: Sim, delta: number): void {
+function updateOrbit(sim: Sim): void {
+  const delta = sim.dtMs
   const { count, formation } = sim
   if (sim.members.length === 0) return
   const range = ORBIT.detectRange * UNIT
@@ -269,7 +276,8 @@ function updateOrbit(sim: Sim, delta: number): void {
 }
 
 /** 队伍位移 + 布局(镜像 moveTeam→layoutTeam);落点交给世界钩子(有界钳制/冰面动量) */
-function moveTeam(sim: Sim, delta: number): void {
+function moveTeam(sim: Sim): void {
+  const delta = sim.dtMs
   const dir = sim.teamDir
   const step = (MoveSpeed.v[sim.captain]! * sim.battleFx.moveSpeedMul * delta) / 1000
   const drift = sim.hooks.teamDrift(sim, delta)
@@ -384,6 +392,11 @@ export function refoldBattleFx(sim: Sim): void {
   sim.battleFx = live.length === 0 ? { ...BATTLE_FX_IDENTITY } : foldBattleEffects(live.map((m) => m.fx))
 }
 
+/** 队长技能的限时全队增伤到期复原 */
+export function expireSkillBuff(sim: Sim): void {
+  if (sim.skillDamageMul !== 1 && sim.elapsedMs >= sim.skillBuffUntil) sim.skillDamageMul = 1
+}
+
 /** 世界时间流速(镜像 worldTimeScale):时停窗口内随队伍移动量放缩,窗口外恒 1 */
 export function worldTimeScale(sim: Sim): number {
   return sim.timeStopMsLeft > 0 ? timeScaleFor(sim.chrono) : 1
@@ -391,54 +404,53 @@ export function worldTimeScale(sim: Sim): number {
 
 /** 波末/失败过场的冻结期:世界与战斗全停,但纯视觉照旧收尾——
  * 旧实现只 physics.pause(),碎片飞散与金币弹入是 tween,不受影响 */
-export function stepFrozenVisuals(sim: Sim, delta: number): void {
-  sim.fxMs += delta
-  updateShards(sim, delta)
+export function stepFrozenVisuals(sim: Sim): void {
+  sim.fxMs += sim.dtMs
+  updateShards(sim)
   stepPickupVisuals(sim)
 }
 
 /** 一帧仿真。delta = 真实帧长(玩家走位/呼吸/编队用),wdelta = 世界时长(敌人/弹体/刷怪用)。
  * 时停即「世界侧 wdelta 变慢而玩家侧 delta 照常」,故两者分开传(镜像旧 update 的 delta/wdelta) */
-export function stepSim(sim: Sim, delta: number, wdelta: number = delta): void {
+export function stepSim(sim: Sim): void {
   // 世界钟按世界时长推进:波次计时/复活/无敌帧/毒跳等一并随时停放慢(与旧一致)
-  sim.elapsedMs += wdelta
-  sim.fxMs += delta // 纯视觉时钟走真实帧长
-  if (sim.timeStopMsLeft > 0) sim.timeStopMsLeft = Math.max(0, sim.timeStopMsLeft - wdelta)
+  sim.elapsedMs += sim.wdtMs
+  sim.fxMs += sim.dtMs // 纯视觉时钟走真实帧长
+  if (sim.timeStopMsLeft > 0) sim.timeStopMsLeft = Math.max(0, sim.timeStopMsLeft - sim.wdtMs)
   // 移动量低通平滑走实时 delta:moveTeam 会写 moveInputRaw,供下一帧 worldTimeScale 读
-  sim.chrono += (sim.moveInputRaw - sim.chrono) * Math.min(1, delta / TIMESTOP.easeMs)
+  sim.chrono += (sim.moveInputRaw - sim.chrono) * Math.min(1, sim.dtMs / TIMESTOP.easeMs)
   // 限时战斗层:剔除到期项后重折(乘区实时,先于移动/攻击/敌速消费,镜像 refoldBattleFx)
   refoldBattleFx(sim)
-  // 队长技能的限时增伤到期复原(镜像 update 里的 skillBuffUntil 判定)
-  if (sim.skillDamageMul !== 1 && sim.elapsedMs >= sim.skillBuffUntil) sim.skillDamageMul = 1
+  expireSkillBuff(sim)
   // 休眠维护(无限世界:远离队伍的敌人冻结)——先于一切读敌人的系统
   updateDormancy(sim)
   // 敌人位置汇入 frameTargets(队伍 orbit/游移门控据此),先于 orbit
   updateFrameTargets(sim)
-  updateOrbit(sim, delta)
-  moveTeam(sim, delta)
+  updateOrbit(sim)
+  moveTeam(sim)
   reviveMembers(sim)
-  regenMembers(sim, wdelta)
+  regenMembers(sim)
   tickPoison(sim)
-  // 以下为世界侧:时停期整体放慢(敌人移速/弹体位移都按 wdelta 积分,无需另乘时标)。
+  // 以下为世界侧:时停期整体放慢(敌人移速/弹体位移都按 wdtMs 积分,无需另乘时标)。
   // 敌人一帧走这条流水线,每一步都是单一职责的独立系统,次序即语义
   popInEnemies(sim)
   despawnExpired(sim)
   fadeEnemyFlash(sim)
   applySlowZones(sim)
   tintEnemies(sim)
-  steerEnemies(sim, wdelta)
-  applyKnockback(sim, wdelta, delta)
+  steerEnemies(sim)
+  applyKnockback(sim)
   commitEnemySteps(sim)
-  animateEnemies(sim, wdelta)
-  updateProjectiles(sim, wdelta)
+  animateEnemies(sim)
+  updateProjectiles(sim)
   // 接触须先于敌弹:同帧两者争同一层无敌帧时旧实现是接触先手(overlap 注册序),
   // 否则贴脸接触的伤害/黏滞/荆棘反伤会被敌弹吃掉的无敌帧一并挡下
   memberContact(sim)
-  updateEnemyProjectiles(sim, wdelta)
+  updateEnemyProjectiles(sim)
   memberVisual(sim)
-  updateShards(sim, delta)
+  updateShards(sim)
   // 世界周期结算(落水掉血等):在位移与战斗之后,读的是本帧最终位置
-  sim.hooks.tick(sim, wdelta)
+  sim.hooks.tick(sim, sim.wdtMs)
 }
 
 /** 组装本局的仿真状态。**队长实体先建**——队伍中心即它的位置，队员绕它编队，
@@ -488,6 +500,8 @@ export function makeSim(
     view: { x: 0, y: 0, right: mapW, bottom: mapH },
     elapsedMs: 0,
     fxMs: 0,
+    dtMs: 0,
+    wdtMs: 0,
     frameTargets: [],
     over: false,
     bossDown: false,

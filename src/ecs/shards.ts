@@ -6,7 +6,8 @@ import type { Sim } from './sim'
 // 生成在 entities/shard.ts。
 
 /** 逐帧推进碎片:匀速飞散(落点过世界钩子)+ 线性缩小/旋转/淡出,到时回收 */
-export function updateShards(sim: Sim, delta: number): void {
+export function updateShards(sim: Sim): void {
+  const delta = sim.dtMs
   const eids = query(sim.world, SHARD_SET as unknown as object[])
   if (eids.length === 0) return
   const dt = delta / 1000

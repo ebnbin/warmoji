@@ -16,7 +16,6 @@ import { backEaseOut } from './ease'
 import { spawnBrood } from './entities/enemy'
 import type { Sim } from './sim'
 import type { BaseOrbitLocomotion, DashLength, DashLocomotion, DetonateLocomotion, LocomotionDef, StandoffLocomotion, DashTrigger } from '../types/enemies'
-import type { FrameIndex } from './frames'
 import type { Point } from '../util/vec'
 
 // 敌人:装配 + 转向(locomotion 状态机 + 击退 + 世界钩子后处理)。
@@ -351,7 +350,8 @@ function broodCount(sim: Sim, nestEid: number): number {
   return n
 }
 
-export function updateSpawners(sim: Sim, atlas: FrameIndex): void {
+export function updateSpawners(sim: Sim): void {
+  const atlas = sim.frames
   if (sim.over) return
   const now = sim.elapsedMs
   const eids = query(sim.world, ENEMY_SET as unknown as object[])
@@ -493,7 +493,8 @@ export function tintEnemies(sim: Sim): void {
 
 /** 敌人转向:按 locomotion 求本帧「行为速度」(px/s)→ 过世界钩子(冰面打滑/河流漂移)
  * → 写进 Step。delta = 世界时长(吃时停) */
-export function steerEnemies(sim: Sim, delta: number): void {
+export function steerEnemies(sim: Sim): void {
+  const delta = sim.wdtMs
   const dt = delta / 1000
   const now = sim.elapsedMs
   const dancing = now < sim.danceEndsAt
@@ -539,7 +540,9 @@ export function steerEnemies(sim: Sim, delta: number): void {
 /** 击退:冲量叠进本帧位移后指数衰减(镜像 decayKnockback)。
  * realDelta = 真实帧长——旧实现把冲量写进 Arcade body 由物理按真实帧长积分,
  * 故时停期「打谁谁飞」照旧成立 */
-export function applyKnockback(sim: Sim, delta: number, realDelta = delta): void {
+export function applyKnockback(sim: Sim): void {
+  const delta = sim.wdtMs
+  const realDelta = sim.dtMs
   const kdt = realDelta / 1000
   const decay = Math.exp(-delta / (KNOCKBACK.tauMs * sim.hooks.knockbackTauMul(sim)))
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
@@ -575,7 +578,8 @@ export function commitEnemySteps(sim: Sim): void {
 /** 行走动画:环境摇摆(轻微旋转)+ 按移动方向翻转(twemoji 默认朝左)。
  * 蓄力/冲刺(EState 2/3)、蹦迪与变形由各自状态机/形象自管,此处不覆盖。
  * 翻转读「含击退」的本帧位移(被击飞时会朝击退方向转身),且读的是禁锢之前的那一份 */
-export function animateEnemies(sim: Sim, delta: number): void {
+export function animateEnemies(sim: Sim): void {
+  const delta = sim.wdtMs
   const now = sim.elapsedMs
   const dancing = now < sim.danceEndsAt
   if (dancing) return

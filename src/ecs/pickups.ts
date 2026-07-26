@@ -152,7 +152,8 @@ function applyBattleMod(sim: Sim, def: FieldPickupDef): void {
 }
 
 /** 逐帧:磁吸 → 拾取 → 到期回收,外加入场弹出与待拾缓浮 */
-export function updatePickups(sim: Sim, delta: number): void {
+export function updatePickups(sim: Sim): void {
+  const delta = sim.dtMs
   const eids = query(sim.world, PICKUP_SET as unknown as object[])
   if (eids.length === 0) return
   const dt = delta / 1000

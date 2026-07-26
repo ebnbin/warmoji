@@ -15,7 +15,8 @@ import type { Sim } from '../../sim'
 
 /** 远程范围轰炸：在侦测范围内以最近敌人为爆心，对爆心圆内所有敌人各一次伤害。
  * echo 连锁：主炸后延迟一段向索敌上限内的随机敌人再补一发折损轰炸 */
-export function castAreaBlasts(sim: Sim, dt: number): void {
+export function castAreaBlasts(sim: Sim): void {
+  const dt = sim.wdtMs
   tickEchoes(sim, dt)
   castScan<AreaBlastDef>(sim, KindAreaBlast, (e, def) => {
     const src = sourceOf(sim, e)

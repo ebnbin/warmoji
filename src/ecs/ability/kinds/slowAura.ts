@@ -16,7 +16,8 @@ const TICK_MS = 500
  * 减速区本身是一个**跟着持有者走的区域实体**（entities/zone.ts），建一次就一直在：
  * 开关随本武器的出手闸门（持有者倒下当场熄，复活自然回来），武器没了它一并回收。
  * dps 光环内持续掉血、freeze 周期脉冲冻结，两条节拍各自走 Pulse，不占冷却 */
-export function castSlowAuras(sim: Sim, dt: number): void {
+export function castSlowAuras(sim: Sim): void {
+  const dt = sim.wdtMs
   castScan<SlowAuraDef>(sim, KindSlowAura, (e, def) => {
     const src = sourceOf(sim, e)
     const x = ownerX(e)

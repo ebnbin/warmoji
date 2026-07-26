@@ -25,7 +25,8 @@ function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, b
 }
 
 /** 逐帧推进抛射物 + 线段扫掠命中 + 出界回收 */
-export function updateProjectiles(sim: Sim, delta: number): void {
+export function updateProjectiles(sim: Sim): void {
+  const delta = sim.wdtMs
   const projs = query(sim.world, PROJ_SET as unknown as object[])
   if (projs.length === 0) return
   const dt = delta / 1000
@@ -124,7 +125,8 @@ function cull(sim: Sim, eid: number): void {
 
 // ── 敌弹(P3e):物理 overlap 命中队员 + 按寿命/出界回收(镜像 spawnEnemyProjectile)──
 
-export function updateEnemyProjectiles(sim: Sim, delta: number): void {
+export function updateEnemyProjectiles(sim: Sim): void {
+  const delta = sim.wdtMs
   const shots = query(sim.world, EPROJ_SET as unknown as object[])
   if (shots.length === 0) return
   const dt = delta / 1000

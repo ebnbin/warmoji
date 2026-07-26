@@ -311,7 +311,8 @@ export function reviveMembers(sim: Sim): void {
 }
 
 /** 再生戒指:持续回复(hp 允许小数,展示与快照处各自取整;时停期随世界冻结) */
-export function regenMembers(sim: Sim, wdelta: number): void {
+export function regenMembers(sim: Sim): void {
+  const wdelta = sim.wdtMs
   for (const m of sim.members) {
     if (!Alive.v[m] || MPerk.regenPerSec[m]! <= 0) continue
     if (MHp.hp[m]! >= MHp.max[m]!) continue

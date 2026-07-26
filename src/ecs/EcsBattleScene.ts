@@ -1327,10 +1327,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   update(_time: number, delta: number): void {
     const sim = this.sim
     if (!this.ready || !sim) return
+    // 本帧两个时长写死在帧起点:此后所有 system 都是 (sim) => void,自己从 sim 读。
+    // 世界时长在时停窗口内随队伍移动量放缩(动则时行、静则近乎凝固),窗口外恒等于真实帧长
+    sim.dtMs = delta
+    sim.wdtMs = delta * worldTimeScale(sim)
     // 过场冻结期(波末横幅/失败结算):世界与战斗全停,但碎片飞散与金币弹入照旧收尾——
     // 旧实现只 physics.pause(),这两样是 tween 驱动的,不受冻结影响
     if (this.ending) {
-      stepFrozenVisuals(sim, delta)
+      stepFrozenVisuals(sim)
       this.cues?.step(sim.fxMs)
       this.rings?.step(sim.fxMs)
       this.damageText?.step(sim.fxMs)
@@ -1358,9 +1362,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     sim.teamDir = keyed ? norm(kx, ky) : stick
     sim.moveInputRaw = keyed ? 1 : Math.min(1, Math.hypot(stick.x, stick.y))
 
-    // 世界时长:时停窗口内随队伍移动量放缩(动则时行、静则近乎凝固),窗口外恒等于真实帧长。
-    // 玩家走位/呼吸/技能 CD 用实时 delta,世界侧(敌人/弹体/刷怪/攻速)一律用 wdelta
-    const wdelta = delta * worldTimeScale(sim)
     // 相机视口回填(纯逻辑侧的子弹回收按视野判定,镜像 cullProjectiles)
     const wv = this.cameras.main.worldView
     sim.view.x = wv.x
@@ -1369,26 +1370,26 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     sim.view.bottom = wv.bottom
     // 索敌快照先行重建:stepSim 内的抛射物 onHit 效果链要用本帧位置
     refreshEnemyTargets(sim)
-    stepSim(sim, delta, wdelta)
+    stepSim(sim)
     // 队员快照重建:敌方能力索敌读它,须先于任何敌方出手
     refreshMemberTargets(sim)
     // 新登场的持械敌人装配 + 魔尘复形
     armEnemies(sim)
     // 能力系统(敌我共用一套:闸门 → 冷却 → 逐 kind 施放;世界时长,时停期队伍的枪也一并凝住)
-    stepAbilities(sim, wdelta)
+    stepAbilities(sim)
     // 部件动画:把时钟翻算成帧下标(帧惰性烘焙,未就绪保持静态帧)
-    if (this.atlas) updateAnims(sim, this.atlas)
+    updateAnims(sim)
     // 亡语重放(分裂/诱饵/治疗/冷枪:本帧内所有死亡的敌人在死亡点触发)
     runDeathEffects(sim)
     // 区域(地面毒圈/灼烧区 + 寒气光环):跟位/开关/到期,再 team 脉冲烧敌 / enemy 节流烧队员
     updateZones(sim)
     // 拾取物(金币 / 战场增减益同一条):磁吸 → 到手 → 到期淡出
-    updatePickups(sim, delta)
+    updatePickups(sim)
     this.drainCollects()
     // 虫巢周期生成子敌(护巢子敌绕巢;拆巢暴走)
-    if (this.atlas) updateSpawners(sim, this.atlas)
+    updateSpawners(sim)
     // 刷怪节奏
-    if (this.atlas) spawnStep(sim, this.atlas, wdelta)
+    spawnStep(sim)
     this.updateTelegraphs()
     // 排空本帧视觉事件:须先于下面的过场判定——否则致死那一帧的死亡爆点/飘字会被 return 吞掉
     // 两个特效层先步进再排空：step 顺带把「本帧视觉钟」写进去，投放据此定起点。

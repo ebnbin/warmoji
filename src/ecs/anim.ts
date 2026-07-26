@@ -39,7 +39,8 @@ export function playClip(sim: Sim, atlas: FrameIndex, eid: number, clipId: strin
 }
 
 /** 逐帧:把时钟翻算成帧下标写进 Sprite.frame(一次性 clip 优先,播完回落 idle) */
-export function updateAnims(sim: Sim, atlas: FrameIndex): void {
+export function updateAnims(sim: Sim): void {
+  const atlas = sim.frames
   const now = sim.elapsedMs
   for (const eid of query(sim.world, ANIM_SET as unknown as object[])) {
     if (Anim.frames[eid]! < 0) continue // 停帧哨兵(阵亡尸体):保持死亡那一帧,不再翻帧

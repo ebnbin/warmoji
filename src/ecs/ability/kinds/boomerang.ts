@@ -20,7 +20,8 @@ import type { Sim } from '../../sim'
 // 双子镖是一枚临时副本（不是武器），全靠 Flyer.of 认亲。
 
 /** 每帧：推进在途的镖 + 摆位闲置的持有物 */
-export function castBoomerangs(sim: Sim, dt: number): void {
+export function castBoomerangs(sim: Sim): void {
+  const dt = sim.wdtMs
   updateFlyers(sim, dt)
   placeIdleBoomerangs(sim)
   castScan<BoomerangDef>(sim, KindBoomerang, (e, def) => {

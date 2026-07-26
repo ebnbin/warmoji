@@ -14,7 +14,6 @@ import { enemyCarries } from './store'
 import { attachCarrierRing } from './pickups'
 import type { Sim } from './sim'
 import type { FieldPickupDef } from '../types/battlefield'
-import type { EcsAtlas } from './render/atlas'
 import { enemyMixAt, pickEnemy } from '../war/enemyAi'
 
 // 刷怪节奏(常规波次制):随跨波累计战斗时长递增难度,供给随在场人数缩放,Boss 波减压;
@@ -138,7 +137,9 @@ function spawnTest(sim: Sim): void {
 }
 
 /** 每帧:预告落地 + 刷怪冷却推进(镜像 spawn) */
-export function spawnStep(sim: Sim, atlas: EcsAtlas, delta: number): void {
+export function spawnStep(sim: Sim): void {
+  const atlas = sim.frames
+  const delta = sim.wdtMs
   const now = sim.elapsedMs
   // 敌潮排期到点:此刻才求落点/出怪表并挂预告(镜像 spawnSurge 的 delayedCall)
   if (sim.pendingSurges.length > 0) {
