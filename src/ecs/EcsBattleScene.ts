@@ -673,7 +673,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     combatSec: number
     spawnIntervalMs: number
     hpMultiplier: number
-    atlasPages?: number
   } {
     const sim = this.sim
     const totalSec = (this.run.combatMs + (sim?.elapsedMs ?? 0)) / 1000
@@ -688,7 +687,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       combatSec: Math.floor(totalSec),
       spawnIntervalMs: Math.round(this.testMode ? densityParams().intervalMs : wave.spawnIntervalMs),
       hpMultiplier: wave.hpMultiplier,
-      atlasPages: this.atlas?.pageCount,
     }
   }
 
