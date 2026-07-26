@@ -6,7 +6,7 @@ import { thrustHitIndices } from '../../../war/hit'
 import { Tint, Transform, VisOff } from '../../components'
 import { sineEaseOut } from '../../ease'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, Followup, Frozen, Gear, Owner, Swing } from '../../components'
+import { Ability, AbilityRef, Aim, Followup, Frozen, Owner, Swing } from '../../components'
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects } from '../effects'
 import { sourceOf } from '../source'
@@ -18,7 +18,7 @@ import type { Sim } from '../../sim'
 /** 突刺：held 时持有物挥出收回，无 held 时角色本体前冲收回；胶囊判定内每敌一次伤害。
  * combo 二连突：主刺后隔一段重新索敌再刺一段（不吃冷却）；onHit 施加在突刺终点 */
 export function castThrusts(sim: Sim, dt: number): void {
-  placeThrustGear(sim)
+  placeThrustBody(sim)
   tickCombos(sim, dt)
   castScan<ThrustDef>(sim, KindThrust, (e, def) => {
     if (Followup.left[e]! > 0) return false // 二连突在途：本轮不另起
@@ -71,8 +71,8 @@ function strike(sim: Sim, e: number, def: ThrustDef): void {
 }
 
 /** 摆位：持有物沿瞄准方向挥出收回；无持有物则改推角色本体的视觉偏移 */
-function placeThrustGear(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindThrust, Gear, Aim, Swing])) {
+function placeThrustBody(sim: Sim): void {
+  for (const e of query(sim.world, [Ability, KindThrust, Aim, Swing])) {
     const def = abilityDefAt(AbilityRef.def[e]!) as ThrustDef
     const frozen = Frozen.v[e] === 1
     if (frozen) {
@@ -81,9 +81,9 @@ function placeThrustGear(sim: Sim): void {
       Followup.left[e] = 0
     }
     const t = frozen ? 0 : lungeT(sim, e, def.thrustMs)
-    const g = Gear.eid[e]!
-    if (g !== 0) {
-      const held = def.held!
+    const g = e
+    if (def.held) {
+      const held = def.held
       const aim = Aim.rad[e]!
       const dist = held.restOffset + t * (def.reach - held.restOffset)
       Transform.x[g] = ownerX(e) + Math.cos(aim) * dist

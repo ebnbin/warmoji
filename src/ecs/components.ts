@@ -253,6 +253,13 @@ export const RING_SET = [Ring, Transform, Tint] as const
 /** 能力实体标记 */
 export const Ability = {}
 
+/** 武器实体标记：**一件武器就是一颗实体**，能力是它身上的组件。
+ * 有外形的（def.held）自带 Transform/Sprite，就是握在手里的那个 emoji；
+ * 徒手能力是同一种实体，只是没有身体。牛仔的左右枪 = 两颗，各自独立冷却。
+ * 生成在 entities/weapon.ts。Ability 与 Weapon 分开是因为召唤物（炮台）
+ * 也带 Ability 但不是武器 */
+export const Weapon = {}
+
 /** 指回只读定义表的下标（defs.ts）：组件只存数值，嵌套的 def 本体不进组件 */
 export const AbilityRef = { def: i32() }
 
@@ -289,7 +296,6 @@ export const Swing = { startMs: f32(), durMs: f32() }
 
 /** 持有物：这条能力的视觉子实体 eid（0 = 无本体持有物，行为主体是角色自己）。
  * 子实体自带 Transform/Sprite/Tint/Depth，随批绘一起画，不是游离的 GameObject */
-export const Gear = { eid: i32() }
 
 /** 光环的两个自走节拍：dps 跳伤与冻结脉冲各自倒计时。
  * 光环没有冷却概念（每帧都要重新登记减速区），故不能借 Cooldown 当计时器 */
@@ -331,8 +337,10 @@ export const Shots = { n: i32() }
 export const Radial = { left: i32(), nextAt: f32(), angle: f32() }
 
 /** 在途回旋镖：phase 0=去程（沿 launch→dest 缓动）1=回程（追持有者实时位置）。
- * Owner.eid 指回发出它的能力实体；已命中集在 store 的 flyerHits */
+ * of = 掷出它的武器实体——主镖就是武器自己（of 指向自身），双子镖是临时副本。
+ * 已命中集在 store 的 flyerHits */
 export const Flyer = {
+  of: i32(),
   phase: u8(),
   launchX: f32(),
   launchY: f32(),
@@ -342,7 +350,7 @@ export const Flyer = {
   damage: f32(),
 }
 
-/** 召唤 / 架设出来的子实体：Owner.eid 指回发出它的能力实体。
+/** 召唤 / 架设出来的子实体：Owner.eid 指回召唤它的武器实体。
  * bornMs 出生时刻（入场弹入 + 拆最旧时比岁数）、dieAt 消散时刻（0=不按时限）、
  * cd 自身行为冷却、phase 候敌打转的相位、size 本体尺寸（弹入插值的终值） */
 export const Minion = { bornMs: f32(), dieAt: f32(), cd: f32(), phase: f32(), size: f32() }

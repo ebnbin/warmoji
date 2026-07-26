@@ -6,7 +6,7 @@ import { Sprite, Tint, Transform } from '../../components'
 import { attachDrawable } from '../../drawable'
 import { flyerHits } from '../../store'
 import { cooldownMul, damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, Cooldown, FACTION, Faction, Flyer, Frozen, Gear, Owner } from '../../components'
+import { Ability, AbilityRef, Aim, Cooldown, FACTION, Faction, Flyer, Frozen } from '../../components'
 import { abilityDefAt } from '../defs'
 import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
@@ -16,12 +16,13 @@ import type { Sim } from '../../sim'
 
 // 回旋镖：出手瞬间锁定最远点，去程飞向该点、回程追踪持有者实时位置；途中碰到的敌人
 // 受伤（去程/回程各判一次）。全部接住后才开始计冷却。
-// 主镖就是持有物实体本身——飞行期给它挂上 Flyer，接住即摘掉，回落成持有物姿态。
+// 主镖就是武器实体本身——飞行期给它挂上 Flyer，接住即摘掉，回落成握持姿态；
+// 双子镖是一枚临时副本（不是武器），全靠 Flyer.of 认亲。
 
 /** 每帧：推进在途的镖 + 摆位闲置的持有物 */
 export function castBoomerangs(sim: Sim, dt: number): void {
   updateFlyers(sim, dt)
-  placeBoomerangGear(sim)
+  placeIdleBoomerangs(sim)
   castScan<BoomerangDef>(sim, KindBoomerang, (e, def) => {
     if (airborne(sim, e) > 0) return false // 还没接住：不另起，也不消耗冷却
     const aim = nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, sourceOf(sim, e)))
@@ -32,10 +33,10 @@ export function castBoomerangs(sim: Sim, dt: number): void {
   })
 }
 
-/** 在途镖数 */
+/** 在途镖数（主镖自己 + 它的双子） */
 function airborne(sim: Sim, e: number): number {
   let n = 0
-  for (const f of query(sim.world, [Flyer, Owner])) if (Owner.eid[f] === e) n++
+  for (const f of query(sim.world, [Flyer])) if (Flyer.of[f] === e) n++
   return n
 }
 
@@ -48,8 +49,9 @@ function launch(sim: Sim, e: number, def: BoomerangDef, aim: number): void {
   const count = def.twin ? 2 : 1
   for (let i = 0; i < count; i++) {
     const angle = aim + i * Math.PI
-    const f = i === 0 ? Gear.eid[e]! : spawnTwin(sim, e, def)
+    const f = i === 0 ? e : spawnTwin(sim, e, def) // 主镖就是武器自己
     addComponent(sim.world, f, Flyer)
+    Flyer.of[f] = e
     Flyer.phase[f] = 0
     Flyer.t[f] = 0
     Flyer.launchX[f] = ox
@@ -66,27 +68,24 @@ function launch(sim: Sim, e: number, def: BoomerangDef, aim: number): void {
 
 /** 双子镖：只在飞行中存在的第二枚 */
 function spawnTwin(sim: Sim, e: number, def: BoomerangDef): number {
-  const g = Gear.eid[e]!
   const t = addEntity(sim.world)
   attachDrawable(sim.world, t, sim.frames, {
     id: def.held.emoji,
     outline: Faction.v[e] === FACTION.enemy ? 'enemy' : 'player',
-    x: Transform.x[g]!,
-    y: Transform.y[g]!,
+    x: Transform.x[e]!,
+    y: Transform.y[e]!,
     size: def.held.size,
     z: 13,
   })
-  Sprite.frame[t] = Sprite.frame[g]! // 与主镖同一变体（描边随持有者）
-  addComponent(sim.world, t, Owner)
-  Owner.eid[t] = e
+  Sprite.frame[t] = Sprite.frame[e]! // 与主镖同一变体（描边随持有者）
   return t
 }
 
 /** 推进：自旋 + 去程缓动 / 回程追人 + 途中判伤 + 磁力吸币 */
 function updateFlyers(sim: Sim, dt: number): void {
-  for (const f of [...query(sim.world, [Flyer, Owner, Transform])]) {
+  for (const f of [...query(sim.world, [Flyer, Transform])]) {
     if (!hasComponent(sim.world, f, Flyer)) continue // 另一枚命中时连带回收了它
-    const e = Owner.eid[f]!
+    const e = Flyer.of[f]!
     const def = abilityDefAt(AbilityRef.def[e]!) as BoomerangDef
     if (Frozen.v[e]) {
       // 持有者倒下：在途的镖一并作废，冷却按裸值重置
@@ -135,23 +134,22 @@ function updateFlyers(sim: Sim, dt: number): void {
   }
 }
 
-/** 收镖：主镖摘掉 Flyer 回落成持有物，双子镖直接离场 */
+/** 收镖：主镖（= 武器本身）摘掉 Flyer 回落成握持姿态，双子镖直接离场 */
 function catchFlyer(sim: Sim, e: number, f: number): void {
   flyerHits[f] = undefined
-  if (f === Gear.eid[e]) removeComponent(sim.world, f, Flyer)
+  if (f === e) removeComponent(sim.world, f, Flyer)
   else removeEntity(sim.world, f)
 }
 
-/** 摆位：闲置的主镖当持有物挂在角色身上 */
-function placeBoomerangGear(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindBoomerang, Gear, Aim])) {
-    const g = Gear.eid[e]!
-    if (g === 0 || hasComponent(sim.world, g, Flyer)) continue
+/** 摆位：不在途的镖握在角色手上 */
+function placeIdleBoomerangs(sim: Sim): void {
+  for (const e of query(sim.world, [Ability, KindBoomerang, Aim, Transform])) {
+    if (hasComponent(sim.world, e, Flyer)) continue
     const held = (abilityDefAt(AbilityRef.def[e]!) as BoomerangDef).held
     const aim = Aim.rad[e]!
-    Transform.x[g] = ownerX(e) + Math.cos(aim) * held.restOffset
-    Transform.y[g] = ownerY(e) + Math.sin(aim) * held.restOffset
-    Transform.rot[g] = aim + held.rotationOffsetDeg * DEG2RAD
-    Tint.alpha[g] = Frozen.v[e] ? 0 : 1
+    Transform.x[e] = ownerX(e) + Math.cos(aim) * held.restOffset
+    Transform.y[e] = ownerY(e) + Math.sin(aim) * held.restOffset
+    Transform.rot[e] = aim + held.rotationOffsetDeg * DEG2RAD
+    Tint.alpha[e] = Frozen.v[e] ? 0 : 1
   }
 }

@@ -5,7 +5,7 @@ import { playSfx } from '../../../audio/sfx'
 import { thrustHitIndices } from '../../../war/hit'
 import { Tint, Transform } from '../../components'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, Frozen, Gear, Radial } from '../../components'
+import { Ability, AbilityRef, Aim, Frozen, Radial } from '../../components'
 import { abilityDefAt } from '../defs'
 import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
@@ -16,7 +16,7 @@ import type { Sim } from '../../sim'
 /** 贯穿激光：向最近敌人发射光束，线段胶囊判定打穿直线上所有敌人。
  * backBeam 正后方补一道；radial 出手改为绕一周的多向序列扫射（取代常规单束） */
 export function castLasers(sim: Sim): void {
-  placeLaserGear(sim)
+  placeLaserBody(sim)
   fireRadials(sim)
   castScan<LaserDef>(sim, KindLaser, (e, def) => {
     if (Radial.left[e]! > 0) return false // 扫射在途：本轮不另起
@@ -79,16 +79,14 @@ function fireBeam(sim: Sim, e: number, def: LaserDef, angle: number, ratio: numb
   })
 }
 
-/** 摆位：持有物定身指向瞄准方向 */
-function placeLaserGear(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindLaser, Gear, Aim])) {
-    const g = Gear.eid[e]!
-    if (g === 0) continue
+/** 摆位：武器自身定身指向瞄准方向 */
+function placeLaserBody(sim: Sim): void {
+  for (const e of query(sim.world, [Ability, KindLaser, Aim, Transform])) {
     const held = (abilityDefAt(AbilityRef.def[e]!) as LaserDef).held
     const aim = Aim.rad[e]!
-    Transform.x[g] = ownerX(e) + Math.cos(aim) * held.restOffset
-    Transform.y[g] = ownerY(e) + Math.sin(aim) * held.restOffset
-    Transform.rot[g] = aim + held.rotationOffsetDeg * DEG2RAD
-    Tint.alpha[g] = Frozen.v[e] ? 0 : 1
+    Transform.x[e] = ownerX(e) + Math.cos(aim) * held.restOffset
+    Transform.y[e] = ownerY(e) + Math.sin(aim) * held.restOffset
+    Transform.rot[e] = aim + held.rotationOffsetDeg * DEG2RAD
+    Tint.alpha[e] = Frozen.v[e] ? 0 : 1
   }
 }

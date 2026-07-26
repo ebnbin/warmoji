@@ -6,7 +6,7 @@ import { EnemyVel, Tint, Transform } from '../../components'
 import { spawnEnemyProjectileEcs, spawnProjectileEcs } from '../../entities/projectile'
 import { enemyDef } from '../../store'
 import { attributionSlot, damageMul, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, FACTION, Faction, Frozen, Gear, Owner, Shots } from '../../components'
+import { Ability, AbilityRef, Aim, FACTION, Faction, Frozen, Owner, Shots } from '../../components'
 import { abilityDefAt } from '../defs'
 import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
@@ -21,7 +21,7 @@ const BULLET_LIFE_MS = 3000
  * 瞄准 nearest 最近目标 / move 持有者移动方向（无需目标）；整圈齐射也无需目标。
  * volley 恒定齐射（≥360° 为整圈，可随机整体旋转）；everyN 每第 n 次改打一轮特殊齐射 */
 export function castProjectiles(sim: Sim): void {
-  placeProjectileGear(sim)
+  placeProjectileBody(sim)
   castScan<ProjectileDef>(sim, KindProjectile, (e, def) => {
     const fullRing = def.volley !== undefined && def.volley.spreadDeg >= 360 - 1e-9
     if (def.aim === 'move') {
@@ -102,10 +102,9 @@ function shoot(sim: Sim, e: number, def: ProjectileDef, x: number, y: number, an
 }
 
 /** 摆位：持有物定身指向瞄准方向（含左右手挂载位） */
-function placeProjectileGear(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindProjectile, Gear, Aim])) {
-    const g = Gear.eid[e]!
-    if (g === 0) continue
+function placeProjectileBody(sim: Sim): void {
+  for (const e of query(sim.world, [Ability, KindProjectile, Aim, Transform])) {
+    const g = e
     const def = abilityDefAt(AbilityRef.def[e]!) as ProjectileDef
     const pos = muzzle(e, def)
     Transform.x[g] = pos.x

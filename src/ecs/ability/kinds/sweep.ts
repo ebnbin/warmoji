@@ -6,7 +6,7 @@ import { sectorHitIndices } from '../../../war/hit'
 import { Tint, Transform } from '../../components'
 import { sineEaseInOut } from '../../ease'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, Frozen, Gear, Swing } from '../../components'
+import { Ability, AbilityRef, Aim, Frozen, Swing } from '../../components'
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects } from '../effects'
 import { sourceOf } from '../source'
@@ -17,7 +17,7 @@ import type { Sim } from '../../sim'
 
 /** 横扫：持有物绕角色扫过一段圆弧，扇形判定内每敌一次伤害；onHit 逐被扫中目标施加 */
 export function castSweeps(sim: Sim): void {
-  placeSweepGear(sim)
+  placeSweepBody(sim)
   castScan<SweepDef>(sim, KindSweep, (e, def) => {
     const src = sourceOf(sim, e)
     const ox = ownerX(e)
@@ -42,9 +42,9 @@ export function castSweeps(sim: Sim): void {
 }
 
 /** 摆位：持有物在瞄准方向两侧的弧上从一端扫到另一端，静止时停在末端 */
-function placeSweepGear(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindSweep, Gear, Aim, Swing])) {
-    const g = Gear.eid[e]!
+function placeSweepBody(sim: Sim): void {
+  for (const e of query(sim.world, [Ability, KindSweep, Aim, Swing, Transform])) {
+    const g = e
     if (g === 0) continue
     const def = abilityDefAt(AbilityRef.def[e]!) as SweepDef
     const frozen = Frozen.v[e] === 1

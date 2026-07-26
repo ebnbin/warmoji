@@ -4,7 +4,7 @@ import type { AssassinateDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { Hp, Iframe, Tint, Transform, VisOff } from '../../components'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, Blink, Followup, Frozen, Gear, Owner } from '../../components'
+import { Ability, AbilityRef, Aim, Blink, Followup, Frozen, Owner } from '../../components'
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects } from '../effects'
 import { sourceOf } from '../source'
@@ -17,7 +17,7 @@ import type { Sim } from '../../sim'
 /** 瞬袭：瞬移到索敌范围内血量最高的敌人背后重斩，短暂停留（期间本体无敌）后闪回原位。
  * 位移走视觉偏移，不动阵型主权。execute 低血目标伤害翻倍；onHit 波及主目标周围 */
 export function castAssassinates(sim: Sim, dt: number): void {
-  placeAssassinGear(sim)
+  placeAssassinBody(sim)
   tickStrikeStay(sim, dt)
   castScan<AssassinateDef>(sim, KindAssassinate, (e, def) => {
     if (Followup.left[e]! > 0) return false // 停留帧内不另起
@@ -106,9 +106,9 @@ function strongestTarget(ox: number, oy: number, list: readonly Target[], maxRan
 }
 
 /** 摆位：持有物定身指向瞄准方向 */
-function placeAssassinGear(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindAssassinate, Gear, Aim])) {
-    const g = Gear.eid[e]!
+function placeAssassinBody(sim: Sim): void {
+  for (const e of query(sim.world, [Ability, KindAssassinate, Aim, Transform])) {
+    const g = e
     if (g === 0) continue
     const def = abilityDefAt(AbilityRef.def[e]!) as AssassinateDef
     const held = def.held!
