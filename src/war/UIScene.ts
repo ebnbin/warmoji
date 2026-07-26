@@ -32,7 +32,7 @@ import {
   toggleLabEnemy,
 } from '../run/lab'
 import type { LabDensity, LabLevel, LabMul } from '../run/lab'
-import { heapMB, rafHz, rendererInfo, startRafMeter, startRenderWatch } from './diagnostics'
+import { heapMB, rafHz, rendererInfo, startRafMeter } from './diagnostics'
 import { emojiCacheStats, emojiImage } from '../emoji/textures'
 import { emojiText, iconLabel } from '../ui/emojiText'
 import { ScrollView } from '../ui/scroll'
@@ -183,7 +183,6 @@ export class UIScene extends Phaser.Scene {
     if (isDevOpen()) this.createDevPanel(res)
     if (isBenchActive()) {
       startRafMeter()
-      startRenderWatch(this.game)
       attachMetrics(this.game)
       this.benchPanel = new BenchPanel(this, this.arena)
       // B 键：停止基准并回配置页（面板上有提示）
@@ -598,7 +597,6 @@ export class UIScene extends Phaser.Scene {
 
   private createDevPanel(res: number): void {
     startRafMeter()
-    startRenderWatch(this.game)
     this.fpsWindowMin = Infinity
     this.frameMaxMs = 0
     this.fpsWindowStart = 0

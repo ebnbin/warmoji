@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-import { noteFrameEnd } from './renderProbe'
 
 // 帧耗时采样器：把一帧拆成「更新」与「渲染」两段分别计时。
 //
@@ -86,9 +85,6 @@ function onPostRender(): void {
   // Phaser 的渲染器统计（Canvas 与 WebGL 字段名一致时可取；取不到留 0）
   const r = g.renderer as unknown as { drawCount?: number }
   drawCount = typeof r.drawCount === 'number' ? r.drawCount : undefined
-  // 帧边界必须每帧都划，且要在预热 return 之前：否则预热期的提交数会一直累加，
-  // 预热结束后第一帧带着一堆陈账，「本帧零提交」就永远判不出来
-  noteFrameEnd()
   if (performance.now() < warmUntil) return
   const total = g.loop.rawDelta
   const f: Frame = {

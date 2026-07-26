@@ -7,7 +7,6 @@ import { emojiCacheStats } from '../emoji/textures'
 import { metricsReport, recentFrameTimes, resetMetrics } from '../bench/metrics'
 import { benchFramework, benchProfile } from '../bench/spec'
 import { reportBench } from '../bench/probe'
-import { renderProbe } from '../bench/renderProbe'
 import type { HudHost } from './hudHost'
 
 // 基准面板：战斗内常驻的实时性能读数 + 帧时曲线。
@@ -101,7 +100,6 @@ export class BenchPanel {
       resetMetrics()
     }
     const m = metricsReport(raf)
-    const probe = renderProbe()
 
     this.title.setText(
       `${benchFramework() === 'ecs' ? 'ECS' : 'arcade'} · ${prof.label} · ${live.toLocaleString()} 实体`,
@@ -161,14 +159,6 @@ export class BenchPanel {
       '── 本档强度 ──',
       `队伍 ${prof.team} 人 · ${['基础', '一阶', '二阶'][prof.level]!} · 攻速 ×${prof.fireRate}`,
       `敌人血量 ×${prof.difficulty} · ${prof.kinds} 种 · 每批 ${prof.spawn.batch} 只`,
-      '',
-      '── 整帧丢失排查 ──',
-      // 「空帧」= 本帧场上有实体、批绘却一个四边形都没提交。
-      // 涨 → 故障在 JS 侧；恒 0 而屏幕确实闪了 → 我们提交了，问题在 GPU/合成器那一层
-      row('空帧', n(probe.blankFrames), probe.blankFrames > 0 ? `间隔 ${probe.blankGap} 帧` : '批绘零提交'),
-      row('JS 异常', n(probe.errors)),
-      row('上下文丢失', n(probe.contextLost)),
-      ...(probe.lastError === '' ? [] : [probe.lastError]),
       '',
       '── 渲染后端 ──',
       rendererInfo(this.scene.game),

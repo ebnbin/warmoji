@@ -1,24 +1,6 @@
 import Phaser from 'phaser'
-import { noteContextLost, noteError } from '../bench/renderProbe'
 
-// dev 面板的环境诊断：原生 rAF 频率计 / 渲染器信息 / JS 堆内存 / 整帧丢失的两类外因
-
-let watchStarted = false
-
-/** 捕获两类「会让整帧消失但不留痕迹」的事件（幂等）。
- *
- * · 渲染中途抛异常：Phaser 不兜 renderWebGL 的异常，抛出去这一帧就在 gl.clear() 之后
- *   废掉了——画面全空、控制台一闪而过、下一帧若条件消失就自动恢复，正是「闪一帧」的样子
- * · WebGL 上下文丢失：iOS 显存吃紧时 WebKit 会回收上下文，恢复期整帧无内容
- *
- * 两者都只在真机偶发，事后靠日志追不到，所以计数常驻。 */
-export function startRenderWatch(game: Phaser.Game): void {
-  if (watchStarted) return
-  watchStarted = true
-  window.addEventListener('error', (e) => noteError(e.message))
-  window.addEventListener('unhandledrejection', (e) => noteError(String(e.reason).slice(0, 120)))
-  game.renderer.on(Phaser.Renderer.Events.LOSE_WEBGL, noteContextLost)
-}
+// dev 面板的环境诊断：原生 rAF 频率计 / 渲染器信息 / JS 堆内存
 
 let rafStarted = false
 let rafPeakHz = 0

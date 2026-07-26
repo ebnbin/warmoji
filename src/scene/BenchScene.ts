@@ -18,7 +18,6 @@ import {
   setBenchProfile,
 } from '../bench/spec'
 import { resetMetrics } from '../bench/metrics'
-import { resetRenderProbe } from '../bench/renderProbe'
 import { labCaptain, labStarters } from '../run/lab'
 import { beginRun } from '../run/state'
 import { battleSceneFor } from '../battle'
@@ -200,7 +199,6 @@ export class BenchScene extends Phaser.Scene {
     setBenchActive(true)
     applyBenchProfile()
     resetMetrics()
-    resetRenderProbe()
     const mapId = loadMap(undefined)
     beginRun(labCaptain(), labStarters(), mapId, true)
     this.scene.start(battleSceneFor(mapId))
