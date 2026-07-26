@@ -47,8 +47,8 @@ import {
   viewport,
   VIEWPORT_CHANGED,
 } from '../util/apply'
-import type { HudSnapshot, WaveSummary } from './hudHost'
-import { activeHudHost } from './hudHost'
+import type { HudInput, HudSnapshot, WaveSummary } from './hudHost'
+import { activeHudHost, setActiveHudInput } from './hudHost'
 import type { HudHost } from './hudHost'
 import { roundRect } from '../ui/shapes'
 import { BenchPanel } from './benchPanel'
@@ -58,7 +58,7 @@ import { clearBenchProfile, isBenchActive, setBenchActive } from '../bench/spec'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
 // 与 BoundedScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
-export class UIScene extends Phaser.Scene {
+export class UIScene extends Phaser.Scene implements HudInput {
   private joystick?: Joystick
   private xpBar!: Phaser.GameObjects.Graphics
   private timeText!: Phaser.GameObjects.Text
@@ -97,7 +97,8 @@ export class UIScene extends Phaser.Scene {
     super('ui')
   }
 
-  get joystickVector(): { x: number; y: number } {
+  /** HudInput 契约：战斗侧每帧读它取移动输入（不认识本类） */
+  get moveVector(): { x: number; y: number } {
     return this.joystick?.vector ?? { x: 0, y: 0 }
   }
 
@@ -129,6 +130,7 @@ export class UIScene extends Phaser.Scene {
     }
 
     this.joystick = new Joystick(this)
+    setActiveHudInput(this)
 
     this.xpBar = this.add.graphics()
     this.bossBar = this.add.graphics().setDepth(120)
@@ -215,6 +217,7 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       // devText 在 SHUTDOWN 里随场景对象一起销毁；清引用，否则关闭 dev 后
       // restart 不重建面板，update 仍对已销毁的 Text 调 setText → 渲染撞空 → 卡死
+      setActiveHudInput(undefined)
       this.devText = undefined
       this.benchPanel?.destroy()
       this.benchPanel = undefined

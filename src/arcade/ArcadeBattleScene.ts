@@ -91,7 +91,6 @@ import { applyBlast, applyEffects } from './abilities/effects'
 import { blastRing } from '../war/cues'
 import type { AbilityDef, Effect } from '../types/abilityDefs'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime, EffectCtx } from './abilities/types'
-import type { UIScene } from '../war/UIScene'
 
 // 竞技场基座：四张地图（有界/无界/河流/虚空）共享的战斗引擎——队伍与
 // 能力装配、伤害与击杀结算、刷怪节奏、敌人行为状态机、地面区域、金币、
@@ -106,7 +105,7 @@ interface TeamStats {
 }
 
 import type { ArcadeBody, ImageObj } from './body'
-import { setActiveHudHost } from '../war/hudHost'
+import { hudMoveVector, setActiveHudHost } from '../war/hudHost'
 import type { HudSnapshot, WaveSummary } from '../war/hudHost'
 import { rollWaveCarriers } from '../war/battleFx'
 import { enemyMixAt, pickEnemy } from '../war/enemyAi'
@@ -1190,12 +1189,11 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
       (held(this.cursors?.up) || held(this.wasd?.W) ? -1 : 0) +
       (held(this.cursors?.down) || held(this.wasd?.S) ? 1 : 0)
 
-    const ui = this.scene.get('ui') as UIScene
-    const dir = kx !== 0 || ky !== 0 ? norm(kx, ky) : ui.joystickVector
+    const stick = hudMoveVector()
+    const dir = kx !== 0 || ky !== 0 ? norm(kx, ky) : stick
     this.teamDir = dir
     // 移动量（键盘满推=1、摇杆取模长）：时停窗口内的世界时标据此放缩（下一帧 update 消费）
-    this.moveInputRaw =
-      kx !== 0 || ky !== 0 ? 1 : Math.min(1, Math.hypot(ui.joystickVector.x, ui.joystickVector.y))
+    this.moveInputRaw = kx !== 0 || ky !== 0 ? 1 : Math.min(1, Math.hypot(stick.x, stick.y))
     const step = (this.stats.moveSpeed * this.battleFx.moveSpeedMul * delta) / 1000
     const drift = this.teamDrift(delta)
     const next = this.constrainTeam({

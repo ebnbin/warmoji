@@ -80,3 +80,28 @@ export interface HudHost {
   /** 测试模式免死开关变更后重算队员血量上限 */
   applyTestInvincible(): void
 }
+
+// ── 反方向：战斗侧要从 HUD 读的全部东西 ──────────────────────────
+//
+// 只有一样：本帧的移动输入。之所以要立这条契约，是因为两套战斗框架此前都在
+// `import type { UIScene }` + `scene.get('ui') as UIScene`，为读一个摇杆向量
+// 把整个 871 行的 HUD 类拖成依赖——方向是反的：HUD 依赖战斗天经地义，
+// 战斗不该认识 HUD 长什么样。收成契约后战斗侧只知道「有人会告诉我移动向量」。
+
+/** HUD 向战斗侧提供的输入 */
+export interface HudInput {
+  /** 本帧移动输入（摇杆；键盘在战斗侧自行合流），未推时为零向量 */
+  readonly moveVector: { x: number; y: number }
+}
+
+const NO_MOVE = { x: 0, y: 0 }
+let activeInput: HudInput | undefined
+
+export function setActiveHudInput(input: HudInput | undefined): void {
+  activeInput = input
+}
+
+/** 本帧移动输入；HUD 未挂载时为零向量（战斗可以没有 HUD，反之不行） */
+export function hudMoveVector(): { x: number; y: number } {
+  return activeInput?.moveVector ?? NO_MOVE
+}

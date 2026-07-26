@@ -74,10 +74,9 @@ import { aggregateTeamCards } from '../data/cards'
 import type { TeamEffects } from '../types/items'
 import { INVINCIBLE_HP, densityParams, labInvincible } from '../run/lab'
 import { tickSkillCd } from '../war/skill'
-import { setActiveHudHost } from '../war/hudHost'
+import { hudMoveVector, setActiveHudHost } from '../war/hudHost'
 import type { HudHost } from '../war/hudHost'
 import type { HudSnapshot } from '../war/hudHost'
-import type { UIScene } from '../war/UIScene'
 import type { Meteor, PendingSpawn, Sim } from './sim'
 import { emojiImage } from '../emoji/textures'
 import { SPAWN } from '../data/enemies'
@@ -1366,7 +1365,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.run.skillCdMs = tickSkillCd(this.run.skillCdMs, delta)
 
     const keyed = kx !== 0 || ky !== 0
-    const stick = (this.scene.get('ui') as UIScene | undefined)?.joystickVector ?? { x: 0, y: 0 }
+    const stick = hudMoveVector()
     sim.teamDir = keyed ? norm(kx, ky) : stick
     sim.moveInputRaw = keyed ? 1 : Math.min(1, Math.hypot(stick.x, stick.y))
 
