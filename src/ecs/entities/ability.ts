@@ -55,15 +55,19 @@ export function equipAbility(
   Blink.y[e] = 0
   Swing.startMs[e] = 0
   Swing.durMs[e] = 0
-  Gear.eid[e] = 'held' in def && def.held ? spawnGear(sim, ownerEid, faction, def.held) : 0
+  Gear.eid[e] = 'held' in def && def.held ? spawnGear(sim, e, ownerEid, faction, def.held) : 0
   return e
 }
 
-/** 持有物子实体：挂在角色身上的能力 emoji，进批绘而非游离 GameObject */
-function spawnGear(sim: Sim, ownerEid: number, faction: number, held: HeldVisual): number {
+/** 持有物子实体：挂在角色身上的能力 emoji，进批绘而非游离 GameObject。
+ * Owner 指**能力实体**（不是角色）：回旋镖飞出去时靠它回查自己是哪条能力的镖，
+ * 与 spawnTwin 的双子镖同口径 */
+function spawnGear(sim: Sim, abilityEid: number, ownerEid: number, faction: number, held: HeldVisual): number {
   const outline: OutlineKind =
     faction === FACTION.enemy ? (Elite.v[ownerEid] || Boss.v[ownerEid] ? 'elite' : 'enemy') : 'player'
   const gear = addEntity(sim.world)
+  addComponent(sim.world, gear, Owner)
+  Owner.eid[gear] = abilityEid
   attachDrawable(sim.world, gear, sim.frames, {
     id: held.emoji,
     outline,
