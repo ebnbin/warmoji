@@ -88,7 +88,7 @@ import { TIMESTOP, timeScaleFor } from '../war/timeStop'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { createAbility } from './abilities/create'
 import { applyBlast, applyEffects } from './abilities/effects'
-import { blastRing } from '../war/cues'
+import { blastRing } from './cues'
 import type { AbilityDef, Effect } from '../types/abilityDefs'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime, EffectCtx } from './abilities/types'
 

@@ -1,5 +1,5 @@
 import type { RallyDef } from '../../types/abilityDefs'
-import { circleCue } from '../../war/cues'
+import { circleCue } from '../cues'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 集结型：阵亡我方满血复活、存活者按上限比例回复、全队短暂无敌，

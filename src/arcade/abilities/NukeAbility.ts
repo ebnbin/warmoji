@@ -1,5 +1,5 @@
 import type { NukeDef } from '../../types/abilityDefs'
-import { screenFlashCue } from '../../war/cues'
+import { screenFlashCue } from '../cues'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 全域打击型：全场活跃目标各吃一次大额伤害 + 全屏白闪。伤害随当前波次

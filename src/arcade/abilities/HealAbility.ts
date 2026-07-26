@@ -1,5 +1,5 @@
 import type { HealDef } from '../../types/abilityDefs'
-import { circleCue } from '../../war/cues'
+import { circleCue } from '../cues'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 治疗型：周期治疗范围内血量比例最低的队友（对友军索敌）。

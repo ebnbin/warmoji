@@ -26,7 +26,7 @@ import { benchFramework, isBenchActive } from './bench/spec'
 //                    能力是每（持有者×能力）一个运行时对象（arcade/abilities/）
 //   · src/ecs/    —— 实验：bitECS 数据导向 + 自绘批量渲染管线，能力本身就是实体，
 //                    按 kind tag 分流给各自的施放系统（ecs/ability/）
-// 共享层（data 表 / maps 几何 / 命中几何 war/hit / 绘制原语 war/cues / emoji / run / core …）
+// 共享层（data 表 / maps 几何 / 命中几何 war/hit / emoji / run / util …）
 // 两侧都依赖，且**不反向依赖任何一侧**，故任一侧都能被整体摘除。
 //
 // 约束：**本文件是全仓唯一允许 import `src/arcade/` 与 `src/ecs/`（及 bitecs）的模块**，

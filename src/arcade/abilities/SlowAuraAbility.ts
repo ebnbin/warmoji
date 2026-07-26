@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
 import type { SlowAuraDef } from '../../types/abilityDefs'
-import { circleCue } from '../../war/cues'
+import { circleCue } from '../cues'
 import type { AbilityContext, AbilityRuntime } from './types'
 
 /** 寒气光环：以队伍中心为圆心持续减速（角色只是来源；角色阵亡光环随之消失）。

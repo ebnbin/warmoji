@@ -2,7 +2,7 @@ import { ACQUIRE } from '../../data/abilities'
 import { UNIT } from '../../util/units'
 import type { AreaBlastDef } from '../../types/abilityDefs'
 import { applyBlast, applyEffects } from './effects'
-import { boomCue, circleCue } from '../../war/cues'
+import { boomCue, circleCue } from '../cues'
 import { nearestTarget, targetsWithin } from './targeting'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 

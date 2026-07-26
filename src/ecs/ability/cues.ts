@@ -1,4 +1,4 @@
-import type { CircleCue } from '../../war/cues'
+import type { CircleCue } from '../render/cues'
 
 // 一次性战斗特效的帧末队列：纯逻辑侧只描述「放一个什么样的特效」，绘制留到场景侧排空。
 // 能力系统因此不碰 Phaser，headless 也能跑完整逻辑。

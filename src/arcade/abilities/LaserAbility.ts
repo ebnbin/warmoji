@@ -3,7 +3,7 @@ import type Phaser from 'phaser'
 import { thrustHitIndices } from '../../war/hit'
 import type { LaserDef } from '../../types/abilityDefs'
 import { emojiImage } from '../../emoji/textures'
-import { beamCue } from '../../war/cues'
+import { beamCue } from '../cues'
 import { nearestAngle } from './targeting'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
