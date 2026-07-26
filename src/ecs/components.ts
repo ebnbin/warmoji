@@ -283,7 +283,16 @@ export const Manual = {}
 export const CastRequest = {}
 
 /** 队伍锚点：位置恒等于队伍中心，供无本体的能力（队长技能载荷）当行为主体 */
-export const AnchorCenter = {}
+/** 队长实体：本局的行为主体与队伍锚点。无碰撞箱、无受击箱、不绘制——
+ * 但移速、拾取半径这些属性属于它，队员绕着它编队。理论上一局一个，但不是硬约束。
+ * 无本体的能力（队长技能载荷）以它为持有者，于是「持有者位置」对所有能力同构 */
+export const Captain = {}
+
+/** 队长移速(世界像素/秒:队长基础 × 道具/卡牌乘区)。队伍整体按它走位 */
+export const MoveSpeed = { v: f32() }
+
+/** 金币磁吸半径(px:队长 coinMagnet × 道具 magnetMul) */
+export const Magnet = { radius: f32() }
 
 /** 瞬闪位移：突袭停留期加在角色跟随点上的视觉偏移（不动阵型主权） */
 export const Blink = { x: f32(), y: f32() }

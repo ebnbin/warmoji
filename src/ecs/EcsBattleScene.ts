@@ -30,13 +30,13 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query, removeEntity } from 'bitecs'
-import { Alive, Boss, Coin, Dormant, Enemy, EnemyProj, Hp, MHp, Nest, Projectile, Revive, Sprite, Transform } from './components'
+import { Alive, Boss, Coin, Dormant, Enemy, EnemyProj, Hp, MHp, MoveSpeed, Nest, Projectile, Revive, Sprite, Transform } from './components'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
-import { spawnSprite } from './entities/sprite'
+import { spawnDrawable } from './entities/drawable'
 import { updateAnims } from './anim'
 import { remapSim } from './remap'
-import { spawnTeam } from './entities/member'
+import { makeSim } from './sim'
 import { updateSpawners } from './enemy'
 import { clearEcsStore } from './store'
 import { armCaptain, armEnemies, armTeam } from './ability/arm'
@@ -119,7 +119,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   /** 团队卡牌聚合乘区（技能 CD 等；与 spawnTeam 内同源，开局定） */
   private teamFx!: TeamEffects
   /** 队伍锚点实体：队长技能载荷挂在它名下（不进自动扫描，只等 castSkill 的施放请求） */
-  private captainAnchor = -1
   /** 过场已排程(波末结算/全灭):置位后 update 早退,避免重复触发 */
   private ending = false
   /** 本波开场基线（波末小结取增量：本波击杀/金币/升级数） */
@@ -199,7 +198,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.sim = undefined
     this.ready = false
     this.ending = false
-    this.captainAnchor = -1
     this.auraRings = []
     this.waveBaseKills = 0
     this.waveBaseCoins = 0
@@ -402,7 +400,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
     this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
-    this.sim = spawnTeam(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
+    this.sim = makeSim(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
     initialLayout(this.sim)
     const walls = MAPS[run.mapId].walls
     if (walls) this.createWalls(this.sim, walls)
@@ -411,7 +409,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const simRef = this.sim
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
     armTeam(this.sim, run, run.testMode)
-    this.captainAnchor = armCaptain(this.sim, run)
+    armCaptain(this.sim, run)
     for (let i = 0; i < this.sim.members.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
@@ -677,7 +675,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.run.skillCdMs = s.cdMs * this.teamFx.skillCdMul
     playSfx('levelup')
     this.events.emit('skill-cast', s.name)
-    if (this.captainAnchor >= 0) requestCast(sim, this.captainAnchor)
+    requestCast(sim, sim.captain)
     return true
   }
 
@@ -1186,7 +1184,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.decorChunks.set(
         key,
         chunkDecor(def, this.run.decorSeed, c.cx, c.cy, cfg.chunkCells).map((d) =>
-          spawnSprite(this.world, atlas, {
+          spawnDrawable(this.world, atlas, {
             id: d.emoji,
             outline: 'player',
             x: d.xU * UNIT,
@@ -1302,7 +1300,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const cols = Math.round(this.mapW / UNIT)
     const rows = Math.round(this.mapH / UNIT)
     for (const d of rollDecor(MAPS[run.mapId].decor, () => rng.next(), cols, rows)) {
-      spawnSprite(this.world, atlas, {
+      spawnDrawable(this.world, atlas, {
         id: d.emoji,
         outline: 'player',
         x: d.xU * UNIT,
@@ -1446,7 +1444,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       mapH: this.mapH,
       dirX: sim.teamDir.x,
       dirY: sim.teamDir.y,
-      moveSpeed: sim.moveSpeed,
+      moveSpeed: MoveSpeed.v[sim.captain]!,
       elapsed: sim.elapsedMs,
       memberPos: sim.members.map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
       frames: sim.members.map((eid) => Sprite.frame[eid]!),

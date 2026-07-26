@@ -3,7 +3,7 @@ import { DEG2RAD } from '../../../util/units'
 import type { BoomerangDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { Sprite, Tint, Transform } from '../../components'
-import { spawnSprite } from '../../entities/sprite'
+import { spawnDrawable } from '../../entities/drawable'
 import { flyerHits } from '../../store'
 import { cooldownMul, damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { Ability, AbilityRef, Aim, Cooldown, FACTION, Faction, Flyer, Frozen, Gear, Owner } from '../../components'
@@ -67,7 +67,7 @@ function launch(sim: Sim, e: number, def: BoomerangDef, aim: number): void {
 /** 双子镖：只在飞行中存在的第二枚 */
 function spawnTwin(sim: Sim, e: number, def: BoomerangDef): number {
   const g = Gear.eid[e]!
-  const t = spawnSprite(sim.world, sim.frames, {
+  const t = spawnDrawable(sim.world, sim.frames, {
     id: def.held.emoji,
     outline: Faction.v[e] === FACTION.enemy ? 'enemy' : 'player',
     x: Transform.x[g]!,

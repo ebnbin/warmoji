@@ -1,6 +1,7 @@
 import { addComponent, addEntity } from 'bitecs'
+import type { FormationId } from '../../types/formation'
 import { UNIT } from '../../util/units'
-import { Rng } from '../../util/rng'
+
 import { FOLLOW } from '../../data/feel'
 import { CAPTAINS } from '../../data/captains'
 import { CHARACTERS } from '../../data/characters'
@@ -11,39 +12,14 @@ import { aggregateTeamCards } from '../../data/cards'
 import { aggregateCharacterEffects, characterXp } from '../../data/items'
 import { levelStatsFor } from '../../data/levels'
 import { characterLevel } from '../../data/charLevel'
-import { BATTLE_FX_IDENTITY } from '../../data/battlefield'
+
 import { currentFormation, guardOrder, hasCenter, waveStartHp } from '../../run/state'
 import { INVINCIBLE_HP, labInvincible, labLevel } from '../../run/lab'
 import { armIdle } from '../anim'
-import { worldFor } from '../worlds'
+
 import type { RunState } from '../../run/state'
-import {
-  Alive,
-  Anim,
-  Breath,
-  Depth,
-  Follow,
-  VisOff,
-  Hurt,
-  Iframe,
-  MAtkSlow,
-  Member,
-  MFlash,
-  MHp,
-  MPerk,
-  OrbitBias,
-  Pop,
-  Post,
-  Quad,
-  Revive,
-  Slot,
-  Sprite,
-  Threat,
-  Tint,
-  Transform,
-  Wander,
-} from '../components'
-import type { Sim } from '../sim'
+import { Alive, Anim, Breath, Depth, Follow, VisOff, Hurt, Iframe, MAtkSlow, Member, MFlash, MHp, MPerk, OrbitBias, Pop, Post, Quad, Revive, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
+
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../render/atlas'
 
@@ -51,15 +27,24 @@ import type { EcsAtlas } from '../render/atlas'
 // 属性逐槽位按已持道具 + 专属等级聚合;血量跨波保留(上一波阵亡者低血量复活)。
 
 /** 建立队伍:返回 Sim(含 members eid 列表),并把队员实体装进 world */
-export function spawnTeam(
+/** 队伍编队的派生结果：实体清单 + 供 Sim 用的编队参数 */
+export interface TeamLayout {
+  members: number[]
+  count: number
+  formation: FormationId
+  postBySlot: number[]
+  lineupOrbit: number[]
+}
+
+/** 建本局全部角色实体（队长不在此列，见 captain.ts）。
+ * 只造实体、只返回编队派生量——Sim 的组装在 ../sim.ts，工厂不碰全局状态 */
+export function spawnCharacters(
   world: EcsWorld,
   atlas: EcsAtlas,
   run: RunState,
   testMode: boolean,
   center: { x: number; y: number },
-  mapW: number,
-  mapH: number,
-): Sim {
+): TeamLayout {
   const rosterIds = run.roster
   const lineup = rosterIds.map((id) => CHARACTERS[id])
   const count = lineup.length
@@ -72,7 +57,6 @@ export function spawnTeam(
   })
   const teamFx = aggregateTeamCards(run.teamCards)
   const captain = CAPTAINS[run.captainId]
-  const moveSpeed = captain.moveSpeed * UNIT * teamFx.moveSpeedMul
   // 测试模式素体血量:「无敌」旋钮开则天量血(镜像 makeMember)
   const labHp = labInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
 
@@ -163,72 +147,5 @@ export function spawnTeam(
     members.push(eid)
   }
 
-  return {
-    world,
-    center: { x: center.x, y: center.y },
-    orbitPhase: 0,
-    driverPost: -1,
-    teamDir: { x: 0, y: 0 },
-    moveInputRaw: 0,
-    moveSpeed,
-    formation,
-    count,
-    postBySlot,
-    lineupOrbit: lineup.map((c) => c.orbit),
-    members,
-    mapId: run.mapId,
-    mapW,
-    mapH,
-    hooks: worldFor(run.mapId),
-    teamVx: 0,
-    teamVy: 0,
-    worldTickAt: 0,
-    zone: null,
-    meteor: null,
-    walls: null,
-    view: { x: 0, y: 0, right: mapW, bottom: mapH },
-    elapsedMs: 0,
-    fxMs: 0,
-    frameTargets: [],
-    over: false,
-    bossDown: false,
-    memberHitCount: 0,
-    skillDamageMul: 1,
-    skillBuffUntil: 0,
-    danceEndsAt: 0,
-    timeStopMsLeft: 0,
-    chrono: 0,
-    battleMods: [],
-    battleFx: { ...BATTLE_FX_IDENTITY },
-    enemySlowMul: teamFx.enemySlowMul,
-    frameSlowZones: [],
-    frameAttractors: [],
-    enemyTargets: [],
-    memberTargets: [],
-    frames: atlas,
-    pendingDeaths: [],
-    pendingDamageNumbers: [],
-    pendingBursts: [],
-    pendingRings: [],
-    pendingCues: [],
-    pendingGrounds: [],
-    rng: new Rng(run.decorSeed ^ 0x9e37),
-    testMode,
-    wave: run.wave,
-    combatMs: run.combatMs,
-    spawnCooldownMs: 300,
-    pendingSpawns: [],
-    pendingSurges: [],
-    run,
-    reward: {
-      captainXpMul: captain.xpGainMul * teamFx.xpGainMul,
-      doubleCoinChance: teamFx.doubleCoinChance,
-      magnetRadius: captain.coinMagnet * UNIT * teamFx.magnetMul,
-      waveHealRatio: teamFx.waveHealRatio,
-      waveCoins: teamFx.waveCoins,
-    },
-    pendingCoins: [],
-    pendingFieldDrops: [],
-    pendingAuras: [],
-  }
+  return { members, count, formation, postBySlot, lineupOrbit: lineup.map((c) => c.orbit) }
 }

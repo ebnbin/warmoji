@@ -5,7 +5,7 @@ import { playSfx } from '../../../audio/sfx'
 import { Anim, Sprite, Tint, Transform } from '../../components'
 import { armIdle, playClip } from '../../anim'
 import { backEaseOut } from '../../ease'
-import { spawnSprite } from '../../entities/sprite'
+import { spawnDrawable } from '../../entities/drawable'
 import { spawnProjectileEcs } from '../../entities/projectile'
 import { attributionSlot, cooldownMul, damageMul, ownerX, ownerY } from '../amp'
 import { AbilityRef, Cooldown, Emplacement, FACTION, Faction, Frozen, Minion, Owner, Retiring } from '../../components'
@@ -32,7 +32,7 @@ function place(sim: Sim, e: number, def: TurretDef): void {
   const outline = Faction.v[e] === FACTION.enemy ? 'enemy' : 'player'
   // 在役数须先数：新座建出来就带 Emplacement，晚数会把自己也算进去
   const live = liveOnes(sim, e)
-  const t = spawnSprite(sim.world, sim.frames, {
+  const t = spawnDrawable(sim.world, sim.frames, {
     id: def.turret.emoji,
     outline,
     x: ownerX(e),

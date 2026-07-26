@@ -1,5 +1,4 @@
 import { UNIT } from '../util/units'
-import type { Rng } from '../util/rng'
 import { FOLLOW, WANDER } from '../data/feel'
 import { ORBIT } from '../data/feel'
 import { MEMBER } from '../data/characters'
@@ -31,6 +30,14 @@ import type { BattleEffects } from '../types/battlefield'
 import type { BattleMod } from '../types/battlefield'
 import type { FieldPickupDef } from '../types/battlefield'
 import { foldBattleEffects } from '../war/battleFx'
+import { CAPTAINS } from '../data/captains'
+import { aggregateTeamCards } from '../data/cards'
+import { Rng } from '../util/rng'
+import { MoveSpeed } from './components'
+import { spawnCaptain } from './entities/captain'
+import { spawnCharacters } from './entities/character'
+import { worldFor } from './worlds'
+import type { EcsAtlas } from './render/atlas'
 
 // ECS 战斗仿真状态 + 系统(纯逻辑,禁 phaser)。数学逐行镜像旧 ArcadeBattleScene 的
 // updateOrbit / moveTeam / layoutTeam,常量与公式不变,只把「读写精灵」换成「读写组件」。
@@ -46,8 +53,8 @@ export interface Sim {
   teamDir: { x: number; y: number }
   /** 本帧移动量 0..1(键盘满推=1,摇杆取模长):供时停时标 */
   moveInputRaw: number
-  /** 队伍移速(世界像素/秒) */
-  moveSpeed: number
+  /** 队长实体 eid：队伍中心即它的位置，移速/磁吸半径是它的组件 */
+  captain: number
   formation: FormationId
   /** 阵容人数 */
   count: number
@@ -186,8 +193,6 @@ export interface RewardConfig {
   captainXpMul: number
   /** 双倍金币概率(道具) */
   doubleCoinChance: number
-  /** 磁吸半径(px:队长 coinMagnet × 道具 magnetMul) */
-  magnetRadius: number
   /** 波末回复比例(团队道具:大锅) */
   waveHealRatio: number
   /** 波末金币分红(团队道具:债券) */
@@ -293,7 +298,7 @@ function updateOrbit(sim: Sim, delta: number): void {
 /** 队伍位移 + 布局(镜像 moveTeam→layoutTeam);落点交给世界钩子(有界钳制/冰面动量) */
 function moveTeam(sim: Sim, delta: number): void {
   const dir = sim.teamDir
-  const step = (sim.moveSpeed * sim.battleFx.moveSpeedMul * delta) / 1000
+  const step = (MoveSpeed.v[sim.captain]! * sim.battleFx.moveSpeedMul * delta) / 1000
   const drift = sim.hooks.teamDrift(sim, delta)
   const next = sim.hooks.constrainTeam(
     sim,
@@ -461,4 +466,95 @@ export function stepSim(sim: Sim, delta: number, wdelta: number = delta): void {
   updateShards(sim, delta)
   // 世界周期结算(落水掉血等):在位移与战斗之后,读的是本帧最终位置
   sim.hooks.tick(sim, wdelta)
+}
+
+/** 组装本局的仿真状态。**队长实体先建**——队伍中心即它的位置，队员绕它编队，
+ * 移速/磁吸半径是它的组件而非全局字段。随后建全部角色实体，最后拼出 Sim。 */
+export function makeSim(
+  world: EcsWorld,
+  atlas: EcsAtlas,
+  run: RunState,
+  testMode: boolean,
+  center: { x: number; y: number },
+  mapW: number,
+  mapH: number,
+): Sim {
+  const teamFx = aggregateTeamCards(run.teamCards)
+  const captainDef = CAPTAINS[run.captainId]
+  const captain = spawnCaptain(
+    world,
+    center.x,
+    center.y,
+    captainDef.moveSpeed * UNIT * teamFx.moveSpeedMul,
+    captainDef.coinMagnet * UNIT * teamFx.magnetMul,
+  )
+  const team = spawnCharacters(world, atlas, run, testMode, center)
+  const { count, formation, postBySlot, lineupOrbit, members } = team
+  return {
+    world,
+    center: { x: center.x, y: center.y },
+    orbitPhase: 0,
+    driverPost: -1,
+    teamDir: { x: 0, y: 0 },
+    moveInputRaw: 0,
+    formation,
+    count,
+    postBySlot,
+    lineupOrbit,
+    members,
+    mapId: run.mapId,
+    mapW,
+    mapH,
+    hooks: worldFor(run.mapId),
+    teamVx: 0,
+    teamVy: 0,
+    worldTickAt: 0,
+    zone: null,
+    meteor: null,
+    walls: null,
+    view: { x: 0, y: 0, right: mapW, bottom: mapH },
+    elapsedMs: 0,
+    fxMs: 0,
+    frameTargets: [],
+    over: false,
+    bossDown: false,
+    memberHitCount: 0,
+    skillDamageMul: 1,
+    skillBuffUntil: 0,
+    danceEndsAt: 0,
+    timeStopMsLeft: 0,
+    chrono: 0,
+    battleMods: [],
+    battleFx: { ...BATTLE_FX_IDENTITY },
+    enemySlowMul: teamFx.enemySlowMul,
+    frameSlowZones: [],
+    frameAttractors: [],
+    enemyTargets: [],
+    memberTargets: [],
+    frames: atlas,
+    pendingDeaths: [],
+    pendingDamageNumbers: [],
+    pendingBursts: [],
+    pendingRings: [],
+    pendingCues: [],
+    pendingGrounds: [],
+    rng: new Rng(run.decorSeed ^ 0x9e37),
+    testMode,
+    wave: run.wave,
+    combatMs: run.combatMs,
+    spawnCooldownMs: 300,
+    pendingSpawns: [],
+    pendingSurges: [],
+    run,
+    reward: {
+      captainXpMul: captainDef.xpGainMul * teamFx.xpGainMul,
+      doubleCoinChance: teamFx.doubleCoinChance,
+      waveHealRatio: teamFx.waveHealRatio,
+      waveCoins: teamFx.waveCoins,
+    },
+    pendingCoins: [],
+    pendingFieldDrops: [],
+    pendingAuras: [],
+    captain,
+  }
 }

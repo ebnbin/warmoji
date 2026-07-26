@@ -10,9 +10,12 @@ import type { EcsWorld } from '../world'
 import type { FrameIndex } from '../frames'
 import type { OutlineKind } from '../../emoji/svg'
 
-// 实体装配(纯逻辑,仅类型引用 atlas/render)。后续阶段在此扩展各类实体的组装函数。
+// 「可绘制实体」的通用底座：只挂 Transform + Sprite + Tint + Depth,别的一概不管。
+// 装饰物(草丛/蘑菇)直接用它;能力的持有物、召唤物、炮台、在途回旋镖先用它建壳,
+// 再由各自的工厂追加专属组件。
+// 注意与 Sprite **组件**区分:那是「怎么画」,这里是「建一个只负责被画的实体」。
 
-export interface SpriteInit {
+export interface DrawableInit {
   id: string
   outline: OutlineKind
   x: number
@@ -30,7 +33,7 @@ export interface SpriteInit {
 }
 
 /** 装配一个可渲染实体(Transform+Sprite+Tint+Depth),返回 eid */
-export function spawnSprite(world: EcsWorld, atlas: FrameIndex, init: SpriteInit): number {
+export function spawnDrawable(world: EcsWorld, atlas: FrameIndex, init: DrawableInit): number {
   const eid = addEntity(world)
   addComponent(world, eid, Transform)
   addComponent(world, eid, Sprite)

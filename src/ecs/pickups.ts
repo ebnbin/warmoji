@@ -7,6 +7,7 @@ import {
   Alive,
   COIN_SET,
   Hurt,
+  Magnet,
   Pop,
   Transform,
   Vel,
@@ -33,7 +34,8 @@ export function magnetCoinsEcs(sim: Sim, delta: number): void {
   const dt = delta / 1000
   const cx = sim.center.x
   const cy = sim.center.y
-  const r2 = sim.reward.magnetRadius * sim.reward.magnetRadius
+  const mag = Magnet.radius[sim.captain]!
+  const r2 = mag * mag
   const collect = PICKUP.collectRadius * UNIT
   const collect2 = collect * collect
   const speed = PICKUP.magnetSpeed * UNIT

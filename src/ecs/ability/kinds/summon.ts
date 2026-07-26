@@ -6,7 +6,7 @@ import { ANIM_DEF } from '../../../emoji/anim'
 import { playSfx } from '../../../audio/sfx'
 import { Anim, Poison, Sprite, Tint, Transform } from '../../components'
 import { armIdle } from '../../anim'
-import { spawnSprite } from '../../entities/sprite'
+import { spawnDrawable } from '../../entities/drawable'
 import { cooldownMul, damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { AbilityRef, Cooldown, FACTION, Faction, Frozen, Minion, Owner, Swarmer } from '../../components'
 import { abilityDefAt } from '../defs'
@@ -32,7 +32,7 @@ export function castSummons(sim: Sim, dt: number): void {
 /** 一只小蜂：出生在主人身上，相位错开好让一波蜂散得开 */
 function spawnMinion(sim: Sim, e: number, def: SummonDef, index: number): void {
   const outline = Faction.v[e] === FACTION.enemy ? 'enemy' : 'player'
-  const b = spawnSprite(sim.world, sim.frames, {
+  const b = spawnDrawable(sim.world, sim.frames, {
     id: def.minion.emoji,
     outline,
     x: ownerX(e),

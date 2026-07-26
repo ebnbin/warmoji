@@ -13,7 +13,7 @@ import { restoreMorphVisual } from '../morph'
 import { enemyDef } from '../store'
 import { FACTION } from '../components'
 import { NEUTRAL_AMP, postponeAbilities } from './equip'
-import { equipAbility, spawnTeamAnchor } from '../entities/ability'
+import { equipAbility } from '../entities/ability'
 import type { Sim } from '../sim'
 
 // 装备：把配装解析成能力实体。队伍在开局一次装齐；敌人首次被扫到时装配
@@ -45,12 +45,11 @@ export function armTeam(sim: Sim, run: RunState, testMode: boolean): void {
 
 /** 队长主动技能的载荷：效果本体是标准能力行，行为主体锚在队伍中心。
  * 不进自动扫描——只等 castSkill 的施放请求。返回锚点实体 */
-export function armCaptain(sim: Sim, run: RunState): number {
-  const anchor = spawnTeamAnchor(sim)
+export function armCaptain(sim: Sim, run: RunState): void {
+  // 队长实体在 makeSim 里已建好（队伍中心即它的位置），这里只挂技能载荷
   for (const a of CAPTAINS[run.captainId].skill.abilities) {
-    equipAbility(sim, anchor, toPx(a), FACTION.team, 0, NEUTRAL_AMP, true)
+    equipAbility(sim, sim.captain, toPx(a), FACTION.team, 0, NEUTRAL_AMP, true)
   }
-  return anchor
 }
 
 /** 给单个敌人装配能力（首发延迟喂初始冷却；projectile.firstDelayMs 优先） */

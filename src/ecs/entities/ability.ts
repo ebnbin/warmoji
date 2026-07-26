@@ -2,9 +2,9 @@ import { addComponent, addComponents, addEntity } from 'bitecs'
 import { abilityPiercesWalls } from '../../war/abilityRules'
 import type { AbilityDef, HeldVisual } from '../../types/abilityDefs'
 import type { OutlineKind } from '../../emoji/svg'
-import { Alive, Boss, Elite, Slot, Transform } from '../components'
-import { spawnSprite } from './sprite'
-import { Ability, AbilityRef, Aim, Amp, AnchorCenter, Blink, Cooldown, Disarmed, FACTION, Faction, Followup, Frozen, Gear, Pulse, Radial, Shots, Manual, Owner, Swing, WallBlocked } from '../components'
+import { Boss, Elite, Transform } from '../components'
+import { spawnDrawable } from './drawable'
+import { Ability, AbilityRef, Aim, Amp, Blink, Cooldown, Disarmed, FACTION, Faction, Followup, Frozen, Gear, Pulse, Radial, Shots, Manual, Owner, Swing, WallBlocked } from '../components'
 import type { AmpInit } from '../ability/equip'
 import { internAbilityDef } from '../ability/defs'
 import { KIND_TAG } from '../ability/tags'
@@ -63,7 +63,7 @@ export function equipAbility(
 function spawnGear(sim: Sim, ownerEid: number, faction: number, held: HeldVisual): number {
   const outline: OutlineKind =
     faction === FACTION.enemy ? (Elite.v[ownerEid] || Boss.v[ownerEid] ? 'elite' : 'enemy') : 'player'
-  return spawnSprite(sim.world, sim.frames, {
+  return spawnDrawable(sim.world, sim.frames, {
     id: held.emoji,
     outline,
     x: Transform.x[ownerEid]!,
@@ -75,18 +75,5 @@ function spawnGear(sim: Sim, ownerEid: number, faction: number, held: HeldVisual
 
 /** 收走某持有者名下的全部能力实体与它们的子实体（持有物、在途坠物）。
  * 持有者离场时调——eid 会被回收再分配，不能留孤儿 */
-
-/** 建一个队伍锚点实体：位置由 followTeamCenter 每帧同步到队伍中心。
- * 无本体的能力（队长技能载荷）以它为行为主体，于是「持有者位置」这一条对所有能力同构 */
-export function spawnTeamAnchor(sim: Sim): number {
-  const world = sim.world
-  const eid = addEntity(world)
-  addComponents(world, eid, AnchorCenter, Transform, Slot, Alive)
-  Transform.x[eid] = sim.center.x
-  Transform.y[eid] = sim.center.y
-  Slot.v[eid] = -1 // 非队员来源：伤害不分账到任何槽位
-  Alive.v[eid] = 1
-  return eid
-}
 
 /** 手动施放：给某持有者名下的手动能力打上本帧施放请求（队长技能通道） */
