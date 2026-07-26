@@ -3,6 +3,7 @@ import { query } from 'bitecs'
 import { Depth, Quad, Sprite, Tint, Transform, RENDERABLE } from '../components'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from './atlas'
+import { noteBatch } from '../../bench/renderProbe'
 
 // 统一自绘：一个自定义 GameObject，renderWebGL 里把全场 renderable 实体（Transform+Sprite+
 // Tint+Depth）一次性经 BatchHandlerQuad 批量画出。每个实体的四角按「相机变换 × 位姿」CPU 侧
@@ -86,7 +87,10 @@ export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
     const node = renderer.renderNodes.getNode(
       'BatchHandlerQuad',
     ) as Phaser.Renderer.WebGL.RenderNodes.BatchHandlerQuad | null
-    if (!node) return
+    if (!node) {
+      noteBatch(0, eids.length)
+      return
+    }
 
     // 只取本深度带的实体，再按 z 小者先画（压在下层），稳定于 eid
     const order = self.order
@@ -106,6 +110,7 @@ export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
     const spriteMatrix = self.spriteMatrix
     const calc = self.calc
 
+    let drawn = 0
     for (let i = 0; i < order.length; i++) {
       const eid = order[i]!
       const frame = Sprite.frame[eid]!
@@ -160,6 +165,8 @@ export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
         tint, tint, tint, tint,
         self.renderOptions,
       )
+      drawn++
     }
+    noteBatch(drawn, order.length)
   }
 }
