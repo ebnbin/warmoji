@@ -36,7 +36,9 @@ let stepStart = 0
 let renderStart = 0
 let lastUpdate = 0
 let lastRender = 0
-let drawCount = 0
+/** 渲染器统计：Canvas 渲染器有 drawCount，WebGL 没有 —— 取不到就是 undefined，
+ * 别填 0 冒充读数（面板上一个假的 0 比一条「—」更误导） */
+let drawCount: number | undefined
 
 function onPreStep(): void {
   stepStart = performance.now()
@@ -53,7 +55,7 @@ function onPostRender(): void {
   if (!g) return
   // Phaser 的渲染器统计（Canvas 与 WebGL 字段名一致时可取；取不到留 0）
   const r = g.renderer as unknown as { drawCount?: number }
-  drawCount = typeof r.drawCount === 'number' ? r.drawCount : 0
+  drawCount = typeof r.drawCount === 'number' ? r.drawCount : undefined
   if (performance.now() < warmUntil) return
   const f: Frame = { total: g.loop.rawDelta, update: lastUpdate, render: lastRender }
   buf[head] = f
@@ -112,8 +114,8 @@ export interface MetricsReport {
   fps: number
   /** 1% low：最慢 1% 帧对应的 FPS（卡顿体感） */
   fpsLow1: number
-  /** 最近一帧的渲染对象数（渲染器统计，取不到为 0） */
-  drawCount: number
+  /** 最近一帧的渲染对象数；WebGL 渲染器不提供，为 undefined */
+  drawCount?: number
 }
 
 function stat(v: readonly number[]): { mean: number; p50: number; p95: number; p99: number; max: number } {
