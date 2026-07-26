@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { Alive, Dormant, Morph, Transform } from '../../components'
-import { Ability, AnchorCenter, Disarmed, FACTION, Faction, Frozen, Owner } from '../components'
+import { Ability, AnchorCenter, Disarmed, FACTION, Faction, Frozen, Owner } from '../../components'
 import type { Sim } from '../../sim'
 
 /** 队伍锚点跟随队伍中心：唯一职责是把队伍中心写进锚点实体的位姿 */

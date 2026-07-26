@@ -11,7 +11,7 @@ import type { RunState } from '../../run/state'
 import { Dormant, ENEMY_SET, Morph, Transform } from '../components'
 import { restoreMorphVisual } from '../morph'
 import { enemyArmed, enemyDef, enemyFireDelayMs } from '../store'
-import { FACTION } from './components'
+import { FACTION } from '../components'
 import { equipAbility, NEUTRAL_AMP, postponeAbilities, spawnTeamAnchor } from './equip'
 import type { Sim } from '../sim'
 

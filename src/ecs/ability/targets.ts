@@ -2,7 +2,7 @@ import { query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { ACQUIRE } from '../../data/abilities'
 import { Alive, Dormant, ENEMY_SET, Hurt, Radius, Transform } from '../components'
-import { FACTION } from './components'
+import { FACTION } from '../components'
 import type { Source } from './source'
 import type { Sim } from '../sim'
 

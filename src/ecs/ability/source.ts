@@ -1,4 +1,4 @@
-import { Amp, FACTION, Faction, Owner, WallBlocked } from './components'
+import { Amp, FACTION, Faction, Owner, WallBlocked } from '../components'
 import { Transform } from '../components'
 import { enemyDef } from '../store'
 import { attributionSlot } from './amp'

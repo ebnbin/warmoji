@@ -28,7 +28,7 @@ import {
   Owner,
   Swing,
   WallBlocked,
-} from './components'
+} from '../components'
 import { internAbilityDef } from './defs'
 import { KIND_TAG } from './tags'
 import type { Sim } from '../sim'

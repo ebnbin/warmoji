@@ -1,7 +1,7 @@
 import type { SlowAuraDef } from '../../../types/abilityDefs'
 import { Slow } from '../../components'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Pulse } from '../components'
+import { Pulse } from '../../components'
 import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindSlowAura } from '../tags'

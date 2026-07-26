@@ -3,7 +3,7 @@ import { waveAt } from '../../data/waves'
 import { labFireRate } from '../../run/lab'
 import { Alive, DmgMul, Iframe, MAtkSlow, Slot, Transform } from '../components'
 import { applyDamage, hurtMember } from '../combat'
-import { Amp, FACTION, Faction, Owner } from './components'
+import { Amp, FACTION, Faction, Owner } from '../components'
 import type { Source } from './source'
 import type { Sim } from '../sim'
 

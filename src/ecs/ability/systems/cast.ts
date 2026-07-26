@@ -1,7 +1,7 @@
 import { hasComponent, query, removeComponent } from 'bitecs'
 import type { AbilityDef } from '../../../types/abilityDefs'
 import { cooldownMul } from '../amp'
-import { Ability, AbilityRef, CastRequest, Cooldown, Disarmed, Frozen, Manual } from '../components'
+import { Ability, AbilityRef, CastRequest, Cooldown, Disarmed, Frozen, Manual } from '../../components'
 import { abilityDefAt } from '../defs'
 import type { Sim } from '../../sim'
 
