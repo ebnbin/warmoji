@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { CaptainScene } from './scene/CaptainScene'
+import { BenchScene } from './scene/BenchScene'
 import { CardScene } from './scene/CardScene'
 import { MapScene } from './scene/MapScene'
 import { MenuScene } from './scene/MenuScene'
@@ -47,7 +48,7 @@ const game = new Phaser.Game({
   // 变步长物理：高刷新率屏幕上敌人/飞刀逐帧平滑移动
   physics: { default: 'arcade', arcade: { fixedStep: false } },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ShopScene, ...BATTLE_SCENES, UIScene, ResultScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, BenchScene, CaptainScene, PromoteScene, CardScene, ShopScene, ...BATTLE_SCENES, UIScene, ResultScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {
@@ -58,7 +59,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
   }
   // 场景 → BGM：大厅页共用一首，战斗页按本局地图配曲。
   // 挂在场景 START 上（restart 重入时 playBgm 幂等不重开）
-  const lobby = ['menu', 'map', 'wiki', 'studio', 'settings', 'captain', 'promote', 'cards', 'shop', 'result']
+  const lobby = ['menu', 'map', 'wiki', 'studio', 'settings', 'bench', 'captain', 'promote', 'cards', 'shop', 'result']
   for (const scene of game.scene.getScenes(false)) {
     const key = scene.scene.key
     if (lobby.includes(key)) {

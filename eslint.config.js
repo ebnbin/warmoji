@@ -91,6 +91,9 @@ export default tseslint.config(
       'src/main.ts',
       'src/scene/*Scene.ts',
       'src/war/UIScene.ts',
+      'src/war/benchPanel.ts',
+      // 基准采样器要挂 Phaser 的帧阶段事件常量
+      'src/bench/metrics.ts',
       'src/war/damageFont.ts',
       'src/util/fx.ts',
       // 旧框架（arcade）整包是表现层：Scene 继承 + Arcade Physics body

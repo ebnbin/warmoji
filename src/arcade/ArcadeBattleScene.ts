@@ -111,6 +111,8 @@ import { setActiveHudHost } from '../war/hudHost'
 import type { HudSnapshot, WaveSummary } from '../war/hudHost'
 import { rollWaveCarriers } from '../war/battleFx'
 import { enemyMixAt, pickEnemy } from '../war/enemyAi'
+import type { BenchSpec } from '../bench/spec'
+import { benchAngle, benchEnemyDef, benchOffset, benchProjectileDef } from '../bench/load'
 export type { ArcadeBody, ImageObj } from './body'
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
@@ -895,6 +897,41 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
       this.run.cardDraws += gained.levelsGained
       playSfx('levelup')
     }
+  }
+
+  // ── 性能基准 ────────────────────────────────────────────────
+  // 两侧同规格投放：不走自然刷怪，直接补足到目标数量。落点在队伍中心周围
+  // 均匀铺开（用固定序列而非随机，两次运行的空间分布一致）。
+
+  benchFill(spec: BenchSpec): void {
+    const cx = this.center.x
+    const cy = this.center.y
+    const edef = benchEnemyDef()
+    for (let i = this.awakeCount; i < spec.enemies; i++) {
+      const o = benchOffset(i)
+      this.materializeEnemy(edef, cx + o.dx * UNIT, cy + o.dy * UNIT, INVINCIBLE_HP)
+    }
+    const pdef = benchProjectileDef()
+    for (let i = this.projectiles.countActive(true); i < spec.projectiles; i++) {
+      const o = benchOffset(i)
+      spawnProjectile(this, cx + o.dx * UNIT, cy + o.dy * UNIT, benchAngle(i), pdef, 0)
+    }
+    for (let i = this.coins.countActive(true); i < spec.coins; i++) {
+      const o = benchOffset(i)
+      spawnCoins(this, cx + o.dx * UNIT, cy + o.dy * UNIT, 1)
+    }
+  }
+
+  benchClear(): void {
+    for (const g of [this.enemies, this.projectiles, this.coins]) {
+      for (const o of g.getChildren()) {
+        const s = o as Phaser.GameObjects.Sprite
+        s.setActive(false).setVisible(false)
+        const b = (s.body ?? undefined) as Phaser.Physics.Arcade.Body | undefined
+        b?.setEnable(false)
+      }
+    }
+    this.awakeCount = 0
   }
 
   /** 释放主动技能（UIScene 按钮/E 键触发）：纯 CD 门槛，就绪即放、重置跨波 CD

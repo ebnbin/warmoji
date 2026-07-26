@@ -176,7 +176,7 @@ interface WarmojiResultDebug {
 }
 
 interface WarmojiDebug {
-  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'promote' | 'cards' | 'shop' | 'arena' | 'result'
+  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'promote' | 'cards' | 'shop' | 'arena' | 'result' | 'bench'
   elapsed: number
   hp: number
   alive: number
@@ -215,8 +215,29 @@ interface WarmojiDebug {
   cards?: WarmojiCardsDebug
   shop?: WarmojiShopDebug
   result?: WarmojiResultDebug
+  /** 性能基准读数（基准页与基准面板同源） */
+  bench?: WarmojiBenchDebug
+}
+
+interface WarmojiBenchDebug {
+  /** 「开始基准」按钮坐标（e2e/探针点它） */
+  start?: { x: number; y: number }
+  framework: string
+  enemies: number
+  projectiles: number
+  coins: number
+  total: number
+  /** 战斗内实时读数（基准面板同源） */
+  fps?: number
+  frameP50?: number
+  frameP95?: number
+  updateMs?: number
+  renderMs?: number
+  samples?: number
 }
 
 interface Window {
   __warmoji?: WarmojiDebug
+  /** 性能基准读数（src/bench/probe.ts 写入；与 __warmoji 独立，两侧一致可采） */
+  __bench?: import('./bench/probe').BenchProbe
 }

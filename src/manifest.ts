@@ -130,6 +130,8 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '1f451',
   // 主菜单 Emoji Studio 入口图标（studio 页内素材按需加载）
   '1f9ea',
+  // 📊 性能基准入口
+  '1f4ca',
   // Studio 内部 UI 图标（tab / clip / 媒体控制 / 眼睛开关）——同步渲染需预载
   '1f3ac', // 🎬 配方
   '1f9e9', // 🧩 模板
