@@ -1,10 +1,71 @@
 import js from '@eslint/js'
 import tseslint from 'typescript-eslint'
 
+// ── 各条 import 护栏的 pattern，提成常量供下面的块组合 ─────────────────────────
+//
+// **为什么要组合而不是各写各的**：flat config 里同名规则「后者整个替换前者」，
+// 而这些块的 files 是重叠的（src/** ⊃ src/ecs/** ⊃ ...）。于是一个覆盖面更大的块
+// 只要排在后面，就会把前面所有更具体的 no-restricted-imports 静默清空——
+// 不报错、不警告，护栏就此形同虚设。这事真发生过一次：assets/*.json 那条作为
+// 最后一个 src/** 块加进来，一口气废掉了它前面的四条护栏，谁都没察觉。
+// 故：**每个块必须自己列全「对该组文件生效的所有 pattern」**，由 eslint.test.ts
+// 逐条实测每道护栏确实还会报错。
+
+/** assets/*.json 只许 data/ 与 types/ 读 */
+const NO_ASSETS_JSON = {
+  group: ['**/assets/*.json', '**/assets/**/*.json'],
+  message: 'assets/*.json 只许 data/ 与 types/ 读：把表搬进 data/ 并导出常量，这里 import 那个常量',
+}
+
+/** 两套战斗实现（含 bitecs）只能经 src/battle.ts 接入 */
+const NO_BATTLE_IMPL = {
+  group: [
+    '**/ecs', '**/ecs/*', '**/ecs/**', './ecs/*', '../ecs/*',
+    '**/arcade', '**/arcade/*', '**/arcade/**', './arcade/*', '../arcade/*',
+    'bitecs',
+  ],
+  message:
+    '战斗实现（src/arcade/ 与 src/ecs/）是两套可互相替换的并列分支：一律经 src/battle.ts 调用，不要直接 import（这样两侧的耦合面才数得清、淘汰其一时能一步拆干净）',
+}
+
+/** 页面层不得依赖 war/ */
+const NO_WAR_FROM_SCENE = {
+  group: ['**/war', '**/war/*', '**/war/**'],
+  message:
+    'src/war/ 只放战斗世界本身，页面不该依赖它。若页面与战斗都要用，说明它是接缝（放 src/run/，如 hudHost）或共享数据（放 src/data/），不该留在 war/',
+}
+
+/** 战斗侧不得依赖页面层（任意深度的相对路径都要拦住） */
+const NO_SCENE_FROM_BATTLE = {
+  group: ['**/scene', '**/scene/*', '**/scene/**'],
+  message: '战斗侧不得依赖场景层；通用控件在 src/ui/，业务数据在 src/data/',
+}
+
+/** 建实体只在 src/ecs/entities/ 下 */
+const NO_ADD_ENTITY = {
+  name: 'bitecs',
+  importNames: ['addEntity'],
+  message:
+    '建实体只在 src/ecs/entities/ 下：一种实体一个工厂，组件包在那里一次挂齐。就地 addEntity 迟早漏挂组件，而漏挂是编译期查不出来的',
+}
+
 export default tseslint.config(
   { ignores: ['dist/', 'node_modules/', 'test-results/', 'playwright-report/', 'public/'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  // 数据表的唯一入口：assets/*.json 只许 data/ 与 types/ 读
+  //（前者导出表，后者用 keyof typeof 派生 id 联合类型）。别处要用就 import data/ 的常量。
+  // 不设这条的下场是同一张表被多处各读一遍、各取一半字段：历史上 feel.json 被
+  // data/feel.ts 与 war/orbit.ts 瓜分，progression.json 更散在 data/waves、
+  // run/recruit、war/xp 三处——想知道「某个参数在哪」得翻遍全仓。
+  // 这条同时把「表 vs 算法」钉死：war/ 与 run/ 只放算法，表一律回 data/。
+  {
+    files: ['src/**/*.ts'],
+    ignores: ['src/data/**/*.ts', 'src/types/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [NO_ASSETS_JSON] }],
+    },
+  },
   // 纯度护栏：纯逻辑文件禁 import phaser（type import 放行——编译期擦除，无运行时依赖）。
   // 表现层文件显式白名单；新增 Phaser 文件必须在此登记——这道摩擦是有意的。
   // 边界的完整定义是「能在 node 的 vitest 里 import」，DOM/WebAudio 越界靠约定与单测把守。
@@ -16,22 +77,7 @@ export default tseslint.config(
     files: ['src/**/*.ts', 'e2e/**/*.ts'],
     ignores: ['src/ecs/**/*.ts', 'src/arcade/**/*.ts', 'src/battle.ts'],
     rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: [
-                '**/ecs', '**/ecs/*', '**/ecs/**', './ecs/*', '../ecs/*',
-                '**/arcade', '**/arcade/*', '**/arcade/**', './arcade/*', '../arcade/*',
-                'bitecs',
-              ],
-              message:
-                '战斗实现（src/arcade/ 与 src/ecs/）是两套可互相替换的并列分支：一律经 src/battle.ts 调用，不要直接 import（这样两侧的耦合面才数得清、淘汰其一时能一步拆干净）',
-            },
-          ],
-        },
-      ],
+      'no-restricted-imports': ['error', { patterns: [NO_BATTLE_IMPL, NO_ASSETS_JSON] }],
     },
   },
   // 战斗域边界护栏：src/war/ 只放战斗世界本身——能力/命中/特效/敌人 AI/世界几何/换算，
@@ -44,27 +90,7 @@ export default tseslint.config(
   {
     files: ['src/scene/**/*.ts'],
     rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['**/war', '**/war/*', '**/war/**'],
-              message:
-                'src/war/ 只放战斗世界本身，页面不该依赖它。若页面与战斗都要用，说明它是接缝（放 src/run/，如 hudHost）或共享数据（放 src/data/），不该留在 war/',
-            },
-            {
-              group: [
-                '**/ecs', '**/ecs/*', '**/ecs/**',
-                '**/arcade', '**/arcade/*', '**/arcade/**',
-                'bitecs',
-              ],
-              message:
-                '战斗实现（src/arcade/ 与 src/ecs/）一律经 src/battle.ts 调用',
-            },
-          ],
-        },
-      ],
+      'no-restricted-imports': ['error', { patterns: [NO_WAR_FROM_SCENE, NO_BATTLE_IMPL, NO_ASSETS_JSON] }],
     },
   },
   // 反方向同样要拦：战斗侧不得依赖页面层。通用控件已抽到 src/ui/。
@@ -73,16 +99,23 @@ export default tseslint.config(
   {
     files: ['src/war/**/*.ts', 'src/arcade/**/*.ts', 'src/ecs/**/*.ts'],
     rules: {
+      'no-restricted-imports': ['error', { patterns: [NO_SCENE_FROM_BATTLE, NO_ASSETS_JSON] }],
+    },
+  },
+  // 建实体的唯一入口护栏：addEntity 只准出现在 src/ecs/entities/ 下，一种实体一个工厂。
+  // 教训来自一个真实缺陷：持有物子实体曾在 kinds/ 里就地 addEntity + 手挂组件，漏了
+  // Owner，于是回旋镖主镖一飞出去就对推进系统隐形（那两个系统都以 Owner 为准入），
+  // 卡在半空不飞不伤不回，85% 的时间都是这个状态。同一批代码里 spawnTwin 是挂了 Owner
+  // 的——**规则有例外就得靠人记，而人会忘**。编译器与类型都拦不住「少挂一个组件」，
+  // 能拦住的只有「这种实体只有一个地方造得出来」。
+  // 必须重述上面那条场景层 pattern：flat config 里同名规则后者整个替换前者。
+  {
+    files: ['src/ecs/**/*.ts'],
+    ignores: ['src/ecs/entities/**/*.ts'],
+    rules: {
       'no-restricted-imports': [
         'error',
-        {
-          patterns: [
-            {
-              group: ['../scene/*', '../scene/**', '../../scene/*', '../../scene/**'],
-              message: '战斗侧不得依赖场景层；通用控件在 src/ui/，业务数据在 src/data/',
-            },
-          ],
-        },
+        { paths: [NO_ADD_ENTITY], patterns: [NO_SCENE_FROM_BATTLE, NO_ASSETS_JSON] },
       ],
     },
   },
@@ -152,6 +185,7 @@ export default tseslint.config(
               ],
               message: 'data 是内容叶子层：只可依赖 util / assets，不得反向依赖业务包',
             },
+            NO_BATTLE_IMPL,
           ],
         },
       ],
@@ -201,6 +235,9 @@ export default tseslint.config(
   {
     files: ['src/types/**/*.ts'],
     rules: {
+      // types 与 data 一样是 assets/*.json 的合法读者（它用 keyof typeof 派生 id 联合类型），
+      // 故这里把上面实现隔离块里的 pattern 重列一遍、独独去掉 NO_ASSETS_JSON
+      'no-restricted-imports': ['error', { patterns: [NO_BATTLE_IMPL] }],
       'no-restricted-syntax': [
         'error',
         {
@@ -228,30 +265,6 @@ export default tseslint.config(
             {
               group: ['../*'],
               message: 'util 不得 import src 中 util 以外的包（杂物层不向上引用）',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  // 数据表的唯一入口：assets/*.json 只许 data/ 与 types/ 读
-  //（前者导出表，后者用 keyof typeof 派生 id 联合类型）。别处要用就 import data/ 的常量。
-  // 不设这条的下场是同一张表被多处各读一遍、各取一半字段：历史上 feel.json 被
-  // data/feel.ts 与 war/orbit.ts 瓜分，progression.json 更散在 data/waves、
-  // run/recruit、war/xp 三处——想知道「某个参数在哪」得翻遍全仓。
-  // 这条同时把「表 vs 算法」钉死：war/ 与 run/ 只放算法，表一律回 data/。
-  {
-    files: ['src/**/*.ts'],
-    ignores: ['src/data/**/*.ts', 'src/types/**/*.ts'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['**/assets/*.json', '**/assets/**/*.json'],
-              message:
-                'assets/*.json 只许 data/ 与 types/ 读：把表搬进 data/ 并导出常量，这里 import 那个常量',
             },
           ],
         },
