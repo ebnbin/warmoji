@@ -13,6 +13,9 @@ import { Alive, Anim, Boss, DmgMul, Dormant, ENEMY_SET, Elite, Flash, Hp, Hurt, 
 import { enemyCarries, enemyDef } from './store'
 import { dropCoins, dropFieldPickup } from './pickups'
 import { unequipAbilities } from './ability/equip'
+import { applyAbilityEffects } from './ability/effects'
+import { enemySource } from './ability/source'
+import type { Effect } from '../types/abilityDefs'
 import type { Sim } from './sim'
 
 // 战斗(P3b):敌人受伤/致死/击退,队员接触伤害/死亡/复活/受击闪光。
@@ -220,15 +223,32 @@ export function memberContact(sim: Sim): void {
       if (MPerk.thorns[m]! > 0 && enemyDef[eid] !== undefined) {
         applyDamage(sim, eid, MPerk.thorns[m]!, 0, undefined, undefined, Slot.v[m]!)
       }
-      // onContact 附加效果(黏黏怪攻速惩罚:镜像 attackSlow 接触积木;默认接触仅 damage)
-      const atkSlow = def.onContact?.find((e) => e.kind === 'attackSlow')
-      if (atkSlow && atkSlow.kind === 'attackSlow') {
-        MAtkSlow.until[m] = now + atkSlow.durationMs
-        MAtkSlow.mul[m] = atkSlow.mul
+      // 接触附加效果整串走效果层(黏黏怪的攻速罚只是其中一种)。
+      // damage 那条不在此列——接触伤害由上面按 def.damage 结算,自带无敌帧节流。
+      // 从前这里是手挑 attackSlow 一种,别的效果写进 onContact 会被静默丢掉
+      const extra = contactExtras(def)
+      if (extra.length > 0) {
+        applyAbilityEffects(sim, enemySource(def.name, 1), extra, {
+          x: mx,
+          y: my,
+          baseDamage: 0,
+          targets: [m],
+        })
       }
       break // 一帧一员只吃一次(无敌帧掌管其余)
     }
   }
+}
+
+/** 接触时要施加的非伤害效果(按 def 记忆一次:接触每帧都在判,不能现过滤现分配) */
+const contactCache = new WeakMap<EnemyDef, readonly Effect[]>()
+function contactExtras(def: EnemyDef): readonly Effect[] {
+  let list = contactCache.get(def)
+  if (!list) {
+    list = (def.onContact ?? []).filter((e) => e.kind !== 'damage')
+    contactCache.set(def, list)
+  }
+  return list
 }
 
 /** 敌人静默移除(自爆/替身到时:不计击杀、不掉落、不放死亡效果) */

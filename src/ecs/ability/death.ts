@@ -4,7 +4,7 @@ import type { DecoyEffect, SplitEffect } from '../../types/enemies'
 import { Despawn } from '../components'
 import { spawnBrood, spawnEnemy } from '../entities/enemy'
 import { applyAbilityEffects } from './effects'
-import { deathSource } from './source'
+import { enemySource } from './source'
 import type { PendingDeath, Sim } from '../sim'
 
 // 亡语(onDeath):死亡触发的一串效果。与命中触发 onHit 复用同一套组合式 Effect 与执行器,
@@ -41,7 +41,7 @@ export function replayDeath(sim: Sim, d: PendingDeath): void {
   const effects = d.def.onDeath
   if (!effects) return
   const hpMul = waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier
-  const src = deathSource(d.def.name, d.dmgMul)
+  const src = enemySource(d.def.name, d.dmgMul)
   for (const fx of effects) {
     if (fx.kind === 'split') spawnSplit(sim, d, fx)
     else if (fx.kind === 'decoy') spawnDecoy(sim, d, fx, hpMul)

@@ -1,6 +1,7 @@
+import { hasComponent } from 'bitecs'
 import type { Effect } from '../../types/abilityDefs'
 import { circleHitIndices } from '../../war/hit'
-import { MAtkSlow, Poison, Slow } from '../components'
+import { MAtkSlow, Morph, Poison, Slow } from '../components'
 import { applyMorph } from '../morph'
 import { spawnEnemyProjectileEcs } from '../entities/projectile'
 import { enemyDef } from '../store'
@@ -12,8 +13,18 @@ import type { Source } from './source'
 import type { Sim } from '../sim'
 
 // 命中效果层（阵营中立）：「投送方式」与「命中后做什么」正交——任何投送都经此施加
-// 同一套效果。落点归属（暴击/击退倍率/战报分账/该打哪一侧）由能力实体本身决定，
+// 同一套效果。落点归属（暴击/击退倍率/战报分账/该打哪一侧）由施放者本身决定，
 // 效果只描述做什么。
+//
+// **状态类效果按「目标有没有这个机制」施加，不按阵营判。** 减速/中毒/变形的状态位
+// 只挂在敌人身上，攻速罚只挂在队员身上——所以「队员不会被减速」不该写成
+// `if (!team) continue`（那是把阵营知识塞进效果层），而该是「目标没有 Slow 组件，
+// 这条效果对它无从落地」。同一条效果碰上没有该机制的目标自然滑过，将来加中立单位
+// 也不用回来改这里。
+//
+// 每种效果一个处理器，收在 EFFECT_KINDS 一张表里：新增一种 = 加一行。
+// 表是**全映射**（`Record<Effect['kind'], …>`），漏掉一种编译期就红——
+// 从前那条 else-if 链漏一种是静默什么都不做。
 
 /** 一次触发的落点：锚点类效果（blast/ground/spawnProjectile/heal）作用于 (x,y)；
  * 逐目标类效果（damage/slow/poison/morph/attackSlow）作用于 targets（本次直接命中的真身） */
@@ -47,7 +58,124 @@ export function applyBlast(
   }
 }
 
-/** 求值一串效果（命中触发 onHit 共用）。缺席某侧机制的效果在该阵营下静默跳过 */
+/** 逐个施加到本次命中的目标上，并先滤掉「没有这套机制」的目标 */
+function eachCapable(sim: Sim, hit: HitCtx, comp: object, apply: (t: number) => void): void {
+  for (const t of hit.targets ?? []) {
+    if (hasComponent(sim.world, t, comp)) apply(t)
+  }
+}
+
+type Handler<K extends Effect['kind']> = (
+  sim: Sim,
+  src: Source,
+  fx: Extract<Effect, { kind: K }>,
+  hit: HitCtx,
+) => void
+
+/** 每种效果一个处理器。全映射：新增一种 Effect 而不在此登记 = 编译不过 */
+const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
+  blast: (sim, src, fx, hit) => {
+    const dmg = Math.max(1, Math.round(hit.baseDamage * fx.ratio))
+    applyBlast(sim, src, hit.x, hit.y, dmg, fx.radius, fx.knockback, hit.exclude)
+    if (!fx.ring) return
+    sim.pendingCues.push({
+      kind: 'circle',
+      x: hit.x,
+      y: hit.y,
+      radius: fx.radius,
+      o: {
+        fill: fx.ring.color,
+        fillAlpha: fx.ring.fillAlpha,
+        stroke: fx.ring.color,
+        lineWidth: fx.ring.lineWidth,
+        lineAlpha: fx.ring.lineAlpha,
+        fromScale: 0.3,
+        toScale: 1,
+        durationMs: fx.ring.durMs,
+        depth: 7,
+      },
+    })
+  },
+
+  damage: (sim, src, fx, hit) => {
+    const dmg = Math.max(1, Math.round(hit.baseDamage * (fx.ratio ?? 1)))
+    for (const t of hit.targets ?? []) damageTarget(sim, src, t, dmg)
+  },
+
+  // 减速位只挂在敌人身上：队员身上没有 Slow，这条效果碰到他们自然滑过
+  slow: (sim, _src, fx, hit) => {
+    const until = sim.elapsedMs + fx.durationMs
+    eachCapable(sim, hit, Slow, (t) => {
+      Slow.until[t] = until
+      Slow.mul[t] = fx.factor
+    })
+  },
+
+  poison: (sim, src, fx, hit) => {
+    const now = sim.elapsedMs
+    eachCapable(sim, hit, Poison, (t) => {
+      Poison.until[t] = now + fx.durationMs
+      Poison.nextTick[t] = now + fx.tickMs
+      Poison.dmg[t] = fx.damage
+      Poison.tickMs[t] = fx.tickMs
+      Poison.slot[t] = src.slot
+    })
+  },
+
+  // enemyDef 已清空 = 这一帧刚死，死者不变形
+  morph: (sim, _src, fx, hit) => {
+    eachCapable(sim, hit, Morph, (t) => {
+      if (enemyDef[t] !== undefined) applyMorph(sim, sim.frames, t, fx)
+    })
+  },
+
+  // 攻速罚只挂在队员身上，同理
+  attackSlow: (sim, _src, fx, hit) => {
+    const until = sim.elapsedMs + fx.durationMs
+    eachCapable(sim, hit, MAtkSlow, (t) => {
+      MAtkSlow.until[t] = until
+      MAtkSlow.mul[t] = fx.mul
+    })
+  },
+
+  // 铺一块地面效果区：它属于施放的那一侧（伤害只落在对面），故要带上阵营
+  ground: (sim, src, fx, hit) => {
+    const team = src.faction === FACTION.team
+    sim.pendingGrounds.push({
+      x: hit.x,
+      y: hit.y,
+      def: fx.def,
+      faction: team ? 'team' : 'enemy',
+      srcSlot: src.slot,
+      srcName: team ? '' : (src.name ?? ''),
+    })
+  },
+
+  // 治疗的是自己这一侧：这里的阵营判断是「找哪一批人」，与上面的机制判断不同
+  heal: (sim, src, fx, hit) => {
+    const all = fx.all ?? true
+    if (src.faction === FACTION.team) healMembers(sim, hit.x, hit.y, fx.range, fx.amount, all)
+    else healEnemies(sim, hit.x, hit.y, fx.range, fx.amount, all, hit.source)
+  },
+
+  // 亡语冷枪：发的是敌弹，故只对敌方侧成立（gen 只允许它出现在敌人亡语里）
+  spawnProjectile: (sim, src, fx, hit) => {
+    if (src.faction === FACTION.team) return
+    const angle = nearestAngle(hit.x, hit.y, targetsOf(sim, src), Infinity)
+    if (angle === null) return
+    spawnEnemyProjectileEcs(sim, sim.frames, hit.x, hit.y, angle, {
+      emoji: fx.projectile.emoji,
+      size: fx.projectile.size,
+      radius: fx.projectile.radius,
+      speed: fx.projectile.speed,
+      damage: Math.round(fx.damage * src.dmgMul),
+      lifeMs: fx.lifeMs,
+      srcName: src.name,
+    })
+  },
+}
+
+/** 求值一串效果（命中触发 onHit 与亡语共用） */
 export function applyAbilityEffects(
   sim: Sim,
   src: Source,
@@ -55,87 +183,7 @@ export function applyAbilityEffects(
   hit: HitCtx,
 ): void {
   if (!effects) return
-  const team = src.faction === FACTION.team
-  const now = sim.elapsedMs
   for (const fx of effects) {
-    if (fx.kind === 'blast') {
-      const dmg = Math.max(1, Math.round(hit.baseDamage * fx.ratio))
-      applyBlast(sim, src, hit.x, hit.y, dmg, fx.radius, fx.knockback, hit.exclude)
-      if (fx.ring) {
-        sim.pendingCues.push({
-          kind: 'circle',
-          x: hit.x,
-          y: hit.y,
-          radius: fx.radius,
-          o: {
-            fill: fx.ring.color,
-            fillAlpha: fx.ring.fillAlpha,
-            stroke: fx.ring.color,
-            lineWidth: fx.ring.lineWidth,
-            lineAlpha: fx.ring.lineAlpha,
-            fromScale: 0.3,
-            toScale: 1,
-            durationMs: fx.ring.durMs,
-            depth: 7,
-          },
-        })
-      }
-    } else if (fx.kind === 'damage') {
-      const dmg = Math.max(1, Math.round(hit.baseDamage * (fx.ratio ?? 1)))
-      for (const t of hit.targets ?? []) damageTarget(sim, src, t, dmg)
-    } else if (fx.kind === 'slow') {
-      if (!team) continue // 队员无减速机制
-      for (const t of hit.targets ?? []) {
-        Slow.until[t] = now + fx.durationMs
-        Slow.mul[t] = fx.factor
-      }
-    } else if (fx.kind === 'poison') {
-      if (!team) continue // 队员无中毒机制
-      const slot = src.slot
-      for (const t of hit.targets ?? []) {
-        Poison.until[t] = now + fx.durationMs
-        Poison.nextTick[t] = now + fx.tickMs
-        Poison.dmg[t] = fx.damage
-        Poison.tickMs[t] = fx.tickMs
-        Poison.slot[t] = slot
-      }
-    } else if (fx.kind === 'morph') {
-      if (!team) continue // 敌方无变形手段
-      for (const t of hit.targets ?? []) {
-        if (enemyDef[t] !== undefined) applyMorph(sim, sim.frames, t, fx) // 死者不变形
-      }
-    } else if (fx.kind === 'attackSlow') {
-      if (team) continue // 攻速减益是敌 → 队员专属
-      for (const t of hit.targets ?? []) {
-        MAtkSlow.until[t] = now + fx.durationMs
-        MAtkSlow.mul[t] = fx.mul
-      }
-    } else if (fx.kind === 'ground') {
-      sim.pendingGrounds.push({
-        x: hit.x,
-        y: hit.y,
-        def: fx.def,
-        faction: team ? 'team' : 'enemy',
-        srcSlot: src.slot,
-        srcName: team ? '' : (src.name ?? ''),
-      })
-    } else if (fx.kind === 'heal') {
-      const all = fx.all ?? true
-      if (team) healMembers(sim, hit.x, hit.y, fx.range, fx.amount, all)
-      else healEnemies(sim, hit.x, hit.y, fx.range, fx.amount, all, hit.source)
-    } else if (fx.kind === 'spawnProjectile') {
-      if (team) continue // 目前只有敌方死亡冷枪在用
-      const angle = nearestAngle(hit.x, hit.y, targetsOf(sim, src), Infinity)
-      if (angle === null) continue
-      spawnEnemyProjectileEcs(sim, sim.frames, hit.x, hit.y, angle, {
-        emoji: fx.projectile.emoji,
-        size: fx.projectile.size,
-        radius: fx.projectile.radius,
-        speed: fx.projectile.speed,
-        damage: Math.round(fx.damage * src.dmgMul),
-        lifeMs: fx.lifeMs,
-        srcName: src.name,
-      })
-    }
+    ;(EFFECT_KINDS[fx.kind] as Handler<Effect['kind']>)(sim, src, fx, hit)
   }
 }

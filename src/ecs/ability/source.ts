@@ -47,7 +47,7 @@ export function boltSource(slot: number): Source {
   return { faction: FACTION.team, slot, kb: 1, crit: 0, dmgMul: 1 }
 }
 
-/** 亡语的来源：阵营=敌方，发弹按死者体质缩放 */
-export function deathSource(name: string, dmgMul: number): Source {
+/** 敌方的非能力来源（亡语 / 接触）：不掷暴击、不乘击退倍率，发弹按体质缩放 */
+export function enemySource(name: string, dmgMul: number): Source {
   return { faction: FACTION.enemy, slot: -1, kb: 1, crit: 0, dmgMul, name }
 }

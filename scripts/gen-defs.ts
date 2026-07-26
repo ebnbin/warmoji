@@ -105,7 +105,8 @@ const TEAM_EFFECT_KEYS = new Set([
   'teamHpMul', 'reviveMul', 'skillCdMul', 'shopDiscountMul', 'freeRerolls', 'draftSize',
 ])
 
-/** onHit 命中效果的合法 kind（与 src/abilities/effects.ts 的 applyEffects 分支同步） */
+/** onHit 命中效果的合法 kind（与两侧效果层的登记表同步：
+ * src/ecs/ability/effects.ts 的 EFFECT_KINDS、src/arcade/abilities/effects.ts） */
 const EFFECT_KINDS = new Set(['blast', 'slow', 'poison', 'ground', 'morph'])
 
 /** 命中效果链校验：kind 合法 + 数值字段成形 */
