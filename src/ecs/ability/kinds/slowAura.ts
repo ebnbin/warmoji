@@ -1,7 +1,7 @@
 import type { SlowAuraDef } from '../../../types/abilityDefs'
-import { Slow } from '../../components'
+import { Anchor, Aura, Faction, Pulse, Slow } from '../../components'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Pulse } from '../../components'
+import { spawnZone } from '../../entities/zone'
 import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindSlowAura } from '../tags'
@@ -12,16 +12,31 @@ import type { Sim } from '../../sim'
 const TICK_MS = 500
 
 /** 寒气光环：以持有者为圆心持续减速。光环没有冷却概念——Cooldown 恒为 0，
- * 于是每帧都过一遍施放扫描、每帧都重新登记减速区（少一帧圈就断一帧）。
- * dps 光环内持续掉血、freeze 周期脉冲冻结，两条节拍各自走 Pulse，不占冷却。
- * 持有者倒下光环随之消失（闸门管） */
+ * 于是每帧都过一遍施放扫描。
+ * 减速区本身是一个**跟着持有者走的区域实体**（entities/zone.ts），建一次就一直在：
+ * 开关随本武器的出手闸门（持有者倒下当场熄，复活自然回来），武器没了它一并回收。
+ * dps 光环内持续掉血、freeze 周期脉冲冻结，两条节拍各自走 Pulse，不占冷却 */
 export function castSlowAuras(sim: Sim, dt: number): void {
   castScan<SlowAuraDef>(sim, KindSlowAura, (e, def) => {
     const src = sourceOf(sim, e)
     const x = ownerX(e)
     const y = ownerY(e)
-    // 本帧减速区（消费方 steerEnemies 读最近一次；ring 供场景侧画光环圈）
-    sim.frameSlowZones.push({ x, y, r2: def.radius * def.radius, factor: def.slowFactor, r: def.radius, ring: def.color })
+    if (Aura.zone[e] === 0) {
+      Aura.zone[e] = spawnZone(sim, {
+        x,
+        y,
+        radius: def.radius,
+        faction: Faction.v[e]!,
+        durationMs: 0,
+        enterMs: 0,
+        color: def.color,
+        fillAlpha: 0.08,
+        lineAlpha: 0.35,
+        lineWidth: 2,
+        chill: { factor: def.slowFactor },
+        follow: { of: Anchor.eid[e]!, owner: e },
+      })
+    }
     const r2 = def.radius * def.radius
     if (def.dps) {
       if (Pulse.dps[e] === 0) Pulse.dps[e] = TICK_MS // 起拍：等满一个周期再跳第一次

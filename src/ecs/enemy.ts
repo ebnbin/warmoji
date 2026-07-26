@@ -8,7 +8,7 @@ import { PICKUPS } from '../data/pickups'
 import { UNIT } from '../util/units'
 import { playSfx } from '../audio/sfx'
 import { despawnEnemy, hurtMember } from './combat'
-import { Alive, Boss, Charge, Despawn, DmgMul, Dormant, EDir, ENEMY_SET, EState, ETurn, EnemyPhase, EnemyVel, Flash, Iframe, Kv, Morph, Nest, PICKUP_SET, Pickup, Poison, Pop, Slow, SpMul, Speed, Sprite, Step, Thief, Tint, Transform, ZoneSlow } from './components'
+import { Alive, Boss, Charge, Despawn, DmgMul, Dormant, EDir, ENEMY_SET, EState, ETurn, EnemyPhase, EnemyVel, FACTION, Flash, Iframe, Kv, Morph, Nest, PICKUP_SET, Pickup, Poison, Pop, Slow, SpMul, Speed, Sprite, Step, Thief, Tint, Transform, Zone, ZoneChill, ZoneSlow } from './components'
 import { enemyDef } from './store'
 import { COIN } from './pickups'
 
@@ -454,14 +454,18 @@ const STEERERS: { [K in LocomotionDef['kind']]: Steerer<K> } = {
   coinThief: (sim, eid, _speed, slow) => steerCoinThief(sim, eid, slow),
 }
 
-/** 本帧减速区叠乘(寒气光环等):落在圈内即按 factor 变慢。转向与染色共读这一份 */
+/** 减速区叠乘(寒气光环等):落在圈内即按 factor 变慢。转向与染色共读这一份。
+ * 减速是**敌人的**属性,故折算在这里而不在 zones.ts:那边只管区自己的事 */
 export function applySlowZones(sim: Sim): void {
+  const chills = query(sim.world, [Zone, ZoneChill, Transform])
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     if (Dormant.v[eid]) continue
     let mul = 1
-    for (const z of sim.frameSlowZones) {
-      const d = sim.hooks.worldDelta(sim, Transform.x[eid]!, Transform.y[eid]!, z.x, z.y)
-      if (d.x * d.x + d.y * d.y <= z.r2) mul *= z.factor
+    for (const z of chills) {
+      if (Zone.on[z] === 0 || Zone.faction[z] === FACTION.enemy) continue // 只落在对面
+      const r = Zone.radius[z]!
+      const d = sim.hooks.worldDelta(sim, Transform.x[eid]!, Transform.y[eid]!, Transform.x[z]!, Transform.y[z]!)
+      if (d.x * d.x + d.y * d.y <= r * r) mul *= ZoneChill.factor[z]!
     }
     ZoneSlow.v[eid] = mul
   }

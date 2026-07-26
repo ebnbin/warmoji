@@ -5,7 +5,9 @@ import { fan, newScratch, resetScratch, ringStrip } from './tri'
 import type { Scratch } from './tri'
 import type { EcsWorld } from '../world'
 
-// 实体光圈：跟着实体走的**持久**呼吸圆（待拾脉冲、携带者极性光环）。
+// 实体圆圈：画在实体位置上的填充圆 + 描边（待拾脉冲、携带者光环、地面效果区、寒气光环）。
+// **全场就这一个画圆的地方**——从前地面区是每块一个 Phaser Graphics + 两条 tween，
+// 寒气光环是场景侧一池 Circle 按帧表对帐，各画各的。
 //
 // 与 cues.ts 的分工：那边是「放完即弃」的一次性特效，数据在投放队列里；
 // 这边的圈是实体的一个属性——实体在圈就在，实体没了圈自然跟着没，
@@ -23,13 +25,11 @@ const SCALE_LO = 0.82
 const SCALE_HI = 1.12
 const ALPHA_LO = 0.35
 const ALPHA_HI = 0.9
-/** 描边宽度（px，恒定） */
-const LINE_W = 3
-
-/** 深度分带：一个批绘对象只有一个 Phaser depth，故按 Ring.z 分开两带
- * （待拾光圈 3 压在金币/敌人之下，携带者光环 4 压在敌人之下） */
+/** 深度分带：一个批绘对象只有一个 Phaser depth，故按 Ring.z 分开三带
+ * （地面区 2 铺在最底、待拾光圈 3 压在金币之下、携带者光环 4 压在敌人之下） */
 const BANDS: readonly { depth: number; zMin: number; zMax: number }[] = [
-  { depth: 3, zMin: -Infinity, zMax: 4 },
+  { depth: 2, zMin: -Infinity, zMax: 3 },
+  { depth: 3, zMin: 3, zMax: 4 },
   { depth: 4, zMin: 4, zMax: Infinity },
 ]
 
@@ -67,15 +67,17 @@ export class RingLayer {
     for (const eid of query(this.world, RING_SET as unknown as object[])) {
       const z = Ring.z[eid]!
       if (z < zMin || z >= zMax) continue
-      const t = breath(this.now - Ring.born[eid]!)
-      const r = Ring.radius[eid]! * (SCALE_LO + (SCALE_HI - SCALE_LO) * t)
-      // 叠上实体自身的 alpha:待拾物到期渐隐、敌人入场渐显,圈跟着一起
-      const a = (ALPHA_HI + (ALPHA_LO - ALPHA_HI) * t) * Tint.alpha[eid]!
+      // 呼吸档：缩放与透明度往返；静止档：半径与透明度全由持有它的系统写
+      const breathing = Ring.breathe[eid] === 1
+      const t = breathing ? breath(this.now - Ring.born[eid]!) : 0
+      const r = Ring.radius[eid]! * (breathing ? SCALE_LO + (SCALE_HI - SCALE_LO) * t : 1)
+      // 叠上实体自身的 alpha:待拾物到期渐隐、敌人入场渐显、地面区淡出，圈跟着一起
+      const a = (breathing ? ALPHA_HI + (ALPHA_LO - ALPHA_HI) * t : 1) * Tint.alpha[eid]!
       const x = Transform.x[eid]!
       const y = Transform.y[eid]! + Ring.dy[eid]!
       const color = Ring.color[eid]!
       fan(o, m, x, y, r, getTintAppendFloatAlpha(color, Ring.fillAlpha[eid]! * a))
-      ringStrip(o, m, x, y, r, LINE_W, getTintAppendFloatAlpha(color, 0.9 * a))
+      ringStrip(o, m, x, y, r, Ring.lineWidth[eid]!, getTintAppendFloatAlpha(color, Ring.lineAlpha[eid]! * a))
     }
     return o
   }

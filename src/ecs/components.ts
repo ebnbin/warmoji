@@ -233,15 +233,54 @@ export const Lifetime = { until: f32() }
 /** 待拾缓浮(纯视觉):图标绕落点上下缓飘。y0 = 落点(逻辑真相),Transform.y = y0 + 偏移 */
 export const Bob = { y0: f32(), amp: f32(), halfMs: f32() }
 
-/** 光圈:跟着实体走的持久呼吸圆(待拾脉冲 / 携带者极性光环)。绘制在 render/rings.ts。
+/** 圆圈:画在实体位置上的填充圆 + 描边(待拾脉冲、携带者光环、地面效果区、寒气光环)。
+ * 绘制在 render/rings.ts——全场就这一个画圆的地方。
+ * breathe=1 走呼吸(缩放与透明度往返,born 定相位);=0 静止,半径由持有它的系统自己写。
  * dy = 相对 Transform 的纵向偏移——图标缓浮时用它把圈按回地面 */
-export const Ring = { color: u32(), radius: f32(), fillAlpha: f32(), born: f32(), dy: f32(), z: f32() }
+export const Ring = {
+  color: u32(),
+  radius: f32(),
+  fillAlpha: f32(),
+  lineAlpha: f32(),
+  lineWidth: f32(),
+  born: f32(),
+  dy: f32(),
+  z: f32(),
+  breathe: u8(),
+}
 
 /** 拾取物查询集(磁吸/拾取/到期:位姿 + 速度) */
 export const PICKUP_SET = [Pickup, Transform, Vel] as const
 
-/** 光圈查询集 */
+/** 圆圈查询集 */
 export const RING_SET = [Ring, Transform, Tint] as const
+
+// ── 区域(zone)──────────────────────────────────────────────
+// 地上一块圆,进去就受影响。地面毒圈/灼烧区与寒气光环是同一个概念的两个实例——
+// 差别只在三个正交旋钮:锚在哪(静止 / 跟着施放者)、活多久(有寿命 / 随武器在)、
+// 进去了怎么样(掉血 / 减速)。生成在 entities/zone.ts,逐帧推进在 zones.ts。
+
+/** 区域标记:半径(px)、阵营(效果只落在对面)、入场缩放时长、本帧生效与否。
+ * on 由 zones.ts 每帧从源头推导(跟随型看那件武器的出手闸门,静止型恒 1),
+ * 消费方只读它——不是一份要各处同步的副本 */
+export const Zone = { radius: f32(), faction: u8(), enterMs: f32(), on: u8() }
+
+/** 区域的持续伤害:每 tickMs 一跳。srcSlot = 战报归属槽位(敌方区 -1,名字在 store) */
+export const ZoneBurn = { damage: f32(), tickMs: f32(), nextAt: f32(), srcSlot: i32() }
+
+/** 区域的减速:区内敌人移速 ×factor */
+export const ZoneChill = { factor: f32() }
+
+/** 区域跟着某个实体走(位姿每帧抄它);不挂 = 静止在落点。
+ * 跟随型另有 Owner 指向造它的那件武器:开关随武器的出手闸门,武器没了圈也没 */
+export const ZoneFollow = { of: i32() }
+
+/** 区域查询集 */
+export const ZONE_SET = [Zone, Transform] as const
+
+/** 上次被地面区烧到的时刻:队员无论同时踩几个区,每 tickMs 至多掉一次血。
+ * 这是队员自己的属性,不是区的属性,故挂在队员身上 */
+export const GroundHit = { last: f32() }
 
 // ── 能力组件 ────────────────────────────────────────────────────────
 // 能力 = 实体。一条能力定义在装备时被物化成一个实体，组件描述「它是哪条定义、谁持有、
@@ -322,8 +361,12 @@ export const Swing = { startMs: f32(), durMs: f32() }
  * 子实体自带 Transform/Sprite/Tint/Depth，随批绘一起画，不是游离的 GameObject */
 
 /** 光环的两个自走节拍：dps 跳伤与冻结脉冲各自倒计时。
- * 光环没有冷却概念（每帧都要重新登记减速区），故不能借 Cooldown 当计时器 */
+ * 光环没有冷却概念（每帧都过一遍施放扫描），故不能借 Cooldown 当计时器 */
 export const Pulse = { dps: f32(), freeze: f32() }
+
+/** 光环名下的减速区实体（0 = 还没建；建一次就一直在，随本武器一并回收）。
+ * eid 在 [1, MAX_ENTITIES)，故 0 可当「没有」 */
+export const Aura = { zone: i32() }
 
 /** 后手：这条能力还欠一发（连锁轰炸的追击 / 二连突的第二段）。left>0 即在途，
  * 与冷却一样只在未冻结时推进；damage 是那一发的伤害快照 */

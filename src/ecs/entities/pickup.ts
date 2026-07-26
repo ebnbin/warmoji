@@ -68,9 +68,12 @@ export function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): n
     Ring.color[eid] = spec.ring.color
     Ring.radius[eid] = spec.ring.radius
     Ring.fillAlpha[eid] = spec.ring.fillAlpha
+    Ring.lineAlpha[eid] = 0.9
+    Ring.lineWidth[eid] = 3
     Ring.born[eid] = sim.fxMs
     Ring.dy[eid] = 0
     Ring.z[eid] = spec.ring.z
+    Ring.breathe[eid] = 1
   }
   pickupDef[eid] = spec.def
   return eid

@@ -40,10 +40,9 @@ export interface Step {
   readonly why?: string
 }
 
-/** 本帧登记表清零：能力系统是唯一生产者，消费方（steerEnemies / updatePickups / 光环圈）
- * 读最近一次。少了这一步登记项会逐帧堆积——光环圈叠成一片白，敌速被反复叠乘冻死 */
+/** 本帧登记表清零：能力系统是唯一生产者，消费方（updatePickups）读最近一次。
+ * 少了这一步登记项会逐帧堆积 */
 function clearFrameRegisters(sim: Sim): void {
-  sim.frameSlowZones.length = 0
   sim.frameAttractors.length = 0
 }
 

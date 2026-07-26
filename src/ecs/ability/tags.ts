@@ -1,4 +1,4 @@
-import { Blink, Followup, Pulse, Radial, Shots, Swing } from '../components'
+import { Aura, Blink, Followup, Pulse, Radial, Shots, Swing } from '../components'
 import type { AbilityDef } from '../../types/abilityDefs'
 
 // 每种能力的登记表：一个 tag 组件 + 它自己需要的状态组件。
@@ -48,6 +48,7 @@ const PulseState: StateSpec = {
   },
 }
 const ShotsState: StateSpec = { comp: Shots, reset: (e) => { Shots.n[e] = 0 } }
+const AuraState: StateSpec = { comp: Aura, reset: (e) => { Aura.zone[e] = 0 } }
 
 export const KindRally = {}
 export const KindDance = {}
@@ -93,5 +94,5 @@ export const KINDS: Partial<Record<AbilityDef['kind'], KindSpec>> = {
   laser: { tag: KindLaser, state: [RadialState] },
   summon: { tag: KindSummon },
   turret: { tag: KindTurret },
-  slowAura: { tag: KindSlowAura, state: [PulseState] },
+  slowAura: { tag: KindSlowAura, state: [PulseState, AuraState] },
 }

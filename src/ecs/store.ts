@@ -35,13 +35,16 @@ export const pickupDef: (FieldPickupDef | undefined)[] =
 /** 敌弹的伤害来源名(结算页敌情明细按敌人名归属) */
 export const eprojSrcName: (string | undefined)[] = new Array<string | undefined>(MAX_ENTITIES).fill(undefined)
 
+/** 敌方地面区的伤害来源名(同上;队伍侧的区按 ZoneBurn.srcSlot 分账,不用名字) */
+export const zoneSrcName: (string | undefined)[] = new Array<string | undefined>(MAX_ENTITIES).fill(undefined)
+
 /** 部件动画的 emoji 与描边(帧惰性解析用;undefined = 该实体不参与动画) */
 export const animId: (string | undefined)[] = new Array<string | undefined>(MAX_ENTITIES).fill(undefined)
 export const animOutline: (import('../emoji/svg').OutlineKind | undefined)[] =
   new Array<import('../emoji/svg').OutlineKind | undefined>(MAX_ENTITIES).fill(undefined)
 
 /** 跨局清场:模块级伴随存储整体清空(eid 从 0 重新分配,旧局引用不能留给新实体)。
- * 场景 create 时与 clearGroundEffectsEcs/clearFieldEcs 一并调用 */
+ * 场景 create 时调 */
 export function clearEcsStore(): void {
   enemyDef.fill(undefined)
   projOnHit.fill(undefined)
@@ -52,4 +55,5 @@ export function clearEcsStore(): void {
   animId.fill(undefined)
   animOutline.fill(undefined)
   eprojSrcName.fill(undefined)
+  zoneSrcName.fill(undefined)
 }

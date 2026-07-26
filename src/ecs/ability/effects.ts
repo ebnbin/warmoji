@@ -4,6 +4,7 @@ import { circleHitIndices } from '../../war/hit'
 import { MAtkSlow, Morph, Poison, Slow } from '../components'
 import { applyMorph } from '../morph'
 import { spawnEnemyProjectileEcs } from '../entities/projectile'
+import { spawnZone } from '../entities/zone'
 import { enemyDef } from '../store'
 import { damageTarget } from './amp'
 import { FACTION } from '../components'
@@ -138,16 +139,26 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
     })
   },
 
-  // 铺一块地面效果区：它属于施放的那一侧（伤害只落在对面），故要带上阵营
+  // 铺一块地面区：它属于施放的那一侧（伤害只落在对面），故要带上阵营。
+  // 铺完就与施放者无关了——毒圈活过放它的人是常态，故不挂 Owner
   ground: (sim, src, fx, hit) => {
-    const team = src.faction === FACTION.team
-    sim.pendingGrounds.push({
+    spawnZone(sim, {
       x: hit.x,
       y: hit.y,
-      def: fx.def,
-      faction: team ? 'team' : 'enemy',
-      srcSlot: src.slot,
-      srcName: team ? '' : (src.name ?? ''),
+      radius: fx.def.radius,
+      faction: src.faction,
+      durationMs: fx.def.durationMs,
+      enterMs: fx.def.enterMs,
+      color: fx.def.color,
+      fillAlpha: fx.def.fillAlpha,
+      lineAlpha: fx.def.lineAlpha,
+      lineWidth: 2,
+      burn: {
+        damage: fx.def.damage,
+        tickMs: fx.def.tickMs,
+        srcSlot: src.slot,
+        srcName: src.faction === FACTION.team ? '' : (src.name ?? ''),
+      },
     })
   },
 

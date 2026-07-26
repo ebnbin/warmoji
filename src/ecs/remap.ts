@@ -1,7 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../war/remap'
-import { Bob, EDir, ENEMY_SET, EPROJ_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Transform, Vel } from './components'
-import { remapGroundEffectsEcs } from './groundEffects'
+import { Bob, EDir, ENEMY_SET, EPROJ_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Transform, Vel, ZONE_SET } from './components'
 import type { Sim } from './sim'
 import type { Point } from '../util/vec'
 
@@ -66,6 +65,6 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     p.x = q.x
     p.y = q.y
   }
-  // 地面效果区(模块级列表,连同它的视觉一起挪;待拾物已是实体,上面走通用通路)
-  remapGroundEffectsEcs(map)
+  // 区域(地面毒圈等;跟随型下一帧自会抄回锚点位置,这里一并挪只为不闪那一帧)
+  for (const eid of query(sim.world, ZONE_SET as unknown as object[])) movePos(eid)
 }

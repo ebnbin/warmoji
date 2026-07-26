@@ -1,7 +1,7 @@
 import { addComponent, addComponents, query, removeEntity } from 'bitecs'
 
 import { abilityPiercesWalls } from '../../war/abilityRules'
-import { Ability, AbilityRef, Aim, Amp, Anchor, CastRequest, Cooldown, Disarmed, Drop, Faction, Flyer, Frozen, Manual, Minion, Owner, WallBlocked, Weapon } from '../components'
+import { Ability, AbilityRef, Aim, Amp, Anchor, CastRequest, Cooldown, Disarmed, Drop, Faction, Flyer, Frozen, Manual, Minion, Owner, WallBlocked, Weapon, ZoneFollow } from '../components'
 import { internAbilityDef } from './defs'
 import { KINDS } from './tags'
 
@@ -80,6 +80,8 @@ export function unequipAbilities(sim: Sim, ownerEid: number): void {
   for (const e of query(world, [Weapon, Owner])) if (Owner.eid[e] === ownerEid) doomed.push(e)
   if (doomed.length === 0) return
   for (const d of query(world, [Drop, Owner])) if (doomed.includes(Owner.eid[d]!)) removeEntity(world, d)
+  // 跟随型区域(寒气光环)挂在武器名下;静止的地面区不挂 Owner——毒圈活过放它的人是常态
+  for (const z of [...query(world, [ZoneFollow, Owner])]) if (doomed.includes(Owner.eid[z]!)) removeEntity(world, z)
   // 召唤物的 Owner 就是施放者本人（Built.by 才指母武器），故直接按持有者判
   for (const m of [...query(world, [Minion, Owner])]) if (Owner.eid[m] === ownerEid) removeEntity(world, m)
   // 双子镖是武器的临时副本（主镖就是武器自己，随下面一并回收）

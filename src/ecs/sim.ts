@@ -22,7 +22,6 @@ import type { RunState } from '../run/state'
 import type { Cue } from './ability/cues'
 import type { Target } from './ability/targets'
 import type { FrameIndex } from './frames'
-import type { GroundEffectDef } from '../types/groundEffects'
 import { TIMESTOP } from '../data/timeStop'
 import { timeScaleFor } from '../war/timeStop'
 import { BATTLE_FX_IDENTITY } from '../data/battlefield'
@@ -108,9 +107,6 @@ export interface Sim {
   battleFx: BattleEffects
   /** 团队卡的敌速乘区(开局定;与 battleFx.enemySlowMul 并行相乘) */
   enemySlowMul: number
-  /** 本帧减速区(寒气光环等每帧重新登记,叠乘敌方移速 + 冷色调提示;wire 每帧重建)。
-   * ring 给出时场景侧另画一圈光环视觉(半径取 r) */
-  frameSlowZones: { x: number; y: number; r2: number; factor: number; r?: number; ring?: number }[]
   /** 本帧金币吸点(磁力回旋镖:镖旁金币直接入账,省去飞回中心;wire 每帧重建) */
   frameAttractors: { x: number; y: number; r2: number }[]
   /** 本帧两侧存活快照(能力索敌共享;targets.ts 每帧重建,含环面镜像坐标) */
@@ -140,8 +136,6 @@ export interface Sim {
   pendingRings: { x: number; y: number; radius: number }[]
   /** 本帧一次性战斗特效(能力系统只入队;场景侧 drainCues 排空,走 war/abilities/cues) */
   pendingCues: Cue[]
-  /** 本帧待铺的地面效果区(视觉需 scene 建 graphics,故经队列;场景侧同帧排空) */
-  pendingGrounds: PendingGround[]
   /** 亡语同步重放(场景侧注入,需 scene/atlas):挂上即在 killEnemy 内当场跑,
    * 未挂则回落到 pendingDeaths 帧末排空 */
   onDeathFx?: (d: PendingDeath) => void
@@ -214,16 +208,6 @@ export interface DamageNumber {
   y: number
   amount: number
   crit: boolean
-}
-
-/** 待铺的地面效果区(灼烧/毒液):阵营决定烧谁,归属供战报分账 */
-export interface PendingGround {
-  x: number
-  y: number
-  def: GroundEffectDef
-  faction: 'team' | 'enemy'
-  srcSlot: number
-  srcName: string
 }
 
 /** 粒子爆点(kind 选发射器:death 紫爆 / coin 金爆 / puff 灰烟) */
@@ -516,7 +500,6 @@ export function makeSim(
     battleMods: [],
     battleFx: { ...BATTLE_FX_IDENTITY },
     enemySlowMul: teamFx.enemySlowMul,
-    frameSlowZones: [],
     frameAttractors: [],
     enemyTargets: [],
     memberTargets: [],
@@ -526,7 +509,6 @@ export function makeSim(
     pendingBursts: [],
     pendingRings: [],
     pendingCues: [],
-    pendingGrounds: [],
     rng: new Rng(run.decorSeed ^ 0x9e37),
     testMode,
     wave: run.wave,

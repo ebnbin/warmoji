@@ -18,7 +18,7 @@ import { INVINCIBLE_HP, labInvincible, labLevel } from '../../run/lab'
 import { armIdle } from '../anim'
 
 import type { RunState } from '../../run/state'
-import { Alive, Anim, Breath, Depth, Follow, VisOff, Hurt, Iframe, MAtkSlow, Member, MFlash, MHp, MPerk, OrbitBias, Pop, Post, Quad, Revive, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
+import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, MAtkSlow, Member, MFlash, MHp, MPerk, OrbitBias, Pop, Post, Quad, Revive, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../render/atlas'
@@ -76,6 +76,7 @@ export function spawnCharacter(
   addComponent(world, eid, Iframe)
   addComponent(world, eid, Revive)
   addComponent(world, eid, Hurt)
+  addComponent(world, eid, GroundHit)
   addComponent(world, eid, MFlash)
   addComponent(world, eid, Transform)
   addComponent(world, eid, Anim)
@@ -114,6 +115,7 @@ export function spawnCharacter(
   MPerk.regenPerSec[eid] = fx.regenPerSec
   Iframe.ms[eid] = MEMBER.iframesMs + fx.iframesAddMs
   Iframe.last[eid] = -1e9
+  GroundHit.last[eid] = -1e9 // 开局就踩进毒圈也该当场掉第一跳
   Revive.ms[eid] = Math.max(1000, TEAM.reviveMs * captain.reviveMul * teamFx.reviveMul + fx.reviveAddMs)
   Revive.at[eid] = 0
   // 受击判定圆(格值需 ×UNIT 换算成 px);N 保 1 中心的被保护收益:半径减半,更难被敌人/敌弹摸到

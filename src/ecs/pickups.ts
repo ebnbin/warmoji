@@ -129,9 +129,12 @@ export function attachCarrierRing(sim: Sim, eid: number, def: FieldPickupDef): v
   Ring.color[eid] = POLARITY_COLOR[def.polarity]
   Ring.radius[eid] = FIELD.auraRadiusU * UNIT
   Ring.fillAlpha[eid] = 0.18
+  Ring.lineAlpha[eid] = 0.9
+  Ring.lineWidth[eid] = 3
   Ring.born[eid] = sim.fxMs
   Ring.dy[eid] = 0
   Ring.z[eid] = 4
+  Ring.breathe[eid] = 1
 }
 
 /** 施加一层限时效果:同 id 只刷新计时不叠加,随即重折乘区 */

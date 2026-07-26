@@ -31,7 +31,7 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query, removeEntity } from 'bitecs'
-import { Alive, Boss, Dormant, Enemy, EnemyProj, Hp, MHp, MoveSpeed, Nest, PICKUP_SET, Pickup, Projectile, Revive, Sprite, Transform } from './components'
+import { Alive, Boss, Dormant, Enemy, EnemyProj, Hp, MHp, MoveSpeed, Nest, PICKUP_SET, Pickup, Projectile, Revive, Sprite, Transform, Zone } from './components'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { spawnDecor } from './entities/decor'
@@ -47,7 +47,7 @@ import { requestCast } from './ability/equip'
 import { Minion } from './components'
 import { stepAbilities } from './ability/run'
 import { replayDeath, runDeathEffects } from './ability/death'
-import { clearGroundEffectsEcs, spawnGroundEffectEcs, updateGroundEffectsEcs } from './groundEffects'
+import { updateZones } from './zones'
 import { COIN, pickupCounts, updatePickups } from './pickups'
 import { spawnBossEcs, spawnCarrierEcs, spawnStep, spawnSurgeEcs } from './spawn'
 
@@ -151,8 +151,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private waveBaseCoins = 0
   private waveBaseLevel = 1
   /** 队员血条(逐帧跟位 + 按血量比例重绘;镜像 drawMemberHp) */
-  /** 光环圈的复用池（按本帧登记的减速区数取用；圆形非 emoji，走不了批绘） */
-  private auraRings: Phaser.GameObjects.Arc[] = []
   private hpBars: Phaser.GameObjects.Graphics[] = []
   private shownHp: number[] = []
   /** 阵亡队员头顶的复活倒计时（秒；仅数字变化时重设文本，避免逐帧重排版） */
@@ -223,7 +221,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.sim = undefined
     this.ready = false
     this.ending = false
-    this.auraRings = []
     this.waveBaseKills = 0
     this.waveBaseCoins = 0
     this.waveBaseLevel = 1
@@ -410,7 +407,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     if (!this.scene.isActive()) return
     this.atlas = atlas
     // 开局清上一局遗留的模块级状态(eid 从 0 重新分配,旧局引用不能留给新实体)
-    clearGroundEffectsEcs()
     clearEcsStore()
     clearAbilityDefs()
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
@@ -558,26 +554,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.cues!.ring(r.x, r.y, r.radius, { color: 0xff5252, fillAlpha: 0.35, lineWidth: 3, lineAlpha: 0.9, durMs: 300 })
     }
     q.length = 0
-  }
-
-  /** 光环圈:寒气光环等每帧重新登记减速区,这里按登记数取一圈池化的圆跟着画 */
-  private drawAuraRings(): void {
-    const zones = this.sim!.frameSlowZones.filter((z) => z.ring !== undefined)
-    for (let i = 0; i < Math.max(zones.length, this.auraRings.length); i++) {
-      const z = zones[i]
-      let ring = this.auraRings[i]
-      if (!z) {
-        ring?.setVisible(false)
-        continue
-      }
-      if (!ring) {
-        ring = this.add.circle(0, 0, 1, 0xffffff, 0.08).setStrokeStyle(2, 0xffffff, 0.35).setDepth(2)
-        this.auraRings.push(ring)
-      }
-      ring.setVisible(true).setPosition(z.x, z.y).setRadius(z.r ?? 0)
-      ring.setFillStyle(z.ring, 0.08)
-      ring.setStrokeStyle(2, z.ring, 0.35)
-    }
   }
 
   /** 排空本帧一次性战斗特效:能力系统只入队,绘制在此落地 */
@@ -1404,10 +1380,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     if (this.atlas) updateAnims(sim, this.atlas)
     // 亡语重放(分裂/诱饵/治疗/冷枪:本帧内所有死亡的敌人在死亡点触发)
     runDeathEffects(sim)
-    // 地面效果(灼烧/毒液区):能力入队的先铺开,再 team 脉冲烧敌 / enemy 节流烧队员 + 到期淡出
-    for (const g of sim.pendingGrounds) spawnGroundEffectEcs(sim, this, g.x, g.y, g.def, g.faction, g.srcSlot, g.srcName)
-    sim.pendingGrounds.length = 0
-    updateGroundEffectsEcs(sim, this)
+    // 区域(地面毒圈/灼烧区 + 寒气光环):跟位/开关/到期,再 team 脉冲烧敌 / enemy 节流烧队员
+    updateZones(sim)
     // 拾取物(金币 / 战场增减益同一条):磁吸 → 到手 → 到期淡出
     updatePickups(sim, delta)
     this.drainCollects()
@@ -1426,7 +1400,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.drainBursts()
     this.drainRings()
     this.drainCues()
-    this.drawAuraRings()
     // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtMember 的 cameras.shake)。
     // 同样须先于过场判定——致死那一帧的抖屏否则被 return 吞掉且永远补不回来
     if (sim.memberHitCount > this.seenHitCount) {
@@ -1506,8 +1479,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       camX: this.cameras.main.scrollX + this.cameras.main.width / 2,
       camY: this.cameras.main.scrollY + this.cameras.main.height / 2,
       zoneR: sim.zone?.r ?? 0,
-      // 本帧减速区数(寒气光环等每帧重新登记;不清零会逐帧堆积,故这也是泄漏哨兵)
-      slowZones: sim.frameSlowZones.length,
+      // 在场区域数(地面毒圈 + 寒气光环):到期不回收 / 跟随型不随武器退场都会在这里堆积
+      zones: query(this.world, [Zone]).length,
       // 在场的能力子实体数(弩塔 + 小蜂):验证同时在场上限与逐个退场
       minions: query(this.world, [Minion]).length,
       logicalW: viewport.logicalWidth,
