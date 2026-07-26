@@ -1,14 +1,13 @@
-import { addComponent, addEntity, hasComponent, query, removeEntity } from 'bitecs'
+import { hasComponent, query, removeEntity } from 'bitecs'
 import { UNIT } from '../../../util/units'
 import { ACQUIRE } from '../../../data/abilities'
 import type { SummonDef } from '../../../types/abilityDefs'
 import { ANIM_DEF } from '../../../emoji/anim'
 import { playSfx } from '../../../audio/sfx'
-import { Anim, Poison, Sprite, Tint, Transform } from '../../components'
-import { armIdle } from '../../anim'
-import { attachDrawable } from '../../drawable'
+import { Poison, Sprite, Tint, Transform } from '../../components'
+import { spawnMinion } from '../../entities/minion'
 import { cooldownMul, damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { AbilityRef, Cooldown, FACTION, Faction, Frozen, Minion, Owner, Swarmer } from '../../components'
+import { AbilityRef, Cooldown, Frozen, Minion, Owner, Swarmer } from '../../components'
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects } from '../effects'
 import { sourceOf } from '../source'
@@ -22,39 +21,32 @@ import type { Sim } from '../../sim'
 /** 放蜂：每隔一段放出一波小蜂，各自寻路扑向最近的敌人（优先未中毒者，好把毒摊开），
  * 撞上即撞击直伤 + onHit 随即自毁；一直没撞到则到寿命消散 */
 export function castSummons(sim: Sim, dt: number): void {
-  updateMinions(sim, dt)
+  updateBees(sim, dt)
   castScan<SummonDef>(sim, KindSummon, (e, def) => {
-    for (let i = 0; i < def.count; i++) spawnMinion(sim, e, def, i)
+    for (let i = 0; i < def.count; i++) spawnBee(sim, e, def, i)
     Cooldown.left[e] = def.intervalMs * cooldownMul(sim, e)
   })
 }
 
 /** 一只小蜂：出生在主人身上，相位错开好让一波蜂散得开 */
-function spawnMinion(sim: Sim, e: number, def: SummonDef, index: number): void {
-  const outline = Faction.v[e] === FACTION.enemy ? 'enemy' : 'player'
-  const b = addEntity(sim.world)
-  attachDrawable(sim.world, b, sim.frames, {
-    id: def.minion.emoji,
-    outline,
+function spawnBee(sim: Sim, e: number, def: SummonDef, index: number): void {
+  spawnMinion(sim, e, {
+    tag: Swarmer,
+    emoji: def.minion.emoji,
+    size: def.minion.size,
+    bornScale: 1,
     x: ownerX(e),
     y: ownerY(e),
-    size: def.minion.size,
     z: 12,
+    lifeMs: def.lifeMs,
+    phase: (index * Math.PI * 2) / def.count,
+    cd: 0,
+    animOffsetMs: (index * ANIM_DEF.durMs) / def.count,
   })
-  addComponent(sim.world, b, Swarmer)
-  addComponent(sim.world, b, Minion)
-  addComponent(sim.world, b, Owner)
-  addComponent(sim.world, b, Anim)
-  Owner.eid[b] = e
-  Minion.bornMs[b] = sim.elapsedMs
-  Minion.dieAt[b] = sim.elapsedMs + def.lifeMs
-  Minion.phase[b] = (index * Math.PI * 2) / def.count
-  Minion.size[b] = def.minion.size
-  armIdle(b, def.minion.emoji, outline, Sprite.frame[b]!, (index * ANIM_DEF.durMs) / def.count)
 }
 
 /** 逐帧：寻路扑敌 / 候敌打转 → 撞上即施伤自毁 → 到寿命消散 */
-function updateMinions(sim: Sim, dt: number): void {
+function updateBees(sim: Sim, dt: number): void {
   for (const b of [...query(sim.world, [Swarmer, Minion, Owner, Transform])]) {
     if (!hasComponent(sim.world, b, Minion)) continue // 同波的前一只自毁时连带回收了它
     const e = Owner.eid[b]!

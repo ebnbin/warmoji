@@ -1,14 +1,17 @@
-import { addComponent, addEntity, hasComponent, query, removeEntity } from 'bitecs'
+import { addComponent, hasComponent, query, removeEntity } from 'bitecs'
 import { DEG2RAD } from '../../../util/units'
 import type { ProjectileDef, TurretDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
-import { Anim, Sprite, Tint, Transform } from '../../components'
-import { armIdle, playClip } from '../../anim'
+import { Tint, Transform } from '../../components'
+import { playClip } from '../../anim'
 import { backEaseOut } from '../../ease'
-import { attachDrawable } from '../../drawable'
+import { spawnMinion } from '../../entities/minion'
 import { spawnProjectileEcs } from '../../entities/projectile'
 import { attributionSlot, cooldownMul, damageMul, ownerX, ownerY } from '../amp'
-import { AbilityRef, Cooldown, Emplacement, FACTION, Faction, Frozen, Minion, Owner, Retiring } from '../../components'
+import { AbilityRef, Cooldown, Emplacement, Frozen, Minion, Owner, Retiring } from '../../components'
+
+/** 超编被拆的退场动画时长（ms，视觉钟） */
+const RETIRE_MS = 240
 import { abilityDefAt } from '../defs'
 import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
@@ -29,28 +32,21 @@ export function castTurrets(sim: Sim, dt: number): void {
 
 /** 在建造者脚下架一座；超编把最老的一座标记退场 */
 function place(sim: Sim, e: number, def: TurretDef): void {
-  const outline = Faction.v[e] === FACTION.enemy ? 'enemy' : 'player'
   // 在役数须先数：新座建出来就带 Emplacement，晚数会把自己也算进去
   const live = liveOnes(sim, e)
-  const t = addEntity(sim.world)
-  attachDrawable(sim.world, t, sim.frames, {
-    id: def.turret.emoji,
-    outline,
+  spawnMinion(sim, e, {
+    tag: Emplacement,
+    emoji: def.turret.emoji,
+    size: def.turret.size,
+    bornScale: 0.2, // 入场弹入的起点
     x: ownerX(e),
     y: ownerY(e) + 6,
-    size: def.turret.size * 0.2, // 入场弹入的起点
     z: 5,
+    lifeMs: 0, // 不按时限：只在超编时被拆
+    phase: 0,
+    cd: 200,
+    animOffsetMs: live.length * 311,
   })
-  addComponent(sim.world, t, Emplacement)
-  addComponent(sim.world, t, Minion)
-  addComponent(sim.world, t, Owner)
-  addComponent(sim.world, t, Anim)
-  Owner.eid[t] = e
-  Minion.bornMs[t] = sim.fxMs
-  Minion.dieAt[t] = 0
-  Minion.cd[t] = 200
-  Minion.size[t] = def.turret.size
-  armIdle(t, def.turret.emoji, outline, Sprite.frame[t]!, live.length * 311)
   playSfx('recruit')
   // 超编拆最旧（不含刚架的这座）
   let over = live.length + 1 - def.maxTurrets
@@ -59,8 +55,7 @@ function place(sim: Sim, e: number, def: TurretDef): void {
     for (const o of live) if (oldest < 0 || Minion.bornMs[o]! < Minion.bornMs[oldest]!) oldest = o
     if (oldest < 0) break
     addComponent(sim.world, oldest, Retiring)
-    Minion.bornMs[oldest] = sim.fxMs
-    Minion.dieAt[oldest] = sim.fxMs + 240
+    Retiring.until[oldest] = sim.fxMs + RETIRE_MS
     live.splice(live.indexOf(oldest), 1)
   }
 }
@@ -86,12 +81,12 @@ function updateEmplacements(sim: Sim, dt: number): void {
       continue
     }
     if (hasComponent(sim.world, t, Retiring)) {
-      const left = Minion.dieAt[t]! - sim.fxMs
+      const left = Retiring.until[t]! - sim.fxMs
       if (left <= 0) {
         removeEntity(sim.world, t)
         continue
       }
-      const p = 1 - left / 240
+      const p = 1 - left / RETIRE_MS
       const k = Minion.size[t]! * (1 - 0.7 * p)
       Transform.w[t] = k
       Transform.h[t] = k

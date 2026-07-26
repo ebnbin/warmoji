@@ -350,13 +350,15 @@ export const Flyer = {
   damage: f32(),
 }
 
-/** 召唤 / 架设出来的子实体：Owner.eid 指回召唤它的武器实体。
- * bornMs 出生时刻（入场弹入 + 拆最旧时比岁数）、dieAt 消散时刻（0=不按时限）、
- * cd 自身行为冷却、phase 候敌打转的相位、size 本体尺寸（弹入插值的终值） */
+/** 召唤物（见 entities/minion.ts）：Owner.eid 指回造它的武器实体。
+ * bornMs 出生时刻（视觉钟：入场弹入 + 拆最旧时比岁数）、dieAt 寿命到期时刻
+ *（世界钟，0=不按时限）、cd 自身行为冷却、phase 候敌打转的相位、
+ * size 本体尺寸（弹入插值的终值） */
 export const Minion = { bornMs: f32(), dieAt: f32(), cd: f32(), phase: f32(), size: f32() }
 
-/** 退场中：超编被拆的装置，缩小淡出到 Minion.dieAt 后离场，期间不再行动 */
-export const Retiring = {}
+/** 退场中：超编被拆的装置，缩小淡出到 until（视觉钟）后离场，期间不再行动。
+ * 与 Minion.dieAt 分开：那个是寿命、走世界钟，这个是退场动画、走视觉钟 */
+export const Retiring = { until: f32() }
 
 /** 小蜂：寻路扑敌、撞上即自毁的召唤物 */
 export const Swarmer = {}
