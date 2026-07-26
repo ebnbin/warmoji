@@ -1,11 +1,11 @@
 import { hasComponent } from 'bitecs'
 import type { Effect } from '../../types/abilityDefs'
 import { circleHitIndices } from '../../war/hit'
-import { MAtkSlow, Morph, Poison, Slow } from '../components'
+import { Enemy, MAtkSlow, Morph, Poison, Slow } from '../components'
 import { applyMorph } from './morph'
 import { spawnEnemyProjectileEcs } from '../entities/projectile'
 import { spawnZone } from '../entities/zone'
-import { enemyDef } from '../store'
+import { } from '../store'
 import { damageTarget } from './damage'
 import { FACTION } from '../components'
 import { healEnemies, healMembers } from './heal'
@@ -123,10 +123,10 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
     })
   },
 
-  // enemyDef 已清空 = 这一帧刚死，死者不变形
+  // 这一帧刚死的不变形
   morph: (sim, _src, fx, hit) => {
     eachCapable(sim, hit, Morph, (t) => {
-      if (enemyDef[t] !== undefined) applyMorph(sim, sim.frames, t, fx)
+      if (hasComponent(sim.world, t, Enemy)) applyMorph(sim, sim.frames, t, fx)
     })
   },
 

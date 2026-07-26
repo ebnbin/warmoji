@@ -1,4 +1,4 @@
-import { query, removeEntity } from 'bitecs'
+import { hasComponent, query, removeEntity } from 'bitecs'
 import { norm } from '../../util/vec'
 import { AI } from '../../data/enemies'
 
@@ -7,7 +7,7 @@ import { PICKUPS } from '../../data/pickups'
 import { UNIT } from '../../util/units'
 import { playSfx } from '../../audio/sfx'
 import { despawnEnemy, hurtMember } from '../ops/combat'
-import { Alive, Charge, DmgMul, EDir, EState, ETurn, Iframe, Nest, PICKUP_SET, Pickup, Speed, Sprite, Thief, Tint, Transform } from '../components'
+import { Alive, Charge, DmgMul, EDir, Enemy, EState, ETurn, Iframe, Nest, Pickup, PICKUP_SET, Speed, Sprite, Thief, Tint, Transform } from '../components'
 import { enemyDef } from '../store'
 import { COIN } from '../ops/pickups'
 
@@ -244,7 +244,7 @@ function steerBaseOrbit(sim: Sim, eid: number, slow: number, lm: BaseOrbitLocomo
   }
   const nest = Nest.of[eid]!
   // 巢失效(被拆/被清)→ 暴走直扑
-  if (nest < 0 || enemyDef[nest] === undefined) return chasePlayer()
+  if (nest < 0 || !hasComponent(sim.world, nest, Enemy)) return chasePlayer()
   const nx = Transform.x[nest]!
   const ny = Transform.y[nest]!
   // 护巢判定:目标是「离本体最近的队员」(与 chasePlayer 同一个人),再量他到巢的距离

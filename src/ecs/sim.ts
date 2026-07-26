@@ -1,31 +1,11 @@
 import { UNIT } from '../util/units'
-import type { FormationId } from '../types/formation'
-import { animateEnemies } from './systems/animateEnemies'
-import { applyKnockback } from './systems/applyKnockback'
-import { applySlowZones } from './systems/applySlowZones'
-import { commitEnemySteps } from './systems/commitEnemySteps'
-import { despawnExpired } from './systems/despawnExpired'
-import { fadeEnemyFlash } from './systems/fadeEnemyFlash'
-import { popInEnemies } from './systems/popInEnemies'
-import { steerEnemies } from './systems/steerEnemies'
-import { tintEnemies } from './systems/tintEnemies'
-import { updateFrameTargets } from './systems/updateFrameTargets'
-import { memberContact } from './systems/memberContact'
-import { memberVisual } from './systems/memberVisual'
-import { regenMembers } from './systems/regenMembers'
-import { reviveMembers } from './systems/reviveMembers'
-import { tickPoison } from './systems/tickPoison'
-import { updateProjectiles } from './systems/updateProjectiles'
-import { updateEnemyProjectiles } from './systems/updateEnemyProjectiles'
-import { updateShards } from './systems/updateShards'
-import { stepPickupVisuals } from './systems/stepPickupVisuals'
-import { updateDormancy } from './systems/updateDormancy'
-import { expireSkillBuff } from './systems/expireSkillBuff'
-import { moveTeam } from './systems/moveTeam'
-import { refoldBattleFx } from './systems/refoldBattleFx'
-import { updateOrbit } from './systems/updateOrbit'
+import { SIM_PIPELINE } from './pipeline/sim'
+import { runPipeline } from './pipeline/step'
 import { animateMembers } from './systems/animateMembers'
+import { stepPickupVisuals } from './systems/stepPickupVisuals'
+import { updateShards } from './systems/updateShards'
 import { layoutTeam } from './systems/layoutTeam'
+import type { FormationId } from '../types/formation'
 import type { FlowField, WallGrid } from '../war/maps/ruins'
 import type { EcsWorld } from './world'
 import type { WorldHooks } from './worlds'
@@ -266,8 +246,8 @@ export function stepFrozenVisuals(sim: Sim): void {
   stepPickupVisuals(sim)
 }
 
-/** 一帧仿真。delta = 真实帧长(玩家走位/呼吸/编队用),wdelta = 世界时长(敌人/弹体/刷怪用)。
- * 时停即「世界侧 wdelta 变慢而玩家侧 delta 照常」,故两者分开传(镜像旧 update 的 delta/wdelta) */
+/** 一帧仿真。两个帧长在帧起点由场景写进 sim（dtMs 真实 / wdtMs 世界），
+ * 此后每个 system 自己去读。次序是数据，见 pipeline/sim.ts */
 export function stepSim(sim: Sim): void {
   // 世界钟按世界时长推进:波次计时/复活/无敌帧/毒跳等一并随时停放慢(与旧一致)
   sim.elapsedMs += sim.wdtMs
@@ -275,40 +255,7 @@ export function stepSim(sim: Sim): void {
   if (sim.timeStopMsLeft > 0) sim.timeStopMsLeft = Math.max(0, sim.timeStopMsLeft - sim.wdtMs)
   // 移动量低通平滑走实时 delta:moveTeam 会写 moveInputRaw,供下一帧 worldTimeScale 读
   sim.chrono += (sim.moveInputRaw - sim.chrono) * Math.min(1, sim.dtMs / TIMESTOP.easeMs)
-  // 限时战斗层:剔除到期项后重折(乘区实时,先于移动/攻击/敌速消费,镜像 refoldBattleFx)
-  refoldBattleFx(sim)
-  expireSkillBuff(sim)
-  // 休眠维护(无限世界:远离队伍的敌人冻结)——先于一切读敌人的系统
-  updateDormancy(sim)
-  // 敌人位置汇入 frameTargets(队伍 orbit/游移门控据此),先于 orbit
-  updateFrameTargets(sim)
-  updateOrbit(sim)
-  moveTeam(sim)
-  layoutTeam(sim)
-  animateMembers(sim)
-  reviveMembers(sim)
-  regenMembers(sim)
-  tickPoison(sim)
-  // 以下为世界侧:时停期整体放慢(敌人移速/弹体位移都按 wdtMs 积分,无需另乘时标)。
-  // 敌人一帧走这条流水线,每一步都是单一职责的独立系统,次序即语义
-  popInEnemies(sim)
-  despawnExpired(sim)
-  fadeEnemyFlash(sim)
-  applySlowZones(sim)
-  tintEnemies(sim)
-  steerEnemies(sim)
-  applyKnockback(sim)
-  commitEnemySteps(sim)
-  animateEnemies(sim)
-  updateProjectiles(sim)
-  // 接触须先于敌弹:同帧两者争同一层无敌帧时旧实现是接触先手(overlap 注册序),
-  // 否则贴脸接触的伤害/黏滞/荆棘反伤会被敌弹吃掉的无敌帧一并挡下
-  memberContact(sim)
-  updateEnemyProjectiles(sim)
-  memberVisual(sim)
-  updateShards(sim)
-  // 世界周期结算(落水掉血等):在位移与战斗之后,读的是本帧最终位置
-  sim.hooks.tick(sim, sim.wdtMs)
+  runPipeline(SIM_PIPELINE, sim)
 }
 
 /** 组装本局的仿真状态。**队长实体先建**——队伍中心即它的位置，队员绕它编队，

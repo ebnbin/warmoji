@@ -1,8 +1,8 @@
-import { query } from 'bitecs'
+import { hasComponent, query } from 'bitecs'
 import type { NukeDef } from '../../types/abilityDefs'
 import { playSfx } from '../../audio/sfx'
-import { Boss, Dormant, ENEMY_SET } from '../components'
-import { enemyDef } from '../store'
+import { Boss, Dormant, Enemy, ENEMY_SET } from '../components'
+import { } from '../store'
 import { damageMul, waveScale } from '../utils/amp'
 import { damageTarget } from '../ops/damage'
 import { sourceOf } from '../utils/source'
@@ -21,7 +21,7 @@ export function castNukes(sim: Sim): void {
     const mul = damageMul(sim, e)
     // 伤害会边遍历边击杀（query 返回的是活动数组），先复制快照
     for (const t of [...query(sim.world, ENEMY_SET as unknown as object[])]) {
-      if (Dormant.v[t] || enemyDef[t] === undefined) continue
+      if (Dormant.v[t] || !hasComponent(sim.world, t, Enemy)) continue
       const damage = Math.max(1, Math.round(def.damage * scale * mul * (Boss.v[t] ? def.bossRatio : 1)))
       damageTarget(sim, src, t, damage)
     }

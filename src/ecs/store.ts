@@ -5,7 +5,9 @@ import type { Effect } from '../types/abilityDefs'
 
 // 富数据伴随存储(按 eid 索引):放**不进类型化数组**的东西——对象引用 / Set / 字符串。
 // 纯数值一律做成组件（见 components.ts）:那些查得到、随实体注册，这里的查不到。
-// spawn 时写、removeEntity 前不必清(下次 spawn 覆盖;eid 复用后新 def 覆盖旧)。
+// **spawn 时必须无条件写**:eid 会复用,漏写就读到上一位住户的残值(见 entities/enemy.ts
+// 里那句「携带者由 spawnCarrier 落地后覆写」——它写的就是 undefined)。反过来,
+// removeEntity 前不必清;曾经靠「清空 enemyDef」当存活判据,那是巧合不是判据,已改成查组件。
 // 跨局(scene.restart)必须整体清空:eid 从头再分配,上一局的引用会挂在新实体身上。
 // 一律 new Array(MAX_ENTITIES).fill(undefined) 预分配:按 eid 索引本就要满容量,
 // 且 fill 让 V8 保持 packed——空 [] 上直接写 eid=5000 会退化成 holey/字典模式。

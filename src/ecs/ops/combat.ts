@@ -9,7 +9,7 @@ import { KNOCKBACK } from '../../data/abilities'
 import { MEMBER } from '../../data/characters'
 import { UNIT } from '../../util/units'
 import { spawnShardsEcs } from '../entities/shard'
-import { Alive, Anim, Boss, DmgMul, Dormant, ENEMY_SET, Elite, Flash, Hp, Iframe, Kv, MFlash, MHp, MPerk, Morph, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from '../components'
+import { Alive, Anim, Boss, DmgMul, Dormant, Elite, Enemy, ENEMY_SET, Flash, Hp, Iframe, Kv, MFlash, MHp, Morph, MPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from '../components'
 import { enemyCarries, enemyDef } from '../store'
 import { dropCoins, dropFieldPickup } from './pickups'
 import { unequipAbilities } from './equip'
@@ -30,9 +30,9 @@ export function applyDamage(
   srcSlot = -1,
   crit = false,
 ): void {
-  // 已离场(同帧内被先一颗子弹打死)或休眠(无限世界远处冻结)即早退:
-  // 镜像 !enemy.active / a.dormant 的通用守卫,防重复计击杀/掉落
-  if (enemyDef[eid] === undefined || Dormant.v[eid]) return
+  // 已离场(同帧内被先一颗子弹打死)或休眠(无限世界远处冻结)即早退:防重复计击杀/掉落。
+  // 「还在不在」问的是实体本身,不是伴随存储被没被清空——后者是巧合,不是判据
+  if (!hasComponent(sim.world, eid, Enemy) || Dormant.v[eid]) return
   const def = enemyDef[eid]
   const morphed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
   // 变形期受伤倍率(魔尘诅咒 vulnMul):放大变羊敌人所受伤害
@@ -131,7 +131,6 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
     flingVx,
     flingVy,
   )
-  enemyDef[eid] = undefined
   unequipAbilities(sim, eid)
   removeEntity(sim.world, eid)
 }
@@ -181,7 +180,6 @@ export function despawnEnemy(sim: Sim, eid: number): void {
   sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
   if (enemyDef[eid]?.spawner) orphanBrood(sim, eid)
   enemyCarries[eid] = undefined
-  enemyDef[eid] = undefined
   unequipAbilities(sim, eid)
   removeEntity(sim.world, eid)
 }

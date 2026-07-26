@@ -1,5 +1,5 @@
-import { query } from 'bitecs'
-import { Alive, DmgMul, Dormant, ENEMY_SET, Hurt, Iframe, Morph, MPerk, Radius, Slot, Transform } from '../components'
+import { hasComponent, query } from 'bitecs'
+import { Alive, DmgMul, Dormant, Enemy, ENEMY_SET, Hurt, Iframe, Morph, MPerk, Radius, Slot, Transform } from '../components'
 import { applyDamage, hurtMember } from '../ops/combat'
 import { applyAbilityEffects } from '../ops/effects'
 import { enemySource } from '../utils/source'
@@ -30,7 +30,7 @@ export function memberContact(sim: Sim): void {
       Iframe.last[m] = now
       hurtMember(sim, m, Math.max(1, Math.round(def.damage * DmgMul.v[eid]!)), def.name)
       // 荆棘背心:接触反伤(与受击同帧、同吃无敌帧节流;击杀归属穿刺者)
-      if (MPerk.thorns[m]! > 0 && enemyDef[eid] !== undefined) {
+      if (MPerk.thorns[m]! > 0 && hasComponent(sim.world, eid, Enemy)) {
         applyDamage(sim, eid, MPerk.thorns[m]!, 0, undefined, undefined, Slot.v[m]!)
       }
       // 接触附加效果整串走效果层(黏黏怪的攻速罚只是其中一种;伤害的真相是 def.damage,

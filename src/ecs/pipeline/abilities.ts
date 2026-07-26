@@ -37,6 +37,8 @@ import { updateDrops } from '../systems/updateDrops'
 import { updateEmplacements } from '../systems/updateEmplacements'
 import { updateFlyers } from '../systems/updateFlyers'
 
+import { runPipeline } from './step'
+import type { Step } from './step'
 import type { Sim } from '../sim'
 
 // 一帧的能力推进：清帧表 → 锚点 → 闸门 → 冷却 → 逐 kind 的那几步。
@@ -53,16 +55,6 @@ import type { Sim } from '../sim'
 //
 // 没有 after 的步 = 与其他步互不相干，怎么排都行。**宁可不声明也不要编一个理由**：
 // 自我印证的依赖（「它排在前面所以它必须排在前面」）比没有依赖更糟，测试会一直绿。
-
-export interface Step {
-  /** 依赖引用用的名字 */
-  readonly name: string
-  run(sim: Sim): void
-  /** 必须排在这些步之后；省略即无约束 */
-  readonly after?: readonly string[]
-  /** 为什么——写不出理由的依赖多半是想出来的 */
-  readonly why?: string
-}
 
 /** 一种能力在出手之前要跑的一步 */
 interface Before {
@@ -172,7 +164,7 @@ function stepsOf(k: Kind): Step[] {
   ]
 }
 
-export const PIPELINE: readonly Step[] = [
+export const ABILITY_PIPELINE: readonly Step[] = [
   {
     name: 'clearFrameRegisters',
     run: clearFrameRegisters,
@@ -200,5 +192,5 @@ export const PIPELINE: readonly Step[] = [
 ]
 
 export function stepAbilities(sim: Sim): void {
-  for (const step of PIPELINE) step.run(sim)
+  runPipeline(ABILITY_PIPELINE, sim)
 }

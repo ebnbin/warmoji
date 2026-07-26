@@ -1,8 +1,9 @@
+import { hasComponent } from 'bitecs'
 import type { StrikeDef } from '../../types/abilityDefs'
 import { playSfx } from '../../audio/sfx'
 import { dropCoins } from './pickups'
-import { AbilityRef, Alive, Drop, Faction, FACTION, Owner, Transform } from '../components'
-import { enemyDef } from '../store'
+import { AbilityRef, Alive, Drop, Enemy, Faction, FACTION, Owner, Transform } from '../components'
+import { } from '../store'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { damageTarget } from './damage'
 import { abilityDefAt } from '../abilityDefs'
@@ -14,7 +15,7 @@ export function land(sim: Sim, d: number): void {
   const e = Owner.eid[d]!
   const target = Drop.target[d]!
   const team = Faction.v[e] === FACTION.team
-  if (team ? enemyDef[target] === undefined : !Alive.v[target]) return
+  if (team ? !hasComponent(sim.world, target, Enemy) : !Alive.v[target]) return
   const src = sourceOf(sim, e)
   const def = abilityDefAt(AbilityRef.def[e]!) as StrikeDef
   if (team && def.coinsPerHit) spawnCoins(sim, Transform.x[d]!, Drop.toY[d]!, def.coinsPerHit)
