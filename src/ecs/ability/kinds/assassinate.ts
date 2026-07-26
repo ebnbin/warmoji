@@ -1,11 +1,9 @@
 import { query } from 'bitecs'
-import { DEG2RAD } from '../../../util/units'
 import type { AssassinateDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { Hp, Iframe, Tint, Transform, VisOff } from '../../components'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, Blink, Followup, Frozen, Owner } from '../../components'
-import { abilityDefAt } from '../defs'
+import { Ability, Aim, Blink, Followup, Frozen, Held, Owner } from '../../components'
 import { applyAbilityEffects } from '../effects'
 import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
@@ -107,16 +105,12 @@ function strongestTarget(ox: number, oy: number, list: readonly Target[], maxRan
 
 /** 摆位：持有物定身指向瞄准方向 */
 function placeAssassinBody(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindAssassinate, Aim, Transform])) {
-    const g = e
-    if (g === 0) continue
-    const def = abilityDefAt(AbilityRef.def[e]!) as AssassinateDef
-    const held = def.held!
+  for (const e of query(sim.world, [Ability, KindAssassinate, Aim, Held, Transform])) {
     const aim = Aim.rad[e]!
-    Transform.x[g] = ownerX(e) + Math.cos(aim) * held.restOffset
-    Transform.y[g] = ownerY(e) + Math.sin(aim) * held.restOffset
-    Transform.rot[g] = aim + held.rotationOffsetDeg * DEG2RAD
-    Tint.alpha[g] = Frozen.v[e] ? 0 : 1
+    Transform.x[e] = ownerX(e) + Math.cos(aim) * Held.restOffset[e]!
+    Transform.y[e] = ownerY(e) + Math.sin(aim) * Held.restOffset[e]!
+    Transform.rot[e] = aim + Held.rotOffset[e]!
+    Tint.alpha[e] = Frozen.v[e] ? 0 : 1
   }
 }
 

@@ -1,12 +1,11 @@
-import { query } from 'bitecs'
-import { DEG2RAD } from '../../../util/units'
+import { hasComponent, query } from 'bitecs'
 import type { ThrustDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { thrustHitIndices } from '../../../war/hit'
 import { Tint, Transform, VisOff } from '../../components'
 import { sineEaseOut } from '../../ease'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, Followup, Frozen, Owner, Swing } from '../../components'
+import { Ability, AbilityRef, Aim, Followup, Frozen, Held, Owner, Swing } from '../../components'
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects } from '../effects'
 import { sourceOf } from '../source'
@@ -81,17 +80,18 @@ function placeThrustBody(sim: Sim): void {
       Followup.left[e] = 0
     }
     const t = frozen ? 0 : lungeT(sim, e, def.thrustMs)
-    const g = e
-    if (def.held) {
-      const held = def.held
+    if (hasComponent(sim.world, e, Held)) {
+      // 有外形：武器刺出去收回来
       const aim = Aim.rad[e]!
-      const dist = held.restOffset + t * (def.reach - held.restOffset)
-      Transform.x[g] = ownerX(e) + Math.cos(aim) * dist
-      Transform.y[g] = ownerY(e) + Math.sin(aim) * dist
-      Transform.rot[g] = aim + held.rotationOffsetDeg * DEG2RAD
-      Tint.alpha[g] = frozen ? 0 : 1
+      const rest = Held.restOffset[e]!
+      const dist = rest + t * (def.reach - rest)
+      Transform.x[e] = ownerX(e) + Math.cos(aim) * dist
+      Transform.y[e] = ownerY(e) + Math.sin(aim) * dist
+      Transform.rot[e] = aim + Held.rotOffset[e]!
+      Tint.alpha[e] = frozen ? 0 : 1
       continue
     }
+    // 无外形：角色本体前冲（独角兽的独角突刺）
     const m = Owner.eid[e]!
     VisOff.x[m] = Math.cos(Aim.rad[e]!) * t * def.lungeDist
     VisOff.y[m] = Math.sin(Aim.rad[e]!) * t * def.lungeDist

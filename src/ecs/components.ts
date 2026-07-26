@@ -259,11 +259,26 @@ export const Anchor = { eid: i32() }
  * 只有需要在「出手那一下」做事的实体才挂它（弩塔的拉弓动画） */
 export const Fired = { at: f32() }
 
+/** 手持外形：这件武器在场上握得出来，位姿由各 kind 的摆位系统写。
+ * **有这个组件 = 有手持外形**——摆位系统靠它取自己该摆的那批，不再去 def 里翻 held。
+ * 徒手能力（无外形）不挂它，于是根本不会被摆位系统扫到 */
+export const Held = {
+  /** 静止时距施放锚点的距离 */
+  restOffset: f32(),
+  /** emoji 素材的原始朝向补偿（弧度，装配时已由度换算） */
+  rotOffset: f32(),
+  /** 左/右手横向挂载：垂直于瞄准方向偏移 side × gap（0 = 不偏） */
+  side: f32(),
+  gap: f32(),
+  /** 本体显示尺寸（世界像素）——双子镖等分身照它建 */
+  size: f32(),
+}
+
 /** 能力实体标记 */
 export const Ability = {}
 
 /** 武器实体标记：**一件武器就是一颗实体**，能力是它身上的组件。
- * 有外形的（def.held）自带 Transform/Sprite，就是握在手里的那个 emoji；
+ * 有外形的自带 Held + Transform/Sprite，就是握在手里的那个 emoji；
  * 徒手能力是同一种实体，只是没有身体。牛仔的左右枪 = 两颗，各自独立冷却。
  * 生成在 entities/weapon.ts。Ability 与 Weapon 分开是因为召唤物（炮台）
  * 也带 Ability 但不是武器 */

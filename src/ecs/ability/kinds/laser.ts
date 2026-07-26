@@ -1,11 +1,10 @@
 import { query } from 'bitecs'
-import { DEG2RAD } from '../../../util/units'
 import type { LaserDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { thrustHitIndices } from '../../../war/hit'
 import { Tint, Transform } from '../../components'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, Frozen, Radial } from '../../components'
+import { Ability, AbilityRef, Aim, Frozen, Held, Radial } from '../../components'
 import { abilityDefAt } from '../defs'
 import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
@@ -81,12 +80,11 @@ function fireBeam(sim: Sim, e: number, def: LaserDef, angle: number, ratio: numb
 
 /** 摆位：武器自身定身指向瞄准方向 */
 function placeLaserBody(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindLaser, Aim, Transform])) {
-    const held = (abilityDefAt(AbilityRef.def[e]!) as LaserDef).held
+  for (const e of query(sim.world, [Ability, KindLaser, Aim, Held, Transform])) {
     const aim = Aim.rad[e]!
-    Transform.x[e] = ownerX(e) + Math.cos(aim) * held.restOffset
-    Transform.y[e] = ownerY(e) + Math.sin(aim) * held.restOffset
-    Transform.rot[e] = aim + held.rotationOffsetDeg * DEG2RAD
+    Transform.x[e] = ownerX(e) + Math.cos(aim) * Held.restOffset[e]!
+    Transform.y[e] = ownerY(e) + Math.sin(aim) * Held.restOffset[e]!
+    Transform.rot[e] = aim + Held.rotOffset[e]!
     Tint.alpha[e] = Frozen.v[e] ? 0 : 1
   }
 }

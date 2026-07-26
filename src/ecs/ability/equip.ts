@@ -1,9 +1,9 @@
 import { addComponent, addComponents, query, removeEntity } from 'bitecs'
 
 import { abilityPiercesWalls } from '../../war/abilityRules'
-import { Ability, AbilityRef, Aim, Amp, Anchor, Blink, CastRequest, Cooldown, Disarmed, Drop, Faction, Flyer, Followup, Frozen, Manual, Minion, Owner, Pulse, Radial, Shots, Swing, WallBlocked, Weapon } from '../components'
+import { Ability, AbilityRef, Aim, Amp, Anchor, CastRequest, Cooldown, Disarmed, Drop, Faction, Flyer, Frozen, Manual, Minion, Owner, WallBlocked, Weapon } from '../components'
 import { internAbilityDef } from './defs'
-import { KIND_TAG } from './tags'
+import { KINDS } from './tags'
 
 import type { AbilityDef } from '../../types/abilityDefs'
 import type { Sim } from '../sim'
@@ -43,11 +43,17 @@ export interface AbilityInit {
  *（entities/minion.ts 的弩塔）。两者的差别只在 anchor：武器从持有者身上放，
  * 弩塔从它自己身上放。返回 false = 该 kind 未登记 tag（不挂，gen 校验保证不会发生） */
 export function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: AbilityInit): boolean {
-  const tag = KIND_TAG[def.kind]
-  if (!tag) return false
+  const spec = KINDS[def.kind]
+  if (!spec) return false
   const world = sim.world
+  // 通用部分：每条能力都要的
   // prettier-ignore
-  addComponents(world, eid, Ability, AbilityRef, Owner, Anchor, Faction, Cooldown, Amp, Frozen, Disarmed, Followup, WallBlocked, Aim, Swing, Shots, Radial, Blink, Pulse, tag)
+  addComponents(world, eid, Ability, AbilityRef, Owner, Anchor, Faction, Cooldown, Amp, Frozen, Disarmed, WallBlocked, Aim, spec.tag)
+  // 该 kind 自己的状态组件：用得到才挂（见 tags.ts）
+  for (const st of spec.state ?? []) {
+    addComponent(world, eid, st.comp)
+    st.reset(eid)
+  }
   if (init.manual) addComponent(world, eid, Manual)
   AbilityRef.def[eid] = internAbilityDef(def)
   Owner.eid[eid] = init.owner
@@ -61,18 +67,8 @@ export function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: Abil
   Amp.battle[eid] = init.amp.battle ? 1 : 0
   Frozen.v[eid] = 0
   Disarmed.v[eid] = 0
-  Followup.left[eid] = 0
-  Followup.damage[eid] = 0
   WallBlocked.v[eid] = abilityPiercesWalls(def) ? 0 : 1
   Aim.rad[eid] = 0
-  Shots.n[eid] = 0
-  Radial.left[eid] = 0
-  Pulse.dps[eid] = 0
-  Pulse.freeze[eid] = 0
-  Blink.x[eid] = 0
-  Blink.y[eid] = 0
-  Swing.startMs[eid] = 0
-  Swing.durMs[eid] = 0
   return true
 }
 

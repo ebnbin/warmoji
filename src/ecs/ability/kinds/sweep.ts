@@ -6,7 +6,7 @@ import { sectorHitIndices } from '../../../war/hit'
 import { Tint, Transform } from '../../components'
 import { sineEaseInOut } from '../../ease'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, Frozen, Swing } from '../../components'
+import { Ability, AbilityRef, Aim, Frozen, Held, Swing } from '../../components'
 import { abilityDefAt } from '../defs'
 import { applyAbilityEffects } from '../effects'
 import { sourceOf } from '../source'
@@ -43,17 +43,15 @@ export function castSweeps(sim: Sim): void {
 
 /** 摆位：持有物在瞄准方向两侧的弧上从一端扫到另一端，静止时停在末端 */
 function placeSweepBody(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindSweep, Aim, Swing, Transform])) {
-    const g = e
-    if (g === 0) continue
+  for (const e of query(sim.world, [Ability, KindSweep, Aim, Swing, Held, Transform])) {
     const def = abilityDefAt(AbilityRef.def[e]!) as SweepDef
     const frozen = Frozen.v[e] === 1
     if (frozen) Swing.durMs[e] = 0
     const angle = Aim.rad[e]! + (sweepT(sim, e, def.sweepMs) * def.arcDeg * DEG2RAD) / 2
-    Transform.x[g] = ownerX(e) + Math.cos(angle) * def.held.restOffset
-    Transform.y[g] = ownerY(e) + Math.sin(angle) * def.held.restOffset
-    Transform.rot[g] = angle + def.held.rotationOffsetDeg * DEG2RAD
-    Tint.alpha[g] = frozen ? 0 : 1
+    Transform.x[e] = ownerX(e) + Math.cos(angle) * Held.restOffset[e]!
+    Transform.y[e] = ownerY(e) + Math.sin(angle) * Held.restOffset[e]!
+    Transform.rot[e] = angle + Held.rotOffset[e]!
+    Tint.alpha[e] = frozen ? 0 : 1
   }
 }
 

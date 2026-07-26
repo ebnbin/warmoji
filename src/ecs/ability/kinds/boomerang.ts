@@ -6,7 +6,7 @@ import { Tint, Transform } from '../../components'
 import { spawnWeaponCopy } from '../../entities/weapon'
 import { flyerHits } from '../../store'
 import { cooldownMul, damageMul, damageTarget, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, Cooldown, Flyer, Frozen } from '../../components'
+import { Ability, AbilityRef, Aim, Cooldown, Flyer, Frozen, Held } from '../../components'
 import { abilityDefAt } from '../defs'
 import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
@@ -49,7 +49,7 @@ function launch(sim: Sim, e: number, def: BoomerangDef, aim: number): void {
   const count = def.twin ? 2 : 1
   for (let i = 0; i < count; i++) {
     const angle = aim + i * Math.PI
-    const f = i === 0 ? e : spawnWeaponCopy(sim, e, def.held) // 主镖就是武器自己，双子是它的分身
+    const f = i === 0 ? e : spawnWeaponCopy(sim, e) // 主镖就是武器自己，双子是它的分身
     addComponent(sim.world, f, Flyer)
     Flyer.of[f] = e
     Flyer.phase[f] = 0
@@ -128,13 +128,12 @@ function catchFlyer(sim: Sim, e: number, f: number): void {
 
 /** 摆位：不在途的镖握在角色手上 */
 function placeIdleBoomerangs(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindBoomerang, Aim, Transform])) {
+  for (const e of query(sim.world, [Ability, KindBoomerang, Aim, Held, Transform])) {
     if (hasComponent(sim.world, e, Flyer)) continue
-    const held = (abilityDefAt(AbilityRef.def[e]!) as BoomerangDef).held
     const aim = Aim.rad[e]!
-    Transform.x[e] = ownerX(e) + Math.cos(aim) * held.restOffset
-    Transform.y[e] = ownerY(e) + Math.sin(aim) * held.restOffset
-    Transform.rot[e] = aim + held.rotationOffsetDeg * DEG2RAD
+    Transform.x[e] = ownerX(e) + Math.cos(aim) * Held.restOffset[e]!
+    Transform.y[e] = ownerY(e) + Math.sin(aim) * Held.restOffset[e]!
+    Transform.rot[e] = aim + Held.rotOffset[e]!
     Tint.alpha[e] = Frozen.v[e] ? 0 : 1
   }
 }

@@ -1,4 +1,4 @@
-import { query } from 'bitecs'
+import { hasComponent, query } from 'bitecs'
 import { DEG2RAD } from '../../../util/units'
 import type { ProjectileDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
@@ -6,8 +6,7 @@ import { EnemyVel, Tint, Transform } from '../../components'
 import { spawnEnemyProjectileEcs, spawnProjectileEcs } from '../../entities/projectile'
 import { enemyDef } from '../../store'
 import { attributionSlot, damageMul, ownerX, ownerY } from '../amp'
-import { Ability, AbilityRef, Aim, FACTION, Faction, Frozen, Owner, Shots } from '../../components'
-import { abilityDefAt } from '../defs'
+import { Ability, Aim, FACTION, Faction, Frozen, Held, Owner, Shots } from '../../components'
 import { sourceOf } from '../source'
 import { castScan } from '../systems/cast'
 import { KindProjectile } from '../tags'
@@ -34,7 +33,7 @@ export function castProjectiles(sim: Sim): void {
     }
     const aim = Aim.rad[e]!
     const damage = Math.round(def.damage * damageMul(sim, e))
-    const from = muzzle(e, def)
+    const from = muzzle(sim, e)
     Shots.n[e] = Shots.n[e]! + 1
     const special = def.everyN && Shots.n[e]! % def.everyN.n === 0
     const volley: { count: number; spreadDeg: number; randomRotate?: boolean } | undefined = special
@@ -70,16 +69,16 @@ function random(sim: Sim, e: number): number {
   return Faction.v[e] === FACTION.enemy ? sim.rng.next() : Math.random()
 }
 
-/** 枪口：无持有物即本体位置；有则沿瞄准方向前伸 restOffset，再按左右手横向偏 mountGap */
-function muzzle(e: number, def: ProjectileDef): { x: number; y: number } {
-  const held = def.held
-  if (!held) return { x: ownerX(e), y: ownerY(e) }
+/** 枪口：无手持外形即施放锚点本身（徒手 / 弩塔）；有则沿瞄准方向前伸 restOffset，
+ * 再按左右手横向偏 gap。**「有没有外形」看有没有 Held 组件**，不去翻 def */
+function muzzle(sim: Sim, e: number): { x: number; y: number } {
+  if (!hasComponent(sim.world, e, Held)) return { x: ownerX(e), y: ownerY(e) }
   const aim = Aim.rad[e]!
-  const side = held.mountSide ?? 0
-  const gap = held.mountGap ?? 0
+  const off = Held.restOffset[e]!
+  const lateral = Held.side[e]! * Held.gap[e]!
   return {
-    x: ownerX(e) + Math.cos(aim) * held.restOffset + Math.cos(aim + Math.PI / 2) * side * gap,
-    y: ownerY(e) + Math.sin(aim) * held.restOffset + Math.sin(aim + Math.PI / 2) * side * gap,
+    x: ownerX(e) + Math.cos(aim) * off + Math.cos(aim + Math.PI / 2) * lateral,
+    y: ownerY(e) + Math.sin(aim) * off + Math.sin(aim + Math.PI / 2) * lateral,
   }
 }
 
@@ -103,16 +102,12 @@ function shoot(sim: Sim, e: number, def: ProjectileDef, x: number, y: number, an
 
 /** 摆位：持有物定身指向瞄准方向（含左右手挂载位） */
 function placeProjectileBody(sim: Sim): void {
-  for (const e of query(sim.world, [Ability, KindProjectile, Aim, Transform])) {
-    const g = e
-    const def = abilityDefAt(AbilityRef.def[e]!) as ProjectileDef
-    // 有身体不等于有持有物外形：弩塔也带 projectile 能力，但它的身体是塔本身，
-    // 位姿归 turret.ts 管，别在这儿按枪口摆它
-    if (!def.held) continue
-    const pos = muzzle(e, def)
-    Transform.x[g] = pos.x
-    Transform.y[g] = pos.y
-    Transform.rot[g] = Aim.rad[e]! + def.held.rotationOffsetDeg * DEG2RAD
-    Tint.alpha[g] = Frozen.v[e] ? 0 : 1
+  // 只摆有手持外形的：弩塔同样带 projectile 能力，但它没有 Held，自然不在这批里
+  for (const e of query(sim.world, [Ability, KindProjectile, Aim, Held, Transform])) {
+    const pos = muzzle(sim, e)
+    Transform.x[e] = pos.x
+    Transform.y[e] = pos.y
+    Transform.rot[e] = Aim.rad[e]! + Held.rotOffset[e]!
+    Tint.alpha[e] = Frozen.v[e] ? 0 : 1
   }
 }
