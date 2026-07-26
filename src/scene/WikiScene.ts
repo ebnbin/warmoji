@@ -5,11 +5,12 @@ import { Rng } from '../util/rng'
 import { visibleEmojiIds } from '../emoji/pack'
 import { browserStorage } from '../util/storage'
 import { loadSettings } from '../save/settings'
-import { usedEmojiSet, wikiEntryByEmoji, wikiGroups } from './wiki'
-import type { WikiEntry, WikiGroup } from './wiki'
+import { usedEmojiSet, wikiEntryByEmoji, wikiGroups } from '../data/wikiEntries'
+import type { WikiEntry, WikiGroup } from '../data/wikiEntries'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
-import { emojiImage, emojiKey, emojiText, ensureEmoji, loadEmojiPack } from '../emoji/textures'
+import { emojiImage, emojiKey, ensureEmoji, loadEmojiPack } from '../emoji/textures'
+import { emojiText } from '../ui/emojiText'
 import { EmojiGrid } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
@@ -18,6 +19,7 @@ import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { VirtualEmojiGrid } from '../ui/virtualGrid'
 import { clipTo } from '../util/mask'
+import { roundRect } from '../ui/shapes'
 
 // 图鉴：单排类别 tab——角色/队长/敌人/能力/道具（条目列表+详情）与
 // 「全部」（twemoji 基础形态完整网格）平级，「全部」排最后。
@@ -224,10 +226,7 @@ export class WikiScene extends Phaser.Scene {
       const cw = widths[i]!
       const on = this.category === i
       const bg = this.add.graphics()
-      bg.fillStyle(on ? 0xffffff : 0x000000, on ? 0.2 : 0.22)
-      bg.fillRoundedRect(x, 0, cw, ch, ch / 2)
-      bg.lineStyle(on ? 2 : 1, 0xffffff, on ? 0.85 : 0.1)
-      bg.strokeRoundedRect(x, 0, cw, ch, ch / 2)
+      roundRect(bg, x, 0, cw, ch, ch / 2, { fill: on ? 0xffffff : 0x000000, fillAlpha: on ? 0.2 : 0.22, strokeWidth: on ? 2 : 1, stroke: 0xffffff, strokeAlpha: on ? 0.85 : 0.1 })
       const icon = emojiImage(this, x + 28, ch / 2, d.icon, 35)
       const label = this.add
         .text(x + 46, ch / 2, d.label, {
@@ -352,10 +351,7 @@ export class WikiScene extends Phaser.Scene {
     const dy = this.origin.y + D.y
 
     const panel = this.add.graphics()
-    panel.fillStyle(0x000000, 0.22)
-    panel.fillRoundedRect(dx, dy, D.w, D.h, 14)
-    panel.lineStyle(1, 0xffffff, 0.1)
-    panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
+    roundRect(panel, dx, dy, D.w, D.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
 
     // 底部留 40px 给固定页脚（收录进度），正文滚动区在其之上
     const view = new ScrollView(this, { x: dx, y: dy, w: D.w, h: D.h - 40 })
@@ -563,8 +559,7 @@ export class WikiScene extends Phaser.Scene {
     const lx = this.origin.x + L.x
     const ly = this.origin.y + L.y
     const frame = this.add.graphics()
-    frame.fillStyle(0x000000, 0.18)
-    frame.fillRoundedRect(lx - 8, ly - 8, L.w + 16, L.h + 16, 14)
+    roundRect(frame, lx - 8, ly - 8, L.w + 16, L.h + 16, 14, { fill: 0x000000, fillAlpha: 0.18 })
     this.renderAllDetail()
 
     const grid = (this.allGrid = new VirtualEmojiGrid(

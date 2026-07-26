@@ -15,12 +15,14 @@ import type { RunState } from '../run/state'
 import { browserStorage } from '../util/storage'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
-import { emojiImage, emojiText } from '../emoji/textures'
+import { emojiImage } from '../emoji/textures'
+import { emojiText } from '../ui/emojiText'
 import { burstEmitter } from '../util/fx'
 import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { roundRect } from '../ui/shapes'
 
 // 终局结算页：胜利（打满 WAVE.totalWaves 波）与失败（团灭）复用同一布局，
 // 只差标题/配色/庆祝粒子。展示整局逐角色战绩（伤害/击杀/阵亡/道具）与全局汇总，
@@ -183,10 +185,7 @@ export class ResultScene extends Phaser.Scene {
   /** 逐角色战绩表：emoji/名字等级 + 伤害/击杀/阵亡 + 随身道具 */
   private renderTable(x: number, y: number, w: number, h: number, res: number): void {
     const panel = this.add.graphics()
-    panel.fillStyle(0x000000, 0.22)
-    panel.fillRoundedRect(x, y, w, h, 14)
-    panel.lineStyle(1, 0xffffff, 0.1)
-    panel.strokeRoundedRect(x, y, w, h, 14)
+    roundRect(panel, x, y, w, h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
 
     const n = this.run.roster.length
     const headerH = 46
@@ -281,10 +280,7 @@ export class ResultScene extends Phaser.Scene {
   /** 敌情面板：按敌人类型的我方击杀数与其对我方造成的伤害（按击杀降序） */
   private renderEnemyPanel(x: number, y: number, w: number, h: number, res: number): void {
     const panel = this.add.graphics()
-    panel.fillStyle(0x000000, 0.22)
-    panel.fillRoundedRect(x, y, w, h, 14)
-    panel.lineStyle(1, 0xffffff, 0.1)
-    panel.strokeRoundedRect(x, y, w, h, 14)
+    roundRect(panel, x, y, w, h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
 
     const st = this.run.stats
     emojiText(
@@ -396,13 +392,9 @@ export class ResultScene extends Phaser.Scene {
   ): void {
     const g = this.add.graphics()
     if (filled) {
-      g.fillStyle(0xffdc5d, 1)
-      g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, rect.h / 2)
+      roundRect(g, rect.x, rect.y, rect.w, rect.h, rect.h / 2, { fill: 0xffdc5d })
     } else {
-      g.fillStyle(0xffffff, 0.12)
-      g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, rect.h / 2)
-      g.lineStyle(1, 0xffffff, 0.35)
-      g.strokeRoundedRect(rect.x, rect.y, rect.w, rect.h, rect.h / 2)
+      roundRect(g, rect.x, rect.y, rect.w, rect.h, rect.h / 2, { fill: 0xffffff, fillAlpha: 0.12, stroke: 0xffffff, strokeAlpha: 0.35 })
     }
     this.add
       .text(rect.x + rect.w / 2, rect.y + rect.h / 2, text, {

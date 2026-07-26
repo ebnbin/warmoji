@@ -21,7 +21,8 @@ import {
 import type { AnimClip, AnimRecipe, SvgTree, TreeRow } from '../emoji/anim'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
-import { emojiImage, emojiKey, emojiSvgText, emojiText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
+import { emojiImage, emojiKey, emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
+import { emojiText } from '../ui/emojiText'
 import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { FONT, UI_FONT } from '../util/fonts'
 import { TAP_SLOP } from '../util/units'
@@ -29,6 +30,7 @@ import { VirtualEmojiGrid } from '../ui/virtualGrid'
 import { ScrollView } from '../ui/scroll'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { clipTo } from '../util/mask'
+import { roundRect } from '../ui/shapes'
 
 // Emoji Studio：twemoji 部件动画的游戏内工作台，三个 tab——
 // 🎬 配方 = animations.json 里的精修动画预览；🧩 模板 = 任选 emoji × 通用
@@ -317,10 +319,7 @@ export class StudioScene extends Phaser.Scene {
     for (const d of defs) {
       const active = this.tab === d.id
       const bg = this.add.graphics()
-      bg.fillStyle(active ? 0xffffff : 0x000000, active ? 0.22 : 0.2)
-      bg.fillRoundedRect(x, y - chipH / 2, chipW, chipH, chipH / 2)
-      bg.lineStyle(2, 0xffffff, active ? 0.9 : 0.12)
-      bg.strokeRoundedRect(x, y - chipH / 2, chipW, chipH, chipH / 2)
+      roundRect(bg, x, y - chipH / 2, chipW, chipH, chipH / 2, { fill: active ? 0xffffff : 0x000000, fillAlpha: active ? 0.22 : 0.2, strokeWidth: 2, stroke: 0xffffff, strokeAlpha: active ? 0.9 : 0.12 })
       const label = emojiText(
         this,
         x + chipW / 2,
@@ -499,10 +498,7 @@ export class StudioScene extends Phaser.Scene {
     for (const c of set.clips) {
       const active = c.id === current.id
       const bg = this.add.graphics()
-      bg.fillStyle(active ? 0xffffff : 0x000000, active ? 0.18 : 0.25)
-      bg.fillRoundedRect(x, y, chipW, chipH, 12)
-      bg.lineStyle(active ? 2 : 1, 0xffffff, active ? 0.9 : 0.12)
-      bg.strokeRoundedRect(x, y, chipW, chipH, 12)
+      roundRect(bg, x, y, chipW, chipH, 12, { fill: active ? 0xffffff : 0x000000, fillAlpha: active ? 0.18 : 0.25, strokeWidth: active ? 2 : 1, stroke: 0xffffff, strokeAlpha: active ? 0.9 : 0.12 })
       const label = emojiText(
         this,
         x + chipW / 2,
@@ -560,10 +556,7 @@ export class StudioScene extends Phaser.Scene {
       const lcy = row * (chipH + 10)
       const active = t.id === this.tplId
       const bg = this.add.graphics()
-      bg.fillStyle(active ? 0xffffff : 0x000000, active ? 0.18 : 0.25)
-      bg.fillRoundedRect(lx, lcy, chipW, chipH, 12)
-      bg.lineStyle(active ? 2 : 1, 0xffffff, active ? 0.9 : 0.1)
-      bg.strokeRoundedRect(lx, lcy, chipW, chipH, 12)
+      roundRect(bg, lx, lcy, chipW, chipH, 12, { fill: active ? 0xffffff : 0x000000, fillAlpha: active ? 0.18 : 0.25, strokeWidth: active ? 2 : 1, stroke: 0xffffff, strokeAlpha: active ? 0.9 : 0.1 })
       const icon = emojiImage(this, lx + chipW / 2, lcy + 22, t.icon, 35)
       const label = this.add
         .text(lx + chipW / 2, lcy + chipH - 15, t.name, {
@@ -717,8 +710,7 @@ export class StudioScene extends Phaser.Scene {
 
         // 结构树列表：遮罩 + 滚动（遮罩不裁输入，行内自校验可见性）
         const treeBg = this.add.graphics()
-        treeBg.fillStyle(0x000000, 0.16)
-        treeBg.fillRoundedRect(treeArea.x - 8, treeArea.y - 8, treeArea.w + 16, treeArea.h + 16, 12)
+        roundRect(treeBg, treeArea.x - 8, treeArea.y - 8, treeArea.w + 16, treeArea.h + 16, 12, { fill: 0x000000, fillAlpha: 0.16 })
         const mask = this.add.graphics().setVisible(false)
         mask.fillStyle(0xffffff, 1)
         mask.fillRect(treeArea.x, treeArea.y, treeArea.w, treeArea.h)
@@ -790,8 +782,7 @@ export class StudioScene extends Phaser.Scene {
       const y = i * ANAT_ROW
       const dim = this.anatEffHidden(row.path)
       const bg = this.add.graphics()
-      bg.fillStyle(0x000000, dim ? 0.3 : 0.2)
-      bg.fillRoundedRect(0, y + 3, a.area.w, ANAT_ROW - 6, 12)
+      roundRect(bg, 0, y + 3, a.area.w, ANAT_ROW - 6, 12, { fill: 0x000000, fillAlpha: dim ? 0.3 : 0.2 })
       bg.lineStyle(1, 0xffffff, dim ? 0.04 : 0.08)
       bg.strokeRoundedRect(1, y + 4, a.area.w - 2, ANAT_ROW - 8, 12)
       const parts: Phaser.GameObjects.GameObject[] = [bg]
@@ -820,10 +811,7 @@ export class StudioScene extends Phaser.Scene {
       }
       if (row.fill && /^#[0-9a-fA-F]{6}$/.test(row.fill)) {
         const sw = this.add.graphics()
-        sw.fillStyle(Number.parseInt(row.fill.slice(1), 16), 1)
-        sw.fillRoundedRect(x, y + ANAT_ROW / 2 - 10, 20, 20, 5)
-        sw.lineStyle(1, 0xffffff, 0.25)
-        sw.strokeRoundedRect(x, y + ANAT_ROW / 2 - 10, 20, 20, 5)
+        roundRect(sw, x, y + ANAT_ROW / 2 - 10, 20, 20, 5, { fill: Number.parseInt(row.fill.slice(1), 16), stroke: 0xffffff, strokeAlpha: 0.25 })
         parts.push(sw)
         x += 32
       }
@@ -962,10 +950,7 @@ export class StudioScene extends Phaser.Scene {
     this.controlSpeed = undefined
     for (const def of defs) {
       const bg = this.add.graphics()
-      bg.fillStyle(0x000000, 0.28)
-      bg.fillRoundedRect(x, y, btnW, btnH, 12)
-      bg.lineStyle(1, 0xffffff, 0.15)
-      bg.strokeRoundedRect(x, y, btnW, btnH, 12)
+      roundRect(bg, x, y, btnW, btnH, 12, { fill: 0x000000, fillAlpha: 0.28, stroke: 0xffffff, strokeAlpha: 0.15 })
       let obj: Phaser.GameObjects.GameObject
       if (def.icon) {
         const icon = emojiImage(this, x + btnW / 2, y + btnH / 2, def.icon(), 32)

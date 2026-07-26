@@ -17,6 +17,7 @@ import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { roundRect } from '../ui/shapes'
 
 // 地图选择页 = 开始游戏第一步（主菜单 → 选地图 → 选队长 → 组队 → 战斗）。
 // 地图即关卡：各图有专属世界规则、出怪表与终波 Boss（详情页「玩法」段展示）。
@@ -127,10 +128,7 @@ export class MapScene extends Phaser.Scene {
     const dx = ox + D.x
     const dy = oy + D.y
     const panel = this.add.graphics()
-    panel.fillStyle(0x000000, 0.22)
-    panel.fillRoundedRect(dx, dy, D.w, D.h, 14)
-    panel.lineStyle(1, 0xffffff, 0.1)
-    panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
+    roundRect(panel, dx, dy, D.w, D.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
     // 地图介绍/装饰预览是变长内容，装进可滚动容器
     this.detailView = new ScrollView(this, { x: dx, y: dy, w: D.w, h: D.h })
 
@@ -143,8 +141,7 @@ export class MapScene extends Phaser.Scene {
     }
     const b = this.btnRect
     const btnBg = this.add.graphics()
-    btnBg.fillStyle(0xffdc5d, 1)
-    btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
+    roundRect(btnBg, b.x, b.y, b.w, b.h, b.h / 2, { fill: 0xffdc5d })
     this.confirmLabel = this.add
       .text(w / 2, oy + L.btn.y, '选择队长', {
         fontFamily: UI_FONT,

@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { TAP_SLOP } from '../util/units'
 import { clipTo, markDirty } from '../util/mask'
+import { roundRect } from './shapes'
 
 // 通用可滚动容器：几何遮罩裁像素 + 滚轮/拖动 + 内容高度钳位。
 // 与 EmojiGrid 同源的手势逻辑，但装任意 GameObject（详情面板的变长文本/图标/交互控件），
@@ -66,8 +67,7 @@ export class ScrollView {
 
     if (opts.frame) {
       const f = scene.add.graphics()
-      f.fillStyle(0x000000, 0.18)
-      f.fillRoundedRect(rect.x - 8, rect.y - 8, rect.w + 16, rect.h + 16, 14)
+      roundRect(f, rect.x - 8, rect.y - 8, rect.w + 16, rect.h + 16, 14, { fill: 0x000000, fillAlpha: 0.18 })
     }
 
     this.content = scene.add.container(rect.x, rect.y - this.scroll)

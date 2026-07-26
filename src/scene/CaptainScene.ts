@@ -7,7 +7,7 @@ import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
 import { beginRun } from '../run/state'
 import { loadCaptain, loadMap, saveCaptain } from '../save/selection'
-import { captainStatGroups } from './stats'
+import { captainStatGroups } from '../data/statLines'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/textures'
@@ -16,6 +16,7 @@ import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { roundRect } from '../ui/shapes'
 
 // 队长选择页 = 组队流程第一步（主菜单 → 选队长 → 组队 → 战斗）。
 // 单选：点列表行即选定并展开详情；队长不参战，其编制/被动影响后续组队与商店。
@@ -112,10 +113,7 @@ export class CaptainScene extends Phaser.Scene {
     const dx = ox + D.x
     const dy = oy + D.y
     const panel = this.add.graphics()
-    panel.fillStyle(0x000000, 0.22)
-    panel.fillRoundedRect(dx, dy, D.w, D.h, 14)
-    panel.lineStyle(1, 0xffffff, 0.1)
-    panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
+    roundRect(panel, dx, dy, D.w, D.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
     // 队长增益/主动技能是变长文案，装进可滚动容器，绝不再靠收紧行距硬塞
     this.detailView = new ScrollView(this, { x: dx, y: dy, w: D.w, h: D.h })
 
@@ -128,8 +126,7 @@ export class CaptainScene extends Phaser.Scene {
     }
     const b = this.btnRect
     const btnBg = this.add.graphics()
-    btnBg.fillStyle(0xffdc5d, 1)
-    btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
+    roundRect(btnBg, b.x, b.y, b.w, b.h, b.h / 2, { fill: 0xffdc5d })
     this.add
       .text(w / 2, oy + L.btn.y, '组建队伍', {
         fontFamily: UI_FONT,

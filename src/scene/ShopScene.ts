@@ -27,7 +27,7 @@ import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
 import { endRun, getRun, hasCenter, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
-import { characterStatGroups } from './stats'
+import { characterStatGroups } from '../data/statLines'
 import { memberMaxHp } from '../data/stats'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
@@ -38,6 +38,7 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { clipTo } from '../util/mask'
+import { roundRect } from '../ui/shapes'
 
 // 波次间商店：左（竖屏为下）为上架位列表——队长占首位、每个出战角色一个位，
 // 各自从自己的道具池随机上架，可购买（自动补货）或付费刷新（队长可提供免费次数）；
@@ -220,10 +221,7 @@ export class ShopScene extends Phaser.Scene {
     const dx = this.origin.x + D.x
     const dy = oy + D.y
     const panel = this.add.graphics()
-    panel.fillStyle(0x000000, 0.22)
-    panel.fillRoundedRect(dx, dy, D.w, D.h, 14)
-    panel.lineStyle(1, 0xffffff, 0.1)
-    panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
+    roundRect(panel, dx, dy, D.w, D.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
 
     // 属性区滚动容器：夹在详情头部与底部道具卡之间，行数多时可拖动/滚轮
     this.statsTop = dy + 112
@@ -291,8 +289,7 @@ export class ShopScene extends Phaser.Scene {
     }
     const b = this.btnRect
     const btnBg = this.add.graphics()
-    btnBg.fillStyle(0xffdc5d, 1)
-    btnBg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2)
+    roundRect(btnBg, b.x, b.y, b.w, b.h, b.h / 2, { fill: 0xffdc5d })
     this.add
       .text(w / 2, oy + L.btn.y, `开始第 ${this.run.wave} 波`, {
         fontFamily: UI_FONT,
@@ -474,10 +471,8 @@ export class ShopScene extends Phaser.Scene {
     const barW = dx + D.w - 24 - barX
     const barY = dy + 92
     const xpBar = this.add.graphics()
-    xpBar.fillStyle(0x000000, 0.4)
-    xpBar.fillRoundedRect(barX, barY, barW, 9, 4)
-    xpBar.fillStyle(prog.maxed ? 0xffdc5d : 0x7cc5ff, 1)
-    xpBar.fillRoundedRect(barX + 1, barY + 1, Math.max(2, (barW - 2) * prog.ratio), 7, 3)
+    roundRect(xpBar, barX, barY, barW, 9, 4, { fill: 0x000000, fillAlpha: 0.4 })
+    roundRect(xpBar, barX + 1, barY + 1, Math.max(2, (barW - 2) * prog.ratio), 7, 3, { fill: prog.maxed ? 0xffdc5d : 0x7cc5ff })
 
     this.detailObjs.push(
       emojiImage(this, dx + 58, dy + 52, def.emoji, 85, 'player'),
@@ -598,8 +593,7 @@ export class ShopScene extends Phaser.Scene {
     const rarity = offer ? ITEMS[offer].rarity : 'common'
     const rarityColor = Number.parseInt(RARITIES[rarity].color.slice(1), 16)
     const card = this.add.graphics()
-    card.fillStyle(0xffffff, 0.07)
-    card.fillRoundedRect(dx + 14, cardY, D.w - 28, 96, 12)
+    roundRect(card, dx + 14, cardY, D.w - 28, 96, 12, { fill: 0xffffff, fillAlpha: 0.07 })
     if (offer && rarity !== 'common') card.lineStyle(2, rarityColor, 0.8)
     else card.lineStyle(1, 0xffdc5d, 0.35)
     card.strokeRoundedRect(dx + 14, cardY, D.w - 28, 96, 12)
@@ -668,8 +662,7 @@ export class ShopScene extends Phaser.Scene {
     const canBuy = offer !== null && this.run.coins >= this.price(offer)
     const bb = this.buyRect
     const buyBg = this.add.graphics()
-    buyBg.fillStyle(canBuy ? 0xffdc5d : 0xffffff, canBuy ? 1 : 0.1)
-    buyBg.fillRoundedRect(bb.x, bb.y, bb.w, bb.h, 27)
+    roundRect(buyBg, bb.x, bb.y, bb.w, bb.h, 27, { fill: canBuy ? 0xffdc5d : 0xffffff, fillAlpha: canBuy ? 1 : 0.1 })
     this.detailObjs.push(
       buyBg,
       this.add
@@ -688,8 +681,7 @@ export class ShopScene extends Phaser.Scene {
     const canRefresh = free || this.run.coins >= SHOP.refreshPrice
     const rb = this.refreshRect
     const refBg = this.add.graphics()
-    refBg.fillStyle(0xffffff, canRefresh ? 0.14 : 0.07)
-    refBg.fillRoundedRect(rb.x, rb.y, rb.w, rb.h, 27)
+    roundRect(refBg, rb.x, rb.y, rb.w, rb.h, 27, { fill: 0xffffff, fillAlpha: canRefresh ? 0.14 : 0.07 })
     if (canRefresh) {
       refBg.lineStyle(1, 0xffffff, 0.3)
       refBg.strokeRoundedRect(rb.x, rb.y, rb.w, rb.h, 27)
@@ -739,10 +731,7 @@ export class ShopScene extends Phaser.Scene {
 
     const overlay = this.add.rectangle(cx, cy, 6000, 6000, 0x000000, 0.55).setDepth(400)
     const panel = this.add.graphics()
-    panel.fillStyle(0x2a2540, 0.98)
-    panel.fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 20)
-    panel.lineStyle(3, 0xffdc5d, 0.9)
-    panel.strokeRoundedRect(-pw / 2, -ph / 2, pw, ph, 20)
+    roundRect(panel, -pw / 2, -ph / 2, pw, ph, 20, { fill: 0x2a2540, fillAlpha: 0.98, strokeWidth: 3, stroke: 0xffdc5d, strokeAlpha: 0.9 })
     const items: Phaser.GameObjects.GameObject[] = [
       panel,
       this.add

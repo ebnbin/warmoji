@@ -3,6 +3,7 @@ import type { OutlineKind } from '../emoji/svg'
 import { TAP_SLOP } from '../util/units'
 import { emojiImage } from '../emoji/textures'
 import { clipTo } from '../util/mask'
+import { roundRect } from './shapes'
 
 // 可滚动 emoji 网格：形象即含义，名字/数值留给详情面板。
 // 队长/组队/商店/图鉴条目页共用——统一滚轮 + 拖动（拖过阈值不算点击）、
@@ -61,8 +62,7 @@ export class EmojiGrid {
     this.scroll = opts.initialScroll ?? 0
 
     const frame = scene.add.graphics()
-    frame.fillStyle(0x000000, 0.18)
-    frame.fillRoundedRect(rect.x - 8, rect.y - 8, rect.w + 16, rect.h + 16, 14)
+    roundRect(frame, rect.x - 8, rect.y - 8, rect.w + 16, rect.h + 16, 14, { fill: 0x000000, fillAlpha: 0.18 })
 
     this.container = scene.add.container(rect.x, rect.y)
     const mask = scene.add.graphics().setVisible(false)

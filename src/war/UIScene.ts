@@ -33,7 +33,8 @@ import {
 } from '../run/lab'
 import type { LabDensity, LabLevel, LabMul } from '../run/lab'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from './diagnostics'
-import { emojiCacheStats, emojiImage, emojiText, iconLabel } from '../emoji/textures'
+import { emojiCacheStats, emojiImage } from '../emoji/textures'
+import { emojiText, iconLabel } from '../ui/emojiText'
 import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { Joystick } from '../ui/Joystick'
@@ -49,6 +50,7 @@ import {
 import type { HudSnapshot, WaveSummary } from './hudHost'
 import { activeHudHost } from './hudHost'
 import type { HudHost } from './hudHost'
+import { roundRect } from '../ui/shapes'
 
 // 屏幕层：HUD、虚拟摇杆、升级提示、结算界面。
 // 与 BoundedScene 并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
@@ -231,13 +233,9 @@ export class UIScene extends Phaser.Scene {
       const rect = { x: cx - 150, y: y - 36, w: 300, h: 72 }
       const g = this.add.graphics().setDepth(251)
       if (filled) {
-        g.fillStyle(0xffdc5d, 1)
-        g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 36)
+        roundRect(g, rect.x, rect.y, rect.w, rect.h, 36, { fill: 0xffdc5d })
       } else {
-        g.fillStyle(0xffffff, 0.12)
-        g.fillRoundedRect(rect.x, rect.y, rect.w, rect.h, 36)
-        g.lineStyle(1, 0xffffff, 0.35)
-        g.strokeRoundedRect(rect.x, rect.y, rect.w, rect.h, 36)
+        roundRect(g, rect.x, rect.y, rect.w, rect.h, 36, { fill: 0xffffff, fillAlpha: 0.12, stroke: 0xffffff, strokeAlpha: 0.35 })
       }
       const t = this.add
         .text(cx, y, label, {
@@ -305,11 +303,9 @@ export class UIScene extends Phaser.Scene {
     const w = 320
     const x = viewport.logicalWidth / 2 - w / 2
     const y = safeInsets.top + 56
-    g.fillStyle(0x000000, 0.55)
-    g.fillRoundedRect(x, y, w, 16, 8)
+    roundRect(g, x, y, w, 16, 8, { fill: 0x000000, fillAlpha: 0.55 })
     const ratio = Math.max(0, Math.min(1, s.bossHp / s.bossMaxHp))
-    g.fillStyle(0xef5350, 1)
-    g.fillRoundedRect(x + 2, y + 2, Math.max(6, (w - 4) * ratio), 12, 6)
+    roundRect(g, x + 2, y + 2, Math.max(6, (w - 4) * ratio), 12, 6, { fill: 0xef5350 })
   }
 
   /** 节点波警示横幅：短暂弹出后淡出（精英潮 / Boss 登场） */
@@ -485,10 +481,8 @@ export class UIScene extends Phaser.Scene {
     list.forEach((f, i) => {
       const by = y0 + i * step + 20
       const ratio = f.totalMs > 0 ? Math.max(0, Math.min(1, f.remainMs / f.totalMs)) : 0
-      g.fillStyle(0x000000, 0.5)
-      g.fillRoundedRect(x - barW / 2, by, barW, 5, 2)
-      g.fillStyle(f.polarity === 'buff' ? 0x66bb6a : 0xef5350, 1)
-      g.fillRoundedRect(x - barW / 2 + 0.5, by + 0.5, Math.max(2, (barW - 1) * ratio), 4, 2)
+      roundRect(g, x - barW / 2, by, barW, 5, 2, { fill: 0x000000, fillAlpha: 0.5 })
+      roundRect(g, x - barW / 2 + 0.5, by + 0.5, Math.max(2, (barW - 1) * ratio), 4, 2, { fill: f.polarity === 'buff' ? 0x66bb6a : 0xef5350 })
     })
   }
 

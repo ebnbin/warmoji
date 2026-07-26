@@ -8,10 +8,12 @@ import { Rng } from '../util/rng'
 import { browserStorage } from '../util/storage'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
-import { emojiImage, iconLabel } from '../emoji/textures'
+import { emojiImage } from '../emoji/textures'
+import { iconLabel } from '../ui/emojiText'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { roundRect } from '../ui/shapes'
 
 // 主菜单：分字母弹跳的两色 logo + 背景漂浮暗纹 + 「角色 vs 敌人」对峙小剧场，
 // 全部用已预载的描边纹理与 tween，比例定位横竖屏通用
@@ -101,8 +103,7 @@ export class MenuScene extends Phaser.Scene {
     const btn = { x: w / 2 - 170, y: h * 0.82 - 36, w: 340, h: 72 }
     this.menuBtn = btn
     const btnBg = this.add.graphics()
-    btnBg.fillStyle(0xffdc5d, 1)
-    btnBg.fillRoundedRect(-btn.w / 2, -btn.h / 2, btn.w, btn.h, btn.h / 2)
+    roundRect(btnBg, -btn.w / 2, -btn.h / 2, btn.w, btn.h, btn.h / 2, { fill: 0xffdc5d })
     const btnText = this.add
       .text(0, 0, '开始战斗', {
         fontFamily: UI_FONT,

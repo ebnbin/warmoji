@@ -24,7 +24,7 @@ import {
   setGuardCenter,
 } from '../run/state'
 import type { RunState } from '../run/state'
-import { characterStatGroups } from './stats'
+import { characterStatGroups } from '../data/statLines'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/textures'
@@ -34,6 +34,7 @@ import type { ScrollRect } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { roundRect } from '../ui/shapes'
 
 // 整编页：每波战斗前的强制招募 + 阵型页。开局组队与波末整编完全复用本页：
 // 队长确认后进来招首发（可返回重选队长），此后每波结束按名额招人直到满编
@@ -286,10 +287,7 @@ export class PromoteScene extends Phaser.Scene {
     const dx = this.origin.x + D.x
     const dy = oy + D.y
     const panel = this.add.graphics()
-    panel.fillStyle(0x000000, 0.22)
-    panel.fillRoundedRect(dx, dy, D.w, D.h, 14)
-    panel.lineStyle(1, 0xffffff, 0.1)
-    panel.strokeRoundedRect(dx, dy, D.w, D.h, 14)
+    roundRect(panel, dx, dy, D.w, D.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
 
     // 详情文字区：招募模式占详情面板一角（detailText），阵型模式占整块 detail。
     // 角色属性（携带/升级卡/被动）是变长文案，装进可滚动容器，不再静默截断
@@ -533,10 +531,7 @@ export class PromoteScene extends Phaser.Scene {
     const posts = formationPosts('guard', n, this.previewPhase)
 
     const panel = this.add.graphics()
-    panel.fillStyle(0x000000, 0.22)
-    panel.fillRoundedRect(lx, ly, L.w, L.h, 14)
-    panel.lineStyle(1, 0xffffff, 0.1)
-    panel.strokeRoundedRect(lx, ly, L.w, L.h, 14)
+    roundRect(panel, lx, ly, L.w, L.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
     this.formationObjs.push(panel)
 
     const maxR = Math.max(...posts.map((p) => Math.hypot(p.x, p.y)), 1)

@@ -15,6 +15,7 @@ import type { ScrollRect } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { roundRect } from '../ui/shapes'
 
 // 团队升级抽卡页：战斗中每升 1 级攒 1 次抽卡（run.cardDraws），战斗后在此逐次三选一。
 // 卡 = 团队层加成（teamFx），替代原「队长道具」那套用金币买的系统。选中即升该卡等级，
@@ -106,10 +107,7 @@ export class CardScene extends Phaser.Scene {
     const level = this.run.teamCards[id] ?? 0
     const rc = RARITY_COLOR[card.rarity] ?? 0xffffff
     const bg = this.add.graphics()
-    bg.fillStyle(0x000000, 0.28)
-    bg.fillRoundedRect(0, y, listW, this.rowH, 14)
-    bg.lineStyle(card.rarity === 'common' ? 1 : 2, rc, card.rarity === 'common' ? 0.3 : 0.85)
-    bg.strokeRoundedRect(0, y, listW, this.rowH, 14)
+    roundRect(bg, 0, y, listW, this.rowH, 14, { fill: 0x000000, fillAlpha: 0.28, strokeWidth: card.rarity === 'common' ? 1 : 2, stroke: rc, strokeAlpha: card.rarity === 'common' ? 0.3 : 0.85 })
 
     const lvText = level > 0 ? `Lv ${level} → ${level + 1}` : `${RARITIES[card.rarity].label} · 新`
     const zone = this.add

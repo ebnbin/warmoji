@@ -1,13 +1,13 @@
-import { KNOCKBACK } from '../data/abilities'
-import { memberMaxHp } from '../data/stats'
-import { CHARACTERS, MEMBER, TEAM, loadoutFor, upgradeCardsFor } from '../data/characters'
-import type { CaptainDef } from '../data/captains'
-import type { CharacterId } from '../data/characters'
-import { aggregateCharacterEffects, resolveAbilityDef } from '../data/items'
-import { tiersForLevel } from '../data/charLevel'
-import { levelStatsFor } from '../data/levels'
-import type { ItemId } from '../data/items'
-import type { AbilityDef } from '../data/abilityDefs'
+import { KNOCKBACK } from './abilities'
+import { memberMaxHp } from './stats'
+import { CHARACTERS, MEMBER, TEAM, loadoutFor, upgradeCardsFor } from './characters'
+import type { CaptainDef } from './captains'
+import type { CharacterId } from './characters'
+import { aggregateCharacterEffects, resolveAbilityDef } from './items'
+import { tiersForLevel } from './charLevel'
+import { levelStatsFor } from './levels'
+import type { ItemId } from './items'
+import type { AbilityDef } from './abilityDefs'
 
 // 角色属性面板的展示模型：把异构的角色/能力参数组织成统一的「属性组」。
 // 距离统一换算为「格」（1 格 = 1 单位 = 地图网格边长），时间换算为秒。

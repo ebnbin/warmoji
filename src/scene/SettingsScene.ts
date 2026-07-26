@@ -7,13 +7,15 @@ import { loadSettings, saveSettings, SETTING_DEFS } from '../save/settings'
 import type { Settings } from '../save/settings'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
-import { emojiImage, emojiText } from '../emoji/textures'
+import { emojiImage } from '../emoji/textures'
+import { emojiText } from '../ui/emojiText'
 import { ScrollView } from '../ui/scroll'
 import type { ScrollRect } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { setBgmEnabled } from '../audio/bgm'
 import { playSfx, setSfxEnabled } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { roundRect } from '../ui/shapes'
 
 // 设置页：按 SETTING_DEFS 定义表渲染开关列表，改动即时持久化。
 // 布局按最小可用空间设计（横 1280×720 / 竖 720×1280），内容块居中于实际视口。
@@ -117,10 +119,7 @@ export class SettingsScene extends Phaser.Scene {
     SETTING_DEFS.forEach((def, i) => {
       const y = i * (S.rowH + S.gap)
       const bg = this.add.graphics()
-      bg.fillStyle(0x000000, 0.22)
-      bg.fillRoundedRect(0, y, S.w, S.rowH, 16)
-      bg.lineStyle(1, 0xffffff, 0.1)
-      bg.strokeRoundedRect(0, y, S.w, S.rowH, 16)
+      roundRect(bg, 0, y, S.w, S.rowH, 16, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
 
       const toggle = this.add.graphics()
       const row: Row = { key: def.key, localY: y, toggle }
@@ -189,8 +188,7 @@ export class SettingsScene extends Phaser.Scene {
     const ty = row.localY + S.rowH / 2 - th / 2
     const g = row.toggle
     g.clear()
-    g.fillStyle(on ? 0xffdc5d : 0xffffff, on ? 1 : 0.16)
-    g.fillRoundedRect(tx, ty, tw, th, th / 2)
+    roundRect(g, tx, ty, tw, th, th / 2, { fill: on ? 0xffdc5d : 0xffffff, fillAlpha: on ? 1 : 0.16 })
     g.fillStyle(on ? 0x25262e : 0xc0c0cc, 1)
     g.fillCircle(on ? tx + tw - th / 2 : tx + th / 2, ty + th / 2, th / 2 - 5)
   }
