@@ -1,19 +1,20 @@
-import { addComponent, addEntity } from 'bitecs'
+import { addComponent } from 'bitecs'
 import {
   Depth,
   Quad,
   Sprite,
   Tint,
   Transform,
-} from '../components'
-import type { EcsWorld } from '../world'
-import type { FrameIndex } from '../frames'
-import type { OutlineKind } from '../../emoji/svg'
+} from './components'
+import type { EcsWorld } from './world'
+import type { FrameIndex } from './frames'
+import type { OutlineKind } from '../emoji/svg'
 
-// 「可绘制实体」的通用底座：只挂 Transform + Sprite + Tint + Depth,别的一概不管。
-// 装饰物(草丛/蘑菇)直接用它;能力的持有物、召唤物、炮台、在途回旋镖先用它建壳,
-// 再由各自的工厂追加专属组件。
-// 注意与 Sprite **组件**区分:那是「怎么画」,这里是「建一个只负责被画的实体」。
+// 「被画出来」这件事的组件包：Transform + Sprite + Tint + Depth 一次挂齐。
+//
+// 它**不是实体类型**，所以不在 entities/ 下——「可绘制」是任何实体都能具备的性质，
+// 装饰物、持有物、召唤物、炮台、在途回旋镖各自是不同的实体，只是都想被画出来。
+// 故这里只挂组件、不建实体：eid 由各实体工厂自己 addEntity 后传进来。
 
 export interface DrawableInit {
   id: string
@@ -32,9 +33,8 @@ export interface DrawableInit {
   z?: number
 }
 
-/** 装配一个可渲染实体(Transform+Sprite+Tint+Depth),返回 eid */
-export function spawnDrawable(world: EcsWorld, atlas: FrameIndex, init: DrawableInit): number {
-  const eid = addEntity(world)
+/** 给已有实体挂上可绘制组件包 */
+export function attachDrawable(world: EcsWorld, eid: number, atlas: FrameIndex, init: DrawableInit): void {
   addComponent(world, eid, Transform)
   addComponent(world, eid, Sprite)
   addComponent(world, eid, Tint)
@@ -51,5 +51,4 @@ export function spawnDrawable(world: EcsWorld, atlas: FrameIndex, init: Drawable
   Tint.alpha[eid] = init.alpha ?? 1
   Depth.z[eid] = init.z ?? 0
   Quad.v[eid] = 0
-  return eid
 }

@@ -35,7 +35,7 @@ import { aggregateTeamCards } from '../data/cards'
 import { Rng } from '../util/rng'
 import { MoveSpeed } from './components'
 import { spawnCaptain } from './entities/captain'
-import { spawnCharacters } from './entities/character'
+import { formTeam } from './entities/captain'
 import { worldFor } from './worlds'
 import type { EcsAtlas } from './render/atlas'
 
@@ -488,7 +488,7 @@ export function makeSim(
     captainDef.moveSpeed * UNIT * teamFx.moveSpeedMul,
     captainDef.coinMagnet * UNIT * teamFx.magnetMul,
   )
-  const team = spawnCharacters(world, atlas, run, testMode, center)
+  const team = formTeam(world, atlas, run, testMode, captain)
   const { count, formation, postBySlot, lineupOrbit, members } = team
   return {
     world,

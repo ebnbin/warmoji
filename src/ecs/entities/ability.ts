@@ -3,7 +3,7 @@ import { abilityPiercesWalls } from '../../war/abilityRules'
 import type { AbilityDef, HeldVisual } from '../../types/abilityDefs'
 import type { OutlineKind } from '../../emoji/svg'
 import { Boss, Elite, Transform } from '../components'
-import { spawnDrawable } from './drawable'
+import { attachDrawable } from '../drawable'
 import { Ability, AbilityRef, Aim, Amp, Blink, Cooldown, Disarmed, FACTION, Faction, Followup, Frozen, Gear, Pulse, Radial, Shots, Manual, Owner, Swing, WallBlocked } from '../components'
 import type { AmpInit } from '../ability/equip'
 import { internAbilityDef } from '../ability/defs'
@@ -63,7 +63,8 @@ export function equipAbility(
 function spawnGear(sim: Sim, ownerEid: number, faction: number, held: HeldVisual): number {
   const outline: OutlineKind =
     faction === FACTION.enemy ? (Elite.v[ownerEid] || Boss.v[ownerEid] ? 'elite' : 'enemy') : 'player'
-  return spawnDrawable(sim.world, sim.frames, {
+  const gear = addEntity(sim.world)
+  attachDrawable(sim.world, gear, sim.frames, {
     id: held.emoji,
     outline,
     x: Transform.x[ownerEid]!,
@@ -71,6 +72,7 @@ function spawnGear(sim: Sim, ownerEid: number, faction: number, held: HeldVisual
     size: held.size,
     z: 13,
   })
+  return gear
 }
 
 /** 收走某持有者名下的全部能力实体与它们的子实体（持有物、在途坠物）。

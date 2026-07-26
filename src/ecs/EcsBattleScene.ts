@@ -33,7 +33,7 @@ import { query, removeEntity } from 'bitecs'
 import { Alive, Boss, Coin, Dormant, Enemy, EnemyProj, Hp, MHp, MoveSpeed, Nest, Projectile, Revive, Sprite, Transform } from './components'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
-import { spawnDrawable } from './entities/drawable'
+import { spawnDecor } from './entities/decor'
 import { updateAnims } from './anim'
 import { remapSim } from './remap'
 import { makeSim } from './sim'
@@ -1184,7 +1184,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.decorChunks.set(
         key,
         chunkDecor(def, this.run.decorSeed, c.cx, c.cy, cfg.chunkCells).map((d) =>
-          spawnDrawable(this.world, atlas, {
+          spawnDecor(this.world, atlas, {
             id: d.emoji,
             outline: 'player',
             x: d.xU * UNIT,
@@ -1300,7 +1300,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const cols = Math.round(this.mapW / UNIT)
     const rows = Math.round(this.mapH / UNIT)
     for (const d of rollDecor(MAPS[run.mapId].decor, () => rng.next(), cols, rows)) {
-      spawnDrawable(this.world, atlas, {
+      spawnDecor(this.world, atlas, {
         id: d.emoji,
         outline: 'player',
         x: d.xU * UNIT,

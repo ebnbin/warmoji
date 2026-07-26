@@ -1,8 +1,8 @@
-import { addComponent, hasComponent, query, removeEntity } from 'bitecs'
+import { addComponent, addEntity, hasComponent, query, removeEntity } from 'bitecs'
 import type { StrikeDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { Alive, Tint, Transform } from '../../components'
-import { spawnDrawable } from '../../entities/drawable'
+import { attachDrawable } from '../../drawable'
 import { enemyDef } from '../../store'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { AbilityRef, Drop, FACTION, Faction, Owner } from '../../components'
@@ -34,7 +34,8 @@ export function castStrikes(sim: Sim): void {
 
 /** 一枚坠物：起点在目标正上方，错峰延迟后开始下落 */
 function spawnDrop(sim: Sim, e: number, def: StrikeDef, t: Target, index: number): void {
-  const d = spawnDrawable(sim.world, sim.frames, {
+  const d = addEntity(sim.world)
+  attachDrawable(sim.world, d, sim.frames, {
     id: def.drop.emoji,
     outline: Faction.v[e] === FACTION.enemy ? 'enemy' : 'player',
     x: t.x,
