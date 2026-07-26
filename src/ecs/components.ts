@@ -335,7 +335,7 @@ export const FACTION = { team: 0, enemy: 1 } as const
 export const Faction = { v: u8() }
 
 /** 冷却剩余 ms（≤0 即就绪） */
-export const Cooldown = { left: f32() }
+export const Cooldown = { left: f32(), baseMs: f32() }
 
 /** 出手乘区（装备时定死的那部分）：dmg 伤害 / cd 冷却 / crit 暴击率 / kb 击退倍率。
  * battle=1 表示这是一条常规出手，吃随局面变的队伍侧乘区（战场限时层、暴击加成、
@@ -359,6 +359,50 @@ export const Swing = { startMs: f32(), durMs: f32() }
 
 /** 持有物：这条能力的视觉子实体 eid（0 = 无本体持有物，行为主体是角色自己）。
  * 子实体自带 Transform/Sprite/Tint/Depth，随批绘一起画，不是游离的 GameObject */
+
+// ── 每种能力的参数组件 ───────────────────────────────────────────────
+// **一种能力 = 一个组件**：它既是「归哪个 system 管」的标记，也装着执行它需要的
+// 全部参数。system 只问「这个实体有没有挂我这个组件」，不问它是什么 kind——
+// 参数就在组件上，不必再顺着一个下标去翻定义对象。
+//
+// def 里的**可选子对象一律拆成可选组件**（群体处方 / 电击起搏 / 扫射 / 冻伤 / 凛冬）：
+// 于是 `if (def.aoe)` 变成 `hasComponent(HealAoe)`——「有这个组件 = 有这个性质」。
+//
+// 参数在装备那一刻由 registries/abilityKinds.ts 的 attach 从 def 写进来，此后 def
+// 与这条能力再无关系。
+
+/** 贯穿激光：向瞄准方向发射线段胶囊光束，打穿直线上所有敌人 */
+export const Laser = {
+  damage: f32(),
+  knockback: f32(),
+  range: f32(),
+  beamRadius: f32(),
+  color: u32(),
+}
+/** 双联：正后方同步补一道 */
+export const LaserBackBeam = {}
+/** 全域扫射：出手改为绕一周的多向序列光束（取代常规单束） */
+export const LaserRadial = { beams: f32(), ratio: f32(), stepMs: f32() }
+
+/** 周期治疗：范围内血量比例最低的那一个 */
+export const Heal = { amount: f32(), range: f32() }
+/** 群体处方：改为范围内全体各回 ratio × amount */
+export const HealAoe = { ratio: f32() }
+/** 电击起搏：范围内有阵亡队友时优先为其减少复活倒计时 */
+export const HealDefib = { reviveCutMs: f32() }
+
+/** 寒气光环：以持有者为圆心的持续减速区（区本身是实体，见 entities/zone.ts） */
+export const SlowAura = { radius: f32(), slowFactor: f32(), color: u32() }
+/** 冻伤：光环内持续掉血（每秒） */
+export const AuraDps = { perSec: f32() }
+/** 凛冬降临：每 intervalMs 冻结光环内敌人 durationMs */
+export const AuraFreeze = { intervalMs: f32(), durationMs: f32() }
+
+/** 全域打击：全场活跃敌人各吃一次大额伤害（随波次威胁倍率缩放，Boss 折减） */
+export const Nuke = { damage: f32(), bossRatio: f32() }
+
+/** 时停：按下开关，世界时标的放缩由 stepSim 逐帧处理 */
+export const TimeStop = { durationMs: f32() }
 
 /** 光环的两个自走节拍：dps 跳伤与冻结脉冲各自倒计时。
  * 光环没有冷却概念（每帧都过一遍施放扫描），故不能借 Cooldown 当计时器 */

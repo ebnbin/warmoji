@@ -1,37 +1,41 @@
-import type { HealDef } from '../../types/abilityDefs'
+import { hasComponent } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
-import { Alive, Cooldown, Faction, FACTION, Revive, Transform } from '../components'
+import { Alive, Cooldown, FACTION, Faction, Heal, HealAoe, HealDefib, Revive, Transform } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { healEnemies, healMembers } from '../ops/heal'
 import { castScan } from '../ops/castScan'
-import { KindHeal } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 周期治疗：治血量比例最低的己方（aoe 则范围全体）。治疗量吃伤害乘区——磨刀石对军医同样有意义。
  * 己方是谁由阵营决定：队伍侧治队员，敌方侧治敌群 */
 export function castHeals(sim: Sim): void {
-  castScan<HealDef>(sim, KindHeal, (e, def) => {
+  castScan(sim, Heal, (e) => {
     const x = ownerX(e)
     const y = ownerY(e)
+    const range = Heal.range[e]!
     const team = Faction.v[e] === FACTION.team
     // 电击起搏优先：救倒下的比奶站着的更急（复活倒计时是队伍侧独有的机制）
-    if (team && def.defib && cutReviveTimer(sim, x, y, def.range, def.defib.reviveCutMs)) {
-      pulse(sim, x, y, def.range, 0xfff176)
+    if (
+      team &&
+      hasComponent(sim.world, e, HealDefib) &&
+      cutReviveTimer(sim, x, y, range, HealDefib.reviveCutMs[e]!)
+    ) {
+      pulse(sim, x, y, range, 0xfff176)
       playSfx('zap')
       return true
     }
-    const base = Math.max(1, Math.round(def.amount * damageMul(sim, e)))
+    const base = Math.max(1, Math.round(Heal.amount[e]! * damageMul(sim, e)))
     // 群体处方：范围内全体各回 ratio × 基准；否则只补最缺血的一个
-    const amount = def.aoe ? Math.max(1, Math.round(base * def.aoe.ratio)) : base
-    const all = def.aoe !== undefined
+    const all = hasComponent(sim.world, e, HealAoe)
+    const amount = all ? Math.max(1, Math.round(base * HealAoe.ratio[e]!)) : base
     const healed = team
-      ? healMembers(sim, x, y, def.range, amount, all)
-      : healEnemies(sim, x, y, def.range, amount, all)
+      ? healMembers(sim, x, y, range, amount, all)
+      : healEnemies(sim, x, y, range, amount, all)
     if (healed === 0) {
       Cooldown.left[e] = 300 // 全员满血：小步重试，不空耗完整冷却
       return false
     }
-    pulse(sim, x, y, def.range, 0x81c784)
+    pulse(sim, x, y, range, 0x81c784)
     playSfx('upgrade')
     return true
   })

@@ -36,9 +36,7 @@ export function spawnWeapon(
   const e = addEntity(world)
   addComponent(world, e, Weapon)
   // 武器的施放锚点是持有者：枪口从人身上算起（弩塔那种自持能力的锚点是它自己）
-  if (!attachAbility(sim, e, def, { owner: ownerEid, anchor: ownerEid, faction, cooldownMs: initialCooldownMs, amp, manual })) {
-    return -1
-  }
+  attachAbility(sim, e, def, { owner: ownerEid, anchor: ownerEid, faction, cooldownMs: initialCooldownMs, amp, manual })
   // 有外形才长身体：Held 一挂，各 kind 的摆位系统就扫得到它（描边随持有者阵营）
   if ('held' in def && def.held) {
     const h = def.held

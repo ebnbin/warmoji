@@ -42,24 +42,27 @@ export interface AbilityInit {
  * **这不是实体类型**：武器带它（entities/weapon.ts），自主开火的召唤物也带它
  *（entities/minion.ts 的弩塔）。两者的差别只在 anchor：武器从持有者身上放，
  * 弩塔从它自己身上放。返回 false = 该 kind 未登记 tag（不挂，gen 校验保证不会发生） */
-export function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: AbilityInit): boolean {
+export function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: AbilityInit): void {
   const spec = KINDS[def.kind]
-  if (!spec) return false
   const world = sim.world
   // 通用部分：每条能力都要的
   // prettier-ignore
-  addComponents(world, eid, Ability, AbilityRef, Owner, Anchor, Faction, Cooldown, Amp, Frozen, Disarmed, WallBlocked, Aim, spec.tag)
+  addComponents(world, eid, Ability, AbilityRef, Owner, Anchor, Faction, Cooldown, Amp, Frozen, Disarmed, WallBlocked, Aim, spec.comp)
   // 该 kind 自己的状态组件：用得到才挂（见 tags.ts）
   for (const st of spec.state ?? []) {
     addComponent(world, eid, st.comp)
     st.reset(eid)
   }
   if (init.manual) addComponent(world, eid, Manual)
+  // 这一种能力自己的参数：装备那一刻从 def 抄进组件，此后 def 与它再无关系
+  ;(spec.attach as ((w: typeof world, e: number, d: AbilityDef) => void) | undefined)?.(world, eid, def)
   AbilityRef.def[eid] = internAbilityDef(def)
   Owner.eid[eid] = init.owner
   Anchor.eid[eid] = init.anchor
   Faction.v[eid] = init.faction
   Cooldown.left[eid] = init.cooldownMs
+  // 出手后的重置间隔:0 = 这一种能力没有冷却概念(光环/周期召唤),由它自己安排下一次
+  Cooldown.baseMs[eid] = 'cooldownMs' in def ? def.cooldownMs : 0
   Amp.dmg[eid] = init.amp.dmg
   Amp.cd[eid] = init.amp.cd
   Amp.crit[eid] = init.amp.crit
@@ -69,7 +72,6 @@ export function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: Abil
   Disarmed.v[eid] = 0
   WallBlocked.v[eid] = abilityPiercesWalls(def) ? 0 : 1
   Aim.rad[eid] = 0
-  return true
 }
 
 /** 收走某持有者名下的全部武器与它们造出来的子实体（召唤物、坠物、在途双子镖）。

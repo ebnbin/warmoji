@@ -1,11 +1,10 @@
-import type { SlowAuraDef } from '../../types/abilityDefs'
-import { Anchor, Aura, Faction, Pulse, Slow } from '../components'
+import { hasComponent } from 'bitecs'
+import { Anchor, Aura, AuraDps, AuraFreeze, Faction, Pulse, Slow, SlowAura } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { damageTarget } from '../ops/damage'
 import { spawnZone } from '../entities/zone'
 import { sourceOf } from '../utils/source'
 import { castScan } from '../ops/castScan'
-import { KindSlowAura } from '../registries/abilityKinds'
 import { targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 
@@ -19,32 +18,33 @@ const TICK_MS = 500
  * dps 光环内持续掉血、freeze 周期脉冲冻结，两条节拍各自走 Pulse，不占冷却 */
 export function castSlowAuras(sim: Sim): void {
   const dt = sim.wdtMs
-  castScan<SlowAuraDef>(sim, KindSlowAura, (e, def) => {
+  castScan(sim, SlowAura, (e) => {
     const src = sourceOf(sim, e)
     const x = ownerX(e)
     const y = ownerY(e)
+    const radius = SlowAura.radius[e]!
     if (Aura.zone[e] === 0) {
       Aura.zone[e] = spawnZone(sim, {
         x,
         y,
-        radius: def.radius,
+        radius,
         faction: Faction.v[e]!,
         durationMs: 0,
         enterMs: 0,
-        color: def.color,
+        color: SlowAura.color[e]!,
         fillAlpha: 0.08,
         lineAlpha: 0.35,
         lineWidth: 2,
-        chill: { factor: def.slowFactor },
+        chill: { factor: SlowAura.slowFactor[e]! },
         follow: { of: Anchor.eid[e]!, owner: e },
       })
     }
-    const r2 = def.radius * def.radius
-    if (def.dps) {
+    const r2 = radius * radius
+    if (hasComponent(sim.world, e, AuraDps)) {
       if (Pulse.dps[e] === 0) Pulse.dps[e] = TICK_MS // 起拍：等满一个周期再跳第一次
       else if ((Pulse.dps[e] = Pulse.dps[e]! - dt) <= 0) {
         Pulse.dps[e] = Pulse.dps[e]! + TICK_MS
-        const damage = Math.max(1, Math.round(((def.dps * TICK_MS) / 1000) * damageMul(sim, e)))
+        const damage = Math.max(1, Math.round(((AuraDps.perSec[e]! * TICK_MS) / 1000) * damageMul(sim, e)))
         for (const t of targetsOf(sim, src)) {
           const dx = t.x - x
           const dy = t.y - y
@@ -52,25 +52,25 @@ export function castSlowAuras(sim: Sim): void {
         }
       }
     }
-    if (def.freeze) {
-      if (Pulse.freeze[e] === 0) Pulse.freeze[e] = def.freeze.intervalMs // 起拍同上
+    if (hasComponent(sim.world, e, AuraFreeze)) {
+      if (Pulse.freeze[e] === 0) Pulse.freeze[e] = AuraFreeze.intervalMs[e]! // 起拍同上
       else if ((Pulse.freeze[e] = Pulse.freeze[e]! - dt) <= 0) {
-        Pulse.freeze[e] = Pulse.freeze[e]! + def.freeze.intervalMs
+        Pulse.freeze[e] = Pulse.freeze[e]! + AuraFreeze.intervalMs[e]!
         for (const t of targetsOf(sim, src)) {
           const dx = t.x - x
           const dy = t.y - y
           if (dx * dx + dy * dy > r2) continue
-          freeze(sim, t.eid, def.freeze.durationMs)
+          freeze(sim, t.eid, AuraFreeze.durationMs[e]!)
         }
         sim.pendingCues.push({
           kind: 'circle',
           x,
           y,
-          radius: def.radius,
+          radius,
           o: {
             fill: 0xffffff,
             fillAlpha: 0.18,
-            stroke: def.color,
+            stroke: SlowAura.color[e]!,
             lineWidth: 4,
             lineAlpha: 0.9,
             fromScale: 0.2,
