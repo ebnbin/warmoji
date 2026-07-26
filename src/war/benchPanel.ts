@@ -18,8 +18,10 @@ import type { HudHost } from './hudHost'
 
 const W = 470
 const CHART_H = 62
-/** 曲线纵轴上限（ms）：16.7 = 60fps 线，33.3 = 30fps 线 */
-const CHART_MAX = 50
+/** 纵轴下限（ms）：轻载时也留出 60fps(16.7) / 30fps(33.3) 两条参考线的位置。
+ * 上限不写死——重载下帧时能到两千毫秒，固定天花板会把曲线整条压在顶边上，
+ * 而重载恰恰是本基准存在的场景 */
+const CHART_FLOOR = 40
 const PAD = 16
 /** 字号候选：放不下就往下取 */
 const SIZES = [20, 18, 16, 14, 12]
@@ -29,6 +31,7 @@ export class BenchPanel {
   private readonly chart: Phaser.GameObjects.Graphics
   private readonly text: Phaser.GameObjects.Text
   private readonly title: Phaser.GameObjects.Text
+  private readonly scaleText: Phaser.GameObjects.Text
   private readonly x: number
   private readonly y: number
   private readonly chartX: number
@@ -52,6 +55,13 @@ export class BenchPanel {
       .setDepth(302)
       .setScrollFactor(0)
     this.chart = scene.add.graphics().setDepth(301).setScrollFactor(0)
+    this.scaleText = scene.add
+      .text(this.x + W - PAD, this.y + 20, '', {
+        fontFamily: 'ui-monospace, monospace', fontSize: '15px', color: '#8a8a99', resolution: res,
+      })
+      .setOrigin(1, 0)
+      .setDepth(302)
+      .setScrollFactor(0)
     this.text = scene.add
       .text(this.x + PAD, this.textY, '', {
         fontFamily: 'ui-monospace, monospace', fontSize: '20px', color: '#e6e6ee',
@@ -67,6 +77,7 @@ export class BenchPanel {
     this.chart.destroy()
     this.text.destroy()
     this.title.destroy()
+    this.scaleText.destroy()
   }
 
   /** 每帧调用；内部按 250ms 节流刷新文本（读数抖动太快反而看不清） */
@@ -177,7 +188,11 @@ export class BenchPanel {
     })
   }
 
-  /** 帧时曲线：右侧最新，横线标 60fps(16.7ms) 与 30fps(33.3ms) */
+  /** 帧时曲线：左旧右新，已有采样横向铺满整幅。
+   *
+   * 纵轴按窗口内 p95 定标而非峰值——单个几千毫秒的尖峰会把量程拉满，
+   * 其余帧全压成贴底的平线（换个方式失真而已）。超出量程的帧直接顶到上边缘，
+   * 视觉上就读作「冲出图表」，正是想要的表达。 */
   private drawChart(): void {
     const g = this.chart
     g.clear()
@@ -186,24 +201,31 @@ export class BenchPanel {
     const w = W - PAD * 2
     roundRect(g, x, y, w, CHART_H, 8, { fill: 0x000000, fillAlpha: 0.45 })
 
-    const line = (msVal: number, color: number): void => {
-      const ly = y + CHART_H - (Math.min(msVal, CHART_MAX) / CHART_MAX) * CHART_H
-      g.lineStyle(1, color, 0.5)
-      g.lineBetween(x, ly, x + w, ly)
-    }
-    line(16.7, 0x4caf50) // 60fps
-    line(33.3, 0xffa726) // 30fps
-
     const frames = recentFrameTimes(w)
-    if (frames.length < 2) return
-    g.lineStyle(1.5, 0xffdc5d, 0.95)
-    g.beginPath()
-    for (let i = 0; i < frames.length; i++) {
-      const px = x + w - i
-      const py = y + CHART_H - (Math.min(frames[i]!, CHART_MAX) / CHART_MAX) * CHART_H
-      if (i === 0) g.moveTo(px, py)
-      else g.lineTo(px, py)
+    const sorted = [...frames].sort((a, b) => a - b)
+    const p95 = sorted.length > 0 ? sorted[Math.min(sorted.length - 1, Math.round(0.95 * (sorted.length - 1)))]! : 0
+    const top = Math.max(CHART_FLOOR, p95 * 1.15)
+    const yOf = (msVal: number): number => y + CHART_H - (Math.min(msVal, top) / top) * CHART_H
+
+    // 参考线：只在量程内才画，否则是条贴底的噪声
+    for (const [msVal, color] of [[16.7, 0x4caf50], [33.3, 0xffa726]] as const) {
+      if (msVal > top) continue
+      g.lineStyle(1, color, 0.5)
+      g.lineBetween(x, yOf(msVal), x + w, yOf(msVal))
     }
-    g.strokePath()
+
+    if (frames.length >= 2) {
+      g.lineStyle(1.5, 0xffdc5d, 0.95)
+      g.beginPath()
+      // 采样不足整幅宽时横向拉伸铺满：否则开局那阵曲线只占右边一小截、中间全空
+      for (let px = 0; px < w; px++) {
+        const idx = Math.min(frames.length - 1, Math.floor(((w - 1 - px) / (w - 1)) * (frames.length - 1)))
+        const py = yOf(frames[idx]!)
+        if (px === 0) g.moveTo(x + px, py)
+        else g.lineTo(x + px, py)
+      }
+      g.strokePath()
+    }
+    this.scaleText.setText(`0–${top.toFixed(0)}ms · ${frames.length}帧`)
   }
 }
