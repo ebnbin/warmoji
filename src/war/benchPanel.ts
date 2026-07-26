@@ -148,6 +148,11 @@ export class BenchPanel {
       row('GameObject', n(p.objects)),
       row('物理体', n(p.bodies)),
       row('emoji 纹理', n(cache.textures)),
+      // 图集页数：超过单批纹理上限（通常 16）就会被切成大量子批，
+      // 每个子批还要换一次 shader 的取样器数量——闪屏时优先看这一行
+      ...(p.atlasPages === undefined
+        ? []
+        : [row('图集页', n(p.atlasPages), p.atlasPages > 16 ? '⚠ 超单批上限 16' : '上限 16')]),
       ...(m.drawCount === undefined ? [] : [row('渲染对象', n(m.drawCount))]),
       row('JS 堆', heap === undefined ? '—' : n(heap), heap === undefined ? '（非 Chrome）' : 'MB'),
       '',

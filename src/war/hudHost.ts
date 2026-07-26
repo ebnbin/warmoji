@@ -74,6 +74,9 @@ export interface HudHost {
     combatSec: number
     spawnIntervalMs: number
     hpMultiplier: number
+    /** 自绘图集的页纹理数（只有 ECS 有；arcade 走 Phaser Sprite，无此概念）。
+     * 关键在于它有没有超过单批纹理上限（通常 16）——超了就会被切成大量子批 */
+    atlasPages?: number
   }
   /** 释放主动技能（按钮/E 键），返回是否真的放出 */
   castSkill(): boolean
