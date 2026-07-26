@@ -1,5 +1,4 @@
-import feelJson from '../assets/feel.json'
-import type { FeelTuning } from '../types/feel'
+import { ORBIT } from '../data/feel'
 
 // 环形阵轨道动力学：环是刚性同步的——所有角色保持均匀间距，共享一个相位，
 // 每人角度 = 均匀槽位角 + 相位。全员按「秉性（CHARACTERS.orbit）× 探测范围内敌情」
@@ -81,8 +80,3 @@ export function stepPhase(phase: number, omega: number, dtMs: number): number {
   return wrapAngle(phase + w * dt)
 }
 
-// 环形阵轨道动力学：全员按「秉性（CHARACTERS.orbit）× 探测范围内敌情」计算移动倾向，
-// 每帧力量（倾向绝对值）最大者即刻掌舵（同力随机、阵亡出局、随时换手），
-// 环是刚性同步的：主力驱动一个共享相位，全员保持均匀间距整体转动（本文件）。
-// 数值在 defs/feel.ts（orbit 段），经 gen 校验产出 feel.json。
-export const ORBIT = (feelJson as unknown as FeelTuning).orbit

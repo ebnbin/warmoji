@@ -44,6 +44,9 @@ export function isFinalWave(wave: number): boolean {
 // 波次制：一波战斗固定时长 → 结算横幅 → 整编/商店 → 下一波；上一波阵亡者下波低血复活。
 // 有限局：打满 totalWaves 波即通关（进结算页），中途团灭进同一结算页的失败版。
 // 结构判定都在本文件；进程/经济的设计数值在 defs/progression.ts（经 gen 校验）。
+/** 队伍经验曲线参数；升级/结算算法在 war/xp.ts */
+export const XP = P.xp
+
 export const WAVE = {
   /** 每波战斗时长（秒），下标 = 波次 - 1；末波为 Boss 波（击败或撑满皆通关） */
   durationsSec: P.waveDurationsSec,
