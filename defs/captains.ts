@@ -1,4 +1,4 @@
-import type { CaptainSource } from '../src/data/captains'
+import type { CaptainSource } from '../src/types/captains'
 
 // 创作层（不进运行时 bundle）：队长数据行。生成 src/assets/captains.json。
 // 技能载荷以 id 引用能力表；gen 校验引用存在且 kind 可释放，运行时解析成 def。

@@ -9,7 +9,7 @@ import { emojiImage } from '../../emoji/textures'
 import { viewport } from '../../util/apply'
 import { enemyOf } from '../enemy/enemies'
 import { approach, onFloe } from '../../war/maps/ice'
-import type { IceConfig } from '../../data/maps'
+import type { IceConfig } from '../../types/maps'
 import { ArcadeBattleScene } from '../ArcadeBattleScene'
 import type { ArcadeBody, ImageObj } from '../ArcadeBattleScene'
 import type { Enemy } from '../enemy/enemies'
@@ -115,7 +115,6 @@ export class IceScene extends ArcadeBattleScene {
       SPAWN.minPlayerDist * UNIT * 1.6,
     )
   }
-
 
   /** 刷怪上限按实时活跃数（本图无休眠，全场敌人都算） */
   protected spawnCapCount(): number {

@@ -3,11 +3,12 @@ import { UNIT } from '../util/units'
 import { emojiImage } from '../emoji/textures'
 import { playSfx } from '../audio/sfx'
 import { FIELD, POLARITY_COLOR } from '../data/battlefield'
-import type { FieldPickupDef } from '../data/battlefield'
-import { foldBattleEffects } from '../data/battlefield'
+import type { FieldPickupDef } from '../types/battlefield'
+
 import { Alive, MFlash, Tint, Transform } from './components'
 import { enemyDef } from './store'
 import type { Sim } from './sim'
+import { foldBattleEffects } from '../war/battleFx'
 
 // 战场拾取(ECS 版,镜像 battlefield.ts):地面待拾实体(不磁吸,靠走位拾取)+ 拾取后施加的
 // 限时战斗层(battleMods,乘区每帧由 refoldBattleFx 重折)+ 携带者极性光环。

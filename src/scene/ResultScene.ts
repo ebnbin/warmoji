@@ -5,8 +5,8 @@ import { BOSSES, ENEMY_DEFS } from '../data/enemies'
 import { PICKUPS } from '../data/pickups'
 import { WAVE } from '../data/waves'
 import { submitScore } from '../save/highscore'
-import { ITEMS, stackCount } from '../data/items'
-import type { ItemId } from '../data/items'
+import { ITEMS } from '../data/items'
+import type { ItemId } from '../types/items'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
@@ -23,6 +23,7 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
+import { stackCount } from './draft'
 
 // 终局结算页：胜利（打满 WAVE.totalWaves 波）与失败（团灭）复用同一布局，
 // 只差标题/配色/庆祝粒子。展示整局逐角色战绩（伤害/击杀/阵亡/道具）与全局汇总，

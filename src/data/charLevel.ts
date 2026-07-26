@@ -1,4 +1,4 @@
-import type { UpgradeTiers } from './characters'
+import type { UpgradeTiers } from '../types/characters'
 
 // 角色专属经验（与团队战斗经验完全独立）：只在商店为某角色购买道具时累积
 //（每张卡自带 upgradeXp）。攒满档位即自动、免费升级——每次升级是「换一个更强的
@@ -20,24 +20,4 @@ export function characterLevel(xp: number): number {
 /** 等级 → 能力档位（喂 loadoutFor / 池推导；2 级解锁一阶、3 级解锁二阶） */
 export function tiersForLevel(level: number): UpgradeTiers {
   return { u1: level >= 2, u2: level >= 3 }
-}
-
-/** 商店进度条数据：当前等级、本级内进度、是否满级 */
-export interface LevelProgress {
-  level: number
-  maxed: boolean
-  /** 本级已攒 / 升下一级所需（满级时均为 0） */
-  cur: number
-  need: number
-  ratio: number
-}
-
-export function levelProgress(xp: number): LevelProgress {
-  const level = characterLevel(xp)
-  if (level >= MAX_CHAR_LEVEL) return { level, maxed: true, cur: 0, need: 0, ratio: 1 }
-  const prev = level === 1 ? 0 : CHAR_XP_THRESHOLDS[level - 2]!
-  const next = CHAR_XP_THRESHOLDS[level - 1]!
-  const cur = xp - prev
-  const need = next - prev
-  return { level, maxed: false, cur, need, ratio: Math.max(0, Math.min(1, cur / need)) }
 }

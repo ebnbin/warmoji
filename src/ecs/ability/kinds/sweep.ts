@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { DEG2RAD } from '../../../util/units'
-import type { SweepDef } from '../../../data/abilityDefs'
+import type { SweepDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { sectorHitIndices } from '../../../war/hit'
 import { Tint, Transform } from '../../components'

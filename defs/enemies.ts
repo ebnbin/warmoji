@@ -1,4 +1,4 @@
-import type { EnemyDef } from '../src/data/enemies'
+import type { EnemyDef } from '../src/types/enemies'
 
 // 创作层（不进运行时 bundle）：敌人/Boss/出场配比数据行。
 // split.into 的对象引用在生成时内联展开为自包含 JSON。

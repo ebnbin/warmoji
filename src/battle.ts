@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
 import { browserStorage } from './util/storage'
 import { loadSettings } from './save/settings'
-import type { MapId } from './data/maps'
+import type { MapId } from './types/maps'
 // ── 旧框架（arcade）──
 import { ARENA_SCENE_KEYS, arenaSceneFor } from './arcade/keys'
 import type { ArenaSceneKey } from './arcade/keys'

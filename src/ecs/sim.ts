@@ -4,7 +4,7 @@ import { FOLLOW, WANDER } from '../data/feel'
 import { ORBIT } from '../war/orbit'
 import { MEMBER } from '../data/characters'
 import { formationPosts, ringPostAngle } from '../data/formation'
-import type { FormationId } from '../data/formation'
+import type { FormationId } from '../types/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../war/orbit'
 import type { OrbitThreat } from '../war/orbit'
 import { Alive, Breath, Depth, Follow, Pop, Sprite, Threat, Transform, VisOff, Wander } from './components'
@@ -34,12 +34,13 @@ import type { RunState } from '../run/state'
 import type { Cue } from './ability/cues'
 import type { Target } from './ability/targets'
 import type { FrameIndex } from './frames'
-import type { GroundEffectDef } from '../data/groundEffects'
-import { TIMESTOP, timeScaleFor } from '../data/timeStop'
-import { BATTLE_FX_IDENTITY, foldBattleEffects } from '../data/battlefield'
-import type { BattleEffects } from '../data/battlefield'
-import type { BattleMod } from '../data/battlefield'
-import type { FieldPickupDef } from '../data/battlefield'
+import type { GroundEffectDef } from '../types/groundEffects'
+import { TIMESTOP, timeScaleFor } from '../war/timeStop'
+import { BATTLE_FX_IDENTITY } from '../data/battlefield'
+import type { BattleEffects } from '../types/battlefield'
+import type { BattleMod } from '../types/battlefield'
+import type { FieldPickupDef } from '../types/battlefield'
+import { foldBattleEffects } from '../war/battleFx'
 
 // ECS 战斗仿真状态 + 系统(纯逻辑,禁 phaser)。数学逐行镜像旧 ArcadeBattleScene 的
 // updateOrbit / moveTeam / layoutTeam,常量与公式不变,只把「读写精灵」换成「读写组件」。
@@ -66,7 +67,7 @@ export interface Sim {
   lineupOrbit: number[]
   /** eid,按槽位序(稳定迭代) */
   members: number[]
-  mapId: import('../data/maps').MapId
+  mapId: import('../types/maps').MapId
   mapW: number
   mapH: number
   /** 本图世界钩子(位移约束/打滑/落水结算…):开局按 mapId 取一份,系统在拐弯处调它 */
@@ -212,7 +213,7 @@ export interface PendingCoins {
 
 /** 预告中待落地的敌人 */
 export interface PendingSpawn {
-  def: import('../data/enemies').EnemyDef
+  def: import('../types/enemies').EnemyDef
   x: number
   y: number
   hp: number
@@ -251,7 +252,7 @@ export interface Burst {
 
 /** 死亡快照(带亡语的敌人;实体已移除,死亡效果按此在死亡点重放) */
 export interface PendingDeath {
-  def: import('../data/enemies').EnemyDef
+  def: import('../types/enemies').EnemyDef
   x: number
   y: number
   elite: boolean

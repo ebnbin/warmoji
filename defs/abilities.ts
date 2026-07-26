@@ -17,7 +17,7 @@ import type {
   ThrustDef,
   TimeStopDef,
   TurretDef,
-} from '../src/data/abilityDefs'
+} from '../src/types/abilityDefs'
 
 // 创作层（不进运行时 bundle）：能力数据行。经 scripts/gen-defs.ts 校验后
 // 生成 src/gen/abilities.json；展开/派生在此层合法（构建期逻辑），

@@ -1,6 +1,6 @@
 import { UNIT } from '../../util/units'
 import { waveAt } from '../../data/waves'
-import type { DecoyEffect, SplitEffect } from '../../data/enemies'
+import type { DecoyEffect, SplitEffect } from '../../types/enemies'
 import { Despawn } from '../components'
 import { spawnBrood, spawnEnemy } from '../enemy'
 import { applyAbilityEffects } from './effects'

@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { DEG2RAD } from '../../../util/units'
-import type { LaserDef } from '../../../data/abilityDefs'
+import type { LaserDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { thrustHitIndices } from '../../../war/hit'
 import { Tint, Transform } from '../../components'

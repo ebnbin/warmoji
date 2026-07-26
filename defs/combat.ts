@@ -1,4 +1,4 @@
-import type { CombatTuning } from '../src/data/abilities'
+import type { CombatTuning } from '../src/types/abilities'
 
 // 战斗手感常量（创作层·不进运行时 bundle）：击退衰减/上限、能力索敌上限。
 // 击退与索敌的逻辑在 src/abilities 与战斗引擎；这里只放设计数值，经 gen 校验产出 combat.json。

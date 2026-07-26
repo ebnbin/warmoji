@@ -1,6 +1,6 @@
 import { WEAPONS } from './weapons.ts'
-import type { WeaponSource } from '../src/data/weapons'
-import type { CharacterAuthoring, InnateSource } from '../src/data/characters'
+import type { WeaponSource } from '../src/types/weapons'
+import type { CharacterAuthoring, InnateSource } from '../src/types/characters'
 
 // 创作层（不进运行时 bundle）：角色数据行。一个角色由两类攻击来源组成——
 // 「持有的武器」（weapons，引用 defs/weapons.ts 的实体武器）与「自带的徒手

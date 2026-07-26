@@ -1,5 +1,5 @@
-import type { MapDecor } from '../../data/maps'
-import type { DecorInstance } from '../../data/maps'
+import type { MapDecor } from '../../types/maps'
+import type { DecorInstance } from '../../types/maps'
 import { Rng } from '../../util/rng'
 import type { Point } from '../../util/vec'
 

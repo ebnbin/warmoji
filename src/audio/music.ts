@@ -1,4 +1,4 @@
-import type { MapId } from '../data/maps'
+import type { MapId } from '../types/maps'
 
 // 程序化 BGM 乐谱层：纯数据/纯函数，输出扁平音符事件表，播放在 ui/bgm.ts。
 // 写谱模型：每曲 = 调式 + 逐小节和弦进行 + 若干声部（低音/琶音/和弦垫/主旋律）
@@ -7,7 +7,6 @@ import type { MapId } from '../data/maps'
 // 战斗曲按地图配：BgmId 直接复用 MapId，'lobby' 盖住全部非战斗页面。
 
 export type BgmId = 'lobby' | MapId
-
 
 export interface BgmNote {
   /** 循环内起始秒 */

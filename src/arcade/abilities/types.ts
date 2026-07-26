@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
-import type { ProjectileDef, ProjectileSpec } from '../../data/abilityDefs'
-import type { GroundEffectDef } from '../../data/groundEffects'
+import type { ProjectileDef, ProjectileSpec } from '../../types/abilityDefs'
+import type { GroundEffectDef } from '../../types/groundEffects'
 import type { SfxId } from '../../audio/sfx'
 import type { OutlineKind } from '../../emoji/svg'
 

@@ -1,17 +1,17 @@
 import { CAPTAINS } from '../data/captains'
 import { CHARACTERS, MEMBER, ROSTER_IDS } from '../data/characters'
-import type { CaptainId } from '../data/captains'
-import type { CharacterId } from '../data/characters'
+import type { CaptainId } from '../types/captains'
+import type { CharacterId } from '../types/characters'
 import { WAVE } from '../data/waves'
-import type { FormationId } from '../data/formation'
+import type { FormationId } from '../types/formation'
 import { browserStorage } from '../util/storage'
-import type { ItemId } from '../data/items'
-import type { CardId } from '../data/cards'
-import type { MapId } from '../data/maps'
+import type { ItemId } from '../types/items'
+import type { CardId } from '../types/cards'
+import type { MapId } from '../types/maps'
 import { MAP_IDS } from '../data/maps'
 import { drawRecruitPool, recruitSeed, refreshRecruitSeed, unlockedCount } from './recruit'
 import { waveDurationMs } from '../data/waves'
-import type { XpState } from '../data/xp'
+import type { XpState } from '../types/xp'
 
 // 一局（run）的跨波次状态：出发时创建，波次间经由商店传递，回组队页时丢弃。
 // 经验模型：每升 1 级得 1 颗能量豆（队长技能的弹药，上限 SKILL.maxBeans，
@@ -174,7 +174,6 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   run.stats.damageTaken.push(0)
   return run.roster.length - 1
 }
-
 
 /** 出现「受保护中心」（可编排）所需的最少队员数：首次满此数即可选一人居中，
  * 之后新入队者只补外圈——与 teamSize 脱钩（未来 8 人队长也在 5 人时定中心） */

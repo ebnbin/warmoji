@@ -3,7 +3,7 @@ import { textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { UNIT } from '../util/units'
 import { MEMBER } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
-import { TIMESTOP } from '../data/timeStop'
+import { TIMESTOP } from '../war/timeStop'
 import { DAMAGE_FONT, ensureDamageFont } from '../war/damageFont'
 import { burstEmitter } from '../util/fx'
 import { blastRing } from '../war/cues'
@@ -19,7 +19,7 @@ import { OUTLINED_EMOJIS } from '../manifest'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAP, MAPS, rollDecor } from '../data/maps'
-import type { MapDef, RiverConfig, TorusConfig, WallsConfig } from '../data/maps'
+import type { MapDef, RiverConfig, TorusConfig, WallsConfig } from '../types/maps'
 import { fitAspectRect } from '../war/maps/void'
 import { driftProfile, riverRect } from '../war/maps/river'
 import type { RiverRect } from '../war/maps/river'
@@ -64,14 +64,14 @@ import { clearGroundEffectsEcs, spawnGroundEffectEcs, updateGroundEffectsEcs } f
 import { drainPendingCoins, magnetCoinsEcs } from './pickups'
 import { spawnBossEcs, spawnCarrierEcs, spawnStep, spawnSurgeEcs } from './spawn'
 import { attachCarrierAuraEcs, clearFieldEcs, fieldCounts, spawnFieldPickupEcs, updateFieldEcs } from './field'
-import { rollWaveCarriers } from '../data/battlefield'
+
 import { initialLayout, stepFrozenVisuals, stepSim, worldTimeScale } from './sim'
 import { settleWave } from './wave'
 import { isBossWave, isEliteWave, waveAt, waveDurationMs, WAVE } from '../data/waves'
-import { xpToNext } from '../data/xp'
+import { xpToNext } from '../war/xp'
 import { CAPTAINS } from '../data/captains'
 import { aggregateTeamCards } from '../data/cards'
-import type { TeamEffects } from '../data/items'
+import type { TeamEffects } from '../types/items'
 import { DENSITY_PARAMS, INVINCIBLE_HP, labDensity, labInvincible } from '../run/lab'
 import { tickSkillCd } from '../war/skill'
 import { setActiveHudHost } from '../war/hudHost'
@@ -81,6 +81,7 @@ import type { UIScene } from '../war/UIScene'
 import type { Meteor, PendingSpawn, Sim } from './sim'
 import { emojiImage } from '../emoji/textures'
 import { SPAWN } from '../data/enemies'
+import { rollWaveCarriers } from '../war/battleFx'
 
 // ECS 实验战斗场景(宿主壳):Phaser 只做画布/相机/输入/音频宿主;战斗世界(实体+系统+
 // 自绘渲染)全在 ECS。P2:有界森林图 + 队伍编队/orbit/游移/跟随弹簧 + 键盘/相机跟随。
@@ -745,8 +746,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const inWater = !onFloe(sim.center.x, sim.center.y, px)
     rect.setFillStyle(WATER_VIGNETTE, inWater ? 0.18 + 0.06 * Math.sin(sim.elapsedMs / 140) : 0)
   }
-
-
 
   /** 视口变化（旋转 / 拉窗口）：跟随式相机只需重设缩放；
    * 单屏图（奔流/工厂）的世界尺寸是从视口推出来的，须整体重映射——

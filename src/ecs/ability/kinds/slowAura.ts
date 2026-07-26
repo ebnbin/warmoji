@@ -1,4 +1,4 @@
-import type { SlowAuraDef } from '../../../data/abilityDefs'
+import type { SlowAuraDef } from '../../../types/abilityDefs'
 import { Slow } from '../../components'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { Pulse } from '../components'

@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
 import { MEMBER, TEAM } from '../../data/characters'
 import { UNIT } from '../../util/units'
-import type { RiverConfig, InfiniteConfig } from '../../data/maps'
+import type { RiverConfig, InfiniteConfig } from '../../types/maps'
 import { MAPS, bossFor } from '../../data/maps'
-import type { MapDef } from '../../data/maps'
+import type { MapDef } from '../../types/maps'
 import { isHorizontal, remapPoint, remapVector } from '../../war/remap'
 import { clampToRiver, driftProfile, flowVector, pastDownstream, riverRect } from '../../war/maps/river'
 import type { RiverRect } from '../../war/maps/river'
@@ -109,7 +109,6 @@ export class RiverScene extends ArcadeBattleScene {
     }
     return pos
   }
-
 
   /** 休眠：同无限图机制（32 格，屏内永不触发） */
   protected buildFrameTargets(): void {

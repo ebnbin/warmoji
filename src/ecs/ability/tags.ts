@@ -1,4 +1,4 @@
-import type { AbilityDef } from '../../data/abilityDefs'
+import type { AbilityDef } from '../../types/abilityDefs'
 
 // 每种能力一个 tag 组件：施放系统靠 tag 取自己那一批实体，不在一个循环里 switch kind。
 // 一条能力归不归某系统管，只看它身上有没有那个 tag——与持有者是谁无关。

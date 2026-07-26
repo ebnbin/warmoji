@@ -1,5 +1,5 @@
 import { playSfx } from '../audio/sfx'
-import { gainXp, waveBonusXp } from '../data/xp'
+import { gainXp, waveBonusXp } from '../war/xp'
 import { isFinalWave } from '../data/waves'
 import { Alive, MHp } from './components'
 import type { Sim } from './sim'

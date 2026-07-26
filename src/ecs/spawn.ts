@@ -3,25 +3,18 @@ import { toPx } from '../war/px'
 import { playSfx } from '../audio/sfx'
 import { bossFor } from '../data/maps'
 import { waveAt, isBossWave } from '../data/waves'
-import {
-  BOSS_SPAWN_RELIEF,
-  ELITE,
-  ENEMIES,
-  SPAWN,
-  SURGE,
-  enemyMixAt,
-  pickEnemy,
-} from '../data/enemies'
+import { BOSS_SPAWN_RELIEF, ELITE, ENEMIES, SPAWN, SURGE } from '../data/enemies'
 import { DENSITY_PARAMS, labDensity, labDifficulty, labEnemySet } from '../run/lab'
 import { MAPS, mapEnemyRoster } from '../data/maps'
-import type { MapDef } from '../data/maps'
+import type { MapDef } from '../types/maps'
 import { hourAt, isDayAt } from '../war/maps/daynight'
 import { Dormant, ENEMY_SET } from './components'
 import { spawnEnemy } from './enemy'
 import { enemyCarries } from './store'
 import type { Sim } from './sim'
-import type { FieldPickupDef } from '../data/battlefield'
+import type { FieldPickupDef } from '../types/battlefield'
 import type { EcsAtlas } from './render/atlas'
+import { enemyMixAt, pickEnemy } from '../war/enemyAi'
 
 // 刷怪节奏(常规波次制):随跨波累计战斗时长递增难度,供给随在场人数缩放,Boss 波减压;
 // 预告(telegraph)以「延迟落地」建模,视觉标记由场景侧按 pendingSpawns 对帐。

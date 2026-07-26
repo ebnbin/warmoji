@@ -71,7 +71,6 @@ export const Pop = { until: f32(), ms: f32(), size: f32(), back: u8(), alpha: f3
 export const Alive = { v: u8() }
 export const Threat = { v: u8() }
 
-
 /** 队员道具属性:荆棘反伤(接触反弹)、击杀回血(吸血獠牙)、再生(每秒回复) */
 export const MPerk = { thorns: f32(), killHeal: f32(), regenPerSec: f32() }
 

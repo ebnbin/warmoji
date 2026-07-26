@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import type { DanceDef } from '../../../data/abilityDefs'
+import type { DanceDef } from '../../../types/abilityDefs'
 import { Boss, ENEMY_SET, EState, Tint } from '../../components'
 import { castScan } from '../systems/cast'
 import { KindDance } from '../tags'

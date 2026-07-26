@@ -1,5 +1,5 @@
 import { addComponent, hasComponent, query, removeEntity } from 'bitecs'
-import type { StrikeDef } from '../../../data/abilityDefs'
+import type { StrikeDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { Alive, Tint, Transform } from '../../components'
 import { spawnSprite } from '../../entities'

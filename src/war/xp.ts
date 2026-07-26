@@ -1,16 +1,12 @@
 import progressionJson from '../assets/progression.json'
-import type { Progression } from './waves'
+import type { Progression } from '../types/waves'
+import type { XpState } from '../types/xp'
 
 // 队伍经验：击杀 + 波末保底两条腿（短波杀怪少，保底占比更高）。
 // 每升 1 级 = 1 次团队升级抽卡（战斗后开卡页三选一，见 cards/registry.ts）。
 // 前快后慢的等比曲线，无上限：升级不冻结（无尽模式直接复用这条曲线）。
 // 校准目标（15 波制）：第 1 波结束 2~3 级，无经验加成队长通关约 22~24 级。
 // 曲线数值在 defs/progression.ts（xp 段），经 gen 校验产出 progression.json，本文件只留纯逻辑。
-
-export interface XpState {
-  level: number
-  xp: number
-}
 
 export function xpToNext(level: number): number {
   return Math.round(XP.base * Math.pow(XP.growth, level - 1))

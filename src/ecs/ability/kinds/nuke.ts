@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import type { NukeDef } from '../../../data/abilityDefs'
+import type { NukeDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { Boss, Dormant, ENEMY_SET } from '../../components'
 import { enemyDef } from '../../store'

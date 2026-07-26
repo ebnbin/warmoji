@@ -44,7 +44,6 @@ export function loadEmojiPack(): Promise<EmojiPack> {
   return packDeferred()
 }
 
-
 /** ordering ID → 完整 SVG 文本（未收录即抛错）。
  * 项目规范的唯一注入点：viewBox 统一 pad 成 48 标准（内容 36 居中 + 四周 6），
  * 纹理/缩略图/Studio 全部经此出口——任何 emoji 素材天生自带 padding */

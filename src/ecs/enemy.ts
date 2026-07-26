@@ -1,7 +1,7 @@
 import { addComponent, addEntity, query, removeEntity } from 'bitecs'
 import { norm } from '../util/vec'
 import { AI, ELITE, SPAWN } from '../data/enemies'
-import type { EnemyDef } from '../data/enemies'
+import type { EnemyDef } from '../types/enemies'
 import { KNOCKBACK } from '../data/abilities'
 import { PICKUPS } from '../data/pickups'
 import { waveAt } from '../data/waves'

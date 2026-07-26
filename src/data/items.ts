@@ -1,8 +1,7 @@
 import itemsJson from '../assets/items.json'
 import economyJson from '../assets/economy.json'
-import { loadoutFor } from './characters'
-import type { UpgradeTiers, CharacterDef } from './characters'
-import type { AbilityDef } from './abilityDefs'
+import type { CharacterEffects, TeamEffects, Economy, ItemRarity, ItemDef, ItemId } from '../types/items'
+import type { AbilityDef } from '../types/abilityDefs'
 
 // 道具 = 一组属性修正（可带负面副作用，数值上保证净增益）。
 // 只开放少量通用属性轴，不逐能力参数开洞；乘法轴叠乘、加法轴叠加。
@@ -12,60 +11,6 @@ import type { AbilityDef } from './abilityDefs'
 // 购买道具即累加它的专属经验，攒满档位自动免费升级（换整套能力 + 基础属性质变）。
 // 每个角色等级是独立形态：拥有各自的道具池（characterPoolFor）与稀有度概率
 //（rarityWeights 按等级抬升），越高级越能刷出高端货。
-
-export interface CharacterEffects {
-  hpAdd: number
-  damageMul: number
-  /** 冷却倍率，<1 攻速更快 */
-  cooldownMul: number
-  /** 能力空间参数（触及/半径/射程/爆炸半径等）统一倍率 */
-  rangeMul: number
-  projSpeedMul: number
-  iframesAddMs: number
-  reviveAddMs: number
-  /** 存活时每秒回复生命（加法叠加） */
-  regenPerSec: number
-  /** 敌人接触到本角色时受到的反伤（加法叠加；仅接触，不含敌弹） */
-  thorns: number
-  /** 本角色击杀敌人时回复生命（加法叠加） */
-  killHeal: number
-  /** 能力伤害暴击概率（加法叠加，封顶 0.5），暴击 = 伤害 ×CRIT_MUL */
-  critChance: number
-  /** 能力击退倍率（乘法叠乘） */
-  knockbackMul: number
-}
-
-export interface TeamEffects {
-  moveSpeedMul: number
-  magnetMul: number
-  /** 敌人掉落双倍金币的概率（加法叠加，封顶 0.9） */
-  doubleCoinChance: number
-  teamDamageMul: number
-  /** 全队经验倍率（乘法叠乘，与队长能力相乘） */
-  xpGainMul: number
-  /** 全体敌人移速倍率（乘法叠乘，保底 0.6），<1 更慢 */
-  enemySlowMul: number
-  /** 波末全队回复生命上限的比例（加法叠加，封顶 0.6） */
-  waveHealRatio: number
-  /** 波末额外金币（加法叠加） */
-  waveCoins: number
-  /** 全队冷却倍率（乘法叠乘，<1 攻速更快） */
-  teamCooldownMul: number
-  /** 全队暴击概率加成（加法，最终与角色暴击相加后封顶 0.5） */
-  critAdd: number
-  /** 全队生命上限倍率（乘法叠乘） */
-  teamHpMul: number
-  /** 全队复活时间倍率（乘法叠乘，<1 更快，保底 0.3） */
-  reviveMul: number
-  /** 队长技能冷却倍率（乘法叠乘，<1 更快，保底 0.3） */
-  skillCdMul: number
-  /** 商店价格倍率（乘法叠乘，<1 更便宜，保底 0.4） */
-  shopDiscountMul: number
-  /** 每次进店额外免费刷新次数（加法） */
-  freeRerolls: number
-  /** 升级抽卡每次额外候选数（加法，3 + draftSize 选 1） */
-  draftSize: number
-}
 
 /** 团队效果的单位元（无卡时的默认值），也是叠加的起点 */
 export const TEAM_FX_IDENTITY: TeamEffects = {
@@ -87,27 +32,11 @@ export const TEAM_FX_IDENTITY: TeamEffects = {
   draftSize: 0,
 }
 
-// 经济/暴击的「设计数值」形状：数据行在 defs/economy.ts（创作层），gen 校验产出 economy.json；
-// 本文件只从中派生惯用导出 CRIT_MUL/PRICE/SHOP，形状与数值不变。
-export interface Economy {
-  /** 暴击伤害倍率 */
-  readonly critMul: number
-  /** 商店价格：基准价随波次通胀上浮 × 前期折扣（到 earlyFadeWaves 波线性消退） */
-  readonly price: {
-    readonly perWave: number
-    readonly earlyDiscount: number
-    readonly earlyFadeWaves: number
-  }
-  /** 商店上架位付费重随价格（队长可提供免费次数） */
-  readonly shop: { readonly refreshPrice: number }
-}
-
 const ECON = economyJson as unknown as Economy
 
 /** 暴击伤害倍率 */
 export const CRIT_MUL = ECON.critMul
 
-export type ItemRarity = 'common' | 'rare' | 'epic'
 export const RARITY_ORDER: readonly ItemRarity[] = ['common', 'rare', 'epic']
 export const RARITIES: Record<ItemRarity, { label: string; color: string }> = {
   common: { label: '普通', color: '#c8c8d4' },
@@ -115,61 +44,13 @@ export const RARITIES: Record<ItemRarity, { label: string; color: string }> = {
   epic: { label: '史诗', color: '#ce93d8' },
 }
 
-/** 上架稀有度权重：随波次向稀有倾斜 + 随「角色等级」独立抬升——每个等级形态一套
- * 独立概率，越高级越常刷出稀有/史诗（史诗常规第 5 波起解锁，但 2 级起角色即便早波
- * 也能刷出）。返回的是相对权重（rollItem 内部归一），无需严格和为 1 */
-export function rarityWeights(wave: number, level = 1): Record<ItemRarity, number> {
-  const lv = Math.max(0, level - 1)
-  const rare = Math.min(0.5, 0.06 + 0.02 * wave + 0.14 * lv)
-  const epicBase = wave < 5 ? 0 : Math.min(0.2, 0.025 * (wave - 4))
-  const epic = Math.min(0.42, epicBase + 0.13 * lv + (lv > 0 ? 0.05 : 0))
-  const common = Math.max(0.05, 1 - rare - epic)
-  return { common, rare, epic }
-}
-
-export type ItemPool = 'all' | AbilityDef['kind']
-
-export interface ItemDef {
-  readonly emoji: string
-  readonly name: string
-  readonly desc: string
-  readonly rarity: ItemRarity
-  readonly price: number
-  /** 单一持有者的购买上限；缺省无限堆叠 */
-  readonly maxStacks?: number
-  readonly pool: ItemPool
-  /** 购买本卡给该角色累加的专属经验点（攒满档位自动质变升级） */
-  readonly upgradeXp: number
-  /** 最低可上架的角色等级（1/2/3，缺省 1）：高等级形态才解锁的高端货 */
-  readonly minLevel?: 1 | 2 | 3
-  readonly effects: Partial<CharacterEffects>
-}
-
-// 道具表：数据行在 defs/items.ts（创作层），npm run gen 生成 items.json
-export type ItemId = keyof typeof itemsJson
 export const ITEMS = itemsJson as unknown as Record<ItemId, ItemDef>
 
 export const ITEM_IDS = Object.keys(ITEMS) as readonly ItemId[]
 
 // ── 池推导（每个角色等级一套独立的池 + 概率）──────────────────
 
-/** 某等级角色的道具池 = 通用道具 + 匹配该等级能力形态的形态道具，且满足最低等级门槛。
- * 升级 = 换了整套能力形态 + 解锁更高端的货架，故池随等级独立变化。 */
-export function characterPoolFor(def: CharacterDef, level: number): ItemId[] {
-  const tiers: UpgradeTiers = { u1: level >= 2, u2: level >= 3 }
-  const kinds = new Set<string>(loadoutFor(def, tiers).map((w) => w.kind))
-  return ITEM_IDS.filter((iid) => {
-    const item: ItemDef = ITEMS[iid]
-    if ((item.minLevel ?? 1) > level) return false
-    return item.pool === 'all' || kinds.has(item.pool)
-  })
-}
-
 // ── 持有与购买 ──────────────────────────────────────────────
-
-export function stackCount(owned: readonly ItemId[], id: ItemId): number {
-  return owned.filter((x) => x === id).length
-}
 
 /** 角色专属经验 = 该角色当前装备的全部道具的 upgradeXp 之和（与获得来源无关：
  * 商店购买 / 未来任何途径塞进 memberItems 的道具都计入）。等级由此纯函数推导 */
@@ -177,45 +58,6 @@ export function characterXp(owned: readonly ItemId[]): number {
   let xp = 0
   for (const id of owned) xp += ITEMS[id].upgradeXp
   return xp
-}
-
-export function reachedStackLimit(owned: readonly ItemId[], id: ItemId): boolean {
-  const def: ItemDef = ITEMS[id]
-  return def.maxStacks !== undefined && stackCount(owned, id) >= def.maxStacks
-}
-
-/** 从池中随机上架一件未达上限的道具；全部达上限返回 null。
- * 两段式抽取：先按波次权重在「有货的稀有度档」间抽签（无货/零权重档的权重
- * 自然归拢到其余档），再在档内均匀抽取 */
-export function rollItem(
-  pool: readonly ItemId[],
-  owned: readonly ItemId[],
-  rand: () => number,
-  wave = 1,
-  level = 1,
-): ItemId | null {
-  const avail = pool.filter((id) => !reachedStackLimit(owned, id))
-  if (avail.length === 0) return null
-  const weights = rarityWeights(wave, level)
-  const buckets = RARITY_ORDER.map((r) => ({
-    items: avail.filter((id) => ITEMS[id].rarity === r),
-    w: weights[r],
-  })).filter((b) => b.items.length > 0 && b.w > 0)
-  let pickList: readonly ItemId[] = avail
-  const totalW = buckets.reduce((s, b) => s + b.w, 0)
-  if (totalW > 0) {
-    let t = rand() * totalW
-    let chosen = buckets[buckets.length - 1]!
-    for (const b of buckets) {
-      if (t < b.w) {
-        chosen = b
-        break
-      }
-      t -= b.w
-    }
-    pickList = chosen.items
-  }
-  return pickList[Math.min(pickList.length - 1, Math.floor(rand() * pickList.length))]!
 }
 
 /** 商店价格：基准价随波次通胀上浮 × 前期折扣（前期金币少，先把货压便宜，

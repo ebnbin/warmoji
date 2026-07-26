@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { SummonDef } from '../../data/abilityDefs'
+import type { SummonDef } from '../../types/abilityDefs'
 import { applyEffects } from './effects'
 import { ACQUIRE } from '../../data/abilities'
 import { UNIT } from '../../util/units'

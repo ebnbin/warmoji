@@ -1,5 +1,5 @@
 import { emojiImage } from '../../emoji/textures'
-import type { StrikeDef } from '../../data/abilityDefs'
+import type { StrikeDef } from '../../types/abilityDefs'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 点名打击型：坠物逐个砸向离锚点最近的 N 个目标——伤害 + 击退（从锚点

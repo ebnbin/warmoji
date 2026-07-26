@@ -1,7 +1,7 @@
 import { CAPTAINS } from './data/captains'
 import { CHARACTERS, baseLoadout } from './data/characters'
-import type { CaptainDef } from './data/captains'
-import type { CharacterDef } from './data/characters'
+import type { CaptainDef } from './types/captains'
+import type { CharacterDef } from './types/characters'
 import type { OutlineKind } from './emoji/svg'
 import { BOSSES, ENEMY_DEFS, SPAWN } from './data/enemies'
 import { PICKUPS } from './data/pickups'
@@ -9,7 +9,7 @@ import { FIELD_PICKUPS } from './data/battlefield'
 import { CARDS } from './data/cards'
 import { ITEMS } from './data/items'
 import { MAPS } from './data/maps'
-import type { MapDef } from './data/maps'
+import type { MapDef } from './types/maps'
 import { SETTING_DEFS } from './save/settings'
 
 // 启动预载清单：独立于 config——它聚合 items/maps/settings 等下游模块，

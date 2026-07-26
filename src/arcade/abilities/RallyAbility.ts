@@ -1,4 +1,4 @@
-import type { RallyDef } from '../../data/abilityDefs'
+import type { RallyDef } from '../../types/abilityDefs'
 import { circleCue } from '../../war/cues'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 

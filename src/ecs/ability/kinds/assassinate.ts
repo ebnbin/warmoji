@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { DEG2RAD } from '../../../util/units'
-import type { AssassinateDef } from '../../../data/abilityDefs'
+import type { AssassinateDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { Hp, Iframe, Tint, Transform, VisOff } from '../../components'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'

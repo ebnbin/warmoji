@@ -1,4 +1,4 @@
-import type { ChainArcDef } from '../../../data/abilityDefs'
+import type { ChainArcDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { damageMul, damageTarget, ownerX, ownerY } from '../amp'
 import { applyAbilityEffects } from '../effects'

@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { DEG2RAD } from '../../../util/units'
-import type { ProjectileDef } from '../../../data/abilityDefs'
+import type { ProjectileDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { Tint, Transform } from '../../components'
 import { spawnEnemyProjectileEcs, spawnProjectileEcs } from '../../projectile'

@@ -1,4 +1,4 @@
-import type { Progression } from '../src/data/waves'
+import type { Progression } from '../src/types/waves'
 
 // 关卡进程与经济（创作层·不进运行时 bundle）：波次时长表 / 精英波 / 无尽循环点 /
 // 复活血比 / 结算横幅时长 / 金币掉落曲线。逻辑（波次映射、掉率函数）留在 src/run/waves.ts，

@@ -4,8 +4,8 @@
 // 高频事件靠节流 + 随机音高抖动避免机关枪感，全局并发上限防爆音。
 
 import { SFX } from '../data/sfx'
-import type { SfxDef, SfxId } from '../data/sfx'
-export type { Wave, SfxDef, SfxId } from '../data/sfx'
+import type { SfxDef, SfxId } from '../types/sfx'
+export type { Wave, SfxDef, SfxId } from '../types/sfx'
 export { SFX } from '../data/sfx'
 
 const SAMPLE_RATE = 22050
@@ -105,7 +105,6 @@ export function initSfx(): void {
 export function setSfxEnabled(on: boolean): void {
   enabled = on
 }
-
 
 export function playSfx(id: SfxId): void {
   if (!enabled || !ctx || !master) return

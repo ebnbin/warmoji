@@ -1,5 +1,5 @@
 import { MAPS } from '../data/maps'
-import type { MapId } from '../data/maps'
+import type { MapId } from '../types/maps'
 
 // 旧框架（Arcade）的场景身份：每种世界形态一套独立 Scene 实现，键即身份。
 // 与 ecs/keys.ts 对称——ECS 那边只有一个统一场景，这边是一族。

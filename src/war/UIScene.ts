@@ -6,7 +6,7 @@ import { endRun, getRun } from '../run/state'
 // 能量豆已移除：技能纯 CD 门槛（见 captains/skill.ts）
 import { isDevOpen, setDevOpen } from './dev'
 import { CHARACTERS } from '../data/characters'
-import type { CharacterId } from '../data/characters'
+import type { CharacterId } from '../types/characters'
 import { mapEnemyRoster } from '../data/maps'
 import { beginRun } from '../run/state'
 import {

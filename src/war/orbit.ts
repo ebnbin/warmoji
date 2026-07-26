@@ -1,5 +1,5 @@
 import feelJson from '../assets/feel.json'
-import type { FeelTuning } from '../data/feel'
+import type { FeelTuning } from '../types/feel'
 
 // 环形阵轨道动力学：环是刚性同步的——所有角色保持均匀间距，共享一个相位，
 // 每人角度 = 均匀槽位角 + 相位。全员按「秉性（CHARACTERS.orbit）× 探测范围内敌情」

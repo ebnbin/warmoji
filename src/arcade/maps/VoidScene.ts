@@ -1,8 +1,8 @@
 import Phaser from 'phaser'
 import { UNIT } from '../../util/units'
-import type { TorusConfig } from '../../data/maps'
+import type { TorusConfig } from '../../types/maps'
 import { MAPS } from '../../data/maps'
-import type { MapDef } from '../../data/maps'
+import type { MapDef } from '../../types/maps'
 import { remapPoint, remapVector } from '../../war/remap'
 import { fitAspectRect, ghostImages, torusDelta, torusDist2, wrapCoord } from '../../war/maps/void'
 import { Rng } from '../../util/rng'
@@ -80,7 +80,6 @@ export class VoidScene extends ArcadeBattleScene {
     }
     return pos
   }
-
 
   /** 索敌/追击/磁吸的几何基元：环面最短差 */
   worldDelta(from: Point, to: Point): Point {

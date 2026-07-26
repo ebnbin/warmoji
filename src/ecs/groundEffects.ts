@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
 import { query } from 'bitecs'
-import type { GroundEffectDef } from '../data/groundEffects'
+import type { GroundEffectDef } from '../types/groundEffects'
 import { Alive, ENEMY_SET, Transform } from './components'
 import { applyDamage, hurtMember } from './combat'
 import type { Sim } from './sim'
@@ -39,7 +39,6 @@ export function remapGroundEffectsEcs(map: (x: number, y: number) => { x: number
     z.gfx.setPosition(p.x, p.y)
   }
 }
-
 
 /** 开局清空(场景重建:上一局的区与节流全清) */
 export function clearGroundEffectsEcs(): void {

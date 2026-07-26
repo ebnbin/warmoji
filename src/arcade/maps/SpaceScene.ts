@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { UNIT } from '../../util/units'
 import { InfiniteScene } from './InfiniteScene'
 import { MAP, MAPS } from '../../data/maps'
-import type { SpaceConfig } from '../../data/maps'
+import type { SpaceConfig } from '../../types/maps'
 import { ringPoint } from '../../war/maps/world'
 import { emojiImage } from '../../emoji/textures'
 import { enemyOf } from '../enemy/enemies'
@@ -82,7 +82,6 @@ export class SpaceScene extends InfiniteScene {
     const half = this.fieldR + MAP.cameraMargin * UNIT
     this.cameras.main.setBounds(this.fieldCx - half, this.fieldCy - half, half * 2, half * 2)
   }
-
 
   /** 终波无专属变化：禁锢圈本就全程常驻（覆盖基类的毒雾缩圈，避免叠一层毒圈） */
   protected onFinalWaveSetup(): void {}

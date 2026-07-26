@@ -1,239 +1,18 @@
 import mapsJson from '../assets/maps.json'
 import mapDefaultsJson from '../assets/mapdefaults.json'
-import type { Palette } from '../util/palette'
+
 import { ENEMIES } from './enemies'
-import type { EnemyDef, EnemyMixRow } from './enemies'
+import type { EnemyDef } from '../types/enemies'
+import type { DecorInstance, MapDecor, MapDef, MapDefaults, MapId } from '../types/maps'
 
 // 地图 = 关卡：一种玩法一个主题——黑森林（有界竞技场）、荒漠（无限世界
 // + 终波缩圈）、奔流（单屏河流 + 水流漂移），每张图都是不同的世界规则。
 // 装饰配置只固定「规则」（emoji 池/尺寸/透明度/密度/倾斜），每局的具体摆放
 // 由 rollDecor 按 run 内的种子随机生成——一局一景，同局各波不变。
 
-export interface MapDecor {
-  /** 装饰 emoji 池（逐格随机挑选，黑描边纹理与玩家侧同款） */
-  readonly emojis: readonly string[]
-  /** 单个装饰的尺寸范围（格）：明显小于战斗实体（1 格），不抢注意力 */
-  readonly sizeU: readonly [number, number]
-  /** 透明度范围（低于战斗实体一大截，保证战场读性） */
-  readonly alpha: readonly [number, number]
-  /** 每格出现装饰的概率范围（逐局掷一次；25×25 = 625 格，0.08 ≈ 50 个） */
-  readonly density: readonly [number, number]
-}
-
-/** 断壁/地形特性（可选）：挂在有界图上即启用墙——挡移动/子弹/视线 + 流场寻路。
- * 目前仅残垣图配置；数据模型上任何有界图都可通过配置本字段获得该玩法（组合式地图特性） */
-export interface WallsConfig {
-  /** 断壁块数 */
-  readonly blocks: number
-  /** 单块最大长度（格） */
-  readonly maxLen: number
-  /** 中心留空半径（格） */
-  readonly centerClearU: number
-  /** 刷怪点离队伍中心的最小格距（别贴脸刷） */
-  readonly spawnMinCellDist: number
-  /** 流场重算节流（ms）：队伍格没变就不重算 */
-  readonly reflowMs: number
-}
-
-/** 昼夜循环特性（可选）：挂在有界图上即启用昼夜——相机随时刻余弦缩放 + 夜幕迷雾圈 +
- * 昼夜两批怪（dayMix/nightMix）。目前仅晨昏原野配置；数据模型上任何有界图都可组合本特性 */
-export interface DayNightConfig {
-  /** 一整天 = 多少秒（白天→黑夜→白天一个完整周期） */
-  readonly cycleSec: number
-  /** wave 1 起始时刻（0..24） */
-  readonly startHour: number
-  /** 正午视野（格）——相机拉最远 */
-  readonly visionMax: number
-  /** 黄昏/黎明视野（格）——标准视野 */
-  readonly visionMid: number
-  /** 午夜视野（格）——相机拉最近 */
-  readonly visionMin: number
-  /** 迷雾圈半径（格）：黄昏/黎明够大到基本不挡 */
-  readonly fogRadiusDusk: number
-  /** 迷雾圈半径（格）：午夜收成一小圈 */
-  readonly fogRadiusMidnight: number
-  /** 午夜迷雾最浓时的不透明度 */
-  readonly fogAlphaMax: number
-  /** 出怪密度：白天间隔倍率（<1 更密） */
-  readonly daySpawnScale: number
-  /** 出怪密度：夜晚间隔倍率（>1 更疏） */
-  readonly nightSpawnScale: number
-}
-
-/** 浮冰/打滑特性（可选）：方形浮冰 + 全局打滑（速度低通趋近目标）+ 四周水域（落水掉血·敌我通吃）。
- * 目前仅浮冰图配置；数据模型上任何图都可组合本特性 */
-export interface IceConfig {
-  /** 方形浮冰边长（格）：战斗区 = [0,floeU]²，其外皆是水 */
-  readonly floeU: number
-  /** 队伍冰上速度响应时间常数（秒）——打滑程度主参数，越大越滑 */
-  readonly teamTauIce: number
-  /** 队伍水中速度响应时间常数（秒） */
-  readonly teamTauWater: number
-  /** 敌人冰上速度响应时间常数（秒） */
-  readonly enemyTauIce: number
-  /** 击退衰减时间常数倍率（低摩擦让击退滑得远） */
-  readonly knockbackTauMul: number
-  /** 水中速度倍率（玩家/敌人同用） */
-  readonly waterSpeedMul: number
-  /** 玩家落水每秒掉血 */
-  readonly waterTeamDps: number
-  /** 敌人落水每秒掉血 */
-  readonly waterEnemyDps: number
-  /** 落水掉血结算间隔（ms） */
-  readonly waterTickMs: number
-}
-
-/** 深空特性（可选）：黑洞禁锢场（向外阻力随距圆心增大）+ 天体横扫危险物（敌我通吃）。
- * 目前仅深空图配置；数据模型上任何图都可组合本特性 */
-export interface SpaceConfig {
-  /** 黑洞禁锢场半径（格）：整张图即此圈，圆心固定在地图中心 */
-  readonly blackholeRadiusU: number
-  /** 天体横扫危险物 */
-  readonly meteor: {
-    /** 平均间隔（ms） */
-    readonly intervalMs: number
-    /** 间隔随机抖动（±ms） */
-    readonly intervalJitterMs: number
-    /** 出现前预警时长（ms） */
-    readonly warnMs: number
-    /** 球体半径（格） */
-    readonly radiusU: number
-    /** 划过速度（格/秒） */
-    readonly speedU: number
-    /** 直线全长（格） */
-    readonly travelU: number
-    /** 相对队伍中心的垂直随机偏移上限（格） */
-    readonly offsetU: number
-    /** 压到的伤害（队员/敌人/Boss 一律照打） */
-    readonly damage: number
-  }
-}
-
-/** 奔流/水流特性（可选）：单屏固定相机 + 河道 + 恒定顺流漂移（万物随波逐流）。
- * 目前仅奔流图配置；数据模型上任何图都可组合本特性 */
-export interface RiverConfig {
-  /** 视野倍率：单屏固定相机下放大逻辑视口（世界尺寸 = 逻辑视口 × viewScale） */
-  readonly viewScale: number
-  /** 河道宽度（格，跨流向恒定） */
-  readonly width: number
-  /** 流速（格/秒，恒定漂移） */
-  readonly flow: number
-  /** 金币漂出下游边界这一距离后清理（格） */
-  readonly coinCullPad: number
-  /** 水面漂浮物数量 */
-  readonly driftCount: number
-  /** 漂浮物个体速度倍率区间 */
-  readonly driftSpeedMul: readonly [number, number]
-  /** 双层水纹滚动速度（视差贴图偏移，约为流速的倍数） */
-  readonly waveSlow: number
-  readonly waveFast: number
-}
-
-/** 环面/传送门特性（可选）：固定 16:9 环面世界（四边传送门，出这头即现那头）+ 跨缝分身相机。
- * 目前仅工厂图配置；数据模型上任何图都可组合本特性 */
-export interface TorusConfig {
-  /** 竞技场长边（格） */
-  readonly arenaLong: number
-  /** 竞技场短边（格） */
-  readonly arenaShort: number
-  /** 条带相机宽度（格）：渲染实体跨缝时的对侧分身 */
-  readonly strip: number
-  /** 玩家子弹寿命（ms）：环面上永远飞不出屏幕，必须按时限回收 */
-  readonly projectileLifeMs: number
-  /** 传送门门框光带厚度（格） */
-  readonly frame: number
-}
-
-/** 无限世界特性（可选）：无边界 + 活跃方形休眠 + 环带刷怪 + 分块装饰。
- * 无限/深空/奔流（借用休眠）等图配置；数据模型上任何图都可组合本特性 */
-export interface InfiniteConfig {
-  /** 活跃方形半边长（格）：超出的敌人休眠（冻结 AI/物理/不占刷怪上限） */
-  readonly activeHalf: number
-  /** 刷怪环带内环（格，以队伍中心为圆心） */
-  readonly spawnRingMin: number
-  /** 刷怪环带外环（格） */
-  readonly spawnRingMax: number
-  /** 装饰分块边长（格） */
-  readonly chunkCells: number
-  /** 装饰活跃范围 = 相机视野外扩的块数 */
-  readonly chunkPad: number
-}
-
-/** 终波缩圈特性（可选）：无限图 Boss 战边界，半径先停留再缓缩到 rMin，圈外队员按 tick 掉血。
- * 目前仅无限图（荒漠）配置；数据模型上任何图都可组合本特性 */
-export interface ShrinkRingConfig {
-  /** 初始半径（格） */
-  readonly r0: number
-  /** 收缩到底的半径（格） */
-  readonly rMin: number
-  /** 开圈后静止观察期（ms） */
-  readonly holdMs: number
-  /** 收缩结束时刻（ms，此后维持 rMin 到波末） */
-  readonly shrinkEndMs: number
-  /** 圈外掉血结算间隔（ms） */
-  readonly tickMs: number
-  /** 圈外每跳掉血 */
-  readonly tickDamage: number
-}
-
-export interface MapDef {
-  readonly emoji: string
-  readonly name: string
-  readonly desc: string
-  /** 世界形态：bounded = 25×25 有界竞技场；infinite = 无边界（终波缩圈）；
-   * river = 单屏固定相机 + 恒定水流；void = 固定 16:9 环面（四边传送门）；
-   * ruins = 有界竞技场 + 断壁（挡移动/子弹/视线，流场寻路）；
-   * daynight = 有界竞技场 + 昼夜循环（相机随时刻涨落、夜幕起迷雾）；
-   * space = 无限世界 + 天体横扫危险物 + 黑洞禁锢场（终波）；
-   * ice = 25×25 方形浮冰 + 全局打滑（不跟手）+ 四周水域（落水掉血·敌我通吃），相机永远跟随 */
-  readonly kind: 'bounded' | 'infinite' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice'
-  /** 有界图尺寸（格）：缺省用 MAP.width/height（25×25）；昼夜图放大到 30×30 */
-  readonly size?: { readonly w: number; readonly h: number }
-  /** 固定色板：战斗场景不再逐局随机 */
-  readonly palette: Palette
-  readonly decor: MapDecor
-  /** 河流图：水面漂浮物池（顺流循环，区别于岸上静态 decor） */
-  readonly drift?: readonly string[]
-  /** 本图出怪表（波次配比——编排属于地图，不属于敌人）。
-   * 昼夜图另有 dayMix/nightMix 分相位出怪；此处存两批并集，供图鉴/名录/兜底用 */
-  readonly mix: readonly EnemyMixRow[]
-  /** 昼夜图专用：白天出怪表（密集正面怪） */
-  readonly dayMix?: readonly EnemyMixRow[]
-  /** 昼夜图专用：黑夜出怪表（稀疏潜袭怪） */
-  readonly nightMix?: readonly EnemyMixRow[]
-  /** 断壁/地形特性（可选）：配置即启用墙 + 流场寻路（当前仅残垣图使用） */
-  readonly walls?: WallsConfig
-  /** 昼夜循环特性（可选）：配置即启用昼夜相机/迷雾/两批怪（当前仅晨昏原野使用） */
-  readonly dayNight?: DayNightConfig
-  /** 浮冰/打滑特性（可选）：配置即启用打滑 + 落水掉血（当前仅浮冰图使用） */
-  readonly ice?: IceConfig
-  /** 深空特性（可选）：配置即启用黑洞禁锢场 + 天体横扫（当前仅深空图使用） */
-  readonly space?: SpaceConfig
-  /** 奔流/水流特性（可选）：配置即启用单屏固定相机 + 河道 + 顺流漂移（当前仅奔流图使用） */
-  readonly river?: RiverConfig
-  /** 环面/传送门特性（可选）：配置即启用环面世界 + 四边传送门 + 分身相机（当前仅工厂图使用） */
-  readonly torus?: TorusConfig
-  /** 无限世界特性（可选）：无边界 + 休眠 + 环带刷怪 + 分块装饰（无限/深空/奔流使用） */
-  readonly infinite?: InfiniteConfig
-  /** 终波缩圈特性（可选）：无限图 Boss 战边界（当前仅荒漠使用） */
-  readonly shrinkRing?: ShrinkRingConfig
-  /** 终波警示横幅副标题（可选）：缺省用「击败它，或撑过 N 秒！」 */
-  readonly finalWaveSub?: string
-  /** 本图终波 Boss：引用 enemies 里某个 role:'boss' 的 kind */
-  readonly boss: string
-}
-
-// 地图表：数据行在 defs/maps.ts（创作层），npm run gen 生成 maps.json
-export type MapId = keyof typeof mapsJson
 export const MAPS = mapsJson as unknown as Record<MapId, MapDef>
 
-
 export const MAP_IDS = Object.keys(MAPS) as readonly MapId[]
-
-export function sanitizeMapId(id: unknown): MapId {
-  return typeof id === 'string' && id in MAPS ? (id as MapId) : MAP_IDS[0]!
-}
-
 
 /** 本图终波 Boss 定义（按 map.boss 引用 enemies 目录） */
 export function bossFor(id: MapId): EnemyDef {
@@ -262,16 +41,6 @@ export function mapEnemyRoster(id: MapId): EnemyDef[] {
 }
 
 // ── 装饰散布 ────────────────────────────────────────────────
-
-/** 一个装饰实例（格坐标，渲染层再乘 UNIT） */
-export interface DecorInstance {
-  emoji: string
-  xU: number
-  yU: number
-  sizeU: number
-  alpha: number
-  rotation: number
-}
 
 /** 低频值噪声场：晶格随机值 + 平滑双线性插值，返回 (xU,yU) → 0..1。
  * 晶格取自同一 rand 流，保证同种子同摆放 */
@@ -335,16 +104,6 @@ export function rollDecor(
     }
   }
   return out
-}
-
-// 有界地图缺省几何（格）：缺省尺寸 + 相机滚动外扩圈。数据行在 defs/mapdefaults.ts（创作层）。
-export interface MapDefaults {
-  /** 有界图缺省宽（格），每图 size.w 可覆盖 */
-  readonly width: number
-  /** 有界图缺省高（格），每图 size.h 可覆盖 */
-  readonly height: number
-  /** 相机滚动范围 = 地图四周外扩这一圈（格） */
-  readonly cameraMargin: number
 }
 
 export const MAP = mapDefaultsJson as unknown as MapDefaults

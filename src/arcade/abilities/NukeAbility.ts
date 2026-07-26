@@ -1,4 +1,4 @@
-import type { NukeDef } from '../../data/abilityDefs'
+import type { NukeDef } from '../../types/abilityDefs'
 import { screenFlashCue } from '../../war/cues'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 

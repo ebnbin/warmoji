@@ -1,4 +1,4 @@
-import type { RallyDef } from '../../../data/abilityDefs'
+import type { RallyDef } from '../../../types/abilityDefs'
 import { Alive, Iframe, MFlash, MHp, Tint } from '../../components'
 import { reviveMember } from '../../combat'
 import { ownerX, ownerY } from '../amp'

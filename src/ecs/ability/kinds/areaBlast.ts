@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import type { AreaBlastDef } from '../../../data/abilityDefs'
+import type { AreaBlastDef } from '../../../types/abilityDefs'
 import { ACQUIRE } from '../../../data/abilities'
 import { UNIT } from '../../../util/units'
 import { playSfx } from '../../../audio/sfx'

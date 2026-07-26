@@ -1,9 +1,6 @@
 import type { SfxId } from './sfx'
 import type { GroundEffectDef } from './groundEffects'
 
-// 能力 = 独立于角色的攻击行为单元；held 缺省时行为主体是角色本体。
-// 新增能力类型：在此加 kind 与 Def，src/abilities/ 加对应运行时类并注册 create.ts。
-
 /** 弹丸视觉规格（能力弹与死亡冷枪共用）：飞行体的形象与运动学，与「谁发、
  * 何时发、带什么命中效果」无关——后者由能力触发机器/命中效果链各自承载 */
 export interface ProjectileSpec {
@@ -13,7 +10,6 @@ export interface ProjectileSpec {
   readonly speed: number
   readonly rotationOffsetDeg: number
 }
-
 /** 持有物视觉：挂在角色身上的能力 emoji */
 export interface HeldVisual {
   readonly emoji: string
@@ -26,12 +22,6 @@ export interface HeldVisual {
   readonly mountSide?: -1 | 1
   readonly mountGap?: number
 }
-
-// ── 命中效果层（可组合，阵营中立；求值见 abilities/effects.ts）─────────
-// 「投送方式」（突刺/弹道/连锁…）与「命中后做什么」正交：后者收拢为一组
-// onHit 效果，任意投送都能挂同一套。新增效果类型：在此加 kind 与接口、
-// 扩 Effect 联合，并在 effects.ts 的 applyEffects 里加分支、gen-defs 加校验。
-
 /** 命中环 VFX：从锚点扩张淡出的一圈（纯表现，参数随效果自带） */
 export interface BlastRing {
   readonly color: number
@@ -40,7 +30,6 @@ export interface BlastRing {
   readonly lineAlpha: number
   readonly durMs: number
 }
-
 /** 圆形范围伤害：对锚点圈内敌对方各造成 ratio×基准伤害；ring 缺省无环 */
 export interface BlastEffect {
   readonly kind: 'blast'
@@ -50,14 +39,12 @@ export interface BlastEffect {
   readonly knockback: number
   readonly ring?: BlastRing
 }
-
 /** 逐目标限时减速（factor=0 即冻结），到时自动恢复 */
 export interface SlowEffect {
   readonly kind: 'slow'
   readonly factor: number
   readonly durationMs: number
 }
-
 /** 逐目标中毒 DoT：命中后每 tickMs 造成 damage 点伤害，持续 durationMs（毒针）。刷新不叠加 */
 export interface PoisonEffect {
   readonly kind: 'poison'
@@ -65,13 +52,11 @@ export interface PoisonEffect {
   readonly tickMs: number
   readonly durationMs: number
 }
-
 /** 命中锚点处留下持续地面效果区（灼烧/毒等）；任意投送都能挂，阵营由 ctx 注入 */
 export interface GroundZone {
   readonly kind: 'ground'
   readonly def: GroundEffectDef
 }
-
 /** 变形：把命中目标变成无害替身（形象顶替、失去一切伤害，到期恢复；Boss 免疫）。
  * vulnMul 为变形期间的受伤倍率（脆弱诅咒）。逐目标施加，敌方无此机制（缺席即 no-op） */
 export interface MorphEffect {
@@ -80,7 +65,6 @@ export interface MorphEffect {
   readonly morphEmoji: string
   readonly vulnMul?: number
 }
-
 /** 发弹：在锚点朝最近敌对方发一枚弹（aim=nearest）。复用弹丸投送机器与
  * ProjectileSpec——「冷却触发的能力发弹」与「死亡触发的冷枪」是同一动作、不同触发。
  * 阵营由 ctx 注入（目前仅敌方死亡冷枪在用；玩家 onHit 不含此 kind） */
@@ -91,7 +75,6 @@ export interface SpawnProjectileEffect {
   readonly lifeMs: number
   readonly aim: 'nearest'
 }
-
 /** 治疗我方范围内单位：与军医能力同一个 ctx.heal 动作，阵营由 ctx 注入。
  * all 缺省 true（范围全体）；死亡触发时由执行器排除正在死亡的自己 */
 export interface HealEffect {
@@ -100,21 +83,18 @@ export interface HealEffect {
   readonly amount: number
   readonly all?: boolean
 }
-
 /** 逐目标直伤：对本次命中/接触的每个目标造成 ratio×基准伤害（缺省 1）。无敌帧节流由 ctx
  * 决定——接触触发在触发点节流、此处裸施伤；远程命中则 ctx.damageTarget 侧节流 */
 export interface DamageEffect {
   readonly kind: 'damage'
   readonly ratio?: number
 }
-
 /** 攻速减益（敌→队员专属）：ctx 实现注入，其余阵营缺席即 no-op（同 morph/spawnBullet 的可选式） */
 export interface AttackSlowEffect {
   readonly kind: 'attackSlow'
   readonly mul: number
   readonly durationMs: number
 }
-
 export type Effect =
   | BlastEffect
   | SlowEffect
@@ -125,7 +105,6 @@ export type Effect =
   | HealEffect
   | DamageEffect
   | AttackSlowEffect
-
 export interface ThrustDef {
   readonly kind: 'thrust'
   readonly damage: number
@@ -145,7 +124,6 @@ export interface ThrustDef {
   /** 命中效果：突刺终点（reach 末端）施加的 onHit 效果（枪尖震波等） */
   readonly onHit?: readonly Effect[]
 }
-
 export interface ProjectileDef {
   readonly kind: 'projectile'
   readonly damage: number
@@ -177,7 +155,6 @@ export interface ProjectileDef {
    * 不吃暴击（与弹丸主伤一致）。 */
   readonly onHit?: readonly Effect[]
 }
-
 export interface SweepDef {
   readonly kind: 'sweep'
   readonly damage: number
@@ -193,7 +170,6 @@ export interface SweepDef {
   /** 命中效果：被扫中的敌人施加的 onHit 效果（震慑减速等，逐目标） */
   readonly onHit?: readonly Effect[]
 }
-
 export interface AreaBlastDef {
   readonly kind: 'areaBlast'
   readonly damage: number
@@ -211,7 +187,6 @@ export interface AreaBlastDef {
   /** 连锁：延迟 delayMs 后向随机敌人追加一次 ratio × 伤害的轰炸 */
   readonly echo?: { readonly delayMs: number; readonly ratio: number }
 }
-
 export interface BoomerangDef {
   readonly kind: 'boomerang'
   readonly damage: number
@@ -233,7 +208,6 @@ export interface BoomerangDef {
   /** 磁力：飞行途中吸取半径内金币 */
   readonly coinMagnetRadius?: number
 }
-
 export interface LaserDef {
   readonly kind: 'laser'
   readonly damage: number
@@ -252,7 +226,6 @@ export interface LaserDef {
   /** 穿墙索敌 + 攻击（机器人激光）：残垣图里无视断壁遮挡索敌，命中扫描本就贯穿 */
   readonly piercesWalls?: boolean
 }
-
 export interface SlowAuraDef {
   readonly kind: 'slowAura'
   /** 光环以队伍中心为圆心持续生效（角色只是来源），无伤害无冷却 */
@@ -266,7 +239,6 @@ export interface SlowAuraDef {
   /** 冰冻脉冲：每 intervalMs 冻结（移速归零）光环内敌人 durationMs */
   readonly freeze?: { readonly intervalMs: number; readonly durationMs: number }
 }
-
 export interface AssassinateDef {
   readonly kind: 'assassinate'
   readonly damage: number
@@ -285,7 +257,6 @@ export interface AssassinateDef {
   /** 处决：目标血量低于 hpRatio 时伤害 ×mul */
   readonly execute?: { readonly hpRatio: number; readonly mul: number }
 }
-
 export interface TurretDef {
   readonly kind: 'turret'
   /** 布置间隔；本体无攻击，输出全部来自弩塔 */
@@ -303,7 +274,6 @@ export interface TurretDef {
   /** 三连弩：每次开火改为扇形连发 */
   readonly burst?: { readonly count: number; readonly spreadDeg: number }
 }
-
 export interface SummonDef {
   readonly kind: 'summon'
   /** 每波放出的小蜂数量（各自独立寻路，优先扑向未中毒的敌人） */
@@ -320,7 +290,6 @@ export interface SummonDef {
   /** 命中效果：蜇中的敌人施加的 onHit 效果（毒 DoT、麻痹减速等，逐目标） */
   readonly onHit?: readonly Effect[]
 }
-
 export interface HealDef {
   readonly kind: 'heal'
   /** 周期治疗范围内血量比例最低的队友 */
@@ -333,7 +302,6 @@ export interface HealDef {
   /** 电击起搏：范围内有阵亡队友时优先为其减少复活倒计时 */
   readonly defib?: { readonly reviveCutMs: number }
 }
-
 export interface ChainArcDef {
   readonly kind: 'chainArc'
   readonly damage: number
@@ -352,9 +320,6 @@ export interface ChainArcDef {
   /** 命中效果：末跳落点施加的 onHit 效果（过载爆裂等，排除已弹跳目标） */
   readonly onHit?: readonly Effect[]
 }
-
-// ── 单发型能力（castNow）：队长主动技能的效果载荷，也可作角色自动能力 ──
-
 export interface RallyDef {
   readonly kind: 'rally'
   readonly cooldownMs: number
@@ -366,7 +331,6 @@ export interface RallyDef {
   readonly ringRadius: number
   readonly color: number
 }
-
 export interface StrikeDef {
   readonly kind: 'strike'
   readonly damage: number
@@ -385,14 +349,12 @@ export interface StrikeDef {
     readonly staggerMs: number
   }
 }
-
 export interface DanceDef {
   readonly kind: 'dance'
   readonly cooldownMs: number
   /** 敌对方全体跳舞定身时长（含休眠者与窗口内新登场者） */
   readonly durationMs: number
 }
-
 export interface BuffDef {
   readonly kind: 'buff'
   readonly cooldownMs: number
@@ -400,7 +362,6 @@ export interface BuffDef {
   readonly damageMul: number
   readonly durationMs: number
 }
-
 export interface NukeDef {
   readonly kind: 'nuke'
   /** 基准伤害 × 当前波次威胁倍率（ctx.waveScale，与敌人成长同步） */
@@ -409,14 +370,12 @@ export interface NukeDef {
   /** Boss 承伤比例 */
   readonly bossRatio: number
 }
-
 export interface TimeStopDef {
   readonly kind: 'timeStop'
   readonly cooldownMs: number
   /** 时停时长：期间敌方时间近乎凝固（移动/攻速/在途敌弹/刷怪），队伍照常 */
   readonly durationMs: number
 }
-
 export type AbilityDef =
   | ThrustDef
   | ProjectileDef
@@ -436,8 +395,3 @@ export type AbilityDef =
   | BuffDef
   | NukeDef
   | TimeStopDef
-
-/** 该武器是否穿墙攻击（残垣图：索敌不被断壁遮挡）。缺省即不穿墙 */
-export function abilityPiercesWalls(def: AbilityDef): boolean {
-  return 'piercesWalls' in def && def.piercesWalls === true
-}

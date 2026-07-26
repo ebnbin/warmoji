@@ -1,4 +1,4 @@
-import type { DanceDef } from '../../data/abilityDefs'
+import type { DanceDef } from '../../types/abilityDefs'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
 /** 群舞型：敌对方全体跳舞定身（含 Boss 与休眠者；蓄力/冲刺被打断，

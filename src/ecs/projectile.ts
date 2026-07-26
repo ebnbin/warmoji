@@ -1,7 +1,7 @@
 import { addComponent, addEntity, query, removeEntity } from 'bitecs'
 import { DEG2RAD, UNIT } from '../util/units'
 import { playSfx } from '../audio/sfx'
-import type { ProjectileDef } from '../data/abilityDefs'
+import type { ProjectileDef } from '../types/abilityDefs'
 import {
   Alive,
   Depth,

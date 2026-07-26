@@ -1,10 +1,10 @@
 import { UNIT } from '../util/units'
 import { norm } from '../util/vec'
 import { TEAM, MEMBER } from '../data/characters'
-import { fleeSteer, SPAWN } from '../data/enemies'
+import { SPAWN } from '../data/enemies'
 import { randomMapPoint } from '../war/spawn'
 import { MAPS } from '../data/maps'
-import type { IceConfig, InfiniteConfig, MapId, RiverConfig, ShrinkRingConfig, SpaceConfig } from '../data/maps'
+import type { IceConfig, InfiniteConfig, MapId, RiverConfig, ShrinkRingConfig, SpaceConfig } from '../types/maps'
 import { approach, onFloe } from '../war/maps/ice'
 import { outsideZone, ringPoint, zoneRadiusAt } from '../war/maps/world'
 import { clampToDisc, confineVelocity, meteorSweep } from '../war/maps/space'
@@ -20,6 +20,7 @@ import { FlowField } from '../war/maps/ruins'
 import { applyDamage, hurtMember } from './combat'
 import type { Sim } from './sim'
 import type { Point } from '../util/vec'
+import { fleeSteer } from '../war/enemyAi'
 
 // 世界钩子(纯逻辑):各地图与「有界森林」不同的那几处行为,收在这里按 mapId 取一份。
 // 旧实现把这些散在 8 个 Scene 子类的 override 里;ECS 侧仿真是纯函数,故改成一张

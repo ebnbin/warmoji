@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { UNIT } from '../../util/units'
 import { MAPS } from '../../data/maps'
-import type { InfiniteConfig, ShrinkRingConfig } from '../../data/maps'
+import type { InfiniteConfig, ShrinkRingConfig } from '../../types/maps'
 import { norm } from '../../util/vec'
 import type { Point } from '../../util/vec'
 import {
@@ -94,7 +94,6 @@ export class InfiniteScene extends ArcadeBattleScene {
   protected bossSpawnPoint(): Point {
     return ringPoint(this.rng, this.zoneCenter ?? this.center, 6 * UNIT, 8 * UNIT)
   }
-
 
   /** 终波：缩圈以此刻队伍位置为圆心张开 */
   protected onFinalWaveSetup(): void {

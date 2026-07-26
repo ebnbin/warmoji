@@ -1,6 +1,6 @@
 import { addComponent, addComponents, addEntity, query, removeEntity } from 'bitecs'
-import { abilityPiercesWalls } from '../../data/abilityDefs'
-import type { AbilityDef, HeldVisual } from '../../data/abilityDefs'
+import { abilityPiercesWalls } from '../../war/abilityRules'
+import type { AbilityDef, HeldVisual } from '../../types/abilityDefs'
 import type { OutlineKind } from '../../emoji/svg'
 import { Alive, Boss, Elite, Slot, Transform } from '../components'
 import { spawnSprite } from '../entities'

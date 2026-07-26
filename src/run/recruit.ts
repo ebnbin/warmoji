@@ -1,9 +1,9 @@
-import type { CaptainId } from '../data/captains'
-import type { CharacterId } from '../data/characters'
+import type { CaptainId } from '../types/captains'
+import type { CharacterId } from '../types/characters'
 import type { StringStorage } from '../util/storage'
 import { Rng } from '../util/rng'
 import progressionJson from '../assets/progression.json'
-import type { Progression } from '../data/waves'
+import type { Progression } from '../types/waves'
 
 // 命定卡池的随机源：种子绑队长、本地持久化。存储值 0 = 「未初始化」哨兵，
 // 第一次真正取用时以当前时间戳初始化并落盘（0 永远不会被当作实际种子）。

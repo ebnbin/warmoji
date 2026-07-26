@@ -1,4 +1,4 @@
-import type { BuffDef } from '../../../data/abilityDefs'
+import type { BuffDef } from '../../../types/abilityDefs'
 import { Alive, MFlash, Tint } from '../../components'
 import { castScan } from '../systems/cast'
 import { KindBuff } from '../tags'

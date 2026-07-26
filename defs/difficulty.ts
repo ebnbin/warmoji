@@ -1,4 +1,4 @@
-import type { Difficulty } from '../src/data/enemies'
+import type { Difficulty } from '../src/types/enemies'
 
 // 难度·敌潮·精英·终波减压（创作层·不进运行时 bundle）：整局的敌人压力/成长曲线设计值。
 // 逻辑（刷怪节奏计算、精英判定、敌潮编排）在 src/enemies 与战斗引擎里；这里只放设计数值，

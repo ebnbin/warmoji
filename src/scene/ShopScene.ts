@@ -1,33 +1,30 @@
 import Phaser from 'phaser'
 import { CAPTAINS } from '../data/captains'
 import { CHARACTERS } from '../data/characters'
-import type { CaptainId } from '../data/captains'
-import type { CharacterId } from '../data/characters'
+import type { CaptainId } from '../types/captains'
+import type { CharacterId } from '../types/characters'
 import { SHOP } from '../data/items'
 import { PICKUPS } from '../data/pickups'
 import {
   aggregateCharacterEffects,
-  characterPoolFor,
   characterXp,
   ITEMS,
   RARITIES,
-  rollItem,
   itemPrice,
-  stackCount,
 } from '../data/items'
-import type { ItemId, ItemDef, CharacterEffects } from '../data/items'
-import { characterLevel, levelProgress } from '../data/charLevel'
+import type { ItemId, ItemDef, CharacterEffects } from '../types/items'
+import { characterLevel } from '../data/charLevel'
 import { levelStatsFor, LEVEL_STATS } from '../data/levels'
 import { upgradeCardsFor } from '../data/characters'
 import { aggregateTeamCards } from '../data/cards'
-import type { TeamEffects } from '../data/items'
+import type { TeamEffects } from '../types/items'
 import { battleSceneFor } from '../battle'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
 import { endRun, getRun, hasCenter, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
-import { characterStatGroups } from '../data/statLines'
+import { characterStatGroups } from '../scene/statLines'
 import { memberMaxHp } from '../data/stats'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
@@ -39,6 +36,7 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
+import { characterPoolFor, levelProgress, rollItem, stackCount } from './draft'
 
 // 波次间商店：左（竖屏为下）为上架位列表——队长占首位、每个出战角色一个位，
 // 各自从自己的道具池随机上架，可购买（自动补货）或付费刷新（队长可提供免费次数）；

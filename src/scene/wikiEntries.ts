@@ -1,36 +1,21 @@
-import { CAPTAINS } from './captains'
-import { CHARACTERS, baseLoadout } from './characters'
-import type { CharacterId } from './characters'
-import { BOSSES, ENEMIES, ENEMY_DEFS } from './enemies'
-import type { EnemyDef } from './enemies'
-import { MAP_IDS, MAPS, bossFor } from './maps'
-import { PICKUPS } from './pickups'
-import { WEAPONS } from './weapons'
-import { CARDS } from './cards'
-import { ITEMS, RARITIES } from './items'
-import type { ItemDef } from './items'
+import { CAPTAINS } from '../data/captains'
+import { CHARACTERS, baseLoadout } from '../data/characters'
+import type { CharacterId } from '../types/characters'
+import { BOSSES, ENEMIES, ENEMY_DEFS } from '../data/enemies'
+import type { EnemyDef } from '../types/enemies'
+import { MAP_IDS, MAPS, bossFor } from '../data/maps'
+import { PICKUPS } from '../data/pickups'
+import { WEAPONS } from '../data/weapons'
+import { CARDS } from '../data/cards'
+import { ITEMS, RARITIES } from '../data/items'
+import type { ItemDef } from '../types/items'
 import { captainStatGroups, characterStatGroups, ABILITY_KIND_LABEL } from './statLines'
+import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
 
 // 图鉴：零维护成本地聚合各注册表——新增 entity 自动出现在图鉴里。
 // 完整 emoji 列表来自打包索引（构建资产，PreloadScene 已预加载），
 // 已收录集合 = 各注册表用到的全部 emoji（语义层，与描边/预载清单无关）。
 // 类别顺序：地图 / 队长 / 角色 / 敌人 / 道具 / 全部。武器并入所属角色（不单列）。
-
-export interface WikiEntry {
-  readonly emoji: string
-  readonly name: string
-  readonly desc: string
-  /** 详情面板的属性行（按 ◆ 组标题分段） */
-  readonly lines: readonly string[]
-  /** 分级子标签（角色专用）：各级属性/能力完全独立，详情页顶部切换 */
-  readonly levels?: readonly { readonly label: string; readonly lines: readonly string[] }[]
-}
-
-export interface WikiGroup {
-  readonly icon: string
-  readonly title: string
-  readonly entries: readonly WikiEntry[]
-}
 
 function grid(units: number): string {
   return `${+units.toFixed(1)}格`

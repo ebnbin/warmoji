@@ -1,6 +1,6 @@
 import { blastRing } from '../../war/cues'
 import { circleHitIndices } from '../../war/hit'
-import type { Effect } from '../../data/abilityDefs'
+import type { Effect } from '../../types/abilityDefs'
 import { angleToNearest } from './targeting'
 import type { EffectCtx, TargetInfo } from './types'
 

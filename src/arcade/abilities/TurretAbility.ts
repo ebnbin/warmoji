@@ -1,6 +1,6 @@
 import { DEG2RAD } from '../../util/units'
 import type Phaser from 'phaser'
-import type { ProjectileDef, TurretDef } from '../../data/abilityDefs'
+import type { ProjectileDef, TurretDef } from '../../types/abilityDefs'
 import { ANIM_DEF } from '../../emoji/anim'
 import { Animator } from '../anim/animator'
 import { clipFramesLive } from '../anim/animTextures'

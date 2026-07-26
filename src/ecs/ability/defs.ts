@@ -1,4 +1,4 @@
-import type { AbilityDef } from '../../data/abilityDefs'
+import type { AbilityDef } from '../../types/abilityDefs'
 
 // 能力定义的只读表：组件里只存下标，定义本体（嵌套对象）按下标取。
 // 同一个 def 对象只登记一次——敌人按种类共享同一份，队员各自解析出自己的一份。

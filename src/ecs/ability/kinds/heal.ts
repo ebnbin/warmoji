@@ -1,4 +1,4 @@
-import type { HealDef } from '../../../data/abilityDefs'
+import type { HealDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { Alive, Revive, Transform } from '../../components'
 import { damageMul, ownerX, ownerY } from '../amp'

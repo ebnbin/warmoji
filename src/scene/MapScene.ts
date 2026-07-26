@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { browserStorage } from '../util/storage'
-import type { MapId } from '../data/maps'
+import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
 import { battleSceneFor } from '../battle'
 import { beginRun } from '../run/state'

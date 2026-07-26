@@ -1,4 +1,4 @@
-import type { HealDef } from '../../data/abilityDefs'
+import type { HealDef } from '../../types/abilityDefs'
 import { circleCue } from '../../war/cues'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 

@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { BlastRing } from '../data/abilityDefs'
+import type { BlastRing } from '../types/abilityDefs'
 import { emojiImage } from '../emoji/textures'
 
 // 表现层（Cue，阵营中立）：一次性放完即弃的战斗特效——与机制正交。能力运行时类

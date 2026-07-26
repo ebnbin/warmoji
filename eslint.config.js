@@ -191,6 +191,26 @@ export default tseslint.config(
       ],
     },
   },
+  // types 是纯类型层：只放 interface / type，零运行时代码。
+  // 它是 defs（创作层）与全部业务包共同的形状契约——一旦混进函数或常量，
+  // 「这张表长什么样」就又埋回了实现里。用 no-restricted-syntax 硬性钉死，
+  // 不靠自觉：新增任何 export function / export const 都会红。
+  {
+    files: ['src/types/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ExportNamedDeclaration > FunctionDeclaration',
+          message: 'types 只放类型声明：函数属于用它的那一层（规则去 war/ 或 data/，只有一个消费方的直接放消费方）',
+        },
+        {
+          selector: 'ExportNamedDeclaration > VariableDeclaration',
+          message: 'types 只放类型声明：常量与表属于 data/',
+        },
+      ],
+    },
+  },
   // util 是杂物层：一堆没有更好归处的静态方法。它**不是**干净的 infra——
   // 里面既有真能带走的（rng / vec / storage / mask），也有纯本作专属的
   // （units 的 UNIT 标定、fonts 字号阶、background 渐变、fx 战斗特效、format）。

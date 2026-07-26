@@ -1,6 +1,6 @@
 import { hslToInt } from '../src/util/palette.ts'
-import type { MapDef } from '../src/data/maps'
-import type { EnemyMixRow } from '../src/data/enemies'
+import type { MapDef } from '../src/types/maps'
+import type { EnemyMixRow } from '../src/types/enemies'
 
 // 创作层（不进运行时 bundle）：地图数据行（调色板以 HSL 书写，生成时算成 int）。
 

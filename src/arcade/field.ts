@@ -2,15 +2,11 @@ import type Phaser from 'phaser'
 import { UNIT } from '../util/units'
 import { emojiImage } from '../emoji/textures'
 import { playSfx } from '../audio/sfx'
-import {
-  BATTLE_FX_IDENTITY,
-  FIELD,
-  POLARITY_COLOR,
-  foldBattleEffects,
-} from '../data/battlefield'
-import type { FieldPickupDef, Polarity } from '../data/battlefield'
+import { BATTLE_FX_IDENTITY, FIELD, POLARITY_COLOR } from '../data/battlefield'
+import type { FieldPickupDef, Polarity } from '../types/battlefield'
 import type { ArcadeBattleScene, ImageObj } from './ArcadeBattleScene'
 import type { Enemy } from './enemy/enemies'
+import { foldBattleEffects } from '../war/battleFx'
 
 // 战场拾取运行时：地面待拾实体（不磁吸，靠走位拾取）+ 已激活的限时战斗层
 // （battleMods → battleFx，逐帧重折）+ 携带者极性光环。金币在 pickups/，
@@ -28,7 +24,6 @@ export interface FieldPickupEntity {
   until: number
   grabbed: boolean
 }
-
 
 /** 掉一枚地面拾取（携带者死亡处 / 注入器）：不磁吸，静置待走位拾取 */
 export function spawnFieldPickup(

@@ -1,7 +1,7 @@
 import { addComponent, hasComponent, query, removeEntity } from 'bitecs'
 import { UNIT } from '../../../util/units'
 import { ACQUIRE } from '../../../data/abilities'
-import type { SummonDef } from '../../../data/abilityDefs'
+import type { SummonDef } from '../../../types/abilityDefs'
 import { ANIM_DEF } from '../../../emoji/anim'
 import { playSfx } from '../../../audio/sfx'
 import { Anim, Poison, Sprite, Tint, Transform } from '../../components'

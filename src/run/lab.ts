@@ -1,7 +1,7 @@
 import { CAPTAINS, TEST_CAPTAIN } from '../data/captains'
 import { ROSTER_IDS } from '../data/characters'
-import type { CharacterId } from '../data/characters'
-import type { CaptainId } from '../data/captains'
+import type { CharacterId } from '../types/characters'
+import type { CaptainId } from '../types/captains'
 
 // 测试模式（地图页勾选进入，run.testMode = true）：免死无时限的沙盒，
 // 敌人 / 角色 + 密度 / 难度 / 攻速 / 无敌 都能在场内自由切换。
@@ -52,7 +52,6 @@ export function toggleLabEnemy(kind: string): void {
   else enemies.add(kind)
 }
 
-
 // ── 角色 ──────────────────────────────────────────────────
 export function isLabCharacterOn(id: CharacterId): boolean {
   return roster.includes(id)
@@ -68,7 +67,6 @@ export function toggleLabCharacter(id: CharacterId): void {
     roster = [...roster, id]
   }
 }
-
 
 /** 角色等级（统一改全部；作用于建队员时的配装档位） */
 export function labLevel(): LabLevel {

@@ -1,6 +1,6 @@
 import { addComponent, hasComponent, query, removeEntity } from 'bitecs'
 import { DEG2RAD } from '../../../util/units'
-import type { ProjectileDef, TurretDef } from '../../../data/abilityDefs'
+import type { ProjectileDef, TurretDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
 import { Anim, Sprite, Tint, Transform } from '../../components'
 import { armIdle, playClip } from '../../anim'

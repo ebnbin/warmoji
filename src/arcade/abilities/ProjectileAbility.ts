@@ -1,6 +1,6 @@
 import { DEG2RAD } from '../../util/units'
 import type Phaser from 'phaser'
-import type { ProjectileDef } from '../../data/abilityDefs'
+import type { ProjectileDef } from '../../types/abilityDefs'
 import { emojiImage } from '../../emoji/textures'
 import { nearestAngle } from './targeting'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
