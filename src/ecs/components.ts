@@ -212,13 +212,36 @@ export const EProj = { damage: f32(), radius: f32(), dieAt: f32() }
 /** 敌弹查询集 */
 export const EPROJ_SET = [EnemyProj, Transform, Vel, EProj] as const
 
-// ── 拾取物·金币(P4)────────────────────────────────────────
+// ── 拾取物(pickup)──────────────────────────────────────────
+// 地上一件东西、走过去就拿到、到手触发一种效果——金币与战场增/减益是同一个概念的
+// 两个实例,故是同一种实体、同一条管线。三者之差只是三个正交旋钮:
+// 磁吸半径(金币有/战场拾取 0)、停留时长(金币永久 = 0)、到手干什么(kind 分派)。
+// 效果登记表与管线在 pickups.ts,生成在 entities/pickup.ts。
 
-/** 金币标记(落地待拾;磁吸向队伍中心,入账半径内 +1 币) */
-export const Coin = {}
+/** 拾取物标记。kind = 到手效果的分派键(见 pickups.ts 的 PICKUP_KINDS) */
+export const Pickup = { kind: i32() }
 
-/** 金币查询集(磁吸/拾取:位姿 + 速度) */
-export const COIN_SET = [Coin, Transform, Vel] as const
+/** 磁吸半径(px):进圈即被吸向队伍中心。0 = 不磁吸(得主动走位过去) */
+export const Pull = { radius: f32() }
+
+/** 拾取判定半径(px):队伍中心进圈即到手 */
+export const Grab = { radius: f32() }
+
+/** 地面停留到期时刻(elapsedMs):到点淡出回收。0 = 永不过期 */
+export const Lifetime = { until: f32() }
+
+/** 待拾缓浮(纯视觉):图标绕落点上下缓飘。y0 = 落点(逻辑真相),Transform.y = y0 + 偏移 */
+export const Bob = { y0: f32(), amp: f32(), halfMs: f32() }
+
+/** 光圈:跟着实体走的持久呼吸圆(待拾脉冲 / 携带者极性光环)。绘制在 render/rings.ts。
+ * dy = 相对 Transform 的纵向偏移——图标缓浮时用它把圈按回地面 */
+export const Ring = { color: u32(), radius: f32(), fillAlpha: f32(), born: f32(), dy: f32(), z: f32() }
+
+/** 拾取物查询集(磁吸/拾取/到期:位姿 + 速度) */
+export const PICKUP_SET = [Pickup, Transform, Vel] as const
+
+/** 光圈查询集 */
+export const RING_SET = [Ring, Transform, Tint] as const
 
 // ── 能力组件 ────────────────────────────────────────────────────────
 // 能力 = 实体。一条能力定义在装备时被物化成一个实体，组件描述「它是哪条定义、谁持有、

@@ -12,7 +12,7 @@ import { memberContact, memberVisual, regenMembers, reviveMembers, tickPoison } 
 import { updateEnemyProjectiles, updateProjectiles } from './projectile'
 import { backEaseOut } from './ease'
 import { updateShards } from './shards'
-import { updateCoinPop } from './pickups'
+import { stepPickupVisuals } from './pickups'
 import { updateDormancy } from './worlds'
 import type { FlowField, WallGrid } from '../war/maps/ruins'
 import type { EcsWorld } from './world'
@@ -149,12 +149,8 @@ export interface Sim {
   run: RunState
   /** 掉落/入账乘区(队长×道具,开局定;精英倍率逐杀叠) */
   reward: RewardConfig
-  /** 本帧内死亡敌人待落地的金币(场景侧 drainPendingCoins 排空,需 atlas) */
-  pendingCoins: PendingCoins[]
-  /** 本帧携带者死亡处待落地的战场拾取(场景侧排空,需 scene 建光圈视觉) */
-  pendingFieldDrops: { x: number; y: number; def: FieldPickupDef }[]
-  /** 本帧新落地的携带者(场景侧给它挂极性光环) */
-  pendingAuras: { eid: number; def: FieldPickupDef }[]
+  /** 本帧到手的战场拾取(场景侧排空,广播「到手横幅」事件) */
+  pendingCollects: FieldPickupDef[]
 }
 
 /** 断壁世界状态(残垣图):网格(可变,碾墙置通行)+ 绕墙流场(低频重算)+
@@ -197,13 +193,6 @@ export interface RewardConfig {
   waveHealRatio: number
   /** 波末金币分红(团队道具:债券) */
   waveCoins: number
-}
-
-/** 待落地金币(死亡点 + 枚数) */
-export interface PendingCoins {
-  x: number
-  y: number
-  count: number
 }
 
 /** 预告中待落地的敌人 */
@@ -421,7 +410,7 @@ export function worldTimeScale(sim: Sim): number {
 export function stepFrozenVisuals(sim: Sim, delta: number): void {
   sim.fxMs += delta
   updateShards(sim, delta)
-  updateCoinPop(sim)
+  stepPickupVisuals(sim)
 }
 
 /** 一帧仿真。delta = 真实帧长(玩家走位/呼吸/编队用),wdelta = 世界时长(敌人/弹体/刷怪用)。
@@ -552,9 +541,7 @@ export function makeSim(
       waveHealRatio: teamFx.waveHealRatio,
       waveCoins: teamFx.waveCoins,
     },
-    pendingCoins: [],
-    pendingFieldDrops: [],
-    pendingAuras: [],
+    pendingCollects: [],
     captain,
   }
 }

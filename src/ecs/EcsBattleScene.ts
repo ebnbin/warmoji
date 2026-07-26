@@ -6,6 +6,7 @@ import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
 import { burstEmitter } from '../util/fx'
 import { CueLayer } from './render/cues'
+import { RingLayer } from './render/rings'
 import { DamageTextLayer } from './render/damageText'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
@@ -30,7 +31,7 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query, removeEntity } from 'bitecs'
-import { Alive, Boss, Coin, Dormant, Enemy, EnemyProj, Hp, MHp, MoveSpeed, Nest, Projectile, Revive, Sprite, Transform } from './components'
+import { Alive, Boss, Dormant, Enemy, EnemyProj, Hp, MHp, MoveSpeed, Nest, PICKUP_SET, Pickup, Projectile, Revive, Sprite, Transform } from './components'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { spawnDecor } from './entities/decor'
@@ -47,9 +48,8 @@ import { Minion } from './components'
 import { stepAbilities } from './ability/run'
 import { replayDeath, runDeathEffects } from './ability/death'
 import { clearGroundEffectsEcs, spawnGroundEffectEcs, updateGroundEffectsEcs } from './groundEffects'
-import { drainPendingCoins, magnetCoinsEcs } from './pickups'
+import { COIN, pickupCounts, updatePickups } from './pickups'
 import { spawnBossEcs, spawnCarrierEcs, spawnStep, spawnSurgeEcs } from './spawn'
-import { attachCarrierAuraEcs, clearFieldEcs, fieldCounts, spawnFieldPickupEcs, updateFieldEcs } from './field'
 
 import { initialLayout, stepFrozenVisuals, stepSim, worldTimeScale } from './sim'
 import { settleWave } from './wave'
@@ -105,11 +105,22 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
 }
 
+/** 在场金币数(探针):拾取物里 kind = COIN 的那些 */
+function liveCoins(world: EcsWorld): number {
+  let n = 0
+  for (const eid of query(world, PICKUP_SET as unknown as object[])) {
+    if (Pickup.kind[eid] === COIN) n++
+  }
+  return n
+}
+
 export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private world!: EcsWorld
   private atlas?: EcsAtlas
   /** 一次性特效层（池化自绘，不挂 tween；见 render/cues.ts） */
   private cues?: CueLayer
+  /** 实体光圈层（待拾脉冲 / 携带者光环；见 render/rings.ts） */
+  private rings?: RingLayer
   private sim?: Sim
   private ready = false
   /** HUD 宿主契约：UIScene 据此显示实验室控件、正计时 */
@@ -195,6 +206,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private resetSceneFields(): void {
     this.atlas = undefined
     this.cues = undefined
+    this.rings = undefined
     this.sim = undefined
     this.ready = false
     this.ending = false
@@ -370,6 +382,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       if (probe) probe.ready = false
       this.atlas?.dispose() // 停掉在途的惰性烘焙:纹理管理器即将归下一局所有
       this.cues?.destroy()
+      this.rings?.destroy()
       this.damageText?.destroy()
       for (const c of this.stripCams) this.cameras.remove(c)
       this.stripCams = []
@@ -385,11 +398,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.atlas = atlas
     // 开局清上一局遗留的模块级状态(eid 从 0 重新分配,旧局引用不能留给新实体)
     clearGroundEffectsEcs()
-    clearFieldEcs()
     clearEcsStore()
     clearAbilityDefs()
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
     this.cues = new CueLayer(this)
+    this.rings = new RingLayer(this, this.world)
     this.spawnDecor(run, atlas)
     this.testMode = run.testMode
     const settings = loadSettings(browserStorage())
@@ -492,6 +505,21 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       })
       this.spawnMarks.set(p, mark)
     }
+  }
+
+  /** 排空本帧到手的战场拾取:广播到 HUD 弹「到手」横幅 */
+  private drainCollects(): void {
+    const sim = this.sim
+    if (!sim || sim.pendingCollects.length === 0) return
+    for (const def of sim.pendingCollects) {
+      this.events.emit('field-collected', {
+        emoji: def.emoji,
+        name: def.name,
+        desc: def.desc,
+        polarity: def.polarity,
+      })
+    }
+    sim.pendingCollects.length = 0
   }
 
   /** 排空本帧粒子爆点:按 kind 分发到死亡/拾币发射器(镜像 deathBurst/coinBurst.explode) */
@@ -655,7 +683,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     return {
       enemies: query(this.world, [Enemy]).filter((eid) => !Dormant.v[eid]).length,
       projectiles: query(this.world, [Projectile]).length,
-      coins: query(this.world, [Coin]).length,
+      coins: liveCoins(this.world),
       pending: sim?.pendingSpawns.length ?? 0,
       objects: this.children.list.length,
       bodies: 0,
@@ -1321,6 +1349,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     if (this.ending) {
       stepFrozenVisuals(sim, delta)
       this.cues?.step(sim.fxMs)
+      this.rings?.step(sim.fxMs)
       this.damageText?.step(sim.fxMs)
       return
     }
@@ -1372,15 +1401,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     for (const g of sim.pendingGrounds) spawnGroundEffectEcs(sim, this, g.x, g.y, g.def, g.faction, g.srcSlot, g.srcName)
     sim.pendingGrounds.length = 0
     updateGroundEffectsEcs(sim, this)
-    // 金币:死亡掉落落地 + 磁吸入账
-    if (this.atlas) drainPendingCoins(sim, this.atlas)
-    magnetCoinsEcs(sim, delta)
-    // 战场拾取:携带者死亡处落地 + 新携带者挂光环 + 走位拾取/到期淡出
-    for (const d of sim.pendingFieldDrops) spawnFieldPickupEcs(sim, this, d.x, d.y, d.def)
-    sim.pendingFieldDrops.length = 0
-    for (const a of sim.pendingAuras) attachCarrierAuraEcs(this, a.eid, a.def)
-    sim.pendingAuras.length = 0
-    updateFieldEcs(sim, this)
+    // 拾取物(金币 / 战场增减益同一条):磁吸 → 到手 → 到期淡出
+    updatePickups(sim, delta)
+    this.drainCollects()
     // 虫巢周期生成子敌(护巢子敌绕巢;拆巢暴走)
     if (this.atlas) updateSpawners(sim, this.atlas)
     // 刷怪节奏
@@ -1390,6 +1413,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 两个特效层先步进再排空：step 顺带把「本帧视觉钟」写进去，投放据此定起点。
     // 反过来的话本帧新投的会拿到上一帧的时钟——开局第一帧甚至会被当场判过期丢掉
     this.cues?.step(sim.fxMs)
+    this.rings?.step(sim.fxMs)
     this.damageText?.step(sim.fxMs)
     this.drainDamageNumbers()
     this.drainBursts()
@@ -1457,12 +1481,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       wave: sim.run.wave,
       coins: sim.run.coins,
       xpLevel: sim.run.xp.level,
-      liveCoins: query(this.world, [Coin]).length,
+      liveCoins: liveCoins(this.world),
       projectiles: query(this.world, [Projectile]).length,
       eprojectiles: query(this.world, [EnemyProj]).length,
       field: {
-        pickups: fieldCounts().pickups,
-        carriers: fieldCounts().carriers,
+        pickups: pickupCounts(sim).pickups,
+        carriers: pickupCounts(sim).carriers,
         active: sim.battleMods.map((m) => ({ id: m.id, remainMs: Math.max(0, m.until - sim.elapsedMs) })),
       },
       over: sim.over,

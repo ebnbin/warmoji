@@ -1,7 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../war/remap'
-import { COIN_SET, EDir, ENEMY_SET, EPROJ_SET, Follow, Kv, PROJ_SET, Transform, Vel } from './components'
-import { remapFieldEcs } from './field'
+import { Bob, EDir, ENEMY_SET, EPROJ_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Transform, Vel } from './components'
 import { remapGroundEffectsEcs } from './groundEffects'
 import type { Sim } from './sim'
 import type { Point } from '../util/vec'
@@ -53,19 +52,20 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     Kv.x[eid] = k.x
     Kv.y[eid] = k.y
   }
-  for (const set of [PROJ_SET, EPROJ_SET, COIN_SET]) {
+  for (const set of [PROJ_SET, EPROJ_SET, PICKUP_SET]) {
     for (const eid of query(sim.world, set as unknown as object[])) {
       movePos(eid)
       moveVel(eid)
     }
   }
+  // 待拾物的缓浮基线跟着挪(下一帧重算偏移;≤6px 的相位跳变看不出)
+  for (const eid of query(sim.world, PICKUP_SET as unknown as object[])) Bob.y0[eid] = Transform.y[eid]!
   // 预告中的落点(标记视觉由场景侧按 pendingSpawns 对帐,自然跟位)
   for (const p of sim.pendingSpawns) {
     const q = map(p.x, p.y)
     p.x = q.x
     p.y = q.y
   }
-  // 地面效果区与地面待拾物(模块级列表,连同它们的视觉一起挪)
+  // 地面效果区(模块级列表,连同它的视觉一起挪;待拾物已是实体,上面走通用通路)
   remapGroundEffectsEcs(map)
-  remapFieldEcs(map)
 }

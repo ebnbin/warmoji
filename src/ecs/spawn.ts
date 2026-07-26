@@ -11,6 +11,7 @@ import { hourAt, isDayAt } from '../war/maps/daynight'
 import { Dormant, ENEMY_SET } from './components'
 import { spawnEnemy } from './entities/enemy'
 import { enemyCarries } from './store'
+import { attachCarrierRing } from './pickups'
 import type { Sim } from './sim'
 import type { FieldPickupDef } from '../types/battlefield'
 import type { EcsAtlas } from './render/atlas'
@@ -156,7 +157,7 @@ export function spawnStep(sim: Sim, atlas: EcsAtlas, delta: number): void {
         if (p.boss && !sim.testMode) playSfx('boom') // 落地轰鸣只属于正式局 Boss(镜像 spawnBoss)
         if (p.carries) {
           enemyCarries[eid] = p.carries
-          sim.pendingAuras.push({ eid, def: p.carries })
+          attachCarrierRing(sim, eid, p.carries)
         }
       }
       else remain.push(p)

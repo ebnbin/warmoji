@@ -1,6 +1,7 @@
 import { addComponent, addEntity, hasComponent, query, removeEntity } from 'bitecs'
 import type { StrikeDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
+import { dropCoins } from '../../pickups'
 import { Alive, Tint, Transform } from '../../components'
 import { attachDrawable } from '../../drawable'
 import { enemyDef } from '../../store'
@@ -89,5 +90,5 @@ function spawnCoins(sim: Sim, x: number, y: number, count: number): void {
   if (sim.over) return
   sim.pendingBursts.push({ x, y, count: 6, kind: 'coin' })
   playSfx('coin')
-  sim.pendingCoins.push({ x, y, count })
+  dropCoins(sim, x, y, count)
 }

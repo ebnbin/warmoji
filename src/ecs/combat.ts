@@ -11,6 +11,7 @@ import { UNIT } from '../util/units'
 import { spawnShardsEcs } from './entities/shard'
 import { Alive, Anim, Boss, DmgMul, Dormant, ENEMY_SET, Elite, Flash, Hp, Hurt, Iframe, Kv, MAtkSlow, MFlash, MHp, MPerk, Morph, Nest, Poison, Pop, Radius, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from './components'
 import { enemyCarries, enemyDef } from './store'
+import { dropCoins, dropFieldPickup } from './pickups'
 import { unequipAbilities } from './ability/equip'
 import type { Sim } from './sim'
 
@@ -115,7 +116,7 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
   // 携带者:死亡即在原地掉下所携拾取(镜像 killEnemy 的 spawnFieldPickup)
   const carries = enemyCarries[eid]
   if (carries) {
-    sim.pendingFieldDrops.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, def: carries })
+    dropFieldPickup(sim, Transform.x[eid]!, Transform.y[eid]!, carries)
     enemyCarries[eid] = undefined
   }
   // 清体:本体裂成四象限碎片,继承致死击退速度飞散
@@ -158,7 +159,7 @@ function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean):
   // 偷币鼠吐回吞掉的币 + 1 枚利息(镜像 grantKillRewards 的 eaten 项)
   const eaten = Thief.eaten[eid]!
   const total = baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0)
-  if (total > 0) sim.pendingCoins.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: total })
+  if (total > 0) dropCoins(sim, Transform.x[eid]!, Transform.y[eid]!, total)
 }
 
 /** 拆巢(镜像 orphanBrood):名下护巢子敌失去锚点——baseOrbit 按各自 orphan 倍率暴走

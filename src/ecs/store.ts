@@ -27,6 +27,11 @@ export const flyerHits: (Set<number> | undefined)[] = new Array<Set<number> | un
 export const enemyCarries: (FieldPickupDef | undefined)[] =
   new Array<FieldPickupDef | undefined>(MAX_ENTITIES).fill(undefined).fill(undefined)
 
+/** 拾取物携带的载荷(只有需要 def 的那些 kind 用得上:战场增/减益要知道自己是哪一枚;
+ * 金币无载荷,kind 本身就是全部信息) */
+export const pickupDef: (FieldPickupDef | undefined)[] =
+  new Array<FieldPickupDef | undefined>(MAX_ENTITIES).fill(undefined)
+
 /** 敌弹的伤害来源名(结算页敌情明细按敌人名归属) */
 export const eprojSrcName: (string | undefined)[] = new Array<string | undefined>(MAX_ENTITIES).fill(undefined)
 
@@ -43,6 +48,7 @@ export function clearEcsStore(): void {
   projHitEids.fill(undefined)
   flyerHits.fill(undefined)
   enemyCarries.fill(undefined)
+  pickupDef.fill(undefined)
   animId.fill(undefined)
   animOutline.fill(undefined)
   eprojSrcName.fill(undefined)

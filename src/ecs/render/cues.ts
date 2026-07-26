@@ -2,6 +2,8 @@ import Phaser from 'phaser'
 import type { BlastRing } from '../../types/abilityDefs'
 import { emojiImage } from '../../emoji/textures'
 import { backEaseOut, cubicEaseIn, cubicEaseOut } from '../ease'
+import { fan, newScratch, quad, resetScratch, ringStrip, segment } from './tri'
+import type { Scratch } from './tri'
 
 // 一次性战斗特效（Cue，阵营中立）：放完即弃，与机制正交——纯逻辑侧只往队列里塞
 // 「放一个什么样的特效」，绘制全在这里（GAS GameplayCue 思路：机制不依赖渲染）。
@@ -68,100 +70,7 @@ const BANDS: readonly { depth: number; zMin: number; zMax: number }[] = [
   { depth: 14, zMin: 9, zMax: Infinity }, // 闪电、斩击、高层圆
 ]
 
-/** 一帧一带的三角形暂存：plain array 复用，稳态零分配 */
-interface Scratch {
-  v: number[]
-  c: number[]
-  i: number[]
-}
-
 type Matrix = Phaser.GameObjects.Components.TransformMatrix
-
-/** 追加一个三角形（顶点经相机矩阵变换到屏幕空间，与 FillTri 的做法一致） */
-function tri(
-  o: Scratch, m: Matrix,
-  x0: number, y0: number, x1: number, y1: number, x2: number, y2: number,
-  color: number,
-): void {
-  const base = o.c.length
-  o.v.push(m.getX(x0, y0), m.getY(x0, y0), m.getX(x1, y1), m.getY(x1, y1), m.getX(x2, y2), m.getY(x2, y2))
-  o.c.push(color, color, color)
-  o.i.push(base, base + 1, base + 2)
-}
-
-/** 四边形 → 两个三角形（顶点须按 TL, BL, BR, TR 顺时针或逆时针连续绕） */
-function quad(
-  o: Scratch, m: Matrix,
-  ax: number, ay: number, bx: number, by: number, cx: number, cy: number, dx: number, dy: number,
-  color: number,
-): void {
-  tri(o, m, ax, ay, bx, by, cx, cy, color)
-  tri(o, m, ax, ay, cx, cy, dx, dy, color)
-}
-
-/** 圆按屏幕半径自适应取段数：太少会出多边形棱角，太多是白给的三角形 */
-function segsFor(radius: number): number {
-  return Math.max(12, Math.min(48, Math.ceil(radius / 3)))
-}
-
-/** 填充圆：以圆心为轴的三角扇 */
-function fan(o: Scratch, m: Matrix, cx: number, cy: number, r: number, color: number): void {
-  const n = segsFor(r)
-  const d = (Math.PI * 2) / n
-  let px = cx + r
-  let py = cy
-  for (let k = 1; k <= n; k++) {
-    const a = k * d
-    const nx = cx + Math.cos(a) * r
-    const ny = cy + Math.sin(a) * r
-    tri(o, m, cx, cy, px, py, nx, ny, color)
-    px = nx
-    py = ny
-  }
-}
-
-/** 圆环（描边）：内外两圈之间铺一圈四边形。a0/a1 给定即只铺该扇段（斩击弧光用）。
- * 与 CueLayer.ring 不同名以免混淆——那个是投放冲击环，这个是三角化 */
-function ringStrip(
-  o: Scratch, m: Matrix,
-  cx: number, cy: number, r: number, width: number, color: number,
-  a0 = 0, a1 = Math.PI * 2,
-): void {
-  const ri = r - width / 2
-  const ro = r + width / 2
-  const span = a1 - a0
-  const n = Math.max(6, Math.ceil(segsFor(r) * (Math.abs(span) / (Math.PI * 2))))
-  const d = span / n
-  for (let k = 0; k < n; k++) {
-    const a = a0 + k * d
-    const b = a0 + (k + 1) * d
-    const ca = Math.cos(a)
-    const sa = Math.sin(a)
-    const cb = Math.cos(b)
-    const sb = Math.sin(b)
-    quad(
-      o, m,
-      cx + ca * ri, cy + sa * ri,
-      cx + ca * ro, cy + sa * ro,
-      cx + cb * ro, cy + sb * ro,
-      cx + cb * ri, cy + sb * ri,
-      color,
-    )
-  }
-}
-
-/** 有向线段加粗成四边形（闪电每一截）。转角处不做接头——闪电本就锯齿状，看不出 */
-function segment(
-  o: Scratch, m: Matrix,
-  x0: number, y0: number, x1: number, y1: number, width: number, color: number,
-): void {
-  const dx = x1 - x0
-  const dy = y1 - y0
-  const len = Math.hypot(dx, dy) || 1
-  const nx = (-dy / len) * (width / 2)
-  const ny = (dx / len) * (width / 2)
-  quad(o, m, x0 + nx, y0 + ny, x0 - nx, y0 - ny, x1 - nx, y1 - ny, x1 + nx, y1 + ny, color)
-}
 
 export class CueLayer {
   // ── 圆（含冲击环）：纯数据 ──
@@ -218,7 +127,7 @@ export class CueLayer {
   private flashAlpha = 0
 
   private readonly batches: EcsShapeBatch[] = []
-  private readonly scratch: Scratch = { v: [], c: [], i: [] }
+  private readonly scratch: Scratch = newScratch()
 
   /** 本帧视觉钟：step 每帧写入，随后的投放取它作为起点 */
   private now = 0
@@ -287,9 +196,7 @@ export class CueLayer {
   /** 把某一带的全部活动特效三角化到暂存里（批绘对象在 renderWebGL 里调） */
   buildBand(band: number, m: Matrix): Scratch {
     const o = this.scratch
-    o.v.length = 0
-    o.c.length = 0
-    o.i.length = 0
+    resetScratch(o)
     const { zMin, zMax } = BANDS[band]!
     const fx = this.now
 

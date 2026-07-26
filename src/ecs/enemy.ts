@@ -8,8 +8,9 @@ import { PICKUPS } from '../data/pickups'
 import { UNIT } from '../util/units'
 import { playSfx } from '../audio/sfx'
 import { despawnEnemy, hurtMember } from './combat'
-import { Alive, Boss, COIN_SET, Charge, Despawn, DmgMul, Dormant, EDir, ENEMY_SET, EState, ETurn, EnemyPhase, EnemyVel, Flash, Iframe, Kv, Morph, Nest, Poison, Pop, Slow, SpMul, Speed, Sprite, Step, Thief, Tint, Transform, ZoneSlow } from './components'
+import { Alive, Boss, Charge, Despawn, DmgMul, Dormant, EDir, ENEMY_SET, EState, ETurn, EnemyPhase, EnemyVel, Flash, Iframe, Kv, Morph, Nest, PICKUP_SET, Pickup, Poison, Pop, Slow, SpMul, Speed, Sprite, Step, Thief, Tint, Transform, ZoneSlow } from './components'
 import { enemyDef } from './store'
+import { COIN } from './pickups'
 
 import { backEaseOut } from './ease'
 import { spawnBrood } from './entities/enemy'
@@ -269,7 +270,8 @@ function steerCoinThief(sim: Sim, eid: number, slow: number): { vx: number; vy: 
   let bestD = Infinity
   let coinX = 0
   let coinY = 0
-  for (const c of query(sim.world, COIN_SET as unknown as object[])) {
+  for (const c of query(sim.world, PICKUP_SET as unknown as object[])) {
+    if (Pickup.kind[c] !== COIN) continue // 只认金币:战场增/减益不是它的口粮
     const w = sim.hooks.worldDelta(sim, ex, ey, Transform.x[c]!, Transform.y[c]!)
     const d = w.x * w.x + w.y * w.y
     if (d < bestD) {
