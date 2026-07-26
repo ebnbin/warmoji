@@ -8,54 +8,8 @@ import { waveAt } from '../data/waves'
 import { UNIT } from '../util/units'
 import { playSfx } from '../audio/sfx'
 import { despawnEnemy, hurtMember } from './combat'
-import {
-  Alive,
-  Anim,
-  Boss,
-  Charge,
-  Pop,
-  COIN_SET,
-  Depth,
-  Despawn,
-  DmgMul,
-  Dormant,
-  EDir,
-  Elite,
-  Enemy,
-  ENEMY_SET,
-  EState,
-  ETurn,
-  Flash,
-  Hp,
-  Iframe,
-  Kv,
-  Morph,
-  Poison,
-  Quad,
-  Radius,
-  Slide,
-  Slow,
-  Speed,
-  SpMul,
-  Sprite,
-  Step,
-  Tint,
-  Transform,
-  ZoneSlow,
-} from './components'
-import {
-  enemyArmed,
-  enemyCarries,
-  enemyDef,
-  enemyFireDelayMs,
-  enemyNest,
-  enemyNextSpawnAt,
-  enemyPhase,
-  enemyVelX,
-  enemyVelY,
-  thiefEaten,
-  thiefNextEatAt,
-} from './store'
+import { Alive, Anim, Boss, COIN_SET, Charge, Depth, Despawn, DmgMul, Dormant, EDir, ENEMY_SET, EState, ETurn, Elite, Enemy, EnemyArm, EnemyPhase, EnemyVel, Flash, Hp, Iframe, Kv, Morph, Nest, Poison, Pop, Quad, Radius, Slide, Slow, SpMul, Speed, Sprite, Step, Thief, Tint, Transform, ZoneSlow } from './components'
+import { enemyCarries, enemyDef } from './store'
 import { armIdle } from './anim'
 import { ANIM_DEF } from '../emoji/anim'
 import { backEaseOut } from './ease'
@@ -133,22 +87,22 @@ export function spawnEnemy(
   Morph.until[eid] = 0
   Morph.vuln[eid] = 1
   Morph.cdUntil[eid] = 0
-  thiefEaten[eid] = 0
-  thiefNextEatAt[eid] = 0
+  Thief.eaten[eid] = 0
+  Thief.nextEatAt[eid] = 0
   enemyCarries[eid] = undefined // 携带者由 spawnCarrier 落地后覆写
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
   Radius.v[eid] = def.radius
   DmgMul.v[eid] = elite ? ELITE.damageMul : 1
   SpMul.v[eid] = elite ? ELITE.speedMul : 1
-  enemyNest[eid] = -1 // 非护巢子敌(spawnBrood 会覆盖为巢 eid)
-  enemyNextSpawnAt[eid] = def.spawner ? sim.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
+  Nest.of[eid] = -1 // 非护巢子敌(spawnBrood 会覆盖为巢 eid)
+  Nest.nextSpawnAt[eid] = def.spawner ? sim.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
   Kv.x[eid] = 0
   Kv.y[eid] = 0
   Slide.x[eid] = 0
   Slide.y[eid] = 0
   Dormant.v[eid] = 0
-  enemyArmed[eid] = 0 // eid 复用:新实体须重新装配能力
+  EnemyArm.armed[eid] = 0 // eid 复用:新实体须重新装配能力
   // 敌人一并带 Alive:「持有者还在不在场上」对能力系统就此与阵营无关(队员阵亡与敌人离场同构)
   Alive.v[eid] = 1
   Flash.until[eid] = 0
@@ -160,13 +114,13 @@ export function spawnEnemy(
   EDir.y[eid] = Math.sin(sim.rng.next() * Math.PI * 2)
   ETurn.at[eid] = sim.elapsedMs + AI.wander.spawnTurnMinMs + sim.rng.next() * AI.wander.spawnTurnJitterMs
   // 首发延迟(镜像 materializeEnemy 的 fireAt;lazy-arm 时喂入能力初始冷却)
-  enemyFireDelayMs[eid] = 900 + sim.rng.next() * 1500
+  EnemyArm.fireDelayMs[eid] = 900 + sim.rng.next() * 1500
   // 行走摇摆随机相位(镜像 materializeEnemy 的 ph)
-  enemyPhase[eid] = sim.rng.next() * Math.PI * 2
+  EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   Sprite.flipX[eid] = 0
   // 部件动画:idle 常驻翻帧,相位按出生随机相错开(镜像 materializeEnemy 的 anim.setIdle)
-  armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (enemyPhase[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
+  armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (EnemyPhase.v[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
   Tint.color[eid] = 0xffffff
   Tint.effect[eid] = 0
   Tint.alpha[eid] = boss ? 0.2 : 0.3 // 起点是绝对值,不乘目标 alpha(镜像 materializeEnemy 的 setAlpha)
@@ -388,7 +342,7 @@ function steerDetonate(sim: Sim, eid: number, slow: number): { vx: number; vy: n
   return { vx: dir.x * sp, vy: dir.y * sp }
 }
 
-/** 护巢环绕(镜像 baseOrbit steerer):绕巢盘旋,玩家逼近巢即扑向玩家;巢被拆(enemyNest=-1)
+/** 护巢环绕(镜像 baseOrbit steerer):绕巢盘旋,玩家逼近巢即扑向玩家;巢被拆(Nest.of=-1)
  * 后直扑玩家(暴走档,倍率已由 orphanBrood 施加)。返回本帧速度 */
 function steerBaseOrbit(sim: Sim, eid: number, slow: number): { vx: number; vy: number } {
   const lm = enemyDef[eid]!.locomotion
@@ -403,7 +357,7 @@ function steerBaseOrbit(sim: Sim, eid: number, slow: number): { vx: number; vy: 
     const dir = sim.hooks.chaseDir(sim, eid, t.x, t.y)
     return { vx: dir.x * sp, vy: dir.y * sp }
   }
-  const nest = enemyNest[eid]!
+  const nest = Nest.of[eid]!
   // 巢失效(被拆/被清)→ 暴走直扑
   if (nest < 0 || enemyDef[nest] === undefined) return chasePlayer()
   const nx = Transform.x[nest]!
@@ -453,10 +407,10 @@ function steerCoinThief(sim: Sim, eid: number, slow: number): { vx: number; vy: 
   const onCoin = bestD <= eatR * eatR
   if (onCoin) {
     // 贴上金币:过冷却才吞一枚(偷走,不入账)
-    if (sim.elapsedMs >= thiefNextEatAt[eid]!) {
+    if (sim.elapsedMs >= Thief.nextEatAt[eid]!) {
       removeEntity(sim.world, coin)
-      thiefEaten[eid] = thiefEaten[eid]! + 1
-      thiefNextEatAt[eid] = sim.elapsedMs + AI.coinThiefEatCdMs
+      Thief.eaten[eid] = Thief.eaten[eid]! + 1
+      Thief.nextEatAt[eid] = sim.elapsedMs + AI.coinThiefEatCdMs
     }
     return { vx: 0, vy: 0 }
   }
@@ -465,11 +419,11 @@ function steerCoinThief(sim: Sim, eid: number, slow: number): { vx: number; vy: 
   return { vx: dir.x * sp, vy: dir.y * sp }
 }
 
-/** 本巢名下在场子敌数(enemyNest 反查) */
+/** 本巢名下在场子敌数(Nest.of 反查) */
 function broodCount(sim: Sim, nestEid: number): number {
   let n = 0
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (enemyNest[eid] === nestEid) n++
+    if (Nest.of[eid] === nestEid) n++
   }
   return n
 }
@@ -499,7 +453,7 @@ export function spawnBrood(
       false,
       false,
     )
-    if (ownerEid >= 0) enemyNest[child] = ownerEid
+    if (ownerEid >= 0) Nest.of[child] = ownerEid
   }
 }
 
@@ -517,8 +471,8 @@ export function updateSpawners(sim: Sim, atlas: FrameIndex): void {
     // 压制期(全场蹦迪 / 魔尘变羊)既不产子也不推进计时——旧实现产子块在两个 continue 之后
     if (now < sim.danceEndsAt) continue
     if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue
-    if (now < enemyNextSpawnAt[eid]!) continue
-    enemyNextSpawnAt[eid] = now + spawner.intervalMs
+    if (now < Nest.nextSpawnAt[eid]!) continue
+    Nest.nextSpawnAt[eid] = now + spawner.intervalMs
     if (active >= SPAWN.maxAlive) continue
     const room = spawner.maxAlive - broodCount(sim, eid)
     if (room <= 0) continue
@@ -625,7 +579,7 @@ export function steerEnemies(sim: Sim, delta: number): void {
     let bvy = 0
     if (dancing) {
       // 蹦迪:定身摇摆(不位移),摇摆幅度大于常态行走
-      Transform.rot[eid] = Math.sin(now / 80 + enemyPhase[eid]!) * 0.3
+      Transform.rot[eid] = Math.sin(now / 80 + EnemyPhase.v[eid]!) * 0.3
     } else if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) {
       // 魔尘变形期:失去本职行为,顶绵羊形象缓速游荡(半速)。缴械/无害/复形在能力层与战斗层
       const d = wanderDir(sim, eid)
@@ -672,8 +626,8 @@ export function steerEnemies(sim: Sim, delta: number): void {
     Step.y[eid] = post.vy * dt
     // 记录本帧移动朝向(击退前的移动分量;敌方 aim:'move' 弹的 ownerHeading 读)
     if (dt > 0) {
-      enemyVelX[eid] = post.vx
-      enemyVelY[eid] = post.vy
+      EnemyVel.x[eid] = post.vx
+      EnemyVel.y[eid] = post.vy
     }
   }
 }
@@ -725,7 +679,7 @@ export function animateEnemies(sim: Sim, delta: number): void {
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     if (Dormant.v[eid]) continue
     if (EState.v[eid] === 2 || EState.v[eid] === 3 || Morph.until[eid] !== 0) continue
-    Transform.rot[eid] = Math.sin(now / 95 + enemyPhase[eid]!) * 0.1
+    Transform.rot[eid] = Math.sin(now / 95 + EnemyPhase.v[eid]!) * 0.1
     const flipVx = dt > 0 ? Step.x[eid]! / dt : 0
     if (Math.abs(flipVx) > 8) Sprite.flipX[eid] = flipVx > 0 ? 1 : 0
   }

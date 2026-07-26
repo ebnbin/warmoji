@@ -30,20 +30,7 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query, removeEntity } from 'bitecs'
-import {
-  Alive,
-  Boss,
-  Coin,
-  Dormant,
-  Enemy,
-  EnemyProj,
-  Hp,
-  MHp,
-  Revive,
-  Projectile,
-  Sprite,
-  Transform,
-} from './components'
+import { Alive, Boss, Coin, Dormant, Enemy, EnemyProj, Hp, MHp, Nest, Projectile, Revive, Sprite, Transform } from './components'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { spawnSprite } from './entities'
@@ -51,7 +38,7 @@ import { updateAnims } from './anim'
 import { remapSim } from './remap'
 import { spawnTeam } from './team'
 import { updateSpawners } from './enemy'
-import { clearEcsStore, enemyNest } from './store'
+import { clearEcsStore } from './store'
 import { armCaptain, armEnemies, armTeam } from './ability/arm'
 import { refreshEnemyTargets, refreshMemberTargets } from './ability/targets'
 import { clearAbilityDefs } from './ability/defs'
@@ -679,7 +666,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       hpMultiplier: wave.hpMultiplier,
     }
   }
-
 
   /** 释放主动技能(镜像 castSkill):纯 CD 门槛,就绪即放、重置跨波 CD;
    * 效果本体是队长持有的标准能力行,逐个单发 */
@@ -1465,8 +1451,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       memberPos: sim.members.map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
       frames: sim.members.map((eid) => Sprite.frame[eid]!),
       enemies: query(this.world, [Enemy]).length,
-      // 护巢子敌数(enemyNest>=0):虫巢生成的子敌带巢引用,自然刷怪的敌人恒 -1,借此隔离测量
-      broods: Array.from(query(this.world, [Enemy]), (eid) => enemyNest[eid]!).filter((n) => n >= 0).length,
+      // 护巢子敌数(Nest.of>=0):虫巢生成的子敌带巢引用,自然刷怪的敌人恒 -1,借此隔离测量
+      broods: Array.from(query(this.world, [Enemy]), (eid) => Nest.of[eid]!).filter((n) => n >= 0).length,
       enemyPos: Array.from(query(this.world, [Enemy]), (eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
       kills: sim.run.kills,
       stats: { damage: [...sim.run.stats.damage], kills: [...sim.run.stats.kills], damageTaken: [...sim.run.stats.damageTaken] },

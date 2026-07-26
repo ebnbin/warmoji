@@ -9,35 +9,8 @@ import { KNOCKBACK } from '../data/abilities'
 import { MEMBER } from '../data/characters'
 import { UNIT } from '../util/units'
 import { spawnShardsEcs } from './shards'
-import {
-  Alive,
-  Anim,
-  Boss,
-  DmgMul,
-  Dormant,
-  Elite,
-  ENEMY_SET,
-  Flash,
-  Hp,
-  Hurt,
-  Iframe,
-  Kv,
-  MAtkSlow,
-  MFlash,
-  MHp,
-  Morph,
-  MPerk,
-  Poison,
-  Pop,
-  Radius,
-  Revive,
-  Slot,
-  SpMul,
-  Sprite,
-  Tint,
-  Transform,
-} from './components'
-import { enemyCarries, enemyDef, enemyNest, thiefEaten } from './store'
+import { Alive, Anim, Boss, DmgMul, Dormant, ENEMY_SET, Elite, Flash, Hp, Hurt, Iframe, Kv, MAtkSlow, MFlash, MHp, MPerk, Morph, Nest, Poison, Pop, Radius, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from './components'
+import { enemyCarries, enemyDef } from './store'
 import { unequipAbilities } from './ability/equip'
 import type { Sim } from './sim'
 
@@ -183,17 +156,17 @@ function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean):
   const baseCoins = dropped ? Math.round(def.coins * (elite ? ELITE.coinsMul : 1)) : 0
   const doubled = baseCoins > 0 && doubleRoll < sim.reward.doubleCoinChance ? baseCoins : 0
   // 偷币鼠吐回吞掉的币 + 1 枚利息(镜像 grantKillRewards 的 eaten 项)
-  const eaten = thiefEaten[eid]!
+  const eaten = Thief.eaten[eid]!
   const total = baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0)
   if (total > 0) sim.pendingCoins.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: total })
 }
 
 /** 拆巢(镜像 orphanBrood):名下护巢子敌失去锚点——baseOrbit 按各自 orphan 倍率暴走
- * (速度/攻击)并转直扑玩家(enemyNest=-1 即触发 baseOrbit steerer 的暴走分支) */
+ * (速度/攻击)并转直扑玩家(Nest.of=-1 即触发 baseOrbit steerer 的暴走分支) */
 export function orphanBrood(sim: Sim, nestEid: number): void {
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (enemyNest[eid] !== nestEid) continue
-    enemyNest[eid] = -1
+    if (Nest.of[eid] !== nestEid) continue
+    Nest.of[eid] = -1
     const lm = enemyDef[eid]?.locomotion
     if (lm?.kind === 'baseOrbit') {
       SpMul.v[eid] = SpMul.v[eid]! * lm.orphanSpeedMul

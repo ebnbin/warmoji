@@ -2,9 +2,9 @@ import { query } from 'bitecs'
 import { DEG2RAD } from '../../../util/units'
 import type { ProjectileDef } from '../../../types/abilityDefs'
 import { playSfx } from '../../../audio/sfx'
-import { Tint, Transform } from '../../components'
+import { EnemyVel, Tint, Transform } from '../../components'
 import { spawnEnemyProjectileEcs, spawnProjectileEcs } from '../../projectile'
-import { enemyDef, enemyVelX, enemyVelY } from '../../store'
+import { enemyDef } from '../../store'
 import { attributionSlot, damageMul, ownerX, ownerY } from '../amp'
 import { Ability, AbilityRef, Aim, FACTION, Faction, Frozen, Gear, Owner, Shots } from '../../components'
 import { abilityDefAt } from '../defs'
@@ -62,7 +62,7 @@ export function castProjectiles(sim: Sim): void {
 function headingOf(sim: Sim, e: number): { x: number; y: number } {
   if (Faction.v[e] !== FACTION.enemy) return sim.teamDir
   const o = Owner.eid[e]!
-  return { x: enemyVelX[o]!, y: enemyVelY[o]! }
+  return { x: EnemyVel.x[o]!, y: EnemyVel.y[o]! }
 }
 
 /** 出手随机流：队伍侧走非确定性随机，敌方侧走 run 种子（镜像两侧 ctx 的 random） */

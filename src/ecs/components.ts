@@ -8,6 +8,8 @@ const f32 = (): Float32Array => new Float32Array(MAX_ENTITIES)
 const i32 = (): Int32Array => new Int32Array(MAX_ENTITIES)
 const u32 = (): Uint32Array => new Uint32Array(MAX_ENTITIES)
 const u8 = (): Uint8Array => new Uint8Array(MAX_ENTITIES)
+/** 需要非 0 初值的 i32（如 -1 表示「无」） */
+const i32Fill = (v: number): Int32Array => new Int32Array(MAX_ENTITIES).fill(v)
 
 /** 位姿:世界坐标 + 旋转(弧度) + 显示尺寸(世界像素,w×h)。渲染据此算四角。 */
 export const Transform = {
@@ -322,3 +324,25 @@ export const Swarmer = {}
 /** 弩塔：架在地上自主索敌开火的装置 */
 export const Emplacement = {}
 
+// ── 敌人专属数值组件 ──────────────────────────────────────────────
+// 这些原先住在 store.ts（按 eid 索引的旁路数组）。它们全是类型化数组，形式上与本文件
+// 其余组件毫无二致，只是没挂进世界——于是既查不到也不随实体注册。搬回来之后
+// store.ts 只留真正放不进类型化数组的富数据（对象引用 / Set / 字符串）。
+// 跨局无需清理：这些字段一律由 spawnEnemy 无条件覆写（EnemyVel 由 steerEnemies 每帧写）。
+
+/** 本帧移动朝向（steerEnemies 写；敌方 aim:'move' 弹的 ownerHeading 读） */
+export const EnemyVel = { x: f32(), y: f32() }
+
+/** 装配状态与出手节奏：armed=是否已装配过能力（eid 复用后 spawnEnemy 清零）；
+ * fireDelayMs=首发延迟（spawn 时抽取，lazy-arm 喂入 createAbility） */
+export const EnemyArm = { armed: u8(), fireDelayMs: f32() }
+
+/** 行走动画的环境摇摆随机相位（spawn 时抽取，同屏错相） */
+export const EnemyPhase = { v: f32() }
+
+/** 虫巢：of = 护巢子敌指回的巢 eid（-1 表示无巢，拆巢时清空触发暴走）；
+ * nextSpawnAt = 巢自身的下次生成时刻（0 表示非 spawner） */
+export const Nest = { of: i32Fill(-1), nextSpawnAt: f32() }
+
+/** 偷币鼠：eaten=已吞金币数（死亡时吐回 + 利息）；nextEatAt=下次可吞时刻（逐枚偷） */
+export const Thief = { eaten: i32(), nextEatAt: f32() }

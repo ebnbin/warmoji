@@ -8,9 +8,9 @@ import { aggregateTeamCards } from '../../data/cards'
 import { toPx } from '../../war/px'
 import { labLevel } from '../../run/lab'
 import type { RunState } from '../../run/state'
-import { Dormant, ENEMY_SET, Morph, Transform } from '../components'
+import { Dormant, ENEMY_SET, EnemyArm, Morph, Transform } from '../components'
 import { restoreMorphVisual } from '../morph'
-import { enemyArmed, enemyDef, enemyFireDelayMs } from '../store'
+import { enemyDef } from '../store'
 import { FACTION } from '../components'
 import { equipAbility, NEUTRAL_AMP, postponeAbilities, spawnTeamAnchor } from './equip'
 import type { Sim } from '../sim'
@@ -55,9 +55,9 @@ export function armCaptain(sim: Sim, run: RunState): number {
 /** 给单个敌人装配能力（首发延迟喂初始冷却；projectile.firstDelayMs 优先） */
 function armEnemy(sim: Sim, eid: number): void {
   const rows = enemyDef[eid]?.abilities
-  enemyArmed[eid] = 1
+  EnemyArm.armed[eid] = 1
   if (!rows) return
-  const fireDelay = enemyFireDelayMs[eid]!
+  const fireDelay = EnemyArm.fireDelayMs[eid]!
   rows.forEach((w, i) => {
     const delay = (w.kind === 'projectile' ? w.firstDelayMs : undefined) ?? fireDelay ?? 600 + i * 230
     equipAbility(sim, eid, w, FACTION.enemy, delay, NEUTRAL_AMP)
@@ -70,7 +70,7 @@ export function armEnemies(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     if (Dormant.v[eid]) continue // 休眠：连装配都推迟，回到活跃范围自然接管
-    if (!enemyArmed[eid]) armEnemy(sim, eid)
+    if (!EnemyArm.armed[eid]) armEnemy(sim, eid)
     // 蹦迪期整段短路，故舞会散场前连复形都不跑（镜像旧 steerEnemies 的分支次序）
     if (now < sim.danceEndsAt) continue
     if (Morph.until[eid] === 0 || now < Morph.until[eid]!) continue
