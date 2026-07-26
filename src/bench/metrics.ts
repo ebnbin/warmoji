@@ -10,6 +10,12 @@ import Phaser from 'phaser'
 //   PRE_STEP → POST_STEP     引擎步进（场景 update + 物理 + tween）
 //   PRE_RENDER → POST_RENDER 渲染提交
 // 两段之外还有浏览器合成/vsync 等待，故 update + render 通常小于 rawDelta。
+//
+// ⚠️ 软件渲染环境（SwiftShader / 无 GPU 的 CI 容器）下**所有时间读数都不可用**：
+// 实测同一框架同一档位重复三次，更新 p50 极差 arcade 7.2ms、ECS 22.0ms（11.3→33.3），
+// 总帧 p50 极差 116ms——噪声比两套框架的差距大一个量级，读数只反映当时 CPU 争抢。
+// 这种环境下只看面板的「引擎结构」段（GameObject / 物理体数）：那是整数计数，与机器无关。
+// 想要可用的时间数据，必须在有真实 GPU 的机器上跑，且重复多次看分布。
 
 /** 单帧采样 */
 interface Frame {
