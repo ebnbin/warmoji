@@ -25,6 +25,10 @@ interface Frame {
   update: number
   /** 渲染提交耗时 */
   render: number
+  /** 两段之外的部分（vsync 等待/合成）。**必须逐帧算好再统计**：
+   * 中位数不可加，用 total.p50 − update.p50 − render.p50 会算出负数
+   *（实测 ECS 8 千档：16.7 − 10.8 − 7.4 = −1.5，clamp 成 0 就是个假读数） */
+  rest: number
 }
 
 const CAPACITY = 1800 // 约 30 秒 @60fps；环形覆盖
@@ -63,7 +67,11 @@ function onPostRender(): void {
   const r = g.renderer as unknown as { drawCount?: number }
   drawCount = typeof r.drawCount === 'number' ? r.drawCount : undefined
   if (performance.now() < warmUntil) return
-  const f: Frame = { total: g.loop.rawDelta, update: lastUpdate, render: lastRender }
+  const total = g.loop.rawDelta
+  const f: Frame = {
+    total, update: lastUpdate, render: lastRender,
+    rest: Math.max(0, total - lastUpdate - lastRender),
+  }
   buf[head] = f
   head = (head + 1) % CAPACITY
   if (filled < CAPACITY) filled++
@@ -116,6 +124,8 @@ export interface MetricsReport {
   update: { mean: number; p50: number; p95: number; max: number }
   /** 渲染提交耗时（ms） */
   render: { mean: number; p50: number; p95: number; max: number }
+  /** 两段之外（vsync 等待/合成）的逐帧耗时（ms） */
+  rest: { mean: number; p50: number; p95: number; max: number }
   /** 由 p50 帧时换算的稳态 FPS */
   fps: number
   /** 1% low：最慢 1% 帧对应的 FPS（卡顿体感） */
@@ -136,12 +146,14 @@ export function metricsReport(): MetricsReport {
   const total = stat(frames.map((f) => f.total))
   const update = stat(frames.map((f) => f.update))
   const render = stat(frames.map((f) => f.render))
+  const rest = stat(frames.map((f) => f.rest))
   return {
     samples: frames.length,
     warming: performance.now() < warmUntil,
     total,
     update,
     render,
+    rest,
     fps: total.p50 > 0 ? 1000 / total.p50 : 0,
     fpsLow1: total.p99 > 0 ? 1000 / total.p99 : 0,
     drawCount,
