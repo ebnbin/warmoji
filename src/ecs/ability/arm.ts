@@ -12,7 +12,8 @@ import { Dormant, ENEMY_SET, EnemyArm, Morph, Transform } from '../components'
 import { restoreMorphVisual } from '../morph'
 import { enemyDef } from '../store'
 import { FACTION } from '../components'
-import { equipAbility, NEUTRAL_AMP, postponeAbilities, spawnTeamAnchor } from './equip'
+import { NEUTRAL_AMP, postponeAbilities } from './equip'
+import { equipAbility, spawnTeamAnchor } from '../entities/ability'
 import type { Sim } from '../sim'
 
 // 装备：把配装解析成能力实体。队伍在开局一次装齐；敌人首次被扫到时装配

@@ -5,10 +5,10 @@ import {
   Sprite,
   Tint,
   Transform,
-} from './components'
-import type { EcsWorld } from './world'
-import type { FrameIndex } from './frames'
-import type { OutlineKind } from '../emoji/svg'
+} from '../components'
+import type { EcsWorld } from '../world'
+import type { FrameIndex } from '../frames'
+import type { OutlineKind } from '../../emoji/svg'
 
 // 实体装配(纯逻辑,仅类型引用 atlas/render)。后续阶段在此扩展各类实体的组装函数。
 

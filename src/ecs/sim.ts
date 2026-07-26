@@ -8,18 +8,7 @@ import type { FormationId } from '../types/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../war/orbit'
 import type { OrbitThreat } from '../war/orbit'
 import { Alive, Breath, Depth, Follow, Pop, Sprite, Threat, Transform, VisOff, Wander } from './components'
-import {
-  animateEnemies,
-  applyKnockback,
-  applySlowZones,
-  commitEnemySteps,
-  despawnExpired,
-  fadeEnemyFlash,
-  popInEnemies,
-  steerEnemies,
-  tintEnemies,
-  updateFrameTargets,
-} from './enemy'
+import { animateEnemies, applyKnockback, applySlowZones, commitEnemySteps, despawnExpired, fadeEnemyFlash, popInEnemies, steerEnemies, tintEnemies, updateFrameTargets } from './enemy'
 import { memberContact, memberVisual, regenMembers, reviveMembers, tickPoison } from './combat'
 import { updateEnemyProjectiles, updateProjectiles } from './projectile'
 import { backEaseOut } from './ease'

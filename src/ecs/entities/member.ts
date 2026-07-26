@@ -1,22 +1,22 @@
 import { addComponent, addEntity } from 'bitecs'
-import { UNIT } from '../util/units'
-import { Rng } from '../util/rng'
-import { FOLLOW } from '../data/feel'
-import { CAPTAINS } from '../data/captains'
-import { CHARACTERS } from '../data/characters'
-import { MEMBER, TEAM } from '../data/characters'
-import { memberMaxHp } from '../data/stats'
-import { formationPosts } from '../data/formation'
-import { aggregateTeamCards } from '../data/cards'
-import { aggregateCharacterEffects, characterXp } from '../data/items'
-import { levelStatsFor } from '../data/levels'
-import { characterLevel } from '../data/charLevel'
-import { BATTLE_FX_IDENTITY } from '../data/battlefield'
-import { currentFormation, guardOrder, hasCenter, waveStartHp } from '../run/state'
-import { INVINCIBLE_HP, labInvincible, labLevel } from '../run/lab'
-import { armIdle } from './anim'
-import { worldFor } from './worlds'
-import type { RunState } from '../run/state'
+import { UNIT } from '../../util/units'
+import { Rng } from '../../util/rng'
+import { FOLLOW } from '../../data/feel'
+import { CAPTAINS } from '../../data/captains'
+import { CHARACTERS } from '../../data/characters'
+import { MEMBER, TEAM } from '../../data/characters'
+import { memberMaxHp } from '../../data/stats'
+import { formationPosts } from '../../data/formation'
+import { aggregateTeamCards } from '../../data/cards'
+import { aggregateCharacterEffects, characterXp } from '../../data/items'
+import { levelStatsFor } from '../../data/levels'
+import { characterLevel } from '../../data/charLevel'
+import { BATTLE_FX_IDENTITY } from '../../data/battlefield'
+import { currentFormation, guardOrder, hasCenter, waveStartHp } from '../../run/state'
+import { INVINCIBLE_HP, labInvincible, labLevel } from '../../run/lab'
+import { armIdle } from '../anim'
+import { worldFor } from '../worlds'
+import type { RunState } from '../../run/state'
 import {
   Alive,
   Anim,
@@ -42,10 +42,10 @@ import {
   Tint,
   Transform,
   Wander,
-} from './components'
-import type { Sim } from './sim'
-import type { EcsWorld } from './world'
-import type { EcsAtlas } from './render/atlas'
+} from '../components'
+import type { Sim } from '../sim'
+import type { EcsWorld } from '../world'
+import type { EcsAtlas } from '../render/atlas'
 
 // 组队(镜像 ArcadeBattleScene setup 的阵容/岗位/成员建立):建 Sim + 逐槽位装配队员实体。
 // 属性逐槽位按已持道具 + 专属等级聚合;血量跨波保留(上一波阵亡者低血量复活)。
