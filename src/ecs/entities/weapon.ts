@@ -2,10 +2,10 @@ import { addComponent, addComponents, addEntity } from 'bitecs'
 import { DEG2RAD } from '../../util/units'
 import type { AbilityDef } from '../../types/abilityDefs'
 import type { OutlineKind } from '../../emoji/svg'
-import { attachDrawable } from '../drawable'
+import { attachDrawable } from './drawable'
 import { Boss, Depth, Elite, FACTION, Held, Quad, Sprite, Tint, Transform, Weapon } from '../components'
-import { attachAbility } from '../ability/equip'
-import type { AmpInit } from '../ability/equip'
+import { attachAbility } from '../ops/equip'
+import type { AmpInit } from '../ops/equip'
 import type { Sim } from '../sim'
 
 // 武器实体：**一件武器就是一颗实体**，能力是挂在它身上的组件

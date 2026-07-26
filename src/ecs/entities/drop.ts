@@ -1,5 +1,5 @@
 import { addComponents, addEntity } from 'bitecs'
-import { attachDrawable } from '../drawable'
+import { attachDrawable } from './drawable'
 import { Drop, FACTION, Faction, Owner } from '../components'
 import type { HeldVisual } from '../../types/abilityDefs'
 import type { Sim } from '../sim'

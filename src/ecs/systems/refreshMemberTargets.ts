@@ -1,5 +1,5 @@
 import { Alive, Hurt, Transform } from '../components'
-import type { Target } from '../ability/targets'
+import type { Target } from '../utils/targets'
 import type { Sim } from '../sim'
 
 // 索敌快照（队伍侧）：须先于任何敌方出手。

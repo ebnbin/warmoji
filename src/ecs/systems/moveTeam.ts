@@ -1,5 +1,4 @@
 import { MoveSpeed } from '../components'
-import { animateMembers, layout } from '../teamLayout'
 import type { Sim } from '../sim'
 
 /** 队伍位移 + 布局(镜像 moveTeam→layoutTeam);落点交给世界钩子(有界钳制/冰面动量) */
@@ -15,6 +14,4 @@ export function moveTeam(sim: Sim): void {
   )
   sim.center.x = next.x
   sim.center.y = next.y
-  layout(sim, delta)
-  animateMembers(sim, delta)
 }

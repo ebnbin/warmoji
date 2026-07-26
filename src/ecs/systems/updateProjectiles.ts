@@ -1,9 +1,9 @@
 import { query, removeEntity } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { ENEMY_SET, Proj, PROJ_SET, Radius, Transform, Vel } from '../components'
-import { applyAbilityEffects } from '../ability/effects'
-import { boltSource } from '../ability/source'
-import { applyDamage } from '../combat'
+import { applyAbilityEffects } from '../ops/effects'
+import { boltSource } from '../utils/source'
+import { applyDamage } from '../ops/combat'
 import { enemyDef, projHitEids, projOnHit } from '../store'
 import type { Sim } from '../sim'
 

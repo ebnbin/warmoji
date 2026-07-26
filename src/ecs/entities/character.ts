@@ -15,7 +15,7 @@ import { characterLevel } from '../../data/charLevel'
 
 import { waveStartHp } from '../../run/state'
 import { INVINCIBLE_HP, labInvincible, labLevel } from '../../run/lab'
-import { armIdle } from '../anim'
+import { armIdle } from '../ops/anim'
 
 import type { RunState } from '../../run/state'
 import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, MAtkSlow, Member, MFlash, MHp, MPerk, OrbitBias, Pop, Post, Quad, Revive, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'

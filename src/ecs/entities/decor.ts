@@ -1,6 +1,6 @@
 import { addEntity } from 'bitecs'
-import { attachDrawable } from '../drawable'
-import type { DrawableInit } from '../drawable'
+import { attachDrawable } from './drawable'
+import type { DrawableInit } from './drawable'
 import type { EcsWorld } from '../world'
 import type { FrameIndex } from '../frames'
 

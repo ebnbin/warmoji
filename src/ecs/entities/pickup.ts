@@ -1,6 +1,6 @@
 import { addComponent, addComponents, addEntity } from 'bitecs'
 import { Bob, Grab, Lifetime, Pickup, Pop, Pull, Ring, Vel } from '../components'
-import { attachDrawable } from '../drawable'
+import { attachDrawable } from './drawable'
 import { pickupDef } from '../store'
 import type { FieldPickupDef } from '../../types/battlefield'
 import type { Sim } from '../sim'

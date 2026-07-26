@@ -1,12 +1,13 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { pickTarget } from '../ability/kinds/summon'
+import { pickTarget } from '../utils/summon'
 import type { SummonDef } from '../../types/abilityDefs'
 import { playSfx } from '../../audio/sfx'
 import { AbilityRef, Built, Frozen, Minion, Sprite, Swarmer, Tint, Transform } from '../components'
-import { damageMul, damageTarget, ownerX, ownerY } from '../ability/amp'
-import { abilityDefAt } from '../ability/defs'
-import { applyAbilityEffects } from '../ability/effects'
-import { sourceOf } from '../ability/source'
+import { damageMul, ownerX, ownerY } from '../utils/amp'
+import { damageTarget } from '../ops/damage'
+import { abilityDefAt } from '../abilityDefs'
+import { applyAbilityEffects } from '../ops/effects'
+import { sourceOf } from '../utils/source'
 import type { Sim } from '../sim'
 
 /** 逐帧：寻路扑敌 / 候敌打转 → 撞上即施伤自毁 → 到寿命消散 */

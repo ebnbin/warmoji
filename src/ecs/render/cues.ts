@@ -1,8 +1,8 @@
 import Phaser from 'phaser'
 import type { BlastRing } from '../../types/abilityDefs'
 import { emojiImage } from '../../emoji/textures'
-import { backEaseOut, cubicEaseIn, cubicEaseOut } from '../ease'
-import type { Cue } from '../ability/cues'
+import { backEaseOut, cubicEaseIn, cubicEaseOut } from '../utils/ease'
+import type { Cue } from '../cues'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment } from './tri'
 import type { Scratch } from './tri'
 

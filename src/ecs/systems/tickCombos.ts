@@ -1,9 +1,9 @@
 import { query } from 'bitecs'
-import { strike } from '../ability/kinds/thrust'
+import { strike } from '../ops/thrust'
 import type { ThrustDef } from '../../types/abilityDefs'
 import { Ability, AbilityRef, Followup, Frozen } from '../components'
-import { abilityDefAt } from '../ability/defs'
-import { KindThrust } from '../ability/tags'
+import { abilityDefAt } from '../abilityDefs'
+import { KindThrust } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 二连突的第二段：与冷却同口径推进，到点重新索敌再刺一次 */

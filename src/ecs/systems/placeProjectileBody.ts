@@ -1,7 +1,7 @@
 import { query } from 'bitecs'
-import { muzzle } from '../ability/kinds/projectile'
+import { muzzle } from '../utils/projectile'
 import { Ability, Aim, Frozen, Held, Tint, Transform } from '../components'
-import { KindProjectile } from '../ability/tags'
+import { KindProjectile } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 摆位：持有物定身指向瞄准方向（含左右手挂载位） */

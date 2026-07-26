@@ -1,11 +1,12 @@
-import { airborne, launch } from '../ability/kinds/boomerang'
+import { airborne } from '../utils/boomerang'
+import { launch } from '../ops/boomerang'
 import type { BoomerangDef } from '../../types/abilityDefs'
-import { ownerX, ownerY } from '../ability/amp'
+import { ownerX, ownerY } from '../utils/amp'
 import { Aim } from '../components'
-import { sourceOf } from '../ability/source'
-import { castScan } from '../ability/castScan'
-import { KindBoomerang } from '../ability/tags'
-import { nearestAngle, targetsOf } from '../ability/targets'
+import { sourceOf } from '../utils/source'
+import { castScan } from '../ops/castScan'
+import { KindBoomerang } from '../registries/abilityKinds'
+import { nearestAngle, targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 
 /** 每帧：推进在途的镖 + 摆位闲置的持有物 */

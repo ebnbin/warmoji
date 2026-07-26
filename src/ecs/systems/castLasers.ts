@@ -1,11 +1,11 @@
-import { fireBeam } from '../ability/kinds/laser'
+import { fireBeam } from '../ops/laser'
 import type { LaserDef } from '../../types/abilityDefs'
-import { ownerX, ownerY } from '../ability/amp'
+import { ownerX, ownerY } from '../utils/amp'
 import { Aim, Radial } from '../components'
-import { sourceOf } from '../ability/source'
-import { castScan } from '../ability/castScan'
-import { KindLaser } from '../ability/tags'
-import { nearestAngle, targetsOf } from '../ability/targets'
+import { sourceOf } from '../utils/source'
+import { castScan } from '../ops/castScan'
+import { KindLaser } from '../registries/abilityKinds'
+import { nearestAngle, targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 
 /** 贯穿激光：向最近敌人发射光束，线段胶囊判定打穿直线上所有敌人。

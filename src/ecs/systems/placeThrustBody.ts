@@ -1,10 +1,10 @@
 import { hasComponent, query } from 'bitecs'
-import { lungeT } from '../ability/kinds/thrust'
+import { lungeT } from '../utils/thrust'
 import type { ThrustDef } from '../../types/abilityDefs'
 import { Ability, AbilityRef, Aim, Followup, Frozen, Held, Owner, Swing, Tint, Transform, VisOff } from '../components'
-import { ownerX, ownerY } from '../ability/amp'
-import { abilityDefAt } from '../ability/defs'
-import { KindThrust } from '../ability/tags'
+import { ownerX, ownerY } from '../utils/amp'
+import { abilityDefAt } from '../abilityDefs'
+import { KindThrust } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 摆位：持有物沿瞄准方向挥出收回；无持有物则改推角色本体的视觉偏移 */

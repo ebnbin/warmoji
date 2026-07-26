@@ -1,10 +1,10 @@
 import type { StrikeDef } from '../../types/abilityDefs'
 import { spawnDrop } from '../entities/drop'
-import { ownerX, ownerY } from '../ability/amp'
-import { sourceOf } from '../ability/source'
-import { castScan } from '../ability/castScan'
-import { KindStrike } from '../ability/tags'
-import { targetsOf } from '../ability/targets'
+import { ownerX, ownerY } from '../utils/amp'
+import { sourceOf } from '../utils/source'
+import { castScan } from '../ops/castScan'
+import { KindStrike } from '../registries/abilityKinds'
+import { targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 
 /** 点名打击：坠物逐个砸向离锚点最近的 N 个目标——落地才结算伤害与掉币。

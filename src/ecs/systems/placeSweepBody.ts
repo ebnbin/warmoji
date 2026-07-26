@@ -1,11 +1,11 @@
 import { query } from 'bitecs'
-import { sweepT } from '../ability/kinds/sweep'
+import { sweepT } from '../utils/sweep'
 import { DEG2RAD } from '../../util/units'
 import type { SweepDef } from '../../types/abilityDefs'
 import { Ability, AbilityRef, Aim, Frozen, Held, Swing, Tint, Transform } from '../components'
-import { ownerX, ownerY } from '../ability/amp'
-import { abilityDefAt } from '../ability/defs'
-import { KindSweep } from '../ability/tags'
+import { ownerX, ownerY } from '../utils/amp'
+import { abilityDefAt } from '../abilityDefs'
+import { KindSweep } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 摆位：持有物在瞄准方向两侧的弧上从一端扫到另一端，静止时停在末端 */

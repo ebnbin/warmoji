@@ -1,9 +1,9 @@
 import type { RallyDef } from '../../types/abilityDefs'
 import { Alive, Iframe, MFlash, MHp, Tint } from '../components'
-import { reviveMember } from '../combat'
-import { ownerX, ownerY } from '../ability/amp'
-import { castScan } from '../ability/castScan'
-import { KindRally } from '../ability/tags'
+import { reviveMember } from '../ops/combat'
+import { ownerX, ownerY } from '../utils/amp'
+import { castScan } from '../ops/castScan'
+import { KindRally } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 集结：阵亡者满血复活、存活者按上限比例回复、全队短暂无敌。

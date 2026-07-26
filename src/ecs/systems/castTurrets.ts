@@ -1,9 +1,9 @@
-import { place } from '../ability/kinds/turret'
+import { place } from '../ops/turret'
 import type { TurretDef } from '../../types/abilityDefs'
 import { Cooldown } from '../components'
-import { cooldownMul } from '../ability/amp'
-import { castScan } from '../ability/castScan'
-import { KindTurret } from '../ability/tags'
+import { cooldownMul } from '../utils/amp'
+import { castScan } from '../ops/castScan'
+import { KindTurret } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 架设弩塔：本体无攻击，周期在脚下架一座。**塔自己开火**——它带着一条 projectile

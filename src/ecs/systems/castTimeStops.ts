@@ -1,6 +1,6 @@
 import type { TimeStopDef } from '../../types/abilityDefs'
-import { castScan } from '../ability/castScan'
-import { KindTimeStop } from '../ability/tags'
+import { castScan } from '../ops/castScan'
+import { KindTimeStop } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 时停：只负责按下开关，世界时标的放缩由 stepSim 的时停通道逐帧处理 */

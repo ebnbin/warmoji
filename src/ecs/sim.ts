@@ -24,14 +24,15 @@ import { expireSkillBuff } from './systems/expireSkillBuff'
 import { moveTeam } from './systems/moveTeam'
 import { refoldBattleFx } from './systems/refoldBattleFx'
 import { updateOrbit } from './systems/updateOrbit'
-import { animateMembers, layout } from './teamLayout'
+import { animateMembers } from './systems/animateMembers'
+import { layoutTeam } from './systems/layoutTeam'
 import type { FlowField, WallGrid } from '../war/maps/ruins'
 import type { EcsWorld } from './world'
 import type { WorldHooks } from './worlds'
 import type { Point } from '../util/vec'
 import type { RunState } from '../run/state'
-import type { Cue } from './ability/cues'
-import type { Target } from './ability/targets'
+import type { Cue } from './cues'
+import type { Target } from './utils/targets'
 import type { FrameIndex } from './frames'
 import { TIMESTOP } from '../data/timeStop'
 import { timeScaleFor } from '../war/timeStop'
@@ -245,8 +246,9 @@ export interface PendingDeath {
 
 /** 首帧前把队员摆到岗位(镜像 setup 里的 layoutTeam(0)) */
 export function initialLayout(sim: Sim): void {
-  layout(sim, 0)
-  animateMembers(sim, 0)
+  sim.dtMs = 0 // 首帧摆位:弹簧/游移都按 0 帧长求值,人直接到位
+  layoutTeam(sim)
+  animateMembers(sim)
 }
 
 /** 一帧仿真(镜像 update 的 updateOrbit→moveTeam→steerEnemies 次序);delta 为真实帧长(ms) */
@@ -282,6 +284,8 @@ export function stepSim(sim: Sim): void {
   updateFrameTargets(sim)
   updateOrbit(sim)
   moveTeam(sim)
+  layoutTeam(sim)
+  animateMembers(sim)
   reviveMembers(sim)
   regenMembers(sim)
   tickPoison(sim)

@@ -1,11 +1,11 @@
-import { blastAt } from '../ability/kinds/areaBlast'
+import { blastAt } from '../ops/areaBlast'
 import type { AreaBlastDef } from '../../types/abilityDefs'
-import { damageMul, ownerX, ownerY } from '../ability/amp'
+import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { Followup } from '../components'
-import { sourceOf } from '../ability/source'
-import { castScan } from '../ability/castScan'
-import { KindAreaBlast } from '../ability/tags'
-import { nearestTarget, targetsOf } from '../ability/targets'
+import { sourceOf } from '../utils/source'
+import { castScan } from '../ops/castScan'
+import { KindAreaBlast } from '../registries/abilityKinds'
+import { nearestTarget, targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 
 /** 远程范围轰炸：在侦测范围内以最近敌人为爆心，对爆心圆内所有敌人各一次伤害。

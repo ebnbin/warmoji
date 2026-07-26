@@ -1,8 +1,8 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { POP_MS, RETIRE_MS } from '../ability/kinds/turret'
+import { POP_MS, RETIRE_MS } from '../ops/turret'
 import { Aim, Cooldown, Emplacement, Fired, Frozen, Minion, Retiring, Tint, Transform } from '../components'
-import { playClip } from '../anim'
-import { backEaseOut } from '../ease'
+import { playClip } from '../ops/anim'
+import { backEaseOut } from '../utils/ease'
 import type { Sim } from '../sim'
 
 /** 逐帧：入场弹入 / 退场淡出 / 建造者倒下时隐去 + 开火那一下的拉弓动画与朝向。

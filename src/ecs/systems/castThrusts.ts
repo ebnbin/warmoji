@@ -1,11 +1,12 @@
-import { reachOf, strike } from '../ability/kinds/thrust'
+import { reachOf } from '../utils/thrust'
+import { strike } from '../ops/thrust'
 import type { ThrustDef } from '../../types/abilityDefs'
-import { ownerX, ownerY } from '../ability/amp'
+import { ownerX, ownerY } from '../utils/amp'
 import { Followup } from '../components'
-import { sourceOf } from '../ability/source'
-import { castScan } from '../ability/castScan'
-import { KindThrust } from '../ability/tags'
-import { nearestAngle, targetsOf } from '../ability/targets'
+import { sourceOf } from '../utils/source'
+import { castScan } from '../ops/castScan'
+import { KindThrust } from '../registries/abilityKinds'
+import { nearestAngle, targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 
 /** 突刺：held 时持有物挥出收回，无 held 时角色本体前冲收回；胶囊判定内每敌一次伤害。

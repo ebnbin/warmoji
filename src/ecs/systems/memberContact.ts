@@ -1,8 +1,8 @@
 import { query } from 'bitecs'
 import { Alive, DmgMul, Dormant, ENEMY_SET, Hurt, Iframe, Morph, MPerk, Radius, Slot, Transform } from '../components'
-import { applyDamage, hurtMember } from '../combat'
-import { applyAbilityEffects } from '../ability/effects'
-import { enemySource } from '../ability/source'
+import { applyDamage, hurtMember } from '../ops/combat'
+import { applyAbilityEffects } from '../ops/effects'
+import { enemySource } from '../utils/source'
 import { enemyDef } from '../store'
 import type { Sim } from '../sim'
 

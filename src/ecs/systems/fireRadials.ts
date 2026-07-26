@@ -1,9 +1,9 @@
 import { query } from 'bitecs'
-import { fireBeam } from '../ability/kinds/laser'
+import { fireBeam } from '../ops/laser'
 import type { LaserDef } from '../../types/abilityDefs'
 import { Ability, AbilityRef, Aim, Frozen, Radial } from '../components'
-import { abilityDefAt } from '../ability/defs'
-import { KindLaser } from '../ability/tags'
+import { abilityDefAt } from '../abilityDefs'
+import { KindLaser } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 全域扫射：按时序逐束兑现，跟随角色实时位置；持有者倒下即作废 */

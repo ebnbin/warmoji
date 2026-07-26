@@ -1,8 +1,8 @@
 import { query } from 'bitecs'
-import { blinkFlash } from '../ability/kinds/assassinate'
+import { blinkFlash } from '../ops/assassinate'
 import { Ability, Blink, Followup, Frozen, Owner, VisOff } from '../components'
-import { ownerX, ownerY } from '../ability/amp'
-import { KindAssassinate } from '../ability/tags'
+import { ownerX, ownerY } from '../utils/amp'
+import { KindAssassinate } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 停留帧推进：到点闪回原位并再闪一次残影 */

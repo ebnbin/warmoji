@@ -1,7 +1,7 @@
 import type { BuffDef } from '../../types/abilityDefs'
 import { Alive, MFlash, Tint } from '../components'
-import { castScan } from '../ability/castScan'
-import { KindBuff } from '../ability/tags'
+import { castScan } from '../ops/castScan'
+import { KindBuff } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 限时全队增伤：不叠加，直接覆写，到期由 stepSim 复原；全队闪一下作到手反馈 */

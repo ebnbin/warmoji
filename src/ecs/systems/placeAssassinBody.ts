@@ -1,7 +1,7 @@
 import { query } from 'bitecs'
 import { Ability, Aim, Frozen, Held, Tint, Transform } from '../components'
-import { ownerX, ownerY } from '../ability/amp'
-import { KindAssassinate } from '../ability/tags'
+import { ownerX, ownerY } from '../utils/amp'
+import { KindAssassinate } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 摆位：持有物定身指向瞄准方向 */

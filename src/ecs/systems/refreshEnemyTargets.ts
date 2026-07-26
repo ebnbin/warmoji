@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { Dormant, ENEMY_SET, Radius, Transform } from '../components'
-import type { Target } from '../ability/targets'
+import type { Target } from '../utils/targets'
 import type { Sim } from '../sim'
 
 // 索敌快照（敌方）：须先于任何队伍侧出手（含抛射物 onHit 命中链）。

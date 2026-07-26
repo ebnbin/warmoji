@@ -1,7 +1,7 @@
 import { hasComponent, query } from 'bitecs'
 import { Ability, Aim, Flyer, Frozen, Held, Tint, Transform } from '../components'
-import { ownerX, ownerY } from '../ability/amp'
-import { KindBoomerang } from '../ability/tags'
+import { ownerX, ownerY } from '../utils/amp'
+import { KindBoomerang } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 摆位：不在途的镖握在角色手上 */

@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { Boss, ENEMY_SET, Pop, Tint, Transform } from '../components'
-import { backEaseOut } from '../ease'
+import { backEaseOut } from '../utils/ease'
 import type { Sim } from '../sim'
 
 /** 入场弹入:缩放/透明插值到位后清零(Boss 走 Back.easeOut 过冲,普通怪线性)。

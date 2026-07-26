@@ -1,9 +1,9 @@
-import { spawnBee } from '../ability/kinds/summon'
+import { spawnBee } from '../ops/summon'
 import type { SummonDef } from '../../types/abilityDefs'
-import { cooldownMul } from '../ability/amp'
+import { cooldownMul } from '../utils/amp'
 import { Cooldown } from '../components'
-import { castScan } from '../ability/castScan'
-import { KindSummon } from '../ability/tags'
+import { castScan } from '../ops/castScan'
+import { KindSummon } from '../registries/abilityKinds'
 import type { Sim } from '../sim'
 
 /** 放蜂：每隔一段放出一波小蜂，各自寻路扑向最近的敌人（优先未中毒者，好把毒摊开），

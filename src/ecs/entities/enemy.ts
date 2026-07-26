@@ -7,7 +7,7 @@ import { waveAt } from '../../data/waves'
 
 import { Alive, Anim, Boss, Charge, Depth, Despawn, DmgMul, Dormant, EDir, EState, ETurn, Elite, Enemy, EnemyArm, EnemyPhase, Flash, Hp, Kv, Morph, Nest, Poison, Pop, Quad, Radius, Slide, Slow, SpMul, Speed, Sprite, Thief, Tint, Transform , Orphan } from '../components'
 import { enemyCarries, enemyDef } from '../store'
-import { armIdle } from '../anim'
+import { armIdle } from '../ops/anim'
 import { ANIM_DEF } from '../../emoji/anim'
 
 import type { Sim } from '../sim'
