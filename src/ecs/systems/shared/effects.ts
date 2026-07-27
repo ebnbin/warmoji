@@ -79,7 +79,7 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
     const dmg = Math.max(1, Math.round(hit.baseDamage * fx.ratio))
     applyBlast(sim, src, hit.x, hit.y, dmg, fx.radius, fx.knockback, hit.exclude)
     if (!fx.ring) return
-    sim.pendingCues.push({
+    sim.out.cues.push({
       kind: 'circle',
       x: hit.x,
       y: hit.y,

@@ -13,7 +13,7 @@ export function blastAt(sim: Sim, e: number, x: number, y: number, damage: numbe
   playSfx('boom')
   applyBlast(sim, src, x, y, damage, radius, AreaBlast.knockback[e]!)
   applyAbilityEffects(sim, src, abilityOnHit[e], { x, y, baseDamage: damage })
-  sim.pendingCues.push(
+  sim.out.cues.push(
     {
       kind: 'circle',
       x,

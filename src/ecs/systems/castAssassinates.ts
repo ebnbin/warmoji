@@ -57,7 +57,7 @@ export function castAssassinates(sim: Sim): void {
       targets: [target.eid],
       exclude: new Set([target.eid]),
     })
-    sim.pendingCues.push({ kind: 'slash', x: target.x, y: target.y, angle: Aim.rad[e]!, radius: 34 })
+    sim.out.cues.push({ kind: 'slash', x: target.x, y: target.y, angle: Aim.rad[e]!, radius: 34 })
     return true
   })
 }

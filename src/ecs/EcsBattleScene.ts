@@ -58,7 +58,9 @@ import { tickSkillCd } from '../war/skill'
 import { hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import type { HudSnapshot } from '../run/hudHost'
-import type { Burst, PendingSpawn, Sim } from './sim'
+import type { PendingSpawn, Sim } from './sim'
+import { drain } from './outbox'
+import type { Burst } from './outbox'
 import type { Meteor } from './worlds'
 import { emojiImage } from '../emoji/textures'
 import { SPAWN } from '../data/enemies'
@@ -511,58 +513,40 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
   }
 
-  /** 排空本帧到手的战场拾取:广播到 HUD 弹「到手」横幅 */
-  private drainCollects(): void {
-    const sim = this.sim
-    if (!sim || sim.pendingCollects.length === 0) return
-    for (const def of sim.pendingCollects) {
-      this.events.emit('field-collected', {
-        emoji: def.emoji,
-        name: def.name,
-        desc: def.desc,
-        polarity: def.polarity,
-      })
-    }
-    sim.pendingCollects.length = 0
-  }
-
-  /** 排空本帧粒子爆点:按 kind 分发到死亡/拾币发射器(镜像 deathBurst/coinBurst.explode) */
-  private drainBursts(): void {
-    const q = this.sim!.pendingBursts
-    if (q.length === 0) return
+  /** 排空本帧的出站信箱。每种事件一条 drain——收信人没准备好(特效层未建/飘字关掉)
+   * 也照样清空,信箱只进不出就是一路涨到卡顿 */
+  private drainOutbox(): void {
+    const out = this.sim!.out
+    // 到手的战场拾取:广播到 HUD 弹「到手」横幅
+    drain(out.collects, (defs) => {
+      for (const d of defs) {
+        this.events.emit('field-collected', { emoji: d.emoji, name: d.name, desc: d.desc, polarity: d.polarity })
+      }
+    })
+    // 敌人受伤飘字(镜像 floatDamage:池化 BitmapText 上浮淡出);关则弃字
+    drain(out.damageNumbers, (ds) => {
+      if (this.damageNumbersOn) for (const d of ds) this.damageText?.push(d.x, d.y, d.amount, d.crit)
+    })
+    // 粒子爆点:按 kind 分发到死亡/拾币发射器(镜像 deathBurst/coinBurst.explode)。
     // 全映射：Burst 新增一种 kind 而不在此登记 = 编译不过（从前的三元链末尾会把
     // 任何没认出来的 kind 都当成死亡紫爆）
-    const byKind: Record<Burst['kind'], Phaser.GameObjects.Particles.ParticleEmitter> = {
-      death: this.deathBurst,
-      coin: this.coinBurst,
-      puff: this.puffBurst,
-    }
-    for (const b of q) byKind[b.kind]!.explode(b.count, b.x, b.y)
-    q.length = 0
-  }
-
-  /** 排空本帧冲击波圈(自爆群伤示警:红圈从 0.3 张到满,300ms) */
-  private drainRings(): void {
-    const q = this.sim!.pendingRings
-    if (q.length === 0) return
-    for (const r of q) {
-      this.cues!.ring(r.x, r.y, r.radius, { color: 0xff5252, fillAlpha: 0.35, lineWidth: 3, lineAlpha: 0.9, durMs: 300 })
-    }
-    q.length = 0
-  }
-
-  /** 排空本帧一次性战斗特效:能力系统只入队,绘制在此落地 */
-  private drainCues(): void {
-    const q = this.sim!.pendingCues
-    if (q.length > 0 && this.cues) drawCues(this.cues, q)
-  }
-
-  /** 排空本帧敌人受伤飘字(镜像 floatDamage:池化 BitmapText 上浮淡出);关则弃字 */
-  private drainDamageNumbers(): void {
-    const q = this.sim!.pendingDamageNumbers
-    if (q.length === 0) return
-    if (this.damageNumbersOn) for (const d of q) this.damageText?.push(d.x, d.y, d.amount, d.crit)
-    q.length = 0
+    drain(out.bursts, (bs) => {
+      const byKind: Record<Burst['kind'], Phaser.GameObjects.Particles.ParticleEmitter> = {
+        death: this.deathBurst,
+        coin: this.coinBurst,
+        puff: this.puffBurst,
+      }
+      for (const b of bs) byKind[b.kind]!.explode(b.count, b.x, b.y)
+    })
+    // 冲击波圈(自爆群伤示警:红圈从 0.3 张到满,300ms)
+    drain(out.rings, (rs) => {
+      const style = { color: 0xff5252, fillAlpha: 0.35, lineWidth: 3, lineAlpha: 0.9, durMs: 300 }
+      for (const r of rs) this.cues?.ring(r.x, r.y, r.radius, style)
+    })
+    // 一次性战斗特效:能力系统只入队,绘制在此落地
+    drain(out.cues, (cs) => {
+      if (this.cues) drawCues(this.cues, cs)
+    })
   }
 
   /** 逐帧队员血条:跟位 + 比例变化才重绘(镜像 drawMemberHp);阵亡隐藏、复活自动恢复 */
@@ -1372,11 +1356,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.cues?.step(sim.fxMs)
     this.rings?.step(sim.fxMs)
     this.damageText?.step(sim.fxMs)
-    this.drainCollects()
-    this.drainDamageNumbers()
-    this.drainBursts()
-    this.drainRings()
-    this.drainCues()
+    this.drainOutbox()
     // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtCharacter 的 cameras.shake)。
     // 同样须先于过场判定——致死那一帧的抖屏否则被 return 吞掉且永远补不回来
     if (sim.characterHitCount > this.seenHitCount) {
@@ -1460,6 +1440,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       zones: query(this.world, [Zone]).length,
       // 在场的能力子实体数(弩塔 + 小蜂):验证同时在场上限与逐个退场
       minions: query(this.world, [Minion]).length,
+      // 出站信箱积压:帧末排空后应恒 0,不为 0 即某条 drain 没清(只进不出会一路涨)
+      outbox: Object.values(sim.out).reduce((n, q) => n + q.length, 0),
       logicalW: viewport.logicalWidth,
       logicalH: viewport.logicalHeight,
       // 残垣:阻挡格数 + 可达刷怪格数(验证断壁成型与连通)

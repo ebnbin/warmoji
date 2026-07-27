@@ -8,8 +8,8 @@ import { layoutTeam } from './systems/layoutTeam'
 import type { FormationId } from '../types/formation'
 import type { EcsWorld } from './world'
 import type { WorldHooks, WorldState } from './worlds'
+import type { Outbox } from './outbox'
 import type { RunState } from '../run/state'
-import type { Cue } from './cues'
 import type { Target } from './utils/targets'
 import type { FrameIndex } from './frames'
 import { TIMESTOP } from '../data/timeStop'
@@ -24,6 +24,7 @@ import { Rng } from '../util/rng'
 import { spawnCaptain } from './entities/captain'
 import { formTeam } from './entities/captain'
 import { newWorldState, worldFor } from './worlds'
+import { newOutbox } from './outbox'
 import type { EcsAtlas } from './atlas'
 
 // ECS 战斗仿真状态 + 系统(纯逻辑,禁 phaser)。数学逐行镜像旧 ArcadeBattleScene 的
@@ -106,16 +107,10 @@ export interface Sim {
   pendingSpawns: PendingSpawn[]
   /** 精英波敌潮的延迟排期(到点才求落点,镜像 spawnSurge 的 delayedCall) */
   pendingSurges: { at: number; hpMul: number; forceElite: boolean }[]
-  /** 本帧内死亡且带亡语的敌人快照(场景侧 runDeathEffects 逐帧排空) */
+  /** 本帧内死亡且带亡语的敌人快照(帧内通道:runDeathEffects 在同一条流水线里排空) */
   pendingDeaths: PendingDeath[]
-  /** 本帧敌人受伤的飘字事件(场景侧 drainDamageNumbers 排空) */
-  pendingDamageNumbers: DamageNumber[]
-  /** 本帧粒子爆点(死亡/拾币;场景侧 drainBursts 排空,按 kind 分发发射器) */
-  pendingBursts: Burst[]
-  /** 本帧冲击波圈(自爆群伤示警;场景侧 drainRings 排空,走 blastRing) */
-  pendingRings: { x: number; y: number; radius: number }[]
-  /** 本帧一次性战斗特效(能力系统只入队;场景侧 drainCues 排空,走 war/abilities/cues) */
-  pendingCues: Cue[]
+  /** 出站信箱:仿真只写、场景侧每帧排空的视觉事件(特效/爆点/飘字/冲击波/到手横幅) */
+  out: Outbox
   /** 亡语同步重放(场景侧注入,需 scene/atlas):挂上即在 killEnemy 内当场跑,
    * 未挂则回落到 pendingDeaths 帧末排空 */
   onDeathFx?: (d: PendingDeath) => void
@@ -123,8 +118,6 @@ export interface Sim {
   run: RunState
   /** 掉落/入账乘区(队长×道具,开局定;精英倍率逐杀叠) */
   reward: RewardConfig
-  /** 本帧到手的战场拾取(场景侧排空,广播「到手横幅」事件) */
-  pendingCollects: FieldPickupDef[]
 }
 
 /** 掉落/拾取乘区(镜像 grantKillRewards / magnetCoins / endWave 的乘区来源) */
@@ -150,22 +143,6 @@ export interface PendingSpawn {
   at: number
   /** 携带者载荷(死亡即掉这枚拾取);普通刷怪为 undefined */
   carries?: FieldPickupDef
-}
-
-/** 敌人受伤飘字(死亡点/命中点 + 数值;暴击金色放大) */
-export interface DamageNumber {
-  x: number
-  y: number
-  amount: number
-  crit: boolean
-}
-
-/** 粒子爆点(kind 选发射器:death 紫爆 / coin 金爆 / puff 灰烟) */
-export interface Burst {
-  x: number
-  y: number
-  count: number
-  kind: 'death' | 'coin' | 'puff'
 }
 
 /** 死亡快照(带亡语的敌人;实体已移除,死亡效果按此在死亡点重放) */
@@ -272,10 +249,7 @@ export function makeSim(
     characterTargets: [],
     frames: atlas,
     pendingDeaths: [],
-    pendingDamageNumbers: [],
-    pendingBursts: [],
-    pendingRings: [],
-    pendingCues: [],
+    out: newOutbox(),
     rng: new Rng(run.decorSeed ^ 0x9e37),
     testMode,
     spawnCooldownMs: 300,
@@ -288,7 +262,6 @@ export function makeSim(
       waveHealRatio: teamFx.waveHealRatio,
       waveCoins: teamFx.waveCoins,
     },
-    pendingCollects: [],
     captain,
   }
 }

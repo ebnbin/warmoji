@@ -17,7 +17,7 @@ export function castRallies(sim: Sim): void {
       Tint.color[m] = 0xffe082
       Tint.effect[m] = 0
     }
-    sim.pendingCues.push({
+    sim.out.cues.push({
       kind: 'circle',
       x: ownerX(e),
       y: ownerY(e),

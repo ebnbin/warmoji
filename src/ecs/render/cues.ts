@@ -442,7 +442,6 @@ const CUE_KINDS: { [K in Cue['kind']]: Draw<K> } = {
 }
 
 /** 排空一批特效到绘制层 */
-export function drawCues(fx: CueLayer, queue: Cue[]): void {
+export function drawCues(fx: CueLayer, queue: readonly Cue[]): void {
   for (const c of queue) (CUE_KINDS[c.kind] as Draw<Cue['kind']>)(fx, c)
-  queue.length = 0
 }

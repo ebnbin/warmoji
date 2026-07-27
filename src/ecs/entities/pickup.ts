@@ -237,7 +237,7 @@ export function pickupCounts(sim: Sim): { pickups: number; carriers: number } {
 /** 战场掉币：落地待拾，音效与爆点随拾取管线 */
 export function spawnCoins(sim: Sim, x: number, y: number, count: number): void {
   if (sim.over) return
-  sim.pendingBursts.push({ x, y, count: 6, kind: 'coin' })
+  sim.out.bursts.push({ x, y, count: 6, kind: 'coin' })
   playSfx('coin')
   dropCoins(sim, x, y, count)
 }

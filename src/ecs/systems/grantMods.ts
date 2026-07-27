@@ -11,7 +11,7 @@ export function grantMods(sim: Sim): void {
     const def = pickupDef[eid]
     if (!def) continue
     applyBattleMod(sim, def)
-    sim.pendingCollects.push(def)
+    sim.out.collects.push(def)
   }
 }
 

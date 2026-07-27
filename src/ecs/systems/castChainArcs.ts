@@ -34,7 +34,7 @@ export function castChainArcs(sim: Sim): void {
       cur = nearestTarget(cur.x, cur.y, targetsOf(sim, src), ChainArc.arcRange[e]!, visited)
     }
     applyAbilityEffects(sim, src, abilityOnHit[e], { x: last.x, y: last.y, baseDamage: damage, exclude: visited })
-    sim.pendingCues.push({ kind: 'lightning', points, color: ChainArc.color[e]! })
+    sim.out.cues.push({ kind: 'lightning', points, color: ChainArc.color[e]! })
     return true
   })
 }

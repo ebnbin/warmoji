@@ -2,7 +2,7 @@ import type { Sim } from '../../sim'
 
 /** 瞬移端点的残影闪光 */
 export function blinkFlash(sim: Sim, x: number, y: number): void {
-  sim.pendingCues.push({
+  sim.out.cues.push({
     kind: 'circle',
     x,
     y,

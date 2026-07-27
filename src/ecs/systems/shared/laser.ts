@@ -20,7 +20,7 @@ export function fireBeam(sim: Sim, e: number, angle: number, ratio: number): voi
   for (const i of thrustHitIndices({ x: ox, y: oy }, angle, range, beamRadius, list)) {
     damageTarget(sim, src, list[i]!.eid, damage, Laser.knockback[e]!, ox, oy)
   }
-  sim.pendingCues.push({
+  sim.out.cues.push({
     kind: 'beam',
     x: ox,
     y: oy,

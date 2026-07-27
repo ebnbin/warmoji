@@ -59,7 +59,7 @@ function cutReviveTimer(sim: Sim, x: number, y: number, range: number, ms: numbe
 
 /** 治疗脉冲环 */
 function pulse(sim: Sim, x: number, y: number, radius: number, color: number): void {
-  sim.pendingCues.push({
+  sim.out.cues.push({
     kind: 'circle',
     x,
     y,

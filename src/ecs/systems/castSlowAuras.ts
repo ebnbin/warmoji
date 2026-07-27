@@ -62,7 +62,7 @@ export function castSlowAuras(sim: Sim): void {
           if (dx * dx + dy * dy > r2) continue
           freeze(sim, t.eid, AuraFreeze.durationMs[e]!)
         }
-        sim.pendingCues.push({
+        sim.out.cues.push({
           kind: 'circle',
           x,
           y,

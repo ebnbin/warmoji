@@ -38,7 +38,7 @@ export function applyDamage(
   // 变形期受伤倍率(魔尘诅咒 vulnMul):放大变羊敌人所受伤害
   const dmg = morphed && Morph.vuln[eid] !== 1 ? Math.round(damage * Morph.vuln[eid]!) : damage
   // 受伤飘字(镜像 floatDamage,在致死判定前:致死一击也飘字)
-  sim.pendingDamageNumbers.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, amount: dmg, crit })
+  sim.out.damageNumbers.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, amount: dmg, crit })
   const hp = Hp.v[eid]! - dmg
   // 结算统计:按伤害来源槽位累计有效伤害(压测阵容槽位越界则跳过,镜像 applyDamage)
   const st = sim.run.stats
@@ -99,8 +99,8 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
   if (def) st.enemyKills[def.name] = (st.enemyKills[def.name] ?? 0) + 1
   if (elite) st.eliteKills += 1
   // 死亡爆点(镜像 despawnKilled 的 6;Boss 另叠 onBossDown 的 24)
-  sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'death' })
-  if (boss) sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 24, kind: 'death' })
+  sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'death' })
+  if (boss) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 24, kind: 'death' })
   if (boss) sim.bossDown = true // 终波 Boss 被击败 → 场景侧走通关结算
   if (def) grantKillRewards(sim, eid, def, elite) // 经验即得 + 金币落地待拾
   // 变形中的敌人 = 一只无能力的羊:死亡不触发任何亡语/拆巢(镜像 killEnemy 的 morph 判定)
@@ -177,7 +177,7 @@ export function orphanBrood(sim: Sim, nestEid: number): void {
 
 /** 敌人静默移除(自爆/替身到时:不计击杀、不掉落、不放死亡效果) */
 export function despawnEnemy(sim: Sim, eid: number): void {
-  sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
+  sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
   if (enemyDef[eid]?.spawner) orphanBrood(sim, eid)
   enemyCarries[eid] = undefined
   unequipAbilities(sim, eid)
@@ -215,7 +215,7 @@ export function hurtCharacter(sim: Sim, eid: number, damage: number, srcName?: s
     Transform.w[eid] = MEMBER.size * UNIT
     Transform.h[eid] = MEMBER.size * UNIT
     // 阵亡灰烟(镜像 killMember 的 puffBurst)
-    sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
+    sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
     if (sim.characters.every((x) => !Alive.v[x])) sim.over = true
   }
 }

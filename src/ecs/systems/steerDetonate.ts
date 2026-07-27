@@ -31,7 +31,7 @@ export function steerDetonate(sim: Sim): void {
         Iframe.last[m] = now
         hurtCharacter(sim, m, dmg, enemyDef[eid]?.name)
       }
-      sim.pendingRings.push({ x: ex, y: ey, radius: r })
+      sim.out.rings.push({ x: ex, y: ey, radius: r })
       playSfx('boom')
       despawnEnemy(sim, eid)
       continue

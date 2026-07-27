@@ -12,7 +12,7 @@ import type { Sim } from '../sim'
 export function castNukes(sim: Sim): void {
   castScan(sim, Nuke, (e) => {
     const src = sourceOf(sim, e)
-    sim.pendingCues.push({ kind: 'screenFlash', color: 0xffffff, alpha: 0.55, durationMs: 380 })
+    sim.out.cues.push({ kind: 'screenFlash', color: 0xffffff, alpha: 0.55, durationMs: 380 })
     playSfx('boom')
     const base = Nuke.damage[e]! * waveScale(sim, e) * damageMul(sim, e)
     const bossRatio = Nuke.bossRatio[e]!
