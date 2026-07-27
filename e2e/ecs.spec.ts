@@ -10,6 +10,12 @@ import type { Page } from '@playwright/test'
 // 顺带钉住出站信箱的积压：sim.out 的五个队列是「仿真只写、场景侧排空」，
 // 漏排一条不会报错，只会一路涨到卡顿——帧末积压恒 0 是它唯一的外部可观测量。
 //
+// 也钉住「自绘层没在参与 Phaser 的深度排序」：DisplayList 排的是 _depth，裸 GameObject
+// 只写 depth 的话它恒为 undefined，比较得 NaN、排序原地不动，深度带整体失效。开局时
+// 看不出来（地图视觉先建、批绘后建，正好该在上），视口一变、单屏图的视觉层整体重建，
+// 那块不透明的地面就排到了末尾，把全场实体一次盖光——屏幕上只剩地图背景，且全程没有
+// 任何异常与报错，实体数/击杀数一切正常。恒 0 是它唯一的外部可观测量。
+//
 // 软渲染下时钟偏慢，允许一次重试。
 
 test.describe.configure({ retries: 1 })
@@ -25,7 +31,7 @@ async function click(page: Page, logical: { x: number; y: number }): Promise<voi
 
 // ECS 侧的探针是 window.__ecs（__warmoji 在 ECS 战斗期间是陈旧的，本场景不写它）。
 // 页面内求值的闭包不能引用本文件的作用域，故各处内联展开
-type Ecs = { elapsed: number; kills: number; enemies: number; outbox: number }
+type Ecs = { elapsed: number; kills: number; enemies: number; outbox: number; unsortedLayers: number }
 type WinEcs = Window & { __ecs?: Ecs }
 
 test('试炼场：ECS 战斗跑得起来、有击杀、出站信箱不积压', async ({ page }) => {
@@ -52,4 +58,8 @@ test('试炼场：ECS 战斗跑得起来、有击杀、出站信箱不积压', a
   expect(ecs.enemies, '场上没敌人：这一局没打起来').toBeGreaterThan(0)
   expect(ecs.kills, '一个都没杀死：能力没在索敌/施伤').toBeGreaterThan(0)
   expect(ecs.outbox, '出站信箱帧末仍有积压：某条 drain 没清').toBe(0)
+  expect(
+    ecs.unsortedLayers,
+    '有自绘层没在参与深度排序（_depth 不是数）：它的叠放次序退化成进显示列表的先后，转屏后会被地图视觉盖住',
+  ).toBe(0)
 })

@@ -3,6 +3,7 @@ import { query } from 'bitecs'
 import { Depth, Quad, Sprite, Tint, Transform, RENDERABLE } from '../components'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
+import { EcsLayer } from './layer'
 export { SPRITE_BANDS } from './bands'
 
 // 统一自绘：一个自定义 GameObject，renderWebGL 里把全场 renderable 实体（Transform+Sprite+
@@ -22,7 +23,7 @@ export { SPRITE_BANDS } from './bands'
 const { getTintAppendFloatAlpha } = Phaser.Renderer.WebGL.Utils
 
 
-export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
+export class EcsSpriteBatch extends EcsLayer {
   private readonly world: EcsWorld
   private readonly atlas: EcsAtlas
   private readonly uv = new Float32Array(4)
@@ -39,22 +40,17 @@ export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
   private readonly renderOptions = {
     multiTexturing: true,
   } as Phaser.Types.Renderer.WebGL.RenderNodes.BatchHandlerQuadRenderOptions
-  // WebGLRenderer.render 渲染每个子对象前会读 child.blendMode 设混合模式;
-  // 裸 GameObject 无 BlendMode 组件，显式给正常混合，否则 setBlendMode(undefined) 报错。
-  blendMode = Phaser.BlendModes.NORMAL
-  // DisplayList 按 .depth 排序。批绘对象按「深度带」拆成若干个（见 SPRITE_BANDS）：
-  // 单个对象会把全场实体压成一层，与地面效果/断壁/预告标记/命中环这些非批绘的
-  // Phaser 图元的前后关系整体错乱，故每带一个对象、depth 取旧实现该层的值。
-  depth: number
+  // 批绘对象按「深度带」拆成若干个（见 SPRITE_BANDS）：单个对象会把全场实体压成一层，
+  // 与地面效果/断壁/预告标记/命中环这些非批绘的 Phaser 图元的前后关系整体错乱，
+  // 故每带一个对象、depth 取旧实现该层的值（怎么排序见 EcsLayer）。
   /** 本对象只画 Depth.z ∈ [zMin, zMax) 的实体 */
   private readonly zMin: number
   private readonly zMax: number
 
   constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number) {
-    super(scene, 'EcsSpriteBatch')
+    super(scene, 'EcsSpriteBatch', depth)
     this.world = world
     this.atlas = atlas
-    this.depth = depth
     this.zMin = zMin
     this.zMax = zMax
     scene.add.existing(this)

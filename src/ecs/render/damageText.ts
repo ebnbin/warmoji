@@ -3,6 +3,7 @@ import { query } from 'bitecs'
 import { UI_FONT } from '../../util/fonts'
 import { DamageNumber, Fx, Transform } from '../components'
 import type { EcsWorld } from '../world'
+import { EcsLayer } from './layer'
 
 // 伤害飘字：命中点上浮淡出的数字。
 //
@@ -136,17 +137,14 @@ export class DamageTextLayer {
 
 /** 飘字批绘：裸 GameObject，只为在显示列表里占 depth 50（与旧实现的 BitmapText 同层）。
  * renderWebGL 由 RenderSteps 以裸函数方式调用，无 this 绑定，状态一律走 src。 */
-class DamageTextBatch extends Phaser.GameObjects.GameObject {
+class DamageTextBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
   /** batch() 每次会往里写 alphaStrategy 并与当前 shader 配置比对，必须是复用的持久对象；
    * multiTexturing 必须显式开，理由同 EcsSpriteBatch */
   private readonly renderOptions = { multiTexturing: true }
-  // 裸 GameObject 无 BlendMode 组件，显式给正常混合
-  blendMode = Phaser.BlendModes.NORMAL
-  depth = 50
 
   constructor(scene: Phaser.Scene, private readonly layer: DamageTextLayer) {
-    super(scene, 'DamageTextBatch')
+    super(scene, 'DamageTextBatch', 50)
     scene.add.existing(this)
   }
 

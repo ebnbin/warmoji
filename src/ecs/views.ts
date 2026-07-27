@@ -53,6 +53,8 @@ export interface ViewCtx {
   /** 世界尺寸：layout() 之后由场景回填 */
   w: number
   h: number
+  /** 图集：boot 里烘好后由场景回填。视口变化早于它就位时为 undefined（装饰待 boot 铺） */
+  atlas?: EcsAtlas
 }
 
 export interface MapView {
@@ -151,6 +153,9 @@ abstract class SingleScreenView extends BoundedView {
     this.destroy(v)
     this.build(v)
     this.camera(v)
+    // **destroy 把本图的装饰实体一并拆了，补回来是自己的事**——不能指望调用方接着补：
+    // 世界尺寸没变时（工厂横屏内拉窗口）场景侧无事可做，就此早退，装饰便再也回不来
+    if (v.atlas) this.decor(v, v.atlas)
   }
 }
 

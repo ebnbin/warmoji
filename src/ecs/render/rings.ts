@@ -4,6 +4,7 @@ import { Ring, RING_SET, Tint, Transform } from '../components'
 import { fan, newScratch, resetScratch, ringStrip } from './tri'
 import type { Scratch } from './tri'
 import type { EcsWorld } from '../world'
+import { EcsLayer } from './layer'
 
 // 实体圆圈：画在实体位置上的填充圆 + 描边（待拾脉冲、携带者光环、地面效果区、寒气光环）。
 // **全场就这一个画圆的地方**——从前地面区是每块一个 Phaser Graphics + 两条 tween，
@@ -86,15 +87,11 @@ export class RingLayer {
 /** 一条深度带的光圈批绘：与 cues.ts 的 EcsShapeBatch 同构（裸 GameObject 只为占一个
  * depth，renderWebGL 里把本带三角形一次提交给 BatchHandlerTriFlat）。
  * 注意 renderWebGL 由 RenderSteps 以裸函数方式调用，无 this 绑定，状态一律走 src。 */
-class EcsRingBatch extends Phaser.GameObjects.GameObject {
+class EcsRingBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
-  // 裸 GameObject 无 BlendMode 组件，显式给正常混合，否则 setBlendMode(undefined) 报错
-  blendMode = Phaser.BlendModes.NORMAL
-  depth: number
 
   constructor(scene: Phaser.Scene, private readonly layer: RingLayer, private readonly band: number) {
-    super(scene, 'EcsRingBatch')
-    this.depth = BANDS[band]!.depth
+    super(scene, 'EcsRingBatch', BANDS[band]!.depth)
     scene.add.existing(this)
   }
 

@@ -7,6 +7,7 @@ import type { EcsWorld } from '../world'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment } from './tri'
 import type { Scratch } from './tri'
 import { SHAPE_BANDS as BANDS } from './bands'
+import { EcsLayer } from './layer'
 
 // 一次性战斗特效（Cue，阵营中立）：放完即弃，与机制正交——纯逻辑侧只往队列里塞
 // 「放一个什么样的特效」，绘制全在这里（GAS GameplayCue 思路：机制不依赖渲染）。
@@ -188,15 +189,11 @@ export class CueLayer {
  * 与 EcsSpriteBatch 同构——那边提交四边形给 BatchHandlerQuad，这边提交三角形给
  * BatchHandlerTriFlat。注意 renderWebGL 由 RenderSteps 以裸函数方式调用，无 this
  * 绑定，状态一律走 src。 */
-class EcsShapeBatch extends Phaser.GameObjects.GameObject {
+class EcsShapeBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
-  // 裸 GameObject 无 BlendMode 组件，显式给正常混合，否则 setBlendMode(undefined) 报错
-  blendMode = Phaser.BlendModes.NORMAL
-  depth: number
 
   constructor(scene: Phaser.Scene, private readonly layer: CueLayer, private readonly band: number) {
-    super(scene, 'EcsShapeBatch')
-    this.depth = BANDS[band]!.depth
+    super(scene, 'EcsShapeBatch', BANDS[band]!.depth)
     scene.add.existing(this)
   }
 

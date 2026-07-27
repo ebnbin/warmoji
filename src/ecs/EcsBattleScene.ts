@@ -248,6 +248,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
     this.cues = new CueLayer(this, this.world)
     this.rings = new RingLayer(this, this.world)
+    this.ctx.atlas = atlas
     this.map.decor(this.ctx, atlas)
     this.testMode = run.testMode
     const settings = loadSettings(browserStorage())
@@ -319,6 +320,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     hint.destroy()
   }
 
+
+  /** 探针：显示列表里**没在参与深度排序**的对象数（见 render/layer.ts）。
+   * 恒 0 是「深度带真的生效」唯一的外部可观测量——一旦不是 0，那些对象的叠放次序
+   * 就退化成进列表的先后，谁后建谁在上 */
+  private unsortedLayers(): number {
+    let n = 0
+    for (const o of this.children.list) {
+      if (typeof (o as unknown as { _depth?: unknown })._depth !== 'number') n++
+    }
+    return n
+  }
 
   /** 排空本帧的出站信箱。每种事件一条 drain——收信人没准备好(特效层未建/飘字关掉)
    * 也照样清空,信箱只进不出就是一路涨到卡顿 */
@@ -490,6 +502,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const { w, h } = this.map.layout(this.ctx)
     this.ctx.w = this.mapW = w
     this.ctx.h = this.mapH = h
+    // 视觉层（含本图的装饰实体）整体归本图自己重建，场景只管世界尺寸这件事
     this.map.resize(this.ctx)
     if (w === fromW && h === fromH) return
     if (sim) {
@@ -498,7 +511,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       remapSim(sim, fromW, fromH, w, h)
       this.centerObj.setPosition(centerX(sim), centerY(sim))
     }
-    if (this.atlas) this.map.decor(this.ctx, this.atlas)
   }
 
 
@@ -635,6 +647,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.timeStopFx?.setFillStyle(TIMESTOP.chillColor, this.timeStopFxAlpha)
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
+      unsortedLayers: this.unsortedLayers(),
       pages: this.atlas?.pageCount ?? 0,
       centerX: centerX(sim),
       centerY: centerY(sim),
