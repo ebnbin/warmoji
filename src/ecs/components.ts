@@ -225,8 +225,26 @@ export const PROJ_SET = [Projectile, Transform, Vel, Proj] as const
 // 磁吸半径(金币有/战场拾取 0)、停留时长(金币永久 = 0)、到手干什么(kind 分派)。
 // 效果登记表与管线在 pickups.ts,生成在 entities/pickup.ts。
 
-/** 拾取物标记。kind = 到手效果的分派键(见 pickups.ts 的 PICKUP_KINDS) */
-export const Pickup = { kind: i32() }
+/** 拾取物标记。「到手给什么」不在这里——见下面那组 Grant*，每种给法一个组件 */
+export const Pickup = {}
+
+/** 本帧到手（一次性事件组件）：updatePickups 挂上，各 Grant 系统消费，reapCollected 最后回收。
+ * 到手效果从前是 PICKUP_KINDS[kind].collect 一个回调，于是「既给钱又给增益」的拾取物
+ * 无处安放；拆成组件后就是两个都挂 */
+export const Collected = {}
+
+/** 到手加钱 */
+export const GrantCoins = { n: f32() }
+
+/** 到手施加一层限时乘区（哪一枚在 store.pickupDef） */
+export const GrantMod = {}
+
+/** 到手全队闪一下（极性色） */
+export const GrantFlash = { color: u32(), ms: f32() }
+
+/** 到手的爆点粒数（音效在 store.pickupSfx）。它与 Grant* 正交——既给钱又给增益的
+ * 拾取物只该爆一次 */
+export const PickupFx = { burst: i32() }
 
 /** 磁吸半径(px):进圈即被吸向队伍中心。0 = 不磁吸(得主动走位过去) */
 export const Pull = { radius: f32() }

@@ -1,14 +1,13 @@
-import { query, removeEntity } from 'bitecs'
+import { addComponent, query, removeEntity } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { PICKUP, PICKUPS } from '../../data/pickups'
-import { Alive, Grab, Hurt, Lifetime, Pickup, PICKUP_SET, Pull, Tint, Transform, Vel } from '../components'
-import { animatePickup, PICKUP_KINDS } from '../entities/pickup'
-import { pickupDef } from '../store'
+import { Alive, Collected, Grab, Hurt, Lifetime, PICKUP_SET, Pull, Tint, Transform, Vel } from '../components'
+import { animatePickup } from '../entities/pickup'
 import type { Sim } from '../sim'
 
 // 拾取物管线:磁吸 → 到手 → 到期回收,外加入场弹出与待拾缓浮。
-// 「不同的拾取给不同的东西」收在 ../pickups.ts 的 PICKUP_KINDS 一处,管线不认种类。
+// 「不同的拾取给不同的东西」不在这条管线里:到手只挂 Collected,由各 Grant 系统各取所需。
 
 /** 地面到期前的渐隐时长(ms) */
 const FADE_MS = 250
@@ -78,11 +77,9 @@ export function updatePickups(sim: Sim): void {
   }
 }
 
-/** 到手:跑该种类的效果,然后回收 */
+/** 到手：只挂个标记。给什么、爆什么、什么时候回收，各归各的系统 */
 function take(sim: Sim, eid: number): void {
-  PICKUP_KINDS[Pickup.kind[eid]!]!.collect(sim, eid)
-  pickupDef[eid] = undefined
-  removeEntity(sim.world, eid)
+  addComponent(sim.world, eid, Collected)
 }
 
 /** 是否蹭到了任一活着队员(圆-圆:队员受击圆 + 拾取物体半径,镜像旧 overlap)。

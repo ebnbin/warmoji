@@ -29,10 +29,13 @@ export const flyerHits: (Set<number> | undefined)[] = new Array<Set<number> | un
 export const enemyCarries: (FieldPickupDef | undefined)[] =
   new Array<FieldPickupDef | undefined>(MAX_ENTITIES).fill(undefined).fill(undefined)
 
-/** 拾取物携带的载荷(只有需要 def 的那些 kind 用得上:战场增/减益要知道自己是哪一枚;
- * 金币无载荷,kind 本身就是全部信息) */
+/** 拾取物携带的载荷(GrantMod 要知道自己是哪一枚;金币无载荷) */
 export const pickupDef: (FieldPickupDef | undefined)[] =
   new Array<FieldPickupDef | undefined>(MAX_ENTITIES).fill(undefined)
+
+/** 拾取物到手的音效(字符串,装不进组件) */
+export const pickupSfx: (import('../types/sfx').SfxId | undefined)[] =
+  new Array<import('../types/sfx').SfxId | undefined>(MAX_ENTITIES).fill(undefined)
 
 /** 能力的命中效果链(Effect[] 是数组,组件装不下;弹丸落地后另抄一份到 projOnHit) */
 export const abilityOnHit: (readonly Effect[] | undefined)[] =
@@ -65,6 +68,7 @@ export function clearEcsStore(): void {
   flyerHits.fill(undefined)
   enemyCarries.fill(undefined)
   pickupDef.fill(undefined)
+  pickupSfx.fill(undefined)
   animId.fill(undefined)
   animOutline.fill(undefined)
   abilityArtEmoji.fill(undefined)

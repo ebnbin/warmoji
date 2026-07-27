@@ -30,8 +30,8 @@ import { WallGrid, generateRuins, reachableCells } from '../war/maps/ruins'
 import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
-import { query, removeEntity } from 'bitecs'
-import { Alive, Boss, Dormant, Enemy, FACTION, Faction, Hp, MHp, MoveSpeed, Nest, PICKUP_SET, Pickup, Projectile, Revive, Sprite, Transform, Zone } from './components'
+import { hasComponent, query, removeEntity } from 'bitecs'
+import { Alive, Boss, Dormant, Enemy, FACTION, Faction, GrantCoins, Hp, MHp, MoveSpeed, Nest, PICKUP_SET, Projectile, Revive, Sprite, Transform, Zone } from './components'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { spawnDecor } from './entities/decor'
@@ -50,8 +50,13 @@ import { stepAbilities } from './pipeline/abilities'
 import { replayDeath } from './systems/shared/death'
 import { runDeathEffects } from './systems/runDeathEffects'
 import { updateZones } from './systems/updateZones'
-import { COIN, pickupCounts } from './entities/pickup'
+import { pickupCounts } from './entities/pickup'
 import { updatePickups } from './systems/updatePickups'
+import { grantCoins } from './systems/grantCoins'
+import { grantFlash } from './systems/grantFlash'
+import { grantMods } from './systems/grantMods'
+import { playPickupFx } from './systems/playPickupFx'
+import { reapCollected } from './systems/reapCollected'
 import { spawnBossEcs, spawnCarrierEcs, spawnSurgeEcs } from './entities/enemy'
 import { spawnStep } from './systems/spawnStep'
 
@@ -109,11 +114,11 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
 }
 
-/** 在场金币数(探针):拾取物里 kind = COIN 的那些 */
+/** 在场金币数(探针):挂了 GrantCoins 的那些拾取物 */
 function liveCoins(world: EcsWorld): number {
   let n = 0
   for (const eid of query(world, PICKUP_SET as unknown as object[])) {
-    if (Pickup.kind[eid] === COIN) n++
+    if (hasComponent(world, eid, GrantCoins)) n++
   }
   return n
 }
@@ -1386,8 +1391,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     runDeathEffects(sim)
     // 区域(地面毒圈/灼烧区 + 寒气光环):跟位/开关/到期,再 team 脉冲烧敌 / enemy 节流烧队员
     updateZones(sim)
-    // 拾取物(金币 / 战场增减益同一条):磁吸 → 到手 → 到期淡出
+    // 拾取物(金币 / 战场增减益同一条):磁吸 → 到手(挂 Collected) → 到期淡出
     updatePickups(sim)
+    // 到手给什么：每种给法一个系统，各取所需；回收必须排在它们之后
+    grantCoins(sim)
+    grantMods(sim)
+    grantFlash(sim)
+    playPickupFx(sim)
+    reapCollected(sim)
     this.drainCollects()
     // 虫巢周期生成子敌(护巢子敌绕巢;拆巢暴走)
     updateSpawners(sim)

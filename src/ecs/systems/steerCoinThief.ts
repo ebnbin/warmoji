@@ -1,10 +1,9 @@
-import { query, removeEntity } from 'bitecs'
+import { hasComponent, query, removeEntity } from 'bitecs'
 import { AI } from '../../data/enemies'
 import { PICKUPS } from '../../data/pickups'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
-import { BVel, CoinThief, Pickup, PICKUP_SET, Radius, Slowed, Speed, Steering, Thief, Transform } from '../components'
-import { COIN } from '../entities/pickup'
+import { BVel, CoinThief, GrantCoins, PICKUP_SET, Radius, Slowed, Speed, Steering, Thief, Transform } from '../components'
 import { wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
 
@@ -21,7 +20,7 @@ export function steerCoinThief(sim: Sim): void {
     let coinX = 0
     let coinY = 0
     for (const c of query(sim.world, PICKUP_SET as unknown as object[])) {
-      if (Pickup.kind[c] !== COIN) continue // 只认金币:战场增/减益不是它的口粮
+      if (!hasComponent(sim.world, c, GrantCoins)) continue // 只认给钱的:战场增/减益不是它的口粮
       const w = sim.hooks.worldDelta(sim, ex, ey, Transform.x[c]!, Transform.y[c]!)
       const d = w.x * w.x + w.y * w.y
       if (d < bestD) {
