@@ -605,6 +605,17 @@ export const MoveSpeed = { v: f32() }
 /** 金币磁吸半径(px:队长 coinMagnet × 道具 magnetMul) */
 export const Magnet = { radius: f32() }
 
+// 下面两样是队长技能开出来的**限时全队效果**。挂在队长身上而非 Sim 上：
+// 它们本来就是一队一份的，从前当全局字段是因为一局只有一个队长。
+// 都用「到期时刻」表达而非「剩余时长」——读方一律 now < until，于是不需要任何
+// 系统去递减、去复原，窗口内新登场的敌人也天然跟着算。
+
+/** 限时全队增伤(队长技能;不叠加,直接覆写)。until 之外恒 1,见 utils/team.teamDamageMul */
+export const TeamDamage = { mul: f32(), until: f32() }
+
+/** 全场蹦迪窗口(队长技能):窗口内全体敌人定身摇摆,含窗口内新登场者 */
+export const DanceWindow = { until: f32() }
+
 /** 瞬闪位移：突袭停留期加在角色跟随点上的视觉偏移（不动阵型主权） */
 export const Blink = { x: f32(), y: f32() }
 

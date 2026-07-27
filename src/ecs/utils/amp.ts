@@ -5,6 +5,7 @@ import { Anchor, DmgMul, CharAtkSlow, Slot, Transform } from '../components'
 import { Amp, FACTION, Faction, Owner } from '../components'
 import type { } from './source'
 import type { Sim } from '../sim'
+import { teamDamageMul } from './team'
 
 // 出手乘区与施伤：所有能力的伤害/冷却/暴击/击退在此收口，各 kind 的施放系统只管
 // 「打谁、打几下」，不各自重算一遍乘区。装备期定死的那部分在 Amp 上，随局面变的
@@ -22,7 +23,7 @@ export function ownerY(e: number): number {
 /** 本次出手的伤害乘区 */
 export function damageMul(sim: Sim, e: number): number {
   if (Faction.v[e] === FACTION.enemy) return DmgMul.v[Owner.eid[e]!]!
-  return Amp.dmg[e]! * (Amp.battle[e] ? sim.battleFx.teamDamageMul : 1) * sim.skillDamageMul
+  return Amp.dmg[e]! * (Amp.battle[e] ? sim.battleFx.teamDamageMul : 1) * teamDamageMul(sim)
 }
 
 /** 本次出手的冷却乘区（敌方无冷却加成；队伍侧叠战场层、黏滞攻速罚与试炼场攻速旋钮） */

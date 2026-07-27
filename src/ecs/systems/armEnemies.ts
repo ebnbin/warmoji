@@ -5,6 +5,7 @@ import { postponeAbilities } from './shared/ability'
 import { restoreMorphVisual } from '../entities/enemy'
 import { enemyDef } from '../store'
 import type { Sim } from '../sim'
+import { isDancing } from '../utils/team'
 
 // 新登场的持械敌人装配 + 魔尘复形。敌人是被扫到时才装（lazy-arm，
 // 与旧实现的出生即装配等价——压制期照样推进冷却）。装配本身在 ../ability/arm.ts。
@@ -17,7 +18,7 @@ export function armEnemies(sim: Sim): void {
     if (Dormant.v[eid]) continue // 休眠：连装配都推迟，回到活跃范围自然接管
     if (!EnemyArm.armed[eid]) armEnemy(sim, eid)
     // 蹦迪期整段短路，故舞会散场前连复形都不跑（镜像旧 steerEnemies 的分支次序）
-    if (now < sim.danceEndsAt) continue
+    if (isDancing(sim)) continue
     if (Morph.until[eid] === 0 || now < Morph.until[eid]!) continue
     restoreMorphVisual(sim.frames, eid)
     sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'puff' }) // 复形灰烟

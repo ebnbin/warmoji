@@ -1,4 +1,4 @@
-import { Transform } from '../components'
+import { DanceWindow, TeamDamage, Transform } from '../components'
 import type { Point } from '../../util/vec'
 import type { Sim } from '../sim'
 
@@ -28,4 +28,15 @@ export function teamCenter(sim: Sim): Point {
 export function setCenter(sim: Sim, x: number, y: number): void {
   Transform.x[sim.captain] = x
   Transform.y[sim.captain] = y
+}
+
+/** 全队增伤乘区（队长技能的限时 buff）。到期即 1——**过期这件事就写在读法里**，
+ * 不需要一个系统去复原它（从前的 expireSkillBuff 就是干这个的） */
+export function teamDamageMul(sim: Sim): number {
+  return sim.elapsedMs < TeamDamage.until[sim.captain]! ? TeamDamage.mul[sim.captain]! : 1
+}
+
+/** 全场蹦迪窗口内？窗口用到期时刻表达，故窗口内新登场的敌人天然跟着跳 */
+export function isDancing(sim: Sim): boolean {
+  return sim.elapsedMs < DanceWindow.until[sim.captain]!
 }

@@ -4,7 +4,6 @@ import { applyKnockback } from '../applyKnockback'
 import { applySlowZones } from '../applySlowZones'
 import { commitEnemySteps } from '../commitEnemySteps'
 import { despawnExpired } from '../despawnExpired'
-import { expireSkillBuff } from '../expireSkillBuff'
 import { fadeEnemyFlash } from '../fadeEnemyFlash'
 import { layoutTeam } from '../layoutTeam'
 import { characterContact } from '../characterContact'
@@ -63,7 +62,6 @@ export const SIM_PIPELINE: readonly Step[] = [
     run: refoldBattleFx,
     why: '战场限时层的乘区是实时的，须先于任何消费它的移动/攻击/敌速',
   },
-  { name: 'expireSkillBuff', run: expireSkillBuff },
   {
     name: 'updateDormancy',
     run: updateDormancy,

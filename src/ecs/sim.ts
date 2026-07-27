@@ -75,11 +75,6 @@ export interface Sim {
   bossDown: boolean
   /** 队员受击累计次数(场景侧据增量触发受击震屏) */
   characterHitCount: number
-  /** 队长技能的限时全队增伤(镜像 stats.damageMul + skillBuffUntil):到期由 stepSim 复原 */
-  skillDamageMul: number
-  skillBuffUntil: number
-  /** 全场蹦迪窗口结束时刻(镜像 danceEndsAt):窗口内全体敌人定身摇摆,含窗口内新登场者 */
-  danceEndsAt: number
   /** 时停剩余(世界时长):>0 时世界时标随队伍移动量放缩(动则时行、静则近乎凝固) */
   timeStopMsLeft: number
   /** 移动量的低通平滑值(实时 delta 推进):worldTimeScale 的输入 */
@@ -233,9 +228,6 @@ export function makeSim(
     over: false,
     bossDown: false,
     characterHitCount: 0,
-    skillDamageMul: 1,
-    skillBuffUntil: 0,
-    danceEndsAt: 0,
     timeStopMsLeft: 0,
     chrono: 0,
     battleMods: [],

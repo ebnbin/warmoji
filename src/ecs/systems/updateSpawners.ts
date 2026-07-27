@@ -5,6 +5,7 @@ import { Dormant, ENEMY_SET, Morph, Nest, Transform } from '../components'
 import { spawnBrood } from '../entities/enemy'
 import { enemyDef } from '../store'
 import type { Sim } from '../sim'
+import { isDancing } from '../utils/team'
 
 /** 本巢名下在场子敌数(Nest.of 反查) */
 function broodCount(sim: Sim, nestEid: number): number {
@@ -26,7 +27,7 @@ export function updateSpawners(sim: Sim): void {
     const spawner = enemyDef[eid]?.spawner
     if (!spawner) continue
     // 压制期(全场蹦迪 / 魔尘变羊)既不产子也不推进计时——旧实现产子块在两个 continue 之后
-    if (now < sim.danceEndsAt) continue
+    if (isDancing(sim)) continue
     if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue
     if (now < Nest.nextSpawnAt[eid]!) continue
     Nest.nextSpawnAt[eid] = now + spawner.intervalMs

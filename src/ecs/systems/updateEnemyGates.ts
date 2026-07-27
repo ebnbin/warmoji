@@ -2,6 +2,7 @@ import { query } from 'bitecs'
 import { BVel, Dormant, ENEMY_SET, EnemyPhase, Morph, Slow, Slowed, Speed, SpMul, Steering, Transform, ZoneSlow } from '../components'
 import { wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
+import { isDancing } from '../utils/team'
 
 /** 由局面派生转向的闸门与倍率：**「谁来开车」只在这一处决定**。
  *
@@ -12,7 +13,7 @@ import type { Sim } from '../sim'
  * BVel 写完并置 0，各走位系统只认这一个标志，不必各自再问一遍「是不是在蹦迪」。 */
 export function updateEnemyGates(sim: Sim): void {
   const now = sim.elapsedMs
-  const dancing = now < sim.danceEndsAt
+  const dancing = isDancing(sim)
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     BVel.x[eid] = 0
     BVel.y[eid] = 0
