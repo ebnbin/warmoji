@@ -1,10 +1,27 @@
-import { addComponent, addComponents, addEntity } from 'bitecs'
+import { addComponent, addComponents, addEntity, hasComponent, removeComponent, removeEntity } from 'bitecs'
 import { DEG2RAD } from '../../util/units'
 import type { HeldVisual } from '../../types/abilityDefs'
 import type { OutlineKind } from '../../emoji/svg'
 import { attachDrawable } from './drawable'
-import { Boss, Depth, Elite, FACTION, Held, Quad, Sprite, Tint, Transform, Weapon } from '../components'
+import {
+  Boomerang,
+  BoomerangTwin,
+  Boss,
+  Depth,
+  Elite,
+  FACTION,
+  Flyer,
+  Held,
+  Quad,
+  Sprite,
+  Tint,
+  Transform,
+  Weapon,
+} from '../components'
 import type { Sim } from '../sim'
+import { playSfx } from '../../audio/sfx'
+import { flyerHits } from '../store'
+import { damageMul, ownerX, ownerY } from '../utils/amp'
 
 // 武器实体 = **一件握在手里、看得见的东西**。它只负责「有形体」这一件事：
 // Weapon + Held + 绘制包，如此而已。能力不在这里挂——是 ops/equip.ts 的 equipAbility
@@ -63,4 +80,40 @@ export function spawnWeaponCopy(sim: Sim, weaponEid: number): number {
   Depth.z[t] = 13
   Quad.v[t] = 0
   return t
+}
+
+// ── 在途回旋镖：掷出与收回 ──────────────────────────────────────────────────
+
+/** 收镖：主镖（= 武器本身）摘掉 Flyer 回落成握持姿态，双子镖直接离场 */
+export function catchFlyer(sim: Sim, e: number, f: number): void {
+  flyerHits[f] = undefined
+  if (f === e) removeComponent(sim.world, f, Flyer)
+  else removeEntity(sim.world, f)
+}
+
+/** 掷出：主镖沿瞄准方向，双子镖朝正反两个方向 */
+export function launch(sim: Sim, e: number, aim: number): void {
+  playSfx('whoosh')
+  const damage = Math.round(Boomerang.damage[e]! * damageMul(sim, e))
+  const range = Boomerang.range[e]!
+  const ox = ownerX(e)
+  const oy = ownerY(e)
+  const count = hasComponent(sim.world, e, BoomerangTwin) ? 2 : 1
+  for (let i = 0; i < count; i++) {
+    const angle = aim + i * Math.PI
+    const f = i === 0 ? e : spawnWeaponCopy(sim, e) // 主镖就是武器自己，双子是它的分身
+    addComponent(sim.world, f, Flyer)
+    Flyer.of[f] = e
+    Flyer.phase[f] = 0
+    Flyer.t[f] = 0
+    Flyer.launchX[f] = ox
+    Flyer.launchY[f] = oy
+    Flyer.destX[f] = ox + Math.cos(angle) * range
+    Flyer.destY[f] = oy + Math.sin(angle) * range
+    Flyer.damage[f] = damage
+    Transform.x[f] = ox
+    Transform.y[f] = oy
+    Tint.alpha[f] = 1
+    flyerHits[f] = new Set()
+  }
 }

@@ -1,5 +1,5 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { POP_MS, RETIRE_MS } from '../ops/turret'
+import { POP_MS, RETIRE_MS } from '../entities/minion'
 import { Aim, Emplacement, Fired, Frozen, Minion, Retiring, Shoot, Tint, Transform } from '../components'
 import { playClip } from '../ops/anim'
 import { backEaseOut } from '../utils/ease'

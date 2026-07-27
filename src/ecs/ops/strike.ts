@@ -1,6 +1,5 @@
 import { hasComponent } from 'bitecs'
-import { playSfx } from '../../audio/sfx'
-import { dropCoins } from './pickups'
+import { spawnCoins } from '../entities/pickup'
 import { Alive, Drop, Enemy, FACTION, Faction, Owner, Strike, Transform } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { damageTarget } from './damage'
@@ -18,12 +17,4 @@ export function land(sim: Sim, d: number): void {
   if (team && coins > 0) spawnCoins(sim, Transform.x[d]!, Drop.toY[d]!, coins)
   const damage = Math.max(1, Math.round(Strike.damage[e]! * damageMul(sim, e)))
   damageTarget(sim, src, target, damage, Strike.knockback[e]!, ownerX(e), ownerY(e))
-}
-
-/** 战场掉币：落地待拾，音效与爆点随拾取管线 */
-export function spawnCoins(sim: Sim, x: number, y: number, count: number): void {
-  if (sim.over) return
-  sim.pendingBursts.push({ x, y, count: 6, kind: 'coin' })
-  playSfx('coin')
-  dropCoins(sim, x, y, count)
 }

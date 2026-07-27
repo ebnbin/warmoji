@@ -1,6 +1,6 @@
 import { hasComponent, query } from 'bitecs'
 import { airborne } from '../utils/boomerang'
-import { catchFlyer } from '../ops/boomerang'
+import { catchFlyer } from '../entities/weapon'
 import { DEG2RAD } from '../../util/units'
 import { Boomerang, CoinMagnet, Flyer, Frozen, Transform } from '../components'
 import { flyerHits } from '../store'

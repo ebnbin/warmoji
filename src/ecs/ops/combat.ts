@@ -11,8 +11,8 @@ import { UNIT } from '../../util/units'
 import { spawnShardsEcs } from '../entities/shard'
 import { Alive, Anim, Boss, DmgMul, Dormant, Elite, Enemy, ENEMY_SET, Flash, Hp, Iframe, Kv, MFlash, MHp, Morph, MPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from '../components'
 import { enemyCarries, enemyDef } from '../store'
-import { dropCoins, dropFieldPickup } from './pickups'
-import { unequipAbilities } from './equip'
+import { dropCoins, dropFieldPickup } from '../entities/pickup'
+import { unequipAbilities } from '../entities/ability'
 import type { Sim } from '../sim'
 
 // 战斗(P3b):敌人受伤/致死/击退,队员接触伤害/死亡/复活/受击闪光。

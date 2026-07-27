@@ -1,4 +1,4 @@
-import { spawnBee } from '../ops/summon'
+import { spawnBee } from '../entities/minion'
 import { cooldownMul } from '../utils/amp'
 import { Summon } from '../components'
 import { castScan } from '../ops/castScan'

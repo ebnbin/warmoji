@@ -3,7 +3,7 @@ import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { PICKUP, PICKUPS } from '../../data/pickups'
 import { Alive, Grab, Hurt, Lifetime, Pickup, PICKUP_SET, Pull, Tint, Transform, Vel } from '../components'
-import { animatePickup, PICKUP_KINDS } from '../ops/pickups'
+import { animatePickup, PICKUP_KINDS } from '../entities/pickup'
 import { pickupDef } from '../store'
 import type { Sim } from '../sim'
 

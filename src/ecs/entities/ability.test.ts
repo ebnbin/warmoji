@@ -5,7 +5,7 @@ import { Drop, FACTION } from '../components'
 import { spawnCaptain } from '../entities/captain'
 import { spawnDrop } from '../entities/drop'
 import { makeWorld } from '../world'
-import { equipAbility, NEUTRAL_AMP, unequipAbilities } from './equip'
+import { equipAbility, NEUTRAL_AMP, unequipAbilities } from './ability'
 import type { FrameIndex } from '../frames'
 import type { Sim } from '../sim'
 

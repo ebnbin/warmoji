@@ -5,7 +5,7 @@ import {
   HealDefib, Laser, LaserBackBeam, LaserRadial, Nuke, Pierce, Pulse, Radial, Rally, Shoot, Shots,
   SlowAura, Strike, Summon, Sweep, Swing, Thrust, ThrustCombo, TimeStop, Turret, Volley,
 } from '../components'
-import { assertFree } from '../ops/equip'
+import { assertFree } from '../entities/ability'
 import { abilityArtEmoji, abilityFireSfx, abilityOnHit } from '../store'
 import type { FrameIndex } from '../frames'
 import type { EcsWorld } from '../world'

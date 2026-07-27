@@ -1,5 +1,5 @@
 import { airborne } from '../utils/boomerang'
-import { launch } from '../ops/boomerang'
+import { launch } from '../entities/weapon'
 import { ownerX, ownerY } from '../utils/amp'
 import { Aim, Boomerang } from '../components'
 import { sourceOf } from '../utils/source'

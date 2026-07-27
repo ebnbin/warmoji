@@ -9,7 +9,7 @@ import { playSfx } from '../../audio/sfx'
 import { despawnEnemy, hurtMember } from '../ops/combat'
 import { Alive, Charge, DmgMul, EDir, Enemy, EState, ETurn, Iframe, Nest, Pickup, PICKUP_SET, Speed, Sprite, Thief, Tint, Transform } from '../components'
 import { enemyDef } from '../store'
-import { COIN } from '../ops/pickups'
+import { COIN } from '../entities/pickup'
 
 import type { Sim } from '../sim'
 import type { BaseOrbitLocomotion, DashLength, DashLocomotion, DetonateLocomotion, LocomotionDef, StandoffLocomotion, DashTrigger } from '../../types/enemies'

@@ -1,6 +1,6 @@
 import { Turret } from '../components'
 import { cooldownMul } from '../utils/amp'
-import { place } from '../ops/turret'
+import { place } from '../entities/minion'
 import { castScan } from '../ops/castScan'
 import type { Sim } from '../sim'
 

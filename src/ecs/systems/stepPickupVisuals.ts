@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { PICKUP_SET } from '../components'
-import { animatePickup } from '../ops/pickups'
+import { animatePickup } from '../entities/pickup'
 import type { Sim } from '../sim'
 
 /** 只推进视觉(入场弹出 / 待拾缓浮),不做磁吸与拾取:波末过场冻结期用——

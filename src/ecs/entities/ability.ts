@@ -1,7 +1,16 @@
 import { addComponent, addComponents, hasComponent, query, removeEntity } from 'bitecs'
 
 import { abilityPiercesWalls } from '../../war/abilityRules'
-import { Ability, Amp, Anchor, CastRequest, Disarmed, Drop, Faction, Flyer, Frozen, Manual, Minion, Owner, WallBlocked, Weapon, ZoneFollow } from '../components'
+import { CHARACTERS, loadoutFor } from '../../data/characters'
+import { CAPTAINS } from '../../data/captains'
+import { aggregateCharacterEffects, characterXp, resolveAbilityDef } from '../../data/items'
+import { levelStatsFor } from '../../data/levels'
+import { characterLevel } from '../../data/charLevel'
+import { aggregateTeamCards } from '../../data/cards'
+import { toPx } from '../../war/px'
+import { labLevel } from '../../run/lab'
+import type { RunState } from '../../run/state'
+import { Ability, Amp, Anchor, CastRequest, Disarmed, Drop, FACTION, Faction, Flyer, Frozen, Manual, Minion, Owner, WallBlocked, Weapon, ZoneFollow } from '../components'
 import type { CdComp } from '../components'
 import { ABILITY_COMPS, KINDS } from '../registries/abilityKinds'
 import type { AttachCtx } from '../registries/abilityKinds'
@@ -11,8 +20,14 @@ import { spawnWeaponBody } from '../entities/weapon'
 import type { EcsWorld } from '../world'
 import type { Sim } from '../sim'
 
-// 装备 = 把定义物化成一件武器实体（见 entities/weapon.ts）。此后「谁有哪些能力」
-// 就是世界里挂在他名下的一批武器，不再是某个对象持有的数组。
+// 「一条能力」的工厂。
+//
+// 它不是一种实体，而是**一组可以挂在任何实体上的组件**：有外形的挂在自己的武器实体上
+//（spawnWeaponBody 造的那颗），徒手的直接挂施放者自己。所以本文件与 weapon.ts 的分工是
+// 「装什么」与「长什么样」，不是两种实体。
+//
+// 此后「谁有哪些能力」就是世界里挂着这组组件、且 Owner 指向他的那些实体
+//（可能包括他自己），不再是某个对象持有的数组。
 
 /** 装备期定死的乘区（队伍侧由道具/等级/团队卡折算；中立方全 1） */
 export interface AmpInit {
@@ -44,11 +59,6 @@ export interface AbilityInit {
   piercesWalls?: boolean
 }
 
-/** 给一个实体挂上「能带一条能力」的组件包——挂完它就进 castScan 的视野。
- *
- * **这不是实体类型**：武器带它（entities/weapon.ts），自主开火的召唤物也带它
- *（entities/minion.ts 的弩塔）。两者的差别只在 anchor：武器从持有者身上放，
- * 弩塔从它自己身上放。返回 false = 该 kind 未登记 tag（不挂，gen 校验保证不会发生） */
 /** 挂一条能力（参数由调用方自己写进组件）。弩塔的开火走这条——它的参数不来自
  * 任何 def，而是从建造它的那件武器的组件里抄 */
 export function attachAbilityCore(
@@ -171,5 +181,43 @@ export function postponeAbilities(sim: Sim, ownerEid: number, ms: number): void 
     for (const e of query(sim.world, [Ability, comp, Owner])) {
       if (Owner.eid[e] === ownerEid) comp.cdLeft[e] = Math.max(comp.cdLeft[e]!, ms)
     }
+  }
+}
+
+// ── 开局装配 ─────────────────────────────────────────────────────────
+
+// 开局装配：把配装解析成一条条能力。队伍在开局一次装齐；敌人首次被扫到时装配
+// （lazy-arm，与旧实现的出生即装配等价，因为压制期照样推进冷却）。
+
+/** 为全队装备能力：逐槽位按已持道具 + 专属等级解析生效能力（测试模式走场内等级旋钮） */
+export function armTeam(sim: Sim, run: RunState, testMode: boolean): void {
+  const teamFx = aggregateTeamCards(run.teamCards)
+  for (let slot = 0; slot < run.roster.length; slot++) {
+    const id = run.roster[slot]!
+    const def = CHARACTERS[id]
+    const owned = testMode ? [] : (run.memberItems[slot] ?? [])
+    const level = testMode ? labLevel() + 1 : characterLevel(characterXp(owned))
+    const tiers = { u1: level >= 2, u2: level >= 3 }
+    const fx = aggregateCharacterEffects(owned, levelStatsFor(id, level))
+    // 装备期乘区（道具/等级/团队卡折算）：随局面变的那部分由 amp.ts 现算
+    const amp = {
+      dmg: fx.damageMul * teamFx.teamDamageMul,
+      cd: fx.cooldownMul * teamFx.teamCooldownMul,
+      crit: fx.critChance + teamFx.critAdd,
+      kb: fx.knockbackMul,
+      battle: true,
+    }
+    loadoutFor(def, tiers).forEach((w, i) => {
+      equipAbility(sim, sim.members[slot]!, toPx(resolveAbilityDef(w, fx)), FACTION.team, 300 + slot * 120 + i * 230, amp)
+    })
+  }
+}
+
+/** 队长主动技能的载荷：效果本体是标准能力行，行为主体锚在队伍中心。
+ * 不进自动扫描——只等 castSkill 的施放请求。返回锚点实体 */
+export function armCaptain(sim: Sim, run: RunState): void {
+  // 队长实体在 makeSim 里已建好（队伍中心即它的位置），这里只挂技能载荷
+  for (const a of CAPTAINS[run.captainId].skill.abilities) {
+    equipAbility(sim, sim.captain, toPx(a), FACTION.team, 0, NEUTRAL_AMP, true)
   }
 }

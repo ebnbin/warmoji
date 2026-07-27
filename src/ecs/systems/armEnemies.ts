@@ -1,7 +1,7 @@
 import { query } from 'bitecs'
 import { Dormant, ENEMY_SET, EnemyArm, FACTION, Morph, Transform } from '../components'
-import { equipAbility, NEUTRAL_AMP, postponeAbilities } from '../ops/equip'
-import { restoreMorphVisual } from '../ops/morph'
+import { equipAbility, NEUTRAL_AMP, postponeAbilities } from '../entities/ability'
+import { restoreMorphVisual } from '../entities/enemy'
 import { enemyDef } from '../store'
 import type { Sim } from '../sim'
 
