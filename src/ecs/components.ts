@@ -650,5 +650,75 @@ export const Nest = { of: i32Fill(-1), nextSpawnAt: f32() }
  * **有这个组件 = 这只子敌会因拆巢暴走**——拆巢时不必回头问它是不是 baseOrbit */
 export const Orphan = { speedMul: f32(), damageMul: f32() }
 
-/** 偷币鼠：eaten=已吞金币数（死亡时吐回 + 利息）；nextEatAt=下次可吞时刻（逐枚偷） */
+/** 偷币鼠：eaten=已吞金库数（死亡时吐回 + 利息）；nextEatAt=下次可吞时刻（逐枚偷） */
 export const Thief = { eaten: i32(), nextEatAt: f32() }
+
+// ── 每种走位的参数组件 ─────────────────────────────────────────────────
+// **一种走位 = 一个组件**，与能力同理：它既是「归哪个转向系统管」的标记，也装着
+// 这种走位需要的全部参数。系统只问「有没有挂我这个组件」，不问 enemyDef.locomotion.kind。
+// def 里的**判别联合一律拆成各自的组件**（冲刺的触发方式与长度），于是
+// `if (trigger.kind === 'timer')` 变成 `hasComponent(DashTimer)`。
+// 翻译只在出生那一刻发生一次，见 entities/enemy.ts 的 LOCOMOTIONS。
+
+/** 直扑最近的活着队员 */
+export const Chase = {}
+
+/** 无目标游荡（wander；Wander 那个名字归队员待机游移） */
+export const Roam = {}
+
+/** 定身不动（虫巢之类） */
+export const Stationary = {}
+
+/** 逃跑：队伍进 range 就背身逃开，否则慢速游荡 */
+export const Flee = { range: f32() }
+
+/** 偷币鼠的走位：直奔最近金币（参数全在 Speed/Radius 与 AI 表里） */
+export const CoinThief = {}
+
+/** 定距风筝：detectRange 内咬人，贴到 standoffDist 就停手站定 */
+export const Standoff = { detectRange: f32(), standoffDist: f32() }
+
+/** 自爆冲锋：进 triggerRange 定身蓄力，蓄力完必炸（def 的 knockback 未被使用，故无字段） */
+export const Detonate = { triggerRange: f32(), windupMs: f32(), blastRadius: f32(), blastDamage: f32() }
+
+/** 护巢环绕：绕巢盘旋，队员逼近巢即扑人。暴走倍率在 Orphan 上，出生即挂 */
+export const BaseOrbit = { orbitRadius: f32(), aggroRange: f32() }
+
+/** 蓄力冲刺。三个 u8 是 def 里的三个二选一，不是「有没有」，故做字段不做 tag */
+export const Dash = {
+  windupMs: f32(),
+  dashSpeed: f32(),
+  /** 非冲刺期：1 追人 / 0 游荡 */
+  idleChase: u8(),
+  /** 瞄准：1 队伍中心 / 0 最近队员 */
+  aimTeamCenter: u8(),
+  /** 锁向时机：1 起跑瞬间（追到最后一刻）/ 0 进蓄力即锁（可预判横躲） */
+  lockAtLaunch: u8(),
+  /** 起跑音效 */
+  whoosh: u8(),
+}
+/** 冲刺触发：定时。出生即预约第一次（Charge.nextDashAt） */
+export const DashTimer = { intervalMs: f32() }
+/** 冲刺触发：探测到人进圈 */
+export const DashDetect = { range: f32(), cooldownMs: f32() }
+/** 冲刺长度：时长制 */
+export const DashTime = { durationMs: f32() }
+/** 冲刺长度：距离制（换算成时长要用 dashSpeed，故留原值） */
+export const DashDist = { dist: f32() }
+
+/** 冲撞碾墙：冲刺态沿途碾碎断壁（残垣图拆迁 Boss）。这是敌人的性质、不属于哪种走位 */
+export const BreaksWalls = {}
+
+// ── 转向的每帧派生量 ───────────────────────────────────────────────────
+
+/** 本帧的行为速度（px/s）：各走位系统写，applyEnemySteps 读。
+ * 击退等冲量不在此，它们直接叠 Step */
+export const BVel = { x: f32(), y: f32() }
+
+/** 本帧移速倍率：减速区 × 能力限时减速 × 体质 × 团队卡与战场拾取。
+ * 各走位系统共读一份，不各算一遍 */
+export const Slowed = { v: f32() }
+
+/** 本帧该不该由本职走位接管：休眠 / 蹦迪定身 / 变形游荡都由 updateEnemyGates 接管，
+ * 那时置 0，各走位系统一律跳过——「谁来开车」只在一处决定 */
+export const Steering = { v: u8() }

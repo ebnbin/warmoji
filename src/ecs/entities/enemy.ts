@@ -1,11 +1,28 @@
 import { addComponent, addEntity, query } from 'bitecs'
 import { AI, ELITE, SPAWN, SURGE } from '../../data/enemies'
-import type { DashTrigger, EnemyDef, LocomotionDef } from '../../types/enemies'
+import type { EnemyDef, LocomotionDef } from '../../types/enemies'
 import { waveAt } from '../../data/waves'
 import {
   Alive,
   Anim,
+  BaseOrbit,
   Boss,
+  BreaksWalls,
+  BVel,
+  Chase,
+  CoinThief,
+  Dash,
+  DashDetect,
+  DashDist,
+  DashTime,
+  DashTimer,
+  Detonate,
+  Flee,
+  Roam,
+  Slowed,
+  Standoff,
+  Stationary,
+  Steering,
   Charge,
   Depth,
   Despawn,
@@ -58,40 +75,79 @@ import { enemyMixAt, pickEnemy } from '../../war/enemyAi'
 // 行为/转向/回收等系统在 ../enemy.ts。
 // 敌人:装配 + 转向(locomotion 状态机 + 击退 + 世界钩子后处理)。
 
-/** 某种 locomotion 出生时要额外置的状态。**全映射**：LocomotionDef 新增一种而不在此
- * 登记 = 编译不过；null 表示「这种不用初始化」——是一个被明确写下来的决定，
- * 不是漏掉。从前是两行 `lm.kind === 'dash' && …` 的三元，加一种要初始化的
- * locomotion 只能靠人记得回来改 */
-type LocoInit<K extends LocomotionDef['kind']> = (
+/** 出生时把 locomotion 翻译成组件。**这是 locomotion.kind 在整个生命周期里被读的
+ * 唯一一次**——此后各转向系统只问「有没有挂我这个组件」（见 systems/steer*.ts）。
+ *
+ * **全映射**：LocomotionDef 新增一种而不在此登记 = 编译不过。从前是一条 else-if 链
+ * 外加一个兜底 else，`flee` 在类型里声明了、这边却从没实现，被那个 else 静默当成
+ * chase 蒙了过去。
+ *
+ * def 里的**判别联合一律拆成各自的组件**（冲刺的 trigger 与 length），于是
+ * `if (trigger.kind === 'timer')` 就此变成 `hasComponent(DashTimer)`。 */
+type LocoAttach<K extends LocomotionDef['kind']> = (
   sim: Sim,
   eid: number,
   lm: Extract<LocomotionDef, { kind: K }>,
 ) => void
-const LOCO_INIT: { [K in LocomotionDef['kind']]: LocoInit<K> | null } = {
-  chase: null,
-  wander: null,
-  static: null,
-  flee: null,
-  coinThief: null,
-  standoff: null,
-  detonate: null,
+const LOCOMOTIONS: { [K in LocomotionDef['kind']]: LocoAttach<K> } = {
+  chase: (sim, eid) => addComponent(sim.world, eid, Chase),
+  wander: (sim, eid) => addComponent(sim.world, eid, Roam),
+  static: (sim, eid) => addComponent(sim.world, eid, Stationary),
+  flee: (sim, eid, lm) => {
+    addComponent(sim.world, eid, Flee)
+    Flee.range[eid] = lm.range
+  },
+  coinThief: (sim, eid) => addComponent(sim.world, eid, CoinThief),
+  standoff: (sim, eid, lm) => {
+    addComponent(sim.world, eid, Standoff)
+    Standoff.detectRange[eid] = lm.detectRange
+    Standoff.standoffDist[eid] = lm.standoffDist
+  },
+  detonate: (sim, eid, lm) => {
+    addComponent(sim.world, eid, Detonate)
+    Detonate.triggerRange[eid] = lm.triggerRange
+    Detonate.windupMs[eid] = lm.windupMs
+    Detonate.blastRadius[eid] = lm.blastRadius
+    Detonate.blastDamage[eid] = lm.blastDamage
+    // def 还有个 knockback，自爆从来没用过它——不抄进组件，免得看着像还有人读
+  },
   baseOrbit: (sim, eid, lm) => {
-    // 暴走倍率随子敌走：拆巢时直接叠，不必回头查它的 locomotion 是什么
+    addComponent(sim.world, eid, BaseOrbit)
+    BaseOrbit.orbitRadius[eid] = lm.orbitRadius
+    BaseOrbit.aggroRange[eid] = lm.aggroRange
+    // 暴走倍率随子敌走：拆巢时直接叠，不必回头查它的走位是什么
     addComponent(sim.world, eid, Orphan)
     Orphan.speedMul[eid] = lm.orphanSpeedMul
     Orphan.damageMul[eid] = lm.orphanDamageMul
   },
   dash: (sim, eid, lm) => {
+    addComponent(sim.world, eid, Dash)
+    Dash.windupMs[eid] = lm.windupMs
+    Dash.dashSpeed[eid] = lm.dashSpeed
+    Dash.idleChase[eid] = lm.idle === 'chase' ? 1 : 0
+    Dash.aimTeamCenter[eid] = lm.aim === 'teamCenter' ? 1 : 0
+    Dash.lockAtLaunch[eid] = lm.lockAt === 'launch' ? 1 : 0
+    Dash.whoosh[eid] = lm.sfx ? 1 : 0
     // idle 走 chase 的从「追」态起步
     EState.v[eid] = lm.idle === 'chase' ? 1 : 0
-    Charge.nextDashAt[eid] = (DASH_FIRST_AT[lm.trigger.kind] as (s: Sim, t: DashTrigger) => number)(sim, lm.trigger)
+    if (lm.trigger.kind === 'timer') {
+      addComponent(sim.world, eid, DashTimer)
+      DashTimer.intervalMs[eid] = lm.trigger.intervalMs
+      // 定时冲刺出生即预约第一次起冲
+      Charge.nextDashAt[eid] = sim.elapsedMs + (lm.trigger.firstDelayMs ?? lm.trigger.intervalMs)
+    } else {
+      addComponent(sim.world, eid, DashDetect)
+      DashDetect.range[eid] = lm.trigger.range
+      DashDetect.cooldownMs[eid] = lm.trigger.cooldownMs
+    }
+    if (lm.length.kind === 'time') {
+      addComponent(sim.world, eid, DashTime)
+      DashTime.durationMs[eid] = lm.length.durationMs
+    } else {
+      addComponent(sim.world, eid, DashDist)
+      DashDist.dist[eid] = lm.length.dist
+    }
   },
-}
-
-/** 定时冲刺出生即预约第一次起冲；探测式没有预约（0）。**全映射** */
-const DASH_FIRST_AT: { [K in DashTrigger['kind']]: (sim: Sim, t: Extract<DashTrigger, { kind: K }>) => number } = {
-  timer: (sim, t) => sim.elapsedMs + (t.firstDelayMs ?? t.intervalMs),
-  detect: () => 0,
 }
 
 /** 装配一个敌人实体(px 化 def),返回 eid */
@@ -133,6 +189,10 @@ export function spawnEnemy(
   addComponent(world, eid, Morph)
   addComponent(world, eid, EDir)
   addComponent(world, eid, ETurn)
+  // 转向的每帧派生量：走位系统的 query 认这几个，漏挂就是「敌人一动不动」
+  addComponent(world, eid, BVel)
+  addComponent(world, eid, Slowed)
+  addComponent(world, eid, Steering)
   addComponent(world, eid, Anim)
   addComponent(world, eid, Sprite)
   addComponent(world, eid, Tint)
@@ -154,7 +214,12 @@ export function spawnEnemy(
   Charge.dashUntil[eid] = 0
   Charge.coolUntil[eid] = 0
   Charge.nextDashAt[eid] = 0
-  ;(LOCO_INIT[def.locomotion.kind] as LocoInit<LocomotionDef['kind']> | null)?.(sim, eid, def.locomotion)
+  BVel.x[eid] = 0
+  BVel.y[eid] = 0
+  Slowed.v[eid] = 1
+  Steering.v[eid] = 0
+  ;(LOCOMOTIONS[def.locomotion.kind] as LocoAttach<LocomotionDef['kind']>)(sim, eid, def.locomotion)
+  if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
   Despawn.at[eid] = 0
   Morph.until[eid] = 0
   Morph.vuln[eid] = 1
