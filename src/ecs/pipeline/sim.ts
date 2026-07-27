@@ -27,10 +27,12 @@ import { updateEnemyGates } from '../systems/updateEnemyGates'
 import { tickPoison } from '../systems/tickPoison'
 import { tintEnemies } from '../systems/tintEnemies'
 import { updateDormancy } from '../systems/updateDormancy'
-import { updateEnemyProjectiles } from '../systems/updateEnemyProjectiles'
 import { updateFrameTargets } from '../systems/updateFrameTargets'
 import { updateOrbit } from '../systems/updateOrbit'
-import { updateProjectiles } from '../systems/updateProjectiles'
+import { cullProjectiles } from '../systems/cullProjectiles'
+import { hitDirectProjectiles } from '../systems/hitDirectProjectiles'
+import { hitSweptProjectiles } from '../systems/hitSweptProjectiles'
+import { moveProjectiles } from '../systems/moveProjectiles'
 import { updateShards } from '../systems/updateShards'
 import { worldTick } from '../systems/worldTick'
 import type { Step } from './step'
@@ -138,7 +140,13 @@ export const SIM_PIPELINE: readonly Step[] = [
     after: ['commitEnemySteps'],
     why: '朝向翻转读的是本帧最终位移',
   },
-  { name: 'updateProjectiles', run: updateProjectiles, after: ['commitEnemySteps'] },
+  { name: 'moveProjectiles', run: moveProjectiles, after: ['commitEnemySteps'] },
+  {
+    name: 'hitSweptProjectiles',
+    run: hitSweptProjectiles,
+    after: ['moveProjectiles'],
+    why: '扫掠线段的起点是 moveProjectiles 记下的 PrevPos',
+  },
   {
     name: 'memberContact',
     run: memberContact,
@@ -146,10 +154,16 @@ export const SIM_PIPELINE: readonly Step[] = [
     why: '接触判定读本帧最终位置',
   },
   {
-    name: 'updateEnemyProjectiles',
-    run: updateEnemyProjectiles,
-    after: ['memberContact'],
+    name: 'hitDirectProjectiles',
+    run: hitDirectProjectiles,
+    after: ['memberContact', 'moveProjectiles'],
     why: '同帧两者争同一层无敌帧时旧实现是接触先手（overlap 注册序）；反过来的话，贴脸接触的伤害/黏滞/荆棘反伤会被敌弹吃掉的无敌帧一并挡下',
+  },
+  {
+    name: 'cullProjectiles',
+    run: cullProjectiles,
+    after: ['hitSweptProjectiles', 'hitDirectProjectiles'],
+    why: '命中而死的先走，剩下的才按寿命/视野/世界钩子回收',
   },
   { name: 'memberVisual', run: memberVisual },
   { name: 'updateShards', run: updateShards },

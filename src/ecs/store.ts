@@ -45,8 +45,8 @@ export const abilityArtEmoji: (string | undefined)[] = new Array<string | undefi
 export const abilityFireSfx: (import('../types/sfx').SfxId | undefined)[] =
   new Array<import('../types/sfx').SfxId | undefined>(MAX_ENTITIES).fill(undefined)
 
-/** 敌弹的伤害来源名(结算页敌情明细按敌人名归属) */
-export const eprojSrcName: (string | undefined)[] = new Array<string | undefined>(MAX_ENTITIES).fill(undefined)
+/** 抛射物的伤害来源名(敌弹用;结算页敌情明细按敌人名归属。我方弹按 Proj.srcSlot 分账) */
+export const projSrcName: (string | undefined)[] = new Array<string | undefined>(MAX_ENTITIES).fill(undefined)
 
 /** 敌方地面区的伤害来源名(同上;队伍侧的区按 ZoneBurn.srcSlot 分账,不用名字) */
 export const zoneSrcName: (string | undefined)[] = new Array<string | undefined>(MAX_ENTITIES).fill(undefined)
@@ -70,6 +70,6 @@ export function clearEcsStore(): void {
   abilityArtEmoji.fill(undefined)
   abilityOnHit.fill(undefined)
   abilityFireSfx.fill(undefined)
-  eprojSrcName.fill(undefined)
+  projSrcName.fill(undefined)
   zoneSrcName.fill(undefined)
 }

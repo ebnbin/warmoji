@@ -31,7 +31,7 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { query, removeEntity } from 'bitecs'
-import { Alive, Boss, Dormant, Enemy, EnemyProj, Hp, MHp, MoveSpeed, Nest, PICKUP_SET, Pickup, Projectile, Revive, Sprite, Transform, Zone } from './components'
+import { Alive, Boss, Dormant, Enemy, FACTION, Faction, Hp, MHp, MoveSpeed, Nest, PICKUP_SET, Pickup, Projectile, Revive, Sprite, Transform, Zone } from './components'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { spawnDecor } from './entities/decor'
@@ -1467,7 +1467,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       xpLevel: sim.run.xp.level,
       liveCoins: liveCoins(this.world),
       projectiles: query(this.world, [Projectile]).length,
-      eprojectiles: query(this.world, [EnemyProj]).length,
+      eprojectiles: query(this.world, [Projectile, Faction]).filter((e) => Faction.v[e] === FACTION.enemy).length,
       field: {
         pickups: pickupCounts(sim).pickups,
         carriers: pickupCounts(sim).carriers,

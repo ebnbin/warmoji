@@ -1,4 +1,6 @@
 import { Bolt, FACTION, Faction, Owner, Shoot } from '../../components'
+import { removeEntity } from 'bitecs'
+import { projHitEids, projOnHit, projSrcName } from '../../store'
 import { spawnEnemyProjectileEcs, spawnProjectileEcs } from '../../entities/projectile'
 import { abilityFireSfx, enemyDef } from '../../store'
 import { attributionSlot } from '../../utils/amp'
@@ -33,4 +35,12 @@ export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, 
 /** 这条能力出手时的音效（敌械弹幕用；队伍弹的 shoot 音效在发弹处） */
 export function fireSfxOf(e: number): import('../../../types/sfx').SfxId | undefined {
   return abilityFireSfx[e]
+}
+
+/** 回收一枚抛射物：伴随存储先清（eid 会复用，残值会挂到下一位住户身上） */
+export function cullProjectile(sim: Sim, eid: number): void {
+  projOnHit[eid] = undefined
+  projHitEids[eid] = undefined
+  projSrcName[eid] = undefined
+  removeEntity(sim.world, eid)
 }

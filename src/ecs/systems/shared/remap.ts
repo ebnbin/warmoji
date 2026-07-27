@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../../war/remap'
-import { Bob, EDir, ENEMY_SET, EPROJ_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Transform, Vel, ZONE_SET } from '../../components'
+import { Bob, EDir, ENEMY_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Transform, Vel, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 
@@ -51,7 +51,7 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     Kv.x[eid] = k.x
     Kv.y[eid] = k.y
   }
-  for (const set of [PROJ_SET, EPROJ_SET, PICKUP_SET]) {
+  for (const set of [PROJ_SET, PICKUP_SET]) {
     for (const eid of query(sim.world, set as unknown as object[])) {
       movePos(eid)
       moveVel(eid)

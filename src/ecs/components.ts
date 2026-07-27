@@ -181,13 +181,15 @@ export const ENEMY_SET = [Enemy, Transform, Speed, Hp] as const
 
 // ── 抛射物(P3c)──────────────────────────────────────────
 
-/** 抛射物标记 */
+/** 抛射物标记(我方弹与敌弹同为它;打哪一侧由 Faction 决定) */
 export const Projectile = {}
 
 /** 速度(世界像素/秒) */
 export const Vel = { x: f32(), y: f32() }
 
-/** 抛射物属性:伤害/半径/击退/来源槽位/贯穿余量/自旋(rad/s)/寿命回收时刻(0=不按寿命) */
+/** 抛射物属性:伤害/半径/击退/来源槽位/贯穿余量/自旋(rad/s)/寿命回收时刻(0=不按寿命)。
+ * 敌弹与我方弹是**同一种实体**——差别不在阵营,在下面那几个可选组件:
+ * 敌弹只是没挂 SweptHit/WallStop/ViewCull,且 kb/pierce/spin 为 0、srcSlot 为 -1 */
 export const Proj = {
   damage: f32(),
   radius: f32(),
@@ -198,19 +200,24 @@ export const Proj = {
   dieAt: f32(),
 }
 
+/** 本帧移动前的位置:线段扫掠命中的起点。回绕帧起点即落点(线段退化成一点) */
+export const PrevPos = { x: f32(), y: f32() }
+
+/** 线段扫掠命中(高速弹不穿模):按段上距离排序依次施伤,吃贯穿。
+ * **不挂 = 圆-圆命中**——慢速弹用不着扫掠 */
+export const SweptHit = {}
+
+/** 撞墙即销毁(残垣图):墙比最近命中点更近时本帧命中作废 */
+export const WallStop = {}
+
+/** 出视野一段即回收:无界世界没有地图边可依,视野才是通用口径 */
+export const ViewCull = {}
+
+/** 世界钩子回收(有界图出地图即灭) */
+export const WorldCull = {}
+
 /** 抛射物查询集 */
 export const PROJ_SET = [Projectile, Transform, Vel, Proj] as const
-
-// ── 敌弹(P3e)──────────────────────────────────────────────
-
-/** 敌弹标记(命中队员;不带贯穿/溅射载荷,镜像旧 spawnEnemyProjectile) */
-export const EnemyProj = {}
-
-/** 敌弹属性:伤害/半径/寿命回收时刻 */
-export const EProj = { damage: f32(), radius: f32(), dieAt: f32() }
-
-/** 敌弹查询集 */
-export const EPROJ_SET = [EnemyProj, Transform, Vel, EProj] as const
 
 // ── 拾取物(pickup)──────────────────────────────────────────
 // 地上一件东西、走过去就拿到、到手触发一种效果——金币与战场增/减益是同一个概念的
