@@ -70,7 +70,7 @@ const DEATH_KINDS: Record<DeathEffect['kind'], DeathHandler> = {
 export function replayDeath(sim: Sim, d: PendingDeath): void {
   const effects = d.def.onDeath
   if (!effects) return
-  const hpMul = waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier
+  const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
   for (const fx of effects) DEATH_KINDS[fx.kind]!(sim, d, fx, hpMul)
 }
 

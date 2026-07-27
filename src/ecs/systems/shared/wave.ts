@@ -8,7 +8,11 @@ import type { Sim } from '../../sim'
 // 结算(大锅回复/债券分红)+ 累计战斗时长 + 波次自增 + 队员血量快照。场景过场(结算横幅/
 // scene.start 到结算/抽卡/整编/商店)留在场景侧。
 
-/** 结算本波:回写 run(经验/回复/金币/combatMs/wave/角色血量),返回是否通关(终波) */
+/** 结算本波:回写 run(经验/回复/金币/combatMs/wave/角色血量),返回是否通关(终波)。
+ *
+ * **调用它即宣告本局的仿真到此为止**——难度曲线读的是 run.combatMs + sim.elapsedMs,
+ * 而这里把 elapsedMs 并进了 run.combatMs;此后再跑一帧就是双计。两处调用方都紧接着
+ * scheduleWaveEnd 置 ending 并 return,此后每帧只走 stepFrozenVisuals(纯视觉,不读这两个)。 */
 export function settleWave(sim: Sim): boolean {
   const run = sim.run
   const finished = isFinalWave(run.wave)

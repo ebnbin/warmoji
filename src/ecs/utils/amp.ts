@@ -38,7 +38,7 @@ export function cooldownMul(sim: Sim, e: number): number {
  * 那边的强度由场内旋钮定；队长技能载荷不受旋钮管辖，照常吃曲线 */
 export function waveScale(sim: Sim, e: number): number {
   if (sim.testMode && Amp.battle[e]) return 1
-  return waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier
+  return waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
 }
 
 /** 伤害归属槽位（结算页按槽位分账）；非队员来源为 -1 */

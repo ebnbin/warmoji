@@ -23,7 +23,7 @@ function spawnIntervalScale(sim: Sim): number {
 /** 挑一只敌人排入预告(镜像 spawnOne→spawnTelegraphed);forceElite 供精英波敌潮强制出金边 */
 function spawnOne(sim: Sim, hpMultiplier: number, forceElite = false): void {
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
-  const elite = !sim.testMode && (forceElite || (sim.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance))
+  const elite = !sim.testMode && (forceElite || (sim.run.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance))
   const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
   const pos = sim.hooks.spawnPoint(sim, false)
   sim.pendingSpawns.push({ def, x: pos.x, y: pos.y, hp, elite, boss: false, at: sim.elapsedMs + SPAWN.telegraphMs })
@@ -88,9 +88,9 @@ export function spawnStep(sim: Sim): void {
   if (sim.spawnCooldownMs > 0) return
   // 测试模式与常规刷怪分道:只补勾选的敌人,旋钮说了算
   if (sim.testMode) return spawnTest(sim)
-  const wave = waveAt((sim.combatMs + sim.elapsedMs) / 1000)
+  const wave = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000)
   const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * sim.characters.length
-  const relief = isBossWave(sim.wave) ? BOSS_SPAWN_RELIEF : 1
+  const relief = isBossWave(sim.run.wave) ? BOSS_SPAWN_RELIEF : 1
   sim.spawnCooldownMs = (wave.spawnIntervalMs * relief * spawnIntervalScale(sim)) / teamFactor
   if (awakeCount(sim) + sim.pendingSpawns.length >= SPAWN.maxAlive) return
   spawnOne(sim, wave.hpMultiplier)

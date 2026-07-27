@@ -152,7 +152,7 @@ function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean):
   gainTeamXp(sim, Math.round(def.xp * xpMul))
   const dropRoll = sim.rng.next()
   const doubleRoll = sim.rng.next()
-  const dropped = dropRoll < coinDropChance((sim.combatMs + sim.elapsedMs) / 1000)
+  const dropped = dropRoll < coinDropChance((sim.run.combatMs + sim.elapsedMs) / 1000)
   const baseCoins = dropped ? Math.round(def.coins * (elite ? ELITE.coinsMul : 1)) : 0
   const doubled = baseCoins > 0 && doubleRoll < sim.reward.doubleCoinChance ? baseCoins : 0
   // 偷币鼠吐回吞掉的币 + 1 枚利息(镜像 grantKillRewards 的 eaten 项)

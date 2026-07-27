@@ -111,9 +111,6 @@ export interface Sim {
   rng: Rng
   /** 试炼场沙盒(刷怪走勾选敌人 + 场内密度/难度旋钮;免死无时限) */
   testMode: boolean
-  /** 波次/累计战斗时长(难度曲线) */
-  wave: number
-  combatMs: number
   /** 刷怪冷却 + 预告中待落地的敌人(telegraph 延迟) */
   spawnCooldownMs: number
   pendingSpawns: PendingSpawn[]
@@ -326,8 +323,6 @@ export function makeSim(
     pendingCues: [],
     rng: new Rng(run.decorSeed ^ 0x9e37),
     testMode,
-    wave: run.wave,
-    combatMs: run.combatMs,
     spawnCooldownMs: 300,
     pendingSpawns: [],
     pendingSurges: [],

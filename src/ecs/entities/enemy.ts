@@ -287,7 +287,7 @@ export function spawnBrood(
   scatter: number,
   ownerEid: number,
 ): void {
-  const hpMul = waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier
+  const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
   for (let i = 0; i < count; i++) {
     const ang = sim.rng.next() * Math.PI * 2
     const child = spawnEnemy(
@@ -317,7 +317,7 @@ export function spawnBrood(
 export function dayNightOf(sim: Sim): { cfg: NonNullable<MapDef['dayNight']>; hour: number } | undefined {
   const cfg = MAPS[sim.mapId].dayNight
   if (!cfg) return undefined
-  return { cfg, hour: hourAt((sim.combatMs + sim.elapsedMs) / 1000, cfg) }
+  return { cfg, hour: hourAt((sim.run.combatMs + sim.elapsedMs) / 1000, cfg) }
 }
 
 /** 本图当前出怪表(昼夜图按时刻在 dayMix/nightMix 间切换,波内也实时换批) */
@@ -325,7 +325,7 @@ export function currentMix(sim: Sim): ReturnType<typeof enemyMixAt> {
   const m = MAPS[sim.mapId]
   const dn = dayNightOf(sim)
   const rows = dn ? ((isDayAt(dn.hour) ? m.dayMix : m.nightMix) ?? m.mix) : m.mix
-  return enemyMixAt(rows, sim.wave)
+  return enemyMixAt(rows, sim.run.wave)
 }
 
 /** 在场活跃敌人数(休眠者不占刷怪上限,镜像 spawnCapCount) */
@@ -340,7 +340,7 @@ export function awakeCount(sim: Sim): number {
  * 敌潮会追着移动中的队伍铺开,⚠ 预告也一个个亮起,而非开场一次性算死 14 个落点 */
 export function spawnSurgeEcs(sim: Sim): void {
   if (sim.over) return
-  const hpMul = waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier
+  const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
   for (let i = 0; i < SURGE.count; i++) {
     sim.pendingSurges.push({
       at: sim.elapsedMs + (i * SURGE.spreadMs) / SURGE.count,
@@ -374,7 +374,7 @@ export function spawnCarrierEcs(sim: Sim, pickup: FieldPickupDef): void {
   if (sim.over) return
   if (awakeCount(sim) + sim.pendingSpawns.length >= SPAWN.maxAlive) return
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
-  const hp = Math.round(def.hp * waveAt((sim.combatMs + sim.elapsedMs) / 1000).hpMultiplier)
+  const hp = Math.round(def.hp * waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier)
   const pos = sim.hooks.spawnPoint(sim, false)
   sim.pendingSpawns.push({
     def,
