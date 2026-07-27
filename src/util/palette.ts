@@ -30,7 +30,6 @@ export function hslToInt(h: number, s: number, l: number): number {
 
 /** 菜单（game scope）固定中性背景 #292f33；地图面保持一个中性值。
  * rng 已不再使用（背景固定），保留签名以兼容各场景调用点 */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function randomPalette(_rng: Rng): Palette {
   return {
     bgFrom: '#292f33',

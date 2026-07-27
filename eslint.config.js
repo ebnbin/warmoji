@@ -53,6 +53,14 @@ export default tseslint.config(
   { ignores: ['dist/', 'node_modules/', 'test-results/', 'playwright-report/', 'public/'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  // 下划线前缀 = 「这个参数我不用，但签名要求它在」。默认规则只放过**尾部**未用参数，
+  // 于是「实现某接口但一个参数都不用」的空实现（如 views.ts 里各图的默认 step）无处安放。
+  {
+    files: ['src/**/*.ts', 'e2e/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    },
+  },
   // 数据表的唯一入口：assets/*.json 只许 data/ 与 types/ 读
   //（前者导出表，后者用 keyof typeof 派生 id 联合类型）。别处要用就 import data/ 的常量。
   // 不设这条的下场是同一张表被多处各读一遍、各取一半字段：历史上 feel.json 被
@@ -134,6 +142,7 @@ export default tseslint.config(
       'src/arcade/**/*.ts',
       // ECS 实验：宿主场景 + 自绘渲染层触碰 Phaser/WebGL（表现层）；ECS 逻辑文件仍禁 phaser
       'src/ecs/EcsBattleScene.ts',
+      'src/ecs/views.ts', // 各图的视觉实现（每张图一份，scene 只认接口）
       'src/ecs/render/**/*.ts',
       'src/battle.ts',
       // ui 整包是通用控件层（Phaser 容器/图形/输入）

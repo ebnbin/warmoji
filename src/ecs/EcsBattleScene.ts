@@ -12,29 +12,23 @@ import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
 import { UI_FONT, FONT } from '../util/fonts'
 import { norm } from '../util/vec'
-import { Rng } from '../util/rng'
 import { applyBackground } from '../util/background'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS } from '../manifest'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
-import { bossFor, MAP, MAPS, rollDecor } from '../data/maps'
-import type { MapDef, RiverConfig, TorusConfig, WallsConfig } from '../types/maps'
-import { fitAspectRect } from '../war/maps/void'
-import { driftSpeed, riverRect } from '../war/maps/river'
-import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from '../war/maps/daynight'
+import { bossFor, MAPS } from '../data/maps'
 import { onFloe } from '../war/maps/ice'
-import { chunkDecor, chunkKey, chunksInRect, outsideZone } from '../war/maps/world'
-import { WallGrid, generateRuins, reachableCells } from '../war/maps/ruins'
 import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
-import { hasComponent, query, removeEntity } from 'bitecs'
+import { hasComponent, query } from 'bitecs'
 import { Alive, Boss, Dormant, Enemy, FACTION, Faction, GrantCoins, Hp, CharHp, MoveSpeed, Nest, PICKUP_SET, Projectile, Revive, Sprite, Transform, Zone } from './components'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
-import { spawnDecor, spawnDriftDecor } from './entities/decor'
 import { remapSim } from './systems/shared/remap'
+import { viewFor } from './views'
+import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
 import { clearEcsStore, modDef } from './store'
 import { armCaptain, armTeam } from './entities/loadout'
@@ -71,25 +65,7 @@ import { centerX, centerY } from './utils/team'
 // 自绘渲染)全在 ECS。P2:有界森林图 + 队伍编队/orbit/游移/跟随弹簧 + 键盘/相机跟随。
 
 // 夜雾:整块暗幕的颜色/深度/尺寸(与 BoundedScene 同值)
-const FOG_COLOR = 0x0a0a1a
-const FOG_DEPTH = 90
-const FOG_SPAN = 9000
 // 浮冰图:深水底色 + 落水蓝渐晕(与 IceScene 同值)
-const WATER_COLOR = 0x0b2a45
-const WATER_VIGNETTE = 0x1e6fd0
-// 奔流图:两岸大地/树干棕(与浅蓝河水强对比,与 RiverScene 同值)
-const BANK_COLOR = 0x54402a
-const BANK_FAR_COLOR = 0x40301f
-
-/** 一片顺流漂浮物(纯视觉):沿流向进度 + 跨向基准偏移 + 摇摆/自旋 */
-/** 颜色明暗缩放(河水跨向渐变用) */
-function shade(color: number, mul: number): number {
-  const r = Math.min(255, Math.round(((color >> 16) & 0xff) * mul))
-  const g = Math.min(255, Math.round(((color >> 8) & 0xff) * mul))
-  const b = Math.min(255, Math.round((color & 0xff) * mul))
-  return (r << 16) | (g << 8) | b
-}
-
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
 }
@@ -103,22 +79,11 @@ function liveCoins(world: EcsWorld): number {
   return n
 }
 
-/** 哪些世界形态走「满屏底色 + 分块装饰 + 出生在原点」的无限地基。**全映射**：
- * MapDef 新增一种 kind 而不在此登记 = 编译不过。从前是 `kind === 'infinite' || kind === 'space'`，
- * 新增一种形态默认落在 false，是漏掉还是有意分不出来 */
-const CHUNKED_BACKDROP: Record<MapDef['kind'], boolean> = {
-  bounded: false,
-  daynight: false,
-  ruins: false,
-  ice: false,
-  void: false,
-  river: false, // 奔流虽是无限世界，但底色是滚动河面，不走分块装饰
-  infinite: true,
-  space: true,
-}
-
 export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private world!: EcsWorld
+  /** 本图的视觉：每张图一份实现（views.ts）。**scene 只握接口，不认识任何一张具体的图** */
+  private map!: MapView
+  private ctx!: ViewCtx
   private atlas?: EcsAtlas
   /** 一次性特效层（池化自绘，不挂 tween；见 render/cues.ts） */
   private cues?: CueLayer
@@ -157,34 +122,20 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private puffBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   /** 昼夜图夜雾：整块暗色矩形 + 反相圆遮罩在其上「挖洞」露出队伍周围 */
-  private fogRect?: Phaser.GameObjects.Rectangle
-  private fogMaskShape?: Phaser.GameObjects.Graphics
   /** 时停冷雾遮罩：屏幕固定的大矩形，alpha 由时停态逐帧驱动（越静越浓） */
   private timeStopFx?: Phaser.GameObjects.Rectangle
   private timeStopFxAlpha = 0
   /** 浮冰图落水蓝渐晕：屏幕固定，队伍在水里时脉冲提示 */
   private waterVignette?: Phaser.GameObjects.Rectangle
   /** 无限图终波缩圈：圈线 + 圈外红渐晕（圈本体状态在 sim.worldState.zone，纯逻辑侧算） */
-  private zoneGfx?: Phaser.GameObjects.Graphics
-  private zoneVignette?: Phaser.GameObjects.Rectangle
   /** 深空图天体横扫的预警车道：跟着横扫实体的 eid 走（球体是那颗实体自己的贴图） */
-  private meteorFx?: { of: number; tele: Phaser.GameObjects.Graphics }
   /** 工厂图（环面）：跨缝分身的条带相机 + 传送门光带/脉动边线 */
-  private stripCams: Phaser.Cameras.Scene2D.Camera[] = []
-  private frameTiles: { tile: Phaser.GameObjects.TileSprite; dx: number; dy: number }[] = []
-  private frameGlow?: Phaser.GameObjects.Graphics
   /** 单屏图（奔流/工厂）的静态视觉层：视口变化时整体重建 */
-  private worldVisuals: Phaser.GameObjects.GameObject[] = []
   /** 同上，但是 ECS 装饰实体（岸上植被 / 散落零件 / 水面漂浮物）：
    * 它们的落点由地图尺寸推出，视口一变就得按新尺寸重铺，故与 worldVisuals 同生共死 */
-  private worldDecor: number[] = []
   /** 奔流图水面动效：双层水纹贴图（漂浮物已是装饰实体，不在此列） */
-  private waveTiles: { tile: Phaser.GameObjects.TileSprite; speed: number }[] = []
   /** 残垣图断壁：格索引 → 该格的石块/顶沿视觉（碾墙时单格销毁） */
-  private wallTiles = new Map<number, Phaser.GameObjects.Rectangle[]>()
   /** 无限图装饰分块：块键 → 该块的装饰实体 eid；视野块集合变化才增删 */
-  private decorChunks = new Map<string, number[]>()
-  private decorRangeKey = ''
   private centerObj!: Phaser.GameObjects.Zone
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -193,11 +144,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
   constructor() {
     super(ECS_SCENE_KEY)
-  }
-
-  /** 本图是否走无限世界地基(满屏底色 + 分块装饰 + 出生在原点) */
-  private get infinite(): boolean {
-    return CHUNKED_BACKDROP[MAPS[this.run.mapId].kind]
   }
 
   /** 开局重置全部可变实例字段（镜像 resetWorldFields 的用意）。
@@ -219,23 +165,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.shownCountdown = []
     this.seenHitCount = 0
     this.damageText = undefined
-    this.fogRect = undefined
-    this.fogMaskShape = undefined
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
-    this.waterVignette = undefined
-    this.zoneGfx = undefined
-    this.zoneVignette = undefined
-    this.meteorFx = undefined
-    this.stripCams = []
-    this.frameTiles = []
-    this.frameGlow = undefined
-    this.worldVisuals = []
-    this.worldDecor = []
-    this.waveTiles = []
-    this.wallTiles = new Map()
-    this.decorChunks = new Map()
-    this.decorRangeKey = ''
   }
 
   create(): void {
@@ -249,106 +180,25 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.teamFx = aggregateTeamCards(run.teamCards)
     const mapDef = MAPS[run.mapId]
     applyBackground(mapDef.palette)
-    // 浮冰图的「地图」即那块方形浮冰(其外皆水),故尺寸取 floeU;
-    // 奔流是单屏世界:世界 = 逻辑视口 × viewScale
-    const rc = mapDef.river
-    const tc = mapDef.torus
-    const landscape = viewport.logicalWidth >= viewport.logicalHeight
-    this.mapW = tc
-      ? (landscape ? tc.arenaLong : tc.arenaShort) * UNIT
-      : rc
-        ? viewport.logicalWidth * rc.viewScale
-        : (mapDef.ice?.floeU ?? mapDef.size?.w ?? MAP.width) * UNIT
-    this.mapH = tc
-      ? (landscape ? tc.arenaShort : tc.arenaLong) * UNIT
-      : rc
-        ? viewport.logicalHeight * rc.viewScale
-        : (mapDef.ice?.floeU ?? mapDef.size?.h ?? MAP.height) * UNIT
-    const margin = MAP.cameraMargin * UNIT
+    // 本图的视觉全交给它自己那份 MapView（views.ts）——**scene 不认识任何一张具体的图**
+    this.map = viewFor(run.mapId)
+    this.ctx = { scene: this, world: this.world, run, def: mapDef, anchor: undefined as never, w: 0, h: 0 }
+    const { w, h, origin } = this.map.layout(this.ctx)
+    this.ctx.w = this.mapW = w
+    this.ctx.h = this.mapH = h
+    this.map.build(this.ctx)
 
-    // 浮冰图:深水底色铺满屏(相机锁定;世界无边界,看到哪都是水)
-    if (mapDef.ice) {
-      this.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, WATER_COLOR)
-        .setScrollFactor(0)
-        .setDepth(-2)
-    }
+    // 队伍锚点（相机跟随目标）：出生点由本图的 layout 给
+    const center = origin
+    this.centerObj = this.add.zone(center.x, center.y, 1, 1)
+    ;(this.ctx as { anchor: Phaser.GameObjects.Zone }).anchor = this.centerObj
+    this.map.camera(this.ctx)
 
-    // 地面:无限世界没有边、也就没有影子边缘——相机锁定的满屏底色即地面;
-    // 有界图为纯色面 + 右下阴影(镜像 drawFloor),浮冰图另描冰缘读得出边界
-    if (tc) {
-      this.buildVoidVisuals(mapDef, tc)
-    } else if (rc) {
-      this.buildRiverVisuals(mapDef, rc)
-    } else if (this.infinite) {
-      this.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, mapDef.palette.map)
-        .setScrollFactor(0)
-        .setDepth(-1)
-    } else {
-      const g = this.add.graphics().setDepth(-1)
-      const so = 0.25 * UNIT
-      g.fillStyle(mapDef.palette.shadow, 1)
-      g.fillRect(so, so, this.mapW, this.mapH)
-      g.fillStyle(mapDef.palette.map, 1)
-      g.fillRect(0, 0, this.mapW, this.mapH)
-      if (mapDef.ice) {
-        g.lineStyle(3, 0xdff3ff, 0.85)
-        g.strokeRect(0, 0, this.mapW, this.mapH)
-      }
-    }
-    if (mapDef.ice) {
-      // 落水蓝渐晕(相机锁定):队伍在水里时提示
-      this.waterVignette = this.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, WATER_VIGNETTE, 0)
-        .setScrollFactor(0)
-        .setDepth(90)
-    }
-
-    // 深空图:常驻黑洞禁锢圈(圆心即出生点原点),亮紫环 + 内侧渐隐提示,一次绘制
-    const fieldR = (mapDef.space?.blackholeRadiusU ?? 0) * UNIT
-    if (fieldR > 0) {
-      const ring = this.add.graphics().setDepth(2)
-      ring.lineStyle(5, 0x9c6bff, 0.7)
-      ring.strokeCircle(0, 0, fieldR)
-      ring.lineStyle(18, 0x6a3fbf, 0.13)
-      ring.strokeCircle(0, 0, fieldR - 9)
-    }
-
-    const cam = this.cameras.main
-    cam.setZoom(rc ? viewport.renderScale / rc.viewScale : viewport.renderScale)
-    // 工厂：主相机视口 = 屏幕内最大居中的竞技场定比矩形（多余留空白）+ 四缝四角条带分身相机
-    if (tc) this.setupTorusCameras(tc)
-    // 浮冰/无限无边界:相机只管跟人(滑进水里、走到天边也跟着走);
-    // 深空的圆是有界的,bounds 钳在其外接框内;有界图照旧外扩一圈
-    if (fieldR > 0) {
-      const half = fieldR + margin
-      cam.setBounds(-half, -half, half * 2, half * 2)
-    } else if (!mapDef.ice && !this.infinite) {
-      cam.setBounds(-margin, -margin, this.mapW + margin * 2, this.mapH + margin * 2)
-    }
-
-    // 昼夜图夜雾（镜像 BoundedScene.createFog）：反相 Mask filter 在暗幕上挖出视野洞。
-    // Phaser 4 的 GeometryMask 在 WebGL 无实现，故与旧路径一样走 filters.internal.addMask(shape, true)
-    if (mapDef.dayNight) {
-      this.fogRect = this.add.rectangle(0, 0, FOG_SPAN, FOG_SPAN, FOG_COLOR, 0).setDepth(FOG_DEPTH).setVisible(false)
-      this.fogMaskShape = this.add.graphics().setVisible(false)
-      this.fogRect.enableFilters()
-      this.fogRect.filters?.internal.addMask(this.fogMaskShape, true)
-    }
-
-    // 时停冷雾遮罩（镜像 ArcadeBattleScene：屏幕固定大矩形，任意地图通用）
+    // 时停冷雾遮罩：屏幕固定的大矩形，**任意地图通用**，故不属于任何一份 MapView
     this.timeStopFx = this.add
       .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, TIMESTOP.chillColor, 0)
       .setScrollFactor(0)
       .setDepth(88)
-
-    // 出生点:无限世界出生在原点(负坐标合法),有界/单屏图在图心
-    const center = this.infinite ? { x: 0, y: 0 } : { x: this.mapW / 2, y: this.mapH / 2 }
-    this.centerObj = this.add.zone(center.x, center.y, 1, 1)
-    // 奔流是固定相机的单屏世界:居中锁死,不跟随
-    if (rc || tc) cam.centerOn(this.mapW / 2, this.mapH / 2)
-    else cam.startFollow(this.centerObj)
 
     this.cursors = this.input.keyboard?.createCursorKeys()
     this.wasd = this.input.keyboard?.addKeys('W,A,S,D') as
@@ -382,8 +232,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.cues?.destroy()
       this.rings?.destroy()
       this.damageText?.destroy()
-      for (const c of this.stripCams) this.cameras.remove(c)
-      this.stripCams = []
+      this.map.destroy(this.ctx)
     })
 
     // 注:ESC = 暂停,绑定在共用的 UIScene 上(与旧竞技场同一处);此处不再另接一份,
@@ -399,7 +248,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
     this.cues = new CueLayer(this, this.world)
     this.rings = new RingLayer(this, this.world)
-    this.spawnDecor(run, atlas)
+    this.map.decor(this.ctx, atlas)
     this.testMode = run.testMode
     const settings = loadSettings(browserStorage())
     this.hitShakeOn = settings.hitShake
@@ -411,8 +260,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
     this.sim = makeSim(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
     initialLayout(this.sim)
-    const walls = MAPS[run.mapId].walls
-    if (walls) this.createWalls(this.sim, walls)
+    this.map.onSimReady(this.ctx, this.sim)
     this.sim.hooks.onStart(this.sim)
     // 亡语同步重放:killEnemy 内当场跑(同帧先死者的治疗要救得到同伴)
     const simRef = this.sim
@@ -454,14 +302,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
     // 正常模式 Boss 波开场:先开世界终波机关(无限图缩圈以此刻队伍位置张开),再预告投放本图 Boss
     if (!run.testMode && isBossWave(run.wave)) {
+      // 缩圈的视觉由无限图那份 MapView 自己按 worldState.zone 惰性建（见 views.ts）
       this.sim.hooks.onFinalWave(this.sim)
-      if (this.sim.worldState.zone) {
-        this.zoneGfx = this.add.graphics().setDepth(2)
-        this.zoneVignette = this.add
-          .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, 0xd32f2f, 0)
-          .setScrollFactor(0)
-          .setDepth(90)
-      }
       this.time.delayedCall(600, () => {
         if (!this.sim || this.sim.over) return
         this.events.emit('wave-warning', {
@@ -637,579 +479,41 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
   }
 
-  /** 昼夜世界步进(镜像 BoundedScene.updateWorld 的 dayNight 分支):相机随时刻平滑缩放 +
-   * 夜幕迷雾开合。出怪表/刷怪间隔的昼夜切换在纯逻辑侧(spawn.ts)按时钟自算 */
-  private updateDayNight(sim: Sim): void {
-    const dn = MAPS[this.run.mapId].dayNight
-    if (!dn) return
-    const hour = hourAt((this.run.combatMs + sim.elapsedMs) / 1000, dn)
-    // 视野 V 格 → zoom = 标准 ×(visionMid/V)
-    this.cameras.main.setZoom((viewport.renderScale * dn.visionMid) / visionGridsAt(hour, dn))
-    const rect = this.fogRect
-    const shape = this.fogMaskShape
-    if (!rect || !shape) return
-    const alpha = fogAlphaAt(hour, dn)
-    if (alpha <= 0.001) {
-      rect.setVisible(false)
-      return
-    }
-    shape.clear()
-    shape.fillStyle(0xffffff)
-    shape.fillCircle(centerX(sim), centerY(sim), fogRadiusAt(hour, dn) * UNIT)
-    rect.setPosition(centerX(sim), centerY(sim)).setFillStyle(FOG_COLOR, alpha).setVisible(true)
-  }
 
-  /** 浮冰世界的视觉步进(镜像 IceScene.updateWater 的渐晕部分):
-   * 队伍中心落水即脉冲蓝渐晕。掉血结算在纯逻辑侧(worlds.ts 的 tick) */
-  private updateWaterVignette(sim: Sim): void {
-    const rect = this.waterVignette
-    if (!rect) return
-    const px = MAPS[this.run.mapId].ice!.floeU * UNIT
-    const inWater = !onFloe(centerX(sim), centerY(sim), px)
-    rect.setFillStyle(WATER_VIGNETTE, inWater ? 0.18 + 0.06 * Math.sin(sim.elapsedMs / 140) : 0)
-  }
 
-  /** 视口变化（旋转 / 拉窗口）：跟随式相机只需重设缩放；
-   * 单屏图（奔流/工厂）的世界尺寸是从视口推出来的，须整体重映射——
-   * 「长轴进度 + 跨轴偏移」的通用几何在 war/remap，与旧图共用一份 */
+  /** 视口变化（旋转 / 拉窗口）：世界尺寸由本图的 layout 说了算；变了才整体重映射
+   * ——「长轴进度 + 跨轴偏移」的通用几何在 war/remap，与旧图共用一份 */
   private onViewportChanged(): void {
     const sim = this.sim
-    const mapDef = MAPS[this.run.mapId]
-    const rc = mapDef.river
-    const tc = mapDef.torus
-    const cam = this.cameras.main
-    if (!rc && !tc) {
-      cam.setZoom(viewport.renderScale)
-      return
-    }
     const fromW = this.mapW
     const fromH = this.mapH
-    const landscape = viewport.logicalWidth >= viewport.logicalHeight
-    this.mapW = tc ? (landscape ? tc.arenaLong : tc.arenaShort) * UNIT : viewport.logicalWidth * rc!.viewScale
-    this.mapH = tc ? (landscape ? tc.arenaShort : tc.arenaLong) * UNIT : viewport.logicalHeight * rc!.viewScale
-    if (tc) {
-      for (const c of this.stripCams) this.cameras.remove(c)
-      this.stripCams = []
-      this.setupTorusCameras(tc)
-    } else {
-      cam.setZoom(viewport.renderScale / rc!.viewScale)
-    }
-    cam.centerOn(this.mapW / 2, this.mapH / 2)
+    const { w, h } = this.map.layout(this.ctx)
+    this.ctx.w = this.mapW = w
+    this.ctx.h = this.mapH = h
+    this.map.resize(this.ctx)
+    if (w === fromW && h === fromH) return
     if (sim) {
-      sim.mapW = this.mapW
-      sim.mapH = this.mapH
-      remapSim(sim, fromW, fromH, this.mapW, this.mapH)
+      sim.mapW = w
+      sim.mapH = h
+      remapSim(sim, fromW, fromH, w, h)
       this.centerObj.setPosition(centerX(sim), centerY(sim))
     }
-    // 视觉层整体重建（战斗实体不在此列：它们是 ECS 实体，坐标已随 remapSim 挪好）
-    for (const o of this.worldVisuals) o.destroy()
-    for (const eid of this.worldDecor) removeEntity(this.world, eid)
-    this.worldVisuals = []
-    this.worldDecor = []
-    this.waveTiles = []
-    this.frameTiles = []
-    this.frameGlow = undefined
-    if (tc) this.buildVoidVisuals(mapDef, tc)
-    else this.buildRiverVisuals(mapDef, rc!)
-    if (this.atlas) this.spawnWorldDecor(mapDef, this.atlas)
-  }
-
-  /** 环面相机（镜像 VoidScene.setupCameras）：主相机裁出屏内最大居中的竞技场定比矩形，
-   * 四缝 + 四角各挂一台条带相机取景对侧溢出——跨缝实体两侧同时可见（渲染层的幽灵分身）。
-   * ECS 侧全场实体是同一个批绘对象，条带相机各自按自己的滚动再画一遍，天然成立 */
-  private setupTorusCameras(cfg: TorusConfig): void {
-    const cw = Math.round(viewport.cssWidth * viewport.dpr)
-    const ch = Math.round(viewport.cssHeight * viewport.dpr)
-    const rect = fitAspectRect(cw, ch, this.mapW, this.mapH)
-    const zoom = rect.w / this.mapW
-    const cam = this.cameras.main
-    cam.setViewport(Math.round(rect.x), Math.round(rect.y), Math.round(rect.w), Math.round(rect.h))
-    cam.setZoom(zoom)
-    const s = cfg.strip * UNIT
-    const sPx = Math.max(2, Math.round(s * zoom))
-    const x0 = Math.round(rect.x)
-    const y0 = Math.round(rect.y)
-    const w = Math.round(rect.w)
-    const h = Math.round(rect.h)
-    const W = this.mapW
-    const H = this.mapH
-    const mk = (vx: number, vy: number, vw: number, vh: number, cx: number, cy: number): void => {
-      const c = this.cameras.add(vx, vy, vw, vh)
-      c.setZoom(zoom)
-      c.centerOn(cx, cy)
-      this.stripCams.push(c)
-    }
-    // 屏幕左缘显示「越过右缝的溢出」（世界 x∈[W, W+s)），其余同理；四角为对角溢出
-    mk(x0, y0, sPx, h, W + s / 2, H / 2)
-    mk(x0 + w - sPx, y0, sPx, h, -s / 2, H / 2)
-    mk(x0, y0, w, sPx, W / 2, H + s / 2)
-    mk(x0, y0 + h - sPx, w, sPx, W / 2, -s / 2)
-    mk(x0, y0, sPx, sPx, W + s / 2, H + s / 2)
-    mk(x0 + w - sPx, y0, sPx, sPx, -s / 2, H + s / 2)
-    mk(x0, y0 + h - sPx, sPx, sPx, W + s / 2, -s / 2)
-    mk(x0 + w - sPx, y0 + h - sPx, sPx, sPx, -s / 2, -s / 2)
-  }
-
-  /** 工厂视觉（镜像 buildVoidVisuals）：钢板地面 + 散落零件 + 传送闸口流光门框。
-   * 静态视觉只画一份——条带相机全部忽略，否则门框/地板会在缝上重影 */
-  private buildVoidVisuals(mapDef: MapDef, cfg: TorusConfig): void {
-    const W = this.mapW
-    const H = this.mapH
-    const statics = this.worldVisuals
-
-    // 钢板厂房地面（中心朝亮的顶灯软渐变，避免硬边椭圆的「盘子感」）
-    const gFloor = this.add.graphics().setDepth(0)
-    gFloor.fillStyle(mapDef.palette.map, 1)
-    gFloor.fillRect(0, 0, W, H)
-    const inner = Phaser.Display.Color.IntegerToColor(mapDef.palette.map).brighten(7).color
-    for (const [k, a] of [
-      [0.95, 0.1],
-      [0.75, 0.1],
-      [0.55, 0.12],
-    ] as const) {
-      gFloor.fillStyle(inner, a)
-      gFloor.fillEllipse(W / 2, H / 2, W * k, H * k)
-    }
-    statics.push(gFloor)
-
-    // 传送门门框：琥珀色警示光带顺时针流动（上→右→下→左）+ 脉动描边
-    this.ensureDashTexture(cfg)
-    const f = cfg.frame * UNIT
-    const mkTile = (x: number, y: number, w: number, h: number, dx: number, dy: number, vertical: boolean): void => {
-      const tile = this.add
-        .tileSprite(x, y, w, h, vertical ? 'void-dash-v' : 'void-dash-h')
-        .setOrigin(0)
-        .setDepth(3.5)
-        .setAlpha(0.42)
-        .setTint(0xffb300)
-      this.frameTiles.push({ tile, dx, dy })
-      statics.push(tile)
-    }
-    mkTile(0, 0, W, f, 1, 0, false)
-    mkTile(W - f, 0, f, H, 0, 1, true)
-    mkTile(0, H - f, W, f, -1, 0, false)
-    mkTile(0, 0, f, H, 0, -1, true)
-
-    this.frameGlow = this.add.graphics().setDepth(3.6)
-    statics.push(this.frameGlow)
-    // 静态视觉只画一份:条带相机全部忽略,否则门框/地板会在缝上重影
-    for (const c of this.stripCams) c.ignore(statics)
-  }
-
-  /** 门框虚线贴图（横/竖两个变体，一次生成） */
-  private ensureDashTexture(cfg: TorusConfig): void {
-    const size = 64
-    const th = Math.round(cfg.frame * UNIT)
-    for (const [key, vertical] of [
-      ['void-dash-h', false],
-      ['void-dash-v', true],
-    ] as const) {
-      if (this.textures.exists(key)) continue
-      const canvas = this.textures.createCanvas(key, vertical ? th : size, vertical ? size : th)
-      if (!canvas) continue
-      const ctx = canvas.getContext()
-      ctx.clearRect(0, 0, vertical ? th : size, vertical ? size : th)
-      ctx.fillStyle = 'rgba(255,255,255,0.85)'
-      // 一节亮虚线 + 留空（滚动后呈流动光点带）
-      if (vertical) ctx.fillRect(th * 0.3, 10, th * 0.4, 14)
-      else ctx.fillRect(10, th * 0.3, 14, th * 0.4)
-      canvas.refresh()
-    }
-  }
-
-  /** 门框逐帧动效（镜像 updatePortals）：光带顺时针流动 + 边线脉动 */
-  private updatePortals(sim: Sim, delta: number): void {
-    if (this.frameTiles.length === 0) return
-    const flow = (56 * delta) / 1000
-    for (const t of this.frameTiles) {
-      t.tile.tilePositionX += t.dx * flow
-      t.tile.tilePositionY += t.dy * flow
-    }
-    const g = this.frameGlow
-    if (!g) return
-    const pulse = 0.4 + 0.22 * Math.sin(sim.elapsedMs / 420)
-    g.clear()
-    g.lineStyle(3, 0xff8f00, pulse)
-    g.strokeRect(1.5, 1.5, this.mapW - 3, this.mapH - 3)
-    g.lineStyle(1.5, 0xffe082, Math.min(1, pulse + 0.25))
-    g.strokeRect(4, 4, this.mapW - 8, this.mapH - 8)
-  }
-
-  /** 奔流水面视觉层(镜像 RiverScene.buildRiverVisuals):两岸暗带 + 河水跨向渐变 +
-   * 岸线浪花 + 双层滚动水纹 + 岸上静态植被 + 顺流漂浮物。全为纯 Phaser 视觉,不进 ECS 批绘 */
-  private buildRiverVisuals(mapDef: MapDef, cfg: RiverConfig): void {
-    const vw = this.mapW
-    const vh = this.mapH
-    const r = riverRect(vw, vh, cfg.width * UNIT)
-    const horizontal = r.horizontal
-
-    // 两岸暗带(河道以外的跨轴余量),外缘更暗给一点纵深
-    const statics = this.worldVisuals
-    const gBank = this.add.graphics().setDepth(0)
-    gBank.fillStyle(BANK_COLOR, 1)
-    gBank.fillRect(0, 0, vw, vh)
-    statics.push(gBank)
-    gBank.fillStyle(BANK_FAR_COLOR, 1)
-    if (horizontal) {
-      if (r.y > 24) gBank.fillRect(0, 0, vw, Math.max(0, r.y - 18))
-      gBank.fillRect(0, Math.min(vh, r.y + r.h + 18), vw, vh)
-    } else {
-      if (r.x > 24) gBank.fillRect(0, 0, Math.max(0, r.x - 18), vh)
-      gBank.fillRect(Math.min(vw, r.x + r.w + 18), 0, vw, vh)
-    }
-
-    // 河水:跨向「岸暗心亮」的两段渐变
-    const gWater = this.add.graphics().setDepth(0.2)
-    statics.push(gWater)
-    const edge = shade(mapDef.palette.map, 0.78)
-    const mid = shade(mapDef.palette.map, 1.12)
-    if (horizontal) {
-      gWater.fillGradientStyle(edge, edge, mid, mid, 1)
-      gWater.fillRect(r.x, r.y, r.w, r.h / 2)
-      gWater.fillGradientStyle(mid, mid, edge, edge, 1)
-      gWater.fillRect(r.x, r.y + r.h / 2, r.w, r.h / 2)
-    } else {
-      gWater.fillGradientStyle(edge, mid, edge, mid, 1)
-      gWater.fillRect(r.x, r.y, r.w / 2, r.h)
-      gWater.fillGradientStyle(mid, edge, mid, edge, 1)
-      gWater.fillRect(r.x + r.w / 2, r.y, r.w / 2, r.h)
-    }
-
-    // 岸线浪花:贴岸白线 + 断续泡点(种子固定,同局重建不变)
-    const gFoam = this.add.graphics().setDepth(0.4)
-    statics.push(gFoam)
-    gFoam.lineStyle(2, 0xffffff, 0.3)
-    const foamRng = new Rng(this.run.decorSeed ^ 0xf0a8)
-    const alongLen = horizontal ? r.w : r.h
-    for (const e of horizontal ? [r.y, r.y + r.h] : [r.x, r.x + r.w]) {
-      if (horizontal) gFoam.lineBetween(0, e, vw, e)
-      else gFoam.lineBetween(e, 0, e, vh)
-      let along = foamRng.next() * 40
-      while (along < alongLen) {
-        const size = 1.5 + foamRng.next() * 2.5
-        const off = (foamRng.next() - 0.5) * 6
-        gFoam.fillStyle(0xffffff, 0.14 + foamRng.next() * 0.14)
-        if (horizontal) gFoam.fillCircle(along, e + off, size)
-        else gFoam.fillCircle(e + off, along, size)
-        along += 24 + foamRng.next() * 60
-      }
-    }
-
-    // 双层水纹(视差滚动)
-    const texKey = this.ensureWaveTexture(horizontal)
-    for (const [alpha, speed] of [
-      [0.1, cfg.waveSlow * UNIT],
-      [0.16, cfg.waveFast * UNIT],
-    ] as const) {
-      const tile = this.add
-        .tileSprite(r.x + r.w / 2, r.y + r.h / 2, r.w, r.h, texKey)
-        .setAlpha(alpha)
-        .setDepth(0.6)
-      tile.tilePositionX = Math.random() * 256
-      tile.tilePositionY = Math.random() * 256
-      this.waveTiles.push({ tile, speed })
-      statics.push(tile)
-    }
-
-  }
-
-  /** 无缝水纹贴图(按朝向各生成一次):沿流向的白色弧形流痕 */
-  private ensureWaveTexture(horizontal: boolean): string {
-    const key = horizontal ? 'river-wave-h' : 'river-wave-v'
-    if (this.textures.exists(key)) return key
-    const size = 256
-    const canvas = this.textures.createCanvas(key, size, size)
-    if (!canvas) return key
-    const ctx = canvas.getContext()
-    ctx.clearRect(0, 0, size, size)
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)'
-    ctx.lineCap = 'round'
-    const rng = new Rng(0x5117e5)
-    for (let i = 0; i < 14; i++) {
-      const cx = 20 + rng.next() * (size - 40)
-      const cy = 20 + rng.next() * (size - 40)
-      const len = 20 + rng.next() * 36
-      const bow = 3 + rng.next() * 5
-      ctx.lineWidth = 1.5 + rng.next() * 1.5
-      ctx.beginPath()
-      if (horizontal) {
-        ctx.moveTo(cx - len / 2, cy)
-        ctx.quadraticCurveTo(cx, cy - bow, cx + len / 2, cy)
-      } else {
-        ctx.moveTo(cx, cy - len / 2)
-        ctx.quadraticCurveTo(cx + bow, cy, cx, cy + len / 2)
-      }
-      ctx.stroke()
-    }
-    canvas.refresh()
-    return key
-  }
-
-  /** 水纹贴图逐帧偏移(镜像 updateWater 的水面部分)。
-   * 漂浮物不在此列——它们是装饰实体,顺流/摇摆/自旋归 systems/driftDecor + spinDecor */
-  private updateRiver(delta: number): void {
-    const cfg = MAPS[this.run.mapId].river
-    if (!cfg) return
-    const dt = delta / 1000
-    const r = riverRect(this.mapW, this.mapH, cfg.width * UNIT)
-    for (const w of this.waveTiles) {
-      if (r.horizontal) w.tile.tilePositionX += w.speed * dt
-      else w.tile.tilePositionY -= w.speed * dt
-    }
-  }
-
-  /** 断壁世界建场(镜像 BoundedScene.createWalls):按种子铺断壁 → 网格 + 可达刷怪格 → 逐格画石块。
-   * 网格/流场是纯逻辑(sim.worldState.walls),此处只负责视觉与回填 */
-  private createWalls(sim: Sim, cfg: WallsConfig): void {
-    const cols = Math.round(this.mapW / UNIT)
-    const rows = Math.round(this.mapH / UNIT)
-    const rng = new Rng(this.run.decorSeed ^ 0x5eed)
-    const blocked = generateRuins(() => rng.next(), cols, rows, {
-      blocks: cfg.blocks,
-      maxLen: cfg.maxLen,
-      centerClearU: cfg.centerClearU,
-    })
-    const grid = new WallGrid(cols, rows, UNIT, blocked)
-    // 只在「从中心可达」的通行格刷怪,保证敌人总能寻路到队伍
-    const cells = [...reachableCells(grid, Math.floor(cols / 2), Math.floor(rows / 2))]
-    sim.worldState.walls = { grid, flowCellX: -1, flowCellY: -1, reflowAcc: 0, spawnCells: cells, smashed: [] }
-    // 逐格填充石块 + 顶沿提亮假高度(逐格存引用供碾墙单格销毁)
-    const palette = MAPS[this.run.mapId].palette
-    const base = Phaser.Display.Color.IntegerToColor(palette.map).darken(38).color
-    const top = Phaser.Display.Color.IntegerToColor(palette.map).darken(18).color
-    const capH = Math.max(3, UNIT * 0.22)
-    for (let cy = 0; cy < rows; cy++) {
-      for (let cx = 0; cx < cols; cx++) {
-        if (!blocked[cy * cols + cx]) continue
-        const px = cx * UNIT + UNIT / 2
-        const py = cy * UNIT + UNIT / 2
-        this.wallTiles.set(cy * cols + cx, [
-          this.add.rectangle(px, py, UNIT - 2, UNIT - 2, base).setDepth(2),
-          this.add.rectangle(px, cy * UNIT + 1 + capH / 2, UNIT - 2, capH, top).setDepth(2.1),
-        ])
-      }
-    }
-  }
-
-  /** 排空本帧被碾碎的断壁(镜像 smashWallAt 的视觉部分):拆石块 + 扬尘 */
-  private drainSmashedWalls(sim: Sim): void {
-    const w = sim.worldState.walls
-    if (!w || w.smashed.length === 0) return
-    for (const idx of w.smashed) {
-      const objs = this.wallTiles.get(idx)
-      if (!objs) continue
-      for (const o of objs) o.destroy()
-      this.wallTiles.delete(idx)
-      const x = ((idx % w.grid.cols) + 0.5) * UNIT
-      const y = (Math.floor(idx / w.grid.cols) + 0.5) * UNIT
-      const c = this.add.circle(x, y, UNIT * 0.4, 0xbcae95, 0.6).setDepth(5)
-      this.tweens.add({ targets: c, scale: 1.8, alpha: 0, duration: 320, onComplete: () => c.destroy() })
-    }
-    w.smashed.length = 0
-  }
-
-  /** 单屏图（工厂/奔流）的布景装饰：散落零件 / 岸上植被 / 水面漂浮物。
-   * 与 buildXVisuals 分开的理由是**时序**——那些是 Phaser 图层，create 一开头就能铺；
-   * 装饰是 ECS 实体，贴图走图集，必须等 atlas 就位。两者一同重建（见 rebuildWorldVisuals）*/
-  private spawnWorldDecor(mapDef: MapDef, atlas: EcsAtlas): void {
-    const tc = mapDef.torus
-    if (tc) {
-      // 散落零件点缀（种子固定：同局重建不变）
-      const W = this.mapW
-      const H = this.mapH
-      const def = mapDef.decor
-      const rng = new Rng(this.run.decorSeed)
-      const cells = (W / UNIT) * (H / UNIT)
-      const density = def.density[0] + rng.next() * (def.density[1] - def.density[0])
-      for (let i = 0; i < Math.round(cells * density); i++) {
-        const sizeU = def.sizeU[0] + rng.next() * (def.sizeU[1] - def.sizeU[0])
-        this.worldDecor.push(
-          spawnDecor(this.world, atlas, {
-            id: def.emojis[Math.floor(rng.next() * def.emojis.length)]!,
-            outline: 'player',
-            x: rng.next() * W,
-            y: rng.next() * H,
-            size: sizeU * UNIT,
-            rot: (rng.next() * 2 - 1) * Math.PI,
-            alpha: def.alpha[0] + rng.next() * (def.alpha[1] - def.alpha[0]),
-            z: 0.5,
-          }),
-        )
-      }
-      return
-    }
-    const cfg = mapDef.river
-    if (!cfg) return
-    const vw = this.mapW
-    const vh = this.mapH
-    const r = riverRect(vw, vh, cfg.width * UNIT)
-    const horizontal = r.horizontal
-    const alongLen = horizontal ? vw : vh
-    // 岸上静态植被:沿长轴等距掷点(种子固定),只落在岸带内
-    const def = mapDef.decor
-    const decorRng = new Rng(this.run.decorSeed)
-    const bands: [number, number][] = horizontal
-      ? [
-          [0, r.y],
-          [r.y + r.h, vh],
-        ]
-      : [
-          [0, r.x],
-          [r.x + r.w, vw],
-        ]
-    for (const [b0, b1] of bands) {
-      const bandW = b1 - b0
-      if (bandW < 0.3 * UNIT) continue
-      for (let along = 0.5 * UNIT; along < alongLen; along += UNIT * (0.9 + decorRng.next() * 0.7)) {
-        if (decorRng.next() > 0.7) continue
-        const emoji = def.emojis[Math.floor(decorRng.next() * def.emojis.length)]!
-        const sizeU = def.sizeU[0] + decorRng.next() * (def.sizeU[1] - def.sizeU[0])
-        const size = Math.min(sizeU * UNIT, bandW * 0.9)
-        const cross = b0 + size / 2 + decorRng.next() * Math.max(1, bandW - size)
-        this.worldDecor.push(
-          spawnDecor(this.world, this.atlas!, {
-            id: emoji,
-            outline: 'player',
-            x: horizontal ? along : cross,
-            y: horizontal ? cross : along,
-            size,
-            rot: (decorRng.next() * 2 - 1) * 0.6,
-            alpha: def.alpha[0] + decorRng.next() * (def.alpha[1] - def.alpha[0]),
-            z: 0.8,
-          }),
-        )
-      }
-    }
-
-    // 漂浮物(顺流循环):会漂、会转的装饰实体,位姿逐帧由 driftDecor 从 u/cross 算出
-    const pool = mapDef.drift ?? ['1f343']
-    const halfCross = (horizontal ? r.h : r.w) / 2
-    for (let i = 0; i < cfg.driftCount; i++) {
-      const cross = (Math.random() * 2 - 1) * halfCross * 0.92
-      this.worldDecor.push(
-        spawnDriftDecor(
-          this.world,
-          this.atlas!,
-          {
-            id: pool[Math.floor(Math.random() * pool.length)]!,
-            outline: 'player',
-            x: 0,
-            y: 0,
-            size: (0.35 + Math.random() * 0.25) * UNIT,
-            alpha: 0.5,
-            z: 1.5,
-            spin: (Math.random() * 2 - 1) * 0.5,
-          },
-          {
-            u: Math.random() * alongLen,
-            cross,
-            speedMul: driftSpeed(cross / halfCross, cfg, Math.random),
-            swayPhase: Math.random() * Math.PI * 2,
-            swayAmp: (0.06 + Math.random() * 0.12) * UNIT,
-          },
-        ),
-      )
-    }
+    if (this.atlas) this.map.decor(this.ctx, this.atlas)
   }
 
 
-  /** 无限世界装饰分块滚动(镜像 InfiniteScene.ensureChunks):视野覆盖的块集合变化时
-   * 整组增删 ECS 静态实体。摆放由 chunkDecor 按 (种子, 块) 纯函数重建——回头看到的景不变 */
-  private ensureChunks(atlas: EcsAtlas): void {
-    const cfg = MAPS[this.run.mapId].infinite!
-    const view = this.cameras.main.worldView
-    const need = chunksInRect(
-      view.x / UNIT,
-      view.y / UNIT,
-      view.right / UNIT,
-      view.bottom / UNIT,
-      cfg.chunkCells,
-      cfg.chunkPad,
-    )
-    const first = need[0]!
-    const last = need[need.length - 1]!
-    const rangeKey = `${first.cx},${first.cy}:${last.cx},${last.cy}`
-    if (rangeKey === this.decorRangeKey) return
-    this.decorRangeKey = rangeKey
-    const def = MAPS[this.run.mapId].decor
-    const needKeys = new Set(need.map((c) => chunkKey(c.cx, c.cy)))
-    for (const [key, eids] of this.decorChunks) {
-      if (needKeys.has(key)) continue
-      for (const eid of eids) removeEntity(this.world, eid)
-      this.decorChunks.delete(key)
-    }
-    for (const c of need) {
-      const key = chunkKey(c.cx, c.cy)
-      if (this.decorChunks.has(key)) continue
-      this.decorChunks.set(
-        key,
-        chunkDecor(def, this.run.decorSeed, c.cx, c.cy, cfg.chunkCells).map((d) =>
-          spawnDecor(this.world, atlas, {
-            id: d.emoji,
-            outline: 'player',
-            x: d.xU * UNIT,
-            y: d.yU * UNIT,
-            size: d.sizeU * UNIT,
-            rot: d.rotation,
-            alpha: d.alpha,
-            z: 1,
-          }),
-        ),
-      )
-    }
-  }
 
-  /** 终波缩圈的视觉(镜像 InfiniteScene.updateZone;圈半径与掉血在 worlds.ts 纯逻辑侧):
-   * 亮边界环 + 内侧提示描边,有队员在圈外则满屏红渐晕脉冲 */
-  private updateZone(sim: Sim): void {
-    const zone = sim.worldState.zone
-    const g = this.zoneGfx
-    if (!zone || !g) return
-    g.clear()
-    g.lineStyle(5, 0xef5350, 0.85)
-    g.strokeCircle(zone.x, zone.y, zone.r)
-    g.lineStyle(14, 0xd32f2f, 0.16)
-    g.strokeCircle(zone.x, zone.y, zone.r + 9)
-    const anyOutside = sim.characters.some(
-      (m) => Alive.v[m] && outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r),
-    )
-    this.zoneVignette?.setFillStyle(0xd32f2f, anyOutside ? 0.16 + 0.08 * Math.sin(sim.elapsedMs / 130) : 0)
-  }
 
-  /** 天体横扫的预警车道(镜像 startMeteorWarn/endMeteor)。
-   * 🪐 球体不在这里——它是横扫实体自己的贴图（z=60），批绘照常画。
-   * 车道是一条粗线段，批绘不了，只能留作 Graphics；但它跟谁走由 **eid** 决定，
-   * 不再拿对象引用对帐 */
-  private updateMeteorFx(sim: Sim): void {
-    const m = query(this.world, [Meteor])[0]
-    const fx = this.meteorFx
-    if (fx && fx.of !== m) {
-      fx.tele.destroy()
-      this.meteorFx = undefined
-    }
-    if (m === undefined) return
-    const cfg = MAPS[this.run.mapId].space!.meteor
-    const rr = cfg.radiusU * UNIT
-    let cur = this.meteorFx
-    if (!cur) {
-      // 危险车道:宽半透明带 + 亮芯线 + 入口标记(球体从此侧划入)
-      const sx = Meteor.sx[m]!
-      const sy = Meteor.sy[m]!
-      const tele = this.add.graphics().setDepth(3)
-      tele.lineStyle(rr * 2, 0xff5252, 0.16)
-      tele.lineBetween(sx, sy, Meteor.ex[m]!, Meteor.ey[m]!)
-      tele.lineStyle(3, 0xff8a80, 0.8)
-      tele.lineBetween(sx, sy, Meteor.ex[m]!, Meteor.ey[m]!)
-      tele.fillStyle(0xff5252, 0.35)
-      tele.fillCircle(sx, sy, rr)
-      cur = { of: m, tele }
-      this.meteorFx = cur
-    }
-    // 预警脉动:轨迹一明一暗,提醒「这条线要来球」;起划后淡下去,只留车道感
-    cur.tele.setAlpha(
-      sim.elapsedMs < Due.at[m]! ? 0.28 + 0.24 * Math.abs(Math.sin(sim.elapsedMs / 110)) : 0.22,
-    )
-  }
+
+
+
+
+
+
+
+
+
+
 
   /** 本波携带者排期(镜像 scheduleCarriers):按预算铺开,均匀撒在本波中前段(留出波末空档)。
    * 第 1 波是纯净开场,不出战场拾取 */
@@ -1245,29 +549,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     })
   }
 
-  /** 地图装饰:按 run 种子随机散布的低透明度 emoji(镜像 BoundedScene.drawDecor),作 ECS 静态实体。
-   * 无限世界改走分块滚动(见 ensureChunks):世界没有边,不能一次铺完 */
-  private spawnDecor(run: RunState, atlas: EcsAtlas): void {
-    if (this.infinite) return this.ensureChunks(atlas)
-    // 奔流的岸上植被 / 工厂的散落零件按各自的图形铺,不走全图散布
-    const mapDef = MAPS[run.mapId]
-    if (mapDef.river || mapDef.torus) return this.spawnWorldDecor(mapDef, atlas)
-    const rng = new Rng(run.decorSeed)
-    const cols = Math.round(this.mapW / UNIT)
-    const rows = Math.round(this.mapH / UNIT)
-    for (const d of rollDecor(MAPS[run.mapId].decor, () => rng.next(), cols, rows)) {
-      spawnDecor(this.world, atlas, {
-        id: d.emoji,
-        outline: 'player',
-        x: d.xU * UNIT,
-        y: d.yU * UNIT,
-        size: d.sizeU * UNIT,
-        rot: d.rotation,
-        alpha: d.alpha,
-        z: 1,
-      })
-    }
-  }
 
   update(_time: number, delta: number): void {
     const sim = this.sim
@@ -1347,15 +628,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       return
     }
     this.centerObj.setPosition(centerX(sim), centerY(sim))
-    this.updateDayNight(sim)
-    this.updateWaterVignette(sim)
-    this.updateZone(sim)
-    this.updateMeteorFx(sim)
-    this.drainSmashedWalls(sim)
-    this.updateRiver(delta)
-    this.updatePortals(sim, delta)
-    // 无限世界:相机走到哪,装饰分块跟到哪(块集合不变则整段免算)
-    if (this.infinite && this.atlas) this.ensureChunks(this.atlas)
+    this.map.step(this.ctx, sim, delta)
     // 冷雾浓度跟随时停态（越静越浓），淡入淡出走实时 delta
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
