@@ -332,8 +332,17 @@ export const FACTION = { team: 0, enemy: 1 } as const
 
 export const Faction = { v: u8() }
 
-/** 冷却剩余 ms（≤0 即就绪） */
-export const Cooldown = { left: f32(), baseMs: f32() }
+/** 冷却字段工厂。**冷却属于「这一种能力」，不属于「这个实体」**——组件按 eid 只有
+ * 一格，军医的战地医疗与飞针挂在同一个宿主上时，共用一份冷却会让其中一条永远打不
+ * 出来，且不报错。所以每种能力的参数组件各带一份，见下面「每种能力的参数组件」。 */
+const cd = (): CdComp => ({ cdLeft: f32(), cdBase: f32() })
+
+/** 带冷却的能力参数组件的形状：castScan / tickCooldowns 只认这个，不认具体是哪种能力。
+ * cdLeft ≤ 0 即就绪；cdBase = 出手后重置到的间隔（0 = 这种能力没有冷却概念，自己安排下一次） */
+export interface CdComp {
+  readonly cdLeft: Float32Array
+  readonly cdBase: Float32Array
+}
 
 /** 出手乘区（装备时定死的那部分）：dmg 伤害 / cd 冷却 / crit 暴击率 / kb 击退倍率。
  * battle=1 表示这是一条常规出手，吃随局面变的队伍侧乘区（战场限时层、暴击加成、
@@ -349,7 +358,9 @@ export const Disarmed = { v: u8() }
 /** 受断壁遮挡：1 = 索敌须探得到头（残垣图）。穿墙能力为 0，无墙图整条判定短路 */
 export const WallBlocked = { v: u8() }
 
-/** 瞄准方向（弧度）：出手瞬间锁定，持有物摆位与命中判定共用同一个角 */
+/** 瞄准方向（弧度）：出手瞬间锁定，持有物摆位与命中判定共用同一个角。
+ * 只挂给真的会瞄准的 6 种能力（突刺/横扫/激光/弹道/刺杀/回旋镖），治疗与天罚不用。
+ * 它按 eid 只有一格，故同一宿主上两条都要瞄准的能力会撞——由 attachAbility 的断言拦下 */
 export const Aim = { rad: f32() }
 
 /** 挥击计时：本次动作的起始时刻（视觉钟）与时长。进度怎么映射成姿态由各 kind 自己解释 */
@@ -368,9 +379,13 @@ export const Swing = { startMs: f32(), durMs: f32() }
 //
 // 参数在装备那一刻由 registries/abilityKinds.ts 的 attach 从 def 写进来，此后 def
 // 与这条能力再无关系。
+//
+// **每个都以 `...cd()` 开头**：冷却是每条能力各一份的状态，不是每个实体一份。
+// 这样一个宿主才能同时挂多条不同种能力（军医 = 战地医疗 + 飞针）而互不干扰。
 
 /** 贯穿激光：向瞄准方向发射线段胶囊光束，打穿直线上所有敌人 */
 export const Laser = {
+  ...cd(),
   damage: f32(),
   knockback: f32(),
   range: f32(),
@@ -383,14 +398,14 @@ export const LaserBackBeam = {}
 export const LaserRadial = { beams: f32(), ratio: f32(), stepMs: f32() }
 
 /** 周期治疗：范围内血量比例最低的那一个 */
-export const Heal = { amount: f32(), range: f32() }
+export const Heal = { ...cd(), amount: f32(), range: f32() }
 /** 群体处方：改为范围内全体各回 ratio × amount */
 export const HealAoe = { ratio: f32() }
 /** 电击起搏：范围内有阵亡队友时优先为其减少复活倒计时 */
 export const HealDefib = { reviveCutMs: f32() }
 
 /** 寒气光环：以持有者为圆心的持续减速区（区本身是实体，见 entities/zone.ts） */
-export const SlowAura = { radius: f32(), slowFactor: f32(), color: u32() }
+export const SlowAura = { ...cd(), radius: f32(), slowFactor: f32(), color: u32() }
 /** 冻伤：光环内持续掉血（每秒） */
 export const AuraDps = { perSec: f32() }
 /** 凛冬降临：每 intervalMs 冻结光环内敌人 durationMs */
@@ -398,6 +413,7 @@ export const AuraFreeze = { intervalMs: f32(), durationMs: f32() }
 
 /** 突刺：沿瞄准方向的线段判定；无持有物时本体前冲 lungeDist */
 export const Thrust = {
+  ...cd(),
   damage: f32(),
   knockback: f32(),
   reach: f32(),
@@ -409,10 +425,11 @@ export const Thrust = {
 export const ThrustCombo = { delayMs: f32() }
 
 /** 横扫：扇形判定 */
-export const Sweep = { damage: f32(), knockback: f32(), radius: f32(), arcDeg: f32(), sweepMs: f32() }
+export const Sweep = { ...cd(), damage: f32(), knockback: f32(), radius: f32(), arcDeg: f32(), sweepMs: f32() }
 
 /** 轰炸：在侦测范围内选爆心，炸一个圆 */
 export const AreaBlast = {
+  ...cd(),
   damage: f32(),
   knockback: f32(),
   detectRange: f32(),
@@ -424,6 +441,7 @@ export const BlastEcho = { delayMs: f32(), ratio: f32() }
 
 /** 连锁闪电：首跳索敌后逐跳传导，每跳衰减 */
 export const ChainArc = {
+  ...cd(),
   damage: f32(),
   knockback: f32(),
   range: f32(),
@@ -435,6 +453,7 @@ export const ChainArc = {
 
 /** 回旋镖：去程锁点、回程追人，全部接住才开始计冷却 */
 export const Boomerang = {
+  ...cd(),
   damage: f32(),
   knockback: f32(),
   range: f32(),
@@ -450,6 +469,7 @@ export const CoinMagnet = { radius: f32() }
 
 /** 瞬闪突袭：闪到目标背后斩击，停留期间无敌，结束闪回 */
 export const Assassinate = {
+  ...cd(),
   damage: f32(),
   knockback: f32(),
   range: f32(),
@@ -461,6 +481,7 @@ export const Execute = { hpRatio: f32(), mul: f32() }
 
 /** 天罚：点名最近的 targets 个目标，坠物砸落 */
 export const Strike = {
+  ...cd(),
   damage: f32(),
   knockback: f32(),
   targets: f32(),
@@ -473,16 +494,16 @@ export const Strike = {
 }
 
 /** 集结号：全队回血 + 短暂无敌 + 冲击环 */
-export const Rally = { healRatio: f32(), invulnMs: f32(), ringRadius: f32(), color: u32() }
+export const Rally = { ...cd(), healRatio: f32(), invulnMs: f32(), ringRadius: f32(), color: u32() }
 
 /** 蹦迪：敌对方全体定身摇摆 */
-export const Dance = { durationMs: f32() }
+export const Dance = { ...cd(), durationMs: f32() }
 
 /** 弱点讲座：限时全队增伤 */
-export const Buff = { damageMul: f32(), durationMs: f32() }
+export const Buff = { ...cd(), damageMul: f32(), durationMs: f32() }
 
 /** 射击：出膛一枚弹丸。range=0 表示用 ACQUIRE 的缺省索敌上限 */
-export const Shoot = { damage: f32(), knockback: f32(), range: f32(), lifeMs: f32() }
+export const Shoot = { ...cd(), damage: f32(), knockback: f32(), range: f32(), lifeMs: f32() }
 /** 瞄准移动方向（缺省是瞄最近目标）——「有这个组件 = 不索敌，朝着走的方向打」 */
 export const AimMove = {}
 /** 弹丸外形与飞行参数（emoji 在装备那一刻已解析成 frame） */
@@ -496,6 +517,7 @@ export const Pierce = { n: f32() }
 
 /** 召唤：每 intervalMs 放一波 count 只，各自寻路撞敌自毁 */
 export const Summon = {
+  ...cd(),
   count: f32(),
   damage: f32(),
   knockback: f32(),
@@ -508,6 +530,7 @@ export const Summon = {
 
 /** 架设弩塔：本体无攻击，周期在脚下架一座；超编拆最旧的 */
 export const Turret = {
+  ...cd(),
   placeIntervalMs: f32(),
   maxTurrets: f32(),
   fireIntervalMs: f32(),
@@ -521,10 +544,10 @@ export const Turret = {
 export const Burst = { count: f32(), spreadDeg: f32() }
 
 /** 全域打击：全场活跃敌人各吃一次大额伤害（随波次威胁倍率缩放，Boss 折减） */
-export const Nuke = { damage: f32(), bossRatio: f32() }
+export const Nuke = { ...cd(), damage: f32(), bossRatio: f32() }
 
 /** 时停：按下开关，世界时标的放缩由 stepSim 逐帧处理 */
-export const TimeStop = { durationMs: f32() }
+export const TimeStop = { ...cd(), durationMs: f32() }
 
 /** 光环的两个自走节拍：dps 跳伤与冻结脉冲各自倒计时。
  * 光环没有冷却概念（每帧都过一遍施放扫描），故不能借 Cooldown 当计时器 */

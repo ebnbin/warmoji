@@ -1,6 +1,6 @@
 import { spawnBee } from '../ops/summon'
 import { cooldownMul } from '../utils/amp'
-import { Cooldown, Summon } from '../components'
+import { Summon } from '../components'
 import { castScan } from '../ops/castScan'
 import type { Sim } from '../sim'
 
@@ -10,6 +10,6 @@ export function castSummons(sim: Sim): void {
   castScan(sim, Summon, (e) => {
     const count = Summon.count[e]!
     for (let i = 0; i < count; i++) spawnBee(sim, e, i)
-    Cooldown.left[e] = Summon.intervalMs[e]! * cooldownMul(sim, e)
+    Summon.cdLeft[e] = Summon.intervalMs[e]! * cooldownMul(sim, e)
   })
 }

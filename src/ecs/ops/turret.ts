@@ -1,6 +1,6 @@
 import { addComponent, removeComponent } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
-import { Ability, Amp, Anchor, Bolt, Burst, Emplacement, Faction, Minion, Owner, Retiring, Shoot, Shots, Turret, Volley } from '../components'
+import { Ability, Aim, Amp, Anchor, Bolt, Burst, Emplacement, Faction, Minion, Owner, Retiring, Shoot, Shots, Turret, Volley } from '../components'
 import { abilityArtEmoji } from '../store'
 import { spawnMinion } from '../entities/minion'
 import { attachAbilityCore } from './equip'
@@ -18,7 +18,11 @@ const FIRST_SHOT_MS = 200
 /** 给塔挂上开火能力：**参数不来自任何 def**，逐个从建造它的那件武器的组件里抄。
  * 三连弩（Burst）就是那条能力的齐射（Volley）；锚点是塔自己 */
 function armTurret(sim: Sim, weapon: number, m: number): void {
-  attachAbilityCore(sim, m, Shoot, [{ comp: Shots, reset: (x) => { Shots.n[x] = 0 } }], {
+  // Aim 与 Shots 是这条能力自己的状态（塔要记住枪口朝向、已发几弹），故随它一起挂
+  attachAbilityCore(sim, m, Shoot, [
+    { comp: Aim, reset: (x) => { Aim.rad[x] = 0 } },
+    { comp: Shots, reset: (x) => { Shots.n[x] = 0 } },
+  ], {
     owner: Owner.eid[m]!,
     anchor: m,
     faction: Faction.v[weapon]!,

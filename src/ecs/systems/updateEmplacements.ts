@@ -1,6 +1,6 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
 import { POP_MS, RETIRE_MS } from '../ops/turret'
-import { Aim, Cooldown, Emplacement, Fired, Frozen, Minion, Retiring, Tint, Transform } from '../components'
+import { Aim, Emplacement, Fired, Frozen, Minion, Retiring, Shoot, Tint, Transform } from '../components'
 import { playClip } from '../ops/anim'
 import { backEaseOut } from '../utils/ease'
 import type { Sim } from '../sim'
@@ -42,7 +42,7 @@ export function updateEmplacements(sim: Sim): void {
     // 本帧刚开过火：拉弓动画铺满到下一发，朝向对准这一发
     if (Fired.at[t] === sim.fxMs) {
       Transform.rot[t] = Aim.rad[t]! - Math.PI / 4
-      playClip(sim, sim.frames, t, 'attack', Cooldown.left[t]!)
+      playClip(sim, sim.frames, t, 'attack', Shoot.cdLeft[t]!)
     }
   }
 }

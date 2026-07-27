@@ -1,6 +1,6 @@
 import { hasComponent } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
-import { Alive, Cooldown, FACTION, Faction, Heal, HealAoe, HealDefib, Revive, Transform } from '../components'
+import { Alive, FACTION, Faction, Heal, HealAoe, HealDefib, Revive, Transform } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { healEnemies, healMembers } from '../ops/heal'
 import { castScan } from '../ops/castScan'
@@ -32,7 +32,7 @@ export function castHeals(sim: Sim): void {
       ? healMembers(sim, x, y, range, amount, all)
       : healEnemies(sim, x, y, range, amount, all)
     if (healed === 0) {
-      Cooldown.left[e] = 300 // 全员满血：小步重试，不空耗完整冷却
+      Heal.cdLeft[e] = 300 // 全员满血：小步重试，不空耗完整冷却
       return false
     }
     pulse(sim, x, y, range, 0x81c784)

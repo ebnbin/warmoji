@@ -2,7 +2,7 @@ import { hasComponent, query } from 'bitecs'
 import { airborne } from '../utils/boomerang'
 import { catchFlyer } from '../ops/boomerang'
 import { DEG2RAD } from '../../util/units'
-import { Boomerang, CoinMagnet, Cooldown, Flyer, Frozen, Transform } from '../components'
+import { Boomerang, CoinMagnet, Flyer, Frozen, Transform } from '../components'
 import { flyerHits } from '../store'
 import { cooldownMul, ownerX, ownerY } from '../utils/amp'
 import { damageTarget } from '../ops/damage'
@@ -19,7 +19,7 @@ export function updateFlyers(sim: Sim): void {
     if (Frozen.v[e]) {
       // 持有者倒下：在途的镖一并作废，冷却按裸值重置
       catchFlyer(sim, e, f)
-      Cooldown.left[e] = Cooldown.baseMs[e]!
+      Boomerang.cdLeft[e] = Boomerang.cdBase[e]!
       continue
     }
     Transform.rot[f] = Transform.rot[f]! + (Boomerang.spinDegPerSec[e]! * DEG2RAD * dt) / 1000
@@ -39,7 +39,7 @@ export function updateFlyers(sim: Sim): void {
       const step = (Boomerang.returnSpeed[e]! * dt) / 1000
       if (dist <= Math.max(step, 20)) {
         catchFlyer(sim, e, f)
-        if (airborne(sim, e) === 0) Cooldown.left[e] = Cooldown.baseMs[e]! * cooldownMul(sim, e)
+        if (airborne(sim, e) === 0) Boomerang.cdLeft[e] = Boomerang.cdBase[e]! * cooldownMul(sim, e)
         continue
       }
       Transform.x[f] = Transform.x[f]! + (dx / dist) * step

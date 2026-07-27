@@ -1,6 +1,6 @@
 import { addComponent } from 'bitecs'
 import {
-  AimMove, AreaBlast, Assassinate, FACTION, Faction, Aura, AuraDps, AuraFreeze, BlastEcho, Blink, Bolt, Boomerang,
+  Aim, AimMove, AreaBlast, Assassinate, FACTION, Faction, Aura, AuraDps, AuraFreeze, BlastEcho, Blink, Bolt, Boomerang,
   BoomerangTwin, Buff, Burst, ChainArc, CoinMagnet, Dance, EveryN, Execute, Followup, Heal, HealAoe,
   HealDefib, Laser, LaserBackBeam, LaserRadial, Nuke, Pierce, Pulse, Radial, Rally, Shoot, Shots,
   SlowAura, Strike, Summon, Sweep, Swing, Thrust, ThrustCombo, TimeStop, Turret, Volley,
@@ -8,6 +8,7 @@ import {
 import { abilityArtEmoji, abilityFireSfx, abilityOnHit } from '../store'
 import type { FrameIndex } from '../frames'
 import type { EcsWorld } from '../world'
+import type { CdComp } from '../components'
 import type { AbilityDef } from '../../types/abilityDefs'
 
 // 每种能力的登记表——**它只干一件事：把 def 翻译成组件**。
@@ -67,6 +68,8 @@ const PulseState: StateSpec = {
 }
 const ShotsState: StateSpec = { comp: Shots, reset: (e) => { Shots.n[e] = 0 } }
 const AuraState: StateSpec = { comp: Aura, reset: (e) => { Aura.zone[e] = 0 } }
+/** 只有真的要瞄准的 kind 才挂——治疗/天罚/时停这些没有方向可言 */
+const AimState: StateSpec = { comp: Aim, reset: (e) => { Aim.rad[e] = 0 } }
 
 /** attach 能用到的东西：世界（挂可选组件）+ 帧索引（把 emoji 解析成 frame） */
 export interface AttachCtx {
@@ -76,8 +79,8 @@ export interface AttachCtx {
 
 /** 一种能力的登记项 */
 interface KindSpec<K extends AbilityDef['kind']> {
-  /** 这一种能力的组件：既是归属标记，也装参数 */
-  readonly comp: object
+  /** 这一种能力的组件：既是归属标记，也装参数，**并带着这条能力自己的冷却** */
+  readonly comp: object & CdComp
   /** 这种能力自己需要的状态组件；不列即不挂 */
   readonly state?: readonly StateSpec[]
   /** 装备那一刻把 def 的参数写进组件；未参数化的 kind 省略 */
@@ -123,7 +126,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
   },
   sweep: {
     comp: Sweep,
-    state: [SwingState],
+    state: [AimState, SwingState],
     attach: (_c, e, d) => {
       Sweep.damage[e] = d.damage
       Sweep.knockback[e] = d.knockback
@@ -152,7 +155,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
   },
   thrust: {
     comp: Thrust,
-    state: [SwingState, FollowupState],
+    state: [AimState, SwingState, FollowupState],
     attach: (c, e, d) => {
       Thrust.damage[e] = d.damage
       Thrust.knockback[e] = d.knockback
@@ -183,7 +186,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
   },
   assassinate: {
     comp: Assassinate,
-    state: [FollowupState, BlinkState],
+    state: [AimState, FollowupState, BlinkState],
     attach: (c, e, d) => {
       Assassinate.damage[e] = d.damage
       Assassinate.knockback[e] = d.knockback
@@ -200,6 +203,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
   },
   boomerang: {
     comp: Boomerang,
+    state: [AimState],
     attach: (c, e, d) => {
       Boomerang.damage[e] = d.damage
       Boomerang.knockback[e] = d.knockback
@@ -231,7 +235,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
   },
   projectile: {
     comp: Shoot,
-    state: [ShotsState],
+    state: [AimState, ShotsState],
     attach: (c, e, d) => {
       Shoot.damage[e] = d.damage
       Shoot.knockback[e] = d.knockback
@@ -338,7 +342,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
   },
   laser: {
     comp: Laser,
-    state: [RadialState],
+    state: [AimState, RadialState],
     attach: (c, e, d) => {
       Laser.damage[e] = d.damage
       Laser.knockback[e] = d.knockback
@@ -355,3 +359,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
     },
   },
 }
+
+/** 全部能力参数组件（= KINDS 的 comp）。冷却下沉到每种能力之后，
+ * 「推进所有冷却」这件事没法再靠单个 query 完成，只能逐种扫一遍 */
+export const ABILITY_COMPS: readonly (object & CdComp)[] = Object.values(KINDS).map((k) => k.comp)

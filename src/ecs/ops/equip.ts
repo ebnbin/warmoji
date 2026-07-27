@@ -1,8 +1,9 @@
 import { addComponent, addComponents, query, removeEntity } from 'bitecs'
 
 import { abilityPiercesWalls } from '../../war/abilityRules'
-import { Ability, Aim, Amp, Anchor, CastRequest, Cooldown, Disarmed, Drop, Faction, Flyer, Frozen, Manual, Minion, Owner, WallBlocked, Weapon, ZoneFollow } from '../components'
-import { KINDS } from '../registries/abilityKinds'
+import { Ability, Amp, Anchor, CastRequest, Disarmed, Drop, Faction, Flyer, Frozen, Manual, Minion, Owner, WallBlocked, Weapon, ZoneFollow } from '../components'
+import type { CdComp } from '../components'
+import { ABILITY_COMPS, KINDS } from '../registries/abilityKinds'
 import type { AttachCtx } from '../registries/abilityKinds'
 
 import type { AbilityDef } from '../../types/abilityDefs'
@@ -51,14 +52,16 @@ export interface AbilityInit {
 export function attachAbilityCore(
   sim: Sim,
   eid: number,
-  comp: object,
+  comp: object & CdComp,
   state: readonly { comp: object; reset(eid: number): void }[],
   init: AbilityInit,
 ): void {
   const world = sim.world
-  // 通用部分：每条能力都要的
+  // 通用部分：每条能力都要的。**这些全是每宿主一份**（阵营、乘区、闸门都由持有者决定），
+  // 所以同一个宿主挂多条能力时它们重复写入同一格也无妨。每条能力各一份的东西
+  //（冷却、瞄准、各 kind 的运行状态）一律不在这里——见 comp 与 state。
   // prettier-ignore
-  addComponents(world, eid, Ability, Owner, Anchor, Faction, Cooldown, Amp, Frozen, Disarmed, WallBlocked, Aim, comp)
+  addComponents(world, eid, Ability, Owner, Anchor, Faction, Amp, Frozen, Disarmed, WallBlocked, comp)
   // 该 kind 自己的状态组件：用得到才挂
   for (const st of state) {
     addComponent(world, eid, st.comp)
@@ -68,8 +71,8 @@ export function attachAbilityCore(
   Owner.eid[eid] = init.owner
   Anchor.eid[eid] = init.anchor
   Faction.v[eid] = init.faction
-  Cooldown.left[eid] = init.cooldownMs
-  Cooldown.baseMs[eid] = init.baseMs
+  comp.cdLeft[eid] = init.cooldownMs
+  comp.cdBase[eid] = init.baseMs
   Amp.dmg[eid] = init.amp.dmg
   Amp.cd[eid] = init.amp.cd
   Amp.crit[eid] = init.amp.crit
@@ -78,7 +81,6 @@ export function attachAbilityCore(
   Frozen.v[eid] = 0
   Disarmed.v[eid] = 0
   WallBlocked.v[eid] = init.piercesWalls ? 0 : 1
-  Aim.rad[eid] = 0
 }
 
 /** 装备一条来自 def 的能力：查登记表 → 挂通用包与该 kind 的组件 → 把参数抄进组件。
@@ -125,7 +127,9 @@ export function requestCast(sim: Sim, ownerEid: number): void {
 
 /** 把某持有者名下的能力冷却至少推迟 ms（变形复形后的缓冲，避免复形瞬间齐射） */
 export function postponeAbilities(sim: Sim, ownerEid: number, ms: number): void {
-  for (const e of query(sim.world, [Ability, Cooldown])) {
-    if (Owner.eid[e] === ownerEid) Cooldown.left[e] = Math.max(Cooldown.left[e]!, ms)
+  for (const comp of ABILITY_COMPS) {
+    for (const e of query(sim.world, [Ability, comp, Owner])) {
+      if (Owner.eid[e] === ownerEid) comp.cdLeft[e] = Math.max(comp.cdLeft[e]!, ms)
+    }
   }
 }
