@@ -610,6 +610,10 @@ export const Magnet = { radius: f32() }
 // 都用「到期时刻」表达而非「剩余时长」——读方一律 now < until，于是不需要任何
 // 系统去递减、去复原，窗口内新登场的敌人也天然跟着算。
 
+/** 环形阵的轨道:相位(整环随主力秉性滑动)+ 本帧主力岗位(-1 = 无人主导)。
+ * 属于「这一队」而非全局——从前是 Sim 字段,同样只因为一局一个队长 */
+export const Orbit = { phase: f32(), driver: i32Fill(-1) }
+
 /** 限时全队增伤(队长技能;不叠加,直接覆写)。until 之外恒 1,见 utils/team.teamDamageMul */
 export const TeamDamage = { mul: f32(), until: f32() }
 

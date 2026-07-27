@@ -8,7 +8,7 @@ import type { RunState } from '../../run/state'
 import type { FormationId } from '../../types/formation'
 import type { EcsAtlas } from '../atlas'
 import { spawnCharacter } from './character'
-import { Alive, Captain, DanceWindow, Magnet, MoveSpeed, Slot, TeamDamage, Transform } from '../components'
+import { Alive, Captain, DanceWindow, Magnet, MoveSpeed, Orbit, Slot, TeamDamage, Transform } from '../components'
 import type { EcsWorld } from '../world'
 
 // 队长实体：本局的行为主体与队伍锚点（位置即队伍中心）。
@@ -26,13 +26,15 @@ export function spawnCaptain(
   magnetRadius: number,
 ): number {
   const eid = addEntity(world)
-  addComponents(world, eid, Captain, Transform, Slot, Alive, MoveSpeed, Magnet, TeamDamage, DanceWindow)
+  addComponents(world, eid, Captain, Transform, Slot, Alive, MoveSpeed, Magnet, Orbit, TeamDamage, DanceWindow)
   Transform.x[eid] = x
   Transform.y[eid] = y
   Slot.v[eid] = -1 // 非队员来源：伤害不分账到任何槽位
   Alive.v[eid] = 1
   MoveSpeed.v[eid] = moveSpeed
   Magnet.radius[eid] = magnetRadius
+  Orbit.phase[eid] = 0
+  Orbit.driver[eid] = -1
   return eid
 }
 

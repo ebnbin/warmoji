@@ -3,7 +3,7 @@ import { ORBIT } from '../../data/feel'
 import { ringPostAngle } from '../../data/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../../war/orbit'
 import type { OrbitThreat } from '../../war/orbit'
-import { Alive, Threat, Transform } from '../components'
+import { Alive, Orbit, Threat, Transform } from '../components'
 import type { Sim } from '../sim'
 import { centerX, centerY } from '../utils/team'
 
@@ -24,7 +24,7 @@ export function updateOrbit(sim: Sim): void {
     const idx = sim.postBySlot[slot] ?? slot
     const base = ringPostAngle(formation, idx, count)
     if (base !== null) rotatable = true
-    const theta = (base ?? 0) + sim.orbitPhase
+    const theta = (base ?? 0) + Orbit.phase[sim.captain]!
     const threats: OrbitThreat[] = []
     for (const t of sim.enemyTargets) {
       const dx = t.x - Transform.x[eid]!
@@ -41,9 +41,10 @@ export function updateOrbit(sim: Sim): void {
     if (base !== null && bias !== 0) wants[idx] = orbitTendency(bias, threats)
   }
   if (!rotatable) return
-  sim.driverPost = pickDriver(
+  const driver = pickDriver(
     wants.map((w) => Math.abs(w)),
     Math.random,
   )
-  sim.orbitPhase = stepPhase(sim.orbitPhase, sim.driverPost >= 0 ? (wants[sim.driverPost] ?? 0) : 0, delta)
+  Orbit.driver[sim.captain] = driver
+  Orbit.phase[sim.captain] = stepPhase(Orbit.phase[sim.captain]!, driver >= 0 ? (wants[driver] ?? 0) : 0, delta)
 }

@@ -2,7 +2,7 @@ import { UNIT } from '../../util/units'
 import { FOLLOW, WANDER } from '../../data/feel'
 import { } from '../../data/characters'
 import { formationPosts } from '../../data/formation'
-import { Alive, Depth, Follow, Threat, Transform, VisOff, Wander } from '../components'
+import { Alive, Depth, Follow, Orbit, Threat, Transform, VisOff, Wander } from '../components'
 import { } from '../utils/ease'
 import type { Sim } from '../sim'
 import { centerX, centerY } from '../utils/team'
@@ -14,7 +14,7 @@ import { centerX, centerY } from '../utils/team'
  * 只管人站在哪;呼吸/弹入/翻转等纯表现在 animateCharacters */
 export function layoutTeam(sim: Sim): void {
   const delta = sim.dtMs
-  const posts = formationPosts(sim.formation, sim.count, sim.orbitPhase)
+  const posts = formationPosts(sim.formation, sim.count, Orbit.phase[sim.captain]!)
   const moving = sim.teamDir.x !== 0 || sim.teamDir.y !== 0
   const dt = Math.min(delta, 50) / 1000
   const tSec = sim.elapsedMs / 1000

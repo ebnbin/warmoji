@@ -32,9 +32,6 @@ import type { EcsAtlas } from './atlas'
 
 export interface Sim {
   world: EcsWorld
-  /** 环相位(可旋转环整体转动) */
-  orbitPhase: number
-  driverPost: number
   /** 本帧移动方向(输入系统写:键盘归一或摇杆向量) */
   teamDir: { x: number; y: number }
   /** 本帧移动量 0..1(键盘满推=1,摇杆取模长):供时停时标 */
@@ -206,8 +203,6 @@ export function makeSim(
   const { count, formation, postBySlot, lineupOrbit, characters } = team
   return {
     world,
-    orbitPhase: 0,
-    driverPost: -1,
     teamDir: { x: 0, y: 0 },
     moveInputRaw: 0,
     formation,
