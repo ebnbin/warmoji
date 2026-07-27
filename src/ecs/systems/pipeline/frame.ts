@@ -1,4 +1,6 @@
 import { armEnemies } from '../armEnemies'
+import { fireCarriers } from '../fireCarriers'
+import { fireSurges } from '../fireSurges'
 import { grantCoins } from '../grantCoins'
 import { grantFlash } from '../grantFlash'
 import { grantMods } from '../grantMods'
@@ -59,7 +61,12 @@ export const FRAME_PIPELINE: readonly Step[] = [
     why: '到手的拾取物在这里离场——早一步，实体没了就什么都结算不到',
   },
   { name: 'updateSpawners', run: updateSpawners },
-  { name: 'spawnStep', run: spawnStep },
+  // 排期到点：各自挂上预告。须先于 spawnStep——它按在场数 + 在途预告数判上限，
+  // 晚一步就是「本帧刚排的预告不算数」，敌潮与常规刷怪一起超额
+  { name: 'fireSurges', run: fireSurges },
+  { name: 'fireCarriers', run: fireCarriers },
+  { name: 'spawnStep', run: spawnStep, after: ['fireSurges', 'fireCarriers'],
+    why: '刷怪上限按「在场 + 在途预告」判，本帧排的预告要算进去' },
 ]
 
 /** 跑完一帧的仿真侧。Scene 只负责它前后的事：回填视口、排空视觉事件、过场判定 */

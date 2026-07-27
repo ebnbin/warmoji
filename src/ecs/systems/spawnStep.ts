@@ -1,14 +1,13 @@
 import { playSfx } from '../../audio/sfx'
 import { toPx } from '../../war/px'
 import { isBossWave, waveAt } from '../../data/waves'
-import { BOSS_SPAWN_RELIEF, ELITE, ENEMIES, SPAWN } from '../../data/enemies'
+import { BOSS_SPAWN_RELIEF, ENEMIES, SPAWN } from '../../data/enemies'
 import { densityParams, labDifficulty, labEnemySet } from '../../run/lab'
 import { mapEnemyRoster } from '../../data/maps'
 import { isDayAt } from '../../war/maps/daynight'
-import { pickEnemy } from '../../war/enemyAi'
 import { attachCarrierRing } from '../entities/pickup'
 import { spawnEnemy } from '../entities/enemy'
-import { awakeCount, currentMix, dayNightOf } from '../entities/enemy'
+import { awakeCount, dayNightOf, telegraphOne } from '../entities/enemy'
 import { spawnTelegraph, telegraphCount } from '../entities/telegraph'
 import { enemyCarries, telegraphCarries, telegraphDef } from '../store'
 import { Due, Telegraph, Transform } from '../components'
@@ -21,15 +20,6 @@ import type { Sim } from '../sim'
 function spawnIntervalScale(sim: Sim): number {
   const dn = dayNightOf(sim)
   return dn ? (isDayAt(dn.hour) ? dn.cfg.daySpawnScale : dn.cfg.nightSpawnScale) : 1
-}
-
-/** 挑一只敌人排入预告(镜像 spawnOne→spawnTelegraphed);forceElite 供精英波敌潮强制出金边 */
-function spawnOne(sim: Sim, hpMultiplier: number, forceElite = false): void {
-  const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
-  const elite = !sim.testMode && (forceElite || (sim.run.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance))
-  const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
-  const pos = sim.hooks.spawnPoint(sim, false)
-  spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, false)
 }
 
 /** 测试模式补场(镜像 spawnTest):只补勾选的敌人,密度(间隔/上限/每批)与难度(血量倍率)
@@ -78,5 +68,5 @@ export function spawnStep(sim: Sim): void {
   const relief = isBossWave(sim.run.wave) ? BOSS_SPAWN_RELIEF : 1
   sim.spawnCooldownMs = (wave.spawnIntervalMs * relief * spawnIntervalScale(sim)) / teamFactor
   if (awakeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
-  spawnOne(sim, wave.hpMultiplier)
+  telegraphOne(sim, wave.hpMultiplier)
 }

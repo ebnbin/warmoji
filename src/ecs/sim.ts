@@ -93,8 +93,6 @@ export interface Sim {
   testMode: boolean
   /** 刷怪冷却(预告本身是实体,见 entities/telegraph.ts) */
   spawnCooldownMs: number
-  /** 精英波敌潮的延迟排期(到点才求落点,镜像 spawnSurge 的 delayedCall) */
-  pendingSurges: { at: number; hpMul: number; forceElite: boolean }[]
   /** 本帧内死亡且带亡语的敌人快照(帧内通道:runDeathEffects 在同一条流水线里排空) */
   pendingDeaths: PendingDeath[]
   /** 出站信箱:仿真只写、场景侧每帧排空的视觉事件(特效/爆点/飘字/冲击波/到手横幅) */
@@ -222,7 +220,6 @@ export function makeSim(
     rng: new Rng(run.decorSeed ^ 0x9e37),
     testMode,
     spawnCooldownMs: 300,
-    pendingSurges: [],
     run,
     reward: {
       captainXpMul: captainDef.xpGainMul * teamFx.xpGainMul,

@@ -44,7 +44,8 @@ import { Minion } from './components'
 import { stepFrame } from './systems/pipeline/frame'
 import { replayDeath } from './systems/shared/death'
 import { pickupCounts } from './entities/pickup'
-import { spawnBossEcs, spawnCarrierEcs, spawnSurgeEcs } from './entities/enemy'
+import { spawnBossEcs, spawnSurgeEcs } from './entities/enemy'
+import { scheduleCarrier } from './entities/schedule'
 import { telegraphCount } from './entities/telegraph'
 
 import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
@@ -1226,11 +1227,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const carriers = rollWaveCarriers(this.run.mapId, this.run.wave, isBossWave(this.run.wave), () => sim.rng.next())
     if (carriers.length === 0) return
     const dur = waveDurationMs(this.run.wave)
+    // 排期是实体（Due + Carrier），走世界钟——从前是 Phaser delayedCall，走墙钟，
+    // 于是时停期间携带者照常到点，而同一波的普通刷怪跟着 wdtMs 慢下来
     carriers.forEach((pickup, i) => {
-      const at = dur * 0.12 + (dur * 0.7 * i) / carriers.length
-      this.time.delayedCall(at, () => {
-        if (this.sim && !this.sim.over) spawnCarrierEcs(this.sim, pickup)
-      })
+      scheduleCarrier(sim, dur * 0.12 + (dur * 0.7 * i) / carriers.length, pickup)
     })
   }
 

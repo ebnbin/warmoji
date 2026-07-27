@@ -57,6 +57,7 @@ import {
 } from '../components'
 import { enemyCarries, enemyDef } from '../store'
 import { spawnTelegraph, telegraphCount } from './telegraph'
+import { scheduleSurge } from './schedule'
 import { armIdle } from '../systems/shared/anim'
 import { ANIM_DEF } from '../../emoji/anim'
 import type { Sim } from '../sim'
@@ -336,6 +337,16 @@ export function awakeCount(sim: Sim): number {
   return n
 }
 
+/** 挑一只敌人排入预告(镜像 spawnOne→spawnTelegraphed);forceElite 供精英波敌潮强制出金边。
+ * 常规刷怪(spawnStep)与敌潮到点(fireSurges)共用 */
+export function telegraphOne(sim: Sim, hpMultiplier: number, forceElite = false): void {
+  const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
+  const elite = !sim.testMode && (forceElite || (sim.run.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance))
+  const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
+  const pos = sim.hooks.spawnPoint(sim, false)
+  spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, false)
+}
+
 /** 精英波敌潮(镜像 spawnSurge):在 spreadMs 内均摊排 SURGE.count 只,前 SURGE.elites 只强制金边。
  * 只排「何时出」,落点与出怪表留到各自时刻才现算——镜像旧实现把整个 spawnOne 塞进 delayedCall:
  * 敌潮会追着移动中的队伍铺开,⚠ 预告也一个个亮起,而非开场一次性算死 14 个落点 */
@@ -343,11 +354,7 @@ export function spawnSurgeEcs(sim: Sim): void {
   if (sim.over) return
   const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
   for (let i = 0; i < SURGE.count; i++) {
-    sim.pendingSurges.push({
-      at: sim.elapsedMs + (i * SURGE.spreadMs) / SURGE.count,
-      hpMul,
-      forceElite: i < SURGE.elites,
-    })
+    scheduleSurge(sim, sim.elapsedMs + (i * SURGE.spreadMs) / SURGE.count, hpMul, i < SURGE.elites)
   }
 }
 
