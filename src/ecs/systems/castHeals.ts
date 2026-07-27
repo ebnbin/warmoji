@@ -5,6 +5,7 @@ import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { healEnemies, healCharacters } from './shared/heal'
 import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
+import { spawnFxCircle } from '../entities/fx'
 
 /** 周期治疗：治血量比例最低的己方（aoe 则范围全体）。治疗量吃伤害乘区——磨刀石对军医同样有意义。
  * 己方是谁由阵营决定：队伍侧治队员，敌方侧治敌群 */
@@ -59,21 +60,15 @@ function cutReviveTimer(sim: Sim, x: number, y: number, range: number, ms: numbe
 
 /** 治疗脉冲环 */
 function pulse(sim: Sim, x: number, y: number, radius: number, color: number): void {
-  sim.out.cues.push({
-    kind: 'circle',
-    x,
-    y,
-    radius,
-    o: {
-      fill: color,
-      fillAlpha: 0.08,
-      stroke: color,
-      lineWidth: 3,
-      lineAlpha: 0.7,
-      fromScale: 0.25,
-      toScale: 1,
-      durationMs: 420,
-      depth: 6,
-    },
+  spawnFxCircle(sim, x, y, radius, {
+    fill: color,
+    fillAlpha: 0.08,
+    stroke: color,
+    lineWidth: 3,
+    lineAlpha: 0.7,
+    fromScale: 0.25,
+    toScale: 1,
+    durationMs: 420,
+    depth: 6,
   })
 }

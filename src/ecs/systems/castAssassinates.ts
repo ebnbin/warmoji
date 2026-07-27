@@ -11,6 +11,7 @@ import { sourceOf } from '../utils/source'
 import { castScan } from './shared/castScan'
 import { targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
+import { spawnFxSlash } from '../entities/fx'
 
 /** 瞬袭：瞬移到索敌范围内血量最高的敌人背后重斩，短暂停留（期间本体无敌）后闪回原位。
  * 位移走视觉偏移，不动阵型主权。execute 低血目标伤害翻倍；onHit 波及主目标周围 */
@@ -57,7 +58,7 @@ export function castAssassinates(sim: Sim): void {
       targets: [target.eid],
       exclude: new Set([target.eid]),
     })
-    sim.out.cues.push({ kind: 'slash', x: target.x, y: target.y, angle: Aim.rad[e]!, radius: 34 })
+    spawnFxSlash(sim, target.x, target.y, Aim.rad[e]!, 34)
     return true
   })
 }

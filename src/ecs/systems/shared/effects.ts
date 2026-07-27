@@ -12,6 +12,7 @@ import { healEnemies, healCharacters } from './heal'
 import { nearestAngle, targetsOf } from '../../utils/targets'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
+import { spawnFxRing } from '../../entities/fx'
 
 // 命中效果层（阵营中立）：「投送方式」与「命中后做什么」正交——任何投送都经此施加
 // 同一套效果。落点归属（暴击/击退倍率/战报分账/该打哪一侧）由施放者本身决定，
@@ -78,24 +79,7 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
   blast: (sim, src, fx, hit) => {
     const dmg = Math.max(1, Math.round(hit.baseDamage * fx.ratio))
     applyBlast(sim, src, hit.x, hit.y, dmg, fx.radius, fx.knockback, hit.exclude)
-    if (!fx.ring) return
-    sim.out.cues.push({
-      kind: 'circle',
-      x: hit.x,
-      y: hit.y,
-      radius: fx.radius,
-      o: {
-        fill: fx.ring.color,
-        fillAlpha: fx.ring.fillAlpha,
-        stroke: fx.ring.color,
-        lineWidth: fx.ring.lineWidth,
-        lineAlpha: fx.ring.lineAlpha,
-        fromScale: 0.3,
-        toScale: 1,
-        durationMs: fx.ring.durMs,
-        depth: 7,
-      },
-    })
+    if (fx.ring) spawnFxRing(sim, hit.x, hit.y, fx.radius, fx.ring)
   },
 
   damage: (sim, src, fx, hit) => {

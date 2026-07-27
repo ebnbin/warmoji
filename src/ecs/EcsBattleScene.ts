@@ -407,7 +407,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 开局清上一局遗留的模块级状态(eid 从 0 重新分配,旧局引用不能留给新实体)
     clearEcsStore()
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
-    this.cues = new CueLayer(this)
+    this.cues = new CueLayer(this, this.world)
     this.rings = new RingLayer(this, this.world)
     this.spawnDecor(run, atlas)
     this.testMode = run.testMode
@@ -513,12 +513,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       }
       for (const b of bs) byKind[b.kind]!.explode(b.count, b.x, b.y)
     })
-    // 冲击波圈(自爆群伤示警:红圈从 0.3 张到满,300ms)
-    drain(out.rings, (rs) => {
-      const style = { color: 0xff5252, fillAlpha: 0.35, lineWidth: 3, lineAlpha: 0.9, durMs: 300 }
-      for (const r of rs) this.cues?.ring(r.x, r.y, r.radius, style)
-    })
-    // 一次性战斗特效:能力系统只入队,绘制在此落地
+    // 剩下这两种特效仍走队列:💥 爆裂是图集贴图、全屏闪是屏幕固定矩形,都做不成世界实体
     drain(out.cues, (cs) => {
       if (this.cues) drawCues(this.cues, cs)
     })

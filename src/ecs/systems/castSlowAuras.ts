@@ -7,6 +7,7 @@ import { sourceOf } from '../utils/source'
 import { castScan } from './shared/castScan'
 import { targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
+import { spawnFxCircle } from '../entities/fx'
 
 /** 冻伤跳伤间隔（半秒一跳，dps 折半） */
 const TICK_MS = 500
@@ -62,22 +63,16 @@ export function castSlowAuras(sim: Sim): void {
           if (dx * dx + dy * dy > r2) continue
           freeze(sim, t.eid, AuraFreeze.durationMs[e]!)
         }
-        sim.out.cues.push({
-          kind: 'circle',
-          x,
-          y,
-          radius,
-          o: {
-            fill: 0xffffff,
-            fillAlpha: 0.18,
-            stroke: SlowAura.color[e]!,
-            lineWidth: 4,
-            lineAlpha: 0.9,
-            fromScale: 0.2,
-            toScale: 1,
-            durationMs: 420,
-            depth: 7,
-          },
+        spawnFxCircle(sim, x, y, radius, {
+          fill: 0xffffff,
+          fillAlpha: 0.18,
+          stroke: SlowAura.color[e]!,
+          lineWidth: 4,
+          lineAlpha: 0.9,
+          fromScale: 0.2,
+          toScale: 1,
+          durationMs: 420,
+          depth: 7,
         })
       }
     }

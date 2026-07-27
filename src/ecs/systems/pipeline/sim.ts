@@ -1,5 +1,6 @@
 import { animateEnemies } from '../animateEnemies'
 import { blinkTelegraphs } from '../blinkTelegraphs'
+import { expireFx } from '../expireFx'
 import { animateCharacters } from '../animateCharacters'
 import { applyKnockback } from '../applyKnockback'
 import { applySlowZones } from '../applySlowZones'
@@ -160,6 +161,7 @@ export const SIM_PIPELINE: readonly Step[] = [
   { name: 'characterVisual', run: characterVisual },
   { name: 'blinkTelegraphs', run: blinkTelegraphs },
   { name: 'updateShards', run: updateShards },
+  { name: 'expireFx', run: expireFx },
   {
     name: 'worldTick',
     run: worldTick,

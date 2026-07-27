@@ -9,6 +9,7 @@ import { castScan } from './shared/castScan'
 import { nearestTarget, targetsOf } from '../utils/targets'
 import type { Target } from '../utils/targets'
 import type { Sim } from '../sim'
+import { spawnFxBolt } from '../entities/fx'
 
 /** 连锁电弧：命中最近敌人后在敌群间弹跳传导，每跳伤害衰减——敌人越密越强。
  * onHit 施加在末跳落点，已弹跳过的目标排除在外 */
@@ -34,7 +35,7 @@ export function castChainArcs(sim: Sim): void {
       cur = nearestTarget(cur.x, cur.y, targetsOf(sim, src), ChainArc.arcRange[e]!, visited)
     }
     applyAbilityEffects(sim, src, abilityOnHit[e], { x: last.x, y: last.y, baseDamage: damage, exclude: visited })
-    sim.out.cues.push({ kind: 'lightning', points, color: ChainArc.color[e]! })
+    spawnFxBolt(sim, points, ChainArc.color[e]!)
     return true
   })
 }

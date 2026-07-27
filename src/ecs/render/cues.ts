@@ -1,8 +1,11 @@
 import Phaser from 'phaser'
-import type { BlastRing } from '../../types/abilityDefs'
+import { query } from 'bitecs'
 import { emojiImage } from '../../emoji/textures'
 import { backEaseOut, cubicEaseIn, cubicEaseOut } from '../utils/ease'
+import { Depth, Fx, FxBeam, FxBolt, FxCircle, FxSlash, Transform } from '../components'
+import { boltPts } from '../store'
 import type { Cue } from '../cues'
+import type { EcsWorld } from '../world'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment } from './tri'
 import type { Scratch } from './tri'
 
@@ -14,16 +17,16 @@ import type { Scratch } from './tri'
 // Phaser 的 Arc 按 iterations=0.01 铺满 ~100 个三角形（带描边约 300），全由它自己提交。
 //
 // 这里走 ECS 侧一贯的做法，与 EcsSpriteBatch 同构：
-//   · 特效是**纯数据**（定长平行数组），没有任何一个 GameObject
+//   · 四种形状类特效各是一颗**实体**（几何在组件上），没有任何一个 GameObject
 //   · 画的活儿归少数几个 EcsShapeBatch —— 光秃秃的 GameObject，只为在显示列表里
 //     占一个 depth，renderWebGL 里把本带全部特效的三角形一次性提交给核心的
 //     BatchHandlerTriFlat（与 EcsSpriteBatch 提交四边形给 BatchHandlerQuad 同理）
 //   · 三角化自己做，按半径自适应取 12–48 段，比 Phaser 的定额 100 段省一个数量级
-//   · 动画由 step(fxMs) 自己推进，不挂 tween；时钟取 sim.fxMs（真实帧长的纯视觉钟，
-//     过场冻结期照旧推进），故特效不受时停拖慢、冻结期也能自然收尾
+//   · 进度由 renderWebGL 按 Fx.bornMs / Fx.durMs 现算，不挂 tween；回收在 systems/expireFx。
+//     时钟取 sim.fxMs（真实帧长的纯视觉钟，过场冻结期照旧推进），故特效不受时停拖慢
 //
-// 两个例外仍是 GameObject：💥 爆裂是图集贴图不是形状（走不了三角批），全屏闪是
-// 单个定屏矩形（批不批都一样）。合计 25 个，恒定不随特效密度增长。
+// 两个例外仍是 GameObject、也仍走 sim.out.cues 队列：💥 爆裂是图集贴图不是形状
+//（走不了三角批），全屏闪是单个定屏矩形（批不批都一样）。合计 25 个，恒定不随特效密度增长。
 //
 // 缓动与 Phaser 同名缓动同参（见 ../ease），观感与旧实现一致。
 
@@ -44,20 +47,10 @@ export interface CircleCue {
   readonly depth: number
 }
 
-// 容量 = 同屏并发上限，超出即按环形下标顶掉最老的一个（顶掉的是放了最久、
-// 最接近淡完的那个，肉眼基本看不出）。纯数据，一个槽位只占几个数字
-const CIRCLES = 64
-const BEAMS = 16
-const BOLTS = 16
-const SLASHES = 16
+// 形状类特效的并发上限与时长现在都在 entities/fx.ts（那边是实体，上限是一条规则）。
+// 这里只剩 💥 爆裂那个池子：它是 GameObject，容量即池容量
 const BOOMS = 24
-/** 单条闪电的折点上限（超出截断；连锁传导实际只有三四个点） */
-const BOLT_PTS = 8
-
 const BOOM_MS = 340
-const BEAM_MS = 200
-const BOLT_MS = 200
-const SLASH_MS = 220
 
 /** 空闲槽位标记（born 存的是 fxMs，恒 ≥ 0） */
 const FREE = -1
@@ -74,48 +67,6 @@ const BANDS: readonly { depth: number; zMin: number; zMax: number }[] = [
 type Matrix = Phaser.GameObjects.Components.TransformMatrix
 
 export class CueLayer {
-  // ── 圆（含冲击环）：纯数据 ──
-  private readonly cBorn = new Float64Array(CIRCLES).fill(FREE)
-  private readonly cX = new Float32Array(CIRCLES)
-  private readonly cY = new Float32Array(CIRCLES)
-  private readonly cR = new Float32Array(CIRCLES)
-  private readonly cDur = new Float32Array(CIRCLES)
-  private readonly cFrom = new Float32Array(CIRCLES)
-  private readonly cTo = new Float32Array(CIRCLES)
-  private readonly cFill = new Int32Array(CIRCLES)
-  private readonly cFillA = new Float32Array(CIRCLES)
-  /** 描边色；-1 = 无描边 */
-  private readonly cStroke = new Int32Array(CIRCLES)
-  private readonly cLineW = new Float32Array(CIRCLES)
-  private readonly cLineA = new Float32Array(CIRCLES)
-  private readonly cDepth = new Float32Array(CIRCLES)
-  private cAt = 0
-
-  // ── 光束：外层色带（depth 7）+ 白芯（depth 8）──
-  private readonly bBorn = new Float64Array(BEAMS).fill(FREE)
-  private readonly bX = new Float32Array(BEAMS)
-  private readonly bY = new Float32Array(BEAMS)
-  private readonly bAngle = new Float32Array(BEAMS)
-  private readonly bLen = new Float32Array(BEAMS)
-  private readonly bRadius = new Float32Array(BEAMS)
-  private readonly bColor = new Int32Array(BEAMS)
-  private bAt = 0
-
-  // ── 闪电：折点存扁平坐标，每槽定长 ──
-  private readonly lBorn = new Float64Array(BOLTS).fill(FREE)
-  private readonly lPts = new Float32Array(BOLTS * BOLT_PTS * 2)
-  private readonly lCount = new Int32Array(BOLTS)
-  private readonly lColor = new Int32Array(BOLTS)
-  private lAt = 0
-
-  // ── 斩击弧光 ──
-  private readonly sBorn = new Float64Array(SLASHES).fill(FREE)
-  private readonly sX = new Float32Array(SLASHES)
-  private readonly sY = new Float32Array(SLASHES)
-  private readonly sAngle = new Float32Array(SLASHES)
-  private readonly sR = new Float32Array(SLASHES)
-  private sAt = 0
-
   // ── 两个例外：图集贴图 / 定屏矩形，走不了三角批 ──
   private readonly booms: Phaser.GameObjects.Image[] = []
   private readonly boomBorn = new Float64Array(BOOMS).fill(FREE)
@@ -133,7 +84,7 @@ export class CueLayer {
   /** 本帧视觉钟：step 每帧写入，随后的投放取它作为起点 */
   private now = 0
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, private readonly world: EcsWorld) {
     for (let i = 0; i < BOOMS; i++) {
       this.booms.push(emojiImage(scene, 0, 0, '1f4a5', 32).setDepth(9).setVisible(false))
     }
@@ -156,19 +107,6 @@ export class CueLayer {
    * 形状类只需判过期——顶点每帧由批绘对象按当前进度现算，不必在此写回 */
   step(fxMs: number): void {
     this.now = fxMs
-    for (let i = 0; i < CIRCLES; i++) {
-      if (this.cBorn[i] !== FREE && fxMs - this.cBorn[i]! >= this.cDur[i]!) this.cBorn[i] = FREE
-    }
-    for (let i = 0; i < BEAMS; i++) {
-      if (this.bBorn[i] !== FREE && fxMs - this.bBorn[i]! >= BEAM_MS) this.bBorn[i] = FREE
-    }
-    for (let i = 0; i < BOLTS; i++) {
-      if (this.lBorn[i] !== FREE && fxMs - this.lBorn[i]! >= BOLT_MS) this.lBorn[i] = FREE
-    }
-    for (let i = 0; i < SLASHES; i++) {
-      if (this.sBorn[i] !== FREE && fxMs - this.sBorn[i]! >= SLASH_MS) this.sBorn[i] = FREE
-    }
-
     for (let i = 0; i < BOOMS; i++) {
       if (this.boomBorn[i] === FREE) continue
       const o = this.booms[i]!
@@ -194,121 +132,80 @@ export class CueLayer {
     }
   }
 
-  /** 把某一带的全部活动特效三角化到暂存里（批绘对象在 renderWebGL 里调） */
+  /** 把某一带的全部活动特效三角化到暂存里（批绘对象在 renderWebGL 里调）。
+   * 遍历的是查询集——四种形状类特效各是一颗实体，几何在组件上 */
   buildBand(band: number, m: Matrix): Scratch {
     const o = this.scratch
     resetScratch(o)
     const { zMin, zMax } = BANDS[band]!
     const fx = this.now
+    const age = (k: number): number => (fx - Fx.bornMs[k]!) / Fx.durMs[k]!
 
-    for (let k = 0; k < CIRCLES; k++) {
-      const born = this.cBorn[k]!
-      if (born === FREE) continue
-      const d = this.cDepth[k]!
+    for (const k of query(this.world, [Fx, FxCircle, Transform, Depth])) {
+      const d = Depth.z[k]!
       if (d < zMin || d >= zMax) continue
-      const e = cubicEaseOut((fx - born) / this.cDur[k]!)
-      const s = this.cFrom[k]! + (this.cTo[k]! - this.cFrom[k]!) * e
-      const r = this.cR[k]! * s
+      const e = cubicEaseOut(age(k))
+      const s = FxCircle.from[k]! + (FxCircle.to[k]! - FxCircle.from[k]!) * e
+      const r = FxCircle.r[k]! * s
       const fade = 1 - e
-      fan(o, m, this.cX[k]!, this.cY[k]!, r, getTintAppendFloatAlpha(this.cFill[k]!, this.cFillA[k]! * fade))
-      const stroke = this.cStroke[k]!
+      const x = Transform.x[k]!
+      const y = Transform.y[k]!
+      fan(o, m, x, y, r, getTintAppendFloatAlpha(FxCircle.fill[k]!, FxCircle.fillAlpha[k]! * fade))
+      const stroke = FxCircle.stroke[k]!
       if (stroke >= 0) {
         // 描边宽度随缩放走，与旧实现整体 setScale 的表现一致
-        ringStrip(o, m, this.cX[k]!, this.cY[k]!, r, this.cLineW[k]! * s, getTintAppendFloatAlpha(stroke, this.cLineA[k]! * fade))
+        ringStrip(o, m, x, y, r, FxCircle.lineW[k]! * s, getTintAppendFloatAlpha(stroke, FxCircle.lineAlpha[k]! * fade))
       }
     }
 
-    // 光束：外层色带在 7 带、白芯在 8 带，纵向收拢 + 淡出
-    for (let k = 0; k < BEAMS; k++) {
-      const born = this.bBorn[k]!
-      if (born === FREE) continue
-      const outer = zMin < 8
-      const core = zMin >= 8 && zMax <= 9
-      if (!outer && !core) continue
-      const e = cubicEaseIn((fx - born) / BEAM_MS)
-      const sy = 1 - 0.85 * e
-      const half = (core ? this.bRadius[k]! * 0.35 : this.bRadius[k]!) * sy
-      const color = core ? 0xffffff : this.bColor[k]!
-      const alpha = (core ? 0.95 : 0.55) * (1 - e)
-      const a = this.bAngle[k]!
-      const ca = Math.cos(a)
-      const sa = Math.sin(a)
-      const x = this.bX[k]!
-      const y = this.bY[k]!
-      const L = this.bLen[k]!
-      // 原点在左中、沿 angle 铺开：局部 (0,±half) → (L,±half)
-      quad(
-        o, m,
-        x - sa * half, y + ca * half,
-        x + sa * half, y - ca * half,
-        x + ca * L + sa * half, y + sa * L - ca * half,
-        x + ca * L - sa * half, y + sa * L + ca * half,
-        getTintAppendFloatAlpha(color, alpha),
-      )
+    // 光束：外层色带在 7 带、白芯在 8 带，纵向收拢 + 淡出（同一颗实体，两带各画一层）
+    const outer = zMin < 8
+    const core = zMin >= 8 && zMax <= 9
+    if (outer || core) {
+      for (const k of query(this.world, [Fx, FxBeam, Transform])) {
+        const e = cubicEaseIn(age(k))
+        const sy = 1 - 0.85 * e
+        const half = (core ? FxBeam.radius[k]! * 0.35 : FxBeam.radius[k]!) * sy
+        const color = core ? 0xffffff : FxBeam.color[k]!
+        const alpha = (core ? 0.95 : 0.55) * (1 - e)
+        const a = Transform.rot[k]!
+        const ca = Math.cos(a)
+        const sa = Math.sin(a)
+        const x = Transform.x[k]!
+        const y = Transform.y[k]!
+        const L = FxBeam.len[k]!
+        // 原点在左中、沿 angle 铺开：局部 (0,±half) → (L,±half)
+        quad(
+          o, m,
+          x - sa * half, y + ca * half,
+          x + sa * half, y - ca * half,
+          x + ca * L + sa * half, y + sa * L - ca * half,
+          x + ca * L - sa * half, y + sa * L + ca * half,
+          getTintAppendFloatAlpha(color, alpha),
+        )
+      }
     }
 
     // 闪电与斩击恒在最上一带
     if (zMax === Infinity) {
-      for (let k = 0; k < BOLTS; k++) {
-        const born = this.lBorn[k]!
-        if (born === FREE) continue
-        const color = getTintAppendFloatAlpha(this.lColor[k]!, 0.95 * (1 - (fx - born) / BOLT_MS))
-        const n = this.lCount[k]!
-        const base = k * BOLT_PTS * 2
-        for (let p = 1; p < n; p++) {
-          segment(
-            o, m,
-            this.lPts[base + (p - 1) * 2]!, this.lPts[base + (p - 1) * 2 + 1]!,
-            this.lPts[base + p * 2]!, this.lPts[base + p * 2 + 1]!,
-            3, color,
-          )
+      for (const k of query(this.world, [Fx, FxBolt])) {
+        const color = getTintAppendFloatAlpha(FxBolt.color[k]!, 0.95 * (1 - age(k)))
+        const pts = boltPts[k]
+        if (!pts) continue
+        for (let p = 1; p < FxBolt.n[k]!; p++) {
+          segment(o, m, pts[(p - 1) * 2]!, pts[(p - 1) * 2 + 1]!, pts[p * 2]!, pts[p * 2 + 1]!, 3, color)
         }
       }
-      for (let k = 0; k < SLASHES; k++) {
-        const born = this.sBorn[k]!
-        if (born === FREE) continue
-        const a = this.sAngle[k]!
+      for (const k of query(this.world, [Fx, FxSlash, Transform])) {
+        const a = Transform.rot[k]!
         ringStrip(
-          o, m, this.sX[k]!, this.sY[k]!, this.sR[k]!, 5,
-          getTintAppendFloatAlpha(0xffffff, 0.9 * (1 - (fx - born) / SLASH_MS)),
+          o, m, Transform.x[k]!, Transform.y[k]!, FxSlash.r[k]!, 5,
+          getTintAppendFloatAlpha(0xffffff, 0.9 * (1 - age(k))),
           a - 1.1, a + 1.1,
         )
       }
     }
     return o
-  }
-
-  circle(x: number, y: number, radius: number, c: CircleCue): void {
-    const i = this.cAt
-    this.cAt = (this.cAt + 1) % CIRCLES
-    this.cBorn[i] = this.now
-    this.cX[i] = x
-    this.cY[i] = y
-    this.cR[i] = radius
-    this.cDur[i] = c.durationMs
-    this.cFrom[i] = c.fromScale
-    this.cTo[i] = c.toScale
-    this.cFill[i] = c.fill
-    this.cFillA[i] = c.fillAlpha
-    this.cStroke[i] = c.stroke ?? -1
-    this.cLineW[i] = c.lineWidth ?? 2
-    this.cLineA[i] = c.lineAlpha ?? 1
-    this.cDepth[i] = c.depth
-  }
-
-  /** 命中环：从锚点扩张淡出的一圈（弹道机器与能力效果链共用，不各画一遍） */
-  ring(x: number, y: number, radius: number, r: BlastRing): void {
-    this.circle(x, y, radius, {
-      fill: r.color,
-      fillAlpha: r.fillAlpha,
-      stroke: r.color,
-      lineWidth: r.lineWidth,
-      lineAlpha: r.lineAlpha,
-      fromScale: 0.3,
-      toScale: 1,
-      durationMs: r.durMs,
-      depth: 7,
-    })
   }
 
   /** 💥 爆裂：emoji 从缩小随机微转弹出到全尺寸并淡出（轰炸命中点） */
@@ -324,63 +221,6 @@ export class CueLayer {
       .setAlpha(1)
       .setVisible(true)
     this.boomBorn[i] = this.now
-  }
-
-  /** 贯穿光束：沿 angle 铺一条长 length 的双层带（外层色 + 白芯），纵向收拢淡出 */
-  beam(x: number, y: number, angle: number, length: number, radius: number, color: number): void {
-    const i = this.bAt
-    this.bAt = (this.bAt + 1) % BEAMS
-    this.bBorn[i] = this.now
-    this.bX[i] = x
-    this.bY[i] = y
-    this.bAngle[i] = angle
-    this.bLen[i] = length
-    this.bRadius[i] = radius
-    this.bColor[i] = color
-  }
-
-  /** 锯齿闪电折线：沿折点串每段拆几截加垂直抖动，短暂淡出（连锁传导路径）。
-   * 抖动在投放时算死存进数组——每帧重算会让电弧疯狂跳动 */
-  lightning(points: readonly { x: number; y: number }[], color: number): void {
-    if (points.length < 2) return
-    const i = this.lAt
-    this.lAt = (this.lAt + 1) % BOLTS
-    const base = i * BOLT_PTS * 2
-    let n = 0
-    const put = (x: number, y: number): void => {
-      if (n >= BOLT_PTS) return
-      this.lPts[base + n * 2] = x
-      this.lPts[base + n * 2 + 1] = y
-      n++
-    }
-    put(points[0]!.x, points[0]!.y)
-    for (let p = 1; p < points.length; p++) {
-      const a = points[p - 1]!
-      const b = points[p]!
-      const segs = 4
-      for (let s = 1; s <= segs; s++) {
-        const t = s / segs
-        const nx = -(b.y - a.y)
-        const ny = b.x - a.x
-        const len = Math.hypot(nx, ny) || 1
-        const jitter = s === segs ? 0 : (Math.random() - 0.5) * 18
-        put(a.x + (b.x - a.x) * t + (nx / len) * jitter, a.y + (b.y - a.y) * t + (ny / len) * jitter)
-      }
-    }
-    this.lCount[i] = n
-    this.lColor[i] = color
-    this.lBorn[i] = this.now
-  }
-
-  /** 斩击弧光：以 (x,y) 为心、朝 angle 画一段 ±1.1rad 的白弧，淡出（瞬袭背刺） */
-  slash(x: number, y: number, angle: number, radius: number): void {
-    const i = this.sAt
-    this.sAt = (this.sAt + 1) % SLASHES
-    this.sBorn[i] = this.now
-    this.sX[i] = x
-    this.sY[i] = y
-    this.sAngle[i] = angle
-    this.sR[i] = radius
   }
 
   /** 全屏白闪：一块盖满视口的定屏矩形淡出（天罚全域打击） */
@@ -433,11 +273,7 @@ class EcsShapeBatch extends Phaser.GameObjects.GameObject {
  * 任何没认出来的 kind 都当成全屏闪） */
 type Draw<K extends Cue['kind']> = (fx: CueLayer, c: Extract<Cue, { kind: K }>) => void
 const CUE_KINDS: { [K in Cue['kind']]: Draw<K> } = {
-  circle: (fx, c) => fx.circle(c.x, c.y, c.radius, c.o),
   boom: (fx, c) => fx.boom(c.x, c.y, c.size),
-  lightning: (fx, c) => fx.lightning(c.points, c.color),
-  slash: (fx, c) => fx.slash(c.x, c.y, c.angle, c.radius),
-  beam: (fx, c) => fx.beam(c.x, c.y, c.angle, c.length, c.radius, c.color),
   screenFlash: (fx, c) => fx.screenFlash(c.color, c.alpha, c.durationMs),
 }
 

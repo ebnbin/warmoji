@@ -3,6 +3,7 @@ import { reviveCharacter } from './shared/combat'
 import { ownerX, ownerY } from '../utils/amp'
 import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
+import { spawnFxCircle } from '../entities/fx'
 
 /** 集结：阵亡者满血复活、存活者按上限比例回复、全队短暂无敌。
  * 无敌走受击无敌帧通道（把「上次受击」推到未来），接触与敌弹一并挡下 */
@@ -17,12 +18,7 @@ export function castRallies(sim: Sim): void {
       Tint.color[m] = 0xffe082
       Tint.effect[m] = 0
     }
-    sim.out.cues.push({
-      kind: 'circle',
-      x: ownerX(e),
-      y: ownerY(e),
-      radius: Rally.ringRadius[e]!,
-      o: {
+    spawnFxCircle(sim, ownerX(e), ownerY(e), Rally.ringRadius[e]!, {
         fill: Rally.color[e]!,
         fillAlpha: 0.3,
         stroke: Rally.color[e]!,
@@ -32,7 +28,6 @@ export function castRallies(sim: Sim): void {
         toScale: 3,
         durationMs: 550,
         depth: 20,
-      },
-    })
+      })
   })
 }

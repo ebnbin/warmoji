@@ -4,6 +4,7 @@ import { runPipeline } from './systems/pipeline/step'
 import { animateCharacters } from './systems/animateCharacters'
 import { stepPickupVisuals } from './systems/stepPickupVisuals'
 import { updateShards } from './systems/updateShards'
+import { expireFx } from './systems/expireFx'
 import { layoutTeam } from './systems/layoutTeam'
 import type { FormationId } from '../types/formation'
 import type { EcsWorld } from './world'
@@ -145,6 +146,7 @@ export function worldTimeScale(sim: Sim): number {
 export function stepFrozenVisuals(sim: Sim): void {
   sim.fxMs += sim.dtMs
   updateShards(sim)
+  expireFx(sim)
   stepPickupVisuals(sim)
 }
 

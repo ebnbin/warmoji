@@ -6,6 +6,7 @@ import { damageTarget } from './damage'
 import { sourceOf } from '../../utils/source'
 import { targetsOf } from '../../utils/targets'
 import type { Sim } from '../../sim'
+import { spawnFxBeam } from '../../entities/fx'
 
 /** 发射一束：胶囊判定 + 光束特效（ratio 折损用于扫射分束） */
 export function fireBeam(sim: Sim, e: number, angle: number, ratio: number): void {
@@ -20,13 +21,5 @@ export function fireBeam(sim: Sim, e: number, angle: number, ratio: number): voi
   for (const i of thrustHitIndices({ x: ox, y: oy }, angle, range, beamRadius, list)) {
     damageTarget(sim, src, list[i]!.eid, damage, Laser.knockback[e]!, ox, oy)
   }
-  sim.out.cues.push({
-    kind: 'beam',
-    x: ox,
-    y: oy,
-    angle,
-    length: range,
-    radius: beamRadius,
-    color: Laser.color[e]!,
-  })
+  spawnFxBeam(sim, ox, oy, angle, range, beamRadius, Laser.color[e]!)
 }

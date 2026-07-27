@@ -256,6 +256,35 @@ export const Grab = { radius: f32() }
 /** 地面停留到期时刻(elapsedMs):到点淡出回收。0 = 永不过期 */
 export const Lifetime = { until: f32() }
 
+// ── 一次性战斗特效(Cue)────────────────────────────────
+// 四种形状类特效从前是 CueLayer 里四套手写的定长 SoA 池，各带一份 born 空闲标记
+// 与一个环形游标——把实体存储在 ECS 外面又实现了一遍。现在就是实体：
+// 位置走 Transform（斩击/光束的朝向走 Transform.rot）、层次走 Depth，
+// 时间走下面这个 Fx，形状参数各自一个组件。批绘照旧，只是改成遍历查询集。
+//
+// 时钟取 sim.fxMs（真实帧长的纯视觉钟）：特效不吃时停拖慢，过场冻结期也能自然收尾。
+
+/** 一次性特效的时间：出生时刻(视觉钟 fxMs) + 时长。到期由 expireFx 回收 */
+export const Fx = { bornMs: f32(), durMs: f32() }
+
+/** 扩散淡出的圆(命中白闪 / 冲击环 / 治疗集结冻结脉冲)：半径按 from→to 缩放同时淡出。
+ * stroke=-1 表示无描边(纯填充闪光) */
+export const FxCircle = {
+  r: f32(), from: f32(), to: f32(),
+  fill: u32(), fillAlpha: f32(),
+  stroke: i32Fill(-1), lineW: f32(), lineAlpha: f32(),
+}
+
+/** 贯穿光束：沿 Transform.rot 铺一条长 len 的双层带(外层色 + 白芯)，纵向收拢淡出 */
+export const FxBeam = { len: f32(), radius: f32(), color: u32() }
+
+/** 锯齿闪电：折点抖动在投放时算死存进 store.boltPts(每帧重算会让电弧疯狂跳动)，
+ * n = 折点数 */
+export const FxBolt = { n: i32(), color: u32() }
+
+/** 斩击弧光：以 Transform 为心、朝 rot 画一段 ±1.1rad 的白弧 */
+export const FxSlash = { r: f32() }
+
 /** 天体横扫(深空图):预警直线两端 + 划行进度 0..1。
  * Transform 是球体当前位置(预警期 Tint.alpha=0,起划才现身),Depth.z=60 与旧实现同层;
  * **Due.at = 起划时刻**,故「预警中/划行中」是派生的而非存的;

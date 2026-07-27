@@ -5,6 +5,10 @@ import { despawnEnemy, hurtCharacter } from './shared/combat'
 import { nearestAlive } from './shared/steer'
 import { enemyDef } from '../store'
 import type { Sim } from '../sim'
+import { spawnFxRing } from '../entities/fx'
+
+/** 自爆群伤示警圈：红圈从 0.3 张到满，300ms（旧实现里这组数在场景侧的 drainRings） */
+const BLAST_RING = { color: 0xff5252, fillAlpha: 0.35, lineWidth: 3, lineAlpha: 0.9, durMs: 300 }
 
 /** 自爆冲锋：追队员 → 进 triggerRange 定身蓄力 → 蓄力完必引爆（群伤范围内队员 + 自毁）。
  * 蓄力前被打死则不炸（引爆不是亡语） */
@@ -31,7 +35,7 @@ export function steerDetonate(sim: Sim): void {
         Iframe.last[m] = now
         hurtCharacter(sim, m, dmg, enemyDef[eid]?.name)
       }
-      sim.out.rings.push({ x: ex, y: ey, radius: r })
+      spawnFxRing(sim, ex, ey, r, BLAST_RING)
       playSfx('boom')
       despawnEnemy(sim, eid)
       continue
