@@ -25,6 +25,9 @@ export const projHitEids: (Set<number> | undefined)[] = new Array<Set<number> | 
 /** 在途回旋镖本程已命中的 eid(去程/回程各判一次,同程内每敌最多一次) */
 export const flyerHits: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(MAX_ENTITIES).fill(undefined).fill(undefined)
 
+/** 本次天体横扫已砸过的实体(每次横扫对同一实体只砸一次) */
+export const meteorHit: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(MAX_ENTITIES).fill(undefined)
+
 /** 战场限时层是哪一枚拾取(id/emoji/极性/乘区都在 def 上) */
 export const modDef: (FieldPickupDef | undefined)[] = new Array<FieldPickupDef | undefined>(MAX_ENTITIES).fill(undefined)
 
@@ -78,6 +81,7 @@ export const animOutline: (import('../emoji/svg').OutlineKind | undefined)[] =
 export function clearEcsStore(): void {
   enemyDef.fill(undefined)
   modDef.fill(undefined)
+  meteorHit.fill(undefined)
   telegraphDef.fill(undefined)
   telegraphCarries.fill(undefined)
   carrierPickup.fill(undefined)

@@ -256,6 +256,12 @@ export const Grab = { radius: f32() }
 /** 地面停留到期时刻(elapsedMs):到点淡出回收。0 = 永不过期 */
 export const Lifetime = { until: f32() }
 
+/** 天体横扫(深空图):预警直线两端 + 划行进度 0..1。
+ * Transform 是球体当前位置(预警期 Tint.alpha=0,起划才现身),Depth.z=60 与旧实现同层;
+ * **Due.at = 起划时刻**,故「预警中/划行中」是派生的而非存的;
+ * 本次已砸过的实体在 store.meteorHit(每次横扫对同一实体只砸一次) */
+export const Meteor = { sx: f32(), sy: f32(), ex: f32(), ey: f32(), t: f32() }
+
 /** 战场限时层：捡到一枚战场拾取就多一层限时乘区。哪一枚（id/emoji/极性/乘区）在
  * store.modDef；到期时刻走 Lifetime，totalMs 供 HUD 画剩余比例。
  * 与地面毒圈(Zone)是同一个概念——战场上一件限时生效的东西 */

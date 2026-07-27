@@ -29,7 +29,8 @@ export const SPRITE_BANDS: readonly { depth: number; zMin: number; zMax: number 
   { depth: 5, zMin: 4, zMax: 6 }, // 敌人
   { depth: 6, zMin: 6, zMax: 7 }, // 敌弹 / 死亡碎片
   { depth: 7, zMin: 7, zMax: 8 }, // Boss
-  { depth: 8, zMin: 8, zMax: Infinity }, // 我方弹 / 被保护中心 / 队员
+  { depth: 8, zMin: 8, zMax: 60 }, // 我方弹 / 被保护中心 / 队员
+  { depth: 60, zMin: 60, zMax: Infinity }, // 天体横扫的球体(压在血条之上)
 ]
 
 export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {

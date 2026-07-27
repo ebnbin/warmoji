@@ -36,8 +36,12 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     ...Object.values(FIELD_PICKUPS).map((p) => p.emoji),
     '2795',
     '1f480',
-    // 刷怪预告的 ⚠ 标记（ECS 侧它是一颗实体，贴图走图集变体；arcade 侧仍是无描边 Image）
+    // 刷怪预告的 ⚠ 标记、深空图天体横扫的 🪐 球体：ECS 侧两者都是实体，贴图走图集变体
+    //（arcade 侧仍是无描边 Image，故 PRELOAD 里那两条也留着）。
+    // 🪐 恰好也是「失重打滑」那枚战场拾取的图标，即便删掉这一行也仍在集里——
+    // 但那是巧合不是依赖：那枚拾取换个 emoji，天体就静默变成 frame=-1
     SPAWN.markEmoji,
+    '1fa90',
     // 财迷「天降横财」的金袋投掷物 + HUD 能量豆
     '1f4b0',
     '1fad8',
@@ -107,7 +111,7 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   ...Object.values(MAPS).map((m) => m.emoji),
   '1f5fa',
   '1f579',
-  // 深空图天体横扫的球体（无描边贴图，SpaceScene 直接 emojiImage 渲染）
+  // 深空图天体横扫的球体（arcade 的 SpaceScene 直接 emojiImage 渲染，无描边）
   '1fa90',
   ...SETTING_DEFS.map((d) => d.icon),
   SPAWN.markEmoji,

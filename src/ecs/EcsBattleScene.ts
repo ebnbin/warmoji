@@ -48,7 +48,7 @@ import { spawnBossEcs, spawnSurgeEcs } from './entities/enemy'
 import { scheduleCarrier } from './entities/schedule'
 import { telegraphCount } from './entities/telegraph'
 import { activeMods } from './entities/modifier'
-import { Lifetime, Modifier } from './components'
+import { Due, Lifetime, Meteor, Modifier } from './components'
 
 import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
 import { settleWave } from './systems/shared/wave'
@@ -65,7 +65,6 @@ import type { HudSnapshot } from '../run/hudHost'
 import type { Sim } from './sim'
 import { drain } from './outbox'
 import type { Burst } from './outbox'
-import type { Meteor } from './worlds'
 import { emojiImage } from '../emoji/textures'
 import { rollWaveCarriers } from '../war/battleFx'
 import { centerX, centerY } from './utils/team'
@@ -180,8 +179,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   /** 无限图终波缩圈：圈线 + 圈外红渐晕（圈本体状态在 sim.worldState.zone，纯逻辑侧算） */
   private zoneGfx?: Phaser.GameObjects.Graphics
   private zoneVignette?: Phaser.GameObjects.Rectangle
-  /** 深空图天体横扫的视觉：与 sim.worldState.meteor 对帐（新一次即建预警轨迹，起划即挂球体，结束即销毁） */
-  private meteorFx?: { of: Meteor; tele: Phaser.GameObjects.Graphics; sphere?: Phaser.GameObjects.Image }
+  /** 深空图天体横扫的预警车道：跟着横扫实体的 eid 走（球体是那颗实体自己的贴图） */
+  private meteorFx?: { of: number; tele: Phaser.GameObjects.Graphics }
   /** 工厂图（环面）：跨缝分身的条带相机 + 传送门光带/脉动边线 */
   private stripCams: Phaser.Cameras.Scene2D.Camera[] = []
   private frameTiles: { tile: Phaser.GameObjects.TileSprite; dx: number; dy: number }[] = []
@@ -1182,43 +1181,39 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.zoneVignette?.setFillStyle(0xd32f2f, anyOutside ? 0.16 + 0.08 * Math.sin(sim.elapsedMs / 130) : 0)
   }
 
-  /** 天体横扫的视觉对帐(镜像 startMeteorWarn/launchMeteor/endMeteor;直线与伤害在纯逻辑侧):
-   * 新一次横扫即画危险车道,预警期脉动,起划挂球体并让轨迹淡下去,结束即销毁 */
-  private updateMeteorFx(sim: Sim, delta: number): void {
-    const m = sim.worldState.meteor
+  /** 天体横扫的预警车道(镜像 startMeteorWarn/endMeteor)。
+   * 🪐 球体不在这里——它是横扫实体自己的贴图（z=60），批绘照常画。
+   * 车道是一条粗线段，批绘不了，只能留作 Graphics；但它跟谁走由 **eid** 决定，
+   * 不再拿对象引用对帐 */
+  private updateMeteorFx(sim: Sim): void {
+    const m = query(this.world, [Meteor])[0]
     const fx = this.meteorFx
     if (fx && fx.of !== m) {
-      fx.sphere?.destroy()
       fx.tele.destroy()
       this.meteorFx = undefined
     }
-    if (!m) return
+    if (m === undefined) return
     const cfg = MAPS[this.run.mapId].space!.meteor
     const rr = cfg.radiusU * UNIT
     let cur = this.meteorFx
     if (!cur) {
       // 危险车道:宽半透明带 + 亮芯线 + 入口标记(球体从此侧划入)
+      const sx = Meteor.sx[m]!
+      const sy = Meteor.sy[m]!
       const tele = this.add.graphics().setDepth(3)
       tele.lineStyle(rr * 2, 0xff5252, 0.16)
-      tele.lineBetween(m.sx, m.sy, m.ex, m.ey)
+      tele.lineBetween(sx, sy, Meteor.ex[m]!, Meteor.ey[m]!)
       tele.lineStyle(3, 0xff8a80, 0.8)
-      tele.lineBetween(m.sx, m.sy, m.ex, m.ey)
+      tele.lineBetween(sx, sy, Meteor.ex[m]!, Meteor.ey[m]!)
       tele.fillStyle(0xff5252, 0.35)
-      tele.fillCircle(m.sx, m.sy, rr)
+      tele.fillCircle(sx, sy, rr)
       cur = { of: m, tele }
       this.meteorFx = cur
     }
-    if (!m.travelling) {
-      // 预警脉动:轨迹一明一暗,提醒「这条线要来球」
-      cur.tele.setAlpha(0.28 + 0.24 * Math.abs(Math.sin(sim.elapsedMs / 110)))
-      return
-    }
-    if (!cur.sphere) {
-      cur.sphere = emojiImage(this, m.sx, m.sy, '1fa90', rr * 2).setDepth(60)
-      cur.tele.setAlpha(0.22) // 划行期间轨迹淡下去,只留车道感
-    }
-    cur.sphere.setPosition(m.sx + (m.ex - m.sx) * m.t, m.sy + (m.ey - m.sy) * m.t)
-    cur.sphere.rotation += (delta / 1000) * 1.4 // 增量累加:入场朝向恒为 0,且不吃世界时标
+    // 预警脉动:轨迹一明一暗,提醒「这条线要来球」;起划后淡下去,只留车道感
+    cur.tele.setAlpha(
+      sim.elapsedMs < Due.at[m]! ? 0.28 + 0.24 * Math.abs(Math.sin(sim.elapsedMs / 110)) : 0.22,
+    )
   }
 
   /** 本波携带者排期(镜像 scheduleCarriers):按预算铺开,均匀撒在本波中前段(留出波末空档)。
@@ -1359,7 +1354,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.updateDayNight(sim)
     this.updateWaterVignette(sim)
     this.updateZone(sim)
-    this.updateMeteorFx(sim, delta)
+    this.updateMeteorFx(sim)
     this.drainSmashedWalls(sim)
     this.updateRiver(sim, delta)
     this.updatePortals(sim, delta)
@@ -1422,7 +1417,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       walls: sim.worldState.walls ? sim.worldState.walls.grid.blocked.filter(Boolean).length : 0,
       spawnCells: sim.worldState.walls?.spawnCells.length ?? 0,
       // 深空:天体横扫态(null=不在途)
-      meteor: sim.worldState.meteor ? { travelling: sim.worldState.meteor.travelling, t: sim.worldState.meteor.t } : null,
+      meteor: ((m) => (m === undefined ? null : { travelling: sim.elapsedMs >= Due.at[m]!, t: Meteor.t[m]! }))(query(this.world, [Meteor])[0]),
     }
   }
 }

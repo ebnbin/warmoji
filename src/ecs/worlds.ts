@@ -13,9 +13,10 @@ import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../war/maps/void
 import type { RiverRect } from '../war/maps/river'
 import { isHorizontal } from '../war/remap'
 import { PICKUPS } from '../data/pickups'
-import { query } from 'bitecs'
-import { Alive, Boss, Dormant, ENEMY_SET, Radius, Slide, Transform } from './components'
-import { enemyDef } from './store'
+import { query, removeEntity } from 'bitecs'
+import { Alive, Boss, Dormant, Due, ENEMY_SET, Meteor, Radius, Slide, Tint, Transform } from './components'
+import { enemyDef, meteorHit } from './store'
+import { spawnMeteor } from './entities/meteor'
 import { FlowField } from '../war/maps/ruins'
 import type { WallGrid } from '../war/maps/ruins'
 import { applyDamage, hurtCharacter } from './systems/shared/combat'
@@ -53,21 +54,6 @@ export interface Walls {
   smashed: number[]
 }
 
-/** 一次天体横扫(深空图):预警直线两端 + 起划时刻 + 划行进度 + 本次已结算过的实体 */
-export interface Meteor {
-  /** false=预警中(到 until 起划) true=划行中 */
-  travelling: boolean
-  sx: number
-  sy: number
-  ex: number
-  ey: number
-  until: number
-  /** 划行进度 0..1 */
-  t: number
-  /** 每次横扫对同一实体只砸一次 */
-  hit: Set<number>
-}
-
 /** 世界钩子的私有状态。每张图只用得上其中一两项,其余保持初值——
  * 谁用哪项写在字段注释里,Sim 不必知道 */
 export interface WorldState {
@@ -78,14 +64,12 @@ export interface WorldState {
   vy: number
   /** 终波缩圈(无限图):圆心 + 当前半径(世界像素);未开圈为 null */
   zone: { x: number; y: number; r: number } | null
-  /** 天体横扫(深空图):预警/划行中的那一次;未在途为 null。场景侧据此建/毁预警轨迹与球体 */
-  meteor: Meteor | null
   /** 断壁世界(残垣图):网格 + 流场 + 待拆格队列;非断壁图为 null */
   walls: Walls | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, vx: 0, vy: 0, zone: null, meteor: null, walls: null }
+  return { tickAt: 0, vx: 0, vy: 0, zone: null, walls: null }
 }
 
 export interface WorldHooks {
@@ -566,44 +550,51 @@ const space: WorldHooks = {
   onStart(sim) {
     sim.worldState.tickAt = 7000 // 首颗天体来得早一点,确保第一波就见识到横扫
   },
-  /** 天体横扫:到点开预警 → 预警结束起划 → 沿直线匀速推进,压到的实体每次只砸一次 */
+  /** 天体横扫:到点开预警 → 预警结束起划 → 沿直线匀速推进,压到的实体每次只砸一次。
+   * 横扫本身是一颗实体(entities/meteor.ts):🪐 是它自己的贴图,预警期 alpha=0 */
   tick(sim, delta) {
     const cfg = spaceCfg(sim).meteor
     const now = sim.elapsedMs
-    const m = sim.worldState.meteor
-    if (!m) {
+    const rr = cfg.radiusU * UNIT
+    const m = query(sim.world, [Meteor])[0]
+    if (m === undefined) {
       if (now < sim.worldState.tickAt) return
       const angle = sim.rng.next() * Math.PI * 2
       const offset = (sim.rng.next() * 2 - 1) * cfg.offsetU * UNIT
       const s = meteorSweep(centerX(sim), centerY(sim), angle, offset, (cfg.travelU * UNIT) / 2)
-      sim.worldState.meteor = { travelling: false, sx: s.sx, sy: s.sy, ex: s.ex, ey: s.ey, until: now + cfg.warnMs, t: 0, hit: new Set() }
+      spawnMeteor(sim, s, cfg.warnMs, rr * 2)
       return
     }
-    if (!m.travelling) {
-      if (now >= m.until) m.travelling = true
-      return
-    }
-    const len = Math.hypot(m.ex - m.sx, m.ey - m.sy) || 1
-    m.t += (cfg.speedU * UNIT * (delta / 1000)) / len
-    const x = m.sx + (m.ex - m.sx) * m.t
-    const y = m.sy + (m.ey - m.sy) * m.t
-    const rr = cfg.radiusU * UNIT
+    if (now < Due.at[m]!) return // 预警中
+    const sx = Meteor.sx[m]!
+    const sy = Meteor.sy[m]!
+    const len = Math.hypot(Meteor.ex[m]! - sx, Meteor.ey[m]! - sy) || 1
+    const t = Meteor.t[m]! + (cfg.speedU * UNIT * (delta / 1000)) / len
+    Meteor.t[m] = t
+    const x = sx + (Meteor.ex[m]! - sx) * t
+    const y = sy + (Meteor.ey[m]! - sy) * t
+    // 球体即本实体的位姿;自旋走真实帧长(增量累加,不吃世界时标,与旧实现同)
+    Transform.x[m] = x
+    Transform.y[m] = y
+    Transform.rot[m] = Transform.rot[m]! + (sim.dtMs / 1000) * 1.4
+    Tint.alpha[m] = 1
+    const hit = meteorHit[m]!
     for (const mem of sim.characters) {
-      if (!Alive.v[mem] || m.hit.has(mem)) continue
+      if (!Alive.v[mem] || hit.has(mem)) continue
       if (Math.hypot(Transform.x[mem]! - x, Transform.y[mem]! - y) < rr) {
-        m.hit.add(mem)
+        hit.add(mem)
         hurtCharacter(sim, mem, cfg.damage, '天体', 0xffaa33)
       }
     }
     for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-      if (Dormant.v[eid] || m.hit.has(eid)) continue
+      if (Dormant.v[eid] || hit.has(eid)) continue
       if (Math.hypot(Transform.x[eid]! - x, Transform.y[eid]! - y) < rr) {
-        m.hit.add(eid)
+        hit.add(eid)
         applyDamage(sim, eid, cfg.damage)
       }
     }
-    if (m.t < 1) return
-    sim.worldState.meteor = null
+    if (t < 1) return
+    removeEntity(sim.world, m)
     sim.worldState.tickAt = now + cfg.intervalMs + (sim.rng.next() * 2 - 1) * cfg.intervalJitterMs
   },
 }
