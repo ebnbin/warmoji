@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ABILITY_PIPELINE } from './abilities'
+import { FRAME_PIPELINE } from './frame'
 import { SIM_PIPELINE } from './sim'
 import type { Step } from './step'
 
@@ -12,6 +13,7 @@ import type { Step } from './step'
 // 唯一能拦住的，是把「谁必须在谁之后」写下来并逐条校验。
 
 const PIPELINES: readonly { name: string; steps: readonly Step[] }[] = [
+  { name: '帧', steps: FRAME_PIPELINE },
   { name: '仿真', steps: SIM_PIPELINE },
   { name: '能力', steps: ABILITY_PIPELINE },
 ]

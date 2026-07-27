@@ -35,32 +35,18 @@ import { Alive, Boss, Dormant, Enemy, FACTION, Faction, GrantCoins, Hp, CharHp, 
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { spawnDecor } from './entities/decor'
-import { updateAnims } from './systems/updateAnims'
 import { remapSim } from './systems/shared/remap'
 import { makeSim } from './sim'
-import { updateSpawners } from './systems/updateSpawners'
 import { clearEcsStore } from './store'
 import { armCaptain, armTeam } from './entities/loadout'
-import { armEnemies } from './systems/armEnemies'
-import { refreshEnemyTargets } from './systems/refreshEnemyTargets'
-import { refreshCharacterTargets } from './systems/refreshCharacterTargets'
 import { requestCast } from './systems/shared/ability'
 import { Minion } from './components'
-import { stepAbilities } from './systems/pipeline/abilities'
+import { stepFrame } from './systems/pipeline/frame'
 import { replayDeath } from './systems/shared/death'
-import { runDeathEffects } from './systems/runDeathEffects'
-import { updateZones } from './systems/updateZones'
 import { pickupCounts } from './entities/pickup'
-import { updatePickups } from './systems/updatePickups'
-import { grantCoins } from './systems/grantCoins'
-import { grantFlash } from './systems/grantFlash'
-import { grantMods } from './systems/grantMods'
-import { playPickupFx } from './systems/playPickupFx'
-import { reapCollected } from './systems/reapCollected'
 import { spawnBossEcs, spawnCarrierEcs, spawnSurgeEcs } from './entities/enemy'
-import { spawnStep } from './systems/spawnStep'
 
-import { initialLayout, stepFrozenVisuals, stepSim, worldTimeScale } from './sim'
+import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
 import { settleWave } from './systems/shared/wave'
 import { isBossWave, isEliteWave, waveAt, waveDurationMs, WAVE } from '../data/waves'
 import { xpToNext } from '../war/xp'
@@ -1376,34 +1362,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     sim.view.y = wv.y
     sim.view.right = wv.right
     sim.view.bottom = wv.bottom
-    // 索敌快照先行重建:stepSim 内的抛射物 onHit 效果链要用本帧位置
-    refreshEnemyTargets(sim)
-    stepSim(sim)
-    // 队员快照重建:敌方能力索敌读它,须先于任何敌方出手
-    refreshCharacterTargets(sim)
-    // 新登场的持械敌人装配 + 魔尘复形
-    armEnemies(sim)
-    // 能力系统(敌我共用一套:闸门 → 冷却 → 逐 kind 施放;世界时长,时停期队伍的枪也一并凝住)
-    stepAbilities(sim)
-    // 部件动画:把时钟翻算成帧下标(帧惰性烘焙,未就绪保持静态帧)
-    updateAnims(sim)
-    // 亡语重放(分裂/诱饵/治疗/冷枪:本帧内所有死亡的敌人在死亡点触发)
-    runDeathEffects(sim)
-    // 区域(地面毒圈/灼烧区 + 寒气光环):跟位/开关/到期,再 team 脉冲烧敌 / enemy 节流烧队员
-    updateZones(sim)
-    // 拾取物(金币 / 战场增减益同一条):磁吸 → 到手(挂 Collected) → 到期淡出
-    updatePickups(sim)
-    // 到手给什么：每种给法一个系统，各取所需；回收必须排在它们之后
-    grantCoins(sim)
-    grantMods(sim)
-    grantFlash(sim)
-    playPickupFx(sim)
-    reapCollected(sim)
-    this.drainCollects()
-    // 虫巢周期生成子敌(护巢子敌绕巢;拆巢暴走)
-    updateSpawners(sim)
-    // 刷怪节奏
-    spawnStep(sim)
+    // 一帧的仿真侧：次序与依赖声明在 systems/pipeline/frame.ts，由 order.test.ts 校验
+    stepFrame(sim)
     this.updateTelegraphs()
     // 排空本帧视觉事件:须先于下面的过场判定——否则致死那一帧的死亡爆点/飘字会被 return 吞掉
     // 两个特效层先步进再排空：step 顺带把「本帧视觉钟」写进去，投放据此定起点。
@@ -1411,6 +1371,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.cues?.step(sim.fxMs)
     this.rings?.step(sim.fxMs)
     this.damageText?.step(sim.fxMs)
+    this.drainCollects()
     this.drainDamageNumbers()
     this.drainBursts()
     this.drainRings()
