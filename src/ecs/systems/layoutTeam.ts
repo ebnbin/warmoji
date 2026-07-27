@@ -5,6 +5,7 @@ import { formationPosts } from '../../data/formation'
 import { Alive, Depth, Follow, Threat, Transform, VisOff, Wander } from '../components'
 import { } from '../utils/ease'
 import type { Sim } from '../sim'
+import { centerX, centerY } from '../utils/team'
 
 // 逐员布局：岗位偏移 + 待机游移 + 跟随弹簧 → 写 Follow/Transform/Depth。
 // 只管人站在哪；呼吸/弹入/翻转等纯表现在 animateCharacters。
@@ -27,8 +28,8 @@ export function layoutTeam(sim: Sim): void {
     Wander.amp[eid] = amp
     const wander = amp * WANDER.radius
     const seed = Wander.seed[eid]!
-    const rawX = sim.center.x + p.x + Math.sin(tSec * WANDER.freqX + seed) * wander
-    const rawY = sim.center.y + p.y + Math.sin(tSec * WANDER.freqY + seed * 2.3) * wander
+    const rawX = centerX(sim) + p.x + Math.sin(tSec * WANDER.freqX + seed) * wander
+    const rawY = centerY(sim) + p.y + Math.sin(tSec * WANDER.freqY + seed * 2.3) * wander
     // 跟随弹簧(用局部量演算,避免类型化数组元素的复合赋值歧义)
     let fx = Follow.x[eid]!
     let fy = Follow.y[eid]!
@@ -67,7 +68,7 @@ export function layoutTeam(sim: Sim): void {
     Transform.y[eid] = fy + VisOff.y[eid]!
     const guarded = sim.formation === 'guard' && idx === 0
     // 遮挡纵深按世界差(环面上贴缝时不跳变)
-    Depth.z[eid] = guarded ? 8.5 : 10 + sim.hooks.worldDelta(sim, sim.center.x, sim.center.y, fx, fy).y / UNIT
+    Depth.z[eid] = guarded ? 8.5 : 10 + sim.hooks.worldDelta(sim, centerX(sim), centerY(sim), fx, fy).y / UNIT
   }
 }
 

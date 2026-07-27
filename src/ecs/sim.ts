@@ -32,8 +32,6 @@ import type { EcsAtlas } from './atlas'
 
 export interface Sim {
   world: EcsWorld
-  /** 队伍中心(世界坐标) */
-  center: { x: number; y: number }
   /** 环相位(可旋转环整体转动) */
   orbitPhase: number
   driverPost: number
@@ -41,7 +39,7 @@ export interface Sim {
   teamDir: { x: number; y: number }
   /** 本帧移动量 0..1(键盘满推=1,摇杆取模长):供时停时标 */
   moveInputRaw: number
-  /** 队长实体 eid：队伍中心即它的位置，移速/磁吸半径是它的组件 */
+  /** 队长实体 eid：**队伍中心就是它的 Transform**（见 utils/team），移速/磁吸半径也是它的组件 */
   captain: number
   formation: FormationId
   /** 阵容人数 */
@@ -213,7 +211,6 @@ export function makeSim(
   const { count, formation, postBySlot, lineupOrbit, characters } = team
   return {
     world,
-    center: { x: center.x, y: center.y },
     orbitPhase: 0,
     driverPost: -1,
     teamDir: { x: 0, y: 0 },

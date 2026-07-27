@@ -1,4 +1,5 @@
 import { MoveSpeed } from '../components'
+import { centerX, centerY, setCenter } from '../utils/team'
 import type { Sim } from '../sim'
 
 /** 队伍位移 + 布局(镜像 moveTeam→layoutTeam);落点交给世界钩子(有界钳制/冰面动量) */
@@ -9,9 +10,8 @@ export function moveTeam(sim: Sim): void {
   const drift = sim.hooks.teamDrift(sim, delta)
   const next = sim.hooks.constrainTeam(
     sim,
-    { x: sim.center.x + dir.x * step + drift.x, y: sim.center.y + dir.y * step + drift.y },
+    { x: centerX(sim) + dir.x * step + drift.x, y: centerY(sim) + dir.y * step + drift.y },
     delta,
   )
-  sim.center.x = next.x
-  sim.center.y = next.y
+  setCenter(sim, next.x, next.y)
 }

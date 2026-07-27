@@ -65,6 +65,7 @@ import type { Meteor } from './worlds'
 import { emojiImage } from '../emoji/textures'
 import { SPAWN } from '../data/enemies'
 import { rollWaveCarriers } from '../war/battleFx'
+import { centerX, centerY } from './utils/team'
 
 // ECS 实验战斗场景(宿主壳):Phaser 只做画布/相机/输入/音频宿主;战斗世界(实体+系统+
 // 自绘渲染)全在 ECS。P2:有界森林图 + 队伍编队/orbit/游移/跟随弹簧 + 键盘/相机跟随。
@@ -698,8 +699,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
     shape.clear()
     shape.fillStyle(0xffffff)
-    shape.fillCircle(sim.center.x, sim.center.y, fogRadiusAt(hour, dn) * UNIT)
-    rect.setPosition(sim.center.x, sim.center.y).setFillStyle(FOG_COLOR, alpha).setVisible(true)
+    shape.fillCircle(centerX(sim), centerY(sim), fogRadiusAt(hour, dn) * UNIT)
+    rect.setPosition(centerX(sim), centerY(sim)).setFillStyle(FOG_COLOR, alpha).setVisible(true)
   }
 
   /** 浮冰世界的视觉步进(镜像 IceScene.updateWater 的渐晕部分):
@@ -708,7 +709,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const rect = this.waterVignette
     if (!rect) return
     const px = MAPS[this.run.mapId].ice!.floeU * UNIT
-    const inWater = !onFloe(sim.center.x, sim.center.y, px)
+    const inWater = !onFloe(centerX(sim), centerY(sim), px)
     rect.setFillStyle(WATER_VIGNETTE, inWater ? 0.18 + 0.06 * Math.sin(sim.elapsedMs / 140) : 0)
   }
 
@@ -742,7 +743,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       sim.mapW = this.mapW
       sim.mapH = this.mapH
       remapSim(sim, fromW, fromH, this.mapW, this.mapH)
-      this.centerObj.setPosition(sim.center.x, sim.center.y)
+      this.centerObj.setPosition(centerX(sim), centerY(sim))
     }
     // 视觉层整体重建（战斗实体不在此列：它们是 ECS 实体，坐标已随 remapSim 挪好）
     for (const o of this.worldVisuals) o.destroy()
@@ -1381,7 +1382,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.time.delayedCall(900, () => this.scene.start('result', { win: false }))
       return
     }
-    this.centerObj.setPosition(sim.center.x, sim.center.y)
+    this.centerObj.setPosition(centerX(sim), centerY(sim))
     this.updateDayNight(sim)
     this.updateWaterVignette(sim)
     this.updateZone(sim)
@@ -1398,8 +1399,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
       pages: this.atlas?.pageCount ?? 0,
-      centerX: sim.center.x,
-      centerY: sim.center.y,
+      centerX: centerX(sim),
+      centerY: centerY(sim),
       characters: sim.characters.length,
       mapW: this.mapW,
       mapH: this.mapH,
@@ -1430,7 +1431,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       alive: sim.characters.filter((eid) => Alive.v[eid]).length,
       memberHp: sim.characters.map((eid) => CharHp.hp[eid]!),
       // 浮冰:队伍中心是否落水(非浮冰图恒 false)
-      inWater: this.waterVignette !== undefined && !onFloe(sim.center.x, sim.center.y, this.mapW),
+      inWater: this.waterVignette !== undefined && !onFloe(centerX(sim), centerY(sim), this.mapW),
       // 无限世界:休眠敌人数 + 相机位置(验证无边界跟随)+ 终波缩圈半径
       dormant: Array.from(query(this.world, [Enemy]), (eid) => Dormant.v[eid]!).filter((v) => v === 1).length,
       camX: this.cameras.main.scrollX + this.cameras.main.width / 2,

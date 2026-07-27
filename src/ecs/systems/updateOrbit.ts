@@ -5,6 +5,7 @@ import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '.
 import type { OrbitThreat } from '../../war/orbit'
 import { Alive, Threat, Transform } from '../components'
 import type { Sim } from '../sim'
+import { centerX, centerY } from '../utils/team'
 
 /** 队伍活感·探测与轨道(镜像 updateOrbit):逐员判定探测范围内有无敌人 + 环上主力驱动共享相位 */
 export function updateOrbit(sim: Sim): void {
@@ -33,7 +34,7 @@ export function updateOrbit(sim: Sim): void {
       Threat.v[eid] = 1
       if (base === null || bias === 0) break
       threats.push({
-        diff: angleDiff(theta, Math.atan2(t.y - sim.center.y, t.x - sim.center.x)),
+        diff: angleDiff(theta, Math.atan2(t.y - centerY(sim), t.x - centerX(sim))),
         weight: threatWeight(Math.sqrt(dSq), range),
       })
     }

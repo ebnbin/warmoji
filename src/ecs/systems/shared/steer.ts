@@ -2,6 +2,7 @@ import { AI } from '../../../data/enemies'
 import { Alive, EDir, ETurn, Transform } from '../../components'
 import type { Point } from '../../../util/vec'
 import type { Sim } from '../../sim'
+import { teamCenter } from '../../utils/team'
 
 // 各走位系统共用的三件事：找人、游荡、瞄谁。都要过世界钩子（残垣图绕墙、有界图折返、
 // 无界图回绕），所以不能是纯函数——wanderDir 还会写 EDir/ETurn。
@@ -39,6 +40,6 @@ export function wanderDir(sim: Sim, eid: number): Point {
 }
 
 /** 瞄谁：队伍中心，或最近的活着队员 */
-export function aimPoint(sim: Sim, eid: number, teamCenter: boolean): Point | null {
-  return teamCenter ? sim.center : nearestAlive(sim, Transform.x[eid]!, Transform.y[eid]!)
+export function aimPoint(sim: Sim, eid: number, atCenter: boolean): Point | null {
+  return atCenter ? teamCenter(sim) : nearestAlive(sim, Transform.x[eid]!, Transform.y[eid]!)
 }

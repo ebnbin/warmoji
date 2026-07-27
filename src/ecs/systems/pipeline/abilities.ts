@@ -1,5 +1,4 @@
 import { clearFrameRegisters } from '../clearFrameRegisters'
-import { followTeamCenter } from '../followTeamCenter'
 import { updateAbilityGates } from '../updateAbilityGates'
 import { tickCooldowns } from '../tickCooldowns'
 
@@ -171,15 +170,8 @@ export const ABILITY_PIPELINE: readonly Step[] = [
     why: '本帧登记表的清零必须先于所有生产者，否则登记项逐帧堆积',
   },
   {
-    name: 'followTeamCenter',
-    run: followTeamCenter,
-    after: ['clearFrameRegisters'],
-    why: '队长实体的位姿即队伍中心，施放锚点读它，故须先于一切施放',
-  },
-  {
     name: 'gates',
     run: updateAbilityGates,
-    after: ['followTeamCenter'],
     why: 'Frozen/Disarmed 是本帧派生的闸门，晚一帧就是「死人还能出一次手」',
   },
   {

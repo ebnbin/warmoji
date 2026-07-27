@@ -22,6 +22,7 @@ import { applyDamage, hurtCharacter } from './systems/shared/combat'
 import type { Sim } from './sim'
 import type { Point } from '../util/vec'
 import { fleeSteer } from '../war/enemyAi'
+import { centerX, centerY, teamCenter } from './utils/team'
 
 // 世界钩子(纯逻辑):各地图与「有界森林」不同的那几处行为,收在这里按 mapId 取一份。
 // 旧实现把这些散在 8 个 Scene 子类的 override 里;ECS 侧仿真是纯函数,故改成一张
@@ -242,7 +243,7 @@ const bounded: WorldHooks = {
       sim.mapW,
       sim.mapH,
       (boss ? 2 : SPAWN.edgeInset) * UNIT,
-      sim.center,
+      teamCenter(sim),
       SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1),
     )
   },
@@ -273,16 +274,16 @@ const ice: WorldHooks = {
   constrainTeam(sim, next, delta) {
     const cfg = iceCfg(sim)
     const dt = delta / 1000
-    if (dt <= 0) return { x: sim.center.x, y: sim.center.y }
+    if (dt <= 0) return { x: centerX(sim), y: centerY(sim) }
     // next 即本帧输入想走到的位置,反推「想要的速度」,再以时间常数 tau 缓慢趋近
-    const desVx = (next.x - sim.center.x) / dt
-    const desVy = (next.y - sim.center.y) / dt
-    const on = onFloe(sim.center.x, sim.center.y, floePx(sim))
+    const desVx = (next.x - centerX(sim)) / dt
+    const desVy = (next.y - centerY(sim)) / dt
+    const on = onFloe(centerX(sim), centerY(sim), floePx(sim))
     const tau = on ? cfg.teamTauIce : cfg.teamTauWater
     const mul = on ? 1 : cfg.waterSpeedMul
     sim.worldState.vx = approach(sim.worldState.vx, desVx * mul, dt, tau)
     sim.worldState.vy = approach(sim.worldState.vy, desVy * mul, dt, tau)
-    return { x: sim.center.x + sim.worldState.vx * dt, y: sim.center.y + sim.worldState.vy * dt }
+    return { x: centerX(sim) + sim.worldState.vx * dt, y: centerY(sim) + sim.worldState.vy * dt }
   },
   // 无界:敌人不钳制(滑出浮冰照常,落水自有掉血结算);游荡也不折返(冰缘不是墙)
   constrainEnemy(_sim, _eid, x, y) {
@@ -336,7 +337,7 @@ const ice: WorldHooks = {
     sim.worldState.tickAt = sim.elapsedMs + cfg.waterTickMs
     const px = floePx(sim)
     const frac = cfg.waterTickMs / 1000
-    if (!onFloe(sim.center.x, sim.center.y, px)) {
+    if (!onFloe(centerX(sim), centerY(sim), px)) {
       const dmg = Math.round(cfg.waterTeamDps * frac)
       for (const m of sim.characters) if (Alive.v[m]) hurtCharacter(sim, m, dmg, '寒水', 0x4fc3f7)
     }
@@ -357,7 +358,7 @@ const ruins: WorldHooks = {
   constrainTeam(sim, next, delta) {
     const box = bounded.constrainTeam(sim, next, delta)
     const w = sim.worldState.walls
-    return w ? w.grid.resolveMove(sim.center.x, sim.center.y, box.x, box.y) : box
+    return w ? w.grid.resolveMove(centerX(sim), centerY(sim), box.x, box.y) : box
   },
   constrainEnemy(sim, eid, x, y) {
     const box = bounded.constrainEnemy(sim, eid, x, y)
@@ -406,8 +407,8 @@ const ruins: WorldHooks = {
     if (!w || w.spawnCells.length === 0) return bounded.spawnPoint(sim, boss)
     const cfg = MAPS[sim.mapId].walls!
     const minCellDist = cfg.spawnMinCellDist + (boss ? 2 : 0)
-    const ccx = w.grid.cellX(sim.center.x)
-    const ccy = w.grid.cellY(sim.center.y)
+    const ccx = w.grid.cellX(centerX(sim))
+    const ccy = w.grid.cellY(centerY(sim))
     const min2 = minCellDist * minCellDist
     const cellCenter = (idx: number): Point => ({
       x: ((idx % w.grid.cols) + 0.5) * UNIT,
@@ -433,8 +434,8 @@ const ruins: WorldHooks = {
     const w = sim.worldState.walls
     if (!w) return
     w.reflowAcc += delta
-    const cx = w.grid.cellX(sim.center.x)
-    const cy = w.grid.cellY(sim.center.y)
+    const cx = w.grid.cellX(centerX(sim))
+    const cy = w.grid.cellY(centerY(sim))
     if (cx === w.flowCellX && cy === w.flowCellY && w.reflowAcc < MAPS[sim.mapId].walls!.reflowMs) return
     w.flow = new FlowField(w.grid, cx, cy)
     w.flowCellX = cx
@@ -485,9 +486,9 @@ const infinite: WorldHooks = {
   },
   spawnPoint(sim, boss) {
     const zone = sim.worldState.zone
-    if (boss) return ringPoint(sim.rng, zone ?? sim.center, 6 * UNIT, 8 * UNIT)
+    if (boss) return ringPoint(sim.rng, zone ?? teamCenter(sim), 6 * UNIT, 8 * UNIT)
     const cfg = infCfg(sim)
-    const p = ringPoint(sim.rng, sim.center, cfg.spawnRingMin * UNIT, cfg.spawnRingMax * UNIT)
+    const p = ringPoint(sim.rng, teamCenter(sim), cfg.spawnRingMin * UNIT, cfg.spawnRingMax * UNIT)
     // 终波:落点收进当前圈内(圈外刷怪毫无意义)
     if (!zone) return p
     const limit = zone.r - UNIT
@@ -499,7 +500,7 @@ const infinite: WorldHooks = {
     return infCfg(sim).activeHalf * UNIT
   },
   onFinalWave(sim) {
-    sim.worldState.zone = { x: sim.center.x, y: sim.center.y, r: ringCfg(sim).r0 * UNIT }
+    sim.worldState.zone = { x: centerX(sim), y: centerY(sim), r: ringCfg(sim).r0 * UNIT }
     sim.worldState.tickAt = ringCfg(sim).tickMs
   },
   /** 缩圈:半径逐帧按曲线收(场景侧据此画圈),圈外队员每 tick 掉血(敌人不受圈伤) */
@@ -538,8 +539,8 @@ const space: WorldHooks = {
   ...infinite,
   constrainTeam(sim, next) {
     const r = fieldR(sim)
-    const v = confineVelocity(sim.center.x, sim.center.y, 0, 0, next.x - sim.center.x, next.y - sim.center.y, r)
-    return clampToDisc(sim.center.x + v.x, sim.center.y + v.y, 0, 0, r)
+    const v = confineVelocity(centerX(sim), centerY(sim), 0, 0, next.x - centerX(sim), next.y - centerY(sim), r)
+    return clampToDisc(centerX(sim) + v.x, centerY(sim) + v.y, 0, 0, r)
   },
   constrainSpawn(sim, x, y, radius) {
     return clampToDisc(x, y, 0, 0, fieldR(sim) - radius)
@@ -557,7 +558,7 @@ const space: WorldHooks = {
     const cfg = infCfg(sim)
     const p = boss
       ? ringPoint(sim.rng, { x: 0, y: 0 }, 6 * UNIT, 8 * UNIT)
-      : ringPoint(sim.rng, sim.center, cfg.spawnRingMin * UNIT, cfg.spawnRingMax * UNIT)
+      : ringPoint(sim.rng, teamCenter(sim), cfg.spawnRingMin * UNIT, cfg.spawnRingMax * UNIT)
     return clampToDisc(p.x, p.y, 0, 0, fieldR(sim) - UNIT)
   },
   // 禁锢圈本就全程常驻,终波不再叠一层毒雾缩圈
@@ -574,7 +575,7 @@ const space: WorldHooks = {
       if (now < sim.worldState.tickAt) return
       const angle = sim.rng.next() * Math.PI * 2
       const offset = (sim.rng.next() * 2 - 1) * cfg.offsetU * UNIT
-      const s = meteorSweep(sim.center.x, sim.center.y, angle, offset, (cfg.travelU * UNIT) / 2)
+      const s = meteorSweep(centerX(sim), centerY(sim), angle, offset, (cfg.travelU * UNIT) / 2)
       sim.worldState.meteor = { travelling: false, sx: s.sx, sy: s.sy, ex: s.ex, ey: s.ey, until: now + cfg.warnMs, t: 0, hit: new Set() }
       return
     }
@@ -694,8 +695,8 @@ const river: WorldHooks = {
     if (!boss) return pos
     for (let i = 0; i < 24; i++) {
       pos = pick()
-      const dx = pos.x - sim.center.x
-      const dy = pos.y - sim.center.y
+      const dx = pos.x - centerX(sim)
+      const dy = pos.y - centerY(sim)
       if (dx * dx + dy * dy >= 5 * UNIT * (5 * UNIT)) break
     }
     return pos
@@ -768,7 +769,7 @@ const torus: WorldHooks = {
     if (!boss) return pos
     for (let i = 0; i < 24; i++) {
       pos = pick()
-      if (torusDist2(pos, sim.center, sim.mapW, sim.mapH) >= 5 * UNIT * (5 * UNIT)) break
+      if (torusDist2(pos, teamCenter(sim), sim.mapW, sim.mapH) >= 5 * UNIT * (5 * UNIT)) break
     }
     return pos
   },

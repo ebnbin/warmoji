@@ -5,6 +5,7 @@ import { PICKUP, PICKUPS } from '../../data/pickups'
 import { Alive, Collected, Grab, Hurt, Lifetime, PICKUP_SET, Pull, Tint, Transform, Vel } from '../components'
 import { animatePickup } from '../entities/pickup'
 import type { Sim } from '../sim'
+import { centerX, centerY } from '../utils/team'
 
 // 拾取物管线:磁吸 → 到手 → 到期回收,外加入场弹出与待拾缓浮。
 // 「不同的拾取给不同的东西」不在这条管线里:到手只挂 Collected,由各 Grant 系统各取所需。
@@ -19,8 +20,8 @@ export function updatePickups(sim: Sim): void {
   if (eids.length === 0) return
   const dt = delta / 1000
   const now = sim.elapsedMs
-  const cx = sim.center.x
-  const cy = sim.center.y
+  const cx = centerX(sim)
+  const cy = centerY(sim)
   for (const eid of eids) {
     animatePickup(sim, eid)
     const x = Transform.x[eid]!
