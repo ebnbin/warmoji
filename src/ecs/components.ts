@@ -173,6 +173,23 @@ export const Dormant = { v: u8() }
  * 渲染层据此把该 frame 的 UV 矩形四等分取其一 */
 export const Quad = { v: u8() }
 
+// ── 地图布景（装饰）────────────────────────────────────
+// 装饰是**一类实体**：草丛、蘑菇、钢板厂房的散落零件、河岸植被、水面漂浮物,
+// 都是「按种子铺在图上的低透明度 emoji」。会不会自转、会不会顺流漂,是这颗装饰
+// 自己的属性——静止的图就是两个都不挂,而不是另起一套实现。
+// 从前不是这样:有界/无限图的装饰是 ECS 实体,而奔流的岸植、工厂的零件是 Phaser
+// Image、漂浮物更是场景里一个 Drift[] 数组 + 手写循环。同一个概念四套写法。
+
+/** 自转(rad/s,加到 Transform.rot 上)。走**真实帧长**——纯视觉,不吃时停拖慢。
+ * 抛射物的自转不在此列(Proj.spin):那是世界物体,随 wdtMs 一起放慢,
+ * 且就在 moveProjectiles 的位移积分旁边一行,单拎出来反要多扫一遍全部弹体 */
+export const Spin = { rate: f32() }
+
+/** 顺流漂(奔流图水面漂浮物):沿流向进度 u + 跨向基线 cross + 速度倍率(中流更快),
+ * 外加绕基线的正弦横摆。漂出下游即回上游换个横位重进场。
+ * 与 Spin 正交——漂浮物两个都挂,岸上植被一个都不挂 */
+export const Drift = { u: f32(), cross: f32(), speedMul: f32(), swayPhase: f32(), swayAmp: f32() }
+
 /** 死亡碎片:飞散速度 + 起止时刻 + 终旋转 + 初始尺寸(线性插值:飞散/缩小/旋转/淡出) */
 export const Shard = { vx: f32(), vy: f32(), startMs: f32(), until: f32(), rot: f32(), size: f32() }
 export const SHARD_SET = [Shard, Transform, Sprite, Tint, Depth] as const

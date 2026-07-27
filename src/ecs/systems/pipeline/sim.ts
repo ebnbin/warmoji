@@ -1,6 +1,8 @@
 import { animateEnemies } from '../animateEnemies'
 import { blinkTelegraphs } from '../blinkTelegraphs'
 import { animateBooms } from '../animateBooms'
+import { driftDecor } from '../driftDecor'
+import { spinDecor } from '../spinDecor'
 import { expireFx } from '../expireFx'
 import { animateCharacters } from '../animateCharacters'
 import { applyKnockback } from '../applyKnockback'
@@ -163,6 +165,9 @@ export const SIM_PIPELINE: readonly Step[] = [
   { name: 'blinkTelegraphs', run: blinkTelegraphs },
   { name: 'updateShards', run: updateShards },
   { name: 'animateBooms', run: animateBooms },
+  // 地图布景：顺流漂先把位姿算出来，自转再叠上去（两者都只写 Transform）
+  { name: 'driftDecor', run: driftDecor },
+  { name: 'spinDecor', run: spinDecor, after: ['driftDecor'] },
   {
     name: 'expireFx',
     run: expireFx,

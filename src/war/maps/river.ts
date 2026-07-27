@@ -56,3 +56,8 @@ export function driftProfile(crossFrac: number): number {
 // 只有玩家与 Boss 被钳在河道内；敌人/金币自由出界——敌人沿用无限图
 // 休眠机制（32 格）并会逆流游回，金币漂出下游即冲走
 // 设计参数（视野倍率/河道宽/流速/漂浮物等）已上移到 MapDef.river（数据）。
+
+/** 漂浮物的顺流速度倍率：中流更快（driftProfile）× 本图的随机区间 */
+export function driftSpeed(crossFrac: number, cfg: { driftSpeedMul: readonly [number, number] }, rand: () => number): number {
+  return driftProfile(crossFrac) * (cfg.driftSpeedMul[0] + rand() * (cfg.driftSpeedMul[1] - cfg.driftSpeedMul[0]))
+}

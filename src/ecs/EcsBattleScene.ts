@@ -21,8 +21,7 @@ import type { RunState } from '../run/state'
 import { bossFor, MAP, MAPS, rollDecor } from '../data/maps'
 import type { MapDef, RiverConfig, TorusConfig, WallsConfig } from '../types/maps'
 import { fitAspectRect } from '../war/maps/void'
-import { driftProfile, riverRect } from '../war/maps/river'
-import type { RiverRect } from '../war/maps/river'
+import { driftSpeed, riverRect } from '../war/maps/river'
 import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from '../war/maps/daynight'
 import { onFloe } from '../war/maps/ice'
 import { chunkDecor, chunkKey, chunksInRect, outsideZone } from '../war/maps/world'
@@ -34,7 +33,7 @@ import { hasComponent, query, removeEntity } from 'bitecs'
 import { Alive, Boss, Dormant, Enemy, FACTION, Faction, GrantCoins, Hp, CharHp, MoveSpeed, Nest, PICKUP_SET, Projectile, Revive, Sprite, Transform, Zone } from './components'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
-import { spawnDecor } from './entities/decor'
+import { spawnDecor, spawnDriftDecor } from './entities/decor'
 import { remapSim } from './systems/shared/remap'
 import { makeSim } from './sim'
 import { clearEcsStore, modDef } from './store'
@@ -65,7 +64,6 @@ import type { HudSnapshot } from '../run/hudHost'
 import type { Sim } from './sim'
 import { drain } from './outbox'
 import type { Burst } from './outbox'
-import { emojiImage } from '../emoji/textures'
 import { rollWaveCarriers } from '../war/battleFx'
 import { centerX, centerY } from './utils/team'
 
@@ -84,16 +82,6 @@ const BANK_COLOR = 0x54402a
 const BANK_FAR_COLOR = 0x40301f
 
 /** 一片顺流漂浮物(纯视觉):沿流向进度 + 跨向基准偏移 + 摇摆/自旋 */
-interface Drift {
-  image: Phaser.GameObjects.Image
-  uPx: number
-  baseCross: number
-  speedMul: number
-  swayPhase: number
-  swayAmp: number
-  spin: number
-}
-
 /** 颜色明暗缩放(河水跨向渐变用) */
 function shade(color: number, mul: number): number {
   const r = Math.min(255, Math.round(((color >> 16) & 0xff) * mul))
@@ -187,9 +175,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private frameGlow?: Phaser.GameObjects.Graphics
   /** 单屏图（奔流/工厂）的静态视觉层：视口变化时整体重建 */
   private worldVisuals: Phaser.GameObjects.GameObject[] = []
-  /** 奔流图水面动效：双层水纹贴图 + 顺流漂浮物（纯视觉，不进 ECS 批绘） */
+  /** 同上，但是 ECS 装饰实体（岸上植被 / 散落零件 / 水面漂浮物）：
+   * 它们的落点由地图尺寸推出，视口一变就得按新尺寸重铺，故与 worldVisuals 同生共死 */
+  private worldDecor: number[] = []
+  /** 奔流图水面动效：双层水纹贴图（漂浮物已是装饰实体，不在此列） */
   private waveTiles: { tile: Phaser.GameObjects.TileSprite; speed: number }[] = []
-  private drifts: Drift[] = []
   /** 残垣图断壁：格索引 → 该格的石块/顶沿视觉（碾墙时单格销毁） */
   private wallTiles = new Map<number, Phaser.GameObjects.Rectangle[]>()
   /** 无限图装饰分块：块键 → 该块的装饰实体 eid；视野块集合变化才增删 */
@@ -241,8 +231,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.frameTiles = []
     this.frameGlow = undefined
     this.worldVisuals = []
+    this.worldDecor = []
     this.waveTiles = []
-    this.drifts = []
     this.wallTiles = new Map()
     this.decorChunks = new Map()
     this.decorRangeKey = ''
@@ -713,13 +703,15 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
     // 视觉层整体重建（战斗实体不在此列：它们是 ECS 实体，坐标已随 remapSim 挪好）
     for (const o of this.worldVisuals) o.destroy()
+    for (const eid of this.worldDecor) removeEntity(this.world, eid)
     this.worldVisuals = []
+    this.worldDecor = []
     this.waveTiles = []
-    this.drifts = []
     this.frameTiles = []
     this.frameGlow = undefined
     if (tc) this.buildVoidVisuals(mapDef, tc)
     else this.buildRiverVisuals(mapDef, rc!)
+    if (this.atlas) this.spawnWorldDecor(mapDef, this.atlas)
   }
 
   /** 环面相机（镜像 VoidScene.setupCameras）：主相机裁出屏内最大居中的竞技场定比矩形，
@@ -779,22 +771,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       gFloor.fillEllipse(W / 2, H / 2, W * k, H * k)
     }
     statics.push(gFloor)
-
-    // 散落零件点缀（种子固定：同局重建不变）
-    const def = mapDef.decor
-    const rng = new Rng(this.run.decorSeed)
-    const cells = (W / UNIT) * (H / UNIT)
-    const density = def.density[0] + rng.next() * (def.density[1] - def.density[0])
-    for (let i = 0; i < Math.round(cells * density); i++) {
-      const emoji = def.emojis[Math.floor(rng.next() * def.emojis.length)]!
-      const sizeU = def.sizeU[0] + rng.next() * (def.sizeU[1] - def.sizeU[0])
-      statics.push(
-        emojiImage(this, rng.next() * W, rng.next() * H, emoji, sizeU * UNIT, 'player')
-          .setAlpha(def.alpha[0] + rng.next() * (def.alpha[1] - def.alpha[0]))
-          .setRotation((rng.next() * 2 - 1) * Math.PI)
-          .setDepth(0.5),
-      )
-    }
 
     // 传送门门框：琥珀色警示光带顺时针流动（上→右→下→左）+ 脉动描边
     this.ensureDashTexture(cfg)
@@ -935,64 +911,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       statics.push(tile)
     }
 
-    // 岸上静态植被:沿长轴等距掷点(种子固定),只落在岸带内
-    const def = mapDef.decor
-    const decorRng = new Rng(this.run.decorSeed)
-    const bands: [number, number][] = horizontal
-      ? [
-          [0, r.y],
-          [r.y + r.h, vh],
-        ]
-      : [
-          [0, r.x],
-          [r.x + r.w, vw],
-        ]
-    for (const [b0, b1] of bands) {
-      const bandW = b1 - b0
-      if (bandW < 0.3 * UNIT) continue
-      for (let along = 0.5 * UNIT; along < alongLen; along += UNIT * (0.9 + decorRng.next() * 0.7)) {
-        if (decorRng.next() > 0.7) continue
-        const emoji = def.emojis[Math.floor(decorRng.next() * def.emojis.length)]!
-        const sizeU = def.sizeU[0] + decorRng.next() * (def.sizeU[1] - def.sizeU[0])
-        const size = Math.min(sizeU * UNIT, bandW * 0.9)
-        const cross = b0 + size / 2 + decorRng.next() * Math.max(1, bandW - size)
-        statics.push(
-          emojiImage(this, horizontal ? along : cross, horizontal ? cross : along, emoji, size, 'player')
-            .setAlpha(def.alpha[0] + decorRng.next() * (def.alpha[1] - def.alpha[0]))
-            .setRotation((decorRng.next() * 2 - 1) * 0.6)
-            .setDepth(0.8),
-        )
-      }
-    }
-
-    // 漂浮物(顺流循环):初始均匀铺满,之后 updateRiver 推进
-    const pool = mapDef.drift ?? ['1f343']
-    const halfCross = (horizontal ? r.h : r.w) / 2
-    for (let i = 0; i < cfg.driftCount; i++) {
-      const emoji = pool[Math.floor(Math.random() * pool.length)]!
-      const d: Drift = {
-        image: emojiImage(this, 0, 0, emoji, (0.35 + Math.random() * 0.25) * UNIT, 'player')
-          .setAlpha(0.5)
-          .setDepth(1.5),
-        uPx: Math.random() * alongLen,
-        baseCross: (Math.random() * 2 - 1) * halfCross * 0.92,
-        speedMul: 1,
-        swayPhase: Math.random() * Math.PI * 2,
-        swayAmp: (0.06 + Math.random() * 0.12) * UNIT,
-        spin: (Math.random() * 2 - 1) * 0.5,
-      }
-      d.speedMul = this.driftSpeed(d.baseCross / halfCross, cfg)
-      statics.push(d.image)
-      this.drifts.push(d)
-      this.placeDrift(d, r, 0)
-    }
-  }
-
-  private driftSpeed(crossFrac: number, cfg: RiverConfig): number {
-    return (
-      driftProfile(crossFrac) *
-      (cfg.driftSpeedMul[0] + Math.random() * (cfg.driftSpeedMul[1] - cfg.driftSpeedMul[0]))
-    )
   }
 
   /** 无缝水纹贴图(按朝向各生成一次):沿流向的白色弧形流痕 */
@@ -1027,15 +945,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     return key
   }
 
-  private placeDrift(d: Drift, r: RiverRect, elapsedMs: number): void {
-    const cross =
-      (r.horizontal ? r.y + r.h / 2 : r.x + r.w / 2) + d.baseCross + Math.sin(elapsedMs / 1250 + d.swayPhase) * d.swayAmp
-    if (r.horizontal) d.image.setPosition(this.mapW - d.uPx, cross)
-    else d.image.setPosition(cross, d.uPx)
-  }
-
-  /** 水面动效逐帧推进(镜像 updateWater):水纹贴图偏移 + 漂浮物顺流/摇摆/自旋 */
-  private updateRiver(sim: Sim, delta: number): void {
+  /** 水纹贴图逐帧偏移(镜像 updateWater 的水面部分)。
+   * 漂浮物不在此列——它们是装饰实体,顺流/摇摆/自旋归 systems/driftDecor + spinDecor */
+  private updateRiver(delta: number): void {
     const cfg = MAPS[this.run.mapId].river
     if (!cfg) return
     const dt = delta / 1000
@@ -1043,20 +955,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     for (const w of this.waveTiles) {
       if (r.horizontal) w.tile.tilePositionX += w.speed * dt
       else w.tile.tilePositionY -= w.speed * dt
-    }
-    const alongLen = r.horizontal ? this.mapW : this.mapH
-    const margin = UNIT
-    const halfCross = (r.horizontal ? r.h : r.w) / 2
-    for (const d of this.drifts) {
-      d.uPx += cfg.flow * UNIT * d.speedMul * dt
-      if (d.uPx > alongLen + margin) {
-        // 漂出下游 → 回上游重新进场(换个横位/速度)
-        d.uPx = -margin
-        d.baseCross = (Math.random() * 2 - 1) * halfCross * 0.92
-        d.speedMul = this.driftSpeed(d.baseCross / halfCross, cfg)
-      }
-      d.image.rotation += d.spin * dt
-      this.placeDrift(d, r, sim.elapsedMs)
     }
   }
 
@@ -1109,6 +1007,111 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
     w.smashed.length = 0
   }
+
+  /** 单屏图（工厂/奔流）的布景装饰：散落零件 / 岸上植被 / 水面漂浮物。
+   * 与 buildXVisuals 分开的理由是**时序**——那些是 Phaser 图层，create 一开头就能铺；
+   * 装饰是 ECS 实体，贴图走图集，必须等 atlas 就位。两者一同重建（见 rebuildWorldVisuals）*/
+  private spawnWorldDecor(mapDef: MapDef, atlas: EcsAtlas): void {
+    const tc = mapDef.torus
+    if (tc) {
+      // 散落零件点缀（种子固定：同局重建不变）
+      const W = this.mapW
+      const H = this.mapH
+      const def = mapDef.decor
+      const rng = new Rng(this.run.decorSeed)
+      const cells = (W / UNIT) * (H / UNIT)
+      const density = def.density[0] + rng.next() * (def.density[1] - def.density[0])
+      for (let i = 0; i < Math.round(cells * density); i++) {
+        const sizeU = def.sizeU[0] + rng.next() * (def.sizeU[1] - def.sizeU[0])
+        this.worldDecor.push(
+          spawnDecor(this.world, atlas, {
+            id: def.emojis[Math.floor(rng.next() * def.emojis.length)]!,
+            outline: 'player',
+            x: rng.next() * W,
+            y: rng.next() * H,
+            size: sizeU * UNIT,
+            rot: (rng.next() * 2 - 1) * Math.PI,
+            alpha: def.alpha[0] + rng.next() * (def.alpha[1] - def.alpha[0]),
+            z: 0.5,
+          }),
+        )
+      }
+      return
+    }
+    const cfg = mapDef.river
+    if (!cfg) return
+    const vw = this.mapW
+    const vh = this.mapH
+    const r = riverRect(vw, vh, cfg.width * UNIT)
+    const horizontal = r.horizontal
+    const alongLen = horizontal ? vw : vh
+    // 岸上静态植被:沿长轴等距掷点(种子固定),只落在岸带内
+    const def = mapDef.decor
+    const decorRng = new Rng(this.run.decorSeed)
+    const bands: [number, number][] = horizontal
+      ? [
+          [0, r.y],
+          [r.y + r.h, vh],
+        ]
+      : [
+          [0, r.x],
+          [r.x + r.w, vw],
+        ]
+    for (const [b0, b1] of bands) {
+      const bandW = b1 - b0
+      if (bandW < 0.3 * UNIT) continue
+      for (let along = 0.5 * UNIT; along < alongLen; along += UNIT * (0.9 + decorRng.next() * 0.7)) {
+        if (decorRng.next() > 0.7) continue
+        const emoji = def.emojis[Math.floor(decorRng.next() * def.emojis.length)]!
+        const sizeU = def.sizeU[0] + decorRng.next() * (def.sizeU[1] - def.sizeU[0])
+        const size = Math.min(sizeU * UNIT, bandW * 0.9)
+        const cross = b0 + size / 2 + decorRng.next() * Math.max(1, bandW - size)
+        this.worldDecor.push(
+          spawnDecor(this.world, this.atlas!, {
+            id: emoji,
+            outline: 'player',
+            x: horizontal ? along : cross,
+            y: horizontal ? cross : along,
+            size,
+            rot: (decorRng.next() * 2 - 1) * 0.6,
+            alpha: def.alpha[0] + decorRng.next() * (def.alpha[1] - def.alpha[0]),
+            z: 0.8,
+          }),
+        )
+      }
+    }
+
+    // 漂浮物(顺流循环):会漂、会转的装饰实体,位姿逐帧由 driftDecor 从 u/cross 算出
+    const pool = mapDef.drift ?? ['1f343']
+    const halfCross = (horizontal ? r.h : r.w) / 2
+    for (let i = 0; i < cfg.driftCount; i++) {
+      const cross = (Math.random() * 2 - 1) * halfCross * 0.92
+      this.worldDecor.push(
+        spawnDriftDecor(
+          this.world,
+          this.atlas!,
+          {
+            id: pool[Math.floor(Math.random() * pool.length)]!,
+            outline: 'player',
+            x: 0,
+            y: 0,
+            size: (0.35 + Math.random() * 0.25) * UNIT,
+            alpha: 0.5,
+            z: 1.5,
+            spin: (Math.random() * 2 - 1) * 0.5,
+          },
+          {
+            u: Math.random() * alongLen,
+            cross,
+            speedMul: driftSpeed(cross / halfCross, cfg, Math.random),
+            swayPhase: Math.random() * Math.PI * 2,
+            swayAmp: (0.06 + Math.random() * 0.12) * UNIT,
+          },
+        ),
+      )
+    }
+  }
+
 
   /** 无限世界装饰分块滚动(镜像 InfiniteScene.ensureChunks):视野覆盖的块集合变化时
    * 整组增删 ECS 静态实体。摆放由 chunkDecor 按 (种子, 块) 纯函数重建——回头看到的景不变 */
@@ -1246,8 +1249,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
    * 无限世界改走分块滚动(见 ensureChunks):世界没有边,不能一次铺完 */
   private spawnDecor(run: RunState, atlas: EcsAtlas): void {
     if (this.infinite) return this.ensureChunks(atlas)
-    // 奔流的岸上植被 / 工厂的散落零件随各自视觉层一并铺,不走全图散布
-    if (MAPS[run.mapId].river || MAPS[run.mapId].torus) return
+    // 奔流的岸上植被 / 工厂的散落零件按各自的图形铺,不走全图散布
+    const mapDef = MAPS[run.mapId]
+    if (mapDef.river || mapDef.torus) return this.spawnWorldDecor(mapDef, atlas)
     const rng = new Rng(run.decorSeed)
     const cols = Math.round(this.mapW / UNIT)
     const rows = Math.round(this.mapH / UNIT)
@@ -1348,7 +1352,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.updateZone(sim)
     this.updateMeteorFx(sim)
     this.drainSmashedWalls(sim)
-    this.updateRiver(sim, delta)
+    this.updateRiver(delta)
     this.updatePortals(sim, delta)
     // 无限世界:相机走到哪,装饰分块跟到哪(块集合不变则整段免算)
     if (this.infinite && this.atlas) this.ensureChunks(this.atlas)
