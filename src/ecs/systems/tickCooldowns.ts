@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { Ability, Frozen } from '../components'
-import { ABILITY_COMPS } from '../registries/abilityKinds'
+import { ABILITY_COMPS } from '../entities/ability'
 import type { Sim } from '../sim'
 
 /** 冷却推进：唯一职责是让未冻结的能力冷却按时长递减。

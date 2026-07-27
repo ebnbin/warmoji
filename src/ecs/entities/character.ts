@@ -21,7 +21,7 @@ import type { RunState } from '../../run/state'
 import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, OrbitBias, Pop, Post, Quad, Revive, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
 
 import type { EcsWorld } from '../world'
-import type { EcsAtlas } from '../render/atlas'
+import type { EcsAtlas } from '../atlas'
 
 // 组队(镜像 ArcadeBattleScene setup 的阵容/岗位/成员建立):建 Sim + 逐槽位装配队员实体。
 // 属性逐槽位按已持道具 + 专属等级聚合;血量跨波保留(上一波阵亡者低血量复活)。

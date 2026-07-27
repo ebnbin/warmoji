@@ -1,8 +1,8 @@
 import type Phaser from 'phaser'
-import { OUTLINE, outlineSvg, setSvgSize } from '../../emoji/svg'
-import type { OutlineKind } from '../../emoji/svg'
-import { emojiSvgText, svgToImage } from '../../emoji/textures'
-import { animClipOf, bakeAnimFrame } from '../../emoji/anim'
+import { OUTLINE, outlineSvg, setSvgSize } from '../emoji/svg'
+import type { OutlineKind } from '../emoji/svg'
+import { emojiSvgText, svgToImage } from '../emoji/textures'
+import { animClipOf, bakeAnimFrame } from '../emoji/anim'
 
 // ECS 自绘渲染的 emoji 图集(atlas):把所有实体会用到的 emoji×描边变体一次性光栅化,
 // 网格打包进若干 POT 页纹理,记录每个变体的 UV。渲染时全场实体共享这几张页纹理,

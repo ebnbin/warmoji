@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { query } from 'bitecs'
 import { Depth, Quad, Sprite, Tint, Transform, RENDERABLE } from '../components'
 import type { EcsWorld } from '../world'
-import type { EcsAtlas } from './atlas'
+import type { EcsAtlas } from '../atlas'
 
 // 统一自绘：一个自定义 GameObject，renderWebGL 里把全场 renderable 实体（Transform+Sprite+
 // Tint+Depth）一次性经 BatchHandlerQuad 批量画出。每个实体的四角按「相机变换 × 位姿」CPU 侧

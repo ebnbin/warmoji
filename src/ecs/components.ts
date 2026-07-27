@@ -38,7 +38,8 @@ export const Depth = {
   z: f32(),
 }
 
-/** 渲染所需组件集(查询用):四者齐备即可被 spriteBatch 画出 */
+/** 渲染所需组件集:四者齐备即可被 spriteBatch 画出。**它是这个集合的唯一声明**——
+ * 查询侧 spriteBatch 用它，构造侧 entities/drawable.ts 的 attachDrawable 展开它 */
 export const RENDERABLE = [Transform, Sprite, Tint, Depth] as const
 
 // ── 角色/移动(P2)──────────────────────────────────────────

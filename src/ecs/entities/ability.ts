@@ -1,24 +1,433 @@
 import { addComponent, addComponents, hasComponent, query, removeEntity } from 'bitecs'
-
-import { abilityPiercesWalls } from '../../war/abilityRules'
-import { CHARACTERS, loadoutFor } from '../../data/characters'
-import { CAPTAINS } from '../../data/captains'
-import { aggregateCharacterEffects, characterXp, resolveAbilityDef } from '../../data/items'
-import { levelStatsFor } from '../../data/levels'
-import { characterLevel } from '../../data/charLevel'
-import { aggregateTeamCards } from '../../data/cards'
-import { toPx } from '../../war/px'
-import { labLevel } from '../../run/lab'
-import type { RunState } from '../../run/state'
-import { Ability, Amp, Anchor, CastRequest, Disarmed, Drop, FACTION, Faction, Flyer, Frozen, Manual, Minion, Owner, WallBlocked, Weapon, ZoneFollow } from '../components'
-import type { CdComp } from '../components'
-import { ABILITY_COMPS, KINDS } from '../registries/abilityKinds'
-import type { AttachCtx } from '../registries/abilityKinds'
-
-import type { AbilityDef } from '../../types/abilityDefs'
-import { spawnWeaponBody } from '../entities/weapon'
+import {
+  Ability,
+  Aim,
+  AimMove,
+  Amp,
+  Anchor,
+  AreaBlast,
+  Assassinate,
+  Aura,
+  AuraDps,
+  AuraFreeze,
+  BlastEcho,
+  Blink,
+  Bolt,
+  Boomerang,
+  BoomerangTwin,
+  Buff,
+  Burst,
+  ChainArc,
+  CoinMagnet,
+  Dance,
+  Disarmed,
+  Drop,
+  EveryN,
+  Execute,
+  FACTION,
+  Faction,
+  Flyer,
+  Followup,
+  Frozen,
+  Heal,
+  HealAoe,
+  HealDefib,
+  Laser,
+  LaserBackBeam,
+  LaserRadial,
+  Manual,
+  Minion,
+  Nuke,
+  Owner,
+  Pierce,
+  Pulse,
+  Radial,
+  Rally,
+  Shoot,
+  Shots,
+  SlowAura,
+  Strike,
+  Summon,
+  Sweep,
+  Swing,
+  Thrown,
+  Thrust,
+  ThrustCombo,
+  TimeStop,
+  Turret,
+  Volley,
+  WallBlocked,
+  Weapon,
+  ZoneFollow,
+} from '../components'
+import { abilityArtEmoji, abilityFireSfx, abilityOnHit } from '../store'
+import type { FrameIndex } from '../frames'
 import type { EcsWorld } from '../world'
+import type { CdComp } from '../components'
+import type { AbilityDef } from '../../types/abilityDefs'
+import { abilityPiercesWalls } from '../../war/abilityRules'
+import { spawnWeaponBody } from '../entities/weapon'
 import type { Sim } from '../sim'
+
+// 每种能力的登记表——**它只干一件事：把 def 翻译成组件**。
+//
+// def 来自 defs/ → gen → JSON，JSON 里 kind 只能是字符串；组件不是字符串。所以从
+// 「数据文件说这是激光」到「给这个实体挂上 Laser 组件」必须有一次映射，而这次映射
+// **只在装备那一刻发生一次**——此后没有任何 system 读 def.kind。
+//
+// **comp**：这一种能力的组件。它既是「归哪个 system 管」的标记，**也装着执行它需要的
+// 全部参数**（见 components.ts 的「每种能力的参数组件」）。系统只问「有没有挂我这个
+// 组件」，参数就在组件上，不必再顺着下标去翻定义对象。
+//
+// **attach**：把 def 的参数写进组件。def 类型按 kind 收窄，写错字段编译不过。
+// def 里的可选子对象一律拆成可选组件——`if (def.aoe)` 就此变成 `hasComponent(HealAoe)`。
+//
+// **state**：只有真的用得到的 kind 才挂。挥击进度只有横扫/突刺有、瞬闪落点只有刺客有、
+// 扫射序列只有激光有——从前是**每颗武器都背着全套**，弩塔身上永远躺着一个用不到的
+// Blink。现在「有这个组件 = 有这个性质」，各系统的 query 自己就把无关实体挡在外面。
+//
+// 这张表是**全映射**：新增一种能力而不在此登记 = 编译不过。从前是 Partial，漏登记只会让
+// attachAbility 静默返回 false——武器造得出来、画得出来、永远不出手，编译/lint/e2e 全绿。
+
+/** 一个状态组件与它的清零方式（组件按 eid 索引，eid 复用会读到上一位住户的残值） */
+interface StateSpec {
+  readonly comp: object
+  reset(eid: number): void
+}
+
+const SwingState: StateSpec = {
+  comp: Swing,
+  reset: (e) => {
+    Swing.startMs[e] = 0
+    Swing.durMs[e] = 0
+  },
+}
+const FollowupState: StateSpec = {
+  comp: Followup,
+  reset: (e) => {
+    Followup.left[e] = 0
+    Followup.damage[e] = 0
+  },
+}
+const RadialState: StateSpec = { comp: Radial, reset: (e) => { Radial.left[e] = 0 } }
+const BlinkState: StateSpec = {
+  comp: Blink,
+  reset: (e) => {
+    Blink.x[e] = 0
+    Blink.y[e] = 0
+  },
+}
+const PulseState: StateSpec = {
+  comp: Pulse,
+  reset: (e) => {
+    Pulse.dps[e] = 0
+    Pulse.freeze[e] = 0
+  },
+}
+const ShotsState: StateSpec = { comp: Shots, reset: (e) => { Shots.n[e] = 0 } }
+const AuraState: StateSpec = { comp: Aura, reset: (e) => { Aura.zone[e] = 0 } }
+/** 只有真的要瞄准的 kind 才挂——治疗/天罚/时停这些没有方向可言 */
+const AimState: StateSpec = { comp: Aim, reset: (e) => { Aim.rad[e] = 0 } }
+const ThrownState: StateSpec = { comp: Thrown, reset: (e) => { Thrown.n[e] = 0 } }
+
+/** attach 能用到的东西：世界（挂可选组件）+ 帧索引（把 emoji 解析成 frame） */
+export interface AttachCtx {
+  readonly world: EcsWorld
+  readonly frames: FrameIndex
+}
+
+/** 一种能力的登记项 */
+interface KindSpec<K extends AbilityDef['kind']> {
+  /** 这一种能力的组件：既是归属标记，也装参数，**并带着这条能力自己的冷却** */
+  readonly comp: object & CdComp
+  /** 这种能力自己需要的状态组件；不列即不挂 */
+  readonly state?: readonly StateSpec[]
+  /** 装备那一刻把 def 的参数写进组件；未参数化的 kind 省略 */
+  attach?(ctx: AttachCtx, e: number, def: Extract<AbilityDef, { kind: K }>): void
+}
+
+export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
+
+  rally: {
+    comp: Rally,
+    attach: (_c, e, d) => {
+      Rally.healRatio[e] = d.healRatio
+      Rally.invulnMs[e] = d.invulnMs
+      Rally.ringRadius[e] = d.ringRadius
+      Rally.color[e] = d.color
+    },
+  },
+  dance: {
+    comp: Dance,
+    attach: (_c, e, d) => {
+      Dance.durationMs[e] = d.durationMs
+    },
+  },
+  buff: {
+    comp: Buff,
+    attach: (_c, e, d) => {
+      Buff.damageMul[e] = d.damageMul
+      Buff.durationMs[e] = d.durationMs
+    },
+  },
+  chainArc: {
+    comp: ChainArc,
+    attach: (_c, e, d) => {
+      ChainArc.damage[e] = d.damage
+      ChainArc.knockback[e] = d.knockback
+      ChainArc.range[e] = d.range
+      ChainArc.arcRange[e] = d.arcRange
+      ChainArc.bounces[e] = d.bounces
+      ChainArc.decay[e] = d.decay
+      ChainArc.color[e] = d.color
+      abilityOnHit[e] = d.onHit
+    },
+  },
+  sweep: {
+    comp: Sweep,
+    state: [AimState, SwingState],
+    attach: (_c, e, d) => {
+      Sweep.damage[e] = d.damage
+      Sweep.knockback[e] = d.knockback
+      Sweep.radius[e] = d.radius
+      Sweep.arcDeg[e] = d.arcDeg
+      Sweep.sweepMs[e] = d.sweepMs
+      abilityOnHit[e] = d.onHit
+    },
+  },
+  areaBlast: {
+    comp: AreaBlast,
+    state: [FollowupState],
+    attach: (c, e, d) => {
+      AreaBlast.damage[e] = d.damage
+      AreaBlast.knockback[e] = d.knockback
+      AreaBlast.detectRange[e] = d.detectRange
+      AreaBlast.blastRadius[e] = d.blastRadius
+      AreaBlast.color[e] = d.color
+      abilityOnHit[e] = d.onHit
+      if (d.echo) {
+        addComponent(c.world, e, BlastEcho)
+        BlastEcho.delayMs[e] = d.echo.delayMs
+        BlastEcho.ratio[e] = d.echo.ratio
+      }
+    },
+  },
+  thrust: {
+    comp: Thrust,
+    state: [AimState, SwingState, FollowupState],
+    attach: (c, e, d) => {
+      Thrust.damage[e] = d.damage
+      Thrust.knockback[e] = d.knockback
+      Thrust.reach[e] = d.reach
+      Thrust.hitRadius[e] = d.hitRadius
+      Thrust.thrustMs[e] = d.thrustMs
+      Thrust.lungeDist[e] = d.lungeDist
+      abilityOnHit[e] = d.onHit
+      if (d.combo) {
+        addComponent(c.world, e, ThrustCombo)
+        ThrustCombo.delayMs[e] = d.combo.delayMs
+      }
+    },
+  },
+  strike: {
+    comp: Strike,
+    attach: (_c, e, d) => {
+      Strike.damage[e] = d.damage
+      Strike.knockback[e] = d.knockback
+      Strike.targets[e] = d.targets
+      Strike.coinsPerHit[e] = d.coinsPerHit ?? 0
+      abilityArtEmoji[e] = d.drop.emoji
+      Strike.size[e] = d.drop.size
+      Strike.fromAbove[e] = d.drop.fromAbove
+      Strike.dropMs[e] = d.drop.dropMs
+      Strike.staggerMs[e] = d.drop.staggerMs
+    },
+  },
+  assassinate: {
+    comp: Assassinate,
+    state: [AimState, FollowupState, BlinkState],
+    attach: (c, e, d) => {
+      Assassinate.damage[e] = d.damage
+      Assassinate.knockback[e] = d.knockback
+      Assassinate.range[e] = d.range
+      Assassinate.behindDist[e] = d.behindDist
+      Assassinate.strikeMs[e] = d.strikeMs
+      abilityOnHit[e] = d.onHit
+      if (d.execute) {
+        addComponent(c.world, e, Execute)
+        Execute.hpRatio[e] = d.execute.hpRatio
+        Execute.mul[e] = d.execute.mul
+      }
+    },
+  },
+  boomerang: {
+    comp: Boomerang,
+    state: [AimState, ThrownState],
+    attach: (c, e, d) => {
+      Boomerang.damage[e] = d.damage
+      Boomerang.knockback[e] = d.knockback
+      Boomerang.range[e] = d.range
+      Boomerang.outMs[e] = d.outMs
+      Boomerang.returnSpeed[e] = d.returnSpeed
+      Boomerang.hitRadius[e] = d.hitRadius
+      Boomerang.spinDegPerSec[e] = d.spinDegPerSec
+      if (d.twin) addComponent(c.world, e, BoomerangTwin)
+      if (d.coinMagnetRadius !== undefined) {
+        addComponent(c.world, e, CoinMagnet)
+        CoinMagnet.radius[e] = d.coinMagnetRadius
+      }
+    },
+  },
+  summon: {
+    comp: Summon,
+    attach: (_c, e, d) => {
+      Summon.count[e] = d.count
+      Summon.damage[e] = d.damage
+      Summon.knockback[e] = d.knockback
+      Summon.intervalMs[e] = d.intervalMs
+      Summon.lifeMs[e] = d.lifeMs
+      abilityArtEmoji[e] = d.minion.emoji
+      Summon.size[e] = d.minion.size
+      Summon.speed[e] = d.minion.speed
+      abilityOnHit[e] = d.onHit
+    },
+  },
+  projectile: {
+    comp: Shoot,
+    state: [AimState, ShotsState],
+    attach: (c, e, d) => {
+      Shoot.damage[e] = d.damage
+      Shoot.knockback[e] = d.knockback
+      Shoot.range[e] = d.range ?? 0 // 0 = 用 ACQUIRE 的缺省索敌上限
+      Shoot.lifeMs[e] = d.lifeMs ?? 0
+      if (d.aim === 'move') addComponent(c.world, e, AimMove)
+      assertFree(c.world, e, Bolt, '弹丸外形组件') // 弹道与弩塔共用 Bolt，同宿主装两条就会撞
+      addComponent(c.world, e, Bolt)
+      // 描边随阵营：敌弹与我方弹用不同的外圈
+      Bolt.frame[e] = c.frames.index(d.projectile.emoji, Faction.v[e] === FACTION.enemy ? 'enemyProjectile' : 'player')
+      Bolt.size[e] = d.projectile.size
+      Bolt.radius[e] = d.projectile.radius
+      Bolt.speed[e] = d.projectile.speed
+      Bolt.rotOffset[e] = d.projectile.rotationOffsetDeg
+      if (d.volley) {
+        addComponent(c.world, e, Volley)
+        Volley.count[e] = d.volley.count
+        Volley.spreadDeg[e] = d.volley.spreadDeg
+        Volley.randomRotate[e] = d.volley.randomRotate ? 1 : 0
+      }
+      if (d.everyN) {
+        addComponent(c.world, e, EveryN)
+        EveryN.n[e] = d.everyN.n
+        EveryN.count[e] = d.everyN.count
+        EveryN.spreadDeg[e] = d.everyN.spreadDeg
+      }
+      if (d.pierce !== undefined) {
+        addComponent(c.world, e, Pierce)
+        Pierce.n[e] = d.pierce
+      }
+      abilityOnHit[e] = d.onHit
+      abilityFireSfx[e] = d.fireSfx
+    },
+  },
+  turret: {
+    comp: Turret,
+    attach: (c, e, d) => {
+      Turret.placeIntervalMs[e] = d.placeIntervalMs
+      Turret.maxTurrets[e] = d.maxTurrets
+      Turret.fireIntervalMs[e] = d.fireIntervalMs
+      Turret.damage[e] = d.damage
+      Turret.knockback[e] = d.knockback
+      Turret.range[e] = d.range
+      abilityArtEmoji[e] = d.turret.emoji
+      Turret.size[e] = d.turret.size
+      // 塔开火用的弹丸外形：塔自持的那条 projectile 能力从这里抄
+      assertFree(c.world, e, Bolt, '弹丸外形组件')
+      addComponent(c.world, e, Bolt)
+      Bolt.frame[e] = c.frames.index(d.projectile.emoji, 'player')
+      Bolt.size[e] = d.projectile.size
+      Bolt.radius[e] = d.projectile.radius
+      Bolt.speed[e] = d.projectile.speed
+      Bolt.rotOffset[e] = d.projectile.rotationOffsetDeg
+      if (d.burst) {
+        addComponent(c.world, e, Burst)
+        Burst.count[e] = d.burst.count
+        Burst.spreadDeg[e] = d.burst.spreadDeg
+      }
+    },
+  },
+  timeStop: {
+    comp: TimeStop,
+    attach: (_c, e, d) => {
+      TimeStop.durationMs[e] = d.durationMs
+    },
+  },
+  nuke: {
+    comp: Nuke,
+    attach: (_c, e, d) => {
+      Nuke.damage[e] = d.damage
+      Nuke.bossRatio[e] = d.bossRatio
+    },
+  },
+  heal: {
+    comp: Heal,
+    attach: (c, e, d) => {
+      Heal.amount[e] = d.amount
+      Heal.range[e] = d.range
+      if (d.aoe) {
+        addComponent(c.world, e, HealAoe)
+        HealAoe.ratio[e] = d.aoe.ratio
+      }
+      if (d.defib) {
+        addComponent(c.world, e, HealDefib)
+        HealDefib.reviveCutMs[e] = d.defib.reviveCutMs
+      }
+    },
+  },
+  slowAura: {
+    comp: SlowAura,
+    state: [PulseState, AuraState],
+    attach: (c, e, d) => {
+      SlowAura.radius[e] = d.radius
+      SlowAura.slowFactor[e] = d.slowFactor
+      SlowAura.color[e] = d.color
+      if (d.dps !== undefined) {
+        addComponent(c.world, e, AuraDps)
+        AuraDps.perSec[e] = d.dps
+      }
+      if (d.freeze) {
+        addComponent(c.world, e, AuraFreeze)
+        AuraFreeze.intervalMs[e] = d.freeze.intervalMs
+        AuraFreeze.durationMs[e] = d.freeze.durationMs
+      }
+    },
+  },
+  laser: {
+    comp: Laser,
+    state: [AimState, RadialState],
+    attach: (c, e, d) => {
+      Laser.damage[e] = d.damage
+      Laser.knockback[e] = d.knockback
+      Laser.range[e] = d.range
+      Laser.beamRadius[e] = d.beamRadius
+      Laser.color[e] = d.color
+      if (d.backBeam) addComponent(c.world, e, LaserBackBeam)
+      if (d.radial) {
+        addComponent(c.world, e, LaserRadial)
+        LaserRadial.beams[e] = d.radial.beams
+        LaserRadial.ratio[e] = d.radial.ratio
+        LaserRadial.stepMs[e] = d.radial.stepMs
+      }
+    },
+  },
+}
+
+/** 全部能力参数组件（= KINDS 的 comp）。冷却下沉到每种能力之后，
+ * 「推进所有冷却」这件事没法再靠单个 query 完成，只能逐种扫一遍 */
+export const ABILITY_COMPS: readonly (object & CdComp)[] = Object.values(KINDS).map((k) => k.comp)
+
+// ── 装备：把 def 物化成组件 ──────────────────────────────────────────────────
+
+
 
 // 「一条能力」的工厂。
 //
@@ -165,57 +574,4 @@ export function unequipAbilities(sim: Sim, ownerEid: number): void {
   for (const f of [...query(world, [Flyer])]) if (weapons.includes(Flyer.of[f]!)) removeEntity(world, f)
   // 持有者本人不在此删——调用方紧接着 removeEntity 它，挂在它身上的能力组件随之消失
   for (const e of weapons) removeEntity(world, e)
-}
-
-export function requestCast(sim: Sim, ownerEid: number): void {
-  for (const e of query(sim.world, [Ability, Manual])) {
-    if (Owner.eid[e] === ownerEid) addComponent(sim.world, e, CastRequest)
-  }
-}
-
-/** 把某持有者名下的能力冷却至少推迟 ms（变形复形后的缓冲，避免复形瞬间齐射） */
-export function postponeAbilities(sim: Sim, ownerEid: number, ms: number): void {
-  for (const comp of ABILITY_COMPS) {
-    for (const e of query(sim.world, [Ability, comp, Owner])) {
-      if (Owner.eid[e] === ownerEid) comp.cdLeft[e] = Math.max(comp.cdLeft[e]!, ms)
-    }
-  }
-}
-
-// ── 开局装配 ─────────────────────────────────────────────────────────
-
-// 开局装配：把配装解析成一条条能力。队伍在开局一次装齐；敌人首次被扫到时装配
-// （lazy-arm，与旧实现的出生即装配等价，因为压制期照样推进冷却）。
-
-/** 为全队装备能力：逐槽位按已持道具 + 专属等级解析生效能力（测试模式走场内等级旋钮） */
-export function armTeam(sim: Sim, run: RunState, testMode: boolean): void {
-  const teamFx = aggregateTeamCards(run.teamCards)
-  for (let slot = 0; slot < run.roster.length; slot++) {
-    const id = run.roster[slot]!
-    const def = CHARACTERS[id]
-    const owned = testMode ? [] : (run.memberItems[slot] ?? [])
-    const level = testMode ? labLevel() + 1 : characterLevel(characterXp(owned))
-    const tiers = { u1: level >= 2, u2: level >= 3 }
-    const fx = aggregateCharacterEffects(owned, levelStatsFor(id, level))
-    // 装备期乘区（道具/等级/团队卡折算）：随局面变的那部分由 amp.ts 现算
-    const amp = {
-      dmg: fx.damageMul * teamFx.teamDamageMul,
-      cd: fx.cooldownMul * teamFx.teamCooldownMul,
-      crit: fx.critChance + teamFx.critAdd,
-      kb: fx.knockbackMul,
-      battle: true,
-    }
-    loadoutFor(def, tiers).forEach((w, i) => {
-      equipAbility(sim, sim.characters[slot]!, toPx(resolveAbilityDef(w, fx)), FACTION.team, 300 + slot * 120 + i * 230, amp)
-    })
-  }
-}
-
-/** 队长主动技能的载荷：效果本体是标准能力行，行为主体锚在队伍中心。
- * 不进自动扫描——只等 castSkill 的施放请求。返回锚点实体 */
-export function armCaptain(sim: Sim, run: RunState): void {
-  // 队长实体在 makeSim 里已建好（队伍中心即它的位置），这里只挂技能载荷
-  for (const a of CAPTAINS[run.captainId].skill.abilities) {
-    equipAbility(sim, sim.captain, toPx(a), FACTION.team, 0, NEUTRAL_AMP, true)
-  }
 }
