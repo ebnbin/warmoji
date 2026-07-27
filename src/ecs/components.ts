@@ -285,6 +285,14 @@ export const FxBolt = { n: i32(), color: u32() }
 /** 斩击弧光：以 Transform 为心、朝 rot 画一段 ±1.1rad 的白弧 */
 export const FxSlash = { r: f32() }
 
+/** 💥 爆裂：图集贴图从缩小随机微转弹出到全尺寸并淡出。size = 全尺寸(世界像素)。
+ * 它是精灵不是形状,故走 spriteBatch 而非 shapeBatch——与天体球体同路 */
+export const FxBoom = { size: f32() }
+
+/** 伤害飘字：数值 + 是否暴击。上浮淡出由 DamageTextBatch 按 Fx 的进度现算,
+ * 故不需要每帧写回任何东西;字形四边形也在那里三角化 */
+export const DamageNumber = { value: i32(), crit: u8() }
+
 /** 天体横扫(深空图):预警直线两端 + 划行进度 0..1。
  * Transform 是球体当前位置(预警期 Tint.alpha=0,起划才现身),Depth.z=60 与旧实现同层;
  * **Due.at = 起划时刻**,故「预警中/划行中」是派生的而非存的;

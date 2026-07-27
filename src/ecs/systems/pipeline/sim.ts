@@ -1,5 +1,6 @@
 import { animateEnemies } from '../animateEnemies'
 import { blinkTelegraphs } from '../blinkTelegraphs'
+import { animateBooms } from '../animateBooms'
 import { expireFx } from '../expireFx'
 import { animateCharacters } from '../animateCharacters'
 import { applyKnockback } from '../applyKnockback'
@@ -161,7 +162,13 @@ export const SIM_PIPELINE: readonly Step[] = [
   { name: 'characterVisual', run: characterVisual },
   { name: 'blinkTelegraphs', run: blinkTelegraphs },
   { name: 'updateShards', run: updateShards },
-  { name: 'expireFx', run: expireFx },
+  { name: 'animateBooms', run: animateBooms },
+  {
+    name: 'expireFx',
+    run: expireFx,
+    after: ['animateBooms'],
+    why: '先按本帧进度画完最后一帧,再回收——反过来的话爆裂的收尾帧会被吞掉',
+  },
   {
     name: 'worldTick',
     run: worldTick,

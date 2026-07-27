@@ -5,7 +5,7 @@ import { MEMBER } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
 import { burstEmitter } from '../util/fx'
-import { CueLayer, drawCues } from './render/cues'
+import { CueLayer } from './render/cues'
 import { RingLayer } from './render/rings'
 import { DamageTextLayer } from './render/damageText'
 import { loadSettings } from '../save/settings'
@@ -414,7 +414,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const settings = loadSettings(browserStorage())
     this.hitShakeOn = settings.hitShake
     this.damageNumbersOn = settings.damageNumbers
-    this.damageText = new DamageTextLayer(this)
+    this.damageText = new DamageTextLayer(this, this.world, this.damageNumbersOn)
     // 粒子爆点(镜像 deathBurst/coinBurst 的配色与速度)
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
     this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
@@ -498,10 +498,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         this.events.emit('field-collected', { emoji: d.emoji, name: d.name, desc: d.desc, polarity: d.polarity })
       }
     })
-    // 敌人受伤飘字(镜像 floatDamage:池化 BitmapText 上浮淡出);关则弃字
-    drain(out.damageNumbers, (ds) => {
-      if (this.damageNumbersOn) for (const d of ds) this.damageText?.push(d.x, d.y, d.amount, d.crit)
-    })
     // 粒子爆点:按 kind 分发到死亡/拾币发射器(镜像 deathBurst/coinBurst.explode)。
     // 全映射：Burst 新增一种 kind 而不在此登记 = 编译不过（从前的三元链末尾会把
     // 任何没认出来的 kind 都当成死亡紫爆）
@@ -513,10 +509,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       }
       for (const b of bs) byKind[b.kind]!.explode(b.count, b.x, b.y)
     })
-    // 剩下这两种特效仍走队列:💥 爆裂是图集贴图、全屏闪是屏幕固定矩形,都做不成世界实体
-    drain(out.cues, (cs) => {
-      if (this.cues) drawCues(this.cues, cs)
-    })
+    // 全屏白闪:唯一没能变成实体的特效(屏幕固定,不在世界坐标里)
+    if (out.flash) {
+      this.cues?.screenFlash(out.flash.color, out.flash.alpha, out.flash.durationMs)
+      out.flash = null
+    }
   }
 
   /** 逐帧队员血条:跟位 + 比例变化才重绘(镜像 drawMemberHp);阵亡隐藏、复活自动恢复 */
@@ -1405,7 +1402,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       // 在场的能力子实体数(弩塔 + 小蜂):验证同时在场上限与逐个退场
       minions: query(this.world, [Minion]).length,
       // 出站信箱积压:帧末排空后应恒 0,不为 0 即某条 drain 没清(只进不出会一路涨)
-      outbox: Object.values(sim.out).reduce((n, q) => n + q.length, 0),
+      outbox: sim.out.bursts.length + sim.out.collects.length + (sim.out.flash ? 1 : 0),
       logicalW: viewport.logicalWidth,
       logicalH: viewport.logicalHeight,
       // 残垣:阻挡格数 + 可达刷怪格数(验证断壁成型与连通)

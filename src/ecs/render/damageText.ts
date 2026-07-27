@@ -1,5 +1,8 @@
 import Phaser from 'phaser'
+import { query } from 'bitecs'
 import { UI_FONT } from '../../util/fonts'
+import { DamageNumber, Fx, Transform } from '../components'
+import type { EcsWorld } from '../world'
 
 // 伤害飘字：命中点上浮淡出的数字。
 //
@@ -26,10 +29,6 @@ const CHARS = 10
 const CHAR_W = 24
 const CHAR_H = 36
 
-const CAPACITY = 256
-const RISE_MS = 350
-/** 空闲槽位标记（born 存的是 fxMs，恒 ≥ 0） */
-const FREE = -1
 
 const { getTintAppendFloatAlpha } = Phaser.Renderer.WebGL.Utils
 
@@ -56,18 +55,11 @@ function bakeDigits(scene: Phaser.Scene): void {
 }
 
 export class DamageTextLayer {
-  private readonly born = new Float64Array(CAPACITY).fill(FREE)
-  private readonly x = new Float32Array(CAPACITY)
-  private readonly y = new Float32Array(CAPACITY)
-  private readonly value = new Int32Array(CAPACITY)
-  private readonly crit = new Uint8Array(CAPACITY)
-  private at = 0
-
   private readonly batch: DamageTextBatch
-  /** 本帧视觉钟：step 每帧写入，随后的投放取它作为起点 */
+  /** 本帧视觉钟（renderWebGL 里算进度用）；关掉飘字时整层不画 */
   private now = 0
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, private readonly world: EcsWorld, private readonly enabled: boolean) {
     bakeDigits(scene)
     this.batch = new DamageTextBatch(scene, this)
   }
@@ -76,24 +68,9 @@ export class DamageTextLayer {
     this.batch.destroy()
   }
 
-  /** 逐帧推进；须在本帧的投放之前调用（它同时给投放定时间起点）。fxMs = sim.fxMs。
-   * 顶点每帧由批绘对象按当前进度现算，这里只需判过期 */
+  /** 本帧视觉钟（回收在 systems/expireFx，这里不再自管过期）。fxMs = sim.fxMs */
   step(fxMs: number): void {
     this.now = fxMs
-    for (let i = 0; i < CAPACITY; i++) {
-      if (this.born[i] !== FREE && fxMs - this.born[i]! >= RISE_MS) this.born[i] = FREE
-    }
-  }
-
-  /** 投放一个飘字（槽位满即环形顶掉最老的一个） */
-  push(x: number, y: number, amount: number, crit: boolean): void {
-    const i = this.at
-    this.at = (this.at + 1) % CAPACITY
-    this.born[i] = this.now
-    this.x[i] = x
-    this.y[i] = y - 14
-    this.value[i] = amount
-    this.crit[i] = crit ? 1 : 0
   }
 
   /** 把全部活动飘字三角化成字形四边形（批绘对象在 renderWebGL 里调）。
@@ -113,23 +90,22 @@ export class DamageTextLayer {
     m: Phaser.GameObjects.Components.TransformMatrix,
     opts: unknown,
   ): void {
+    if (!this.enabled) return
     const fx = this.now
-    for (let i = 0; i < CAPACITY; i++) {
-      const b = this.born[i]!
-      if (b === FREE) continue
-      const t = (fx - b) / RISE_MS
-      const crit = this.crit[i] === 1
+    for (const eid of query(this.world, [Fx, DamageNumber, Transform])) {
+      const t = (fx - Fx.bornMs[eid]!) / Fx.durMs[eid]!
+      const crit = DamageNumber.crit[eid] === 1
       const size = crit ? 34 : 24
       const gh = size
       const gw = (CHAR_W * size) / CHAR_H
-      const cy = this.y[i]! - 26 * t // y-14 → y-40
+      const cy = Transform.y[eid]! - 26 * t // y-14 → y-40
       const tint = getTintAppendFloatAlpha(crit ? 0xffdc5d : 0xffffff, 1 - t)
 
       // 位数：从高位到低位逐字形铺；整串以 x 居中（等价旧实现的 setOrigin(0.5)）
-      const n = this.value[i]!
+      const n = DamageNumber.value[eid]!
       let digits = 1
       for (let v = n; v >= 10; v = Math.floor(v / 10)) digits++
-      let left = this.x[i]! - (digits * gw) / 2
+      let left = Transform.x[eid]! - (digits * gw) / 2
 
       for (let d = digits - 1; d >= 0; d--) {
         let p = 1

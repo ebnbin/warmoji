@@ -1,13 +1,12 @@
 import Phaser from 'phaser'
 import { query } from 'bitecs'
-import { emojiImage } from '../../emoji/textures'
-import { backEaseOut, cubicEaseIn, cubicEaseOut } from '../utils/ease'
+import { cubicEaseIn, cubicEaseOut } from '../utils/ease'
 import { Depth, Fx, FxBeam, FxBolt, FxCircle, FxSlash, Transform } from '../components'
 import { boltPts } from '../store'
-import type { Cue } from '../cues'
 import type { EcsWorld } from '../world'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment } from './tri'
 import type { Scratch } from './tri'
+import { SHAPE_BANDS as BANDS } from './bands'
 
 // 一次性战斗特效（Cue，阵营中立）：放完即弃，与机制正交——纯逻辑侧只往队列里塞
 // 「放一个什么样的特效」，绘制全在这里（GAS GameplayCue 思路：机制不依赖渲染）。
@@ -25,8 +24,10 @@ import type { Scratch } from './tri'
 //   · 进度由 renderWebGL 按 Fx.bornMs / Fx.durMs 现算，不挂 tween；回收在 systems/expireFx。
 //     时钟取 sim.fxMs（真实帧长的纯视觉钟，过场冻结期照旧推进），故特效不受时停拖慢
 //
-// 两个例外仍是 GameObject、也仍走 sim.out.cues 队列：💥 爆裂是图集贴图不是形状
-//（走不了三角批），全屏闪是单个定屏矩形（批不批都一样）。合计 25 个，恒定不随特效密度增长。
+// 只剩一个例外：全屏白闪是一块 setScrollFactor(0) 的矩形——它在**屏幕坐标**里，
+// 不在世界里，做不成世界实体，故仍是 GameObject，仍经 sim.out.flash 传进来。
+// 💥 爆裂从前也在此列（说它「走不了三角批」是对的，但那只说明它进不了形状批；
+// 它是贴图，进精灵批就好），现已是实体 FxBoom。
 //
 // 缓动与 Phaser 同名缓动同参（见 ../ease），观感与旧实现一致。
 
@@ -47,32 +48,15 @@ export interface CircleCue {
   readonly depth: number
 }
 
-// 形状类特效的并发上限与时长现在都在 entities/fx.ts（那边是实体，上限是一条规则）。
-// 这里只剩 💥 爆裂那个池子：它是 GameObject，容量即池容量
-const BOOMS = 24
-const BOOM_MS = 340
 
 /** 空闲槽位标记（born 存的是 fxMs，恒 ≥ 0） */
 const FREE = -1
 
-/** 批绘的深度分带：本带只画 depth ∈ [zMin, zMax) 的特效。
- * 分带是必需的——一个批绘对象只有一个 depth，它画的东西全落在那一层，而特效要与
- * 精灵带（7、8）和血条（11）前后穿插。三条带覆盖整个实数轴，不会有特效被静默丢掉 */
-const BANDS: readonly { depth: number; zMin: number; zMax: number }[] = [
-  { depth: 7, zMin: -Infinity, zMax: 8 }, // 冲击环、光束外层
-  { depth: 8, zMin: 8, zMax: 9 }, // 光束白芯、部分圆
-  { depth: 14, zMin: 9, zMax: Infinity }, // 闪电、斩击、高层圆
-]
 
 type Matrix = Phaser.GameObjects.Components.TransformMatrix
 
 export class CueLayer {
-  // ── 两个例外：图集贴图 / 定屏矩形，走不了三角批 ──
-  private readonly booms: Phaser.GameObjects.Image[] = []
-  private readonly boomBorn = new Float64Array(BOOMS).fill(FREE)
-  private readonly boomFull = new Float32Array(BOOMS)
-  private boomAt = 0
-
+  // ── 唯一的例外：屏幕固定的矩形，不在世界坐标里，做不成实体 ──
   private readonly flash: Phaser.GameObjects.Rectangle
   private flashBorn = FREE
   private flashDur = 0
@@ -85,9 +69,6 @@ export class CueLayer {
   private now = 0
 
   constructor(scene: Phaser.Scene, private readonly world: EcsWorld) {
-    for (let i = 0; i < BOOMS; i++) {
-      this.booms.push(emojiImage(scene, 0, 0, '1f4a5', 32).setDepth(9).setVisible(false))
-    }
     this.flash = scene.add
       .rectangle(scene.scale.width / 2, scene.scale.height / 2, 6000, 6000, 0xffffff, 1)
       .setScrollFactor(0)
@@ -97,7 +78,6 @@ export class CueLayer {
   }
 
   destroy(): void {
-    for (const b of this.booms) b.destroy()
     this.flash.destroy()
     for (const b of this.batches) b.destroy()
     this.batches.length = 0
@@ -107,20 +87,6 @@ export class CueLayer {
    * 形状类只需判过期——顶点每帧由批绘对象按当前进度现算，不必在此写回 */
   step(fxMs: number): void {
     this.now = fxMs
-    for (let i = 0; i < BOOMS; i++) {
-      if (this.boomBorn[i] === FREE) continue
-      const o = this.booms[i]!
-      const t = (fxMs - this.boomBorn[i]!) / BOOM_MS
-      if (t >= 1) {
-        this.boomBorn[i] = FREE
-        o.setVisible(false)
-        continue
-      }
-      const e = backEaseOut(t)
-      const full = this.boomFull[i]!
-      o.setScale(full * (0.4 + 0.6 * e)).setAlpha(1 - e)
-    }
-
     if (this.flashBorn !== FREE) {
       const t = (fxMs - this.flashBorn) / this.flashDur
       if (t >= 1) {
@@ -208,20 +174,6 @@ export class CueLayer {
     return o
   }
 
-  /** 💥 爆裂：emoji 从缩小随机微转弹出到全尺寸并淡出（轰炸命中点） */
-  boom(x: number, y: number, size: number): void {
-    const i = this.boomAt
-    this.boomAt = (this.boomAt + 1) % BOOMS
-    const b = this.booms[i]!
-    b.setPosition(x, y).setDisplaySize(size, size)
-    const full = b.scale
-    this.boomFull[i] = full
-    b.setScale(full * 0.4)
-      .setRotation((Math.random() - 0.5) * 0.8)
-      .setAlpha(1)
-      .setVisible(true)
-    this.boomBorn[i] = this.now
-  }
 
   /** 全屏白闪：一块盖满视口的定屏矩形淡出（天罚全域打击） */
   screenFlash(color: number, alpha: number, durationMs: number): void {
@@ -268,16 +220,3 @@ class EcsShapeBatch extends Phaser.GameObjects.GameObject {
   }
 }
 
-/** 每种特效怎么落到绘制层。全映射：新增一种 Cue 而不在此登记 = 编译不过
- *（从前是场景侧一条 else-if 链，漏一种是静默什么都不画，而且末尾的 else 会把
- * 任何没认出来的 kind 都当成全屏闪） */
-type Draw<K extends Cue['kind']> = (fx: CueLayer, c: Extract<Cue, { kind: K }>) => void
-const CUE_KINDS: { [K in Cue['kind']]: Draw<K> } = {
-  boom: (fx, c) => fx.boom(c.x, c.y, c.size),
-  screenFlash: (fx, c) => fx.screenFlash(c.color, c.alpha, c.durationMs),
-}
-
-/** 排空一批特效到绘制层 */
-export function drawCues(fx: CueLayer, queue: readonly Cue[]): void {
-  for (const c of queue) (CUE_KINDS[c.kind] as Draw<Cue['kind']>)(fx, c)
-}

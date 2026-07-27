@@ -1,6 +1,7 @@
 import { addComponents, addEntity, query, removeEntity } from 'bitecs'
-import { Depth, Fx, FxBeam, FxBolt, FxCircle, FxSlash, Transform } from '../components'
+import { DamageNumber, Depth, Fx, FxBeam, FxBolt, FxBoom, FxCircle, FxSlash, Transform } from '../components'
 import { boltPts } from '../store'
+import { attachDrawable } from './drawable'
 import type { CircleCue } from '../render/cues'
 import type { Sim } from '../sim'
 
@@ -15,11 +16,15 @@ import type { Sim } from '../sim'
 const BEAM_MS = 200
 const BOLT_MS = 200
 const SLASH_MS = 220
+const BOOM_MS = 340
+const RISE_MS = 350
 /** 单条闪电的折点上限（超出截断；连锁传导实际只有三四个点） */
 const BOLT_PTS = 8
+/** 💥 的深度：落在 spriteBatch 的 [30,60) 带（Phaser depth 9），与旧实现同层 */
+const BOOM_Z = 30
 
 /** 同屏并发上限（与旧实现的池容量同值） */
-const CAP = { circle: 64, beam: 16, bolt: 16, slash: 16 }
+const CAP = { circle: 64, beam: 16, bolt: 16, slash: 16, boom: 24, damage: 256 }
 
 /** 超额即顶掉最老的一个（按出生时刻，不按查询集的物理次序） */
 function capFx(sim: Sim, comp: object, cap: number): void {
@@ -116,6 +121,42 @@ export function spawnFxBolt(sim: Sim, points: readonly { x: number; y: number }[
   FxBolt.n[eid] = pts.length / 2
   FxBolt.color[eid] = color
   boltPts[eid] = Float32Array.from(pts)
+  return eid
+}
+
+/** 💥 爆裂：缩小随机微转弹出到全尺寸并淡出。它是精灵不是形状——贴图走图集，
+ * 由 spriteBatch 画（z=30 那条带），逐帧的缩放/淡出在 systems/animateBooms */
+export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): number {
+  capFx(sim, FxBoom, CAP.boom)
+  const eid = addEntity(sim.world)
+  addComponents(sim.world, eid, Fx, FxBoom)
+  Fx.bornMs[eid] = sim.fxMs
+  Fx.durMs[eid] = BOOM_MS
+  FxBoom.size[eid] = size
+  attachDrawable(sim.world, eid, sim.frames, {
+    id: '1f4a5',
+    outline: 'player',
+    x,
+    y,
+    size: size * 0.4, // 起始 0.4 倍，由 animateBooms 弹到全尺寸
+    rot: (Math.random() - 0.5) * 0.8,
+    z: BOOM_Z,
+  })
+  return eid
+}
+
+/** 伤害飘字：命中点上浮淡出的数字。绘制在 render/damageText.ts（自绘字形四边形），
+ * 故这里只有数据，不挂 Sprite */
+export function spawnDamageNumber(sim: Sim, x: number, y: number, amount: number, crit: boolean): number {
+  capFx(sim, DamageNumber, CAP.damage)
+  const eid = addEntity(sim.world)
+  addComponents(sim.world, eid, Fx, DamageNumber, Transform)
+  Fx.bornMs[eid] = sim.fxMs
+  Fx.durMs[eid] = RISE_MS
+  Transform.x[eid] = x
+  Transform.y[eid] = y - 14 // 起点略高于命中点（与旧实现同）
+  DamageNumber.value[eid] = amount
+  DamageNumber.crit[eid] = crit ? 1 : 0
   return eid
 }
 

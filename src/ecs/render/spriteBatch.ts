@@ -3,6 +3,7 @@ import { query } from 'bitecs'
 import { Depth, Quad, Sprite, Tint, Transform, RENDERABLE } from '../components'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
+export { SPRITE_BANDS } from './bands'
 
 // 统一自绘：一个自定义 GameObject，renderWebGL 里把全场 renderable 实体（Transform+Sprite+
 // Tint+Depth）一次性经 BatchHandlerQuad 批量画出。每个实体的四角按「相机变换 × 位姿」CPU 侧
@@ -20,18 +21,6 @@ import type { EcsAtlas } from '../atlas'
 
 const { getTintAppendFloatAlpha } = Phaser.Renderer.WebGL.Utils
 
-/** 批绘的深度分带:[zMin, zMax) 的实体归入一个 Phaser depth。
- * depth 值逐个对齐旧实现该类实体的 setDepth,好让非批绘的地面效果(2)/断壁(2、2.1)/
- * 拾取光圈(3)/预告标记与携带者光环(4)/拾取图标(6)/命中环(7)/血条(11) 前后关系不变 */
-export const SPRITE_BANDS: readonly { depth: number; zMin: number; zMax: number }[] = [
-  { depth: 1, zMin: -Infinity, zMax: 2 }, // 装饰
-  { depth: 3, zMin: 2, zMax: 4 }, // 金币
-  { depth: 5, zMin: 4, zMax: 6 }, // 敌人
-  { depth: 6, zMin: 6, zMax: 7 }, // 敌弹 / 死亡碎片
-  { depth: 7, zMin: 7, zMax: 8 }, // Boss
-  { depth: 8, zMin: 8, zMax: 60 }, // 我方弹 / 被保护中心 / 队员
-  { depth: 60, zMin: 60, zMax: Infinity }, // 天体横扫的球体(压在血条之上)
-]
 
 export class EcsSpriteBatch extends Phaser.GameObjects.GameObject {
   private readonly world: EcsWorld

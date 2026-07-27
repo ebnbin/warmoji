@@ -4,6 +4,7 @@ import { runPipeline } from './systems/pipeline/step'
 import { animateCharacters } from './systems/animateCharacters'
 import { stepPickupVisuals } from './systems/stepPickupVisuals'
 import { updateShards } from './systems/updateShards'
+import { animateBooms } from './systems/animateBooms'
 import { expireFx } from './systems/expireFx'
 import { layoutTeam } from './systems/layoutTeam'
 import type { FormationId } from '../types/formation'
@@ -146,6 +147,7 @@ export function worldTimeScale(sim: Sim): number {
 export function stepFrozenVisuals(sim: Sim): void {
   sim.fxMs += sim.dtMs
   updateShards(sim)
+  animateBooms(sim)
   expireFx(sim)
   stepPickupVisuals(sim)
 }

@@ -42,6 +42,8 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     // 但那是巧合不是依赖：那枚拾取换个 emoji，天体就静默变成 frame=-1
     SPAWN.markEmoji,
     '1fa90',
+    // 💥 爆裂：同样是实体（FxBoom），走精灵批绘
+    '1f4a5',
     // 财迷「天降横财」的金袋投掷物 + HUD 能量豆
     '1f4b0',
     '1fad8',

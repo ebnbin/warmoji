@@ -14,6 +14,7 @@ import { enemyCarries, enemyDef } from '../../store'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
 import type { Sim } from '../../sim'
+import { spawnDamageNumber } from '../../entities/fx'
 
 // 战斗(P3b):敌人受伤/致死/击退,队员接触伤害/死亡/复活/受击闪光。
 // 镜像 applyDamage / onMemberTouched / hurtCharacter / killMember / reviveCharacter 的核心数值;
@@ -38,7 +39,7 @@ export function applyDamage(
   // 变形期受伤倍率(魔尘诅咒 vulnMul):放大变羊敌人所受伤害
   const dmg = morphed && Morph.vuln[eid] !== 1 ? Math.round(damage * Morph.vuln[eid]!) : damage
   // 受伤飘字(镜像 floatDamage,在致死判定前:致死一击也飘字)
-  sim.out.damageNumbers.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, amount: dmg, crit })
+  spawnDamageNumber(sim, Transform.x[eid]!, Transform.y[eid]!, dmg, crit)
   const hp = Hp.v[eid]! - dmg
   // 结算统计:按伤害来源槽位累计有效伤害(压测阵容槽位越界则跳过,镜像 applyDamage)
   const st = sim.run.stats

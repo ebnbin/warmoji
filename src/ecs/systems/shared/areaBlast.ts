@@ -4,7 +4,7 @@ import { abilityOnHit } from '../../store'
 import { applyAbilityEffects, applyBlast } from './effects'
 import { sourceOf } from '../../utils/source'
 import type { Sim } from '../../sim'
-import { spawnFxCircle } from '../../entities/fx'
+import { spawnFxBoom, spawnFxCircle } from '../../entities/fx'
 
 /** 一次完整爆炸：伤害 + 命中效果 + 白闪核心/冲击环/爆裂 */
 export function blastAt(sim: Sim, e: number, x: number, y: number, damage: number): void {
@@ -14,7 +14,7 @@ export function blastAt(sim: Sim, e: number, x: number, y: number, damage: numbe
   playSfx('boom')
   applyBlast(sim, src, x, y, damage, radius, AreaBlast.knockback[e]!)
   applyAbilityEffects(sim, src, abilityOnHit[e], { x, y, baseDamage: damage })
-  // 白闪核心 + 冲击环是实体；💥 爆裂仍走队列（图集贴图，批绘不了形状）
+  // 白闪核心 + 冲击环 + 💥 爆裂,三者都是实体
   spawnFxCircle(sim, x, y, radius * 0.55, { fill: 0xffffff, fillAlpha: 0.9, fromScale: 1, toScale: 1.7, durationMs: 170, depth: 8 })
   spawnFxCircle(sim, x, y, radius, {
     fill: color,
@@ -27,5 +27,5 @@ export function blastAt(sim: Sim, e: number, x: number, y: number, damage: numbe
     durationMs: 400,
     depth: 7,
   })
-  sim.out.cues.push({ kind: 'boom', x, y, size: radius * 1.5 })
+  spawnFxBoom(sim, x, y, radius * 1.5)
 }
