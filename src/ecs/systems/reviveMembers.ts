@@ -1,5 +1,5 @@
 import { Alive, Revive } from '../components'
-import { reviveMember } from '../ops/combat'
+import { reviveMember } from './shared/combat'
 import type { Sim } from '../sim'
 
 /** 阵亡复活轮询(全队阵亡后不复活——待结算) */

@@ -3,7 +3,7 @@ import { launch } from '../entities/weapon'
 import { ownerX, ownerY } from '../utils/amp'
 import { Aim, Boomerang } from '../components'
 import { sourceOf } from '../utils/source'
-import { castScan } from '../ops/castScan'
+import { castScan } from './shared/castScan'
 import { nearestAngle, targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 

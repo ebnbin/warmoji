@@ -1,8 +1,8 @@
-import { CRIT_MUL } from '../../data/items'
-import { Alive, FACTION, Iframe } from '../components'
+import { CRIT_MUL } from '../../../data/items'
+import { Alive, FACTION, Iframe } from '../../components'
 import { applyDamage, hurtMember } from './combat'
-import type { Source } from '../utils/source'
-import type { Sim } from '../sim'
+import type { Source } from '../../utils/source'
+import type { Sim } from '../../sim'
 
 // 施伤的唯一入口：阵营决定进哪条结算（敌→队员吃无敌帧节流，队→敌走暴击/击退）。
 // 它不是 system——被人指着打某个目标，不 query；也不是纯函数——会写组件。

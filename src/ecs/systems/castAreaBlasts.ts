@@ -1,9 +1,9 @@
-import { blastAt } from '../ops/areaBlast'
+import { blastAt } from './shared/areaBlast'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { hasComponent } from 'bitecs'
 import { AreaBlast, BlastEcho, Followup } from '../components'
 import { sourceOf } from '../utils/source'
-import { castScan } from '../ops/castScan'
+import { castScan } from './shared/castScan'
 import { nearestTarget, targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 

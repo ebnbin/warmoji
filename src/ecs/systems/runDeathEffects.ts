@@ -1,4 +1,4 @@
-import { replayDeath } from '../ops/death'
+import { replayDeath } from './shared/death'
 import type { Sim } from '../sim'
 
 /** 排空死亡队列:仅作兜底(onDeathFx 未挂时,如 headless 仿真) */

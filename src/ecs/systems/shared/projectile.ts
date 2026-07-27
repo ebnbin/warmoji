@@ -1,8 +1,8 @@
-import { Bolt, FACTION, Faction, Owner, Shoot } from '../components'
-import { spawnEnemyProjectileEcs, spawnProjectileEcs } from '../entities/projectile'
-import { abilityFireSfx, enemyDef } from '../store'
-import { attributionSlot } from '../utils/amp'
-import type { Sim } from '../sim'
+import { Bolt, FACTION, Faction, Owner, Shoot } from '../../components'
+import { spawnEnemyProjectileEcs, spawnProjectileEcs } from '../../entities/projectile'
+import { abilityFireSfx, enemyDef } from '../../store'
+import { attributionSlot } from '../../utils/amp'
+import type { Sim } from '../../sim'
 
 /** 敌方能力弹药缺省寿命 */
 const BULLET_LIFE_MS = 3000
@@ -31,6 +31,6 @@ export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, 
 }
 
 /** 这条能力出手时的音效（敌械弹幕用；队伍弹的 shoot 音效在发弹处） */
-export function fireSfxOf(e: number): import('../../types/sfx').SfxId | undefined {
+export function fireSfxOf(e: number): import('../../../types/sfx').SfxId | undefined {
   return abilityFireSfx[e]
 }

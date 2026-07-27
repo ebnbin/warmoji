@@ -1,5 +1,5 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { land } from '../ops/strike'
+import { land } from './shared/strike'
 import { Drop, Owner, Tint, Transform } from '../components'
 import type { Sim } from '../sim'
 

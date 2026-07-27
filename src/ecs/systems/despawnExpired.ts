@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { Despawn, Dormant, ENEMY_SET } from '../components'
-import { despawnEnemy } from '../ops/combat'
+import { despawnEnemy } from './shared/combat'
 import type { Sim } from '../sim'
 
 /** 定时静默移除:亡语诱饵尸壳到时离场(不计击杀、不掉落、不放死亡效果) */

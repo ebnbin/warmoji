@@ -16,7 +16,7 @@ import {
   ZoneBurn,
   ZoneFollow,
 } from '../components'
-import { applyDamage, hurtMember } from '../ops/combat'
+import { applyDamage, hurtMember } from './shared/combat'
 import { backEaseOut } from '../utils/ease'
 import { zoneSrcName } from '../store'
 import type { Sim } from '../sim'

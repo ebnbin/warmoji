@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { ENEMY_SET, Poison } from '../components'
-import { applyDamage } from '../ops/combat'
+import { applyDamage } from './shared/combat'
 import type { Sim } from '../sim'
 
 /** 中毒 DoT:每 tickMs 一跳,到期解毒(镜像 steerEnemies 的毒逻辑核心) */

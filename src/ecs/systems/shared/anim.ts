@@ -1,9 +1,9 @@
-import { ANIM_DEF } from '../../emoji/anim'
-import type { OutlineKind } from '../../emoji/svg'
-import { Anim } from '../components'
-import { animId, animOutline } from '../store'
-import type { Sim } from '../sim'
-import type { FrameIndex } from '../frames'
+import { ANIM_DEF } from '../../../emoji/anim'
+import type { OutlineKind } from '../../../emoji/svg'
+import { Anim } from '../../components'
+import { animId, animOutline } from '../../store'
+import type { Sim } from '../../sim'
+import type { FrameIndex } from '../../frames'
 
 // 部件动画(镜像 Animator):常驻 idle 循环 + 一次性覆盖 clip,把游戏时钟翻算成帧下标,
 // 写进 Sprite.frame 即换帧。帧是惰性烘焙的:未就绪时 atlas 返回 frames=0,

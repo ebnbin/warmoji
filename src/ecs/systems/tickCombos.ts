@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { strike } from '../ops/thrust'
+import { strike } from './shared/thrust'
 import { Ability, Followup, Frozen, Thrust } from '../components'
 import type { Sim } from '../sim'
 

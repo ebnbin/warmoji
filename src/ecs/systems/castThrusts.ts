@@ -1,10 +1,10 @@
 import { reachOf } from '../utils/thrust'
-import { strike } from '../ops/thrust'
+import { strike } from './shared/thrust'
 import { ownerX, ownerY } from '../utils/amp'
 import { hasComponent } from 'bitecs'
 import { Followup, Thrust, ThrustCombo } from '../components'
 import { sourceOf } from '../utils/source'
-import { castScan } from '../ops/castScan'
+import { castScan } from './shared/castScan'
 import { nearestAngle, targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 

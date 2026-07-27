@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { blinkFlash } from '../ops/assassinate'
+import { blinkFlash } from './shared/assassinate'
 import { Ability, Assassinate, Blink, Followup, Frozen, Owner, VisOff } from '../components'
 import { ownerX, ownerY } from '../utils/amp'
 import type { Sim } from '../sim'

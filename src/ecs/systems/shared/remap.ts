@@ -1,8 +1,8 @@
 import { query } from 'bitecs'
-import { remapPoint, remapVector, isHorizontal } from '../../war/remap'
-import { Bob, EDir, ENEMY_SET, EPROJ_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Transform, Vel, ZONE_SET } from '../components'
-import type { Sim } from '../sim'
-import type { Point } from '../../util/vec'
+import { remapPoint, remapVector, isHorizontal } from '../../../war/remap'
+import { Bob, EDir, ENEMY_SET, EPROJ_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Transform, Vel, ZONE_SET } from '../../components'
+import type { Sim } from '../../sim'
+import type { Point } from '../../../util/vec'
 
 // 视口横竖切换/尺寸变化时的世界重映射(仅单屏图:奔流/工厂——它们的世界尺寸由视口推出)。
 // 位置按「长轴进度 + 跨轴偏移」映射,速度/朝向随坐标系旋转;几何在 war/remap,与旧图共用一份。

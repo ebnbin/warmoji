@@ -1,8 +1,8 @@
 import { hasComponent, query, removeComponent } from 'bitecs'
-import { cooldownMul } from '../utils/amp'
-import { Ability, CastRequest, Disarmed, Fired, Frozen, Manual } from '../components'
-import type { CdComp } from '../components'
-import type { Sim } from '../sim'
+import { cooldownMul } from '../../utils/amp'
+import { Ability, CastRequest, Disarmed, Fired, Frozen, Manual } from '../../components'
+import type { CdComp } from '../../components'
+import type { Sim } from '../../sim'
 
 // 「何时出手」只此一处：各 kind 的系统只回答「出手做什么」。
 // 手动能力（队长技能载荷）不参与自动扫描，只等施放请求。

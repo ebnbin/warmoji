@@ -1,7 +1,7 @@
 import { Alive, Iframe, MFlash, MHp, Rally, Tint } from '../components'
-import { reviveMember } from '../ops/combat'
+import { reviveMember } from './shared/combat'
 import { ownerX, ownerY } from '../utils/amp'
-import { castScan } from '../ops/castScan'
+import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
 /** 集结：阵亡者满血复活、存活者按上限比例回复、全队短暂无敌。

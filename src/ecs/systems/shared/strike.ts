@@ -1,10 +1,10 @@
 import { hasComponent } from 'bitecs'
-import { spawnCoins } from '../entities/pickup'
-import { Alive, Drop, Enemy, FACTION, Faction, Owner, Strike, Transform } from '../components'
-import { damageMul, ownerX, ownerY } from '../utils/amp'
+import { spawnCoins } from '../../entities/pickup'
+import { Alive, Drop, Enemy, FACTION, Faction, Owner, Strike, Transform } from '../../components'
+import { damageMul, ownerX, ownerY } from '../../utils/amp'
 import { damageTarget } from './damage'
-import { sourceOf } from '../utils/source'
-import type { Sim } from '../sim'
+import { sourceOf } from '../../utils/source'
+import type { Sim } from '../../sim'
 
 /** 落地：目标还在才结算——伤害 + 击退（从锚点推开）+ 落点掉币 */
 export function land(sim: Sim, d: number): void {

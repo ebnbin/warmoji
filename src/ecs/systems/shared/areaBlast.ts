@@ -1,9 +1,9 @@
-import { playSfx } from '../../audio/sfx'
-import { AreaBlast } from '../components'
-import { abilityOnHit } from '../store'
+import { playSfx } from '../../../audio/sfx'
+import { AreaBlast } from '../../components'
+import { abilityOnHit } from '../../store'
 import { applyAbilityEffects, applyBlast } from './effects'
-import { sourceOf } from '../utils/source'
-import type { Sim } from '../sim'
+import { sourceOf } from '../../utils/source'
+import type { Sim } from '../../sim'
 
 /** 一次完整爆炸：伤害 + 命中效果 + 白闪核心/冲击环/爆裂 */
 export function blastAt(sim: Sim, e: number, x: number, y: number, damage: number): void {

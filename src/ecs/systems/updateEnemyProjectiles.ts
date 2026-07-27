@@ -1,6 +1,6 @@
 import { query, removeEntity } from 'bitecs'
 import { Alive, EProj, EPROJ_SET, Hurt, Iframe, Transform, Vel } from '../components'
-import { hurtMember } from '../ops/combat'
+import { hurtMember } from './shared/combat'
 import { eprojSrcName } from '../store'
 import type { Sim } from '../sim'
 

@@ -1,10 +1,10 @@
 import { hasComponent } from 'bitecs'
 import { Anchor, Aura, AuraDps, AuraFreeze, Faction, Pulse, Slow, SlowAura } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
-import { damageTarget } from '../ops/damage'
+import { damageTarget } from './shared/damage'
 import { spawnZone } from '../entities/zone'
 import { sourceOf } from '../utils/source'
-import { castScan } from '../ops/castScan'
+import { castScan } from './shared/castScan'
 import { targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 

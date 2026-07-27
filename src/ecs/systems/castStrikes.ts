@@ -3,7 +3,7 @@ import { Strike } from '../components'
 import { abilityArtEmoji } from '../store'
 import { ownerX, ownerY } from '../utils/amp'
 import { sourceOf } from '../utils/source'
-import { castScan } from '../ops/castScan'
+import { castScan } from './shared/castScan'
 import { targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 

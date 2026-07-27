@@ -1,8 +1,8 @@
-import { playSfx } from '../../audio/sfx'
-import { gainXp, waveBonusXp } from '../../war/xp'
-import { isFinalWave } from '../../data/waves'
-import { Alive, MHp } from '../components'
-import type { Sim } from '../sim'
+import { playSfx } from '../../../audio/sfx'
+import { gainXp, waveBonusXp } from '../../../war/xp'
+import { isFinalWave } from '../../../data/waves'
+import { Alive, MHp } from '../../components'
+import type { Sim } from '../../sim'
 
 // 波次结算(镜像 endWave 的纯 run 变更部分):波末保底经验(队长×道具倍率)+ 团队道具波末
 // 结算(大锅回复/债券分红)+ 累计战斗时长 + 波次自增 + 队员血量快照。场景过场(结算横幅/

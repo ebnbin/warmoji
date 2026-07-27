@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
-import { Alive, ENEMY_SET, Hp, MHp, Transform } from '../components'
-import type { Sim } from '../sim'
+import { Alive, ENEMY_SET, Hp, MHp, Transform } from '../../components'
+import type { Sim } from '../../sim'
 
 // 治疗的两侧落点（阵营中立的一对原语）：谁被治由调用方按阵营选，挑选规则两侧一致——
 // all=false 只治「血量比例」最低的一个，满血者不计，返回实际被治数。

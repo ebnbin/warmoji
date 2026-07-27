@@ -1,5 +1,5 @@
 import { Alive, Buff, MFlash, Tint } from '../components'
-import { castScan } from '../ops/castScan'
+import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
 /** 限时全队增伤：不叠加，直接覆写，到期由 stepSim 复原；全队闪一下作到手反馈 */

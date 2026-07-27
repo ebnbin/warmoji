@@ -39,7 +39,7 @@ import {
   Transform,
 } from '../components'
 import { enemyCarries, enemyDef } from '../store'
-import { armIdle } from '../ops/anim'
+import { armIdle } from '../systems/shared/anim'
 import { ANIM_DEF } from '../../emoji/anim'
 import type { Sim } from '../sim'
 import type { FrameIndex } from '../frames'

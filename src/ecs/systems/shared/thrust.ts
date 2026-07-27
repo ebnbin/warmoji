@@ -1,14 +1,14 @@
-import { reachOf } from '../utils/thrust'
-import { playSfx } from '../../audio/sfx'
-import { thrustHitIndices } from '../../war/hit'
-import { damageMul, ownerX, ownerY } from '../utils/amp'
+import { reachOf } from '../../utils/thrust'
+import { playSfx } from '../../../audio/sfx'
+import { thrustHitIndices } from '../../../war/hit'
+import { damageMul, ownerX, ownerY } from '../../utils/amp'
 import { damageTarget } from './damage'
-import { Aim, Swing, Thrust } from '../components'
-import { abilityOnHit } from '../store'
+import { Aim, Swing, Thrust } from '../../components'
+import { abilityOnHit } from '../../store'
 import { applyAbilityEffects } from './effects'
-import { sourceOf } from '../utils/source'
-import { nearestAngle, targetsOf } from '../utils/targets'
-import type { Sim } from '../sim'
+import { sourceOf } from '../../utils/source'
+import { nearestAngle, targetsOf } from '../../utils/targets'
+import type { Sim } from '../../sim'
 
 /** 单段突刺：索敌 → 胶囊判定 → 终点命中效果 → 起一段挥击动画 */
 export function strike(sim: Sim, e: number): void {

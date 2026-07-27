@@ -2,8 +2,8 @@ import { hasComponent } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
 import { Alive, FACTION, Faction, Heal, HealAoe, HealDefib, Revive, Transform } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
-import { healEnemies, healMembers } from '../ops/heal'
-import { castScan } from '../ops/castScan'
+import { healEnemies, healMembers } from './shared/heal'
+import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
 /** 周期治疗：治血量比例最低的己方（aoe 则范围全体）。治疗量吃伤害乘区——磨刀石对军医同样有意义。

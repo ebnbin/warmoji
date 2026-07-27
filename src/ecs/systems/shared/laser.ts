@@ -1,11 +1,11 @@
-import { playSfx } from '../../audio/sfx'
-import { thrustHitIndices } from '../../war/hit'
-import { Laser } from '../components'
-import { damageMul, ownerX, ownerY } from '../utils/amp'
+import { playSfx } from '../../../audio/sfx'
+import { thrustHitIndices } from '../../../war/hit'
+import { Laser } from '../../components'
+import { damageMul, ownerX, ownerY } from '../../utils/amp'
 import { damageTarget } from './damage'
-import { sourceOf } from '../utils/source'
-import { targetsOf } from '../utils/targets'
-import type { Sim } from '../sim'
+import { sourceOf } from '../../utils/source'
+import { targetsOf } from '../../utils/targets'
+import type { Sim } from '../../sim'
 
 /** 发射一束：胶囊判定 + 光束特效（ratio 折损用于扫射分束） */
 export function fireBeam(sim: Sim, e: number, angle: number, ratio: number): void {

@@ -1,7 +1,7 @@
 import { Turret } from '../components'
 import { cooldownMul } from '../utils/amp'
 import { place } from '../entities/minion'
-import { castScan } from '../ops/castScan'
+import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
 /** 架设弩塔：本体无攻击，周期在脚下架一座。**塔自己开火**——它带着一条 projectile

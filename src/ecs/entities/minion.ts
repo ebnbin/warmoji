@@ -1,5 +1,5 @@
 import { addComponent, addComponents, addEntity, removeComponent } from 'bitecs'
-import { armIdle } from '../ops/anim'
+import { armIdle } from '../systems/shared/anim'
 import { attachDrawable } from './drawable'
 import {
   Ability,

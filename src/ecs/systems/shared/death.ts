@@ -1,12 +1,12 @@
-import { UNIT } from '../../util/units'
-import { waveAt } from '../../data/waves'
-import type { DeathEffect, DecoyEffect, SplitEffect } from '../../types/enemies'
-import type { Effect } from '../../types/abilityDefs'
-import { Despawn } from '../components'
-import { spawnBrood, spawnEnemy } from '../entities/enemy'
+import { UNIT } from '../../../util/units'
+import { waveAt } from '../../../data/waves'
+import type { DeathEffect, DecoyEffect, SplitEffect } from '../../../types/enemies'
+import type { Effect } from '../../../types/abilityDefs'
+import { Despawn } from '../../components'
+import { spawnBrood, spawnEnemy } from '../../entities/enemy'
 import { applyAbilityEffects } from './effects'
-import { enemySource } from '../utils/source'
-import type { PendingDeath, Sim } from '../sim'
+import { enemySource } from '../../utils/source'
+import type { PendingDeath, Sim } from '../../sim'
 
 // 亡语(onDeath):死亡触发的一串效果。与命中触发 onHit 复用同一套组合式 Effect 与执行器,
 // 来源是一份按死者快照捏出来的值——实体已离场,不能再指望它还在。

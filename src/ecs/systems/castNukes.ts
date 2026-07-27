@@ -2,9 +2,9 @@ import { hasComponent, query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
 import { Boss, Dormant, ENEMY_SET, Enemy, Nuke } from '../components'
 import { damageMul, waveScale } from '../utils/amp'
-import { damageTarget } from '../ops/damage'
+import { damageTarget } from './shared/damage'
 import { sourceOf } from '../utils/source'
-import { castScan } from '../ops/castScan'
+import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
 /** 全域打击：全场活跃敌人各吃一次大额伤害 + 全屏白闪。伤害随当前波次威胁倍率缩放

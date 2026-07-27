@@ -1,7 +1,7 @@
 import { spawnBee } from '../entities/minion'
 import { cooldownMul } from '../utils/amp'
 import { Summon } from '../components'
-import { castScan } from '../ops/castScan'
+import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
 /** 放蜂：每隔一段放出一波小蜂，各自寻路扑向最近的敌人（优先未中毒者，好把毒摊开），

@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { blastAt } from '../ops/areaBlast'
+import { blastAt } from './shared/areaBlast'
 import { ACQUIRE } from '../../data/abilities'
 import { UNIT } from '../../util/units'
 import { ownerX, ownerY } from '../utils/amp'

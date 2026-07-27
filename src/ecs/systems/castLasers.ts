@@ -1,9 +1,9 @@
 import { hasComponent } from 'bitecs'
 import { Aim, Laser, LaserBackBeam, LaserRadial, Radial } from '../components'
 import { ownerX, ownerY } from '../utils/amp'
-import { fireBeam } from '../ops/laser'
+import { fireBeam } from './shared/laser'
 import { sourceOf } from '../utils/source'
-import { castScan } from '../ops/castScan'
+import { castScan } from './shared/castScan'
 import { nearestAngle, targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 
