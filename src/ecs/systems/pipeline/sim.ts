@@ -27,7 +27,6 @@ import { updateEnemyGates } from '../updateEnemyGates'
 import { tickPoison } from '../tickPoison'
 import { tintEnemies } from '../tintEnemies'
 import { updateDormancy } from '../updateDormancy'
-import { updateFrameTargets } from '../updateFrameTargets'
 import { updateOrbit } from '../updateOrbit'
 import { cullProjectiles } from '../cullProjectiles'
 import { hitDirectProjectiles } from '../hitDirectProjectiles'
@@ -70,13 +69,7 @@ export const SIM_PIPELINE: readonly Step[] = [
     run: updateDormancy,
     why: '休眠是本帧派生的：远离队伍的敌人冻结 AI 与位移，故须先于一切读敌人的系统',
   },
-  {
-    name: 'updateFrameTargets',
-    run: updateFrameTargets,
-    after: ['updateDormancy'],
-    why: '威胁点里不该有休眠怪；队伍 orbit/游移门控读这一份，故也须先于 updateOrbit',
-  },
-  { name: 'updateOrbit', run: updateOrbit, after: ['updateFrameTargets'] },
+  { name: 'updateOrbit', run: updateOrbit },
   {
     name: 'moveTeam',
     run: moveTeam,

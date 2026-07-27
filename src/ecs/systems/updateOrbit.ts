@@ -25,7 +25,7 @@ export function updateOrbit(sim: Sim): void {
     if (base !== null) rotatable = true
     const theta = (base ?? 0) + sim.orbitPhase
     const threats: OrbitThreat[] = []
-    for (const t of sim.frameTargets) {
+    for (const t of sim.enemyTargets) {
       const dx = t.x - Transform.x[eid]!
       const dy = t.y - Transform.y[eid]!
       const dSq = dx * dx + dy * dy

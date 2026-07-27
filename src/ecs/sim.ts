@@ -9,7 +9,6 @@ import type { FormationId } from '../types/formation'
 import type { FlowField, WallGrid } from '../war/maps/ruins'
 import type { EcsWorld } from './world'
 import type { WorldHooks } from './worlds'
-import type { Point } from '../util/vec'
 import type { RunState } from '../run/state'
 import type { Cue } from './cues'
 import type { Target } from './utils/targets'
@@ -81,8 +80,6 @@ export interface Sim {
    * wdtMs = 世界时长(敌人/弹体/刷怪/攻速),时停期比 dtMs 慢 */
   dtMs: number
   wdtMs: number
-  /** 本帧威胁点(敌人位置) */
-  frameTargets: Point[]
   /** 全队阵亡(游戏结束标记;失败结算) */
   over: boolean
   /** 终波 Boss 被击败(场景侧据此走通关结算) */
@@ -307,7 +304,6 @@ export function makeSim(
     fxMs: 0,
     dtMs: 0,
     wdtMs: 0,
-    frameTargets: [],
     over: false,
     bossDown: false,
     characterHitCount: 0,
