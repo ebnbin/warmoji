@@ -36,6 +36,8 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     ...Object.values(FIELD_PICKUPS).map((p) => p.emoji),
     '2795',
     '1f480',
+    // 刷怪预告的 ⚠ 标记（ECS 侧它是一颗实体，贴图走图集变体；arcade 侧仍是无描边 Image）
+    SPAWN.markEmoji,
     // 财迷「天降横财」的金袋投掷物 + HUD 能量豆
     '1f4b0',
     '1fad8',

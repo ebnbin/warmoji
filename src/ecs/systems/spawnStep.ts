@@ -9,7 +9,10 @@ import { pickEnemy } from '../../war/enemyAi'
 import { attachCarrierRing } from '../entities/pickup'
 import { spawnEnemy } from '../entities/enemy'
 import { awakeCount, currentMix, dayNightOf } from '../entities/enemy'
-import { enemyCarries } from '../store'
+import { spawnTelegraph, telegraphCount } from '../entities/telegraph'
+import { enemyCarries, telegraphCarries, telegraphDef } from '../store'
+import { Due, Telegraph, Transform } from '../components'
+import { query, removeEntity } from 'bitecs'
 import type { Sim } from '../sim'
 
 // 刷怪节奏：预告落地 + 冷却推进。挑怪/落点/难度都在 ../spawn.ts，这里只管节拍。
@@ -26,7 +29,7 @@ function spawnOne(sim: Sim, hpMultiplier: number, forceElite = false): void {
   const elite = !sim.testMode && (forceElite || (sim.run.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance))
   const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
   const pos = sim.hooks.spawnPoint(sim, false)
-  sim.pendingSpawns.push({ def, x: pos.x, y: pos.y, hp, elite, boss: false, at: sim.elapsedMs + SPAWN.telegraphMs })
+  spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, false)
 }
 
 /** 测试模式补场(镜像 spawnTest):只补勾选的敌人,密度(间隔/上限/每批)与难度(血量倍率)
@@ -39,19 +42,11 @@ function spawnTest(sim: Sim): void {
   if (kinds.length === 0) return
   const hpMul = labDifficulty()
   for (let i = 0; i < d.batch; i++) {
-    if (awakeCount(sim) + sim.pendingSpawns.length >= d.cap) return
+    if (awakeCount(sim) + telegraphCount(sim) >= d.cap) return
     const raw = ENEMIES[kinds[Math.floor(sim.rng.next() * kinds.length)]!]!
     const def = toPx(raw)
     const pos = sim.hooks.spawnPoint(sim, raw.role === 'boss')
-    sim.pendingSpawns.push({
-      def,
-      x: pos.x,
-      y: pos.y,
-      hp: Math.round(def.hp * hpMul),
-      elite: false,
-      boss: raw.role === 'boss',
-      at: sim.elapsedMs + SPAWN.telegraphMs,
-    })
+    spawnTelegraph(sim, def, pos.x, pos.y, Math.round(def.hp * hpMul), false, raw.role === 'boss')
   }
 }
 
@@ -60,29 +55,19 @@ export function spawnStep(sim: Sim): void {
   const atlas = sim.frames
   const delta = sim.wdtMs
   const now = sim.elapsedMs
-  // 敌潮排期到点:此刻才求落点/出怪表并挂预告(镜像 spawnSurge 的 delayedCall)
-  if (sim.pendingSurges.length > 0) {
-    const rest: typeof sim.pendingSurges = []
-    for (const s of sim.pendingSurges) {
-      if (now >= s.at) spawnOne(sim, s.hpMul, s.forceElite)
-      else rest.push(s)
+  // 预告到点:在原地换成真敌人。快照迭代——spawnEnemy 会建实体,直接迭代活查询集会漏
+  for (const e of [...query(sim.world, [Telegraph, Due])]) {
+    if (now < Due.at[e]!) continue
+    const boss = Telegraph.boss[e] === 1
+    const eid = spawnEnemy(sim, atlas, telegraphDef[e]!, Transform.x[e]!, Transform.y[e]!,
+      Telegraph.hp[e]!, Telegraph.elite[e] === 1, boss)
+    if (boss && !sim.testMode) playSfx('boom') // 落地轰鸣只属于正式局 Boss(镜像 spawnBoss)
+    const carries = telegraphCarries[e]
+    if (carries) {
+      enemyCarries[eid] = carries
+      attachCarrierRing(sim, eid, carries)
     }
-    sim.pendingSurges = rest
-  }
-  if (sim.pendingSpawns.length > 0) {
-    const remain: typeof sim.pendingSpawns = []
-    for (const p of sim.pendingSpawns) {
-      if (now >= p.at) {
-        const eid = spawnEnemy(sim, atlas, p.def, p.x, p.y, p.hp, p.elite, p.boss)
-        if (p.boss && !sim.testMode) playSfx('boom') // 落地轰鸣只属于正式局 Boss(镜像 spawnBoss)
-        if (p.carries) {
-          enemyCarries[eid] = p.carries
-          attachCarrierRing(sim, eid, p.carries)
-        }
-      }
-      else remain.push(p)
-    }
-    sim.pendingSpawns = remain
+    removeEntity(sim.world, e)
   }
   sim.spawnCooldownMs -= delta
   if (sim.spawnCooldownMs > 0) return
@@ -92,6 +77,6 @@ export function spawnStep(sim: Sim): void {
   const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * sim.characters.length
   const relief = isBossWave(sim.run.wave) ? BOSS_SPAWN_RELIEF : 1
   sim.spawnCooldownMs = (wave.spawnIntervalMs * relief * spawnIntervalScale(sim)) / teamFactor
-  if (awakeCount(sim) + sim.pendingSpawns.length >= SPAWN.maxAlive) return
+  if (awakeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
   spawnOne(sim, wave.hpMultiplier)
 }

@@ -256,6 +256,13 @@ export const Grab = { radius: f32() }
 /** 地面停留到期时刻(elapsedMs):到点淡出回收。0 = 永不过期 */
 export const Lifetime = { until: f32() }
 
+/** 到点要发生一件事(elapsedMs)。与 Lifetime 正相反——Lifetime 是「到点消失」,
+ * Due 是「到点开始」。谁挂它就谁到点动:预告落地、敌潮出怪、携带者上场。
+ * **它只说「什么时候」,不说「做什么」**——做什么由同一实体上的载荷组件决定,
+ * 每种载荷一个系统。于是「稍后做某事」不再需要三套机制(sim 数组 / Phaser 定时器),
+ * 而且一律走世界时钟:时停期该慢的自然跟着慢 */
+export const Due = { at: f32() }
+
 /** 待拾缓浮(纯视觉):图标绕落点上下缓飘。y0 = 落点(逻辑真相),Transform.y = y0 + 偏移 */
 export const Bob = { y0: f32(), amp: f32(), halfMs: f32() }
 
@@ -690,6 +697,20 @@ export const EnemyPhase = { v: f32() }
 /** 虫巢：of = 护巢子敌指回的巢 eid（-1 表示无巢，拆巢时清空触发暴走）；
  * nextSpawnAt = 巢自身的下次生成时刻（0 表示非 spawner） */
 export const Nest = { of: i32Fill(-1), nextSpawnAt: f32() }
+
+// ── Due 的三种载荷：到点各做各的 ────────────────────────
+// 从前分别是 sim.pendingSpawns 数组、sim.pendingSurges 数组、场景侧的 Phaser
+// delayedCall。三样东西同一个意思（「到点做件事」），三套实现、两种时钟。
+
+/** 刷怪预告：⚠ 标在落点脉冲，Due 到点即在原地换成真敌人。
+ * def 与携带载荷装不进类型化数组，在 store 的 telegraphDef / telegraphCarries */
+export const Telegraph = { hp: f32(), elite: u8(), boss: u8(), bornMs: f32() }
+
+/** 敌潮排期：到点才求落点与出怪表（早求的话落点会偏到队伍现在已不在的地方） */
+export const Surge = { hpMul: f32(), forceElite: u8() }
+
+/** 携带者排期：到点挂一只带战场拾取的敌人（载荷在 store 的 carrierPickup） */
+export const Carrier = {}
 
 /** 拆巢暴走倍率：巢没了之后叠到自己的速度/攻击上。
  * **有这个组件 = 这只子敌会因拆巢暴走**——拆巢时不必回头问它是不是 baseOrbit */

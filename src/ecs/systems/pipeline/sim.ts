@@ -1,4 +1,5 @@
 import { animateEnemies } from '../animateEnemies'
+import { blinkTelegraphs } from '../blinkTelegraphs'
 import { animateCharacters } from '../animateCharacters'
 import { applyKnockback } from '../applyKnockback'
 import { applySlowZones } from '../applySlowZones'
@@ -157,6 +158,7 @@ export const SIM_PIPELINE: readonly Step[] = [
     why: '命中而死的先走，剩下的才按寿命/视野/世界钩子回收',
   },
   { name: 'characterVisual', run: characterVisual },
+  { name: 'blinkTelegraphs', run: blinkTelegraphs },
   { name: 'updateShards', run: updateShards },
   {
     name: 'worldTick',

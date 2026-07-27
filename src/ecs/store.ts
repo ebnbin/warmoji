@@ -25,6 +25,17 @@ export const projHitEids: (Set<number> | undefined)[] = new Array<Set<number> | 
 /** 在途回旋镖本程已命中的 eid(去程/回程各判一次,同程内每敌最多一次) */
 export const flyerHits: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(MAX_ENTITIES).fill(undefined).fill(undefined)
 
+/** 刷怪预告要落地的敌人 def */
+export const telegraphDef: (EnemyDef | undefined)[] = new Array<EnemyDef | undefined>(MAX_ENTITIES).fill(undefined)
+
+/** 刷怪预告要落地的敌人携带的战场拾取(普通刷怪为 undefined) */
+export const telegraphCarries: (FieldPickupDef | undefined)[] =
+  new Array<FieldPickupDef | undefined>(MAX_ENTITIES).fill(undefined)
+
+/** 携带者排期到点要挂的那枚战场拾取 */
+export const carrierPickup: (FieldPickupDef | undefined)[] =
+  new Array<FieldPickupDef | undefined>(MAX_ENTITIES).fill(undefined)
+
 /** 敌人携带的战场拾取(携带者:死亡即在原地掉这枚拾取) */
 export const enemyCarries: (FieldPickupDef | undefined)[] =
   new Array<FieldPickupDef | undefined>(MAX_ENTITIES).fill(undefined).fill(undefined)
@@ -63,6 +74,9 @@ export const animOutline: (import('../emoji/svg').OutlineKind | undefined)[] =
  * 场景 create 时调 */
 export function clearEcsStore(): void {
   enemyDef.fill(undefined)
+  telegraphDef.fill(undefined)
+  telegraphCarries.fill(undefined)
+  carrierPickup.fill(undefined)
   projOnHit.fill(undefined)
   projHitEids.fill(undefined)
   flyerHits.fill(undefined)

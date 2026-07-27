@@ -45,6 +45,7 @@ import { stepFrame } from './systems/pipeline/frame'
 import { replayDeath } from './systems/shared/death'
 import { pickupCounts } from './entities/pickup'
 import { spawnBossEcs, spawnCarrierEcs, spawnSurgeEcs } from './entities/enemy'
+import { telegraphCount } from './entities/telegraph'
 
 import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
 import { settleWave } from './systems/shared/wave'
@@ -58,12 +59,11 @@ import { tickSkillCd } from '../war/skill'
 import { hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import type { HudSnapshot } from '../run/hudHost'
-import type { PendingSpawn, Sim } from './sim'
+import type { Sim } from './sim'
 import { drain } from './outbox'
 import type { Burst } from './outbox'
 import type { Meteor } from './worlds'
 import { emojiImage } from '../emoji/textures'
-import { SPAWN } from '../data/enemies'
 import { rollWaveCarriers } from '../war/battleFx'
 import { centerX, centerY } from './utils/team'
 
@@ -162,8 +162,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private damageNumbersOn = false
   /** 伤害飘字层（纯数据 + 单个批绘对象，不挂 tween；见 render/damageText.ts） */
   private damageText?: DamageTextLayer
-  /** 刷怪预告标记(按 pendingSpawn 对帐:出现即挂脉冲⚠,落地即销毁) */
-  private spawnMarks = new Map<PendingSpawn, Phaser.GameObjects.Image>()
   /** 粒子爆点发射器(死亡紫爆 / 拾币金爆 / 灰烟) */
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -229,7 +227,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.shownCountdown = []
     this.seenHitCount = 0
     this.damageText = undefined
-    this.spawnMarks = new Map()
     this.fogRect = undefined
     this.fogMaskShape = undefined
     this.timeStopFx = undefined
@@ -488,31 +485,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     hint.destroy()
   }
 
-  /** 刷怪预告标记对帐(镜像 spawnTelegraphed 的⚠脉冲):新 pending 挂脉冲标记,落地即销毁 */
-  private updateTelegraphs(): void {
-    const sim = this.sim!
-    const live = new Set<PendingSpawn>(sim.pendingSpawns)
-    for (const [p, mark] of this.spawnMarks) {
-      if (live.has(p)) continue
-      this.tweens.killTweensOf(mark)
-      mark.destroy()
-      this.spawnMarks.delete(p)
-    }
-    for (const p of sim.pendingSpawns) {
-      if (this.spawnMarks.has(p)) continue
-      const mark = emojiImage(this, p.x, p.y, SPAWN.markEmoji, SPAWN.markSize * UNIT * (p.boss ? 2 : 1))
-        .setDepth(4)
-        .setAlpha(0)
-      this.tweens.add({
-        targets: mark,
-        alpha: 1,
-        duration: SPAWN.telegraphMs / (p.boss ? 4 : 6),
-        yoyo: true,
-        repeat: p.boss ? 3 : 2,
-      })
-      this.spawnMarks.set(p, mark)
-    }
-  }
 
   /** 排空本帧的出站信箱。每种事件一条 drain——收信人没准备好(特效层未建/飘字关掉)
    * 也照样清空,信箱只进不出就是一路涨到卡顿 */
@@ -647,7 +619,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       enemies: query(this.world, [Enemy]).filter((eid) => !Dormant.v[eid]).length,
       projectiles: query(this.world, [Projectile]).length,
       coins: liveCoins(this.world),
-      pending: sim?.pendingSpawns.length ?? 0,
+      pending: sim ? telegraphCount(sim) : 0,
       objects: this.children.list.length,
       bodies: 0,
       combatSec: Math.floor(totalSec),
@@ -1350,7 +1322,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     sim.view.bottom = wv.bottom
     // 一帧的仿真侧：次序与依赖声明在 systems/pipeline/frame.ts，由 order.test.ts 校验
     stepFrame(sim)
-    this.updateTelegraphs()
     // 排空本帧视觉事件:须先于下面的过场判定——否则致死那一帧的死亡爆点/飘字会被 return 吞掉
     // 两个特效层先步进再排空：step 顺带把「本帧视觉钟」写进去，投放据此定起点。
     // 反过来的话本帧新投的会拿到上一帧的时钟——开局第一帧甚至会被当场判过期丢掉

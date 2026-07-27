@@ -56,6 +56,7 @@ import {
   Transform,
 } from '../components'
 import { enemyCarries, enemyDef } from '../store'
+import { spawnTelegraph, telegraphCount } from './telegraph'
 import { armIdle } from '../systems/shared/anim'
 import { ANIM_DEF } from '../../emoji/anim'
 import type { Sim } from '../sim'
@@ -310,7 +311,7 @@ export function spawnBrood(
 // ── 刷怪：涌潮 / Boss / 携带者 ──────────────────────────────────────────────────
 
 // 刷怪节奏(常规波次制):随跨波累计战斗时长递增难度,供给随在场人数缩放,Boss 波减压;
-// 预告(telegraph)以「延迟落地」建模,视觉标记由场景侧按 pendingSpawns 对帐。
+// 预告(telegraph)是一颗实体(entities/telegraph.ts):⚠ 标记就是它自己的贴图。
 // 试炼场与常规刷怪分道:只补勾选的敌人,密度/难度走场内旋钮。
 
 /** 当前时钟小时(昼夜图用;非昼夜图恒 undefined) */
@@ -357,35 +358,18 @@ export function spawnBossEcs(sim: Sim): void {
   const def = toPx(bossFor(sim.mapId))
   const pos = sim.hooks.spawnPoint(sim, true)
   // 与普通敌人同一条预告管线,只是标记更大、预告更久(镜像 spawnBoss)
-  sim.pendingSpawns.push({
-    def,
-    x: pos.x,
-    y: pos.y,
-    hp: def.hp,
-    elite: false,
-    boss: true,
-    at: sim.elapsedMs + SPAWN.telegraphMs * 1.6,
-  })
+  spawnTelegraph(sim, def, pos.x, pos.y, def.hp, false, true, undefined, SPAWN.telegraphMs * 1.6)
 }
 
 /** 投放一名携带者(镜像 spawnCarrier):从当前出怪表取普通怪 + carries 载荷,走同一预告管线。
  * 场上过挤则本次跳过 */
 export function spawnCarrierEcs(sim: Sim, pickup: FieldPickupDef): void {
   if (sim.over) return
-  if (awakeCount(sim) + sim.pendingSpawns.length >= SPAWN.maxAlive) return
+  if (awakeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
   const hp = Math.round(def.hp * waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier)
   const pos = sim.hooks.spawnPoint(sim, false)
-  sim.pendingSpawns.push({
-    def,
-    x: pos.x,
-    y: pos.y,
-    hp,
-    elite: false,
-    boss: false,
-    at: sim.elapsedMs + SPAWN.telegraphMs,
-    carries: pickup,
-  })
+  spawnTelegraph(sim, def, pos.x, pos.y, hp, false, false, pickup)
 }
 
 // ── 魔尘变形：换外形与组件 ──────────────────────────────────────────────────

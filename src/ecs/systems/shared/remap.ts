@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../../war/remap'
-import { Bob, EDir, ENEMY_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Transform, Vel, ZONE_SET } from '../../components'
+import { Bob, EDir, ENEMY_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import { centerX, centerY, setCenter } from '../../utils/team'
@@ -59,12 +59,8 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
   }
   // 待拾物的缓浮基线跟着挪(下一帧重算偏移;≤6px 的相位跳变看不出)
   for (const eid of query(sim.world, PICKUP_SET as unknown as object[])) Bob.y0[eid] = Transform.y[eid]!
-  // 预告中的落点(标记视觉由场景侧按 pendingSpawns 对帐,自然跟位)
-  for (const p of sim.pendingSpawns) {
-    const q = map(p.x, p.y)
-    p.x = q.x
-    p.y = q.y
-  }
+  // 预告中的落点(⚠ 标记就是该实体自己的贴图,挪位姿即挪标记)
+  for (const eid of query(sim.world, [Telegraph, Transform])) movePos(eid)
   // 区域(地面毒圈等;跟随型下一帧自会抄回锚点位置,这里一并挪只为不闪那一帧)
   for (const eid of query(sim.world, ZONE_SET as unknown as object[])) movePos(eid)
 }

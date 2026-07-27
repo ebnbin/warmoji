@@ -17,7 +17,6 @@ import { timeScaleFor } from '../war/timeStop'
 import { BATTLE_FX_IDENTITY } from '../data/battlefield'
 import type { BattleEffects } from '../types/battlefield'
 import type { BattleMod } from '../types/battlefield'
-import type { FieldPickupDef } from '../types/battlefield'
 import { CAPTAINS } from '../data/captains'
 import { aggregateTeamCards } from '../data/cards'
 import { Rng } from '../util/rng'
@@ -92,9 +91,8 @@ export interface Sim {
   rng: Rng
   /** 试炼场沙盒(刷怪走勾选敌人 + 场内密度/难度旋钮;免死无时限) */
   testMode: boolean
-  /** 刷怪冷却 + 预告中待落地的敌人(telegraph 延迟) */
+  /** 刷怪冷却(预告本身是实体,见 entities/telegraph.ts) */
   spawnCooldownMs: number
-  pendingSpawns: PendingSpawn[]
   /** 精英波敌潮的延迟排期(到点才求落点,镜像 spawnSurge 的 delayedCall) */
   pendingSurges: { at: number; hpMul: number; forceElite: boolean }[]
   /** 本帧内死亡且带亡语的敌人快照(帧内通道:runDeathEffects 在同一条流水线里排空) */
@@ -120,19 +118,6 @@ export interface RewardConfig {
   waveHealRatio: number
   /** 波末金币分红(团队道具:债券) */
   waveCoins: number
-}
-
-/** 预告中待落地的敌人 */
-export interface PendingSpawn {
-  def: import('../types/enemies').EnemyDef
-  x: number
-  y: number
-  hp: number
-  elite: boolean
-  boss: boolean
-  at: number
-  /** 携带者载荷(死亡即掉这枚拾取);普通刷怪为 undefined */
-  carries?: FieldPickupDef
 }
 
 /** 死亡快照(带亡语的敌人;实体已移除,死亡效果按此在死亡点重放) */
@@ -237,7 +222,6 @@ export function makeSim(
     rng: new Rng(run.decorSeed ^ 0x9e37),
     testMode,
     spawnCooldownMs: 300,
-    pendingSpawns: [],
     pendingSurges: [],
     run,
     reward: {
