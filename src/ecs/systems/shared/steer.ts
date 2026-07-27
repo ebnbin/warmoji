@@ -11,7 +11,7 @@ export function nearestAlive(sim: Sim, x: number, y: number): Point | null {
   let bestX = 0
   let bestY = 0
   let bestD = Infinity
-  for (const eid of sim.members) {
+  for (const eid of sim.characters) {
     if (!Alive.v[eid]) continue
     const d = sim.hooks.worldDelta(sim, x, y, Transform.x[eid]!, Transform.y[eid]!)
     const d2 = d.x * d.x + d.y * d.y

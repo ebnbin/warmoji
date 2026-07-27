@@ -1,7 +1,7 @@
 import { UNIT } from '../util/units'
 import { SIM_PIPELINE } from './pipeline/sim'
 import { runPipeline } from './pipeline/step'
-import { animateMembers } from './systems/animateMembers'
+import { animateCharacters } from './systems/animateCharacters'
 import { stepPickupVisuals } from './systems/stepPickupVisuals'
 import { updateShards } from './systems/updateShards'
 import { layoutTeam } from './systems/layoutTeam'
@@ -52,7 +52,7 @@ export interface Sim {
   /** 槽位 → 环上秉性(避敌/迎敌) */
   lineupOrbit: number[]
   /** eid,按槽位序(稳定迭代) */
-  members: number[]
+  characters: number[]
   mapId: import('../types/maps').MapId
   mapW: number
   mapH: number
@@ -88,7 +88,7 @@ export interface Sim {
   /** 终波 Boss 被击败(场景侧据此走通关结算) */
   bossDown: boolean
   /** 队员受击累计次数(场景侧据增量触发受击震屏) */
-  memberHitCount: number
+  characterHitCount: number
   /** 队长技能的限时全队增伤(镜像 stats.damageMul + skillBuffUntil):到期由 stepSim 复原 */
   skillDamageMul: number
   skillBuffUntil: number
@@ -107,7 +107,7 @@ export interface Sim {
   frameAttractors: { x: number; y: number; r2: number }[]
   /** 本帧两侧存活快照(能力索敌共享;targets.ts 每帧重建,含环面镜像坐标) */
   enemyTargets: Target[]
-  memberTargets: Target[]
+  characterTargets: Target[]
   /** 帧索引表:纯逻辑系统据此建带贴图的实体(开局注入) */
   frames: FrameIndex
   /** 敌人行为随机源(游荡换向/生成等;按 run 种子确定) */
@@ -228,7 +228,7 @@ export interface PendingDeath {
 export function initialLayout(sim: Sim): void {
   sim.dtMs = 0 // 首帧摆位:弹簧/游移都按 0 帧长求值,人直接到位
   layoutTeam(sim)
-  animateMembers(sim)
+  animateCharacters(sim)
 }
 
 /** 一帧仿真(镜像 update 的 updateOrbit→moveTeam→steerEnemies 次序);delta 为真实帧长(ms) */
@@ -279,7 +279,7 @@ export function makeSim(
     captainDef.coinMagnet * UNIT * teamFx.magnetMul,
   )
   const team = formTeam(world, atlas, run, testMode, captain)
-  const { count, formation, postBySlot, lineupOrbit, members } = team
+  const { count, formation, postBySlot, lineupOrbit, characters } = team
   return {
     world,
     center: { x: center.x, y: center.y },
@@ -291,7 +291,7 @@ export function makeSim(
     count,
     postBySlot,
     lineupOrbit,
-    members,
+    characters,
     mapId: run.mapId,
     mapW,
     mapH,
@@ -310,7 +310,7 @@ export function makeSim(
     frameTargets: [],
     over: false,
     bossDown: false,
-    memberHitCount: 0,
+    characterHitCount: 0,
     skillDamageMul: 1,
     skillBuffUntil: 0,
     danceEndsAt: 0,
@@ -321,7 +321,7 @@ export function makeSim(
     enemySlowMul: teamFx.enemySlowMul,
     frameAttractors: [],
     enemyTargets: [],
-    memberTargets: [],
+    characterTargets: [],
     frames: atlas,
     pendingDeaths: [],
     pendingDamageNumbers: [],

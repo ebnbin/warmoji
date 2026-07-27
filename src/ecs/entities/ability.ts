@@ -206,7 +206,7 @@ export function armTeam(sim: Sim, run: RunState, testMode: boolean): void {
       battle: true,
     }
     loadoutFor(def, tiers).forEach((w, i) => {
-      equipAbility(sim, sim.members[slot]!, toPx(resolveAbilityDef(w, fx)), FACTION.team, 300 + slot * 120 + i * 230, amp)
+      equipAbility(sim, sim.characters[slot]!, toPx(resolveAbilityDef(w, fx)), FACTION.team, 300 + slot * 120 + i * 230, amp)
     })
   }
 }

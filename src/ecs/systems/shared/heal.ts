@@ -1,42 +1,42 @@
 import { query } from 'bitecs'
-import { Alive, ENEMY_SET, Hp, MHp, Transform } from '../../components'
+import { Alive, ENEMY_SET, Hp, CharHp, Transform } from '../../components'
 import type { Sim } from '../../sim'
 
 // 治疗的两侧落点（阵营中立的一对原语）：谁被治由调用方按阵营选，挑选规则两侧一致——
 // all=false 只治「血量比例」最低的一个，满血者不计，返回实际被治数。
 
 /** 治疗范围内我方队员 */
-export function healMembers(sim: Sim, x: number, y: number, range: number, amount: number, all: boolean): number {
+export function healCharacters(sim: Sim, x: number, y: number, range: number, amount: number, all: boolean): number {
   const r2 = range * range
   if (all) {
     let n = 0
-    for (const m of sim.members) {
+    for (const m of sim.characters) {
       if (!Alive.v[m]) continue
       const dx = Transform.x[m]! - x
       const dy = Transform.y[m]! - y
       if (dx * dx + dy * dy > r2) continue
-      if (MHp.hp[m]! >= MHp.max[m]!) continue
-      MHp.hp[m] = Math.min(MHp.max[m]!, MHp.hp[m]! + amount)
+      if (CharHp.hp[m]! >= CharHp.max[m]!) continue
+      CharHp.hp[m] = Math.min(CharHp.max[m]!, CharHp.hp[m]! + amount)
       n++
     }
     return n
   }
   let best = -1
   let bestRatio = Infinity
-  for (const m of sim.members) {
+  for (const m of sim.characters) {
     if (!Alive.v[m]) continue
     const dx = Transform.x[m]! - x
     const dy = Transform.y[m]! - y
     if (dx * dx + dy * dy > r2) continue
-    if (MHp.hp[m]! >= MHp.max[m]!) continue
-    const ratio = MHp.hp[m]! / MHp.max[m]!
+    if (CharHp.hp[m]! >= CharHp.max[m]!) continue
+    const ratio = CharHp.hp[m]! / CharHp.max[m]!
     if (ratio < bestRatio) {
       bestRatio = ratio
       best = m
     }
   }
   if (best < 0) return 0
-  MHp.hp[best] = Math.min(MHp.max[best]!, MHp.hp[best]! + amount)
+  CharHp.hp[best] = Math.min(CharHp.max[best]!, CharHp.hp[best]! + amount)
   return 1
 }
 

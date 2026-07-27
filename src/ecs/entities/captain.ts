@@ -38,7 +38,7 @@ export function spawnCaptain(
 
 /** 队伍编队的派生结果：实体清单 + 供 Sim 用的编队参数 */
 export interface TeamLayout {
-  members: number[]
+  characters: number[]
   count: number
   formation: FormationId
   postBySlot: number[]
@@ -69,11 +69,11 @@ export function formTeam(
     return post >= 0 ? post : slot
   })
   const posts = formationPosts(formation, count, 0)
-  const members: number[] = []
+  const characters: number[] = []
   for (let slot = 0; slot < count; slot++) {
     const post = postBySlot[slot] ?? slot
     const off = posts[post] ?? { x: 0, y: 0 }
-    members.push(
+    characters.push(
       spawnCharacter(world, atlas, run, testMode, {
         slot,
         post,
@@ -85,5 +85,5 @@ export function formTeam(
       }),
     )
   }
-  return { members, count, formation, postBySlot, lineupOrbit: rosterIds.map((id) => CHARACTERS[id].orbit) }
+  return { characters, count, formation, postBySlot, lineupOrbit: rosterIds.map((id) => CHARACTERS[id].orbit) }
 }

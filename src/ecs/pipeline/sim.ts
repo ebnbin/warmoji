@@ -1,5 +1,5 @@
 import { animateEnemies } from '../systems/animateEnemies'
-import { animateMembers } from '../systems/animateMembers'
+import { animateCharacters } from '../systems/animateCharacters'
 import { applyKnockback } from '../systems/applyKnockback'
 import { applySlowZones } from '../systems/applySlowZones'
 import { commitEnemySteps } from '../systems/commitEnemySteps'
@@ -7,13 +7,13 @@ import { despawnExpired } from '../systems/despawnExpired'
 import { expireSkillBuff } from '../systems/expireSkillBuff'
 import { fadeEnemyFlash } from '../systems/fadeEnemyFlash'
 import { layoutTeam } from '../systems/layoutTeam'
-import { memberContact } from '../systems/memberContact'
-import { memberVisual } from '../systems/memberVisual'
+import { characterContact } from '../systems/characterContact'
+import { characterVisual } from '../systems/characterVisual'
 import { moveTeam } from '../systems/moveTeam'
 import { popInEnemies } from '../systems/popInEnemies'
 import { refoldBattleFx } from '../systems/refoldBattleFx'
-import { regenMembers } from '../systems/regenMembers'
-import { reviveMembers } from '../systems/reviveMembers'
+import { regenCharacters } from '../systems/regenCharacters'
+import { reviveCharacters } from '../systems/reviveCharacters'
 import { applyEnemySteps } from '../systems/applyEnemySteps'
 import { steerBaseOrbit } from '../systems/steerBaseOrbit'
 import { steerChase } from '../systems/steerChase'
@@ -90,13 +90,13 @@ export const SIM_PIPELINE: readonly Step[] = [
     why: '逐员站位是绕队伍中心算的，中心须先挪到本帧位置',
   },
   {
-    name: 'animateMembers',
-    run: animateMembers,
+    name: 'animateCharacters',
+    run: animateCharacters,
     after: ['layoutTeam'],
     why: '呼吸挤压叠在本帧站位之上（写的是同一个 Transform.w/h）',
   },
-  { name: 'reviveMembers', run: reviveMembers },
-  { name: 'regenMembers', run: regenMembers },
+  { name: 'reviveCharacters', run: reviveCharacters },
+  { name: 'regenCharacters', run: regenCharacters },
   { name: 'tickPoison', run: tickPoison },
   { name: 'popInEnemies', run: popInEnemies, after: ['updateDormancy'] },
   { name: 'despawnExpired', run: despawnExpired, after: ['updateDormancy'] },
@@ -148,15 +148,15 @@ export const SIM_PIPELINE: readonly Step[] = [
     why: '扫掠线段的起点是 moveProjectiles 记下的 PrevPos',
   },
   {
-    name: 'memberContact',
-    run: memberContact,
+    name: 'characterContact',
+    run: characterContact,
     after: ['commitEnemySteps'],
     why: '接触判定读本帧最终位置',
   },
   {
     name: 'hitDirectProjectiles',
     run: hitDirectProjectiles,
-    after: ['memberContact', 'moveProjectiles'],
+    after: ['characterContact', 'moveProjectiles'],
     why: '同帧两者争同一层无敌帧时旧实现是接触先手（overlap 注册序）；反过来的话，贴脸接触的伤害/黏滞/荆棘反伤会被敌弹吃掉的无敌帧一并挡下',
   },
   {
@@ -165,12 +165,12 @@ export const SIM_PIPELINE: readonly Step[] = [
     after: ['hitSweptProjectiles', 'hitDirectProjectiles'],
     why: '命中而死的先走，剩下的才按寿命/视野/世界钩子回收',
   },
-  { name: 'memberVisual', run: memberVisual },
+  { name: 'characterVisual', run: characterVisual },
   { name: 'updateShards', run: updateShards },
   {
     name: 'worldTick',
     run: worldTick,
-    after: ['commitEnemySteps', 'memberContact'],
+    after: ['commitEnemySteps', 'characterContact'],
     why: '世界周期结算（落水掉血、圈外掉血、天体横扫）读的是本帧最终位置',
   },
 ]

@@ -18,7 +18,7 @@ import { INVINCIBLE_HP, labInvincible, labLevel } from '../../run/lab'
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
-import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, MAtkSlow, Member, MFlash, MHp, MPerk, OrbitBias, Pop, Post, Quad, Revive, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
+import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, OrbitBias, Pop, Post, Quad, Revive, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../render/atlas'
@@ -26,7 +26,7 @@ import type { EcsAtlas } from '../render/atlas'
 // 组队(镜像 ArcadeBattleScene setup 的阵容/岗位/成员建立):建 Sim + 逐槽位装配队员实体。
 // 属性逐槽位按已持道具 + 专属等级聚合;血量跨波保留(上一波阵亡者低血量复活)。
 
-/** 建立队伍:返回 Sim(含 members eid 列表),并把队员实体装进 world */
+/** 建立队伍:返回 Sim(含 characters eid 列表),并把队员实体装进 world */
 /** 队伍编队的派生结果：实体清单 + 供 Sim 用的编队参数 */
 /** 角色在场上的站位——**由创建者决定**。角色自己不知道阵型、不知道自己站哪，
  * 只知道「我被放在这个坐标、这个岗位」。旋转环的角度分配是队长的事（见 captain.ts） */
@@ -59,7 +59,7 @@ export function spawnCharacter(
   const labHp = labInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
   const size = MEMBER.size * UNIT
     const eid = addEntity(world)
-  addComponent(world, eid, Member)
+  addComponent(world, eid, Character)
   addComponent(world, eid, Slot)
   addComponent(world, eid, Post)
   addComponent(world, eid, OrbitBias)
@@ -70,14 +70,14 @@ export function spawnCharacter(
   addComponent(world, eid, Pop)
   addComponent(world, eid, Alive)
   addComponent(world, eid, Threat)
-  addComponent(world, eid, MHp)
-  addComponent(world, eid, MAtkSlow)
-  addComponent(world, eid, MPerk)
+  addComponent(world, eid, CharHp)
+  addComponent(world, eid, CharAtkSlow)
+  addComponent(world, eid, CharPerk)
   addComponent(world, eid, Iframe)
   addComponent(world, eid, Revive)
   addComponent(world, eid, Hurt)
   addComponent(world, eid, GroundHit)
-  addComponent(world, eid, MFlash)
+  addComponent(world, eid, CharFlash)
   addComponent(world, eid, Transform)
   addComponent(world, eid, Anim)
   addComponent(world, eid, Sprite)
@@ -99,8 +99,8 @@ export function spawnCharacter(
   Pop.until[eid] = 0
   Alive.v[eid] = 1
   Threat.v[eid] = 0
-  MAtkSlow.until[eid] = 0
-  MAtkSlow.mul[eid] = 1
+  CharAtkSlow.until[eid] = 0
+  CharAtkSlow.mul[eid] = 1
   // 道具属性:正常局按该槽位已持道具 + 专属等级聚合,测试模式素体
   const owned = testMode ? [] : (run.memberItems[slot] ?? [])
   // 等级与能力侧同源(测试模式走场内旋钮档位),否则旋钮只改能力不改属性
@@ -108,11 +108,11 @@ export function spawnCharacter(
   const fx = aggregateCharacterEffects(owned, levelStatsFor(run.roster[slot]!, level))
   const maxHp = testMode ? labHp : Math.round(memberMaxHp(fx.hpAdd, captain.hpMul) * teamFx.teamHpMul)
   // 血量跨波保留;上一波阵亡者低血量复活(测试模式素体满血)
-  MHp.hp[eid] = testMode ? labHp : waveStartHp(run.memberHp[slot] ?? MEMBER.maxHp, maxHp)
-  MHp.max[eid] = maxHp
-  MPerk.thorns[eid] = fx.thorns
-  MPerk.killHeal[eid] = fx.killHeal
-  MPerk.regenPerSec[eid] = fx.regenPerSec
+  CharHp.hp[eid] = testMode ? labHp : waveStartHp(run.memberHp[slot] ?? MEMBER.maxHp, maxHp)
+  CharHp.max[eid] = maxHp
+  CharPerk.thorns[eid] = fx.thorns
+  CharPerk.killHeal[eid] = fx.killHeal
+  CharPerk.regenPerSec[eid] = fx.regenPerSec
   Iframe.ms[eid] = MEMBER.iframesMs + fx.iframesAddMs
   Iframe.last[eid] = -1e9
   GroundHit.last[eid] = -1e9 // 开局就踩进毒圈也该当场掉第一跳
@@ -120,7 +120,7 @@ export function spawnCharacter(
   Revive.at[eid] = 0
   // 受击判定圆(格值需 ×UNIT 换算成 px);N 保 1 中心的被保护收益:半径减半,更难被敌人/敌弹摸到
   Hurt.radius[eid] = MEMBER.radius * UNIT * place.hurtRadiusMul
-  MFlash.until[eid] = 0
+  CharFlash.until[eid] = 0
   Transform.x[eid] = x
   Transform.y[eid] = y
   Transform.rot[eid] = 0

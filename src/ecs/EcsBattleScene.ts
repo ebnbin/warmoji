@@ -31,7 +31,7 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Alive, Boss, Dormant, Enemy, FACTION, Faction, GrantCoins, Hp, MHp, MoveSpeed, Nest, PICKUP_SET, Projectile, Revive, Sprite, Transform, Zone } from './components'
+import { Alive, Boss, Dormant, Enemy, FACTION, Faction, GrantCoins, Hp, CharHp, MoveSpeed, Nest, PICKUP_SET, Projectile, Revive, Sprite, Transform, Zone } from './components'
 import { EcsAtlas } from './render/atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { spawnDecor } from './entities/decor'
@@ -43,7 +43,7 @@ import { clearEcsStore } from './store'
 import { armCaptain, armTeam } from './entities/ability'
 import { armEnemies } from './systems/armEnemies'
 import { refreshEnemyTargets } from './systems/refreshEnemyTargets'
-import { refreshMemberTargets } from './systems/refreshMemberTargets'
+import { refreshCharacterTargets } from './systems/refreshCharacterTargets'
 import { requestCast } from './entities/ability'
 import { Minion } from './components'
 import { stepAbilities } from './pipeline/abilities'
@@ -440,7 +440,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
     armTeam(this.sim, run, run.testMode)
     armCaptain(this.sim, run)
-    for (let i = 0; i < this.sim.members.length; i++) {
+    for (let i = 0; i < this.sim.characters.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
       this.deadTexts.push(
@@ -581,8 +581,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   /** 逐帧队员血条:跟位 + 比例变化才重绘(镜像 drawMemberHp);阵亡隐藏、复活自动恢复 */
   private updateHpBars(): void {
     const sim = this.sim!
-    for (let i = 0; i < sim.members.length; i++) {
-      const m = sim.members[i]!
+    for (let i = 0; i < sim.characters.length; i++) {
+      const m = sim.characters[i]!
       const g = this.hpBars[i]
       if (!g) continue
       const dead = this.deadTexts[i]
@@ -603,7 +603,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       dead?.setVisible(false)
       this.shownCountdown[i] = -1
       g.setVisible(true).setPosition(Transform.x[m]!, Transform.y[m]!)
-      const ratio = Math.max(0, MHp.hp[m]! / MHp.max[m]!)
+      const ratio = Math.max(0, CharHp.hp[m]! / CharHp.max[m]!)
       if (Math.abs(ratio - this.shownHp[i]!) < 0.005) continue
       this.shownHp[i] = ratio
       const w = 0.8 * UNIT
@@ -703,9 +703,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const sim = this.sim
     if (!sim) return
     const mh = labInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
-    for (const m of sim.members) {
-      MHp.max[m] = mh
-      MHp.hp[m] = labInvincible() ? mh : Math.min(MHp.hp[m]!, mh)
+    for (const m of sim.characters) {
+      CharHp.max[m] = mh
+      CharHp.hp[m] = labInvincible() ? mh : Math.min(CharHp.hp[m]!, mh)
     }
   }
 
@@ -1229,7 +1229,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     g.strokeCircle(zone.x, zone.y, zone.r)
     g.lineStyle(14, 0xd32f2f, 0.16)
     g.strokeCircle(zone.x, zone.y, zone.r + 9)
-    const anyOutside = sim.members.some(
+    const anyOutside = sim.characters.some(
       (m) => Alive.v[m] && outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r),
     )
     this.zoneVignette?.setFillStyle(0xd32f2f, anyOutside ? 0.16 + 0.08 * Math.sin(sim.elapsedMs / 130) : 0)
@@ -1380,7 +1380,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     refreshEnemyTargets(sim)
     stepSim(sim)
     // 队员快照重建:敌方能力索敌读它,须先于任何敌方出手
-    refreshMemberTargets(sim)
+    refreshCharacterTargets(sim)
     // 新登场的持械敌人装配 + 魔尘复形
     armEnemies(sim)
     // 能力系统(敌我共用一套:闸门 → 冷却 → 逐 kind 施放;世界时长,时停期队伍的枪也一并凝住)
@@ -1415,10 +1415,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.drainBursts()
     this.drainRings()
     this.drainCues()
-    // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtMember 的 cameras.shake)。
+    // 受击震屏:本帧有队员挨打则轻抖画面(镜像 hurtCharacter 的 cameras.shake)。
     // 同样须先于过场判定——致死那一帧的抖屏否则被 return 吞掉且永远补不回来
-    if (sim.memberHitCount > this.seenHitCount) {
-      this.seenHitCount = sim.memberHitCount
+    if (sim.characterHitCount > this.seenHitCount) {
+      this.seenHitCount = sim.characterHitCount
       if (this.hitShakeOn) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     }
     this.updateHpBars()
@@ -1458,15 +1458,15 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       pages: this.atlas?.pageCount ?? 0,
       centerX: sim.center.x,
       centerY: sim.center.y,
-      members: sim.members.length,
+      characters: sim.characters.length,
       mapW: this.mapW,
       mapH: this.mapH,
       dirX: sim.teamDir.x,
       dirY: sim.teamDir.y,
       moveSpeed: MoveSpeed.v[sim.captain]!,
       elapsed: sim.elapsedMs,
-      memberPos: sim.members.map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
-      frames: sim.members.map((eid) => Sprite.frame[eid]!),
+      memberPos: sim.characters.map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
+      frames: sim.characters.map((eid) => Sprite.frame[eid]!),
       enemies: query(this.world, [Enemy]).length,
       // 护巢子敌数(Nest.of>=0):虫巢生成的子敌带巢引用,自然刷怪的敌人恒 -1,借此隔离测量
       broods: Array.from(query(this.world, [Enemy]), (eid) => Nest.of[eid]!).filter((n) => n >= 0).length,
@@ -1485,8 +1485,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         active: sim.battleMods.map((m) => ({ id: m.id, remainMs: Math.max(0, m.until - sim.elapsedMs) })),
       },
       over: sim.over,
-      alive: sim.members.filter((eid) => Alive.v[eid]).length,
-      memberHp: sim.members.map((eid) => MHp.hp[eid]!),
+      alive: sim.characters.filter((eid) => Alive.v[eid]).length,
+      memberHp: sim.characters.map((eid) => CharHp.hp[eid]!),
       // 浮冰:队伍中心是否落水(非浮冰图恒 false)
       inWater: this.waterVignette !== undefined && !onFloe(sim.center.x, sim.center.y, this.mapW),
       // 无限世界:休眠敌人数 + 相机位置(验证无边界跟随)+ 终波缩圈半径

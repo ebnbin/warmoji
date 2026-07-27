@@ -17,7 +17,7 @@ import { query } from 'bitecs'
 import { Alive, Boss, Dormant, ENEMY_SET, Radius, Slide, Transform } from './components'
 import { enemyDef } from './store'
 import { FlowField } from '../war/maps/ruins'
-import { applyDamage, hurtMember } from './systems/shared/combat'
+import { applyDamage, hurtCharacter } from './systems/shared/combat'
 import type { Sim } from './sim'
 import type { Point } from '../util/vec'
 import { fleeSteer } from '../war/enemyAi'
@@ -282,7 +282,7 @@ const ice: WorldHooks = {
     const frac = cfg.waterTickMs / 1000
     if (!onFloe(sim.center.x, sim.center.y, px)) {
       const dmg = Math.round(cfg.waterTeamDps * frac)
-      for (const m of sim.members) if (Alive.v[m]) hurtMember(sim, m, dmg, '寒水', 0x4fc3f7)
+      for (const m of sim.characters) if (Alive.v[m]) hurtCharacter(sim, m, dmg, '寒水', 0x4fc3f7)
     }
     const edmg = Math.round(cfg.waterEnemyDps * frac)
     for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
@@ -454,10 +454,10 @@ const infinite: WorldHooks = {
     zone.r = zoneRadiusAt(sim.elapsedMs, cfg) * UNIT
     if (sim.elapsedMs < sim.worldTickAt) return
     sim.worldTickAt = sim.elapsedMs + cfg.tickMs
-    for (const m of sim.members) {
+    for (const m of sim.characters) {
       if (!Alive.v[m]) continue
       if (outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r)) {
-        hurtMember(sim, m, cfg.tickDamage, '毒雾', 0xef5350)
+        hurtCharacter(sim, m, cfg.tickDamage, '毒雾', 0xef5350)
       }
     }
   },
@@ -531,11 +531,11 @@ const space: WorldHooks = {
     const x = m.sx + (m.ex - m.sx) * m.t
     const y = m.sy + (m.ey - m.sy) * m.t
     const rr = cfg.radiusU * UNIT
-    for (const mem of sim.members) {
+    for (const mem of sim.characters) {
       if (!Alive.v[mem] || m.hit.has(mem)) continue
       if (Math.hypot(Transform.x[mem]! - x, Transform.y[mem]! - y) < rr) {
         m.hit.add(mem)
-        hurtMember(sim, mem, cfg.damage, '天体', 0xffaa33)
+        hurtCharacter(sim, mem, cfg.damage, '天体', 0xffaa33)
       }
     }
     for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {

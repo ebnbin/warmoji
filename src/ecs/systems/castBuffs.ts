@@ -1,4 +1,4 @@
-import { Alive, Buff, MFlash, Tint } from '../components'
+import { Alive, Buff, CharFlash, Tint } from '../components'
 import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
@@ -7,9 +7,9 @@ export function castBuffs(sim: Sim): void {
   castScan(sim, Buff, (e) => {
     sim.skillDamageMul = Buff.damageMul[e]!
     sim.skillBuffUntil = sim.elapsedMs + Buff.durationMs[e]!
-    for (const m of sim.members) {
+    for (const m of sim.characters) {
       if (!Alive.v[m]) continue
-      MFlash.until[m] = sim.elapsedMs + 350
+      CharFlash.until[m] = sim.elapsedMs + 350
       Tint.color[m] = 0x80d8ff
       Tint.effect[m] = 0
     }

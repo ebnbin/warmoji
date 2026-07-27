@@ -89,7 +89,7 @@ export function spawnStep(sim: Sim): void {
   // 测试模式与常规刷怪分道:只补勾选的敌人,旋钮说了算
   if (sim.testMode) return spawnTest(sim)
   const wave = waveAt((sim.combatMs + sim.elapsedMs) / 1000)
-  const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * sim.members.length
+  const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * sim.characters.length
   const relief = isBossWave(sim.wave) ? BOSS_SPAWN_RELIEF : 1
   sim.spawnCooldownMs = (wave.spawnIntervalMs * relief * spawnIntervalScale(sim)) / teamFactor
   if (awakeCount(sim) + sim.pendingSpawns.length >= SPAWN.maxAlive) return

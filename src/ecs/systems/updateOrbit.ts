@@ -10,13 +10,13 @@ import type { Sim } from '../sim'
 export function updateOrbit(sim: Sim): void {
   const delta = sim.dtMs
   const { count, formation } = sim
-  if (sim.members.length === 0) return
+  if (sim.characters.length === 0) return
   const range = ORBIT.detectRange * UNIT
   const rangeSq = range * range
-  const wants = new Array<number>(sim.members.length).fill(0)
+  const wants = new Array<number>(sim.characters.length).fill(0)
   let rotatable = false
-  for (let slot = 0; slot < sim.members.length; slot++) {
-    const eid = sim.members[slot]!
+  for (let slot = 0; slot < sim.characters.length; slot++) {
+    const eid = sim.characters[slot]!
     Threat.v[eid] = 0
     if (!Alive.v[eid]) continue
     const bias = sim.lineupOrbit[slot] ?? 0

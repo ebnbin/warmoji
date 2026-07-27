@@ -1,14 +1,14 @@
 import { hasComponent } from 'bitecs'
 import type { Effect } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../../war/hit'
-import { Enemy, MAtkSlow, Morph, Poison, Slow } from '../../components'
+import { Enemy, CharAtkSlow, Morph, Poison, Slow } from '../../components'
 import { applyMorph } from '../../entities/enemy'
 import { spawnEnemyProjectileEcs } from '../../entities/projectile'
 import { spawnZone } from '../../entities/zone'
 import { } from '../../store'
 import { damageTarget } from './damage'
 import { FACTION } from '../../components'
-import { healEnemies, healMembers } from './heal'
+import { healEnemies, healCharacters } from './heal'
 import { nearestAngle, targetsOf } from '../../utils/targets'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
@@ -133,9 +133,9 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
   // 攻速罚只挂在队员身上，同理
   attackSlow: (sim, _src, fx, hit) => {
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, hit, MAtkSlow, (t) => {
-      MAtkSlow.until[t] = until
-      MAtkSlow.mul[t] = fx.mul
+    eachCapable(sim, hit, CharAtkSlow, (t) => {
+      CharAtkSlow.until[t] = until
+      CharAtkSlow.mul[t] = fx.mul
     })
   },
 
@@ -165,7 +165,7 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
   // 治疗的是自己这一侧：这里的阵营判断是「找哪一批人」，与上面的机制判断不同
   heal: (sim, src, fx, hit) => {
     const all = fx.all ?? true
-    if (src.faction === FACTION.team) healMembers(sim, hit.x, hit.y, fx.range, fx.amount, all)
+    if (src.faction === FACTION.team) healCharacters(sim, hit.x, hit.y, fx.range, fx.amount, all)
     else healEnemies(sim, hit.x, hit.y, fx.range, fx.amount, all, hit.source)
   },
 

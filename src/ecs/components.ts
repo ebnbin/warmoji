@@ -41,10 +41,10 @@ export const Depth = {
 /** 渲染所需组件集(查询用):四者齐备即可被 spriteBatch 画出 */
 export const RENDERABLE = [Transform, Sprite, Tint, Depth] as const
 
-// ── 队员/移动(P2)──────────────────────────────────────────
+// ── 角色/移动(P2)──────────────────────────────────────────
 
-/** 队员标记 */
-export const Member = {}
+/** 角色标记（数据层叫 CHARACTERS，此处同名；旧称「队员」已统一） */
+export const Character = {}
 
 /** 槽位(招募次序)与队形岗位(座次) */
 export const Slot = { v: i32() }
@@ -74,17 +74,17 @@ export const Alive = { v: u8() }
 export const Threat = { v: u8() }
 
 /** 队员道具属性:荆棘反伤(接触反弹)、击杀回血(吸血獠牙)、再生(每秒回复) */
-export const MPerk = { thorns: f32(), killHeal: f32(), regenPerSec: f32() }
+export const CharPerk = { thorns: f32(), killHeal: f32(), regenPerSec: f32() }
 
 /** 队员攻速惩罚(黏黏怪接触:until 到期时刻 + mul 冷却倍率;期间攻速变慢 + 黏液绿) */
-export const MAtkSlow = { until: f32(), mul: f32() }
+export const CharAtkSlow = { until: f32(), mul: f32() }
 
 /** 队员血量 + 无敌帧 + 复活 + 受击判定半径 + 受击闪光恢复时刻 */
-export const MHp = { hp: f32(), max: f32() }
+export const CharHp = { hp: f32(), max: f32() }
 export const Iframe = { ms: f32(), last: f32() }
 export const Revive = { ms: f32(), at: f32() }
 export const Hurt = { radius: f32() }
-export const MFlash = { until: f32() }
+export const CharFlash = { until: f32() }
 
 // ── 敌人(P3)──────────────────────────────────────────────
 

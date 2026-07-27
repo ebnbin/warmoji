@@ -17,7 +17,7 @@ export interface Target {
 
 /** 这一下该打谁：阵营决定索敌落在哪一侧；给了视点的还要探得到头（断壁遮挡） */
 export function targetsOf(sim: Sim, src: Source): readonly Target[] {
-  if (src.faction === FACTION.enemy) return sim.memberTargets
+  if (src.faction === FACTION.enemy) return sim.characterTargets
   const list = sim.enemyTargets
   const sight = src.sight
   if (!sight) return list

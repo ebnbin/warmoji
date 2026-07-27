@@ -2,7 +2,7 @@ import { hasComponent } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
 import { Alive, FACTION, Faction, Heal, HealAoe, HealDefib, Revive, Transform } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
-import { healEnemies, healMembers } from './shared/heal'
+import { healEnemies, healCharacters } from './shared/heal'
 import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
@@ -29,7 +29,7 @@ export function castHeals(sim: Sim): void {
     const all = hasComponent(sim.world, e, HealAoe)
     const amount = all ? Math.max(1, Math.round(base * HealAoe.ratio[e]!)) : base
     const healed = team
-      ? healMembers(sim, x, y, range, amount, all)
+      ? healCharacters(sim, x, y, range, amount, all)
       : healEnemies(sim, x, y, range, amount, all)
     if (healed === 0) {
       Heal.cdLeft[e] = 300 // 全员满血：小步重试，不空耗完整冷却
@@ -45,7 +45,7 @@ export function castHeals(sim: Sim): void {
 function cutReviveTimer(sim: Sim, x: number, y: number, range: number, ms: number): boolean {
   const r2 = range * range
   let best = -1
-  for (const m of sim.members) {
+  for (const m of sim.characters) {
     if (Alive.v[m]) continue
     const dx = Transform.x[m]! - x
     const dy = Transform.y[m]! - y

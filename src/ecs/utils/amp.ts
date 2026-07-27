@@ -1,7 +1,7 @@
 import { } from '../../data/items'
 import { waveAt } from '../../data/waves'
 import { labFireRate } from '../../run/lab'
-import { Anchor, DmgMul, MAtkSlow, Slot, Transform } from '../components'
+import { Anchor, DmgMul, CharAtkSlow, Slot, Transform } from '../components'
 import { Amp, FACTION, Faction, Owner } from '../components'
 import type { } from './source'
 import type { Sim } from '../sim'
@@ -29,7 +29,7 @@ export function damageMul(sim: Sim, e: number): number {
 export function cooldownMul(sim: Sim, e: number): number {
   if (Faction.v[e] === FACTION.enemy) return 1
   const o = Owner.eid[e]!
-  const atk = MAtkSlow.until[o]! > sim.elapsedMs ? MAtkSlow.mul[o]! : 1
+  const atk = CharAtkSlow.until[o]! > sim.elapsedMs ? CharAtkSlow.mul[o]! : 1
   const lab = sim.testMode && Amp.battle[e] ? 1 / labFireRate() : 1
   return Amp.cd[e]! * sim.battleFx.teamCooldownMul * atk * lab
 }

@@ -1,6 +1,6 @@
 import { CRIT_MUL } from '../../../data/items'
 import { Alive, FACTION, Iframe } from '../../components'
-import { applyDamage, hurtMember } from './combat'
+import { applyDamage, hurtCharacter } from './combat'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 
@@ -22,7 +22,7 @@ export function damageTarget(
     if (sim.over || !Alive.v[target]) return
     if (sim.elapsedMs - Iframe.last[target]! < Iframe.ms[target]!) return
     Iframe.last[target] = sim.elapsedMs
-    hurtMember(sim, target, damage, src.name)
+    hurtCharacter(sim, target, damage, src.name)
     return
   }
   const chance = Math.min(0.5, src.crit)

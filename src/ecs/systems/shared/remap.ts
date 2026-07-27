@@ -21,7 +21,7 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
   sim.teamVx = tv.x
   sim.teamVy = tv.y
 
-  for (const m of sim.members) {
+  for (const m of sim.characters) {
     const p = map(Follow.x[m]!, Follow.y[m]!)
     const v = rot(Follow.vx[m]!, Follow.vy[m]!)
     Follow.x[m] = p.x

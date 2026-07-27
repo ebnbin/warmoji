@@ -9,14 +9,14 @@ import { KNOCKBACK } from '../../../data/abilities'
 import { MEMBER } from '../../../data/characters'
 import { UNIT } from '../../../util/units'
 import { spawnShardsEcs } from '../../entities/shard'
-import { Alive, Anim, Boss, DmgMul, Dormant, Elite, Enemy, ENEMY_SET, Flash, Hp, Iframe, Kv, MFlash, MHp, Morph, MPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from '../../components'
+import { Alive, Anim, Boss, DmgMul, Dormant, Elite, Enemy, ENEMY_SET, Flash, Hp, Iframe, Kv, CharFlash, CharHp, Morph, CharPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from '../../components'
 import { enemyCarries, enemyDef } from '../../store'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
 import type { Sim } from '../../sim'
 
 // 战斗(P3b):敌人受伤/致死/击退,队员接触伤害/死亡/复活/受击闪光。
-// 镜像 applyDamage / onMemberTouched / hurtMember / killMember / reviveMember 的核心数值;
+// 镜像 applyDamage / onMemberTouched / hurtCharacter / killMember / reviveCharacter 的核心数值;
 // 掉落/结算统计/死亡效果/状态效果(毒/减速/变羊)在后续增量追加。
 
 /** 敌人受伤(镜像 applyDamage 核心) */
@@ -87,9 +87,9 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
   const st = sim.run.stats
   if (srcSlot >= 0 && srcSlot < st.kills.length) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
   // 击杀触发(镜像 runOnKill):吸血獠牙回血
-  const killer = sim.members[srcSlot]
-  if (killer !== undefined && Alive.v[killer] && MPerk.killHeal[killer]! > 0) {
-    MHp.hp[killer] = Math.min(MHp.max[killer]!, MHp.hp[killer]! + MPerk.killHeal[killer]!)
+  const killer = sim.characters[srcSlot]
+  if (killer !== undefined && Alive.v[killer] && CharPerk.killHeal[killer]! > 0) {
+    CharHp.hp[killer] = Math.min(CharHp.max[killer]!, CharHp.hp[killer]! + CharPerk.killHeal[killer]!)
   }
   playSfx('kill')
   const def = enemyDef[eid]
@@ -184,20 +184,20 @@ export function despawnEnemy(sim: Sim, eid: number): void {
   removeEntity(sim.world, eid)
 }
 
-/** 队员受伤(镜像 hurtMember + killMember);blast/接触等外部命中点直接调用(无敌帧由调用方掌管) */
-export function hurtMember(sim: Sim, eid: number, damage: number, srcName?: string, tint = 0xff7777): void {
-  // 敌情明细:承伤按人累计 + 按敌人名归属(镜像 hurtMember)
+/** 队员受伤(镜像 hurtCharacter + killMember);blast/接触等外部命中点直接调用(无敌帧由调用方掌管) */
+export function hurtCharacter(sim: Sim, eid: number, damage: number, srcName?: string, tint = 0xff7777): void {
+  // 敌情明细:承伤按人累计 + 按敌人名归属(镜像 hurtCharacter)
   const st = sim.run.stats
   const slot = Slot.v[eid]!
   if (slot >= 0 && slot < st.damageTaken.length) {
     st.damageTaken[slot] = (st.damageTaken[slot] ?? 0) + damage
   }
   if (srcName) st.enemyDamage[srcName] = (st.enemyDamage[srcName] ?? 0) + damage
-  const hp = Math.max(0, MHp.hp[eid]! - damage)
-  MHp.hp[eid] = hp
+  const hp = Math.max(0, CharHp.hp[eid]! - damage)
+  CharHp.hp[eid] = hp
   playSfx('hurt')
-  sim.memberHitCount++ // 场景侧据增量触发受击震屏
-  MFlash.until[eid] = sim.elapsedMs + 120
+  sim.characterHitCount++ // 场景侧据增量触发受击震屏
+  CharFlash.until[eid] = sim.elapsedMs + 120
   Tint.color[eid] = tint // 受击闪色(常态红;地面毒区毒绿)
   Tint.effect[eid] = 0
   if (hp <= 0) {
@@ -216,22 +216,22 @@ export function hurtMember(sim: Sim, eid: number, damage: number, srcName?: stri
     Transform.h[eid] = MEMBER.size * UNIT
     // 阵亡灰烟(镜像 killMember 的 puffBurst)
     sim.pendingBursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
-    if (sim.members.every((x) => !Alive.v[x])) sim.over = true
+    if (sim.characters.every((x) => !Alive.v[x])) sim.over = true
   }
 }
 
-/** 复活单个队员(镜像 reviveMember):满血起身 + 无敌帧重置 + 复原染色 + 弹入。
+/** 复活单个队员(镜像 reviveCharacter):满血起身 + 无敌帧重置 + 复原染色 + 弹入。
  * 到点自动复活与队长技能集结(rallyTeam)共用这一处 */
-export function reviveMember(sim: Sim, eid: number): void {
+export function reviveCharacter(sim: Sim, eid: number): void {
   const now = sim.elapsedMs
   playSfx('revive')
   Alive.v[eid] = 1
   Anim.frames[eid] = 0 // 解除停帧哨兵(0 = 待惰性解析)
-  MHp.hp[eid] = MHp.max[eid]!
+  CharHp.hp[eid] = CharHp.max[eid]!
   Iframe.last[eid] = now
   Tint.color[eid] = 0xffffff
   Tint.alpha[eid] = 1
   Tint.effect[eid] = 0
-  Pop.until[eid] = now + 200 // 复活弹入(镜像 reviveMember 的 scale 弹)
+  Pop.until[eid] = now + 200 // 复活弹入(镜像 reviveCharacter 的 scale 弹)
 }
 

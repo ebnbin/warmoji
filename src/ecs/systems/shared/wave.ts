@@ -1,14 +1,14 @@
 import { playSfx } from '../../../audio/sfx'
 import { gainXp, waveBonusXp } from '../../../war/xp'
 import { isFinalWave } from '../../../data/waves'
-import { Alive, MHp } from '../../components'
+import { Alive, CharHp } from '../../components'
 import type { Sim } from '../../sim'
 
 // 波次结算(镜像 endWave 的纯 run 变更部分):波末保底经验(队长×道具倍率)+ 团队道具波末
 // 结算(大锅回复/债券分红)+ 累计战斗时长 + 波次自增 + 队员血量快照。场景过场(结算横幅/
 // scene.start 到结算/抽卡/整编/商店)留在场景侧。
 
-/** 结算本波:回写 run(经验/回复/金币/combatMs/wave/memberHp),返回是否通关(终波) */
+/** 结算本波:回写 run(经验/回复/金币/combatMs/wave/角色血量),返回是否通关(终波) */
 export function settleWave(sim: Sim): boolean {
   const run = sim.run
   const finished = isFinalWave(run.wave)
@@ -21,15 +21,15 @@ export function settleWave(sim: Sim): boolean {
   }
   // 团队道具波末结算:大锅回复(血量快照前生效)
   if (sim.reward.waveHealRatio > 0) {
-    for (const m of sim.members) {
+    for (const m of sim.characters) {
       if (!Alive.v[m]) continue
-      MHp.hp[m] = Math.min(MHp.max[m]!, MHp.hp[m]! + MHp.max[m]! * sim.reward.waveHealRatio)
+      CharHp.hp[m] = Math.min(CharHp.max[m]!, CharHp.hp[m]! + CharHp.max[m]! * sim.reward.waveHealRatio)
     }
   }
   // 债券分红计入本波金币
   if (sim.reward.waveCoins > 0) run.coins += sim.reward.waveCoins
   run.combatMs += sim.elapsedMs
   run.wave += 1
-  run.memberHp = sim.members.map((m) => (Alive.v[m] ? Math.round(MHp.hp[m]!) : 0))
+  run.memberHp = sim.characters.map((m) => (Alive.v[m] ? Math.round(CharHp.hp[m]!) : 0))
   return finished
 }

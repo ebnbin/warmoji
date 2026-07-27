@@ -16,7 +16,7 @@ import {
   ZoneBurn,
   ZoneFollow,
 } from '../components'
-import { applyDamage, hurtMember } from './shared/combat'
+import { applyDamage, hurtCharacter } from './shared/combat'
 import { backEaseOut } from '../utils/ease'
 import { zoneSrcName } from '../store'
 import type { Sim } from '../sim'
@@ -91,7 +91,7 @@ function burnEnemies(sim: Sim, burns: readonly number[], now: number): void {
 
 /** 烧队员:按受害者节流(队员少:无论同时踩几个区,每 tickMs 至多掉一次血) */
 function burnMembers(sim: Sim, burns: readonly number[], now: number): void {
-  for (const m of sim.members) {
+  for (const m of sim.characters) {
     if (!Alive.v[m]) continue
     for (const z of burns) {
       if (Zone.on[z] === 0 || Zone.faction[z] !== FACTION.enemy) continue
@@ -100,7 +100,7 @@ function burnMembers(sim: Sim, burns: readonly number[], now: number): void {
       if (d.x * d.x + d.y * d.y > r * r) continue
       if (now - GroundHit.last[m]! >= ZoneBurn.tickMs[z]!) {
         GroundHit.last[m] = now
-        hurtMember(sim, m, ZoneBurn.damage[z]!, zoneSrcName[z] || undefined, 0xa5d86a) // 中毒/灼烧走毒绿闪
+        hurtCharacter(sim, m, ZoneBurn.damage[z]!, zoneSrcName[z] || undefined, 0xa5d86a) // 中毒/灼烧走毒绿闪
       }
       break
     }

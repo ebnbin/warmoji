@@ -7,18 +7,18 @@ import { } from '../utils/ease'
 import type { Sim } from '../sim'
 
 // 逐员布局：岗位偏移 + 待机游移 + 跟随弹簧 → 写 Follow/Transform/Depth。
-// 只管人站在哪；呼吸/弹入/翻转等纯表现在 animateMembers。
+// 只管人站在哪；呼吸/弹入/翻转等纯表现在 animateCharacters。
 
 /** 逐员布局:岗位偏移 + 待机游移 + 跟随弹簧 → 写 Follow/Transform/Depth(镜像 layoutTeam)。
- * 只管人站在哪;呼吸/弹入/翻转等纯表现在 animateMembers */
+ * 只管人站在哪;呼吸/弹入/翻转等纯表现在 animateCharacters */
 export function layoutTeam(sim: Sim): void {
   const delta = sim.dtMs
   const posts = formationPosts(sim.formation, sim.count, sim.orbitPhase)
   const moving = sim.teamDir.x !== 0 || sim.teamDir.y !== 0
   const dt = Math.min(delta, 50) / 1000
   const tSec = sim.elapsedMs / 1000
-  for (let slot = 0; slot < sim.members.length; slot++) {
-    const eid = sim.members[slot]!
+  for (let slot = 0; slot < sim.characters.length; slot++) {
+    const eid = sim.characters[slot]!
     const idx = sim.postBySlot[slot] ?? slot
     const p = posts[idx] ?? { x: 0, y: 0 }
     const wanderOn = Alive.v[eid]! && !moving && !Threat.v[eid]
@@ -72,4 +72,4 @@ export function layoutTeam(sim: Sim): void {
 }
 
 /** 队员的程序化小动画(镜像 animateMember):呼吸挤压拉伸 + 朝移动方向翻转(仅活着的)。
- * 复活弹入期(Pop)用弹入缩放覆盖呼吸(镜像 reviveMember 的 Back.easeOut scale 弹) */
+ * 复活弹入期(Pop)用弹入缩放覆盖呼吸(镜像 reviveCharacter 的 Back.easeOut scale 弹) */

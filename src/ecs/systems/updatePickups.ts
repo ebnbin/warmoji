@@ -43,7 +43,7 @@ export function updatePickups(sim: Sim): void {
     const dist2 = w.x * w.x + w.y * w.y
     // 到手:近队伍中心(拾取半径) 或 蹭到任一活着队员的身子(仅磁吸类——战场拾取要的就是走位)
     const grab = Grab.radius[eid]!
-    if (dist2 <= grab * grab || (Pull.radius[eid]! > 0 && nearAliveMember(sim, x, y))) {
+    if (dist2 <= grab * grab || (Pull.radius[eid]! > 0 && nearAliveCharacter(sim, x, y))) {
       take(sim, eid)
       continue
     }
@@ -84,9 +84,9 @@ function take(sim: Sim, eid: number): void {
 
 /** 是否蹭到了任一活着队员(圆-圆:队员受击圆 + 拾取物体半径,镜像旧 overlap)。
  * 受保护中心(受击圆减半)的捡币范围也随之小一圈,与旧实现一致 */
-function nearAliveMember(sim: Sim, x: number, y: number): boolean {
+function nearAliveCharacter(sim: Sim, x: number, y: number): boolean {
   const cr = PICKUPS.coin.radius * UNIT
-  for (const m of sim.members) {
+  for (const m of sim.characters) {
     if (!Alive.v[m]) continue
     const rr = Hurt.radius[m]! + cr
     const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
