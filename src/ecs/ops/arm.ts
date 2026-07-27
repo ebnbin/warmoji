@@ -8,8 +8,7 @@ import { toPx } from '../../war/px'
 import { labLevel } from '../../run/lab'
 import type { RunState } from '../../run/state'
 import { FACTION } from '../components'
-import { NEUTRAL_AMP } from './equip'
-import { spawnWeapon } from '../entities/weapon'
+import { equipAbility, NEUTRAL_AMP } from './equip'
 import type { Sim } from '../sim'
 
 // 装备：把配装解析成武器实体。队伍在开局一次装齐；敌人首次被扫到时装配
@@ -34,7 +33,7 @@ export function armTeam(sim: Sim, run: RunState, testMode: boolean): void {
       battle: true,
     }
     loadoutFor(def, tiers).forEach((w, i) => {
-      spawnWeapon(sim, sim.members[slot]!, toPx(resolveAbilityDef(w, fx)), FACTION.team, 300 + slot * 120 + i * 230, amp)
+      equipAbility(sim, sim.members[slot]!, toPx(resolveAbilityDef(w, fx)), FACTION.team, 300 + slot * 120 + i * 230, amp)
     })
   }
 }
@@ -44,6 +43,6 @@ export function armTeam(sim: Sim, run: RunState, testMode: boolean): void {
 export function armCaptain(sim: Sim, run: RunState): void {
   // 队长实体在 makeSim 里已建好（队伍中心即它的位置），这里只挂技能载荷
   for (const a of CAPTAINS[run.captainId].skill.abilities) {
-    spawnWeapon(sim, sim.captain, toPx(a), FACTION.team, 0, NEUTRAL_AMP, true)
+    equipAbility(sim, sim.captain, toPx(a), FACTION.team, 0, NEUTRAL_AMP, true)
   }
 }

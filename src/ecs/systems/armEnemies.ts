@@ -1,8 +1,7 @@
 import { query } from 'bitecs'
 import { Dormant, ENEMY_SET, EnemyArm, FACTION, Morph, Transform } from '../components'
-import { NEUTRAL_AMP, postponeAbilities } from '../ops/equip'
+import { equipAbility, NEUTRAL_AMP, postponeAbilities } from '../ops/equip'
 import { restoreMorphVisual } from '../ops/morph'
-import { spawnWeapon } from '../entities/weapon'
 import { enemyDef } from '../store'
 import type { Sim } from '../sim'
 
@@ -34,6 +33,6 @@ function armEnemy(sim: Sim, eid: number): void {
   rows.forEach((w, i) => {
     // 「有没有声明首发延迟」是能力自己的性质，不该问它是不是某个 kind
     const delay = ('firstDelayMs' in w ? w.firstDelayMs : undefined) ?? fireDelay ?? 600 + i * 230
-    spawnWeapon(sim, eid, w, FACTION.enemy, delay, NEUTRAL_AMP)
+    equipAbility(sim, eid, w, FACTION.enemy, delay, NEUTRAL_AMP)
   })
 }

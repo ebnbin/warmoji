@@ -5,6 +5,7 @@ import {
   HealDefib, Laser, LaserBackBeam, LaserRadial, Nuke, Pierce, Pulse, Radial, Rally, Shoot, Shots,
   SlowAura, Strike, Summon, Sweep, Swing, Thrust, ThrustCombo, TimeStop, Turret, Volley,
 } from '../components'
+import { assertFree } from '../ops/equip'
 import { abilityArtEmoji, abilityFireSfx, abilityOnHit } from '../store'
 import type { FrameIndex } from '../frames'
 import type { EcsWorld } from '../world'
@@ -242,6 +243,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
       Shoot.range[e] = d.range ?? 0 // 0 = 用 ACQUIRE 的缺省索敌上限
       Shoot.lifeMs[e] = d.lifeMs ?? 0
       if (d.aim === 'move') addComponent(c.world, e, AimMove)
+      assertFree(c.world, e, Bolt, '弹丸外形组件') // 弹道与弩塔共用 Bolt，同宿主装两条就会撞
       addComponent(c.world, e, Bolt)
       // 描边随阵营：敌弹与我方弹用不同的外圈
       Bolt.frame[e] = c.frames.index(d.projectile.emoji, Faction.v[e] === FACTION.enemy ? 'enemyProjectile' : 'player')
@@ -281,6 +283,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
       abilityArtEmoji[e] = d.turret.emoji
       Turret.size[e] = d.turret.size
       // 塔开火用的弹丸外形：塔自持的那条 projectile 能力从这里抄
+      assertFree(c.world, e, Bolt, '弹丸外形组件')
       addComponent(c.world, e, Bolt)
       Bolt.frame[e] = c.frames.index(d.projectile.emoji, 'player')
       Bolt.size[e] = d.projectile.size
