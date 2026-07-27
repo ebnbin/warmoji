@@ -17,6 +17,7 @@ import { query } from 'bitecs'
 import { Alive, Boss, Dormant, ENEMY_SET, Radius, Slide, Transform } from './components'
 import { enemyDef } from './store'
 import { FlowField } from '../war/maps/ruins'
+import type { WallGrid } from '../war/maps/ruins'
 import { applyDamage, hurtCharacter } from './systems/shared/combat'
 import type { Sim } from './sim'
 import type { Point } from '../util/vec'
@@ -30,6 +31,61 @@ import { fleeSteer } from '../war/enemyAi'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
+
+// ── 钩子自己的状态 ────────────────────────────────────
+// 这几样从前平铺在 Sim 上,于是每张图都看得见另外七张图的字段:残垣图的天体恒 null、
+// 深空图的断壁恒 null。钩子有行为却没有存放处,只好把状态寄存在全局。
+// 现在收成一个盒子:Sim 上只留 worldState,盒子里装什么由本图的钩子说了算。
+
+/** 断壁世界状态(残垣图):网格(可变,碾墙置通行)+ 绕墙流场(低频重算)+
+ * 可达刷怪格 + 本帧被碾碎的格(场景侧排空拆视觉) */
+export interface Walls {
+  grid: WallGrid
+  flow?: FlowField
+  /** 上次重算流场时的队伍格与累计时长(格变了或到点就重算) */
+  flowCellX: number
+  flowCellY: number
+  reflowAcc: number
+  /** 从中心 4 连通可达的通行格(只在这些格刷怪,保证敌人总能寻到队伍) */
+  spawnCells: number[]
+  /** 本帧被碾碎的格索引(场景侧排空:拆视觉 + 扬尘) */
+  smashed: number[]
+}
+
+/** 一次天体横扫(深空图):预警直线两端 + 起划时刻 + 划行进度 + 本次已结算过的实体 */
+export interface Meteor {
+  /** false=预警中(到 until 起划) true=划行中 */
+  travelling: boolean
+  sx: number
+  sy: number
+  ex: number
+  ey: number
+  until: number
+  /** 划行进度 0..1 */
+  t: number
+  /** 每次横扫对同一实体只砸一次 */
+  hit: Set<number>
+}
+
+/** 世界钩子的私有状态。每张图只用得上其中一两项,其余保持初值——
+ * 谁用哪项写在字段注释里,Sim 不必知道 */
+export interface WorldState {
+  /** 周期结算/事件的下次时刻(落水掉血、圈外掉血、下一颗天体);仅 tick 自管 */
+  tickAt: number
+  /** 队伍滑行速度(世界像素/秒):浮冰等动量世界的积分器状态,其余图恒 0 */
+  vx: number
+  vy: number
+  /** 终波缩圈(无限图):圆心 + 当前半径(世界像素);未开圈为 null */
+  zone: { x: number; y: number; r: number } | null
+  /** 天体横扫(深空图):预警/划行中的那一次;未在途为 null。场景侧据此建/毁预警轨迹与球体 */
+  meteor: Meteor | null
+  /** 断壁世界(残垣图):网格 + 流场 + 待拆格队列;非断壁图为 null */
+  walls: Walls | null
+}
+
+export function newWorldState(): WorldState {
+  return { tickAt: 0, vx: 0, vy: 0, zone: null, meteor: null, walls: null }
+}
 
 export interface WorldHooks {
   /** 世界差向量(索敌/追击/磁吸/接触/编队的几何基元):环面取最短差(可能穿缝);默认直减。
@@ -224,9 +280,9 @@ const ice: WorldHooks = {
     const on = onFloe(sim.center.x, sim.center.y, floePx(sim))
     const tau = on ? cfg.teamTauIce : cfg.teamTauWater
     const mul = on ? 1 : cfg.waterSpeedMul
-    sim.teamVx = approach(sim.teamVx, desVx * mul, dt, tau)
-    sim.teamVy = approach(sim.teamVy, desVy * mul, dt, tau)
-    return { x: sim.center.x + sim.teamVx * dt, y: sim.center.y + sim.teamVy * dt }
+    sim.worldState.vx = approach(sim.worldState.vx, desVx * mul, dt, tau)
+    sim.worldState.vy = approach(sim.worldState.vy, desVy * mul, dt, tau)
+    return { x: sim.center.x + sim.worldState.vx * dt, y: sim.center.y + sim.worldState.vy * dt }
   },
   // 无界:敌人不钳制(滑出浮冰照常,落水自有掉血结算);游荡也不折返(冰缘不是墙)
   constrainEnemy(_sim, _eid, x, y) {
@@ -271,13 +327,13 @@ const ice: WorldHooks = {
     return x < -m || x > px + m || y < -m || y > px + m
   },
   onStart(sim) {
-    sim.worldTickAt = iceCfg(sim).waterTickMs
+    sim.worldState.tickAt = iceCfg(sim).waterTickMs
   },
   /** 落水结算:队伍(按中心)与各敌人(按各自位置)在水里每 tick 掉血,敌我通吃 */
   tick(sim) {
     const cfg = iceCfg(sim)
-    if (sim.elapsedMs < sim.worldTickAt) return
-    sim.worldTickAt = sim.elapsedMs + cfg.waterTickMs
+    if (sim.elapsedMs < sim.worldState.tickAt) return
+    sim.worldState.tickAt = sim.elapsedMs + cfg.waterTickMs
     const px = floePx(sim)
     const frac = cfg.waterTickMs / 1000
     if (!onFloe(sim.center.x, sim.center.y, px)) {
@@ -300,12 +356,12 @@ const ruins: WorldHooks = {
   ...bounded,
   constrainTeam(sim, next, delta) {
     const box = bounded.constrainTeam(sim, next, delta)
-    const w = sim.walls
+    const w = sim.worldState.walls
     return w ? w.grid.resolveMove(sim.center.x, sim.center.y, box.x, box.y) : box
   },
   constrainEnemy(sim, eid, x, y) {
     const box = bounded.constrainEnemy(sim, eid, x, y)
-    const w = sim.walls
+    const w = sim.worldState.walls
     // 穿墙(幽灵)/破墙(拆迁 Boss)不吃墙碰撞;其余贴墙滑动兜底,防击退/游荡把敌人挤进墙
     const def = enemyDef[eid]
     if (!w || def?.phasesWalls || def?.breaksWalls) return box
@@ -313,7 +369,7 @@ const ruins: WorldHooks = {
   },
   /** 追击:穿墙敌人直线穿行;其余走流场绕墙,不可达回退直线 */
   chaseDir(sim, eid, tx, ty) {
-    const w = sim.walls
+    const w = sim.worldState.walls
     if (!w || enemyDef[eid]?.phasesWalls) return bounded.chaseDir(sim, eid, tx, ty)
     const dir = w.flow?.sampleDir(Transform.x[eid]!, Transform.y[eid]!)
     if (dir && (dir.x !== 0 || dir.y !== 0)) return dir
@@ -322,7 +378,7 @@ const ruins: WorldHooks = {
   /** 游荡:盒子折返基础上,前方是墙就掉头 */
   wanderDir(sim, eid, dx, dy) {
     const d = bounded.wanderDir(sim, eid, dx, dy)
-    const w = sim.walls
+    const w = sim.worldState.walls
     if (!w) return d
     const ahead = 0.8 * UNIT
     if (w.grid.pointBlocked(Transform.x[eid]! + d.x * ahead, Transform.y[eid]! + d.y * ahead)) {
@@ -331,11 +387,11 @@ const ruins: WorldHooks = {
     return d
   },
   wallHit(sim, ax, ay, bx, by) {
-    return sim.walls?.grid.segmentHit(ax, ay, bx, by) ?? null
+    return sim.worldState.walls?.grid.segmentHit(ax, ay, bx, by) ?? null
   },
   /** 碾碎该格:网格置通行 + 排进待拆队列(场景侧拆视觉/扬尘)+ 逼流场下帧重算 */
   smashWall(sim, x, y) {
-    const w = sim.walls
+    const w = sim.worldState.walls
     if (!w) return
     const cx = w.grid.cellX(x)
     const cy = w.grid.cellY(y)
@@ -346,7 +402,7 @@ const ruins: WorldHooks = {
   },
   /** 只在从中心可达的通行格刷怪,且离队伍中心足够远(镜像 pickSpawn) */
   spawnPoint(sim, boss) {
-    const w = sim.walls
+    const w = sim.worldState.walls
     if (!w || w.spawnCells.length === 0) return bounded.spawnPoint(sim, boss)
     const cfg = MAPS[sim.mapId].walls!
     const minCellDist = cfg.spawnMinCellDist + (boss ? 2 : 0)
@@ -370,11 +426,11 @@ const ruins: WorldHooks = {
   },
   /** 敌弹:出界回收之外,进墙也销毁 */
   cullEnemyProjectile(sim, x, y) {
-    return bounded.cullEnemyProjectile(sim, x, y) || (sim.walls?.grid.pointBlocked(x, y) ?? false)
+    return bounded.cullEnemyProjectile(sim, x, y) || (sim.worldState.walls?.grid.pointBlocked(x, y) ?? false)
   },
   /** 逐帧低频重算流场(队伍格变了 / 到点就重算) */
   tick(sim, delta) {
-    const w = sim.walls
+    const w = sim.worldState.walls
     if (!w) return
     w.reflowAcc += delta
     const cx = w.grid.cellX(sim.center.x)
@@ -428,7 +484,7 @@ const infinite: WorldHooks = {
     return { x, y }
   },
   spawnPoint(sim, boss) {
-    const zone = sim.zone
+    const zone = sim.worldState.zone
     if (boss) return ringPoint(sim.rng, zone ?? sim.center, 6 * UNIT, 8 * UNIT)
     const cfg = infCfg(sim)
     const p = ringPoint(sim.rng, sim.center, cfg.spawnRingMin * UNIT, cfg.spawnRingMax * UNIT)
@@ -443,17 +499,17 @@ const infinite: WorldHooks = {
     return infCfg(sim).activeHalf * UNIT
   },
   onFinalWave(sim) {
-    sim.zone = { x: sim.center.x, y: sim.center.y, r: ringCfg(sim).r0 * UNIT }
-    sim.worldTickAt = ringCfg(sim).tickMs
+    sim.worldState.zone = { x: sim.center.x, y: sim.center.y, r: ringCfg(sim).r0 * UNIT }
+    sim.worldState.tickAt = ringCfg(sim).tickMs
   },
   /** 缩圈:半径逐帧按曲线收(场景侧据此画圈),圈外队员每 tick 掉血(敌人不受圈伤) */
   tick(sim) {
-    const zone = sim.zone
+    const zone = sim.worldState.zone
     if (!zone) return
     const cfg = ringCfg(sim)
     zone.r = zoneRadiusAt(sim.elapsedMs, cfg) * UNIT
-    if (sim.elapsedMs < sim.worldTickAt) return
-    sim.worldTickAt = sim.elapsedMs + cfg.tickMs
+    if (sim.elapsedMs < sim.worldState.tickAt) return
+    sim.worldState.tickAt = sim.elapsedMs + cfg.tickMs
     for (const m of sim.characters) {
       if (!Alive.v[m]) continue
       if (outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r)) {
@@ -507,19 +563,19 @@ const space: WorldHooks = {
   // 禁锢圈本就全程常驻,终波不再叠一层毒雾缩圈
   onFinalWave() {},
   onStart(sim) {
-    sim.worldTickAt = 7000 // 首颗天体来得早一点,确保第一波就见识到横扫
+    sim.worldState.tickAt = 7000 // 首颗天体来得早一点,确保第一波就见识到横扫
   },
   /** 天体横扫:到点开预警 → 预警结束起划 → 沿直线匀速推进,压到的实体每次只砸一次 */
   tick(sim, delta) {
     const cfg = spaceCfg(sim).meteor
     const now = sim.elapsedMs
-    const m = sim.meteor
+    const m = sim.worldState.meteor
     if (!m) {
-      if (now < sim.worldTickAt) return
+      if (now < sim.worldState.tickAt) return
       const angle = sim.rng.next() * Math.PI * 2
       const offset = (sim.rng.next() * 2 - 1) * cfg.offsetU * UNIT
       const s = meteorSweep(sim.center.x, sim.center.y, angle, offset, (cfg.travelU * UNIT) / 2)
-      sim.meteor = { travelling: false, sx: s.sx, sy: s.sy, ex: s.ex, ey: s.ey, until: now + cfg.warnMs, t: 0, hit: new Set() }
+      sim.worldState.meteor = { travelling: false, sx: s.sx, sy: s.sy, ex: s.ex, ey: s.ey, until: now + cfg.warnMs, t: 0, hit: new Set() }
       return
     }
     if (!m.travelling) {
@@ -546,8 +602,8 @@ const space: WorldHooks = {
       }
     }
     if (m.t < 1) return
-    sim.meteor = null
-    sim.worldTickAt = now + cfg.intervalMs + (sim.rng.next() * 2 - 1) * cfg.intervalJitterMs
+    sim.worldState.meteor = null
+    sim.worldState.tickAt = now + cfg.intervalMs + (sim.rng.next() * 2 - 1) * cfg.intervalJitterMs
   },
 }
 

@@ -36,7 +36,7 @@ export function sourceOf(sim: Sim, e: number): Source {
     name: enemySide ? enemyDef[Owner.eid[e]!]?.name : undefined,
     // 无墙图与穿墙能力整条判定短路（wallHit 恒 null，白扫一遍不值当）
     sight:
-      sim.walls !== null && WallBlocked.v[e] && !enemySide
+      sim.worldState.walls !== null && WallBlocked.v[e] && !enemySide
         ? { x: Transform.x[Anchor.eid[e]!]!, y: Transform.y[Anchor.eid[e]!]! }
         : undefined,
   }

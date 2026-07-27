@@ -58,7 +58,8 @@ import { tickSkillCd } from '../war/skill'
 import { hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import type { HudSnapshot } from '../run/hudHost'
-import type { Burst, Meteor, PendingSpawn, Sim } from './sim'
+import type { Burst, PendingSpawn, Sim } from './sim'
+import type { Meteor } from './worlds'
 import { emojiImage } from '../emoji/textures'
 import { SPAWN } from '../data/enemies'
 import { rollWaveCarriers } from '../war/battleFx'
@@ -172,10 +173,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private timeStopFxAlpha = 0
   /** 浮冰图落水蓝渐晕：屏幕固定，队伍在水里时脉冲提示 */
   private waterVignette?: Phaser.GameObjects.Rectangle
-  /** 无限图终波缩圈：圈线 + 圈外红渐晕（圈本体状态在 sim.zone，纯逻辑侧算） */
+  /** 无限图终波缩圈：圈线 + 圈外红渐晕（圈本体状态在 sim.worldState.zone，纯逻辑侧算） */
   private zoneGfx?: Phaser.GameObjects.Graphics
   private zoneVignette?: Phaser.GameObjects.Rectangle
-  /** 深空图天体横扫的视觉：与 sim.meteor 对帐（新一次即建预警轨迹，起划即挂球体，结束即销毁） */
+  /** 深空图天体横扫的视觉：与 sim.worldState.meteor 对帐（新一次即建预警轨迹，起划即挂球体，结束即销毁） */
   private meteorFx?: { of: Meteor; tele: Phaser.GameObjects.Graphics; sphere?: Phaser.GameObjects.Image }
   /** 工厂图（环面）：跨缝分身的条带相机 + 传送门光带/脉动边线 */
   private stripCams: Phaser.Cameras.Scene2D.Camera[] = []
@@ -462,7 +463,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 正常模式 Boss 波开场:先开世界终波机关(无限图缩圈以此刻队伍位置张开),再预告投放本图 Boss
     if (!run.testMode && isBossWave(run.wave)) {
       this.sim.hooks.onFinalWave(this.sim)
-      if (this.sim.zone) {
+      if (this.sim.worldState.zone) {
         this.zoneGfx = this.add.graphics().setDepth(2)
         this.zoneVignette = this.add
           .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, 0xd32f2f, 0)
@@ -1109,7 +1110,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   }
 
   /** 断壁世界建场(镜像 BoundedScene.createWalls):按种子铺断壁 → 网格 + 可达刷怪格 → 逐格画石块。
-   * 网格/流场是纯逻辑(sim.walls),此处只负责视觉与回填 */
+   * 网格/流场是纯逻辑(sim.worldState.walls),此处只负责视觉与回填 */
   private createWalls(sim: Sim, cfg: WallsConfig): void {
     const cols = Math.round(this.mapW / UNIT)
     const rows = Math.round(this.mapH / UNIT)
@@ -1122,7 +1123,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const grid = new WallGrid(cols, rows, UNIT, blocked)
     // 只在「从中心可达」的通行格刷怪,保证敌人总能寻路到队伍
     const cells = [...reachableCells(grid, Math.floor(cols / 2), Math.floor(rows / 2))]
-    sim.walls = { grid, flowCellX: -1, flowCellY: -1, reflowAcc: 0, spawnCells: cells, smashed: [] }
+    sim.worldState.walls = { grid, flowCellX: -1, flowCellY: -1, reflowAcc: 0, spawnCells: cells, smashed: [] }
     // 逐格填充石块 + 顶沿提亮假高度(逐格存引用供碾墙单格销毁)
     const palette = MAPS[this.run.mapId].palette
     const base = Phaser.Display.Color.IntegerToColor(palette.map).darken(38).color
@@ -1143,7 +1144,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
   /** 排空本帧被碾碎的断壁(镜像 smashWallAt 的视觉部分):拆石块 + 扬尘 */
   private drainSmashedWalls(sim: Sim): void {
-    const w = sim.walls
+    const w = sim.worldState.walls
     if (!w || w.smashed.length === 0) return
     for (const idx of w.smashed) {
       const objs = this.wallTiles.get(idx)
@@ -1207,7 +1208,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   /** 终波缩圈的视觉(镜像 InfiniteScene.updateZone;圈半径与掉血在 worlds.ts 纯逻辑侧):
    * 亮边界环 + 内侧提示描边,有队员在圈外则满屏红渐晕脉冲 */
   private updateZone(sim: Sim): void {
-    const zone = sim.zone
+    const zone = sim.worldState.zone
     const g = this.zoneGfx
     if (!zone || !g) return
     g.clear()
@@ -1224,7 +1225,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   /** 天体横扫的视觉对帐(镜像 startMeteorWarn/launchMeteor/endMeteor;直线与伤害在纯逻辑侧):
    * 新一次横扫即画危险车道,预警期脉动,起划挂球体并让轨迹淡下去,结束即销毁 */
   private updateMeteorFx(sim: Sim, delta: number): void {
-    const m = sim.meteor
+    const m = sim.worldState.meteor
     const fx = this.meteorFx
     if (fx && fx.of !== m) {
       fx.sphere?.destroy()
@@ -1454,7 +1455,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       dormant: Array.from(query(this.world, [Enemy]), (eid) => Dormant.v[eid]!).filter((v) => v === 1).length,
       camX: this.cameras.main.scrollX + this.cameras.main.width / 2,
       camY: this.cameras.main.scrollY + this.cameras.main.height / 2,
-      zoneR: sim.zone?.r ?? 0,
+      zoneR: sim.worldState.zone?.r ?? 0,
       // 在场区域数(地面毒圈 + 寒气光环):到期不回收 / 跟随型不随武器退场都会在这里堆积
       zones: query(this.world, [Zone]).length,
       // 在场的能力子实体数(弩塔 + 小蜂):验证同时在场上限与逐个退场
@@ -1462,10 +1463,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       logicalW: viewport.logicalWidth,
       logicalH: viewport.logicalHeight,
       // 残垣:阻挡格数 + 可达刷怪格数(验证断壁成型与连通)
-      walls: sim.walls ? sim.walls.grid.blocked.filter(Boolean).length : 0,
-      spawnCells: sim.walls?.spawnCells.length ?? 0,
+      walls: sim.worldState.walls ? sim.worldState.walls.grid.blocked.filter(Boolean).length : 0,
+      spawnCells: sim.worldState.walls?.spawnCells.length ?? 0,
       // 深空:天体横扫态(null=不在途)
-      meteor: sim.meteor ? { travelling: sim.meteor.travelling, t: sim.meteor.t } : null,
+      meteor: sim.worldState.meteor ? { travelling: sim.worldState.meteor.travelling, t: sim.worldState.meteor.t } : null,
     }
   }
 }

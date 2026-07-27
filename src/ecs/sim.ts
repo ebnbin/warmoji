@@ -6,9 +6,8 @@ import { stepPickupVisuals } from './systems/stepPickupVisuals'
 import { updateShards } from './systems/updateShards'
 import { layoutTeam } from './systems/layoutTeam'
 import type { FormationId } from '../types/formation'
-import type { FlowField, WallGrid } from '../war/maps/ruins'
 import type { EcsWorld } from './world'
-import type { WorldHooks } from './worlds'
+import type { WorldHooks, WorldState } from './worlds'
 import type { RunState } from '../run/state'
 import type { Cue } from './cues'
 import type { Target } from './utils/targets'
@@ -24,7 +23,7 @@ import { aggregateTeamCards } from '../data/cards'
 import { Rng } from '../util/rng'
 import { spawnCaptain } from './entities/captain'
 import { formTeam } from './entities/captain'
-import { worldFor } from './worlds'
+import { newWorldState, worldFor } from './worlds'
 import type { EcsAtlas } from './atlas'
 
 // ECS 战斗仿真状态 + 系统(纯逻辑,禁 phaser)。数学逐行镜像旧 ArcadeBattleScene 的
@@ -57,17 +56,8 @@ export interface Sim {
   mapH: number
   /** 本图世界钩子(位移约束/打滑/落水结算…):开局按 mapId 取一份,系统在拐弯处调它 */
   hooks: WorldHooks
-  /** 队伍滑行速度(世界像素/秒):浮冰等动量世界的积分器状态,有界世界恒 0 */
-  teamVx: number
-  teamVy: number
-  /** 世界周期结算/事件的下次时刻(落水掉血、圈外掉血、下一颗天体;hooks 自管) */
-  worldTickAt: number
-  /** 终波缩圈(无限图):圆心 + 当前半径(世界像素);未开圈为 null */
-  zone: { x: number; y: number; r: number } | null
-  /** 天体横扫(深空图):预警/划行中的那一次;未在途为 null。场景侧据此建/毁预警轨迹与球体 */
-  meteor: Meteor | null
-  /** 断壁世界(残垣图):网格 + 流场 + 待拆格队列;非断壁图为 null */
-  walls: Walls | null
+  /** 钩子自己的状态(滑行速度/周期时刻/缩圈/天体/断壁):除场景侧建场与取视觉外,只有 hooks 碰 */
+  worldState: WorldState
   /** 相机世界视口(场景侧每帧回填):玩家子弹飞出视野一段即回收,镜像 cullProjectiles */
   view: { x: number; y: number; right: number; bottom: number }
   elapsedMs: number
@@ -135,36 +125,6 @@ export interface Sim {
   reward: RewardConfig
   /** 本帧到手的战场拾取(场景侧排空,广播「到手横幅」事件) */
   pendingCollects: FieldPickupDef[]
-}
-
-/** 断壁世界状态(残垣图):网格(可变,碾墙置通行)+ 绕墙流场(低频重算)+
- * 可达刷怪格 + 本帧被碾碎的格(场景侧排空拆视觉) */
-export interface Walls {
-  grid: WallGrid
-  flow?: FlowField
-  /** 上次重算流场时的队伍格与累计时长(格变了或到点就重算) */
-  flowCellX: number
-  flowCellY: number
-  reflowAcc: number
-  /** 从中心 4 连通可达的通行格(只在这些格刷怪,保证敌人总能寻到队伍) */
-  spawnCells: number[]
-  /** 本帧被碾碎的格索引(场景侧排空:拆视觉 + 扬尘) */
-  smashed: number[]
-}
-
-/** 一次天体横扫(深空图):预警直线两端 + 起划时刻 + 划行进度 + 本次已结算过的实体 */
-export interface Meteor {
-  /** false=预警中(到 until 起划) true=划行中 */
-  travelling: boolean
-  sx: number
-  sy: number
-  ex: number
-  ey: number
-  until: number
-  /** 划行进度 0..1 */
-  t: number
-  /** 每次横扫对同一实体只砸一次 */
-  hit: Set<number>
 }
 
 /** 掉落/拾取乘区(镜像 grantKillRewards / magnetCoins / endWave 的乘区来源) */
@@ -290,12 +250,7 @@ export function makeSim(
     mapW,
     mapH,
     hooks: worldFor(run.mapId),
-    teamVx: 0,
-    teamVy: 0,
-    worldTickAt: 0,
-    zone: null,
-    meteor: null,
-    walls: null,
+    worldState: newWorldState(),
     view: { x: 0, y: 0, right: mapW, bottom: mapH },
     elapsedMs: 0,
     fxMs: 0,
