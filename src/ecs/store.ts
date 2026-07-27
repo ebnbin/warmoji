@@ -25,6 +25,9 @@ export const projHitEids: (Set<number> | undefined)[] = new Array<Set<number> | 
 /** 在途回旋镖本程已命中的 eid(去程/回程各判一次,同程内每敌最多一次) */
 export const flyerHits: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(MAX_ENTITIES).fill(undefined).fill(undefined)
 
+/** 战场限时层是哪一枚拾取(id/emoji/极性/乘区都在 def 上) */
+export const modDef: (FieldPickupDef | undefined)[] = new Array<FieldPickupDef | undefined>(MAX_ENTITIES).fill(undefined)
+
 /** 刷怪预告要落地的敌人 def */
 export const telegraphDef: (EnemyDef | undefined)[] = new Array<EnemyDef | undefined>(MAX_ENTITIES).fill(undefined)
 
@@ -74,6 +77,7 @@ export const animOutline: (import('../emoji/svg').OutlineKind | undefined)[] =
  * 场景 create 时调 */
 export function clearEcsStore(): void {
   enemyDef.fill(undefined)
+  modDef.fill(undefined)
   telegraphDef.fill(undefined)
   telegraphCarries.fill(undefined)
   carrierPickup.fill(undefined)

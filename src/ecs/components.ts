@@ -256,6 +256,11 @@ export const Grab = { radius: f32() }
 /** 地面停留到期时刻(elapsedMs):到点淡出回收。0 = 永不过期 */
 export const Lifetime = { until: f32() }
 
+/** 战场限时层：捡到一枚战场拾取就多一层限时乘区。哪一枚（id/emoji/极性/乘区）在
+ * store.modDef；到期时刻走 Lifetime，totalMs 供 HUD 画剩余比例。
+ * 与地面毒圈(Zone)是同一个概念——战场上一件限时生效的东西 */
+export const Modifier = { totalMs: f32() }
+
 /** 到点要发生一件事(elapsedMs)。与 Lifetime 正相反——Lifetime 是「到点消失」,
  * Due 是「到点开始」。谁挂它就谁到点动:预告落地、敌潮出怪、携带者上场。
  * **它只说「什么时候」,不说「做什么」**——做什么由同一实体上的载荷组件决定,

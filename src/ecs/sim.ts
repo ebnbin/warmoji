@@ -16,7 +16,6 @@ import { TIMESTOP } from '../data/timeStop'
 import { timeScaleFor } from '../war/timeStop'
 import { BATTLE_FX_IDENTITY } from '../data/battlefield'
 import type { BattleEffects } from '../types/battlefield'
-import type { BattleMod } from '../types/battlefield'
 import { CAPTAINS } from '../data/captains'
 import { aggregateTeamCards } from '../data/cards'
 import { Rng } from '../util/rng'
@@ -75,8 +74,7 @@ export interface Sim {
   timeStopMsLeft: number
   /** 移动量的低通平滑值(实时 delta 推进):worldTimeScale 的输入 */
   chrono: number
-  /** 战场拾取施加的限时层(逐个到期)与其每帧重折的乘区(镜像 battleMods/battleFx) */
-  battleMods: BattleMod[]
+  /** 在场限时层折出来的乘区(派生值:层本身是实体,见 entities/modifier.ts) */
   battleFx: BattleEffects
   /** 团队卡的敌速乘区(开局定;与 battleFx.enemySlowMul 并行相乘) */
   enemySlowMul: number
@@ -208,7 +206,6 @@ export function makeSim(
     characterHitCount: 0,
     timeStopMsLeft: 0,
     chrono: 0,
-    battleMods: [],
     battleFx: { ...BATTLE_FX_IDENTITY },
     enemySlowMul: teamFx.enemySlowMul,
     frameAttractors: [],

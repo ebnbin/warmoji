@@ -37,7 +37,7 @@ import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { spawnDecor } from './entities/decor'
 import { remapSim } from './systems/shared/remap'
 import { makeSim } from './sim'
-import { clearEcsStore } from './store'
+import { clearEcsStore, modDef } from './store'
 import { armCaptain, armTeam } from './entities/loadout'
 import { requestCast } from './systems/shared/ability'
 import { Minion } from './components'
@@ -47,6 +47,8 @@ import { pickupCounts } from './entities/pickup'
 import { spawnBossEcs, spawnSurgeEcs } from './entities/enemy'
 import { scheduleCarrier } from './entities/schedule'
 import { telegraphCount } from './entities/telegraph'
+import { activeMods } from './entities/modifier'
+import { Lifetime, Modifier } from './components'
 
 import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
 import { settleWave } from './systems/shared/wave'
@@ -581,11 +583,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       bossHp: boss !== undefined ? Hp.v[boss]! : null,
       bossMaxHp: bossFor(this.run.mapId).hp,
       // 已激活的战场拾取效果(HUD 图标 + 剩余计时)
-      battleFx: (sim?.battleMods ?? []).map((m) => ({
-        emoji: m.emoji,
-        polarity: m.polarity,
-        remainMs: Math.max(0, m.until - elapsed),
-        totalMs: m.totalMs,
+      battleFx: (sim ? activeMods(sim) : []).map((e) => ({
+        emoji: modDef[e]!.emoji,
+        polarity: modDef[e]!.polarity,
+        remainMs: Math.max(0, Lifetime.until[e]! - elapsed),
+        totalMs: Modifier.totalMs[e]!,
       })),
     }
   }
@@ -1396,7 +1398,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       field: {
         pickups: pickupCounts(sim).pickups,
         carriers: pickupCounts(sim).carriers,
-        active: sim.battleMods.map((m) => ({ id: m.id, remainMs: Math.max(0, m.until - sim.elapsedMs) })),
+        active: activeMods(sim).map((e) => ({ id: modDef[e]!.id, remainMs: Math.max(0, Lifetime.until[e]! - sim.elapsedMs) })),
       },
       over: sim.over,
       alive: sim.characters.filter((eid) => Alive.v[eid]).length,
