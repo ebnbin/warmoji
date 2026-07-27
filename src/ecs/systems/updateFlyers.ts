@@ -1,8 +1,7 @@
 import { hasComponent, query } from 'bitecs'
-import { airborne } from '../utils/boomerang'
 import { catchFlyer } from '../entities/weapon'
 import { DEG2RAD } from '../../util/units'
-import { Boomerang, CoinMagnet, Flyer, Frozen, Transform } from '../components'
+import { Boomerang, CoinMagnet, Flyer, Frozen, Thrown, Transform } from '../components'
 import { flyerHits } from '../store'
 import { cooldownMul, ownerX, ownerY } from '../utils/amp'
 import { damageTarget } from './shared/damage'
@@ -14,7 +13,6 @@ import type { Sim } from '../sim'
 export function updateFlyers(sim: Sim): void {
   const dt = sim.wdtMs
   for (const f of [...query(sim.world, [Flyer, Transform])]) {
-    if (!hasComponent(sim.world, f, Flyer)) continue // 另一枚命中时连带回收了它
     const e = Flyer.of[f]!
     if (Frozen.v[e]) {
       // 持有者倒下：在途的镖一并作废，冷却按裸值重置
@@ -39,7 +37,7 @@ export function updateFlyers(sim: Sim): void {
       const step = (Boomerang.returnSpeed[e]! * dt) / 1000
       if (dist <= Math.max(step, 20)) {
         catchFlyer(sim, e, f)
-        if (airborne(sim, e) === 0) Boomerang.cdLeft[e] = Boomerang.cdBase[e]! * cooldownMul(sim, e)
+        if (Thrown.n[e] === 0) Boomerang.cdLeft[e] = Boomerang.cdBase[e]! * cooldownMul(sim, e)
         continue
       }
       Transform.x[f] = Transform.x[f]! + (dx / dist) * step

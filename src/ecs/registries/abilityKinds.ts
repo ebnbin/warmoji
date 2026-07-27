@@ -3,7 +3,7 @@ import {
   Aim, AimMove, AreaBlast, Assassinate, FACTION, Faction, Aura, AuraDps, AuraFreeze, BlastEcho, Blink, Bolt, Boomerang,
   BoomerangTwin, Buff, Burst, ChainArc, CoinMagnet, Dance, EveryN, Execute, Followup, Heal, HealAoe,
   HealDefib, Laser, LaserBackBeam, LaserRadial, Nuke, Pierce, Pulse, Radial, Rally, Shoot, Shots,
-  SlowAura, Strike, Summon, Sweep, Swing, Thrust, ThrustCombo, TimeStop, Turret, Volley,
+  SlowAura, Strike, Summon, Sweep, Swing, Thrown, Thrust, ThrustCombo, TimeStop, Turret, Volley,
 } from '../components'
 import { assertFree } from '../entities/ability'
 import { abilityArtEmoji, abilityFireSfx, abilityOnHit } from '../store'
@@ -71,6 +71,7 @@ const ShotsState: StateSpec = { comp: Shots, reset: (e) => { Shots.n[e] = 0 } }
 const AuraState: StateSpec = { comp: Aura, reset: (e) => { Aura.zone[e] = 0 } }
 /** 只有真的要瞄准的 kind 才挂——治疗/天罚/时停这些没有方向可言 */
 const AimState: StateSpec = { comp: Aim, reset: (e) => { Aim.rad[e] = 0 } }
+const ThrownState: StateSpec = { comp: Thrown, reset: (e) => { Thrown.n[e] = 0 } }
 
 /** attach 能用到的东西：世界（挂可选组件）+ 帧索引（把 emoji 解析成 frame） */
 export interface AttachCtx {
@@ -204,7 +205,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
   },
   boomerang: {
     comp: Boomerang,
-    state: [AimState],
+    state: [AimState, ThrownState],
     attach: (c, e, d) => {
       Boomerang.damage[e] = d.damage
       Boomerang.knockback[e] = d.knockback

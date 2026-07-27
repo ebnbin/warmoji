@@ -161,10 +161,8 @@ export function unequipAbilities(sim: Sim, ownerEid: number): void {
   for (const z of [...query(world, [ZoneFollow, Owner])]) if (hosts.includes(Owner.eid[z]!)) removeEntity(world, z)
   // 召唤物的 Owner 就是施放者本人（Built.by 才指母武器），故直接按持有者判
   for (const m of [...query(world, [Minion, Owner])]) if (Owner.eid[m] === ownerEid) removeEntity(world, m)
-  // 双子镖是武器的临时副本（主镖就是武器自己，随下面一并回收）
-  for (const f of [...query(world, [Flyer])]) {
-    if (f !== Flyer.of[f] && weapons.includes(Flyer.of[f]!)) removeEntity(world, f)
-  }
+  // 在途的镖是独立实体，随掷出它的武器一并回收
+  for (const f of [...query(world, [Flyer])]) if (weapons.includes(Flyer.of[f]!)) removeEntity(world, f)
   // 持有者本人不在此删——调用方紧接着 removeEntity 它，挂在它身上的能力组件随之消失
   for (const e of weapons) removeEntity(world, e)
 }

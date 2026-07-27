@@ -592,9 +592,13 @@ export const Shots = { n: i32() }
 /** 全域扫射的在途序列：left 剩余束数、nextAt 下一束时刻、angle 下一束方向 */
 export const Radial = { left: i32(), nextAt: f32(), angle: f32() }
 
+/** 这把武器在途几枚（回旋镖）。出手时置 count，每接住一枚减一，归零才计冷却。
+ * 从前是每帧遍历全部 Flyer 数 of===e，现在一次读 */
+export const Thrown = { n: i32() }
+
 /** 在途回旋镖：phase 0=去程（沿 launch→dest 缓动）1=回程（追持有者实时位置）。
- * of = 掷出它的武器实体——主镖就是武器自己（of 指向自身），双子镖是临时副本。
- * 已命中集在 store 的 flyerHits */
+ * of = 掷出它的武器实体。它是一颗独立实体——武器本身始终留在手上（在途期间隐藏），
+ * 不再有「主镖就是武器自己」这回事。已命中集在 store 的 flyerHits */
 export const Flyer = {
   of: i32(),
   phase: u8(),

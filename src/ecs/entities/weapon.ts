@@ -1,4 +1,4 @@
-import { addComponent, addComponents, addEntity, hasComponent, removeComponent, removeEntity } from 'bitecs'
+import { addComponent, addComponents, addEntity, hasComponent, removeEntity } from 'bitecs'
 import { DEG2RAD } from '../../util/units'
 import type { HeldVisual } from '../../types/abilityDefs'
 import type { OutlineKind } from '../../emoji/svg'
@@ -14,6 +14,7 @@ import {
   Held,
   Quad,
   Sprite,
+  Thrown,
   Tint,
   Transform,
   Weapon,
@@ -60,10 +61,12 @@ export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, f
   return e
 }
 
-/** 掷出去的一枚武器副本（双子镖）：与本体同外形同变体，只在飞行期存在，接住即离场。
- * 它不带能力、不属于谁的装备，只是那把武器的一个分身。
- * 外形全照本体的组件取——能掷出去的武器必然有身体 */
-export function spawnWeaponCopy(sim: Sim, weaponEid: number): number {
+/** 掷出去的一枚在途回旋镖：与武器同外形同变体，只在飞行期存在，接住即离场。
+ *
+ * **它不是武器**——武器始终留在持有者手上（在途期间隐藏）。从前主镖就是武器实体本身
+ * 飞了出去，于是双子镖没有实体可用，只好造个「武器副本」；现在每一枚在途的镖都是
+ * 一颗同构的独立实体，掷一枚和掷两枚没有区别。 */
+function spawnFlyerBody(sim: Sim, weaponEid: number): number {
   const t = addEntity(sim.world)
   addComponents(sim.world, t, Transform, Sprite, Tint, Depth, Quad)
   const size = Held.size[weaponEid]!
@@ -84,14 +87,14 @@ export function spawnWeaponCopy(sim: Sim, weaponEid: number): number {
 
 // ── 在途回旋镖：掷出与收回 ──────────────────────────────────────────────────
 
-/** 收镖：主镖（= 武器本身）摘掉 Flyer 回落成握持姿态，双子镖直接离场 */
+/** 收镖：在途的那一枚离场，武器的在途计数减一（归零才由 updateFlyers 计冷却） */
 export function catchFlyer(sim: Sim, e: number, f: number): void {
   flyerHits[f] = undefined
-  if (f === e) removeComponent(sim.world, f, Flyer)
-  else removeEntity(sim.world, f)
+  removeEntity(sim.world, f)
+  Thrown.n[e] = Math.max(0, Thrown.n[e]! - 1)
 }
 
-/** 掷出：主镖沿瞄准方向，双子镖朝正反两个方向 */
+/** 掷出：单镖沿瞄准方向，双子镖朝正反两个方向。武器留在手上（摆位系统按 Thrown 隐藏） */
 export function launch(sim: Sim, e: number, aim: number): void {
   playSfx('whoosh')
   const damage = Math.round(Boomerang.damage[e]! * damageMul(sim, e))
@@ -99,9 +102,10 @@ export function launch(sim: Sim, e: number, aim: number): void {
   const ox = ownerX(e)
   const oy = ownerY(e)
   const count = hasComponent(sim.world, e, BoomerangTwin) ? 2 : 1
+  Thrown.n[e] = count
   for (let i = 0; i < count; i++) {
     const angle = aim + i * Math.PI
-    const f = i === 0 ? e : spawnWeaponCopy(sim, e) // 主镖就是武器自己，双子是它的分身
+    const f = spawnFlyerBody(sim, e)
     addComponent(sim.world, f, Flyer)
     Flyer.of[f] = e
     Flyer.phase[f] = 0
