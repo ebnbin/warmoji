@@ -1,65 +1,35 @@
 import Phaser from 'phaser'
+import { CHARACTERS } from '../data/characters'
+import { ENEMY_DEFS } from '../data/enemies'
+import { loadHighScore } from '../save/highscore'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
+import { browserStorage } from '../util/storage'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/textures'
+import { iconLabel } from '../ui/emojiText'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
-import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 
-// 主菜单：⚔️ + 字标 + 一个主按钮 + 一排次级入口，居中一列，横竖屏同构。
+// 主菜单：两色 logo + 背景暗纹 + 「角色 vs 敌人」对峙小剧场，
+// 全部用已预载的描边纹理与 tween，比例定位横竖屏通用。
 //
-// 这里此前堆了四套无限循环的 tween：背景漂浮的暗纹 emoji、字标逐字弹跳、
-// 「角色 vs 敌人」互射的小剧场、主按钮呼吸缩放。**一直在动的东西读起来就是廉价**——
-// 它没有在表达任何状态，只是在证明自己会动。现在只保留一次进场：
-// 三组内容淡入并微微上浮，随即静止；**动效必须收场**，这是本页唯一的动效规矩。
-//
-// 一并去掉的还有：无信息量的副标题、最佳记录（排行榜之后单独做），
-// 以及 Twemoji 署名行——署名收进设置页一处，不必每张大厅页都挂一条。
-
-interface Rect {
-  x: number
-  y: number
-  w: number
-  h: number
-}
-
-/** 次级入口（场景键即 key） */
-const ENTRIES: readonly { key: 'studio' | 'wiki' | 'settings'; icon: string; label: string }[] = [
-  { key: 'studio', icon: '1f9ea', label: '工作台' },
-  { key: 'wiki', icon: '1f4d6', label: '图鉴' },
-  { key: 'settings', icon: '2699', label: '设置' },
-]
-
-/** 一列内容的度量（相对字标基线）。竖屏整体放大：同一套尺寸摆到 720×1280 上，
- * 会缩成一小簇浮在正中，四周全是空——空得像是还没做完，而不是克制 */
-interface MenuMetrics {
-  readonly logoSize: string
-  readonly swordSize: number
-  readonly swordDy: number
-  readonly startDy: number
-  readonly startW: number
-  readonly entryDy: number
-  readonly entryH: number
-}
-
-const LANDSCAPE: MenuMetrics = {
-  logoSize: FONT.display, swordSize: 96, swordDy: -122, startDy: 148, startW: 380, entryDy: 262, entryH: 56,
-}
-
-const PORTRAIT: MenuMetrics = {
-  logoSize: '100px', swordSize: 140, swordDy: -178, startDy: 216, startW: 440, entryDy: 372, entryH: 64,
-}
-
+// **一条规矩：不做上下摆动**。原地上下浮动的东西最招眼、也最没信息量，
+// 一屏三处一起晃就是廉价感的来源。摇摆（rotation）与横向弹道保留——
+// 前者是「站在那儿」的呼吸感，后者真的在表达「双方在互射」。
+// 副标题也不要：那行字没有信息量。Twemoji 署名收在设置页一处。
 export class MenuScene extends Phaser.Scene {
   // 视口变化触发的 restart 只重排布局，保留背景色等页面状态
   private preserveOnRestart = false
   private palette?: Palette
-  private startRect: Rect = { x: 0, y: 0, w: 0, h: 0 }
-  private entryRects: Record<string, Rect> = {}
+  private menuBtn = { x: 0, y: 0, w: 0, h: 0 }
+  private gearRect = { x: 0, y: 0, w: 0, h: 0 }
+  private bookRect = { x: 0, y: 0, w: 0, h: 0 }
+  private studioRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
     super('menu')
@@ -72,73 +42,65 @@ export class MenuScene extends Phaser.Scene {
     }
     this.preserveOnRestart = false
     applyBackground(this.palette)
-    this.entryRects = {}
-
     const w = viewport.logicalWidth
     const h = viewport.logicalHeight
     const res = textRes()
-    const m = h > w ? PORTRAIT : LANDSCAPE
-    const cx = w / 2
-    // 基线由「这一列实际占多高」反推：把整列的视觉重心放在 0.48 高度（略高于正中更耐看）。
-    // 写死基线的话，横竖屏里上下留白会一头大一头小
-    const top = m.swordDy - m.swordSize / 2
-    const bottom = m.entryDy + m.entryH / 2
-    const baseY = Math.round(h * 0.48 - (top + bottom) / 2)
+    const rng = new Rng((Date.now() ^ 0x9e3779b9) >>> 0)
 
-    const logo = this.buildLogo(cx, baseY, m, res)
-    const start = this.buildStart(cx, baseY + m.startDy, m, res)
-    const entries = this.buildEntries(cx, baseY + m.entryDy, m, res)
+    this.createBackdrop(w, h, rng)
+    this.createLogo(w, h * 0.22, res)
 
-    // 进场：淡入 + 上浮 16px，逐组错开 70ms；收场后页面完全静止
-    for (const [i, box] of [logo, start, entries].entries()) {
-      box.setAlpha(0)
-      box.y += 16
-      this.tweens.add({
-        targets: box,
-        alpha: 1,
-        y: '-=16',
-        duration: 420,
-        delay: i * 70,
-        ease: 'Cubic.easeOut',
+    this.createVignette(w / 2, h * 0.52)
+
+    const best = loadHighScore(browserStorage())
+    if (best.bestWave > 0) {
+      iconLabel(this, w / 2, h * 0.66, '1f3c6', 35, `最佳：第 ${best.bestWave} 波 · 击杀 ${best.bestKills}`, {
+        fontFamily: UI_FONT,
+        fontSize: FONT.body,
+        color: '#ffdc5d',
+        resolution: res,
       })
     }
 
-    this.input.keyboard?.once('keydown-SPACE', () => this.startGame())
-    this.input.keyboard?.once('keydown-ENTER', () => this.startGame())
+    // 右上角入口：🧪 Emoji Studio + 📖 图鉴 + ⚙️ 设置（圆底增强可点性）
+    const iconBg = this.add.graphics()
+    iconBg.fillStyle(0x000000, 0.18)
+    const gearX = w - safeInsets.right - 44
+    const gearY = safeInsets.top + 44
+    iconBg.fillCircle(gearX, gearY, 32)
+    iconBg.fillCircle(gearX - 84, gearY, 32)
+    iconBg.fillCircle(gearX - 168, gearY, 32)
+    emojiImage(this, gearX, gearY, '2699', 54)
+      .setAlpha(0.9)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => {
+        playSfx('click')
+        this.scene.start('settings')
+      })
+    this.gearRect = { x: gearX - 28, y: gearY - 28, w: 56, h: 56 }
+    emojiImage(this, gearX - 84, gearY, '1f4d6', 54)
+      .setAlpha(0.9)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => {
+        playSfx('click')
+        this.scene.start('wiki')
+      })
+    this.bookRect = { x: gearX - 84 - 28, y: gearY - 28, w: 56, h: 56 }
+    emojiImage(this, gearX - 168, gearY, '1f9ea', 54)
+      .setAlpha(0.9)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => {
+        playSfx('click')
+        this.scene.start('studio')
+      })
+    this.studioRect = { x: gearX - 168 - 28, y: gearY - 28, w: 56, h: 56 }
 
-    this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
-    })
-
-    this.report()
-  }
-
-  /** ⚔️ + 双色字标，静态。字标按两段实测宽度拼接后整体居中，不逐字摆位 */
-  private buildLogo(cx: number, y: number, m: MenuMetrics, res: number): Phaser.GameObjects.Container {
-    const style = {
-      fontFamily: UI_FONT,
-      fontSize: m.logoSize,
-      fontStyle: 'bold',
-      resolution: res,
-    }
-    const war = this.add.text(0, 0, 'War', { ...style, color: '#ffdc5d' }).setOrigin(0, 0.5)
-    const moji = this.add.text(0, 0, 'Moji', { ...style, color: '#f5f5f5' }).setOrigin(0, 0.5)
-    const total = war.width + moji.width
-    war.setX(-total / 2)
-    moji.setX(-total / 2 + war.width)
-    const sword = emojiImage(this, 0, m.swordDy, '2694', m.swordSize)
-    return this.add.container(cx, y, [sword, war, moji])
-  }
-
-  /** 主按钮：琥珀实心胶囊，静态；按下时整块轻微下压，抬起即出发 */
-  private buildStart(cx: number, cy: number, m: MenuMetrics, res: number): Phaser.GameObjects.Container {
-    const bw = Math.min(m.startW, viewport.logicalWidth - 96)
-    const bh = 78
-    this.startRect = { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh }
-    const bg = this.add.graphics()
-    roundRect(bg, -bw / 2, -bh / 2, bw, bh, bh / 2, { fill: 0xffdc5d })
-    const label = this.add
+    // 明确的按钮 + 空格键开始，避免任意点击误触；轻微脉动引导视线
+    const btn = { x: w / 2 - 170, y: h * 0.82 - 36, w: 340, h: 72 }
+    this.menuBtn = btn
+    const btnBg = this.add.graphics()
+    roundRect(btnBg, -btn.w / 2, -btn.h / 2, btn.w, btn.h, btn.h / 2, { fill: 0xffdc5d })
+    const btnText = this.add
       .text(0, 0, '开始战斗', {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
@@ -147,73 +109,31 @@ export class MenuScene extends Phaser.Scene {
         resolution: res,
       })
       .setOrigin(0.5)
-    const box = this.add.container(cx, cy, [bg, label])
-    const r = this.startRect
+    const btnBox = this.add.container(w / 2, h * 0.82, [btnBg, btnText])
+    this.tweens.add({
+      targets: btnBox,
+      scale: 1.045,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
     this.add
-      .zone(r.x, r.y, r.w, r.h)
+      .zone(btn.x, btn.y, btn.w, btn.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => box.setScale(0.97))
-      .on('pointerupoutside', () => box.setScale(1))
       .on('pointerup', () => {
-        box.setScale(1)
-        this.startGame()
+        playSfx('click')
+        this.scene.start('map')
       })
-    return box
-  }
+    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('map'))
+    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('map'))
 
-  /** 次级入口：一排轻量胶囊（图标 + 文字），宽度按文字实测自适应 */
-  private buildEntries(cx: number, cy: number, m: MenuMetrics, res: number): Phaser.GameObjects.Container {
-    const h = m.entryH
-    const gap = 14
-    const padX = 20
-    const icon = 32
-    const built = ENTRIES.map((e) => {
-      const label = this.add
-        .text(0, 0, e.label, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          color: '#c8c8d4',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5)
-      return { ...e, label, w: padX * 2 + icon + 10 + label.width }
+    this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
-    const total = built.reduce((s, b) => s + b.w, 0) + gap * (built.length - 1)
-    const box = this.add.container(cx, cy)
-    let x = -total / 2
-    for (const b of built) {
-      const bg = this.add.graphics()
-      roundRect(bg, x, -h / 2, b.w, h, h / 2, {
-        fill: 0xffffff, fillAlpha: 0.07, stroke: 0xffffff, strokeAlpha: 0.14,
-      })
-      const img = emojiImage(this, x + padX + icon / 2, 0, b.icon, icon)
-      b.label.setX(x + padX + icon + 10)
-      box.add([bg, img, b.label])
-      // 命中区用世界坐标：容器只承载进场动画，输入不跟着它一起动
-      const rect: Rect = { x: cx + x, y: cy - h / 2, w: b.w, h }
-      this.entryRects[b.key] = rect
-      this.add
-        .zone(rect.x, rect.y, rect.w, rect.h)
-        .setOrigin(0)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
-          playSfx('click')
-          this.scene.start(b.key)
-        })
-      x += b.w + gap
-    }
-    return box
-  }
 
-  private startGame(): void {
-    playSfx('click')
-    this.scene.start('map')
-  }
-
-  private report(): void {
-    const center = (r: Rect): Rect => ({ x: r.x + r.w / 2, y: r.y + r.h / 2, w: r.w, h: r.h })
-    const empty: Rect = { x: 0, y: 0, w: 0, h: 0 }
     reportDebug({
       scene: 'menu',
       elapsed: 0,
@@ -224,18 +144,169 @@ export class MenuScene extends Phaser.Scene {
       enemies: 0,
       pending: 0,
       fps: 0,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
+      viewW: w,
+      viewH: h,
       playerX: 0,
       playerY: 0,
       camX: 0,
       camY: 0,
       menu: {
-        start: center(this.startRect),
-        settings: center(this.entryRects.settings ?? empty),
-        wiki: center(this.entryRects.wiki ?? empty),
-        studio: center(this.entryRects.studio ?? empty),
+        start: {
+          x: this.menuBtn.x + this.menuBtn.w / 2,
+          y: this.menuBtn.y + this.menuBtn.h / 2,
+          w: this.menuBtn.w,
+          h: this.menuBtn.h,
+        },
+        settings: {
+          x: this.gearRect.x + this.gearRect.w / 2,
+          y: this.gearRect.y + this.gearRect.h / 2,
+          w: this.gearRect.w,
+          h: this.gearRect.h,
+        },
+        wiki: {
+          x: this.bookRect.x + this.bookRect.w / 2,
+          y: this.bookRect.y + this.bookRect.h / 2,
+          w: this.bookRect.w,
+          h: this.bookRect.h,
+        },
+        studio: {
+          x: this.studioRect.x + this.studioRect.w / 2,
+          y: this.studioRect.y + this.studioRect.h / 2,
+          w: this.studioRect.w,
+          h: this.studioRect.h,
+        },
       },
+    })
+  }
+
+  /** 背景漂浮暗纹：低透明度的敌人/能力 emoji 缓慢浮动旋转，增加画面纵深 */
+  private createBackdrop(w: number, h: number, rng: Rng): void {
+    // 敌人暗纹按比例在敌表里取样，避免写死下标——roster 增删/重排都不会取错或越界崩溃
+    const uniqEnemies = [...new Set(ENEMY_DEFS.map((e) => e.emoji))]
+    const enemyDecor = [0.2, 0.45, 0.75]
+      .map((f) => uniqEnemies[Math.min(uniqEnemies.length - 1, Math.floor(f * uniqEnemies.length))])
+      .filter((e): e is string => e !== undefined)
+      .map((emoji) => ({ emoji, outline: 'enemy' as const }))
+    const decor: { emoji: string; outline: 'enemy' | 'player' }[] = [
+      ...enemyDecor,
+      { emoji: '1fa93', outline: 'player' },
+      { emoji: '1fa83', outline: 'player' },
+      { emoji: '1f345', outline: 'player' },
+    ]
+    decor.forEach((d, i) => {
+      // 均匀散布在左右两侧竖条内，避开中央内容区
+      const side = i % 2 === 0 ? 0.06 + rng.next() * 0.16 : 0.78 + rng.next() * 0.16
+      const img = emojiImage(
+        this,
+        w * side,
+        h * (0.12 + rng.next() * 0.76),
+        d.emoji,
+        75 + rng.next() * 54,
+        d.outline,
+      )
+        .setAlpha(0.1)
+        .setRotation((rng.next() - 0.5) * 0.5)
+      // 只摇不浮：上下飘的暗纹会把视线从中间的内容上拽走
+      this.tweens.add({
+        targets: img,
+        rotation: img.rotation + 0.16,
+        duration: 2600 + rng.next() * 2200,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+        delay: rng.next() * 1200,
+      })
+    })
+  }
+
+  /** 分字母两色 logo：War 琥珀 + Moji 白，逐字错相弹跳；两侧⚔️摇摆 */
+  private createLogo(w: number, y: number, res: number): void {
+    const letters: { ch: string; color: string }[] = [
+      { ch: 'W', color: '#ffdc5d' },
+      { ch: 'a', color: '#ffdc5d' },
+      { ch: 'r', color: '#ffdc5d' },
+      { ch: 'M', color: '#f5f5f5' },
+      { ch: 'o', color: '#f5f5f5' },
+      { ch: 'j', color: '#f5f5f5' },
+      { ch: 'i', color: '#f5f5f5' },
+    ]
+    const texts = letters.map((l) =>
+      this.add
+        .text(0, y, l.ch, {
+          fontFamily: UI_FONT,
+          fontSize: FONT.display,
+          fontStyle: 'bold',
+          color: l.color,
+          resolution: res,
+        })
+        .setOrigin(0, 0.5),
+    )
+    const total = texts.reduce((s, t) => s + t.width, 0)
+    let x = w / 2 - total / 2
+    // 字标静止：逐字错相弹跳是这一屏里最跳的一处
+    for (const t of texts) {
+      t.setX(x)
+      x += t.width
+    }
+    const left = emojiImage(this, w / 2 - total / 2 - 58, y, '2694', 85)
+    const right = emojiImage(this, w / 2 + total / 2 + 58, y, '2694', 85)
+    this.tweens.add({
+      targets: left,
+      rotation: { from: -0.12, to: 0.12 },
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
+    this.tweens.add({
+      targets: right,
+      rotation: { from: 0.12, to: -0.12 },
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    })
+  }
+
+  /** 对峙小剧场：三名角色（面朝右弹跳）与三只敌人（摇摆）隔空互射 */
+  private createVignette(cx: number, cy: number): void {
+    const chars = Object.values(CHARACTERS)
+      .slice(0, 3)
+      .map((c) => c.emoji)
+    // 角色站定不跳；对面敌人保留摇摆，两队之间的弹道照旧来回
+    chars.forEach((emoji, i) => {
+      emojiImage(this, cx - 260 + i * 90, cy, emoji, 75, 'player').setFlipX(true)
+    })
+    const enemies = ENEMY_DEFS.slice(0, 3).map((s) => s.emoji)
+    enemies.forEach((emoji, i) => {
+      const img = emojiImage(this, cx + 80 + i * 90, cy, emoji, 70, 'enemy')
+      this.tweens.add({
+        targets: img,
+        rotation: { from: -0.09, to: 0.09 },
+        duration: 520,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+        delay: i * 170,
+      })
+    })
+    // 互射：番茄向右、敌弹向左，循环往复（弹道两端与两队保持间隙）
+    const tomato = emojiImage(this, cx - 34, cy - 6, '1f345', 40, 'player')
+    this.tweens.add({
+      targets: tomato,
+      x: cx + 42,
+      rotation: 6,
+      duration: 780,
+      repeat: -1,
+      repeatDelay: 260,
+    })
+    const shot = emojiImage(this, cx + 42, cy + 22, '1f534', 30, 'enemyProjectile')
+    this.tweens.add({
+      targets: shot,
+      x: cx - 34,
+      duration: 1100,
+      repeat: -1,
+      repeatDelay: 420,
     })
   }
 
