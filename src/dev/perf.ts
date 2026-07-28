@@ -41,6 +41,8 @@ export class PerfView {
     private readonly host: HudHost,
     private readonly w: number,
     private readonly top: number,
+    /** 是否跑在试炼场里：决定要不要念沙盒旋钮（正式局里那些旋钮根本不生效） */
+    private readonly sandbox: boolean,
   ) {
     const res = textRes()
     this.chart = scene.add.graphics()
@@ -71,8 +73,10 @@ export class PerfView {
 
   private refresh(): void {
     const p = this.host.perfSnapshot()
-    // 强度直读旋钮而非预设：旋钮可以逐个手改，照着预设念会念出一份与场上不符的强度
-    const step = scaleStep()
+    // 强度直读旋钮而非预设：旋钮可以逐个手改，照着预设念会念出一份与场上不符的强度。
+    // 正式局里这些旋钮不生效，故整段都不念——一份看着煞有介事、实则不成立的读数，
+    // 比没有这段更糟
+    const step = this.sandbox ? scaleStep() : undefined
     const cache = emojiCacheStats(this.scene)
     const heap = heapMB()
     const raf = rafHz()
@@ -80,7 +84,7 @@ export class PerfView {
     // 满载后清一次采样：刷怪从 0 爬到上限的那几百帧场上没几个实体、轻松满帧，
     // 混进来会把中位数整个拉到「赶上 vsync」那一档，读出来的稳态是假的。
     // 一次性闩死——敌人数会在上限附近上下浮动，否则会反复清零
-    if (!this.steadyArmed && p.enemies >= step.spawn.cap * 0.95) {
+    if (step && !this.steadyArmed && p.enemies >= step.spawn.cap * 0.95) {
       this.steadyArmed = true
       resetMetrics()
     }
@@ -119,7 +123,7 @@ export class PerfView {
       `vsync 档  ${m.buckets.map((b, i) => `${i === 3 ? '≥4' : i + 1}×${(b * 100).toFixed(0)}%`).join(' ')}`,
       '',
       '── 在场实体（真实战斗产出）──',
-      row('敌人', n(p.enemies), `上限 ${n(step.spawn.cap)}`),
+      row('敌人', n(p.enemies), step ? `上限 ${n(step.spawn.cap)}` : ''),
       row('弹体', n(p.projectiles)),
       row('金币', n(p.coins)),
       row('刷怪预告', n(p.pending)),
@@ -131,11 +135,13 @@ export class PerfView {
       row('emoji 纹理', n(cache.textures)),
       ...(m.drawCount === undefined ? [] : [row('渲染对象', n(m.drawCount))]),
       row('JS 堆', heap === undefined ? '—' : n(heap), heap === undefined ? '（非 Chrome）' : 'MB'),
-      '',
-      '── 本档强度 ──',
-      `队伍 ${labStarters().length} 人 · ${['基础', '一阶', '二阶'][labLevel()]!} · 攻速 ×${labFireRate()}`,
-      `敌人血量 ×${labDifficulty()} · ${labEnemySet().size} 种`,
-      `规模「${step.label}」上限 ${n(step.spawn.cap)} · 每批 ${step.spawn.batch} 只`,
+      ...(step === undefined ? [] : [
+        '',
+        '── 本档强度 ──',
+        `队伍 ${labStarters().length} 人 · ${['基础', '一阶', '二阶'][labLevel()]!} · 攻速 ×${labFireRate()}`,
+        `敌人血量 ×${labDifficulty()} · ${labEnemySet().size} 种`,
+        `规模「${step.label}」上限 ${n(step.spawn.cap)} · 每批 ${step.spawn.batch} 只`,
+      ]),
       '',
       '── 渲染后端 ──',
       rendererInfo(this.scene.game),

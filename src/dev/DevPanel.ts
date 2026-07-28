@@ -218,7 +218,10 @@ export class DevPanel {
           { id: 'preset', label: '强度' },
           { id: 'perf', label: '性能' },
         ]
-      : [{ id: 'perf', label: '性能' }]
+      : []
+    // 正式局只有性能一页：没有可切的东西就不画页签栏，
+    // 一个铺满整行的「页签」看着像个按钮，只会让人以为点了会发生什么
+    if (defs.length === 0) return 0
     const h = 44
     const pad = 12
     const cw = (w - pad * 2) / defs.length
@@ -393,7 +396,7 @@ export class DevPanel {
     y = this.note(y + 4, res, ecsOn
       ? 'ECS：bitECS 数据导向 + 自绘批量渲染'
       : 'arcade：一实体一 GameObject + Arcade Physics body')
-    this.perf = new PerfView(this.scene, this.host, this.view.viewport.w, y + 10)
+    this.perf = new PerfView(this.scene, this.host, this.view.viewport.w, y + 10, this.host.testMode)
     this.view.add(this.perf.objects)
     this.perfH = this.perf.update(0)
     return this.perfH

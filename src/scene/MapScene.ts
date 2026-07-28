@@ -118,6 +118,37 @@ export class MapScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
+    // 试炼场入口：只有开发者模式开着才出现。关掉开发者模式时一并把选择态归零，
+    // 否则会留下一个既看不见、又仍然生效的开关。
+    // 放在页头右端而不是确认按钮上方：那里是详情卡片的地盘，浮一颗药丸上去像是画错了
+    this.devMode = loadSettings(browserStorage()).devMode
+    if (!this.devMode) this.testMode = false
+    if (this.devMode) {
+      const tw = 210
+      const th = 46
+      this.testRect = { x: ox + L.content.w - 40 - tw, y: oy + L.headerY - th / 2, w: tw, h: th }
+      const t = this.testRect
+      this.testBg = this.add.graphics()
+      this.testLabel = this.add
+        .text(t.x + t.w / 2, oy + L.headerY, '', {
+          fontFamily: UI_FONT,
+          fontSize: FONT.small,
+          fontStyle: 'bold',
+          color: '#ffffff',
+          resolution: res,
+        })
+        .setOrigin(0.5)
+      this.add
+        .zone(t.x, t.y, t.w, t.h)
+        .setOrigin(0)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerup', () => {
+          playSfx('click')
+          this.testMode = !this.testMode
+          this.refresh()
+        })
+    }
+
     // 地图网格（单选；形象即含义，主题与装饰看详情面板）
     this.grid = new EmojiGrid(this, { x: ox + L.list.x, y: oy + L.list.y, w: L.list.w, h: L.list.h })
     this.grid.onTap = (key): void => {
@@ -156,35 +187,6 @@ export class MapScene extends Phaser.Scene {
         resolution: res,
       })
       .setOrigin(0.5)
-    // 试炼场入口：只有开发者模式开着才出现。关掉开发者模式时一并把选择态归零，
-    // 否则会留下一个既看不见、又仍然生效的开关
-    this.devMode = loadSettings(browserStorage()).devMode
-    if (!this.devMode) this.testMode = false
-    if (this.devMode) {
-      const tw = Math.min(360, L.btn.w)
-      const th = 52
-      this.testRect = { x: w / 2 - tw / 2, y: b.y - 16 - th, w: tw, h: th }
-      const t = this.testRect
-      this.testBg = this.add.graphics()
-      this.testLabel = this.add
-        .text(w / 2, t.y + th / 2, '', {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          fontStyle: 'bold',
-          color: '#ffffff',
-          resolution: res,
-        })
-        .setOrigin(0.5)
-      this.add
-        .zone(t.x, t.y, t.w, t.h)
-        .setOrigin(0)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
-          playSfx('click')
-          this.testMode = !this.testMode
-          this.refresh()
-        })
-    }
     const confirm = (): void => {
       playSfx('click')
       // 试炼场：跳过队长/组队/商店，用当前旋钮在该图上开沙盒
@@ -309,7 +311,7 @@ export class MapScene extends Phaser.Scene {
         fill: on ? 0xffdc5d : 0xffffff, fillAlpha: on ? 0.92 : 0.08,
         stroke: 0xffffff, strokeAlpha: on ? 0 : 0.18,
       })
-      this.testLabel.setText(on ? '试炼场：开 · 免死沙盒' : '试炼场：关')
+      this.testLabel.setText(on ? '试炼场：开' : '试炼场：关')
       this.testLabel.setColor(on ? '#25262e' : '#c8c8d4')
     }
     this.confirmLabel.setText(on ? '进入试炼场' : '选择队长')
