@@ -50,7 +50,7 @@ import { xpToNext } from '../war/xp'
 import { CAPTAINS } from '../data/captains'
 import { aggregateTeamCards } from '../data/cards'
 import type { TeamEffects } from '../types/items'
-import { INVINCIBLE_HP, densityParams, labInvincible } from '../run/lab'
+import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from '../run/sandbox'
 import { tickSkillCd } from '../war/skill'
 import { hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
@@ -92,7 +92,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private sim?: Sim
   private ready = false
   /** HUD 宿主契约：UIScene 据此显示实验室控件、正计时 */
-  testMode = false
+  sandbox = false
   /** HUD 宿主契约：当前 run（HUD 读 mapId/金币/经验等） */
   run!: RunState
   /** 团队卡牌聚合乘区（技能 CD 等；与 spawnTeam 内同源，开局定） */
@@ -176,7 +176,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     const run = getRun()
     this.run = run
-    this.testMode = run.testMode
+    this.sandbox = run.sandbox
     this.teamFx = aggregateTeamCards(run.teamCards)
     const mapDef = MAPS[run.mapId]
     applyBackground(mapDef.palette)
@@ -250,7 +250,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.rings = new RingLayer(this, this.world)
     this.ctx.atlas = atlas
     this.map.decor(this.ctx, atlas)
-    this.testMode = run.testMode
+    this.sandbox = run.sandbox
     const settings = loadSettings(browserStorage())
     this.hitShakeOn = settings.hitShake
     this.damageNumbersOn = settings.damageNumbers
@@ -259,14 +259,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
     this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
-    this.sim = makeSim(this.world, atlas, run, run.testMode, center, this.mapW, this.mapH)
+    this.sim = makeSim(this.world, atlas, run, run.sandbox, center, this.mapW, this.mapH)
     initialLayout(this.sim)
     this.map.onSimReady(this.ctx, this.sim)
     this.sim.hooks.onStart(this.sim)
     // 亡语同步重放:killEnemy 内当场跑(同帧先死者的治疗要救得到同伴)
     const simRef = this.sim
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
-    armTeam(this.sim, run, run.testMode)
+    armTeam(this.sim, run, run.sandbox)
     armCaptain(this.sim, run)
     for (let i = 0; i < this.sim.characters.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
@@ -288,12 +288,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       )
       this.shownCountdown.push(-1)
     }
-    if (!run.testMode) this.scheduleCarriers()
+    if (!run.sandbox) this.scheduleCarriers()
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
     this.waveBaseLevel = run.xp.level
     // 精英波:开场警示横幅后放敌潮(镜像 setup 的 isEliteWave 分支)
-    if (!run.testMode && isEliteWave(run.wave)) {
+    if (!run.sandbox && isEliteWave(run.wave)) {
       this.time.delayedCall(600, () => {
         const sim = this.sim
         if (!sim || sim.over) return
@@ -302,7 +302,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       })
     }
     // 正常模式 Boss 波开场:先开世界终波机关(无限图缩圈以此刻队伍位置张开),再预告投放本图 Boss
-    if (!run.testMode && isBossWave(run.wave)) {
+    if (!run.sandbox && isBossWave(run.wave)) {
       // 缩圈的视觉由无限图那份 MapView 自己按 worldState.zone 惰性建（见 views.ts）
       this.sim.hooks.onFinalWave(this.sim)
       this.time.delayedCall(600, () => {
@@ -461,7 +461,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       objects: this.children.list.length,
       bodies: 0,
       combatSec: Math.floor(totalSec),
-      spawnIntervalMs: Math.round(this.testMode ? densityParams().intervalMs : wave.spawnIntervalMs),
+      spawnIntervalMs: Math.round(this.sandbox ? spawnParams().intervalMs : wave.spawnIntervalMs),
       hpMultiplier: wave.hpMultiplier,
     }
   }
@@ -480,14 +480,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     return true
   }
 
-  /** 测试模式免死开关变更后重算队员血量上限(镜像 applyTestInvincible) */
-  applyTestInvincible(): void {
+  /** 试炼场免死开关变更后重算队员血量上限(镜像 applySandboxInvincible) */
+  applySandboxInvincible(): void {
     const sim = this.sim
     if (!sim) return
-    const mh = labInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
+    const mh = sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
     for (const m of sim.characters) {
       CharHp.max[m] = mh
-      CharHp.hp[m] = labInvincible() ? mh : Math.min(CharHp.hp[m]!, mh)
+      CharHp.hp[m] = sandboxInvincible() ? mh : Math.min(CharHp.hp[m]!, mh)
     }
   }
 
@@ -578,8 +578,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.damageText?.step(sim.fxMs)
       return
     }
-    // 波次时间到 → 结算 + 过场(测试模式无尽,便于性能观测)。用上一帧 elapsedMs 判定(晚 1 帧无碍)
-    if (!this.testMode && sim.elapsedMs >= waveDurationMs(sim.run.wave)) {
+    // 波次时间到 → 结算 + 过场(试炼场无尽,便于性能观测)。用上一帧 elapsedMs 判定(晚 1 帧无碍)
+    if (!this.sandbox && sim.elapsedMs >= waveDurationMs(sim.run.wave)) {
       const finished = settleWave(sim)
       this.scheduleWaveEnd(finished)
       return
@@ -623,7 +623,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
     this.updateHpBars()
     // 终波 Boss 被击败 → 通关结算(镜像 onBossDown → endWave)
-    if (!this.testMode && sim.bossDown) {
+    if (!this.sandbox && sim.bossDown) {
       // 稍候片刻让碎块飞散可见,再走通关结算(镜像 onBossDown 的 700ms)。
       // 这 700ms 世界照常运转(不置 ending),否则碎块凝住、爆点也放不出来
       sim.bossDown = false
@@ -631,7 +631,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         if (this.sim && !this.ending) this.scheduleWaveEnd(settleWave(this.sim))
       })
     }
-    // 全队阵亡 → 失败结算(试炼场同样结算:镜像旧 gameOver 无 testMode 门槛)
+    // 全队阵亡 → 失败结算(试炼场同样结算:镜像旧 gameOver 无 sandbox 门槛)
     if (sim.over) {
       this.ending = true
       this.run.combatMs += sim.elapsedMs // 败局也计入本波已打的时长(镜像 gameOver)

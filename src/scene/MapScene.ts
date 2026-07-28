@@ -4,7 +4,7 @@ import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
 import { battleSceneFor } from '../battle'
 import { beginRun } from '../run/state'
-import { labCaptain, labStarters } from '../run/lab'
+import { sandboxCaptain, sandboxStarters } from '../run/sandbox'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
@@ -73,7 +73,7 @@ export class MapScene extends Phaser.Scene {
   private confirmLabel!: Phaser.GameObjects.Text
   /** 试炼场开关（仅开发者模式下出现）：勾上则跳过队长/组队，直接进该图的沙盒 */
   private devMode = false
-  private testMode = false
+  private sandbox = false
   private testRect = { x: 0, y: 0, w: 0, h: 0 }
   private testBg?: Phaser.GameObjects.Graphics
   private testLabel?: Phaser.GameObjects.Text
@@ -122,7 +122,7 @@ export class MapScene extends Phaser.Scene {
     // 否则会留下一个既看不见、又仍然生效的开关。
     // 放在页头右端而不是确认按钮上方：那里是详情卡片的地盘，浮一颗药丸上去像是画错了
     this.devMode = loadSettings(browserStorage()).devMode
-    if (!this.devMode) this.testMode = false
+    if (!this.devMode) this.sandbox = false
     if (this.devMode) {
       const tw = 210
       const th = 46
@@ -144,7 +144,7 @@ export class MapScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .on('pointerup', () => {
           playSfx('click')
-          this.testMode = !this.testMode
+          this.sandbox = !this.sandbox
           this.refresh()
         })
     }
@@ -190,8 +190,8 @@ export class MapScene extends Phaser.Scene {
     const confirm = (): void => {
       playSfx('click')
       // 试炼场：跳过队长/组队/商店，用当前旋钮在该图上开沙盒
-      if (this.testMode) {
-        beginRun(labCaptain(), labStarters(), this.selectedId, true)
+      if (this.sandbox) {
+        beginRun(sandboxCaptain(), sandboxStarters(), this.selectedId, true)
         this.scene.start(battleSceneFor(this.selectedId))
         return
       }
@@ -303,7 +303,7 @@ export class MapScene extends Phaser.Scene {
 
   private refresh(): void {
     this.grid.setSelected(this.selectedId)
-    const on = this.testMode
+    const on = this.sandbox
     if (this.testBg && this.testLabel) {
       const t = this.testRect
       this.testBg.clear()
@@ -349,7 +349,7 @@ export class MapScene extends Phaser.Scene {
           ? {
               x: Math.round(this.testRect.x + this.testRect.w / 2),
               y: Math.round(this.testRect.y + this.testRect.h / 2),
-              on: this.testMode,
+              on: this.sandbox,
             }
           : undefined,
       },

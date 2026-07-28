@@ -90,7 +90,7 @@ export interface Sim {
   /** 敌人行为随机源(游荡换向/生成等;按 run 种子确定) */
   rng: Rng
   /** 试炼场沙盒(刷怪走勾选敌人 + 场内密度/难度旋钮;免死无时限) */
-  testMode: boolean
+  sandbox: boolean
   /** 刷怪冷却(预告本身是实体,见 entities/telegraph.ts) */
   spawnCooldownMs: number
   /** 本帧内死亡且带亡语的敌人快照(帧内通道:runDeathEffects 在同一条流水线里排空) */
@@ -170,7 +170,7 @@ export function makeSim(
   world: EcsWorld,
   atlas: EcsAtlas,
   run: RunState,
-  testMode: boolean,
+  sandbox: boolean,
   center: { x: number; y: number },
   mapW: number,
   mapH: number,
@@ -184,7 +184,7 @@ export function makeSim(
     captainDef.moveSpeed * UNIT * teamFx.moveSpeedMul,
     captainDef.coinMagnet * UNIT * teamFx.magnetMul,
   )
-  const team = formTeam(world, atlas, run, testMode, captain)
+  const team = formTeam(world, atlas, run, sandbox, captain)
   const { count, formation, postBySlot, lineupOrbit, characters } = team
   return {
     world,
@@ -219,7 +219,7 @@ export function makeSim(
     pendingDeaths: [],
     out: newOutbox(),
     rng: new Rng(run.decorSeed ^ 0x9e37),
-    testMode,
+    sandbox,
     spawnCooldownMs: 300,
     run,
     reward: {

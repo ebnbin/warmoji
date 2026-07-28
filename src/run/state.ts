@@ -22,8 +22,8 @@ export interface RunState {
   captainId: CaptainId
   /** 本局地图（关卡）；开局在地图选择页定下 */
   mapId: MapId
-  /** 测试模式：地图页勾选进入——免死无时限的沙盒，敌人/角色/队长/密度/难度场内自由切换 */
-  testMode: boolean
+  /** 试炼场：地图页开启进入——免死无时限的沙盒，敌人/角色/规模/难度/攻速场内自由切换 */
+  sandbox: boolean
   /** 地面装饰的摆放种子：一局一景，同局各波不变 */
   decorSeed: number
   /** 当前要打的波次（1 起）；波次结束进商店前 +1 */
@@ -78,7 +78,7 @@ export function beginRun(
   captainId: CaptainId,
   starters: readonly CharacterId[],
   mapId: MapId = MAP_IDS[0]!,
-  testMode = false,
+  sandbox = false,
 ): RunState {
   const captain = CAPTAINS[captainId]
   // 跳波开局（如神童）：难度时钟按被跳过波次的时长预推进，
@@ -91,7 +91,7 @@ export function beginRun(
     captainId,
     recruitPool: drawRecruitPool(recruitSeed(browserStorage(), captainId), ROSTER_IDS),
     mapId,
-    testMode,
+    sandbox,
     decorSeed: (Math.random() * 0xffffffff) >>> 0,
     wave: captain.startWave,
     coins: captain.startCoins,

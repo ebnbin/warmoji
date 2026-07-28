@@ -5,7 +5,7 @@ import { roundRect } from '../ui/shapes'
 import { heapMB, rafHz, rendererInfo } from './diagnostics'
 import { emojiCacheStats } from '../emoji/textures'
 import { metricsReport, recentFrameTimes, resetMetrics } from './metrics'
-import { labDifficulty, labEnemySet, labFireRate, labLevel, labStarters, scaleStep } from '../run/lab'
+import { sandboxDifficulty, sandboxEnemySet, sandboxFireRate, sandboxLevel, sandboxStarters, scaleStep } from '../run/sandbox'
 import { reportDevPerf } from './probe'
 import type { HudHost } from '../run/hudHost'
 
@@ -138,8 +138,8 @@ export class PerfView {
       ...(step === undefined ? [] : [
         '',
         '── 本档强度 ──',
-        `队伍 ${labStarters().length} 人 · ${['基础', '一阶', '二阶'][labLevel()]!} · 攻速 ×${labFireRate()}`,
-        `敌人血量 ×${labDifficulty()} · ${labEnemySet().size} 种`,
+        `队伍 ${sandboxStarters().length} 人 · ${['基础', '一阶', '二阶'][sandboxLevel()]!} · 攻速 ×${sandboxFireRate()}`,
+        `敌人血量 ×${sandboxDifficulty()} · ${sandboxEnemySet().size} 种`,
         `规模「${step.label}」上限 ${n(step.spawn.cap)} · 每批 ${step.spawn.batch} 只`,
       ]),
       '',

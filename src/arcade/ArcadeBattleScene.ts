@@ -28,14 +28,14 @@ import { memberMaxHp } from '../data/stats'
 import type { CharacterId, CharacterDef } from '../types/characters'
 import { aggregateTeamCards } from '../data/cards'
 import {
-  densityParams,
+  spawnParams,
   INVINCIBLE_HP,
-  labDifficulty,
-  labEnemySet,
-  labFireRate,
-  labInvincible,
-  labLevel,
-} from '../run/lab'
+  sandboxDifficulty,
+  sandboxEnemySet,
+  sandboxFireRate,
+  sandboxInvincible,
+  sandboxLevel,
+} from '../run/sandbox'
 import { AI, BOSS_SPAWN_RELIEF, DEFAULT_CONTACT, ELITE, ENEMIES, SPAWN, SURGE } from '../data/enemies'
 import type { EnemyDef } from '../types/enemies'
 import { UNIT } from '../util/units'
@@ -167,12 +167,12 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     timeStop: (durationMs) => this.startTimeStop(durationMs),
     buffTeamDamage: (mul, durationMs) => this.buffTeamDamage(mul, durationMs),
     spawnCoins: (x, y, count) => this.spawnRewardCoins(x, y, count),
-    waveScale: () => (this.testMode ? 1 : waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier),
+    waveScale: () => (this.sandbox ? 1 : waveAt((this.run.combatMs + this.elapsedMs) / 1000).hpMultiplier),
     isBossTarget: (ref) => enemyOf(ref as ImageObj).boss,
     morphTarget: (ref, spec) => this.applyHex(ref as ImageObj, spec),
     damageMul: () => this.stats.damageMul,
-    // 测试模式攻速旋钮实时生效：冷却按 labFireRate 现算（每帧读，改档即生效不重开）
-    cooldownMul: () => this.stats.cooldownMul * this.testFireFactor(),
+    // 试炼场攻速旋钮实时生效：冷却按 sandboxFireRate 现算（每帧读，改档即生效不重开）
+    cooldownMul: () => this.stats.cooldownMul * this.sandboxFireFactor(),
     sfx: (id) => playSfx(id),
   }
   // 效果触发的场景级 team ctx：子弹/命中效果复用统一 applyEffects，归属靠 teamEffectSlot
@@ -271,9 +271,9 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
   /** 时停冷雾遮罩（屏幕固定，任意地图通用）+ 其当前不透明度（平滑淡入淡出） */
   private timeStopFx?: Phaser.GameObjects.Rectangle
   private timeStopFxAlpha = 0
-  // 测试模式（地图页勾选进入）：免死/无时限/无进度/无精英Boss波/满编环形的沙盒；
+  // 试炼场（地图页勾选进入）：免死/无时限/无进度/无精英Boss波/满编环形的沙盒；
   // 出怪来自场内勾选，密度/难度/攻速/无敌由场内旋钮控制
-  testMode = false
+  sandbox = false
   over = false
   // 本波战果基线（结算横幅展示增量用）
   private waveBaseKills = 0
@@ -321,7 +321,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
   }
   /** 当前波次的出怪权重表：默认取本图 mix；昼夜图按相位覆写为白天/黑夜两套之一 */
   protected buildEnemyMix(): EnemyMixEntry[] {
-    return enemyMixAt(MAPS[this.run.mapId].mix, this.testMode ? 10 : this.run.wave)
+    return enemyMixAt(MAPS[this.run.mapId].mix, this.sandbox ? 10 : this.run.wave)
   }
   /** 出怪间隔倍率（<1 更密、>1 更疏）：默认 1；昼夜图白天更密、夜晚更疏 */
   protected spawnIntervalScale(): number {
@@ -580,7 +580,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
       objects: this.children.list.length,
       bodies: this.physics.world.bodies.size,
       combatSec: Math.floor(totalSec),
-      spawnIntervalMs: Math.round(this.testMode ? densityParams().intervalMs : wave.spawnIntervalMs),
+      spawnIntervalMs: Math.round(this.sandbox ? spawnParams().intervalMs : wave.spawnIntervalMs),
       hpMultiplier: wave.hpMultiplier,
     }
   }
@@ -615,14 +615,14 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     const mapDef = MAPS[this.run.mapId]
     this.palette = mapDef.palette
     applyBackground(this.palette)
-    this.testMode = this.run.testMode
+    this.sandbox = this.run.sandbox
     this.settings = loadSettings(browserStorage())
     this.stats = {
       damageMul: 1,
-      // 测试模式的攻速旋钮：冷却 ÷ 倍率（×10 = 十倍攻速，重现旧压测手感）
+      // 试炼场的攻速旋钮：冷却 ÷ 倍率（×10 = 十倍攻速，重现旧压测手感）
       cooldownMul: 1,
       moveSpeed: CAPTAINS[this.run.captainId].moveSpeed * UNIT,
-      maxHp: this.testMode && labInvincible() ? INVINCIBLE_HP : MEMBER.maxHp,
+      maxHp: this.sandbox && sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp,
     }
     this.elapsedMs = 0
     this.spawnCooldownMs = 300
@@ -663,12 +663,12 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     this.centerObj = this.add.zone(this.center.x, this.center.y, 1, 1)
 
     this.memberGroup = this.add.group()
-    // 阵容来自 run（正常局招募制；测试模式即地图页勾选进入时的场内勾选角色）
+    // 阵容来自 run（正常局招募制；试炼场即地图页勾选进入时的场内勾选角色）
     const rosterIds = this.run.roster
     this.lineup = rosterIds.map((id) => CHARACTERS[id])
     // 槽位 → 队形岗位：达 5 人后 N 保 1 按 guardOrder（0 号岗 = 受保护中心，
-    // 互换中心不影响其他人的岗位）；未达门槛/测试模式为环形，槽位即岗位
-    const order = this.testMode || !hasCenter(this.run) ? null : guardOrder(this.run)
+    // 互换中心不影响其他人的岗位）；未达门槛/试炼场为环形，槽位即岗位
+    const order = this.sandbox || !hasCenter(this.run) ? null : guardOrder(this.run)
     this.postBySlot = rosterIds.map((id, slot) => {
       if (!order) return slot
       const post = order.indexOf(id)
@@ -707,13 +707,13 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     this.projectiles = this.add.group()
     this.enemyProjectiles = this.add.group()
     this.coins = this.add.group()
-    // 正常局按当前波次配比出怪；测试模式不走出怪表（改由 spawnTest 从场内勾选出怪），此值备用
+    // 正常局按当前波次配比出怪；试炼场不走出怪表（改由 spawnSandbox 从场内勾选出怪），此值备用
     this.enemyMix = this.buildEnemyMix()
     // 战场拾取：本波按预算铺开固定数量的携带者（本图池抽定 buff/debuff）
-    if (!this.testMode) this.scheduleCarriers()
+    if (!this.sandbox) this.scheduleCarriers()
 
     // 节点波：精英波敌潮与末波 Boss，开场警示横幅后兑现
-    if (!this.testMode && isEliteWave(this.run.wave)) {
+    if (!this.sandbox && isEliteWave(this.run.wave)) {
       this.time.delayedCall(600, () => {
         if (this.over) return
         this.events.emit('wave-warning', {
@@ -723,7 +723,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
         this.spawnSurge()
       })
     }
-    if (!this.testMode && isBossWave(this.run.wave)) {
+    if (!this.sandbox && isBossWave(this.run.wave)) {
       this.onFinalWaveSetup()
       this.time.delayedCall(600, () => {
         if (this.over) return
@@ -786,8 +786,8 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     if (tsActive) this.timeStopMsLeft = Math.max(0, this.timeStopMsLeft - wdelta)
     this.elapsedMs += wdelta
 
-    // 波次时间到 → 结算/商店（测试模式无尽，便于性能观测）
-    if (!this.testMode && this.elapsedMs >= waveDurationMs(this.run.wave)) {
+    // 波次时间到 → 结算/商店（试炼场无尽，便于性能观测）
+    if (!this.sandbox && this.elapsedMs >= waveDurationMs(this.run.wave)) {
       this.endWave()
       return
     }
@@ -1001,9 +1001,9 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
 
   // ── 队伍 ────────────────────────────────────────────────────
 
-  /** 生效队形：满员自动 N 保 1（测试模式固定环形） */
+  /** 生效队形：满员自动 N 保 1（试炼场固定环形） */
   protected activeFormation(): FormationId {
-    return this.testMode ? 'ring' : currentFormation(this.run)
+    return this.sandbox ? 'ring' : currentFormation(this.run)
   }
 
   /** 当前队形的全部岗位偏移（环形全员/N 保 1 外圈含主力驱动的共享相位） */
@@ -1047,11 +1047,11 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
       },
     }
     // 道具修正：个体属性 + 每角色独立的伤害/冷却倍率 ctx + 预算生效能力参数；
-    // 专属升级来自已购的角色专属升级卡（测试模式无道具 = 素体）
-    const owned = this.testMode ? [] : (this.run.memberItems[slot] ?? [])
-    // 角色等级：测试模式由「角色等级」旋钮给定（labLevel 0/1/2 → 1/2/3 级）；
+    // 专属升级来自已购的角色专属升级卡（试炼场无道具 = 素体）
+    const owned = this.sandbox ? [] : (this.run.memberItems[slot] ?? [])
+    // 角色等级：试炼场由「角色等级」旋钮给定（sandboxLevel 0/1/2 → 1/2/3 级）；
     // 正常局由该角色累计的专属经验推导。等级同时决定能力档位与基础属性质变。
-    const level = this.testMode ? labLevel() + 1 : characterLevel(characterXp(owned))
+    const level = this.sandbox ? sandboxLevel() + 1 : characterLevel(characterXp(owned))
     const fx = aggregateCharacterEffects(owned, levelStatsFor(id, level))
     const tiers = tiersForLevel(level)
     const memberCtx: AbilityContext = {
@@ -1068,7 +1068,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
           this.teamFx.teamCooldownMul *
           this.battleFx.teamCooldownMul *
           atk *
-          this.testFireFactor()
+          this.sandboxFireFactor()
         )
       },
       // 伤害/子弹带上来源槽位：结算页按角色统计输出与击杀。
@@ -1106,7 +1106,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
         mm.anim.play(clipId, { durMs })
       },
     }
-    const maxHp = this.testMode
+    const maxHp = this.sandbox
       ? this.stats.maxHp
       : Math.round(memberMaxHp(fx.hpAdd, CAPTAINS[this.run.captainId].hpMul) * this.teamFx.teamHpMul)
     // 部件动画：idle 常驻翻帧（slot 错开相位），帧烘焙是惰性的，就绪前保持静态
@@ -1139,7 +1139,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
       thorns: fx.thorns,
       killHeal: fx.killHeal,
       // 血量跨波保留；上一波阵亡者低血量复活（压测模式不走 run 状态）
-      hp: this.testMode
+      hp: this.sandbox
         ? this.stats.maxHp
         : waveStartHp(this.run.memberHp[slot] ?? MEMBER.maxHp, maxHp),
       alive: true,
@@ -1766,8 +1766,8 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
   private spawn(delta: number): void {
     this.spawnCooldownMs -= delta
     if (this.spawnCooldownMs > 0) return
-    // 测试模式：只补勾选的敌人，密度/难度由场内旋钮控制，与常规刷怪分道
-    if (this.testMode) return this.spawnTest()
+    // 试炼场：只补勾选的敌人，密度/难度由场内旋钮控制，与常规刷怪分道
+    if (this.sandbox) return this.spawnSandbox()
     // 难度按跨波累计战斗时长递增；刷怪供给随在场人数缩放（单人首发不会被满编压力淹没）；
     // Boss 波常规刷怪减压：焦点让给 Boss，避免「满速杂兵 + 精英 + Boss」三重压力叠满
     const wave = waveAt((this.run.combatMs + this.elapsedMs) / 1000)
@@ -1778,16 +1778,16 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     this.spawnOne(wave.hpMultiplier)
   }
 
-  /** 测试模式补场：从勾选敌人里随机取，密度（间隔/上限/每批）与难度（血量倍率）走场内旋钮。
-   * boss 用 Boss 待遇生成；larva 直接生成即无属主 → 走暴走档。免死/无时限由测试模式提供 */
-  private spawnTest(): void {
-    const d = densityParams()
+  /** 试炼场补场：从勾选敌人里随机取，密度（间隔/上限/每批）与难度（血量倍率）走场内旋钮。
+   * boss 用 Boss 待遇生成；larva 直接生成即无属主 → 走暴走档。免死/无时限由试炼场提供 */
+  private spawnSandbox(): void {
+    const d = spawnParams()
     this.spawnCooldownMs = d.intervalMs
     // 勾选集跨图保留，但只生成本图会出现的敌人——他图残留的勾选在此图不出场
     const roster = new Set<string>(mapEnemyRoster(this.run.mapId).map((e) => e.kind))
-    const kinds = [...labEnemySet()].filter((k) => k in ENEMIES && roster.has(k))
+    const kinds = [...sandboxEnemySet()].filter((k) => k in ENEMIES && roster.has(k))
     if (kinds.length === 0) return
-    const hpMul = labDifficulty()
+    const hpMul = sandboxDifficulty()
     for (let i = 0; i < d.batch; i++) {
       if (this.spawnCapCount() + this.pendingSpawns >= d.cap) return
       const raw = ENEMIES[kinds[Math.floor(this.rng.next() * kinds.length)]!]!
@@ -1796,18 +1796,18 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     }
   }
 
-  /** 测试模式攻速倍率（我方冷却 ÷ 此值）：每帧现读，攻速旋钮改档即生效 */
-  private testFireFactor(): number {
-    return this.testMode ? 1 / labFireRate() : 1
+  /** 试炼场攻速倍率（我方冷却 ÷ 此值）：每帧现读，攻速旋钮改档即生效 */
+  private sandboxFireFactor(): number {
+    return this.sandbox ? 1 / sandboxFireRate() : 1
   }
 
-  /** 测试模式「无敌」旋钮实时生效：即时改写全队血量上限（开则回满），无需重开竞技场 */
-  applyTestInvincible(): void {
-    const mh = labInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
+  /** 试炼场「无敌」旋钮实时生效：即时改写全队血量上限（开则回满），无需重开竞技场 */
+  applySandboxInvincible(): void {
+    const mh = sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
     this.stats.maxHp = mh
     for (const m of this.members) {
       m.maxHp = mh
-      m.hp = labInvincible() ? mh : Math.min(m.hp, mh)
+      m.hp = sandboxInvincible() ? mh : Math.min(m.hp, mh)
     }
   }
 
@@ -1815,7 +1815,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     const def = toPx(pickEnemy(this.enemyMix, () => this.rng.next()))
     // 精英怪：到波数后按概率强化出场（血量刷怪时算入，移速/伤害走敌身标记）
     const elite =
-      !this.testMode &&
+      !this.sandbox &&
       (forceElite ||
         (this.run.wave >= ELITE.fromWave && this.rng.next() < ELITE.chance))
     const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))

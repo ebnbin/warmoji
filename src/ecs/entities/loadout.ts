@@ -5,7 +5,7 @@ import { levelStatsFor } from '../../data/levels'
 import { characterLevel } from '../../data/charLevel'
 import { aggregateTeamCards } from '../../data/cards'
 import { toPx } from '../../war/px'
-import { labLevel } from '../../run/lab'
+import { sandboxLevel } from '../../run/sandbox'
 import { FACTION } from '../components'
 import { equipAbility, NEUTRAL_AMP } from './ability'
 import type { RunState } from '../../run/state'
@@ -14,14 +14,14 @@ import type { Sim } from '../sim'
 // 开局装配：把配装解析成一条条能力。队伍在开局一次装齐；敌人首次被扫到时装配
 // （lazy-arm，与旧实现的出生即装配等价，因为压制期照样推进冷却）。
 
-/** 为全队装备能力：逐槽位按已持道具 + 专属等级解析生效能力（测试模式走场内等级旋钮） */
-export function armTeam(sim: Sim, run: RunState, testMode: boolean): void {
+/** 为全队装备能力：逐槽位按已持道具 + 专属等级解析生效能力（试炼场走场内等级旋钮） */
+export function armTeam(sim: Sim, run: RunState, sandbox: boolean): void {
   const teamFx = aggregateTeamCards(run.teamCards)
   for (let slot = 0; slot < run.roster.length; slot++) {
     const id = run.roster[slot]!
     const def = CHARACTERS[id]
-    const owned = testMode ? [] : (run.memberItems[slot] ?? [])
-    const level = testMode ? labLevel() + 1 : characterLevel(characterXp(owned))
+    const owned = sandbox ? [] : (run.memberItems[slot] ?? [])
+    const level = sandbox ? sandboxLevel() + 1 : characterLevel(characterXp(owned))
     const tiers = { u1: level >= 2, u2: level >= 3 }
     const fx = aggregateCharacterEffects(owned, levelStatsFor(id, level))
     // 装备期乘区（道具/等级/团队卡折算）：随局面变的那部分由 amp.ts 现算

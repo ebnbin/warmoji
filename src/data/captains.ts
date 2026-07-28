@@ -22,8 +22,9 @@ export const CAPTAINS = Object.fromEntries(
 ) as Record<CaptainId, CaptainDef>
 export const CAPTAIN_IDS = Object.keys(CAPTAINS) as readonly CaptainId[]
 
-/** 测试专用队长：不进正常队长选择页，测试模式固定用它（编制 8、无限金币、永远满豆、无增益） */
-export const TEST_CAPTAIN: CaptainId = 'tester'
+/** 沙盒专用队长：不进正常队长选择页，试炼场固定用它（编制 8、无限金币、永远满豆、无增益）。
+ * 内容侧 id 仍是 tester（队长表是内容数据，不随代码措辞改） */
+export const SANDBOX_CAPTAIN: CaptainId = 'tester'
 
-/** 正常可选队长（排除测试专用队长）：队长选择页用 */
-export const PICKABLE_CAPTAIN_IDS = CAPTAIN_IDS.filter((id) => id !== TEST_CAPTAIN)
+/** 正常可选队长（排除沙盒专用队长）：队长选择页用 */
+export const PICKABLE_CAPTAIN_IDS = CAPTAIN_IDS.filter((id) => id !== SANDBOX_CAPTAIN)

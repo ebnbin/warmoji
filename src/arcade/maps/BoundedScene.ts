@@ -187,7 +187,7 @@ export class BoundedScene extends ArcadeBattleScene {
     if (!dn) return super.buildEnemyMix()
     const m = this.mapDef
     const rows = (isDayAt(this.clockHour()) ? m.dayMix : m.nightMix) ?? m.mix
-    return enemyMixAt(rows, this.testMode ? 10 : this.run.wave)
+    return enemyMixAt(rows, this.sandbox ? 10 : this.run.wave)
   }
 
   /** dayNight 图白天更密、夜晚更疏；否则常速 */

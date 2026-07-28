@@ -55,16 +55,16 @@ export function formTeam(
   world: EcsWorld,
   atlas: EcsAtlas,
   run: RunState,
-  testMode: boolean,
+  sandbox: boolean,
   captainEid: number,
 ): TeamLayout {
   const cx = Transform.x[captainEid]!
   const cy = Transform.y[captainEid]!
   const rosterIds = run.roster
   const count = rosterIds.length
-  const formation = testMode ? 'ring' : currentFormation(run)
+  const formation = sandbox ? 'ring' : currentFormation(run)
   // N 保 1：护卫序把某个角色排到中心岗位，故 slot ≠ post
-  const order = testMode || !hasCenter(run) ? null : guardOrder(run)
+  const order = sandbox || !hasCenter(run) ? null : guardOrder(run)
   const postBySlot = rosterIds.map((id, slot) => {
     if (!order) return slot
     const post = order.indexOf(id)
@@ -76,7 +76,7 @@ export function formTeam(
     const post = postBySlot[slot] ?? slot
     const off = posts[post] ?? { x: 0, y: 0 }
     characters.push(
-      spawnCharacter(world, atlas, run, testMode, {
+      spawnCharacter(world, atlas, run, sandbox, {
         slot,
         post,
         x: cx + off.x,

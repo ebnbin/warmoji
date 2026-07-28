@@ -58,8 +58,8 @@ export function activeHudHost(): HudHost | undefined {
 }
 
 export interface HudHost {
-  /** 测试模式（沙盒）：HUD 据此显示实验室控件、计时改为正计时 */
-  readonly testMode: boolean
+  /** 试炼场（沙盒）：HUD 据此放开开发者面板的沙盒页签、计时改为正计时 */
+  readonly sandbox: boolean
   /** 场景事件（wave-complete / wave-warning / skill-cast / field-collected） */
   readonly events: Phaser.Events.EventEmitter
   /** 场景插件（暂停/恢复/重启/切场景） */
@@ -84,8 +84,8 @@ export interface HudHost {
   }
   /** 释放主动技能（按钮/E 键），返回是否真的放出 */
   castSkill(): boolean
-  /** 测试模式免死开关变更后重算队员血量上限 */
-  applyTestInvincible(): void
+  /** 试炼场「无敌」旋钮变更后重算队员血量上限 */
+  applySandboxInvincible(): void
 }
 
 // ── 反方向：战斗侧要从 HUD 读的全部东西 ──────────────────────────

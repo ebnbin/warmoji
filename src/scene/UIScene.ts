@@ -238,12 +238,12 @@ export class UIScene extends Phaser.Scene implements HudInput {
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.drawXpBar(s)
     if (s.kills !== this.last.kills) this.killsText.setText(String(s.kills))
     if (s.coins !== this.last.coins) this.coinsText.setText(String(s.coins))
-    // 常规显示本波倒计时；测试模式无波次限时，显示已进行时间
+    // 常规显示本波倒计时；试炼场无波次限时，显示已进行时间
     const remainSec = Math.ceil(s.remainMs / 1000)
     const lastRemainSec = Math.ceil(this.last.remainMs / 1000)
     if (s.wave !== this.last.wave || remainSec !== lastRemainSec || s.seconds !== this.last.seconds) {
       this.timeText.setText(
-        this.arena.testMode ? formatTime(s.seconds) : `第${s.wave}波 ${formatTime(remainSec)}`,
+        this.arena.sandbox ? formatTime(s.seconds) : `第${s.wave}波 ${formatTime(remainSec)}`,
       )
     }
     if (s.bossHp !== this.last.bossHp) this.drawBossBar(s)

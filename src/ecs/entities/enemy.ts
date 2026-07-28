@@ -341,7 +341,7 @@ export function awakeCount(sim: Sim): number {
  * 常规刷怪(spawnStep)与敌潮到点(fireSurges)共用 */
 export function telegraphOne(sim: Sim, hpMultiplier: number, forceElite = false): void {
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
-  const elite = !sim.testMode && (forceElite || (sim.run.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance))
+  const elite = !sim.sandbox && (forceElite || (sim.run.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance))
   const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
   const pos = sim.hooks.spawnPoint(sim, false)
   spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, false)
@@ -359,7 +359,7 @@ export function spawnSurgeEcs(sim: Sim): void {
 }
 
 /** 生成本图 Boss(镜像 spawnBoss:同一 materialize 管线,boss 标记金边/深度/HUD 血条)。
- * 正常模式的 Boss 波开场调用;测试模式经 __ecsSpawnEnemy(bossKind) 直投 */
+ * 正常模式的 Boss 波开场调用;试炼场经 __ecsSpawnEnemy(bossKind) 直投 */
 export function spawnBossEcs(sim: Sim): void {
   if (sim.over) return
   const def = toPx(bossFor(sim.mapId))

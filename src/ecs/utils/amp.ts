@@ -1,6 +1,6 @@
 import { } from '../../data/items'
 import { waveAt } from '../../data/waves'
-import { labFireRate } from '../../run/lab'
+import { sandboxFireRate } from '../../run/sandbox'
 import { Anchor, DmgMul, CharAtkSlow, Slot, Transform } from '../components'
 import { Amp, FACTION, Faction, Owner } from '../components'
 import type { } from './source'
@@ -31,14 +31,14 @@ export function cooldownMul(sim: Sim, e: number): number {
   if (Faction.v[e] === FACTION.enemy) return 1
   const o = Owner.eid[e]!
   const atk = CharAtkSlow.until[o]! > sim.elapsedMs ? CharAtkSlow.mul[o]! : 1
-  const lab = sim.testMode && Amp.battle[e] ? 1 / labFireRate() : 1
+  const lab = sim.sandbox && Amp.battle[e] ? 1 / sandboxFireRate() : 1
   return Amp.cd[e]! * sim.battleFx.teamCooldownMul * atk * lab
 }
 
 /** 波次威胁倍率（随敌人成长缩放的效果用）。试炼场里常规出手不吃波次成长——
  * 那边的强度由场内旋钮定；队长技能载荷不受旋钮管辖，照常吃曲线 */
 export function waveScale(sim: Sim, e: number): number {
-  if (sim.testMode && Amp.battle[e]) return 1
+  if (sim.sandbox && Amp.battle[e]) return 1
   return waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
 }
 

@@ -3,28 +3,28 @@ import { CHARACTERS } from '../data/characters'
 import { mapEnemyRoster } from '../data/maps'
 import type { CharacterId } from '../types/characters'
 import {
-  applyLabPreset,
-  isLabCharacterOn,
-  isLabEnemyOn,
-  labCaptain,
-  labDifficulty,
-  labFireRate,
-  labInvincible,
-  labLevel,
-  labPresetId,
-  labScale,
-  labStarters,
-  LAB_PRESETS,
+  applySandboxPreset,
+  isSandboxCharacterOn,
+  isSandboxEnemyOn,
+  sandboxCaptain,
+  sandboxDifficulty,
+  sandboxFireRate,
+  sandboxInvincible,
+  sandboxLevel,
+  sandboxPresetId,
+  sandboxScale,
+  sandboxStarters,
+  SANDBOX_PRESETS,
   SCALES,
-  setLabDifficulty,
-  setLabFireRate,
-  setLabInvincible,
-  setLabLevel,
-  setLabScale,
-  toggleLabCharacter,
-  toggleLabEnemy,
-} from '../run/lab'
-import type { LabLevel, LabMul } from '../run/lab'
+  setSandboxDifficulty,
+  setSandboxFireRate,
+  setSandboxInvincible,
+  setSandboxLevel,
+  setSandboxScale,
+  toggleSandboxCharacter,
+  toggleSandboxEnemy,
+} from '../run/sandbox'
+import type { SandboxLevel, SandboxMul } from '../run/sandbox'
 import { beginRun } from '../run/state'
 import type { HudHost } from '../run/hudHost'
 import { battleSceneFor } from '../battle'
@@ -120,7 +120,7 @@ export class DevPanel {
   private rebuild(): void {
     this.clearObjs()
     // 试炼场四页全开；正式局只留「性能」——战场/队伍旋钮会毁掉一局正式游戏
-    if (!this.host.testMode && tab !== 'perf') tab = 'perf'
+    if (!this.host.sandbox && tab !== 'perf') tab = 'perf'
     if (!open) {
       this.view.setViewport(OFFSCREEN)
       detachMetrics()
@@ -174,7 +174,7 @@ export class DevPanel {
     this.objs.push(g, blocker)
 
     const headH = 50
-    const label = this.host.testMode ? '开发者 · 试炼场' : '开发者'
+    const label = this.host.sandbox ? '开发者 · 试炼场' : '开发者'
     this.objs.push(
       this.scene.add
         .text(x + 16, y + headH / 2, label, {
@@ -211,7 +211,7 @@ export class DevPanel {
   }
 
   private buildTabs(x: number, y: number, w: number, res: number): number {
-    const defs: { id: DevTab; label: string }[] = this.host.testMode
+    const defs: { id: DevTab; label: string }[] = this.host.sandbox
       ? [
           { id: 'field', label: '战场' },
           { id: 'team', label: '队伍' },
@@ -266,72 +266,72 @@ export class DevPanel {
     // 只列本图会出现的敌人（波次编排 + 终波 Boss + 衍生子代），不混入他图的怪
     y = this.section('敌人 · 实时生效', y, res, mapEnemyRoster(this.host.run.mapId).map((d) => ({
       label: d.name,
-      on: isLabEnemyOn(d.kind),
+      on: isSandboxEnemyOn(d.kind),
       tap: (): void => {
-        toggleLabEnemy(d.kind)
+        toggleSandboxEnemy(d.kind)
         this.rebuild()
       },
     })))
     // 规模阶梯整条铺开：面板选得到的就是刷怪器的全部量程
     y = this.section('规模 · 在场上限', y + 12, res, SCALES.map((s) => ({
       label: `${s.label} ${s.spawn.cap}`,
-      on: labScale() === s.id,
+      on: sandboxScale() === s.id,
       tap: (): void => {
-        setLabScale(s.id)
+        setSandboxScale(s.id)
         this.rebuild()
       },
     })))
-    const muls: LabMul[] = [1, 3, 10]
+    const muls: SandboxMul[] = [1, 3, 10]
     y = this.section('难度 · 敌人血量', y + 12, res, muls.map((m) => ({
       label: `×${m}`,
-      on: labDifficulty() === m,
+      on: sandboxDifficulty() === m,
       tap: (): void => {
-        setLabDifficulty(m)
+        setSandboxDifficulty(m)
         this.rebuild()
       },
     })))
     y = this.section('攻速 · 我方冷却 ÷ 它', y + 12, res, muls.map((m) => ({
       label: `×${m}`,
-      on: labFireRate() === m,
+      on: sandboxFireRate() === m,
       tap: (): void => {
-        setLabFireRate(m)
+        setSandboxFireRate(m)
         this.rebuild()
       },
     })))
     // 无敌切换即时改写全队血量上限，再重渲面板
     const setInv = (on: boolean): void => {
-      setLabInvincible(on)
-      this.host.applyTestInvincible()
+      setSandboxInvincible(on)
+      this.host.applySandboxInvincible()
       this.rebuild()
     }
     y = this.section('无敌', y + 12, res, [
-      { label: '开', on: labInvincible(), tap: (): void => setInv(true) },
-      { label: '关', on: !labInvincible(), tap: (): void => setInv(false) },
+      { label: '开', on: sandboxInvincible(), tap: (): void => setInv(true) },
+      { label: '关', on: !sandboxInvincible(), tap: (): void => setInv(false) },
     ])
     return y + 8
   }
 
   /** 队伍：角色与等级——都要重建队伍，故改完重开战斗场景 */
   private buildTeam(res: number): number {
-    let y = this.note(0, res, `当前 ${labStarters().length} 人 · 改动后重建队伍`)
+    let y = this.note(0, res, `当前 ${sandboxStarters().length} 人 · 改动后重建队伍`)
     y = this.section('角色 · 最少 1 最多 8', y + 6, res, Object.entries(CHARACTERS).map(([id, c]) => ({
       label: c.name,
-      on: isLabCharacterOn(id as CharacterId),
+      on: isSandboxCharacterOn(id as CharacterId),
       tap: (): void => {
-        toggleLabCharacter(id as CharacterId)
+        toggleSandboxCharacter(id as CharacterId)
         this.restartWithTeam()
       },
     })))
-    const levels: { lv: LabLevel; label: string }[] = [
+    const levels: { lv: SandboxLevel; label: string }[] = [
       { lv: 0, label: '基础' },
       { lv: 1, label: '一阶' },
       { lv: 2, label: '二阶' },
     ]
     y = this.section('角色等级 · 换整套能力形态', y + 12, res, levels.map((l) => ({
       label: l.label,
-      on: labLevel() === l.lv,
+      on: sandboxLevel() === l.lv,
       tap: (): void => {
-        setLabLevel(l.lv)
+        setSandboxLevel(l.lv)
         this.restartWithTeam()
       },
     })))
@@ -340,17 +340,17 @@ export class DevPanel {
 
   /** 强度：一组旋钮的具名取值，点一下批量写进去 */
   private buildPresets(res: number): number {
-    const cur = labPresetId()
+    const cur = sandboxPresetId()
     let y = this.note(
       0,
       res,
       cur === undefined
         ? '当前：自定义（旋钮被手动改过）'
-        : `当前：${LAB_PRESETS.find((p) => p.id === cur)?.label ?? cur}`,
+        : `当前：${SANDBOX_PRESETS.find((p) => p.id === cur)?.label ?? cur}`,
     )
     y += 6
     const w = this.view.viewport.w
-    for (const p of LAB_PRESETS) {
+    for (const p of SANDBOX_PRESETS) {
       const on = p.id === cur
       const rowH = 62
       const bg = this.scene.add.graphics()
@@ -375,7 +375,7 @@ export class DevPanel {
         .on('pointerup', () => {
           if (this.view.wasDragged) return
           playSfx('click')
-          applyLabPreset(p.id)
+          applySandboxPreset(p.id)
           this.restartWithTeam()
         })
       this.view.add([bg, label, desc, zone])
@@ -396,7 +396,7 @@ export class DevPanel {
     y = this.note(y + 4, res, ecsOn
       ? 'ECS：bitECS 数据导向 + 自绘批量渲染'
       : 'arcade：一实体一 GameObject + Arcade Physics body')
-    this.perf = new PerfView(this.scene, this.host, this.view.viewport.w, y + 10, this.host.testMode)
+    this.perf = new PerfView(this.scene, this.host, this.view.viewport.w, y + 10, this.host.sandbox)
     this.view.add(this.perf.objects)
     this.perfH = this.perf.update(0)
     return this.perfH
@@ -465,7 +465,7 @@ export class DevPanel {
   /** 角色/等级/预设：配装与站位在建队员时定死，只能重建队伍。
    * 战斗场景重启会连带重启 UIScene，本面板随之按新状态重渲 */
   private restartWithTeam(): void {
-    beginRun(labCaptain(), labStarters(), this.host.run.mapId, true)
+    beginRun(sandboxCaptain(), sandboxStarters(), this.host.run.mapId, true)
     resetMetrics()
     this.host.scene.restart()
   }

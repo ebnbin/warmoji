@@ -14,7 +14,7 @@ import { levelStatsFor } from '../../data/levels'
 import { characterLevel } from '../../data/charLevel'
 
 import { waveStartHp } from '../../run/state'
-import { INVINCIBLE_HP, labInvincible, labLevel } from '../../run/lab'
+import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../../run/sandbox'
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
@@ -48,15 +48,15 @@ export function spawnCharacter(
   world: EcsWorld,
   atlas: EcsAtlas,
   run: RunState,
-  testMode: boolean,
+  sandbox: boolean,
   place: CharacterPlacement,
 ): number {
   const { slot, post, x, y } = place
   const def = CHARACTERS[run.roster[slot]!]
   const teamFx = aggregateTeamCards(run.teamCards)
   const captain = CAPTAINS[run.captainId]
-  // 测试模式素体血量:「无敌」旋钮开则天量血(镜像 makeMember)
-  const labHp = labInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
+  // 试炼场素体血量:「无敌」旋钮开则天量血(镜像 makeMember)
+  const labHp = sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
   const size = MEMBER.size * UNIT
     const eid = addEntity(world)
   addComponent(world, eid, Character)
@@ -101,14 +101,14 @@ export function spawnCharacter(
   Threat.v[eid] = 0
   CharAtkSlow.until[eid] = 0
   CharAtkSlow.mul[eid] = 1
-  // 道具属性:正常局按该槽位已持道具 + 专属等级聚合,测试模式素体
-  const owned = testMode ? [] : (run.memberItems[slot] ?? [])
-  // 等级与能力侧同源(测试模式走场内旋钮档位),否则旋钮只改能力不改属性
-  const level = testMode ? labLevel() + 1 : characterLevel(characterXp(owned))
+  // 道具属性:正常局按该槽位已持道具 + 专属等级聚合,试炼场素体
+  const owned = sandbox ? [] : (run.memberItems[slot] ?? [])
+  // 等级与能力侧同源(试炼场走场内旋钮档位),否则旋钮只改能力不改属性
+  const level = sandbox ? sandboxLevel() + 1 : characterLevel(characterXp(owned))
   const fx = aggregateCharacterEffects(owned, levelStatsFor(run.roster[slot]!, level))
-  const maxHp = testMode ? labHp : Math.round(memberMaxHp(fx.hpAdd, captain.hpMul) * teamFx.teamHpMul)
-  // 血量跨波保留;上一波阵亡者低血量复活(测试模式素体满血)
-  CharHp.hp[eid] = testMode ? labHp : waveStartHp(run.memberHp[slot] ?? MEMBER.maxHp, maxHp)
+  const maxHp = sandbox ? labHp : Math.round(memberMaxHp(fx.hpAdd, captain.hpMul) * teamFx.teamHpMul)
+  // 血量跨波保留;上一波阵亡者低血量复活(试炼场素体满血)
+  CharHp.hp[eid] = sandbox ? labHp : waveStartHp(run.memberHp[slot] ?? MEMBER.maxHp, maxHp)
   CharHp.max[eid] = maxHp
   CharPerk.thorns[eid] = fx.thorns
   CharPerk.killHeal[eid] = fx.killHeal
