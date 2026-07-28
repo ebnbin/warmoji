@@ -6,6 +6,8 @@ import { endRun, getRun } from '../run/state'
 // 能量豆已移除：技能纯 CD 门槛（见 captains/skill.ts）
 import { CHARACTERS } from '../data/characters'
 import type { CharacterId } from '../types/characters'
+import { loadSettings } from '../save/settings'
+import { browserStorage } from '../util/storage'
 import { mapEnemyRoster } from '../data/maps'
 import { beginRun } from '../run/state'
 import {
@@ -172,23 +174,30 @@ export class UIScene extends Phaser.Scene implements HudInput {
       if (this.paused) this.togglePause()
     })
 
-    const wrench = emojiImage(
-      this,
-      w - sR - 12,
-      viewport.logicalHeight - safeInsets.bottom - 26,
-      '1f527',
-      40,
-    )
-      .setOrigin(1, 1)
-      .setDepth(300)
-      .setAlpha(0.45)
-      .setInteractive({ useHandCursor: true })
-    wrench.on('pointerdown', () => {
-      if (this.paused) return
-      devOpen = !devOpen
-      this.scene.restart()
-    })
-    if (devOpen) this.createDevPanel(res)
+    // 🔧 开发者面板：只在设置里开了「开发者模式」时才露出。
+    // 早先它对所有人常驻——正式局里也挂着一块 dev 读数，那不是正式内容该有的样子
+    if (loadSettings(browserStorage()).devMode) {
+      const wrench = emojiImage(
+        this,
+        w - sR - 12,
+        viewport.logicalHeight - safeInsets.bottom - 26,
+        '1f527',
+        40,
+      )
+        .setOrigin(1, 1)
+        .setDepth(300)
+        .setAlpha(0.45)
+        .setInteractive({ useHandCursor: true })
+      wrench.on('pointerdown', () => {
+        if (this.paused) return
+        devOpen = !devOpen
+        this.scene.restart()
+      })
+      if (devOpen) this.createDevPanel(res)
+    } else {
+      // 关掉开发者模式时把展开态一并归零，重新打开不会莫名其妙已经是展开的
+      devOpen = false
+    }
     if (isBenchActive()) {
       startRafMeter()
       attachMetrics(this.game)
