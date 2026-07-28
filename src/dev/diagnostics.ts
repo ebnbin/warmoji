@@ -42,7 +42,7 @@ let rendererCache: string | undefined
  * 原始 UNMASKED_RENDERER 串又长又全是噪声，在面板里要占两行
  *（`ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)`），
  * 真正要看的只有两件事：是不是软件渲染、什么型号。软件渲染直接标红字义——
- * 那种环境下面板里所有时间读数都不可用（见 bench/metrics.ts 顶部）。 */
+ * 那种环境下面板里所有时间读数都不可用（见 dev/metrics.ts 顶部）。 */
 export function rendererInfo(game: Phaser.Game): string {
   if (!rendererCache) {
     if (game.renderer.type === Phaser.WEBGL) {

@@ -17,7 +17,7 @@ import { IceScene } from './arcade/maps/IceScene'
 import { EcsBattleScene } from './ecs/EcsBattleScene'
 import { ECS_SCENE_KEY } from './ecs/keys'
 import type { EcsSceneKey } from './ecs/keys'
-import { benchFramework, isBenchActive } from './bench/spec'
+import { benchFramework, isBenchActive } from './dev/spec'
 
 // 战斗实现的唯一接线面（facade）。
 //

@@ -133,9 +133,9 @@ export default tseslint.config(
       'src/main.ts',
       'src/scene/*Scene.ts',
       // 基准面板/环境诊断/采样器：Phaser 帧阶段事件、渲染器信息、自绘面板
-      'src/bench/panel.ts',
-      'src/bench/diagnostics.ts',
-      'src/bench/metrics.ts',
+      'src/dev/panel.ts',
+      'src/dev/diagnostics.ts',
+      'src/dev/metrics.ts',
       'src/war/damageFont.ts',
       'src/util/fx.ts',
       // 旧框架（arcade）整包是表现层：Scene 继承 + Arcade Physics body

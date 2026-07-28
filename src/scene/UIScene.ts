@@ -34,7 +34,7 @@ import {
   toggleLabEnemy,
 } from '../run/lab'
 import type { LabLevel, LabMul, LabScale } from '../run/lab'
-import { heapMB, rafHz, rendererInfo, startRafMeter } from '../bench/diagnostics'
+import { heapMB, rafHz, rendererInfo, startRafMeter } from '../dev/diagnostics'
 import { emojiCacheStats, emojiImage } from '../emoji/textures'
 import { emojiText, iconLabel } from '../ui/emojiText'
 import { ScrollView } from '../ui/scroll'
@@ -53,10 +53,10 @@ import type { HudInput, HudSnapshot, WaveSummary } from '../run/hudHost'
 import { activeHudHost, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import { roundRect } from '../ui/shapes'
-import { BenchPanel } from '../bench/panel'
-import { attachMetrics, detachMetrics } from '../bench/metrics'
-import { clearBench } from '../bench/probe'
-import { isBenchActive, setBenchActive } from '../bench/spec'
+import { BenchPanel } from '../dev/panel'
+import { attachMetrics, detachMetrics } from '../dev/metrics'
+import { clearBench } from '../dev/probe'
+import { isBenchActive, setBenchActive } from '../dev/spec'
 
 // dev 工具随线上版本常驻：游戏内 🔧 按钮开合性能面板（FPS/内存等），无需 URL 参数。
 // 状态挂模块级而非场景字段：视口变化会重启本场景，挂场景上会被一起重置。

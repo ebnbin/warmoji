@@ -237,6 +237,6 @@ interface WarmojiBenchDebug {
 
 interface Window {
   __warmoji?: WarmojiDebug
-  /** 性能基准读数（src/bench/probe.ts 写入；与 __warmoji 独立，两侧一致可采） */
-  __bench?: import('./bench/probe').BenchProbe
+  /** 性能基准读数（src/dev/probe.ts 写入；与 __warmoji 独立，两侧一致可采） */
+  __bench?: import('./dev/probe').BenchProbe
 }
