@@ -9,6 +9,7 @@ import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
 import { loadMap, saveMap } from '../save/selection'
+import { loadSettings } from '../save/settings'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/textures'
@@ -70,8 +71,12 @@ export class MapScene extends Phaser.Scene {
   private detailView!: ScrollView
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private confirmLabel!: Phaser.GameObjects.Text
-  private testChk!: Phaser.GameObjects.Text
+  /** 试炼场开关（仅开发者模式下出现）：勾上则跳过队长/组队，直接进该图的沙盒 */
+  private devMode = false
   private testMode = false
+  private testRect = { x: 0, y: 0, w: 0, h: 0 }
+  private testBg?: Phaser.GameObjects.Graphics
+  private testLabel?: Phaser.GameObjects.Text
 
   constructor() {
     super('map')
@@ -151,26 +156,38 @@ export class MapScene extends Phaser.Scene {
         resolution: res,
       })
       .setOrigin(0.5)
-    // 测试模式勾选框（在确认按钮上方）：勾上则跳过队长/组队，直接进该图的沙盒
-    this.testChk = this.add
-      .text(w / 2, b.y - 20, '', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.body,
-        color: '#ffffff',
-        backgroundColor: '#00000055',
-        padding: { x: 10, y: 5 },
-        resolution: res,
-      })
-      .setOrigin(0.5, 1)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
-        playSfx('click')
-        this.testMode = !this.testMode
-        this.refresh()
-      })
+    // 试炼场入口：只有开发者模式开着才出现。关掉开发者模式时一并把选择态归零，
+    // 否则会留下一个既看不见、又仍然生效的开关
+    this.devMode = loadSettings(browserStorage()).devMode
+    if (!this.devMode) this.testMode = false
+    if (this.devMode) {
+      const tw = Math.min(360, L.btn.w)
+      const th = 52
+      this.testRect = { x: w / 2 - tw / 2, y: b.y - 16 - th, w: tw, h: th }
+      const t = this.testRect
+      this.testBg = this.add.graphics()
+      this.testLabel = this.add
+        .text(w / 2, t.y + th / 2, '', {
+          fontFamily: UI_FONT,
+          fontSize: FONT.small,
+          fontStyle: 'bold',
+          color: '#ffffff',
+          resolution: res,
+        })
+        .setOrigin(0.5)
+      this.add
+        .zone(t.x, t.y, t.w, t.h)
+        .setOrigin(0)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerup', () => {
+          playSfx('click')
+          this.testMode = !this.testMode
+          this.refresh()
+        })
+    }
     const confirm = (): void => {
       playSfx('click')
-      // 测试模式：跳过队长/组队/商店，用当前勾选阵容在该图上开沙盒
+      // 试炼场：跳过队长/组队/商店，用当前旋钮在该图上开沙盒
       if (this.testMode) {
         beginRun(labCaptain(), labStarters(), this.selectedId, true)
         this.scene.start(battleSceneFor(this.selectedId))
@@ -284,10 +301,18 @@ export class MapScene extends Phaser.Scene {
 
   private refresh(): void {
     this.grid.setSelected(this.selectedId)
-    this.testChk.setText(`测试模式（免死沙盒·跳过组队）：${this.testMode ? '开' : '关'}`)
-    this.testChk.setColor(this.testMode ? '#ffdc5d' : '#c8c8d4')
-    this.testChk.setBackgroundColor(this.testMode ? '#2e7d32' : '#00000055')
-    this.confirmLabel.setText(this.testMode ? '进入测试模式' : '选择队长')
+    const on = this.testMode
+    if (this.testBg && this.testLabel) {
+      const t = this.testRect
+      this.testBg.clear()
+      roundRect(this.testBg, t.x, t.y, t.w, t.h, t.h / 2, {
+        fill: on ? 0xffdc5d : 0xffffff, fillAlpha: on ? 0.92 : 0.08,
+        stroke: 0xffffff, strokeAlpha: on ? 0 : 0.18,
+      })
+      this.testLabel.setText(on ? '试炼场：开 · 免死沙盒' : '试炼场：关')
+      this.testLabel.setColor(on ? '#25262e' : '#c8c8d4')
+    }
+    this.confirmLabel.setText(on ? '进入试炼场' : '选择队长')
     this.renderDetail(textRes())
     this.reportMap()
   }
@@ -318,11 +343,13 @@ export class MapScene extends Phaser.Scene {
           w: this.btnRect.w,
           h: this.btnRect.h,
         },
-        test: {
-          x: Math.round(this.testChk.x),
-          y: Math.round(this.testChk.getBounds().centerY),
-          on: this.testMode,
-        },
+        test: this.devMode
+          ? {
+              x: Math.round(this.testRect.x + this.testRect.w / 2),
+              y: Math.round(this.testRect.y + this.testRect.h / 2),
+              on: this.testMode,
+            }
+          : undefined,
       },
     })
   }

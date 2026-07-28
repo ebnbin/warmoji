@@ -4,65 +4,21 @@ import { PICKUPS } from '../data/pickups'
 import { formatTime } from '../util/format'
 import { endRun, getRun } from '../run/state'
 // 能量豆已移除：技能纯 CD 门槛（见 captains/skill.ts）
-import { CHARACTERS } from '../data/characters'
-import type { CharacterId } from '../types/characters'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
-import { mapEnemyRoster } from '../data/maps'
-import { beginRun } from '../run/state'
-import {
-  isLabCharacterOn,
-  isLabEnemyOn,
-  isLabPanelOpen,
-  labCaptain,
-  labDifficulty,
-  labFireRate,
-  labInvincible,
-  labLevel,
-  labPanelScroll,
-  labScale,
-  labStarters,
-  SCALES,
-  setLabDifficulty,
-  setLabFireRate,
-  setLabInvincible,
-  setLabLevel,
-  setLabPanelOpen,
-  setLabPanelScroll,
-  setLabScale,
-  toggleLabCharacter,
-  toggleLabEnemy,
-} from '../run/lab'
-import type { LabLevel, LabMul, LabScale } from '../run/lab'
-import { heapMB, rafHz, rendererInfo, startRafMeter } from '../dev/diagnostics'
-import { emojiCacheStats, emojiImage } from '../emoji/textures'
+import { emojiImage } from '../emoji/textures'
 import { emojiText, iconLabel } from '../ui/emojiText'
-import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { Joystick } from '../ui/Joystick'
 import { playSfx } from '../audio/sfx'
-import {
-  applyCamera,
-  isStandalone,
-  safeInsets,
-  textRes,
-  viewport,
-  VIEWPORT_CHANGED,
-} from '../util/apply'
+import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import type { HudInput, HudSnapshot, WaveSummary } from '../run/hudHost'
 import { activeHudHost, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import { roundRect } from '../ui/shapes'
-import { BenchPanel } from '../dev/panel'
-import { attachMetrics, detachMetrics } from '../dev/metrics'
-import { clearBench } from '../dev/probe'
-import { isBenchActive, setBenchActive } from '../dev/spec'
+import { DevPanel } from '../dev/DevPanel'
 
-// dev 工具随线上版本常驻：游戏内 🔧 按钮开合性能面板（FPS/内存等），无需 URL 参数。
-// 状态挂模块级而非场景字段：视口变化会重启本场景，挂场景上会被一起重置。
-let devOpen = false
-
-// 屏幕层：HUD、虚拟摇杆、暂停浮层、波末横幅、试炼场面板、dev/基准面板。
+// 屏幕层：HUD、虚拟摇杆、暂停浮层、波末横幅、开发者面板。
 // 与战斗场景并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
 // 它是一块页面而非战斗世界，故住在 scene/ 而非 war/：对战斗的读写全经
 // run/hudHost 的两条契约（HudHost 读战斗、HudInput 供战斗读移动输入），
@@ -75,16 +31,10 @@ export class UIScene extends Phaser.Scene implements HudInput {
   private killsText!: Phaser.GameObjects.Text
   private coinsText!: Phaser.GameObjects.Text
   private last!: HudSnapshot
-  private devText?: Phaser.GameObjects.Text
-  private benchPanel?: BenchPanel
-  private fpsWindowMin = Infinity
-  private frameMaxMs = 0
-  private fpsWindowStart = 0
-  private devRefreshedAt = 0
+  /** 开发者面板（仅设置里开了开发者模式时挂载） */
+  private dev?: DevPanel
   private paused = false
   private pauseObjs: Phaser.GameObjects.GameObject[] = []
-  /** 试炼场控制面板的可滚动容器（敌人/角色列表随内容增长，不再堆出屏外） */
-  private labView?: ScrollView
   // 队长技能按钮（左下角）：底圆 + 队长头像 + 冷却扇形暗罩 + 秒数 + 就绪光圈
   private skillBase?: Phaser.GameObjects.Arc
   private skillEmoji?: Phaser.GameObjects.Image
@@ -175,45 +125,9 @@ export class UIScene extends Phaser.Scene implements HudInput {
       if (this.paused) this.togglePause()
     })
 
-    // 🔧 开发者面板：只在设置里开了「开发者模式」时才露出。
-    // 早先它对所有人常驻——正式局里也挂着一块 dev 读数，那不是正式内容该有的样子
-    if (loadSettings(browserStorage()).devMode) {
-      const wrench = emojiImage(
-        this,
-        w - sR - 12,
-        viewport.logicalHeight - safeInsets.bottom - 26,
-        '1f527',
-        40,
-      )
-        .setOrigin(1, 1)
-        .setDepth(300)
-        .setAlpha(0.45)
-        .setInteractive({ useHandCursor: true })
-      wrench.on('pointerdown', () => {
-        if (this.paused) return
-        devOpen = !devOpen
-        this.scene.restart()
-      })
-      if (devOpen) this.createDevPanel(res)
-    } else {
-      // 关掉开发者模式时把展开态一并归零，重新打开不会莫名其妙已经是展开的
-      devOpen = false
-    }
-    if (isBenchActive()) {
-      startRafMeter()
-      attachMetrics(this.game)
-      this.benchPanel = new BenchPanel(this, this.arena)
-      // B 键：停止基准并回配置页（面板上有提示）
-      this.input.keyboard?.on('keydown-B', () => {
-        setBenchActive(false)
-        detachMetrics()
-        clearBench()
-        this.scene.stop('ui')
-        this.arena.scene.start('bench')
-      })
-    }
-    // 基准模式下不挂试炼场面板：它会挡住画面、且其旋钮会干扰负载
-    if (this.arena.testMode && !isBenchActive()) this.createLabControls()
+    // 开发者面板：设置里开了「开发者模式」才挂。它自带 🔧 收起态，
+    // 试炼场旋钮与性能读数都在里面——战斗内不再有第二块 dev UI
+    if (loadSettings(browserStorage()).devMode) this.dev = new DevPanel(this, this.arena)
 
     this.createSkillButton(res)
     this.createFxIndicators()
@@ -230,12 +144,11 @@ export class UIScene extends Phaser.Scene implements HudInput {
       arenaEvents.off('skill-cast', this.onSkillCast, this)
       arenaEvents.off('field-collected', this.onFieldCollected, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
-      // devText 在 SHUTDOWN 里随场景对象一起销毁；清引用，否则关闭 dev 后
-      // restart 不重建面板，update 仍对已销毁的 Text 调 setText → 渲染撞空 → 卡死
       setActiveHudInput(undefined)
-      this.devText = undefined
-      this.benchPanel?.destroy()
-      this.benchPanel = undefined
+      // 面板持有逐帧刷新的对象与帧采样监听：清引用，否则 restart 后
+      // update 仍对已销毁的 Text 调 setText → 渲染撞空 → 卡死
+      this.dev?.destroy()
+      this.dev = undefined
     })
 
     // 视口变化会重启本场景：恢复暂停浮层
@@ -260,6 +173,8 @@ export class UIScene extends Phaser.Scene implements HudInput {
     }
   }
 
+  /** 暂停浮层压在开发者面板之上：面板在 320+，浮层若还留在 250 就会被面板穿透，
+   * 「已暂停」的黑幕上浮着一块可点的 dev 面板——暂停就不再是暂停 */
   private showPauseOverlay(): void {
     const res = textRes()
     const cx = viewport.logicalWidth / 2
@@ -271,7 +186,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
       onTap: () => void,
     ): Phaser.GameObjects.GameObject[] => {
       const rect = { x: cx - 150, y: y - 36, w: 300, h: 72 }
-      const g = this.add.graphics().setDepth(251)
+      const g = this.add.graphics().setDepth(401)
       if (filled) {
         roundRect(g, rect.x, rect.y, rect.w, rect.h, 36, { fill: 0xffdc5d })
       } else {
@@ -286,17 +201,17 @@ export class UIScene extends Phaser.Scene implements HudInput {
           resolution: res,
         })
         .setOrigin(0.5)
-        .setDepth(252)
+        .setDepth(402)
       const z = this.add
         .zone(rect.x, rect.y, rect.w, rect.h)
         .setOrigin(0)
-        .setDepth(252)
+        .setDepth(402)
         .setInteractive({ useHandCursor: true })
         .on('pointerup', onTap)
       return [g, t, z]
     }
     this.pauseObjs = [
-      this.add.rectangle(cx, cy, 6000, 6000, 0x000000, 0.6).setDepth(250),
+      this.add.rectangle(cx, cy, 6000, 6000, 0x000000, 0.6).setDepth(400),
       this.add
         .text(cx, cy - 116, '已暂停', {
           fontFamily: UI_FONT,
@@ -306,7 +221,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
           resolution: textRes(),
         })
         .setOrigin(0.5)
-        .setDepth(251),
+        .setDepth(401),
       ...button(cy + 8, '继 续', true, () => this.togglePause()),
       ...button(cy + 100, '结束本局', false, () => {
         endRun()
@@ -316,8 +231,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
   }
 
   update(time: number): void {
-    if (this.devText) this.updateDevPanel(time)
-    this.benchPanel?.update(time)
+    this.dev?.update(time)
     this.updateSkillButton()
     const s = this.arena.hudSnapshot()
     this.updateFxIndicators(s.battleFx)
@@ -611,233 +525,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
 
   private onViewportChanged(): void {
     this.scene.restart()
-  }
-
-  private createDevPanel(res: number): void {
-    startRafMeter()
-    this.fpsWindowMin = Infinity
-    this.frameMaxMs = 0
-    this.fpsWindowStart = 0
-    this.devRefreshedAt = 0
-    const h = viewport.logicalHeight
-    const btnY = h - safeInsets.bottom - 12
-    this.devText = this.add
-      .text(safeInsets.left + 12, btnY, '', {
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-        fontSize: '16px',
-        color: '#ffffff',
-        backgroundColor: '#000000',
-        padding: { x: 8, y: 6 },
-        lineSpacing: 4,
-        resolution: res,
-      })
-      .setOrigin(0, 1)
-      .setDepth(300)
-      .setAlpha(0.88)
-  }
-
-  private static readonly CHIP_ON = '#2e7d32'
-  private static readonly CHIP_OFF = '#555555'
-
-  /** 试炼场控制面板（左上角）：🎯 按钮开合，内含 敌人/角色/等级/旋钮 多段勾选。
-   * 敌人实时生效不重启；角色/等级改动后重开竞技场（重建队伍）——重开也会重渲本面板。
-   * 各段勾选项随内容增长（敌人/角色只增不减），装进可滚动容器，绝不再堆出屏外 */
-  private createLabControls(): void {
-    const gx = safeInsets.left + 12
-    const top = safeInsets.top + 62
-    const open = isLabPanelOpen()
-    this.add
-      .text(gx, top, `试炼场设置：${open ? '收起' : '展开'}`, {
-        fontFamily: UI_FONT,
-        fontSize: FONT.caption,
-        fontStyle: 'bold',
-        color: '#ffffff',
-        backgroundColor: '#3949ab',
-        padding: { x: 10, y: 6 },
-        resolution: textRes(),
-      })
-      .setDepth(300)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => {
-        setLabPanelOpen(!isLabPanelOpen())
-        this.scene.restart()
-      })
-    if (!open) return
-
-    // 面板从标题下方一直排到技能按钮上方；内容超出即滚动
-    const viewTop = top + 34
-    const skillTop = viewport.logicalHeight - safeInsets.bottom - 55 * 2 - 24
-    const view = (this.labView = new ScrollView(
-      this,
-      { x: gx, y: viewTop, w: 372, h: Math.max(120, skillTop - viewTop - 12) },
-      { initialScroll: labPanelScroll() },
-    ))
-    view.setDepth(300)
-    view.onScroll = (): void => setLabPanelScroll(view.scrollY)
-
-    // 角色/队长改动：用当前勾选阵容在当前地图上重开竞技场（shutdown→create 会重启本 UI，面板自动重渲）
-    const applyTeam = (): void => {
-      beginRun(labCaptain(), labStarters(), this.arena.run.mapId, true)
-      this.arena.scene.restart()
-    }
-    let y = 0
-    // 只列本图会出现的敌人（波次编排 + 终波 Boss + 衍生子代），不混入他图的怪
-    y = this.labSection('敌人（实时）', y, mapEnemyRoster(this.arena.run.mapId).map((d) => ({
-      label: d.name,
-      on: () => isLabEnemyOn(d.kind),
-      tap: (chip) => {
-        toggleLabEnemy(d.kind)
-        chip.setBackgroundColor(isLabEnemyOn(d.kind) ? UIScene.CHIP_ON : UIScene.CHIP_OFF)
-      },
-    })))
-    y = this.labSection('角色 · 最少1最多8（改后重建队伍）', y + 8, Object.entries(CHARACTERS).map(([id, c]) => ({
-      label: c.name,
-      on: () => isLabCharacterOn(id as CharacterId),
-      tap: () => {
-        toggleLabCharacter(id as CharacterId)
-        applyTeam()
-      },
-    })))
-    // 角色等级：统一改全部角色的升级档（改后重建队伍——配装在建队员时定）
-    const levels: { lv: LabLevel; label: string }[] = [
-      { lv: 0, label: '基础' },
-      { lv: 1, label: '一阶' },
-      { lv: 2, label: '二阶' },
-    ]
-    y = this.labSection('角色等级（改后重建队伍）', y + 8, levels.map((l) => ({
-      label: l.label,
-      on: () => labLevel() === l.lv,
-      tap: () => {
-        setLabLevel(l.lv)
-        this.arena.scene.restart()
-      },
-    })))
-    // 旋钮实时生效（密度/难度/攻速由 arena 每帧现读，无敌见下）：只重渲本面板刷新选中态，
-    // 不重开竞技场、不清场——观察不被打断
-    const applyKnob = (): void => {
-      this.scene.restart()
-    }
-    // 规模阶梯直接铺开（低 6 → 8 千）：面板选得到的就是刷怪器的全部量程，
-    // 不再有「基准才够得到的档位」
-    y = this.labSection('规模（在场上限）', y + 8, SCALES.map((s) => ({
-      label: `${s.label} ${s.spawn.cap}`,
-      on: (): boolean => labScale() === s.id,
-      tap: (): void => {
-        setLabScale(s.id as LabScale)
-        applyKnob()
-      },
-    })))
-    const muls: LabMul[] = [1, 3, 10]
-    y = this.labSection('难度（敌人血量）', y + 8, muls.map((m) => ({
-      label: `×${m}`,
-      on: () => labDifficulty() === m,
-      tap: () => {
-        setLabDifficulty(m)
-        applyKnob()
-      },
-    })))
-    y = this.labSection('攻速（我方）', y + 8, muls.map((m) => ({
-      label: `×${m}`,
-      on: () => labFireRate() === m,
-      tap: () => {
-        setLabFireRate(m)
-        applyKnob()
-      },
-    })))
-    // 无敌切换即时改写全队血量上限（arena.applyTestInvincible），再重渲面板
-    const applyInvincible = (on: boolean): void => {
-      setLabInvincible(on)
-      this.arena.applyTestInvincible()
-      this.scene.restart()
-    }
-    y = this.labSection('无敌', y + 8, [
-      { label: '开', on: () => labInvincible(), tap: () => applyInvincible(true) },
-      { label: '关', on: () => !labInvincible(), tap: () => applyInvincible(false) },
-    ])
-    view.setContentHeight(y + 8)
-  }
-
-  /** 一段带标题的 chip 流式布局（装进 labView，坐标相对内容顶）：chip 按内容宽自适应、
-   * 排满一行自动换行——名字再长也不会横向溢出。返回本段底部 localY（供下一段接着排） */
-  private labSection(
-    title: string,
-    gy: number,
-    items: { label: string; on: () => boolean; tap: (chip: Phaser.GameObjects.Text) => void }[],
-  ): number {
-    const view = this.labView!
-    const maxW = view.viewport.w - 14
-    const gap = 5
-    view.add(
-      this.add.text(0, gy, title, {
-        fontFamily: UI_FONT,
-        fontSize: FONT.caption,
-        fontStyle: 'bold',
-        color: '#ffdc5d',
-        stroke: '#000000',
-        strokeThickness: 3,
-        resolution: textRes(),
-      }),
-    )
-    let cx = 0
-    let cy = gy + 22
-    let rowH = 0
-    for (const it of items) {
-      const chip = this.add
-        .text(0, 0, it.label, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.caption,
-          color: '#ffffff',
-          backgroundColor: it.on() ? UIScene.CHIP_ON : UIScene.CHIP_OFF,
-          padding: { x: 8, y: 5 },
-          resolution: textRes(),
-        })
-        .setInteractive({ useHandCursor: true })
-      if (cx > 0 && cx + chip.width > maxW) {
-        cx = 0
-        cy += rowH + gap
-        rowH = 0
-      }
-      chip.setPosition(cx, cy)
-      view.add(chip)
-      chip.on('pointerup', () => {
-        if (view.wasDragged) return
-        it.tap(chip)
-      })
-      cx += chip.width + gap
-      rowH = Math.max(rowH, chip.height)
-    }
-    return cy + rowH + gap
-  }
-
-  private updateDevPanel(time: number): void {
-    const fps = this.game.loop.actualFps
-    const rawDelta = this.game.loop.rawDelta
-    if (time - this.fpsWindowStart > 5000) {
-      this.fpsWindowStart = time
-      this.fpsWindowMin = fps
-      this.frameMaxMs = rawDelta
-    } else {
-      if (fps < this.fpsWindowMin) this.fpsWindowMin = fps
-      if (rawDelta > this.frameMaxMs) this.frameMaxMs = rawDelta
-    }
-    if (time - this.devRefreshedAt < 250) return
-    this.devRefreshedAt = time
-    const p = this.arena.perfSnapshot()
-    const cache = emojiCacheStats(this)
-    const raf = rafHz()
-    const heap = heapMB()
-    const vp = viewport
-    const gl = rendererInfo(this.game)
-    this.devText!.setText([
-      `FPS ${fps.toFixed(0)}（5s低 ${Number.isFinite(this.fpsWindowMin) ? this.fpsWindowMin.toFixed(0) : '-'}）· rAF ${raf > 0 ? raf : '-'}`,
-      `帧峰值 ${this.frameMaxMs.toFixed(0)}ms${heap === undefined ? '' : ` · 内存 ${heap}MB`}`,
-      `敌人 ${p.enemies} · 预告 ${p.pending} · 子弹 ${p.projectiles} · 金币 ${p.coins}`,
-      `对象 ${p.objects} · 物理体 ${p.bodies} · emoji纹理 ${cache.textures}（固定 ${cache.pinned}）`,
-      `难度 t ${p.combatSec}s · 刷怪 ${p.spawnIntervalMs}ms · 血量 ×${p.hpMultiplier.toFixed(2)}`,
-      `视口 ${Math.round(vp.logicalWidth)}×${Math.round(vp.logicalHeight)} ×${vp.fitScale.toFixed(2)} · DPR ${vp.dpr} · 画布 ${Math.round(vp.cssWidth * vp.dpr)}×${Math.round(vp.cssHeight * vp.dpr)}`,
-      `inner ${window.innerWidth}×${window.innerHeight} · screen ${screen.width}×${screen.height} · 安全区 ${Math.round(safeInsets.top)}/${Math.round(safeInsets.right)}/${Math.round(safeInsets.bottom)}/${Math.round(safeInsets.left)}${isStandalone() ? ' · PWA' : ''}`,
-      gl.length > 54 ? `${gl.slice(0, 53)}…` : gl,
-    ])
   }
 
   /** 波末结算横幅：冻结期展示本波战果，随场景切换自然销毁 */

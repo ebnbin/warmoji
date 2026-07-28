@@ -17,7 +17,6 @@ import { IceScene } from './arcade/maps/IceScene'
 import { EcsBattleScene } from './ecs/EcsBattleScene'
 import { ECS_SCENE_KEY } from './ecs/keys'
 import type { EcsSceneKey } from './ecs/keys'
-import { benchFramework, isBenchActive } from './dev/spec'
 
 // 战斗实现的唯一接线面（facade）。
 //
@@ -71,10 +70,12 @@ export function ecsEnabled(): boolean {
 }
 
 /** 本图应进入的战斗场景键：ecs 开 = 统一的 ECS 场景；关 = 按世界形态路由的旧场景。
- * A/B 分流只此一处，战斗启动点（地图页/商店/整编页）都调它 */
+ * A/B 分流只此一处，战斗启动点（地图页/商店/整编页/开发者面板）都调它。
+ *
+ * 曾经这里还有一条「基准模式按基准页选的框架强制路由」的特例——那是第二个真相，
+ * 于是「现在跑的是哪套战斗」要看两个地方。开发者面板改成直接写 settings.ecs 后
+ * 特例删除：用哪套战斗永远只由那一个开关决定 */
 export function battleSceneFor(mapId: MapId): BattleSceneKey {
-  // 基准模式：按基准页选的框架强制路由，不看设置开关——A/B 对比必须能显式指定
-  if (isBenchActive()) return benchFramework() === 'ecs' ? ECS_SCENE_KEY : arenaSceneFor(mapId)
   return ecsEnabled() ? ECS_SCENE_KEY : arenaSceneFor(mapId)
 }
 

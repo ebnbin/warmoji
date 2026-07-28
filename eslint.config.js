@@ -41,6 +41,13 @@ const NO_SCENE_FROM_BATTLE = {
   message: '战斗侧不得依赖场景层；通用控件在 src/ui/，业务数据在 src/data/',
 }
 
+/** 战斗侧不得依赖开发者工具 */
+const NO_DEV_FROM_BATTLE = {
+  group: ['**/dev', '**/dev/*', '**/dev/**'],
+  message:
+    'src/dev/ 是开发者工具（面板 / 帧采样 / 环境诊断），方向只能是它读战斗。战斗侧一旦依赖它，「开发者模式默认关」就不再等于「这些代码不参与正式游戏」——沙盒旋钮读的是 src/run/lab.ts，那才是两边都够得到的那一层',
+}
+
 /** 建实体只在 src/ecs/entities/ 下 */
 const NO_ADD_ENTITY = {
   name: 'bitecs',
@@ -107,7 +114,7 @@ export default tseslint.config(
   {
     files: ['src/war/**/*.ts', 'src/arcade/**/*.ts', 'src/ecs/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [NO_SCENE_FROM_BATTLE, NO_ASSETS_JSON] }],
+      'no-restricted-imports': ['error', { patterns: [NO_SCENE_FROM_BATTLE, NO_DEV_FROM_BATTLE, NO_ASSETS_JSON] }],
     },
   },
   // 建实体的唯一入口护栏：addEntity 只准出现在 src/ecs/entities/ 下，一种实体一个工厂。
@@ -123,7 +130,7 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': [
         'error',
-        { paths: [NO_ADD_ENTITY], patterns: [NO_SCENE_FROM_BATTLE, NO_ASSETS_JSON] },
+        { paths: [NO_ADD_ENTITY], patterns: [NO_SCENE_FROM_BATTLE, NO_DEV_FROM_BATTLE, NO_ASSETS_JSON] },
       ],
     },
   },
@@ -132,10 +139,8 @@ export default tseslint.config(
     ignores: [
       'src/main.ts',
       'src/scene/*Scene.ts',
-      // 基准面板/环境诊断/采样器：Phaser 帧阶段事件、渲染器信息、自绘面板
-      'src/dev/panel.ts',
-      'src/dev/diagnostics.ts',
-      'src/dev/metrics.ts',
+      // 开发者工具整包是表现层：Phaser 帧阶段事件、渲染器信息、自绘面板
+      'src/dev/**/*.ts',
       'src/war/damageFont.ts',
       'src/util/fx.ts',
       // 旧框架（arcade）整包是表现层：Scene 继承 + Arcade Physics body

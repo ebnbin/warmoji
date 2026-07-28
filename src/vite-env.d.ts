@@ -164,7 +164,8 @@ interface WarmojiMapDebug {
   selected: string
   items: { id: string; x: number; y: number; w: number; h: number }[]
   start: { x: number; y: number; w: number; h: number }
-  test: { x: number; y: number; on: boolean }
+  /** 试炼场开关（仅开发者模式下存在） */
+  test?: { x: number; y: number; on: boolean }
 }
 
 interface WarmojiResultDebug {
@@ -176,7 +177,7 @@ interface WarmojiResultDebug {
 }
 
 interface WarmojiDebug {
-  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'promote' | 'cards' | 'shop' | 'arena' | 'result' | 'bench'
+  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'promote' | 'cards' | 'shop' | 'arena' | 'result'
   elapsed: number
   hp: number
   alive: number
@@ -215,28 +216,10 @@ interface WarmojiDebug {
   cards?: WarmojiCardsDebug
   shop?: WarmojiShopDebug
   result?: WarmojiResultDebug
-  /** 性能基准读数（基准页与基准面板同源） */
-  bench?: WarmojiBenchDebug
-}
-
-interface WarmojiBenchDebug {
-  /** 「开始基准」按钮坐标（e2e/探针点它） */
-  start?: { x: number; y: number }
-  framework: string
-  profile: string
-  team: number
-  cap: number
-  /** 战斗内实时读数（基准面板同源） */
-  fps?: number
-  frameP50?: number
-  frameP95?: number
-  updateMs?: number
-  renderMs?: number
-  samples?: number
 }
 
 interface Window {
   __warmoji?: WarmojiDebug
-  /** 性能基准读数（src/dev/probe.ts 写入；与 __warmoji 独立，两侧一致可采） */
-  __bench?: import('./dev/probe').BenchProbe
+  /** 开发者面板的性能读数（src/dev/probe.ts 写入；与 __warmoji 独立，两套框架下一致可采） */
+  __dev?: import('./dev/probe').DevPerfProbe
 }

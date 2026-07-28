@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test'
 //
 // 钉的是一个具体缺陷：gameplay.spec.ts 走的是 src/arcade/——设置默认 ecs:false，
 // 开局流程进的是老场景。于是天天在改的 ECS 侧一条 e2e 也没有：白屏、建场抛异常、
-// 流水线某步炸掉，单测与 typecheck 全绿，CI 也全绿。ECS 路径唯一的入口是试炼场。
+// 流水线某步炸掉，单测与 typecheck 全绿，CI 也全绿。
 //
 // 顺带钉住出站信箱的积压：sim.out 的五个队列是「仿真只写、场景侧排空」，
 // 漏排一条不会报错，只会一路涨到卡顿——帧末积压恒 0 是它唯一的外部可观测量。
@@ -48,13 +48,21 @@ test('试炼场：ECS 战斗跑得起来、有击杀、出站信箱不积压', a
   })
   page.on('pageerror', (e) => errors.push(String(e)))
 
+  // 两个开关直接种进 localStorage（键名同 src/save/settings.ts）：本条守卫钉的是
+  // 「ECS 战斗打不打得起来」，不是「设置页能不能点」。这两项都排在设置列表末尾、
+  // 要先滚动才点得到，走 UI 只会让这条守卫依赖一堆与它无关的布局细节。
+  await page.addInitScript(() => {
+    localStorage.setItem('warmoji.settings.v1', JSON.stringify({ ecs: true, devMode: true }))
+  })
   await page.goto('/')
+
+  // 开局 → 地图页 → 打开试炼场 → 出发（ECS 路径最短的入口就是试炼场：免死无时限）
   await page.waitForFunction(() => window.__warmoji?.scene === 'menu' && !!window.__warmoji.menu)
-  // 主菜单的 📊：设置按钮左侧第四格（基准页默认跑 ECS 框架）
-  const s = await page.evaluate(() => window.__warmoji!.menu!.settings)
-  await click(page, { x: s.x - 252, y: s.y })
-  await page.waitForFunction(() => !!window.__warmoji?.bench?.start, undefined, { timeout: 20_000 })
-  await click(page, await page.evaluate(() => window.__warmoji!.bench!.start!))
+  await click(page, await page.evaluate(() => window.__warmoji!.menu!.start))
+  await page.waitForFunction(() => window.__warmoji?.scene === 'map' && !!window.__warmoji.map?.test)
+  await click(page, await page.evaluate(() => window.__warmoji!.map!.test!))
+  await page.waitForFunction(() => window.__warmoji?.map?.test?.on === true)
+  await click(page, await page.evaluate(() => window.__warmoji!.map!.start))
 
   await page.waitForFunction(() => (window as WinEcs).__ecs !== undefined, undefined, { timeout: 30_000 })
   await page.waitForFunction(() => ((window as WinEcs).__ecs?.elapsed ?? 0) > 15_000, undefined, { timeout: 120_000 })

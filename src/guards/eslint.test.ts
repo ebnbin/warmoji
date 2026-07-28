@@ -43,6 +43,11 @@ const GUARDS: readonly { name: string; file: string; code: string }[] = [
     code: "import { UIScene } from '../../../scene/UIScene'\nvoid UIScene\n",
   },
   {
+    name: '战斗侧不得依赖开发者工具',
+    file: 'src/ecs/systems/spawnStep.ts',
+    code: "import { DevPanel } from '../../dev/DevPanel'\nvoid DevPanel\n",
+  },
+  {
     name: 'assets/*.json 只许 data/ 与 types/ 读',
     file: 'src/war/xp.ts',
     code: "import waves from '../assets/progression.json'\nvoid waves\n",

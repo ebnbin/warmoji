@@ -98,14 +98,6 @@ export class MenuScene extends Phaser.Scene {
         this.scene.start('studio')
       })
     this.studioRect = { x: gearX - 168 - 28, y: gearY - 28, w: 56, h: 56 }
-    // 📊 性能基准：两套战斗实现在同一份负载下的帧预算对比
-    emojiImage(this, gearX - 252, gearY, '1f4ca', 54)
-      .setAlpha(0.9)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
-        playSfx('click')
-        this.scene.start('bench')
-      })
 
     // 明确的按钮 + 空格键开始，避免任意点击误触；轻微脉动引导视线
     const btn = { x: w / 2 - 170, y: h * 0.82 - 36, w: 340, h: 72 }

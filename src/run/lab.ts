@@ -14,9 +14,8 @@ import type { CaptainId } from '../types/captains'
 // 它们的签名是**对战斗侧的契约**：试炼场的形态怎么变，都不该让任何一套战斗跟着改一行。
 
 const enemies = new Set<string>()
-// 默认 1 人：最少 1、最多 = 测试队长编制（8）
+// 最少 1 人、最多 = 测试队长编制（8）；开局值由文件末尾的默认预设写入
 let roster: CharacterId[] = [...ROSTER_IDS.slice(0, 1)]
-let panelOpen = true
 
 /** 角色等级：统一作用于全部角色的升级档（0 基础 / 1 一阶 / 2 二阶，对应升级卡 u1/u2） */
 export type LabLevel = 0 | 1 | 2
@@ -245,22 +244,6 @@ export function labStarters(): CharacterId[] {
   return r.length > 0 ? r : [ROSTER_IDS[0]!]
 }
 
-// ── 面板开合 / 滚动位置（跨重启保留） ─────────────────────
-export function isLabPanelOpen(): boolean {
-  return panelOpen
-}
-
-export function setLabPanelOpen(on: boolean): void {
-  panelOpen = on
-}
-
-// 控制面板滚动位置：勾选项常触发场景重启，保留位置才不会每次跳回顶部
-let panelScroll = 0
-
-export function labPanelScroll(): number {
-  return panelScroll
-}
-
-export function setLabPanelScroll(v: number): void {
-  panelScroll = v
-}
+// 开局默认套一档预设：敌人勾选集若为空，进了沙盒一只怪都不会出——
+// 「打开就是一片死寂」不是一个合理的初始状态
+applyLabPreset(LAB_PRESETS[0]!.id)
