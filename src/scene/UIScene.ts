@@ -15,24 +15,25 @@ import {
   isLabEnemyOn,
   isLabPanelOpen,
   labCaptain,
-  labDensity,
   labDifficulty,
   labFireRate,
   labInvincible,
   labLevel,
   labPanelScroll,
+  labScale,
   labStarters,
-  setLabDensity,
+  SCALES,
   setLabDifficulty,
   setLabFireRate,
   setLabInvincible,
   setLabLevel,
   setLabPanelOpen,
   setLabPanelScroll,
+  setLabScale,
   toggleLabCharacter,
   toggleLabEnemy,
 } from '../run/lab'
-import type { LabDensity, LabLevel, LabMul } from '../run/lab'
+import type { LabLevel, LabMul, LabScale } from '../run/lab'
 import { heapMB, rafHz, rendererInfo, startRafMeter } from '../bench/diagnostics'
 import { emojiCacheStats, emojiImage } from '../emoji/textures'
 import { emojiText, iconLabel } from '../ui/emojiText'
@@ -55,7 +56,7 @@ import { roundRect } from '../ui/shapes'
 import { BenchPanel } from '../bench/panel'
 import { attachMetrics, detachMetrics } from '../bench/metrics'
 import { clearBench } from '../bench/probe'
-import { clearBenchProfile, isBenchActive, setBenchActive } from '../bench/spec'
+import { isBenchActive, setBenchActive } from '../bench/spec'
 
 // dev 工具随线上版本常驻：游戏内 🔧 按钮开合性能面板（FPS/内存等），无需 URL 参数。
 // 状态挂模块级而非场景字段：视口变化会重启本场景，挂场景上会被一起重置。
@@ -205,7 +206,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
       // B 键：停止基准并回配置页（面板上有提示）
       this.input.keyboard?.on('keydown-B', () => {
         setBenchActive(false)
-        clearBenchProfile()
         detachMetrics()
         clearBench()
         this.scene.stop('ui')
@@ -717,17 +717,13 @@ export class UIScene extends Phaser.Scene implements HudInput {
     const applyKnob = (): void => {
       this.scene.restart()
     }
-    const densities: { k: LabDensity; label: string }[] = [
-      { k: 'low', label: '低' },
-      { k: 'mid', label: '中' },
-      { k: 'high', label: '高' },
-      { k: 'max', label: '爆满' },
-    ]
-    y = this.labSection('密度', y + 8, densities.map((d) => ({
-      label: d.label,
-      on: () => labDensity() === d.k,
-      tap: () => {
-        setLabDensity(d.k)
+    // 规模阶梯直接铺开（低 6 → 8 千）：面板选得到的就是刷怪器的全部量程，
+    // 不再有「基准才够得到的档位」
+    y = this.labSection('规模（在场上限）', y + 8, SCALES.map((s) => ({
+      label: `${s.label} ${s.spawn.cap}`,
+      on: (): boolean => labScale() === s.id,
+      tap: (): void => {
+        setLabScale(s.id as LabScale)
         applyKnob()
       },
     })))

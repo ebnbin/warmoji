@@ -5,7 +5,17 @@ import { roundRect } from '../ui/shapes'
 import { heapMB, rafHz, rendererInfo } from './diagnostics'
 import { emojiCacheStats } from '../emoji/textures'
 import { metricsReport, recentFrameTimes, resetMetrics } from './metrics'
-import { benchFramework, benchProfile } from './spec'
+import { benchFramework } from './spec'
+import {
+  labDifficulty,
+  labEnemySet,
+  labFireRate,
+  labLevel,
+  labPresetId,
+  labStarters,
+  LAB_PRESETS,
+  scaleStep,
+} from '../run/lab'
 import { reportBench } from './probe'
 import type { HudHost } from '../run/hudHost'
 
@@ -88,7 +98,11 @@ export class BenchPanel {
     this.refreshedAt = time
 
     const p = this.host.perfSnapshot()
-    const prof = benchProfile()
+    // 强度直读旋钮而非预设：旋钮可以逐个手改（此时预设标签为「自定义」），
+    // 照着预设念会念出一份与场上不符的强度
+    const step = scaleStep()
+    const presetId = labPresetId()
+    const presetLabel = LAB_PRESETS.find((x) => x.id === presetId)?.label ?? '自定义'
     const cache = emojiCacheStats(this.scene)
     const heap = heapMB()
     const raf = rafHz()
@@ -97,14 +111,14 @@ export class BenchPanel {
     // 满载后清一次采样：刷怪从 0 爬到上限的那几百帧场上没几个实体、轻松满帧，
     // 混进来会把中位数整个拉到「赶上 vsync」那一档，读出来的稳态是假的。
     // 一次性闩死——敌人数会在上限附近上下浮动，否则会反复清零
-    if (!this.steadyArmed && p.enemies >= prof.spawn.cap * 0.95) {
+    if (!this.steadyArmed && p.enemies >= step.spawn.cap * 0.95) {
       this.steadyArmed = true
       resetMetrics()
     }
     const m = metricsReport(raf)
 
     this.title.setText(
-      `${benchFramework() === 'ecs' ? 'ECS' : 'arcade'} · ${prof.label} · ${live.toLocaleString()} 实体`,
+      `${benchFramework() === 'ecs' ? 'ECS' : 'arcade'} · ${presetLabel} · ${live.toLocaleString()} 实体`,
     )
 
     // 数值列右对齐到固定宽度，标签左对齐——扫读时数字成一竖列
@@ -140,7 +154,7 @@ export class BenchPanel {
       `vsync 档  ${m.buckets.map((b, i) => `${i === 3 ? '≥4' : i + 1}×${(b * 100).toFixed(0)}%`).join(' ')}`,
       '',
       '── 在场实体（真实战斗产出）──',
-      row('敌人', n(p.enemies), `上限 ${n(prof.spawn.cap)}`),
+      row('敌人', n(p.enemies), `上限 ${n(step.spawn.cap)}`),
       row('弹体', n(p.projectiles)),
       row('金币', n(p.coins)),
       row('刷怪预告', n(p.pending)),
@@ -154,8 +168,8 @@ export class BenchPanel {
       row('JS 堆', heap === undefined ? '—' : n(heap), heap === undefined ? '（非 Chrome）' : 'MB'),
       '',
       '── 本档强度 ──',
-      `队伍 ${prof.team} 人 · ${['基础', '一阶', '二阶'][prof.level]!} · 攻速 ×${prof.fireRate}`,
-      `敌人血量 ×${prof.difficulty} · ${prof.kinds} 种 · 每批 ${prof.spawn.batch} 只`,
+      `队伍 ${labStarters().length} 人 · ${['基础', '一阶', '二阶'][labLevel()]!} · 攻速 ×${labFireRate()}`,
+      `敌人血量 ×${labDifficulty()} · ${labEnemySet().size} 种 · 规模「${step.label}」每批 ${step.spawn.batch} 只`,
       '',
       '── 渲染后端 ──',
       rendererInfo(this.scene.game),
@@ -168,7 +182,7 @@ export class BenchPanel {
 
     reportBench({
       framework: benchFramework(),
-      profile: prof.id,
+      profile: presetId ?? 'custom',
       live: { enemies: p.enemies, projectiles: p.projectiles, coins: p.coins },
       objects: p.objects,
       bodies: p.bodies,

@@ -8,17 +8,10 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
-import {
-  applyBenchProfile,
-  BENCH_PROFILES,
-  benchFramework,
-  benchProfile,
-  setBenchActive,
-  setBenchFramework,
-  setBenchProfile,
-} from '../bench/spec'
+import { benchFramework, setBenchActive, setBenchFramework } from '../bench/spec'
 import { resetMetrics } from '../bench/metrics'
-import { labCaptain, labStarters } from '../run/lab'
+import { applyLabPreset, labCaptain, labStarters, LAB_PRESETS, SCALES } from '../run/lab'
+import type { LabPreset } from '../run/lab'
 import { beginRun } from '../run/state'
 import { battleSceneFor } from '../battle'
 import { loadMap } from '../save/selection'
@@ -37,9 +30,15 @@ export class BenchScene extends Phaser.Scene {
   private detailText?: Phaser.GameObjects.Text
   private startY = 0
   private startX = 0
+  /** 本页的选择态：档位要到「开始」才写进试炼场旋钮，翻看不改变沙盒 */
+  private selected = LAB_PRESETS[0]!.id
 
   constructor() {
     super('bench')
+  }
+
+  private preset(): LabPreset {
+    return LAB_PRESETS.find((p) => p.id === this.selected) ?? LAB_PRESETS[0]!
   }
 
   create(): void {
@@ -101,7 +100,7 @@ export class BenchScene extends Phaser.Scene {
       .text(leftX - colW / 2, y, '强度档位', { fontFamily: UI_FONT, fontSize: FONT.small, color: '#8a8a99', resolution: res })
       .setOrigin(0, 0.5)
     y += 24
-    for (const p of BENCH_PROFILES) {
+    for (const p of LAB_PRESETS) {
       const rect = { x: leftX - colW / 2, y, w: colW, h: 50 }
       const bg = this.add.graphics()
       this.profileRows.push({ id: p.id, bg, rect })
@@ -116,7 +115,7 @@ export class BenchScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .on('pointerdown', () => {
           playSfx('click')
-          setBenchProfile(p.id)
+          this.selected = p.id
           this.refresh()
         })
       y += 54
@@ -164,7 +163,8 @@ export class BenchScene extends Phaser.Scene {
   }
 
   private refresh(): void {
-    const cur = benchProfile()
+    const cur = this.preset()
+    const spawn = (SCALES.find((s) => s.id === cur.scale) ?? SCALES[1]!).spawn
     for (const t of this.profileRows) {
       t.bg.clear()
       const on = t.id === cur.id
@@ -183,9 +183,9 @@ export class BenchScene extends Phaser.Scene {
       `角色等级  ${['基础', '一阶', '二阶'][cur.level]!.padStart(5)}（换整套能力形态）`,
       `我方攻速  ${`×${cur.fireRate}`.padStart(5)}（冷却 ÷ 它 → 弹幕密度）`,
       '',
-      `刷怪间隔  ${String(cur.spawn.intervalMs).padStart(5)} ms`,
-      `在场上限  ${String(cur.spawn.cap).padStart(5)} 只`,
-      `每批投放  ${String(cur.spawn.batch).padStart(5)} 只`,
+      `刷怪间隔  ${String(spawn.intervalMs).padStart(5)} ms`,
+      `在场上限  ${String(spawn.cap).padStart(5)} 只`,
+      `每批投放  ${String(spawn.batch).padStart(5)} 只`,
       `敌人血量  ${`×${cur.difficulty}`.padStart(5)}（活得越久堆得越多）`,
       `敌人种类  ${String(cur.kinds).padStart(5)} 种`,
       '',
@@ -197,7 +197,7 @@ export class BenchScene extends Phaser.Scene {
 
   private startBench(): void {
     setBenchActive(true)
-    applyBenchProfile()
+    applyLabPreset(this.selected)
     resetMetrics()
     const mapId = loadMap(undefined)
     beginRun(labCaptain(), labStarters(), mapId, true)
@@ -205,7 +205,7 @@ export class BenchScene extends Phaser.Scene {
   }
 
   private report(): void {
-    const cur = benchProfile()
+    const cur = this.preset()
     reportDebug({
       scene: 'bench',
       elapsed: 0, hp: 0, alive: 0, kills: 0, level: 1, enemies: 0, pending: 0, fps: 0,
@@ -216,7 +216,7 @@ export class BenchScene extends Phaser.Scene {
         framework: benchFramework(),
         profile: cur.id,
         team: cur.team,
-        cap: cur.spawn.cap,
+        cap: (SCALES.find((s) => s.id === cur.scale) ?? SCALES[1]!).spawn.cap,
       },
     })
   }
