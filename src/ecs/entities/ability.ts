@@ -65,7 +65,7 @@ import type { FrameIndex } from '../frames'
 import type { EcsWorld } from '../world'
 import type { CdComp } from '../components'
 import type { AbilityDef } from '../../types/abilityDefs'
-import { abilityPiercesWalls } from '../../war/abilityRules'
+import { abilityPiercesWalls } from '../../data/abilities'
 import { spawnWeaponBody } from '../entities/weapon'
 import type { Sim } from '../sim'
 

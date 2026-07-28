@@ -62,12 +62,12 @@ import { armIdle } from '../systems/shared/anim'
 import { ANIM_DEF } from '../../emoji/anim'
 import type { Sim } from '../sim'
 import type { FrameIndex } from '../frames'
-import { toPx } from '../../war/px'
+import { toPx } from '../../data/px'
 import { bossFor, MAPS } from '../../data/maps'
 import type { MapDef } from '../../types/maps'
-import { hourAt, isDayAt } from '../../war/maps/daynight'
+import { hourAt, isDayAt } from '../worlds/daynight'
 import type { FieldPickupDef } from '../../types/battlefield'
-import { enemyMixAt, pickEnemy } from '../../war/enemyAi'
+import { enemyMixAt, pickEnemy } from '../utils/spawnMix'
 
 
 

@@ -18,7 +18,7 @@ import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAPS } from '../data/maps'
-import { onFloe } from '../war/maps/ice'
+import { onFloe } from './worlds/ice'
 import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
@@ -46,19 +46,19 @@ import { Due, Lifetime, Meteor, Modifier } from './components'
 import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
 import { settleWave } from './systems/shared/wave'
 import { isBossWave, isEliteWave, waveAt, waveDurationMs, WAVE } from '../data/waves'
-import { xpToNext } from '../war/xp'
+import { xpToNext } from '../run/xp'
 import { CAPTAINS } from '../data/captains'
 import { aggregateTeamCards } from '../data/cards'
 import type { TeamEffects } from '../types/items'
 import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from '../run/sandbox'
-import { tickSkillCd } from '../war/skill'
+import { tickSkillCd } from '../run/state'
 import { hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import type { HudSnapshot } from '../run/hudHost'
 import type { Sim } from './sim'
 import { drain } from './outbox'
 import type { Burst } from './outbox'
-import { rollWaveCarriers } from '../war/battleFx'
+import { rollWaveCarriers } from './utils/battleFx'
 import { centerX, centerY } from './utils/team'
 
 // ECS 实验战斗场景(宿主壳):Phaser 只做画布/相机/输入/音频宿主;战斗世界(实体+系统+
@@ -494,7 +494,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
 
   /** 视口变化（旋转 / 拉窗口）：世界尺寸由本图的 layout 说了算；变了才整体重映射
-   * ——「长轴进度 + 跨轴偏移」的通用几何在 war/remap，与旧图共用一份 */
+   * ——「长轴进度 + 跨轴偏移」的通用几何在 utils/remap */
   private onViewportChanged(): void {
     const sim = this.sim
     const fromW = this.mapW

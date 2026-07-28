@@ -1,6 +1,6 @@
 import { DEG2RAD } from '../../util/units'
 import { playSfx } from '../../audio/sfx'
-import { sectorHitIndices } from '../../war/hit'
+import { sectorHitIndices } from '../utils/hit'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { damageTarget } from './shared/damage'
 import { Aim, Sweep, Swing } from '../components'

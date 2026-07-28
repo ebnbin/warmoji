@@ -122,6 +122,14 @@ export function beginRun(
 }
 
 /** 未经组队页直接进战斗时兜底开新局（默认队长 + 花名册首个角色） */
+/** 队长主动技能的冷却推进：战斗时钟每帧递减到 0 为止。
+ * 效果本体是标准能力行（CAPTAINS[id].skill.abilities，战斗侧单发施放），
+ * 剩余冷却存在 RunState.skillCdMs（跨波持久）；就绪门槛就是它归零。
+ * 冷却时长可被团队升级卡的 skillCdMul 缩短（见 data/cards.ts） */
+export function tickSkillCd(remainMs: number, deltaMs: number): number {
+  return Math.max(0, remainMs - deltaMs)
+}
+
 export function getRun(): RunState {
   if (!current) return beginRun('angel', ROSTER_IDS.slice(0, 1))
   return current

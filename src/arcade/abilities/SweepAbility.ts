@@ -1,6 +1,6 @@
 import { DEG2RAD } from '../../util/units'
 import type Phaser from 'phaser'
-import { sectorHitIndices } from '../../war/hit'
+import { sectorHitIndices } from '../../arcade/hit'
 import type { SweepDef } from '../../types/abilityDefs'
 import { applyEffects } from './effects'
 import { emojiImage } from '../../emoji/textures'

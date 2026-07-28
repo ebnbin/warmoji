@@ -11,7 +11,7 @@ import type { Polarity } from '../types/battlefield'
 // 抽成接口而非让 ECS 继承 ArcadeBattleScene：两套战斗内部结构完全不同（GameObject 阵
 // vs 组件数组），共享的只有这张「对外读数」表。
 //
-// 为什么住在 run/ 而不是 war/ 或 scene/：它两边都要用，而 war/ ↔ scene/ 互不可见
+// 为什么住在 run/ 而不是战斗侧或 scene/：它两边都要用，而战斗实现 ↔ scene/ 互不可见
 //（eslint 双向拦着）。落在两边都够得到的下层才不用削弱那条边界；而「当前正在跑的
 // 战斗场景」本就是单局运行时状态，与 run/ 的其余内容同类。
 

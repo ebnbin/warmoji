@@ -9,10 +9,6 @@ export function wrapCoord(v: number, size: number): number {
   return ((v % size) + size) % size
 }
 
-export function wrapPoint(p: Point, w: number, h: number): Point {
-  return { x: wrapCoord(p.x, w), y: wrapCoord(p.y, h) }
-}
-
 /** 环面最短差向量 from→to：各轴回绕到 ±半场内（可能穿缝） */
 export function torusDelta(from: Point, to: Point, w: number, h: number): Point {
   let dx = to.x - from.x

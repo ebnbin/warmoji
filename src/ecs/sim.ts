@@ -9,13 +9,12 @@ import { expireFx } from './systems/expireFx'
 import { layoutTeam } from './systems/layoutTeam'
 import type { FormationId } from '../types/formation'
 import type { EcsWorld } from './world'
-import type { WorldHooks, WorldState } from './worlds'
+import type { WorldHooks, WorldState } from './worlds/hooks'
 import type { Outbox } from './outbox'
 import type { RunState } from '../run/state'
 import type { Target } from './utils/targets'
 import type { FrameIndex } from './frames'
 import { TIMESTOP } from '../data/timeStop'
-import { timeScaleFor } from '../war/timeStop'
 import { BATTLE_FX_IDENTITY } from '../data/battlefield'
 import type { BattleEffects } from '../types/battlefield'
 import { CAPTAINS } from '../data/captains'
@@ -23,7 +22,7 @@ import { aggregateTeamCards } from '../data/cards'
 import { Rng } from '../util/rng'
 import { spawnCaptain } from './entities/captain'
 import { formTeam } from './entities/captain'
-import { newWorldState, worldFor } from './worlds'
+import { newWorldState, worldFor } from './worlds/hooks'
 import { newOutbox } from './outbox'
 import type { EcsAtlas } from './atlas'
 
@@ -136,6 +135,13 @@ export function initialLayout(sim: Sim): void {
 }
 
 /** 一帧仿真(镜像 update 的 updateOrbit→moveTeam→steerEnemies 次序);delta 为真实帧长(ms) */
+
+/** 队伍移动量 input01∈[0,1] → 世界时间流速∈[floor,1]（越动越快，线性）。
+ * 时停 = 把「秒针」窗口化：窗口内动则恢复常速、静止则降到 floor（近乎凝固） */
+function timeScaleFor(input01: number): number {
+  const t = input01 < 0 ? 0 : input01 > 1 ? 1 : input01
+  return TIMESTOP.floor + (1 - TIMESTOP.floor) * t
+}
 
 /** 世界时间流速(镜像 worldTimeScale):时停窗口内随队伍移动量放缩,窗口外恒 1 */
 export function worldTimeScale(sim: Sim): number {

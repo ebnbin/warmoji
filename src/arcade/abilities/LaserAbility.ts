@@ -1,6 +1,6 @@
 import { DEG2RAD } from '../../util/units'
 import type Phaser from 'phaser'
-import { thrustHitIndices } from '../../war/hit'
+import { thrustHitIndices } from '../../arcade/hit'
 import type { LaserDef } from '../../types/abilityDefs'
 import { emojiImage } from '../../emoji/textures'
 import { beamCue } from '../cues'

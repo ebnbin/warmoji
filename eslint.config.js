@@ -28,13 +28,6 @@ const NO_BATTLE_IMPL = {
     '战斗实现（src/arcade/ 与 src/ecs/）是两套可互相替换的并列分支：一律经 src/battle.ts 调用，不要直接 import（这样两侧的耦合面才数得清、淘汰其一时能一步拆干净）',
 }
 
-/** 页面层不得依赖 war/ */
-const NO_WAR_FROM_SCENE = {
-  group: ['**/war', '**/war/*', '**/war/**'],
-  message:
-    'src/war/ 只放战斗世界本身，页面不该依赖它。若页面与战斗都要用，说明它是接缝（放 src/run/，如 hudHost）或共享数据（放 src/data/），不该留在 war/',
-}
-
 /** 战斗侧不得依赖页面层（任意深度的相对路径都要拦住） */
 const NO_SCENE_FROM_BATTLE = {
   group: ['**/scene', '**/scene/*', '**/scene/**'],
@@ -71,9 +64,9 @@ export default tseslint.config(
   // 数据表的唯一入口：assets/*.json 只许 data/ 与 types/ 读
   //（前者导出表，后者用 keyof typeof 派生 id 联合类型）。别处要用就 import data/ 的常量。
   // 不设这条的下场是同一张表被多处各读一遍、各取一半字段：历史上 feel.json 被
-  // data/feel.ts 与 war/orbit.ts 瓜分，progression.json 更散在 data/waves、
-  // run/recruit、war/xp 三处——想知道「某个参数在哪」得翻遍全仓。
-  // 这条同时把「表 vs 算法」钉死：war/ 与 run/ 只放算法，表一律回 data/。
+  // data/feel.ts 与两套战斗的轨道算法瓜分，progression.json 更散在 data/waves、
+  // run/recruit、run/xp 三处——想知道「某个参数在哪」得翻遍全仓。
+  // 这条同时把「表 vs 算法」钉死：两套战斗实现与 run/ 只放算法，表一律回 data/。
   {
     files: ['src/**/*.ts'],
     ignores: ['src/data/**/*.ts', 'src/types/**/*.ts'],
@@ -95,24 +88,22 @@ export default tseslint.config(
       'no-restricted-imports': ['error', { patterns: [NO_BATTLE_IMPL, NO_ASSETS_JSON] }],
     },
   },
-  // 战斗域边界护栏：src/war/ 只放战斗世界本身——能力/命中/特效/敌人 AI/世界几何/换算，
-  // 判据是「两套战斗实现至少有一方真的 import 它」。全部页面（含 HUD 的 UIScene）都在
-  // src/scene/，一律不得依赖 war/——战斗场景相对页面是独立的，这条边界一破，
-  // 「战斗是一块可整体替换的东西」这个前提就没了。
-  // 必须排在上面那条实现隔离护栏之后：flat config 里同名规则后者整个替换前者，
-  // 故这里把 war 与两套实现的 pattern 一并给出（页面三者都不该碰）。
+  // 页面层不得依赖任何战斗实现。从前还有第三个 pattern（src/war/ 那层两套共用的战斗
+  // 世界），现在它已按架构拆回两侧各自包内——「战斗是一块可整体替换的东西」这个前提
+  // 由 NO_BATTLE_IMPL 一条就守得住。
+  // 必须排在上面那条实现隔离护栏之后：flat config 里同名规则后者整个替换前者。
   // main.ts 不在此列：它要把战斗场景与 HUD 注册进 Phaser。
   {
     files: ['src/scene/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [NO_WAR_FROM_SCENE, NO_BATTLE_IMPL, NO_ASSETS_JSON] }],
+      'no-restricted-imports': ['error', { patterns: [NO_BATTLE_IMPL, NO_ASSETS_JSON] }],
     },
   },
   // 反方向同样要拦：战斗侧不得依赖页面层。通用控件已抽到 src/ui/。
   // 历史上这个方向漏过两次：UIScene 曾直接 import menu/scroll；两套战斗框架曾
   // import type { UIScene } 只为读一个摇杆向量（现已收成 run/hudHost 的 HudInput 契约）。
   {
-    files: ['src/war/**/*.ts', 'src/arcade/**/*.ts', 'src/ecs/**/*.ts'],
+    files: ['src/arcade/**/*.ts', 'src/ecs/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', { patterns: [NO_SCENE_FROM_BATTLE, NO_DEV_FROM_BATTLE, NO_ASSETS_JSON] }],
     },
@@ -141,7 +132,6 @@ export default tseslint.config(
       'src/scene/*Scene.ts',
       // 开发者工具整包是表现层：Phaser 帧阶段事件、渲染器信息、自绘面板
       'src/dev/**/*.ts',
-      'src/war/damageFont.ts',
       'src/util/fx.ts',
       // 旧框架（arcade）整包是表现层：Scene 继承 + Arcade Physics body
       'src/arcade/**/*.ts',
@@ -173,7 +163,7 @@ export default tseslint.config(
   },
   // data 是内容层：各张游戏数据表（读 src/assets/*.json）+ 其类型 + 对表的纯查询。
   // 它是叶子——只许向下依赖 util 与 assets，不得依赖任何业务包。
-  // 一旦 data 反向引用 war/run/scene，「内容与玩法分离」就名存实亡。
+  // 一旦 data 反向引用 run/scene 或某套战斗实现，「内容与玩法分离」就名存实亡。
   {
     files: ['src/data/**/*.ts'],
     rules: {
@@ -186,7 +176,6 @@ export default tseslint.config(
               //（试过 ['../*', '!../util/*'] —— 负向被忽略，连 util 一起拦），故只能正向枚举。
               // 新增顶层包时记得同步这张表。
               group: [
-                '../war/*', '../war/**',
                 '../arcade/*', '../arcade/**',
                 '../ecs/*', '../ecs/**',
                 '../battle',
@@ -208,7 +197,7 @@ export default tseslint.config(
   // defs 是创作层：内容与数值的手写源，经 scripts/gen-defs.ts 校验后产出 src/assets/*.json。
   // 它对 src 的依赖只该是「这张表长什么样」——即 src/data/ 里的数据类型定义；
   // 另允许 src/util/ 的纯工具（如 palette.hslToInt，让地图配色能按 HSL 书写）。
-  // 一旦 defs 够到 war/audio/scene 等功能包，创作层就跟着玩法实现走了：
+  // 一旦 defs 够到 audio/scene 等功能包，创作层就跟着玩法实现走了：
   // 那些包本该反过来消费内容，删改其中任一个都会连累「内容怎么写」。
   {
     files: ['defs/**/*.ts'],
@@ -221,7 +210,6 @@ export default tseslint.config(
               // 同 data 那条：group 不支持 '!' negation，只能正向枚举禁止项。
               // src/ 下新增顶层包时记得同步这张表。
               group: [
-                '../src/war/*', '../src/war/**',
                 '../src/arcade/*', '../src/arcade/**',
                 '../src/ecs/*', '../src/ecs/**',
                 '../src/battle', '../src/debug', '../src/manifest',
@@ -256,7 +244,7 @@ export default tseslint.config(
         'error',
         {
           selector: 'ExportNamedDeclaration > FunctionDeclaration',
-          message: 'types 只放类型声明：函数属于用它的那一层（规则去 war/ 或 data/，只有一个消费方的直接放消费方）',
+          message: 'types 只放类型声明：函数属于用它的那一层（内容规则去 data/，战斗规则去用它那套实现的包内，只有一个消费方的直接放消费方）',
         },
         {
           selector: 'ExportNamedDeclaration > VariableDeclaration',

@@ -4,7 +4,7 @@ import { aggregateCharacterEffects, characterXp, resolveAbilityDef } from '../..
 import { levelStatsFor } from '../../data/levels'
 import { characterLevel } from '../../data/charLevel'
 import { aggregateTeamCards } from '../../data/cards'
-import { toPx } from '../../war/px'
+import { toPx } from '../../data/px'
 import { sandboxLevel } from '../../run/sandbox'
 import { FACTION } from '../components'
 import { equipAbility, NEUTRAL_AMP } from './ability'

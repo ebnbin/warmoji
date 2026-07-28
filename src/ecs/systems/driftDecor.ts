@@ -1,7 +1,7 @@
 import { query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { MAPS } from '../../data/maps'
-import { driftSpeed, riverRect } from '../../war/maps/river'
+import { driftSpeed, riverRect } from '../worlds/river'
 import { Drift, Transform } from '../components'
 import type { Sim } from '../sim'
 

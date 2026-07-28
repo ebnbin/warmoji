@@ -16,12 +16,12 @@ import { query } from 'bitecs'
 import { Alive, Due, Meteor, Transform } from './components'
 import { centerX, centerY } from './utils/team'
 import { spawnDriftDecor } from './entities/decor'
-import { chunkDecor, chunkKey, chunksInRect, outsideZone } from '../war/maps/world'
-import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from '../war/maps/daynight'
-import { onFloe } from '../war/maps/ice'
-import { driftSpeed, riverRect } from '../war/maps/river'
-import { fitAspectRect } from '../war/maps/void'
-import { generateRuins, reachableCells, WallGrid } from '../war/maps/ruins'
+import { chunkDecor, chunkKey, chunksInRect, outsideZone } from './worlds/infinite'
+import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynight'
+import { onFloe } from './worlds/ice'
+import { driftSpeed, riverRect } from './worlds/river'
+import { fitAspectRect } from './worlds/torus'
+import { generateRuins, reachableCells, WallGrid } from './worlds/ruins'
 
 // 各图专属的视觉常量（从 EcsBattleScene 搬来：它们只有本文件的对应视图用得上）
 const FOG_COLOR = 0x0a0a1a

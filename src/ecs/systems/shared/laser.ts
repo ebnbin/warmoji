@@ -1,5 +1,5 @@
 import { playSfx } from '../../../audio/sfx'
-import { thrustHitIndices } from '../../../war/hit'
+import { thrustHitIndices } from '../../utils/hit'
 import { Laser } from '../../components'
 import { damageMul, ownerX, ownerY } from '../../utils/amp'
 import { damageTarget } from './damage'

@@ -25,8 +25,14 @@ import type { EcsSceneKey } from './ecs/keys'
 //                    能力是每（持有者×能力）一个运行时对象（arcade/abilities/）
 //   · src/ecs/    —— 实验：bitECS 数据导向 + 自绘批量渲染管线，能力本身就是实体，
 //                    按 kind tag 分流给各自的施放系统（ecs/ability/）
-// 共享层（data 表 / maps 几何 / 命中几何 war/hit / emoji / run / util …）
-// 两侧都依赖，且**不反向依赖任何一侧**，故任一侧都能被整体摘除。
+// 共享层只剩「与战斗形态无关」的那些：data 表 / types / emoji / audio / ui /
+// run（局外进度：RunState、经验曲线、技能冷却、HUD 接缝）/ util。两侧都依赖它，
+// 且它**不反向依赖任何一侧**，故任一侧都能被整体摘除。
+//
+// 战斗世界本身（命中几何 / 轨道动力学 / 敌人 AI / 各图世界模型 / 视口重映射…）
+// **不在共享层**：它按两套架构各自的分层拆进了各自包内，两份代码有意重复。
+// 从前它们合住在 src/war/，一个包同时服侍两套架构——省下的那点重复，代价是
+// 「删掉一侧」不再是删一个目录，且这一层永远只能长成两边的最小公约数。
 //
 // 约束：**本文件是全仓唯一允许 import `src/arcade/` 与 `src/ecs/`（及 bitecs）的模块**，
 // 由 eslint 的 no-restricted-imports 强制。项目代码一律经此处调用，于是「两套实现与
@@ -39,9 +45,7 @@ import type { EcsSceneKey } from './ecs/keys'
 //   3. eslint.config.js 去掉该侧的护栏与白名单；删 ECS 侧一并删 package.json 的 bitecs
 //   （e2e 已收敛为 smoke + gameplay 两条底线守卫，不绑任一侧实现，故无需增删）
 //
-// 删后共享层不会留下死文件——每个共享文件都还有别的使用方。留在 war/ 里只服务单侧的导出
-// 也一并可删：arcade 侧 hit.ts::sweepFirstHitIndex、world/void.ts::wrapCoord、
-// world/world.ts::isWithinActive；ECS 侧 cues.ts::CircleCue、world/void.ts::wrapPoint。
+// 删后共享层不会留下死文件——每个共享文件都还有别的使用方；战斗世界那部分随目录一起走。
 // 另有 `src/run/hudHost.ts`——为了一个 UIScene 同时服务两套战斗而抽的双向接缝
 //（HudHost：HUD 读战斗；HudInput：战斗读移动输入），只剩一个实现者时可简化。
 

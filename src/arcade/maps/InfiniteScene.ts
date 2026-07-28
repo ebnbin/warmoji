@@ -11,7 +11,7 @@ import {
   outsideZone,
   ringPoint,
   zoneRadiusAt,
-} from '../../war/maps/world'
+} from '../../arcade/maps/world'
 import { emojiImage } from '../../emoji/textures'
 import { viewport } from '../../util/apply'
 import { ArcadeBattleScene } from '../ArcadeBattleScene'

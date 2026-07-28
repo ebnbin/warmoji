@@ -1,5 +1,8 @@
-import { isHorizontal } from '../remap'
+import { isHorizontal } from '../utils/remap'
 import type { Point } from '../../util/vec'
+
+// 本图的纯世界模型（禁 phaser/DOM）；接进 WorldHooks 的是同目录的 hooks.ts。
+// ECS 侧的一份——旧框架侧在 arcade/maps/ 下另有等价实现，两份有意重复。
 
 // 河流地图的世界模型（纯逻辑，禁 phaser/DOM）。
 // 世界 = 逻辑视口（相机静止）；河道沿长轴、跨短轴居中、宽度恒定。
@@ -44,7 +47,7 @@ export function clampToRiver(p: Point, rect: RiverRect, pad: number): Point {
 
 /** 漂浮物速度剖面：河心最快、近岸放缓（真实河流的流速分布，仅视觉层用）。
  * crossFrac = |跨向偏移| / (河宽/2)，超出河道按岸边速度 */
-export function driftProfile(crossFrac: number): number {
+function driftProfile(crossFrac: number): number {
   const f = Math.min(1, Math.abs(crossFrac))
   return 0.6 + 0.4 * (1 - f * f)
 }

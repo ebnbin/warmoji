@@ -1,8 +1,12 @@
-import { ENEMIES } from '../data/enemies'
-import type { EnemyDef, EnemyMixEntry, EnemyMixRow } from '../types/enemies'
+import { ENEMIES } from '../../data/enemies'
+import type { EnemyDef, EnemyMixEntry, EnemyMixRow } from '../../types/enemies'
+import type { Rng } from '../../util/rng'
+import { dist2 } from '../../util/vec'
+import type { Point } from '../../util/vec'
 
-// 敌人投放与行为的战斗规则：波次混编取样、按权重抽取、逃跑转向。
-// 只被两套战斗实现消费，故归战斗共享层而非内容层。
+// 敌人投放与行为的战斗规则：这一波出什么、按权重抽哪一只、刷在哪、逃跑往哪转。
+// 旧框架侧的一份；ECS 侧另有等价实现（ecs/utils/spawnMix + systems/shared/steer），
+// 两份有意重复——两套架构各自成包、互不引用，删掉任一侧都是删一个目录。
 
 /** 某一波的出场配比（已按 sinceWave 过滤、权重夹在上下限之间） */
 export function enemyMixAt(mix: readonly EnemyMixRow[], wave: number): EnemyMixEntry[] {
@@ -44,4 +48,28 @@ export function fleeSteer(
     return { x: -awayY / t, y: awayX / t }
   }
   return { x: fx / len, y: fy / len }
+}
+
+/**
+ * 地图内随机刷怪点：距边缘 ≥ inset，距 avoid（玩家）≥ minDist；
+ * 拒绝采样最多 20 次，全拒则返回最后一次（minDist 过大时的兜底）。
+ */
+export function randomMapPoint(
+  rng: Rng,
+  width: number,
+  height: number,
+  inset: number,
+  avoid: Point,
+  minDist: number,
+): Point {
+  const xMin = Math.round(inset)
+  const xMax = Math.round(width - inset)
+  const yMin = Math.round(inset)
+  const yMax = Math.round(height - inset)
+  let p: Point = { x: xMin, y: yMin }
+  for (let i = 0; i < 20; i++) {
+    p = { x: rng.int(xMin, xMax), y: rng.int(yMin, yMax) }
+    if (dist2(p, avoid) >= minDist * minDist) return p
+  }
+  return p
 }

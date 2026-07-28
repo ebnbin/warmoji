@@ -1,6 +1,6 @@
 import { reachOf } from '../../utils/thrust'
 import { playSfx } from '../../../audio/sfx'
-import { thrustHitIndices } from '../../../war/hit'
+import { thrustHitIndices } from '../../utils/hit'
 import { damageMul, ownerX, ownerY } from '../../utils/amp'
 import { damageTarget } from './damage'
 import { Aim, Swing, Thrust } from '../../components'

@@ -33,9 +33,9 @@ const GUARDS: readonly { name: string; file: string; code: string }[] = [
     code: "import { addEntity } from 'bitecs'\nvoid addEntity\n",
   },
   {
-    name: '页面层不得依赖 war/',
+    name: '页面层不得依赖战斗实现',
     file: 'src/scene/UIScene.ts',
-    code: "import { xpToNext } from '../war/xp'\nvoid xpToNext\n",
+    code: "import { worldFor } from '../ecs/worlds/hooks'\nvoid worldFor\n",
   },
   {
     name: '战斗侧不得依赖场景层',
@@ -49,7 +49,7 @@ const GUARDS: readonly { name: string; file: string; code: string }[] = [
   },
   {
     name: 'assets/*.json 只许 data/ 与 types/ 读',
-    file: 'src/war/xp.ts',
+    file: 'src/run/xp.ts',
     code: "import waves from '../assets/progression.json'\nvoid waves\n",
   },
   {
@@ -60,11 +60,11 @@ const GUARDS: readonly { name: string; file: string; code: string }[] = [
   {
     name: 'data 是内容叶子层',
     file: 'src/data/pickups.ts',
-    code: "import { xpToNext } from '../war/xp'\nvoid xpToNext\n",
+    code: "import { xpToNext } from '../run/xp'\nvoid xpToNext\n",
   },
   {
     name: '纯逻辑文件禁 import phaser',
-    file: 'src/war/xp.ts',
+    file: 'src/run/xp.ts',
     code: "import Phaser from 'phaser'\nvoid Phaser\n",
   },
   {

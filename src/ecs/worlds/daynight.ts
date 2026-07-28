@@ -3,6 +3,9 @@
 // 视野随时刻余弦涨落，夜里额外收一层以队伍为心的迷雾圈。设计参数在 MapDef.dayNight（数据）。
 import type { DayNightConfig } from '../../types/maps'
 
+// 本图的纯世界模型（禁 phaser/DOM）；接进 WorldHooks 的是同目录的 hooks.ts。
+// ECS 侧的一份——旧框架侧在 arcade/maps/ 下另有等价实现，两份有意重复。
+
 /** 累计战斗秒 → 游戏时刻（0..24），跨波持久、按周期回卷 */
 export function hourAt(combatSec: number, cfg: DayNightConfig): number {
   const h = cfg.startHour + combatSec * (24 / cfg.cycleSec)
@@ -15,7 +18,7 @@ export function visionGridsAt(hour: number, cfg: DayNightConfig): number {
 }
 
 /** 夜深程度 0..1：白天恒 0，黄昏/黎明 0，午夜 1（迷雾半径/浓度都挂它） */
-export function nightDepthAt(hour: number): number {
+function nightDepthAt(hour: number): number {
   const fromMidnight = Math.min(hour, 24 - hour) // 距午夜的小时数 0..12
   return Math.max(0, 1 - fromMidnight / 6)
 }

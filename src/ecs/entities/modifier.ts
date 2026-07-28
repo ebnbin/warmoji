@@ -1,6 +1,6 @@
 import { addComponents, addEntity, query, removeEntity } from 'bitecs'
 import { BATTLE_FX_IDENTITY } from '../../data/battlefield'
-import { foldBattleEffects } from '../../war/battleFx'
+import { foldBattleEffects } from '../utils/battleFx'
 import { Lifetime, Modifier } from '../components'
 import { modDef } from '../store'
 import type { BattleEffects, FieldPickupDef } from '../../types/battlefield'

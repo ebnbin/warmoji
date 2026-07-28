@@ -1,7 +1,7 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
 import { norm } from '../../../util/vec'
 import { playSfx } from '../../../audio/sfx'
-import { gainXp } from '../../../war/xp'
+import { gainXp } from '../../../run/xp'
 import { coinDropChance } from '../../../data/waves'
 import { ELITE } from '../../../data/enemies'
 import type { EnemyDef } from '../../../types/enemies'

@@ -1,6 +1,6 @@
 import { hasComponent } from 'bitecs'
 import type { Effect } from '../../../types/abilityDefs'
-import { circleHitIndices } from '../../../war/hit'
+import { circleHitIndices } from '../../utils/hit'
 import { Enemy, CharAtkSlow, Morph, Poison, Slow } from '../../components'
 import { applyMorph } from '../../entities/enemy'
 import { spawnEnemyProjectileEcs } from '../../entities/projectile'

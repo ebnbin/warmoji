@@ -1,6 +1,6 @@
-import { BATTLE_FX_IDENTITY, CARRIER_BUDGET, POOLS } from '../data/battlefield'
-import type { BattleEffects, FieldPickupDef, Polarity } from '../types/battlefield'
-import type { MapId } from '../types/maps'
+import { BATTLE_FX_IDENTITY, CARRIER_BUDGET, POOLS } from '../../data/battlefield'
+import type { BattleEffects, FieldPickupDef, Polarity } from '../../types/battlefield'
+import type { MapId } from '../../types/maps'
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
 
@@ -15,7 +15,7 @@ function pickPolarity(
 }
 
 // 限时战斗层的规则：多来源效果折叠、按波次分配携带者预算与抽取。
-// 只被两套战斗实现消费。
+// ECS 侧的一份；旧框架侧另有等价实现（arcade/field.ts 尾段），两份有意重复。
 
 /** 叠加多个限时片段：乘区相乘、crit 相加，最终封顶/保底防叠飞。 */
 export function foldBattleEffects(parts: readonly Partial<BattleEffects>[]): BattleEffects {

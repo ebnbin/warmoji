@@ -20,9 +20,9 @@ import { DevPanel } from '../dev/DevPanel'
 
 // 屏幕层：HUD、虚拟摇杆、暂停浮层、波末横幅、开发者面板。
 // 与战斗场景并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
-// 它是一块页面而非战斗世界，故住在 scene/ 而非 war/：对战斗的读写全经
+// 它是一块页面而非战斗世界，故住在 scene/ 而非战斗侧：对战斗的读写全经
 // run/hudHost 的两条契约（HudHost 读战斗、HudInput 供战斗读移动输入），
-// 本文件对 war/ 与两套战斗实现零依赖。
+// 本文件对两套战斗实现零依赖。
 export class UIScene extends Phaser.Scene implements HudInput {
   private joystick?: Joystick
   private xpBar!: Phaser.GameObjects.Graphics

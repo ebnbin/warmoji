@@ -1,12 +1,12 @@
 import { query } from 'bitecs'
-import { remapPoint, remapVector, isHorizontal } from '../../../war/remap'
+import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
 import { Bob, EDir, ENEMY_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import { centerX, centerY, setCenter } from '../../utils/team'
 
 // 视口横竖切换/尺寸变化时的世界重映射(仅单屏图:奔流/工厂——它们的世界尺寸由视口推出)。
-// 位置按「长轴进度 + 跨轴偏移」映射,速度/朝向随坐标系旋转;几何在 war/remap,与旧图共用一份。
+// 位置按「长轴进度 + 跨轴偏移」映射,速度/朝向随坐标系旋转;几何在 utils/remap（纯函数,不碰实体）。
 
 /** 把整局仿真从旧视口尺寸搬到新视口尺寸(队伍中心/跟随点/敌人/弹体/金币/预告点) */
 export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, toH: number): void {

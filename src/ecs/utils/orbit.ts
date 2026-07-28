@@ -1,4 +1,4 @@
-import { ORBIT } from '../data/feel'
+import { ORBIT } from '../../data/feel'
 
 // 环形阵轨道动力学：环是刚性同步的——所有角色保持均匀间距，共享一个相位，
 // 每人角度 = 均匀槽位角 + 相位。全员按「秉性（CHARACTERS.orbit）× 探测范围内敌情」
@@ -13,7 +13,7 @@ export interface OrbitThreat {
   weight: number
 }
 
-// 注:war/hit.ts 另有一份 wrapAngle（取模实现）。两者数值等价但浮点路径不同，
+// 注:utils/hit.ts 另有一份 wrapAngle（取模实现）。两者数值等价但浮点路径不同，
 // 战斗数值对逐位一致敏感，故不合并、各自模块私有
 function wrapAngle(a: number): number {
   return Math.atan2(Math.sin(a), Math.cos(a))

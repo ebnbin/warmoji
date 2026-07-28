@@ -26,7 +26,7 @@ export function ringPoint(rng: Rng, center: Point, rMin: number, rMax: number): 
 // 密度的低频噪声场同样按世界格坐标哈希采样，跨块天然连续。
 
 /** 整数坐标哈希 → [0,1)：装饰的一切逐格随机都从它派生（负坐标安全） */
-export function hash01(seed: number, x: number, y: number): number {
+function hash01(seed: number, x: number, y: number): number {
   let h = (seed ^ 0x9e3779b9) >>> 0
   h = Math.imul(h ^ (x | 0), 0x85ebca6b) >>> 0
   h = (h ^ (h >>> 13)) >>> 0
@@ -36,7 +36,7 @@ export function hash01(seed: number, x: number, y: number): number {
 }
 
 /** 低频值噪声（世界格坐标，波长 waveU 格）：晶格值来自 hash01，平滑双线性 */
-export function worldNoise(seed: number, xU: number, yU: number, waveU: number): number {
+function worldNoise(seed: number, xU: number, yU: number, waveU: number): number {
   const gx = xU / waveU
   const gy = yU / waveU
   const ix = Math.floor(gx)
@@ -52,7 +52,7 @@ export function worldNoise(seed: number, xU: number, yU: number, waveU: number):
 }
 
 /** 块坐标（floor 除法，负坐标正确） */
-export function chunkOf(xU: number, chunkCells: number): number {
+function chunkOf(xU: number, chunkCells: number): number {
   return Math.floor(xU / chunkCells)
 }
 

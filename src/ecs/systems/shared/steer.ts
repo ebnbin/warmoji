@@ -43,3 +43,30 @@ export function wanderDir(sim: Sim, eid: number): Point {
 export function aimPoint(sim: Sim, eid: number, atCenter: boolean): Point | null {
   return atCenter ? teamCenter(sim) : nearestAlive(sim, Transform.x[eid]!, Transform.y[eid]!)
 }
+
+
+/** 逃离转向：贴近地图边缘时叠加向内分量，沿墙滑行绕开而不是顶着边界冲。
+ * 纯几何（不读 sim）——有界世界的钩子调它，无界世界不需要 */
+export function fleeSteer(
+  x: number,
+  y: number,
+  awayX: number,
+  awayY: number,
+  mapW: number,
+  mapH: number,
+  margin: number,
+): Point {
+  let fx = awayX
+  let fy = awayY
+  if (x < margin) fx += ((margin - x) / margin) * 2
+  if (x > mapW - margin) fx -= ((x - (mapW - margin)) / margin) * 2
+  if (y < margin) fy += ((margin - y) / margin) * 2
+  if (y > mapH - margin) fy -= ((y - (mapH - margin)) / margin) * 2
+  const len = Math.hypot(fx, fy)
+  if (len < 1e-6) {
+    // 完全抵消（顶死在边上）时沿切线走
+    const t = Math.hypot(awayX, awayY) || 1
+    return { x: -awayY / t, y: awayX / t }
+  }
+  return { x: fx / len, y: fy / len }
+}
