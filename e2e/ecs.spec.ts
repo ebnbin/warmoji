@@ -10,6 +10,12 @@ import type { Page } from '@playwright/test'
 // 顺带钉住出站信箱的积压：sim.out 的五个队列是「仿真只写、场景侧排空」，
 // 漏排一条不会报错，只会一路涨到卡顿——帧末积压恒 0 是它唯一的外部可观测量。
 //
+// 还钉住「实体引用了图集里没有的 emoji 变体」：atlas.index 返回 -1，批绘当场 continue，
+// 那颗实体就此隐形——照常移动、照常打人，只是永远画不出来，也不报错。清单（emoji ×
+// 描边阵营）与建实体处各写一份，改一边漏一边就是这个下场。恒 0 是它唯一的外部可观测量。
+// 它守不住带 idle 部件动画的那类（角色/敌人）：clip 是惰性烘焙的、不查静态清单，
+// 漏登记也会被动画帧接上——这条主要守住静态贴图（拾取物、装饰、特效、预告标记）。
+//
 // 也钉住「自绘层没在参与 Phaser 的深度排序」：DisplayList 排的是 _depth，裸 GameObject
 // 只写 depth 的话它恒为 undefined，比较得 NaN、排序原地不动，深度带整体失效。开局时
 // 看不出来（地图视觉先建、批绘后建，正好该在上），视口一变、单屏图的视觉层整体重建，
@@ -31,7 +37,7 @@ async function click(page: Page, logical: { x: number; y: number }): Promise<voi
 
 // ECS 侧的探针是 window.__ecs（__warmoji 在 ECS 战斗期间是陈旧的，本场景不写它）。
 // 页面内求值的闭包不能引用本文件的作用域，故各处内联展开
-type Ecs = { elapsed: number; kills: number; enemies: number; outbox: number; unsortedLayers: number }
+type Ecs = { elapsed: number; kills: number; enemies: number; outbox: number; unsortedLayers: number; blindSprites: number }
 type WinEcs = Window & { __ecs?: Ecs }
 
 test('试炼场：ECS 战斗跑得起来、有击杀、出站信箱不积压', async ({ page }) => {
@@ -58,6 +64,7 @@ test('试炼场：ECS 战斗跑得起来、有击杀、出站信箱不积压', a
   expect(ecs.enemies, '场上没敌人：这一局没打起来').toBeGreaterThan(0)
   expect(ecs.kills, '一个都没杀死：能力没在索敌/施伤').toBeGreaterThan(0)
   expect(ecs.outbox, '出站信箱帧末仍有积压：某条 drain 没清').toBe(0)
+  expect(ecs.blindSprites, '有实体的贴图变体不在图集里（frame=-1）：它在场却永远画不出来，且不报错').toBe(0)
   expect(
     ecs.unsortedLayers,
     '有自绘层没在参与深度排序（_depth 不是数）：它的叠放次序退化成进显示列表的先后，转屏后会被地图视觉盖住',

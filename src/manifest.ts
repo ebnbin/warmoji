@@ -42,8 +42,6 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     // 但那是巧合不是依赖：那枚拾取换个 emoji，天体就静默变成 frame=-1
     SPAWN.markEmoji,
     '1fa90',
-    // 💥 爆裂：同样是实体（FxBoom），走精灵批绘
-    '1f4a5',
     // 财迷「天降横财」的金袋投掷物 + HUD 能量豆
     '1f4b0',
     '1fad8',
@@ -60,6 +58,12 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     ...new Set([...ENEMY_DEFS.map((e) => e.emoji), ...BOSSES.map((e) => e.emoji), ...morphEmojis(), ...armedBodyEmojis()]),
   ],
 }
+
+/** ECS 图集里**不描边**的那些：特效贴图。💥 爆裂是实体（FxBoom）走精灵批绘，
+ * 但它是特效不是角色——剪影描边是分敌我用的，特效没有阵营。而且描边是画在 emoji 那
+ * 6 单位余量里的：给它描一圈，同一个标称尺寸下墨迹从占格 0.75 涨到 0.836，看起来就
+ * 比旧实现大了一圈（旧实现与 arcade 侧都是无描边的 Image） */
+export const PLAIN_EMOJIS: readonly string[] = ['1f4a5']
 
 /** 持械敌人的能力视觉（持有物/塔体/召唤物/点名坠物）：随敌人本体阵营描边 */
 function armedBodyEmojis(): string[] {

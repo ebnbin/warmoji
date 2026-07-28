@@ -135,7 +135,7 @@ export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): numbe
   FxBoom.size[eid] = size
   attachDrawable(sim.world, eid, sim.frames, {
     id: '1f4a5',
-    outline: 'player',
+    outline: undefined, // 特效不描边：描一圈会把同一标称尺寸的墨迹撑大一圈（见 manifest 的 PLAIN_EMOJIS）
     x,
     y,
     size: size * 0.4, // 起始 0.4 倍，由 animateBooms 弹到全尺寸

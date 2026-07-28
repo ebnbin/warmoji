@@ -14,7 +14,7 @@ import { UI_FONT, FONT } from '../util/fonts'
 import { norm } from '../util/vec'
 import { applyBackground } from '../util/background'
 import { playSfx } from '../audio/sfx'
-import { OUTLINED_EMOJIS } from '../manifest'
+import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAPS } from '../data/maps'
@@ -23,7 +23,7 @@ import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Dormant, Enemy, FACTION, Faction, GrantCoins, Hp, CharHp, MoveSpeed, Nest, PICKUP_SET, Projectile, Revive, Sprite, Transform, Zone } from './components'
+import { Alive, Boss, Dormant, Enemy, FACTION, Faction, GrantCoins, Hp, CharHp, MoveSpeed, Nest, PICKUP_SET, Projectile, RENDERABLE, Revive, Sprite, Transform, Zone } from './components'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
@@ -240,7 +240,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   }
 
   private async boot(run: RunState, center: { x: number; y: number }, hint: Phaser.GameObjects.Text): Promise<void> {
-    const atlas = await EcsAtlas.build(this, OUTLINED_EMOJIS)
+    const atlas = await EcsAtlas.build(this, OUTLINED_EMOJIS, PLAIN_EMOJIS)
     if (!this.scene.isActive()) return
     this.atlas = atlas
     // 开局清上一局遗留的模块级状态(eid 从 0 重新分配,旧局引用不能留给新实体)
@@ -648,6 +648,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
       unsortedLayers: this.unsortedLayers(),
+      blindSprites: query(this.world, RENDERABLE as unknown as object[]).filter((e) => Sprite.frame[e]! < 0).length,
       pages: this.atlas?.pageCount ?? 0,
       centerX: centerX(sim),
       centerY: centerY(sim),

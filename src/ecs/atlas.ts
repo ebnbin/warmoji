@@ -17,12 +17,19 @@ const PER_PAGE = COLS * COLS // 每页格数 = 64
 // 帧位上限:静态变体 + 惰性烘焙的动画帧(按需增页,一局只烘真正登场的那几种)
 const MAX_FRAMES = 2048
 
-function variantKey(id: string, outline: OutlineKind): string {
-  return `${id}|${outline}`
+/** 变体键。outline 为 undefined 即不描边那一版（旧路径 emojiKey 同义） */
+function variantKey(id: string, outline: OutlineKind | undefined): string {
+  return `${id}|${outline ?? ''}`
 }
 
-function clipKey(id: string, outline: OutlineKind, clipId: string): string {
-  return `${id}|${outline}|${clipId}`
+function clipKey(id: string, outline: OutlineKind | undefined, clipId: string): string {
+  return `${id}|${outline ?? ''}|${clipId}`
+}
+
+/** 光栅化一个变体：描边与否是唯一的分支，其余与旧路径 createTexture 逐字同源 */
+function rasterize(raw: string, outline: OutlineKind | undefined): Promise<HTMLImageElement> {
+  const svg = outline ? outlineSvg(raw, OUTLINE.radius, OUTLINE.colors[outline]) : raw
+  return svgToImage(setSvgSize(svg, CELL))
 }
 
 const NO_CLIP = { base: -1, frames: 0 }
@@ -109,7 +116,7 @@ export class EcsAtlas {
   /** 某 emoji 某 clip 的帧基址与帧数(整套帧连续排布)。
    * 首次询问即在后台烘焙,未就绪返回 frames=0——调用方保持静态帧,烘好后再问即接上
    *(渐进增强,与旧 clipFramesLive 同策略) */
-  clip(id: string, outline: OutlineKind, clipId: string): { base: number; frames: number } {
+  clip(id: string, outline: OutlineKind | undefined, clipId: string): { base: number; frames: number } {
     const key = clipKey(id, outline, clipId)
     const hit = this.clips.get(key)
     if (hit) return hit
@@ -129,7 +136,7 @@ export class EcsAtlas {
   }
 
   /** 惰性烘焙:整套帧连续落格(必要时增页),完成后刷新受影响的页纹理 */
-  private async bakeClip(id: string, outline: OutlineKind, clipId: string, key: string): Promise<void> {
+  private async bakeClip(id: string, outline: OutlineKind | undefined, clipId: string, key: string): Promise<void> {
     const clip = animClipOf(id, clipId)
     const scene = this.scene
     if (!clip || !scene || this.disposed || !this.hasRoom(clip.frames)) {
@@ -139,10 +146,7 @@ export class EcsAtlas {
     const raw = await emojiSvgText(id)
     const recipe = { ...clip, viewBox: undefined }
     const imgs = await Promise.all(
-      Array.from({ length: clip.frames }, (_, i) => {
-        const svg = outlineSvg(bakeAnimFrame(raw, recipe, i / clip.frames), OUTLINE.radius, OUTLINE.colors[outline])
-        return svgToImage(setSvgSize(svg, CELL))
-      }),
+      Array.from({ length: clip.frames }, (_, i) => rasterize(bakeAnimFrame(raw, recipe, i / clip.frames), outline)),
     )
     // 光栅化是异步的:场景可能已切换、或期间格位被别的 clip 占满,此时静默丢弃
     if (this.disposed || !scene.textures || !this.hasRoom(imgs.length)) return
@@ -158,7 +162,7 @@ export class EcsAtlas {
   }
 
   /** 变体索引(id + 描边阵营)→ frame;未收录返回 -1 */
-  index(id: string, outline: OutlineKind): number {
+  index(id: string, outline: OutlineKind | undefined): number {
     return this.keyToFrame.get(variantKey(id, outline)) ?? -1
   }
 
@@ -189,6 +193,7 @@ export class EcsAtlas {
   static async build(
     scene: Phaser.Scene,
     outlined: Record<OutlineKind, readonly string[]>,
+    plain: readonly string[],
   ): Promise<EcsAtlas> {
     // 清单恒定(OUTLINED_EMOJIS),故一个进程只建一次:跨局复用页纹理与已烘好的 clip 帧,
     // 既不每局泄漏 2048² 纹理,第 2 波起也不必重烘部件动画(否则会短暂回落静态帧)
@@ -197,25 +202,23 @@ export class EcsAtlas {
       return shared
     }
     // 收集去重后的全部变体(id,outline)
-    const variants: { id: string; outline: OutlineKind }[] = []
+    const variants: { id: string; outline: OutlineKind | undefined }[] = []
     const seen = new Set<string>()
-    for (const outline of Object.keys(outlined) as OutlineKind[]) {
-      for (const id of outlined[outline]) {
-        const k = variantKey(id, outline)
-        if (seen.has(k)) continue
-        seen.add(k)
-        variants.push({ id, outline })
-      }
+    const take = (id: string, outline: OutlineKind | undefined): void => {
+      const k = variantKey(id, outline)
+      if (seen.has(k)) return
+      seen.add(k)
+      variants.push({ id, outline })
     }
+    for (const outline of Object.keys(outlined) as OutlineKind[]) {
+      for (const id of outlined[outline]) take(id, outline)
+    }
+    for (const id of plain) take(id, undefined)
 
     const atlas = new EcsAtlas()
     // 并行光栅化,顺序落格
     const imgs = await Promise.all(
-      variants.map(async ({ id, outline }) => {
-        const raw = await emojiSvgText(id)
-        const svg = outlineSvg(raw, OUTLINE.radius, OUTLINE.colors[outline])
-        return svgToImage(setSvgSize(svg, CELL))
-      }),
+      variants.map(async ({ id, outline }) => rasterize(await emojiSvgText(id), outline)),
     )
     for (let i = 0; i < variants.length; i++) {
       const { id, outline } = variants[i]!

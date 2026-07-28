@@ -18,7 +18,8 @@ import type { OutlineKind } from '../../emoji/svg'
 
 export interface DrawableInit {
   id: string
-  outline: OutlineKind
+  /** 描边阵营；undefined = 不描边（特效贴图用，见 frames.ts） */
+  outline: OutlineKind | undefined
   x: number
   y: number
   /** 显示尺寸(世界像素,正方) */
