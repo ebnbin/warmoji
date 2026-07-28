@@ -4,6 +4,7 @@ import { UI_FONT } from '../../util/fonts'
 import { DamageNumber, Fx, Transform } from '../components'
 import type { EcsWorld } from '../world'
 import { EcsLayer } from './layer'
+import { packTint } from './tint'
 
 // 伤害飘字：命中点上浮淡出的数字。
 //
@@ -31,7 +32,6 @@ const CHAR_W = 24
 const CHAR_H = 36
 
 
-const { getTintAppendFloatAlpha } = Phaser.Renderer.WebGL.Utils
 
 /** 把 0-9 烘成一张 240×36 的字形图（幂等；纹理挂在游戏级 TextureManager 上跨局有效） */
 function bakeDigits(scene: Phaser.Scene): void {
@@ -100,7 +100,7 @@ export class DamageTextLayer {
       const gh = size
       const gw = (CHAR_W * size) / CHAR_H
       const cy = Transform.y[eid]! - 26 * t // y-14 → y-40
-      const tint = getTintAppendFloatAlpha(crit ? 0xffdc5d : 0xffffff, 1 - t)
+      const tint = packTint(crit ? 0xffdc5d : 0xffffff, 1 - t)
 
       // 位数：从高位到低位逐字形铺；整串以 x 居中（等价旧实现的 setOrigin(0.5)）
       const n = DamageNumber.value[eid]!

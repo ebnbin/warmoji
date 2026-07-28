@@ -4,6 +4,7 @@ import { Depth, Quad, Sprite, Tint, Transform, RENDERABLE } from '../components'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
 import { EcsLayer } from './layer'
+import { packTint } from './tint'
 export { SPRITE_BANDS } from './bands'
 
 // 统一自绘：一个自定义 GameObject，renderWebGL 里把全场 renderable 实体（Transform+Sprite+
@@ -20,7 +21,6 @@ export { SPRITE_BANDS } from './bands'
 // · camera 的视图矩阵已包含 scroll（v3 不含，需手动扣减），故这里不再减 scrollX/Y。
 // · 四角顺序 v3 是 TL,BL,BR,TR，v4 是 TL,BL,TR,BR（照搬 v3 顺序会画出扭曲四边形）。
 
-const { getTintAppendFloatAlpha } = Phaser.Renderer.WebGL.Utils
 
 
 export class EcsSpriteBatch extends EcsLayer {
@@ -132,7 +132,7 @@ export class EcsSpriteBatch extends EcsLayer {
 
       // 不再乘 camera.alpha：v4 在合成阶段统一施加相机透明度（核心的 SubmitterQuad /
       // TransformerImage 同样不碰它），v3 那样逐顶点再乘一次会双重变淡
-      const tint = getTintAppendFloatAlpha(Tint.color[eid]!, Tint.alpha[eid]!)
+      const tint = packTint(Tint.color[eid]!, Tint.alpha[eid]!)
       // Tint.effect 的 0/1 与 v4 的 TintModes.MULTIPLY/FILL 同值同义
       const tintMode = Tint.effect[eid]!
       const tex = self.atlas.pageGlTexture(self.atlas.page(frame))

@@ -5,6 +5,7 @@ import { fan, newScratch, resetScratch, ringStrip } from './tri'
 import type { Scratch } from './tri'
 import type { EcsWorld } from '../world'
 import { EcsLayer } from './layer'
+import { packTint } from './tint'
 
 // 实体圆圈：画在实体位置上的填充圆 + 描边（待拾脉冲、携带者光环、地面效果区、寒气光环）。
 // **全场就这一个画圆的地方**——从前地面区是每块一个 Phaser Graphics + 两条 tween，
@@ -18,7 +19,6 @@ import { EcsLayer } from './layer'
 // 绘制同样自己三角化 + 一次批提交（见 tri.ts），不是 Phaser 的 Arc：
 // 一个 Arc 铺 ~300 个三角形还各带一条 yoyo tween，这里全场两个批绘对象、零 tween。
 
-const { getTintAppendFloatAlpha } = Phaser.Renderer.WebGL.Utils
 
 /** 呼吸半周期（ms）：scale/alpha 在 lo↔hi 之间线性往返（镜像旧 tween 的 yoyo + Linear） */
 const BREATH_MS = 700
@@ -77,8 +77,8 @@ export class RingLayer {
       const x = Transform.x[eid]!
       const y = Transform.y[eid]! + Ring.dy[eid]!
       const color = Ring.color[eid]!
-      fan(o, m, x, y, r, getTintAppendFloatAlpha(color, Ring.fillAlpha[eid]! * a))
-      ringStrip(o, m, x, y, r, Ring.lineWidth[eid]!, getTintAppendFloatAlpha(color, Ring.lineAlpha[eid]! * a))
+      fan(o, m, x, y, r, packTint(color, Ring.fillAlpha[eid]! * a))
+      ringStrip(o, m, x, y, r, Ring.lineWidth[eid]!, packTint(color, Ring.lineAlpha[eid]! * a))
     }
     return o
   }

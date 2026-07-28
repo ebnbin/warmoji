@@ -8,6 +8,7 @@ import { fan, newScratch, quad, resetScratch, ringStrip, segment } from './tri'
 import type { Scratch } from './tri'
 import { SHAPE_BANDS as BANDS } from './bands'
 import { EcsLayer } from './layer'
+import { packTint } from './tint'
 
 // 一次性战斗特效（Cue，阵营中立）：放完即弃，与机制正交——纯逻辑侧只往队列里塞
 // 「放一个什么样的特效」，绘制全在这里（GAS GameplayCue 思路：机制不依赖渲染）。
@@ -32,7 +33,6 @@ import { EcsLayer } from './layer'
 //
 // 缓动与 Phaser 同名缓动同参（见 ../ease），观感与旧实现一致。
 
-const { getTintAppendFloatAlpha } = Phaser.Renderer.WebGL.Utils
 
 /** 扩散淡出的圆：填充圆（可选描边），从 fromScale 缩放到 toScale 同时淡出。
  * 命中白闪、冲击环、治疗/集结/冻结脉冲共用此一处——各自传颜色/尺度/时长/深度。 */
@@ -117,11 +117,11 @@ export class CueLayer {
       const fade = 1 - e
       const x = Transform.x[k]!
       const y = Transform.y[k]!
-      fan(o, m, x, y, r, getTintAppendFloatAlpha(FxCircle.fill[k]!, FxCircle.fillAlpha[k]! * fade))
+      fan(o, m, x, y, r, packTint(FxCircle.fill[k]!, FxCircle.fillAlpha[k]! * fade))
       const stroke = FxCircle.stroke[k]!
       if (stroke >= 0) {
         // 描边宽度随缩放走，与旧实现整体 setScale 的表现一致
-        ringStrip(o, m, x, y, r, FxCircle.lineW[k]! * s, getTintAppendFloatAlpha(stroke, FxCircle.lineAlpha[k]! * fade))
+        ringStrip(o, m, x, y, r, FxCircle.lineW[k]! * s, packTint(stroke, FxCircle.lineAlpha[k]! * fade))
       }
     }
 
@@ -148,7 +148,7 @@ export class CueLayer {
           x + sa * half, y - ca * half,
           x + ca * L + sa * half, y + sa * L - ca * half,
           x + ca * L - sa * half, y + sa * L + ca * half,
-          getTintAppendFloatAlpha(color, alpha),
+          packTint(color, alpha),
         )
       }
     }
@@ -156,7 +156,7 @@ export class CueLayer {
     // 闪电与斩击恒在最上一带
     if (zMax === Infinity) {
       for (const k of query(this.world, [Fx, FxBolt])) {
-        const color = getTintAppendFloatAlpha(FxBolt.color[k]!, 0.95 * (1 - age(k)))
+        const color = packTint(FxBolt.color[k]!, 0.95 * (1 - age(k)))
         const pts = boltPts[k]
         if (!pts) continue
         for (let p = 1; p < FxBolt.n[k]!; p++) {
@@ -167,7 +167,7 @@ export class CueLayer {
         const a = Transform.rot[k]!
         ringStrip(
           o, m, Transform.x[k]!, Transform.y[k]!, FxSlash.r[k]!, 5,
-          getTintAppendFloatAlpha(0xffffff, 0.9 * (1 - age(k))),
+          packTint(0xffffff, 0.9 * (1 - age(k))),
           a - 1.1, a + 1.1,
         )
       }
