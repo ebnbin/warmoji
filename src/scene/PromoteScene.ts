@@ -33,7 +33,7 @@ import { ScrollView } from '../ui/scroll'
 import type { ScrollRect } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
-import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 
 // 整编页：每波战斗前的强制招募 + 阵型页。开局组队与波末整编完全复用本页：
@@ -360,17 +360,6 @@ export class PromoteScene extends Phaser.Scene {
       })
     this.input.keyboard?.on('keydown-ENTER', () => this.confirm())
     this.input.keyboard?.on('keydown-SPACE', () => this.confirm())
-
-    // Twemoji 图形许可（CC-BY 4.0）要求署名
-    this.add
-      .text(w / 2, h - safeInsets.bottom - 10, 'emoji graphics © Twemoji · CC-BY 4.0 · 有改动', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.caption,
-        color: '#ffffff',
-        resolution: res,
-      })
-      .setOrigin(0.5, 1)
-      .setAlpha(0.28)
 
     if (this.mode === 'formation') {
       this.rebuildFormation()

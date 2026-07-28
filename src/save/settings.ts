@@ -48,8 +48,8 @@ export const SETTING_DEFS: readonly SettingDef[] = [
   { key: 'damageNumbers', icon: '1f522', label: '伤害数字', desc: '敌人受击时飘出伤害数值' },
   { key: 'hitShake', icon: '1f4f3', label: '受击震屏', desc: '队员受到伤害时轻微抖动画面' },
   { key: 'showSkinTone', icon: '1f44b_1f3fd', label: '肤色 emoji', desc: '图鉴与 Studio 全部页展示含肤色的 emoji 变体' },
-  { key: 'ecs', icon: '1f9ea', label: 'ECS 实验战斗', desc: 'ECS 框架 + 自绘渲染管线复刻的战斗（实验，默认关；与旧战斗互不影响）' },
-  { key: 'devMode', icon: '1f527', label: '开发者模式', desc: '解锁地图页的试炼场入口与战斗内开发者面板（敌人/规模旋钮 + 实时性能读数）' },
+  { key: 'ecs', icon: '1f9ea', label: 'ECS 实验战斗', desc: 'bitECS + 自绘渲染管线的实验战斗（默认关）' },
+  { key: 'devMode', icon: '1f527', label: '开发者模式', desc: '解锁地图页的试炼场入口与战斗内开发者面板' },
 ]
 
 const KEY = 'warmoji.settings.v1'

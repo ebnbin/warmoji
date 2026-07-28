@@ -15,7 +15,7 @@ import { EmojiGrid } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
-import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 
 // 队长选择页 = 组队流程第一步（主菜单 → 选队长 → 组队 → 战斗）。
@@ -151,17 +151,6 @@ export class CaptainScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-ENTER', confirm)
     this.input.keyboard?.on('keydown-SPACE', confirm)
     this.input.keyboard?.on('keydown-ESC', () => this.scene.start('map'))
-
-    // Twemoji 图形许可（CC-BY 4.0）要求署名
-    this.add
-      .text(w / 2, h - safeInsets.bottom - 10, 'emoji graphics © Twemoji · CC-BY 4.0 · 有改动', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.caption,
-        color: '#ffffff',
-        resolution: res,
-      })
-      .setOrigin(0.5, 1)
-      .setAlpha(0.28)
 
     this.refresh()
 

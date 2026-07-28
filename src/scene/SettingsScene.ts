@@ -145,7 +145,7 @@ export class SettingsScene extends Phaser.Scene {
         bg,
         emojiImage(this, 50, y + S.rowH / 2, def.icon, 58),
         this.add
-          .text(92, y + S.rowH / 2 - 18, def.label, {
+          .text(92, y + 32, def.label, {
             fontFamily: UI_FONT,
             fontSize: FONT.head,
             fontStyle: 'bold',
@@ -153,22 +153,43 @@ export class SettingsScene extends Phaser.Scene {
             resolution: res,
           })
           .setOrigin(0, 0.5),
+        // 说明必须换行：定义表里的文案只会越写越长，不换行就是直接冲出卡片
+        // 被滚动遮罩裁掉半句——右侧还得给开关让出位置，故按开关左缘定宽。
+        // 标题与说明改成从上往下成块排（而非各自相对行心居中）：
+        // 居中排法下说明一换行就往上长，会盖住标题
         this.add
-          .text(92, y + S.rowH / 2 + 20, def.desc, {
+          .text(92, y + 54, def.desc, {
             fontFamily: UI_FONT,
             fontSize: FONT.small,
             color: '#b9b9c6',
             resolution: res,
+            wordWrap: { width: S.w - 24 - 76 - 92 - 16, useAdvancedWrap: true },
+            lineSpacing: 2,
           })
-          .setOrigin(0, 0.5),
+          .setOrigin(0, 0),
         toggle,
         zone,
       ])
       this.drawToggle(row)
     })
-    this.list.setContentHeight(
-      SETTING_DEFS.length * (S.rowH + S.gap) - S.gap,
+    // Twemoji 图形许可（CC-BY 4.0）要求署名。全作只此一处：署名要的是「可被找到」，
+    // 不是「每张页面都挂一条」——大厅每页贴一行既没人读，又占掉每张页面的底部。
+    // 放进滚动内容的末尾而非屏幕底部固定行：后者会紧贴着被裁掉一半的最后一行，
+    // 看着像是撞上了；跟着列表滚到底才是「附注」该在的位置
+    const rowsH = SETTING_DEFS.length * (S.rowH + S.gap) - S.gap
+    const licenseY = rowsH + 30
+    this.list.add(
+      this.add
+        .text(S.w / 2, licenseY, 'emoji graphics © Twemoji · CC-BY 4.0 · 有改动', {
+          fontFamily: UI_FONT,
+          fontSize: FONT.caption,
+          color: '#ffffff',
+          resolution: res,
+        })
+        .setOrigin(0.5, 0)
+        .setAlpha(0.34),
     )
+    this.list.setContentHeight(licenseY + 34)
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

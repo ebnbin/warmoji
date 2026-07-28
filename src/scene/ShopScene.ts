@@ -33,7 +33,7 @@ import { EmojiGrid } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
-import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
 import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
@@ -306,17 +306,6 @@ export class ShopScene extends Phaser.Scene {
       })
     this.input.keyboard?.on('keydown-ENTER', () => this.nextWave())
     this.input.keyboard?.on('keydown-SPACE', () => this.nextWave())
-
-    // Twemoji 图形许可（CC-BY 4.0）要求署名
-    this.add
-      .text(w / 2, h - safeInsets.bottom - 10, 'emoji graphics © Twemoji · CC-BY 4.0 · 有改动', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.caption,
-        color: '#ffffff',
-        resolution: res,
-      })
-      .setOrigin(0.5, 1)
-      .setAlpha(0.28)
 
     this.refresh()
 
