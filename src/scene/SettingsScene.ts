@@ -132,6 +132,9 @@ export class SettingsScene extends Phaser.Scene {
         .on('pointerup', () => {
           if (this.list.wasDragged) return
           this.settings[def.key] = !this.settings[def.key]
+          // 关掉开发者模式时把 ECS 实验一并归位：它的开关只长在开发者面板上，
+          // 留着 ecs=true 就等于把人锁在实验战斗里，而能切回去的那个面板已经没了
+          if (def.key === 'devMode' && !this.settings.devMode) this.settings.ecs = false
           saveSettings(browserStorage(), this.settings)
           // 音效/BGM 开关即时生效；开启瞬间用一声 click 给听感反馈
           setSfxEnabled(this.settings.sound)

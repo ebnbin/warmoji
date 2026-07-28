@@ -386,10 +386,10 @@ export class DevPanel {
 
   /** 性能：框架对照 + 帧读数 */
   private buildPerf(res: number): number {
-    // 框架就是设置里那一个开关，不另设覆写——「用哪套战斗」只有一个真相。
-    // 放在这里是因为 A/B 对照要在同一份负载下来回切，回设置页太远
+    // 框架写的就是 settings.ecs，不另设覆写——「用哪套战斗」只有一个真相。
+    // 这里是它唯一的开关：A/B 对照要在同一份负载下来回切，挨着帧读数才看得出差别
     const ecsOn = loadSettings(browserStorage()).ecs
-    let y = this.section('框架 · 即设置里的「ECS 实验战斗」', 0, res, [
+    let y = this.section('框架 · ECS 实验战斗', 0, res, [
       { label: 'arcade', on: !ecsOn, tap: (): void => this.switchFramework(false) },
       { label: 'ECS', on: ecsOn, tap: (): void => this.switchFramework(true) },
     ])
