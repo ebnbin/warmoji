@@ -276,6 +276,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       })
     }
     this.ready = true
+    this.installProbe(this.sim)
     hint.destroy()
   }
 
@@ -287,6 +288,70 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       if (typeof (o as unknown as { _depth?: unknown })._depth !== 'number') n++
     }
     return n
+  }
+
+  /** e2e 探针：字段按需求值，不占每帧开销 */
+  private installProbe(sim: Sim): void {
+    const world = this.world
+    const layers = (): number => this.unsortedLayers()
+    const pages = (): number => this.atlas?.pageCount ?? 0
+    const map = (): { w: number; h: number } => ({ w: this.mapW, h: this.mapH })
+    const inWater = (): boolean => this.waterVignette !== undefined && !onFloe(centerX(sim), centerY(sim), this.mapW)
+    const cam = (): Phaser.Cameras.Scene2D.Camera => this.cameras.main
+    ;(window as unknown as { __ecs?: object }).__ecs = {
+      ready: true,
+      get unsortedLayers() { return layers() },
+      get blindSprites() { return query(world, RENDERABLE as unknown as object[]).filter((e) => Sprite.frame[e]! < 0).length },
+      get pages() { return pages() },
+      get centerX() { return centerX(sim) },
+      get centerY() { return centerY(sim) },
+      get characters() { return sim.characters.length },
+      get mapW() { return map().w },
+      get mapH() { return map().h },
+      get dirX() { return sim.teamDir.x },
+      get dirY() { return sim.teamDir.y },
+      get moveSpeed() { return MoveSpeed.v[sim.captain]! },
+      get elapsed() { return sim.elapsedMs },
+      get memberPos() { return sim.characters.map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })) },
+      get frames() { return sim.characters.map((eid) => Sprite.frame[eid]!) },
+      get enemies() { return query(world, [Enemy]).length },
+      get broods() { return Array.from(query(world, [Enemy]), (eid) => Nest.of[eid]!).filter((n) => n >= 0).length },
+      get enemyPos() { return Array.from(query(world, [Enemy]), (eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })) },
+      get kills() { return sim.run.kills },
+      get stats() { return { damage: [...sim.run.stats.damage], kills: [...sim.run.stats.kills], damageTaken: [...sim.run.stats.damageTaken] } },
+      get wave() { return sim.run.wave },
+      get coins() { return sim.run.coins },
+      get xpLevel() { return sim.run.xp.level },
+      get liveCoins() { return liveCoins(world) },
+      get projectiles() { return query(world, [Projectile]).length },
+      get eprojectiles() { return query(world, [Projectile, Faction]).filter((e) => Faction.v[e] === FACTION.enemy).length },
+      get field() {
+        const c = pickupCounts(sim)
+        return {
+          pickups: c.pickups,
+          carriers: c.carriers,
+          active: activeMods(sim).map((e) => ({ id: modDef[e]!.id, remainMs: Math.max(0, Lifetime.until[e]! - sim.elapsedMs) })),
+        }
+      },
+      get over() { return sim.over },
+      get alive() { return sim.characters.filter((eid) => Alive.v[eid]).length },
+      get memberHp() { return sim.characters.map((eid) => CharHp.hp[eid]!) },
+      get inWater() { return inWater() },
+      get dormant() { return Array.from(query(world, [Enemy]), (eid) => Dormant.v[eid]!).filter((v) => v === 1).length },
+      get camX() { return cam().scrollX + cam().width / 2 },
+      get camY() { return cam().scrollY + cam().height / 2 },
+      get zoneR() { return sim.worldState.zone?.r ?? 0 },
+      get zones() { return query(world, [Zone]).length },
+      get minions() { return query(world, [Minion]).length },
+      // 帧末应恒 0
+      get outbox() { return sim.out.bursts.length + sim.out.collects.length + (sim.out.flash ? 1 : 0) },
+      get logicalW() { return viewport.logicalWidth },
+      get logicalH() { return viewport.logicalHeight },
+      get walls() { return sim.worldState.walls ? sim.worldState.walls.grid.blocked.filter(Boolean).length : 0 },
+      get spawnCells() { return sim.worldState.walls?.spawnCells.length ?? 0 },
+      // null = 不在途
+      get meteor() { return ((m) => (m === undefined ? null : { travelling: sim.elapsedMs >= Due.at[m]!, t: Meteor.t[m]! }))(query(world, [Meteor])[0]) },
+    }
   }
 
   /** 每种事件一条 drain，收信人没准备好也清空 */
@@ -566,56 +631,5 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
     this.timeStopFx?.setFillStyle(TIMESTOP.chillColor, this.timeStopFxAlpha)
-    ;(window as unknown as { __ecs?: object }).__ecs = {
-      ready: true,
-      unsortedLayers: this.unsortedLayers(),
-      blindSprites: query(this.world, RENDERABLE as unknown as object[]).filter((e) => Sprite.frame[e]! < 0).length,
-      pages: this.atlas?.pageCount ?? 0,
-      centerX: centerX(sim),
-      centerY: centerY(sim),
-      characters: sim.characters.length,
-      mapW: this.mapW,
-      mapH: this.mapH,
-      dirX: sim.teamDir.x,
-      dirY: sim.teamDir.y,
-      moveSpeed: MoveSpeed.v[sim.captain]!,
-      elapsed: sim.elapsedMs,
-      memberPos: sim.characters.map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
-      frames: sim.characters.map((eid) => Sprite.frame[eid]!),
-      enemies: query(this.world, [Enemy]).length,
-      broods: Array.from(query(this.world, [Enemy]), (eid) => Nest.of[eid]!).filter((n) => n >= 0).length,
-      enemyPos: Array.from(query(this.world, [Enemy]), (eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })),
-      kills: sim.run.kills,
-      stats: { damage: [...sim.run.stats.damage], kills: [...sim.run.stats.kills], damageTaken: [...sim.run.stats.damageTaken] },
-      wave: sim.run.wave,
-      coins: sim.run.coins,
-      xpLevel: sim.run.xp.level,
-      liveCoins: liveCoins(this.world),
-      projectiles: query(this.world, [Projectile]).length,
-      eprojectiles: query(this.world, [Projectile, Faction]).filter((e) => Faction.v[e] === FACTION.enemy).length,
-      field: {
-        pickups: pickupCounts(sim).pickups,
-        carriers: pickupCounts(sim).carriers,
-        active: activeMods(sim).map((e) => ({ id: modDef[e]!.id, remainMs: Math.max(0, Lifetime.until[e]! - sim.elapsedMs) })),
-      },
-      over: sim.over,
-      alive: sim.characters.filter((eid) => Alive.v[eid]).length,
-      memberHp: sim.characters.map((eid) => CharHp.hp[eid]!),
-      inWater: this.waterVignette !== undefined && !onFloe(centerX(sim), centerY(sim), this.mapW),
-      dormant: Array.from(query(this.world, [Enemy]), (eid) => Dormant.v[eid]!).filter((v) => v === 1).length,
-      camX: this.cameras.main.scrollX + this.cameras.main.width / 2,
-      camY: this.cameras.main.scrollY + this.cameras.main.height / 2,
-      zoneR: sim.worldState.zone?.r ?? 0,
-      zones: query(this.world, [Zone]).length,
-      minions: query(this.world, [Minion]).length,
-      // 帧末应恒 0
-      outbox: sim.out.bursts.length + sim.out.collects.length + (sim.out.flash ? 1 : 0),
-      logicalW: viewport.logicalWidth,
-      logicalH: viewport.logicalHeight,
-      walls: sim.worldState.walls ? sim.worldState.walls.grid.blocked.filter(Boolean).length : 0,
-      spawnCells: sim.worldState.walls?.spawnCells.length ?? 0,
-      // null = 不在途
-      meteor: ((m) => (m === undefined ? null : { travelling: sim.elapsedMs >= Due.at[m]!, t: Meteor.t[m]! }))(query(this.world, [Meteor])[0]),
-    }
   }
 }
