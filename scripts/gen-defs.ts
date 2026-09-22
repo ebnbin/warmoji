@@ -37,20 +37,15 @@ import type { FeelTuning } from '../src/types/feel'
 import type { AiTuning } from '../src/types/enemies'
 import type { MapDef } from '../src/types/maps'
 
-// 内容管线生成器：执行创作层（defs/）→ 校验 → 产出 src/assets/*.json，
-// 并把脚本侧的原始资源（scripts/emoji/*.txt）原样拷进 src/assets/。
-// 于是 src/assets/ 整体是本脚本的产物、整体 gitignore，运行时只管读。
-// 校验全部在此完成（形状/数值/交叉引用/可序列化），运行时零校验直读。
-// 任何一条失败即退出非零，构建中止。
+// 校验全部在此完成，运行时零校验直读；任一失败即退出非零
 
 const errors: string[] = []
 function bad(path: string, msg: string): void {
   errors.push(`${path}: ${msg}`)
 }
-// 软护栏（数值预算）：越界只告警、不计入 errors、不阻断构建（见文末打印）
+// 越界只告警，不阻断构建
 const warnings: string[] = []
 const BUDGETS = BUDGET as Record<string, { role: string; dps: readonly [number, number] }>
-/** 战斗能力生效 DPS 落在设计带宽外即提示（描述式，当前应零告警） */
 function checkBudget(id: string, a: Record<string, unknown>): void {
   const b = BUDGETS[String(a.kind)]
   if (!b) return
@@ -66,7 +61,6 @@ function str(path: string, v: unknown): void {
   if (typeof v !== 'string' || v.length === 0) bad(path, '需为非空字符串')
 }
 
-/** 纯静态性：JSON 往返后深度相等（函数/undefined/类实例在此现形） */
 function pure(path: string, v: unknown): void {
   const roundtrip: unknown = JSON.parse(JSON.stringify(v))
   if (JSON.stringify(roundtrip) !== JSON.stringify(v)) bad(path, '含不可序列化内容')
@@ -78,38 +72,35 @@ const ABILITY_KINDS = new Set([
   'rally', 'strike', 'dance', 'buff', 'nuke', 'timeStop',
 ])
 
-/** 实现了 castNow（手动单发）的 kind——队长主动技能载荷只能用这些（与
- * src/abilities 各运行时类同步维护） */
+/** 队长主动技能可用的 kind，须与两套战斗实现的手动施放同步 */
 const CASTABLE_KINDS = new Set(['rally', 'strike', 'dance', 'buff', 'nuke', 'timeStop'])
 
-/** 卡面合法标签（与 src/cards/registry.ts 的 CardTag 同步） */
+/** 须与 CardTag 同步 */
 const CARD_TAGS = new Set([
   'economy', 'tempo', 'offense', 'defense', 'meta', 'skill', 'loot', 'trade', 'curse',
 ])
 
-/** 限时战斗层的合法轴（与 src/battlefield/registry.ts 的 BattleEffects 键同步）：战场拾取 fx 只能落在这些键上 */
+/** 须与 BattleEffects 的键同步 */
 const BATTLE_EFFECT_KEYS = new Set([
   'moveSpeedMul', 'teamDamageMul', 'teamCooldownMul', 'critAdd', 'enemySlowMul',
 ])
 
-/** 角色效果的合法轴（与 src/items/registry.ts 的 CharacterEffects 键同步）：等级形态片段只能落在这些键上 */
+/** 须与 CharacterEffects 的键同步 */
 const CHARACTER_EFFECT_KEYS = new Set([
   'hpAdd', 'damageMul', 'cooldownMul', 'rangeMul', 'projSpeedMul', 'iframesAddMs',
   'reviveAddMs', 'regenPerSec', 'thorns', 'killHeal', 'critChance', 'knockbackMul',
 ])
 
-/** 团队效果的合法轴（与 src/items/registry.ts 的 TeamEffects 键同步）：卡面 effects 只能落在这些键上 */
+/** 须与 TeamEffects 的键同步 */
 const TEAM_EFFECT_KEYS = new Set([
   'moveSpeedMul', 'magnetMul', 'doubleCoinChance', 'teamDamageMul', 'xpGainMul',
   'enemySlowMul', 'waveHealRatio', 'waveCoins', 'teamCooldownMul', 'critAdd',
   'teamHpMul', 'reviveMul', 'skillCdMul', 'shopDiscountMul', 'freeRerolls', 'draftSize',
 ])
 
-/** onHit 命中效果的合法 kind（与两侧效果层的登记表同步：
- * src/ecs/ability/effects.ts 的 EFFECT_KINDS、src/arcade/abilities/effects.ts） */
+/** 须与两套战斗实现的命中效果种类同步 */
 const EFFECT_KINDS = new Set(['blast', 'slow', 'poison', 'ground', 'morph'])
 
-/** 命中效果链校验：kind 合法 + 数值字段成形 */
 function checkEffects(path: string, effects: unknown): void {
   if (!Array.isArray(effects)) {
     bad(`${path}.onHit`, '需为数组')
@@ -152,7 +143,6 @@ function checkAbility(path: string, a: Record<string, unknown>): void {
 }
 
 const abilityIds = new Set(Object.keys(ABILITIES))
-/** 能力 id 引用校验：持有方（角色配装/升级/队长技能）引的 id 必须在能力表中 */
 function checkRef(path: string, id: unknown): boolean {
   if (typeof id !== 'string' || !abilityIds.has(id)) {
     bad(path, `引用了不存在的能力：${String(id)}`)
@@ -168,7 +158,7 @@ for (const [id, a] of Object.entries(ABILITIES)) {
   pure(`abilities.${id}`, a)
 }
 
-// ── weapons（实体载体：base + 各升级档，能力以 id 引用）──
+// ── weapons ──
 function checkTier(path: string, t: { ability: unknown; card: { icon: unknown; name: unknown; desc: unknown } }): void {
   checkRef(`${path}.ability`, t.ability)
   str(`${path}.card.icon`, t.card.icon)
@@ -184,7 +174,7 @@ for (const [id, w] of Object.entries(WEAPONS)) {
   pure(p, w)
 }
 
-// ── characters（载体形态；gen 展平回 abilities/upgrades 写 characters.json）+ captains ──
+// ── characters + captains ──
 const weaponReg = WEAPONS as Record<string, { upgrades: readonly { card: { name: string } }[] }>
 function cardsAtTier(c: { weapons: readonly string[]; innate: readonly { upgrades: readonly { card: { name: string } }[] }[] }, k: number): { name: string }[] {
   const cards: { name: string }[] = []
@@ -214,7 +204,6 @@ for (const [id, c] of Object.entries(CHARACTERS)) {
     checkRef(`${ip}.base`, inn.base)
     for (const [ti, t] of inn.upgrades.entries()) checkTier(`${ip}.upgrades[${ti}]`, t)
   }
-  // 每档必须可达（至少一个载体在该档有升级）且多载体同档卡文案一致（展平去重要求）
   for (const k of [0, 1]) {
     const cards = cardsAtTier(c, k)
     if (cards.length === 0) bad(p, `缺第 ${k + 1} 档升级卡`)
@@ -242,7 +231,7 @@ for (const [id, c] of Object.entries(CAPTAINS)) {
   pure(p, c)
 }
 
-// ── levels（角色等级形态的基础属性质变：每角色 2 档完整片段）──
+// ── levels ──
 {
   const ls = LEVEL_STATS as Record<string, readonly Partial<Record<string, unknown>>[]>
   const charIds = new Set(Object.keys(CHARACTERS))
@@ -279,8 +268,6 @@ function checkEnemy(path: string, e: (typeof ENEMIES)[string]): void {
   for (const [i, a] of (e.abilities ?? []).entries()) checkAbility(`${path}.abilities[${i}]`, a as unknown as Record<string, unknown>)
   for (const [i, fx] of (e.onContact ?? []).entries()) {
     const cp = `${path}.onContact[${i}]`
-    // onContact 只写「接触伤害之外」的附加效果：伤害的真相是 def.damage，
-    // 再写一条 { kind:'damage' } 只会让人以为它是另一份伤害
     if (fx.kind === 'attackSlow') {
       num(`${cp}.mul`, fx.mul, 0.01)
       num(`${cp}.durationMs`, fx.durationMs, 1)
@@ -294,8 +281,6 @@ function checkEnemy(path: string, e: (typeof ENEMIES)[string]): void {
     num(`${path}.spawner.count`, e.spawner.count, 1)
     num(`${path}.spawner.maxAlive`, e.spawner.maxAlive, 1)
   }
-  // 亡语（onDeath）：组合式 Effect（ground/heal/spawnProjectile）+ 生成实体类（split/decoy）。
-  // 命中专属的 blast/slow/morph 不允许作亡语（无 baseDamage/targets），落到 else 报错。
   for (const [i, fx] of (e.onDeath ?? []).entries()) {
     const dp = `${path}.onDeath[${i}]`
     if (fx.kind === 'split') {
@@ -340,7 +325,7 @@ for (const [id, it] of Object.entries<ItemDef>(ITEMS as Record<string, ItemDef>)
   pure(p, it)
 }
 
-// ── cards（团队升级卡：卡面数据 + 效果轴合法性）──
+// ── cards ──
 for (const [id, c] of Object.entries<CardDef>(CARDS as Record<string, CardDef>)) {
   const p = `cards.${id}`
   str(`${p}.emoji`, c.emoji)
@@ -360,7 +345,7 @@ for (const [id, c] of Object.entries<CardDef>(CARDS as Record<string, CardDef>))
   pure(p, c)
 }
 
-// ── battlefield（战场拾取：各图池内容 + 拾取旋钮）──
+// ── battlefield ──
 {
   const bf: BattlefieldTuning = BATTLEFIELD
   const seenIds = new Set<string>()
@@ -418,7 +403,7 @@ for (const [id, c] of Object.entries<CardDef>(CARDS as Record<string, CardDef>))
   pure('battlefield', bf)
 }
 
-// ── sfx（程序化音效参数）──
+// ── sfx ──
 {
   const waves = new Set(['square', 'sawtooth', 'triangle', 'sine', 'noise'])
   for (const [id, s] of Object.entries<SfxDef>(SFX as Record<string, SfxDef>)) {
@@ -441,7 +426,7 @@ for (const [id, c] of Object.entries<CardDef>(CARDS as Record<string, CardDef>))
   }
 }
 
-// ── mapdefaults（有界地图缺省几何）──
+// ── mapdefaults ──
 {
   const p = 'mapdefaults'
   const d: MapDefaults = MAP_DEFAULTS
@@ -451,7 +436,7 @@ for (const [id, c] of Object.entries<CardDef>(CARDS as Record<string, CardDef>))
   pure(p, d)
 }
 
-// ── timestop（时停技能：时标 + 冷雾表现）──
+// ── timestop ──
 {
   const p = 'timestop'
   const t: TimeStopTuning = TIMESTOP
@@ -566,7 +551,7 @@ for (const [id, m] of Object.entries(MAPS)) {
   pure(p, m)
 }
 
-// ── pickups（拾取物内容 + 管线旋钮）──
+// ── pickups ──
 for (const [id, pk] of Object.entries(PICKUPS.defs)) {
   const p = `pickups.defs.${id}`
   str(`${p}.emoji`, pk.emoji)
@@ -578,10 +563,9 @@ num('pickups.pipeline.magnetSpeed', PICKUPS.pipeline.magnetSpeed, 0.01)
 num('pickups.pipeline.collectRadius', PICKUPS.pipeline.collectRadius, 0.01)
 pure('pickups.pipeline', PICKUPS.pipeline)
 
-// ── progression（关卡进程 + 经济）──
+// ── progression ──
 {
   const p = 'progression'
-  // 按 Progression 类型看待（宽化字面量），使形状/数值守卫对任意数据成立
   const g: Progression = PROGRESSION
   if (!Array.isArray(g.waveDurationsSec) || g.waveDurationsSec.length === 0) {
     bad(`${p}.waveDurationsSec`, '需为非空数组')
@@ -608,7 +592,7 @@ pure('pickups.pipeline', PICKUPS.pipeline)
   pure(p, g)
 }
 
-// ── difficulty（难度 / 敌潮 / 精英 / 终波减压）──
+// ── difficulty ──
 {
   const p = 'difficulty'
   const d: Difficulty = DIFFICULTY
@@ -641,7 +625,7 @@ pure('pickups.pipeline', PICKUPS.pipeline)
   pure(p, d)
 }
 
-// ── team（队伍/角色基线）──
+// ── team ──
 {
   const p = 'team'
   const t: TeamBaseline = TEAM_BASELINE
@@ -657,7 +641,7 @@ pure('pickups.pipeline', PICKUPS.pipeline)
   pure(p, t)
 }
 
-// ── combat（战斗手感：击退 / 索敌）──
+// ── combat ──
 {
   const p = 'combat'
   const c: CombatTuning = COMBAT
@@ -668,7 +652,7 @@ pure('pickups.pipeline', PICKUPS.pipeline)
   pure(p, c)
 }
 
-// ── ai（敌人 AI 手感：游荡换向 / 风筝滞回 / 偷币冷却 / 逃兵限速）──
+// ── ai ──
 {
   const p = 'ai'
   const g: AiTuning = AI
@@ -682,7 +666,7 @@ pure('pickups.pipeline', PICKUPS.pipeline)
   pure(p, g)
 }
 
-// ── feel（战斗手感：跟随弹簧 / 待机游移 / 受击抖屏）──
+// ── feel ──
 {
   const p = 'feel'
   const f: FeelTuning = FEEL
@@ -703,7 +687,7 @@ pure('pickups.pipeline', PICKUPS.pipeline)
   pure(p, f)
 }
 
-// ── economy（暴击 / 商店定价）──
+// ── economy ──
 {
   const p = 'economy'
   const ec: Economy = ECONOMY
@@ -752,8 +736,7 @@ write('combat', COMBAT)
 write('feel', FEEL)
 write('economy', ECONOMY)
 
-// emoji 打包资源：从 Emoji Studio 引入、随代码提交的原始数据源，不参与校验，原样拷贝。
-// 体量大且逐行对齐，任何改写都会破坏 ordering 与 twemoji 的行序对应，故只拷不动。
+// ordering.txt 与 twemoji.txt 逐行对应，只拷贝不改写
 mkdirSync('src/assets/emoji', { recursive: true })
 for (const name of ['ordering.txt', 'twemoji.txt']) {
   copyFileSync(`scripts/emoji/${name}`, `src/assets/emoji/${name}`)

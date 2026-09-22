@@ -1,12 +1,12 @@
 import { existsSync } from 'node:fs'
 import { defineConfig } from '@playwright/test'
 
-// 容器预装固定版 Chromium 且禁止下载浏览器；CI 走 playwright install 的默认浏览器
+// 容器禁止下载浏览器，只能用预装的 Chromium
 const containerChromium = '/opt/pw-browsers/chromium'
 
 export default defineConfig({
   testDir: './e2e',
-  // 无 GPU 环境（CI/容器）软件渲染帧率低，游戏时间流逝慢，预算放宽
+  // 软件渲染下游戏时间走得慢
   timeout: 90_000,
   reporter: [['list']],
   use: {

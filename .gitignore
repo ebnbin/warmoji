@@ -6,5 +6,5 @@ playwright-report/
 *.log
 .DS_Store
 
-# 资源目录整体是构建产物：由 scripts/gen-defs.ts 生成（json）或从 scripts/emoji/ 拷入（txt）
+# 构建产物：由 scripts/gen-defs.ts 生成
 src/assets/
