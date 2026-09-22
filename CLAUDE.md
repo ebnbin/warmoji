@@ -13,7 +13,7 @@
 - 每个 session 开始时先完成初始化，再做其他事情。初始化的步骤：执行 `git checkout main && git pull --ff-only origin main`，无法快进时停下来询问用户；删除 harness 分配的本地 `claude/*` 分支，远端分支不删；然后汇报状态，等待需求。在此之前不创建分支，不修改代码。
 - 需求确定后，从最新的 `origin/main` 创建新分支。第一个 commit 推送后立即创建 PR，后续修改继续提交到同一个 PR。PR 的标题和描述只写目标，不写细节；改动超出目标时，新开 PR。
 - 不主动合并 PR，合并由用户完成。PR 合并后，该分支不再使用；新的工作使用新分支和新 PR。除非用户要求，不读取其他分支和其他 PR。冲突留到合并时处理。
-- 不使用 amend、squash、fixup，任何修正都以新 commit 提交。唯一允许改写历史的操作：将自己的 PR 分支 rebase 到最新的 `main` 上，再用 `git push --force-with-lease` 推送回同一条分支。不使用 `--no-verify`。
+- 不使用 amend、squash、fixup、rebase，不 force push，任何修正都以新 commit 提交。需要同步 `main` 时，把 `origin/main` merge 进自己的分支。不使用 `--no-verify`。
 
 ## 检查与测试
 
