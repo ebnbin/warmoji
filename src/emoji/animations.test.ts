@@ -7,8 +7,7 @@ import { PICKUPS } from '../data/pickups'
 import { packSvg, parseEmojiPack } from './pack'
 import { ANIM_SETS, animClipOf, animSetOf, bakeAnimFrame, splitSvg } from './anim'
 
-// 动画资源与真实素材的对账：validateAnimResource 只能查格式，
-// 这里对着打包 SVG 查「部件下标是否越界」（bake 对越界静默输出空，必须显式测）
+// 守卫：部件下标越界时 bake 静默输出空帧，validateAnimResource 查不到
 function loadPack(): ReturnType<typeof parseEmojiPack> {
   const ordering = readFileSync('src/assets/emoji/ordering.txt', 'utf8')
   const twemoji = readFileSync('src/assets/emoji/twemoji.txt', 'utf8')
@@ -19,7 +18,7 @@ describe('实体动画覆盖', () => {
   it('全部实体（角色/队长/敌人/Boss/变形羊/弩塔）都有专属动画', () => {
     const entities = new Set<string>([
       ...Object.values(CHARACTERS).map((c) => c.emoji),
-      // 测试专用队长不进正常选择页，无需专属动画
+      // 沙盒队长无需动画
       ...PICKABLE_CAPTAIN_IDS.map((id) => CAPTAINS[id].emoji),
       ...ENEMY_DEFS.map((e) => e.emoji),
       ...BOSSES.map((e) => e.emoji),
