@@ -13,8 +13,7 @@ import { targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 import { spawnFxSlash } from '../entities/fx'
 
-/** 瞬袭：瞬移到索敌范围内血量最高的敌人背后重斩，短暂停留（期间本体无敌）后闪回原位。
- * 位移走视觉偏移，不动阵型主权。execute 低血目标伤害翻倍；onHit 波及主目标周围 */
+/** 位移走视觉偏移，不动阵型 */
 export function castAssassinates(sim: Sim): void {
   castScan(sim, Assassinate, (e) => {
     if (Followup.left[e]! > 0) return false // 停留帧内不另起
@@ -24,7 +23,6 @@ export function castAssassinates(sim: Sim): void {
     const target = strongestTarget(ox, oy, targetsOf(sim, src), Assassinate.range[e]!)
     if (!target) return false
 
-    // 落点：目标背面（沿本体→目标方向再往前越过目标）
     const dx = target.x - ox
     const dy = target.y - oy
     const d = Math.hypot(dx, dy) || 1
@@ -43,7 +41,6 @@ export function castAssassinates(sim: Sim): void {
     playSfx('whoosh')
     blinkFlash(sim, landX, landY)
 
-    // 斩击：主目标全额，处决按血量比例翻倍；连环刃波及周围小圈（排除主目标）
     let damage = Math.round(Assassinate.damage[e]! * damageMul(sim, e))
     if (hasComponent(sim.world, e, Execute)) {
       const hp = Hp.v[target.eid] ?? 0

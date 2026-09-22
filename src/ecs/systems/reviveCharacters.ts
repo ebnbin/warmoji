@@ -2,7 +2,7 @@ import { Alive, Revive } from '../components'
 import { reviveCharacter } from './shared/combat'
 import type { Sim } from '../sim'
 
-/** 阵亡复活轮询(全队阵亡后不复活——待结算) */
+/** 全队阵亡后不复活 */
 export function reviveCharacters(sim: Sim): void {
   if (sim.over) return
   const now = sim.elapsedMs

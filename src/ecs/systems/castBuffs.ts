@@ -2,7 +2,6 @@ import { Alive, Buff, CharFlash, TeamDamage, Tint } from '../components'
 import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
-/** 限时全队增伤：不叠加，直接覆写到队长的 TeamDamage；全队闪一下作到手反馈 */
 export function castBuffs(sim: Sim): void {
   castScan(sim, Buff, (e) => {
     TeamDamage.mul[sim.captain] = Buff.damageMul[e]!

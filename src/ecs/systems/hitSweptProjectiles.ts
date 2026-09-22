@@ -7,9 +7,6 @@ import { cullProjectile } from './shared/projectile'
 import { enemyDef, projHitEids, projOnHit } from '../store'
 import type { Sim } from '../sim'
 
-// 线段扫掠命中（高速弹不穿模）：收集本帧线段扫到的目标，按段上距离排序，只结算首个；
-// 贯穿弹靠下一帧继续推进。撞墙即销毁（残垣图，WallStop）。
-
 function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax
   const dy = by - ay
@@ -22,7 +19,6 @@ function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, b
   return (px - cx) * (px - cx) + (py - cy) * (py - cy)
 }
 
-/** 扫掠命中 + 撞墙销毁 */
 export function hitSweptProjectiles(sim: Sim): void {
   const projs = query(sim.world, [SweptHit, Proj, PrevPos, Transform])
   if (projs.length === 0) return
@@ -34,7 +30,7 @@ export function hitSweptProjectiles(sim: Sim): void {
     const by = Transform.y[eid]!
     const hit = projHitEids[eid]!
     const pr = Proj.radius[eid]!
-    // t = 目标在线段上的投影参数(排序键);d2 = 到起点的中心距²(撞墙比较用)
+    // t 线段投影参数；d2 到起点的中心距²
     const found: { enemy: number; t: number; d2: number }[] = []
     const segX = bx - sx
     const segY = by - sy
@@ -42,7 +38,7 @@ export function hitSweptProjectiles(sim: Sim): void {
     for (const en of enemies) {
       if (hit.has(en)) continue
       const rr = pr + Radius.v[en]!
-      // 目标位置取相对线段起点的最近镜像(环面:隔缝命中也成立)
+      // 取相对线段起点的最近镜像
       const w = sim.hooks.worldDelta(sim, sx, sy, Transform.x[en]!, Transform.y[en]!)
       const tx2 = sx + w.x
       const ty2 = sy + w.y
@@ -51,7 +47,6 @@ export function hitSweptProjectiles(sim: Sim): void {
       found.push({ enemy: en, t: proj, d2: w.x * w.x + w.y * w.y })
     }
     found.sort((p, q) => p.t - q.t)
-    // 残垣图:子弹撞墙即销毁(墙比最近命中点更近时,本帧命中作废)——无墙图 wallHit 恒 null
     const wall = sim.hooks.wallHit(sim, sx, sy, bx, by)
     if (wall !== null) {
       const dw = (wall.x - sx) ** 2 + (wall.y - sy) ** 2
@@ -61,16 +56,15 @@ export function hitSweptProjectiles(sim: Sim): void {
         continue
       }
     }
-    // 每帧只结算首个命中(命中一个即收尾,贯穿弹靠下一帧继续推进)
+    // 每帧只结算首个命中
     const f = found[0]
     if (f === undefined || enemyDef[f.enemy] === undefined) continue
     hit.add(f.enemy)
     const hx = Transform.x[f.enemy]!
     const hy = Transform.y[f.enemy]!
-    // 归属随弹丸走——子弹常比发射者活得久,故来源是一份值而非能力实体
     const src = boltSource(Proj.srcSlot[eid]!)
     damageTarget(sim, src, f.enemy, Proj.damage[eid]!, Proj.kb[eid]!, sx, sy)
-    // 命中效果链(溅射/减速/毒/变羊…):主目标排除出溅射圈
+    // 主目标排除出溅射圈
     const onHit = projOnHit[eid]
     if (onHit && onHit.length > 0) {
       applyAbilityEffects(sim, src, onHit, {

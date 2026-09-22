@@ -3,8 +3,7 @@ import { Dormant, ENEMY_SET, EState, Flash, Poison, Tint, ZoneSlow } from '../co
 import type { Sim } from '../sim'
 import { isDancing } from '../utils/team'
 
-/** 非白闪期的常驻染色:蹦迪粉 > 中毒毒绿 > 蓄力橙 > 减速冷蓝 > 常态白。
- * 旧实现的橙/蓝只在状态翻转那一帧写一次,毒绿却逐帧重涂,故稳态下毒绿压过橙 */
+/** 优先级：蹦迪粉 > 中毒毒绿 > 蓄力橙 > 减速冷蓝 > 常态白 */
 export function tintEnemies(sim: Sim): void {
   const now = sim.elapsedMs
   const dancing = isDancing(sim)

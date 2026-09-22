@@ -16,11 +16,6 @@ import { unequipAbilities } from '../../entities/ability'
 import type { Sim } from '../../sim'
 import { spawnDamageNumber } from '../../entities/fx'
 
-// 战斗(P3b):敌人受伤/致死/击退,队员接触伤害/死亡/复活/受击闪光。
-// 镜像 applyDamage / onMemberTouched / hurtCharacter / killMember / reviveCharacter 的核心数值;
-// 掉落/结算统计/死亡效果/状态效果(毒/减速/变羊)在后续增量追加。
-
-/** 敌人受伤(镜像 applyDamage 核心) */
 export function applyDamage(
   sim: Sim,
   eid: number,
@@ -31,28 +26,25 @@ export function applyDamage(
   srcSlot = -1,
   crit = false,
 ): void {
-  // 已离场(同帧内被先一颗子弹打死)或休眠(无限世界远处冻结)即早退:防重复计击杀/掉落。
-  // 「还在不在」问的是实体本身,不是伴随存储被没被清空——后者是巧合,不是判据
+  // 已离场或休眠即早退，防重复计击杀
   if (!hasComponent(sim.world, eid, Enemy) || Dormant.v[eid]) return
   const def = enemyDef[eid]
   const morphed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
-  // 变形期受伤倍率(魔尘诅咒 vulnMul):放大变羊敌人所受伤害
   const dmg = morphed && Morph.vuln[eid] !== 1 ? Math.round(damage * Morph.vuln[eid]!) : damage
-  // 受伤飘字(镜像 floatDamage,在致死判定前:致死一击也飘字)
+  // 致死一击也飘字
   spawnDamageNumber(sim, Transform.x[eid]!, Transform.y[eid]!, dmg, crit)
   const hp = Hp.v[eid]! - dmg
-  // 结算统计:按伤害来源槽位累计有效伤害(压测阵容槽位越界则跳过,镜像 applyDamage)
   const st = sim.run.stats
   if (srcSlot >= 0 && srcSlot < st.damage.length) {
     st.damage[srcSlot] = (st.damage[srcSlot] ?? 0) + Math.min(dmg, Math.max(0, Hp.v[eid]!))
   }
-  // 击退免疫在变形期失效(绵羊可被击退):致死与非致死分支同口径
+  // 变形期击退免疫失效
   const kbImmune = def?.kbImmune === true && !morphed
   if (hp <= 0) {
     let flingVx = 0
     let flingVy = 0
     if (knockback > 0 && srcX !== undefined && srcY !== undefined && !kbImmune) {
-      // 方向走世界差(环面上跨缝命中不会把尸体甩向长的那一边)
+      // 方向走世界差
       const d = sim.hooks.worldDelta(sim, srcX, srcY, Transform.x[eid]!, Transform.y[eid]!)
       const dir = norm(d.x, d.y)
       flingVx = dir.x * knockback
@@ -64,7 +56,7 @@ export function applyDamage(
   Hp.v[eid] = hp
   playSfx('hit')
   Flash.until[eid] = sim.elapsedMs + 70
-  Tint.effect[eid] = 1 // 纯白填充
+  Tint.effect[eid] = 1
   Tint.color[eid] = 0xffffff
   const kb = kbImmune ? 0 : knockback
   if (kb > 0 && srcX !== undefined && srcY !== undefined) {
@@ -82,12 +74,10 @@ export function applyDamage(
   }
 }
 
-/** 击杀(计数 + 掉落结算 + 亡语入队 + 清体) */
 export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flingVy = 0): void {
-  sim.run.kills++ // 击杀计数落在 run 上(与旧一致):HUD 顶栏、波末小结、结算页都读它
+  sim.run.kills++
   const st = sim.run.stats
   if (srcSlot >= 0 && srcSlot < st.kills.length) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
-  // 击杀触发(镜像 runOnKill):吸血獠牙回血
   const killer = sim.characters[srcSlot]
   if (killer !== undefined && Alive.v[killer] && CharPerk.killHeal[killer]! > 0) {
     CharHp.hp[killer] = Math.min(CharHp.max[killer]!, CharHp.hp[killer]! + CharPerk.killHeal[killer]!)
@@ -96,31 +86,25 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
   const def = enemyDef[eid]
   const elite = Elite.v[eid] === 1
   const boss = Boss.v[eid] === 1
-  // 敌情明细(结算页战报):按敌人名累计击杀 + 精英击杀计数
   if (def) st.enemyKills[def.name] = (st.enemyKills[def.name] ?? 0) + 1
   if (elite) st.eliteKills += 1
-  // 死亡爆点(镜像 despawnKilled 的 6;Boss 另叠 onBossDown 的 24)
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'death' })
   if (boss) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 24, kind: 'death' })
-  if (boss) sim.bossDown = true // 终波 Boss 被击败 → 场景侧走通关结算
-  if (def) grantKillRewards(sim, eid, def, elite) // 经验即得 + 金币落地待拾
-  // 变形中的敌人 = 一只无能力的羊:死亡不触发任何亡语/拆巢(镜像 killEnemy 的 morph 判定)
+  if (boss) sim.bossDown = true
+  if (def) grantKillRewards(sim, eid, def, elite)
+  // 变形中死亡不触发亡语与拆巢
   const hexed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
-  // 亡语快照(实体即将移除:先记死亡点/体质,场景侧 runDeathEffects 重放)
   if (!hexed && def?.onDeath) {
     const snap = { def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: DmgMul.v[eid]! }
-    // 当场重放(清体之前,镜像 killEnemy 内的 runDeathEffects);无重放钩子时回落到帧末排空
     if (sim.onDeathFx) sim.onDeathFx(snap)
     else sim.pendingDeaths.push(snap)
   }
-  if (!hexed && def?.spawner) orphanBrood(sim, eid) // 拆巢:名下护巢子敌暴走 + 转直扑
-  // 携带者:死亡即在原地掉下所携拾取(镜像 killEnemy 的 spawnFieldPickup)
+  if (!hexed && def?.spawner) orphanBrood(sim, eid)
   const carries = enemyCarries[eid]
   if (carries) {
     dropFieldPickup(sim, Transform.x[eid]!, Transform.y[eid]!, carries)
     enemyCarries[eid] = undefined
   }
-  // 清体:本体裂成四象限碎片,继承致死击退速度飞散
   spawnShardsEcs(
     sim,
     Transform.x[eid]!,
@@ -136,7 +120,6 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
   removeEntity(sim.world, eid)
 }
 
-/** 经验统一入口(镜像 gainTeamXp):升级累计抽卡,不冻结 */
 function gainTeamXp(sim: Sim, amount: number): void {
   const gained = gainXp(sim.run.xp, amount)
   sim.run.xp = gained.state
@@ -146,8 +129,7 @@ function gainTeamXp(sim: Sim, amount: number): void {
   }
 }
 
-/** 击杀掉落(镜像 grantKillRewards):经验即得(队长×道具×精英),金币按概率落地待拾。
- * rng 每杀固定取两次(掉落判定 + 双倍判定),勿调整取用次序 */
+/** rng 每杀固定取两次，勿调整取用次序 */
 function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean): void {
   const xpMul = sim.reward.captainXpMul * (elite ? ELITE.xpMul : 1)
   gainTeamXp(sim, Math.round(def.xp * xpMul))
@@ -156,19 +138,15 @@ function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean):
   const dropped = dropRoll < coinDropChance((sim.run.combatMs + sim.elapsedMs) / 1000)
   const baseCoins = dropped ? Math.round(def.coins * (elite ? ELITE.coinsMul : 1)) : 0
   const doubled = baseCoins > 0 && doubleRoll < sim.reward.doubleCoinChance ? baseCoins : 0
-  // 偷币鼠吐回吞掉的币 + 1 枚利息(镜像 grantKillRewards 的 eaten 项)
   const eaten = Thief.eaten[eid]!
   const total = baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0)
   if (total > 0) dropCoins(sim, Transform.x[eid]!, Transform.y[eid]!, total)
 }
 
-/** 拆巢(镜像 orphanBrood):名下护巢子敌失去锚点——baseOrbit 按各自 orphan 倍率暴走
- * (速度/攻击)并转直扑玩家(Nest.of=-1 即触发 baseOrbit steerer 的暴走分支) */
 export function orphanBrood(sim: Sim, nestEid: number): void {
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     if (Nest.of[eid] !== nestEid) continue
     Nest.of[eid] = -1
-    // 会不会暴走是子敌自己的性质（出生时挂的 Orphan），与它的 locomotion 叫什么无关
     if (hasComponent(sim.world, eid, Orphan)) {
       SpMul.v[eid] = SpMul.v[eid]! * Orphan.speedMul[eid]!
       DmgMul.v[eid] = DmgMul.v[eid]! * Orphan.damageMul[eid]!
@@ -176,7 +154,7 @@ export function orphanBrood(sim: Sim, nestEid: number): void {
   }
 }
 
-/** 敌人静默移除(自爆/替身到时:不计击杀、不掉落、不放死亡效果) */
+/** 不计击杀、不掉落、不放死亡效果 */
 export function despawnEnemy(sim: Sim, eid: number): void {
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
   if (enemyDef[eid]?.spawner) orphanBrood(sim, eid)
@@ -185,9 +163,8 @@ export function despawnEnemy(sim: Sim, eid: number): void {
   removeEntity(sim.world, eid)
 }
 
-/** 队员受伤(镜像 hurtCharacter + killMember);blast/接触等外部命中点直接调用(无敌帧由调用方掌管) */
+/** 无敌帧由调用方掌管 */
 export function hurtCharacter(sim: Sim, eid: number, damage: number, srcName?: string, tint = 0xff7777): void {
-  // 敌情明细:承伤按人累计 + 按敌人名归属(镜像 hurtCharacter)
   const st = sim.run.stats
   const slot = Slot.v[eid]!
   if (slot >= 0 && slot < st.damageTaken.length) {
@@ -197,42 +174,38 @@ export function hurtCharacter(sim: Sim, eid: number, damage: number, srcName?: s
   const hp = Math.max(0, CharHp.hp[eid]! - damage)
   CharHp.hp[eid] = hp
   playSfx('hurt')
-  sim.characterHitCount++ // 场景侧据增量触发受击震屏
+  sim.characterHitCount++
   CharFlash.until[eid] = sim.elapsedMs + 120
-  Tint.color[eid] = tint // 受击闪色(常态红;地面毒区毒绿)
+  Tint.color[eid] = tint
   Tint.effect[eid] = 0
   if (hp <= 0) {
     Alive.v[eid] = 0
     Revive.at[eid] = sim.elapsedMs + Revive.ms[eid]!
     Tint.color[eid] = 0x888888
     Tint.alpha[eid] = 0.35
-    // 战报「阵亡」列(镜像 killMember 的 stats.deaths 累加)
     const deaths = sim.run.stats.deaths
     if (slot >= 0 && slot < deaths.length) deaths[slot] = (deaths[slot] ?? 0) + 1
-    // 尸体定格:停帧 + 尺寸复位成基准正方(镜像 killMember 的 setRotation(0).setScale(baseScale))
+    // 尸体定格
     Anim.frames[eid] = -1
     Anim.onceFrames[eid] = 0
     Transform.rot[eid] = 0
     Transform.w[eid] = MEMBER.size * UNIT
     Transform.h[eid] = MEMBER.size * UNIT
-    // 阵亡灰烟(镜像 killMember 的 puffBurst)
     sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
     if (sim.characters.every((x) => !Alive.v[x])) sim.over = true
   }
 }
 
-/** 复活单个队员(镜像 reviveCharacter):满血起身 + 无敌帧重置 + 复原染色 + 弹入。
- * 到点自动复活与队长技能集结(rallyTeam)共用这一处 */
 export function reviveCharacter(sim: Sim, eid: number): void {
   const now = sim.elapsedMs
   playSfx('revive')
   Alive.v[eid] = 1
-  Anim.frames[eid] = 0 // 解除停帧哨兵(0 = 待惰性解析)
+  Anim.frames[eid] = 0 // 解除停帧哨兵
   CharHp.hp[eid] = CharHp.max[eid]!
   Iframe.last[eid] = now
   Tint.color[eid] = 0xffffff
   Tint.alpha[eid] = 1
   Tint.effect[eid] = 0
-  Pop.until[eid] = now + 200 // 复活弹入(镜像 reviveCharacter 的 scale 弹)
+  Pop.until[eid] = now + 200
 }
 

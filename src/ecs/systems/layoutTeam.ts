@@ -7,11 +7,7 @@ import { } from '../utils/ease'
 import type { Sim } from '../sim'
 import { centerX, centerY } from '../utils/team'
 
-// 逐员布局：岗位偏移 + 待机游移 + 跟随弹簧 → 写 Follow/Transform/Depth。
-// 只管人站在哪；呼吸/弹入/翻转等纯表现在 animateCharacters。
-
-/** 逐员布局:岗位偏移 + 待机游移 + 跟随弹簧 → 写 Follow/Transform/Depth(镜像 layoutTeam)。
- * 只管人站在哪;呼吸/弹入/翻转等纯表现在 animateCharacters */
+/** 只管人站在哪；纯表现在 animateCharacters */
 export function layoutTeam(sim: Sim): void {
   const delta = sim.dtMs
   const posts = formationPosts(sim.formation, sim.count, Orbit.phase[sim.captain]!)
@@ -30,12 +26,11 @@ export function layoutTeam(sim: Sim): void {
     const seed = Wander.seed[eid]!
     const rawX = centerX(sim) + p.x + Math.sin(tSec * WANDER.freqX + seed) * wander
     const rawY = centerY(sim) + p.y + Math.sin(tSec * WANDER.freqY + seed * 2.3) * wander
-    // 跟随弹簧(用局部量演算,避免类型化数组元素的复合赋值歧义)
     let fx = Follow.x[eid]!
     let fy = Follow.y[eid]!
     let fvx = Follow.vx[eid]!
     let fvy = Follow.vy[eid]!
-    // 环面弹簧:目标取离当前跟随点最近的镜像——中心穿缝时队员各自走最短路穿门,阵型全程连贯
+    // 目标取离跟随点最近的镜像
     const td = sim.hooks.worldDelta(sim, fx, fy, rawX, rawY)
     const tx = fx + td.x
     const ty = fy + td.y
@@ -55,7 +50,6 @@ export function layoutTeam(sim: Sim): void {
       fx += lagX * pull
       fy += lagY * pull
     }
-    // 跟随点回绕(环面),弹簧状态始终保持在竞技场内
     const wrapped = sim.hooks.wrap(sim, fx, fy)
     fx = wrapped.x
     fy = wrapped.y
@@ -63,14 +57,12 @@ export function layoutTeam(sim: Sim): void {
     Follow.y[eid] = fy
     Follow.vx[eid] = fvx
     Follow.vy[eid] = fvy
-    // 能力视觉偏移叠在跟随点之上(突刺前冲/瞬闪):只动画面,不动阵型与索敌锚点
     Transform.x[eid] = fx + VisOff.x[eid]!
     Transform.y[eid] = fy + VisOff.y[eid]!
     const guarded = sim.formation === 'guard' && idx === 0
-    // 遮挡纵深按世界差(环面上贴缝时不跳变)
+    // 纵深按世界差
     Depth.z[eid] = guarded ? 8.5 : 10 + sim.hooks.worldDelta(sim, centerX(sim), centerY(sim), fx, fy).y / UNIT
   }
 }
 
-/** 队员的程序化小动画(镜像 animateMember):呼吸挤压拉伸 + 朝移动方向翻转(仅活着的)。
- * 复活弹入期(Pop)用弹入缩放覆盖呼吸(镜像 reviveCharacter 的 Back.easeOut scale 弹) */
+/** 复活弹入期用弹入缩放覆盖呼吸 */

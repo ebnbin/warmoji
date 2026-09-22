@@ -6,7 +6,7 @@ import { damageTarget } from './damage'
 import { sourceOf } from '../../utils/source'
 import type { Sim } from '../../sim'
 
-/** 落地：目标还在才结算——伤害 + 击退（从锚点推开）+ 落点掉币 */
+/** 目标还在才结算 */
 export function land(sim: Sim, d: number): void {
   const e = Owner.eid[d]!
   const target = Drop.target[d]!

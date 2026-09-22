@@ -4,11 +4,7 @@ import { applyDamage, hurtCharacter } from './combat'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 
-// 施伤的唯一入口：阵营决定进哪条结算（敌→队员吃无敌帧节流，队→敌走暴击/击退）。
-// 它不是 system——被人指着打某个目标，不 query；也不是纯函数——会写组件。
-
-/** 施伤的唯一入口：阵营决定落点——队伍侧打敌人（暴击掷点 + 击退倍率在此生效），
- * 敌方侧打队员（吃无敌帧节流；队员无击退机制，击退参数忽略） */
+/** 施伤唯一入口：队伍侧打敌人走暴击 + 击退，敌方侧打队员吃无敌帧节流 */
 export function damageTarget(
   sim: Sim,
   src: Source,

@@ -8,7 +8,7 @@ import { targetsOf } from '../../utils/targets'
 import type { Sim } from '../../sim'
 import { spawnFxBeam } from '../../entities/fx'
 
-/** 发射一束：胶囊判定 + 光束特效（ratio 折损用于扫射分束） */
+/** ratio 为扫射分束的折损 */
 export function fireBeam(sim: Sim, e: number, angle: number, ratio: number): void {
   const src = sourceOf(sim, e)
   playSfx('zap')

@@ -1,7 +1,7 @@
 import { Alive, CharHp, CharPerk } from '../components'
 import type { Sim } from '../sim'
 
-/** 再生戒指:持续回复(hp 允许小数,展示与快照处各自取整;时停期随世界冻结) */
+/** hp 允许小数，展示处取整 */
 export function regenCharacters(sim: Sim): void {
   const wdelta = sim.wdtMs
   for (const m of sim.characters) {

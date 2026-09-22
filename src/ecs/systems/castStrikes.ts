@@ -7,8 +7,7 @@ import { castScan } from './shared/castScan'
 import { targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 
-/** 点名打击：坠物逐个砸向离锚点最近的 N 个目标——落地才结算伤害与掉币。
- * 镜像坐标按真身去重（坠物落在可见的那一处） */
+/** 镜像坐标按真身去重 */
 export function castStrikes(sim: Sim): void {
   castScan(sim, Strike, (e) => {
     const src = sourceOf(sim, e)

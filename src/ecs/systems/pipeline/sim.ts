@@ -41,14 +41,9 @@ import { worldTick } from '../worldTick'
 import type { Step } from './step'
 import type { Sim } from '../../sim'
 
-// 一帧仿真的流水线。步与步之间的先后此前只写在注释里——「先于一切读敌人的系统」、
-// 「先于 orbit」、「接触须先于敌弹」，每条都是踩过坑才写下的真实约束，但挪一行不会红。
-// 现在它们是 after + why，由 order.test.ts 逐条校验。
-//
-// 时停期整体放慢：敌人移速/弹体位移都按 sim.wdtMs 积分，无需在任何一步另乘时标。
+// 时停期敌人移速与弹体位移都按 sim.wdtMs 积分，任何一步不得另乘时标
 
-/** 各走位的转向系统。彼此之间没有次序关系——一只敌人只挂一种走位组件，
- * 两个系统扫不到同一只 */
+/** 彼此无序：一只敌人只挂一种走位组件 */
 const STEERERS: readonly { name: string; run: (sim: Sim) => void }[] = [
   { name: 'steerChase', run: steerChase },
   { name: 'steerRoam', run: steerRoam },
@@ -58,7 +53,7 @@ const STEERERS: readonly { name: string; run: (sim: Sim) => void }[] = [
   { name: 'steerBaseOrbit', run: steerBaseOrbit },
   { name: 'steerCoinThief', run: steerCoinThief },
   { name: 'steerDash', run: steerDash },
-  // static 没有系统：它就是「不动」，BVel 由 enemyGates 清零后没人再写
+  // static 无系统：BVel 由 enemyGates 清零后没人再写
 ]
 
 export const SIM_PIPELINE: readonly Step[] = [
@@ -110,7 +105,6 @@ export const SIM_PIPELINE: readonly Step[] = [
     after: ['applySlowZones'],
     why: 'Slowed 是本帧派生的移速倍率，各走位系统共读；Steering 决定本职走位这一帧接不接管',
   },
-  // 每种走位一个系统，各自只认自己那个组件，互不相干，故彼此无序
   ...STEERERS.map((s) => ({ ...s, after: ['enemyGates'] })),
   {
     name: 'applyEnemySteps',
@@ -165,7 +159,7 @@ export const SIM_PIPELINE: readonly Step[] = [
   { name: 'blinkTelegraphs', run: blinkTelegraphs },
   { name: 'updateShards', run: updateShards },
   { name: 'animateBooms', run: animateBooms },
-  // 地图布景：顺流漂先把位姿算出来，自转再叠上去（两者都只写 Transform）
+  // driftDecor 先算位姿，spinDecor 再叠
   { name: 'driftDecor', run: driftDecor },
   { name: 'spinDecor', run: spinDecor, after: ['driftDecor'] },
   {

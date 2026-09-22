@@ -5,8 +5,7 @@ import { cullProjectile } from './shared/projectile'
 import { projSrcName } from '../store'
 import type { Sim } from '../sim'
 
-/** 圆-圆命中（慢速弹用不着扫掠）：蹭到任一活着队员即结算，吃无敌帧节流。
- * 被无敌帧挡下也照常销毁——挡的是伤害，不是弹 */
+/** 被无敌帧挡下也照常销毁 */
 export function hitDirectProjectiles(sim: Sim): void {
   if (sim.over) return
   const now = sim.elapsedMs

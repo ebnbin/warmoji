@@ -3,7 +3,6 @@ import { Ability, Aim, Frozen, Held, Laser, Tint, Transform } from '../component
 import { ownerX, ownerY } from '../utils/amp'
 import type { Sim } from '../sim'
 
-/** 摆位：武器自身定身指向瞄准方向 */
 export function placeLaserBody(sim: Sim): void {
   for (const e of query(sim.world, [Ability, Laser, Aim, Held, Transform])) {
     const aim = Aim.rad[e]!

@@ -3,7 +3,6 @@ import { strike } from './shared/thrust'
 import { Ability, Followup, Frozen, Thrust } from '../components'
 import type { Sim } from '../sim'
 
-/** 二连突的第二段：与冷却同口径推进，到点重新索敌再刺一次 */
 export function tickCombos(sim: Sim): void {
   const dt = sim.wdtMs
   for (const e of query(sim.world, [Ability, Thrust, Followup])) {

@@ -2,8 +2,6 @@ import { query } from 'bitecs'
 import { Dormant, ENEMY_SET, FACTION, Transform, Zone, ZoneChill, ZoneSlow } from '../components'
 import type { Sim } from '../sim'
 
-/** 减速区叠乘(寒气光环等):落在圈内即按 factor 变慢。转向与染色共读这一份。
- * 减速是**敌人的**属性,故折算在这里而不在 zones.ts:那边只管区自己的事 */
 export function applySlowZones(sim: Sim): void {
   const chills = query(sim.world, [Zone, ZoneChill, Transform])
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {

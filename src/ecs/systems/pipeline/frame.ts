@@ -20,12 +20,6 @@ import { stepSim } from '../../sim'
 import type { Step } from './step'
 import type { Sim } from '../../sim'
 
-// 一帧的最外圈。SIM_PIPELINE 与 ABILITY_PIPELINE 各自是它的一步。
-//
-// 这一层从前只是 EcsBattleScene.update() 里的一串裸调用：每步都有个 why 注释说明
-// 它为什么在这，但全是行序，没有一条被声明、被校验。而它承载的恰恰是跨子系统的
-// 依赖——最难在别处发现的那种，破坏了也全是静默的：索敌快照晚一步，抛射物的命中
-// 效果链用的就是上一帧位置；reapCollected 早一步，金币静静地不入账。
 
 export const FRAME_PIPELINE: readonly Step[] = [
   { name: 'refreshEnemyTargets', run: refreshEnemyTargets },
@@ -49,7 +43,6 @@ export const FRAME_PIPELINE: readonly Step[] = [
   { name: 'runDeathEffects', run: runDeathEffects },
   { name: 'updateZones', run: updateZones },
   { name: 'updatePickups', run: updatePickups },
-  // 到手给什么：每种给法一个系统，各取所需。四者互不相干，故彼此无序
   { name: 'grantCoins', run: grantCoins, after: ['updatePickups'] },
   { name: 'grantMods', run: grantMods, after: ['updatePickups'] },
   { name: 'grantFlash', run: grantFlash, after: ['updatePickups'] },
@@ -61,15 +54,13 @@ export const FRAME_PIPELINE: readonly Step[] = [
     why: '到手的拾取物在这里离场——早一步，实体没了就什么都结算不到',
   },
   { name: 'updateSpawners', run: updateSpawners },
-  // 排期到点：各自挂上预告。须先于 spawnStep——它按在场数 + 在途预告数判上限，
-  // 晚一步就是「本帧刚排的预告不算数」，敌潮与常规刷怪一起超额
+  // 须先于 spawnStep：它按在场数 + 在途预告数判上限
   { name: 'fireSurges', run: fireSurges },
   { name: 'fireCarriers', run: fireCarriers },
   { name: 'spawnStep', run: spawnStep, after: ['fireSurges', 'fireCarriers'],
     why: '刷怪上限按「在场 + 在途预告」判，本帧排的预告要算进去' },
 ]
 
-/** 跑完一帧的仿真侧。Scene 只负责它前后的事：回填视口、排空视觉事件、过场判定 */
 export function stepFrame(sim: Sim): void {
   runPipeline(FRAME_PIPELINE, sim)
 }

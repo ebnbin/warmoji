@@ -9,13 +9,12 @@ import { sourceOf } from '../utils/source'
 import { targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 
-/** 推进：自旋 + 去程缓动 / 回程追人 + 途中判伤 + 磁力吸币 */
 export function updateFlyers(sim: Sim): void {
   const dt = sim.wdtMs
   for (const f of [...query(sim.world, [Flyer, Transform])]) {
     const e = Flyer.of[f]!
     if (Frozen.v[e]) {
-      // 持有者倒下：在途的镖一并作废，冷却按裸值重置
+      // 持有者倒下即作废
       catchFlyer(sim, e, f)
       Boomerang.cdLeft[e] = Boomerang.cdBase[e]!
       continue

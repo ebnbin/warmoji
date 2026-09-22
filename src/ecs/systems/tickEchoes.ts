@@ -8,7 +8,6 @@ import { sourceOf } from '../utils/source'
 import { targetsOf, targetsWithin } from '../utils/targets'
 import type { Sim } from '../sim'
 
-/** 后手轰炸的倒计时：与冷却同口径，只在未冻结时推进 */
 export function tickEchoes(sim: Sim): void {
   const dt = sim.wdtMs
   for (const e of query(sim.world, [Ability, AreaBlast, Followup])) {
@@ -16,7 +15,6 @@ export function tickEchoes(sim: Sim): void {
     Followup.left[e] = Followup.left[e]! - dt
     if (Followup.left[e]! > 0) continue
     Followup.left[e] = 0
-    // 落点取索敌上限内的随机敌人：无限地图上不能轰到无穷远
     const near = targetsWithin(ownerX(e), ownerY(e), targetsOf(sim, sourceOf(sim, e)), ACQUIRE.range * UNIT)
     if (near.length === 0) continue
     const t = near[Math.floor(Math.random() * near.length)]!

@@ -10,7 +10,6 @@ import { sourceOf } from '../../utils/source'
 import { nearestAngle, targetsOf } from '../../utils/targets'
 import type { Sim } from '../../sim'
 
-/** 单段突刺：索敌 → 胶囊判定 → 终点命中效果 → 起一段挥击动画 */
 export function strike(sim: Sim, e: number): void {
   const src = sourceOf(sim, e)
   const reach = Thrust.reach[e]!
