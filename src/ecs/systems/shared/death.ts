@@ -7,6 +7,7 @@ import { spawnBrood, spawnEnemy } from '../../entities/enemy'
 import { applyAbilityEffects } from './effects'
 import { enemySource } from '../../utils/source'
 import type { PendingDeath, Sim } from '../../sim'
+import { crowded } from '../../world'
 
 function spawnSplit(sim: Sim, d: PendingDeath, fx: SplitEffect): void {
   if (sim.over) return
@@ -14,7 +15,7 @@ function spawnSplit(sim: Sim, d: PendingDeath, fx: SplitEffect): void {
 }
 
 function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): void {
-  if (sim.over) return
+  if (sim.over || crowded(sim.world)) return
   const husk = {
     ...d.def,
     damage: 0,

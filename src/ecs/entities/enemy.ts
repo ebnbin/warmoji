@@ -62,6 +62,7 @@ import { armIdle } from '../systems/shared/anim'
 import { ANIM_DEF } from '../../emoji/anim'
 import type { Sim } from '../sim'
 import type { FrameIndex } from '../frames'
+import { crowded } from '../world'
 import { toPx } from '../../data/px'
 import { bossFor, MAPS } from '../../data/maps'
 import type { MapDef } from '../../types/maps'
@@ -263,6 +264,7 @@ export function spawnBrood(
 ): void {
   const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
   for (let i = 0; i < count; i++) {
+    if (crowded(sim.world)) return
     const ang = sim.rng.next() * Math.PI * 2
     const child = spawnEnemy(
       sim,

@@ -27,6 +27,7 @@ import { playSfx } from '../../audio/sfx'
 import { PICKUP, PICKUPS } from '../../data/pickups'
 import { FIELD, POLARITY_COLOR } from '../../data/battlefield'
 import { backEaseOut } from '../utils/ease'
+import { crowded } from '../world'
 
 
 export interface PickupSpec {
@@ -153,6 +154,7 @@ function fieldSpec(def: FieldPickupDef): PickupSpec {
 export function dropCoins(sim: Sim, x: number, y: number, count: number): void {
   const spec = coinSpec(sim)
   for (let i = 0; i < count; i++) {
+    if (crowded(sim.world)) return
     const jx = count > 1 ? (sim.rng.next() - 0.5) * 0.6 * UNIT : 0
     const jy = count > 1 ? (sim.rng.next() - 0.5) * 0.6 * UNIT : 0
     spawnPickup(sim, x + jx, y + jy, spec)
