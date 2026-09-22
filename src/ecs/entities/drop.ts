@@ -1,4 +1,5 @@
-import { addComponents, addEntity } from 'bitecs'
+import { addComponents } from 'bitecs'
+import { newEntity } from './entity'
 import { attachDrawable } from './drawable'
 import { Drop, FACTION, Faction, Owner } from '../components'
 import type { Sim } from '../sim'
@@ -19,7 +20,7 @@ export interface DropSpec {
 }
 
 export function spawnDrop(sim: Sim, weaponEid: number, spec: DropSpec): number {
-  const d = addEntity(sim.world)
+  const d = newEntity(sim.world)
   attachDrawable(sim.world, d, sim.frames, {
     id: spec.emoji,
     outline: Faction.v[weaponEid] === FACTION.enemy ? 'enemy' : 'player',

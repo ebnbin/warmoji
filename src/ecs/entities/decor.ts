@@ -1,4 +1,5 @@
-import { addComponent, addComponents, addEntity } from 'bitecs'
+import { addComponent, addComponents } from 'bitecs'
+import { newEntity } from './entity'
 import { Drift, Spin } from '../components'
 import { attachDrawable } from './drawable'
 import type { DrawableInit } from './drawable'
@@ -12,7 +13,7 @@ export interface DecorInit extends DrawableInit {
 }
 
 export function spawnDecor(world: EcsWorld, atlas: FrameIndex, init: DecorInit): number {
-  const eid = addEntity(world)
+  const eid = newEntity(world)
   attachDrawable(world, eid, atlas, init)
   if (init.spin !== undefined) {
     addComponent(world, eid, Spin)

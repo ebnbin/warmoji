@@ -1,4 +1,5 @@
-import { addComponent, addComponents, addEntity } from 'bitecs'
+import { addComponent, addComponents } from 'bitecs'
+import { newEntity } from './entity'
 import { Lifetime, Owner, Ring, Tint, Transform, Zone, ZoneBurn, ZoneChill, ZoneFollow } from '../components'
 import { zoneSrcName } from '../store'
 import type { Sim } from '../sim'
@@ -28,7 +29,7 @@ export interface ZoneSpec {
 
 export function spawnZone(sim: Sim, spec: ZoneSpec): number {
   const world = sim.world
-  const eid = addEntity(world)
+  const eid = newEntity(world)
   addComponents(world, eid, Zone, Transform, Tint, Ring, Lifetime)
   Zone.radius[eid] = spec.radius
   Zone.faction[eid] = spec.faction

@@ -1,4 +1,5 @@
-import { addComponent, addComponents, addEntity, hasComponent, query } from 'bitecs'
+import { addComponent, addComponents, hasComponent, query } from 'bitecs'
+import { newEntity } from './entity'
 import {
   Bob,
   GrantCoins,
@@ -59,7 +60,7 @@ export interface PickupSpec {
 /** 落点先过世界钩子 */
 export function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
   const p = sim.hooks.constrainCoin(sim, x, y)
-  const eid = addEntity(sim.world)
+  const eid = newEntity(sim.world)
   // Bob 恒挂，amp = 0 即不浮
   addComponents(sim.world, eid, Pickup, Pull, Grab, Lifetime, Vel, Pop, Bob)
   attachDrawable(sim.world, eid, sim.frames, {

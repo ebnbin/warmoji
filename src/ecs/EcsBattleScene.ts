@@ -30,7 +30,8 @@ import { remapSim } from './systems/shared/remap'
 import { viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
-import { clearEcsStore, modDef } from './store'
+import { modDef } from './store'
+import { resetEntityStorage } from './storage'
 import { armCaptain, armTeam } from './entities/loadout'
 import { requestCast } from './systems/shared/ability'
 import { Minion } from './components'
@@ -214,7 +215,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // 构建图集期间场景可能已重开：isActive 仍为真，但本次 boot 已过期
     if (gen !== this.bootGen || !this.scene.isActive()) return
     this.atlas = atlas
-    clearEcsStore()
+    resetEntityStorage()
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
     this.cues = new CueLayer(this, this.world)
     this.rings = new RingLayer(this, this.world)

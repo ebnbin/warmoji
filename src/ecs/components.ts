@@ -1,13 +1,35 @@
-import { MAX_ENTITIES } from './world'
+import { INITIAL_CAPACITY } from './world'
 
-// 所有数组容量 = MAX_ENTITIES；spawn 时须写全字段，跨局复用不清理
+// 数组按 eid 索引，扩容时整体替换（见 storage.ts）：不得缓存数组引用，也不得写 `X.f[i] = 会建实体的调用()`。
+// spawn 时须写全字段，跨局复用不清理
 
-const f32 = (): Float32Array => new Float32Array(MAX_ENTITIES)
-const i32 = (): Int32Array => new Int32Array(MAX_ENTITIES)
-const u32 = (): Uint32Array => new Uint32Array(MAX_ENTITIES)
-const u8 = (): Uint8Array => new Uint8Array(MAX_ENTITIES)
+type Column = Float32Array | Int32Array | Uint32Array | Uint8Array
+
+/** 非 0 初值的列 */
+const FILL = new WeakMap<Column, number>()
+
+const f32 = (): Float32Array => new Float32Array(INITIAL_CAPACITY)
+const i32 = (): Int32Array => new Int32Array(INITIAL_CAPACITY)
+const u32 = (): Uint32Array => new Uint32Array(INITIAL_CAPACITY)
+const u8 = (): Uint8Array => new Uint8Array(INITIAL_CAPACITY)
 /** 需要非 0 初值的 i32（如 -1 表示「无」） */
-const i32Fill = (v: number): Int32Array => new Int32Array(MAX_ENTITIES).fill(v)
+const i32Fill = (v: number): Int32Array => {
+  const a = new Int32Array(INITIAL_CAPACITY).fill(v)
+  FILL.set(a, v)
+  return a
+}
+
+/** 同类型的新列：前段照抄，新增的槽位填初值 */
+export function resizeColumn<T extends Column>(old: T, length: number): T {
+  const next = new (old.constructor as new (length: number) => T)(length)
+  next.set(length >= old.length ? old : old.subarray(0, length))
+  const fill = FILL.get(old)
+  if (fill !== undefined) {
+    if (length > old.length) next.fill(fill, old.length)
+    FILL.set(next, fill)
+  }
+  return next
+}
 
 /** 世界坐标、旋转（弧度）、显示尺寸（世界像素） */
 export const Transform = {

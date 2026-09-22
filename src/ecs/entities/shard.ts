@@ -1,4 +1,5 @@
-import { addComponent, addEntity } from 'bitecs'
+import { addComponent } from 'bitecs'
+import { newEntity } from './entity'
 import { norm } from '../../util/vec'
 import { KNOCKBACK } from '../../data/abilities'
 import { Depth, Quad, Shard, Sprite, Tint, Transform } from '../components'
@@ -28,7 +29,7 @@ export function spawnShardsEcs(
     const oy = (i < 2 ? -1 : 1) * (dh / 2)
     const dir = norm(ox, oy)
     const scatter = 45 + sim.rng.next() * 65
-    const eid = addEntity(sim.world)
+    const eid = newEntity(sim.world)
     addComponent(sim.world, eid, Shard)
     addComponent(sim.world, eid, Transform)
     addComponent(sim.world, eid, Sprite)

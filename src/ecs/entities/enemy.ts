@@ -1,4 +1,5 @@
-import { addComponent, addEntity, query } from 'bitecs'
+import { addComponent, query } from 'bitecs'
+import { newEntity } from './entity'
 import { AI, ELITE, SPAWN, SURGE } from '../../data/enemies'
 import type { EnemyDef, LocomotionDef } from '../../types/enemies'
 import { waveAt } from '../../data/waves'
@@ -153,7 +154,7 @@ export function spawnEnemy(
   const world = sim.world
   const outline = elite || boss ? 'elite' : 'enemy'
   const size = def.size * (elite ? ELITE.sizeMul : 1)
-  const eid = addEntity(world)
+  const eid = newEntity(world)
   addComponent(world, eid, Enemy)
   addComponent(world, eid, Alive)
   addComponent(world, eid, Transform)

@@ -1,4 +1,5 @@
-import { addComponent, addComponents, addEntity, hasComponent } from 'bitecs'
+import { addComponent, addComponents, hasComponent } from 'bitecs'
+import { newEntity } from './entity'
 import { DEG2RAD } from '../../util/units'
 import { playSfx } from '../../audio/sfx'
 import {
@@ -18,7 +19,7 @@ function spawnBolt(
   faction: number,
   art: { frame: number; size: number; speed: number; rotOffsetDeg: number },
 ): number {
-  const eid = addEntity(sim.world)
+  const eid = newEntity(sim.world)
   // prettier-ignore
   addComponents(sim.world, eid, Projectile, Transform, Vel, Proj, PrevPos, Faction, Sprite, Tint, Depth)
   Transform.x[eid] = x

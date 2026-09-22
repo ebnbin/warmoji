@@ -1,4 +1,5 @@
-import { addComponents, addEntity } from 'bitecs'
+import { addComponents } from 'bitecs'
+import { newEntity } from './entity'
 import { Due, Meteor } from '../components'
 import { meteorHit } from '../store'
 import { attachDrawable } from './drawable'
@@ -12,7 +13,7 @@ export function spawnMeteor(
   warnMs: number,
   size: number,
 ): number {
-  const eid = addEntity(sim.world)
+  const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Meteor, Due)
   Meteor.sx[eid] = s.sx
   Meteor.sy[eid] = s.sy

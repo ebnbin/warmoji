@@ -43,9 +43,19 @@ const GUARDS: readonly { name: string; file: string; code: string }[] = [
     code: "import waves from '../assets/progression.json'\nvoid waves\n",
   },
   {
-    name: '建实体只在 src/ecs/entities/ 下',
+    name: '建实体只走 newEntity：entities/ 外',
     file: 'src/ecs/pickups.ts',
     code: "import { addEntity } from 'bitecs'\nvoid addEntity\n",
+  },
+  {
+    name: '建实体只走 newEntity：entities/ 内',
+    file: 'src/ecs/entities/pickup.ts',
+    code: "import { addEntity } from 'bitecs'\nvoid addEntity\n",
+  },
+  {
+    name: '建实体只在 src/ecs/entities/ 下',
+    file: 'src/ecs/systems/spawnStep.ts',
+    code: "import { newEntity } from '../entities/entity'\nvoid newEntity\n",
   },
   {
     name: 'data 是内容叶子层',
@@ -69,6 +79,11 @@ const ALLOWED: readonly { name: string; file: string; code: string }[] = [
   {
     name: 'entities/ 下建实体照常',
     file: 'src/ecs/entities/pickup.ts',
+    code: "import { newEntity } from './entity'\nvoid newEntity\n",
+  },
+  {
+    name: 'newEntity 本身调 addEntity 照常',
+    file: 'src/ecs/entities/entity.ts',
     code: "import { addEntity } from 'bitecs'\nvoid addEntity\n",
   },
   {
