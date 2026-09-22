@@ -1,7 +1,6 @@
 import type { BattlefieldTuning } from '../src/types/battlefield'
 
 export const BATTLEFIELD = {
-  // 每图至少 1 增益 + 1 减益
   pools: {
     forest: [
       { id: 'forest_hunt', emoji: '1f43a', name: '狩猎本能', desc: '全队伤害 +35%（8 秒）', polarity: 'buff', durationMs: 8000, fx: { teamDamageMul: 1.35 } },
@@ -58,7 +57,6 @@ export const BATTLEFIELD = {
     ],
   },
   field: { grabRadiusU: 0.9, groundMs: 9000, auraRadiusU: 0.85 },
-  // 固定数量，非概率
   carrierBudget: {
     boss: { buff: 1, debuff: 2 },
     waveTiers: [

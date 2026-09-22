@@ -8,7 +8,6 @@ export const PICKUPS = {
       radius: 0.22,
     },
   },
-  // magnetSpeed 格/秒；collectRadius 格；磁吸范围在 CaptainDef.coinMagnet
   pipeline: {
     magnetSpeed: 8,
     collectRadius: 0.5,

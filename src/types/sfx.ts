@@ -11,9 +11,9 @@ export interface SfxDef {
   duration: number
   /** 峰值音量 0..1 */
   volume: number
-  /** 起音时长（秒，线性淡入，默认 5ms 防爆点） */
+  /** 起音时长（秒），缺省 5ms */
   attack?: number
-  /** 衰减曲线指数：1 线性，越大收尾越快（默认 1.6） */
+  /** 衰减曲线指数，缺省 1.6 */
   decayPow?: number
   /** 琶音：时长均分 N 段，各段频率乘以对应倍率 */
   steps?: readonly number[]
@@ -22,5 +22,4 @@ export interface SfxDef {
   /** 随机音高抖动（±比例） */
   jitter?: number
 }
-// 音效表：数据行在 defs/sfx.ts（创作层），npm run gen 校验并生成 sfx.json
 export type SfxId = keyof typeof sfxJson

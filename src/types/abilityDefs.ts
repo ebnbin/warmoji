@@ -1,8 +1,6 @@
 import type { SfxId } from './sfx'
 import type { GroundEffectDef } from './groundEffects'
 
-/** 弹丸视觉规格（能力弹与死亡冷枪共用）：飞行体的形象与运动学，与「谁发、
- * 何时发、带什么命中效果」无关——后者由能力触发机器/命中效果链各自承载 */
 export interface ProjectileSpec {
   readonly emoji: string
   readonly size: number
@@ -10,7 +8,6 @@ export interface ProjectileSpec {
   readonly speed: number
   readonly rotationOffsetDeg: number
 }
-/** 持有物视觉：挂在角色身上的能力 emoji */
 export interface HeldVisual {
   readonly emoji: string
   readonly size: number
@@ -22,7 +19,6 @@ export interface HeldVisual {
   readonly mountSide?: -1 | 1
   readonly mountGap?: number
 }
-/** 命中环 VFX：从锚点扩张淡出的一圈（纯表现，参数随效果自带） */
 export interface BlastRing {
   readonly color: number
   readonly fillAlpha: number
@@ -30,7 +26,7 @@ export interface BlastRing {
   readonly lineAlpha: number
   readonly durMs: number
 }
-/** 圆形范围伤害：对锚点圈内敌对方各造成 ratio×基准伤害；ring 缺省无环 */
+/** ratio × 基准伤害；ring 缺省无环 */
 export interface BlastEffect {
   readonly kind: 'blast'
   readonly radius: number
@@ -39,35 +35,30 @@ export interface BlastEffect {
   readonly knockback: number
   readonly ring?: BlastRing
 }
-/** 逐目标限时减速（factor=0 即冻结），到时自动恢复 */
+/** factor = 0 即冻结 */
 export interface SlowEffect {
   readonly kind: 'slow'
   readonly factor: number
   readonly durationMs: number
 }
-/** 逐目标中毒 DoT：命中后每 tickMs 造成 damage 点伤害，持续 durationMs（毒针）。刷新不叠加 */
+/** 每 tickMs 造成 damage，持续 durationMs；刷新不叠加 */
 export interface PoisonEffect {
   readonly kind: 'poison'
   readonly damage: number
   readonly tickMs: number
   readonly durationMs: number
 }
-/** 命中锚点处留下持续地面效果区（灼烧/毒等）；任意投送都能挂，阵营由 ctx 注入 */
 export interface GroundZone {
   readonly kind: 'ground'
   readonly def: GroundEffectDef
 }
-/** 变形：把命中目标变成无害替身（形象顶替、失去一切伤害，到期恢复；Boss 免疫）。
- * vulnMul 为变形期间的受伤倍率（脆弱诅咒）。逐目标施加，敌方无此机制（缺席即 no-op） */
+/** Boss 免疫；vulnMul 为变形期间的受伤倍率 */
 export interface MorphEffect {
   readonly kind: 'morph'
   readonly durationMs: number
   readonly morphEmoji: string
   readonly vulnMul?: number
 }
-/** 发弹：在锚点朝最近敌对方发一枚弹（aim=nearest）。复用弹丸投送机器与
- * ProjectileSpec——「冷却触发的能力发弹」与「死亡触发的冷枪」是同一动作、不同触发。
- * 阵营由 ctx 注入（目前仅敌方死亡冷枪在用；玩家 onHit 不含此 kind） */
 export interface SpawnProjectileEffect {
   readonly kind: 'spawnProjectile'
   readonly projectile: ProjectileSpec
@@ -75,21 +66,19 @@ export interface SpawnProjectileEffect {
   readonly lifeMs: number
   readonly aim: 'nearest'
 }
-/** 治疗我方范围内单位：与军医能力同一个 ctx.heal 动作，阵营由 ctx 注入。
- * all 缺省 true（范围全体）；死亡触发时由执行器排除正在死亡的自己 */
+/** all 缺省 true；死亡触发时排除自己 */
 export interface HealEffect {
   readonly kind: 'heal'
   readonly range: number
   readonly amount: number
   readonly all?: boolean
 }
-/** 逐目标直伤：对本次命中/接触的每个目标造成 ratio×基准伤害（缺省 1）。无敌帧节流由 ctx
- * 决定——接触触发在触发点节流、此处裸施伤；远程命中则 ctx.damageTarget 侧节流 */
+/** ratio × 基准伤害，缺省 1 */
 export interface DamageEffect {
   readonly kind: 'damage'
   readonly ratio?: number
 }
-/** 攻速减益（敌→队员专属）：ctx 实现注入，其余阵营缺席即 no-op（同 morph/spawnBullet 的可选式） */
+/** 敌→队员专属 */
 export interface AttackSlowEffect {
   readonly kind: 'attackSlow'
   readonly mul: number
@@ -109,19 +98,19 @@ export interface ThrustDef {
   readonly kind: 'thrust'
   readonly damage: number
   readonly cooldownMs: number
-  /** 命中击退冲量（px/秒，方向从伤害源指向敌人；位移 ≈ 冲量 × KNOCKBACK.tauMs/1000） */
+  /** 击退冲量（px/秒），位移 ≈ 冲量 × KNOCKBACK.tauMs/1000 */
   readonly knockback: number
-  /** 判定：从角色中心沿瞄准方向的线段长度 */
+  /** 判定线段长度，从角色中心起 */
   readonly reach: number
   readonly hitRadius: number
   readonly thrustMs: number
   /** 无持有物时角色本体前冲的距离 */
   readonly lungeDist: number
   readonly held?: HeldVisual
-  // ── 能力字段（core/abilities.ts 按角色等级注入） ──
-  /** 二连突：出手后隔 delayMs 重新索敌再刺一段 */
+  // ── 能力字段 ──
+  /** 隔 delayMs 重新索敌再刺一段 */
   readonly combo?: { readonly delayMs: number }
-  /** 命中效果：突刺终点（reach 末端）施加的 onHit 效果（枪尖震波等） */
+  /** 施加于突刺终点 */
   readonly onHit?: readonly Effect[]
 }
 export interface ProjectileDef {
@@ -129,30 +118,26 @@ export interface ProjectileDef {
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
-  /** 瞄准：nearest 最近目标（缺省）/ move 持有者移动方向（无需目标，ctx 供朝向） */
+  /** 缺省 nearest；move = 持有者移动方向，无需目标 */
   readonly aim?: 'nearest' | 'move'
-  /** 索敌上限覆写（缺省 ACQUIRE.range；敌械行可给大值表达「任意距离开火」） */
+  /** 缺省 ACQUIRE.range */
   readonly range?: number
-  /** 弹药寿命（敌械弹按寿命回收；队伍弹走出屏/TTL 机制，字段不参与） */
+  /** 仅敌方弹按寿命回收 */
   readonly lifeMs?: number
-  /** 首发延迟覆写（敌械用；缺省由装配方给错峰值） */
+  /** 缺省由装配方给错峰值 */
   readonly firstDelayMs?: number
-  /** 每次出手的音效（敌械弹幕用；队伍弹的 shoot 音效在引擎发弹处） */
+  /** 仅敌方弹生效 */
   readonly fireSfx?: SfxId
   readonly held?: HeldVisual
   readonly projectile: ProjectileSpec
   // ── 能力字段 ──
-  /** 齐射：每次出手发射 count 枚，扇形均匀散开 spreadDeg（度）；
-   * spreadDeg ≥ 360 为整圈（按 count 均分步进不重叠端点，无需目标），
-   * randomRotate 每轮随机整体旋转（经 ctx.random，Boss 环形弹幕） */
+  /** spreadDeg ≥ 360 为整圈且无需目标；randomRotate 每轮随机整体旋转 */
   readonly volley?: { readonly count: number; readonly spreadDeg: number; readonly randomRotate?: boolean }
-  /** 每第 n 次出手改为一轮特殊齐射 */
+  /** 每第 n 次出手改为此齐射 */
   readonly everyN?: { readonly n: number; readonly count: number; readonly spreadDeg: number }
-  /** 贯穿：命中后继续飞行，可再命中的额外敌人数 */
+  /** 可再命中的额外敌人数 */
   readonly pierce?: number
-  /** 命中效果：弹丸命中点施加的 onHit 效果（溅射 blast、魔尘 morph 等）。
-   * 在弹道机器（projectiles.ts）里落地——与角色能力同走 ctx 不同，弹丸伤害
-   * 不吃暴击（与弹丸主伤一致）。 */
+  /** 不吃暴击 */
   readonly onHit?: readonly Effect[]
 }
 export interface SweepDef {
@@ -160,14 +145,13 @@ export interface SweepDef {
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
-  /** 扇形判定半径与弧宽 */
+  /** 扇形判定半径 */
   readonly radius: number
   /** 扫掠弧宽（度） */
   readonly arcDeg: number
   readonly sweepMs: number
   readonly held: HeldVisual
   // ── 能力字段 ──
-  /** 命中效果：被扫中的敌人施加的 onHit 效果（震慑减速等，逐目标） */
   readonly onHit?: readonly Effect[]
 }
 export interface AreaBlastDef {
@@ -175,16 +159,15 @@ export interface AreaBlastDef {
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
-  /** 侦测范围：在此距离内选取爆心（离持有者最近的敌人） */
+  /** 爆心选取范围：离持有者最近的敌人 */
   readonly detectRange: number
-  /** 爆炸判定半径（以爆心为圆心） */
+  /** 以爆心为圆心 */
   readonly blastRadius: number
-  /** 特效环颜色 */
   readonly color: number
   // ── 能力字段 ──
-  /** 命中效果：爆心施加的 onHit 效果（灼烧地面等） */
+  /** 施加于爆心 */
   readonly onHit?: readonly Effect[]
-  /** 连锁：延迟 delayMs 后向随机敌人追加一次 ratio × 伤害的轰炸 */
+  /** 延迟 delayMs 后对随机敌人追加 ratio × 伤害 */
   readonly echo?: { readonly delayMs: number; readonly ratio: number }
 }
 export interface BoomerangDef {
@@ -196,16 +179,16 @@ export interface BoomerangDef {
   /** 去程距离在出手瞬间锁定 */
   readonly range: number
   readonly outMs: number
-  /** 回程追踪角色实时位置的速度 */
+  /** 回程速度，追踪角色实时位置 */
   readonly returnSpeed: number
   readonly hitRadius: number
   /** 飞行自旋角速度（度/秒） */
   readonly spinDegPerSec: number
   readonly held: HeldVisual
   // ── 能力字段 ──
-  /** 双镖：同时向反方向掷出第二枚 */
+  /** 反方向同掷第二枚 */
   readonly twin?: boolean
-  /** 磁力：飞行途中吸取半径内金币 */
+  /** 飞行途中吸金币的半径 */
   readonly coinMagnetRadius?: number
 }
 export interface LaserDef {
@@ -213,30 +196,30 @@ export interface LaserDef {
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
-  /** 光束长度；判定为线段胶囊（thrustHitIndices），贯穿直线上所有敌人 */
+  /** 光束长度；贯穿直线上所有敌人 */
   readonly range: number
   readonly beamRadius: number
   readonly color: number
   readonly held: HeldVisual
   // ── 能力字段 ──
-  /** 双联：向正后方同步射出第二道光束 */
+  /** 正后方同步第二道 */
   readonly backBeam?: boolean
-  /** 全域扫射：出手变为绕一周的多向序列光束（每束 ratio × 伤害），取代常规单束 */
+  /** 取代单束：绕一周的 beams 束序列，每束 ratio × 伤害 */
   readonly radial?: { readonly beams: number; readonly ratio: number; readonly stepMs: number }
-  /** 穿墙索敌 + 攻击（机器人激光）：残垣图里无视断壁遮挡索敌，命中扫描本就贯穿 */
+  /** 索敌无视断壁 */
   readonly piercesWalls?: boolean
 }
 export interface SlowAuraDef {
   readonly kind: 'slowAura'
-  /** 光环以队伍中心为圆心持续生效（角色只是来源），无伤害无冷却 */
+  /** 圆心为队伍中心 */
   readonly radius: number
   /** 敌人移速乘数 */
   readonly slowFactor: number
   readonly color: number
   // ── 能力字段 ──
-  /** 冻伤：光环内敌人持续掉血（每秒） */
+  /** 光环内每秒掉血 */
   readonly dps?: number
-  /** 冰冻脉冲：每 intervalMs 冻结（移速归零）光环内敌人 durationMs */
+  /** 每 intervalMs 冻结光环内敌人 durationMs */
   readonly freeze?: { readonly intervalMs: number; readonly durationMs: number }
 }
 export interface AssassinateDef {
@@ -244,17 +227,17 @@ export interface AssassinateDef {
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
-  /** 索敌半径：范围内血量最高者优先（精英/厚血怪是刺杀目标） */
+  /** 索敌半径：血量最高者优先 */
   readonly range: number
-  /** 落点：目标背后（相对队伍中心的反侧）这段距离 */
+  /** 落点在目标背后（相对队伍中心的反侧）的距离 */
   readonly behindDist: number
   /** 突袭停留时长；期间本体无敌，结束闪回原位 */
   readonly strikeMs: number
   readonly held?: HeldVisual
   // ── 能力字段 ──
-  /** 命中效果：斩击目标处施加的 onHit 效果（连环刃等，排除主目标） */
+  /** 排除主目标 */
   readonly onHit?: readonly Effect[]
-  /** 处决：目标血量低于 hpRatio 时伤害 ×mul */
+  /** 目标血量比例低于 hpRatio 时伤害 × mul */
   readonly execute?: { readonly hpRatio: number; readonly mul: number }
 }
 export interface TurretDef {
@@ -267,39 +250,35 @@ export interface TurretDef {
   readonly fireIntervalMs: number
   readonly damage: number
   readonly knockback: number
-  /** 弩塔索敌半径 */
   readonly range: number
   readonly projectile: ProjectileSpec
   // ── 能力字段 ──
-  /** 三连弩：每次开火改为扇形连发 */
+  /** 每次开火改为扇形连发 */
   readonly burst?: { readonly count: number; readonly spreadDeg: number }
 }
 export interface SummonDef {
   readonly kind: 'summon'
-  /** 每波放出的小蜂数量（各自独立寻路，优先扑向未中毒的敌人） */
+  /** 每波放出的数量 */
   readonly count: number
   readonly minion: { readonly emoji: string; readonly size: number; readonly speed: number }
-  /** 撞击直伤（小，威胁主要在毒） */
   readonly damage: number
   readonly knockback: number
-  /** 放蜂波次间隔（ms）：每隔一段时间放出一波 count 只 */
   readonly intervalMs: number
-  /** 单只寿命（ms）：撞到敌人施毒即自毁；一直没撞到则到寿命消散 */
+  /** 撞到敌人即自毁，否则到寿命消散 */
   readonly lifeMs: number
   // ── 能力字段 ──
-  /** 命中效果：蜇中的敌人施加的 onHit 效果（毒 DoT、麻痹减速等，逐目标） */
   readonly onHit?: readonly Effect[]
 }
 export interface HealDef {
   readonly kind: 'heal'
-  /** 周期治疗范围内血量比例最低的队友 */
+  /** 目标为范围内血量比例最低者 */
   readonly amount: number
   readonly cooldownMs: number
   readonly range: number
   // ── 能力字段 ──
-  /** 群体处方：改为范围内全体回复 ratio × amount */
+  /** 改为范围内全体各回 ratio × amount */
   readonly aoe?: { readonly ratio: number }
-  /** 电击起搏：范围内有阵亡队友时优先为其减少复活倒计时 */
+  /** 范围内有阵亡者时优先减其复活倒计时 */
   readonly defib?: { readonly reviveCutMs: number }
 }
 export interface ChainArcDef {
@@ -317,17 +296,16 @@ export interface ChainArcDef {
   readonly decay: number
   readonly color: number
   // ── 能力字段 ──
-  /** 命中效果：末跳落点施加的 onHit 效果（过载爆裂等，排除已弹跳目标） */
+  /** 施加于末跳落点，排除已弹跳目标 */
   readonly onHit?: readonly Effect[]
 }
 export interface RallyDef {
   readonly kind: 'rally'
   readonly cooldownMs: number
-  /** 存活我方按生命上限比例回复；阵亡者满血复活（rallyTeam 语义） */
+  /** 存活者按上限比例回复；阵亡者满血复活 */
   readonly healRatio: number
-  /** 全队短暂无敌时长 */
   readonly invulnMs: number
-  /** 冲击环视觉半径 */
+  /** 纯视觉 */
   readonly ringRadius: number
   readonly color: number
 }
@@ -336,9 +314,9 @@ export interface StrikeDef {
   readonly damage: number
   readonly cooldownMs: number
   readonly knockback: number
-  /** 点名打击离锚点最近的 N 个目标 */
+  /** 离锚点最近的 N 个 */
   readonly targets: number
-  /** 每次命中落地掉落的金币数 */
+  /** 每次命中掉落的金币数 */
   readonly coinsPerHit?: number
   /** 坠物视觉：从目标上方 fromAbove 处砸落，逐个错峰 staggerMs */
   readonly drop: {
@@ -352,19 +330,18 @@ export interface StrikeDef {
 export interface DanceDef {
   readonly kind: 'dance'
   readonly cooldownMs: number
-  /** 敌对方全体跳舞定身时长（含休眠者与窗口内新登场者） */
+  /** 含休眠者与窗口内新登场者 */
   readonly durationMs: number
 }
 export interface BuffDef {
   readonly kind: 'buff'
   readonly cooldownMs: number
-  /** 限时全队伤害倍率（到期自动复原） */
   readonly damageMul: number
   readonly durationMs: number
 }
 export interface NukeDef {
   readonly kind: 'nuke'
-  /** 基准伤害 × 当前波次威胁倍率（ctx.waveScale，与敌人成长同步） */
+  /** 基准伤害，实际 × 波次威胁倍率 */
   readonly damage: number
   readonly cooldownMs: number
   /** Boss 承伤比例 */
@@ -373,7 +350,7 @@ export interface NukeDef {
 export interface TimeStopDef {
   readonly kind: 'timeStop'
   readonly cooldownMs: number
-  /** 时停时长：期间敌方时间近乎凝固（移动/攻速/在途敌弹/刷怪），队伍照常 */
+  /** 敌方时间近乎凝固，队伍照常 */
   readonly durationMs: number
 }
 export type AbilityDef =

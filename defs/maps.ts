@@ -234,7 +234,6 @@ export const MAPS = {
       alpha: [0.14, 0.26],
       density: [0.09, 0.13],
     },
-    // 并集只供图鉴与兜底；出怪按 dayMix/nightMix
     mix: [...DAY_MIX, ...NIGHT_MIX],
     dayMix: DAY_MIX,
     nightMix: NIGHT_MIX,

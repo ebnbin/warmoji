@@ -3,14 +3,11 @@ import { TEAM } from './characters'
 import type { Point } from '../util/vec'
 import type { FormationId } from '../types/formation'
 
-/** 环形阵按人数取半径：3 人小环更紧凑 */
 function ringRadius(count: number): number {
   return (count === 3 ? TEAM.smallRingRadius : TEAM.ringRadius) * UNIT
 }
 
-/** 岗位在「可旋转环」上的基准角（不含相位）：环形 ≥3 人全员上环；
- * N 保 1 的 0 号居中（null）、其余上外圈。null 岗位不参与环上主力竞争
- *（1~2 人阵整体不旋转，全员 null） */
+/** 基准角，不含相位；null = 不在可旋转环上（居中者与 1~2 人阵） */
 export function ringPostAngle(id: FormationId, post: number, count: number): number | null {
   if (id === 'ring') {
     if (count < 3) return null
@@ -23,9 +20,7 @@ export function ringPostAngle(id: FormationId, post: number, count: number): num
   return null
 }
 
-/** 队形各岗位相对队伍中心的偏移；ringPhase 为环相位（环形 ≥3 人全员、
- * N 保 1 外圈随之整体旋转，中心与 1~2 人阵不受影响）。
- * 岗位序：环形 0 号正上顺时针（2 人为左、右）；N 保 1 0 号中心、1.. 外圈 */
+/** 岗位序：环形 0 号正上顺时针（2 人为左、右）；guard 0 号中心、其余外圈 */
 export function formationPosts(id: FormationId, count: number, ringPhase = 0): Point[] {
   if (id === 'guard' && count >= 2) {
     return Array.from({ length: count }, (_, post) => {
