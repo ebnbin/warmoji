@@ -29,8 +29,9 @@ function spawnSandbox(sim: Sim): void {
   const kinds = [...sandboxEnemySet()].filter((k) => k in ENEMIES && roster.has(k))
   if (kinds.length === 0) return
   const hpMul = sandboxDifficulty()
-  for (let i = 0; i < d.batch; i++) {
-    if (awakeCount(sim) + telegraphCount(sim) >= d.cap || crowded(sim.world)) return
+  let live = awakeCount(sim) + telegraphCount(sim)
+  for (let i = 0; i < d.batch; i++, live++) {
+    if (live >= d.cap || crowded(sim.world)) return
     const raw = ENEMIES[kinds[Math.floor(sim.rng.next() * kinds.length)]!]!
     const def = toPx(raw)
     const pos = sim.hooks.spawnPoint(sim, raw.role === 'boss')
