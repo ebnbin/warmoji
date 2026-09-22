@@ -23,7 +23,6 @@ import { driftSpeed, riverRect } from './worlds/river'
 import { fitAspectRect } from './worlds/torus'
 import { generateRuins, reachableCells, WallGrid } from './worlds/ruins'
 
-// 各图专属的视觉常量（从 EcsBattleScene 搬来：它们只有本文件的对应视图用得上）
 const FOG_COLOR = 0x0a0a1a
 const FOG_DEPTH = 90
 const FOG_SPAN = 9000
@@ -32,58 +31,45 @@ const WATER_VIGNETTE = 0x1e6fd0
 const BANK_COLOR = 0x54402a
 const BANK_FAR_COLOR = 0x40301f
 
-// 地图视觉（每张图一份，禁止 scene 认识任何一张具体的图）。
-//
-// 与 worlds.ts 的 WorldHooks 是同一个形状、同一套分工：那边收「本图与有界森林不同的
-// **行为**」，这边收「本图与有界森林不同的**样子**」。scene 只握一个 MapView，
-// 按接口调用；每张图自己实现自己需要的那几项，其余继承 BoundedView 的默认。
-//
-// 为什么是类而不是像 WorldHooks 那样的对象表：视觉状态是**每局一份**的（水纹贴图、
-// 条带相机、传送门框、断壁石块…）。挂在模块级单例上就会跨局残留——那正是
-// WorldState 当初要解决的问题。一局一个实例，状态就是实例字段，天然干净。
+// 每张图一份视觉实现，scene 只认 MapView 接口。视觉状态挂实例字段，不得挂模块级（跨局残留）
 
-/** 视图能碰的东西。**不给整个 scene 的私有面**——视图只该建自己的视觉，不该反过来指挥场景 */
+/** 视图只建自己的视觉，不指挥场景 */
 export interface ViewCtx {
   readonly scene: Phaser.Scene
   readonly world: EcsWorld
   readonly run: RunState
   readonly def: MapDef
-  /** 队伍锚点（相机跟随目标） */
+  /** 相机跟随目标 */
   readonly anchor: Phaser.GameObjects.Zone
-  /** 世界尺寸：layout() 之后由场景回填 */
+  /** layout() 之后由场景回填 */
   w: number
   h: number
-  /** 图集：boot 里烘好后由场景回填。视口变化早于它就位时为 undefined（装饰待 boot 铺） */
+  /** 场景回填；未就位时为 undefined */
   atlas?: EcsAtlas
 }
 
 export interface MapView {
-  /** 世界尺寸与出生点。**最先问**——建场、相机、makeSim 都要用 */
+  /** 最先调用 */
   layout(v: ViewCtx): { w: number; h: number; origin: Point }
-  /** 建场：地面/水面/常驻视觉。此刻图集尚未就位，**不能建实体** */
+  /** 图集尚未就位，不能建实体 */
   build(v: ViewCtx): void
-  /** 相机：缩放 / 边界 / 跟随或居中 / 额外相机。在 anchor 就位之后 */
+  /** 在 anchor 就位之后 */
   camera(v: ViewCtx): void
-  /** 图集就位后：铺本图的装饰实体 */
+  /** 图集就位后 */
   decor(v: ViewCtx, atlas: EcsAtlas): void
-  /** sim 建好后：往 worldState 写本图的世界状态（残垣在此铺断壁网格） */
+  /** sim 建好后 */
   onSimReady(v: ViewCtx, sim: Sim): void
-  /** 逐帧视觉（水纹滚动、夜雾、缩圈、传送门流光…） */
   step(v: ViewCtx, sim: Sim, delta: number): void
-  /** 视口变化后重建（尺寸已由场景按新的 layout() 回填进 v.w/v.h） */
+  /** 视口变化后；v.w/v.h 已按新 layout() 回填 */
   resize(v: ViewCtx): void
-  /** 收场 */
   destroy(v: ViewCtx): void
 }
 
 const CAM_MARGIN = () => MAP.cameraMargin * UNIT
 
-/** 有界森林基线：纯色地面 + 右下阴影、相机外扩一圈跟人、全图按种子散布装饰。
- * 其余各图 extends 它，只覆写自己不同的那几项 */
 export class BoundedView implements MapView {
-  /** 本图建的 Phaser 视觉对象（视口重建时整体销毁） */
+  /** 视口重建时整体销毁 */
   protected visuals: Phaser.GameObjects.GameObject[] = []
-  /** 本图铺的装饰实体（同上） */
   protected decorEids: number[] = []
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
@@ -93,7 +79,6 @@ export class BoundedView implements MapView {
   }
 
   build(v: ViewCtx): void {
-    // 纯色面 + 右下阴影（镜像 drawFloor）
     const g = v.scene.add.graphics().setDepth(-1)
     const so = 0.25 * UNIT
     g.fillStyle(v.def.palette.shadow, 1)
@@ -147,27 +132,26 @@ export class BoundedView implements MapView {
   }
 }
 
-/** 视口变化即整体重建的单屏图（奔流/工厂）：世界尺寸由视口推出，旧视觉全作废 */
+/** 视口变化即整体重建 */
 abstract class SingleScreenView extends BoundedView {
   resize(v: ViewCtx): void {
     this.destroy(v)
     this.build(v)
     this.camera(v)
-    // **destroy 把本图的装饰实体一并拆了，补回来是自己的事**——不能指望调用方接着补：
-    // 世界尺寸没变时（工厂横屏内拉窗口）场景侧无事可做，就此早退，装饰便再也回不来
+    // destroy 拆掉了装饰实体，须在此补回
     if (v.atlas) this.decor(v, v.atlas)
   }
 }
 
 
-// ── 晨昏：有界基线 + 夜雾（反相遮罩在暗幕上挖出视野洞）──────────────
+// ── 晨昏 ──
 class DayNightView extends BoundedView {
   private fogRect?: Phaser.GameObjects.Rectangle
   private fogMask?: Phaser.GameObjects.Graphics
 
   build(v: ViewCtx): void {
     super.build(v)
-    // Phaser 4 的 GeometryMask 在 WebGL 无实现，故走 filters.internal.addMask(shape, true)
+    // Phaser 4 的 GeometryMask 在 WebGL 无实现，须走 filters.internal.addMask
     const rect = v.scene.add.rectangle(0, 0, FOG_SPAN, FOG_SPAN, FOG_COLOR, 0).setDepth(FOG_DEPTH).setVisible(false)
     const shape = v.scene.add.graphics().setVisible(false)
     rect.enableFilters()
@@ -180,7 +164,6 @@ class DayNightView extends BoundedView {
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const dn = v.def.dayNight!
     const hour = hourAt((v.run.combatMs + sim.elapsedMs) / 1000, dn)
-    // 视野 V 格 → zoom = 标准 ×(visionMid/V)
     v.scene.cameras.main.setZoom((viewport.renderScale * dn.visionMid) / visionGridsAt(hour, dn))
     const rect = this.fogRect
     const shape = this.fogMask
@@ -194,7 +177,7 @@ class DayNightView extends BoundedView {
   }
 }
 
-// ── 浮冰：地图即那块方形浮冰，其外皆水；相机不设边界（滑进水里也跟着走）──
+// ── 浮冰 ──
 class IceView extends BoundedView {
   private vignette?: Phaser.GameObjects.Rectangle
 
@@ -204,7 +187,6 @@ class IceView extends BoundedView {
   }
 
   build(v: ViewCtx): void {
-    // 深水底色铺满屏（相机锁定；世界无边界，看到哪都是水）
     this.visuals.push(
       v.scene.add
         .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, WATER_COLOR)
@@ -212,7 +194,6 @@ class IceView extends BoundedView {
         .setDepth(-2),
     )
     super.build(v)
-    // 冰缘：描出边界才读得出「哪里是浮冰」
     const g = v.scene.add.graphics().setDepth(-1)
     g.lineStyle(3, 0xdff3ff, 0.85)
     g.strokeRect(0, 0, v.w, v.h)
@@ -225,12 +206,10 @@ class IceView extends BoundedView {
   }
 
   camera(v: ViewCtx): void {
-    // 无边界：相机只管跟人（滑进水里、走到天边也跟着走）
     v.scene.cameras.main.setZoom(viewport.renderScale)
     v.scene.cameras.main.startFollow(v.anchor)
   }
 
-  /** 队伍中心落水即脉冲蓝渐晕（掉血结算在纯逻辑侧的 worlds.ts tick） */
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const px = v.def.ice!.floeU * UNIT
     const inWater = !onFloe(centerX(sim), centerY(sim), px)
@@ -238,9 +217,8 @@ class IceView extends BoundedView {
   }
 }
 
-// ── 无限世界：满屏底色当地面 + 出生在原点 + 装饰分块滚动 + 终波缩圈 ──────
+// ── 无限世界 ──
 class InfiniteView extends BoundedView {
-  /** 分块装饰要在 step 里按相机位置增删，故把图集留下来 */
   protected atlas?: EcsAtlas
   private zoneGfx?: Phaser.GameObjects.Graphics
   private zoneVignette?: Phaser.GameObjects.Rectangle
@@ -249,11 +227,10 @@ class InfiniteView extends BoundedView {
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
     const { w, h } = super.layout(v)
-    return { w, h, origin: { x: 0, y: 0 } } // 无限世界出生在原点（负坐标合法）
+    return { w, h, origin: { x: 0, y: 0 } } // 负坐标合法
   }
 
   build(v: ViewCtx): void {
-    // 没有边、也就没有影子边缘——相机锁定的满屏底色即地面
     this.visuals.push(
       v.scene.add
         .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, v.def.palette.map)
@@ -267,7 +244,7 @@ class InfiniteView extends BoundedView {
     v.scene.cameras.main.startFollow(v.anchor)
   }
 
-  /** 装饰不一次铺完（世界没有边）：留下图集，改由 step 按相机位置分块增删 */
+  /** 不一次铺完；由 step 按相机位置分块增删 */
   decor(_v: ViewCtx, atlas: EcsAtlas): void {
     this.atlas = atlas
   }
@@ -277,7 +254,6 @@ class InfiniteView extends BoundedView {
     this.drawZone(v, sim)
   }
 
-  /** 终波缩圈的圈线 + 圈外红渐晕（圈本体在 worldState.zone，纯逻辑侧算） */
   protected drawZone(v: ViewCtx, sim: Sim): void {
     const zone = sim.worldState.zone
     if (!zone) return
@@ -301,8 +277,7 @@ class InfiniteView extends BoundedView {
     this.zoneVignette?.setFillStyle(0xd32f2f, anyOutside ? 0.16 + 0.08 * Math.sin(sim.elapsedMs / 130) : 0)
   }
 
-  /** 视野覆盖的块集合变化时整组增删装饰实体。
-   * 摆放由 chunkDecor 按 (种子, 块) 纯函数重建——回头看到的景不变 */
+  /** 摆放由 (种子, 块) 纯函数决定，回头看到的景不变 */
   private ensureChunks(v: ViewCtx): void {
     const atlas = this.atlas
     if (!atlas) return
@@ -349,7 +324,7 @@ class InfiniteView extends BoundedView {
   }
 }
 
-// ── 深空：无限地基 + 常驻黑洞禁锢圈 + 天体横扫的预警车道 ────────────────
+// ── 深空 ──
 class SpaceView extends InfiniteView {
   private meteorFx?: { of: number; tele: Phaser.GameObjects.Graphics }
 
@@ -367,7 +342,6 @@ class SpaceView extends InfiniteView {
 
   camera(v: ViewCtx): void {
     super.camera(v)
-    // 圆是有界的：bounds 钳在其外接框内
     const fieldR = (v.def.space?.blackholeRadiusU ?? 0) * UNIT
     if (fieldR <= 0) return
     const half = fieldR + MAP.cameraMargin * UNIT
@@ -379,8 +353,7 @@ class SpaceView extends InfiniteView {
     this.drawMeteorLane(v, sim)
   }
 
-  /** 天体的预警车道。🪐 球体不在这里——它是横扫实体自己的贴图（z=60），批绘照常画。
-   * 车道是一条粗线段，批绘不了，只能留作 Graphics；但它跟谁走由 **eid** 决定 */
+  /** 车道按 eid 跟随横扫实体 */
   private drawMeteorLane(v: ViewCtx, sim: Sim): void {
     const m = query(v.world, [Meteor])[0]
     const fx = this.meteorFx
@@ -393,7 +366,6 @@ class SpaceView extends InfiniteView {
     const rr = cfg.radiusU * UNIT
     let cur = this.meteorFx
     if (!cur) {
-      // 危险车道：宽半透明带 + 亮芯线 + 入口标记（球体从此侧划入）
       const sx = Meteor.sx[m]!
       const sy = Meteor.sy[m]!
       const tele = v.scene.add.graphics().setDepth(3)
@@ -406,7 +378,6 @@ class SpaceView extends InfiniteView {
       cur = { of: m, tele }
       this.meteorFx = cur
     }
-    // 预警脉动：轨迹一明一暗；起划后淡下去，只留车道感
     cur.tele.setAlpha(sim.elapsedMs < Due.at[m]! ? 0.28 + 0.24 * Math.abs(Math.sin(sim.elapsedMs / 110)) : 0.22)
   }
 
@@ -417,12 +388,11 @@ class SpaceView extends InfiniteView {
   }
 }
 
-// ── 残垣：有界基线 + 断壁网格（逻辑）与逐格石块（视觉）────────────────
+// ── 残垣 ──
 class RuinsView extends BoundedView {
-  /** 格索引 → 该格的石块/顶沿视觉（碾墙时单格销毁） */
+  /** 格索引 → 石块视觉，碾墙时单格销毁 */
   private tiles = new Map<number, Phaser.GameObjects.Rectangle[]>()
 
-  /** 断壁网格是**世界状态**，故在 sim 就位后铺；石块随之逐格画出 */
   onSimReady(v: ViewCtx, sim: Sim): void {
     const cfg = v.def.walls
     if (!cfg) return
@@ -435,10 +405,9 @@ class RuinsView extends BoundedView {
       centerClearU: cfg.centerClearU,
     })
     const grid = new WallGrid(cols, rows, UNIT, blocked)
-    // 只在「从中心可达」的通行格刷怪，保证敌人总能寻路到队伍
+    // 刷怪点须从中心可达
     const cells = [...reachableCells(grid, Math.floor(cols / 2), Math.floor(rows / 2))]
     sim.worldState.walls = { grid, flowCellX: -1, flowCellY: -1, reflowAcc: 0, spawnCells: cells, smashed: [] }
-    // 逐格填充石块 + 顶沿提亮假高度（逐格存引用供碾墙单格销毁）
     const base = Phaser.Display.Color.IntegerToColor(v.def.palette.map).darken(38).color
     const top = Phaser.Display.Color.IntegerToColor(v.def.palette.map).darken(18).color
     const capH = Math.max(3, UNIT * 0.22)
@@ -455,7 +424,6 @@ class RuinsView extends BoundedView {
     }
   }
 
-  /** 排空本帧被碾碎的断壁：拆石块 + 扬尘 */
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const w = sim.worldState.walls
     if (!w || w.smashed.length === 0) return
@@ -479,7 +447,7 @@ class RuinsView extends BoundedView {
   }
 }
 
-// ── 奔流：单屏世界（世界 = 逻辑视口 × viewScale），相机居中不跟随 ──────────
+// ── 奔流 ──
 class RiverView extends SingleScreenView {
   private waveTiles: { tile: Phaser.GameObjects.TileSprite; speed: number }[] = []
 
@@ -498,7 +466,6 @@ class RiverView extends SingleScreenView {
     const horizontal = r.horizontal
     const add = v.scene.add
 
-    // 两岸暗带（河道以外的跨轴余量），外缘更暗给一点纵深
     const gBank = add.graphics().setDepth(0)
     gBank.fillStyle(BANK_COLOR, 1)
     gBank.fillRect(0, 0, vw, vh)
@@ -512,7 +479,6 @@ class RiverView extends SingleScreenView {
       gBank.fillRect(Math.min(vw, r.x + r.w + 18), 0, vw, vh)
     }
 
-    // 河水：跨向「岸暗心亮」的两段渐变
     const gWater = add.graphics().setDepth(0.2)
     this.visuals.push(gWater)
     const edge = shade(v.def.palette.map, 0.78)
@@ -529,7 +495,7 @@ class RiverView extends SingleScreenView {
       gWater.fillRect(r.x + r.w / 2, r.y, r.w / 2, r.h)
     }
 
-    // 岸线浪花：贴岸白线 + 断续泡点（种子固定，同局重建不变）
+    // 种子固定，同局重建不变
     const gFoam = add.graphics().setDepth(0.4)
     this.visuals.push(gFoam)
     gFoam.lineStyle(2, 0xffffff, 0.3)
@@ -549,7 +515,6 @@ class RiverView extends SingleScreenView {
       }
     }
 
-    // 双层水纹（视差滚动）
     const texKey = ensureWaveTexture(v.scene, horizontal)
     for (const [alpha, speed] of [
       [0.1, cfg.waveSlow * UNIT],
@@ -564,7 +529,6 @@ class RiverView extends SingleScreenView {
   }
 
   camera(v: ViewCtx): void {
-    // 固定相机的单屏世界：居中锁死，不跟随
     const cam = v.scene.cameras.main
     cam.setZoom(viewport.renderScale / v.def.river!.viewScale)
     cam.centerOn(v.w / 2, v.h / 2)
@@ -578,7 +542,7 @@ class RiverView extends SingleScreenView {
     const def = v.def.decor
     const decorRng = new Rng(v.run.decorSeed)
 
-    // 岸上静态植被：沿长轴等距掷点（种子固定），只落在岸带内
+    // 种子固定，只落在岸带内
     const bands: [number, number][] = horizontal
       ? [
           [0, r.y],
@@ -611,7 +575,6 @@ class RiverView extends SingleScreenView {
       }
     }
 
-    // 漂浮物（顺流循环）：会漂、会转的装饰实体，位姿逐帧由 driftDecor 从 u/cross 算出
     const pool = v.def.drift ?? ['1f343']
     const halfCross = (horizontal ? r.h : r.w) / 2
     for (let i = 0; i < cfg.driftCount; i++) {
@@ -642,7 +605,6 @@ class RiverView extends SingleScreenView {
     }
   }
 
-  /** 水纹贴图逐帧偏移。漂浮物不在此列——它们是装饰实体，归 driftDecor + spinDecor */
   step(v: ViewCtx, _sim: Sim, delta: number): void {
     const cfg = v.def.river!
     const dt = delta / 1000
@@ -659,7 +621,7 @@ class RiverView extends SingleScreenView {
   }
 }
 
-// ── 工厂（环面）：钢板地面 + 跨缝条带相机 + 传送闸口流光门框 ────────────
+// ── 工厂 ──
 class TorusView extends SingleScreenView {
   private stripCams: Phaser.Cameras.Scene2D.Camera[] = []
   private frameTiles: { tile: Phaser.GameObjects.TileSprite; dx: number; dy: number }[] = []
@@ -673,14 +635,12 @@ class TorusView extends SingleScreenView {
     return { w, h, origin: { x: w / 2, y: h / 2 } }
   }
 
-  /** 静态视觉只画一份——条带相机全部忽略（见 camera），否则门框/地板会在缝上重影 */
   build(v: ViewCtx): void {
     const cfg = v.def.torus!
     const W = v.w
     const H = v.h
     const add = v.scene.add
 
-    // 钢板厂房地面（中心朝亮的顶灯软渐变，避免硬边椭圆的「盘子感」）
     const gFloor = add.graphics().setDepth(0)
     gFloor.fillStyle(v.def.palette.map, 1)
     gFloor.fillRect(0, 0, W, H)
@@ -695,7 +655,6 @@ class TorusView extends SingleScreenView {
     }
     this.visuals.push(gFloor)
 
-    // 传送门门框：琥珀色警示光带顺时针流动（上→右→下→左）+ 脉动描边
     ensureDashTexture(v.scene, cfg)
     const f = cfg.frame * UNIT
     const mkTile = (x: number, y: number, w: number, h: number, dx: number, dy: number, vertical: boolean): void => {
@@ -717,9 +676,7 @@ class TorusView extends SingleScreenView {
     this.visuals.push(this.frameGlow)
   }
 
-  /** 主相机裁出屏内最大居中的竞技场定比矩形；四缝 + 四角各挂一台条带相机取景对侧溢出
-   * ——跨缝实体两侧同时可见（渲染层的幽灵分身）。ECS 侧全场实体是同一个批绘对象，
-   * 条带相机各自按自己的滚动再画一遍，天然成立 */
+  /** 四缝 + 四角各一台条带相机取景对侧溢出 */
   camera(v: ViewCtx): void {
     const cfg = v.def.torus!
     const cw = Math.round(viewport.cssWidth * viewport.dpr)
@@ -744,7 +701,7 @@ class TorusView extends SingleScreenView {
       c.centerOn(cx, cy)
       this.stripCams.push(c)
     }
-    // 屏幕左缘显示「越过右缝的溢出」（世界 x∈[W, W+s)），其余同理；四角为对角溢出
+    // 左缘显示越过右缝的溢出 x ∈ [W, W+s)，其余同理
     mk(x0, y0, sPx, h, W + s / 2, H / 2)
     mk(x0 + w - sPx, y0, sPx, h, -s / 2, H / 2)
     mk(x0, y0, w, sPx, W / 2, H + s / 2)
@@ -753,14 +710,12 @@ class TorusView extends SingleScreenView {
     mk(x0 + w - sPx, y0, sPx, sPx, -s / 2, H + s / 2)
     mk(x0, y0 + h - sPx, sPx, sPx, W + s / 2, -s / 2)
     mk(x0 + w - sPx, y0 + h - sPx, sPx, sPx, -s / 2, -s / 2)
-    // 静态视觉只画一份：条带相机全部忽略，否则门框/地板会在缝上重影。
-    // **必须在建完条带相机之后**——ignore 是逐相机的，旧实现在 create 路径上先 build 后建相机，
-    // 于是首次进图这一句作用在空数组上，缝上会重影，转屏重建后才正常
+    // 须在建完条带相机之后：ignore 是逐相机的，否则缝上重影
     for (const c of this.stripCams) c.ignore(this.visuals)
   }
 
   decor(v: ViewCtx, atlas: EcsAtlas): void {
-    // 散落零件点缀（种子固定：同局重建不变）
+    // 种子固定，同局重建不变
     const def = v.def.decor
     const rng = new Rng(v.run.decorSeed)
     const cells = (v.w / UNIT) * (v.h / UNIT)
@@ -782,7 +737,6 @@ class TorusView extends SingleScreenView {
     }
   }
 
-  /** 门框逐帧动效：光带顺时针流动 + 边线脉动 */
   step(v: ViewCtx, sim: Sim, delta: number): void {
     if (this.frameTiles.length === 0) return
     const flow = (56 * delta) / 1000
@@ -809,8 +763,7 @@ class TorusView extends SingleScreenView {
   }
 }
 
-/** 无缝水纹贴图（按朝向各生成一次）：沿流向的白色弧形流痕。
- * 与「哪张图」无关的资产，全局纹理缓存，幂等 */
+/** 幂等，全局纹理缓存 */
 function ensureWaveTexture(scene: Phaser.Scene, horizontal: boolean): string {
   const key = horizontal ? 'river-wave-h' : 'river-wave-v'
   if (scene.textures.exists(key)) return key
@@ -842,7 +795,7 @@ function ensureWaveTexture(scene: Phaser.Scene, horizontal: boolean): string {
   return key
 }
 
-/** 门框虚线贴图（横/竖两个变体，一次生成）。同上，是资产不是视觉层 */
+/** 幂等 */
 function ensureDashTexture(scene: Phaser.Scene, cfg: TorusConfig): void {
   const size = 64
   const th = Math.round(cfg.frame * UNIT)
@@ -856,14 +809,12 @@ function ensureDashTexture(scene: Phaser.Scene, cfg: TorusConfig): void {
     const ctx = canvas.getContext()
     ctx.clearRect(0, 0, vertical ? th : size, vertical ? size : th)
     ctx.fillStyle = 'rgba(255,255,255,0.85)'
-    // 一节亮虚线 + 留空（滚动后呈流动光点带）
     if (vertical) ctx.fillRect(th * 0.3, 10, th * 0.4, 14)
     else ctx.fillRect(10, th * 0.3, 14, th * 0.4)
     canvas.refresh()
   }
 }
 
-/** 颜色明暗缩放（河水跨向渐变用） */
 function shade(color: number, mul: number): number {
   const r = Math.min(255, Math.round(((color >> 16) & 0xff) * mul))
   const g = Math.min(255, Math.round(((color >> 8) & 0xff) * mul))
@@ -875,7 +826,6 @@ export function viewFor(mapId: MapId): MapView {
   return MAKE[MAPS[mapId].kind]()
 }
 
-/** kind → 视图工厂。**全映射**：MapDef 新增一种 kind 而不在此登记 = 编译不过 */
 const MAKE: Record<MapDef['kind'], () => MapView> = {
   bounded: () => new BoundedView(),
   daynight: () => new DayNightView(),
