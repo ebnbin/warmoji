@@ -1,11 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
-// 致命失败守卫（之二）：游戏能不能打。装得上但玩不了——出怪断了、能力不索敌、
-// 时钟不推进——类型与单测都拦不住，只能真跑一局。开局流程内联在此，不设共享
-// helper 层：唯一使用方就是本文件。
-// 站桩：默认队长 1 人第 1 波，节奏缓，无操作也能撑过断言窗口。
-// 软渲染下游戏时钟偏慢，慢输出首发角色偶发撑不出击杀而超时，允许重试。
+// 守卫：游戏能不能打（出怪、索敌、时钟推进）。软渲染下时钟偏慢，允许重试
 test.describe.configure({ retries: 2 })
 
 /** 逻辑坐标 → canvas CSS 坐标后点击（canvas CSS 尺寸 = 窗口尺寸） */
@@ -17,7 +13,6 @@ async function click(page: Page, logical: { x: number; y: number }): Promise<voi
   await page.locator('#game canvas').click({ position: pos })
 }
 
-/** 走完开局：标题 → 地图确认 → 队长确认 → 整编（点满名额入队）→ 战斗 */
 async function startRun(page: Page): Promise<void> {
   await page.waitForFunction(() => window.__warmoji?.scene === 'menu' && !!window.__warmoji.menu)
   await click(page, await page.evaluate(() => window.__warmoji!.menu!.start))
@@ -42,7 +37,6 @@ async function startRun(page: Page): Promise<void> {
     }))
     if (st.scene !== 'promote') break
     if (st.mode === 'formation') {
-      // 队形环节确认即出发
       await confirm()
       await page.waitForFunction(() => window.__warmoji?.scene !== 'promote', undefined, {
         timeout: 15_000,
@@ -50,7 +44,6 @@ async function startRun(page: Page): Promise<void> {
       break
     }
     if (st.picked.length < st.due) {
-      // 命定卡池三态：只点可选（open）的牌，点满名额才能整批确认
       const next = st.items.find((x) => (x.state ?? 'open') === 'open' && !st.picked.includes(x.id))
       if (!next) throw new Error('整编页：已解锁候选不足以点满名额')
       const r = await page.evaluate(
@@ -82,7 +75,6 @@ test('开局后自动战斗：出怪、能力自动击杀、计时推进、无�
   await page.goto('/')
   await startRun(page)
 
-  // 先出现刷怪预告标记，随后敌人落地
   await page.waitForFunction(() => (window.__warmoji?.pending ?? 0) > 0, undefined, {
     timeout: 15_000,
   })
@@ -90,7 +82,6 @@ test('开局后自动战斗：出怪、能力自动击杀、计时推进、无�
     timeout: 15_000,
   })
 
-  // 玩家不动，能力自动索敌应产生击杀（随机首发可能是慢输出角色，窗口放宽）
   await page.waitForFunction(() => (window.__warmoji?.kills ?? 0) >= 1, undefined, {
     timeout: 120_000,
   })
@@ -103,7 +94,6 @@ test('开局后自动战斗：出怪、能力自动击杀、计时推进、无�
   expect(state?.kills ?? 0).toBeGreaterThanOrEqual(1)
   expect(state?.hp ?? 0).toBeGreaterThan(0)
 
-  // 暂停（ESC）：局内时间冻结；恢复后继续推进
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
   const t1 = await page.evaluate(() => window.__warmoji!.elapsed)

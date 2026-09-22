@@ -1,10 +1,7 @@
 import type { CharacterId } from '../src/types/characters'
 import type { CharacterEffects } from '../src/types/items'
 
-// 角色各等级形态的「基础属性质变」（创作层·内容）：与能力换行并列的另一半质变。
-// 语义是整体替换而非叠加：[0] = 2 级形态相对基础队员的完整加成，[1] = 3 级形态的完整加成
-//（已含更强数值，不与 2 级叠加）。主题化：坦克向堆血、爆发向堆伤/暴击、持续向堆攻速。
-// 取用逻辑在 src/characters/levels.ts，这里只放数据——经 gen 校验产出 levels.json。
+// 整体替换而非叠加：[0] = 2 级形态的完整加成，[1] = 3 级形态的完整加成
 type Tier = Partial<CharacterEffects>
 
 export const LEVEL_STATS = {

@@ -1,8 +1,5 @@
 import type { EnemyDef } from '../src/types/enemies'
 
-// 创作层（不进运行时 bundle）：敌人/Boss/出场配比数据行。
-// split.into 的对象引用在生成时内联展开为自包含 JSON。
-
 export const ZOMBIE: EnemyDef = {
   kind: 'zombie',
   locomotion: { kind: 'chase' },
@@ -23,7 +20,6 @@ export const GHOST: EnemyDef = {
   locomotion: { kind: 'chase' },
   emoji: '1f47b',
   name: '幽灵',
-  // 穿墙：无视断壁直线飘向队伍——残垣图里墙挡不住它（专治猥琐龟缩）
   phasesWalls: true,
   desc: '飘得很快的追击者，血薄，能穿墙直取队伍，死亡时治疗周围同伴',
   size: 1.2,
@@ -33,11 +29,9 @@ export const GHOST: EnemyDef = {
   damage: 5,
   xp: 2,
   coins: 2,
-  // 亡语：临终把生气渡给周围受伤的同伴（先集火它反而奶了一片）
   onDeath: [{ kind: 'heal', range: 3, amount: 12, all: true }],
 }
 
-/** 游荡射手：不索敌，慢速乱逛，周期性朝自己移动方向放一发慢弹（弹幕污染走位空间） */
 export const INVADER: EnemyDef = {
   kind: 'invader',
   locomotion: { kind: 'wander' },
@@ -62,7 +56,6 @@ export const INVADER: EnemyDef = {
       projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3, rotationOffsetDeg: 0 },
     },
   ],
-  // 亡语：朝断气那一刻最近队员的方向补一发慢速冷枪（击杀后仍要走位）
   onDeath: [
     {
       kind: 'spawnProjectile',
@@ -74,7 +67,6 @@ export const INVADER: EnemyDef = {
   ],
 }
 
-/** 突刺怪：探测圈内锁定蓄力方向 → 短延迟 → 直线冲刺一段距离（横向位移可躲） */
 export const BOAR: EnemyDef = {
   kind: 'boar',
   emoji: '1f417',
@@ -97,12 +89,9 @@ export const BOAR: EnemyDef = {
     aim: 'nearest',
     lockAt: 'windup',
   },
-  // 亡语：原地化作半透明尸壳，无伤害无行为但能吸引火力，3 秒后消散
   onDeath: [{ kind: 'decoy', hp: 40, durationMs: 3000, alpha: 0.5 }],
 }
 
-/** 定距射手：在玩家外维持固定站位环，够不着就凑近、太近才后退，站定吐慢速毒弹
- * （几百只会在玩家四周围成一圈，玩家一动整体重新贴距离） */
 export const SNAKE: EnemyDef = {
   kind: 'snake',
   emoji: '1f40d',
@@ -122,7 +111,7 @@ export const SNAKE: EnemyDef = {
       damage: 5,
       cooldownMs: 2600,
       knockback: 0,
-      // 索敌上限略大于站位距离：站定时也够得着玩家开火
+      // 须大于 standoffDist
       range: 8,
       lifeMs: 4500,
       projectile: { emoji: '1f7e2', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
@@ -130,7 +119,6 @@ export const SNAKE: EnemyDef = {
   ],
 }
 
-/** 毒爆怪：慢速近战，死亡原地留毒液池（别在自己的风筝路线上打爆它） */
 export const MUSHROOM: EnemyDef = {
   kind: 'mushroom',
   locomotion: { kind: 'chase' },
@@ -161,7 +149,6 @@ export const MUSHROOM: EnemyDef = {
   ],
 }
 
-/** 偷金币鼠：不理玩家，直奔地上最近的金币吃掉；击杀吐回吃掉的 + 1 枚利息 */
 export const RAT: EnemyDef = {
   kind: 'rat',
   locomotion: { kind: 'coinThief' },
@@ -177,7 +164,6 @@ export const RAT: EnemyDef = {
   coins: 2,
 }
 
-/** 黏黏怪：缓慢肉盾，蹭到队员会糊一层黏液——该队员攻击冷却大增数秒（别让它贴脸磨输出） */
 export const SLIME: EnemyDef = {
   kind: 'slime',
   locomotion: { kind: 'chase' },
@@ -209,7 +195,6 @@ export const BLOBLING: EnemyDef = {
   coins: 0,
 }
 
-/** 分裂怪：死亡分裂成 2 只更小更快的迷你泡泡 */
 export const BLOB: EnemyDef = {
   kind: 'blob',
   locomotion: { kind: 'chase' },
@@ -226,8 +211,6 @@ export const BLOB: EnemyDef = {
   onDeath: [{ kind: 'split', into: BLOBLING, count: 2 }],
 }
 
-/** 小飞虫：虫巢吐出的护巢飞虫——绕巢盘旋、玩家逼近巢即扑击；巢被拆后失锚暴走
- * （提速 + 加攻并直扑玩家，双属性档位切换）。不进自然刷怪，只由虫巢生成 */
 export const LARVA: EnemyDef = {
   kind: 'larva',
   locomotion: {
@@ -249,7 +232,6 @@ export const LARVA: EnemyDef = {
   coins: 0,
 }
 
-/** 虫巢：原地不动的肉盾巢穴，每隔几秒吐出小飞虫——不拆掉就一直刷，得优先清巢 */
 export const HIVE: EnemyDef = {
   kind: 'hive',
   locomotion: { kind: 'static' },
@@ -263,13 +245,10 @@ export const HIVE: EnemyDef = {
   damage: 4,
   xp: 8,
   coins: 6,
-  // 固定装置：不但移速为零，击退也免疫（否则带击退的武器能把巢穴推走）
   kbImmune: true,
-  // 每巢在场至多 6 只护巢飞虫：满则停生，被清掉后续生，巢被拆才彻底停
   spawner: { into: LARVA, intervalMs: 4000, count: 2, maxAlive: 6, firstDelayMs: 2000 },
 }
 
-/** 自爆怪：径直扑向玩家，贴身即定身蓄力，蓄力完原地引爆 AoE（蓄力前击杀可拆弹） */
 export const CREEPER: EnemyDef = {
   kind: 'creeper',
   emoji: '1f4a3',
@@ -279,13 +258,11 @@ export const CREEPER: EnemyDef = {
   radius: 0.5,
   hp: 55,
   speed: 1.6,
-  // 威胁全在自爆；接触仅象征性蹭伤（通常蓄力引爆先于贴脸）
   damage: 6,
   xp: 6,
   coins: 4,
   locomotion: {
     kind: 'detonate',
-    // 触发距离与爆炸半径都调大：贴脸才炸→提前进圈就蓄力，爆开范围更唬人（更难躲）
     triggerRange: 2.6,
     windupMs: 800,
     blastRadius: 3.8,
@@ -294,8 +271,6 @@ export const CREEPER: EnemyDef = {
   },
 }
 
-/** 林祭司：唯一的「敌方治疗者」——周期群体治疗周围受伤的同伴（绿脉冲示警）。
- * 不清掉它，怪潮会被源源不断奶回来，逼玩家优先点它。 */
 export const ELF: EnemyDef = {
   kind: 'elf',
   locomotion: { kind: 'chase' },
@@ -312,7 +287,6 @@ export const ELF: EnemyDef = {
   abilities: [{ kind: 'heal', amount: 13, cooldownMs: 2600, range: 3.5, aoe: { ratio: 1 } }],
 }
 
-/** 炮龟：缓慢重甲的远程攻城位——缩在硬壳里朝队伍抛一串硬壳弹，免疫击退，血厚难推。 */
 export const TURTLE: EnemyDef = {
   kind: 'turtle',
   locomotion: { kind: 'chase' },
@@ -342,7 +316,6 @@ export const TURTLE: EnemyDef = {
   ],
 }
 
-/** 跳蝗：成群的蝗虫，一蹦一蹦地扑向队伍（高频短冲刺）——脆但难缠，专啃走位空间。 */
 export const LOCUST: EnemyDef = {
   kind: 'locust',
   emoji: '1f997',
@@ -367,7 +340,6 @@ export const LOCUST: EnemyDef = {
   },
 }
 
-/** 石像鬼：沉重的石像守卫——血极厚、移速慢、免疫击退，硬生生压过来堵路吸火力。 */
 export const GARGOYLE: EnemyDef = {
   kind: 'gargoyle',
   locomotion: { kind: 'chase' },
@@ -384,7 +356,6 @@ export const GARGOYLE: EnemyDef = {
   kbImmune: true,
 }
 
-/** 毒河豚：鼓胀的毒气球——贴身鼓爆一团毒气冲击（自爆）；被戳破则炸开一大片毒云残留。 */
 export const PUFFER: EnemyDef = {
   kind: 'puffer',
   emoji: '1f421',
@@ -422,7 +393,6 @@ export const PUFFER: EnemyDef = {
   ],
 }
 
-/** 飞碟：悬停的碟形来客，绕队伍维持定距、站定俯射能量弹（太空图专精 · 定距远程） */
 const UFO: EnemyDef = {
   kind: 'ufo',
   emoji: '1f6f8',
@@ -449,7 +419,6 @@ const UFO: EnemyDef = {
   ],
 }
 
-/** 小灰人：成群逼近的灰皮异星客，脆但快，贴身骚扰（太空图专精 · 快速脆皮） */
 const ALIEN: EnemyDef = {
   kind: 'alien',
   emoji: '1f47d',
@@ -465,7 +434,6 @@ const ALIEN: EnemyDef = {
   locomotion: { kind: 'chase' },
 }
 
-/** 流星：拖着尾焰蓄势，锁定后直线疾冲，横向可躲（太空图专精 · 突刺） */
 const COMET: EnemyDef = {
   kind: 'comet',
   emoji: '2604',
@@ -515,11 +483,8 @@ export const ENEMY_DEFS: readonly EnemyDef[] = [
   COMET,
 ]
 
-// Boss 就是 role:'boss' 的普通条目——每张地图一只专属 Boss，技能贴合该图主题与玩法。
-// 出怪表 mix 移到各 Map；此处只给 Boss 本体（map.boss 按 kind 引用）。
+// ── Boss ──
 
-/** 黑森林专属 Boss——树妖：召唤毒菌蔓生战场（spawner→毒蘑菇，死亡留毒液池），
- * 喷吐孢子弹幕封走位。缓慢厚重的召唤者/控场型，逼玩家优先清菌再近身。 */
 const FOREST_BOSS: EnemyDef = {
   kind: 'treant',
   role: 'boss',
@@ -535,7 +500,6 @@ const FOREST_BOSS: EnemyDef = {
   coins: 60,
   kbImmune: true,
   locomotion: { kind: 'chase' },
-  // 育菌：周期从根须育出毒蘑菇（亡语留毒液池），不清就越滚越多
   spawner: { into: MUSHROOM, intervalMs: 5200, count: 2, maxAlive: 6, firstDelayMs: 3000 },
   abilities: [
     {
@@ -551,8 +515,6 @@ const FOREST_BOSS: EnemyDef = {
   ],
 }
 
-/** 荒漠专属 Boss——蝎王：掘沙尾刺猛扑（dash 突袭）+ 毒液扇射。无边大漠里高机动
- * 逼近型，突袭配远程毒幕，逼玩家横向拉扯躲刺。 */
 const DESERT_BOSS: EnemyDef = {
   kind: 'scorpion',
   role: 'boss',
@@ -593,8 +555,6 @@ const DESERT_BOSS: EnemyDef = {
   ],
 }
 
-/** 奔流专属 Boss——巨鳄：喷吐水弹扇幕 + 掀起水柱自天砸落（strike）。潜伏河道的
- * 远程+范围压制型，水柱无视走位天降，逼玩家在水流漂移里不停换位。 */
 const RIVER_BOSS: EnemyDef = {
   kind: 'croc',
   role: 'boss',
@@ -633,8 +593,6 @@ const RIVER_BOSS: EnemyDef = {
   ],
 }
 
-/** 工厂专属 Boss——母机核心：激光点射穿插整圈环扫（everyN 每三发一轮环射，
- * 环面地图上绕圈回卷）+ 液压重锤自天砸落（strike）。远程弹幕+范围压制型。 */
 const FACTORY_BOSS: EnemyDef = {
   kind: 'mecha',
   role: 'boss',
@@ -660,7 +618,6 @@ const FACTORY_BOSS: EnemyDef = {
       lifeMs: 6000,
       aim: 'nearest',
       fireSfx: 'boom',
-      // 每三发一轮整圈激光环扫，其余为点射
       everyN: { n: 3, count: 12, spreadDeg: 360 },
       projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
     },
@@ -676,9 +633,6 @@ const FACTORY_BOSS: EnemyDef = {
 }
 
 
-/** 残垣图专属 Boss——拆迁鬼：犀角冲撞碾碎沿途断壁（breaksWalls），把回廊拆成开阔地；
- * 第二技能「落石」从天砸向最近队员，无视断壁遮挡（残垣崩落，猥琐龟缩也躲不掉）。
- * 冲撞只在冲刺态破墙（steer.ts），非冲刺期照常走流场绕墙逼近队伍中心。 */
 const RUINS_BOSS: EnemyDef = {
   kind: 'rhino',
   role: 'boss',
@@ -693,7 +647,6 @@ const RUINS_BOSS: EnemyDef = {
   xp: 60,
   coins: 60,
   kbImmune: true,
-  // 冲撞破墙：非冲刺期走流场绕墙逼近，冲刺态锁定队伍中心直线冲、沿途碾碎断壁
   breaksWalls: true,
   locomotion: {
     kind: 'dash',
@@ -707,7 +660,6 @@ const RUINS_BOSS: EnemyDef = {
     sfx: 'whoosh',
   },
   abilities: [
-    // 落石：点名最近 5 名队员，巨石自天而降砸下——坠物从上方落地，天然无视断壁遮挡
     {
       kind: 'strike',
       damage: 24,
@@ -719,9 +671,6 @@ const RUINS_BOSS: EnemyDef = {
   ],
 }
 
-/** 晨昏原野专属 Boss——晦明：半明半暗的月相之主。阳面喷洒「日冕环爆」（整圈日芒弹幕，
- * 白昼里看得最清、压迫最盛），阴面召落「月华坠」（点名队员的月光坠击，夜雾里防不胜防）。
- * 昼夜循环里两套招式随光影此消彼长；贴身追击、击退免疫。 */
 const DAYNIGHT_BOSS: EnemyDef = {
   kind: 'eclipse',
   role: 'boss',
@@ -738,7 +687,6 @@ const DAYNIGHT_BOSS: EnemyDef = {
   kbImmune: true,
   locomotion: { kind: 'chase' },
   abilities: [
-    // 日冕环爆：整圈日芒弹幕（阳面之力）
     {
       kind: 'projectile',
       damage: 8,
@@ -750,7 +698,6 @@ const DAYNIGHT_BOSS: EnemyDef = {
       volley: { count: 14, spreadDeg: 360 },
       projectile: { emoji: '1f31f', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 },
     },
-    // 月华坠：点名最近 4 名队员，月光自天坠落（阴面之力）
     {
       kind: 'strike',
       damage: 22,
@@ -762,9 +709,6 @@ const DAYNIGHT_BOSS: EnemyDef = {
   ],
 }
 
-/** 太空图专属 Boss——奇点：类黑洞天体。进场即张开「禁锢力场」（越靠边缘、向外的阻力越大，
- * 到边缘 100%——场内所有实体谁也逃不出去，规则在 SpaceArenaScene）；两招——吸积盘环爆
- * （整圈能量弹幕）+ 奇点坍缩（点名队员的引力坠击）。贴身追击、击退免疫。 */
 const SPACE_BOSS: EnemyDef = {
   kind: 'blackhole',
   role: 'boss',
@@ -781,7 +725,6 @@ const SPACE_BOSS: EnemyDef = {
   kbImmune: true,
   locomotion: { kind: 'chase' },
   abilities: [
-    // 吸积盘环爆：整圈能量弹幕
     {
       kind: 'projectile',
       damage: 8,
@@ -793,7 +736,6 @@ const SPACE_BOSS: EnemyDef = {
       volley: { count: 16, spreadDeg: 360 },
       projectile: { emoji: '1f4ab', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 },
     },
-    // 奇点坍缩：点名最近 4 名队员，引力坠击自天砸下
     {
       kind: 'strike',
       damage: 22,
@@ -805,7 +747,7 @@ const SPACE_BOSS: EnemyDef = {
   ],
 }
 
-/** 生成用：kind → 定义（顺序即展示顺序；Boss 按地图顺序排在常规怪之后） */
+/** 顺序即图鉴展示顺序 */
 export const ENEMIES = Object.fromEntries(
   [...ENEMY_DEFS, FOREST_BOSS, DESERT_BOSS, RIVER_BOSS, FACTORY_BOSS, RUINS_BOSS, DAYNIGHT_BOSS, SPACE_BOSS].map((e) => [e.kind, e]),
 ) as Record<string, EnemyDef>

@@ -2,11 +2,8 @@ import type Phaser from 'phaser'
 import type { GroundEffectDef } from '../types/groundEffects'
 import type { ArcadeBattleScene, ImageObj } from './ArcadeBattleScene'
 
-// 地面效果（阵营中立）：留在地面的持续区，敌我同构——team 放的烧敌人、
-// enemy 放的烧队员（同 PoE ground effect 的阵营规则）。跳伤施加语义按
-// 目标阵营分流，两种语义都来自合并前的毒液池/灼烧地面，行为不变：
-// · 烧队员 = 按受害者节流（队员少：无论踩几个区，每 tickMs 至多掉一次血）
-// · 烧敌人 = 按区域脉冲（敌人多：每区自打节拍，每拍烧区内全部敌人）
+// 跳伤按目标阵营分流：烧队员按受害者节流（每 tickMs 至多掉一次血，踩几个区都一样）；
+// 烧敌人按区域脉冲（每区自打节拍，每拍烧区内全部敌人）
 
 export type GroundEffectOwner =
   | { faction: 'team'; srcSlot: number }
@@ -20,7 +17,7 @@ export interface GroundEffect {
   until: number
   tickMs: number
   damage: number
-  /** team 区的脉冲节拍时刻（enemy 区按受害者节流，不用） */
+  /** 仅 team 区用 */
   nextTickAt: number
   /** 伤害归属：team 区记出招槽位，enemy 区记来源名 */
   srcSlot: number
@@ -86,7 +83,7 @@ export function updateGroundEffects(scene: ArcadeBattleScene): void {
   for (const g of scene.groundEffects) {
     if (g.faction !== 'team' || now < g.nextTickAt) continue
     g.nextTickAt = now + g.tickMs
-    // frameTargets 直查（虚空含镜像：镜像间距 ≥ 半场 ≫ 效果半径，不会重复命中）
+    // 虚空图镜像间距 ≥ 半场 ≫ 效果半径，frameTargets 直查不会重复命中
     for (const t of scene.frameTargets) {
       const dx = t.x - g.x
       const dy = t.y - g.y

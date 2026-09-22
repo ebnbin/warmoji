@@ -9,21 +9,12 @@ import { memberOf } from '../member'
 import type { Enemy } from './enemies'
 import type { ArcadeBattleScene, ImageObj } from '../ArcadeBattleScene'
 
-// 敌人持械：def.abilities 有行即装配能力实例（能力类阵营中立，
-// abilities/types.ts）。此处提供敌方视角的 ctx 实现：targets = 队员快照、
-// 伤害走队员受击结算（吃无敌帧）、发弹入敌弹组、治疗作用于敌群。
-// 注意：def 随父级 toPx 深换算进场，此处直接实例化，勿二次换算。
-// 敌弹机制暂不带贯穿/溅射载荷；队员个体减速机制未建——两者都等
-// 首个需要它们的敌械行落地时再扩展。
+// def 已随父级 toPx 深换算，此处不得二次换算
 
-/** 敌方能力弹药的缺省寿命（def.lifeMs 可覆写；敌弹必须按寿命回收） */
+/** 敌弹必须按寿命回收；def.lifeMs 可覆写 */
 const BULLET_LIFE_MS = 3000
 
-/** fireDelayMs：首发延迟基线（materialize 的随机开火抽取喂入，保持攻击
- * 积木时代的首发分布与 rng 流位次）；def.firstDelayMs 优先 */
-/** 敌方视角的阵营中立 ctx：targets = 队员快照、伤害走队员受击结算、发弹入敌弹组、
- * 治疗作用于敌群。持械（armEnemy）与死亡效果（deathEffects）共用同一份实现——
- * 二者都是「敌人在某处触发一串动作」，只是触发时机不同。 */
+/** 持械与亡语共用同一份 ctx */
 export function buildEnemyCtx(scene: ArcadeBattleScene, a: Enemy): AbilityContext {
   const e = a.image
   const outline = a.elite || a.boss ? 'elite' : 'enemy'
@@ -33,7 +24,7 @@ export function buildEnemyCtx(scene: ArcadeBattleScene, a: Enemy): AbilityContex
     targets: () => scene.frameMemberTargets,
     targetHp: (ref) => memberOf(ref as ImageObj).hp,
     targetMaxHp: (ref) => memberOf(ref as ImageObj).maxHp,
-    // 击退参数忽略：队员无击退机制（阵型弹簧持有位置主权）
+    // 击退忽略：队员位置由阵型弹簧持有
     damageTarget: (ref, damage) => {
       const m = memberOf(ref as ImageObj)
       if (scene.over || !m.alive) return
@@ -52,7 +43,7 @@ export function buildEnemyCtx(scene: ArcadeBattleScene, a: Enemy): AbilityContex
         a.def.name,
       )
     },
-    // aim:'move' 弹的朝向 = 物理速度方向（速度为零时朝右，与原攻击积木一致）
+    // 速度为零时朝右
     ownerHeading: () => {
       const body = e.body as { velocity?: { x: number; y: number } } | null
       return { x: body?.velocity?.x ?? 0, y: body?.velocity?.y ?? 0 }
@@ -65,7 +56,6 @@ export function buildEnemyCtx(scene: ArcadeBattleScene, a: Enemy): AbilityContex
       spawnGroundEffect(scene, x, y, def, { faction: 'enemy', srcName: a.def.name }),
     heal: (x, y, range, amount, all, exclude) =>
       healEnemies(scene, x, y, range, amount, all, exclude ? enemyOf(exclude as ImageObj) : undefined),
-    // 效果触发的一次性冷枪：走敌弹机器，dmgMul 与本体挂钩（精英冷枪更痛）
     spawnBullet: (x, y, angle, spec, damage, lifeMs) =>
       spawnEnemyProjectile(
         scene,
@@ -84,7 +74,7 @@ export function buildEnemyCtx(scene: ArcadeBattleScene, a: Enemy): AbilityContex
       a.anim.register(clipId, clipFramesLive(scene, a.def.emoji, clipId, outline))
       a.anim.play(clipId, { durMs })
     },
-    // 可选能力（吸金币/无敌帧/复活缩时）是队员专属概念：缺席
+    // 吸金币/无敌帧/复活缩时为队员专属：缺席
   }
 }
 
@@ -99,8 +89,7 @@ export function armEnemy(scene: ArcadeBattleScene, a: Enemy, fireDelayMs?: numbe
     get y() {
       return e.y
     },
-    // 敌人位置主权在物理/移动策略，不做弹性偏移：
-    // 自体动作类能力在敌人身上只有判定，身体动画走 held 视觉或 clip
+    // 敌人位置由移动策略持有，不做视觉偏移
     setVisualOffset() {},
   }
   const ctx = buildEnemyCtx(scene, a)
@@ -114,8 +103,7 @@ export function armEnemy(scene: ArcadeBattleScene, a: Enemy, fireDelayMs?: numbe
   )
 }
 
-/** 治疗敌群：all=false 只治血量比例最低的一只；满血者不计，返回被治数量。
- * exclude 排除某一只（幽灵亡语治疗时排除正在死亡的自己） */
+/** all=false 只治血量比例最低的一只；满血者不计；返回被治数量 */
 export function healEnemies(
   scene: ArcadeBattleScene,
   x: number,

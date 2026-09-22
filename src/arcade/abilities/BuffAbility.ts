@@ -1,8 +1,6 @@
 import type { BuffDef } from '../../types/abilityDefs'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 增益型：限时全队伤害倍率（经 stats.damageMul 流入所有能力伤害链，
- * 到期由战斗时钟自动复原） */
 export class BuffAbility implements AbilityRuntime {
   private cooldown: number
 

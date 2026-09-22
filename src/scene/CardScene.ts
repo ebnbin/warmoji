@@ -18,11 +18,6 @@ import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '..
 import { roundRect } from '../ui/shapes'
 import { rollCardChoices } from '../run/draft'
 
-// 团队升级抽卡页：战斗中每升 1 级攒 1 次抽卡（run.cardDraws），战斗后在此逐次三选一。
-// 卡 = 团队层加成（teamFx），替代原「队长道具」那套用金币买的系统。选中即升该卡等级，
-// 抽满次数后进正常下一站（开箱 / 招募 / 商店）。候选数 = 3 + 广纳卡的 draftSize。
-// 布局：竖排卡列表装进可滚动容器，候选再多/描述再长都不溢出，横竖屏通吃。
-
 const RARITY_COLOR: Record<string, number> = {
   common: 0xc8c8d4,
   rare: 0x4fc3f7,
@@ -48,7 +43,6 @@ export class CardScene extends Phaser.Scene {
     const preserved = this.preserveOnRestart
     this.preserveOnRestart = false
     this.run = getRun()
-    // 抽卡次数用尽（或误入）：走正常下一站
     if (this.run.cardDraws <= 0) {
       this.scene.start(this.nextScene())
       return
@@ -61,7 +55,6 @@ export class CardScene extends Phaser.Scene {
     const res = textRes()
     const oy = (h - Math.min(h, 1280)) / 2
 
-    // 本次候选：3 + 广纳卡加成，按波次稀有度权重，跳过满级卡
     const teamFx = aggregateTeamCards(this.run.teamCards)
     const count = 3 + teamFx.draftSize
     this.choices = rollCardChoices(this.run.teamCards, Math.random, count, this.run.wave)
@@ -85,7 +78,6 @@ export class CardScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    // 卡列表（可滚动）
     const listW = Math.min(w - 48, 660)
     const top = oy + 150
     const bottom = h - safeInsets.bottom - 24
@@ -101,7 +93,6 @@ export class CardScene extends Phaser.Scene {
     })
   }
 
-  /** 一张候选卡：图标 + 名称/稀有度/当前等级 + 介绍，整行可点选 */
   private buildCardRow(id: CardId, i: number, listW: number, res: number): void {
     const card = CARDS[id]
     const y = i * (this.rowH + this.rowGap)
@@ -154,7 +145,6 @@ export class CardScene extends Phaser.Scene {
     ])
   }
 
-  /** 选中：该卡等级 +1，扣一次抽卡，重建页面（create 里抽完即进下一站） */
   private pick(id: CardId): void {
     const cur = this.run.teamCards[id] ?? 0
     this.run.teamCards[id] = Math.min(cur + 1, CARDS[id].maxLevel)

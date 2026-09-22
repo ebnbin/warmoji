@@ -5,8 +5,6 @@ import { BVel, Flee, Slowed, Speed, Steering, Transform } from '../components'
 import { nearestAlive, wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
 
-/** 逃跑：队伍进 range 就背身逃开（方向经世界钩子修正，有界图贴边沿墙滑行），
- * 否则慢速游荡 */
 export function steerFlee(sim: Sim): void {
   for (const eid of query(sim.world, [Flee, Steering, Transform, Speed])) {
     if (!Steering.v[eid]) continue

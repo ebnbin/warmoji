@@ -11,8 +11,6 @@ import type { Target } from '../utils/targets'
 import type { Sim } from '../sim'
 import { spawnFxBolt } from '../entities/fx'
 
-/** 连锁电弧：命中最近敌人后在敌群间弹跳传导，每跳伤害衰减——敌人越密越强。
- * onHit 施加在末跳落点，已弹跳过的目标排除在外 */
 export function castChainArcs(sim: Sim): void {
   castScan(sim, ChainArc, (e) => {
     const src = sourceOf(sim, e)

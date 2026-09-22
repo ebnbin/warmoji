@@ -5,12 +5,6 @@ import { packSvg, parseEmojiPack } from './pack'
 import type { EmojiPack } from './pack'
 import { EMOJI_PAD, outlineSvg, padSvg, setSvgSize } from './svg'
 
-// twemoji 全集打包资源（ordering.txt + twemoji.txt，源在 scripts/emoji/，gen 拷进
-// src/assets/emoji/；图形 CC-BY 4.0）：PreloadScene 门禁预加载后经 primeEmojiPack 注入，任意 emoji 的
-// SVG 文本同步可取。emoji 全项目以 ordering ID 为唯一标识，从不作为字符/字体使用。
-// 纹理管线：SVG 文本 → svg.ts 纯函数改写 → 光栅化 → Phaser 纹理；
-// 描边按阵营配色（player 黑 / enemy 紫 / enemyProjectile 红 / elite 金），每色一个纹理变体。
-// 启动只预载 PRELOAD_EMOJIS，其余按需 ensureEmoji，超 LRU 上限淘汰最久未用。
 const RASTER = 256
 const LRU_LIMIT = 256
 
@@ -31,22 +25,19 @@ function packDeferred(): Promise<EmojiPack> {
   return packPromise
 }
 
-/** 预加载注入：PreloadScene 拿到两份构建资产后解析并解锁全部等待方（幂等）。
- * 解析失败即抛错——资源门禁不放行 */
+/** 幂等；解析失败即抛错 */
 export function primeEmojiPack(orderingText: string, twemojiText: string): void {
   const pack = parseEmojiPack(orderingText, twemojiText)
   void packDeferred()
   resolvePack?.(pack)
 }
 
-/** 打包资源（PreloadScene 注入前保持等待） */
+/** primeEmojiPack 之前保持等待 */
 export function loadEmojiPack(): Promise<EmojiPack> {
   return packDeferred()
 }
 
-/** ordering ID → 完整 SVG 文本（未收录即抛错）。
- * 项目规范的唯一注入点：viewBox 统一 pad 成 48 标准（内容 36 居中 + 四周 6），
- * 纹理/缩略图/Studio 全部经此出口——任何 emoji 素材天生自带 padding */
+/** 未收录即抛错；viewBox 统一 pad 成 48 标准的唯一注入点 */
 export async function emojiSvgText(id: string): Promise<string> {
   const pack = await loadEmojiPack()
   const svg = packSvg(pack, id)
@@ -54,7 +45,7 @@ export async function emojiSvgText(id: string): Promise<string> {
   return padSvg(svg, EMOJI_PAD)
 }
 
-/** dev 面板诊断：存活 emoji 纹理数与固定预载数（LRU 上限只约束非固定部分） */
+/** LRU 上限只约束非预载部分 */
 export function emojiCacheStats(scene: Phaser.Scene): { textures: number; pinned: number } {
   return {
     textures: scene.textures.getTextureKeys().filter((k) => k.startsWith('emoji-')).length,
@@ -62,7 +53,7 @@ export function emojiCacheStats(scene: Phaser.Scene): { textures: number; pinned
   }
 }
 
-// player 沿用旧后缀 '-ol'，其余按阵营命名
+// 后缀须与 arcade/anim/animTextures.ts 一致
 const KIND_SUFFIX: Record<OutlineKind, string> = {
   player: '-ol',
   enemy: '-ole',
@@ -74,7 +65,7 @@ export function emojiKey(id: string, outline?: OutlineKind): string {
   return `emoji-${id}${outline ? KIND_SUFFIX[outline] : ''}`
 }
 
-/** SVG 文本 → 位图（尺寸由 SVG 自身的 width/height 决定），图鉴缩略图也复用 */
+/** 尺寸由 SVG 自身的 width/height 决定 */
 export async function svgToImage(svgText: string): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }))
   try {
@@ -98,7 +89,7 @@ async function createTexture(scene: Phaser.Scene, id: string, outline?: OutlineK
   return key
 }
 
-/** 确保 emoji 纹理可用（按需取正文 + 改写 + 光栅化），并发去重 */
+/** 并发去重 */
 export function ensureEmoji(scene: Phaser.Scene, id: string, outline?: OutlineKind): Promise<string> {
   const key = emojiKey(id, outline)
   lastUsed.set(key, ++useTick)
@@ -127,7 +118,7 @@ function evictIfNeeded(scene: Phaser.Scene): void {
   }
 }
 
-/** 启动预载：清单由 boot 注入（本包不依赖游戏内容），预载纹理不参与 LRU 淘汰 */
+/** 预载纹理不参与 LRU 淘汰 */
 export async function loadEmojiTextures(
   scene: Phaser.Scene,
   preload: readonly string[],

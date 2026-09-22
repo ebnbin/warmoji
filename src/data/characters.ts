@@ -7,12 +7,6 @@ import { WEAPONS } from './weapons'
 import type { UpgradeCard, WeaponId } from '../types/weapons'
 import type { Carrier, CharacterAuthoring, CharacterDef, CharacterId, InnateSource, TeamBaseline, UpgradeTiers } from '../types/characters'
 
-// 角色花名册：一个角色由若干「攻击来源」（载体）组成——持有的武器（weapons，
-// 引用实体武器）与自带的徒手能力（innate，无实体武器，直接引用能力）。
-// 每个载体自带升级路径（base + 各档）。运行时把两类载体统一成 Carrier 视图，
-// loadoutFor 按当前档位取各载体的生效能力（换持整行）。能力可被复用，身份/升级
-// 路径归载体。磁盘形态（characters.json）能力以 id 引用，加载时解析成 def 一次。
-
 function tierLevel(tiers: UpgradeTiers): 0 | 1 | 2 {
   return tiers.u2 ? 2 : tiers.u1 ? 1 : 0
 }
@@ -37,7 +31,6 @@ function innateCarrier(i: InnateSource): Carrier {
   }
 }
 
-/** id 引用 → def：加载时一次性解析（能力表/武器表由 gen 校验，此处断言收口） */
 function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
   return {
     emoji: src.emoji,
@@ -55,23 +48,21 @@ export const CHARACTERS = Object.fromEntries(
 ) as Record<CharacterId, CharacterDef>
 export const ROSTER_IDS = Object.keys(CHARACTERS) as readonly CharacterId[]
 
-/** 载体在指定档位的生效能力（无该档停留最高档，如军医飞针无升级恒 base） */
+/** 无该档时停留在已有的最高档 */
 function carrierAbility(c: Carrier, level: 0 | 1 | 2): AbilityDef {
   return c.tiers[Math.min(level, c.tiers.length - 1)]!
 }
 
-/** 生效配装：各载体在当前档位的能力（升级卡质变 = 换持整行；未解锁用基础行） */
 export function loadoutFor(def: CharacterDef, tiers: UpgradeTiers): readonly AbilityDef[] {
   const level = tierLevel(tiers)
   return def.carriers.map((c) => carrierAbility(c, level))
 }
 
-/** 基础配装（0 档全体载体）：道具池推导 / 资源预载用 */
 export function baseLoadout(def: CharacterDef): readonly AbilityDef[] {
   return def.carriers.map((c) => c.tiers[0]!)
 }
 
-/** 角色两档升级卡（多载体同档取首个有升级的载体，gen 已校验同档一致） */
+/** 同档多载体的卡文案由 gen 校验一致 */
 export function upgradeCardsFor(def: CharacterDef): readonly [UpgradeCard, UpgradeCard] {
   const pick = (k: 0 | 1): UpgradeCard => {
     for (const c of def.carriers) {

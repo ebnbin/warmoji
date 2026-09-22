@@ -3,9 +3,7 @@ import { KNOCKBACK } from '../../data/abilities'
 import { Dormant, ENEMY_SET, Kv, Step } from '../components'
 import type { Sim } from '../sim'
 
-/** 击退:冲量叠进本帧位移后指数衰减(镜像 decayKnockback)。
- * realDelta = 真实帧长——旧实现把冲量写进 Arcade body 由物理按真实帧长积分,
- * 故时停期「打谁谁飞」照旧成立 */
+/** 走真实帧长：时停期击退照飞 */
 export function applyKnockback(sim: Sim): void {
   const delta = sim.wdtMs
   const realDelta = sim.dtMs

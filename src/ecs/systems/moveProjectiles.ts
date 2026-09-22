@@ -2,9 +2,7 @@ import { query } from 'bitecs'
 import { PrevPos, Proj, PROJ_SET, Transform, Vel } from '../components'
 import type { Sim } from '../sim'
 
-/** 推进所有抛射物：积分速度 + 环面回绕 + 自旋，并记下移动前的位置。
- * PrevPos 是扫掠命中的线段起点——回绕帧起点即落点，线段退化成一点，本帧不判命中
- *（否则线段横贯全图产生假命中） */
+/** 回绕帧 PrevPos 取落点，线段退化成一点，本帧不判命中 */
 export function moveProjectiles(sim: Sim): void {
   const dt = sim.wdtMs / 1000
   for (const eid of query(sim.world, PROJ_SET as unknown as object[])) {

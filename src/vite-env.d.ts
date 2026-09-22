@@ -3,12 +3,12 @@
 declare const __BUILD_HASH__: string
 declare const __BUILD_TIME__: string
 
-// e2e 读取的运行时状态（src/ui/debug.ts 写入）
+// e2e 读取的运行时状态
 interface WarmojiPromoteDebug {
   mode: 'recruit' | 'formation'
   /** 招募模式 = 详情面板正在展示的候选；阵型模式 = 当前受保护中心 */
   selected: string
-  /** 招募模式 = 命定卡池网格（state 三态）；阵型模式 = 预览中的队员站位 */
+  /** 招募模式 = 卡池网格；阵型模式 = 队员站位 */
   items: {
     id: string
     x: number
@@ -18,12 +18,10 @@ interface WarmojiPromoteDebug {
     state?: 'open' | 'locked' | 'taken'
   }[]
   confirm: { x: number; y: number; w: number; h: number; enabled: boolean }
-  /** wave=1 为「返回队长页」，wave>1 为「结束本局」，fromShop 为「返回商店」 */
   back: { x: number; y: number; w: number; h: number }
-  /** 招募模式：本波名额数与已点进空位的候选 */
+  /** 招募模式：名额数与已选候选 */
   due?: number
   picked?: string[]
-  /** 阵型页（mode='formation' 时提供）：满员自动 N 保 1，只可选中心 */
   formation?: { center: string }
 }
 
@@ -33,7 +31,7 @@ interface WarmojiShopDebug {
   focusedId: string
   freeRefreshes: number
   level: number
-  /** 聚焦角色的专属等级（1/2/3）与累计经验 */
+  /** 专属等级 1..3 与累计经验 */
   focusedLevel: number
   focusedXp: number
   slots: {
@@ -45,22 +43,21 @@ interface WarmojiShopDebug {
     offer: string | null
     price: number | null
     owned: number
-    /** 该角色专属等级（1/2/3） */
+    /** 专属等级 1..3 */
     level: number
   }[]
   buy: { x: number; y: number; w: number; h: number; enabled: boolean }
   refresh: { x: number; y: number; w: number; h: number; enabled: boolean }
   start: { x: number; y: number; w: number; h: number }
-  /** 阵型页入口（满员后出现） */
+  /** 满员后才有，否则 null */
   formation: { x: number; y: number; w: number; h: number } | null
 }
 
 interface WarmojiCardsDebug {
   /** 待抽次数（含当前这次） */
   remaining: number
-  /** 已持团队卡（cardId → 等级），供验证选卡生效 */
+  /** cardId → 等级 */
   owned: Record<string, number>
-  /** 当前三选一的候选卡：id + 现等级/上限 + 稀有度 + 命中矩形 */
   choices: {
     id: string
     level: number
@@ -74,11 +71,8 @@ interface WarmojiCardsDebug {
 }
 
 interface WarmojiFieldDebug {
-  /** 地面待拾的拾取（不磁吸，需走位拾取） */
   pickups: { id: string; polarity: 'buff' | 'debuff'; x: number; y: number }[]
-  /** 已激活的限时效果（拾取后短时生效） */
   active: { id: string; polarity: 'buff' | 'debuff'; remainMs: number }[]
-  /** 在场携带者数（带极性光环的敌人） */
   carriers: number
 }
 
@@ -93,16 +87,13 @@ interface WarmojiStudioDebug {
   tab: 'recipes' | 'templates' | 'anatomy'
   tabs: { id: string; x: number; y: number; w: number; h: number }[]
   items: { key: string; x: number; y: number; w: number; h: number }[]
-  /** 当前 tab 在素材网格中的选中 key */
   selected: string
-  /** 模板页当前模板 id */
   template: string
   templates: { id: string; x: number; y: number; w: number; h: number }[]
-  /** 配方页当前 clip id 与切换 chips 命中区（单 clip 实体无 chips） */
+  /** 单 clip 时 clips 为空 */
   clip: string
   clips: { id: string; x: number; y: number; w: number; h: number }[]
-  /** 解剖页结构树工作台（仅解剖 tab 且树就绪时提供；rows 只含完整可见行，
-   * 点行即切换该节点显/隐，容器行的箭头区收起/展开） */
+  /** 仅解剖 tab 且树就绪时提供；rows 只含完整可见行 */
   anatomy?: {
     hidden: string[]
     rows: {
@@ -122,12 +113,11 @@ interface WarmojiStudioDebug {
     full: { x: number; y: number; w: number; h: number }
     split: { x: number; y: number; w: number; h: number }
   }
-  /** 播放控制按钮命中区（prev/toggle/next/speed） */
+  /** 键：prev / toggle / next / speed */
   controls: Record<string, { x: number; y: number; w: number; h: number }>
   paused: boolean
   speed: number
   preview: 'idle' | 'loading' | 'ready'
-  /** 已按需渲染的素材缩略图数量（feed 流，与图鉴共用缓存） */
   thumbsReady: number
   back: { x: number; y: number; w: number; h: number }
 }
@@ -139,7 +129,6 @@ interface WarmojiWikiDebug {
   entryCount: number
   manifestCount: number
   usedCount: number
-  /** 已按需渲染的缩略图数量（feed 流：滚到哪渲染到哪） */
   thumbsReady: number
   scrollY: number
   maxScroll: number
@@ -164,7 +153,7 @@ interface WarmojiMapDebug {
   selected: string
   items: { id: string; x: number; y: number; w: number; h: number }[]
   start: { x: number; y: number; w: number; h: number }
-  /** 试炼场开关（仅开发者模式下存在） */
+  /** 仅开发者模式下存在 */
   test?: { x: number; y: number; on: boolean }
 }
 
@@ -194,17 +183,13 @@ interface WarmojiDebug {
   camY: number
   wave?: number
   coins?: number
-  /** arena：当前局队形 id */
   formation?: string
-  /** arena：当前局地图 id */
   mapId?: string
-  /** 无限地图：休眠中的敌人数 */
+  /** 无限地图才有 */
   dormant?: number
-  /** 无限地图终波：当前缩圈半径（未开圈为 undefined） */
+  /** 终波缩圈半径，未开圈为 undefined */
   zoneRadius?: number
-  /** arena：队长主动技能状态（纯 CD 门槛） */
   skill?: { remainMs: number; ready: boolean }
-  /** arena：战场拾取（地面待拾 + 已激活效果 + 携带者数） */
   field?: WarmojiFieldDebug
   menu?: WarmojiMenuDebug
   map?: WarmojiMapDebug
@@ -220,6 +205,5 @@ interface WarmojiDebug {
 
 interface Window {
   __warmoji?: WarmojiDebug
-  /** 开发者面板的性能读数（src/dev/probe.ts 写入；与 __warmoji 独立，两套框架下一致可采） */
   __dev?: import('./dev/probe').DevPerfProbe
 }

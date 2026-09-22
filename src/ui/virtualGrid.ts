@@ -3,12 +3,8 @@ import { TAP_SLOP } from '../util/units'
 import { emojiThumbKey, requestEmojiThumb } from '../emoji/thumbs'
 import { clipTo } from '../util/mask'
 
-// 全量 emoji 虚拟网格（feed 流）：环形缓冲复用固定数量 Image——
-// slot = index % poolSize，只有窗口边缘换入的格子才重绑；格子滚入视口
-// 按需光栅化自己的缩略图（emojiThumbs 页级缓存，滚回零等待）。
-// 滚轮 + 拖动 + 惯性滑动，点选画选中框。图鉴「全部」页与 Studio 素材区共用。
-// 输入监听挂 scene.input（场景重启自动清理）；惯性驱动挂场景 UPDATE，
-// SHUTDOWN 时自摘（scene.events 不随 restart 清空，不摘会跨局叠加）。
+// 环形缓冲复用固定数量 Image：slot = index % poolSize。
+// 惯性驱动挂场景 UPDATE，SHUTDOWN 时自摘：scene.events 不随 restart 清空
 
 const CELL = 72
 const ICON = 70
@@ -19,11 +15,10 @@ interface Slot {
 }
 
 export class VirtualEmojiGrid {
-  /** 点选格子（拖动不算；key 为码点） */
   onTap?: (cp: string) => void
-  /** 滚动回调；settled = 拖动结束/惯性停止的终态（中途高频，消费方自行节流） */
+  /** settled = 终态；中途高频，消费方自行节流 */
   onScrolled?: (settled: boolean) => void
-  /** 缩略图落地的拖尾节流回调（150ms 至多一次），调试上报进度用 */
+  /** 150ms 至多一次 */
   onThumbsProgress?: () => void
 
   private scene: Phaser.Scene
@@ -40,13 +35,12 @@ export class VirtualEmojiGrid {
   private selected: string | null = null
   private dragging = false
   private dragMoved = false
-  /** 本次按下是否落在网格内（防止跨面板拖过来松手触发误选） */
   private pressIn = false
-  /** 本次按下发生在惯性滚动中 = 截停滚动，不算点击（移动端惯例） */
+  /** 按下时正在惯性滚动：只截停，不算点击 */
   private stopPress = false
   private dragStartY = 0
   private dragStartScroll = 0
-  // 惯性滚动：拖动时采样速度（px/ms），松手后指数衰减
+  // px/ms
   private flingV = 0
   private lastMoveY = 0
   private lastMoveT = 0
@@ -90,8 +84,7 @@ export class VirtualEmojiGrid {
     })
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.dragMoved = false
-      // 只有列表在明显滑动中（≥ 每帧约 6px）按下才算截停；衰减尾巴的
-      // 不可见余速不能吃掉点击（0.05 阈值实测把"甩完即点"大量误杀）
+      // 阈值 0.35 ≈ 每帧 6px：衰减尾巴的余速不能吃掉点击
       this.stopPress = Math.abs(this.flingV) >= 0.35
       this.flingV = 0
       this.pressIn = this.contains(p)
@@ -107,7 +100,7 @@ export class VirtualEmojiGrid {
     scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dy = this.dragStartY - p.worldY
-      // 不可滚动时拖动无意义，不判拖——轻点永不被误杀
+      // 不可滚动时不判拖
       if (this.max > 0 && Math.abs(dy) > TAP_SLOP) this.dragMoved = true
       if (this.dragMoved) {
         this.scrollTo(this.dragStartScroll + dy)
@@ -117,9 +110,7 @@ export class VirtualEmojiGrid {
         this.lastMoveT = scene.time.now
       }
     })
-    // 画布外松手（pointerupoutside）与正常松手同路；系统手势打断（touchcancel）
-    // 两者都不发 pointerup——不清 dragging 会冻结惯性速度，之后每次按下都被
-    // 误判截停、点击全灭（用户实报的"点击经常没反应"）
+    // pointerupoutside 与 touchcancel 都不发 pointerup；dragging 不清会让之后每次按下都被判截停
     scene.input.on('pointerup', this.release, this)
     scene.input.on('pointerupoutside', this.release, this)
 
@@ -137,12 +128,10 @@ export class VirtualEmojiGrid {
     return this.max
   }
 
-  /** 最近一次按下是否发生了拖动（外部按钮的 pointerup 用它防误触） */
   get wasDragged(): boolean {
     return this.dragMoved
   }
 
-  /** 换清单（进场/切 tab）：滑窗全量重绑，滚动位置钳制进新范围 */
   setItems(keys: readonly string[]): void {
     this.keys = keys
     const totalRows = Math.ceil(keys.length / this.cols)
@@ -171,7 +160,6 @@ export class VirtualEmojiGrid {
     this.drawRing()
   }
 
-  /** 选中格不在视口内时滚动到使其居中（切 tab/进场对齐用） */
   ensureVisible(): void {
     const index = this.selected ? this.keys.indexOf(this.selected) : -1
     if (index < 0) return
@@ -180,8 +168,7 @@ export class VirtualEmojiGrid {
     this.scrollTo(top - (this.rect.h - CELL) / 2)
   }
 
-  /** 视口坐标下完整可见格子的命中矩形（e2e 调试上报用，按清单序）；
-   * 被上下边缘裁剪的半行不报——报了也点不到（命中区只覆盖列表矩形） */
+  /** 视口坐标；只含完整可见的格子（半行点不到） */
   cellRects(): { key: string; x: number; y: number; w: number; h: number }[] {
     return this.slots
       .filter((s) => s.boundIndex >= 0 && this.keys[s.boundIndex] !== undefined)
@@ -201,7 +188,7 @@ export class VirtualEmojiGrid {
     this.container.y = this.rect.y - this.scroll
     this.updateWindow()
     this.onScrolled?.(false)
-    // 滚轮没有「松手」事件：拖尾去抖一发终态，消费方的节流上报才能收敛到最终位置
+    // 滚轮没有松手事件：去抖后补一发终态
     this.settleTimer?.remove()
     this.settleTimer = this.scene.time.delayedCall(160, () => {
       this.settleTimer = undefined
@@ -209,10 +196,8 @@ export class VirtualEmojiGrid {
     })
   }
 
-  /** 松手/出画布松手共用；释放拖动态并决定是否进入惯性 */
   private release(): void {
     this.dragging = false
-    // 松手：速度足够则进入惯性滑动，否则立即定格并通知终态
     if (!this.dragMoved || Math.abs(this.flingV) < 0.05) {
       this.flingV = 0
       this.onScrolled?.(true)
@@ -220,13 +205,13 @@ export class VirtualEmojiGrid {
   }
 
   private onUpdate(_time: number, delta: number): void {
-    // 兜底：手势被系统打断（touchcancel 等不发任何 up 事件）时按指针实况解除拖动
+    // touchcancel 不发 up 事件：按指针实况解除拖动
     if (this.dragging && !this.scene.input.activePointer.isDown) this.release()
     if (this.flingV === 0 || this.dragging) return
     const next = this.scroll + this.flingV * delta
     this.scrollTo(next)
     this.flingV *= Math.exp(-delta / 320)
-    // 低于每帧约 1px 就定格——指数衰减的尾巴又长又不可见，拖着只会挡点击
+    // 0.05 ≈ 每帧 1px
     if (Math.abs(this.flingV) < 0.05 || next <= 0 || next >= this.max) {
       this.flingV = 0
       this.onScrolled?.(true)
@@ -238,7 +223,6 @@ export class VirtualEmojiGrid {
     return p.worldX >= r.x && p.worldX <= r.x + r.w && p.worldY >= r.y && p.worldY <= r.y + r.h
   }
 
-  /** 虚拟滚动核心：只有窗口边缘换入的格子才重绑 */
   private updateWindow(): void {
     if (this.slots.length === 0 || this.keys.length === 0) return
     const first = Math.floor(this.scroll / CELL) * this.cols
@@ -261,7 +245,7 @@ export class VirtualEmojiGrid {
       slot.image.setPosition(cx, cy).setTexture(hit).setDisplaySize(ICON, ICON).setAlpha(alpha).setVisible(true)
       return
     }
-    // 缓存未命中：先空格，渲染完成且格子仍绑着同一条目（清单也没换）时浮现
+    // 异步回填前校验格子仍绑着同一条目且清单未换
     slot.image.setVisible(false)
     void requestEmojiThumb(this.scene, cp).then((key) => {
       if (!key || slot.boundIndex !== index || this.keys[index] !== cp || !this.scene.sys.isActive()) return
@@ -270,7 +254,7 @@ export class VirtualEmojiGrid {
     })
   }
 
-  /** 缩略图落地的拖尾节流：150ms 至多通知一次，且最后一批必有通知 */
+  /** 最后一批必有通知 */
   private reportProgress(): void {
     if (this.progressPending) return
     this.progressPending = true

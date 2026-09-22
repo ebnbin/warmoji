@@ -3,7 +3,6 @@ import { BVel, Chase, Slowed, Speed, Steering, Transform } from '../components'
 import { nearestAlive } from './shared/steer'
 import type { Sim } from '../sim'
 
-/** 直扑最近的活着队员（方向经世界钩子——残垣图走流场绕墙） */
 export function steerChase(sim: Sim): void {
   for (const eid of query(sim.world, [Chase, Steering, Transform, Speed])) {
     if (!Steering.v[eid]) continue

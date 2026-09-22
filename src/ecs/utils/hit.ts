@@ -1,9 +1,5 @@
 import type { Point } from '../../util/vec'
 
-// 命中几何：能力运行时判「打没打到」的纯函数（突刺线段 / 扫掠线段 / 圆 / 扇形）。
-// 与能力的数据形状（data/abilityDefs.ts）分开——那边是「这个能力长什么样」，
-// 这边是「这一发打中了谁」，只有战斗侧用得到。
-
 export interface HitTarget {
   x: number
   y: number
@@ -18,7 +14,7 @@ export function wrapAngle(a: number): number {
   return r
 }
 
-/** 突刺命中：目标圆与线段 [origin, origin + dir·reach] 的距离 ≤ hitRadius + 目标半径 */
+/** 目标圆与线段 [origin, origin + dir·reach] 的距离 ≤ hitRadius + 目标半径 */
 export function thrustHitIndices(
   origin: Point,
   angle: number,
@@ -42,7 +38,7 @@ export function thrustHitIndices(
   return out
 }
 
-/** 圆形命中：与圆心距离 ≤ radius + 目标半径 */
+/** 与圆心距离 ≤ radius + 目标半径 */
 export function circleHitIndices(
   center: Point,
   radius: number,
@@ -59,7 +55,7 @@ export function circleHitIndices(
   return out
 }
 
-/** 扇形命中：距离在半径内且方位角在弧宽内（贴身目标直接命中） */
+/** 贴身目标直接命中 */
 export function sectorHitIndices(
   origin: Point,
   aimAngle: number,

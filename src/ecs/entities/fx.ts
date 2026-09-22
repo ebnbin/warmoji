@@ -5,28 +5,22 @@ import { attachDrawable } from './drawable'
 import type { CircleCue } from '../render/cues'
 import type { Sim } from '../sim'
 
-// 一次性战斗特效实体（阵营中立，放完即弃）。机制侧只管「放一个什么样的特效」，
-// 绘制全在 render/cues.ts（GAS GameplayCue 思路：机制不依赖渲染）。
-//
-// 上限不是存储方式，是一条规则：同屏并发超出即顶掉最老的一个（顶掉的是放了最久、
-// 最接近淡完的那个，肉眼基本看不出）。旧实现用定长数组 + 环形游标来表达它，
-// 于是上限与存储绑死；现在上限就写在这里，存储照常是实体。
+// 同屏并发超出即顶掉最老的一个
 
-/** 固定时长（旧实现里是绘制层的常量，现在是投放时写进 Fx.durMs 的值） */
 const BEAM_MS = 200
 const BOLT_MS = 200
 const SLASH_MS = 220
 const BOOM_MS = 340
 const RISE_MS = 350
-/** 单条闪电的折点上限（超出截断；连锁传导实际只有三四个点） */
+/** 超出截断 */
 const BOLT_PTS = 8
-/** 💥 的深度：落在 spriteBatch 的 [30,60) 带（Phaser depth 9），与旧实现同层 */
+/** 落在 spriteBatch 的 [30,60) 深度带 */
 const BOOM_Z = 30
 
-/** 同屏并发上限（与旧实现的池容量同值） */
+/** 同屏并发上限 */
 const CAP = { circle: 64, beam: 16, bolt: 16, slash: 16, boom: 24, damage: 256 }
 
-/** 超额即顶掉最老的一个（按出生时刻，不按查询集的物理次序） */
+/** 按出生时刻顶掉最老的一个 */
 function capFx(sim: Sim, comp: object, cap: number): void {
   const live = query(sim.world, [Fx, comp])
   if (live.length < cap) return
@@ -48,7 +42,6 @@ function newFx(sim: Sim, comp: object, cap: number, x: number, y: number, durMs:
   return eid
 }
 
-/** 扩散淡出的圆 */
 export function spawnFxCircle(sim: Sim, x: number, y: number, radius: number, c: CircleCue): number {
   const eid = newFx(sim, FxCircle, CAP.circle, x, y, c.durationMs, c.depth)
   FxCircle.r[eid] = radius
@@ -154,7 +147,7 @@ export function spawnDamageNumber(sim: Sim, x: number, y: number, amount: number
   Fx.bornMs[eid] = sim.fxMs
   Fx.durMs[eid] = RISE_MS
   Transform.x[eid] = x
-  Transform.y[eid] = y - 14 // 起点略高于命中点（与旧实现同）
+  Transform.y[eid] = y - 14 // 起点略高于命中点
   DamageNumber.value[eid] = amount
   DamageNumber.crit[eid] = crit ? 1 : 0
   return eid

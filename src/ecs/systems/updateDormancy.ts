@@ -3,7 +3,6 @@ import { Boss, Dormant, ENEMY_SET, Transform } from '../components'
 import type { Sim } from '../sim'
 import { centerX, centerY } from '../utils/team'
 
-/** 休眠维护(无限世界):出活跃方形的敌人冻结、回来即唤醒。Boss 永不休眠 */
 export function updateDormancy(sim: Sim): void {
   const half = sim.hooks.activeHalf(sim)
   if (half === Infinity) return

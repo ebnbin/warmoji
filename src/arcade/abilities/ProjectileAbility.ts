@@ -5,9 +5,6 @@ import { emojiImage } from '../../emoji/textures'
 import { nearestAngle } from './targeting'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 发射型：held 时持有物定身指向目标（可带左右手挂载位）；无 held 时角色本体出弹。
- * 瞄准：nearest 最近目标 / move 持有者移动方向（无需目标）；整圈 volley 也无需目标。
- * 能力：volley 恒定齐射（≥2π 为整圈，可随机旋转）；everyN 每第 n 次特殊齐射 */
 export class ProjectileAbility implements AbilityRuntime {
   private image?: Phaser.GameObjects.Image
   private cooldown: number
@@ -70,7 +67,6 @@ export class ProjectileAbility implements AbilityRuntime {
       const full = volley.spreadDeg >= 360 - 1e-9
       const base = full && volley.randomRotate ? (this.ctx.random?.() ?? 0) * Math.PI * 2 : this.aim
       for (let i = 0; i < volley.count; i++) {
-        // 整圈按 count 均分步进（端点不重叠）；扇形沿瞄准方向对称散开
         const angle = full
           ? base + (i * volley.spreadDeg * DEG2RAD) / volley.count
           : this.aim + volley.spreadDeg * DEG2RAD * (i / (volley.count - 1) - 0.5)

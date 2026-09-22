@@ -2,9 +2,7 @@ import { emojiImage } from '../../emoji/textures'
 import type { StrikeDef } from '../../types/abilityDefs'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 点名打击型：坠物逐个砸向离锚点最近的 N 个目标——伤害 + 击退（从锚点
- * 推开）+ 落点掉金币（被砸死的照常掉落，两份都拿）。目标快照含镜像坐标
- * 时按最近镜像计距并去重（坠物落在可见位置上） */
+/** 镜像坐标按最近镜像计距并去重 */
 export class StrikeAbility implements AbilityRuntime {
   private cooldown: number
 

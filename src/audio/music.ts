@@ -1,11 +1,5 @@
 import type { MapId } from '../types/maps'
 
-// 程序化 BGM 乐谱层：纯数据/纯函数，输出扁平音符事件表，播放在 ui/bgm.ts。
-// 写谱模型：每曲 = 调式 + 逐小节和弦进行 + 若干声部（低音/琶音/和弦垫/主旋律）
-// + 打击乐模式串。低音、琶音、和弦垫由和弦推导（和声天然统一），主旋律显式
-// 写音符（有记忆点）；乐句按 A/A'/B/A 之类的段落展开，整曲无缝循环。
-// 战斗曲按地图配：BgmId 直接复用 MapId，'lobby' 盖住全部非战斗页面。
-
 export type BgmId = 'lobby' | MapId
 
 export interface BgmNote {
@@ -17,7 +11,7 @@ export interface BgmNote {
   vol: number
   attack: number
   release: number
-  /** 走本曲回声送出（无回声配置的曲子忽略此标记） */
+  /** 无回声配置的曲子忽略 */
   echo?: boolean
 }
 
@@ -43,7 +37,6 @@ export interface BgmScore {
 const MAJOR = [0, 2, 4, 5, 7, 9, 11] as const
 const DORIAN = [0, 2, 3, 5, 7, 9, 10] as const
 const AEOLIAN = [0, 2, 3, 5, 7, 8, 10] as const
-/** 弗里几亚主音阶（和声小调第五调式）：荒漠/异域味的来源 */
 const PHRYGIAN_DOM = [0, 1, 4, 5, 7, 8, 10] as const
 
 interface Voice {
@@ -51,12 +44,11 @@ interface Voice {
   vol: number
   attack: number
   release: number
-  /** 声部整体八度偏移 */
   octave: number
   echo?: boolean
 }
 
-/** 旋律显式音符：[小节, 步, 音阶度数（可越八度/为负）, 时值步数] */
+/** [小节, 步, 音阶度数（可越八度/为负）, 时值步数] */
 type Line = readonly (readonly [number, number, number, number])[]
 
 class Builder {
@@ -69,7 +61,7 @@ class Builder {
     private readonly stepsPerBar: number,
   ) {}
 
-  /** 音阶度数 → 频率（度数越界自动进出八度） */
+  /** 度数越界自动进出八度 */
   private freq(deg: number, octave: number): number {
     const n = this.scale.length
     const idx = ((deg % n) + n) % n
@@ -80,7 +72,7 @@ class Builder {
   note(v: Voice, bar: number, step: number, deg: number, durSteps: number, detune = 1): void {
     this.notes.push({
       t: (bar * this.stepsPerBar + step) * this.stepSec,
-      // 留一点门隙让同度连音不粘连
+      // 0.92 留门隙，同度连音不粘连
       dur: durSteps * this.stepSec * 0.92,
       freq: this.freq(deg, v.octave) * detune,
       wave: v.wave,
@@ -95,7 +87,7 @@ class Builder {
     for (const [bar, step, deg, dur] of entries) this.note(v, bar, step, deg, dur)
   }
 
-  /** 低音：逐小节按和弦实例化模式串。r=根音 t=三音 f=五音 o=高八度根音 .=休止 -=延长前音 */
+  /** 模式串：r=根音 t=三音 f=五音 o=高八度根音 .=休止 -=延长前音 */
   bass(v: Voice, chords: readonly number[], pattern: string): void {
     const tone: Record<string, number> = { r: 0, t: 2, f: 4, o: 7 }
     for (let bar = 0; bar < chords.length; bar++) {
@@ -112,7 +104,7 @@ class Builder {
     }
   }
 
-  /** 琶音：和弦音序（0 根 1 三 2 五 3 高八度根 4 高八度三…）逐步循环铺满小节 */
+  /** seq：0 根 1 三 2 五 3 高八度根 4 高八度三… */
   arp(v: Voice, chords: readonly number[], seq: readonly number[], fromBar = 0, toBar = chords.length): void {
     let i = 0
     for (let bar = fromBar; bar < toBar; bar++) {
@@ -125,8 +117,7 @@ class Builder {
     }
   }
 
-  /** 和弦垫：整小节长音；tones 为和弦音索引（如 [0,1,2] 全三和弦、[0,2] 空心五度）。
-   * detune>0 时每音叠一条微升的影子音（合唱式加宽） */
+  /** tones 为和弦音索引；detune>0 时每音叠一条微升影子音 */
   pad(v: Voice, chords: readonly number[], tones: readonly number[], detune = 0): void {
     for (let bar = 0; bar < chords.length; bar++) {
       for (const tone of tones) {
@@ -137,7 +128,7 @@ class Builder {
     }
   }
 
-  /** 打击乐模式串铺满 [fromBar, toBar)：x=重击 o=轻击 .=休止 */
+  /** [fromBar, toBar)；模式串：x=重击 o=轻击 .=休止 */
   drums(kind: BgmHitKind, pattern: string, fromBar: number, toBar: number, vol: number): void {
     for (let bar = fromBar; bar < toBar; bar++) {
       for (let s = 0; s < pattern.length; s++) {
@@ -181,9 +172,8 @@ function track(
   }
 }
 
-// ── 五首曲子 ────────────────────────────────────────────────
+// ── 曲目 ────────────────────────────────────────────────
 
-/** 大厅：温暖的 C 大调摇篮曲式，界面页共用（96 BPM，40 秒循环） */
 function buildLobby(): BgmScore {
   const chords = [0, 5, 3, 4, 0, 5, 3, 4, 3, 4, 2, 5, 1, 4, 0, 0]
   return track(
@@ -196,7 +186,7 @@ function buildLobby(): BgmScore {
       b.bass(bass, chords, 'r...f...')
       b.pad(pad, chords, [0, 1, 2])
       b.line(lead, [
-        // A 段（问句 + 答句）
+        // A 段
         [0, 0, 2, 2], [0, 2, 1, 2], [0, 4, 0, 2], [0, 6, 1, 2],
         [1, 0, 2, 4], [1, 4, 4, 3],
         [2, 0, 5, 2], [2, 2, 4, 2], [2, 4, 2, 2], [2, 6, 4, 2],
@@ -205,7 +195,7 @@ function buildLobby(): BgmScore {
         [5, 0, 2, 4], [5, 4, 4, 4],
         [6, 0, 5, 2], [6, 2, 6, 2], [6, 4, 7, 3],
         [7, 0, 4, 6],
-        // B 段（上行提亮 → 收束回家）
+        // B 段
         [8, 0, 7, 2], [8, 2, 6, 2], [8, 4, 5, 2], [8, 6, 6, 2],
         [9, 0, 4, 4], [9, 4, 6, 2], [9, 6, 7, 2],
         [10, 0, 6, 2], [10, 2, 5, 2], [10, 4, 4, 2], [10, 6, 2, 2],
@@ -213,7 +203,7 @@ function buildLobby(): BgmScore {
         [12, 0, 1, 2], [12, 2, 3, 2], [12, 4, 5, 2], [12, 6, 3, 2],
         [13, 0, 4, 2], [13, 2, 2, 2], [13, 4, 1, 4],
         [14, 0, 0, 8],
-        // 第 16 小节留白换气，接回循环开头
+        // 第 16 小节留白
       ])
       b.drums('hat', '..x...x.', 0, 16, 0.06)
       b.drums('kick', 'x.......', 8, 16, 0.14)
@@ -221,7 +211,6 @@ function buildLobby(): BgmScore {
   )
 }
 
-/** 黑森林：E 多利亚探险民谣，驱动性低音 + 高把位 B 段（128 BPM，30 秒循环） */
 function buildForest(): BgmScore {
   const chords = [0, 2, 6, 3, 0, 2, 6, 3, 2, 3, 6, 0, 0, 2, 6, 3]
   return track(
@@ -234,7 +223,7 @@ function buildForest(): BgmScore {
       b.bass(bass, chords, 'r.r.r.ro')
       b.arp(arp, chords, [0, 1, 2, 3, 2, 1])
       b.line(lead, [
-        // A 段：林间行进
+        // A 段
         [0, 0, 0, 1], [0, 1, 1, 1], [0, 2, 2, 2], [0, 4, 4, 2], [0, 6, 3, 2],
         [1, 0, 2, 2], [1, 2, 4, 2], [1, 4, 7, 3], [1, 7, 6, 1],
         [2, 0, 6, 2], [2, 2, 5, 2], [2, 4, 4, 4],
@@ -243,12 +232,12 @@ function buildForest(): BgmScore {
         [5, 0, 2, 2], [5, 2, 4, 2], [5, 4, 7, 4],
         [6, 0, 6, 2], [6, 2, 5, 2], [6, 4, 4, 4],
         [7, 0, 3, 4], [7, 4, 2, 2], [7, 6, 1, 2],
-        // B 段：登高远望（上八度）
+        // B 段
         [8, 0, 7, 2], [8, 2, 8, 2], [8, 4, 9, 4],
         [9, 0, 10, 2], [9, 2, 9, 2], [9, 4, 8, 4],
         [10, 0, 9, 2], [10, 2, 8, 2], [10, 4, 6, 2], [10, 6, 4, 2],
         [11, 0, 7, 6],
-        // A' 收尾
+        // A' 段
         [12, 0, 0, 1], [12, 1, 1, 1], [12, 2, 2, 2], [12, 4, 4, 2], [12, 6, 3, 2],
         [13, 0, 2, 2], [13, 2, 4, 2], [13, 4, 7, 4],
         [14, 0, 6, 2], [14, 2, 5, 2], [14, 4, 4, 4],
@@ -257,14 +246,12 @@ function buildForest(): BgmScore {
       b.drums('kick', 'x...x...', 0, 16, 0.3)
       b.drums('snare', '....x...', 0, 16, 0.18)
       b.drums('hat', 'x.x.x.x.', 0, 16, 0.07)
-      // 段落末的过门
       b.drums('snare', '......xx', 7, 8, 0.16)
       b.drums('snare', '....x.xx', 15, 16, 0.16)
     },
   )
 }
 
-/** 荒漠：A 弗里几亚主音阶驼铃谣，3-3-2 律动 + 装饰性蛇形旋律（100 BPM，38 秒循环） */
 function buildDesert(): BgmScore {
   const chords = [0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0]
   return track(
@@ -277,7 +264,7 @@ function buildDesert(): BgmScore {
       b.bass(bass, chords, 'r..r..f.')
       b.pad(drone, chords, [0, 2])
       b.line(lead, [
-        // A 段：远方的商队
+        // A 段
         [0, 0, 4, 2], [0, 2, 3, 1], [0, 3, 2, 1], [0, 4, 3, 4],
         [1, 0, 2, 1], [1, 1, 1, 1], [1, 2, 0, 4],
         [2, 4, 5, 2], [2, 6, 4, 2],
@@ -286,12 +273,12 @@ function buildDesert(): BgmScore {
         [5, 0, 7, 2], [5, 2, 6, 2], [5, 4, 5, 4],
         [6, 0, 4, 6],
         [7, 0, 3, 1], [7, 1, 4, 1], [7, 2, 3, 1], [7, 3, 2, 1], [7, 4, 1, 2], [7, 6, 0, 2],
-        // B 段：热浪上行
+        // B 段
         [8, 0, 7, 3], [8, 3, 8, 1], [8, 4, 9, 4],
         [9, 0, 9, 2], [9, 2, 8, 2], [9, 4, 7, 4],
         [10, 0, 5, 2], [10, 2, 6, 2], [10, 4, 7, 3], [10, 7, 5, 1],
         [11, 0, 4, 6],
-        // A' 回落
+        // A' 段
         [12, 0, 4, 2], [12, 2, 3, 1], [12, 3, 2, 1], [12, 4, 3, 4],
         [13, 0, 2, 1], [13, 1, 1, 1], [13, 2, 0, 4],
         [14, 0, 5, 2], [14, 2, 4, 2], [14, 4, 3, 4],
@@ -304,7 +291,6 @@ function buildDesert(): BgmScore {
   )
 }
 
-/** 奔流：G 大调 6/8 流水，琶音层是不停的河（8 分音符 168/分，34 秒循环） */
 function buildRiver(): BgmScore {
   const chords = [0, 4, 5, 3, 0, 4, 5, 3, 5, 2, 3, 4, 0, 3, 4, 0]
   return track(
@@ -317,7 +303,6 @@ function buildRiver(): BgmScore {
       const lead: Voice = { wave: 'sine', vol: 0.14, attack: 0.02, release: 0.12, octave: 1 }
       b.bass(bass, chords, 'r..f..')
       b.arp(water, chords, [0, 1, 2, 3, 2, 1])
-      // B 段加一层高音水花
       b.arp(sparkle, chords, [3, 4, 5], 8, 16)
       b.line(lead, [
         [0, 0, 2, 3], [0, 3, 1, 3],
@@ -343,7 +328,6 @@ function buildRiver(): BgmScore {
   )
 }
 
-/** 虚空：A 小调暗流，微失谐宽垫 + 带回声的稀疏信号灯（76 BPM，50 秒循环） */
 function buildVoid(): BgmScore {
   const chords = [0, 5, 2, 6, 0, 5, 2, 6, 3, 5, 0, 6, 3, 5, 6, 6]
   return track(
@@ -355,7 +339,7 @@ function buildVoid(): BgmScore {
       bars: 16,
       rootMidi: 45,
       scale: AEOLIAN,
-      // 附点八分回声：0.75 拍
+      // 附点八分 = 0.75 拍
       echo: { delaySec: (60 / 76) * 0.75, feedback: 0.45, level: 0.5 },
     },
     (b) => {
@@ -380,7 +364,7 @@ function buildVoid(): BgmScore {
         [12, 0, 3, 4],
         [13, 0, 5, 4],
         [14, 0, 6, 6],
-        // 第 16 小节全休止：给回声尾巴留呼吸
+        // 第 16 小节全休止
       ])
       b.drums('kick', 'x.......', 0, 16, 0.3)
       b.drums('hat', '....x...', 0, 16, 0.04)
@@ -388,7 +372,6 @@ function buildVoid(): BgmScore {
   )
 }
 
-/** 残垣：暗沉废墟氛围——弗里几亚属和声 + 稀疏滴水琶音 + 幽远主题（84 BPM，45.7 秒循环） */
 function buildRuins(): BgmScore {
   const chords = [0, 6, 3, 5, 0, 6, 4, 5, 3, 6, 0, 5, 4, 6, 3, 0]
   return track(
@@ -406,7 +389,6 @@ function buildRuins(): BgmScore {
       const bass: Voice = { wave: 'sine', vol: 0.2, attack: 0.02, release: 0.14, octave: -1 }
       const pad: Voice = { wave: 'square', vol: 0.028, attack: 0.3, release: 0.9, octave: 0 }
       const lead: Voice = { wave: 'triangle', vol: 0.1, attack: 0.01, release: 0.12, octave: 1, echo: true }
-      // 滴水琶音：稀疏正弦点滴，垫出废墟空旷回响
       const drip: Voice = { wave: 'sine', vol: 0.03, attack: 0.004, release: 0.07, octave: 2 }
       b.bass(bass, chords, 'r.......')
       b.pad(pad, chords, [0, 1, 2], 0.006)
@@ -427,7 +409,7 @@ function buildRuins(): BgmScore {
         [12, 0, 1, 4],
         [13, 0, 3, 4],
         [14, 0, 0, 6],
-        // 第 16 小节全休止：回声尾巴留白
+        // 第 16 小节全休止
       ])
       b.drums('kick', 'x.......', 0, 16, 0.22)
       b.drums('hat', '....x...', 0, 16, 0.04)
@@ -436,8 +418,6 @@ function buildRuins(): BgmScore {
   )
 }
 
-/** 晨昏原野：D 大调开阔谣——A 段拂晓上行（视野渐开），B 段暮色沉降（夜幕四合），
- * 尾段回到拂晓，正合昼夜轮转（108 BPM 循环） */
 function buildDayNight(): BgmScore {
   const chords = [0, 4, 5, 3, 0, 4, 1, 5, 6, 3, 4, 5, 0, 4, 5, 0]
   return track(
@@ -460,7 +440,7 @@ function buildDayNight(): BgmScore {
       b.pad(pad, chords, [0, 2, 4], 0.005)
       b.arp(arp, chords, [0, 2, 4, 2])
       b.line(lead, [
-        // A 段：拂晓上行（视野渐开）
+        // A 段
         [0, 0, 0, 2], [0, 2, 2, 2], [0, 4, 4, 4],
         [1, 0, 4, 2], [1, 2, 5, 2], [1, 4, 7, 4],
         [2, 0, 7, 2], [2, 2, 6, 2], [2, 4, 4, 4],
@@ -469,12 +449,12 @@ function buildDayNight(): BgmScore {
         [5, 0, 4, 2], [5, 2, 7, 2], [5, 4, 9, 4],
         [6, 0, 7, 2], [6, 2, 6, 2], [6, 4, 5, 4],
         [7, 0, 4, 6], [7, 6, 5, 2],
-        // B 段：暮色沉降（视野收窄、夜幕四合）
+        // B 段
         [8, 0, 7, 2], [8, 2, 6, 2], [8, 4, 4, 4],
         [9, 0, 5, 2], [9, 2, 4, 2], [9, 4, 2, 4],
         [10, 0, 4, 2], [10, 2, 2, 2], [10, 4, 0, 4],
         [11, 0, 2, 6],
-        // A' 收束回到拂晓
+        // A' 段
         [12, 0, 0, 2], [12, 2, 2, 2], [12, 4, 4, 4],
         [13, 0, 4, 2], [13, 2, 5, 2], [13, 4, 7, 4],
         [14, 0, 7, 2], [14, 2, 5, 2], [14, 4, 4, 4],
@@ -488,8 +468,6 @@ function buildDayNight(): BgmScore {
   )
 }
 
-/** 深空：A 小调空灵慢板——低频脉冲垫底、稀疏正弦星点飘浮、长回声拖尾，营造宇宙的
- * 空旷与失重；72 BPM 循环 */
 function buildSpace(): BgmScore {
   const chords = [0, 5, 3, 6, 0, 4, 5, 3, 6, 2, 5, 3, 0, 5, 6, 4]
   return track(
@@ -506,14 +484,13 @@ function buildSpace(): BgmScore {
     (b) => {
       const bass: Voice = { wave: 'sine', vol: 0.2, attack: 0.06, release: 0.3, octave: -1 }
       const pad: Voice = { wave: 'triangle', vol: 0.03, attack: 0.5, release: 1.2, octave: 0 }
-      // 星点：稀疏高频正弦，长回声拖成一串飘浮的光点
       const star: Voice = { wave: 'sine', vol: 0.035, attack: 0.004, release: 0.1, octave: 2, echo: true }
       const lead: Voice = { wave: 'triangle', vol: 0.075, attack: 0.02, release: 0.2, octave: 1, echo: true }
       b.bass(bass, chords, 'r.......')
       b.pad(pad, chords, [0, 2, 4], 0.006)
       b.arp(star, chords, [0, 4, 2, 4, 0, 5], 0, 16)
       b.line(lead, [
-        // A 段：漂向深空（缓缓上行）
+        // A 段
         [0, 0, 0, 4], [0, 4, 4, 4],
         [1, 0, 5, 6], [1, 6, 4, 2],
         [2, 0, 3, 4], [2, 4, 2, 4],
@@ -522,12 +499,12 @@ function buildSpace(): BgmScore {
         [5, 0, 4, 6], [5, 6, 5, 2],
         [6, 0, 7, 4], [6, 4, 6, 4],
         [7, 0, 4, 8],
-        // B 段：登临星海之巅（上八度悬停）
+        // B 段
         [8, 0, 9, 4], [8, 4, 7, 4],
         [9, 0, 8, 6], [9, 6, 6, 2],
         [10, 0, 7, 4], [10, 4, 5, 4],
         [11, 0, 6, 8],
-        // A' 沉降回环
+        // A' 段
         [12, 0, 4, 4], [12, 4, 2, 4],
         [13, 0, 3, 6], [13, 6, 2, 2],
         [14, 0, 4, 4], [14, 4, 5, 4],
@@ -548,7 +525,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   ruins: buildRuins,
   daynight: buildDayNight,
   space: buildSpace,
-  // 浮冰：暂借深空的空灵飘浮曲（冷调、稀疏，占位），建议后续单独作一支寒冰主题曲
+  // 暂借深空曲
   ice: buildSpace,
 }
 

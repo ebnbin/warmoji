@@ -9,16 +9,12 @@ import type { Member } from '../member'
 import type { Enemy } from './enemies'
 import type { ArcadeBody, ArcadeBattleScene, ImageObj } from '../ArcadeBattleScene'
 
-/** 定距风筝的站位滞回带（避免恰好卡在 standoffDist 上抖动） */
+/** 站位滞回带 */
 const STANDOFF_BAND = AI.standoffBandU * UNIT
 
-/** 偷币鼠吞币冷却（ms）：短，但保证一枚一枚地偷，不会一帧扫光一堆 */
 const COINTHIEF_EAT_CD = AI.coinThiefEatCdMs
 
-// 敌人移动策略注册表：按 def.locomotion.kind 分发，镜像 abilities/create.ts。
-// 每个策略只负责逐帧速度决策与状态机推进；攻击在 enemyAbilities.ts、
-// 死亡效果在 battle/deathEffects.ts、公共帧留守 ArcadeBattleScene.steerEnemies。
-// 世界差异经场景钩子（wanderDir/fleeDir）。
+// 策略只做逐帧速度决策与状态机推进；世界差异经场景钩子（chaseDir/wanderDir/fleeDir）
 
 interface SteerCtx {
   scene: ArcadeBattleScene
@@ -32,7 +28,6 @@ interface SteerCtx {
 type Steerer = (ctx: SteerCtx) => void
 
 const chase: Steerer = ({ scene, a, body, slow, target }) => {
-  // 追击方向经世界钩子（残垣图走流场绕墙；其余图 = 径直 norm(worldDelta)）
   const dir = scene.chaseDir(a, target.image)
   body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
 }
@@ -42,13 +37,10 @@ const wander: Steerer = ({ scene, a, body, slow }) => {
   body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
 }
 
-/** 原地不动（巢穴/固定装置）：速度恒零，行为全在其他机制（spawner 等） */
 const staticSteer: Steerer = ({ body }) => {
   body.setVelocity(0, 0)
 }
 
-/** 统一冲刺：探测触发（野猪）与定时触发（Boss）同一状态机——
- * 蓄力（定身颤动）→ 冲刺（锁定方向直线冲）→ 冷却/回到 idle 移动 */
 const dash: Steerer = (ctx) => {
   const { scene, a, body, slow, now, target } = ctx
   const lm = a.def.locomotion
@@ -56,7 +48,6 @@ const dash: Steerer = (ctx) => {
   const e = a.image
   const c = (a.charge ??= { windupUntil: 0, dashUntil: 0, coolUntil: 0, nextDashAt: 0 })
   if (a.state === 'windup') {
-    // 脚本化姿态：本体自管旋转（蓄力颤动），主循环跳过环境摇摆
     a.posed = true
     body.setVelocity(0, 0)
     e.setRotation(Math.sin(now / 28) * 0.14)
@@ -71,12 +62,10 @@ const dash: Steerer = (ctx) => {
     return
   }
   if (a.state === 'dash') {
-    // 脚本化姿态：本体前倾并按冲刺方向翻转（原在主循环渲染分支，收回本策略自管）
     a.posed = true
     body.setVelocity(a.dirX * lm.dashSpeed * slow, a.dirY * lm.dashSpeed * slow)
     e.setRotation(a.dirX * 0.3)
     e.setFlipX(a.dirX > 0)
-    // 冲刺碾墙（残垣图拆迁 Boss）：沿途碾碎断壁，只在冲刺态生效
     if (a.def.breaksWalls) scene.smashWallAt(e.x, e.y)
     if (now >= c.dashUntil) {
       if (lm.trigger.kind === 'timer') {
@@ -89,7 +78,6 @@ const dash: Steerer = (ctx) => {
     }
     return
   }
-  // 触发判定
   if (lm.trigger.kind === 'timer') {
     if (now >= c.nextDashAt) {
       a.posed = true
@@ -102,7 +90,6 @@ const dash: Steerer = (ctx) => {
     const d = scene.worldDelta(e, target.image)
     const dist2 = d.x * d.x + d.y * d.y
     if (a.state !== 'cool' && dist2 <= lm.trigger.range * lm.trigger.range) {
-      // 进入探测圈：锁定当前方向蓄力（横向位移可躲）
       if (lm.lockAt === 'windup') lockDashDir(ctx, lm.aim)
       a.posed = true
       a.state = 'windup'
@@ -112,11 +99,9 @@ const dash: Steerer = (ctx) => {
     }
     if (a.state === 'cool' && now >= c.coolUntil) a.state = 'wander'
   }
-  // idle 移动（非脚本姿态，交还主循环做环境摇摆）：追击目标跟随 aim（Boss 逼近队伍中心，而非最近队员）
   a.posed = false
   if (lm.idle === 'chase') {
     const to = lm.aim === 'teamCenter' ? scene.center : target.image
-    // 逼近走位经世界钩子（残垣图流场绕墙；冲刺本身仍锁直线，撞墙即「被引进墙」）
     const dir = scene.chaseDir(a, to)
     body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
   } else {
@@ -140,7 +125,6 @@ const flee: Steerer = ({ scene, a, body, slow, target }) => {
   const d = scene.worldDelta(e, target.image)
   const dist2 = d.x * d.x + d.y * d.y
   if (dist2 <= lm.range * lm.range) {
-    // 逃离方向经世界钩子修正（有界图贴边沿墙滑行）
     const away = norm(-d.x, -d.y)
     const dir = scene.fleeDir(a, away)
     body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
@@ -153,7 +137,6 @@ const flee: Steerer = ({ scene, a, body, slow, target }) => {
 const coinThief: Steerer = ({ scene, a, body, slow, now }) => {
   const def = a.def
   const e = a.image
-  // 直奔最近的金币；没金币就慢速游荡
   let coin: ImageObj | undefined
   let bestD = Infinity
   for (const c of scene.coins.getChildren() as ImageObj[]) {
@@ -168,14 +151,12 @@ const coinThief: Steerer = ({ scene, a, body, slow, now }) => {
   if (coin) {
     const eatR = def.radius + PICKUPS.coin.radius * UNIT
     const onCoin = bestD <= eatR * eatR
-    // 偷币要过冷却：贴到金币也得等 COINTHIEF_EAT_CD 才吞一枚，不能一帧扫光一堆
     const thief = (a.thief ??= { eaten: 0, nextEatAt: 0 })
     if (onCoin && now >= thief.nextEatAt) {
       releasePooled(coin)
       thief.eaten += 1
       thief.nextEatAt = now + COINTHIEF_EAT_CD
     } else if (onCoin) {
-      // 贴着金币但在偷币冷却中：原地守着等下一口
       body.setVelocity(0, 0)
     } else {
       const d = scene.worldDelta(e, coin)
@@ -188,7 +169,6 @@ const coinThief: Steerer = ({ scene, a, body, slow, now }) => {
   }
 }
 
-/** 定距风筝：detectRange 内咬人——太远贴近、太近后退、站位带内停手，形成绕玩家的固定距离环 */
 const standoff: Steerer = ({ scene, a, body, slow, target }) => {
   const lm = a.def.locomotion
   if (lm.kind !== 'standoff') return
@@ -196,31 +176,25 @@ const standoff: Steerer = ({ scene, a, body, slow, target }) => {
   const d = scene.worldDelta(a.image, target.image)
   const dist = Math.hypot(d.x, d.y)
   if (dist > lm.detectRange) {
-    // 未咬住玩家：慢速游荡
     const dir = scene.wanderDir(a)
     body.setVelocity(dir.x * sp * 0.5, dir.y * sp * 0.5)
   } else if (dist > lm.standoffDist + STANDOFF_BAND) {
-    // 太远：贴近
     const dir = norm(d.x, d.y)
     body.setVelocity(dir.x * sp, dir.y * sp)
   } else if (dist < lm.standoffDist - STANDOFF_BAND) {
-    // 太近：边逃边打（逃离方向经世界钩子修正贴边）
     const dir = scene.fleeDir(a, norm(-d.x, -d.y))
     body.setVelocity(dir.x * sp, dir.y * sp)
   } else {
-    // 站位带内：停住吐弹（射击由能力驱动）
     body.setVelocity(0, 0)
   }
 }
 
-/** 自爆冲锋：追玩家 → 进 triggerRange 定身蓄力 → 蓄力完必引爆（scene.detonate 群伤玩家后自毁）*/
 const detonate: Steerer = ({ scene, a, body, slow, now, target }) => {
   const lm = a.def.locomotion
   if (lm.kind !== 'detonate') return
   const e = a.image
   const c = (a.charge ??= { windupUntil: 0, dashUntil: 0, coolUntil: 0, nextDashAt: 0 })
   if (a.state === 'windup') {
-    // 脚本化姿态：定身拆弹，红白脉冲示警
     a.posed = true
     body.setVelocity(0, 0)
     e.setTint(now % 240 < 120 ? 0xffffff : 0xff5252)
@@ -234,12 +208,10 @@ const detonate: Steerer = ({ scene, a, body, slow, now, target }) => {
     a.posed = true
     return
   }
-  // 逼近走位经世界钩子（残垣图绕墙寻路）
   const dir = scene.chaseDir(a, target.image)
   body.setVelocity(dir.x * a.def.speed * slow, dir.y * a.def.speed * slow)
 }
 
-/** 护巢环绕：绕巢（owner）盘旋，玩家逼近巢即扑向玩家；巢被拆（owner 清空/失效）后直扑玩家（暴走档）*/
 const baseOrbit: Steerer = ({ scene, a, body, slow, target }) => {
   const lm = a.def.locomotion
   if (lm.kind !== 'baseOrbit') return
@@ -247,11 +219,10 @@ const baseOrbit: Steerer = ({ scene, a, body, slow, target }) => {
   const owner = a.owner
   const sp = a.def.speed * slow
   const chasePlayer = (): void => {
-    // 扑向玩家经世界钩子（残垣图绕墙寻路）
     const dir = scene.chaseDir(a, target.image)
     body.setVelocity(dir.x * sp, dir.y * sp)
   }
-  // 巢失效（被拆 / 被对象池回收顶替）→ 暴走直扑（暴走倍率已由 orphanBrood 在拆巢时施加）
+  // owner 的精灵可能已被对象池复用给别的敌人
   if (!owner || !owner.image.active || enemyOf(owner.image) !== owner) {
     chasePlayer()
     return
@@ -263,7 +234,6 @@ const baseOrbit: Steerer = ({ scene, a, body, slow, target }) => {
     chasePlayer()
     return
   }
-  // 绕巢：切向环绕 + 半径回正（r<orbitRadius 外扩、r>orbitRadius 内收）
   const rx = e.x - nest.x
   const ry = e.y - nest.y
   const r = Math.hypot(rx, ry) || 1

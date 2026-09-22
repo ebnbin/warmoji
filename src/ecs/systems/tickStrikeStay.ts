@@ -4,13 +4,12 @@ import { Ability, Assassinate, Blink, Followup, Frozen, Owner, VisOff } from '..
 import { ownerX, ownerY } from '../utils/amp'
 import type { Sim } from '../sim'
 
-/** 停留帧推进：到点闪回原位并再闪一次残影 */
 export function tickStrikeStay(sim: Sim): void {
   const dt = sim.wdtMs
   for (const e of query(sim.world, [Ability, Assassinate, Followup, Blink])) {
     if (Followup.left[e]! <= 0) continue
     const m = Owner.eid[e]!
-    // 阵亡即收势：立刻结束停留（镜像旧 setVisible(false) 把停留掐到最后一帧）
+    // 阵亡即收势
     Followup.left[e] = Frozen.v[e] ? 0 : Followup.left[e]! - dt
     if (Followup.left[e]! > 0) {
       VisOff.x[m] = Blink.x[e]!

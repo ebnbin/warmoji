@@ -1,9 +1,6 @@
 import type { ItemDef } from '../src/types/items'
 
-// 创作层（不进运行时 bundle）：道具数据行。角色质变不再靠买升级卡——每张卡自带
-// upgradeXp（购买即给该角色累加专属经验，攒满档位自动质变）。高端货可设 minLevel
-// （仅高等级角色形态才上架）。生成 src/assets/items.json。
-// upgradeXp 与稀有度/价格松相关但逐卡微调：普通 ~10-15、稀有 ~24-28、史诗 ~52-56。
+// upgradeXp 约定：普通 10~15、稀有 24~28、史诗 52~56
 
 export const ITEMS = {
   // ── 通用池 · 普通（15~35）──
@@ -127,7 +124,7 @@ export const ITEMS = {
     upgradeXp: 24,
     effects: { knockbackMul: 1.35 },
   },
-  // ── 通用池 · 史诗（90~130；minLevel 高端货，需升级解锁）──
+  // ── 通用池 · 史诗（90~130）──
   fateDice: {
     emoji: '1f3b2',
     name: '命运骰子',
@@ -242,6 +239,4 @@ export const ITEMS = {
     upgradeXp: 12,
     effects: { rangeMul: 1.2 },
   },
-  // 团队增益在经验升级卡（cards/registry.ts）；角色质变靠专属经验（每卡 upgradeXp）自动升级，
-  // 商店只卖角色装备、不再出售升级卡
 } as const satisfies Record<string, ItemDef>

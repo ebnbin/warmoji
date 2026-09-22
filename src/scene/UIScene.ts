@@ -3,7 +3,6 @@ import { CAPTAINS } from '../data/captains'
 import { PICKUPS } from '../data/pickups'
 import { formatTime } from '../util/format'
 import { endRun, getRun } from '../run/state'
-// 能量豆已移除：技能纯 CD 门槛（见 captains/skill.ts）
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
 import { emojiImage } from '../emoji/textures'
@@ -18,11 +17,6 @@ import type { HudHost } from '../run/hudHost'
 import { roundRect } from '../ui/shapes'
 import { DevPanel } from '../dev/DevPanel'
 
-// 屏幕层：HUD、虚拟摇杆、暂停浮层、波末横幅、开发者面板。
-// 与战斗场景并行运行，相机静止不随地图滚动，坐标即逻辑视口坐标。
-// 它是一块页面而非战斗世界，故住在 scene/ 而非战斗侧：对战斗的读写全经
-// run/hudHost 的两条契约（HudHost 读战斗、HudInput 供战斗读移动输入），
-// 本文件对两套战斗实现零依赖。
 export class UIScene extends Phaser.Scene implements HudInput {
   private joystick?: Joystick
   private xpBar!: Phaser.GameObjects.Graphics
@@ -31,23 +25,22 @@ export class UIScene extends Phaser.Scene implements HudInput {
   private killsText!: Phaser.GameObjects.Text
   private coinsText!: Phaser.GameObjects.Text
   private last!: HudSnapshot
-  /** 开发者面板（仅设置里开了开发者模式时挂载） */
   private dev?: DevPanel
   private paused = false
   private pauseObjs: Phaser.GameObjects.GameObject[] = []
-  // 队长技能按钮（左下角）：底圆 + 队长头像 + 冷却扇形暗罩 + 秒数 + 就绪光圈
+  // 队长技能按钮
   private skillBase?: Phaser.GameObjects.Arc
   private skillEmoji?: Phaser.GameObjects.Image
   private skillMask?: Phaser.GameObjects.Graphics
   private skillCdText?: Phaser.GameObjects.Text
   private skillRing?: Phaser.GameObjects.Arc
   private skillCenter = { x: 0, y: 0 }
-  /** 队长头像的基准缩放（emojiImage 经 setDisplaySize 得到的小数 scale） */
+  /** setDisplaySize 后的小数 scale，弹跳按它做相对缩放 */
   private skillEmojiScale = 1
   private skillWasReady = false
   private skillShownSec = -1
   private skillShownRatio = -1
-  // 战场拾取效果指示（左上，经验条下方竖排）：图标随激活集变动重建，剩余时间条每帧重绘
+  // 战场拾取效果指示
   private fxIcons: Phaser.GameObjects.Image[] = []
   private fxBars?: Phaser.GameObjects.Graphics
   private fxKey = ''
@@ -56,13 +49,11 @@ export class UIScene extends Phaser.Scene implements HudInput {
     super('ui')
   }
 
-  /** HudInput 契约：战斗侧每帧读它取移动输入（不认识本类） */
   get moveVector(): { x: number; y: number } {
     return this.joystick?.vector ?? { x: 0, y: 0 }
   }
 
-  /** 当前战斗场景，按 HUD 宿主契约取用（两套战斗实现都满足）。
-   * 宿主在自己的 create 里登记，且先于 scene.launch('ui')，故此处必然已就位 */
+  /** 宿主在 create 里登记且先于 scene.launch('ui')，此处必已就位 */
   private get arena(): HudHost {
     return activeHudHost()!
   }
@@ -71,7 +62,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     applyCamera(this)
     const res = textRes()
     const w = viewport.logicalWidth
-    // 全屏贴边的 HUD 须避开刘海/状态栏/Home 条
     const { top: sT, right: sR } = safeInsets
     this.last = {
       xp: -1,
@@ -93,7 +83,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
 
     this.xpBar = this.add.graphics()
     this.bossBar = this.add.graphics().setDepth(120)
-    // 深色字 + 白描边：浅色地图与暗色背景（相机贴边时）上都可读
     const hudText = {
       fontFamily: UI_FONT,
       color: '#2b2b33',
@@ -101,7 +90,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
       strokeThickness: 3,
       resolution: res,
     }
-    // 经验条 = 距下一次团队升级抽卡的进度（升级即在战斗后开卡页三选一）
     this.timeText = this.add
       .text(w / 2, sT + 10, '', { ...hudText, fontSize: FONT.lead })
       .setOrigin(0.5, 0)
@@ -114,7 +102,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
       .text(w - sR - 46, sT + 48, '0', { ...hudText, fontSize: FONT.head })
       .setOrigin(1, 0)
 
-    // 暂停：按钮或 ESC；已暂停或已结算时按钮行为由 togglePause 把关
     emojiImage(this, w - sR - 26, sT + 112, '23f8', 48)
       .setDepth(300)
       .setAlpha(0.85)
@@ -125,8 +112,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
       if (this.paused) this.togglePause()
     })
 
-    // 开发者面板：设置里开了「开发者模式」才挂。它自带 🔧 收起态，
-    // 试炼场旋钮与性能读数都在里面——战斗内不再有第二块 dev UI
     if (loadSettings(browserStorage()).devMode) this.dev = new DevPanel(this, this.arena)
 
     this.createSkillButton(res)
@@ -145,13 +130,11 @@ export class UIScene extends Phaser.Scene implements HudInput {
       arenaEvents.off('field-collected', this.onFieldCollected, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       setActiveHudInput(undefined)
-      // 面板持有逐帧刷新的对象与帧采样监听：清引用，否则 restart 后
-      // update 仍对已销毁的 Text 调 setText → 渲染撞空 → 卡死
+      // 须销毁并清引用：restart 后 update 仍会对已销毁的 Text 调 setText
       this.dev?.destroy()
       this.dev = undefined
     })
 
-    // 视口变化会重启本场景：恢复暂停浮层
     if (this.arena.scene.isPaused()) {
       this.paused = true
       this.showPauseOverlay()
@@ -173,8 +156,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
     }
   }
 
-  /** 暂停浮层压在开发者面板之上：面板在 320+，浮层若还留在 250 就会被面板穿透，
-   * 「已暂停」的黑幕上浮着一块可点的 dev 面板——暂停就不再是暂停 */
+  /** depth 须高于开发者面板（320+） */
   private showPauseOverlay(): void {
     const res = textRes()
     const cx = viewport.logicalWidth / 2
@@ -238,7 +220,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.drawXpBar(s)
     if (s.kills !== this.last.kills) this.killsText.setText(String(s.kills))
     if (s.coins !== this.last.coins) this.coinsText.setText(String(s.coins))
-    // 常规显示本波倒计时；试炼场无波次限时，显示已进行时间
     const remainSec = Math.ceil(s.remainMs / 1000)
     const lastRemainSec = Math.ceil(this.last.remainMs / 1000)
     if (s.wave !== this.last.wave || remainSec !== lastRemainSec || s.seconds !== this.last.seconds) {
@@ -250,7 +231,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     this.last = s
   }
 
-  /** 终波 Boss 血条：波次计时下方居中的红条 */
   private drawBossBar(s: HudSnapshot): void {
     const g = this.bossBar
     g.clear()
@@ -263,7 +243,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     roundRect(g, x + 2, y + 2, Math.max(6, (w - 4) * ratio), 12, 6, { fill: 0xef5350 })
   }
 
-  /** 节点波警示横幅：短暂弹出后淡出（精英潮 / Boss 登场） */
   private onWaveWarning(w: { title: string; sub: string }): void {
     const res = textRes()
     const cx = viewport.logicalWidth / 2
@@ -359,7 +338,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     this.arena.castSkill()
   }
 
-  /** 逐帧刷新按钮状态：冷却中扇形暗罩（脏检查）；就绪时光圈呼吸（纯 CD，无弹药态） */
   private updateSkillButton(): void {
     if (!this.skillMask) return
     const sk = this.arena.skillSnapshot()
@@ -374,7 +352,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
         this.skillCdText?.setText(String(remainSec))
         this.skillEmoji?.setAlpha(0.4)
         this.skillRing?.setVisible(false)
-        // 剩余冷却的扇形暗罩：从 12 点起顺时针，随充能收缩
         const g = this.skillMask
         g.clear()
         g.fillStyle(0x000000, 0.6)
@@ -390,8 +367,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
       this.skillCdText?.setText('')
       this.skillEmoji?.setAlpha(1)
       this.skillRing?.setVisible(true)
-      // 就绪弹跳提示（各自按基准缩放做相对弹跳：emoji 的原生 scale 是小数，
-      // 不能 tween 到绝对 1）
+      // emoji 的 scale 是小数，弹跳须相对基准缩放，不能 tween 到绝对 1
       const bump = (obj: Phaser.GameObjects.GameObject | undefined, base: number): void => {
         if (!obj) return
         this.tweens.add({
@@ -416,7 +392,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     this.fxBars = this.add.graphics().setDepth(121)
   }
 
-  /** 激活集变动才重建图标（低频）；剩余时间条每帧重绘（绿=增益/红=减益） */
   private updateFxIndicators(list: HudSnapshot['battleFx']): void {
     const x = safeInsets.left + 26
     const y0 = safeInsets.top + 52
@@ -441,7 +416,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     })
   }
 
-  /** 技能释放横幅：技能名短暂弹出（比波次警示小一号、更快收场） */
   private onSkillCast(name: string): void {
     const t = emojiText(
       this,
@@ -467,8 +441,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     this.tweens.add({ targets: t, alpha: 0, delay: 900, duration: 400, onComplete: () => t.destroy() })
   }
 
-  /** 拾取战场增益/减益的到手横幅：名字 + 极性 + 效果说明（绿=增益/红=减益），
-   * 让玩家明确知道刚拿到了什么、持续多久（HUD 左上图标是之后的常驻提醒） */
   private onFieldCollected(fx: {
     emoji: string
     name: string
@@ -527,7 +499,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     this.scene.restart()
   }
 
-  /** 波末结算横幅：冻结期展示本波战果，随场景切换自然销毁 */
   private onWaveComplete(s: WaveSummary): void {
     const res = textRes()
     const cx = viewport.logicalWidth / 2

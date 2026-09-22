@@ -9,14 +9,10 @@ import { targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 import { spawnFxCircle } from '../entities/fx'
 
-/** 冻伤跳伤间隔（半秒一跳，dps 折半） */
+/** 冻伤跳伤间隔 */
 const TICK_MS = 500
 
-/** 寒气光环：以持有者为圆心持续减速。光环没有冷却概念——Cooldown 恒为 0，
- * 于是每帧都过一遍施放扫描。
- * 减速区本身是一个**跟着持有者走的区域实体**（entities/zone.ts），建一次就一直在：
- * 开关随本武器的出手闸门（持有者倒下当场熄，复活自然回来），武器没了它一并回收。
- * dps 光环内持续掉血、freeze 周期脉冲冻结，两条节拍各自走 Pulse，不占冷却 */
+/** 光环无冷却，每帧都过施放扫描；减速区实体建一次一直在，开关随出手闸门 */
 export function castSlowAuras(sim: Sim): void {
   const dt = sim.wdtMs
   castScan(sim, SlowAura, (e) => {
@@ -42,7 +38,7 @@ export function castSlowAuras(sim: Sim): void {
     }
     const r2 = radius * radius
     if (hasComponent(sim.world, e, AuraDps)) {
-      if (Pulse.dps[e] === 0) Pulse.dps[e] = TICK_MS // 起拍：等满一个周期再跳第一次
+      if (Pulse.dps[e] === 0) Pulse.dps[e] = TICK_MS // 等满一个周期再跳第一次
       else if ((Pulse.dps[e] = Pulse.dps[e]! - dt) <= 0) {
         Pulse.dps[e] = Pulse.dps[e]! + TICK_MS
         const damage = Math.max(1, Math.round(((AuraDps.perSec[e]! * TICK_MS) / 1000) * damageMul(sim, e)))
@@ -54,7 +50,7 @@ export function castSlowAuras(sim: Sim): void {
       }
     }
     if (hasComponent(sim.world, e, AuraFreeze)) {
-      if (Pulse.freeze[e] === 0) Pulse.freeze[e] = AuraFreeze.intervalMs[e]! // 起拍同上
+      if (Pulse.freeze[e] === 0) Pulse.freeze[e] = AuraFreeze.intervalMs[e]!
       else if ((Pulse.freeze[e] = Pulse.freeze[e]! - dt) <= 0) {
         Pulse.freeze[e] = Pulse.freeze[e]! + AuraFreeze.intervalMs[e]!
         for (const t of targetsOf(sim, src)) {
@@ -79,7 +75,6 @@ export function castSlowAuras(sim: Sim): void {
   })
 }
 
-/** 凛冬脉冲：移速归零一段时长（走通用限时减速通道） */
 function freeze(sim: Sim, eid: number, durationMs: number): void {
   Slow.until[eid] = sim.elapsedMs + durationMs
   Slow.mul[eid] = 0

@@ -11,7 +11,6 @@ import { castScan } from './shared/castScan'
 import { nearestAngle, targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 
-/** 横扫：持有物绕角色扫过一段圆弧，扇形判定内每敌一次伤害；onHit 逐被扫中目标施加 */
 export function castSweeps(sim: Sim): void {
   castScan(sim, Sweep, (e) => {
     const src = sourceOf(sim, e)
@@ -19,7 +18,6 @@ export function castSweeps(sim: Sim): void {
     const ox = ownerX(e)
     const oy = ownerY(e)
     const list = targetsOf(sim, src)
-    // 侦测门槛：扇形半径内无敌人就不出手（不空挥）
     const aim = nearestAngle(ox, oy, list, radius)
     if (aim === null) return false
     Aim.rad[e] = aim

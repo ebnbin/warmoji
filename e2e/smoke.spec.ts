@@ -15,8 +15,6 @@ test('页面可加载：canvas 渲染、版本徽章存在、无控制台错误'
 
   await page.waitForFunction(() => window.__warmoji?.scene === 'menu')
 
-  // 屏幕锚定的背景画在页面层；theme-color 跟随背景色（iOS 状态栏着色），
-  // 菜单已改为固定中性色，故是十六进制而非早期的 hsl()
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundImage)
   expect(bg).toContain('linear-gradient')
   const themeColor = await page.evaluate(
@@ -24,14 +22,12 @@ test('页面可加载：canvas 渲染、版本徽章存在、无控制台错误'
   )
   expect(themeColor).toMatch(/^#[0-9a-f]{6}$/i)
 
-  // PWA manifest 与图标可达（Android 状态栏/导航栏着色依赖 WebAPK 安装）
   const manifest = await page.request.get('/manifest.webmanifest')
   expect(manifest.ok()).toBeTruthy()
   expect((await manifest.json()).display).toBe('fullscreen')
   expect((await page.request.get('/icons/icon-512.png')).ok()).toBeTruthy()
 
-  // 进入 menu 已证明 emoji 打包资源（ordering.txt + twemoji.txt）加载并解析成功
-  // （PreloadScene 门禁：拿不到或解析不了就停在预载页，不会到达 menu）
+  // 到达 menu 即证明 emoji 包已加载解析（PreloadScene 门禁）
 
   // 跑几帧，暴露启动后才出现的运行时错误
   await page.waitForTimeout(800)

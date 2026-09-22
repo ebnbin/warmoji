@@ -4,20 +4,16 @@ import type { OutlineKind } from '../emoji/svg'
 import { emojiSvgText, svgToImage } from '../emoji/textures'
 import { animClipOf, bakeAnimFrame } from '../emoji/anim'
 
-// ECS 自绘渲染的 emoji 图集(atlas):把所有实体会用到的 emoji×描边变体一次性光栅化,
-// 网格打包进若干 POT 页纹理,记录每个变体的 UV。渲染时全场实体共享这几张页纹理,
-// MultiPipeline 多纹理批处理(≤16 页可一次 flush),从而 entity 数与 draw call 解绑。
-// 光栅化完全复用旧的 emoji SVG 管线(emojiSvgText→outlineSvg→setSvgSize→svgToImage),
-// 保证每个 glyph 与旧路径逐像素一致。
+// 光栅化复用 emoji SVG 管线，与非图集路径逐像素一致；页数 ≤ 16 才能一次 flush
 
-const CELL = 256 // 单格像素(与旧 RASTER 一致,保证清晰度)
-const PAGE = 2048 // 页边长(POT)
-const COLS = PAGE / CELL // 每行格数 = 8
-const PER_PAGE = COLS * COLS // 每页格数 = 64
-// 帧位上限:静态变体 + 惰性烘焙的动画帧(按需增页,一局只烘真正登场的那几种)
+const CELL = 256 // 单格像素
+const PAGE = 2048 // 页边长，须为 POT
+const COLS = PAGE / CELL
+const PER_PAGE = COLS * COLS
+// 帧位上限：静态变体 + 惰性烘焙的动画帧
 const MAX_FRAMES = 2048
 
-/** 变体键。outline 为 undefined 即不描边那一版（旧路径 emojiKey 同义） */
+/** outline undefined = 不描边 */
 function variantKey(id: string, outline: OutlineKind | undefined): string {
   return `${id}|${outline ?? ''}`
 }
@@ -26,7 +22,6 @@ function clipKey(id: string, outline: OutlineKind | undefined, clipId: string): 
   return `${id}|${outline ?? ''}|${clipId}`
 }
 
-/** 光栅化一个变体：描边与否是唯一的分支，其余与旧路径 createTexture 逐字同源 */
 function rasterize(raw: string, outline: OutlineKind | undefined): Promise<HTMLImageElement> {
   const svg = outline ? outlineSvg(raw, OUTLINE.radius, OUTLINE.colors[outline]) : raw
   return svgToImage(setSvgSize(svg, CELL))
@@ -34,9 +29,9 @@ function rasterize(raw: string, outline: OutlineKind | undefined): Promise<HTMLI
 
 const NO_CLIP = { base: -1, frames: 0 }
 
-/** 图集实例序号:页纹理键按实例唯一——跨局重建时新旧图集不会争同一个纹理键 */
+/** 页纹理键按实例唯一 */
 let atlasSerial = 0
-/** 跨局复用的图集单例(清单恒定,一个进程建一次即可) */
+/** 跨局复用 */
 let shared: EcsAtlas | undefined
 
 export class EcsAtlas {
@@ -48,26 +43,24 @@ export class EcsAtlas {
   private readonly pages: Phaser.Textures.CanvasTexture[] = []
   private readonly canvases: HTMLCanvasElement[] = []
   private readonly ctxs: CanvasRenderingContext2D[] = []
-  /** 下一个空闲格位(静态变体铺完后即动画帧的起点) */
+  /** 下一个空闲格位 */
   private cursor = 0
   private scene?: Phaser.Scene
   private readonly serial = atlasSerial++
-  /** 场景已关闭:在途的惰性烘焙就此作废(纹理管理器已归新一局所有) */
+  /** 场景已关闭，在途烘焙作废 */
   private disposed = false
 
-  /** 场景关闭时调用:挂起在途烘焙的落格与刷新。图集本体跨局复用(见 build 的模块级缓存),
-   * 页纹理与 clip 缓存都留着——旧路径的 emoji 纹理由 PreloadScene 一次性 pin、
-   * clip 帧存在模块级 liveFrames 里,同样跨局有效 */
+  /** 场景关闭时调用；图集本体与 clip 缓存跨局保留 */
   dispose(): void {
     this.disposed = true
   }
 
-  /** 新一局接手:重新指向当前场景并解除挂起(页纹理挂在游戏级 TextureManager 上,天然还在) */
+  /** 新一局接手 */
   private rebind(scene: Phaser.Scene): void {
     this.scene = scene
     this.disposed = false
   }
-  /** clip → 帧基址与帧数;帧数 0 表示该 emoji 无此 clip(问过一次就不再问) */
+  /** 帧数 0 = 无此 clip */
   private readonly clips = new Map<string, { base: number; frames: number }>()
   /** 正在烘焙中的 clip(去重) */
   private readonly baking = new Set<string>()
@@ -98,7 +91,7 @@ export class EcsAtlas {
     this.pages.push(scene.textures.addCanvas(key, cv)!)
   }
 
-  /** 把一张光栅图落进某格并记 UV(V 轴按 GL 朝向,原点在下) */
+  /** V 轴按 GL 朝向，原点在下 */
   private place(frame: number, img: HTMLImageElement | HTMLCanvasElement): void {
     const page = Math.floor(frame / PER_PAGE)
     const local = frame % PER_PAGE
@@ -113,9 +106,7 @@ export class EcsAtlas {
     this.pageOf[frame] = page
   }
 
-  /** 某 emoji 某 clip 的帧基址与帧数(整套帧连续排布)。
-   * 首次询问即在后台烘焙,未就绪返回 frames=0——调用方保持静态帧,烘好后再问即接上
-   *(渐进增强,与旧 clipFramesLive 同策略) */
+  /** 首次询问即后台烘焙；未就绪返回 frames = 0，调用方保持静态帧 */
   clip(id: string, outline: OutlineKind | undefined, clipId: string): { base: number; frames: number } {
     const key = clipKey(id, outline, clipId)
     const hit = this.clips.get(key)
@@ -123,19 +114,18 @@ export class EcsAtlas {
     if (!this.baking.has(key)) {
       this.baking.add(key)
       void this.bakeClip(id, outline, clipId, key).catch(() => {
-        // 光栅化失败(取字形/解码出错):记为「无此 clip」,实体保持静态帧,不再反复重试
+        // 失败记为无此 clip，不再重试
         this.clips.set(key, NO_CLIP)
       })
     }
     return NO_CLIP
   }
 
-  /** 还能放下这么多帧吗(格位上限兜底:满了就不再烘,实体保持静态帧) */
   private hasRoom(n: number): boolean {
     return this.cursor + n <= MAX_FRAMES
   }
 
-  /** 惰性烘焙:整套帧连续落格(必要时增页),完成后刷新受影响的页纹理 */
+  /** 整套帧连续落格 */
   private async bakeClip(id: string, outline: OutlineKind | undefined, clipId: string, key: string): Promise<void> {
     const clip = animClipOf(id, clipId)
     const scene = this.scene
@@ -148,7 +138,7 @@ export class EcsAtlas {
     const imgs = await Promise.all(
       Array.from({ length: clip.frames }, (_, i) => rasterize(bakeAnimFrame(raw, recipe, i / clip.frames), outline)),
     )
-    // 光栅化是异步的:场景可能已切换、或期间格位被别的 clip 占满,此时静默丢弃
+    // 场景已切换或格位已满则静默丢弃
     if (this.disposed || !scene.textures || !this.hasRoom(imgs.length)) return
     const base = this.cursor
     const touched = new Set<number>()
@@ -161,7 +151,7 @@ export class EcsAtlas {
     this.clips.set(key, { base, frames: clip.frames })
   }
 
-  /** 变体索引(id + 描边阵营)→ frame;未收录返回 -1 */
+  /** 未收录返回 -1 */
   index(id: string, outline: OutlineKind | undefined): number {
     return this.keyToFrame.get(variantKey(id, outline)) ?? -1
   }
@@ -175,12 +165,10 @@ export class EcsAtlas {
     out[3] = this.uv[b + 3]!
   }
 
-  /** frame 所在页 */
   page(frame: number): number {
     return this.pageOf[frame]!
   }
 
-  /** 页的 GL 纹理句柄(供 MultiPipeline.batchQuad 绑定) */
   pageGlTexture(page: number): Phaser.Renderer.WebGL.Wrappers.WebGLTextureWrapper {
     return this.pages[page]!.get().source.glTexture!
   }
@@ -189,19 +177,16 @@ export class EcsAtlas {
     return this.pages.length
   }
 
-  /** 从「阵营→emoji 列表」清单构建图集(复用旧 emoji 光栅化,逐 glyph 一致) */
   static async build(
     scene: Phaser.Scene,
     outlined: Record<OutlineKind, readonly string[]>,
     plain: readonly string[],
   ): Promise<EcsAtlas> {
-    // 清单恒定(OUTLINED_EMOJIS),故一个进程只建一次:跨局复用页纹理与已烘好的 clip 帧,
-    // 既不每局泄漏 2048² 纹理,第 2 波起也不必重烘部件动画(否则会短暂回落静态帧)
+    // 一个进程只建一次，跨局复用
     if (shared) {
       shared.rebind(scene)
       return shared
     }
-    // 收集去重后的全部变体(id,outline)
     const variants: { id: string; outline: OutlineKind | undefined }[] = []
     const seen = new Set<string>()
     const take = (id: string, outline: OutlineKind | undefined): void => {
@@ -216,7 +201,6 @@ export class EcsAtlas {
     for (const id of plain) take(id, undefined)
 
     const atlas = new EcsAtlas()
-    // 并行光栅化,顺序落格
     const imgs = await Promise.all(
       variants.map(async ({ id, outline }) => rasterize(await emojiSvgText(id), outline)),
     )
@@ -226,7 +210,6 @@ export class EcsAtlas {
       atlas.place(frame, imgs[i]!)
       atlas.keyToFrame.set(variantKey(id, outline), frame)
     }
-    // 页纹理统一登记(此后 scene 就位,增页即时登记)
     atlas.scene = scene
     for (let p = 0; p < atlas.canvases.length; p++) {
       const key = `ecs-atlas-${atlas.serial}-${p}`

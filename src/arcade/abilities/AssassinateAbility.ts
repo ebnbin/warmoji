@@ -7,14 +7,12 @@ import { strongestTarget } from './targeting'
 import { emojiImage } from '../../emoji/textures'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 瞬袭型：冷却好时瞬移到索敌范围内血量最高的敌人背后重斩，短暂停留
- * （期间本体无敌）后闪回原位。位移走 visualOffset（与队伍布局叠加，物理体
- * 随视觉走）。能力：onHit 斩击目标命中效果（连环刃等）；execute 低血目标伤害翻倍 */
+/** 位移走 visualOffset，物理体随视觉走 */
 export class AssassinateAbility implements AbilityRuntime {
   private image?: Phaser.GameObjects.Image
   private cooldown: number
   private aim = 0
-  /** 突袭剩余时长；>0 表示正处于背刺停留帧 */
+  /** >0 表示停留帧 */
   private strikeLeft = 0
   private offset = { x: 0, y: 0 }
 
@@ -40,7 +38,6 @@ export class AssassinateAbility implements AbilityRuntime {
     if (this.strikeLeft > 0) {
       this.strikeLeft -= delta
       if (this.strikeLeft <= 0) {
-        // 闪回原位
         this.offset = { x: 0, y: 0 }
         owner.setVisualOffset(0, 0)
         this.flash(owner.x, owner.y)
@@ -51,14 +48,12 @@ export class AssassinateAbility implements AbilityRuntime {
     }
 
     if (this.cooldown > 0) return
-    // 索敌：范围内血量最高者（精英/厚血怪优先挨刀）
     const target = strongestTarget(owner.x, owner.y, this.ctx.targets(), this.def.range, (ref) =>
       this.ctx.targetHp(ref),
     )
     if (!target) return
     this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
 
-    // 落点：目标背面（沿本体→目标方向再往前越过目标）
     const dx = target.x - owner.x
     const dy = target.y - owner.y
     const d = Math.hypot(dx, dy) || 1
@@ -73,7 +68,6 @@ export class AssassinateAbility implements AbilityRuntime {
     this.ctx.sfx('whoosh')
     this.flash(landX, landY)
 
-    // 斩击：主目标全额，处决判定按血量比例；连环刃波及周围小圈
     let damage = Math.round(this.def.damage * this.ctx.damageMul())
     const exec = this.def.execute
     if (exec) {
@@ -93,7 +87,6 @@ export class AssassinateAbility implements AbilityRuntime {
     slashCue(this.ctx.scene, target.x, target.y, this.aim, 34)
   }
 
-  /** 瞬移端点的残影闪光 */
   private flash(x: number, y: number): void {
     circleCue(this.ctx.scene, x, y, 26, {
       fill: 0xb388ff,

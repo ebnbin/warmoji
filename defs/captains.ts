@@ -1,8 +1,5 @@
 import type { CaptainSource } from '../src/types/captains'
 
-// 创作层（不进运行时 bundle）：队长数据行。生成 src/assets/captains.json。
-// 技能载荷以 id 引用能力表；gen 校验引用存在且 kind 可释放，运行时解析成 def。
-
 export const CAPTAINS = {
   angel: {
     emoji: '1f607',
@@ -136,8 +133,7 @@ export const CAPTAINS = {
       abilities: ['timeFreeze'],
     },
   },
-  // 测试专用队长（不进正常队长选择页；测试模式固定用它）：编制 8、无限金币、
-  // 永远满豆，其余全中性无增益。技能只是测试便利（定身全场便于观察），非增益
+  // 测试专用：不进队长选择页
   tester: {
     emoji: '1f9ea',
     name: '测试员',

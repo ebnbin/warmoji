@@ -7,15 +7,13 @@ import { emojiImage } from '../../emoji/textures'
 import { nearestAngle } from './targeting'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 突刺型：held 时持有物挥出收回；无 held 时角色本体前冲收回。胶囊判定内每敌一次伤害。
- * 能力：combo 出手后短暂延迟重新索敌再刺一段；onHit 突刺终点命中效果（枪尖震波等） */
 export class ThrustAbility implements AbilityRuntime {
   private image?: Phaser.GameObjects.Image
   private cooldown: number
   private aim = 0
   private lunge = { t: 0 }
   private tween?: Phaser.Tweens.Tween
-  /** 二连突的第二段倒计时；≤0 无待发 */
+  /** ≤0 无待发 */
   private comboIn = 0
 
   constructor(
@@ -43,7 +41,6 @@ export class ThrustAbility implements AbilityRuntime {
       )
     }
 
-    // 二连突：主刺后隔 delayMs 重新索敌补第二段（不吃冷却）
     if (this.comboIn > 0) {
       this.comboIn -= delta
       if (this.comboIn <= 0) this.strike(owner)
@@ -52,19 +49,17 @@ export class ThrustAbility implements AbilityRuntime {
 
     if (this.cooldown > 0) return
     const targets = this.ctx.targets()
-    // 侦测门槛：射程内无敌人就不出手（不空刺）——上限 = 突刺长度 + 判定半径
     if (nearestAngle(owner, targets, this.range()) === null) return
     this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
     this.strike(owner)
     if (this.def.combo) this.comboIn = this.def.combo.delayMs
   }
 
-  /** 攻击索敌上限（像素）：只打得到射程内的敌人才挥 */
+  /** 像素 */
   private range(): number {
     return this.def.reach + this.def.hitRadius
   }
 
-  /** 单段突刺：索敌 → 胶囊判定 → 终点震波（能力）→ 挥出动画 */
   private strike(owner: AbilityOwner): void {
     const targets = this.ctx.targets()
     const aim = nearestAngle(owner, targets, this.range())

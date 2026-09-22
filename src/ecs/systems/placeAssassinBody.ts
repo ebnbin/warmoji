@@ -3,7 +3,6 @@ import { Ability, Aim, Assassinate, Frozen, Held, Tint, Transform } from '../com
 import { ownerX, ownerY } from '../utils/amp'
 import type { Sim } from '../sim'
 
-/** 摆位：持有物定身指向瞄准方向 */
 export function placeAssassinBody(sim: Sim): void {
   for (const e of query(sim.world, [Ability, Assassinate, Aim, Held, Transform])) {
     const aim = Aim.rad[e]!

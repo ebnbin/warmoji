@@ -3,10 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../manifest'
 import { ANIM_SETS } from './anim'
 
-// emoji 缺失守卫：游戏引用的每个 emoji ID 都必须在 ordering 全集里
-//（ordering.txt 是唯一 SSOT）。PRELOAD_EMOJIS + OUTLINED_EMOJIS 已聚合全部
-// 游戏内容 emoji（角色/队长/敌人/道具/地图/武器/拾取/UI 图标/Studio 图标 +
-// 各阵营描边变体 + 变形替身 + 亡语弹体），动画集补上被动画的实体。
+// 守卫：游戏引用的 emoji ID 必须都在 ordering.txt 里，缺失的在运行时只会渲染不出来
 const ordering = new Set(
   readFileSync('src/assets/emoji/ordering.txt', 'utf8').split('\n').map((l) => l.trim()).filter(Boolean),
 )

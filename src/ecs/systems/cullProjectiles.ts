@@ -4,7 +4,6 @@ import { Proj, PROJ_SET, Transform, ViewCull, WorldCull } from '../components'
 import { cullProjectile } from './shared/projectile'
 import type { Sim } from '../sim'
 
-/** 回收：寿命到点 / 出视野 / 世界钩子说该没了。三条各由一个组件决定，互不排斥 */
 export function cullProjectiles(sim: Sim): void {
   const now = sim.elapsedMs
   const view = sim.view

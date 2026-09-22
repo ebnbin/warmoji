@@ -17,14 +17,10 @@ interface Bee {
   dead: boolean
 }
 
-/** 放蜂型（蜂后）：每隔 intervalMs 放出一波 count 只小蜂——各自寻路扑向最近的敌人
- * （优先未中毒者，好把毒摊开），撞上即造成撞击直伤 + onHit 毒素随即自毁；一直没撞到
- * 则到寿命(lifeMs)消散。毒 = onHit 的 poison 效果（每秒一跳、持续数秒的 DoT）。 */
 export class SummonAbility implements AbilityRuntime {
   private bees: Bee[] = []
-  /** 动画时钟：delta 累积（暂停即停帧） */
+  /** delta 累积，暂停即停帧 */
   private clock = 0
-  /** 距下一波放蜂的倒计时 */
   private waveCd: number
   private readonly frames: string[]
   private visible = true
@@ -50,7 +46,7 @@ export class SummonAbility implements AbilityRuntime {
     }
   }
 
-  /** 优先未中毒的最近敌人；没有未中毒者则退而求其次取最近敌人 */
+  /** 优先未中毒的最近敌人 */
   private pickTarget(bx: number, by: number): TargetInfo | null {
     const targets = this.ctx.targets()
     const max = ACQUIRE.range * UNIT
@@ -97,7 +93,6 @@ export class SummonAbility implements AbilityRuntime {
 
       const target = this.pickTarget(b.img.x, b.img.y)
       b.phase += dt * 3
-      // 有目标就扑过去；没目标就在主人身边打转候敌
       const dest = target
         ? { x: target.x, y: target.y }
         : { x: owner.x + Math.cos(b.phase) * 40, y: owner.y + Math.sin(b.phase) * 40 - 8 }
@@ -114,7 +109,6 @@ export class SummonAbility implements AbilityRuntime {
         const tx = target.x - b.img.x
         const ty = target.y - b.img.y
         if (tx * tx + ty * ty <= rr * rr) {
-          // 撞上：撞击直伤 + 施毒(onHit)，随即自毁
           const damage = Math.round(this.def.damage * this.ctx.damageMul())
           this.ctx.damageTarget(target.ref, damage, this.def.knockback, b.img.x, b.img.y)
           applyEffects(this.ctx, this.def.onHit, {

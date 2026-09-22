@@ -2,20 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, normalize, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// 循环 import 守卫。
-//
-// 钉的是一个具体缺陷：**ESM 的循环引用能不能跑，取决于模块求值时刻有没有真的读到
-// 对方的绑定；而谁先求值取决于模块图的遍历次序**——也就是取决于哪个文件碰巧被先
-// import。改一个完全无关的文件的 import 顺序就可能翻转它，典型症状是「dev 好好的、
-// 一 build 就白屏」，或者反过来。
-//
-// 这事真发生过：registries/abilityKinds.ts 与 entities/ability.ts 互相 import 了好几个
-// commit（一边要查登记表、另一边要用断言函数），一直没炸——因为两边都只在函数体里
-// 用对方，顶层不碰。纯属巧合：任何一边往顶层加一句 `Object.keys(KINDS)` 就会变成
-// 依赖求值次序的 ReferenceError。
-//
-// 而这类问题**没有任何现成检查拦得住**：tsc 不管循环 import（它只做类型解析），
-// eslint 这边没装 import 插件，单测与 e2e 照常全绿。只能自己走一遍图。
+// 守卫：循环 import 能否运行取决于模块求值次序，改无关文件的 import 顺序就可能翻转成 ReferenceError；tsc 与 eslint 都不查
 
 const ROOT = 'src'
 /** import type 会被 TS 擦掉，不构成运行时环，故排除 */
@@ -29,7 +16,7 @@ function tsFiles(dir: string): string[] {
   })
 }
 
-/** 相对说明符 → 实际文件路径（.ts / 目录 index.ts） */
+/** .ts 或目录 index.ts */
 function resolve(from: string, spec: string): string | null {
   const base = normalize(join(dirname(from), spec))
   for (const cand of [`${base}.ts`, join(base, 'index.ts'), base]) {
@@ -42,7 +29,7 @@ function resolve(from: string, spec: string): string | null {
   return null
 }
 
-/** 深度优先找回边，返回每条环的路径 */
+/** 返回每条环的路径 */
 function findCycles(graph: ReadonlyMap<string, readonly string[]>): string[][] {
   const cycles: string[][] = []
   const state = new Map<string, 1 | 2>()

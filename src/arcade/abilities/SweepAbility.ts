@@ -7,12 +7,11 @@ import { emojiImage } from '../../emoji/textures'
 import { nearestAngle } from './targeting'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 横扫型：持有物绕角色扫过一段圆弧，扇形判定内每敌一次伤害 */
 export class SweepAbility implements AbilityRuntime {
   private image: Phaser.GameObjects.Image
   private cooldown: number
   private aim = 0
-  /** -1 → 1：从弧的一端扫到另一端 */
+  /** -1 → 1 */
   private sweep = { t: 1 }
   private tween?: Phaser.Tweens.Tween
 
@@ -34,7 +33,6 @@ export class SweepAbility implements AbilityRuntime {
 
     if (this.cooldown > 0) return
     const targets = this.ctx.targets()
-    // 侦测门槛：扇形半径内无敌人就不出手（不空挥）
     const aim = nearestAngle(owner, targets, this.def.radius)
     if (aim === null) return
     this.aim = aim
@@ -53,7 +51,6 @@ export class SweepAbility implements AbilityRuntime {
       this.ctx.damageTarget(targets[i]!.ref, damage, this.def.knockback, owner.x, owner.y)
       hitRefs.push(targets[i]!.ref)
     }
-    // 命中效果（震慑减速等）：逐被扫中目标施加
     applyEffects(this.ctx, this.def.onHit, { center: { x: owner.x, y: owner.y }, baseDamage: damage, targets: hitRefs })
 
     this.tween?.remove()

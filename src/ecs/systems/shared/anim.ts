@@ -5,11 +5,6 @@ import { animId, animOutline } from '../../store'
 import type { Sim } from '../../sim'
 import type { FrameIndex } from '../../frames'
 
-// 部件动画(镜像 Animator):常驻 idle 循环 + 一次性覆盖 clip,把游戏时钟翻算成帧下标,
-// 写进 Sprite.frame 即换帧。帧是惰性烘焙的:未就绪时 atlas 返回 frames=0,
-// 此处保持静态帧,烘好后下一帧自然接上(渐进增强,无加载闪烁)。
-
-/** 给实体登记常驻 idle:记下 emoji/描边(帧惰性解析)+ 相位偏移(同屏大量实体错开呼吸) */
 export function armIdle(eid: number, id: string, outline: OutlineKind, still: number, offsetMs: number): void {
   animId[eid] = id
   animOutline[eid] = outline
@@ -24,13 +19,13 @@ export function armIdle(eid: number, id: string, outline: OutlineKind, still: nu
   Anim.still[eid] = still
 }
 
-/** 播一次性 clip 覆盖 idle:durMs = 本次行为的真实间隔(攻速直接驱动动画速度) */
+/** durMs = 本次行为的真实间隔 */
 export function playClip(sim: Sim, atlas: FrameIndex, eid: number, clipId: string, durMs: number): void {
   const id = animId[eid]
   const outline = animOutline[eid]
   if (id === undefined || outline === undefined) return
   const c = atlas.clip(id, outline, clipId)
-  if (c.frames === 0) return // 尚未烘好:本次不播(与旧 Animator 的静默一致)
+  if (c.frames === 0) return // 尚未烘好则不播
   Anim.onceBase[eid] = c.base
   Anim.onceFrames[eid] = c.frames
   Anim.onceDur[eid] = durMs

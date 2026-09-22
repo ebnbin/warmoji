@@ -4,13 +4,7 @@ import { FRAME_PIPELINE } from './frame'
 import { SIM_PIPELINE } from './sim'
 import type { Step } from './step'
 
-// 系统次序守卫。
-//
-// 钉的是这样一个缺陷：**流水线的次序即语义，破坏它却什么都不会红**。
-// 把 turret 挪到 projectile 之前，弩塔的拉弓动画晚一帧；把 gates 挪到施放之后，
-// 死人还能再出一次手；把 characterContact 挪到敌弹之后，贴脸接触的伤害会被敌弹
-// 吃掉的无敌帧一并挡下——编译过、lint 过、e2e 过，画面也「看着差不多」。
-// 唯一能拦住的，是把「谁必须在谁之后」写下来并逐条校验。
+// 守卫：流水线次序即语义，打乱它不会有任何检查变红
 
 const PIPELINES: readonly { name: string; steps: readonly Step[] }[] = [
   { name: '帧', steps: FRAME_PIPELINE },

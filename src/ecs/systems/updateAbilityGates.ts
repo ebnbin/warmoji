@@ -3,8 +3,6 @@ import { Ability, Alive, Disarmed, Dormant, Faction, FACTION, Frozen, Morph, Own
 import type { Sim } from '../sim'
 import { isDancing } from '../utils/team'
 
-/** 由持有者状态刷新出手闸门：阵亡/休眠者冻结（连冷却都不推进），被压制者缴械
- *（推进冷却但不出手）。施放系统只读这两个标志，不各自去查持有者是什么状态 */
 export function updateAbilityGates(sim: Sim): void {
   const now = sim.elapsedMs
   const dancing = isDancing(sim)

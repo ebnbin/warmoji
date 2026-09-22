@@ -6,34 +6,16 @@ import type { EcsWorld } from '../world'
 import { EcsLayer } from './layer'
 import { packTint } from './tint'
 
-// 伤害飘字：命中点上浮淡出的数字。
-//
-// 与 arcade 那份的区别，也正是这份要单独存在的理由。arcade 是 64 个池化的 BitmapText
-// + 每次命中 `tweens.add({...})`：而 Phaser 4 的 TweenManager **不池化 tween**
-//（TweenBuilder 每次 new 一个 Tween，还要为每个属性建 TweenData），加上配置对象字面量
-// 与 onComplete 闭包，**每个伤害数字至少三次堆分配**；回收槽位时的 killTweensOf 还要
-// 扫一遍活动 tween 列表。这笔开销**没有上限，随战斗烈度线性涨**——8 千档一秒几百次
-// 命中，全压在帧里。
-//
-// 这里走 ECS 侧一贯的做法，与 EcsSpriteBatch / EcsShapeBatch 同构：
-//   · 飘字是**纯数据**（定长平行数组），没有任何一个 GameObject
-//   · 画的活儿归一个 DamageTextBatch —— 裸 GameObject，只为在显示列表占一个 depth，
-//     renderWebGL 里把全部飘字**逐字形**提交四边形给 BatchHandlerQuad
-//     （与 EcsSpriteBatch 同一个批处理器，能批进同一批次）
-//   · 上浮与淡出由 step(fxMs) 自己推进，不挂 tween；时钟取 sim.fxMs
-//
-// 字形纹理仍是启动时一次性烘好的 0-9 光栅图（这一步与框架无关），但不再注册成
-// Phaser 的 RetroFont 位图字体——自绘时 UV 直接算，用不着那套。
 
 const TEX_KEY = 'ecs-damage-digits'
 const CHARS = 10
-/** 字形按 2 倍显示尺寸渲染，高 DPR 下缩放依然清晰（与旧实现同参） */
+/** 字形按 2 倍显示尺寸渲染 */
 const CHAR_W = 24
 const CHAR_H = 36
 
 
 
-/** 把 0-9 烘成一张 240×36 的字形图（幂等；纹理挂在游戏级 TextureManager 上跨局有效） */
+/** 幂等，纹理跨局有效 */
 function bakeDigits(scene: Phaser.Scene): void {
   if (scene.textures.exists(TEX_KEY)) return
   const canvas = document.createElement('canvas')
@@ -57,7 +39,7 @@ function bakeDigits(scene: Phaser.Scene): void {
 
 export class DamageTextLayer {
   private readonly batch: DamageTextBatch
-  /** 本帧视觉钟（renderWebGL 里算进度用）；关掉飘字时整层不画 */
+  /** 本帧视觉钟 */
   private now = 0
 
   constructor(scene: Phaser.Scene, private readonly world: EcsWorld, private readonly enabled: boolean) {
@@ -69,13 +51,10 @@ export class DamageTextLayer {
     this.batch.destroy()
   }
 
-  /** 本帧视觉钟（回收在 systems/expireFx，这里不再自管过期）。fxMs = sim.fxMs */
   step(fxMs: number): void {
     this.now = fxMs
   }
 
-  /** 把全部活动飘字三角化成字形四边形（批绘对象在 renderWebGL 里调）。
-   * 与旧实现一致：暴击 34px 金色、普通 24px 白色，350ms 内从 y-14 线性升到 y-40 并淡出 */
   emit(
     node: {
       batch: (
@@ -99,10 +78,9 @@ export class DamageTextLayer {
       const size = crit ? 34 : 24
       const gh = size
       const gw = (CHAR_W * size) / CHAR_H
-      const cy = Transform.y[eid]! - 26 * t // y-14 → y-40
+      const cy = Transform.y[eid]! - 26 * t
       const tint = packTint(crit ? 0xffdc5d : 0xffffff, 1 - t)
 
-      // 位数：从高位到低位逐字形铺；整串以 x 居中（等价旧实现的 setOrigin(0.5)）
       const n = DamageNumber.value[eid]!
       let digits = 1
       for (let v = n; v >= 10; v = Math.floor(v / 10)) digits++
@@ -116,7 +94,7 @@ export class DamageTextLayer {
         const x1 = left + gw
         const y0 = cy - gh / 2
         const y1 = cy + gh / 2
-        // UV 按「起点 + 尺寸」给，v 轴取 GL 朝向（原点在下），故 vh 为负——与 atlas 同约定
+        // v 轴取 GL 朝向，vh 为负
         const u = digit / CHARS
         node.batch(
           ctx, tex,
@@ -135,12 +113,10 @@ export class DamageTextLayer {
   }
 }
 
-/** 飘字批绘：裸 GameObject，只为在显示列表里占 depth 50（与旧实现的 BitmapText 同层）。
- * renderWebGL 由 RenderSteps 以裸函数方式调用，无 this 绑定，状态一律走 src。 */
+/** 占 depth 50；renderWebGL 无 this 绑定，状态一律走 src */
 class DamageTextBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
-  /** batch() 每次会往里写 alphaStrategy 并与当前 shader 配置比对，必须是复用的持久对象；
-   * multiTexturing 必须显式开，理由同 EcsSpriteBatch */
+  /** 须是复用的持久对象；multiTexturing 须显式开 */
   private readonly renderOptions = { multiTexturing: true }
 
   constructor(scene: Phaser.Scene, private readonly layer: DamageTextLayer) {

@@ -7,11 +7,9 @@ import { enemyDef } from '../store'
 import type { Sim } from '../sim'
 import { spawnFxRing } from '../entities/fx'
 
-/** 自爆群伤示警圈：红圈从 0.3 张到满，300ms（旧实现里这组数在场景侧的 drainRings） */
 const BLAST_RING = { color: 0xff5252, fillAlpha: 0.35, lineWidth: 3, lineAlpha: 0.9, durMs: 300 }
 
-/** 自爆冲锋：追队员 → 进 triggerRange 定身蓄力 → 蓄力完必引爆（群伤范围内队员 + 自毁）。
- * 蓄力前被打死则不炸（引爆不是亡语） */
+/** 蓄力前被打死则不炸 */
 export function steerDetonate(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of [...query(sim.world, [Detonate, Steering, Transform, Speed])]) {
@@ -19,7 +17,6 @@ export function steerDetonate(sim: Sim): void {
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
     if (EState.v[eid] === 2) {
-      // 定身拆弹 + 红白脉冲示警(脚本化姿态);到时引爆。乘算染色(白=原样、红=偏红),非纯色填充
       Tint.effect[eid] = 0
       Tint.color[eid] = now % 240 < 120 ? 0xffffff : 0xff5252
       if (now < Charge.windupUntil[eid]!) continue
@@ -30,7 +27,7 @@ export function steerDetonate(sim: Sim): void {
         if (!Alive.v[m]) continue
         const d = sim.hooks.worldDelta(sim, ex, ey, Transform.x[m]!, Transform.y[m]!)
         if (d.x * d.x + d.y * d.y > r2) continue
-        // 与敌方能力同口径:吃无敌帧节流并消费之(免得接触伤害与自爆同帧双吃)
+        // 吃无敌帧节流并消费之
         if (now - Iframe.last[m]! < Iframe.ms[m]!) continue
         Iframe.last[m] = now
         hurtCharacter(sim, m, dmg, enemyDef[eid]?.name)

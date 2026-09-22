@@ -2,10 +2,8 @@ import { query } from 'bitecs'
 import { Alive, ENEMY_SET, Hp, CharHp, Transform } from '../../components'
 import type { Sim } from '../../sim'
 
-// 治疗的两侧落点（阵营中立的一对原语）：谁被治由调用方按阵营选，挑选规则两侧一致——
-// all=false 只治「血量比例」最低的一个，满血者不计，返回实际被治数。
+// all = false 只治血量比例最低的一个，满血者不计；返回实际被治数
 
-/** 治疗范围内我方队员 */
 export function healCharacters(sim: Sim, x: number, y: number, range: number, amount: number, all: boolean): number {
   const r2 = range * range
   if (all) {
@@ -40,7 +38,7 @@ export function healCharacters(sim: Sim, x: number, y: number, range: number, am
   return 1
 }
 
-/** 治疗范围内敌群；excludeEid 排除一只（亡语治疗时排除正在死亡的自己） */
+/** excludeEid 排除一只 */
 export function healEnemies(
   sim: Sim,
   x: number,

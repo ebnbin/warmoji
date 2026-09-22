@@ -2,16 +2,11 @@ import type Phaser from 'phaser'
 import type { BlastRing } from '../types/abilityDefs'
 import { emojiImage } from '../emoji/textures'
 
-// 表现层（Cue，阵营中立）：一次性放完即弃的战斗特效——与机制正交。能力运行时类
-// 只「触发一个 cue」，不自己写 tween/draw（GAS GameplayCue 思路：机制不依赖渲染）。
-// 持续性视觉（持有物/召唤物/光环圈）是能力生命周期状态，由各类自管，不在此列。
+// 一次性特效；持续性视觉（持有物/召唤物/光环圈）由各能力自管
 
-/** 扩散淡出的圆：填充圆（可选描边），从 fromScale 缩放到 toScale 同时淡出后销毁。
- * 命中白闪、冲击环、治疗/集结/冻结脉冲共用此一处——各自传颜色/尺度/时长/深度。 */
 export interface CircleCue {
   readonly fill: number
   readonly fillAlpha: number
-  /** 描边色；省略即无描边（纯填充闪光） */
   readonly stroke?: number
   readonly lineWidth?: number
   readonly lineAlpha?: number
@@ -34,7 +29,6 @@ export function circleCue(scene: Phaser.Scene, x: number, y: number, radius: num
   })
 }
 
-/** 💥 爆裂：emoji 从缩小随机微转弹出到全尺寸并淡出（轰炸命中点）。 */
 export function boomCue(scene: Phaser.Scene, x: number, y: number, size: number): void {
   const boom = emojiImage(scene, x, y, '1f4a5', size).setDepth(9)
   const full = boom.scale
@@ -49,7 +43,6 @@ export function boomCue(scene: Phaser.Scene, x: number, y: number, size: number)
   })
 }
 
-/** 贯穿光束：沿 angle 铺一条长 length 的双层矩形（外层色 + 白芯），纵向收拢淡出。 */
 export function beamCue(
   scene: Phaser.Scene,
   x: number,
@@ -74,7 +67,6 @@ export function beamCue(
   })
 }
 
-/** 锯齿闪电折线：沿折点串每段拆几截加垂直抖动画一条电弧，短暂淡出（连锁传导路径）。 */
 export function lightningCue(scene: Phaser.Scene, points: readonly { x: number; y: number }[], color: number): void {
   if (points.length < 2) return
   const g = scene.add.graphics().setDepth(14)
@@ -98,7 +90,6 @@ export function lightningCue(scene: Phaser.Scene, points: readonly { x: number; 
   scene.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() })
 }
 
-/** 斩击弧光：以 (x,y) 为心、朝 angle 画一段 ±1.1rad 的白弧，淡出（瞬袭背刺）。 */
 export function slashCue(scene: Phaser.Scene, x: number, y: number, angle: number, radius: number): void {
   const g = scene.add.graphics().setDepth(14)
   g.lineStyle(5, 0xffffff, 0.9)
@@ -108,7 +99,6 @@ export function slashCue(scene: Phaser.Scene, x: number, y: number, angle: numbe
   scene.tweens.add({ targets: g, alpha: 0, duration: 220, onComplete: () => g.destroy() })
 }
 
-/** 全屏白闪：一块盖满视口的定屏矩形淡出（天罚全域打击）。 */
 export function screenFlashCue(scene: Phaser.Scene, color: number, alpha: number, durationMs: number): void {
   const flash = scene.add
     .rectangle(scene.scale.width / 2, scene.scale.height / 2, 6000, 6000, color, alpha)
@@ -117,8 +107,6 @@ export function screenFlashCue(scene: Phaser.Scene, color: number, alpha: number
   scene.tweens.add({ targets: flash, alpha: 0, duration: durationMs, onComplete: () => flash.destroy() })
 }
 
-/** 命中环：从锚点扩张淡出的一圈（纯表现，参数随效果自带）。
- * 弹道机器与能力效果链共用同一处，不各画一遍。 */
 export function blastRing(scene: Phaser.Scene, x: number, y: number, radius: number, ring: BlastRing): void {
   circleCue(scene, x, y, radius, {
     fill: ring.color,

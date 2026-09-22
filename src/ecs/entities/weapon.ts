@@ -24,24 +24,12 @@ import { playSfx } from '../../audio/sfx'
 import { flyerHits } from '../store'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 
-// 武器实体 = **一件握在手里、看得见的东西**。它只负责「有形体」这一件事：
-// Weapon + Held + 绘制包，如此而已。能力不在这里挂——是 ops/equip.ts 的 equipAbility
-// 决定把能力组件挂到这颗身体上，还是直接挂到施放者自己身上（徒手能力）。
-//
-// 为什么徒手能力不需要这颗实体：能力所需的一切（参数、冷却、瞄准、各 kind 的状态）
-// 现在都在「这一种能力」自己的组件里，一个宿主同时挂治疗与飞针互不干扰。
-// 从前冷却挂在共享组件上，一格装不下两份，才被迫每条能力造一颗实体。
-//
-// 那什么时候还需要它：① 有外形要画、要摆位（各 place*Body 系统查 Held）；
-// ② 同一个人身上要挂两条**同种**能力——牛仔的左右两把枪都是 projectile，
-// 组件按 eid 只有一格，只能靠两颗实体各装一份。这两件事在数据里恰好总是同时成立。
 
-/** 造一件武器的身体，挂到持有者名下。返回 eid——能力由调用方挂到它身上 */
+/** 能力由调用方挂到返回的 eid 上 */
 export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, faction: number): number {
   const world = sim.world
   const e = addEntity(world)
   addComponent(world, e, Weapon)
-  // 描边随持有者阵营（敌械与我方武器用不同外圈）
   const outline: OutlineKind =
     faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? 'elite' : 'enemy') : 'player'
   attachDrawable(world, e, sim.frames, {
@@ -61,11 +49,7 @@ export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, f
   return e
 }
 
-/** 掷出去的一枚在途回旋镖：与武器同外形同变体，只在飞行期存在，接住即离场。
- *
- * **它不是武器**——武器始终留在持有者手上（在途期间隐藏）。从前主镖就是武器实体本身
- * 飞了出去，于是双子镖没有实体可用，只好造个「武器副本」；现在每一枚在途的镖都是
- * 一颗同构的独立实体，掷一枚和掷两枚没有区别。 */
+/** 在途回旋镖是独立实体，武器留在手上 */
 function spawnFlyerBody(sim: Sim, weaponEid: number): number {
   const t = addEntity(sim.world)
   addComponents(sim.world, t, Transform, Sprite, Tint, Depth, Quad)
@@ -75,7 +59,7 @@ function spawnFlyerBody(sim: Sim, weaponEid: number): number {
   Transform.rot[t] = Transform.rot[weaponEid]!
   Transform.w[t] = size
   Transform.h[t] = size
-  Sprite.frame[t] = Sprite.frame[weaponEid]! // 同一 atlas 变体（描边已随持有者定好）
+  Sprite.frame[t] = Sprite.frame[weaponEid]!
   Sprite.flipX[t] = 0
   Tint.color[t] = 0xffffff
   Tint.effect[t] = 0
@@ -85,16 +69,15 @@ function spawnFlyerBody(sim: Sim, weaponEid: number): number {
   return t
 }
 
-// ── 在途回旋镖：掷出与收回 ──────────────────────────────────────────────────
+// ── 在途回旋镖 ──
 
-/** 收镖：在途的那一枚离场，武器的在途计数减一（归零才由 updateFlyers 计冷却） */
 export function catchFlyer(sim: Sim, e: number, f: number): void {
   flyerHits[f] = undefined
   removeEntity(sim.world, f)
   Thrown.n[e] = Math.max(0, Thrown.n[e]! - 1)
 }
 
-/** 掷出：单镖沿瞄准方向，双子镖朝正反两个方向。武器留在手上（摆位系统按 Thrown 隐藏） */
+/** 武器留在手上，摆位系统按 Thrown 隐藏 */
 export function launch(sim: Sim, e: number, aim: number): void {
   playSfx('whoosh')
   const damage = Math.round(Boomerang.damage[e]! * damageMul(sim, e))

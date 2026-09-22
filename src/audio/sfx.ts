@@ -1,8 +1,3 @@
-// 程序化音效：迷你 sfxr 风格合成器。
-// 首个用户手势解锁 AudioContext（浏览器自动播放策略），随即把参数表逐条
-// 离线合成为 AudioBuffer（一次性，毫秒级）；战斗中播放只是 BufferSource 回放。
-// 高频事件靠节流 + 随机音高抖动避免机关枪感，全局并发上限防爆音。
-
 import { SFX } from '../data/sfx'
 import type { SfxDef, SfxId } from '../types/sfx'
 export type { Wave, SfxDef, SfxId } from '../types/sfx'
@@ -19,7 +14,7 @@ let enabled = true
 let active = 0
 const stats = { baked: 0, played: 0 }
 
-/** 手写采样合成：波形 + 频率滑移/琶音 + 起音-衰减包络；噪声走一阶低通（种子固定可复现） */
+/** 噪声种子固定，可复现 */
 function render(audio: AudioContext, def: SfxDef): AudioBuffer {
   const n = Math.max(1, Math.round(def.duration * SAMPLE_RATE))
   const buf = audio.createBuffer(1, n, SAMPLE_RATE)
@@ -67,8 +62,7 @@ function render(audio: AudioContext, def: SfxDef): AudioBuffer {
   return buf
 }
 
-/** 惰性创建共享 AudioContext（音效与 BGM 共用一个）并尝试恢复；
- * 无 WebAudio 的环境返回 undefined 静默降级为无声 */
+/** 音效与 BGM 共用；无 WebAudio 时返回 undefined */
 export function ensureAudio(): AudioContext | undefined {
   try {
     if (!ctx) {
@@ -88,12 +82,12 @@ export function ensureAudio(): AudioContext | undefined {
   }
 }
 
-/** 已创建的共享上下文（不触发创建/恢复） */
+/** 不触发创建 */
 export function audioCtx(): AudioContext | undefined {
   return ctx
 }
 
-/** 注册首个用户手势解锁；重复调用/无 WebAudio 环境均安全 */
+/** 幂等 */
 export function initSfx(): void {
   const unlock = (): void => {
     ensureAudio()
@@ -109,7 +103,6 @@ export function setSfxEnabled(on: boolean): void {
 export function playSfx(id: SfxId): void {
   if (!enabled || !ctx || !master) return
   if (ctx.state !== 'running') {
-    // 后台挂起后由下一次交互/播放尝试恢复
     void ctx.resume()
     return
   }

@@ -7,7 +7,6 @@ import { Alive, Orbit, Threat, Transform } from '../components'
 import type { Sim } from '../sim'
 import { centerX, centerY } from '../utils/team'
 
-/** 队伍活感·探测与轨道(镜像 updateOrbit):逐员判定探测范围内有无敌人 + 环上主力驱动共享相位 */
 export function updateOrbit(sim: Sim): void {
   const delta = sim.dtMs
   const { count, formation } = sim

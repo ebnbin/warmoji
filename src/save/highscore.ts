@@ -5,7 +5,7 @@ export interface HighScore {
   bestKills: number
 }
 
-// v1 记录的是存活秒数，波次制后语义失效，直接换 key 弃旧
+// v1 是存活秒数，不兼容，不读
 const KEY = 'warmoji.highscore.v2'
 const ZERO: HighScore = { bestWave: 0, bestKills: 0 }
 

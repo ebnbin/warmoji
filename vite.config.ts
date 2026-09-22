@@ -1,7 +1,6 @@
 import { execSync } from 'node:child_process'
 import { defineConfig } from 'vitest/config'
 
-// 构建版本号：Vercel/CI 环境取平台注入的 commit SHA，本地取 git HEAD，兜底 'dev'。
 function commitHash(): string {
   const fromEnv = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA
   if (fromEnv) return fromEnv.slice(0, 7)
@@ -16,7 +15,7 @@ function commitHash(): string {
 
 export default defineConfig({
   build: {
-    // SVG 必须以文件形式产出，Phaser 用 XHR 加载，内联 data URI 有兼容风险
+    // SVG 须以文件产出：Phaser 经 XHR 加载，内联 data URI 不可靠
     assetsInlineLimit: 0,
   },
   define: {

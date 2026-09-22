@@ -6,10 +6,9 @@ import { castScan } from './shared/castScan'
 import { nearestAngle, targetsOf } from '../utils/targets'
 import type { Sim } from '../sim'
 
-/** 每帧：推进在途的镖 + 摆位闲置的持有物 */
 export function castBoomerangs(sim: Sim): void {
   castScan(sim, Boomerang, (e) => {
-    if (Thrown.n[e]! > 0) return false // 还没接住：不另起，也不消耗冷却
+    if (Thrown.n[e]! > 0) return false // 未全部接住不另起
     const aim = nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, sourceOf(sim, e)))
     if (aim === null) return false
     Aim.rad[e] = aim

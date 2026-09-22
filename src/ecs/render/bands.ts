@@ -5,13 +5,8 @@ export interface Band {
   readonly zMax: number
 }
 
-// 批绘的深度分带（纯数据，不碰 Phaser）。
 //
-// 分带是必需的：一个批绘对象只有一个 depth，它画的东西全落在那一层——而 ECS 的实体
-// 要与场景侧那些没批绘的 Phaser 图元（地面效果、断壁、缩圈、天体车道、血条…）前后穿插。
-// 每带一个批绘对象，depth 取旧实现该层的值。
-//
-// 两张表**共用同一个 Phaser depth 轴**，改任何一张都要照着另一张看一眼：
+// 两张表共用同一个 Phaser depth 轴，改任何一张都要照着另一张看一眼：
 //
 //   Phaser depth │ 精灵带 (z)        │ 形状带 (z)      │ 场景侧裸图元
 //   ─────────────┼───────────────────┼─────────────────┼──────────────────
@@ -30,7 +25,6 @@ export interface Band {
 //
 // 同一个 Phaser depth 上有两个对象时（如 8），先后由加入显示列表的次序决定。
 
-/** 精灵批绘的分带（走 EcsSpriteBatch） */
 export const SPRITE_BANDS: readonly Band[] = [
   { depth: 1, zMin: -Infinity, zMax: 2 }, // 装饰
   { depth: 3, zMin: 2, zMax: 4 }, // 金币
@@ -42,7 +36,7 @@ export const SPRITE_BANDS: readonly Band[] = [
   { depth: 60, zMin: 60, zMax: Infinity }, // 天体横扫的球体（压在血条之上）
 ]
 
-/** 形状批绘的分带（走 EcsShapeBatch）。三条带覆盖整个实数轴，不会有特效被静默丢掉 */
+/** 三条带须覆盖整个实数轴 */
 export const SHAPE_BANDS: readonly Band[] = [
   { depth: 7, zMin: -Infinity, zMax: 8 }, // 冲击环、光束外层
   { depth: 8, zMin: 8, zMax: 9 }, // 光束白芯、部分圆

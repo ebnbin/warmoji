@@ -40,31 +40,16 @@ import { runPipeline } from './step'
 import type { Step } from './step'
 import type { Sim } from '../../sim'
 
-// 一帧的能力推进：清帧表 → 锚点 → 闸门 → 冷却 → 逐 kind 的那几步。
-//
-// **次序即语义，而次序此前只存在于源码行序里。** 把 turret 往上挪一行，弩塔的拉弓
-// 动画就悄悄晚一帧；把 gates 挪到施放之后，死人还能再出一次手——两者都不报错、
-// 不警告，跑起来也「看着差不多」。
-// 所以这里不是一串裸调用，而是一张**声明了依赖的流水线**：每一步写清它必须排在谁
-// 之后、为什么。run.test.ts 校验实际次序满足全部声明，并且不留悬空引用。
-//
-// 一种能力往往不止一步：**摆位 / 推进在途 / 出手是三个独立的 system**。它们从前藏在
-// castXxx 的函数体开头（`castLasers` 头两行就是 placeLaserBody + fireRadials），
-// 于是这一层的次序又缩回了源码行序里。现在它们与 cast 平级列在这里。
-//
-// 没有 after 的步 = 与其他步互不相干，怎么排都行。**宁可不声明也不要编一个理由**：
-// 自我印证的依赖（「它排在前面所以它必须排在前面」）比没有依赖更糟，测试会一直绿。
+// 声明了依赖的流水线，order.test.ts 校验；没有真实依赖就不写 after
 
-/** 一种能力在出手之前要跑的一步 */
 interface Before {
   readonly name: string
   readonly run: (sim: Sim) => void
-  /** 与同 kind 其他前置步之间的真实先后；没有就别写 */
+  /** 没有真实先后就别写 */
   readonly after?: readonly string[]
   readonly why?: string
 }
 
-/** 一种能力：出手前的那几步 + 出手本身 */
 interface Kind {
   readonly name: string
   readonly cast: (sim: Sim) => void
@@ -74,10 +59,7 @@ interface Kind {
   readonly why?: string
 }
 
-/** 逐 kind：彼此独立，只共同要求排在冷却推进之后。
- * 每个 before 步都必须排在本 kind 的 cast 之前——这条由 stepsOf 结构性保证并写进
- * cast.after：摆位要在出手前摆好（出手当帧读的是这一帧的位姿），在途的要先推进完
- *（还欠一发 / 还没接住时这一轮不另起） */
+/** 每个 before 步排在本 kind 的 cast 之前，由 stepsOf 保证 */
 const KINDS: readonly Kind[] = [
   { name: 'rally', cast: castRallies },
   { name: 'dance', cast: castDances },
@@ -144,7 +126,6 @@ const KINDS: readonly Kind[] = [
   { name: 'slowAura', cast: castSlowAuras },
 ]
 
-/** 把一种能力摊成流水线的若干步：before 各步，然后是 cast */
 function stepsOf(k: Kind): Step[] {
   const before = (k.before ?? []).map((b) => ({
     name: b.name,

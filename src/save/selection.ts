@@ -8,8 +8,6 @@ function sanitizeMapId(id: unknown): MapId {
   return typeof id === 'string' && id in MAPS ? (id as MapId) : MAP_IDS[0]!
 }
 
-// 跨局持久化的只有地图与队长选择；阵容不再持久化——开局招募与波末整编
-// 走同一套强制流程（PromoteScene），每局从空阵容按点数现招。
 const CAPTAIN_KEY = 'warmoji.captain.v1'
 const MAP_KEY = 'warmoji.map.v1'
 

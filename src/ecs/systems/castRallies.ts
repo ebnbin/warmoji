@@ -5,15 +5,13 @@ import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 import { spawnFxCircle } from '../entities/fx'
 
-/** 集结：阵亡者满血复活、存活者按上限比例回复、全队短暂无敌。
- * 无敌走受击无敌帧通道（把「上次受击」推到未来），接触与敌弹一并挡下 */
+/** 无敌走受击无敌帧通道 */
 export function castRallies(sim: Sim): void {
   castScan(sim, Rally, (e) => {
     for (const m of sim.characters) {
       if (!Alive.v[m]) reviveCharacter(sim, m)
       else CharHp.hp[m] = Math.min(CharHp.max[m]!, CharHp.hp[m]! + CharHp.max[m]! * Rally.healRatio[e]!)
       Iframe.last[m] = sim.elapsedMs + Rally.invulnMs[e]! - Iframe.ms[m]!
-      // 到手反馈：全队闪一下圣光金（走受击闪光同一通道，到期由 characterVisual 复原）
       CharFlash.until[m] = sim.elapsedMs + 320
       Tint.color[m] = 0xffe082
       Tint.effect[m] = 0

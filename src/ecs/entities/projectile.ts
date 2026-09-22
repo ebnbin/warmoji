@@ -8,18 +8,7 @@ import {
 import { abilityOnHit, projHitEids, projOnHit, projSrcName } from '../store'
 import type { Sim } from '../sim'
 
-// 抛射物实体：**我方弹与敌弹是同一种实体**。打哪一侧由 Faction 决定（索敌与施伤都经
-// 阵营中立的 targetsOf / damageTarget），行为差异全在几个可选组件上：
-//
-//   SweptHit  线段扫掠命中（高速弹不穿模）—— 敌弹慢，不挂，走圆-圆
-//   WallStop  撞墙即销毁（残垣图）—— 敌弹不判
-//   ViewCull  出视野即回收 —— 与 Proj.dieAt 二选一（环面按寿命）
-//   WorldCull 世界钩子回收（有界图出图即灭）
-//
-// 从前这是两种实体（Projectile/EnemyProj + Proj/EProj + 两套查询集 + 两个更新系统），
-// 而那四条差异没有一条是「阵营」造成的。
 
-/** 两侧共用的弹体骨架：位姿 + 速度 + 外形 + 归属，返回 eid */
 function spawnBolt(
   sim: Sim,
   x: number,
@@ -50,8 +39,7 @@ function spawnBolt(
   return eid
 }
 
-/** 发射一枚我方弹。弹的外形与飞行参数全在**开火那条能力**的 Bolt/Shoot/Pierce 组件上,
- * 装备那一刻就抄好了(见 registries/abilityKinds.ts) */
+/** 外形与飞行参数取自开火那条能力的组件 */
 export function spawnProjectileEcs(
   sim: Sim,
   src: number,
@@ -75,7 +63,6 @@ export function spawnProjectileEcs(
   Proj.srcSlot[eid] = srcSlot
   Proj.pierce[eid] = hasComponent(sim.world, src, Pierce) ? Pierce.n[src]! : 0
   Proj.spin[eid] = rotOffset === 0 ? 9 : 0
-  // 环面上子弹永远飞不出屏,只能按寿命回收；其余图按视野
   const life = sim.hooks.projectileLifeMs(sim)
   Proj.dieAt[eid] = life > 0 ? sim.elapsedMs + life : 0
   if (life <= 0) addComponent(sim.world, eid, ViewCull)
@@ -86,7 +73,6 @@ export function spawnProjectileEcs(
   playSfx('shoot')
 }
 
-/** 敌弹描述(能力侧 spawnProjectile 归约后的基本载荷;外形已解析成 frame) */
 export interface EnemyShotSpec {
   frame: number
   size: number
@@ -94,11 +80,11 @@ export interface EnemyShotSpec {
   speed: number
   damage: number
   lifeMs: number
-  /** 伤害来源名(结算页敌情明细按敌人名归属) */
+  /** 结算页按敌人名归属 */
   srcName?: string
 }
 
-/** 发射一枚敌弹(伤害已含 dmgMul,不再二次乘) */
+/** 伤害已含 dmgMul */
 export function spawnEnemyProjectileEcs(
   sim: Sim,
   x: number,
@@ -116,7 +102,7 @@ export function spawnEnemyProjectileEcs(
   Proj.damage[eid] = Math.round(spec.damage)
   Proj.radius[eid] = spec.radius
   Proj.kb[eid] = 0 // 队员没有击退机制
-  Proj.srcSlot[eid] = -1 // 敌方来源不分账到槽位，按名字归属
+  Proj.srcSlot[eid] = -1 // 按名字归属
   Proj.pierce[eid] = 0
   Proj.spin[eid] = 0
   Proj.dieAt[eid] = sim.elapsedMs + spec.lifeMs

@@ -2,10 +2,7 @@ import type { HealDef } from '../../types/abilityDefs'
 import { circleCue } from '../cues'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 治疗型：周期治疗范围内血量比例最低的队友（对友军索敌）。
- * 能力：aoe 群体处方（范围全体按比例回复）；defib 电击起搏
- *（范围内有阵亡队友时优先减其复活倒计时）。治疗量吃伤害倍率——
- * 磨刀石对军医同样有意义 */
+/** 治疗量吃伤害倍率 */
 export class HealAbility implements AbilityRuntime {
   private cooldown: number
 
@@ -21,7 +18,7 @@ export class HealAbility implements AbilityRuntime {
     this.cooldown -= delta
     if (this.cooldown > 0) return
 
-    // 电击起搏优先：救倒下的比奶站着的更急
+    // 电击起搏优先
     if (this.def.defib && this.ctx.cutReviveTimer?.(owner.x, owner.y, this.def.range, this.def.defib.reviveCutMs)) {
       this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
       this.pulse(owner, 0xfff176)
@@ -38,12 +35,11 @@ export class HealAbility implements AbilityRuntime {
       this.pulse(owner, 0x81c784)
       this.ctx.sfx('upgrade')
     } else {
-      // 全员满血：小步重试，不空耗完整冷却
+      // 全员满血时小步重试
       this.cooldown = 300
     }
   }
 
-  /** 治疗脉冲环 */
   private pulse(owner: AbilityOwner, color: number): void {
     circleCue(this.ctx.scene, owner.x, owner.y, this.def.range, {
       fill: color,

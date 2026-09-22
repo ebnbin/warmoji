@@ -21,10 +21,6 @@ import { VirtualEmojiGrid } from '../ui/virtualGrid'
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
 
-// 图鉴：单排类别 tab——角色/队长/敌人/能力/道具（条目列表+详情）与
-// 「全部」（twemoji 基础形态完整网格）平级，「全部」排最后。
-// 「全部」页 = VirtualEmojiGrid feed 流组件：无前置构建，滚到哪个格子
-// 哪个格子按需光栅化（页内缓存、滚回零等待），退出图鉴全量释放内存。
 interface WikiLayout {
   content: { w: number; h: number }
   headerY: number
@@ -33,8 +29,6 @@ interface WikiLayout {
   list: { x: number; y: number; w: number; h: number }
 }
 
-// 方向对应约定：竖屏「上」= 横屏「左」（详情），竖屏「下」= 横屏「右」（列表/网格）。
-// 类别 chip 横屏单行；竖屏一行放不下，拆成两行（catsY 为首行中心）。
 const LANDSCAPE: WikiLayout = {
   content: { w: 1280, h: 720 },
   headerY: 44,
@@ -51,28 +45,26 @@ const PORTRAIT: WikiLayout = {
   list: { x: 24, y: 664, w: 672, h: 588 },
 }
 
-/** 详情卡对象池：Text 只创建一次，切换条目仅 setText——
- * 点击时批量 创建+销毁 文本会触发成串的 canvas 光栅化与 GPU 纹理增删（真机掉帧主因） */
+/** Text 只创建一次，切换条目仅 setText：批量创建销毁 Text 会触发成串光栅化与纹理增删 */
 interface DetailPool {
   view: ScrollView
   icon: Phaser.GameObjects.Image
   badge: Phaser.GameObjects.Text
   name: Phaser.GameObjects.Text
   desc: Phaser.GameObjects.Text
-  /** 分级子标签（角色 1/2/3 级切换）：随详情内容滚动，点选切换当前展示等级 */
   levelTabs: Phaser.GameObjects.Text[]
   sections: { title: Phaser.GameObjects.Text; body: Phaser.GameObjects.Text }[]
   footer: Phaser.GameObjects.Text
 }
 
 export class WikiScene extends Phaser.Scene {
-  // 视口变化触发的 restart 只重排布局，保留背景色/标签页/类别/焦点/滚动等页面状态
+  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   /** 0..groups.length-1 = 分组条目；groups.length = 「全部」网格页 */
   private category = 0
   private focusedKey = ''
-  /** 当前详情条目的分级子标签选中项（角色 0/1/2 = 1/2/3 级）；切换条目/类别时归零 */
+  /** 0/1/2 = 1/2/3 级 */
   private levelSel = 0
   private currentCategory = ''
   private currentEntry?: WikiEntry
@@ -80,7 +72,6 @@ export class WikiScene extends Phaser.Scene {
   private manifest: string[] = []
   private used = new Set<string>()
   private groups: WikiGroup[] = []
-  /** 进场缓存，避免每次点击重建反查表/重算收录数 */
   private entryLookup = new Map<string, { category: string; entry: WikiEntry }>()
   private manifestUsed = 0
 
@@ -91,7 +82,7 @@ export class WikiScene extends Phaser.Scene {
   private listScroll = 0
   private gridScroll = 0
   private pool?: DetailPool
-  // 类别行：单排 tab 放进容器，超宽横向滚动。catRects 存的是容器内局部 x
+  // catRects 存容器内局部 x
   private catRects: { title: string; x: number; y: number; w: number; h: number }[] = []
   private catContainer?: Phaser.GameObjects.Container
   private catScroll = 0
@@ -116,7 +107,6 @@ export class WikiScene extends Phaser.Scene {
     applyBackground(this.palette)
     this.groups = wikiGroups()
     this.used = usedEmojiSet()
-    // 缩略图档位按设备渲染缩放定（52 逻辑 px 格子的物理像素 1:1）；同档复用缓存
     prepareEmojiThumbs(this, emojiThumbSize(70, viewport.renderScale))
     this.entryLookup = wikiEntryByEmoji()
     this.pool = undefined
@@ -176,22 +166,19 @@ export class WikiScene extends Phaser.Scene {
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
-      // 真退出图鉴才释放缩略缓存；旋转/切类别的内部 restart 保留（同档位复用）
+      // 只在真退出时释放缩略缓存
       if (!this.preserveOnRestart) releaseEmojiThumbs(this)
     })
 
     this.reportWiki()
   }
 
-  /** 两套网格任一发生拖动即视为拖动（返回/类别按钮防误触） */
   private wasDragged(): boolean {
     return (this.entryGrid?.wasDragged ?? false) || (this.allGrid?.wasDragged ?? false)
   }
 
   // ── 类别横向 tab（单排，可横向滚动） ─────────────────────────
 
-  /** 类别 tab：角色/队长/敌人/能力/道具 + 「全部」平级排最后。单排放进带遮罩的
-   * 容器：放得下就居中，放不下就拖动/滚轮左右滑（同一行，绝不换行） */
   private createCategoryTabs(res: number): void {
     const L = this.layout
     this.catRects = []
@@ -204,7 +191,6 @@ export class WikiScene extends Phaser.Scene {
     const widths = defs.map((d) => 44 + d.label.length * 22 + 20)
     const total = widths.reduce((s, x) => s + x, 0) + gap * (defs.length - 1)
 
-    // 行可视区 = 内容宽减两侧留白；tab 单排装进容器，超宽横向滚动
     const margin = this.layout === PORTRAIT ? 24 : 40
     const rowW = L.content.w - margin * 2
     const rowX = this.origin.x + margin
@@ -212,7 +198,6 @@ export class WikiScene extends Phaser.Scene {
     this.catRowRect = { x: rowX, y: rowY, w: rowW, h: ch }
     this.catScrollMax = Math.max(0, total - rowW)
     this.catScroll = Math.max(0, Math.min(this.catScrollMax, this.catScroll))
-    // 放得下就居中不滚；放不下则从头左对齐、可滚
     const startX = this.catScrollMax > 0 ? 0 : (rowW - total) / 2
 
     const container = (this.catContainer = this.add.container(rowX - this.catScroll, rowY))
@@ -242,8 +227,7 @@ export class WikiScene extends Phaser.Scene {
       x += cw + gap
     })
 
-    // 单一命中区盖住行可视区：点选按指针 x 反解出 tab，拖动/滚轮横向滚
-    //（几何遮罩只裁绘制不裁输入，所以不给每个 tab 挂 zone，避免滚出屏外仍拦点击）
+    // 几何遮罩不裁输入：不给每个 tab 挂 zone，滚出屏外的仍会拦点击
     this.add
       .zone(rowX, rowY, rowW, ch)
       .setOrigin(0)
@@ -286,7 +270,6 @@ export class WikiScene extends Phaser.Scene {
     if (this.time.now - this.reportAt > 120) this.reportWiki()
   }
 
-  /** 命中区反解：按指针 x（含滚动偏移）找到所在 tab，非拖动即切类别 */
   private onCatTap(p: Phaser.Input.Pointer): void {
     if (this.wasDragged() || this.catDragMoved) return
     const localX = p.worldX - this.catRowRect.x + this.catScroll
@@ -341,8 +324,6 @@ export class WikiScene extends Phaser.Scene {
     this.reportWiki()
   }
 
-  /** 详情卡对象池：所有 Text/Image 只创建一次，之后仅 setText/setTexture 复用。
-   * 正文（名称/介绍/属性分段）装进可滚动容器——分段数不再封顶 6、内容也不再被硬截断 */
   private ensurePool(): DetailPool {
     if (this.pool) return this.pool
     const res = textRes()
@@ -353,7 +334,6 @@ export class WikiScene extends Phaser.Scene {
     const panel = this.add.graphics()
     roundRect(panel, dx, dy, D.w, D.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
 
-    // 底部留 40px 给固定页脚（收录进度），正文滚动区在其之上
     const view = new ScrollView(this, { x: dx, y: dy, w: D.w, h: D.h - 40 })
 
     const badge = this.add
@@ -391,7 +371,6 @@ export class WikiScene extends Phaser.Scene {
       .setOrigin(0, 0)
       .setVisible(false)
     view.add([badge, icon, name, desc])
-    // 分级子标签（Lv1/2/3）：随内容滚动，点选切换当前展示等级（拖动时不误触）
     const levelTabs = [0, 1, 2].map((i) => {
       const t = this.add
         .text(0, 0, '', {
@@ -425,7 +404,6 @@ export class WikiScene extends Phaser.Scene {
     return this.pool
   }
 
-  /** 取第 i 个属性分段（不足则新建并加入滚动内容，分段数不封顶） */
   private sectionAt(i: number): { title: Phaser.GameObjects.Text; body: Phaser.GameObjects.Text } {
     const P = this.pool!
     let s = P.sections[i]
@@ -448,7 +426,7 @@ export class WikiScene extends Phaser.Scene {
           fontFamily: UI_FONT,
           fontSize: FONT.body,
           color: '#d0d0d8',
-          // 升级特性是纯中文长句（无空格），需按字断行，否则超宽被面板裁掉
+          // 纯中文无空格，须 useAdvancedWrap 按字断行
           wordWrap: { width: D.w - 56, useAdvancedWrap: true },
           lineSpacing: 8,
           resolution: res,
@@ -461,7 +439,7 @@ export class WikiScene extends Phaser.Scene {
     return s
   }
 
-  /** 池化的 emoji 图标：纹理未就绪时异步拉取，回填前校验仍是同一目标 */
+  /** 异步回填前校验仍是同一目标 */
   private setPoolIcon(icon: Phaser.GameObjects.Image, emoji: string, size: number): void {
     const key = emojiKey(emoji)
     icon.setData('want', key)
@@ -476,8 +454,6 @@ export class WikiScene extends Phaser.Scene {
     })
   }
 
-  /** 详情卡（图鉴页与完整列表页共用）：类别 + 名称 + 介绍 + 属性分段（全部可滚动） */
-  /** 分级子标签点选：切换当前展示等级并重绘详情 */
   private selectLevel(i: number): void {
     if (this.levelSel === i || !this.currentEntry) return
     this.levelSel = i
@@ -495,10 +471,8 @@ export class WikiScene extends Phaser.Scene {
     P.desc.setText(e.desc).setVisible(true)
     P.footer.setVisible(false)
 
-    // 属性从介绍文字实际底部之后排起（不再固定 y，长介绍不会压住第一段）
     let cursor = Math.max(138, P.desc.y + P.desc.height + 14)
 
-    // 分级子标签（角色）：在介绍下方排一行 Lv 芯片；选中项高亮，用其对应等级的属性行
     const lvls = e.levels
     if (lvls && lvls.length > 0) {
       const sel = Math.min(this.levelSel, lvls.length - 1)
@@ -521,7 +495,7 @@ export class WikiScene extends Phaser.Scene {
       for (const t of P.levelTabs) t.setVisible(false)
     }
 
-    // 属性行分段：◆ 标题 + 后续内容合并为一个多行 Text（少量对象、单次光栅化）
+    // 标题与内容合并为一个 Text，少光栅化
     const lines = lvls && lvls.length > 0 ? lvls[Math.min(this.levelSel, lvls.length - 1)]!.lines : e.lines
     const segments: { title: string; body: string[] }[] = []
     for (const line of lines) {
@@ -579,7 +553,6 @@ export class WikiScene extends Phaser.Scene {
     }
     grid.onScrolled = (settled): void => {
       this.gridScroll = grid.scrollY
-      // 滚动中的调试上报节流；拖动结束/惯性停止补终态
       if (settled || this.time.now - this.reportAt > 120) this.reportWiki()
     }
     grid.onThumbsProgress = (): void => this.reportWiki()
@@ -597,7 +570,6 @@ export class WikiScene extends Phaser.Scene {
   private async loadManifest(): Promise<void> {
     if (this.manifest.length > 0) return
     try {
-      // 全量清单来自打包资源（ordering 顺序）；按「显示肤色」开关过滤肤色变体（component 不受影响）
       const showSkinTone = loadSettings(browserStorage()).showSkinTone
       this.manifest = [...visibleEmojiIds(await loadEmojiPack(), showSkinTone)]
     } catch (err) {
@@ -605,7 +577,6 @@ export class WikiScene extends Phaser.Scene {
     }
   }
 
-  /** 完整列表页的详情面板：收录进度 + 选中项详情（已收录展示类别与属性） */
   private renderAllDetail(): void {
     const P = this.ensurePool()
     const selected = this.allSelected
@@ -619,7 +590,6 @@ export class WikiScene extends Phaser.Scene {
         s.body.setVisible(false)
       }
       if (selected) {
-        // 未收录：展示 emoji 本体与待收录状态
         this.setPoolIcon(P.icon, selected, 85)
         P.name.setText('未收录').setColor('#9a9aa8').setVisible(true)
         P.desc.setText('这个 emoji 还没有成为游戏实体').setVisible(true)
@@ -682,7 +652,7 @@ export class WikiScene extends Phaser.Scene {
           w: this.layout.list.w,
           h: this.layout.list.h,
         },
-        // 上报屏幕中心（含横向滚动偏移），供 e2e 点击落点
+        // 供 e2e 点击：含横向滚动偏移
         categories: this.catRects.map((c) => ({
           title: c.title,
           x: this.catRowRect.x - this.catScroll + c.x + c.w / 2,

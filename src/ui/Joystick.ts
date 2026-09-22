@@ -4,7 +4,7 @@ const RADIUS = 56
 const THUMB_RADIUS = 24
 const DEADZONE = 0.12
 
-/** 浮动虚拟摇杆：按下处为原点，拖出方向向量（模 0~1）；监听挂在 scene.input，场景重启自动清理 */
+/** 向量模 0~1；监听挂 scene.input，场景重启自动清理 */
 export class Joystick {
   private scene: Phaser.Scene
   private base: Phaser.GameObjects.Arc | null = null
@@ -28,7 +28,6 @@ export class Joystick {
 
   private onDown(pointer: Phaser.Input.Pointer): void {
     if (this.pointerId !== null) return
-    // 点在可交互 UI（如压测按钮）上时不触发摇杆
     if (this.scene.input.hitTestPointer(pointer).length > 0) return
     this.pointerId = pointer.id
     this.originX = pointer.worldX

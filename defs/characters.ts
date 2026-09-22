@@ -2,12 +2,6 @@ import { WEAPONS } from './weapons.ts'
 import type { WeaponSource } from '../src/types/weapons'
 import type { CharacterAuthoring, InnateSource } from '../src/types/characters'
 
-// 创作层（不进运行时 bundle）：角色数据行。一个角色由两类攻击来源组成——
-// 「持有的武器」（weapons，引用 defs/weapons.ts 的实体武器）与「自带的徒手
-// 能力」（innate，无实体武器，直接引用能力）。二者都自带升级路径（base + 各档）。
-// gen 直接写出载体形态的 characters.json，运行时统一成 Carrier 消费；
-// 商店升级卡文案（defs/items.ts）由 characterCard 从各载体档位派生（多载体去重）。
-
 export const CHARACTERS = {
   juggler: {
     emoji: '1f939',
@@ -214,11 +208,10 @@ export const CHARACTERS = {
   },
 } as const satisfies Record<string, CharacterAuthoring>
 
-// ── 载体展平：把 weapons + innate 两类载体按档位展平回旧的 abilities/upgrades ──
+// ── 载体展平 ──
 
 const WEAPON_MAP = WEAPONS as Record<string, WeaponSource>
 
-/** 一个载体（武器或徒手能力）的档位视图：base + 各升级档 */
 interface Carrier {
   readonly base: string
   readonly upgrades: InnateSource['upgrades']
@@ -234,7 +227,7 @@ function carriersOf(c: CharacterAuthoring): Carrier[] {
   ]
 }
 
-/** 角色在指定档位的升级卡（多载体同档取首个有升级的载体；gen 校验同档卡一致） */
+/** 同档多载体的卡文案由 gen 校验一致 */
 export function characterCard(c: CharacterAuthoring, index: 0 | 1): { icon: string; name: string; desc: string } {
   for (const cr of carriersOf(c)) {
     const u = cr.upgrades[index]

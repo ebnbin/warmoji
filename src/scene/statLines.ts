@@ -41,7 +41,6 @@ function sec(ms: number): string {
 }
 
 export function abilityStatLines(w: AbilityDef): string[] {
-  // slowAura/heal/summon/turret 无常规「伤害·冷却」首行语义，各自定制
   if (w.kind === 'slowAura') {
     return [
       `减速 ${Math.round((1 - w.slowFactor) * 100)}% · 范围 ${grid(w.radius)}`,
@@ -68,7 +67,6 @@ export function abilityStatLines(w: AbilityDef): string[] {
       `塔伤害 ${w.damage} · 射速 ${sec(w.fireIntervalMs)} · 射程 ${grid(w.range)}`,
     ]
   }
-  // 单发型载荷（队长主动技能）：各自定制，无常规首行
   if (w.kind === 'rally') {
     return [
       `阵亡队员满血复活 · 存活队员回复 ${Math.round(w.healRatio * 100)}%`,
@@ -96,7 +94,7 @@ export function abilityStatLines(w: AbilityDef): string[] {
   if (w.kind === 'timeStop') {
     return [`时停领域 ${sec(w.durationMs)}（按世界时长计，静止时同步放慢）`, '静止则全场近乎凝固、移动则时间恢复流动']
   }
-  // 击退展示为大致位移距离（冲量 × 衰减时间常数）
+  // 击退按位移距离展示：冲量 × 衰减时间常数
   const base = `伤害 ${w.damage} · 冷却 ${sec(w.cooldownMs)} · 击退 ${grid((w.knockback * KNOCKBACK.tauMs) / 1000)}`
   switch (w.kind) {
     case 'projectile':
@@ -118,8 +116,7 @@ export function abilityStatLines(w: AbilityDef): string[] {
   }
 }
 
-/** 角色面板：数值为道具修正后的生效值（伤害/冷却在展示层套倍率），
- * 能力行数取「能力注入后」的生效 def（如全周横扫的 360° 弧宽）+ 专属升级组 */
+/** 数值为道具修正后的生效值 */
 export function characterStatGroups(
   id: CharacterId,
   items: readonly ItemId[] = [],
@@ -136,13 +133,11 @@ export function characterStatGroups(
     `生命上限 ${memberMaxHp(fx.hpAdd)} · 受击无敌 ${sec(MEMBER.iframesMs + fx.iframesAddMs)}`,
     `复活 ${sec(Math.max(1000, TEAM.reviveMs + fx.reviveAddMs))}`,
   ]
-  // 稀有道具带来的触发式属性：有才显示，避免面板常年一排 0
   if (fx.regenPerSec > 0) baseLines.push(`每秒回复 ${fx.regenPerSec} 生命`)
   if (fx.killHeal > 0) baseLines.push(`击杀回复 ${fx.killHeal} 生命`)
   if (fx.thorns > 0) baseLines.push(`敌人接触反伤 ${fx.thorns}`)
   if (fx.critChance > 0) baseLines.push(`暴击率 ${Math.round(fx.critChance * 100)}%（伤害 ×2）`)
   const groups: StatGroup[] = [{ icon: '2764', title: '基础', lines: baseLines }]
-  // 升级路径组（跨等级视角）：默认展示；per-level 独立视角（图鉴 / 角色选择）关掉它
   if (opts.path !== false) {
     groups.push({
       icon: '2b50',
@@ -154,9 +149,6 @@ export function characterStatGroups(
       }),
     })
   }
-  // 攻击来源逐载体展示：名字/图标取自载体（武器/徒手能力），数值取该载体当前档位能力。
-  // 已解锁的升级档位在此列出「质变特性」（升级卡文案），使各等级面板不只是数值差异——
-  // 而是逐条讲清该级武器/能力真正解锁了什么（贯穿弹 / 全周横扫 / 处决 …）。
   const tier = tiers.u2 ? 2 : tiers.u1 ? 1 : 0
   for (const [i, carrier] of def.carriers.entries()) {
     const display = displayDef(resolveAbilityDef(loadout[i]!, fx), dmgMul, cdMul, fx.knockbackMul)
@@ -174,7 +166,7 @@ export function characterStatGroups(
   return groups
 }
 
-/** 展示用生效值：把伤害/冷却/击退倍率套进各 kind 自己的对应字段 */
+/** 只用于展示 */
 function displayDef(w: AbilityDef, dmgMul: number, cdMul: number, kbMul: number): AbilityDef {
   switch (w.kind) {
     case 'slowAura':
@@ -212,7 +204,6 @@ function displayDef(w: AbilityDef, dmgMul: number, cdMul: number, kbMul: number)
   }
 }
 
-/** 队长面板：doctrine（起始团队被动 + 编制）+ 主动技能。团队增益改由经验升级卡提供 */
 export function captainStatGroups(def: CaptainDef): StatGroup[] {
   const lines = [
     `编制上限 ${def.teamSize} 人 · 每波结束固定招募 1 人` +

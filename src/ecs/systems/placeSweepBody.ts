@@ -5,7 +5,6 @@ import { Ability, Aim, Frozen, Held, Sweep, Swing, Tint, Transform } from '../co
 import { ownerX, ownerY } from '../utils/amp'
 import type { Sim } from '../sim'
 
-/** 摆位：持有物在瞄准方向两侧的弧上从一端扫到另一端，静止时停在末端 */
 export function placeSweepBody(sim: Sim): void {
   for (const e of query(sim.world, [Ability, Sweep, Aim, Swing, Held, Transform])) {
     const frozen = Frozen.v[e] === 1
