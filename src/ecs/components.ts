@@ -226,8 +226,8 @@ export const PROJ_SET = [Projectile, Transform, Vel, Proj] as const
 
 // ── 拾取物 ──
 
-/** 到手效果由 Grant* 组件决定 */
-export const Pickup = {}
+/** 到手效果由 Grant* 组件决定；bornMs = 落地时刻（elapsedMs） */
+export const Pickup = { bornMs: f32() }
 
 /** 一次性事件组件：updatePickups 挂上，Grant 系统消费，reapCollected 回收 */
 export const Collected = {}

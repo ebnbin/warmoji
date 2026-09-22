@@ -1,7 +1,8 @@
-import { addComponent, addComponents, hasComponent, query } from 'bitecs'
+import { addComponent, addComponents, hasComponent, query, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
 import {
   Bob,
+  Collected,
   GrantCoins,
   GrantFlash,
   GrantMod,
@@ -28,7 +29,9 @@ import { playSfx } from '../../audio/sfx'
 import { PICKUP, PICKUPS } from '../../data/pickups'
 import { FIELD, POLARITY_COLOR } from '../../data/battlefield'
 import { backEaseOut } from '../utils/ease'
-import { crowded } from '../world'
+
+/** 地上金币上限，超出即顶掉最早落地的一枚 */
+const COIN_CAP = 2048
 
 
 export interface PickupSpec {
@@ -71,6 +74,7 @@ export function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): n
     size: spec.size,
     z: spec.z,
   })
+  Pickup.bornMs[eid] = sim.elapsedMs
   Pull.radius[eid] = spec.pull
   Grab.radius[eid] = spec.grab
   Lifetime.until[eid] = spec.groundMs > 0 ? sim.elapsedMs + spec.groundMs : 0
@@ -152,10 +156,27 @@ function fieldSpec(def: FieldPickupDef): PickupSpec {
   }
 }
 
+/** 已拾取、待结算的不计也不动 */
+function capCoins(sim: Sim): void {
+  const coins = query(sim.world, [Pickup, GrantCoins])
+  if (coins.length < COIN_CAP) return
+  let n = 0
+  let oldest = -1
+  for (const c of coins) {
+    if (hasComponent(sim.world, c, Collected)) continue
+    n++
+    if (oldest < 0 || Pickup.bornMs[c]! < Pickup.bornMs[oldest]!) oldest = c
+  }
+  if (n < COIN_CAP) return
+  pickupDef[oldest] = undefined
+  pickupSfx[oldest] = undefined
+  removeEntity(sim.world, oldest)
+}
+
 export function dropCoins(sim: Sim, x: number, y: number, count: number): void {
   const spec = coinSpec(sim)
   for (let i = 0; i < count; i++) {
-    if (crowded(sim.world)) return
+    capCoins(sim)
     const jx = count > 1 ? (sim.rng.next() - 0.5) * 0.6 * UNIT : 0
     const jy = count > 1 ? (sim.rng.next() - 0.5) * 0.6 * UNIT : 0
     spawnPickup(sim, x + jx, y + jy, spec)
