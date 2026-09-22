@@ -4,13 +4,7 @@ import type { Effect } from '../../types/abilityDefs'
 import { angleToNearest } from './targeting'
 import type { EffectCtx, TargetInfo } from './types'
 
-// 能力效果层（阵营中立）：命中/覆盖后施加的可复用效果，与「投送方式」正交——
-// 任何投送（突刺/弹道/连锁/轰炸…）都经此施加同一套效果，消除各能力类里
-// 重复手写的二次判定。ctx.damageTarget 注入阵营/暴击/击退倍率。
-
-/** 命中点圆形范围伤害：对圈内敌对方各造成一次 damage（击退方向从爆心指向目标）。
- * exclude 跳过指定目标（主目标/已命中，避免二次计伤）。溅射/终点震波/连环刃
- * /轰炸共用此一处判定。 */
+/** exclude 跳过的目标不计伤 */
 export function applyBlast(
   ctx: EffectCtx,
   center: { readonly x: number; readonly y: number },
@@ -27,9 +21,7 @@ export function applyBlast(
   }
 }
 
-/** 一次触发的上下文：锚点类效果（blast/ground/spawnProjectile/heal）作用于 center；
- * 逐目标类效果（slow/morph）作用于 targets（本次直接命中的敌对方真身）。
- * exclude 供 blast 跳过主目标/已命中；source 为触发者本身（死亡触发时供 heal 排除自己）。 */
+/** 锚点类效果作用于 center；逐目标类作用于 targets；source 为触发者，死亡触发时 heal 排除它 */
 export interface HitContext {
   readonly center: { readonly x: number; readonly y: number }
   readonly baseDamage: number
@@ -38,8 +30,6 @@ export interface HitContext {
   readonly source?: TargetInfo['ref']
 }
 
-/** 求值一串效果（命中触发 onHit / 死亡触发 onDeath 共用）：blast 打 center 圆内、
- * slow/morph 施加到 targets、ground 留地面区、heal 治我方、spawnProjectile 朝最近敌对方发弹。 */
 export function applyEffects(
   ctx: EffectCtx,
   effects: readonly Effect[] | undefined,

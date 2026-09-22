@@ -16,17 +16,7 @@ import { enemyOf } from '../enemy/enemies'
 import { projectileOf } from '../projectiles'
 import type { ArcadeBody, ImageObj } from '../ArcadeBattleScene'
 
-// 河流竞技场（kind='river'）：单屏世界——相机静止，世界 = 逻辑视口 × 1.2
-// （viewScale 经相机 zoom 实现，实体速度/尺寸全不变）。世界规则：
-// · 河道沿长轴居中、宽恒 this.riverCfg.width，短边余量为两岸暗带（不可进入）
-// · 水流：恒定漂移矢量（横屏右→左，竖屏上→下）逐帧加在所有实体上
-//   （子弹除外）——顺流快/逆流慢/挂机漂向下游全部由此自然涌现
-// · 钳制：队伍中心与 Boss 被钳在河道内；敌人只钳跨向（不能上岸），
-//   上下游可自由出屏——沿用无限图休眠机制（32 格）并会逆流游回；
-//   金币漂出下游一段距离即清理（玩家钳在屏内永远追不回）
-// · 旋转：横竖屏是同一条河，视口变化时按「流向进度 + 跨向偏移」重映射
-//   全部实体（等价于逆时针 90° 旋转），水面视觉层整体重建
-// · 流动感三层：双层水纹视差滚动 + 漂浮物顺流循环 + 两岸静态植被反衬
+// 单屏世界：世界 = 逻辑视口 × viewScale，相机静止
 
 /** 漂浮物：uPx = 距上游边缘的流向距离，baseCross = 跨向基准偏移 */
 interface Drift {
@@ -39,7 +29,6 @@ interface Drift {
   spin: number
 }
 
-/** 颜色明暗缩放（水面横向深浅渐变用） */
 function shade(color: number, mul: number): number {
   const r = Math.min(255, Math.round(((color >> 16) & 0xff) * mul))
   const g = Math.min(255, Math.round(((color >> 8) & 0xff) * mul))
@@ -48,13 +37,12 @@ function shade(color: number, mul: number): number {
 }
 
 export class RiverScene extends ArcadeBattleScene {
-  // 河道世界：视口尺寸/朝向 + 河道矩形 + 流速矢量
   private viewW = 0
   private viewH = 0
   private horizontal = true
   private river!: RiverRect
   private flow: Point = { x: 0, y: 0 }
-  // 水面视觉层（视口变化时整体销毁重建）
+  // 视口变化时整体重建
   private waterObjs: Phaser.GameObjects.GameObject[] = []
   private waveTiles: { tile: Phaser.GameObjects.TileSprite; speed: number }[] = []
   private drifts: Drift[] = []
@@ -63,12 +51,11 @@ export class RiverScene extends ArcadeBattleScene {
     super('arenaRiver')
   }
 
-  /** 奔流特性配置（来自 MapDef 数据；奔流图必配 river） */
   private get riverCfg(): RiverConfig {
     return MAPS[this.run.mapId].river!
   }
 
-  /** 无限世界特性配置（奔流借用其休眠活跃半边长） */
+  /** 只用其休眠参数 */
   private get infCfg(): InfiniteConfig {
     return MAPS[this.run.mapId].infinite!
   }
@@ -79,7 +66,6 @@ export class RiverScene extends ArcadeBattleScene {
     this.drifts = []
   }
 
-  /** 单屏世界：相机静止，视野按 viewScale 放大（世界 = 逻辑视口 × 1.2） */
   protected createWorld(): void {
     this.setupCamera()
     this.buildRiverVisuals()
@@ -89,7 +75,6 @@ export class RiverScene extends ArcadeBattleScene {
     return { x: this.viewW / 2, y: this.viewH / 2 }
   }
 
-  /** 河道内均匀随机（贴边留半格；与有界图的全图随机同思路） */
   protected spawnPoint(): Point {
     const pad = 0.5 * UNIT
     return {
@@ -98,7 +83,7 @@ export class RiverScene extends ArcadeBattleScene {
     }
   }
 
-  /** Boss 落点：河道内取距队伍 ≥5 格的随机点（采样兜底取最后一次） */
+  /** 距队伍 ≥ 5 格；采样兜底取最后一次 */
   protected bossSpawnPoint(): Point {
     let pos = this.spawnPoint()
     for (let i = 0; i < 24; i++) {
@@ -110,12 +95,10 @@ export class RiverScene extends ArcadeBattleScene {
     return pos
   }
 
-  /** 休眠：同无限图机制（32 格，屏内永不触发） */
   protected buildFrameTargets(): void {
     this.dormancyFrameTargets(this.infCfg.activeHalf * UNIT)
   }
 
-  /** 自主移动 + 水流漂移，然后钳入河道（挂机会被推到下游边并卡住） */
   protected constrainTeam(next: Point): Point {
     return clampToRiver(next, this.river, (TEAM.ringRadius + MEMBER.radius) * UNIT)
   }
@@ -125,7 +108,7 @@ export class RiverScene extends ArcadeBattleScene {
     return { x: this.flow.x * dt, y: this.flow.y * dt }
   }
 
-  /** 落点跨向钳入河道（分裂怪贴岸溅出等边缘情况兜底；沿流向不钳） */
+  /** 只钳跨向 */
   protected constrainEnemyPos(p: Point, radius: number): Point {
     const r = this.river
     if (this.horizontal) {
@@ -142,12 +125,10 @@ export class RiverScene extends ArcadeBattleScene {
     this.applyFlowAndClampBoss(e, body)
   }
 
-  /** 漂出下游边界外一段距离：河水冲走（玩家钳在屏内，永远追不回） */
   cullCoin(c: ImageObj): boolean {
     return pastDownstream(c, this.viewW, this.viewH, this.riverCfg.coinCullPad * UNIT)
   }
 
-  /** 不在磁吸范围：纯随波逐流 */
   coinIdleVelocity(): Point {
     return this.flow
   }
@@ -156,7 +137,6 @@ export class RiverScene extends ArcadeBattleScene {
     this.updateWater(delta)
   }
 
-  /** 河流图上报世界尺寸（= 逻辑视口 × viewScale），供探针换算位置 */
   protected debugViewSize(): { w: number; h: number } {
     return { w: this.viewW, h: this.viewH }
   }
@@ -165,10 +145,8 @@ export class RiverScene extends ArcadeBattleScene {
     return { dormant: this.dormantCount }
   }
 
-  // ── 视口变化：同一条河的重映射 ──────────────────────────────
+  // ── 视口变化 ──
 
-  /** 横竖屏切换/窗口缩放：按「流向进度 + 跨向偏移」重映射全部实体，
-   * 速度与朝向矢量随坐标系旋转，水面视觉层整体重建 */
   protected onViewportChanged(): void {
     const fromW = this.viewW
     const fromH = this.viewH
@@ -178,7 +156,6 @@ export class RiverScene extends ArcadeBattleScene {
     const map = (p: Point): Point => remapPoint(p, fromW, fromH, this.viewW, this.viewH)
     const rot = (v: Point): Point => remapVector(v, fromHorizontal, this.horizontal)
 
-    // 队伍：中心 + 每个成员的弹簧状态一起搬（视觉偏移/血条随帧刷新）
     const c = map(this.center)
     this.center.x = c.x
     this.center.y = c.y
@@ -196,7 +173,6 @@ export class RiverScene extends ArcadeBattleScene {
       m.deadText.setPosition(m.image.x, m.image.y)
     }
 
-    // 动力学实体：位置 body.reset + 速度/朝向数据旋转
     const remapBody = (obj: ImageObj): void => {
       const body = obj.body as ArcadeBody
       const p = map({ x: obj.x, y: obj.y })
@@ -234,7 +210,7 @@ export class RiverScene extends ArcadeBattleScene {
       g.y = p.y
       g.gfx.setPosition(p.x, p.y)
     }
-    // 刷怪预告：闭包共享的 pos 对象原位改写，落地点自动跟随
+    // pos 对象原位改写，落地点自动跟随
     for (const pm of this.pendingMarks) {
       const p = map(pm.pos)
       pm.pos.x = p.x
@@ -245,7 +221,6 @@ export class RiverScene extends ArcadeBattleScene {
     this.buildRiverVisuals()
   }
 
-  /** 静止相机 + 河流图专属视野倍率，并同步派生的世界几何 */
   private setupCamera(): void {
     this.viewW = viewport.logicalWidth * this.riverCfg.viewScale
     this.viewH = viewport.logicalHeight * this.riverCfg.viewScale
@@ -257,10 +232,9 @@ export class RiverScene extends ArcadeBattleScene {
     this.flow = flowVector(this.horizontal, this.riverCfg.flow * UNIT)
   }
 
-  // ── 水流与钳制 ──────────────────────────────────────────────
+  // ── 水流与钳制 ──
 
-  /** 普通敌人：加水流后钳住跨向速度（不能上岸），越界一帧内硬拉回岸线；
-   * 沿流向不钳——漂出上下游屏外是设计的一部分 */
+  /** 只钳跨向 */
   private applyFlowAndBankClamp(e: ImageObj, body: ArcadeBody, radius: number): void {
     body.velocity.x += this.flow.x
     body.velocity.y += this.flow.y
@@ -280,7 +254,7 @@ export class RiverScene extends ArcadeBattleScene {
     }
   }
 
-  /** Boss 与玩家同款钳制：加水流后，把会把它推出河道的速度分量清零 */
+  /** Boss 两轴都钳 */
   private applyFlowAndClampBoss(e: ImageObj, body: ArcadeBody): void {
     body.velocity.x += this.flow.x
     body.velocity.y += this.flow.y
@@ -292,9 +266,9 @@ export class RiverScene extends ArcadeBattleScene {
     if (e.y >= r.y + r.h - pad && body.velocity.y > 0) body.velocity.y = 0
   }
 
-  // ── 水面视觉层：两岸 + 深浅渐变 + 岸线浪花 + 双层水纹 + 漂浮物 ──
+  // ── 水面视觉层 ──
 
-  /** 整体重建（create 与视口变化时调用）；战斗实体不在此列 */
+  /** create 与视口变化时整体重建 */
   private buildRiverVisuals(): void {
     for (const o of this.waterObjs) o.destroy()
     this.waterObjs = []
@@ -306,15 +280,12 @@ export class RiverScene extends ArcadeBattleScene {
     const vh = this.viewH
     const r = this.river
     const water = this.palette.map
-    // 大地/树干棕：与浅蓝河水强对比
     const bank = 0x54402a
     const bankFar = 0x40301f
 
-    // 两岸暗带（河道以外的短边余量；河道贯穿长轴，只有跨轴两侧有岸）
     const gBank = this.add.graphics().setDepth(0)
     gBank.fillStyle(bank, 1)
     gBank.fillRect(0, 0, vw, vh)
-    // 岸的外缘更暗一点，给一点纵深
     gBank.fillStyle(bankFar, 1)
     if (this.horizontal) {
       if (r.y > 24) gBank.fillRect(0, 0, vw, Math.max(0, r.y - 18))
@@ -325,7 +296,6 @@ export class RiverScene extends ArcadeBattleScene {
     }
     this.waterObjs.push(gBank)
 
-    // 河水：跨向「岸暗心亮」的两段渐变
     const gWater = this.add.graphics().setDepth(0.2)
     const edge = shade(water, 0.78)
     const mid = shade(water, 1.12)
@@ -342,7 +312,7 @@ export class RiverScene extends ArcadeBattleScene {
     }
     this.waterObjs.push(gWater)
 
-    // 岸线浪花：贴岸白线 + 断续泡点（种子固定，同局重建不变）
+    // 种子固定，同局重建不变
     const gFoam = this.add.graphics().setDepth(0.4)
     gFoam.lineStyle(2, 0xffffff, 0.3)
     const foamRng = new Rng(this.run.decorSeed ^ 0xf0a8)
@@ -363,7 +333,6 @@ export class RiverScene extends ArcadeBattleScene {
     }
     this.waterObjs.push(gFoam)
 
-    // 双层水纹（视差滚动）
     this.ensureWaveTexture()
     const texKey = this.horizontal ? 'river-wave-h' : 'river-wave-v'
     for (const [alpha, speed] of [
@@ -380,7 +349,7 @@ export class RiverScene extends ArcadeBattleScene {
       this.waterObjs.push(tile)
     }
 
-    // 岸上静态植被：沿长轴等距掷点（种子固定），只落在岸带内
+    // 种子固定，只落在岸带内
     const mapDef: MapDef = MAPS[this.run.mapId]
     const def = mapDef.decor
     const decorRng = new Rng(this.run.decorSeed)
@@ -417,7 +386,6 @@ export class RiverScene extends ArcadeBattleScene {
       }
     }
 
-    // 漂浮物（顺流循环）：初始均匀铺满，之后 updateWater 推进
     const driftPool = mapDef.drift ?? ['1f343']
     for (let i = 0; i < this.riverCfg.driftCount; i++) {
       const emoji = driftPool[Math.floor(Math.random() * driftPool.length)]!
@@ -441,7 +409,7 @@ export class RiverScene extends ArcadeBattleScene {
     }
   }
 
-  /** 无缝水纹贴图（按朝向各生成一次）：沿流向的白色弧形流痕 */
+  /** 按朝向各生成一次 */
   private ensureWaveTexture(): void {
     const key = this.horizontal ? 'river-wave-h' : 'river-wave-v'
     if (this.textures.exists(key)) return
@@ -482,7 +450,6 @@ export class RiverScene extends ArcadeBattleScene {
     else d.image.setPosition(cross, d.uPx)
   }
 
-  /** 水面动效逐帧推进：水纹贴图偏移 + 漂浮物顺流/摇摆/自旋 */
   private updateWater(delta: number): void {
     const dt = delta / 1000
     for (const w of this.waveTiles) {
@@ -494,7 +461,6 @@ export class RiverScene extends ArcadeBattleScene {
     for (const d of this.drifts) {
       d.uPx += this.riverCfg.flow * UNIT * d.speedMul * dt
       if (d.uPx > alongLen + margin) {
-        // 漂出下游 → 回上游重新进场（换个横位/速度）
         d.uPx = -margin
         const halfCross = (this.horizontal ? this.river.h : this.river.w) / 2
         d.baseCross = (Math.random() * 2 - 1) * halfCross * 0.92

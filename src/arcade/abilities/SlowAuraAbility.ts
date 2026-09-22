@@ -3,12 +3,11 @@ import type { SlowAuraDef } from '../../types/abilityDefs'
 import { circleCue } from '../cues'
 import type { AbilityContext, AbilityRuntime } from './types'
 
-/** 寒气光环：以队伍中心为圆心持续减速（角色只是来源；角色阵亡光环随之消失）。
- * 能力：dps 光环内持续掉血（雪人的输出手段）；freeze 周期脉冲冻结 */
+/** 圆心为队伍中心；角色阵亡光环随之消失 */
 export class SlowAuraAbility implements AbilityRuntime {
   private ring: Phaser.GameObjects.Arc
   private hidden = false
-  /** 冻伤跳伤间隔（半秒一跳，dps 折半） */
+  /** 冻伤跳伤间隔 */
   private static readonly TICK_MS = 500
   private tickIn = SlowAuraAbility.TICK_MS
   private freezeIn: number
@@ -18,7 +17,7 @@ export class SlowAuraAbility implements AbilityRuntime {
     private ctx: AbilityContext,
     initialCooldownMs: number,
   ) {
-    // 光环持续生效，无冷却概念
+    // 光环无冷却概念
     void initialCooldownMs
     this.freezeIn = def.freeze?.intervalMs ?? 0
     this.ring = ctx.scene.add
@@ -34,7 +33,6 @@ export class SlowAuraAbility implements AbilityRuntime {
     this.ctx.applySlow(c.x, c.y, this.def.radius, this.def.slowFactor)
 
     const r2 = this.def.radius * this.def.radius
-    // 冻伤：周期性对光环内敌人跳伤
     if (this.def.dps) {
       this.tickIn -= delta
       if (this.tickIn <= 0) {
@@ -51,7 +49,6 @@ export class SlowAuraAbility implements AbilityRuntime {
       }
     }
 
-    // 凛冬降临：周期脉冲冻结光环内敌人
     if (this.def.freeze) {
       this.freezeIn -= delta
       if (this.freezeIn <= 0) {

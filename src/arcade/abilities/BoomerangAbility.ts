@@ -5,7 +5,6 @@ import { emojiImage } from '../../emoji/textures'
 import { nearestAngle } from './targeting'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 单枚镖的飞行状态 */
 interface Flyer {
   image: Phaser.GameObjects.Image
   phase: 'idle' | 'out' | 'back'
@@ -17,12 +16,7 @@ interface Flyer {
   hitSet: Set<Phaser.GameObjects.Image>
 }
 
-/**
- * 回旋镖：出手瞬间锁定最远点，去程飞向该点；回程追踪角色实时位置。
- * 飞行途中碰到的敌人受伤，去程/回程各判一次（同一程内每敌最多一次）。
- * 全部接住后才开始计冷却。
- * 能力：twin 同时向反方向掷出第二枚；coinMagnetRadius 飞行途中吸取金币。
- */
+/** 全部接住后才开始计冷却 */
 export class BoomerangAbility implements AbilityRuntime {
   private flyers: Flyer[]
   private cooldown: number
@@ -77,12 +71,10 @@ export class BoomerangAbility implements AbilityRuntime {
       if (f.phase === 'idle') continue
       this.updateFlyer(f, delta, owner)
     }
-    // 全部接住 → 开始计冷却
     if (this.idle) this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
   }
 
   private updateFlyer(f: Flyer, delta: number, owner: AbilityOwner): void {
-    // 自旋 + 途中判伤 + 磁力吸币（能力）
     f.image.rotation += (this.def.spinDegPerSec * DEG2RAD * delta) / 1000
     if (f.phase === 'out') {
       f.flightT = Math.min(1, f.flightT + delta / this.def.outMs)
@@ -103,7 +95,6 @@ export class BoomerangAbility implements AbilityRuntime {
       if (dist <= Math.max(step, 20)) {
         f.phase = 'idle'
         f.hitSet.clear()
-        // 双子镖收回后隐藏，主镖回到持有物姿态
         if (f !== this.flyers[0]) f.image.setVisible(false)
         return
       }
@@ -129,7 +120,6 @@ export class BoomerangAbility implements AbilityRuntime {
     this.ctx.sfx('whoosh')
     this.damage = Math.round(this.def.damage * this.ctx.damageMul())
     this.flyers.forEach((f, i) => {
-      // 双子镖朝正反两个方向出手
       const angle = this.aim + i * Math.PI
       f.phase = 'out'
       f.flightT = 0

@@ -1,13 +1,11 @@
 import Phaser from 'phaser'
 import { UI_FONT } from '../util/fonts'
 
-// 伤害数字专用位图字体：启动时把 0-9 光栅化成一张字形图，
-// 战斗中的数字用 BitmapText 摆字形四边形——零 canvas 光栅化、零纹理分配。
-// （此前每次命中新建 Text = 新建+销毁一张纹理，iOS TBDR 上帧中纹理分配会整管线停顿）
+// 伤害数字须走 BitmapText：帧中新建 Text 会分配纹理，iOS TBDR 上整管线停顿
 export const DAMAGE_FONT = 'damage-digits'
 const TEX_KEY = 'damage-digits-tex'
 const CHARS = '0123456789'
-// 字形按 2 倍显示尺寸渲染，高 DPR 下缩放依然清晰
+// 2 倍显示尺寸，高 DPR 下不糊
 const CHAR_W = 24
 const CHAR_H = 36
 

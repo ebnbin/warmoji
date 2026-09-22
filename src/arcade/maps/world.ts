@@ -3,29 +3,22 @@ import type { DecorInstance } from '../../types/maps'
 import { Rng } from '../../util/rng'
 import type { Point } from '../../util/vec'
 
-// 无限地图的世界模型（纯逻辑，禁 phaser/DOM）。设计原则：有限地图未来
-// 可以成为无限地图的子集——活跃判定/装饰分块对有界世界同样成立（只是
-// 永不触发/被矩形裁剪），消费方通过这里的函数问世界问题，不自己算几何。
-
-/** 活跃判定：按轴距离（Chebyshev 方形）。半边长取 32 格时，25×25 有界图
- * 上任意两点的轴距 ≤25，永不休眠——同一机制天然兼容有界世界 */
+/** 按轴距离（Chebyshev 方形） */
 export function isWithinActive(dx: number, dy: number, half: number): boolean {
   return Math.abs(dx) <= half && Math.abs(dy) <= half
 }
 
-/** 环带随机点（面积均匀）：r² 在 [rMin², rMax²] 均匀采样，角度均匀 */
+/** 面积均匀 */
 export function ringPoint(rng: Rng, center: Point, rMin: number, rMax: number): Point {
   const r = Math.sqrt(rMin * rMin + rng.next() * (rMax * rMax - rMin * rMin))
   const a = rng.next() * Math.PI * 2
   return { x: center.x + Math.cos(a) * r, y: center.y + Math.sin(a) * r }
 }
 
-// ── 装饰分块 ────────────────────────────────────────────────
-// 块只是精灵生命周期的批次粒度：装饰按「格」逐格决定，每格的随机流由
-// (种子, 格坐标) 哈希派生——任何访问顺序、任何块划分都得到同一摆放。
-// 密度的低频噪声场同样按世界格坐标哈希采样，跨块天然连续。
+// ── 装饰分块 ──
+// 每格的随机流由 (种子, 格坐标) 哈希派生：任何访问顺序、任何块划分都得到同一摆放
 
-/** 整数坐标哈希 → [0,1)：装饰的一切逐格随机都从它派生（负坐标安全） */
+/** [0,1)，负坐标安全 */
 function hash01(seed: number, x: number, y: number): number {
   let h = (seed ^ 0x9e3779b9) >>> 0
   h = Math.imul(h ^ (x | 0), 0x85ebca6b) >>> 0
@@ -35,7 +28,7 @@ function hash01(seed: number, x: number, y: number): number {
   return h / 0x100000000
 }
 
-/** 低频值噪声（世界格坐标，波长 waveU 格）：晶格值来自 hash01，平滑双线性 */
+/** 晶格值来自 hash01，平滑双线性 */
 function worldNoise(seed: number, xU: number, yU: number, waveU: number): number {
   const gx = xU / waveU
   const gy = yU / waveU
@@ -51,12 +44,12 @@ function worldNoise(seed: number, xU: number, yU: number, waveU: number): number
   return (v00 * (1 - fx) + v10 * fx) * (1 - fy) + (v01 * (1 - fx) + v11 * fx) * fy
 }
 
-/** 块坐标（floor 除法，负坐标正确） */
+/** 负坐标正确 */
 function chunkOf(xU: number, chunkCells: number): number {
   return Math.floor(xU / chunkCells)
 }
 
-/** 覆盖矩形（格坐标）的全部块，外扩 pad 块：相机视野 → 应活跃的块集合 */
+/** 外扩 pad 块 */
 export function chunksInRect(
   x0U: number,
   y0U: number,
@@ -80,9 +73,7 @@ export function chunkKey(cx: number, cy: number): string {
   return `${cx},${cy}`
 }
 
-/** 一个块的装饰摆放（世界格坐标）：与 rollDecor 同风格——噪声场调制逐格
- * 密度成簇、允许溢出邻格；密度基准由种子一次性决定（全图统一）。
- * 完全确定：同 (seed, 块) 任何时刻重建结果一致 */
+/** 完全确定：同 (seed, 块) 任何时刻重建结果一致 */
 export function chunkDecor(
   def: MapDecor,
   seed: number,
@@ -90,7 +81,7 @@ export function chunkDecor(
   cy: number,
   chunkCells: number,
 ): DecorInstance[] {
-  // 全图统一的密度基准：与格无关，只由种子决定
+  // 密度基准只由种子决定
   const densityRoll = hash01(seed, 0x5eed, 0x5eed)
   const density = def.density[0] + densityRoll * (def.density[1] - def.density[0])
   const out: DecorInstance[] = []
@@ -100,7 +91,6 @@ export function chunkDecor(
     for (let dx = 0; dx < chunkCells; dx++) {
       const xU = x0 + dx
       const yU = y0 + dy
-      // 每格独立随机流：跨块确定性的关键
       const rng = new Rng((hash01(seed ^ 0x00d5c0de, xU, yU) * 0xffffffff) >>> 0)
       const local =
         density * (0.15 + 1.7 * Math.pow(worldNoise(seed, xU + 0.5, yU + 0.5, 6), 1.5))
@@ -121,7 +111,7 @@ export function chunkDecor(
   return out
 }
 
-// ── 终波缩圈 ────────────────────────────────────────────────
+// ── 终波缩圈 ──
 
 export interface ZoneDef {
   readonly r0: number
@@ -130,7 +120,7 @@ export interface ZoneDef {
   readonly shrinkEndMs: number
 }
 
-/** 缩圈半径曲线：观察期恒 r0 → 线性收缩 → 到底后恒 rMin */
+/** 观察期恒 r0 → 线性收缩 → 恒 rMin */
 export function zoneRadiusAt(tMs: number, def: ZoneDef): number {
   if (tMs <= def.holdMs) return def.r0
   if (tMs >= def.shrinkEndMs) return def.rMin
@@ -138,13 +128,9 @@ export function zoneRadiusAt(tMs: number, def: ZoneDef): number {
   return def.r0 + (def.rMin - def.r0) * k
 }
 
-/** 点是否在圈外（圈伤判定） */
 export function outsideZone(p: Point, center: Point, radius: number): boolean {
   const dx = p.x - center.x
   const dy = p.y - center.y
   return dx * dx + dy * dy > radius * radius
 }
 
-// 无限世界模型的设计参数（活跃方形半边长 / 刷怪环带 / 分块尺寸）已上移到 MapDef.infinite，
-// 终波缩圈参数（r0/rMin/hold/shrinkEnd/tick）已上移到 MapDef.shrinkRing（均为数据）。
-// 活跃判定用按轴距离（Chebyshev 方形）：与地图/分块/视口的矩形几何同构。

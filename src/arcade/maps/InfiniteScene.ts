@@ -17,37 +17,24 @@ import { viewport } from '../../util/apply'
 import { ArcadeBattleScene } from '../ArcadeBattleScene'
 import type { ImageObj } from '../ArcadeBattleScene'
 
-// 无限竞技场（kind='infinite'）：世界没有边，出生在原点、负坐标合法。
-// 世界规则：
-// · 地面：相机锁定的满屏底色；装饰按 8×8 格分块随视野滚动增删（core/world.ts
-//   纯函数按种子重建同一摆放，回头看到的景不变）
-// · 休眠：以队伍中心为锚的活跃方形（按轴距离，半边长 this.infCfg.activeHalf），
-//   出界敌人冻结（关物理体、不索敌、不占刷怪上限），回到范围自动唤醒
-// · 刷怪：队伍中心外的环带（this.infCfg.spawnRingMin~Max）随机落点
-// · 终波缩圈：以进波瞬间队伍位置为心，16 格缓缩到 12 格停（防风筝 Boss），
-//   圈外队员按 tick 掉血 + 满屏红渐晕警示
+// 没有边，出生在原点，负坐标合法
 export class InfiniteScene extends ArcadeBattleScene {
-  // 装饰分块：活跃块 → 该块的装饰精灵；视野块范围变化才增删
   private decorChunks = new Map<string, ImageObj[]>()
   private decorRangeKey = ''
-  // 终波缩圈（仅 Boss 波存在）
   private zoneCenter?: Point
   private zoneRadius = 0
   private zoneGfx?: Phaser.GameObjects.Graphics
   private zoneVignette?: Phaser.GameObjects.Rectangle
   private nextZoneTickAt = 0
 
-  // 场景键可覆写：深空图复用整套无限世界规则（相机/分块/休眠/环带刷怪），叠加太空机制
   constructor(key = 'arenaInfinite') {
     super(key)
   }
 
-  /** 无限世界特性配置（来自 MapDef 数据；无限/深空图必配 infinite）。protected 供深空子类复用 */
   protected get infCfg(): InfiniteConfig {
     return MAPS[this.run.mapId].infinite!
   }
 
-  /** 终波缩圈配置（来自 MapDef 数据；荒漠图必配 shrinkRing） */
   private get ringCfg(): ShrinkRingConfig {
     return MAPS[this.run.mapId].shrinkRing!
   }
@@ -63,12 +50,11 @@ export class InfiniteScene extends ArcadeBattleScene {
   }
 
   protected createWorld(): void {
-    // 无边界世界：物理世界不设边界（无任何 collideWorldBounds 消费者）
     this.drawFloor()
     this.cameras.main.setZoom(viewport.renderScale)
   }
 
-  /** 相机：跟随但不设 bounds——世界没有边 */
+  /** 不设 bounds */
   protected attachCamera(target: Phaser.GameObjects.Zone): void {
     this.cameras.main.startFollow(target)
   }
@@ -77,7 +63,7 @@ export class InfiniteScene extends ArcadeBattleScene {
     return { x: 0, y: 0 }
   }
 
-  /** 环带随机点；终波把落点收进当前圈内（圈外刷怪毫无意义） */
+  /** 终波落点收进圈内 */
   protected spawnPoint(): Point {
     const p = ringPoint(this.rng, this.center, this.infCfg.spawnRingMin * UNIT, this.infCfg.spawnRingMax * UNIT)
     if (this.zoneCenter) {
@@ -90,12 +76,11 @@ export class InfiniteScene extends ArcadeBattleScene {
     return p
   }
 
-  /** Boss 落在初始圈内的环带上 */
   protected bossSpawnPoint(): Point {
     return ringPoint(this.rng, this.zoneCenter ?? this.center, 6 * UNIT, 8 * UNIT)
   }
 
-  /** 终波：缩圈以此刻队伍位置为圆心张开 */
+  /** 以此刻队伍位置为圆心 */
   protected onFinalWaveSetup(): void {
     this.zoneCenter = { x: this.center.x, y: this.center.y }
     this.zoneRadius = this.ringCfg.r0 * UNIT
@@ -107,7 +92,7 @@ export class InfiniteScene extends ArcadeBattleScene {
     this.nextZoneTickAt = this.ringCfg.tickMs
   }
 
-  /** 休眠分区：冻结/唤醒 + 活跃计数 + 本帧攻击目标（休眠怪不可被索敌） */
+  /** 休眠者不可被索敌 */
   protected buildFrameTargets(): void {
     this.dormancyFrameTargets(this.infCfg.activeHalf * UNIT)
   }
@@ -129,9 +114,8 @@ export class InfiniteScene extends ArcadeBattleScene {
     }
   }
 
-  // ── 地面与装饰分块 ──────────────────────────────────────────
+  // ── 地面与装饰分块 ──
 
-  /** 无限地面 = 相机锁定的满屏底色（世界没有边，也就没有影子边缘） */
   private drawFloor(): void {
     this.add
       .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, this.palette.map)
@@ -139,8 +123,7 @@ export class InfiniteScene extends ArcadeBattleScene {
       .setDepth(0)
   }
 
-  /** 装饰分块滚动：视野覆盖的块集合变化时增删（core/world.ts 纯函数按
-   * 种子重建同一摆放；块整组建/销毁，软渲染下避免逐帧细碎增删） */
+  /** 摆放由 (种子, 块) 纯函数决定；块整组建/销毁 */
   private ensureChunks(): void {
     const view = this.cameras.main.worldView
     const cells = this.infCfg.chunkCells
@@ -175,20 +158,19 @@ export class InfiniteScene extends ArcadeBattleScene {
     }
   }
 
-  // ── 终波缩圈 ────────────────────────────────────────────────
+  // ── 终波缩圈 ──
 
   private updateZone(): void {
     const center = this.zoneCenter
     if (!center || !this.zoneGfx) return
     this.zoneRadius = zoneRadiusAt(this.elapsedMs, this.ringCfg) * UNIT
-    // 圈渲染：亮边界环 + 内侧安全提示描边
     const g = this.zoneGfx
     g.clear()
     g.lineStyle(5, 0xef5350, 0.85)
     g.strokeCircle(center.x, center.y, this.zoneRadius)
     g.lineStyle(14, 0xd32f2f, 0.16)
     g.strokeCircle(center.x, center.y, this.zoneRadius + 9)
-    // 圈外队员：红色渐晕 + 按 tick 掉血（敌人不受圈伤）
+    // 圈外只有队员掉血
     const anyOutside = this.members.some(
       (m) => m.alive && outsideZone({ x: m.image.x, y: m.image.y }, center, this.zoneRadius),
     )

@@ -4,8 +4,6 @@ import { lightningCue } from '../cues'
 import { nearestTarget } from './targeting'
 import type { TargetInfo, AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 连锁型：电弧命中最近敌人后在敌群间弹跳传导，每跳伤害衰减——
- * 敌人越密越强。能力：bounces 提升；onHit 末跳落点命中效果（过载爆裂等） */
 export class ChainArcAbility implements AbilityRuntime {
   private cooldown: number
 
@@ -26,7 +24,6 @@ export class ChainArcAbility implements AbilityRuntime {
     this.cooldown = this.def.cooldownMs * this.ctx.cooldownMul()
     this.ctx.sfx('zap')
 
-    // 逐跳传导：伤害递减，路径记折线
     const points: { x: number; y: number }[] = [{ x: owner.x, y: owner.y }]
     let damage = this.def.damage * this.ctx.damageMul()
     let cur: TargetInfo | null = first

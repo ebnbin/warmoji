@@ -5,12 +5,8 @@ import { animClipOf, bakeAnimFrame } from '../../emoji/anim'
 import { outlineSvg, setSvgSize } from '../../emoji/svg'
 import { emojiSvgText, svgToImage } from '../../emoji/textures'
 
-// 动画帧纹理烘焙层：clip（studio 的关键帧配方）→ 每帧一张 Phaser 纹理。
-// 与静态纹理同规格：48 标准 viewBox 全幅、描边烙进位图、光栅 256——
-// 这样任何拿 emoji 纹理换算 scale 的消费者（成员呼吸、出生 tween）无需感知
-// 当前贴的是静态帧还是动画帧。clip 自带的 viewBox 只是 Studio 的取景放大，
-// 游戏内烘焙一律忽略。惰性按需烘焙 + 并发去重；帧数少（10~12）不参与 LRU。
-// emoji 以 ordering ID 标识（与打包资源一致），从不作为字符使用。
+// 帧纹理与静态纹理同规格（48 viewBox 全幅、描边烙进位图、光栅 256），换帧不改 scale 语义；
+// clip 自带的 viewBox 只用于 Studio 取景，烘焙时忽略。emoji 以 ordering ID 标识，不作为字符使用
 const RASTER = 256
 
 const OUTLINE_SUFFIX: Record<OutlineKind, string> = {
@@ -49,7 +45,7 @@ async function bakeClip(
     let frame = bakeAnimFrame(svg, recipe, i / clip.frames)
     if (outline) frame = outlineSvg(frame, OUTLINE.radius, OUTLINE.colors[outline])
     const img = await svgToImage(setSvgSize(frame, RASTER))
-    // 光栅化是异步的，场景可能已切换/重启——纹理管理器还在才写入
+    // 异步回来时场景可能已销毁（scene.textures 为空）
     if (!scene.textures || scene.textures.exists(key)) continue
     scene.textures.addImage(key, img)
   }
@@ -58,9 +54,7 @@ async function bakeClip(
 
 const liveFrames = new Map<string, string[]>()
 
-/** 帧 key 的「活数组」：同步立即返回（可能为空），烘焙完成后就地填充。
- * Animator.register 持有引用即可自动接上，调用方无需回调/重注册。
- * 模块级缓存跨场景重启复用（纹理本就是全局的，重启不重烘） */
+/** 同步返回帧 key 数组（可能为空），烘焙完成后就地填充；持有引用即可，不需重注册 */
 export function clipFramesLive(
   scene: Phaser.Scene,
   id: string,
@@ -80,8 +74,7 @@ export function clipFramesLive(
   return arr
 }
 
-/** 确保某 emoji 某 clip 的整套帧纹理可用，返回按帧序的纹理 key 数组；
- * 该 emoji 没有这个 clip 时返回 null（调用方保持静态纹理即可） */
+/** 该 emoji 没有这个 clip 时返回 null */
 function ensureClipTextures(
   scene: Phaser.Scene,
   id: string,

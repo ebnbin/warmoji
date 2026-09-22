@@ -2,9 +2,7 @@ import type { NukeDef } from '../../types/abilityDefs'
 import { screenFlashCue } from '../cues'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 全域打击型：全场活跃目标各吃一次大额伤害 + 全屏白闪。伤害随当前波次
- * 威胁倍率缩放（ctx.waveScale，与敌人血量成长同步），Boss 按比例折减；
- * 镜像坐标按真身去重，休眠者不在目标快照内天然豁免 */
+/** 镜像坐标按真身去重；休眠者不在快照内，天然豁免 */
 export class NukeAbility implements AbilityRuntime {
   private cooldown: number
 
@@ -30,7 +28,7 @@ export class NukeAbility implements AbilityRuntime {
     const scale = this.ctx.waveScale?.() ?? 1
     const mul = this.ctx.damageMul()
     const seen = new Set<unknown>()
-    // 伤害会边遍历边击杀，先复制快照
+    // 边遍历边击杀，须先复制快照
     for (const t of [...this.ctx.targets()]) {
       if (seen.has(t.ref) || !t.ref.active) continue
       seen.add(t.ref)

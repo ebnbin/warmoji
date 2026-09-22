@@ -2,8 +2,6 @@ import type { RallyDef } from '../../types/abilityDefs'
 import { circleCue } from '../cues'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 集结型：阵亡我方满血复活、存活者按上限比例回复、全队短暂无敌，
- * 以我方锚点（队伍中心）爆出冲击环。团队操作经 ctx.rallyTeam 收口 */
 export class RallyAbility implements AbilityRuntime {
   private cooldown: number
 

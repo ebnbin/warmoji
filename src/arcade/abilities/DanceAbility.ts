@@ -1,8 +1,7 @@
 import type { DanceDef } from '../../types/abilityDefs'
 import type { AbilityContext, AbilityOwner, AbilityRuntime } from './types'
 
-/** 群舞型：敌对方全体跳舞定身（含 Boss 与休眠者；蓄力/冲刺被打断，
- * 窗口内新登场的也要跳）。逐帧表现在敌方转向的舞蹈分支 */
+/** 含 Boss 与休眠者；窗口内新登场的也要跳 */
 export class DanceAbility implements AbilityRuntime {
   private cooldown: number
 

@@ -17,19 +17,7 @@ import { releasePooled } from '../pool'
 import type { Member } from '../member'
 import type { ArcadeBody, ImageObj } from '../ArcadeBattleScene'
 
-// 工厂竞技场（kind='void' 环面世界，主题=自动化车间）：世界规则：
-// · 环面：固定 16:9 竞技场（横屏 24×13.5 格，竖屏互换），四边两两粘合成
-//   传送门——没有任何墙，所有实体（玩家/敌人/Boss/子弹/金币）坐标按模回绕
-// · 几何环面化：索敌喂「真身 + 三个镜像坐标」（能力零改动即隔门瞄准）；
-//   AI 追击/磁吸/接触判定全用环面最短差；面积效果的判定半径远小于半场，
-//   镜像永不重复命中同一真身
-// · 碰撞不走物理 overlap：队员×敌人/敌弹改为手写环面圆-圆判定，缝上精确；
-//   物理引擎只负责速度积分
-// · 子弹按寿命回收（环面上永远飞不出屏幕）；扫掠线段在回绕帧重置起点
-// · 渲染分身：主相机视口裁剪出屏幕内最大居中 16:9（余量留空白），四缝
-//   + 四角各挂一个条带相机取景对侧溢出——实体跨缝时两侧同时可见，
-//   全体实体/血条/粒子零逐实体管理；地板/门框/零件在条带相机中忽略
-// · 传送门：四边流光门框（顺时针流动的虚线光带 + 脉动）
+// 环面：坐标按模回绕，没有墙；距离/方向用环面最短差；碰撞不走物理 overlap；子弹按寿命回收
 export class VoidScene extends ArcadeBattleScene {
   private arenaW = 0
   private arenaH = 0
@@ -43,13 +31,12 @@ export class VoidScene extends ArcadeBattleScene {
     super('arenaVoid')
   }
 
-  /** 环面/传送门特性配置（来自 MapDef 数据；工厂图必配 torus） */
   private get torusCfg(): TorusConfig {
     return MAPS[this.run.mapId].torus!
   }
 
   protected resetWorldFields(): void {
-    // 环面上子弹永不出屏：按寿命回收（基座 spawnProjectile 消费）。this.run 此时已就绪
+    // this.run 此时已就绪
     this.projectileTtlMs = this.torusCfg.projectileLifeMs
     this.staticVisuals = []
     this.frameTiles = []
@@ -66,12 +53,11 @@ export class VoidScene extends ArcadeBattleScene {
     return { x: this.arenaW / 2, y: this.arenaH / 2 }
   }
 
-  /** 全场随机（环面上无所谓贴边） */
   protected spawnPoint(): Point {
     return { x: this.rng.next() * this.arenaW, y: this.rng.next() * this.arenaH }
   }
 
-  /** Boss 落点：距队伍环面距离 ≥5 格的随机点（采样兜底） */
+  /** 距队伍环面距离 ≥ 5 格；采样兜底 */
   protected bossSpawnPoint(): Point {
     let pos = this.spawnPoint()
     for (let i = 0; i < 24; i++) {
@@ -81,12 +67,10 @@ export class VoidScene extends ArcadeBattleScene {
     return pos
   }
 
-  /** 索敌/追击/磁吸的几何基元：环面最短差 */
   worldDelta(from: Point, to: Point): Point {
     return torusDelta(from, to, this.arenaW, this.arenaH)
   }
 
-  /** 索敌目标：真身 + 三镜像（能力隔门瞄准的关键） */
   protected buildFrameTargets(): void {
     const targets: TargetInfo[] = []
     let count = 0
@@ -104,7 +88,6 @@ export class VoidScene extends ArcadeBattleScene {
     this.frameTargets = targets
   }
 
-  /** 敌方能力的索敌目标：真身 + 三镜像（持械敌人隔门瞄准队员） */
   protected buildMemberTargets(): TargetInfo[] {
     const targets: TargetInfo[] = []
     for (const m of this.members) {
@@ -117,37 +100,35 @@ export class VoidScene extends ArcadeBattleScene {
     return targets
   }
 
-  /** 环面：不钳制，穿缝回绕 */
+  /** 不钳制，穿缝回绕 */
   protected constrainTeam(next: Point): Point {
     return { x: wrapCoord(next.x, this.arenaW), y: wrapCoord(next.y, this.arenaH) }
   }
 
-  /** 环面弹簧：目标取离当前跟随点最近的镜像——中心穿缝时队员各自
-   * 走最短路穿门，阵型全程连贯（配条带相机即两侧同时可见） */
+  /** 目标取离跟随点最近的镜像 */
   protected springTarget(m: Member, tx: number, ty: number): Point {
     const d = torusDelta({ x: m.followX, y: m.followY }, { x: tx, y: ty }, this.arenaW, this.arenaH)
     return { x: m.followX + d.x, y: m.followY + d.y }
   }
 
-  /** 跟随点回绕，弹簧状态保持在竞技场内 */
   protected constrainFollow(m: Member): void {
     m.followX = wrapCoord(m.followX, this.arenaW)
     m.followY = wrapCoord(m.followY, this.arenaH)
   }
 
-  /** 遮挡纵深按环面差（贴缝时不跳变） */
+  /** 按环面差 */
   protected memberDepthY(m: Member): number {
     return torusDelta(this.center, { x: m.followX, y: m.followY }, this.arenaW, this.arenaH).y
   }
 
-  /** 无物理 overlap：接触判定改为手写环面圆-圆（touchStep），缝上精确 */
+  /** 接触判定改为手写环面圆-圆 */
   protected setupTouchOverlaps(): void {}
 
   protected touchStep(): void {
     this.touchChecks()
   }
 
-  /** 落点回绕（分裂怪贴缝溅出等情况直接绕到对侧） */
+  /** 回绕 */
   protected constrainEnemyPos(p: Point): Point {
     return { x: wrapCoord(p.x, this.arenaW), y: wrapCoord(p.y, this.arenaH) }
   }
@@ -156,7 +137,7 @@ export class VoidScene extends ArcadeBattleScene {
     return { x: wrapCoord(p.x, this.arenaW), y: wrapCoord(p.y, this.arenaH) }
   }
 
-  /** 子弹按寿命回收（环面上永远飞不出屏幕，位置回收不适用） */
+  /** 按寿命回收 */
   protected cullProjectiles(): void {
     for (const p of this.projectiles.getChildren() as ImageObj[]) {
       if (p.active && this.elapsedMs >= projectileOf(p).dieAt) releasePooled(p)
@@ -168,7 +149,6 @@ export class VoidScene extends ArcadeBattleScene {
     this.updatePortals(delta)
   }
 
-  /** 虚空图上报竞技场世界尺寸，供探针换算位置 */
   protected debugViewSize(): { w: number; h: number } {
     return { w: this.arenaW, h: this.arenaH }
   }
@@ -178,10 +158,9 @@ export class VoidScene extends ArcadeBattleScene {
     this.stripCams = []
   }
 
-  // ── 相机：视口裁剪 + 条带分身 ───────────────────────────────
+  // ── 相机 ──
 
-  /** 主相机视口 = 屏幕内最大居中 16:9（多余留空白）；四缝 + 四角挂
-   * 条带相机取景对侧溢出——跨缝实体两侧同时可见（渲染层的幽灵分身） */
+  /** 四缝 + 四角各一台条带相机取景对侧溢出 */
   private setupCameras(): void {
     const landscape = viewport.logicalWidth >= viewport.logicalHeight
     this.arenaW = (landscape ? this.torusCfg.arenaLong : this.torusCfg.arenaShort) * UNIT
@@ -211,12 +190,11 @@ export class VoidScene extends ArcadeBattleScene {
     }
     const W = this.arenaW
     const H = this.arenaH
-    // 屏幕左缘显示「越过右缝的溢出」（世界 x∈[W, W+s)），其余同理
+    // 左缘显示越过右缝的溢出 x ∈ [W, W+s)，其余同理
     mk(x0, y0, sPx, h, W + s / 2, H / 2)
     mk(x0 + w - sPx, y0, sPx, h, -s / 2, H / 2)
     mk(x0, y0, w, sPx, W / 2, H + s / 2)
     mk(x0, y0 + h - sPx, w, sPx, W / 2, -s / 2)
-    // 四角（对角溢出）
     mk(x0, y0, sPx, sPx, W + s / 2, H + s / 2)
     mk(x0 + w - sPx, y0, sPx, sPx, -s / 2, H + s / 2)
     mk(x0, y0 + h - sPx, sPx, sPx, W + s / 2, -s / 2)
@@ -224,15 +202,15 @@ export class VoidScene extends ArcadeBattleScene {
     this.applyStripIgnores()
   }
 
-  /** 静态视觉层只画一份：条带相机全部忽略（否则门框/地板会在缝上重影） */
+  /** 条带相机全部忽略，否则缝上重影 */
   private applyStripIgnores(): void {
     if (this.staticVisuals.length === 0) return
     for (const c of this.stripCams) c.ignore(this.staticVisuals)
   }
 
-  // ── 世界步进：回绕 ──────────────────────────────────────────
+  // ── 回绕 ──
 
-  /** 动力学实体逐帧回绕（物理积分已完成后调用）；返回是否发生回绕 */
+  /** 物理积分后调用；返回是否发生回绕 */
   private wrapBody(obj: ImageObj): boolean {
     const nx = wrapCoord(obj.x, this.arenaW)
     const ny = wrapCoord(obj.y, this.arenaH)
@@ -254,7 +232,7 @@ export class VoidScene extends ArcadeBattleScene {
     }
     for (const p of this.projectiles.getChildren() as ImageObj[]) {
       if (!p.active) continue
-      // 回绕帧重置扫掠线段起点：否则线段会横贯全图产生假命中
+      // 回绕帧须重置扫掠起点，否则线段横贯全图
       if (this.wrapBody(p)) {
         const b = projectileOf(p)
         b.prevX = p.x
@@ -266,7 +244,7 @@ export class VoidScene extends ArcadeBattleScene {
     }
   }
 
-  // ── 手写接触判定（环面圆-圆，替代物理 overlap；缝上精确）────
+  // ── 手写接触判定 ──
 
   private touchChecks(): void {
     if (this.over) return
@@ -288,9 +266,9 @@ export class VoidScene extends ArcadeBattleScene {
     }
   }
 
-  // ── 工厂视觉：钢板地面 + 散落零件 + 传送闸口流光门框 ──────────────
+  // ── 工厂视觉 ──
 
-  /** 静态视觉整体重建（create 与视口变化时）；随后刷新条带相机忽略表 */
+  /** 重建后须刷新条带相机忽略表 */
   private buildVoidVisuals(): void {
     for (const o of this.staticVisuals) o.destroy()
     this.staticVisuals = []
@@ -301,7 +279,6 @@ export class VoidScene extends ArcadeBattleScene {
     const H = this.arenaH
     const mapDef: MapDef = MAPS[this.run.mapId]
 
-    // 钢板厂房地面（中心朝亮的顶灯软渐变，避免硬边椭圆的「盘子感」）
     const gFloor = this.add.graphics().setDepth(0)
     gFloor.fillStyle(this.palette.map, 1)
     gFloor.fillRect(0, 0, W, H)
@@ -316,7 +293,7 @@ export class VoidScene extends ArcadeBattleScene {
     }
     this.staticVisuals.push(gFloor)
 
-    // 散落零件点缀（种子固定：同局重建不变）
+    // 种子固定，同局重建不变
     const def = mapDef.decor
     const rng = new Rng(this.run.decorSeed)
     const cells = (W / UNIT) * (H / UNIT)
@@ -332,7 +309,6 @@ export class VoidScene extends ArcadeBattleScene {
       this.staticVisuals.push(img)
     }
 
-    // 传送门门框：流动虚线光带（TileSprite 滚动）+ 脉动描边
     this.ensureDashTexture()
     const f = this.torusCfg.frame * UNIT
     const mkTile = (
@@ -349,12 +325,10 @@ export class VoidScene extends ArcadeBattleScene {
         .setOrigin(0)
         .setDepth(3.5)
         .setAlpha(0.42)
-        // 传送闸口：琥珀色警示光带顺时针流动（工业危险边界读性）
         .setTint(0xffb300)
       this.frameTiles.push({ tile, dx, dy })
       this.staticVisuals.push(tile)
     }
-    // 顺时针流动：上→右→下→左
     mkTile(0, 0, W, f, 1, 0, false)
     mkTile(W - f, 0, f, H, 0, 1, true)
     mkTile(0, H - f, W, f, -1, 0, false)
@@ -367,7 +341,7 @@ export class VoidScene extends ArcadeBattleScene {
     this.applyStripIgnores()
   }
 
-  /** 门框虚线贴图（横/竖两个变体，一次生成） */
+  /** 一次生成 */
   private ensureDashTexture(): void {
     const size = 64
     const th = Math.round(this.torusCfg.frame * UNIT)
@@ -381,14 +355,12 @@ export class VoidScene extends ArcadeBattleScene {
       const ctx = canvas.getContext()
       ctx.clearRect(0, 0, vertical ? th : size, vertical ? size : th)
       ctx.fillStyle = 'rgba(255,255,255,0.85)'
-      // 一节亮虚线 + 留空（滚动后呈流动光点带）
       if (vertical) ctx.fillRect(th * 0.3, 10, th * 0.4, 14)
       else ctx.fillRect(10, th * 0.3, 14, th * 0.4)
       canvas.refresh()
     }
   }
 
-  /** 门框逐帧动效：光带顺时针流动 + 边线脉动 */
   private updatePortals(delta: number): void {
     const flow = (56 * delta) / 1000
     for (const t of this.frameTiles) {
@@ -407,7 +379,7 @@ export class VoidScene extends ArcadeBattleScene {
     g.strokeRect(4, 4, W - 8, H - 8)
   }
 
-  // ── 视口变化：横竖互换 = 纯 90° 旋转重映射 ───────────────────
+  // ── 视口变化 ──
 
   protected onViewportChanged(): void {
     const fromW = this.arenaW
