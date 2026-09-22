@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 
-// 战斗视觉特效的共享资源：粒子用的小圆点纹理（tint 上色，NORMAL 混合在浅色地图上也清晰）
+// 粒子点纹理走 tint 上色，混合模式保持 NORMAL：ADD 在浅色地图上看不见
 const DOT_KEY = 'fx-dot'
 
 export function ensureFxDot(scene: Phaser.Scene): string {
@@ -18,7 +18,7 @@ export function ensureFxDot(scene: Phaser.Scene): string {
   return DOT_KEY
 }
 
-/** 一次性爆发型粒子发射器（emitting=false，用 explode(n, x, y) 触发） */
+/** emitting=false，用 explode 触发 */
 export function burstEmitter(
   scene: Phaser.Scene,
   tints: number[],

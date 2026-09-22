@@ -1,4 +1,4 @@
-// mulberry32：种子相同则序列相同（可复现、可单测）
+// mulberry32
 export class Rng {
   private state: number
 

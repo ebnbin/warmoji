@@ -41,21 +41,8 @@ import { startRafMeter } from './diagnostics'
 import { PerfView } from './perf'
 import { clearDevPerf } from './probe'
 
-// 开发者面板：战斗内唯一的开发者入口，🔧 药丸点开即整块卡片。
-//
-// 它替掉了此前并存的三块东西：试炼场的 chip 面板（左上）、🔧 的 dev 文本读数
-//（左下）、性能基准的读数面板（右侧）。三者的门槛各不相同、还互相打架
-//（基准模式下要显式把试炼场面板关掉，否则两块面板叠在一起），实际是同一件事
-// 被切成了三份。合成一块带页签的卡片后，「这一局能调什么、能看什么」只有一个答案。
-//
-// 页签按上下文启用：正式局只有「性能」（战场/队伍旋钮会毁掉一局正式游戏），
-// 试炼场四页全开。面板本身只在设置里开了「开发者模式」时才由 UIScene 挂载。
-//
-// 改旋钮**只重建面板自己**，不再 restart 整个 UIScene——只有真正需要重建队伍的
-// 改动（角色/等级/预设）才重开战斗场景。
-
 const DEPTH = 320
-/** 收起时把滚动区挪出画面：它的滚轮/拖动监听常驻，留在原位会吞掉战场上的手势 */
+/** 收起时滚动区挪出画面：其监听常驻，留在原位会吞掉战场手势 */
 const OFFSCREEN = { x: -10_000, y: -10_000, w: 0, h: 0 }
 
 export type DevTab = 'field' | 'team' | 'preset' | 'perf'
@@ -80,13 +67,13 @@ export class DevPanel {
     private readonly scene: Phaser.Scene,
     private readonly host: HudHost,
   ) {
-    // 滚动区只建一次：它的滚轮/拖动监听挂在 scene.input 上，每次开合都新建会一路累积
+    // 只建一次：其监听挂在 scene.input 上，重建会累积
     this.view = new ScrollView(scene, OFFSCREEN)
     this.view.setDepth(DEPTH + 4)
     this.rebuild()
   }
 
-  /** 每帧调用；只有「性能」页有逐帧内容 */
+  /** 每帧调用 */
   update(time: number): void {
     if (!this.perf) return
     const h = this.perf.update(time)
@@ -119,7 +106,7 @@ export class DevPanel {
 
   private rebuild(): void {
     this.clearObjs()
-    // 试炼场四页全开；正式局只留「性能」——战场/队伍旋钮会毁掉一局正式游戏
+    // 正式局只留性能页
     if (!this.host.sandbox && tab !== 'perf') tab = 'perf'
     if (!open) {
       this.view.setViewport(OFFSCREEN)
@@ -160,7 +147,6 @@ export class DevPanel {
     const M = 12
     const w = Math.min(470, viewport.logicalWidth - safeInsets.left - safeInsets.right - M * 2)
     const x = viewport.logicalWidth - safeInsets.right - M - w
-    // 让开右上角的击杀/金币/暂停三件 HUD——面板不该盖住玩家自己的读数
     const y = safeInsets.top + 150
     const h = viewport.logicalHeight - safeInsets.bottom - M - y
 
@@ -168,8 +154,7 @@ export class DevPanel {
     roundRect(g, x, y, w, h, 16, {
       fill: 0x05060a, fillAlpha: 0.9, stroke: 0xffdc5d, strokeAlpha: 0.45, strokeWidth: 2,
     })
-    // 吞输入：浮动摇杆按「有没有点在可交互 UI 上」决定要不要起手，
-    // 没有这块底板的话在面板上滑动会同时把队伍拽着跑
+    // 底板吞输入，否则在面板上滑动会拽动摇杆
     const blocker = this.scene.add.zone(x, y, w, h).setOrigin(0).setDepth(DEPTH + 1).setInteractive()
     this.objs.push(g, blocker)
 
@@ -219,8 +204,6 @@ export class DevPanel {
           { id: 'perf', label: '性能' },
         ]
       : []
-    // 正式局只有性能一页：没有可切的东西就不画页签栏，
-    // 一个铺满整行的「页签」看着像个按钮，只会让人以为点了会发生什么
     if (defs.length === 0) return 0
     const h = 44
     const pad = 12
@@ -260,10 +243,8 @@ export class DevPanel {
 
   // ── 内容：各页 ────────────────────────────────────────────
 
-  /** 战场：敌人 / 规模 / 难度 / 攻速 / 无敌——全部实时生效，不重开战斗 */
   private buildField(res: number): number {
     let y = 0
-    // 只列本图会出现的敌人（波次编排 + 终波 Boss + 衍生子代），不混入他图的怪
     y = this.section('敌人 · 实时生效', y, res, mapEnemyRoster(this.host.run.mapId).map((d) => ({
       label: d.name,
       on: isSandboxEnemyOn(d.kind),
@@ -272,7 +253,6 @@ export class DevPanel {
         this.rebuild()
       },
     })))
-    // 规模阶梯整条铺开：面板选得到的就是刷怪器的全部量程
     y = this.section('规模 · 在场上限', y + 12, res, SCALES.map((s) => ({
       label: `${s.label} ${s.spawn.cap}`,
       on: sandboxScale() === s.id,
@@ -298,7 +278,6 @@ export class DevPanel {
         this.rebuild()
       },
     })))
-    // 无敌切换即时改写全队血量上限，再重渲面板
     const setInv = (on: boolean): void => {
       setSandboxInvincible(on)
       this.host.applySandboxInvincible()
@@ -311,7 +290,6 @@ export class DevPanel {
     return y + 8
   }
 
-  /** 队伍：角色与等级——都要重建队伍，故改完重开战斗场景 */
   private buildTeam(res: number): number {
     let y = this.note(0, res, `当前 ${sandboxStarters().length} 人 · 改动后重建队伍`)
     y = this.section('角色 · 最少 1 最多 8', y + 6, res, Object.entries(CHARACTERS).map(([id, c]) => ({
@@ -338,7 +316,6 @@ export class DevPanel {
     return y + 8
   }
 
-  /** 强度：一组旋钮的具名取值，点一下批量写进去 */
   private buildPresets(res: number): number {
     const cur = sandboxPresetId()
     let y = this.note(
@@ -384,11 +361,7 @@ export class DevPanel {
     return y
   }
 
-  /** 性能：框架对照 + 帧读数 */
   private buildPerf(res: number): number {
-    // 与设置页的「ECS 实验战斗」同写 settings.ecs 这一个键，不另设覆写——
-    // 「用哪套战斗」只有一个真相，两处怎么点都不会读出两种答案。
-    // 这里也放一份，是因为 A/B 对照要在同一份负载下来回切，挨着帧读数才看得出差别
     const ecsOn = loadSettings(browserStorage()).ecs
     let y = this.section('框架 · 即设置里的「ECS 实验战斗」', 0, res, [
       { label: 'arcade', on: !ecsOn, tap: (): void => this.switchFramework(false) },
@@ -405,8 +378,7 @@ export class DevPanel {
 
   // ── 控件 ──────────────────────────────────────────────────
 
-  /** 一段带标题的 chip 流式布局（坐标相对内容顶）：chip 按内容宽自适应、
-   * 排满一行自动换行——名字再长也不会横向溢出。返回本段底部 y */
+  /** 坐标相对内容顶；返回本段底部 y */
   private section(title: string, gy: number, res: number, items: readonly ChipItem[]): number {
     const maxW = this.view.viewport.w
     const gap = 6
@@ -419,7 +391,6 @@ export class DevPanel {
     let cy = gy + 26
     const chipH = 40
     for (const it of items) {
-      // 先量文字再画底：chip 宽度跟着内容走，中英混排都不会挤
       const t = this.scene.add.text(0, 0, it.label, {
         fontFamily: UI_FONT, fontSize: FONT.caption,
         color: it.on ? '#25262e' : '#d6d6e0', resolution: res,
@@ -450,7 +421,7 @@ export class DevPanel {
     return cy + chipH
   }
 
-  /** 一行灰色说明文字（自动换行），返回其底部 y */
+  /** 返回底部 y */
   private note(gy: number, res: number, text: string): number {
     const t = this.scene.add.text(0, gy, text, {
       fontFamily: UI_FONT, fontSize: FONT.caption, color: '#9a9aa8', resolution: res,
@@ -463,21 +434,19 @@ export class DevPanel {
 
   // ── 需要重开战斗场景的改动 ────────────────────────────────
 
-  /** 角色/等级/预设：配装与站位在建队员时定死，只能重建队伍。
-   * 战斗场景重启会连带重启 UIScene，本面板随之按新状态重渲 */
+  /** 战斗场景重启会连带重启 UIScene */
   private restartWithTeam(): void {
     beginRun(sandboxCaptain(), sandboxStarters(), this.host.run.mapId, true)
     resetMetrics()
     this.host.scene.restart()
   }
 
-  /** 切框架：改的就是设置里那一个开关，然后按新开关重新路由战斗场景 */
   private switchFramework(ecs: boolean): void {
     const s = loadSettings(browserStorage())
     if (s.ecs === ecs) return
     saveSettings(browserStorage(), { ...s, ecs })
     resetMetrics()
-    // 新战斗场景会在自己的 create 里重新 launch HUD，故先停掉当前这份
+    // 新战斗场景会在 create 里重新 launch HUD，须先停掉当前这份
     this.scene.scene.stop('ui')
     this.host.scene.start(battleSceneFor(this.host.run.mapId))
   }

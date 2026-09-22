@@ -3,11 +3,11 @@ import { VIEW } from './units'
 export interface Viewport {
   cssWidth: number
   cssHeight: number
-  /** 设备像素比，钳制在 [1, 3]（iPhone 普遍为 3；再高收益小、填充率代价大） */
+  /** 钳制在 [1, 3] */
   dpr: number
   /** css px / 逻辑 px，保证保底区完整可见的最大缩放 */
   fitScale: number
-  /** 设备物理 px / 逻辑 px = fitScale * dpr，相机缩放与文本栅格化密度用它 */
+  /** 设备物理 px / 逻辑 px = fitScale × dpr */
   renderScale: number
   logicalWidth: number
   logicalHeight: number

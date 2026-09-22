@@ -4,14 +4,12 @@ import type { Viewport } from './viewport'
 
 export const VIEWPORT_CHANGED = 'viewport-changed'
 
-/** iOS 从主屏幕启动的独立 PWA（navigator.standalone 为 Safari 私有属性） */
+/** navigator.standalone 为 Safari 私有属性 */
 export function isStandalone(): boolean {
   return (navigator as unknown as { standalone?: boolean }).standalone === true
 }
 
-/** iOS PWA 冷启动/旋转后内容层可能钉在扣掉 Home 条的错误视口上（已知 WebKit bug，
- * 物理旋转才修正）。短暂把 viewport-fit 切成 auto 再切回 cover，隔帧生效，
- * 强制 WebKit 做等效旋转的视口重算；完成后回调方重新量尺寸 */
+/** iOS PWA 冷启动/旋转后内容层可能钉在错误视口上（WebKit bug）：把 viewport-fit 切成 auto 再切回 cover 强制重算 */
 export function nudgeIosViewport(onDone: () => void): void {
   if (!isStandalone()) return
   const meta = document.querySelector('meta[name="viewport"]')
@@ -24,10 +22,7 @@ export function nudgeIosViewport(onDone: () => void): void {
   })
 }
 
-/** 画布 CSS 尺寸。
- * 独立 PWA 恒为全屏，但 iOS 竖屏首次布局会把 Home 条区域从视口里扣掉且不再更新
- * （innerHeight/dvh 全是错的，事件也不补发），故直接取屏幕物理尺寸按方向映射；
- * 浏览器模式取 #game 实测矩形（html 高度 100dvh） */
+/** 独立 PWA 取屏幕物理尺寸按方向映射：iOS 竖屏首次布局会扣掉 Home 条且不再更新；浏览器模式取 #game 实测矩形 */
 function cssSize(): { w: number; h: number } {
   if (isStandalone()) {
     const short = Math.min(screen.width, screen.height)
@@ -56,7 +51,7 @@ export interface SafeInsets {
   left: number
 }
 
-/** 刘海/状态栏/Home 条的安全区侵入（逻辑 px）：全屏贴边的 UI 须以此偏移 */
+/** 逻辑 px */
 export let safeInsets: SafeInsets = readSafeInsets(viewport.fitScale)
 
 function readSafeInsets(fitScale: number): SafeInsets {
@@ -70,7 +65,6 @@ function readSafeInsets(fitScale: number): SafeInsets {
   }
 }
 
-/** 文本栅格化密度跟随渲染缩放（含 DPR），避免放大发糊 */
 export function textRes(): number {
   return Math.max(1, viewport.renderScale)
 }
@@ -81,11 +75,7 @@ export function applyCamera(scene: Phaser.Scene): void {
   cam.centerOn(viewport.logicalWidth / 2, viewport.logicalHeight / 2)
 }
 
-/**
- * canvas 物理像素 = CSS × DPR，CSS 尺寸手动钉在 #game 实测矩形；
- * 高分屏上 1 canvas 像素 = 1 设备像素，浏览器不再做拉伸重采样。
- * 无实际变化时跳过（iOS 视口异步稳定需要多次复查，不能每次都重启场景）。
- */
+/** canvas 物理像素 = CSS × DPR；无实际变化时跳过：iOS 视口异步稳定需要多次复查，不能每次都重启场景 */
 export function refreshViewport(game: Phaser.Game, force = false): void {
   const css = cssSize()
   const next = computeViewport(css.w, css.h, window.devicePixelRatio)

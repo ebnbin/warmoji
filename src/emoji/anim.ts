@@ -1,8 +1,4 @@
-// Emoji Studio 纯逻辑层：twemoji 部件动画的资源格式与烘焙函数。
-// twemoji 无语义标签，部件识别靠「固定色板 + getBBox 边界 + 绘制顺序」人工判读后
-// 沉淀为资源数据（animations.json = 原始 SVG 引用 + 动画参数）；本层只做
-// 纯字符串变换（禁 DOM），原始 SVG 永不改动。动画 = 部件分组关键帧 +
-// fx 程序化效果层，按统一规格烘焙成 N 帧静态 SVG → N 张纹理循环播放。
+// 纯字符串变换，禁 DOM；原始 SVG 永不改动
 import animationsJson from './animations.json'
 
 const OPEN_TAG = /<svg\b[^>]*>/
@@ -11,22 +7,21 @@ const TAG = /<(\/?)([a-zA-Z][\w:-]*)((?:"[^"]*"|[^">])*?)(\/?)>/g
 
 export interface SplitSvg {
   open: string
-  /** <defs> 原文（无则空串）——绘制元素可能引用其中的 clipPath 等，重组输出必须带上 */
+  /** 无则空串；重组输出必须带上（clipPath 等引用） */
   defs: string
   els: string[]
 }
 
 interface TopSegment {
   tag: string
-  /** 平衡的元素原文（容器含整个子树） */
+  /** 容器含整个子树 */
   text: string
-  /** 容器开标签；自闭合叶子为 null */
+  /** 叶子为 null */
   open: string | null
-  /** 容器内部原文；叶子为 null */
+  /** 叶子为 null */
   inner: string | null
 }
 
-/** 深度计数切顶层段落：任意标签、任意嵌套都平衡正确（不依赖标签白名单） */
 function topLevelSegments(body: string): TopSegment[] {
   const out: TopSegment[] = []
   const re = new RegExp(TAG.source, 'g')
@@ -64,8 +59,7 @@ function topLevelSegments(body: string): TopSegment[] {
   return out
 }
 
-/** 把 SVG 切成开标签 + defs + 顶层绘制元素数组。defs 单列：它不绘制、
- * 只是共享定义（clipPath 等），下标序保持「绘制元素」语义，重组时恒带上 */
+/** defs 单列，不占绘制元素下标 */
 export function splitSvg(svg: string): SplitSvg {
   const open = OPEN_TAG.exec(svg)?.[0]
   if (!open) throw new Error('不是有效的 SVG')
@@ -87,8 +81,7 @@ function replaceViewBox(open: string, viewBox: string): string {
 
 // ── 动画 ────────────────────────────────────────────────────
 
-/** 关键帧：t 为周期内相位 0..1（首尾值应闭环）；变换绕 (cx,cy) 施加。
- * scaleX/scaleY 与 scale 相乘——挤压拉伸（squash & stretch）用 */
+/** t 为周期内相位 0..1，首尾须闭环；scaleX/scaleY 与 scale 相乘 */
 export interface PartKeyframe {
   readonly t: number
   readonly rotate?: number
@@ -101,16 +94,15 @@ export interface PartKeyframe {
 }
 
 export interface AnimPart {
-  /** 顶层元素下标（splitSvg 序）；成员聚合渲染在最大下标处（略提 z 序，配方自行保证视觉等价） */
+  /** splitSvg 序；成员聚合渲染在最大下标处 */
   readonly indices: readonly number[]
-  /** 旋转/缩放中心（viewBox 坐标） */
+  /** viewBox 坐标 */
   readonly cx?: number
   readonly cy?: number
   readonly keyframes: readonly PartKeyframe[]
 }
 
-/** 程序化效果层：每帧生成原 SVG 里不存在的新 path（火星/涟漪/高光/电弧…），
- * back 垫在本体之下、front 盖在本体之上 */
+/** back 垫在本体之下、front 盖在本体之上 */
 export interface FxLayer {
   readonly layer: 'back' | 'front'
   readonly render: (t: number) => string
@@ -120,11 +112,10 @@ export interface AnimRecipe {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  /** 部件拆解说明（Studio 详情页展示识别依据） */
   readonly anatomy: string
   readonly parts: readonly AnimPart[]
   readonly fx?: readonly FxLayer[]
-  /** 效果超出原画布时扩容（如头顶蒸汽、上方火星） */
+  /** 效果超出原画布时扩容 */
   readonly viewBox?: string
 }
 
@@ -138,7 +129,7 @@ interface PartPose {
   opacity: number
 }
 
-/** 相位 t（0..1）处的分段线性插值；t 落在首帧前/末帧后按闭环回绕 */
+/** t 落在首帧前/末帧后按闭环回绕 */
 export function lerpKeyframes(kfs: readonly PartKeyframe[], t: number): PartPose {
   const fill = (k: PartKeyframe): Required<PartKeyframe> => ({
     t: k.t,
@@ -177,7 +168,6 @@ export function lerpKeyframes(kfs: readonly PartKeyframe[], t: number): PartPose
     prev = cur
     prevT = cur.t
   }
-  // phase 落在末帧之后：向首帧（+1 周期）回绕插值
   const first = fill(kfs[0]!)
   const span = first.t + 1 - prevT
   return blend(prev, first, span <= 0 ? 1 : (phase - prevT) / span)
@@ -188,8 +178,6 @@ const fmt = (n: number): string => {
   return Object.is(r, -0) ? '0' : String(r)
 }
 
-/** 把动画在相位 t 烘焙成一帧静态 SVG：部件包 <g> 写死 transform、
- * fx 层按帧生成新 path（back 垫底 / front 盖面），其余元素原样保序 */
 export function bakeAnimFrame(svg: string, recipe: AnimRecipe, t: number): string {
   const { open, defs, els } = splitSvg(svg)
   const ownerAt = new Map<number, AnimPart>()
@@ -233,7 +221,6 @@ export function bakeAnimFrame(svg: string, recipe: AnimRecipe, t: number): strin
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
 
-/** 四芒星 path data（星光/电光用） */
 export function star4(cx: number, cy: number, r: number): string {
   const k = r * 0.22
   return (
@@ -243,7 +230,6 @@ export function star4(cx: number, cy: number, r: number): string {
   )
 }
 
-/** 粒子升腾（火星/气泡）：每颗按相位错开循环，上升途中渐小渐隐 */
 export function fxRise(opts: {
   readonly particles: readonly { x: number; phase: number; size: number; color: string; drift?: number }[]
   readonly y0: number
@@ -266,7 +252,6 @@ export function fxRise(opts: {
   }
 }
 
-/** 高光斜条扫过：clipPath 裁剪在圆形表面内（金属/宝石的反光） */
 export function fxShineSweep(opts: {
   readonly clip: { cx: number; cy: number; r: number }
   readonly id: string
@@ -275,7 +260,7 @@ export function fxShineSweep(opts: {
   return {
     layer: 'front',
     render: (t) => {
-      // 斜平行四边形从左外扫到右外；周期后 40% 无高光（歇一拍）
+      // 周期后 40% 无高光
       const sweep = t / 0.6
       if (sweep > 1) return ''
       const x = cx - r - 14 + (2 * r + 22) * sweep
@@ -289,7 +274,6 @@ export function fxShineSweep(opts: {
   }
 }
 
-/** 星光闪烁：定点四芒星错相缩放脉冲 */
 export function fxSparkles(opts: {
   readonly stars: readonly { x: number; y: number; r: number; phase: number; color?: string }[]
 }): FxLayer {
@@ -299,7 +283,7 @@ export function fxSparkles(opts: {
       opts.stars
         .map((s) => {
           const pt = (t + s.phase) % 1
-          // 每颗每周期亮一次：前 55% 隐藏
+          // 前 55% 隐藏
           if (pt < 0.55) return ''
           const k = Math.sin(((pt - 0.55) / 0.45) * Math.PI)
           if (k <= 0.05) return ''
@@ -309,7 +293,6 @@ export function fxSparkles(opts: {
   }
 }
 
-/** 涟漪环扩散：椭圆描边从小到大、由实到无 */
 export function fxRipples(opts: {
   readonly cx: number
   readonly cy: number
@@ -335,7 +318,6 @@ export function fxRipples(opts: {
   }
 }
 
-/** 电弧闪现：小折线在各自相位窗内硬切出现（放电的随机感靠错窗） */
 export function fxBolts(opts: {
   readonly bolts: readonly {
     points: readonly (readonly [number, number])[]
@@ -358,7 +340,6 @@ export function fxBolts(opts: {
   }
 }
 
-/** 蒸汽波浪：竖向 S 形描边升起淡出（怒气/热气） */
 export function fxSteam(opts: {
   readonly wisps: readonly { x: number; y0: number; phase: number }[]
 }): FxLayer {
@@ -381,17 +362,12 @@ export function fxSteam(opts: {
   }
 }
 
-// ── 动画资源格式：原始 SVG + 动画参数 = 可存储/校验/热加载的数据资产 ──
-// fx 用「生成器名 + 参数」声明（函数无法序列化），加载时经注册表还原成渲染函数。
-// 资源文件：src/emoji/animations.json（format 版本化；def 为缺省播放规格）。
-// v2 起一个 emoji 是一组具名 clip（idle 待机循环、attack 攻击周期…）：
-// clip 只是纯相位空间的资产，播放时长/触发时机全由玩法侧决定——
-// kind='cycle' 的契约是「相位 0..1 = 一个完整行为周期、出手时刻锚在相位终点」，
-// 播放器按真实行为间隔铺放相位即可让动画速度天然跟随行为速度（如攻速）。
+// ── 动画资源格式 ──
+// fx 用「生成器名 + 参数」声明，加载时经注册表还原。kind='cycle' 的契约：相位 0..1 = 一个完整行为周期，出手时刻锚在相位终点
 
 export const ANIM_FORMAT = 'warmoji-anim@2'
 
-/** fx 声明：gen 必须是注册表成员；layer 缺省用生成器自身默认 */
+/** gen 须为注册表成员；layer 缺省用生成器默认 */
 export interface FxDecl {
   readonly gen: string
   readonly layer?: 'back' | 'front'
@@ -400,7 +376,7 @@ export interface FxDecl {
 
 export type AnimClipKind = 'loop' | 'cycle'
 
-/** 单个 clip 的资源形态：省略 kind 视为 loop；frames 缺省用全局 def */
+/** 省略 kind 视为 loop；frames 缺省用全局 def */
 export interface AnimClipEntry {
   readonly kind?: AnimClipKind
   readonly frames?: number
@@ -420,11 +396,11 @@ export interface AnimResourceEntry {
 export interface AnimResource {
   readonly format: string
   readonly def: { readonly frames: number; readonly durMs: number }
-  /** key = emoji 的 codepoints（与打包索引的 c 键一致） */
+  /** key = ordering ID */
   readonly animations: Readonly<Record<string, AnimResourceEntry>>
 }
 
-/** fx 生成器注册表：资源里的 gen 名 → 还原函数。新增效果类型 = 此处加一行 */
+/** 新增效果类型在此加一行 */
 const FX_REGISTRY = {
   rise: fxRise,
   shine: fxShineSweep,
@@ -436,7 +412,7 @@ const FX_REGISTRY = {
 
 export const FX_GENERATORS = Object.keys(FX_REGISTRY) as readonly string[]
 
-// 注意不能用 lerpKeyframes(kfs,0) 与 (kfs,1) 对比——相位 1 会归一化回 0，恒等
+// 不能用 lerpKeyframes(kfs,0) 与 (kfs,1) 对比：相位 1 会归一化回 0
 const poseOf = (kf: PartKeyframe): PartPose => ({
   rotate: kf.rotate ?? 0,
   tx: kf.tx ?? 0,
@@ -456,8 +432,7 @@ const poseEq = (a: PartPose, b: PartPose): boolean =>
   Math.abs(a.scaleY - b.scaleY) < 1e-9 &&
   Math.abs(a.opacity - b.opacity) < 1e-9
 
-/** 资源校验：格式版本 / 播放规格 / 每个 clip 的关键帧闭环与时序 / 部件下标 /
- * fx 生成器存在。违规即抛错（带定位信息）——坏资源在加载期暴露，不进运行时 */
+/** 违规即抛错 */
 export function validateAnimResource(data: AnimResource): void {
   if (data.format !== ANIM_FORMAT) {
     throw new Error(`动画资源格式不符：期望 ${ANIM_FORMAT}，得到 ${String(data.format)}`)
@@ -515,21 +490,19 @@ export function validateAnimResource(data: AnimResource): void {
   }
 }
 
-/** fx 声明 → 渲染函数（模板套用与资源加载共用的还原逻辑） */
 export function restoreFx(decl: FxDecl): FxLayer {
   const make = FX_REGISTRY[decl.gen as keyof typeof FX_REGISTRY] as (params: unknown) => FxLayer
   const fx = make(decl.params)
   return decl.layer ? { ...fx, layer: decl.layer } : fx
 }
 
-/** 运行时 clip：可直接喂给 bakeAnimFrame 的配方 + 播放语义（kind/frames） */
 export interface AnimClip extends AnimRecipe {
   readonly id: string
   readonly kind: AnimClipKind
   readonly frames: number
 }
 
-/** 一个 emoji 的整套动画：具名 clip 集（首个视为代表作/待机） */
+/** 首个 clip 为代表作 */
 export interface AnimSet {
   readonly emoji: string
   readonly name: string
@@ -562,13 +535,13 @@ export function loadAnimSets(data: AnimResource): AnimSet[] {
 
 const RESOURCE = animationsJson as unknown as AnimResource
 
-/** 缺省播放规格（clip 未自带 frames 时用；durMs 是 loop 类 clip 的标准时长） */
+/** durMs 为 loop 类 clip 的标准时长 */
 export const ANIM_DEF: { readonly frames: number; readonly durMs: number } = RESOURCE.def
 
-/** 动画花名册：从资源文件加载（坏数据在此即抛错，dev/测试期暴露） */
+/** 坏数据在此即抛错 */
 export const ANIM_SETS: readonly AnimSet[] = loadAnimSets(RESOURCE)
 
-/** 兼容视图：每个 emoji 的首个 clip（画廊/模板等只关心代表作的场合用） */
+/** 每个 emoji 的首个 clip */
 export const ANIM_RECIPES: readonly AnimClip[] = ANIM_SETS.map((s) => s.clips[0]!)
 
 export function animSetOf(emoji: string): AnimSet | undefined {
@@ -579,8 +552,7 @@ export function animClipOf(emoji: string, clipId: string): AnimClip | undefined 
   return animSetOf(emoji)?.clips.find((c) => c.id === clipId)
 }
 
-/** 播放进度 → 帧下标（播放器与测试共用的纯函数）：
- * once 播完停在末帧；循环按相位回绕 */
+/** once 播完停在末帧；循环按相位回绕 */
 export function clipFrameIndex(
   elapsedMs: number,
   durMs: number,
@@ -594,17 +566,15 @@ export function clipFrameIndex(
   return Math.min(frames - 1, Math.floor(wrapped * frames))
 }
 
-// ── 通用动画模板：不依赖部件解剖，任意 emoji 即选即用 ──────────
-// 模板 = 全体元素的关键帧（whole，套用时展开成 [0..n-1]）+ fx 声明。
-// 专属配方（animations.json）是逐 emoji 精修；模板是批量铺动画的底座，
-// 也是「预测一个静态物品动起来什么样」的快速试衣间。
+// ── 通用动画模板 ──────────
+// 模板 = 全体元素的关键帧（whole，套用时展开成 [0..n-1]）+ fx 声明
 
 export interface AnimTemplate {
   readonly id: string
   readonly icon: string
   readonly name: string
   readonly desc: string
-  /** 全体元素统一施加的关键帧动画（可缺省：纯 fx 模板） */
+  /** 缺省即纯 fx 模板 */
   readonly whole?: {
     readonly cx?: number
     readonly cy?: number
@@ -824,7 +794,6 @@ export function animTemplateOf(id: string): AnimTemplate | undefined {
   return ANIM_TEMPLATES.find((t) => t.id === id)
 }
 
-/** 模板 × 任意 emoji：全体元素展开成一个部件，fx 声明还原，产出可烘焙配方 */
 export function applyTemplate(tpl: AnimTemplate, emoji: string, svg: string): AnimRecipe {
   const n = splitSvg(svg).els.length
   return {
@@ -847,20 +816,19 @@ export function applyTemplate(tpl: AnimTemplate, emoji: string, svg: string): An
   }
 }
 
-// ── SVG 结构树：解剖工作台（写专属配方时的部件情报）──────────────
-// 树 = SVG 原文的镜像：顶层元素为一级节点，g/defs 等容器可下钻到子元素。
-// 节点 path key：顶层 "3"，组内 "3/1"——显隐/选中状态都以它为键。
+// ── SVG 结构树 ──────────────
+// 节点 path key：顶层 "3"，组内 "3/1"
 
 export interface SvgTreeNode {
   readonly path: string
   readonly tag: string
-  /** 平衡的节点原文（容器含整个子树） */
+  /** 容器含整个子树 */
   readonly raw: string
-  /** 容器开标签；叶子为 null */
+  /** 叶子为 null */
   readonly open: string | null
   readonly fill: string | null
   readonly children: readonly SvgTreeNode[]
-  /** 绘制型节点；defs 子树 = 共享定义（clipPath 等），不绘制、不可显隐 */
+  /** defs 子树为 false：不绘制、不可显隐 */
   readonly paints: boolean
 }
 
@@ -885,7 +853,6 @@ function buildNodes(body: string, parentPath: string, paints: boolean): SvgTreeN
   })
 }
 
-/** SVG 文本 → 结构树（含 defs 节点，paints=false） */
 export function parseSvgTree(svg: string): SvgTree {
   const open = OPEN_TAG.exec(svg)?.[0]
   if (!open) throw new Error('不是有效的 SVG')
@@ -896,12 +863,11 @@ export function parseSvgTree(svg: string): SvgTree {
 }
 
 export interface ComposeState {
-  /** 隐藏节点 path 集合（容器隐藏 = 整个子树消失） */
+  /** 容器隐藏 = 整个子树消失 */
   readonly hidden?: ReadonlySet<string>
 }
 
-/** 按显隐状态把结构树重组回 SVG 文本。defs 恒原样保留（裁剪引用不能断）；
- * 无状态时输出与原文等价。纯字符串操作，不改任何原文片段 */
+/** defs 恒原样保留；无状态时输出与原文等价 */
 export function composeSvg(tree: SvgTree, state: ComposeState = {}): string {
   const hidden = state.hidden ?? new Set<string>()
   const anyHiddenWithin = (path: string): boolean => {
@@ -911,7 +877,6 @@ export function composeSvg(tree: SvgTree, state: ComposeState = {}): string {
   const emit = (node: SvgTreeNode): string => {
     if (!node.paints) return node.raw
     if (hidden.has(node.path)) return ''
-    // 仅当子树内有隐藏项才需要拆开容器逐子重组，否则原样直出
     return node.children.length > 0 && anyHiddenWithin(node.path)
       ? `${node.open}${node.children.map(emit).join('')}</${node.tag}>`
       : node.raw
@@ -925,12 +890,11 @@ export interface TreeRow {
   readonly fill: string | null
   readonly depth: number
   readonly paints: boolean
-  /** 有子节点（可展开/收起） */
   readonly container: boolean
   readonly childCount: number
 }
 
-/** 结构树 → 平铺行（UI 列表用）；collapsed 中的容器不展开其子行 */
+/** collapsed 中的容器不展开其子行 */
 export function flattenTree(tree: SvgTree, collapsed: ReadonlySet<string>): TreeRow[] {
   const rows: TreeRow[] = []
   const walk = (nodes: readonly SvgTreeNode[], depth: number): void => {

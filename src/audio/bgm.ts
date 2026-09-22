@@ -2,10 +2,8 @@ import { bgmScore } from './music'
 import type { BgmHit, BgmId, BgmNote, BgmScore } from './music'
 import { audioCtx, ensureAudio } from './sfx'
 
-// BGM 播放器：前瞻调度器逐段排入 core/music.ts 的乐谱事件，整曲无缝循环。
-// 与音效共用一个 AudioContext（首个手势解锁），BGM 走独立主增益压在音效之下；
-// 切曲/开关走增益淡入淡出。音符/打击乐渲染按 (ctx, out) 参数化——离线渲染
-// （renderBgmOffline，探针用）与实时播放走同一条合成路径。
+// 与音效共用一个 AudioContext，BGM 走独立主增益压在音效之下。
+// 音符/打击乐渲染按 (ctx, out) 参数化：离线渲染与实时播放走同一条合成路径
 
 const LOOKAHEAD_SEC = 0.4
 const TICK_MS = 100
@@ -71,7 +69,6 @@ function scheduleNote(
 
 function scheduleHit(ctx: BaseAudioContext, out: AudioNode, h: BgmHit, when: number): void {
   if (h.kind === 'kick' || h.kind === 'tom') {
-    // 正弦扫频鼓身
     const [f0, f1, dur] = h.kind === 'kick' ? [150, 42, 0.13] : [190, 82, 0.14]
     const osc = ctx.createOscillator()
     osc.type = 'sine'
@@ -90,7 +87,6 @@ function scheduleHit(ctx: BaseAudioContext, out: AudioNode, h: BgmHit, when: num
     osc.stop(when + dur + 0.02)
     return
   }
-  // 噪声打击：军鼓带通、踩镲高通
   const src = ctx.createBufferSource()
   src.buffer = noiseBuffer(ctx)
   const filter = ctx.createBiquadFilter()
@@ -118,7 +114,7 @@ function scheduleHit(ctx: BaseAudioContext, out: AudioNode, h: BgmHit, when: num
   src.stop(when + dur + 0.02)
 }
 
-/** 建回声链（送出增益 → 延迟 → 反馈环 → 湿声并入 out），返回送出节点 */
+/** 返回送出节点 */
 function buildEcho(ctx: BaseAudioContext, out: AudioNode, def: NonNullable<BgmScore['echo']>): GainNode {
   const send = ctx.createGain()
   send.gain.value = def.level
@@ -133,7 +129,7 @@ function buildEcho(ctx: BaseAudioContext, out: AudioNode, def: NonNullable<BgmSc
   return send
 }
 
-/** 把 [fromSec, toSec) 播放窗内的乐谱事件（跨圈展开）排入目标节点 */
+/** [fromSec, toSec)，跨圈展开 */
 function scheduleWindow(
   ctx: BaseAudioContext,
   out: AudioNode,
@@ -162,7 +158,7 @@ function tick(): void {
   if (!ctx || !playing || !trackGain || ctx.state !== 'running') return
   const score = bgmScore(playing)
   const now = ctx.currentTime - anchor
-  // 后台节流醒来：跳过错过的段落，按当前圈位置继续（不追播积压音符）
+  // 后台节流醒来后跳过错过的段落，不追播
   if (now > cursor + 1) cursor = Math.max(0, now)
   const until = now + LOOKAHEAD_SEC
   if (until <= cursor) return
@@ -170,7 +166,6 @@ function tick(): void {
   cursor = until
 }
 
-/** 淡出并弃用当前曲的增益链（音符自然衰减，节点稍后随 GC 断开） */
 function fadeOutCurrent(ctx: AudioContext): void {
   if (!trackGain) return
   const g = trackGain
@@ -207,7 +202,6 @@ function startIfWanted(): void {
   startTrack(ctx, desired)
 }
 
-/** 注册手势解锁：首个交互后若有待播曲即起播 */
 export function initBgm(): void {
   const unlock = (): void => {
     ensureAudio()
@@ -217,7 +211,7 @@ export function initBgm(): void {
   window.addEventListener('keydown', unlock, { once: true })
 }
 
-/** 声明想播的曲子（幂等）；上下文未解锁/开关关闭时仅记录，条件齐后起播 */
+/** 幂等；未解锁或关闭时仅记录，条件齐后起播 */
 export function playBgm(id: BgmId): void {
   desired = id
   if (playing === id) return
@@ -238,7 +232,6 @@ export function setBgmEnabled(on: boolean): void {
   startIfWanted()
 }
 
-/** 离线渲染一段曲子并统计响度（探针用：验证真的出声且各曲不同） */
 export async function renderBgmOffline(
   id: BgmId,
   seconds = 4,
