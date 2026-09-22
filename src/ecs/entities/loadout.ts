@@ -11,10 +11,8 @@ import { equipAbility, NEUTRAL_AMP } from './ability'
 import type { RunState } from '../../run/state'
 import type { Sim } from '../sim'
 
-// 开局装配：把配装解析成一条条能力。队伍在开局一次装齐；敌人首次被扫到时装配
-// （lazy-arm，与旧实现的出生即装配等价，因为压制期照样推进冷却）。
+// 队伍开局装齐；敌人首次被扫到时装配
 
-/** 为全队装备能力：逐槽位按已持道具 + 专属等级解析生效能力（试炼场走场内等级旋钮） */
 export function armTeam(sim: Sim, run: RunState, sandbox: boolean): void {
   const teamFx = aggregateTeamCards(run.teamCards)
   for (let slot = 0; slot < run.roster.length; slot++) {
@@ -24,7 +22,7 @@ export function armTeam(sim: Sim, run: RunState, sandbox: boolean): void {
     const level = sandbox ? sandboxLevel() + 1 : characterLevel(characterXp(owned))
     const tiers = { u1: level >= 2, u2: level >= 3 }
     const fx = aggregateCharacterEffects(owned, levelStatsFor(id, level))
-    // 装备期乘区（道具/等级/团队卡折算）：随局面变的那部分由 amp.ts 现算
+    // 随局面变的乘区由 amp.ts 现算
     const amp = {
       dmg: fx.damageMul * teamFx.teamDamageMul,
       cd: fx.cooldownMul * teamFx.teamCooldownMul,
@@ -38,10 +36,7 @@ export function armTeam(sim: Sim, run: RunState, sandbox: boolean): void {
   }
 }
 
-/** 队长主动技能的载荷：效果本体是标准能力行，行为主体锚在队伍中心。
- * 不进自动扫描——只等 castSkill 的施放请求。返回锚点实体 */
 export function armCaptain(sim: Sim, run: RunState): void {
-  // 队长实体在 makeSim 里已建好（队伍中心即它的位置），这里只挂技能载荷
   for (const a of CAPTAINS[run.captainId].skill.abilities) {
     equipAbility(sim, sim.captain, toPx(a), FACTION.team, 0, NEUTRAL_AMP, true)
   }
