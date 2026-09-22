@@ -65,9 +65,10 @@ export function spawnProjectileEcs(
   Proj.srcSlot[eid] = srcSlot
   Proj.pierce[eid] = hasComponent(sim.world, src, Pierce) ? Pierce.n[src]! : 0
   Proj.spin[eid] = rotOffset === 0 ? 9 : 0
-  const life = sim.hooks.projectileLifeMs(sim)
-  Proj.dieAt[eid] = life > 0 ? sim.elapsedMs + life : 0
-  if (life <= 0) addComponent(sim.world, eid, ViewCull)
+  const mapLife = sim.hooks.projectileLifeMs(sim)
+  const life = mapLife > 0 ? Math.min(mapLife, Shoot.lifeMs[src]!) : Shoot.lifeMs[src]!
+  Proj.dieAt[eid] = sim.elapsedMs + life
+  if (mapLife <= 0) addComponent(sim.world, eid, ViewCull)
   Depth.z[eid] = 8
   projOnHit[eid] = abilityOnHit[src]
   projHitEids[eid] = new Set()

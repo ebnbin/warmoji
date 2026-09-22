@@ -196,7 +196,7 @@ export const Projectile = {}
 /** 世界像素/秒 */
 export const Vel = { x: f32(), y: f32() }
 
-/** 自旋 rad/s；寿命回收时刻 0 = 不按寿命；敌弹来源槽位为 -1 */
+/** 自旋 rad/s；dieAt 寿命回收时刻；敌弹来源槽位为 -1 */
 export const Proj = {
   damage: f32(),
   radius: f32(),
@@ -516,6 +516,7 @@ export const Turret = {
   damage: f32(),
   knockback: f32(),
   range: f32(),
+  lifeMs: f32(),
   /** emoji 在 store.abilityArtEmoji */
   size: f32(),
 }

@@ -36,6 +36,7 @@ export class TurretAbility implements AbilityRuntime {
       damage: def.damage,
       cooldownMs: def.fireIntervalMs,
       knockback: def.knockback,
+      lifeMs: def.lifeMs,
       projectile: def.projectile,
     }
     this.idleFrames = clipFramesLive(ctx.scene, def.turret.emoji, 'idle', ctx.ownerOutline)

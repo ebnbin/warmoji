@@ -277,7 +277,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
       Shoot.damage[e] = d.damage
       Shoot.knockback[e] = d.knockback
       Shoot.range[e] = d.range ?? 0
-      Shoot.lifeMs[e] = d.lifeMs ?? 0
+      Shoot.lifeMs[e] = d.lifeMs
       if (d.aim === 'move') addComponent(c.world, e, AimMove)
       assertFree(c.world, e, Bolt, '弹丸外形组件') // 弹道与弩塔共用 Bolt，同宿主装两条就会撞
       addComponent(c.world, e, Bolt)
@@ -315,6 +315,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
       Turret.damage[e] = d.damage
       Turret.knockback[e] = d.knockback
       Turret.range[e] = d.range
+      Turret.lifeMs[e] = d.lifeMs
       abilityArtEmoji[e] = d.turret.emoji
       Turret.size[e] = d.turret.size
       // 塔自持的 projectile 能力从这里抄外形

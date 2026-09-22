@@ -133,7 +133,7 @@ function armTurret(sim: Sim, weapon: number, m: number): void {
   Shoot.damage[m] = Turret.damage[weapon]!
   Shoot.knockback[m] = Turret.knockback[weapon]!
   Shoot.range[m] = Turret.range[weapon]!
-  Shoot.lifeMs[m] = 0
+  Shoot.lifeMs[m] = Turret.lifeMs[weapon]!
   addComponent(sim.world, m, Bolt)
   Bolt.frame[m] = Bolt.frame[weapon]!
   Bolt.size[m] = Bolt.size[weapon]!

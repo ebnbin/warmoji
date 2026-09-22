@@ -69,7 +69,7 @@ export interface WorldHooks {
   ghosts(sim: Sim, x: number, y: number): Point[]
   /** 坐标回绕；默认原样 */
   wrap(sim: Sim, x: number, y: number): Point
-  /** 玩家子弹寿命（ms）；0 = 按视野回收 */
+  /** 玩家子弹的地图寿命上限（ms），与子弹自身寿命取小；0 = 不设，另按视野回收 */
   projectileLifeMs(sim: Sim): number
   /** 队伍的世界漂移，加在本帧输入位移之上，再过 constrainTeam；默认无 */
   teamDrift(sim: Sim, delta: number): Point

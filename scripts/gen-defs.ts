@@ -139,6 +139,7 @@ function checkEffects(path: string, effects: unknown): void {
 
 function checkAbility(path: string, a: Record<string, unknown>): void {
   if (!ABILITY_KINDS.has(a.kind as string)) bad(path, `未知 kind：${String(a.kind)}`)
+  if (a.kind === 'projectile' || a.kind === 'turret') num(`${path}.lifeMs`, a.lifeMs, 1)
   if (a.onHit !== undefined) checkEffects(path, a.onHit)
 }
 

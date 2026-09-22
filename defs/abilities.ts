@@ -24,6 +24,7 @@ const pistol = {
   damage: 16,
   cooldownMs: 600,
   knockback: 3,
+  lifeMs: 2000,
   held: {
     emoji: '1f52b',
     size: 0.75,
@@ -48,6 +49,7 @@ const BASE = {
     damage: 22,
     cooldownMs: 450,
     knockback: 3.5,
+    lifeMs: 2000,
     projectile: {
       emoji: '1f345',
       size: 0.55,
@@ -144,6 +146,7 @@ const BASE = {
     damage: 10,
     cooldownMs: 1000,
     knockback: 2,
+    lifeMs: 2000,
     projectile: {
       emoji: '2728',
       size: 0.5,
@@ -178,6 +181,7 @@ const BASE = {
     damage: 13,
     knockback: 2.5,
     range: 5.5,
+    lifeMs: 2000,
     projectile: {
       emoji: '1fab5',
       size: 0.42,
@@ -207,6 +211,7 @@ const BASE = {
     damage: 8,
     cooldownMs: 800,
     knockback: 2,
+    lifeMs: 2000,
     projectile: {
       emoji: '1f489',
       size: 0.48,
