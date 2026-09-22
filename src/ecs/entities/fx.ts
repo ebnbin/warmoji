@@ -147,7 +147,7 @@ export function spawnDamageNumber(sim: Sim, x: number, y: number, amount: number
   Fx.bornMs[eid] = sim.fxMs
   Fx.durMs[eid] = RISE_MS
   Transform.x[eid] = x
-  Transform.y[eid] = y - 14 // 起点略高于命中点（与旧实现同）
+  Transform.y[eid] = y - 14 // 起点略高于命中点
   DamageNumber.value[eid] = amount
   DamageNumber.crit[eid] = crit ? 1 : 0
   return eid

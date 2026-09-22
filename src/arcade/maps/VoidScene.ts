@@ -121,7 +121,7 @@ export class VoidScene extends ArcadeBattleScene {
     return torusDelta(this.center, { x: m.followX, y: m.followY }, this.arenaW, this.arenaH).y
   }
 
-  /** 接触判定改为手写环面圆-圆 */
+  /** 接触判定走手写环面圆-圆，不用物理 overlap */
   protected setupTouchOverlaps(): void {}
 
   protected touchStep(): void {
