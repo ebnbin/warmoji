@@ -117,6 +117,7 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
     flingVy,
   )
   unequipAbilities(sim, eid)
+  enemyDef[eid] = undefined
   removeEntity(sim.world, eid)
 }
 
@@ -160,6 +161,7 @@ export function despawnEnemy(sim: Sim, eid: number): void {
   if (enemyDef[eid]?.spawner) orphanBrood(sim, eid)
   enemyCarries[eid] = undefined
   unequipAbilities(sim, eid)
+  enemyDef[eid] = undefined
   removeEntity(sim.world, eid)
 }
 
