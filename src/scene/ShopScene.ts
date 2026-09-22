@@ -38,10 +38,6 @@ import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
 import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
 
-// 波次间商店：左（竖屏为下）为上架位列表——队长占首位、每个出战角色一个位，
-// 各自从自己的道具池随机上架，可购买（自动补货）或付费刷新（队长可提供免费次数）；
-// 右（竖屏为上）为选中对象的属性面板（道具修正后数值）+ 当前上架道具卡。
-// 布局按最小可用空间设计（横 1280×720 / 竖 720×1280），内容块居中于实际视口。
 interface ShopLayout {
   content: { w: number; h: number }
   titleY: number
@@ -51,7 +47,6 @@ interface ShopLayout {
   btn: { y: number; w: number; h: number }
 }
 
-// 方向对应约定：竖屏「上」= 横屏「左」（详情），竖屏「下」= 横屏「右」（上架位列表）
 const LANDSCAPE: ShopLayout = {
   content: { w: 1280, h: 720 },
   titleY: 46,
@@ -70,10 +65,8 @@ const PORTRAIT: ShopLayout = {
   btn: { y: 1162, w: 360, h: 72 },
 }
 
-// 上架位：每个出战角色一个，按阵容槽位排列（团队增益已迁到升级卡，商店只卖角色装备）。
-// 招募/升级已拆分到整编页（PromoteScene），商店只管道具购物
 export class ShopScene extends Phaser.Scene {
-  // 视口变化触发的 restart 只重排布局，保留背景色/焦点/上架结果等页面状态
+  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
@@ -81,23 +74,20 @@ export class ShopScene extends Phaser.Scene {
   private lineup: CharacterId[] = []
   private focusedId: CharacterId = 'juggler'
   private offers: (ItemId | null)[] = []
-  /** 团队升级卡效果（本局）：商店折扣 / 额外免费刷新 从这里取 */
   private teamFx!: TeamEffects
   private layout!: ShopLayout
   private origin = { x: 0, y: 0 }
   private grid!: EmojiGrid
   private detailObjs: Phaser.GameObjects.GameObject[] = []
-  /** 上架道具卡的介绍文字区（变长）——固定卡高装不下就在卡内滚动，不再压到购买/刷新键 */
   private offerDescView!: ScrollView
   private coinsText!: Phaser.GameObjects.Text
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private buyRect = { x: 0, y: 0, w: 0, h: 0 }
   private refreshRect = { x: 0, y: 0, w: 0, h: 0 }
   private formationRect: { x: number; y: number; w: number; h: number } | null = null
-  /** 沉睡（阵型页打开）期间视口变过，唤醒时需要重排 */
+  /** 沉睡期间视口变过，唤醒时重排 */
   private wakeDirty = false
   private quitArmed = false
-  // 上架位网格自带滚动；详情属性区行数多时也可滚动
   private slotScroll = 0
   private statsContainer!: Phaser.GameObjects.Container
   private statsScroll = 0
@@ -124,7 +114,6 @@ export class ShopScene extends Phaser.Scene {
     this.lineup = [...this.run.roster]
     this.teamFx = aggregateTeamCards(this.run.teamCards)
     if (!preserved) {
-      // 进店结算：天使复活满血；免费刷新次数按队长重置（+团队调货卡）；全部上架位重新随机
       if (CAPTAINS[this.captainId].reviveInShop) {
         this.run.memberHp = this.run.memberHp.map((_, slot) => this.slotMaxHp(slot))
       }
@@ -156,7 +145,6 @@ export class ShopScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    // 结束本局回主界面：二次点击确认，防误触弃局
     const quit = this.add
       .text(this.origin.x + 40, oy + L.titleY, '✕ 结束', {
         fontFamily: UI_FONT,
@@ -181,7 +169,6 @@ export class ShopScene extends Phaser.Scene {
       })
     })
 
-    // 阵型入口：达 5 人后常驻——商店睡眠等待，从阵型页返回时货架原样保留
     this.formationRect = null
     if (hasCenter(this.run)) {
       const fm = this.add
@@ -214,14 +201,12 @@ export class ShopScene extends Phaser.Scene {
 
     this.createSlots()
 
-    // 详情面板底板
     const D = L.detail
     const dx = this.origin.x + D.x
     const dy = oy + D.y
     const panel = this.add.graphics()
     roundRect(panel, dx, dy, D.w, D.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
 
-    // 属性区滚动容器：夹在详情头部与底部道具卡之间，行数多时可拖动/滚轮
     this.statsTop = dy + 112
     this.statsH = D.h - 112 - 118
     this.statsContainer = this.add.container(0, 0)
@@ -230,7 +215,6 @@ export class ShopScene extends Phaser.Scene {
     statsMask.fillRect(dx, this.statsTop, D.w, this.statsH)
     clipTo(this.statsContainer, statsMask)
 
-    // 上架道具卡的购买/刷新按钮命中区（内容随 refresh 重绘）
     const cardY = dy + D.h - 110
     this.buyRect = { x: dx + D.w - 26 - 140, y: cardY + 21, w: 140, h: 54 }
     this.refreshRect = { x: this.buyRect.x - 8 - 150, y: cardY + 21, w: 150, h: 54 }
@@ -249,14 +233,13 @@ export class ShopScene extends Phaser.Scene {
         if (!this.dragMoved && !this.grid.wasDragged) this.refreshFocused()
       })
 
-    // 卡内介绍滚动区（图标右侧、刷新键左侧的一条带）——只创建一次，renderOfferCard 复用
+    // 只创建一次，renderOfferCard 复用
     this.offerDescView = new ScrollView(
       this,
       { x: dx + 88, y: cardY + 42, w: this.refreshRect.x - (dx + 88) - 12, h: 52 },
       { scrollbar: true },
     )
 
-    // 详情属性区滚动（上架位网格的滚动由 EmojiGrid 自理）
     this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy2: number) => {
       if (this.inStats(p)) this.setStatsScroll(this.statsScroll + dy2 * 0.6)
     })
@@ -278,7 +261,6 @@ export class ShopScene extends Phaser.Scene {
       this.dragging = false
     })
 
-    // 继续按钮
     this.btnRect = {
       x: w / 2 - L.btn.w / 2,
       y: oy + L.btn.y - L.btn.h / 2,
@@ -317,7 +299,6 @@ export class ShopScene extends Phaser.Scene {
 
   // ── 上架/购买 ───────────────────────────────────────────────
 
-  /** 该槽位角色当前等级：由已装备道具的 upgradeXp 之和推导（来源无关） */
   private levelOf(slot: number): number {
     return characterLevel(characterXp(this.run.memberItems[slot] ?? []))
   }
@@ -331,12 +312,11 @@ export class ShopScene extends Phaser.Scene {
     return (this.run.memberItems[slot] ??= [])
   }
 
-  /** 当前聚焦角色的阵容槽位（-1 = 无效） */
+  /** -1 = 无效 */
   private focusedIndex(): number {
     return this.lineup.indexOf(this.focusedId)
   }
 
-  /** 折后价：基础波次价 × 团队砍价卡倍率（四舍五入，至少 1） */
   private price(offer: ItemId): number {
     return Math.max(1, Math.round(itemPrice(offer, this.run.wave) * this.teamFx.shopDiscountMul))
   }
@@ -353,12 +333,10 @@ export class ShopScene extends Phaser.Scene {
     const beforeLevel = this.levelOf(idx)
     const owned = this.ownedFor(idx)
     owned.push(offer)
-    // 装备道具即累加该角色专属经验（等级由 memberItems 纯函数推导）；跨阈值即自动质变升级
     const afterLevel = this.levelOf(idx)
-    // 购买后自动补货：用新等级的池 + 概率
     this.offers[idx] = rollItem(this.poolFor(idx), owned, Math.random, this.run.wave, afterLevel)
     this.refresh()
-    // 升级弹窗在刷新之后（盖在最上层）；跨多级则以最终等级为准
+    // 须在 refresh 之后，盖在最上层
     if (afterLevel > beforeLevel) this.showLevelUp(idx, afterLevel)
   }
 
@@ -382,7 +360,6 @@ export class ShopScene extends Phaser.Scene {
 
   // ── 上架位网格（每个出战角色一个；形象即含义，角标 = 当前上架道具） ──
 
-  /** 网格条目：id 即 key；角标显示该位当前上架道具，带血条 */
   private buildSlotItems(): { key: string; emoji: string; outline: 'player'; badge?: string; hpRatio?: number }[] {
     return this.lineup.map((id, slot) => {
       const max = this.slotMaxHp(slot)
@@ -453,7 +430,6 @@ export class ShopScene extends Phaser.Scene {
       color: hp / max > 0.5 ? '#9ccc9c' : '#ffb74d',
     }
 
-    // 角色专属经验进度条：进店即见、每次购买当场推进（满档在购买瞬间弹升级窗）
     const barX = dx + 104
     const barW = dx + D.w - 24 - barX
     const barY = dy + 92
@@ -497,11 +473,9 @@ export class ShopScene extends Phaser.Scene {
       xpBar,
     )
 
-    // 属性区（可滚动）：已购道具行 + 属性组
     const statObjs: Phaser.GameObjects.GameObject[] = []
     let cursor = this.statsTop + 16
     if (owned.length > 0) {
-      // 已购道具行：按面板宽自动换行，道具再多也不会横向溢出（纵向靠属性区滚动）
       const startX = dx + 42
       const maxX = dx + D.w - 42
       let x = startX
@@ -576,7 +550,6 @@ export class ShopScene extends Phaser.Scene {
     const offer = this.offers[idx] ?? null
     const owned = this.ownedFor(idx)
 
-    // 卡片边框随稀有度着色：普通保持原金色弱描边，稀有/史诗用档位色加亮
     const rarity = offer ? ITEMS[offer].rarity : 'common'
     const rarityColor = Number.parseInt(RARITIES[rarity].color.slice(1), 16)
     const card = this.add.graphics()
@@ -616,7 +589,6 @@ export class ShopScene extends Phaser.Scene {
           })
           .setOrigin(0, 0.5),
       )
-      // 介绍文字装进卡内滚动区：再长也不会撑破卡片、压住购买/刷新键
       this.offerDescView.clear()
       const desc = this.add
         .text(0, 0, `${item.desc}${stackNote}`, {
@@ -645,7 +617,6 @@ export class ShopScene extends Phaser.Scene {
       )
     }
 
-    // 购买按钮（价格已含团队砍价折扣）
     const canBuy = offer !== null && this.run.coins >= this.price(offer)
     const bb = this.buyRect
     const buyBg = this.add.graphics()
@@ -663,7 +634,6 @@ export class ShopScene extends Phaser.Scene {
         .setOrigin(0.5),
     )
 
-    // 刷新按钮
     const free = this.run.freeRefreshes > 0
     const canRefresh = free || this.run.coins >= SHOP.refreshPrice
     const rb = this.refreshRect
@@ -691,7 +661,7 @@ export class ShopScene extends Phaser.Scene {
     )
   }
 
-  /** 效果片段 → 人读串（升级弹窗展示基础属性质变，只列有变化的轴） */
+  /** 只列有变化的轴 */
   private formatEffects(fx: Partial<CharacterEffects>): string {
     const parts: string[] = []
     if (fx.hpAdd) parts.push(`生命 ${fx.hpAdd > 0 ? '+' : ''}${fx.hpAdd}`)
@@ -702,8 +672,6 @@ export class ShopScene extends Phaser.Scene {
     return parts.join(' · ')
   }
 
-  /** 质变升级弹窗：购买跨阈值当场弹出——新等级 + 新能力 + 基础属性质变。
-   * 点任意处或 ~3.4 秒后淡出；盖在最上层，期间挡住购买误触 */
   private showLevelUp(slot: number, level: number): void {
     playSfx('levelup')
     const res = textRes()
@@ -804,10 +772,8 @@ export class ShopScene extends Phaser.Scene {
 
   private refresh(): void {
     this.coinsText.setText(`${this.run.coins}`)
-    // 购买/刷新会换上架、升级/招募会变血条：整格重建 + 选中态
     this.grid.setItems(this.buildSlotItems())
     this.grid.setSelected(this.focusedId)
-    // 招募位以外的聚焦对象变化时，属性区滚动位置由 renderDetail 重新钳制
     this.renderDetail(textRes())
     this.reportShop()
   }
@@ -817,15 +783,13 @@ export class ShopScene extends Phaser.Scene {
     this.scene.start(battleSceneFor(this.run.mapId))
   }
 
-  /** 打开阵型页（本场景睡眠，返回时唤醒，货架/金币/免费刷新原样保留）。
-   * 必须先入睡再启动阵型页：promote 的 init 以「商店确实在沉睡」验证 fromShop */
+  /** 须先入睡再启动阵型页：promote 的 init 以商店在沉睡验证 fromShop */
   private openFormation(): void {
     playSfx('click')
     this.scene.sleep()
     this.scene.run('promote', { fromShop: true })
   }
 
-  /** 从阵型页返回：沉睡期间视口变过则重排（保留货架），否则仅恢复调试上报 */
   private onWake(): void {
     if (this.wakeDirty) {
       this.wakeDirty = false
@@ -913,7 +877,7 @@ export class ShopScene extends Phaser.Scene {
   }
 
   private onViewportChanged(): void {
-    // 阵型页打开期间（本场景沉睡）不能 restart，否则会顶掉上层页面；唤醒时补排
+    // 沉睡中不能 restart，会顶掉上层页面；唤醒时补排
     if (this.scene.isSleeping()) {
       this.wakeDirty = true
       return

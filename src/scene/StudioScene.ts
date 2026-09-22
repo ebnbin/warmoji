@@ -32,15 +32,7 @@ import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '..
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
 
-// Emoji Studio：twemoji 部件动画的游戏内工作台，三个 tab——
-// 🎬 配方 = animations.json 里的精修动画预览；🧩 模板 = 任选 emoji × 通用
-// 动画模板即选即看（铺量动画的试衣间）；🔬 解剖 = SVG 结构树工作台：
-// 树镜像原文结构（顶层元素 + 组/defs 可下钻），点行切换该节点显/隐，
-// 双大图对照（上完整原图恒不变，下拆分图 = 只画可见节点）。
-// 素材区 = feed 流虚拟网格：配方页列有配方的 emoji，模板/解剖页列全部
-// 基础形态（两者对任意 SVG 通用）。预览区带暂停/逐帧/速度控制。内容按
-// 保底画布设计、整体居中；studio- 纹理场景自管理，shutdown 全清，
-// 缩略缓存真退出才释放。
+// studio- 纹理由本场景自管：shutdown 全清；缩略缓存只在真退出时释放
 interface StudioLayout {
   content: { w: number; h: number }
   headerY: number
@@ -49,8 +41,6 @@ interface StudioLayout {
   list: { x: number; y: number; w: number; h: number }
 }
 
-// 主体详情块横竖屏都是接近正方形的大块（横屏受视口高限制为 720×550，
-// 竖屏 672×672），剩余空间给素材网格：横屏在右（6 列），竖屏在下（5 行）
 const LANDSCAPE: StudioLayout = {
   content: { w: 1280, h: 720 },
   headerY: 44,
@@ -69,15 +59,13 @@ const PORTRAIT: StudioLayout = {
 
 const RASTER = 256
 const SPEEDS = [1, 0.5, 0.25] as const
-// 解剖页结构树：行高/缩进按手机可点性放大（64 逻辑 px ≈ 手机 32 CSS px 行高）
 const ANAT_ROW = 64
 const ANAT_INDENT = 28
-/** 树行内缩进起点与箭头/眼睛列宽（点击分派与绘制共用） */
+/** 点击分派与绘制共用 */
 const anatIndentOf = (depth: number): number => 16 + depth * ANAT_INDENT
 
 type Tab = 'recipes' | 'templates' | 'anatomy'
 
-/** 解剖页一次构建期的引用集合（切换选择/emoji 时随 detailObjs 整组销毁重建） */
 interface AnatUi {
   tree: SvgTree
   splitImg: Phaser.GameObjects.Image
@@ -90,7 +78,6 @@ interface AnatUi {
   bigSize: number
 }
 
-/** 模板/解剖页的默认素材（任意 emoji 皆可选，这里只是进场的起点） */
 const DEFAULT_SUBJECT = '1f939'
 
 export class StudioScene extends Phaser.Scene {
@@ -98,25 +85,23 @@ export class StudioScene extends Phaser.Scene {
   private palette?: Palette
   private tab: Tab = 'recipes'
   private recipeSel = ANIM_RECIPES[0]!.emoji
-  /** 配方页当前 clip（多 clip 实体可切换；换实体重置为首个 clip） */
   private clipSel = 'idle'
   private clipRects: { id: string; x: number; y: number; w: number; h: number }[] = []
   private tplEmoji = DEFAULT_SUBJECT
   private tplId = ANIM_TEMPLATES[0]!.id
   private anatEmoji = DEFAULT_SUBJECT
-  /** 全部基础形态码点清单（打包资源就绪后填充） */
   private allKeys: string[] = []
 
-  // 解剖页结构树工作台状态（换 emoji 归零；旋转 restart 保留）
+  // 换 emoji 归零；视口 restart 保留
   private anat?: AnatUi
   private anatHidden = new Set<string>()
   private anatCollapsed = new Set<string>()
   private anatScroll = 0
   private anatScrollMax = 0
-  /** 全展开行（信息行计数用）与当前视图行（点击反解/上报用，受收起影响） */
+  /** anatAllRows 全展开；anatRowMeta 当前视图（受收起影响） */
   private anatAllRows: TreeRow[] = []
   private anatRowMeta: TreeRow[] = []
-  /** 拆分图光栅化竞态令牌与滚动纹理键（新帧就绪才替换/回收旧帧） */
+  /** 竞态令牌：新帧就绪才替换并回收旧帧 */
   private anatSplitGen = 0
   private anatLiveCounter = 0
   private anatLiveKey?: string
@@ -134,20 +119,17 @@ export class StudioScene extends Phaser.Scene {
   private reportAt = 0
   private previewImg?: Phaser.GameObjects.Image
   private previewState: 'idle' | 'loading' | 'ready' = 'idle'
-  // 播放控制：暂停 + 逐帧步进 + 速度（跨选择保留，换 tab 重置暂停）
   private paused = false
   private speedIdx = 0
   private frameKeys: string[] = []
   private frameIdx = 0
   private previewSize = 0
   private animTimer?: Phaser.Time.TimerEvent
-  /** 异步烘焙的竞态令牌：切换选择后旧任务作废 */
+  /** 竞态令牌：切换选择后旧任务作废 */
   private jobGen = 0
   /** 本场景创建的纹理，shutdown 全量移除 */
   private ownedKeys = new Set<string>()
-  /** 详情面板动态内容（切换选择时整组销毁重建） */
   private detailObjs: Phaser.GameObjects.GameObject[] = []
-  /** 详情面板下半部（模板 chips / 配方文案）的可滚动区，随每次重建重定位 */
   private detailScroll!: ScrollView
   private tabObjs: Phaser.GameObjects.GameObject[] = []
   private tabRects: { id: Tab; x: number; y: number; w: number; h: number }[] = []
@@ -175,7 +157,6 @@ export class StudioScene extends Phaser.Scene {
       this.paused = false
       this.speedIdx = 0
     }
-    // 缩略图档位按设备渲染缩放定（52 逻辑 px 格子的物理像素 1:1）；同档复用缓存
     prepareEmojiThumbs(this, emojiThumbSize(70, viewport.renderScale))
     this.previewState = 'idle'
     this.detailObjs = []
@@ -226,7 +207,6 @@ export class StudioScene extends Phaser.Scene {
     const G = this.listRect()
     frames.fillRoundedRect(D.x - 8, D.y - 8, D.w + 16, D.h + 16, 14)
     frames.fillRoundedRect(G.x - 8, G.y - 8, G.w + 16, G.h + 16, 14)
-    // 详情下半部滚动区（模板 chips / 配方文案）：初始占位，各页构建时 setViewport 重定位
     this.detailScroll = new ScrollView(this, { x: D.x, y: D.y, w: D.w, h: D.h })
 
     this.buildTabs(res)
@@ -237,7 +217,6 @@ export class StudioScene extends Phaser.Scene {
     }
     grid.onThumbsProgress = () => this.report()
 
-    // 解剖结构树滚动：滚轮 + 拖动（命中区与素材网格不重叠；挂 scene.input 随场景重启自清）
     this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (this.anatContains(p)) this.anatScrollTo(this.anatScroll + dy * 0.6)
     })
@@ -262,7 +241,6 @@ export class StudioScene extends Phaser.Scene {
     this.input.on('pointerup', releaseTree)
     this.input.on('pointerupoutside', releaseTree)
 
-    // 模板 chips 的图标走常规纹理需预载；素材网格与预览均按需异步
     const need = new Set<string>(ANIM_TEMPLATES.map((t) => t.icon))
     void Promise.all([
       Promise.all([...need].map((e) => ensureEmoji(this, e).catch(() => ''))),
@@ -283,7 +261,6 @@ export class StudioScene extends Phaser.Scene {
       this.jobGen++
       for (const key of this.ownedKeys) this.textures.remove(key)
       this.ownedKeys.clear()
-      // 真退出 Studio 才释放缩略缓存；旋转的内部 restart 保留（同档位复用）
       if (!this.preserveOnRestart) releaseEmojiThumbs(this)
     })
     this.report()
@@ -350,7 +327,6 @@ export class StudioScene extends Phaser.Scene {
     }
   }
 
-  /** 素材清单：配方页 = 有配方的 emoji；模板/解剖页 = 全部基础形态（通用操作） */
   private applyTab(): void {
     const grid = this.grid
     if (grid) {
@@ -392,7 +368,6 @@ export class StudioScene extends Phaser.Scene {
     this.report()
   }
 
-  /** 解剖工作台状态归零（换 emoji / 进场重置） */
   private resetAnatState(): void {
     this.anatHidden = new Set()
     this.anatCollapsed = new Set()
@@ -419,7 +394,6 @@ export class StudioScene extends Phaser.Scene {
     return { d: this.detailRect(), res: textRes() }
   }
 
-  /** 🎬 配方页：动画预览 + clip 切换（多 clip 实体）+ 播放控制 + 名称/描述/拆解 */
   private buildRecipeDetail(): void {
     const { d, res } = this.resetDetail()
     const set = animSetOf(this.recipeSel)
@@ -435,7 +409,6 @@ export class StudioScene extends Phaser.Scene {
     if (set.clips.length > 1) y = this.buildClipChips(set, clip, cx, y, res) + 12
     y = this.buildControls(cx, y, res) + 18
     const recipe = clip
-    // 名称/描述/拆解为变长文案：装进可滚动区（配方文字再长也不会顶出面板）
     const view = this.detailScroll
     view.setViewport({ x: d.x, y, w: d.w, h: d.y + d.h - y - 8 })
     let ly = 0
@@ -482,7 +455,6 @@ export class StudioScene extends Phaser.Scene {
     )
   }
 
-  /** clip 切换 chips（仅多 clip 实体出现）：待机/攻击等具名动画横排即点即换 */
   private buildClipChips(
     set: { clips: readonly AnimClip[] },
     current: AnimClip,
@@ -529,7 +501,6 @@ export class StudioScene extends Phaser.Scene {
     return y + chipH
   }
 
-  /** 🧩 模板页：套用预览 + 播放控制 + 模板 chips */
   private buildTemplateDetail(): void {
     const { d, res } = this.resetDetail()
     const tpl = animTemplateOf(this.tplId) ?? ANIM_TEMPLATES[0]!
@@ -541,8 +512,6 @@ export class StudioScene extends Phaser.Scene {
     y += previewSize + 14
     y = this.buildControls(cx, y, res) + 16
 
-    // 模板 chips + 说明：装进可滚动区（模板数增长也不会顶出详情面板底部）。
-    // 坐标相对滚动区顶（viewport 从 chips 起始 y 到面板底），点击命中读世界坐标供 e2e
     const chipsTop = y
     const view = this.detailScroll
     view.setViewport({ x: d.x, y: chipsTop, w: d.w, h: d.y + d.h - chipsTop - 8 })
@@ -596,7 +565,6 @@ export class StudioScene extends Phaser.Scene {
     ly += desc.height + 8
     view.setContentHeight(ly)
 
-    // 套用模板需要目标 SVG 的元素数：异步取文本后构配方烘焙
     const emoji = this.tplEmoji
     const gen = ++this.jobGen
     this.previewState = 'loading'
@@ -612,8 +580,6 @@ export class StudioScene extends Phaser.Scene {
       })
   }
 
-  /** 🔬 解剖页：主体块横竖屏同构——左列预览（上「完整」下「拆分」，
-   * 空间不够图缩小）+ 右侧竖排结构树（行高/命中区按手机可点性放大） */
   private buildAnatomyDetail(): void {
     const { d, res } = this.resetDetail()
     const portrait = this.layout === PORTRAIT
@@ -655,7 +621,6 @@ export class StudioScene extends Phaser.Scene {
       .then(async (svg) => {
         if (gen !== this.jobGen) return
         const tree = parseSvgTree(svg)
-        // 完整大图纹理：每 emoji 只烘一次
         const fullKey = `studio-anat-full-${emoji}`
         if (!this.textures.exists(fullKey)) {
           const img = await svgToImage(setSvgSize(svg, RASTER))
@@ -666,13 +631,11 @@ export class StudioScene extends Phaser.Scene {
         }
         if (gen !== this.jobGen || !this.scene.isActive('studio')) return
 
-        // 主体块同构布局：左列预览 + 右侧竖排树
         const colX = d.x + 24
         const colW = portrait ? 250 : 260
         const colCx = colX + colW / 2
         const treeArea = { x: colX + colW + 20, y: d.y + 52, w: d.w - 48 - colW - 20, h: d.h - 68 }
 
-        // 左列：上「完整」下「拆分」（初始无状态 = 同图），底部信息行
         const boxes = this.add.graphics()
         boxes.fillStyle(0x000000, 0.25)
         let cy = d.y + 52
@@ -708,7 +671,6 @@ export class StudioScene extends Phaser.Scene {
           .setOrigin(0.5, 0)
         const caps = [capFull, capSplit]
 
-        // 结构树列表：遮罩 + 滚动（遮罩不裁输入，行内自校验可见性）
         const treeBg = this.add.graphics()
         roundRect(treeBg, treeArea.x - 8, treeArea.y - 8, treeArea.w + 16, treeArea.h + 16, 12, { fill: 0x000000, fillAlpha: 0.16 })
         const mask = this.add.graphics().setVisible(false)
@@ -716,9 +678,7 @@ export class StudioScene extends Phaser.Scene {
         mask.fillRect(treeArea.x, treeArea.y, treeArea.w, treeArea.h)
         const rowsBox = this.add.container(treeArea.x, treeArea.y)
         clipTo(rowsBox, mask)
-        // 树区只有这一个命中区（与可视区域等大），行/眼睛/箭头按坐标分派。
-        // 行级隐形 zone 会在遮罩外照常拦截输入（遮罩不裁点击），竖屏时
-        // 溢出行盖住下方素材网格、点击整块被吞——这就是"解剖页点不了网格"
+        // 树区只有这一个命中区：行级 zone 在遮罩外照常拦截输入（遮罩不裁点击），会吞掉下方网格的点击
         const treeZone = this.add
           .zone(treeArea.x, treeArea.y, treeArea.w, treeArea.h)
           .setOrigin(0)
@@ -742,7 +702,7 @@ export class StudioScene extends Phaser.Scene {
       })
   }
 
-  /** path 自身或任一祖先被隐藏（行置灰与上报共用） */
+  /** 自身或任一祖先被隐藏 */
   private anatEffHidden(path: string): boolean {
     const segs = path.split('/')
     for (let i = 1; i <= segs.length; i++) {
@@ -766,7 +726,6 @@ export class StudioScene extends Phaser.Scene {
     if (this.time.now - this.reportAt > 120) this.report()
   }
 
-  /** 结构树行列表全量重建（行数小；选中/显隐/展开任一变化都走这里） */
   private rebuildAnatRows(): void {
     const a = this.anat
     if (!a) return
@@ -802,7 +761,7 @@ export class StudioScene extends Phaser.Scene {
       }
       let x = indent + 34
       if (row.paints) {
-        // 眼睛是行状态指示（整行都是显/隐开关，不是独立按钮）
+        // 眼睛只是指示，整行才是开关
         parts.push(
           emojiImage(this, x + 16, y + ANAT_ROW / 2, this.anatHidden.has(row.path) ? '1f648' : '1f441', 32)
             .setAlpha(dim && !this.anatHidden.has(row.path) ? 0.4 : 1),
@@ -834,7 +793,6 @@ export class StudioScene extends Phaser.Scene {
     })
   }
 
-  /** 树区统一命中分派：容器行的箭头区收起/展开，其余整行 = 显/隐开关 */
   private onTreeTap(p: Phaser.Input.Pointer): void {
     const a = this.anat
     if (!a || this.grid?.wasDragged || this.anatDragMoved) return
@@ -866,8 +824,6 @@ export class StudioScene extends Phaser.Scene {
     a.info.setText(`共 ${paintCount} 个绘制节点 · 已隐藏 ${this.anatHidden.size}`)
   }
 
-  /** 拆分大图重光栅化：没有隐藏项时直接复用完整图纹理；否则合成 → 烘新帧 →
-   * 就绪才替换并回收上一帧纹理（竞态凭代数自弃） */
   private async refreshAnatSplit(): Promise<void> {
     const a = this.anat
     if (!a) return
@@ -892,7 +848,7 @@ export class StudioScene extends Phaser.Scene {
     }
   }
 
-  /** 回收上一帧拆分纹理，记录新帧 key（undefined = 只回收） */
+  /** undefined = 只回收 */
   private dropAnatLive(next: string | undefined): void {
     if (this.anatLiveKey && this.anatLiveKey !== next && this.textures.exists(this.anatLiveKey)) {
       this.textures.remove(this.anatLiveKey)
@@ -903,8 +859,7 @@ export class StudioScene extends Phaser.Scene {
 
   // ── 预览与播放控制 ──────────────────────────────────────────
 
-  /** 预览 Image：全量网格任选的 emoji 纹理未必就绪——先占位隐藏，
-   * 静态图异步浮现垫底（烘焙帧若先到位则不再回退到静态图） */
+  /** 烘焙帧若先到位则不再回退到静态图 */
   private spawnPreview(cx: number, cy: number, size: number, emoji: string): void {
     const img = this.add.image(cx, cy, '__DEFAULT').setVisible(false)
     this.previewImg = img
@@ -918,9 +873,8 @@ export class StudioScene extends Phaser.Scene {
       .catch((err) => console.warn(`预览加载失败 ${emoji}: ${String(err)}`))
   }
 
-  /** 播放控制条：⏮ ⏯ ⏭ 速度（媒体控制图标走 SVG 纹理，速度是文字）；返回控制条底部 y */
+  /** 返回控制条底部 y */
   private buildControls(cx: number, y: number, res: number): number {
-    // icon 为媒体控制 emoji 的 ordering ID（预载）；speed 为纯文字
     const defs: { id: string; icon?: () => string; onTap: () => void }[] = [
       { id: 'prev', icon: () => '23ee', onTap: () => this.stepFrame(-1) },
       {
@@ -992,7 +946,7 @@ export class StudioScene extends Phaser.Scene {
     this.report()
   }
 
-  /** 逐帧步进（自动暂停） */
+  /** 自动暂停 */
   private stepFrame(dir: 1 | -1): void {
     if (this.frameKeys.length === 0) return
     if (!this.paused) {
@@ -1004,13 +958,12 @@ export class StudioScene extends Phaser.Scene {
     this.previewImg?.setTexture(this.frameKeys[this.frameIdx]!).setDisplaySize(this.previewSize, this.previewSize)
   }
 
-  /** 按当前暂停/速度状态重建播放 timer */
   private restartTimer(): void {
     this.animTimer?.remove()
     this.animTimer = undefined
     if (this.paused || this.frameKeys.length === 0) return
     this.animTimer = this.time.addEvent({
-      // 周期总时长恒为 def.durMs，帧多的 clip 单帧更短
+      // 周期总时长恒为 def.durMs
       delay: Math.max(30, ANIM_DEF.durMs / this.frameKeys.length / SPEEDS[this.speedIdx]!),
       loop: true,
       callback: () => {
@@ -1020,7 +973,6 @@ export class StudioScene extends Phaser.Scene {
     })
   }
 
-  /** 烘焙配方帧并进入播放（keyPrefix 缺省按配方 emoji 命名；frames 缺省用全局 def） */
   private startBake(recipe: AnimRecipe, size: number, keyPrefix?: string, frames?: number): void {
     const gen = ++this.jobGen
     this.previewState = 'loading'
@@ -1061,7 +1013,6 @@ export class StudioScene extends Phaser.Scene {
 
   // ── 杂项 ────────────────────────────────────────────────────
 
-  /** 解剖工作台调试上报：完整可见的行（含眼睛命中区）+ 状态 + 关键矩形 */
   private anatReport(): NonNullable<WarmojiStudioDebug['anatomy']> | undefined {
     const a = this.anat
     if (this.tab !== 'anatomy' || !a) return undefined

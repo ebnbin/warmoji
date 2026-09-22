@@ -17,8 +17,6 @@ import { playSfx, setSfxEnabled } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 
-// 设置页：按 SETTING_DEFS 定义表渲染开关列表，改动即时持久化。
-// 布局按最小可用空间设计（横 1280×720 / 竖 720×1280），内容块居中于实际视口。
 interface SettingsLayout {
   content: { w: number; h: number }
   headerY: number
@@ -39,13 +37,13 @@ const PORTRAIT: SettingsLayout = {
 
 interface Row {
   key: keyof Settings
-  /** 行内 y（相对滚动内容顶），世界坐标 = listRect.y + localY - scrollY */
+  /** 相对滚动内容顶 */
   localY: number
   toggle: Phaser.GameObjects.Graphics
 }
 
 export class SettingsScene extends Phaser.Scene {
-  // 视口变化触发的 restart 只重排布局，保留背景色等页面状态
+  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private settings!: Settings
@@ -108,8 +106,6 @@ export class SettingsScene extends Phaser.Scene {
       { origin: 0.5 },
     )
 
-    // 开关列表：居中单列，装进可滚动容器——选项定义表（SETTING_DEFS）只增不减，
-    // 行数超出可视高度即滚动，不再从第 5 项起跑出屏外
     const S = L.list
     const lx = (w - S.w) / 2
     const listTop = oy + S.y
@@ -133,7 +129,6 @@ export class SettingsScene extends Phaser.Scene {
           if (this.list.wasDragged) return
           this.settings[def.key] = !this.settings[def.key]
           saveSettings(browserStorage(), this.settings)
-          // 音效/BGM 开关即时生效；开启瞬间用一声 click 给听感反馈
           setSfxEnabled(this.settings.sound)
           setBgmEnabled(this.settings.bgm)
           playSfx('click')
@@ -153,10 +148,6 @@ export class SettingsScene extends Phaser.Scene {
             resolution: res,
           })
           .setOrigin(0, 0.5),
-        // 说明必须换行：定义表里的文案只会越写越长，不换行就是直接冲出卡片
-        // 被滚动遮罩裁掉半句——右侧还得给开关让出位置，故按开关左缘定宽。
-        // 标题与说明改成从上往下成块排（而非各自相对行心居中）：
-        // 居中排法下说明一换行就往上长，会盖住标题
         this.add
           .text(92, y + 54, def.desc, {
             fontFamily: UI_FONT,
@@ -172,10 +163,7 @@ export class SettingsScene extends Phaser.Scene {
       ])
       this.drawToggle(row)
     })
-    // Twemoji 图形许可（CC-BY 4.0）要求署名。全作只此一处：署名要的是「可被找到」，
-    // 不是「每张页面都挂一条」——大厅每页贴一行既没人读，又占掉每张页面的底部。
-    // 放进滚动内容的末尾而非屏幕底部固定行：后者会紧贴着被裁掉一半的最后一行，
-    // 看着像是撞上了；跟着列表滚到底才是「附注」该在的位置
+    // Twemoji 图形许可（CC-BY 4.0）要求署名，全作只此一处
     const rowsH = SETTING_DEFS.length * (S.rowH + S.gap) - S.gap
     const licenseY = rowsH + 30
     this.list.add(
@@ -199,7 +187,6 @@ export class SettingsScene extends Phaser.Scene {
     this.reportSettings()
   }
 
-  /** 开关胶囊：开 = 琥珀色右侧圆钮，关 = 灰底左侧圆钮（坐标相对滚动内容） */
   private drawToggle(row: Row): void {
     const on = this.settings[row.key]
     const S = this.layout.list

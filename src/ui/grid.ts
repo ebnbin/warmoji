@@ -5,18 +5,12 @@ import { emojiImage } from '../emoji/textures'
 import { clipTo } from '../util/mask'
 import { roundRect } from './shapes'
 
-// 可滚动 emoji 网格：形象即含义，名字/数值留给详情面板。
-// 队长/组队/商店/图鉴条目页共用——统一滚轮 + 拖动（拖过阈值不算点击）、
-// 选中白圈高亮、可选右上角标（✅ / 上架道具）与底部血条。
-// 列数按容器宽自适应，条目再多也只是变长可滚动。
-
 export interface EmojiGridItem {
   key: string
   emoji: string
   outline?: OutlineKind
-  /** 右上角标 emoji（如 ✅ 已选 / 当前上架道具） */
   badge?: string
-  /** 底部血条比例 0..1（undefined 不显示） */
+  /** 0..1；undefined 不显示 */
   hpRatio?: number
 }
 
@@ -27,7 +21,7 @@ interface Cell {
   bg: Phaser.GameObjects.Graphics
 }
 
-// 网格间隙（逻辑 px）；命中反解时落在缝隙不算点中
+// 逻辑 px
 const GAP = 10
 
 export class EmojiGrid {
@@ -70,9 +64,7 @@ export class EmojiGrid {
     mask.fillRect(rect.x, rect.y, rect.w, rect.h)
     clipTo(this.container, mask)
 
-    // 网格只有这一个命中区（与可视区域等大），格子从坐标反解。
-    // 逐格 zone 会在遮罩外照常拦截输入（遮罩不裁点击），滚出视口的
-    // 格子会盖住网格外侧控件、把那里的点击整块吃掉
+    // 只有这一个命中区：逐格 zone 在遮罩外照常拦截输入（遮罩不裁点击）
     scene.add
       .zone(rect.x, rect.y, rect.w, rect.h)
       .setOrigin(0)
@@ -82,7 +74,6 @@ export class EmojiGrid {
         const pitch = this.cell + this.gap
         const lx = p.worldX - rect.x
         const ly = p.worldY - rect.y + this.scroll
-        // 落在格间缝隙不算点中
         if (lx % pitch > this.cell || ly % pitch > this.cell) return
         const col = Math.floor(lx / pitch)
         if (col < 0 || col >= this.cols) return
@@ -90,7 +81,6 @@ export class EmojiGrid {
         if (item) this.onTap?.(item.key)
       })
 
-    // 滚轮 + 拖动；监听挂 scene.input，场景重启自动清理
     scene.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (this.contains(p)) this.setScroll(this.scroll + dy * 0.6)
     })
@@ -124,12 +114,10 @@ export class EmojiGrid {
     return this.contentHeight
   }
 
-  /** 最近一次按下是否发生了拖动（外部按钮的 pointerup 用它防误触） */
   get wasDragged(): boolean {
     return this.dragMovedFlag
   }
 
-  /** 重建全部格子（条目/角标/血条变化时调用；本页条目量级小，直接重建） */
   setItems(items: readonly EmojiGridItem[]): void {
     this.container.removeAll(true)
     this.cells = []
@@ -175,7 +163,7 @@ export class EmojiGrid {
     this.redraw()
   }
 
-  /** 视口坐标下的格子命中矩形（e2e 调试上报用） */
+  /** 视口坐标；e2e 用 */
   cellRects(): { key: string; x: number; y: number; w: number; h: number }[] {
     return this.cells.map((c) => ({
       key: c.item.key,

@@ -5,9 +5,6 @@ import { loadEmojiTextures, primeEmojiPack } from '../emoji/textures'
 import { FONT, UI_FONT } from '../util/fonts'
 import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../manifest'
 
-// 资源门禁：emoji 包（ordering.txt 顺序/ID + twemoji.txt SVG 正文）是游戏的
-// 全部视觉素材，经 Phaser loader 预加载，拿不到或解析不了就停在本页——没有
-// emoji 数据游戏没有开始的意义。两份文件随代码提交并带内容 hash 原子部署。
 export class PreloadScene extends Phaser.Scene {
   constructor() {
     super('preload')
@@ -33,7 +30,7 @@ export class PreloadScene extends Phaser.Scene {
       this.fail('资源解析失败，请刷新重试')
       return
     }
-    // 单个纹理烘焙失败保持宽容（console.error 让 e2e 捕获）；包已就位即放行
+    // 单个纹理烘焙失败不拦：console.error 由 e2e 捕获
     loadEmojiTextures(this, PRELOAD_EMOJIS, OUTLINED_EMOJIS)
       .catch((err) => console.error(`emoji 纹理加载失败: ${String(err)}`))
       .finally(() => this.scene.start('menu'))

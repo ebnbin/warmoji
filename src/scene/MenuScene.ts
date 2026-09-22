@@ -15,15 +15,8 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 
-// 主菜单：两色 logo + 背景暗纹 + 「角色 vs 敌人」对峙小剧场，
-// 全部用已预载的描边纹理与 tween，比例定位横竖屏通用。
-//
-// **一条规矩：不做上下摆动**。原地上下浮动的东西最招眼、也最没信息量，
-// 一屏三处一起晃就是廉价感的来源。摇摆（rotation）与横向弹道保留——
-// 前者是「站在那儿」的呼吸感，后者真的在表达「双方在互射」。
-// 副标题也不要：那行字没有信息量。Twemoji 署名收在设置页一处。
 export class MenuScene extends Phaser.Scene {
-  // 视口变化触发的 restart 只重排布局，保留背景色等页面状态
+  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private menuBtn = { x: 0, y: 0, w: 0, h: 0 }
@@ -62,7 +55,6 @@ export class MenuScene extends Phaser.Scene {
       })
     }
 
-    // 右上角入口：🧪 Emoji Studio + 📖 图鉴 + ⚙️ 设置（圆底增强可点性）
     const iconBg = this.add.graphics()
     iconBg.fillStyle(0x000000, 0.18)
     const gearX = w - safeInsets.right - 44
@@ -95,7 +87,6 @@ export class MenuScene extends Phaser.Scene {
       })
     this.studioRect = { x: gearX - 168 - 28, y: gearY - 28, w: 56, h: 56 }
 
-    // 明确的按钮 + 空格键开始，避免任意点击误触；轻微脉动引导视线
     const btn = { x: w / 2 - 170, y: h * 0.82 - 36, w: 340, h: 72 }
     this.menuBtn = btn
     const btnBg = this.add.graphics()
@@ -179,9 +170,7 @@ export class MenuScene extends Phaser.Scene {
     })
   }
 
-  /** 背景漂浮暗纹：低透明度的敌人/能力 emoji 缓慢浮动旋转，增加画面纵深 */
   private createBackdrop(w: number, h: number, rng: Rng): void {
-    // 敌人暗纹按比例在敌表里取样，避免写死下标——roster 增删/重排都不会取错或越界崩溃
     const uniqEnemies = [...new Set(ENEMY_DEFS.map((e) => e.emoji))]
     const enemyDecor = [0.2, 0.45, 0.75]
       .map((f) => uniqEnemies[Math.min(uniqEnemies.length - 1, Math.floor(f * uniqEnemies.length))])
@@ -194,7 +183,6 @@ export class MenuScene extends Phaser.Scene {
       { emoji: '1f345', outline: 'player' },
     ]
     decor.forEach((d, i) => {
-      // 均匀散布在左右两侧竖条内，避开中央内容区
       const side = i % 2 === 0 ? 0.06 + rng.next() * 0.16 : 0.78 + rng.next() * 0.16
       const img = emojiImage(
         this,
@@ -206,7 +194,6 @@ export class MenuScene extends Phaser.Scene {
       )
         .setAlpha(0.1)
         .setRotation((rng.next() - 0.5) * 0.5)
-      // 只摇不浮：上下飘的暗纹会把视线从中间的内容上拽走
       this.tweens.add({
         targets: img,
         rotation: img.rotation + 0.16,
@@ -219,7 +206,6 @@ export class MenuScene extends Phaser.Scene {
     })
   }
 
-  /** 分字母两色 logo：War 琥珀 + Moji 白，逐字错相弹跳；两侧⚔️摇摆 */
   private createLogo(w: number, y: number, res: number): void {
     const letters: { ch: string; color: string }[] = [
       { ch: 'W', color: '#ffdc5d' },
@@ -243,7 +229,6 @@ export class MenuScene extends Phaser.Scene {
     )
     const total = texts.reduce((s, t) => s + t.width, 0)
     let x = w / 2 - total / 2
-    // 字标静止：逐字错相弹跳是这一屏里最跳的一处
     for (const t of texts) {
       t.setX(x)
       x += t.width
@@ -268,12 +253,10 @@ export class MenuScene extends Phaser.Scene {
     })
   }
 
-  /** 对峙小剧场：三名角色（面朝右弹跳）与三只敌人（摇摆）隔空互射 */
   private createVignette(cx: number, cy: number): void {
     const chars = Object.values(CHARACTERS)
       .slice(0, 3)
       .map((c) => c.emoji)
-    // 角色站定不跳；对面敌人保留摇摆，两队之间的弹道照旧来回
     chars.forEach((emoji, i) => {
       emojiImage(this, cx - 260 + i * 90, cy, emoji, 75, 'player').setFlipX(true)
     })
@@ -290,7 +273,6 @@ export class MenuScene extends Phaser.Scene {
         delay: i * 170,
       })
     })
-    // 互射：番茄向右、敌弹向左，循环往复（弹道两端与两队保持间隙）
     const tomato = emojiImage(this, cx - 34, cy - 6, '1f345', 40, 'player')
     this.tweens.add({
       targets: tomato,

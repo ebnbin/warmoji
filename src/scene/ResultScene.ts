@@ -25,9 +25,6 @@ import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { stackCount } from '../run/draft'
 
-// 终局结算页：胜利（打满 WAVE.totalWaves 波）与失败（团灭）复用同一布局，
-// 只差标题/配色/庆祝粒子。展示整局逐角色战绩（伤害/击杀/阵亡/道具）与全局汇总，
-// 最高分在此提交。离开本页即丢弃 run（再来一局回队长页 / 回主菜单）。
 interface ResultLayout {
   content: { w: number; h: number }
   titleY: number
@@ -63,7 +60,7 @@ export class ResultScene extends Phaser.Scene {
   private palette?: Palette
   private run!: RunState
   private win = false
-  /** 最高分只在首次进入时提交一次（视口重启不重复计） */
+  /** 视口重启不重复提交 */
   private submitted = false
   private best = { newBest: false, bestWave: 0, bestKills: 0 }
   private againRect = { x: 0, y: 0, w: 0, h: 0 }
@@ -87,7 +84,6 @@ export class ResultScene extends Phaser.Scene {
 
     if (!this.submitted) {
       this.submitted = true
-      // 胜利按打满的总波数记，失败按倒下的当前波记
       const wave = this.win ? WAVE.totalWaves : this.run.wave
       const r = submitScore(browserStorage(), wave, this.run.kills)
       this.best = { newBest: r.newBest, bestWave: r.score.bestWave, bestKills: r.score.bestKills }
@@ -102,7 +98,6 @@ export class ResultScene extends Phaser.Scene {
     const oy = origin.y
     const cx = w / 2
 
-    // 标题（胜利带弹跳与彩带粒子）
     const title = emojiText(
       this,
       cx,
@@ -126,7 +121,6 @@ export class ResultScene extends Phaser.Scene {
       this.time.delayedCall(320, () => confetti.explode(26, cx + 180, oy + L.titleY))
     }
 
-    // 副标题：战报一行
     const captain = CAPTAINS[this.run.captainId]
     const minutes = Math.floor(this.run.combatMs / 60000)
     const seconds = Math.round((this.run.combatMs % 60000) / 1000)
@@ -155,7 +149,6 @@ export class ResultScene extends Phaser.Scene {
     this.renderTable(origin.x + L.table.x, oy + L.table.y, L.table.w, L.table.h, res)
     this.renderEnemyPanel(origin.x + L.enemy.x, oy + L.enemy.y, L.enemy.w, L.enemy.h, res)
 
-    // 按钮：再来一局（主）/ 回主菜单（副）；防误触 500ms 后可交互
     const btnW = 300
     const btnH = 68
     const gap = 26
@@ -183,21 +176,19 @@ export class ResultScene extends Phaser.Scene {
     })
   }
 
-  /** 逐角色战绩表：emoji/名字等级 + 伤害/击杀/阵亡 + 随身道具 */
   private renderTable(x: number, y: number, w: number, h: number, res: number): void {
     const panel = this.add.graphics()
     roundRect(panel, x, y, w, h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
 
     const n = this.run.roster.length
     const headerH = 46
-    // 固定行高 + 可滚动：队伍编制变大（现已达 8）也逐行清晰，不再被 area/count 压成一坨
     const rowH = 64
     const label = (tx: number, ty: number, text: string, color = '#9d9dad'): void => {
       this.add
         .text(tx, ty, text, { fontFamily: UI_FONT, fontSize: FONT.small, color, resolution: res })
         .setOrigin(0.5)
     }
-    // 列布局（相对表宽的比例，横竖屏通吃）；表头用绝对坐标固定，数据行用内容内局部坐标
+    // 表头用绝对坐标，数据行用滚动内容局部坐标
     label(x + w * 0.43, y + headerH / 2 + 4, '伤害')
     label(x + w * 0.55, y + headerH / 2 + 4, '承伤')
     label(x + w * 0.65, y + headerH / 2 + 4, '击杀')
@@ -239,7 +230,6 @@ export class ResultScene extends Phaser.Scene {
       cell(colKills, `${this.run.stats.kills[slot] ?? 0}`)
       const deaths = this.run.stats.deaths[slot] ?? 0
       cell(colDeaths, deaths > 0 ? `${deaths}` : '—', deaths > 0 ? '#ef9a9a' : '#6f6f7d')
-      // 随身道具：去重带层数，最多 2 组图标 + 溢出计数
       const owned = this.run.memberItems[slot] ?? []
       const unique = [...new Set(owned)] as ItemId[]
       const shown = unique.slice(0, 2)
@@ -278,7 +268,6 @@ export class ResultScene extends Phaser.Scene {
     rows.setContentHeight(rowH * n)
   }
 
-  /** 敌情面板：按敌人类型的我方击杀数与其对我方造成的伤害（按击杀降序） */
   private renderEnemyPanel(x: number, y: number, w: number, h: number, res: number): void {
     const panel = this.add.graphics()
     roundRect(panel, x, y, w, h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
@@ -348,7 +337,6 @@ export class ResultScene extends Phaser.Scene {
     label(colKills, '击杀')
     label(colDmg, '对我方伤害')
     const top = y + headerH + 22
-    // 固定行高 + 可滚动：敌人种类只增不减，行多了滚动查看，不再压成重叠的细行
     const rowH = 42
     const fmt = (v: number): string => (v >= 10000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`)
     const bossNames = new Set(BOSSES.map((e) => e.name))
@@ -407,7 +395,7 @@ export class ResultScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
     const zone = this.add.zone(rect.x, rect.y, rect.w, rect.h).setOrigin(0)
-    // 防死亡瞬间误触：0.5 秒后才接受点击
+    // 防死亡瞬间误触
     this.time.delayedCall(500, () => {
       if (!zone.active) return
       zone.setInteractive({ useHandCursor: true }).on('pointerup', () => {

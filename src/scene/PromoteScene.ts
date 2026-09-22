@@ -36,21 +36,11 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 
-// 整编页：每波战斗前的强制招募 + 阵型页。开局组队与波末整编完全复用本页：
-// 队长确认后进来招首发（可返回重选队长），此后每波结束按名额招人直到满编
-//（不可跳过、无其他招募途径；跳波开局可能一波多名额，一页选满才能出发）。
-// 候选来自命定卡池（run.recruitPool，开局按队长种子抽定整局固定）：网格常驻
-// 十卡三态——已解锁可选 / ❓ 盖牌（身份保密，按编制数逐档揭晓）/ 已入队 🎖️。
-// 详情面板内嵌一块阵型预览：已有队员 + 本波空位按实际战斗布局慢转，点候选
-// 填入空位、点预览里的人换下。招募完成后——首次满员额外展示一次阵型页
-//（formation 模式：满员自动 N 保 1，玩家点选受保护的中心），此后阵型调整走
-// 商店的常驻入口（fromShop，商店睡眠等待返回）。
 interface PromoteLayout {
   content: { w: number; h: number }
   headerY: number
   stepY: number
   detail: { x: number; y: number; w: number; h: number }
-  /** 招募模式：详情面板内切出的阵型预览区与文字详情区 */
   preview: { x: number; y: number; w: number; h: number }
   detailText: { x: number; y: number; w: number; h: number }
   list: { x: number; y: number; w: number; h: number }
@@ -79,10 +69,9 @@ const PORTRAIT: PromoteLayout = {
   btn: { y: 1184, w: 360, h: 72 },
 }
 
-/** 阵型预览外圈的缓慢顺时针环绕转速（rad/s，纯装饰） */
+/** rad/s */
 const PREVIEW_SPIN = 0.18
 
-/** 按各站位实际间距收缩图标尺寸：队伍变大（最多 8）时相邻不再重叠 */
 function fitIconSize(posts: readonly { x: number; y: number }[], scale: number, base: number): number {
   let minD = Infinity
   for (let i = 0; i < posts.length; i++) {
@@ -95,39 +84,32 @@ function fitIconSize(posts: readonly { x: number; y: number }[], scale: number, 
 }
 
 export class PromoteScene extends Phaser.Scene {
-  // 视口变化触发的 restart 只重排布局，保留背景色/选中等页面状态
+  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
   private mode: 'recruit' | 'formation' = 'recruit'
-  /** recruit 模式：详情面板正在展示的卡（角色 id 或 lock-N 盖牌位） */
+  /** 角色 id 或 lock-N */
   private selectedKey = ''
-  /** recruit 模式：本波名额数、命定卡池（整局固定）与本轮解锁数 */
   private due = 0
   private pool: CharacterId[] = []
   private unlocked = 0
-  /** 已点进空位的候选（顺序即入队槽位序），点满 due 个才能确认 */
+  /** 顺序即入队槽位序 */
   private picked: CharacterId[] = []
-  /** 从商店进入的阵型调整（商店睡眠中，退出时唤醒） */
   private fromShop = false
-  /** 中心互换动画播放中，忽略输入 */
   private swapBusy = false
   private layout!: PromoteLayout
   private origin = { x: 0, y: 0 }
   private grid?: EmojiGrid
-  /** 详情文字区（招募：detailText 子区；阵型：整块 detail）——变长属性装进可滚动容器 */
   private detailView!: ScrollView
   private detailRect: ScrollRect = { x: 0, y: 0, w: 0, h: 0 }
   private formationObjs: Phaser.GameObjects.GameObject[] = []
   private memberImgs: Phaser.GameObjects.Image[] = []
   private memberZones: Phaser.GameObjects.Zone[] = []
   private memberRects: { id: string; x: number; y: number; w: number; h: number }[] = []
-  /** 阵型预览的当前图标尺寸（按人数收缩，layout 逐帧摆位时复用其半径） */
   private formationIconSize = 80
-  /** 预览外圈的环绕相位与几何（update 逐帧推进） */
   private previewPhase = 0
   private previewGeom = { cx: 0, cy: 0, scale: 1 }
-  /** recruit 模式的预览记号（容器 + 已选位的命中区），随相位逐帧摆位 */
   private previewTokens: { c: Phaser.GameObjects.Container; zone?: Phaser.GameObjects.Zone; post: number }[] = []
   private previewObjs: Phaser.GameObjects.GameObject[] = []
   private btnBg?: Phaser.GameObjects.Graphics
@@ -142,8 +124,7 @@ export class PromoteScene extends Phaser.Scene {
   }
 
   init(data?: { fromShop?: boolean }): void {
-    // Phaser 的 scene.start 不传 data 时会沿用上一次的 data——只有商店确实在
-    // 沉睡等待（阵型入口打开）时才认 fromShop，防脏标记把正常整编顶成阵型页
+    // Phaser 的 scene.start 不传 data 时沿用上一次的 data，故以商店确实在沉睡为准
     this.fromShop = !!data?.fromShop && this.scene.isSleeping('shop')
   }
 
@@ -165,15 +146,12 @@ export class PromoteScene extends Phaser.Scene {
 
     const resolved = this.resolveMode()
     if (!resolved) {
-      // 名额结清且无阵型页可展示：直接去下一站
       this.scene.start(this.nextScene())
       return
     }
     this.mode = resolved
-    // 首次满员的阵型页只自动展示这一次
     if (this.mode === 'formation' && !this.fromShop) this.run.formationIntroduced = true
     if (this.mode !== 'formation') {
-      // 命定卡池：开局已定（run.recruitPool），这里只算本轮名额与解锁进度
       this.due = recruitDueCount(this.run)
       this.pool = [...this.run.recruitPool]
       this.unlocked = recruitUnlocked(this.run)
@@ -209,7 +187,6 @@ export class PromoteScene extends Phaser.Scene {
       .setOrigin(0.5)
 
     if (this.fromShop) {
-      // 商店入口：返回即唤醒沉睡的商店（货架/金币/免费刷新原样保留）
       const back = this.add
         .text(this.origin.x + 40, oy + L.headerY, '← 返回商店', {
           fontFamily: UI_FONT,
@@ -223,7 +200,6 @@ export class PromoteScene extends Phaser.Scene {
       this.backRect = { x: back.x, y: back.y - back.height / 2, w: back.width, h: back.height }
       this.input.keyboard?.on('keydown-ESC', () => this.exitToShop())
     } else if (this.isInitial()) {
-      // 开局组队：可反悔，返回重选队长（本局作废）
       const back = this.add
         .text(this.origin.x + 40, oy + L.headerY, '← 返回', {
           fontFamily: UI_FONT,
@@ -244,7 +220,6 @@ export class PromoteScene extends Phaser.Scene {
         this.scene.start('captain')
       })
     } else {
-      // 波末整编：队长不可重选，只能结束本局（二次点击确认，防误触弃局）
       const quit = this.add
         .text(this.origin.x + 40, oy + L.headerY, '✕ 结束', {
           fontFamily: UI_FONT,
@@ -271,7 +246,6 @@ export class PromoteScene extends Phaser.Scene {
       this.backRect = { x: quit.x, y: quit.y - quit.height / 2, w: quit.width, h: quit.height }
     }
 
-    // 步骤说明：剩余点数 + 当前环节要做的事
     this.add
       .text(w / 2, oy + L.stepY, this.stepBanner(), {
         fontFamily: UI_FONT,
@@ -282,21 +256,17 @@ export class PromoteScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    // 详情面板底板（两种模式共用同一块区域）
     const D = L.detail
     const dx = this.origin.x + D.x
     const dy = oy + D.y
     const panel = this.add.graphics()
     roundRect(panel, dx, dy, D.w, D.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
 
-    // 详情文字区：招募模式占详情面板一角（detailText），阵型模式占整块 detail。
-    // 角色属性（携带/升级卡/被动）是变长文案，装进可滚动容器，不再静默截断
     const T = this.mode === 'formation' ? L.detail : L.detailText
     this.detailRect = { x: this.origin.x + T.x, y: oy + T.y, w: T.w, h: T.h }
     this.detailView = new ScrollView(this, this.detailRect)
 
     if (this.mode !== 'formation') {
-      // 预览区与文字详情区之间的细分隔线
       const pv = L.preview
       const div = this.add.graphics()
       div.lineStyle(1, 0xffffff, 0.12)
@@ -308,8 +278,6 @@ export class PromoteScene extends Phaser.Scene {
         div.lineBetween(xx, oy + pv.y + 14, xx, oy + pv.y + pv.h - 14)
       }
 
-      // 命定卡池网格（十卡三态）：可选牌点击进出空位（选满后 1 名额时点击
-      // 即换人，多名额需先在预览里换下）；盖牌/已入队的点击只看详情
       this.grid = new EmojiGrid(this, {
         x: this.origin.x + L.list.x,
         y: oy + L.list.y,
@@ -331,7 +299,6 @@ export class PromoteScene extends Phaser.Scene {
       this.grid.setItems(this.buildItems())
     }
 
-    // 确认按钮
     this.btnRect = {
       x: w / 2 - L.btn.w / 2,
       y: oy + L.btn.y - L.btn.h / 2,
@@ -373,12 +340,11 @@ export class PromoteScene extends Phaser.Scene {
     })
   }
 
-  /** 开局组队（首波开战前）还是波末整编：首波 = 队长的开局波次（可跳波） */
+  /** 首波 = 队长的开局波次，可跳波 */
   private isInitial(): boolean {
     return this.run.wave === CAPTAINS[this.run.captainId].startWave
   }
 
-  /** 点数花完后的去向：开局看队长 firstWaveShop（默认直接开战），波末必进商店 */
   private nextScene(): BattleSceneKey | 'shop' {
     if (this.isInitial() && !CAPTAINS[this.run.captainId].firstWaveShop) {
       return battleSceneFor(this.run.mapId)
@@ -386,8 +352,7 @@ export class PromoteScene extends Phaser.Scene {
     return 'shop'
   }
 
-  /** 当前环节：商店入口直达阵型页；否则本波有名额必须招募，
-   * 首次满员再补一次阵型页，无事可办返回 null（直接去下一站） */
+  /** null = 无事可办，直接去下一站 */
   private resolveMode(): 'recruit' | 'formation' | null {
     if (this.fromShop) return 'formation'
     const step = promoteStep(this.run)
@@ -414,7 +379,6 @@ export class PromoteScene extends Phaser.Scene {
     return this.mode === 'formation' || (this.due > 0 && this.picked.length === this.due)
   }
 
-  /** 确认按钮的可用态与计数文案（招募未选满置灰不可按） */
   private updateConfirm(): void {
     const enabled = this.confirmEnabled()
     this.btnBg?.setAlpha(enabled ? 1 : 0.35)
@@ -424,7 +388,6 @@ export class PromoteScene extends Phaser.Scene {
     }
   }
 
-  /** 唤醒沉睡的商店并退出本页（商店货架/金币/刷新次数原样保留） */
   private exitToShop(): void {
     playSfx('click')
     this.scene.wake('shop')
@@ -433,7 +396,6 @@ export class PromoteScene extends Phaser.Scene {
 
   // ── 数据 ────────────────────────────────────────────────────
 
-  /** 卡状态：盖牌（未解锁）/ 已入队 / 可选。key 为 lock-N 或角色 id */
   private cardState(key: string): 'locked' | 'taken' | 'open' {
     if (key.startsWith('lock-')) return 'locked'
     const idx = this.pool.indexOf(key as CharacterId)
@@ -450,7 +412,6 @@ export class PromoteScene extends Phaser.Scene {
     return this.pool.includes(this.selectedKey as CharacterId)
   }
 
-  /** 十卡三态：已解锁按角色亮牌（入队 ✔️ / 本轮已选 ✅），未解锁 ❓ 盖牌 */
   private buildItems(): { key: string; emoji: string; outline?: 'player'; badge?: string }[] {
     return this.pool.map((id, i) => {
       if (i >= this.unlocked) return { key: `lock-${i}`, emoji: '2753' }
@@ -480,14 +441,12 @@ export class PromoteScene extends Phaser.Scene {
       }
       return
     }
-    // 批量入队：按点选顺序占槽位（预览里的站位即入队后的站位）
     for (const id of this.picked) {
       if (recruitMember(this.run, id) < 0) return
     }
     playSfx('recruit')
     this.picked = []
     this.selectedKey = ''
-    // 下一环节或直接开拔（重建页面刷新模式/候选；保留背景色）
     if (this.resolveMode()) {
       this.preserveOnRestart = true
       this.scene.restart()
@@ -498,13 +457,10 @@ export class PromoteScene extends Phaser.Scene {
 
   // ── 阵型页：N 保 1 中心选择器 ───────────────────────────────
 
-  /** 岗位 → 角色：0 号中心，其余外圈（guardOrder 稳定次序，互换不牵连他人） */
   private postIds(): CharacterId[] {
     return guardOrder(this.run)
   }
 
-  /** 重建阵型预览（列表区）：真实摆出 N 保 1，点选外圈队员与中心互换；
-   * 外圈随 previewPhase 缓慢顺时针环绕（layoutFormationPreview 逐帧摆位） */
   private rebuildFormation(): void {
     for (const o of this.formationObjs) o.destroy()
     this.formationObjs = []
@@ -538,7 +494,6 @@ export class PromoteScene extends Phaser.Scene {
       const px = cx + p.x * scale
       const py = cy + p.y * scale
       if (post === 0) {
-        // 受保护中心：琥珀色光环标注（中心不随外圈环绕）
         const ring = this.add.graphics()
         ring.lineStyle(3, 0xffdc5d, 0.95)
         ring.strokeCircle(px, py, half + 4)
@@ -573,14 +528,13 @@ export class PromoteScene extends Phaser.Scene {
     this.reportPromote()
   }
 
-  /** 按当前环绕相位重摆外圈成员（图像/命中区/调试矩形同步；互换动画期间暂停） */
   private layoutFormationPreview(): void {
     const ids = this.postIds()
     const posts = formationPosts('guard', ids.length, this.previewPhase)
     const { cx, cy, scale } = this.previewGeom
     const half = this.formationIconSize / 2
     posts.forEach((p, post) => {
-      if (post === 0) return // 中心不动
+      if (post === 0) return
       const img = this.memberImgs[post]
       const zone = this.memberZones[post]
       const rect = this.memberRects[post]
@@ -599,7 +553,7 @@ export class PromoteScene extends Phaser.Scene {
       if (this.swapBusy) return
       this.previewPhase += (delta / 1000) * PREVIEW_SPIN
       this.layoutFormationPreview()
-      // 外圈在转，调试矩形定期刷新，e2e 取到的坐标不至于过期
+      // 外圈在转，e2e 上报的矩形须定期刷新
       this.reportTimer += delta
       if (this.reportTimer >= 300) {
         this.reportTimer = 0
@@ -611,7 +565,6 @@ export class PromoteScene extends Phaser.Scene {
     this.layoutRecruitPreview()
   }
 
-  /** 点选外圈队员：与中心互换（带滑动动画） */
   private onMemberTap(post: number): void {
     if (this.swapBusy || post === 0) return
     const ids = this.postIds()
@@ -641,7 +594,6 @@ export class PromoteScene extends Phaser.Scene {
     })
   }
 
-  /** 详情区展示当前中心角色（复用招募/升级的属性版式） */
   private renderCenterDetail(res: number): void {
     this.detailView.clear()
     const center = guardCenter(this.run)
@@ -691,7 +643,6 @@ export class PromoteScene extends Phaser.Scene {
     }
     const D = this.detailRect
 
-    // 盖牌：不透露身份，只提示揭晓条件
     if (this.selectedKey.startsWith('lock-')) {
       const idx = Number(this.selectedKey.slice(5))
       this.detailView.add([
@@ -751,11 +702,10 @@ export class PromoteScene extends Phaser.Scene {
     this.detailView.setContentHeight(end + 12)
   }
 
-  /** 属性组列表（招募/阵型详情共用）：渲染进 detailView，返回排完的内容底端 */
+  /** 返回排完的内容底端 y */
   private renderStatGroups(id: CharacterId, items: ItemId[], res: number, startY: number): number {
     const wrap = this.detailRect.w - 104
     let cursor = startY
-    // 选角色只描述当前（本级）属性与能力，不列跨级升级路径
     for (const group of characterStatGroups(id, items, 1, { path: false })) {
       this.detailView.add([
         emojiImage(this, 42, cursor, group.icon, 35),
@@ -800,8 +750,6 @@ export class PromoteScene extends Phaser.Scene {
 
   // ── 招募模式：阵型预览（详情面板内嵌，与阵型页同款慢转） ────
 
-  /** 重建预览记号：已有队员实心、已选候选带高亮环、空位虚线圈；
-   * 布局与战斗同源（formationPosts 按招完后的人数取形），≥3 人随相位慢转 */
   private rebuildRecruitPreview(): void {
     for (const t of this.previewTokens) t.zone?.destroy()
     for (const o of this.previewObjs) o.destroy()
@@ -818,7 +766,6 @@ export class PromoteScene extends Phaser.Scene {
     const base = Math.min(P.w, P.h) >= 240 ? 58 : 50
     const fit = Math.min(P.w, P.h) / 2 - base / 2 - 24
     const scale = Math.min(2.2, fit / maxR)
-    // 环上人越多相邻越挤，按实际间距收缩图标，避免 total 变大时糊成一坨
     const size = fitIconSize(posts, scale, base)
     const cx = px + P.w / 2
     const cy = py + P.h / 2 - 6
@@ -829,12 +776,10 @@ export class PromoteScene extends Phaser.Scene {
       this.previewObjs.push(c)
       const token: { c: Phaser.GameObjects.Container; zone?: Phaser.GameObjects.Zone; post: number } = { c, post }
       if (post < n) {
-        // 已有队员
         c.add(emojiImage(this, 0, 0, CHARACTERS[this.run.roster[post]!].emoji, size, 'player'))
       } else {
         const id = this.picked[post - n]
         if (id) {
-          // 已点进空位的候选：高亮环 + 点击换下
           const halo = this.add.graphics()
           halo.lineStyle(3, 0x81d4fa, 0.95)
           halo.strokeCircle(0, 0, size / 2 + 5)
@@ -854,7 +799,6 @@ export class PromoteScene extends Phaser.Scene {
             })
           token.zone = zone
         } else {
-          // 待填的空位：虚线圈 + 淡加号
           const dash = this.add.graphics()
           dash.lineStyle(2.5, 0xffffff, 0.5)
           const R = size / 2 + 3
@@ -887,7 +831,6 @@ export class PromoteScene extends Phaser.Scene {
     )
   }
 
-  /** 按当前相位重摆招募预览（容器与命中区同步；1~2 人布局天然静止） */
   private layoutRecruitPreview(): void {
     if (this.previewTokens.length === 0) return
     const total = this.run.roster.length + this.due

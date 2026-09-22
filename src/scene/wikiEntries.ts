@@ -12,11 +12,6 @@ import type { ItemDef } from '../types/items'
 import { captainStatGroups, characterStatGroups, ABILITY_KIND_LABEL } from './statLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
 
-// 图鉴：零维护成本地聚合各注册表——新增 entity 自动出现在图鉴里。
-// 完整 emoji 列表来自打包索引（构建资产，PreloadScene 已预加载），
-// 已收录集合 = 各注册表用到的全部 emoji（语义层，与描边/预载清单无关）。
-// 类别顺序：地图 / 队长 / 角色 / 敌人 / 道具 / 全部。武器并入所属角色（不单列）。
-
 function grid(units: number): string {
   return `${+units.toFixed(1)}格`
 }
@@ -83,7 +78,6 @@ export function enemyStatLines(e: EnemyDef): string[] {
   return lines
 }
 
-/** 地图详情行：世界规则 + 终波头目 + 出没敌人名录 */
 function mapStatLines(id: (typeof MAP_IDS)[number]): string[] {
   const m = MAPS[id]
   const boss = bossFor(id)
@@ -95,7 +89,6 @@ function mapStatLines(id: (typeof MAP_IDS)[number]): string[] {
   ]
 }
 
-/** 属性组扁平化为详情行（组标题行 + 内容行） */
 function flatten(groups: readonly { title: string; lines: readonly string[] }[]): string[] {
   return groups.flatMap((g) => [`◆ ${g.title}`, ...g.lines])
 }
@@ -125,8 +118,6 @@ export function wikiGroups(): WikiGroup[] {
     {
       icon: '1f939',
       title: '角色',
-      // 每个角色带 1/2/3 级子标签：各级属性与能力完全独立（不含跨级升级路径）。
-      // 武器/徒手能力并入本表（详情的攻击来源分段），不再单列「武器」类别
       entries: (Object.keys(CHARACTERS) as CharacterId[]).map((id) => ({
         emoji: CHARACTERS[id].emoji,
         name: CHARACTERS[id].name,
@@ -140,7 +131,6 @@ export function wikiGroups(): WikiGroup[] {
     },
     {
       icon: '1f9df',
-      // 敌人含 Boss（各图终波头目排在常规怪之后）
       title: '敌人',
       entries: [...ENEMY_DEFS, ...BOSSES].map((e) => ({
         emoji: e.emoji,
@@ -151,7 +141,6 @@ export function wikiGroups(): WikiGroup[] {
     },
     {
       icon: '1f6e1',
-      // 道具含队长升级卡（升级时三选一的全队增益卡）
       title: '道具',
       entries: [
         ...Object.values<ItemDef>(ITEMS).map((i) => ({
@@ -177,7 +166,7 @@ export function wikiGroups(): WikiGroup[] {
   ]
 }
 
-/** emoji → 图鉴条目反查（完整列表点击已收录项时展示类别与详情；重复归属取首个） */
+/** 重复归属取首个 */
 export function wikiEntryByEmoji(): Map<string, { category: string; entry: WikiEntry }> {
   const map = new Map<string, { category: string; entry: WikiEntry }>()
   for (const g of wikiGroups()) {
@@ -188,11 +177,9 @@ export function wikiEntryByEmoji(): Map<string, { category: string; entry: WikiE
   return map
 }
 
-/** 已作为游戏实体登场的 emoji（语义集合，用于完整列表的「已收录」标记） */
 export function usedEmojiSet(): Set<string> {
   const used = new Set<string>()
   for (const g of wikiGroups()) for (const e of g.entries) used.add(e.emoji)
-  // 图鉴条目之外的战斗实体：武器载体图标 + 各档升级卡图标 + 持有物/弹体
   for (const w of Object.values(WEAPONS)) used.add(w.emoji)
   for (const c of Object.values(CHARACTERS)) {
     for (const carrier of c.carriers) {

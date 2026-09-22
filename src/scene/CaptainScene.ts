@@ -18,9 +18,6 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 
-// 队长选择页 = 组队流程第一步（主菜单 → 选队长 → 组队 → 战斗）。
-// 单选：点列表行即选定并展开详情；队长不参战，其编制/被动影响后续组队与商店。
-// 布局沿用方向约定：竖屏「上」= 横屏「左」（详情），列表在下/右。
 interface CaptainLayout {
   content: { w: number; h: number }
   headerY: number
@@ -46,7 +43,7 @@ const PORTRAIT: CaptainLayout = {
 }
 
 export class CaptainScene extends Phaser.Scene {
-  // 视口变化触发的 restart 只重排布局，保留背景色等页面状态
+  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private selectedId: CaptainId = PICKABLE_CAPTAIN_IDS[0]!
@@ -96,7 +93,6 @@ export class CaptainScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    // 队长网格（单选；形象即含义，名字与能力看详情面板）
     this.grid = new EmojiGrid(this, { x: ox + L.list.x, y: oy + L.list.y, w: L.list.w, h: L.list.h })
     this.grid.onTap = (key): void => {
       playSfx('click')
@@ -108,16 +104,13 @@ export class CaptainScene extends Phaser.Scene {
       PICKABLE_CAPTAIN_IDS.map((id) => ({ key: id, emoji: CAPTAINS[id].emoji, outline: 'player' as const })),
     )
 
-    // 详情面板底板
     const D = L.detail
     const dx = ox + D.x
     const dy = oy + D.y
     const panel = this.add.graphics()
     roundRect(panel, dx, dy, D.w, D.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
-    // 队长增益/主动技能是变长文案，装进可滚动容器，绝不再靠收紧行距硬塞
     this.detailView = new ScrollView(this, { x: dx, y: dy, w: D.w, h: D.h })
 
-    // 确认按钮
     this.btnRect = {
       x: w / 2 - L.btn.w / 2,
       y: oy + L.btn.y - L.btn.h / 2,
@@ -138,8 +131,6 @@ export class CaptainScene extends Phaser.Scene {
       .setOrigin(0.5)
     const confirm = (): void => {
       playSfx('click')
-      // 开局组队 = 第一次整编：空阵容起步，按队长开局点数强制招募/升级；
-      // 地图在上一步已选定并持久化，这里读入本局
       beginRun(this.selectedId, [], loadMap(browserStorage()))
       this.scene.start('promote')
     }
@@ -161,7 +152,6 @@ export class CaptainScene extends Phaser.Scene {
   }
 
   private renderDetail(res: number): void {
-    // 内容坐标以详情面板左上为原点（0,0），滚动由 ScrollView 负责
     this.detailView.clear()
     const D = this.layout.detail
     const def = CAPTAINS[this.selectedId]

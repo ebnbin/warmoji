@@ -20,11 +20,6 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 
-// 地图选择页 = 开始游戏第一步（主菜单 → 选地图 → 选队长 → 组队 → 战斗）。
-// 地图即关卡：各图有专属世界规则、出怪表与终波 Boss（详情页「玩法」段展示）。
-// 布局沿用方向约定：竖屏「上」= 横屏「左」（详情），列表在下/右。
-
-/** 各图世界规则一句话（地图详情「玩法」段） */
 const MAP_PLAY_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> = {
   bounded: '有界竞技场：25×25 方场，边界围合',
   infinite: '无限世界：可朝任意方向走到天涯，终波毒雾收拢成圈',
@@ -61,7 +56,7 @@ const PORTRAIT: MapLayout = {
 }
 
 export class MapScene extends Phaser.Scene {
-  // 视口变化触发的 restart 只重排布局，保留背景色等页面状态
+  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private selectedId: MapId = MAP_IDS[0]!
@@ -71,7 +66,6 @@ export class MapScene extends Phaser.Scene {
   private detailView!: ScrollView
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private confirmLabel!: Phaser.GameObjects.Text
-  /** 试炼场开关（仅开发者模式下出现）：勾上则跳过队长/组队，直接进该图的沙盒 */
   private devMode = false
   private sandbox = false
   private testRect = { x: 0, y: 0, w: 0, h: 0 }
@@ -118,9 +112,7 @@ export class MapScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    // 试炼场入口：只有开发者模式开着才出现。关掉开发者模式时一并把选择态归零，
-    // 否则会留下一个既看不见、又仍然生效的开关。
-    // 放在页头右端而不是确认按钮上方：那里是详情卡片的地盘，浮一颗药丸上去像是画错了
+    // 开发者模式关闭时须把 sandbox 归零，否则开关看不见却仍生效
     this.devMode = loadSettings(browserStorage()).devMode
     if (!this.devMode) this.sandbox = false
     if (this.devMode) {
@@ -149,7 +141,6 @@ export class MapScene extends Phaser.Scene {
         })
     }
 
-    // 地图网格（单选；形象即含义，主题与装饰看详情面板）
     this.grid = new EmojiGrid(this, { x: ox + L.list.x, y: oy + L.list.y, w: L.list.w, h: L.list.h })
     this.grid.onTap = (key): void => {
       playSfx('click')
@@ -159,16 +150,13 @@ export class MapScene extends Phaser.Scene {
     }
     this.grid.setItems(MAP_IDS.map((id) => ({ key: id, emoji: MAPS[id].emoji })))
 
-    // 详情面板底板
     const D = L.detail
     const dx = ox + D.x
     const dy = oy + D.y
     const panel = this.add.graphics()
     roundRect(panel, dx, dy, D.w, D.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
-    // 地图介绍/装饰预览是变长内容，装进可滚动容器
     this.detailView = new ScrollView(this, { x: dx, y: dy, w: D.w, h: D.h })
 
-    // 确认按钮
     this.btnRect = {
       x: w / 2 - L.btn.w / 2,
       y: oy + L.btn.y - L.btn.h / 2,
@@ -189,7 +177,6 @@ export class MapScene extends Phaser.Scene {
       .setOrigin(0.5)
     const confirm = (): void => {
       playSfx('click')
-      // 试炼场：跳过队长/组队/商店，用当前旋钮在该图上开沙盒
       if (this.sandbox) {
         beginRun(sandboxCaptain(), sandboxStarters(), this.selectedId, true)
         this.scene.start(battleSceneFor(this.selectedId))
@@ -215,7 +202,6 @@ export class MapScene extends Phaser.Scene {
   }
 
   private renderDetail(res: number): void {
-    // 内容坐标以详情面板左上为原点（0,0），滚动交给 ScrollView
     this.detailView.clear()
     const D = this.layout.detail
     const def = MAPS[this.selectedId]
@@ -268,7 +254,6 @@ export class MapScene extends Phaser.Scene {
     line(def.desc)
     cursor += 14
     group('1f33f', '地面装饰')
-    // 装饰 emoji 预览：按面板宽自动换行，装饰再多也不会横向溢出
     const startX = 62 + 16
     const pitch = 46
     const perRow = Math.max(1, Math.floor((D.w - startX - 16) / pitch))
