@@ -112,6 +112,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
   private mapW = 0
   private mapH = 0
+  /** 每次 create 递增；boot 等完图集后据此判断自己是否已过期 */
+  private bootGen = 0
 
   constructor() {
     super(ECS_SCENE_KEY)
@@ -181,7 +183,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       .setScrollFactor(0)
       .setDepth(1000)
 
-    void this.boot(run, center, hint)
+    void this.boot(++this.bootGen, run, center, hint)
 
     setActiveHudHost(this) // 须先登记再拉起 HUD
     this.scene.launch('ui')
@@ -202,9 +204,15 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // ESC 已绑定在 UIScene 上，此处不得再接
   }
 
-  private async boot(run: RunState, center: { x: number; y: number }, hint: Phaser.GameObjects.Text): Promise<void> {
+  private async boot(
+    gen: number,
+    run: RunState,
+    center: { x: number; y: number },
+    hint: Phaser.GameObjects.Text,
+  ): Promise<void> {
     const atlas = await EcsAtlas.build(this, OUTLINED_EMOJIS, PLAIN_EMOJIS)
-    if (!this.scene.isActive()) return
+    // 构建图集期间场景可能已重开：isActive 仍为真，但本次 boot 已过期
+    if (gen !== this.bootGen || !this.scene.isActive()) return
     this.atlas = atlas
     clearEcsStore()
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
