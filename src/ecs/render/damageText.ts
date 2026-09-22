@@ -1,8 +1,7 @@
 import Phaser from 'phaser'
-import { query } from 'bitecs'
 import { UI_FONT } from '../../util/fonts'
-import { DamageNumber, Fx, Transform } from '../components'
-import type { EcsWorld } from '../world'
+import { DAMAGE_NUMBER_CAP, DAMAGE_NUMBER_RISE_MS } from '../damageNumbers'
+import type { DamageNumbers } from '../damageNumbers'
 import { EcsLayer } from './layer'
 import { packTint } from './tint'
 
@@ -42,7 +41,7 @@ export class DamageTextLayer {
   /** 本帧视觉钟 */
   private now = 0
 
-  constructor(scene: Phaser.Scene, private readonly world: EcsWorld, private readonly enabled: boolean) {
+  constructor(scene: Phaser.Scene, private readonly nums: DamageNumbers, private readonly enabled: boolean) {
     bakeDigits(scene)
     this.batch = new DamageTextBatch(scene, this)
   }
@@ -72,19 +71,23 @@ export class DamageTextLayer {
   ): void {
     if (!this.enabled) return
     const fx = this.now
-    for (const eid of query(this.world, [Fx, DamageNumber, Transform])) {
-      const t = (fx - Fx.bornMs[eid]!) / Fx.durMs[eid]!
-      const crit = DamageNumber.crit[eid] === 1
+    const buf = this.nums
+    // 从最老的一条画起，新的压在上面
+    for (let j = 0; j < DAMAGE_NUMBER_CAP; j++) {
+      const i = (buf.head + j) % DAMAGE_NUMBER_CAP
+      const t = (fx - buf.born[i]!) / DAMAGE_NUMBER_RISE_MS
+      if (!(t >= 0 && t < 1)) continue
+      const crit = buf.crit[i] === 1
       const size = crit ? 34 : 24
       const gh = size
       const gw = (CHAR_W * size) / CHAR_H
-      const cy = Transform.y[eid]! - 26 * t
+      const cy = buf.y[i]! - 26 * t
       const tint = packTint(crit ? 0xffdc5d : 0xffffff, 1 - t)
 
-      const n = DamageNumber.value[eid]!
+      const n = buf.value[i]!
       let digits = 1
       for (let v = n; v >= 10; v = Math.floor(v / 10)) digits++
-      let left = Transform.x[eid]! - (digits * gw) / 2
+      let left = buf.x[i]! - (digits * gw) / 2
 
       for (let d = digits - 1; d >= 0; d--) {
         let p = 1

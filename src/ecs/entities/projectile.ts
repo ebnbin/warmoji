@@ -7,6 +7,7 @@ import {
 } from '../components'
 import { abilityOnHit, projHitEids, projOnHit, projSrcName } from '../store'
 import type { Sim } from '../sim'
+import { crowded } from '../world'
 
 
 function spawnBolt(
@@ -92,6 +93,7 @@ export function spawnEnemyProjectileEcs(
   angle: number,
   spec: EnemyShotSpec,
 ): void {
+  if (crowded(sim.world)) return
   const eid = spawnBolt(sim, x, y, angle, FACTION.enemy, {
     frame: spec.frame,
     size: spec.size,

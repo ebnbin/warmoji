@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { PrevPos, Proj, Radius, SweptHit, Transform, ENEMY_SET } from '../components'
+import { Dormant, PrevPos, Proj, Radius, SweptHit, Transform, ENEMY_SET } from '../components'
 import { applyAbilityEffects } from './shared/effects'
 import { boltSource } from '../utils/source'
 import { damageTarget } from './shared/damage'
@@ -36,7 +36,8 @@ export function hitSweptProjectiles(sim: Sim): void {
     const segY = by - sy
     const segLen2 = segX * segX + segY * segY
     for (const en of enemies) {
-      if (hit.has(en)) continue
+      // 已死未提交的 eid 可能已被别的实体复用；休眠者不可被命中
+      if (enemyDef[en] === undefined || Dormant.v[en] || hit.has(en)) continue
       const rr = pr + Radius.v[en]!
       // 取相对线段起点的最近镜像
       const w = sim.hooks.worldDelta(sim, sx, sy, Transform.x[en]!, Transform.y[en]!)
@@ -58,7 +59,7 @@ export function hitSweptProjectiles(sim: Sim): void {
     }
     // 每帧只结算首个命中
     const f = found[0]
-    if (f === undefined || enemyDef[f.enemy] === undefined) continue
+    if (f === undefined) continue
     hit.add(f.enemy)
     const hx = Transform.x[f.enemy]!
     const hy = Transform.y[f.enemy]!

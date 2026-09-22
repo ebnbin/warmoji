@@ -113,10 +113,12 @@ export class EcsAtlas {
     if (hit) return hit
     if (!this.baking.has(key)) {
       this.baking.add(key)
-      void this.bakeClip(id, outline, clipId, key).catch(() => {
-        // 失败记为无此 clip，不再重试
-        this.clips.set(key, NO_CLIP)
-      })
+      void this.bakeClip(id, outline, clipId, key)
+        .catch(() => {
+          // 失败记为无此 clip，不再重试
+          this.clips.set(key, NO_CLIP)
+        })
+        .finally(() => this.baking.delete(key))
     }
     return NO_CLIP
   }
@@ -129,7 +131,9 @@ export class EcsAtlas {
   private async bakeClip(id: string, outline: OutlineKind | undefined, clipId: string, key: string): Promise<void> {
     const clip = animClipOf(id, clipId)
     const scene = this.scene
-    if (!clip || !scene || this.disposed || !this.hasRoom(clip.frames)) {
+    // 场景已关闭则不记结果，下一局再问时重烘
+    if (!scene || this.disposed) return
+    if (!clip || !this.hasRoom(clip.frames)) {
       this.clips.set(key, NO_CLIP)
       return
     }
@@ -138,8 +142,11 @@ export class EcsAtlas {
     const imgs = await Promise.all(
       Array.from({ length: clip.frames }, (_, i) => rasterize(bakeAnimFrame(raw, recipe, i / clip.frames), outline)),
     )
-    // 场景已切换或格位已满则静默丢弃
-    if (this.disposed || !scene.textures || !this.hasRoom(imgs.length)) return
+    if (this.disposed || !scene.textures) return
+    if (!this.hasRoom(imgs.length)) {
+      this.clips.set(key, NO_CLIP)
+      return
+    }
     const base = this.cursor
     const touched = new Set<number>()
     for (const img of imgs) {

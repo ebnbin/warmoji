@@ -253,8 +253,6 @@ export const FxSlash = { r: f32() }
 /** size = 全尺寸（世界像素）；走 spriteBatch */
 export const FxBoom = { size: f32() }
 
-export const DamageNumber = { value: i32(), crit: u8() }
-
 /** Due.at = 起划时刻；已砸过的实体在 store.meteorHit，同一实体只砸一次 */
 export const Meteor = { sx: f32(), sy: f32(), ex: f32(), ey: f32(), t: f32() }
 
