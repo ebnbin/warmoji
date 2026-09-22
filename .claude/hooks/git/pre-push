@@ -1,0 +1,10 @@
+#!/bin/sh
+# main 守卫：拒绝任何推向 main 的推送（含删除）。main 只经 PR 进入（见 CLAUDE.md）
+# stdin 每行：<local ref> <local sha> <remote ref> <remote sha>
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "pre-push: 禁止推向 main。把提交推到自己的分支并建 PR" >&2
+    exit 1
+  fi
+done
+exit 0

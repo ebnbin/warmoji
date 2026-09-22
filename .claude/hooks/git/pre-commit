@@ -1,0 +1,6 @@
+#!/bin/sh
+# main 守卫：main 只经 PR 进入，提交一律在自己的分支上（见 CLAUDE.md）
+if [ "$(git symbolic-ref --quiet --short HEAD 2>/dev/null)" = "main" ]; then
+  echo "pre-commit: 禁止在 main 上提交。先切一条分支：git switch -c <分支名>" >&2
+  exit 1
+fi
