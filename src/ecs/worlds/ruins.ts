@@ -1,26 +1,17 @@
 import { norm } from '../../util/vec'
 import type { Point } from '../../util/vec'
 
-// 本图的纯世界模型（禁 phaser/DOM）；接进 WorldHooks 的是同目录的 hooks.ts。
-// ECS 侧的一份——旧框架侧在 arcade/maps/ 下另有等价实现，两份有意重复。
-
-// 残垣地图（kind='ruins'）的纯几何（禁 phaser/DOM）：
-// · WallGrid —— 断壁网格：点/线段是否撞墙（视线遮挡 + 子弹裁剪）、贴墙滑动
-// · FlowField —— 流场寻路：从队伍所在格 BFS 出方向场，敌人采样即可绕墙包抄
-// · generateRuins —— 逐局按种子铺断壁；reachableCells —— 连通判定（只在可达区刷怪）
-// 接进世界钩子的是同目录的 hooks.ts（chaseDir/wallHit/constrainTeam…）。
-
-/** 断壁网格：cols×rows 个格，每格阻挡/通行。cellPx = 每格世界像素边长 */
+/** cellPx = 每格世界像素边长 */
 export class WallGrid {
   constructor(
     readonly cols: number,
     readonly rows: number,
     readonly cellPx: number,
-    /** 行优先 blocked[y*cols+x]（可变：拆迁 Boss 冲刺碾墙时置 false） */
+    /** 行优先 blocked[y * cols + x]，可变 */
     readonly blocked: boolean[],
   ) {}
 
-  /** 改写某格阻挡态（破墙/垒墙）。越界忽略。返回是否真的发生了变化 */
+  /** 越界忽略；返回是否发生变化 */
   setBlocked(cx: number, cy: number, value: boolean): boolean {
     if (cx < 0 || cx >= this.cols || cy < 0 || cy >= this.rows) return false
     const i = cy * this.cols + cx
@@ -35,7 +26,7 @@ export class WallGrid {
   cellY(worldY: number): number {
     return Math.floor(worldY / this.cellPx)
   }
-  /** 越界视为通行（外框墙由物理世界边界另管） */
+  /** 越界视为通行 */
   isBlockedCell(cx: number, cy: number): boolean {
     if (cx < 0 || cx >= this.cols || cy < 0 || cy >= this.rows) return false
     return this.blocked[cy * this.cols + cx]!
@@ -44,7 +35,7 @@ export class WallGrid {
     return this.isBlockedCell(this.cellX(x), this.cellY(y))
   }
 
-  /** 线段 a→b 首个撞墙点（世界坐标）；不撞返回 null。Amanatides–Woo 网格步进 */
+  /** 不撞返回 null；Amanatides–Woo 网格步进 */
   segmentHit(ax: number, ay: number, bx: number, by: number): Point | null {
     const cs = this.cellPx
     const x = ax / cs
@@ -82,12 +73,11 @@ export class WallGrid {
     return null
   }
 
-  /** 贴墙滑动：目标格被挡就分轴放行（撞墙时保留未被挡的那一轴） */
+  /** 目标格被挡就分轴放行 */
   resolveMove(fromX: number, fromY: number, toX: number, toY: number): Point {
     let nx = toX
     let ny = toY
     if (this.pointBlocked(toX, toY)) {
-      // 先试只走 x（保 y），再试只走 y（保 x）
       if (this.pointBlocked(toX, fromY)) nx = fromX
       if (this.pointBlocked(nx, toY)) ny = fromY
     }
@@ -95,7 +85,7 @@ export class WallGrid {
   }
 }
 
-/** 从起点格出发、4 连通可达的通行格集合（连通判定/刷怪区） */
+/** 4 连通 */
 export function reachableCells(grid: WallGrid, startCx: number, startCy: number): Set<number> {
   const out = new Set<number>()
   if (grid.isBlockedCell(startCx, startCy)) return out
@@ -122,7 +112,7 @@ export function reachableCells(grid: WallGrid, startCx: number, startCy: number)
   return out
 }
 
-/** 流场：从目标格 BFS（4 连通）出距离场；采样点返回指向目标（绕墙）的单位方向 */
+/** 从目标格 BFS 出距离场 */
 export class FlowField {
   private readonly dist: Int32Array
 
@@ -167,8 +157,7 @@ export class FlowField {
     return v < 0 ? Infinity : v
   }
 
-  /** 世界坐标 → 指向目标的单位方向：朝「最能缩短距离」的通行邻格下坡走
-   *（8 邻，斜向禁穿墙角）。不可达 / 已在目标返回 {0,0} */
+  /** 8 邻，斜向禁穿墙角；不可达或已在目标返回 {0,0} */
   sampleDir(x: number, y: number): Point {
     const cx = this.grid.cellX(x)
     const cy = this.grid.cellY(y)
@@ -178,7 +167,6 @@ export class FlowField {
     let bx = 0
     let by = 0
     for (const [dx, dy] of NEIGH8) {
-      // 斜向禁止穿墙角：两个正交相邻格必须都通行
       if (dx !== 0 && dy !== 0) {
         if (this.grid.isBlockedCell(cx + dx, cy) || this.grid.isBlockedCell(cx, cy + dy)) continue
       }
@@ -205,7 +193,6 @@ const NEIGH8: readonly (readonly [number, number])[] = [
   [-1, -1],
 ]
 
-/** 逐局随机铺断壁：撒若干矩形废墟块，留出中心开阔出生区。返回 blocked 数组 */
 export function generateRuins(
   rand: () => number,
   cols: number,
@@ -219,7 +206,6 @@ export function generateRuins(
   const midX = cols / 2
   const midY = rows / 2
   for (let b = 0; b < opts.blocks; b++) {
-    // 矩形块：一维偏长（回廊感），随机横竖
     const long = 1 + Math.floor(rand() * opts.maxLen)
     const short = 1 + Math.floor(rand() * 2)
     const horizontal = rand() < 0.5
@@ -231,7 +217,7 @@ export function generateRuins(
       for (let xx = x0; xx < x0 + w; xx++) set(xx, yy)
     }
   }
-  // 抠出中心开阔出生区（半径 centerClearU 的圆盘），保证队伍不被埋、出生连通
+  // 中心留空，保证出生连通
   const r2 = opts.centerClearU * opts.centerClearU
   for (let cy = 0; cy < rows; cy++) {
     for (let cx = 0; cx < cols; cx++) {

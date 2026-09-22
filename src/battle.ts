@@ -18,7 +18,7 @@ import { EcsBattleScene } from './ecs/EcsBattleScene'
 import { ECS_SCENE_KEY } from './ecs/keys'
 import type { EcsSceneKey } from './ecs/keys'
 
-// 全仓唯一允许 import src/arcade/、src/ecs/ 与 bitecs 的模块（eslint 强制）
+// 全仓唯一允许 import src/arcade/、src/ecs/ 与 bitecs 的模块（eslint 强制）。战斗世界两侧各一份，有意重复，不抽共享层
 
 export type BattleSceneKey = ArenaSceneKey | EcsSceneKey
 

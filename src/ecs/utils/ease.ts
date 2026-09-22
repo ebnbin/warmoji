@@ -1,28 +1,27 @@
-// 缓动(纯函数):与 Phaser 的同名缓动同参,供纯逻辑侧的弹入动画用。
-// 单独成模块是为了避免 sim ↔ enemy 之间为了一个缓动函数互相 import 成环。
+// 与 Phaser 同名缓动同参
 
-/** Sine.easeOut:起步快、末段收 */
+/** Sine.easeOut */
 export function sineEaseOut(t: number): number {
   return Math.sin(t * (Math.PI / 2))
 }
 
-/** Sine.easeInOut:两端慢、中段快 */
+/** Sine.easeInOut */
 export function sineEaseInOut(t: number): number {
   return 0.5 * (1 - Math.cos(Math.PI * t))
 }
 
-/** Cubic.easeOut:起步最快、末段缓收 */
+/** Cubic.easeOut */
 export function cubicEaseOut(t: number): number {
   const u = 1 - t
   return 1 - u * u * u
 }
 
-/** Cubic.easeIn:起步几乎不动、末段猛收 */
+/** Cubic.easeIn */
 export function cubicEaseIn(t: number): number {
   return t * t * t
 }
 
-/** Back.easeOut(Phaser 默认过冲量):末段轻微过冲再回落 */
+/** Back.easeOut，Phaser 默认过冲量 */
 export function backEaseOut(t: number): number {
   const c1 = 1.70158
   const c3 = c1 + 1

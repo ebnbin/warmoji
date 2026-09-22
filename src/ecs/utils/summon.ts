@@ -6,7 +6,7 @@ import type { Target } from './targets'
 import type { Source } from './source'
 import type { Sim } from '../sim'
 
-/** 优先未中毒的最近敌人；没有未中毒者则退而求其次取最近的 */
+/** 优先未中毒的最近敌人 */
 export function pickTarget(sim: Sim, src: Source, bx: number, by: number): Target | null {
   const max = ACQUIRE.range * UNIT
   let bestFresh: Target | null = null

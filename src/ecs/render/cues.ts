@@ -10,36 +10,13 @@ import { SHAPE_BANDS as BANDS } from './bands'
 import { EcsLayer } from './layer'
 import { packTint } from './tint'
 
-// 一次性战斗特效（Cue，阵营中立）：放完即弃，与机制正交——纯逻辑侧只往队列里塞
-// 「放一个什么样的特效」，绘制全在这里（GAS GameplayCue 思路：机制不依赖渲染）。
-//
-// 与 arcade 那份的区别，也正是这份要单独存在的理由。arcade 每放一个特效就 new 一个
-// Arc/Rectangle/Graphics + 挂一条 tween：特效数 = GameObject 数 = tween 数，而且
-// Phaser 的 Arc 按 iterations=0.01 铺满 ~100 个三角形（带描边约 300），全由它自己提交。
-//
-// 这里走 ECS 侧一贯的做法，与 EcsSpriteBatch 同构：
-//   · 四种形状类特效各是一颗**实体**（几何在组件上），没有任何一个 GameObject
-//   · 画的活儿归少数几个 EcsShapeBatch —— 光秃秃的 GameObject，只为在显示列表里
-//     占一个 depth，renderWebGL 里把本带全部特效的三角形一次性提交给核心的
-//     BatchHandlerTriFlat（与 EcsSpriteBatch 提交四边形给 BatchHandlerQuad 同理）
-//   · 三角化自己做，按半径自适应取 12–48 段，比 Phaser 的定额 100 段省一个数量级
-//   · 进度由 renderWebGL 按 Fx.bornMs / Fx.durMs 现算，不挂 tween；回收在 systems/expireFx。
-//     时钟取 sim.fxMs（真实帧长的纯视觉钟，过场冻结期照旧推进），故特效不受时停拖慢
-//
-// 只剩一个例外：全屏白闪是一块 setScrollFactor(0) 的矩形——它在**屏幕坐标**里，
-// 不在世界里，做不成世界实体，故仍是 GameObject，仍经 sim.out.flash 传进来。
-// 💥 爆裂从前也在此列（说它「走不了三角批」是对的，但那只说明它进不了形状批；
-// 它是贴图，进精灵批就好），现已是实体 FxBoom。
-//
-// 缓动与 Phaser 同名缓动同参（见 ../ease），观感与旧实现一致。
+// 四种形状类特效各是实体，画在 EcsShapeBatch；进度按 Fx.bornMs / durMs 在 renderWebGL 现算，时钟取 sim.fxMs
 
 
-/** 扩散淡出的圆：填充圆（可选描边），从 fromScale 缩放到 toScale 同时淡出。
- * 命中白闪、冲击环、治疗/集结/冻结脉冲共用此一处——各自传颜色/尺度/时长/深度。 */
 export interface CircleCue {
   readonly fill: number
   readonly fillAlpha: number
-  /** 描边色；省略即无描边（纯填充闪光） */
+  /** 省略即无描边 */
   readonly stroke?: number
   readonly lineWidth?: number
   readonly lineAlpha?: number
@@ -57,7 +34,7 @@ const FREE = -1
 type Matrix = Phaser.GameObjects.Components.TransformMatrix
 
 export class CueLayer {
-  // ── 唯一的例外：屏幕固定的矩形，不在世界坐标里，做不成实体 ──
+  // 屏幕固定，不在世界坐标里
   private readonly flash: Phaser.GameObjects.Rectangle
   private flashBorn = FREE
   private flashDur = 0
@@ -66,7 +43,7 @@ export class CueLayer {
   private readonly batches: EcsShapeBatch[] = []
   private readonly scratch: Scratch = newScratch()
 
-  /** 本帧视觉钟：step 每帧写入，随后的投放取它作为起点 */
+  /** step 每帧写入，投放取它作为起点 */
   private now = 0
 
   constructor(scene: Phaser.Scene, private readonly world: EcsWorld) {
@@ -84,8 +61,7 @@ export class CueLayer {
     this.batches.length = 0
   }
 
-  /** 逐帧推进；须在本帧的投放之前调用（它同时给投放定时间起点）。fxMs = sim.fxMs。
-   * 形状类只需判过期——顶点每帧由批绘对象按当前进度现算，不必在此写回 */
+  /** 须在本帧的投放之前调用 */
   step(fxMs: number): void {
     this.now = fxMs
     if (this.flashBorn !== FREE) {
@@ -99,8 +75,6 @@ export class CueLayer {
     }
   }
 
-  /** 把某一带的全部活动特效三角化到暂存里（批绘对象在 renderWebGL 里调）。
-   * 遍历的是查询集——四种形状类特效各是一颗实体，几何在组件上 */
   buildBand(band: number, m: Matrix): Scratch {
     const o = this.scratch
     resetScratch(o)
@@ -120,12 +94,11 @@ export class CueLayer {
       fan(o, m, x, y, r, packTint(FxCircle.fill[k]!, FxCircle.fillAlpha[k]! * fade))
       const stroke = FxCircle.stroke[k]!
       if (stroke >= 0) {
-        // 描边宽度随缩放走，与旧实现整体 setScale 的表现一致
         ringStrip(o, m, x, y, r, FxCircle.lineW[k]! * s, packTint(stroke, FxCircle.lineAlpha[k]! * fade))
       }
     }
 
-    // 光束：外层色带在 7 带、白芯在 8 带，纵向收拢 + 淡出（同一颗实体，两带各画一层）
+    // 光束外层在 7 带、白芯在 8 带
     const outer = zMin < 8
     const core = zMin >= 8 && zMax <= 9
     if (outer || core) {
@@ -141,7 +114,6 @@ export class CueLayer {
         const x = Transform.x[k]!
         const y = Transform.y[k]!
         const L = FxBeam.len[k]!
-        // 原点在左中、沿 angle 铺开：局部 (0,±half) → (L,±half)
         quad(
           o, m,
           x - sa * half, y + ca * half,
@@ -176,7 +148,6 @@ export class CueLayer {
   }
 
 
-  /** 全屏白闪：一块盖满视口的定屏矩形淡出（天罚全域打击） */
   screenFlash(color: number, alpha: number, durationMs: number): void {
     this.flash.setFillStyle(color, 1).setAlpha(alpha).setVisible(true)
     this.flashBorn = this.now
@@ -185,10 +156,7 @@ export class CueLayer {
   }
 }
 
-/** 一条深度带的形状批绘：光秃秃的 GameObject，只为在显示列表里占一个 depth。
- * 与 EcsSpriteBatch 同构——那边提交四边形给 BatchHandlerQuad，这边提交三角形给
- * BatchHandlerTriFlat。注意 renderWebGL 由 RenderSteps 以裸函数方式调用，无 this
- * 绑定，状态一律走 src。 */
+/** renderWebGL 由 RenderSteps 以裸函数调用，无 this 绑定，状态一律走 src */
 class EcsShapeBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
 

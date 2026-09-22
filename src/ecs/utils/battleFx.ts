@@ -14,10 +14,6 @@ function pickPolarity(
   return sub[Math.floor(rand() * sub.length) % sub.length]
 }
 
-// 限时战斗层的规则：多来源效果折叠、按波次分配携带者预算与抽取。
-// ECS 侧的一份；旧框架侧另有等价实现（arcade/field.ts 尾段），两份有意重复。
-
-/** 叠加多个限时片段：乘区相乘、crit 相加，最终封顶/保底防叠飞。 */
 export function foldBattleEffects(parts: readonly Partial<BattleEffects>[]): BattleEffects {
   const fx = { ...BATTLE_FX_IDENTITY }
   for (const p of parts) {
@@ -34,14 +30,13 @@ export function foldBattleEffects(parts: readonly Partial<BattleEffects>[]): Bat
   fx.enemySlowMul = clamp(fx.enemySlowMul, 0.4, 2.2)
   return fx
 }
-/** 本波携带者预算（固定数量，非概率）：随波次上探，Boss 波偏减益施压。分档表见 battlefield 数据 */
 export function waveCarrierBudget(wave: number, isBoss: boolean): { buff: number; debuff: number } {
   const cb = CARRIER_BUDGET
   if (isBoss) return { buff: cb.boss.buff, debuff: cb.boss.debuff }
   for (const t of cb.waveTiers) if (wave <= t.upToWave) return { buff: t.buff, debuff: t.debuff }
   return { buff: cb.fallback.buff, debuff: cb.fallback.debuff }
 }
-/** 本波所有携带者背的拾取（buff/debuff 数由预算表定，从本图池随机抽，可重复） */
+/** 可重复 */
 export function rollWaveCarriers(
   mapId: MapId,
   wave: number,
