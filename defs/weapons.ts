@@ -1,9 +1,5 @@
 import type { WeaponSource } from '../src/types/weapons'
 
-// 创作层（不进运行时 bundle）：武器数据行。生成 src/assets/weapons.json。
-// 武器包装一个纯行为 Ability，自带升级路径（base + 两档，每档一张升级卡）。
-// 能力以 id 引用能力表；gen 校验引用存在。
-
 export const WEAPONS = {
   axe: {
     name: '巨斧横扫',
