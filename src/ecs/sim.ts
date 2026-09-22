@@ -11,6 +11,7 @@ import type { FormationId } from '../types/formation'
 import type { EcsWorld } from './world'
 import type { WorldHooks, WorldState } from './worlds/hooks'
 import type { Outbox } from './outbox'
+import type { DamageNumbers } from './damageNumbers'
 import type { RunState } from '../run/state'
 import type { Target } from './utils/targets'
 import type { FrameIndex } from './frames'
@@ -24,6 +25,7 @@ import { spawnCaptain } from './entities/captain'
 import { formTeam } from './entities/captain'
 import { newWorldState, worldFor } from './worlds/hooks'
 import { newOutbox } from './outbox'
+import { newDamageNumbers } from './damageNumbers'
 import type { EcsAtlas } from './atlas'
 
 export interface Sim {
@@ -81,6 +83,7 @@ export interface Sim {
   pendingDeaths: PendingDeath[]
   /** 仿真只写，场景侧每帧排空 */
   out: Outbox
+  damageNumbers: DamageNumbers
   /** 挂上则在 killEnemy 内当场跑，否则回落到 pendingDeaths */
   onDeathFx?: (d: PendingDeath) => void
   run: RunState
@@ -195,6 +198,7 @@ export function makeSim(
     frames: atlas,
     pendingDeaths: [],
     out: newOutbox(),
+    damageNumbers: newDamageNumbers(),
     rng: new Rng(run.decorSeed ^ 0x9e37),
     sandbox,
     spawnCooldownMs: 300,

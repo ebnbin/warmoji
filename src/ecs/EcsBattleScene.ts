@@ -216,11 +216,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const settings = loadSettings(browserStorage())
     this.hitShakeOn = settings.hitShake
     this.damageNumbersOn = settings.damageNumbers
-    this.damageText = new DamageTextLayer(this, this.world, this.damageNumbersOn)
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
     this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
     this.sim = makeSim(this.world, atlas, run, run.sandbox, center, this.mapW, this.mapH)
+    this.damageText = new DamageTextLayer(this, this.sim.damageNumbers, this.damageNumbersOn)
     initialLayout(this.sim)
     this.map.onSimReady(this.ctx, this.sim)
     this.sim.hooks.onStart(this.sim)

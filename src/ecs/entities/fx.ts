@@ -1,6 +1,7 @@
 import { addComponents, addEntity, query, removeEntity } from 'bitecs'
-import { DamageNumber, Depth, Fx, FxBeam, FxBolt, FxBoom, FxCircle, FxSlash, Transform } from '../components'
+import { Depth, Fx, FxBeam, FxBolt, FxBoom, FxCircle, FxSlash, Transform } from '../components'
 import { boltPts } from '../store'
+import { pushDamageNumber } from '../damageNumbers'
 import { attachDrawable } from './drawable'
 import type { CircleCue } from '../render/cues'
 import type { Sim } from '../sim'
@@ -11,14 +12,13 @@ const BEAM_MS = 200
 const BOLT_MS = 200
 const SLASH_MS = 220
 const BOOM_MS = 340
-const RISE_MS = 350
 /** 超出截断 */
 const BOLT_PTS = 8
 /** 落在 spriteBatch 的 [30,60) 深度带 */
 const BOOM_Z = 30
 
 /** 同屏并发上限 */
-const CAP = { circle: 64, beam: 16, bolt: 16, slash: 16, boom: 24, damage: 256 }
+const CAP = { circle: 64, beam: 16, bolt: 16, slash: 16, boom: 24 }
 
 /** 按出生时刻顶掉最老的一个 */
 function capFx(sim: Sim, comp: object, cap: number): void {
@@ -138,19 +138,9 @@ export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): numbe
   return eid
 }
 
-/** 伤害飘字：命中点上浮淡出的数字。绘制在 render/damageText.ts（自绘字形四边形），
- * 故这里只有数据，不挂 Sprite */
-export function spawnDamageNumber(sim: Sim, x: number, y: number, amount: number, crit: boolean): number {
-  capFx(sim, DamageNumber, CAP.damage)
-  const eid = addEntity(sim.world)
-  addComponents(sim.world, eid, Fx, DamageNumber, Transform)
-  Fx.bornMs[eid] = sim.fxMs
-  Fx.durMs[eid] = RISE_MS
-  Transform.x[eid] = x
-  Transform.y[eid] = y - 14 // 起点略高于命中点
-  DamageNumber.value[eid] = amount
-  DamageNumber.crit[eid] = crit ? 1 : 0
-  return eid
+/** 伤害飘字：命中点上浮淡出的数字，绘制在 render/damageText.ts */
+export function spawnDamageNumber(sim: Sim, x: number, y: number, amount: number, crit: boolean): void {
+  pushDamageNumber(sim.damageNumbers, x, y - 14, amount, crit, sim.fxMs) // 起点略高于命中点
 }
 
 /** 斩击弧光 */
