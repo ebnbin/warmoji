@@ -11,8 +11,8 @@ const BEAM_MS = 200
 const BOLT_MS = 200
 const SLASH_MS = 220
 const BOOM_MS = 340
-/** 落在 spriteBatch 的 [30,60) 深度带 */
-const BOOM_Z = 30
+/** 压在被保护中心之上、队员之下 */
+const BOOM_Z = 9
 
 function newFx(sim: Sim, comp: object, x: number, y: number, durMs: number, z: number): number {
   const eid = newEntity(sim.world)
