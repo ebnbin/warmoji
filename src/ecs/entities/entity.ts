@@ -1,4 +1,4 @@
-import { addEntity, entityExists } from 'bitecs'
+import { addEntity } from 'bitecs'
 import { ensureCapacity } from '../storage'
 import { Uid } from '../components'
 import type { EcsWorld } from '../world'
@@ -14,7 +14,3 @@ export function newEntity(world: EcsWorld): number {
   return eid
 }
 
-/** 记下的 (eid, uid) 是否仍是同一个在场实体 */
-export function isSameEntity(world: EcsWorld, eid: number, uid: number): boolean {
-  return uid !== 0 && entityExists(world, eid) && Uid.v[eid] === uid
-}

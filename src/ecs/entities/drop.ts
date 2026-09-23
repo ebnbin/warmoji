@@ -1,7 +1,7 @@
 import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { attachDrawable } from './drawable'
-import { Drop, FACTION, Faction, Owner } from '../components'
+import { Drop, FACTION, Faction, Owner, Uid } from '../components'
 import type { Sim } from '../sim'
 
 
@@ -37,5 +37,6 @@ export function spawnDrop(sim: Sim, weaponEid: number, spec: DropSpec): number {
   Drop.fromY[d] = spec.y - spec.fromAbove
   Drop.toY[d] = spec.y
   Drop.target[d] = spec.target
+  Drop.targetUid[d] = Uid.v[spec.target]!
   return d
 }

@@ -569,7 +569,8 @@ export const DanceWindow = { until: f32() }
 export const Blink = { x: f32(), y: f32() }
 
 /** 落地才结算；Owner 指回能力实体；startMs 可在未来，期间不显形 */
-export const Drop = { startMs: f32(), durMs: f32(), fromY: f32(), toY: f32(), target: i32() }
+/** target 与 targetUid 成对：落地时比对，目标换人即作废 */
+export const Drop = { startMs: f32(), durMs: f32(), fromY: f32(), toY: f32(), target: i32(), targetUid: u32() }
 
 export const Shots = { n: i32() }
 

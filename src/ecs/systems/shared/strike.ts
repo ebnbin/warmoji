@@ -1,6 +1,6 @@
-import { hasComponent } from 'bitecs'
 import { spawnCoins } from '../../entities/pickup'
-import { Alive, Drop, Enemy, FACTION, Faction, Owner, Strike, Transform } from '../../components'
+import { Alive, Drop, FACTION, Faction, Owner, Strike, Transform } from '../../components'
+import { isSameEntity } from '../../utils/identity'
 import { damageMul, ownerX, ownerY } from '../../utils/amp'
 import { damageTarget } from './damage'
 import { sourceOf } from '../../utils/source'
@@ -11,7 +11,7 @@ export function land(sim: Sim, d: number): void {
   const e = Owner.eid[d]!
   const target = Drop.target[d]!
   const team = Faction.v[e] === FACTION.team
-  if (team ? !hasComponent(sim.world, target, Enemy) : !Alive.v[target]) return
+  if (!isSameEntity(sim.world, target, Drop.targetUid[d]!) || (!team && !Alive.v[target])) return
   const src = sourceOf(sim, e)
   const coins = Strike.coinsPerHit[e]!
   if (team && coins > 0) spawnCoins(sim, Transform.x[d]!, Drop.toY[d]!, coins)
