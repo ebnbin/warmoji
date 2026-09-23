@@ -486,7 +486,8 @@ export function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: Omit
   attachAbilityCore(sim, eid, spec.comp, spec.state ?? [], {
     ...init,
     baseMs: 'cooldownMs' in def ? def.cooldownMs : 0,
-    piercesWalls: abilityPiercesWalls(def),
+    // 手动施放（队长技）不吃断壁遮挡
+    piercesWalls: init.manual === true || abilityPiercesWalls(def),
   })
   // 须在 Faction 之后：attach 按 Faction 挑外形
   ;(spec.attach as ((c: AttachCtx, e: number, d: AbilityDef) => void) | undefined)?.(
