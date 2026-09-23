@@ -198,6 +198,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.scene.launch('ui')
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.bootGen++ // 在途的 boot 作废
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.scene.stop('ui')
       // e2e 靠 __ecs.ready 判断战斗已收场；换成空壳以放开对本局的引用
@@ -219,8 +220,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     hint: Phaser.GameObjects.Text,
   ): Promise<void> {
     const atlas = await EcsAtlas.build(this, OUTLINED_EMOJIS, PLAIN_EMOJIS)
-    // 构建图集期间场景可能已重开：isActive 仍为真，但本次 boot 已过期
-    if (gen !== this.bootGen || !this.scene.isActive()) return
+    // 场景关闭或重开后本次 boot 作废；暂停不作废
+    if (gen !== this.bootGen) return
     this.atlas = atlas
     resetEntityStorage()
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
