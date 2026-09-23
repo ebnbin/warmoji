@@ -614,16 +614,15 @@ const river: WorldHooks = {
     let oy = vy + f.y
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
-    const rad = Boss.v[eid] === 1 ? Radius.v[eid]! : 0
-    if (Boss.v[eid] === 1 || !r.horizontal) {
+    const rad = Radius.v[eid]!
+    const boss = Boss.v[eid] === 1
+    if (boss || !r.horizontal) {
       if (x <= r.x + rad && ox < 0) ox = 0
       if (x >= r.x + r.w - rad && ox > 0) ox = 0
     }
-    if (Boss.v[eid] === 1 || r.horizontal) {
-      const lo = r.y + (Boss.v[eid] === 1 ? rad : Radius.v[eid]!)
-      const hi = r.y + r.h - (Boss.v[eid] === 1 ? rad : Radius.v[eid]!)
-      if (y <= lo && oy < 0) oy = 0
-      if (y >= hi && oy > 0) oy = 0
+    if (boss || r.horizontal) {
+      if (y <= r.y + rad && oy < 0) oy = 0
+      if (y >= r.y + r.h - rad && oy > 0) oy = 0
     }
     return { vx: ox, vy: oy }
   },
