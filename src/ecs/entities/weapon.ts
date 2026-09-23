@@ -26,13 +26,17 @@ import { flyerHits } from '../store'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 
 
+/** 持有者派生物（持械、坠物、召唤物、弩塔）的描边：敌方精英与 Boss 用精英描边 */
+export function holderOutline(faction: number, holderEid: number): OutlineKind {
+  return faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? 'elite' : 'enemy') : 'player'
+}
+
 /** 能力由调用方挂到返回的 eid 上 */
 export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, faction: number): number {
   const world = sim.world
   const e = newEntity(world)
   addComponent(world, e, Weapon)
-  const outline: OutlineKind =
-    faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? 'elite' : 'enemy') : 'player'
+  const outline = holderOutline(faction, holderEid)
   attachDrawable(world, e, sim.frames, {
     id: held.emoji,
     outline,

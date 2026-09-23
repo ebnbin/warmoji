@@ -2,6 +2,7 @@ import { addComponent, addComponents, removeComponent } from 'bitecs'
 import { newEntity } from './entity'
 import { armIdle } from '../systems/shared/anim'
 import { attachDrawable } from './drawable'
+import { holderOutline } from './weapon'
 import {
   Ability,
   Aim,
@@ -12,7 +13,6 @@ import {
   Built,
   Burst,
   Emplacement,
-  FACTION,
   Faction,
   Fired,
   Minion,
@@ -26,7 +26,6 @@ import {
   Turret,
   Volley,
 } from '../components'
-import type { OutlineKind } from '../../emoji/svg'
 import type { Sim } from '../sim'
 import { ANIM_DEF } from '../../emoji/anim'
 import { abilityArtEmoji } from '../store'
@@ -60,7 +59,7 @@ export interface MinionSpec {
 
 /** 阵营与描边随武器走 */
 export function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
-  const outline: OutlineKind = Faction.v[weaponEid] === FACTION.enemy ? 'enemy' : 'player'
+  const outline = holderOutline(Faction.v[weaponEid]!, Owner.eid[weaponEid]!)
   const m = newEntity(sim.world)
   attachDrawable(sim.world, m, sim.frames, {
     id: spec.emoji,
