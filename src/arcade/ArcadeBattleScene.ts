@@ -8,7 +8,7 @@ import { attachMember, memberOf } from './member'
 import type { Member } from './member'
 import { projectileOf, spawnProjectile, sweepProjectiles, updateEnemyProjectiles } from './projectiles'
 import { circleBody } from './body'
-import { CoinLedger, collectCoin, magnetCoins, spawnCoins, spawnShards } from './pickups'
+import { capCoins, collectCoin, magnetCoins, spawnCoins, spawnShards } from './pickups'
 import { spawnGroundEffect, updateGroundEffects } from './groundEffects'
 import type { GroundEffect } from './groundEffects'
 import {
@@ -129,8 +129,6 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
   projectiles!: Phaser.GameObjects.Group
   enemyProjectiles!: Phaser.GameObjects.Group
   coins!: Phaser.GameObjects.Group
-  /** 地上金币的落地次序，随 coins 组一起重建 */
-  coinLedger = new CoinLedger()
   groundEffects: GroundEffect[] = []
   protected enemyMix: EnemyMixEntry[] = []
   frameTargets: TargetInfo[] = []
@@ -649,7 +647,6 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     this.projectiles = this.add.group()
     this.enemyProjectiles = this.add.group()
     this.coins = this.add.group()
-    this.coinLedger = new CoinLedger()
     this.enemyMix = this.buildEnemyMix()
     if (!this.sandbox) this.scheduleCarriers()
 
@@ -749,6 +746,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     updateEnemyProjectiles(this)
     updateGroundEffects(this)
     magnetCoins(this)
+    capCoins(this)
     updateFieldPickups(this)
     sweepProjectiles(this, wdelta)
     this.cullProjectiles()

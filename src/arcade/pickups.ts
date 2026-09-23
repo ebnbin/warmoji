@@ -8,62 +8,33 @@ import { KNOCKBACK } from '../data/abilities'
 import { acquirePooled, releasePooled } from './pool'
 import type { ArcadeBody, ArcadeBattleScene, ImageObj } from './ArcadeBattleScene'
 
-/** 地上金币上限；超出即顶掉最早落地的一枚 */
+/** 地上金币上限；生成时不管，每帧超出即从最早落地的删起，允许一帧内短暂超额 */
 const COIN_CAP = 2048
 
-/** 金币按落地先后排队；池对象会复用，队内按落地序号认人，离场的留在队里等出队时跳过 */
-export class CoinLedger {
-  private readonly order: ImageObj[] = []
-  private readonly stamps: number[] = []
-  private head = 0
-  private readonly stampOf = new Map<ImageObj, number>()
-  private next = 1
-  private live = 0
-
-  landed(coin: ImageObj): void {
-    const s = this.next++
-    this.stampOf.set(coin, s)
-    this.order.push(coin)
-    this.stamps.push(s)
-    this.live++
-  }
-
-  /** 金币离场的唯一出口 */
-  release(coin: ImageObj): void {
-    if (!this.stampOf.delete(coin)) return
-    this.live--
-    releasePooled(coin)
-  }
-
-  /** 已满则顶掉最早落地的一枚 */
-  makeRoom(): void {
-    while (this.live >= COIN_CAP && this.head < this.order.length) {
-      const coin = this.order[this.head]!
-      const s = this.stamps[this.head]!
-      this.head++
-      if (this.stampOf.get(coin) === s) this.release(coin)
-    }
-    if (this.head > 4096 && this.head * 2 > this.order.length) {
-      this.order.splice(0, this.head)
-      this.stamps.splice(0, this.head)
-      this.head = 0
-    }
-  }
-}
+/** 池对象复用，落地时刻按对象记 */
+const bornAt = new WeakMap<ImageObj, number>()
+let landedSeq = 0
 
 export function spawnCoins(scene: ArcadeBattleScene, x: number, y: number, count: number): void {
   for (let i = 0; i < count; i++) {
-    scene.coinLedger.makeRoom()
     const jx = count > 1 ? (scene.rng.next() - 0.5) * 0.6 * UNIT : 0
     const jy = count > 1 ? (scene.rng.next() - 0.5) * 0.6 * UNIT : 0
     const pos = scene.constrainCoinPos({ x: x + jx, y: y + jy })
     const coin = acquirePooled(scene, scene.coins, pos.x, pos.y, emojiKey(PICKUPS.coin.emoji, 'player'), PICKUPS.coin.size * UNIT, PICKUPS.coin.radius * UNIT)
     coin.setDepth(3)
-    scene.coinLedger.landed(coin)
+    bornAt.set(coin, landedSeq++)
     const base = coin.scaleX
     coin.setScale(base * 0.3)
     scene.tweens.add({ targets: coin, scale: base, duration: 160, ease: 'Back.easeOut' })
   }
+}
+
+/** 每帧一次 */
+export function capCoins(scene: ArcadeBattleScene): void {
+  const coins = (scene.coins.getChildren() as ImageObj[]).filter((c) => c.active)
+  if (coins.length <= COIN_CAP) return
+  coins.sort((a, b) => (bornAt.get(a) ?? 0) - (bornAt.get(b) ?? 0))
+  for (let i = 0; i < coins.length - COIN_CAP; i++) releasePooled(coins[i]!)
 }
 
 export function magnetCoins(scene: ArcadeBattleScene): void {
@@ -74,7 +45,7 @@ export function magnetCoins(scene: ArcadeBattleScene): void {
   for (const c of scene.coins.getChildren() as ImageObj[]) {
     if (!c.active) continue
     if (scene.cullCoin(c)) {
-      scene.coinLedger.release(c)
+      releasePooled(c)
       continue
     }
     if (scene.frameAttractors.length > 0) {
@@ -109,7 +80,7 @@ export function collectCoin(scene: ArcadeBattleScene, coin: ImageObj): void {
   if (!coin.active) return
   scene.coinBurst.explode(4, coin.x, coin.y)
   playSfx('coin')
-  scene.coinLedger.release(coin)
+  releasePooled(coin)
   scene.run.coins += 1
 }
 

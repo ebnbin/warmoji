@@ -3,6 +3,7 @@ import { PICKUPS } from '../../data/pickups'
 import { AI } from '../../data/enemies'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
+import { releasePooled } from '../pool'
 import { enemyOf } from './enemies'
 import type { Member } from '../member'
 import type { Enemy } from './enemies'
@@ -152,7 +153,7 @@ const coinThief: Steerer = ({ scene, a, body, slow, now }) => {
     const onCoin = bestD <= eatR * eatR
     const thief = (a.thief ??= { eaten: 0, nextEatAt: 0 })
     if (onCoin && now >= thief.nextEatAt) {
-      scene.coinLedger.release(coin)
+      releasePooled(coin)
       thief.eaten += 1
       thief.nextEatAt = now + COINTHIEF_EAT_CD
     } else if (onCoin) {

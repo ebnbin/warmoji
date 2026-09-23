@@ -1,4 +1,5 @@
 import { armEnemies } from '../armEnemies'
+import { capCoins } from '../capCoins'
 import { fireCarriers } from '../fireCarriers'
 import { fireSurges } from '../fireSurges'
 import { grantCoins } from '../grantCoins'
@@ -45,6 +46,12 @@ export const FRAME_PIPELINE: readonly Step[] = [
     run: reapCollected,
     after: ['grantCoins', 'grantMods', 'grantFlash', 'playPickupFx'],
     why: '到手的拾取物在这里离场——早一步，实体没了就什么都结算不到',
+  },
+  {
+    name: 'capCoins',
+    run: capCoins,
+    after: ['reapCollected'],
+    why: '上限只数地上的金币，已拾取的须先离场',
   },
   { name: 'updateSpawners', run: updateSpawners },
   // 须先于 spawnStep：它按在场数 + 在途预告数判上限
