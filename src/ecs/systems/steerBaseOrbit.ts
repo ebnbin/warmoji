@@ -27,8 +27,9 @@ export function steerBaseOrbit(sim: Sim): void {
       BVel.y[eid] = dir.y * sp
       continue
     }
-    const rx = ex - Transform.x[nest]!
-    const ry = ey - Transform.y[nest]!
+    const rel = sim.hooks.worldDelta(sim, Transform.x[nest]!, Transform.y[nest]!, ex, ey)
+    const rx = rel.x
+    const ry = rel.y
     const r = Math.hypot(rx, ry) || 1
     const want = BaseOrbit.orbitRadius[eid]!
     const radial = (want - r) / want

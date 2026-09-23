@@ -23,13 +23,23 @@ export function updateBees(sim: Sim): void {
       removeEntity(sim.world, b)
       continue
     }
-    const bx = Transform.x[b]!
-    const by = Transform.y[b]!
+    // 追镜像目标可能出图：每帧先回绕
+    const at = sim.hooks.wrap(sim, Transform.x[b]!, Transform.y[b]!)
+    const bx = at.x
+    const by = at.y
     const src = sourceOf(sim, e)
     const target = pickTarget(sim, src, bx, by)
     Minion.phase[b] = Minion.phase[b]! + (Math.min(dt, 50) / 1000) * 3
-    const destX = target ? target.x : ownerX(e) + Math.cos(Minion.phase[b]!) * 40
-    const destY = target ? target.y : ownerY(e) + Math.sin(Minion.phase[b]!) * 40 - 8
+    // 待机绕持有者的最近镜像
+    const home = sim.hooks.worldDelta(
+      sim,
+      bx,
+      by,
+      ownerX(e) + Math.cos(Minion.phase[b]!) * 40,
+      ownerY(e) + Math.sin(Minion.phase[b]!) * 40 - 8,
+    )
+    const destX = target ? target.x : bx + home.x
+    const destY = target ? target.y : by + home.y
     const dx = destX - bx
     const dy = destY - by
     const d = Math.hypot(dx, dy)

@@ -46,9 +46,8 @@ function cutReviveTimer(sim: Sim, x: number, y: number, range: number, ms: numbe
   let best = -1
   for (const m of sim.characters) {
     if (Alive.v[m]) continue
-    const dx = Transform.x[m]! - x
-    const dy = Transform.y[m]! - y
-    if (dx * dx + dy * dy > r2) continue
+    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
+    if (d.x * d.x + d.y * d.y > r2) continue
     if (best < 0 || Revive.at[m]! > Revive.at[best]!) best = m
   }
   if (best < 0) return false

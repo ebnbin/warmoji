@@ -30,17 +30,18 @@ export function updateFlyers(sim: Sim): void {
         flyerHits[f]!.clear()
       }
     } else {
-      const dx = ownerX(e) - Transform.x[f]!
-      const dy = ownerY(e) - Transform.y[f]!
-      const dist = Math.hypot(dx, dy)
+      // 回程追持有者的最近镜像
+      const d = sim.hooks.worldDelta(sim, Transform.x[f]!, Transform.y[f]!, ownerX(e), ownerY(e))
+      const dist = Math.hypot(d.x, d.y)
       const step = (Boomerang.returnSpeed[e]! * dt) / 1000
       if (dist <= Math.max(step, 20)) {
         catchFlyer(sim, e, f)
         if (Thrown.n[e] === 0) Boomerang.cdLeft[e] = Boomerang.cdBase[e]! * cooldownMul(sim, e)
         continue
       }
-      Transform.x[f] = Transform.x[f]! + (dx / dist) * step
-      Transform.y[f] = Transform.y[f]! + (dy / dist) * step
+      const p = sim.hooks.wrap(sim, Transform.x[f]! + (d.x / dist) * step, Transform.y[f]! + (d.y / dist) * step)
+      Transform.x[f] = p.x
+      Transform.y[f] = p.y
     }
     if (hasComponent(sim.world, e, CoinMagnet)) {
       const r = CoinMagnet.radius[e]!
