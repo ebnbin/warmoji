@@ -31,6 +31,11 @@ export function resizeColumn<T extends Column>(old: T, length: number): T {
   return next
 }
 
+/** 全局唯一、永不复用的实体编号，由 newEntity 写入；0 = 无。eid 会被立即复用，跨时刻认同一实体须比对它 */
+export const Uid = {
+  v: u32(),
+}
+
 /** 世界坐标、旋转（弧度）、显示尺寸（世界像素） */
 export const Transform = {
   x: f32(),
