@@ -63,6 +63,9 @@ import type { Burst } from './outbox'
 import { rollWaveCarriers } from './utils/battleFx'
 import { centerX, centerY } from './utils/team'
 
+/** Boss 倒下到结算的视觉等待，让碎块飞散可见 */
+const BOSS_SETTLE_MS = 700
+
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
 }
@@ -101,6 +104,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private shownCountdown: number[] = []
   private hitShakeOn = false
   private seenHitCount = 0
+  /** Boss 倒下时的 fxMs；-1 = 未倒下 */
+  private bossDownAt = -1
   private damageNumbersOn = false
   private damageText?: DamageTextLayer
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -137,6 +142,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.deadTexts = []
     this.shownCountdown = []
     this.seenHitCount = 0
+    this.bossDownAt = -1
     this.damageText = undefined
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
@@ -628,9 +634,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     if (!this.sandbox && sim.bossDown) {
       // 这段延迟内不置 ending，世界照常运转
       sim.bossDown = false
-      this.time.delayedCall(700, () => {
-        if (this.sim && !this.ending) this.scheduleWaveEnd(settleWave(this.sim))
-      })
+      this.bossDownAt = sim.fxMs
     }
     if (sim.over) {
       this.ending = true
@@ -644,7 +648,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
     if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
-    // 须在全灭判定之后：时限内全灭判负
-    if (lastFrame) this.scheduleWaveEnd(settleWave(sim))
+    // 结算只在 stepFrame 之后：此前挂上的技能请求都已施放；须在全灭判定之后，时限内全灭判负
+    const bossSettle = this.bossDownAt >= 0 && sim.fxMs - this.bossDownAt >= BOSS_SETTLE_MS
+    if (lastFrame || bossSettle) this.scheduleWaveEnd(settleWave(sim))
   }
 }
