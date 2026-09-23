@@ -24,7 +24,7 @@ export function spawnMeteor(
   meteorHit[eid] = new Set()
   attachDrawable(sim.world, eid, sim.frames, {
     id: '1fa90',
-    outline: 'player',
+    outline: undefined,
     x: s.sx,
     y: s.sy,
     size,
