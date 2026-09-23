@@ -91,7 +91,7 @@ export const Wander = { seed: f32(), amp: f32() }
 
 export const Breath = { phase: f32() }
 
-/** until 结束时刻（0 = 无）；back 1 = Back.easeOut，0 = 线性 */
+/** until 结束时刻（0 = 无；队员复活按 fxMs，敌人入场按 elapsedMs）；back 1 = Back.easeOut，0 = 线性 */
 export const Pop = { until: f32(), ms: f32(), size: f32(), back: u8(), alpha: f32() }
 
 export const Alive = { v: u8() }
@@ -316,7 +316,8 @@ export const RING_SET = [Ring, Transform, Tint] as const
 // ── 区域 ──
 
 /** 半径 px；效果只落在对面阵营；on 每帧由 updateZones 推导，消费方只读 */
-export const Zone = { radius: f32(), faction: u8(), enterMs: f32(), on: u8() }
+/** fadeAt 到期后开始淡出的 fxMs，0 = 未到期 */
+export const Zone = { radius: f32(), faction: u8(), enterMs: f32(), on: u8(), fadeAt: f32() }
 
 /** srcSlot 战报归属，敌方区 -1 */
 export const ZoneBurn = { damage: f32(), tickMs: f32(), nextAt: f32(), srcSlot: i32() }

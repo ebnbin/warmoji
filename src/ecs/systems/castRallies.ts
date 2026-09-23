@@ -12,7 +12,7 @@ export function castRallies(sim: Sim): void {
       if (!Alive.v[m]) reviveCharacter(sim, m)
       else CharHp.hp[m] = Math.min(CharHp.max[m]!, CharHp.hp[m]! + CharHp.max[m]! * Rally.healRatio[e]!)
       Iframe.last[m] = sim.elapsedMs + Rally.invulnMs[e]! - Iframe.ms[m]!
-      CharFlash.until[m] = sim.elapsedMs + 320
+      CharFlash.until[m] = sim.fxMs + 320
       Tint.color[m] = 0xffe082
       Tint.effect[m] = 0
     }

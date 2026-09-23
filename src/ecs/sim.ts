@@ -1,7 +1,12 @@
 import { UNIT } from '../util/units'
 import { SIM_PIPELINE } from './systems/pipeline/sim'
 import { runPipeline } from './systems/pipeline/step'
-import { animateCharacters } from './systems/animateCharacters'
+import { animateCharacters, finishCharacterPops } from './systems/animateCharacters'
+import { characterVisual } from './systems/characterVisual'
+import { finishEnemyPops } from './systems/popInEnemies'
+import { hideTelegraphs } from './systems/blinkTelegraphs'
+import { finishZoneFades } from './systems/updateZones'
+import { updateEmplacements } from './systems/updateEmplacements'
 import { stepPickupVisuals } from './systems/stepPickupVisuals'
 import { updateShards } from './systems/updateShards'
 import { animateBooms } from './systems/animateBooms'
@@ -125,13 +130,19 @@ export function worldTimeScale(sim: Sim): number {
   return sim.timeStopMsLeft > 0 ? timeScaleFor(sim.chrono) : 1
 }
 
-/** 过场冻结期：世界全停，纯视觉照旧收尾 */
+/** 过场冻结期：世界全停，纯视觉照旧收尾；随世界钟走的过渡直接到位 */
 export function stepFrozenVisuals(sim: Sim): void {
   sim.fxMs += sim.dtMs
   updateShards(sim)
   animateBooms(sim)
   expireFx(sim)
   stepPickupVisuals(sim)
+  characterVisual(sim)
+  finishCharacterPops(sim)
+  finishEnemyPops(sim)
+  hideTelegraphs(sim)
+  finishZoneFades(sim)
+  updateEmplacements(sim)
 }
 
 /** 帧长由场景在帧起点写进 sim；次序见 pipeline/sim.ts */

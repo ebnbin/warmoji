@@ -178,7 +178,7 @@ export function hurtCharacter(sim: Sim, eid: number, damage: number, srcName?: s
   CharHp.hp[eid] = hp
   playSfx('hurt')
   sim.characterHitCount++
-  CharFlash.until[eid] = sim.elapsedMs + 120
+  CharFlash.until[eid] = sim.fxMs + 120
   Tint.color[eid] = tint
   Tint.effect[eid] = 0
   if (hp <= 0) {
@@ -209,6 +209,9 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   Tint.color[eid] = 0xffffff
   Tint.alpha[eid] = 1
   Tint.effect[eid] = 0
-  Pop.until[eid] = now + 200
+  Pop.until[eid] = sim.fxMs + 200
+  // 弹入首帧即从小尺寸起
+  Transform.w[eid] = MEMBER.size * UNIT * 0.3
+  Transform.h[eid] = MEMBER.size * UNIT * 0.3
 }
 
