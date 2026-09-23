@@ -145,10 +145,12 @@ const bounded: WorldHooks = {
       y: Math.min(Math.max(next.y, clampMin), sim.mapH - clampMin),
     }
   },
-  constrainEnemy(sim, _eid, x, y) {
+  /** 整个身体留在图内 */
+  constrainEnemy(sim, eid, x, y) {
+    const r = Radius.v[eid]!
     return {
-      x: x < 0 ? 0 : x > sim.mapW ? sim.mapW : x,
-      y: y < 0 ? 0 : y > sim.mapH ? sim.mapH : y,
+      x: Math.min(Math.max(x, r), sim.mapW - r),
+      y: Math.min(Math.max(y, r), sim.mapH - r),
     }
   },
   constrainSpawn(sim, x, y) {
