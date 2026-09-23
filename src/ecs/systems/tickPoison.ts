@@ -1,14 +1,15 @@
 import { query } from 'bitecs'
-import { ENEMY_SET, Poison } from '../components'
+import { Dormant, ENEMY_SET, Poison } from '../components'
 import { applyDamage } from './shared/combat'
 import type { Sim } from '../sim'
 
+/** 休眠者的跳伤挂起，醒来后逐帧补跳（休眠者不吃伤害，推进计时等于白丢） */
 export function tickPoison(sim: Sim): void {
   // 跳伤可能击杀，须先快照
   const enemies = [...query(sim.world, ENEMY_SET as unknown as object[])]
   const now = sim.elapsedMs
   for (const eid of enemies) {
-    if (Poison.until[eid] === 0) continue
+    if (Poison.until[eid] === 0 || Dormant.v[eid]) continue
     if (now >= Poison.until[eid]!) {
       Poison.until[eid] = 0
       continue
