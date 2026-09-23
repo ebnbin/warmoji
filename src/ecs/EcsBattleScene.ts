@@ -55,7 +55,7 @@ import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from '../run/sandbox'
 import { tickSkillCd } from '../run/state'
 import { hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
-import type { HudSnapshot } from '../run/hudHost'
+import type { HudSnapshot, WaveSummary } from '../run/hudHost'
 import type { Sim } from './sim'
 import { drain } from './outbox'
 import type { Burst } from './outbox'
@@ -442,7 +442,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       wave: this.run.wave,
       seconds: Math.floor(elapsed / 1000),
       remainMs: Math.max(0, waveDurationMs(this.run.wave) - elapsed),
-      over: sim?.over ?? false,
       bossHp: boss !== undefined ? Hp.v[boss]! : null,
       bossMaxHp: bossFor(this.run.mapId).hp,
       battleFx: (sim ? activeMods(sim) : []).map((e) => ({
@@ -569,7 +568,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       kills: run.kills - this.waveBaseKills,
       coins: run.coins - this.waveBaseCoins,
       levels: run.xp.level - this.waveBaseLevel,
-    })
+    } satisfies WaveSummary)
     this.time.delayedCall(WAVE.summaryMs, () => {
       if (finished) this.scene.start('result', { win: true })
       else if (run.cardDraws > 0) this.scene.start('cards')

@@ -72,7 +72,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
       wave: -1,
       seconds: -1,
       remainMs: -1,
-      over: false,
       bossHp: null,
       bossMaxHp: 1,
       battleFx: [],
