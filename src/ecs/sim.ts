@@ -105,6 +105,8 @@ export interface RewardConfig {
 
 /** 实体已移除，死亡效果按此在死亡点重放 */
 export interface PendingDeath {
+  /** 当场重放时死者仍在世；延后重放时为 -1 */
+  eid: number
   def: import('../types/enemies').EnemyDef
   x: number
   y: number

@@ -95,8 +95,8 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
   // 变形中死亡不触发亡语与失巢暴走
   const hexed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
   if (!hexed && def?.onDeath) {
-    const snap = { def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: DmgMul.v[eid]! }
-    if (sim.onDeathFx) sim.onDeathFx(snap)
+    const snap = { eid: -1, def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: DmgMul.v[eid]! }
+    if (sim.onDeathFx) sim.onDeathFx({ ...snap, eid })
     else sim.pendingDeaths.push(snap)
   }
   if (def?.spawner) orphanBrood(sim, eid, !hexed)

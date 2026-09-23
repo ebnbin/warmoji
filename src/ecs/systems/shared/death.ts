@@ -37,6 +37,7 @@ const toEffectLayer: DeathHandler = (sim, d, fx) => {
     x: d.x,
     y: d.y,
     baseDamage: 0,
+    source: d.eid,
   })
 }
 
