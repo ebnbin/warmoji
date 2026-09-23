@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { BVel, Dormant, ENEMY_SET, EnemyPhase, Morph, Slow, Slowed, Speed, SpMul, Steering, Transform, ZoneSlow } from '../components'
+import { BVel, DanceWindow, Dormant, ENEMY_SET, EnemyPhase, Morph, Slow, Slowed, Speed, SpMul, Steering, Transform, ZoneSlow } from '../components'
 import { wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
 import { isDancing } from '../utils/team'
@@ -7,6 +7,11 @@ import { isDancing } from '../utils/team'
 /** 「谁来开车」只在这一处决定；时停不在此处乘 */
 export function updateEnemyGates(sim: Sim): void {
   const now = sim.elapsedMs
+  const until = DanceWindow.until[sim.captain]!
+  if (until !== 0 && now >= until) {
+    DanceWindow.until[sim.captain] = 0
+    for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) Transform.rot[eid] = 0
+  }
   const dancing = isDancing(sim)
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     BVel.x[eid] = 0

@@ -568,7 +568,7 @@ export const Orbit = { phase: f32(), driver: i32Fill(-1) }
 /** 不叠加，直接覆写；until 之外恒 1 */
 export const TeamDamage = { mul: f32(), until: f32() }
 
-/** 含窗口内新登场者 */
+/** 含窗口内新登场者；到期由 updateEnemyGates 归零 */
 export const DanceWindow = { until: f32() }
 
 export const Blink = { x: f32(), y: f32() }

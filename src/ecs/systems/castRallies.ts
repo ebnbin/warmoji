@@ -6,8 +6,8 @@ import type { Sim } from '../sim'
 import { spawnFxCircle } from '../entities/fx'
 
 /** 无敌走受击无敌帧通道 */
-export function castRallies(sim: Sim): void {
-  castScan(sim, Rally, (e) => {
+export function castRallies(sim: Sim, scan = castScan): void {
+  scan(sim, Rally, (e) => {
     for (const m of sim.characters) {
       if (!Alive.v[m]) reviveCharacter(sim, m)
       else CharHp.hp[m] = Math.min(CharHp.max[m]!, CharHp.hp[m]! + CharHp.max[m]! * Rally.healRatio[e]!)

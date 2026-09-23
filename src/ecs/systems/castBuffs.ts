@@ -2,8 +2,8 @@ import { Alive, Buff, CharFlash, TeamDamage, Tint } from '../components'
 import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
-export function castBuffs(sim: Sim): void {
-  castScan(sim, Buff, (e) => {
+export function castBuffs(sim: Sim, scan = castScan): void {
+  scan(sim, Buff, (e) => {
     TeamDamage.mul[sim.captain] = Buff.damageMul[e]!
     TeamDamage.until[sim.captain] = sim.elapsedMs + Buff.durationMs[e]!
     for (const m of sim.characters) {

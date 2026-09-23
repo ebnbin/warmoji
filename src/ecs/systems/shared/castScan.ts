@@ -11,6 +11,7 @@ export function castScan(sim: Sim, comp: object & CdComp, cast: (eid: number) =>
   // 出手可能回收能力实体，须先快照
   for (const e of [...query(sim.world, [Ability, comp])]) {
     if (!hasComponent(sim.world, e, Ability)) continue
+    // 兜底 castRequests 未覆盖的 kind，不可删
     if (hasComponent(sim.world, e, CastRequest)) {
       removeComponent(sim.world, e, CastRequest)
       cast(e)
@@ -21,5 +22,14 @@ export function castScan(sim: Sim, comp: object & CdComp, cast: (eid: number) =>
     if (cast(e) === false) continue
     if (hasComponent(sim.world, e, Fired)) Fired.v[e] = 1
     if (comp.cdBase[e]! > 0) comp.cdLeft[e] = comp.cdBase[e]! * cooldownMul(sim, e)
+  }
+}
+
+/** 只结算手动请求，不做自动扫描 */
+export function castRequested(sim: Sim, comp: object & CdComp, cast: (eid: number) => boolean | void): void {
+  for (const e of [...query(sim.world, [Ability, comp, CastRequest])]) {
+    if (!hasComponent(sim.world, e, CastRequest)) continue
+    removeComponent(sim.world, e, CastRequest)
+    cast(e)
   }
 }
