@@ -4,7 +4,6 @@ import { norm } from '../../util/vec'
 import { KNOCKBACK } from '../../data/abilities'
 import { Depth, Quad, Shard, Sprite, Tint, Transform } from '../components'
 import type { Sim } from '../sim'
-import { crowded } from '../world'
 
 /** flingVx/Vy = 致死一击的击退速度 */
 export function spawnShardsEcs(
@@ -18,7 +17,6 @@ export function spawnShardsEcs(
   flingVx: number,
   flingVy: number,
 ): void {
-  if (crowded(sim.world)) return
   const dw = w / 2
   const dh = h / 2
   const now = sim.fxMs
