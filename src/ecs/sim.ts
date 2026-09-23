@@ -74,7 +74,7 @@ export interface Sim {
   /** 每帧重建，含环面镜像坐标；我方索敌不走快照，见 utils/targets.ts */
   characterTargets: Target[]
   frames: FrameIndex
-  /** 按 run 种子确定 */
+  /** 按 run 种子与波次确定：同一局同一波可复现，各波不同 */
   rng: Rng
   sandbox: boolean
   spawnCooldownMs: number
@@ -197,7 +197,7 @@ export function makeSim(
     pendingDeaths: [],
     out: newOutbox(),
     damageNumbers: newDamageNumbers(),
-    rng: new Rng(run.decorSeed ^ 0x9e37),
+    rng: new Rng((run.decorSeed ^ 0x9e37 ^ Math.imul(run.wave, 0x9e3779b1)) >>> 0),
     sandbox,
     spawnCooldownMs: 300,
     run,
