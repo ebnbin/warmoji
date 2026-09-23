@@ -41,7 +41,7 @@ export class DamageTextLayer {
   /** 本帧视觉钟 */
   private now = 0
 
-  constructor(scene: Phaser.Scene, private readonly nums: DamageNumbers, private readonly enabled: boolean) {
+  constructor(scene: Phaser.Scene, private readonly nums: DamageNumbers) {
     bakeDigits(scene)
     this.batch = new DamageTextBatch(scene, this)
   }
@@ -69,7 +69,6 @@ export class DamageTextLayer {
     m: Phaser.GameObjects.Components.TransformMatrix,
     opts: unknown,
   ): void {
-    if (!this.enabled) return
     const fx = this.now
     const buf = this.nums
     // 从最老的一条画起，新的压在上面
