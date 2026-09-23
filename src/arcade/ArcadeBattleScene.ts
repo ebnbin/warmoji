@@ -7,7 +7,7 @@ import { attachMember, memberOf } from './member'
 import type { Member } from './member'
 import { projectileOf, spawnProjectile, sweepProjectiles, updateEnemyProjectiles } from './projectiles'
 import { circleBody } from './body'
-import { collectCoin, magnetCoins, spawnCoins, spawnShards } from './pickups'
+import { CoinLedger, collectCoin, magnetCoins, spawnCoins, spawnShards } from './pickups'
 import { spawnGroundEffect, updateGroundEffects } from './groundEffects'
 import type { GroundEffect } from './groundEffects'
 import {
@@ -115,6 +115,8 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
 
 /** 变羊恢复后的再变冷却（ms） */
 const MORPH_RECAST_CD = 5000
+/** 连续休眠满此时长（世界时钟）即回收；中途醒来则下次入眠重新计时 */
+const DORMANT_TTL_MS = 30000
 
 export abstract class ArcadeBattleScene extends Phaser.Scene {
   protected lineup: readonly CharacterDef[] = []
@@ -126,6 +128,8 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
   projectiles!: Phaser.GameObjects.Group
   enemyProjectiles!: Phaser.GameObjects.Group
   coins!: Phaser.GameObjects.Group
+  /** 地上金币的落地次序，随 coins 组一起重建 */
+  coinLedger = new CoinLedger()
   groundEffects: GroundEffect[] = []
   protected enemyMix: EnemyMixEntry[] = []
   frameTargets: TargetInfo[] = []
@@ -463,11 +467,12 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     this.cameras.main.setZoom(viewport.renderScale)
   }
 
-  /** 休眠 = 关物理体 + 清速度 + 不参与索敌/碰撞/AI，状态全保留；Boss 永不休眠 */
+  /** 休眠 = 关物理体 + 清速度 + 不参与索敌/碰撞/AI，状态全保留；Boss 永不休眠。连续休眠满 DORMANT_TTL_MS 即回收 */
   protected dormancyFrameTargets(activeHalf: number): void {
     let awake = 0
     let dormant = 0
     const targets: TargetInfo[] = []
+    const expired: ImageObj[] = []
     for (const e of this.enemies.getChildren() as ImageObj[]) {
       if (!e.active) continue
       const a = enemyOf(e)
@@ -479,9 +484,13 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
           body.enable = true
         } else {
           a.dormant = true
+          a.dormantSince = this.elapsedMs
           body.setVelocity(0, 0)
           body.enable = false
         }
+      } else if (!within && this.elapsedMs - a.dormantSince >= DORMANT_TTL_MS) {
+        expired.push(e)
+        continue
       }
       if (within) {
         awake++
@@ -490,6 +499,8 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
         dormant++
       }
     }
+    // 遍历完再回收：回收会改动正在遍历的组
+    for (const e of expired) this.despawnEnemy(e, false)
     this.awakeCount = awake
     this.dormantCount = dormant
     this.frameTargets = targets
@@ -635,6 +646,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     this.projectiles = this.add.group()
     this.enemyProjectiles = this.add.group()
     this.coins = this.add.group()
+    this.coinLedger = new CoinLedger()
     this.enemyMix = this.buildEnemyMix()
     if (!this.sandbox) this.scheduleCarriers()
 
@@ -1579,11 +1591,12 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
   }
 
   /** 不计击杀、不掉落、不跑死亡效果 */
-  private despawnEnemy(enemy: ImageObj): void {
+  private despawnEnemy(enemy: ImageObj, puff = true): void {
     const a = enemyOf(enemy)
+    if (a.def.spawner) this.orphanBrood(a)
     detachCarrierAura(this, a)
     if (a.abilities) for (const w of a.abilities) w.destroy()
-    this.puffBurst.explode(8, enemy.x, enemy.y)
+    if (puff) this.puffBurst.explode(8, enemy.x, enemy.y)
     releasePooled(enemy)
   }
 
