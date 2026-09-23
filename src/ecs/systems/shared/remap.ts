@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
-import { Aim, Blink, Bob, EDir, ENEMY_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
+import { Aim, Blink, Bob, Drop, EDir, ENEMY_SET, Flyer, Follow, Kv, Minion, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import { centerX, centerY, setCenter } from '../../utils/team'
@@ -73,4 +73,24 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
   for (const eid of query(sim.world, PICKUP_SET as unknown as object[])) Bob.y0[eid] = Transform.y[eid]!
   for (const eid of query(sim.world, [Telegraph, Transform])) movePos(eid)
   for (const eid of query(sim.world, ZONE_SET as unknown as object[])) movePos(eid)
+  for (const eid of query(sim.world, [Minion, Transform])) movePos(eid)
+  for (const f of query(sim.world, [Flyer, Transform])) {
+    movePos(f)
+    const from = map(Flyer.launchX[f]!, Flyer.launchY[f]!)
+    const to = map(Flyer.destX[f]!, Flyer.destY[f]!)
+    Flyer.launchX[f] = from.x
+    Flyer.launchY[f] = from.y
+    Flyer.destX[f] = to.x
+    Flyer.destY[f] = to.y
+  }
+  // 坠物按落点重映射，下落高度不变
+  for (const d of query(sim.world, [Drop, Transform])) {
+    const land = map(Transform.x[d]!, Drop.toY[d]!)
+    const fall = Drop.toY[d]! - Drop.fromY[d]!
+    const above = Drop.toY[d]! - Transform.y[d]!
+    Transform.x[d] = land.x
+    Drop.toY[d] = land.y
+    Drop.fromY[d] = land.y - fall
+    Transform.y[d] = land.y - above
+  }
 }
