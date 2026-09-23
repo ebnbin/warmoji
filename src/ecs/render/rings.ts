@@ -23,10 +23,10 @@ const BREATHS: readonly Breath[] = [
   { ms: 650, scaleLo: 0.85, scaleHi: 1.12, alphaLo: 0.4, alphaHi: 0.85 },
 ]
 
-/** 地面区 2 最底、待拾光圈 3 压在金币之下、携带者光环 4 压在敌人之下 */
+/** 地面区 2 最底、待拾光圈 2.5 压在金币（3）之下、携带者光环 4 压在敌人（5）之下 */
 const BANDS: readonly { depth: number; zMin: number; zMax: number }[] = [
   { depth: 2, zMin: -Infinity, zMax: 3 },
-  { depth: 3, zMin: 3, zMax: 4 },
+  { depth: 2.5, zMin: 3, zMax: 4 },
   { depth: 4, zMin: 4, zMax: Infinity },
 ]
 

@@ -128,5 +128,3 @@ export function outsideZone(p: Point, center: Point, radius: number): boolean {
   const dy = p.y - center.y
   return dx * dx + dy * dy > radius * radius
 }
-
-// 活跃判定用按轴距离（Chebyshev 方形）

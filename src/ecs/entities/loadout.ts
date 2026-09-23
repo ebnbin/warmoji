@@ -2,7 +2,7 @@ import { CHARACTERS, loadoutFor } from '../../data/characters'
 import { CAPTAINS } from '../../data/captains'
 import { aggregateCharacterEffects, characterXp, resolveAbilityDef } from '../../data/items'
 import { levelStatsFor } from '../../data/levels'
-import { characterLevel } from '../../data/charLevel'
+import { characterLevel, tiersForLevel } from '../../data/charLevel'
 import { aggregateTeamCards } from '../../data/cards'
 import { toPx } from '../../data/px'
 import { sandboxLevel } from '../../run/sandbox'
@@ -20,7 +20,7 @@ export function armTeam(sim: Sim, run: RunState, sandbox: boolean): void {
     const def = CHARACTERS[id]
     const owned = sandbox ? [] : (run.memberItems[slot] ?? [])
     const level = sandbox ? sandboxLevel() + 1 : characterLevel(characterXp(owned))
-    const tiers = { u1: level >= 2, u2: level >= 3 }
+    const tiers = tiersForLevel(level)
     const fx = aggregateCharacterEffects(owned, levelStatsFor(id, level))
     // 随局面变的乘区由 amp.ts 现算
     const amp = {
