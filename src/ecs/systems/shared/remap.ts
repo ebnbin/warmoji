@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
-import { Bob, EDir, ENEMY_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, ZONE_SET } from '../../components'
+import { Aim, Blink, Bob, EDir, ENEMY_SET, Follow, Kv, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import { centerX, centerY, setCenter } from '../../utils/team'
@@ -21,12 +21,24 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
   for (const m of sim.characters) {
     const p = map(Follow.x[m]!, Follow.y[m]!)
     const v = rot(Follow.vx[m]!, Follow.vy[m]!)
+    const off = rot(VisOff.x[m]!, VisOff.y[m]!)
     Follow.x[m] = p.x
     Follow.y[m] = p.y
     Follow.vx[m] = v.x
     Follow.vy[m] = v.y
-    Transform.x[m] = p.x
-    Transform.y[m] = p.y
+    VisOff.x[m] = off.x
+    VisOff.y[m] = off.y
+    Transform.x[m] = p.x + off.x
+    Transform.y[m] = p.y + off.y
+  }
+  for (const e of query(sim.world, [Blink])) {
+    const b = rot(Blink.x[e]!, Blink.y[e]!)
+    Blink.x[e] = b.x
+    Blink.y[e] = b.y
+  }
+  for (const e of query(sim.world, [Aim])) {
+    const a = rot(Math.cos(Aim.rad[e]!), Math.sin(Aim.rad[e]!))
+    Aim.rad[e] = Math.atan2(a.y, a.x)
   }
 
   const movePos = (eid: number): void => {
