@@ -87,7 +87,8 @@ export interface Sim {
   pendingDeaths: PendingDeath[]
   /** 仿真只写，场景侧每帧排空 */
   out: Outbox
-  damageNumbers: DamageNumbers
+  /** 设置里关掉伤害数字时为 null：仿真不写 */
+  damageNumbers: DamageNumbers | null
   /** 挂上则在 killEnemy 内当场跑，否则回落到 pendingDeaths */
   onDeathFx?: (d: PendingDeath) => void
   run: RunState
@@ -166,6 +167,7 @@ export function makeSim(
   center: { x: number; y: number },
   mapW: number,
   mapH: number,
+  damageNumbers: boolean,
 ): Sim {
   const teamFx = aggregateTeamCards(run.teamCards)
   const captainDef = CAPTAINS[run.captainId]
@@ -209,7 +211,7 @@ export function makeSim(
     frames: atlas,
     pendingDeaths: [],
     out: newOutbox(),
-    damageNumbers: newDamageNumbers(),
+    damageNumbers: damageNumbers ? newDamageNumbers() : null,
     rng: new Rng((run.decorSeed ^ 0x9e37 ^ Math.imul(run.wave, 0x9e3779b1)) >>> 0),
     sandbox,
     spawnCooldownMs: 300,

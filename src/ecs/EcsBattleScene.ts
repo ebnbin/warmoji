@@ -105,7 +105,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private seenHitCount = 0
   /** Boss 倒下时的 fxMs；-1 = 未倒下 */
   private bossDownAt = -1
-  private damageNumbersOn = false
   private damageText?: DamageTextLayer
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -230,14 +229,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.sandbox = run.sandbox
     const settings = loadSettings(browserStorage())
     this.hitShakeOn = settings.hitShake
-    this.damageNumbersOn = settings.damageNumbers
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
     this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
     // 出生点以 centerObj 为准：开局前的视口变化只挪它
     const center = { x: this.centerObj.x, y: this.centerObj.y }
-    this.sim = makeSim(this.world, atlas, run, run.sandbox, center, this.mapW, this.mapH)
-    this.damageText = new DamageTextLayer(this, this.sim.damageNumbers, this.damageNumbersOn)
+    this.sim = makeSim(this.world, atlas, run, run.sandbox, center, this.mapW, this.mapH, settings.damageNumbers)
+    if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
     initialLayout(this.sim)
     this.sim.hooks.onStart(this.sim)
     this.map.onSimReady(this.ctx, this.sim)

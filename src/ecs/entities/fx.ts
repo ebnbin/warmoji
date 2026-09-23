@@ -123,6 +123,7 @@ export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): numbe
 
 /** 伤害飘字：命中点上浮淡出的数字，绘制在 render/damageText.ts */
 export function spawnDamageNumber(sim: Sim, x: number, y: number, amount: number, crit: boolean): void {
+  if (!sim.damageNumbers) return
   pushDamageNumber(sim.damageNumbers, x, y - 14, amount, crit, sim.fxMs) // 起点略高于命中点
 }
 
