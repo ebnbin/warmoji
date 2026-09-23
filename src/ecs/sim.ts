@@ -52,7 +52,7 @@ export interface Sim {
   mapW: number
   mapH: number
   hooks: WorldHooks
-  /** 只有 hooks 与场景侧建场/取视觉碰它 */
+  /** 只有 hooks 写；场景侧只读来画 */
   worldState: WorldState
   /** 场景侧每帧回填 */
   view: { x: number; y: number; right: number; bottom: number }

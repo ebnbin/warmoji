@@ -242,8 +242,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.sim = makeSim(this.world, atlas, run, run.sandbox, center, this.mapW, this.mapH)
     this.damageText = new DamageTextLayer(this, this.sim.damageNumbers, this.damageNumbersOn)
     initialLayout(this.sim)
-    this.map.onSimReady(this.ctx, this.sim)
     this.sim.hooks.onStart(this.sim)
+    this.map.onSimReady(this.ctx, this.sim)
     // 亡语须同步重放：同帧先死者的治疗要救得到同伴
     const simRef = this.sim
     simRef.onDeathFx = (d) => replayDeath(simRef, d)

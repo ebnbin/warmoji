@@ -3,6 +3,7 @@ import { norm } from '../../util/vec'
 import { TEAM, MEMBER } from '../../data/characters'
 import { SPAWN } from '../../data/enemies'
 import { randomMapPoint } from '../utils/spawn'
+import { Rng } from '../../util/rng'
 import { MAPS } from '../../data/maps'
 import type { IceConfig, InfiniteConfig, MapDef, MapId, RiverConfig, ShrinkRingConfig, SpaceConfig } from '../../types/maps'
 import { approach, onFloe } from '../worlds/ice'
@@ -17,8 +18,7 @@ import { query, removeEntity } from 'bitecs'
 import { Alive, Boss, Dormant, Due, ENEMY_SET, Meteor, Radius, Slide, Tint, Transform, Uid } from '../components'
 import { enemyDef, meteorHit } from '../store'
 import { spawnMeteor } from '../entities/meteor'
-import { FlowField } from '../worlds/ruins'
-import type { WallGrid } from '../worlds/ruins'
+import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
 import { applyDamage, hurtCharacter } from '../systems/shared/combat'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
@@ -323,6 +323,23 @@ const ice: WorldHooks = {
 /** 有界 + 断壁：挡移动/子弹/视线；刷怪只落在从中心可达的格 */
 const ruins: WorldHooks = {
   ...bounded,
+  /** 断壁由 run 种子确定 */
+  onStart(sim) {
+    const cfg = MAPS[sim.mapId].walls
+    if (!cfg) return
+    const cols = Math.round(sim.mapW / UNIT)
+    const rows = Math.round(sim.mapH / UNIT)
+    const rng = new Rng(sim.run.decorSeed ^ 0x5eed)
+    const blocked = generateRuins(() => rng.next(), cols, rows, {
+      blocks: cfg.blocks,
+      maxLen: cfg.maxLen,
+      centerClearU: cfg.centerClearU,
+    })
+    const grid = new WallGrid(cols, rows, UNIT, blocked)
+    // 刷怪点须从中心可达
+    const spawnCells = [...reachableCells(grid, Math.floor(cols / 2), Math.floor(rows / 2))]
+    sim.worldState.walls = { grid, flowCellX: -1, flowCellY: -1, reflowAcc: 0, spawnCells, smashed: [] }
+  },
   constrainTeam(sim, next, delta) {
     const box = bounded.constrainTeam(sim, next, delta)
     const w = sim.worldState.walls
