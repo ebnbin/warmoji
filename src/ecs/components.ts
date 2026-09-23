@@ -31,6 +31,11 @@ export function resizeColumn<T extends Column>(old: T, length: number): T {
   return next
 }
 
+/** 全局唯一、永不复用的实体编号，由 newEntity 写入；0 = 无。eid 会被立即复用，跨时刻认同一实体须比对它 */
+export const Uid = {
+  v: u32(),
+}
+
 /** 世界坐标、旋转（弧度）、显示尺寸（世界像素） */
 export const Transform = {
   x: f32(),
@@ -564,7 +569,8 @@ export const DanceWindow = { until: f32() }
 export const Blink = { x: f32(), y: f32() }
 
 /** 落地才结算；Owner 指回能力实体；startMs 可在未来，期间不显形 */
-export const Drop = { startMs: f32(), durMs: f32(), fromY: f32(), toY: f32(), target: i32() }
+/** target 与 targetUid 成对：落地时比对，目标换人即作废 */
+export const Drop = { startMs: f32(), durMs: f32(), fromY: f32(), toY: f32(), target: i32(), targetUid: u32() }
 
 export const Shots = { n: i32() }
 

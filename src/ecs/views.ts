@@ -22,6 +22,7 @@ import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/river'
 import { fitAspectRect } from './worlds/torus'
 import { generateRuins, reachableCells, WallGrid } from './worlds/ruins'
+import { setOverlayFill } from '../util/fx'
 
 const FOG_COLOR = 0x0a0a1a
 const FOG_DEPTH = 90
@@ -213,7 +214,7 @@ class IceView extends BoundedView {
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const px = v.def.ice!.floeU * UNIT
     const inWater = !onFloe(centerX(sim), centerY(sim), px)
-    this.vignette?.setFillStyle(WATER_VIGNETTE, inWater ? 0.18 + 0.06 * Math.sin(sim.elapsedMs / 140) : 0)
+    if (this.vignette) setOverlayFill(this.vignette, WATER_VIGNETTE, inWater ? 0.18 + 0.06 * Math.sin(sim.elapsedMs / 140) : 0)
   }
 }
 
@@ -274,7 +275,7 @@ class InfiniteView extends BoundedView {
     const anyOutside = sim.characters.some(
       (m) => Alive.v[m] && outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r),
     )
-    this.zoneVignette?.setFillStyle(0xd32f2f, anyOutside ? 0.16 + 0.08 * Math.sin(sim.elapsedMs / 130) : 0)
+    if (this.zoneVignette) setOverlayFill(this.zoneVignette, 0xd32f2f, anyOutside ? 0.16 + 0.08 * Math.sin(sim.elapsedMs / 130) : 0)
   }
 
   /** 摆放由 (种子, 块) 纯函数决定，回头看到的景不变 */
@@ -623,7 +624,7 @@ class RiverView extends SingleScreenView {
 
 // ── 工厂 ──
 class TorusView extends SingleScreenView {
-  private stripCams: Phaser.Cameras.Scene2D.Camera[] = []
+  private mirrorCams: Phaser.Cameras.Scene2D.Camera[] = []
   private frameTiles: { tile: Phaser.GameObjects.TileSprite; dx: number; dy: number }[] = []
   private frameGlow?: Phaser.GameObjects.Graphics
 
@@ -676,9 +677,8 @@ class TorusView extends SingleScreenView {
     this.visuals.push(this.frameGlow)
   }
 
-  /** 四缝 + 四角各一台条带相机取景对侧溢出 */
+  /** 主相机取景整块场地；另 8 台同视口的相机各错开一整张图，补画越过四缝与四角的溢出，多大都画全 */
   camera(v: ViewCtx): void {
-    const cfg = v.def.torus!
     const cw = Math.round(viewport.cssWidth * viewport.dpr)
     const ch = Math.round(viewport.cssHeight * viewport.dpr)
     const rect = fitAspectRect(cw, ch, v.w, v.h)
@@ -687,31 +687,20 @@ class TorusView extends SingleScreenView {
     cam.setViewport(Math.round(rect.x), Math.round(rect.y), Math.round(rect.w), Math.round(rect.h))
     cam.setZoom(zoom)
     cam.centerOn(v.w / 2, v.h / 2)
-    const s = cfg.strip * UNIT
-    const sPx = Math.max(2, Math.round(s * zoom))
-    const x0 = Math.round(rect.x)
-    const y0 = Math.round(rect.y)
-    const w = Math.round(rect.w)
-    const h = Math.round(rect.h)
     const W = v.w
     const H = v.h
-    const mk = (vx: number, vy: number, vw: number, vh: number, cx: number, cy: number): void => {
-      const c = v.scene.cameras.add(vx, vy, vw, vh)
-      c.setZoom(zoom)
-      c.centerOn(cx, cy)
-      this.stripCams.push(c)
+    // 取景 [W, 2W) 的相机把越过右缝的部分画在左侧，其余同理
+    for (const dx of [-1, 0, 1]) {
+      for (const dy of [-1, 0, 1]) {
+        if (dx === 0 && dy === 0) continue
+        const c = v.scene.cameras.add(Math.round(rect.x), Math.round(rect.y), Math.round(rect.w), Math.round(rect.h))
+        c.setZoom(zoom)
+        c.centerOn(W / 2 + dx * W, H / 2 + dy * H)
+        this.mirrorCams.push(c)
+      }
     }
-    // 左缘显示越过右缝的溢出 x ∈ [W, W+s)，其余同理
-    mk(x0, y0, sPx, h, W + s / 2, H / 2)
-    mk(x0 + w - sPx, y0, sPx, h, -s / 2, H / 2)
-    mk(x0, y0, w, sPx, W / 2, H + s / 2)
-    mk(x0, y0 + h - sPx, w, sPx, W / 2, -s / 2)
-    mk(x0, y0, sPx, sPx, W + s / 2, H + s / 2)
-    mk(x0 + w - sPx, y0, sPx, sPx, -s / 2, H + s / 2)
-    mk(x0, y0 + h - sPx, sPx, sPx, W + s / 2, -s / 2)
-    mk(x0 + w - sPx, y0 + h - sPx, sPx, sPx, -s / 2, -s / 2)
-    // 须在建完条带相机之后：ignore 是逐相机的，否则缝上重影
-    for (const c of this.stripCams) c.ignore(this.visuals)
+    // 须在建完错位相机之后：ignore 是逐相机的，否则缝上重影
+    for (const c of this.mirrorCams) c.ignore(this.visuals)
   }
 
   decor(v: ViewCtx, atlas: EcsAtlas): void {
@@ -755,8 +744,8 @@ class TorusView extends SingleScreenView {
   }
 
   destroy(v: ViewCtx): void {
-    for (const c of this.stripCams) v.scene.cameras.remove(c)
-    this.stripCams = []
+    for (const c of this.mirrorCams) v.scene.cameras.remove(c)
+    this.mirrorCams = []
     this.frameTiles = []
     this.frameGlow = undefined
     super.destroy(v)

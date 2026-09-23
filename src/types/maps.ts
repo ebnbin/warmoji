@@ -113,8 +113,6 @@ export interface TorusConfig {
   readonly arenaLong: number
   /** 竞技场短边（格） */
   readonly arenaShort: number
-  /** 条带相机宽度（格）：渲染实体跨缝时的对侧分身 */
-  readonly strip: number
   /** 玩家子弹寿命（ms）：环面上飞不出屏幕，须按时限回收 */
   readonly projectileLifeMs: number
   /** 传送门门框光带厚度（格） */

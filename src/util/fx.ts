@@ -36,3 +36,8 @@ export function burstEmitter(
     })
     .setDepth(20)
 }
+
+/** 全屏罩层按透明度着色；近乎透明即隐藏，免得每帧白画一遍整屏 */
+export function setOverlayFill(rect: Phaser.GameObjects.Rectangle, color: number, alpha: number): void {
+  rect.setFillStyle(color, alpha).setVisible(alpha > 0.001)
+}

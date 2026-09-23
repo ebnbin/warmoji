@@ -9,6 +9,7 @@ import type { Scratch } from './tri'
 import { SHAPE_BANDS as BANDS } from './bands'
 import { EcsLayer } from './layer'
 import { packTint } from './tint'
+import { mainCameraOnly } from '../../util/camera'
 
 // 四种形状类特效各是实体，画在 EcsShapeBatch；进度按 Fx.bornMs / durMs 在 renderWebGL 现算，时钟取 sim.fxMs
 
@@ -47,11 +48,13 @@ export class CueLayer {
   private now = 0
 
   constructor(scene: Phaser.Scene, private readonly world: EcsWorld) {
-    this.flash = scene.add
-      .rectangle(scene.scale.width / 2, scene.scale.height / 2, 6000, 6000, 0xffffff, 1)
-      .setScrollFactor(0)
-      .setDepth(200)
-      .setVisible(false)
+    this.flash = mainCameraOnly(
+      scene.add
+        .rectangle(scene.scale.width / 2, scene.scale.height / 2, 6000, 6000, 0xffffff, 1)
+        .setScrollFactor(0)
+        .setDepth(200)
+        .setVisible(false),
+    )
     for (let b = 0; b < BANDS.length; b++) this.batches.push(new EcsShapeBatch(scene, this, b))
   }
 

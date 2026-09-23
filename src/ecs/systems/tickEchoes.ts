@@ -5,7 +5,7 @@ import { UNIT } from '../../util/units'
 import { ownerX, ownerY } from '../utils/amp'
 import { Ability, AreaBlast, Followup, Frozen } from '../components'
 import { sourceOf } from '../utils/source'
-import { targetsOf, targetsWithin } from '../utils/targets'
+import { targetsNear } from '../utils/targets'
 import type { Sim } from '../sim'
 
 export function tickEchoes(sim: Sim): void {
@@ -15,7 +15,10 @@ export function tickEchoes(sim: Sim): void {
     Followup.left[e] = Followup.left[e]! - dt
     if (Followup.left[e]! > 0) continue
     Followup.left[e] = 0
-    const near = targetsWithin(ownerX(e), ownerY(e), targetsOf(sim, sourceOf(sim, e)), ACQUIRE.range * UNIT)
+    const ox = ownerX(e)
+    const oy = ownerY(e)
+    const r = ACQUIRE.range * UNIT
+    const near = targetsNear(sim, sourceOf(sim, e), ox, oy, r).filter((t) => (t.x - ox) ** 2 + (t.y - oy) ** 2 <= r * r)
     if (near.length === 0) continue
     const t = near[Math.floor(Math.random() * near.length)]!
     blastAt(sim, e, t.x, t.y, Followup.damage[e]!)

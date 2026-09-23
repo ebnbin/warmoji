@@ -6,7 +6,7 @@ import {
   Bolt, Depth, FACTION, Faction, Pierce, PrevPos, Proj, Projectile, Quad, Shoot,
   Sprite, SweptHit, Tint, Transform, Vel, ViewCull, WallStop, WorldCull,
 } from '../components'
-import { abilityOnHit, projHitEids, projOnHit, projSrcName } from '../store'
+import { abilityOnHit, projHitUids, projOnHit, projSrcName } from '../store'
 import type { Sim } from '../sim'
 
 
@@ -70,7 +70,7 @@ export function spawnProjectileEcs(
   if (mapLife <= 0) addComponent(sim.world, eid, ViewCull)
   Depth.z[eid] = 8
   projOnHit[eid] = abilityOnHit[src]
-  projHitEids[eid] = new Set()
+  projHitUids[eid] = new Set()
   projSrcName[eid] = undefined
   playSfx('shoot')
 }
@@ -110,6 +110,6 @@ export function spawnEnemyProjectileEcs(
   Proj.dieAt[eid] = sim.elapsedMs + spec.lifeMs
   Depth.z[eid] = 6
   projOnHit[eid] = undefined
-  projHitEids[eid] = undefined
+  projHitUids[eid] = undefined
   projSrcName[eid] = spec.srcName
 }

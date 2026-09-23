@@ -189,7 +189,6 @@ export const MAPS = {
     torus: {
       arenaLong: 24,
       arenaShort: 13.5,
-      strip: 1.5,
       projectileLifeMs: 1500,
       frame: 0.3,
     },

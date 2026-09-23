@@ -14,6 +14,7 @@ import { ArcadeBattleScene } from '../ArcadeBattleScene'
 import type { ArcadeBody, ImageObj } from '../ArcadeBattleScene'
 import type { Enemy } from '../enemy/enemies'
 import type { Point } from '../../util/vec'
+import { setOverlayFill } from '../../util/fx'
 
 const WATER_COLOR = 0x0b2a45
 
@@ -181,7 +182,7 @@ export class IceScene extends ArcadeBattleScene {
     const teamInWater = !onFloe(this.center.x, this.center.y, this.floePx)
     if (this.waterVignette) {
       const a = teamInWater ? 0.18 + 0.06 * Math.sin(this.elapsedMs / 140) : 0
-      this.waterVignette.setFillStyle(0x1e6fd0, a)
+      setOverlayFill(this.waterVignette, 0x1e6fd0, a)
     }
     if (this.elapsedMs < this.nextWaterTickAt) return
     this.nextWaterTickAt = this.elapsedMs + this.iceCfg.waterTickMs

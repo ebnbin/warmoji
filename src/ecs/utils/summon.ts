@@ -1,7 +1,7 @@
 import { UNIT } from '../../util/units'
 import { ACQUIRE } from '../../data/abilities'
 import { Poison } from '../components'
-import { targetsOf } from './targets'
+import { eachTarget } from './targets'
 import type { Target } from './targets'
 import type { Source } from './source'
 import type { Sim } from '../sim'
@@ -13,18 +13,18 @@ export function pickTarget(sim: Sim, src: Source, bx: number, by: number): Targe
   let bestFreshD = max * max
   let bestAny: Target | null = null
   let bestAnyD = max * max
-  for (const t of targetsOf(sim, src)) {
-    const dx = t.x - bx
-    const dy = t.y - by
+  eachTarget(sim, src, bx, by, max, (eid, x, y, radius) => {
+    const dx = x - bx
+    const dy = y - by
     const d = dx * dx + dy * dy
     if (d < bestAnyD) {
       bestAnyD = d
-      bestAny = t
+      bestAny = { eid, x, y, radius }
     }
-    if (Poison.until[t.eid]! <= sim.elapsedMs && d < bestFreshD) {
+    if (Poison.until[eid]! <= sim.elapsedMs && d < bestFreshD) {
       bestFreshD = d
-      bestFresh = t
+      bestFresh = { eid, x, y, radius }
     }
-  }
+  })
   return bestFresh ?? bestAny
 }

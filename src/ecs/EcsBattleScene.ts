@@ -4,7 +4,7 @@ import { UNIT } from '../util/units'
 import { MEMBER } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
-import { burstEmitter } from '../util/fx'
+import { burstEmitter, setOverlayFill } from '../util/fx'
 import { CueLayer } from './render/cues'
 import { RingLayer } from './render/rings'
 import { DamageTextLayer } from './render/damageText'
@@ -13,6 +13,7 @@ import { browserStorage } from '../util/storage'
 import { UI_FONT, FONT } from '../util/fonts'
 import { norm } from '../util/vec'
 import { applyBackground } from '../util/background'
+import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
 import { getRun, promoteStep } from '../run/state'
@@ -164,25 +165,29 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     ;(this.ctx as { anchor: Phaser.GameObjects.Zone }).anchor = this.centerObj
     this.map.camera(this.ctx)
 
-    this.timeStopFx = this.add
-      .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, TIMESTOP.chillColor, 0)
-      .setScrollFactor(0)
-      .setDepth(88)
+    this.timeStopFx = mainCameraOnly(
+      this.add
+        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, TIMESTOP.chillColor, 0)
+        .setScrollFactor(0)
+        .setDepth(88),
+    )
 
     this.cursors = this.input.keyboard?.createCursorKeys()
     this.wasd = this.input.keyboard?.addKeys('W,A,S,D') as
       | Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
       | undefined
 
-    const hint = this.add
-      .text(viewport.logicalWidth / 2, 40, 'ECS 实验 · 构建图集…', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.small,
-        color: '#8fa1b5',
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(1000)
+    const hint = mainCameraOnly(
+      this.add
+        .text(viewport.logicalWidth / 2, 40, 'ECS 实验 · 构建图集…', {
+          fontFamily: UI_FONT,
+          fontSize: FONT.small,
+          color: '#8fa1b5',
+        })
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(1000),
+    )
 
     void this.boot(++this.bootGen, run, center, hint)
 
@@ -639,6 +644,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.map.step(this.ctx, sim, delta)
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
-    this.timeStopFx?.setFillStyle(TIMESTOP.chillColor, this.timeStopFxAlpha)
+    if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
   }
 }

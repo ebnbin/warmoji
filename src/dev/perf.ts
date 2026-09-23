@@ -4,7 +4,7 @@ import { textRes } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { heapMB, rafHz, rendererInfo } from './diagnostics'
 import { emojiCacheStats } from '../emoji/textures'
-import { metricsReport, recentFrameTimes, resetMetrics } from './metrics'
+import { metricsReport, nextFrameSeq, recentFrames } from './metrics'
 import { sandboxDifficulty, sandboxEnemySet, sandboxFireRate, sandboxLevel, sandboxStarters, scaleStep } from '../run/sandbox'
 import { reportDevPerf } from './probe'
 import type { HudHost } from '../run/hudHost'
@@ -16,6 +16,11 @@ const CHART_H = 74
 const CHART_FLOOR = 40
 const SCALE_ROW = 32
 
+/** 试炼场首次满载时的帧序号；此前为 -1。由 DevPanel 持有：它随每局重建，切页签不重建 */
+export interface SteadyMark {
+  seq: number
+}
+
 export class PerfView {
   /** 由面板挂进滚动容器并统一销毁 */
   readonly objects: Phaser.GameObjects.GameObject[]
@@ -24,7 +29,6 @@ export class PerfView {
   private readonly scaleText: Phaser.GameObjects.Text
   private readonly text: Phaser.GameObjects.Text
   private refreshedAt = 0
-  private steadyArmed = false
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -32,6 +36,7 @@ export class PerfView {
     private readonly w: number,
     private readonly top: number,
     private readonly sandbox: boolean,
+    private readonly steady: SteadyMark,
   ) {
     const res = textRes()
     this.chart = scene.add.graphics()
@@ -66,12 +71,10 @@ export class PerfView {
     const heap = heapMB()
     const raf = rafHz()
 
-    // 满载后清一次采样，爬坡期不算稳态；一次性闩死，敌人数在上限附近浮动会反复触发
-    if (step && !this.steadyArmed && p.enemies >= step.spawn.cap * 0.95) {
-      this.steadyArmed = true
-      resetMetrics()
-    }
-    const m = metricsReport(raf)
+    // 爬坡期不算稳态：首次满载起才统计，缓冲与波动图不清；一次性闩死，敌人数在上限附近浮动会反复触发
+    if (step && this.steady.seq < 0 && p.enemies >= step.spawn.cap * 0.95) this.steady.seq = nextFrameSeq()
+    const steady = this.steady.seq >= 0
+    const m = metricsReport(raf, steady ? this.steady.seq : 0)
 
     const row = (label: string, value: string, note = ''): string =>
       `${label.padEnd(9)}${value.padStart(9)}${note ? '  ' + note : ''}`
@@ -81,7 +84,7 @@ export class PerfView {
     this.text.setText([
       m.warming
         ? '预热中：前 800ms 的帧不计入统计'
-        : `已采样 ${m.samples} 帧${this.steadyArmed ? '（满载后重采）' : '（刷怪爬坡中）'}`,
+        : `已采样 ${m.samples} 帧${steady ? '（满载起）' : step ? '（刷怪爬坡中）' : ''}`,
       '',
       '── 帧耗时（毫秒 · 越小越好）──',
       row('总计 p50', ms(m.total.p50)),
@@ -91,13 +94,13 @@ export class PerfView {
       // 中位数不可加，三段之和不等于总计
       row('· 更新', ms(m.update.p50), '场景逻辑+物理'),
       row('· 渲染', ms(m.render.p50), '渲染提交'),
-      row('· 其余', ms(m.rest.p50), 'vsync/合成'),
+      row('· 其余', ms(m.rest.p50), '帧外：vsync 等待/GC/异步任务'),
       row('· 帧间跳变', ms(m.jitter.p50), '节奏抖动'),
       '',
       '── 帧率（fps）──',
-      row('平均', m.fps.toFixed(1), '每秒实交付帧数'),
+      row('平均', m.fps.toFixed(1), '采样窗口内均值'),
       row('1% 低', m.fpsLow1.toFixed(1), '卡顿体感'),
-      row('引擎报告', this.scene.game.loop.actualFps.toFixed(1), '独立口径·对照'),
+      row('引擎估计', this.scene.game.loop.actualFps.toFixed(1), 'Phaser 每秒指数平均·抹平尖峰·仅对照'),
       row('中位档', m.fpsMedian.toFixed(1), 'vsync 量化·勿当帧率'),
       row('屏幕上限', raf > 0 ? String(raf) : '—', 'Hz · 实测峰值'),
       `vsync 档  ${m.buckets.map((b, i) => `${i === 3 ? '≥4' : i + 1}×${(b * 100).toFixed(0)}%`).join(' ')}`,
@@ -135,7 +138,7 @@ export class PerfView {
     })
   }
 
-  /** 左旧右新；纵轴按窗口内 p95 定标，超出量程的帧顶到上边缘 */
+  /** 左旧右新；纵轴按窗口内 p95 定标，超出量程的帧顶到上边缘；竖线标出满载起点 */
   private drawChart(): void {
     const g = this.chart
     g.clear()
@@ -143,7 +146,8 @@ export class PerfView {
     const y = this.top
     roundRect(g, 0, y, w, CHART_H, 10, { fill: 0x000000, fillAlpha: 0.45 })
 
-    const frames = recentFrameTimes(Math.round(w))
+    const recent = recentFrames(Math.round(w))
+    const frames = recent.map((f) => f.total)
     const sorted = [...frames].sort((a, b) => a - b)
     const p95 = sorted.length > 0 ? sorted[Math.min(sorted.length - 1, Math.round(0.95 * (sorted.length - 1)))]! : 0
     const top = Math.max(CHART_FLOOR, p95 * 1.15)
@@ -165,6 +169,12 @@ export class PerfView {
         else g.lineTo(px, py)
       }
       g.strokePath()
+      const at = this.steady.seq >= 0 ? recent.findIndex((f) => f.seq < this.steady.seq) : -1
+      if (at > 0) {
+        const px = ((w - 1) * (frames.length - 1 - (at - 0.5))) / (frames.length - 1)
+        g.lineStyle(1, 0xffffff, 0.6)
+        g.lineBetween(px, y, px, y + CHART_H)
+      }
     }
     this.scaleText.setText(`0–${top.toFixed(0)}ms · ${frames.length}帧`)
   }

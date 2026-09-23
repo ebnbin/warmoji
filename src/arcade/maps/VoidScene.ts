@@ -21,7 +21,7 @@ import type { ArcadeBody, ImageObj } from '../ArcadeBattleScene'
 export class VoidScene extends ArcadeBattleScene {
   private arenaW = 0
   private arenaH = 0
-  private stripCams: Phaser.Cameras.Scene2D.Camera[] = []
+  private mirrorCams: Phaser.Cameras.Scene2D.Camera[] = []
   // 静态视觉层（地板/零件/门框）：条带相机忽略，只画一份
   private staticVisuals: Phaser.GameObjects.GameObject[] = []
   private frameTiles: { tile: Phaser.GameObjects.TileSprite; dx: number; dy: number }[] = []
@@ -41,7 +41,7 @@ export class VoidScene extends ArcadeBattleScene {
     this.staticVisuals = []
     this.frameTiles = []
     this.frameGlow = undefined
-    this.stripCams = []
+    this.mirrorCams = []
   }
 
   protected createWorld(): void {
@@ -154,13 +154,13 @@ export class VoidScene extends ArcadeBattleScene {
   }
 
   protected onShutdown(): void {
-    for (const c of this.stripCams) this.cameras.remove(c)
-    this.stripCams = []
+    for (const c of this.mirrorCams) this.cameras.remove(c)
+    this.mirrorCams = []
   }
 
   // ── 相机 ──
 
-  /** 四缝 + 四角各一台条带相机取景对侧溢出 */
+  /** 主相机取景整块场地；另 8 台同视口的相机各错开一整张图，补画越过四缝与四角的溢出，多大都画全 */
   private setupCameras(): void {
     const landscape = viewport.logicalWidth >= viewport.logicalHeight
     this.arenaW = (landscape ? this.torusCfg.arenaLong : this.torusCfg.arenaShort) * UNIT
@@ -174,38 +174,27 @@ export class VoidScene extends ArcadeBattleScene {
     cam.setZoom(zoom)
     cam.centerOn(this.arenaW / 2, this.arenaH / 2)
 
-    for (const c of this.stripCams) this.cameras.remove(c)
-    this.stripCams = []
-    const s = this.torusCfg.strip * UNIT
-    const sPx = Math.max(2, Math.round(s * zoom))
-    const x0 = Math.round(rect.x)
-    const y0 = Math.round(rect.y)
-    const w = Math.round(rect.w)
-    const h = Math.round(rect.h)
-    const mk = (vx: number, vy: number, vw: number, vh: number, cx: number, cy: number): void => {
-      const c = this.cameras.add(vx, vy, vw, vh)
-      c.setZoom(zoom)
-      c.centerOn(cx, cy)
-      this.stripCams.push(c)
-    }
+    for (const c of this.mirrorCams) this.cameras.remove(c)
+    this.mirrorCams = []
     const W = this.arenaW
     const H = this.arenaH
-    // 左缘显示越过右缝的溢出 x ∈ [W, W+s)，其余同理
-    mk(x0, y0, sPx, h, W + s / 2, H / 2)
-    mk(x0 + w - sPx, y0, sPx, h, -s / 2, H / 2)
-    mk(x0, y0, w, sPx, W / 2, H + s / 2)
-    mk(x0, y0 + h - sPx, w, sPx, W / 2, -s / 2)
-    mk(x0, y0, sPx, sPx, W + s / 2, H + s / 2)
-    mk(x0 + w - sPx, y0, sPx, sPx, -s / 2, H + s / 2)
-    mk(x0, y0 + h - sPx, sPx, sPx, W + s / 2, -s / 2)
-    mk(x0 + w - sPx, y0 + h - sPx, sPx, sPx, -s / 2, -s / 2)
-    this.applyStripIgnores()
+    // 取景 [W, 2W) 的相机把越过右缝的部分画在左侧，其余同理
+    for (const dx of [-1, 0, 1]) {
+      for (const dy of [-1, 0, 1]) {
+        if (dx === 0 && dy === 0) continue
+        const c = this.cameras.add(Math.round(rect.x), Math.round(rect.y), Math.round(rect.w), Math.round(rect.h))
+        c.setZoom(zoom)
+        c.centerOn(W / 2 + dx * W, H / 2 + dy * H)
+        this.mirrorCams.push(c)
+      }
+    }
+    this.applyMirrorIgnores()
   }
 
-  /** 条带相机全部忽略，否则缝上重影 */
-  private applyStripIgnores(): void {
+  /** 错位相机全部忽略，否则缝上重影 */
+  private applyMirrorIgnores(): void {
     if (this.staticVisuals.length === 0) return
-    for (const c of this.stripCams) c.ignore(this.staticVisuals)
+    for (const c of this.mirrorCams) c.ignore(this.staticVisuals)
   }
 
   // ── 回绕 ──
@@ -338,7 +327,7 @@ export class VoidScene extends ArcadeBattleScene {
     this.frameGlow = glow
     this.staticVisuals.push(glow)
 
-    this.applyStripIgnores()
+    this.applyMirrorIgnores()
   }
 
   /** 一次生成 */

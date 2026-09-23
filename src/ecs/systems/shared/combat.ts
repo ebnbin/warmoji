@@ -92,14 +92,14 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
   if (boss) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 24, kind: 'death' })
   if (boss) sim.bossDown = true
   if (def) grantKillRewards(sim, eid, def, elite)
-  // 变形中死亡不触发亡语与拆巢
+  // 变形中死亡不触发亡语与失巢暴走
   const hexed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
   if (!hexed && def?.onDeath) {
     const snap = { def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: DmgMul.v[eid]! }
     if (sim.onDeathFx) sim.onDeathFx(snap)
     else sim.pendingDeaths.push(snap)
   }
-  if (!hexed && def?.spawner) orphanBrood(sim, eid)
+  if (def?.spawner) orphanBrood(sim, eid, !hexed)
   const carries = enemyCarries[eid]
   if (carries) {
     dropFieldPickup(sim, Transform.x[eid]!, Transform.y[eid]!, carries)
@@ -144,11 +144,12 @@ function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean):
   if (total > 0) dropCoins(sim, Transform.x[eid]!, Transform.y[eid]!, total)
 }
 
-export function orphanBrood(sim: Sim, nestEid: number): void {
+/** rage = false 只解链接，不给失巢暴走加成 */
+export function orphanBrood(sim: Sim, nestEid: number, rage = true): void {
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     if (Nest.of[eid] !== nestEid) continue
     Nest.of[eid] = -1
-    if (hasComponent(sim.world, eid, Orphan)) {
+    if (rage && hasComponent(sim.world, eid, Orphan)) {
       SpMul.v[eid] = SpMul.v[eid]! * Orphan.speedMul[eid]!
       DmgMul.v[eid] = DmgMul.v[eid]! * Orphan.damageMul[eid]!
     }

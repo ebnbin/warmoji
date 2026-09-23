@@ -1,6 +1,6 @@
 import { Bolt, FACTION, Faction, Owner, Shoot } from '../../components'
 import { removeEntity } from 'bitecs'
-import { projHitEids, projOnHit, projSrcName } from '../../store'
+import { projHitUids, projOnHit, projSrcName } from '../../store'
 import { spawnEnemyProjectileEcs, spawnProjectileEcs } from '../../entities/projectile'
 import { abilityFireSfx, enemyDef } from '../../store'
 import { attributionSlot } from '../../utils/amp'
@@ -34,7 +34,7 @@ export function fireSfxOf(e: number): import('../../../types/sfx').SfxId | undef
 /** 伴随存储先清 */
 export function cullProjectile(sim: Sim, eid: number): void {
   projOnHit[eid] = undefined
-  projHitEids[eid] = undefined
+  projHitUids[eid] = undefined
   projSrcName[eid] = undefined
   removeEntity(sim.world, eid)
 }

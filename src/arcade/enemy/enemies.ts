@@ -57,6 +57,8 @@ export interface Enemy {
   elite: boolean
   boss: boolean
   dormant: boolean
+  /** 本次入眠的世界时刻；醒来后下次入眠重新计 */
+  dormantSince: number
   kbImmune: boolean
   state: EnemyState
   /** 为真时主循环跳过环境摇摆，旋转由移动策略自管 */
@@ -110,6 +112,7 @@ export function attachEnemy(image: ImageObj, def: EnemyDef, hp: number, init?: P
     elite: false,
     boss: false,
     dormant: false,
+    dormantSince: 0,
     kbImmune: false,
     state: 'wander',
     posed: false,

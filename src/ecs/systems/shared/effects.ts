@@ -9,7 +9,7 @@ import { } from '../../store'
 import { damageTarget } from './damage'
 import { FACTION } from '../../components'
 import { healEnemies, healCharacters } from './heal'
-import { nearestAngle, targetsOf } from '../../utils/targets'
+import { nearestAngle, targetsNear } from '../../utils/targets'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 import { spawnFxRing } from '../../entities/fx'
@@ -38,7 +38,7 @@ export function applyBlast(
   knockback: number,
   exclude?: ReadonlySet<number>,
 ): void {
-  const list = targetsOf(sim, src)
+  const list = targetsNear(sim, src, x, y, radius)
   for (const i of circleHitIndices({ x, y }, radius, list)) {
     const t = list[i]!
     if (exclude?.has(t.eid)) continue
@@ -136,7 +136,7 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
   // 只对敌方侧成立，gen 校验
   spawnProjectile: (sim, src, fx, hit) => {
     if (src.faction === FACTION.team) return
-    const angle = nearestAngle(hit.x, hit.y, targetsOf(sim, src), Infinity)
+    const angle = nearestAngle(sim, src, hit.x, hit.y, Infinity)
     if (angle === null) return
     spawnEnemyProjectileEcs(sim, hit.x, hit.y, angle, {
       frame: sim.frames.index(fx.projectile.emoji, 'enemyProjectile'),

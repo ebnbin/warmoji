@@ -71,8 +71,7 @@ export interface Sim {
   enemySlowMul: number
   /** 每帧重建 */
   frameAttractors: { x: number; y: number; r2: number }[]
-  /** 每帧重建，含环面镜像坐标 */
-  enemyTargets: Target[]
+  /** 每帧重建，含环面镜像坐标；我方索敌不走快照，见 utils/targets.ts */
   characterTargets: Target[]
   frames: FrameIndex
   /** 按 run 种子确定 */
@@ -193,7 +192,6 @@ export function makeSim(
     battleFx: { ...BATTLE_FX_IDENTITY },
     enemySlowMul: teamFx.enemySlowMul,
     frameAttractors: [],
-    enemyTargets: [],
     characterTargets: [],
     frames: atlas,
     pendingDeaths: [],

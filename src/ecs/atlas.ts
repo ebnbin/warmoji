@@ -33,6 +33,8 @@ const NO_CLIP = { base: -1, frames: 0 }
 let atlasSerial = 0
 /** 跨局复用 */
 let shared: EcsAtlas | undefined
+/** 首建进行中；期间再来的调用等它，不另建一份 */
+let building: Promise<EcsAtlas> | undefined
 
 export class EcsAtlas {
   /** frame*4 → u0,v0,u1,v1 */
@@ -184,16 +186,31 @@ export class EcsAtlas {
     return this.pages.length
   }
 
+  /** 一个进程只建一次，跨局复用；交出前绑到本次调用的场景 */
   static async build(
     scene: Phaser.Scene,
     outlined: Record<OutlineKind, readonly string[]>,
     plain: readonly string[],
   ): Promise<EcsAtlas> {
-    // 一个进程只建一次，跨局复用
-    if (shared) {
-      shared.rebind(scene)
-      return shared
+    if (!shared) {
+      // 失败即清掉，下次重建
+      building ??= EcsAtlas.create(scene, outlined, plain)
+        .then((a) => (shared = a))
+        .finally(() => {
+          building = undefined
+        })
+      await building
     }
+    const atlas = shared!
+    atlas.rebind(scene)
+    return atlas
+  }
+
+  private static async create(
+    scene: Phaser.Scene,
+    outlined: Record<OutlineKind, readonly string[]>,
+    plain: readonly string[],
+  ): Promise<EcsAtlas> {
     const variants: { id: string; outline: OutlineKind | undefined }[] = []
     const seen = new Set<string>()
     const take = (id: string, outline: OutlineKind | undefined): void => {
@@ -223,7 +240,6 @@ export class EcsAtlas {
       if (scene.textures.exists(key)) scene.textures.remove(key)
       atlas.pages.push(scene.textures.addCanvas(key, atlas.canvases[p]!)!)
     }
-    shared = atlas
     return atlas
   }
 }

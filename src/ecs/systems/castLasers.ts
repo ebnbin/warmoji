@@ -4,13 +4,13 @@ import { ownerX, ownerY } from '../utils/amp'
 import { fireBeam } from './shared/laser'
 import { sourceOf } from '../utils/source'
 import { castScan } from './shared/castScan'
-import { nearestAngle, targetsOf } from '../utils/targets'
+import { nearestAngle } from '../utils/targets'
 import type { Sim } from '../sim'
 
 export function castLasers(sim: Sim): void {
   castScan(sim, Laser, (e) => {
     if (Radial.left[e]! > 0) return false // 扫射在途：本轮不另起
-    const aim = nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, sourceOf(sim, e)), Laser.range[e]!)
+    const aim = nearestAngle(sim, sourceOf(sim, e), ownerX(e), ownerY(e), Laser.range[e]!)
     if (aim === null) return false
     Aim.rad[e] = aim
     if (hasComponent(sim.world, e, LaserRadial)) {

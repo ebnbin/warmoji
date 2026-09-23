@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { UI_FONT } from '../../util/fonts'
-import { DAMAGE_NUMBER_CAP, DAMAGE_NUMBER_RISE_MS } from '../damageNumbers'
+import { DAMAGE_NUMBER_RISE_MS } from '../damageNumbers'
 import type { DamageNumbers } from '../damageNumbers'
 import { EcsLayer } from './layer'
 import { packTint } from './tint'
@@ -73,8 +73,9 @@ export class DamageTextLayer {
     const fx = this.now
     const buf = this.nums
     // 从最老的一条画起，新的压在上面
-    for (let j = 0; j < DAMAGE_NUMBER_CAP; j++) {
-      const i = (buf.head + j) % DAMAGE_NUMBER_CAP
+    const cap = buf.born.length
+    for (let j = 0; j < cap; j++) {
+      const i = (buf.head + j) % cap
       const t = (fx - buf.born[i]!) / DAMAGE_NUMBER_RISE_MS
       if (!(t >= 0 && t < 1)) continue
       const crit = buf.crit[i] === 1

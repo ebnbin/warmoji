@@ -7,7 +7,7 @@ import { Aim, Swing, Thrust } from '../../components'
 import { abilityOnHit } from '../../store'
 import { applyAbilityEffects } from './effects'
 import { sourceOf } from '../../utils/source'
-import { nearestAngle, targetsOf } from '../../utils/targets'
+import { nearestAngle, targetsNear } from '../../utils/targets'
 import type { Sim } from '../../sim'
 
 export function strike(sim: Sim, e: number): void {
@@ -15,9 +15,9 @@ export function strike(sim: Sim, e: number): void {
   const reach = Thrust.reach[e]!
   const ox = ownerX(e)
   const oy = ownerY(e)
-  const list = targetsOf(sim, src)
-  const aim = nearestAngle(ox, oy, list, reachOf(e))
+  const aim = nearestAngle(sim, src, ox, oy, reachOf(e))
   if (aim === null) return
+  const list = targetsNear(sim, src, ox, oy, reachOf(e))
   Aim.rad[e] = aim
   playSfx('whoosh')
   const damage = Math.round(Thrust.damage[e]! * damageMul(sim, e))

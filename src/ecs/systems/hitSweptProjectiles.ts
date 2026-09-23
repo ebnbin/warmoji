@@ -1,10 +1,10 @@
 import { query } from 'bitecs'
-import { Dormant, PrevPos, Proj, Radius, SweptHit, Transform, ENEMY_SET } from '../components'
+import { Dormant, PrevPos, Proj, Radius, SweptHit, Transform, Uid, ENEMY_SET } from '../components'
 import { applyAbilityEffects } from './shared/effects'
 import { boltSource } from '../utils/source'
 import { damageTarget } from './shared/damage'
 import { cullProjectile } from './shared/projectile'
-import { enemyDef, projHitEids, projOnHit } from '../store'
+import { enemyDef, projHitUids, projOnHit } from '../store'
 import type { Sim } from '../sim'
 
 function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
@@ -28,7 +28,7 @@ export function hitSweptProjectiles(sim: Sim): void {
     const sy = PrevPos.y[eid]!
     const bx = Transform.x[eid]!
     const by = Transform.y[eid]!
-    const hit = projHitEids[eid]!
+    const hit = projHitUids[eid]!
     const pr = Proj.radius[eid]!
     // t 线段投影参数；d2 到起点的中心距²
     const found: { enemy: number; t: number; d2: number }[] = []
@@ -37,7 +37,7 @@ export function hitSweptProjectiles(sim: Sim): void {
     const segLen2 = segX * segX + segY * segY
     for (const en of enemies) {
       // 已死未提交的 eid 可能已被别的实体复用；休眠者不可被命中
-      if (enemyDef[en] === undefined || Dormant.v[en] || hit.has(en)) continue
+      if (enemyDef[en] === undefined || Dormant.v[en] || hit.has(Uid.v[en]!)) continue
       const rr = pr + Radius.v[en]!
       // 取相对线段起点的最近镜像
       const w = sim.hooks.worldDelta(sim, sx, sy, Transform.x[en]!, Transform.y[en]!)
@@ -60,7 +60,7 @@ export function hitSweptProjectiles(sim: Sim): void {
     // 每帧只结算首个命中
     const f = found[0]
     if (f === undefined) continue
-    hit.add(f.enemy)
+    hit.add(Uid.v[f.enemy]!)
     const hx = Transform.x[f.enemy]!
     const hy = Transform.y[f.enemy]!
     const src = boltSource(Proj.srcSlot[eid]!)

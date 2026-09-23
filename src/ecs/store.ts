@@ -13,16 +13,16 @@ export const enemyDef: (EnemyDef | undefined)[] = new Array<EnemyDef | undefined
 export const projOnHit: (readonly Effect[] | undefined)[] =
   new Array<readonly Effect[] | undefined>(INITIAL_CAPACITY).fill(undefined).fill(undefined)
 
-/** 已命中的敌人 eid，贯穿去重 */
-export const projHitEids: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(INITIAL_CAPACITY).fill(undefined).fill(undefined)
+/** 已命中敌人的 Uid，贯穿去重 */
+export const projHitUids: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(INITIAL_CAPACITY).fill(undefined).fill(undefined)
 
-/** 在途回旋镖本程已命中的 eid */
+/** 在途回旋镖本程已命中的 Uid */
 export const flyerHits: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(INITIAL_CAPACITY).fill(undefined).fill(undefined)
 
 /** 闪电折点，x,y 交替 */
 export const boltPts: (Float32Array | undefined)[] = new Array<Float32Array | undefined>(INITIAL_CAPACITY).fill(undefined)
 
-/** 本次天体横扫已砸过的实体 */
+/** 本次天体横扫已砸过实体的 Uid */
 export const meteorHit: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(INITIAL_CAPACITY).fill(undefined)
 
 /** 战场限时层是哪一枚拾取 */

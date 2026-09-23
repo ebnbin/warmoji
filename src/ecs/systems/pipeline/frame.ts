@@ -1,4 +1,5 @@
 import { armEnemies } from '../armEnemies'
+import { capCoins } from '../capCoins'
 import { fireCarriers } from '../fireCarriers'
 import { fireSurges } from '../fireSurges'
 import { grantCoins } from '../grantCoins'
@@ -7,7 +8,6 @@ import { grantMods } from '../grantMods'
 import { playPickupFx } from '../playPickupFx'
 import { reapCollected } from '../reapCollected'
 import { refreshCharacterTargets } from '../refreshCharacterTargets'
-import { refreshEnemyTargets } from '../refreshEnemyTargets'
 import { runDeathEffects } from '../runDeathEffects'
 import { spawnStep } from '../spawnStep'
 import { updateAnims } from '../updateAnims'
@@ -22,13 +22,7 @@ import type { Sim } from '../../sim'
 
 
 export const FRAME_PIPELINE: readonly Step[] = [
-  { name: 'refreshEnemyTargets', run: refreshEnemyTargets },
-  {
-    name: 'stepSim',
-    run: stepSim,
-    after: ['refreshEnemyTargets'],
-    why: 'stepSim 内的抛射物 onHit 效果链要用本帧位置；队伍 orbit 的威胁点也读这一份',
-  },
+  { name: 'stepSim', run: stepSim },
   { name: 'refreshCharacterTargets', run: refreshCharacterTargets },
   { name: 'armEnemies', run: armEnemies },
   {
@@ -52,6 +46,12 @@ export const FRAME_PIPELINE: readonly Step[] = [
     run: reapCollected,
     after: ['grantCoins', 'grantMods', 'grantFlash', 'playPickupFx'],
     why: '到手的拾取物在这里离场——早一步，实体没了就什么都结算不到',
+  },
+  {
+    name: 'capCoins',
+    run: capCoins,
+    after: ['reapCollected'],
+    why: '上限只数地上的金币，已拾取的须先离场',
   },
   { name: 'updateSpawners', run: updateSpawners },
   // 须先于 spawnStep：它按在场数 + 在途预告数判上限

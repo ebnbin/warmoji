@@ -8,6 +8,13 @@ import { KNOCKBACK } from '../data/abilities'
 import { acquirePooled, releasePooled } from './pool'
 import type { ArcadeBody, ArcadeBattleScene, ImageObj } from './ArcadeBattleScene'
 
+/** 地上金币上限；生成时不管，每帧超出即从最早落地的删起，允许一帧内短暂超额 */
+const COIN_CAP = 2048
+
+/** 池对象复用，落地时刻按对象记 */
+const bornAt = new WeakMap<ImageObj, number>()
+let landedSeq = 0
+
 export function spawnCoins(scene: ArcadeBattleScene, x: number, y: number, count: number): void {
   for (let i = 0; i < count; i++) {
     const jx = count > 1 ? (scene.rng.next() - 0.5) * 0.6 * UNIT : 0
@@ -15,10 +22,19 @@ export function spawnCoins(scene: ArcadeBattleScene, x: number, y: number, count
     const pos = scene.constrainCoinPos({ x: x + jx, y: y + jy })
     const coin = acquirePooled(scene, scene.coins, pos.x, pos.y, emojiKey(PICKUPS.coin.emoji, 'player'), PICKUPS.coin.size * UNIT, PICKUPS.coin.radius * UNIT)
     coin.setDepth(3)
+    bornAt.set(coin, landedSeq++)
     const base = coin.scaleX
     coin.setScale(base * 0.3)
     scene.tweens.add({ targets: coin, scale: base, duration: 160, ease: 'Back.easeOut' })
   }
+}
+
+/** 每帧一次 */
+export function capCoins(scene: ArcadeBattleScene): void {
+  const coins = (scene.coins.getChildren() as ImageObj[]).filter((c) => c.active)
+  if (coins.length <= COIN_CAP) return
+  coins.sort((a, b) => (bornAt.get(a) ?? 0) - (bornAt.get(b) ?? 0))
+  for (let i = 0; i < coins.length - COIN_CAP; i++) releasePooled(coins[i]!)
 }
 
 export function magnetCoins(scene: ArcadeBattleScene): void {
@@ -84,6 +100,8 @@ export function spawnShards(scene: ArcadeBattleScene, enemy: ImageObj, flingVx: 
   const dh = enemy.displayHeight / 2
   const t = KNOCKBACK.deathSlideMs / 1000
   for (let i = 0; i < 4; i++) {
+    // 轮到的还在飞就插一个新的，不抢占
+    if (scene.shardPool[scene.shardPoolIdx]!.visible) scene.shardPool.splice(scene.shardPoolIdx, 0, scene.newShard())
     const shard = scene.shardPool[scene.shardPoolIdx]!
     scene.shardPoolIdx = (scene.shardPoolIdx + 1) % scene.shardPool.length
     scene.tweens.killTweensOf(shard)

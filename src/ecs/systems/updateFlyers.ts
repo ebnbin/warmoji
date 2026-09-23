@@ -1,12 +1,12 @@
 import { hasComponent, query } from 'bitecs'
 import { catchFlyer } from '../entities/weapon'
 import { DEG2RAD } from '../../util/units'
-import { Boomerang, CoinMagnet, Flyer, Frozen, Thrown, Transform } from '../components'
+import { Boomerang, CoinMagnet, Flyer, Frozen, Thrown, Transform, Uid } from '../components'
 import { flyerHits } from '../store'
 import { cooldownMul, ownerX, ownerY } from '../utils/amp'
 import { damageTarget } from './shared/damage'
 import { sourceOf } from '../utils/source'
-import { targetsOf } from '../utils/targets'
+import { targetsNear } from '../utils/targets'
 import type { Sim } from '../sim'
 
 export function updateFlyers(sim: Sim): void {
@@ -48,13 +48,13 @@ export function updateFlyers(sim: Sim): void {
     }
     const hits = flyerHits[f]!
     const src = sourceOf(sim, e)
-    for (const t of targetsOf(sim, src)) {
-      if (hits.has(t.eid)) continue
+    for (const t of targetsNear(sim, src, Transform.x[f]!, Transform.y[f]!, Boomerang.hitRadius[e]!)) {
+      if (hits.has(Uid.v[t.eid]!)) continue
       const dx = t.x - Transform.x[f]!
       const dy = t.y - Transform.y[f]!
       const rr = Boomerang.hitRadius[e]! + t.radius
       if (dx * dx + dy * dy > rr * rr) continue
-      hits.add(t.eid)
+      hits.add(Uid.v[t.eid]!)
       damageTarget(sim, src, t.eid, Flyer.damage[f]!, Boomerang.knockback[e]!, Transform.x[f]!, Transform.y[f]!)
     }
   }
