@@ -7,8 +7,10 @@ export function hourAt(combatSec: number, cfg: DayNightConfig): number {
   return ((h % 24) + 24) % 24
 }
 
+/** 正午 visionMax、黄昏/黎明 visionMid、午夜 visionMin，其间按余弦过渡 */
 export function visionGridsAt(hour: number, cfg: DayNightConfig): number {
-  return cfg.visionMid + (cfg.visionMax - cfg.visionMid) * Math.cos(((hour - 12) * Math.PI) / 12)
+  const c = Math.cos(((hour - 12) * Math.PI) / 12)
+  return cfg.visionMid + (c >= 0 ? cfg.visionMax - cfg.visionMid : cfg.visionMid - cfg.visionMin) * c
 }
 
 /** 0..1：白天与黄昏 0，午夜 1 */
