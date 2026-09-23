@@ -13,7 +13,7 @@ export function castNukes(sim: Sim): void {
     const src = sourceOf(sim, e)
     sim.out.flash = { color: 0xffffff, alpha: 0.55, durationMs: 380 }
     playSfx('boom')
-    const base = Nuke.damage[e]! * waveScale(sim, e) * damageMul(sim, e)
+    const base = Nuke.damage[e]! * waveScale(sim) * damageMul(sim, e)
     const bossRatio = Nuke.bossRatio[e]!
     // 边遍历边击杀，须先复制快照
     for (const t of [...query(sim.world, ENEMY_SET as unknown as object[])]) {
