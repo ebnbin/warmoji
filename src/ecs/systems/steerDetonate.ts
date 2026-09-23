@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
-import { Alive, BVel, Charge, Detonate, DmgMul, EState, Iframe, Slowed, Speed, Steering, Tint, Transform } from '../components'
+import { Alive, BVel, Charge, Detonate, DmgMul, EState, Hurt, Iframe, Slowed, Speed, Steering, Tint, Transform } from '../components'
 import { despawnEnemy, hurtCharacter } from './shared/combat'
 import { nearestAlive } from './shared/steer'
 import { enemyDef } from '../store'
@@ -22,11 +22,11 @@ export function steerDetonate(sim: Sim): void {
       if (now < Charge.windupUntil[eid]!) continue
       const dmg = Math.round(Detonate.blastDamage[eid]! * DmgMul.v[eid]!)
       const r = Detonate.blastRadius[eid]!
-      const r2 = r * r
       for (const m of sim.characters) {
         if (!Alive.v[m]) continue
         const d = sim.hooks.worldDelta(sim, ex, ey, Transform.x[m]!, Transform.y[m]!)
-        if (d.x * d.x + d.y * d.y > r2) continue
+        const rr = r + Hurt.radius[m]!
+        if (d.x * d.x + d.y * d.y > rr * rr) continue
         // 吃无敌帧节流并消费之
         if (now - Iframe.last[m]! < Iframe.ms[m]!) continue
         Iframe.last[m] = now
