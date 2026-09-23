@@ -566,8 +566,10 @@ class RiverView extends SingleScreenView {
 
     const pool = v.def.drift ?? ['1f343']
     const halfCross = (horizontal ? r.h : r.w) / 2
+    const mid = horizontal ? r.y + r.h / 2 : r.x + r.w / 2
     for (let i = 0; i < cfg.driftCount; i++) {
       const cross = (Math.random() * 2 - 1) * halfCross * 0.92
+      const u = Math.random() * alongLen
       this.decorEids.push(
         spawnDriftDecor(
           v.world,
@@ -575,15 +577,15 @@ class RiverView extends SingleScreenView {
           {
             id: pool[Math.floor(Math.random() * pool.length)]!,
             outline: 'player',
-            x: 0,
-            y: 0,
+            x: horizontal ? v.w - u : mid + cross,
+            y: horizontal ? mid + cross : u,
             size: (0.35 + Math.random() * 0.25) * UNIT,
             alpha: 0.5,
             z: 1.5,
             spin: (Math.random() * 2 - 1) * 0.5,
           },
           {
-            u: Math.random() * alongLen,
+            u,
             cross,
             speedMul: driftSpeed(cross / halfCross, cfg, Math.random),
             swayPhase: Math.random() * Math.PI * 2,
