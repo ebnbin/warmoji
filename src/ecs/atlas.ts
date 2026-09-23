@@ -42,6 +42,7 @@ export class EcsAtlas {
   /** frame → 页索引 */
   private readonly pageOf: Int32Array
   private readonly keyToFrame = new Map<string, number>()
+  private readonly reportedMissing = new Set<string>()
   private readonly pages: Phaser.Textures.CanvasTexture[] = []
   private readonly canvases: HTMLCanvasElement[] = []
   private readonly ctxs: CanvasRenderingContext2D[] = []
@@ -160,9 +161,16 @@ export class EcsAtlas {
     this.clips.set(key, { base, frames: clip.frames })
   }
 
-  /** 未收录返回 -1 */
+  /** 未收录返回 -1，每个变体只报一次错 */
   index(id: string, outline: OutlineKind | undefined): number {
-    return this.keyToFrame.get(variantKey(id, outline)) ?? -1
+    const k = variantKey(id, outline)
+    const frame = this.keyToFrame.get(k)
+    if (frame !== undefined) return frame
+    if (!this.reportedMissing.has(k)) {
+      this.reportedMissing.add(k)
+      console.error(`图集未收录变体：${k}`)
+    }
+    return -1
   }
 
   /** frame → UV(写入 out[0..3] = u0,v0,u1,v1) */
@@ -225,13 +233,23 @@ export class EcsAtlas {
     for (const id of plain) take(id, undefined)
 
     const atlas = new EcsAtlas()
+    // 单个变体失败不拦开战：只记错误，该变体不入表
     const imgs = await Promise.all(
-      variants.map(async ({ id, outline }) => rasterize(await emojiSvgText(id), outline)),
+      variants.map(async ({ id, outline }) => {
+        try {
+          return await rasterize(await emojiSvgText(id), outline)
+        } catch (e) {
+          console.error(`图集变体光栅化失败：${variantKey(id, outline)}`, e)
+          return undefined
+        }
+      }),
     )
     for (let i = 0; i < variants.length; i++) {
+      const img = imgs[i]
+      if (!img) continue
       const { id, outline } = variants[i]!
       const frame = atlas.alloc()
-      atlas.place(frame, imgs[i]!)
+      atlas.place(frame, img)
       atlas.keyToFrame.set(variantKey(id, outline), frame)
     }
     atlas.scene = scene

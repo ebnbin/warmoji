@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../manifest'
+import { OUTLINED_EMOJIS, PLAIN_EMOJIS, PRELOAD_EMOJIS } from '../manifest'
 import { ANIM_SETS } from './anim'
 
 // 守卫：游戏引用的 emoji ID 必须都在 ordering.txt 里，缺失的在运行时只会渲染不出来
@@ -9,10 +9,11 @@ const ordering = new Set(
 )
 
 describe('emoji ID 完整性', () => {
-  it('预载 / 描边 / 动画引用的每个 emoji ID 都在 ordering 全集中', () => {
+  it('预载 / 描边 / 不描边 / 动画引用的每个 emoji ID 都在 ordering 全集中', () => {
     const ids = new Set<string>([
       ...PRELOAD_EMOJIS,
       ...Object.values(OUTLINED_EMOJIS).flat(),
+      ...PLAIN_EMOJIS,
       ...ANIM_SETS.map((s) => s.emoji),
     ])
     const missing = [...ids].filter((id) => !ordering.has(id)).sort()

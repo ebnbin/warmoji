@@ -163,8 +163,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.ctx.h = this.mapH = h
     this.map.build(this.ctx)
 
-    const center = origin
-    this.centerObj = this.add.zone(center.x, center.y, 1, 1)
+    this.centerObj = this.add.zone(origin.x, origin.y, 1, 1)
     ;(this.ctx as { anchor: Phaser.GameObjects.Zone }).anchor = this.centerObj
     this.map.camera(this.ctx)
 
@@ -192,12 +191,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         .setDepth(1000),
     )
 
-    void this.boot(++this.bootGen, run, center, hint)
+    const gen = ++this.bootGen
+    this.boot(gen, run, hint).catch((e: unknown) => {
+      console.error('ECS 战斗启动失败', e)
+      if (gen === this.bootGen) hint.setText('战斗启动失败，请暂停后结束本局')
+    })
 
     setActiveHudHost(this) // 须先登记再拉起 HUD
     this.scene.launch('ui')
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.bootGen++ // 在途的 boot 作废
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.scene.stop('ui')
       // e2e 靠 __ecs.ready 判断战斗已收场；换成空壳以放开对本局的引用
@@ -212,15 +216,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     // ESC 已绑定在 UIScene 上，此处不得再接
   }
 
-  private async boot(
-    gen: number,
-    run: RunState,
-    center: { x: number; y: number },
-    hint: Phaser.GameObjects.Text,
-  ): Promise<void> {
+  private async boot(gen: number, run: RunState, hint: Phaser.GameObjects.Text): Promise<void> {
     const atlas = await EcsAtlas.build(this, OUTLINED_EMOJIS, PLAIN_EMOJIS)
-    // 构建图集期间场景可能已重开：isActive 仍为真，但本次 boot 已过期
-    if (gen !== this.bootGen || !this.scene.isActive()) return
+    // 场景关闭或重开后本次 boot 作废；暂停不作废
+    if (gen !== this.bootGen) return
     this.atlas = atlas
     resetEntityStorage()
     for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
@@ -235,6 +234,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
     this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
+    // 出生点以 centerObj 为准：开局前的视口变化只挪它
+    const center = { x: this.centerObj.x, y: this.centerObj.y }
     this.sim = makeSim(this.world, atlas, run, run.sandbox, center, this.mapW, this.mapH)
     this.damageText = new DamageTextLayer(this, this.sim.damageNumbers, this.damageNumbersOn)
     initialLayout(this.sim)
@@ -520,7 +521,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const sim = this.sim
     const fromW = this.mapW
     const fromH = this.mapH
-    const { w, h } = this.map.layout(this.ctx)
+    const { w, h, origin } = this.map.layout(this.ctx)
     this.ctx.w = this.mapW = w
     this.ctx.h = this.mapH = h
     this.map.resize(this.ctx)
@@ -530,6 +531,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       sim.mapH = h
       remapSim(sim, fromW, fromH, w, h)
       this.centerObj.setPosition(centerX(sim), centerY(sim))
+    } else {
+      this.centerObj.setPosition(origin.x, origin.y)
     }
   }
 

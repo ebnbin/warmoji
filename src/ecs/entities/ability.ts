@@ -321,7 +321,7 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
       // 塔自持的 projectile 能力从这里抄外形
       assertFree(c.world, e, Bolt, '弹丸外形组件')
       addComponent(c.world, e, Bolt)
-      Bolt.frame[e] = c.frames.index(d.projectile.emoji, 'player')
+      Bolt.frame[e] = c.frames.index(d.projectile.emoji, Faction.v[e] === FACTION.enemy ? 'enemyProjectile' : 'player')
       Bolt.size[e] = d.projectile.size
       Bolt.radius[e] = d.projectile.radius
       Bolt.speed[e] = d.projectile.speed

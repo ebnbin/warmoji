@@ -31,9 +31,9 @@ export function cooldownMul(sim: Sim, e: number): number {
   return Amp.cd[e]! * sim.battleFx.teamCooldownMul * atk * lab
 }
 
-/** 试炼场里常规出手不吃波次成长，队长技能载荷照常吃 */
-export function waveScale(sim: Sim, e: number): number {
-  if (sim.sandbox && Amp.battle[e]) return 1
+/** 试炼场恒 1 */
+export function waveScale(sim: Sim): number {
+  if (sim.sandbox) return 1
   return waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
 }
 
