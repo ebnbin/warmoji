@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
-import { Dormant, Nest, Transform } from '../components'
+import { removeEntity } from 'bitecs'
+import { DanceWindow, Dormant, Nest, Transform } from '../components'
 import { enemyDef } from '../store'
 import { resetEntityStorage } from '../storage'
 import { INITIAL_CAPACITY, makeWorld } from '../world'
@@ -25,4 +26,35 @@ it('eid 越过初始容量后写入照常读回，重置后容量复原', () => 
   expect(Transform.x.length).toBe(INITIAL_CAPACITY)
   expect(enemyDef.length).toBe(INITIAL_CAPACITY)
   expect(enemyDef[eid]).toBeUndefined()
+})
+
+// 守卫：新实体读到同一 eid 上一任留下的组件值，曾致蹦迪窗口串到下一波、角色继承敌人的休眠整局不出手
+
+it('新实体不带同一 eid 上一任的值：同 world 回收与新 world 重发都一样', () => {
+  const dirty = (eid: number): void => {
+    DanceWindow.until[eid] = 5000
+    Dormant.v[eid] = 1
+    Nest.of[eid] = 7
+    enemyDef[eid] = {} as EnemyDef
+  }
+  const expectClean = (eid: number): void => {
+    expect(DanceWindow.until[eid]).toBe(0)
+    expect(Dormant.v[eid]).toBe(0)
+    expect(Nest.of[eid]).toBe(-1)
+    expect(enemyDef[eid]).toBeUndefined()
+  }
+  resetEntityStorage()
+  const world = makeWorld()
+  const first = newEntity(world)
+  dirty(first)
+  removeEntity(world, first)
+  const recycled = newEntity(world)
+  expect(recycled).toBe(first)
+  expectClean(recycled)
+
+  dirty(recycled)
+  resetEntityStorage()
+  const reissued = newEntity(makeWorld())
+  expect(reissued).toBe(first)
+  expectClean(reissued)
 })

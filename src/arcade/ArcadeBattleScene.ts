@@ -543,7 +543,6 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
       wave: this.run.wave,
       seconds: Math.floor(this.elapsedMs / 1000),
       remainMs: Math.max(0, waveDurationMs(this.run.wave) - this.elapsedMs),
-      over: this.over,
       bossHp: this.boss?.active ? enemyOf(this.boss).hp : null,
       bossMaxHp: bossFor(this.run.mapId).hp,
       battleFx: this.battleMods.map((m) => ({

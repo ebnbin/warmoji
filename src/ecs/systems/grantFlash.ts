@@ -6,7 +6,7 @@ import type { Sim } from '../sim'
 export function grantFlash(sim: Sim): void {
   for (const eid of query(sim.world, [Collected, GrantFlash])) {
     const color = GrantFlash.color[eid]!
-    const until = sim.elapsedMs + GrantFlash.ms[eid]!
+    const until = sim.fxMs + GrantFlash.ms[eid]!
     for (const m of sim.characters) {
       if (!Alive.v[m]) continue
       CharFlash.until[m] = until

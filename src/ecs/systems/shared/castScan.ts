@@ -19,7 +19,7 @@ export function castScan(sim: Sim, comp: object & CdComp, cast: (eid: number) =>
     if (hasComponent(sim.world, e, Manual)) continue
     if (Frozen.v[e] || Disarmed.v[e] || comp.cdLeft[e]! > 0) continue
     if (cast(e) === false) continue
-    if (hasComponent(sim.world, e, Fired)) Fired.at[e] = sim.fxMs
+    if (hasComponent(sim.world, e, Fired)) Fired.v[e] = 1
     if (comp.cdBase[e]! > 0) comp.cdLeft[e] = comp.cdBase[e]! * cooldownMul(sim, e)
   }
 }

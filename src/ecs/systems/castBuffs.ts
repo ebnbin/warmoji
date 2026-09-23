@@ -8,7 +8,7 @@ export function castBuffs(sim: Sim): void {
     TeamDamage.until[sim.captain] = sim.elapsedMs + Buff.durationMs[e]!
     for (const m of sim.characters) {
       if (!Alive.v[m]) continue
-      CharFlash.until[m] = sim.elapsedMs + 350
+      CharFlash.until[m] = sim.fxMs + 350
       Tint.color[m] = 0x80d8ff
       Tint.effect[m] = 0
     }

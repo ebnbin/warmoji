@@ -14,7 +14,6 @@ export interface HudSnapshot {
   wave: number
   seconds: number
   remainMs: number
-  over: boolean
   /** null = 无 Boss */
   bossHp: number | null
   bossMaxHp: number

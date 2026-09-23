@@ -1,12 +1,16 @@
 import { INITIAL_CAPACITY } from './world'
 
 // 数组按 eid 索引，扩容时整体替换（见 storage.ts）：不得缓存数组引用，也不得写 `X.f[i] = 会建实体的调用()`。
-// spawn 时须写全字段，跨局复用不清理
+// newEntity 发出 eid 时，该 eid 在全部列上复位为初值
 
-type Column = Float32Array | Int32Array | Uint32Array | Uint8Array
+export type Column = Float32Array | Int32Array | Uint32Array | Uint8Array
 
 /** 非 0 初值的列 */
 const FILL = new WeakMap<Column, number>()
+
+export function columnFill(col: Column): number {
+  return FILL.get(col) ?? 0
+}
 
 const f32 = (): Float32Array => new Float32Array(INITIAL_CAPACITY)
 const i32 = (): Int32Array => new Int32Array(INITIAL_CAPACITY)
@@ -87,7 +91,7 @@ export const Wander = { seed: f32(), amp: f32() }
 
 export const Breath = { phase: f32() }
 
-/** until 结束时刻（0 = 无）；back 1 = Back.easeOut，0 = 线性 */
+/** until 结束时刻（0 = 无；队员复活按 fxMs，敌人入场按 elapsedMs）；back 1 = Back.easeOut，0 = 线性 */
 export const Pop = { until: f32(), ms: f32(), size: f32(), back: u8(), alpha: f32() }
 
 export const Alive = { v: u8() }
@@ -290,9 +294,9 @@ export const Modifier = { totalMs: f32() }
 export const Due = { at: f32() }
 
 /** 纯视觉；y0 = 落点，Transform.y = y0 + 偏移 */
-export const Bob = { y0: f32(), amp: f32(), halfMs: f32() }
+export const Bob = { y0: f32(), amp: f32(), halfMs: f32(), born: f32() }
 
-/** breathe 1 = 呼吸（born 定相位），0 = 静止且半径由持有系统写；dy 相对 Transform 的纵向偏移 */
+/** breathe 0 = 静止且半径由持有系统写，非 0 = 呼吸档位（见 render/rings.ts，born 定相位）；dy 相对 Transform 的纵向偏移 */
 export const Ring = {
   color: u32(),
   radius: f32(),
@@ -312,7 +316,8 @@ export const RING_SET = [Ring, Transform, Tint] as const
 // ── 区域 ──
 
 /** 半径 px；效果只落在对面阵营；on 每帧由 updateZones 推导，消费方只读 */
-export const Zone = { radius: f32(), faction: u8(), enterMs: f32(), on: u8() }
+/** fadeAt 到期后开始淡出的 fxMs，0 = 未到期 */
+export const Zone = { radius: f32(), faction: u8(), enterMs: f32(), on: u8(), fadeAt: f32() }
 
 /** srcSlot 战报归属，敌方区 -1 */
 export const ZoneBurn = { damage: f32(), tickMs: f32(), nextAt: f32(), srcSlot: i32() }
@@ -333,8 +338,8 @@ export const GroundHit = { last: f32() }
 /** 出手位置来源；Owner 是归属与状态来源，二者可不同（弩塔） */
 export const Anchor = { eid: i32() }
 
-/** 视觉钟；castScan 出手成功时写入 */
-export const Fired = { at: f32() }
+/** 出手标记：castScan 出手成功时置 1，消费方读到后清 0 */
+export const Fired = { v: u8() }
 
 /** 有此组件 = 有手持外形；位姿由各 kind 的摆位系统写 */
 export const Held = {

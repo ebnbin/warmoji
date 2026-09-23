@@ -22,7 +22,7 @@ export function spawnDecor(world: EcsWorld, atlas: FrameIndex, init: DecorInit):
   return eid
 }
 
-/** init 的 x/y 只是首帧占位 */
+/** init 的 x/y 须是 d 对应的首帧位置，此后由 driftDecor 接管 */
 export function spawnDriftDecor(
   world: EcsWorld,
   atlas: FrameIndex,

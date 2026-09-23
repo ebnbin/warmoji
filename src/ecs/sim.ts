@@ -1,7 +1,12 @@
 import { UNIT } from '../util/units'
 import { SIM_PIPELINE } from './systems/pipeline/sim'
 import { runPipeline } from './systems/pipeline/step'
-import { animateCharacters } from './systems/animateCharacters'
+import { animateCharacters, finishCharacterPops } from './systems/animateCharacters'
+import { characterVisual } from './systems/characterVisual'
+import { finishEnemyPops } from './systems/popInEnemies'
+import { hideTelegraphs } from './systems/blinkTelegraphs'
+import { finishZoneFades } from './systems/updateZones'
+import { updateEmplacements } from './systems/updateEmplacements'
 import { stepPickupVisuals } from './systems/stepPickupVisuals'
 import { updateShards } from './systems/updateShards'
 import { animateBooms } from './systems/animateBooms'
@@ -47,7 +52,7 @@ export interface Sim {
   mapW: number
   mapH: number
   hooks: WorldHooks
-  /** 只有 hooks 与场景侧建场/取视觉碰它 */
+  /** 只有 hooks 写；场景侧读来画，并排空 walls.smashed */
   worldState: WorldState
   /** 场景侧每帧回填 */
   view: { x: number; y: number; right: number; bottom: number }
@@ -74,7 +79,7 @@ export interface Sim {
   /** 每帧重建，含环面镜像坐标；我方索敌不走快照，见 utils/targets.ts */
   characterTargets: Target[]
   frames: FrameIndex
-  /** 按 run 种子确定 */
+  /** 按 run 种子与波次确定：同一局同一波可复现，各波不同 */
   rng: Rng
   sandbox: boolean
   spawnCooldownMs: number
@@ -100,6 +105,8 @@ export interface RewardConfig {
 
 /** 实体已移除，死亡效果按此在死亡点重放 */
 export interface PendingDeath {
+  /** 当场重放时死者仍在世；延后重放时为 -1 */
+  eid: number
   def: import('../types/enemies').EnemyDef
   x: number
   y: number
@@ -125,13 +132,19 @@ export function worldTimeScale(sim: Sim): number {
   return sim.timeStopMsLeft > 0 ? timeScaleFor(sim.chrono) : 1
 }
 
-/** 过场冻结期：世界全停，纯视觉照旧收尾 */
+/** 过场冻结期：世界全停，纯视觉照旧收尾；随世界钟走的过渡直接到位 */
 export function stepFrozenVisuals(sim: Sim): void {
   sim.fxMs += sim.dtMs
   updateShards(sim)
   animateBooms(sim)
   expireFx(sim)
   stepPickupVisuals(sim)
+  characterVisual(sim)
+  finishCharacterPops(sim)
+  finishEnemyPops(sim)
+  hideTelegraphs(sim)
+  finishZoneFades(sim)
+  updateEmplacements(sim)
 }
 
 /** 帧长由场景在帧起点写进 sim；次序见 pipeline/sim.ts */
@@ -197,7 +210,7 @@ export function makeSim(
     pendingDeaths: [],
     out: newOutbox(),
     damageNumbers: newDamageNumbers(),
-    rng: new Rng(run.decorSeed ^ 0x9e37),
+    rng: new Rng((run.decorSeed ^ 0x9e37 ^ Math.imul(run.wave, 0x9e3779b1)) >>> 0),
     sandbox,
     spawnCooldownMs: 300,
     run,

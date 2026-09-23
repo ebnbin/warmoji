@@ -30,9 +30,6 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     ...Object.values(FIELD_PICKUPS).map((p) => p.emoji),
     '2795',
     '1f480',
-    // 刷怪预告 ⚠ 与天体横扫 🪐（后者不依赖战场拾取恰好也用 🪐）
-    SPAWN.markEmoji,
-    '1fa90',
     // 💰 金袋投掷物、🫘 能量豆
     '1f4b0',
     '1fad8',
@@ -47,8 +44,8 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   ],
 }
 
-/** 图集里不描边的特效贴图 */
-export const PLAIN_EMOJIS: readonly string[] = ['1f4a5']
+/** 图集里不描边的贴图：💥 爆裂、⚠ 刷怪预告、🪐 天体横扫 */
+export const PLAIN_EMOJIS: readonly string[] = ['1f4a5', SPAWN.markEmoji, '1fa90']
 
 function armedBodyEmojis(): string[] {
   return [...ENEMY_DEFS, ...BOSSES].flatMap((e) =>

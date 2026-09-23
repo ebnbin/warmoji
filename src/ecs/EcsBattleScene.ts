@@ -19,7 +19,6 @@ import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAPS } from '../data/maps'
-import { onFloe } from './worlds/ice'
 import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
@@ -56,12 +55,15 @@ import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from '../run/sandbox'
 import { tickSkillCd } from '../run/state'
 import { hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
-import type { HudSnapshot } from '../run/hudHost'
+import type { HudSnapshot, WaveSummary } from '../run/hudHost'
 import type { Sim } from './sim'
 import { drain } from './outbox'
 import type { Burst } from './outbox'
 import { rollWaveCarriers } from './utils/battleFx'
 import { centerX, centerY } from './utils/team'
+
+/** Boss 倒下到结算的视觉等待，让碎块飞散可见 */
+const BOSS_SETTLE_MS = 700
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
@@ -101,6 +103,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private shownCountdown: number[] = []
   private hitShakeOn = false
   private seenHitCount = 0
+  /** Boss 倒下时的 fxMs；-1 = 未倒下 */
+  private bossDownAt = -1
   private damageNumbersOn = false
   private damageText?: DamageTextLayer
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -108,7 +112,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private puffBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private timeStopFx?: Phaser.GameObjects.Rectangle
   private timeStopFxAlpha = 0
-  private waterVignette?: Phaser.GameObjects.Rectangle
   private centerObj!: Phaser.GameObjects.Zone
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -137,6 +140,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.deadTexts = []
     this.shownCountdown = []
     this.seenHitCount = 0
+    this.bossDownAt = -1
     this.damageText = undefined
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
@@ -145,7 +149,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   create(): void {
     this.resetSceneFields()
     this.world = makeWorld()
-    ;(window as unknown as { __ecsWorld?: EcsWorld }).__ecsWorld = this.world
 
     const run = getRun()
     this.run = run
@@ -197,9 +200,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.scene.stop('ui')
-      // e2e 靠 __ecs.ready 判断战斗已收场
-      const probe = (window as unknown as { __ecs?: { ready: boolean } }).__ecs
-      if (probe) probe.ready = false
+      // e2e 靠 __ecs.ready 判断战斗已收场；换成空壳以放开对本局的引用
+      ;(window as unknown as { __ecs?: { ready: boolean } }).__ecs = { ready: false }
       this.atlas?.dispose()
       this.cues?.destroy()
       this.rings?.destroy()
@@ -236,8 +238,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.sim = makeSim(this.world, atlas, run, run.sandbox, center, this.mapW, this.mapH)
     this.damageText = new DamageTextLayer(this, this.sim.damageNumbers, this.damageNumbersOn)
     initialLayout(this.sim)
-    this.map.onSimReady(this.ctx, this.sim)
     this.sim.hooks.onStart(this.sim)
+    this.map.onSimReady(this.ctx, this.sim)
     // 亡语须同步重放：同帧先死者的治疗要救得到同伴
     const simRef = this.sim
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
@@ -310,7 +312,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const layers = (): number => this.unsortedLayers()
     const pages = (): number => this.atlas?.pageCount ?? 0
     const map = (): { w: number; h: number } => ({ w: this.mapW, h: this.mapH })
-    const inWater = (): boolean => this.waterVignette !== undefined && !onFloe(centerX(sim), centerY(sim), this.mapW)
     const cam = (): Phaser.Cameras.Scene2D.Camera => this.cameras.main
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
@@ -350,7 +351,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       get over() { return sim.over },
       get alive() { return sim.characters.filter((eid) => Alive.v[eid]).length },
       get memberHp() { return sim.characters.map((eid) => CharHp.hp[eid]!) },
-      get inWater() { return inWater() },
       get dormant() { return Array.from(query(world, [Enemy]), (eid) => Dormant.v[eid]!).filter((v) => v === 1).length },
       get camX() { return cam().scrollX + cam().width / 2 },
       get camY() { return cam().scrollY + cam().height / 2 },
@@ -442,7 +442,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       wave: this.run.wave,
       seconds: Math.floor(elapsed / 1000),
       remainMs: Math.max(0, waveDurationMs(this.run.wave) - elapsed),
-      over: sim?.over ?? false,
       bossHp: boss !== undefined ? Hp.v[boss]! : null,
       bossMaxHp: bossFor(this.run.mapId).hp,
       battleFx: (sim ? activeMods(sim) : []).map((e) => ({
@@ -569,7 +568,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       kills: run.kills - this.waveBaseKills,
       coins: run.coins - this.waveBaseCoins,
       levels: run.xp.level - this.waveBaseLevel,
-    })
+    } satisfies WaveSummary)
     this.time.delayedCall(WAVE.summaryMs, () => {
       if (finished) this.scene.start('result', { win: true })
       else if (run.cardDraws > 0) this.scene.start('cards')
@@ -590,11 +589,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.damageText?.step(sim.fxMs)
       return
     }
-    if (!this.sandbox && sim.elapsedMs >= waveDurationMs(sim.run.wave)) {
-      const finished = settleWave(sim)
-      this.scheduleWaveEnd(finished)
-      return
-    }
+    // 越线帧只模拟到时限为止，世界时间恰好停在波末
+    const leftMs = this.sandbox ? Infinity : waveDurationMs(sim.run.wave) - sim.elapsedMs
+    const lastFrame = sim.wdtMs >= leftMs
+    if (lastFrame) sim.wdtMs = leftMs
     const kx =
       (held(this.cursors?.left) || held(this.wasd?.A) ? -1 : 0) +
       (held(this.cursors?.right) || held(this.wasd?.D) ? 1 : 0)
@@ -629,9 +627,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     if (!this.sandbox && sim.bossDown) {
       // 这段延迟内不置 ending，世界照常运转
       sim.bossDown = false
-      this.time.delayedCall(700, () => {
-        if (this.sim && !this.ending) this.scheduleWaveEnd(settleWave(this.sim))
-      })
+      this.bossDownAt = sim.fxMs
     }
     if (sim.over) {
       this.ending = true
@@ -645,5 +641,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
     if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
+    // 结算只在 stepFrame 之后：此前挂上的技能请求都已施放；须在全灭判定之后，时限内全灭判负
+    const bossSettle = this.bossDownAt >= 0 && sim.fxMs - this.bossDownAt >= BOSS_SETTLE_MS
+    if (lastFrame || bossSettle) this.scheduleWaveEnd(settleWave(sim))
   }
 }

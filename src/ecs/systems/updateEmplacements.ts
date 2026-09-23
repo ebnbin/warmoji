@@ -35,7 +35,8 @@ export function updateEmplacements(sim: Sim): void {
       Transform.h[t] = Minion.size[t]!
     }
     Tint.alpha[t] = 1
-    if (Fired.at[t] === sim.fxMs) {
+    if (Fired.v[t]) {
+      Fired.v[t] = 0
       Transform.rot[t] = Aim.rad[t]! - Math.PI / 4
       playClip(sim, sim.frames, t, 'attack', Shoot.cdLeft[t]!)
     }

@@ -95,8 +95,8 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
   // 变形中死亡不触发亡语与失巢暴走
   const hexed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
   if (!hexed && def?.onDeath) {
-    const snap = { def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: DmgMul.v[eid]! }
-    if (sim.onDeathFx) sim.onDeathFx(snap)
+    const snap = { eid: -1, def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: DmgMul.v[eid]! }
+    if (sim.onDeathFx) sim.onDeathFx({ ...snap, eid })
     else sim.pendingDeaths.push(snap)
   }
   if (def?.spawner) orphanBrood(sim, eid, !hexed)
@@ -178,7 +178,7 @@ export function hurtCharacter(sim: Sim, eid: number, damage: number, srcName?: s
   CharHp.hp[eid] = hp
   playSfx('hurt')
   sim.characterHitCount++
-  CharFlash.until[eid] = sim.elapsedMs + 120
+  CharFlash.until[eid] = sim.fxMs + 120
   Tint.color[eid] = tint
   Tint.effect[eid] = 0
   if (hp <= 0) {
@@ -209,6 +209,9 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   Tint.color[eid] = 0xffffff
   Tint.alpha[eid] = 1
   Tint.effect[eid] = 0
-  Pop.until[eid] = now + 200
+  Pop.until[eid] = sim.fxMs + 200
+  // 弹入首帧即从小尺寸起
+  Transform.w[eid] = MEMBER.size * UNIT * 0.3
+  Transform.h[eid] = MEMBER.size * UNIT * 0.3
 }
 

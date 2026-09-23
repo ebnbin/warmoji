@@ -35,10 +35,15 @@ export function wanderDir(sim: Sim, eid: number): Point {
   return d
 }
 
+/** 返回相对自身的最近镜像 */
 export function aimPoint(sim: Sim, eid: number, atCenter: boolean): Point | null {
-  return atCenter ? teamCenter(sim) : nearestAlive(sim, Transform.x[eid]!, Transform.y[eid]!)
+  const x = Transform.x[eid]!
+  const y = Transform.y[eid]!
+  if (!atCenter) return nearestAlive(sim, x, y)
+  const c = teamCenter(sim)
+  const d = sim.hooks.worldDelta(sim, x, y, c.x, c.y)
+  return { x: x + d.x, y: y + d.y }
 }
-
 
 /** 纯几何，不读 sim */
 export function fleeSteer(

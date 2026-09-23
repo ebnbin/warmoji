@@ -27,7 +27,7 @@ import { UNIT } from '../../util/units'
 import { playSfx } from '../../audio/sfx'
 import { PICKUP, PICKUPS } from '../../data/pickups'
 import { FIELD, POLARITY_COLOR } from '../../data/battlefield'
-import { backEaseOut } from '../utils/ease'
+import { backEaseOut, sineEaseInOut } from '../utils/ease'
 
 
 export interface PickupSpec {
@@ -84,6 +84,7 @@ export function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): n
   Bob.y0[eid] = p.y
   Bob.amp[eid] = spec.bob
   Bob.halfMs[eid] = 620
+  Bob.born[eid] = sim.fxMs
   if (spec.ring) {
     addComponent(sim.world, eid, Ring)
     Ring.color[eid] = spec.ring.color
@@ -170,12 +171,12 @@ export function attachCarrierRing(sim: Sim, eid: number, def: FieldPickupDef): v
   Ring.color[eid] = POLARITY_COLOR[def.polarity]
   Ring.radius[eid] = FIELD.auraRadiusU * UNIT
   Ring.fillAlpha[eid] = 0.18
-  Ring.lineAlpha[eid] = 0.9
+  Ring.lineAlpha[eid] = 0.85
   Ring.lineWidth[eid] = 3
   Ring.born[eid] = sim.fxMs
   Ring.dy[eid] = 0
   Ring.z[eid] = 4
-  Ring.breathe[eid] = 1
+  Ring.breathe[eid] = 2
 }
 
 
@@ -193,8 +194,9 @@ export function animatePickup(sim: Sim, eid: number): void {
   }
   if (Bob.amp[eid]! > 0) {
     // 光圈按 -off 抵消，贴在落点
-    const t = (sim.fxMs % (Bob.halfMs[eid]! * 2)) / Bob.halfMs[eid]!
-    const off = -Bob.amp[eid]! * (t <= 1 ? t : 2 - t)
+    const half = Bob.halfMs[eid]!
+    const t = ((sim.fxMs - Bob.born[eid]!) % (half * 2)) / half
+    const off = -Bob.amp[eid]! * sineEaseInOut(t <= 1 ? t : 2 - t)
     Transform.y[eid] = Bob.y0[eid]! + off
     Ring.dy[eid] = -off
   }

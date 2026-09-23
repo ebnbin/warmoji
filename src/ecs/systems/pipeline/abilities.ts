@@ -121,7 +121,7 @@ const KINDS: readonly Kind[] = [
       },
     ],
     after: ['projectile'],
-    why: '弩塔自持 projectile 能力、由 castProjectiles 代为出手；它的拉弓动画读 Fired.at === fxMs，须同帧看到那一次出手',
+    why: '弩塔自持 projectile 能力、由 castProjectiles 代为出手；它的拉弓动画消费 Fired 出手标记，须同帧看到那一次出手',
   },
   { name: 'slowAura', cast: castSlowAuras },
 ]

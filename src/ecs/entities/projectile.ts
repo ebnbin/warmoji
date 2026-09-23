@@ -16,14 +16,14 @@ function spawnBolt(
   y: number,
   angle: number,
   faction: number,
-  art: { frame: number; size: number; speed: number; rotOffsetDeg: number },
+  art: { frame: number; size: number; speed: number; rot: number },
 ): number {
   const eid = newEntity(sim.world)
   // prettier-ignore
   addComponents(sim.world, eid, Projectile, Transform, Vel, Proj, PrevPos, Faction, Sprite, Tint, Depth)
   Transform.x[eid] = x
   Transform.y[eid] = y
-  Transform.rot[eid] = angle + art.rotOffsetDeg * DEG2RAD
+  Transform.rot[eid] = art.rot
   Transform.w[eid] = art.size
   Transform.h[eid] = art.size
   PrevPos.x[eid] = x
@@ -55,7 +55,7 @@ export function spawnProjectileEcs(
     frame: Bolt.frame[src]!,
     size: Bolt.size[src]!,
     speed: Bolt.speed[src]!,
-    rotOffsetDeg: rotOffset,
+    rot: angle + rotOffset * DEG2RAD,
   })
   addComponents(sim.world, eid, SweptHit, WallStop)
   Proj.damage[eid] = damage
@@ -98,7 +98,8 @@ export function spawnEnemyProjectileEcs(
     frame: spec.frame,
     size: spec.size,
     speed: spec.speed,
-    rotOffsetDeg: 0,
+    // 敌弹贴图恒正立
+    rot: 0,
   })
   addComponent(sim.world, eid, WorldCull)
   Proj.damage[eid] = Math.round(spec.damage)

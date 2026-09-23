@@ -10,9 +10,8 @@ export function healCharacters(sim: Sim, x: number, y: number, range: number, am
     let n = 0
     for (const m of sim.characters) {
       if (!Alive.v[m]) continue
-      const dx = Transform.x[m]! - x
-      const dy = Transform.y[m]! - y
-      if (dx * dx + dy * dy > r2) continue
+      const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
+      if (d.x * d.x + d.y * d.y > r2) continue
       if (CharHp.hp[m]! >= CharHp.max[m]!) continue
       CharHp.hp[m] = Math.min(CharHp.max[m]!, CharHp.hp[m]! + amount)
       n++
@@ -23,9 +22,8 @@ export function healCharacters(sim: Sim, x: number, y: number, range: number, am
   let bestRatio = Infinity
   for (const m of sim.characters) {
     if (!Alive.v[m]) continue
-    const dx = Transform.x[m]! - x
-    const dy = Transform.y[m]! - y
-    if (dx * dx + dy * dy > r2) continue
+    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
+    if (d.x * d.x + d.y * d.y > r2) continue
     if (CharHp.hp[m]! >= CharHp.max[m]!) continue
     const ratio = CharHp.hp[m]! / CharHp.max[m]!
     if (ratio < bestRatio) {
@@ -53,9 +51,8 @@ export function healEnemies(
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     if (eid === excludeEid) continue
     if (Hp.v[eid]! >= Hp.max[eid]!) continue
-    const dx = Transform.x[eid]! - x
-    const dy = Transform.y[eid]! - y
-    if (dx * dx + dy * dy <= r2) hurt.push(eid)
+    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[eid]!, Transform.y[eid]!)
+    if (d.x * d.x + d.y * d.y <= r2) hurt.push(eid)
   }
   if (hurt.length === 0) return 0
   let targets: number[]

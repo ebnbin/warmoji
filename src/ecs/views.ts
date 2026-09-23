@@ -21,7 +21,6 @@ import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynigh
 import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/river'
 import { fitAspectRect } from './worlds/torus'
-import { generateRuins, reachableCells, WallGrid } from './worlds/ruins'
 import { setOverlayFill } from '../util/fx'
 
 const FOG_COLOR = 0x0a0a1a
@@ -58,7 +57,7 @@ export interface MapView {
   camera(v: ViewCtx): void
   /** 图集就位后 */
   decor(v: ViewCtx, atlas: EcsAtlas): void
-  /** sim 建好后 */
+  /** sim 建好、hooks.onStart 跑完后 */
   onSimReady(v: ViewCtx, sim: Sim): void
   step(v: ViewCtx, sim: Sim, delta: number): void
   /** 视口变化后；v.w/v.h 已按新 layout() 回填 */
@@ -395,20 +394,9 @@ class RuinsView extends BoundedView {
   private tiles = new Map<number, Phaser.GameObjects.Rectangle[]>()
 
   onSimReady(v: ViewCtx, sim: Sim): void {
-    const cfg = v.def.walls
-    if (!cfg) return
-    const cols = Math.round(v.w / UNIT)
-    const rows = Math.round(v.h / UNIT)
-    const rng = new Rng(v.run.decorSeed ^ 0x5eed)
-    const blocked = generateRuins(() => rng.next(), cols, rows, {
-      blocks: cfg.blocks,
-      maxLen: cfg.maxLen,
-      centerClearU: cfg.centerClearU,
-    })
-    const grid = new WallGrid(cols, rows, UNIT, blocked)
-    // 刷怪点须从中心可达
-    const cells = [...reachableCells(grid, Math.floor(cols / 2), Math.floor(rows / 2))]
-    sim.worldState.walls = { grid, flowCellX: -1, flowCellY: -1, reflowAcc: 0, spawnCells: cells, smashed: [] }
+    const w = sim.worldState.walls
+    if (!w) return
+    const { cols, rows, blocked } = w.grid
     const base = Phaser.Display.Color.IntegerToColor(v.def.palette.map).darken(38).color
     const top = Phaser.Display.Color.IntegerToColor(v.def.palette.map).darken(18).color
     const capH = Math.max(3, UNIT * 0.22)
@@ -578,8 +566,10 @@ class RiverView extends SingleScreenView {
 
     const pool = v.def.drift ?? ['1f343']
     const halfCross = (horizontal ? r.h : r.w) / 2
+    const mid = horizontal ? r.y + r.h / 2 : r.x + r.w / 2
     for (let i = 0; i < cfg.driftCount; i++) {
       const cross = (Math.random() * 2 - 1) * halfCross * 0.92
+      const u = Math.random() * alongLen
       this.decorEids.push(
         spawnDriftDecor(
           v.world,
@@ -587,15 +577,15 @@ class RiverView extends SingleScreenView {
           {
             id: pool[Math.floor(Math.random() * pool.length)]!,
             outline: 'player',
-            x: 0,
-            y: 0,
+            x: horizontal ? v.w - u : mid + cross,
+            y: horizontal ? mid + cross : u,
             size: (0.35 + Math.random() * 0.25) * UNIT,
             alpha: 0.5,
             z: 1.5,
             spin: (Math.random() * 2 - 1) * 0.5,
           },
           {
-            u: Math.random() * alongLen,
+            u,
             cross,
             speedMul: driftSpeed(cross / halfCross, cfg, Math.random),
             swayPhase: Math.random() * Math.PI * 2,

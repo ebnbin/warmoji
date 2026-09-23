@@ -3,6 +3,7 @@ import { norm } from '../../util/vec'
 import { TEAM, MEMBER } from '../../data/characters'
 import { SPAWN } from '../../data/enemies'
 import { randomMapPoint } from '../utils/spawn'
+import { Rng } from '../../util/rng'
 import { MAPS } from '../../data/maps'
 import type { IceConfig, InfiniteConfig, MapDef, MapId, RiverConfig, ShrinkRingConfig, SpaceConfig } from '../../types/maps'
 import { approach, onFloe } from '../worlds/ice'
@@ -17,8 +18,7 @@ import { query, removeEntity } from 'bitecs'
 import { Alive, Boss, Dormant, Due, ENEMY_SET, Meteor, Radius, Slide, Tint, Transform, Uid } from '../components'
 import { enemyDef, meteorHit } from '../store'
 import { spawnMeteor } from '../entities/meteor'
-import { FlowField } from '../worlds/ruins'
-import type { WallGrid } from '../worlds/ruins'
+import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
 import { applyDamage, hurtCharacter } from '../systems/shared/combat'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
@@ -145,10 +145,12 @@ const bounded: WorldHooks = {
       y: Math.min(Math.max(next.y, clampMin), sim.mapH - clampMin),
     }
   },
-  constrainEnemy(sim, _eid, x, y) {
+  /** 整个身体留在图内 */
+  constrainEnemy(sim, eid, x, y) {
+    const r = Radius.v[eid]!
     return {
-      x: x < 0 ? 0 : x > sim.mapW ? sim.mapW : x,
-      y: y < 0 ? 0 : y > sim.mapH ? sim.mapH : y,
+      x: Math.min(Math.max(x, r), sim.mapW - r),
+      y: Math.min(Math.max(y, r), sim.mapH - r),
     }
   },
   constrainSpawn(sim, x, y) {
@@ -321,6 +323,23 @@ const ice: WorldHooks = {
 /** 有界 + 断壁：挡移动/子弹/视线；刷怪只落在从中心可达的格 */
 const ruins: WorldHooks = {
   ...bounded,
+  /** 断壁由 run 种子确定 */
+  onStart(sim) {
+    const cfg = MAPS[sim.mapId].walls
+    if (!cfg) return
+    const cols = Math.round(sim.mapW / UNIT)
+    const rows = Math.round(sim.mapH / UNIT)
+    const rng = new Rng(sim.run.decorSeed ^ 0x5eed)
+    const blocked = generateRuins(() => rng.next(), cols, rows, {
+      blocks: cfg.blocks,
+      maxLen: cfg.maxLen,
+      centerClearU: cfg.centerClearU,
+    })
+    const grid = new WallGrid(cols, rows, UNIT, blocked)
+    // 刷怪点须从中心可达
+    const spawnCells = [...reachableCells(grid, Math.floor(cols / 2), Math.floor(rows / 2))]
+    sim.worldState.walls = { grid, flowCellX: -1, flowCellY: -1, reflowAcc: 0, spawnCells, smashed: [] }
+  },
   constrainTeam(sim, next, delta) {
     const box = bounded.constrainTeam(sim, next, delta)
     const w = sim.worldState.walls
@@ -332,7 +351,7 @@ const ruins: WorldHooks = {
     // 穿墙与破墙的不吃墙碰撞
     const def = enemyDef[eid]
     if (!w || def?.phasesWalls || def?.breaksWalls) return box
-    return w.grid.resolveMove(Transform.x[eid]!, Transform.y[eid]!, box.x, box.y)
+    return w.grid.separateCircle(box.x, box.y, Radius.v[eid]!)
   },
   /** 不可达时回退直线 */
   chaseDir(sim, eid, tx, ty) {
@@ -614,16 +633,15 @@ const river: WorldHooks = {
     let oy = vy + f.y
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
-    const rad = Boss.v[eid] === 1 ? Radius.v[eid]! : 0
-    if (Boss.v[eid] === 1 || !r.horizontal) {
+    const rad = Radius.v[eid]!
+    const boss = Boss.v[eid] === 1
+    if (boss || !r.horizontal) {
       if (x <= r.x + rad && ox < 0) ox = 0
       if (x >= r.x + r.w - rad && ox > 0) ox = 0
     }
-    if (Boss.v[eid] === 1 || r.horizontal) {
-      const lo = r.y + (Boss.v[eid] === 1 ? rad : Radius.v[eid]!)
-      const hi = r.y + r.h - (Boss.v[eid] === 1 ? rad : Radius.v[eid]!)
-      if (y <= lo && oy < 0) oy = 0
-      if (y >= hi && oy > 0) oy = 0
+    if (boss || r.horizontal) {
+      if (y <= r.y + rad && oy < 0) oy = 0
+      if (y >= r.y + r.h - rad && oy > 0) oy = 0
     }
     return { vx: ox, vy: oy }
   },

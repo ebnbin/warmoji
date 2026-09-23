@@ -22,8 +22,28 @@ import { zoneSrcName } from '../store'
 import type { Sim } from '../sim'
 
 
-/** 效果在 until 停，视觉再淡这么久 */
+/** 效果在 until 停，视觉再按 fxMs 淡这么久 */
 const FADE_MS = 250
+
+/** 到期区域的淡出；返回是否已回收 */
+function fadeExpired(sim: Sim, z: number): boolean {
+  if (Zone.fadeAt[z] === 0) Zone.fadeAt[z] = sim.fxMs
+  const over = sim.fxMs - Zone.fadeAt[z]!
+  if (over >= FADE_MS) {
+    removeEntity(sim.world, z)
+    return true
+  }
+  Zone.on[z] = 0
+  Tint.alpha[z] = 1 - over / FADE_MS
+  return false
+}
+
+/** 过场冻结期：已在淡出的区域照常淡完 */
+export function finishZoneFades(sim: Sim): void {
+  for (const z of [...query(sim.world, ZONE_SET as unknown as object[])]) {
+    if (Zone.fadeAt[z] !== 0) fadeExpired(sim, z)
+  }
+}
 
 export function updateZones(sim: Sim): void {
   const world = sim.world
@@ -40,22 +60,16 @@ export function updateZones(sim: Sim): void {
       const w = Owner.eid[z]!
       Zone.on[z] = Frozen.v[w] === 0 && Disarmed.v[w] === 0 ? 1 : 0
     }
-    // 淡出的透明度压过开关
-    let alpha = Zone.on[z] ? 1 : 0
     const until = Lifetime.until[z]!
+    // 淡出的透明度压过开关
     if (until > 0 && now >= until) {
-      const over = now - until
-      if (over >= FADE_MS) {
-        removeEntity(world, z)
-        continue
-      }
-      Zone.on[z] = 0
-      alpha = 1 - over / FADE_MS
+      if (fadeExpired(sim, z)) continue
+    } else {
+      Tint.alpha[z] = Zone.on[z] ? 1 : 0
     }
     const enter = Zone.enterMs[z]!
     const age = sim.fxMs - Ring.born[z]!
     Ring.radius[z] = Zone.radius[z]! * (enter > 0 && age < enter ? 0.3 + 0.7 * backEaseOut(age / enter) : 1)
-    Tint.alpha[z] = alpha
   }
   const burns = [...query(world, [Zone, ZoneBurn, Transform])]
   if (burns.length === 0) return

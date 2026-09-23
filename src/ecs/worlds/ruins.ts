@@ -73,6 +73,47 @@ export class WallGrid {
     return null
   }
 
+  /** 圆与挡格重叠时逐格沿最短方向推出：贴墙即滑动，陷进墙里也能脱出 */
+  separateCircle(x: number, y: number, r: number): Point {
+    const cs = this.cellPx
+    let px = x
+    let py = y
+    const x0 = this.cellX(px - r)
+    const x1 = this.cellX(px + r)
+    const y0 = this.cellY(py - r)
+    const y1 = this.cellY(py + r)
+    for (let cy = y0; cy <= y1; cy++) {
+      for (let cx = x0; cx <= x1; cx++) {
+        if (!this.isBlockedCell(cx, cy)) continue
+        const lx = cx * cs
+        const ly = cy * cs
+        const hx = lx + cs
+        const hy = ly + cs
+        const dx = px - Math.min(Math.max(px, lx), hx)
+        const dy = py - Math.min(Math.max(py, ly), hy)
+        const d2 = dx * dx + dy * dy
+        if (d2 >= r * r) continue
+        if (d2 > 0) {
+          const d = Math.sqrt(d2)
+          px += (dx / d) * (r - d)
+          py += (dy / d) * (r - d)
+          continue
+        }
+        // 圆心在格内：沿穿透最浅的一侧推出
+        const left = px - lx
+        const right = hx - px
+        const up = py - ly
+        const down = hy - py
+        const m = Math.min(left, right, up, down)
+        if (m === left) px = lx - r
+        else if (m === right) px = hx + r
+        else if (m === up) py = ly - r
+        else py = hy + r
+      }
+    }
+    return { x: px, y: py }
+  }
+
   /** 目标格被挡就分轴放行 */
   resolveMove(fromX: number, fromY: number, toX: number, toY: number): Point {
     let nx = toX
