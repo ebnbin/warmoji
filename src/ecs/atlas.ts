@@ -42,6 +42,7 @@ export class EcsAtlas {
   /** frame → 页索引 */
   private readonly pageOf: Int32Array
   private readonly keyToFrame = new Map<string, number>()
+  private readonly reportedMissing = new Set<string>()
   private readonly pages: Phaser.Textures.CanvasTexture[] = []
   private readonly canvases: HTMLCanvasElement[] = []
   private readonly ctxs: CanvasRenderingContext2D[] = []
@@ -160,9 +161,16 @@ export class EcsAtlas {
     this.clips.set(key, { base, frames: clip.frames })
   }
 
-  /** 未收录返回 -1 */
+  /** 未收录返回 -1，每个变体只报一次错 */
   index(id: string, outline: OutlineKind | undefined): number {
-    return this.keyToFrame.get(variantKey(id, outline)) ?? -1
+    const k = variantKey(id, outline)
+    const frame = this.keyToFrame.get(k)
+    if (frame !== undefined) return frame
+    if (!this.reportedMissing.has(k)) {
+      this.reportedMissing.add(k)
+      console.error(`图集未收录变体：${k}`)
+    }
+    return -1
   }
 
   /** frame → UV(写入 out[0..3] = u0,v0,u1,v1) */
