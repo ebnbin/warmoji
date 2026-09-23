@@ -7,7 +7,7 @@ import { headingOf, muzzle } from '../utils/projectile'
 import { fireSfxOf, random, shoot } from './shared/projectile'
 import { sourceOf } from '../utils/source'
 import { castScan } from './shared/castScan'
-import { nearestAngle, targetsOf } from '../utils/targets'
+import { nearestAngle } from '../utils/targets'
 import type { Sim } from '../sim'
 
 export function castProjectiles(sim: Sim): void {
@@ -20,7 +20,7 @@ export function castProjectiles(sim: Sim): void {
       Aim.rad[e] = Math.atan2(h.y, h.x)
     } else if (!fullRing) {
       const range = Shoot.range[e]!
-      const aim = nearestAngle(ownerX(e), ownerY(e), targetsOf(sim, sourceOf(sim, e)), range > 0 ? range : undefined)
+      const aim = nearestAngle(sim, sourceOf(sim, e), ownerX(e), ownerY(e), range > 0 ? range : undefined)
       if (aim === null) return false
       Aim.rad[e] = aim
     }

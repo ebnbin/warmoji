@@ -3,6 +3,8 @@ import { ORBIT } from '../../data/feel'
 import { ringPostAngle } from '../../data/formation'
 import { angleDiff, orbitTendency, pickDriver, stepPhase, threatWeight } from '../utils/orbit'
 import type { OrbitThreat } from '../utils/orbit'
+import { eachTarget } from '../utils/targets'
+import { boltSource } from '../utils/source'
 import { Alive, Orbit, Threat, Transform } from '../components'
 import type { Sim } from '../sim'
 import { centerX, centerY } from '../utils/team'
@@ -14,6 +16,7 @@ export function updateOrbit(sim: Sim): void {
   const range = ORBIT.detectRange * UNIT
   const rangeSq = range * range
   const wants = new Array<number>(sim.characters.length).fill(0)
+  const src = boltSource(-1)
   let rotatable = false
   for (let slot = 0; slot < sim.characters.length; slot++) {
     const eid = sim.characters[slot]!
@@ -25,18 +28,20 @@ export function updateOrbit(sim: Sim): void {
     if (base !== null) rotatable = true
     const theta = (base ?? 0) + Orbit.phase[sim.captain]!
     const threats: OrbitThreat[] = []
-    for (const t of sim.enemyTargets) {
-      const dx = t.x - Transform.x[eid]!
-      const dy = t.y - Transform.y[eid]!
+    const mx = Transform.x[eid]!
+    const my = Transform.y[eid]!
+    eachTarget(sim, src, mx, my, range, (_t, tx, ty) => {
+      const dx = tx - mx
+      const dy = ty - my
       const dSq = dx * dx + dy * dy
-      if (dSq >= rangeSq) continue
+      if (dSq >= rangeSq) return
       Threat.v[eid] = 1
-      if (base === null || bias === 0) break
+      if (base === null || bias === 0) return true
       threats.push({
-        diff: angleDiff(theta, Math.atan2(t.y - centerY(sim), t.x - centerX(sim))),
+        diff: angleDiff(theta, Math.atan2(ty - centerY(sim), tx - centerX(sim))),
         weight: threatWeight(Math.sqrt(dSq), range),
       })
-    }
+    })
     if (base !== null && bias !== 0) wants[idx] = orbitTendency(bias, threats)
   }
   if (!rotatable) return

@@ -7,7 +7,6 @@ import { grantMods } from '../grantMods'
 import { playPickupFx } from '../playPickupFx'
 import { reapCollected } from '../reapCollected'
 import { refreshCharacterTargets } from '../refreshCharacterTargets'
-import { refreshEnemyTargets } from '../refreshEnemyTargets'
 import { runDeathEffects } from '../runDeathEffects'
 import { spawnStep } from '../spawnStep'
 import { updateAnims } from '../updateAnims'
@@ -22,13 +21,7 @@ import type { Sim } from '../../sim'
 
 
 export const FRAME_PIPELINE: readonly Step[] = [
-  { name: 'refreshEnemyTargets', run: refreshEnemyTargets },
-  {
-    name: 'stepSim',
-    run: stepSim,
-    after: ['refreshEnemyTargets'],
-    why: 'stepSim 内的抛射物 onHit 效果链要用本帧位置；队伍 orbit 的威胁点也读这一份',
-  },
+  { name: 'stepSim', run: stepSim },
   { name: 'refreshCharacterTargets', run: refreshCharacterTargets },
   { name: 'armEnemies', run: armEnemies },
   {

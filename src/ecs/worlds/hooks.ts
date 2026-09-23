@@ -63,6 +63,8 @@ export function newWorldState(): WorldState {
 }
 
 export interface WorldHooks {
+  /** 坐标按地图尺寸回绕 */
+  readonly torus: boolean
   /** 世界差向量：环面取最短差；默认直减 */
   worldDelta(sim: Sim, fromX: number, fromY: number, toX: number, toY: number): Point
   /** 索敌镜像坐标；默认无 */
@@ -119,6 +121,7 @@ export interface WorldHooks {
 
 /** 有界世界基线 */
 const bounded: WorldHooks = {
+  torus: false,
   worldDelta(_sim, fromX, fromY, toX, toY) {
     return { x: toX - fromX, y: toY - fromY }
   },
@@ -673,6 +676,7 @@ const river: WorldHooks = {
 /** 坐标按模回绕，没有墙；距离/方向用环面最短差；子弹按寿命回收 */
 const torus: WorldHooks = {
   ...bounded,
+  torus: true,
   worldDelta(sim, fromX, fromY, toX, toY) {
     return torusDelta({ x: fromX, y: fromY }, { x: toX, y: toY }, sim.mapW, sim.mapH)
   },

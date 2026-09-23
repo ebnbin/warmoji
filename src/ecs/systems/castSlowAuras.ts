@@ -5,7 +5,7 @@ import { damageTarget } from './shared/damage'
 import { spawnZone } from '../entities/zone'
 import { sourceOf } from '../utils/source'
 import { castScan } from './shared/castScan'
-import { targetsOf } from '../utils/targets'
+import { targetsNear } from '../utils/targets'
 import type { Sim } from '../sim'
 import { spawnFxCircle } from '../entities/fx'
 
@@ -44,7 +44,7 @@ export function castSlowAuras(sim: Sim): void {
       else if ((Pulse.dps[e] = Pulse.dps[e]! - dt) <= 0) {
         Pulse.dps[e] = Pulse.dps[e]! + TICK_MS
         const damage = Math.max(1, Math.round(((AuraDps.perSec[e]! * TICK_MS) / 1000) * damageMul(sim, e)))
-        for (const t of targetsOf(sim, src)) {
+        for (const t of targetsNear(sim, src, x, y, radius)) {
           const dx = t.x - x
           const dy = t.y - y
           if (dx * dx + dy * dy <= r2) damageTarget(sim, src, t.eid, damage)
@@ -55,7 +55,7 @@ export function castSlowAuras(sim: Sim): void {
       if (Pulse.freeze[e] === 0) Pulse.freeze[e] = AuraFreeze.intervalMs[e]!
       else if ((Pulse.freeze[e] = Pulse.freeze[e]! - dt) <= 0) {
         Pulse.freeze[e] = Pulse.freeze[e]! + AuraFreeze.intervalMs[e]!
-        for (const t of targetsOf(sim, src)) {
+        for (const t of targetsNear(sim, src, x, y, radius)) {
           const dx = t.x - x
           const dy = t.y - y
           if (dx * dx + dy * dy > r2) continue

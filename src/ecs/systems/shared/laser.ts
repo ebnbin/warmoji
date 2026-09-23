@@ -4,7 +4,7 @@ import { Laser } from '../../components'
 import { damageMul, ownerX, ownerY } from '../../utils/amp'
 import { damageTarget } from './damage'
 import { sourceOf } from '../../utils/source'
-import { targetsOf } from '../../utils/targets'
+import { targetsNear } from '../../utils/targets'
 import type { Sim } from '../../sim'
 import { spawnFxBeam } from '../../entities/fx'
 
@@ -17,7 +17,7 @@ export function fireBeam(sim: Sim, e: number, angle: number, ratio: number): voi
   const beamRadius = Laser.beamRadius[e]!
   const ox = ownerX(e)
   const oy = ownerY(e)
-  const list = targetsOf(sim, src)
+  const list = targetsNear(sim, src, ox, oy, range + beamRadius)
   for (const i of thrustHitIndices({ x: ox, y: oy }, angle, range, beamRadius, list)) {
     damageTarget(sim, src, list[i]!.eid, damage, Laser.knockback[e]!, ox, oy)
   }

@@ -8,7 +8,7 @@ import { abilityOnHit } from '../store'
 import { applyAbilityEffects } from './shared/effects'
 import { sourceOf } from '../utils/source'
 import { castScan } from './shared/castScan'
-import { nearestAngle, targetsOf } from '../utils/targets'
+import { nearestAngle, targetsNear } from '../utils/targets'
 import type { Sim } from '../sim'
 
 export function castSweeps(sim: Sim): void {
@@ -17,9 +17,9 @@ export function castSweeps(sim: Sim): void {
     const radius = Sweep.radius[e]!
     const ox = ownerX(e)
     const oy = ownerY(e)
-    const list = targetsOf(sim, src)
-    const aim = nearestAngle(ox, oy, list, radius)
+    const aim = nearestAngle(sim, src, ox, oy, radius)
     if (aim === null) return false
+    const list = targetsNear(sim, src, ox, oy, radius)
     Aim.rad[e] = aim
     playSfx('whoosh')
     const damage = Math.round(Sweep.damage[e]! * damageMul(sim, e))

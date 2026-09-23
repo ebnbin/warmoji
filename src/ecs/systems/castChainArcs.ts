@@ -6,7 +6,7 @@ import { damageTarget } from './shared/damage'
 import { applyAbilityEffects } from './shared/effects'
 import { sourceOf } from '../utils/source'
 import { castScan } from './shared/castScan'
-import { nearestTarget, targetsOf } from '../utils/targets'
+import { nearestTarget } from '../utils/targets'
 import type { Target } from '../utils/targets'
 import type { Sim } from '../sim'
 import { spawnFxBolt } from '../entities/fx'
@@ -17,7 +17,7 @@ export function castChainArcs(sim: Sim): void {
     const ox = ownerX(e)
     const oy = ownerY(e)
     const visited = new Set<number>()
-    let cur = nearestTarget(ox, oy, targetsOf(sim, src), ChainArc.range[e]!, visited)
+    let cur = nearestTarget(sim, src, ox, oy, ChainArc.range[e]!, visited)
     if (!cur) return false
     playSfx('zap')
     const points: { x: number; y: number }[] = [{ x: ox, y: oy }]
@@ -30,7 +30,7 @@ export function castChainArcs(sim: Sim): void {
       damageTarget(sim, src, cur.eid, Math.max(1, Math.round(damage)), ChainArc.knockback[e]!, from.x, from.y)
       last = cur
       damage *= ChainArc.decay[e]!
-      cur = nearestTarget(cur.x, cur.y, targetsOf(sim, src), ChainArc.arcRange[e]!, visited)
+      cur = nearestTarget(sim, src, cur.x, cur.y, ChainArc.arcRange[e]!, visited)
     }
     applyAbilityEffects(sim, src, abilityOnHit[e], { x: last.x, y: last.y, baseDamage: damage, exclude: visited })
     spawnFxBolt(sim, points, ChainArc.color[e]!)

@@ -9,7 +9,7 @@ import { damageTarget } from './shared/damage'
 import { applyAbilityEffects } from './shared/effects'
 import { sourceOf } from '../utils/source'
 import { castScan } from './shared/castScan'
-import { targetsOf } from '../utils/targets'
+import { targetsNear } from '../utils/targets'
 import type { Sim } from '../sim'
 import { spawnFxSlash } from '../entities/fx'
 
@@ -20,7 +20,7 @@ export function castAssassinates(sim: Sim): void {
     const src = sourceOf(sim, e)
     const ox = ownerX(e)
     const oy = ownerY(e)
-    const target = strongestTarget(ox, oy, targetsOf(sim, src), Assassinate.range[e]!)
+    const target = strongestTarget(ox, oy, targetsNear(sim, src, ox, oy, Assassinate.range[e]!), Assassinate.range[e]!)
     if (!target) return false
 
     const dx = target.x - ox
