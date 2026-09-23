@@ -1,8 +1,9 @@
 import { CAPTAINS } from './data/captains'
-import { CHARACTERS, baseLoadout } from './data/characters'
+import { CHARACTERS } from './data/characters'
 import type { CaptainDef } from './types/captains'
 import type { CharacterDef } from './types/characters'
 import type { OutlineKind } from './emoji/svg'
+import type { AbilityDef } from './types/abilityDefs'
 import { BOSSES, ENEMY_DEFS, SPAWN } from './data/enemies'
 import { PICKUPS } from './data/pickups'
 import { FIELD_PICKUPS } from './data/battlefield'
@@ -14,24 +15,36 @@ import { SETTING_DEFS } from './save/settings'
 
 const roster: readonly CharacterDef[] = Object.values(CHARACTERS)
 
+/** 我方可能装上的全部能力：各角色全部档位 + 各队长技能 */
+const teamAbilities: readonly AbilityDef[] = [
+  ...roster.flatMap((c) => c.carriers.flatMap((cr) => cr.tiers)),
+  ...Object.values<CaptainDef>(CAPTAINS).flatMap((c) => c.skill.abilities),
+]
+
+/** 持械、塔身、召唤物、坠物 */
+function abilityBodyEmojis(w: AbilityDef): string[] {
+  return [
+    ...('held' in w && w.held ? [w.held.emoji] : []),
+    ...(w.kind === 'turret' ? [w.turret.emoji] : []),
+    ...(w.kind === 'summon' ? [w.minion.emoji] : []),
+    ...(w.kind === 'strike' ? [w.drop.emoji] : []),
+  ]
+}
+
+function abilityShotEmojis(w: AbilityDef): string[] {
+  return w.kind === 'projectile' || w.kind === 'turret' ? [w.projectile.emoji] : []
+}
+
 export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   player: [
     ...roster.map((c) => c.emoji),
     ...Object.values<CaptainDef>(CAPTAINS).map((c) => c.emoji),
-    ...roster.flatMap((c) =>
-      baseLoadout(c).flatMap((w) => [
-        ...('held' in w && w.held ? [w.held.emoji] : []),
-        ...(w.kind === 'projectile' || w.kind === 'turret' ? [w.projectile.emoji] : []),
-        ...(w.kind === 'turret' ? [w.turret.emoji] : []),
-        ...(w.kind === 'summon' ? [w.minion.emoji] : []),
-      ]),
-    ),
+    ...teamAbilities.flatMap((w) => [...abilityBodyEmojis(w), ...abilityShotEmojis(w)]),
     ...Object.values(PICKUPS).map((p) => p.emoji),
     ...Object.values(FIELD_PICKUPS).map((p) => p.emoji),
     '2795',
     '1f480',
-    // 💰 金袋投掷物、🫘 能量豆
-    '1f4b0',
+    // 🫘 能量豆
     '1fad8',
     ...new Set(
       Object.values<MapDef>(MAPS).flatMap((m) => [...m.decor.emojis, ...(m.drift ?? [])]),
@@ -48,22 +61,11 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
 export const PLAIN_EMOJIS: readonly string[] = ['1f4a5', SPAWN.markEmoji, '1fa90']
 
 function armedBodyEmojis(): string[] {
-  return [...ENEMY_DEFS, ...BOSSES].flatMap((e) =>
-    (e.abilities ?? []).flatMap((w) => [
-      ...('held' in w && w.held ? [w.held.emoji] : []),
-      ...(w.kind === 'turret' ? [w.turret.emoji] : []),
-      ...(w.kind === 'summon' ? [w.minion.emoji] : []),
-      ...(w.kind === 'strike' ? [w.drop.emoji] : []),
-    ]),
-  )
+  return [...ENEMY_DEFS, ...BOSSES].flatMap((e) => (e.abilities ?? []).flatMap(abilityBodyEmojis))
 }
 
 function armedShotEmojis(): string[] {
-  return [...ENEMY_DEFS, ...BOSSES].flatMap((e) =>
-    (e.abilities ?? []).flatMap((w) =>
-      w.kind === 'projectile' || w.kind === 'turret' ? [w.projectile.emoji] : [],
-    ),
-  )
+  return [...ENEMY_DEFS, ...BOSSES].flatMap((e) => (e.abilities ?? []).flatMap(abilityShotEmojis))
 }
 
 function deathShotEmojis(): string[] {
@@ -73,12 +75,8 @@ function deathShotEmojis(): string[] {
 }
 
 function morphEmojis(): string[] {
-  return roster.flatMap((c) =>
-    baseLoadout(c).flatMap((w) =>
-      w.kind === 'projectile' && w.onHit
-        ? w.onHit.flatMap((e) => (e.kind === 'morph' ? [e.morphEmoji] : []))
-        : [],
-    ),
+  return teamAbilities.flatMap((w) =>
+    'onHit' in w && w.onHit ? w.onHit.flatMap((e) => (e.kind === 'morph' ? [e.morphEmoji] : [])) : [],
   )
 }
 
