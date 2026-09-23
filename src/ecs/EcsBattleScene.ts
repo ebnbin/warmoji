@@ -590,11 +590,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.damageText?.step(sim.fxMs)
       return
     }
-    if (!this.sandbox && sim.elapsedMs >= waveDurationMs(sim.run.wave)) {
-      const finished = settleWave(sim)
-      this.scheduleWaveEnd(finished)
-      return
-    }
+    // 越线帧只模拟到时限为止，世界时间恰好停在波末
+    const leftMs = this.sandbox ? Infinity : waveDurationMs(sim.run.wave) - sim.elapsedMs
+    const lastFrame = sim.wdtMs >= leftMs
+    if (lastFrame) sim.wdtMs = leftMs
     const kx =
       (held(this.cursors?.left) || held(this.wasd?.A) ? -1 : 0) +
       (held(this.cursors?.right) || held(this.wasd?.D) ? 1 : 0)
@@ -645,5 +644,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
     if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
+    // 须在全灭判定之后：时限内全灭判负
+    if (lastFrame) this.scheduleWaveEnd(settleWave(sim))
   }
 }
