@@ -224,6 +224,7 @@ export function spawnEnemy(
   Slide.x[eid] = 0
   Slide.y[eid] = 0
   Dormant.v[eid] = 0
+  Dormant.since[eid] = 0
   EnemyArm.armed[eid] = 0 // eid 复用:新实体须重新装配能力
   Alive.v[eid] = 1
   Flash.until[eid] = 0

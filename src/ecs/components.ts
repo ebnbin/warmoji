@@ -169,8 +169,8 @@ export const ANIM_SET = [Anim, Sprite] as const
 /** 行为速度的平滑值，击退不入此列 */
 export const Slide = { x: f32(), y: f32() }
 
-/** 休眠：冻结 AI、不被索敌、不占刷怪上限；Boss 永不休眠 */
-export const Dormant = { v: u8() }
+/** 休眠：冻结 AI、不被索敌、不占刷怪上限；Boss 永不休眠。since = 本次入眠时刻（elapsedMs） */
+export const Dormant = { v: u8(), since: f32() }
 
 /** 0 = 整张；1..4 = 左上/右上/左下/右下 */
 export const Quad = { v: u8() }
