@@ -12,6 +12,8 @@ interface Frame {
   rest: number
   /** 与上一帧的时长差（绝对值） */
   jitter: number
+  /** 入账序号，跨 reset 单调递增 */
+  seq: number
 }
 
 const CAPACITY = 1800 // 约 30 秒 @60fps
@@ -31,6 +33,7 @@ let lastRender = 0
 /** 上一帧的分项已测完、等下一帧起点结算 */
 let pending = false
 let prevTotal = 0
+let nextSeq = 0
 /** Canvas 渲染器才有；取不到就是 undefined，不填 0 */
 let drawCount: number | undefined
 
@@ -60,6 +63,7 @@ function record(total: number): void {
     total, update: lastUpdate, render: lastRender,
     rest: Math.max(0, total - lastUpdate - lastRender),
     jitter: prevTotal > 0 ? Math.abs(total - prevTotal) : 0,
+    seq: nextSeq++,
   }
   prevTotal = total
   buf[head] = f
@@ -140,9 +144,14 @@ function stat(v: readonly number[]): { mean: number; p50: number; p95: number; p
   return { mean: sum / v.length, p50: percentile(s, 50), p95: percentile(s, 95), p99: percentile(s, 99), max: s[s.length - 1]! }
 }
 
-/** refreshHz 测不到时按 60 算 */
-export function metricsReport(refreshHz = 60): MetricsReport {
-  const frames = buf.slice(0, filled)
+/** 下一帧入账时的序号 */
+export function nextFrameSeq(): number {
+  return nextSeq
+}
+
+/** refreshHz 测不到时按 60 算；只统计序号 ≥ fromSeq 的帧 */
+export function metricsReport(refreshHz = 60, fromSeq = 0): MetricsReport {
+  const frames = buf.slice(0, filled).filter((f) => f.seq >= fromSeq)
   const total = stat(frames.map((f) => f.total))
   const update = stat(frames.map((f) => f.update))
   const render = stat(frames.map((f) => f.render))
@@ -174,11 +183,11 @@ export function metricsReport(refreshHz = 60): MetricsReport {
 }
 
 /** 新→旧 */
-export function recentFrameTimes(n: number): number[] {
-  const out: number[] = []
+export function recentFrames(n: number): { total: number; seq: number }[] {
+  const out: { total: number; seq: number }[] = []
   for (let i = 0; i < Math.min(n, filled); i++) {
     const f = buf[(head - 1 - i + CAPACITY * 2) % CAPACITY]
-    if (f) out.push(f.total)
+    if (f) out.push(f)
   }
   return out
 }

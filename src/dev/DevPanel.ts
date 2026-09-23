@@ -39,6 +39,7 @@ import { emojiImage } from '../emoji/textures'
 import { attachMetrics, detachMetrics, resetMetrics } from './metrics'
 import { startRafMeter } from './diagnostics'
 import { PerfView } from './perf'
+import type { SteadyMark } from './perf'
 import { clearDevPerf } from './probe'
 
 const DEPTH = 320
@@ -62,6 +63,7 @@ export class DevPanel {
   private readonly view: ScrollView
   private perf?: PerfView
   private perfH = 0
+  private readonly steady: SteadyMark = { seq: -1 }
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -370,7 +372,7 @@ export class DevPanel {
     y = this.note(y + 4, res, ecsOn
       ? 'ECS：bitECS 数据导向 + 自绘批量渲染'
       : 'arcade：一实体一 GameObject + Arcade Physics body')
-    this.perf = new PerfView(this.scene, this.host, this.view.viewport.w, y + 10, this.host.sandbox)
+    this.perf = new PerfView(this.scene, this.host, this.view.viewport.w, y + 10, this.host.sandbox, this.steady)
     this.view.add(this.perf.objects)
     this.perfH = this.perf.update(0)
     return this.perfH
