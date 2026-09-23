@@ -1,4 +1,4 @@
-import { addComponents, query, removeEntity } from 'bitecs'
+import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { Depth, Fx, FxBeam, FxBolt, FxBoom, FxCircle, FxSlash, Transform } from '../components'
 import { boltPts } from '../store'
@@ -6,8 +6,6 @@ import { pushDamageNumber } from '../damageNumbers'
 import { attachDrawable } from './drawable'
 import type { CircleCue } from '../render/cues'
 import type { Sim } from '../sim'
-
-// 同屏并发超出即顶掉最老的一个
 
 const BEAM_MS = 200
 const BOLT_MS = 200
@@ -18,20 +16,7 @@ const BOLT_PTS = 8
 /** 落在 spriteBatch 的 [30,60) 深度带 */
 const BOOM_Z = 30
 
-/** 同屏并发上限 */
-const CAP = { circle: 64, beam: 16, bolt: 16, slash: 16, boom: 24 }
-
-/** 按出生时刻顶掉最老的一个 */
-function capFx(sim: Sim, comp: object, cap: number): void {
-  const live = query(sim.world, [Fx, comp])
-  if (live.length < cap) return
-  let oldest = live[0]!
-  for (const e of live) if (Fx.bornMs[e]! < Fx.bornMs[oldest]!) oldest = e
-  removeEntity(sim.world, oldest)
-}
-
-function newFx(sim: Sim, comp: object, cap: number, x: number, y: number, durMs: number, z: number): number {
-  capFx(sim, comp, cap)
+function newFx(sim: Sim, comp: object, x: number, y: number, durMs: number, z: number): number {
   const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Fx, Transform, Depth, comp)
   Fx.bornMs[eid] = sim.fxMs
@@ -44,7 +29,7 @@ function newFx(sim: Sim, comp: object, cap: number, x: number, y: number, durMs:
 }
 
 export function spawnFxCircle(sim: Sim, x: number, y: number, radius: number, c: CircleCue): number {
-  const eid = newFx(sim, FxCircle, CAP.circle, x, y, c.durationMs, c.depth)
+  const eid = newFx(sim, FxCircle, x, y, c.durationMs, c.depth)
   FxCircle.r[eid] = radius
   FxCircle.from[eid] = c.fromScale
   FxCircle.to[eid] = c.toScale
@@ -87,7 +72,7 @@ export function spawnFxBeam(
   radius: number,
   color: number,
 ): number {
-  const eid = newFx(sim, FxBeam, CAP.beam, x, y, BEAM_MS, 7)
+  const eid = newFx(sim, FxBeam, x, y, BEAM_MS, 7)
   Transform.rot[eid] = angle
   FxBeam.len[eid] = length
   FxBeam.radius[eid] = radius
@@ -111,7 +96,7 @@ export function spawnFxBolt(sim: Sim, points: readonly { x: number; y: number }[
       pts.push(a.x + (b.x - a.x) * t + (nx / len) * jitter, a.y + (b.y - a.y) * t + (ny / len) * jitter)
     }
   }
-  const eid = newFx(sim, FxBolt, CAP.bolt, pts[0]!, pts[1]!, BOLT_MS, 9)
+  const eid = newFx(sim, FxBolt, pts[0]!, pts[1]!, BOLT_MS, 9)
   FxBolt.n[eid] = pts.length / 2
   FxBolt.color[eid] = color
   boltPts[eid] = Float32Array.from(pts)
@@ -121,7 +106,6 @@ export function spawnFxBolt(sim: Sim, points: readonly { x: number; y: number }[
 /** 💥 爆裂：缩小随机微转弹出到全尺寸并淡出。它是精灵不是形状——贴图走图集，
  * 由 spriteBatch 画（z=30 那条带），逐帧的缩放/淡出在 systems/animateBooms */
 export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): number {
-  capFx(sim, FxBoom, CAP.boom)
   const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Fx, FxBoom)
   Fx.bornMs[eid] = sim.fxMs
@@ -146,7 +130,7 @@ export function spawnDamageNumber(sim: Sim, x: number, y: number, amount: number
 
 /** 斩击弧光 */
 export function spawnFxSlash(sim: Sim, x: number, y: number, angle: number, radius: number): number {
-  const eid = newFx(sim, FxSlash, CAP.slash, x, y, SLASH_MS, 9)
+  const eid = newFx(sim, FxSlash, x, y, SLASH_MS, 9)
   Transform.rot[eid] = angle
   FxSlash.r[eid] = radius
   return eid
