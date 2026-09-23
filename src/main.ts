@@ -31,7 +31,8 @@ setSfxEnabled(loadSettings(browserStorage()).sound)
 setBgmEnabled(loadSettings(browserStorage()).bgm)
 
 const game = new Phaser.Game({
-  type: Phaser.AUTO,
+  // 只支持 WebGL：拿不到的浏览器在 boot.ts 就被拦下
+  type: Phaser.WEBGL,
   parent: 'game',
   // 背景渐变画在 canvas 之下，canvas 须透明
   transparent: true,
