@@ -2,7 +2,7 @@ import { addComponent, query, removeEntity } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { PICKUP, PICKUPS } from '../../data/pickups'
-import { Alive, Collected, Grab, Hurt, Lifetime, PICKUP_SET, Pull, Tint, Transform, Vel } from '../components'
+import { Alive, Bob, Collected, Grab, Hurt, Lifetime, PICKUP_SET, Pull, Tint, Transform, Vel } from '../components'
 import { animatePickup } from '../entities/pickup'
 import type { Sim } from '../sim'
 import { centerX, centerY } from '../utils/team'
@@ -21,7 +21,8 @@ export function updatePickups(sim: Sim): void {
   for (const eid of eids) {
     animatePickup(sim, eid)
     const x = Transform.x[eid]!
-    const y = Transform.y[eid]!
+    // 浮动只是视觉，判定用落点
+    const y = Bob.amp[eid]! > 0 ? Bob.y0[eid]! : Transform.y[eid]!
     // 吸点优先
     if (sim.frameAttractors.length > 0 && Pull.radius[eid]! > 0) {
       let taken = false

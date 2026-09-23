@@ -48,6 +48,10 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     Kv.x[eid] = k.x
     Kv.y[eid] = k.y
   }
+  // 浮动中的拾取物按落点重映射，浮动由下一帧 animatePickup 叠回
+  for (const eid of query(sim.world, PICKUP_SET as unknown as object[])) {
+    if (Bob.amp[eid]! > 0) Transform.y[eid] = Bob.y0[eid]!
+  }
   for (const set of [PROJ_SET, PICKUP_SET]) {
     for (const eid of query(sim.world, set as unknown as object[])) {
       movePos(eid)
