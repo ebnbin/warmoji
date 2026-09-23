@@ -19,7 +19,6 @@ import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAPS } from '../data/maps'
-import { onFloe } from './worlds/ice'
 import { ECS_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
@@ -113,7 +112,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private puffBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private timeStopFx?: Phaser.GameObjects.Rectangle
   private timeStopFxAlpha = 0
-  private waterVignette?: Phaser.GameObjects.Rectangle
   private centerObj!: Phaser.GameObjects.Zone
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
@@ -151,7 +149,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   create(): void {
     this.resetSceneFields()
     this.world = makeWorld()
-    ;(window as unknown as { __ecsWorld?: EcsWorld }).__ecsWorld = this.world
 
     const run = getRun()
     this.run = run
@@ -203,9 +200,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.scene.stop('ui')
-      // e2e 靠 __ecs.ready 判断战斗已收场
-      const probe = (window as unknown as { __ecs?: { ready: boolean } }).__ecs
-      if (probe) probe.ready = false
+      // e2e 靠 __ecs.ready 判断战斗已收场；换成空壳以放开对本局的引用
+      ;(window as unknown as { __ecs?: { ready: boolean } }).__ecs = { ready: false }
       this.atlas?.dispose()
       this.cues?.destroy()
       this.rings?.destroy()
@@ -316,7 +312,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const layers = (): number => this.unsortedLayers()
     const pages = (): number => this.atlas?.pageCount ?? 0
     const map = (): { w: number; h: number } => ({ w: this.mapW, h: this.mapH })
-    const inWater = (): boolean => this.waterVignette !== undefined && !onFloe(centerX(sim), centerY(sim), this.mapW)
     const cam = (): Phaser.Cameras.Scene2D.Camera => this.cameras.main
     ;(window as unknown as { __ecs?: object }).__ecs = {
       ready: true,
@@ -356,7 +351,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       get over() { return sim.over },
       get alive() { return sim.characters.filter((eid) => Alive.v[eid]).length },
       get memberHp() { return sim.characters.map((eid) => CharHp.hp[eid]!) },
-      get inWater() { return inWater() },
       get dormant() { return Array.from(query(world, [Enemy]), (eid) => Dormant.v[eid]!).filter((v) => v === 1).length },
       get camX() { return cam().scrollX + cam().width / 2 },
       get camY() { return cam().scrollY + cam().height / 2 },
