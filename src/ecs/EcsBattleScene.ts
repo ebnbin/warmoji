@@ -192,7 +192,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         .setDepth(1000),
     )
 
-    void this.boot(++this.bootGen, run, center, hint)
+    const gen = ++this.bootGen
+    this.boot(gen, run, center, hint).catch((e: unknown) => {
+      console.error('ECS 战斗启动失败', e)
+      if (gen === this.bootGen) hint.setText('战斗启动失败，请暂停后结束本局')
+    })
 
     setActiveHudHost(this) // 须先登记再拉起 HUD
     this.scene.launch('ui')

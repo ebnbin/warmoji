@@ -225,13 +225,23 @@ export class EcsAtlas {
     for (const id of plain) take(id, undefined)
 
     const atlas = new EcsAtlas()
+    // 单个变体失败不拦开战：只记错误，该变体不入表
     const imgs = await Promise.all(
-      variants.map(async ({ id, outline }) => rasterize(await emojiSvgText(id), outline)),
+      variants.map(async ({ id, outline }) => {
+        try {
+          return await rasterize(await emojiSvgText(id), outline)
+        } catch (e) {
+          console.error(`图集变体光栅化失败：${variantKey(id, outline)}`, e)
+          return undefined
+        }
+      }),
     )
     for (let i = 0; i < variants.length; i++) {
+      const img = imgs[i]
+      if (!img) continue
       const { id, outline } = variants[i]!
       const frame = atlas.alloc()
-      atlas.place(frame, imgs[i]!)
+      atlas.place(frame, img)
       atlas.keyToFrame.set(variantKey(id, outline), frame)
     }
     atlas.scene = scene
