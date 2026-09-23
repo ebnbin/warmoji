@@ -3,7 +3,7 @@ import type { EnemyDef } from '../types/enemies'
 import type { FieldPickupDef } from '../types/battlefield'
 import type { Effect } from '../types/abilityDefs'
 
-// 放不进类型化数组的富数据，按 eid 索引。spawn 时必须无条件写（eid 会复用）；跨局由 resetEntityStorage 整体清空；
+// 放不进类型化数组的富数据，按 eid 索引。newEntity 发出 eid 时复位为 undefined；跨局由 resetEntityStorage 整体清空；
 // 一律 new Array(INITIAL_CAPACITY).fill 预分配，保持 packed；本文件只导出这类数组，扩容按导出项逐个补齐
 
 /** px 化的 def */

@@ -1,12 +1,16 @@
 import { INITIAL_CAPACITY } from './world'
 
 // 数组按 eid 索引，扩容时整体替换（见 storage.ts）：不得缓存数组引用，也不得写 `X.f[i] = 会建实体的调用()`。
-// spawn 时须写全字段，跨局复用不清理
+// newEntity 发出 eid 时，该 eid 在全部列上复位为初值
 
-type Column = Float32Array | Int32Array | Uint32Array | Uint8Array
+export type Column = Float32Array | Int32Array | Uint32Array | Uint8Array
 
 /** 非 0 初值的列 */
 const FILL = new WeakMap<Column, number>()
+
+export function columnFill(col: Column): number {
+  return FILL.get(col) ?? 0
+}
 
 const f32 = (): Float32Array => new Float32Array(INITIAL_CAPACITY)
 const i32 = (): Int32Array => new Int32Array(INITIAL_CAPACITY)
