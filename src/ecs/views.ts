@@ -22,6 +22,7 @@ import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/river'
 import { fitAspectRect } from './worlds/torus'
 import { generateRuins, reachableCells, WallGrid } from './worlds/ruins'
+import { setOverlayFill } from '../util/fx'
 
 const FOG_COLOR = 0x0a0a1a
 const FOG_DEPTH = 90
@@ -213,7 +214,7 @@ class IceView extends BoundedView {
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const px = v.def.ice!.floeU * UNIT
     const inWater = !onFloe(centerX(sim), centerY(sim), px)
-    this.vignette?.setFillStyle(WATER_VIGNETTE, inWater ? 0.18 + 0.06 * Math.sin(sim.elapsedMs / 140) : 0)
+    if (this.vignette) setOverlayFill(this.vignette, WATER_VIGNETTE, inWater ? 0.18 + 0.06 * Math.sin(sim.elapsedMs / 140) : 0)
   }
 }
 
@@ -274,7 +275,7 @@ class InfiniteView extends BoundedView {
     const anyOutside = sim.characters.some(
       (m) => Alive.v[m] && outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r),
     )
-    this.zoneVignette?.setFillStyle(0xd32f2f, anyOutside ? 0.16 + 0.08 * Math.sin(sim.elapsedMs / 130) : 0)
+    if (this.zoneVignette) setOverlayFill(this.zoneVignette, 0xd32f2f, anyOutside ? 0.16 + 0.08 * Math.sin(sim.elapsedMs / 130) : 0)
   }
 
   /** 摆放由 (种子, 块) 纯函数决定，回头看到的景不变 */

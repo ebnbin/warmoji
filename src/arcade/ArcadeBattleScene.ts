@@ -81,7 +81,7 @@ import { applyBackground } from '../util/background'
 import { DAMAGE_FONT, ensureDamageFont } from './damageFont'
 import { reportDebug } from '../debug'
 import { emojiImage, emojiKey } from '../emoji/textures'
-import { burstEmitter } from '../util/fx'
+import { burstEmitter, setOverlayFill } from '../util/fx'
 import { acquirePooled, releasePooled } from './pool'
 import { playSfx } from '../audio/sfx'
 import { UI_FONT } from '../util/fonts'
@@ -448,7 +448,7 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     const target = active ? (1 - this.chrono) * TIMESTOP.chillMaxAlpha : 0
     const rate = Math.min(1, delta / TIMESTOP.fadeMs)
     this.timeStopFxAlpha += (target - this.timeStopFxAlpha) * rate
-    this.timeStopFx?.setFillStyle(TIMESTOP.chillColor, this.timeStopFxAlpha)
+    if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
   }
   /** 在管线末尾执行 */
   protected updateWorld(_delta: number): void {

@@ -16,6 +16,7 @@ import { emojiImage } from '../../emoji/textures'
 import { viewport } from '../../util/apply'
 import { ArcadeBattleScene } from '../ArcadeBattleScene'
 import type { ImageObj } from '../ArcadeBattleScene'
+import { setOverlayFill } from '../../util/fx'
 
 // 没有边，出生在原点，负坐标合法
 export class InfiniteScene extends ArcadeBattleScene {
@@ -176,7 +177,7 @@ export class InfiniteScene extends ArcadeBattleScene {
     )
     if (this.zoneVignette) {
       const pulse = 0.16 + 0.08 * Math.sin(this.elapsedMs / 130)
-      this.zoneVignette.setFillStyle(0xd32f2f, anyOutside ? pulse : 0)
+      setOverlayFill(this.zoneVignette, 0xd32f2f, anyOutside ? pulse : 0)
     }
     if (this.elapsedMs >= this.nextZoneTickAt) {
       this.nextZoneTickAt = this.elapsedMs + this.ringCfg.tickMs

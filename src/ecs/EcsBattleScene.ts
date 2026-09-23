@@ -4,7 +4,7 @@ import { UNIT } from '../util/units'
 import { MEMBER } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
-import { burstEmitter } from '../util/fx'
+import { burstEmitter, setOverlayFill } from '../util/fx'
 import { CueLayer } from './render/cues'
 import { RingLayer } from './render/rings'
 import { DamageTextLayer } from './render/damageText'
@@ -644,6 +644,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.map.step(this.ctx, sim, delta)
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
-    this.timeStopFx?.setFillStyle(TIMESTOP.chillColor, this.timeStopFxAlpha)
+    if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
   }
 }
