@@ -1,6 +1,7 @@
 import { hasComponent } from 'bitecs'
-import { Anchor, Aura, AuraDps, AuraFreeze, Faction, Pulse, Slow, SlowAura } from '../components'
+import { Anchor, Aura, AuraDps, AuraFreeze, FACTION, Faction, Pulse, Slow, SlowAura } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
+import { centerX, centerY } from '../utils/team'
 import { damageTarget } from './shared/damage'
 import { spawnZone } from '../entities/zone'
 import { sourceOf } from '../utils/source'
@@ -12,13 +13,14 @@ import { spawnFxCircle } from '../entities/fx'
 /** 冻伤跳伤间隔 */
 const TICK_MS = 500
 
-/** 光环无冷却，每帧都过施放扫描；减速区实体建一次一直在，开关随出手闸门 */
+/** 光环无冷却，每帧都过施放扫描；减速区实体建一次一直在，开关随出手闸门。我方光环圆心为队伍中心，断壁视点仍是持有者 */
 export function castSlowAuras(sim: Sim): void {
   const dt = sim.wdtMs
   castScan(sim, SlowAura, (e) => {
     const src = sourceOf(sim, e)
-    const x = ownerX(e)
-    const y = ownerY(e)
+    const onTeam = Faction.v[e] === FACTION.team
+    const x = onTeam ? centerX(sim) : ownerX(e)
+    const y = onTeam ? centerY(sim) : ownerY(e)
     const radius = SlowAura.radius[e]!
     if (Aura.zone[e] === 0) {
       // 须先落局部变量：spawnZone 可能扩容替换 Aura.zone
@@ -34,14 +36,15 @@ export function castSlowAuras(sim: Sim): void {
         lineAlpha: 0.35,
         lineWidth: 2,
         chill: { factor: SlowAura.slowFactor[e]! },
-        follow: { of: Anchor.eid[e]!, owner: e },
+        follow: { of: onTeam ? sim.captain : Anchor.eid[e]!, owner: e },
       })
       Aura.zone[e] = zone
+      Pulse.dps[e] = TICK_MS
+      Pulse.freeze[e] = hasComponent(sim.world, e, AuraFreeze) ? AuraFreeze.intervalMs[e]! : 0
     }
     const r2 = radius * radius
     if (hasComponent(sim.world, e, AuraDps)) {
-      if (Pulse.dps[e] === 0) Pulse.dps[e] = TICK_MS // 等满一个周期再跳第一次
-      else if ((Pulse.dps[e] = Pulse.dps[e]! - dt) <= 0) {
+      if ((Pulse.dps[e] = Pulse.dps[e]! - dt) <= 0) {
         Pulse.dps[e] = Pulse.dps[e]! + TICK_MS
         const damage = Math.max(1, Math.round(((AuraDps.perSec[e]! * TICK_MS) / 1000) * damageMul(sim, e)))
         for (const t of targetsNear(sim, src, x, y, radius)) {
@@ -52,8 +55,7 @@ export function castSlowAuras(sim: Sim): void {
       }
     }
     if (hasComponent(sim.world, e, AuraFreeze)) {
-      if (Pulse.freeze[e] === 0) Pulse.freeze[e] = AuraFreeze.intervalMs[e]!
-      else if ((Pulse.freeze[e] = Pulse.freeze[e]! - dt) <= 0) {
+      if ((Pulse.freeze[e] = Pulse.freeze[e]! - dt) <= 0) {
         Pulse.freeze[e] = Pulse.freeze[e]! + AuraFreeze.intervalMs[e]!
         for (const t of targetsNear(sim, src, x, y, radius)) {
           const dx = t.x - x

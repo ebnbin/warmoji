@@ -365,6 +365,8 @@ export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
     comp: SlowAura,
     state: [PulseState, AuraState],
     attach: (c, e, d) => {
+      // 常驻光环不参与首发错峰：开局第一帧即生效
+      SlowAura.cdLeft[e] = 0
       SlowAura.radius[e] = d.radius
       SlowAura.slowFactor[e] = d.slowFactor
       SlowAura.color[e] = d.color
