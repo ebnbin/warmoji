@@ -677,13 +677,9 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
 
     ensureDamageFont(this)
-    this.damagePool = Array.from({ length: 64 }, () =>
-      this.add.bitmapText(0, 0, DAMAGE_FONT).setFontSize(24).setOrigin(0.5).setDepth(50).setVisible(false),
-    )
+    this.damagePool = Array.from({ length: 64 }, () => this.newDamageText())
     this.damagePoolIdx = 0
-    this.shardPool = Array.from({ length: 64 }, () =>
-      this.add.image(0, 0, '__DEFAULT').setDepth(6).setVisible(false),
-    )
+    this.shardPool = Array.from({ length: 64 }, () => this.newShard())
     this.shardPoolIdx = 0
 
     this.cursors = this.input.keyboard?.createCursorKeys()
@@ -1601,8 +1597,18 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
     releasePooled(enemy)
   }
 
+  private newDamageText(): Phaser.GameObjects.BitmapText {
+    return this.add.bitmapText(0, 0, DAMAGE_FONT).setFontSize(24).setOrigin(0.5).setDepth(50).setVisible(false)
+  }
+
+  newShard(): ImageObj {
+    return this.add.image(0, 0, '__DEFAULT').setDepth(6).setVisible(false) as ImageObj
+  }
+
   private floatDamage(x: number, y: number, amount: number, crit = false): void {
     if (!this.settings.damageNumbers) return
+    // 轮到的还在播就插一个新的，不抢占
+    if (this.damagePool[this.damagePoolIdx]!.visible) this.damagePool.splice(this.damagePoolIdx, 0, this.newDamageText())
     const t = this.damagePool[this.damagePoolIdx]!
     this.damagePoolIdx = (this.damagePoolIdx + 1) % this.damagePool.length
     this.tweens.killTweensOf(t)

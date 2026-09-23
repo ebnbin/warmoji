@@ -100,6 +100,8 @@ export function spawnShards(scene: ArcadeBattleScene, enemy: ImageObj, flingVx: 
   const dh = enemy.displayHeight / 2
   const t = KNOCKBACK.deathSlideMs / 1000
   for (let i = 0; i < 4; i++) {
+    // 轮到的还在飞就插一个新的，不抢占
+    if (scene.shardPool[scene.shardPoolIdx]!.visible) scene.shardPool.splice(scene.shardPoolIdx, 0, scene.newShard())
     const shard = scene.shardPool[scene.shardPoolIdx]!
     scene.shardPoolIdx = (scene.shardPoolIdx + 1) % scene.shardPool.length
     scene.tweens.killTweensOf(shard)
