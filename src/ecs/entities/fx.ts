@@ -11,8 +11,6 @@ const BEAM_MS = 200
 const BOLT_MS = 200
 const SLASH_MS = 220
 const BOOM_MS = 340
-/** 超出截断 */
-const BOLT_PTS = 8
 /** 落在 spriteBatch 的 [30,60) 深度带 */
 const BOOM_Z = 30
 
@@ -83,11 +81,11 @@ export function spawnFxBeam(
 /** 锯齿闪电折线：沿折点串每段拆几截加垂直抖动。抖动在此算死——每帧重算会疯狂跳动 */
 export function spawnFxBolt(sim: Sim, points: readonly { x: number; y: number }[], color: number): number {
   const pts: number[] = [points[0]!.x, points[0]!.y]
-  for (let p = 1; p < points.length && pts.length < BOLT_PTS * 2; p++) {
+  for (let p = 1; p < points.length; p++) {
     const a = points[p - 1]!
     const b = points[p]!
     const segs = 4
-    for (let s = 1; s <= segs && pts.length < BOLT_PTS * 2; s++) {
+    for (let s = 1; s <= segs; s++) {
       const t = s / segs
       const nx = -(b.y - a.y)
       const ny = b.x - a.x
