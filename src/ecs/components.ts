@@ -337,8 +337,8 @@ export const GroundHit = { last: f32() }
 /** 出手位置来源；Owner 是归属与状态来源，二者可不同（弩塔） */
 export const Anchor = { eid: i32() }
 
-/** 视觉钟；castScan 出手成功时写入 */
-export const Fired = { at: f32() }
+/** 出手标记：castScan 出手成功时置 1，消费方读到后清 0 */
+export const Fired = { v: u8() }
 
 /** 有此组件 = 有手持外形；位姿由各 kind 的摆位系统写 */
 export const Held = {
