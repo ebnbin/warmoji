@@ -13,7 +13,6 @@ import { enemyCarries, telegraphCarries, telegraphDef } from '../store'
 import { Due, Telegraph, Transform } from '../components'
 import { query, removeEntity } from 'bitecs'
 import type { Sim } from '../sim'
-import { crowded } from '../world'
 
 /** 非昼夜图恒 1 */
 function spawnIntervalScale(sim: Sim): number {
@@ -31,7 +30,7 @@ function spawnSandbox(sim: Sim): void {
   const hpMul = sandboxDifficulty()
   let live = awakeCount(sim) + telegraphCount(sim)
   for (let i = 0; i < d.batch; i++, live++) {
-    if (live >= d.cap || crowded(sim.world)) return
+    if (live >= d.cap) return
     const raw = ENEMIES[kinds[Math.floor(sim.rng.next() * kinds.length)]!]!
     const def = toPx(raw)
     const pos = sim.hooks.spawnPoint(sim, raw.role === 'boss')
@@ -64,6 +63,6 @@ export function spawnStep(sim: Sim): void {
   const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * sim.characters.length
   const relief = isBossWave(sim.run.wave) ? BOSS_SPAWN_RELIEF : 1
   sim.spawnCooldownMs = (wave.spawnIntervalMs * relief * spawnIntervalScale(sim)) / teamFactor
-  if (awakeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive || crowded(sim.world)) return
+  if (awakeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
   telegraphOne(sim, wave.hpMultiplier)
 }

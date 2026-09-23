@@ -1,9 +1,9 @@
-import { addComponent, addEntity } from 'bitecs'
+import { addComponent } from 'bitecs'
+import { newEntity } from './entity'
 import { norm } from '../../util/vec'
 import { KNOCKBACK } from '../../data/abilities'
 import { Depth, Quad, Shard, Sprite, Tint, Transform } from '../components'
 import type { Sim } from '../sim'
-import { crowded } from '../world'
 
 /** flingVx/Vy = 致死一击的击退速度 */
 export function spawnShardsEcs(
@@ -17,7 +17,6 @@ export function spawnShardsEcs(
   flingVx: number,
   flingVy: number,
 ): void {
-  if (crowded(sim.world)) return
   const dw = w / 2
   const dh = h / 2
   const now = sim.fxMs
@@ -28,7 +27,7 @@ export function spawnShardsEcs(
     const oy = (i < 2 ? -1 : 1) * (dh / 2)
     const dir = norm(ox, oy)
     const scatter = 45 + sim.rng.next() * 65
-    const eid = addEntity(sim.world)
+    const eid = newEntity(sim.world)
     addComponent(sim.world, eid, Shard)
     addComponent(sim.world, eid, Transform)
     addComponent(sim.world, eid, Sprite)

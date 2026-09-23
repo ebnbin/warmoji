@@ -11,7 +11,7 @@ export function cullProjectiles(sim: Sim): void {
   for (const eid of [...query(sim.world, PROJ_SET as unknown as object[])]) {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
-    if (Proj.dieAt[eid] !== 0 && now >= Proj.dieAt[eid]!) {
+    if (now >= Proj.dieAt[eid]!) {
       cullProjectile(sim, eid)
       continue
     }

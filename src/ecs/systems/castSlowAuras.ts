@@ -21,7 +21,8 @@ export function castSlowAuras(sim: Sim): void {
     const y = ownerY(e)
     const radius = SlowAura.radius[e]!
     if (Aura.zone[e] === 0) {
-      Aura.zone[e] = spawnZone(sim, {
+      // 须先落局部变量：spawnZone 可能扩容替换 Aura.zone
+      const zone = spawnZone(sim, {
         x,
         y,
         radius,
@@ -35,6 +36,7 @@ export function castSlowAuras(sim: Sim): void {
         chill: { factor: SlowAura.slowFactor[e]! },
         follow: { of: Anchor.eid[e]!, owner: e },
       })
+      Aura.zone[e] = zone
     }
     const r2 = radius * radius
     if (hasComponent(sim.world, e, AuraDps)) {

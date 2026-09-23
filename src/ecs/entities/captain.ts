@@ -1,4 +1,5 @@
-import { addComponents, addEntity } from 'bitecs'
+import { addComponents } from 'bitecs'
+import { newEntity } from './entity'
 import { UNIT } from '../../util/units'
 import { CHARACTERS } from '../../data/characters'
 import { formationPosts } from '../../data/formation'
@@ -20,7 +21,7 @@ export function spawnCaptain(
   moveSpeed: number,
   magnetRadius: number,
 ): number {
-  const eid = addEntity(world)
+  const eid = newEntity(world)
   addComponents(world, eid, Captain, Transform, Slot, Alive, MoveSpeed, Magnet, Orbit, TeamDamage, DanceWindow)
   Transform.x[eid] = x
   Transform.y[eid] = y

@@ -1,4 +1,5 @@
-import { addComponent, addEntity } from 'bitecs'
+import { addComponent } from 'bitecs'
+import { newEntity } from './entity'
 
 import { UNIT } from '../../util/units'
 
@@ -48,7 +49,7 @@ export function spawnCharacter(
   const captain = CAPTAINS[run.captainId]
   const labHp = sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
   const size = MEMBER.size * UNIT
-    const eid = addEntity(world)
+    const eid = newEntity(world)
   addComponent(world, eid, Character)
   addComponent(world, eid, Slot)
   addComponent(world, eid, Post)

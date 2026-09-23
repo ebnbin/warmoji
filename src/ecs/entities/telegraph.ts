@@ -1,4 +1,5 @@
-import { addComponents, addEntity, query } from 'bitecs'
+import { addComponents, query } from 'bitecs'
+import { newEntity } from './entity'
 import { UNIT } from '../../util/units'
 import { SPAWN } from '../../data/enemies'
 import { Due, Telegraph } from '../components'
@@ -23,7 +24,7 @@ export function spawnTelegraph(
   carries?: FieldPickupDef,
   delayMs = SPAWN.telegraphMs,
 ): number {
-  const eid = addEntity(sim.world)
+  const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Telegraph, Due)
   Telegraph.hp[eid] = hp
   Telegraph.elite[eid] = elite ? 1 : 0

@@ -1,4 +1,5 @@
-import { addComponents, addEntity, query, removeEntity } from 'bitecs'
+import { addComponents, query, removeEntity } from 'bitecs'
+import { newEntity } from './entity'
 import { Depth, Fx, FxBeam, FxBolt, FxBoom, FxCircle, FxSlash, Transform } from '../components'
 import { boltPts } from '../store'
 import { pushDamageNumber } from '../damageNumbers'
@@ -31,7 +32,7 @@ function capFx(sim: Sim, comp: object, cap: number): void {
 
 function newFx(sim: Sim, comp: object, cap: number, x: number, y: number, durMs: number, z: number): number {
   capFx(sim, comp, cap)
-  const eid = addEntity(sim.world)
+  const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Fx, Transform, Depth, comp)
   Fx.bornMs[eid] = sim.fxMs
   Fx.durMs[eid] = durMs
@@ -121,7 +122,7 @@ export function spawnFxBolt(sim: Sim, points: readonly { x: number; y: number }[
  * 由 spriteBatch 画（z=30 那条带），逐帧的缩放/淡出在 systems/animateBooms */
 export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): number {
   capFx(sim, FxBoom, CAP.boom)
-  const eid = addEntity(sim.world)
+  const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Fx, FxBoom)
   Fx.bornMs[eid] = sim.fxMs
   Fx.durMs[eid] = BOOM_MS

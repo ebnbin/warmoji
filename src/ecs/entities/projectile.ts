@@ -1,4 +1,5 @@
-import { addComponent, addComponents, addEntity, hasComponent } from 'bitecs'
+import { addComponent, addComponents, hasComponent } from 'bitecs'
+import { newEntity } from './entity'
 import { DEG2RAD } from '../../util/units'
 import { playSfx } from '../../audio/sfx'
 import {
@@ -7,7 +8,6 @@ import {
 } from '../components'
 import { abilityOnHit, projHitEids, projOnHit, projSrcName } from '../store'
 import type { Sim } from '../sim'
-import { crowded } from '../world'
 
 
 function spawnBolt(
@@ -18,7 +18,7 @@ function spawnBolt(
   faction: number,
   art: { frame: number; size: number; speed: number; rotOffsetDeg: number },
 ): number {
-  const eid = addEntity(sim.world)
+  const eid = newEntity(sim.world)
   // prettier-ignore
   addComponents(sim.world, eid, Projectile, Transform, Vel, Proj, PrevPos, Faction, Sprite, Tint, Depth)
   Transform.x[eid] = x
@@ -64,9 +64,10 @@ export function spawnProjectileEcs(
   Proj.srcSlot[eid] = srcSlot
   Proj.pierce[eid] = hasComponent(sim.world, src, Pierce) ? Pierce.n[src]! : 0
   Proj.spin[eid] = rotOffset === 0 ? 9 : 0
-  const life = sim.hooks.projectileLifeMs(sim)
-  Proj.dieAt[eid] = life > 0 ? sim.elapsedMs + life : 0
-  if (life <= 0) addComponent(sim.world, eid, ViewCull)
+  const mapLife = sim.hooks.projectileLifeMs(sim)
+  const life = mapLife > 0 ? Math.min(mapLife, Shoot.lifeMs[src]!) : Shoot.lifeMs[src]!
+  Proj.dieAt[eid] = sim.elapsedMs + life
+  if (mapLife <= 0) addComponent(sim.world, eid, ViewCull)
   Depth.z[eid] = 8
   projOnHit[eid] = abilityOnHit[src]
   projHitEids[eid] = new Set()
@@ -93,7 +94,6 @@ export function spawnEnemyProjectileEcs(
   angle: number,
   spec: EnemyShotSpec,
 ): void {
-  if (crowded(sim.world)) return
   const eid = spawnBolt(sim, x, y, angle, FACTION.enemy, {
     frame: spec.frame,
     size: spec.size,

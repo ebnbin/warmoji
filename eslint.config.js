@@ -34,7 +34,13 @@ const NO_ADD_ENTITY = {
   name: 'bitecs',
   importNames: ['addEntity'],
   message:
-    '建实体只在 src/ecs/entities/ 下：一种实体一个工厂，组件包在那里一次挂齐。就地 addEntity 迟早漏挂组件，而漏挂是编译期查不出来的',
+    '建实体一律走 entities/entity.ts 的 newEntity：编号越过组件数组容量时它先扩容，绕过它的写入会静默丢失',
+}
+
+const NO_NEW_ENTITY = {
+  regex: '(^|/)entities/entity$',
+  message:
+    '建实体只在 src/ecs/entities/ 下：一种实体一个工厂，组件包在那里一次挂齐。就地建实体迟早漏挂组件，而漏挂是编译期查不出来的',
 }
 
 export default tseslint.config(
@@ -78,11 +84,25 @@ export default tseslint.config(
   // 须重列上一块的 pattern
   {
     files: ['src/ecs/**/*.ts'],
-    ignores: ['src/ecs/entities/**/*.ts'],
+    ignores: ['src/ecs/entities/entity.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
         { paths: [NO_ADD_ENTITY], patterns: [NO_SCENE_FROM_BATTLE, NO_DEV_FROM_BATTLE, NO_ASSETS_JSON] },
+      ],
+    },
+  },
+  // 须排在上一块之后，并重列它的 path 与 pattern
+  {
+    files: ['src/ecs/**/*.ts'],
+    ignores: ['src/ecs/entities/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [NO_ADD_ENTITY],
+          patterns: [NO_NEW_ENTITY, NO_SCENE_FROM_BATTLE, NO_DEV_FROM_BATTLE, NO_ASSETS_JSON],
+        },
       ],
     },
   },

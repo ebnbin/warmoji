@@ -1,4 +1,5 @@
-import { addComponent, addComponents, addEntity, hasComponent, removeEntity } from 'bitecs'
+import { addComponent, addComponents, hasComponent, removeEntity } from 'bitecs'
+import { newEntity } from './entity'
 import { DEG2RAD } from '../../util/units'
 import type { HeldVisual } from '../../types/abilityDefs'
 import type { OutlineKind } from '../../emoji/svg'
@@ -28,7 +29,7 @@ import { damageMul, ownerX, ownerY } from '../utils/amp'
 /** 能力由调用方挂到返回的 eid 上 */
 export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, faction: number): number {
   const world = sim.world
-  const e = addEntity(world)
+  const e = newEntity(world)
   addComponent(world, e, Weapon)
   const outline: OutlineKind =
     faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? 'elite' : 'enemy') : 'player'
@@ -51,7 +52,7 @@ export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, f
 
 /** 在途回旋镖是独立实体，武器留在手上 */
 function spawnFlyerBody(sim: Sim, weaponEid: number): number {
-  const t = addEntity(sim.world)
+  const t = newEntity(sim.world)
   addComponents(sim.world, t, Transform, Sprite, Tint, Depth, Quad)
   const size = Held.size[weaponEid]!
   Transform.x[t] = Transform.x[weaponEid]!

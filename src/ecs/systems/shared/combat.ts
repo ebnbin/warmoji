@@ -156,8 +156,8 @@ export function orphanBrood(sim: Sim, nestEid: number): void {
 }
 
 /** 不计击杀、不掉落、不放死亡效果 */
-export function despawnEnemy(sim: Sim, eid: number): void {
-  sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
+export function despawnEnemy(sim: Sim, eid: number, puff = true): void {
+  if (puff) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
   if (enemyDef[eid]?.spawner) orphanBrood(sim, eid)
   enemyCarries[eid] = undefined
   unequipAbilities(sim, eid)

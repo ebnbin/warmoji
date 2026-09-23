@@ -1,13 +1,35 @@
-import { MAX_ENTITIES } from './world'
+import { INITIAL_CAPACITY } from './world'
 
-// 所有数组容量 = MAX_ENTITIES；spawn 时须写全字段，跨局复用不清理
+// 数组按 eid 索引，扩容时整体替换（见 storage.ts）：不得缓存数组引用，也不得写 `X.f[i] = 会建实体的调用()`。
+// spawn 时须写全字段，跨局复用不清理
 
-const f32 = (): Float32Array => new Float32Array(MAX_ENTITIES)
-const i32 = (): Int32Array => new Int32Array(MAX_ENTITIES)
-const u32 = (): Uint32Array => new Uint32Array(MAX_ENTITIES)
-const u8 = (): Uint8Array => new Uint8Array(MAX_ENTITIES)
+type Column = Float32Array | Int32Array | Uint32Array | Uint8Array
+
+/** 非 0 初值的列 */
+const FILL = new WeakMap<Column, number>()
+
+const f32 = (): Float32Array => new Float32Array(INITIAL_CAPACITY)
+const i32 = (): Int32Array => new Int32Array(INITIAL_CAPACITY)
+const u32 = (): Uint32Array => new Uint32Array(INITIAL_CAPACITY)
+const u8 = (): Uint8Array => new Uint8Array(INITIAL_CAPACITY)
 /** 需要非 0 初值的 i32（如 -1 表示「无」） */
-const i32Fill = (v: number): Int32Array => new Int32Array(MAX_ENTITIES).fill(v)
+const i32Fill = (v: number): Int32Array => {
+  const a = new Int32Array(INITIAL_CAPACITY).fill(v)
+  FILL.set(a, v)
+  return a
+}
+
+/** 同类型的新列：前段照抄，新增的槽位填初值 */
+export function resizeColumn<T extends Column>(old: T, length: number): T {
+  const next = new (old.constructor as new (length: number) => T)(length)
+  next.set(length >= old.length ? old : old.subarray(0, length))
+  const fill = FILL.get(old)
+  if (fill !== undefined) {
+    if (length > old.length) next.fill(fill, old.length)
+    FILL.set(next, fill)
+  }
+  return next
+}
 
 /** 世界坐标、旋转（弧度）、显示尺寸（世界像素） */
 export const Transform = {
@@ -147,8 +169,8 @@ export const ANIM_SET = [Anim, Sprite] as const
 /** 行为速度的平滑值，击退不入此列 */
 export const Slide = { x: f32(), y: f32() }
 
-/** 休眠：冻结 AI、不被索敌、不占刷怪上限；Boss 永不休眠 */
-export const Dormant = { v: u8() }
+/** 休眠：冻结 AI、不被索敌、不占刷怪上限；Boss 永不休眠。since = 本次入眠时刻（elapsedMs） */
+export const Dormant = { v: u8(), since: f32() }
 
 /** 0 = 整张；1..4 = 左上/右上/左下/右下 */
 export const Quad = { v: u8() }
@@ -174,7 +196,7 @@ export const Projectile = {}
 /** 世界像素/秒 */
 export const Vel = { x: f32(), y: f32() }
 
-/** 自旋 rad/s；寿命回收时刻 0 = 不按寿命；敌弹来源槽位为 -1 */
+/** 自旋 rad/s；dieAt 寿命回收时刻；敌弹来源槽位为 -1 */
 export const Proj = {
   damage: f32(),
   radius: f32(),
@@ -204,8 +226,8 @@ export const PROJ_SET = [Projectile, Transform, Vel, Proj] as const
 
 // ── 拾取物 ──
 
-/** 到手效果由 Grant* 组件决定 */
-export const Pickup = {}
+/** 到手效果由 Grant* 组件决定；bornMs = 落地时刻（elapsedMs） */
+export const Pickup = { bornMs: f32() }
 
 /** 一次性事件组件：updatePickups 挂上，Grant 系统消费，reapCollected 回收 */
 export const Collected = {}
@@ -494,6 +516,7 @@ export const Turret = {
   damage: f32(),
   knockback: f32(),
   range: f32(),
+  lifeMs: f32(),
   /** emoji 在 store.abilityArtEmoji */
   size: f32(),
 }

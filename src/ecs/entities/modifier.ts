@@ -1,4 +1,5 @@
-import { addComponents, addEntity, query, removeEntity } from 'bitecs'
+import { addComponents, query, removeEntity } from 'bitecs'
+import { newEntity } from './entity'
 import { BATTLE_FX_IDENTITY } from '../../data/battlefield'
 import { foldBattleEffects } from '../utils/battleFx'
 import { Lifetime, Modifier } from '../components'
@@ -12,7 +13,7 @@ export function spawnModifier(sim: Sim, def: FieldPickupDef): number {
   for (const e of [...query(sim.world, [Modifier])]) {
     if (modDef[e]?.id === def.id) removeEntity(sim.world, e)
   }
-  const eid = addEntity(sim.world)
+  const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Modifier, Lifetime)
   Modifier.totalMs[eid] = def.durationMs
   Lifetime.until[eid] = sim.elapsedMs + def.durationMs

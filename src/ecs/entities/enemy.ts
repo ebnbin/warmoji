@@ -1,4 +1,5 @@
-import { addComponent, addEntity, query } from 'bitecs'
+import { addComponent, query } from 'bitecs'
+import { newEntity } from './entity'
 import { AI, ELITE, SPAWN, SURGE } from '../../data/enemies'
 import type { EnemyDef, LocomotionDef } from '../../types/enemies'
 import { waveAt } from '../../data/waves'
@@ -62,7 +63,6 @@ import { armIdle } from '../systems/shared/anim'
 import { ANIM_DEF } from '../../emoji/anim'
 import type { Sim } from '../sim'
 import type { FrameIndex } from '../frames'
-import { crowded } from '../world'
 import { toPx } from '../../data/px'
 import { bossFor, MAPS } from '../../data/maps'
 import type { MapDef } from '../../types/maps'
@@ -153,7 +153,7 @@ export function spawnEnemy(
   const world = sim.world
   const outline = elite || boss ? 'elite' : 'enemy'
   const size = def.size * (elite ? ELITE.sizeMul : 1)
-  const eid = addEntity(world)
+  const eid = newEntity(world)
   addComponent(world, eid, Enemy)
   addComponent(world, eid, Alive)
   addComponent(world, eid, Transform)
@@ -223,6 +223,7 @@ export function spawnEnemy(
   Slide.x[eid] = 0
   Slide.y[eid] = 0
   Dormant.v[eid] = 0
+  Dormant.since[eid] = 0
   EnemyArm.armed[eid] = 0 // eid 复用:新实体须重新装配能力
   Alive.v[eid] = 1
   Flash.until[eid] = 0
@@ -264,7 +265,6 @@ export function spawnBrood(
 ): void {
   const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
   for (let i = 0; i < count; i++) {
-    if (crowded(sim.world)) return
     const ang = sim.rng.next() * Math.PI * 2
     const child = spawnEnemy(
       sim,

@@ -122,8 +122,8 @@ export interface ProjectileDef {
   readonly aim?: 'nearest' | 'move'
   /** 缺省 ACQUIRE.range */
   readonly range?: number
-  /** 仅敌方弹按寿命回收 */
-  readonly lifeMs?: number
+  /** 子弹寿命 */
+  readonly lifeMs: number
   /** 缺省由装配方给错峰值 */
   readonly firstDelayMs?: number
   /** 仅敌方弹生效 */
@@ -251,6 +251,8 @@ export interface TurretDef {
   readonly damage: number
   readonly knockback: number
   readonly range: number
+  /** 弩塔子弹寿命 */
+  readonly lifeMs: number
   readonly projectile: ProjectileSpec
   // ── 能力字段 ──
   /** 每次开火改为扇形连发 */

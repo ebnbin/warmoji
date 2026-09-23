@@ -1,4 +1,5 @@
-import { addComponent, addComponents, addEntity, removeComponent } from 'bitecs'
+import { addComponent, addComponents, removeComponent } from 'bitecs'
+import { newEntity } from './entity'
 import { armIdle } from '../systems/shared/anim'
 import { attachDrawable } from './drawable'
 import {
@@ -60,7 +61,7 @@ export interface MinionSpec {
 /** 阵营与描边随武器走 */
 export function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
   const outline: OutlineKind = Faction.v[weaponEid] === FACTION.enemy ? 'enemy' : 'player'
-  const m = addEntity(sim.world)
+  const m = newEntity(sim.world)
   attachDrawable(sim.world, m, sim.frames, {
     id: spec.emoji,
     outline,
@@ -132,7 +133,7 @@ function armTurret(sim: Sim, weapon: number, m: number): void {
   Shoot.damage[m] = Turret.damage[weapon]!
   Shoot.knockback[m] = Turret.knockback[weapon]!
   Shoot.range[m] = Turret.range[weapon]!
-  Shoot.lifeMs[m] = 0
+  Shoot.lifeMs[m] = Turret.lifeMs[weapon]!
   addComponent(sim.world, m, Bolt)
   Bolt.frame[m] = Bolt.frame[weapon]!
   Bolt.size[m] = Bolt.size[weapon]!
