@@ -294,9 +294,9 @@ export const Modifier = { totalMs: f32() }
 export const Due = { at: f32() }
 
 /** 纯视觉；y0 = 落点，Transform.y = y0 + 偏移 */
-export const Bob = { y0: f32(), amp: f32(), halfMs: f32() }
+export const Bob = { y0: f32(), amp: f32(), halfMs: f32(), born: f32() }
 
-/** breathe 1 = 呼吸（born 定相位），0 = 静止且半径由持有系统写；dy 相对 Transform 的纵向偏移 */
+/** breathe 0 = 静止且半径由持有系统写，非 0 = 呼吸档位（见 render/rings.ts，born 定相位）；dy 相对 Transform 的纵向偏移 */
 export const Ring = {
   color: u32(),
   radius: f32(),

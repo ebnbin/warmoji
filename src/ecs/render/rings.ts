@@ -7,14 +7,22 @@ import type { EcsWorld } from '../world'
 import { EcsLayer } from './layer'
 import { packTint } from './tint'
 
+interface Breath {
+  /** 半周期（ms） */
+  ms: number
+  scaleLo: number
+  scaleHi: number
+  alphaLo: number
+  alphaHi: number
+}
 
+/** 按 Ring.breathe 取：0 静止，1 待拾光圈，2 携带者光环 */
+const BREATHS: readonly Breath[] = [
+  { ms: 1, scaleLo: 1, scaleHi: 1, alphaLo: 1, alphaHi: 1 },
+  { ms: 700, scaleLo: 0.82, scaleHi: 1.12, alphaLo: 0.35, alphaHi: 0.9 },
+  { ms: 650, scaleLo: 0.85, scaleHi: 1.12, alphaLo: 0.4, alphaHi: 0.85 },
+]
 
-/** 呼吸半周期（ms） */
-const BREATH_MS = 700
-const SCALE_LO = 0.82
-const SCALE_HI = 1.12
-const ALPHA_LO = 0.35
-const ALPHA_HI = 0.9
 /** 地面区 2 最底、待拾光圈 3 压在金币之下、携带者光环 4 压在敌人之下 */
 const BANDS: readonly { depth: number; zMin: number; zMax: number }[] = [
   { depth: 2, zMin: -Infinity, zMax: 3 },
@@ -22,8 +30,8 @@ const BANDS: readonly { depth: number; zMin: number; zMax: number }[] = [
   { depth: 4, zMin: 4, zMax: Infinity },
 ]
 
-function breath(age: number): number {
-  const t = (age % (BREATH_MS * 2)) / BREATH_MS
+function breath(age: number, ms: number): number {
+  const t = (age % (ms * 2)) / ms
   return t <= 1 ? t : 2 - t
 }
 
@@ -53,10 +61,10 @@ export class RingLayer {
     for (const eid of query(this.world, RING_SET as unknown as object[])) {
       const z = Ring.z[eid]!
       if (z < zMin || z >= zMax) continue
-      const breathing = Ring.breathe[eid] === 1
-      const t = breathing ? breath(this.now - Ring.born[eid]!) : 0
-      const r = Ring.radius[eid]! * (breathing ? SCALE_LO + (SCALE_HI - SCALE_LO) * t : 1)
-      const a = (breathing ? ALPHA_HI + (ALPHA_LO - ALPHA_HI) * t : 1) * Tint.alpha[eid]!
+      const b = BREATHS[Ring.breathe[eid]!]!
+      const t = Ring.breathe[eid] ? breath(this.now - Ring.born[eid]!, b.ms) : 0
+      const r = Ring.radius[eid]! * (b.scaleLo + (b.scaleHi - b.scaleLo) * t)
+      const a = (b.alphaHi + (b.alphaLo - b.alphaHi) * t) * Tint.alpha[eid]!
       const x = Transform.x[eid]!
       const y = Transform.y[eid]! + Ring.dy[eid]!
       const color = Ring.color[eid]!
