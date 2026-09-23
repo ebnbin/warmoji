@@ -525,7 +525,6 @@ for (const [id, m] of Object.entries(MAPS)) {
   if (to) {
     num(`${p}.torus.arenaLong`, to.arenaLong, 1)
     num(`${p}.torus.arenaShort`, to.arenaShort, 1)
-    num(`${p}.torus.strip`, to.strip, 0.01)
     num(`${p}.torus.projectileLifeMs`, to.projectileLifeMs, 1)
     num(`${p}.torus.frame`, to.frame, 0)
   }

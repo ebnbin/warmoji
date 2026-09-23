@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { toPx } from '../data/px'
+import { mainCameraOnly } from '../util/camera'
 import { attachEnemy, enemyOf } from './enemy/enemies'
 import type { Enemy } from './enemy/enemies'
 import { armEnemy, buildEnemyCtx, healEnemies } from './enemy/abilities'
@@ -598,10 +599,12 @@ export abstract class ArcadeBattleScene extends Phaser.Scene {
 
     this.createWorld()
 
-    this.timeStopFx = this.add
-      .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, TIMESTOP.chillColor, 0)
-      .setScrollFactor(0)
-      .setDepth(88)
+    this.timeStopFx = mainCameraOnly(
+      this.add
+        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, TIMESTOP.chillColor, 0)
+        .setScrollFactor(0)
+        .setDepth(88),
+    )
 
     this.center = this.spawnCenter()
     this.centerObj = this.add.zone(this.center.x, this.center.y, 1, 1)

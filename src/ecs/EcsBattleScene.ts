@@ -13,6 +13,7 @@ import { browserStorage } from '../util/storage'
 import { UI_FONT, FONT } from '../util/fonts'
 import { norm } from '../util/vec'
 import { applyBackground } from '../util/background'
+import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
 import { getRun, promoteStep } from '../run/state'
@@ -164,25 +165,29 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     ;(this.ctx as { anchor: Phaser.GameObjects.Zone }).anchor = this.centerObj
     this.map.camera(this.ctx)
 
-    this.timeStopFx = this.add
-      .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, TIMESTOP.chillColor, 0)
-      .setScrollFactor(0)
-      .setDepth(88)
+    this.timeStopFx = mainCameraOnly(
+      this.add
+        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, TIMESTOP.chillColor, 0)
+        .setScrollFactor(0)
+        .setDepth(88),
+    )
 
     this.cursors = this.input.keyboard?.createCursorKeys()
     this.wasd = this.input.keyboard?.addKeys('W,A,S,D') as
       | Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
       | undefined
 
-    const hint = this.add
-      .text(viewport.logicalWidth / 2, 40, 'ECS 实验 · 构建图集…', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.small,
-        color: '#8fa1b5',
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(1000)
+    const hint = mainCameraOnly(
+      this.add
+        .text(viewport.logicalWidth / 2, 40, 'ECS 实验 · 构建图集…', {
+          fontFamily: UI_FONT,
+          fontSize: FONT.small,
+          color: '#8fa1b5',
+        })
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(1000),
+    )
 
     void this.boot(++this.bootGen, run, center, hint)
 

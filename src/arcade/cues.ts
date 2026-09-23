@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import type { BlastRing } from '../types/abilityDefs'
 import { emojiImage } from '../emoji/textures'
+import { mainCameraOnly } from '../util/camera'
 
 // 一次性特效；持续性视觉（持有物/召唤物/光环圈）由各能力自管
 
@@ -100,10 +101,12 @@ export function slashCue(scene: Phaser.Scene, x: number, y: number, angle: numbe
 }
 
 export function screenFlashCue(scene: Phaser.Scene, color: number, alpha: number, durationMs: number): void {
-  const flash = scene.add
-    .rectangle(scene.scale.width / 2, scene.scale.height / 2, 6000, 6000, color, alpha)
-    .setScrollFactor(0)
-    .setDepth(200)
+  const flash = mainCameraOnly(
+    scene.add
+      .rectangle(scene.scale.width / 2, scene.scale.height / 2, 6000, 6000, color, alpha)
+      .setScrollFactor(0)
+      .setDepth(200),
+  )
   scene.tweens.add({ targets: flash, alpha: 0, duration: durationMs, onComplete: () => flash.destroy() })
 }
 
