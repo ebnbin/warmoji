@@ -334,7 +334,7 @@ const ruins: WorldHooks = {
     // 穿墙与破墙的不吃墙碰撞
     const def = enemyDef[eid]
     if (!w || def?.phasesWalls || def?.breaksWalls) return box
-    return w.grid.resolveMove(Transform.x[eid]!, Transform.y[eid]!, box.x, box.y)
+    return w.grid.separateCircle(box.x, box.y, Radius.v[eid]!)
   },
   /** 不可达时回退直线 */
   chaseDir(sim, eid, tx, ty) {
