@@ -5,7 +5,7 @@ import type { CardId } from '../types/cards'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
-import { getRun, promoteStep } from '../run/state'
+import { getRun, teamStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
@@ -155,7 +155,7 @@ export class CardScene extends Phaser.Scene {
   }
 
   private nextScene(): 'promote' | 'shop' {
-    return promoteStep(this.run) ? 'promote' : 'shop'
+    return teamStep(this.run) ? 'promote' : 'shop'
   }
 
   private reportCards(): void {

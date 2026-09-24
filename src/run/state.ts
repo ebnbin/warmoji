@@ -206,9 +206,11 @@ export function setGuardCenter(run: RunState, id: CharacterId): boolean {
   return true
 }
 
-/** null = 直接进店 */
-export function promoteStep(run: RunState): 'recruit' | null {
-  return recruitDueCount(run) > 0 ? 'recruit' : null
+/** 整编的下一页；null = 整编已无事可办 */
+export function teamStep(run: RunState): 'recruit' | 'formation' | null {
+  if (recruitDueCount(run) > 0) return 'recruit'
+  if (hasCenter(run) && !run.formationIntroduced) return 'formation'
+  return null
 }
 
 /** storedHp 0（阵亡）以低血量复活 */

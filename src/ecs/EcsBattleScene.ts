@@ -16,7 +16,7 @@ import { applyBackground } from '../util/background'
 import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
-import { getRun, promoteStep } from '../run/state'
+import { getRun, teamStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAPS } from '../data/maps'
 import { BATTLE_SCENE_KEY } from './keys'
@@ -570,7 +570,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.time.delayedCall(WAVE.summaryMs, () => {
       if (finished) this.scene.start('result', { win: true })
       else if (run.cardDraws > 0) this.scene.start('cards')
-      else this.scene.start(promoteStep(run) ? 'promote' : 'shop')
+      else this.scene.start(teamStep(run) ? 'promote' : 'shop')
     })
   }
 
