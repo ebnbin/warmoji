@@ -53,49 +53,44 @@ async function startRun(page: Page, mapId?: string): Promise<void> {
   )
   await click(page, await page.evaluate(() => window.__warmoji!.captain!.start))
   await page.waitForFunction(
-    () => window.__warmoji?.scene === 'promote' && !!window.__warmoji.promote,
+    () =>
+      (window.__warmoji?.scene === 'recruit' && !!window.__warmoji.recruit) ||
+      (window.__warmoji?.scene === 'formation' && !!window.__warmoji.formation),
   )
-  const confirm = async (): Promise<void> =>
-    click(page, await page.evaluate(() => window.__warmoji!.promote!.confirm))
   for (let step = 0; step < 40; step++) {
     const st = await page.evaluate(() => ({
       inBattle: (window as WinEcs).__ecs?.ready === true,
       scene: window.__warmoji!.scene,
-      mode: window.__warmoji!.promote?.mode,
-      due: window.__warmoji!.promote?.due ?? 0,
-      picked: window.__warmoji!.promote?.picked ?? [],
-      items: (window.__warmoji!.promote?.items ?? []).map((x) => ({ id: x.id, state: x.state })),
+      due: window.__warmoji!.recruit?.due ?? 0,
+      picked: window.__warmoji!.recruit?.picked ?? [],
+      items: (window.__warmoji!.recruit?.items ?? []).map((x) => ({ id: x.id, state: x.state })),
     }))
-    if (st.inBattle || st.scene !== 'promote') break
-    if (st.mode === 'formation') {
-      await confirm()
+    if (st.inBattle) break
+    if (st.scene === 'formation') {
+      await click(page, await page.evaluate(() => window.__warmoji!.formation!.confirm))
       await page.waitForFunction(
-        () => window.__warmoji?.scene !== 'promote' || (window as WinEcs).__ecs?.ready === true,
+        () => window.__warmoji?.scene !== 'formation' || (window as WinEcs).__ecs?.ready === true,
         undefined,
         { timeout: 30_000 },
       )
       break
     }
+    if (st.scene !== 'recruit') break
     if (st.picked.length < st.due) {
       // 雪人初始只减速不伤害，单人开局必然零击杀
-      const next = st.items.find(
-        (x) => (x.state ?? 'open') === 'open' && !st.picked.includes(x.id) && x.id !== 'snowman',
-      )
-      if (!next) throw new Error('整编页：已解锁候选不足以点满名额')
+      const next = st.items.find((x) => x.state === 'open' && !st.picked.includes(x.id) && x.id !== 'snowman')
+      if (!next) throw new Error('招募页：已解锁候选不足以点满名额')
       const r = await page.evaluate(
-        (k) => window.__warmoji!.promote!.items.find((x) => x.id === k)!,
+        (k) => window.__warmoji!.recruit!.items.find((x) => x.id === k)!,
         next.id,
       )
       await click(page, { x: r.x + r.w / 2, y: r.y + r.h / 2 })
-      await page.waitForFunction((k) => window.__warmoji?.promote?.selected === k, next.id)
+      await page.waitForFunction((k) => window.__warmoji?.recruit?.selected === k, next.id)
       continue
     }
-    await confirm()
+    await click(page, await page.evaluate(() => window.__warmoji!.recruit!.confirm))
     await page.waitForFunction(
-      () =>
-        window.__warmoji?.scene !== 'promote' ||
-        window.__warmoji.promote?.mode === 'formation' ||
-        (window as WinEcs).__ecs?.ready === true,
+      () => window.__warmoji?.scene !== 'recruit' || (window as WinEcs).__ecs?.ready === true,
       undefined,
       { timeout: 30_000 },
     )
