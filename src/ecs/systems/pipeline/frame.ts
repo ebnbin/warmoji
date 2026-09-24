@@ -14,7 +14,7 @@ import { updateAnims } from '../updateAnims'
 import { updatePickups } from '../updatePickups'
 import { updateSpawners } from '../updateSpawners'
 import { updateZones } from '../updateZones'
-import { stepAbilities } from './abilities'
+import { castRequests, stepAbilities } from './abilities'
 import { runPipeline } from './step'
 import { stepSim } from '../../sim'
 import type { Step } from './step'
@@ -22,7 +22,13 @@ import type { Sim } from '../../sim'
 
 
 export const FRAME_PIPELINE: readonly Step[] = [
-  { name: 'stepSim', run: stepSim },
+  { name: 'castRequests', run: castRequests },
+  {
+    name: 'stepSim',
+    run: stepSim,
+    after: ['castRequests'],
+    why: '队长技按按键时刻结算，须先于本帧的伤害；晚一帧就是「圣光复活了全队仍判负」',
+  },
   { name: 'refreshCharacterTargets', run: refreshCharacterTargets },
   { name: 'armEnemies', run: armEnemies },
   {
@@ -30,7 +36,7 @@ export const FRAME_PIPELINE: readonly Step[] = [
     run: stepAbilities,
     after: ['stepSim', 'refreshCharacterTargets', 'armEnemies'],
     why:
-      '队伍中心是 stepSim 里的 moveTeam 挪的，而施放锚点读它；' +
+      '队伍中心是 stepSim 里的 moveTeam 挪的，而自动施放的锚点读它；' +
       '队员快照是敌方能力的索敌来源；魔尘复形的冷却缓冲在 armEnemies 里施加，晚了就是复形瞬间齐射',
   },
   { name: 'updateAnims', run: updateAnims },

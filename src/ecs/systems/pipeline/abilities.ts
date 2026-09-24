@@ -36,6 +36,7 @@ import { updateDrops } from '../updateDrops'
 import { updateEmplacements } from '../updateEmplacements'
 import { updateFlyers } from '../updateFlyers'
 
+import { castRequested } from '../shared/castScan'
 import { runPipeline } from './step'
 import type { Step } from './step'
 import type { Sim } from '../../sim'
@@ -166,4 +167,11 @@ export const ABILITY_PIPELINE: readonly Step[] = [
 
 export function stepAbilities(sim: Sim): void {
   runPipeline(ABILITY_PIPELINE, sim)
+}
+
+/** 须覆盖 scripts/gen-defs.ts 的 CASTABLE_KINDS；次序随 KINDS */
+const MANUAL_CASTS = [castRallies, castDances, castBuffs, castTimeStops, castNukes, castStrikes]
+
+export function castRequests(sim: Sim): void {
+  for (const cast of MANUAL_CASTS) cast(sim, castRequested)
 }

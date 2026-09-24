@@ -8,8 +8,8 @@ import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
 /** 休眠者不在活跃集内，天然豁免 */
-export function castNukes(sim: Sim): void {
-  castScan(sim, Nuke, (e) => {
+export function castNukes(sim: Sim, scan = castScan): void {
+  scan(sim, Nuke, (e) => {
     const src = sourceOf(sim, e)
     sim.out.flash = { color: 0xffffff, alpha: 0.55, durationMs: 380 }
     playSfx('boom')
