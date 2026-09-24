@@ -570,7 +570,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.time.delayedCall(WAVE.summaryMs, () => {
       if (finished) this.scene.start('result', { win: true })
       else if (run.cardDraws > 0) this.scene.start('cards')
-      else this.scene.start(teamStep(run) ? 'promote' : 'shop')
+      else this.scene.start(teamStep(run) ?? 'shop')
     })
   }
 

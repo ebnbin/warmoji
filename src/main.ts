@@ -4,7 +4,8 @@ import { CardScene } from './scene/CardScene'
 import { MapScene } from './scene/MapScene'
 import { MenuScene } from './scene/MenuScene'
 import { PreloadScene } from './scene/PreloadScene'
-import { PromoteScene } from './scene/PromoteScene'
+import { RecruitScene } from './scene/RecruitScene'
+import { FormationScene } from './scene/FormationScene'
 import { ResultScene } from './scene/ResultScene'
 import { SettingsScene } from './scene/SettingsScene'
 import { ShopScene } from './scene/ShopScene'
@@ -43,7 +44,7 @@ const game = new Phaser.Game({
   height: Math.round(viewport.cssHeight * viewport.dpr),
   input: { activePointers: 3 },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, PromoteScene, CardScene, ShopScene, EcsBattleScene, UIScene, ResultScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, RecruitScene, FormationScene, CardScene, ShopScene, EcsBattleScene, UIScene, ResultScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {
@@ -52,7 +53,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
   for (const delay of [0, 100, 500, 1000]) {
     window.setTimeout(() => nudgeIosViewport(() => refreshViewport(game)), delay)
   }
-  const lobby = ['menu', 'map', 'wiki', 'studio', 'settings', 'captain', 'promote', 'cards', 'shop', 'result']
+  const lobby = ['menu', 'map', 'wiki', 'studio', 'settings', 'captain', 'recruit', 'formation', 'cards', 'shop', 'result']
   for (const scene of game.scene.getScenes(false)) {
     const key = scene.scene.key
     if (lobby.includes(key)) {

@@ -783,11 +783,11 @@ export class ShopScene extends Phaser.Scene {
     this.scene.start(BATTLE_SCENE_KEY)
   }
 
-  /** 须先入睡再启动阵型页：promote 的 init 以商店在沉睡验证 fromShop */
+  /** 须先入睡再启动阵型页：阵型页的 init 以商店在沉睡验证 fromShop */
   private openFormation(): void {
     playSfx('click')
     this.scene.sleep()
-    this.scene.run('promote', { fromShop: true })
+    this.scene.run('formation', { fromShop: true })
   }
 
   private onWake(): void {

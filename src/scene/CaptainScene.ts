@@ -5,7 +5,7 @@ import { browserStorage } from '../util/storage'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
-import { beginRun } from '../run/state'
+import { beginRun, teamStep } from '../run/state'
 import { loadCaptain, loadMap, saveCaptain } from '../save/selection'
 import { captainStatGroups } from '../scene/statLines'
 import { applyBackground } from '../util/background'
@@ -17,6 +17,7 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
+import { nextAfterTeam } from './teamPage'
 
 interface CaptainLayout {
   content: { w: number; h: number }
@@ -131,8 +132,8 @@ export class CaptainScene extends Phaser.Scene {
       .setOrigin(0.5)
     const confirm = (): void => {
       playSfx('click')
-      beginRun(this.selectedId, [], loadMap(browserStorage()))
-      this.scene.start('promote')
+      const run = beginRun(this.selectedId, [], loadMap(browserStorage()))
+      this.scene.start(teamStep(run) ?? nextAfterTeam(run))
     }
     this.add
       .zone(b.x, b.y, b.w, b.h)

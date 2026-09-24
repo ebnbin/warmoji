@@ -123,7 +123,7 @@ export function addRunExit(
   x: number,
   y: number,
   res: number,
-  dragged: () => boolean,
+  dragged = (): boolean => false,
 ): Rect {
   const style = { fontFamily: UI_FONT, fontSize: FONT.strong, color: '#c8c8d4', resolution: res }
   if (isInitialWave(run)) {
@@ -164,7 +164,7 @@ export function addConfirmButton(
   label: string,
   res: number,
   onConfirm: () => void,
-  dragged: () => boolean,
+  dragged = (): boolean => false,
 ): { bg: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.Text; rect: Rect } {
   const cx = origin.x + L.content.w / 2
   const cy = origin.y + L.btn.y

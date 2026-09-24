@@ -4,25 +4,32 @@ declare const __BUILD_HASH__: string
 declare const __BUILD_TIME__: string
 
 // e2e 读取的运行时状态
-interface WarmojiPromoteDebug {
-  mode: 'recruit' | 'formation'
-  /** 招募模式 = 详情面板正在展示的候选；阵型模式 = 当前受保护中心 */
+interface WarmojiRecruitDebug {
+  /** 详情面板正在展示的候选 */
   selected: string
-  /** 招募模式 = 卡池网格；阵型模式 = 队员站位 */
+  /** 卡池网格 */
   items: {
     id: string
     x: number
     y: number
     w: number
     h: number
-    state?: 'open' | 'locked' | 'taken'
+    state: 'open' | 'locked' | 'taken'
   }[]
   confirm: { x: number; y: number; w: number; h: number; enabled: boolean }
   back: { x: number; y: number; w: number; h: number }
-  /** 招募模式：名额数与已选候选 */
-  due?: number
-  picked?: string[]
-  formation?: { center: string }
+  /** 名额数与已选候选 */
+  due: number
+  picked: string[]
+}
+
+interface WarmojiFormationDebug {
+  /** 当前受保护中心 */
+  center: string
+  /** 队员站位 */
+  items: { id: string; x: number; y: number; w: number; h: number }[]
+  confirm: { x: number; y: number; w: number; h: number }
+  back: { x: number; y: number; w: number; h: number }
 }
 
 interface WarmojiShopDebug {
@@ -160,7 +167,7 @@ interface WarmojiResultDebug {
 }
 
 interface WarmojiDebug {
-  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'promote' | 'cards' | 'shop' | 'result'
+  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'recruit' | 'formation' | 'cards' | 'shop' | 'result'
   elapsed: number
   kills: number
   level: number
@@ -174,7 +181,8 @@ interface WarmojiDebug {
   studio?: WarmojiStudioDebug
   settings?: WarmojiSettingsDebug
   captain?: WarmojiCaptainDebug
-  promote?: WarmojiPromoteDebug
+  recruit?: WarmojiRecruitDebug
+  formation?: WarmojiFormationDebug
   cards?: WarmojiCardsDebug
   shop?: WarmojiShopDebug
   result?: WarmojiResultDebug
