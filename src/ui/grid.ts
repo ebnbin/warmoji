@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import type { OutlineKind } from '../emoji/svg'
 import { TAP_SLOP } from '../util/units'
-import { emojiImage } from '../emoji/textures'
+import { emojiImage } from '../emoji/hold'
 import { clipTo } from '../util/mask'
 import { roundRect } from './shapes'
 

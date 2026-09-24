@@ -12,7 +12,7 @@ import { loadMap, saveMap } from '../save/selection'
 import { loadSettings } from '../save/settings'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
-import { emojiImage } from '../emoji/textures'
+import { emojiImage, preloadEmojis } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
@@ -30,6 +30,8 @@ const MAP_PLAY_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
   space: '深空星海：无限世界，天体不时沿直线横扫（敌我通吃、有预警可躲）；终波奇点张开禁锢场，越往外阻力越大、谁也逃不出',
   ice: '浮冰：25×25 方形浮冰，全场打滑——不跟手、刹不住、会过冲，击退也滑得更远；滑出冰面即落水，每秒掉血又游得慢（敌我通吃），把敌人推下水淹死是活路。相机永远跟随',
 }
+
+const GROUP_ICONS = { theme: '1f5fa', decor: '1f33f', play: '1f579' } as const
 
 interface MapLayout {
   content: { w: number; h: number }
@@ -74,6 +76,16 @@ export class MapScene extends Phaser.Scene {
 
   constructor() {
     super('map')
+  }
+
+  preload(): void {
+    preloadEmojis(this, [
+      ...Object.values(GROUP_ICONS).map((id) => ({ id })),
+      ...MAP_IDS.flatMap((id) => [
+        { id: MAPS[id].emoji },
+        ...MAPS[id].decor.emojis.map((e) => ({ id: e, outline: 'player' as const })),
+      ]),
+    ])
   }
 
   create(): void {
@@ -250,10 +262,10 @@ export class MapScene extends Phaser.Scene {
       cursor += Math.max(36, t.height + 8)
     }
 
-    group('1f5fa', '主题')
+    group(GROUP_ICONS.theme, '主题')
     line(def.desc)
     cursor += 14
-    group('1f33f', '地面装饰')
+    group(GROUP_ICONS.decor, '地面装饰')
     const startX = 62 + 16
     const pitch = 46
     const perRow = Math.max(1, Math.floor((D.w - startX - 16) / pitch))
@@ -269,7 +281,7 @@ export class MapScene extends Phaser.Scene {
       placed++
     }
     cursor += 44
-    group('1f579', '玩法')
+    group(GROUP_ICONS.play, '玩法')
     line(MAP_PLAY_LABEL[def.kind])
     line(`终波头目 ${bossFor(this.selectedId).name}`, '#9a9aa8')
     this.detailView.setContentHeight(cursor + 12)

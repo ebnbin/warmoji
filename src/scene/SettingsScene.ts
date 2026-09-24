@@ -7,8 +7,8 @@ import { loadSettings, saveSettings, SETTING_DEFS } from '../save/settings'
 import type { Settings } from '../save/settings'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
-import { emojiImage } from '../emoji/textures'
-import { emojiText } from '../ui/emojiText'
+import { emojiImage, preloadEmojis } from '../emoji/hold'
+import { emojiText, templateEmojis } from '../ui/emojiText'
 import { ScrollView } from '../ui/scroll'
 import type { ScrollRect } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
@@ -35,6 +35,8 @@ const PORTRAIT: SettingsLayout = {
   list: { y: 180, w: 672, rowH: 110, gap: 14 },
 }
 
+const TITLE = '{2699} 设置'
+
 interface Row {
   key: keyof Settings
   /** 相对滚动内容顶 */
@@ -55,6 +57,10 @@ export class SettingsScene extends Phaser.Scene {
 
   constructor() {
     super('settings')
+  }
+
+  preload(): void {
+    preloadEmojis(this, [...templateEmojis(TITLE), ...SETTING_DEFS.map((d) => d.icon)].map((id) => ({ id })))
   }
 
   create(): void {
@@ -95,7 +101,7 @@ export class SettingsScene extends Phaser.Scene {
       this,
       w / 2,
       oy + L.headerY,
-      '{2699} 设置',
+      TITLE,
       {
         fontFamily: UI_FONT,
         fontSize: FONT.title,

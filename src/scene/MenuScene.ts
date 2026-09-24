@@ -2,23 +2,48 @@ import Phaser from 'phaser'
 import { CHARACTERS } from '../data/characters'
 import { ENEMY_DEFS } from '../data/enemies'
 import { loadHighScore } from '../save/highscore'
+import type { HighScore } from '../save/highscore'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
 import { browserStorage } from '../util/storage'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
-import { emojiImage } from '../emoji/textures'
+import { emojiImage, preloadEmojis } from '../emoji/hold'
+import type { EmojiRef } from '../emoji/hold'
 import { iconLabel } from '../ui/emojiText'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 
+function backdropDecor(): EmojiRef[] {
+  const uniqEnemies = [...new Set(ENEMY_DEFS.map((e) => e.emoji))]
+  return [
+    ...[0.2, 0.45, 0.75]
+      .map((f) => uniqEnemies[Math.min(uniqEnemies.length - 1, Math.floor(f * uniqEnemies.length))])
+      .filter((e): e is string => e !== undefined)
+      .map((id) => ({ id, outline: 'enemy' as const })),
+    { id: '1fa93', outline: 'player' },
+    { id: '1fa83', outline: 'player' },
+    { id: '1f345', outline: 'player' },
+  ]
+}
+
+function vignetteCast(): { heroes: string[]; foes: string[] } {
+  return {
+    heroes: Object.values(CHARACTERS)
+      .slice(0, 3)
+      .map((c) => c.emoji),
+    foes: ENEMY_DEFS.slice(0, 3).map((s) => s.emoji),
+  }
+}
+
 export class MenuScene extends Phaser.Scene {
   // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
+  private best!: HighScore
   private menuBtn = { x: 0, y: 0, w: 0, h: 0 }
   private gearRect = { x: 0, y: 0, w: 0, h: 0 }
   private bookRect = { x: 0, y: 0, w: 0, h: 0 }
@@ -26,6 +51,20 @@ export class MenuScene extends Phaser.Scene {
 
   constructor() {
     super('menu')
+  }
+
+  preload(): void {
+    this.best = loadHighScore(browserStorage())
+    const cast = vignetteCast()
+    preloadEmojis(this, [
+      ...['2699', '1f4d6', '1f9ea', '2694'].map((id) => ({ id })),
+      ...(this.best.bestWave > 0 ? [{ id: '1f3c6' }] : []),
+      ...backdropDecor(),
+      ...cast.heroes.map((id) => ({ id, outline: 'player' as const })),
+      ...cast.foes.map((id) => ({ id, outline: 'enemy' as const })),
+      { id: '1f345', outline: 'player' },
+      { id: '1f534', outline: 'enemyProjectile' },
+    ])
   }
 
   create(): void {
@@ -45,7 +84,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.createVignette(w / 2, h * 0.52)
 
-    const best = loadHighScore(browserStorage())
+    const best = this.best
     if (best.bestWave > 0) {
       iconLabel(this, w / 2, h * 0.66, '1f3c6', 35, `最佳：第 ${best.bestWave} 波 · 击杀 ${best.bestKills}`, {
         fontFamily: UI_FONT,
@@ -162,24 +201,13 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createBackdrop(w: number, h: number, rng: Rng): void {
-    const uniqEnemies = [...new Set(ENEMY_DEFS.map((e) => e.emoji))]
-    const enemyDecor = [0.2, 0.45, 0.75]
-      .map((f) => uniqEnemies[Math.min(uniqEnemies.length - 1, Math.floor(f * uniqEnemies.length))])
-      .filter((e): e is string => e !== undefined)
-      .map((emoji) => ({ emoji, outline: 'enemy' as const }))
-    const decor: { emoji: string; outline: 'enemy' | 'player' }[] = [
-      ...enemyDecor,
-      { emoji: '1fa93', outline: 'player' },
-      { emoji: '1fa83', outline: 'player' },
-      { emoji: '1f345', outline: 'player' },
-    ]
-    decor.forEach((d, i) => {
+    backdropDecor().forEach((d, i) => {
       const side = i % 2 === 0 ? 0.06 + rng.next() * 0.16 : 0.78 + rng.next() * 0.16
       const img = emojiImage(
         this,
         w * side,
         h * (0.12 + rng.next() * 0.76),
-        d.emoji,
+        d.id,
         75 + rng.next() * 54,
         d.outline,
       )
@@ -245,14 +273,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createVignette(cx: number, cy: number): void {
-    const chars = Object.values(CHARACTERS)
-      .slice(0, 3)
-      .map((c) => c.emoji)
-    chars.forEach((emoji, i) => {
+    const cast = vignetteCast()
+    cast.heroes.forEach((emoji, i) => {
       emojiImage(this, cx - 260 + i * 90, cy, emoji, 75, 'player').setFlipX(true)
     })
-    const enemies = ENEMY_DEFS.slice(0, 3).map((s) => s.emoji)
-    enemies.forEach((emoji, i) => {
+    cast.foes.forEach((emoji, i) => {
       const img = emojiImage(this, cx + 80 + i * 90, cy, emoji, 70, 'enemy')
       this.tweens.add({
         targets: img,

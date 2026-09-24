@@ -10,7 +10,7 @@ import { loadCaptain, loadMap, saveCaptain } from '../save/selection'
 import { captainStatGroups } from '../scene/statLines'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
-import { emojiImage } from '../emoji/textures'
+import { emojiImage, preloadEmojis } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
@@ -58,13 +58,24 @@ export class CaptainScene extends Phaser.Scene {
     super('captain')
   }
 
+  preload(): void {
+    if (!this.preserveOnRestart) this.selectedId = loadCaptain(browserStorage())
+    const ids = new Set<CaptainId>([this.selectedId, ...PICKABLE_CAPTAIN_IDS])
+    preloadEmojis(
+      this,
+      [...ids].flatMap((id) => [
+        { id: CAPTAINS[id].emoji, outline: 'player' as const },
+        ...captainStatGroups(CAPTAINS[id]).map((g) => ({ id: g.icon })),
+      ]),
+    )
+  }
+
   create(): void {
     applyCamera(this)
     const preserved = this.preserveOnRestart
     this.preserveOnRestart = false
     if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
     applyBackground(this.palette)
-    if (!preserved) this.selectedId = loadCaptain(browserStorage())
 
     const w = viewport.logicalWidth
     const h = viewport.logicalHeight
