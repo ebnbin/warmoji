@@ -70,12 +70,6 @@ interface WarmojiCardsDebug {
   }[]
 }
 
-interface WarmojiFieldDebug {
-  pickups: { id: string; polarity: 'buff' | 'debuff'; x: number; y: number }[]
-  active: { id: string; polarity: 'buff' | 'debuff'; remainMs: number }[]
-  carriers: number
-}
-
 interface WarmojiMenuDebug {
   start: { x: number; y: number; w: number; h: number }
   settings: { x: number; y: number; w: number; h: number }
@@ -166,31 +160,14 @@ interface WarmojiResultDebug {
 }
 
 interface WarmojiDebug {
-  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'promote' | 'cards' | 'shop' | 'arena' | 'result'
+  scene: 'menu' | 'map' | 'wiki' | 'studio' | 'settings' | 'captain' | 'promote' | 'cards' | 'shop' | 'result'
   elapsed: number
-  hp: number
-  alive: number
   kills: number
   level: number
-  enemies: number
-  pending: number
-  fps: number
   viewW: number
   viewH: number
-  playerX: number
-  playerY: number
-  camX: number
-  camY: number
   wave?: number
   coins?: number
-  formation?: string
-  mapId?: string
-  /** 无限地图才有 */
-  dormant?: number
-  /** 终波缩圈半径，未开圈为 undefined */
-  zoneRadius?: number
-  skill?: { remainMs: number; ready: boolean }
-  field?: WarmojiFieldDebug
   menu?: WarmojiMenuDebug
   map?: WarmojiMapDebug
   wiki?: WarmojiWikiDebug

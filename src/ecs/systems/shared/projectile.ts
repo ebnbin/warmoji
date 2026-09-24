@@ -1,7 +1,7 @@
 import { Bolt, FACTION, Faction, Owner, Shoot } from '../../components'
 import { removeEntity } from 'bitecs'
 import { projHitUids, projOnHit, projSrcName } from '../../store'
-import { spawnEnemyProjectileEcs, spawnProjectileEcs } from '../../entities/projectile'
+import { spawnEnemyProjectile, spawnProjectile } from '../../entities/projectile'
 import { abilityFireSfx, enemyDef } from '../../store'
 import { attributionSlot } from '../../utils/amp'
 import type { Sim } from '../../sim'
@@ -13,10 +13,10 @@ export function random(sim: Sim, e: number): number {
 
 export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, damage: number): void {
   if (Faction.v[e] !== FACTION.enemy) {
-    spawnProjectileEcs(sim, e, x, y, angle, damage, attributionSlot(e))
+    spawnProjectile(sim, e, x, y, angle, damage, attributionSlot(e))
     return
   }
-  spawnEnemyProjectileEcs(sim, x, y, angle, {
+  spawnEnemyProjectile(sim, x, y, angle, {
     frame: Bolt.frame[e]!,
     size: Bolt.size[e]!,
     radius: Bolt.radius[e]!,

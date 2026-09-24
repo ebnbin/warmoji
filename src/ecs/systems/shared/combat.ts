@@ -8,7 +8,7 @@ import type { EnemyDef } from '../../../types/enemies'
 import { KNOCKBACK } from '../../../data/abilities'
 import { MEMBER } from '../../../data/characters'
 import { UNIT } from '../../../util/units'
-import { spawnShardsEcs } from '../../entities/shard'
+import { spawnShards } from '../../entities/shard'
 import { Alive, Anim, Boss, DmgMul, Dormant, Elite, Enemy, ENEMY_SET, Flash, Hp, Iframe, Kv, CharFlash, CharHp, Morph, CharPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from '../../components'
 import { enemyCarries, enemyDef } from '../../store'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
@@ -105,7 +105,7 @@ export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flin
     dropFieldPickup(sim, Transform.x[eid]!, Transform.y[eid]!, carries)
     enemyCarries[eid] = undefined
   }
-  spawnShardsEcs(
+  spawnShards(
     sim,
     Transform.x[eid]!,
     Transform.y[eid]!,

@@ -80,8 +80,8 @@ export const SANDBOX_PRESETS: readonly SandboxPreset[] = [
   { id: 'busy', label: '繁忙', desc: '8 人一阶 · 高规模 · 攻速 ×3 —— 后期大混战', team: 8, level: 1, scale: 'high', difficulty: 3, fireRate: 3, kinds: 12 },
   { id: 'heavy', label: '重载', desc: '8 人二阶 · 爆满 · 全种类 —— 数百只同场', team: 8, level: 2, scale: 'max', difficulty: 10, fireRate: 10, kinds: 28 },
   { id: 'k2', label: '2 千', desc: '把真实刷怪器开到 2000 并发', team: 8, level: 2, scale: 'k2', difficulty: 10, fireRate: 10, kinds: 28 },
-  { id: 'k4', label: '4 千', desc: '4000 并发 —— 预期两侧都开始跪', team: 8, level: 2, scale: 'k4', difficulty: 10, fireRate: 10, kinds: 28 },
-  { id: 'k8', label: '8 千', desc: '8000 并发 —— 看谁跪得晚', team: 8, level: 2, scale: 'k8', difficulty: 10, fireRate: 10, kinds: 28 },
+  { id: 'k4', label: '4 千', desc: '把真实刷怪器开到 4000 并发', team: 8, level: 2, scale: 'k4', difficulty: 10, fireRate: 10, kinds: 28 },
+  { id: 'k8', label: '8 千', desc: '把真实刷怪器开到 8000 并发', team: 8, level: 2, scale: 'k8', difficulty: 10, fireRate: 10, kinds: 28 },
 ]
 
 /** 只是标签，不参与判定；任一旋钮手动改过即 undefined */

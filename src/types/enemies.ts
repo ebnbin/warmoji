@@ -1,13 +1,5 @@
 import type { AbilityDef, Effect } from './abilityDefs'
 
-export interface EnemyProjectileDef {
-  readonly emoji: string
-  readonly size: number
-  readonly radius: number
-  readonly speed: number
-  readonly damage: number
-  readonly lifeMs: number
-}
 // ── 移动方式 ────────────────────────────────────────────────
 export type DashTrigger =
   | { readonly kind: 'detect'; readonly range: number; readonly cooldownMs: number }
@@ -41,7 +33,6 @@ export interface DetonateLocomotion {
   readonly windupMs: number
   readonly blastRadius: number
   readonly blastDamage: number
-  readonly knockback: number
 }
 /** 巢被拆后按 orphan 倍率强化并直扑玩家 */
 export interface BaseOrbitLocomotion {
@@ -118,7 +109,6 @@ export interface EnemyDef {
   readonly locomotion: LocomotionDef
   readonly abilities?: readonly AbilityDef[]
   readonly onDeath?: readonly DeathEffect[]
-  /** 缺省 = 一发接触伤害 */
   readonly onContact?: readonly Effect[]
   readonly spawner?: {
     readonly into: EnemyDef

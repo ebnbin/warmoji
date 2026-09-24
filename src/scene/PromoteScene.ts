@@ -4,8 +4,8 @@ import { CHARACTERS } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { formationPosts } from '../data/formation'
 import type { ItemId } from '../types/items'
-import { battleSceneFor } from '../battle'
-import type { BattleSceneKey } from '../battle'
+import { BATTLE_SCENE_KEY } from '../ecs/keys'
+import type { BattleSceneKey } from '../ecs/keys'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { unlockAt } from '../run/recruit'
@@ -347,7 +347,7 @@ export class PromoteScene extends Phaser.Scene {
 
   private nextScene(): BattleSceneKey | 'shop' {
     if (this.isInitial() && !CAPTAINS[this.run.captainId].firstWaveShop) {
-      return battleSceneFor(this.run.mapId)
+      return BATTLE_SCENE_KEY
     }
     return 'shop'
   }
@@ -851,21 +851,12 @@ export class PromoteScene extends Phaser.Scene {
     reportDebug({
       scene: 'promote',
       elapsed: 0,
-      hp: 0,
-      alive: 0,
       kills: this.run.kills,
       level: this.run.xp.level,
       wave: this.run.wave,
       coins: this.run.coins,
-      enemies: 0,
-      pending: 0,
-      fps: 0,
       viewW: viewport.logicalWidth,
       viewH: viewport.logicalHeight,
-      playerX: 0,
-      playerY: 0,
-      camX: 0,
-      camY: 0,
       promote: {
         mode: this.mode,
         selected: this.mode === 'formation' ? center : this.selectedKey,

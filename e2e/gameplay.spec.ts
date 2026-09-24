@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test'
 // 图集缺变体的隐形实体、未参与深度排序的自绘层三者恒为 0，它们出错都不报错，只有这里能看见。软渲染下时钟偏慢，允许重试
 test.describe.configure({ retries: 2 })
 
-// ECS 战斗期间 __warmoji 停在进战斗前的场景，探针是 window.__ecs；页面内求值的闭包不能引用本文件作用域，故各处内联
+// 战斗期间 __warmoji 停在进战斗前的场景，探针是 window.__ecs；页面内求值的闭包不能引用本文件作用域，故各处内联
 type Ecs = {
   ready: boolean
   elapsed: number
@@ -100,7 +100,7 @@ async function startRun(page: Page, mapId?: string): Promise<void> {
       { timeout: 30_000 },
     )
   }
-  // 默认设置须进 ECS 战斗；首局要先建图集
+  // 首局要先建图集
   await page.waitForFunction(() => (window as WinEcs).__ecs?.ready === true, undefined, { timeout: 30_000 })
 }
 
@@ -124,7 +124,7 @@ async function expectFighting(page: Page, label: string): Promise<void> {
   ).toBe(0)
 }
 
-test('正式局 ECS 战斗：出怪、自动击杀、计时推进、暂停冻结、结束本局后再开一局、无控制台错误', async ({ page }) => {
+test('正式局战斗：出怪、自动击杀、计时推进、暂停冻结、结束本局后再开一局、无控制台错误', async ({ page }) => {
   test.setTimeout(240_000)
   const errors = collectErrors(page)
 

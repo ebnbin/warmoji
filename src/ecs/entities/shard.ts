@@ -6,7 +6,7 @@ import { Depth, Quad, Shard, Sprite, Tint, Transform } from '../components'
 import type { Sim } from '../sim'
 
 /** flingVx/Vy = 致死一击的击退速度 */
-export function spawnShardsEcs(
+export function spawnShards(
   sim: Sim,
   x: number,
   y: number,

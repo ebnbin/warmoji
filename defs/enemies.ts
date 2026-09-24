@@ -267,7 +267,6 @@ export const CREEPER: EnemyDef = {
     windupMs: 800,
     blastRadius: 3.8,
     blastDamage: 32,
-    knockback: 5,
   },
 }
 
@@ -374,7 +373,6 @@ export const PUFFER: EnemyDef = {
     windupMs: 700,
     blastRadius: 2.8,
     blastDamage: 22,
-    knockback: 4,
   },
   onDeath: [
     {

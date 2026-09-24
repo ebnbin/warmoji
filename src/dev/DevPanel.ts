@@ -27,9 +27,6 @@ import {
 import type { SandboxLevel, SandboxMul } from '../run/sandbox'
 import { beginRun } from '../run/state'
 import type { HudHost } from '../run/hudHost'
-import { battleSceneFor } from '../battle'
-import { loadSettings, saveSettings } from '../save/settings'
-import { browserStorage } from '../util/storage'
 import { ScrollView } from '../ui/scroll'
 import { roundRect } from '../ui/shapes'
 import { FONT, UI_FONT } from '../util/fonts'
@@ -190,7 +187,7 @@ export class DevPanel {
     this.view.scrollTo(0)
 
     const contentH =
-      tab === 'perf' ? this.buildPerf(res)
+      tab === 'perf' ? this.buildPerf()
         : tab === 'preset' ? this.buildPresets(res)
           : tab === 'team' ? this.buildTeam(res)
             : this.buildField(res)
@@ -363,16 +360,8 @@ export class DevPanel {
     return y
   }
 
-  private buildPerf(res: number): number {
-    const ecsOn = loadSettings(browserStorage()).ecs
-    let y = this.section('框架 · 即设置里的「ECS 实验战斗」', 0, res, [
-      { label: 'arcade', on: !ecsOn, tap: (): void => this.switchFramework(false) },
-      { label: 'ECS', on: ecsOn, tap: (): void => this.switchFramework(true) },
-    ])
-    y = this.note(y + 4, res, ecsOn
-      ? 'ECS：bitECS 数据导向 + 自绘批量渲染'
-      : 'arcade：一实体一 GameObject + Arcade Physics body')
-    this.perf = new PerfView(this.scene, this.host, this.view.viewport.w, y + 10, this.host.sandbox, this.steady)
+  private buildPerf(): number {
+    this.perf = new PerfView(this.scene, this.host, this.view.viewport.w, 0, this.host.sandbox, this.steady)
     this.view.add(this.perf.objects)
     this.perfH = this.perf.update(0)
     return this.perfH
@@ -441,15 +430,5 @@ export class DevPanel {
     beginRun(sandboxCaptain(), sandboxStarters(), this.host.run.mapId, true)
     resetMetrics()
     this.host.scene.restart()
-  }
-
-  private switchFramework(ecs: boolean): void {
-    const s = loadSettings(browserStorage())
-    if (s.ecs === ecs) return
-    saveSettings(browserStorage(), { ...s, ecs })
-    resetMetrics()
-    // 新战斗场景会在 create 里重新 launch HUD，须先停掉当前这份
-    this.scene.scene.stop('ui')
-    this.host.scene.start(battleSceneFor(this.host.run.mapId))
   }
 }

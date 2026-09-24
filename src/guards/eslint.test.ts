@@ -13,19 +13,9 @@ async function rulesFiredOn(filePath: string, code: string): Promise<string[]> {
 
 const GUARDS: readonly { name: string; file: string; code: string }[] = [
   {
-    name: '实现隔离：主干不得直接 import 战斗实现',
-    file: 'src/run/state.ts',
-    code: "import { EcsBattleScene } from '../ecs/EcsBattleScene'\nvoid EcsBattleScene\n",
-  },
-  {
-    name: '实现隔离：主干不得直接 import bitecs',
+    name: 'src/ecs/ 外不得 import bitecs',
     file: 'src/run/state.ts',
     code: "import { addEntity } from 'bitecs'\nvoid addEntity\n",
-  },
-  {
-    name: '页面层不得依赖战斗实现',
-    file: 'src/scene/UIScene.ts',
-    code: "import { worldFor } from '../ecs/worlds/hooks'\nvoid worldFor\n",
   },
   {
     name: '战斗侧不得依赖场景层',
@@ -95,11 +85,6 @@ const ALLOWED: readonly { name: string; file: string; code: string }[] = [
     name: 'data/ 读 assets json 照常',
     file: 'src/data/pickups.ts',
     code: "import pickups from '../assets/pickups.json'\nvoid pickups\n",
-  },
-  {
-    name: 'battle.ts 是唯一允许 import 两侧实现的接线面',
-    file: 'src/battle.ts',
-    code: "import { EcsBattleScene } from './ecs/EcsBattleScene'\nvoid EcsBattleScene\n",
   },
 ]
 

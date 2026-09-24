@@ -3,7 +3,7 @@ import type { RunState } from './state'
 import type { Polarity } from '../types/battlefield'
 
 // HudHost：战斗 → HUD 的全部读数；HudInput：HUD → 战斗的全部输入。两侧只经这两条契约相识：
-// 两套战斗实现都按结构满足 HudHost，战斗侧不认识 UIScene
+// 战斗场景按结构满足 HudHost，不认识 UIScene
 
 export interface HudSnapshot {
   xp: number
@@ -53,7 +53,6 @@ export interface HudHost {
     coins: number
     pending: number
     objects: number
-    bodies: number
     combatSec: number
     spawnIntervalMs: number
     hpMultiplier: number

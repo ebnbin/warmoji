@@ -94,7 +94,7 @@ export function detachMetrics(): void {
   pending = false
 }
 
-/** 切换负载/框架后调用 */
+/** 切换负载后调用 */
 export function resetMetrics(): void {
   buf.length = 0
   head = 0

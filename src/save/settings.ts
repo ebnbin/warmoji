@@ -8,8 +8,6 @@ export interface Settings {
   bgm: boolean
   /** 肤色变体是否展示；component 不受影响 */
   showSkinTone: boolean
-  /** 用 ECS 战斗；设置页与开发者面板同写此字段 */
-  ecs: boolean
   /** 只决定开发者工具是否露出，不影响战斗行为 */
   devMode: boolean
 }
@@ -20,7 +18,6 @@ export const DEFAULT_SETTINGS: Settings = {
   sound: true,
   bgm: true,
   showSkinTone: false,
-  ecs: true,
   devMode: false,
 }
 
@@ -39,7 +36,6 @@ export const SETTING_DEFS: readonly SettingDef[] = [
   { key: 'damageNumbers', icon: '1f522', label: '伤害数字', desc: '敌人受击时飘出伤害数值' },
   { key: 'hitShake', icon: '1f4f3', label: '受击震屏', desc: '队员受到伤害时轻微抖动画面' },
   { key: 'showSkinTone', icon: '1f44b_1f3fd', label: '肤色 emoji', desc: '图鉴与 Studio 全部页展示含肤色的 emoji 变体' },
-  { key: 'ecs', icon: '1f9ea', label: 'ECS 实验战斗', desc: 'bitECS + 自绘渲染管线的实验战斗（默认开）' },
   { key: 'devMode', icon: '1f527', label: '开发者模式', desc: '解锁地图页的试炼场入口与战斗内开发者面板' },
 ]
 
@@ -56,7 +52,6 @@ export function sanitizeSettings(raw: unknown): Settings {
     sound: pick('sound'),
     bgm: pick('bgm'),
     showSkinTone: pick('showSkinTone'),
-    ecs: pick('ecs'),
     devMode: pick('devMode'),
   }
 }

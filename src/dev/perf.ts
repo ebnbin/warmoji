@@ -92,7 +92,7 @@ export class PerfView {
       row('     p99', ms(m.total.p99)),
       row('     最大', ms(m.total.max)),
       // 中位数不可加，三段之和不等于总计
-      row('· 更新', ms(m.update.p50), '场景逻辑+物理'),
+      row('· 更新', ms(m.update.p50), '场景逻辑'),
       row('· 渲染', ms(m.render.p50), '渲染提交'),
       row('· 其余', ms(m.rest.p50), '帧外：vsync 等待/GC/异步任务'),
       row('· 帧间跳变', ms(m.jitter.p50), '节奏抖动'),
@@ -112,9 +112,8 @@ export class PerfView {
       row('刷怪预告', n(p.pending)),
       row('刷怪间隔', `${p.spawnIntervalMs}`, 'ms'),
       '',
-      '── 引擎结构（架构差异所在）──',
+      '── 引擎结构 ──',
       row('GameObject', n(p.objects)),
-      row('物理体', n(p.bodies)),
       row('emoji 纹理', n(cache.textures)),
       ...(m.drawCount === undefined ? [] : [row('渲染对象', n(m.drawCount))]),
       row('JS 堆', heap === undefined ? '—' : n(heap), heap === undefined ? '（非 Chrome）' : 'MB'),
@@ -133,7 +132,6 @@ export class PerfView {
     reportDevPerf({
       live: { enemies: p.enemies, projectiles: p.projectiles, coins: p.coins },
       objects: p.objects,
-      bodies: p.bodies,
       metrics: m,
     })
   }
