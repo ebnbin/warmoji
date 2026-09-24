@@ -1,6 +1,6 @@
 import { } from '../../data/items'
 import { waveAt } from '../../data/waves'
-import { sandboxFireRate } from '../sandbox'
+import { sandboxFireRate } from '../sandbox/knobs'
 import { Anchor, DmgMul, CharAtkSlow, Slot, Transform } from '../components'
 import { Amp, FACTION, Faction, Owner } from '../components'
 import type { } from './source'
@@ -27,8 +27,8 @@ export function cooldownMul(sim: Sim, e: number): number {
   if (Faction.v[e] === FACTION.enemy) return 1
   const o = Owner.eid[e]!
   const atk = CharAtkSlow.until[o]! > sim.elapsedMs ? CharAtkSlow.mul[o]! : 1
-  const lab = sim.sandbox && Amp.battle[e] ? 1 / sandboxFireRate() : 1
-  return Amp.cd[e]! * sim.battleFx.teamCooldownMul * atk * lab
+  const sandboxMul = sim.sandbox && Amp.battle[e] ? 1 / sandboxFireRate() : 1
+  return Amp.cd[e]! * sim.battleFx.teamCooldownMul * atk * sandboxMul
 }
 
 /** 试炼场恒 1 */

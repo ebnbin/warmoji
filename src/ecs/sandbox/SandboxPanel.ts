@@ -23,8 +23,8 @@ import {
   setSandboxScale,
   toggleSandboxCharacter,
   toggleSandboxEnemy,
-} from '../sandbox'
-import type { SandboxLevel, SandboxMul } from '../sandbox'
+} from './knobs'
+import type { SandboxLevel, SandboxMul } from './knobs'
 import type { EcsBattleScene } from '../EcsBattleScene'
 import { ScrollView } from '../../ui/scroll'
 import { roundRect } from '../../ui/shapes'
@@ -36,7 +36,7 @@ import { attachMetrics, detachMetrics, resetMetrics } from './metrics'
 import { startRafMeter } from './diagnostics'
 import { PerfView } from './perf'
 import type { SteadyMark } from './perf'
-import { clearDevPerf } from './probe'
+import { clearSandboxPerf } from './probe'
 
 export const PILL_ICON = '1f527'
 
@@ -44,11 +44,11 @@ const DEPTH = 320
 /** 收起时滚动区挪出画面：其监听常驻，留在原位会吞掉战场手势 */
 const OFFSCREEN = { x: -10_000, y: -10_000, w: 0, h: 0 }
 
-export type DevTab = 'field' | 'team' | 'preset' | 'perf'
+export type SandboxTab = 'field' | 'team' | 'preset' | 'perf'
 
-// 开合与页签挂模块级：视口变化与战斗重启都会重启 LabScene，挂实例上会被一起重置
+// 开合与页签挂模块级：视口变化与战斗重启都会重启 SandboxScene，挂实例上会被一起重置
 let open = false
-let tab: DevTab = 'field'
+let tab: SandboxTab = 'field'
 
 interface ChipItem {
   readonly label: string
@@ -56,7 +56,7 @@ interface ChipItem {
   readonly tap: () => void
 }
 
-export class DevPanel {
+export class SandboxPanel {
   private objs: Phaser.GameObjects.GameObject[] = []
   private readonly view: ScrollView
   private perf?: PerfView
@@ -87,7 +87,7 @@ export class DevPanel {
     this.clearObjs()
     this.view.destroy()
     detachMetrics()
-    clearDevPerf()
+    clearSandboxPerf()
   }
 
   private clearObjs(): void {
@@ -111,7 +111,7 @@ export class DevPanel {
     if (!open) {
       this.view.setViewport(OFFSCREEN)
       detachMetrics()
-      clearDevPerf()
+      clearSandboxPerf()
       this.buildPill()
       return
     }
@@ -159,10 +159,9 @@ export class DevPanel {
     this.objs.push(g, blocker)
 
     const headH = 50
-    const label = this.battle.sandbox ? '开发者 · 试炼场' : '开发者'
     this.objs.push(
       this.scene.add
-        .text(x + 16, y + headH / 2, label, {
+        .text(x + 16, y + headH / 2, '试炼场', {
           fontFamily: UI_FONT, fontSize: FONT.strong, fontStyle: 'bold', color: '#ffdc5d', resolution: res,
         })
         .setOrigin(0, 0.5)
@@ -196,7 +195,7 @@ export class DevPanel {
   }
 
   private buildTabs(x: number, y: number, w: number, res: number): number {
-    const defs: { id: DevTab; label: string }[] = this.battle.sandbox
+    const defs: { id: SandboxTab; label: string }[] = this.battle.sandbox
       ? [
           { id: 'field', label: '战场' },
           { id: 'team', label: '队伍' },
@@ -426,7 +425,7 @@ export class DevPanel {
 
   // ── 需要重开战斗场景的改动 ────────────────────────────────
 
-  /** 战斗 scene 重启会连带重启 HUD 与 LabScene */
+  /** 战斗 scene 重启会连带重启 HUD 与 SandboxScene */
   private restartWithTeam(): void {
     beginSandboxRun(this.battle.run.mapId)
     resetMetrics()

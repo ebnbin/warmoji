@@ -1,11 +1,11 @@
-import { CAPTAINS, SANDBOX_CAPTAIN } from '../data/captains'
-import { ROSTER_IDS } from '../data/characters'
-import { ENEMY_DEFS } from '../data/enemies'
-import type { CharacterId } from '../types/characters'
-import type { CaptainId } from '../types/captains'
-import type { MapId } from '../types/maps'
-import { beginRun } from '../run/state'
-import type { RunState } from '../run/state'
+import { CAPTAINS, SANDBOX_CAPTAIN } from '../../data/captains'
+import { ROSTER_IDS } from '../../data/characters'
+import { ENEMY_DEFS } from '../../data/enemies'
+import type { CharacterId } from '../../types/characters'
+import type { CaptainId } from '../../types/captains'
+import type { MapId } from '../../types/maps'
+import { beginRun } from '../../run/state'
+import type { RunState } from '../../run/state'
 
 // 战斗侧只读 spawnParams / INVINCIBLE_HP / sandboxEnemySet / sandboxDifficulty / sandboxFireRate /
 // sandboxInvincible / sandboxLevel，签名是对战斗侧的契约。选择状态为模块级，跨场景重启保留

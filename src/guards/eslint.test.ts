@@ -23,9 +23,9 @@ const GUARDS: readonly { name: string; file: string; code: string }[] = [
     code: "import { UIScene } from '../../../scene/UIScene'\nvoid UIScene\n",
   },
   {
-    name: '战斗侧不得依赖试炼工具',
+    name: '战斗侧不得依赖试炼场面板',
     file: 'src/ecs/systems/spawnStep.ts',
-    code: "import { DevPanel } from '../lab/DevPanel'\nvoid DevPanel\n",
+    code: "import { SandboxPanel } from '../sandbox/SandboxPanel'\nvoid SandboxPanel\n",
   },
   {
     name: 'assets/*.json 只许 data/ 与 types/ 读',

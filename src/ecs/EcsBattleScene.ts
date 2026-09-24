@@ -19,7 +19,7 @@ import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
 import { getRun, teamStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAPS } from '../data/maps'
-import { BATTLE_SCENE_KEY, LAB_SCENE_KEY } from './keys'
+import { BATTLE_SCENE_KEY, SANDBOX_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
@@ -51,7 +51,7 @@ import { xpToNext } from '../run/xp'
 import { CAPTAINS } from '../data/captains'
 import { aggregateTeamCards } from '../data/cards'
 import type { TeamEffects } from '../types/items'
-import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox'
+import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox/knobs'
 import { tickSkillCd } from '../run/state'
 import { hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
@@ -199,13 +199,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     setActiveHudHost(this) // 须先登记再拉起 HUD
     this.scene.launch('ui')
     const lab = loadSettings(browserStorage()).devMode
-    if (lab) this.scene.launch(LAB_SCENE_KEY)
+    if (lab) this.scene.launch(SANDBOX_SCENE_KEY)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.bootGen++ // 在途的 boot 作废
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.scene.stop('ui')
-      if (lab) this.scene.stop(LAB_SCENE_KEY)
+      if (lab) this.scene.stop(SANDBOX_SCENE_KEY)
       // e2e 靠 __ecs.ready 判断战斗已收场；换成空壳以放开对本局的引用
       ;(window as unknown as { __ecs?: { ready: boolean } }).__ecs = { ready: false }
       this.atlas?.dispose()

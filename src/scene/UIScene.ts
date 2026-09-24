@@ -146,7 +146,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     }
   }
 
-  /** depth 须高于开发者面板（320+） */
   private showPauseOverlay(): void {
     const res = textRes()
     const cx = viewport.logicalWidth / 2

@@ -5,8 +5,8 @@ import { roundRect } from '../../ui/shapes'
 import { heapMB, rafHz, rendererInfo } from './diagnostics'
 import { emojiCacheStats } from '../../emoji/textures'
 import { metricsReport, nextFrameSeq, recentFrames } from './metrics'
-import { sandboxDifficulty, sandboxEnemySet, sandboxFireRate, sandboxLevel, sandboxStarters, scaleStep } from '../sandbox'
-import { reportDevPerf } from './probe'
+import { sandboxDifficulty, sandboxEnemySet, sandboxFireRate, sandboxLevel, sandboxStarters, scaleStep } from './knobs'
+import { reportSandboxPerf } from './probe'
 import type { EcsBattleScene } from '../EcsBattleScene'
 
 // 坐标以面板内容区顶为原点
@@ -16,7 +16,7 @@ const CHART_H = 74
 const CHART_FLOOR = 40
 const SCALE_ROW = 32
 
-/** 试炼场首次满载时的帧序号；此前为 -1。由 DevPanel 持有：它随每局重建，切页签不重建 */
+/** 试炼场首次满载时的帧序号；此前为 -1。由 SandboxPanel 持有：它随每局重建，切页签不重建 */
 export interface SteadyMark {
   seq: number
 }
@@ -129,7 +129,7 @@ export class PerfView {
       rendererInfo(this.scene.game),
     ])
 
-    reportDevPerf({
+    reportSandboxPerf({
       live: { enemies: p.enemies, projectiles: p.projectiles, coins: p.coins },
       objects: p.objects,
       metrics: m,

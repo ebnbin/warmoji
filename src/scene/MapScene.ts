@@ -3,7 +3,7 @@ import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
 import { BATTLE_SCENE_KEY } from '../ecs/keys'
-import { beginSandboxRun } from '../ecs/sandbox'
+import { beginSandboxRun } from '../ecs/sandbox/knobs'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
@@ -69,9 +69,9 @@ export class MapScene extends Phaser.Scene {
   private confirmLabel!: Phaser.GameObjects.Text
   private devMode = false
   private sandbox = false
-  private testRect = { x: 0, y: 0, w: 0, h: 0 }
-  private testBg?: Phaser.GameObjects.Graphics
-  private testLabel?: Phaser.GameObjects.Text
+  private sandboxRect = { x: 0, y: 0, w: 0, h: 0 }
+  private sandboxBg?: Phaser.GameObjects.Graphics
+  private sandboxLabel?: Phaser.GameObjects.Text
 
   constructor() {
     super('map')
@@ -129,10 +129,10 @@ export class MapScene extends Phaser.Scene {
     if (this.devMode) {
       const tw = 210
       const th = 46
-      this.testRect = { x: ox + L.content.w - 40 - tw, y: oy + L.headerY - th / 2, w: tw, h: th }
-      const t = this.testRect
-      this.testBg = this.add.graphics()
-      this.testLabel = this.add
+      this.sandboxRect = { x: ox + L.content.w - 40 - tw, y: oy + L.headerY - th / 2, w: tw, h: th }
+      const t = this.sandboxRect
+      this.sandboxBg = this.add.graphics()
+      this.sandboxLabel = this.add
         .text(t.x + t.w / 2, oy + L.headerY, '', {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
@@ -289,15 +289,15 @@ export class MapScene extends Phaser.Scene {
   private refresh(): void {
     this.grid.setSelected(this.selectedId)
     const on = this.sandbox
-    if (this.testBg && this.testLabel) {
-      const t = this.testRect
-      this.testBg.clear()
-      roundRect(this.testBg, t.x, t.y, t.w, t.h, t.h / 2, {
+    if (this.sandboxBg && this.sandboxLabel) {
+      const t = this.sandboxRect
+      this.sandboxBg.clear()
+      roundRect(this.sandboxBg, t.x, t.y, t.w, t.h, t.h / 2, {
         fill: on ? 0xffdc5d : 0xffffff, fillAlpha: on ? 0.92 : 0.08,
         stroke: 0xffffff, strokeAlpha: on ? 0 : 0.18,
       })
-      this.testLabel.setText(on ? '试炼场：开' : '试炼场：关')
-      this.testLabel.setColor(on ? '#25262e' : '#c8c8d4')
+      this.sandboxLabel.setText(on ? '试炼场：开' : '试炼场：关')
+      this.sandboxLabel.setColor(on ? '#25262e' : '#c8c8d4')
     }
     this.confirmLabel.setText(on ? '进入试炼场' : '选择队长')
     this.renderDetail(textRes())
@@ -321,10 +321,10 @@ export class MapScene extends Phaser.Scene {
           w: this.btnRect.w,
           h: this.btnRect.h,
         },
-        test: this.devMode
+        sandbox: this.devMode
           ? {
-              x: Math.round(this.testRect.x + this.testRect.w / 2),
-              y: Math.round(this.testRect.y + this.testRect.h / 2),
+              x: Math.round(this.sandboxRect.x + this.sandboxRect.w / 2),
+              y: Math.round(this.sandboxRect.y + this.sandboxRect.h / 2),
               on: this.sandbox,
             }
           : undefined,

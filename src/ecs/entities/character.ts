@@ -15,7 +15,7 @@ import { levelStatsFor } from '../../data/levels'
 import { characterLevel } from '../../data/charLevel'
 
 import { waveStartHp } from '../../run/state'
-import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox'
+import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox/knobs'
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
@@ -47,7 +47,7 @@ export function spawnCharacter(
   const def = CHARACTERS[run.roster[slot]!]
   const teamFx = aggregateTeamCards(run.teamCards)
   const captain = CAPTAINS[run.captainId]
-  const labHp = sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
+  const sandboxHp = sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
   const size = MEMBER.size * UNIT
     const eid = newEntity(world)
   addComponent(world, eid, Character)
@@ -96,8 +96,8 @@ export function spawnCharacter(
   // 等级须与能力侧同源
   const level = sandbox ? sandboxLevel() + 1 : characterLevel(characterXp(owned))
   const fx = aggregateCharacterEffects(owned, levelStatsFor(run.roster[slot]!, level))
-  const maxHp = sandbox ? labHp : Math.round(memberMaxHp(fx.hpAdd, captain.hpMul) * teamFx.teamHpMul)
-  CharHp.hp[eid] = sandbox ? labHp : waveStartHp(run.memberHp[slot] ?? MEMBER.maxHp, maxHp)
+  const maxHp = sandbox ? sandboxHp : Math.round(memberMaxHp(fx.hpAdd, captain.hpMul) * teamFx.teamHpMul)
+  CharHp.hp[eid] = sandbox ? sandboxHp : waveStartHp(run.memberHp[slot] ?? MEMBER.maxHp, maxHp)
   CharHp.max[eid] = maxHp
   CharPerk.thorns[eid] = fx.thorns
   CharPerk.killHeal[eid] = fx.killHeal
