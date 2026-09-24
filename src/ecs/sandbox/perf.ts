@@ -1,13 +1,13 @@
 import Phaser from 'phaser'
-import { FONT } from '../util/fonts'
-import { textRes } from '../util/apply'
-import { roundRect } from '../ui/shapes'
+import { FONT } from '../../util/fonts'
+import { textRes } from '../../util/apply'
+import { roundRect } from '../../ui/shapes'
 import { heapMB, rafHz, rendererInfo } from './diagnostics'
-import { emojiCacheStats } from '../emoji/textures'
+import { emojiCacheStats } from '../../emoji/textures'
 import { metricsReport, nextFrameSeq, recentFrames } from './metrics'
-import { sandboxDifficulty, sandboxEnemySet, sandboxFireRate, sandboxLevel, sandboxStarters, scaleStep } from '../run/sandbox'
-import { reportDevPerf } from './probe'
-import type { HudHost } from '../run/hudHost'
+import { sandboxDifficulty, sandboxEnemySet, sandboxFireRate, sandboxLevel, sandboxStarters, scaleStep } from './knobs'
+import { reportSandboxPerf } from './probe'
+import type { EcsBattleScene } from '../EcsBattleScene'
 
 // 坐标以面板内容区顶为原点
 
@@ -16,7 +16,7 @@ const CHART_H = 74
 const CHART_FLOOR = 40
 const SCALE_ROW = 32
 
-/** 试炼场首次满载时的帧序号；此前为 -1。由 DevPanel 持有：它随每局重建，切页签不重建 */
+/** 试炼场首次满载时的帧序号；此前为 -1。由 SandboxPanel 持有：它随每局重建，切页签不重建 */
 export interface SteadyMark {
   seq: number
 }
@@ -32,7 +32,7 @@ export class PerfView {
 
   constructor(
     private readonly scene: Phaser.Scene,
-    private readonly host: HudHost,
+    private readonly battle: EcsBattleScene,
     private readonly w: number,
     private readonly top: number,
     private readonly sandbox: boolean,
@@ -64,7 +64,7 @@ export class PerfView {
   }
 
   private refresh(): void {
-    const p = this.host.perfSnapshot()
+    const p = this.battle.perfSnapshot()
     // 直读旋钮而非预设：旋钮可逐个手改
     const step = this.sandbox ? scaleStep() : undefined
     const cache = emojiCacheStats(this.scene)
@@ -129,7 +129,7 @@ export class PerfView {
       rendererInfo(this.scene.game),
     ])
 
-    reportDevPerf({
+    reportSandboxPerf({
       live: { enemies: p.enemies, projectiles: p.projectiles, coins: p.coins },
       objects: p.objects,
       metrics: m,

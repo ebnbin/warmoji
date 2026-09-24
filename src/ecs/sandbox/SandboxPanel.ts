@@ -1,12 +1,12 @@
 import Phaser from 'phaser'
-import { CHARACTERS } from '../data/characters'
-import { mapEnemyRoster } from '../data/maps'
-import type { CharacterId } from '../types/characters'
+import { CHARACTERS } from '../../data/characters'
+import { mapEnemyRoster } from '../../data/maps'
+import type { CharacterId } from '../../types/characters'
 import {
   applySandboxPreset,
+  beginSandboxRun,
   isSandboxCharacterOn,
   isSandboxEnemyOn,
-  sandboxCaptain,
   sandboxDifficulty,
   sandboxFireRate,
   sandboxInvincible,
@@ -23,31 +23,32 @@ import {
   setSandboxScale,
   toggleSandboxCharacter,
   toggleSandboxEnemy,
-} from '../run/sandbox'
-import type { SandboxLevel, SandboxMul } from '../run/sandbox'
-import { beginRun } from '../run/state'
-import type { HudHost } from '../run/hudHost'
-import { ScrollView } from '../ui/scroll'
-import { roundRect } from '../ui/shapes'
-import { FONT, UI_FONT } from '../util/fonts'
-import { safeInsets, textRes, viewport } from '../util/apply'
-import { playSfx } from '../audio/sfx'
-import { emojiImage } from '../emoji/hold'
+} from './knobs'
+import type { SandboxLevel, SandboxMul } from './knobs'
+import type { EcsBattleScene } from '../EcsBattleScene'
+import { ScrollView } from '../../ui/scroll'
+import { roundRect } from '../../ui/shapes'
+import { FONT, UI_FONT } from '../../util/fonts'
+import { safeInsets, textRes, viewport } from '../../util/apply'
+import { playSfx } from '../../audio/sfx'
+import { emojiImage } from '../../emoji/hold'
 import { attachMetrics, detachMetrics, resetMetrics } from './metrics'
 import { startRafMeter } from './diagnostics'
 import { PerfView } from './perf'
 import type { SteadyMark } from './perf'
-import { clearDevPerf } from './probe'
+import { clearSandboxPerf } from './probe'
+
+export const PILL_ICON = '1f527'
 
 const DEPTH = 320
 /** 收起时滚动区挪出画面：其监听常驻，留在原位会吞掉战场手势 */
 const OFFSCREEN = { x: -10_000, y: -10_000, w: 0, h: 0 }
 
-export type DevTab = 'field' | 'team' | 'preset' | 'perf'
+export type SandboxTab = 'field' | 'team' | 'preset' | 'perf'
 
-// 开合与页签挂模块级：视口变化会重启 UIScene，挂实例上会被一起重置
+// 开合与页签挂模块级：视口变化与战斗重启都会重启 SandboxScene，挂实例上会被一起重置
 let open = false
-let tab: DevTab = 'field'
+let tab: SandboxTab = 'field'
 
 interface ChipItem {
   readonly label: string
@@ -55,7 +56,7 @@ interface ChipItem {
   readonly tap: () => void
 }
 
-export class DevPanel {
+export class SandboxPanel {
   private objs: Phaser.GameObjects.GameObject[] = []
   private readonly view: ScrollView
   private perf?: PerfView
@@ -64,7 +65,7 @@ export class DevPanel {
 
   constructor(
     private readonly scene: Phaser.Scene,
-    private readonly host: HudHost,
+    private readonly battle: EcsBattleScene,
   ) {
     // 只建一次：其监听挂在 scene.input 上，重建会累积
     this.view = new ScrollView(scene, OFFSCREEN)
@@ -86,7 +87,7 @@ export class DevPanel {
     this.clearObjs()
     this.view.destroy()
     detachMetrics()
-    clearDevPerf()
+    clearSandboxPerf()
   }
 
   private clearObjs(): void {
@@ -106,11 +107,11 @@ export class DevPanel {
   private rebuild(): void {
     this.clearObjs()
     // 正式局只留性能页
-    if (!this.host.sandbox && tab !== 'perf') tab = 'perf'
+    if (!this.battle.sandbox && tab !== 'perf') tab = 'perf'
     if (!open) {
       this.view.setViewport(OFFSCREEN)
       detachMetrics()
-      clearDevPerf()
+      clearSandboxPerf()
       this.buildPill()
       return
     }
@@ -129,7 +130,7 @@ export class DevPanel {
     roundRect(g, cx - r, cy - r, r * 2, r * 2, r, {
       fill: 0x05060a, fillAlpha: 0.6, stroke: 0xffdc5d, strokeAlpha: 0.45, strokeWidth: 2,
     })
-    const icon = emojiImage(this.scene, cx, cy, '1f527', 40).setDepth(DEPTH + 1).setAlpha(0.92)
+    const icon = emojiImage(this.scene, cx, cy, PILL_ICON, 40).setDepth(DEPTH + 1).setAlpha(0.92)
     const zone = this.scene.add
       .zone(cx - r, cy - r, r * 2, r * 2)
       .setOrigin(0)
@@ -158,10 +159,9 @@ export class DevPanel {
     this.objs.push(g, blocker)
 
     const headH = 50
-    const label = this.host.sandbox ? '开发者 · 试炼场' : '开发者'
     this.objs.push(
       this.scene.add
-        .text(x + 16, y + headH / 2, label, {
+        .text(x + 16, y + headH / 2, '试炼场', {
           fontFamily: UI_FONT, fontSize: FONT.strong, fontStyle: 'bold', color: '#ffdc5d', resolution: res,
         })
         .setOrigin(0, 0.5)
@@ -195,7 +195,7 @@ export class DevPanel {
   }
 
   private buildTabs(x: number, y: number, w: number, res: number): number {
-    const defs: { id: DevTab; label: string }[] = this.host.sandbox
+    const defs: { id: SandboxTab; label: string }[] = this.battle.sandbox
       ? [
           { id: 'field', label: '战场' },
           { id: 'team', label: '队伍' },
@@ -244,7 +244,7 @@ export class DevPanel {
 
   private buildField(res: number): number {
     let y = 0
-    y = this.section('敌人 · 实时生效', y, res, mapEnemyRoster(this.host.run.mapId).map((d) => ({
+    y = this.section('敌人 · 实时生效', y, res, mapEnemyRoster(this.battle.run.mapId).map((d) => ({
       label: d.name,
       on: isSandboxEnemyOn(d.kind),
       tap: (): void => {
@@ -279,7 +279,7 @@ export class DevPanel {
     })))
     const setInv = (on: boolean): void => {
       setSandboxInvincible(on)
-      this.host.applySandboxInvincible()
+      this.battle.applySandboxInvincible()
       this.rebuild()
     }
     y = this.section('无敌', y + 12, res, [
@@ -361,7 +361,7 @@ export class DevPanel {
   }
 
   private buildPerf(): number {
-    this.perf = new PerfView(this.scene, this.host, this.view.viewport.w, 0, this.host.sandbox, this.steady)
+    this.perf = new PerfView(this.scene, this.battle, this.view.viewport.w, 0, this.battle.sandbox, this.steady)
     this.view.add(this.perf.objects)
     this.perfH = this.perf.update(0)
     return this.perfH
@@ -425,10 +425,10 @@ export class DevPanel {
 
   // ── 需要重开战斗场景的改动 ────────────────────────────────
 
-  /** 战斗场景重启会连带重启 UIScene */
+  /** 战斗 scene 重启会连带重启 HUD 与 SandboxScene */
   private restartWithTeam(): void {
-    beginRun(sandboxCaptain(), sandboxStarters(), this.host.run.mapId, true)
+    beginSandboxRun(this.battle.run.mapId)
     resetMetrics()
-    this.host.scene.restart()
+    this.battle.scene.restart()
   }
 }

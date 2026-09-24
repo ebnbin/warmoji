@@ -1,5 +1,4 @@
 import type Phaser from 'phaser'
-import type { RunState } from './state'
 import type { Polarity } from '../types/battlefield'
 
 // HudHost：战斗 → HUD 的全部读数；HudInput：HUD → 战斗的全部输入。两侧只经这两条契约相识：
@@ -44,23 +43,10 @@ export interface HudHost {
   /** 须发出 wave-complete / wave-warning / skill-cast / field-collected */
   readonly events: Phaser.Events.EventEmitter
   readonly scene: Phaser.Scenes.ScenePlugin
-  readonly run: RunState
   hudSnapshot(): HudSnapshot
   skillSnapshot(): { name: string; remainMs: number; cdMs: number; ready: boolean }
-  perfSnapshot(): {
-    enemies: number
-    projectiles: number
-    coins: number
-    pending: number
-    objects: number
-    combatSec: number
-    spawnIntervalMs: number
-    hpMultiplier: number
-  }
   /** 返回是否真的放出 */
   castSkill(): boolean
-  /** 无敌旋钮变更后调用 */
-  applySandboxInvincible(): void
 }
 
 // ── HudInput ──

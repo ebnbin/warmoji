@@ -154,8 +154,7 @@ interface WarmojiMapDebug {
   selected: string
   items: { id: string; x: number; y: number; w: number; h: number }[]
   start: { x: number; y: number; w: number; h: number }
-  /** 仅开发者模式下存在 */
-  test?: { x: number; y: number; on: boolean }
+  sandbox: { x: number; y: number; on: boolean }
 }
 
 interface WarmojiResultDebug {
@@ -190,5 +189,5 @@ interface WarmojiDebug {
 
 interface Window {
   __warmoji?: WarmojiDebug
-  __dev?: import('./dev/probe').DevPerfProbe
+  __sandbox?: import('./ecs/sandbox/probe').SandboxPerfProbe
 }
