@@ -230,8 +230,9 @@ export function spawnEnemy(
   Slow.until[eid] = 0
   Slow.mul[eid] = 1
   Poison.until[eid] = 0
-  EDir.x[eid] = Math.cos(sim.rng.next() * Math.PI * 2)
-  EDir.y[eid] = Math.sin(sim.rng.next() * Math.PI * 2)
+  const heading = sim.rng.next() * Math.PI * 2
+  EDir.x[eid] = Math.cos(heading)
+  EDir.y[eid] = Math.sin(heading)
   ETurn.at[eid] = sim.elapsedMs + AI.wander.spawnTurnMinMs + sim.rng.next() * AI.wander.spawnTurnJitterMs
   EnemyArm.fireDelayMs[eid] = 900 + sim.rng.next() * 1500
   EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2

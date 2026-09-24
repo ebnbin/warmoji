@@ -24,6 +24,6 @@ export function settleWave(sim: Sim): boolean {
   if (sim.reward.waveCoins > 0) run.coins += sim.reward.waveCoins
   run.combatMs += sim.elapsedMs
   run.wave += 1
-  run.memberHp = sim.characters.map((m) => (Alive.v[m] ? Math.round(CharHp.hp[m]!) : 0))
+  run.memberHp = sim.characters.map((m) => (Alive.v[m] ? Math.max(1, Math.round(CharHp.hp[m]!)) : 0))
   return finished
 }

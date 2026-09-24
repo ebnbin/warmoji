@@ -10,13 +10,12 @@ export function tickPoison(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of enemies) {
     if (Poison.until[eid] === 0 || Dormant.v[eid]) continue
-    if (now >= Poison.until[eid]!) {
-      Poison.until[eid] = 0
-      continue
-    }
-    if (now >= Poison.nextTick[eid]!) {
+    // 落在 until 上的那一跳也算
+    if (now >= Poison.nextTick[eid]! && Poison.nextTick[eid]! <= Poison.until[eid]!) {
       Poison.nextTick[eid] = Poison.nextTick[eid]! + Poison.tickMs[eid]!
       applyDamage(sim, eid, Poison.dmg[eid]!, 0, undefined, undefined, Poison.slot[eid]!)
+      continue
     }
+    if (now >= Poison.until[eid]!) Poison.until[eid] = 0
   }
 }

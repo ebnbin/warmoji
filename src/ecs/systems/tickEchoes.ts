@@ -11,7 +11,12 @@ import type { Sim } from '../sim'
 export function tickEchoes(sim: Sim): void {
   const dt = sim.wdtMs
   for (const e of query(sim.world, [Ability, AreaBlast, Followup])) {
-    if (Followup.left[e]! <= 0 || Frozen.v[e]) continue
+    if (Followup.left[e]! <= 0) continue
+    if (Frozen.v[e]) {
+      // 阵亡即作废
+      Followup.left[e] = 0
+      continue
+    }
     Followup.left[e] = Followup.left[e]! - dt
     if (Followup.left[e]! > 0) continue
     Followup.left[e] = 0
