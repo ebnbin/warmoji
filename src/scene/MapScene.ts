@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
-import { battleSceneFor } from '../battle'
+import { ECS_SCENE_KEY } from '../ecs/keys'
 import { beginRun } from '../run/state'
 import { sandboxCaptain, sandboxStarters } from '../run/sandbox'
 import { randomPalette } from '../util/palette'
@@ -179,7 +179,7 @@ export class MapScene extends Phaser.Scene {
       playSfx('click')
       if (this.sandbox) {
         beginRun(sandboxCaptain(), sandboxStarters(), this.selectedId, true)
-        this.scene.start(battleSceneFor(this.selectedId))
+        this.scene.start(ECS_SCENE_KEY)
         return
       }
       this.scene.start('captain')
@@ -297,19 +297,10 @@ export class MapScene extends Phaser.Scene {
     reportDebug({
       scene: 'map',
       elapsed: 0,
-      hp: 0,
-      alive: 0,
       kills: 0,
       level: 1,
-      enemies: 0,
-      pending: 0,
-      fps: 0,
       viewW: viewport.logicalWidth,
       viewH: viewport.logicalHeight,
-      playerX: 0,
-      playerY: 0,
-      camX: 0,
-      camY: 0,
       map: {
         selected: this.selectedId,
         items: this.grid.cellRects().map((r) => ({ id: r.key, x: r.x, y: r.y, w: r.w, h: r.h })),

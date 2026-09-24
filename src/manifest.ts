@@ -90,10 +90,7 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   // 🗺 🕹 地图详情组图标
   '1f5fa',
   '1f579',
-  // 🪐 天体横扫（arcade 侧用无描边版）
-  '1fa90',
   ...SETTING_DEFS.map((d) => d.icon),
-  SPAWN.markEmoji,
   // 属性面板组图标
   '2b50',
   '2699',
@@ -115,8 +112,6 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '1f451',
   // 🧪 Studio 入口
   '1f9ea',
-  // 📊 性能基准入口
-  '1f4ca',
   // Studio 内部图标：同步渲染，须预载
   '1f3ac', // 🎬 配方
   '1f9e9', // 🧩 模板

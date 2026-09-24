@@ -45,7 +45,6 @@ const DEATH_KINDS: Record<DeathEffect['kind'], DeathHandler> = {
   split: (sim, d, fx) => spawnSplit(sim, d, fx as SplitEffect),
   decoy: (sim, d, fx, hpMul) => spawnDecoy(sim, d, fx as DecoyEffect, hpMul),
   blast: toEffectLayer,
-  damage: toEffectLayer,
   slow: toEffectLayer,
   poison: toEffectLayer,
   morph: toEffectLayer,

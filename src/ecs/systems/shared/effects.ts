@@ -3,7 +3,7 @@ import type { Effect } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
 import { Enemy, CharAtkSlow, Morph, Poison, Slow } from '../../components'
 import { applyMorph } from '../../entities/enemy'
-import { spawnEnemyProjectileEcs } from '../../entities/projectile'
+import { spawnEnemyProjectile } from '../../entities/projectile'
 import { spawnZone } from '../../entities/zone'
 import { } from '../../store'
 import { damageTarget } from './damage'
@@ -64,11 +64,6 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
     const dmg = Math.max(1, Math.round(hit.baseDamage * fx.ratio))
     applyBlast(sim, src, hit.x, hit.y, dmg, fx.radius, fx.knockback, hit.exclude)
     if (fx.ring) spawnFxRing(sim, hit.x, hit.y, fx.radius, fx.ring)
-  },
-
-  damage: (sim, src, fx, hit) => {
-    const dmg = Math.max(1, Math.round(hit.baseDamage * (fx.ratio ?? 1)))
-    for (const t of hit.targets ?? []) damageTarget(sim, src, t, dmg)
   },
 
   slow: (sim, _src, fx, hit) => {
@@ -138,7 +133,7 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
     if (src.faction === FACTION.team) return
     const angle = nearestAngle(sim, src, hit.x, hit.y, Infinity)
     if (angle === null) return
-    spawnEnemyProjectileEcs(sim, hit.x, hit.y, angle, {
+    spawnEnemyProjectile(sim, hit.x, hit.y, angle, {
       frame: sim.frames.index(fx.projectile.emoji, 'enemyProjectile'),
       size: fx.projectile.size,
       radius: fx.projectile.radius,

@@ -1,10 +1,7 @@
 import enemiesJson from '../assets/enemies.json'
 import difficultyJson from '../assets/difficulty.json'
 import aiJson from '../assets/ai.json'
-import type { Effect } from '../types/abilityDefs'
 import type { AiTuning, Difficulty, EnemyDef } from '../types/enemies'
-
-export const DEFAULT_CONTACT: readonly Effect[] = [{ kind: 'damage' }]
 
 export const ENEMIES = enemiesJson.enemies as unknown as Record<string, EnemyDef>
 const ALL_ENEMIES = Object.values(ENEMIES)

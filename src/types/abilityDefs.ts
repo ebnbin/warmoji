@@ -73,11 +73,6 @@ export interface HealEffect {
   readonly amount: number
   readonly all?: boolean
 }
-/** ratio × 基准伤害，缺省 1 */
-export interface DamageEffect {
-  readonly kind: 'damage'
-  readonly ratio?: number
-}
 /** 敌→队员专属 */
 export interface AttackSlowEffect {
   readonly kind: 'attackSlow'
@@ -92,7 +87,6 @@ export type Effect =
   | MorphEffect
   | SpawnProjectileEffect
   | HealEffect
-  | DamageEffect
   | AttackSlowEffect
 export interface ThrustDef {
   readonly kind: 'thrust'

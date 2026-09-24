@@ -128,19 +128,10 @@ export class MenuScene extends Phaser.Scene {
     reportDebug({
       scene: 'menu',
       elapsed: 0,
-      hp: 0,
-      alive: 0,
       kills: 0,
       level: 1,
-      enemies: 0,
-      pending: 0,
-      fps: 0,
       viewW: w,
       viewH: h,
-      playerX: 0,
-      playerY: 0,
-      camX: 0,
-      camY: 0,
       menu: {
         start: {
           x: this.menuBtn.x + this.menuBtn.w / 2,

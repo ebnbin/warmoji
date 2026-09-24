@@ -9,14 +9,9 @@ const NO_ASSETS_JSON = {
   message: 'assets/*.json 只许 data/ 与 types/ 读：把表搬进 data/ 并导出常量，这里 import 那个常量',
 }
 
-const NO_BATTLE_IMPL = {
-  group: [
-    '**/ecs', '**/ecs/*', '**/ecs/**', './ecs/*', '../ecs/*',
-    '**/arcade', '**/arcade/*', '**/arcade/**', './arcade/*', '../arcade/*',
-    'bitecs',
-  ],
-  message:
-    '战斗实现（src/arcade/ 与 src/ecs/）是两套可互相替换的并列分支：一律经 src/battle.ts 调用，不要直接 import（这样两侧的耦合面才数得清、淘汰其一时能一步拆干净）',
+const NO_BITECS = {
+  group: ['bitecs'],
+  message: 'bitecs 只许 src/ecs/ 使用',
 }
 
 const NO_SCENE_FROM_BATTLE = {
@@ -63,20 +58,20 @@ export default tseslint.config(
   // 用基础版 no-restricted-imports，与 phaser 那条 @typescript-eslint 版互不替换；type import 一并禁
   {
     files: ['src/**/*.ts', 'e2e/**/*.ts'],
-    ignores: ['src/ecs/**/*.ts', 'src/arcade/**/*.ts', 'src/battle.ts'],
+    ignores: ['src/ecs/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [NO_BATTLE_IMPL, NO_ASSETS_JSON] }],
+      'no-restricted-imports': ['error', { patterns: [NO_BITECS, NO_ASSETS_JSON] }],
     },
   },
   // 须排在上一块之后
   {
     files: ['src/scene/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [NO_BATTLE_IMPL, NO_ASSETS_JSON] }],
+      'no-restricted-imports': ['error', { patterns: [NO_BITECS, NO_ASSETS_JSON] }],
     },
   },
   {
-    files: ['src/arcade/**/*.ts', 'src/ecs/**/*.ts'],
+    files: ['src/ecs/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', { patterns: [NO_SCENE_FROM_BATTLE, NO_DEV_FROM_BATTLE, NO_ASSETS_JSON] }],
     },
@@ -113,11 +108,9 @@ export default tseslint.config(
       'src/scene/*Scene.ts',
       'src/dev/**/*.ts',
       'src/util/fx.ts',
-      'src/arcade/**/*.ts',
       'src/ecs/EcsBattleScene.ts',
       'src/ecs/views.ts',
       'src/ecs/render/**/*.ts',
-      'src/battle.ts',
       'src/ui/**/*.ts',
       'src/emoji/textures.ts',
       'src/emoji/thumbs.ts',
@@ -148,9 +141,7 @@ export default tseslint.config(
             {
               // group 不支持 '!' 取反，只能正向枚举；新增顶层包须同步此表
               group: [
-                '../arcade/*', '../arcade/**',
                 '../ecs/*', '../ecs/**',
-                '../battle',
                 '../run/*', '../run/**',
                 '../save/*', '../save/**',
                 '../scene/*', '../scene/**',
@@ -160,7 +151,7 @@ export default tseslint.config(
               ],
               message: 'data 是内容叶子层：只可依赖 util / assets，不得反向依赖业务包',
             },
-            NO_BATTLE_IMPL,
+            NO_BITECS,
           ],
         },
       ],
@@ -176,9 +167,8 @@ export default tseslint.config(
             {
               // 同上：正向枚举，新增顶层包须同步此表
               group: [
-                '../src/arcade/*', '../src/arcade/**',
                 '../src/ecs/*', '../src/ecs/**',
-                '../src/battle', '../src/debug', '../src/manifest',
+                '../src/debug', '../src/manifest',
                 '../src/run/*', '../src/run/**',
                 '../src/save/*', '../src/save/**',
                 '../src/scene/*', '../src/scene/**',
@@ -199,12 +189,23 @@ export default tseslint.config(
     files: ['src/types/**/*.ts'],
     rules: {
       // 有意不含 NO_ASSETS_JSON：types 也读 assets/*.json
-      'no-restricted-imports': ['error', { patterns: [NO_BATTLE_IMPL] }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/ecs', '**/ecs/*', '**/ecs/**', './ecs/*', '../ecs/*'],
+              message: 'types 只放类型声明，不得依赖 src/ecs/',
+            },
+            NO_BITECS,
+          ],
+        },
+      ],
       'no-restricted-syntax': [
         'error',
         {
           selector: 'ExportNamedDeclaration > FunctionDeclaration',
-          message: 'types 只放类型声明：函数属于用它的那一层（内容规则去 data/，战斗规则去用它那套实现的包内，只有一个消费方的直接放消费方）',
+          message: 'types 只放类型声明：函数属于用它的那一层（内容规则去 data/，战斗规则去 src/ecs/，只有一个消费方的直接放消费方）',
         },
         {
           selector: 'ExportNamedDeclaration > VariableDeclaration',

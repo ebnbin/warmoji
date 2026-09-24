@@ -38,7 +38,7 @@ import { Minion } from './components'
 import { stepFrame } from './systems/pipeline/frame'
 import { replayDeath } from './systems/shared/death'
 import { pickupCounts } from './entities/pickup'
-import { spawnBossEcs, spawnSurgeEcs } from './entities/enemy'
+import { spawnBoss, spawnSurge } from './entities/enemy'
 import { scheduleCarrier } from './entities/schedule'
 import { telegraphCount } from './entities/telegraph'
 import { activeMods } from './entities/modifier'
@@ -180,7 +180,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     const hint = mainCameraOnly(
       this.add
-        .text(viewport.logicalWidth / 2, 40, 'ECS 实验 · 构建图集…', {
+        .text(viewport.logicalWidth / 2, 40, '构建图集…', {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           color: '#8fa1b5',
@@ -192,7 +192,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     const gen = ++this.bootGen
     this.boot(gen, run, hint).catch((e: unknown) => {
-      console.error('ECS 战斗启动失败', e)
+      console.error('战斗启动失败', e)
       if (gen === this.bootGen) hint.setText('战斗启动失败，请暂停后结束本局')
     })
 
@@ -273,7 +273,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         const sim = this.sim
         if (!sim || sim.over) return
         this.events.emit('wave-warning', { title: '精英来袭', sub: '敌人潮涌来，小心金边强敌！' })
-        spawnSurgeEcs(sim)
+        spawnSurge(sim)
       })
     }
     // 先开终波机关，再预告投放 Boss
@@ -287,7 +287,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
             MAPS[run.mapId].finalWaveSub ??
             `击败它，或撑过 ${Math.round(waveDurationMs(run.wave) / 1000)} 秒！`,
         })
-        spawnBossEcs(this.sim)
+        spawnBoss(this.sim)
       })
     }
     this.ready = true
@@ -462,14 +462,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
   }
 
-  /** ECS 无物理体，bodies 恒 0 */
   perfSnapshot(): {
     enemies: number
     projectiles: number
     coins: number
     pending: number
     objects: number
-    bodies: number
     combatSec: number
     spawnIntervalMs: number
     hpMultiplier: number
@@ -483,7 +481,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       coins: liveCoins(this.world),
       pending: sim ? telegraphCount(sim) : 0,
       objects: this.children.list.length,
-      bodies: 0,
       combatSec: Math.floor(totalSec),
       spawnIntervalMs: Math.round(this.sandbox ? spawnParams().intervalMs : wave.spawnIntervalMs),
       hpMultiplier: wave.hpMultiplier,

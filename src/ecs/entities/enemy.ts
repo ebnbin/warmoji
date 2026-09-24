@@ -100,7 +100,6 @@ const LOCOMOTIONS: { [K in LocomotionDef['kind']]: LocoAttach<K> } = {
     Detonate.windupMs[eid] = lm.windupMs
     Detonate.blastRadius[eid] = lm.blastRadius
     Detonate.blastDamage[eid] = lm.blastDamage
-    // def.knockback 无人读，不抄
   },
   baseOrbit: (sim, eid, lm) => {
     addComponent(sim.world, eid, BaseOrbit)
@@ -314,7 +313,7 @@ export function telegraphOne(sim: Sim, hpMultiplier: number, forceElite = false)
 }
 
 /** 只排何时出；落点与出怪表到点才算 */
-export function spawnSurgeEcs(sim: Sim): void {
+export function spawnSurge(sim: Sim): void {
   if (sim.over) return
   const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
   for (let i = 0; i < SURGE.count; i++) {
@@ -322,7 +321,7 @@ export function spawnSurgeEcs(sim: Sim): void {
   }
 }
 
-export function spawnBossEcs(sim: Sim): void {
+export function spawnBoss(sim: Sim): void {
   if (sim.over) return
   const def = toPx(bossFor(sim.mapId))
   const pos = sim.hooks.spawnPoint(sim, true)
@@ -330,7 +329,7 @@ export function spawnBossEcs(sim: Sim): void {
 }
 
 /** 场上过挤则跳过 */
-export function spawnCarrierEcs(sim: Sim, pickup: FieldPickupDef): void {
+export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
   if (sim.over) return
   if (awakeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))

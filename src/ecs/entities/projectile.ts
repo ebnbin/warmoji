@@ -41,7 +41,7 @@ function spawnBolt(
 }
 
 /** 外形与飞行参数取自开火那条能力的组件 */
-export function spawnProjectileEcs(
+export function spawnProjectile(
   sim: Sim,
   src: number,
   x: number,
@@ -87,7 +87,7 @@ export interface EnemyShotSpec {
 }
 
 /** 伤害已含 dmgMul */
-export function spawnEnemyProjectileEcs(
+export function spawnEnemyProjectile(
   sim: Sim,
   x: number,
   y: number,

@@ -45,11 +45,3 @@ export interface BattlefieldTuning {
     readonly fallback: { readonly buff: number; readonly debuff: number }
   }
 }
-export interface BattleMod {
-  id: string
-  emoji: string
-  polarity: Polarity
-  until: number
-  totalMs: number
-  fx: Partial<BattleEffects>
-}

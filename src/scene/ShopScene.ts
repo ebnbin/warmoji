@@ -18,7 +18,7 @@ import { levelStatsFor, LEVEL_STATS } from '../data/levels'
 import { upgradeCardsFor } from '../data/characters'
 import { aggregateTeamCards } from '../data/cards'
 import type { TeamEffects } from '../types/items'
-import { battleSceneFor } from '../battle'
+import { ECS_SCENE_KEY } from '../ecs/keys'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
@@ -780,7 +780,7 @@ export class ShopScene extends Phaser.Scene {
 
   private nextWave(): void {
     playSfx('click')
-    this.scene.start(battleSceneFor(this.run.mapId))
+    this.scene.start(ECS_SCENE_KEY)
   }
 
   /** 须先入睡再启动阵型页：promote 的 init 以商店在沉睡验证 fromShop */
@@ -806,21 +806,12 @@ export class ShopScene extends Phaser.Scene {
     reportDebug({
       scene: 'shop',
       elapsed: 0,
-      hp: 0,
-      alive: 0,
       kills: this.run.kills,
       level: this.run.xp.level,
       wave: this.run.wave,
       coins: this.run.coins,
-      enemies: 0,
-      pending: 0,
-      fps: 0,
       viewW: viewport.logicalWidth,
       viewH: viewport.logicalHeight,
-      playerX: 0,
-      playerY: 0,
-      camX: 0,
-      camY: 0,
       shop: {
         wave: this.run.wave,
         coins: this.run.coins,

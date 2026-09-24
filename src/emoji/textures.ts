@@ -53,7 +53,6 @@ export function emojiCacheStats(scene: Phaser.Scene): { textures: number; pinned
   }
 }
 
-// 后缀须与 arcade/anim/animTextures.ts 一致
 const KIND_SUFFIX: Record<OutlineKind, string> = {
   player: '-ol',
   enemy: '-ole',

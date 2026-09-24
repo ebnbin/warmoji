@@ -147,7 +147,7 @@ export const SIM_PIPELINE: readonly Step[] = [
     name: 'hitDirectProjectiles',
     run: hitDirectProjectiles,
     after: ['characterContact', 'moveProjectiles'],
-    why: '同帧两者争同一层无敌帧时旧实现是接触先手（overlap 注册序）；反过来的话，贴脸接触的伤害/黏滞/荆棘反伤会被敌弹吃掉的无敌帧一并挡下',
+    why: '同帧两者争同一层无敌帧时接触先手；反过来的话，贴脸接触的伤害/黏滞/荆棘反伤会被敌弹吃掉的无敌帧一并挡下',
   },
   {
     name: 'cullProjectiles',

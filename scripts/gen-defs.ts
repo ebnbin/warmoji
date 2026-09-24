@@ -72,7 +72,7 @@ const ABILITY_KINDS = new Set([
   'rally', 'strike', 'dance', 'buff', 'nuke', 'timeStop',
 ])
 
-/** 队长主动技能可用的 kind，须与两套战斗实现的手动施放同步 */
+/** 队长主动技能可用的 kind，须被 src/ecs/systems/pipeline/abilities.ts 的 MANUAL_CASTS 覆盖 */
 const CASTABLE_KINDS = new Set(['rally', 'strike', 'dance', 'buff', 'nuke', 'timeStop'])
 
 /** 须与 CardTag 同步 */
@@ -98,7 +98,7 @@ const TEAM_EFFECT_KEYS = new Set([
   'teamHpMul', 'reviveMul', 'skillCdMul', 'shopDiscountMul', 'freeRerolls', 'draftSize',
 ])
 
-/** 须与两套战斗实现的命中效果种类同步 */
+/** 须被 src/ecs/systems/shared/effects.ts 的 EFFECT_KINDS 覆盖 */
 const EFFECT_KINDS = new Set(['blast', 'slow', 'poison', 'ground', 'morph'])
 
 function checkEffects(path: string, effects: unknown): void {
@@ -226,7 +226,7 @@ for (const [id, c] of Object.entries(CAPTAINS)) {
     const ap = `${p}.skill.abilities[${ai}]`
     if (checkRef(ap, a)) {
       const kind = (ABILITIES as Record<string, { kind: string }>)[a]!.kind
-      if (!CASTABLE_KINDS.has(kind)) bad(ap, `kind ${kind} 未实现 castNow，不能作主动技能载荷`)
+      if (!CASTABLE_KINDS.has(kind)) bad(ap, `kind ${kind} 不能手动施放，不能作主动技能载荷`)
     }
   }
   pure(p, c)

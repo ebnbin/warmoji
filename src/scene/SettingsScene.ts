@@ -206,19 +206,10 @@ export class SettingsScene extends Phaser.Scene {
     reportDebug({
       scene: 'settings',
       elapsed: 0,
-      hp: 0,
-      alive: 0,
       kills: 0,
       level: 1,
-      enemies: 0,
-      pending: 0,
-      fps: 0,
       viewW: viewport.logicalWidth,
       viewH: viewport.logicalHeight,
-      playerX: 0,
-      playerY: 0,
-      camX: 0,
-      camY: 0,
       settings: {
         items: this.rows.map((r) => ({
           id: r.key,

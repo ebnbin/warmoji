@@ -8,7 +8,7 @@ import { beginRun, tickSkillCd } from '../run/state'
 import { INVINCIBLE_HP } from '../run/sandbox'
 import { UNIT } from '../util/units'
 import { CharHp, Transform } from './components'
-import { spawnBossEcs, spawnSurgeEcs } from './entities/enemy'
+import { spawnBoss, spawnSurge } from './entities/enemy'
 import { armCaptain, armTeam } from './entities/loadout'
 import { scheduleCarrier } from './entities/schedule'
 import { initialLayout, makeSim, worldTimeScale } from './sim'
@@ -91,11 +91,11 @@ function play(mapId: MapId, wave: number, captain: CaptainId, roster: CharacterI
     stepFrame(sim)
     if (surge && sim.fxMs >= 600) {
       surge = false
-      spawnSurgeEcs(sim)
+      spawnSurge(sim)
     }
     if (boss && sim.fxMs >= 600) {
       boss = false
-      spawnBossEcs(sim)
+      spawnBoss(sim)
     }
     sim.out.bursts.length = 0
     sim.out.collects.length = 0
