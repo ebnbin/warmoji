@@ -17,7 +17,7 @@ import {
 import type { RunState } from '../run/state'
 import { applyBackground } from '../util/background'
 import { reportDebug } from '../debug'
-import { emojiImage } from '../emoji/textures'
+import { emojiImage } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
 import type { ScrollRect } from '../ui/scroll'

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { emojiImage } from '../emoji/textures'
+import { emojiImage } from '../emoji/hold'
 
 export function iconLabel(
   scene: Phaser.Scene,
@@ -19,6 +19,16 @@ export function iconLabel(
   return scene.add.container(x, y, [icon, label])
 }
 
+const SLOTS = /(\{[^}]+\})/
+const SLOT = /^\{([^}]+)\}$/
+
+export function templateEmojis(template: string): string[] {
+  return template.split(SLOTS).flatMap((seg) => {
+    const m = SLOT.exec(seg)
+    return m ? [m[1]!] : []
+  })
+}
+
 /** 模板中 {id} 为内联 SVG 图标；文字里带 emoji 一律走这里，不用字体。origin 只作用于水平方向，垂直恒居中于 y */
 export function emojiText(
   scene: Phaser.Scene,
@@ -35,9 +45,9 @@ export function emojiText(
 
   const parts: (Phaser.GameObjects.Image | Phaser.GameObjects.Text)[] = []
   const widths: number[] = []
-  for (const seg of template.split(/(\{[^}]+\})/)) {
+  for (const seg of template.split(SLOTS)) {
     if (!seg) continue
-    const m = /^\{([^}]+)\}$/.exec(seg)
+    const m = SLOT.exec(seg)
     if (m) {
       parts.push(emojiImage(scene, 0, 0, m[1]!, iconSize))
       widths.push(iconSize)

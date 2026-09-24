@@ -107,6 +107,7 @@ export default tseslint.config(
       'src/ui/**/*.ts',
       'src/emoji/textures.ts',
       'src/emoji/thumbs.ts',
+      'src/emoji/hold.ts',
       'src/util/apply.ts',
     ],
     rules: {

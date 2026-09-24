@@ -80,11 +80,15 @@ export async function svgToImage(svgText: string): Promise<HTMLImageElement> {
   }
 }
 
-async function createTexture(scene: Phaser.Scene, id: string, outline?: OutlineKind): Promise<string> {
-  const key = emojiKey(id, outline)
+export async function emojiRaster(id: string, outline?: OutlineKind): Promise<HTMLImageElement> {
   const raw = await emojiSvgText(id)
   const svg = outline ? outlineSvg(raw, OUTLINE.radius, OUTLINE.colors[outline]) : raw
-  scene.textures.addImage(key, await svgToImage(setSvgSize(svg, RASTER)))
+  return svgToImage(setSvgSize(svg, RASTER))
+}
+
+async function createTexture(scene: Phaser.Scene, id: string, outline?: OutlineKind): Promise<string> {
+  const key = emojiKey(id, outline)
+  scene.textures.addImage(key, await emojiRaster(id, outline))
   return key
 }
 
@@ -137,15 +141,4 @@ export async function loadEmojiTextures(
         .catch((err) => console.error(`emoji 纹理加载失败: ${String(err)}`)),
     ),
   )
-}
-
-export function emojiImage(
-  scene: Phaser.Scene,
-  x: number,
-  y: number,
-  id: string,
-  size: number,
-  outline?: OutlineKind,
-): Phaser.GameObjects.Image {
-  return scene.add.image(x, y, emojiKey(id, outline)).setDisplaySize(size, size)
 }
