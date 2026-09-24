@@ -154,8 +154,7 @@ interface WarmojiMapDebug {
   selected: string
   items: { id: string; x: number; y: number; w: number; h: number }[]
   start: { x: number; y: number; w: number; h: number }
-  /** 仅开发者模式下存在 */
-  sandbox?: { x: number; y: number; on: boolean }
+  sandbox: { x: number; y: number; on: boolean }
 }
 
 interface WarmojiResultDebug {

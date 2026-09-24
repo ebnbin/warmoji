@@ -198,14 +198,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     setActiveHudHost(this) // 须先登记再拉起 HUD
     this.scene.launch('ui')
-    const lab = loadSettings(browserStorage()).devMode
-    if (lab) this.scene.launch(SANDBOX_SCENE_KEY)
+    this.scene.launch(SANDBOX_SCENE_KEY)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.bootGen++ // 在途的 boot 作废
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.scene.stop('ui')
-      if (lab) this.scene.stop(SANDBOX_SCENE_KEY)
+      this.scene.stop(SANDBOX_SCENE_KEY)
       // e2e 靠 __ecs.ready 判断战斗已收场；换成空壳以放开对本局的引用
       ;(window as unknown as { __ecs?: { ready: boolean } }).__ecs = { ready: false }
       this.atlas?.dispose()

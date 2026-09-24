@@ -5,7 +5,7 @@ import { BATTLE_SCENE_KEY, SANDBOX_SCENE_KEY } from '../keys'
 import type { EcsBattleScene } from '../EcsBattleScene'
 import { SandboxPanel, PILL_ICON } from './SandboxPanel'
 
-/** 开发者模式下随战斗 scene 启停，叠在 HUD 之上；战斗暂停期间入睡 */
+/** 随战斗 scene 启停，叠在 HUD 之上；战斗暂停期间入睡 */
 export class SandboxScene extends Phaser.Scene {
   private panel?: SandboxPanel
 
