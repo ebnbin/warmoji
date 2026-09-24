@@ -12,7 +12,7 @@ import { StudioScene } from './scene/StudioScene'
 import { UIScene } from './scene/UIScene'
 import { WikiScene } from './scene/WikiScene'
 import { EcsBattleScene } from './ecs/EcsBattleScene'
-import { ECS_SCENE_KEY } from './ecs/keys'
+import { BATTLE_SCENE_KEY } from './ecs/keys'
 import { browserStorage } from './util/storage'
 import { getRun } from './run/state'
 import { loadSettings } from './save/settings'
@@ -57,7 +57,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
     const key = scene.scene.key
     if (lobby.includes(key)) {
       scene.events.on(Phaser.Scenes.Events.START, () => playBgm('lobby'))
-    } else if (key === ECS_SCENE_KEY) {
+    } else if (key === BATTLE_SCENE_KEY) {
       scene.events.on(Phaser.Scenes.Events.START, () => playBgm(getRun().mapId))
     }
   }

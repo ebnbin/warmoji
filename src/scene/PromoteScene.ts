@@ -4,8 +4,8 @@ import { CHARACTERS } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { formationPosts } from '../data/formation'
 import type { ItemId } from '../types/items'
-import { ECS_SCENE_KEY } from '../ecs/keys'
-import type { EcsSceneKey } from '../ecs/keys'
+import { BATTLE_SCENE_KEY } from '../ecs/keys'
+import type { BattleSceneKey } from '../ecs/keys'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { unlockAt } from '../run/recruit'
@@ -345,9 +345,9 @@ export class PromoteScene extends Phaser.Scene {
     return this.run.wave === CAPTAINS[this.run.captainId].startWave
   }
 
-  private nextScene(): EcsSceneKey | 'shop' {
+  private nextScene(): BattleSceneKey | 'shop' {
     if (this.isInitial() && !CAPTAINS[this.run.captainId].firstWaveShop) {
-      return ECS_SCENE_KEY
+      return BATTLE_SCENE_KEY
     }
     return 'shop'
   }

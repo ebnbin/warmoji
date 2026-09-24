@@ -1,2 +1,2 @@
-export const ECS_SCENE_KEY = 'ecsArena' as const
-export type EcsSceneKey = typeof ECS_SCENE_KEY
+export const BATTLE_SCENE_KEY = 'battle' as const
+export type BattleSceneKey = typeof BATTLE_SCENE_KEY

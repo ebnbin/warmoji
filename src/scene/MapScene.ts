@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
-import { ECS_SCENE_KEY } from '../ecs/keys'
+import { BATTLE_SCENE_KEY } from '../ecs/keys'
 import { beginRun } from '../run/state'
 import { sandboxCaptain, sandboxStarters } from '../run/sandbox'
 import { randomPalette } from '../util/palette'
@@ -179,7 +179,7 @@ export class MapScene extends Phaser.Scene {
       playSfx('click')
       if (this.sandbox) {
         beginRun(sandboxCaptain(), sandboxStarters(), this.selectedId, true)
-        this.scene.start(ECS_SCENE_KEY)
+        this.scene.start(BATTLE_SCENE_KEY)
         return
       }
       this.scene.start('captain')

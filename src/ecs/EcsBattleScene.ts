@@ -19,7 +19,7 @@ import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
 import { getRun, promoteStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAPS } from '../data/maps'
-import { ECS_SCENE_KEY } from './keys'
+import { BATTLE_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
@@ -120,7 +120,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private bootGen = 0
 
   constructor() {
-    super(ECS_SCENE_KEY)
+    super(BATTLE_SCENE_KEY)
   }
 
   /** Phaser 跨局复用同一个 Scene 实例，可变字段须在此重置 */

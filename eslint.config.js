@@ -63,13 +63,6 @@ export default tseslint.config(
       'no-restricted-imports': ['error', { patterns: [NO_BITECS, NO_ASSETS_JSON] }],
     },
   },
-  // 须排在上一块之后
-  {
-    files: ['src/scene/**/*.ts'],
-    rules: {
-      'no-restricted-imports': ['error', { patterns: [NO_BITECS, NO_ASSETS_JSON] }],
-    },
-  },
   {
     files: ['src/ecs/**/*.ts'],
     rules: {
