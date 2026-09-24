@@ -3,6 +3,9 @@ import { ROSTER_IDS } from '../data/characters'
 import { ENEMY_DEFS } from '../data/enemies'
 import type { CharacterId } from '../types/characters'
 import type { CaptainId } from '../types/captains'
+import type { MapId } from '../types/maps'
+import { beginRun } from '../run/state'
+import type { RunState } from '../run/state'
 
 // 战斗侧只读 spawnParams / INVINCIBLE_HP / sandboxEnemySet / sandboxDifficulty / sandboxFireRate /
 // sandboxInvincible / sandboxLevel，签名是对战斗侧的契约。选择状态为模块级，跨场景重启保留
@@ -91,7 +94,7 @@ export function sandboxPresetId(): string | undefined {
   return presetId
 }
 
-/** 调用方随后须 beginRun + 重启战斗 */
+/** 调用方随后须 beginSandboxRun + 重启战斗 */
 export function applySandboxPreset(id: string): void {
   const p = SANDBOX_PRESETS.find((x) => x.id === id)
   if (!p) return
@@ -133,7 +136,7 @@ export function isSandboxCharacterOn(id: CharacterId): boolean {
   return roster.includes(id)
 }
 
-/** 改动后由调用方 beginRun + 重启应用 */
+/** 改动后由调用方 beginSandboxRun + 重启应用 */
 export function toggleSandboxCharacter(id: CharacterId): void {
   if (roster.includes(id)) {
     if (roster.length <= 1) return
@@ -145,7 +148,7 @@ export function toggleSandboxCharacter(id: CharacterId): void {
   presetId = undefined
 }
 
-/** 改动后由调用方 beginRun + 重启应用 */
+/** 改动后由调用方 beginSandboxRun + 重启应用 */
 export function setSandboxRoster(ids: readonly CharacterId[]): void {
   roster = ids.length > 0 ? [...ids] : [...ROSTER_IDS.slice(0, 1)]
   presetId = undefined
@@ -206,6 +209,10 @@ export function setSandboxInvincible(on: boolean): void {
 export function sandboxStarters(): CharacterId[] {
   const r = roster.slice(0, CAPTAINS[SANDBOX_CAPTAIN].teamSize)
   return r.length > 0 ? r : [ROSTER_IDS[0]!]
+}
+
+export function beginSandboxRun(mapId: MapId): RunState {
+  return beginRun(sandboxCaptain(), sandboxStarters(), mapId, true)
 }
 
 // 开局默认预设

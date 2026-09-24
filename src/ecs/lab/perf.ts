@@ -1,13 +1,13 @@
 import Phaser from 'phaser'
-import { FONT } from '../util/fonts'
-import { textRes } from '../util/apply'
-import { roundRect } from '../ui/shapes'
+import { FONT } from '../../util/fonts'
+import { textRes } from '../../util/apply'
+import { roundRect } from '../../ui/shapes'
 import { heapMB, rafHz, rendererInfo } from './diagnostics'
-import { emojiCacheStats } from '../emoji/textures'
+import { emojiCacheStats } from '../../emoji/textures'
 import { metricsReport, nextFrameSeq, recentFrames } from './metrics'
-import { sandboxDifficulty, sandboxEnemySet, sandboxFireRate, sandboxLevel, sandboxStarters, scaleStep } from '../run/sandbox'
+import { sandboxDifficulty, sandboxEnemySet, sandboxFireRate, sandboxLevel, sandboxStarters, scaleStep } from '../sandbox'
 import { reportDevPerf } from './probe'
-import type { HudHost } from '../run/hudHost'
+import type { EcsBattleScene } from '../EcsBattleScene'
 
 // 坐标以面板内容区顶为原点
 
@@ -32,7 +32,7 @@ export class PerfView {
 
   constructor(
     private readonly scene: Phaser.Scene,
-    private readonly host: HudHost,
+    private readonly battle: EcsBattleScene,
     private readonly w: number,
     private readonly top: number,
     private readonly sandbox: boolean,
@@ -64,7 +64,7 @@ export class PerfView {
   }
 
   private refresh(): void {
-    const p = this.host.perfSnapshot()
+    const p = this.battle.perfSnapshot()
     // 直读旋钮而非预设：旋钮可逐个手改
     const step = this.sandbox ? scaleStep() : undefined
     const cache = emojiCacheStats(this.scene)

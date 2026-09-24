@@ -19,10 +19,10 @@ const NO_SCENE_FROM_BATTLE = {
   message: '战斗侧不得依赖场景层；通用控件在 src/ui/，业务数据在 src/data/',
 }
 
-const NO_DEV_FROM_BATTLE = {
-  group: ['**/dev', '**/dev/*', '**/dev/**'],
+const NO_LAB_FROM_BATTLE = {
+  group: ['**/lab', '**/lab/*', '**/lab/**'],
   message:
-    'src/dev/ 是开发者工具（面板 / 帧采样 / 环境诊断），方向只能是它读战斗。战斗侧一旦依赖它，「开发者模式默认关」就不再等于「这些代码不参与正式游戏」——沙盒旋钮读的是 src/run/lab.ts，那才是两边都够得到的那一层',
+    'src/ecs/lab/ 是战斗的试炼与诊断工具（面板 / 帧采样 / 环境诊断），方向只能是它读战斗。战斗侧一旦依赖它，「开发者模式默认关」就不再等于「这些代码不参与正式游戏」——试炼场旋钮在 src/ecs/sandbox.ts，那才是两边都够得到的那一层',
 }
 
 const NO_ADD_ENTITY = {
@@ -66,7 +66,7 @@ export default tseslint.config(
   {
     files: ['src/ecs/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [NO_SCENE_FROM_BATTLE, NO_DEV_FROM_BATTLE, NO_ASSETS_JSON] }],
+      'no-restricted-imports': ['error', { patterns: [NO_SCENE_FROM_BATTLE, NO_LAB_FROM_BATTLE, NO_ASSETS_JSON] }],
     },
   },
   // 须重列上一块的 pattern
@@ -76,7 +76,7 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': [
         'error',
-        { paths: [NO_ADD_ENTITY], patterns: [NO_SCENE_FROM_BATTLE, NO_DEV_FROM_BATTLE, NO_ASSETS_JSON] },
+        { paths: [NO_ADD_ENTITY], patterns: [NO_SCENE_FROM_BATTLE, NO_LAB_FROM_BATTLE, NO_ASSETS_JSON] },
       ],
     },
   },
@@ -89,7 +89,7 @@ export default tseslint.config(
         'error',
         {
           paths: [NO_ADD_ENTITY],
-          patterns: [NO_NEW_ENTITY, NO_SCENE_FROM_BATTLE, NO_DEV_FROM_BATTLE, NO_ASSETS_JSON],
+          patterns: [NO_NEW_ENTITY, NO_SCENE_FROM_BATTLE, NO_LAB_FROM_BATTLE, NO_ASSETS_JSON],
         },
       ],
     },
@@ -99,7 +99,7 @@ export default tseslint.config(
     ignores: [
       'src/main.ts',
       'src/scene/*Scene.ts',
-      'src/dev/**/*.ts',
+      'src/ecs/lab/**/*.ts',
       'src/util/fx.ts',
       'src/ecs/EcsBattleScene.ts',
       'src/ecs/views.ts',

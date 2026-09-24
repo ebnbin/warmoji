@@ -3,8 +3,6 @@ import { CAPTAINS } from '../data/captains'
 import { PICKUPS } from '../data/pickups'
 import { formatTime } from '../util/format'
 import { endRun, getRun } from '../run/state'
-import { loadSettings } from '../save/settings'
-import { browserStorage } from '../util/storage'
 import { emojiImage } from '../emoji/hold'
 import { emojiText, iconLabel } from '../ui/emojiText'
 import { FONT, UI_FONT } from '../util/fonts'
@@ -15,7 +13,6 @@ import type { HudInput, HudSnapshot, WaveSummary } from '../run/hudHost'
 import { activeHudHost, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import { roundRect } from '../ui/shapes'
-import { DevPanel } from '../dev/DevPanel'
 
 export class UIScene extends Phaser.Scene implements HudInput {
   private joystick?: Joystick
@@ -25,7 +22,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
   private killsText!: Phaser.GameObjects.Text
   private coinsText!: Phaser.GameObjects.Text
   private last!: HudSnapshot
-  private dev?: DevPanel
   private paused = false
   private pauseObjs: Phaser.GameObjects.GameObject[] = []
   // 队长技能按钮
@@ -111,8 +107,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
       if (this.paused) this.togglePause()
     })
 
-    if (loadSettings(browserStorage()).devMode) this.dev = new DevPanel(this, this.arena)
-
     this.createSkillButton(res)
     this.createFxIndicators()
 
@@ -129,9 +123,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
       arenaEvents.off('field-collected', this.onFieldCollected, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       setActiveHudInput(undefined)
-      // 须销毁并清引用：restart 后 update 仍会对已销毁的 Text 调 setText
-      this.dev?.destroy()
-      this.dev = undefined
     })
 
     if (this.arena.scene.isPaused()) {
@@ -211,8 +202,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
     ]
   }
 
-  update(time: number): void {
-    this.dev?.update(time)
+  update(): void {
     this.updateSkillButton()
     const s = this.arena.hudSnapshot()
     this.updateFxIndicators(s.battleFx)

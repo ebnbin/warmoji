@@ -190,5 +190,5 @@ interface WarmojiDebug {
 
 interface Window {
   __warmoji?: WarmojiDebug
-  __dev?: import('./dev/probe').DevPerfProbe
+  __dev?: import('./ecs/lab/probe').DevPerfProbe
 }

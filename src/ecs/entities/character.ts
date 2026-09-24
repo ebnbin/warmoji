@@ -15,7 +15,7 @@ import { levelStatsFor } from '../../data/levels'
 import { characterLevel } from '../../data/charLevel'
 
 import { waveStartHp } from '../../run/state'
-import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../../run/sandbox'
+import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox'
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'

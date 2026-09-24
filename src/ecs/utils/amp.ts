@@ -1,6 +1,6 @@
 import { } from '../../data/items'
 import { waveAt } from '../../data/waves'
-import { sandboxFireRate } from '../../run/sandbox'
+import { sandboxFireRate } from '../sandbox'
 import { Anchor, DmgMul, CharAtkSlow, Slot, Transform } from '../components'
 import { Amp, FACTION, Faction, Owner } from '../components'
 import type { } from './source'

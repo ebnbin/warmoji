@@ -13,6 +13,7 @@ import { StudioScene } from './scene/StudioScene'
 import { UIScene } from './scene/UIScene'
 import { WikiScene } from './scene/WikiScene'
 import { EcsBattleScene } from './ecs/EcsBattleScene'
+import { LabScene } from './ecs/lab/LabScene'
 import { BATTLE_SCENE_KEY } from './ecs/keys'
 import { browserStorage } from './util/storage'
 import { getRun } from './run/state'
@@ -44,7 +45,7 @@ const game = new Phaser.Game({
   height: Math.round(viewport.cssHeight * viewport.dpr),
   input: { activePointers: 3 },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, RecruitScene, FormationScene, CardScene, ShopScene, EcsBattleScene, UIScene, ResultScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, RecruitScene, FormationScene, CardScene, ShopScene, EcsBattleScene, UIScene, LabScene, ResultScene],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {

@@ -3,8 +3,7 @@ import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
 import { BATTLE_SCENE_KEY } from '../ecs/keys'
-import { beginRun } from '../run/state'
-import { sandboxCaptain, sandboxStarters } from '../run/sandbox'
+import { beginSandboxRun } from '../ecs/sandbox'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
@@ -190,7 +189,7 @@ export class MapScene extends Phaser.Scene {
     const confirm = (): void => {
       playSfx('click')
       if (this.sandbox) {
-        beginRun(sandboxCaptain(), sandboxStarters(), this.selectedId, true)
+        beginSandboxRun(this.selectedId)
         this.scene.start(BATTLE_SCENE_KEY)
         return
       }
