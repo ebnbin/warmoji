@@ -613,10 +613,11 @@ const river: WorldHooks = {
   constrainTeam(sim, next) {
     return clampToRiver(next, riverOf(sim), (TEAM.ringRadius + MEMBER.radius) * UNIT)
   },
-  /** 只钳跨向 */
+  /** 普通敌人只钳跨向，Boss 两轴都钳 */
   constrainEnemy(sim, eid, x, y) {
     const r = riverOf(sim)
     const rad = Radius.v[eid]!
+    if (Boss.v[eid] === 1) return clampToRiver({ x, y }, r, rad)
     if (r.horizontal) return { x, y: Math.min(Math.max(y, r.y + rad), r.y + r.h - rad) }
     return { x: Math.min(Math.max(x, r.x + rad), r.x + r.w - rad), y }
   },
