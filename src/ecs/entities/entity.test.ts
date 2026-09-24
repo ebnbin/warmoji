@@ -7,7 +7,7 @@ import { INITIAL_CAPACITY, makeWorld } from '../world'
 import { newEntity } from './entity'
 import type { EnemyDef } from '../../types/enemies'
 
-// 守卫：组件数组定长时，eid 越过容量后的写入被静默丢弃、读出 undefined，曾致整局抛错
+// 守卫：eid 越过组件数组容量后的写入被静默丢弃、读出 undefined，整局抛错
 
 it('eid 越过初始容量后写入照常读回，重置后容量复原', () => {
   resetEntityStorage()
@@ -28,7 +28,7 @@ it('eid 越过初始容量后写入照常读回，重置后容量复原', () => 
   expect(enemyDef[eid]).toBeUndefined()
 })
 
-// 守卫：新实体读到同一 eid 上一任留下的组件值，曾致蹦迪窗口串到下一波、角色继承敌人的休眠整局不出手
+// 守卫：新实体读到同一 eid 上一任留下的组件值：蹦迪窗口串到下一波、角色继承敌人的休眠整局不出手
 
 it('新实体不带同一 eid 上一任的值：同 world 回收与新 world 重发都一样', () => {
   const dirty = (eid: number): void => {

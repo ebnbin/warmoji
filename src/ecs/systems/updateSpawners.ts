@@ -2,7 +2,7 @@ import { query } from 'bitecs'
 import { SPAWN } from '../../data/enemies'
 import { UNIT } from '../../util/units'
 import { Dormant, ENEMY_SET, Morph, Nest, Transform } from '../components'
-import { spawnBrood } from '../entities/enemy'
+import { awakeCount, spawnBrood } from '../entities/enemy'
 import { enemyDef } from '../store'
 import type { Sim } from '../sim'
 import { isDancing } from '../utils/team'
@@ -20,7 +20,7 @@ export function updateSpawners(sim: Sim): void {
   if (sim.over) return
   const now = sim.elapsedMs
   const eids = query(sim.world, ENEMY_SET as unknown as object[])
-  let active = eids.length
+  let active = awakeCount(sim)
   for (const eid of eids) {
     if (Dormant.v[eid]) continue // 休眠的巢不产子
     const spawner = enemyDef[eid]?.spawner

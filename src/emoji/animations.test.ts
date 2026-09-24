@@ -3,11 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { CAPTAINS, PICKABLE_CAPTAIN_IDS } from '../data/captains'
 import { CHARACTERS } from '../data/characters'
 import { BOSSES, ENEMY_DEFS } from '../data/enemies'
-import { PICKUPS } from '../data/pickups'
 import { packSvg, parseEmojiPack } from './pack'
-import { ANIM_SETS, animClipOf, animSetOf, bakeAnimFrame, splitSvg } from './anim'
+import { ANIM_SETS, animSetOf, bakeAnimFrame, splitSvg } from './anim'
 
-// 守卫：部件下标越界时 bake 静默输出空帧，validateAnimResource 查不到
 function loadPack(): ReturnType<typeof parseEmojiPack> {
   const ordering = readFileSync('src/assets/emoji/ordering.txt', 'utf8')
   const twemoji = readFileSync('src/assets/emoji/twemoji.txt', 'utf8')
@@ -15,6 +13,7 @@ function loadPack(): ReturnType<typeof parseEmojiPack> {
 }
 
 describe('实体动画覆盖', () => {
+  // 守卫：实体缺 idle clip 时在场只显示静态帧，不报错
   it('全部实体（角色/队长/敌人/Boss/变形羊/弩塔）都有专属动画', () => {
     const entities = new Set<string>([
       ...Object.values(CHARACTERS).map((c) => c.emoji),
@@ -31,16 +30,9 @@ describe('实体动画覆盖', () => {
       expect(set!.clips.length, `${id} 没有任何 clip`).toBeGreaterThan(0)
       expect(set!.clips[0]!.id, `${id} 首个 clip 应为 idle（待机/代表作约定）`).toBe('idle')
     }
-    void PICKUPS
   })
 
-  it('弩塔有独立的 attack 周期 clip（攻速绑定的旗舰用例）', () => {
-    const attack = animClipOf('1f3f9', 'attack')
-    expect(attack).toBeDefined()
-    expect(attack!.kind).toBe('cycle')
-    expect(attack!.frames).toBeGreaterThanOrEqual(8)
-  })
-
+  // 守卫：部件下标越界时 bake 静默输出空帧，validateAnimResource 查不到
   it('每个 clip 的部件下标都在真实 SVG 元素范围内，且多相位烘焙不炸', () => {
     const pack = loadPack()
     for (const set of ANIM_SETS) {

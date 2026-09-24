@@ -13,7 +13,7 @@ import type { EnemyDef } from '../../types/enemies'
 import type { FrameIndex } from '../frames'
 import type { Sim } from '../sim'
 
-// 守卫：同一宿主上共用组件的两条徒手能力在装配时抛错，战斗当帧冻结；数据改出这种组合须先在这里挂
+// 守卫：同一宿主上共用组件的两条徒手能力在装配时抛错，战斗当帧冻结
 
 const frames: FrameIndex = { index: () => 0, clip: () => ({ base: 0, frames: 0 }) }
 

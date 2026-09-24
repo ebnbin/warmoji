@@ -395,8 +395,6 @@ export const Aim = { rad: f32() }
 /** 视觉钟 */
 export const Swing = { startMs: f32(), durMs: f32() }
 
-/** 视觉子实体 eid；0 = 无 */
-
 // ── 每种能力的参数组件 ──
 // 一种能力 = 一个组件，既是归属标记也装全部参数；def 的可选子对象拆成可选组件；每个都以 cd() 开头
 

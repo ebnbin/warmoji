@@ -352,7 +352,7 @@ export interface NukeDef {
 export interface TimeStopDef {
   readonly kind: 'timeStop'
   readonly cooldownMs: number
-  /** 敌方时间近乎凝固，队伍照常 */
+  /** 世界时长；期间静止则全场近乎凝固，移动则恢复流动 */
   readonly durationMs: number
 }
 export type AbilityDef =

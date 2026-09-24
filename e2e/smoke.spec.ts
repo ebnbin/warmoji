@@ -27,13 +27,9 @@ test('页面可加载：canvas 渲染、版本徽章存在、无控制台错误'
   expect((await manifest.json()).display).toBe('fullscreen')
   expect((await page.request.get('/icons/icon-512.png')).ok()).toBeTruthy()
 
-  // 到达 menu 即证明 emoji 包已加载解析（PreloadScene 门禁）
-
   // 跑几帧，暴露启动后才出现的运行时错误
   await page.waitForTimeout(800)
   expect(errors).toEqual([])
-
-  await page.screenshot({ path: 'test-results/menu.png' })
 })
 
 // 守卫：拿不到 WebGL 的浏览器打开游戏要看到提示，而不是白屏或进战斗后冻结
