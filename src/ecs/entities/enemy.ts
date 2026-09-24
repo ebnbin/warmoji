@@ -176,9 +176,9 @@ export function spawnEnemy(
   addComponent(world, eid, Morph)
   addComponent(world, eid, EDir)
   addComponent(world, eid, ETurn)
-  // 走位系统的 query 认这几个，漏挂则敌人不动
   addComponent(world, eid, BVel)
   addComponent(world, eid, Slowed)
+  // 走位系统的 query 认它，漏挂则敌人不动
   addComponent(world, eid, Steering)
   addComponent(world, eid, Anim)
   addComponent(world, eid, Sprite)

@@ -102,7 +102,7 @@ export function spawnFxBolt(sim: Sim, points: readonly { x: number; y: number }[
 }
 
 /** 💥 爆裂：缩小随机微转弹出到全尺寸并淡出。它是精灵不是形状——贴图走图集，
- * 由 spriteBatch 画（z=30 那条带），逐帧的缩放/淡出在 systems/animateBooms */
+ * 由 spriteBatch 画（深度 8 那条带），逐帧的缩放/淡出在 systems/animateBooms */
 export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): number {
   const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Fx, FxBoom)

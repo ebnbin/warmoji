@@ -22,7 +22,6 @@ function arena(mapId: 'void' | 'forest', w: number, h: number, n: number, seed: 
   const eids: number[] = []
   for (let i = 0; i < n; i++) {
     const eid = spawnEnemy(sim, frames, def, 0, 0, 10, false, false)
-    // 一半贴着接缝放
     const edge = i % 2 === 0
     Transform.x[eid] = edge ? (rng.next() < 0.5 ? rng.next() * 40 : w - rng.next() * 40) : rng.next() * w
     Transform.y[eid] = edge ? (rng.next() < 0.5 ? rng.next() * 40 : h - rng.next() * 40) : rng.next() * h

@@ -64,5 +64,3 @@ export function layoutTeam(sim: Sim): void {
     Depth.z[eid] = guarded ? 8.5 : 10 + sim.hooks.worldDelta(sim, centerX(sim), centerY(sim), fx, fy).y / UNIT
   }
 }
-
-/** 复活弹入期用弹入缩放覆盖呼吸 */

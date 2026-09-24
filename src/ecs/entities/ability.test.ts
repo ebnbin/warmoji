@@ -18,7 +18,6 @@ describe('unequipAbilities', () => {
     const world = makeWorld()
     const sim = { world, frames } as unknown as Sim
     const host = spawnCaptain(world, 0, 0, 0, 0)
-    // dimensionStrike 无 held ⇒ 能力组件直接挂 host，坠物的 Owner 也就是 host
     expect(equipAbility(sim, host, ABILITIES.dimensionStrike, FACTION.team, 0, NEUTRAL_AMP)).toBe(host)
     const drop = spawnDrop(sim, host, {
       emoji: '1f4a5', x: 0, y: 0, size: 1, fromAbove: 4, delayMs: 0, dropMs: 300, target: 0,
