@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CHARACTERS } from '../data/characters'
+import { CHARACTERS, TEAM } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { formationPosts } from '../data/formation'
 import { randomPalette } from '../util/palette'
@@ -75,8 +75,8 @@ export class FormationScene extends Phaser.Scene {
       this,
       L,
       this.origin,
-      '布置阵型',
-      this.fromShop ? '点选一名队员，与中心互换' : '满员自动列阵 N 保 1 · 点选队员设为受保护的中心',
+      '指定队长',
+      this.fromShop ? '点选一名队员，与队长互换' : '满员后由队长带队 · 点选队员设为队长',
       res,
     )
 
@@ -167,7 +167,7 @@ export class FormationScene extends Phaser.Scene {
         ring.strokeCircle(px, py, half + 4)
         this.memberObjs.push(ring)
       }
-      const img = emojiImage(this, px, py, CHARACTERS[id].emoji, size, 'player')
+      const img = emojiImage(this, px, py, CHARACTERS[id].emoji, post === 0 ? size * TEAM.leaderSizeMul : size, 'player')
       this.memberObjs.push(img)
       this.memberImgs[post] = img
       const zone = this.add
@@ -181,7 +181,7 @@ export class FormationScene extends Phaser.Scene {
 
     this.memberObjs.push(
       this.add
-        .text(cx, ly + L.h - 20, '点选队员，与中心互换', {
+        .text(cx, ly + L.h - 20, '点选队员，与队长互换', {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           color: '#d0d0d8',
@@ -259,7 +259,7 @@ export class FormationScene extends Phaser.Scene {
     const items = this.run.memberItems[slot] ?? []
 
     const subtitle = this.add
-      .text(104, 80, '站在队伍正中，受击判定减半，更少被敌人摸到', {
+      .text(104, 80, '由你直接操控，全队按他的移速行军；其他队员用各自的移速跟随', {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         color: '#b9b9c6',
@@ -270,7 +270,7 @@ export class FormationScene extends Phaser.Scene {
     this.detailView.add([
       emojiImage(this, 58, 56, def.emoji, 85, 'player'),
       this.add
-        .text(104, 44, `${def.name} · 受保护的中心`, {
+        .text(104, 44, `${def.name} · 队长`, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',

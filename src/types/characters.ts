@@ -14,6 +14,7 @@ export interface CharacterAuthoring {
   readonly name: string
   readonly desc: string
   readonly orbit: number
+  readonly moveSpeed: number
   readonly weapons: readonly WeaponId[]
   readonly innate: readonly InnateSource[]
 }
@@ -28,6 +29,7 @@ export interface CharacterDef {
   readonly name: string
   readonly desc: string
   readonly orbit: number
+  readonly moveSpeed: number
   readonly carriers: readonly Carrier[]
 }
 export interface UpgradeTiers {
@@ -41,7 +43,7 @@ export interface TeamBaseline {
     readonly smallRingRadius: number
     readonly pairGap: number
     readonly reviveMs: number
-    readonly guardCenterHurtboxMul: number
+    readonly leaderSizeMul: number
   }
   readonly member: {
     readonly size: number

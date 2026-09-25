@@ -86,6 +86,7 @@ export const CharPerk = { thorns: f32(), killHeal: f32(), regenPerSec: f32() }
 export const CharAtkSlow = { until: f32(), mul: f32() }
 
 export const CharHp = { hp: f32(), max: f32() }
+export const CharScale = { v: f32() }
 export const Iframe = { ms: f32(), last: f32() }
 export const Revive = { ms: f32(), at: f32() }
 export const Hurt = { radius: f32() }

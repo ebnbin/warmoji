@@ -8,6 +8,7 @@ import { boltSource } from '../utils/source'
 import { Alive, Orbit, Threat, Transform } from '../components'
 import type { Sim } from '../sim'
 import { centerX, centerY } from '../utils/team'
+import { orbitOn } from './shared/pursuit'
 
 export function updateOrbit(sim: Sim): void {
   const delta = sim.dtMs
@@ -44,7 +45,7 @@ export function updateOrbit(sim: Sim): void {
     })
     if (base !== null && bias !== 0) wants[idx] = orbitTendency(bias, threats)
   }
-  if (!rotatable) return
+  if (!rotatable || !orbitOn()) return
   const driver = pickDriver(
     wants.map((w) => Math.abs(w)),
     Math.random,

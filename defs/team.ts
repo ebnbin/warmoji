@@ -6,7 +6,7 @@ export const TEAM_BASELINE = {
     smallRingRadius: 0.58,
     pairGap: 1.1,
     reviveMs: 10_000,
-    guardCenterHurtboxMul: 0.5,
+    leaderSizeMul: 1.35,
   },
   member: {
     size: 1.2,

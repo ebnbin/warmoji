@@ -1,8 +1,10 @@
 import { UNIT } from '../../util/units'
 import { MEMBER } from '../../data/characters'
-import { Alive, Breath, Pop, Sprite, Transform } from '../components'
+import { Alive, Breath, CharScale, Follow, Pop, Sprite, Transform } from '../components'
 import { backEaseOut } from '../utils/ease'
 import type { Sim } from '../sim'
+
+const STRIDE = 20
 
 function popping(sim: Sim, eid: number, charSize: number): boolean {
   const left = Pop.until[eid]! - sim.fxMs
@@ -14,8 +16,9 @@ function popping(sim: Sim, eid: number, charSize: number): boolean {
 }
 
 export function finishCharacterPops(sim: Sim): void {
-  const charSize = MEMBER.size * UNIT
+  const baseSize = MEMBER.size * UNIT
   for (const eid of sim.characters) {
+    const charSize = baseSize * CharScale.v[eid]!
     if (!Alive.v[eid] || Pop.until[eid] === 0 || popping(sim, eid, charSize)) continue
     Pop.until[eid] = 0
     Transform.w[eid] = charSize
@@ -25,10 +28,14 @@ export function finishCharacterPops(sim: Sim): void {
 
 export function animateCharacters(sim: Sim): void {
   const delta = sim.dtMs
-  const moving = sim.teamDir.x !== 0 || sim.teamDir.y !== 0
-  const charSize = MEMBER.size * UNIT
+  const teamMoving = sim.teamDir.x !== 0 || sim.teamDir.y !== 0
+  const baseSize = MEMBER.size * UNIT
   for (const eid of sim.characters) {
     if (!Alive.v[eid]) continue
+    const own = sim.pursuit && eid !== sim.leader
+    const vx = own ? Follow.vx[eid]! : sim.teamDir.x
+    const moving = own ? Math.hypot(Follow.vx[eid]!, Follow.vy[eid]!) > STRIDE : teamMoving
+    const charSize = baseSize * CharScale.v[eid]!
     if (!popping(sim, eid, charSize)) {
       const bp = Breath.phase[eid]! + delta / (moving ? 85 : 140)
       Breath.phase[eid] = bp
@@ -36,6 +43,6 @@ export function animateCharacters(sim: Sim): void {
       Transform.w[eid] = charSize * (1 - s * 0.6)
       Transform.h[eid] = charSize * (1 + s)
     }
-    if (Math.abs(sim.teamDir.x) > 0.2) Sprite.flipX[eid] = sim.teamDir.x > 0 ? 1 : 0
+    if (Math.abs(vx) > (own ? STRIDE : 0.2)) Sprite.flipX[eid] = vx > 0 ? 1 : 0
   }
 }

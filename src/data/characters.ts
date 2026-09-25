@@ -38,6 +38,7 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
     name: src.name,
     desc: src.desc,
     orbit: src.orbit,
+    moveSpeed: src.moveSpeed,
     carriers: [...src.weapons.map(weaponCarrier), ...src.innate.map(innateCarrier)],
   }
 }

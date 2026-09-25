@@ -169,7 +169,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
 
     if (hasCenter(this.run)) {
       const fm = this.add
-        .text(this.origin.x + L.content.w - 40, oy + L.titleY, '⛨ 队形', {
+        .text(this.origin.x + L.content.w - 40, oy + L.titleY, '⛨ 队长', {
           fontFamily: UI_FONT,
           fontSize: FONT.strong,
           color: '#ffdc5d',

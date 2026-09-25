@@ -28,6 +28,7 @@ import {
 } from './sandbox/knobs'
 import type { SandboxLevel, SandboxMul } from './sandbox/knobs'
 import { pipelineProfile, resetPipelineProfile } from './systems/pipeline/step'
+import { PURSUIT_FLAGS } from './systems/shared/pursuit'
 
 const MULS: readonly SandboxMul[] = [1, 3, 10]
 const LEVELS: readonly { readonly lv: SandboxLevel; readonly label: string }[] = [
@@ -89,6 +90,9 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
         ...(battle.sandbox ? [] : [{ label: '结束本波', run: (): void => battle.devEndWave() }]),
       ],
     },
+    devFlagItem(PURSUIT_FLAGS.pursuit),
+    devFlagItem(PURSUIT_FLAGS.orbit),
+    devFlagItem(PURSUIT_FLAGS.separation),
     devFlagItem('battle.targets'),
     devFlagItem('ecs.profile'),
     { kind: 'text', label: '流水线剖析 · 平均毫秒/帧 · 外层含内层', mono: true, read: profileText },

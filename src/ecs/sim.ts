@@ -38,6 +38,8 @@ export interface Sim {
   teamDir: { x: number; y: number }
   moveInputRaw: number
   captain: number
+  leader: number
+  pursuit: boolean
   formation: FormationId
   count: number
   postBySlot: number[]
@@ -148,7 +150,7 @@ export function makeSim(
     captainDef.coinMagnet * UNIT * teamFx.magnetMul,
   )
   const team = formTeam(world, atlas, run, sandbox, captain)
-  const { count, formation, postBySlot, lineupOrbit, characters } = team
+  const { count, formation, postBySlot, lineupOrbit, characters, leader } = team
   return {
     world,
     teamDir: { x: 0, y: 0 },
@@ -192,5 +194,7 @@ export function makeSim(
       waveCoins: teamFx.waveCoins,
     },
     captain,
+    leader,
+    pursuit: false,
   }
 }

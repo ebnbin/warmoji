@@ -39,6 +39,7 @@ export interface TeamLayout {
   formation: FormationId
   postBySlot: number[]
   lineupOrbit: number[]
+  leader: number
 }
 
 export function formTeam(
@@ -52,8 +53,8 @@ export function formTeam(
   const cy = Transform.y[captainEid]!
   const rosterIds = run.roster
   const count = rosterIds.length
-  const formation = sandbox ? 'ring' : currentFormation(run)
-  const order = sandbox || !hasCenter(run) ? null : guardOrder(run)
+  const formation = currentFormation(run)
+  const order = hasCenter(run) ? guardOrder(run) : null
   const postBySlot = rosterIds.map((id, slot) => {
     if (!order) return slot
     const post = order.indexOf(id)
@@ -61,19 +62,21 @@ export function formTeam(
   })
   const posts = formationPosts(formation, count, 0)
   const characters: number[] = []
+  let leader = -1
   for (let slot = 0; slot < count; slot++) {
     const post = postBySlot[slot] ?? slot
     const off = posts[post] ?? { x: 0, y: 0 }
-    characters.push(
-      spawnCharacter(world, atlas, run, sandbox, {
-        slot,
-        post,
-        x: cx + off.x,
-        y: cy + off.y,
-        depthOffsetY: off.y / UNIT,
-        hurtRadiusMul: formation === 'guard' && post === 0 ? TEAM.guardCenterHurtboxMul : 1,
-      }),
-    )
+    const lead = formation === 'guard' && post === 0
+    const eid = spawnCharacter(world, atlas, run, sandbox, {
+      slot,
+      post,
+      x: cx + off.x,
+      y: cy + off.y,
+      depthOffsetY: off.y / UNIT,
+      sizeMul: lead ? TEAM.leaderSizeMul : 1,
+    })
+    if (lead) leader = eid
+    characters.push(eid)
   }
-  return { characters, count, formation, postBySlot, lineupOrbit: rosterIds.map((id) => CHARACTERS[id].orbit) }
+  return { characters, count, formation, postBySlot, lineupOrbit: rosterIds.map((id) => CHARACTERS[id].orbit), leader }
 }

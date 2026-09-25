@@ -19,7 +19,7 @@ import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox/knobs
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
-import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, OrbitBias, Pop, Post, Quad, Revive, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
+import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, CharScale, MoveSpeed, OrbitBias, Pop, Post, Quad, Revive, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
@@ -30,7 +30,7 @@ export interface CharacterPlacement {
   x: number
   y: number
   depthOffsetY: number
-  hurtRadiusMul: number
+  sizeMul: number
 }
 
 export function spawnCharacter(
@@ -45,7 +45,7 @@ export function spawnCharacter(
   const teamFx = aggregateTeamCards(run.teamCards)
   const captain = CAPTAINS[run.captainId]
   const sandboxHp = sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
-  const size = MEMBER.size * UNIT
+  const size = MEMBER.size * UNIT * place.sizeMul
     const eid = newEntity(world)
   addComponent(world, eid, Character)
   addComponent(world, eid, Slot)
@@ -59,6 +59,8 @@ export function spawnCharacter(
   addComponent(world, eid, Alive)
   addComponent(world, eid, Threat)
   addComponent(world, eid, CharHp)
+  addComponent(world, eid, CharScale)
+  addComponent(world, eid, MoveSpeed)
   addComponent(world, eid, CharAtkSlow)
   addComponent(world, eid, CharPerk)
   addComponent(world, eid, Iframe)
@@ -103,7 +105,9 @@ export function spawnCharacter(
   GroundHit.last[eid] = -1e9
   Revive.ms[eid] = Math.max(1000, TEAM.reviveMs * captain.reviveMul * teamFx.reviveMul + fx.reviveAddMs)
   Revive.at[eid] = 0
-  Hurt.radius[eid] = MEMBER.radius * UNIT * place.hurtRadiusMul
+  Hurt.radius[eid] = MEMBER.radius * UNIT * place.sizeMul
+  CharScale.v[eid] = place.sizeMul
+  MoveSpeed.v[eid] = def.moveSpeed * UNIT * teamFx.moveSpeedMul
   CharFlash.until[eid] = 0
   Transform.x[eid] = x
   Transform.y[eid] = y
