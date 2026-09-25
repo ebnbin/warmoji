@@ -6,6 +6,7 @@ export const CHARACTERS = {
     name: '杂耍演员',
     desc: '向最近的敌人连续抛掷番茄',
     orbit: -0.5,
+    body: { thrust: 30, drag: 5, mass: 0.9 },
     weapons: [],
     innate: [
       {
@@ -24,6 +25,7 @@ export const CHARACTERS = {
     name: '独角兽',
     desc: '独角向前突刺，穿透沿途敌人',
     orbit: 0.8,
+    body: { thrust: 34, drag: 4.5, mass: 1 },
     weapons: [],
     innate: [
       {
@@ -42,6 +44,7 @@ export const CHARACTERS = {
     name: '巨魔',
     desc: '挥舞巨斧，横扫身前扇形范围',
     orbit: 1,
+    body: { thrust: 17, drag: 4.5, mass: 1.8 },
     weapons: ['axe'],
     innate: [],
   },
@@ -50,6 +53,7 @@ export const CHARACTERS = {
     name: '牛仔',
     desc: '左右双枪齐发，射出高速水弹',
     orbit: -0.7,
+    body: { thrust: 29, drag: 5, mass: 1 },
     weapons: ['pistolLeft', 'pistolRight'],
     innate: [],
   },
@@ -58,6 +62,7 @@ export const CHARACTERS = {
     name: '法师',
     desc: '在远处敌人脚下引爆奥术轰炸',
     orbit: -1,
+    body: { thrust: 25, drag: 5, mass: 0.9 },
     weapons: [],
     innate: [
       {
@@ -76,6 +81,7 @@ export const CHARACTERS = {
     name: '袋鼠',
     desc: '掷出回旋镖，去程回程皆可伤敌',
     orbit: 0.4,
+    body: { thrust: 28, drag: 4, mass: 0.9 },
     weapons: ['boomerang'],
     innate: [],
   },
@@ -84,6 +90,7 @@ export const CHARACTERS = {
     name: '机器人',
     desc: '手持激光器，灼穿一条直线上的所有敌人',
     orbit: -0.6,
+    body: { thrust: 21, drag: 5, mass: 1.4 },
     weapons: ['laserBeam'],
     innate: [],
   },
@@ -92,6 +99,7 @@ export const CHARACTERS = {
     name: '雪人',
     desc: '以队伍中心散发寒气，持续减速范围内的敌人',
     orbit: 0,
+    body: { thrust: 17.5, drag: 5, mass: 1.5 },
     weapons: [],
     innate: [
       {
@@ -110,6 +118,7 @@ export const CHARACTERS = {
     name: '仙子',
     desc: '魔尘弹把敌人整个变成一只无能力的绵羊——暂时失去攻击、被动与亡语，只保留血量，一段时间后恢复；同一敌人变羊有冷却',
     orbit: -0.6,
+    body: { thrust: 32, drag: 5, mass: 0.5 },
     weapons: [],
     innate: [
       {
@@ -128,6 +137,7 @@ export const CHARACTERS = {
     name: '刺客',
     desc: '瞬移到范围内血最厚的敌人背后重斩一刀，再闪回原位；出手瞬间无敌',
     orbit: 0.5,
+    body: { thrust: 32, drag: 4, mass: 0.7 },
     weapons: ['dagger'],
     innate: [],
   },
@@ -136,6 +146,7 @@ export const CHARACTERS = {
     name: '河狸工程师',
     desc: '自己不动手，定期在脚下架起自动开火的弩塔',
     orbit: -0.3,
+    body: { thrust: 22, drag: 5.5, mass: 1.1 },
     weapons: [],
     innate: [
       {
@@ -154,6 +165,7 @@ export const CHARACTERS = {
     name: '蜂后',
     desc: '每隔一阵放出一群小蜂，自主寻路蜇敌施毒后自毁，优先扑向未中毒的目标',
     orbit: -0.2,
+    body: { thrust: 25, drag: 4.5, mass: 0.8 },
     weapons: [],
     innate: [
       {
@@ -172,6 +184,7 @@ export const CHARACTERS = {
     name: '军医',
     desc: '周期治疗附近血量最低的队友，顺手甩两支飞针',
     orbit: -0.8,
+    body: { thrust: 26, drag: 5, mass: 1 },
     weapons: [],
     innate: [
       {
@@ -191,6 +204,7 @@ export const CHARACTERS = {
     name: '水母',
     desc: '电弧在敌群间弹跳传导，敌人越密越疼',
     orbit: 0.2,
+    body: { thrust: 13.5, drag: 3, mass: 0.8 },
     weapons: [],
     innate: [
       {

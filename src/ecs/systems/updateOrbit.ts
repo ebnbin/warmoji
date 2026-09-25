@@ -44,7 +44,7 @@ export function updateOrbit(sim: Sim): void {
     })
     if (base !== null && bias !== 0) wants[idx] = orbitTendency(bias, threats)
   }
-  if (!rotatable) return
+  if (!rotatable || sim.leader >= 0) return
   const driver = pickDriver(
     wants.map((w) => Math.abs(w)),
     Math.random,

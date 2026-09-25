@@ -10,7 +10,7 @@ import { KNOCKBACK } from '../../../data/abilities'
 import { MEMBER } from '../../../data/characters'
 import { UNIT } from '../../../util/units'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anim, Boss, DmgMul, Dormant, Elite, Enemy, ENEMY_SET, Flash, Hp, Iframe, Kv, CharFlash, CharHp, Morph, CharPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from '../../components'
+import { Alive, Anim, Boss, DmgMul, Dormant, Elite, Enemy, ENEMY_SET, Flash, Hp, Iframe, Kv, CharFlash, CharHp, CharScale, Morph, CharPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from '../../components'
 import { enemyCarries, enemyDef } from '../../store'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
@@ -194,8 +194,8 @@ function hurt(sim: Sim, eid: number, damage: number, tint: number): void {
     Anim.frames[eid] = -1
     Anim.onceFrames[eid] = 0
     Transform.rot[eid] = 0
-    Transform.w[eid] = MEMBER.size * UNIT
-    Transform.h[eid] = MEMBER.size * UNIT
+    Transform.w[eid] = MEMBER.size * UNIT * CharScale.v[eid]!
+    Transform.h[eid] = MEMBER.size * UNIT * CharScale.v[eid]!
     sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
     if (sim.characters.every((x) => !Alive.v[x])) sim.over = true
   }
@@ -212,7 +212,7 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   Tint.alpha[eid] = 1
   Tint.effect[eid] = 0
   Pop.until[eid] = sim.fxMs + 200
-  Transform.w[eid] = MEMBER.size * UNIT * 0.3
-  Transform.h[eid] = MEMBER.size * UNIT * 0.3
+  Transform.w[eid] = MEMBER.size * UNIT * 0.3 * CharScale.v[eid]!
+  Transform.h[eid] = MEMBER.size * UNIT * 0.3 * CharScale.v[eid]!
 }
 

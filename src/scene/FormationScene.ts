@@ -1,7 +1,8 @@
 import Phaser from 'phaser'
-import { CHARACTERS } from '../data/characters'
+import { CHARACTERS, TEAM } from '../data/characters'
 import type { CharacterId } from '../types/characters'
-import { formationPosts } from '../data/formation'
+import { fanSlots } from '../data/formation'
+import { SQUAD } from '../data/feel'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
@@ -21,7 +22,6 @@ import {
   addTeamFrame,
   fitIconSize,
   nextAfterTeam,
-  PREVIEW_SPIN,
   renderStatGroups,
   teamLayout,
 } from './teamPage'
@@ -41,9 +41,6 @@ export class FormationScene extends Phaser.Scene {
   private memberObjs: Phaser.GameObjects.GameObject[] = []
   private memberImgs: Phaser.GameObjects.Image[] = []
   private memberZones: Phaser.GameObjects.Zone[] = []
-  private iconSize = 80
-  private phase = 0
-  private geom = { cx: 0, cy: 0, scale: 1 }
 
   constructor() {
     super(SceneKey.Formation)
@@ -75,8 +72,8 @@ export class FormationScene extends Phaser.Scene {
       this,
       L,
       this.origin,
-      '布置阵型',
-      this.fromShop ? '点选一名队员，与中心互换' : '满员自动列阵 N 保 1 · 点选队员设为受保护的中心',
+      '指定队长',
+      this.fromShop ? '点选一名队员，与队长互换' : '满员后由队长带队 · 点选队员设为队长',
       res,
     )
 
@@ -141,7 +138,10 @@ export class FormationScene extends Phaser.Scene {
     const ly = this.origin.y + L.y
     const ids = this.postIds()
     const n = ids.length
-    const posts = formationPosts('guard', n, this.phase)
+    const fan = fanSlots(Math.max(0, n - 1), SQUAD.fanDistance, SQUAD.fanSpreadDeg, 0, -1)
+    const raw = [{ x: 0, y: 0 }, ...fan]
+    const midY = (Math.min(...raw.map((p) => p.y)) + Math.max(...raw.map((p) => p.y))) / 2
+    const posts = raw.map((p) => ({ x: p.x, y: p.y - midY }))
 
     const panel = this.add.graphics()
     roundRect(panel, lx, ly, L.w, L.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
@@ -151,9 +151,7 @@ export class FormationScene extends Phaser.Scene {
     const cx = lx + L.w / 2
     const cy = ly + L.h / 2
     const scale = Math.min(2.4, (Math.min(L.w, L.h) / 2 - 76) / maxR)
-    this.geom = { cx, cy, scale }
     const size = fitIconSize(posts, scale, 80)
-    this.iconSize = size
     const half = size / 2
 
     posts.forEach((p, post) => {
@@ -167,7 +165,7 @@ export class FormationScene extends Phaser.Scene {
         ring.strokeCircle(px, py, half + 4)
         this.memberObjs.push(ring)
       }
-      const img = emojiImage(this, px, py, CHARACTERS[id].emoji, size, 'player')
+      const img = emojiImage(this, px, py, CHARACTERS[id].emoji, post === 0 ? size * TEAM.leaderSizeMul : size * TEAM.followerSizeMul, 'player')
       this.memberObjs.push(img)
       this.memberImgs[post] = img
       const zone = this.add
@@ -181,7 +179,7 @@ export class FormationScene extends Phaser.Scene {
 
     this.memberObjs.push(
       this.add
-        .text(cx, ly + L.h - 20, '点选队员，与中心互换', {
+        .text(cx, ly + L.h - 20, '点选队员，与队长互换', {
           fontFamily: UI_FONT,
           fontSize: FONT.small,
           color: '#d0d0d8',
@@ -192,29 +190,6 @@ export class FormationScene extends Phaser.Scene {
     )
 
     this.renderCenterDetail(res)
-  }
-
-  private layoutMembers(): void {
-    const ids = this.postIds()
-    const posts = formationPosts('guard', ids.length, this.phase)
-    const { cx, cy, scale } = this.geom
-    const half = this.iconSize / 2
-    posts.forEach((p, post) => {
-      if (post === 0) return
-      const img = this.memberImgs[post]
-      const zone = this.memberZones[post]
-      if (!img || !zone) return
-      const px = cx + p.x * scale
-      const py = cy + p.y * scale
-      img.setPosition(px, py)
-      zone.setPosition(px - half, py - half)
-    })
-  }
-
-  update(_time: number, delta: number): void {
-    if (this.swapBusy) return
-    this.phase += (delta / 1000) * PREVIEW_SPIN
-    this.layoutMembers()
   }
 
   private onMemberTap(post: number): void {
@@ -259,7 +234,7 @@ export class FormationScene extends Phaser.Scene {
     const items = this.run.memberItems[slot] ?? []
 
     const subtitle = this.add
-      .text(104, 80, '站在队伍正中，受击判定减半，更少被敌人摸到', {
+      .text(104, 80, '由你直接操控，全队按他的移速行军；其他队员用各自的移速跟随', {
         fontFamily: UI_FONT,
         fontSize: FONT.small,
         color: '#b9b9c6',
@@ -270,7 +245,7 @@ export class FormationScene extends Phaser.Scene {
     this.detailView.add([
       emojiImage(this, 58, 56, def.emoji, 85, 'player'),
       this.add
-        .text(104, 44, `${def.name} · 受保护的中心`, {
+        .text(104, 44, `${def.name} · 队长`, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',

@@ -136,7 +136,7 @@ function runSections(game: Phaser.Game): DevSection[] {
             { label: '选队长', run: () => gotoScene(game, SceneKey.Captain) },
             { label: '商店', run: () => (ensureRun(), gotoScene(game, SceneKey.Shop)) },
             { label: '招募', run: () => (ensureRun(), gotoScene(game, SceneKey.Recruit)) },
-            { label: '阵型', run: () => (ensureRun(), gotoScene(game, SceneKey.Formation)) },
+            { label: '队长', run: () => (ensureRun(), gotoScene(game, SceneKey.Formation)) },
             { label: '卡牌', run: () => (ensureRun(), gotoScene(game, SceneKey.Cards)) },
             { label: '结算 · 胜', run: () => (ensureRun(), gotoScene(game, SceneKey.Result, { win: true })) },
             { label: '结算 · 负', run: () => (ensureRun(), gotoScene(game, SceneKey.Result, { win: false })) },

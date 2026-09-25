@@ -86,6 +86,7 @@ export const CharPerk = { thorns: f32(), killHeal: f32(), regenPerSec: f32() }
 export const CharAtkSlow = { until: f32(), mul: f32() }
 
 export const CharHp = { hp: f32(), max: f32() }
+export const CharScale = { v: f32() }
 export const Iframe = { ms: f32(), last: f32() }
 export const Revive = { ms: f32(), at: f32() }
 export const Hurt = { radius: f32() }
@@ -436,7 +437,10 @@ export const CastRequest = {}
 
 export const Captain = {}
 
-export const MoveSpeed = { v: f32() }
+export const Phys = { vx: f32(), vy: f32(), thrust: f32(), drag: f32(), mass: f32() }
+
+/** ghost：0 存活；1 阵亡且已预订目标位、正在归位；2 阵亡且已停靠 */
+export const Seat = { v: i32Fill(-1), ghost: u8() }
 
 export const Magnet = { radius: f32() }
 

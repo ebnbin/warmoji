@@ -3,6 +3,11 @@ import type { AbilityId } from './abilities'
 import type { AbilityDef } from './abilityDefs'
 import type { AbilityTier, UpgradeCard, WeaponId } from './weapons'
 
+export interface BodyParams {
+  readonly thrust: number
+  readonly drag: number
+  readonly mass: number
+}
 export interface InnateSource {
   readonly name: string
   readonly icon: string
@@ -14,6 +19,7 @@ export interface CharacterAuthoring {
   readonly name: string
   readonly desc: string
   readonly orbit: number
+  readonly body: BodyParams
   readonly weapons: readonly WeaponId[]
   readonly innate: readonly InnateSource[]
 }
@@ -28,6 +34,7 @@ export interface CharacterDef {
   readonly name: string
   readonly desc: string
   readonly orbit: number
+  readonly body: BodyParams
   readonly carriers: readonly Carrier[]
 }
 export interface UpgradeTiers {
@@ -41,7 +48,10 @@ export interface TeamBaseline {
     readonly smallRingRadius: number
     readonly pairGap: number
     readonly reviveMs: number
-    readonly guardCenterHurtboxMul: number
+    readonly leaderSizeMul: number
+    readonly followerSizeMul: number
+    readonly leaderGrip: number
+    readonly anchor: { readonly drag: number; readonly mass: number }
   }
   readonly member: {
     readonly size: number

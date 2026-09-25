@@ -128,7 +128,7 @@ export function characterStatGroups(
   const cdMul = fx.cooldownMul
   const baseLines = [
     `生命上限 ${memberMaxHp(fx.hpAdd)} · 受击无敌 ${sec(MEMBER.iframesMs + fx.iframesAddMs)}`,
-    `复活 ${sec(Math.max(1000, TEAM.reviveMs + fx.reviveAddMs))}`,
+    `极速 ${grid(def.body.thrust / def.body.drag)}/秒 · 质量 ${def.body.mass} · 复活 ${sec(Math.max(1000, TEAM.reviveMs + fx.reviveAddMs))}`,
   ]
   if (fx.regenPerSec > 0) baseLines.push(`每秒回复 ${fx.regenPerSec} 生命`)
   if (fx.killHeal > 0) baseLines.push(`击杀回复 ${fx.killHeal} 生命`)

@@ -22,7 +22,7 @@ import { bossFor, MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Dormant, Enemy, GrantCoins, Hp, CharHp, PICKUP_SET, Projectile, Revive, Transform } from './components'
+import { Alive, Boss, CharScale, Dormant, Enemy, GrantCoins, Hp, CharHp, PICKUP_SET, Projectile, Revive, Transform } from './components'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
@@ -402,7 +402,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       if (Math.abs(ratio - this.shownHp[i]!) < 0.005) continue
       this.shownHp[i] = ratio
       const w = 0.8 * UNIT
-      const y = MEMBER.size * UNIT * 0.62
+      const y = MEMBER.size * UNIT * CharScale.v[m]! * 0.62
       g.clear()
       g.fillStyle(0x000000, 0.45)
       g.fillRect(-w / 2, y, w, 6)

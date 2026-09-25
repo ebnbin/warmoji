@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
-import { Aim, Blink, Bob, Drop, EDir, ENEMY_SET, Flyer, Follow, Kv, Minion, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
+import { Aim, Blink, Bob, Drop, EDir, ENEMY_SET, Flyer, Follow, Kv, Minion, Phys, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import { centerX, centerY, setCenter } from '../../utils/team'
@@ -13,9 +13,13 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
 
   const c = map(centerX(sim), centerY(sim))
   setCenter(sim, c.x, c.y)
-  const tv = rot(sim.worldState.vx, sim.worldState.vy)
-  sim.worldState.vx = tv.x
-  sim.worldState.vy = tv.y
+  for (const b of [sim.captain, ...sim.characters]) {
+    const v = rot(Phys.vx[b]!, Phys.vy[b]!)
+    Phys.vx[b] = v.x
+    Phys.vy[b] = v.y
+  }
+  const h = rot(sim.heading.x, sim.heading.y)
+  sim.heading = { x: h.x, y: h.y }
 
   for (const m of sim.characters) {
     const p = map(Follow.x[m]!, Follow.y[m]!)
