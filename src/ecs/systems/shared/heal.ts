@@ -45,7 +45,7 @@ export function healEnemies(
 ): number {
   const r2 = range * range
   const hurt: number[] = []
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (eid === excludeEid) continue
     if (Hp.v[eid]! >= Hp.max[eid]!) continue
     const d = sim.hooks.worldDelta(sim, x, y, Transform.x[eid]!, Transform.y[eid]!)

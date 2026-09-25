@@ -11,7 +11,7 @@ const FADE_MS = 250
 
 export function updatePickups(sim: Sim): void {
   const delta = sim.dtMs
-  const eids = query(sim.world, PICKUP_SET as unknown as object[])
+  const eids = query(sim.world, PICKUP_SET)
   if (eids.length === 0) return
   const dt = delta / 1000
   const now = sim.elapsedMs

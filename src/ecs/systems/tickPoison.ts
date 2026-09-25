@@ -4,7 +4,7 @@ import { applyDamage } from './shared/combat'
 import type { Sim } from '../sim'
 
 export function tickPoison(sim: Sim): void {
-  const enemies = [...query(sim.world, ENEMY_SET as unknown as object[])]
+  const enemies = [...query(sim.world, ENEMY_SET)]
   const now = sim.elapsedMs
   for (const eid of enemies) {
     if (Poison.until[eid] === 0 || Dormant.v[eid]) continue

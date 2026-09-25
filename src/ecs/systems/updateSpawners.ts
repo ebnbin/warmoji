@@ -9,7 +9,7 @@ import { isDancing } from '../utils/team'
 
 function broodCount(sim: Sim, nestEid: number): number {
   let n = 0
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Nest.of[eid] === nestEid) n++
   }
   return n
@@ -19,7 +19,7 @@ export function updateSpawners(sim: Sim): void {
   const atlas = sim.frames
   if (sim.over) return
   const now = sim.elapsedMs
-  const eids = query(sim.world, ENEMY_SET as unknown as object[])
+  const eids = query(sim.world, ENEMY_SET)
   let active = awakeCount(sim)
   for (const eid of eids) {
     if (Dormant.v[eid]) continue

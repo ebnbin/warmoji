@@ -11,14 +11,14 @@ function finishPop(eid: number): void {
 }
 
 export function finishEnemyPops(sim: Sim): void {
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Pop.until[eid] !== 0) finishPop(eid)
   }
 }
 
 export function popInEnemies(sim: Sim): void {
   const now = sim.elapsedMs
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Pop.until[eid] === 0) continue
     const left = Pop.until[eid]! - now
     if (left <= 0) {

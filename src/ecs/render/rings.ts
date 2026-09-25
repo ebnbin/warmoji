@@ -54,7 +54,7 @@ export class RingLayer {
     const o = this.scratch
     resetScratch(o)
     const { zMin, zMax } = BANDS[band]!
-    for (const eid of query(this.world, RING_SET as unknown as object[])) {
+    for (const eid of query(this.world, RING_SET)) {
       const z = Ring.z[eid]!
       if (z < zMin || z >= zMax) continue
       const b = BREATHS[Ring.breathe[eid]!]!

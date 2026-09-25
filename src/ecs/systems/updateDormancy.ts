@@ -11,7 +11,7 @@ export function updateDormancy(sim: Sim): void {
   if (half === Infinity) return
   const now = sim.elapsedMs
   const expired: number[] = []
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     const within =
       Boss.v[eid] === 1 ||
       (Math.abs(Transform.x[eid]! - centerX(sim)) <= half && Math.abs(Transform.y[eid]! - centerY(sim)) <= half)

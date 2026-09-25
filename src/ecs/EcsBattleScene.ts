@@ -68,7 +68,7 @@ function held(key?: Phaser.Input.Keyboard.Key): boolean {
 
 function liveCoins(world: EcsWorld): number {
   let n = 0
-  for (const eid of query(world, PICKUP_SET as unknown as object[])) {
+  for (const eid of query(world, PICKUP_SET)) {
     if (hasComponent(world, eid, GrantCoins)) n++
   }
   return n

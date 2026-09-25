@@ -4,7 +4,7 @@ import type { Sim } from '../sim'
 
 export function moveProjectiles(sim: Sim): void {
   const dt = sim.wdtMs / 1000
-  for (const eid of query(sim.world, PROJ_SET as unknown as object[])) {
+  for (const eid of query(sim.world, PROJ_SET)) {
     const ax = Transform.x[eid]!
     const ay = Transform.y[eid]!
     const stepX = Vel.x[eid]! * dt

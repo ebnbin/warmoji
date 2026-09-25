@@ -139,7 +139,7 @@ function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean):
 }
 
 function orphanBrood(sim: Sim, nestEid: number, rage = true): void {
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Nest.of[eid] !== nestEid) continue
     Nest.of[eid] = -1
     if (rage && hasComponent(sim.world, eid, Orphan)) {

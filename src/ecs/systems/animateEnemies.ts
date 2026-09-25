@@ -9,7 +9,7 @@ export function animateEnemies(sim: Sim): void {
   const dancing = isDancing(sim)
   if (dancing) return
   const dt = delta / 1000
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Dormant.v[eid]) continue
     if (EState.v[eid] === 2 || EState.v[eid] === 3 || Morph.until[eid] !== 0) continue
     Transform.rot[eid] = Math.sin(now / 95 + EnemyPhase.v[eid]!) * 0.1

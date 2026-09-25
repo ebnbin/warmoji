@@ -5,7 +5,7 @@ import type { Sim } from '../sim'
 export function applyEnemySteps(sim: Sim): void {
   const delta = sim.wdtMs
   const dt = delta / 1000
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Dormant.v[eid]) continue
     const post = sim.hooks.postSteerEnemy(sim, eid, BVel.x[eid]!, BVel.y[eid]!, delta)
     Step.x[eid] = post.vx * dt

@@ -31,7 +31,7 @@ export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach:
   const h = sim.mapH
   const torus = sim.hooks.torus
   const finite = Number.isFinite(reach)
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Dormant.v[eid]) continue
     const r = Radius.v[eid]!
     const rr = reach + r

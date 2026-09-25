@@ -263,7 +263,7 @@ const ice: WorldHooks = {
       for (const m of sim.characters) if (Alive.v[m]) hurtCharacter(sim, m, dmg, '寒水', 0x4fc3f7)
     }
     const edmg = Math.round(cfg.waterEnemyDps * frac)
-    for (const eid of [...query(sim.world, ENEMY_SET as unknown as object[])]) {
+    for (const eid of [...query(sim.world, ENEMY_SET)]) {
       if (!onFloe(Transform.x[eid]!, Transform.y[eid]!, px)) applyDamage(sim, eid, edmg)
     }
   },
@@ -504,7 +504,7 @@ const space: WorldHooks = {
         hurtCharacter(sim, mem, cfg.damage, '天体', 0xffaa33)
       }
     }
-    for (const eid of [...query(sim.world, ENEMY_SET as unknown as object[])]) {
+    for (const eid of [...query(sim.world, ENEMY_SET)]) {
       if (Dormant.v[eid] || hit.has(Uid.v[eid]!)) continue
       if (Math.hypot(Transform.x[eid]! - x, Transform.y[eid]! - y) < rr) {
         hit.add(Uid.v[eid]!)

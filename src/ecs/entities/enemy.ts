@@ -291,7 +291,7 @@ function currentMix(sim: Sim): ReturnType<typeof enemyMixAt> {
 
 export function awakeCount(sim: Sim): number {
   let n = 0
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) if (!Dormant.v[eid]) n++
+  for (const eid of query(sim.world, ENEMY_SET)) if (!Dormant.v[eid]) n++
   return n
 }
 

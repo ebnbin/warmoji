@@ -42,7 +42,7 @@ export class EcsSpriteBatch extends EcsLayer {
     const camera = drawingContext.camera
     if (!camera) return
 
-    const eids = query(self.world, RENDERABLE as unknown as object[])
+    const eids = query(self.world, RENDERABLE)
     if (eids.length === 0) return
 
     const node = renderer.renderNodes.getNode(

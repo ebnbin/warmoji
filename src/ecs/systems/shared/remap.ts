@@ -50,7 +50,7 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     Vel.x[eid] = v.x
     Vel.y[eid] = v.y
   }
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     movePos(eid)
     const d = rot(EDir.x[eid]!, EDir.y[eid]!)
     EDir.x[eid] = d.x
@@ -59,18 +59,18 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     Kv.x[eid] = k.x
     Kv.y[eid] = k.y
   }
-  for (const eid of query(sim.world, PICKUP_SET as unknown as object[])) {
+  for (const eid of query(sim.world, PICKUP_SET)) {
     if (Bob.amp[eid]! > 0) Transform.y[eid] = Bob.y0[eid]!
   }
   for (const set of [PROJ_SET, PICKUP_SET]) {
-    for (const eid of query(sim.world, set as unknown as object[])) {
+    for (const eid of query(sim.world, set)) {
       movePos(eid)
       moveVel(eid)
     }
   }
-  for (const eid of query(sim.world, PICKUP_SET as unknown as object[])) Bob.y0[eid] = Transform.y[eid]!
+  for (const eid of query(sim.world, PICKUP_SET)) Bob.y0[eid] = Transform.y[eid]!
   for (const eid of query(sim.world, [Telegraph, Transform])) movePos(eid)
-  for (const eid of query(sim.world, ZONE_SET as unknown as object[])) movePos(eid)
+  for (const eid of query(sim.world, ZONE_SET)) movePos(eid)
   for (const eid of query(sim.world, [Minion, Transform])) movePos(eid)
   for (const f of query(sim.world, [Flyer, Transform])) {
     movePos(f)

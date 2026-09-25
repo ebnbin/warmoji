@@ -22,7 +22,7 @@ function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, b
 export function hitSweptProjectiles(sim: Sim): void {
   const projs = query(sim.world, [SweptHit, Proj, PrevPos, Transform])
   if (projs.length === 0) return
-  const enemies = query(sim.world, ENEMY_SET as unknown as object[])
+  const enemies = query(sim.world, ENEMY_SET)
   for (const eid of [...projs]) {
     const sx = PrevPos.x[eid]!
     const sy = PrevPos.y[eid]!

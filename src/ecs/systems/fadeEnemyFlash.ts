@@ -4,7 +4,7 @@ import type { Sim } from '../sim'
 
 export function fadeEnemyFlash(sim: Sim): void {
   const now = sim.elapsedMs
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Dormant.v[eid]) continue
     if (Flash.until[eid] !== 0 && now >= Flash.until[eid]!) Flash.until[eid] = 0
   }

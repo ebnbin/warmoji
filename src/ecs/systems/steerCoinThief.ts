@@ -11,7 +11,7 @@ export function steerCoinThief(sim: Sim): void {
   const thieves = query(sim.world, [CoinThief, Steering, Transform, Speed, Radius])
   if (thieves.length === 0) return
   const coins: number[] = []
-  for (const c of query(sim.world, PICKUP_SET as unknown as object[])) {
+  for (const c of query(sim.world, PICKUP_SET)) {
     if (hasComponent(sim.world, c, GrantCoins)) coins.push(c)
   }
   for (const eid of thieves) {

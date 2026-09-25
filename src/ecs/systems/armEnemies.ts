@@ -9,7 +9,7 @@ import { isDancing } from '../utils/team'
 
 export function armEnemies(sim: Sim): void {
   const now = sim.elapsedMs
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Dormant.v[eid]) continue
     if (!EnemyArm.armed[eid]) armEnemy(sim, eid)
     if (isDancing(sim)) continue

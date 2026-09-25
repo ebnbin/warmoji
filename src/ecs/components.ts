@@ -1,3 +1,4 @@
+import type { QueryTerm } from 'bitecs'
 import { INITIAL_CAPACITY } from './world'
 
 // 数组按 eid 索引，扩容时整体替换（见 storage.ts）：不得缓存数组引用，也不得写 `X.f[i] = 会建实体的调用()`
@@ -58,7 +59,7 @@ export const Depth = {
   z: f32(),
 }
 
-export const RENDERABLE = [Transform, Sprite, Tint, Depth] as const
+export const RENDERABLE: QueryTerm[] = [Transform, Sprite, Tint, Depth]
 
 export const Character = {}
 
@@ -139,7 +140,7 @@ export const Anim = {
   onceAt: f32(),
   still: i32(),
 }
-export const ANIM_SET = [Anim, Sprite] as const
+export const ANIM_SET: QueryTerm[] = [Anim, Sprite]
 
 export const Slide = { x: f32(), y: f32() }
 
@@ -152,9 +153,9 @@ export const Spin = { rate: f32() }
 export const Drift = { u: f32(), cross: f32(), speedMul: f32(), swayPhase: f32(), swayAmp: f32() }
 
 export const Shard = { vx: f32(), vy: f32(), startMs: f32(), until: f32(), rot: f32(), size: f32() }
-export const SHARD_SET = [Shard, Transform, Sprite, Tint, Depth] as const
+export const SHARD_SET: QueryTerm[] = [Shard, Transform, Sprite, Tint, Depth]
 
-export const ENEMY_SET = [Enemy, Transform, Speed, Hp] as const
+export const ENEMY_SET: QueryTerm[] = [Enemy, Transform, Speed, Hp]
 
 export const Projectile = {}
 
@@ -180,7 +181,7 @@ export const ViewCull = {}
 
 export const WorldCull = {}
 
-export const PROJ_SET = [Projectile, Transform, Vel, Proj] as const
+export const PROJ_SET: QueryTerm[] = [Projectile, Transform, Vel, Proj]
 
 export const Pickup = { bornMs: f32() }
 
@@ -236,9 +237,9 @@ export const Ring = {
   breathe: u8(),
 }
 
-export const PICKUP_SET = [Pickup, Transform, Vel] as const
+export const PICKUP_SET: QueryTerm[] = [Pickup, Transform, Vel]
 
-export const RING_SET = [Ring, Transform, Tint] as const
+export const RING_SET: QueryTerm[] = [Ring, Transform, Tint]
 
 export const Zone = { radius: f32(), faction: u8(), enterMs: f32(), on: u8(), fadeAt: f32() }
 
@@ -248,7 +249,7 @@ export const ZoneChill = { factor: f32() }
 
 export const ZoneFollow = { of: i32() }
 
-export const ZONE_SET = [Zone, Transform] as const
+export const ZONE_SET: QueryTerm[] = [Zone, Transform]
 
 export const GroundHit = { last: f32() }
 

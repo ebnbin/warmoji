@@ -9,10 +9,10 @@ export function updateEnemyGates(sim: Sim): void {
   const until = DanceWindow.until[sim.captain]!
   if (until !== 0 && now >= until) {
     DanceWindow.until[sim.captain] = 0
-    for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) Transform.rot[eid] = 0
+    for (const eid of query(sim.world, ENEMY_SET)) Transform.rot[eid] = 0
   }
   const dancing = isDancing(sim)
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     BVel.x[eid] = 0
     BVel.y[eid] = 0
     if (Dormant.v[eid]) {

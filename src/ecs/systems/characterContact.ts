@@ -7,7 +7,7 @@ import { enemyDef } from '../store'
 import type { Sim } from '../sim'
 
 export function characterContact(sim: Sim): void {
-  const enemies = query(sim.world, ENEMY_SET as unknown as object[])
+  const enemies = query(sim.world, ENEMY_SET)
   if (enemies.length === 0) return
   if (sim.over) return
   const now = sim.elapsedMs

@@ -37,14 +37,14 @@ function fadeExpired(sim: Sim, z: number): boolean {
 }
 
 export function finishZoneFades(sim: Sim): void {
-  for (const z of [...query(sim.world, ZONE_SET as unknown as object[])]) {
+  for (const z of [...query(sim.world, ZONE_SET)]) {
     if (Zone.fadeAt[z] !== 0) fadeExpired(sim, z)
   }
 }
 
 export function updateZones(sim: Sim): void {
   const world = sim.world
-  const zones = [...query(world, ZONE_SET as unknown as object[])]
+  const zones = [...query(world, ZONE_SET)]
   if (zones.length === 0) return
   const now = sim.elapsedMs
   for (const z of zones) {
@@ -76,7 +76,7 @@ function burnEnemies(sim: Sim, burns: readonly number[], now: number): void {
   for (const z of burns) {
     if (Zone.on[z] === 0 || Zone.faction[z] === FACTION.enemy || now < ZoneBurn.nextAt[z]!) continue
     ZoneBurn.nextAt[z] = now + ZoneBurn.tickMs[z]!
-    enemies ??= [...query(sim.world, ENEMY_SET as unknown as object[])]
+    enemies ??= [...query(sim.world, ENEMY_SET)]
     const r = Zone.radius[z]!
     const damage = ZoneBurn.damage[z]!
     const slot = ZoneBurn.srcSlot[z]!

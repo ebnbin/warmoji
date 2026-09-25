@@ -6,7 +6,7 @@ import { isDancing } from '../utils/team'
 export function tintEnemies(sim: Sim): void {
   const now = sim.elapsedMs
   const dancing = isDancing(sim)
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Dormant.v[eid] || Flash.until[eid] !== 0) continue
     Tint.effect[eid] = 0
     Tint.color[eid] = dancing

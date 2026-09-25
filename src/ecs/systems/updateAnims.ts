@@ -7,7 +7,7 @@ import type { Sim } from '../sim'
 export function updateAnims(sim: Sim): void {
   const atlas = sim.frames
   const now = sim.elapsedMs
-  for (const eid of query(sim.world, ANIM_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ANIM_SET)) {
     if (Anim.frames[eid]! < 0) continue
     const id = animId[eid]
     const outline = animOutline[eid]
