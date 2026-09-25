@@ -52,12 +52,12 @@ export let safeInsets: SafeInsets = readSafeInsets(viewport.fitScale)
 
 function readSafeInsets(fitScale: number): SafeInsets {
   const style = getComputedStyle(document.documentElement)
-  const px = (name: string): number => parseFloat(style.getPropertyValue(name)) || 0
+  const px = (side: keyof SafeInsets): number => parseFloat(style.getPropertyValue(`--safe-${side}`)) || 0
   return {
-    top: px('--safe-top') / fitScale,
-    right: px('--safe-right') / fitScale,
-    bottom: px('--safe-bottom') / fitScale,
-    left: px('--safe-left') / fitScale,
+    top: px('top') / fitScale,
+    right: px('right') / fitScale,
+    bottom: px('bottom') / fitScale,
+    left: px('left') / fitScale,
   }
 }
 

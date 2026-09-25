@@ -12,7 +12,7 @@ export const BATTLE_FX_IDENTITY: BattleEffects = {
 
 const BF: BattlefieldTuning = BATTLEFIELD
 
-export const POOLS: Record<MapId, readonly FieldPickupDef[]> = BF.pools
+export const POOLS: Record<MapId, readonly FieldPickupDef[]> = BATTLEFIELD.pools
 
 export const FIELD_PICKUPS: readonly FieldPickupDef[] = Object.values(POOLS).flat()
 
