@@ -8,7 +8,6 @@ import { PICKUPS } from '../data/pickups'
 import { WAVE } from '../data/waves'
 import { submitScore } from '../save/highscore'
 import { ITEMS } from '../data/items'
-import type { ItemId } from '../types/items'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
@@ -230,7 +229,7 @@ export class ResultScene extends Phaser.Scene {
       const deaths = this.run.stats.deaths[slot] ?? 0
       cell(colDeaths, deaths > 0 ? `${deaths}` : '—', deaths > 0 ? '#ef9a9a' : '#6f6f7d')
       const owned = this.run.memberItems[slot] ?? []
-      const unique = [...new Set(owned)] as ItemId[]
+      const unique = [...new Set(owned)]
       const shown = unique.slice(0, 2)
       shown.forEach((item, i) => {
         const ix = colItems - ((shown.length - 1) / 2 - i) * 38

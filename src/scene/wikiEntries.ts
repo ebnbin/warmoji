@@ -1,6 +1,5 @@
 import { CAPTAINS } from '../data/captains'
-import { CHARACTERS, baseLoadout } from '../data/characters'
-import type { CharacterId } from '../types/characters'
+import { CHARACTERS, ROSTER_IDS, baseLoadout } from '../data/characters'
 import { BOSSES, ENEMIES, ENEMY_DEFS } from '../data/enemies'
 import type { EnemyDef } from '../types/enemies'
 import { MAP_IDS, MAPS, bossFor } from '../data/maps'
@@ -118,7 +117,7 @@ export function wikiGroups(): WikiGroup[] {
     {
       icon: '1f939',
       title: '角色',
-      entries: (Object.keys(CHARACTERS) as CharacterId[]).map((id) => ({
+      entries: ROSTER_IDS.map((id) => ({
         emoji: CHARACTERS[id].emoji,
         name: CHARACTERS[id].name,
         desc: CHARACTERS[id].desc,

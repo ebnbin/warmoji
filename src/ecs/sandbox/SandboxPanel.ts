@@ -1,7 +1,6 @@
 import Phaser from 'phaser'
-import { CHARACTERS } from '../../data/characters'
+import { CHARACTERS, ROSTER_IDS } from '../../data/characters'
 import { mapEnemyRoster } from '../../data/maps'
-import type { CharacterId } from '../../types/characters'
 import {
   applySandboxPreset,
   beginSandboxRun,
@@ -276,11 +275,11 @@ export class SandboxPanel {
 
   private buildTeam(res: number): number {
     let y = this.note(0, res, `当前 ${sandboxStarters().length} 人 · 改动后重建队伍`)
-    y = this.section('角色 · 最少 1 最多 8', y + 6, res, Object.entries(CHARACTERS).map(([id, c]) => ({
-      label: c.name,
-      on: isSandboxCharacterOn(id as CharacterId),
+    y = this.section('角色 · 最少 1 最多 8', y + 6, res, ROSTER_IDS.map((id) => ({
+      label: CHARACTERS[id].name,
+      on: isSandboxCharacterOn(id),
       tap: (): void => {
-        toggleSandboxCharacter(id as CharacterId)
+        toggleSandboxCharacter(id)
         this.restartWithTeam()
       },
     })))

@@ -1,3 +1,4 @@
+import { StorageKey } from '../util/storage'
 import type { StringStorage } from '../util/storage'
 
 export interface HighScore {
@@ -5,13 +6,12 @@ export interface HighScore {
   bestKills: number
 }
 
-const KEY = 'warmoji.highscore.v2'
 const ZERO: HighScore = { bestWave: 0, bestKills: 0 }
 
 export function loadHighScore(storage: StringStorage | undefined): HighScore {
   if (!storage) return { ...ZERO }
   try {
-    const raw = storage.getItem(KEY)
+    const raw = storage.getItem(StorageKey.Highscore)
     if (!raw) return { ...ZERO }
     const parsed = JSON.parse(raw) as Partial<HighScore>
     return {
@@ -36,7 +36,7 @@ export function submitScore(
   }
   if (storage) {
     try {
-      storage.setItem(KEY, JSON.stringify(score))
+      storage.setItem(StorageKey.Highscore, JSON.stringify(score))
     } catch {
     }
   }

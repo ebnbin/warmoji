@@ -1,3 +1,4 @@
+import { StorageKey } from '../util/storage'
 import type { StringStorage } from '../util/storage'
 
 export interface Settings {
@@ -33,8 +34,6 @@ export const SETTING_DEFS: readonly SettingDef[] = [
   { key: 'showSkinTone', icon: '1f44b_1f3fd', label: '肤色 emoji', desc: '图鉴与 Studio 全部页展示含肤色的 emoji 变体' },
 ]
 
-const KEY = 'warmoji.settings.v1'
-
 function sanitizeSettings(raw: unknown): Settings {
   const obj = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
   const pick = (k: SettingKey): boolean =>
@@ -51,7 +50,7 @@ function sanitizeSettings(raw: unknown): Settings {
 export function loadSettings(storage: StringStorage | undefined): Settings {
   if (!storage) return { ...DEFAULT_SETTINGS }
   try {
-    return sanitizeSettings(JSON.parse(storage.getItem(KEY) ?? 'null'))
+    return sanitizeSettings(JSON.parse(storage.getItem(StorageKey.Settings) ?? 'null'))
   } catch {
     return { ...DEFAULT_SETTINGS }
   }
@@ -59,7 +58,7 @@ export function loadSettings(storage: StringStorage | undefined): Settings {
 
 export function saveSettings(storage: StringStorage | undefined, settings: Settings): void {
   try {
-    storage?.setItem(KEY, JSON.stringify(settings))
+    storage?.setItem(StorageKey.Settings, JSON.stringify(settings))
   } catch {
   }
 }
