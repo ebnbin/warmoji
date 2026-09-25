@@ -34,47 +34,52 @@ import { updateDrops } from '../updateDrops'
 import { updateEmplacements } from '../updateEmplacements'
 import { updateFlyers } from '../updateFlyers'
 import { castRequested } from '../shared/castScan'
-import { runPipeline } from './step'
-import type { Step } from './step'
 import type { Sim } from '../../sim'
+import { pipeline, runPipeline } from './step'
+import type { Step } from './step'
 
-const ABILITY_PIPELINE: readonly Step[] = [
+const afterCooldown = (steps: readonly Step[]): Step[] =>
+  steps.map((s) => (typeof s === 'function' ? { run: s, after: [tickCooldowns] } : { run: s.run, after: [tickCooldowns, ...s.after] }))
+
+const ABILITY_PIPELINE = pipeline([
   clearFrameRegisters,
   updateAbilityGates,
-  tickCooldowns,
-  castRallies,
-  castDances,
-  castBuffs,
-  castTimeStops,
-  castNukes,
-  castHeals,
-  tickEchoes,
-  castAreaBlasts,
-  castChainArcs,
-  placeThrustBody,
-  tickCombos,
-  castThrusts,
-  placeSweepBody,
-  castSweeps,
-  updateDrops,
-  castStrikes,
-  placeAssassinBody,
-  tickStrikeStay,
-  castAssassinates,
-  placeProjectileBody,
-  castProjectiles,
-  updateFlyers,
-  placeIdleBoomerangs,
-  castBoomerangs,
-  placeLaserBody,
-  fireRadials,
-  castLasers,
-  updateBees,
-  castSummons,
-  updateEmplacements,
-  castTurrets,
-  castSlowAuras,
-]
+  { run: tickCooldowns, after: [updateAbilityGates] },
+  ...afterCooldown([
+    castRallies,
+    castDances,
+    castBuffs,
+    castTimeStops,
+    castNukes,
+    castHeals,
+    tickEchoes,
+    { run: castAreaBlasts, after: [tickEchoes] },
+    castChainArcs,
+    placeThrustBody,
+    tickCombos,
+    { run: castThrusts, after: [placeThrustBody, tickCombos] },
+    placeSweepBody,
+    { run: castSweeps, after: [placeSweepBody] },
+    updateDrops,
+    { run: castStrikes, after: [updateDrops] },
+    placeAssassinBody,
+    tickStrikeStay,
+    { run: castAssassinates, after: [placeAssassinBody, tickStrikeStay] },
+    placeProjectileBody,
+    { run: castProjectiles, after: [placeProjectileBody] },
+    updateFlyers,
+    { run: placeIdleBoomerangs, after: [updateFlyers] },
+    { run: castBoomerangs, after: [updateFlyers, placeIdleBoomerangs] },
+    placeLaserBody,
+    fireRadials,
+    { run: castLasers, after: [placeLaserBody, fireRadials] },
+    updateBees,
+    { run: castSummons, after: [updateBees] },
+    updateEmplacements,
+    { run: castTurrets, after: [updateEmplacements, castProjectiles] },
+    castSlowAuras,
+  ]),
+])
 
 export function stepAbilities(sim: Sim): void {
   runPipeline(ABILITY_PIPELINE, sim)

@@ -15,32 +15,31 @@ import { updatePickups } from '../updatePickups'
 import { updateSpawners } from '../updateSpawners'
 import { updateZones } from '../updateZones'
 import { castRequests, stepAbilities } from './abilities'
-import { runPipeline } from './step'
 import { stepSim } from '../../sim'
-import type { Step } from './step'
 import type { Sim } from '../../sim'
+import { pipeline, runPipeline } from './step'
 
-const FRAME_PIPELINE: readonly Step[] = [
+const FRAME_PIPELINE = pipeline([
   castRequests,
-  stepSim,
+  { run: stepSim, after: [castRequests] },
   refreshCharacterTargets,
   armEnemies,
-  stepAbilities,
+  { run: stepAbilities, after: [stepSim, refreshCharacterTargets, armEnemies] },
   updateAnims,
   runDeathEffects,
   updateZones,
   updatePickups,
-  grantCoins,
-  grantMods,
-  grantFlash,
-  playPickupFx,
-  reapCollected,
-  capCoins,
+  { run: grantCoins, after: [updatePickups] },
+  { run: grantMods, after: [updatePickups] },
+  { run: grantFlash, after: [updatePickups] },
+  { run: playPickupFx, after: [updatePickups] },
+  { run: reapCollected, after: [grantCoins, grantMods, grantFlash, playPickupFx] },
+  { run: capCoins, after: [reapCollected] },
   updateSpawners,
   fireSurges,
   fireCarriers,
-  spawnStep,
-]
+  { run: spawnStep, after: [fireSurges, fireCarriers] },
+])
 
 export function stepFrame(sim: Sim): void {
   runPipeline(FRAME_PIPELINE, sim)
