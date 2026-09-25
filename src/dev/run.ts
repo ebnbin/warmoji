@@ -1,11 +1,11 @@
 import type Phaser from 'phaser'
-import type { DevSection } from '../devtools'
+import type { DevProvider, DevSection } from '../devtools'
 import { CAPTAINS, PICKABLE_CAPTAIN_IDS } from '../data/captains'
-import { ROSTER_IDS } from '../data/characters'
+import { CHARACTERS, ROSTER_IDS } from '../data/characters'
 import { MAP_IDS, MAPS } from '../data/maps'
 import { waveDurationMs } from '../data/waves'
 import { beginSandboxRun } from '../ecs/sandbox/knobs'
-import { beginRun, currentRun } from '../run/state'
+import { beginRun, currentRun, endRun } from '../run/state'
 import { SceneKey } from '../scene/keys'
 import type { CaptainId } from '../types/captains'
 import type { MapId } from '../types/maps'
@@ -31,9 +31,42 @@ function ensureRun(): void {
   if (!currentRun()) newRun()
 }
 
-/** 主菜单页专有：跳过招募与商店直接开打，或直跳各流程页 */
-export function quickStartSections(game: Phaser.Game): DevSection[] {
+function runText(): string {
+  const run = currentRun()
+  if (!run) return '当前没有进行中的一局'
+  const cards = Object.entries(run.teamCards).reduce((s, [, n]) => s + (n ?? 0), 0)
   return [
+    `${CAPTAINS[run.captainId].name} · ${MAPS[run.mapId].name}${run.sandbox ? ' · 试炼场' : ''}`,
+    `第 ${run.wave} 波 · 金币 ${run.coins} · 击杀 ${run.kills} · 等级 ${run.xp.level}（${run.xp.xp} xp）· 待抽卡 ${run.cardDraws}`,
+    `队伍 ${run.roster.map((id) => CHARACTERS[id].name).join('、')}`,
+    `队伍卡 ${cards} 张 · 技能冷却 ${Math.ceil(run.skillCdMs / 1000)} s · 累计战斗 ${Math.round(run.combatMs / 1000)} s`,
+  ].join('\n')
+}
+
+/** 游戏级：一局的建立、状态与流程页直跳，与当前停在哪一页无关 */
+function runSections(game: Phaser.Game): DevSection[] {
+  return [
+    {
+      id: 'status',
+      title: '对局',
+      items: () => [
+        { kind: 'text', mono: true, read: runText },
+        {
+          kind: 'buttons',
+          buttons: [
+            { label: '金币 +100', run: () => void (currentRun() && (currentRun()!.coins += 100)) },
+            { label: '金币 +1000', run: () => void (currentRun() && (currentRun()!.coins += 1000)) },
+            {
+              label: '结束本局回主菜单',
+              run: (): void => {
+                endRun()
+                gotoScene(game, SceneKey.Menu)
+              },
+            },
+          ],
+        },
+      ],
+    },
     {
       id: 'quickstart',
       title: '开局',
@@ -73,24 +106,22 @@ export function quickStartSections(game: Phaser.Game): DevSection[] {
           set: (id) => (startWave = Number(id)),
         },
         {
-          kind: 'buttons',
-          label: '跳过招募与商店直接开打',
-          buttons: [
-            {
-              label: '开始一局',
-              run: (): void => {
-                newRun()
-                gotoScene(game, SceneKey.Battle)
-              },
-            },
-            {
-              label: '试炼场开局',
-              run: (): void => {
-                beginSandboxRun(mapId)
-                gotoScene(game, SceneKey.Battle)
-              },
-            },
-          ],
+          kind: 'action',
+          label: '开始一局战斗',
+          desc: '按上面的地图、队长、人数、波数新建一局，跳过招募与商店直接进战斗',
+          run: (): void => {
+            newRun()
+            gotoScene(game, SceneKey.Battle)
+          },
+        },
+        {
+          kind: 'action',
+          label: '进入试炼场',
+          desc: '用上面选的地图开一局试炼场：队员无敌，刷怪规模与敌人种类在战斗页签里调',
+          run: (): void => {
+            beginSandboxRun(mapId)
+            gotoScene(game, SceneKey.Battle)
+          },
         },
       ],
     },
@@ -98,7 +129,7 @@ export function quickStartSections(game: Phaser.Game): DevSection[] {
       id: 'flow',
       title: '流程页',
       items: () => [
-        { kind: 'text', read: () => '没有对局时先按开局页的选择建一局默认的' },
+        { kind: 'text', read: () => '直接跳到某个流程页；需要对局的页面在没有对局时先按开局页的选择建一局' },
         {
           kind: 'buttons',
           buttons: [
@@ -117,4 +148,8 @@ export function quickStartSections(game: Phaser.Game): DevSection[] {
       ],
     },
   ]
+}
+
+export function runProvider(game: Phaser.Game): DevProvider {
+  return { id: 'run', title: '对局', sections: runSections(game) }
 }

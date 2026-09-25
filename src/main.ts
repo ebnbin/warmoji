@@ -24,6 +24,7 @@ import { installDevTools, registerGameProvider } from './devtools'
 import { appProvider } from './dev/app'
 import { audioProvider } from './dev/audio'
 import { emojiProvider } from './dev/emoji'
+import { runProvider } from './dev/run'
 import { settingsProvider } from './dev/settings'
 import { SceneKey } from './scene/keys'
 
@@ -63,6 +64,7 @@ installDevTools(game, {
 })
 
 registerGameProvider(appProvider(game))
+registerGameProvider(runProvider(game))
 registerGameProvider(settingsProvider())
 registerGameProvider(audioProvider())
 registerGameProvider(emojiProvider(game))

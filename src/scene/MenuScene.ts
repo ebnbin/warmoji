@@ -17,7 +17,6 @@ import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '..
 import { roundRect } from '../ui/shapes'
 import { SceneKey } from './keys'
 import type { DevProvider, DevProviderHost } from '../devtools'
-import { quickStartSections } from '../dev/quickStart'
 
 function backdropDecor(): EmojiRef[] {
   const uniqEnemies = [...new Set(ENEMY_DEFS.map((e) => e.emoji))]
@@ -271,7 +270,29 @@ export class MenuScene extends Phaser.Scene implements DevProviderHost {
     this.scene.restart()
   }
 
+  /** 只暴露这一页自己的动作；跨页面的开局与直跳在游戏组的"对局"里 */
   devProvider(): DevProvider {
-    return { id: 'menu', title: '主菜单', sections: quickStartSections(this.game) }
+    return {
+      id: 'menu',
+      title: '主菜单',
+      sections: [
+        {
+          id: 'menu',
+          title: '主菜单',
+          items: () => [
+            {
+              kind: 'buttons',
+              label: '这一页的按钮',
+              buttons: [
+                { label: '开始战斗', run: () => this.scene.start(SceneKey.Map) },
+                { label: '设置', run: () => this.scene.start(SceneKey.Settings) },
+                { label: '图鉴', run: () => this.scene.start(SceneKey.Wiki) },
+                { label: 'Studio', run: () => this.scene.start(SceneKey.Studio) },
+              ],
+            },
+          ],
+        },
+      ],
+    }
   }
 }
