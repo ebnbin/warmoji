@@ -15,6 +15,8 @@ export interface FeelTuning {
     readonly reverseGain: number
     readonly turnRateDeg: number
     readonly recallDist: number
+    readonly handoverMs: number
+    readonly facingTauMs: number
   }
   readonly wander: {
     readonly radius: number

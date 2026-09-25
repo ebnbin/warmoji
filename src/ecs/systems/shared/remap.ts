@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
-import { Aim, Blink, Bob, Drop, EDir, ENEMY_SET, Flyer, Follow, Kv, Minion, Phys, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
+import { Aim, Blink, Bob, Drop, EDir, ENEMY_SET, Facing, Flyer, Follow, Kv, Minion, Phys, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import { centerX, centerY, setCenter } from '../../utils/team'
@@ -20,6 +20,12 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
   }
   const h = rot(sim.heading.x, sim.heading.y)
   sim.heading = { x: h.x, y: h.y }
+  const ho = sim.handover
+  if (ho) {
+    const c = rot(ho.camX, ho.camY)
+    ho.camX = c.x
+    ho.camY = c.y
+  }
 
   for (const m of sim.characters) {
     const p = map(Follow.x[m]!, Follow.y[m]!)
@@ -33,6 +39,12 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     VisOff.y[m] = off.y
     Transform.x[m] = p.x + off.x
     Transform.y[m] = p.y + off.y
+    const f = rot(Facing.x[m]!, Facing.y[m]!)
+    Facing.x[m] = f.x
+    Facing.y[m] = f.y
+    const fv = rot(Facing.vx[m]!, Facing.vy[m]!)
+    Facing.vx[m] = fv.x
+    Facing.vy[m] = fv.y
   }
   for (const e of query(sim.world, [Blink])) {
     const b = rot(Blink.x[e]!, Blink.y[e]!)

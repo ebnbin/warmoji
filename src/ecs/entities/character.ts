@@ -19,7 +19,7 @@ import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox/knobs
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
-import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, CharScale, OrbitBias, Phys, Pop, Post, Quad, Revive, Seat, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
+import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, CharScale, Facing, OrbitBias, Phys, Pop, Post, Quad, Revive, Seat, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
@@ -62,6 +62,7 @@ export function spawnCharacter(
   addComponent(world, eid, CharScale)
   addComponent(world, eid, Phys)
   addComponent(world, eid, Seat)
+  addComponent(world, eid, Facing)
   addComponent(world, eid, CharAtkSlow)
   addComponent(world, eid, CharPerk)
   addComponent(world, eid, Iframe)
@@ -115,6 +116,10 @@ export function spawnCharacter(
   Phys.mass[eid] = def.body.mass
   Seat.v[eid] = -1
   Seat.ghost[eid] = 0
+  Facing.x[eid] = 0
+  Facing.y[eid] = -1
+  Facing.vx[eid] = 0
+  Facing.vy[eid] = 0
   CharFlash.until[eid] = 0
   Transform.x[eid] = x
   Transform.y[eid] = y

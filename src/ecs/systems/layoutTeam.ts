@@ -1,7 +1,7 @@
 import { UNIT } from '../../util/units'
 import { FOLLOW, SQUAD, WANDER } from '../../data/feel'
 import { fanSlots, formationPosts } from '../../data/formation'
-import { Alive, Depth, Follow, Orbit, Phys, Seat, Threat, Transform, VisOff, Wander } from '../components'
+import { Alive, Depth, Facing, Follow, Orbit, Phys, Seat, Threat, Transform, VisOff, Wander } from '../components'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { centerX, centerY } from '../utils/team'
@@ -9,6 +9,20 @@ import { settleBody, stepBody } from './shared/body'
 import { fanDistance, fanSpreadDeg, physicsOn, recallDist, reverseGain, seatHysteresis, turnRate } from './shared/squad'
 
 const HEADING_MIN = 0.5
+
+/** 相对介质的速度先低通滤波，滤波后快过阈值才更新朝向，静止时保留上一次的方向 */
+function face(sim: Sim, eid: number, vx: number, vy: number): void {
+  const medium = sim.hooks.mediumVelocity(sim, Follow.x[eid]!, Follow.y[eid]!)
+  const k = Math.min(1, sim.dtMs / SQUAD.facingTauMs)
+  const fvx = Facing.vx[eid]! + (vx - medium.x - Facing.vx[eid]!) * k
+  const fvy = Facing.vy[eid]! + (vy - medium.y - Facing.vy[eid]!) * k
+  Facing.vx[eid] = fvx
+  Facing.vy[eid] = fvy
+  const speed = Math.hypot(fvx, fvy)
+  if (speed <= HEADING_MIN * UNIT) return
+  Facing.x[eid] = fvx / speed
+  Facing.y[eid] = fvy / speed
+}
 
 function spring(eid: number, tx: number, ty: number, dt: number): void {
   let fx = Follow.x[eid]!
@@ -134,6 +148,7 @@ function layoutSquad(sim: Sim): void {
   const speed = Math.hypot(hx, hy)
   const moving = speed > HEADING_MIN * UNIT
   if (moving) turnHeading(sim, hx / speed, hy / speed, dt)
+  face(sim, leader, Phys.vx[leader]!, Phys.vy[leader]!)
   const followers = sim.characters.filter((e) => e !== leader)
   // 目标位本身也受场地约束：贴墙时缩到可达处，否则队员永远到不了、也占不上
   const seats = fanSlots(followers.length, fanDistance(), fanSpreadDeg(), sim.heading.x, sim.heading.y).map((o) =>
@@ -206,6 +221,7 @@ function layoutSquad(sim: Sim): void {
       settleBody(sim, f, from, to, dt)
       Follow.x[f] = to.x
       Follow.y[f] = to.y
+      face(sim, f, Phys.vx[f]!, Phys.vy[f]!)
     }
   } else {
     for (const f of alive) {
@@ -213,6 +229,7 @@ function layoutSquad(sim: Sim): void {
       const raw = wanderTarget(sim, f, seat.x, seat.y, !moving && !Threat.v[f])
       const t = nearTarget(sim, f, raw.x, raw.y)
       spring(f, t.x, t.y, dt)
+      face(sim, f, Follow.vx[f]!, Follow.vy[f]!)
     }
   }
   const ghostStep = SQUAD.ghostSpeed * UNIT * dt

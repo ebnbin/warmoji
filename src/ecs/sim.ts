@@ -41,6 +41,7 @@ export interface Sim {
   leader: number
   physics: boolean
   heading: { x: number; y: number }
+  handover: Handover | null
   formation: FormationId
   count: number
   postBySlot: number[]
@@ -75,6 +76,18 @@ export interface Sim {
   onDeathFx?: (d: PendingDeath) => void
   run: RunState
   reward: RewardConfig
+}
+
+/** 换队长的过渡期：尺寸插值、相机偏移收敛、新队长免伤；camX/camY 是旧中心相对新中心的偏移 */
+export interface Handover {
+  msLeft: number
+  ms: number
+  from: number
+  to: number
+  fromScale: number
+  toScale: number
+  camX: number
+  camY: number
 }
 
 interface RewardConfig {
@@ -198,5 +211,6 @@ export function makeSim(
     leader,
     physics: false,
     heading: { x: 0, y: -1 },
+    handover: null,
   }
 }
