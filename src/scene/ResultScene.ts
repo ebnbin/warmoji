@@ -1,7 +1,9 @@
 import Phaser from 'phaser'
 import { CAPTAINS } from '../data/captains'
 import { CHARACTERS } from '../data/characters'
-import { BOSSES, ENEMY_DEFS } from '../data/enemies'
+import { ENEMIES } from '../data/enemies'
+import { HAZARD_NAMES } from '../data/maps'
+import { keysOf } from '../util/record'
 import { PICKUPS } from '../data/pickups'
 import { WAVE } from '../data/waves'
 import { submitScore } from '../save/highscore'
@@ -300,13 +302,17 @@ export class ResultScene extends Phaser.Scene {
       )
     }
 
-    const emojiByName = new Map<string, string>([
-      ...ENEMY_DEFS.map((e) => [e.name, e.emoji] as const),
-      ...BOSSES.map((e) => [e.name, e.emoji] as const),
-    ])
-    const names = [...new Set([...Object.keys(st.enemyKills), ...Object.keys(st.enemyDamage)])]
-      .sort((a, b) => (st.enemyKills[b] ?? 0) - (st.enemyKills[a] ?? 0))
-    if (names.length === 0) {
+    const enemyKinds = [...new Set([...keysOf(st.enemyKills), ...keysOf(st.enemyDamage)])].sort(
+      (a, b) => (st.enemyKills[b] ?? 0) - (st.enemyKills[a] ?? 0),
+    )
+    const lines: { name: string; emoji?: string; boss: boolean; kills: number; dmg: number }[] = [
+      ...enemyKinds.map((k) => {
+        const e = ENEMIES[k]
+        return { name: e.name, emoji: e.emoji, boss: e.role === 'boss', kills: st.enemyKills[k] ?? 0, dmg: st.enemyDamage[k] ?? 0 }
+      }),
+      ...keysOf(st.hazardDamage).map((h) => ({ name: HAZARD_NAMES[h], boss: false, kills: 0, dmg: st.hazardDamage[h] ?? 0 })),
+    ]
+    if (lines.length === 0) {
       this.add
         .text(x + w / 2, y + h / 2, '—', {
           fontFamily: UI_FONT,
@@ -336,21 +342,18 @@ export class ResultScene extends Phaser.Scene {
     const top = y + headerH + 22
     const rowH = 42
     const fmt = (v: number): string => (v >= 10000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`)
-    const bossNames = new Set(BOSSES.map((e) => e.name))
     const colKillsL = colKills - x
     const colDmgL = colDmg - x
     const rows = new ScrollView(this, { x, y: top, w, h: y + h - top - 12 })
-    names.forEach((name, i) => {
+    lines.forEach((line, i) => {
       const cy = rowH * i + rowH / 2
-      const isBoss = bossNames.has(name)
-      const emoji = emojiByName.get(name)
-      if (emoji) rows.add(emojiImage(this, 34, cy, emoji, Math.min(40, rowH - 5), isBoss ? 'elite' : 'enemy'))
+      if (line.emoji) rows.add(emojiImage(this, 34, cy, line.emoji, Math.min(40, rowH - 5), line.boss ? 'elite' : 'enemy'))
       rows.add(
         this.add
-          .text(58, cy, name, {
+          .text(58, cy, line.name, {
             fontFamily: UI_FONT,
             fontSize: FONT.body,
-            color: isBoss ? '#ffdc5d' : '#e4e4ec',
+            color: line.boss ? '#ffdc5d' : '#e4e4ec',
             resolution: res,
           })
           .setOrigin(0, 0.5),
@@ -362,11 +365,10 @@ export class ResultScene extends Phaser.Scene {
             .setOrigin(0.5),
         )
       }
-      cell(colKillsL, `${st.enemyKills[name] ?? 0}`)
-      const dmg = st.enemyDamage[name] ?? 0
-      cell(colDmgL, dmg > 0 ? fmt(dmg) : '—', dmg > 0 ? '#ffab91' : '#6f6f7d')
+      cell(colKillsL, `${line.kills}`)
+      cell(colDmgL, line.dmg > 0 ? fmt(line.dmg) : '—', line.dmg > 0 ? '#ffab91' : '#6f6f7d')
     })
-    rows.setContentHeight(rowH * names.length)
+    rows.setContentHeight(rowH * lines.length)
   }
 
   private drawButton(

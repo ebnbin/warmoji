@@ -33,7 +33,7 @@ function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): 
 type DeathHandler = (sim: Sim, d: PendingDeath, fx: DeathEffect, hpMul: number) => void
 
 const toEffectLayer: DeathHandler = (sim, d, fx) => {
-  applyAbilityEffects(sim, enemySource(d.def.name, d.dmgMul), [fx as Effect], {
+  applyAbilityEffects(sim, enemySource(d.def.kind, d.dmgMul), [fx as Effect], {
     x: d.x,
     y: d.y,
     baseDamage: 0,

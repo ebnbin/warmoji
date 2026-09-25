@@ -1,7 +1,8 @@
 import { addComponent, addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { Lifetime, Owner, Ring, Tint, Transform, Zone, ZoneBurn, ZoneChill, ZoneFollow } from '../components'
-import { zoneSrcName } from '../store'
+import { zoneSrcEnemy } from '../store'
+import type { EnemyKind } from '../../types/enemies'
 import type { Sim } from '../sim'
 
 
@@ -16,7 +17,7 @@ export interface ZoneSpec {
   fillAlpha: number
   lineAlpha: number
   lineWidth: number
-  burn?: { damage: number; tickMs: number; srcSlot: number; srcName: string }
+  burn?: { damage: number; tickMs: number; srcSlot: number; srcEnemy: EnemyKind | undefined }
   chill?: { factor: number }
   follow?: { of: number; owner: number }
 }
@@ -53,7 +54,7 @@ export function spawnZone(sim: Sim, spec: ZoneSpec): number {
     ZoneBurn.tickMs[eid] = spec.burn.tickMs
     ZoneBurn.nextAt[eid] = sim.elapsedMs + spec.burn.tickMs
     ZoneBurn.srcSlot[eid] = spec.burn.srcSlot
-    zoneSrcName[eid] = spec.burn.srcName
+    zoneSrcEnemy[eid] = spec.burn.srcEnemy
   }
   if (spec.chill) {
     addComponent(world, eid, ZoneChill)

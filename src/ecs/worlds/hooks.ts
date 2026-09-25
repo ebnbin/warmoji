@@ -19,7 +19,7 @@ import { Alive, Boss, Dormant, Due, ENEMY_SET, Meteor, Radius, Slide, Tint, Tran
 import { enemyDef, meteorHit } from '../store'
 import { spawnMeteor } from '../entities/meteor'
 import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
-import { applyDamage, hurtCharacter } from '../systems/shared/combat'
+import { applyDamage, hurtByHazard } from '../systems/shared/combat'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { fleeSteer } from '../systems/shared/steer'
@@ -260,7 +260,7 @@ const ice: WorldHooks = {
     const frac = cfg.waterTickMs / 1000
     if (!onFloe(centerX(sim), centerY(sim), px)) {
       const dmg = Math.round(cfg.waterTeamDps * frac)
-      for (const m of sim.characters) if (Alive.v[m]) hurtCharacter(sim, m, dmg, '寒水', 0x4fc3f7)
+      for (const m of sim.characters) if (Alive.v[m]) hurtByHazard(sim, m, dmg, 'coldWater', 0x4fc3f7)
     }
     const edmg = Math.round(cfg.waterEnemyDps * frac)
     for (const eid of [...query(sim.world, ENEMY_SET)]) {
@@ -430,7 +430,7 @@ const infinite: WorldHooks = {
     for (const m of sim.characters) {
       if (!Alive.v[m]) continue
       if (outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r)) {
-        hurtCharacter(sim, m, cfg.tickDamage, '毒雾', 0xef5350)
+        hurtByHazard(sim, m, cfg.tickDamage, 'poisonFog', 0xef5350)
       }
     }
   },
@@ -501,7 +501,7 @@ const space: WorldHooks = {
       if (!Alive.v[mem] || hit.has(Uid.v[mem]!)) continue
       if (Math.hypot(Transform.x[mem]! - x, Transform.y[mem]! - y) < rr) {
         hit.add(Uid.v[mem]!)
-        hurtCharacter(sim, mem, cfg.damage, '天体', 0xffaa33)
+        hurtByHazard(sim, mem, cfg.damage, 'meteor', 0xffaa33)
       }
     }
     for (const eid of [...query(sim.world, ENEMY_SET)]) {

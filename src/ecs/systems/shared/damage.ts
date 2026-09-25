@@ -17,7 +17,7 @@ export function damageTarget(
     if (sim.over || !Alive.v[target]) return
     if (sim.elapsedMs - Iframe.last[target]! < Iframe.ms[target]!) return
     Iframe.last[target] = sim.elapsedMs
-    hurtCharacter(sim, target, damage, src.name)
+    hurtCharacter(sim, target, damage, src.enemy)
     return
   }
   const chance = Math.min(0.5, src.crit)

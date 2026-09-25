@@ -6,7 +6,8 @@ import {
   Bolt, Depth, FACTION, Faction, Pierce, PrevPos, Proj, Projectile, Quad, Shoot,
   Sprite, SweptHit, Tint, Transform, Vel, ViewCull, WallStop, WorldCull,
 } from '../components'
-import { abilityOnHit, projHitUids, projOnHit, projSrcName } from '../store'
+import { abilityOnHit, projHitUids, projOnHit, projSrcEnemy } from '../store'
+import type { EnemyKind } from '../../types/enemies'
 import type { Sim } from '../sim'
 
 
@@ -69,7 +70,7 @@ export function spawnProjectile(
   Depth.z[eid] = 8
   projOnHit[eid] = abilityOnHit[src]
   projHitUids[eid] = new Set()
-  projSrcName[eid] = undefined
+  projSrcEnemy[eid] = undefined
   playSfx('shoot')
 }
 
@@ -80,7 +81,7 @@ export interface EnemyShotSpec {
   speed: number
   damage: number
   lifeMs: number
-  srcName?: string
+  srcEnemy?: EnemyKind
 }
 
 export function spawnEnemyProjectile(
@@ -107,5 +108,5 @@ export function spawnEnemyProjectile(
   Depth.z[eid] = 6
   projOnHit[eid] = undefined
   projHitUids[eid] = undefined
-  projSrcName[eid] = spec.srcName
+  projSrcEnemy[eid] = spec.srcEnemy
 }

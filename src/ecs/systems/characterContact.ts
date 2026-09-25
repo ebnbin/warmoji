@@ -27,12 +27,12 @@ export function characterContact(sim: Sim): void {
       if (def.damage <= 0) continue
       if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue
       Iframe.last[m] = now
-      hurtCharacter(sim, m, Math.max(1, Math.round(def.damage * DmgMul.v[eid]!)), def.name)
+      hurtCharacter(sim, m, Math.max(1, Math.round(def.damage * DmgMul.v[eid]!)), def.kind)
       if (CharPerk.thorns[m]! > 0 && hasComponent(sim.world, eid, Enemy)) {
         applyDamage(sim, eid, CharPerk.thorns[m]!, 0, undefined, undefined, Slot.v[m]!)
       }
       if (def.onContact && def.onContact.length > 0) {
-        applyAbilityEffects(sim, enemySource(def.name, 1), def.onContact, {
+        applyAbilityEffects(sim, enemySource(def.kind, 1), def.onContact, {
           x: mx,
           y: my,
           baseDamage: 0,

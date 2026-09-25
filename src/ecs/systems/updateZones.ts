@@ -18,7 +18,7 @@ import {
 } from '../components'
 import { applyDamage, hurtCharacter } from './shared/combat'
 import { backEaseOut } from '../utils/ease'
-import { zoneSrcName } from '../store'
+import { zoneSrcEnemy } from '../store'
 import type { Sim } from '../sim'
 
 
@@ -97,7 +97,7 @@ function burnMembers(sim: Sim, burns: readonly number[], now: number): void {
       if (d.x * d.x + d.y * d.y > r * r) continue
       if (now - GroundHit.last[m]! >= ZoneBurn.tickMs[z]!) {
         GroundHit.last[m] = now
-        hurtCharacter(sim, m, ZoneBurn.damage[z]!, zoneSrcName[z] || undefined, 0xa5d86a)
+        hurtCharacter(sim, m, ZoneBurn.damage[z]!, zoneSrcEnemy[z], 0xa5d86a)
       }
       break
     }

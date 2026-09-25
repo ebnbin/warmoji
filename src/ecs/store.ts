@@ -1,5 +1,5 @@
 import { INITIAL_CAPACITY } from './world'
-import type { EnemyDef } from '../types/enemies'
+import type { EnemyDef, EnemyKind } from '../types/enemies'
 import type { FieldPickupDef } from '../types/battlefield'
 import type { Effect } from '../types/abilityDefs'
 
@@ -43,9 +43,9 @@ export const abilityArtEmoji: (string | undefined)[] = new Array<string | undefi
 export const abilityFireSfx: (import('../types/sfx').SfxId | undefined)[] =
   new Array<import('../types/sfx').SfxId | undefined>(INITIAL_CAPACITY).fill(undefined)
 
-export const projSrcName: (string | undefined)[] = new Array<string | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const projSrcEnemy: (EnemyKind | undefined)[] = new Array<EnemyKind | undefined>(INITIAL_CAPACITY).fill(undefined)
 
-export const zoneSrcName: (string | undefined)[] = new Array<string | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const zoneSrcEnemy: (EnemyKind | undefined)[] = new Array<EnemyKind | undefined>(INITIAL_CAPACITY).fill(undefined)
 
 export const animId: (string | undefined)[] = new Array<string | undefined>(INITIAL_CAPACITY).fill(undefined)
 export const animOutline: (import('../emoji/svg').OutlineKind | undefined)[] =

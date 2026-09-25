@@ -106,6 +106,9 @@ export interface MapDef {
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof MAPS
+
+export type Hazard = 'coldWater' | 'poisonFog' | 'meteor'
+
 export interface DecorInstance {
   emoji: string
   xU: number

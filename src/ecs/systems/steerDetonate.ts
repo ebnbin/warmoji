@@ -30,7 +30,7 @@ export function steerDetonate(sim: Sim): void {
         if (d.x * d.x + d.y * d.y > rr * rr) continue
         if (now - Iframe.last[m]! < Iframe.ms[m]!) continue
         Iframe.last[m] = now
-        hurtCharacter(sim, m, dmg, enemyDef[eid]?.name)
+        hurtCharacter(sim, m, dmg, enemyDef[eid]?.kind)
       }
       spawnFxRing(sim, ex, ey, r, BLAST_RING)
       playSfx('boom')

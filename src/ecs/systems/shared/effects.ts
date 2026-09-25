@@ -5,7 +5,6 @@ import { Enemy, CharAtkSlow, Morph, Poison, Slow } from '../../components'
 import { applyMorph } from '../../entities/enemy'
 import { spawnEnemyProjectile } from '../../entities/projectile'
 import { spawnZone } from '../../entities/zone'
-import { } from '../../store'
 import { damageTarget } from './damage'
 import { FACTION } from '../../components'
 import { healEnemies, healCharacters } from './heal'
@@ -110,7 +109,7 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
         damage: fx.def.damage,
         tickMs: fx.def.tickMs,
         srcSlot: src.slot,
-        srcName: src.faction === FACTION.team ? '' : (src.name ?? ''),
+        srcEnemy: src.faction === FACTION.team ? undefined : src.enemy,
       },
     })
   },
@@ -132,7 +131,7 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
       speed: fx.projectile.speed,
       damage: Math.round(fx.damage * src.dmgMul),
       lifeMs: fx.lifeMs,
-      srcName: src.name,
+      srcEnemy: src.enemy,
     })
   },
 }

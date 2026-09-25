@@ -4,7 +4,8 @@ import { playSfx } from '../../../audio/sfx'
 import { gainXp } from '../../../run/xp'
 import { coinDropChance } from '../../../data/waves'
 import { ELITE } from '../../../data/enemies'
-import type { EnemyDef } from '../../../types/enemies'
+import type { EnemyDef, EnemyKind } from '../../../types/enemies'
+import type { Hazard } from '../../../types/maps'
 import { KNOCKBACK } from '../../../data/abilities'
 import { MEMBER } from '../../../data/characters'
 import { UNIT } from '../../../util/units'
@@ -82,7 +83,7 @@ function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flingVy = 0
   const def = enemyDef[eid]
   const elite = Elite.v[eid] === 1
   const boss = Boss.v[eid] === 1
-  if (def) st.enemyKills[def.name] = (st.enemyKills[def.name] ?? 0) + 1
+  if (def) st.enemyKills[def.kind] = (st.enemyKills[def.kind] ?? 0) + 1
   if (elite) st.eliteKills += 1
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'death' })
   if (boss) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 24, kind: 'death' })
@@ -158,13 +159,24 @@ export function despawnEnemy(sim: Sim, eid: number, puff = true): void {
   removeEntity(sim.world, eid)
 }
 
-export function hurtCharacter(sim: Sim, eid: number, damage: number, srcName?: string, tint = 0xff7777): void {
+export function hurtCharacter(sim: Sim, eid: number, damage: number, enemy?: EnemyKind, tint = 0xff7777): void {
+  const byEnemy = sim.run.stats.enemyDamage
+  if (enemy) byEnemy[enemy] = (byEnemy[enemy] ?? 0) + damage
+  hurt(sim, eid, damage, tint)
+}
+
+export function hurtByHazard(sim: Sim, eid: number, damage: number, hazard: Hazard, tint: number): void {
+  const byHazard = sim.run.stats.hazardDamage
+  byHazard[hazard] = (byHazard[hazard] ?? 0) + damage
+  hurt(sim, eid, damage, tint)
+}
+
+function hurt(sim: Sim, eid: number, damage: number, tint: number): void {
   const st = sim.run.stats
   const slot = Slot.v[eid]!
   if (slot >= 0 && slot < st.damageTaken.length) {
     st.damageTaken[slot] = (st.damageTaken[slot] ?? 0) + damage
   }
-  if (srcName) st.enemyDamage[srcName] = (st.enemyDamage[srcName] ?? 0) + damage
   const hp = Math.max(0, CharHp.hp[eid]! - damage)
   CharHp.hp[eid] = hp
   playSfx('hurt')

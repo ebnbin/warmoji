@@ -4,7 +4,7 @@ import { keysOf } from '../util/record'
 
 import { ENEMIES } from './enemies'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
-import type { DecorInstance, MapDecor, MapDef, MapDefaults, MapId } from '../types/maps'
+import type { DecorInstance, Hazard, MapDecor, MapDef, MapDefaults, MapId } from '../types/maps'
 
 export const MAPS: Record<MapId, MapDef> = MAP_TABLE
 
@@ -86,3 +86,5 @@ export function rollDecor(
 }
 
 export const MAP: MapDefaults = MAP_DEFAULTS
+
+export const HAZARD_NAMES: Record<Hazard, string> = { coldWater: '寒水', poisonFog: '毒雾', meteor: '天体' }

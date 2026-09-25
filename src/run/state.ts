@@ -7,7 +7,8 @@ import type { FormationId } from '../types/formation'
 import { browserStorage } from '../util/storage'
 import type { ItemId } from '../types/items'
 import type { CardId } from '../types/cards'
-import type { MapId } from '../types/maps'
+import type { Hazard, MapId } from '../types/maps'
+import type { EnemyKind } from '../types/enemies'
 import { MAP_IDS } from '../data/maps'
 import { drawRecruitPool, recruitSeed, refreshRecruitSeed, unlockedCount } from './recruit'
 import { waveDurationMs } from '../data/waves'
@@ -39,8 +40,9 @@ export interface RunState {
     kills: number[]
     deaths: number[]
     damageTaken: number[]
-    enemyKills: Record<string, number>
-    enemyDamage: Record<string, number>
+    enemyKills: Partial<Record<EnemyKind, number>>
+    enemyDamage: Partial<Record<EnemyKind, number>>
+    hazardDamage: Partial<Record<Hazard, number>>
     eliteKills: number
   }
 }
@@ -84,6 +86,7 @@ export function beginRun(
       damageTaken: roster.map(() => 0),
       enemyKills: {},
       enemyDamage: {},
+      hazardDamage: {},
       eliteKills: 0,
     },
   }

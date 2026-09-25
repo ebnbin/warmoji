@@ -2,7 +2,7 @@ import { Not, query } from 'bitecs'
 import { Alive, Hurt, Iframe, Proj, Projectile, SweptHit, Transform } from '../components'
 import { hurtCharacter } from './shared/combat'
 import { cullProjectile } from './shared/projectile'
-import { projSrcName } from '../store'
+import { projSrcEnemy } from '../store'
 import type { Sim } from '../sim'
 
 export function hitDirectProjectiles(sim: Sim): void {
@@ -19,7 +19,7 @@ export function hitDirectProjectiles(sim: Sim): void {
       if (d.x * d.x + d.y * d.y > rr * rr) continue
       if (now - Iframe.last[m]! >= Iframe.ms[m]!) {
         Iframe.last[m] = now
-        hurtCharacter(sim, m, Proj.damage[eid]!, projSrcName[eid])
+        hurtCharacter(sim, m, Proj.damage[eid]!, projSrcEnemy[eid])
       }
       cullProjectile(sim, eid)
       break
