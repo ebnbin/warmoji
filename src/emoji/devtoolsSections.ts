@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
 import { registerDevSection } from '../devtools'
 import { emojiHoldStats } from './hold'
-import { emojiPackStats, emojiTextureStats } from './textures'
+import { emojiPackStats, emojiTextureStats, evictUnpinnedEmoji } from './textures'
 import { emojiThumbStats } from './thumbs'
 
 function emojiText(game: Phaser.Game): string {
@@ -22,6 +22,12 @@ export function registerEmojiDevTools(game: Phaser.Game): void {
   registerDevSection({
     id: 'emoji',
     title: 'emoji',
-    items: () => [{ kind: 'text', mono: true, read: () => emojiText(game) }],
+    items: () => [
+      { kind: 'text', mono: true, read: () => emojiText(game) },
+      {
+        kind: 'buttons',
+        buttons: [{ label: '释放未固定的 emoji 纹理', run: () => console.warn(`释放了 ${evictUnpinnedEmoji(game.textures)} 个 emoji 纹理`) }],
+      },
+    ],
   })
 }

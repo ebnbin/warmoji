@@ -15,6 +15,7 @@ import { WikiScene } from './scene/WikiScene'
 import { EcsBattleScene } from './ecs/EcsBattleScene'
 import { browserStorage, StorageKey } from './util/storage'
 import { endRun, getRun } from './run/state'
+import { gotoScene, registerLobbyDevTools } from './scene/devtoolsSections'
 import { loadSettings } from './save/settings'
 import { initBgm, playBgm, setBgmEnabled } from './audio/bgm'
 import { initSfx, playSfx, setSfxEnabled } from './audio/sfx'
@@ -70,16 +71,13 @@ registerDevSection({
       desc: '结束当前一局，停掉所有业务场景',
       run: (): void => {
         endRun()
-        for (const s of game.scene.getScenes(false)) {
-          const status = s.sys.settings.status
-          if (s.scene.key !== SceneKey.DevTools && status >= Phaser.Scenes.RUNNING && status <= Phaser.Scenes.SLEEPING) s.scene.stop()
-        }
-        game.scene.start(SceneKey.Menu)
+        gotoScene(game, SceneKey.Menu)
       },
     },
   ],
 })
 
+registerLobbyDevTools(game)
 registerEmojiDevTools(game)
 
 game.events.once(Phaser.Core.Events.READY, () => {

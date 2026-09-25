@@ -133,6 +133,17 @@ function evictIfNeeded(scene: Phaser.Scene): void {
   }
 }
 
+export function evictUnpinnedEmoji(textures: Phaser.Textures.TextureManager): number {
+  let n = 0
+  for (const k of [...lastUsed.keys()]) {
+    if (pinned.has(k)) continue
+    if (textures.exists(k)) textures.remove(k)
+    lastUsed.delete(k)
+    n++
+  }
+  return n
+}
+
 export async function loadEmojiTextures(
   scene: Phaser.Scene,
   preload: readonly string[],

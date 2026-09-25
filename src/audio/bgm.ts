@@ -203,6 +203,10 @@ export function initBgm(): void {
   window.addEventListener('keydown', unlock, { once: true })
 }
 
+export function bgmStatus(): { desired: BgmId | null; playing: BgmId | null; enabled: boolean } {
+  return { desired, playing, enabled }
+}
+
 export function playBgm(id: BgmId): void {
   desired = id
   if (playing === id) return

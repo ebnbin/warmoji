@@ -27,6 +27,7 @@ import {
   toggleSandboxEnemy,
 } from './sandbox/knobs'
 import type { SandboxLevel, SandboxMul } from './sandbox/knobs'
+import { pipelineProfile, resetPipelineProfile } from './systems/pipeline/step'
 
 const MULS: readonly SandboxMul[] = [1, 3, 10]
 const LEVELS: readonly { readonly lv: SandboxLevel; readonly label: string }[] = [
@@ -36,6 +37,17 @@ const LEVELS: readonly { readonly lv: SandboxLevel; readonly label: string }[] =
 ]
 const STEADY_RATIO = 0.95
 
+function profileText(): string {
+  const p = pipelineProfile()
+  if (p.frames === 0) return '未采样：在"开关"页签打开"战斗 · 流水线剖析"'
+  const rows = p.rows.slice(0, 14)
+  const total = p.rows.reduce((s, r) => s + r.avgMs, 0)
+  return [
+    `已采样 ${p.frames} 帧 · 各 system 平均合计 ${total.toFixed(2)} ms/帧`,
+    ...rows.map((r) => `${r.avgMs.toFixed(3).padStart(7)} ms  ${r.name}`),
+  ].join('\n')
+}
+
 function battleItems(battle: EcsBattleScene): DevItem[] {
   return [
     {
@@ -43,6 +55,7 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
       mono: true,
       read: (): string => {
         const p = battle.perfSnapshot()
+        const kinds = battle.devEnemyCounts()
         return [
           `敌人      ${p.enemies}`,
           `弹体      ${p.projectiles}`,
@@ -51,9 +64,33 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
           `刷怪间隔  ${p.spawnIntervalMs} ms`,
           `GameObject ${p.objects}`,
           `图集页    ${p.atlasPages}`,
+          `按种类    ${kinds.length > 0 ? kinds.slice(0, 8).map((k) => `${k.name} ${k.n}`).join(' · ') : '无'}`,
         ].join('\n')
       },
     },
+    {
+      kind: 'buttons',
+      label: '生成',
+      buttons: [
+        { label: '1 只', run: () => battle.devSpawn('one') },
+        { label: '1 只精英', run: () => battle.devSpawn('elite') },
+        { label: '精英潮', run: () => battle.devSpawn('surge') },
+        { label: 'Boss', run: () => battle.devSpawn('boss') },
+        { label: '全灭', run: () => battle.devKillAll() },
+      ],
+    },
+    {
+      kind: 'buttons',
+      label: '作弊',
+      buttons: [
+        { label: '金币 +1000', run: () => battle.devGrant('coins') },
+        { label: '升一级', run: () => battle.devGrant('level') },
+        { label: '技能冷却清零', run: () => battle.devResetSkill() },
+        ...(battle.sandbox ? [] : [{ label: '结束本波', run: (): void => battle.devEndWave() }]),
+      ],
+    },
+    { kind: 'text', label: '流水线剖析 · 平均毫秒/帧 · 外层含内层', mono: true, read: profileText },
+    { kind: 'buttons', buttons: [{ label: '重置剖析', run: resetPipelineProfile }] },
   ]
 }
 

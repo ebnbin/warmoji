@@ -41,6 +41,10 @@ export function setDevConfig(cfg: DevToolsConfig): ResolvedConfig {
   return current
 }
 
+export function maybeDevConfig(): ResolvedConfig | undefined {
+  return current
+}
+
 export function devConfig(): ResolvedConfig {
   if (!current) throw new Error('devtools 尚未安装：先调用 installDevTools')
   return current

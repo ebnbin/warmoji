@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { devConfig } from './config'
+import { devConfig, maybeDevConfig } from './config'
 
 export type DevSide = 'left' | 'right'
 
@@ -51,8 +51,12 @@ function load(key: string): DevSettings {
   }
 }
 
+/** 安装前读取只给默认值且不缓存：模块初始化阶段声明的开关不至于抛错 */
 export function devSettings(): DevSettings {
-  current ??= load(devConfig().storageKey)
+  if (current) return current
+  const cfg = maybeDevConfig()
+  if (!cfg) return { ...DEFAULTS, flags: {}, choices: {} }
+  current = load(cfg.storageKey)
   return current
 }
 
