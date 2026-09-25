@@ -1,4 +1,3 @@
-// mulberry32
 export class Rng {
   private state: number
 
@@ -6,7 +5,6 @@ export class Rng {
     this.state = seed >>> 0
   }
 
-  /** [0, 1) */
   next(): number {
     this.state = (this.state + 0x6d2b79f5) >>> 0
     let t = this.state
@@ -15,17 +13,7 @@ export class Rng {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
 
-  /** [min, max]，两端包含 */
   int(min: number, max: number): number {
     return min + Math.floor(this.next() * (max - min + 1))
-  }
-
-  pick<T>(items: readonly T[]): T {
-    if (items.length === 0) throw new Error('pick: 数组为空')
-    return items[this.int(0, items.length - 1)]!
-  }
-
-  chance(probability: number): boolean {
-    return this.next() < probability
   }
 }

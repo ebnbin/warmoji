@@ -1,7 +1,6 @@
 import { Alive, CharHp, CharPerk } from '../components'
 import type { Sim } from '../sim'
 
-/** hp 允许小数，展示处取整 */
 export function regenCharacters(sim: Sim): void {
   const wdelta = sim.wdtMs
   for (const m of sim.characters) {

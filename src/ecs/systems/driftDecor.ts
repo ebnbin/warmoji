@@ -5,7 +5,6 @@ import { driftSpeed, riverRect } from '../worlds/river'
 import { Drift, Transform } from '../components'
 import type { Sim } from '../sim'
 
-// 位姿是派生的：真相是 u 与 cross，x/y 每帧由河道几何算出
 export function driftDecor(sim: Sim): void {
   const cfg = MAPS[sim.mapId].river
   if (!cfg) return

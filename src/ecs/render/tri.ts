@@ -3,7 +3,6 @@ import type Phaser from 'phaser'
 
 type Matrix = Phaser.GameObjects.Components.TransformMatrix
 
-/** 复用，稳态零分配 */
 export interface Scratch {
   v: number[]
   c: number[]
@@ -20,8 +19,7 @@ export function resetScratch(o: Scratch): void {
   o.i.length = 0
 }
 
-/** 顶点经相机矩阵变换到屏幕空间 */
-export function tri(
+function tri(
   o: Scratch, m: Matrix,
   x0: number, y0: number, x1: number, y1: number, x2: number, y2: number,
   color: number,
@@ -32,7 +30,6 @@ export function tri(
   o.i.push(base, base + 1, base + 2)
 }
 
-/** 顶点须连续绕 */
 export function quad(
   o: Scratch, m: Matrix,
   ax: number, ay: number, bx: number, by: number, cx: number, cy: number, dx: number, dy: number,
@@ -42,8 +39,7 @@ export function quad(
   tri(o, m, ax, ay, cx, cy, dx, dy, color)
 }
 
-/** 按屏幕半径自适应取段数 */
-export function segsFor(radius: number): number {
+function segsFor(radius: number): number {
   return Math.max(12, Math.min(48, Math.ceil(radius / 3)))
 }
 
@@ -62,7 +58,6 @@ export function fan(o: Scratch, m: Matrix, cx: number, cy: number, r: number, co
   }
 }
 
-/** a0/a1 给定即只铺该扇段 */
 export function ringStrip(
   o: Scratch, m: Matrix,
   cx: number, cy: number, r: number, width: number, color: number,
@@ -91,7 +86,6 @@ export function ringStrip(
   }
 }
 
-/** 转角处不做接头 */
 export function segment(
   o: Scratch, m: Matrix,
   x0: number, y0: number, x1: number, y1: number, width: number, color: number,

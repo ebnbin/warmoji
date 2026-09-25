@@ -6,7 +6,6 @@ import { attachDrawable } from './drawable'
 import type { Sim } from '../sim'
 
 
-/** warnMs 之后从 (sx,sy) 起划向 (ex,ey) */
 export function spawnMeteor(
   sim: Sim,
   s: { sx: number; sy: number; ex: number; ey: number },
@@ -28,7 +27,7 @@ export function spawnMeteor(
     x: s.sx,
     y: s.sy,
     size,
-    alpha: 0, // 起划才由 tick 拉到 1
+    alpha: 0,
     z: 60,
   })
   return eid

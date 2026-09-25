@@ -1,9 +1,8 @@
 import Phaser from 'phaser'
 
-// 粒子点纹理走 tint 上色，混合模式保持 NORMAL：ADD 在浅色地图上看不见
 const DOT_KEY = 'fx-dot'
 
-export function ensureFxDot(scene: Phaser.Scene): string {
+function ensureFxDot(scene: Phaser.Scene): string {
   if (scene.textures.exists(DOT_KEY)) return DOT_KEY
   const size = 16
   const canvas = document.createElement('canvas')
@@ -18,7 +17,6 @@ export function ensureFxDot(scene: Phaser.Scene): string {
   return DOT_KEY
 }
 
-/** emitting=false，用 explode 触发 */
 export function burstEmitter(
   scene: Phaser.Scene,
   tints: number[],
@@ -37,7 +35,6 @@ export function burstEmitter(
     .setDepth(20)
 }
 
-/** 全屏罩层按透明度着色；近乎透明即隐藏，免得每帧白画一遍整屏 */
 export function setOverlayFill(rect: Phaser.GameObjects.Rectangle, color: number, alpha: number): void {
   rect.setFillStyle(color, alpha).setVisible(alpha > 0.001)
 }

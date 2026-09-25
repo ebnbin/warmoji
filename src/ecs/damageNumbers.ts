@@ -1,5 +1,3 @@
-// 仿真只写、渲染层只读；最老的一条还没播完就翻倍扩容，不覆盖、不建实体
-
 const INITIAL_CAP = 256
 export const DAMAGE_NUMBER_RISE_MS = 350
 
@@ -8,9 +6,7 @@ export interface DamageNumbers {
   y: Float32Array
   value: Int32Array
   crit: Uint8Array
-  /** fxMs；空槽为 -Infinity */
   born: Float64Array
-  /** 下一条写入的槽位，也是最老的一条 */
   head: number
 }
 
@@ -25,7 +21,6 @@ export function newDamageNumbers(): DamageNumbers {
   }
 }
 
-/** 从最老的一条起按序搬进两倍长的新数组，新槽位接在末尾 */
 function grow(d: DamageNumbers): void {
   const cap = d.born.length
   const order = <T extends Float32Array | Int32Array | Uint8Array | Float64Array>(a: T, next: T): T => {

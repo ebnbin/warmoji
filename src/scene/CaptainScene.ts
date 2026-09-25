@@ -9,7 +9,6 @@ import { beginRun, teamStep } from '../run/state'
 import { loadCaptain, loadMap, saveCaptain } from '../save/selection'
 import { captainStatGroups } from '../scene/statLines'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage, preloadEmojis } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
@@ -18,6 +17,7 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { nextAfterTeam } from './teamPage'
+import { SceneKey } from './keys'
 
 interface CaptainLayout {
   content: { w: number; h: number }
@@ -44,18 +44,17 @@ const PORTRAIT: CaptainLayout = {
 }
 
 export class CaptainScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private selectedId: CaptainId = PICKABLE_CAPTAIN_IDS[0]!
   private layout!: CaptainLayout
   private origin = { x: 0, y: 0 }
-  private grid!: EmojiGrid
+  private grid!: EmojiGrid<CaptainId>
   private detailView!: ScrollView
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
-    super('captain')
+    super(SceneKey.Captain)
   }
 
   preload(): void {
@@ -94,7 +93,7 @@ export class CaptainScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.scene.start('map'))
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.scene.start(SceneKey.Map))
     this.add
       .text(w / 2, oy + L.headerY, '选择队长', {
         fontFamily: UI_FONT,
@@ -108,7 +107,7 @@ export class CaptainScene extends Phaser.Scene {
     this.grid = new EmojiGrid(this, { x: ox + L.list.x, y: oy + L.list.y, w: L.list.w, h: L.list.h })
     this.grid.onTap = (key): void => {
       playSfx('click')
-      this.selectedId = key as CaptainId
+      this.selectedId = key
       saveCaptain(browserStorage(), this.selectedId)
       this.refresh()
     }
@@ -150,10 +149,10 @@ export class CaptainScene extends Phaser.Scene {
       .zone(b.x, b.y, b.w, b.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', confirm)
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, confirm)
     this.input.keyboard?.on('keydown-ENTER', confirm)
     this.input.keyboard?.on('keydown-SPACE', confirm)
-    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('map'))
+    this.input.keyboard?.on('keydown-ESC', () => this.scene.start(SceneKey.Map))
 
     this.refresh()
 
@@ -226,28 +225,6 @@ export class CaptainScene extends Phaser.Scene {
   private refresh(): void {
     this.grid.setSelected(this.selectedId)
     this.renderDetail(textRes())
-    this.reportCaptain()
-  }
-
-  private reportCaptain(): void {
-    reportDebug({
-      scene: 'captain',
-      elapsed: 0,
-      kills: 0,
-      level: 1,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      captain: {
-        selected: this.selectedId,
-        items: this.grid.cellRects().map((r) => ({ id: r.key, x: r.x, y: r.y, w: r.w, h: r.h })),
-        start: {
-          x: this.btnRect.x + this.btnRect.w / 2,
-          y: this.btnRect.y + this.btnRect.h / 2,
-          w: this.btnRect.w,
-          h: this.btnRect.h,
-        },
-      },
-    })
   }
 
   private onViewportChanged(): void {

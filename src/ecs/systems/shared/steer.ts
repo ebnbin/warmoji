@@ -4,7 +4,6 @@ import type { Point } from '../../../util/vec'
 import type { Sim } from '../../sim'
 import { teamCenter } from '../../utils/team'
 
-/** 距离走世界钩子 */
 export function nearestAlive(sim: Sim, x: number, y: number): Point | null {
   let bestX = 0
   let bestY = 0
@@ -35,7 +34,6 @@ export function wanderDir(sim: Sim, eid: number): Point {
   return d
 }
 
-/** 返回相对自身的最近镜像 */
 export function aimPoint(sim: Sim, eid: number, atCenter: boolean): Point | null {
   const x = Transform.x[eid]!
   const y = Transform.y[eid]!
@@ -45,7 +43,6 @@ export function aimPoint(sim: Sim, eid: number, atCenter: boolean): Point | null
   return { x: x + d.x, y: y + d.y }
 }
 
-/** 纯几何，不读 sim */
 export function fleeSteer(
   x: number,
   y: number,
@@ -63,7 +60,6 @@ export function fleeSteer(
   if (y > mapH - margin) fy -= ((y - (mapH - margin)) / margin) * 2
   const len = Math.hypot(fx, fy)
   if (len < 1e-6) {
-    // 完全抵消时沿切线走
     const t = Math.hypot(awayX, awayY) || 1
     return { x: -awayY / t, y: awayX / t }
   }

@@ -1,16 +1,20 @@
 import type { Sim } from '../../sim'
 
-// 每步声明它必须排在谁之后；没有真实依赖就不写 after。校验在 order.test.ts
+export type System = (sim: Sim) => void
+export type Step = System | { readonly run: System; readonly after: readonly System[] }
 
-export interface Step {
-  readonly name: string
-  run(sim: Sim): void
-  /** 必须排在这些步之后；省略即无约束 */
-  readonly after?: readonly string[]
-  /** 写不出理由的依赖多半是想出来的 */
-  readonly why?: string
+export function pipeline(steps: readonly Step[]): readonly System[] {
+  const runs = steps.map((s) => (typeof s === 'function' ? s : s.run))
+  steps.forEach((s, i) => {
+    if (typeof s === 'function') return
+    for (const dep of s.after) {
+      const j = runs.indexOf(dep)
+      if (j < 0 || j >= i) throw new Error(`流水线次序错误：${s.run.name} 须排在 ${dep.name} 之后`)
+    }
+  })
+  return runs
 }
 
-export function runPipeline(pipeline: readonly Step[], sim: Sim): void {
-  for (const step of pipeline) step.run(sim)
+export function runPipeline(systems: readonly System[], sim: Sim): void {
+  for (const run of systems) run(sim)
 }

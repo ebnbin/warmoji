@@ -1,5 +1,3 @@
-// 纹理按 key 计数持有：归还的扣减推迟到 settle，归零且不在显示才删除；只删本表生成的纹理
-
 export interface TextureStore<S> {
   exists(key: string): boolean
   add(key: string, source: S): void
@@ -8,7 +6,6 @@ export interface TextureStore<S> {
 
 export interface TextureSpec<S> {
   readonly key: string
-  /** 失败须 reject */
   readonly make: () => Promise<S>
 }
 
@@ -21,7 +18,6 @@ interface Entry {
 
 export class HoldTable<S> {
   private readonly store: TextureStore<S>
-  /** settle 时至多取一次 */
   private readonly shownKeys: () => ReadonlySet<string>
   private readonly entries = new Map<string, Entry>()
   private pending: string[] = []
@@ -31,7 +27,6 @@ export class HoldTable<S> {
     this.shownKeys = shownKeys
   }
 
-  /** ready 在全部生成结束后兑现，单张失败只报错；done 表示此刻已全部就绪 */
   retain(specs: readonly TextureSpec<S>[]): { ready: Promise<void>; done: boolean } {
     const waits: Promise<void>[] = []
     for (const spec of specs) {
@@ -42,7 +37,6 @@ export class HoldTable<S> {
     return { ready: Promise.all(waits).then(() => undefined), done: waits.length === 0 }
   }
 
-  /** 同一帧内再被持有的 key 不会删了再建 */
   release(keys: readonly string[]): void {
     this.pending.push(...keys)
   }
@@ -74,7 +68,6 @@ export class HoldTable<S> {
       .make()
       .then(
         (source) => {
-          // 生成途中已被全部归还
           if (this.entries.get(spec.key) !== entry) return
           if (this.store.exists(spec.key)) entry.owned = false
           else this.store.add(spec.key, source)

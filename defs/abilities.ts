@@ -29,7 +29,6 @@ const pistol = {
     emoji: '1f52b',
     size: 0.75,
     restOffset: 0.45,
-    // twemoji 1f52b 枪口朝左
     rotationOffsetDeg: 180,
     mountGap: 0.32,
   },
@@ -38,7 +37,6 @@ const pistol = {
     size: 0.45,
     radius: 0.15,
     speed: 13,
-    // twemoji 1f4a7 水滴尖端朝上
     rotationOffsetDeg: 90,
   },
 } satisfies ProjectileDef
@@ -80,7 +78,6 @@ const BASE = {
       emoji: '1fa93',
       size: 0.85,
       restOffset: 0.6,
-      // twemoji 1fa93 斧刃朝左上
       rotationOffsetDeg: 135,
     },
   } satisfies SweepDef,
@@ -114,7 +111,6 @@ const BASE = {
       emoji: '1f526',
       size: 0.75,
       restOffset: 0.45,
-      // twemoji 1f526 灯头朝左下
       rotationOffsetDeg: 135,
     },
   } satisfies LaserDef,
@@ -168,7 +164,6 @@ const BASE = {
       emoji: '1f5e1',
       size: 0.7,
       restOffset: 0.42,
-      // twemoji 1f5e1 刀尖朝左下
       rotationOffsetDeg: 135,
     },
   } satisfies AssassinateDef,
@@ -217,7 +212,6 @@ const BASE = {
       size: 0.48,
       radius: 0.15,
       speed: 12,
-      // twemoji 1f489 针头朝左下
       rotationOffsetDeg: 135,
     },
   } satisfies ProjectileDef,
@@ -233,13 +227,11 @@ const BASE = {
     color: 0x40c4ff,
   } satisfies ChainArcDef,
 
-  // ── 队长主动技能载荷 ──
   holyLight: {
     kind: 'rally',
     cooldownMs: 35_000,
     healRatio: 0.5,
     invulnMs: 2000,
-    // = TEAM.ringRadius + MEMBER.radius
     ringRadius: 1.25,
     color: 0xffe082,
   } satisfies RallyDef,
@@ -276,116 +268,113 @@ const BASE = {
   } satisfies TimeStopDef,
 } as const
 
-// ── 升级档位行：后缀 2 = 一阶卡，3 = 一阶 + 二阶累积 ──
-
-export const tomatoThrow2 = {
+const tomatoThrow2 = {
   ...BASE.tomatoThrow,
   volley: { count: 3, spreadDeg: 18 },
 } satisfies ProjectileDef
-export const tomatoThrow3 = {
+const tomatoThrow3 = {
   ...tomatoThrow2,
   onHit: [
     { kind: 'blast', radius: 0.9, ratio: 0.6, knockback: 0, ring: { color: 0xef5350, fillAlpha: 0.25, lineWidth: 3, lineAlpha: 0.8, durMs: 220 } },
   ],
 } satisfies ProjectileDef
 
-export const hornThrust2 = {
+const hornThrust2 = {
   ...BASE.hornThrust,
   combo: { delayMs: 170 },
 } satisfies ThrustDef
-export const hornThrust3 = {
+const hornThrust3 = {
   ...hornThrust2,
   onHit: [
     { kind: 'blast', radius: 1.1, ratio: 0.6, knockback: 11.25, ring: { color: 0xff8ad8, fillAlpha: 0.3, lineWidth: 4, lineAlpha: 0.9, durMs: 260 } },
   ],
 } satisfies ThrustDef
 
-export const axeSweep2 = {
+const axeSweep2 = {
   ...BASE.axeSweep,
   arcDeg: 360,
   sweepMs: Math.round(BASE.axeSweep.sweepMs * 1.35),
 } satisfies SweepDef
-export const axeSweep3 = {
+const axeSweep3 = {
   ...axeSweep2,
   onHit: [{ kind: 'slow', factor: 0.55, durationMs: 1200 }],
 } satisfies SweepDef
 
-export const pistolLeft2 = { ...BASE.pistolLeft, pierce: 2 } satisfies ProjectileDef
-export const pistolRight2 = { ...BASE.pistolRight, pierce: 2 } satisfies ProjectileDef
-export const pistolLeft3 = {
+const pistolLeft2 = { ...BASE.pistolLeft, pierce: 2 } satisfies ProjectileDef
+const pistolRight2 = { ...BASE.pistolRight, pierce: 2 } satisfies ProjectileDef
+const pistolLeft3 = {
   ...pistolLeft2,
   everyN: { n: 4, count: 5, spreadDeg: 32 },
 } satisfies ProjectileDef
-export const pistolRight3 = {
+const pistolRight3 = {
   ...pistolRight2,
   everyN: { n: 4, count: 5, spreadDeg: 32 },
 } satisfies ProjectileDef
 
-export const arcaneBlast2 = {
+const arcaneBlast2 = {
   ...BASE.arcaneBlast,
   onHit: [
     { kind: 'ground', def: { radius: 1.4, durationMs: 3000, tickMs: 400, damage: 3, color: 0xff7043, fillAlpha: 0.18, lineAlpha: 0.55, enterMs: 200 } },
   ],
 } satisfies AreaBlastDef
-export const arcaneBlast3 = {
+const arcaneBlast3 = {
   ...arcaneBlast2,
   echo: { delayMs: 250, ratio: 0.75 },
 } satisfies AreaBlastDef
 
-export const boomerang2 = { ...BASE.boomerang, twin: true } satisfies BoomerangDef
-export const boomerang3 = {
+const boomerang2 = { ...BASE.boomerang, twin: true } satisfies BoomerangDef
+const boomerang3 = {
   ...boomerang2,
   hitRadius: BASE.boomerang.hitRadius * 1.4,
   held: { ...BASE.boomerang.held, size: BASE.boomerang.held.size * 1.4 },
   coinMagnetRadius: 1.6,
 } satisfies BoomerangDef
 
-export const laserBeam2 = { ...BASE.laserBeam, backBeam: true } satisfies LaserDef
-export const laserBeam3 = {
+const laserBeam2 = { ...BASE.laserBeam, backBeam: true } satisfies LaserDef
+const laserBeam3 = {
   ...laserBeam2,
   radial: { beams: 8, ratio: 0.6, stepMs: 60 },
 } satisfies LaserDef
 
-export const frostAura2 = { ...BASE.frostAura, dps: 6 } satisfies SlowAuraDef
-export const frostAura3 = {
+const frostAura2 = { ...BASE.frostAura, dps: 6 } satisfies SlowAuraDef
+const frostAura3 = {
   ...frostAura2,
   freeze: { intervalMs: 5000, durationMs: 700 },
 } satisfies SlowAuraDef
 
-export const sparkleBolt2 = {
+const sparkleBolt2 = {
   ...BASE.sparkleBolt,
   pierce: 1,
   onHit: [{ kind: 'morph', durationMs: 4000, morphEmoji: '1f411' }],
 } satisfies ProjectileDef
-export const sparkleBolt3 = {
+const sparkleBolt3 = {
   ...sparkleBolt2,
   onHit: [{ kind: 'morph', durationMs: 4000, morphEmoji: '1f411', vulnMul: 1.4 }],
 } satisfies ProjectileDef
 
-export const shadowStrike2 = {
+const shadowStrike2 = {
   ...BASE.shadowStrike,
-  // knockback = 主斩击退 × 0.6
   onHit: [{ kind: 'blast', radius: 1.0, ratio: 0.6, knockback: 3.6 }],
 } satisfies AssassinateDef
-export const shadowStrike3 = {
+const shadowStrike3 = {
   ...shadowStrike2,
   execute: { hpRatio: 0.35, mul: 2 },
 } satisfies AssassinateDef
 
-export const woodTurret2 = {
+const woodTurret2 = {
   ...BASE.woodTurret,
   maxTurrets: BASE.woodTurret.maxTurrets + 1,
 } satisfies TurretDef
-export const woodTurret3 = {
+const woodTurret3 = {
   ...woodTurret2,
   burst: { count: 3, spreadDeg: 17 },
 } satisfies TurretDef
 
-export const beeSwarm2 = {
+const beeSwarm2 = {
   ...BASE.beeSwarm,
   count: BASE.beeSwarm.count + 1,
 } satisfies SummonDef
-export const beeSwarm3 = {
+const beeSwarm3 = {
   ...beeSwarm2,
   onHit: [
     { kind: 'poison', damage: 13, tickMs: 1000, durationMs: 5000 },
@@ -393,16 +382,15 @@ export const beeSwarm3 = {
   ],
 } satisfies SummonDef
 
-export const fieldMedkit2 = { ...BASE.fieldMedkit, aoe: { ratio: 0.6 } } satisfies HealDef
-export const fieldMedkit3 = {
+const fieldMedkit2 = { ...BASE.fieldMedkit, aoe: { ratio: 0.6 } } satisfies HealDef
+const fieldMedkit3 = {
   ...fieldMedkit2,
   defib: { reviveCutMs: 2000 },
 } satisfies HealDef
 
-export const voltArc2 = { ...BASE.voltArc, bounces: 4 } satisfies ChainArcDef
-export const voltArc3 = {
+const voltArc2 = { ...BASE.voltArc, bounces: 4 } satisfies ChainArcDef
+const voltArc3 = {
   ...voltArc2,
-  // knockback = 本体击退 × 0.6
   onHit: [
     { kind: 'blast', radius: 0.9, ratio: 0.6, knockback: 1.5, ring: { color: 0x40c4ff, fillAlpha: 0.25, lineWidth: 3, lineAlpha: 0.9, durMs: 240 } },
   ],

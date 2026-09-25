@@ -3,7 +3,6 @@ export interface Point {
   y: number
 }
 
-/** 零向量返回 (0, 0) */
 export function norm(x: number, y: number): Point {
   const len = Math.hypot(x, y)
   if (len === 0) return { x: 0, y: 0 }

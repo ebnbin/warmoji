@@ -5,7 +5,6 @@ import { KNOCKBACK } from '../../data/abilities'
 import { Depth, Quad, Shard, Sprite, Tint, Transform } from '../components'
 import type { Sim } from '../sim'
 
-/** flingVx/Vy = 致死一击的击退速度 */
 export function spawnShards(
   sim: Sim,
   x: number,
@@ -21,7 +20,6 @@ export function spawnShards(
   const dh = h / 2
   const now = sim.fxMs
   for (let i = 0; i < 4; i++) {
-    // 碎片同步本体的翻转
     const col = i % 2 === 0 ? -1 : 1
     const ox = (flipX ? -col : col) * (dw / 2)
     const oy = (i < 2 ? -1 : 1) * (dh / 2)
@@ -44,7 +42,7 @@ export function spawnShards(
     Tint.color[eid] = 0xffffff
     Tint.effect[eid] = 0
     Tint.alpha[eid] = 1
-    Depth.z[eid] = 6 // 压在地面效果之上、血条之下
+    Depth.z[eid] = 6
     Shard.vx[eid] = flingVx + dir.x * scatter
     Shard.vy[eid] = flingVy + dir.y * scatter
     Shard.startMs[eid] = now

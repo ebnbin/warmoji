@@ -69,18 +69,17 @@ import type { MapDef } from '../../types/maps'
 import { hourAt, isDayAt } from '../worlds/daynight'
 import type { FieldPickupDef } from '../../types/battlefield'
 import { enemyMixAt, pickEnemy } from '../utils/spawnMix'
+import type { ByKind } from '../../util/record'
 
 
 
 
 
-/** locomotion.kind 只在此读一次 */
-type LocoAttach<K extends LocomotionDef['kind']> = (
-  sim: Sim,
-  eid: number,
-  lm: Extract<LocomotionDef, { kind: K }>,
-) => void
-const LOCOMOTIONS: { [K in LocomotionDef['kind']]: LocoAttach<K> } = {
+type LocomotionOf = ByKind<LocomotionDef>
+
+type LocoAttach<K extends keyof LocomotionOf> = (sim: Sim, eid: number, lm: LocomotionOf[K]) => void
+
+const LOCOMOTIONS: { [K in keyof LocomotionOf]: LocoAttach<K> } = {
   chase: (sim, eid) => addComponent(sim.world, eid, Chase),
   wander: (sim, eid) => addComponent(sim.world, eid, Roam),
   static: (sim, eid) => addComponent(sim.world, eid, Stationary),
@@ -137,6 +136,10 @@ const LOCOMOTIONS: { [K in LocomotionDef['kind']]: LocoAttach<K> } = {
   },
 }
 
+function attachLocomotion<K extends keyof LocomotionOf>(sim: Sim, eid: number, lm: LocomotionOf[K] & { readonly kind: K }): void {
+  LOCOMOTIONS[lm.kind](sim, eid, lm)
+}
+
 export function spawnEnemy(
   sim: Sim,
   atlas: FrameIndex,
@@ -146,7 +149,6 @@ export function spawnEnemy(
   hp: number,
   elite: boolean,
   boss: boolean,
-  /** 目标透明度，入场弹入收敛到它 */
   alpha = 1,
 ): number {
   const world = sim.world
@@ -177,7 +179,6 @@ export function spawnEnemy(
   addComponent(world, eid, ETurn)
   addComponent(world, eid, BVel)
   addComponent(world, eid, Slowed)
-  // 走位系统的 query 认它，漏挂则敌人不动
   addComponent(world, eid, Steering)
   addComponent(world, eid, Anim)
   addComponent(world, eid, Sprite)
@@ -201,7 +202,7 @@ export function spawnEnemy(
   BVel.y[eid] = 0
   Slowed.v[eid] = 1
   Steering.v[eid] = 0
-  ;(LOCOMOTIONS[def.locomotion.kind] as LocoAttach<LocomotionDef['kind']>)(sim, eid, def.locomotion)
+  attachLocomotion(sim, eid, def.locomotion)
   if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
   Despawn.at[eid] = 0
   Morph.until[eid] = 0
@@ -209,13 +210,13 @@ export function spawnEnemy(
   Morph.cdUntil[eid] = 0
   Thief.eaten[eid] = 0
   Thief.nextEatAt[eid] = 0
-  enemyCarries[eid] = undefined // 携带者由 spawnCarrier 落地后覆写
+  enemyCarries[eid] = undefined
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
   Radius.v[eid] = def.radius
   DmgMul.v[eid] = elite ? ELITE.damageMul : 1
   SpMul.v[eid] = elite ? ELITE.speedMul : 1
-  Nest.of[eid] = -1 // spawnBrood 会覆盖为巢 eid
+  Nest.of[eid] = -1
   Nest.nextSpawnAt[eid] = def.spawner ? sim.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
   Kv.x[eid] = 0
   Kv.y[eid] = 0
@@ -223,7 +224,7 @@ export function spawnEnemy(
   Slide.y[eid] = 0
   Dormant.v[eid] = 0
   Dormant.since[eid] = 0
-  EnemyArm.armed[eid] = 0 // eid 复用:新实体须重新装配能力
+  EnemyArm.armed[eid] = 0
   Alive.v[eid] = 1
   Flash.until[eid] = 0
   Slow.until[eid] = 0
@@ -252,7 +253,6 @@ export function spawnEnemy(
   return eid
 }
 
-/** ownerEid ≥ 0 记为护巢子敌；分裂用 -1 */
 export function spawnBrood(
   sim: Sim,
   atlas: FrameIndex,
@@ -280,30 +280,25 @@ export function spawnBrood(
   }
 }
 
-// ── 刷怪 ──
-
-/** 非昼夜图为 undefined */
 export function dayNightOf(sim: Sim): { cfg: NonNullable<MapDef['dayNight']>; hour: number } | undefined {
   const cfg = MAPS[sim.mapId].dayNight
   if (!cfg) return undefined
   return { cfg, hour: hourAt((sim.run.combatMs + sim.elapsedMs) / 1000, cfg) }
 }
 
-export function currentMix(sim: Sim): ReturnType<typeof enemyMixAt> {
+function currentMix(sim: Sim): ReturnType<typeof enemyMixAt> {
   const m = MAPS[sim.mapId]
   const dn = dayNightOf(sim)
   const rows = dn ? ((isDayAt(dn.hour) ? m.dayMix : m.nightMix) ?? m.mix) : m.mix
   return enemyMixAt(rows, sim.run.wave)
 }
 
-/** 休眠者不计 */
 export function awakeCount(sim: Sim): number {
   let n = 0
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) if (!Dormant.v[eid]) n++
+  for (const eid of query(sim.world, ENEMY_SET)) if (!Dormant.v[eid]) n++
   return n
 }
 
-/** forceElite 强制精英 */
 export function telegraphOne(sim: Sim, hpMultiplier: number, forceElite = false): void {
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
   const elite = !sim.sandbox && (forceElite || (sim.run.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance))
@@ -312,7 +307,6 @@ export function telegraphOne(sim: Sim, hpMultiplier: number, forceElite = false)
   spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, false)
 }
 
-/** 只排何时出；落点与出怪表到点才算 */
 export function spawnSurge(sim: Sim): void {
   if (sim.over) return
   const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
@@ -328,7 +322,6 @@ export function spawnBoss(sim: Sim): void {
   spawnTelegraph(sim, def, pos.x, pos.y, def.hp, false, true, undefined, SPAWN.telegraphMs * 1.6)
 }
 
-/** 场上过挤则跳过 */
 export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
   if (sim.over) return
   if (awakeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
@@ -338,12 +331,8 @@ export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
   spawnTelegraph(sim, def, pos.x, pos.y, hp, false, false, pickup)
 }
 
-// ── 魔尘变形 ──
+const MORPH_RECAST_CD = 5000
 
-/** 变形 + 复形冷却 */
-export const MORPH_RECAST_CD = 5000
-
-/** Boss 或冷却中拒绝 */
 export function applyMorph(
   sim: Sim,
   atlas: FrameIndex,

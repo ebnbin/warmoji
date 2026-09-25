@@ -14,13 +14,13 @@ import { UIScene } from './scene/UIScene'
 import { WikiScene } from './scene/WikiScene'
 import { EcsBattleScene } from './ecs/EcsBattleScene'
 import { SandboxScene } from './ecs/sandbox/SandboxScene'
-import { BATTLE_SCENE_KEY } from './ecs/keys'
 import { browserStorage } from './util/storage'
 import { getRun } from './run/state'
 import { loadSettings } from './save/settings'
 import { initBgm, playBgm, setBgmEnabled } from './audio/bgm'
 import { initSfx, setSfxEnabled } from './audio/sfx'
 import { isStandalone, nudgeIosViewport, refreshViewport, viewport } from './util/apply'
+import { SceneKey } from './scene/keys'
 
 const badge = document.getElementById('build-badge')
 if (badge) {
@@ -34,12 +34,9 @@ setSfxEnabled(loadSettings(browserStorage()).sound)
 setBgmEnabled(loadSettings(browserStorage()).bgm)
 
 const game = new Phaser.Game({
-  // 只支持 WebGL：拿不到的浏览器在 boot.ts 就被拦下
   type: Phaser.WEBGL,
   parent: 'game',
-  // 背景渐变画在 canvas 之下，canvas 须透明
   transparent: true,
-  // mipmap 依赖 emoji 纹理为 2 次幂尺寸。pixelArt 沿用 Phaser 3 的默认判据 zoom !== 1
   render: { mipmapFilter: 'LINEAR_MIPMAP_LINEAR', pixelArt: viewport.dpr !== 1 },
   width: Math.round(viewport.cssWidth * viewport.dpr),
   height: Math.round(viewport.cssHeight * viewport.dpr),
@@ -50,22 +47,28 @@ const game = new Phaser.Game({
 
 game.events.once(Phaser.Core.Events.READY, () => {
   refreshViewport(game, true)
-  // iOS PWA 冷启动后视口尺寸异步稳定
   for (const delay of [0, 100, 500, 1000]) {
     window.setTimeout(() => nudgeIosViewport(() => refreshViewport(game)), delay)
   }
-  const lobby = ['menu', 'map', 'wiki', 'studio', 'settings', 'captain', 'recruit', 'formation', 'cards', 'shop', 'result']
-  for (const scene of game.scene.getScenes(false)) {
-    const key = scene.scene.key
-    if (lobby.includes(key)) {
-      scene.events.on(Phaser.Scenes.Events.START, () => playBgm('lobby'))
-    } else if (key === BATTLE_SCENE_KEY) {
-      scene.events.on(Phaser.Scenes.Events.START, () => playBgm(getRun().mapId))
-    }
+  const lobby = [
+    SceneKey.Menu,
+    SceneKey.Map,
+    SceneKey.Wiki,
+    SceneKey.Studio,
+    SceneKey.Settings,
+    SceneKey.Captain,
+    SceneKey.Recruit,
+    SceneKey.Formation,
+    SceneKey.Cards,
+    SceneKey.Shop,
+    SceneKey.Result,
+  ]
+  for (const key of lobby) {
+    game.scene.getScene(key).events.on(Phaser.Scenes.Events.START, () => playBgm('lobby'))
   }
+  game.scene.getScene(SceneKey.Battle).events.on(Phaser.Scenes.Events.START, () => playBgm(getRun().mapId))
 })
 
-// iOS 旋转/启动后视口尺寸异步稳定且不补发 resize
 let resizeTimer: number | undefined
 const scheduleRefresh = (): void => {
   window.clearTimeout(resizeTimer)

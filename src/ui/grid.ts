@@ -5,27 +5,25 @@ import { emojiImage } from '../emoji/hold'
 import { clipTo } from '../util/mask'
 import { roundRect } from './shapes'
 
-export interface EmojiGridItem {
-  key: string
+export interface EmojiGridItem<K> {
+  key: K
   emoji: string
   outline?: OutlineKind
   badge?: string
-  /** 0..1；undefined 不显示 */
   hpRatio?: number
 }
 
-interface Cell {
-  item: EmojiGridItem
+interface Cell<K> {
+  item: EmojiGridItem<K>
   relX: number
   relY: number
   bg: Phaser.GameObjects.Graphics
 }
 
-// 逻辑 px
 const GAP = 10
 
-export class EmojiGrid {
-  onTap?: (key: string) => void
+export class EmojiGrid<K> {
+  onTap?: (key: K) => void
   onScroll?: () => void
 
   private scene: Phaser.Scene
@@ -34,8 +32,8 @@ export class EmojiGrid {
   private readonly gap = GAP
   private cols: number
   private container: Phaser.GameObjects.Container
-  private cells: Cell[] = []
-  private selectedKey: string | null = null
+  private cells: Cell<K>[] = []
+  private selectedKey: K | null = null
   private scroll = 0
   private max = 0
   private contentHeight = 0
@@ -64,12 +62,11 @@ export class EmojiGrid {
     mask.fillRect(rect.x, rect.y, rect.w, rect.h)
     clipTo(this.container, mask)
 
-    // 只有这一个命中区：逐格 zone 在遮罩外照常拦截输入（遮罩不裁点击）
     scene.add
       .zone(rect.x, rect.y, rect.w, rect.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', (p: Phaser.Input.Pointer) => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, (p: Phaser.Input.Pointer) => {
         if (this.dragMovedFlag) return
         const pitch = this.cell + this.gap
         const lx = p.worldX - rect.x
@@ -81,19 +78,18 @@ export class EmojiGrid {
         if (item) this.onTap?.(item.key)
       })
 
-    scene.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+    scene.input.on(Phaser.Input.Events.POINTER_WHEEL, (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (this.contains(p)) this.setScroll(this.scroll + dy * 0.6)
     })
-    scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+    scene.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
       this.dragMovedFlag = false
-      // 恒赋值：上一轮手势异常结束（出画布/系统打断）不能把拖动态卡住
       this.dragging = this.contains(p)
       if (this.dragging) {
         this.dragStartY = p.worldY
         this.dragStartScroll = this.scroll
       }
     })
-    scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+    scene.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dy = this.dragStartY - p.worldY
       if (this.max > 0 && Math.abs(dy) > TAP_SLOP) this.dragMovedFlag = true
@@ -102,23 +98,19 @@ export class EmojiGrid {
     const release = (): void => {
       this.dragging = false
     }
-    scene.input.on('pointerup', release)
-    scene.input.on('pointerupoutside', release)
+    scene.input.on(Phaser.Input.Events.POINTER_UP, release)
+    scene.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, release)
   }
 
   get scrollY(): number {
     return this.scroll
   }
 
-  get contentH(): number {
-    return this.contentHeight
-  }
-
   get wasDragged(): boolean {
     return this.dragMovedFlag
   }
 
-  setItems(items: readonly EmojiGridItem[]): void {
+  setItems(items: readonly EmojiGridItem<K>[]): void {
     this.container.removeAll(true)
     this.cells = []
     const pitch = this.cell + this.gap
@@ -158,20 +150,9 @@ export class EmojiGrid {
     this.redraw()
   }
 
-  setSelected(key: string | null): void {
+  setSelected(key: K | null): void {
     this.selectedKey = key
     this.redraw()
-  }
-
-  /** 视口坐标；e2e 用 */
-  cellRects(): { key: string; x: number; y: number; w: number; h: number }[] {
-    return this.cells.map((c) => ({
-      key: c.item.key,
-      x: this.rect.x + c.relX,
-      y: this.rect.y + c.relY - this.scroll,
-      w: this.cell,
-      h: this.cell,
-    }))
   }
 
   private contains(p: Phaser.Input.Pointer): boolean {

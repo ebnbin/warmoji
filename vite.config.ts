@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from 'vite'
 
 function commitHash(): string {
   const fromEnv = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA
@@ -21,8 +21,5 @@ export default defineConfig({
   define: {
     __BUILD_HASH__: JSON.stringify(commitHash()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'),
-  },
-  test: {
-    include: ['src/**/*.test.ts'],
   },
 })

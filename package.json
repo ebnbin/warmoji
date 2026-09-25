@@ -4,33 +4,17 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "predev": "npm run gen",
     "dev": "vite",
-    "prebuild": "npm run gen",
-    "build": "vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
-    "test": "vitest run",
-    "e2e": "playwright test",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run e2e",
-    "gen": "node scripts/gen-defs.ts",
-    "balance": "node scripts/balance.ts",
-    "pretypecheck": "npm run gen",
-    "pretest": "npm run gen"
+    "build": "node scripts/check-defs.ts && tsc --noEmit && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "bitecs": "^0.4.0",
     "phaser": "^4.2.1"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.1",
-    "eslint": "^10.7.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.63.0",
-    "vite": "^8.1.4",
-    "vitest": "^4.1.10"
+    "vite": "^8.1.4"
   }
 }

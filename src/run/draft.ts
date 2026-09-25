@@ -7,8 +7,7 @@ import type { CardId } from '../types/cards'
 import type { CharacterDef, UpgradeTiers } from '../types/characters'
 import type { LevelProgress } from '../types/charLevel'
 
-/** 相对权重，不必和为 1 */
-export function rarityWeights(wave: number, level = 1): Record<ItemRarity, number> {
+function rarityWeights(wave: number, level = 1): Record<ItemRarity, number> {
   const lv = Math.max(0, level - 1)
   const rare = Math.min(0.5, 0.06 + 0.02 * wave + 0.14 * lv)
   const epicBase = wave < 5 ? 0 : Math.min(0.2, 0.025 * (wave - 4))
@@ -18,7 +17,7 @@ export function rarityWeights(wave: number, level = 1): Record<ItemRarity, numbe
 }
 export function characterPoolFor(def: CharacterDef, level: number): ItemId[] {
   const tiers: UpgradeTiers = { u1: level >= 2, u2: level >= 3 }
-  const kinds = new Set<string>(loadoutFor(def, tiers).map((w) => w.kind))
+  const kinds = new Set(loadoutFor(def, tiers).map((w) => w.kind))
   return ITEM_IDS.filter((iid) => {
     const item: ItemDef = ITEMS[iid]
     if ((item.minLevel ?? 1) > level) return false
@@ -28,11 +27,10 @@ export function characterPoolFor(def: CharacterDef, level: number): ItemId[] {
 export function stackCount(owned: readonly ItemId[], id: ItemId): number {
   return owned.filter((x) => x === id).length
 }
-export function reachedStackLimit(owned: readonly ItemId[], id: ItemId): boolean {
+function reachedStackLimit(owned: readonly ItemId[], id: ItemId): boolean {
   const def: ItemDef = ITEMS[id]
   return def.maxStacks !== undefined && stackCount(owned, id) >= def.maxStacks
 }
-/** 全部达上限返回 null；先按权重抽稀有度档（无货档不参与），再在档内均匀抽 */
 export function rollItem(
   pool: readonly ItemId[],
   owned: readonly ItemId[],
@@ -64,12 +62,11 @@ export function rollItem(
   return pickList[Math.min(pickList.length - 1, Math.floor(rand() * pickList.length))]!
 }
 
-export function cardAtMax(owned: Readonly<Record<string, number>>, id: CardId): boolean {
+function cardAtMax(owned: Readonly<Partial<Record<CardId, number>>>, id: CardId): boolean {
   return (owned[id] ?? 0) >= CARDS[id].maxLevel
 }
-/** 互不相同、未满级；池不够时返回更少 */
 export function rollCardChoices(
-  owned: Readonly<Record<string, number>>,
+  owned: Readonly<Partial<Record<CardId, number>>>,
   rand: () => number,
   count: number,
   wave = 1,
@@ -98,10 +95,10 @@ export function rollCardChoices(
 
 export function levelProgress(xp: number): LevelProgress {
   const level = characterLevel(xp)
-  if (level >= MAX_CHAR_LEVEL) return { level, maxed: true, cur: 0, need: 0, ratio: 1 }
+  if (level >= MAX_CHAR_LEVEL) return { maxed: true, cur: 0, need: 0, ratio: 1 }
   const prev = level === 1 ? 0 : CHAR_XP_THRESHOLDS[level - 2]!
   const next = CHAR_XP_THRESHOLDS[level - 1]!
   const cur = xp - prev
   const need = next - prev
-  return { level, maxed: false, cur, need, ratio: Math.max(0, Math.min(1, cur / need)) }
+  return { maxed: false, cur, need, ratio: Math.max(0, Math.min(1, cur / need)) }
 }

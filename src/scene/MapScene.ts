@@ -2,14 +2,12 @@ import Phaser from 'phaser'
 import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
-import { BATTLE_SCENE_KEY } from '../ecs/keys'
 import { beginSandboxRun } from '../ecs/sandbox/knobs'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
 import { loadMap, saveMap } from '../save/selection'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage, preloadEmojis } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
@@ -17,6 +15,7 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
+import { SceneKey } from './keys'
 
 const MAP_PLAY_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> = {
   bounded: '有界竞技场：25×25 方场，边界围合',
@@ -56,13 +55,12 @@ const PORTRAIT: MapLayout = {
 }
 
 export class MapScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private selectedId: MapId = MAP_IDS[0]!
   private layout!: MapLayout
   private origin = { x: 0, y: 0 }
-  private grid!: EmojiGrid
+  private grid!: EmojiGrid<MapId>
   private detailView!: ScrollView
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private confirmLabel!: Phaser.GameObjects.Text
@@ -72,7 +70,7 @@ export class MapScene extends Phaser.Scene {
   private sandboxLabel!: Phaser.GameObjects.Text
 
   constructor() {
-    super('map')
+    super(SceneKey.Map)
   }
 
   preload(): void {
@@ -110,7 +108,7 @@ export class MapScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.scene.start('menu'))
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.scene.start(SceneKey.Menu))
     this.add
       .text(w / 2, oy + L.headerY, '选择地图', {
         fontFamily: UI_FONT,
@@ -139,7 +137,7 @@ export class MapScene extends Phaser.Scene {
       .zone(t.x, t.y, t.w, t.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         playSfx('click')
         this.sandbox = !this.sandbox
         this.refresh()
@@ -148,7 +146,7 @@ export class MapScene extends Phaser.Scene {
     this.grid = new EmojiGrid(this, { x: ox + L.list.x, y: oy + L.list.y, w: L.list.w, h: L.list.h })
     this.grid.onTap = (key): void => {
       playSfx('click')
-      this.selectedId = key as MapId
+      this.selectedId = key
       saveMap(browserStorage(), this.selectedId)
       this.refresh()
     }
@@ -183,19 +181,19 @@ export class MapScene extends Phaser.Scene {
       playSfx('click')
       if (this.sandbox) {
         beginSandboxRun(this.selectedId)
-        this.scene.start(BATTLE_SCENE_KEY)
+        this.scene.start(SceneKey.Battle)
         return
       }
-      this.scene.start('captain')
+      this.scene.start(SceneKey.Captain)
     }
     this.add
       .zone(b.x, b.y, b.w, b.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', confirm)
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, confirm)
     this.input.keyboard?.on('keydown-ENTER', confirm)
     this.input.keyboard?.on('keydown-SPACE', confirm)
-    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
+    this.input.keyboard?.on('keydown-ESC', () => this.scene.start(SceneKey.Menu))
 
     this.refresh()
 
@@ -292,33 +290,6 @@ export class MapScene extends Phaser.Scene {
     this.sandboxLabel.setColor(on ? '#25262e' : '#c8c8d4')
     this.confirmLabel.setText(on ? '进入试炼场' : '选择队长')
     this.renderDetail(textRes())
-    this.reportMap()
-  }
-
-  private reportMap(): void {
-    reportDebug({
-      scene: 'map',
-      elapsed: 0,
-      kills: 0,
-      level: 1,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      map: {
-        selected: this.selectedId,
-        items: this.grid.cellRects().map((r) => ({ id: r.key, x: r.x, y: r.y, w: r.w, h: r.h })),
-        start: {
-          x: this.btnRect.x + this.btnRect.w / 2,
-          y: this.btnRect.y + this.btnRect.h / 2,
-          w: this.btnRect.w,
-          h: this.btnRect.h,
-        },
-        sandbox: {
-          x: Math.round(this.sandboxRect.x + this.sandboxRect.w / 2),
-          y: Math.round(this.sandboxRect.y + this.sandboxRect.h / 2),
-          on: this.sandbox,
-        },
-      },
-    })
   }
 
   private onViewportChanged(): void {

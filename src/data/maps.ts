@@ -1,21 +1,21 @@
-import mapsJson from '../assets/maps.json'
-import mapDefaultsJson from '../assets/mapdefaults.json'
+import { MAPS as MAP_TABLE } from '../../defs/maps'
+import { MAP_DEFAULTS } from '../../defs/mapdefaults'
+import { keysOf } from '../util/record'
 
 import { ENEMIES } from './enemies'
-import type { EnemyDef } from '../types/enemies'
-import type { DecorInstance, MapDecor, MapDef, MapDefaults, MapId } from '../types/maps'
+import type { EnemyDef, EnemyKind } from '../types/enemies'
+import type { DecorInstance, Hazard, MapDecor, MapDef, MapDefaults, MapId } from '../types/maps'
 
-export const MAPS = mapsJson as unknown as Record<MapId, MapDef>
+export const MAPS: Record<MapId, MapDef> = MAP_TABLE
 
-export const MAP_IDS = Object.keys(MAPS) as readonly MapId[]
+export const MAP_IDS: readonly MapId[] = keysOf(MAPS)
 
 export function bossFor(id: MapId): EnemyDef {
-  return ENEMIES[MAPS[id].boss]!
+  return ENEMIES[MAPS[id].boss]
 }
 
-/** 含衍生子代；按出现序去重，子代紧随亲代，Boss 末位 */
 export function mapEnemyRoster(id: MapId): EnemyDef[] {
-  const seen = new Set<string>()
+  const seen = new Set<EnemyKind>()
   const out: EnemyDef[] = []
   const add = (def: EnemyDef): void => {
     if (seen.has(def.kind)) return
@@ -24,17 +24,11 @@ export function mapEnemyRoster(id: MapId): EnemyDef[] {
     if (def.spawner) add(def.spawner.into)
     for (const fx of def.onDeath ?? []) if (fx.kind === 'split') add(fx.into)
   }
-  for (const row of MAPS[id].mix) {
-    const def = ENEMIES[row.kind]
-    if (def) add(def)
-  }
+  for (const row of MAPS[id].mix) add(ENEMIES[row.kind])
   add(bossFor(id))
   return out
 }
 
-// ── 装饰散布 ──
-
-/** 返回 (xU, yU) → 0..1；晶格取自同一 rand 流，同种子同摆放 */
 function noiseField(
   rand: () => number,
   cols: number,
@@ -61,7 +55,6 @@ function noiseField(
   }
 }
 
-/** 按 run 种子生成，同局各波不变 */
 export function rollDecor(
   def: MapDecor,
   rand: () => number,
@@ -92,4 +85,6 @@ export function rollDecor(
   return out
 }
 
-export const MAP = mapDefaultsJson as unknown as MapDefaults
+export const MAP: MapDefaults = MAP_DEFAULTS
+
+export const HAZARD_NAMES: Record<Hazard, string> = { coldWater: '寒水', poisonFog: '毒雾', meteor: '天体' }

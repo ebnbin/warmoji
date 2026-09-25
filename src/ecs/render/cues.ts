@@ -7,17 +7,14 @@ import type { EcsWorld } from '../world'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment } from './tri'
 import type { Scratch } from './tri'
 import { SHAPE_BANDS as BANDS } from './bands'
-import { EcsLayer } from './layer'
+import { EcsLayer, LayerType } from './layer'
 import { packTint } from './tint'
 import { mainCameraOnly } from '../../util/camera'
-
-// 四种形状类特效各是实体，画在 EcsShapeBatch；进度按 Fx.bornMs / durMs 在 renderWebGL 现算，时钟取 sim.fxMs
 
 
 export interface CircleCue {
   readonly fill: number
   readonly fillAlpha: number
-  /** 省略即无描边 */
   readonly stroke?: number
   readonly lineWidth?: number
   readonly lineAlpha?: number
@@ -28,14 +25,12 @@ export interface CircleCue {
 }
 
 
-/** 空闲槽位标记（born 存的是 fxMs，恒 ≥ 0） */
 const FREE = -1
 
 
 type Matrix = Phaser.GameObjects.Components.TransformMatrix
 
 export class CueLayer {
-  // 屏幕固定，不在世界坐标里
   private readonly flash: Phaser.GameObjects.Rectangle
   private flashBorn = FREE
   private flashDur = 0
@@ -44,7 +39,6 @@ export class CueLayer {
   private readonly batches: EcsShapeBatch[] = []
   private readonly scratch: Scratch = newScratch()
 
-  /** step 每帧写入，投放取它作为起点 */
   private now = 0
 
   constructor(scene: Phaser.Scene, private readonly world: EcsWorld) {
@@ -64,7 +58,6 @@ export class CueLayer {
     this.batches.length = 0
   }
 
-  /** 须在本帧的投放之前调用 */
   step(fxMs: number): void {
     this.now = fxMs
     if (this.flashBorn !== FREE) {
@@ -101,7 +94,6 @@ export class CueLayer {
       }
     }
 
-    // 光束外层在 7 带、白芯在 8 带
     const outer = zMin < 8
     const core = zMin >= 8 && zMax <= 9
     if (outer || core) {
@@ -128,7 +120,6 @@ export class CueLayer {
       }
     }
 
-    // 闪电与斩击恒在最上一带
     if (zMax === Infinity) {
       for (const k of query(this.world, [Fx, FxBolt])) {
         const color = packTint(FxBolt.color[k]!, 0.95 * (1 - age(k)))
@@ -159,28 +150,25 @@ export class CueLayer {
   }
 }
 
-/** renderWebGL 由 RenderSteps 以裸函数调用，无 this 绑定，状态一律走 src */
 class EcsShapeBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
 
   constructor(scene: Phaser.Scene, private readonly layer: CueLayer, private readonly band: number) {
-    super(scene, 'EcsShapeBatch', BANDS[band]!.depth)
+    super(scene, LayerType.Shape, BANDS[band]!.depth)
     scene.add.existing(this)
   }
 
   renderWebGL(
     renderer: Phaser.Renderer.WebGL.WebGLRenderer,
-    src: Phaser.GameObjects.GameObject,
+    self: EcsShapeBatch,
     drawingContext: Phaser.Renderer.WebGL.DrawingContext,
   ): void {
-    const self = src as EcsShapeBatch
     const camera = drawingContext.camera
     if (!camera) return
     const node = renderer.renderNodes.getNode('BatchHandlerTriFlat') as
       | { batch: (ctx: unknown, i: number[], v: number[], c: number[], l: null) => void }
       | null
     if (!node) return
-    // v4 的视图矩阵已含 scroll；实参与核心各 Transformer 一致（!useCanvas）
     const m = self.camMatrix.copyFrom(camera.getViewMatrix(!drawingContext.useCanvas))
     const o = self.layer.buildBand(self.band, m)
     if (o.i.length === 0) return

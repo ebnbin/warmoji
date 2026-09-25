@@ -8,7 +8,6 @@ import { targetsNear } from '../../utils/targets'
 import type { Sim } from '../../sim'
 import { spawnFxBeam } from '../../entities/fx'
 
-/** ratio 为扫射分束的折损 */
 export function fireBeam(sim: Sim, e: number, angle: number, ratio: number): void {
   const src = sourceOf(sim, e)
   playSfx('zap')

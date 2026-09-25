@@ -14,6 +14,4 @@ git config author.email "ebnbin@gmail.com"
 
 git config core.hooksPath "$(git rev-parse --show-toplevel)/.claude/hooks/git"
 
-# --no-save：hook 不得改 package-lock.json
 npm install --no-audit --no-fund --no-save
-npm run gen

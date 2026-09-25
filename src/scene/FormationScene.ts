@@ -8,7 +8,6 @@ import { Rng } from '../util/rng'
 import { getRun, guardCenter, guardOrder, setGuardCenter } from '../run/state'
 import type { RunState } from '../run/state'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/hold'
 import { ScrollView } from '../ui/scroll'
 import type { ScrollRect } from '../ui/scroll'
@@ -27,9 +26,9 @@ import {
   teamLayout,
 } from './teamPage'
 import type { TeamLayout } from './teamPage'
+import { SceneKey } from './keys'
 
 export class FormationScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
@@ -42,21 +41,16 @@ export class FormationScene extends Phaser.Scene {
   private memberObjs: Phaser.GameObjects.GameObject[] = []
   private memberImgs: Phaser.GameObjects.Image[] = []
   private memberZones: Phaser.GameObjects.Zone[] = []
-  private memberRects: { id: string; x: number; y: number; w: number; h: number }[] = []
   private iconSize = 80
   private phase = 0
   private geom = { cx: 0, cy: 0, scale: 1 }
-  private reportTimer = 0
-  private btnRect = { x: 0, y: 0, w: 0, h: 0 }
-  private backRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
-    super('formation')
+    super(SceneKey.Formation)
   }
 
   init(data?: { fromShop?: boolean }): void {
-    // Phaser 的 scene.start 不传 data 时沿用上一次的 data，故以商店确实在沉睡为准
-    this.fromShop = !!data?.fromShop && this.scene.isSleeping('shop')
+    this.fromShop = !!data?.fromShop && this.scene.isSleeping(SceneKey.Shop)
   }
 
   create(): void {
@@ -96,19 +90,18 @@ export class FormationScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5)
         .setInteractive({ useHandCursor: true })
-      back.on('pointerup', () => this.exitToShop())
-      this.backRect = { x: back.x, y: back.y - back.height / 2, w: back.width, h: back.height }
+      back.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.exitToShop())
       this.input.keyboard?.on('keydown-ESC', () => this.exitToShop())
     } else {
-      this.backRect = addRunExit(this, this.run, this.origin.x + 40, oy + L.headerY, res)
+      addRunExit(this, this.run, this.origin.x + 40, oy + L.headerY, res)
     }
 
     const D = L.detail
     this.detailRect = { x: this.origin.x + D.x, y: oy + D.y, w: D.w, h: D.h }
     this.detailView = new ScrollView(this, this.detailRect)
 
-    const label = this.fromShop ? '返回商店' : nextAfterTeam(this.run) === 'shop' ? '前往商店' : '开战'
-    this.btnRect = addConfirmButton(this, L, this.origin, label, res, () => this.confirm()).rect
+    const label = this.fromShop ? '返回商店' : nextAfterTeam(this.run) === SceneKey.Shop ? '前往商店' : '开战'
+    addConfirmButton(this, L, this.origin, label, res, () => this.confirm())
 
     this.rebuild()
 
@@ -129,7 +122,7 @@ export class FormationScene extends Phaser.Scene {
 
   private exitToShop(): void {
     playSfx('click')
-    this.scene.wake('shop')
+    this.scene.wake(SceneKey.Shop)
     this.scene.stop()
   }
 
@@ -142,7 +135,6 @@ export class FormationScene extends Phaser.Scene {
     this.memberObjs = []
     this.memberImgs = []
     this.memberZones = []
-    this.memberRects = []
     const res = textRes()
     const L = this.layout.list
     const lx = this.origin.x + L.x
@@ -182,10 +174,9 @@ export class FormationScene extends Phaser.Scene {
         .zone(px - half, py - half, size, size)
         .setOrigin(0)
         .setInteractive({ useHandCursor: post !== 0 })
-        .on('pointerup', () => this.onMemberTap(post))
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.onMemberTap(post))
       this.memberObjs.push(zone)
       this.memberZones[post] = zone
-      this.memberRects[post] = { id, x: px - half, y: py - half, w: size, h: size }
     })
 
     this.memberObjs.push(
@@ -201,7 +192,6 @@ export class FormationScene extends Phaser.Scene {
     )
 
     this.renderCenterDetail(res)
-    this.report()
   }
 
   private layoutMembers(): void {
@@ -213,14 +203,11 @@ export class FormationScene extends Phaser.Scene {
       if (post === 0) return
       const img = this.memberImgs[post]
       const zone = this.memberZones[post]
-      const rect = this.memberRects[post]
-      if (!img || !zone || !rect) return
+      if (!img || !zone) return
       const px = cx + p.x * scale
       const py = cy + p.y * scale
       img.setPosition(px, py)
       zone.setPosition(px - half, py - half)
-      rect.x = px - half
-      rect.y = py - half
     })
   }
 
@@ -228,12 +215,6 @@ export class FormationScene extends Phaser.Scene {
     if (this.swapBusy) return
     this.phase += (delta / 1000) * PREVIEW_SPIN
     this.layoutMembers()
-    // 外圈在转，e2e 上报的矩形须定期刷新
-    this.reportTimer += delta
-    if (this.reportTimer >= 300) {
-      this.reportTimer = 0
-      this.report()
-    }
   }
 
   private onMemberTap(post: number): void {
@@ -302,35 +283,6 @@ export class FormationScene extends Phaser.Scene {
     const start = Math.max(128, 80 + subtitle.height + 12)
     const end = renderStatGroups(this, this.detailView, D.w, center, items, res, start)
     this.detailView.setContentHeight(end + 12)
-  }
-
-  private report(): void {
-    reportDebug({
-      scene: 'formation',
-      elapsed: 0,
-      kills: this.run.kills,
-      level: this.run.xp.level,
-      wave: this.run.wave,
-      coins: this.run.coins,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      formation: {
-        center: guardCenter(this.run) ?? '',
-        items: this.memberRects.map((r) => ({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h })),
-        confirm: {
-          x: this.btnRect.x + this.btnRect.w / 2,
-          y: this.btnRect.y + this.btnRect.h / 2,
-          w: this.btnRect.w,
-          h: this.btnRect.h,
-        },
-        back: {
-          x: this.backRect.x + this.backRect.w / 2,
-          y: this.backRect.y + this.backRect.h / 2,
-          w: this.backRect.w,
-          h: this.backRect.h,
-        },
-      },
-    })
   }
 
   private onViewportChanged(): void {

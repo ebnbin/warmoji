@@ -133,7 +133,6 @@ export const CAPTAINS = {
       abilities: ['timeFreeze'],
     },
   },
-  // 测试专用：不进队长选择页
   tester: {
     emoji: '1f9ea',
     name: '测试员',

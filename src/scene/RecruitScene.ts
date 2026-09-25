@@ -16,9 +16,9 @@ import {
 } from '../run/state'
 import type { RunState } from '../run/state'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
+import type { EmojiGridItem } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
 import type { ScrollRect } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
@@ -36,22 +36,20 @@ import {
   teamLayout,
 } from './teamPage'
 import type { TeamLayout } from './teamPage'
+import { SceneKey } from './keys'
 
 export class RecruitScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
-  /** 角色 id 或 lock-N */
-  private selectedKey = ''
+  private selectedKey: CharacterId | number | null = null
   private due = 0
   private pool: CharacterId[] = []
   private unlocked = 0
-  /** 顺序即入队槽位序 */
   private picked: CharacterId[] = []
   private layout!: TeamLayout
   private origin = { x: 0, y: 0 }
-  private grid!: EmojiGrid
+  private grid!: EmojiGrid<CharacterId | number>
   private detailView!: ScrollView
   private detailRect: ScrollRect = { x: 0, y: 0, w: 0, h: 0 }
   private previewPhase = 0
@@ -60,11 +58,9 @@ export class RecruitScene extends Phaser.Scene {
   private previewObjs: Phaser.GameObjects.GameObject[] = []
   private btnBg!: Phaser.GameObjects.Graphics
   private btnLabel!: Phaser.GameObjects.Text
-  private btnRect = { x: 0, y: 0, w: 0, h: 0 }
-  private backRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
-    super('recruit')
+    super(SceneKey.Recruit)
   }
 
   create(): void {
@@ -85,7 +81,7 @@ export class RecruitScene extends Phaser.Scene {
       ? this.picked.filter((id) => open.includes(id)).slice(0, this.due)
       : []
     if (!preserved || !this.validSelected()) {
-      this.selectedKey = open[0] ?? ''
+      this.selectedKey = open[0] ?? null
     }
 
     const w = viewport.logicalWidth
@@ -97,7 +93,7 @@ export class RecruitScene extends Phaser.Scene {
     const dragged = (): boolean => this.grid.wasDragged
 
     addTeamFrame(this, L, this.origin, isInitialWave(this.run) ? '组建队伍' : '队伍整编', this.stepBanner(), res)
-    this.backRect = addRunExit(this, this.run, this.origin.x + 40, oy + L.headerY, res, dragged)
+    addRunExit(this, this.run, this.origin.x + 40, oy + L.headerY, res, dragged)
 
     const T = L.detailText
     this.detailRect = { x: this.origin.x + T.x, y: oy + T.y, w: T.w, h: T.h }
@@ -123,12 +119,11 @@ export class RecruitScene extends Phaser.Scene {
     this.grid.onTap = (key): void => {
       playSfx('click')
       this.selectedKey = key
-      if (this.cardState(key) === 'open') {
-        const id = key as CharacterId
-        const at = this.picked.indexOf(id)
+      if (typeof key !== 'number' && this.cardState(key) === 'open') {
+        const at = this.picked.indexOf(key)
         if (at >= 0) this.picked.splice(at, 1)
-        else if (this.picked.length < this.due) this.picked.push(id)
-        else if (this.due === 1) this.picked = [id]
+        else if (this.picked.length < this.due) this.picked.push(key)
+        else if (this.due === 1) this.picked = [key]
       }
       this.refresh()
     }
@@ -137,7 +132,6 @@ export class RecruitScene extends Phaser.Scene {
     const btn = addConfirmButton(this, L, this.origin, this.confirmLabel(), res, () => this.confirm(), dragged)
     this.btnBg = btn.bg
     this.btnLabel = btn.label
-    this.btnRect = btn.rect
 
     this.refresh()
 
@@ -168,27 +162,22 @@ export class RecruitScene extends Phaser.Scene {
     }
   }
 
-  // ── 数据 ────────────────────────────────────────────────────
-
-  private cardState(key: string): 'locked' | 'taken' | 'open' {
-    if (key.startsWith('lock-')) return 'locked'
-    const idx = this.pool.indexOf(key as CharacterId)
+  private cardState(id: CharacterId): 'locked' | 'taken' | 'open' {
+    const idx = this.pool.indexOf(id)
     if (idx < 0 || idx >= this.unlocked) return 'locked'
-    return this.run.roster.includes(key as CharacterId) ? 'taken' : 'open'
+    return this.run.roster.includes(id) ? 'taken' : 'open'
   }
 
   private validSelected(): boolean {
-    if (!this.selectedKey) return false
-    if (this.selectedKey.startsWith('lock-')) {
-      const idx = Number(this.selectedKey.slice(5))
-      return idx >= this.unlocked && idx < this.pool.length
-    }
-    return this.pool.includes(this.selectedKey as CharacterId)
+    const sel = this.selectedKey
+    if (sel === null) return false
+    if (typeof sel === 'number') return sel >= this.unlocked && sel < this.pool.length
+    return this.pool.includes(sel)
   }
 
-  private buildItems(): { key: string; emoji: string; outline?: 'player'; badge?: string }[] {
+  private buildItems(): EmojiGridItem<CharacterId | number>[] {
     return this.pool.map((id, i) => {
-      if (i >= this.unlocked) return { key: `lock-${i}`, emoji: '2753' }
+      if (i >= this.unlocked) return { key: i, emoji: '2753' }
       return {
         key: id,
         emoji: CHARACTERS[id].emoji,
@@ -202,8 +191,6 @@ export class RecruitScene extends Phaser.Scene {
     })
   }
 
-  // ── 确认执行 ────────────────────────────────────────────────
-
   private confirm(): void {
     if (!this.confirmEnabled()) return
     for (const id of this.picked) {
@@ -211,7 +198,7 @@ export class RecruitScene extends Phaser.Scene {
     }
     playSfx('recruit')
     this.picked = []
-    this.selectedKey = ''
+    this.selectedKey = null
     this.scene.start(teamStep(this.run) ?? nextAfterTeam(this.run))
   }
 
@@ -220,18 +207,17 @@ export class RecruitScene extends Phaser.Scene {
     this.layoutPreview()
   }
 
-  // ── 详情（文字详情区，预览占掉面板一角） ────────────────────
-
   private renderDetail(res: number): void {
     this.detailView.clear()
-    if (!this.selectedKey) {
+    const sel = this.selectedKey
+    if (sel === null) {
       this.detailView.setContentHeight(0)
       return
     }
     const D = this.detailRect
 
-    if (this.selectedKey.startsWith('lock-')) {
-      const idx = Number(this.selectedKey.slice(5))
+    if (typeof sel === 'number') {
+      const idx = sel
       this.detailView.add([
         emojiImage(this, 46, 48, '2753', 74),
         this.add
@@ -257,7 +243,7 @@ export class RecruitScene extends Phaser.Scene {
       return
     }
 
-    const id = this.selectedKey as CharacterId
+    const id = sel
     const def = CHARACTERS[id]
     const state = this.cardState(id)
     const tag = state === 'taken' ? ' · 已入队' : this.picked.includes(id) ? ' · 已选' : ''
@@ -291,14 +277,11 @@ export class RecruitScene extends Phaser.Scene {
 
   private refresh(): void {
     this.grid.setItems(this.buildItems())
-    this.grid.setSelected(this.selectedKey || null)
+    this.grid.setSelected(this.selectedKey)
     this.renderDetail(textRes())
     this.rebuildPreview()
     this.updateConfirm()
-    this.report()
   }
-
-  // ── 队伍预览（详情面板内嵌，与阵型页同款慢转） ──────────────
 
   private rebuildPreview(): void {
     for (const t of this.previewTokens) t.zone?.destroy()
@@ -339,7 +322,7 @@ export class RecruitScene extends Phaser.Scene {
             .zone(c.x - size / 2, c.y - size / 2, size, size)
             .setOrigin(0)
             .setInteractive({ useHandCursor: true })
-            .on('pointerup', () => {
+            .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
               if (this.grid.wasDragged) return
               playSfx('click')
               const at = this.picked.indexOf(id)
@@ -394,45 +377,6 @@ export class RecruitScene extends Phaser.Scene {
       t.c.setPosition(x, y)
       t.zone?.setPosition(x - t.zone.width / 2, y - t.zone.height / 2)
     }
-  }
-
-  private report(): void {
-    reportDebug({
-      scene: 'recruit',
-      elapsed: 0,
-      kills: this.run.kills,
-      level: this.run.xp.level,
-      wave: this.run.wave,
-      coins: this.run.coins,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      recruit: {
-        selected: this.selectedKey,
-        items: this.grid.cellRects().map((r) => ({
-          id: r.key,
-          x: r.x,
-          y: r.y,
-          w: r.w,
-          h: r.h,
-          state: this.cardState(r.key),
-        })),
-        confirm: {
-          x: this.btnRect.x + this.btnRect.w / 2,
-          y: this.btnRect.y + this.btnRect.h / 2,
-          w: this.btnRect.w,
-          h: this.btnRect.h,
-          enabled: this.confirmEnabled(),
-        },
-        back: {
-          x: this.backRect.x + this.backRect.w / 2,
-          y: this.backRect.y + this.backRect.h / 2,
-          w: this.backRect.w,
-          h: this.backRect.h,
-        },
-        due: this.due,
-        picked: [...this.picked],
-      },
-    })
   }
 
   private onViewportChanged(): void {

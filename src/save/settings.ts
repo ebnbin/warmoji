@@ -1,16 +1,15 @@
+import { StorageKey } from '../util/storage'
 import type { StringStorage } from '../util/storage'
 
-// 新增选项须同步：Settings 字段 + DEFAULT_SETTINGS 默认值 + SETTING_DEFS 一行
 export interface Settings {
   damageNumbers: boolean
   hitShake: boolean
   sound: boolean
   bgm: boolean
-  /** 肤色变体是否展示；component 不受影响 */
   showSkinTone: boolean
 }
 
-export const DEFAULT_SETTINGS: Settings = {
+const DEFAULT_SETTINGS: Settings = {
   damageNumbers: true,
   hitShake: true,
   sound: true,
@@ -18,7 +17,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showSkinTone: false,
 }
 
-export type SettingKey = keyof Settings
+type SettingKey = keyof Settings
 
 export interface SettingDef {
   readonly key: SettingKey
@@ -35,13 +34,12 @@ export const SETTING_DEFS: readonly SettingDef[] = [
   { key: 'showSkinTone', icon: '1f44b_1f3fd', label: '肤色 emoji', desc: '图鉴与 Studio 全部页展示含肤色的 emoji 变体' },
 ]
 
-const KEY = 'warmoji.settings.v1'
-
-/** 逐字段取合法值，缺省回退默认 */
-export function sanitizeSettings(raw: unknown): Settings {
+function sanitizeSettings(raw: unknown): Settings {
   const obj = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
-  const pick = (k: SettingKey): boolean =>
-    typeof obj[k] === 'boolean' ? (obj[k] as boolean) : DEFAULT_SETTINGS[k]
+  const pick = (k: SettingKey): boolean => {
+    const v = obj[k]
+    return typeof v === 'boolean' ? v : DEFAULT_SETTINGS[k]
+  }
   return {
     damageNumbers: pick('damageNumbers'),
     hitShake: pick('hitShake'),
@@ -54,7 +52,7 @@ export function sanitizeSettings(raw: unknown): Settings {
 export function loadSettings(storage: StringStorage | undefined): Settings {
   if (!storage) return { ...DEFAULT_SETTINGS }
   try {
-    return sanitizeSettings(JSON.parse(storage.getItem(KEY) ?? 'null'))
+    return sanitizeSettings(JSON.parse(storage.getItem(StorageKey.Settings) ?? 'null'))
   } catch {
     return { ...DEFAULT_SETTINGS }
   }
@@ -62,8 +60,7 @@ export function loadSettings(storage: StringStorage | undefined): Settings {
 
 export function saveSettings(storage: StringStorage | undefined, settings: Settings): void {
   try {
-    storage?.setItem(KEY, JSON.stringify(settings))
+    storage?.setItem(StorageKey.Settings, JSON.stringify(settings))
   } catch {
-    // 隐私模式/配额写入失败可忽略
   }
 }

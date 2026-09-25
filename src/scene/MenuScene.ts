@@ -8,7 +8,6 @@ import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
 import { browserStorage } from '../util/storage'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage, preloadEmojis } from '../emoji/hold'
 import type { EmojiRef } from '../emoji/hold'
 import { iconLabel } from '../ui/emojiText'
@@ -16,6 +15,7 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
+import { SceneKey } from './keys'
 
 function backdropDecor(): EmojiRef[] {
   const uniqEnemies = [...new Set(ENEMY_DEFS.map((e) => e.emoji))]
@@ -40,17 +40,12 @@ function vignetteCast(): { heroes: string[]; foes: string[] } {
 }
 
 export class MenuScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private best!: HighScore
-  private menuBtn = { x: 0, y: 0, w: 0, h: 0 }
-  private gearRect = { x: 0, y: 0, w: 0, h: 0 }
-  private bookRect = { x: 0, y: 0, w: 0, h: 0 }
-  private studioRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
-    super('menu')
+    super(SceneKey.Menu)
   }
 
   preload(): void {
@@ -104,30 +99,26 @@ export class MenuScene extends Phaser.Scene {
     emojiImage(this, gearX, gearY, '2699', 54)
       .setAlpha(0.9)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         playSfx('click')
-        this.scene.start('settings')
+        this.scene.start(SceneKey.Settings)
       })
-    this.gearRect = { x: gearX - 28, y: gearY - 28, w: 56, h: 56 }
     emojiImage(this, gearX - 84, gearY, '1f4d6', 54)
       .setAlpha(0.9)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         playSfx('click')
-        this.scene.start('wiki')
+        this.scene.start(SceneKey.Wiki)
       })
-    this.bookRect = { x: gearX - 84 - 28, y: gearY - 28, w: 56, h: 56 }
     emojiImage(this, gearX - 168, gearY, '1f9ea', 54)
       .setAlpha(0.9)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         playSfx('click')
-        this.scene.start('studio')
+        this.scene.start(SceneKey.Studio)
       })
-    this.studioRect = { x: gearX - 168 - 28, y: gearY - 28, w: 56, h: 56 }
 
     const btn = { x: w / 2 - 170, y: h * 0.82 - 36, w: 340, h: 72 }
-    this.menuBtn = btn
     const btnBg = this.add.graphics()
     roundRect(btnBg, -btn.w / 2, -btn.h / 2, btn.w, btn.h, btn.h / 2, { fill: 0xffdc5d })
     const btnText = this.add
@@ -152,51 +143,16 @@ export class MenuScene extends Phaser.Scene {
       .zone(btn.x, btn.y, btn.w, btn.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         playSfx('click')
-        this.scene.start('map')
+        this.scene.start(SceneKey.Map)
       })
-    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('map'))
-    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('map'))
+    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start(SceneKey.Map))
+    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start(SceneKey.Map))
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
-    })
-
-    reportDebug({
-      scene: 'menu',
-      elapsed: 0,
-      kills: 0,
-      level: 1,
-      viewW: w,
-      viewH: h,
-      menu: {
-        start: {
-          x: this.menuBtn.x + this.menuBtn.w / 2,
-          y: this.menuBtn.y + this.menuBtn.h / 2,
-          w: this.menuBtn.w,
-          h: this.menuBtn.h,
-        },
-        settings: {
-          x: this.gearRect.x + this.gearRect.w / 2,
-          y: this.gearRect.y + this.gearRect.h / 2,
-          w: this.gearRect.w,
-          h: this.gearRect.h,
-        },
-        wiki: {
-          x: this.bookRect.x + this.bookRect.w / 2,
-          y: this.bookRect.y + this.bookRect.h / 2,
-          w: this.bookRect.w,
-          h: this.bookRect.h,
-        },
-        studio: {
-          x: this.studioRect.x + this.studioRect.w / 2,
-          y: this.studioRect.y + this.studioRect.h / 2,
-          w: this.studioRect.w,
-          h: this.studioRect.h,
-        },
-      },
     })
   }
 

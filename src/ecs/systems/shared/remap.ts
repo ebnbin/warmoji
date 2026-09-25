@@ -5,7 +5,6 @@ import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import { centerX, centerY, setCenter } from '../../utils/team'
 
-// 仅单屏图：世界尺寸由视口推出
 export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, toH: number): void {
   const fromH0 = isHorizontal(fromW, fromH)
   const toH0 = isHorizontal(toW, toH)
@@ -51,7 +50,7 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     Vel.x[eid] = v.x
     Vel.y[eid] = v.y
   }
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     movePos(eid)
     const d = rot(EDir.x[eid]!, EDir.y[eid]!)
     EDir.x[eid] = d.x
@@ -60,19 +59,18 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     Kv.x[eid] = k.x
     Kv.y[eid] = k.y
   }
-  // 浮动中的拾取物按落点重映射，浮动由下一帧 animatePickup 叠回
-  for (const eid of query(sim.world, PICKUP_SET as unknown as object[])) {
+  for (const eid of query(sim.world, PICKUP_SET)) {
     if (Bob.amp[eid]! > 0) Transform.y[eid] = Bob.y0[eid]!
   }
   for (const set of [PROJ_SET, PICKUP_SET]) {
-    for (const eid of query(sim.world, set as unknown as object[])) {
+    for (const eid of query(sim.world, set)) {
       movePos(eid)
       moveVel(eid)
     }
   }
-  for (const eid of query(sim.world, PICKUP_SET as unknown as object[])) Bob.y0[eid] = Transform.y[eid]!
+  for (const eid of query(sim.world, PICKUP_SET)) Bob.y0[eid] = Transform.y[eid]!
   for (const eid of query(sim.world, [Telegraph, Transform])) movePos(eid)
-  for (const eid of query(sim.world, ZONE_SET as unknown as object[])) movePos(eid)
+  for (const eid of query(sim.world, ZONE_SET)) movePos(eid)
   for (const eid of query(sim.world, [Minion, Transform])) movePos(eid)
   for (const f of query(sim.world, [Flyer, Transform])) {
     movePos(f)
@@ -83,7 +81,6 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     Flyer.destX[f] = to.x
     Flyer.destY[f] = to.y
   }
-  // 坠物按落点重映射，下落高度不变
   for (const d of query(sim.world, [Drop, Transform])) {
     const land = map(Transform.x[d]!, Drop.toY[d]!)
     const fall = Drop.toY[d]! - Drop.fromY[d]!

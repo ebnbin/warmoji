@@ -1,7 +1,6 @@
 import type { CharacterId } from '../src/types/characters'
 import type { CharacterEffects } from '../src/types/items'
 
-// 整体替换而非叠加：[0] = 2 级形态的完整加成，[1] = 3 级形态的完整加成
 type Tier = Partial<CharacterEffects>
 
 export const LEVEL_STATS = {

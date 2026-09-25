@@ -3,12 +3,11 @@ import { KNOCKBACK } from '../../data/abilities'
 import { Dormant, ENEMY_SET, Kv, Step } from '../components'
 import type { Sim } from '../sim'
 
-/** 位移与衰减都走真实帧长：时停期击退照飞，飞行距离不变 */
 export function applyKnockback(sim: Sim): void {
   const realDelta = sim.dtMs
   const kdt = realDelta / 1000
   const decay = Math.exp(-realDelta / (KNOCKBACK.tauMs * sim.hooks.knockbackTauMul(sim)))
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Dormant.v[eid]) continue
     const kvx = Kv.x[eid]!
     const kvy = Kv.y[eid]!

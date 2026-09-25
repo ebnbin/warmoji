@@ -1,10 +1,10 @@
-import itemsJson from '../assets/items.json'
-import economyJson from '../assets/economy.json'
+import { ITEMS as ITEM_TABLE } from '../../defs/items'
+import { ECONOMY } from '../../defs/economy'
+import { keysOf } from '../util/record'
 import type { CharacterEffects, TeamEffects, Economy, ItemRarity, ItemDef, ItemId } from '../types/items'
 import type { AbilityDef } from '../types/abilityDefs'
 
-/** 叠加的单位元 */
-export const TEAM_FX_IDENTITY: TeamEffects = {
+const TEAM_FX_IDENTITY: TeamEffects = {
   moveSpeedMul: 1,
   magnetMul: 1,
   doubleCoinChance: 0,
@@ -23,7 +23,7 @@ export const TEAM_FX_IDENTITY: TeamEffects = {
   draftSize: 0,
 }
 
-const ECON = economyJson as unknown as Economy
+const ECON: Economy = ECONOMY
 
 export const CRIT_MUL = ECON.critMul
 
@@ -34,13 +34,9 @@ export const RARITIES: Record<ItemRarity, { label: string; color: string }> = {
   epic: { label: '史诗', color: '#ce93d8' },
 }
 
-export const ITEMS = itemsJson as unknown as Record<ItemId, ItemDef>
+export const ITEMS: Record<ItemId, ItemDef> = ITEM_TABLE
 
-export const ITEM_IDS = Object.keys(ITEMS) as readonly ItemId[]
-
-// ── 池推导 ──
-
-// ── 持有与购买 ──
+export const ITEM_IDS: readonly ItemId[] = keysOf(ITEMS)
 
 export function characterXp(owned: readonly ItemId[]): number {
   let xp = 0
@@ -48,8 +44,7 @@ export function characterXp(owned: readonly ItemId[]): number {
   return xp
 }
 
-/** ITEMS.price 是基准价，展示与扣款都走 itemPrice */
-export const PRICE = ECON.price
+const PRICE = ECON.price
 
 export function itemPrice(id: ItemId, wave: number): number {
   const inflate = 1 + PRICE.perWave * Math.max(0, wave - 1)
@@ -57,9 +52,6 @@ export function itemPrice(id: ItemId, wave: number): number {
   return Math.max(1, Math.round(ITEMS[id].price * inflate * disc))
 }
 
-// ── 效果叠加 ──
-
-/** extra：角色等级形态的基础属性片段，与道具同一条叠加管线 */
 export function aggregateCharacterEffects(
   owned: readonly ItemId[],
   extra: readonly Partial<CharacterEffects>[] = [],
@@ -129,8 +121,6 @@ export function foldTeamEffects(parts: readonly Partial<TeamEffects>[]): TeamEff
   fx.teamCooldownMul = Math.max(0.4, fx.teamCooldownMul)
   return fx
 }
-
-// ── 能力参数修正 ──
 
 /** 只缩放空间参数与弹速；伤害/冷却由运行时倍率处理，此处不得再乘 */
 export function resolveAbilityDef(w: AbilityDef, fx: CharacterEffects): AbilityDef {

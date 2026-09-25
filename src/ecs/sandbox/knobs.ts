@@ -4,17 +4,13 @@ import { ENEMY_DEFS } from '../../data/enemies'
 import type { CharacterId } from '../../types/characters'
 import type { CaptainId } from '../../types/captains'
 import type { MapId } from '../../types/maps'
+import type { EnemyKind } from '../../types/enemies'
 import { beginRun } from '../../run/state'
 import type { RunState } from '../../run/state'
 
-// 战斗侧只读 spawnParams / INVINCIBLE_HP / sandboxEnemySet / sandboxDifficulty / sandboxFireRate /
-// sandboxInvincible / sandboxLevel，签名是对战斗侧的契约。选择状态为模块级，跨场景重启保留
-
-const enemies = new Set<string>()
-// 开局值由文件末尾的默认预设写入
+const enemies = new Set<EnemyKind>()
 let roster: CharacterId[] = [...ROSTER_IDS.slice(0, 1)]
 
-/** 0 基础 / 1 一阶 / 2 二阶 */
 export type SandboxLevel = 0 | 1 | 2
 let level: SandboxLevel = 0
 
@@ -34,7 +30,6 @@ export interface ScaleStep {
   readonly spawn: SpawnParams
 }
 
-/** 数值实测调出，不按公式派生：cap 涨十倍时 interval 并非等比缩小 */
 export const SCALES: readonly ScaleStep[] = [
   { id: 'low', label: '低', spawn: { intervalMs: 1100, cap: 6, batch: 1 } },
   { id: 'mid', label: '中', spawn: { intervalMs: 700, cap: 12, batch: 1 } },
@@ -45,7 +40,6 @@ export const SCALES: readonly ScaleStep[] = [
   { id: 'k8', label: '8千', spawn: { intervalMs: 16, cap: 8000, batch: 48 } },
 ]
 
-/** 难度 × 敌人血量；攻速 ÷ 我方冷却 */
 export type SandboxMul = 1 | 3 | 10
 
 let scale: SandboxScale = 'mid'
@@ -57,16 +51,14 @@ export function scaleStep(): ScaleStep {
   return SCALES.find((s) => s.id === scale) ?? SCALES[1]!
 }
 
-/** 唯一出口；战斗侧每帧现读 */
 export function spawnParams(): SpawnParams {
   return scaleStep().spawn
 }
 
-// ── 强度预设 ──────────────────────────────────────────────
-// 预设只写真实玩法旋钮，不旁路注入实体
+export type SandboxPresetId = 'normal' | 'busy' | 'heavy' | 'k2' | 'k4' | 'k8'
 
 export interface SandboxPreset {
-  readonly id: string
+  readonly id: SandboxPresetId
   readonly label: string
   readonly desc: string
   readonly team: number
@@ -74,7 +66,6 @@ export interface SandboxPreset {
   readonly scale: SandboxScale
   readonly difficulty: SandboxMul
   readonly fireRate: SandboxMul
-  /** 取表前 N 种 */
   readonly kinds: number
 }
 
@@ -87,17 +78,14 @@ export const SANDBOX_PRESETS: readonly SandboxPreset[] = [
   { id: 'k8', label: '8 千', desc: '把真实刷怪器开到 8000 并发', team: 8, level: 2, scale: 'k8', difficulty: 10, fireRate: 10, kinds: 28 },
 ]
 
-/** 只是标签，不参与判定；任一旋钮手动改过即 undefined */
-let presetId: string | undefined
+let presetId: SandboxPresetId | undefined
 
-export function sandboxPresetId(): string | undefined {
+export function sandboxPresetId(): SandboxPresetId | undefined {
   return presetId
 }
 
-/** 调用方随后须 beginSandboxRun + 重启战斗 */
-export function applySandboxPreset(id: string): void {
-  const p = SANDBOX_PRESETS.find((x) => x.id === id)
-  if (!p) return
+export function applySandboxPreset(id: SandboxPresetId): void {
+  const p = SANDBOX_PRESETS.find((x) => x.id === id)!
   setSandboxRoster(ROSTER_IDS.slice(0, Math.min(p.team, ROSTER_IDS.length)))
   setSandboxLevel(p.level)
   setSandboxEnemies(ENEMY_DEFS.slice(0, p.kinds).map((e) => e.kind))
@@ -105,38 +93,33 @@ export function applySandboxPreset(id: string): void {
   setSandboxDifficulty(p.difficulty)
   setSandboxFireRate(p.fireRate)
   setSandboxInvincible(true)
-  // 各 setter 会清掉 presetId，须最后写
   presetId = p.id
 }
 
-// ── 敌人 ──────────────────────────────────────────────────
-export function sandboxEnemySet(): ReadonlySet<string> {
+export function sandboxEnemySet(): ReadonlySet<EnemyKind> {
   return enemies
 }
 
-export function isSandboxEnemyOn(kind: string): boolean {
+export function isSandboxEnemyOn(kind: EnemyKind): boolean {
   return enemies.has(kind)
 }
 
-export function setSandboxEnemies(kinds: readonly string[]): void {
+function setSandboxEnemies(kinds: readonly EnemyKind[]): void {
   enemies.clear()
   for (const k of kinds) enemies.add(k)
   presetId = undefined
 }
 
-/** 即时生效，无需重启 */
-export function toggleSandboxEnemy(kind: string): void {
+export function toggleSandboxEnemy(kind: EnemyKind): void {
   if (enemies.has(kind)) enemies.delete(kind)
   else enemies.add(kind)
   presetId = undefined
 }
 
-// ── 角色 ──────────────────────────────────────────────────
 export function isSandboxCharacterOn(id: CharacterId): boolean {
   return roster.includes(id)
 }
 
-/** 改动后由调用方 beginSandboxRun + 重启应用 */
 export function toggleSandboxCharacter(id: CharacterId): void {
   if (roster.includes(id)) {
     if (roster.length <= 1) return
@@ -148,8 +131,7 @@ export function toggleSandboxCharacter(id: CharacterId): void {
   presetId = undefined
 }
 
-/** 改动后由调用方 beginSandboxRun + 重启应用 */
-export function setSandboxRoster(ids: readonly CharacterId[]): void {
+function setSandboxRoster(ids: readonly CharacterId[]): void {
   roster = ids.length > 0 ? [...ids] : [...ROSTER_IDS.slice(0, 1)]
   presetId = undefined
 }
@@ -163,12 +145,10 @@ export function setSandboxLevel(lv: SandboxLevel): void {
   presetId = undefined
 }
 
-// ── 队长（固定沙盒专用队长，不可更改） ─────────────────────
-export function sandboxCaptain(): CaptainId {
+function sandboxCaptain(): CaptainId {
   return SANDBOX_CAPTAIN
 }
 
-// ── 旋钮：规模 / 难度 / 攻速 / 无敌（战斗侧每帧实时读取，改动即时生效不重启）──
 export function sandboxScale(): SandboxScale {
   return scale
 }
@@ -205,7 +185,6 @@ export function setSandboxInvincible(on: boolean): void {
   presetId = undefined
 }
 
-// ── 开局 ──────────────────────────────────────────────────
 export function sandboxStarters(): CharacterId[] {
   const r = roster.slice(0, CAPTAINS[SANDBOX_CAPTAIN].teamSize)
   return r.length > 0 ? r : [ROSTER_IDS[0]!]
@@ -215,5 +194,4 @@ export function beginSandboxRun(mapId: MapId): RunState {
   return beginRun(sandboxCaptain(), sandboxStarters(), mapId, true)
 }
 
-// 开局默认预设
 applySandboxPreset(SANDBOX_PRESETS[0]!.id)

@@ -4,7 +4,6 @@ import { isFinalWave } from '../../../data/waves'
 import { Alive, CharHp } from '../../components'
 import type { Sim } from '../../sim'
 
-/** 调用它即宣告本局仿真到此为止：elapsedMs 已并进 run.combatMs，再跑一帧就是双计 */
 export function settleWave(sim: Sim): boolean {
   const run = sim.run
   const finished = isFinalWave(run.wave)
@@ -14,7 +13,6 @@ export function settleWave(sim: Sim): boolean {
     run.cardDraws += gained.levelsGained
     playSfx('levelup')
   }
-  // 须在血量快照前
   if (sim.reward.waveHealRatio > 0) {
     for (const m of sim.characters) {
       if (!Alive.v[m]) continue

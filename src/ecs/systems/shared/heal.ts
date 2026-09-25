@@ -2,8 +2,6 @@ import { query } from 'bitecs'
 import { Alive, ENEMY_SET, Hp, CharHp, Transform } from '../../components'
 import type { Sim } from '../../sim'
 
-// all = false 只治血量比例最低的一个，满血者不计；返回实际被治数
-
 export function healCharacters(sim: Sim, x: number, y: number, range: number, amount: number, all: boolean): number {
   const r2 = range * range
   if (all) {
@@ -36,7 +34,6 @@ export function healCharacters(sim: Sim, x: number, y: number, range: number, am
   return 1
 }
 
-/** excludeEid 排除一只 */
 export function healEnemies(
   sim: Sim,
   x: number,
@@ -48,7 +45,7 @@ export function healEnemies(
 ): number {
   const r2 = range * range
   const hurt: number[] = []
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (eid === excludeEid) continue
     if (Hp.v[eid]! >= Hp.max[eid]!) continue
     const d = sim.hooks.worldDelta(sim, x, y, Transform.x[eid]!, Transform.y[eid]!)

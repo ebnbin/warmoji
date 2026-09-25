@@ -1,6 +1,5 @@
 import { CAPTAINS } from '../data/captains'
-import { CHARACTERS, baseLoadout } from '../data/characters'
-import type { CharacterId } from '../types/characters'
+import { CHARACTERS, ROSTER_IDS, baseLoadout } from '../data/characters'
 import { BOSSES, ENEMIES, ENEMY_DEFS } from '../data/enemies'
 import type { EnemyDef } from '../types/enemies'
 import { MAP_IDS, MAPS, bossFor } from '../data/maps'
@@ -39,7 +38,7 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
   ice: '浮冰（25×25 方形浮冰；全局打滑不跟手，滑出冰面落水掉血·敌我通吃，相机永远跟随）',
 }
 
-export function enemyStatLines(e: EnemyDef): string[] {
+function enemyStatLines(e: EnemyDef): string[] {
   const lines = [
     `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
     `行为 ${LOCOMOTION_LABEL[e.locomotion.kind]} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}`,
@@ -118,7 +117,7 @@ export function wikiGroups(): WikiGroup[] {
     {
       icon: '1f939',
       title: '角色',
-      entries: (Object.keys(CHARACTERS) as CharacterId[]).map((id) => ({
+      entries: ROSTER_IDS.map((id) => ({
         emoji: CHARACTERS[id].emoji,
         name: CHARACTERS[id].name,
         desc: CHARACTERS[id].desc,
@@ -166,7 +165,6 @@ export function wikiGroups(): WikiGroup[] {
   ]
 }
 
-/** 重复归属取首个 */
 export function wikiEntryByEmoji(): Map<string, { category: string; entry: WikiEntry }> {
   const map = new Map<string, { category: string; entry: WikiEntry }>()
   for (const g of wikiGroups()) {

@@ -18,14 +18,12 @@ import {
 } from '../components'
 import { applyDamage, hurtCharacter } from './shared/combat'
 import { backEaseOut } from '../utils/ease'
-import { zoneSrcName } from '../store'
+import { zoneSrcEnemy } from '../store'
 import type { Sim } from '../sim'
 
 
-/** 效果在 until 停，视觉再按 fxMs 淡这么久 */
 const FADE_MS = 250
 
-/** 到期区域的淡出；返回是否已回收 */
 function fadeExpired(sim: Sim, z: number): boolean {
   if (Zone.fadeAt[z] === 0) Zone.fadeAt[z] = sim.fxMs
   const over = sim.fxMs - Zone.fadeAt[z]!
@@ -38,21 +36,18 @@ function fadeExpired(sim: Sim, z: number): boolean {
   return false
 }
 
-/** 过场冻结期：已在淡出的区域照常淡完 */
 export function finishZoneFades(sim: Sim): void {
-  for (const z of [...query(sim.world, ZONE_SET as unknown as object[])]) {
+  for (const z of [...query(sim.world, ZONE_SET)]) {
     if (Zone.fadeAt[z] !== 0) fadeExpired(sim, z)
   }
 }
 
 export function updateZones(sim: Sim): void {
   const world = sim.world
-  // 迭代中会回收，须先快照
-  const zones = [...query(world, ZONE_SET as unknown as object[])]
+  const zones = [...query(world, ZONE_SET)]
   if (zones.length === 0) return
   const now = sim.elapsedMs
   for (const z of zones) {
-    // 跟随型：开关随造它的武器能否出手
     if (hasComponent(world, z, ZoneFollow)) {
       const a = ZoneFollow.of[z]!
       Transform.x[z] = Transform.x[a]!
@@ -61,7 +56,6 @@ export function updateZones(sim: Sim): void {
       Zone.on[z] = Frozen.v[w] === 0 && Disarmed.v[w] === 0 ? 1 : 0
     }
     const until = Lifetime.until[z]!
-    // 淡出的透明度压过开关
     if (until > 0 && now >= until) {
       if (fadeExpired(sim, z)) continue
     } else {
@@ -77,14 +71,12 @@ export function updateZones(sim: Sim): void {
   burnMembers(sim, burns, now)
 }
 
-/** 按区域节拍 */
 function burnEnemies(sim: Sim, burns: readonly number[], now: number): void {
   let enemies: readonly number[] | undefined
   for (const z of burns) {
     if (Zone.on[z] === 0 || Zone.faction[z] === FACTION.enemy || now < ZoneBurn.nextAt[z]!) continue
     ZoneBurn.nextAt[z] = now + ZoneBurn.tickMs[z]!
-    // 跳伤可能击杀，须先快照
-    enemies ??= [...query(sim.world, ENEMY_SET as unknown as object[])]
+    enemies ??= [...query(sim.world, ENEMY_SET)]
     const r = Zone.radius[z]!
     const damage = ZoneBurn.damage[z]!
     const slot = ZoneBurn.srcSlot[z]!
@@ -95,7 +87,6 @@ function burnEnemies(sim: Sim, burns: readonly number[], now: number): void {
   }
 }
 
-/** 按受害者节流 */
 function burnMembers(sim: Sim, burns: readonly number[], now: number): void {
   for (const m of sim.characters) {
     if (!Alive.v[m]) continue
@@ -106,7 +97,7 @@ function burnMembers(sim: Sim, burns: readonly number[], now: number): void {
       if (d.x * d.x + d.y * d.y > r * r) continue
       if (now - GroundHit.last[m]! >= ZoneBurn.tickMs[z]!) {
         GroundHit.last[m] = now
-        hurtCharacter(sim, m, ZoneBurn.damage[z]!, zoneSrcName[z] || undefined, 0xa5d86a)
+        hurtCharacter(sim, m, ZoneBurn.damage[z]!, zoneSrcEnemy[z], 0xa5d86a)
       }
       break
     }

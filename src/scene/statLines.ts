@@ -31,7 +31,6 @@ export const ABILITY_KIND_LABEL: Record<AbilityDef['kind'], string> = {
   timeStop: '时停',
 }
 
-/** px → 格 */
 function grid(units: number): string {
   return `${+units.toFixed(1)}格`
 }
@@ -40,7 +39,7 @@ function sec(ms: number): string {
   return `${+(ms / 1000).toFixed(2)}秒`
 }
 
-export function abilityStatLines(w: AbilityDef): string[] {
+function abilityStatLines(w: AbilityDef): string[] {
   if (w.kind === 'slowAura') {
     return [
       `减速 ${Math.round((1 - w.slowFactor) * 100)}% · 范围 ${grid(w.radius)}`,
@@ -94,7 +93,6 @@ export function abilityStatLines(w: AbilityDef): string[] {
   if (w.kind === 'timeStop') {
     return [`时停领域 ${sec(w.durationMs)}（按世界时长计，静止时同步放慢）`, '静止则全场近乎凝固、移动则时间恢复流动']
   }
-  // 击退按位移距离展示：冲量 × 衰减时间常数
   const base = `伤害 ${w.damage} · 冷却 ${sec(w.cooldownMs)} · 击退 ${grid((w.knockback * KNOCKBACK.tauMs) / 1000)}`
   switch (w.kind) {
     case 'projectile':
@@ -116,7 +114,6 @@ export function abilityStatLines(w: AbilityDef): string[] {
   }
 }
 
-/** 数值为道具修正后的生效值 */
 export function characterStatGroups(
   id: CharacterId,
   items: readonly ItemId[] = [],
@@ -166,7 +163,6 @@ export function characterStatGroups(
   return groups
 }
 
-/** 只用于展示 */
 function displayDef(w: AbilityDef, dmgMul: number, cdMul: number, kbMul: number): AbilityDef {
   switch (w.kind) {
     case 'slowAura':

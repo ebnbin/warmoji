@@ -22,7 +22,7 @@ function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, b
 export function hitSweptProjectiles(sim: Sim): void {
   const projs = query(sim.world, [SweptHit, Proj, PrevPos, Transform])
   if (projs.length === 0) return
-  const enemies = query(sim.world, ENEMY_SET as unknown as object[])
+  const enemies = query(sim.world, ENEMY_SET)
   for (const eid of [...projs]) {
     const sx = PrevPos.x[eid]!
     const sy = PrevPos.y[eid]!
@@ -30,16 +30,13 @@ export function hitSweptProjectiles(sim: Sim): void {
     const by = Transform.y[eid]!
     const hit = projHitUids[eid]!
     const pr = Proj.radius[eid]!
-    // t 线段投影参数；d2 到起点的中心距²
     const found: { enemy: number; t: number; d2: number }[] = []
     const segX = bx - sx
     const segY = by - sy
     const segLen2 = segX * segX + segY * segY
     for (const en of enemies) {
-      // 已死未提交的 eid 可能已被别的实体复用；休眠者不可被命中
       if (enemyDef[en] === undefined || Dormant.v[en] || hit.has(Uid.v[en]!)) continue
       const rr = pr + Radius.v[en]!
-      // 取相对线段起点的最近镜像
       const w = sim.hooks.worldDelta(sim, sx, sy, Transform.x[en]!, Transform.y[en]!)
       const tx2 = sx + w.x
       const ty2 = sy + w.y
@@ -57,7 +54,6 @@ export function hitSweptProjectiles(sim: Sim): void {
         continue
       }
     }
-    // 每帧只结算首个命中
     const f = found[0]
     if (f === undefined) continue
     hit.add(Uid.v[f.enemy]!)
@@ -65,7 +61,6 @@ export function hitSweptProjectiles(sim: Sim): void {
     const hy = Transform.y[f.enemy]!
     const src = boltSource(Proj.srcSlot[eid]!)
     damageTarget(sim, src, f.enemy, Proj.damage[eid]!, Proj.kb[eid]!, sx, sy)
-    // 主目标排除出溅射圈
     const onHit = projOnHit[eid]
     if (onHit && onHit.length > 0) {
       applyAbilityEffects(sim, src, onHit, {

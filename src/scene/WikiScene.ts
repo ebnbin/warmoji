@@ -8,7 +8,6 @@ import { loadSettings } from '../save/settings'
 import { usedEmojiSet, wikiEntryByEmoji, wikiGroups } from '../scene/wikiEntries'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiKey, ensureEmoji, loadEmojiPack } from '../emoji/textures'
 import { emojiImage } from '../emoji/hold'
 import { emojiText } from '../ui/emojiText'
@@ -17,10 +16,11 @@ import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { TAP_SLOP } from '../util/units'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
-import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
+import { emojiThumbSize, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { VirtualEmojiGrid } from '../ui/virtualGrid'
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
+import { SceneKey } from './keys'
 
 interface WikiLayout {
   content: { w: number; h: number }
@@ -46,7 +46,6 @@ const PORTRAIT: WikiLayout = {
   list: { x: 24, y: 664, w: 672, h: 588 },
 }
 
-/** Text 只创建一次，切换条目仅 setText：批量创建销毁 Text 会触发成串光栅化与纹理增删 */
 interface DetailPool {
   view: ScrollView
   icon: Phaser.GameObjects.Image
@@ -59,13 +58,10 @@ interface DetailPool {
 }
 
 export class WikiScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
-  /** 0..groups.length-1 = 分组条目；groups.length = 「全部」网格页 */
   private category = 0
-  private focusedKey = ''
-  /** 0/1/2 = 1/2/3 级 */
+  private focusedIndex = 0
   private levelSel = 0
   private currentCategory = ''
   private currentEntry?: WikiEntry
@@ -78,13 +74,13 @@ export class WikiScene extends Phaser.Scene {
 
   private layout!: WikiLayout
   private origin = { x: 0, y: 0 }
-  private entryGrid?: EmojiGrid
+  private entryGrid?: EmojiGrid<number>
   private allGrid?: VirtualEmojiGrid
   private listScroll = 0
   private gridScroll = 0
   private pool?: DetailPool
-  // catRects 存容器内局部 x
-  private catRects: { title: string; x: number; y: number; w: number; h: number }[] = []
+  private readonly iconWant = new WeakMap<Phaser.GameObjects.Image, string>()
+  private catRects: { x: number; w: number }[] = []
   private catContainer?: Phaser.GameObjects.Container
   private catScroll = 0
   private catScrollMax = 0
@@ -93,11 +89,9 @@ export class WikiScene extends Phaser.Scene {
   private catDragMoved = false
   private catDragStartX = 0
   private catDragStartScroll = 0
-  private backRect = { x: 0, y: 0, w: 0, h: 0 }
-  private reportAt = 0
 
   constructor() {
-    super('wiki')
+    super(SceneKey.Wiki)
   }
 
   create(): void {
@@ -113,7 +107,7 @@ export class WikiScene extends Phaser.Scene {
     this.pool = undefined
     if (!preserved) {
       this.category = 0
-      this.focusedKey = ''
+      this.focusedIndex = 0
       this.allSelected = null
       this.listScroll = 0
       this.gridScroll = 0
@@ -130,7 +124,7 @@ export class WikiScene extends Phaser.Scene {
     const ox = this.origin.x
     const oy = this.origin.y
 
-    const back = this.add
+    this.add
       .text(ox + 40, oy + L.headerY, '← 返回', {
         fontFamily: UI_FONT,
         fontSize: FONT.strong,
@@ -139,11 +133,10 @@ export class WikiScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
-        if (!this.wasDragged()) this.scene.start('menu')
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
+        if (!this.wasDragged()) this.scene.start(SceneKey.Menu)
       })
-    this.backRect = { x: back.x, y: back.y - back.height / 2, w: back.width, h: back.height }
-    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
+    this.input.keyboard?.on('keydown-ESC', () => this.scene.start(SceneKey.Menu))
 
     emojiText(
       this,
@@ -167,18 +160,14 @@ export class WikiScene extends Phaser.Scene {
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
-      // 只在真退出时释放缩略缓存
       if (!this.preserveOnRestart) releaseEmojiThumbs(this)
     })
 
-    this.reportWiki()
   }
 
   private wasDragged(): boolean {
     return (this.entryGrid?.wasDragged ?? false) || (this.allGrid?.wasDragged ?? false)
   }
-
-  // ── 类别横向 tab（单排，可横向滚动） ─────────────────────────
 
   private createCategoryTabs(res: number): void {
     const L = this.layout
@@ -224,22 +213,21 @@ export class WikiScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5)
       container.add([bg, icon, label])
-      this.catRects.push({ title: d.title, x, y: 0, w: cw, h: ch })
+      this.catRects.push({ x, w: cw })
       x += cw + gap
     })
 
-    // 几何遮罩不裁输入：不给每个 tab 挂 zone，滚出屏外的仍会拦点击
     this.add
       .zone(rowX, rowY, rowW, ch)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', (p: Phaser.Input.Pointer) => this.onCatTap(p))
-    this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, dx: number, dy: number) => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, (p: Phaser.Input.Pointer) => this.onCatTap(p))
+    this.input.on(Phaser.Input.Events.POINTER_WHEEL, (p: Phaser.Input.Pointer, _o: unknown, dx: number, dy: number) => {
       if (this.catContains(p)) {
         this.catScrollTo(this.catScroll + (Math.abs(dx) > Math.abs(dy) ? dx : dy) * 0.6)
       }
     })
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
       this.catDragMoved = false
       this.catDragging = this.catContains(p)
       if (this.catDragging) {
@@ -247,7 +235,7 @@ export class WikiScene extends Phaser.Scene {
         this.catDragStartScroll = this.catScroll
       }
     })
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       if (!this.catDragging || !p.isDown) return
       const dx = p.worldX - this.catDragStartX
       if (this.catScrollMax > 0 && Math.abs(dx) > TAP_SLOP) this.catDragMoved = true
@@ -256,8 +244,8 @@ export class WikiScene extends Phaser.Scene {
     const release = (): void => {
       this.catDragging = false
     }
-    this.input.on('pointerup', release)
-    this.input.on('pointerupoutside', release)
+    this.input.on(Phaser.Input.Events.POINTER_UP, release)
+    this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, release)
   }
 
   private catContains(p: Phaser.Input.Pointer): boolean {
@@ -268,7 +256,6 @@ export class WikiScene extends Phaser.Scene {
   private catScrollTo(v: number): void {
     this.catScroll = Math.max(0, Math.min(this.catScrollMax, v))
     this.catContainer?.setX(this.catRowRect.x - this.catScroll)
-    if (this.time.now - this.reportAt > 120) this.reportWiki()
   }
 
   private onCatTap(p: Phaser.Input.Pointer): void {
@@ -277,7 +264,7 @@ export class WikiScene extends Phaser.Scene {
     const i = this.catRects.findIndex((c) => localX >= c.x && localX < c.x + c.w)
     if (i < 0 || this.category === i) return
     this.category = i
-    this.focusedKey = ''
+    this.focusedIndex = 0
     this.levelSel = 0
     this.listScroll = 0
     this.preserveOnRestart = true
@@ -288,41 +275,33 @@ export class WikiScene extends Phaser.Scene {
     return this.category === this.groups.length
   }
 
-  // ── 图鉴视图：当前类别的条目网格 + 详情 ─────────────────────
-
   private createEntriesView(): void {
     const L = this.layout.list
     const group = this.groups[this.category]!
-    if (!this.focusedKey && group.entries[0]) {
-      this.focusedKey = `${group.title}:${group.entries[0].name}`
-    }
     this.entryGrid = new EmojiGrid(
       this,
       { x: this.origin.x + L.x, y: this.origin.y + L.y, w: L.w, h: L.h },
       { initialScroll: this.listScroll },
     )
     this.entryGrid.onTap = (key): void => {
-      this.focusedKey = key
+      this.focusedIndex = key
       this.levelSel = 0
       this.refreshEntries()
     }
     this.entryGrid.onScroll = (): void => {
       this.listScroll = this.entryGrid!.scrollY
-      if (this.time.now - this.reportAt > 120) this.reportWiki()
     }
     this.entryGrid.setItems(
-      group.entries.map((entry) => ({ key: `${group.title}:${entry.name}`, emoji: entry.emoji })),
+      group.entries.map((entry, i) => ({ key: i, emoji: entry.emoji })),
     )
     this.refreshEntries()
   }
 
   private refreshEntries(): void {
     const group = this.groups[this.category]!
-    this.entryGrid?.setSelected(this.focusedKey)
-    const entry =
-      group.entries.find((e) => `${group.title}:${e.name}` === this.focusedKey) ?? group.entries[0]
+    this.entryGrid?.setSelected(this.focusedIndex)
+    const entry = group.entries[this.focusedIndex] ?? group.entries[0]
     if (entry) this.renderDetailCard(group.title, entry)
-    this.reportWiki()
   }
 
   private ensurePool(): DetailPool {
@@ -386,7 +365,7 @@ export class WikiScene extends Phaser.Scene {
         .setOrigin(0, 0)
         .setVisible(false)
         .setInteractive({ useHandCursor: true })
-      t.on('pointerup', () => {
+      t.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (!view.wasDragged) this.selectLevel(i)
       })
       return t
@@ -427,7 +406,6 @@ export class WikiScene extends Phaser.Scene {
           fontFamily: UI_FONT,
           fontSize: FONT.body,
           color: '#d0d0d8',
-          // 纯中文无空格，须 useAdvancedWrap 按字断行
           wordWrap: { width: D.w - 56, useAdvancedWrap: true },
           lineSpacing: 8,
           resolution: res,
@@ -440,17 +418,16 @@ export class WikiScene extends Phaser.Scene {
     return s
   }
 
-  /** 异步回填前校验仍是同一目标 */
   private setPoolIcon(icon: Phaser.GameObjects.Image, emoji: string, size: number): void {
     const key = emojiKey(emoji)
-    icon.setData('want', key)
+    this.iconWant.set(icon, key)
     if (this.textures.exists(key)) {
       icon.setTexture(key).setDisplaySize(size, size).setVisible(true)
       return
     }
     icon.setVisible(false)
     void ensureEmoji(this, emoji).then((k) => {
-      if (icon.getData('want') !== k || !this.scene.isActive('wiki')) return
+      if (this.iconWant.get(icon) !== k || !this.scene.isActive(SceneKey.Wiki)) return
       icon.setTexture(k).setDisplaySize(size, size).setVisible(true)
     })
   }
@@ -496,7 +473,6 @@ export class WikiScene extends Phaser.Scene {
       for (const t of P.levelTabs) t.setVisible(false)
     }
 
-    // 标题与内容合并为一个 Text，少光栅化
     const lines = lvls && lvls.length > 0 ? lvls[Math.min(this.levelSel, lvls.length - 1)]!.lines : e.lines
     const segments: { title: string; body: string[] }[] = []
     for (const line of lines) {
@@ -527,8 +503,6 @@ export class WikiScene extends Phaser.Scene {
     P.view.setContentHeight(cursor + 12)
   }
 
-  // ── 全部 emoji 视图：懒加载清单 + feed 流虚拟网格组件 ───────
-
   private createAllView(): void {
     const L = this.layout.list
     const lx = this.origin.x + L.x
@@ -550,21 +524,17 @@ export class WikiScene extends Phaser.Scene {
       this.levelSel = 0
       grid.setSelected(cp)
       this.renderAllDetail()
-      this.reportWiki()
     }
-    grid.onScrolled = (settled): void => {
+    grid.onScrolled = (): void => {
       this.gridScroll = grid.scrollY
-      if (settled || this.time.now - this.reportAt > 120) this.reportWiki()
     }
-    grid.onThumbsProgress = (): void => this.reportWiki()
 
     void this.loadManifest().then(() => {
-      if (!this.scene.isActive('wiki') || !this.isAllPage()) return
+      if (!this.scene.isActive(SceneKey.Wiki) || !this.isAllPage()) return
       this.manifestUsed = this.manifest.filter((cp) => this.used.has(cp)).length
       grid.setItems(this.manifest)
       grid.setSelected(this.allSelected)
       this.renderAllDetail()
-      this.reportWiki()
     })
   }
 
@@ -609,58 +579,6 @@ export class WikiScene extends Phaser.Scene {
           : '加载清单中…',
       )
       .setVisible(true)
-  }
-
-  private reportWiki(): void {
-    reportDebug({
-      scene: 'wiki',
-      elapsed: 0,
-      kills: 0,
-      level: 1,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      wiki: {
-        category: this.isAllPage() ? '全部' : (this.groups[this.category]?.title ?? ''),
-        focused: this.focusedKey,
-        allSelected: this.allSelected,
-        entryCount: this.entryGrid ? this.entryGrid.cellRects().length : 0,
-        manifestCount: this.manifest.length,
-        usedCount: this.used.size,
-        thumbsReady: emojiThumbsReady(),
-        scrollY: this.isAllPage() ? this.gridScroll : this.listScroll,
-        maxScroll: this.isAllPage()
-          ? (this.allGrid?.maxScroll ?? 0)
-          : Math.max(0, (this.entryGrid?.contentH ?? 0) - this.layout.list.h),
-        items: (this.entryGrid?.cellRects() ?? []).map((r) => ({
-          key: r.key,
-          x: r.x,
-          y: r.y,
-          w: r.w,
-          h: r.h,
-        })),
-        list: {
-          x: this.origin.x + this.layout.list.x,
-          y: this.origin.y + this.layout.list.y,
-          w: this.layout.list.w,
-          h: this.layout.list.h,
-        },
-        // 供 e2e 点击：含横向滚动偏移
-        categories: this.catRects.map((c) => ({
-          title: c.title,
-          x: this.catRowRect.x - this.catScroll + c.x + c.w / 2,
-          y: this.catRowRect.y + c.y + c.h / 2,
-          w: c.w,
-          h: c.h,
-        })),
-        back: {
-          x: this.backRect.x + this.backRect.w / 2,
-          y: this.backRect.y + this.backRect.h / 2,
-          w: this.backRect.w,
-          h: this.backRect.h,
-        },
-      },
-    })
-    this.reportAt = this.time.now
   }
 
   private onViewportChanged(): void {

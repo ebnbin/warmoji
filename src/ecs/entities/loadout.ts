@@ -11,8 +11,6 @@ import { equipAbility, NEUTRAL_AMP } from './ability'
 import type { RunState } from '../../run/state'
 import type { Sim } from '../sim'
 
-// 队伍开局装齐；敌人首次被扫到时装配
-
 export function armTeam(sim: Sim, run: RunState, sandbox: boolean): void {
   const teamFx = aggregateTeamCards(run.teamCards)
   for (let slot = 0; slot < run.roster.length; slot++) {
@@ -22,7 +20,6 @@ export function armTeam(sim: Sim, run: RunState, sandbox: boolean): void {
     const level = sandbox ? sandboxLevel() + 1 : characterLevel(characterXp(owned))
     const tiers = tiersForLevel(level)
     const fx = aggregateCharacterEffects(owned, levelStatsFor(id, level))
-    // 随局面变的乘区由 amp.ts 现算
     const amp = {
       dmg: fx.damageMul * teamFx.teamDamageMul,
       cd: fx.cooldownMul * teamFx.teamCooldownMul,

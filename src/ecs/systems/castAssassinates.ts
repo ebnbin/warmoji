@@ -13,10 +13,9 @@ import { targetsNear } from '../utils/targets'
 import type { Sim } from '../sim'
 import { spawnFxSlash } from '../entities/fx'
 
-/** 位移走视觉偏移，不动阵型 */
 export function castAssassinates(sim: Sim): void {
   castScan(sim, Assassinate, (e) => {
-    if (Followup.left[e]! > 0) return false // 停留帧内不另起
+    if (Followup.left[e]! > 0) return false
     const src = sourceOf(sim, e)
     const ox = ownerX(e)
     const oy = ownerY(e)

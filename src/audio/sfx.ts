@@ -1,6 +1,6 @@
 import { SFX } from '../data/sfx'
 import type { SfxDef, SfxId } from '../types/sfx'
-export { SFX } from '../data/sfx'
+import { keysOf } from '../util/record'
 
 const SAMPLE_RATE = 22050
 const MAX_VOICES = 14
@@ -13,7 +13,6 @@ let enabled = true
 let active = 0
 const stats = { baked: 0, played: 0 }
 
-/** 噪声种子固定，可复现 */
 function render(audio: AudioContext, def: SfxDef): AudioBuffer {
   const n = Math.max(1, Math.round(def.duration * SAMPLE_RATE))
   const buf = audio.createBuffer(1, n, SAMPLE_RATE)
@@ -61,7 +60,6 @@ function render(audio: AudioContext, def: SfxDef): AudioBuffer {
   return buf
 }
 
-/** 音效与 BGM 共用；无 WebAudio 时返回 undefined */
 export function ensureAudio(): AudioContext | undefined {
   try {
     if (!ctx) {
@@ -69,8 +67,8 @@ export function ensureAudio(): AudioContext | undefined {
       master = ctx.createGain()
       master.gain.value = 0.5
       master.connect(ctx.destination)
-      for (const [id, def] of Object.entries(SFX) as [SfxId, SfxDef][]) {
-        buffers.set(id, render(ctx, def))
+      for (const id of keysOf(SFX)) {
+        buffers.set(id, render(ctx, SFX[id]))
         stats.baked++
       }
     }
@@ -81,12 +79,10 @@ export function ensureAudio(): AudioContext | undefined {
   }
 }
 
-/** 不触发创建 */
 export function audioCtx(): AudioContext | undefined {
   return ctx
 }
 
-/** 幂等 */
 export function initSfx(): void {
   const unlock = (): void => {
     ensureAudio()

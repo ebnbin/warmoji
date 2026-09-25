@@ -3,7 +3,6 @@ import { Ability, Aim, Frozen, LaserRadial, Radial } from '../components'
 import { fireBeam } from './shared/laser'
 import type { Sim } from '../sim'
 
-/** 持有者倒下即作废 */
 export function fireRadials(sim: Sim): void {
   for (const e of query(sim.world, [Ability, LaserRadial, Radial])) {
     if (Radial.left[e]! <= 0) continue

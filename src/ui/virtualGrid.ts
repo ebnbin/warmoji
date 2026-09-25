@@ -3,9 +3,6 @@ import { TAP_SLOP } from '../util/units'
 import { emojiThumbKey, requestEmojiThumb } from '../emoji/thumbs'
 import { clipTo } from '../util/mask'
 
-// 环形缓冲复用固定数量 Image：slot = index % poolSize。
-// 惯性驱动挂场景 UPDATE，SHUTDOWN 时自摘：scene.events 不随 restart 清空
-
 const CELL = 72
 const ICON = 70
 
@@ -16,10 +13,7 @@ interface Slot {
 
 export class VirtualEmojiGrid {
   onTap?: (cp: string) => void
-  /** settled = 终态；中途高频，消费方自行节流 */
-  onScrolled?: (settled: boolean) => void
-  /** 150ms 至多一次 */
-  onThumbsProgress?: () => void
+  onScrolled?: () => void
 
   private scene: Phaser.Scene
   private rect: { x: number; y: number; w: number; h: number }
@@ -36,16 +30,12 @@ export class VirtualEmojiGrid {
   private dragging = false
   private dragMoved = false
   private pressIn = false
-  /** 按下时正在惯性滚动：只截停，不算点击 */
   private stopPress = false
   private dragStartY = 0
   private dragStartScroll = 0
-  // px/ms
   private flingV = 0
   private lastMoveY = 0
   private lastMoveT = 0
-  private progressPending = false
-  private settleTimer?: Phaser.Time.TimerEvent
 
   constructor(
     scene: Phaser.Scene,
@@ -70,7 +60,7 @@ export class VirtualEmojiGrid {
       .zone(rect.x, rect.y, rect.w, rect.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', (p: Phaser.Input.Pointer) => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, (p: Phaser.Input.Pointer) => {
         if (this.dragMoved || !this.pressIn || this.stopPress) return
         const col = Math.floor((p.worldX - rect.x) / CELL)
         const index = Math.floor((p.worldY - rect.y + this.scroll) / CELL) * this.cols + col
@@ -79,16 +69,14 @@ export class VirtualEmojiGrid {
         this.onTap?.(cp)
       })
 
-    scene.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+    scene.input.on(Phaser.Input.Events.POINTER_WHEEL, (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (this.contains(p)) this.scrollTo(this.scroll + dy * 0.6)
     })
-    scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+    scene.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
       this.dragMoved = false
-      // 阈值 0.35 ≈ 每帧 6px：衰减尾巴的余速不能吃掉点击
       this.stopPress = Math.abs(this.flingV) >= 0.35
       this.flingV = 0
       this.pressIn = this.contains(p)
-      // 恒赋值：异常结束的上一轮手势不能把 dragging 卡在 true
       this.dragging = this.pressIn
       if (this.pressIn) {
         this.dragStartY = p.worldY
@@ -97,10 +85,9 @@ export class VirtualEmojiGrid {
         this.lastMoveT = scene.time.now
       }
     })
-    scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+    scene.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dy = this.dragStartY - p.worldY
-      // 不可滚动时不判拖
       if (this.max > 0 && Math.abs(dy) > TAP_SLOP) this.dragMoved = true
       if (this.dragMoved) {
         this.scrollTo(this.dragStartScroll + dy)
@@ -110,9 +97,8 @@ export class VirtualEmojiGrid {
         this.lastMoveT = scene.time.now
       }
     })
-    // pointerupoutside 与 touchcancel 都不发 pointerup；dragging 不清会让之后每次按下都被判截停
-    scene.input.on('pointerup', this.release, this)
-    scene.input.on('pointerupoutside', this.release, this)
+    scene.input.on(Phaser.Input.Events.POINTER_UP, this.release, this)
+    scene.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.release, this)
 
     scene.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this)
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -122,10 +108,6 @@ export class VirtualEmojiGrid {
 
   get scrollY(): number {
     return this.scroll
-  }
-
-  get maxScroll(): number {
-    return this.max
   }
 
   get wasDragged(): boolean {
@@ -168,53 +150,28 @@ export class VirtualEmojiGrid {
     this.scrollTo(top - (this.rect.h - CELL) / 2)
   }
 
-  /** 视口坐标；只含完整可见的格子（半行点不到） */
-  cellRects(): { key: string; x: number; y: number; w: number; h: number }[] {
-    return this.slots
-      .filter((s) => s.boundIndex >= 0 && this.keys[s.boundIndex] !== undefined)
-      .sort((a, b) => a.boundIndex - b.boundIndex)
-      .map((s) => ({
-        key: this.keys[s.boundIndex]!,
-        x: this.rect.x + (s.boundIndex % this.cols) * CELL,
-        y: this.rect.y + Math.floor(s.boundIndex / this.cols) * CELL - this.scroll,
-        w: CELL,
-        h: CELL,
-      }))
-      .filter((r) => r.y >= this.rect.y && r.y + r.h <= this.rect.y + this.rect.h)
-  }
-
   scrollTo(y: number): void {
     this.scroll = Math.max(0, Math.min(this.max, y))
     this.container.y = this.rect.y - this.scroll
     this.updateWindow()
-    this.onScrolled?.(false)
-    // 滚轮没有松手事件：去抖后补一发终态
-    this.settleTimer?.remove()
-    this.settleTimer = this.scene.time.delayedCall(160, () => {
-      this.settleTimer = undefined
-      if (this.scene.sys.isActive()) this.onScrolled?.(true)
-    })
+    this.onScrolled?.()
   }
 
   private release(): void {
     this.dragging = false
     if (!this.dragMoved || Math.abs(this.flingV) < 0.05) {
       this.flingV = 0
-      this.onScrolled?.(true)
     }
   }
 
   private onUpdate(_time: number, delta: number): void {
-    // touchcancel 不发 up 事件：按指针实况解除拖动
     if (this.dragging && !this.scene.input.activePointer.isDown) this.release()
     if (this.flingV === 0 || this.dragging) return
     const next = this.scroll + this.flingV * delta
     this.scrollTo(next)
     this.flingV *= Math.exp(-delta / 320)
-    // 0.05 ≈ 每帧 1px
     if (Math.abs(this.flingV) < 0.05 || next <= 0 || next >= this.max) {
       this.flingV = 0
-      this.onScrolled?.(true)
     }
   }
 
@@ -245,22 +202,10 @@ export class VirtualEmojiGrid {
       slot.image.setPosition(cx, cy).setTexture(hit).setDisplaySize(ICON, ICON).setAlpha(alpha).setVisible(true)
       return
     }
-    // 异步回填前校验格子仍绑着同一条目且清单未换
     slot.image.setVisible(false)
     void requestEmojiThumb(this.scene, cp).then((key) => {
       if (!key || slot.boundIndex !== index || this.keys[index] !== cp || !this.scene.sys.isActive()) return
       slot.image.setPosition(cx, cy).setTexture(key).setDisplaySize(ICON, ICON).setAlpha(alpha).setVisible(true)
-      this.reportProgress()
-    })
-  }
-
-  /** 最后一批必有通知 */
-  private reportProgress(): void {
-    if (this.progressPending) return
-    this.progressPending = true
-    this.scene.time.delayedCall(150, () => {
-      this.progressPending = false
-      if (this.scene.sys.isActive()) this.onThumbsProgress?.()
     })
   }
 

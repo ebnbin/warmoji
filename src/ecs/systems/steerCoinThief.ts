@@ -7,13 +7,11 @@ import { BVel, CoinThief, GrantCoins, PICKUP_SET, Radius, Slowed, Speed, Steerin
 import { wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
 
-/** 偷走不入账，死亡时吐回 */
 export function steerCoinThief(sim: Sim): void {
   const thieves = query(sim.world, [CoinThief, Steering, Transform, Speed, Radius])
   if (thieves.length === 0) return
-  // 只认给钱的；被吞的就地记 -1，同帧别的鼠不再认它
   const coins: number[] = []
-  for (const c of query(sim.world, PICKUP_SET as unknown as object[])) {
+  for (const c of query(sim.world, PICKUP_SET)) {
     if (hasComponent(sim.world, c, GrantCoins)) coins.push(c)
   }
   for (const eid of thieves) {
@@ -48,7 +46,6 @@ export function steerCoinThief(sim: Sim): void {
     }
     const eatR = Radius.v[eid]! + PICKUPS.coin.radius * UNIT
     if (bestD <= eatR * eatR) {
-      // 吞的这一帧不移动
       if (sim.elapsedMs >= Thief.nextEatAt[eid]!) {
         removeEntity(sim.world, coin)
         coins[coinAt] = -1

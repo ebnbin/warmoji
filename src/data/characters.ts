@@ -1,5 +1,6 @@
-import charactersJson from '../assets/characters.json'
-import teamJson from '../assets/team.json'
+import { CHARACTERS as CHARACTER_TABLE } from '../../defs/characters'
+import { TEAM_BASELINE } from '../../defs/team'
+import { keysOf, mapValues } from '../util/record'
 import { ABILITIES } from './abilities'
 
 import type { AbilityDef } from '../types/abilityDefs'
@@ -16,7 +17,6 @@ function weaponCarrier(wid: WeaponId): Carrier {
   return {
     name: w.name,
     icon: w.emoji,
-    weaponId: wid,
     tiers: [w.base, ...w.upgrades.map((u) => u.ability)],
     cards: [w.upgrades[0]?.card ?? null, w.upgrades[1]?.card ?? null],
   }
@@ -41,14 +41,9 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
   }
 }
 
-export const CHARACTERS = Object.fromEntries(
-  Object.entries(charactersJson as unknown as Record<CharacterId, CharacterAuthoring>).map(
-    ([id, src]) => [id, hydrateCharacter(src)],
-  ),
-) as Record<CharacterId, CharacterDef>
-export const ROSTER_IDS = Object.keys(CHARACTERS) as readonly CharacterId[]
+export const CHARACTERS: Record<CharacterId, CharacterDef> = mapValues(CHARACTER_TABLE, hydrateCharacter)
+export const ROSTER_IDS: readonly CharacterId[] = keysOf(CHARACTERS)
 
-/** 无该档时停留在已有的最高档 */
 function carrierAbility(c: Carrier, level: 0 | 1 | 2): AbilityDef {
   return c.tiers[Math.min(level, c.tiers.length - 1)]!
 }
@@ -62,7 +57,6 @@ export function baseLoadout(def: CharacterDef): readonly AbilityDef[] {
   return def.carriers.map((c) => c.tiers[0]!)
 }
 
-/** 同档多载体的卡文案由 gen 校验一致 */
 export function upgradeCardsFor(def: CharacterDef): readonly [UpgradeCard, UpgradeCard] {
   const pick = (k: 0 | 1): UpgradeCard => {
     for (const c of def.carriers) {
@@ -74,6 +68,6 @@ export function upgradeCardsFor(def: CharacterDef): readonly [UpgradeCard, Upgra
   return [pick(0), pick(1)]
 }
 
-const TB = teamJson as unknown as TeamBaseline
+const TB: TeamBaseline = TEAM_BASELINE
 export const TEAM = TB.team
 export const MEMBER = TB.member

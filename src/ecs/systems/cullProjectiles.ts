@@ -8,7 +8,7 @@ export function cullProjectiles(sim: Sim): void {
   const now = sim.elapsedMs
   const view = sim.view
   const slack = 4 * UNIT
-  for (const eid of [...query(sim.world, PROJ_SET as unknown as object[])]) {
+  for (const eid of [...query(sim.world, PROJ_SET)]) {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     if (now >= Proj.dieAt[eid]!) {

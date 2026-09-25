@@ -7,7 +7,6 @@ function ringRadius(count: number): number {
   return (count === 3 ? TEAM.smallRingRadius : TEAM.ringRadius) * UNIT
 }
 
-/** 基准角，不含相位；null = 不在可旋转环上（居中者与 1~2 人阵） */
 export function ringPostAngle(id: FormationId, post: number, count: number): number | null {
   if (id === 'ring') {
     if (count < 3) return null
@@ -20,7 +19,6 @@ export function ringPostAngle(id: FormationId, post: number, count: number): num
   return null
 }
 
-/** 岗位序：环形 0 号正上顺时针（2 人为左、右）；guard 0 号中心、其余外圈 */
 export function formationPosts(id: FormationId, count: number, ringPhase = 0): Point[] {
   if (id === 'guard' && count >= 2) {
     return Array.from({ length: count }, (_, post) => {

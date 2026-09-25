@@ -2,9 +2,8 @@ import { query } from 'bitecs'
 import { Dormant, ENEMY_SET, Step, Transform } from '../components'
 import type { Sim } from '../sim'
 
-/** 禁锢 → 约束 → Transform */
 export function commitEnemySteps(sim: Sim): void {
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Dormant.v[eid]) continue
     const ox = Transform.x[eid]!
     const oy = Transform.y[eid]!

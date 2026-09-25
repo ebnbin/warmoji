@@ -3,8 +3,6 @@ import { TAP_SLOP } from '../util/units'
 import { clipTo, markDirty } from '../util/mask'
 import { roundRect } from './shapes'
 
-// 几何遮罩只裁像素不裁输入：滚出视口的交互子项仍会拦截点击，故每次滚动按可视矩形逐子项开关 input
-
 export interface ScrollRect {
   x: number
   y: number
@@ -12,16 +10,15 @@ export interface ScrollRect {
   h: number
 }
 
-export function maxScrollOf(contentHeight: number, viewH: number): number {
+function maxScrollOf(contentHeight: number, viewH: number): number {
   return Math.max(0, contentHeight - viewH)
 }
 
-export function clampScroll(y: number, max: number): number {
+function clampScroll(y: number, max: number): number {
   return Math.max(0, Math.min(max, y))
 }
 
-/** max <= 0 表示无需滚动条 */
-export function thumbGeom(
+function thumbGeom(
   rect: ScrollRect,
   contentHeight: number,
   scroll: number,
@@ -34,16 +31,13 @@ export function thumbGeom(
 }
 
 export class ScrollView {
-  /** 子项坐标以内容顶为原点 */
   readonly content: Phaser.GameObjects.Container
-  onScroll?: () => void
 
   private rect: ScrollRect
   private scroll = 0
   private max = 0
   private contentHeight = 0
   private maskGfx: Phaser.GameObjects.Graphics
-  /** 改了矩形要 markDirty */
   private mask?: Phaser.Filters.Mask
   private bar?: Phaser.GameObjects.Graphics
   private dragging = false
@@ -72,19 +66,18 @@ export class ScrollView {
 
     if (opts.scrollbar !== false) this.bar = scene.add.graphics()
 
-    scene.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+    scene.input.on(Phaser.Input.Events.POINTER_WHEEL, (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (this.contains(p)) this.setScroll(this.scroll + dy * 0.6)
     })
-    scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+    scene.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
       this.dragMovedFlag = false
-      // 恒赋值：上一轮手势异常结束（出画布/系统打断）不能把拖动态卡住
       this.dragging = this.contains(p)
       if (this.dragging) {
         this.dragStartY = p.worldY
         this.dragStartScroll = this.scroll
       }
     })
-    scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+    scene.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dy = this.dragStartY - p.worldY
       if (this.max > 0 && Math.abs(dy) > TAP_SLOP) this.dragMovedFlag = true
@@ -93,16 +86,8 @@ export class ScrollView {
     const release = (): void => {
       this.dragging = false
     }
-    scene.input.on('pointerup', release)
-    scene.input.on('pointerupoutside', release)
-  }
-
-  get scrollY(): number {
-    return this.scroll
-  }
-
-  get maxScroll(): number {
-    return this.max
+    scene.input.on(Phaser.Input.Events.POINTER_UP, release)
+    scene.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, release)
   }
 
   get wasDragged(): boolean {
@@ -126,7 +111,6 @@ export class ScrollView {
     return this
   }
 
-  /** 填完子项后调用 */
   setContentHeight(h: number): void {
     this.contentHeight = Math.max(0, h)
     this.max = maxScrollOf(this.contentHeight, this.rect.h)
@@ -173,7 +157,6 @@ export class ScrollView {
     this.content.y = this.rect.y - this.scroll
     this.clipInput()
     this.drawBar()
-    this.onScroll?.()
   }
 
   private clipInput(): void {

@@ -1,4 +1,5 @@
 import { ANIM_DEF } from '../../../emoji/anim'
+import type { AnimClipId } from '../../../emoji/anim'
 import type { OutlineKind } from '../../../emoji/svg'
 import { Anim } from '../../components'
 import { animId, animOutline } from '../../store'
@@ -19,13 +20,12 @@ export function armIdle(eid: number, id: string, outline: OutlineKind, still: nu
   Anim.still[eid] = still
 }
 
-/** durMs = 本次行为的真实间隔 */
-export function playClip(sim: Sim, atlas: FrameIndex, eid: number, clipId: string, durMs: number): void {
+export function playClip(sim: Sim, atlas: FrameIndex, eid: number, clipId: AnimClipId, durMs: number): void {
   const id = animId[eid]
   const outline = animOutline[eid]
   if (id === undefined || outline === undefined) return
   const c = atlas.clip(id, outline, clipId)
-  if (c.frames === 0) return // 尚未烘好则不播
+  if (c.frames === 0) return
   Anim.onceBase[eid] = c.base
   Anim.onceFrames[eid] = c.frames
   Anim.onceDur[eid] = durMs

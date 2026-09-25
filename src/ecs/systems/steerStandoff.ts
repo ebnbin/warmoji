@@ -37,6 +37,5 @@ export function steerStandoff(sim: Sim): void {
       BVel.y[eid] = d.y * sp
       continue
     }
-    // 站位带内停手，BVel 已由 updateEnemyGates 清零
   }
 }

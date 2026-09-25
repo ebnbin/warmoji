@@ -7,43 +7,32 @@ import type { FormationId } from '../types/formation'
 import { browserStorage } from '../util/storage'
 import type { ItemId } from '../types/items'
 import type { CardId } from '../types/cards'
-import type { MapId } from '../types/maps'
+import type { Hazard, MapId } from '../types/maps'
+import type { EnemyKind } from '../types/enemies'
 import { MAP_IDS } from '../data/maps'
 import { drawRecruitPool, recruitSeed, refreshRecruitSeed, unlockedCount } from './recruit'
 import { waveDurationMs } from '../data/waves'
 import type { XpState } from '../types/xp'
+import { SceneKey } from '../scene/keys'
 
 export interface RunState {
   captainId: CaptainId
   mapId: MapId
   sandbox: boolean
-  /** 一局一景，各波不变 */
   decorSeed: number
-  /** 1 起；波次结束进商店前 +1 */
   wave: number
   coins: number
   kills: number
-  /** level = 已升级数，xp = 当前级进度；无上限 */
   xp: XpState
-  /** 每升 1 级 +1 */
   cardDraws: number
-  /** cardId → 等级 */
   teamCards: Partial<Record<CardId, number>>
-  /** 已完成波次的累计 */
   combatMs: number
-  /** 顺序即卡位，整局固定 */
   recruitPool: CharacterId[]
-  /** 下标即槽位 */
   roster: CharacterId[]
-  /** 按槽位；0 = 波末已阵亡 */
   memberHp: number[]
-  /** 按槽位；重复 = 堆叠；角色等级由此纯函数推导，凡进此列表就计入 */
   memberItems: ItemId[][]
-  /** 进店时重置 */
   freeRefreshes: number
-  /** 跨波持久；只在战斗内递减 */
   skillCdMs: number
-  /** 0 号 = 受保护中心，1.. = 外圈；懒初始化；互换中心只交换两人 */
   guardOrder: CharacterId[]
   formationIntroduced: boolean
   stats: {
@@ -51,10 +40,9 @@ export interface RunState {
     kills: number[]
     deaths: number[]
     damageTaken: number[]
-    /** 敌人名 → 我方击杀数 */
-    enemyKills: Record<string, number>
-    /** 敌人名 → 对我方造成的伤害 */
-    enemyDamage: Record<string, number>
+    enemyKills: Partial<Record<EnemyKind, number>>
+    enemyDamage: Partial<Record<EnemyKind, number>>
+    hazardDamage: Partial<Record<Hazard, number>>
     eliteKills: number
   }
 }
@@ -68,7 +56,6 @@ export function beginRun(
   sandbox = false,
 ): RunState {
   const captain = CAPTAINS[captainId]
-  // 跳波开局：难度时钟按被跳过波次的时长预推进，与正常打到该波一致
   let skippedMs = 0
   for (let w = 1; w < captain.startWave; w++) skippedMs += waveDurationMs(w)
   const roster = [...starters]
@@ -99,6 +86,7 @@ export function beginRun(
       damageTaken: roster.map(() => 0),
       enemyKills: {},
       enemyDamage: {},
+      hazardDamage: {},
       eliteKills: 0,
     },
   }
@@ -114,17 +102,15 @@ export function getRun(): RunState {
   return current
 }
 
-/** 胜/败/主动放弃的唯一收口 */
 export function endRun(): void {
   if (current) refreshRecruitSeed(browserStorage(), current.captainId)
   current = undefined
 }
 
-export function rosterCap(run: RunState): number {
+function rosterCap(run: RunState): number {
   return CAPTAINS[run.captainId].teamSize
 }
 
-/** 含本波名额 */
 export function recruitUnlocked(run: RunState): number {
   return Math.min(unlockedCount(Math.min(rosterCap(run), run.wave)), run.recruitPool.length)
 }
@@ -133,7 +119,7 @@ export function recruitCandidates(run: RunState): CharacterId[] {
   return run.recruitPool.slice(0, recruitUnlocked(run)).filter((id) => !run.roster.includes(id))
 }
 
-export function recruitDue(run: RunState): boolean {
+function recruitDue(run: RunState): boolean {
   return run.roster.length < Math.min(rosterCap(run), run.wave)
 }
 
@@ -142,11 +128,10 @@ export function recruitDueCount(run: RunState): number {
   return Math.max(0, Math.min(due, recruitCandidates(run).length))
 }
 
-export function canRecruit(run: RunState, id: CharacterId): boolean {
+function canRecruit(run: RunState, id: CharacterId): boolean {
   return recruitDue(run) && id in CHARACTERS && !run.roster.includes(id)
 }
 
-/** 返回新槽位，失败 -1 */
 export function recruitMember(run: RunState, id: CharacterId): number {
   if (!canRecruit(run, id)) return -1
   run.roster.push(id)
@@ -159,8 +144,7 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   return run.roster.length - 1
 }
 
-/** 与 teamSize 脱钩 */
-export const GUARD_MIN = 5
+const GUARD_MIN = 5
 
 export function hasCenter(run: RunState): boolean {
   return run.roster.length >= GUARD_MIN
@@ -170,7 +154,6 @@ export function currentFormation(run: RunState): FormationId {
   return hasCenter(run) ? 'guard' : 'ring'
 }
 
-/** 增量保序：新入队者接到外圈末尾，中心不动 */
 function ensureGuardOrder(run: RunState): void {
   if (!hasCenter(run)) return
   const kept = run.guardOrder.filter((id) => run.roster.includes(id))
@@ -179,14 +162,12 @@ function ensureGuardOrder(run: RunState): void {
   run.guardOrder = [...kept, ...added]
 }
 
-/** 未达门槛按 roster 顺序 */
 export function guardOrder(run: RunState): CharacterId[] {
   if (!hasCenter(run)) return [...run.roster]
   ensureGuardOrder(run)
   return [...run.guardOrder]
 }
 
-/** 未达门槛为 null */
 export function guardCenter(run: RunState): CharacterId | null {
   if (!hasCenter(run)) return null
   ensureGuardOrder(run)
@@ -206,14 +187,12 @@ export function setGuardCenter(run: RunState, id: CharacterId): boolean {
   return true
 }
 
-/** 整编的下一页；null = 整编已无事可办 */
-export function teamStep(run: RunState): 'recruit' | 'formation' | null {
-  if (recruitDueCount(run) > 0) return 'recruit'
-  if (hasCenter(run) && !run.formationIntroduced) return 'formation'
+export function teamStep(run: RunState): SceneKey.Recruit | SceneKey.Formation | null {
+  if (recruitDueCount(run) > 0) return SceneKey.Recruit
+  if (hasCenter(run) && !run.formationIntroduced) return SceneKey.Formation
   return null
 }
 
-/** storedHp 0（阵亡）以低血量复活 */
 export function waveStartHp(storedHp: number, maxHp: number): number {
   if (storedHp > 0) return Math.min(storedHp, maxHp)
   return Math.round(maxHp * WAVE.reviveHpRatio)

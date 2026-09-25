@@ -1,4 +1,3 @@
-/** radius 为格 */
 export interface GroundEffectDef {
   readonly radius: number
   readonly durationMs: number

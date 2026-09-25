@@ -30,13 +30,12 @@ export function foldBattleEffects(parts: readonly Partial<BattleEffects>[]): Bat
   fx.enemySlowMul = clamp(fx.enemySlowMul, 0.4, 2.2)
   return fx
 }
-export function waveCarrierBudget(wave: number, isBoss: boolean): { buff: number; debuff: number } {
+function waveCarrierBudget(wave: number, isBoss: boolean): { buff: number; debuff: number } {
   const cb = CARRIER_BUDGET
   if (isBoss) return { buff: cb.boss.buff, debuff: cb.boss.debuff }
   for (const t of cb.waveTiers) if (wave <= t.upToWave) return { buff: t.buff, debuff: t.debuff }
   return { buff: cb.fallback.buff, debuff: cb.fallback.debuff }
 }
-/** 可重复 */
 export function rollWaveCarriers(
   mapId: MapId,
   wave: number,

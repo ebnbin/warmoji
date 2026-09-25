@@ -39,7 +39,6 @@ export function steerDash(sim: Sim): void {
     }
 
     if (state === 3) {
-      // 结束的这一帧仍按冲刺速度走完
       if (now >= Charge.dashUntil[eid]!) {
         if (hasComponent(sim.world, eid, DashTimer)) {
           EState.v[eid] = 1
@@ -78,7 +77,6 @@ export function steerDash(sim: Sim): void {
       continue
     }
 
-    // 冲刺本身锁直线，不经世界钩子
     const speed = Speed.v[eid]! * slow
     if (Dash.idleChase[eid]) {
       const to = aimPoint(sim, eid, Dash.aimTeamCenter[eid] === 1)

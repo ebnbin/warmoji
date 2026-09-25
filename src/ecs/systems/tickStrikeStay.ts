@@ -9,7 +9,6 @@ export function tickStrikeStay(sim: Sim): void {
   for (const e of query(sim.world, [Ability, Assassinate, Followup, Blink])) {
     if (Followup.left[e]! <= 0) continue
     const m = Owner.eid[e]!
-    // 阵亡即收势
     Followup.left[e] = Frozen.v[e] ? 0 : Followup.left[e]! - dt
     if (Followup.left[e]! > 0) {
       VisOff.x[m] = Blink.x[e]!

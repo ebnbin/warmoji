@@ -7,14 +7,12 @@ import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 import { spawnFxCircle } from '../entities/fx'
 
-/** 治疗量吃伤害乘区 */
 export function castHeals(sim: Sim): void {
   castScan(sim, Heal, (e) => {
     const x = ownerX(e)
     const y = ownerY(e)
     const range = Heal.range[e]!
     const team = Faction.v[e] === FACTION.team
-    // 电击起搏优先
     if (
       team &&
       hasComponent(sim.world, e, HealDefib) &&
@@ -31,7 +29,7 @@ export function castHeals(sim: Sim): void {
       ? healCharacters(sim, x, y, range, amount, all)
       : healEnemies(sim, x, y, range, amount, all)
     if (healed === 0) {
-      Heal.cdLeft[e] = 300 // 全员满血时小步重试
+      Heal.cdLeft[e] = 300
       return false
     }
     pulse(sim, x, y, range, 0x81c784)
@@ -40,7 +38,6 @@ export function castHeals(sim: Sim): void {
   })
 }
 
-/** 无阵亡者返回 false */
 function cutReviveTimer(sim: Sim, x: number, y: number, range: number, ms: number): boolean {
   const r2 = range * range
   let best = -1

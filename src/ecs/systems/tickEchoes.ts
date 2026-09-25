@@ -13,7 +13,6 @@ export function tickEchoes(sim: Sim): void {
   for (const e of query(sim.world, [Ability, AreaBlast, Followup])) {
     if (Followup.left[e]! <= 0) continue
     if (Frozen.v[e]) {
-      // 阵亡即作废
       Followup.left[e] = 0
       continue
     }

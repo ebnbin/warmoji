@@ -15,13 +15,11 @@ import { SETTING_DEFS } from './save/settings'
 
 const roster: readonly CharacterDef[] = Object.values(CHARACTERS)
 
-/** 我方可能装上的全部能力：各角色全部档位 + 各队长技能 */
 const teamAbilities: readonly AbilityDef[] = [
   ...roster.flatMap((c) => c.carriers.flatMap((cr) => cr.tiers)),
   ...Object.values<CaptainDef>(CAPTAINS).flatMap((c) => c.skill.abilities),
 ]
 
-/** 持械、塔身、召唤物、坠物 */
 function abilityBodyEmojis(w: AbilityDef): string[] {
   return [
     ...('held' in w && w.held ? [w.held.emoji] : []),
@@ -41,10 +39,9 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     ...Object.values<CaptainDef>(CAPTAINS).map((c) => c.emoji),
     ...teamAbilities.flatMap((w) => [...abilityBodyEmojis(w), ...abilityShotEmojis(w)]),
     ...Object.values(PICKUPS).map((p) => p.emoji),
-    ...Object.values(FIELD_PICKUPS).map((p) => p.emoji),
+    ...FIELD_PICKUPS.map((p) => p.emoji),
     '2795',
     '1f480',
-    // 🫘 能量豆
     '1fad8',
     ...new Set(
       Object.values<MapDef>(MAPS).flatMap((m) => [...m.decor.emojis, ...(m.drift ?? [])]),
@@ -57,7 +54,6 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   ],
 }
 
-/** 图集里不描边的贴图：💥 爆裂、⚠ 刷怪预告、🪐 天体横扫 */
 export const PLAIN_EMOJIS: readonly string[] = ['1f4a5', SPAWN.markEmoji, '1fa90']
 
 function armedBodyEmojis(): string[] {
@@ -80,18 +76,15 @@ function morphEmojis(): string[] {
   )
 }
 
-// 不在此清单的 emoji 按需加载（ensureEmoji）
 export const PRELOAD_EMOJIS: readonly string[] = [
   ...Object.values(OUTLINED_EMOJIS).flat(),
   ...roster.flatMap((c) => c.carriers.map((cr) => cr.icon)),
   ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),
   ...Object.values(CARDS).map((c) => c.emoji),
   ...Object.values(MAPS).map((m) => m.emoji),
-  // 🗺 🕹 地图详情组图标
   '1f5fa',
   '1f579',
   ...SETTING_DEFS.map((d) => d.icon),
-  // 属性面板组图标
   '2b50',
   '2699',
   '1f4d6',
@@ -99,7 +92,6 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '2795',
   '2b06',
   '2694',
-  // 命定卡池：盖牌 + 已入队角标
   '2753',
   '1f396',
   '1f3c6',
@@ -110,16 +102,14 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '2705',
   '23f8',
   '1f451',
-  // 🧪 Studio 入口
   '1f9ea',
-  // Studio 内部图标：同步渲染，须预载
-  '1f3ac', // 🎬 配方
-  '1f9e9', // 🧩 模板
-  '1f52c', // 🔬 解剖
-  '1f9d8', // 🧘 待机
-  '23ee', // ⏮ 上一帧
-  '25b6', // ▶ 播放
-  '23ed', // ⏭ 下一帧
-  '1f441', // 👁 可见
-  '1f648', // 🙈 隐藏
+  '1f3ac',
+  '1f9e9',
+  '1f52c',
+  '1f9d8',
+  '23ee',
+  '25b6',
+  '23ed',
+  '1f441',
+  '1f648',
 ]

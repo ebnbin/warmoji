@@ -9,10 +9,11 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { Joystick } from '../ui/Joystick'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
-import type { HudInput, HudSnapshot, WaveSummary } from '../run/hudHost'
-import { activeHudHost, setActiveHudInput } from '../run/hudHost'
+import type { FieldCollected, HudInput, HudSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
+import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import { roundRect } from '../ui/shapes'
+import { SceneKey } from './keys'
 
 export class UIScene extends Phaser.Scene implements HudInput {
   private joystick?: Joystick
@@ -24,32 +25,28 @@ export class UIScene extends Phaser.Scene implements HudInput {
   private last!: HudSnapshot
   private paused = false
   private pauseObjs: Phaser.GameObjects.GameObject[] = []
-  // 队长技能按钮
   private skillBase?: Phaser.GameObjects.Arc
   private skillEmoji?: Phaser.GameObjects.Image
   private skillMask?: Phaser.GameObjects.Graphics
   private skillCdText?: Phaser.GameObjects.Text
   private skillRing?: Phaser.GameObjects.Arc
   private skillCenter = { x: 0, y: 0 }
-  /** setDisplaySize 后的小数 scale，弹跳按它做相对缩放 */
   private skillEmojiScale = 1
   private skillWasReady = false
   private skillShownSec = -1
   private skillShownRatio = -1
-  // 战场拾取效果指示
   private fxIcons: Phaser.GameObjects.Image[] = []
   private fxBars?: Phaser.GameObjects.Graphics
   private fxKey = ''
 
   constructor() {
-    super('ui')
+    super(SceneKey.Ui)
   }
 
   get moveVector(): { x: number; y: number } {
     return this.joystick?.vector ?? { x: 0, y: 0 }
   }
 
-  /** 宿主在 create 里登记且先于 scene.launch('ui')，此处必已就位 */
   private get arena(): HudHost {
     return activeHudHost()!
   }
@@ -62,7 +59,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     this.last = {
       xp: -1,
       xpNext: -1,
-      level: -1,
       kills: -1,
       coins: -1,
       wave: -1,
@@ -101,7 +97,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
       .setDepth(300)
       .setAlpha(0.85)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.togglePause())
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.togglePause())
     this.input.keyboard?.on('keydown-ESC', () => this.togglePause())
     this.input.keyboard?.on('keydown-SPACE', () => {
       if (this.paused) this.togglePause()
@@ -111,16 +107,16 @@ export class UIScene extends Phaser.Scene implements HudInput {
     this.createFxIndicators()
 
     const arenaEvents = this.arena.events
-    arenaEvents.on('wave-complete', this.onWaveComplete, this)
-    arenaEvents.on('wave-warning', this.onWaveWarning, this)
-    arenaEvents.on('skill-cast', this.onSkillCast, this)
-    arenaEvents.on('field-collected', this.onFieldCollected, this)
+    arenaEvents.on(HudEvent.WaveComplete, this.onWaveComplete, this)
+    arenaEvents.on(HudEvent.WaveWarning, this.onWaveWarning, this)
+    arenaEvents.on(HudEvent.SkillCast, this.onSkillCast, this)
+    arenaEvents.on(HudEvent.FieldCollected, this.onFieldCollected, this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      arenaEvents.off('wave-complete', this.onWaveComplete, this)
-      arenaEvents.off('wave-warning', this.onWaveWarning, this)
-      arenaEvents.off('skill-cast', this.onSkillCast, this)
-      arenaEvents.off('field-collected', this.onFieldCollected, this)
+      arenaEvents.off(HudEvent.WaveComplete, this.onWaveComplete, this)
+      arenaEvents.off(HudEvent.WaveWarning, this.onWaveWarning, this)
+      arenaEvents.off(HudEvent.SkillCast, this.onSkillCast, this)
+      arenaEvents.off(HudEvent.FieldCollected, this.onFieldCollected, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       setActiveHudInput(undefined)
     })
@@ -130,8 +126,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
       this.showPauseOverlay()
     }
   }
-
-  // ── 暂停 ────────────────────────────────────────────────────
 
   private togglePause(): void {
     if (this.paused) {
@@ -178,7 +172,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
         .setOrigin(0)
         .setDepth(402)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', onTap)
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, onTap)
       return [g, t, z]
     }
     this.pauseObjs = [
@@ -196,7 +190,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
       ...button(cy + 8, '继 续', true, () => this.togglePause()),
       ...button(cy + 100, '结束本局', false, () => {
         endRun()
-        this.arena.scene.start('menu')
+        this.arena.scene.start(SceneKey.Menu)
       }),
     ]
   }
@@ -231,7 +225,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
     roundRect(g, x + 2, y + 2, Math.max(6, (w - 4) * ratio), 12, 6, { fill: 0xef5350 })
   }
 
-  private onWaveWarning(w: { title: string; sub: string }): void {
+  private onWaveWarning(w: WaveWarning): void {
     const res = textRes()
     const cx = viewport.logicalWidth / 2
     const cy = viewport.logicalHeight * 0.3
@@ -278,8 +272,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     })
   }
 
-  // ── 队长主动技能按钮（左下角）────────────────────────────────
-
   private createSkillButton(res: number): void {
     const r = 55
     const cx = safeInsets.left + r + 24
@@ -317,7 +309,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
       .setOrigin(0)
       .setDepth(304)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.tryCastSkill())
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.tryCastSkill())
     this.input.keyboard?.on('keydown-E', () => this.tryCastSkill())
   }
 
@@ -355,7 +347,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
       this.skillCdText?.setText('')
       this.skillEmoji?.setAlpha(1)
       this.skillRing?.setVisible(true)
-      // emoji 的 scale 是小数，弹跳须相对基准缩放，不能 tween 到绝对 1
       const bump = (obj: Phaser.GameObjects.GameObject | undefined, base: number): void => {
         if (!obj) return
         this.tweens.add({
@@ -371,8 +362,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     }
     this.skillRing?.setAlpha(0.5 + 0.4 * Math.sin(this.time.now / 240))
   }
-
-  // ── 战场拾取效果指示（左上角，经验条下方竖排）───────────────
 
   private createFxIndicators(): void {
     this.fxIcons = []
@@ -429,12 +418,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
     this.tweens.add({ targets: t, alpha: 0, delay: 900, duration: 400, onComplete: () => t.destroy() })
   }
 
-  private onFieldCollected(fx: {
-    emoji: string
-    name: string
-    desc: string
-    polarity: 'buff' | 'debuff'
-  }): void {
+  private onFieldCollected(fx: FieldCollected): void {
     const res = textRes()
     const buff = fx.polarity === 'buff'
     const cx = viewport.logicalWidth / 2

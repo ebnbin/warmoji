@@ -1,16 +1,15 @@
 import Phaser from 'phaser'
 import { applyCamera, VIEWPORT_CHANGED } from '../../util/apply'
 import { preloadEmojis } from '../../emoji/hold'
-import { BATTLE_SCENE_KEY, SANDBOX_SCENE_KEY } from '../keys'
 import type { EcsBattleScene } from '../EcsBattleScene'
 import { SandboxPanel, PILL_ICON } from './SandboxPanel'
+import { SceneKey } from '../../scene/keys'
 
-/** 随战斗 scene 启停，叠在 HUD 之上；战斗暂停期间入睡 */
 export class SandboxScene extends Phaser.Scene {
   private panel?: SandboxPanel
 
   constructor() {
-    super(SANDBOX_SCENE_KEY)
+    super(SceneKey.Sandbox)
   }
 
   preload(): void {
@@ -19,7 +18,7 @@ export class SandboxScene extends Phaser.Scene {
 
   create(): void {
     applyCamera(this)
-    const battle = this.scene.get(BATTLE_SCENE_KEY) as EcsBattleScene
+    const battle = this.scene.get<EcsBattleScene>(SceneKey.Battle)
     this.panel = new SandboxPanel(this, battle)
     const sleep = (): void => {
       this.scene.sleep()

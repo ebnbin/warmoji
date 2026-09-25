@@ -4,12 +4,11 @@ import { Anim, ANIM_SET, Sprite } from '../components'
 import { animId, animOutline } from '../store'
 import type { Sim } from '../sim'
 
-/** 一次性 clip 优先，播完回落 idle */
 export function updateAnims(sim: Sim): void {
   const atlas = sim.frames
   const now = sim.elapsedMs
-  for (const eid of query(sim.world, ANIM_SET as unknown as object[])) {
-    if (Anim.frames[eid]! < 0) continue // frames < 0 = 停帧哨兵
+  for (const eid of query(sim.world, ANIM_SET)) {
+    if (Anim.frames[eid]! < 0) continue
     const id = animId[eid]
     const outline = animOutline[eid]
     if (id === undefined || outline === undefined) continue

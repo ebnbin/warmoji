@@ -4,8 +4,6 @@ import { emojiKey, emojiRaster } from './textures'
 import { HoldTable } from './holdTable'
 import type { TextureSpec } from './holdTable'
 
-// scene 持有的 emoji 纹理随其 SHUTDOWN 归还
-
 export interface EmojiRef {
   readonly id: string
   readonly outline?: OutlineKind
@@ -14,9 +12,7 @@ export interface EmojiRef {
 class Hold {
   readonly scene: Phaser.Scene
   readonly keys: ReadonlySet<string>
-  /** 全部生成结束后兑现；单张失败只报错 */
   readonly ready: Promise<void>
-  /** 创建时已全部就绪 */
   readonly done: boolean
   released = false
 
@@ -36,7 +32,6 @@ class Hold {
   }
 }
 
-/** 让 create 等持有就绪；持有已归还则不再回调 loader */
 class HoldFile extends Phaser.Loader.File {
   private readonly hold: Hold
 
@@ -76,15 +71,11 @@ function tableOf(game: Phaser.Game): HoldTable<HTMLImageElement> {
   return table
 }
 
-/** 各 scene 显示列表里（含容器内部）正在用的纹理 */
 function shownKeys(game: Phaser.Game): Set<string> {
   const keys = new Set<string>()
   const walk = (list: readonly Phaser.GameObjects.GameObject[]): void => {
     for (const obj of list) {
-      if ('texture' in obj) {
-        const key = (obj.texture as Phaser.Textures.Texture | undefined)?.key
-        if (key) keys.add(key)
-      }
+      if ('texture' in obj && obj.texture instanceof Phaser.Textures.Texture && obj.texture.key) keys.add(obj.texture.key)
       if (obj instanceof Phaser.GameObjects.Container || obj instanceof Phaser.GameObjects.Layer) walk(obj.list)
     }
   }
@@ -123,13 +114,11 @@ function hold(scene: Phaser.Scene, refs: readonly EmojiRef[]): Hold {
   return h
 }
 
-/** 只在 preload 里调用：create 等清单全部就绪 */
 export function preloadEmojis(scene: Phaser.Scene, refs: readonly EmojiRef[]): void {
   const h = hold(scene, refs)
   if (!h.done) scene.load.addFile(new HoldFile(scene.load, h))
 }
 
-/** 当前没有持有的 scene 不查；同一 (scene, key) 只报一次 */
 function assertHeld(scene: Phaser.Scene, key: string): void {
   const mine = holdsOf.get(scene)
   if (!mine) return

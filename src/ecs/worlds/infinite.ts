@@ -3,17 +3,12 @@ import type { DecorInstance } from '../../types/maps'
 import { Rng } from '../../util/rng'
 import type { Point } from '../../util/vec'
 
-/** 面积均匀 */
 export function ringPoint(rng: Rng, center: Point, rMin: number, rMax: number): Point {
   const r = Math.sqrt(rMin * rMin + rng.next() * (rMax * rMax - rMin * rMin))
   const a = rng.next() * Math.PI * 2
   return { x: center.x + Math.cos(a) * r, y: center.y + Math.sin(a) * r }
 }
 
-// ── 装饰分块 ──
-// 每格的随机流由 (种子, 格坐标) 哈希派生：任何访问顺序、任何块划分都得到同一摆放
-
-/** [0,1)，负坐标安全 */
 function hash01(seed: number, x: number, y: number): number {
   let h = (seed ^ 0x9e3779b9) >>> 0
   h = Math.imul(h ^ (x | 0), 0x85ebca6b) >>> 0
@@ -23,7 +18,6 @@ function hash01(seed: number, x: number, y: number): number {
   return h / 0x100000000
 }
 
-/** 晶格值来自 hash01，平滑双线性 */
 function worldNoise(seed: number, xU: number, yU: number, waveU: number): number {
   const gx = xU / waveU
   const gy = yU / waveU
@@ -39,12 +33,10 @@ function worldNoise(seed: number, xU: number, yU: number, waveU: number): number
   return (v00 * (1 - fx) + v10 * fx) * (1 - fy) + (v01 * (1 - fx) + v11 * fx) * fy
 }
 
-/** 负坐标正确 */
 function chunkOf(xU: number, chunkCells: number): number {
   return Math.floor(xU / chunkCells)
 }
 
-/** 外扩 pad 块 */
 export function chunksInRect(
   x0U: number,
   y0U: number,
@@ -64,11 +56,12 @@ export function chunksInRect(
   return out
 }
 
-export function chunkKey(cx: number, cy: number): string {
+export type ChunkKey = `${number},${number}`
+
+export function chunkKey(cx: number, cy: number): ChunkKey {
   return `${cx},${cy}`
 }
 
-/** 完全确定：同 (seed, 块) 任何时刻重建结果一致 */
 export function chunkDecor(
   def: MapDecor,
   seed: number,
@@ -76,7 +69,6 @@ export function chunkDecor(
   cy: number,
   chunkCells: number,
 ): DecorInstance[] {
-  // 密度基准只由种子决定
   const densityRoll = hash01(seed, 0x5eed, 0x5eed)
   const density = def.density[0] + densityRoll * (def.density[1] - def.density[0])
   const out: DecorInstance[] = []
@@ -106,8 +98,6 @@ export function chunkDecor(
   return out
 }
 
-// ── 终波缩圈 ──
-
 export interface ZoneDef {
   readonly r0: number
   readonly rMin: number
@@ -115,7 +105,6 @@ export interface ZoneDef {
   readonly shrinkEndMs: number
 }
 
-/** 观察期恒 r0 → 线性收缩 → 恒 rMin */
 export function zoneRadiusAt(tMs: number, def: ZoneDef): number {
   if (tMs <= def.holdMs) return def.r0
   if (tMs >= def.shrinkEndMs) return def.rMin

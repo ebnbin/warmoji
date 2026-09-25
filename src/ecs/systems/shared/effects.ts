@@ -5,26 +5,21 @@ import { Enemy, CharAtkSlow, Morph, Poison, Slow } from '../../components'
 import { applyMorph } from '../../entities/enemy'
 import { spawnEnemyProjectile } from '../../entities/projectile'
 import { spawnZone } from '../../entities/zone'
-import { } from '../../store'
 import { damageTarget } from './damage'
 import { FACTION } from '../../components'
 import { healEnemies, healCharacters } from './heal'
 import { nearestAngle, targetsNear } from '../../utils/targets'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
+import type { ByKind } from '../../../util/record'
 import { spawnFxRing } from '../../entities/fx'
 
-// 状态类效果按目标有没有对应组件施加，不按阵营判
-
-/** 锚点类效果作用于 (x,y)；逐目标类作用于 targets */
 export interface HitCtx {
   readonly x: number
   readonly y: number
   readonly baseDamage: number
   readonly targets?: readonly number[]
-  /** blast 跳过的目标 */
   readonly exclude?: ReadonlySet<number>
-  /** 死亡触发时 heal 排除它 */
   readonly source?: number
 }
 
@@ -52,14 +47,11 @@ function eachCapable(sim: Sim, hit: HitCtx, comp: object, apply: (t: number) => 
   }
 }
 
-type Handler<K extends Effect['kind']> = (
-  sim: Sim,
-  src: Source,
-  fx: Extract<Effect, { kind: K }>,
-  hit: HitCtx,
-) => void
+type EffectOf = ByKind<Effect>
 
-const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
+type Handler<K extends keyof EffectOf> = (sim: Sim, src: Source, fx: EffectOf[K], hit: HitCtx) => void
+
+const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   blast: (sim, src, fx, hit) => {
     const dmg = Math.max(1, Math.round(hit.baseDamage * fx.ratio))
     applyBlast(sim, src, hit.x, hit.y, dmg, fx.radius, fx.knockback, hit.exclude)
@@ -85,7 +77,6 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
     })
   },
 
-  // 这一帧刚死的不变形
   morph: (sim, _src, fx, hit) => {
     eachCapable(sim, hit, Morph, (t) => {
       if (hasComponent(sim.world, t, Enemy)) applyMorph(sim, sim.frames, t, fx)
@@ -100,7 +91,6 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
     })
   },
 
-  // 不挂 Owner：可活过放它的人
   ground: (sim, src, fx, hit) => {
     spawnZone(sim, {
       x: hit.x,
@@ -117,7 +107,7 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
         damage: fx.def.damage,
         tickMs: fx.def.tickMs,
         srcSlot: src.slot,
-        srcName: src.faction === FACTION.team ? '' : (src.name ?? ''),
+        srcEnemy: src.faction === FACTION.team ? undefined : src.enemy,
       },
     })
   },
@@ -128,7 +118,6 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
     else healEnemies(sim, hit.x, hit.y, fx.range, fx.amount, all, hit.source)
   },
 
-  // 只对敌方侧成立，gen 校验
   spawnProjectile: (sim, src, fx, hit) => {
     if (src.faction === FACTION.team) return
     const angle = nearestAngle(sim, src, hit.x, hit.y, Infinity)
@@ -140,7 +129,7 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
       speed: fx.projectile.speed,
       damage: Math.round(fx.damage * src.dmgMul),
       lifeMs: fx.lifeMs,
-      srcName: src.name,
+      srcEnemy: src.enemy,
     })
   },
 }
@@ -152,7 +141,9 @@ export function applyAbilityEffects(
   hit: HitCtx,
 ): void {
   if (!effects) return
-  for (const fx of effects) {
-    ;(EFFECT_KINDS[fx.kind] as Handler<Effect['kind']>)(sim, src, fx, hit)
-  }
+  for (const fx of effects) applyEffect(sim, src, fx, hit)
+}
+
+function applyEffect<K extends keyof EffectOf>(sim: Sim, src: Source, fx: EffectOf[K] & { readonly kind: K }, hit: HitCtx): void {
+  EFFECT_KINDS[fx.kind](sim, src, fx, hit)
 }

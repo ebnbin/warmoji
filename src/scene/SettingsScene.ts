@@ -6,7 +6,6 @@ import { Rng } from '../util/rng'
 import { loadSettings, saveSettings, SETTING_DEFS } from '../save/settings'
 import type { Settings } from '../save/settings'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage, preloadEmojis } from '../emoji/hold'
 import { emojiText, templateEmojis } from '../ui/emojiText'
 import { ScrollView } from '../ui/scroll'
@@ -16,6 +15,7 @@ import { setBgmEnabled } from '../audio/bgm'
 import { playSfx, setSfxEnabled } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
+import { SceneKey } from './keys'
 
 interface SettingsLayout {
   content: { w: number; h: number }
@@ -39,13 +39,11 @@ const TITLE = '{2699} 设置'
 
 interface Row {
   key: keyof Settings
-  /** 相对滚动内容顶 */
   localY: number
   toggle: Phaser.GameObjects.Graphics
 }
 
 export class SettingsScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private settings!: Settings
@@ -53,10 +51,9 @@ export class SettingsScene extends Phaser.Scene {
   private rows: Row[] = []
   private list!: ScrollView
   private listRect: ScrollRect = { x: 0, y: 0, w: 0, h: 0 }
-  private backRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
-    super('settings')
+    super(SceneKey.Settings)
   }
 
   preload(): void {
@@ -79,7 +76,7 @@ export class SettingsScene extends Phaser.Scene {
     const origin = { x: (w - L.content.w) / 2, y: (h - L.content.h) / 2 }
     const oy = origin.y
 
-    const back = this.add
+    this.add
       .text(origin.x + 40, oy + L.headerY, '← 返回', {
         fontFamily: UI_FONT,
         fontSize: FONT.strong,
@@ -88,14 +85,8 @@ export class SettingsScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.scene.start('menu'))
-    this.backRect = {
-      x: back.x,
-      y: back.y - back.height / 2,
-      w: back.width,
-      h: back.height,
-    }
-    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.scene.start(SceneKey.Menu))
+    this.input.keyboard?.on('keydown-ESC', () => this.scene.start(SceneKey.Menu))
 
     emojiText(
       this,
@@ -131,7 +122,7 @@ export class SettingsScene extends Phaser.Scene {
         .zone(0, y, S.w, S.rowH)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
           if (this.list.wasDragged) return
           this.settings[def.key] = !this.settings[def.key]
           saveSettings(browserStorage(), this.settings)
@@ -139,7 +130,6 @@ export class SettingsScene extends Phaser.Scene {
           setBgmEnabled(this.settings.bgm)
           playSfx('click')
           this.drawToggle(row)
-          this.reportSettings()
         })
 
       this.list.add([
@@ -169,7 +159,6 @@ export class SettingsScene extends Phaser.Scene {
       ])
       this.drawToggle(row)
     })
-    // Twemoji 图形许可（CC-BY 4.0）要求署名，全作只此一处
     const rowsH = SETTING_DEFS.length * (S.rowH + S.gap) - S.gap
     const licenseY = rowsH + 30
     this.list.add(
@@ -190,7 +179,6 @@ export class SettingsScene extends Phaser.Scene {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
 
-    this.reportSettings()
   }
 
   private drawToggle(row: Row): void {
@@ -205,34 +193,6 @@ export class SettingsScene extends Phaser.Scene {
     roundRect(g, tx, ty, tw, th, th / 2, { fill: on ? 0xffdc5d : 0xffffff, fillAlpha: on ? 1 : 0.16 })
     g.fillStyle(on ? 0x25262e : 0xc0c0cc, 1)
     g.fillCircle(on ? tx + tw - th / 2 : tx + th / 2, ty + th / 2, th / 2 - 5)
-  }
-
-  private reportSettings(): void {
-    const S = this.layout.list
-    reportDebug({
-      scene: 'settings',
-      elapsed: 0,
-      kills: 0,
-      level: 1,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      settings: {
-        items: this.rows.map((r) => ({
-          id: r.key,
-          x: this.listRect.x,
-          y: this.listRect.y + r.localY - this.list.scrollY,
-          w: S.w,
-          h: S.rowH,
-          on: this.settings[r.key],
-        })),
-        back: {
-          x: this.backRect.x + this.backRect.w / 2,
-          y: this.backRect.y + this.backRect.h / 2,
-          w: this.backRect.w,
-          h: this.backRect.h,
-        },
-      },
-    })
   }
 
   private onViewportChanged(): void {

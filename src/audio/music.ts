@@ -3,7 +3,6 @@ import type { MapId } from '../types/maps'
 export type BgmId = 'lobby' | MapId
 
 export interface BgmNote {
-  /** 循环内起始秒 */
   t: number
   dur: number
   freq: number
@@ -11,11 +10,10 @@ export interface BgmNote {
   vol: number
   attack: number
   release: number
-  /** 无回声配置的曲子忽略 */
   echo?: boolean
 }
 
-export type BgmHitKind = 'kick' | 'snare' | 'hat' | 'tom'
+type BgmHitKind = 'kick' | 'snare' | 'hat' | 'tom'
 
 export interface BgmHit {
   t: number
@@ -24,15 +22,11 @@ export interface BgmHit {
 }
 
 export interface BgmScore {
-  id: BgmId
-  bpm: number
   loopSec: number
   notes: BgmNote[]
   hits: BgmHit[]
   echo?: { delaySec: number; feedback: number; level: number }
 }
-
-// ── 写谱工具 ────────────────────────────────────────────────
 
 const MAJOR = [0, 2, 4, 5, 7, 9, 11] as const
 const DORIAN = [0, 2, 3, 5, 7, 9, 10] as const
@@ -48,8 +42,19 @@ interface Voice {
   echo?: boolean
 }
 
-/** [小节, 步, 音阶度数（可越八度/为负）, 时值步数] */
 type Line = readonly (readonly [number, number, number, number])[]
+
+type Pattern<P extends string, Step extends string> = P extends `${Step}${infer Rest}`
+  ? Pattern<Rest, Step>
+  : P extends ''
+    ? unknown
+    : never
+
+const BASS_TONE = { r: 0, t: 2, f: 4, o: 7 }
+
+type BassStep = keyof typeof BASS_TONE | '.' | '-'
+
+type DrumStep = 'x' | 'o' | '.'
 
 class Builder {
   notes: BgmNote[] = []
@@ -61,7 +66,6 @@ class Builder {
     private readonly stepsPerBar: number,
   ) {}
 
-  /** 度数越界自动进出八度 */
   private freq(deg: number, octave: number): number {
     const n = this.scale.length
     const idx = ((deg % n) + n) % n
@@ -72,7 +76,6 @@ class Builder {
   note(v: Voice, bar: number, step: number, deg: number, durSteps: number, detune = 1): void {
     this.notes.push({
       t: (bar * this.stepsPerBar + step) * this.stepSec,
-      // 0.92 留门隙，同度连音不粘连
       dur: durSteps * this.stepSec * 0.92,
       freq: this.freq(deg, v.octave) * detune,
       wave: v.wave,
@@ -87,24 +90,23 @@ class Builder {
     for (const [bar, step, deg, dur] of entries) this.note(v, bar, step, deg, dur)
   }
 
-  /** 模式串：r=根音 t=三音 f=五音 o=高八度根音 .=休止 -=延长前音 */
-  bass(v: Voice, chords: readonly number[], pattern: string): void {
-    const tone: Record<string, number> = { r: 0, t: 2, f: 4, o: 7 }
+  bass<P extends string>(v: Voice, chords: readonly number[], pattern: P & Pattern<P, BassStep>): void {
+    const tones: Readonly<Record<string, number>> = BASS_TONE
     for (let bar = 0; bar < chords.length; bar++) {
       const root = chords[bar]!
       let last: BgmNote | undefined
       for (let s = 0; s < pattern.length; s++) {
         const ch = pattern[s]!
+        const tone = tones[ch]
         if (ch === '-' && last) last.dur += this.stepSec
-        else if (ch in tone) {
-          this.note(v, bar, s, root + tone[ch]!, 1)
+        else if (tone !== undefined) {
+          this.note(v, bar, s, root + tone, 1)
           last = this.notes[this.notes.length - 1]
         } else last = undefined
       }
     }
   }
 
-  /** seq：0 根 1 三 2 五 3 高八度根 4 高八度三… */
   arp(v: Voice, chords: readonly number[], seq: readonly number[], fromBar = 0, toBar = chords.length): void {
     let i = 0
     for (let bar = fromBar; bar < toBar; bar++) {
@@ -117,7 +119,6 @@ class Builder {
     }
   }
 
-  /** tones 为和弦音索引；detune>0 时每音叠一条微升影子音 */
   pad(v: Voice, chords: readonly number[], tones: readonly number[], detune = 0): void {
     for (let bar = 0; bar < chords.length; bar++) {
       for (const tone of tones) {
@@ -128,8 +129,7 @@ class Builder {
     }
   }
 
-  /** [fromBar, toBar)；模式串：x=重击 o=轻击 .=休止 */
-  drums(kind: BgmHitKind, pattern: string, fromBar: number, toBar: number, vol: number): void {
+  drums<P extends string>(kind: BgmHitKind, pattern: P & Pattern<P, DrumStep>, fromBar: number, toBar: number, vol: number): void {
     for (let bar = fromBar; bar < toBar; bar++) {
       for (let s = 0; s < pattern.length; s++) {
         const ch = pattern[s]
@@ -146,10 +146,8 @@ class Builder {
 }
 
 function track(
-  id: BgmId,
   opts: {
     bpm: number
-    /** 每拍步数（8 分音符网格 = 2；6/8 曲直接以 8 分为拍 = 1） */
     stepsPerBeat: number
     stepsPerBar: number
     bars: number
@@ -163,8 +161,6 @@ function track(
   const b = new Builder(opts.rootMidi, opts.scale, stepSec, opts.stepsPerBar)
   build(b)
   return {
-    id,
-    bpm: opts.bpm,
     loopSec: opts.bars * opts.stepsPerBar * stepSec,
     notes: b.notes,
     hits: b.hits,
@@ -172,12 +168,9 @@ function track(
   }
 }
 
-// ── 曲目 ────────────────────────────────────────────────
-
 function buildLobby(): BgmScore {
   const chords = [0, 5, 3, 4, 0, 5, 3, 4, 3, 4, 2, 5, 1, 4, 0, 0]
   return track(
-    'lobby',
     { bpm: 96, stepsPerBeat: 2, stepsPerBar: 8, bars: 16, rootMidi: 60, scale: MAJOR },
     (b) => {
       const bass: Voice = { wave: 'triangle', vol: 0.17, attack: 0.01, release: 0.06, octave: -2 }
@@ -186,7 +179,6 @@ function buildLobby(): BgmScore {
       b.bass(bass, chords, 'r...f...')
       b.pad(pad, chords, [0, 1, 2])
       b.line(lead, [
-        // A 段
         [0, 0, 2, 2], [0, 2, 1, 2], [0, 4, 0, 2], [0, 6, 1, 2],
         [1, 0, 2, 4], [1, 4, 4, 3],
         [2, 0, 5, 2], [2, 2, 4, 2], [2, 4, 2, 2], [2, 6, 4, 2],
@@ -195,7 +187,6 @@ function buildLobby(): BgmScore {
         [5, 0, 2, 4], [5, 4, 4, 4],
         [6, 0, 5, 2], [6, 2, 6, 2], [6, 4, 7, 3],
         [7, 0, 4, 6],
-        // B 段
         [8, 0, 7, 2], [8, 2, 6, 2], [8, 4, 5, 2], [8, 6, 6, 2],
         [9, 0, 4, 4], [9, 4, 6, 2], [9, 6, 7, 2],
         [10, 0, 6, 2], [10, 2, 5, 2], [10, 4, 4, 2], [10, 6, 2, 2],
@@ -203,7 +194,6 @@ function buildLobby(): BgmScore {
         [12, 0, 1, 2], [12, 2, 3, 2], [12, 4, 5, 2], [12, 6, 3, 2],
         [13, 0, 4, 2], [13, 2, 2, 2], [13, 4, 1, 4],
         [14, 0, 0, 8],
-        // 第 16 小节留白
       ])
       b.drums('hat', '..x...x.', 0, 16, 0.06)
       b.drums('kick', 'x.......', 8, 16, 0.14)
@@ -214,7 +204,6 @@ function buildLobby(): BgmScore {
 function buildForest(): BgmScore {
   const chords = [0, 2, 6, 3, 0, 2, 6, 3, 2, 3, 6, 0, 0, 2, 6, 3]
   return track(
-    'forest',
     { bpm: 128, stepsPerBeat: 2, stepsPerBar: 8, bars: 16, rootMidi: 52, scale: DORIAN },
     (b) => {
       const bass: Voice = { wave: 'square', vol: 0.12, attack: 0.008, release: 0.04, octave: -1 }
@@ -223,7 +212,6 @@ function buildForest(): BgmScore {
       b.bass(bass, chords, 'r.r.r.ro')
       b.arp(arp, chords, [0, 1, 2, 3, 2, 1])
       b.line(lead, [
-        // A 段
         [0, 0, 0, 1], [0, 1, 1, 1], [0, 2, 2, 2], [0, 4, 4, 2], [0, 6, 3, 2],
         [1, 0, 2, 2], [1, 2, 4, 2], [1, 4, 7, 3], [1, 7, 6, 1],
         [2, 0, 6, 2], [2, 2, 5, 2], [2, 4, 4, 4],
@@ -232,12 +220,10 @@ function buildForest(): BgmScore {
         [5, 0, 2, 2], [5, 2, 4, 2], [5, 4, 7, 4],
         [6, 0, 6, 2], [6, 2, 5, 2], [6, 4, 4, 4],
         [7, 0, 3, 4], [7, 4, 2, 2], [7, 6, 1, 2],
-        // B 段
         [8, 0, 7, 2], [8, 2, 8, 2], [8, 4, 9, 4],
         [9, 0, 10, 2], [9, 2, 9, 2], [9, 4, 8, 4],
         [10, 0, 9, 2], [10, 2, 8, 2], [10, 4, 6, 2], [10, 6, 4, 2],
         [11, 0, 7, 6],
-        // A' 段
         [12, 0, 0, 1], [12, 1, 1, 1], [12, 2, 2, 2], [12, 4, 4, 2], [12, 6, 3, 2],
         [13, 0, 2, 2], [13, 2, 4, 2], [13, 4, 7, 4],
         [14, 0, 6, 2], [14, 2, 5, 2], [14, 4, 4, 4],
@@ -255,7 +241,6 @@ function buildForest(): BgmScore {
 function buildDesert(): BgmScore {
   const chords = [0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0]
   return track(
-    'desert',
     { bpm: 100, stepsPerBeat: 2, stepsPerBar: 8, bars: 16, rootMidi: 45, scale: PHRYGIAN_DOM },
     (b) => {
       const bass: Voice = { wave: 'triangle', vol: 0.18, attack: 0.012, release: 0.08, octave: 0 }
@@ -264,7 +249,6 @@ function buildDesert(): BgmScore {
       b.bass(bass, chords, 'r..r..f.')
       b.pad(drone, chords, [0, 2])
       b.line(lead, [
-        // A 段
         [0, 0, 4, 2], [0, 2, 3, 1], [0, 3, 2, 1], [0, 4, 3, 4],
         [1, 0, 2, 1], [1, 1, 1, 1], [1, 2, 0, 4],
         [2, 4, 5, 2], [2, 6, 4, 2],
@@ -273,12 +257,10 @@ function buildDesert(): BgmScore {
         [5, 0, 7, 2], [5, 2, 6, 2], [5, 4, 5, 4],
         [6, 0, 4, 6],
         [7, 0, 3, 1], [7, 1, 4, 1], [7, 2, 3, 1], [7, 3, 2, 1], [7, 4, 1, 2], [7, 6, 0, 2],
-        // B 段
         [8, 0, 7, 3], [8, 3, 8, 1], [8, 4, 9, 4],
         [9, 0, 9, 2], [9, 2, 8, 2], [9, 4, 7, 4],
         [10, 0, 5, 2], [10, 2, 6, 2], [10, 4, 7, 3], [10, 7, 5, 1],
         [11, 0, 4, 6],
-        // A' 段
         [12, 0, 4, 2], [12, 2, 3, 1], [12, 3, 2, 1], [12, 4, 3, 4],
         [13, 0, 2, 1], [13, 1, 1, 1], [13, 2, 0, 4],
         [14, 0, 5, 2], [14, 2, 4, 2], [14, 4, 3, 4],
@@ -294,7 +276,6 @@ function buildDesert(): BgmScore {
 function buildRiver(): BgmScore {
   const chords = [0, 4, 5, 3, 0, 4, 5, 3, 5, 2, 3, 4, 0, 3, 4, 0]
   return track(
-    'river',
     { bpm: 168, stepsPerBeat: 1, stepsPerBar: 6, bars: 16, rootMidi: 55, scale: MAJOR },
     (b) => {
       const bass: Voice = { wave: 'sine', vol: 0.17, attack: 0.015, release: 0.1, octave: -1 }
@@ -331,7 +312,6 @@ function buildRiver(): BgmScore {
 function buildVoid(): BgmScore {
   const chords = [0, 5, 2, 6, 0, 5, 2, 6, 3, 5, 0, 6, 3, 5, 6, 6]
   return track(
-    'void',
     {
       bpm: 76,
       stepsPerBeat: 2,
@@ -339,7 +319,6 @@ function buildVoid(): BgmScore {
       bars: 16,
       rootMidi: 45,
       scale: AEOLIAN,
-      // 附点八分 = 0.75 拍
       echo: { delaySec: (60 / 76) * 0.75, feedback: 0.45, level: 0.5 },
     },
     (b) => {
@@ -364,7 +343,6 @@ function buildVoid(): BgmScore {
         [12, 0, 3, 4],
         [13, 0, 5, 4],
         [14, 0, 6, 6],
-        // 第 16 小节全休止
       ])
       b.drums('kick', 'x.......', 0, 16, 0.3)
       b.drums('hat', '....x...', 0, 16, 0.04)
@@ -375,7 +353,6 @@ function buildVoid(): BgmScore {
 function buildRuins(): BgmScore {
   const chords = [0, 6, 3, 5, 0, 6, 4, 5, 3, 6, 0, 5, 4, 6, 3, 0]
   return track(
-    'ruins',
     {
       bpm: 84,
       stepsPerBeat: 2,
@@ -409,7 +386,6 @@ function buildRuins(): BgmScore {
         [12, 0, 1, 4],
         [13, 0, 3, 4],
         [14, 0, 0, 6],
-        // 第 16 小节全休止
       ])
       b.drums('kick', 'x.......', 0, 16, 0.22)
       b.drums('hat', '....x...', 0, 16, 0.04)
@@ -421,7 +397,6 @@ function buildRuins(): BgmScore {
 function buildDayNight(): BgmScore {
   const chords = [0, 4, 5, 3, 0, 4, 1, 5, 6, 3, 4, 5, 0, 4, 5, 0]
   return track(
-    'daynight',
     {
       bpm: 108,
       stepsPerBeat: 2,
@@ -440,7 +415,6 @@ function buildDayNight(): BgmScore {
       b.pad(pad, chords, [0, 2, 4], 0.005)
       b.arp(arp, chords, [0, 2, 4, 2])
       b.line(lead, [
-        // A 段
         [0, 0, 0, 2], [0, 2, 2, 2], [0, 4, 4, 4],
         [1, 0, 4, 2], [1, 2, 5, 2], [1, 4, 7, 4],
         [2, 0, 7, 2], [2, 2, 6, 2], [2, 4, 4, 4],
@@ -449,12 +423,10 @@ function buildDayNight(): BgmScore {
         [5, 0, 4, 2], [5, 2, 7, 2], [5, 4, 9, 4],
         [6, 0, 7, 2], [6, 2, 6, 2], [6, 4, 5, 4],
         [7, 0, 4, 6], [7, 6, 5, 2],
-        // B 段
         [8, 0, 7, 2], [8, 2, 6, 2], [8, 4, 4, 4],
         [9, 0, 5, 2], [9, 2, 4, 2], [9, 4, 2, 4],
         [10, 0, 4, 2], [10, 2, 2, 2], [10, 4, 0, 4],
         [11, 0, 2, 6],
-        // A' 段
         [12, 0, 0, 2], [12, 2, 2, 2], [12, 4, 4, 4],
         [13, 0, 4, 2], [13, 2, 5, 2], [13, 4, 7, 4],
         [14, 0, 7, 2], [14, 2, 5, 2], [14, 4, 4, 4],
@@ -471,7 +443,6 @@ function buildDayNight(): BgmScore {
 function buildSpace(): BgmScore {
   const chords = [0, 5, 3, 6, 0, 4, 5, 3, 6, 2, 5, 3, 0, 5, 6, 4]
   return track(
-    'space',
     {
       bpm: 72,
       stepsPerBeat: 2,
@@ -490,7 +461,6 @@ function buildSpace(): BgmScore {
       b.pad(pad, chords, [0, 2, 4], 0.006)
       b.arp(star, chords, [0, 4, 2, 4, 0, 5], 0, 16)
       b.line(lead, [
-        // A 段
         [0, 0, 0, 4], [0, 4, 4, 4],
         [1, 0, 5, 6], [1, 6, 4, 2],
         [2, 0, 3, 4], [2, 4, 2, 4],
@@ -499,12 +469,10 @@ function buildSpace(): BgmScore {
         [5, 0, 4, 6], [5, 6, 5, 2],
         [6, 0, 7, 4], [6, 4, 6, 4],
         [7, 0, 4, 8],
-        // B 段
         [8, 0, 9, 4], [8, 4, 7, 4],
         [9, 0, 8, 6], [9, 6, 6, 2],
         [10, 0, 7, 4], [10, 4, 5, 4],
         [11, 0, 6, 8],
-        // A' 段
         [12, 0, 4, 4], [12, 4, 2, 4],
         [13, 0, 3, 6], [13, 6, 2, 2],
         [14, 0, 4, 4], [14, 4, 5, 4],
@@ -525,7 +493,6 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   ruins: buildRuins,
   daynight: buildDayNight,
   space: buildSpace,
-  // 暂借深空曲
   ice: buildSpace,
 }
 

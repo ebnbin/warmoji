@@ -18,7 +18,6 @@ import { levelStatsFor, LEVEL_STATS } from '../data/levels'
 import { upgradeCardsFor } from '../data/characters'
 import { aggregateTeamCards } from '../data/cards'
 import type { TeamEffects } from '../types/items'
-import { BATTLE_SCENE_KEY } from '../ecs/keys'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
@@ -27,9 +26,9 @@ import type { RunState } from '../run/state'
 import { characterStatGroups } from '../scene/statLines'
 import { memberMaxHp } from '../data/stats'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
+import type { EmojiGridItem } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
@@ -37,12 +36,13 @@ import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
 import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
+import { SceneKey } from './keys'
 
 interface ShopLayout {
   content: { w: number; h: number }
   titleY: number
   coinsY: number
-  slots: { x: number; y: number; w: number; h: number; rowH: number; gap: number }
+  slots: { x: number; y: number; w: number; h: number }
   detail: { x: number; y: number; w: number; h: number }
   btn: { y: number; w: number; h: number }
 }
@@ -52,7 +52,7 @@ const LANDSCAPE: ShopLayout = {
   titleY: 46,
   coinsY: 98,
   detail: { x: 40, y: 132, w: 730, h: 488 },
-  slots: { x: 810, y: 132, w: 430, h: 488, rowH: 96, gap: 10 },
+  slots: { x: 810, y: 132, w: 430, h: 488 },
   btn: { y: 660, w: 340, h: 64 },
 }
 
@@ -61,12 +61,11 @@ const PORTRAIT: ShopLayout = {
   titleY: 54,
   coinsY: 106,
   detail: { x: 24, y: 144, w: 672, h: 460 },
-  slots: { x: 24, y: 628, w: 672, h: 470, rowH: 96, gap: 10 },
+  slots: { x: 24, y: 628, w: 672, h: 470 },
   btn: { y: 1162, w: 360, h: 72 },
 }
 
 export class ShopScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
@@ -77,15 +76,13 @@ export class ShopScene extends Phaser.Scene {
   private teamFx!: TeamEffects
   private layout!: ShopLayout
   private origin = { x: 0, y: 0 }
-  private grid!: EmojiGrid
+  private grid!: EmojiGrid<CharacterId>
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private offerDescView!: ScrollView
   private coinsText!: Phaser.GameObjects.Text
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private buyRect = { x: 0, y: 0, w: 0, h: 0 }
   private refreshRect = { x: 0, y: 0, w: 0, h: 0 }
-  private formationRect: { x: number; y: number; w: number; h: number } | null = null
-  /** 沉睡期间视口变过，唤醒时重排 */
   private wakeDirty = false
   private quitArmed = false
   private slotScroll = 0
@@ -100,7 +97,7 @@ export class ShopScene extends Phaser.Scene {
   private dragStartScroll = 0
 
   constructor() {
-    super('shop')
+    super(SceneKey.Shop)
   }
 
   create(): void {
@@ -154,11 +151,11 @@ export class ShopScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
-    quit.on('pointerup', () => {
+    quit.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
       if (this.dragMoved || this.grid.wasDragged) return
       if (this.quitArmed) {
         endRun()
-        this.scene.start('menu')
+        this.scene.start(SceneKey.Menu)
         return
       }
       this.quitArmed = true
@@ -169,7 +166,6 @@ export class ShopScene extends Phaser.Scene {
       })
     })
 
-    this.formationRect = null
     if (hasCenter(this.run)) {
       const fm = this.add
         .text(this.origin.x + L.content.w - 40, oy + L.titleY, '⛨ 队形', {
@@ -180,11 +176,10 @@ export class ShopScene extends Phaser.Scene {
         })
         .setOrigin(1, 0.5)
         .setInteractive({ useHandCursor: true })
-      fm.on('pointerup', () => {
+      fm.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (this.dragMoved || this.grid.wasDragged) return
         this.openFormation()
       })
-      this.formationRect = { x: fm.x - fm.width, y: fm.y - fm.height / 2, w: fm.width, h: fm.height }
     }
     this.events.on(Phaser.Scenes.Events.WAKE, this.onWake, this)
 
@@ -222,28 +217,27 @@ export class ShopScene extends Phaser.Scene {
       .zone(this.buyRect.x, this.buyRect.y, this.buyRect.w, this.buyRect.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (!this.dragMoved && !this.grid.wasDragged) this.buyFocused()
       })
     this.add
       .zone(this.refreshRect.x, this.refreshRect.y, this.refreshRect.w, this.refreshRect.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (!this.dragMoved && !this.grid.wasDragged) this.refreshFocused()
       })
 
-    // 只创建一次，renderOfferCard 复用
     this.offerDescView = new ScrollView(
       this,
       { x: dx + 88, y: cardY + 42, w: this.refreshRect.x - (dx + 88) - 12, h: 52 },
       { scrollbar: true },
     )
 
-    this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy2: number) => {
+    this.input.on(Phaser.Input.Events.POINTER_WHEEL, (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy2: number) => {
       if (this.inStats(p)) this.setStatsScroll(this.statsScroll + dy2 * 0.6)
     })
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
       this.dragMoved = false
       this.dragging = this.inStats(p)
       if (this.dragging) {
@@ -251,13 +245,13 @@ export class ShopScene extends Phaser.Scene {
         this.dragStartScroll = this.statsScroll
       }
     })
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dyDrag = this.dragStartY - p.worldY
       if (this.statsMax > 0 && Math.abs(dyDrag) > 10) this.dragMoved = true
       if (this.dragMoved) this.setStatsScroll(this.dragStartScroll + dyDrag)
     })
-    this.input.on('pointerup', () => {
+    this.input.on(Phaser.Input.Events.POINTER_UP, () => {
       this.dragging = false
     })
 
@@ -283,7 +277,7 @@ export class ShopScene extends Phaser.Scene {
       .zone(b.x, b.y, b.w, b.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (!this.dragMoved && !this.grid.wasDragged) this.nextWave()
       })
     this.input.keyboard?.on('keydown-ENTER', () => this.nextWave())
@@ -296,8 +290,6 @@ export class ShopScene extends Phaser.Scene {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
   }
-
-  // ── 上架/购买 ───────────────────────────────────────────────
 
   private levelOf(slot: number): number {
     return characterLevel(characterXp(this.run.memberItems[slot] ?? []))
@@ -312,7 +304,6 @@ export class ShopScene extends Phaser.Scene {
     return (this.run.memberItems[slot] ??= [])
   }
 
-  /** -1 = 无效 */
   private focusedIndex(): number {
     return this.lineup.indexOf(this.focusedId)
   }
@@ -336,7 +327,6 @@ export class ShopScene extends Phaser.Scene {
     const afterLevel = this.levelOf(idx)
     this.offers[idx] = rollItem(this.poolFor(idx), owned, Math.random, this.run.wave, afterLevel)
     this.refresh()
-    // 须在 refresh 之后，盖在最上层
     if (afterLevel > beforeLevel) this.showLevelUp(idx, afterLevel)
   }
 
@@ -358,9 +348,7 @@ export class ShopScene extends Phaser.Scene {
     return memberMaxHp(aggregateCharacterEffects(owned, levelStatsFor(id, this.levelOf(slot))).hpAdd)
   }
 
-  // ── 上架位网格（每个出战角色一个；形象即含义，角标 = 当前上架道具） ──
-
-  private buildSlotItems(): { key: string; emoji: string; outline: 'player'; badge?: string; hpRatio?: number }[] {
+  private buildSlotItems(): EmojiGridItem<CharacterId>[] {
     return this.lineup.map((id, slot) => {
       const max = this.slotMaxHp(slot)
       const hp = waveStartHp(this.run.memberHp[slot] ?? max, max)
@@ -385,7 +373,7 @@ export class ShopScene extends Phaser.Scene {
     this.grid.onTap = (key): void => {
       if (this.focusedId !== key) this.statsScroll = 0
       playSfx('click')
-      this.focusedId = key as CharacterId
+      this.focusedId = key
       this.refresh()
     }
     this.grid.onScroll = (): void => {
@@ -408,8 +396,6 @@ export class ShopScene extends Phaser.Scene {
     this.statsScroll = Math.max(0, Math.min(this.statsMax, y))
     this.statsContainer.y = -this.statsScroll
   }
-
-  // ── 属性面板 + 上架道具卡 ──────────────────────────────────
 
   private renderDetail(res: number): void {
     for (const o of this.detailObjs) o.destroy()
@@ -661,7 +647,6 @@ export class ShopScene extends Phaser.Scene {
     )
   }
 
-  /** 只列有变化的轴 */
   private formatEffects(fx: Partial<CharacterEffects>): string {
     const parts: string[] = []
     if (fx.hpAdd) parts.push(`生命 ${fx.hpAdd > 0 ? '+' : ''}${fx.hpAdd}`)
@@ -764,7 +749,7 @@ export class ShopScene extends Phaser.Scene {
       overlay.destroy()
       box.destroy()
     }
-    overlay.setInteractive().on('pointerup', dismiss)
+    overlay.setInteractive().on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, dismiss)
     this.time.delayedCall(3400, () => {
       if (box.active) dismiss()
     })
@@ -775,19 +760,17 @@ export class ShopScene extends Phaser.Scene {
     this.grid.setItems(this.buildSlotItems())
     this.grid.setSelected(this.focusedId)
     this.renderDetail(textRes())
-    this.reportShop()
   }
 
   private nextWave(): void {
     playSfx('click')
-    this.scene.start(BATTLE_SCENE_KEY)
+    this.scene.start(SceneKey.Battle)
   }
 
-  /** 须先入睡再启动阵型页：阵型页的 init 以商店在沉睡验证 fromShop */
   private openFormation(): void {
     playSfx('click')
     this.scene.sleep()
-    this.scene.run('formation', { fromShop: true })
+    this.scene.run(SceneKey.Formation, { fromShop: true })
   }
 
   private onWake(): void {
@@ -797,78 +780,9 @@ export class ShopScene extends Phaser.Scene {
       this.scene.restart()
       return
     }
-    this.reportShop()
-  }
-
-  private reportShop(): void {
-    const idx = this.focusedIndex()
-    const offer = this.offers[idx] ?? null
-    reportDebug({
-      scene: 'shop',
-      elapsed: 0,
-      kills: this.run.kills,
-      level: this.run.xp.level,
-      wave: this.run.wave,
-      coins: this.run.coins,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      shop: {
-        wave: this.run.wave,
-        coins: this.run.coins,
-        focusedId: this.focusedId,
-        freeRefreshes: this.run.freeRefreshes,
-        level: this.run.xp.level,
-        focusedLevel: idx >= 0 ? this.levelOf(idx) : 1,
-        focusedXp: idx >= 0 ? characterXp(this.run.memberItems[idx] ?? []) : 0,
-        slots: this.grid.cellRects().map((r) => {
-          const id = r.key as CharacterId
-          const index = this.lineup.indexOf(id)
-          return {
-            id,
-            x: r.x,
-            y: r.y,
-            w: r.w,
-            h: r.h,
-            offer: this.offers[index] ?? null,
-            price: this.offers[index] ? this.price(this.offers[index]!) : null,
-            owned: this.ownedFor(index).length,
-            level: this.levelOf(index),
-          }
-        }),
-        buy: {
-          x: this.buyRect.x + this.buyRect.w / 2,
-          y: this.buyRect.y + this.buyRect.h / 2,
-          w: this.buyRect.w,
-          h: this.buyRect.h,
-          enabled: offer !== null && this.run.coins >= this.price(offer),
-        },
-        refresh: {
-          x: this.refreshRect.x + this.refreshRect.w / 2,
-          y: this.refreshRect.y + this.refreshRect.h / 2,
-          w: this.refreshRect.w,
-          h: this.refreshRect.h,
-          enabled: this.run.freeRefreshes > 0 || this.run.coins >= SHOP.refreshPrice,
-        },
-        start: {
-          x: this.btnRect.x + this.btnRect.w / 2,
-          y: this.btnRect.y + this.btnRect.h / 2,
-          w: this.btnRect.w,
-          h: this.btnRect.h,
-        },
-        formation: this.formationRect
-          ? {
-              x: this.formationRect.x + this.formationRect.w / 2,
-              y: this.formationRect.y + this.formationRect.h / 2,
-              w: this.formationRect.w,
-              h: this.formationRect.h,
-            }
-          : null,
-      },
-    })
   }
 
   private onViewportChanged(): void {
-    // 沉睡中不能 restart，会顶掉上层页面；唤醒时补排
     if (this.scene.isSleeping()) {
       this.wakeDirty = true
       return

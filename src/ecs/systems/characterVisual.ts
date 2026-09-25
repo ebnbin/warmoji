@@ -1,7 +1,6 @@
 import { Alive, CharAtkSlow, CharFlash, Tint } from '../components'
 import type { Sim } from '../sim'
 
-/** 黏滞是战斗效果，按世界时；着色是纯视觉，按 fxMs */
 export function characterVisual(sim: Sim): void {
   const now = sim.elapsedMs
   for (const m of sim.characters) {

@@ -1,10 +1,16 @@
-// 不直接碰 localStorage：消费方注入，单测注入内存实现
-export interface StringStorage {
-  getItem(key: string): string | null
-  setItem(key: string, value: string): void
+export enum StorageKey {
+  Settings = 'warmoji.settings.v1',
+  Captain = 'warmoji.captain.v1',
+  Map = 'warmoji.map.v1',
+  Recruit = 'warmoji.recruit.v1',
+  Highscore = 'warmoji.highscore.v2',
 }
 
-/** 隐私模式下访问 localStorage 会抛错 */
+export interface StringStorage {
+  getItem(key: StorageKey): string | null
+  setItem(key: StorageKey, value: string): void
+}
+
 export function browserStorage(): StringStorage | undefined {
   try {
     return globalThis.localStorage

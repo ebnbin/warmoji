@@ -1,5 +1,4 @@
-// 拿不到 WebGL 就不加载游戏，只给提示；检测须与 Phaser 的一致（phaser/src/device/Features.js）
-
+// 检测须与 Phaser 的一致（phaser/src/device/Features.js）
 function webglAvailable(): boolean {
   if (!('WebGLRenderingContext' in window)) return false
   try {

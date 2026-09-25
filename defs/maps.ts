@@ -163,7 +163,6 @@ export const MAPS = {
       waveSlow: 0.6,
       waveFast: 1.2,
     },
-    // 只用其休眠参数
     infinite: { activeHalf: 32, spawnRingMin: 4, spawnRingMax: 16, chunkCells: 8, chunkPad: 1 },
     boss: 'croc',
   },
@@ -270,7 +269,6 @@ export const MAPS = {
     },
     mix: SPACE_MIX,
     finalWaveSub: '奇点降临——禁锢星域内已无处可逃，正面迎战！',
-    // 禁锢场半径 ≈ 地图内切圆
     space: {
       blackholeRadiusU: 12.5,
       meteor: {

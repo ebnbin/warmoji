@@ -26,12 +26,10 @@ import { flyerHits } from '../store'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 
 
-/** 持有者派生物（持械、坠物、召唤物、弩塔）的描边：敌方精英与 Boss 用精英描边 */
 export function holderOutline(faction: number, holderEid: number): OutlineKind {
   return faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? 'elite' : 'enemy') : 'player'
 }
 
-/** 能力由调用方挂到返回的 eid 上 */
 export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, faction: number): number {
   const world = sim.world
   const e = newEntity(world)
@@ -54,7 +52,6 @@ export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, f
   return e
 }
 
-/** 在途回旋镖是独立实体，武器留在手上 */
 function spawnFlyerBody(sim: Sim, weaponEid: number): number {
   const t = newEntity(sim.world)
   addComponents(sim.world, t, Transform, Sprite, Tint, Depth, Quad)
@@ -74,15 +71,12 @@ function spawnFlyerBody(sim: Sim, weaponEid: number): number {
   return t
 }
 
-// ── 在途回旋镖 ──
-
 export function catchFlyer(sim: Sim, e: number, f: number): void {
   flyerHits[f] = undefined
   removeEntity(sim.world, f)
   Thrown.n[e] = Math.max(0, Thrown.n[e]! - 1)
 }
 
-/** 武器留在手上，摆位系统按 Thrown 隐藏 */
 export function launch(sim: Sim, e: number, aim: number): void {
   playSfx('whoosh')
   const damage = Math.round(Boomerang.damage[e]! * damageMul(sim, e))

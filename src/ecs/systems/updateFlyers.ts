@@ -14,7 +14,6 @@ export function updateFlyers(sim: Sim): void {
   for (const f of [...query(sim.world, [Flyer, Transform])]) {
     const e = Flyer.of[f]!
     if (Frozen.v[e]) {
-      // 持有者倒下即作废
       catchFlyer(sim, e, f)
       Boomerang.cdLeft[e] = Boomerang.cdBase[e]!
       continue
@@ -30,7 +29,6 @@ export function updateFlyers(sim: Sim): void {
         flyerHits[f]!.clear()
       }
     } else {
-      // 回程追持有者的最近镜像
       const d = sim.hooks.worldDelta(sim, Transform.x[f]!, Transform.y[f]!, ownerX(e), ownerY(e))
       const dist = Math.hypot(d.x, d.y)
       const step = (Boomerang.returnSpeed[e]! * dt) / 1000

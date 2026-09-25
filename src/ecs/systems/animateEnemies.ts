@@ -3,14 +3,13 @@ import { Dormant, ENEMY_SET, EnemyPhase, EState, Morph, Sprite, Step, Transform 
 import type { Sim } from '../sim'
 import { isDancing } from '../utils/team'
 
-/** EState 2/3、蹦迪与变形不在此覆盖；翻转读禁锢前的本帧位移 */
 export function animateEnemies(sim: Sim): void {
   const delta = sim.wdtMs
   const now = sim.elapsedMs
   const dancing = isDancing(sim)
   if (dancing) return
   const dt = delta / 1000
-  for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
+  for (const eid of query(sim.world, ENEMY_SET)) {
     if (Dormant.v[eid]) continue
     if (EState.v[eid] === 2 || EState.v[eid] === 3 || Morph.until[eid] !== 0) continue
     Transform.rot[eid] = Math.sin(now / 95 + EnemyPhase.v[eid]!) * 0.1

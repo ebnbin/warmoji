@@ -1,12 +1,13 @@
 import Phaser from 'phaser'
 import { CAPTAINS } from '../data/captains'
 import { CHARACTERS } from '../data/characters'
-import { BOSSES, ENEMY_DEFS } from '../data/enemies'
+import { ENEMIES } from '../data/enemies'
+import { HAZARD_NAMES } from '../data/maps'
+import { keysOf } from '../util/record'
 import { PICKUPS } from '../data/pickups'
 import { WAVE } from '../data/waves'
 import { submitScore } from '../save/highscore'
 import { ITEMS } from '../data/items'
-import type { ItemId } from '../types/items'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
@@ -14,7 +15,6 @@ import { endRun, getRun } from '../run/state'
 import type { RunState } from '../run/state'
 import { browserStorage } from '../util/storage'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/hold'
 import { emojiText } from '../ui/emojiText'
 import { burstEmitter } from '../util/fx'
@@ -24,6 +24,7 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { stackCount } from '../run/draft'
+import { SceneKey } from './keys'
 
 interface ResultLayout {
   content: { w: number; h: number }
@@ -60,14 +61,13 @@ export class ResultScene extends Phaser.Scene {
   private palette?: Palette
   private run!: RunState
   private win = false
-  /** 视口重启不重复提交 */
   private submitted = false
   private best = { newBest: false, bestWave: 0, bestKills: 0 }
   private againRect = { x: 0, y: 0, w: 0, h: 0 }
   private menuRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
-    super('result')
+    super(SceneKey.Result)
   }
 
   init(data?: { win?: boolean }): void {
@@ -156,11 +156,11 @@ export class ResultScene extends Phaser.Scene {
     this.menuRect = { x: cx + gap / 2, y: oy + L.btnY - btnH / 2, w: btnW, h: btnH }
     const again = (): void => {
       endRun()
-      this.scene.start('captain')
+      this.scene.start(SceneKey.Captain)
     }
     const menu = (): void => {
       endRun()
-      this.scene.start('menu')
+      this.scene.start(SceneKey.Menu)
     }
     this.drawButton(this.againRect, '再来一局', true, again, res)
     this.drawButton(this.menuRect, '回主菜单', false, menu, res)
@@ -169,7 +169,6 @@ export class ResultScene extends Phaser.Scene {
       this.input.keyboard?.once('keydown-SPACE', again)
     })
 
-    this.reportResult()
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
@@ -188,7 +187,6 @@ export class ResultScene extends Phaser.Scene {
         .text(tx, ty, text, { fontFamily: UI_FONT, fontSize: FONT.small, color, resolution: res })
         .setOrigin(0.5)
     }
-    // 表头用绝对坐标，数据行用滚动内容局部坐标
     label(x + w * 0.43, y + headerH / 2 + 4, '伤害')
     label(x + w * 0.55, y + headerH / 2 + 4, '承伤')
     label(x + w * 0.65, y + headerH / 2 + 4, '击杀')
@@ -231,7 +229,7 @@ export class ResultScene extends Phaser.Scene {
       const deaths = this.run.stats.deaths[slot] ?? 0
       cell(colDeaths, deaths > 0 ? `${deaths}` : '—', deaths > 0 ? '#ef9a9a' : '#6f6f7d')
       const owned = this.run.memberItems[slot] ?? []
-      const unique = [...new Set(owned)] as ItemId[]
+      const unique = [...new Set(owned)]
       const shown = unique.slice(0, 2)
       shown.forEach((item, i) => {
         const ix = colItems - ((shown.length - 1) / 2 - i) * 38
@@ -303,13 +301,17 @@ export class ResultScene extends Phaser.Scene {
       )
     }
 
-    const emojiByName = new Map<string, string>([
-      ...ENEMY_DEFS.map((e) => [e.name, e.emoji] as const),
-      ...BOSSES.map((e) => [e.name, e.emoji] as const),
-    ])
-    const names = [...new Set([...Object.keys(st.enemyKills), ...Object.keys(st.enemyDamage)])]
-      .sort((a, b) => (st.enemyKills[b] ?? 0) - (st.enemyKills[a] ?? 0))
-    if (names.length === 0) {
+    const enemyKinds = [...new Set([...keysOf(st.enemyKills), ...keysOf(st.enemyDamage)])].sort(
+      (a, b) => (st.enemyKills[b] ?? 0) - (st.enemyKills[a] ?? 0),
+    )
+    const lines: { name: string; emoji?: string; boss: boolean; kills: number; dmg: number }[] = [
+      ...enemyKinds.map((k) => {
+        const e = ENEMIES[k]
+        return { name: e.name, emoji: e.emoji, boss: e.role === 'boss', kills: st.enemyKills[k] ?? 0, dmg: st.enemyDamage[k] ?? 0 }
+      }),
+      ...keysOf(st.hazardDamage).map((h) => ({ name: HAZARD_NAMES[h], boss: false, kills: 0, dmg: st.hazardDamage[h] ?? 0 })),
+    ]
+    if (lines.length === 0) {
       this.add
         .text(x + w / 2, y + h / 2, '—', {
           fontFamily: UI_FONT,
@@ -339,21 +341,18 @@ export class ResultScene extends Phaser.Scene {
     const top = y + headerH + 22
     const rowH = 42
     const fmt = (v: number): string => (v >= 10000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`)
-    const bossNames = new Set(BOSSES.map((e) => e.name))
     const colKillsL = colKills - x
     const colDmgL = colDmg - x
     const rows = new ScrollView(this, { x, y: top, w, h: y + h - top - 12 })
-    names.forEach((name, i) => {
+    lines.forEach((line, i) => {
       const cy = rowH * i + rowH / 2
-      const isBoss = bossNames.has(name)
-      const emoji = emojiByName.get(name)
-      if (emoji) rows.add(emojiImage(this, 34, cy, emoji, Math.min(40, rowH - 5), isBoss ? 'elite' : 'enemy'))
+      if (line.emoji) rows.add(emojiImage(this, 34, cy, line.emoji, Math.min(40, rowH - 5), line.boss ? 'elite' : 'enemy'))
       rows.add(
         this.add
-          .text(58, cy, name, {
+          .text(58, cy, line.name, {
             fontFamily: UI_FONT,
             fontSize: FONT.body,
-            color: isBoss ? '#ffdc5d' : '#e4e4ec',
+            color: line.boss ? '#ffdc5d' : '#e4e4ec',
             resolution: res,
           })
           .setOrigin(0, 0.5),
@@ -365,11 +364,10 @@ export class ResultScene extends Phaser.Scene {
             .setOrigin(0.5),
         )
       }
-      cell(colKillsL, `${st.enemyKills[name] ?? 0}`)
-      const dmg = st.enemyDamage[name] ?? 0
-      cell(colDmgL, dmg > 0 ? fmt(dmg) : '—', dmg > 0 ? '#ffab91' : '#6f6f7d')
+      cell(colKillsL, `${line.kills}`)
+      cell(colDmgL, line.dmg > 0 ? fmt(line.dmg) : '—', line.dmg > 0 ? '#ffab91' : '#6f6f7d')
     })
-    rows.setContentHeight(rowH * names.length)
+    rows.setContentHeight(rowH * lines.length)
   }
 
   private drawButton(
@@ -395,43 +393,12 @@ export class ResultScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
     const zone = this.add.zone(rect.x, rect.y, rect.w, rect.h).setOrigin(0)
-    // 防死亡瞬间误触
     this.time.delayedCall(500, () => {
       if (!zone.active) return
-      zone.setInteractive({ useHandCursor: true }).on('pointerup', () => {
+      zone.setInteractive({ useHandCursor: true }).on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         playSfx('click')
         onTap()
       })
-    })
-  }
-
-  private reportResult(): void {
-    reportDebug({
-      scene: 'result',
-      elapsed: this.run.combatMs / 1000,
-      kills: this.run.kills,
-      level: this.run.xp.level,
-      wave: this.run.wave,
-      coins: this.run.coins,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      result: {
-        win: this.win,
-        rows: this.run.roster.length,
-        newBest: this.best.newBest,
-        again: {
-          x: this.againRect.x + this.againRect.w / 2,
-          y: this.againRect.y + this.againRect.h / 2,
-          w: this.againRect.w,
-          h: this.againRect.h,
-        },
-        menu: {
-          x: this.menuRect.x + this.menuRect.w / 2,
-          y: this.menuRect.y + this.menuRect.h / 2,
-          w: this.menuRect.w,
-          h: this.menuRect.h,
-        },
-      },
     })
   }
 

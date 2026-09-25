@@ -1,31 +1,33 @@
 import type { CaptainId } from '../types/captains'
 import type { CharacterId } from '../types/characters'
+import { StorageKey } from '../util/storage'
 import type { StringStorage } from '../util/storage'
 import { Rng } from '../util/rng'
 import { RECRUIT } from '../data/waves'
+import { CAPTAIN_IDS } from '../data/captains'
 
-// 存储值 0 = 未初始化哨兵，首次取用时以时间戳初始化并落盘；
-// 只有一局落幕（endRun）才滚新种子，刷新页面或来回逛菜单不换池
-const KEY = 'warmoji.recruit.v1'
-
-function loadSeeds(storage: StringStorage | undefined): Record<string, number> {
+function loadSeeds(storage: StringStorage | undefined): Partial<Record<CaptainId, number>> {
+  const seeds: Partial<Record<CaptainId, number>> = {}
   try {
-    const raw: unknown = JSON.parse(storage?.getItem(KEY) ?? 'null')
-    return typeof raw === 'object' && raw !== null ? (raw as Record<string, number>) : {}
+    const raw: unknown = JSON.parse(storage?.getItem(StorageKey.Recruit) ?? 'null')
+    if (typeof raw !== 'object' || raw === null) return seeds
+    const obj = raw as Record<string, unknown>
+    for (const id of CAPTAIN_IDS) {
+      const v = obj[id]
+      if (typeof v === 'number') seeds[id] = v
+    }
   } catch {
-    return {}
+  }
+  return seeds
+}
+
+function saveSeeds(storage: StringStorage | undefined, seeds: Partial<Record<CaptainId, number>>): void {
+  try {
+    storage?.setItem(StorageKey.Recruit, JSON.stringify(seeds))
+  } catch {
   }
 }
 
-function saveSeeds(storage: StringStorage | undefined, seeds: Record<string, number>): void {
-  try {
-    storage?.setItem(KEY, JSON.stringify(seeds))
-  } catch {
-    // 隐私模式/配额写入失败可忽略
-  }
-}
-
-/** 结果不为 0，保住哨兵语义 */
 function freshSeed(): number {
   return Math.max(1, Date.now() >>> 0)
 }
@@ -48,7 +50,6 @@ export function refreshRecruitSeed(storage: StringStorage | undefined, captainId
   saveSeeds(storage, seeds)
 }
 
-/** 顺序即卡位；纯函数，同种子同结果 */
 export function drawRecruitPool(
   seed: number,
   roster: readonly CharacterId[],
@@ -57,7 +58,6 @@ export function drawRecruitPool(
   const rng = new Rng(seed >>> 0)
   const pool = [...roster]
   const n = Math.max(0, Math.min(size, pool.length))
-  // Fisher–Yates 只洗前 n 位
   for (let i = 0; i < n; i++) {
     const j = i + Math.floor(rng.next() * (pool.length - i))
     ;[pool[i], pool[j]] = [pool[j]!, pool[i]!]
@@ -65,14 +65,12 @@ export function drawRecruitPool(
   return pool.slice(0, n)
 }
 
-/** 越界取末位，封顶池大小 */
 export function unlockedCount(openSlots: number): number {
   const table = RECRUIT.unlocks
   const idx = Math.max(0, Math.min(table.length - 1, openSlots - 1))
   return Math.min(RECRUIT.poolSize, openSlots <= 0 ? 0 : table[idx]!)
 }
 
-/** index 0 起，返回值 1 起；表外卡位视作末档 */
 export function unlockAt(index: number): number {
   const table = RECRUIT.unlocks
   for (let k = 0; k < table.length; k++) {

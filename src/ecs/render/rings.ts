@@ -4,11 +4,10 @@ import { Ring, RING_SET, Tint, Transform } from '../components'
 import { fan, newScratch, resetScratch, ringStrip } from './tri'
 import type { Scratch } from './tri'
 import type { EcsWorld } from '../world'
-import { EcsLayer } from './layer'
+import { EcsLayer, LayerType } from './layer'
 import { packTint } from './tint'
 
 interface Breath {
-  /** 半周期（ms） */
   ms: number
   scaleLo: number
   scaleHi: number
@@ -16,14 +15,12 @@ interface Breath {
   alphaHi: number
 }
 
-/** 按 Ring.breathe 取：0 静止，1 待拾光圈，2 携带者光环 */
 const BREATHS: readonly Breath[] = [
   { ms: 1, scaleLo: 1, scaleHi: 1, alphaLo: 1, alphaHi: 1 },
   { ms: 700, scaleLo: 0.82, scaleHi: 1.12, alphaLo: 0.35, alphaHi: 0.9 },
   { ms: 650, scaleLo: 0.85, scaleHi: 1.12, alphaLo: 0.4, alphaHi: 0.85 },
 ]
 
-/** 地面区 2 最底、待拾光圈 2.5 压在金币（3）之下、携带者光环 4 压在敌人（5）之下 */
 const BANDS: readonly { depth: number; zMin: number; zMax: number }[] = [
   { depth: 2, zMin: -Infinity, zMax: 3 },
   { depth: 2.5, zMin: 3, zMax: 4 },
@@ -38,7 +35,6 @@ function breath(age: number, ms: number): number {
 export class RingLayer {
   private readonly batches: EcsRingBatch[] = []
   private readonly scratch: Scratch = newScratch()
-  /** 本帧视觉钟 */
   private now = 0
 
   constructor(scene: Phaser.Scene, private readonly world: EcsWorld) {
@@ -58,7 +54,7 @@ export class RingLayer {
     const o = this.scratch
     resetScratch(o)
     const { zMin, zMax } = BANDS[band]!
-    for (const eid of query(this.world, RING_SET as unknown as object[])) {
+    for (const eid of query(this.world, RING_SET)) {
       const z = Ring.z[eid]!
       if (z < zMin || z >= zMax) continue
       const b = BREATHS[Ring.breathe[eid]!]!
@@ -75,28 +71,25 @@ export class RingLayer {
   }
 }
 
-/** renderWebGL 无 this 绑定，状态一律走 src */
 class EcsRingBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
 
   constructor(scene: Phaser.Scene, private readonly layer: RingLayer, private readonly band: number) {
-    super(scene, 'EcsRingBatch', BANDS[band]!.depth)
+    super(scene, LayerType.Ring, BANDS[band]!.depth)
     scene.add.existing(this)
   }
 
   renderWebGL(
     renderer: Phaser.Renderer.WebGL.WebGLRenderer,
-    src: Phaser.GameObjects.GameObject,
+    self: EcsRingBatch,
     drawingContext: Phaser.Renderer.WebGL.DrawingContext,
   ): void {
-    const self = src as EcsRingBatch
     const camera = drawingContext.camera
     if (!camera) return
     const node = renderer.renderNodes.getNode('BatchHandlerTriFlat') as
       | { batch: (ctx: unknown, i: number[], v: number[], c: number[], l: null) => void }
       | null
     if (!node) return
-    // v4 的视图矩阵已含 scroll；实参与核心各 Transformer 一致（!useCanvas）
     const m = self.camMatrix.copyFrom(camera.getViewMatrix(!drawingContext.useCanvas))
     const o = self.layer.buildBand(self.band, m)
     if (o.i.length === 0) return

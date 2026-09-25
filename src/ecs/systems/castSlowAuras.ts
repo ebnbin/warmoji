@@ -10,10 +10,8 @@ import { targetsNear } from '../utils/targets'
 import type { Sim } from '../sim'
 import { spawnFxCircle } from '../entities/fx'
 
-/** 冻伤跳伤间隔 */
 const TICK_MS = 500
 
-/** 光环无冷却，每帧都过施放扫描；减速区实体建一次一直在，开关随出手闸门。我方光环圆心为队伍中心，断壁视点仍是持有者 */
 export function castSlowAuras(sim: Sim): void {
   const dt = sim.wdtMs
   castScan(sim, SlowAura, (e) => {

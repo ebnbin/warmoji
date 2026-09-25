@@ -7,7 +7,6 @@ import { castScan } from './shared/castScan'
 import { targetsNear } from '../utils/targets'
 import type { Sim } from '../sim'
 
-/** 镜像坐标按真身去重 */
 export function castStrikes(sim: Sim, scan = castScan): void {
   scan(sim, Strike, (e) => {
     const src = sourceOf(sim, e)

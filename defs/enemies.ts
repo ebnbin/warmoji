@@ -1,6 +1,6 @@
-import type { EnemyDef } from '../src/types/enemies'
+import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 
-export const ZOMBIE: EnemyDef = {
+const ZOMBIE = {
   kind: 'zombie',
   locomotion: { kind: 'chase' },
   emoji: '1f9df',
@@ -13,9 +13,9 @@ export const ZOMBIE: EnemyDef = {
   damage: 8,
   xp: 3,
   coins: 2,
-}
+} satisfies EnemyDef
 
-export const GHOST: EnemyDef = {
+const GHOST = {
   kind: 'ghost',
   locomotion: { kind: 'chase' },
   emoji: '1f47b',
@@ -30,9 +30,9 @@ export const GHOST: EnemyDef = {
   xp: 2,
   coins: 2,
   onDeath: [{ kind: 'heal', range: 3, amount: 12, all: true }],
-}
+} satisfies EnemyDef
 
-export const INVADER: EnemyDef = {
+const INVADER = {
   kind: 'invader',
   locomotion: { kind: 'wander' },
   emoji: '1f47e',
@@ -65,9 +65,9 @@ export const INVADER: EnemyDef = {
       projectile: { emoji: '1f6f8', size: 0.6, radius: 0.2, speed: 1.5, rotationOffsetDeg: 0 },
     },
   ],
-}
+} satisfies EnemyDef
 
-export const BOAR: EnemyDef = {
+const BOAR = {
   kind: 'boar',
   emoji: '1f417',
   name: '野猪',
@@ -90,9 +90,9 @@ export const BOAR: EnemyDef = {
     lockAt: 'windup',
   },
   onDeath: [{ kind: 'decoy', hp: 40, durationMs: 3000, alpha: 0.5 }],
-}
+} satisfies EnemyDef
 
-export const SNAKE: EnemyDef = {
+const SNAKE = {
   kind: 'snake',
   emoji: '1f40d',
   name: '毒蛇',
@@ -111,15 +111,14 @@ export const SNAKE: EnemyDef = {
       damage: 5,
       cooldownMs: 2600,
       knockback: 0,
-      // 须大于 standoffDist
       range: 8,
       lifeMs: 4500,
       projectile: { emoji: '1f7e2', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
     },
   ],
-}
+} satisfies EnemyDef
 
-export const MUSHROOM: EnemyDef = {
+const MUSHROOM = {
   kind: 'mushroom',
   locomotion: { kind: 'chase' },
   emoji: '1f344',
@@ -147,9 +146,9 @@ export const MUSHROOM: EnemyDef = {
       },
     },
   ],
-}
+} satisfies EnemyDef
 
-export const RAT: EnemyDef = {
+const RAT = {
   kind: 'rat',
   locomotion: { kind: 'coinThief' },
   emoji: '1f400',
@@ -162,9 +161,9 @@ export const RAT: EnemyDef = {
   damage: 3,
   xp: 3,
   coins: 2,
-}
+} satisfies EnemyDef
 
-export const SLIME: EnemyDef = {
+const SLIME = {
   kind: 'slime',
   locomotion: { kind: 'chase' },
   emoji: '1f40c',
@@ -178,9 +177,9 @@ export const SLIME: EnemyDef = {
   xp: 4,
   coins: 3,
   onContact: [{ kind: 'attackSlow', mul: 1.6, durationMs: 3000 }],
-}
+} satisfies EnemyDef
 
-export const BLOBLING: EnemyDef = {
+const BLOBLING = {
   kind: 'blobling',
   locomotion: { kind: 'chase' },
   emoji: '1fae7',
@@ -193,9 +192,9 @@ export const BLOBLING: EnemyDef = {
   damage: 4,
   xp: 1,
   coins: 0,
-}
+} satisfies EnemyDef
 
-export const BLOB: EnemyDef = {
+const BLOB = {
   kind: 'blob',
   locomotion: { kind: 'chase' },
   emoji: '1fae7',
@@ -209,9 +208,9 @@ export const BLOB: EnemyDef = {
   xp: 4,
   coins: 3,
   onDeath: [{ kind: 'split', into: BLOBLING, count: 2 }],
-}
+} satisfies EnemyDef
 
-export const LARVA: EnemyDef = {
+const LARVA = {
   kind: 'larva',
   locomotion: {
     kind: 'baseOrbit',
@@ -230,9 +229,9 @@ export const LARVA: EnemyDef = {
   damage: 3,
   xp: 1,
   coins: 0,
-}
+} satisfies EnemyDef
 
-export const HIVE: EnemyDef = {
+const HIVE = {
   kind: 'hive',
   locomotion: { kind: 'static' },
   emoji: '1faba',
@@ -247,9 +246,9 @@ export const HIVE: EnemyDef = {
   coins: 6,
   kbImmune: true,
   spawner: { into: LARVA, intervalMs: 4000, count: 2, maxAlive: 6, firstDelayMs: 2000 },
-}
+} satisfies EnemyDef
 
-export const CREEPER: EnemyDef = {
+const CREEPER = {
   kind: 'creeper',
   emoji: '1f4a3',
   name: '自爆怪',
@@ -268,9 +267,9 @@ export const CREEPER: EnemyDef = {
     blastRadius: 3.8,
     blastDamage: 32,
   },
-}
+} satisfies EnemyDef
 
-export const ELF: EnemyDef = {
+const ELF = {
   kind: 'elf',
   locomotion: { kind: 'chase' },
   emoji: '1f9dd',
@@ -284,9 +283,9 @@ export const ELF: EnemyDef = {
   xp: 5,
   coins: 4,
   abilities: [{ kind: 'heal', amount: 13, cooldownMs: 2600, range: 3.5, aoe: { ratio: 1 } }],
-}
+} satisfies EnemyDef
 
-export const TURTLE: EnemyDef = {
+const TURTLE = {
   kind: 'turtle',
   locomotion: { kind: 'chase' },
   emoji: '1f422',
@@ -313,9 +312,9 @@ export const TURTLE: EnemyDef = {
       projectile: { emoji: '1faa8', size: 0.4, radius: 0.15, speed: 2.6, rotationOffsetDeg: 0 },
     },
   ],
-}
+} satisfies EnemyDef
 
-export const LOCUST: EnemyDef = {
+const LOCUST = {
   kind: 'locust',
   emoji: '1f997',
   name: '跳蝗',
@@ -337,9 +336,9 @@ export const LOCUST: EnemyDef = {
     aim: 'nearest',
     lockAt: 'launch',
   },
-}
+} satisfies EnemyDef
 
-export const GARGOYLE: EnemyDef = {
+const GARGOYLE = {
   kind: 'gargoyle',
   locomotion: { kind: 'chase' },
   emoji: '1f5ff',
@@ -353,9 +352,9 @@ export const GARGOYLE: EnemyDef = {
   xp: 8,
   coins: 6,
   kbImmune: true,
-}
+} satisfies EnemyDef
 
-export const PUFFER: EnemyDef = {
+const PUFFER = {
   kind: 'puffer',
   emoji: '1f421',
   name: '毒河豚',
@@ -389,9 +388,9 @@ export const PUFFER: EnemyDef = {
       },
     },
   ],
-}
+} satisfies EnemyDef
 
-const UFO: EnemyDef = {
+const UFO = {
   kind: 'ufo',
   emoji: '1f6f8',
   name: '飞碟',
@@ -415,9 +414,9 @@ const UFO: EnemyDef = {
       projectile: { emoji: '1f4ab', size: 0.45, radius: 0.15, speed: 3.4, rotationOffsetDeg: 0 },
     },
   ],
-}
+} satisfies EnemyDef
 
-const ALIEN: EnemyDef = {
+const ALIEN = {
   kind: 'alien',
   emoji: '1f47d',
   name: '小灰人',
@@ -430,9 +429,9 @@ const ALIEN: EnemyDef = {
   xp: 4,
   coins: 2,
   locomotion: { kind: 'chase' },
-}
+} satisfies EnemyDef
 
-const COMET: EnemyDef = {
+const COMET = {
   kind: 'comet',
   emoji: '2604',
   name: '流星',
@@ -455,35 +454,10 @@ const COMET: EnemyDef = {
     lockAt: 'launch',
     sfx: 'whoosh',
   },
-}
+} satisfies EnemyDef
 
-export const ENEMY_DEFS: readonly EnemyDef[] = [
-  ZOMBIE,
-  GHOST,
-  INVADER,
-  BOAR,
-  SNAKE,
-  MUSHROOM,
-  RAT,
-  SLIME,
-  BLOB,
-  BLOBLING,
-  HIVE,
-  LARVA,
-  CREEPER,
-  ELF,
-  TURTLE,
-  LOCUST,
-  GARGOYLE,
-  PUFFER,
-  UFO,
-  ALIEN,
-  COMET,
-]
 
-// ── Boss ──
-
-const FOREST_BOSS: EnemyDef = {
+const FOREST_BOSS = {
   kind: 'treant',
   role: 'boss',
   emoji: '1f333',
@@ -511,9 +485,9 @@ const FOREST_BOSS: EnemyDef = {
       projectile: { emoji: '1f7e2', size: 0.42, radius: 0.15, speed: 2.4, rotationOffsetDeg: 0 },
     },
   ],
-}
+} satisfies EnemyDef
 
-const DESERT_BOSS: EnemyDef = {
+const DESERT_BOSS = {
   kind: 'scorpion',
   role: 'boss',
   emoji: '1f982',
@@ -551,9 +525,9 @@ const DESERT_BOSS: EnemyDef = {
       projectile: { emoji: '1f7e3', size: 0.42, radius: 0.15, speed: 3.2, rotationOffsetDeg: 0 },
     },
   ],
-}
+} satisfies EnemyDef
 
-const RIVER_BOSS: EnemyDef = {
+const RIVER_BOSS = {
   kind: 'croc',
   role: 'boss',
   emoji: '1f40a',
@@ -589,9 +563,9 @@ const RIVER_BOSS: EnemyDef = {
       drop: { emoji: '1f4a7', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
   ],
-}
+} satisfies EnemyDef
 
-const FACTORY_BOSS: EnemyDef = {
+const FACTORY_BOSS = {
   kind: 'mecha',
   role: 'boss',
   emoji: '1f916',
@@ -628,10 +602,10 @@ const FACTORY_BOSS: EnemyDef = {
       drop: { emoji: '1f528', size: 1.1, fromAbove: 4, dropMs: 220, staggerMs: 80 },
     },
   ],
-}
+} satisfies EnemyDef
 
 
-const RUINS_BOSS: EnemyDef = {
+const RUINS_BOSS = {
   kind: 'rhino',
   role: 'boss',
   emoji: '1f98f',
@@ -667,9 +641,9 @@ const RUINS_BOSS: EnemyDef = {
       drop: { emoji: '1faa8', size: 1.1, fromAbove: 4, dropMs: 240, staggerMs: 90 },
     },
   ],
-}
+} satisfies EnemyDef
 
-const DAYNIGHT_BOSS: EnemyDef = {
+const DAYNIGHT_BOSS = {
   kind: 'eclipse',
   role: 'boss',
   emoji: '1f317',
@@ -705,9 +679,9 @@ const DAYNIGHT_BOSS: EnemyDef = {
       drop: { emoji: '1f319', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
   ],
-}
+} satisfies EnemyDef
 
-const SPACE_BOSS: EnemyDef = {
+const SPACE_BOSS = {
   kind: 'blackhole',
   role: 'boss',
   emoji: '1f300',
@@ -743,9 +717,37 @@ const SPACE_BOSS: EnemyDef = {
       drop: { emoji: '1f311', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
   ],
-}
+} satisfies EnemyDef
 
-/** 顺序即图鉴展示顺序 */
-export const ENEMIES = Object.fromEntries(
-  [...ENEMY_DEFS, FOREST_BOSS, DESERT_BOSS, RIVER_BOSS, FACTORY_BOSS, RUINS_BOSS, DAYNIGHT_BOSS, SPACE_BOSS].map((e) => [e.kind, e]),
-) as Record<string, EnemyDef>
+type EnemyTable = { readonly [K in EnemyKind]: EnemyDef & { readonly kind: K } }
+
+export const ENEMIES: EnemyTable = {
+  zombie: ZOMBIE,
+  ghost: GHOST,
+  invader: INVADER,
+  boar: BOAR,
+  snake: SNAKE,
+  mushroom: MUSHROOM,
+  rat: RAT,
+  slime: SLIME,
+  blob: BLOB,
+  blobling: BLOBLING,
+  hive: HIVE,
+  larva: LARVA,
+  creeper: CREEPER,
+  elf: ELF,
+  turtle: TURTLE,
+  locust: LOCUST,
+  gargoyle: GARGOYLE,
+  puffer: PUFFER,
+  ufo: UFO,
+  alien: ALIEN,
+  comet: COMET,
+  treant: FOREST_BOSS,
+  scorpion: DESERT_BOSS,
+  croc: RIVER_BOSS,
+  mecha: FACTORY_BOSS,
+  rhino: RUINS_BOSS,
+  eclipse: DAYNIGHT_BOSS,
+  blackhole: SPACE_BOSS,
+}

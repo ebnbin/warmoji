@@ -2,9 +2,6 @@ import { bgmScore } from './music'
 import type { BgmHit, BgmId, BgmNote, BgmScore } from './music'
 import { audioCtx, ensureAudio } from './sfx'
 
-// 与音效共用一个 AudioContext，BGM 走独立主增益压在音效之下。
-// 音符/打击乐渲染按 (ctx, out) 参数化：离线渲染与实时播放走同一条合成路径
-
 const LOOKAHEAD_SEC = 0.4
 const TICK_MS = 100
 const MASTER_VOL = 0.42
@@ -16,9 +13,7 @@ let echoSend: GainNode | undefined
 let desired: BgmId | null = null
 let playing: BgmId | null = null
 let enabled = true
-/** 当前曲第 0 圈起点（ctx 时钟） */
 let anchor = 0
-/** 已调度到的播放秒（相对 anchor） */
 let cursor = 0
 let timer: number | undefined
 
@@ -114,7 +109,6 @@ function scheduleHit(ctx: BaseAudioContext, out: AudioNode, h: BgmHit, when: num
   src.stop(when + dur + 0.02)
 }
 
-/** 返回送出节点 */
 function buildEcho(ctx: BaseAudioContext, out: AudioNode, def: NonNullable<BgmScore['echo']>): GainNode {
   const send = ctx.createGain()
   send.gain.value = def.level
@@ -129,7 +123,6 @@ function buildEcho(ctx: BaseAudioContext, out: AudioNode, def: NonNullable<BgmSc
   return send
 }
 
-/** [fromSec, toSec)，跨圈展开 */
 function scheduleWindow(
   ctx: BaseAudioContext,
   out: AudioNode,
@@ -158,7 +151,6 @@ function tick(): void {
   if (!ctx || !playing || !trackGain || ctx.state !== 'running') return
   const score = bgmScore(playing)
   const now = ctx.currentTime - anchor
-  // 后台节流醒来后跳过错过的段落，不追播
   if (now > cursor + 1) cursor = Math.max(0, now)
   const until = now + LOOKAHEAD_SEC
   if (until <= cursor) return
@@ -211,7 +203,6 @@ export function initBgm(): void {
   window.addEventListener('keydown', unlock, { once: true })
 }
 
-/** 幂等；未解锁或关闭时仅记录，条件齐后起播 */
 export function playBgm(id: BgmId): void {
   desired = id
   if (playing === id) return
@@ -230,27 +221,4 @@ export function setBgmEnabled(on: boolean): void {
     return
   }
   startIfWanted()
-}
-
-export async function renderBgmOffline(
-  id: BgmId,
-  seconds = 4,
-): Promise<{ rms: number; peak: number; notes: number }> {
-  const score = bgmScore(id)
-  const rate = 22050
-  const ctx = new OfflineAudioContext(1, Math.ceil(rate * seconds), rate)
-  const out = ctx.createGain()
-  out.gain.value = MASTER_VOL
-  out.connect(ctx.destination)
-  const echo = score.echo ? buildEcho(ctx, out, score.echo) : undefined
-  scheduleWindow(ctx, out, echo, score, 0, seconds, 0)
-  const buf = await ctx.startRendering()
-  const data = buf.getChannelData(0)
-  let sum = 0
-  let peak = 0
-  for (const s of data) {
-    sum += s * s
-    peak = Math.max(peak, Math.abs(s))
-  }
-  return { rms: Math.sqrt(sum / data.length), peak, notes: score.notes.length }
 }

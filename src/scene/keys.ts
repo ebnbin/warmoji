@@ -1,0 +1,17 @@
+export enum SceneKey {
+  Preload = 'preload',
+  Menu = 'menu',
+  Map = 'map',
+  Wiki = 'wiki',
+  Studio = 'studio',
+  Settings = 'settings',
+  Captain = 'captain',
+  Recruit = 'recruit',
+  Formation = 'formation',
+  Cards = 'cards',
+  Shop = 'shop',
+  Battle = 'battle',
+  Ui = 'ui',
+  Sandbox = 'sandbox',
+  Result = 'result',
+}

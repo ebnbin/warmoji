@@ -10,7 +10,6 @@ import type { FieldPickupDef } from '../../types/battlefield'
 import type { Sim } from '../sim'
 
 
-/** 压在金币之上、敌人之下 */
 const MARK_Z = 4
 
 export function spawnTelegraph(
@@ -39,13 +38,12 @@ export function spawnTelegraph(
     x,
     y,
     size: SPAWN.markSize * UNIT * (boss ? 2 : 1),
-    alpha: 0, // 首帧就由 blinkTelegraphs 写实值
+    alpha: 0,
     z: MARK_Z,
   })
   return eid
 }
 
-/** 刷怪上限须计入在途预告 */
 export function telegraphCount(sim: Sim): number {
   return query(sim.world, [Telegraph]).length
 }

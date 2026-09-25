@@ -8,7 +8,6 @@ import { Rng } from '../util/rng'
 import { getRun, teamStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/hold'
 import { ScrollView } from '../ui/scroll'
 import type { ScrollRect } from '../ui/scroll'
@@ -17,12 +16,7 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { rollCardChoices } from '../run/draft'
-
-const RARITY_COLOR: Record<string, number> = {
-  common: 0xc8c8d4,
-  rare: 0x4fc3f7,
-  epic: 0xce93d8,
-}
+import { SceneKey } from './keys'
 
 export class CardScene extends Phaser.Scene {
   private preserveOnRestart = false
@@ -35,7 +29,7 @@ export class CardScene extends Phaser.Scene {
   private rowGap = 12
 
   constructor() {
-    super('cards')
+    super(SceneKey.Cards)
   }
 
   create(): void {
@@ -86,7 +80,6 @@ export class CardScene extends Phaser.Scene {
     this.choices.forEach((id, i) => this.buildCardRow(id, i, listW, res))
     this.list.setContentHeight(this.choices.length * (this.rowH + this.rowGap))
 
-    this.reportCards()
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
@@ -97,7 +90,7 @@ export class CardScene extends Phaser.Scene {
     const card = CARDS[id]
     const y = i * (this.rowH + this.rowGap)
     const level = this.run.teamCards[id] ?? 0
-    const rc = RARITY_COLOR[card.rarity] ?? 0xffffff
+    const rc = Number.parseInt(RARITIES[card.rarity].color.slice(1), 16)
     const bg = this.add.graphics()
     roundRect(bg, 0, y, listW, this.rowH, 14, { fill: 0x000000, fillAlpha: 0.28, strokeWidth: card.rarity === 'common' ? 1 : 2, stroke: rc, strokeAlpha: card.rarity === 'common' ? 0.3 : 0.85 })
 
@@ -106,7 +99,7 @@ export class CardScene extends Phaser.Scene {
       .zone(0, y, listW, this.rowH)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (this.list.wasDragged) return
         this.pick(id)
       })
@@ -154,35 +147,8 @@ export class CardScene extends Phaser.Scene {
     this.scene.restart()
   }
 
-  private nextScene(): 'recruit' | 'formation' | 'shop' {
-    return teamStep(this.run) ?? 'shop'
-  }
-
-  private reportCards(): void {
-    reportDebug({
-      scene: 'cards',
-      elapsed: 0,
-      kills: this.run.kills,
-      level: this.run.xp.level,
-      wave: this.run.wave,
-      coins: this.run.coins,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      cards: {
-        remaining: this.run.cardDraws,
-        owned: { ...this.run.teamCards } as Record<string, number>,
-        choices: this.choices.map((id, i) => ({
-          id,
-          level: this.run.teamCards[id] ?? 0,
-          maxLevel: CARDS[id].maxLevel,
-          rarity: CARDS[id].rarity,
-          x: this.listRect.x + this.listRect.w / 2,
-          y: this.listRect.y + i * (this.rowH + this.rowGap) + this.rowH / 2 - this.list.scrollY,
-          w: this.listRect.w,
-          h: this.rowH,
-        })),
-      },
-    })
+  private nextScene(): SceneKey.Recruit | SceneKey.Formation | SceneKey.Shop {
+    return teamStep(this.run) ?? SceneKey.Shop
   }
 
   private onViewportChanged(): void {

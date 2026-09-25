@@ -1,15 +1,10 @@
 import type Phaser from 'phaser'
 
 export interface RoundRectStyle {
-  /** 省略则不填充 */
   readonly fill?: number
-  /** 缺省 1 */
   readonly fillAlpha?: number
-  /** 省略则不描边 */
   readonly stroke?: number
-  /** 缺省 1 */
   readonly strokeAlpha?: number
-  /** 缺省 1 */
   readonly strokeWidth?: number
 }
 

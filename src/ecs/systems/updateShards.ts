@@ -4,7 +4,7 @@ import type { Sim } from '../sim'
 
 export function updateShards(sim: Sim): void {
   const delta = sim.dtMs
-  const eids = query(sim.world, SHARD_SET as unknown as object[])
+  const eids = query(sim.world, SHARD_SET)
   if (eids.length === 0) return
   const dt = delta / 1000
   const now = sim.fxMs
