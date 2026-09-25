@@ -3,7 +3,6 @@ import { CAPTAINS } from '../../data/captains'
 import { aggregateCharacterEffects, characterXp, resolveAbilityDef } from '../../data/items'
 import { levelStatsFor } from '../../data/levels'
 import { characterLevel, tiersForLevel } from '../../data/charLevel'
-import { aggregateTeamCards } from '../../data/cards'
 import { toPx } from '../../data/px'
 import { sandboxLevel } from '../sandbox/knobs'
 import { FACTION } from '../components'
@@ -12,7 +11,6 @@ import type { RunState } from '../../run/state'
 import type { Sim } from '../sim'
 
 export function armTeam(sim: Sim, run: RunState, sandbox: boolean): void {
-  const teamFx = aggregateTeamCards(run.teamCards)
   for (let slot = 0; slot < run.roster.length; slot++) {
     const id = run.roster[slot]!
     const def = CHARACTERS[id]
@@ -21,9 +19,9 @@ export function armTeam(sim: Sim, run: RunState, sandbox: boolean): void {
     const tiers = tiersForLevel(level)
     const fx = aggregateCharacterEffects(owned, levelStatsFor(id, level))
     const amp = {
-      dmg: fx.damageMul * teamFx.teamDamageMul,
-      cd: fx.cooldownMul * teamFx.teamCooldownMul,
-      crit: fx.critChance + teamFx.critAdd,
+      dmg: fx.damageMul,
+      cd: fx.cooldownMul,
+      crit: fx.critChance,
       kb: fx.knockbackMul,
       battle: true,
     }

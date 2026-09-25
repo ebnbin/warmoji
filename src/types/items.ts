@@ -15,24 +15,6 @@ export interface CharacterEffects {
   critChance: number
   knockbackMul: number
 }
-export interface TeamEffects {
-  moveSpeedMul: number
-  magnetMul: number
-  doubleCoinChance: number
-  teamDamageMul: number
-  xpGainMul: number
-  enemySlowMul: number
-  waveHealRatio: number
-  waveCoins: number
-  teamCooldownMul: number
-  critAdd: number
-  teamHpMul: number
-  reviveMul: number
-  skillCdMul: number
-  shopDiscountMul: number
-  freeRerolls: number
-  draftSize: number
-}
 export interface Economy {
   readonly critMul: number
   readonly price: {

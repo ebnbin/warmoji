@@ -23,7 +23,6 @@ export function updateEnemyGates(sim: Sim): void {
       ZoneSlow.v[eid]! *
       (now < Slow.until[eid]! ? Slow.mul[eid]! : 1) *
       SpMul.v[eid]! *
-      sim.enemySlowMul *
       sim.battleFx.enemySlowMul
     Slowed.v[eid] = slow
     if (dancing) {

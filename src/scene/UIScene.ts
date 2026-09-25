@@ -639,13 +639,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     const lineStyle = { fontFamily: UI_FONT, fontSize: FONT.head, color: '#ffffff', resolution: res }
     iconLabel(this, cx - 140, cy + 12, '1f480', 37, `击杀 ${s.kills}`, lineStyle).setDepth(231)
     iconLabel(this, cx + 140, cy + 12, PICKUPS.coin.emoji, 37, `金币 +${s.coins}`, lineStyle).setDepth(231)
-    if (s.levels > 0) {
-      iconLabel(this, cx, cy + 72, '1fad8', 35, `能量豆 +${s.levels}（队长技能弹药）`, {
-        ...lineStyle,
-        fontSize: FONT.body,
-        color: '#b3e5fc',
-      }).setDepth(231)
-    }
+
   }
 
   private drawXpBar(s: HudSnapshot): void {
@@ -676,7 +670,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
                 { label: '拾取提示', run: () => this.onFieldCollected({ emoji: PICKUPS.coin.emoji, name: '预览拾取', desc: '开发者工具触发', polarity: 'buff' }) },
                 { label: '技能提示', run: () => this.onSkillCast('预览技能') },
                 { label: '队长交接', run: () => this.onLeaderChanged({ emoji: PICKUPS.coin.emoji, name: '预览' }) },
-                { label: '波次完成', run: () => this.onWaveComplete({ wave: 1, kills: 12, coins: 34, levels: 1 }) },
+                { label: '波次完成', run: () => this.onWaveComplete({ wave: 1, kills: 12, coins: 34 }) },
               ],
             },
           ],

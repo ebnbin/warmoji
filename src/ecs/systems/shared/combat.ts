@@ -121,7 +121,6 @@ export function gainTeamXp(sim: Sim, amount: number): void {
   const gained = gainXp(sim.run.xp, amount)
   sim.run.xp = gained.state
   if (gained.levelsGained > 0) {
-    sim.run.cardDraws += gained.levelsGained
     playSfx('levelup')
   }
 }
@@ -130,12 +129,10 @@ function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean):
   const xpMul = sim.reward.captainXpMul * (elite ? ELITE.xpMul : 1)
   gainTeamXp(sim, Math.round(def.xp * xpMul))
   const dropRoll = sim.rng.next()
-  const doubleRoll = sim.rng.next()
   const dropped = dropRoll < coinDropChance((sim.run.combatMs + sim.elapsedMs) / 1000)
   const baseCoins = dropped ? Math.round(def.coins * (elite ? ELITE.coinsMul : 1)) : 0
-  const doubled = baseCoins > 0 && doubleRoll < sim.reward.doubleCoinChance ? baseCoins : 0
   const eaten = Thief.eaten[eid]!
-  const total = baseCoins + doubled + eaten + (eaten > 0 ? 1 : 0)
+  const total = baseCoins + eaten + (eaten > 0 ? 1 : 0)
   if (total > 0) dropCoins(sim, Transform.x[eid]!, Transform.y[eid]!, total)
 }
 

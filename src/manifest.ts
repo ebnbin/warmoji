@@ -7,7 +7,6 @@ import type { AbilityDef } from './types/abilityDefs'
 import { BOSSES, ENEMY_DEFS, SPAWN } from './data/enemies'
 import { PICKUPS } from './data/pickups'
 import { FIELD_PICKUPS } from './data/battlefield'
-import { CARDS } from './data/cards'
 import { ITEMS } from './data/items'
 import { MAPS } from './data/maps'
 import type { MapDef } from './types/maps'
@@ -80,7 +79,6 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   ...Object.values(OUTLINED_EMOJIS).flat(),
   ...roster.flatMap((c) => c.carriers.map((cr) => cr.icon)),
   ...Object.values<{ emoji: string }>(ITEMS).map((i) => i.emoji),
-  ...Object.values(CARDS).map((c) => c.emoji),
   ...Object.values(MAPS).map((m) => m.emoji),
   '1f5fa',
   '1f579',

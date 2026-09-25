@@ -18,7 +18,6 @@ export interface WaveSummary {
   wave: number
   kills: number
   coins: number
-  levels: number
 }
 
 export interface WaveWarning {

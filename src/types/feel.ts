@@ -18,17 +18,5 @@ export interface FeelTuning {
     readonly handoverMs: number
     readonly facingTauMs: number
   }
-  readonly wander: {
-    readonly radius: number
-    readonly freqX: number
-    readonly freqY: number
-    readonly rampMs: number
-  }
   readonly hitShake: { readonly durationMs: number; readonly intensity: number }
-  readonly orbit: {
-    readonly detectRange: number
-    readonly maxSpeed: number
-    readonly avoidGain: number
-    readonly seekGain: number
-  }
 }

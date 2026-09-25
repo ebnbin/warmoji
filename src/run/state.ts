@@ -3,10 +3,8 @@ import { CHARACTERS, MEMBER, ROSTER_IDS } from '../data/characters'
 import type { CaptainId } from '../types/captains'
 import type { CharacterId } from '../types/characters'
 import { WAVE } from '../data/waves'
-import type { FormationId } from '../types/formation'
 import { browserStorage } from '../util/storage'
 import type { ItemId } from '../types/items'
-import type { CardId } from '../types/cards'
 import type { Hazard, MapId } from '../types/maps'
 import type { EnemyKind } from '../types/enemies'
 import { MAP_IDS } from '../data/maps'
@@ -24,8 +22,6 @@ export interface RunState {
   coins: number
   kills: number
   xp: XpState
-  cardDraws: number
-  teamCards: Partial<Record<CardId, number>>
   combatMs: number
   recruitPool: CharacterId[]
   roster: CharacterId[]
@@ -33,8 +29,7 @@ export interface RunState {
   memberItems: ItemId[][]
   freeRefreshes: number
   skillCdMs: number
-  guardOrder: CharacterId[]
-  formationIntroduced: boolean
+  leaderId: CharacterId
   stats: {
     damage: number[]
     kills: number[]
@@ -69,16 +64,13 @@ export function beginRun(
     coins: captain.startCoins,
     kills: 0,
     xp: { level: 1, xp: 0 },
-    cardDraws: 0,
-    teamCards: {},
     combatMs: skippedMs,
     roster,
     memberHp: roster.map(() => MEMBER.maxHp),
     memberItems: roster.map(() => []),
     freeRefreshes: 0,
     skillCdMs: 0,
-    guardOrder: [],
-    formationIntroduced: false,
+    leaderId: roster[0]!,
     stats: {
       damage: roster.map(() => 0),
       kills: roster.map(() => 0),
@@ -148,53 +140,13 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   return run.roster.length - 1
 }
 
-const GUARD_MIN = 5
-
-export function hasCenter(run: RunState): boolean {
-  return run.roster.length >= GUARD_MIN
+/** 队长所在的名单位置；名单里找不到就回到首位 */
+export function leaderSlot(run: RunState): number {
+  return Math.max(0, run.roster.indexOf(run.leaderId))
 }
 
-export function currentFormation(run: RunState): FormationId {
-  return hasCenter(run) ? 'guard' : 'ring'
-}
-
-function ensureGuardOrder(run: RunState): void {
-  if (!hasCenter(run)) return
-  const kept = run.guardOrder.filter((id) => run.roster.includes(id))
-  const added = run.roster.filter((id) => !kept.includes(id))
-  if (added.length === 0 && kept.length === run.guardOrder.length) return
-  run.guardOrder = [...kept, ...added]
-}
-
-export function guardOrder(run: RunState): CharacterId[] {
-  if (!hasCenter(run)) return [...run.roster]
-  ensureGuardOrder(run)
-  return [...run.guardOrder]
-}
-
-export function guardCenter(run: RunState): CharacterId | null {
-  if (!hasCenter(run)) return null
-  ensureGuardOrder(run)
-  return run.guardOrder[0] ?? null
-}
-
-export function setGuardCenter(run: RunState, id: CharacterId): boolean {
-  if (!hasCenter(run) || !run.roster.includes(id)) return false
-  ensureGuardOrder(run)
-  const idx = run.guardOrder.indexOf(id)
-  if (idx < 0) return false
-  if (idx > 0) {
-    const prev = run.guardOrder[0]!
-    run.guardOrder[0] = id
-    run.guardOrder[idx] = prev
-  }
-  return true
-}
-
-export function teamStep(run: RunState): SceneKey.Recruit | SceneKey.Formation | null {
-  if (recruitDueCount(run) > 0) return SceneKey.Recruit
-  if (hasCenter(run) && !run.formationIntroduced) return SceneKey.Formation
-  return null
+export function teamStep(run: RunState): SceneKey.Recruit | null {
+  return recruitDueCount(run) > 0 ? SceneKey.Recruit : null
 }
 
 export function waveStartHp(storedHp: number, maxHp: number): number {

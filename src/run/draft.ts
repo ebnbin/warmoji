@@ -1,9 +1,7 @@
 import { ITEMS, ITEM_IDS, RARITY_ORDER } from '../data/items'
 import { loadoutFor } from '../data/characters'
-import { CARDS, CARD_IDS } from '../data/cards'
 import { CHAR_XP_THRESHOLDS, MAX_CHAR_LEVEL, characterLevel } from '../data/charLevel'
 import type { ItemDef, ItemId, ItemRarity } from '../types/items'
-import type { CardId } from '../types/cards'
 import type { CharacterDef, UpgradeTiers } from '../types/characters'
 import type { LevelProgress } from '../types/charLevel'
 
@@ -60,37 +58,6 @@ export function rollItem(
     pickList = chosen.items
   }
   return pickList[Math.min(pickList.length - 1, Math.floor(rand() * pickList.length))]!
-}
-
-function cardAtMax(owned: Readonly<Partial<Record<CardId, number>>>, id: CardId): boolean {
-  return (owned[id] ?? 0) >= CARDS[id].maxLevel
-}
-export function rollCardChoices(
-  owned: Readonly<Partial<Record<CardId, number>>>,
-  rand: () => number,
-  count: number,
-  wave = 1,
-): CardId[] {
-  const pool = CARD_IDS.filter((id) => !cardAtMax(owned, id))
-  const weights = rarityWeights(wave)
-  const w = (id: CardId): number => Math.max(0.0001, weights[CARDS[id].rarity])
-  const chosen: CardId[] = []
-  while (chosen.length < count && pool.length > 0) {
-    let total = 0
-    for (const id of pool) total += w(id)
-    let t = rand() * total
-    let idx = pool.length - 1
-    for (let i = 0; i < pool.length; i++) {
-      if (t < w(pool[i]!)) {
-        idx = i
-        break
-      }
-      t -= w(pool[i]!)
-    }
-    chosen.push(pool[idx]!)
-    pool.splice(idx, 1)
-  }
-  return chosen
 }
 
 export function levelProgress(xp: number): LevelProgress {

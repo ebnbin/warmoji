@@ -4,7 +4,6 @@ import { AI } from '../defs/ai.ts'
 import { ANIMATIONS } from '../defs/animations.ts'
 import { BATTLEFIELD } from '../defs/battlefield.ts'
 import { CAPTAINS } from '../defs/captains.ts'
-import { CARDS } from '../defs/cards.ts'
 import { CHARACTERS } from '../defs/characters.ts'
 import { COMBAT } from '../defs/combat.ts'
 import { DIFFICULTY } from '../defs/difficulty.ts'
@@ -79,7 +78,6 @@ write('ai', AI)
 write('animations', ANIMATIONS)
 write('battlefield', BATTLEFIELD)
 write('captains', CAPTAINS)
-write('cards', CARDS)
 write('characters', CHARACTERS)
 write('combat', COMBAT)
 write('difficulty', DIFFICULTY)

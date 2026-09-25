@@ -13,7 +13,7 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
 
   const c = map(centerX(sim), centerY(sim))
   setCenter(sim, c.x, c.y)
-  for (const b of [sim.captain, ...sim.characters]) {
+  for (const b of sim.characters) {
     const v = rot(Phys.vx[b]!, Phys.vy[b]!)
     Phys.vx[b] = v.x
     Phys.vy[b] = v.y

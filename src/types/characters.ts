@@ -18,7 +18,6 @@ export interface CharacterAuthoring {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly orbit: number
   readonly body: BodyParams
   readonly weapons: readonly WeaponId[]
   readonly innate: readonly InnateSource[]
@@ -33,7 +32,6 @@ export interface CharacterDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly orbit: number
   readonly body: BodyParams
   readonly carriers: readonly Carrier[]
 }
@@ -51,7 +49,6 @@ export interface TeamBaseline {
     readonly leaderSizeMul: number
     readonly followerSizeMul: number
     readonly leaderGrip: number
-    readonly anchor: { readonly drag: number; readonly mass: number }
   }
   readonly member: {
     readonly size: number

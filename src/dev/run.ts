@@ -34,12 +34,11 @@ function ensureRun(): void {
 function runText(): string {
   const run = currentRun()
   if (!run) return '当前没有进行中的一局'
-  const cards = Object.entries(run.teamCards).reduce((s, [, n]) => s + (n ?? 0), 0)
   return [
     `${CAPTAINS[run.captainId].name} · ${MAPS[run.mapId].name}${run.sandbox ? ' · 试炼场' : ''}`,
-    `第 ${run.wave} 波 · 金币 ${run.coins} · 击杀 ${run.kills} · 等级 ${run.xp.level}（${run.xp.xp} xp）· 待抽卡 ${run.cardDraws}`,
-    `队伍 ${run.roster.map((id) => CHARACTERS[id].name).join('、')}`,
-    `队伍卡 ${cards} 张 · 技能冷却 ${Math.ceil(run.skillCdMs / 1000)} s · 累计战斗 ${Math.round(run.combatMs / 1000)} s`,
+    `第 ${run.wave} 波 · 金币 ${run.coins} · 击杀 ${run.kills} · 等级 ${run.xp.level}（${run.xp.xp} xp）`,
+    `队伍 ${run.roster.map((id) => CHARACTERS[id].name).join('、')} · 队长 ${CHARACTERS[run.leaderId].name}`,
+    `技能冷却 ${Math.ceil(run.skillCdMs / 1000)} s · 累计战斗 ${Math.round(run.combatMs / 1000)} s`,
   ].join('\n')
 }
 
@@ -136,8 +135,6 @@ function runSections(game: Phaser.Game): DevSection[] {
             { label: '选队长', run: () => gotoScene(game, SceneKey.Captain) },
             { label: '商店', run: () => (ensureRun(), gotoScene(game, SceneKey.Shop)) },
             { label: '招募', run: () => (ensureRun(), gotoScene(game, SceneKey.Recruit)) },
-            { label: '队长', run: () => (ensureRun(), gotoScene(game, SceneKey.Formation)) },
-            { label: '卡牌', run: () => (ensureRun(), gotoScene(game, SceneKey.Cards)) },
             { label: '结算 · 胜', run: () => (ensureRun(), gotoScene(game, SceneKey.Result, { win: true })) },
             { label: '结算 · 负', run: () => (ensureRun(), gotoScene(game, SceneKey.Result, { win: false })) },
             { label: '图鉴', run: () => gotoScene(game, SceneKey.Wiki) },
