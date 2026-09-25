@@ -5,14 +5,15 @@ export interface FeelTuning {
     readonly zeta: number
     readonly maxLag: number
   }
-  readonly pursuit: {
-    readonly arriveRadius: number
-    readonly slowRadius: number
-    readonly easeFloor: number
-    readonly leash: number
-    readonly catchUpMul: number
-    readonly snapDist: number
-    readonly separation: number
+  readonly squad: {
+    readonly fanDistance: number
+    readonly fanSpreadDeg: number
+    readonly seatRadius: number
+    readonly seatHysteresis: number
+    readonly reverseGain: number
+    readonly repelRadius: number
+    readonly repelForce: number
+    readonly recallDist: number
   }
   readonly wander: {
     readonly radius: number

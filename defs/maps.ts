@@ -305,8 +305,10 @@ export const MAPS = {
     mix: ICE_MIX,
     ice: {
       floeU: 25,
-      teamTauIce: 1.2,
-      teamTauWater: 0.12,
+      traction: 0.12,
+      waterTraction: 0.35,
+      waterViscosity: 2.5,
+      waterTau: 0.12,
       enemyTauIce: 0.85,
       knockbackTauMul: 8,
       waterSpeedMul: 0.45,

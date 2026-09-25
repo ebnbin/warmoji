@@ -1,6 +1,6 @@
 import { UNIT } from '../../util/units'
 import { MEMBER } from '../../data/characters'
-import { Alive, Breath, CharScale, Follow, Pop, Sprite, Transform } from '../components'
+import { Alive, Breath, CharScale, Phys, Pop, Sprite, Transform } from '../components'
 import { backEaseOut } from '../utils/ease'
 import type { Sim } from '../sim'
 
@@ -32,9 +32,9 @@ export function animateCharacters(sim: Sim): void {
   const baseSize = MEMBER.size * UNIT
   for (const eid of sim.characters) {
     if (!Alive.v[eid]) continue
-    const own = sim.pursuit && eid !== sim.leader
-    const vx = own ? Follow.vx[eid]! : sim.teamDir.x
-    const moving = own ? Math.hypot(Follow.vx[eid]!, Follow.vy[eid]!) > STRIDE : teamMoving
+    const own = sim.physics
+    const vx = own ? Phys.vx[eid]! : sim.teamDir.x
+    const moving = own ? Math.hypot(Phys.vx[eid]!, Phys.vy[eid]!) > STRIDE : teamMoving
     const charSize = baseSize * CharScale.v[eid]!
     if (!popping(sim, eid, charSize)) {
       const bp = Breath.phase[eid]! + delta / (moving ? 85 : 140)

@@ -19,7 +19,7 @@ import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox/knobs
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
-import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, CharScale, MoveSpeed, OrbitBias, Pop, Post, Quad, Revive, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
+import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, CharScale, OrbitBias, Phys, Pop, Post, Quad, Revive, Seat, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
@@ -60,7 +60,8 @@ export function spawnCharacter(
   addComponent(world, eid, Threat)
   addComponent(world, eid, CharHp)
   addComponent(world, eid, CharScale)
-  addComponent(world, eid, MoveSpeed)
+  addComponent(world, eid, Phys)
+  addComponent(world, eid, Seat)
   addComponent(world, eid, CharAtkSlow)
   addComponent(world, eid, CharPerk)
   addComponent(world, eid, Iframe)
@@ -107,7 +108,12 @@ export function spawnCharacter(
   Revive.at[eid] = 0
   Hurt.radius[eid] = MEMBER.radius * UNIT * place.sizeMul
   CharScale.v[eid] = place.sizeMul
-  MoveSpeed.v[eid] = def.moveSpeed * UNIT * teamFx.moveSpeedMul
+  Phys.vx[eid] = 0
+  Phys.vy[eid] = 0
+  Phys.thrust[eid] = def.body.thrust * UNIT * teamFx.moveSpeedMul
+  Phys.drag[eid] = def.body.drag
+  Phys.mass[eid] = def.body.mass
+  Seat.v[eid] = -1
   CharFlash.until[eid] = 0
   Transform.x[eid] = x
   Transform.y[eid] = y

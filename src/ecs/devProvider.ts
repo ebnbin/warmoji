@@ -28,7 +28,7 @@ import {
 } from './sandbox/knobs'
 import type { SandboxLevel, SandboxMul } from './sandbox/knobs'
 import { pipelineProfile, resetPipelineProfile } from './systems/pipeline/step'
-import { PURSUIT_FLAGS } from './systems/shared/pursuit'
+import { SQUAD_FLAGS } from './systems/shared/squad'
 
 const MULS: readonly SandboxMul[] = [1, 3, 10]
 const LEVELS: readonly { readonly lv: SandboxLevel; readonly label: string }[] = [
@@ -90,9 +90,19 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
         ...(battle.sandbox ? [] : [{ label: '结束本波', run: (): void => battle.devEndWave() }]),
       ],
     },
-    devFlagItem(PURSUIT_FLAGS.pursuit),
-    devFlagItem(PURSUIT_FLAGS.orbit),
-    devFlagItem(PURSUIT_FLAGS.separation),
+    devFlagItem(SQUAD_FLAGS.physics),
+    {
+      kind: 'text',
+      label: '队伍物理 · 极速 = 推力 ÷ 阻力 · 响应 = 质量 ÷ 阻力 · 其余旋钮在"开关"页签',
+      mono: true,
+      read: (): string =>
+        battle.run.roster
+          .map((id) => {
+            const b = CHARACTERS[id].body
+            return `${CHARACTERS[id].name}  极速 ${(b.thrust / b.drag).toFixed(1)}  响应 ${(b.mass / b.drag).toFixed(2)}s  质量 ${b.mass}`
+          })
+          .join('\n'),
+    },
     devFlagItem('battle.targets'),
     devFlagItem('ecs.profile'),
     { kind: 'text', label: '流水线剖析 · 平均毫秒/帧 · 外层含内层', mono: true, read: profileText },

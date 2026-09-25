@@ -24,9 +24,16 @@ import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { fleeSteer } from '../systems/shared/steer'
 import { centerX, centerY, teamCenter } from '../utils/team'
+import { iceTraction } from '../systems/shared/squad'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
+
+export interface Surface {
+  readonly traction: number
+  readonly viscosity: number
+}
+const GROUND: Surface = { traction: 1, viscosity: 1 }
 
 interface Walls {
   grid: WallGrid
@@ -40,14 +47,12 @@ interface Walls {
 
 export interface WorldState {
   tickAt: number
-  vx: number
-  vy: number
   zone: { x: number; y: number; r: number } | null
   walls: Walls | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, vx: 0, vy: 0, zone: null, walls: null }
+  return { tickAt: 0, zone: null, walls: null }
 }
 
 export interface WorldHooks {
@@ -56,8 +61,9 @@ export interface WorldHooks {
   ghosts(sim: Sim, x: number, y: number): Point[]
   wrap(sim: Sim, x: number, y: number): Point
   projectileLifeMs(sim: Sim): number
-  teamDrift(sim: Sim, delta: number): Point
-  constrainTeam(sim: Sim, next: Point, delta: number): Point
+  mediumVelocity(sim: Sim, x: number, y: number): Point
+  surface(sim: Sim, x: number, y: number): Surface
+  constrainBody(sim: Sim, from: Point, next: Point, delta: number): Point
   constrainEnemy(sim: Sim, eid: number, x: number, y: number): Point
   constrainSpawn(sim: Sim, x: number, y: number, radius: number): Point
   chaseDir(sim: Sim, eid: number, tx: number, ty: number): Point
@@ -94,10 +100,13 @@ const bounded: WorldHooks = {
   projectileLifeMs() {
     return 0
   },
-  teamDrift() {
+  mediumVelocity() {
     return ZERO
   },
-  constrainTeam(sim, next) {
+  surface() {
+    return GROUND
+  },
+  constrainBody(sim, _from, next) {
     const clampMin = (TEAM.ringRadius + MEMBER.radius) * UNIT
     return {
       x: Math.min(Math.max(next.x, clampMin), sim.mapW - clampMin),
@@ -195,18 +204,13 @@ function floePx(sim: Sim): number {
 
 const ice: WorldHooks = {
   ...bounded,
-  constrainTeam(sim, next, delta) {
+  constrainBody(_sim, _from, next) {
+    return next
+  },
+  surface(sim, x, y) {
     const cfg = iceCfg(sim)
-    const dt = delta / 1000
-    if (dt <= 0) return { x: centerX(sim), y: centerY(sim) }
-    const desVx = (next.x - centerX(sim)) / dt
-    const desVy = (next.y - centerY(sim)) / dt
-    const on = onFloe(centerX(sim), centerY(sim), floePx(sim))
-    const tau = on ? cfg.teamTauIce : cfg.teamTauWater
-    const mul = on ? 1 : cfg.waterSpeedMul
-    sim.worldState.vx = approach(sim.worldState.vx, desVx * mul, dt, tau)
-    sim.worldState.vy = approach(sim.worldState.vy, desVy * mul, dt, tau)
-    return { x: centerX(sim) + sim.worldState.vx * dt, y: centerY(sim) + sim.worldState.vy * dt }
+    if (onFloe(x, y, floePx(sim))) return { traction: iceTraction(), viscosity: 1 }
+    return { traction: cfg.waterTraction, viscosity: cfg.waterViscosity }
   },
   constrainEnemy(_sim, _eid, x, y) {
     return { x, y }
@@ -228,7 +232,7 @@ const ice: WorldHooks = {
     const dt = delta / 1000
     if (dt <= 0) return { vx, vy }
     const on = onFloe(Transform.x[eid]!, Transform.y[eid]!, floePx(sim))
-    const tau = on ? cfg.enemyTauIce : cfg.teamTauWater
+    const tau = on ? cfg.enemyTauIce : cfg.waterTau
     const mul = on ? 1 : cfg.waterSpeedMul
     const sx = approach(Slide.x[eid]!, vx * mul, dt, tau)
     const sy = approach(Slide.y[eid]!, vy * mul, dt, tau)
@@ -258,9 +262,9 @@ const ice: WorldHooks = {
     sim.worldState.tickAt = sim.elapsedMs + cfg.waterTickMs
     const px = floePx(sim)
     const frac = cfg.waterTickMs / 1000
-    if (!onFloe(centerX(sim), centerY(sim), px)) {
-      const dmg = Math.round(cfg.waterTeamDps * frac)
-      for (const m of sim.characters) if (Alive.v[m]) hurtByHazard(sim, m, dmg, 'coldWater', 0x4fc3f7)
+    const dmg = Math.round(cfg.waterTeamDps * frac)
+    for (const m of sim.characters) {
+      if (Alive.v[m] && !onFloe(Transform.x[m]!, Transform.y[m]!, px)) hurtByHazard(sim, m, dmg, 'coldWater', 0x4fc3f7)
     }
     const edmg = Math.round(cfg.waterEnemyDps * frac)
     for (const eid of [...query(sim.world, ENEMY_SET)]) {
@@ -286,10 +290,10 @@ const ruins: WorldHooks = {
     const spawnCells = [...reachableCells(grid, Math.floor(cols / 2), Math.floor(rows / 2))]
     sim.worldState.walls = { grid, flowCellX: -1, flowCellY: -1, reflowAcc: 0, spawnCells, smashed: [] }
   },
-  constrainTeam(sim, next, delta) {
-    const box = bounded.constrainTeam(sim, next, delta)
+  constrainBody(sim, from, next, delta) {
+    const box = bounded.constrainBody(sim, from, next, delta)
     const w = sim.worldState.walls
-    return w ? w.grid.resolveMove(centerX(sim), centerY(sim), box.x, box.y) : box
+    return w ? w.grid.resolveMove(from.x, from.y, box.x, box.y) : box
   },
   constrainEnemy(sim, eid, x, y) {
     const box = bounded.constrainEnemy(sim, eid, x, y)
@@ -378,7 +382,7 @@ function ringCfg(sim: Sim): ShrinkRingConfig {
 
 const infinite: WorldHooks = {
   ...bounded,
-  constrainTeam(_sim, next) {
+  constrainBody(_sim, _from, next) {
     return next
   },
   constrainEnemy(_sim, _eid, x, y) {
@@ -446,10 +450,10 @@ function fieldR(sim: Sim): number {
 
 const space: WorldHooks = {
   ...infinite,
-  constrainTeam(sim, next) {
+  constrainBody(sim, from, next) {
     const r = fieldR(sim)
-    const v = confineVelocity(centerX(sim), centerY(sim), 0, 0, next.x - centerX(sim), next.y - centerY(sim), r)
-    return clampToDisc(centerX(sim) + v.x, centerY(sim) + v.y, 0, 0, r)
+    const v = confineVelocity(from.x, from.y, 0, 0, next.x - from.x, next.y - from.y, r)
+    return clampToDisc(from.x + v.x, from.y + v.y, 0, 0, r)
   },
   constrainSpawn(sim, x, y, radius) {
     return clampToDisc(x, y, 0, 0, fieldR(sim) - radius)
@@ -531,12 +535,10 @@ function flowOf(sim: Sim): Point {
 
 const river: WorldHooks = {
   ...bounded,
-  teamDrift(sim, delta) {
-    const f = flowOf(sim)
-    const dt = delta / 1000
-    return { x: f.x * dt, y: f.y * dt }
+  mediumVelocity(sim) {
+    return flowOf(sim)
   },
-  constrainTeam(sim, next) {
+  constrainBody(sim, _from, next) {
     return clampToRiver(next, riverOf(sim), (TEAM.ringRadius + MEMBER.radius) * UNIT)
   },
   constrainEnemy(sim, eid, x, y) {
@@ -631,7 +633,7 @@ const torus: WorldHooks = {
   projectileLifeMs(sim) {
     return MAPS[sim.mapId].torus!.projectileLifeMs
   },
-  constrainTeam(sim, next) {
+  constrainBody(sim, _from, next) {
     return wrapPoint(next, sim.mapW, sim.mapH)
   },
   constrainEnemy(sim, _eid, x, y) {

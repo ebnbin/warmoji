@@ -29,8 +29,10 @@ export interface DayNightConfig {
 }
 export interface IceConfig {
   readonly floeU: number
-  readonly teamTauIce: number
-  readonly teamTauWater: number
+  readonly traction: number
+  readonly waterTraction: number
+  readonly waterViscosity: number
+  readonly waterTau: number
   readonly enemyTauIce: number
   readonly knockbackTauMul: number
   readonly waterSpeedMul: number

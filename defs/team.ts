@@ -6,7 +6,10 @@ export const TEAM_BASELINE = {
     smallRingRadius: 0.58,
     pairGap: 1.1,
     reviveMs: 10_000,
-    leaderSizeMul: 1.35,
+    leaderSizeMul: 1.25,
+    followerSizeMul: 0.75,
+    leaderGrip: 8,
+    anchor: { drag: 5, mass: 1 },
   },
   member: {
     size: 1.2,

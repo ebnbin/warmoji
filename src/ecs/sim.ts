@@ -39,7 +39,8 @@ export interface Sim {
   moveInputRaw: number
   captain: number
   leader: number
-  pursuit: boolean
+  physics: boolean
+  heading: { x: number; y: number }
   formation: FormationId
   count: number
   postBySlot: number[]
@@ -195,6 +196,7 @@ export function makeSim(
     },
     captain,
     leader,
-    pursuit: false,
+    physics: false,
+    heading: { x: 0, y: -1 },
   }
 }
