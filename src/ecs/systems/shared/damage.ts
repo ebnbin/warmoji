@@ -4,7 +4,6 @@ import { applyDamage, hurtCharacter } from './combat'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 
-/** 施伤唯一入口：队伍侧打敌人走暴击 + 击退，敌方侧打队员吃无敌帧节流 */
 export function damageTarget(
   sim: Sim,
   src: Source,

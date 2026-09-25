@@ -9,12 +9,11 @@ import type { Sim } from '../sim'
 
 export function castLasers(sim: Sim): void {
   castScan(sim, Laser, (e) => {
-    if (Radial.left[e]! > 0) return false // 扫射在途：本轮不另起
+    if (Radial.left[e]! > 0) return false
     const aim = nearestAngle(sim, sourceOf(sim, e), ownerX(e), ownerY(e), Laser.range[e]!)
     if (aim === null) return false
     Aim.rad[e] = aim
     if (hasComponent(sim.world, e, LaserRadial)) {
-      // 首束下一帧兑现
       Radial.left[e] = LaserRadial.beams[e]!
       Radial.nextAt[e] = sim.elapsedMs
       Radial.angle[e] = aim

@@ -4,7 +4,6 @@ import { Alive, Breath, Pop, Sprite, Transform } from '../components'
 import { backEaseOut } from '../utils/ease'
 import type { Sim } from '../sim'
 
-/** 复活弹入按 fxMs；返回是否仍在弹入 */
 function popping(sim: Sim, eid: number, charSize: number): boolean {
   const left = Pop.until[eid]! - sim.fxMs
   if (left <= 0) return false
@@ -14,7 +13,6 @@ function popping(sim: Sim, eid: number, charSize: number): boolean {
   return true
 }
 
-/** 过场冻结期：只把复活弹入播完，不呼吸 */
 export function finishCharacterPops(sim: Sim): void {
   const charSize = MEMBER.size * UNIT
   for (const eid of sim.characters) {
@@ -31,7 +29,6 @@ export function animateCharacters(sim: Sim): void {
   const charSize = MEMBER.size * UNIT
   for (const eid of sim.characters) {
     if (!Alive.v[eid]) continue
-    // 弹入覆盖呼吸
     if (!popping(sim, eid, charSize)) {
       const bp = Breath.phase[eid]! + delta / (moving ? 85 : 140)
       Breath.phase[eid] = bp

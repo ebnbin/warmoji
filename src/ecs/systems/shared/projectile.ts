@@ -6,7 +6,6 @@ import { abilityFireSfx, enemyDef } from '../../store'
 import { attributionSlot } from '../../utils/amp'
 import type { Sim } from '../../sim'
 
-/** 队伍侧非确定性随机，敌方侧走 run 种子 */
 export function random(sim: Sim, e: number): number {
   return Faction.v[e] === FACTION.enemy ? sim.rng.next() : Math.random()
 }
@@ -31,7 +30,6 @@ export function fireSfxOf(e: number): import('../../../types/sfx').SfxId | undef
   return abilityFireSfx[e]
 }
 
-/** 伴随存储先清 */
 export function cullProjectile(sim: Sim, eid: number): void {
   projOnHit[eid] = undefined
   projHitUids[eid] = undefined

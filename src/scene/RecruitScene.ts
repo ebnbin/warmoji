@@ -37,16 +37,13 @@ import {
 import type { TeamLayout } from './teamPage'
 
 export class RecruitScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
-  /** 角色 id 或 lock-N */
   private selectedKey = ''
   private due = 0
   private pool: CharacterId[] = []
   private unlocked = 0
-  /** 顺序即入队槽位序 */
   private picked: CharacterId[] = []
   private layout!: TeamLayout
   private origin = { x: 0, y: 0 }
@@ -164,8 +161,6 @@ export class RecruitScene extends Phaser.Scene {
     }
   }
 
-  // ── 数据 ────────────────────────────────────────────────────
-
   private cardState(key: string): 'locked' | 'taken' | 'open' {
     if (key.startsWith('lock-')) return 'locked'
     const idx = this.pool.indexOf(key as CharacterId)
@@ -198,8 +193,6 @@ export class RecruitScene extends Phaser.Scene {
     })
   }
 
-  // ── 确认执行 ────────────────────────────────────────────────
-
   private confirm(): void {
     if (!this.confirmEnabled()) return
     for (const id of this.picked) {
@@ -215,8 +208,6 @@ export class RecruitScene extends Phaser.Scene {
     this.previewPhase += (delta / 1000) * PREVIEW_SPIN
     this.layoutPreview()
   }
-
-  // ── 详情（文字详情区，预览占掉面板一角） ────────────────────
 
   private renderDetail(res: number): void {
     this.detailView.clear()
@@ -292,8 +283,6 @@ export class RecruitScene extends Phaser.Scene {
     this.rebuildPreview()
     this.updateConfirm()
   }
-
-  // ── 队伍预览（详情面板内嵌，与阵型页同款慢转） ──────────────
 
   private rebuildPreview(): void {
     for (const t of this.previewTokens) t.zone?.destroy()

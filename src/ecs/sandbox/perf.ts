@@ -8,20 +8,15 @@ import { metricsReport, nextFrameSeq, recentFrames } from './metrics'
 import { sandboxDifficulty, sandboxEnemySet, sandboxFireRate, sandboxLevel, sandboxStarters, scaleStep } from './knobs'
 import type { EcsBattleScene } from '../EcsBattleScene'
 
-// 坐标以面板内容区顶为原点
-
 const CHART_H = 74
-/** ms；留出 16.7 / 33.3 两条参考线的位置 */
 const CHART_FLOOR = 40
 const SCALE_ROW = 32
 
-/** 试炼场首次满载时的帧序号；此前为 -1。由 SandboxPanel 持有：它随每局重建，切页签不重建 */
 export interface SteadyMark {
   seq: number
 }
 
 export class PerfView {
-  /** 由面板挂进滚动容器并统一销毁 */
   readonly objects: Phaser.GameObjects.GameObject[]
 
   private readonly chart: Phaser.GameObjects.Graphics
@@ -52,7 +47,6 @@ export class PerfView {
     this.objects = [this.chart, this.scaleText, this.text]
   }
 
-  /** 每帧调用；返回内容总高 */
   update(time: number): number {
     this.drawChart()
     if (time - this.refreshedAt >= 250) {
@@ -64,13 +58,11 @@ export class PerfView {
 
   private refresh(): void {
     const p = this.battle.perfSnapshot()
-    // 直读旋钮而非预设：旋钮可逐个手改
     const step = this.sandbox ? scaleStep() : undefined
     const cache = emojiCacheStats(this.scene)
     const heap = heapMB()
     const raf = rafHz()
 
-    // 爬坡期不算稳态：首次满载起才统计，缓冲与波动图不清；一次性闩死，敌人数在上限附近浮动会反复触发
     if (step && this.steady.seq < 0 && p.enemies >= step.spawn.cap * 0.95) this.steady.seq = nextFrameSeq()
     const steady = this.steady.seq >= 0
     const m = metricsReport(raf, steady ? this.steady.seq : 0)
@@ -90,7 +82,6 @@ export class PerfView {
       row('     p95', ms(m.total.p95)),
       row('     p99', ms(m.total.p99)),
       row('     最大', ms(m.total.max)),
-      // 中位数不可加，三段之和不等于总计
       row('· 更新', ms(m.update.p50), '场景逻辑'),
       row('· 渲染', ms(m.render.p50), '渲染提交'),
       row('· 其余', ms(m.rest.p50), '帧外：vsync 等待/GC/异步任务'),
@@ -129,7 +120,6 @@ export class PerfView {
     ])
   }
 
-  /** 左旧右新；纵轴按窗口内 p95 定标，超出量程的帧顶到上边缘；竖线标出满载起点 */
   private drawChart(): void {
     const g = this.chart
     g.clear()

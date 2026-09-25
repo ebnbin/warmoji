@@ -5,7 +5,6 @@ export interface HighScore {
   bestKills: number
 }
 
-// v1 是存活秒数，不兼容，不读
 const KEY = 'warmoji.highscore.v2'
 const ZERO: HighScore = { bestWave: 0, bestKills: 0 }
 
@@ -39,7 +38,6 @@ export function submitScore(
     try {
       storage.setItem(KEY, JSON.stringify(score))
     } catch {
-      // 隐私模式/配额写入失败可忽略
     }
   }
   return { score, newBest }

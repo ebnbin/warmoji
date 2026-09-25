@@ -2,7 +2,6 @@ import { query } from 'bitecs'
 import { PrevPos, Proj, PROJ_SET, Transform, Vel } from '../components'
 import type { Sim } from '../sim'
 
-/** 回绕帧 PrevPos 随落点平移同一个回绕量，扫掠线段跨缝连续；PrevPos 可能落在图外 */
 export function moveProjectiles(sim: Sim): void {
   const dt = sim.wdtMs / 1000
   for (const eid of query(sim.world, PROJ_SET as unknown as object[])) {

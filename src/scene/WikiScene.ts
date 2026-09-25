@@ -45,7 +45,6 @@ const PORTRAIT: WikiLayout = {
   list: { x: 24, y: 664, w: 672, h: 588 },
 }
 
-/** Text 只创建一次，切换条目仅 setText：批量创建销毁 Text 会触发成串光栅化与纹理增删 */
 interface DetailPool {
   view: ScrollView
   icon: Phaser.GameObjects.Image
@@ -58,13 +57,10 @@ interface DetailPool {
 }
 
 export class WikiScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
-  /** 0..groups.length-1 = 分组条目；groups.length = 「全部」网格页 */
   private category = 0
   private focusedKey = ''
-  /** 0/1/2 = 1/2/3 级 */
   private levelSel = 0
   private currentCategory = ''
   private currentEntry?: WikiEntry
@@ -82,7 +78,6 @@ export class WikiScene extends Phaser.Scene {
   private listScroll = 0
   private gridScroll = 0
   private pool?: DetailPool
-  // catRects 存容器内局部 x
   private catRects: { x: number; w: number }[] = []
   private catContainer?: Phaser.GameObjects.Container
   private catScroll = 0
@@ -163,7 +158,6 @@ export class WikiScene extends Phaser.Scene {
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
-      // 只在真退出时释放缩略缓存
       if (!this.preserveOnRestart) releaseEmojiThumbs(this)
     })
 
@@ -172,8 +166,6 @@ export class WikiScene extends Phaser.Scene {
   private wasDragged(): boolean {
     return (this.entryGrid?.wasDragged ?? false) || (this.allGrid?.wasDragged ?? false)
   }
-
-  // ── 类别横向 tab（单排，可横向滚动） ─────────────────────────
 
   private createCategoryTabs(res: number): void {
     const L = this.layout
@@ -223,7 +215,6 @@ export class WikiScene extends Phaser.Scene {
       x += cw + gap
     })
 
-    // 几何遮罩不裁输入：不给每个 tab 挂 zone，滚出屏外的仍会拦点击
     this.add
       .zone(rowX, rowY, rowW, ch)
       .setOrigin(0)
@@ -281,8 +272,6 @@ export class WikiScene extends Phaser.Scene {
   private isAllPage(): boolean {
     return this.category === this.groups.length
   }
-
-  // ── 图鉴视图：当前类别的条目网格 + 详情 ─────────────────────
 
   private createEntriesView(): void {
     const L = this.layout.list
@@ -419,7 +408,6 @@ export class WikiScene extends Phaser.Scene {
           fontFamily: UI_FONT,
           fontSize: FONT.body,
           color: '#d0d0d8',
-          // 纯中文无空格，须 useAdvancedWrap 按字断行
           wordWrap: { width: D.w - 56, useAdvancedWrap: true },
           lineSpacing: 8,
           resolution: res,
@@ -432,7 +420,6 @@ export class WikiScene extends Phaser.Scene {
     return s
   }
 
-  /** 异步回填前校验仍是同一目标 */
   private setPoolIcon(icon: Phaser.GameObjects.Image, emoji: string, size: number): void {
     const key = emojiKey(emoji)
     icon.setData('want', key)
@@ -488,7 +475,6 @@ export class WikiScene extends Phaser.Scene {
       for (const t of P.levelTabs) t.setVisible(false)
     }
 
-    // 标题与内容合并为一个 Text，少光栅化
     const lines = lvls && lvls.length > 0 ? lvls[Math.min(this.levelSel, lvls.length - 1)]!.lines : e.lines
     const segments: { title: string; body: string[] }[] = []
     for (const line of lines) {
@@ -518,8 +504,6 @@ export class WikiScene extends Phaser.Scene {
     P.view.scrollTo(0)
     P.view.setContentHeight(cursor + 12)
   }
-
-  // ── 全部 emoji 视图：懒加载清单 + feed 流虚拟网格组件 ───────
 
   private createAllView(): void {
     const L = this.layout.list

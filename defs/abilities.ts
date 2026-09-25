@@ -29,7 +29,6 @@ const pistol = {
     emoji: '1f52b',
     size: 0.75,
     restOffset: 0.45,
-    // twemoji 1f52b 枪口朝左
     rotationOffsetDeg: 180,
     mountGap: 0.32,
   },
@@ -38,7 +37,6 @@ const pistol = {
     size: 0.45,
     radius: 0.15,
     speed: 13,
-    // twemoji 1f4a7 水滴尖端朝上
     rotationOffsetDeg: 90,
   },
 } satisfies ProjectileDef
@@ -80,7 +78,6 @@ const BASE = {
       emoji: '1fa93',
       size: 0.85,
       restOffset: 0.6,
-      // twemoji 1fa93 斧刃朝左上
       rotationOffsetDeg: 135,
     },
   } satisfies SweepDef,
@@ -114,7 +111,6 @@ const BASE = {
       emoji: '1f526',
       size: 0.75,
       restOffset: 0.45,
-      // twemoji 1f526 灯头朝左下
       rotationOffsetDeg: 135,
     },
   } satisfies LaserDef,
@@ -168,7 +164,6 @@ const BASE = {
       emoji: '1f5e1',
       size: 0.7,
       restOffset: 0.42,
-      // twemoji 1f5e1 刀尖朝左下
       rotationOffsetDeg: 135,
     },
   } satisfies AssassinateDef,
@@ -217,7 +212,6 @@ const BASE = {
       size: 0.48,
       radius: 0.15,
       speed: 12,
-      // twemoji 1f489 针头朝左下
       rotationOffsetDeg: 135,
     },
   } satisfies ProjectileDef,
@@ -233,13 +227,11 @@ const BASE = {
     color: 0x40c4ff,
   } satisfies ChainArcDef,
 
-  // ── 队长主动技能载荷 ──
   holyLight: {
     kind: 'rally',
     cooldownMs: 35_000,
     healRatio: 0.5,
     invulnMs: 2000,
-    // = TEAM.ringRadius + MEMBER.radius
     ringRadius: 1.25,
     color: 0xffe082,
   } satisfies RallyDef,
@@ -275,8 +267,6 @@ const BASE = {
     durationMs: 15_000,
   } satisfies TimeStopDef,
 } as const
-
-// ── 升级档位行：后缀 2 = 一阶卡，3 = 一阶 + 二阶累积 ──
 
 const tomatoThrow2 = {
   ...BASE.tomatoThrow,
@@ -364,7 +354,6 @@ const sparkleBolt3 = {
 
 const shadowStrike2 = {
   ...BASE.shadowStrike,
-  // knockback = 主斩击退 × 0.6
   onHit: [{ kind: 'blast', radius: 1.0, ratio: 0.6, knockback: 3.6 }],
 } satisfies AssassinateDef
 const shadowStrike3 = {
@@ -402,7 +391,6 @@ const fieldMedkit3 = {
 const voltArc2 = { ...BASE.voltArc, bounces: 4 } satisfies ChainArcDef
 const voltArc3 = {
   ...voltArc2,
-  // knockback = 本体击退 × 0.6
   onHit: [
     { kind: 'blast', radius: 0.9, ratio: 0.6, knockback: 1.5, ring: { color: 0x40c4ff, fillAlpha: 0.25, lineWidth: 3, lineAlpha: 0.9, durMs: 240 } },
   ],

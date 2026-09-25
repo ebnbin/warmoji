@@ -7,7 +7,6 @@ import type { CardId } from '../types/cards'
 import type { CharacterDef, UpgradeTiers } from '../types/characters'
 import type { LevelProgress } from '../types/charLevel'
 
-/** 相对权重，不必和为 1 */
 function rarityWeights(wave: number, level = 1): Record<ItemRarity, number> {
   const lv = Math.max(0, level - 1)
   const rare = Math.min(0.5, 0.06 + 0.02 * wave + 0.14 * lv)
@@ -32,7 +31,6 @@ function reachedStackLimit(owned: readonly ItemId[], id: ItemId): boolean {
   const def: ItemDef = ITEMS[id]
   return def.maxStacks !== undefined && stackCount(owned, id) >= def.maxStacks
 }
-/** 全部达上限返回 null；先按权重抽稀有度档（无货档不参与），再在档内均匀抽 */
 export function rollItem(
   pool: readonly ItemId[],
   owned: readonly ItemId[],
@@ -67,7 +65,6 @@ export function rollItem(
 function cardAtMax(owned: Readonly<Record<string, number>>, id: CardId): boolean {
   return (owned[id] ?? 0) >= CARDS[id].maxLevel
 }
-/** 互不相同、未满级；池不够时返回更少 */
 export function rollCardChoices(
   owned: Readonly<Record<string, number>>,
   rand: () => number,

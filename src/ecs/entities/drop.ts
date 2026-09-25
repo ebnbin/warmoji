@@ -12,11 +12,8 @@ export interface DropSpec {
   target: number
   x: number
   y: number
-  /** px */
   fromAbove: number
-  /** ms，视觉钟 */
   dropMs: number
-  /** ms */
   delayMs: number
 }
 

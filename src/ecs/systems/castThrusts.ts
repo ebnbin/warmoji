@@ -10,7 +10,7 @@ import type { Sim } from '../sim'
 
 export function castThrusts(sim: Sim): void {
   castScan(sim, Thrust, (e) => {
-    if (Followup.left[e]! > 0) return false // 二连突在途：本轮不另起
+    if (Followup.left[e]! > 0) return false
     const src = sourceOf(sim, e)
     if (nearestAngle(sim, src, ownerX(e), ownerY(e), reachOf(e)) === null) return false
     strike(sim, e)

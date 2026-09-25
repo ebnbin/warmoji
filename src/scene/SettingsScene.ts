@@ -38,13 +38,11 @@ const TITLE = '{2699} 设置'
 
 interface Row {
   key: keyof Settings
-  /** 相对滚动内容顶 */
   localY: number
   toggle: Phaser.GameObjects.Graphics
 }
 
 export class SettingsScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private settings!: Settings
@@ -160,7 +158,6 @@ export class SettingsScene extends Phaser.Scene {
       ])
       this.drawToggle(row)
     })
-    // Twemoji 图形许可（CC-BY 4.0）要求署名，全作只此一处
     const rowsH = SETTING_DEFS.length * (S.rowH + S.gap) - S.gap
     const licenseY = rowsH + 30
     this.list.add(

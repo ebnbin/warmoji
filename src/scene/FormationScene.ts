@@ -28,7 +28,6 @@ import {
 import type { TeamLayout } from './teamPage'
 
 export class FormationScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
@@ -50,7 +49,6 @@ export class FormationScene extends Phaser.Scene {
   }
 
   init(data?: { fromShop?: boolean }): void {
-    // Phaser 的 scene.start 不传 data 时沿用上一次的 data，故以商店确实在沉睡为准
     this.fromShop = !!data?.fromShop && this.scene.isSleeping('shop')
   }
 

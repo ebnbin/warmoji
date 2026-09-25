@@ -10,7 +10,6 @@ export interface EmojiGridItem {
   emoji: string
   outline?: OutlineKind
   badge?: string
-  /** 0..1；undefined 不显示 */
   hpRatio?: number
 }
 
@@ -21,7 +20,6 @@ interface Cell {
   bg: Phaser.GameObjects.Graphics
 }
 
-// 逻辑 px
 const GAP = 10
 
 export class EmojiGrid {
@@ -64,7 +62,6 @@ export class EmojiGrid {
     mask.fillRect(rect.x, rect.y, rect.w, rect.h)
     clipTo(this.container, mask)
 
-    // 只有这一个命中区：逐格 zone 在遮罩外照常拦截输入（遮罩不裁点击）
     scene.add
       .zone(rect.x, rect.y, rect.w, rect.h)
       .setOrigin(0)
@@ -86,7 +83,6 @@ export class EmojiGrid {
     })
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.dragMovedFlag = false
-      // 恒赋值：上一轮手势异常结束（出画布/系统打断）不能把拖动态卡住
       this.dragging = this.contains(p)
       if (this.dragging) {
         this.dragStartY = p.worldY

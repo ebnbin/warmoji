@@ -69,9 +69,6 @@ import { abilityPiercesWalls } from '../../data/abilities'
 import { spawnWeaponBody } from '../entities/weapon'
 import type { Sim } from '../sim'
 
-// 把 def 翻译成组件的唯一登记点；此后没有任何 system 读 def.kind
-
-/** 状态组件与它的清零方式：eid 复用须清零 */
 interface StateSpec {
   readonly comp: object
   reset(eid: number): void
@@ -117,9 +114,7 @@ interface AttachCtx {
 }
 
 interface KindSpec<K extends AbilityDef['kind']> {
-  /** 既是归属标记也装参数，含自己的冷却 */
   readonly comp: object & CdComp
-  /** 不列即不挂 */
   readonly state?: readonly StateSpec[]
   attach?(ctx: AttachCtx, e: number, def: Extract<AbilityDef, { kind: K }>): void
 }
@@ -279,7 +274,7 @@ const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
       Shoot.range[e] = d.range ?? 0
       Shoot.lifeMs[e] = d.lifeMs
       if (d.aim === 'move') addComponent(c.world, e, AimMove)
-      assertFree(c.world, e, Bolt, '弹丸外形组件') // 弹道与弩塔共用 Bolt，同宿主装两条就会撞
+      assertFree(c.world, e, Bolt, '弹丸外形组件')
       addComponent(c.world, e, Bolt)
       Bolt.frame[e] = c.frames.index(d.projectile.emoji, Faction.v[e] === FACTION.enemy ? 'enemyProjectile' : 'player')
       Bolt.size[e] = d.projectile.size
@@ -318,7 +313,6 @@ const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
       Turret.lifeMs[e] = d.lifeMs
       abilityArtEmoji[e] = d.turret.emoji
       Turret.size[e] = d.turret.size
-      // 塔自持的 projectile 能力从这里抄外形
       assertFree(c.world, e, Bolt, '弹丸外形组件')
       addComponent(c.world, e, Bolt)
       Bolt.frame[e] = c.frames.index(d.projectile.emoji, Faction.v[e] === FACTION.enemy ? 'enemyProjectile' : 'player')
@@ -365,7 +359,6 @@ const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
     comp: SlowAura,
     state: [PulseState, AuraState],
     attach: (c, e, d) => {
-      // 常驻光环不参与首发错峰：开局第一帧即生效
       SlowAura.cdLeft[e] = 0
       SlowAura.radius[e] = d.radius
       SlowAura.slowFactor[e] = d.slowFactor
@@ -403,42 +396,29 @@ const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
 
 export const ABILITY_COMPS: readonly (object & CdComp)[] = Object.values(KINDS).map((k) => k.comp)
 
-// ── 装备 ──
 
 
-
-// 一条能力 = 一组可挂在任何实体上的组件：有外形的挂在武器实体上，徒手的挂施放者自己
-
-/** 装备期定死；中立方全 1 */
 export interface AmpInit {
   dmg: number
   cd: number
   crit: number
   kb: number
-  /** 是否吃战场限时层的队伍乘区 */
   battle: boolean
 }
 
 export const NEUTRAL_AMP: AmpInit = { dmg: 1, cd: 1, crit: 0, kb: 1, battle: false }
 
 export interface AbilityInit {
-  /** 归属：伤害账、乘区、闸门都按它（弩塔 = 建造者） */
   owner: number
-  /** 出手位置来源（弩塔 = 它自己） */
   anchor: number
   faction: number
-  /** 首发冷却 */
   cooldownMs: number
   amp: AmpInit
-  /** 不进自动扫描 */
   manual?: boolean
-  /** 0 = 无冷却概念 */
   baseMs: number
-  /** 索敌/命中是否无视断壁遮挡 */
   piercesWalls?: boolean
 }
 
-/** 参数由调用方自己写进组件 */
 export function attachAbilityCore(
   sim: Sim,
   eid: number,
@@ -447,11 +427,8 @@ export function attachAbilityCore(
   init: AbilityInit,
 ): void {
   const world = sim.world
-  // 同一宿主不能挂两份同种能力（组件按 eid 只有一格）；需要两份就让其中一份住进自己的实体
   assertFree(world, eid, comp, 'kind 组件')
   for (const st of state) assertFree(world, eid, st.comp, '状态组件')
-  // 每宿主一份的通用组件；每条能力各一份的在 comp 与 state
-  // prettier-ignore
   addComponents(world, eid, Ability, Owner, Anchor, Faction, Amp, Frozen, Disarmed, WallBlocked, comp)
   for (const st of state) {
     addComponent(world, eid, st.comp)
@@ -473,23 +450,19 @@ export function attachAbilityCore(
   WallBlocked.v[eid] = init.piercesWalls ? 0 : 1
 }
 
-/** 已有人住即抛错 */
 function assertFree(world: EcsWorld, eid: number, comp: object, what: string): void {
   if (hasComponent(world, eid, comp)) {
     throw new Error(`实体 ${eid} 上已有这条能力的${what}：同一宿主不能挂两份同种能力，请让其中一份住进独立实体`)
   }
 }
 
-/** def.kind 只在此读一次 */
 function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: Omit<AbilityInit, 'baseMs' | 'piercesWalls'>): void {
   const spec = KINDS[def.kind]
   attachAbilityCore(sim, eid, spec.comp, spec.state ?? [], {
     ...init,
     baseMs: 'cooldownMs' in def ? def.cooldownMs : 0,
-    // 手动施放（队长技）不吃断壁遮挡
     piercesWalls: init.manual === true || abilityPiercesWalls(def),
   })
-  // 须在 Faction 之后：attach 按 Faction 挑外形
   ;(spec.attach as ((c: AttachCtx, e: number, d: AbilityDef) => void) | undefined)?.(
     { world: sim.world, frames: sim.frames },
     eid,
@@ -497,7 +470,6 @@ function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: Omit<Abilit
   )
 }
 
-/** 返回承载它的 eid：有外形的住进武器实体，徒手的挂施放者自己；owner 与 anchor 一律指施放者，武器身体不参与判定 */
 export function equipAbility(
   sim: Sim,
   host: number,
@@ -512,18 +484,14 @@ export function equipAbility(
   return carrier
 }
 
-/** 持有者离场时调；eid 会被回收，不能留孤儿 */
 export function unequipAbilities(sim: Sim, ownerEid: number): void {
   const world = sim.world
   const weapons: number[] = []
   for (const e of query(world, [Weapon, Owner])) if (Owner.eid[e] === ownerEid) weapons.push(e)
-  // 徒手能力挂在持有者自己身上，归属须连本人一起查
   const hosts = [...weapons, ownerEid]
   for (const d of query(world, [Drop, Owner])) if (hosts.includes(Owner.eid[d]!)) removeEntity(world, d)
-  // 静止地面区不挂 Owner，可活过放它的人
   for (const z of [...query(world, [ZoneFollow, Owner])]) if (hosts.includes(Owner.eid[z]!)) removeEntity(world, z)
   for (const m of [...query(world, [Minion, Owner])]) if (Owner.eid[m] === ownerEid) removeEntity(world, m)
   for (const f of [...query(world, [Flyer])]) if (weapons.includes(Flyer.of[f]!)) removeEntity(world, f)
-  // 持有者本人由调用方删
   for (const e of weapons) removeEntity(world, e)
 }

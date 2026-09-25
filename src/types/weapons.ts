@@ -11,7 +11,6 @@ export interface AbilityTier {
   readonly ability: AbilityId
   readonly card: UpgradeCard
 }
-/** 能力以 id 引用 */
 export interface WeaponSource {
   readonly name: string
   readonly emoji: string
@@ -19,7 +18,6 @@ export interface WeaponSource {
   readonly upgrades: readonly AbilityTier[]
 }
 export type WeaponId = keyof typeof weaponsJson
-/** 能力 id 已解析为 def */
 export interface WeaponDef {
   readonly name: string
   readonly emoji: string

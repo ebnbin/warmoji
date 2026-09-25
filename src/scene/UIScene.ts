@@ -24,19 +24,16 @@ export class UIScene extends Phaser.Scene implements HudInput {
   private last!: HudSnapshot
   private paused = false
   private pauseObjs: Phaser.GameObjects.GameObject[] = []
-  // 队长技能按钮
   private skillBase?: Phaser.GameObjects.Arc
   private skillEmoji?: Phaser.GameObjects.Image
   private skillMask?: Phaser.GameObjects.Graphics
   private skillCdText?: Phaser.GameObjects.Text
   private skillRing?: Phaser.GameObjects.Arc
   private skillCenter = { x: 0, y: 0 }
-  /** setDisplaySize 后的小数 scale，弹跳按它做相对缩放 */
   private skillEmojiScale = 1
   private skillWasReady = false
   private skillShownSec = -1
   private skillShownRatio = -1
-  // 战场拾取效果指示
   private fxIcons: Phaser.GameObjects.Image[] = []
   private fxBars?: Phaser.GameObjects.Graphics
   private fxKey = ''
@@ -49,7 +46,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     return this.joystick?.vector ?? { x: 0, y: 0 }
   }
 
-  /** 宿主在 create 里登记且先于 scene.launch('ui')，此处必已就位 */
   private get arena(): HudHost {
     return activeHudHost()!
   }
@@ -129,8 +125,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
       this.showPauseOverlay()
     }
   }
-
-  // ── 暂停 ────────────────────────────────────────────────────
 
   private togglePause(): void {
     if (this.paused) {
@@ -277,8 +271,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     })
   }
 
-  // ── 队长主动技能按钮（左下角）────────────────────────────────
-
   private createSkillButton(res: number): void {
     const r = 55
     const cx = safeInsets.left + r + 24
@@ -354,7 +346,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
       this.skillCdText?.setText('')
       this.skillEmoji?.setAlpha(1)
       this.skillRing?.setVisible(true)
-      // emoji 的 scale 是小数，弹跳须相对基准缩放，不能 tween 到绝对 1
       const bump = (obj: Phaser.GameObjects.GameObject | undefined, base: number): void => {
         if (!obj) return
         this.tweens.add({
@@ -370,8 +361,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     }
     this.skillRing?.setAlpha(0.5 + 0.4 * Math.sin(this.time.now / 240))
   }
-
-  // ── 战场拾取效果指示（左上角，经验条下方竖排）───────────────
 
   private createFxIndicators(): void {
     this.fxIcons = []

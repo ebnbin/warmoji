@@ -1,6 +1,5 @@
 import type { UpgradeTiers } from '../types/characters'
 
-/** 升到 2 级 / 3 级的累计经验阈值 */
 export const CHAR_XP_THRESHOLDS = [80, 320] as const
 export const MAX_CHAR_LEVEL = CHAR_XP_THRESHOLDS.length + 1
 

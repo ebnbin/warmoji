@@ -206,4 +206,3 @@ export const CHARACTERS = {
   },
 } as const satisfies Record<string, CharacterAuthoring>
 
-// ── 载体展平 ──

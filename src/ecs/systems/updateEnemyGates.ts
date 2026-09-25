@@ -4,7 +4,6 @@ import { wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
 import { isDancing } from '../utils/team'
 
-/** 「谁来开车」只在这一处决定；时停不在此处乘 */
 export function updateEnemyGates(sim: Sim): void {
   const now = sim.elapsedMs
   const until = DanceWindow.until[sim.captain]!

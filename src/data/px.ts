@@ -1,6 +1,5 @@
 import { UNIT } from '../util/units'
 
-// 数据表一律格值，进场处 toPx 一次换算成 px
 const SPATIAL = new Set([
   'knockback',
   'size',
@@ -46,7 +45,6 @@ function walk(value: unknown, key: string | null): unknown {
   return value
 }
 
-/** 深拷贝，原对象不动 */
 export function toPx<T>(value: T): T {
   return walk(value, null) as T
 }

@@ -1,12 +1,9 @@
 import type { Point } from '../../util/vec'
 
-// 朝向翻转即逆时针 90° 旋转，零拉伸；同向仅尺寸变化时长轴按比例、跨轴保持中心绝对偏移
-
 export function isHorizontal(viewW: number, viewH: number): boolean {
   return viewW >= viewH
 }
 
-/** 长轴进度以横屏右缘 = 竖屏顶缘为 0；跨轴取相对短轴中线的带符号偏移 */
 export function remapPoint(
   p: Point,
   fromW: number,
@@ -23,7 +20,6 @@ export function remapPoint(
   return { x: toW / 2 + v, y: toH * u }
 }
 
-/** 横→竖 (vx,vy)→(vy,−vx)，竖→横为其逆 */
 export function remapVector(
   v: Point,
   fromHorizontal: boolean,

@@ -6,7 +6,6 @@ export interface HitTarget {
   radius: number
 }
 
-/** 归一化到 (-π, π] */
 function wrapAngle(a: number): number {
   let r = a % (2 * Math.PI)
   if (r <= -Math.PI) r += 2 * Math.PI
@@ -14,7 +13,6 @@ function wrapAngle(a: number): number {
   return r
 }
 
-/** 目标圆与线段 [origin, origin + dir·reach] 的距离 ≤ hitRadius + 目标半径 */
 export function thrustHitIndices(
   origin: Point,
   angle: number,
@@ -38,7 +36,6 @@ export function thrustHitIndices(
   return out
 }
 
-/** 与圆心距离 ≤ radius + 目标半径 */
 export function circleHitIndices(
   center: Point,
   radius: number,
@@ -55,7 +52,6 @@ export function circleHitIndices(
   return out
 }
 
-/** 贴身目标直接命中 */
 export function sectorHitIndices(
   origin: Point,
   aimAngle: number,

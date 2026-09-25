@@ -3,6 +3,4 @@ dist/
 .vercel/
 *.log
 .DS_Store
-
-# 构建产物：由 scripts/gen-defs.ts 生成
 src/assets/

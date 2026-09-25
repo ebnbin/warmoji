@@ -49,7 +49,6 @@ export function teamLayout(w: number, h: number): TeamLayout {
   return h > w ? PORTRAIT : LANDSCAPE
 }
 
-/** rad/s */
 export const PREVIEW_SPIN = 0.18
 
 export function fitIconSize(posts: readonly { x: number; y: number }[], scale: number, base: number): number {
@@ -63,7 +62,6 @@ export function fitIconSize(posts: readonly { x: number; y: number }[], scale: n
   return Math.max(24, Math.min(base, minD * scale * 0.92))
 }
 
-/** 首波 = 队长的开局波次，可跳波 */
 export function isInitialWave(run: RunState): boolean {
   return run.wave === CAPTAINS[run.captainId].startWave
 }
@@ -72,7 +70,6 @@ export function nextAfterTeam(run: RunState): BattleSceneKey | 'shop' {
   return isInitialWave(run) && !CAPTAINS[run.captainId].firstWaveShop ? BATTLE_SCENE_KEY : 'shop'
 }
 
-/** 标题、步骤横幅与详情面板底 */
 export function addTeamFrame(
   scene: Phaser.Scene,
   L: TeamLayout,
@@ -185,7 +182,6 @@ export function addConfirmButton(
   return { bg, label: text }
 }
 
-/** 返回排完的内容底端 y */
 export function renderStatGroups(
   scene: Phaser.Scene,
   view: ScrollView,

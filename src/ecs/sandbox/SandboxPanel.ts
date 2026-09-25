@@ -40,12 +40,10 @@ import type { SteadyMark } from './perf'
 export const PILL_ICON = '1f527'
 
 const DEPTH = 320
-/** 收起时滚动区挪出画面：其监听常驻，留在原位会吞掉战场手势 */
 const OFFSCREEN = { x: -10_000, y: -10_000, w: 0, h: 0 }
 
 type SandboxTab = 'field' | 'team' | 'preset' | 'perf'
 
-// 开合与页签挂模块级：视口变化与战斗重启都会重启 SandboxScene，挂实例上会被一起重置
 let open = false
 let tab: SandboxTab = 'field'
 
@@ -66,13 +64,11 @@ export class SandboxPanel {
     private readonly scene: Phaser.Scene,
     private readonly battle: EcsBattleScene,
   ) {
-    // 只建一次：其监听挂在 scene.input 上，重建会累积
     this.view = new ScrollView(scene, OFFSCREEN)
     this.view.setDepth(DEPTH + 4)
     this.rebuild()
   }
 
-  /** 每帧调用 */
   update(time: number): void {
     if (!this.perf) return
     const h = this.perf.update(time)
@@ -104,7 +100,6 @@ export class SandboxPanel {
 
   private rebuild(): void {
     this.clearObjs()
-    // 正式局只留性能页
     if (!this.battle.sandbox && tab !== 'perf') tab = 'perf'
     if (!open) {
       this.view.setViewport(OFFSCREEN)
@@ -116,8 +111,6 @@ export class SandboxPanel {
     attachMetrics(this.scene.game)
     this.buildCard()
   }
-
-  // ── 收起态：右下角一颗 🔧 药丸 ────────────────────────────
 
   private buildPill(): void {
     const r = 34
@@ -137,8 +130,6 @@ export class SandboxPanel {
     this.objs.push(g, icon, zone)
   }
 
-  // ── 展开态：标题栏 + 页签 + 内容 ──────────────────────────
-
   private buildCard(): void {
     const res = textRes()
     const M = 12
@@ -151,7 +142,6 @@ export class SandboxPanel {
     roundRect(g, x, y, w, h, 16, {
       fill: 0x05060a, fillAlpha: 0.9, stroke: 0xffdc5d, strokeAlpha: 0.45, strokeWidth: 2,
     })
-    // 底板吞输入，否则在面板上滑动会拽动摇杆
     const blocker = this.scene.add.zone(x, y, w, h).setOrigin(0).setDepth(DEPTH + 1).setInteractive()
     this.objs.push(g, blocker)
 
@@ -236,8 +226,6 @@ export class SandboxPanel {
     })
     return h
   }
-
-  // ── 内容：各页 ────────────────────────────────────────────
 
   private buildField(res: number): number {
     let y = 0
@@ -364,9 +352,6 @@ export class SandboxPanel {
     return this.perfH
   }
 
-  // ── 控件 ──────────────────────────────────────────────────
-
-  /** 坐标相对内容顶；返回本段底部 y */
   private section(title: string, gy: number, res: number, items: readonly ChipItem[]): number {
     const maxW = this.view.viewport.w
     const gap = 6
@@ -409,7 +394,6 @@ export class SandboxPanel {
     return cy + chipH
   }
 
-  /** 返回底部 y */
   private note(gy: number, res: number, text: string): number {
     const t = this.scene.add.text(0, gy, text, {
       fontFamily: UI_FONT, fontSize: FONT.caption, color: '#9a9aa8', resolution: res,
@@ -420,9 +404,6 @@ export class SandboxPanel {
     return gy + t.height
   }
 
-  // ── 需要重开战斗场景的改动 ────────────────────────────────
-
-  /** 战斗 scene 重启会连带重启 HUD 与 SandboxScene */
   private restartWithTeam(): void {
     beginSandboxRun(this.battle.run.mapId)
     resetMetrics()

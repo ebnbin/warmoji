@@ -29,7 +29,6 @@ export function templateEmojis(template: string): string[] {
   })
 }
 
-/** 模板中 {id} 为内联 SVG 图标；文字里带 emoji 一律走这里，不用字体。origin 只作用于水平方向，垂直恒居中于 y */
 export function emojiText(
   scene: Phaser.Scene,
   x: number,
@@ -61,7 +60,6 @@ export function emojiText(
   let cursor = -total * origin
   parts.forEach((p, i) => {
     const w = widths[i]!
-    // Image 以中心定位，Text 以左边（setOrigin(0,0.5)）定位
     p.setX(p instanceof Phaser.GameObjects.Image ? cursor + w / 2 : cursor)
     cursor += w + gap
   })

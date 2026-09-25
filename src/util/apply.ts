@@ -4,12 +4,10 @@ import type { Viewport } from './viewport'
 
 export const VIEWPORT_CHANGED = 'viewport-changed'
 
-/** navigator.standalone 为 Safari 私有属性 */
 export function isStandalone(): boolean {
   return (navigator as unknown as { standalone?: boolean }).standalone === true
 }
 
-/** iOS PWA 冷启动/旋转后内容层可能钉在错误视口上（WebKit bug）：把 viewport-fit 切成 auto 再切回 cover 强制重算 */
 export function nudgeIosViewport(onDone: () => void): void {
   if (!isStandalone()) return
   const meta = document.querySelector('meta[name="viewport"]')
@@ -22,7 +20,6 @@ export function nudgeIosViewport(onDone: () => void): void {
   })
 }
 
-/** 独立 PWA 取屏幕物理尺寸按方向映射：iOS 竖屏首次布局会扣掉 Home 条且不再更新；浏览器模式取 #game 实测矩形 */
 function cssSize(): { w: number; h: number } {
   if (isStandalone()) {
     const short = Math.min(screen.width, screen.height)
@@ -51,7 +48,6 @@ export interface SafeInsets {
   left: number
 }
 
-/** 逻辑 px */
 export let safeInsets: SafeInsets = readSafeInsets(viewport.fitScale)
 
 function readSafeInsets(fitScale: number): SafeInsets {
@@ -75,7 +71,6 @@ export function applyCamera(scene: Phaser.Scene): void {
   cam.centerOn(viewport.logicalWidth / 2, viewport.logicalHeight / 2)
 }
 
-/** canvas 物理像素 = CSS × DPR；无实际变化时跳过：iOS 视口异步稳定需要多次复查，不能每次都重启场景 */
 export function refreshViewport(game: Phaser.Game, force = false): void {
   const css = cssSize()
   const next = computeViewport(css.w, css.h, window.devicePixelRatio)

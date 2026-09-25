@@ -19,7 +19,6 @@ function spawnBolt(
   art: { frame: number; size: number; speed: number; rot: number },
 ): number {
   const eid = newEntity(sim.world)
-  // prettier-ignore
   addComponents(sim.world, eid, Projectile, Transform, Vel, Proj, PrevPos, Faction, Sprite, Tint, Depth)
   Transform.x[eid] = x
   Transform.y[eid] = y
@@ -40,7 +39,6 @@ function spawnBolt(
   return eid
 }
 
-/** 外形与飞行参数取自开火那条能力的组件 */
 export function spawnProjectile(
   sim: Sim,
   src: number,
@@ -82,11 +80,9 @@ export interface EnemyShotSpec {
   speed: number
   damage: number
   lifeMs: number
-  /** 结算页按敌人名归属 */
   srcName?: string
 }
 
-/** 伤害已含 dmgMul */
 export function spawnEnemyProjectile(
   sim: Sim,
   x: number,
@@ -98,14 +94,13 @@ export function spawnEnemyProjectile(
     frame: spec.frame,
     size: spec.size,
     speed: spec.speed,
-    // 敌弹贴图恒正立
     rot: 0,
   })
   addComponent(sim.world, eid, WorldCull)
   Proj.damage[eid] = Math.round(spec.damage)
   Proj.radius[eid] = spec.radius
-  Proj.kb[eid] = 0 // 队员没有击退机制
-  Proj.srcSlot[eid] = -1 // 按名字归属
+  Proj.kb[eid] = 0
+  Proj.srcSlot[eid] = -1
   Proj.pierce[eid] = 0
   Proj.spin[eid] = 0
   Proj.dieAt[eid] = sim.elapsedMs + spec.lifeMs

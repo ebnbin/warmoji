@@ -38,26 +38,18 @@ import { liveOnes } from '../utils/turret'
 interface MinionSpec {
   tag: object
   emoji: string
-  /** 世界像素 */
   size: number
-  /** 出生尺寸倍率：<1 即带入场弹入，1 = 直接到位 */
   bornScale: number
   x: number
   y: number
   z: number
-  /** ms，世界钟；0 = 不按时限 */
   lifeMs: number
-  /** 弧度 */
   phase: number
-  /** ms */
   cd: number
-  /** 部件动画的相位错峰（ms）；省略即保持静态帧 */
   animOffsetMs?: number
-  /** 由建造方在回调里挂自持能力 */
   arm?: (minion: number) => void
 }
 
-/** 阵营与描边随武器走 */
 function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
   const outline = holderOutline(Faction.v[weaponEid]!, Owner.eid[weaponEid]!)
   const m = newEntity(sim.world)
@@ -88,8 +80,6 @@ function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
   return m
 }
 
-// ── 小蜂 ──────────────────────────────────────────────────
-
 export function spawnBee(sim: Sim, e: number, index: number): void {
   const count = Summon.count[e]!
   spawnMinion(sim, e, {
@@ -107,16 +97,10 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
   })
 }
 
-// ── 弩塔 ──
-
-/** 超编被拆的退场动画时长（ms，视觉钟） */
 export const RETIRE_MS = 240
-/** 入场弹入时长（ms，视觉钟） */
 export const POP_MS = 220
-/** 首发延迟 */
 const FIRST_SHOT_MS = 200
 
-/** 参数从建造它的武器的组件里抄；Burst 即塔的 Volley */
 function armTurret(sim: Sim, weapon: number, m: number): void {
   attachAbilityCore(sim, m, Shoot, [
     { comp: Aim, reset: (x) => { Aim.rad[x] = 0 } },
@@ -149,7 +133,6 @@ function armTurret(sim: Sim, weapon: number, m: number): void {
 }
 
 export function place(sim: Sim, e: number): void {
-  // 须先数在役数，否则会把新座算进去
   const live = liveOnes(sim, e)
   spawnMinion(sim, e, {
     tag: Emplacement,
@@ -166,7 +149,6 @@ export function place(sim: Sim, e: number): void {
     arm: (m) => armTurret(sim, e, m),
   })
   playSfx('recruit')
-  // 不含刚架的这座
   let over = live.length + 1 - Turret.maxTurrets[e]!
   while (over-- > 0) {
     let oldest = -1
@@ -174,7 +156,7 @@ export function place(sim: Sim, e: number): void {
     if (oldest < 0) break
     addComponent(sim.world, oldest, Retiring)
     Retiring.until[oldest] = sim.fxMs + RETIRE_MS
-    removeComponent(sim.world, oldest, Ability) // Disarmed 会被闸门每帧重置，须摘 Ability
+    removeComponent(sim.world, oldest, Ability)
     live.splice(live.indexOf(oldest), 1)
   }
 }

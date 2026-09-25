@@ -17,7 +17,6 @@ export interface CardDef {
   readonly desc: string
   readonly rarity: ItemRarity
   readonly tags: readonly CardTag[]
-  /** 1 = 唯一；每级把 effects 再叠加一次 */
   readonly maxLevel: number
   readonly effects: Partial<TeamEffects>
 }

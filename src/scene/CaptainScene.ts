@@ -43,7 +43,6 @@ const PORTRAIT: CaptainLayout = {
 }
 
 export class CaptainScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private selectedId: CaptainId = PICKABLE_CAPTAIN_IDS[0]!

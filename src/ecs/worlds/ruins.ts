@@ -1,17 +1,14 @@
 import { norm } from '../../util/vec'
 import type { Point } from '../../util/vec'
 
-/** cellPx = 每格世界像素边长 */
 export class WallGrid {
   constructor(
     readonly cols: number,
     readonly rows: number,
     readonly cellPx: number,
-    /** 行优先 blocked[y * cols + x]，可变 */
     readonly blocked: boolean[],
   ) {}
 
-  /** 越界忽略；返回是否发生变化 */
   setBlocked(cx: number, cy: number, value: boolean): boolean {
     if (cx < 0 || cx >= this.cols || cy < 0 || cy >= this.rows) return false
     const i = cy * this.cols + cx
@@ -26,7 +23,6 @@ export class WallGrid {
   cellY(worldY: number): number {
     return Math.floor(worldY / this.cellPx)
   }
-  /** 越界视为通行 */
   isBlockedCell(cx: number, cy: number): boolean {
     if (cx < 0 || cx >= this.cols || cy < 0 || cy >= this.rows) return false
     return this.blocked[cy * this.cols + cx]!
@@ -35,7 +31,6 @@ export class WallGrid {
     return this.isBlockedCell(this.cellX(x), this.cellY(y))
   }
 
-  /** 不撞返回 null；Amanatides–Woo 网格步进 */
   segmentHit(ax: number, ay: number, bx: number, by: number): Point | null {
     const cs = this.cellPx
     const x = ax / cs
@@ -73,7 +68,6 @@ export class WallGrid {
     return null
   }
 
-  /** 圆与挡格重叠时逐格沿最短方向推出：贴墙即滑动，陷进墙里也能脱出 */
   separateCircle(x: number, y: number, r: number): Point {
     const cs = this.cellPx
     let px = x
@@ -99,7 +93,6 @@ export class WallGrid {
           py += (dy / d) * (r - d)
           continue
         }
-        // 圆心在格内：沿穿透最浅的一侧推出
         const left = px - lx
         const right = hx - px
         const up = py - ly
@@ -114,7 +107,6 @@ export class WallGrid {
     return { x: px, y: py }
   }
 
-  /** 目标格被挡就分轴放行 */
   resolveMove(fromX: number, fromY: number, toX: number, toY: number): Point {
     let nx = toX
     let ny = toY
@@ -126,7 +118,6 @@ export class WallGrid {
   }
 }
 
-/** 4 连通 */
 export function reachableCells(grid: WallGrid, startCx: number, startCy: number): Set<number> {
   const out = new Set<number>()
   if (grid.isBlockedCell(startCx, startCy)) return out
@@ -153,7 +144,6 @@ export function reachableCells(grid: WallGrid, startCx: number, startCy: number)
   return out
 }
 
-/** 从目标格 BFS 出距离场 */
 export class FlowField {
   private readonly dist: Int32Array
 
@@ -198,7 +188,6 @@ export class FlowField {
     return v < 0 ? Infinity : v
   }
 
-  /** 8 邻，斜向禁穿墙角；不可达或已在目标返回 {0,0} */
   sampleDir(x: number, y: number): Point {
     const cx = this.grid.cellX(x)
     const cy = this.grid.cellY(y)
@@ -258,7 +247,6 @@ export function generateRuins(
       for (let xx = x0; xx < x0 + w; xx++) set(xx, yy)
     }
   }
-  // 中心留空，保证出生连通
   const r2 = opts.centerClearU * opts.centerClearU
   for (let cy = 0; cy < rows; cy++) {
     for (let cx = 0; cx < cols; cx++) {

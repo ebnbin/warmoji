@@ -12,7 +12,6 @@ let enabled = true
 let active = 0
 const stats = { baked: 0, played: 0 }
 
-/** 噪声种子固定，可复现 */
 function render(audio: AudioContext, def: SfxDef): AudioBuffer {
   const n = Math.max(1, Math.round(def.duration * SAMPLE_RATE))
   const buf = audio.createBuffer(1, n, SAMPLE_RATE)
@@ -60,7 +59,6 @@ function render(audio: AudioContext, def: SfxDef): AudioBuffer {
   return buf
 }
 
-/** 音效与 BGM 共用；无 WebAudio 时返回 undefined */
 export function ensureAudio(): AudioContext | undefined {
   try {
     if (!ctx) {
@@ -80,12 +78,10 @@ export function ensureAudio(): AudioContext | undefined {
   }
 }
 
-/** 不触发创建 */
 export function audioCtx(): AudioContext | undefined {
   return ctx
 }
 
-/** 幂等 */
 export function initSfx(): void {
   const unlock = (): void => {
     ensureAudio()

@@ -59,7 +59,6 @@ export class ResultScene extends Phaser.Scene {
   private palette?: Palette
   private run!: RunState
   private win = false
-  /** 视口重启不重复提交 */
   private submitted = false
   private best = { newBest: false, bestWave: 0, bestKills: 0 }
   private againRect = { x: 0, y: 0, w: 0, h: 0 }
@@ -186,7 +185,6 @@ export class ResultScene extends Phaser.Scene {
         .text(tx, ty, text, { fontFamily: UI_FONT, fontSize: FONT.small, color, resolution: res })
         .setOrigin(0.5)
     }
-    // 表头用绝对坐标，数据行用滚动内容局部坐标
     label(x + w * 0.43, y + headerH / 2 + 4, '伤害')
     label(x + w * 0.55, y + headerH / 2 + 4, '承伤')
     label(x + w * 0.65, y + headerH / 2 + 4, '击杀')
@@ -393,7 +391,6 @@ export class ResultScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
     const zone = this.add.zone(rect.x, rect.y, rect.w, rect.h).setOrigin(0)
-    // 防死亡瞬间误触
     this.time.delayedCall(500, () => {
       if (!zone.active) return
       zone.setInteractive({ useHandCursor: true }).on('pointerup', () => {

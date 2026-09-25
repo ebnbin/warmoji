@@ -1,15 +1,12 @@
 import type { Rng } from './rng'
 
 export interface Palette {
-  /** 左上 */
   bgFrom: string
-  /** 右下 */
   bgTo: string
   map: number
   shadow: number
 }
 
-/** h: 0-360, s/l: 0-1 → 0xRRGGBB */
 export function hslToInt(h: number, s: number, l: number): number {
   const c = (1 - Math.abs(2 * l - 1)) * s
   const hp = (((h % 360) + 360) % 360) / 60

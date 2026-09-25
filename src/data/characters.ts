@@ -47,7 +47,6 @@ export const CHARACTERS = Object.fromEntries(
 ) as Record<CharacterId, CharacterDef>
 export const ROSTER_IDS = Object.keys(CHARACTERS) as readonly CharacterId[]
 
-/** 无该档时停留在已有的最高档 */
 function carrierAbility(c: Carrier, level: 0 | 1 | 2): AbilityDef {
   return c.tiers[Math.min(level, c.tiers.length - 1)]!
 }
@@ -61,7 +60,6 @@ export function baseLoadout(def: CharacterDef): readonly AbilityDef[] {
   return def.carriers.map((c) => c.tiers[0]!)
 }
 
-/** 同档多载体的卡文案由 gen 校验一致 */
 export function upgradeCardsFor(def: CharacterDef): readonly [UpgradeCard, UpgradeCard] {
   const pick = (k: 0 | 1): UpgradeCard => {
     for (const c of def.carriers) {

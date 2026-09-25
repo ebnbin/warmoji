@@ -1,9 +1,6 @@
 import type { ItemDef } from '../src/types/items'
 
-// upgradeXp 约定：普通 10~15、稀有 24~28、史诗 52~56
-
 export const ITEMS = {
-  // ── 通用池 · 普通（15~35）──
   gemHeart: {
     emoji: '2764',
     name: '生命宝石',
@@ -79,7 +76,6 @@ export const ITEMS = {
     upgradeXp: 12,
     effects: { reviveAddMs: -2000 },
   },
-  // ── 通用池 · 稀有（40~55）──
   regenRing: {
     emoji: '1f48d',
     name: '再生戒指',
@@ -124,7 +120,6 @@ export const ITEMS = {
     upgradeXp: 24,
     effects: { knockbackMul: 1.35 },
   },
-  // ── 通用池 · 史诗（90~130）──
   fateDice: {
     emoji: '1f3b2',
     name: '命运骰子',
@@ -161,7 +156,6 @@ export const ITEMS = {
     minLevel: 2,
     effects: { iframesAddMs: 400 },
   },
-  // ── 能力形态专属池（普通） ──
   blastPowder: {
     emoji: '1f4a5',
     name: '扩爆火药',

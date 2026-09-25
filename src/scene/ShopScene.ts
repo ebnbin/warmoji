@@ -65,7 +65,6 @@ const PORTRAIT: ShopLayout = {
 }
 
 export class ShopScene extends Phaser.Scene {
-  // 视口变化触发的 restart 置真，保留页面状态
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
@@ -83,7 +82,6 @@ export class ShopScene extends Phaser.Scene {
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private buyRect = { x: 0, y: 0, w: 0, h: 0 }
   private refreshRect = { x: 0, y: 0, w: 0, h: 0 }
-  /** 沉睡期间视口变过，唤醒时重排 */
   private wakeDirty = false
   private quitArmed = false
   private slotScroll = 0
@@ -229,7 +227,6 @@ export class ShopScene extends Phaser.Scene {
         if (!this.dragMoved && !this.grid.wasDragged) this.refreshFocused()
       })
 
-    // 只创建一次，renderOfferCard 复用
     this.offerDescView = new ScrollView(
       this,
       { x: dx + 88, y: cardY + 42, w: this.refreshRect.x - (dx + 88) - 12, h: 52 },
@@ -293,8 +290,6 @@ export class ShopScene extends Phaser.Scene {
     })
   }
 
-  // ── 上架/购买 ───────────────────────────────────────────────
-
   private levelOf(slot: number): number {
     return characterLevel(characterXp(this.run.memberItems[slot] ?? []))
   }
@@ -308,7 +303,6 @@ export class ShopScene extends Phaser.Scene {
     return (this.run.memberItems[slot] ??= [])
   }
 
-  /** -1 = 无效 */
   private focusedIndex(): number {
     return this.lineup.indexOf(this.focusedId)
   }
@@ -332,7 +326,6 @@ export class ShopScene extends Phaser.Scene {
     const afterLevel = this.levelOf(idx)
     this.offers[idx] = rollItem(this.poolFor(idx), owned, Math.random, this.run.wave, afterLevel)
     this.refresh()
-    // 须在 refresh 之后，盖在最上层
     if (afterLevel > beforeLevel) this.showLevelUp(idx, afterLevel)
   }
 
@@ -353,8 +346,6 @@ export class ShopScene extends Phaser.Scene {
     const owned = this.run.memberItems[slot] ?? []
     return memberMaxHp(aggregateCharacterEffects(owned, levelStatsFor(id, this.levelOf(slot))).hpAdd)
   }
-
-  // ── 上架位网格（每个出战角色一个；形象即含义，角标 = 当前上架道具） ──
 
   private buildSlotItems(): { key: string; emoji: string; outline: 'player'; badge?: string; hpRatio?: number }[] {
     return this.lineup.map((id, slot) => {
@@ -404,8 +395,6 @@ export class ShopScene extends Phaser.Scene {
     this.statsScroll = Math.max(0, Math.min(this.statsMax, y))
     this.statsContainer.y = -this.statsScroll
   }
-
-  // ── 属性面板 + 上架道具卡 ──────────────────────────────────
 
   private renderDetail(res: number): void {
     for (const o of this.detailObjs) o.destroy()
@@ -657,7 +646,6 @@ export class ShopScene extends Phaser.Scene {
     )
   }
 
-  /** 只列有变化的轴 */
   private formatEffects(fx: Partial<CharacterEffects>): string {
     const parts: string[] = []
     if (fx.hpAdd) parts.push(`生命 ${fx.hpAdd > 0 ? '+' : ''}${fx.hpAdd}`)
@@ -778,7 +766,6 @@ export class ShopScene extends Phaser.Scene {
     this.scene.start(BATTLE_SCENE_KEY)
   }
 
-  /** 须先入睡再启动阵型页：阵型页的 init 以商店在沉睡验证 fromShop */
   private openFormation(): void {
     playSfx('click')
     this.scene.sleep()
@@ -795,7 +782,6 @@ export class ShopScene extends Phaser.Scene {
   }
 
   private onViewportChanged(): void {
-    // 沉睡中不能 restart，会顶掉上层页面；唤醒时补排
     if (this.scene.isSleeping()) {
       this.wakeDirty = true
       return

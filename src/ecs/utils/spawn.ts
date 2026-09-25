@@ -2,7 +2,6 @@ import type { Rng } from '../../util/rng'
 import { dist2 } from '../../util/vec'
 import type { Point } from '../../util/vec'
 
-/** 距边缘 ≥ inset，距 avoid ≥ minDist；拒绝采样最多 20 次，全拒则返回最后一次 */
 export function randomMapPoint(
   rng: Rng,
   width: number,

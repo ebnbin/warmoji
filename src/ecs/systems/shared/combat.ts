@@ -26,25 +26,21 @@ export function applyDamage(
   srcSlot = -1,
   crit = false,
 ): void {
-  // 已离场或休眠即早退，防重复计击杀
   if (!hasComponent(sim.world, eid, Enemy) || Dormant.v[eid]) return
   const def = enemyDef[eid]
   const morphed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
   const dmg = morphed && Morph.vuln[eid] !== 1 ? Math.round(damage * Morph.vuln[eid]!) : damage
-  // 致死一击也飘字
   spawnDamageNumber(sim, Transform.x[eid]!, Transform.y[eid]!, dmg, crit)
   const hp = Hp.v[eid]! - dmg
   const st = sim.run.stats
   if (srcSlot >= 0 && srcSlot < st.damage.length) {
     st.damage[srcSlot] = (st.damage[srcSlot] ?? 0) + Math.min(dmg, Math.max(0, Hp.v[eid]!))
   }
-  // 变形期击退免疫失效
   const kbImmune = def?.kbImmune === true && !morphed
   if (hp <= 0) {
     let flingVx = 0
     let flingVy = 0
     if (knockback > 0 && srcX !== undefined && srcY !== undefined && !kbImmune) {
-      // 方向走世界差
       const d = sim.hooks.worldDelta(sim, srcX, srcY, Transform.x[eid]!, Transform.y[eid]!)
       const dir = norm(d.x, d.y)
       flingVx = dir.x * knockback
@@ -92,7 +88,6 @@ function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flingVy = 0
   if (boss) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 24, kind: 'death' })
   if (boss) sim.bossDown = true
   if (def) grantKillRewards(sim, eid, def, elite)
-  // 变形中死亡不触发亡语与失巢暴走
   const hexed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
   if (!hexed && def?.onDeath) {
     const snap = { eid: -1, def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: DmgMul.v[eid]! }
@@ -130,7 +125,6 @@ function gainTeamXp(sim: Sim, amount: number): void {
   }
 }
 
-/** rng 每杀固定取两次，勿调整取用次序 */
 function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean): void {
   const xpMul = sim.reward.captainXpMul * (elite ? ELITE.xpMul : 1)
   gainTeamXp(sim, Math.round(def.xp * xpMul))
@@ -144,7 +138,6 @@ function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean):
   if (total > 0) dropCoins(sim, Transform.x[eid]!, Transform.y[eid]!, total)
 }
 
-/** rage = false 只解链接，不给失巢暴走加成 */
 function orphanBrood(sim: Sim, nestEid: number, rage = true): void {
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     if (Nest.of[eid] !== nestEid) continue
@@ -156,7 +149,6 @@ function orphanBrood(sim: Sim, nestEid: number, rage = true): void {
   }
 }
 
-/** 不计击杀、不掉落、不放死亡效果 */
 export function despawnEnemy(sim: Sim, eid: number, puff = true): void {
   if (puff) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
   if (enemyDef[eid]?.spawner) orphanBrood(sim, eid)
@@ -166,7 +158,6 @@ export function despawnEnemy(sim: Sim, eid: number, puff = true): void {
   removeEntity(sim.world, eid)
 }
 
-/** 无敌帧由调用方掌管 */
 export function hurtCharacter(sim: Sim, eid: number, damage: number, srcName?: string, tint = 0xff7777): void {
   const st = sim.run.stats
   const slot = Slot.v[eid]!
@@ -188,7 +179,6 @@ export function hurtCharacter(sim: Sim, eid: number, damage: number, srcName?: s
     Tint.alpha[eid] = 0.35
     const deaths = sim.run.stats.deaths
     if (slot >= 0 && slot < deaths.length) deaths[slot] = (deaths[slot] ?? 0) + 1
-    // 尸体定格
     Anim.frames[eid] = -1
     Anim.onceFrames[eid] = 0
     Transform.rot[eid] = 0
@@ -203,14 +193,13 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   const now = sim.elapsedMs
   playSfx('revive')
   Alive.v[eid] = 1
-  Anim.frames[eid] = 0 // 解除停帧哨兵
+  Anim.frames[eid] = 0
   CharHp.hp[eid] = CharHp.max[eid]!
   Iframe.last[eid] = now
   Tint.color[eid] = 0xffffff
   Tint.alpha[eid] = 1
   Tint.effect[eid] = 0
   Pop.until[eid] = sim.fxMs + 200
-  // 弹入首帧即从小尺寸起
   Transform.w[eid] = MEMBER.size * UNIT * 0.3
   Transform.h[eid] = MEMBER.size * UNIT * 0.3
 }

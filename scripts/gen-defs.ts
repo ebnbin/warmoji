@@ -46,7 +46,6 @@ write('combat', COMBAT)
 write('feel', FEEL)
 write('economy', ECONOMY)
 
-// ordering.txt 与 twemoji.txt 逐行对应，只拷贝不改写
 mkdirSync('src/assets/emoji', { recursive: true })
 for (const name of ['ordering.txt', 'twemoji.txt']) {
   copyFileSync(`scripts/emoji/${name}`, `src/assets/emoji/${name}`)

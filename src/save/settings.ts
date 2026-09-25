@@ -1,12 +1,10 @@
 import type { StringStorage } from '../util/storage'
 
-// 新增选项须同步：Settings 字段 + DEFAULT_SETTINGS 默认值 + SETTING_DEFS 一行
 export interface Settings {
   damageNumbers: boolean
   hitShake: boolean
   sound: boolean
   bgm: boolean
-  /** 肤色变体是否展示；component 不受影响 */
   showSkinTone: boolean
 }
 
@@ -37,7 +35,6 @@ export const SETTING_DEFS: readonly SettingDef[] = [
 
 const KEY = 'warmoji.settings.v1'
 
-/** 逐字段取合法值，缺省回退默认 */
 function sanitizeSettings(raw: unknown): Settings {
   const obj = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
   const pick = (k: SettingKey): boolean =>
@@ -64,6 +61,5 @@ export function saveSettings(storage: StringStorage | undefined, settings: Setti
   try {
     storage?.setItem(KEY, JSON.stringify(settings))
   } catch {
-    // 隐私模式/配额写入失败可忽略
   }
 }

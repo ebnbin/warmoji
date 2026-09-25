@@ -8,7 +8,6 @@ import type { BattleEffects, FieldPickupDef } from '../../types/battlefield'
 import type { Sim } from '../sim'
 
 
-/** 同 id 只刷新计时不叠加 */
 export function spawnModifier(sim: Sim, def: FieldPickupDef): number {
   for (const e of [...query(sim.world, [Modifier])]) {
     if (modDef[e]?.id === def.id) removeEntity(sim.world, e)
@@ -21,7 +20,6 @@ export function spawnModifier(sim: Sim, def: FieldPickupDef): number {
   return eid
 }
 
-/** 按施加先后排序：查询集的物理次序不稳定 */
 export function activeMods(sim: Sim): number[] {
   const born = (e: number): number => Lifetime.until[e]! - Modifier.totalMs[e]!
   return [...query(sim.world, [Modifier, Lifetime])].sort((a, b) => born(a) - born(b) || a - b)

@@ -3,7 +3,6 @@ import { Dormant, ENEMY_SET, EnemyPhase, EState, Morph, Sprite, Step, Transform 
 import type { Sim } from '../sim'
 import { isDancing } from '../utils/team'
 
-/** EState 2/3、蹦迪与变形不在此覆盖；翻转读禁锢前的本帧位移 */
 export function animateEnemies(sim: Sim): void {
   const delta = sim.wdtMs
   const now = sim.elapsedMs

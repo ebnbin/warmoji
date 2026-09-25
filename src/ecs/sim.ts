@@ -36,77 +36,52 @@ import type { EcsAtlas } from './atlas'
 export interface Sim {
   world: EcsWorld
   teamDir: { x: number; y: number }
-  /** 0..1，供时停时标 */
   moveInputRaw: number
-  /** 队伍中心即它的 Transform */
   captain: number
   formation: FormationId
   count: number
-  /** 槽位 → 岗位 */
   postBySlot: number[]
-  /** 槽位 → 环上秉性 */
   lineupOrbit: number[]
-  /** 按槽位序 */
   characters: number[]
   mapId: import('../types/maps').MapId
   mapW: number
   mapH: number
   hooks: WorldHooks
-  /** 只有 hooks 写；场景侧读来画，并排空 walls.smashed */
   worldState: WorldState
-  /** 场景侧每帧回填 */
   view: { x: number; y: number; right: number; bottom: number }
   elapsedMs: number
-  /** 纯视觉时钟：真实帧长累加，不吃时停，过场冻结期照走 */
   fxMs: number
-  /** 帧起点写一次，system 一律从这里读。dtMs 真实帧长（走位/视觉）；wdtMs 世界时长（敌人/弹体/刷怪），时停期更慢 */
   dtMs: number
   wdtMs: number
   over: boolean
   bossDown: boolean
-  /** 场景侧据增量触发震屏 */
   characterHitCount: number
-  /** 世界时长；>0 时世界时标随移动量放缩 */
   timeStopMsLeft: number
-  /** 移动量的低通平滑值，worldTimeScale 的输入 */
   chrono: number
-  /** 派生值：由在场限时层实体折出 */
   battleFx: BattleEffects
-  /** 开局定；与 battleFx.enemySlowMul 相乘 */
   enemySlowMul: number
-  /** 每帧重建 */
   frameAttractors: { x: number; y: number; r2: number }[]
-  /** 每帧重建，含环面镜像坐标；我方索敌不走快照，见 utils/targets.ts */
   characterTargets: Target[]
   frames: FrameIndex
-  /** 按 run 种子与波次确定：同一局同一波可复现，各波不同 */
   rng: Rng
   sandbox: boolean
   spawnCooldownMs: number
-  /** 帧内通道，runDeathEffects 排空 */
   pendingDeaths: PendingDeath[]
-  /** 仿真只写，场景侧每帧排空 */
   out: Outbox
-  /** 设置里关掉伤害数字时为 null：仿真不写 */
   damageNumbers: DamageNumbers | null
-  /** 挂上则在 killEnemy 内当场跑，否则回落到 pendingDeaths */
   onDeathFx?: (d: PendingDeath) => void
   run: RunState
-  /** 开局定；精英倍率逐杀再叠 */
   reward: RewardConfig
 }
 
 interface RewardConfig {
-  /** 队长 × 道具；精英逐杀再叠 */
   captainXpMul: number
   doubleCoinChance: number
   waveHealRatio: number
   waveCoins: number
 }
 
-/** 实体已移除，死亡效果按此在死亡点重放 */
 export interface PendingDeath {
-  /** 当场重放时死者仍在世；延后重放时为 -1 */
   eid: number
   def: import('../types/enemies').EnemyDef
   x: number
@@ -117,23 +92,20 @@ export interface PendingDeath {
 }
 
 export function initialLayout(sim: Sim): void {
-  sim.dtMs = 0 // 0 帧长：人直接到位
+  sim.dtMs = 0
   layoutTeam(sim)
   animateCharacters(sim)
 }
 
-/** 移动量 [0,1] → 流速 [floor,1]，线性 */
 function timeScaleFor(input01: number): number {
   const t = input01 < 0 ? 0 : input01 > 1 ? 1 : input01
   return TIMESTOP.floor + (1 - TIMESTOP.floor) * t
 }
 
-/** 时停窗口外恒 1 */
 export function worldTimeScale(sim: Sim): number {
   return sim.timeStopMsLeft > 0 ? timeScaleFor(sim.chrono) : 1
 }
 
-/** 过场冻结期：世界全停，纯视觉照旧收尾；随世界钟走的过渡直接到位 */
 export function stepFrozenVisuals(sim: Sim): void {
   sim.fxMs += sim.dtMs
   updateShards(sim)
@@ -148,17 +120,14 @@ export function stepFrozenVisuals(sim: Sim): void {
   updateEmplacements(sim)
 }
 
-/** 帧长由场景在帧起点写进 sim；次序见 pipeline/sim.ts */
 export function stepSim(sim: Sim): void {
   sim.elapsedMs += sim.wdtMs
   sim.fxMs += sim.dtMs
   if (sim.timeStopMsLeft > 0) sim.timeStopMsLeft = Math.max(0, sim.timeStopMsLeft - sim.wdtMs)
-  // moveInputRaw 由 moveTeam 写，供下一帧读
   sim.chrono += (sim.moveInputRaw - sim.chrono) * Math.min(1, sim.dtMs / TIMESTOP.easeMs)
   runPipeline(SIM_PIPELINE, sim)
 }
 
-/** 队长实体先建，再建角色实体 */
 export function makeSim(
   world: EcsWorld,
   atlas: EcsAtlas,

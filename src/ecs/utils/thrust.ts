@@ -6,7 +6,6 @@ export function reachOf(e: number): number {
   return Thrust.reach[e]! + Thrust.hitRadius[e]!
 }
 
-/** 0→1→0，两程都走 Sine.easeOut */
 export function lungeT(sim: Sim, e: number, thrustMs: number): number {
   const half = thrustMs / 2
   if (Swing.durMs[e] === 0 || half <= 0) return 0

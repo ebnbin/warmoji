@@ -16,7 +16,6 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Phaser loader 对单文件失败不中断（complete 照常触发），以缓存缺席为准
     const ordering = this.cache.text.get('emoji-ordering') as string | undefined
     const bundle = this.cache.text.get('emoji-bundle') as string | undefined
     if (ordering === undefined || bundle === undefined) {
@@ -30,7 +29,6 @@ export class PreloadScene extends Phaser.Scene {
       this.fail('资源解析失败，请刷新重试')
       return
     }
-    // 单个纹理烘焙失败不拦：console.error 由 e2e 捕获
     loadEmojiTextures(this, PRELOAD_EMOJIS, OUTLINED_EMOJIS)
       .catch((err) => console.error(`emoji 纹理加载失败: ${String(err)}`))
       .finally(() => this.scene.start('menu'))

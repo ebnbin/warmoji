@@ -3,9 +3,6 @@ import { TAP_SLOP } from '../util/units'
 import { emojiThumbKey, requestEmojiThumb } from '../emoji/thumbs'
 import { clipTo } from '../util/mask'
 
-// 环形缓冲复用固定数量 Image：slot = index % poolSize。
-// 惯性驱动挂场景 UPDATE，SHUTDOWN 时自摘：scene.events 不随 restart 清空
-
 const CELL = 72
 const ICON = 70
 
@@ -33,11 +30,9 @@ export class VirtualEmojiGrid {
   private dragging = false
   private dragMoved = false
   private pressIn = false
-  /** 按下时正在惯性滚动：只截停，不算点击 */
   private stopPress = false
   private dragStartY = 0
   private dragStartScroll = 0
-  // px/ms
   private flingV = 0
   private lastMoveY = 0
   private lastMoveT = 0
@@ -79,11 +74,9 @@ export class VirtualEmojiGrid {
     })
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.dragMoved = false
-      // 阈值 0.35 ≈ 每帧 6px：衰减尾巴的余速不能吃掉点击
       this.stopPress = Math.abs(this.flingV) >= 0.35
       this.flingV = 0
       this.pressIn = this.contains(p)
-      // 恒赋值：异常结束的上一轮手势不能把 dragging 卡在 true
       this.dragging = this.pressIn
       if (this.pressIn) {
         this.dragStartY = p.worldY
@@ -95,7 +88,6 @@ export class VirtualEmojiGrid {
     scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dy = this.dragStartY - p.worldY
-      // 不可滚动时不判拖
       if (this.max > 0 && Math.abs(dy) > TAP_SLOP) this.dragMoved = true
       if (this.dragMoved) {
         this.scrollTo(this.dragStartScroll + dy)
@@ -105,7 +97,6 @@ export class VirtualEmojiGrid {
         this.lastMoveT = scene.time.now
       }
     })
-    // pointerupoutside 与 touchcancel 都不发 pointerup；dragging 不清会让之后每次按下都被判截停
     scene.input.on('pointerup', this.release, this)
     scene.input.on('pointerupoutside', this.release, this)
 
@@ -174,13 +165,11 @@ export class VirtualEmojiGrid {
   }
 
   private onUpdate(_time: number, delta: number): void {
-    // touchcancel 不发 up 事件：按指针实况解除拖动
     if (this.dragging && !this.scene.input.activePointer.isDown) this.release()
     if (this.flingV === 0 || this.dragging) return
     const next = this.scroll + this.flingV * delta
     this.scrollTo(next)
     this.flingV *= Math.exp(-delta / 320)
-    // 0.05 ≈ 每帧 1px
     if (Math.abs(this.flingV) < 0.05 || next <= 0 || next >= this.max) {
       this.flingV = 0
     }
@@ -213,7 +202,6 @@ export class VirtualEmojiGrid {
       slot.image.setPosition(cx, cy).setTexture(hit).setDisplaySize(ICON, ICON).setAlpha(alpha).setVisible(true)
       return
     }
-    // 异步回填前校验格子仍绑着同一条目且清单未换
     slot.image.setVisible(false)
     void requestEmojiThumb(this.scene, cp).then((key) => {
       if (!key || slot.boundIndex !== index || this.keys[index] !== cp || !this.scene.sys.isActive()) return

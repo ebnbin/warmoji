@@ -14,13 +14,11 @@ import { Due, Telegraph, Transform } from '../components'
 import { query, removeEntity } from 'bitecs'
 import type { Sim } from '../sim'
 
-/** 非昼夜图恒 1 */
 function spawnIntervalScale(sim: Sim): number {
   const dn = dayNightOf(sim)
   return dn ? (isDayAt(dn.hour) ? dn.cfg.daySpawnScale : dn.cfg.nightSpawnScale) : 1
 }
 
-/** 只补勾选的敌人，且只生成本图会出现的 */
 function spawnSandbox(sim: Sim): void {
   const d = spawnParams()
   sim.spawnCooldownMs = d.intervalMs
@@ -42,7 +40,6 @@ export function spawnStep(sim: Sim): void {
   const atlas = sim.frames
   const delta = sim.wdtMs
   const now = sim.elapsedMs
-  // 迭代中会建实体，须先快照
   for (const e of [...query(sim.world, [Telegraph, Due])]) {
     if (now < Due.at[e]!) continue
     const boss = Telegraph.boss[e] === 1

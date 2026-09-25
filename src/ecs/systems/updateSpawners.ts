@@ -22,10 +22,9 @@ export function updateSpawners(sim: Sim): void {
   const eids = query(sim.world, ENEMY_SET as unknown as object[])
   let active = awakeCount(sim)
   for (const eid of eids) {
-    if (Dormant.v[eid]) continue // 休眠的巢不产子
+    if (Dormant.v[eid]) continue
     const spawner = enemyDef[eid]?.spawner
     if (!spawner) continue
-    // 压制期既不产子也不推进计时
     if (isDancing(sim)) continue
     if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue
     if (now < Nest.nextSpawnAt[eid]!) continue
@@ -35,6 +34,6 @@ export function updateSpawners(sim: Sim): void {
     if (room <= 0) continue
     const n = Math.min(spawner.count, room)
     spawnBrood(sim, atlas, spawner.into, n, Transform.x[eid]!, Transform.y[eid]!, 0.6 * UNIT, eid)
-    active += n // 同帧后面的巢看得到刚产的子敌
+    active += n
   }
 }

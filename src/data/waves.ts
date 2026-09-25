@@ -13,7 +13,6 @@ export function waveAt(elapsedSec: number): WaveState {
   }
 }
 
-/** 超出表的波次映射回 [loopFrom, 末波] 循环 */
 function cycleWave(wave: number): number {
   const last = WAVE.durationsSec.length
   if (wave <= last) return wave
@@ -29,7 +28,6 @@ export function isEliteWave(wave: number): boolean {
   return WAVE.eliteWaves.includes(cycleWave(wave))
 }
 
-/** 无尽循环里每圈一次 */
 export function isBossWave(wave: number): boolean {
   return cycleWave(wave) === WAVE.durationsSec.length
 }
@@ -56,7 +54,6 @@ const COIN_ECON = {
   dropChanceHalfLifeSec: P.coinDropChanceHalfLifeSec,
 } as const
 
-/** 1 → dropChanceMin，按累计战斗时长指数衰减 */
 export function coinDropChance(combatSec: number): number {
   const t = Math.exp(-Math.max(0, combatSec) / COIN_ECON.dropChanceHalfLifeSec)
   return COIN_ECON.dropChanceMin + (1 - COIN_ECON.dropChanceMin) * t

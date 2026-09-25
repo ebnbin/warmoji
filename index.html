@@ -7,7 +7,6 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>WarMoji</title>
-    <!-- theme-color 是初始值，运行时随背景渐变更新 -->
     <meta name="theme-color" content="#292f33" />
     <meta name="color-scheme" content="dark" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -20,7 +19,6 @@
       href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>"
     />
     <style>
-      /* 安全区变量供 JS 读取 */
       :root {
         color-scheme: dark;
         --safe-top: env(safe-area-inset-top, 0px);
@@ -32,7 +30,6 @@
       body {
         margin: 0;
         padding: 0;
-        /* iOS 独立 PWA 下 100% 不含 Home 条区域，须用 dvh */
         height: 100%;
         height: 100dvh;
         background: #292f33;

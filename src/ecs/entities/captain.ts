@@ -13,7 +13,6 @@ import { Alive, Captain, DanceWindow, Magnet, MoveSpeed, Orbit, Slot, TeamDamage
 import type { EcsWorld } from '../world'
 
 
-/** moveSpeed / magnetRadius 已含道具与卡牌乘区 */
 export function spawnCaptain(
   world: EcsWorld,
   x: number,
@@ -25,7 +24,7 @@ export function spawnCaptain(
   addComponents(world, eid, Captain, Transform, Slot, Alive, MoveSpeed, Magnet, Orbit, TeamDamage, DanceWindow)
   Transform.x[eid] = x
   Transform.y[eid] = y
-  Slot.v[eid] = -1 // 伤害不分账到任何槽位
+  Slot.v[eid] = -1
   Alive.v[eid] = 1
   MoveSpeed.v[eid] = moveSpeed
   Magnet.radius[eid] = magnetRadius
@@ -54,7 +53,6 @@ export function formTeam(
   const rosterIds = run.roster
   const count = rosterIds.length
   const formation = sandbox ? 'ring' : currentFormation(run)
-  // 护卫序下 slot ≠ post
   const order = sandbox || !hasCenter(run) ? null : guardOrder(run)
   const postBySlot = rosterIds.map((id, slot) => {
     if (!order) return slot

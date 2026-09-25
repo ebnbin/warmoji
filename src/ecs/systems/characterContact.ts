@@ -18,20 +18,19 @@ export function characterContact(sim: Sim): void {
     const my = Transform.y[m]!
     const hr = Hurt.radius[m]!
     for (const eid of enemies) {
-      if (Dormant.v[eid]) continue // 休眠者不判
+      if (Dormant.v[eid]) continue
       const rr = hr + Radius.v[eid]!
       const d = sim.hooks.worldDelta(sim, mx, my, Transform.x[eid]!, Transform.y[eid]!)
       if (d.x * d.x + d.y * d.y > rr * rr) continue
       const def = enemyDef[eid]
       if (!def) continue
-      if (def.damage <= 0) continue // damage = 0 的诱饵尸壳无害
-      if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue // 变形期无害
+      if (def.damage <= 0) continue
+      if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue
       Iframe.last[m] = now
       hurtCharacter(sim, m, Math.max(1, Math.round(def.damage * DmgMul.v[eid]!)), def.name)
       if (CharPerk.thorns[m]! > 0 && hasComponent(sim.world, eid, Enemy)) {
         applyDamage(sim, eid, CharPerk.thorns[m]!, 0, undefined, undefined, Slot.v[m]!)
       }
-      // onContact 只含伤害之外的效果，伤害已在上面结算
       if (def.onContact && def.onContact.length > 0) {
         applyAbilityEffects(sim, enemySource(def.name, 1), def.onContact, {
           x: mx,
@@ -40,7 +39,7 @@ export function characterContact(sim: Sim): void {
           targets: [m],
         })
       }
-      break // 一帧一员只吃一次
+      break
     }
   }
 }

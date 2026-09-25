@@ -25,19 +25,16 @@ function packDeferred(): Promise<EmojiPack> {
   return packPromise
 }
 
-/** 幂等；解析失败即抛错 */
 export function primeEmojiPack(orderingText: string, twemojiText: string): void {
   const pack = parseEmojiPack(orderingText, twemojiText)
   void packDeferred()
   resolvePack?.(pack)
 }
 
-/** primeEmojiPack 之前保持等待 */
 export function loadEmojiPack(): Promise<EmojiPack> {
   return packDeferred()
 }
 
-/** 未收录即抛错；viewBox 统一 pad 成 48 标准的唯一注入点 */
 export async function emojiSvgText(id: string): Promise<string> {
   const pack = await loadEmojiPack()
   const svg = packSvg(pack, id)
@@ -45,7 +42,6 @@ export async function emojiSvgText(id: string): Promise<string> {
   return padSvg(svg, EMOJI_PAD)
 }
 
-/** LRU 上限只约束非预载部分 */
 export function emojiCacheStats(scene: Phaser.Scene): { textures: number } {
   return {
     textures: scene.textures.getTextureKeys().filter((k) => k.startsWith('emoji-')).length,
@@ -63,7 +59,6 @@ export function emojiKey(id: string, outline?: OutlineKind): string {
   return `emoji-${id}${outline ? KIND_SUFFIX[outline] : ''}`
 }
 
-/** 尺寸由 SVG 自身的 width/height 决定 */
 export async function svgToImage(svgText: string): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }))
   try {
@@ -91,7 +86,6 @@ async function createTexture(scene: Phaser.Scene, id: string, outline?: OutlineK
   return key
 }
 
-/** 并发去重 */
 export function ensureEmoji(scene: Phaser.Scene, id: string, outline?: OutlineKind): Promise<string> {
   const key = emojiKey(id, outline)
   lastUsed.set(key, ++useTick)
@@ -120,7 +114,6 @@ function evictIfNeeded(scene: Phaser.Scene): void {
   }
 }
 
-/** 预载纹理不参与 LRU 淘汰 */
 export async function loadEmojiTextures(
   scene: Phaser.Scene,
   preload: readonly string[],
@@ -136,7 +129,6 @@ export async function loadEmojiTextures(
         .then((key) => {
           pinned.add(key)
         })
-        // console.error 让 e2e 的无报错断言能捕获资源缺失
         .catch((err) => console.error(`emoji 纹理加载失败: ${String(err)}`)),
     ),
   )

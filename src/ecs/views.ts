@@ -31,36 +31,24 @@ const WATER_VIGNETTE = 0x1e6fd0
 const BANK_COLOR = 0x54402a
 const BANK_FAR_COLOR = 0x40301f
 
-// 每张图一份视觉实现，scene 只认 MapView 接口。视觉状态挂实例字段，不得挂模块级（跨局残留）
-
-/** 视图只建自己的视觉，不指挥场景 */
 export interface ViewCtx {
   readonly scene: Phaser.Scene
   readonly world: EcsWorld
   readonly run: RunState
   readonly def: MapDef
-  /** 相机跟随目标 */
   readonly anchor: Phaser.GameObjects.Zone
-  /** layout() 之后由场景回填 */
   w: number
   h: number
-  /** 场景回填；未就位时为 undefined */
   atlas?: EcsAtlas
 }
 
 export interface MapView {
-  /** 最先调用 */
   layout(v: ViewCtx): { w: number; h: number; origin: Point }
-  /** 图集尚未就位，不能建实体 */
   build(v: ViewCtx): void
-  /** 在 anchor 就位之后 */
   camera(v: ViewCtx): void
-  /** 图集就位后 */
   decor(v: ViewCtx, atlas: EcsAtlas): void
-  /** sim 建好、hooks.onStart 跑完后 */
   onSimReady(v: ViewCtx, sim: Sim): void
   step(v: ViewCtx, sim: Sim, delta: number): void
-  /** 视口变化后；v.w/v.h 已按新 layout() 回填 */
   resize(v: ViewCtx): void
   destroy(v: ViewCtx): void
 }
@@ -68,7 +56,6 @@ export interface MapView {
 const CAM_MARGIN = () => MAP.cameraMargin * UNIT
 
 class BoundedView implements MapView {
-  /** 视口重建时整体销毁 */
   protected visuals: Phaser.GameObjects.GameObject[] = []
   protected decorEids: number[] = []
 
@@ -132,26 +119,22 @@ class BoundedView implements MapView {
   }
 }
 
-/** 视口变化即整体重建 */
 abstract class SingleScreenView extends BoundedView {
   resize(v: ViewCtx): void {
     this.destroy(v)
     this.build(v)
     this.camera(v)
-    // destroy 拆掉了装饰实体，须在此补回
     if (v.atlas) this.decor(v, v.atlas)
   }
 }
 
 
-// ── 晨昏 ──
 class DayNightView extends BoundedView {
   private fogRect?: Phaser.GameObjects.Rectangle
   private fogMask?: Phaser.GameObjects.Graphics
 
   build(v: ViewCtx): void {
     super.build(v)
-    // Phaser 4 的 GeometryMask 在 WebGL 无实现，须走 filters.internal.addMask
     const rect = v.scene.add.rectangle(0, 0, FOG_SPAN, FOG_SPAN, FOG_COLOR, 0).setDepth(FOG_DEPTH).setVisible(false)
     const shape = v.scene.add.graphics().setVisible(false)
     rect.enableFilters()
@@ -177,7 +160,6 @@ class DayNightView extends BoundedView {
   }
 }
 
-// ── 浮冰 ──
 class IceView extends BoundedView {
   private vignette?: Phaser.GameObjects.Rectangle
 
@@ -217,7 +199,6 @@ class IceView extends BoundedView {
   }
 }
 
-// ── 无限世界 ──
 class InfiniteView extends BoundedView {
   protected atlas?: EcsAtlas
   private zoneGfx?: Phaser.GameObjects.Graphics
@@ -227,7 +208,7 @@ class InfiniteView extends BoundedView {
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
     const { w, h } = super.layout(v)
-    return { w, h, origin: { x: 0, y: 0 } } // 负坐标合法
+    return { w, h, origin: { x: 0, y: 0 } }
   }
 
   build(v: ViewCtx): void {
@@ -244,7 +225,6 @@ class InfiniteView extends BoundedView {
     v.scene.cameras.main.startFollow(v.anchor)
   }
 
-  /** 不一次铺完；由 step 按相机位置分块增删 */
   decor(_v: ViewCtx, atlas: EcsAtlas): void {
     this.atlas = atlas
   }
@@ -277,7 +257,6 @@ class InfiniteView extends BoundedView {
     if (this.zoneVignette) setOverlayFill(this.zoneVignette, 0xd32f2f, anyOutside ? 0.16 + 0.08 * Math.sin(sim.elapsedMs / 130) : 0)
   }
 
-  /** 摆放由 (种子, 块) 纯函数决定，回头看到的景不变 */
   private ensureChunks(v: ViewCtx): void {
     const atlas = this.atlas
     if (!atlas) return
@@ -324,7 +303,6 @@ class InfiniteView extends BoundedView {
   }
 }
 
-// ── 深空 ──
 class SpaceView extends InfiniteView {
   private meteorFx?: { of: number; tele: Phaser.GameObjects.Graphics }
 
@@ -353,7 +331,6 @@ class SpaceView extends InfiniteView {
     this.drawMeteorLane(v, sim)
   }
 
-  /** 车道按 eid 跟随横扫实体 */
   private drawMeteorLane(v: ViewCtx, sim: Sim): void {
     const m = query(v.world, [Meteor])[0]
     const fx = this.meteorFx
@@ -388,9 +365,7 @@ class SpaceView extends InfiniteView {
   }
 }
 
-// ── 残垣 ──
 class RuinsView extends BoundedView {
-  /** 格索引 → 石块视觉，碾墙时单格销毁 */
   private tiles = new Map<number, Phaser.GameObjects.Rectangle[]>()
 
   onSimReady(v: ViewCtx, sim: Sim): void {
@@ -436,7 +411,6 @@ class RuinsView extends BoundedView {
   }
 }
 
-// ── 奔流 ──
 class RiverView extends SingleScreenView {
   private waveTiles: { tile: Phaser.GameObjects.TileSprite; speed: number }[] = []
 
@@ -484,7 +458,6 @@ class RiverView extends SingleScreenView {
       gWater.fillRect(r.x + r.w / 2, r.y, r.w / 2, r.h)
     }
 
-    // 种子固定，同局重建不变
     const gFoam = add.graphics().setDepth(0.4)
     this.visuals.push(gFoam)
     gFoam.lineStyle(2, 0xffffff, 0.3)
@@ -531,7 +504,6 @@ class RiverView extends SingleScreenView {
     const def = v.def.decor
     const decorRng = new Rng(v.run.decorSeed)
 
-    // 种子固定，只落在岸带内
     const bands: [number, number][] = horizontal
       ? [
           [0, r.y],
@@ -612,7 +584,6 @@ class RiverView extends SingleScreenView {
   }
 }
 
-// ── 工厂 ──
 class TorusView extends SingleScreenView {
   private mirrorCams: Phaser.Cameras.Scene2D.Camera[] = []
   private frameTiles: { tile: Phaser.GameObjects.TileSprite; dx: number; dy: number }[] = []
@@ -667,7 +638,6 @@ class TorusView extends SingleScreenView {
     this.visuals.push(this.frameGlow)
   }
 
-  /** 主相机取景整块场地；另 8 台同视口的相机各错开一整张图，补画越过四缝与四角的溢出，多大都画全 */
   camera(v: ViewCtx): void {
     const cw = Math.round(viewport.cssWidth * viewport.dpr)
     const ch = Math.round(viewport.cssHeight * viewport.dpr)
@@ -679,7 +649,6 @@ class TorusView extends SingleScreenView {
     cam.centerOn(v.w / 2, v.h / 2)
     const W = v.w
     const H = v.h
-    // 取景 [W, 2W) 的相机把越过右缝的部分画在左侧，其余同理
     for (const dx of [-1, 0, 1]) {
       for (const dy of [-1, 0, 1]) {
         if (dx === 0 && dy === 0) continue
@@ -689,12 +658,10 @@ class TorusView extends SingleScreenView {
         this.mirrorCams.push(c)
       }
     }
-    // 须在建完错位相机之后：ignore 是逐相机的，否则缝上重影
     for (const c of this.mirrorCams) c.ignore(this.visuals)
   }
 
   decor(v: ViewCtx, atlas: EcsAtlas): void {
-    // 种子固定，同局重建不变
     const def = v.def.decor
     const rng = new Rng(v.run.decorSeed)
     const cells = (v.w / UNIT) * (v.h / UNIT)
@@ -742,7 +709,6 @@ class TorusView extends SingleScreenView {
   }
 }
 
-/** 幂等，全局纹理缓存 */
 function ensureWaveTexture(scene: Phaser.Scene, horizontal: boolean): string {
   const key = horizontal ? 'river-wave-h' : 'river-wave-v'
   if (scene.textures.exists(key)) return key
@@ -774,7 +740,6 @@ function ensureWaveTexture(scene: Phaser.Scene, horizontal: boolean): string {
   return key
 }
 
-/** 幂等 */
 function ensureDashTexture(scene: Phaser.Scene, cfg: TorusConfig): void {
   const size = 64
   const th = Math.round(cfg.frame * UNIT)

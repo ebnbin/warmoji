@@ -3,7 +3,6 @@ import economyJson from '../assets/economy.json'
 import type { CharacterEffects, TeamEffects, Economy, ItemRarity, ItemDef, ItemId } from '../types/items'
 import type { AbilityDef } from '../types/abilityDefs'
 
-/** 叠加的单位元 */
 const TEAM_FX_IDENTITY: TeamEffects = {
   moveSpeedMul: 1,
   magnetMul: 1,
@@ -38,17 +37,12 @@ export const ITEMS = itemsJson as unknown as Record<ItemId, ItemDef>
 
 export const ITEM_IDS = Object.keys(ITEMS) as readonly ItemId[]
 
-// ── 池推导 ──
-
-// ── 持有与购买 ──
-
 export function characterXp(owned: readonly ItemId[]): number {
   let xp = 0
   for (const id of owned) xp += ITEMS[id].upgradeXp
   return xp
 }
 
-/** ITEMS.price 是基准价，展示与扣款都走 itemPrice */
 const PRICE = ECON.price
 
 export function itemPrice(id: ItemId, wave: number): number {
@@ -57,9 +51,6 @@ export function itemPrice(id: ItemId, wave: number): number {
   return Math.max(1, Math.round(ITEMS[id].price * inflate * disc))
 }
 
-// ── 效果叠加 ──
-
-/** extra：角色等级形态的基础属性片段，与道具同一条叠加管线 */
 export function aggregateCharacterEffects(
   owned: readonly ItemId[],
   extra: readonly Partial<CharacterEffects>[] = [],
@@ -130,9 +121,6 @@ export function foldTeamEffects(parts: readonly Partial<TeamEffects>[]): TeamEff
   return fx
 }
 
-// ── 能力参数修正 ──
-
-/** 只缩放空间参数与弹速；伤害/冷却由运行时倍率处理，此处不得再乘 */
 export function resolveAbilityDef(w: AbilityDef, fx: CharacterEffects): AbilityDef {
   const r = fx.rangeMul
   switch (w.kind) {

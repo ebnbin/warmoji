@@ -15,7 +15,6 @@ function commitHash(): string {
 
 export default defineConfig({
   build: {
-    // SVG 须以文件产出：Phaser 经 XHR 加载，内联 data URI 不可靠
     assetsInlineLimit: 0,
   },
   define: {

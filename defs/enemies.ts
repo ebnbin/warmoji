@@ -111,7 +111,6 @@ const SNAKE: EnemyDef = {
       damage: 5,
       cooldownMs: 2600,
       knockback: 0,
-      // 须大于 standoffDist
       range: 8,
       lifeMs: 4500,
       projectile: { emoji: '1f7e2', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
@@ -481,8 +480,6 @@ const ENEMY_DEFS: readonly EnemyDef[] = [
   COMET,
 ]
 
-// ── Boss ──
-
 const FOREST_BOSS: EnemyDef = {
   kind: 'treant',
   role: 'boss',
@@ -745,7 +742,6 @@ const SPACE_BOSS: EnemyDef = {
   ],
 }
 
-/** 顺序即图鉴展示顺序 */
 export const ENEMIES = Object.fromEntries(
   [...ENEMY_DEFS, FOREST_BOSS, DESERT_BOSS, RIVER_BOSS, FACTORY_BOSS, RUINS_BOSS, DAYNIGHT_BOSS, SPACE_BOSS].map((e) => [e.kind, e]),
 ) as Record<string, EnemyDef>

@@ -3,8 +3,6 @@ import { TAP_SLOP } from '../util/units'
 import { clipTo, markDirty } from '../util/mask'
 import { roundRect } from './shapes'
 
-// 几何遮罩只裁像素不裁输入：滚出视口的交互子项仍会拦截点击，故每次滚动按可视矩形逐子项开关 input
-
 export interface ScrollRect {
   x: number
   y: number
@@ -20,7 +18,6 @@ function clampScroll(y: number, max: number): number {
   return Math.max(0, Math.min(max, y))
 }
 
-/** max <= 0 表示无需滚动条 */
 function thumbGeom(
   rect: ScrollRect,
   contentHeight: number,
@@ -34,7 +31,6 @@ function thumbGeom(
 }
 
 export class ScrollView {
-  /** 子项坐标以内容顶为原点 */
   readonly content: Phaser.GameObjects.Container
 
   private rect: ScrollRect
@@ -42,7 +38,6 @@ export class ScrollView {
   private max = 0
   private contentHeight = 0
   private maskGfx: Phaser.GameObjects.Graphics
-  /** 改了矩形要 markDirty */
   private mask?: Phaser.Filters.Mask
   private bar?: Phaser.GameObjects.Graphics
   private dragging = false
@@ -76,7 +71,6 @@ export class ScrollView {
     })
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.dragMovedFlag = false
-      // 恒赋值：上一轮手势异常结束（出画布/系统打断）不能把拖动态卡住
       this.dragging = this.contains(p)
       if (this.dragging) {
         this.dragStartY = p.worldY
@@ -117,7 +111,6 @@ export class ScrollView {
     return this
   }
 
-  /** 填完子项后调用 */
   setContentHeight(h: number): void {
     this.contentHeight = Math.max(0, h)
     this.max = maxScrollOf(this.contentHeight, this.rect.h)

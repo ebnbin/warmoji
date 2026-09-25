@@ -60,7 +60,6 @@ import type { Burst } from './outbox'
 import { rollWaveCarriers } from './utils/battleFx'
 import { centerX, centerY } from './utils/team'
 
-/** Boss 倒下到结算的视觉等待，让碎块飞散可见 */
 const BOSS_SETTLE_MS = 700
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
@@ -86,22 +85,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private ready = false
   sandbox = false
   run!: RunState
-  /** 开局定 */
   private teamFx!: TeamEffects
-  /** 置位后 update 早退 */
   private ending = false
-  /** 本波开场基线，波末取增量 */
   private waveBaseKills = 0
   private waveBaseCoins = 0
   private waveBaseLevel = 1
   private hpBars: Phaser.GameObjects.Graphics[] = []
   private shownHp: number[] = []
-  /** 仅整秒变化时重设文本 */
   private deadTexts: Phaser.GameObjects.Text[] = []
   private shownCountdown: number[] = []
   private hitShakeOn = false
   private seenHitCount = 0
-  /** Boss 倒下时的 fxMs；-1 = 未倒下 */
   private bossDownAt = -1
   private damageText?: DamageTextLayer
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -114,14 +108,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
   private mapW = 0
   private mapH = 0
-  /** 每次 create 递增；boot 等完图集后据此判断自己是否已过期 */
   private bootGen = 0
 
   constructor() {
     super(BATTLE_SCENE_KEY)
   }
 
-  /** Phaser 跨局复用同一个 Scene 实例，可变字段须在此重置 */
   private resetSceneFields(): void {
     this.atlas = undefined
     this.cues = undefined
@@ -194,12 +186,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       if (gen === this.bootGen) hint.setText('战斗启动失败，请暂停后结束本局')
     })
 
-    setActiveHudHost(this) // 须先登记再拉起 HUD
+    setActiveHudHost(this)
     this.scene.launch('ui')
     this.scene.launch(SANDBOX_SCENE_KEY)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.bootGen++ // 在途的 boot 作废
+      this.bootGen++
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.scene.stop('ui')
       this.scene.stop(SANDBOX_SCENE_KEY)
@@ -209,13 +201,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.damageText?.destroy()
       this.map.destroy(this.ctx)
     })
-
-    // ESC 已绑定在 UIScene 上，此处不得再接
   }
 
   private async boot(gen: number, run: RunState, hint: Phaser.GameObjects.Text): Promise<void> {
     const atlas = await EcsAtlas.build(this, OUTLINED_EMOJIS, PLAIN_EMOJIS)
-    // 场景关闭或重开后本次 boot 作废；暂停不作废
     if (gen !== this.bootGen) return
     this.atlas = atlas
     resetEntityStorage()
@@ -230,14 +219,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
     this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
-    // 出生点以 centerObj 为准：开局前的视口变化只挪它
     const center = { x: this.centerObj.x, y: this.centerObj.y }
     this.sim = makeSim(this.world, atlas, run, run.sandbox, center, this.mapW, this.mapH, settings.damageNumbers)
     if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
     initialLayout(this.sim)
     this.sim.hooks.onStart(this.sim)
     this.map.onSimReady(this.ctx, this.sim)
-    // 亡语须同步重放：同帧先死者的治疗要救得到同伴
     const simRef = this.sim
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
     armTeam(this.sim, run, run.sandbox)
@@ -274,7 +261,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
         spawnSurge(sim)
       })
     }
-    // 先开终波机关，再预告投放 Boss
     if (!run.sandbox && isBossWave(run.wave)) {
       this.sim.hooks.onFinalWave(this.sim)
       this.time.delayedCall(600, () => {
@@ -293,7 +279,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   }
 
 
-  /** 每种事件一条 drain，收信人没准备好也清空 */
   private drainOutbox(): void {
     const out = this.sim!.out
     drain(out.collects, (defs) => {
@@ -315,7 +300,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
   }
 
-  /** 比例变化才重绘 */
   private updateHpBars(): void {
     const sim = this.sim!
     for (let i = 0; i < sim.characters.length; i++) {
@@ -351,8 +335,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       g.fillRect(-w / 2 + 1, y + 1, (w - 2) * ratio, 4)
     }
   }
-
-  // ── HudHost ──
 
   hudSnapshot(): HudSnapshot {
     const sim = this.sim
@@ -408,7 +390,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
   castSkill(): boolean {
     const sim = this.sim
-    // ending 期间放技能只会白白重置 CD
     if (!sim || sim.over || this.ending || this.run.skillCdMs > 0) return false
     const s = CAPTAINS[this.run.captainId].skill
     this.run.skillCdMs = s.cdMs * this.teamFx.skillCdMul
@@ -430,7 +411,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
 
 
-  /** 世界尺寸变了才整体重映射 */
   private onViewportChanged(): void {
     const sim = this.sim
     const fromW = this.mapW
@@ -464,7 +444,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
 
 
-  /** 均匀撒在本波中前段；第 1 波不出 */
   private scheduleCarriers(): void {
     const sim = this.sim
     if (!sim || this.run.wave < 2) return
@@ -506,7 +485,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.damageText?.step(sim.fxMs)
       return
     }
-    // 越线帧只模拟到时限为止，世界时间恰好停在波末
     const leftMs = this.sandbox ? Infinity : waveDurationMs(sim.run.wave) - sim.elapsedMs
     const lastFrame = sim.wdtMs >= leftMs
     if (lastFrame) sim.wdtMs = leftMs
@@ -516,7 +494,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const ky =
       (held(this.cursors?.up) || held(this.wasd?.W) ? -1 : 0) +
       (held(this.cursors?.down) || held(this.wasd?.S) ? 1 : 0)
-    // 技能冷却按真实时钟推进，不随时停拖长
     this.run.skillCdMs = tickSkillCd(this.run.skillCdMs, delta)
 
     const keyed = kx !== 0 || ky !== 0
@@ -530,25 +507,22 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     sim.view.right = wv.right
     sim.view.bottom = wv.bottom
     stepFrame(sim)
-    // 特效层先 step 再排空（step 写入本帧视觉钟）；排空须先于过场判定
     this.cues?.step(sim.fxMs)
     this.rings?.step(sim.fxMs)
     this.damageText?.step(sim.fxMs)
     this.drainOutbox()
-    // 须先于过场判定
     if (sim.characterHitCount > this.seenHitCount) {
       this.seenHitCount = sim.characterHitCount
       if (this.hitShakeOn) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     }
     this.updateHpBars()
     if (!this.sandbox && sim.bossDown) {
-      // 这段延迟内不置 ending，世界照常运转
       sim.bossDown = false
       this.bossDownAt = sim.fxMs
     }
     if (sim.over) {
       this.ending = true
-      this.run.combatMs += sim.elapsedMs // 败局也计入
+      this.run.combatMs += sim.elapsedMs
       playSfx('over')
       this.time.delayedCall(900, () => this.scene.start('result', { win: false }))
       return
@@ -558,7 +532,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
     if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
-    // 结算只在 stepFrame 之后：此前挂上的技能请求都已施放；须在全灭判定之后，时限内全灭判负
     const bossSettle = this.bossDownAt >= 0 && sim.fxMs - this.bossDownAt >= BOSS_SETTLE_MS
     if (lastFrame || bossSettle) this.scheduleWaveEnd(settleWave(sim))
   }

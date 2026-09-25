@@ -12,7 +12,7 @@ import type { Sim } from '../sim'
 export function updateBees(sim: Sim): void {
   const dt = sim.wdtMs
   for (const b of [...query(sim.world, [Swarmer, Minion, Built, Transform])]) {
-    if (!hasComponent(sim.world, b, Minion)) continue // 同波的前一只自毁时连带回收了它
+    if (!hasComponent(sim.world, b, Minion)) continue
     const e = Built.by[b]!
     if (Frozen.v[e]) {
       Tint.alpha[b] = 0
@@ -23,14 +23,12 @@ export function updateBees(sim: Sim): void {
       removeEntity(sim.world, b)
       continue
     }
-    // 追镜像目标可能出图：每帧先回绕
     const at = sim.hooks.wrap(sim, Transform.x[b]!, Transform.y[b]!)
     const bx = at.x
     const by = at.y
     const src = sourceOf(sim, e)
     const target = pickTarget(sim, src, bx, by)
     Minion.phase[b] = Minion.phase[b]! + (Math.min(dt, 50) / 1000) * 3
-    // 待机绕持有者的最近镜像
     const home = sim.hooks.worldDelta(
       sim,
       bx,

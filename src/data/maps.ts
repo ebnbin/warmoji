@@ -13,7 +13,6 @@ export function bossFor(id: MapId): EnemyDef {
   return ENEMIES[MAPS[id].boss]!
 }
 
-/** 含衍生子代；按出现序去重，子代紧随亲代，Boss 末位 */
 export function mapEnemyRoster(id: MapId): EnemyDef[] {
   const seen = new Set<string>()
   const out: EnemyDef[] = []
@@ -32,9 +31,6 @@ export function mapEnemyRoster(id: MapId): EnemyDef[] {
   return out
 }
 
-// ── 装饰散布 ──
-
-/** 返回 (xU, yU) → 0..1；晶格取自同一 rand 流，同种子同摆放 */
 function noiseField(
   rand: () => number,
   cols: number,
@@ -61,7 +57,6 @@ function noiseField(
   }
 }
 
-/** 按 run 种子生成，同局各波不变 */
 export function rollDecor(
   def: MapDecor,
   rand: () => number,

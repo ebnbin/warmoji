@@ -3,7 +3,6 @@ import { Dormant, ENEMY_SET, EState, Flash, Poison, Tint, ZoneSlow } from '../co
 import type { Sim } from '../sim'
 import { isDancing } from '../utils/team'
 
-/** 优先级：蹦迪粉 > 中毒毒绿 > 蓄力橙 > 减速冷蓝 > 常态白 */
 export function tintEnemies(sim: Sim): void {
   const now = sim.elapsedMs
   const dancing = isDancing(sim)

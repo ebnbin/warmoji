@@ -7,7 +7,6 @@ import { } from '../utils/ease'
 import type { Sim } from '../sim'
 import { centerX, centerY } from '../utils/team'
 
-/** 只管人站在哪；纯表现在 animateCharacters */
 export function layoutTeam(sim: Sim): void {
   const delta = sim.dtMs
   const posts = formationPosts(sim.formation, sim.count, Orbit.phase[sim.captain]!)
@@ -30,7 +29,6 @@ export function layoutTeam(sim: Sim): void {
     let fy = Follow.y[eid]!
     let fvx = Follow.vx[eid]!
     let fvy = Follow.vy[eid]!
-    // 目标取离跟随点最近的镜像
     const td = sim.hooks.worldDelta(sim, fx, fy, rawX, rawY)
     const tx = fx + td.x
     const ty = fy + td.y
@@ -60,7 +58,6 @@ export function layoutTeam(sim: Sim): void {
     Transform.x[eid] = fx + VisOff.x[eid]!
     Transform.y[eid] = fy + VisOff.y[eid]!
     const guarded = sim.formation === 'guard' && idx === 0
-    // 纵深按世界差
     Depth.z[eid] = guarded ? 8.5 : 10 + sim.hooks.worldDelta(sim, centerX(sim), centerY(sim), fx, fy).y / UNIT
   }
 }

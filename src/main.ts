@@ -34,12 +34,9 @@ setSfxEnabled(loadSettings(browserStorage()).sound)
 setBgmEnabled(loadSettings(browserStorage()).bgm)
 
 const game = new Phaser.Game({
-  // 只支持 WebGL：拿不到的浏览器在 boot.ts 就被拦下
   type: Phaser.WEBGL,
   parent: 'game',
-  // 背景渐变画在 canvas 之下，canvas 须透明
   transparent: true,
-  // mipmap 依赖 emoji 纹理为 2 次幂尺寸。pixelArt 沿用 Phaser 3 的默认判据 zoom !== 1
   render: { mipmapFilter: 'LINEAR_MIPMAP_LINEAR', pixelArt: viewport.dpr !== 1 },
   width: Math.round(viewport.cssWidth * viewport.dpr),
   height: Math.round(viewport.cssHeight * viewport.dpr),
@@ -50,7 +47,6 @@ const game = new Phaser.Game({
 
 game.events.once(Phaser.Core.Events.READY, () => {
   refreshViewport(game, true)
-  // iOS PWA 冷启动后视口尺寸异步稳定
   for (const delay of [0, 100, 500, 1000]) {
     window.setTimeout(() => nudgeIosViewport(() => refreshViewport(game)), delay)
   }
@@ -65,7 +61,6 @@ game.events.once(Phaser.Core.Events.READY, () => {
   }
 })
 
-// iOS 旋转/启动后视口尺寸异步稳定且不补发 resize
 let resizeTimer: number | undefined
 const scheduleRefresh = (): void => {
   window.clearTimeout(resizeTimer)

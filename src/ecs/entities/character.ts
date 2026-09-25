@@ -25,13 +25,10 @@ import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
 
 export interface CharacterPlacement {
-  /** 伤害分账、道具归属、跨波血量都按它索引 */
   slot: number
-  /** 可与 slot 不同 */
   post: number
   x: number
   y: number
-  /** 格 */
   depthOffsetY: number
   hurtRadiusMul: number
 }
@@ -93,7 +90,6 @@ export function spawnCharacter(
   CharAtkSlow.until[eid] = 0
   CharAtkSlow.mul[eid] = 1
   const owned = sandbox ? [] : (run.memberItems[slot] ?? [])
-  // 等级须与能力侧同源
   const level = sandbox ? sandboxLevel() + 1 : characterLevel(characterXp(owned))
   const fx = aggregateCharacterEffects(owned, levelStatsFor(run.roster[slot]!, level))
   const maxHp = sandbox ? sandboxHp : Math.round(memberMaxHp(fx.hpAdd, captain.hpMul) * teamFx.teamHpMul)
@@ -104,7 +100,7 @@ export function spawnCharacter(
   CharPerk.regenPerSec[eid] = fx.regenPerSec
   Iframe.ms[eid] = MEMBER.iframesMs + fx.iframesAddMs
   Iframe.last[eid] = -1e9
-  GroundHit.last[eid] = -1e9 // 开局就踩进毒圈也该当场掉第一跳
+  GroundHit.last[eid] = -1e9
   Revive.ms[eid] = Math.max(1000, TEAM.reviveMs * captain.reviveMul * teamFx.reviveMul + fx.reviveAddMs)
   Revive.at[eid] = 0
   Hurt.radius[eid] = MEMBER.radius * UNIT * place.hurtRadiusMul

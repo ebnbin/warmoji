@@ -9,7 +9,6 @@ export function requestCast(sim: Sim, ownerEid: number): void {
   }
 }
 
-/** 冷却至少推迟 ms */
 export function postponeAbilities(sim: Sim, ownerEid: number, ms: number): void {
   for (const comp of ABILITY_COMPS) {
     for (const e of query(sim.world, [Ability, comp, Owner])) {

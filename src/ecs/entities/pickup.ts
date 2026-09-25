@@ -30,35 +30,24 @@ import { backEaseOut, sineEaseInOut } from '../utils/ease'
 
 interface PickupSpec {
   emoji: string
-  /** 显示尺寸(px) */
   size: number
   z: number
-  /** 磁吸半径(px);0 = 不磁吸 */
   pull: number
-  /** 拾取半径(px) */
   grab: number
-  /** 地面停留(ms);0 = 永不过期 */
   groundMs: number
-  /** 入场弹出时长(ms);0 = 无 */
   popMs: number
-  /** 待拾缓浮幅度(px);0 = 不浮 */
   bob: number
-  /** 省略即无圈；radius 应与 grab 同值 */
   ring?: { color: number; radius: number; fillAlpha: number; z: number }
   def?: FieldPickupDef
-  // ── 到手效果：各自对应一个组件，都不给也合法 ──
   coins?: number
-  /** 用 def */
   mod?: boolean
   flash?: { color: number; ms: number }
   fx?: { burst: number; sfx: SfxId }
 }
 
-/** 落点先过世界钩子 */
 function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
   const p = sim.hooks.constrainCoin(sim, x, y)
   const eid = newEntity(sim.world)
-  // Bob 恒挂，amp = 0 即不浮
   addComponents(sim.world, eid, Pickup, Pull, Grab, Lifetime, Vel, Pop, Bob)
   attachDrawable(sim.world, eid, sim.frames, {
     id: spec.emoji,
@@ -113,8 +102,6 @@ function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
   }
   return eid
 }
-
-// ── 掉落 ──────────────────────────────────────────────────
 
 
 function coinSpec(sim: Sim): PickupSpec {
@@ -178,7 +165,6 @@ export function attachCarrierRing(sim: Sim, eid: number, def: FieldPickupDef): v
 }
 
 
-/** 走视觉钟 */
 export function animatePickup(sim: Sim, eid: number): void {
   const popLeft = Pop.until[eid]! - sim.fxMs
   const size = Pop.size[eid]!
@@ -191,7 +177,6 @@ export function animatePickup(sim: Sim, eid: number): void {
     Transform.h[eid] = size
   }
   if (Bob.amp[eid]! > 0) {
-    // 光圈按 -off 抵消，贴在落点
     const half = Bob.halfMs[eid]!
     const t = ((sim.fxMs - Bob.born[eid]!) % (half * 2)) / half
     const off = -Bob.amp[eid]! * sineEaseInOut(t <= 1 ? t : 2 - t)

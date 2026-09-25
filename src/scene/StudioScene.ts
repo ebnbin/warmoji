@@ -32,7 +32,6 @@ import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '..
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
 
-// studio- 纹理由本场景自管：shutdown 全清；缩略缓存只在真退出时释放
 interface StudioLayout {
   content: { w: number; h: number }
   headerY: number
@@ -61,7 +60,6 @@ const RASTER = 256
 const SPEEDS = [1, 0.5, 0.25] as const
 const ANAT_ROW = 64
 const ANAT_INDENT = 28
-/** 点击分派与绘制共用 */
 const anatIndentOf = (depth: number): number => 16 + depth * ANAT_INDENT
 
 type Tab = 'recipes' | 'templates' | 'anatomy'
@@ -91,16 +89,13 @@ export class StudioScene extends Phaser.Scene {
   private anatEmoji = DEFAULT_SUBJECT
   private allKeys: string[] = []
 
-  // 换 emoji 归零；视口 restart 保留
   private anat?: AnatUi
   private anatHidden = new Set<string>()
   private anatCollapsed = new Set<string>()
   private anatScroll = 0
   private anatScrollMax = 0
-  /** anatAllRows 全展开；anatRowMeta 当前视图（受收起影响） */
   private anatAllRows: TreeRow[] = []
   private anatRowMeta: TreeRow[] = []
-  /** 竞态令牌：新帧就绪才替换并回收旧帧 */
   private anatSplitGen = 0
   private anatLiveCounter = 0
   private anatLiveKey?: string
@@ -119,9 +114,7 @@ export class StudioScene extends Phaser.Scene {
   private frameIdx = 0
   private previewSize = 0
   private animTimer?: Phaser.Time.TimerEvent
-  /** 竞态令牌：切换选择后旧任务作废 */
   private jobGen = 0
-  /** 本场景创建的纹理，shutdown 全量移除 */
   private ownedKeys = new Set<string>()
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private detailScroll!: ScrollView
@@ -201,7 +194,6 @@ export class StudioScene extends Phaser.Scene {
     })
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.anatDragMoved = false
-      // 恒赋值：手势异常结束不能把拖动态卡住
       this.anatDragging = this.anatContains(p)
       if (this.anatDragging) {
         this.anatDragStartY = p.worldY
@@ -253,8 +245,6 @@ export class StudioScene extends Phaser.Scene {
     const l = this.layout.list
     return { x: this.origin.x + l.x, y: this.origin.y + l.y, w: l.w, h: l.h }
   }
-
-  // ── tab 与素材网格 ──────────────────────────────────────────
 
   private buildTabs(res: number): void {
     const defs: { id: Tab; label: string }[] = [
@@ -347,8 +337,6 @@ export class StudioScene extends Phaser.Scene {
     this.anatCollapsed = new Set()
     this.anatScroll = 0
   }
-
-  // ── 详情面板（三种形态共用清场逻辑） ────────────────────────
 
   private resetDetail(): { d: { x: number; y: number; w: number; h: number }; res: number } {
     this.animTimer?.remove()
@@ -640,7 +628,6 @@ export class StudioScene extends Phaser.Scene {
         mask.fillRect(treeArea.x, treeArea.y, treeArea.w, treeArea.h)
         const rowsBox = this.add.container(treeArea.x, treeArea.y)
         clipTo(rowsBox, mask)
-        // 树区只有这一个命中区：行级 zone 在遮罩外照常拦截输入（遮罩不裁点击），会吞掉下方网格的点击
         const treeZone = this.add
           .zone(treeArea.x, treeArea.y, treeArea.w, treeArea.h)
           .setOrigin(0)
@@ -659,7 +646,6 @@ export class StudioScene extends Phaser.Scene {
       })
   }
 
-  /** 自身或任一祖先被隐藏 */
   private anatEffHidden(path: string): boolean {
     const segs = path.split('/')
     for (let i = 1; i <= segs.length; i++) {
@@ -717,7 +703,6 @@ export class StudioScene extends Phaser.Scene {
       }
       let x = indent + 34
       if (row.paints) {
-        // 眼睛只是指示，整行才是开关
         parts.push(
           emojiImage(this, x + 16, y + ANAT_ROW / 2, this.anatHidden.has(row.path) ? '1f648' : '1f441', 32)
             .setAlpha(dim && !this.anatHidden.has(row.path) ? 0.4 : 1),
@@ -802,7 +787,6 @@ export class StudioScene extends Phaser.Scene {
     }
   }
 
-  /** undefined = 只回收 */
   private dropAnatLive(next: string | undefined): void {
     if (this.anatLiveKey && this.anatLiveKey !== next && this.textures.exists(this.anatLiveKey)) {
       this.textures.remove(this.anatLiveKey)
@@ -811,9 +795,6 @@ export class StudioScene extends Phaser.Scene {
     this.anatLiveKey = next
   }
 
-  // ── 预览与播放控制 ──────────────────────────────────────────
-
-  /** 烘焙帧若先到位则不再回退到静态图 */
   private spawnPreview(cx: number, cy: number, size: number, emoji: string): void {
     const img = this.add.image(cx, cy, '__DEFAULT').setVisible(false)
     this.previewImg = img
@@ -827,7 +808,6 @@ export class StudioScene extends Phaser.Scene {
       .catch((err) => console.warn(`预览加载失败 ${emoji}: ${String(err)}`))
   }
 
-  /** 返回控制条底部 y */
   private buildControls(cx: number, y: number, res: number): number {
     const defs: { id: string; icon?: () => string; onTap: () => void }[] = [
       { id: 'prev', icon: () => '23ee', onTap: () => this.stepFrame(-1) },
@@ -898,7 +878,6 @@ export class StudioScene extends Phaser.Scene {
     this.controlSpeed?.setText(`${SPEEDS[this.speedIdx]}×`)
   }
 
-  /** 自动暂停 */
   private stepFrame(dir: 1 | -1): void {
     if (this.frameKeys.length === 0) return
     if (!this.paused) {
@@ -915,7 +894,6 @@ export class StudioScene extends Phaser.Scene {
     this.animTimer = undefined
     if (this.paused || this.frameKeys.length === 0) return
     this.animTimer = this.time.addEvent({
-      // 周期总时长恒为 def.durMs
       delay: Math.max(30, ANIM_DEF.durMs / this.frameKeys.length / SPEEDS[this.speedIdx]!),
       loop: true,
       callback: () => {
@@ -958,8 +936,6 @@ export class StudioScene extends Phaser.Scene {
     }
     return keys
   }
-
-  // ── 杂项 ────────────────────────────────────────────────────
 
   private onViewportChanged(): void {
     this.preserveOnRestart = true

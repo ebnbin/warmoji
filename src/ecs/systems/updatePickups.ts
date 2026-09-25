@@ -7,7 +7,6 @@ import { animatePickup } from '../entities/pickup'
 import type { Sim } from '../sim'
 import { centerX, centerY } from '../utils/team'
 
-/** 地面到期前的渐隐时长(ms) */
 const FADE_MS = 250
 
 export function updatePickups(sim: Sim): void {
@@ -21,9 +20,7 @@ export function updatePickups(sim: Sim): void {
   for (const eid of eids) {
     animatePickup(sim, eid)
     const x = Transform.x[eid]!
-    // 浮动只是视觉，判定用落点
     const y = Bob.amp[eid]! > 0 ? Bob.y0[eid]! : Transform.y[eid]!
-    // 吸点优先
     if (sim.frameAttractors.length > 0 && Pull.radius[eid]! > 0) {
       let taken = false
       for (const a of sim.frameAttractors) {
@@ -38,7 +35,6 @@ export function updatePickups(sim: Sim): void {
     }
     const w = sim.hooks.worldDelta(sim, x, y, cx, cy)
     const dist2 = w.x * w.x + w.y * w.y
-    // 蹭到队员身子也算到手，仅磁吸类
     const grab = Grab.radius[eid]!
     if (dist2 <= grab * grab || (Pull.radius[eid]! > 0 && nearAliveCharacter(sim, x, y))) {
       take(sim, eid)
@@ -63,7 +59,6 @@ export function updatePickups(sim: Sim): void {
       Vel.x[eid] = idle.x
       Vel.y[eid] = idle.y
     }
-    // 只回绕不钳制
     const moved = sim.hooks.wrap(sim, x + Vel.x[eid]! * dt, y + Vel.y[eid]! * dt)
     Transform.x[eid] = moved.x
     Transform.y[eid] = moved.y
@@ -75,7 +70,6 @@ function take(sim: Sim, eid: number): void {
   addComponent(sim.world, eid, Collected)
 }
 
-/** 圆-圆：队员受击圆 + 拾取物半径 */
 function nearAliveCharacter(sim: Sim, x: number, y: number): boolean {
   const cr = PICKUPS.coin.radius * UNIT
   for (const m of sim.characters) {

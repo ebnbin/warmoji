@@ -8,11 +8,11 @@ import type { Sim } from '../sim'
 
 export function castBoomerangs(sim: Sim): void {
   castScan(sim, Boomerang, (e) => {
-    if (Thrown.n[e]! > 0) return false // 未全部接住不另起
+    if (Thrown.n[e]! > 0) return false
     const aim = nearestAngle(sim, sourceOf(sim, e), ownerX(e), ownerY(e))
     if (aim === null) return false
     Aim.rad[e] = aim
     launch(sim, e, aim)
-    return false // 冷却待全部接住后才开始计
+    return false
   })
 }

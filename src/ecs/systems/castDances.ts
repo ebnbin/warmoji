@@ -3,7 +3,6 @@ import { Boss, Dance, DanceWindow, ENEMY_SET, EState, Tint } from '../components
 import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
-/** 出手瞬间打断在场者的蓄力/冲刺 */
 export function castDances(sim: Sim, scan = castScan): void {
   scan(sim, Dance, (e) => {
     DanceWindow.until[sim.captain] = sim.elapsedMs + Dance.durationMs[e]!

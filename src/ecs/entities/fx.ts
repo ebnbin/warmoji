@@ -11,7 +11,6 @@ const BEAM_MS = 200
 const BOLT_MS = 200
 const SLASH_MS = 220
 const BOOM_MS = 340
-/** 压在被保护中心之上、队员之下 */
 const BOOM_Z = 9
 
 function newFx(sim: Sim, comp: object, x: number, y: number, durMs: number, z: number): number {
@@ -39,7 +38,6 @@ export function spawnFxCircle(sim: Sim, x: number, y: number, radius: number, c:
   return eid
 }
 
-/** 命中环：从锚点扩张淡出的一圈（弹道机器与能力效果链共用，不各画一遍） */
 export function spawnFxRing(
   sim: Sim,
   x: number,
@@ -60,7 +58,6 @@ export function spawnFxRing(
   })
 }
 
-/** 贯穿光束（外层色带在 7 带、白芯在 8 带；两带共读同一颗实体） */
 export function spawnFxBeam(
   sim: Sim,
   x: number,
@@ -78,7 +75,6 @@ export function spawnFxBeam(
   return eid
 }
 
-/** 锯齿闪电折线：沿折点串每段拆几截加垂直抖动。抖动在此算死——每帧重算会疯狂跳动 */
 export function spawnFxBolt(sim: Sim, points: readonly { x: number; y: number }[], color: number): number {
   const pts: number[] = [points[0]!.x, points[0]!.y]
   for (let p = 1; p < points.length; p++) {
@@ -101,8 +97,6 @@ export function spawnFxBolt(sim: Sim, points: readonly { x: number; y: number }[
   return eid
 }
 
-/** 💥 爆裂：缩小随机微转弹出到全尺寸并淡出。它是精灵不是形状——贴图走图集，
- * 由 spriteBatch 画（深度 8 那条带），逐帧的缩放/淡出在 systems/animateBooms */
 export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): number {
   const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Fx, FxBoom)
@@ -111,23 +105,21 @@ export function spawnFxBoom(sim: Sim, x: number, y: number, size: number): numbe
   FxBoom.size[eid] = size
   attachDrawable(sim.world, eid, sim.frames, {
     id: '1f4a5',
-    outline: undefined, // 特效不描边：描一圈会把同一标称尺寸的墨迹撑大一圈（见 manifest 的 PLAIN_EMOJIS）
+    outline: undefined,
     x,
     y,
-    size: size * 0.4, // 起始 0.4 倍，由 animateBooms 弹到全尺寸
+    size: size * 0.4,
     rot: (Math.random() - 0.5) * 0.8,
     z: BOOM_Z,
   })
   return eid
 }
 
-/** 伤害飘字：命中点上浮淡出的数字，绘制在 render/damageText.ts */
 export function spawnDamageNumber(sim: Sim, x: number, y: number, amount: number, crit: boolean): void {
   if (!sim.damageNumbers) return
-  pushDamageNumber(sim.damageNumbers, x, y - 14, amount, crit, sim.fxMs) // 起点略高于命中点
+  pushDamageNumber(sim.damageNumbers, x, y - 14, amount, crit, sim.fxMs)
 }
 
-/** 斩击弧光 */
 export function spawnFxSlash(sim: Sim, x: number, y: number, angle: number, radius: number): number {
   const eid = newFx(sim, FxSlash, x, y, SLASH_MS, 9)
   Transform.rot[eid] = angle

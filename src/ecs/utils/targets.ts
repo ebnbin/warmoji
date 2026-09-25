@@ -5,9 +5,6 @@ import { Dormant, ENEMY_SET, FACTION, Radius, Transform } from '../components'
 import type { Source } from './source'
 import type { Sim } from '../sim'
 
-// 我方索敌每次现查存活、清醒的敌人，不留跨系统的快照；敌方索敌读 characterTargets
-
-/** 坐标可能是环面镜像坐标 */
 export interface Target {
   readonly eid: number
   readonly x: number
@@ -15,14 +12,8 @@ export interface Target {
   readonly radius: number
 }
 
-/** 返回 true 即停止遍历 */
 type Visit = (eid: number, x: number, y: number, radius: number) => boolean | void
 
-/**
- * 逐个访问与 (cx, cy) 中心距 ≤ reach + 目标半径的目标；给了视点的还要探得到头。
- * 环面上每个落在范围内的像各访问一次，reach 无限时只取最近像。
- * visit 内不得施伤：击杀会原地改动正在遍历的存活列表
- */
 export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
   if (src.faction === FACTION.enemy) {
     for (const t of sim.characterTargets) {
@@ -72,7 +63,6 @@ export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach:
   }
 }
 
-/** 同 eachTarget 的筛选；结果是独立数组，可以边遍历边施伤 */
 export function targetsNear(sim: Sim, src: Source, cx: number, cy: number, reach: number): Target[] {
   const out: Target[] = []
   eachTarget(sim, src, cx, cy, reach, (eid, x, y, radius) => {
@@ -81,7 +71,6 @@ export function targetsNear(sim: Sim, src: Source, cx: number, cy: number, reach
   return out
 }
 
-/** 中心距严格小于 maxRange；exclude 跳过真身 */
 export function nearestTarget(
   sim: Sim,
   src: Source,
@@ -111,7 +100,6 @@ export function nearestTarget(
   return bestEid < 0 ? null : { eid: bestEid, x: bestX, y: bestY, radius: bestR }
 }
 
-/** 无目标返回 null；上限缺省 ACQUIRE.range */
 export function nearestAngle(
   sim: Sim,
   src: Source,

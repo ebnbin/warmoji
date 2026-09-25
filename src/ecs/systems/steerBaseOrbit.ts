@@ -4,7 +4,6 @@ import { BaseOrbit, BVel, Enemy, Nest, Slowed, Speed, Steering, Transform } from
 import { nearestAlive } from './shared/steer'
 import type { Sim } from '../sim'
 
-/** 暴走倍率由 Orphan 在拆巢时施加，与本系统无关 */
 export function steerBaseOrbit(sim: Sim): void {
   for (const eid of query(sim.world, [BaseOrbit, Steering, Transform, Speed])) {
     if (!Steering.v[eid]) continue
@@ -15,7 +14,6 @@ export function steerBaseOrbit(sim: Sim): void {
     const nest = Nest.of[eid]!
     let orbit = nest >= 0 && hasComponent(sim.world, nest, Enemy)
     if (orbit && target) {
-      // 以巢为基准量最近队员的距离
       const td = sim.hooks.worldDelta(sim, Transform.x[nest]!, Transform.y[nest]!, target.x, target.y)
       const ar = BaseOrbit.aggroRange[eid]!
       if (td.x * td.x + td.y * td.y <= ar * ar) orbit = false

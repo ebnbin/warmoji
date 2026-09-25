@@ -17,7 +17,6 @@ export const CAPTAINS = Object.fromEntries(
 ) as Record<CaptainId, CaptainDef>
 export const CAPTAIN_IDS = Object.keys(CAPTAINS) as readonly CaptainId[]
 
-/** 不进队长选择页 */
 export const SANDBOX_CAPTAIN: CaptainId = 'tester'
 
 export const PICKABLE_CAPTAIN_IDS = CAPTAIN_IDS.filter((id) => id !== SANDBOX_CAPTAIN)

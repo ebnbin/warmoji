@@ -2,7 +2,6 @@ import { Alive, Hurt, Transform } from '../components'
 import type { Target } from '../utils/targets'
 import type { Sim } from '../sim'
 
-/** 须先于任何敌方出手 */
 export function refreshCharacterTargets(sim: Sim): void {
   const list: Target[] = []
   for (const m of sim.characters) {

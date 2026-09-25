@@ -1,7 +1,6 @@
 import { ENEMIES } from '../../data/enemies'
 import type { EnemyDef, EnemyMixEntry, EnemyMixRow } from '../../types/enemies'
 
-/** 已按 sinceWave 过滤，权重夹在上下限之间 */
 export function enemyMixAt(mix: readonly EnemyMixRow[], wave: number): EnemyMixEntry[] {
   return mix.filter((m) => wave >= m.sinceWave).map((m) => ({
     def: ENEMIES[m.kind]!,

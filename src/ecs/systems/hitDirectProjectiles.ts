@@ -5,7 +5,6 @@ import { cullProjectile } from './shared/projectile'
 import { projSrcName } from '../store'
 import type { Sim } from '../sim'
 
-/** 被无敌帧挡下也照常销毁 */
 export function hitDirectProjectiles(sim: Sim): void {
   if (sim.over) return
   const now = sim.elapsedMs

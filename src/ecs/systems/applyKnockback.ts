@@ -3,7 +3,6 @@ import { KNOCKBACK } from '../../data/abilities'
 import { Dormant, ENEMY_SET, Kv, Step } from '../components'
 import type { Sim } from '../sim'
 
-/** 位移与衰减都走真实帧长：时停期击退照飞，飞行距离不变 */
 export function applyKnockback(sim: Sim): void {
   const realDelta = sim.dtMs
   const kdt = realDelta / 1000

@@ -8,7 +8,6 @@ export function placeThrustBody(sim: Sim): void {
   for (const e of query(sim.world, [Ability, Thrust, Aim, Swing])) {
     const frozen = Frozen.v[e] === 1
     if (frozen) {
-      // 阵亡即收势
       Swing.durMs[e] = 0
       Followup.left[e] = 0
     }

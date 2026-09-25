@@ -4,7 +4,6 @@ import { telegraphOne } from '../entities/enemy'
 import type { Sim } from '../sim'
 
 export function fireSurges(sim: Sim): void {
-  // 迭代中会建实体，须先快照
   for (const eid of [...query(sim.world, [Due, Surge])]) {
     if (sim.elapsedMs < Due.at[eid]!) continue
     telegraphOne(sim, Surge.hpMul[eid]!, Surge.forceElite[eid] === 1)

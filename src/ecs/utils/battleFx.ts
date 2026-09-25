@@ -36,7 +36,6 @@ function waveCarrierBudget(wave: number, isBoss: boolean): { buff: number; debuf
   for (const t of cb.waveTiers) if (wave <= t.upToWave) return { buff: t.buff, debuff: t.debuff }
   return { buff: cb.fallback.buff, debuff: cb.fallback.debuff }
 }
-/** 可重复 */
 export function rollWaveCarriers(
   mapId: MapId,
   wave: number,

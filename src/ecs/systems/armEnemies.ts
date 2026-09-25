@@ -7,13 +7,11 @@ import { enemyDef } from '../store'
 import type { Sim } from '../sim'
 import { isDancing } from '../utils/team'
 
-/** 复形时缴械后延，避免复形瞬间齐射 */
 export function armEnemies(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
-    if (Dormant.v[eid]) continue // 休眠者推迟装配
+    if (Dormant.v[eid]) continue
     if (!EnemyArm.armed[eid]) armEnemy(sim, eid)
-    // 蹦迪期不复形
     if (isDancing(sim)) continue
     if (Morph.until[eid] === 0 || now < Morph.until[eid]!) continue
     restoreMorphVisual(sim.frames, eid)
@@ -22,7 +20,6 @@ export function armEnemies(sim: Sim): void {
   }
 }
 
-/** projectile.firstDelayMs 优先于首发延迟 */
 function armEnemy(sim: Sim, eid: number): void {
   const rows = enemyDef[eid]?.abilities
   EnemyArm.armed[eid] = 1

@@ -14,17 +14,12 @@ import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 import { spawnFxRing } from '../../entities/fx'
 
-// 状态类效果按目标有没有对应组件施加，不按阵营判
-
-/** 锚点类效果作用于 (x,y)；逐目标类作用于 targets */
 export interface HitCtx {
   readonly x: number
   readonly y: number
   readonly baseDamage: number
   readonly targets?: readonly number[]
-  /** blast 跳过的目标 */
   readonly exclude?: ReadonlySet<number>
-  /** 死亡触发时 heal 排除它 */
   readonly source?: number
 }
 
@@ -85,7 +80,6 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
     })
   },
 
-  // 这一帧刚死的不变形
   morph: (sim, _src, fx, hit) => {
     eachCapable(sim, hit, Morph, (t) => {
       if (hasComponent(sim.world, t, Enemy)) applyMorph(sim, sim.frames, t, fx)
@@ -100,7 +94,6 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
     })
   },
 
-  // 不挂 Owner：可活过放它的人
   ground: (sim, src, fx, hit) => {
     spawnZone(sim, {
       x: hit.x,
@@ -128,7 +121,6 @@ const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
     else healEnemies(sim, hit.x, hit.y, fx.range, fx.amount, all, hit.source)
   },
 
-  // 只对敌方侧成立，gen 校验
   spawnProjectile: (sim, src, fx, hit) => {
     if (src.faction === FACTION.team) return
     const angle = nearestAngle(sim, src, hit.x, hit.y, Infinity)

@@ -8,13 +8,11 @@ import { packTint } from './tint'
 
 const TEX_KEY = 'ecs-damage-digits'
 const CHARS = 10
-/** 字形按 2 倍显示尺寸渲染 */
 const CHAR_W = 24
 const CHAR_H = 36
 
 
 
-/** 幂等，纹理跨局有效 */
 function bakeDigits(scene: Phaser.Scene): void {
   if (scene.textures.exists(TEX_KEY)) return
   const canvas = document.createElement('canvas')
@@ -38,7 +36,6 @@ function bakeDigits(scene: Phaser.Scene): void {
 
 export class DamageTextLayer {
   private readonly batch: DamageTextBatch
-  /** 本帧视觉钟 */
   private now = 0
 
   constructor(scene: Phaser.Scene, private readonly nums: DamageNumbers) {
@@ -71,7 +68,6 @@ export class DamageTextLayer {
   ): void {
     const fx = this.now
     const buf = this.nums
-    // 从最老的一条画起，新的压在上面
     const cap = buf.born.length
     for (let j = 0; j < cap; j++) {
       const i = (buf.head + j) % cap
@@ -97,16 +93,15 @@ export class DamageTextLayer {
         const x1 = left + gw
         const y0 = cy - gh / 2
         const y1 = cy + gh / 2
-        // v 轴取 GL 朝向，vh 为负
         const u = digit / CHARS
         node.batch(
           ctx, tex,
-          m.getX(x0, y0), m.getY(x0, y0), // TL
-          m.getX(x0, y1), m.getY(x0, y1), // BL
-          m.getX(x1, y0), m.getY(x1, y0), // TR
-          m.getX(x1, y1), m.getY(x1, y1), // BR
+          m.getX(x0, y0), m.getY(x0, y0),
+          m.getX(x0, y1), m.getY(x0, y1),
+          m.getX(x1, y0), m.getY(x1, y0),
+          m.getX(x1, y1), m.getY(x1, y1),
           u, 1, 1 / CHARS, -1,
-          0, // TintModes.MULTIPLY
+          0,
           tint, tint, tint, tint,
           opts,
         )
@@ -116,10 +111,8 @@ export class DamageTextLayer {
   }
 }
 
-/** 占 depth 50；renderWebGL 无 this 绑定，状态一律走 src */
 class DamageTextBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
-  /** 须是复用的持久对象；multiTexturing 须显式开 */
   private readonly renderOptions = { multiTexturing: true }
 
   constructor(scene: Phaser.Scene, private readonly layer: DamageTextLayer) {
@@ -139,7 +132,6 @@ class DamageTextBatch extends EcsLayer {
     if (!node) return
     const tex = self.scene.textures.get(TEX_KEY).get().source.glTexture
     if (!tex) return
-    // v4 的视图矩阵已含 scroll；实参与核心各 Transformer 一致（!useCanvas）
     const m = self.camMatrix.copyFrom(camera.getViewMatrix(!drawingContext.useCanvas))
     self.layer.emit(node as never, drawingContext, tex, m, self.renderOptions)
   }

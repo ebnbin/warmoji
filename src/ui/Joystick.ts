@@ -4,7 +4,6 @@ const RADIUS = 56
 const THUMB_RADIUS = 24
 const DEADZONE = 0.12
 
-/** 向量模 0~1；监听挂 scene.input，场景重启自动清理 */
 export class Joystick {
   private scene: Phaser.Scene
   private base: Phaser.GameObjects.Arc | null = null

@@ -9,7 +9,6 @@ import { spawnFxRing } from '../entities/fx'
 
 const BLAST_RING = { color: 0xff5252, fillAlpha: 0.35, lineWidth: 3, lineAlpha: 0.9, durMs: 300 }
 
-/** 蓄力前被打死则不炸 */
 export function steerDetonate(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of [...query(sim.world, [Detonate, Steering, Transform, Speed])]) {
@@ -17,7 +16,6 @@ export function steerDetonate(sim: Sim): void {
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
     if (EState.v[eid] === 2) {
-      // 受击白闪优先
       if (Flash.until[eid] === 0) {
         Tint.effect[eid] = 0
         Tint.color[eid] = now % 240 < 120 ? 0xffffff : 0xff5252
@@ -30,7 +28,6 @@ export function steerDetonate(sim: Sim): void {
         const d = sim.hooks.worldDelta(sim, ex, ey, Transform.x[m]!, Transform.y[m]!)
         const rr = r + Hurt.radius[m]!
         if (d.x * d.x + d.y * d.y > rr * rr) continue
-        // 吃无敌帧节流并消费之
         if (now - Iframe.last[m]! < Iframe.ms[m]!) continue
         Iframe.last[m] = now
         hurtCharacter(sim, m, dmg, enemyDef[eid]?.name)

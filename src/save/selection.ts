@@ -27,7 +27,6 @@ export function saveCaptain(storage: StringStorage | undefined, id: CaptainId): 
   try {
     storage?.setItem(CAPTAIN_KEY, id)
   } catch {
-    // 隐私模式/配额写入失败可忽略
   }
 }
 
@@ -43,6 +42,5 @@ export function saveMap(storage: StringStorage | undefined, id: MapId): void {
   try {
     storage?.setItem(MAP_KEY, id)
   } catch {
-    // 隐私模式/配额写入失败可忽略
   }
 }

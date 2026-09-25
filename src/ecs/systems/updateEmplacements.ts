@@ -5,7 +5,6 @@ import { playClip } from './shared/anim'
 import { backEaseOut } from '../utils/ease'
 import type { Sim } from '../sim'
 
-/** 索敌、冷却、出弹全归 castProjectiles */
 export function updateEmplacements(sim: Sim): void {
   for (const t of [...query(sim.world, [Emplacement, Minion, Transform])]) {
     if (hasComponent(sim.world, t, Retiring)) {

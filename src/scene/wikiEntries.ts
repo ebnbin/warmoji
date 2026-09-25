@@ -166,7 +166,6 @@ export function wikiGroups(): WikiGroup[] {
   ]
 }
 
-/** 重复归属取首个 */
 export function wikiEntryByEmoji(): Map<string, { category: string; entry: WikiEntry }> {
   const map = new Map<string, { category: string; entry: WikiEntry }>()
   for (const g of wikiGroups()) {
