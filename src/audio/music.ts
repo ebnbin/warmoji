@@ -44,6 +44,18 @@ interface Voice {
 
 type Line = readonly (readonly [number, number, number, number])[]
 
+type Pattern<P extends string, Step extends string> = P extends `${Step}${infer Rest}`
+  ? Pattern<Rest, Step>
+  : P extends ''
+    ? unknown
+    : never
+
+const BASS_TONE = { r: 0, t: 2, f: 4, o: 7 }
+
+type BassStep = keyof typeof BASS_TONE | '.' | '-'
+
+type DrumStep = 'x' | 'o' | '.'
+
 class Builder {
   notes: BgmNote[] = []
   hits: BgmHit[] = []
@@ -78,16 +90,17 @@ class Builder {
     for (const [bar, step, deg, dur] of entries) this.note(v, bar, step, deg, dur)
   }
 
-  bass(v: Voice, chords: readonly number[], pattern: string): void {
-    const tone: Record<string, number> = { r: 0, t: 2, f: 4, o: 7 }
+  bass<P extends string>(v: Voice, chords: readonly number[], pattern: P & Pattern<P, BassStep>): void {
+    const tones: Readonly<Record<string, number>> = BASS_TONE
     for (let bar = 0; bar < chords.length; bar++) {
       const root = chords[bar]!
       let last: BgmNote | undefined
       for (let s = 0; s < pattern.length; s++) {
         const ch = pattern[s]!
+        const tone = tones[ch]
         if (ch === '-' && last) last.dur += this.stepSec
-        else if (ch in tone) {
-          this.note(v, bar, s, root + tone[ch]!, 1)
+        else if (tone !== undefined) {
+          this.note(v, bar, s, root + tone, 1)
           last = this.notes[this.notes.length - 1]
         } else last = undefined
       }
@@ -116,7 +129,7 @@ class Builder {
     }
   }
 
-  drums(kind: BgmHitKind, pattern: string, fromBar: number, toBar: number, vol: number): void {
+  drums<P extends string>(kind: BgmHitKind, pattern: P & Pattern<P, DrumStep>, fromBar: number, toBar: number, vol: number): void {
     for (let bar = fromBar; bar < toBar; bar++) {
       for (let s = 0; s < pattern.length; s++) {
         const ch = pattern[s]
