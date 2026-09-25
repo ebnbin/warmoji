@@ -7,8 +7,6 @@ export enum SceneKey {
   Settings = 'settings',
   Captain = 'captain',
   Recruit = 'recruit',
-  Formation = 'formation',
-  Cards = 'cards',
   Shop = 'shop',
   Battle = 'battle',
   Ui = 'ui',

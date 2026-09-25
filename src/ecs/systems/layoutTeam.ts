@@ -1,7 +1,7 @@
 import { UNIT } from '../../util/units'
-import { FOLLOW, SQUAD, WANDER } from '../../data/feel'
-import { fanSlots, formationPosts } from '../../data/formation'
-import { Alive, Depth, Facing, Follow, Orbit, Phys, Seat, Threat, Transform, VisOff, Wander } from '../components'
+import { FOLLOW, SQUAD } from '../../data/feel'
+import { fanSlots } from '../../data/formation'
+import { Alive, Depth, Facing, Follow, Phys, Seat, Transform, VisOff } from '../components'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { centerX, centerY } from '../utils/team'
@@ -24,6 +24,7 @@ function face(sim: Sim, eid: number, vx: number, vy: number): void {
   Facing.y[eid] = fvy / speed
 }
 
+/** 关闭物理跟随时的弹簧粘合，只用来对比手感 */
 function spring(eid: number, tx: number, ty: number, dt: number): void {
   let fx = Follow.x[eid]!
   let fy = Follow.y[eid]!
@@ -57,19 +58,6 @@ function nearTarget(sim: Sim, eid: number, x: number, y: number): Point {
   return { x: Follow.x[eid]! + d.x, y: Follow.y[eid]! + d.y }
 }
 
-function wanderTarget(sim: Sim, eid: number, x: number, y: number, on: boolean): Point {
-  let amp = Wander.amp[eid]!
-  amp += ((on ? 1 : 0) - amp) * Math.min(1, sim.dtMs / WANDER.rampMs)
-  Wander.amp[eid] = amp
-  const wander = amp * WANDER.radius
-  const seed = Wander.seed[eid]!
-  const tSec = sim.elapsedMs / 1000
-  return {
-    x: x + Math.sin(tSec * WANDER.freqX + seed) * wander,
-    y: y + Math.sin(tSec * WANDER.freqY + seed * 2.3) * wander,
-  }
-}
-
 function commit(sim: Sim): void {
   for (const eid of sim.characters) {
     const wrapped = sim.hooks.wrap(sim, Follow.x[eid]!, Follow.y[eid]!)
@@ -79,23 +67,6 @@ function commit(sim: Sim): void {
     Transform.y[eid] = wrapped.y + VisOff.y[eid]!
     Depth.z[eid] = 10 + sim.hooks.worldDelta(sim, centerX(sim), centerY(sim), wrapped.x, wrapped.y).y / UNIT
   }
-}
-
-/** 不满员：环形队形位加弹簧粘合 */
-function layoutRing(sim: Sim): void {
-  const posts = formationPosts(sim.formation, sim.count, Orbit.phase[sim.captain]!)
-  const moving = sim.teamDir.x !== 0 || sim.teamDir.y !== 0
-  const dt = Math.min(sim.dtMs, 50) / 1000
-  for (let slot = 0; slot < sim.characters.length; slot++) {
-    const eid = sim.characters[slot]!
-    const idx = sim.postBySlot[slot] ?? slot
-    const p = posts[idx] ?? { x: 0, y: 0 }
-    const on = Alive.v[eid] === 1 && !moving && !Threat.v[eid]
-    const raw = wanderTarget(sim, eid, centerX(sim) + p.x, centerY(sim) + p.y, on)
-    const t = nearTarget(sim, eid, raw.x, raw.y)
-    spring(eid, t.x, t.y, dt)
-  }
-  commit(sim)
 }
 
 /** 在空位里挑离自己最近的；只有近出滞后量才换，当前位已被别人占了则必须换 */
@@ -131,8 +102,8 @@ function turnHeading(sim: Sim, tx: number, ty: number, dt: number): void {
   sim.heading = { x: Math.cos(cur + step), y: Math.sin(cur + step) }
 }
 
-/** 满员：队长贴中心，队员用物理跑向身后扇形上的目标位；进占位半径即占位、同位取最近，阵亡者停靠后紧跟 */
-function layoutSquad(sim: Sim): void {
+/** 队长贴中心，队员用物理跑向身后扇形上的目标位；进占位半径即占位、同位取最近，阵亡者停靠后紧跟 */
+export function layoutTeam(sim: Sim): void {
   const delta = sim.dtMs
   const dt = Math.min(delta, 50) / 1000
   const leader = sim.leader
@@ -146,8 +117,7 @@ function layoutSquad(sim: Sim): void {
   const hx = Phys.vx[leader]! - medium.x
   const hy = Phys.vy[leader]! - medium.y
   const speed = Math.hypot(hx, hy)
-  const moving = speed > HEADING_MIN * UNIT
-  if (moving) turnHeading(sim, hx / speed, hy / speed, dt)
+  if (speed > HEADING_MIN * UNIT) turnHeading(sim, hx / speed, hy / speed, dt)
   face(sim, leader, Phys.vx[leader]!, Phys.vy[leader]!)
   const followers = sim.characters.filter((e) => e !== leader)
   // 目标位本身也受场地约束：贴墙时缩到可达处，否则队员永远到不了、也占不上
@@ -226,8 +196,7 @@ function layoutSquad(sim: Sim): void {
   } else {
     for (const f of alive) {
       const seat = seats[Seat.v[f]!]!
-      const raw = wanderTarget(sim, f, seat.x, seat.y, !moving && !Threat.v[f])
-      const t = nearTarget(sim, f, raw.x, raw.y)
+      const t = nearTarget(sim, f, seat.x, seat.y)
       spring(f, t.x, t.y, dt)
       face(sim, f, Follow.vx[f]!, Follow.vy[f]!)
     }
@@ -254,9 +223,4 @@ function layoutSquad(sim: Sim): void {
     Follow.y[f] = seat.y
   }
   commit(sim)
-}
-
-export function layoutTeam(sim: Sim): void {
-  if (sim.leader < 0) layoutRing(sim)
-  else layoutSquad(sim)
 }

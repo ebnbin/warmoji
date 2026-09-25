@@ -12,7 +12,6 @@ import { updateShards } from './systems/updateShards'
 import { animateBooms } from './systems/animateBooms'
 import { expireFx } from './systems/expireFx'
 import { layoutTeam } from './systems/layoutTeam'
-import type { FormationId } from '../types/formation'
 import type { EcsWorld } from './world'
 import type { WorldHooks, WorldState } from './worlds/hooks'
 import type { Outbox } from './outbox'
@@ -24,7 +23,6 @@ import { TIMESTOP } from '../data/timeStop'
 import { BATTLE_FX_IDENTITY } from '../data/battlefield'
 import type { BattleEffects } from '../types/battlefield'
 import { CAPTAINS } from '../data/captains'
-import { aggregateTeamCards } from '../data/cards'
 import { Rng } from '../util/rng'
 import { spawnCaptain } from './entities/captain'
 import { formTeam } from './entities/captain'
@@ -42,10 +40,6 @@ export interface Sim {
   physics: boolean
   heading: { x: number; y: number }
   handover: Handover | null
-  formation: FormationId
-  count: number
-  postBySlot: number[]
-  lineupOrbit: number[]
   characters: number[]
   mapId: import('../types/maps').MapId
   mapW: number
@@ -63,7 +57,6 @@ export interface Sim {
   timeStopMsLeft: number
   chrono: number
   battleFx: BattleEffects
-  enemySlowMul: number
   frameAttractors: { x: number; y: number; r2: number }[]
   characterTargets: Target[]
   frames: FrameIndex
@@ -92,9 +85,6 @@ export interface Handover {
 
 interface RewardConfig {
   captainXpMul: number
-  doubleCoinChance: number
-  waveHealRatio: number
-  waveCoins: number
 }
 
 export interface PendingDeath {
@@ -154,25 +144,14 @@ export function makeSim(
   mapH: number,
   damageNumbers: boolean,
 ): Sim {
-  const teamFx = aggregateTeamCards(run.teamCards)
   const captainDef = CAPTAINS[run.captainId]
-  const captain = spawnCaptain(
-    world,
-    center.x,
-    center.y,
-    captainDef.moveSpeed * UNIT * teamFx.moveSpeedMul,
-    captainDef.coinMagnet * UNIT * teamFx.magnetMul,
-  )
+  const captain = spawnCaptain(world, center.x, center.y, captainDef.coinMagnet * UNIT)
   const team = formTeam(world, atlas, run, sandbox, captain)
-  const { count, formation, postBySlot, lineupOrbit, characters, leader } = team
+  const { characters, leader } = team
   return {
     world,
     teamDir: { x: 0, y: 0 },
     moveInputRaw: 0,
-    formation,
-    count,
-    postBySlot,
-    lineupOrbit,
     characters,
     mapId: run.mapId,
     mapW,
@@ -190,7 +169,6 @@ export function makeSim(
     timeStopMsLeft: 0,
     chrono: 0,
     battleFx: { ...BATTLE_FX_IDENTITY },
-    enemySlowMul: teamFx.enemySlowMul,
     frameAttractors: [],
     characterTargets: [],
     frames: atlas,
@@ -201,12 +179,7 @@ export function makeSim(
     sandbox,
     spawnCooldownMs: 300,
     run,
-    reward: {
-      captainXpMul: captainDef.xpGainMul * teamFx.xpGainMul,
-      doubleCoinChance: teamFx.doubleCoinChance,
-      waveHealRatio: teamFx.waveHealRatio,
-      waveCoins: teamFx.waveCoins,
-    },
+    reward: { captainXpMul: captainDef.xpGainMul },
     captain,
     leader,
     physics: false,

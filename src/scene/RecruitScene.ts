@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { CHARACTERS } from '../data/characters'
 import type { CharacterId } from '../types/characters'
-import { formationPosts } from '../data/formation'
+import { ringPosts } from '../data/formation'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { unlockAt } from '../run/recruit'
@@ -295,7 +295,7 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     const n = this.run.roster.length
     const total = n + this.due
     if (total === 0) return
-    const posts = formationPosts('ring', total, this.previewPhase)
+    const posts = ringPosts(total, this.previewPhase)
     const maxR = Math.max(...posts.map((p) => Math.hypot(p.x, p.y)), 1)
     const base = Math.min(P.w, P.h) >= 240 ? 58 : 50
     const fit = Math.min(P.w, P.h) / 2 - base / 2 - 24
@@ -368,7 +368,7 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
   private layoutPreview(): void {
     if (this.previewTokens.length === 0) return
     const total = this.run.roster.length + this.due
-    const posts = formationPosts('ring', total, this.previewPhase)
+    const posts = ringPosts(total, this.previewPhase)
     const { cx, cy, scale } = this.previewGeom
     for (const t of this.previewTokens) {
       const p = posts[t.post]

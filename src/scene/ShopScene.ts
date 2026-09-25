@@ -16,12 +16,10 @@ import type { ItemId, ItemDef, CharacterEffects } from '../types/items'
 import { characterLevel } from '../data/charLevel'
 import { levelStatsFor, LEVEL_STATS } from '../data/levels'
 import { upgradeCardsFor } from '../data/characters'
-import { aggregateTeamCards } from '../data/cards'
-import type { TeamEffects } from '../types/items'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
-import { endRun, getRun, hasCenter, waveStartHp } from '../run/state'
+import { endRun, getRun, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
 import { characterStatGroups } from '../scene/statLines'
 import { memberMaxHp } from '../data/stats'
@@ -74,7 +72,6 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
   private lineup: CharacterId[] = []
   private focusedId: CharacterId = 'juggler'
   private offers: (ItemId | null)[] = []
-  private teamFx!: TeamEffects
   private layout!: ShopLayout
   private origin = { x: 0, y: 0 }
   private grid!: EmojiGrid<CharacterId>
@@ -84,7 +81,6 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private buyRect = { x: 0, y: 0, w: 0, h: 0 }
   private refreshRect = { x: 0, y: 0, w: 0, h: 0 }
-  private wakeDirty = false
   private quitArmed = false
   private slotScroll = 0
   private statsContainer!: Phaser.GameObjects.Container
@@ -110,12 +106,11 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     this.run = getRun()
     this.captainId = this.run.captainId
     this.lineup = [...this.run.roster]
-    this.teamFx = aggregateTeamCards(this.run.teamCards)
     if (!preserved) {
       if (CAPTAINS[this.captainId].reviveInShop) {
         this.run.memberHp = this.run.memberHp.map((_, slot) => this.slotMaxHp(slot))
       }
-      this.run.freeRefreshes = CAPTAINS[this.captainId].freeRefreshes + this.teamFx.freeRerolls
+      this.run.freeRefreshes = CAPTAINS[this.captainId].freeRefreshes
       this.offers = this.lineup.map((_, slot) =>
         rollItem(this.poolFor(slot), this.ownedFor(slot), Math.random, this.run.wave, this.levelOf(slot)),
       )
@@ -167,22 +162,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
       })
     })
 
-    if (hasCenter(this.run)) {
-      const fm = this.add
-        .text(this.origin.x + L.content.w - 40, oy + L.titleY, '⛨ 队长', {
-          fontFamily: UI_FONT,
-          fontSize: FONT.strong,
-          color: '#ffdc5d',
-          resolution: res,
-        })
-        .setOrigin(1, 0.5)
-        .setInteractive({ useHandCursor: true })
-      fm.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
-        if (this.dragMoved || this.grid.wasDragged) return
-        this.openFormation()
-      })
-    }
-    this.events.on(Phaser.Scenes.Events.WAKE, this.onWake, this)
+
 
     emojiImage(this, w / 2 - 28, oy + L.coinsY, PICKUPS.coin.emoji, 42, 'player')
     this.coinsText = this.add
@@ -310,7 +290,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
   }
 
   private price(offer: ItemId): number {
-    return Math.max(1, Math.round(itemPrice(offer, this.run.wave) * this.teamFx.shopDiscountMul))
+    return Math.max(1, Math.round(itemPrice(offer, this.run.wave)))
   }
 
   private buyFocused(): void {
@@ -768,26 +748,8 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     this.scene.start(SceneKey.Battle)
   }
 
-  private openFormation(): void {
-    playSfx('click')
-    this.scene.sleep()
-    this.scene.run(SceneKey.Formation, { fromShop: true })
-  }
-
-  private onWake(): void {
-    if (this.wakeDirty) {
-      this.wakeDirty = false
-      this.preserveOnRestart = true
-      this.scene.restart()
-      return
-    }
-  }
 
   private onViewportChanged(): void {
-    if (this.scene.isSleeping()) {
-      this.wakeDirty = true
-      return
-    }
     this.preserveOnRestart = true
     this.scene.restart()
   }

@@ -9,7 +9,6 @@ import { CHARACTERS } from '../../data/characters'
 import { MEMBER, TEAM } from '../../data/characters'
 import { memberMaxHp } from '../../data/stats'
 
-import { aggregateTeamCards } from '../../data/cards'
 import { aggregateCharacterEffects, characterXp } from '../../data/items'
 import { levelStatsFor } from '../../data/levels'
 import { characterLevel } from '../../data/charLevel'
@@ -19,14 +18,13 @@ import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox/knobs
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
-import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, CharScale, Facing, OrbitBias, Phys, Pop, Post, Quad, Revive, Seat, Slot, Sprite, Threat, Tint, Transform, Wander } from '../components'
+import { Alive, Anim, Breath, Depth, Follow, GroundHit, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, CharScale, Facing, Phys, Pop, Quad, Revive, Seat, Slot, Sprite, Tint, Transform } from '../components'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
 
 export interface CharacterPlacement {
   slot: number
-  post: number
   x: number
   y: number
   depthOffsetY: number
@@ -40,24 +38,19 @@ export function spawnCharacter(
   sandbox: boolean,
   place: CharacterPlacement,
 ): number {
-  const { slot, post, x, y } = place
+  const { slot, x, y } = place
   const def = CHARACTERS[run.roster[slot]!]
-  const teamFx = aggregateTeamCards(run.teamCards)
   const captain = CAPTAINS[run.captainId]
   const sandboxHp = sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
   const size = MEMBER.size * UNIT * place.sizeMul
     const eid = newEntity(world)
   addComponent(world, eid, Character)
   addComponent(world, eid, Slot)
-  addComponent(world, eid, Post)
-  addComponent(world, eid, OrbitBias)
   addComponent(world, eid, Follow)
   addComponent(world, eid, VisOff)
-  addComponent(world, eid, Wander)
   addComponent(world, eid, Breath)
   addComponent(world, eid, Pop)
   addComponent(world, eid, Alive)
-  addComponent(world, eid, Threat)
   addComponent(world, eid, CharHp)
   addComponent(world, eid, CharScale)
   addComponent(world, eid, Phys)
@@ -76,8 +69,6 @@ export function spawnCharacter(
   addComponent(world, eid, Tint)
   addComponent(world, eid, Depth)
   Slot.v[eid] = slot
-  Post.v[eid] = post
-  OrbitBias.v[eid] = def.orbit
   Follow.x[eid] = x
   Follow.y[eid] = y
   Follow.vx[eid] = 0
@@ -85,18 +76,15 @@ export function spawnCharacter(
   VisOff.x[eid] = 0
   VisOff.y[eid] = 0
   Follow.k[eid] = FOLLOW.kBase * (1 + FOLLOW.kJitter * Math.sin(slot * 12.9898))
-  Wander.seed[eid] = slot * 2.399
-  Wander.amp[eid] = 0
   Breath.phase[eid] = slot * 1.3
   Pop.until[eid] = 0
   Alive.v[eid] = 1
-  Threat.v[eid] = 0
   CharAtkSlow.until[eid] = 0
   CharAtkSlow.mul[eid] = 1
   const owned = sandbox ? [] : (run.memberItems[slot] ?? [])
   const level = sandbox ? sandboxLevel() + 1 : characterLevel(characterXp(owned))
   const fx = aggregateCharacterEffects(owned, levelStatsFor(run.roster[slot]!, level))
-  const maxHp = sandbox ? sandboxHp : Math.round(memberMaxHp(fx.hpAdd, captain.hpMul) * teamFx.teamHpMul)
+  const maxHp = sandbox ? sandboxHp : memberMaxHp(fx.hpAdd, captain.hpMul)
   CharHp.hp[eid] = sandbox ? sandboxHp : waveStartHp(run.memberHp[slot] ?? MEMBER.maxHp, maxHp)
   CharHp.max[eid] = maxHp
   CharPerk.thorns[eid] = fx.thorns
@@ -105,13 +93,13 @@ export function spawnCharacter(
   Iframe.ms[eid] = MEMBER.iframesMs + fx.iframesAddMs
   Iframe.last[eid] = -1e9
   GroundHit.last[eid] = -1e9
-  Revive.ms[eid] = Math.max(1000, TEAM.reviveMs * captain.reviveMul * teamFx.reviveMul + fx.reviveAddMs)
+  Revive.ms[eid] = Math.max(1000, TEAM.reviveMs * captain.reviveMul + fx.reviveAddMs)
   Revive.at[eid] = 0
   Hurt.radius[eid] = MEMBER.radius * UNIT * place.sizeMul
   CharScale.v[eid] = place.sizeMul
   Phys.vx[eid] = 0
   Phys.vy[eid] = 0
-  Phys.thrust[eid] = def.body.thrust * UNIT * teamFx.moveSpeedMul
+  Phys.thrust[eid] = def.body.thrust * UNIT
   Phys.drag[eid] = def.body.drag
   Phys.mass[eid] = def.body.mass
   Seat.v[eid] = -1

@@ -32,7 +32,6 @@ import { updateEnemyGates } from '../updateEnemyGates'
 import { tickPoison } from '../tickPoison'
 import { tintEnemies } from '../tintEnemies'
 import { updateDormancy } from '../updateDormancy'
-import { updateOrbit } from '../updateOrbit'
 import { cullProjectiles } from '../cullProjectiles'
 import { hitDirectProjectiles } from '../hitDirectProjectiles'
 import { hitSweptProjectiles } from '../hitSweptProjectiles'
@@ -47,9 +46,8 @@ const STEERERS = [steerChase, steerRoam, steerFlee, steerStandoff, steerDetonate
 export const SIM_PIPELINE = pipeline([
   refoldBattleFx,
   updateDormancy,
-  updateOrbit,
   stepHandover,
-  { run: moveTeam, after: [updateOrbit, stepHandover] },
+  { run: moveTeam, after: [stepHandover] },
   { run: layoutTeam, after: [moveTeam] },
   { run: animateCharacters, after: [layoutTeam] },
   reviveCharacters,

@@ -205,7 +205,7 @@ export function captainStatGroups(def: CaptainDef): StatGroup[] {
     `编制上限 ${def.teamSize} 人 · 每波结束固定招募 1 人` +
       (def.startWave > 1 ? ` · 从第 ${def.startWave} 波开始` : '') +
       (def.startCoins > 0 ? ` · 开局 ${def.startCoins} 金币` : ''),
-    `移速 ${grid(def.moveSpeed)}/秒 · 金币拾取 ${grid(def.coinMagnet)}`,
+    `金币拾取 ${grid(def.coinMagnet)}`,
   ]
   if (def.hpMul !== 1) lines.push(`全队生命 ×${+def.hpMul.toFixed(2)}`)
   if (def.reviveMul !== 1) lines.push(`复活时间 ×${+def.reviveMul.toFixed(2)}`)
@@ -220,6 +220,6 @@ export function captainStatGroups(def: CaptainDef): StatGroup[] {
         ...def.skill.abilities.flatMap((w) => abilityStatLines(w)),
       ],
     },
-    { icon: '1f45f', title: '团队', lines: [...lines, '团队增益来自战斗后的经验升级卡（三选一）'] },
+    { icon: '1f45f', title: '团队', lines },
   ]
 }

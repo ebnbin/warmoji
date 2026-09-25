@@ -37,7 +37,6 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
     emoji: src.emoji,
     name: src.name,
     desc: src.desc,
-    orbit: src.orbit,
     body: src.body,
     carriers: [...src.weapons.map(weaponCarrier), ...src.innate.map(innateCarrier)],
   }

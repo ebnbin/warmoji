@@ -16,7 +16,7 @@ import { applyBackground } from '../util/background'
 import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
-import { getRun, setGuardCenter, teamStep } from '../run/state'
+import { getRun, teamStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAPS } from '../data/maps'
 import { makeWorld } from './world'
@@ -46,8 +46,6 @@ import { settleWave } from './systems/shared/wave'
 import { isBossWave, isEliteWave, waveAt, waveDurationMs, WAVE } from '../data/waves'
 import { xpToNext } from '../run/xp'
 import { CAPTAINS } from '../data/captains'
-import { aggregateTeamCards } from '../data/cards'
-import type { TeamEffects } from '../types/items'
 import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox/knobs'
 import { tickSkillCd } from '../run/state'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
@@ -94,11 +92,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private ready = false
   sandbox = false
   run!: RunState
-  private teamFx!: TeamEffects
   private ending = false
   private waveBaseKills = 0
   private waveBaseCoins = 0
-  private waveBaseLevel = 1
   private hpBars: Phaser.GameObjects.Graphics[] = []
   private shownHp: number[] = []
   private deadTexts: Phaser.GameObjects.Text[] = []
@@ -139,7 +135,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.ending = false
     this.waveBaseKills = 0
     this.waveBaseCoins = 0
-    this.waveBaseLevel = 1
     this.hpBars = []
     this.shownHp = []
     this.deadTexts = []
@@ -222,7 +217,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const run = getRun()
     this.run = run
     this.sandbox = run.sandbox
-    this.teamFx = aggregateTeamCards(run.teamCards)
     const mapDef = MAPS[run.mapId]
     applyBackground(mapDef.palette)
     this.map = viewFor(run.mapId)
@@ -331,7 +325,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     if (!run.sandbox) this.scheduleCarriers()
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
-    this.waveBaseLevel = run.xp.level
     if (!run.sandbox && isEliteWave(run.wave)) {
       this.time.delayedCall(600, () => {
         const sim = this.sim
@@ -442,7 +435,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const s = CAPTAINS[this.run.captainId].skill
     return {
       remainMs: this.run.skillCdMs,
-      cdMs: s.cdMs * this.teamFx.skillCdMul,
+      cdMs: s.cdMs,
     }
   }
 
@@ -473,7 +466,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const sim = this.sim
     if (!sim || sim.over || this.ending || this.run.skillCdMs > 0) return false
     const s = CAPTAINS[this.run.captainId].skill
-    this.run.skillCdMs = s.cdMs * this.teamFx.skillCdMul
+    this.run.skillCdMs = s.cdMs
     playSfx('levelup')
     this.hud.emit(HudEvent.SkillCast, s.name)
     requestCast(sim, sim.captain)
@@ -482,7 +475,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   squadSnapshot(): SquadSnapshot | null {
     const sim = this.sim
-    if (!sim || sim.leader < 0) return null
+    if (!sim || sim.characters.length < 2) return null
     return {
       leaderSlot: sim.characters.indexOf(sim.leader),
       switching: sim.handover !== null,
@@ -569,17 +562,15 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.ending = true
     const sim = this.sim!
     const run = sim.run
-    if (sim.leader >= 0) setGuardCenter(run, run.roster[sim.characters.indexOf(sim.leader)]!)
+    run.leaderId = run.roster[sim.characters.indexOf(sim.leader)]!
     playSfx('wave')
     this.hud.emit(HudEvent.WaveComplete, {
       wave: run.wave - 1,
       kills: run.kills - this.waveBaseKills,
       coins: run.coins - this.waveBaseCoins,
-      levels: run.xp.level - this.waveBaseLevel,
     })
     this.time.delayedCall(WAVE.summaryMs, () => {
       if (finished) this.scene.start(SceneKey.Result, { win: true })
-      else if (run.cardDraws > 0) this.scene.start(SceneKey.Cards)
       else this.scene.start(teamStep(run) ?? SceneKey.Shop)
     })
   }

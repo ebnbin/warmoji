@@ -7,7 +7,7 @@ import type { Sim } from '../sim'
 export function moveTeam(sim: Sim): void {
   const dt = Math.min(sim.dtMs, 50) / 1000
   if (dt <= 0) return
-  const mover = sim.leader >= 0 ? sim.leader : sim.captain
+  const mover = sim.leader
   const thrust = Phys.thrust[mover]! * sim.battleFx.moveSpeedMul
   const from = { x: centerX(sim), y: centerY(sim) }
   const next = stepBody(

@@ -14,7 +14,6 @@ interface CaptainOf<A> {
   readonly desc: string
   readonly skill: CaptainSkillOf<A>
   readonly teamSize: number
-  readonly moveSpeed: number
   readonly coinMagnet: number
   readonly hpMul: number
   readonly reviveMul: number

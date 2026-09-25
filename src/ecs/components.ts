@@ -64,22 +64,16 @@ export const RENDERABLE: QueryTerm[] = [Transform, Sprite, Tint, Depth]
 export const Character = {}
 
 export const Slot = { v: i32() }
-export const Post = { v: i32() }
-
-export const OrbitBias = { v: f32() }
 
 export const Follow = { x: f32(), y: f32(), vx: f32(), vy: f32(), k: f32() }
 
 export const VisOff = { x: f32(), y: f32() }
-
-export const Wander = { seed: f32(), amp: f32() }
 
 export const Breath = { phase: f32() }
 
 export const Pop = { until: f32(), ms: f32(), size: f32(), back: u8(), alpha: f32() }
 
 export const Alive = { v: u8() }
-export const Threat = { v: u8() }
 
 export const CharPerk = { thorns: f32(), killHeal: f32(), regenPerSec: f32() }
 
@@ -446,8 +440,6 @@ export const Seat = { v: i32Fill(-1), ghost: u8() }
 export const Facing = { x: f32(), y: f32(), vx: f32(), vy: f32() }
 
 export const Magnet = { radius: f32() }
-
-export const Orbit = { phase: f32(), driver: i32Fill(-1) }
 
 export const TeamDamage = { mul: f32(), until: f32() }
 

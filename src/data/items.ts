@@ -2,27 +2,8 @@ import itemsJson from '../assets/items.json'
 import economyJson from '../assets/economy.json'
 import { fromJson } from './json'
 import { keysOf } from '../util/record'
-import type { CharacterEffects, TeamEffects, Economy, ItemRarity, ItemDef, ItemId } from '../types/items'
+import type { CharacterEffects, Economy, ItemRarity, ItemDef, ItemId } from '../types/items'
 import type { AbilityDef } from '../types/abilityDefs'
-
-const TEAM_FX_IDENTITY: TeamEffects = {
-  moveSpeedMul: 1,
-  magnetMul: 1,
-  doubleCoinChance: 0,
-  teamDamageMul: 1,
-  xpGainMul: 1,
-  enemySlowMul: 1,
-  waveHealRatio: 0,
-  waveCoins: 0,
-  teamCooldownMul: 1,
-  critAdd: 0,
-  teamHpMul: 1,
-  reviveMul: 1,
-  skillCdMul: 1,
-  shopDiscountMul: 1,
-  freeRerolls: 0,
-  draftSize: 0,
-}
 
 const ECON = fromJson<Economy>(economyJson)
 
@@ -91,37 +72,6 @@ export function aggregateCharacterEffects(
   return fx
 }
 
-export function foldTeamEffects(parts: readonly Partial<TeamEffects>[]): TeamEffects {
-  const fx: TeamEffects = { ...TEAM_FX_IDENTITY }
-  for (const e of parts) {
-    fx.moveSpeedMul *= e.moveSpeedMul ?? 1
-    fx.magnetMul *= e.magnetMul ?? 1
-    fx.doubleCoinChance += e.doubleCoinChance ?? 0
-    fx.teamDamageMul *= e.teamDamageMul ?? 1
-    fx.xpGainMul *= e.xpGainMul ?? 1
-    fx.enemySlowMul *= e.enemySlowMul ?? 1
-    fx.waveHealRatio += e.waveHealRatio ?? 0
-    fx.waveCoins += e.waveCoins ?? 0
-    fx.teamCooldownMul *= e.teamCooldownMul ?? 1
-    fx.critAdd += e.critAdd ?? 0
-    fx.teamHpMul *= e.teamHpMul ?? 1
-    fx.reviveMul *= e.reviveMul ?? 1
-    fx.skillCdMul *= e.skillCdMul ?? 1
-    fx.shopDiscountMul *= e.shopDiscountMul ?? 1
-    fx.freeRerolls += e.freeRerolls ?? 0
-    fx.draftSize += e.draftSize ?? 0
-  }
-  fx.doubleCoinChance = Math.min(0.9, fx.doubleCoinChance)
-  fx.enemySlowMul = Math.max(0.6, fx.enemySlowMul)
-  fx.waveHealRatio = Math.min(0.6, Math.max(0, fx.waveHealRatio))
-  fx.critAdd = Math.min(0.5, Math.max(0, fx.critAdd))
-  fx.reviveMul = Math.max(0.3, fx.reviveMul)
-  fx.skillCdMul = Math.max(0.3, fx.skillCdMul)
-  fx.shopDiscountMul = Math.max(0.4, fx.shopDiscountMul)
-  fx.teamHpMul = Math.max(0.3, fx.teamHpMul)
-  fx.teamCooldownMul = Math.max(0.4, fx.teamCooldownMul)
-  return fx
-}
 
 /** 只缩放空间参数与弹速；伤害/冷却由运行时倍率处理，此处不得再乘 */
 export function resolveAbilityDef(w: AbilityDef, fx: CharacterEffects): AbilityDef {

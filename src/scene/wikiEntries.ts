@@ -5,7 +5,6 @@ import type { EnemyDef } from '../types/enemies'
 import { MAP_IDS, MAPS, bossFor } from '../data/maps'
 import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
-import { CARDS } from '../data/cards'
 import { ITEMS, RARITIES } from '../data/items'
 import type { ItemDef } from '../types/items'
 import { captainStatGroups, characterStatGroups, ABILITY_KIND_LABEL } from './statLines'
@@ -151,15 +150,7 @@ export function wikiGroups(): WikiGroup[] {
             `池归属 ${i.pool === 'all' ? '通用' : ABILITY_KIND_LABEL[i.pool]} · 角色经验 +${i.upgradeXp}${i.minLevel && i.minLevel > 1 ? ` · ${i.minLevel} 级解锁` : ''}`,
           ],
         })),
-        ...Object.values(CARDS).map((c) => ({
-          emoji: c.emoji,
-          name: c.name,
-          desc: c.desc,
-          lines: [
-            `升级卡 · ${RARITIES[c.rarity].label} · 升级时三选一，提供全队增益`,
-            c.maxLevel > 1 ? `可叠加至 ${c.maxLevel} 级（每级再叠加一次）` : '唯一（不可叠加）',
-          ],
-        })),
+
       ],
     },
   ]
