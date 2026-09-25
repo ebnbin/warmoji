@@ -13,13 +13,14 @@ import { StudioScene } from './scene/StudioScene'
 import { UIScene } from './scene/UIScene'
 import { WikiScene } from './scene/WikiScene'
 import { EcsBattleScene } from './ecs/EcsBattleScene'
-import { SandboxScene } from './ecs/sandbox/SandboxScene'
-import { browserStorage } from './util/storage'
-import { getRun } from './run/state'
+import { browserStorage, StorageKey } from './util/storage'
+import { endRun, getRun } from './run/state'
 import { loadSettings } from './save/settings'
 import { initBgm, playBgm, setBgmEnabled } from './audio/bgm'
-import { initSfx, setSfxEnabled } from './audio/sfx'
-import { isStandalone, nudgeIosViewport, refreshViewport, viewport } from './util/apply'
+import { initSfx, playSfx, setSfxEnabled } from './audio/sfx'
+import { applyCamera, isStandalone, nudgeIosViewport, refreshViewport, safeInsets, textRes, viewport } from './util/apply'
+import { UI_FONT } from './util/fonts'
+import { installDevTools, registerDevSection } from './devtools'
 import { SceneKey } from './scene/keys'
 
 const badge = document.getElementById('build-badge')
@@ -42,7 +43,40 @@ const game = new Phaser.Game({
   height: Math.round(viewport.cssHeight * viewport.dpr),
   input: { activePointers: 3 },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, RecruitScene, FormationScene, CardScene, ShopScene, EcsBattleScene, UIScene, SandboxScene, ResultScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, CaptainScene, RecruitScene, FormationScene, CardScene, ShopScene, EcsBattleScene, UIScene, ResultScene],
+})
+
+installDevTools(game, {
+  key: SceneKey.DevTools,
+  storageKey: StorageKey.DevTools,
+  accent: 0xffdc5d,
+  font: { family: UI_FONT, size: 22 },
+  layout: (scene) => {
+    applyCamera(scene)
+    return { width: viewport.logicalWidth, height: viewport.logicalHeight, insets: safeInsets, textResolution: textRes() }
+  },
+  onTap: () => playSfx('click'),
+})
+
+registerDevSection({
+  id: 'app',
+  title: '应用',
+  items: () => [
+    { kind: 'text', mono: true, read: () => `构建 ${__BUILD_HASH__} · ${__BUILD_TIME__}` },
+    {
+      kind: 'action',
+      label: '回到主菜单',
+      desc: '结束当前一局，停掉所有业务场景',
+      run: (): void => {
+        endRun()
+        for (const s of game.scene.getScenes(false)) {
+          const status = s.sys.settings.status
+          if (s.scene.key !== SceneKey.DevTools && status >= Phaser.Scenes.RUNNING && status <= Phaser.Scenes.SLEEPING) s.scene.stop()
+        }
+        game.scene.start(SceneKey.Menu)
+      },
+    },
+  ],
 })
 
 game.events.once(Phaser.Core.Events.READY, () => {
@@ -87,4 +121,3 @@ window.addEventListener('orientationchange', () => {
   window.setTimeout(() => refreshViewport(game), 400)
   window.setTimeout(() => refreshViewport(game), 1000)
 })
-

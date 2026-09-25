@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/check-defs.ts && tsc --noEmit && vite build",
+    "build": "node scripts/check-defs.ts && node scripts/check-devtools.ts && tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

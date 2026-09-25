@@ -16,6 +16,7 @@ const buf: Frame[] = []
 let head = 0
 let filled = 0
 let warmUntil = 0
+let markSeq = 0
 
 let attached: Phaser.Game | undefined
 let stepStart = 0
@@ -49,7 +50,9 @@ function onPostRender(): void {
 
 function record(total: number): void {
   const f: Frame = {
-    total, update: lastUpdate, render: lastRender,
+    total,
+    update: lastUpdate,
+    render: lastRender,
     rest: Math.max(0, total - lastUpdate - lastRender),
     jitter: prevTotal > 0 ? Math.abs(total - prevTotal) : 0,
     seq: nextSeq++,
@@ -88,7 +91,17 @@ export function resetMetrics(): void {
   filled = 0
   prevTotal = 0
   pending = false
+  markSeq = nextSeq
   warmUntil = performance.now() + WARMUP_MS
+}
+
+/** 统计从下一帧起算，此前的样本只留在曲线里 */
+export function markMetrics(): void {
+  markSeq = nextSeq
+}
+
+export function metricsMarkSeq(): number {
+  return markSeq
 }
 
 function percentile(sorted: readonly number[], p: number): number {
@@ -119,12 +132,8 @@ function stat(v: readonly number[]): { mean: number; p50: number; p95: number; p
   return { mean: sum / v.length, p50: percentile(s, 50), p95: percentile(s, 95), p99: percentile(s, 99), max: s[s.length - 1]! }
 }
 
-export function nextFrameSeq(): number {
-  return nextSeq
-}
-
-export function metricsReport(refreshHz = 60, fromSeq = 0): MetricsReport {
-  const frames = buf.slice(0, filled).filter((f) => f.seq >= fromSeq)
+export function metricsReport(refreshHz = 60): MetricsReport {
+  const frames = buf.slice(0, filled).filter((f) => f.seq >= markSeq)
   const total = stat(frames.map((f) => f.total))
   const update = stat(frames.map((f) => f.update))
   const render = stat(frames.map((f) => f.render))
@@ -161,4 +170,58 @@ export function recentFrames(n: number): { total: number; seq: number }[] {
     if (f) out.push(f)
   }
   return out
+}
+
+let rafStarted = false
+let rafPeakHz = 0
+let rafFrames = 0
+let rafWindowStart = 0
+
+export function startRafMeter(): void {
+  if (rafStarted) return
+  rafStarted = true
+  rafWindowStart = performance.now()
+  const tick = (now: number): void => {
+    rafFrames++
+    const span = now - rafWindowStart
+    if (span >= 1000) {
+      rafPeakHz = Math.max(rafPeakHz, Math.round((rafFrames * 1000) / span))
+      rafFrames = 0
+      rafWindowStart = now
+    }
+    requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+}
+
+export function rafHz(): number {
+  return rafPeakHz
+}
+
+let rendererCache: string | undefined
+
+function shortGpu(raw: string): string {
+  if (raw === '') return '未知 GPU'
+  if (/swiftshader|llvmpipe|software/i.test(raw)) return 'SwiftShader 软件渲染 · 时间读数不可用'
+  const m = /Renderer:\s*([^,()]+)/.exec(raw) ?? /^ANGLE \([^,]+,\s*([^,()]+)/.exec(raw)
+  return (m?.[1] ?? raw).trim().slice(0, 48)
+}
+
+export function rendererInfo(game: Phaser.Game): string {
+  if (!rendererCache) {
+    if (game.renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer) {
+      const gl = game.renderer.gl
+      const ext = gl.getExtension('WEBGL_debug_renderer_info')
+      const raw = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : ''
+      rendererCache = `WebGL · ${shortGpu(raw)}`
+    } else {
+      rendererCache = 'Canvas'
+    }
+  }
+  return rendererCache
+}
+
+export function heapMB(): number | undefined {
+  const m = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory
+  return m ? Math.round(m.usedJSHeapSize / 1048576) : undefined
 }

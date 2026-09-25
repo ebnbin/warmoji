@@ -12,6 +12,6 @@ export enum SceneKey {
   Shop = 'shop',
   Battle = 'battle',
   Ui = 'ui',
-  Sandbox = 'sandbox',
+  DevTools = 'devtools',
   Result = 'result',
 }

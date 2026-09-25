@@ -59,6 +59,7 @@ import type { Burst } from './outbox'
 import { rollWaveCarriers } from './utils/battleFx'
 import { centerX, centerY } from './utils/team'
 import { SceneKey } from '../scene/keys'
+import { attachBattleDevTools } from './devtoolsSections'
 
 const BOSS_SETTLE_MS = 700
 
@@ -192,13 +193,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     setActiveHudHost(this)
     this.scene.launch(SceneKey.Ui)
-    this.scene.launch(SceneKey.Sandbox)
+    attachBattleDevTools(this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.bootGen++
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.scene.stop(SceneKey.Ui)
-      this.scene.stop(SceneKey.Sandbox)
       this.atlas?.dispose()
       this.cues?.destroy()
       this.rings?.destroy()

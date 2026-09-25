@@ -4,6 +4,7 @@ export enum StorageKey {
   Map = 'warmoji.map.v1',
   Recruit = 'warmoji.recruit.v1',
   Highscore = 'warmoji.highscore.v2',
+  DevTools = 'warmoji.devtools.v1',
 }
 
 export interface StringStorage {
