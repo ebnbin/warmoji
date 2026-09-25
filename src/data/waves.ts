@@ -1,8 +1,9 @@
 import { SPAWN } from './enemies'
-import { PROGRESSION } from '../../defs/progression'
+import progressionJson from '../assets/progression.json'
+import { fromJson } from './json'
 import type { Progression, WaveState } from '../types/waves'
 
-const P: Progression = PROGRESSION
+const P = fromJson<Progression>(progressionJson)
 
 export function waveAt(elapsedSec: number): WaveState {
   const t = Math.max(0, elapsedSec)

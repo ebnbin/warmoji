@@ -1,9 +1,10 @@
-import { LEVEL_STATS as LEVEL_TABLE } from '../../defs/levels'
+import levelsJson from '../assets/levels.json'
+import { fromJson } from './json'
 import type { CharacterId } from '../types/characters'
 
 import type { Tier } from '../types/levels'
 
-export const LEVEL_STATS: Record<CharacterId, readonly [Tier, Tier]> = LEVEL_TABLE
+export const LEVEL_STATS = fromJson<Record<CharacterId, readonly [Tier, Tier]>>(levelsJson)
 
 export function levelStatsFor(id: CharacterId, level: number): Tier[] {
   if (level <= 1) return []

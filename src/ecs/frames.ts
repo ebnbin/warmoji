@@ -1,4 +1,4 @@
-import type { AnimClipId } from '../emoji/anim'
+import type { AnimClipId } from '../types/anim'
 import type { OutlineKind } from '../emoji/svg'
 
 export interface FrameIndex {

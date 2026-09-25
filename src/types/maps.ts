@@ -1,4 +1,4 @@
-import type { MAPS } from '../../defs/maps'
+import type mapsJson from '../assets/maps.json'
 import type { Palette } from '../util/palette'
 import type { EnemyKind, EnemyMixRow } from './enemies'
 
@@ -105,7 +105,7 @@ export interface MapDef {
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
-export type MapId = keyof typeof MAPS
+export type MapId = keyof typeof mapsJson
 
 export type Hazard = 'coldWater' | 'poisonFog' | 'meteor'
 

@@ -1,5 +1,5 @@
 import { ANIM_DEF } from '../../../emoji/anim'
-import type { AnimClipId } from '../../../emoji/anim'
+import type { AnimClipId } from '../../../types/anim'
 import type { OutlineKind } from '../../../emoji/svg'
 import { Anim } from '../../components'
 import { animId, animOutline } from '../../store'

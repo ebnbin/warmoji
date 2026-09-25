@@ -1,4 +1,3 @@
-import type { BATTLEFIELD } from '../../defs/battlefield'
 import type { MapId } from './maps'
 
 export type Polarity = 'buff' | 'debuff'
@@ -9,8 +8,8 @@ export interface BattleEffects {
   critAdd: number
   enemySlowMul: number
 }
-interface FieldPickupOf<Id> {
-  readonly id: Id
+export interface FieldPickupDef {
+  readonly id: string
   readonly emoji: string
   readonly name: string
   readonly desc: string
@@ -18,11 +17,8 @@ interface FieldPickupOf<Id> {
   readonly durationMs: number
   readonly fx: Partial<BattleEffects>
 }
-export type FieldPickupSource = FieldPickupOf<string>
-export type FieldPickupId = (typeof BATTLEFIELD)['pools'][MapId][number]['id']
-export type FieldPickupDef = FieldPickupOf<FieldPickupId>
 export interface BattlefieldTuning {
-  readonly pools: Record<MapId, readonly FieldPickupSource[]>
+  readonly pools: Record<MapId, readonly FieldPickupDef[]>
   readonly field: {
     readonly grabRadiusU: number
     readonly groundMs: number

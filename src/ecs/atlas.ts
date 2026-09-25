@@ -4,7 +4,7 @@ import type { OutlineKind } from '../emoji/svg'
 import { keysOf } from '../util/record'
 import { emojiSvgText, svgToImage } from '../emoji/textures'
 import { animClipOf, bakeAnimFrame } from '../emoji/anim'
-import type { AnimClipId } from '../emoji/anim'
+import type { AnimClipId } from '../types/anim'
 
 const CELL = 256
 const PAGE = 2048

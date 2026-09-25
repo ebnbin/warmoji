@@ -1,7 +1,8 @@
-import { PICKUPS as PICKUP_TABLE } from '../../defs/pickups'
+import pickupsJson from '../assets/pickups.json'
+import { fromJson } from './json'
 import type { PickupDef, PickupId, PickupTable } from '../types/pickups'
 
-const PT: PickupTable = PICKUP_TABLE
+const PT = fromJson<PickupTable>(pickupsJson)
 
-export const PICKUPS: Record<PickupId, PickupDef> = PICKUP_TABLE.defs
+export const PICKUPS = fromJson<Record<PickupId, PickupDef>>(pickupsJson.defs)
 export const PICKUP = PT.pipeline

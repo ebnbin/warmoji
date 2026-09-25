@@ -1,5 +1,6 @@
-import { CHARACTERS as CHARACTER_TABLE } from '../../defs/characters'
-import { TEAM_BASELINE } from '../../defs/team'
+import charactersJson from '../assets/characters.json'
+import teamJson from '../assets/team.json'
+import { fromJson } from './json'
 import { keysOf, mapValues } from '../util/record'
 import { ABILITIES } from './abilities'
 
@@ -41,6 +42,7 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
   }
 }
 
+const CHARACTER_TABLE = fromJson<Record<CharacterId, CharacterAuthoring>>(charactersJson)
 export const CHARACTERS: Record<CharacterId, CharacterDef> = mapValues(CHARACTER_TABLE, hydrateCharacter)
 export const ROSTER_IDS: readonly CharacterId[] = keysOf(CHARACTERS)
 
@@ -68,6 +70,6 @@ export function upgradeCardsFor(def: CharacterDef): readonly [UpgradeCard, Upgra
   return [pick(0), pick(1)]
 }
 
-const TB: TeamBaseline = TEAM_BASELINE
+const TB = fromJson<TeamBaseline>(teamJson)
 export const TEAM = TB.team
 export const MEMBER = TB.member

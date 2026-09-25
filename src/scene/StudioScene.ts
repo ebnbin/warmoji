@@ -17,7 +17,8 @@ import {
   flattenTree,
   parseSvgTree,
 } from '../emoji/anim'
-import type { AnimClip, AnimClipId, AnimRecipe, AnimTemplate, SvgTree, TreeRow } from '../emoji/anim'
+import type { AnimClip, AnimRecipe, AnimTemplate, SvgTree, TreeRow } from '../emoji/anim'
+import type { AnimClipId } from '../types/anim'
 import { applyBackground } from '../util/background'
 import { emojiKey, emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
 import { emojiImage } from '../emoji/hold'

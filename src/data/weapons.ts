@@ -1,4 +1,5 @@
-import { WEAPONS as WEAPON_TABLE } from '../../defs/weapons'
+import weaponsJson from '../assets/weapons.json'
+import { fromJson } from './json'
 import { mapValues } from '../util/record'
 import { ABILITIES } from './abilities'
 
@@ -13,4 +14,5 @@ function hydrate(w: WeaponSource): WeaponDef {
   }
 }
 
+const WEAPON_TABLE = fromJson<Record<WeaponId, WeaponSource>>(weaponsJson)
 export const WEAPONS: Record<WeaponId, WeaponDef> = mapValues(WEAPON_TABLE, hydrate)
