@@ -46,8 +46,8 @@ export const CAPTAINS = {
   party: {
     emoji: '1f973',
     name: '派对之星',
-    desc: '气氛组拉满，编制上限 6 人',
-    teamSize: 6,
+    desc: '气氛组拉满',
+    teamSize: 5,
     coinMagnet: 2.5,
     hpMul: 0.95,
     reviveMul: 1,
@@ -130,8 +130,8 @@ export const CAPTAINS = {
   tester: {
     emoji: '1f9ea',
     name: '测试员',
-    desc: '测试专用：编制 8、无限金币、永远满豆，无任何增益',
-    teamSize: 8,
+    desc: '测试专用：无限金币，无任何增益',
+    teamSize: 5,
     coinMagnet: 2.25,
     hpMul: 1,
     reviveMul: 1,

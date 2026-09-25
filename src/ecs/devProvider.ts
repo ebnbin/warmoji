@@ -1,7 +1,7 @@
 import type { EcsBattleScene } from './EcsBattleScene'
 import { devFlagItem, markPerf, resetPerf } from '../devtools'
 import type { DevItem, DevProvider } from '../devtools'
-import { CHARACTERS, ROSTER_IDS } from '../data/characters'
+import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { mapEnemyRoster } from '../data/maps'
 import {
   applySandboxPreset,
@@ -189,7 +189,7 @@ function sandboxItems(battle: EcsBattleScene): DevItem[] {
     },
     {
       kind: 'flags',
-      label: '角色 · 最少 1 最多 8 · 改动后重建队伍',
+      label: `角色 · 最少 1 最多 ${TEAM.maxSize} · 改动后重建队伍`,
       options: ROSTER_IDS.map((id) => ({ id, label: CHARACTERS[id].name })),
       has: (id) => ROSTER_IDS.some((c) => c === id && isSandboxCharacterOn(c)),
       toggle: (id): void => {

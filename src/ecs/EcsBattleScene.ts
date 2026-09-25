@@ -475,7 +475,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   squadSnapshot(): SquadSnapshot | null {
     const sim = this.sim
-    if (!sim || sim.characters.length < 2) return null
+    if (!sim) return null
     return {
       leaderSlot: sim.characters.indexOf(sim.leader),
       switching: sim.handover !== null,

@@ -45,6 +45,7 @@ export interface TeamBaseline {
     readonly ringRadius: number
     readonly smallRingRadius: number
     readonly pairGap: number
+    readonly maxSize: number
     readonly reviveMs: number
     readonly leaderSizeMul: number
     readonly followerSizeMul: number

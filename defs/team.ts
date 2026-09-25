@@ -5,6 +5,7 @@ export const TEAM_BASELINE = {
     ringRadius: 0.8,
     smallRingRadius: 0.58,
     pairGap: 1.1,
+    maxSize: 5,
     reviveMs: 10_000,
     leaderSizeMul: 1.25,
     followerSizeMul: 0.75,

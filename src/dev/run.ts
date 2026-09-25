@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
 import type { DevProvider, DevSection } from '../devtools'
 import { CAPTAINS, PICKABLE_CAPTAIN_IDS } from '../data/captains'
-import { CHARACTERS, ROSTER_IDS } from '../data/characters'
+import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { MAP_IDS, MAPS } from '../data/maps'
 import { waveDurationMs } from '../data/waves'
 import { beginSandboxRun } from '../ecs/sandbox/knobs'
@@ -15,7 +15,7 @@ let mapId: MapId = MAP_IDS[0]!
 let captainId: CaptainId = PICKABLE_CAPTAIN_IDS[0]!
 let teamSize = 1
 let startWave = 1
-const TEAM_SIZES = [1, 2, 4, 8]
+const TEAM_SIZES = Array.from({ length: TEAM.maxSize }, (_, i) => i + 1)
 const START_WAVES = [1, 2, 3, 5, 8, 10]
 
 function newRun(): void {
