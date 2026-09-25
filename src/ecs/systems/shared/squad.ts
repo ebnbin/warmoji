@@ -42,3 +42,4 @@ export const fanDistance = numChoice('team.fanDistance', '扇形距离', '', [1,
 export const recallDist = numChoice('team.recall', '掉队回收', '离队长超过多少格直接拉回目标位，唯一的非物理规则', [10, 14, 0], SQUAD.recallDist, (v) => (v === 0 ? '不回收' : `${v} 格`))
 export const iceTraction = numChoice('team.iceTraction', '冰面抓地', '冰面对推力与阻力的共同折扣', [0.06, 0.12, 0.25], MAPS.ice.ice?.traction ?? 1, (v) => String(v))
 
+export const handoverMs = numChoice('team.handoverMs', '交接时长', '换队长时尺寸、相机与无敌的过渡时间', [250, 500, 800], SQUAD.handoverMs, (v) => `${v} ms`)

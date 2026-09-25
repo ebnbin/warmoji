@@ -33,11 +33,33 @@ export interface FieldCollected {
   polarity: Polarity
 }
 
+export interface SquadMember {
+  emoji: string
+  name: string
+  alive: boolean
+  hp: number
+  max: number
+  reviveSec: number
+}
+
+/** 满员才有队长；members 按入队顺序 */
+export interface SquadSnapshot {
+  leaderSlot: number
+  switching: boolean
+  members: SquadMember[]
+}
+
+export interface LeaderChanged {
+  emoji: string
+  name: string
+}
+
 export enum HudEvent {
   WaveWarning = 'wave-warning',
   WaveComplete = 'wave-complete',
   SkillCast = 'skill-cast',
   FieldCollected = 'field-collected',
+  LeaderChanged = 'leader-changed',
 }
 
 interface HudPayload {
@@ -45,6 +67,7 @@ interface HudPayload {
   [HudEvent.WaveComplete]: WaveSummary
   [HudEvent.SkillCast]: string
   [HudEvent.FieldCollected]: FieldCollected
+  [HudEvent.LeaderChanged]: LeaderChanged
 }
 
 export interface HudEvents {
@@ -70,6 +93,8 @@ export interface HudHost {
   hudSnapshot(): HudSnapshot
   skillSnapshot(): { remainMs: number; cdMs: number }
   castSkill(): boolean
+  squadSnapshot(): SquadSnapshot | null
+  switchLeader(slot: number): boolean
 }
 
 export interface HudInput {

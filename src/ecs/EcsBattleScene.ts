@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { UNIT } from '../util/units'
-import { MEMBER } from '../data/characters'
+import { CHARACTERS, MEMBER } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
 import { burstEmitter, setOverlayFill } from '../util/fx'
@@ -16,7 +16,7 @@ import { applyBackground } from '../util/background'
 import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
-import { getRun, teamStep } from '../run/state'
+import { getRun, setGuardCenter, teamStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAPS } from '../data/maps'
 import { makeWorld } from './world'
@@ -51,7 +51,7 @@ import type { TeamEffects } from '../types/items'
 import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox/knobs'
 import { tickSkillCd } from '../run/state'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
-import type { HudEvents, HudHost } from '../run/hudHost'
+import type { HudEvents, HudHost, SquadSnapshot } from '../run/hudHost'
 import type { HudSnapshot } from '../run/hudHost'
 import type { Sim } from './sim'
 import { drain } from './outbox'
@@ -63,6 +63,7 @@ import { battleDevProvider, watchSandboxSteady } from './devProvider'
 import { defineDevFlag } from '../devtools'
 import type { DevProvider, DevProviderHost } from '../devtools'
 import { applyDamage, gainTeamXp } from './systems/shared/combat'
+import { canSwitchLeader, handoverCamOffset, switchLeader } from './systems/shared/leader'
 import { telegraphOne } from './entities/enemy'
 import { enemyDef } from './store'
 
@@ -105,6 +106,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private hitShakeOn = false
   private seenHitCount = 0
   private bossDownAt = -1
+  private shownLeader = -1
   private damageText?: DamageTextLayer
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -144,6 +146,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.shownCountdown = []
     this.seenHitCount = 0
     this.bossDownAt = -1
+    this.shownLeader = -1
     this.damageText = undefined
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
@@ -297,6 +300,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const center = { x: this.centerObj.x, y: this.centerObj.y }
     this.sim = makeSim(this.world, atlas, run, run.sandbox, center, this.mapW, this.mapH, settings.damageNumbers)
     if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
+    this.shownLeader = this.sim.leader
     initialLayout(this.sim)
     this.sim.hooks.onStart(this.sim)
     this.map.onSimReady(this.ctx, this.sim)
@@ -476,6 +480,35 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     return true
   }
 
+  squadSnapshot(): SquadSnapshot | null {
+    const sim = this.sim
+    if (!sim || sim.leader < 0) return null
+    return {
+      leaderSlot: sim.characters.indexOf(sim.leader),
+      switching: sim.handover !== null,
+      members: sim.characters.map((m, slot) => {
+        const def = CHARACTERS[this.run.roster[slot]!]
+        return {
+          emoji: def.emoji,
+          name: def.name,
+          alive: Alive.v[m] === 1,
+          hp: CharHp.hp[m]!,
+          max: CharHp.max[m]!,
+          reviveSec: Math.max(0, Math.ceil((Revive.at[m]! - sim.elapsedMs) / 1000)),
+        }
+      }),
+    }
+  }
+
+  switchLeader(slot: number): boolean {
+    const sim = this.sim
+    if (!sim || this.ending) return false
+    const eid = sim.characters[slot]
+    if (eid === undefined || !canSwitchLeader(sim, eid)) return false
+    switchLeader(sim, eid)
+    return true
+  }
+
   applySandboxInvincible(): void {
     const sim = this.sim
     if (!sim) return
@@ -534,7 +567,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   private scheduleWaveEnd(finished: boolean): void {
     this.ending = true
-    const run = this.sim!.run
+    const sim = this.sim!
+    const run = sim.run
+    if (sim.leader >= 0) setGuardCenter(run, run.roster[sim.characters.indexOf(sim.leader)]!)
     playSfx('wave')
     this.hud.emit(HudEvent.WaveComplete, {
       wave: run.wave - 1,
@@ -584,6 +619,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     sim.view.right = wv.right
     sim.view.bottom = wv.bottom
     stepFrame(sim)
+    if (sim.leader !== this.shownLeader) {
+      this.shownLeader = sim.leader
+      const def = CHARACTERS[this.run.roster[sim.characters.indexOf(sim.leader)]!]
+      playSfx('whoosh')
+      this.hud.emit(HudEvent.LeaderChanged, { emoji: def.emoji, name: def.name })
+    }
     this.cues?.step(sim.fxMs)
     this.rings?.step(sim.fxMs)
     this.damageText?.step(sim.fxMs)
@@ -605,7 +646,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.time.delayedCall(900, () => this.scene.start(SceneKey.Result, { win: false }))
       return
     }
-    this.centerObj.setPosition(centerX(sim), centerY(sim))
+    const camOff = handoverCamOffset(sim)
+    this.centerObj.setPosition(centerX(sim) + camOff.x, centerY(sim) + camOff.y)
     this.map.step(this.ctx, sim, delta)
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)

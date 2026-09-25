@@ -14,6 +14,7 @@ import { layoutTeam } from '../layoutTeam'
 import { characterContact } from '../characterContact'
 import { characterVisual } from '../characterVisual'
 import { moveTeam } from '../moveTeam'
+import { stepHandover } from '../shared/leader'
 import { popInEnemies } from '../popInEnemies'
 import { refoldBattleFx } from '../refoldBattleFx'
 import { regenCharacters } from '../regenCharacters'
@@ -47,7 +48,8 @@ export const SIM_PIPELINE = pipeline([
   refoldBattleFx,
   updateDormancy,
   updateOrbit,
-  { run: moveTeam, after: [updateOrbit] },
+  stepHandover,
+  { run: moveTeam, after: [updateOrbit, stepHandover] },
   { run: layoutTeam, after: [moveTeam] },
   { run: animateCharacters, after: [layoutTeam] },
   reviveCharacters,
