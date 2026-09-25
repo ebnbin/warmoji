@@ -1,5 +1,6 @@
-import itemsJson from '../assets/items.json'
-import economyJson from '../assets/economy.json'
+import { ITEMS as ITEM_TABLE } from '../../defs/items'
+import { ECONOMY } from '../../defs/economy'
+import { keysOf } from '../util/record'
 import type { CharacterEffects, TeamEffects, Economy, ItemRarity, ItemDef, ItemId } from '../types/items'
 import type { AbilityDef } from '../types/abilityDefs'
 
@@ -22,7 +23,7 @@ const TEAM_FX_IDENTITY: TeamEffects = {
   draftSize: 0,
 }
 
-const ECON = economyJson as unknown as Economy
+const ECON: Economy = ECONOMY
 
 export const CRIT_MUL = ECON.critMul
 
@@ -33,9 +34,9 @@ export const RARITIES: Record<ItemRarity, { label: string; color: string }> = {
   epic: { label: '史诗', color: '#ce93d8' },
 }
 
-export const ITEMS = itemsJson as unknown as Record<ItemId, ItemDef>
+export const ITEMS: Record<ItemId, ItemDef> = ITEM_TABLE
 
-export const ITEM_IDS = Object.keys(ITEMS) as readonly ItemId[]
+export const ITEM_IDS: readonly ItemId[] = keysOf(ITEMS)
 
 export function characterXp(owned: readonly ItemId[]): number {
   let xp = 0

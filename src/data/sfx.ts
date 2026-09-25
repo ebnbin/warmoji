@@ -1,4 +1,4 @@
-import sfxJson from '../assets/sfx.json'
+import { SFX as SFX_TABLE } from '../../defs/sfx'
 import type { SfxDef, SfxId } from '../types/sfx'
 
-export const SFX = sfxJson as unknown as Record<SfxId, SfxDef>
+export const SFX: Record<SfxId, SfxDef> = SFX_TABLE

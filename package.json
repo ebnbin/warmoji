@@ -4,12 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "predev": "npm run gen",
     "dev": "vite",
-    "prebuild": "npm run gen",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "gen": "node scripts/gen-defs.ts"
+    "build": "node scripts/check-defs.ts && tsc --noEmit && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "bitecs": "^0.4.0",

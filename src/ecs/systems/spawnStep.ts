@@ -13,6 +13,7 @@ import { enemyCarries, telegraphCarries, telegraphDef } from '../store'
 import { Due, Telegraph, Transform } from '../components'
 import { query, removeEntity } from 'bitecs'
 import type { Sim } from '../sim'
+import type { EnemyKind } from '../../types/enemies'
 
 function spawnIntervalScale(sim: Sim): number {
   const dn = dayNightOf(sim)
@@ -22,14 +23,14 @@ function spawnIntervalScale(sim: Sim): number {
 function spawnSandbox(sim: Sim): void {
   const d = spawnParams()
   sim.spawnCooldownMs = d.intervalMs
-  const roster = new Set<string>(mapEnemyRoster(sim.mapId).map((e) => e.kind))
-  const kinds = [...sandboxEnemySet()].filter((k) => k in ENEMIES && roster.has(k))
+  const roster = new Set<EnemyKind>(mapEnemyRoster(sim.mapId).map((e) => e.kind))
+  const kinds = [...sandboxEnemySet()].filter((k) => roster.has(k))
   if (kinds.length === 0) return
   const hpMul = sandboxDifficulty()
   let live = awakeCount(sim) + telegraphCount(sim)
   for (let i = 0; i < d.batch; i++, live++) {
     if (live >= d.cap) return
-    const raw = ENEMIES[kinds[Math.floor(sim.rng.next() * kinds.length)]!]!
+    const raw = ENEMIES[kinds[Math.floor(sim.rng.next() * kinds.length)]!]
     const def = toPx(raw)
     const pos = sim.hooks.spawnPoint(sim, raw.role === 'boss')
     spawnTelegraph(sim, def, pos.x, pos.y, Math.round(def.hp * hpMul), false, raw.role === 'boss')

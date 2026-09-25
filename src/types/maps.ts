@@ -1,6 +1,6 @@
-import mapsJson from '../assets/maps.json'
+import type { MAPS } from '../../defs/maps'
 import type { Palette } from '../util/palette'
-import type { EnemyDef, EnemyMixRow } from './enemies'
+import type { EnemyKind, EnemyMixRow } from './enemies'
 
 export interface MapDecor {
   readonly emojis: readonly string[]
@@ -103,9 +103,9 @@ export interface MapDef {
   readonly infinite?: InfiniteConfig
   readonly shrinkRing?: ShrinkRingConfig
   readonly finalWaveSub?: string
-  readonly boss: EnemyDef['kind']
+  readonly boss: EnemyKind
 }
-export type MapId = keyof typeof mapsJson
+export type MapId = keyof typeof MAPS
 export interface DecorInstance {
   emoji: string
   xU: number

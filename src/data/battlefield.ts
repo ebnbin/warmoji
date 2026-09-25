@@ -1,4 +1,4 @@
-import battlefieldJson from '../assets/battlefield.json'
+import { BATTLEFIELD } from '../../defs/battlefield'
 import type { MapId } from '../types/maps'
 import type { BattleEffects, BattlefieldTuning, FieldPickupDef, Polarity } from '../types/battlefield'
 
@@ -10,7 +10,7 @@ export const BATTLE_FX_IDENTITY: BattleEffects = {
   enemySlowMul: 1,
 }
 
-const BF = battlefieldJson as unknown as BattlefieldTuning
+const BF: BattlefieldTuning = BATTLEFIELD
 
 export const POOLS: Record<MapId, readonly FieldPickupDef[]> = BF.pools
 

@@ -1,5 +1,6 @@
-import charactersJson from '../assets/characters.json'
-import teamJson from '../assets/team.json'
+import { CHARACTERS as CHARACTER_TABLE } from '../../defs/characters'
+import { TEAM_BASELINE } from '../../defs/team'
+import { keysOf, mapValues } from '../util/record'
 import { ABILITIES } from './abilities'
 
 import type { AbilityDef } from '../types/abilityDefs'
@@ -40,12 +41,8 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
   }
 }
 
-export const CHARACTERS = Object.fromEntries(
-  Object.entries(charactersJson as unknown as Record<CharacterId, CharacterAuthoring>).map(
-    ([id, src]) => [id, hydrateCharacter(src)],
-  ),
-) as Record<CharacterId, CharacterDef>
-export const ROSTER_IDS = Object.keys(CHARACTERS) as readonly CharacterId[]
+export const CHARACTERS: Record<CharacterId, CharacterDef> = mapValues(CHARACTER_TABLE, hydrateCharacter)
+export const ROSTER_IDS: readonly CharacterId[] = keysOf(CHARACTERS)
 
 function carrierAbility(c: Carrier, level: 0 | 1 | 2): AbilityDef {
   return c.tiers[Math.min(level, c.tiers.length - 1)]!
@@ -71,6 +68,6 @@ export function upgradeCardsFor(def: CharacterDef): readonly [UpgradeCard, Upgra
   return [pick(0), pick(1)]
 }
 
-const TB = teamJson as unknown as TeamBaseline
+const TB: TeamBaseline = TEAM_BASELINE
 export const TEAM = TB.team
 export const MEMBER = TB.member

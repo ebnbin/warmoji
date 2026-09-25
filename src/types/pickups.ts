@@ -1,4 +1,4 @@
-import pickupsJson from '../assets/pickups.json'
+import type { PICKUPS } from '../../defs/pickups'
 
 export interface PickupDef {
   readonly emoji: string
@@ -13,4 +13,4 @@ export interface PickupTable {
   readonly defs: Record<string, PickupDef>
   readonly pipeline: PickupPipeline
 }
-export type PickupId = keyof typeof pickupsJson.defs
+export type PickupId = keyof typeof PICKUPS.defs

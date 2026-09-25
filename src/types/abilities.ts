@@ -1,4 +1,4 @@
-import abilitiesJson from '../assets/abilities.json'
+import type { ABILITIES } from '../../defs/abilities'
 
 export interface CombatTuning {
   readonly knockback: {
@@ -8,4 +8,4 @@ export interface CombatTuning {
   }
   readonly acquire: { readonly range: number }
 }
-export type AbilityId = keyof typeof abilitiesJson
+export type AbilityId = keyof typeof ABILITIES

@@ -58,36 +58,37 @@ export interface DecoyEffect {
   readonly alpha: number
 }
 export type DeathEffect = Effect | SplitEffect | DecoyEffect
+export type EnemyKind =
+  | 'zombie'
+  | 'ghost'
+  | 'mushroom'
+  | 'blob'
+  | 'blobling'
+  | 'invader'
+  | 'boar'
+  | 'snake'
+  | 'rat'
+  | 'slime'
+  | 'hive'
+  | 'larva'
+  | 'creeper'
+  | 'rhino'
+  | 'treant'
+  | 'scorpion'
+  | 'croc'
+  | 'mecha'
+  | 'elf'
+  | 'turtle'
+  | 'locust'
+  | 'gargoyle'
+  | 'puffer'
+  | 'eclipse'
+  | 'ufo'
+  | 'alien'
+  | 'comet'
+  | 'blackhole'
 export interface EnemyDef {
-  readonly kind:
-    | 'zombie'
-    | 'ghost'
-    | 'mushroom'
-    | 'blob'
-    | 'blobling'
-    | 'invader'
-    | 'boar'
-    | 'snake'
-    | 'rat'
-    | 'slime'
-    | 'hive'
-    | 'larva'
-    | 'creeper'
-    | 'rhino'
-    | 'treant'
-    | 'scorpion'
-    | 'croc'
-    | 'mecha'
-    | 'elf'
-    | 'turtle'
-    | 'locust'
-    | 'gargoyle'
-    | 'puffer'
-    | 'eclipse'
-    | 'ufo'
-    | 'alien'
-    | 'comet'
-    | 'blackhole'
+  readonly kind: EnemyKind
   readonly emoji: string
   readonly name: string
   readonly desc: string
@@ -115,7 +116,7 @@ export interface EnemyDef {
   readonly role?: 'enemy' | 'boss'
 }
 export interface EnemyMixRow {
-  readonly kind: EnemyDef['kind']
+  readonly kind: EnemyKind
   readonly sinceWave: number
   readonly base: number
   readonly perWave: number

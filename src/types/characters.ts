@@ -1,4 +1,4 @@
-import charactersJson from '../assets/characters.json'
+import type { CHARACTERS } from '../../defs/characters'
 import type { AbilityId } from './abilities'
 import type { AbilityDef } from './abilityDefs'
 import type { AbilityTier, UpgradeCard, WeaponId } from './weapons'
@@ -34,7 +34,7 @@ export interface UpgradeTiers {
   u1: boolean
   u2: boolean
 }
-export type CharacterId = keyof typeof charactersJson
+export type CharacterId = keyof typeof CHARACTERS
 export interface TeamBaseline {
   readonly team: {
     readonly ringRadius: number

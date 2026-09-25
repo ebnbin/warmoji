@@ -4,10 +4,11 @@ import { ENEMY_DEFS } from '../../data/enemies'
 import type { CharacterId } from '../../types/characters'
 import type { CaptainId } from '../../types/captains'
 import type { MapId } from '../../types/maps'
+import type { EnemyKind } from '../../types/enemies'
 import { beginRun } from '../../run/state'
 import type { RunState } from '../../run/state'
 
-const enemies = new Set<string>()
+const enemies = new Set<EnemyKind>()
 let roster: CharacterId[] = [...ROSTER_IDS.slice(0, 1)]
 
 export type SandboxLevel = 0 | 1 | 2
@@ -54,8 +55,10 @@ export function spawnParams(): SpawnParams {
   return scaleStep().spawn
 }
 
+export type SandboxPresetId = 'normal' | 'busy' | 'heavy' | 'k2' | 'k4' | 'k8'
+
 export interface SandboxPreset {
-  readonly id: string
+  readonly id: SandboxPresetId
   readonly label: string
   readonly desc: string
   readonly team: number
@@ -75,15 +78,14 @@ export const SANDBOX_PRESETS: readonly SandboxPreset[] = [
   { id: 'k8', label: '8 千', desc: '把真实刷怪器开到 8000 并发', team: 8, level: 2, scale: 'k8', difficulty: 10, fireRate: 10, kinds: 28 },
 ]
 
-let presetId: string | undefined
+let presetId: SandboxPresetId | undefined
 
-export function sandboxPresetId(): string | undefined {
+export function sandboxPresetId(): SandboxPresetId | undefined {
   return presetId
 }
 
-export function applySandboxPreset(id: string): void {
-  const p = SANDBOX_PRESETS.find((x) => x.id === id)
-  if (!p) return
+export function applySandboxPreset(id: SandboxPresetId): void {
+  const p = SANDBOX_PRESETS.find((x) => x.id === id)!
   setSandboxRoster(ROSTER_IDS.slice(0, Math.min(p.team, ROSTER_IDS.length)))
   setSandboxLevel(p.level)
   setSandboxEnemies(ENEMY_DEFS.slice(0, p.kinds).map((e) => e.kind))
@@ -94,21 +96,21 @@ export function applySandboxPreset(id: string): void {
   presetId = p.id
 }
 
-export function sandboxEnemySet(): ReadonlySet<string> {
+export function sandboxEnemySet(): ReadonlySet<EnemyKind> {
   return enemies
 }
 
-export function isSandboxEnemyOn(kind: string): boolean {
+export function isSandboxEnemyOn(kind: EnemyKind): boolean {
   return enemies.has(kind)
 }
 
-function setSandboxEnemies(kinds: readonly string[]): void {
+function setSandboxEnemies(kinds: readonly EnemyKind[]): void {
   enemies.clear()
   for (const k of kinds) enemies.add(k)
   presetId = undefined
 }
 
-export function toggleSandboxEnemy(kind: string): void {
+export function toggleSandboxEnemy(kind: EnemyKind): void {
   if (enemies.has(kind)) enemies.delete(kind)
   else enemies.add(kind)
   presetId = undefined

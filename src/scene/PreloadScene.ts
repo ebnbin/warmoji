@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import emojiOrderingUrl from '../assets/emoji/ordering.txt?url'
-import emojiBundleUrl from '../assets/emoji/twemoji.txt?url'
+import emojiOrderingUrl from '../emoji/ordering.txt?url'
+import emojiBundleUrl from '../emoji/twemoji.txt?url'
 import { loadEmojiTextures, primeEmojiPack } from '../emoji/textures'
 import { FONT, UI_FONT } from '../util/fonts'
 import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../manifest'

@@ -1,4 +1,4 @@
-import type { EnemyDef } from '../src/types/enemies'
+import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 
 const ZOMBIE: EnemyDef = {
   kind: 'zombie',
@@ -744,4 +744,4 @@ const SPACE_BOSS: EnemyDef = {
 
 export const ENEMIES = Object.fromEntries(
   [...ENEMY_DEFS, FOREST_BOSS, DESERT_BOSS, RIVER_BOSS, FACTORY_BOSS, RUINS_BOSS, DAYNIGHT_BOSS, SPACE_BOSS].map((e) => [e.kind, e]),
-) as Record<string, EnemyDef>
+) as Record<EnemyKind, EnemyDef>
