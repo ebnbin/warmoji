@@ -8,7 +8,6 @@ import { loadSettings } from '../save/settings'
 import { usedEmojiSet, wikiEntryByEmoji, wikiGroups } from '../scene/wikiEntries'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiKey, ensureEmoji, loadEmojiPack } from '../emoji/textures'
 import { emojiImage } from '../emoji/hold'
 import { emojiText } from '../ui/emojiText'
@@ -17,7 +16,7 @@ import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { TAP_SLOP } from '../util/units'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
-import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
+import { emojiThumbSize, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { VirtualEmojiGrid } from '../ui/virtualGrid'
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
@@ -93,8 +92,6 @@ export class WikiScene extends Phaser.Scene {
   private catDragMoved = false
   private catDragStartX = 0
   private catDragStartScroll = 0
-  private backRect = { x: 0, y: 0, w: 0, h: 0 }
-  private reportAt = 0
 
   constructor() {
     super('wiki')
@@ -130,7 +127,7 @@ export class WikiScene extends Phaser.Scene {
     const ox = this.origin.x
     const oy = this.origin.y
 
-    const back = this.add
+    this.add
       .text(ox + 40, oy + L.headerY, '← 返回', {
         fontFamily: UI_FONT,
         fontSize: FONT.strong,
@@ -142,7 +139,6 @@ export class WikiScene extends Phaser.Scene {
       .on('pointerup', () => {
         if (!this.wasDragged()) this.scene.start('menu')
       })
-    this.backRect = { x: back.x, y: back.y - back.height / 2, w: back.width, h: back.height }
     this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
 
     emojiText(
@@ -171,7 +167,6 @@ export class WikiScene extends Phaser.Scene {
       if (!this.preserveOnRestart) releaseEmojiThumbs(this)
     })
 
-    this.reportWiki()
   }
 
   private wasDragged(): boolean {
@@ -268,7 +263,6 @@ export class WikiScene extends Phaser.Scene {
   private catScrollTo(v: number): void {
     this.catScroll = Math.max(0, Math.min(this.catScrollMax, v))
     this.catContainer?.setX(this.catRowRect.x - this.catScroll)
-    if (this.time.now - this.reportAt > 120) this.reportWiki()
   }
 
   private onCatTap(p: Phaser.Input.Pointer): void {
@@ -308,7 +302,6 @@ export class WikiScene extends Phaser.Scene {
     }
     this.entryGrid.onScroll = (): void => {
       this.listScroll = this.entryGrid!.scrollY
-      if (this.time.now - this.reportAt > 120) this.reportWiki()
     }
     this.entryGrid.setItems(
       group.entries.map((entry) => ({ key: `${group.title}:${entry.name}`, emoji: entry.emoji })),
@@ -322,7 +315,6 @@ export class WikiScene extends Phaser.Scene {
     const entry =
       group.entries.find((e) => `${group.title}:${e.name}` === this.focusedKey) ?? group.entries[0]
     if (entry) this.renderDetailCard(group.title, entry)
-    this.reportWiki()
   }
 
   private ensurePool(): DetailPool {
@@ -550,13 +542,10 @@ export class WikiScene extends Phaser.Scene {
       this.levelSel = 0
       grid.setSelected(cp)
       this.renderAllDetail()
-      this.reportWiki()
     }
-    grid.onScrolled = (settled): void => {
+    grid.onScrolled = (): void => {
       this.gridScroll = grid.scrollY
-      if (settled || this.time.now - this.reportAt > 120) this.reportWiki()
     }
-    grid.onThumbsProgress = (): void => this.reportWiki()
 
     void this.loadManifest().then(() => {
       if (!this.scene.isActive('wiki') || !this.isAllPage()) return
@@ -564,7 +553,6 @@ export class WikiScene extends Phaser.Scene {
       grid.setItems(this.manifest)
       grid.setSelected(this.allSelected)
       this.renderAllDetail()
-      this.reportWiki()
     })
   }
 
@@ -609,58 +597,6 @@ export class WikiScene extends Phaser.Scene {
           : '加载清单中…',
       )
       .setVisible(true)
-  }
-
-  private reportWiki(): void {
-    reportDebug({
-      scene: 'wiki',
-      elapsed: 0,
-      kills: 0,
-      level: 1,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      wiki: {
-        category: this.isAllPage() ? '全部' : (this.groups[this.category]?.title ?? ''),
-        focused: this.focusedKey,
-        allSelected: this.allSelected,
-        entryCount: this.entryGrid ? this.entryGrid.cellRects().length : 0,
-        manifestCount: this.manifest.length,
-        usedCount: this.used.size,
-        thumbsReady: emojiThumbsReady(),
-        scrollY: this.isAllPage() ? this.gridScroll : this.listScroll,
-        maxScroll: this.isAllPage()
-          ? (this.allGrid?.maxScroll ?? 0)
-          : Math.max(0, (this.entryGrid?.contentH ?? 0) - this.layout.list.h),
-        items: (this.entryGrid?.cellRects() ?? []).map((r) => ({
-          key: r.key,
-          x: r.x,
-          y: r.y,
-          w: r.w,
-          h: r.h,
-        })),
-        list: {
-          x: this.origin.x + this.layout.list.x,
-          y: this.origin.y + this.layout.list.y,
-          w: this.layout.list.w,
-          h: this.layout.list.h,
-        },
-        // 供 e2e 点击：含横向滚动偏移
-        categories: this.catRects.map((c) => ({
-          title: c.title,
-          x: this.catRowRect.x - this.catScroll + c.x + c.w / 2,
-          y: this.catRowRect.y + c.y + c.h / 2,
-          w: c.w,
-          h: c.h,
-        })),
-        back: {
-          x: this.backRect.x + this.backRect.w / 2,
-          y: this.backRect.y + this.backRect.h / 2,
-          w: this.backRect.w,
-          h: this.backRect.h,
-        },
-      },
-    })
-    this.reportAt = this.time.now
   }
 
   private onViewportChanged(): void {

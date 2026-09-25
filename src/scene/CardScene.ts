@@ -8,7 +8,6 @@ import { Rng } from '../util/rng'
 import { getRun, teamStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/hold'
 import { ScrollView } from '../ui/scroll'
 import type { ScrollRect } from '../ui/scroll'
@@ -86,7 +85,6 @@ export class CardScene extends Phaser.Scene {
     this.choices.forEach((id, i) => this.buildCardRow(id, i, listW, res))
     this.list.setContentHeight(this.choices.length * (this.rowH + this.rowGap))
 
-    this.reportCards()
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
@@ -156,33 +154,6 @@ export class CardScene extends Phaser.Scene {
 
   private nextScene(): 'recruit' | 'formation' | 'shop' {
     return teamStep(this.run) ?? 'shop'
-  }
-
-  private reportCards(): void {
-    reportDebug({
-      scene: 'cards',
-      elapsed: 0,
-      kills: this.run.kills,
-      level: this.run.xp.level,
-      wave: this.run.wave,
-      coins: this.run.coins,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      cards: {
-        remaining: this.run.cardDraws,
-        owned: { ...this.run.teamCards } as Record<string, number>,
-        choices: this.choices.map((id, i) => ({
-          id,
-          level: this.run.teamCards[id] ?? 0,
-          maxLevel: CARDS[id].maxLevel,
-          rarity: CARDS[id].rarity,
-          x: this.listRect.x + this.listRect.w / 2,
-          y: this.listRect.y + i * (this.rowH + this.rowGap) + this.rowH / 2 - this.list.scrollY,
-          w: this.listRect.w,
-          h: this.rowH,
-        })),
-      },
-    })
   }
 
   private onViewportChanged(): void {

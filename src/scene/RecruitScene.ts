@@ -16,7 +16,6 @@ import {
 } from '../run/state'
 import type { RunState } from '../run/state'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
@@ -60,8 +59,6 @@ export class RecruitScene extends Phaser.Scene {
   private previewObjs: Phaser.GameObjects.GameObject[] = []
   private btnBg!: Phaser.GameObjects.Graphics
   private btnLabel!: Phaser.GameObjects.Text
-  private btnRect = { x: 0, y: 0, w: 0, h: 0 }
-  private backRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
     super('recruit')
@@ -97,7 +94,7 @@ export class RecruitScene extends Phaser.Scene {
     const dragged = (): boolean => this.grid.wasDragged
 
     addTeamFrame(this, L, this.origin, isInitialWave(this.run) ? '组建队伍' : '队伍整编', this.stepBanner(), res)
-    this.backRect = addRunExit(this, this.run, this.origin.x + 40, oy + L.headerY, res, dragged)
+    addRunExit(this, this.run, this.origin.x + 40, oy + L.headerY, res, dragged)
 
     const T = L.detailText
     this.detailRect = { x: this.origin.x + T.x, y: oy + T.y, w: T.w, h: T.h }
@@ -137,7 +134,6 @@ export class RecruitScene extends Phaser.Scene {
     const btn = addConfirmButton(this, L, this.origin, this.confirmLabel(), res, () => this.confirm(), dragged)
     this.btnBg = btn.bg
     this.btnLabel = btn.label
-    this.btnRect = btn.rect
 
     this.refresh()
 
@@ -295,7 +291,6 @@ export class RecruitScene extends Phaser.Scene {
     this.renderDetail(textRes())
     this.rebuildPreview()
     this.updateConfirm()
-    this.report()
   }
 
   // ── 队伍预览（详情面板内嵌，与阵型页同款慢转） ──────────────
@@ -394,45 +389,6 @@ export class RecruitScene extends Phaser.Scene {
       t.c.setPosition(x, y)
       t.zone?.setPosition(x - t.zone.width / 2, y - t.zone.height / 2)
     }
-  }
-
-  private report(): void {
-    reportDebug({
-      scene: 'recruit',
-      elapsed: 0,
-      kills: this.run.kills,
-      level: this.run.xp.level,
-      wave: this.run.wave,
-      coins: this.run.coins,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      recruit: {
-        selected: this.selectedKey,
-        items: this.grid.cellRects().map((r) => ({
-          id: r.key,
-          x: r.x,
-          y: r.y,
-          w: r.w,
-          h: r.h,
-          state: this.cardState(r.key),
-        })),
-        confirm: {
-          x: this.btnRect.x + this.btnRect.w / 2,
-          y: this.btnRect.y + this.btnRect.h / 2,
-          w: this.btnRect.w,
-          h: this.btnRect.h,
-          enabled: this.confirmEnabled(),
-        },
-        back: {
-          x: this.backRect.x + this.backRect.w / 2,
-          y: this.backRect.y + this.backRect.h / 2,
-          w: this.backRect.w,
-          h: this.backRect.h,
-        },
-        due: this.due,
-        picked: [...this.picked],
-      },
-    })
   }
 
   private onViewportChanged(): void {

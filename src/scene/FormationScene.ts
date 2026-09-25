@@ -8,7 +8,6 @@ import { Rng } from '../util/rng'
 import { getRun, guardCenter, guardOrder, setGuardCenter } from '../run/state'
 import type { RunState } from '../run/state'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/hold'
 import { ScrollView } from '../ui/scroll'
 import type { ScrollRect } from '../ui/scroll'
@@ -46,9 +45,6 @@ export class FormationScene extends Phaser.Scene {
   private iconSize = 80
   private phase = 0
   private geom = { cx: 0, cy: 0, scale: 1 }
-  private reportTimer = 0
-  private btnRect = { x: 0, y: 0, w: 0, h: 0 }
-  private backRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
     super('formation')
@@ -97,10 +93,9 @@ export class FormationScene extends Phaser.Scene {
         .setOrigin(0, 0.5)
         .setInteractive({ useHandCursor: true })
       back.on('pointerup', () => this.exitToShop())
-      this.backRect = { x: back.x, y: back.y - back.height / 2, w: back.width, h: back.height }
       this.input.keyboard?.on('keydown-ESC', () => this.exitToShop())
     } else {
-      this.backRect = addRunExit(this, this.run, this.origin.x + 40, oy + L.headerY, res)
+      addRunExit(this, this.run, this.origin.x + 40, oy + L.headerY, res)
     }
 
     const D = L.detail
@@ -108,7 +103,7 @@ export class FormationScene extends Phaser.Scene {
     this.detailView = new ScrollView(this, this.detailRect)
 
     const label = this.fromShop ? '返回商店' : nextAfterTeam(this.run) === 'shop' ? '前往商店' : '开战'
-    this.btnRect = addConfirmButton(this, L, this.origin, label, res, () => this.confirm()).rect
+    addConfirmButton(this, L, this.origin, label, res, () => this.confirm())
 
     this.rebuild()
 
@@ -201,7 +196,6 @@ export class FormationScene extends Phaser.Scene {
     )
 
     this.renderCenterDetail(res)
-    this.report()
   }
 
   private layoutMembers(): void {
@@ -228,12 +222,6 @@ export class FormationScene extends Phaser.Scene {
     if (this.swapBusy) return
     this.phase += (delta / 1000) * PREVIEW_SPIN
     this.layoutMembers()
-    // 外圈在转，e2e 上报的矩形须定期刷新
-    this.reportTimer += delta
-    if (this.reportTimer >= 300) {
-      this.reportTimer = 0
-      this.report()
-    }
   }
 
   private onMemberTap(post: number): void {
@@ -302,35 +290,6 @@ export class FormationScene extends Phaser.Scene {
     const start = Math.max(128, 80 + subtitle.height + 12)
     const end = renderStatGroups(this, this.detailView, D.w, center, items, res, start)
     this.detailView.setContentHeight(end + 12)
-  }
-
-  private report(): void {
-    reportDebug({
-      scene: 'formation',
-      elapsed: 0,
-      kills: this.run.kills,
-      level: this.run.xp.level,
-      wave: this.run.wave,
-      coins: this.run.coins,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      formation: {
-        center: guardCenter(this.run) ?? '',
-        items: this.memberRects.map((r) => ({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h })),
-        confirm: {
-          x: this.btnRect.x + this.btnRect.w / 2,
-          y: this.btnRect.y + this.btnRect.h / 2,
-          w: this.btnRect.w,
-          h: this.btnRect.h,
-        },
-        back: {
-          x: this.backRect.x + this.backRect.w / 2,
-          y: this.backRect.y + this.backRect.h / 2,
-          w: this.backRect.w,
-          h: this.backRect.h,
-        },
-      },
-    })
   }
 
   private onViewportChanged(): void {

@@ -20,11 +20,10 @@ import {
 } from '../emoji/anim'
 import type { AnimClip, AnimRecipe, SvgTree, TreeRow } from '../emoji/anim'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiKey, emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
 import { emojiImage } from '../emoji/hold'
 import { emojiText } from '../ui/emojiText'
-import { emojiThumbSize, emojiThumbsReady, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
+import { emojiThumbSize, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji/thumbs'
 import { FONT, UI_FONT } from '../util/fonts'
 import { TAP_SLOP } from '../util/units'
 import { VirtualEmojiGrid } from '../ui/virtualGrid'
@@ -110,16 +109,11 @@ export class StudioScene extends Phaser.Scene {
   private anatDragMoved = false
   private anatDragStartY = 0
   private anatDragStartScroll = 0
-  private anatResetRect = { x: 0, y: 0, w: 0, h: 0 }
-  private anatFullRect = { x: 0, y: 0, w: 0, h: 0 }
-  private anatSplitRect = { x: 0, y: 0, w: 0, h: 0 }
 
   private layout!: StudioLayout
   private origin = { x: 0, y: 0 }
   private grid?: VirtualEmojiGrid
-  private reportAt = 0
   private previewImg?: Phaser.GameObjects.Image
-  private previewState: 'idle' | 'loading' | 'ready' = 'idle'
   private paused = false
   private speedIdx = 0
   private frameKeys: string[] = []
@@ -136,7 +130,6 @@ export class StudioScene extends Phaser.Scene {
   private tabRects: { id: Tab; x: number; y: number; w: number; h: number }[] = []
   private tplRects: { id: string; x: number; y: number; w: number; h: number }[] = []
   private controlRects: Record<string, { x: number; y: number; w: number; h: number }> = {}
-  private backRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
     super('studio')
@@ -159,7 +152,6 @@ export class StudioScene extends Phaser.Scene {
       this.speedIdx = 0
     }
     prepareEmojiThumbs(this, emojiThumbSize(70, viewport.renderScale))
-    this.previewState = 'idle'
     this.detailObjs = []
     this.tabObjs = []
     const w = viewport.logicalWidth
@@ -168,7 +160,7 @@ export class StudioScene extends Phaser.Scene {
     this.origin = { x: (w - L.content.w) / 2, y: (h - L.content.h) / 2 }
     const res = textRes()
 
-    const backText = this.add
+    this.add
       .text(Math.max(this.origin.x + 40, safeInsets.left + 24), this.origin.y + L.headerY, '← 返回', {
         fontFamily: UI_FONT,
         fontSize: FONT.strong,
@@ -180,12 +172,6 @@ export class StudioScene extends Phaser.Scene {
       .on('pointerup', () => {
         if (!(this.grid?.wasDragged ?? false)) this.scene.start('menu')
       })
-    this.backRect = {
-      x: backText.x,
-      y: backText.y - backText.height / 2,
-      w: backText.width,
-      h: backText.height,
-    }
     this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
     emojiText(
       this,
@@ -213,10 +199,6 @@ export class StudioScene extends Phaser.Scene {
     this.buildTabs(res)
     const grid = (this.grid = new VirtualEmojiGrid(this, G))
     grid.onTap = (cp) => this.onGridTap(cp)
-    grid.onScrolled = (settled) => {
-      if (settled || this.time.now - this.reportAt > 120) this.report()
-    }
-    grid.onThumbsProgress = () => this.report()
 
     this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (this.anatContains(p)) this.anatScrollTo(this.anatScroll + dy * 0.6)
@@ -264,7 +246,6 @@ export class StudioScene extends Phaser.Scene {
       this.ownedKeys.clear()
       if (!this.preserveOnRestart) releaseEmojiThumbs(this)
     })
-    this.report()
   }
 
   private detailRect(): { x: number; y: number; w: number; h: number } {
@@ -343,7 +324,6 @@ export class StudioScene extends Phaser.Scene {
     if (this.tab === 'recipes') this.buildRecipeDetail()
     else if (this.tab === 'templates') this.buildTemplateDetail()
     else this.buildAnatomyDetail()
-    this.report()
   }
 
   private onGridTap(cp: string): void {
@@ -366,7 +346,6 @@ export class StudioScene extends Phaser.Scene {
       this.grid?.setSelected(cp)
       this.buildAnatomyDetail()
     }
-    this.report()
   }
 
   private resetAnatState(): void {
@@ -493,7 +472,6 @@ export class StudioScene extends Phaser.Scene {
           if (this.grid?.wasDragged || this.clipSel === c.id) return
           this.clipSel = c.id
           this.buildRecipeDetail()
-          this.report()
         })
       this.clipRects.push({ id: c.id, x, y, w: chipW, h: chipH })
       this.detailObjs.push(bg, label, zone)
@@ -545,7 +523,6 @@ export class StudioScene extends Phaser.Scene {
           if (this.grid?.wasDragged || view.wasDragged || this.tplId === t.id) return
           this.tplId = t.id
           this.buildTemplateDetail()
-          this.report()
         })
       view.add([bg, icon, label, zone])
       this.tplRects.push({ id: t.id, x: d.x + lx, y: chipsTop + lcy, w: chipW, h: chipH })
@@ -568,7 +545,6 @@ export class StudioScene extends Phaser.Scene {
 
     const emoji = this.tplEmoji
     const gen = ++this.jobGen
-    this.previewState = 'loading'
     void emojiSvgText(emoji)
       .then((svg) => {
         if (gen !== this.jobGen) return
@@ -577,7 +553,6 @@ export class StudioScene extends Phaser.Scene {
       })
       .catch((err) => {
         console.error(`模板套用失败: ${String(err)}`)
-        if (gen === this.jobGen) this.previewState = 'idle'
       })
   }
 
@@ -587,7 +562,6 @@ export class StudioScene extends Phaser.Scene {
     const bigSize = portrait ? 300 : 240
     const emoji = this.anatEmoji
     const gen = ++this.jobGen
-    this.previewState = 'loading'
 
     const title = this.add
       .text(d.x + 24, d.y + 14, '结构树 · 点行显/隐', {
@@ -613,9 +587,7 @@ export class StudioScene extends Phaser.Scene {
         this.rebuildAnatRows()
         this.refreshAnatInfo()
         void this.refreshAnatSplit()
-        this.report()
       })
-    this.anatResetRect = { x: reset.x - reset.width, y: reset.y, w: reset.width, h: reset.height }
     this.detailObjs.push(title, reset)
 
     void emojiSvgText(emoji)
@@ -689,17 +661,12 @@ export class StudioScene extends Phaser.Scene {
         this.detailObjs.push(treeBg, boxes, fullImg, splitImg, ...caps, info, mask, rowsBox, treeZone)
         this.anat = { tree, splitImg, fullKey, info, rowsBox, area: treeArea, rowObjs: [], res, bigSize }
         this.anatAllRows = flattenTree(tree, new Set())
-        this.anatFullRect = { x: colCx - bigSize / 2, y: fullY - bigSize / 2, w: bigSize, h: bigSize }
-        this.anatSplitRect = { x: colCx - bigSize / 2, y: splitY - bigSize / 2, w: bigSize, h: bigSize }
         this.rebuildAnatRows()
         this.refreshAnatInfo()
         void this.refreshAnatSplit()
-        this.previewState = 'ready'
-        this.report()
       })
       .catch((err) => {
         console.error(`解剖失败: ${String(err)}`)
-        if (gen === this.jobGen) this.previewState = 'idle'
       })
   }
 
@@ -724,7 +691,6 @@ export class StudioScene extends Phaser.Scene {
     if (!a) return
     this.anatScroll = Math.max(0, Math.min(this.anatScrollMax, y))
     a.rowsBox.y = a.area.y - this.anatScroll
-    if (this.time.now - this.reportAt > 120) this.report()
   }
 
   private rebuildAnatRows(): void {
@@ -806,7 +772,6 @@ export class StudioScene extends Phaser.Scene {
       if (this.anatCollapsed.has(row.path)) this.anatCollapsed.delete(row.path)
       else this.anatCollapsed.add(row.path)
       this.rebuildAnatRows()
-      this.report()
       return
     }
     if (!row.paints) return
@@ -815,7 +780,6 @@ export class StudioScene extends Phaser.Scene {
     this.rebuildAnatRows()
     this.refreshAnatInfo()
     void this.refreshAnatSplit()
-    this.report()
   }
 
   private refreshAnatInfo(): void {
@@ -944,7 +908,6 @@ export class StudioScene extends Phaser.Scene {
   private refreshControls(): void {
     this.controlToggle?.setTexture(emojiKey(this.paused ? '25b6' : '23f8'))
     this.controlSpeed?.setText(`${SPEEDS[this.speedIdx]}×`)
-    this.report()
   }
 
   /** 自动暂停 */
@@ -976,21 +939,17 @@ export class StudioScene extends Phaser.Scene {
 
   private startBake(recipe: AnimRecipe, size: number, keyPrefix?: string, frames?: number): void {
     const gen = ++this.jobGen
-    this.previewState = 'loading'
     void this.bakeAnimTextures(recipe, keyPrefix, frames ?? ANIM_DEF.frames)
       .then((keys) => {
         if (gen !== this.jobGen || !this.previewImg) return
-        this.previewState = 'ready'
         this.frameKeys = keys
         this.frameIdx = 0
         this.previewSize = size
         this.previewImg.setTexture(keys[0]!).setDisplaySize(size, size).setVisible(true)
         this.restartTimer()
-        this.report()
       })
       .catch((err) => {
         console.error(`动画烘焙失败: ${String(err)}`)
-        if (gen === this.jobGen) this.previewState = 'idle'
       })
   }
 
@@ -1014,64 +973,8 @@ export class StudioScene extends Phaser.Scene {
 
   // ── 杂项 ────────────────────────────────────────────────────
 
-  private anatReport(): NonNullable<WarmojiStudioDebug['anatomy']> | undefined {
-    const a = this.anat
-    if (this.tab !== 'anatomy' || !a) return undefined
-    return {
-      hidden: [...this.anatHidden],
-      rows: this.anatRowMeta
-        .map((row, i) => ({
-          path: row.path,
-          tag: row.tag,
-          depth: row.depth,
-          container: row.container,
-          paints: row.paints,
-          expanded: row.container ? !this.anatCollapsed.has(row.path) : null,
-          hidden: this.anatEffHidden(row.path),
-          x: a.area.x,
-          y: a.area.y + i * ANAT_ROW - this.anatScroll,
-          w: a.area.w,
-          h: ANAT_ROW,
-        }))
-        .filter((r) => r.y >= a.area.y && r.y + r.h <= a.area.y + a.area.h),
-      reset: this.anatResetRect,
-      full: this.anatFullRect,
-      split: this.anatSplitRect,
-    }
-  }
-
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
-  }
-
-  private report(): void {
-    reportDebug({
-      scene: 'studio',
-      elapsed: 0,
-      kills: 0,
-      level: 1,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      studio: {
-        tab: this.tab,
-        tabs: this.tabRects.map((t) => ({ id: t.id, x: t.x, y: t.y, w: t.w, h: t.h })),
-        items: this.grid?.cellRects() ?? [],
-        selected:
-          this.tab === 'recipes' ? this.recipeSel : this.tab === 'templates' ? this.tplEmoji : this.anatEmoji,
-        template: this.tplId,
-        templates: this.tplRects,
-        clip: this.clipSel,
-        clips: this.clipRects,
-        anatomy: this.anatReport(),
-        controls: this.controlRects,
-        paused: this.paused,
-        speed: SPEEDS[this.speedIdx]!,
-        preview: this.previewState,
-        thumbsReady: emojiThumbsReady(),
-        back: this.backRect,
-      },
-    })
-    this.reportAt = this.time.now
   }
 }

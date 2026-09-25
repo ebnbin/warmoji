@@ -27,7 +27,6 @@ import type { RunState } from '../run/state'
 import { characterStatGroups } from '../scene/statLines'
 import { memberMaxHp } from '../data/stats'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
@@ -84,7 +83,6 @@ export class ShopScene extends Phaser.Scene {
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private buyRect = { x: 0, y: 0, w: 0, h: 0 }
   private refreshRect = { x: 0, y: 0, w: 0, h: 0 }
-  private formationRect: { x: number; y: number; w: number; h: number } | null = null
   /** 沉睡期间视口变过，唤醒时重排 */
   private wakeDirty = false
   private quitArmed = false
@@ -169,7 +167,6 @@ export class ShopScene extends Phaser.Scene {
       })
     })
 
-    this.formationRect = null
     if (hasCenter(this.run)) {
       const fm = this.add
         .text(this.origin.x + L.content.w - 40, oy + L.titleY, '⛨ 队形', {
@@ -184,7 +181,6 @@ export class ShopScene extends Phaser.Scene {
         if (this.dragMoved || this.grid.wasDragged) return
         this.openFormation()
       })
-      this.formationRect = { x: fm.x - fm.width, y: fm.y - fm.height / 2, w: fm.width, h: fm.height }
     }
     this.events.on(Phaser.Scenes.Events.WAKE, this.onWake, this)
 
@@ -775,7 +771,6 @@ export class ShopScene extends Phaser.Scene {
     this.grid.setItems(this.buildSlotItems())
     this.grid.setSelected(this.focusedId)
     this.renderDetail(textRes())
-    this.reportShop()
   }
 
   private nextWave(): void {
@@ -797,74 +792,6 @@ export class ShopScene extends Phaser.Scene {
       this.scene.restart()
       return
     }
-    this.reportShop()
-  }
-
-  private reportShop(): void {
-    const idx = this.focusedIndex()
-    const offer = this.offers[idx] ?? null
-    reportDebug({
-      scene: 'shop',
-      elapsed: 0,
-      kills: this.run.kills,
-      level: this.run.xp.level,
-      wave: this.run.wave,
-      coins: this.run.coins,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      shop: {
-        wave: this.run.wave,
-        coins: this.run.coins,
-        focusedId: this.focusedId,
-        freeRefreshes: this.run.freeRefreshes,
-        level: this.run.xp.level,
-        focusedLevel: idx >= 0 ? this.levelOf(idx) : 1,
-        focusedXp: idx >= 0 ? characterXp(this.run.memberItems[idx] ?? []) : 0,
-        slots: this.grid.cellRects().map((r) => {
-          const id = r.key as CharacterId
-          const index = this.lineup.indexOf(id)
-          return {
-            id,
-            x: r.x,
-            y: r.y,
-            w: r.w,
-            h: r.h,
-            offer: this.offers[index] ?? null,
-            price: this.offers[index] ? this.price(this.offers[index]!) : null,
-            owned: this.ownedFor(index).length,
-            level: this.levelOf(index),
-          }
-        }),
-        buy: {
-          x: this.buyRect.x + this.buyRect.w / 2,
-          y: this.buyRect.y + this.buyRect.h / 2,
-          w: this.buyRect.w,
-          h: this.buyRect.h,
-          enabled: offer !== null && this.run.coins >= this.price(offer),
-        },
-        refresh: {
-          x: this.refreshRect.x + this.refreshRect.w / 2,
-          y: this.refreshRect.y + this.refreshRect.h / 2,
-          w: this.refreshRect.w,
-          h: this.refreshRect.h,
-          enabled: this.run.freeRefreshes > 0 || this.run.coins >= SHOP.refreshPrice,
-        },
-        start: {
-          x: this.btnRect.x + this.btnRect.w / 2,
-          y: this.btnRect.y + this.btnRect.h / 2,
-          w: this.btnRect.w,
-          h: this.btnRect.h,
-        },
-        formation: this.formationRect
-          ? {
-              x: this.formationRect.x + this.formationRect.w / 2,
-              y: this.formationRect.y + this.formationRect.h / 2,
-              w: this.formationRect.w,
-              h: this.formationRect.h,
-            }
-          : null,
-      },
-    })
   }
 
   private onViewportChanged(): void {

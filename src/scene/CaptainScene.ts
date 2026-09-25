@@ -9,7 +9,6 @@ import { beginRun, teamStep } from '../run/state'
 import { loadCaptain, loadMap, saveCaptain } from '../save/selection'
 import { captainStatGroups } from '../scene/statLines'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage, preloadEmojis } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
@@ -226,28 +225,6 @@ export class CaptainScene extends Phaser.Scene {
   private refresh(): void {
     this.grid.setSelected(this.selectedId)
     this.renderDetail(textRes())
-    this.reportCaptain()
-  }
-
-  private reportCaptain(): void {
-    reportDebug({
-      scene: 'captain',
-      elapsed: 0,
-      kills: 0,
-      level: 1,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      captain: {
-        selected: this.selectedId,
-        items: this.grid.cellRects().map((r) => ({ id: r.key, x: r.x, y: r.y, w: r.w, h: r.h })),
-        start: {
-          x: this.btnRect.x + this.btnRect.w / 2,
-          y: this.btnRect.y + this.btnRect.h / 2,
-          w: this.btnRect.w,
-          h: this.btnRect.h,
-        },
-      },
-    })
   }
 
   private onViewportChanged(): void {

@@ -9,7 +9,6 @@ import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
 import { loadMap, saveMap } from '../save/selection'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage, preloadEmojis } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
@@ -292,33 +291,6 @@ export class MapScene extends Phaser.Scene {
     this.sandboxLabel.setColor(on ? '#25262e' : '#c8c8d4')
     this.confirmLabel.setText(on ? '进入试炼场' : '选择队长')
     this.renderDetail(textRes())
-    this.reportMap()
-  }
-
-  private reportMap(): void {
-    reportDebug({
-      scene: 'map',
-      elapsed: 0,
-      kills: 0,
-      level: 1,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      map: {
-        selected: this.selectedId,
-        items: this.grid.cellRects().map((r) => ({ id: r.key, x: r.x, y: r.y, w: r.w, h: r.h })),
-        start: {
-          x: this.btnRect.x + this.btnRect.w / 2,
-          y: this.btnRect.y + this.btnRect.h / 2,
-          w: this.btnRect.w,
-          h: this.btnRect.h,
-        },
-        sandbox: {
-          x: Math.round(this.sandboxRect.x + this.sandboxRect.w / 2),
-          y: Math.round(this.sandboxRect.y + this.sandboxRect.h / 2),
-          on: this.sandbox,
-        },
-      },
-    })
   }
 
   private onViewportChanged(): void {

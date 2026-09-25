@@ -36,7 +36,6 @@ import { attachMetrics, detachMetrics, resetMetrics } from './metrics'
 import { startRafMeter } from './diagnostics'
 import { PerfView } from './perf'
 import type { SteadyMark } from './perf'
-import { clearSandboxPerf } from './probe'
 
 export const PILL_ICON = '1f527'
 
@@ -87,7 +86,6 @@ export class SandboxPanel {
     this.clearObjs()
     this.view.destroy()
     detachMetrics()
-    clearSandboxPerf()
   }
 
   private clearObjs(): void {
@@ -111,7 +109,6 @@ export class SandboxPanel {
     if (!open) {
       this.view.setViewport(OFFSCREEN)
       detachMetrics()
-      clearSandboxPerf()
       this.buildPill()
       return
     }

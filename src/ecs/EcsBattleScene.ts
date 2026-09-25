@@ -23,7 +23,7 @@ import { BATTLE_SCENE_KEY, SANDBOX_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Dormant, Enemy, FACTION, Faction, GrantCoins, Hp, CharHp, MoveSpeed, Nest, PICKUP_SET, Projectile, RENDERABLE, Revive, Sprite, Transform, Zone } from './components'
+import { Alive, Boss, Dormant, Enemy, GrantCoins, Hp, CharHp, PICKUP_SET, Projectile, Revive, Transform } from './components'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
@@ -34,15 +34,13 @@ import { modDef } from './store'
 import { resetEntityStorage } from './storage'
 import { armCaptain, armTeam } from './entities/loadout'
 import { requestCast } from './systems/shared/ability'
-import { Minion } from './components'
 import { stepFrame } from './systems/pipeline/frame'
 import { replayDeath } from './systems/shared/death'
-import { pickupCounts } from './entities/pickup'
 import { spawnBoss, spawnSurge } from './entities/enemy'
 import { scheduleCarrier } from './entities/schedule'
 import { telegraphCount } from './entities/telegraph'
 import { activeMods } from './entities/modifier'
-import { Due, Lifetime, Meteor, Modifier } from './components'
+import { Lifetime, Modifier } from './components'
 
 import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
 import { settleWave } from './systems/shared/wave'
@@ -205,8 +203,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.scene.stop('ui')
       this.scene.stop(SANDBOX_SCENE_KEY)
-      // e2e 靠 __ecs.ready 判断战斗已收场；换成空壳以放开对本局的引用
-      ;(window as unknown as { __ecs?: { ready: boolean } }).__ecs = { ready: false }
       this.atlas?.dispose()
       this.cues?.destroy()
       this.rings?.destroy()
@@ -293,81 +289,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       })
     }
     this.ready = true
-    this.installProbe(this.sim)
     hint.destroy()
   }
 
-
-  /** 探针：未参与深度排序的对象数，应恒 0 */
-  private unsortedLayers(): number {
-    let n = 0
-    for (const o of this.children.list) {
-      if (typeof (o as unknown as { _depth?: unknown })._depth !== 'number') n++
-    }
-    return n
-  }
-
-  /** e2e 探针：字段按需求值，不占每帧开销 */
-  private installProbe(sim: Sim): void {
-    const world = this.world
-    const layers = (): number => this.unsortedLayers()
-    const pages = (): number => this.atlas?.pageCount ?? 0
-    const map = (): { w: number; h: number } => ({ w: this.mapW, h: this.mapH })
-    const cam = (): Phaser.Cameras.Scene2D.Camera => this.cameras.main
-    ;(window as unknown as { __ecs?: object }).__ecs = {
-      ready: true,
-      get unsortedLayers() { return layers() },
-      get blindSprites() { return query(world, RENDERABLE as unknown as object[]).filter((e) => Sprite.frame[e]! < 0).length },
-      get pages() { return pages() },
-      get centerX() { return centerX(sim) },
-      get centerY() { return centerY(sim) },
-      get characters() { return sim.characters.length },
-      get mapW() { return map().w },
-      get mapH() { return map().h },
-      get dirX() { return sim.teamDir.x },
-      get dirY() { return sim.teamDir.y },
-      get moveSpeed() { return MoveSpeed.v[sim.captain]! },
-      get elapsed() { return sim.elapsedMs },
-      get memberPos() { return sim.characters.map((eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })) },
-      get frames() { return sim.characters.map((eid) => Sprite.frame[eid]!) },
-      get enemies() { return query(world, [Enemy]).length },
-      get broods() { return Array.from(query(world, [Enemy]), (eid) => Nest.of[eid]!).filter((n) => n >= 0).length },
-      get enemyPos() { return Array.from(query(world, [Enemy]), (eid) => ({ x: Transform.x[eid]!, y: Transform.y[eid]! })) },
-      get kills() { return sim.run.kills },
-      get stats() { return { damage: [...sim.run.stats.damage], kills: [...sim.run.stats.kills], damageTaken: [...sim.run.stats.damageTaken] } },
-      get wave() { return sim.run.wave },
-      get coins() { return sim.run.coins },
-      get xpLevel() { return sim.run.xp.level },
-      get liveCoins() { return liveCoins(world) },
-      get projectiles() { return query(world, [Projectile]).length },
-      get eprojectiles() { return query(world, [Projectile, Faction]).filter((e) => Faction.v[e] === FACTION.enemy).length },
-      get field() {
-        const c = pickupCounts(sim)
-        return {
-          pickups: c.pickups,
-          carriers: c.carriers,
-          active: activeMods(sim).map((e) => ({ id: modDef[e]!.id, remainMs: Math.max(0, Lifetime.until[e]! - sim.elapsedMs) })),
-        }
-      },
-      get over() { return sim.over },
-      get alive() { return sim.characters.filter((eid) => Alive.v[eid]).length },
-      get memberHp() { return sim.characters.map((eid) => CharHp.hp[eid]!) },
-      get dormant() { return Array.from(query(world, [Enemy]), (eid) => Dormant.v[eid]!).filter((v) => v === 1).length },
-      get camX() { return cam().scrollX + cam().width / 2 },
-      get camY() { return cam().scrollY + cam().height / 2 },
-      get zoneR() { return sim.worldState.zone?.r ?? 0 },
-      get zones() { return query(world, [Zone]).length },
-      get minions() { return query(world, [Minion]).length },
-      // 帧末应恒 0
-      get outbox() { return sim.out.bursts.length + sim.out.collects.length + (sim.out.flash ? 1 : 0) },
-      get logicalW() { return viewport.logicalWidth },
-      get logicalH() { return viewport.logicalHeight },
-      get walls() { return sim.worldState.walls ? sim.worldState.walls.grid.blocked.filter(Boolean).length : 0 },
-      get spawnCells() { return sim.worldState.walls?.spawnCells.length ?? 0 },
-      // null = 不在途
-      get meteor() { return ((m) => (m === undefined ? null : { travelling: sim.elapsedMs >= Due.at[m]!, t: Meteor.t[m]! }))(query(world, [Meteor])[0]) },
-    }
-  }
 
   /** 每种事件一条 drain，收信人没准备好也清空 */
   private drainOutbox(): void {

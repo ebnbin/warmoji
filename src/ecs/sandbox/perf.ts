@@ -6,7 +6,6 @@ import { heapMB, rafHz, rendererInfo } from './diagnostics'
 import { emojiCacheStats } from '../../emoji/textures'
 import { metricsReport, nextFrameSeq, recentFrames } from './metrics'
 import { sandboxDifficulty, sandboxEnemySet, sandboxFireRate, sandboxLevel, sandboxStarters, scaleStep } from './knobs'
-import { reportSandboxPerf } from './probe'
 import type { EcsBattleScene } from '../EcsBattleScene'
 
 // 坐标以面板内容区顶为原点
@@ -128,12 +127,6 @@ export class PerfView {
       '── 渲染后端 ──',
       rendererInfo(this.scene.game),
     ])
-
-    reportSandboxPerf({
-      live: { enemies: p.enemies, projectiles: p.projectiles, coins: p.coins },
-      objects: p.objects,
-      metrics: m,
-    })
   }
 
   /** 左旧右新；纵轴按窗口内 p95 定标，超出量程的帧顶到上边缘；竖线标出满载起点 */

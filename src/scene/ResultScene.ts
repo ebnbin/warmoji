@@ -14,7 +14,6 @@ import { endRun, getRun } from '../run/state'
 import type { RunState } from '../run/state'
 import { browserStorage } from '../util/storage'
 import { applyBackground } from '../util/background'
-import { reportDebug } from '../debug'
 import { emojiImage } from '../emoji/hold'
 import { emojiText } from '../ui/emojiText'
 import { burstEmitter } from '../util/fx'
@@ -169,7 +168,6 @@ export class ResultScene extends Phaser.Scene {
       this.input.keyboard?.once('keydown-SPACE', again)
     })
 
-    this.reportResult()
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
@@ -402,36 +400,6 @@ export class ResultScene extends Phaser.Scene {
         playSfx('click')
         onTap()
       })
-    })
-  }
-
-  private reportResult(): void {
-    reportDebug({
-      scene: 'result',
-      elapsed: this.run.combatMs / 1000,
-      kills: this.run.kills,
-      level: this.run.xp.level,
-      wave: this.run.wave,
-      coins: this.run.coins,
-      viewW: viewport.logicalWidth,
-      viewH: viewport.logicalHeight,
-      result: {
-        win: this.win,
-        rows: this.run.roster.length,
-        newBest: this.best.newBest,
-        again: {
-          x: this.againRect.x + this.againRect.w / 2,
-          y: this.againRect.y + this.againRect.h / 2,
-          w: this.againRect.w,
-          h: this.againRect.h,
-        },
-        menu: {
-          x: this.menuRect.x + this.menuRect.w / 2,
-          y: this.menuRect.y + this.menuRect.h / 2,
-          w: this.menuRect.w,
-          h: this.menuRect.h,
-        },
-      },
     })
   }
 
