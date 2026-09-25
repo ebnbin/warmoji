@@ -18,6 +18,7 @@ import type { RunState } from '../run/state'
 import { applyBackground } from '../util/background'
 import { emojiImage } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
+import type { EmojiGridItem } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
 import type { ScrollRect } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
@@ -41,14 +42,14 @@ export class RecruitScene extends Phaser.Scene {
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
-  private selectedKey = ''
+  private selectedKey: CharacterId | number | null = null
   private due = 0
   private pool: CharacterId[] = []
   private unlocked = 0
   private picked: CharacterId[] = []
   private layout!: TeamLayout
   private origin = { x: 0, y: 0 }
-  private grid!: EmojiGrid
+  private grid!: EmojiGrid<CharacterId | number>
   private detailView!: ScrollView
   private detailRect: ScrollRect = { x: 0, y: 0, w: 0, h: 0 }
   private previewPhase = 0
@@ -80,7 +81,7 @@ export class RecruitScene extends Phaser.Scene {
       ? this.picked.filter((id) => open.includes(id)).slice(0, this.due)
       : []
     if (!preserved || !this.validSelected()) {
-      this.selectedKey = open[0] ?? ''
+      this.selectedKey = open[0] ?? null
     }
 
     const w = viewport.logicalWidth
@@ -118,12 +119,11 @@ export class RecruitScene extends Phaser.Scene {
     this.grid.onTap = (key): void => {
       playSfx('click')
       this.selectedKey = key
-      if (this.cardState(key) === 'open') {
-        const id = key as CharacterId
-        const at = this.picked.indexOf(id)
+      if (typeof key !== 'number' && this.cardState(key) === 'open') {
+        const at = this.picked.indexOf(key)
         if (at >= 0) this.picked.splice(at, 1)
-        else if (this.picked.length < this.due) this.picked.push(id)
-        else if (this.due === 1) this.picked = [id]
+        else if (this.picked.length < this.due) this.picked.push(key)
+        else if (this.due === 1) this.picked = [key]
       }
       this.refresh()
     }
@@ -162,25 +162,22 @@ export class RecruitScene extends Phaser.Scene {
     }
   }
 
-  private cardState(key: string): 'locked' | 'taken' | 'open' {
-    if (key.startsWith('lock-')) return 'locked'
-    const idx = this.pool.indexOf(key as CharacterId)
+  private cardState(id: CharacterId): 'locked' | 'taken' | 'open' {
+    const idx = this.pool.indexOf(id)
     if (idx < 0 || idx >= this.unlocked) return 'locked'
-    return this.run.roster.includes(key as CharacterId) ? 'taken' : 'open'
+    return this.run.roster.includes(id) ? 'taken' : 'open'
   }
 
   private validSelected(): boolean {
-    if (!this.selectedKey) return false
-    if (this.selectedKey.startsWith('lock-')) {
-      const idx = Number(this.selectedKey.slice(5))
-      return idx >= this.unlocked && idx < this.pool.length
-    }
-    return this.pool.includes(this.selectedKey as CharacterId)
+    const sel = this.selectedKey
+    if (sel === null) return false
+    if (typeof sel === 'number') return sel >= this.unlocked && sel < this.pool.length
+    return this.pool.includes(sel)
   }
 
-  private buildItems(): { key: string; emoji: string; outline?: 'player'; badge?: string }[] {
+  private buildItems(): EmojiGridItem<CharacterId | number>[] {
     return this.pool.map((id, i) => {
-      if (i >= this.unlocked) return { key: `lock-${i}`, emoji: '2753' }
+      if (i >= this.unlocked) return { key: i, emoji: '2753' }
       return {
         key: id,
         emoji: CHARACTERS[id].emoji,
@@ -201,7 +198,7 @@ export class RecruitScene extends Phaser.Scene {
     }
     playSfx('recruit')
     this.picked = []
-    this.selectedKey = ''
+    this.selectedKey = null
     this.scene.start(teamStep(this.run) ?? nextAfterTeam(this.run))
   }
 
@@ -212,14 +209,15 @@ export class RecruitScene extends Phaser.Scene {
 
   private renderDetail(res: number): void {
     this.detailView.clear()
-    if (!this.selectedKey) {
+    const sel = this.selectedKey
+    if (sel === null) {
       this.detailView.setContentHeight(0)
       return
     }
     const D = this.detailRect
 
-    if (this.selectedKey.startsWith('lock-')) {
-      const idx = Number(this.selectedKey.slice(5))
+    if (typeof sel === 'number') {
+      const idx = sel
       this.detailView.add([
         emojiImage(this, 46, 48, '2753', 74),
         this.add
@@ -245,7 +243,7 @@ export class RecruitScene extends Phaser.Scene {
       return
     }
 
-    const id = this.selectedKey as CharacterId
+    const id = sel
     const def = CHARACTERS[id]
     const state = this.cardState(id)
     const tag = state === 'taken' ? ' · 已入队' : this.picked.includes(id) ? ' · 已选' : ''
@@ -279,7 +277,7 @@ export class RecruitScene extends Phaser.Scene {
 
   private refresh(): void {
     this.grid.setItems(this.buildItems())
-    this.grid.setSelected(this.selectedKey || null)
+    this.grid.setSelected(this.selectedKey)
     this.renderDetail(textRes())
     this.rebuildPreview()
     this.updateConfirm()

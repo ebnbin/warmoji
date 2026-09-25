@@ -61,7 +61,7 @@ export class WikiScene extends Phaser.Scene {
   private preserveOnRestart = false
   private palette?: Palette
   private category = 0
-  private focusedKey = ''
+  private focusedIndex = 0
   private levelSel = 0
   private currentCategory = ''
   private currentEntry?: WikiEntry
@@ -74,7 +74,7 @@ export class WikiScene extends Phaser.Scene {
 
   private layout!: WikiLayout
   private origin = { x: 0, y: 0 }
-  private entryGrid?: EmojiGrid
+  private entryGrid?: EmojiGrid<number>
   private allGrid?: VirtualEmojiGrid
   private listScroll = 0
   private gridScroll = 0
@@ -106,7 +106,7 @@ export class WikiScene extends Phaser.Scene {
     this.pool = undefined
     if (!preserved) {
       this.category = 0
-      this.focusedKey = ''
+      this.focusedIndex = 0
       this.allSelected = null
       this.listScroll = 0
       this.gridScroll = 0
@@ -263,7 +263,7 @@ export class WikiScene extends Phaser.Scene {
     const i = this.catRects.findIndex((c) => localX >= c.x && localX < c.x + c.w)
     if (i < 0 || this.category === i) return
     this.category = i
-    this.focusedKey = ''
+    this.focusedIndex = 0
     this.levelSel = 0
     this.listScroll = 0
     this.preserveOnRestart = true
@@ -277,16 +277,13 @@ export class WikiScene extends Phaser.Scene {
   private createEntriesView(): void {
     const L = this.layout.list
     const group = this.groups[this.category]!
-    if (!this.focusedKey && group.entries[0]) {
-      this.focusedKey = `${group.title}:${group.entries[0].name}`
-    }
     this.entryGrid = new EmojiGrid(
       this,
       { x: this.origin.x + L.x, y: this.origin.y + L.y, w: L.w, h: L.h },
       { initialScroll: this.listScroll },
     )
     this.entryGrid.onTap = (key): void => {
-      this.focusedKey = key
+      this.focusedIndex = key
       this.levelSel = 0
       this.refreshEntries()
     }
@@ -294,16 +291,15 @@ export class WikiScene extends Phaser.Scene {
       this.listScroll = this.entryGrid!.scrollY
     }
     this.entryGrid.setItems(
-      group.entries.map((entry) => ({ key: `${group.title}:${entry.name}`, emoji: entry.emoji })),
+      group.entries.map((entry, i) => ({ key: i, emoji: entry.emoji })),
     )
     this.refreshEntries()
   }
 
   private refreshEntries(): void {
     const group = this.groups[this.category]!
-    this.entryGrid?.setSelected(this.focusedKey)
-    const entry =
-      group.entries.find((e) => `${group.title}:${e.name}` === this.focusedKey) ?? group.entries[0]
+    this.entryGrid?.setSelected(this.focusedIndex)
+    const entry = group.entries[this.focusedIndex] ?? group.entries[0]
     if (entry) this.renderDetailCard(group.title, entry)
   }
 

@@ -28,6 +28,7 @@ import { memberMaxHp } from '../data/stats'
 import { applyBackground } from '../util/background'
 import { emojiImage } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
+import type { EmojiGridItem } from '../ui/grid'
 import { ScrollView } from '../ui/scroll'
 import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
@@ -75,7 +76,7 @@ export class ShopScene extends Phaser.Scene {
   private teamFx!: TeamEffects
   private layout!: ShopLayout
   private origin = { x: 0, y: 0 }
-  private grid!: EmojiGrid
+  private grid!: EmojiGrid<CharacterId>
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private offerDescView!: ScrollView
   private coinsText!: Phaser.GameObjects.Text
@@ -347,7 +348,7 @@ export class ShopScene extends Phaser.Scene {
     return memberMaxHp(aggregateCharacterEffects(owned, levelStatsFor(id, this.levelOf(slot))).hpAdd)
   }
 
-  private buildSlotItems(): { key: string; emoji: string; outline: 'player'; badge?: string; hpRatio?: number }[] {
+  private buildSlotItems(): EmojiGridItem<CharacterId>[] {
     return this.lineup.map((id, slot) => {
       const max = this.slotMaxHp(slot)
       const hp = waveStartHp(this.run.memberHp[slot] ?? max, max)
@@ -372,7 +373,7 @@ export class ShopScene extends Phaser.Scene {
     this.grid.onTap = (key): void => {
       if (this.focusedId !== key) this.statsScroll = 0
       playSfx('click')
-      this.focusedId = key as CharacterId
+      this.focusedId = key
       this.refresh()
     }
     this.grid.onScroll = (): void => {

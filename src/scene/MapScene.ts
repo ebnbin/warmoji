@@ -60,7 +60,7 @@ export class MapScene extends Phaser.Scene {
   private selectedId: MapId = MAP_IDS[0]!
   private layout!: MapLayout
   private origin = { x: 0, y: 0 }
-  private grid!: EmojiGrid
+  private grid!: EmojiGrid<MapId>
   private detailView!: ScrollView
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
   private confirmLabel!: Phaser.GameObjects.Text
@@ -146,7 +146,7 @@ export class MapScene extends Phaser.Scene {
     this.grid = new EmojiGrid(this, { x: ox + L.list.x, y: oy + L.list.y, w: L.list.w, h: L.list.h })
     this.grid.onTap = (key): void => {
       playSfx('click')
-      this.selectedId = key as MapId
+      this.selectedId = key
       saveMap(browserStorage(), this.selectedId)
       this.refresh()
     }

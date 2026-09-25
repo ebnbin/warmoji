@@ -18,12 +18,6 @@ import { roundRect } from '../ui/shapes'
 import { rollCardChoices } from '../run/draft'
 import { SceneKey } from './keys'
 
-const RARITY_COLOR: Record<string, number> = {
-  common: 0xc8c8d4,
-  rare: 0x4fc3f7,
-  epic: 0xce93d8,
-}
-
 export class CardScene extends Phaser.Scene {
   private preserveOnRestart = false
   private palette?: Palette
@@ -96,7 +90,7 @@ export class CardScene extends Phaser.Scene {
     const card = CARDS[id]
     const y = i * (this.rowH + this.rowGap)
     const level = this.run.teamCards[id] ?? 0
-    const rc = RARITY_COLOR[card.rarity] ?? 0xffffff
+    const rc = Number.parseInt(RARITIES[card.rarity].color.slice(1), 16)
     const bg = this.add.graphics()
     roundRect(bg, 0, y, listW, this.rowH, 14, { fill: 0x000000, fillAlpha: 0.28, strokeWidth: card.rarity === 'common' ? 1 : 2, stroke: rc, strokeAlpha: card.rarity === 'common' ? 0.3 : 0.85 })
 

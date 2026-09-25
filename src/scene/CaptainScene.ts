@@ -49,7 +49,7 @@ export class CaptainScene extends Phaser.Scene {
   private selectedId: CaptainId = PICKABLE_CAPTAIN_IDS[0]!
   private layout!: CaptainLayout
   private origin = { x: 0, y: 0 }
-  private grid!: EmojiGrid
+  private grid!: EmojiGrid<CaptainId>
   private detailView!: ScrollView
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
 
@@ -107,7 +107,7 @@ export class CaptainScene extends Phaser.Scene {
     this.grid = new EmojiGrid(this, { x: ox + L.list.x, y: oy + L.list.y, w: L.list.w, h: L.list.h })
     this.grid.onTap = (key): void => {
       playSfx('click')
-      this.selectedId = key as CaptainId
+      this.selectedId = key
       saveCaptain(browserStorage(), this.selectedId)
       this.refresh()
     }

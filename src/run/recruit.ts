@@ -3,19 +3,26 @@ import type { CharacterId } from '../types/characters'
 import type { StringStorage } from '../util/storage'
 import { Rng } from '../util/rng'
 import { RECRUIT } from '../data/waves'
+import { CAPTAIN_IDS } from '../data/captains'
 
 const KEY = 'warmoji.recruit.v1'
 
-function loadSeeds(storage: StringStorage | undefined): Record<string, number> {
+function loadSeeds(storage: StringStorage | undefined): Partial<Record<CaptainId, number>> {
+  const seeds: Partial<Record<CaptainId, number>> = {}
   try {
     const raw: unknown = JSON.parse(storage?.getItem(KEY) ?? 'null')
-    return typeof raw === 'object' && raw !== null ? (raw as Record<string, number>) : {}
+    if (typeof raw !== 'object' || raw === null) return seeds
+    const obj = raw as Record<string, unknown>
+    for (const id of CAPTAIN_IDS) {
+      const v = obj[id]
+      if (typeof v === 'number') seeds[id] = v
+    }
   } catch {
-    return {}
   }
+  return seeds
 }
 
-function saveSeeds(storage: StringStorage | undefined, seeds: Record<string, number>): void {
+function saveSeeds(storage: StringStorage | undefined, seeds: Partial<Record<CaptainId, number>>): void {
   try {
     storage?.setItem(KEY, JSON.stringify(seeds))
   } catch {

@@ -5,16 +5,16 @@ import { emojiImage } from '../emoji/hold'
 import { clipTo } from '../util/mask'
 import { roundRect } from './shapes'
 
-export interface EmojiGridItem {
-  key: string
+export interface EmojiGridItem<K> {
+  key: K
   emoji: string
   outline?: OutlineKind
   badge?: string
   hpRatio?: number
 }
 
-interface Cell {
-  item: EmojiGridItem
+interface Cell<K> {
+  item: EmojiGridItem<K>
   relX: number
   relY: number
   bg: Phaser.GameObjects.Graphics
@@ -22,8 +22,8 @@ interface Cell {
 
 const GAP = 10
 
-export class EmojiGrid {
-  onTap?: (key: string) => void
+export class EmojiGrid<K> {
+  onTap?: (key: K) => void
   onScroll?: () => void
 
   private scene: Phaser.Scene
@@ -32,8 +32,8 @@ export class EmojiGrid {
   private readonly gap = GAP
   private cols: number
   private container: Phaser.GameObjects.Container
-  private cells: Cell[] = []
-  private selectedKey: string | null = null
+  private cells: Cell<K>[] = []
+  private selectedKey: K | null = null
   private scroll = 0
   private max = 0
   private contentHeight = 0
@@ -110,7 +110,7 @@ export class EmojiGrid {
     return this.dragMovedFlag
   }
 
-  setItems(items: readonly EmojiGridItem[]): void {
+  setItems(items: readonly EmojiGridItem<K>[]): void {
     this.container.removeAll(true)
     this.cells = []
     const pitch = this.cell + this.gap
@@ -150,7 +150,7 @@ export class EmojiGrid {
     this.redraw()
   }
 
-  setSelected(key: string | null): void {
+  setSelected(key: K | null): void {
     this.selectedKey = key
     this.redraw()
   }

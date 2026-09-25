@@ -17,7 +17,7 @@ function rarityWeights(wave: number, level = 1): Record<ItemRarity, number> {
 }
 export function characterPoolFor(def: CharacterDef, level: number): ItemId[] {
   const tiers: UpgradeTiers = { u1: level >= 2, u2: level >= 3 }
-  const kinds = new Set<string>(loadoutFor(def, tiers).map((w) => w.kind))
+  const kinds = new Set(loadoutFor(def, tiers).map((w) => w.kind))
   return ITEM_IDS.filter((iid) => {
     const item: ItemDef = ITEMS[iid]
     if ((item.minLevel ?? 1) > level) return false
@@ -62,11 +62,11 @@ export function rollItem(
   return pickList[Math.min(pickList.length - 1, Math.floor(rand() * pickList.length))]!
 }
 
-function cardAtMax(owned: Readonly<Record<string, number>>, id: CardId): boolean {
+function cardAtMax(owned: Readonly<Partial<Record<CardId, number>>>, id: CardId): boolean {
   return (owned[id] ?? 0) >= CARDS[id].maxLevel
 }
 export function rollCardChoices(
-  owned: Readonly<Record<string, number>>,
+  owned: Readonly<Partial<Record<CardId, number>>>,
   rand: () => number,
   count: number,
   wave = 1,
