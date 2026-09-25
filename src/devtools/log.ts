@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 
-export type DevLogLevel = 'warn' | 'error'
+export type DevLogLevel = 'info' | 'warn' | 'error'
 
 export interface DevLogEntry {
   readonly at: number
@@ -16,6 +16,7 @@ const MAX_TEXT = 600
 const entries: DevLogEntry[] = []
 let unread = 0
 let started = false
+let captureInfo = false
 
 function describe(v: unknown): string {
   if (v instanceof Error) return v.stack ?? `${v.name}: ${v.message}`
@@ -42,8 +43,17 @@ type ConsoleFn = (...args: unknown[]) => void
 function wrap(level: DevLogLevel, orig: ConsoleFn): ConsoleFn {
   return (...args: unknown[]): void => {
     orig.apply(console, args)
+    if (level === 'info' && !captureInfo) return
     push(level, args.map(describe).join(' '))
   }
+}
+
+export function infoCaptureOn(): boolean {
+  return captureInfo
+}
+
+export function setInfoCapture(on: boolean): void {
+  captureInfo = on
 }
 
 export function startLogCapture(): void {
@@ -51,6 +61,8 @@ export function startLogCapture(): void {
   started = true
   console.error = wrap('error', console.error as ConsoleFn)
   console.warn = wrap('warn', console.warn as ConsoleFn)
+  console.log = wrap('info', console.log as ConsoleFn)
+  console.info = wrap('info', console.info as ConsoleFn)
   window.addEventListener('error', (e) => {
     push('error', e.error instanceof Error ? describe(e.error) : `${e.message} (${e.filename}:${e.lineno})`)
   })
