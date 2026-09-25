@@ -17,6 +17,7 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { nextAfterTeam } from './teamPage'
+import { SceneKey } from './keys'
 
 interface CaptainLayout {
   content: { w: number; h: number }
@@ -53,7 +54,7 @@ export class CaptainScene extends Phaser.Scene {
   private btnRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
-    super('captain')
+    super(SceneKey.Captain)
   }
 
   preload(): void {
@@ -92,7 +93,7 @@ export class CaptainScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.scene.start('map'))
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.scene.start(SceneKey.Map))
     this.add
       .text(w / 2, oy + L.headerY, '选择队长', {
         fontFamily: UI_FONT,
@@ -148,10 +149,10 @@ export class CaptainScene extends Phaser.Scene {
       .zone(b.x, b.y, b.w, b.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', confirm)
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, confirm)
     this.input.keyboard?.on('keydown-ENTER', confirm)
     this.input.keyboard?.on('keydown-SPACE', confirm)
-    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('map'))
+    this.input.keyboard?.on('keydown-ESC', () => this.scene.start(SceneKey.Map))
 
     this.refresh()
 

@@ -18,7 +18,6 @@ import { levelStatsFor, LEVEL_STATS } from '../data/levels'
 import { upgradeCardsFor } from '../data/characters'
 import { aggregateTeamCards } from '../data/cards'
 import type { TeamEffects } from '../types/items'
-import { BATTLE_SCENE_KEY } from '../ecs/keys'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
@@ -36,6 +35,7 @@ import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
 import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
+import { SceneKey } from './keys'
 
 interface ShopLayout {
   content: { w: number; h: number }
@@ -96,7 +96,7 @@ export class ShopScene extends Phaser.Scene {
   private dragStartScroll = 0
 
   constructor() {
-    super('shop')
+    super(SceneKey.Shop)
   }
 
   create(): void {
@@ -150,11 +150,11 @@ export class ShopScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
-    quit.on('pointerup', () => {
+    quit.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
       if (this.dragMoved || this.grid.wasDragged) return
       if (this.quitArmed) {
         endRun()
-        this.scene.start('menu')
+        this.scene.start(SceneKey.Menu)
         return
       }
       this.quitArmed = true
@@ -175,7 +175,7 @@ export class ShopScene extends Phaser.Scene {
         })
         .setOrigin(1, 0.5)
         .setInteractive({ useHandCursor: true })
-      fm.on('pointerup', () => {
+      fm.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (this.dragMoved || this.grid.wasDragged) return
         this.openFormation()
       })
@@ -216,14 +216,14 @@ export class ShopScene extends Phaser.Scene {
       .zone(this.buyRect.x, this.buyRect.y, this.buyRect.w, this.buyRect.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (!this.dragMoved && !this.grid.wasDragged) this.buyFocused()
       })
     this.add
       .zone(this.refreshRect.x, this.refreshRect.y, this.refreshRect.w, this.refreshRect.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (!this.dragMoved && !this.grid.wasDragged) this.refreshFocused()
       })
 
@@ -233,10 +233,10 @@ export class ShopScene extends Phaser.Scene {
       { scrollbar: true },
     )
 
-    this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy2: number) => {
+    this.input.on(Phaser.Input.Events.POINTER_WHEEL, (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy2: number) => {
       if (this.inStats(p)) this.setStatsScroll(this.statsScroll + dy2 * 0.6)
     })
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
       this.dragMoved = false
       this.dragging = this.inStats(p)
       if (this.dragging) {
@@ -244,13 +244,13 @@ export class ShopScene extends Phaser.Scene {
         this.dragStartScroll = this.statsScroll
       }
     })
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dyDrag = this.dragStartY - p.worldY
       if (this.statsMax > 0 && Math.abs(dyDrag) > 10) this.dragMoved = true
       if (this.dragMoved) this.setStatsScroll(this.dragStartScroll + dyDrag)
     })
-    this.input.on('pointerup', () => {
+    this.input.on(Phaser.Input.Events.POINTER_UP, () => {
       this.dragging = false
     })
 
@@ -276,7 +276,7 @@ export class ShopScene extends Phaser.Scene {
       .zone(b.x, b.y, b.w, b.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (!this.dragMoved && !this.grid.wasDragged) this.nextWave()
       })
     this.input.keyboard?.on('keydown-ENTER', () => this.nextWave())
@@ -748,7 +748,7 @@ export class ShopScene extends Phaser.Scene {
       overlay.destroy()
       box.destroy()
     }
-    overlay.setInteractive().on('pointerup', dismiss)
+    overlay.setInteractive().on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, dismiss)
     this.time.delayedCall(3400, () => {
       if (box.active) dismiss()
     })
@@ -763,13 +763,13 @@ export class ShopScene extends Phaser.Scene {
 
   private nextWave(): void {
     playSfx('click')
-    this.scene.start(BATTLE_SCENE_KEY)
+    this.scene.start(SceneKey.Battle)
   }
 
   private openFormation(): void {
     playSfx('click')
     this.scene.sleep()
-    this.scene.run('formation', { fromShop: true })
+    this.scene.run(SceneKey.Formation, { fromShop: true })
   }
 
   private onWake(): void {

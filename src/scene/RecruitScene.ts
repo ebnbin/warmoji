@@ -35,6 +35,7 @@ import {
   teamLayout,
 } from './teamPage'
 import type { TeamLayout } from './teamPage'
+import { SceneKey } from './keys'
 
 export class RecruitScene extends Phaser.Scene {
   private preserveOnRestart = false
@@ -58,7 +59,7 @@ export class RecruitScene extends Phaser.Scene {
   private btnLabel!: Phaser.GameObjects.Text
 
   constructor() {
-    super('recruit')
+    super(SceneKey.Recruit)
   }
 
   create(): void {
@@ -323,7 +324,7 @@ export class RecruitScene extends Phaser.Scene {
             .zone(c.x - size / 2, c.y - size / 2, size, size)
             .setOrigin(0)
             .setInteractive({ useHandCursor: true })
-            .on('pointerup', () => {
+            .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
               if (this.grid.wasDragged) return
               playSfx('click')
               const at = this.picked.indexOf(id)

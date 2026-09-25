@@ -9,10 +9,11 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { Joystick } from '../ui/Joystick'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
-import type { HudInput, HudSnapshot, WaveSummary } from '../run/hudHost'
-import { activeHudHost, setActiveHudInput } from '../run/hudHost'
+import type { FieldCollected, HudInput, HudSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
+import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import { roundRect } from '../ui/shapes'
+import { SceneKey } from './keys'
 
 export class UIScene extends Phaser.Scene implements HudInput {
   private joystick?: Joystick
@@ -39,7 +40,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
   private fxKey = ''
 
   constructor() {
-    super('ui')
+    super(SceneKey.Ui)
   }
 
   get moveVector(): { x: number; y: number } {
@@ -96,7 +97,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
       .setDepth(300)
       .setAlpha(0.85)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.togglePause())
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.togglePause())
     this.input.keyboard?.on('keydown-ESC', () => this.togglePause())
     this.input.keyboard?.on('keydown-SPACE', () => {
       if (this.paused) this.togglePause()
@@ -106,16 +107,16 @@ export class UIScene extends Phaser.Scene implements HudInput {
     this.createFxIndicators()
 
     const arenaEvents = this.arena.events
-    arenaEvents.on('wave-complete', this.onWaveComplete, this)
-    arenaEvents.on('wave-warning', this.onWaveWarning, this)
-    arenaEvents.on('skill-cast', this.onSkillCast, this)
-    arenaEvents.on('field-collected', this.onFieldCollected, this)
+    arenaEvents.on(HudEvent.WaveComplete, this.onWaveComplete, this)
+    arenaEvents.on(HudEvent.WaveWarning, this.onWaveWarning, this)
+    arenaEvents.on(HudEvent.SkillCast, this.onSkillCast, this)
+    arenaEvents.on(HudEvent.FieldCollected, this.onFieldCollected, this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      arenaEvents.off('wave-complete', this.onWaveComplete, this)
-      arenaEvents.off('wave-warning', this.onWaveWarning, this)
-      arenaEvents.off('skill-cast', this.onSkillCast, this)
-      arenaEvents.off('field-collected', this.onFieldCollected, this)
+      arenaEvents.off(HudEvent.WaveComplete, this.onWaveComplete, this)
+      arenaEvents.off(HudEvent.WaveWarning, this.onWaveWarning, this)
+      arenaEvents.off(HudEvent.SkillCast, this.onSkillCast, this)
+      arenaEvents.off(HudEvent.FieldCollected, this.onFieldCollected, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       setActiveHudInput(undefined)
     })
@@ -171,7 +172,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
         .setOrigin(0)
         .setDepth(402)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', onTap)
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, onTap)
       return [g, t, z]
     }
     this.pauseObjs = [
@@ -189,7 +190,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
       ...button(cy + 8, '继 续', true, () => this.togglePause()),
       ...button(cy + 100, '结束本局', false, () => {
         endRun()
-        this.arena.scene.start('menu')
+        this.arena.scene.start(SceneKey.Menu)
       }),
     ]
   }
@@ -224,7 +225,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
     roundRect(g, x + 2, y + 2, Math.max(6, (w - 4) * ratio), 12, 6, { fill: 0xef5350 })
   }
 
-  private onWaveWarning(w: { title: string; sub: string }): void {
+  private onWaveWarning(w: WaveWarning): void {
     const res = textRes()
     const cx = viewport.logicalWidth / 2
     const cy = viewport.logicalHeight * 0.3
@@ -308,7 +309,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
       .setOrigin(0)
       .setDepth(304)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.tryCastSkill())
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.tryCastSkill())
     this.input.keyboard?.on('keydown-E', () => this.tryCastSkill())
   }
 
@@ -417,12 +418,7 @@ export class UIScene extends Phaser.Scene implements HudInput {
     this.tweens.add({ targets: t, alpha: 0, delay: 900, duration: 400, onComplete: () => t.destroy() })
   }
 
-  private onFieldCollected(fx: {
-    emoji: string
-    name: string
-    desc: string
-    polarity: 'buff' | 'debuff'
-  }): void {
+  private onFieldCollected(fx: FieldCollected): void {
     const res = textRes()
     const buff = fx.polarity === 'buff'
     const cx = viewport.logicalWidth / 2

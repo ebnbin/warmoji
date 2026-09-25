@@ -16,6 +16,7 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { rollCardChoices } from '../run/draft'
+import { SceneKey } from './keys'
 
 const RARITY_COLOR: Record<string, number> = {
   common: 0xc8c8d4,
@@ -34,7 +35,7 @@ export class CardScene extends Phaser.Scene {
   private rowGap = 12
 
   constructor() {
-    super('cards')
+    super(SceneKey.Cards)
   }
 
   create(): void {
@@ -104,7 +105,7 @@ export class CardScene extends Phaser.Scene {
       .zone(0, y, listW, this.rowH)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (this.list.wasDragged) return
         this.pick(id)
       })
@@ -152,8 +153,8 @@ export class CardScene extends Phaser.Scene {
     this.scene.restart()
   }
 
-  private nextScene(): 'recruit' | 'formation' | 'shop' {
-    return teamStep(this.run) ?? 'shop'
+  private nextScene(): SceneKey.Recruit | SceneKey.Formation | SceneKey.Shop {
+    return teamStep(this.run) ?? SceneKey.Shop
   }
 
   private onViewportChanged(): void {

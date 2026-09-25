@@ -21,6 +21,38 @@ export interface WaveSummary {
   levels: number
 }
 
+export interface WaveWarning {
+  title: string
+  sub: string
+}
+
+export interface FieldCollected {
+  emoji: string
+  name: string
+  desc: string
+  polarity: Polarity
+}
+
+export enum HudEvent {
+  WaveWarning = 'wave-warning',
+  WaveComplete = 'wave-complete',
+  SkillCast = 'skill-cast',
+  FieldCollected = 'field-collected',
+}
+
+interface HudPayload {
+  [HudEvent.WaveWarning]: WaveWarning
+  [HudEvent.WaveComplete]: WaveSummary
+  [HudEvent.SkillCast]: string
+  [HudEvent.FieldCollected]: FieldCollected
+}
+
+export interface HudEvents {
+  emit<E extends HudEvent>(event: E, payload: HudPayload[E]): boolean
+  on<E extends HudEvent>(event: E, fn: (payload: HudPayload[E]) => void, context: object): this
+  off<E extends HudEvent>(event: E, fn: (payload: HudPayload[E]) => void, context: object): this
+}
+
 let active: HudHost | undefined
 
 export function setActiveHudHost(host: HudHost): void {
@@ -33,7 +65,7 @@ export function activeHudHost(): HudHost | undefined {
 
 export interface HudHost {
   readonly sandbox: boolean
-  readonly events: Phaser.Events.EventEmitter
+  readonly events: HudEvents
   readonly scene: Phaser.Scenes.ScenePlugin
   hudSnapshot(): HudSnapshot
   skillSnapshot(): { remainMs: number; cdMs: number }

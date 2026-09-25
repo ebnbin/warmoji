@@ -12,6 +12,7 @@ import { MAP_IDS } from '../data/maps'
 import { drawRecruitPool, recruitSeed, refreshRecruitSeed, unlockedCount } from './recruit'
 import { waveDurationMs } from '../data/waves'
 import type { XpState } from '../types/xp'
+import { SceneKey } from '../scene/keys'
 
 export interface RunState {
   captainId: CaptainId
@@ -183,9 +184,9 @@ export function setGuardCenter(run: RunState, id: CharacterId): boolean {
   return true
 }
 
-export function teamStep(run: RunState): 'recruit' | 'formation' | null {
-  if (recruitDueCount(run) > 0) return 'recruit'
-  if (hasCenter(run) && !run.formationIntroduced) return 'formation'
+export function teamStep(run: RunState): SceneKey.Recruit | SceneKey.Formation | null {
+  if (recruitDueCount(run) > 0) return SceneKey.Recruit
+  if (hasCenter(run) && !run.formationIntroduced) return SceneKey.Formation
   return null
 }
 

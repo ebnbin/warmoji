@@ -15,6 +15,7 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
+import { SceneKey } from './keys'
 
 function backdropDecor(): EmojiRef[] {
   const uniqEnemies = [...new Set(ENEMY_DEFS.map((e) => e.emoji))]
@@ -44,7 +45,7 @@ export class MenuScene extends Phaser.Scene {
   private best!: HighScore
 
   constructor() {
-    super('menu')
+    super(SceneKey.Menu)
   }
 
   preload(): void {
@@ -98,23 +99,23 @@ export class MenuScene extends Phaser.Scene {
     emojiImage(this, gearX, gearY, '2699', 54)
       .setAlpha(0.9)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         playSfx('click')
-        this.scene.start('settings')
+        this.scene.start(SceneKey.Settings)
       })
     emojiImage(this, gearX - 84, gearY, '1f4d6', 54)
       .setAlpha(0.9)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         playSfx('click')
-        this.scene.start('wiki')
+        this.scene.start(SceneKey.Wiki)
       })
     emojiImage(this, gearX - 168, gearY, '1f9ea', 54)
       .setAlpha(0.9)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         playSfx('click')
-        this.scene.start('studio')
+        this.scene.start(SceneKey.Studio)
       })
 
     const btn = { x: w / 2 - 170, y: h * 0.82 - 36, w: 340, h: 72 }
@@ -142,12 +143,12 @@ export class MenuScene extends Phaser.Scene {
       .zone(btn.x, btn.y, btn.w, btn.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         playSfx('click')
-        this.scene.start('map')
+        this.scene.start(SceneKey.Map)
       })
-    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('map'))
-    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('map'))
+    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start(SceneKey.Map))
+    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start(SceneKey.Map))
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

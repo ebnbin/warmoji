@@ -15,6 +15,7 @@ import { setBgmEnabled } from '../audio/bgm'
 import { playSfx, setSfxEnabled } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
+import { SceneKey } from './keys'
 
 interface SettingsLayout {
   content: { w: number; h: number }
@@ -52,7 +53,7 @@ export class SettingsScene extends Phaser.Scene {
   private listRect: ScrollRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
-    super('settings')
+    super(SceneKey.Settings)
   }
 
   preload(): void {
@@ -84,8 +85,8 @@ export class SettingsScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.scene.start('menu'))
-    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.scene.start(SceneKey.Menu))
+    this.input.keyboard?.on('keydown-ESC', () => this.scene.start(SceneKey.Menu))
 
     emojiText(
       this,
@@ -121,7 +122,7 @@ export class SettingsScene extends Phaser.Scene {
         .zone(0, y, S.w, S.rowH)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
           if (this.list.wasDragged) return
           this.settings[def.key] = !this.settings[def.key]
           saveSettings(browserStorage(), this.settings)

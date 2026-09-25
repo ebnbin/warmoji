@@ -4,10 +4,11 @@ import emojiBundleUrl from '../emoji/twemoji.txt?url'
 import { loadEmojiTextures, primeEmojiPack } from '../emoji/textures'
 import { FONT, UI_FONT } from '../util/fonts'
 import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../manifest'
+import { SceneKey } from './keys'
 
 export class PreloadScene extends Phaser.Scene {
   constructor() {
-    super('preload')
+    super(SceneKey.Preload)
   }
 
   preload(): void {
@@ -31,7 +32,7 @@ export class PreloadScene extends Phaser.Scene {
     }
     loadEmojiTextures(this, PRELOAD_EMOJIS, OUTLINED_EMOJIS)
       .catch((err) => console.error(`emoji 纹理加载失败: ${String(err)}`))
-      .finally(() => this.scene.start('menu'))
+      .finally(() => this.scene.start(SceneKey.Menu))
   }
 
   private fail(message: string): void {

@@ -1,7 +1,5 @@
-import type Phaser from 'phaser'
+import Phaser from 'phaser'
 import { CAPTAINS } from '../data/captains'
-import { BATTLE_SCENE_KEY } from '../ecs/keys'
-import type { BattleSceneKey } from '../ecs/keys'
 import { emojiImage } from '../emoji/hold'
 import { endRun } from '../run/state'
 import type { RunState } from '../run/state'
@@ -11,6 +9,7 @@ import type { ScrollView } from '../ui/scroll'
 import { roundRect } from '../ui/shapes'
 import { FONT, UI_FONT } from '../util/fonts'
 import { characterStatGroups } from './statLines'
+import { SceneKey } from './keys'
 
 export interface TeamLayout {
   content: { w: number; h: number }
@@ -66,8 +65,8 @@ export function isInitialWave(run: RunState): boolean {
   return run.wave === CAPTAINS[run.captainId].startWave
 }
 
-export function nextAfterTeam(run: RunState): BattleSceneKey | 'shop' {
-  return isInitialWave(run) && !CAPTAINS[run.captainId].firstWaveShop ? BATTLE_SCENE_KEY : 'shop'
+export function nextAfterTeam(run: RunState): SceneKey.Battle | SceneKey.Shop {
+  return isInitialWave(run) && !CAPTAINS[run.captainId].firstWaveShop ? SceneKey.Battle : SceneKey.Shop
 }
 
 export function addTeamFrame(
@@ -119,10 +118,10 @@ export function addRunExit(
   if (isInitialWave(run)) {
     const leave = (): void => {
       endRun()
-      scene.scene.start('captain')
+      scene.scene.start(SceneKey.Captain)
     }
     const back = scene.add.text(x, y, '← 返回', style).setOrigin(0, 0.5).setInteractive({ useHandCursor: true })
-    back.on('pointerup', () => {
+    back.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
       if (!dragged()) leave()
     })
     scene.input.keyboard?.on('keydown-ESC', leave)
@@ -130,11 +129,11 @@ export function addRunExit(
   }
   let armed = false
   const quit = scene.add.text(x, y, '✕ 结束', style).setOrigin(0, 0.5).setInteractive({ useHandCursor: true })
-  quit.on('pointerup', () => {
+  quit.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
     if (dragged()) return
     if (armed) {
       endRun()
-      scene.scene.start('menu')
+      scene.scene.start(SceneKey.Menu)
       return
     }
     armed = true
@@ -174,7 +173,7 @@ export function addConfirmButton(
     .zone(rect.x, rect.y, rect.w, rect.h)
     .setOrigin(0)
     .setInteractive({ useHandCursor: true })
-    .on('pointerup', () => {
+    .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
       if (!dragged()) onConfirm()
     })
   scene.input.keyboard?.on('keydown-ENTER', onConfirm)

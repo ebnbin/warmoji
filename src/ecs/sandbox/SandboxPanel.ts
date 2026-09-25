@@ -126,7 +126,7 @@ export class SandboxPanel {
       .setOrigin(0)
       .setDepth(DEPTH + 2)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.toggle())
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.toggle())
     this.objs.push(g, icon, zone)
   }
 
@@ -164,7 +164,7 @@ export class SandboxPanel {
         .setOrigin(0)
         .setDepth(DEPTH + 3)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => this.toggle()),
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.toggle()),
     )
 
     const tabsY = y + headH
@@ -216,7 +216,7 @@ export class SandboxPanel {
         .setOrigin(0)
         .setDepth(DEPTH + 3)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
           if (tab === d.id) return
           playSfx('click')
           tab = d.id
@@ -333,7 +333,7 @@ export class SandboxPanel {
         .zone(0, y, w, rowH)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
           if (this.view.wasDragged) return
           playSfx('click')
           applySandboxPreset(p.id)
@@ -383,7 +383,7 @@ export class SandboxPanel {
         .zone(cx, cy, cw, chipH)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
           if (this.view.wasDragged) return
           playSfx('click')
           it.tap()

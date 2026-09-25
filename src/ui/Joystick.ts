@@ -16,9 +16,9 @@ export class Joystick {
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene
-    scene.input.on('pointerdown', this.onDown, this)
-    scene.input.on('pointermove', this.onMove, this)
-    scene.input.on('pointerup', this.onUp, this)
+    scene.input.on(Phaser.Input.Events.POINTER_DOWN, this.onDown, this)
+    scene.input.on(Phaser.Input.Events.POINTER_MOVE, this.onMove, this)
+    scene.input.on(Phaser.Input.Events.POINTER_UP, this.onUp, this)
   }
 
   get vector(): { x: number; y: number } {

@@ -60,7 +60,7 @@ export class VirtualEmojiGrid {
       .zone(rect.x, rect.y, rect.w, rect.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', (p: Phaser.Input.Pointer) => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, (p: Phaser.Input.Pointer) => {
         if (this.dragMoved || !this.pressIn || this.stopPress) return
         const col = Math.floor((p.worldX - rect.x) / CELL)
         const index = Math.floor((p.worldY - rect.y + this.scroll) / CELL) * this.cols + col
@@ -69,10 +69,10 @@ export class VirtualEmojiGrid {
         this.onTap?.(cp)
       })
 
-    scene.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+    scene.input.on(Phaser.Input.Events.POINTER_WHEEL, (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (this.contains(p)) this.scrollTo(this.scroll + dy * 0.6)
     })
-    scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+    scene.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
       this.dragMoved = false
       this.stopPress = Math.abs(this.flingV) >= 0.35
       this.flingV = 0
@@ -85,7 +85,7 @@ export class VirtualEmojiGrid {
         this.lastMoveT = scene.time.now
       }
     })
-    scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+    scene.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dy = this.dragStartY - p.worldY
       if (this.max > 0 && Math.abs(dy) > TAP_SLOP) this.dragMoved = true
@@ -97,8 +97,8 @@ export class VirtualEmojiGrid {
         this.lastMoveT = scene.time.now
       }
     })
-    scene.input.on('pointerup', this.release, this)
-    scene.input.on('pointerupoutside', this.release, this)
+    scene.input.on(Phaser.Input.Events.POINTER_UP, this.release, this)
+    scene.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.release, this)
 
     scene.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this)
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

@@ -2,7 +2,6 @@ import Phaser from 'phaser'
 import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
-import { BATTLE_SCENE_KEY } from '../ecs/keys'
 import { beginSandboxRun } from '../ecs/sandbox/knobs'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
@@ -16,6 +15,7 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
+import { SceneKey } from './keys'
 
 const MAP_PLAY_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> = {
   bounded: '有界竞技场：25×25 方场，边界围合',
@@ -70,7 +70,7 @@ export class MapScene extends Phaser.Scene {
   private sandboxLabel!: Phaser.GameObjects.Text
 
   constructor() {
-    super('map')
+    super(SceneKey.Map)
   }
 
   preload(): void {
@@ -108,7 +108,7 @@ export class MapScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => this.scene.start('menu'))
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.scene.start(SceneKey.Menu))
     this.add
       .text(w / 2, oy + L.headerY, '选择地图', {
         fontFamily: UI_FONT,
@@ -137,7 +137,7 @@ export class MapScene extends Phaser.Scene {
       .zone(t.x, t.y, t.w, t.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         playSfx('click')
         this.sandbox = !this.sandbox
         this.refresh()
@@ -181,19 +181,19 @@ export class MapScene extends Phaser.Scene {
       playSfx('click')
       if (this.sandbox) {
         beginSandboxRun(this.selectedId)
-        this.scene.start(BATTLE_SCENE_KEY)
+        this.scene.start(SceneKey.Battle)
         return
       }
-      this.scene.start('captain')
+      this.scene.start(SceneKey.Captain)
     }
     this.add
       .zone(b.x, b.y, b.w, b.h)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', confirm)
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, confirm)
     this.input.keyboard?.on('keydown-ENTER', confirm)
     this.input.keyboard?.on('keydown-SPACE', confirm)
-    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
+    this.input.keyboard?.on('keydown-ESC', () => this.scene.start(SceneKey.Menu))
 
     this.refresh()
 

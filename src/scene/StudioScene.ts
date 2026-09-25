@@ -31,6 +31,7 @@ import { ScrollView } from '../ui/scroll'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
+import { SceneKey } from './keys'
 
 interface StudioLayout {
   content: { w: number; h: number }
@@ -121,7 +122,7 @@ export class StudioScene extends Phaser.Scene {
   private tabObjs: Phaser.GameObjects.GameObject[] = []
 
   constructor() {
-    super('studio')
+    super(SceneKey.Studio)
   }
 
   create(): void {
@@ -158,10 +159,10 @@ export class StudioScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
-        if (!(this.grid?.wasDragged ?? false)) this.scene.start('menu')
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
+        if (!(this.grid?.wasDragged ?? false)) this.scene.start(SceneKey.Menu)
       })
-    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
+    this.input.keyboard?.on('keydown-ESC', () => this.scene.start(SceneKey.Menu))
     emojiText(
       this,
       w / 2,
@@ -189,10 +190,10 @@ export class StudioScene extends Phaser.Scene {
     const grid = (this.grid = new VirtualEmojiGrid(this, G))
     grid.onTap = (cp) => this.onGridTap(cp)
 
-    this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+    this.input.on(Phaser.Input.Events.POINTER_WHEEL, (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (this.anatContains(p)) this.anatScrollTo(this.anatScroll + dy * 0.6)
     })
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
       this.anatDragMoved = false
       this.anatDragging = this.anatContains(p)
       if (this.anatDragging) {
@@ -200,7 +201,7 @@ export class StudioScene extends Phaser.Scene {
         this.anatDragStartScroll = this.anatScroll
       }
     })
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       if (!this.anatDragging || !p.isDown) return
       const dy = this.anatDragStartY - p.worldY
       if (this.anatScrollMax > 0 && Math.abs(dy) > TAP_SLOP) this.anatDragMoved = true
@@ -209,8 +210,8 @@ export class StudioScene extends Phaser.Scene {
     const releaseTree = (): void => {
       this.anatDragging = false
     }
-    this.input.on('pointerup', releaseTree)
-    this.input.on('pointerupoutside', releaseTree)
+    this.input.on(Phaser.Input.Events.POINTER_UP, releaseTree)
+    this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, releaseTree)
 
     const need = new Set<string>(ANIM_TEMPLATES.map((t) => t.icon))
     void Promise.all([
@@ -221,7 +222,7 @@ export class StudioScene extends Phaser.Scene {
         })
         .catch((err) => console.error(`emoji 清单加载失败: ${String(err)}`)),
     ]).then(() => {
-      if (!this.scene.isActive('studio')) return
+      if (!this.scene.isActive(SceneKey.Studio)) return
       this.applyTab()
     })
 
@@ -281,7 +282,7 @@ export class StudioScene extends Phaser.Scene {
         .zone(x, y - chipH / 2, chipW, chipH)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
           if (this.tab === d.id || this.grid?.wasDragged) return
           this.tab = d.id
           this.paused = false
@@ -447,7 +448,7 @@ export class StudioScene extends Phaser.Scene {
         .zone(x, y, chipW, chipH)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
           if (this.grid?.wasDragged || this.clipSel === c.id) return
           this.clipSel = c.id
           this.buildRecipeDetail()
@@ -497,7 +498,7 @@ export class StudioScene extends Phaser.Scene {
         .zone(lx, lcy, chipW, chipH)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
           if (this.grid?.wasDragged || view.wasDragged || this.tplId === t.id) return
           this.tplId = t.id
           this.buildTemplateDetail()
@@ -557,7 +558,7 @@ export class StudioScene extends Phaser.Scene {
       })
       .setOrigin(1, 0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (this.grid?.wasDragged || this.anatDragMoved) return
         if (this.anatHidden.size === 0 && this.anatCollapsed.size === 0) return
         this.resetAnatState()
@@ -579,7 +580,7 @@ export class StudioScene extends Phaser.Scene {
             this.ownedKeys.add(fullKey)
           }
         }
-        if (gen !== this.jobGen || !this.scene.isActive('studio')) return
+        if (gen !== this.jobGen || !this.scene.isActive(SceneKey.Studio)) return
 
         const colX = d.x + 24
         const colW = portrait ? 250 : 260
@@ -632,7 +633,7 @@ export class StudioScene extends Phaser.Scene {
           .zone(treeArea.x, treeArea.y, treeArea.w, treeArea.h)
           .setOrigin(0)
           .setInteractive({ useHandCursor: true })
-          .on('pointerup', (p: Phaser.Input.Pointer) => this.onTreeTap(p))
+          .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, (p: Phaser.Input.Pointer) => this.onTreeTap(p))
 
         this.detailObjs.push(treeBg, boxes, fullImg, splitImg, ...caps, info, mask, rowsBox, treeZone)
         this.anat = { tree, splitImg, fullKey, info, rowsBox, area: treeArea, rowObjs: [], res, bigSize }
@@ -776,7 +777,7 @@ export class StudioScene extends Phaser.Scene {
     const svg = composeSvg(a.tree, { hidden: this.anatHidden })
     try {
       const img = await svgToImage(setSvgSize(svg, RASTER))
-      if (gen !== this.anatSplitGen || detailGen !== this.jobGen || !this.scene.isActive('studio')) return
+      if (gen !== this.anatSplitGen || detailGen !== this.jobGen || !this.scene.isActive(SceneKey.Studio)) return
       const key = `studio-anat-live-${++this.anatLiveCounter}`
       this.textures.addImage(key, img)
       this.ownedKeys.add(key)
@@ -802,7 +803,7 @@ export class StudioScene extends Phaser.Scene {
     this.detailObjs.push(img)
     void ensureEmoji(this, emoji)
       .then((key) => {
-        if (this.previewImg !== img || this.frameKeys.length > 0 || !this.scene.isActive('studio')) return
+        if (this.previewImg !== img || this.frameKeys.length > 0 || !this.scene.isActive(SceneKey.Studio)) return
         img.setTexture(key).setDisplaySize(size, size).setVisible(true)
       })
       .catch((err) => console.warn(`预览加载失败 ${emoji}: ${String(err)}`))
@@ -860,7 +861,7 @@ export class StudioScene extends Phaser.Scene {
         .zone(x, y, btnW, btnH)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
           if (this.grid?.wasDragged) return
           def.onTap()
         })

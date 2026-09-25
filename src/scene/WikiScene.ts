@@ -20,6 +20,7 @@ import { emojiThumbSize, prepareEmojiThumbs, releaseEmojiThumbs } from '../emoji
 import { VirtualEmojiGrid } from '../ui/virtualGrid'
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
+import { SceneKey } from './keys'
 
 interface WikiLayout {
   content: { w: number; h: number }
@@ -89,7 +90,7 @@ export class WikiScene extends Phaser.Scene {
   private catDragStartScroll = 0
 
   constructor() {
-    super('wiki')
+    super(SceneKey.Wiki)
   }
 
   create(): void {
@@ -131,10 +132,10 @@ export class WikiScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
-        if (!this.wasDragged()) this.scene.start('menu')
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
+        if (!this.wasDragged()) this.scene.start(SceneKey.Menu)
       })
-    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('menu'))
+    this.input.keyboard?.on('keydown-ESC', () => this.scene.start(SceneKey.Menu))
 
     emojiText(
       this,
@@ -219,13 +220,13 @@ export class WikiScene extends Phaser.Scene {
       .zone(rowX, rowY, rowW, ch)
       .setOrigin(0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerup', (p: Phaser.Input.Pointer) => this.onCatTap(p))
-    this.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, dx: number, dy: number) => {
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, (p: Phaser.Input.Pointer) => this.onCatTap(p))
+    this.input.on(Phaser.Input.Events.POINTER_WHEEL, (p: Phaser.Input.Pointer, _o: unknown, dx: number, dy: number) => {
       if (this.catContains(p)) {
         this.catScrollTo(this.catScroll + (Math.abs(dx) > Math.abs(dy) ? dx : dy) * 0.6)
       }
     })
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
       this.catDragMoved = false
       this.catDragging = this.catContains(p)
       if (this.catDragging) {
@@ -233,7 +234,7 @@ export class WikiScene extends Phaser.Scene {
         this.catDragStartScroll = this.catScroll
       }
     })
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       if (!this.catDragging || !p.isDown) return
       const dx = p.worldX - this.catDragStartX
       if (this.catScrollMax > 0 && Math.abs(dx) > TAP_SLOP) this.catDragMoved = true
@@ -242,8 +243,8 @@ export class WikiScene extends Phaser.Scene {
     const release = (): void => {
       this.catDragging = false
     }
-    this.input.on('pointerup', release)
-    this.input.on('pointerupoutside', release)
+    this.input.on(Phaser.Input.Events.POINTER_UP, release)
+    this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, release)
   }
 
   private catContains(p: Phaser.Input.Pointer): boolean {
@@ -367,7 +368,7 @@ export class WikiScene extends Phaser.Scene {
         .setOrigin(0, 0)
         .setVisible(false)
         .setInteractive({ useHandCursor: true })
-      t.on('pointerup', () => {
+      t.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         if (!view.wasDragged) this.selectLevel(i)
       })
       return t
@@ -429,7 +430,7 @@ export class WikiScene extends Phaser.Scene {
     }
     icon.setVisible(false)
     void ensureEmoji(this, emoji).then((k) => {
-      if (icon.getData('want') !== k || !this.scene.isActive('wiki')) return
+      if (icon.getData('want') !== k || !this.scene.isActive(SceneKey.Wiki)) return
       icon.setTexture(k).setDisplaySize(size, size).setVisible(true)
     })
   }
@@ -532,7 +533,7 @@ export class WikiScene extends Phaser.Scene {
     }
 
     void this.loadManifest().then(() => {
-      if (!this.scene.isActive('wiki') || !this.isAllPage()) return
+      if (!this.scene.isActive(SceneKey.Wiki) || !this.isAllPage()) return
       this.manifestUsed = this.manifest.filter((cp) => this.used.has(cp)).length
       grid.setItems(this.manifest)
       grid.setSelected(this.allSelected)

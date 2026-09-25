@@ -66,10 +66,10 @@ export class ScrollView {
 
     if (opts.scrollbar !== false) this.bar = scene.add.graphics()
 
-    scene.input.on('wheel', (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+    scene.input.on(Phaser.Input.Events.POINTER_WHEEL, (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (this.contains(p)) this.setScroll(this.scroll + dy * 0.6)
     })
-    scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+    scene.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
       this.dragMovedFlag = false
       this.dragging = this.contains(p)
       if (this.dragging) {
@@ -77,7 +77,7 @@ export class ScrollView {
         this.dragStartScroll = this.scroll
       }
     })
-    scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+    scene.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       if (!this.dragging || !p.isDown) return
       const dy = this.dragStartY - p.worldY
       if (this.max > 0 && Math.abs(dy) > TAP_SLOP) this.dragMovedFlag = true
@@ -86,8 +86,8 @@ export class ScrollView {
     const release = (): void => {
       this.dragging = false
     }
-    scene.input.on('pointerup', release)
-    scene.input.on('pointerupoutside', release)
+    scene.input.on(Phaser.Input.Events.POINTER_UP, release)
+    scene.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, release)
   }
 
   get wasDragged(): boolean {

@@ -19,7 +19,6 @@ import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
 import { getRun, teamStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { bossFor, MAPS } from '../data/maps'
-import { BATTLE_SCENE_KEY, SANDBOX_SCENE_KEY } from './keys'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
@@ -51,14 +50,15 @@ import { aggregateTeamCards } from '../data/cards'
 import type { TeamEffects } from '../types/items'
 import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox/knobs'
 import { tickSkillCd } from '../run/state'
-import { hudMoveVector, setActiveHudHost } from '../run/hudHost'
-import type { HudHost } from '../run/hudHost'
-import type { HudSnapshot, WaveSummary } from '../run/hudHost'
+import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
+import type { HudEvents, HudHost } from '../run/hudHost'
+import type { HudSnapshot } from '../run/hudHost'
 import type { Sim } from './sim'
 import { drain } from './outbox'
 import type { Burst } from './outbox'
 import { rollWaveCarriers } from './utils/battleFx'
 import { centerX, centerY } from './utils/team'
+import { SceneKey } from '../scene/keys'
 
 const BOSS_SETTLE_MS = 700
 
@@ -111,7 +111,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private bootGen = 0
 
   constructor() {
-    super(BATTLE_SCENE_KEY)
+    super(SceneKey.Battle)
+  }
+
+  private get hud(): HudEvents {
+    return this.events
   }
 
   /** Phaser 跨局复用同一个 Scene 实例，可变字段须在此重置 */
@@ -188,14 +192,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     })
 
     setActiveHudHost(this)
-    this.scene.launch('ui')
-    this.scene.launch(SANDBOX_SCENE_KEY)
+    this.scene.launch(SceneKey.Ui)
+    this.scene.launch(SceneKey.Sandbox)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.bootGen++
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
-      this.scene.stop('ui')
-      this.scene.stop(SANDBOX_SCENE_KEY)
+      this.scene.stop(SceneKey.Ui)
+      this.scene.stop(SceneKey.Sandbox)
       this.atlas?.dispose()
       this.cues?.destroy()
       this.rings?.destroy()
@@ -258,7 +262,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.time.delayedCall(600, () => {
         const sim = this.sim
         if (!sim || sim.over) return
-        this.events.emit('wave-warning', { title: '精英来袭', sub: '敌人潮涌来，小心金边强敌！' })
+        this.hud.emit(HudEvent.WaveWarning, { title: '精英来袭', sub: '敌人潮涌来，小心金边强敌！' })
         spawnSurge(sim)
       })
     }
@@ -266,7 +270,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.sim.hooks.onFinalWave(this.sim)
       this.time.delayedCall(600, () => {
         if (!this.sim || this.sim.over) return
-        this.events.emit('wave-warning', {
+        this.hud.emit(HudEvent.WaveWarning, {
           title: `${bossFor(run.mapId).name}出现`,
           sub:
             MAPS[run.mapId].finalWaveSub ??
@@ -284,7 +288,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const out = this.sim!.out
     drain(out.collects, (defs) => {
       for (const d of defs) {
-        this.events.emit('field-collected', { emoji: d.emoji, name: d.name, desc: d.desc, polarity: d.polarity })
+        this.hud.emit(HudEvent.FieldCollected, { emoji: d.emoji, name: d.name, desc: d.desc, polarity: d.polarity })
       }
     })
     drain(out.bursts, (bs) => {
@@ -395,7 +399,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const s = CAPTAINS[this.run.captainId].skill
     this.run.skillCdMs = s.cdMs * this.teamFx.skillCdMul
     playSfx('levelup')
-    this.events.emit('skill-cast', s.name)
+    this.hud.emit(HudEvent.SkillCast, s.name)
     requestCast(sim, sim.captain)
     return true
   }
@@ -460,16 +464,16 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.ending = true
     const run = this.sim!.run
     playSfx('wave')
-    this.events.emit('wave-complete', {
+    this.hud.emit(HudEvent.WaveComplete, {
       wave: run.wave - 1,
       kills: run.kills - this.waveBaseKills,
       coins: run.coins - this.waveBaseCoins,
       levels: run.xp.level - this.waveBaseLevel,
-    } satisfies WaveSummary)
+    })
     this.time.delayedCall(WAVE.summaryMs, () => {
-      if (finished) this.scene.start('result', { win: true })
-      else if (run.cardDraws > 0) this.scene.start('cards')
-      else this.scene.start(teamStep(run) ?? 'shop')
+      if (finished) this.scene.start(SceneKey.Result, { win: true })
+      else if (run.cardDraws > 0) this.scene.start(SceneKey.Cards)
+      else this.scene.start(teamStep(run) ?? SceneKey.Shop)
     })
   }
 
@@ -525,7 +529,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       this.ending = true
       this.run.combatMs += sim.elapsedMs
       playSfx('over')
-      this.time.delayedCall(900, () => this.scene.start('result', { win: false }))
+      this.time.delayedCall(900, () => this.scene.start(SceneKey.Result, { win: false }))
       return
     }
     this.centerObj.setPosition(centerX(sim), centerY(sim))

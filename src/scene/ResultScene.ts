@@ -23,6 +23,7 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { stackCount } from '../run/draft'
+import { SceneKey } from './keys'
 
 interface ResultLayout {
   content: { w: number; h: number }
@@ -65,7 +66,7 @@ export class ResultScene extends Phaser.Scene {
   private menuRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
-    super('result')
+    super(SceneKey.Result)
   }
 
   init(data?: { win?: boolean }): void {
@@ -154,11 +155,11 @@ export class ResultScene extends Phaser.Scene {
     this.menuRect = { x: cx + gap / 2, y: oy + L.btnY - btnH / 2, w: btnW, h: btnH }
     const again = (): void => {
       endRun()
-      this.scene.start('captain')
+      this.scene.start(SceneKey.Captain)
     }
     const menu = (): void => {
       endRun()
-      this.scene.start('menu')
+      this.scene.start(SceneKey.Menu)
     }
     this.drawButton(this.againRect, '再来一局', true, again, res)
     this.drawButton(this.menuRect, '回主菜单', false, menu, res)
@@ -393,7 +394,7 @@ export class ResultScene extends Phaser.Scene {
     const zone = this.add.zone(rect.x, rect.y, rect.w, rect.h).setOrigin(0)
     this.time.delayedCall(500, () => {
       if (!zone.active) return
-      zone.setInteractive({ useHandCursor: true }).on('pointerup', () => {
+      zone.setInteractive({ useHandCursor: true }).on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         playSfx('click')
         onTap()
       })

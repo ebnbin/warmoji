@@ -26,6 +26,7 @@ import {
   teamLayout,
 } from './teamPage'
 import type { TeamLayout } from './teamPage'
+import { SceneKey } from './keys'
 
 export class FormationScene extends Phaser.Scene {
   private preserveOnRestart = false
@@ -45,11 +46,11 @@ export class FormationScene extends Phaser.Scene {
   private geom = { cx: 0, cy: 0, scale: 1 }
 
   constructor() {
-    super('formation')
+    super(SceneKey.Formation)
   }
 
   init(data?: { fromShop?: boolean }): void {
-    this.fromShop = !!data?.fromShop && this.scene.isSleeping('shop')
+    this.fromShop = !!data?.fromShop && this.scene.isSleeping(SceneKey.Shop)
   }
 
   create(): void {
@@ -89,7 +90,7 @@ export class FormationScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5)
         .setInteractive({ useHandCursor: true })
-      back.on('pointerup', () => this.exitToShop())
+      back.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.exitToShop())
       this.input.keyboard?.on('keydown-ESC', () => this.exitToShop())
     } else {
       addRunExit(this, this.run, this.origin.x + 40, oy + L.headerY, res)
@@ -99,7 +100,7 @@ export class FormationScene extends Phaser.Scene {
     this.detailRect = { x: this.origin.x + D.x, y: oy + D.y, w: D.w, h: D.h }
     this.detailView = new ScrollView(this, this.detailRect)
 
-    const label = this.fromShop ? '返回商店' : nextAfterTeam(this.run) === 'shop' ? '前往商店' : '开战'
+    const label = this.fromShop ? '返回商店' : nextAfterTeam(this.run) === SceneKey.Shop ? '前往商店' : '开战'
     addConfirmButton(this, L, this.origin, label, res, () => this.confirm())
 
     this.rebuild()
@@ -121,7 +122,7 @@ export class FormationScene extends Phaser.Scene {
 
   private exitToShop(): void {
     playSfx('click')
-    this.scene.wake('shop')
+    this.scene.wake(SceneKey.Shop)
     this.scene.stop()
   }
 
@@ -173,7 +174,7 @@ export class FormationScene extends Phaser.Scene {
         .zone(px - half, py - half, size, size)
         .setOrigin(0)
         .setInteractive({ useHandCursor: post !== 0 })
-        .on('pointerup', () => this.onMemberTap(post))
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.onMemberTap(post))
       this.memberObjs.push(zone)
       this.memberZones[post] = zone
     })
