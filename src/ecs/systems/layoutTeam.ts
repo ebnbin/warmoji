@@ -6,7 +6,7 @@ import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { centerX, centerY } from '../utils/team'
 import { settleBody, stepBody } from './shared/body'
-import { fanDistance, fanSpreadDeg, physicsOn, recallDist, repelForce, reverseGain, seatHysteresis, seatMode } from './shared/squad'
+import { fanDistance, fanSpreadDeg, physicsOn, recallDist, repelForce, reverseGain, seatHysteresis } from './shared/squad'
 
 const HEADING_MIN = 0.5
 
@@ -84,17 +84,18 @@ function layoutRing(sim: Sim): void {
   commit(sim)
 }
 
-/** 每帧挑离自己最近的目标位，允许多人抢同一个；只有近出滞后量才换 */
-function pickSeat(sim: Sim, eid: number, seats: readonly Point[]): number {
+/** 在空位里挑离自己最近的；只有近出滞后量才换，当前位已被别人占了则必须换 */
+function pickSeat(sim: Sim, eid: number, seats: readonly Point[], free: (i: number) => boolean): number {
   const x = Follow.x[eid]!
   const y = Follow.y[eid]!
   const distTo = (s: Point): number => {
     const d = sim.hooks.worldDelta(sim, x, y, s.x, s.y)
     return Math.hypot(d.x, d.y)
   }
-  let best = 0
+  let best = -1
   let bestD = Infinity
   seats.forEach((s, i) => {
+    if (!free(i)) return
     const d = distTo(s)
     if (d < bestD) {
       bestD = d
@@ -102,29 +103,8 @@ function pickSeat(sim: Sim, eid: number, seats: readonly Point[]): number {
     }
   })
   const cur = Seat.v[eid]!
-  if (cur >= 0 && cur < seats.length && distTo(seats[cur]!) <= bestD + seatHysteresis() * UNIT) return cur
+  if (cur >= 0 && cur < seats.length && free(cur) && distTo(seats[cur]!) <= bestD + seatHysteresis() * UNIT) return cur
   return best
-}
-
-/** 先到先得：全局按距离从近到远配对，各占一位；当前位享受滞后量的优先 */
-function assignExclusive(sim: Sim, alive: readonly number[], seats: readonly Point[]): void {
-  const bonus = seatHysteresis() * UNIT
-  const pairs: { eid: number; seat: number; d: number }[] = []
-  for (const eid of alive) {
-    for (let i = 0; i < seats.length; i++) {
-      const d = sim.hooks.worldDelta(sim, Follow.x[eid]!, Follow.y[eid]!, seats[i]!.x, seats[i]!.y)
-      pairs.push({ eid, seat: i, d: Math.hypot(d.x, d.y) - (Seat.v[eid] === i ? bonus : 0) })
-    }
-  }
-  pairs.sort((a, b) => a.d - b.d)
-  const taken = new Set<number>()
-  const placed = new Set<number>()
-  for (const p of pairs) {
-    if (taken.has(p.seat) || placed.has(p.eid)) continue
-    taken.add(p.seat)
-    placed.add(p.eid)
-    Seat.v[p.eid] = p.seat
-  }
 }
 
 function repulsion(sim: Sim, alive: readonly number[]): Map<number, { x: number; y: number }> {
@@ -154,7 +134,7 @@ function repulsion(sim: Sim, alive: readonly number[]): Map<number, { x: number;
   return extra
 }
 
-/** 满员：队长贴中心，队员在队长身后的扇形目标位之间用物理跑位 */
+/** 满员：队长贴中心，队员在队长身后的扇形目标位之间用物理跑位；进占位半径即占位、同位取最近，阵亡者停靠后紧跟 */
 function layoutSquad(sim: Sim): void {
   const delta = sim.dtMs
   const dt = Math.min(delta, 50) / 1000
@@ -172,18 +152,36 @@ function layoutSquad(sim: Sim): void {
   const moving = speed > HEADING_MIN * UNIT
   if (moving) sim.heading = { x: hx / speed, y: hy / speed }
   const followers = sim.characters.filter((e) => e !== leader)
-  const alive = followers.filter((e) => Alive.v[e] === 1)
   const seats = fanSlots(followers.length, fanDistance(), fanSpreadDeg(), sim.heading.x, sim.heading.y).map((o) => ({
     x: cx + o.x,
     y: cy + o.y,
   }))
+  const seatR = SQUAD.seatRadius * UNIT
+  const distToSeat = (f: number, i: number): number => {
+    const d = sim.hooks.worldDelta(sim, Follow.x[f]!, Follow.y[f]!, seats[i]!.x, seats[i]!.y)
+    return Math.hypot(d.x, d.y)
+  }
+  const claimR = SQUAD.claimRadius * UNIT
+  const claims: { f: number; s: number; d: number }[] = []
+  for (const f of followers) {
+    if (Alive.v[f] && Seat.docked[f]) Seat.docked[f] = 0
+    const s = Seat.v[f]!
+    if (s < 0 || s >= seats.length) continue
+    const d = Seat.docked[f] === 1 ? 0 : distToSeat(f, s)
+    if (d <= claimR) claims.push({ f, s, d })
+  }
+  claims.sort((a, b) => a.d - b.d)
+  const occupant: number[] = seats.map(() => -1)
+  for (const c of claims) if (occupant[c.s]! < 0) occupant[c.s] = c.f
+  for (const f of followers) {
+    if (occupant[Seat.v[f]!] === f) continue
+    Seat.v[f] = pickSeat(sim, f, seats, (i) => occupant[i]! < 0)
+  }
+  const alive = followers.filter((e) => Alive.v[e] === 1)
   const physics = physicsOn()
   sim.physics = physics
-  if (seatMode() === 'exclusive') assignExclusive(sim, alive, seats)
-  else for (const f of alive) Seat.v[f] = pickSeat(sim, f, seats)
   if (physics) {
     const extra = repulsion(sim, alive)
-    const seatR = SQUAD.seatRadius * UNIT
     const recall = recallDist() > 0 ? recallDist() * UNIT : Infinity
     for (const f of alive) {
       const seat = seats[Seat.v[f]!]!
@@ -223,12 +221,26 @@ function layoutSquad(sim: Sim): void {
       spring(f, t.x, t.y, dt)
     }
   }
-  const backX = cx - sim.heading.x * fanDistance() * UNIT
-  const backY = cy - sim.heading.y * fanDistance() * UNIT
+  const ghostStep = SQUAD.ghostSpeed * UNIT * dt
   for (const f of followers) {
     if (Alive.v[f]) continue
-    const t = nearTarget(sim, f, backX, backY)
-    spring(f, t.x, t.y, dt)
+    const seat = seats[Seat.v[f]!]!
+    Phys.vx[f] = 0
+    Phys.vy[f] = 0
+    Follow.vx[f] = 0
+    Follow.vy[f] = 0
+    if (!Seat.docked[f]) {
+      const d = sim.hooks.worldDelta(sim, Follow.x[f]!, Follow.y[f]!, seat.x, seat.y)
+      const dist = Math.hypot(d.x, d.y)
+      if (dist > seatR && dist > ghostStep) {
+        Follow.x[f] = Follow.x[f]! + (d.x / dist) * ghostStep
+        Follow.y[f] = Follow.y[f]! + (d.y / dist) * ghostStep
+        continue
+      }
+      Seat.docked[f] = 1
+    }
+    Follow.x[f] = seat.x
+    Follow.y[f] = seat.y
   }
   commit(sim)
 }

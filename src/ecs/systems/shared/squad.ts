@@ -36,20 +36,9 @@ function numChoice(
 export const leaderGrip = numChoice('team.grip', '队长抓地', '推力与阻力同乘：极速不变，响应更快', [4, 8, 16], TEAM.leaderGrip, (v) => `×${v}`)
 export const reverseGain = numChoice('team.reverseGain', '回头倍率', '速度背离目标位时的驱动力倍数', [1, 2, 3], SQUAD.reverseGain, (v) => `×${v}`)
 export const repelForce = numChoice('team.repel', '斥力', '队员重叠时的最大推力', [0, 20, 40, 80], SQUAD.repelForce, (v) => (v === 0 ? '无' : String(v)))
-export const seatHysteresis = numChoice('team.seatHysteresis', '换位滞后', '另一个目标位近出多少格才换', [0, 0.2, 0.4], SQUAD.seatHysteresis, (v) => `${v} 格`)
+export const seatHysteresis = numChoice('team.seatHysteresis', '换位滞后', '另一个目标位近出多少格才换', [0, 0.25, 0.5], SQUAD.seatHysteresis, (v) => `${v} 格`)
 export const fanSpreadDeg = numChoice('team.fanSpread', '扇形角度', '', [90, 120, 150], SQUAD.fanSpreadDeg, (v) => `${v}°`)
 export const fanDistance = numChoice('team.fanDistance', '扇形距离', '', [1, 1.5, 2], SQUAD.fanDistance, (v) => `${v} 格`)
 export const recallDist = numChoice('team.recall', '掉队回收', '离队长超过多少格直接拉回目标位，唯一的非物理规则', [10, 14, 0], SQUAD.recallDist, (v) => (v === 0 ? '不回收' : `${v} 格`))
 export const iceTraction = numChoice('team.iceTraction', '冰面抓地', '冰面对推力与阻力的共同折扣', [0.06, 0.12, 0.25], MAPS.ice.ice?.traction ?? 1, (v) => String(v))
 
-export const seatMode = defineDevChoice({
-  id: 'team.seatMode',
-  group: '队伍',
-  label: '目标位分配',
-  desc: '',
-  options: [
-    { id: 'nearest', label: '各选最近，允许争抢' },
-    { id: 'exclusive', label: '先到先得，各占一位' },
-  ],
-  default: 'nearest',
-})

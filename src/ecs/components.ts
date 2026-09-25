@@ -439,7 +439,7 @@ export const Captain = {}
 
 export const Phys = { vx: f32(), vy: f32(), thrust: f32(), drag: f32(), mass: f32() }
 
-export const Seat = { v: i32Fill(-1) }
+export const Seat = { v: i32Fill(-1), docked: u8() }
 
 export const Magnet = { radius: f32() }
 

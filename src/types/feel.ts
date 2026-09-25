@@ -9,7 +9,9 @@ export interface FeelTuning {
     readonly fanDistance: number
     readonly fanSpreadDeg: number
     readonly seatRadius: number
+    readonly claimRadius: number
     readonly seatHysteresis: number
+    readonly ghostSpeed: number
     readonly reverseGain: number
     readonly repelRadius: number
     readonly repelForce: number

@@ -114,6 +114,7 @@ export function spawnCharacter(
   Phys.drag[eid] = def.body.drag
   Phys.mass[eid] = def.body.mass
   Seat.v[eid] = -1
+  Seat.docked[eid] = 0
   CharFlash.until[eid] = 0
   Transform.x[eid] = x
   Transform.y[eid] = y
