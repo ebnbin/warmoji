@@ -37,8 +37,9 @@ import {
 } from './teamPage'
 import type { TeamLayout } from './teamPage'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
 
-export class RecruitScene extends Phaser.Scene {
+export class RecruitScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
@@ -382,5 +383,33 @@ export class RecruitScene extends Phaser.Scene {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
+  }
+
+  devProvider(): DevProvider {
+    return {
+      id: 'recruit',
+      title: '招募页',
+      sections: [
+        {
+          id: 'recruit',
+          title: '招募页',
+          items: () => [
+            {
+              kind: 'action',
+              label: '自动补齐并入队',
+              desc: '按候选顺序把空位填满后直接确认，省去逐个点选',
+              run: (): void => {
+                for (const id of this.pool.slice(0, this.unlocked)) {
+                  if (this.picked.length >= this.due) break
+                  if (this.cardState(id) === 'open' && !this.picked.includes(id)) this.picked.push(id)
+                }
+                this.refresh()
+                this.confirm()
+              },
+            },
+          ],
+        },
+      ],
+    }
   }
 }

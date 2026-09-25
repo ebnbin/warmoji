@@ -16,6 +16,13 @@ interface Entry {
   ready: Promise<void>
 }
 
+export interface HoldStats {
+  readonly keys: number
+  readonly refs: number
+  readonly loading: number
+  readonly pendingRelease: number
+}
+
 export class HoldTable<S> {
   private readonly store: TextureStore<S>
   private readonly shownKeys: () => ReadonlySet<string>
@@ -35,6 +42,16 @@ export class HoldTable<S> {
       if (!entry.done) waits.push(entry.ready)
     }
     return { ready: Promise.all(waits).then(() => undefined), done: waits.length === 0 }
+  }
+
+  stats(): HoldStats {
+    let refs = 0
+    let loading = 0
+    for (const e of this.entries.values()) {
+      refs += e.refs
+      if (!e.done) loading++
+    }
+    return { keys: this.entries.size, refs, loading, pendingRelease: this.pending.length }
   }
 
   release(keys: readonly string[]): void {

@@ -91,6 +91,10 @@ export function initSfx(): void {
   window.addEventListener('keydown', unlock, { once: true })
 }
 
+export function sfxStats(): { baked: number; played: number; active: number; max: number; enabled: boolean; state: string } {
+  return { baked: stats.baked, played: stats.played, active, max: MAX_VOICES, enabled, state: ctx?.state ?? '未创建' }
+}
+
 export function setSfxEnabled(on: boolean): void {
   enabled = on
 }

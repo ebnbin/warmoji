@@ -31,6 +31,7 @@ import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '..
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
 
 interface StudioLayout {
   content: { w: number; h: number }
@@ -78,7 +79,7 @@ interface AnatUi {
 
 const DEFAULT_SUBJECT = '1f939'
 
-export class StudioScene extends Phaser.Scene {
+export class StudioScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private tab: Tab = 'recipes'
@@ -940,5 +941,30 @@ export class StudioScene extends Phaser.Scene {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
+  }
+
+  devProvider(): DevProvider {
+    return {
+      id: 'studio',
+      title: 'Studio',
+      sections: [
+        {
+          id: 'studio',
+          title: 'Studio',
+          items: () => [
+            {
+              kind: 'action',
+              label: '随机换一个 emoji',
+              desc: '在当前页签的全集里随机选一个，省去在几千个里翻找',
+              run: (): void => {
+                const keys = this.tab === 'recipes' ? ANIM_RECIPES.map((r) => r.emoji) : this.allKeys
+                const cp = keys[Math.floor(Math.random() * keys.length)]
+                if (cp) this.onGridTap(cp)
+              },
+            },
+          ],
+        },
+      ],
+    }
   }
 }

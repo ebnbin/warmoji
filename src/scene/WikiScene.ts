@@ -21,6 +21,7 @@ import { VirtualEmojiGrid } from '../ui/virtualGrid'
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
 
 interface WikiLayout {
   content: { w: number; h: number }
@@ -57,7 +58,7 @@ interface DetailPool {
   footer: Phaser.GameObjects.Text
 }
 
-export class WikiScene extends Phaser.Scene {
+export class WikiScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private category = 0
@@ -584,5 +585,32 @@ export class WikiScene extends Phaser.Scene {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
+  }
+
+  devProvider(): DevProvider {
+    return {
+      id: 'wiki',
+      title: '图鉴页',
+      sections: [
+        {
+          id: 'wiki',
+          title: '图鉴页',
+          items: () => [
+            {
+              kind: 'action',
+              label: '随机条目',
+              desc: '在当前分类里随机选一条',
+              run: (): void => {
+                const g = this.groups[this.category]
+                if (!g || g.entries.length === 0) return
+                this.focusedIndex = Math.floor(Math.random() * g.entries.length)
+                this.levelSel = 0
+                this.refreshEntries()
+              },
+            },
+          ],
+        },
+      ],
+    }
   }
 }

@@ -97,6 +97,10 @@ export function tickSkillCd(remainMs: number, deltaMs: number): number {
   return Math.max(0, remainMs - deltaMs)
 }
 
+export function currentRun(): RunState | undefined {
+  return current
+}
+
 export function getRun(): RunState {
   if (!current) return beginRun('angel', ROSTER_IDS.slice(0, 1))
   return current

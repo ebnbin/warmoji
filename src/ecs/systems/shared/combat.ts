@@ -117,7 +117,7 @@ function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flingVy = 0
   removeEntity(sim.world, eid)
 }
 
-function gainTeamXp(sim: Sim, amount: number): void {
+export function gainTeamXp(sim: Sim, amount: number): void {
   const gained = gainXp(sim.run.xp, amount)
   sim.run.xp = gained.state
   if (gained.levelsGained > 0) {

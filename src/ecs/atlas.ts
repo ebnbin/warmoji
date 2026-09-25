@@ -165,6 +165,10 @@ export class EcsAtlas {
     out[3] = this.uv[b + 3]!
   }
 
+  get pageCount(): number {
+    return this.pages.length
+  }
+
   page(frame: number): number {
     return this.pageOf[frame]!
   }

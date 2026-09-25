@@ -59,6 +59,14 @@ import type { Burst } from './outbox'
 import { rollWaveCarriers } from './utils/battleFx'
 import { centerX, centerY } from './utils/team'
 import { SceneKey } from '../scene/keys'
+import { battleDevProvider, watchSandboxSteady } from './devProvider'
+import { defineDevFlag } from '../devtools'
+import type { DevProvider, DevProviderHost } from '../devtools'
+import { applyDamage, gainTeamXp } from './systems/shared/combat'
+import { telegraphOne } from './entities/enemy'
+import { enemyDef } from './store'
+
+const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
 
 const BOSS_SETTLE_MS = 700
 
@@ -74,7 +82,7 @@ function liveCoins(world: EcsWorld): number {
   return n
 }
 
-export class EcsBattleScene extends Phaser.Scene implements HudHost {
+export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProviderHost {
   private world!: EcsWorld
   private map!: MapView
   private ctx!: ViewCtx
@@ -109,6 +117,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
   private mapW = 0
   private mapH = 0
   private bootGen = 0
+  private devGfx?: Phaser.GameObjects.Graphics
 
   constructor() {
     super(SceneKey.Battle)
@@ -138,6 +147,69 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.damageText = undefined
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
+    this.devGfx = undefined
+  }
+
+  devProvider(): DevProvider {
+    return battleDevProvider(this)
+  }
+
+  devSpawn(kind: 'one' | 'elite' | 'surge' | 'boss'): void {
+    const sim = this.sim
+    if (!sim || sim.over) return
+    if (kind === 'one') telegraphOne(sim, 1, false)
+    else if (kind === 'elite') telegraphOne(sim, 1, true)
+    else if (kind === 'surge') spawnSurge(sim)
+    else spawnBoss(sim)
+  }
+
+  devKillAll(): void {
+    const sim = this.sim
+    if (!sim || sim.over) return
+    for (const eid of [...query(this.world, [Enemy])]) if (!Dormant.v[eid]) applyDamage(sim, eid, 1e9)
+  }
+
+  devGrant(kind: 'coins' | 'level'): void {
+    const sim = this.sim
+    if (!sim) return
+    if (kind === 'coins') this.run.coins += 1000
+    else gainTeamXp(sim, Math.max(1, xpToNext(this.run.xp.level) - this.run.xp.xp))
+  }
+
+  devEndWave(): void {
+    const sim = this.sim
+    if (!sim || sim.over || this.ending || this.sandbox) return
+    this.scheduleWaveEnd(settleWave(sim))
+  }
+
+  devResetSkill(): void {
+    this.run.skillCdMs = 0
+  }
+
+  devEnemyCounts(): { name: string; n: number }[] {
+    const counts = new Map<string, number>()
+    for (const eid of query(this.world, [Enemy])) {
+      const name = enemyDef[eid]?.name ?? '?'
+      counts.set(name, (counts.get(name) ?? 0) + 1)
+    }
+    return [...counts].map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n)
+  }
+
+  private drawDevTargets(sim: Sim): void {
+    if (!showTargets()) {
+      this.devGfx?.clear()
+      return
+    }
+    this.devGfx ??= this.add.graphics().setDepth(90)
+    const g = this.devGfx
+    g.clear()
+    g.lineStyle(2, 0xffdc5d, 0.7)
+    sim.characters.forEach((m, i) => {
+      const t = sim.characterTargets[i]
+      if (!t || !Alive.v[m]) return
+      g.lineBetween(Transform.x[m]!, Transform.y[m]!, t.x, t.y)
+      g.strokeCircle(t.x, t.y, Math.max(6, t.radius))
+    })
   }
 
   create(): void {
@@ -192,13 +264,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     setActiveHudHost(this)
     this.scene.launch(SceneKey.Ui)
-    this.scene.launch(SceneKey.Sandbox)
+    if (this.sandbox) watchSandboxSteady(this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.bootGen++
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       this.scene.stop(SceneKey.Ui)
-      this.scene.stop(SceneKey.Sandbox)
       this.atlas?.dispose()
       this.cues?.destroy()
       this.rings?.destroy()
@@ -378,6 +449,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     pending: number
     objects: number
     spawnIntervalMs: number
+    atlasPages: number
   } {
     const sim = this.sim
     const totalSec = (this.run.combatMs + (sim?.elapsedMs ?? 0)) / 1000
@@ -389,6 +461,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       pending: sim ? telegraphCount(sim) : 0,
       objects: this.children.list.length,
       spawnIntervalMs: Math.round(this.sandbox ? spawnParams().intervalMs : wave.spawnIntervalMs),
+      atlasPages: this.atlas?.pageCount ?? 0,
     }
   }
 
@@ -520,6 +593,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       if (this.hitShakeOn) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     }
     this.updateHpBars()
+    this.drawDevTargets(sim)
     if (!this.sandbox && sim.bossDown) {
       sim.bossDown = false
       this.bossDownAt = sim.fxMs
