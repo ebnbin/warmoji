@@ -30,8 +30,8 @@ let rendererCache: string | undefined
 
 export function rendererInfo(game: Phaser.Game): string {
   if (!rendererCache) {
-    if (game.renderer.type === Phaser.WEBGL) {
-      const gl = (game.renderer as Phaser.Renderer.WebGL.WebGLRenderer).gl
+    if (game.renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer) {
+      const gl = game.renderer.gl
       const ext = gl.getExtension('WEBGL_debug_renderer_info')
       const raw = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : ''
       rendererCache = `WebGL · ${shortGpu(raw)}`
@@ -50,6 +50,6 @@ function shortGpu(raw: string): string {
 }
 
 export function heapMB(): number | undefined {
-  const m = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory
+  const m = performance.memory
   return m ? Math.round(m.usedJSHeapSize / 1048576) : undefined
 }

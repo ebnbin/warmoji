@@ -68,6 +68,7 @@ import type { AbilityDef } from '../../types/abilityDefs'
 import { abilityPiercesWalls } from '../../data/abilities'
 import { spawnWeaponBody } from '../entities/weapon'
 import type { Sim } from '../sim'
+import type { ByKind } from '../../util/record'
 
 interface StateSpec {
   readonly comp: object
@@ -113,13 +114,15 @@ interface AttachCtx {
   readonly frames: FrameIndex
 }
 
-interface KindSpec<K extends AbilityDef['kind']> {
+type AbilityOf = ByKind<AbilityDef>
+
+interface KindSpec<K extends keyof AbilityOf> {
   readonly comp: object & CdComp
   readonly state?: readonly StateSpec[]
-  attach?(ctx: AttachCtx, e: number, def: Extract<AbilityDef, { kind: K }>): void
+  attach?(ctx: AttachCtx, e: number, def: AbilityOf[K]): void
 }
 
-const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
+const KINDS: { [K in keyof AbilityOf]: KindSpec<K> } = {
 
   rally: {
     comp: Rally,
@@ -463,11 +466,11 @@ function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: Omit<Abilit
     baseMs: 'cooldownMs' in def ? def.cooldownMs : 0,
     piercesWalls: init.manual === true || abilityPiercesWalls(def),
   })
-  ;(spec.attach as ((c: AttachCtx, e: number, d: AbilityDef) => void) | undefined)?.(
-    { world: sim.world, frames: sim.frames },
-    eid,
-    def,
-  )
+  attachKind({ world: sim.world, frames: sim.frames }, eid, def)
+}
+
+function attachKind<K extends keyof AbilityOf>(ctx: AttachCtx, eid: number, def: AbilityOf[K] & { readonly kind: K }): void {
+  KINDS[def.kind].attach?.(ctx, eid, def)
 }
 
 export function equipAbility(

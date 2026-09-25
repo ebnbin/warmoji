@@ -75,10 +75,7 @@ function shownKeys(game: Phaser.Game): Set<string> {
   const keys = new Set<string>()
   const walk = (list: readonly Phaser.GameObjects.GameObject[]): void => {
     for (const obj of list) {
-      if ('texture' in obj) {
-        const key = (obj.texture as Phaser.Textures.Texture | undefined)?.key
-        if (key) keys.add(key)
-      }
+      if ('texture' in obj && obj.texture instanceof Phaser.Textures.Texture && obj.texture.key) keys.add(obj.texture.key)
       if (obj instanceof Phaser.GameObjects.Container || obj instanceof Phaser.GameObjects.Layer) walk(obj.list)
     }
   }

@@ -36,8 +36,10 @@ export const SETTING_DEFS: readonly SettingDef[] = [
 
 function sanitizeSettings(raw: unknown): Settings {
   const obj = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
-  const pick = (k: SettingKey): boolean =>
-    typeof obj[k] === 'boolean' ? (obj[k] as boolean) : DEFAULT_SETTINGS[k]
+  const pick = (k: SettingKey): boolean => {
+    const v = obj[k]
+    return typeof v === 'boolean' ? v : DEFAULT_SETTINGS[k]
+  }
   return {
     damageNumbers: pick('damageNumbers'),
     hitShake: pick('hitShake'),

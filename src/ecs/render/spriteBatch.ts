@@ -35,10 +35,9 @@ export class EcsSpriteBatch extends EcsLayer {
 
   renderWebGL(
     renderer: Phaser.Renderer.WebGL.WebGLRenderer,
-    src: Phaser.GameObjects.GameObject,
+    self: EcsSpriteBatch,
     drawingContext: Phaser.Renderer.WebGL.DrawingContext,
   ): void {
-    const self = src as EcsSpriteBatch
     const camera = drawingContext.camera
     if (!camera) return
 

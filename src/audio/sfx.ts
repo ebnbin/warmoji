@@ -1,5 +1,6 @@
 import { SFX } from '../data/sfx'
 import type { SfxDef, SfxId } from '../types/sfx'
+import { keysOf } from '../util/record'
 
 const SAMPLE_RATE = 22050
 const MAX_VOICES = 14
@@ -66,8 +67,8 @@ export function ensureAudio(): AudioContext | undefined {
       master = ctx.createGain()
       master.gain.value = 0.5
       master.connect(ctx.destination)
-      for (const [id, def] of Object.entries(SFX) as [SfxId, SfxDef][]) {
-        buffers.set(id, render(ctx, def))
+      for (const id of keysOf(SFX)) {
+        buffers.set(id, render(ctx, SFX[id]))
         stats.baked++
       }
     }

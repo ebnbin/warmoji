@@ -69,17 +69,17 @@ import type { MapDef } from '../../types/maps'
 import { hourAt, isDayAt } from '../worlds/daynight'
 import type { FieldPickupDef } from '../../types/battlefield'
 import { enemyMixAt, pickEnemy } from '../utils/spawnMix'
+import type { ByKind } from '../../util/record'
 
 
 
 
 
-type LocoAttach<K extends LocomotionDef['kind']> = (
-  sim: Sim,
-  eid: number,
-  lm: Extract<LocomotionDef, { kind: K }>,
-) => void
-const LOCOMOTIONS: { [K in LocomotionDef['kind']]: LocoAttach<K> } = {
+type LocomotionOf = ByKind<LocomotionDef>
+
+type LocoAttach<K extends keyof LocomotionOf> = (sim: Sim, eid: number, lm: LocomotionOf[K]) => void
+
+const LOCOMOTIONS: { [K in keyof LocomotionOf]: LocoAttach<K> } = {
   chase: (sim, eid) => addComponent(sim.world, eid, Chase),
   wander: (sim, eid) => addComponent(sim.world, eid, Roam),
   static: (sim, eid) => addComponent(sim.world, eid, Stationary),
@@ -134,6 +134,10 @@ const LOCOMOTIONS: { [K in LocomotionDef['kind']]: LocoAttach<K> } = {
       DashDist.dist[eid] = lm.length.dist
     }
   },
+}
+
+function attachLocomotion<K extends keyof LocomotionOf>(sim: Sim, eid: number, lm: LocomotionOf[K] & { readonly kind: K }): void {
+  LOCOMOTIONS[lm.kind](sim, eid, lm)
 }
 
 export function spawnEnemy(
@@ -198,7 +202,7 @@ export function spawnEnemy(
   BVel.y[eid] = 0
   Slowed.v[eid] = 1
   Steering.v[eid] = 0
-  ;(LOCOMOTIONS[def.locomotion.kind] as LocoAttach<LocomotionDef['kind']>)(sim, eid, def.locomotion)
+  attachLocomotion(sim, eid, def.locomotion)
   if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
   Despawn.at[eid] = 0
   Morph.until[eid] = 0

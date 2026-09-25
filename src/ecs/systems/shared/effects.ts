@@ -11,6 +11,7 @@ import { healEnemies, healCharacters } from './heal'
 import { nearestAngle, targetsNear } from '../../utils/targets'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
+import type { ByKind } from '../../../util/record'
 import { spawnFxRing } from '../../entities/fx'
 
 export interface HitCtx {
@@ -46,14 +47,11 @@ function eachCapable(sim: Sim, hit: HitCtx, comp: object, apply: (t: number) => 
   }
 }
 
-type Handler<K extends Effect['kind']> = (
-  sim: Sim,
-  src: Source,
-  fx: Extract<Effect, { kind: K }>,
-  hit: HitCtx,
-) => void
+type EffectOf = ByKind<Effect>
 
-const EFFECT_KINDS: { [K in Effect['kind']]: Handler<K> } = {
+type Handler<K extends keyof EffectOf> = (sim: Sim, src: Source, fx: EffectOf[K], hit: HitCtx) => void
+
+const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   blast: (sim, src, fx, hit) => {
     const dmg = Math.max(1, Math.round(hit.baseDamage * fx.ratio))
     applyBlast(sim, src, hit.x, hit.y, dmg, fx.radius, fx.knockback, hit.exclude)
@@ -143,7 +141,9 @@ export function applyAbilityEffects(
   hit: HitCtx,
 ): void {
   if (!effects) return
-  for (const fx of effects) {
-    ;(EFFECT_KINDS[fx.kind] as Handler<Effect['kind']>)(sim, src, fx, hit)
-  }
+  for (const fx of effects) applyEffect(sim, src, fx, hit)
+}
+
+function applyEffect<K extends keyof EffectOf>(sim: Sim, src: Source, fx: EffectOf[K] & { readonly kind: K }, hit: HitCtx): void {
+  EFFECT_KINDS[fx.kind](sim, src, fx, hit)
 }

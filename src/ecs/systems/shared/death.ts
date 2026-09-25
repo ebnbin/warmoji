@@ -7,6 +7,7 @@ import { spawnBrood, spawnEnemy } from '../../entities/enemy'
 import { applyAbilityEffects } from './effects'
 import { enemySource } from '../../utils/source'
 import type { PendingDeath, Sim } from '../../sim'
+import type { ByKind } from '../../../util/record'
 
 function spawnSplit(sim: Sim, d: PendingDeath, fx: SplitEffect): void {
   if (sim.over) return
@@ -30,10 +31,12 @@ function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): 
   Despawn.at[eid] = sim.elapsedMs + fx.durationMs
 }
 
-type DeathHandler = (sim: Sim, d: PendingDeath, fx: DeathEffect, hpMul: number) => void
+type DeathOf = ByKind<DeathEffect>
 
-const toEffectLayer: DeathHandler = (sim, d, fx) => {
-  applyAbilityEffects(sim, enemySource(d.def.kind, d.dmgMul), [fx as Effect], {
+type DeathHandler<K extends keyof DeathOf> = (sim: Sim, d: PendingDeath, fx: DeathOf[K], hpMul: number) => void
+
+const toEffectLayer = (sim: Sim, d: PendingDeath, fx: Effect): void => {
+  applyAbilityEffects(sim, enemySource(d.def.kind, d.dmgMul), [fx], {
     x: d.x,
     y: d.y,
     baseDamage: 0,
@@ -41,9 +44,9 @@ const toEffectLayer: DeathHandler = (sim, d, fx) => {
   })
 }
 
-const DEATH_KINDS: Record<DeathEffect['kind'], DeathHandler> = {
-  split: (sim, d, fx) => spawnSplit(sim, d, fx as SplitEffect),
-  decoy: (sim, d, fx, hpMul) => spawnDecoy(sim, d, fx as DecoyEffect, hpMul),
+const DEATH_KINDS: { [K in keyof DeathOf]: DeathHandler<K> } = {
+  split: spawnSplit,
+  decoy: spawnDecoy,
   blast: toEffectLayer,
   slow: toEffectLayer,
   poison: toEffectLayer,
@@ -58,6 +61,10 @@ export function replayDeath(sim: Sim, d: PendingDeath): void {
   const effects = d.def.onDeath
   if (!effects) return
   const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
-  for (const fx of effects) DEATH_KINDS[fx.kind]!(sim, d, fx, hpMul)
+  for (const fx of effects) replayEffect(sim, d, fx, hpMul)
+}
+
+function replayEffect<K extends keyof DeathOf>(sim: Sim, d: PendingDeath, fx: DeathOf[K] & { readonly kind: K }, hpMul: number): void {
+  DEATH_KINDS[fx.kind](sim, d, fx, hpMul)
 }
 

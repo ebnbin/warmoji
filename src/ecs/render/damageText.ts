@@ -123,10 +123,9 @@ class DamageTextBatch extends EcsLayer {
 
   renderWebGL(
     renderer: Phaser.Renderer.WebGL.WebGLRenderer,
-    src: Phaser.GameObjects.GameObject,
+    self: DamageTextBatch,
     drawingContext: Phaser.Renderer.WebGL.DrawingContext,
   ): void {
-    const self = src as DamageTextBatch
     const camera = drawingContext.camera
     if (!camera) return
     const node = renderer.renderNodes.getNode('BatchHandlerQuad')

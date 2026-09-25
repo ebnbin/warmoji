@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import { OUTLINE, outlineSvg, setSvgSize } from '../emoji/svg'
 import type { OutlineKind } from '../emoji/svg'
+import { keysOf } from '../util/record'
 import { emojiSvgText, svgToImage } from '../emoji/textures'
 import { animClipOf, bakeAnimFrame } from '../emoji/anim'
 import type { AnimClipId } from '../emoji/anim'
@@ -203,7 +204,7 @@ export class EcsAtlas {
       seen.add(k)
       variants.push({ id, outline })
     }
-    for (const outline of Object.keys(outlined) as OutlineKind[]) {
+    for (const outline of keysOf(outlined)) {
       for (const id of outlined[outline]) take(id, outline)
     }
     for (const id of plain) take(id, undefined)

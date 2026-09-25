@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { OUTLINE } from './svg'
 import type { OutlineKind } from './svg'
+import { keysOf } from '../util/record'
 import { packSvg, parseEmojiPack } from './pack'
 import type { EmojiPack } from './pack'
 import { EMOJI_PAD, outlineSvg, padSvg, setSvgSize } from './svg'
@@ -120,7 +121,7 @@ export async function loadEmojiTextures(
   outlined: Record<OutlineKind, readonly string[]>,
 ): Promise<void> {
   const jobs: Promise<string>[] = preload.map((id) => ensureEmoji(scene, id))
-  for (const kind of Object.keys(outlined) as OutlineKind[]) {
+  for (const kind of keysOf(outlined)) {
     for (const id of outlined[kind]) jobs.push(ensureEmoji(scene, id, kind))
   }
   await Promise.all(

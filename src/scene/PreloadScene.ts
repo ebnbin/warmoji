@@ -22,9 +22,9 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create(): void {
-    const ordering = this.cache.text.get(TextAsset.EmojiOrdering) as string | undefined
-    const bundle = this.cache.text.get(TextAsset.EmojiBundle) as string | undefined
-    if (ordering === undefined || bundle === undefined) {
+    const ordering: unknown = this.cache.text.get(TextAsset.EmojiOrdering)
+    const bundle: unknown = this.cache.text.get(TextAsset.EmojiBundle)
+    if (typeof ordering !== 'string' || typeof bundle !== 'string') {
       this.fail('资源加载失败，请检查网络后刷新')
       return
     }

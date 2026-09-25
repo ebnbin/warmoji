@@ -13,10 +13,11 @@ export function loadHighScore(storage: StringStorage | undefined): HighScore {
   try {
     const raw = storage.getItem(StorageKey.Highscore)
     if (!raw) return { ...ZERO }
-    const parsed = JSON.parse(raw) as Partial<HighScore>
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return { ...ZERO }
     return {
-      bestWave: typeof parsed.bestWave === 'number' ? parsed.bestWave : 0,
-      bestKills: typeof parsed.bestKills === 'number' ? parsed.bestKills : 0,
+      bestWave: 'bestWave' in parsed && typeof parsed.bestWave === 'number' ? parsed.bestWave : 0,
+      bestKills: 'bestKills' in parsed && typeof parsed.bestKills === 'number' ? parsed.bestKills : 0,
     }
   } catch {
     return { ...ZERO }

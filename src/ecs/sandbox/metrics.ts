@@ -43,8 +43,7 @@ function onPostRender(): void {
   lastRender = performance.now() - renderStart
   const g = attached
   if (!g) return
-  const r = g.renderer as unknown as { drawCount?: number }
-  drawCount = typeof r.drawCount === 'number' ? r.drawCount : undefined
+  drawCount = g.renderer instanceof Phaser.Renderer.Canvas.CanvasRenderer ? g.renderer.drawCount : undefined
   pending = performance.now() >= warmUntil
 }
 

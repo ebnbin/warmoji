@@ -18,7 +18,7 @@ export class SandboxScene extends Phaser.Scene {
 
   create(): void {
     applyCamera(this)
-    const battle = this.scene.get(SceneKey.Battle) as EcsBattleScene
+    const battle = this.scene.get<EcsBattleScene>(SceneKey.Battle)
     this.panel = new SandboxPanel(this, battle)
     const sleep = (): void => {
       this.scene.sleep()

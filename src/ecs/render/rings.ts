@@ -81,10 +81,9 @@ class EcsRingBatch extends EcsLayer {
 
   renderWebGL(
     renderer: Phaser.Renderer.WebGL.WebGLRenderer,
-    src: Phaser.GameObjects.GameObject,
+    self: EcsRingBatch,
     drawingContext: Phaser.Renderer.WebGL.DrawingContext,
   ): void {
-    const self = src as EcsRingBatch
     const camera = drawingContext.camera
     if (!camera) return
     const node = renderer.renderNodes.getNode('BatchHandlerTriFlat') as

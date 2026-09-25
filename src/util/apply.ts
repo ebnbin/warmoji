@@ -5,7 +5,7 @@ import type { Viewport } from './viewport'
 export const VIEWPORT_CHANGED = 'viewport-changed'
 
 export function isStandalone(): boolean {
-  return (navigator as unknown as { standalone?: boolean }).standalone === true
+  return navigator.standalone === true
 }
 
 export function nudgeIosViewport(onDone: () => void): void {

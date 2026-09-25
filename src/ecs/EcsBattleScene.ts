@@ -151,14 +151,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const mapDef = MAPS[run.mapId]
     applyBackground(mapDef.palette)
     this.map = viewFor(run.mapId)
-    this.ctx = { scene: this, world: this.world, run, def: mapDef, anchor: undefined as never, w: 0, h: 0 }
+    this.centerObj = this.add.zone(0, 0, 1, 1)
+    this.ctx = { scene: this, world: this.world, run, def: mapDef, anchor: this.centerObj, w: 0, h: 0 }
     const { w, h, origin } = this.map.layout(this.ctx)
     this.ctx.w = this.mapW = w
     this.ctx.h = this.mapH = h
     this.map.build(this.ctx)
 
-    this.centerObj = this.add.zone(origin.x, origin.y, 1, 1)
-    ;(this.ctx as { anchor: Phaser.GameObjects.Zone }).anchor = this.centerObj
+    this.centerObj.setPosition(origin.x, origin.y)
     this.map.camera(this.ctx)
 
     this.timeStopFx = mainCameraOnly(
@@ -169,9 +169,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     )
 
     this.cursors = this.input.keyboard?.createCursorKeys()
-    this.wasd = this.input.keyboard?.addKeys('W,A,S,D') as
-      | Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
-      | undefined
+    const kb = this.input.keyboard
+    this.wasd = kb ? { W: kb.addKey('W'), A: kb.addKey('A'), S: kb.addKey('S'), D: kb.addKey('D') } : undefined
 
     const hint = mainCameraOnly(
       this.add
