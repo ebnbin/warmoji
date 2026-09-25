@@ -79,6 +79,7 @@ export class WikiScene extends Phaser.Scene {
   private listScroll = 0
   private gridScroll = 0
   private pool?: DetailPool
+  private readonly iconWant = new WeakMap<Phaser.GameObjects.Image, string>()
   private catRects: { x: number; w: number }[] = []
   private catContainer?: Phaser.GameObjects.Container
   private catScroll = 0
@@ -419,14 +420,14 @@ export class WikiScene extends Phaser.Scene {
 
   private setPoolIcon(icon: Phaser.GameObjects.Image, emoji: string, size: number): void {
     const key = emojiKey(emoji)
-    icon.setData('want', key)
+    this.iconWant.set(icon, key)
     if (this.textures.exists(key)) {
       icon.setTexture(key).setDisplaySize(size, size).setVisible(true)
       return
     }
     icon.setVisible(false)
     void ensureEmoji(this, emoji).then((k) => {
-      if (icon.getData('want') !== k || !this.scene.isActive(SceneKey.Wiki)) return
+      if (this.iconWant.get(icon) !== k || !this.scene.isActive(SceneKey.Wiki)) return
       icon.setTexture(k).setDisplaySize(size, size).setVisible(true)
     })
   }

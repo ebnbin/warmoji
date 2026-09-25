@@ -11,12 +11,16 @@ const COLS = PAGE / CELL
 const PER_PAGE = COLS * COLS
 const MAX_FRAMES = 2048
 
-function variantKey(id: string, outline: OutlineKind | undefined): string {
+type VariantKey = `${string}|${OutlineKind | ''}`
+
+type ClipKey = `${VariantKey}|${AnimClipId}`
+
+function variantKey(id: string, outline: OutlineKind | undefined): VariantKey {
   return `${id}|${outline ?? ''}`
 }
 
-function clipKey(id: string, outline: OutlineKind | undefined, clipId: AnimClipId): string {
-  return `${id}|${outline ?? ''}|${clipId}`
+function clipKey(id: string, outline: OutlineKind | undefined, clipId: AnimClipId): ClipKey {
+  return `${variantKey(id, outline)}|${clipId}`
 }
 
 function rasterize(raw: string, outline: OutlineKind | undefined): Promise<HTMLImageElement> {
@@ -33,8 +37,8 @@ let building: Promise<EcsAtlas> | undefined
 export class EcsAtlas {
   private readonly uv: Float32Array
   private readonly pageOf: Int32Array
-  private readonly keyToFrame = new Map<string, number>()
-  private readonly reportedMissing = new Set<string>()
+  private readonly keyToFrame = new Map<VariantKey, number>()
+  private readonly reportedMissing = new Set<VariantKey>()
   private readonly pages: Phaser.Textures.CanvasTexture[] = []
   private readonly canvases: HTMLCanvasElement[] = []
   private readonly ctxs: CanvasRenderingContext2D[] = []
@@ -51,8 +55,8 @@ export class EcsAtlas {
     this.scene = scene
     this.disposed = false
   }
-  private readonly clips = new Map<string, { base: number; frames: number }>()
-  private readonly baking = new Set<string>()
+  private readonly clips = new Map<ClipKey, { base: number; frames: number }>()
+  private readonly baking = new Set<ClipKey>()
 
   private constructor() {
     this.uv = new Float32Array(MAX_FRAMES * 4)
@@ -112,7 +116,7 @@ export class EcsAtlas {
     return this.cursor + n <= MAX_FRAMES
   }
 
-  private async bakeClip(id: string, outline: OutlineKind | undefined, clipId: AnimClipId, key: string): Promise<void> {
+  private async bakeClip(id: string, outline: OutlineKind | undefined, clipId: AnimClipId, key: ClipKey): Promise<void> {
     const clip = animClipOf(id, clipId)
     const scene = this.scene
     if (!scene || this.disposed) return
@@ -192,7 +196,7 @@ export class EcsAtlas {
     plain: readonly string[],
   ): Promise<EcsAtlas> {
     const variants: { id: string; outline: OutlineKind | undefined }[] = []
-    const seen = new Set<string>()
+    const seen = new Set<VariantKey>()
     const take = (id: string, outline: OutlineKind | undefined): void => {
       const k = variantKey(id, outline)
       if (seen.has(k)) return
