@@ -114,6 +114,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     super(BATTLE_SCENE_KEY)
   }
 
+  /** Phaser 跨局复用同一个 Scene 实例，可变字段须在此重置 */
   private resetSceneFields(): void {
     this.atlas = undefined
     this.cues = undefined
@@ -532,6 +533,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
     if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
+    // 须在 stepFrame 与全灭判定之后：时限内全灭判负
     const bossSettle = this.bossDownAt >= 0 && sim.fxMs - this.bossDownAt >= BOSS_SETTLE_MS
     if (lastFrame || bossSettle) this.scheduleWaveEnd(settleWave(sim))
   }

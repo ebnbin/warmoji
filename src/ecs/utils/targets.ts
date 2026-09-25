@@ -14,6 +14,7 @@ export interface Target {
 
 type Visit = (eid: number, x: number, y: number, radius: number) => boolean | void
 
+/** visit 内不得施伤：击杀会原地改动正在遍历的存活列表 */
 export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
   if (src.faction === FACTION.enemy) {
     for (const t of sim.characterTargets) {

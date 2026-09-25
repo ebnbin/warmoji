@@ -42,6 +42,7 @@ import { pipeline } from './step'
 
 const STEERERS = [steerChase, steerRoam, steerFlee, steerStandoff, steerDetonate, steerBaseOrbit, steerCoinThief, steerDash]
 
+// 时停期敌人移速与弹体位移都按 sim.wdtMs 积分，任何一步不得另乘时标
 export const SIM_PIPELINE = pipeline([
   refoldBattleFx,
   updateDormancy,

@@ -488,6 +488,7 @@ export function unequipAbilities(sim: Sim, ownerEid: number): void {
   const world = sim.world
   const weapons: number[] = []
   for (const e of query(world, [Weapon, Owner])) if (Owner.eid[e] === ownerEid) weapons.push(e)
+  // 徒手能力挂在持有者自己身上，归属须连本人一起查
   const hosts = [...weapons, ownerEid]
   for (const d of query(world, [Drop, Owner])) if (hosts.includes(Owner.eid[d]!)) removeEntity(world, d)
   for (const z of [...query(world, [ZoneFollow, Owner])]) if (hosts.includes(Owner.eid[z]!)) removeEntity(world, z)

@@ -21,6 +21,7 @@ export function castSlowAuras(sim: Sim): void {
     const y = onTeam ? centerY(sim) : ownerY(e)
     const radius = SlowAura.radius[e]!
     if (Aura.zone[e] === 0) {
+      // 须先落局部变量：spawnZone 可能扩容替换 Aura.zone
       const zone = spawnZone(sim, {
         x,
         y,

@@ -7,6 +7,7 @@ import type { Sim } from '../../sim'
 export function castScan(sim: Sim, comp: object & CdComp, cast: (eid: number) => boolean | void): void {
   for (const e of [...query(sim.world, [Ability, comp])]) {
     if (!hasComponent(sim.world, e, Ability)) continue
+    // 兜底 castRequests 未覆盖的 kind，不可删
     if (hasComponent(sim.world, e, CastRequest)) {
       removeComponent(sim.world, e, CastRequest)
       cast(e)

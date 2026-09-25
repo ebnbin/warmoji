@@ -1,3 +1,4 @@
+// 检测须与 Phaser 的一致（phaser/src/device/Features.js）
 function webglAvailable(): boolean {
   if (!('WebGLRenderingContext' in window)) return false
   try {

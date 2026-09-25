@@ -89,6 +89,7 @@ function shownKeys(game: Phaser.Game): Set<string> {
 function scheduleSettle(game: Phaser.Game): void {
   if (settleQueued) return
   settleQueued = true
+  // 须在本帧 scene 切换之后、渲染之前结算
   game.events.once(Phaser.Core.Events.POST_STEP, () => {
     settleQueued = false
     tableOf(game).settle()

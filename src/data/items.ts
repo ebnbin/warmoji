@@ -121,6 +121,7 @@ export function foldTeamEffects(parts: readonly Partial<TeamEffects>[]): TeamEff
   return fx
 }
 
+/** 只缩放空间参数与弹速；伤害/冷却由运行时倍率处理，此处不得再乘 */
 export function resolveAbilityDef(w: AbilityDef, fx: CharacterEffects): AbilityDef {
   const r = fx.rangeMul
   switch (w.kind) {

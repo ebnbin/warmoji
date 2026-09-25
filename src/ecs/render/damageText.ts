@@ -113,6 +113,7 @@ export class DamageTextLayer {
 
 class DamageTextBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
+  /** 须是复用的持久对象；multiTexturing 须显式开 */
   private readonly renderOptions = { multiTexturing: true }
 
   constructor(scene: Phaser.Scene, private readonly layer: DamageTextLayer) {

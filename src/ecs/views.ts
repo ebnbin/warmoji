@@ -135,6 +135,7 @@ class DayNightView extends BoundedView {
 
   build(v: ViewCtx): void {
     super.build(v)
+    // Phaser 4 的 GeometryMask 在 WebGL 无实现，须走 filters.internal.addMask
     const rect = v.scene.add.rectangle(0, 0, FOG_SPAN, FOG_SPAN, FOG_COLOR, 0).setDepth(FOG_DEPTH).setVisible(false)
     const shape = v.scene.add.graphics().setVisible(false)
     rect.enableFilters()

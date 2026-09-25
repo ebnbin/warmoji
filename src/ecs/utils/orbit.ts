@@ -5,6 +5,7 @@ export interface OrbitThreat {
   weight: number
 }
 
+// 与 hit.ts 的 wrapAngle 浮点路径不同，不得合并
 function wrapAngle(a: number): number {
   return Math.atan2(Math.sin(a), Math.cos(a))
 }

@@ -1,5 +1,6 @@
 import { INITIAL_CAPACITY } from './world'
 
+// 数组按 eid 索引，扩容时整体替换（见 storage.ts）：不得缓存数组引用，也不得写 `X.f[i] = 会建实体的调用()`
 export type Column = Float32Array | Int32Array | Uint32Array | Uint8Array
 
 const FILL = new WeakMap<Column, number>()
@@ -29,6 +30,7 @@ export function resizeColumn<T extends Column>(old: T, length: number): T {
   return next
 }
 
+/** 全局唯一、永不复用的实体编号，由 newEntity 写入；0 = 无。eid 会被立即复用，跨时刻认同一实体须比对它 */
 export const Uid = {
   v: u32(),
 }

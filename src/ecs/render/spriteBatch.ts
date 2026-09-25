@@ -17,6 +17,7 @@ export class EcsSpriteBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
   private readonly calc = new Phaser.GameObjects.Components.TransformMatrix()
   private order: number[] = []
+  /** 须是复用的持久对象；multiTexturing 须显式开，缺省为单纹理且会与核心逐帧互相翻转 */
   private readonly renderOptions = {
     multiTexturing: true,
   } as Phaser.Types.Renderer.WebGL.RenderNodes.BatchHandlerQuadRenderOptions

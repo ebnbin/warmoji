@@ -71,6 +71,7 @@ export function applyCamera(scene: Phaser.Scene): void {
   cam.centerOn(viewport.logicalWidth / 2, viewport.logicalHeight / 2)
 }
 
+/** 无实际变化时须跳过：iOS 视口异步稳定需要多次复查，不能每次都重启场景 */
 export function refreshViewport(game: Phaser.Game, force = false): void {
   const css = cssSize()
   const next = computeViewport(css.w, css.h, window.devicePixelRatio)
