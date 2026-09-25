@@ -1,6 +1,8 @@
 import type Phaser from 'phaser'
 import { setDevConfig } from './config'
 import { startLogCapture } from './log'
+import { installInspect } from './inspect'
+import { installInputWatch } from './inputWatch'
 import { DevToolsScene } from './scene'
 import { registerBuiltins } from './sections'
 import { installTimeControl } from './timeControl'
@@ -39,6 +41,8 @@ export function installDevTools(game: Phaser.Game, config: DevToolsConfig = {}):
   const cfg = setDevConfig(config)
   startLogCapture()
   installTimeControl(game, cfg.key)
+  installInspect(game, cfg.key)
+  installInputWatch(game)
   registerBuiltins(game)
   game.scene.add(cfg.key, DevToolsScene, true)
 }

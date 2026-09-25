@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { currentLayout } from './config'
+import { currentLayout, devConfig } from './config'
 import { COLOR, textStyle } from './draw'
 import { clearDevLog, devLogEntries, LOG_CHANGED, logEvents, markLogRead, unreadErrorCount } from './log'
 import { rendererInfo, resetMetrics } from './metrics'
@@ -7,19 +7,12 @@ import { mountPerf } from './perf'
 import { refreshDevPanel, registerDevSection } from './registry'
 import { resourceItems } from './resources'
 import { flagItems } from './flags'
+import { inspectItems } from './inspect'
+import { inputItems } from './inputWatch'
+import { sceneItems, scenesText } from './scenes'
 import { pausedSceneCount, setTimeScale, stepOneFrame, TIME_SCALES, timeScale, timeText } from './timeControl'
 import { devSettings, updateDevSettings } from './settings'
 import type { DevItem, DevWidget, DevWidgetContext } from './types'
-
-const STATUS: Readonly<Record<number, string>> = {
-  [Phaser.Scenes.INIT]: '初始化',
-  [Phaser.Scenes.START]: '启动',
-  [Phaser.Scenes.LOADING]: '加载',
-  [Phaser.Scenes.CREATING]: '创建',
-  [Phaser.Scenes.RUNNING]: '运行',
-  [Phaser.Scenes.PAUSED]: '暂停',
-  [Phaser.Scenes.SLEEPING]: '休眠',
-}
 
 const r = (v: number): string => String(Math.round(v))
 
@@ -34,13 +27,6 @@ function viewportText(game: Phaser.Game): string {
     lines.push(`逻辑 ${r(L.width)}×${r(L.height)} · 安全区 上${r(i.top)} 右${r(i.right)} 下${r(i.bottom)} 左${r(i.left)}`)
   }
   return lines.join('\n')
-}
-
-function scenesText(game: Phaser.Game): string {
-  return game.scene
-    .getScenes(false)
-    .map((s) => `${s.scene.key.padEnd(12)} ${(STATUS[s.sys.settings.status] ?? '停止').padEnd(3)} ${s.children.length}`)
-    .join('\n')
 }
 
 function overviewItems(game: Phaser.Game): DevItem[] {
@@ -220,6 +206,7 @@ function timeItems(): DevItem[] {
 
 export function registerBuiltins(game: Phaser.Game): void {
   registerDevSection({ id: 'devtools.overview', title: '概览', order: 1000, items: () => overviewItems(game) })
+  registerDevSection({ id: 'devtools.scenes', title: '场景', order: 1002, items: () => sceneItems(game, devConfig().key) })
   registerDevSection({ id: 'devtools.flags', title: '开关', order: 1005, items: flagItems })
   registerDevSection({ id: 'devtools.time', title: '时间', order: 1008, items: timeItems })
   registerDevSection({
@@ -231,6 +218,8 @@ export function registerBuiltins(game: Phaser.Game): void {
       { kind: 'action', label: '重新采样', desc: '清空样本并重新预热', run: resetMetrics },
     ],
   })
+  registerDevSection({ id: 'devtools.inspect', title: '检视', order: 1012, items: inspectItems })
+  registerDevSection({ id: 'devtools.input', title: '输入', order: 1013, items: inputItems })
   registerDevSection({ id: 'devtools.resources', title: '资源', order: 1015, items: () => resourceItems(game) })
   registerDevSection({
     id: 'devtools.log',

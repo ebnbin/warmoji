@@ -8,11 +8,14 @@ import { ScrollRegion } from './scroll'
 import type { Rect } from './scroll'
 import { devSettings, SETTINGS_CHANGED, settingsEvents, updateDevSettings } from './settings'
 import { enforceTimeControl, timeScale } from './timeControl'
+import { isPickMode, pickAt } from './inspect'
+import { canvasToWorld, paintOverlays, worldToCanvas } from './overlay'
+import type { OverlayCtx } from './overlay'
 import type { DevLayout, DevSection, DevTheme, DevWidget } from './types'
 import { renderItem } from './widgets'
 import type { RenderCtx } from './widgets'
 
-const DEPTH = { guides: 0, pill: 10, panel: 20, blocker: 21, chrome: 22, content: 30 } as const
+const DEPTH = { guides: 0, overlay: 2, picker: 5, pill: 10, panel: 20, blocker: 21, chrome: 22, content: 30 } as const
 const POLL_MS = 250
 const DRAG_SLOP = 12
 const MARGIN = 12
@@ -60,6 +63,9 @@ export class DevToolsScene extends Phaser.Scene {
   private theme!: DevTheme
   private panelCam!: Phaser.Cameras.Scene2D.Camera
   private guides!: Phaser.GameObjects.Graphics
+  private overlay!: Phaser.GameObjects.Graphics
+  private overlayCtx!: OverlayCtx
+  private picker?: Phaser.GameObjects.Zone
   private pill?: Pill
   private drag?: PillDrag
   private chrome: Phaser.GameObjects.GameObject[] = []
@@ -88,6 +94,16 @@ export class DevToolsScene extends Phaser.Scene {
     this.guides = this.add.graphics().setDepth(DEPTH.guides)
     this.panelCam.ignore(this.guides)
     this.drawGuides()
+    this.overlay = this.add.graphics().setDepth(DEPTH.overlay)
+    this.panelCam.ignore(this.overlay)
+    this.overlayCtx = {
+      game: this.game,
+      toLocal: (scene, x, y, sfx = 1, sfy = 1): { x: number; y: number } => {
+        const c = worldToCanvas(scene.cameras.main, x, y, sfx, sfy)
+        return canvasToWorld(this.cameras.main, c.x, c.y)
+      },
+      canvasToLocal: (px, py): { x: number; y: number } => canvasToWorld(this.cameras.main, px, py),
+    }
     if (open) this.buildPanel()
     else this.buildPill()
 
@@ -109,6 +125,7 @@ export class DevToolsScene extends Phaser.Scene {
       if (this.current) this.rememberScroll(this.current)
       this.teardownPanel()
       this.pill = undefined
+      this.picker = undefined
       this.drag = undefined
     })
   }
@@ -116,6 +133,9 @@ export class DevToolsScene extends Phaser.Scene {
   /** 用墙钟而非引擎时间：慢放或暂停时面板照常刷新 */
   update(): void {
     enforceTimeControl()
+    this.overlay.clear()
+    paintOverlays(this.overlay, this.overlayCtx)
+    this.syncPicker()
     const now = performance.now()
     if (this.rebuildQueued) {
       this.rebuildQueued = false
@@ -123,6 +143,24 @@ export class DevToolsScene extends Phaser.Scene {
     }
     if (open) this.tickContent(now)
     else this.tickPill(now)
+  }
+
+  /** 拾取模式下铺一层全屏 zone 吃掉面板外的点击，业务 scene 收不到 */
+  private syncPicker(): void {
+    const want = isPickMode()
+    if (want && !this.picker) {
+      const L = this.layout
+      this.picker = this.add
+        .zone(0, 0, L.width, L.height)
+        .setOrigin(0)
+        .setDepth(DEPTH.picker)
+        .setInteractive({ useHandCursor: true })
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, (p: Phaser.Input.Pointer) => pickAt(p.x, p.y))
+      this.panelCam.ignore(this.picker)
+    } else if (!want && this.picker) {
+      this.picker.destroy()
+      this.picker = undefined
+    }
   }
 
   private get gap(): number {
