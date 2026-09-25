@@ -25,7 +25,6 @@ import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { stackCount } from '../run/draft'
 import { SceneKey } from './keys'
-import type { DevProvider, DevProviderHost } from '../devtools'
 
 interface ResultLayout {
   content: { w: number; h: number }
@@ -57,7 +56,7 @@ const PORTRAIT: ResultLayout = {
   btnY: 1206,
 }
 
-export class ResultScene extends Phaser.Scene implements DevProviderHost {
+export class ResultScene extends Phaser.Scene {
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
@@ -155,8 +154,14 @@ export class ResultScene extends Phaser.Scene implements DevProviderHost {
     const gap = 26
     this.againRect = { x: cx - btnW - gap / 2, y: oy + L.btnY - btnH / 2, w: btnW, h: btnH }
     this.menuRect = { x: cx + gap / 2, y: oy + L.btnY - btnH / 2, w: btnW, h: btnH }
-    const again = (): void => this.again()
-    const menu = (): void => this.toMenu()
+    const again = (): void => {
+      endRun()
+      this.scene.start(SceneKey.Captain)
+    }
+    const menu = (): void => {
+      endRun()
+      this.scene.start(SceneKey.Menu)
+    }
     this.drawButton(this.againRect, '再来一局', true, again, res)
     this.drawButton(this.menuRect, '回主菜单', false, menu, res)
     this.time.delayedCall(500, () => {
@@ -400,38 +405,5 @@ export class ResultScene extends Phaser.Scene implements DevProviderHost {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart({ win: this.win })
-  }
-
-  private again(): void {
-    endRun()
-    this.scene.start(SceneKey.Captain)
-  }
-
-  private toMenu(): void {
-    endRun()
-    this.scene.start(SceneKey.Menu)
-  }
-
-  devProvider(): DevProvider {
-    return {
-      id: 'result',
-      title: '结算页',
-      sections: [
-        {
-          id: 'result',
-          title: '结算页',
-          items: () => [
-            { kind: 'text', mono: true, read: () => `${this.win ? '胜利' : '失败'} · 第 ${this.run.wave} 波 · 击杀 ${this.run.kills} · 金币 ${this.run.coins}` },
-            {
-              kind: 'buttons',
-              buttons: [
-                { label: '再来一局', run: () => this.again() },
-                { label: '回主菜单', run: () => this.toMenu() },
-              ],
-            },
-          ],
-        },
-      ],
-    }
   }
 }

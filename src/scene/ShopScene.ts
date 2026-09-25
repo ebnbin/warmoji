@@ -802,15 +802,6 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
           title: '商店页',
           items: () => [
             {
-              kind: 'text',
-              mono: true,
-              read: () =>
-                [
-                  `金币 ${this.run.coins} · 免费刷新 ${this.run.freeRefreshes} · 第 ${this.run.wave} 波`,
-                  `聚焦 ${CHARACTERS[this.focusedId].name} · 商品 ${this.offers.map((o) => (o ? ITEMS[o].name : '空')).join('、')}`,
-                ].join('\n'),
-            },
-            {
               kind: 'buttons',
               buttons: [
                 {
@@ -827,9 +818,6 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
                     this.refreshFocused()
                   },
                 },
-                { label: '买下当前商品', run: () => this.buyFocused() },
-                { label: '开始下一波', run: () => this.nextWave() },
-                { label: '打开阵型', run: () => this.openFormation() },
               ],
             },
           ],

@@ -953,38 +953,14 @@ export class StudioScene extends Phaser.Scene implements DevProviderHost {
           title: 'Studio',
           items: () => [
             {
-              kind: 'choice',
-              label: '页签',
-              options: [
-                { id: 'recipes', label: '动画配方' },
-                { id: 'templates', label: '模板' },
-                { id: 'anatomy', label: '解剖' },
-              ],
-              get: () => this.tab,
-              set: (id): void => {
-                if ((id !== 'recipes' && id !== 'templates' && id !== 'anatomy') || id === this.tab) return
-                this.tab = id
-                this.preserveOnRestart = true
-                this.scene.restart()
+              kind: 'action',
+              label: '随机换一个 emoji',
+              desc: '在当前页签的全集里随机选一个，省去在几千个里翻找',
+              run: (): void => {
+                const keys = this.tab === 'recipes' ? ANIM_RECIPES.map((r) => r.emoji) : this.allKeys
+                const cp = keys[Math.floor(Math.random() * keys.length)]
+                if (cp) this.onGridTap(cp)
               },
-            },
-            {
-              kind: 'text',
-              mono: true,
-              read: () => `配方 ${this.recipeSel} · 模板对象 ${this.tplEmoji} · 解剖对象 ${this.anatEmoji} · 全集 ${this.allKeys.length}`,
-            },
-            {
-              kind: 'buttons',
-              buttons: [
-                {
-                  label: '随机换一个 emoji',
-                  run: (): void => {
-                    const keys = this.tab === 'recipes' ? ANIM_RECIPES.map((r) => r.emoji) : this.allKeys
-                    const cp = keys[Math.floor(Math.random() * keys.length)]
-                    if (cp) this.onGridTap(cp)
-                  },
-                },
-              ],
             },
           ],
         },

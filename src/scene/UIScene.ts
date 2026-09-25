@@ -523,16 +523,14 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
           id: 'hud',
           title: 'HUD',
           items: () => [
-            { kind: 'text', read: () => (this.paused ? '战斗已由 HUD 暂停' : '战斗进行中') },
             {
               kind: 'buttons',
-              label: '预览 HUD 提示',
+              label: '预览提示 · 不必等战斗里真的发生',
               buttons: [
                 { label: '波次预警', run: () => this.onWaveWarning({ title: '预览：精英来袭', sub: '开发者工具触发的预警文案' }) },
                 { label: '拾取提示', run: () => this.onFieldCollected({ emoji: PICKUPS.coin.emoji, name: '预览拾取', desc: '开发者工具触发', polarity: 'buff' }) },
                 { label: '技能提示', run: () => this.onSkillCast('预览技能') },
                 { label: '波次完成', run: () => this.onWaveComplete({ wave: 1, kills: 12, coins: 34, levels: 1 }) },
-                { label: this.paused ? '继续' : '暂停', run: () => this.togglePause() },
               ],
             },
           ],

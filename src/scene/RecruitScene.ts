@@ -395,31 +395,17 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
           title: '招募页',
           items: () => [
             {
-              kind: 'text',
-              mono: true,
-              read: (): string => {
-                const open = this.pool.slice(0, this.unlocked).filter((id) => this.cardState(id) === 'open')
-                return [
-                  `待招 ${this.due} · 已选 ${this.picked.length} · 已解锁 ${this.unlocked}/${this.pool.length}`,
-                  `可招 ${open.length > 0 ? open.map((id) => CHARACTERS[id].name).join('、') : '无'}`,
-                ].join('\n')
+              kind: 'action',
+              label: '自动补齐并入队',
+              desc: '按候选顺序把空位填满后直接确认，省去逐个点选',
+              run: (): void => {
+                for (const id of this.pool.slice(0, this.unlocked)) {
+                  if (this.picked.length >= this.due) break
+                  if (this.cardState(id) === 'open' && !this.picked.includes(id)) this.picked.push(id)
+                }
+                this.refresh()
+                this.confirm()
               },
-            },
-            {
-              kind: 'buttons',
-              buttons: [
-                {
-                  label: '自动补齐并入队',
-                  run: (): void => {
-                    for (const id of this.pool.slice(0, this.unlocked)) {
-                      if (this.picked.length >= this.due) break
-                      if (this.cardState(id) === 'open' && !this.picked.includes(id)) this.picked.push(id)
-                    }
-                    this.refresh()
-                    this.confirm()
-                  },
-                },
-              ],
             },
           ],
         },

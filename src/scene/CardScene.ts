@@ -166,19 +166,14 @@ export class CardScene extends Phaser.Scene implements DevProviderHost {
           id: 'cards',
           title: '卡牌页',
           items: () => [
-            { kind: 'text', mono: true, read: () => `待抽 ${this.run.cardDraws} 张` },
-            { kind: 'buttons', label: '直接选卡', buttons: this.choices.map((id) => ({ label: CARDS[id].name, run: (): void => this.pick(id) })) },
             {
-              kind: 'buttons',
-              buttons: [
-                {
-                  label: '放弃剩余抽卡',
-                  run: (): void => {
-                    this.run.cardDraws = 0
-                    this.scene.start(this.nextScene())
-                  },
-                },
-              ],
+              kind: 'action',
+              label: '放弃剩余抽卡',
+              desc: `页面上没有跳过的入口；待抽 ${this.run.cardDraws} 张，清零后进入下一步`,
+              run: (): void => {
+                this.run.cardDraws = 0
+                this.scene.start(this.nextScene())
+              },
             },
           ],
         },

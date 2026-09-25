@@ -597,40 +597,16 @@ export class WikiScene extends Phaser.Scene implements DevProviderHost {
           title: '图鉴页',
           items: () => [
             {
-              kind: 'choice',
-              label: '分类',
-              options: [...this.groups.map((g, i) => ({ id: String(i), label: g.title })), { id: String(this.groups.length), label: '全部' }],
-              get: () => String(this.category),
-              set: (id): void => {
-                const i = Number(id)
-                if (!Number.isInteger(i) || i < 0 || i > this.groups.length || i === this.category) return
-                this.category = i
-                this.focusedIndex = 0
+              kind: 'action',
+              label: '随机条目',
+              desc: '在当前分类里随机选一条',
+              run: (): void => {
+                const g = this.groups[this.category]
+                if (!g || g.entries.length === 0) return
+                this.focusedIndex = Math.floor(Math.random() * g.entries.length)
                 this.levelSel = 0
-                this.listScroll = 0
-                this.preserveOnRestart = true
-                this.scene.restart()
+                this.refreshEntries()
               },
-            },
-            {
-              kind: 'text',
-              mono: true,
-              read: () => `${this.currentCategory || '全部'} · ${this.currentEntry?.name ?? '—'} · 条目 ${this.groups[this.category]?.entries.length ?? 0}`,
-            },
-            {
-              kind: 'buttons',
-              buttons: [
-                {
-                  label: '随机条目',
-                  run: (): void => {
-                    const g = this.groups[this.category]
-                    if (!g || g.entries.length === 0) return
-                    this.focusedIndex = Math.floor(Math.random() * g.entries.length)
-                    this.levelSel = 0
-                    this.refreshEntries()
-                  },
-                },
-              ],
             },
           ],
         },
