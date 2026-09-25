@@ -13,8 +13,7 @@ export interface FeelTuning {
     readonly seatHysteresis: number
     readonly ghostSpeed: number
     readonly reverseGain: number
-    readonly repelRadius: number
-    readonly repelForce: number
+    readonly turnRateDeg: number
     readonly recallDist: number
   }
   readonly wander: {

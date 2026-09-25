@@ -35,7 +35,7 @@ function numChoice(
 
 export const leaderGrip = numChoice('team.grip', '队长抓地', '推力与阻力同乘：极速不变，响应更快', [4, 8, 16], TEAM.leaderGrip, (v) => `×${v}`)
 export const reverseGain = numChoice('team.reverseGain', '回头倍率', '速度背离目标位时的驱动力倍数', [1, 2, 3], SQUAD.reverseGain, (v) => `×${v}`)
-export const repelForce = numChoice('team.repel', '斥力', '队员重叠时的最大推力', [0, 20, 40, 80], SQUAD.repelForce, (v) => (v === 0 ? '无' : String(v)))
+export const turnRate = numChoice('team.turnRate', '转向速率', '目标位扇形随队长朝向转动的角速度', [360, 600, 900], SQUAD.turnRateDeg, (v) => `${v}°/秒`)
 export const seatHysteresis = numChoice('team.seatHysteresis', '换位滞后', '另一个目标位近出多少格才换', [0, 0.25, 0.5], SQUAD.seatHysteresis, (v) => `${v} 格`)
 export const fanSpreadDeg = numChoice('team.fanSpread', '扇形角度', '', [90, 120, 150], SQUAD.fanSpreadDeg, (v) => `${v}°`)
 export const fanDistance = numChoice('team.fanDistance', '扇形距离', '', [1, 1.5, 2], SQUAD.fanDistance, (v) => `${v} 格`)

@@ -6,7 +6,7 @@ import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { centerX, centerY } from '../utils/team'
 import { settleBody, stepBody } from './shared/body'
-import { fanDistance, fanSpreadDeg, physicsOn, recallDist, repelForce, reverseGain, seatHysteresis } from './shared/squad'
+import { fanDistance, fanSpreadDeg, physicsOn, recallDist, reverseGain, seatHysteresis, turnRate } from './shared/squad'
 
 const HEADING_MIN = 0.5
 
@@ -107,34 +107,17 @@ function pickSeat(sim: Sim, eid: number, seats: readonly Point[], free: (i: numb
   return best
 }
 
-function repulsion(sim: Sim, alive: readonly number[]): Map<number, { x: number; y: number }> {
-  const extra = new Map<number, { x: number; y: number }>()
-  for (const f of alive) extra.set(f, { x: 0, y: 0 })
-  const radius = SQUAD.repelRadius * UNIT
-  const force = repelForce() * UNIT
-  if (force <= 0) return extra
-  for (let i = 0; i < alive.length; i++) {
-    for (let j = i + 1; j < alive.length; j++) {
-      const a = alive[i]!
-      const b = alive[j]!
-      const d = sim.hooks.worldDelta(sim, Follow.x[a]!, Follow.y[a]!, Follow.x[b]!, Follow.y[b]!)
-      const dist = Math.hypot(d.x, d.y)
-      if (dist >= radius) continue
-      const mag = force * (1 - dist / radius)
-      const nx = dist > 1e-3 ? d.x / dist : 1
-      const ny = dist > 1e-3 ? d.y / dist : 0
-      const ea = extra.get(a)!
-      const eb = extra.get(b)!
-      ea.x -= nx * mag
-      ea.y -= ny * mag
-      eb.x += nx * mag
-      eb.y += ny * mag
-    }
-  }
-  return extra
+/** 朝向按限速转向队长的运动方向，目标位扇形随之沿弧线转动而不是瞬移 */
+function turnHeading(sim: Sim, tx: number, ty: number, dt: number): void {
+  const cur = Math.atan2(sim.heading.y, sim.heading.x)
+  const raw = Math.atan2(ty, tx) - cur
+  const diff = Math.atan2(Math.sin(raw), Math.cos(raw))
+  const max = (turnRate() * Math.PI * dt) / 180
+  const step = Math.abs(diff) <= max ? diff : (diff < 0 ? -1 : 1) * max
+  sim.heading = { x: Math.cos(cur + step), y: Math.sin(cur + step) }
 }
 
-/** 满员：队长贴中心，队员在队长身后的扇形目标位之间用物理跑位；进占位半径即占位、同位取最近，阵亡者停靠后紧跟 */
+/** 满员：队长贴中心，队员用物理跑向身后扇形上的目标位；进占位半径即占位、同位取最近，阵亡者停靠后紧跟 */
 function layoutSquad(sim: Sim): void {
   const delta = sim.dtMs
   const dt = Math.min(delta, 50) / 1000
@@ -150,12 +133,12 @@ function layoutSquad(sim: Sim): void {
   const hy = Phys.vy[leader]! - medium.y
   const speed = Math.hypot(hx, hy)
   const moving = speed > HEADING_MIN * UNIT
-  if (moving) sim.heading = { x: hx / speed, y: hy / speed }
+  if (moving) turnHeading(sim, hx / speed, hy / speed, dt)
   const followers = sim.characters.filter((e) => e !== leader)
-  const seats = fanSlots(followers.length, fanDistance(), fanSpreadDeg(), sim.heading.x, sim.heading.y).map((o) => ({
-    x: cx + o.x,
-    y: cy + o.y,
-  }))
+  // 目标位本身也受场地约束：贴墙时缩到可达处，否则队员永远到不了、也占不上
+  const seats = fanSlots(followers.length, fanDistance(), fanSpreadDeg(), sim.heading.x, sim.heading.y).map((o) =>
+    sim.hooks.constrainBody(sim, { x: cx, y: cy }, { x: cx + o.x, y: cy + o.y }, delta),
+  )
   const seatR = SQUAD.seatRadius * UNIT
   const distToSeat = (f: number, i: number): number => {
     const d = sim.hooks.worldDelta(sim, Follow.x[f]!, Follow.y[f]!, seats[i]!.x, seats[i]!.y)
@@ -181,7 +164,6 @@ function layoutSquad(sim: Sim): void {
   const physics = physicsOn()
   sim.physics = physics
   if (physics) {
-    const extra = repulsion(sim, alive)
     const recall = recallDist() > 0 ? recallDist() * UNIT : Infinity
     for (const f of alive) {
       const seat = seats[Seat.v[f]!]!
@@ -206,8 +188,7 @@ function layoutSquad(sim: Sim): void {
         driveX = nx * thrust
         driveY = ny * thrust
       }
-      const e = extra.get(f)!
-      const next = stepBody(sim, f, from.x, from.y, { driveX, driveY, extraX: e.x, extraY: e.y }, 1, dt)
+      const next = stepBody(sim, f, from.x, from.y, { driveX, driveY, extraX: 0, extraY: 0 }, 1, dt)
       const to = sim.hooks.constrainBody(sim, from, next, delta)
       settleBody(sim, f, from, to, dt)
       Follow.x[f] = to.x
