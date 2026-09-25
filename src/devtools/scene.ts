@@ -9,6 +9,7 @@ import type { Rect } from './scroll'
 import { devSettings, SETTINGS_CHANGED, settingsEvents, updateDevSettings } from './settings'
 import { enforceTimeControl, timeScale } from './timeControl'
 import { isPickMode, pickAt } from './inspect'
+import { sampleHistory } from './history'
 import { canvasToWorld, paintOverlays, worldToCanvas } from './overlay'
 import type { OverlayCtx } from './overlay'
 import type { DevLayout, DevSection, DevTheme, DevWidget } from './types'
@@ -137,6 +138,7 @@ export class DevToolsScene extends Phaser.Scene {
     paintOverlays(this.overlay, this.overlayCtx)
     this.syncPicker()
     const now = performance.now()
+    sampleHistory(now)
     if (this.rebuildQueued) {
       this.rebuildQueued = false
       if (open) this.rebuildPanel()
@@ -178,6 +180,7 @@ export class DevToolsScene extends Phaser.Scene {
   private onSettingsChanged(): void {
     this.drawGuides()
     if (this.pill) this.setPillText(this.pillLabel())
+    if (open) this.queueRebuild()
   }
 
   private pillLabel(): string {
@@ -343,7 +346,7 @@ export class DevToolsScene extends Phaser.Scene {
     const u = th.body
     const s = devSettings()
     const availW = L.width - L.insets.left - L.insets.right - MARGIN * 2
-    const w = Math.max(u * 8, Math.min(u * 22, availW))
+    const w = Math.max(u * 8, Math.min(s.wide ? u * 36 : u * 22, availW))
     const x = s.side === 'right' ? L.width - L.insets.right - MARGIN - w : L.insets.left + MARGIN
     const y = L.insets.top + MARGIN
     const h = L.height - L.insets.top - L.insets.bottom - MARGIN * 2

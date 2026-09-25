@@ -6,6 +6,7 @@ import type { DevLogLevel } from './log'
 import { clock, copyText, downloadDataUrl, stamp } from './util'
 import { rendererInfo, resetMetrics } from './metrics'
 import { mountPerf } from './perf'
+import { mountHistory } from './history'
 import { refreshDevPanel, registerDevSection } from './registry'
 import { resourceItems } from './resources'
 import { flagItems } from './flags'
@@ -43,6 +44,7 @@ function overviewItems(game: Phaser.Game): DevItem[] {
       get: () => devSettings().pillFps,
       set: (on) => updateDevSettings({ pillFps: on }),
     },
+    { kind: 'toggle', label: '宽面板', desc: '桌面上看长列表更省事', get: () => devSettings().wide, set: (on) => updateDevSettings({ wide: on }) },
     {
       kind: 'toggle',
       label: '显示安全区边界',
@@ -323,6 +325,8 @@ export function registerBuiltins(game: Phaser.Game): void {
     items: () => [
       { kind: 'custom', mount: (ctx) => mountPerf(game, ctx) },
       { kind: 'action', label: '重新采样', desc: '清空样本并重新预热', run: resetMetrics },
+      { kind: 'text', label: '一分钟走势 · 面板收起时也在采样', read: () => '' },
+      { kind: 'custom', mount: mountHistory },
     ],
   })
   registerDevSection({ id: 'devtools.inspect', title: '检视', order: 1012, items: inspectItems })

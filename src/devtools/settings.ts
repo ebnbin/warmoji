@@ -10,6 +10,7 @@ export interface DevSettings {
   tab: string | null
   pillFps: boolean
   safeArea: boolean
+  wide: boolean
   flags: Record<string, boolean>
   choices: Record<string, string>
 }
@@ -17,13 +18,13 @@ export interface DevSettings {
 export const SETTINGS_CHANGED = 'changed'
 export const settingsEvents = new Phaser.Events.EventEmitter()
 
-const DEFAULTS: DevSettings = { side: 'right', y: 1, tab: null, pillFps: false, safeArea: false, flags: {}, choices: {} }
+const DEFAULTS: DevSettings = { side: 'right', y: 1, tab: null, pillFps: false, safeArea: false, wide: false, flags: {}, choices: {} }
 
 let current: DevSettings | undefined
 
 function sanitize(raw: unknown): DevSettings {
   const o = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
-  const bool = (k: 'pillFps' | 'safeArea'): boolean => (typeof o[k] === 'boolean' ? o[k] : DEFAULTS[k])
+  const bool = (k: 'pillFps' | 'safeArea' | 'wide'): boolean => (typeof o[k] === 'boolean' ? o[k] : DEFAULTS[k])
   const y = typeof o.y === 'number' && Number.isFinite(o.y) ? Math.min(1, Math.max(0, o.y)) : DEFAULTS.y
   const record = <T extends boolean | string>(k: 'flags' | 'choices', type: 'boolean' | 'string'): Record<string, T> => {
     const v = o[k]
@@ -38,6 +39,7 @@ function sanitize(raw: unknown): DevSettings {
     tab: typeof o.tab === 'string' ? o.tab : null,
     pillFps: bool('pillFps'),
     safeArea: bool('safeArea'),
+    wide: bool('wide'),
     flags: record<boolean>('flags', 'boolean'),
     choices: record<string>('choices', 'string'),
   }
