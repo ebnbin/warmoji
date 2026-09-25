@@ -15,7 +15,7 @@ export interface BgmNote {
   echo?: boolean
 }
 
-export type BgmHitKind = 'kick' | 'snare' | 'hat' | 'tom'
+type BgmHitKind = 'kick' | 'snare' | 'hat' | 'tom'
 
 export interface BgmHit {
   t: number

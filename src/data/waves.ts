@@ -51,7 +51,7 @@ export const WAVE = {
   summaryMs: P.summaryMs,
 } as const
 
-export const COIN_ECON = {
+const COIN_ECON = {
   dropChanceMin: P.coinDropChanceMin,
   dropChanceHalfLifeSec: P.coinDropChanceHalfLifeSec,
 } as const

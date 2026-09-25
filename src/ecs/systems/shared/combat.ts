@@ -74,7 +74,7 @@ export function applyDamage(
   }
 }
 
-export function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flingVy = 0): void {
+function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flingVy = 0): void {
   sim.run.kills++
   const st = sim.run.stats
   if (srcSlot >= 0 && srcSlot < st.kills.length) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
@@ -145,7 +145,7 @@ function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean):
 }
 
 /** rage = false 只解链接，不给失巢暴走加成 */
-export function orphanBrood(sim: Sim, nestEid: number, rage = true): void {
+function orphanBrood(sim: Sim, nestEid: number, rage = true): void {
   for (const eid of query(sim.world, ENEMY_SET as unknown as object[])) {
     if (Nest.of[eid] !== nestEid) continue
     Nest.of[eid] = -1

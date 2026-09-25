@@ -1,7 +1,7 @@
 import cardsJson from '../assets/cards.json'
 import type { ItemRarity, TeamEffects } from './items'
 
-export type CardTag =
+type CardTag =
   | 'economy'
   | 'tempo'
   | 'offense'

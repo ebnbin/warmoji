@@ -96,7 +96,7 @@ export interface Sim {
   reward: RewardConfig
 }
 
-export interface RewardConfig {
+interface RewardConfig {
   /** 队长 × 道具；精英逐杀再叠 */
   captainXpMul: number
   doubleCoinChance: number

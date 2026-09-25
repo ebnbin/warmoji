@@ -120,7 +120,7 @@ export function endRun(): void {
   current = undefined
 }
 
-export function rosterCap(run: RunState): number {
+function rosterCap(run: RunState): number {
   return CAPTAINS[run.captainId].teamSize
 }
 
@@ -133,7 +133,7 @@ export function recruitCandidates(run: RunState): CharacterId[] {
   return run.recruitPool.slice(0, recruitUnlocked(run)).filter((id) => !run.roster.includes(id))
 }
 
-export function recruitDue(run: RunState): boolean {
+function recruitDue(run: RunState): boolean {
   return run.roster.length < Math.min(rosterCap(run), run.wave)
 }
 
@@ -142,7 +142,7 @@ export function recruitDueCount(run: RunState): number {
   return Math.max(0, Math.min(due, recruitCandidates(run).length))
 }
 
-export function canRecruit(run: RunState, id: CharacterId): boolean {
+function canRecruit(run: RunState, id: CharacterId): boolean {
   return recruitDue(run) && id in CHARACTERS && !run.roster.includes(id)
 }
 
@@ -160,7 +160,7 @@ export function recruitMember(run: RunState, id: CharacterId): number {
 }
 
 /** 与 teamSize 脱钩 */
-export const GUARD_MIN = 5
+const GUARD_MIN = 5
 
 export function hasCenter(run: RunState): boolean {
   return run.roster.length >= GUARD_MIN

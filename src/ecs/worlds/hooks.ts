@@ -32,7 +32,7 @@ const NO_GHOSTS: Point[] = []
 
 // ── 钩子自己的状态 ──
 
-export interface Walls {
+interface Walls {
   grid: WallGrid
   flow?: FlowField
   /** 上次重算流场时的队伍格与累计时长 */

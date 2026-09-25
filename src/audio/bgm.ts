@@ -231,26 +231,3 @@ export function setBgmEnabled(on: boolean): void {
   }
   startIfWanted()
 }
-
-export async function renderBgmOffline(
-  id: BgmId,
-  seconds = 4,
-): Promise<{ rms: number; peak: number; notes: number }> {
-  const score = bgmScore(id)
-  const rate = 22050
-  const ctx = new OfflineAudioContext(1, Math.ceil(rate * seconds), rate)
-  const out = ctx.createGain()
-  out.gain.value = MASTER_VOL
-  out.connect(ctx.destination)
-  const echo = score.echo ? buildEcho(ctx, out, score.echo) : undefined
-  scheduleWindow(ctx, out, echo, score, 0, seconds, 0)
-  const buf = await ctx.startRendering()
-  const data = buf.getChannelData(0)
-  let sum = 0
-  let peak = 0
-  for (const s of data) {
-    sum += s * s
-    peak = Math.max(peak, Math.abs(s))
-  }
-  return { rms: Math.sqrt(sum / data.length), peak, notes: score.notes.length }
-}

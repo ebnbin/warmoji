@@ -1,6 +1,6 @@
 import sfxJson from '../assets/sfx.json'
 
-export type Wave = 'square' | 'sawtooth' | 'triangle' | 'sine' | 'noise'
+type Wave = 'square' | 'sawtooth' | 'triangle' | 'sine' | 'noise'
 export interface SfxDef {
   wave: Wave
   /** 起始频率 Hz（noise 时为低通滤波截止频率） */

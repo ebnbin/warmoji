@@ -12,7 +12,7 @@ export interface MapDecor {
   readonly density: readonly [number, number]
 }
 /** 挂上即启用断壁：挡移动/子弹/视线 + 流场寻路 */
-export interface WallsConfig {
+interface WallsConfig {
   readonly blocks: number
   /** 单块最大长度（格） */
   readonly maxLen: number

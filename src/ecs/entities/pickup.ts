@@ -1,16 +1,14 @@
-import { addComponent, addComponents, hasComponent, query } from 'bitecs'
+import { addComponent, addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import {
   Bob,
   GrantCoins,
   GrantFlash,
   GrantMod,
-  Enemy,
   Grab,
   Lifetime,
   Magnet,
   Pickup,
-  PICKUP_SET,
   PickupFx,
   Pop,
   Pull,
@@ -19,7 +17,7 @@ import {
   Vel,
 } from '../components'
 import { attachDrawable } from './drawable'
-import { enemyCarries, pickupDef, pickupSfx } from '../store'
+import { pickupDef, pickupSfx } from '../store'
 import type { FieldPickupDef } from '../../types/battlefield'
 import type { SfxId } from '../../types/sfx'
 import type { Sim } from '../sim'
@@ -30,7 +28,7 @@ import { FIELD, POLARITY_COLOR } from '../../data/battlefield'
 import { backEaseOut, sineEaseInOut } from '../utils/ease'
 
 
-export interface PickupSpec {
+interface PickupSpec {
   emoji: string
   /** 显示尺寸(px) */
   size: number
@@ -57,7 +55,7 @@ export interface PickupSpec {
 }
 
 /** 落点先过世界钩子 */
-export function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
+function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
   const p = sim.hooks.constrainCoin(sim, x, y)
   const eid = newEntity(sim.world)
   // Bob 恒挂，amp = 0 即不浮
@@ -200,18 +198,6 @@ export function animatePickup(sim: Sim, eid: number): void {
     Transform.y[eid] = Bob.y0[eid]! + off
     Ring.dy[eid] = -off
   }
-}
-
-export function pickupCounts(sim: Sim): { pickups: number; carriers: number } {
-  let pickups = 0
-  for (const eid of query(sim.world, PICKUP_SET as unknown as object[])) {
-    if (hasComponent(sim.world, eid, GrantMod)) pickups++
-  }
-  let carriers = 0
-  for (const eid of query(sim.world, [Enemy])) {
-    if (enemyCarries[eid] !== undefined) carriers++
-  }
-  return { pickups, carriers }
 }
 
 export function spawnCoins(sim: Sim, x: number, y: number, count: number): void {

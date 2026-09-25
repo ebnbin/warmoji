@@ -8,7 +8,7 @@ import type { CharacterDef, UpgradeTiers } from '../types/characters'
 import type { LevelProgress } from '../types/charLevel'
 
 /** 相对权重，不必和为 1 */
-export function rarityWeights(wave: number, level = 1): Record<ItemRarity, number> {
+function rarityWeights(wave: number, level = 1): Record<ItemRarity, number> {
   const lv = Math.max(0, level - 1)
   const rare = Math.min(0.5, 0.06 + 0.02 * wave + 0.14 * lv)
   const epicBase = wave < 5 ? 0 : Math.min(0.2, 0.025 * (wave - 4))
@@ -28,7 +28,7 @@ export function characterPoolFor(def: CharacterDef, level: number): ItemId[] {
 export function stackCount(owned: readonly ItemId[], id: ItemId): number {
   return owned.filter((x) => x === id).length
 }
-export function reachedStackLimit(owned: readonly ItemId[], id: ItemId): boolean {
+function reachedStackLimit(owned: readonly ItemId[], id: ItemId): boolean {
   const def: ItemDef = ITEMS[id]
   return def.maxStacks !== undefined && stackCount(owned, id) >= def.maxStacks
 }
@@ -64,7 +64,7 @@ export function rollItem(
   return pickList[Math.min(pickList.length - 1, Math.floor(rand() * pickList.length))]!
 }
 
-export function cardAtMax(owned: Readonly<Record<string, number>>, id: CardId): boolean {
+function cardAtMax(owned: Readonly<Record<string, number>>, id: CardId): boolean {
   return (owned[id] ?? 0) >= CARDS[id].maxLevel
 }
 /** 互不相同、未满级；池不够时返回更少 */

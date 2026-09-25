@@ -19,13 +19,4 @@ export class Rng {
   int(min: number, max: number): number {
     return min + Math.floor(this.next() * (max - min + 1))
   }
-
-  pick<T>(items: readonly T[]): T {
-    if (items.length === 0) throw new Error('pick: 数组为空')
-    return items[this.int(0, items.length - 1)]!
-  }
-
-  chance(probability: number): boolean {
-    return this.next() < probability
-  }
 }

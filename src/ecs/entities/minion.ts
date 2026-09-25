@@ -35,7 +35,7 @@ import { attachAbilityCore } from '../entities/ability'
 import { liveOnes } from '../utils/turret'
 
 
-export interface MinionSpec {
+interface MinionSpec {
   tag: object
   emoji: string
   /** 世界像素 */
@@ -58,7 +58,7 @@ export interface MinionSpec {
 }
 
 /** 阵营与描边随武器走 */
-export function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
+function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
   const outline = holderOutline(Faction.v[weaponEid]!, Owner.eid[weaponEid]!)
   const m = newEntity(sim.world)
   attachDrawable(sim.world, m, sim.frames, {

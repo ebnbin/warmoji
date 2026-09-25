@@ -289,7 +289,7 @@ export function dayNightOf(sim: Sim): { cfg: NonNullable<MapDef['dayNight']>; ho
   return { cfg, hour: hourAt((sim.run.combatMs + sim.elapsedMs) / 1000, cfg) }
 }
 
-export function currentMix(sim: Sim): ReturnType<typeof enemyMixAt> {
+function currentMix(sim: Sim): ReturnType<typeof enemyMixAt> {
   const m = MAPS[sim.mapId]
   const dn = dayNightOf(sim)
   const rows = dn ? ((isDayAt(dn.hour) ? m.dayMix : m.nightMix) ?? m.mix) : m.mix
@@ -341,7 +341,7 @@ export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
 // ── 魔尘变形 ──
 
 /** 变形 + 复形冷却 */
-export const MORPH_RECAST_CD = 5000
+const MORPH_RECAST_CD = 5000
 
 /** Boss 或冷却中拒绝 */
 export function applyMorph(

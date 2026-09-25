@@ -63,7 +63,7 @@ export interface Economy {
   readonly shop: { readonly refreshPrice: number }
 }
 export type ItemRarity = 'common' | 'rare' | 'epic'
-export type ItemPool = 'all' | AbilityDef['kind']
+type ItemPool = 'all' | AbilityDef['kind']
 export interface ItemDef {
   readonly emoji: string
   readonly name: string

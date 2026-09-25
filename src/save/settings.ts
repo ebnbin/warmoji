@@ -10,7 +10,7 @@ export interface Settings {
   showSkinTone: boolean
 }
 
-export const DEFAULT_SETTINGS: Settings = {
+const DEFAULT_SETTINGS: Settings = {
   damageNumbers: true,
   hitShake: true,
   sound: true,
@@ -18,7 +18,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showSkinTone: false,
 }
 
-export type SettingKey = keyof Settings
+type SettingKey = keyof Settings
 
 export interface SettingDef {
   readonly key: SettingKey
@@ -38,7 +38,7 @@ export const SETTING_DEFS: readonly SettingDef[] = [
 const KEY = 'warmoji.settings.v1'
 
 /** 逐字段取合法值，缺省回退默认 */
-export function sanitizeSettings(raw: unknown): Settings {
+function sanitizeSettings(raw: unknown): Settings {
   const obj = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
   const pick = (k: SettingKey): boolean =>
     typeof obj[k] === 'boolean' ? (obj[k] as boolean) : DEFAULT_SETTINGS[k]

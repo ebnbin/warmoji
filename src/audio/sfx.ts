@@ -1,6 +1,5 @@
 import { SFX } from '../data/sfx'
 import type { SfxDef, SfxId } from '../types/sfx'
-export { SFX } from '../data/sfx'
 
 const SAMPLE_RATE = 22050
 const MAX_VOICES = 14

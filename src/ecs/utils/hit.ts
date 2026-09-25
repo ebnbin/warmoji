@@ -7,7 +7,7 @@ export interface HitTarget {
 }
 
 /** 归一化到 (-π, π] */
-export function wrapAngle(a: number): number {
+function wrapAngle(a: number): number {
   let r = a % (2 * Math.PI)
   if (r <= -Math.PI) r += 2 * Math.PI
   if (r > Math.PI) r -= 2 * Math.PI

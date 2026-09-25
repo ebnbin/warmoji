@@ -1,13 +1,13 @@
 import type { AbilityDef, Effect } from './abilityDefs'
 
 // ── 移动方式 ────────────────────────────────────────────────
-export type DashTrigger =
+type DashTrigger =
   | { readonly kind: 'detect'; readonly range: number; readonly cooldownMs: number }
   | { readonly kind: 'timer'; readonly intervalMs: number; readonly firstDelayMs?: number }
-export type DashLength =
+type DashLength =
   | { readonly kind: 'dist'; readonly dist: number }
   | { readonly kind: 'time'; readonly durationMs: number }
-export interface DashLocomotion {
+interface DashLocomotion {
   readonly kind: 'dash'
   readonly windupMs: number
   readonly dashSpeed: number
@@ -18,7 +18,7 @@ export interface DashLocomotion {
   readonly lockAt: 'windup' | 'launch'
   readonly sfx?: 'whoosh'
 }
-export interface StandoffLocomotion {
+interface StandoffLocomotion {
   readonly kind: 'standoff'
   /** 超出则只游荡 */
   readonly detectRange: number
@@ -26,7 +26,7 @@ export interface StandoffLocomotion {
   readonly standoffDist: number
 }
 /** 蓄力前被打死则不炸 */
-export interface DetonateLocomotion {
+interface DetonateLocomotion {
   readonly kind: 'detonate'
   /** 进入即定身蓄力 */
   readonly triggerRange: number
@@ -35,7 +35,7 @@ export interface DetonateLocomotion {
   readonly blastDamage: number
 }
 /** 巢被拆后按 orphan 倍率强化并直扑玩家 */
-export interface BaseOrbitLocomotion {
+interface BaseOrbitLocomotion {
   readonly kind: 'baseOrbit'
   readonly orbitRadius: number
   /** 以巢为基准 */

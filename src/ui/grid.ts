@@ -110,10 +110,6 @@ export class EmojiGrid {
     return this.scroll
   }
 
-  get contentH(): number {
-    return this.contentHeight
-  }
-
   get wasDragged(): boolean {
     return this.dragMovedFlag
   }
@@ -161,17 +157,6 @@ export class EmojiGrid {
   setSelected(key: string | null): void {
     this.selectedKey = key
     this.redraw()
-  }
-
-  /** 视口坐标；e2e 用 */
-  cellRects(): { key: string; x: number; y: number; w: number; h: number }[] {
-    return this.cells.map((c) => ({
-      key: c.item.key,
-      x: this.rect.x + c.relX,
-      y: this.rect.y + c.relY - this.scroll,
-      w: this.cell,
-      h: this.cell,
-    }))
   }
 
   private contains(p: Phaser.Input.Pointer): boolean {

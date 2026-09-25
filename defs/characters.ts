@@ -1,6 +1,4 @@
-import { WEAPONS } from './weapons.ts'
-import type { WeaponSource } from '../src/types/weapons'
-import type { CharacterAuthoring, InnateSource } from '../src/types/characters'
+import type { CharacterAuthoring } from '../src/types/characters'
 
 export const CHARACTERS = {
   juggler: {
@@ -209,29 +207,3 @@ export const CHARACTERS = {
 } as const satisfies Record<string, CharacterAuthoring>
 
 // ── 载体展平 ──
-
-const WEAPON_MAP = WEAPONS as Record<string, WeaponSource>
-
-interface Carrier {
-  readonly base: string
-  readonly upgrades: InnateSource['upgrades']
-}
-
-function carriersOf(c: CharacterAuthoring): Carrier[] {
-  return [
-    ...c.weapons.map((wid) => {
-      const w = WEAPON_MAP[wid]!
-      return { base: w.base, upgrades: w.upgrades }
-    }),
-    ...c.innate.map((i) => ({ base: i.base, upgrades: i.upgrades })),
-  ]
-}
-
-/** 同档多载体的卡文案由 gen 校验一致 */
-export function characterCard(c: CharacterAuthoring, index: 0 | 1): { icon: string; name: string; desc: string } {
-  for (const cr of carriersOf(c)) {
-    const u = cr.upgrades[index]
-    if (u) return u.card
-  }
-  throw new Error('角色缺升级档')
-}

@@ -16,10 +16,7 @@ interface Slot {
 
 export class VirtualEmojiGrid {
   onTap?: (cp: string) => void
-  /** settled = 终态；中途高频，消费方自行节流 */
-  onScrolled?: (settled: boolean) => void
-  /** 150ms 至多一次 */
-  onThumbsProgress?: () => void
+  onScrolled?: () => void
 
   private scene: Phaser.Scene
   private rect: { x: number; y: number; w: number; h: number }
@@ -44,8 +41,6 @@ export class VirtualEmojiGrid {
   private flingV = 0
   private lastMoveY = 0
   private lastMoveT = 0
-  private progressPending = false
-  private settleTimer?: Phaser.Time.TimerEvent
 
   constructor(
     scene: Phaser.Scene,
@@ -124,10 +119,6 @@ export class VirtualEmojiGrid {
     return this.scroll
   }
 
-  get maxScroll(): number {
-    return this.max
-  }
-
   get wasDragged(): boolean {
     return this.dragMoved
   }
@@ -168,39 +159,17 @@ export class VirtualEmojiGrid {
     this.scrollTo(top - (this.rect.h - CELL) / 2)
   }
 
-  /** 视口坐标；只含完整可见的格子（半行点不到） */
-  cellRects(): { key: string; x: number; y: number; w: number; h: number }[] {
-    return this.slots
-      .filter((s) => s.boundIndex >= 0 && this.keys[s.boundIndex] !== undefined)
-      .sort((a, b) => a.boundIndex - b.boundIndex)
-      .map((s) => ({
-        key: this.keys[s.boundIndex]!,
-        x: this.rect.x + (s.boundIndex % this.cols) * CELL,
-        y: this.rect.y + Math.floor(s.boundIndex / this.cols) * CELL - this.scroll,
-        w: CELL,
-        h: CELL,
-      }))
-      .filter((r) => r.y >= this.rect.y && r.y + r.h <= this.rect.y + this.rect.h)
-  }
-
   scrollTo(y: number): void {
     this.scroll = Math.max(0, Math.min(this.max, y))
     this.container.y = this.rect.y - this.scroll
     this.updateWindow()
-    this.onScrolled?.(false)
-    // 滚轮没有松手事件：去抖后补一发终态
-    this.settleTimer?.remove()
-    this.settleTimer = this.scene.time.delayedCall(160, () => {
-      this.settleTimer = undefined
-      if (this.scene.sys.isActive()) this.onScrolled?.(true)
-    })
+    this.onScrolled?.()
   }
 
   private release(): void {
     this.dragging = false
     if (!this.dragMoved || Math.abs(this.flingV) < 0.05) {
       this.flingV = 0
-      this.onScrolled?.(true)
     }
   }
 
@@ -214,7 +183,6 @@ export class VirtualEmojiGrid {
     // 0.05 ≈ 每帧 1px
     if (Math.abs(this.flingV) < 0.05 || next <= 0 || next >= this.max) {
       this.flingV = 0
-      this.onScrolled?.(true)
     }
   }
 
@@ -250,17 +218,6 @@ export class VirtualEmojiGrid {
     void requestEmojiThumb(this.scene, cp).then((key) => {
       if (!key || slot.boundIndex !== index || this.keys[index] !== cp || !this.scene.sys.isActive()) return
       slot.image.setPosition(cx, cy).setTexture(key).setDisplaySize(ICON, ICON).setAlpha(alpha).setVisible(true)
-      this.reportProgress()
-    })
-  }
-
-  /** 最后一批必有通知 */
-  private reportProgress(): void {
-    if (this.progressPending) return
-    this.progressPending = true
-    this.scene.time.delayedCall(150, () => {
-      this.progressPending = false
-      if (this.scene.sys.isActive()) this.onThumbsProgress?.()
     })
   }
 

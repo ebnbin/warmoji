@@ -5,7 +5,7 @@ const OPEN_TAG = /<svg\b[^>]*>/
 // 通用标签 token：属性内引号里的 > 不会截断
 const TAG = /<(\/?)([a-zA-Z][\w:-]*)((?:"[^"]*"|[^">])*?)(\/?)>/g
 
-export interface SplitSvg {
+interface SplitSvg {
   open: string
   /** 无则空串；重组输出必须带上（clipPath 等引用） */
   defs: string
@@ -60,7 +60,7 @@ function topLevelSegments(body: string): TopSegment[] {
 }
 
 /** defs 单列，不占绘制元素下标 */
-export function splitSvg(svg: string): SplitSvg {
+function splitSvg(svg: string): SplitSvg {
   const open = OPEN_TAG.exec(svg)?.[0]
   if (!open) throw new Error('不是有效的 SVG')
   const closeIdx = svg.lastIndexOf('</svg>')
@@ -82,7 +82,7 @@ function replaceViewBox(open: string, viewBox: string): string {
 // ── 动画 ────────────────────────────────────────────────────
 
 /** t 为周期内相位 0..1，首尾须闭环；scaleX/scaleY 与 scale 相乘 */
-export interface PartKeyframe {
+interface PartKeyframe {
   readonly t: number
   readonly rotate?: number
   readonly tx?: number
@@ -93,7 +93,7 @@ export interface PartKeyframe {
   readonly opacity?: number
 }
 
-export interface AnimPart {
+interface AnimPart {
   /** splitSvg 序；成员聚合渲染在最大下标处 */
   readonly indices: readonly number[]
   /** viewBox 坐标 */
@@ -103,7 +103,7 @@ export interface AnimPart {
 }
 
 /** back 垫在本体之下、front 盖在本体之上 */
-export interface FxLayer {
+interface FxLayer {
   readonly layer: 'back' | 'front'
   readonly render: (t: number) => string
 }
@@ -130,7 +130,7 @@ interface PartPose {
 }
 
 /** t 落在首帧前/末帧后按闭环回绕 */
-export function lerpKeyframes(kfs: readonly PartKeyframe[], t: number): PartPose {
+function lerpKeyframes(kfs: readonly PartKeyframe[], t: number): PartPose {
   const fill = (k: PartKeyframe): Required<PartKeyframe> => ({
     t: k.t,
     rotate: k.rotate ?? 0,
@@ -221,7 +221,7 @@ export function bakeAnimFrame(svg: string, recipe: AnimRecipe, t: number): strin
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
 
-export function star4(cx: number, cy: number, r: number): string {
+function star4(cx: number, cy: number, r: number): string {
   const k = r * 0.22
   return (
     `M${fmt(cx)} ${fmt(cy - r)}L${fmt(cx + k)} ${fmt(cy - k)}L${fmt(cx + r)} ${fmt(cy)}` +
@@ -230,7 +230,7 @@ export function star4(cx: number, cy: number, r: number): string {
   )
 }
 
-export function fxRise(opts: {
+function fxRise(opts: {
   readonly particles: readonly { x: number; phase: number; size: number; color: string; drift?: number }[]
   readonly y0: number
   readonly y1: number
@@ -252,7 +252,7 @@ export function fxRise(opts: {
   }
 }
 
-export function fxShineSweep(opts: {
+function fxShineSweep(opts: {
   readonly clip: { cx: number; cy: number; r: number }
   readonly id: string
 }): FxLayer {
@@ -274,7 +274,7 @@ export function fxShineSweep(opts: {
   }
 }
 
-export function fxSparkles(opts: {
+function fxSparkles(opts: {
   readonly stars: readonly { x: number; y: number; r: number; phase: number; color?: string }[]
 }): FxLayer {
   return {
@@ -293,7 +293,7 @@ export function fxSparkles(opts: {
   }
 }
 
-export function fxRipples(opts: {
+function fxRipples(opts: {
   readonly cx: number
   readonly cy: number
   readonly color: string
@@ -318,7 +318,7 @@ export function fxRipples(opts: {
   }
 }
 
-export function fxBolts(opts: {
+function fxBolts(opts: {
   readonly bolts: readonly {
     points: readonly (readonly [number, number])[]
     window: readonly [number, number]
@@ -340,7 +340,7 @@ export function fxBolts(opts: {
   }
 }
 
-export function fxSteam(opts: {
+function fxSteam(opts: {
   readonly wisps: readonly { x: number; y0: number; phase: number }[]
 }): FxLayer {
   return {
@@ -365,19 +365,19 @@ export function fxSteam(opts: {
 // ── 动画资源格式 ──
 // fx 用「生成器名 + 参数」声明，加载时经注册表还原。kind='cycle' 的契约：相位 0..1 = 一个完整行为周期，出手时刻锚在相位终点
 
-export const ANIM_FORMAT = 'warmoji-anim@2'
+const ANIM_FORMAT = 'warmoji-anim@2'
 
 /** gen 须为注册表成员；layer 缺省用生成器默认 */
-export interface FxDecl {
+interface FxDecl {
   readonly gen: string
   readonly layer?: 'back' | 'front'
   readonly params: unknown
 }
 
-export type AnimClipKind = 'loop' | 'cycle'
+type AnimClipKind = 'loop' | 'cycle'
 
 /** 省略 kind 视为 loop；frames 缺省用全局 def */
-export interface AnimClipEntry {
+interface AnimClipEntry {
   readonly kind?: AnimClipKind
   readonly frames?: number
   readonly viewBox?: string
@@ -385,7 +385,7 @@ export interface AnimClipEntry {
   readonly fx?: readonly FxDecl[]
 }
 
-export interface AnimResourceEntry {
+interface AnimResourceEntry {
   readonly emoji: string
   readonly name: string
   readonly desc: string
@@ -393,7 +393,7 @@ export interface AnimResourceEntry {
   readonly clips: Readonly<Record<string, AnimClipEntry>>
 }
 
-export interface AnimResource {
+interface AnimResource {
   readonly format: string
   readonly def: { readonly frames: number; readonly durMs: number }
   /** key = ordering ID */
@@ -410,7 +410,7 @@ const FX_REGISTRY = {
   steam: fxSteam,
 } as const satisfies Record<string, (params: never) => FxLayer>
 
-export const FX_GENERATORS = Object.keys(FX_REGISTRY) as readonly string[]
+const FX_GENERATORS = Object.keys(FX_REGISTRY) as readonly string[]
 
 // 不能用 lerpKeyframes(kfs,0) 与 (kfs,1) 对比：相位 1 会归一化回 0
 const poseOf = (kf: PartKeyframe): PartPose => ({
@@ -433,7 +433,7 @@ const poseEq = (a: PartPose, b: PartPose): boolean =>
   Math.abs(a.opacity - b.opacity) < 1e-9
 
 /** 违规即抛错 */
-export function validateAnimResource(data: AnimResource): void {
+function validateAnimResource(data: AnimResource): void {
   if (data.format !== ANIM_FORMAT) {
     throw new Error(`动画资源格式不符：期望 ${ANIM_FORMAT}，得到 ${String(data.format)}`)
   }
@@ -490,7 +490,7 @@ export function validateAnimResource(data: AnimResource): void {
   }
 }
 
-export function restoreFx(decl: FxDecl): FxLayer {
+function restoreFx(decl: FxDecl): FxLayer {
   const make = FX_REGISTRY[decl.gen as keyof typeof FX_REGISTRY] as (params: unknown) => FxLayer
   const fx = make(decl.params)
   return decl.layer ? { ...fx, layer: decl.layer } : fx
@@ -511,7 +511,7 @@ export interface AnimSet {
   readonly clips: readonly AnimClip[]
 }
 
-export function loadAnimSets(data: AnimResource): AnimSet[] {
+function loadAnimSets(data: AnimResource): AnimSet[] {
   validateAnimResource(data)
   return Object.values(data.animations).map((entry) => ({
     emoji: entry.emoji,
@@ -539,7 +539,7 @@ const RESOURCE = animationsJson as unknown as AnimResource
 export const ANIM_DEF: { readonly frames: number; readonly durMs: number } = RESOURCE.def
 
 /** 坏数据在此即抛错 */
-export const ANIM_SETS: readonly AnimSet[] = loadAnimSets(RESOURCE)
+const ANIM_SETS: readonly AnimSet[] = loadAnimSets(RESOURCE)
 
 /** 每个 emoji 的首个 clip */
 export const ANIM_RECIPES: readonly AnimClip[] = ANIM_SETS.map((s) => s.clips[0]!)
@@ -819,7 +819,7 @@ export function applyTemplate(tpl: AnimTemplate, emoji: string, svg: string): An
 // ── SVG 结构树 ──────────────
 // 节点 path key：顶层 "3"，组内 "3/1"
 
-export interface SvgTreeNode {
+interface SvgTreeNode {
   readonly path: string
   readonly tag: string
   /** 容器含整个子树 */

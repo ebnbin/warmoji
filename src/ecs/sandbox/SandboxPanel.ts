@@ -43,7 +43,7 @@ const DEPTH = 320
 /** 收起时滚动区挪出画面：其监听常驻，留在原位会吞掉战场手势 */
 const OFFSCREEN = { x: -10_000, y: -10_000, w: 0, h: 0 }
 
-export type SandboxTab = 'field' | 'team' | 'preset' | 'perf'
+type SandboxTab = 'field' | 'team' | 'preset' | 'perf'
 
 // 开合与页签挂模块级：视口变化与战斗重启都会重启 SandboxScene，挂实例上会被一起重置
 let open = false

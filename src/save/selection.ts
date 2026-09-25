@@ -11,7 +11,7 @@ function sanitizeMapId(id: unknown): MapId {
 const CAPTAIN_KEY = 'warmoji.captain.v1'
 const MAP_KEY = 'warmoji.map.v1'
 
-export function sanitizeCaptain(id: unknown): CaptainId {
+function sanitizeCaptain(id: unknown): CaptainId {
   return typeof id === 'string' && id in CAPTAINS ? (id as CaptainId) : CAPTAIN_IDS[0]!
 }
 

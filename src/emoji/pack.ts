@@ -1,7 +1,7 @@
 // 纯逻辑，禁 DOM。ordering.txt 每行一个 ordering ID（全项目唯一标识），twemoji.txt 每行一个去 header 的 SVG 正文，行序对齐；
 // emoji 不作为字符/字体使用
 
-export const EMOJI_HEADER = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">'
+const EMOJI_HEADER = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">'
 
 export interface EmojiPack {
   /** ordering 顺序的全部 ID */
@@ -37,12 +37,12 @@ export function packSvg(pack: EmojiPack, id: string): string | null {
   return `${EMOJI_HEADER}${body}</svg>`
 }
 
-export function allEmojiIds(pack: EmojiPack): readonly string[] {
+function allEmojiIds(pack: EmojiPack): readonly string[] {
   return pack.ids
 }
 
 /** ID 里带下划线连接的肤色修饰符（1f3fb..1f3ff）；独立 component 不含下划线，不算变体 */
-export function isSkinToneVariant(id: string): boolean {
+function isSkinToneVariant(id: string): boolean {
   return /_1f3f[b-f]/.test(id)
 }
 

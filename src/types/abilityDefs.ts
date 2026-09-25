@@ -1,7 +1,7 @@
 import type { SfxId } from './sfx'
 import type { GroundEffectDef } from './groundEffects'
 
-export interface ProjectileSpec {
+interface ProjectileSpec {
   readonly emoji: string
   readonly size: number
   readonly radius: number
@@ -19,7 +19,7 @@ export interface HeldVisual {
   readonly mountSide?: -1 | 1
   readonly mountGap?: number
 }
-export interface BlastRing {
+interface BlastRing {
   readonly color: number
   readonly fillAlpha: number
   readonly lineWidth: number
@@ -27,7 +27,7 @@ export interface BlastRing {
   readonly durMs: number
 }
 /** ratio × 基准伤害；ring 缺省无环 */
-export interface BlastEffect {
+interface BlastEffect {
   readonly kind: 'blast'
   readonly radius: number
   readonly ratio: number
@@ -36,30 +36,30 @@ export interface BlastEffect {
   readonly ring?: BlastRing
 }
 /** factor = 0 即冻结 */
-export interface SlowEffect {
+interface SlowEffect {
   readonly kind: 'slow'
   readonly factor: number
   readonly durationMs: number
 }
 /** 每 tickMs 造成 damage，持续 durationMs；刷新不叠加 */
-export interface PoisonEffect {
+interface PoisonEffect {
   readonly kind: 'poison'
   readonly damage: number
   readonly tickMs: number
   readonly durationMs: number
 }
-export interface GroundZone {
+interface GroundZone {
   readonly kind: 'ground'
   readonly def: GroundEffectDef
 }
 /** Boss 免疫；vulnMul 为变形期间的受伤倍率 */
-export interface MorphEffect {
+interface MorphEffect {
   readonly kind: 'morph'
   readonly durationMs: number
   readonly morphEmoji: string
   readonly vulnMul?: number
 }
-export interface SpawnProjectileEffect {
+interface SpawnProjectileEffect {
   readonly kind: 'spawnProjectile'
   readonly projectile: ProjectileSpec
   readonly damage: number
@@ -67,14 +67,14 @@ export interface SpawnProjectileEffect {
   readonly aim: 'nearest'
 }
 /** all 缺省 true；死亡触发时排除自己 */
-export interface HealEffect {
+interface HealEffect {
   readonly kind: 'heal'
   readonly range: number
   readonly amount: number
   readonly all?: boolean
 }
 /** 敌→队员专属 */
-export interface AttackSlowEffect {
+interface AttackSlowEffect {
   readonly kind: 'attackSlow'
   readonly mul: number
   readonly durationMs: number

@@ -6,7 +6,7 @@ export interface PickupDef {
   readonly radius: number
 }
 /** 以队伍中心为基点；磁吸范围 = CaptainDef.coinMagnet × teamFx.magnetMul */
-export interface PickupPipeline {
+interface PickupPipeline {
   /** 磁吸飞行速度（格/秒） */
   readonly magnetSpeed: number
   /** 入账半径（格） */

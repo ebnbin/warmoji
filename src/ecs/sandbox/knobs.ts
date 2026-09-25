@@ -118,7 +118,7 @@ export function isSandboxEnemyOn(kind: string): boolean {
   return enemies.has(kind)
 }
 
-export function setSandboxEnemies(kinds: readonly string[]): void {
+function setSandboxEnemies(kinds: readonly string[]): void {
   enemies.clear()
   for (const k of kinds) enemies.add(k)
   presetId = undefined
@@ -149,7 +149,7 @@ export function toggleSandboxCharacter(id: CharacterId): void {
 }
 
 /** 改动后由调用方 beginSandboxRun + 重启应用 */
-export function setSandboxRoster(ids: readonly CharacterId[]): void {
+function setSandboxRoster(ids: readonly CharacterId[]): void {
   roster = ids.length > 0 ? [...ids] : [...ROSTER_IDS.slice(0, 1)]
   presetId = undefined
 }
@@ -164,7 +164,7 @@ export function setSandboxLevel(lv: SandboxLevel): void {
 }
 
 // ── 队长（固定沙盒专用队长，不可更改） ─────────────────────
-export function sandboxCaptain(): CaptainId {
+function sandboxCaptain(): CaptainId {
   return SANDBOX_CAPTAIN
 }
 

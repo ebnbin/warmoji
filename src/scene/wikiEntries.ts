@@ -39,7 +39,7 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
   ice: '浮冰（25×25 方形浮冰；全局打滑不跟手，滑出冰面落水掉血·敌我通吃，相机永远跟随）',
 }
 
-export function enemyStatLines(e: EnemyDef): string[] {
+function enemyStatLines(e: EnemyDef): string[] {
   const lines = [
     `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
     `行为 ${LOCOMOTION_LABEL[e.locomotion.kind]} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}`,

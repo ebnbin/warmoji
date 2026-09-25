@@ -12,16 +12,16 @@ export interface ScrollRect {
   h: number
 }
 
-export function maxScrollOf(contentHeight: number, viewH: number): number {
+function maxScrollOf(contentHeight: number, viewH: number): number {
   return Math.max(0, contentHeight - viewH)
 }
 
-export function clampScroll(y: number, max: number): number {
+function clampScroll(y: number, max: number): number {
   return Math.max(0, Math.min(max, y))
 }
 
 /** max <= 0 表示无需滚动条 */
-export function thumbGeom(
+function thumbGeom(
   rect: ScrollRect,
   contentHeight: number,
   scroll: number,
@@ -36,7 +36,6 @@ export function thumbGeom(
 export class ScrollView {
   /** 子项坐标以内容顶为原点 */
   readonly content: Phaser.GameObjects.Container
-  onScroll?: () => void
 
   private rect: ScrollRect
   private scroll = 0
@@ -95,14 +94,6 @@ export class ScrollView {
     }
     scene.input.on('pointerup', release)
     scene.input.on('pointerupoutside', release)
-  }
-
-  get scrollY(): number {
-    return this.scroll
-  }
-
-  get maxScroll(): number {
-    return this.max
   }
 
   get wasDragged(): boolean {
@@ -173,7 +164,6 @@ export class ScrollView {
     this.content.y = this.rect.y - this.scroll
     this.clipInput()
     this.drawBar()
-    this.onScroll?.()
   }
 
   private clipInput(): void {

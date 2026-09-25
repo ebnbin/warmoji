@@ -67,7 +67,7 @@ export interface MapView {
 
 const CAM_MARGIN = () => MAP.cameraMargin * UNIT
 
-export class BoundedView implements MapView {
+class BoundedView implements MapView {
   /** 视口重建时整体销毁 */
   protected visuals: Phaser.GameObjects.GameObject[] = []
   protected decorEids: number[] = []

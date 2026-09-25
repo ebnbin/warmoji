@@ -61,10 +61,6 @@ export function requestEmojiThumb(scene: Phaser.Scene, cp: string): Promise<stri
   return p
 }
 
-export function emojiThumbsReady(): number {
-  return ready.size
-}
-
 export function releaseEmojiThumbs(scene: Phaser.Scene): void {
   generation++
   for (const key of ready.values()) scene.textures.remove(key)

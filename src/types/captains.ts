@@ -3,16 +3,14 @@ import type { AbilityId } from './abilities'
 import type { AbilityDef } from './abilityDefs'
 
 // 技能冷却只按战斗时钟推进，跨波保留
-export interface CaptainSkillOf<A> {
+interface CaptainSkillOf<A> {
   readonly name: string
   readonly desc: string
   readonly cdMs: number
   /** 释放时逐个单发 */
   readonly abilities: readonly A[]
 }
-export type CaptainSkillSource = CaptainSkillOf<AbilityId>
-export type CaptainSkill = CaptainSkillOf<AbilityDef>
-export interface CaptainOf<A> {
+interface CaptainOf<A> {
   readonly emoji: string
   readonly name: string
   readonly desc: string

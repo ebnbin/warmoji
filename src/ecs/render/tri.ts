@@ -21,7 +21,7 @@ export function resetScratch(o: Scratch): void {
 }
 
 /** 顶点经相机矩阵变换到屏幕空间 */
-export function tri(
+function tri(
   o: Scratch, m: Matrix,
   x0: number, y0: number, x1: number, y1: number, x2: number, y2: number,
   color: number,
@@ -43,7 +43,7 @@ export function quad(
 }
 
 /** 按屏幕半径自适应取段数 */
-export function segsFor(radius: number): number {
+function segsFor(radius: number): number {
   return Math.max(12, Math.min(48, Math.ceil(radius / 3)))
 }
 

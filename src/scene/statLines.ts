@@ -40,7 +40,7 @@ function sec(ms: number): string {
   return `${+(ms / 1000).toFixed(2)}秒`
 }
 
-export function abilityStatLines(w: AbilityDef): string[] {
+function abilityStatLines(w: AbilityDef): string[] {
   if (w.kind === 'slowAura') {
     return [
       `减速 ${Math.round((1 - w.slowFactor) * 100)}% · 范围 ${grid(w.radius)}`,

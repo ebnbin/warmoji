@@ -190,10 +190,6 @@ export class EcsAtlas {
     return this.pages[page]!.get().source.glTexture!
   }
 
-  get pageCount(): number {
-    return this.pages.length
-  }
-
   /** 一个进程只建一次，跨局复用；交出前绑到本次调用的场景 */
   static async build(
     scene: Phaser.Scene,

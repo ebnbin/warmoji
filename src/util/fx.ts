@@ -3,7 +3,7 @@ import Phaser from 'phaser'
 // 粒子点纹理走 tint 上色，混合模式保持 NORMAL：ADD 在浅色地图上看不见
 const DOT_KEY = 'fx-dot'
 
-export function ensureFxDot(scene: Phaser.Scene): string {
+function ensureFxDot(scene: Phaser.Scene): string {
   if (scene.textures.exists(DOT_KEY)) return DOT_KEY
   const size = 16
   const canvas = document.createElement('canvas')

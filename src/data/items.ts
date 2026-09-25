@@ -4,7 +4,7 @@ import type { CharacterEffects, TeamEffects, Economy, ItemRarity, ItemDef, ItemI
 import type { AbilityDef } from '../types/abilityDefs'
 
 /** 叠加的单位元 */
-export const TEAM_FX_IDENTITY: TeamEffects = {
+const TEAM_FX_IDENTITY: TeamEffects = {
   moveSpeedMul: 1,
   magnetMul: 1,
   doubleCoinChance: 0,
@@ -49,7 +49,7 @@ export function characterXp(owned: readonly ItemId[]): number {
 }
 
 /** ITEMS.price 是基准价，展示与扣款都走 itemPrice */
-export const PRICE = ECON.price
+const PRICE = ECON.price
 
 export function itemPrice(id: ItemId, wave: number): number {
   const inflate = 1 + PRICE.perWave * Math.max(0, wave - 1)

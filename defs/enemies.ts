@@ -1,6 +1,6 @@
 import type { EnemyDef } from '../src/types/enemies'
 
-export const ZOMBIE: EnemyDef = {
+const ZOMBIE: EnemyDef = {
   kind: 'zombie',
   locomotion: { kind: 'chase' },
   emoji: '1f9df',
@@ -15,7 +15,7 @@ export const ZOMBIE: EnemyDef = {
   coins: 2,
 }
 
-export const GHOST: EnemyDef = {
+const GHOST: EnemyDef = {
   kind: 'ghost',
   locomotion: { kind: 'chase' },
   emoji: '1f47b',
@@ -32,7 +32,7 @@ export const GHOST: EnemyDef = {
   onDeath: [{ kind: 'heal', range: 3, amount: 12, all: true }],
 }
 
-export const INVADER: EnemyDef = {
+const INVADER: EnemyDef = {
   kind: 'invader',
   locomotion: { kind: 'wander' },
   emoji: '1f47e',
@@ -67,7 +67,7 @@ export const INVADER: EnemyDef = {
   ],
 }
 
-export const BOAR: EnemyDef = {
+const BOAR: EnemyDef = {
   kind: 'boar',
   emoji: '1f417',
   name: '野猪',
@@ -92,7 +92,7 @@ export const BOAR: EnemyDef = {
   onDeath: [{ kind: 'decoy', hp: 40, durationMs: 3000, alpha: 0.5 }],
 }
 
-export const SNAKE: EnemyDef = {
+const SNAKE: EnemyDef = {
   kind: 'snake',
   emoji: '1f40d',
   name: '毒蛇',
@@ -119,7 +119,7 @@ export const SNAKE: EnemyDef = {
   ],
 }
 
-export const MUSHROOM: EnemyDef = {
+const MUSHROOM: EnemyDef = {
   kind: 'mushroom',
   locomotion: { kind: 'chase' },
   emoji: '1f344',
@@ -149,7 +149,7 @@ export const MUSHROOM: EnemyDef = {
   ],
 }
 
-export const RAT: EnemyDef = {
+const RAT: EnemyDef = {
   kind: 'rat',
   locomotion: { kind: 'coinThief' },
   emoji: '1f400',
@@ -164,7 +164,7 @@ export const RAT: EnemyDef = {
   coins: 2,
 }
 
-export const SLIME: EnemyDef = {
+const SLIME: EnemyDef = {
   kind: 'slime',
   locomotion: { kind: 'chase' },
   emoji: '1f40c',
@@ -180,7 +180,7 @@ export const SLIME: EnemyDef = {
   onContact: [{ kind: 'attackSlow', mul: 1.6, durationMs: 3000 }],
 }
 
-export const BLOBLING: EnemyDef = {
+const BLOBLING: EnemyDef = {
   kind: 'blobling',
   locomotion: { kind: 'chase' },
   emoji: '1fae7',
@@ -195,7 +195,7 @@ export const BLOBLING: EnemyDef = {
   coins: 0,
 }
 
-export const BLOB: EnemyDef = {
+const BLOB: EnemyDef = {
   kind: 'blob',
   locomotion: { kind: 'chase' },
   emoji: '1fae7',
@@ -211,7 +211,7 @@ export const BLOB: EnemyDef = {
   onDeath: [{ kind: 'split', into: BLOBLING, count: 2 }],
 }
 
-export const LARVA: EnemyDef = {
+const LARVA: EnemyDef = {
   kind: 'larva',
   locomotion: {
     kind: 'baseOrbit',
@@ -232,7 +232,7 @@ export const LARVA: EnemyDef = {
   coins: 0,
 }
 
-export const HIVE: EnemyDef = {
+const HIVE: EnemyDef = {
   kind: 'hive',
   locomotion: { kind: 'static' },
   emoji: '1faba',
@@ -249,7 +249,7 @@ export const HIVE: EnemyDef = {
   spawner: { into: LARVA, intervalMs: 4000, count: 2, maxAlive: 6, firstDelayMs: 2000 },
 }
 
-export const CREEPER: EnemyDef = {
+const CREEPER: EnemyDef = {
   kind: 'creeper',
   emoji: '1f4a3',
   name: '自爆怪',
@@ -270,7 +270,7 @@ export const CREEPER: EnemyDef = {
   },
 }
 
-export const ELF: EnemyDef = {
+const ELF: EnemyDef = {
   kind: 'elf',
   locomotion: { kind: 'chase' },
   emoji: '1f9dd',
@@ -286,7 +286,7 @@ export const ELF: EnemyDef = {
   abilities: [{ kind: 'heal', amount: 13, cooldownMs: 2600, range: 3.5, aoe: { ratio: 1 } }],
 }
 
-export const TURTLE: EnemyDef = {
+const TURTLE: EnemyDef = {
   kind: 'turtle',
   locomotion: { kind: 'chase' },
   emoji: '1f422',
@@ -315,7 +315,7 @@ export const TURTLE: EnemyDef = {
   ],
 }
 
-export const LOCUST: EnemyDef = {
+const LOCUST: EnemyDef = {
   kind: 'locust',
   emoji: '1f997',
   name: '跳蝗',
@@ -339,7 +339,7 @@ export const LOCUST: EnemyDef = {
   },
 }
 
-export const GARGOYLE: EnemyDef = {
+const GARGOYLE: EnemyDef = {
   kind: 'gargoyle',
   locomotion: { kind: 'chase' },
   emoji: '1f5ff',
@@ -355,7 +355,7 @@ export const GARGOYLE: EnemyDef = {
   kbImmune: true,
 }
 
-export const PUFFER: EnemyDef = {
+const PUFFER: EnemyDef = {
   kind: 'puffer',
   emoji: '1f421',
   name: '毒河豚',
@@ -457,7 +457,7 @@ const COMET: EnemyDef = {
   },
 }
 
-export const ENEMY_DEFS: readonly EnemyDef[] = [
+const ENEMY_DEFS: readonly EnemyDef[] = [
   ZOMBIE,
   GHOST,
   INVADER,

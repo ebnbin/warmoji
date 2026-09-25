@@ -111,7 +111,7 @@ const AuraState: StateSpec = { comp: Aura, reset: (e) => { Aura.zone[e] = 0 } }
 const AimState: StateSpec = { comp: Aim, reset: (e) => { Aim.rad[e] = 0 } }
 const ThrownState: StateSpec = { comp: Thrown, reset: (e) => { Thrown.n[e] = 0 } }
 
-export interface AttachCtx {
+interface AttachCtx {
   readonly world: EcsWorld
   readonly frames: FrameIndex
 }
@@ -124,7 +124,7 @@ interface KindSpec<K extends AbilityDef['kind']> {
   attach?(ctx: AttachCtx, e: number, def: Extract<AbilityDef, { kind: K }>): void
 }
 
-export const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
+const KINDS: { [K in AbilityDef['kind']]: KindSpec<K> } = {
 
   rally: {
     comp: Rally,
@@ -474,14 +474,14 @@ export function attachAbilityCore(
 }
 
 /** 已有人住即抛错 */
-export function assertFree(world: EcsWorld, eid: number, comp: object, what: string): void {
+function assertFree(world: EcsWorld, eid: number, comp: object, what: string): void {
   if (hasComponent(world, eid, comp)) {
     throw new Error(`实体 ${eid} 上已有这条能力的${what}：同一宿主不能挂两份同种能力，请让其中一份住进独立实体`)
   }
 }
 
 /** def.kind 只在此读一次 */
-export function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: Omit<AbilityInit, 'baseMs' | 'piercesWalls'>): void {
+function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: Omit<AbilityInit, 'baseMs' | 'piercesWalls'>): void {
   const spec = KINDS[def.kind]
   attachAbilityCore(sim, eid, spec.comp, spec.state ?? [], {
     ...init,
