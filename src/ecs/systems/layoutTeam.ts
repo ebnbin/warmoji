@@ -147,17 +147,30 @@ function layoutSquad(sim: Sim): void {
   const claimR = SQUAD.claimRadius * UNIT
   const claims: { f: number; s: number; d: number }[] = []
   for (const f of followers) {
-    if (Alive.v[f] && Seat.docked[f]) Seat.docked[f] = 0
+    const dead = Alive.v[f] === 0
+    if (!dead && Seat.ghost[f]) Seat.ghost[f] = 0
     const s = Seat.v[f]!
     if (s < 0 || s >= seats.length) continue
-    const d = Seat.docked[f] === 1 ? 0 : distToSeat(f, s)
+    if (dead) {
+      if (Seat.ghost[f]) claims.push({ f, s, d: -1 })
+      continue
+    }
+    const d = distToSeat(f, s)
     if (d <= claimR) claims.push({ f, s, d })
   }
   claims.sort((a, b) => a.d - b.d)
   const occupant: number[] = seats.map(() => -1)
   for (const c of claims) if (occupant[c.s]! < 0) occupant[c.s] = c.f
+  // 刚阵亡的当帧就预订最近的空位，归位途中不再换位，别人也不再挑它
   for (const f of followers) {
-    if (occupant[Seat.v[f]!] === f) continue
+    if (Alive.v[f] || Seat.ghost[f]) continue
+    const s = pickSeat(sim, f, seats, (i) => occupant[i]! < 0)
+    Seat.v[f] = s
+    Seat.ghost[f] = 1
+    occupant[s] = f
+  }
+  for (const f of followers) {
+    if (!Alive.v[f] || occupant[Seat.v[f]!] === f) continue
     Seat.v[f] = pickSeat(sim, f, seats, (i) => occupant[i]! < 0)
   }
   const alive = followers.filter((e) => Alive.v[e] === 1)
@@ -210,7 +223,7 @@ function layoutSquad(sim: Sim): void {
     Phys.vy[f] = 0
     Follow.vx[f] = 0
     Follow.vy[f] = 0
-    if (!Seat.docked[f]) {
+    if (Seat.ghost[f] !== 2) {
       const d = sim.hooks.worldDelta(sim, Follow.x[f]!, Follow.y[f]!, seat.x, seat.y)
       const dist = Math.hypot(d.x, d.y)
       if (dist > seatR && dist > ghostStep) {
@@ -218,7 +231,7 @@ function layoutSquad(sim: Sim): void {
         Follow.y[f] = Follow.y[f]! + (d.y / dist) * ghostStep
         continue
       }
-      Seat.docked[f] = 1
+      Seat.ghost[f] = 2
     }
     Follow.x[f] = seat.x
     Follow.y[f] = seat.y

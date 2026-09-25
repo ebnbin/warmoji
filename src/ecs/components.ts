@@ -439,7 +439,8 @@ export const Captain = {}
 
 export const Phys = { vx: f32(), vy: f32(), thrust: f32(), drag: f32(), mass: f32() }
 
-export const Seat = { v: i32Fill(-1), docked: u8() }
+/** ghost：0 存活；1 阵亡且已预订目标位、正在归位；2 阵亡且已停靠 */
+export const Seat = { v: i32Fill(-1), ghost: u8() }
 
 export const Magnet = { radius: f32() }
 
