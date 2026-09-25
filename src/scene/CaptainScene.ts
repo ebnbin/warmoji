@@ -18,6 +18,7 @@ import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { nextAfterTeam } from './teamPage'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
 
 interface CaptainLayout {
   content: { w: number; h: number }
@@ -43,7 +44,7 @@ const PORTRAIT: CaptainLayout = {
   btn: { y: 1184, w: 360, h: 72 },
 }
 
-export class CaptainScene extends Phaser.Scene {
+export class CaptainScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private selectedId: CaptainId = PICKABLE_CAPTAIN_IDS[0]!
@@ -140,11 +141,7 @@ export class CaptainScene extends Phaser.Scene {
         resolution: res,
       })
       .setOrigin(0.5)
-    const confirm = (): void => {
-      playSfx('click')
-      const run = beginRun(this.selectedId, [], loadMap(browserStorage()))
-      this.scene.start(teamStep(run) ?? nextAfterTeam(run))
-    }
+    const confirm = (): void => this.confirm()
     this.add
       .zone(b.x, b.y, b.w, b.h)
       .setOrigin(0)
@@ -230,5 +227,46 @@ export class CaptainScene extends Phaser.Scene {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
+  }
+
+  private confirm(): void {
+    playSfx('click')
+    const run = beginRun(this.selectedId, [], loadMap(browserStorage()))
+    this.scene.start(teamStep(run) ?? nextAfterTeam(run))
+  }
+
+  devProvider(): DevProvider {
+    return {
+      id: 'captain',
+      title: '队长页',
+      sections: [
+        {
+          id: 'captain',
+          title: '队长页',
+          items: () => [
+            {
+              kind: 'choice',
+              label: '队长',
+              options: PICKABLE_CAPTAIN_IDS.map((id) => ({ id, label: CAPTAINS[id].name })),
+              get: () => this.selectedId,
+              set: (id): void => {
+                const c = PICKABLE_CAPTAIN_IDS.find((x) => x === id)
+                if (!c) return
+                this.selectedId = c
+                saveCaptain(browserStorage(), c)
+                this.refresh()
+              },
+            },
+            {
+              kind: 'buttons',
+              buttons: [
+                { label: '确认出发', run: () => this.confirm() },
+                { label: '返回地图', run: () => this.scene.start(SceneKey.Map) },
+              ],
+            },
+          ],
+        },
+      ],
+    }
   }
 }

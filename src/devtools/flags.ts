@@ -1,6 +1,6 @@
 import { refreshDevPanel } from './registry'
 import { devSettings, updateDevSettings } from './settings'
-import type { DevItem, DevOption } from './types'
+import type { DevItem, DevOption, DevToggleItem } from './types'
 
 export interface DevFlagDef {
   readonly id: string
@@ -37,6 +37,13 @@ export function defineDevFlag(def: DevFlagDef): () => boolean {
   flagDefs.set(def.id, def)
   refreshDevPanel()
   return () => devFlag(def.id)
+}
+
+/** 让 provider 把自己的开关放进自己的页签 */
+export function devFlagItem(id: string): DevToggleItem {
+  const def = flagDefs.get(id)
+  if (!def) throw new Error(`devtools 开关未定义：${id}`)
+  return { kind: 'toggle', label: def.label, desc: def.desc, get: () => devFlag(id), set: (on) => setDevFlag(id, on) }
 }
 
 export function devChoice(id: string): string {

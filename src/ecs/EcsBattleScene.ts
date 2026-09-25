@@ -59,8 +59,9 @@ import type { Burst } from './outbox'
 import { rollWaveCarriers } from './utils/battleFx'
 import { centerX, centerY } from './utils/team'
 import { SceneKey } from '../scene/keys'
-import { attachBattleDevTools } from './devtoolsSections'
+import { battleDevProvider, watchSandboxSteady } from './devProvider'
 import { defineDevFlag } from '../devtools'
+import type { DevProvider, DevProviderHost } from '../devtools'
 import { applyDamage, gainTeamXp } from './systems/shared/combat'
 import { telegraphOne } from './entities/enemy'
 import { enemyDef } from './store'
@@ -81,7 +82,7 @@ function liveCoins(world: EcsWorld): number {
   return n
 }
 
-export class EcsBattleScene extends Phaser.Scene implements HudHost {
+export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProviderHost {
   private world!: EcsWorld
   private map!: MapView
   private ctx!: ViewCtx
@@ -147,6 +148,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
     this.devGfx = undefined
+  }
+
+  devProvider(): DevProvider {
+    return battleDevProvider(this)
   }
 
   devSpawn(kind: 'one' | 'elite' | 'surge' | 'boss'): void {
@@ -259,7 +264,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
 
     setActiveHudHost(this)
     this.scene.launch(SceneKey.Ui)
-    attachBattleDevTools(this)
+    if (this.sandbox) watchSandboxSteady(this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.bootGen++

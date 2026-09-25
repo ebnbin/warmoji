@@ -21,6 +21,7 @@ import { VirtualEmojiGrid } from '../ui/virtualGrid'
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
 
 interface WikiLayout {
   content: { w: number; h: number }
@@ -57,7 +58,7 @@ interface DetailPool {
   footer: Phaser.GameObjects.Text
 }
 
-export class WikiScene extends Phaser.Scene {
+export class WikiScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private category = 0
@@ -584,5 +585,56 @@ export class WikiScene extends Phaser.Scene {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
+  }
+
+  devProvider(): DevProvider {
+    return {
+      id: 'wiki',
+      title: '图鉴页',
+      sections: [
+        {
+          id: 'wiki',
+          title: '图鉴页',
+          items: () => [
+            {
+              kind: 'choice',
+              label: '分类',
+              options: [...this.groups.map((g, i) => ({ id: String(i), label: g.title })), { id: String(this.groups.length), label: '全部' }],
+              get: () => String(this.category),
+              set: (id): void => {
+                const i = Number(id)
+                if (!Number.isInteger(i) || i < 0 || i > this.groups.length || i === this.category) return
+                this.category = i
+                this.focusedIndex = 0
+                this.levelSel = 0
+                this.listScroll = 0
+                this.preserveOnRestart = true
+                this.scene.restart()
+              },
+            },
+            {
+              kind: 'text',
+              mono: true,
+              read: () => `${this.currentCategory || '全部'} · ${this.currentEntry?.name ?? '—'} · 条目 ${this.groups[this.category]?.entries.length ?? 0}`,
+            },
+            {
+              kind: 'buttons',
+              buttons: [
+                {
+                  label: '随机条目',
+                  run: (): void => {
+                    const g = this.groups[this.category]
+                    if (!g || g.entries.length === 0) return
+                    this.focusedIndex = Math.floor(Math.random() * g.entries.length)
+                    this.levelSel = 0
+                    this.refreshEntries()
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }
   }
 }

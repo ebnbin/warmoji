@@ -37,8 +37,9 @@ import {
 } from './teamPage'
 import type { TeamLayout } from './teamPage'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
 
-export class RecruitScene extends Phaser.Scene {
+export class RecruitScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
@@ -382,5 +383,47 @@ export class RecruitScene extends Phaser.Scene {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
+  }
+
+  devProvider(): DevProvider {
+    return {
+      id: 'recruit',
+      title: '招募页',
+      sections: [
+        {
+          id: 'recruit',
+          title: '招募页',
+          items: () => [
+            {
+              kind: 'text',
+              mono: true,
+              read: (): string => {
+                const open = this.pool.slice(0, this.unlocked).filter((id) => this.cardState(id) === 'open')
+                return [
+                  `待招 ${this.due} · 已选 ${this.picked.length} · 已解锁 ${this.unlocked}/${this.pool.length}`,
+                  `可招 ${open.length > 0 ? open.map((id) => CHARACTERS[id].name).join('、') : '无'}`,
+                ].join('\n')
+              },
+            },
+            {
+              kind: 'buttons',
+              buttons: [
+                {
+                  label: '自动补齐并入队',
+                  run: (): void => {
+                    for (const id of this.pool.slice(0, this.unlocked)) {
+                      if (this.picked.length >= this.due) break
+                      if (this.cardState(id) === 'open' && !this.picked.includes(id)) this.picked.push(id)
+                    }
+                    this.refresh()
+                    this.confirm()
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }
   }
 }

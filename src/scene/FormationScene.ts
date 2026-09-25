@@ -27,8 +27,9 @@ import {
 } from './teamPage'
 import type { TeamLayout } from './teamPage'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
 
-export class FormationScene extends Phaser.Scene {
+export class FormationScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
@@ -288,5 +289,22 @@ export class FormationScene extends Phaser.Scene {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart({ fromShop: this.fromShop })
+  }
+
+  devProvider(): DevProvider {
+    return {
+      id: 'formation',
+      title: '阵型页',
+      sections: [
+        {
+          id: 'formation',
+          title: '阵型页',
+          items: () => [
+            { kind: 'text', mono: true, read: () => `站位 ${this.postIds().map((id) => CHARACTERS[id].name).join(' → ')}` },
+            { kind: 'buttons', buttons: [{ label: this.fromShop ? '回到商店' : '确认阵型', run: () => this.confirm() }] },
+          ],
+        },
+      ],
+    }
   }
 }

@@ -7,7 +7,7 @@ import { clock, copyText, downloadDataUrl, stamp } from './util'
 import { rendererInfo, resetMetrics } from './metrics'
 import { mountPerf } from './perf'
 import { mountHistory } from './history'
-import { refreshDevPanel, registerDevSection } from './registry'
+import { refreshDevPanel, registerDevProvider } from './registry'
 import { resourceItems } from './resources'
 import { flagItems } from './flags'
 import { inspectItems } from './inspect'
@@ -314,30 +314,32 @@ function timeItems(): DevItem[] {
 }
 
 export function registerBuiltins(game: Phaser.Game): void {
-  registerDevSection({ id: 'devtools.overview', title: '概览', order: 1000, items: () => overviewItems(game) })
-  registerDevSection({ id: 'devtools.scenes', title: '场景', order: 1002, items: () => sceneItems(game, devConfig().key) })
-  registerDevSection({ id: 'devtools.flags', title: '开关', order: 1005, items: flagItems })
-  registerDevSection({ id: 'devtools.time', title: '时间', order: 1008, items: timeItems })
-  registerDevSection({
-    id: 'devtools.perf',
-    title: '性能',
-    order: 1010,
-    items: () => [
-      { kind: 'custom', mount: (ctx) => mountPerf(game, ctx) },
-      { kind: 'action', label: '重新采样', desc: '清空样本并重新预热', run: resetMetrics },
-      { kind: 'text', label: '一分钟走势 · 面板收起时也在采样', read: () => '' },
-      { kind: 'custom', mount: mountHistory },
-    ],
-  })
-  registerDevSection({ id: 'devtools.inspect', title: '检视', order: 1012, items: inspectItems })
-  registerDevSection({ id: 'devtools.input', title: '输入', order: 1013, items: inputItems })
-  registerDevSection({ id: 'devtools.resources', title: '资源', order: 1015, items: () => resourceItems(game) })
-  registerDevSection({
-    id: 'devtools.log',
-    title: '日志',
-    order: 1020,
-    badge: () => (unreadErrorCount() > 0 ? String(unreadErrorCount()) : ''),
-    items: logItems,
-  })
-  registerDevSection({ id: 'devtools.storage', title: '存储', order: 1030, items: storageItems })
+  registerDevProvider(
+    {
+      id: 'engine',
+      title: '引擎',
+      sections: [
+        { id: 'overview', title: '概览', items: () => overviewItems(game) },
+        { id: 'scenes', title: '场景', items: () => sceneItems(game, devConfig().key) },
+        { id: 'flags', title: '开关', items: flagItems },
+        { id: 'time', title: '时间', items: timeItems },
+        {
+          id: 'perf',
+          title: '性能',
+          items: () => [
+            { kind: 'custom', mount: (ctx) => mountPerf(game, ctx) },
+            { kind: 'action', label: '重新采样', desc: '清空样本并重新预热', run: resetMetrics },
+            { kind: 'text', label: '一分钟走势 · 面板收起时也在采样', read: () => '' },
+            { kind: 'custom', mount: mountHistory },
+          ],
+        },
+        { id: 'inspect', title: '检视', items: inspectItems },
+        { id: 'input', title: '输入', items: inputItems },
+        { id: 'resources', title: '资源', items: () => resourceItems(game) },
+        { id: 'log', title: '日志', badge: () => (unreadErrorCount() > 0 ? String(unreadErrorCount()) : ''), items: logItems },
+        { id: 'storage', title: '存储', items: storageItems },
+      ],
+    },
+    'engine',
+  )
 }

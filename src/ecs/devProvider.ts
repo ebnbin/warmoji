@@ -1,6 +1,6 @@
 import type { EcsBattleScene } from './EcsBattleScene'
-import { markPerf, resetPerf, sceneDevSection } from '../devtools'
-import type { DevItem } from '../devtools'
+import { devFlagItem, markPerf, resetPerf } from '../devtools'
+import type { DevItem, DevProvider } from '../devtools'
 import { CHARACTERS, ROSTER_IDS } from '../data/characters'
 import { mapEnemyRoster } from '../data/maps'
 import {
@@ -89,6 +89,8 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
         ...(battle.sandbox ? [] : [{ label: '结束本波', run: (): void => battle.devEndWave() }]),
       ],
     },
+    devFlagItem('battle.targets'),
+    devFlagItem('ecs.profile'),
     { kind: 'text', label: '流水线剖析 · 平均毫秒/帧 · 外层含内层', mono: true, read: profileText },
     { kind: 'buttons', buttons: [{ label: '重置剖析', run: resetPipelineProfile }] },
   ]
@@ -199,9 +201,20 @@ function sandboxItems(battle: EcsBattleScene): DevItem[] {
   ]
 }
 
-export function attachBattleDevTools(battle: EcsBattleScene): void {
-  sceneDevSection(battle, { id: 'battle', title: '战斗', items: () => battleItems(battle) })
-  if (!battle.sandbox) return
+/** 战斗 scene 专有能力；试炼场页签只在试炼场模式下出现 */
+export function battleDevProvider(battle: EcsBattleScene): DevProvider {
+  return {
+    id: 'battle',
+    title: '战斗',
+    sections: [
+      { id: 'battle', title: '战斗', items: () => battleItems(battle) },
+      ...(battle.sandbox ? [{ id: 'sandbox', title: '试炼场', items: (): DevItem[] => sandboxItems(battle) }] : []),
+    ],
+  }
+}
+
+/** 试炼场刷怪达到上限时把性能采样窗口起点标在那一刻 */
+export function watchSandboxSteady(battle: EcsBattleScene): void {
   let steady = false
   battle.time.addEvent({
     delay: 500,
@@ -212,5 +225,4 @@ export function attachBattleDevTools(battle: EcsBattleScene): void {
       markPerf()
     },
   })
-  sceneDevSection(battle, { id: 'sandbox', title: '试炼场', items: () => sandboxItems(battle) })
 }

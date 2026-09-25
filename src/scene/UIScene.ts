@@ -14,8 +14,9 @@ import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import { roundRect } from '../ui/shapes'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
 
-export class UIScene extends Phaser.Scene implements HudInput {
+export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private joystick?: Joystick
   private xpBar!: Phaser.GameObjects.Graphics
   private timeText!: Phaser.GameObjects.Text
@@ -511,5 +512,32 @@ export class UIScene extends Phaser.Scene implements HudInput {
     g.fillRect(x, y, 200, 14)
     g.fillStyle(0x4dd0e1, 1)
     g.fillRect(x + 1, y + 1, 198 * Math.min(1, s.xp / s.xpNext), 12)
+  }
+
+  devProvider(): DevProvider {
+    return {
+      id: 'ui',
+      title: 'HUD',
+      sections: [
+        {
+          id: 'hud',
+          title: 'HUD',
+          items: () => [
+            { kind: 'text', read: () => (this.paused ? '战斗已由 HUD 暂停' : '战斗进行中') },
+            {
+              kind: 'buttons',
+              label: '预览 HUD 提示',
+              buttons: [
+                { label: '波次预警', run: () => this.onWaveWarning({ title: '预览：精英来袭', sub: '开发者工具触发的预警文案' }) },
+                { label: '拾取提示', run: () => this.onFieldCollected({ emoji: PICKUPS.coin.emoji, name: '预览拾取', desc: '开发者工具触发', polarity: 'buff' }) },
+                { label: '技能提示', run: () => this.onSkillCast('预览技能') },
+                { label: '波次完成', run: () => this.onWaveComplete({ wave: 1, kills: 12, coins: 34, levels: 1 }) },
+                { label: this.paused ? '继续' : '暂停', run: () => this.togglePause() },
+              ],
+            },
+          ],
+        },
+      ],
+    }
   }
 }

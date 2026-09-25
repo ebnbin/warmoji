@@ -3,7 +3,9 @@ import { devConfig, setCurrentLayout, themeOf } from './config'
 import type { ResolvedConfig } from './config'
 import { COLOR, hex, roundRect, textStyle } from './draw'
 import { LOG_CHANGED, logEvents, unreadErrorCount } from './log'
-import { listDevSections, PANEL_REFRESH, REGISTRY_CHANGED, registryEvents } from './registry'
+import { listDevProviders, PANEL_REFRESH, REGISTRY_CHANGED, registryEvents } from './registry'
+import type { DevProviderEntry } from './registry'
+import { syncSceneHosts } from './sceneHosts'
 import { ScrollRegion } from './scroll'
 import type { Rect } from './scroll'
 import { devSettings, SETTINGS_CHANGED, settingsEvents, updateDevSettings } from './settings'
@@ -12,7 +14,7 @@ import { isPickMode, pickAt } from './inspect'
 import { sampleHistory } from './history'
 import { canvasToWorld, paintOverlays, worldToCanvas } from './overlay'
 import type { OverlayCtx } from './overlay'
-import type { DevLayout, DevSection, DevTheme, DevWidget } from './types'
+import type { DevLayout, DevScope, DevSection, DevTheme, DevWidget } from './types'
 import { renderItem } from './widgets'
 import type { RenderCtx } from './widgets'
 
@@ -55,8 +57,32 @@ interface Polled {
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
 
+const GROUPS: readonly { readonly scope: DevScope; readonly label: string }[] = [
+  { scope: 'scene', label: '场景' },
+  { scope: 'game', label: '游戏' },
+  { scope: 'engine', label: '引擎' },
+]
+
+interface Tab {
+  readonly key: string
+  readonly label: string
+  readonly section: DevSection
+}
+
+function tabsOf(entries: readonly DevProviderEntry[]): Tab[] {
+  const multi = entries.length > 1
+  return entries.flatMap((e) =>
+    e.provider.sections.map((section) => ({
+      key: `${e.scope}/${e.provider.id}/${section.id}`,
+      label: multi && e.provider.sections.length > 1 ? `${e.provider.title}·${section.title}` : section.title,
+      section,
+    })),
+  )
+}
+
 let open = false
 const scrollByTab = new Map<string, number>()
+const tabByGroup = new Map<DevScope, string>()
 
 export class DevToolsScene extends Phaser.Scene {
   private cfg!: ResolvedConfig
@@ -71,7 +97,7 @@ export class DevToolsScene extends Phaser.Scene {
   private drag?: PillDrag
   private chrome: Phaser.GameObjects.GameObject[] = []
   private region?: ScrollRegion
-  private current?: DevSection
+  private current?: Tab
   private entries: Entry[] = []
   private polled: Polled[] = []
   private widgets: DevWidget[] = []
@@ -133,6 +159,7 @@ export class DevToolsScene extends Phaser.Scene {
 
   /** 用墙钟而非引擎时间：慢放或暂停时面板照常刷新 */
   update(): void {
+    syncSceneHosts()
     enforceTimeControl()
     this.overlay.clear()
     paintOverlays(this.overlay, this.overlayCtx)
@@ -371,25 +398,83 @@ export class DevToolsScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.togglePanel()),
     )
-    const sections = listDevSections()
-    const current = sections.find((sec) => sec.id === s.tab) ?? sections[0]
+    const groupsBottom = this.buildGroups(chrome, s.group, x + u * 0.6, y + headH, w - u * 1.2)
+    const entries = listDevProviders(s.group)
+    const tabs = tabsOf(entries)
+    const current = tabs.find((t) => t.key === s.tab) ?? tabs[0]
     this.current = current
-    const tabsBottom = this.buildTabs(chrome, sections, current, x + u * 0.6, y + headH, w - u * 1.2)
+    let tabsBottom = this.buildTabs(chrome, tabs, current, x + u * 0.6, groupsBottom, w - u * 1.2)
+    if (tabs.length === 0) {
+      const hint =
+        s.group === 'scene'
+          ? '当前活动的 scene 都没有注册能力：让 scene 实现 devProvider()'
+          : s.group === 'game'
+            ? '游戏还没有注册能力：用 registerGameProvider'
+            : '没有引擎能力'
+      const t = this.add
+        .text(x + u * 0.6, groupsBottom + u * 0.4, hint, textStyle(th, th.caption, { color: COLOR.muted, wrap: w - u * 1.2 }))
+        .setDepth(DEPTH.chrome)
+      chrome.push(t)
+      tabsBottom = t.y + t.height
+    }
     for (const o of chrome) this.panelCam.ignore(o)
     this.chrome = chrome
     const top = tabsBottom + u * 0.4
     const rect: Rect = { x: x + u * 0.6, y: top, w: w - u * 1.2, h: Math.max(u, y + h - top - u * 0.5) }
     this.region = new ScrollRegion(this, this.panelCam, rect, DEPTH.content)
     if (current) {
-      this.renderContent(current)
-      this.region.scrollTo(scrollByTab.get(current.id) ?? 0)
+      this.renderContent(current.section)
+      this.region.scrollTo(scrollByTab.get(current.key) ?? 0)
     }
+  }
+
+  /** 三组导航：场景（当前活动 scene 注册的）、游戏、引擎；场景组标出是哪些 scene */
+  private buildGroups(chrome: Phaser.GameObjects.GameObject[], active: DevScope, x0: number, y0: number, maxW: number): number {
+    const th = this.theme
+    const u = th.body
+    const chipH = u * 1.6
+    const gap = u * 0.3
+    const padX = u * 0.55
+    let cx = 0
+    const cy = y0 + u * 0.2
+    for (const g of GROUPS) {
+      const entries = listDevProviders(g.scope)
+      const n = entries.reduce((sum, e) => sum + e.provider.sections.length, 0)
+      const on = g.scope === active
+      const owners = g.scope === 'scene' ? entries.map((e) => e.owner ?? e.provider.title).join('·') : ''
+      const label = `${g.label} ${n}${owners ? ` · ${owners}` : ''}`
+      const bg = this.add.graphics().setDepth(DEPTH.chrome)
+      const t = this.add
+        .text(0, 0, label, textStyle(th, th.caption, { color: on ? hex(th.accent) : COLOR.muted, bold: on }))
+        .setDepth(DEPTH.chrome)
+      const cw = Math.min(maxW, t.width + padX * 2)
+      if (cx > 0 && cx + cw > maxW) break
+      roundRect(bg, x0 + cx, cy, cw, chipH, u * 0.35, {
+        fill: on ? th.accent : COLOR.chip, fillAlpha: on ? 0.16 : 0.05, stroke: on ? th.accent : COLOR.line, strokeAlpha: on ? 0.7 : 0.1,
+      })
+      t.setPosition(x0 + cx + cw / 2, cy + chipH / 2).setOrigin(0.5)
+      const z = this.add
+        .zone(x0 + cx, cy, cw, chipH)
+        .setOrigin(0)
+        .setDepth(DEPTH.chrome)
+        .setInteractive({ useHandCursor: true })
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
+          if (on) return
+          this.cfg.onTap()
+          if (this.current) this.rememberScroll(this.current)
+          updateDevSettings({ group: g.scope, tab: tabByGroup.get(g.scope) ?? null })
+          this.queueRebuild()
+        })
+      chrome.push(bg, t, z)
+      cx += cw + gap
+    }
+    return cy + chipH + u * 0.2
   }
 
   private buildTabs(
     chrome: Phaser.GameObjects.GameObject[],
-    sections: readonly DevSection[],
-    current: DevSection | undefined,
+    tabs: readonly Tab[],
+    current: Tab | undefined,
     x0: number,
     y0: number,
     maxW: number,
@@ -401,12 +486,12 @@ export class DevToolsScene extends Phaser.Scene {
     const padX = u * 0.6
     let cx = 0
     let cy = y0 + u * 0.2
-    for (const sec of sections) {
-      const on = sec === current
-      const badge = sec.badge?.() ?? ''
+    for (const tab of tabs) {
+      const on = tab === current
+      const badge = tab.section.badge?.() ?? ''
       const bg = this.add.graphics().setDepth(DEPTH.chrome)
       const t = this.add
-        .text(0, 0, badge === '' ? sec.title : `${sec.title} ${badge}`, textStyle(th, th.caption, { color: on ? COLOR.onAccent : COLOR.text, bold: on }))
+        .text(0, 0, badge === '' ? tab.label : `${tab.label} ${badge}`, textStyle(th, th.caption, { color: on ? COLOR.onAccent : COLOR.text, bold: on }))
         .setDepth(DEPTH.chrome)
       const cw = Math.min(maxW, t.width + padX * 2)
       if (cx > 0 && cx + cw > maxW) {
@@ -426,13 +511,14 @@ export class DevToolsScene extends Phaser.Scene {
           if (on) return
           this.cfg.onTap()
           if (current) this.rememberScroll(current)
-          updateDevSettings({ tab: sec.id })
+          tabByGroup.set(devSettings().group, tab.key)
+          updateDevSettings({ tab: tab.key })
           this.queueRebuild()
         })
       chrome.push(bg, t, z)
       cx += cw + gap
     }
-    return sections.length > 0 ? cy + chipH : y0
+    return tabs.length > 0 ? cy + chipH : y0
   }
 
   private renderContent(section: DevSection): void {
@@ -500,8 +586,8 @@ export class DevToolsScene extends Phaser.Scene {
     this.relayout()
   }
 
-  private rememberScroll(section: DevSection): void {
-    if (this.region) scrollByTab.set(section.id, this.region.offset)
+  private rememberScroll(tab: Tab): void {
+    if (this.region) scrollByTab.set(tab.key, this.region.offset)
   }
 
   private rebuildPanel(): void {

@@ -14,15 +14,17 @@ import { UIScene } from './scene/UIScene'
 import { WikiScene } from './scene/WikiScene'
 import { EcsBattleScene } from './ecs/EcsBattleScene'
 import { browserStorage, StorageKey } from './util/storage'
-import { endRun, getRun } from './run/state'
-import { gotoScene, registerLobbyDevTools } from './scene/devtoolsSections'
+import { getRun } from './run/state'
 import { loadSettings } from './save/settings'
 import { initBgm, playBgm, setBgmEnabled } from './audio/bgm'
 import { initSfx, playSfx, setSfxEnabled } from './audio/sfx'
 import { applyCamera, isStandalone, nudgeIosViewport, refreshViewport, safeInsets, textRes, viewport } from './util/apply'
 import { UI_FONT } from './util/fonts'
-import { installDevTools, registerDevSection } from './devtools'
-import { registerEmojiDevTools } from './emoji/devtoolsSections'
+import { installDevTools, registerGameProvider } from './devtools'
+import { appProvider } from './dev/app'
+import { audioProvider } from './dev/audio'
+import { emojiProvider } from './dev/emoji'
+import { settingsProvider } from './dev/settings'
 import { SceneKey } from './scene/keys'
 
 const badge = document.getElementById('build-badge')
@@ -60,25 +62,10 @@ installDevTools(game, {
   onTap: () => playSfx('click'),
 })
 
-registerDevSection({
-  id: 'app',
-  title: '应用',
-  items: () => [
-    { kind: 'text', mono: true, read: () => `构建 ${__BUILD_HASH__} · ${__BUILD_TIME__}` },
-    {
-      kind: 'action',
-      label: '回到主菜单',
-      desc: '结束当前一局，停掉所有业务场景',
-      run: (): void => {
-        endRun()
-        gotoScene(game, SceneKey.Menu)
-      },
-    },
-  ],
-})
-
-registerLobbyDevTools(game)
-registerEmojiDevTools(game)
+registerGameProvider(appProvider(game))
+registerGameProvider(settingsProvider())
+registerGameProvider(audioProvider())
+registerGameProvider(emojiProvider(game))
 
 game.events.once(Phaser.Core.Events.READY, () => {
   refreshViewport(game, true)

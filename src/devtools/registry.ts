@@ -1,36 +1,43 @@
 import Phaser from 'phaser'
-import type { DevSection } from './types'
+import type { DevProvider, DevScope } from './types'
 
 export const REGISTRY_CHANGED = 'changed'
 export const PANEL_REFRESH = 'refresh'
 export const registryEvents = new Phaser.Events.EventEmitter()
 
-const sections = new Map<string, DevSection>()
-const seq = new Map<string, number>()
+export interface DevProviderEntry {
+  readonly provider: DevProvider
+  readonly scope: DevScope
+  readonly seq: number
+  /** scene 作用域时为 scene key */
+  readonly owner?: string
+}
+
+const entries: DevProviderEntry[] = []
 let serial = 0
 
-export function registerDevSection(def: DevSection): () => void {
-  if (sections.has(def.id)) throw new Error(`devtools 页签 id 重复：${def.id}`)
-  sections.set(def.id, def)
-  seq.set(def.id, serial++)
+export function registerDevProvider(provider: DevProvider, scope: DevScope, owner?: string): () => void {
+  if (entries.some((e) => e.scope === scope && e.provider.id === provider.id)) {
+    throw new Error(`devtools provider id 重复：${scope}/${provider.id}`)
+  }
+  const ids = new Set<string>()
+  for (const s of provider.sections) {
+    if (ids.has(s.id)) throw new Error(`devtools provider ${provider.id} 的页签 id 重复：${s.id}`)
+    ids.add(s.id)
+  }
+  const entry: DevProviderEntry = { provider, scope, seq: serial++, owner }
+  entries.push(entry)
   registryEvents.emit(REGISTRY_CHANGED)
   return () => {
-    if (sections.get(def.id) !== def) return
-    sections.delete(def.id)
-    seq.delete(def.id)
+    const i = entries.indexOf(entry)
+    if (i < 0) return
+    entries.splice(i, 1)
     registryEvents.emit(REGISTRY_CHANGED)
   }
 }
 
-export function sceneDevSection(scene: Phaser.Scene, def: DevSection): void {
-  const off = registerDevSection(def)
-  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, off)
-}
-
-export function listDevSections(): DevSection[] {
-  return [...sections.values()].sort(
-    (a, b) => (a.order ?? 0) - (b.order ?? 0) || (seq.get(a.id) ?? 0) - (seq.get(b.id) ?? 0),
-  )
+export function listDevProviders(scope: DevScope): DevProviderEntry[] {
+  return entries.filter((e) => e.scope === scope).sort((a, b) => a.seq - b.seq)
 }
 
 export function refreshDevPanel(): void {

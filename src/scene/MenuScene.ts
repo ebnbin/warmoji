@@ -16,6 +16,8 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
+import { quickStartSections } from '../dev/quickStart'
 
 function backdropDecor(): EmojiRef[] {
   const uniqEnemies = [...new Set(ENEMY_DEFS.map((e) => e.emoji))]
@@ -39,7 +41,7 @@ function vignetteCast(): { heroes: string[]; foes: string[] } {
   }
 }
 
-export class MenuScene extends Phaser.Scene {
+export class MenuScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private best!: HighScore
@@ -267,5 +269,9 @@ export class MenuScene extends Phaser.Scene {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
+  }
+
+  devProvider(): DevProvider {
+    return { id: 'menu', title: '主菜单', sections: quickStartSections(this.game) }
   }
 }

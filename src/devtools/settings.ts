@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { devConfig, maybeDevConfig } from './config'
+import type { DevScope } from './types'
 
 export type DevSide = 'left' | 'right'
 
@@ -7,6 +8,7 @@ export interface DevSettings {
   side: DevSide
   /** 胶囊在可用高度上的位置比例 */
   y: number
+  group: DevScope
   tab: string | null
   pillFps: boolean
   safeArea: boolean
@@ -18,7 +20,7 @@ export interface DevSettings {
 export const SETTINGS_CHANGED = 'changed'
 export const settingsEvents = new Phaser.Events.EventEmitter()
 
-const DEFAULTS: DevSettings = { side: 'right', y: 1, tab: null, pillFps: false, safeArea: false, wide: false, flags: {}, choices: {} }
+const DEFAULTS: DevSettings = { side: 'right', y: 1, group: 'scene', tab: null, pillFps: false, safeArea: false, wide: false, flags: {}, choices: {} }
 
 let current: DevSettings | undefined
 
@@ -36,6 +38,7 @@ function sanitize(raw: unknown): DevSettings {
   return {
     side: o.side === 'left' ? 'left' : 'right',
     y,
+    group: o.group === 'game' || o.group === 'engine' ? o.group : 'scene',
     tab: typeof o.tab === 'string' ? o.tab : null,
     pillFps: bool('pillFps'),
     safeArea: bool('safeArea'),

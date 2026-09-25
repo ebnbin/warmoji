@@ -37,6 +37,7 @@ import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
 import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
 
 interface ShopLayout {
   content: { w: number; h: number }
@@ -65,7 +66,7 @@ const PORTRAIT: ShopLayout = {
   btn: { y: 1162, w: 360, h: 72 },
 }
 
-export class ShopScene extends Phaser.Scene {
+export class ShopScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
@@ -789,5 +790,51 @@ export class ShopScene extends Phaser.Scene {
     }
     this.preserveOnRestart = true
     this.scene.restart()
+  }
+
+  devProvider(): DevProvider {
+    return {
+      id: 'shop',
+      title: '商店页',
+      sections: [
+        {
+          id: 'shop',
+          title: '商店页',
+          items: () => [
+            {
+              kind: 'text',
+              mono: true,
+              read: () =>
+                [
+                  `金币 ${this.run.coins} · 免费刷新 ${this.run.freeRefreshes} · 第 ${this.run.wave} 波`,
+                  `聚焦 ${CHARACTERS[this.focusedId].name} · 商品 ${this.offers.map((o) => (o ? ITEMS[o].name : '空')).join('、')}`,
+                ].join('\n'),
+            },
+            {
+              kind: 'buttons',
+              buttons: [
+                {
+                  label: '金币 +1000',
+                  run: (): void => {
+                    this.run.coins += 1000
+                    this.refresh()
+                  },
+                },
+                {
+                  label: '免费刷新当前格',
+                  run: (): void => {
+                    this.run.freeRefreshes += 1
+                    this.refreshFocused()
+                  },
+                },
+                { label: '买下当前商品', run: () => this.buyFocused() },
+                { label: '开始下一波', run: () => this.nextWave() },
+                { label: '打开阵型', run: () => this.openFormation() },
+              ],
+            },
+          ],
+        },
+      ],
+    }
   }
 }

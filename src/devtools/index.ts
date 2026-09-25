@@ -9,11 +9,20 @@ import { registerBuiltins } from './sections'
 import { installTimeControl } from './timeControl'
 import type { DevToolsConfig } from './types'
 
-export { defineDevChoice, defineDevFlag, devChoice, devFlag, setDevChoice, setDevFlag } from './flags'
+import { registerDevProvider } from './registry'
+import { installSceneHosts } from './sceneHosts'
+import type { DevProvider } from './types'
+
+export { defineDevChoice, defineDevFlag, devChoice, devFlag, devFlagItem, setDevChoice, setDevFlag } from './flags'
 export type { DevChoiceDef, DevFlagDef } from './flags'
 export { markMetrics as markPerf, resetMetrics as resetPerf } from './metrics'
-export { refreshDevPanel, registerDevSection, sceneDevSection } from './registry'
+export { refreshDevPanel } from './registry'
 export { setTimeScale, timeScale, TIME_SCALES } from './timeControl'
+
+/** 游戏级能力：与具体 scene 无关，随游戏常驻；scene 专有能力改由 scene 实现 devProvider() */
+export function registerGameProvider(provider: DevProvider): () => void {
+  return registerDevProvider(provider, 'game')
+}
 export type {
   DevActionItem,
   DevButtonsItem,
@@ -24,6 +33,9 @@ export type {
   DevItem,
   DevLayout,
   DevOption,
+  DevProvider,
+  DevProviderHost,
+  DevScope,
   DevSection,
   DevTextItem,
   DevTheme,
@@ -45,6 +57,7 @@ export function installDevTools(game: Phaser.Game, config: DevToolsConfig = {}):
   installInspect(game, cfg.key)
   installInputWatch(game)
   installHistory(game)
+  installSceneHosts(game, cfg.key)
   registerBuiltins(game)
   game.scene.add(cfg.key, DevToolsScene, true)
 }

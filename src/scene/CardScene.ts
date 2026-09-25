@@ -17,8 +17,9 @@ import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '..
 import { roundRect } from '../ui/shapes'
 import { rollCardChoices } from '../run/draft'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
 
-export class CardScene extends Phaser.Scene {
+export class CardScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
@@ -154,5 +155,34 @@ export class CardScene extends Phaser.Scene {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
+  }
+
+  devProvider(): DevProvider {
+    return {
+      id: 'cards',
+      title: '卡牌页',
+      sections: [
+        {
+          id: 'cards',
+          title: '卡牌页',
+          items: () => [
+            { kind: 'text', mono: true, read: () => `待抽 ${this.run.cardDraws} 张` },
+            { kind: 'buttons', label: '直接选卡', buttons: this.choices.map((id) => ({ label: CARDS[id].name, run: (): void => this.pick(id) })) },
+            {
+              kind: 'buttons',
+              buttons: [
+                {
+                  label: '放弃剩余抽卡',
+                  run: (): void => {
+                    this.run.cardDraws = 0
+                    this.scene.start(this.nextScene())
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }
   }
 }

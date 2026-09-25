@@ -31,6 +31,7 @@ import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '..
 import { clipTo } from '../util/mask'
 import { roundRect } from '../ui/shapes'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
 
 interface StudioLayout {
   content: { w: number; h: number }
@@ -78,7 +79,7 @@ interface AnatUi {
 
 const DEFAULT_SUBJECT = '1f939'
 
-export class StudioScene extends Phaser.Scene {
+export class StudioScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private tab: Tab = 'recipes'
@@ -940,5 +941,54 @@ export class StudioScene extends Phaser.Scene {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
+  }
+
+  devProvider(): DevProvider {
+    return {
+      id: 'studio',
+      title: 'Studio',
+      sections: [
+        {
+          id: 'studio',
+          title: 'Studio',
+          items: () => [
+            {
+              kind: 'choice',
+              label: '页签',
+              options: [
+                { id: 'recipes', label: '动画配方' },
+                { id: 'templates', label: '模板' },
+                { id: 'anatomy', label: '解剖' },
+              ],
+              get: () => this.tab,
+              set: (id): void => {
+                if ((id !== 'recipes' && id !== 'templates' && id !== 'anatomy') || id === this.tab) return
+                this.tab = id
+                this.preserveOnRestart = true
+                this.scene.restart()
+              },
+            },
+            {
+              kind: 'text',
+              mono: true,
+              read: () => `配方 ${this.recipeSel} · 模板对象 ${this.tplEmoji} · 解剖对象 ${this.anatEmoji} · 全集 ${this.allKeys.length}`,
+            },
+            {
+              kind: 'buttons',
+              buttons: [
+                {
+                  label: '随机换一个 emoji',
+                  run: (): void => {
+                    const keys = this.tab === 'recipes' ? ANIM_RECIPES.map((r) => r.emoji) : this.allKeys
+                    const cp = keys[Math.floor(Math.random() * keys.length)]
+                    if (cp) this.onGridTap(cp)
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }
   }
 }

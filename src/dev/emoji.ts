@@ -1,8 +1,8 @@
 import type Phaser from 'phaser'
-import { registerDevSection } from '../devtools'
-import { emojiHoldStats } from './hold'
-import { emojiPackStats, emojiTextureStats, evictUnpinnedEmoji } from './textures'
-import { emojiThumbStats } from './thumbs'
+import type { DevProvider } from '../devtools'
+import { emojiHoldStats } from '../emoji/hold'
+import { emojiPackStats, emojiTextureStats, evictUnpinnedEmoji } from '../emoji/textures'
+import { emojiThumbStats } from '../emoji/thumbs'
 
 function emojiText(game: Phaser.Game): string {
   const pack = emojiPackStats()
@@ -18,16 +18,23 @@ function emojiText(game: Phaser.Game): string {
   ].join('\n')
 }
 
-export function registerEmojiDevTools(game: Phaser.Game): void {
-  registerDevSection({
+/** 游戏级：emoji 资源流水线的状态 */
+export function emojiProvider(game: Phaser.Game): DevProvider {
+  return {
     id: 'emoji',
     title: 'emoji',
-    items: () => [
-      { kind: 'text', mono: true, read: () => emojiText(game) },
+    sections: [
       {
-        kind: 'buttons',
-        buttons: [{ label: '释放未固定的 emoji 纹理', run: () => console.warn(`释放了 ${evictUnpinnedEmoji(game.textures)} 个 emoji 纹理`) }],
+        id: 'emoji',
+        title: 'emoji',
+        items: () => [
+          { kind: 'text', mono: true, read: () => emojiText(game) },
+          {
+            kind: 'buttons',
+            buttons: [{ label: '释放未固定的 emoji 纹理', run: () => console.warn(`释放了 ${evictUnpinnedEmoji(game.textures)} 个 emoji 纹理`) }],
+          },
+        ],
       },
     ],
-  })
+  }
 }

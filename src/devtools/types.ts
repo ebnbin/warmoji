@@ -85,11 +85,23 @@ export interface DevWidget {
 export interface DevSection {
   readonly id: string
   readonly title: string
-  /** 升序排列；内置页签为 1000 起，业务默认 0 */
-  readonly order?: number
   /** 显示在页签名后面的短文本，如未读数 */
   readonly badge?: () => string
   readonly items: () => readonly DevItem[]
+}
+
+/** 面板分三组：当前 scene 注册的、游戏级的、引擎内置的 */
+export type DevScope = 'scene' | 'game' | 'engine'
+
+export interface DevProvider {
+  readonly id: string
+  readonly title: string
+  readonly sections: readonly DevSection[]
+}
+
+/** scene 实现它即自动在 CREATE 时注册、SHUTDOWN 时注销 */
+export interface DevProviderHost {
+  devProvider(): DevProvider
 }
 
 export interface DevInsets {

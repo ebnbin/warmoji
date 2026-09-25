@@ -16,6 +16,7 @@ import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
 import { SceneKey } from './keys'
+import type { DevProvider, DevProviderHost } from '../devtools'
 
 const MAP_PLAY_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> = {
   bounded: '有界竞技场：25×25 方场，边界围合',
@@ -54,7 +55,7 @@ const PORTRAIT: MapLayout = {
   btn: { y: 1184, w: 360, h: 72 },
 }
 
-export class MapScene extends Phaser.Scene {
+export class MapScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private selectedId: MapId = MAP_IDS[0]!
@@ -177,15 +178,7 @@ export class MapScene extends Phaser.Scene {
         resolution: res,
       })
       .setOrigin(0.5)
-    const confirm = (): void => {
-      playSfx('click')
-      if (this.sandbox) {
-        beginSandboxRun(this.selectedId)
-        this.scene.start(SceneKey.Battle)
-        return
-      }
-      this.scene.start(SceneKey.Captain)
-    }
+    const confirm = (): void => this.confirm()
     this.add
       .zone(b.x, b.y, b.w, b.h)
       .setOrigin(0)
@@ -295,5 +288,60 @@ export class MapScene extends Phaser.Scene {
   private onViewportChanged(): void {
     this.preserveOnRestart = true
     this.scene.restart()
+  }
+
+  private confirm(): void {
+    playSfx('click')
+    if (this.sandbox) {
+      beginSandboxRun(this.selectedId)
+      this.scene.start(SceneKey.Battle)
+      return
+    }
+    this.scene.start(SceneKey.Captain)
+  }
+
+  devProvider(): DevProvider {
+    return {
+      id: 'map',
+      title: '地图页',
+      sections: [
+        {
+          id: 'map',
+          title: '地图页',
+          items: () => [
+            {
+              kind: 'choice',
+              label: '地图',
+              options: MAP_IDS.map((id) => ({ id, label: MAPS[id].name })),
+              get: () => this.selectedId,
+              set: (id): void => {
+                const m = MAP_IDS.find((x) => x === id)
+                if (!m) return
+                this.selectedId = m
+                saveMap(browserStorage(), m)
+                this.refresh()
+              },
+            },
+            {
+              kind: 'toggle',
+              label: '试炼场',
+              desc: '与页面右上角的开关同一状态',
+              get: () => this.sandbox,
+              set: (on): void => {
+                this.sandbox = on
+                this.refresh()
+              },
+            },
+            {
+              kind: 'buttons',
+              buttons: [
+                { label: this.sandbox ? '进入试炼场' : '选择队长', run: () => this.confirm() },
+                { label: '返回主菜单', run: () => this.scene.start(SceneKey.Menu) },
+              ],
+            },
+          ],
+        },
+      ],
+    }
   }
 }
