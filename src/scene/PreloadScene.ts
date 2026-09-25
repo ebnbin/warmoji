@@ -6,19 +6,24 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../manifest'
 import { SceneKey } from './keys'
 
+enum TextAsset {
+  EmojiOrdering = 'emoji-ordering',
+  EmojiBundle = 'emoji-bundle',
+}
+
 export class PreloadScene extends Phaser.Scene {
   constructor() {
     super(SceneKey.Preload)
   }
 
   preload(): void {
-    this.load.text('emoji-ordering', emojiOrderingUrl)
-    this.load.text('emoji-bundle', emojiBundleUrl)
+    this.load.text(TextAsset.EmojiOrdering, emojiOrderingUrl)
+    this.load.text(TextAsset.EmojiBundle, emojiBundleUrl)
   }
 
   create(): void {
-    const ordering = this.cache.text.get('emoji-ordering') as string | undefined
-    const bundle = this.cache.text.get('emoji-bundle') as string | undefined
+    const ordering = this.cache.text.get(TextAsset.EmojiOrdering) as string | undefined
+    const bundle = this.cache.text.get(TextAsset.EmojiBundle) as string | undefined
     if (ordering === undefined || bundle === undefined) {
       this.fail('资源加载失败，请检查网络后刷新')
       return

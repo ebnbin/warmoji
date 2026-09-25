@@ -4,7 +4,7 @@ import { Ring, RING_SET, Tint, Transform } from '../components'
 import { fan, newScratch, resetScratch, ringStrip } from './tri'
 import type { Scratch } from './tri'
 import type { EcsWorld } from '../world'
-import { EcsLayer } from './layer'
+import { EcsLayer, LayerType } from './layer'
 import { packTint } from './tint'
 
 interface Breath {
@@ -75,7 +75,7 @@ class EcsRingBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
 
   constructor(scene: Phaser.Scene, private readonly layer: RingLayer, private readonly band: number) {
-    super(scene, 'EcsRingBatch', BANDS[band]!.depth)
+    super(scene, LayerType.Ring, BANDS[band]!.depth)
     scene.add.existing(this)
   }
 

@@ -56,7 +56,9 @@ export function chunksInRect(
   return out
 }
 
-export function chunkKey(cx: number, cy: number): string {
+export type ChunkKey = `${number},${number}`
+
+export function chunkKey(cx: number, cy: number): ChunkKey {
   return `${cx},${cy}`
 }
 

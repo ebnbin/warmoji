@@ -3,7 +3,7 @@ import { query } from 'bitecs'
 import { Depth, Quad, Sprite, Tint, Transform, RENDERABLE } from '../components'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
-import { EcsLayer } from './layer'
+import { EcsLayer, LayerType } from './layer'
 import { packTint } from './tint'
 export { SPRITE_BANDS } from './bands'
 
@@ -25,7 +25,7 @@ export class EcsSpriteBatch extends EcsLayer {
   private readonly zMax: number
 
   constructor(scene: Phaser.Scene, world: EcsWorld, atlas: EcsAtlas, depth: number, zMin: number, zMax: number) {
-    super(scene, 'EcsSpriteBatch', depth)
+    super(scene, LayerType.Sprite, depth)
     this.world = world
     this.atlas = atlas
     this.zMin = zMin

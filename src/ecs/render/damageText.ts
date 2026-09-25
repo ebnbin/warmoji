@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { UI_FONT } from '../../util/fonts'
 import { DAMAGE_NUMBER_RISE_MS } from '../damageNumbers'
 import type { DamageNumbers } from '../damageNumbers'
-import { EcsLayer } from './layer'
+import { EcsLayer, LayerType } from './layer'
 import { packTint } from './tint'
 
 
@@ -117,7 +117,7 @@ class DamageTextBatch extends EcsLayer {
   private readonly renderOptions = { multiTexturing: true }
 
   constructor(scene: Phaser.Scene, private readonly layer: DamageTextLayer) {
-    super(scene, 'DamageTextBatch', 50)
+    super(scene, LayerType.DamageText, 50)
     scene.add.existing(this)
   }
 

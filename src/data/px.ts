@@ -1,6 +1,16 @@
 import { UNIT } from '../util/units'
+import type { AbilityDef } from '../types/abilityDefs'
+import type { EnemyDef } from '../types/enemies'
 
-const SPATIAL = new Set([
+type FieldName<T, Depth extends unknown[] = []> = Depth['length'] extends 6
+  ? never
+  : T extends readonly (infer U)[]
+    ? FieldName<U, Depth>
+    : T extends object
+      ? { [K in keyof T & string]-?: K | FieldName<T[K], [...Depth, 0]> }[keyof T & string]
+      : never
+
+const SPATIAL: ReadonlySet<string> = new Set<FieldName<EnemyDef | AbilityDef>>([
   'knockback',
   'size',
   'radius',
@@ -20,7 +30,6 @@ const SPATIAL = new Set([
   'coinMagnetRadius',
   'dashSpeed',
   'dist',
-  'fleeRange',
   'ringRadius',
   'fromAbove',
   'standoffDist',

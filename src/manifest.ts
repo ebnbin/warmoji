@@ -39,7 +39,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
     ...Object.values<CaptainDef>(CAPTAINS).map((c) => c.emoji),
     ...teamAbilities.flatMap((w) => [...abilityBodyEmojis(w), ...abilityShotEmojis(w)]),
     ...Object.values(PICKUPS).map((p) => p.emoji),
-    ...Object.values(FIELD_PICKUPS).map((p) => p.emoji),
+    ...FIELD_PICKUPS.map((p) => p.emoji),
     '2795',
     '1f480',
     '1fad8',

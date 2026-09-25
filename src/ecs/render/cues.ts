@@ -7,7 +7,7 @@ import type { EcsWorld } from '../world'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment } from './tri'
 import type { Scratch } from './tri'
 import { SHAPE_BANDS as BANDS } from './bands'
-import { EcsLayer } from './layer'
+import { EcsLayer, LayerType } from './layer'
 import { packTint } from './tint'
 import { mainCameraOnly } from '../../util/camera'
 
@@ -154,7 +154,7 @@ class EcsShapeBatch extends EcsLayer {
   private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
 
   constructor(scene: Phaser.Scene, private readonly layer: CueLayer, private readonly band: number) {
-    super(scene, 'EcsShapeBatch', BANDS[band]!.depth)
+    super(scene, LayerType.Shape, BANDS[band]!.depth)
     scene.add.existing(this)
   }
 

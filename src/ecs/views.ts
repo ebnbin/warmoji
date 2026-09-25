@@ -17,6 +17,7 @@ import { Alive, Due, Meteor, Transform } from './components'
 import { centerX, centerY } from './utils/team'
 import { spawnDriftDecor } from './entities/decor'
 import { chunkDecor, chunkKey, chunksInRect, outsideZone } from './worlds/infinite'
+import type { ChunkKey } from './worlds/infinite'
 import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynight'
 import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/river'
@@ -204,7 +205,7 @@ class InfiniteView extends BoundedView {
   protected atlas?: EcsAtlas
   private zoneGfx?: Phaser.GameObjects.Graphics
   private zoneVignette?: Phaser.GameObjects.Rectangle
-  private chunks = new Map<string, number[]>()
+  private chunks = new Map<ChunkKey, number[]>()
   private rangeKey = ''
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
