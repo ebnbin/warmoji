@@ -1,5 +1,4 @@
 export interface LevelProgress {
-  level: number
   maxed: boolean
   /** 满级时均为 0 */
   cur: number

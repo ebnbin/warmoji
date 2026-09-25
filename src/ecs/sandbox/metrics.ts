@@ -116,15 +116,15 @@ export interface MetricsReport {
   /** 为真时读数不可信 */
   warming: boolean
   /** ms */
-  total: { mean: number; p50: number; p95: number; p99: number; max: number }
+  total: { p50: number; p95: number; p99: number; max: number }
   /** ms */
-  update: { mean: number; p50: number; p95: number; max: number }
+  update: { p50: number }
   /** ms */
-  render: { mean: number; p50: number; p95: number; max: number }
+  render: { p50: number }
   /** ms */
-  rest: { mean: number; p50: number; p95: number; max: number }
+  rest: { p50: number }
   /** ms */
-  jitter: { mean: number; p50: number; p95: number; max: number }
+  jitter: { p50: number }
   /** 1000 / 平均帧时 */
   fps: number
   /** 1000 / 中位帧时；vsync 量化下双峰分布会整个跳档，不能当帧率用 */

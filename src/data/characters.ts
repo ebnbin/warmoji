@@ -16,7 +16,6 @@ function weaponCarrier(wid: WeaponId): Carrier {
   return {
     name: w.name,
     icon: w.emoji,
-    weaponId: wid,
     tiers: [w.base, ...w.upgrades.map((u) => u.ability)],
     cards: [w.upgrades[0]?.card ?? null, w.upgrades[1]?.card ?? null],
   }

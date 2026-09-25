@@ -41,7 +41,7 @@ export function meteorSweep(
   angle: number,
   offset: number,
   halfLen: number,
-): { sx: number; sy: number; ex: number; ey: number; dx: number; dy: number } {
+): { sx: number; sy: number; ex: number; ey: number } {
   const dx = Math.cos(angle)
   const dy = Math.sin(angle)
   // 垂直于前进方向的偏移
@@ -52,7 +52,5 @@ export function meteorSweep(
     sy: cy + oy - dy * halfLen,
     ex: cx + ox + dx * halfLen,
     ey: cy + oy + dy * halfLen,
-    dx,
-    dy,
   }
 }

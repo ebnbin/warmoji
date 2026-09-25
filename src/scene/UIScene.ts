@@ -62,7 +62,6 @@ export class UIScene extends Phaser.Scene implements HudInput {
     this.last = {
       xp: -1,
       xpNext: -1,
-      level: -1,
       kills: -1,
       coins: -1,
       wave: -1,

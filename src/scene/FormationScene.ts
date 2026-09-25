@@ -41,7 +41,6 @@ export class FormationScene extends Phaser.Scene {
   private memberObjs: Phaser.GameObjects.GameObject[] = []
   private memberImgs: Phaser.GameObjects.Image[] = []
   private memberZones: Phaser.GameObjects.Zone[] = []
-  private memberRects: { id: string; x: number; y: number; w: number; h: number }[] = []
   private iconSize = 80
   private phase = 0
   private geom = { cx: 0, cy: 0, scale: 1 }
@@ -137,7 +136,6 @@ export class FormationScene extends Phaser.Scene {
     this.memberObjs = []
     this.memberImgs = []
     this.memberZones = []
-    this.memberRects = []
     const res = textRes()
     const L = this.layout.list
     const lx = this.origin.x + L.x
@@ -180,7 +178,6 @@ export class FormationScene extends Phaser.Scene {
         .on('pointerup', () => this.onMemberTap(post))
       this.memberObjs.push(zone)
       this.memberZones[post] = zone
-      this.memberRects[post] = { id, x: px - half, y: py - half, w: size, h: size }
     })
 
     this.memberObjs.push(
@@ -207,14 +204,11 @@ export class FormationScene extends Phaser.Scene {
       if (post === 0) return
       const img = this.memberImgs[post]
       const zone = this.memberZones[post]
-      const rect = this.memberRects[post]
-      if (!img || !zone || !rect) return
+      if (!img || !zone) return
       const px = cx + p.x * scale
       const py = cy + p.y * scale
       img.setPosition(px, py)
       zone.setPosition(px - half, py - half)
-      rect.x = px - half
-      rect.y = py - half
     })
   }
 

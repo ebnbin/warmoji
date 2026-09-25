@@ -49,13 +49,6 @@ export function teamLayout(w: number, h: number): TeamLayout {
   return h > w ? PORTRAIT : LANDSCAPE
 }
 
-interface Rect {
-  x: number
-  y: number
-  w: number
-  h: number
-}
-
 /** rad/s */
 export const PREVIEW_SPIN = 0.18
 
@@ -124,7 +117,7 @@ export function addRunExit(
   y: number,
   res: number,
   dragged = (): boolean => false,
-): Rect {
+): void {
   const style = { fontFamily: UI_FONT, fontSize: FONT.strong, color: '#c8c8d4', resolution: res }
   if (isInitialWave(run)) {
     const leave = (): void => {
@@ -136,7 +129,7 @@ export function addRunExit(
       if (!dragged()) leave()
     })
     scene.input.keyboard?.on('keydown-ESC', leave)
-    return { x: back.x, y: back.y - back.height / 2, w: back.width, h: back.height }
+    return
   }
   let armed = false
   const quit = scene.add.text(x, y, '✕ 结束', style).setOrigin(0, 0.5).setInteractive({ useHandCursor: true })
@@ -154,7 +147,6 @@ export function addRunExit(
       if (quit.active) quit.setText('✕ 结束').setColor('#c8c8d4')
     })
   })
-  return { x: quit.x, y: quit.y - quit.height / 2, w: quit.width, h: quit.height }
 }
 
 export function addConfirmButton(
@@ -165,7 +157,7 @@ export function addConfirmButton(
   res: number,
   onConfirm: () => void,
   dragged = (): boolean => false,
-): { bg: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.Text; rect: Rect } {
+): { bg: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.Text } {
   const cx = origin.x + L.content.w / 2
   const cy = origin.y + L.btn.y
   const rect = { x: cx - L.btn.w / 2, y: cy - L.btn.h / 2, w: L.btn.w, h: L.btn.h }
@@ -190,7 +182,7 @@ export function addConfirmButton(
     })
   scene.input.keyboard?.on('keydown-ENTER', onConfirm)
   scene.input.keyboard?.on('keydown-SPACE', onConfirm)
-  return { bg, label: text, rect }
+  return { bg, label: text }
 }
 
 /** 返回排完的内容底端 y */

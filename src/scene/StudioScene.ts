@@ -86,7 +86,6 @@ export class StudioScene extends Phaser.Scene {
   private tab: Tab = 'recipes'
   private recipeSel = ANIM_RECIPES[0]!.emoji
   private clipSel = 'idle'
-  private clipRects: { id: string; x: number; y: number; w: number; h: number }[] = []
   private tplEmoji = DEFAULT_SUBJECT
   private tplId = ANIM_TEMPLATES[0]!.id
   private anatEmoji = DEFAULT_SUBJECT
@@ -127,9 +126,6 @@ export class StudioScene extends Phaser.Scene {
   private detailObjs: Phaser.GameObjects.GameObject[] = []
   private detailScroll!: ScrollView
   private tabObjs: Phaser.GameObjects.GameObject[] = []
-  private tabRects: { id: Tab; x: number; y: number; w: number; h: number }[] = []
-  private tplRects: { id: string; x: number; y: number; w: number; h: number }[] = []
-  private controlRects: Record<string, { x: number; y: number; w: number; h: number }> = {}
 
   constructor() {
     super('studio')
@@ -268,7 +264,6 @@ export class StudioScene extends Phaser.Scene {
     ]
     for (const o of this.tabObjs) o.destroy()
     this.tabObjs = []
-    this.tabRects = []
     const cx = this.origin.x + this.layout.content.w / 2
     const y = this.origin.y + this.layout.tabsY
     const chipW = 176
@@ -303,7 +298,6 @@ export class StudioScene extends Phaser.Scene {
           this.buildTabs(textRes())
           this.applyTab()
         })
-      this.tabRects.push({ id: d.id, x, y: y - chipH / 2, w: chipW, h: chipH })
       this.tabObjs.push(bg, label, zone)
       x += chipW + gap
     }
@@ -366,11 +360,8 @@ export class StudioScene extends Phaser.Scene {
     this.detailScroll?.clear()
     this.previewImg = undefined
     this.frameKeys = []
-    this.tplRects = []
-    this.clipRects = []
     this.anat = undefined
     this.anatRowMeta = []
-    this.controlRects = {}
     return { d: this.detailRect(), res: textRes() }
   }
 
@@ -473,7 +464,6 @@ export class StudioScene extends Phaser.Scene {
           this.clipSel = c.id
           this.buildRecipeDetail()
         })
-      this.clipRects.push({ id: c.id, x, y, w: chipW, h: chipH })
       this.detailObjs.push(bg, label, zone)
       x += chipW + gap
     }
@@ -525,7 +515,6 @@ export class StudioScene extends Phaser.Scene {
           this.buildTemplateDetail()
         })
       view.add([bg, icon, label, zone])
-      this.tplRects.push({ id: t.id, x: d.x + lx, y: chipsTop + lcy, w: chipW, h: chipH })
     })
     let ly = Math.ceil(ANIM_TEMPLATES.length / cols) * (chipH + 10) + 8
     const desc = this.add
@@ -895,7 +884,6 @@ export class StudioScene extends Phaser.Scene {
           if (this.grid?.wasDragged) return
           def.onTap()
         })
-      this.controlRects[def.id] = { x, y, w: btnW, h: btnH }
       this.detailObjs.push(bg, obj, zone)
       x += btnW + gap
     }

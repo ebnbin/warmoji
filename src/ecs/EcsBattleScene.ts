@@ -361,7 +361,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     return {
       xp: this.run.xp.xp,
       xpNext: xpToNext(this.run.xp.level),
-      level: this.run.xp.level,
       kills: this.run.kills,
       coins: this.run.coins,
       wave: this.run.wave,
@@ -378,13 +377,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     }
   }
 
-  skillSnapshot(): { name: string; remainMs: number; cdMs: number; ready: boolean } {
+  skillSnapshot(): { remainMs: number; cdMs: number } {
     const s = CAPTAINS[this.run.captainId].skill
     return {
-      name: s.name,
       remainMs: this.run.skillCdMs,
       cdMs: s.cdMs * this.teamFx.skillCdMul,
-      ready: this.run.skillCdMs <= 0,
     }
   }
 
@@ -394,9 +391,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     coins: number
     pending: number
     objects: number
-    combatSec: number
     spawnIntervalMs: number
-    hpMultiplier: number
   } {
     const sim = this.sim
     const totalSec = (this.run.combatMs + (sim?.elapsedMs ?? 0)) / 1000
@@ -407,9 +402,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       coins: liveCoins(this.world),
       pending: sim ? telegraphCount(sim) : 0,
       objects: this.children.list.length,
-      combatSec: Math.floor(totalSec),
       spawnIntervalMs: Math.round(this.sandbox ? spawnParams().intervalMs : wave.spawnIntervalMs),
-      hpMultiplier: wave.hpMultiplier,
     }
   }
 

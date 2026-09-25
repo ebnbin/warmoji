@@ -98,10 +98,10 @@ export function rollCardChoices(
 
 export function levelProgress(xp: number): LevelProgress {
   const level = characterLevel(xp)
-  if (level >= MAX_CHAR_LEVEL) return { level, maxed: true, cur: 0, need: 0, ratio: 1 }
+  if (level >= MAX_CHAR_LEVEL) return { maxed: true, cur: 0, need: 0, ratio: 1 }
   const prev = level === 1 ? 0 : CHAR_XP_THRESHOLDS[level - 2]!
   const next = CHAR_XP_THRESHOLDS[level - 1]!
   const cur = xp - prev
   const need = next - prev
-  return { level, maxed: false, cur, need, ratio: Math.max(0, Math.min(1, cur / need)) }
+  return { maxed: false, cur, need, ratio: Math.max(0, Math.min(1, cur / need)) }
 }

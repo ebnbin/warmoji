@@ -24,8 +24,6 @@ export interface BgmHit {
 }
 
 export interface BgmScore {
-  id: BgmId
-  bpm: number
   loopSec: number
   notes: BgmNote[]
   hits: BgmHit[]
@@ -146,7 +144,6 @@ class Builder {
 }
 
 function track(
-  id: BgmId,
   opts: {
     bpm: number
     /** 每拍步数（8 分音符网格 = 2；6/8 曲直接以 8 分为拍 = 1） */
@@ -163,8 +160,6 @@ function track(
   const b = new Builder(opts.rootMidi, opts.scale, stepSec, opts.stepsPerBar)
   build(b)
   return {
-    id,
-    bpm: opts.bpm,
     loopSec: opts.bars * opts.stepsPerBar * stepSec,
     notes: b.notes,
     hits: b.hits,
@@ -177,7 +172,6 @@ function track(
 function buildLobby(): BgmScore {
   const chords = [0, 5, 3, 4, 0, 5, 3, 4, 3, 4, 2, 5, 1, 4, 0, 0]
   return track(
-    'lobby',
     { bpm: 96, stepsPerBeat: 2, stepsPerBar: 8, bars: 16, rootMidi: 60, scale: MAJOR },
     (b) => {
       const bass: Voice = { wave: 'triangle', vol: 0.17, attack: 0.01, release: 0.06, octave: -2 }
@@ -214,7 +208,6 @@ function buildLobby(): BgmScore {
 function buildForest(): BgmScore {
   const chords = [0, 2, 6, 3, 0, 2, 6, 3, 2, 3, 6, 0, 0, 2, 6, 3]
   return track(
-    'forest',
     { bpm: 128, stepsPerBeat: 2, stepsPerBar: 8, bars: 16, rootMidi: 52, scale: DORIAN },
     (b) => {
       const bass: Voice = { wave: 'square', vol: 0.12, attack: 0.008, release: 0.04, octave: -1 }
@@ -255,7 +248,6 @@ function buildForest(): BgmScore {
 function buildDesert(): BgmScore {
   const chords = [0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0]
   return track(
-    'desert',
     { bpm: 100, stepsPerBeat: 2, stepsPerBar: 8, bars: 16, rootMidi: 45, scale: PHRYGIAN_DOM },
     (b) => {
       const bass: Voice = { wave: 'triangle', vol: 0.18, attack: 0.012, release: 0.08, octave: 0 }
@@ -294,7 +286,6 @@ function buildDesert(): BgmScore {
 function buildRiver(): BgmScore {
   const chords = [0, 4, 5, 3, 0, 4, 5, 3, 5, 2, 3, 4, 0, 3, 4, 0]
   return track(
-    'river',
     { bpm: 168, stepsPerBeat: 1, stepsPerBar: 6, bars: 16, rootMidi: 55, scale: MAJOR },
     (b) => {
       const bass: Voice = { wave: 'sine', vol: 0.17, attack: 0.015, release: 0.1, octave: -1 }
@@ -331,7 +322,6 @@ function buildRiver(): BgmScore {
 function buildVoid(): BgmScore {
   const chords = [0, 5, 2, 6, 0, 5, 2, 6, 3, 5, 0, 6, 3, 5, 6, 6]
   return track(
-    'void',
     {
       bpm: 76,
       stepsPerBeat: 2,
@@ -375,7 +365,6 @@ function buildVoid(): BgmScore {
 function buildRuins(): BgmScore {
   const chords = [0, 6, 3, 5, 0, 6, 4, 5, 3, 6, 0, 5, 4, 6, 3, 0]
   return track(
-    'ruins',
     {
       bpm: 84,
       stepsPerBeat: 2,
@@ -421,7 +410,6 @@ function buildRuins(): BgmScore {
 function buildDayNight(): BgmScore {
   const chords = [0, 4, 5, 3, 0, 4, 1, 5, 6, 3, 4, 5, 0, 4, 5, 0]
   return track(
-    'daynight',
     {
       bpm: 108,
       stepsPerBeat: 2,
@@ -471,7 +459,6 @@ function buildDayNight(): BgmScore {
 function buildSpace(): BgmScore {
   const chords = [0, 5, 3, 6, 0, 4, 5, 3, 6, 2, 5, 3, 0, 5, 6, 4]
   return track(
-    'space',
     {
       bpm: 72,
       stepsPerBeat: 2,

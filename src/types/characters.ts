@@ -21,7 +21,6 @@ export interface CharacterAuthoring {
 export interface Carrier {
   readonly name: string
   readonly icon: string
-  readonly weaponId?: WeaponId
   readonly tiers: readonly AbilityDef[]
   readonly cards: readonly (UpgradeCard | null)[]
 }

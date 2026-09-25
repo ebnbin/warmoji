@@ -46,10 +46,9 @@ export async function emojiSvgText(id: string): Promise<string> {
 }
 
 /** LRU 上限只约束非预载部分 */
-export function emojiCacheStats(scene: Phaser.Scene): { textures: number; pinned: number } {
+export function emojiCacheStats(scene: Phaser.Scene): { textures: number } {
   return {
     textures: scene.textures.getTextureKeys().filter((k) => k.startsWith('emoji-')).length,
-    pinned: pinned.size,
   }
 }
 

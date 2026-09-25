@@ -83,7 +83,7 @@ export class WikiScene extends Phaser.Scene {
   private gridScroll = 0
   private pool?: DetailPool
   // catRects 存容器内局部 x
-  private catRects: { title: string; x: number; y: number; w: number; h: number }[] = []
+  private catRects: { x: number; w: number }[] = []
   private catContainer?: Phaser.GameObjects.Container
   private catScroll = 0
   private catScrollMax = 0
@@ -219,7 +219,7 @@ export class WikiScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5)
       container.add([bg, icon, label])
-      this.catRects.push({ title: d.title, x, y: 0, w: cw, h: ch })
+      this.catRects.push({ x, w: cw })
       x += cw + gap
     })
 

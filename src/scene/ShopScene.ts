@@ -41,7 +41,7 @@ interface ShopLayout {
   content: { w: number; h: number }
   titleY: number
   coinsY: number
-  slots: { x: number; y: number; w: number; h: number; rowH: number; gap: number }
+  slots: { x: number; y: number; w: number; h: number }
   detail: { x: number; y: number; w: number; h: number }
   btn: { y: number; w: number; h: number }
 }
@@ -51,7 +51,7 @@ const LANDSCAPE: ShopLayout = {
   titleY: 46,
   coinsY: 98,
   detail: { x: 40, y: 132, w: 730, h: 488 },
-  slots: { x: 810, y: 132, w: 430, h: 488, rowH: 96, gap: 10 },
+  slots: { x: 810, y: 132, w: 430, h: 488 },
   btn: { y: 660, w: 340, h: 64 },
 }
 
@@ -60,7 +60,7 @@ const PORTRAIT: ShopLayout = {
   titleY: 54,
   coinsY: 106,
   detail: { x: 24, y: 144, w: 672, h: 460 },
-  slots: { x: 24, y: 628, w: 672, h: 470, rowH: 96, gap: 10 },
+  slots: { x: 24, y: 628, w: 672, h: 470 },
   btn: { y: 1162, w: 360, h: 72 },
 }
 

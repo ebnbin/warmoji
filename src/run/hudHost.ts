@@ -7,7 +7,6 @@ import type { Polarity } from '../types/battlefield'
 export interface HudSnapshot {
   xp: number
   xpNext: number
-  level: number
   kills: number
   coins: number
   wave: number
@@ -44,7 +43,7 @@ export interface HudHost {
   readonly events: Phaser.Events.EventEmitter
   readonly scene: Phaser.Scenes.ScenePlugin
   hudSnapshot(): HudSnapshot
-  skillSnapshot(): { name: string; remainMs: number; cdMs: number; ready: boolean }
+  skillSnapshot(): { remainMs: number; cdMs: number }
   /** 返回是否真的放出 */
   castSkill(): boolean
 }
