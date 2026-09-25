@@ -1,4 +1,5 @@
-import { TIMESTOP as TIMESTOP_TUNING } from '../../defs/timestop'
+import timestopJson from '../assets/timestop.json'
+import { fromJson } from './json'
 import type { TimeStopTuning } from '../types/timeStop'
 
-export const TIMESTOP: TimeStopTuning = TIMESTOP_TUNING
+export const TIMESTOP = fromJson<TimeStopTuning>(timestopJson)

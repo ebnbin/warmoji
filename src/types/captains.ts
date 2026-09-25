@@ -1,4 +1,4 @@
-import type { CAPTAINS } from '../../defs/captains'
+import type captainsJson from '../assets/captains.json'
 import type { AbilityId } from './abilities'
 import type { AbilityDef } from './abilityDefs'
 
@@ -27,4 +27,4 @@ interface CaptainOf<A> {
 }
 export type CaptainSource = CaptainOf<AbilityId>
 export type CaptainDef = CaptainOf<AbilityDef>
-export type CaptainId = keyof typeof CAPTAINS
+export type CaptainId = keyof typeof captainsJson

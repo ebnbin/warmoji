@@ -1,12 +1,13 @@
-import { MAPS as MAP_TABLE } from '../../defs/maps'
-import { MAP_DEFAULTS } from '../../defs/mapdefaults'
+import mapsJson from '../assets/maps.json'
+import mapDefaultsJson from '../assets/mapdefaults.json'
+import { fromJson } from './json'
 import { keysOf } from '../util/record'
 
 import { ENEMIES } from './enemies'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
 import type { DecorInstance, Hazard, MapDecor, MapDef, MapDefaults, MapId } from '../types/maps'
 
-export const MAPS: Record<MapId, MapDef> = MAP_TABLE
+export const MAPS = fromJson<Record<MapId, MapDef>>(mapsJson)
 
 export const MAP_IDS: readonly MapId[] = keysOf(MAPS)
 
@@ -85,6 +86,6 @@ export function rollDecor(
   return out
 }
 
-export const MAP: MapDefaults = MAP_DEFAULTS
+export const MAP = fromJson<MapDefaults>(mapDefaultsJson)
 
 export const HAZARD_NAMES: Record<Hazard, string> = { coldWater: '寒水', poisonFog: '毒雾', meteor: '天体' }

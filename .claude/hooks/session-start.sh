@@ -15,3 +15,4 @@ git config author.email "ebnbin@gmail.com"
 git config core.hooksPath "$(git rev-parse --show-toplevel)/.claude/hooks/git"
 
 npm install --no-audit --no-fund --no-save
+npm run gen

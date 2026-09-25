@@ -1,4 +1,4 @@
-import type { CARDS } from '../../defs/cards'
+import type cardsJson from '../assets/cards.json'
 import type { ItemRarity, TeamEffects } from './items'
 
 type CardTag =
@@ -20,4 +20,4 @@ export interface CardDef {
   readonly maxLevel: number
   readonly effects: Partial<TeamEffects>
 }
-export type CardId = keyof typeof CARDS
+export type CardId = keyof typeof cardsJson

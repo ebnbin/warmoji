@@ -1,4 +1,6 @@
-import { ANIMATIONS } from './animations'
+import { ANIMATIONS } from '../data/animations'
+import { keysOf } from '../util/record'
+import type { AnimClipId, AnimClipKind, AnimPart, AnimResource, FxDecl, FxGen, FxParams, FxSide, PartKeyframe } from '../types/anim'
 
 const OPEN_TAG = /<svg\b[^>]*>/
 const TAG = /<(\/?)([a-zA-Z][\w:-]*)((?:"[^"]*"|[^">])*?)(\/?)>/g
@@ -72,26 +74,8 @@ function replaceViewBox(open: string, viewBox: string): string {
   return open.replace(/viewBox="[^"]*"/, `viewBox="${viewBox}"`)
 }
 
-interface PartKeyframe {
-  readonly t: number
-  readonly rotate?: number
-  readonly tx?: number
-  readonly ty?: number
-  readonly scale?: number
-  readonly scaleX?: number
-  readonly scaleY?: number
-  readonly opacity?: number
-}
-
-interface AnimPart {
-  readonly indices: readonly number[]
-  readonly cx?: number
-  readonly cy?: number
-  readonly keyframes: readonly PartKeyframe[]
-}
-
 interface FxLayer {
-  readonly layer: 'back' | 'front'
+  readonly layer: FxSide
   readonly render: (t: number) => string
 }
 
@@ -212,11 +196,7 @@ function star4(cx: number, cy: number, r: number): string {
   )
 }
 
-function fxRise(opts: {
-  readonly particles: readonly { x: number; phase: number; size: number; color: string; drift?: number }[]
-  readonly y0: number
-  readonly y1: number
-}): FxLayer {
+function fxRise(opts: FxParams['rise']): FxLayer {
   return {
     layer: 'front',
     render: (t) =>
@@ -234,10 +214,7 @@ function fxRise(opts: {
   }
 }
 
-function fxShineSweep(opts: {
-  readonly clip: { cx: number; cy: number; r: number }
-  readonly id: string
-}): FxLayer {
+function fxShineSweep(opts: FxParams['shine']): FxLayer {
   const { cx, cy, r } = opts.clip
   return {
     layer: 'front',
@@ -255,9 +232,7 @@ function fxShineSweep(opts: {
   }
 }
 
-function fxSparkles(opts: {
-  readonly stars: readonly { x: number; y: number; r: number; phase: number; color?: string }[]
-}): FxLayer {
+function fxSparkles(opts: FxParams['sparkles']): FxLayer {
   return {
     layer: 'front',
     render: (t) =>
@@ -273,13 +248,7 @@ function fxSparkles(opts: {
   }
 }
 
-function fxRipples(opts: {
-  readonly cx: number
-  readonly cy: number
-  readonly color: string
-  readonly rings: readonly { phase: number }[]
-  readonly window: readonly [number, number]
-}): FxLayer {
+function fxRipples(opts: FxParams['ripples']): FxLayer {
   const [w0, w1] = opts.window
   return {
     layer: 'back',
@@ -297,14 +266,7 @@ function fxRipples(opts: {
   }
 }
 
-function fxBolts(opts: {
-  readonly bolts: readonly {
-    points: readonly (readonly [number, number])[]
-    window: readonly [number, number]
-    color?: string
-    width?: number
-  }[]
-}): FxLayer {
+function fxBolts(opts: FxParams['bolts']): FxLayer {
   return {
     layer: 'front',
     render: (t) =>
@@ -319,9 +281,7 @@ function fxBolts(opts: {
   }
 }
 
-function fxSteam(opts: {
-  readonly wisps: readonly { x: number; y0: number; phase: number }[]
-}): FxLayer {
+function fxSteam(opts: FxParams['steam']): FxLayer {
   return {
     layer: 'front',
     render: (t) =>
@@ -341,7 +301,7 @@ function fxSteam(opts: {
   }
 }
 
-const FX_GENERATORS = {
+const FX_REGISTRY: { readonly [G in FxGen]: (params: FxParams[G]) => FxLayer } = {
   rise: fxRise,
   shine: fxShineSweep,
   sparkles: fxSparkles,
@@ -350,42 +310,7 @@ const FX_GENERATORS = {
   steam: fxSteam,
 }
 
-type FxGen = keyof typeof FX_GENERATORS
-
-type FxParams = { readonly [G in FxGen]: Parameters<(typeof FX_GENERATORS)[G]>[0] }
-
-const FX_REGISTRY: { readonly [G in FxGen]: (params: FxParams[G]) => FxLayer } = FX_GENERATORS
-
-type FxDecl<G extends FxGen = FxGen> = {
-  readonly [K in G]: { readonly gen: K; readonly layer?: 'back' | 'front'; readonly params: FxParams[K] }
-}[G]
-
-type AnimClipKind = 'loop' | 'cycle'
-
-const ANIM_CLIP_IDS = ['idle', 'attack'] as const
-
-export type AnimClipId = (typeof ANIM_CLIP_IDS)[number]
-
-interface AnimClipEntry {
-  readonly kind?: AnimClipKind
-  readonly frames?: number
-  readonly viewBox?: string
-  readonly parts: readonly AnimPart[]
-  readonly fx?: readonly FxDecl[]
-}
-
-interface AnimResourceEntry {
-  readonly emoji: string
-  readonly name: string
-  readonly desc: string
-  readonly anatomy: string
-  readonly clips: Readonly<Partial<Record<AnimClipId, AnimClipEntry>>>
-}
-
-export interface AnimResource {
-  readonly def: { readonly frames: number; readonly durMs: number }
-  readonly animations: Readonly<Record<string, AnimResourceEntry>>
-}
+const ANIM_CLIP_IDS = keysOf({ idle: 0, attack: 0 } satisfies Record<AnimClipId, 0>)
 
 const poseOf = (kf: PartKeyframe): PartPose => ({
   rotate: kf.rotate ?? 0,

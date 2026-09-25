@@ -1,4 +1,5 @@
-import { CAPTAINS as CAPTAIN_TABLE } from '../../defs/captains'
+import captainsJson from '../assets/captains.json'
+import { fromJson } from './json'
 import { keysOf, mapValues } from '../util/record'
 import { ABILITIES } from './abilities'
 import type { AbilityId } from '../types/abilities'
@@ -11,6 +12,7 @@ function hydrateCaptain(src: CaptainSource): CaptainDef {
   return { ...src, skill: { ...src.skill, abilities: resolveAbilities(src.skill.abilities) } }
 }
 
+const CAPTAIN_TABLE = fromJson<Record<CaptainId, CaptainSource>>(captainsJson)
 export const CAPTAINS: Record<CaptainId, CaptainDef> = mapValues(CAPTAIN_TABLE, hydrateCaptain)
 export const CAPTAIN_IDS: readonly CaptainId[] = keysOf(CAPTAINS)
 

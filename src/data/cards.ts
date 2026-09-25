@@ -1,10 +1,11 @@
-import { CARDS as CARD_TABLE } from '../../defs/cards'
+import cardsJson from '../assets/cards.json'
+import { fromJson } from './json'
 import { keysOf } from '../util/record'
 import { foldTeamEffects } from './items'
 import type { TeamEffects } from '../types/items'
 import type { CardDef, CardId } from '../types/cards'
 
-export const CARDS: Record<CardId, CardDef> = CARD_TABLE
+export const CARDS = fromJson<Record<CardId, CardDef>>(cardsJson)
 export const CARD_IDS: readonly CardId[] = keysOf(CARDS)
 
 export function aggregateTeamCards(owned: Readonly<Partial<Record<CardId, number>>>): TeamEffects {

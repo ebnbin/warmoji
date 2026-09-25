@@ -4,8 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "npm run gen",
     "dev": "vite",
-    "build": "node scripts/check-defs.ts && node scripts/check-devtools.ts && tsc --noEmit && vite build",
+    "gen": "node scripts/gen-defs.ts",
+    "prebuild": "npm run gen",
+    "build": "node scripts/check-devtools.ts && tsc --noEmit && tsc --noEmit -p tsconfig.tools.json && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

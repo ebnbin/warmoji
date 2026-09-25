@@ -1,4 +1,4 @@
-import type { ITEMS } from '../../defs/items'
+import type itemsJson from '../assets/items.json'
 import type { AbilityDef } from './abilityDefs'
 
 export interface CharacterEffects {
@@ -56,4 +56,4 @@ export interface ItemDef {
   readonly minLevel?: 1 | 2 | 3
   readonly effects: Partial<CharacterEffects>
 }
-export type ItemId = keyof typeof ITEMS
+export type ItemId = keyof typeof itemsJson

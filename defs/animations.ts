@@ -1,4 +1,4 @@
-import type { AnimResource } from './anim'
+import type { AnimResource } from '../src/types/anim'
 
 export const ANIMATIONS: AnimResource = {
   def: { frames: 10, durMs: 1000 },

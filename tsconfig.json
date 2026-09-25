@@ -3,6 +3,8 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "rootDir": "src",
     "lib": [
       "ES2022",
       "DOM",
@@ -25,9 +27,6 @@
     "allowImportingTsExtensions": true
   },
   "include": [
-    "src",
-    "defs",
-    "scripts",
-    "vite.config.ts"
+    "src"
   ]
 }

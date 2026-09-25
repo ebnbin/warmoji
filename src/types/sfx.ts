@@ -1,4 +1,4 @@
-import type { SFX } from '../../defs/sfx'
+import type sfxJson from '../assets/sfx.json'
 
 type Wave = 'square' | 'sawtooth' | 'triangle' | 'sine' | 'noise'
 export interface SfxDef {
@@ -13,4 +13,4 @@ export interface SfxDef {
   throttleMs?: number
   jitter?: number
 }
-export type SfxId = keyof typeof SFX
+export type SfxId = keyof typeof sfxJson
