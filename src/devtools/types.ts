@@ -45,12 +45,18 @@ export interface DevFlagsItem {
   readonly toggle: (id: string) => void
 }
 
+export interface DevButtonsItem {
+  readonly kind: 'buttons'
+  readonly label?: string
+  readonly buttons: readonly { readonly label: string; readonly run: () => void }[]
+}
+
 export interface DevCustomItem {
   readonly kind: 'custom'
   readonly mount: (ctx: DevWidgetContext) => DevWidget
 }
 
-export type DevItem = DevTextItem | DevActionItem | DevToggleItem | DevChoiceItem | DevFlagsItem | DevCustomItem
+export type DevItem = DevTextItem | DevActionItem | DevToggleItem | DevChoiceItem | DevFlagsItem | DevButtonsItem | DevCustomItem
 
 export interface DevTheme {
   readonly font: string

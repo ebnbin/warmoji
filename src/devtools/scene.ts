@@ -7,6 +7,7 @@ import { listDevSections, PANEL_REFRESH, REGISTRY_CHANGED, registryEvents } from
 import { ScrollRegion } from './scroll'
 import type { Rect } from './scroll'
 import { devSettings, SETTINGS_CHANGED, settingsEvents, updateDevSettings } from './settings'
+import { enforceTimeControl, timeScale } from './timeControl'
 import type { DevLayout, DevSection, DevTheme, DevWidget } from './types'
 import { renderItem } from './widgets'
 import type { RenderCtx } from './widgets'
@@ -25,6 +26,7 @@ interface Pill {
   readonly zone: Phaser.GameObjects.Zone
   readonly h: number
   w: number
+  altered: boolean
 }
 
 interface PillDrag {
@@ -111,13 +113,16 @@ export class DevToolsScene extends Phaser.Scene {
     })
   }
 
-  update(time: number): void {
+  /** 用墙钟而非引擎时间：慢放或暂停时面板照常刷新 */
+  update(): void {
+    enforceTimeControl()
+    const now = performance.now()
     if (this.rebuildQueued) {
       this.rebuildQueued = false
       if (open) this.rebuildPanel()
     }
-    if (open) this.tickContent(time)
-    else this.tickPill(time)
+    if (open) this.tickContent(now)
+    else this.tickPill(now)
   }
 
   private get gap(): number {
@@ -134,7 +139,14 @@ export class DevToolsScene extends Phaser.Scene {
 
   private onSettingsChanged(): void {
     this.drawGuides()
-    if (this.pill && !devSettings().pillFps) this.setPillText('dev')
+    if (this.pill) this.setPillText(this.pillLabel())
+  }
+
+  private pillLabel(): string {
+    const scale = timeScale()
+    const tag = scale === 0 ? '暂停' : scale === 1 ? '' : `×${scale}`
+    const body = devSettings().pillFps ? this.fpsText() : 'dev'
+    return tag ? `${tag} ${body}` : body
   }
 
   private togglePanel(): void {
@@ -176,8 +188,8 @@ export class DevToolsScene extends Phaser.Scene {
       const w = this.cameras.main.getWorldPoint(p.x, p.y)
       this.drag = { id: p.id, wx: w.x, wy: w.y, ox: box.x, oy: box.y, moved: false }
     })
-    this.pill = { box, bg, text, badgeBg, badgeText, zone, h, w: 0 }
-    this.setPillText(devSettings().pillFps ? this.fpsText() : 'dev')
+    this.pill = { box, bg, text, badgeBg, badgeText, zone, h, w: 0, altered: false }
+    this.setPillText(this.pillLabel())
     this.shownUnread = -1
     this.refreshBadge()
   }
@@ -198,11 +210,13 @@ export class DevToolsScene extends Phaser.Scene {
     pill.text.setText(s)
     const u = this.theme.body
     const w = Math.max(u * 3.2, pill.text.width + u * 1.4)
-    if (Math.abs(w - pill.w) > 1) {
+    const altered = timeScale() !== 1
+    if (Math.abs(w - pill.w) > 1 || altered !== pill.altered) {
       pill.w = w
+      pill.altered = altered
       pill.bg.clear()
       roundRect(pill.bg, -w / 2, -pill.h / 2, w, pill.h, pill.h / 2, {
-        fill: COLOR.bg, fillAlpha: 0.72, stroke: this.theme.accent, strokeAlpha: 0.5, strokeWidth: 2,
+        fill: COLOR.bg, fillAlpha: 0.72, stroke: altered ? COLOR.warn : this.theme.accent, strokeAlpha: altered ? 0.9 : 0.5, strokeWidth: 2,
       })
       pill.zone.setPosition(-w / 2, -pill.h / 2).setSize(w, pill.h)
       if (!this.drag) {
@@ -280,9 +294,9 @@ export class DevToolsScene extends Phaser.Scene {
   }
 
   private tickPill(time: number): void {
-    if (!this.pill || !devSettings().pillFps || time - this.lastPoll < POLL_MS) return
+    if (!this.pill || time - this.lastPoll < POLL_MS) return
     this.lastPoll = time
-    this.setPillText(this.fpsText())
+    this.setPillText(this.pillLabel())
   }
 
   private buildPanel(): void {

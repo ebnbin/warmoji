@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { COLOR, roundRect, textStyle } from './draw'
-import type { DevChoiceItem, DevCustomItem, DevItem, DevOption, DevTextItem, DevTheme, DevToggleItem, DevWidget } from './types'
+import type { DevButtonsItem, DevChoiceItem, DevCustomItem, DevItem, DevOption, DevTextItem, DevTheme, DevToggleItem, DevWidget } from './types'
 
 export interface RenderCtx {
   readonly scene: Phaser.Scene
@@ -27,7 +27,7 @@ function zone(ctx: RenderCtx, x: number, y: number, w: number, h: number, onUp: 
 }
 
 function caption(ctx: RenderCtx, label: string): { obj: Phaser.GameObjects.Text; bottom: number } {
-  const obj = ctx.scene.add.text(0, 0, label, textStyle(ctx.theme, ctx.theme.caption, { bold: true, color: COLOR.muted }))
+  const obj = ctx.scene.add.text(0, 0, label, textStyle(ctx.theme, ctx.theme.caption, { bold: true, color: COLOR.muted, wrap: ctx.width }))
   return { obj, bottom: obj.height + ctx.theme.body * 0.3 }
 }
 
@@ -136,6 +136,35 @@ function renderChips(
   return { objects, height: cy + chipH }
 }
 
+function renderButtons(item: DevButtonsItem, ctx: RenderCtx): Rendered {
+  const u = ctx.theme.body
+  const objects: Phaser.GameObjects.GameObject[] = []
+  let cy = 0
+  if (item.label !== undefined) {
+    const c = caption(ctx, item.label)
+    objects.push(c.obj)
+    cy = c.bottom
+  }
+  const chipH = u * 1.8
+  const gap = u * 0.3
+  const padX = u * 0.6
+  let cx = 0
+  for (const b of item.buttons) {
+    const bg = ctx.scene.add.graphics()
+    const t = ctx.scene.add.text(0, 0, b.label, textStyle(ctx.theme, ctx.theme.caption))
+    const cw = Math.min(ctx.width, t.width + padX * 2)
+    if (cx > 0 && cx + cw > ctx.width) {
+      cx = 0
+      cy += chipH + gap
+    }
+    roundRect(bg, cx, cy, cw, chipH, u * 0.45, { fill: COLOR.chip, fillAlpha: 0.12, stroke: ctx.theme.accent, strokeAlpha: 0.45 })
+    t.setPosition(cx + cw / 2, cy + chipH / 2).setOrigin(0.5)
+    objects.push(bg, t, zone(ctx, cx, cy, cw, chipH, ctx.tap(b.run)))
+    cx += cw + gap
+  }
+  return { objects, height: item.buttons.length > 0 ? cy + chipH : cy }
+}
+
 function renderChoiceRows(item: DevChoiceItem, ctx: RenderCtx): Rendered {
   const c = caption(ctx, item.label)
   const objects: Phaser.GameObjects.GameObject[] = [c.obj]
@@ -169,6 +198,8 @@ export function renderItem(item: DevItem, ctx: RenderCtx): Rendered {
         : renderChips(item.label, item.options, (o) => item.get() === o.id, (o) => item.set(o.id), ctx)
     case 'flags':
       return renderChips(item.label, item.options, (o) => item.has(o.id), (o) => item.toggle(o.id), ctx)
+    case 'buttons':
+      return renderButtons(item, ctx)
     case 'custom':
       return renderCustom(item, ctx)
   }

@@ -6,6 +6,8 @@ import { rendererInfo, resetMetrics } from './metrics'
 import { mountPerf } from './perf'
 import { refreshDevPanel, registerDevSection } from './registry'
 import { resourceItems } from './resources'
+import { flagItems } from './flags'
+import { pausedSceneCount, setTimeScale, stepOneFrame, TIME_SCALES, timeScale, timeText } from './timeControl'
 import { devSettings, updateDevSettings } from './settings'
 import type { DevItem, DevWidget, DevWidgetContext } from './types'
 
@@ -202,8 +204,24 @@ function storageItems(): DevItem[] {
   return items
 }
 
+function timeItems(): DevItem[] {
+  return [
+    {
+      kind: 'choice',
+      label: '游戏速度 · 暂停与单步逐 scene 暂停，慢放与快进驱动引擎时钟',
+      options: TIME_SCALES.map((s) => ({ id: String(s), label: s === 0 ? '暂停' : `×${s}` })),
+      get: () => String(timeScale()),
+      set: (id) => setTimeScale(Number(id)),
+    },
+    { kind: 'action', label: '单步', desc: `暂停时让业务 scene 推进一帧${pausedSceneCount() > 0 ? '' : '（当前未暂停）'}`, run: stepOneFrame },
+    { kind: 'text', mono: true, read: timeText },
+  ]
+}
+
 export function registerBuiltins(game: Phaser.Game): void {
   registerDevSection({ id: 'devtools.overview', title: '概览', order: 1000, items: () => overviewItems(game) })
+  registerDevSection({ id: 'devtools.flags', title: '开关', order: 1005, items: flagItems })
+  registerDevSection({ id: 'devtools.time', title: '时间', order: 1008, items: timeItems })
   registerDevSection({
     id: 'devtools.perf',
     title: '性能',
