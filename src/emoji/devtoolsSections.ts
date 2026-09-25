@@ -1,0 +1,27 @@
+import type Phaser from 'phaser'
+import { registerDevSection } from '../devtools'
+import { emojiHoldStats } from './hold'
+import { emojiPackStats, emojiTextureStats } from './textures'
+import { emojiThumbStats } from './thumbs'
+
+function emojiText(game: Phaser.Game): string {
+  const pack = emojiPackStats()
+  const tex = emojiTextureStats(game.textures)
+  const hold = emojiHoldStats(game)
+  const thumbs = emojiThumbStats()
+  return [
+    pack ? `资源包 ${pack.ids} 个 emoji` : '资源包未加载',
+    `纹理 ${tex.textures} 个 · LRU 跟踪 ${tex.tracked} / 上限 ${tex.limit} · 固定 ${tex.pinned} · 生成中 ${tex.inflight}`,
+    `持有表 键 ${hold.table.keys} · 引用 ${hold.table.refs} · 生成中 ${hold.table.loading} · 待释放 ${hold.table.pendingRelease}`,
+    `各 scene 持有：${hold.scenes.length > 0 ? hold.scenes.map((s) => `${s.key} ${s.holds}`).join(' · ') : '无'}`,
+    `缩略图 就绪 ${thumbs.ready} · 生成中 ${thumbs.inflight} · 尺寸 ${thumbs.size}`,
+  ].join('\n')
+}
+
+export function registerEmojiDevTools(game: Phaser.Game): void {
+  registerDevSection({
+    id: 'emoji',
+    title: 'emoji',
+    items: () => [{ kind: 'text', mono: true, read: () => emojiText(game) }],
+  })
+}

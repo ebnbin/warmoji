@@ -16,6 +16,7 @@ let useTick = 0
 
 let packPromise: Promise<EmojiPack> | undefined
 let resolvePack: ((pack: EmojiPack) => void) | undefined
+let loadedPack: EmojiPack | undefined
 
 function packDeferred(): Promise<EmojiPack> {
   if (!packPromise) {
@@ -28,8 +29,13 @@ function packDeferred(): Promise<EmojiPack> {
 
 export function primeEmojiPack(orderingText: string, twemojiText: string): void {
   const pack = parseEmojiPack(orderingText, twemojiText)
+  loadedPack = pack
   void packDeferred()
   resolvePack?.(pack)
+}
+
+export function emojiPackStats(): { ids: number } | undefined {
+  return loadedPack ? { ids: loadedPack.ids.length } : undefined
 }
 
 export function loadEmojiPack(): Promise<EmojiPack> {
@@ -43,9 +49,21 @@ export async function emojiSvgText(id: string): Promise<string> {
   return padSvg(svg, EMOJI_PAD)
 }
 
-export function emojiCacheStats(scene: Phaser.Scene): { textures: number } {
+export interface EmojiTextureStats {
+  readonly textures: number
+  readonly tracked: number
+  readonly pinned: number
+  readonly inflight: number
+  readonly limit: number
+}
+
+export function emojiTextureStats(textures: Phaser.Textures.TextureManager): EmojiTextureStats {
   return {
-    textures: scene.textures.getTextureKeys().filter((k) => k.startsWith('emoji-')).length,
+    textures: textures.getTextureKeys().filter((k) => k.startsWith('emoji-')).length,
+    tracked: lastUsed.size,
+    pinned: pinned.size,
+    inflight: inflight.size,
+    limit: LRU_LIMIT,
   }
 }
 

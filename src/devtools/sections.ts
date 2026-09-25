@@ -5,6 +5,7 @@ import { clearDevLog, devLogEntries, LOG_CHANGED, logEvents, markLogRead, unread
 import { rendererInfo, resetMetrics } from './metrics'
 import { mountPerf } from './perf'
 import { refreshDevPanel, registerDevSection } from './registry'
+import { resourceItems } from './resources'
 import { devSettings, updateDevSettings } from './settings'
 import type { DevItem, DevWidget, DevWidgetContext } from './types'
 
@@ -212,6 +213,7 @@ export function registerBuiltins(game: Phaser.Game): void {
       { kind: 'action', label: '重新采样', desc: '清空样本并重新预热', run: resetMetrics },
     ],
   })
+  registerDevSection({ id: 'devtools.resources', title: '资源', order: 1015, items: () => resourceItems(game) })
   registerDevSection({
     id: 'devtools.log',
     title: '日志',

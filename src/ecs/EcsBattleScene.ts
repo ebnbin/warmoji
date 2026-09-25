@@ -378,6 +378,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
     pending: number
     objects: number
     spawnIntervalMs: number
+    atlasPages: number
   } {
     const sim = this.sim
     const totalSec = (this.run.combatMs + (sim?.elapsedMs ?? 0)) / 1000
@@ -389,6 +390,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost {
       pending: sim ? telegraphCount(sim) : 0,
       objects: this.children.list.length,
       spawnIntervalMs: Math.round(this.sandbox ? spawnParams().intervalMs : wave.spawnIntervalMs),
+      atlasPages: this.atlas?.pageCount ?? 0,
     }
   }
 

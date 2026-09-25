@@ -24,6 +24,10 @@ export function prepareEmojiThumbs(scene: Phaser.Scene, size: number): void {
   thumbSize = size
 }
 
+export function emojiThumbStats(): { ready: number; inflight: number; size: number } {
+  return { ready: ready.size, inflight: inflight.size, size: thumbSize }
+}
+
 export function emojiThumbKey(cp: string): string | undefined {
   return ready.get(cp)
 }

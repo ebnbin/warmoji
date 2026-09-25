@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import type { OutlineKind } from './svg'
 import { emojiKey, emojiRaster } from './textures'
 import { HoldTable } from './holdTable'
-import type { TextureSpec } from './holdTable'
+import type { HoldStats, TextureSpec } from './holdTable'
 
 export interface EmojiRef {
   readonly id: string
@@ -112,6 +112,13 @@ function hold(scene: Phaser.Scene, refs: readonly EmojiRef[]): Hold {
   }
   mine.add(h)
   return h
+}
+
+export function emojiHoldStats(game: Phaser.Game): { table: HoldStats; scenes: { key: string; holds: number }[] } {
+  return {
+    table: tableOf(game).stats(),
+    scenes: [...holdsOf].map(([scene, holds]) => ({ key: scene.scene.key, holds: holds.size })),
+  }
 }
 
 export function preloadEmojis(scene: Phaser.Scene, refs: readonly EmojiRef[]): void {

@@ -50,6 +50,7 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
           `刷怪预告  ${p.pending}`,
           `刷怪间隔  ${p.spawnIntervalMs} ms`,
           `GameObject ${p.objects}`,
+          `图集页    ${p.atlasPages}`,
         ].join('\n')
       },
     },

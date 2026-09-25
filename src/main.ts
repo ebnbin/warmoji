@@ -21,6 +21,7 @@ import { initSfx, playSfx, setSfxEnabled } from './audio/sfx'
 import { applyCamera, isStandalone, nudgeIosViewport, refreshViewport, safeInsets, textRes, viewport } from './util/apply'
 import { UI_FONT } from './util/fonts'
 import { installDevTools, registerDevSection } from './devtools'
+import { registerEmojiDevTools } from './emoji/devtoolsSections'
 import { SceneKey } from './scene/keys'
 
 const badge = document.getElementById('build-badge')
@@ -78,6 +79,8 @@ registerDevSection({
     },
   ],
 })
+
+registerEmojiDevTools(game)
 
 game.events.once(Phaser.Core.Events.READY, () => {
   refreshViewport(game, true)
