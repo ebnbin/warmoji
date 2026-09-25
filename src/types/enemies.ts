@@ -115,7 +115,7 @@ export interface EnemyDef {
   readonly role?: 'enemy' | 'boss'
 }
 export interface EnemyMixRow {
-  readonly kind: string
+  readonly kind: EnemyDef['kind']
   readonly sinceWave: number
   readonly base: number
   readonly perWave: number
