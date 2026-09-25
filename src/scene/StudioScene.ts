@@ -11,14 +11,13 @@ import {
   ANIM_DEF,
   ANIM_TEMPLATES,
   animSetOf,
-  animTemplateOf,
   applyTemplate,
   bakeAnimFrame,
   composeSvg,
   flattenTree,
   parseSvgTree,
 } from '../emoji/anim'
-import type { AnimClip, AnimRecipe, SvgTree, TreeRow } from '../emoji/anim'
+import type { AnimClip, AnimClipId, AnimRecipe, AnimTemplate, SvgTree, TreeRow } from '../emoji/anim'
 import { applyBackground } from '../util/background'
 import { emojiKey, emojiSvgText, ensureEmoji, loadEmojiPack, svgToImage } from '../emoji/textures'
 import { emojiImage } from '../emoji/hold'
@@ -84,9 +83,9 @@ export class StudioScene extends Phaser.Scene {
   private palette?: Palette
   private tab: Tab = 'recipes'
   private recipeSel = ANIM_RECIPES[0]!.emoji
-  private clipSel = 'idle'
+  private clipSel: AnimClipId = 'idle'
   private tplEmoji = DEFAULT_SUBJECT
-  private tplId = ANIM_TEMPLATES[0]!.id
+  private tpl: AnimTemplate = ANIM_TEMPLATES[0]!
   private anatEmoji = DEFAULT_SUBJECT
   private allKeys: string[] = []
 
@@ -135,7 +134,7 @@ export class StudioScene extends Phaser.Scene {
       this.tab = 'recipes'
       this.recipeSel = ANIM_RECIPES[0]!.emoji
       this.tplEmoji = DEFAULT_SUBJECT
-      this.tplId = ANIM_TEMPLATES[0]!.id
+      this.tpl = ANIM_TEMPLATES[0]!
       this.anatEmoji = DEFAULT_SUBJECT
       this.resetAnatState()
       this.paused = false
@@ -422,7 +421,7 @@ export class StudioScene extends Phaser.Scene {
     y: number,
     res: number,
   ): number {
-    const labels: Record<string, string> = { idle: '{1f9d8} 待机', attack: '{2694} 攻击' }
+    const labels: Record<AnimClipId, string> = { idle: '{1f9d8} 待机', attack: '{2694} 攻击' }
     const chipH = 46
     const gap = 10
     const chipW = Math.min(170, (this.detailRect().w - 48 - (set.clips.length - 1) * gap) / set.clips.length)
@@ -435,7 +434,7 @@ export class StudioScene extends Phaser.Scene {
         this,
         x + chipW / 2,
         y + chipH / 2,
-        labels[c.id] ?? c.id,
+        labels[c.id],
         {
           fontFamily: UI_FONT,
           fontSize: FONT.body,
@@ -461,7 +460,7 @@ export class StudioScene extends Phaser.Scene {
 
   private buildTemplateDetail(): void {
     const { d, res } = this.resetDetail()
-    const tpl = animTemplateOf(this.tplId) ?? ANIM_TEMPLATES[0]!
+    const tpl = this.tpl
     const portrait = this.layout === PORTRAIT
     const previewSize = portrait ? 260 : 295
     const cx = d.x + d.w / 2
@@ -481,7 +480,7 @@ export class StudioScene extends Phaser.Scene {
       const row = Math.floor(i / cols)
       const lx = 20 + col * (chipW + 10)
       const lcy = row * (chipH + 10)
-      const active = t.id === this.tplId
+      const active = t === this.tpl
       const bg = this.add.graphics()
       roundRect(bg, lx, lcy, chipW, chipH, 12, { fill: active ? 0xffffff : 0x000000, fillAlpha: active ? 0.18 : 0.25, strokeWidth: active ? 2 : 1, stroke: 0xffffff, strokeAlpha: active ? 0.9 : 0.1 })
       const icon = emojiImage(this, lx + chipW / 2, lcy + 22, t.icon, 35)
@@ -499,8 +498,8 @@ export class StudioScene extends Phaser.Scene {
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
         .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
-          if (this.grid?.wasDragged || view.wasDragged || this.tplId === t.id) return
-          this.tplId = t.id
+          if (this.grid?.wasDragged || view.wasDragged || this.tpl === t) return
+          this.tpl = t
           this.buildTemplateDetail()
         })
       view.add([bg, icon, label, zone])
@@ -810,7 +809,7 @@ export class StudioScene extends Phaser.Scene {
   }
 
   private buildControls(cx: number, y: number, res: number): number {
-    const defs: { id: string; icon?: () => string; onTap: () => void }[] = [
+    const defs: { id: 'prev' | 'toggle' | 'next' | 'speed'; icon?: () => string; onTap: () => void }[] = [
       { id: 'prev', icon: () => '23ee', onTap: () => this.stepFrame(-1) },
       {
         id: 'toggle',

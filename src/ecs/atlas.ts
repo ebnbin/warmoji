@@ -3,6 +3,7 @@ import { OUTLINE, outlineSvg, setSvgSize } from '../emoji/svg'
 import type { OutlineKind } from '../emoji/svg'
 import { emojiSvgText, svgToImage } from '../emoji/textures'
 import { animClipOf, bakeAnimFrame } from '../emoji/anim'
+import type { AnimClipId } from '../emoji/anim'
 
 const CELL = 256
 const PAGE = 2048
@@ -14,7 +15,7 @@ function variantKey(id: string, outline: OutlineKind | undefined): string {
   return `${id}|${outline ?? ''}`
 }
 
-function clipKey(id: string, outline: OutlineKind | undefined, clipId: string): string {
+function clipKey(id: string, outline: OutlineKind | undefined, clipId: AnimClipId): string {
   return `${id}|${outline ?? ''}|${clipId}`
 }
 
@@ -92,7 +93,7 @@ export class EcsAtlas {
     this.pageOf[frame] = page
   }
 
-  clip(id: string, outline: OutlineKind | undefined, clipId: string): { base: number; frames: number } {
+  clip(id: string, outline: OutlineKind | undefined, clipId: AnimClipId): { base: number; frames: number } {
     const key = clipKey(id, outline, clipId)
     const hit = this.clips.get(key)
     if (hit) return hit
@@ -111,7 +112,7 @@ export class EcsAtlas {
     return this.cursor + n <= MAX_FRAMES
   }
 
-  private async bakeClip(id: string, outline: OutlineKind | undefined, clipId: string, key: string): Promise<void> {
+  private async bakeClip(id: string, outline: OutlineKind | undefined, clipId: AnimClipId, key: string): Promise<void> {
     const clip = animClipOf(id, clipId)
     const scene = this.scene
     if (!scene || this.disposed) return

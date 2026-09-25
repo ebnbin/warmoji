@@ -1,4 +1,5 @@
 import { ANIM_DEF } from '../../../emoji/anim'
+import type { AnimClipId } from '../../../emoji/anim'
 import type { OutlineKind } from '../../../emoji/svg'
 import { Anim } from '../../components'
 import { animId, animOutline } from '../../store'
@@ -19,7 +20,7 @@ export function armIdle(eid: number, id: string, outline: OutlineKind, still: nu
   Anim.still[eid] = still
 }
 
-export function playClip(sim: Sim, atlas: FrameIndex, eid: number, clipId: string, durMs: number): void {
+export function playClip(sim: Sim, atlas: FrameIndex, eid: number, clipId: AnimClipId, durMs: number): void {
   const id = animId[eid]
   const outline = animOutline[eid]
   if (id === undefined || outline === undefined) return

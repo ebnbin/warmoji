@@ -1,4 +1,4 @@
-import animationsJson from './animations.json'
+import { ANIMATIONS } from './animations'
 
 const OPEN_TAG = /<svg\b[^>]*>/
 const TAG = /<(\/?)([a-zA-Z][\w:-]*)((?:"[^"]*"|[^">])*?)(\/?)>/g
@@ -341,15 +341,30 @@ function fxSteam(opts: {
   }
 }
 
-const ANIM_FORMAT = 'warmoji-anim@2'
-
-interface FxDecl {
-  readonly gen: string
-  readonly layer?: 'back' | 'front'
-  readonly params: unknown
+const FX_GENERATORS = {
+  rise: fxRise,
+  shine: fxShineSweep,
+  sparkles: fxSparkles,
+  ripples: fxRipples,
+  bolts: fxBolts,
+  steam: fxSteam,
 }
 
+type FxGen = keyof typeof FX_GENERATORS
+
+type FxParams = { readonly [G in FxGen]: Parameters<(typeof FX_GENERATORS)[G]>[0] }
+
+const FX_REGISTRY: { readonly [G in FxGen]: (params: FxParams[G]) => FxLayer } = FX_GENERATORS
+
+type FxDecl<G extends FxGen = FxGen> = {
+  readonly [K in G]: { readonly gen: K; readonly layer?: 'back' | 'front'; readonly params: FxParams[K] }
+}[G]
+
 type AnimClipKind = 'loop' | 'cycle'
+
+const ANIM_CLIP_IDS = ['idle', 'attack'] as const
+
+export type AnimClipId = (typeof ANIM_CLIP_IDS)[number]
 
 interface AnimClipEntry {
   readonly kind?: AnimClipKind
@@ -364,25 +379,13 @@ interface AnimResourceEntry {
   readonly name: string
   readonly desc: string
   readonly anatomy: string
-  readonly clips: Readonly<Record<string, AnimClipEntry>>
+  readonly clips: Readonly<Partial<Record<AnimClipId, AnimClipEntry>>>
 }
 
-interface AnimResource {
-  readonly format: string
+export interface AnimResource {
   readonly def: { readonly frames: number; readonly durMs: number }
   readonly animations: Readonly<Record<string, AnimResourceEntry>>
 }
-
-const FX_REGISTRY = {
-  rise: fxRise,
-  shine: fxShineSweep,
-  sparkles: fxSparkles,
-  ripples: fxRipples,
-  bolts: fxBolts,
-  steam: fxSteam,
-} as const satisfies Record<string, (params: never) => FxLayer>
-
-const FX_GENERATORS = Object.keys(FX_REGISTRY) as readonly string[]
 
 const poseOf = (kf: PartKeyframe): PartPose => ({
   rotate: kf.rotate ?? 0,
@@ -404,22 +407,15 @@ const poseEq = (a: PartPose, b: PartPose): boolean =>
   Math.abs(a.opacity - b.opacity) < 1e-9
 
 function validateAnimResource(data: AnimResource): void {
-  if (data.format !== ANIM_FORMAT) {
-    throw new Error(`动画资源格式不符：期望 ${ANIM_FORMAT}，得到 ${String(data.format)}`)
-  }
   if (!(data.def.frames >= 2) || !(data.def.durMs > 0)) {
     throw new Error('动画资源 def 非法：frames 需 ≥2，durMs 需 >0')
   }
   for (const [key, entry] of Object.entries(data.animations)) {
     const at = `animations.${key}`
     if (!entry.emoji || !entry.name) throw new Error(`${at}: 缺少 emoji/name`)
-    const clipIds = Object.keys(entry.clips ?? {})
-    if (clipIds.length === 0) throw new Error(`${at}: 至少要有一个 clip`)
+    if (Object.keys(entry.clips).length === 0) throw new Error(`${at}: 至少要有一个 clip`)
     for (const [clipId, clip] of Object.entries(entry.clips)) {
       const cat = `${at}.clips.${clipId}`
-      if (clip.kind !== undefined && clip.kind !== 'loop' && clip.kind !== 'cycle') {
-        throw new Error(`${cat}: kind 只能是 loop/cycle`)
-      }
       if (clip.frames !== undefined && (!Number.isInteger(clip.frames) || clip.frames < 2)) {
         throw new Error(`${cat}: frames 需为 ≥2 的整数`)
       }
@@ -448,26 +444,17 @@ function validateAnimResource(data: AnimResource): void {
           throw new Error(`${pat}: 首尾姿态不闭环（循环/连续周期播放会跳变）`)
         }
       })
-      clip.fx?.forEach((decl, fi) => {
-        if (!(decl.gen in FX_REGISTRY)) {
-          throw new Error(`${cat}.fx[${fi}]: 未知生成器 "${decl.gen}"（可用：${FX_GENERATORS.join('/')}）`)
-        }
-        if (decl.layer !== undefined && decl.layer !== 'back' && decl.layer !== 'front') {
-          throw new Error(`${cat}.fx[${fi}]: layer 只能是 back/front`)
-        }
-      })
     }
   }
 }
 
-function restoreFx(decl: FxDecl): FxLayer {
-  const make = FX_REGISTRY[decl.gen as keyof typeof FX_REGISTRY] as (params: unknown) => FxLayer
-  const fx = make(decl.params)
+function restoreFx<G extends FxGen>(decl: FxDecl<G>): FxLayer {
+  const fx = FX_REGISTRY[decl.gen](decl.params)
   return decl.layer ? { ...fx, layer: decl.layer } : fx
 }
 
 export interface AnimClip extends AnimRecipe {
-  readonly id: string
+  readonly id: AnimClipId
   readonly kind: AnimClipKind
   readonly frames: number
 }
@@ -487,26 +474,30 @@ function loadAnimSets(data: AnimResource): AnimSet[] {
     name: entry.name,
     desc: entry.desc,
     anatomy: entry.anatomy,
-    clips: Object.entries(entry.clips).map(([id, clip]) => ({
-      id,
-      kind: clip.kind ?? 'loop',
-      frames: clip.frames ?? data.def.frames,
-      emoji: entry.emoji,
-      name: entry.name,
-      desc: entry.desc,
-      anatomy: entry.anatomy,
-      viewBox: clip.viewBox,
-      parts: clip.parts,
-      fx: clip.fx?.map(restoreFx),
-    })),
+    clips: ANIM_CLIP_IDS.flatMap((id) => {
+      const clip = entry.clips[id]
+      if (!clip) return []
+      return [
+        {
+          id,
+          kind: clip.kind ?? 'loop',
+          frames: clip.frames ?? data.def.frames,
+          emoji: entry.emoji,
+          name: entry.name,
+          desc: entry.desc,
+          anatomy: entry.anatomy,
+          viewBox: clip.viewBox,
+          parts: clip.parts,
+          fx: clip.fx?.map(restoreFx),
+        },
+      ]
+    }),
   }))
 }
 
-const RESOURCE = animationsJson as unknown as AnimResource
+export const ANIM_DEF: { readonly frames: number; readonly durMs: number } = ANIMATIONS.def
 
-export const ANIM_DEF: { readonly frames: number; readonly durMs: number } = RESOURCE.def
-
-const ANIM_SETS: readonly AnimSet[] = loadAnimSets(RESOURCE)
+const ANIM_SETS: readonly AnimSet[] = loadAnimSets(ANIMATIONS)
 
 export const ANIM_RECIPES: readonly AnimClip[] = ANIM_SETS.map((s) => s.clips[0]!)
 
@@ -514,7 +505,7 @@ export function animSetOf(emoji: string): AnimSet | undefined {
   return ANIM_SETS.find((s) => s.emoji === emoji)
 }
 
-export function animClipOf(emoji: string, clipId: string): AnimClip | undefined {
+export function animClipOf(emoji: string, clipId: AnimClipId): AnimClip | undefined {
   return animSetOf(emoji)?.clips.find((c) => c.id === clipId)
 }
 
@@ -750,10 +741,6 @@ export const ANIM_TEMPLATES: readonly AnimTemplate[] = [
     ],
   },
 ]
-
-export function animTemplateOf(id: string): AnimTemplate | undefined {
-  return ANIM_TEMPLATES.find((t) => t.id === id)
-}
 
 export function applyTemplate(tpl: AnimTemplate, emoji: string, svg: string): AnimRecipe {
   const n = splitSvg(svg).els.length
