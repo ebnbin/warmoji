@@ -126,7 +126,7 @@ export function gainTeamXp(sim: Sim, amount: number): void {
 }
 
 function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean): void {
-  const xpMul = sim.reward.captainXpMul * (elite ? ELITE.xpMul : 1)
+  const xpMul = elite ? ELITE.xpMul : 1
   gainTeamXp(sim, Math.round(def.xp * xpMul))
   const dropRoll = sim.rng.next()
   const dropped = dropRoll < coinDropChance((sim.run.combatMs + sim.elapsedMs) / 1000)

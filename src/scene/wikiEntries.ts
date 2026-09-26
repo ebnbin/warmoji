@@ -1,4 +1,3 @@
-import { CAPTAINS } from '../data/captains'
 import { CHARACTERS, ROSTER_IDS, baseLoadout } from '../data/characters'
 import { BOSSES, ENEMIES, ENEMY_DEFS } from '../data/enemies'
 import type { EnemyDef } from '../types/enemies'
@@ -7,7 +6,7 @@ import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
 import { ITEMS, RARITIES } from '../data/items'
 import type { ItemDef } from '../types/items'
-import { captainStatGroups, characterStatGroups, ABILITY_KIND_LABEL } from './statLines'
+import { characterStatGroups, ABILITY_KIND_LABEL } from './statLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
 
 function grid(units: number): string {
@@ -101,16 +100,6 @@ export function wikiGroups(): WikiGroup[] {
         name: MAPS[id].name,
         desc: MAPS[id].desc,
         lines: mapStatLines(id),
-      })),
-    },
-    {
-      icon: '1f607',
-      title: '队长',
-      entries: Object.values(CAPTAINS).map((c) => ({
-        emoji: c.emoji,
-        name: c.name,
-        desc: c.desc,
-        lines: flatten(captainStatGroups(c)),
       })),
     },
     {

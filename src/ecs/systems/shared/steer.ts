@@ -2,7 +2,7 @@ import { AI } from '../../../data/enemies'
 import { Alive, EDir, ETurn, Transform } from '../../components'
 import type { Point } from '../../../util/vec'
 import type { Sim } from '../../sim'
-import { teamCenter } from '../../utils/team'
+import { leaderPoint } from '../../utils/team'
 
 /** 影遁期间敌人找不到任何队员；嘲讽期间所有敌人都只看得见嘲讽者 */
 export function nearestAlive(sim: Sim, x: number, y: number): Point | null {
@@ -41,11 +41,11 @@ export function wanderDir(sim: Sim, eid: number): Point {
   return d
 }
 
-export function aimPoint(sim: Sim, eid: number, atCenter: boolean): Point | null {
+export function aimPoint(sim: Sim, eid: number, atLeader: boolean): Point | null {
   const x = Transform.x[eid]!
   const y = Transform.y[eid]!
-  if (!atCenter) return nearestAlive(sim, x, y)
-  const c = teamCenter(sim)
+  if (!atLeader) return nearestAlive(sim, x, y)
+  const c = leaderPoint(sim)
   const d = sim.hooks.worldDelta(sim, x, y, c.x, c.y)
   return { x: x + d.x, y: y + d.y }
 }

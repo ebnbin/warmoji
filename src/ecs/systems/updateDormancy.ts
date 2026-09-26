@@ -1,7 +1,7 @@
 import { query } from 'bitecs'
 import { Boss, Dormant, ENEMY_SET, Transform } from '../components'
 import type { Sim } from '../sim'
-import { centerX, centerY } from '../utils/team'
+import { leaderX, leaderY } from '../utils/team'
 import { despawnEnemy } from './shared/combat'
 
 const DORMANT_TTL_MS = 30000
@@ -14,7 +14,7 @@ export function updateDormancy(sim: Sim): void {
   for (const eid of query(sim.world, ENEMY_SET)) {
     const within =
       Boss.v[eid] === 1 ||
-      (Math.abs(Transform.x[eid]! - centerX(sim)) <= half && Math.abs(Transform.y[eid]! - centerY(sim)) <= half)
+      (Math.abs(Transform.x[eid]! - leaderX(sim)) <= half && Math.abs(Transform.y[eid]! - leaderY(sim)) <= half)
     if (within) {
       Dormant.v[eid] = 0
     } else if (!Dormant.v[eid]) {

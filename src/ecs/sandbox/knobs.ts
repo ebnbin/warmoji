@@ -1,8 +1,6 @@
-import { CAPTAINS, SANDBOX_CAPTAIN } from '../../data/captains'
-import { ROSTER_IDS } from '../../data/characters'
+import { ROSTER_IDS, TEAM } from '../../data/characters'
 import { ENEMY_DEFS } from '../../data/enemies'
 import type { CharacterId } from '../../types/characters'
-import type { CaptainId } from '../../types/captains'
 import type { MapId } from '../../types/maps'
 import type { EnemyKind } from '../../types/enemies'
 import { beginRun } from '../../run/state'
@@ -125,7 +123,7 @@ export function toggleSandboxCharacter(id: CharacterId): void {
     if (roster.length <= 1) return
     roster = roster.filter((x) => x !== id)
   } else {
-    if (roster.length >= CAPTAINS[SANDBOX_CAPTAIN].teamSize) return
+    if (roster.length >= TEAM.maxSize) return
     roster = [...roster, id]
   }
   presetId = undefined
@@ -143,10 +141,6 @@ export function sandboxLevel(): SandboxLevel {
 export function setSandboxLevel(lv: SandboxLevel): void {
   level = lv
   presetId = undefined
-}
-
-function sandboxCaptain(): CaptainId {
-  return SANDBOX_CAPTAIN
 }
 
 export function sandboxScale(): SandboxScale {
@@ -186,12 +180,16 @@ export function setSandboxInvincible(on: boolean): void {
 }
 
 export function sandboxStarters(): CharacterId[] {
-  const r = roster.slice(0, CAPTAINS[SANDBOX_CAPTAIN].teamSize)
+  const r = roster.slice(0, TEAM.maxSize)
   return r.length > 0 ? r : [ROSTER_IDS[0]!]
 }
 
+const SANDBOX_COINS = 999_999
+
 export function beginSandboxRun(mapId: MapId): RunState {
-  return beginRun(sandboxCaptain(), sandboxStarters(), mapId, true)
+  const run = beginRun(sandboxStarters(), mapId, true)
+  run.coins = SANDBOX_COINS
+  return run
 }
 
 applySandboxPreset(SANDBOX_PRESETS[0]!.id)

@@ -1,11 +1,10 @@
 import { query } from 'bitecs'
 import { SPAWN } from '../../data/enemies'
 import { UNIT } from '../../util/units'
-import { Dormant, ENEMY_SET, Morph, Nest, Transform } from '../components'
+import { Dancing, Dormant, ENEMY_SET, Morph, Nest, Transform } from '../components'
 import { awakeCount, spawnBrood } from '../entities/enemy'
 import { enemyDef } from '../store'
 import type { Sim } from '../sim'
-import { isDancing } from '../utils/team'
 
 function broodCount(sim: Sim, nestEid: number): number {
   let n = 0
@@ -25,7 +24,7 @@ export function updateSpawners(sim: Sim): void {
     if (Dormant.v[eid]) continue
     const spawner = enemyDef[eid]?.spawner
     if (!spawner) continue
-    if (isDancing(sim)) continue
+    if (Dancing.until[eid] !== 0) continue
     if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue
     if (now < Nest.nextSpawnAt[eid]!) continue
     Nest.nextSpawnAt[eid] = now + spawner.intervalMs

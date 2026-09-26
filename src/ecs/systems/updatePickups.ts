@@ -2,26 +2,28 @@ import { addComponent, query, removeEntity } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { PICKUP, PICKUPS } from '../../data/pickups'
-import { Alive, Bob, Collected, Grab, Hurt, Lifetime, PICKUP_SET, Pull, Tint, Transform, Vel } from '../components'
+import { Alive, Bob, Collected, Grab, Hurt, Lifetime, Magnet, PICKUP_SET, Pull, Tint, Transform, Vel } from '../components'
 import { animatePickup } from '../entities/pickup'
 import type { Sim } from '../sim'
-import { centerX, centerY } from '../utils/team'
+import { leaderX, leaderY } from '../utils/team'
 
 const FADE_MS = 250
 
+/** 金币被吸附范围内最近的存活角色吸走、碰到任何角色即拾取；不吸附的拾取物只有队长走过去才捡 */
 export function updatePickups(sim: Sim): void {
   const delta = sim.dtMs
   const eids = query(sim.world, PICKUP_SET)
   if (eids.length === 0) return
   const dt = delta / 1000
   const now = sim.elapsedMs
-  const cx = centerX(sim)
-  const cy = centerY(sim)
+  const lx = leaderX(sim)
+  const ly = leaderY(sim)
   for (const eid of eids) {
     animatePickup(sim, eid)
     const x = Transform.x[eid]!
     const y = Bob.amp[eid]! > 0 ? Bob.y0[eid]! : Transform.y[eid]!
-    if (sim.frameAttractors.length > 0 && Pull.radius[eid]! > 0) {
+    const magnetic = Pull.on[eid] === 1
+    if (sim.frameAttractors.length > 0 && magnetic) {
       let taken = false
       for (const a of sim.frameAttractors) {
         const ad = sim.hooks.worldDelta(sim, x, y, a.x, a.y)
@@ -33,10 +35,9 @@ export function updatePickups(sim: Sim): void {
       }
       if (taken) continue
     }
-    const w = sim.hooks.worldDelta(sim, x, y, cx, cy)
-    const dist2 = w.x * w.x + w.y * w.y
     const grab = Grab.radius[eid]!
-    if (dist2 <= grab * grab || (Pull.radius[eid]! > 0 && nearAliveCharacter(sim, x, y))) {
+    const grabbed = magnetic ? nearAliveCharacter(sim, x, y, grab) : Alive.v[sim.leader] === 1 && within(sim, x, y, lx, ly, grab)
+    if (grabbed) {
       take(sim, eid)
       continue
     }
@@ -48,11 +49,11 @@ export function updatePickups(sim: Sim): void {
       }
       if (left < FADE_MS) Tint.alpha[eid] = left / FADE_MS
     }
-    if (Pull.radius[eid]! === 0) continue
+    if (!magnetic) continue
     const idle = sim.hooks.coinIdleVelocity(sim)
-    const pull = Pull.radius[eid]!
-    if (dist2 < pull * pull) {
-      const dir = norm(w.x, w.y)
+    const pull = magnetPull(sim, x, y)
+    if (pull) {
+      const dir = norm(pull.x, pull.y)
       Vel.x[eid] = dir.x * PICKUP.magnetSpeed * UNIT + idle.x
       Vel.y[eid] = dir.y * PICKUP.magnetSpeed * UNIT + idle.y
     } else {
@@ -70,13 +71,33 @@ function take(sim: Sim, eid: number): void {
   addComponent(sim.world, eid, Collected)
 }
 
-function nearAliveCharacter(sim: Sim, x: number, y: number): boolean {
+function within(sim: Sim, x: number, y: number, tx: number, ty: number, r: number): boolean {
+  const d = sim.hooks.worldDelta(sim, x, y, tx, ty)
+  return d.x * d.x + d.y * d.y <= r * r
+}
+
+function nearAliveCharacter(sim: Sim, x: number, y: number, grab: number): boolean {
   const cr = PICKUPS.coin.radius * UNIT
   for (const m of sim.characters) {
     if (!Alive.v[m]) continue
-    const rr = Hurt.radius[m]! + cr
-    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
-    if (d.x * d.x + d.y * d.y <= rr * rr) return true
+    if (within(sim, x, y, Transform.x[m]!, Transform.y[m]!, Math.max(grab, Hurt.radius[m]! + cr))) return true
   }
   return false
+}
+
+/** 最近的存活角色把金币拉向自己，前提是金币在他的吸附半径内 */
+function magnetPull(sim: Sim, x: number, y: number): { x: number; y: number } | null {
+  let best: { x: number; y: number } | null = null
+  let bestD2 = Infinity
+  let bestR = 0
+  for (const m of sim.characters) {
+    if (!Alive.v[m]) continue
+    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
+    const d2 = d.x * d.x + d.y * d.y
+    if (d2 >= bestD2) continue
+    bestD2 = d2
+    bestR = Magnet.radius[m]!
+    best = d
+  }
+  return best && bestD2 < bestR * bestR ? best : null
 }

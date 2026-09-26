@@ -190,7 +190,7 @@ export const GrantFlash = { color: u32(), ms: f32() }
 
 export const PickupFx = { burst: i32() }
 
-export const Pull = { radius: f32() }
+export const Pull = { on: u8() }
 
 export const Grab = { radius: f32() }
 
@@ -440,8 +440,6 @@ export const Manual = {}
 
 export const CastRequest = {}
 
-export const Captain = {}
-
 export const Phys = { vx: f32(), vy: f32(), thrust: f32(), drag: f32(), mass: f32() }
 
 /** ghost：0 存活；1 阵亡且已预订目标位、正在归位；2 阵亡且已停靠 */
@@ -452,9 +450,11 @@ export const Facing = { x: f32(), y: f32(), vx: f32(), vy: f32() }
 
 export const Magnet = { radius: f32() }
 
-export const TeamDamage = { mul: f32(), until: f32() }
+/** 全队增益不挂在队伍上，而是给每个角色各写一份 */
+export const DmgBuff = { mul: f32(), until: f32() }
 
-export const DanceWindow = { until: f32() }
+/** 蹦迪是每个敌人身上的状态，施法之后刷出来的敌人不受影响 */
+export const Dancing = { until: f32() }
 
 export const Blink = { x: f32(), y: f32() }
 
@@ -525,7 +525,7 @@ export const Dash = {
   windupMs: f32(),
   dashSpeed: f32(),
   idleChase: u8(),
-  aimTeamCenter: u8(),
+  aimLeader: u8(),
   lockAtLaunch: u8(),
   whoosh: u8(),
 }

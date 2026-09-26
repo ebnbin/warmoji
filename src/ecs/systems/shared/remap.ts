@@ -3,7 +3,6 @@ import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
 import { Aim, Blink, Bob, Drop, EDir, ENEMY_SET, Facing, Flyer, Follow, Kv, Minion, Phys, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
-import { centerX, centerY, setCenter } from '../../utils/team'
 
 export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, toH: number): void {
   const fromH0 = isHorizontal(fromW, fromH)
@@ -11,8 +10,6 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
   const map = (x: number, y: number): Point => remapPoint({ x, y }, fromW, fromH, toW, toH)
   const rot = (x: number, y: number): Point => remapVector({ x, y }, fromH0, toH0)
 
-  const c = map(centerX(sim), centerY(sim))
-  setCenter(sim, c.x, c.y)
   for (const b of sim.characters) {
     const v = rot(Phys.vx[b]!, Phys.vy[b]!)
     Phys.vx[b] = v.x

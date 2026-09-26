@@ -1,11 +1,10 @@
 import { } from '../../data/items'
 import { waveAt } from '../../data/waves'
 import { sandboxFireRate } from '../sandbox/knobs'
-import { Anchor, DmgMul, CharAtkSlow, Slot, Transform } from '../components'
+import { Anchor, DmgBuff, DmgMul, CharAtkSlow, Slot, Transform } from '../components'
 import { Amp, FACTION, Faction, Owner } from '../components'
 import type { } from './source'
 import type { Sim } from '../sim'
-import { teamDamageMul } from './team'
 
 export function ownerX(e: number): number {
   return Transform.x[Anchor.eid[e]!]!
@@ -17,7 +16,9 @@ export function ownerY(e: number): number {
 
 export function damageMul(sim: Sim, e: number): number {
   if (Faction.v[e] === FACTION.enemy) return DmgMul.v[Owner.eid[e]!]!
-  return Amp.dmg[e]! * (Amp.battle[e] ? sim.battleFx.teamDamageMul : 1) * teamDamageMul(sim)
+  const o = Owner.eid[e]!
+  const buff = sim.elapsedMs < DmgBuff.until[o]! ? DmgBuff.mul[o]! : 1
+  return Amp.dmg[e]! * (Amp.battle[e] ? sim.battleFx.teamDamageMul : 1) * buff
 }
 
 export function cooldownMul(sim: Sim, e: number): number {

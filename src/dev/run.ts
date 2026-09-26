@@ -1,26 +1,22 @@
 import type Phaser from 'phaser'
 import type { DevProvider, DevSection } from '../devtools'
-import { CAPTAINS, PICKABLE_CAPTAIN_IDS } from '../data/captains'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { MAP_IDS, MAPS } from '../data/maps'
 import { waveDurationMs } from '../data/waves'
 import { beginSandboxRun } from '../ecs/sandbox/knobs'
 import { beginRun, currentRun, endRun } from '../run/state'
 import { SceneKey } from '../scene/keys'
-import type { CaptainId } from '../types/captains'
 import type { MapId } from '../types/maps'
 import { gotoScene } from './nav'
 
 let mapId: MapId = MAP_IDS[0]!
-let captainId: CaptainId = PICKABLE_CAPTAIN_IDS[0]!
 let teamSize = 1
 let startWave = 1
 const TEAM_SIZES = Array.from({ length: TEAM.maxSize }, (_, i) => i + 1)
 const START_WAVES = [1, 2, 3, 5, 8, 10]
 
 function newRun(): void {
-  const captain = CAPTAINS[captainId]
-  const run = beginRun(captainId, ROSTER_IDS.slice(0, Math.min(teamSize, captain.teamSize)), mapId)
+  const run = beginRun(ROSTER_IDS.slice(0, teamSize), mapId)
   run.wave = Math.max(run.wave, startWave)
   let skipped = 0
   for (let w = 1; w < run.wave; w++) skipped += waveDurationMs(w)
@@ -35,10 +31,10 @@ function runText(): string {
   const run = currentRun()
   if (!run) return '当前没有进行中的一局'
   return [
-    `${CAPTAINS[run.captainId].name} · ${MAPS[run.mapId].name}${run.sandbox ? ' · 试炼场' : ''}`,
+    `${MAPS[run.mapId].name}${run.sandbox ? ' · 试炼场' : ''}`,
     `第 ${run.wave} 波 · 金币 ${run.coins} · 击杀 ${run.kills} · 等级 ${run.xp.level}（${run.xp.xp} xp）`,
     `队伍 ${run.roster.map((id) => CHARACTERS[id].name).join('、')} · 队长 ${CHARACTERS[run.leaderId].name}`,
-    `技能冷却 ${Math.ceil(run.skillCdMs / 1000)} s · 累计战斗 ${Math.round(run.combatMs / 1000)} s`,
+    `累计战斗 ${Math.round(run.combatMs / 1000)} s`,
   ].join('\n')
 }
 
@@ -82,17 +78,7 @@ function runSections(game: Phaser.Game): DevSection[] {
         },
         {
           kind: 'choice',
-          label: '队长',
-          options: PICKABLE_CAPTAIN_IDS.map((id) => ({ id, label: CAPTAINS[id].name })),
-          get: () => captainId,
-          set: (id): void => {
-            const c = PICKABLE_CAPTAIN_IDS.find((x) => x === id)
-            if (c) captainId = c
-          },
-        },
-        {
-          kind: 'choice',
-          label: '首发人数 · 按花名册顺序，受队长上限约束',
+          label: '首发人数 · 按花名册顺序',
           options: TEAM_SIZES.map((n) => ({ id: String(n), label: String(n) })),
           get: () => String(teamSize),
           set: (id) => (teamSize = Number(id)),
@@ -132,7 +118,6 @@ function runSections(game: Phaser.Game): DevSection[] {
         {
           kind: 'buttons',
           buttons: [
-            { label: '选队长', run: () => gotoScene(game, SceneKey.Captain) },
             { label: '商店', run: () => (ensureRun(), gotoScene(game, SceneKey.Shop)) },
             { label: '招募', run: () => (ensureRun(), gotoScene(game, SceneKey.Recruit)) },
             { label: '结算 · 胜', run: () => (ensureRun(), gotoScene(game, SceneKey.Result, { win: true })) },

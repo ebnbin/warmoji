@@ -1,28 +1,21 @@
-import { DanceWindow, TeamDamage, Transform } from '../components'
+import { Follow } from '../components'
 import type { Point } from '../../util/vec'
 import type { Sim } from '../sim'
 
-export function centerX(sim: Sim): number {
-  return Transform.x[sim.captain]!
+/** 队伍没有中心，"队伍在哪"就是队长的物理位置 */
+export function leaderX(sim: Sim): number {
+  return Follow.x[sim.leader]!
 }
 
-export function centerY(sim: Sim): number {
-  return Transform.y[sim.captain]!
+export function leaderY(sim: Sim): number {
+  return Follow.y[sim.leader]!
 }
 
-export function teamCenter(sim: Sim): Point {
-  return { x: centerX(sim), y: centerY(sim) }
+export function leaderPoint(sim: Sim): Point {
+  return { x: leaderX(sim), y: leaderY(sim) }
 }
 
-export function setCenter(sim: Sim, x: number, y: number): void {
-  Transform.x[sim.captain] = x
-  Transform.y[sim.captain] = y
-}
-
-export function teamDamageMul(sim: Sim): number {
-  return sim.elapsedMs < TeamDamage.until[sim.captain]! ? TeamDamage.mul[sim.captain]! : 1
-}
-
-export function isDancing(sim: Sim): boolean {
-  return sim.elapsedMs < DanceWindow.until[sim.captain]!
+export function placeLeader(sim: Sim, x: number, y: number): void {
+  Follow.x[sim.leader] = x
+  Follow.y[sim.leader] = y
 }

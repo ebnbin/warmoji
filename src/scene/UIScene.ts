@@ -1,8 +1,7 @@
 import Phaser from 'phaser'
-import { CAPTAINS } from '../data/captains'
 import { PICKUPS } from '../data/pickups'
 import { formatTime } from '../util/format'
-import { endRun, getRun } from '../run/state'
+import { endRun } from '../run/state'
 import { emojiImage } from '../emoji/hold'
 import { emojiKey } from '../emoji/textures'
 import { emojiText, iconLabel } from '../ui/emojiText'
@@ -55,16 +54,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private last!: HudSnapshot
   private paused = false
   private pauseObjs: Phaser.GameObjects.GameObject[] = []
-  private skillBase?: Phaser.GameObjects.Arc
-  private skillEmoji?: Phaser.GameObjects.Image
-  private skillMask?: Phaser.GameObjects.Graphics
-  private skillCdText?: Phaser.GameObjects.Text
-  private skillRing?: Phaser.GameObjects.Arc
-  private skillCenter = { x: 0, y: 0 }
-  private skillEmojiScale = 1
-  private skillWasReady = false
-  private skillShownSec = -1
-  private skillShownRatio = -1
   private fxIcons: Phaser.GameObjects.Image[] = []
   private fxBars?: Phaser.GameObjects.Graphics
   private fxKey = ''
@@ -142,7 +131,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       if (this.paused) this.togglePause()
     })
 
-    this.createSkillButton(res)
     this.createFxIndicators()
     this.squad = []
     this.squadArc = []
@@ -255,7 +243,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   }
 
   update(): void {
-    this.updateSkillButton()
     this.updateSquad()
     const s = this.arena.hudSnapshot()
     this.updateFxIndicators(s.battleFx)
@@ -330,97 +317,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
         sub.destroy()
       },
     })
-  }
-
-  private createSkillButton(res: number): void {
-    const r = 55
-    const cx = safeInsets.left + r + 24
-    const cy = viewport.logicalHeight - safeInsets.bottom - r - 24
-    this.skillCenter = { x: cx, y: cy }
-    this.skillWasReady = false
-    this.skillShownSec = -1
-    this.skillShownRatio = -1
-    this.skillBase = this.add
-      .circle(cx, cy, r, 0x000000, 0.38)
-      .setStrokeStyle(3, 0xffffff, 0.28)
-      .setDepth(300)
-    this.skillEmoji = emojiImage(this, cx, cy, CAPTAINS[getRun().captainId].emoji, 76, 'player').setDepth(301)
-    this.skillEmojiScale = this.skillEmoji.scaleX
-    this.skillMask = this.add.graphics().setDepth(302)
-    this.skillCdText = this.add
-      .text(cx, cy, '', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.head,
-        fontStyle: 'bold',
-        color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 4,
-        resolution: res,
-      })
-      .setOrigin(0.5)
-      .setDepth(303)
-    this.skillRing = this.add
-      .circle(cx, cy, r + 6, 0x000000, 0)
-      .setStrokeStyle(3, 0xffdc5d, 0.9)
-      .setDepth(303)
-      .setVisible(false)
-    this.add
-      .zone(cx - r, cy - r, r * 2, r * 2)
-      .setOrigin(0)
-      .setDepth(304)
-      .setInteractive({ useHandCursor: true })
-      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.tryCastSkill())
-    this.input.keyboard?.on('keydown-E', () => this.tryCastSkill())
-  }
-
-  private tryCastSkill(): void {
-    if (this.paused) return
-    this.arena.castSkill()
-  }
-
-  private updateSkillButton(): void {
-    if (!this.skillMask) return
-    const sk = this.arena.skillSnapshot()
-    if (!sk) return
-    if (sk.remainMs > 0) {
-      const remainSec = Math.ceil(sk.remainMs / 1000)
-      const ratio = sk.cdMs > 0 ? sk.remainMs / sk.cdMs : 0
-      if (this.skillWasReady || remainSec !== this.skillShownSec || Math.abs(ratio - this.skillShownRatio) > 0.01) {
-        this.skillWasReady = false
-        this.skillShownSec = remainSec
-        this.skillShownRatio = ratio
-        this.skillCdText?.setText(String(remainSec))
-        this.skillEmoji?.setAlpha(0.4)
-        this.skillRing?.setVisible(false)
-        const g = this.skillMask
-        g.clear()
-        g.fillStyle(0x000000, 0.6)
-        g.slice(this.skillCenter.x, this.skillCenter.y, 52, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2, false)
-        g.fillPath()
-      }
-      return
-    }
-    if (!this.skillWasReady) {
-      this.skillWasReady = true
-      this.skillShownSec = -1
-      this.skillMask.clear()
-      this.skillCdText?.setText('')
-      this.skillEmoji?.setAlpha(1)
-      this.skillRing?.setVisible(true)
-      const bump = (obj: Phaser.GameObjects.GameObject | undefined, base: number): void => {
-        if (!obj) return
-        this.tweens.add({
-          targets: obj,
-          scaleX: { from: base * 1.16, to: base },
-          scaleY: { from: base * 1.16, to: base },
-          duration: 260,
-          ease: 'Back.easeOut',
-        })
-      }
-      bump(this.skillBase, 1)
-      bump(this.skillEmoji, this.skillEmojiScale)
-    }
-    this.skillRing?.setAlpha(0.5 + 0.4 * Math.sin(this.time.now / 240))
   }
 
   private squadCorner(): { x: number; y: number } {

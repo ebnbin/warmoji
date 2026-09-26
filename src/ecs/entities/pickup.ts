@@ -7,7 +7,6 @@ import {
   GrantMod,
   Grab,
   Lifetime,
-  Magnet,
   Pickup,
   PickupFx,
   Pop,
@@ -32,7 +31,7 @@ interface PickupSpec {
   emoji: string
   size: number
   z: number
-  pull: number
+  magnetic: boolean
   grab: number
   groundMs: number
   popMs: number
@@ -58,7 +57,7 @@ function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
     z: spec.z,
   })
   Pickup.bornMs[eid] = sim.elapsedMs
-  Pull.radius[eid] = spec.pull
+  Pull.on[eid] = spec.magnetic ? 1 : 0
   Grab.radius[eid] = spec.grab
   Lifetime.until[eid] = spec.groundMs > 0 ? sim.elapsedMs + spec.groundMs : 0
   Vel.x[eid] = 0
@@ -104,12 +103,12 @@ function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
 }
 
 
-function coinSpec(sim: Sim): PickupSpec {
+function coinSpec(): PickupSpec {
   return {
     emoji: PICKUPS.coin.emoji,
     size: PICKUPS.coin.size * UNIT,
     z: 3,
-    pull: Magnet.radius[sim.captain]!,
+    magnetic: true,
     grab: PICKUP.collectRadius * UNIT,
     groundMs: 0,
     popMs: 160,
@@ -125,7 +124,7 @@ function fieldSpec(def: FieldPickupDef): PickupSpec {
     emoji: def.emoji,
     size: 0.85 * UNIT,
     z: 6,
-    pull: 0,
+    magnetic: false,
     grab: FIELD.grabRadiusU * UNIT,
     groundMs: FIELD.groundMs,
     popMs: 180,
@@ -139,7 +138,7 @@ function fieldSpec(def: FieldPickupDef): PickupSpec {
 }
 
 export function dropCoins(sim: Sim, x: number, y: number, count: number): void {
-  const spec = coinSpec(sim)
+  const spec = coinSpec()
   for (let i = 0; i < count; i++) {
     const jx = count > 1 ? (sim.rng.next() - 0.5) * 0.6 * UNIT : 0
     const jy = count > 1 ? (sim.rng.next() - 0.5) * 0.6 * UNIT : 0

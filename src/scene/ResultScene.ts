@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-import { CAPTAINS } from '../data/captains'
 import { CHARACTERS } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
 import { HAZARD_NAMES } from '../data/maps'
@@ -121,7 +120,6 @@ export class ResultScene extends Phaser.Scene {
       this.time.delayedCall(320, () => confetti.explode(26, cx + 180, oy + L.titleY))
     }
 
-    const captain = CAPTAINS[this.run.captainId]
     const minutes = Math.floor(this.run.combatMs / 60000)
     const seconds = Math.round((this.run.combatMs % 60000) / 1000)
     const waveText = this.win
@@ -131,7 +129,7 @@ export class ResultScene extends Phaser.Scene {
       this,
       cx,
       oy + L.subY,
-      `{${captain.emoji}} ${captain.name} · ${waveText} · 击杀 ${this.run.kills} · {${PICKUPS.coin.emoji}}${this.run.coins} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
+      `${this.run.roster.map((id) => `{${CHARACTERS[id].emoji}}`).join('')} · ${waveText} · 击杀 ${this.run.kills} · {${PICKUPS.coin.emoji}}${this.run.coins} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
       { fontFamily: UI_FONT, fontSize: FONT.head, color: '#e8e8f0', resolution: res },
       { origin: 0.5 },
     )
@@ -156,7 +154,7 @@ export class ResultScene extends Phaser.Scene {
     this.menuRect = { x: cx + gap / 2, y: oy + L.btnY - btnH / 2, w: btnW, h: btnH }
     const again = (): void => {
       endRun()
-      this.scene.start(SceneKey.Captain)
+      this.scene.start(SceneKey.Map)
     }
     const menu = (): void => {
       endRun()

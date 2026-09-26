@@ -1,7 +1,6 @@
 import { KNOCKBACK } from '../data/abilities'
 import { memberMaxHp } from '../data/stats'
 import { CHARACTERS, MEMBER, TEAM, loadoutFor, upgradeCardsFor } from '../data/characters'
-import type { CaptainDef } from '../types/captains'
 import type { CharacterId } from '../types/characters'
 import { aggregateCharacterEffects, resolveAbilityDef } from '../data/items'
 import { tiersForLevel } from '../data/charLevel'
@@ -50,7 +49,7 @@ function abilityStatLines(w: AbilityDef): string[] {
   if (w.kind === 'slowAura') {
     return [
       `减速 ${Math.round((1 - w.slowFactor) * 100)}% · 范围 ${grid(w.radius)}`,
-      '以队伍中心为圆心持续生效',
+      '以自己为圆心持续生效',
     ]
   }
   if (w.kind === 'heal') {
@@ -255,28 +254,4 @@ function displayDef(w: AbilityDef, dmgMul: number, cdMul: number, kbMul: number)
         knockback: w.knockback * kbMul,
       }
   }
-}
-
-export function captainStatGroups(def: CaptainDef): StatGroup[] {
-  const lines = [
-    `编制上限 ${def.teamSize} 人 · 每波结束固定招募 1 人` +
-      (def.startWave > 1 ? ` · 从第 ${def.startWave} 波开始` : '') +
-      (def.startCoins > 0 ? ` · 开局 ${def.startCoins} 金币` : ''),
-    `金币拾取 ${grid(def.coinMagnet)}`,
-  ]
-  if (def.hpMul !== 1) lines.push(`全队生命 ×${+def.hpMul.toFixed(2)}`)
-  if (def.reviveMul !== 1) lines.push(`复活时间 ×${+def.reviveMul.toFixed(2)}`)
-  if (def.xpGainMul !== 1) lines.push(`经验获取 ×${+def.xpGainMul.toFixed(2)}`)
-  return [
-    { icon: '1f451', title: '队长能力', lines: [def.desc] },
-    {
-      icon: '26a1',
-      title: `主动技能 · ${def.skill.name}`,
-      lines: [
-        `${def.skill.desc}（冷却 ${Math.round(def.skill.cdMs / 1000)} 秒，仅 CD 门槛）`,
-        ...def.skill.abilities.flatMap((w) => abilityStatLines(w)),
-      ],
-    },
-    { icon: '1f45f', title: '团队', lines },
-  ]
 }

@@ -1,7 +1,5 @@
 import Phaser from 'phaser'
-import { CAPTAINS } from '../data/captains'
 import { CHARACTERS } from '../data/characters'
-import type { CaptainId } from '../types/captains'
 import type { CharacterId } from '../types/characters'
 import { SHOP } from '../data/items'
 import { PICKUPS } from '../data/pickups'
@@ -68,7 +66,6 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private palette?: Palette
   private run!: RunState
-  private captainId: CaptainId = 'angel'
   private lineup: CharacterId[] = []
   private focusedId: CharacterId = 'juggler'
   private offers: (ItemId | null)[] = []
@@ -104,13 +101,9 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
     applyBackground(this.palette)
     this.run = getRun()
-    this.captainId = this.run.captainId
     this.lineup = [...this.run.roster]
     if (!preserved) {
-      if (CAPTAINS[this.captainId].reviveInShop) {
-        this.run.memberHp = this.run.memberHp.map((_, slot) => this.slotMaxHp(slot))
-      }
-      this.run.freeRefreshes = CAPTAINS[this.captainId].freeRefreshes
+      this.run.freeRefreshes = 0
       this.offers = this.lineup.map((_, slot) =>
         rollItem(this.poolFor(slot), this.ownedFor(slot), Math.random, this.run.wave, this.levelOf(slot)),
       )

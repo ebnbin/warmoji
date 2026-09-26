@@ -3,7 +3,7 @@ import { Alive, Leap, Rush, Tint } from '../components'
 import { damageMul } from '../utils/amp'
 import { sourceOf } from '../utils/source'
 import { targetsNear } from '../utils/targets'
-import { centerX, centerY } from '../utils/team'
+import { leaderX, leaderY } from '../utils/team'
 import { damageTarget } from './shared/damage'
 import { applyBlast } from './shared/effects'
 import { spawnFxBoom, spawnFxCircle } from '../entities/fx'
@@ -12,8 +12,8 @@ import type { Sim } from '../sim'
 /** 冲刺沿途撞击、跳跃落地爆发、嘲讽到期与隐匿的半透明，都在队长走完这一帧之后结算 */
 export function tickSkillStates(sim: Sim): void {
   const now = sim.elapsedMs
-  const cx = centerX(sim)
-  const cy = centerY(sim)
+  const cx = leaderX(sim)
+  const cy = leaderY(sim)
   const rush = sim.rush
   if (rush) {
     const e = rush.e

@@ -1,6 +1,4 @@
-import { CAPTAINS } from './data/captains'
 import { CHARACTERS } from './data/characters'
-import type { CaptainDef } from './types/captains'
 import type { CharacterDef } from './types/characters'
 import type { OutlineKind } from './emoji/svg'
 import type { AbilityDef } from './types/abilityDefs'
@@ -17,7 +15,6 @@ const roster: readonly CharacterDef[] = Object.values(CHARACTERS)
 const teamAbilities: readonly AbilityDef[] = [
   ...roster.flatMap((c) => c.carriers.flatMap((cr) => cr.tiers)),
   ...roster.map((c) => c.skill.ability),
-  ...Object.values<CaptainDef>(CAPTAINS).flatMap((c) => c.skill.abilities),
 ]
 
 function abilityBodyEmojis(w: AbilityDef): string[] {
@@ -37,7 +34,6 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   player: [
     ...roster.map((c) => c.emoji),
     ...roster.map((c) => c.skill.icon),
-    ...Object.values<CaptainDef>(CAPTAINS).map((c) => c.emoji),
     ...teamAbilities.flatMap((w) => [...abilityBodyEmojis(w), ...abilityShotEmojis(w)]),
     ...Object.values(PICKUPS).map((p) => p.emoji),
     ...FIELD_PICKUPS.map((p) => p.emoji),

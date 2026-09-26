@@ -1,7 +1,6 @@
 import { hasComponent } from 'bitecs'
-import { Anchor, Aura, AuraDps, AuraFreeze, FACTION, Faction, Pulse, Slow, SlowAura } from '../components'
+import { Anchor, Aura, AuraDps, AuraFreeze, Faction, Pulse, Slow, SlowAura } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
-import { centerX, centerY } from '../utils/team'
 import { damageTarget } from './shared/damage'
 import { spawnZone } from '../entities/zone'
 import { sourceOf } from '../utils/source'
@@ -16,9 +15,8 @@ export function castSlowAuras(sim: Sim): void {
   const dt = sim.wdtMs
   castScan(sim, SlowAura, (e) => {
     const src = sourceOf(sim, e)
-    const onTeam = Faction.v[e] === FACTION.team
-    const x = onTeam ? centerX(sim) : ownerX(e)
-    const y = onTeam ? centerY(sim) : ownerY(e)
+    const x = ownerX(e)
+    const y = ownerY(e)
     const radius = SlowAura.radius[e]!
     if (Aura.zone[e] === 0) {
       // 须先落局部变量：spawnZone 可能扩容替换 Aura.zone
@@ -34,7 +32,7 @@ export function castSlowAuras(sim: Sim): void {
         lineAlpha: 0.35,
         lineWidth: 2,
         chill: { factor: SlowAura.slowFactor[e]! },
-        follow: { of: onTeam ? sim.captain : Anchor.eid[e]!, owner: e },
+        follow: { of: Anchor.eid[e]!, owner: e },
       })
       Aura.zone[e] = zone
       Pulse.dps[e] = TICK_MS

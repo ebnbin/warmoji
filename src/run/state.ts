@@ -1,6 +1,4 @@
-import { CAPTAINS } from '../data/captains'
-import { CHARACTERS, MEMBER, ROSTER_IDS } from '../data/characters'
-import type { CaptainId } from '../types/captains'
+import { CHARACTERS, MEMBER, ROSTER_IDS, TEAM } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { WAVE } from '../data/waves'
 import { browserStorage } from '../util/storage'
@@ -9,12 +7,10 @@ import type { Hazard, MapId } from '../types/maps'
 import type { EnemyKind } from '../types/enemies'
 import { MAP_IDS } from '../data/maps'
 import { drawRecruitPool, recruitSeed, refreshRecruitSeed, unlockedCount } from './recruit'
-import { waveDurationMs } from '../data/waves'
 import type { XpState } from '../types/xp'
 import { SceneKey } from '../scene/keys'
 
 export interface RunState {
-  captainId: CaptainId
   mapId: MapId
   sandbox: boolean
   decorSeed: number
@@ -28,7 +24,6 @@ export interface RunState {
   memberHp: number[]
   memberItems: ItemId[][]
   freeRefreshes: number
-  skillCdMs: number
   skillCd: number[]
   leaderId: CharacterId
   stats: {
@@ -45,32 +40,22 @@ export interface RunState {
 
 let current: RunState | undefined
 
-export function beginRun(
-  captainId: CaptainId,
-  starters: readonly CharacterId[],
-  mapId: MapId = MAP_IDS[0]!,
-  sandbox = false,
-): RunState {
-  const captain = CAPTAINS[captainId]
-  let skippedMs = 0
-  for (let w = 1; w < captain.startWave; w++) skippedMs += waveDurationMs(w)
+export function beginRun(starters: readonly CharacterId[], mapId: MapId = MAP_IDS[0]!, sandbox = false): RunState {
   const roster = [...starters]
   current = {
-    captainId,
-    recruitPool: drawRecruitPool(recruitSeed(browserStorage(), captainId), ROSTER_IDS),
+    recruitPool: drawRecruitPool(recruitSeed(browserStorage()), ROSTER_IDS),
     mapId,
     sandbox,
     decorSeed: (Math.random() * 0xffffffff) >>> 0,
-    wave: captain.startWave,
-    coins: captain.startCoins,
+    wave: 1,
+    coins: 0,
     kills: 0,
     xp: { level: 1, xp: 0 },
-    combatMs: skippedMs,
+    combatMs: 0,
     roster,
     memberHp: roster.map(() => MEMBER.maxHp),
     memberItems: roster.map(() => []),
     freeRefreshes: 0,
-    skillCdMs: 0,
     skillCd: roster.map(() => 0),
     leaderId: roster[0]!,
     stats: {
@@ -87,30 +72,22 @@ export function beginRun(
   return current
 }
 
-export function tickSkillCd(remainMs: number, deltaMs: number): number {
-  return Math.max(0, remainMs - deltaMs)
-}
-
 export function currentRun(): RunState | undefined {
   return current
 }
 
 export function getRun(): RunState {
-  if (!current) return beginRun('angel', ROSTER_IDS.slice(0, 1))
+  if (!current) return beginRun(ROSTER_IDS.slice(0, 1))
   return current
 }
 
 export function endRun(): void {
-  if (current) refreshRecruitSeed(browserStorage(), current.captainId)
+  if (current) refreshRecruitSeed(browserStorage())
   current = undefined
 }
 
-function rosterCap(run: RunState): number {
-  return CAPTAINS[run.captainId].teamSize
-}
-
 export function recruitUnlocked(run: RunState): number {
-  return Math.min(unlockedCount(Math.min(rosterCap(run), run.wave)), run.recruitPool.length)
+  return Math.min(unlockedCount(Math.min(TEAM.maxSize, run.wave)), run.recruitPool.length)
 }
 
 export function recruitCandidates(run: RunState): CharacterId[] {
@@ -118,11 +95,11 @@ export function recruitCandidates(run: RunState): CharacterId[] {
 }
 
 function recruitDue(run: RunState): boolean {
-  return run.roster.length < Math.min(rosterCap(run), run.wave)
+  return run.roster.length < Math.min(TEAM.maxSize, run.wave)
 }
 
 export function recruitDueCount(run: RunState): number {
-  const due = Math.min(rosterCap(run), run.wave) - run.roster.length
+  const due = Math.min(TEAM.maxSize, run.wave) - run.roster.length
   return Math.max(0, Math.min(due, recruitCandidates(run).length))
 }
 
