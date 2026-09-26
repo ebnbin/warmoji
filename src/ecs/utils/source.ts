@@ -4,7 +4,9 @@ import { enemyDef } from '../store'
 import { attributionSlot } from './amp'
 import type { Sim } from '../sim'
 import type { EnemyKind } from '../../types/enemies'
+import type { Hazard } from '../../types/maps'
 
+/** 一次伤害的来源：阵营决定打谁，其余是归因与倍率 */
 export interface Source {
   readonly faction: number
   readonly slot: number
@@ -12,6 +14,8 @@ export interface Source {
   readonly crit: number
   readonly dmgMul: number
   readonly enemy?: EnemyKind
+  readonly hazard?: Hazard
+  readonly tint?: number
   readonly sight?: { readonly x: number; readonly y: number }
 }
 
@@ -38,3 +42,9 @@ export function boltSource(slot: number): Source {
 export function enemySource(enemy: EnemyKind, dmgMul: number): Source {
   return { faction: FACTION.enemy, slot: -1, kb: 1, crit: 0, dmgMul, enemy }
 }
+
+export function hazardSource(hazard: Hazard, tint: number): Source {
+  return { faction: FACTION.world, slot: -1, kb: 1, crit: 0, dmgMul: 1, hazard, tint }
+}
+
+export const WORLD_SOURCE: Source = { faction: FACTION.world, slot: -1, kb: 1, crit: 0, dmgMul: 1 }

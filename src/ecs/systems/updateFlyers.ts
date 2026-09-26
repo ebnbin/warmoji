@@ -4,7 +4,7 @@ import { DEG2RAD } from '../../util/units'
 import { Boomerang, CoinMagnet, Flyer, Frozen, Thrown, Transform, Uid } from '../components'
 import { flyerHits } from '../store'
 import { cooldownMul, ownerX, ownerY } from '../utils/amp'
-import { damageTarget } from './shared/damage'
+import { hit } from './shared/damage'
 import { sourceOf } from '../utils/source'
 import { targetsNear } from '../utils/targets'
 import type { Sim } from '../sim'
@@ -54,7 +54,7 @@ export function updateFlyers(sim: Sim): void {
       const rr = Boomerang.hitRadius[e]! + t.radius
       if (dx * dx + dy * dy > rr * rr) continue
       hits.add(Uid.v[t.eid]!)
-      damageTarget(sim, src, t.eid, Flyer.damage[f]!, Boomerang.knockback[e]!, Transform.x[f]!, Transform.y[f]!)
+      hit(sim, src, t.eid, Flyer.damage[f]!, { knockback: Boomerang.knockback[e]!, from: { x: Transform.x[f]!, y: Transform.y[f]! } })
     }
   }
 }

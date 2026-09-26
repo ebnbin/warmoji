@@ -1,6 +1,7 @@
 import { UNIT } from '../../../util/units'
 import { MEMBER, TEAM } from '../../../data/characters'
-import { Alive, CharScale, Facing, Iframe, Leaping, Radius, Rushing, Seat, Transform } from '../../components'
+import { Alive, CharScale, Facing, Leaping, Radius, Rushing, Seat, Transform } from '../../components'
+import { grantIframe } from './combat'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import { handoverMs } from './squad'
@@ -73,7 +74,7 @@ export function switchLeader(sim: Sim, eid: number): void {
   // 扇形整体搬家：阵亡者重新预订最近的空位，按归位速度过去而不是瞬移
   for (const f of sim.characters) if (!Alive.v[f]) Seat.ghost[f] = 0
   const ms = handoverMs()
-  Iframe.last[eid] = Math.max(Iframe.last[eid]!, sim.elapsedMs + ms - Iframe.ms[eid]!)
+  grantIframe(sim, eid, ms)
   sim.handover = { msLeft: ms, ms, from, to: eid, fromScale: CharScale.v[from]!, toScale: CharScale.v[eid]!, camX: d.x, camY: d.y }
 }
 

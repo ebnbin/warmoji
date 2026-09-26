@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { Alive, ENEMY_SET, Hp, CharHp, Transform } from '../../components'
+import { Alive, ENEMY_SET, Hp, Transform } from '../../components'
 import type { Sim } from '../../sim'
 
 export function healCharacters(sim: Sim, x: number, y: number, range: number, amount: number, all: boolean): number {
@@ -10,8 +10,8 @@ export function healCharacters(sim: Sim, x: number, y: number, range: number, am
       if (!Alive.v[m]) continue
       const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
       if (d.x * d.x + d.y * d.y > r2) continue
-      if (CharHp.hp[m]! >= CharHp.max[m]!) continue
-      CharHp.hp[m] = Math.min(CharHp.max[m]!, CharHp.hp[m]! + amount)
+      if (Hp.v[m]! >= Hp.max[m]!) continue
+      Hp.v[m] = Math.min(Hp.max[m]!, Hp.v[m]! + amount)
       n++
     }
     return n
@@ -22,15 +22,15 @@ export function healCharacters(sim: Sim, x: number, y: number, range: number, am
     if (!Alive.v[m]) continue
     const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
     if (d.x * d.x + d.y * d.y > r2) continue
-    if (CharHp.hp[m]! >= CharHp.max[m]!) continue
-    const ratio = CharHp.hp[m]! / CharHp.max[m]!
+    if (Hp.v[m]! >= Hp.max[m]!) continue
+    const ratio = Hp.v[m]! / Hp.max[m]!
     if (ratio < bestRatio) {
       bestRatio = ratio
       best = m
     }
   }
   if (best < 0) return 0
-  CharHp.hp[best] = Math.min(CharHp.max[best]!, CharHp.hp[best]! + amount)
+  Hp.v[best] = Math.min(Hp.max[best]!, Hp.v[best]! + amount)
   return 1
 }
 

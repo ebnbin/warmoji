@@ -2,7 +2,7 @@ import { query } from 'bitecs'
 import { Dormant, PrevPos, Proj, Radius, SweptHit, Transform, Uid, ENEMY_SET } from '../components'
 import { applyAbilityEffects } from './shared/effects'
 import { boltSource } from '../utils/source'
-import { damageTarget } from './shared/damage'
+import { hit } from './shared/damage'
 import { cullProjectile } from './shared/projectile'
 import { enemyDef, projHitUids, projOnHit } from '../store'
 import type { Sim } from '../sim'
@@ -28,14 +28,14 @@ export function hitSweptProjectiles(sim: Sim): void {
     const sy = PrevPos.y[eid]!
     const bx = Transform.x[eid]!
     const by = Transform.y[eid]!
-    const hit = projHitUids[eid]!
+    const struck = projHitUids[eid]!
     const pr = Proj.radius[eid]!
     const found: { enemy: number; t: number; d2: number }[] = []
     const segX = bx - sx
     const segY = by - sy
     const segLen2 = segX * segX + segY * segY
     for (const en of enemies) {
-      if (enemyDef[en] === undefined || Dormant.v[en] || hit.has(Uid.v[en]!)) continue
+      if (enemyDef[en] === undefined || Dormant.v[en] || struck.has(Uid.v[en]!)) continue
       const rr = pr + Radius.v[en]!
       const w = sim.hooks.worldDelta(sim, sx, sy, Transform.x[en]!, Transform.y[en]!)
       const tx2 = sx + w.x
@@ -47,11 +47,11 @@ export function hitSweptProjectiles(sim: Sim): void {
     found.sort((p, q) => p.t - q.t)
     const f = found[0]
     if (f === undefined) continue
-    hit.add(Uid.v[f.enemy]!)
+    struck.add(Uid.v[f.enemy]!)
     const hx = Transform.x[f.enemy]!
     const hy = Transform.y[f.enemy]!
     const src = boltSource(Proj.srcSlot[eid]!)
-    damageTarget(sim, src, f.enemy, Proj.damage[eid]!, Proj.kb[eid]!, sx, sy)
+    hit(sim, src, f.enemy, Proj.damage[eid]!, { knockback: Proj.kb[eid]!, from: { x: sx, y: sy } })
     const onHit = projOnHit[eid]
     if (onHit && onHit.length > 0) {
       applyAbilityEffects(sim, src, onHit, {

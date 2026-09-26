@@ -47,6 +47,8 @@ export const projSrcEnemy: (EnemyKind | undefined)[] = new Array<EnemyKind | und
 
 export const zoneSrcEnemy: (EnemyKind | undefined)[] = new Array<EnemyKind | undefined>(INITIAL_CAPACITY).fill(undefined)
 
+export const poisonSrc: (import('./utils/source').Source | undefined)[] = new Array<import('./utils/source').Source | undefined>(INITIAL_CAPACITY).fill(undefined)
+
 export const animId: (string | undefined)[] = new Array<string | undefined>(INITIAL_CAPACITY).fill(undefined)
 export const animOutline: (import('../emoji/svg').OutlineKind | undefined)[] =
   new Array<import('../emoji/svg').OutlineKind | undefined>(INITIAL_CAPACITY).fill(undefined)

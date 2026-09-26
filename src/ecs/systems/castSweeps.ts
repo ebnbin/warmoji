@@ -2,7 +2,7 @@ import { DEG2RAD } from '../../util/units'
 import { playSfx } from '../../audio/sfx'
 import { sectorHitIndices } from '../utils/hit'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
-import { damageTarget } from './shared/damage'
+import { hit } from './shared/damage'
 import { Aim, Sweep, Swing } from '../components'
 import { abilityOnHit } from '../store'
 import { applyAbilityEffects } from './shared/effects'
@@ -25,7 +25,7 @@ export function castSweeps(sim: Sim): void {
     const damage = Math.round(Sweep.damage[e]! * damageMul(sim, e))
     const hits: number[] = []
     for (const i of sectorHitIndices({ x: ox, y: oy }, aim, Sweep.arcDeg[e]! * DEG2RAD, radius, list)) {
-      damageTarget(sim, src, list[i]!.eid, damage, Sweep.knockback[e]!, ox, oy)
+      hit(sim, src, list[i]!.eid, damage, { knockback: Sweep.knockback[e]!, from: { x: ox, y: oy } })
       hits.push(list[i]!.eid)
     }
     applyAbilityEffects(sim, src, abilityOnHit[e], { x: ox, y: oy, baseDamage: damage, targets: hits })

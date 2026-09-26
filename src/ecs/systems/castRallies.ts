@@ -1,5 +1,5 @@
-import { Alive, Iframe, CharFlash, CharHp, Rally, Tint } from '../components'
-import { reviveCharacter } from './shared/combat'
+import { Alive, CharFlash, Hp, Rally, Tint } from '../components'
+import { grantIframe, reviveCharacter } from './shared/combat'
 import { ownerX, ownerY } from '../utils/amp'
 import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
@@ -9,8 +9,8 @@ export function castRallies(sim: Sim, scan = castScan): void {
   scan(sim, Rally, (e) => {
     for (const m of sim.characters) {
       if (!Alive.v[m]) reviveCharacter(sim, m)
-      else CharHp.hp[m] = Math.min(CharHp.max[m]!, CharHp.hp[m]! + CharHp.max[m]! * Rally.healRatio[e]!)
-      Iframe.last[m] = sim.elapsedMs + Rally.invulnMs[e]! - Iframe.ms[m]!
+      else Hp.v[m] = Math.min(Hp.max[m]!, Hp.v[m]! + Hp.max[m]! * Rally.healRatio[e]!)
+      grantIframe(sim, m, Rally.invulnMs[e]!)
       CharFlash.until[m] = sim.fxMs + 320
       Tint.color[m] = 0xffe082
       Tint.effect[m] = 0

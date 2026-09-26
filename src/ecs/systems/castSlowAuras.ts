@@ -1,7 +1,7 @@
 import { hasComponent } from 'bitecs'
 import { Anchor, Aura, AuraDps, AuraFreeze, Faction, Pulse, Slow, SlowAura } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
-import { damageTarget } from './shared/damage'
+import { hit } from './shared/damage'
 import { spawnZone } from '../entities/zone'
 import { sourceOf } from '../utils/source'
 import { castScan } from './shared/castScan'
@@ -46,7 +46,7 @@ export function castSlowAuras(sim: Sim): void {
         for (const t of targetsNear(sim, src, x, y, radius)) {
           const dx = t.x - x
           const dy = t.y - y
-          if (dx * dx + dy * dy <= r2) damageTarget(sim, src, t.eid, damage)
+          if (dx * dx + dy * dy <= r2) hit(sim, src, t.eid, damage, { tick: true })
         }
       }
     }

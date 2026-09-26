@@ -4,7 +4,7 @@ import { abilityOnHit } from '../store'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { sourceOf } from '../utils/source'
 import { targetsNear } from '../utils/targets'
-import { damageTarget } from './shared/damage'
+import { hit } from './shared/damage'
 import { applyAbilityEffects } from './shared/effects'
 import { castScan } from './shared/castScan'
 import { spawnFxBoom, spawnFxCircle } from '../entities/fx'
@@ -20,7 +20,7 @@ export function castNovas(sim: Sim, scan = castScan): void {
     const list = targetsNear(sim, src, x, y, radius)
     const damage = Math.round(Nova.damage[e]! * damageMul(sim, e))
     applyAbilityEffects(sim, src, abilityOnHit[e], { x, y, baseDamage: damage, targets: list.map((t) => t.eid) })
-    if (damage > 0) for (const t of list) damageTarget(sim, src, t.eid, damage, Nova.knockback[e]!, x, y)
+    if (damage > 0) for (const t of list) hit(sim, src, t.eid, damage, { knockback: Nova.knockback[e]!, from: { x: x, y: y } })
     playSfx('boom')
     const color = Nova.color[e]!
     spawnFxCircle(sim, x, y, radius * 0.5, { fill: 0xffffff, fillAlpha: 0.8, fromScale: 0.6, toScale: 1.6, durationMs: 180, depth: 8 })

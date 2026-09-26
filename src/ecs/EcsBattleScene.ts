@@ -23,7 +23,7 @@ import { bossFor, MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, CharScale, Dormant, Enemy, Facing, GrantCoins, Hp, CharHp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
+import { Alive, Boss, CharScale, Dormant, Enemy, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
@@ -59,7 +59,9 @@ import { SceneKey } from '../scene/keys'
 import { battleDevProvider, watchSandboxSteady } from './devProvider'
 import { defineDevFlag } from '../devtools'
 import type { DevProvider, DevProviderHost } from '../devtools'
-import { applyDamage, gainTeamXp } from './systems/shared/combat'
+import { gainTeamXp } from './systems/shared/combat'
+import { hit } from './systems/shared/damage'
+import { WORLD_SOURCE } from './utils/source'
 import { canSwitchLeader, handoverCamOffset, switchLeader } from './systems/shared/leader'
 import { telegraphOne } from './entities/enemy'
 import { enemyDef } from './store'
@@ -167,7 +169,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   devKillAll(): void {
     const sim = this.sim
     if (!sim || sim.over) return
-    for (const eid of [...query(this.world, [Enemy])]) if (!Dormant.v[eid]) applyDamage(sim, eid, 1e9)
+    for (const eid of [...query(this.world, [Enemy])]) if (!Dormant.v[eid]) hit(sim, WORLD_SOURCE, eid, 1e9, { tick: true })
   }
 
   devGrant(kind: 'coins' | 'level'): void {
@@ -397,7 +399,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       dead?.setVisible(false)
       this.shownCountdown[i] = -1
       g.setVisible(true).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
-      const ratio = Math.max(0, CharHp.hp[m]! / CharHp.max[m]!)
+      const ratio = Math.max(0, Hp.v[m]! / Hp.max[m]!)
       if (Math.abs(ratio - this.shownHp[i]!) < 0.005) continue
       this.shownHp[i] = ratio
       const w = 0.8 * UNIT
@@ -471,8 +473,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
           cdRemainMs: this.run.skillCd[slot] ?? 0,
           cdMs: def.skill.cdMs,
           alive: Alive.v[m] === 1,
-          hp: CharHp.hp[m]!,
-          max: CharHp.max[m]!,
+          hp: Hp.v[m]!,
+          max: Hp.max[m]!,
           reviveSec: Math.max(0, Math.ceil((Revive.at[m]! - sim.elapsedMs) / 1000)),
         }
       }),
@@ -555,8 +557,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     if (!sim) return
     const mh = sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
     for (const m of sim.characters) {
-      CharHp.max[m] = mh
-      CharHp.hp[m] = sandboxInvincible() ? mh : Math.min(CharHp.hp[m]!, mh)
+      Hp.max[m] = mh
+      Hp.v[m] = sandboxInvincible() ? mh : Math.min(Hp.v[m]!, mh)
     }
   }
 

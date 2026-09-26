@@ -1,7 +1,9 @@
 import { query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
-import { Alive, Drive, Charge, Detonate, DmgMul, EState, Flash, Radius, Iframe, Slowed, Speed, Steering, Tint, Transform } from '../components'
-import { despawnEnemy, hurtCharacter } from './shared/combat'
+import { Alive, Drive, Charge, Detonate, DmgMul, EState, Flash, Radius, Slowed, Speed, Steering, Tint, Transform } from '../components'
+import { despawnEnemy } from './shared/combat'
+import { hit } from './shared/damage'
+import { enemySource } from '../utils/source'
 import { nearestAlive } from './shared/steer'
 import { enemyDef } from '../store'
 import type { Sim } from '../sim'
@@ -28,9 +30,8 @@ export function steerDetonate(sim: Sim): void {
         const d = sim.hooks.worldDelta(sim, ex, ey, Transform.x[m]!, Transform.y[m]!)
         const rr = r + Radius.v[m]!
         if (d.x * d.x + d.y * d.y > rr * rr) continue
-        if (now - Iframe.last[m]! < Iframe.ms[m]!) continue
-        Iframe.last[m] = now
-        hurtCharacter(sim, m, dmg, enemyDef[eid]?.kind)
+        const kind = enemyDef[eid]?.kind
+        if (kind) hit(sim, enemySource(kind, DmgMul.v[eid]!), m, dmg)
       }
       spawnFxRing(sim, ex, ey, r, BLAST_RING)
       playSfx('boom')

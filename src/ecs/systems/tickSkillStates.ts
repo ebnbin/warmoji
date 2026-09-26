@@ -3,7 +3,7 @@ import { Alive, Hidden, Leap, Leaping, Rush, RushHit, Rushing, Tint, Transform, 
 import { damageMul } from '../utils/amp'
 import { sourceOf } from '../utils/source'
 import { targetsNear } from '../utils/targets'
-import { damageTarget } from './shared/damage'
+import { hit } from './shared/damage'
 import { applyBlast } from './shared/effects'
 import { spawnFxBoom, spawnFxCircle } from '../entities/fx'
 import type { Sim } from '../sim'
@@ -41,7 +41,7 @@ function rushHits(sim: Sim, m: number): void {
   for (const t of targetsNear(sim, src, x, y, Rush.hitRadius[e]!)) {
     if (RushHit.stamp[t.eid] === stamp) continue
     RushHit.stamp[t.eid] = stamp
-    damageTarget(sim, src, t.eid, damage, Rush.knockback[e]!, x, y)
+    hit(sim, src, t.eid, damage, { knockback: Rush.knockback[e]!, from: { x: x, y: y } })
   }
 }
 

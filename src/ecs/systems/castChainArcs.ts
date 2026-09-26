@@ -2,7 +2,7 @@ import { playSfx } from '../../audio/sfx'
 import { ChainArc } from '../components'
 import { abilityOnHit } from '../store'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
-import { damageTarget } from './shared/damage'
+import { hit } from './shared/damage'
 import { applyAbilityEffects } from './shared/effects'
 import { sourceOf } from '../utils/source'
 import { castScan } from './shared/castScan'
@@ -27,7 +27,7 @@ export function castChainArcs(sim: Sim): void {
       visited.add(cur.eid)
       const from = points[points.length - 1]!
       points.push({ x: cur.x, y: cur.y })
-      damageTarget(sim, src, cur.eid, Math.max(1, Math.round(damage)), ChainArc.knockback[e]!, from.x, from.y)
+      hit(sim, src, cur.eid, Math.max(1, Math.round(damage)), { knockback: ChainArc.knockback[e]!, from: { x: from.x, y: from.y } })
       last = cur
       damage *= ChainArc.decay[e]!
       cur = nearestTarget(sim, src, cur.x, cur.y, ChainArc.arcRange[e]!, visited)

@@ -1,73 +1,54 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { norm } from '../../../util/vec'
 import { playSfx } from '../../../audio/sfx'
 import { gainXp } from '../../../run/xp'
 import { coinDropChance } from '../../../data/waves'
 import { ELITE } from '../../../data/enemies'
-import type { EnemyDef, EnemyKind } from '../../../types/enemies'
-import type { Hazard } from '../../../types/maps'
+import type { EnemyDef } from '../../../types/enemies'
 import { MEMBER } from '../../../data/characters'
 import { UNIT } from '../../../util/units'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anchored, Anim, Boss, DmgMul, Dormant, Elite, Enemy, ENEMY_SET, Flash, Hp, Iframe, CharFlash, CharHp, CharScale, Morph, CharPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Taunting, Thief, Tint, Transform } from '../../components'
-import { impulse } from './body'
+import { Alive, Anchored, Anim, Boss, DmgMul, Elite, ENEMY_SET, Hp, Iframe, CharScale, Morph, CharPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from '../../components'
 import { enemyCarries, enemyDef } from '../../store'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
+import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
-import { spawnDamageNumber } from '../../entities/fx'
 
-export function applyDamage(
-  sim: Sim,
-  eid: number,
-  damage: number,
-  knockback = 0,
-  srcX?: number,
-  srcY?: number,
-  srcSlot = -1,
-  crit = false,
-): void {
-  if (!hasComponent(sim.world, eid, Enemy) || Dormant.v[eid]) return
-  const morphed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
-  const dmg = morphed && Morph.vuln[eid] !== 1 ? Math.round(damage * Morph.vuln[eid]!) : damage
-  spawnDamageNumber(sim, Transform.x[eid]!, Transform.y[eid]!, dmg, crit)
-  const hp = Hp.v[eid]! - dmg
-  const st = sim.run.stats
-  if (srcSlot >= 0 && srcSlot < st.damage.length) {
-    st.damage[srcSlot] = (st.damage[srcSlot] ?? 0) + Math.min(dmg, Math.max(0, Hp.v[eid]!))
-  }
-  const anchored = hasComponent(sim.world, eid, Anchored)
-  if (hp <= 0) {
-    let flingVx = 0
-    let flingVy = 0
-    if (knockback > 0 && srcX !== undefined && srcY !== undefined && !anchored) {
-      const d = sim.hooks.worldDelta(sim, srcX, srcY, Transform.x[eid]!, Transform.y[eid]!)
-      const dir = norm(d.x, d.y)
-      flingVx = dir.x * knockback
-      flingVy = dir.y * knockback
-    }
-    killEnemy(sim, eid, srcSlot, flingVx, flingVy)
+/** 生命归零：带复活计时的身体倒地等待，其余身体死亡移除 */
+export function die(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: number): void {
+  if (hasComponent(sim.world, eid, Revive)) {
+    down(sim, eid)
     return
   }
-  Hp.v[eid] = hp
-  playSfx('hit')
-  Flash.until[eid] = sim.elapsedMs + 70
-  Tint.effect[eid] = 1
-  Tint.color[eid] = 0xffffff
-  if (knockback > 0 && srcX !== undefined && srcY !== undefined) {
-    const d = sim.hooks.worldDelta(sim, srcX, srcY, Transform.x[eid]!, Transform.y[eid]!)
-    const dir = norm(d.x, d.y)
-    impulse(sim, eid, dir.x * knockback, dir.y * knockback)
-  }
+  const anchored = hasComponent(sim.world, eid, Anchored)
+  killEnemy(sim, eid, src.slot, anchored ? 0 : flingVx, anchored ? 0 : flingVy)
 }
 
-function killEnemy(sim: Sim, eid: number, srcSlot = -1, flingVx = 0, flingVy = 0): void {
+function down(sim: Sim, eid: number): void {
+  Hp.v[eid] = 0
+  Alive.v[eid] = 0
+  Revive.at[eid] = sim.elapsedMs + Revive.ms[eid]!
+  Tint.color[eid] = 0x888888
+  Tint.alpha[eid] = 0.35
+  const st = sim.run.stats
+  const slot = Slot.v[eid]!
+  if (slot >= 0 && slot < st.deaths.length) st.deaths[slot] = (st.deaths[slot] ?? 0) + 1
+  Anim.frames[eid] = -1
+  Anim.onceFrames[eid] = 0
+  Transform.rot[eid] = 0
+  Transform.w[eid] = MEMBER.size * UNIT * CharScale.v[eid]!
+  Transform.h[eid] = MEMBER.size * UNIT * CharScale.v[eid]!
+  sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
+  if (sim.characters.every((x) => !Alive.v[x])) sim.over = true
+}
+
+function killEnemy(sim: Sim, eid: number, srcSlot: number, flingVx: number, flingVy: number): void {
   sim.run.kills++
   const st = sim.run.stats
   if (srcSlot >= 0 && srcSlot < st.kills.length) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
   const killer = sim.characters[srcSlot]
   if (killer !== undefined && Alive.v[killer] && CharPerk.killHeal[killer]! > 0) {
-    CharHp.hp[killer] = Math.min(CharHp.max[killer]!, CharHp.hp[killer]! + CharPerk.killHeal[killer]!)
+    Hp.v[killer] = Math.min(Hp.max[killer]!, Hp.v[killer]! + CharPerk.killHeal[killer]!)
   }
   playSfx('kill')
   const def = enemyDef[eid]
@@ -146,48 +127,9 @@ export function despawnEnemy(sim: Sim, eid: number, puff = true): void {
   removeEntity(sim.world, eid)
 }
 
-export function hurtCharacter(sim: Sim, eid: number, damage: number, enemy?: EnemyKind, tint = 0xff7777): void {
-  const byEnemy = sim.run.stats.enemyDamage
-  if (enemy) byEnemy[enemy] = (byEnemy[enemy] ?? 0) + damage
-  hurt(sim, eid, damage, tint)
-}
-
-export function hurtByHazard(sim: Sim, eid: number, damage: number, hazard: Hazard, tint: number): void {
-  const byHazard = sim.run.stats.hazardDamage
-  byHazard[hazard] = (byHazard[hazard] ?? 0) + damage
-  hurt(sim, eid, damage, tint)
-}
-
-function hurt(sim: Sim, eid: number, rawDamage: number, tint: number): void {
-  const shielded = sim.elapsedMs < Taunting.until[eid]!
-  const damage = shielded ? Math.max(1, Math.round(rawDamage * Taunting.mul[eid]!)) : rawDamage
-  const st = sim.run.stats
-  const slot = Slot.v[eid]!
-  if (slot >= 0 && slot < st.damageTaken.length) {
-    st.damageTaken[slot] = (st.damageTaken[slot] ?? 0) + damage
-  }
-  const hp = Math.max(0, CharHp.hp[eid]! - damage)
-  CharHp.hp[eid] = hp
-  playSfx('hurt')
-  sim.characterHitCount++
-  CharFlash.until[eid] = sim.fxMs + 120
-  Tint.color[eid] = tint
-  Tint.effect[eid] = 0
-  if (hp <= 0) {
-    Alive.v[eid] = 0
-    Revive.at[eid] = sim.elapsedMs + Revive.ms[eid]!
-    Tint.color[eid] = 0x888888
-    Tint.alpha[eid] = 0.35
-    const deaths = sim.run.stats.deaths
-    if (slot >= 0 && slot < deaths.length) deaths[slot] = (deaths[slot] ?? 0) + 1
-    Anim.frames[eid] = -1
-    Anim.onceFrames[eid] = 0
-    Transform.rot[eid] = 0
-    Transform.w[eid] = MEMBER.size * UNIT * CharScale.v[eid]!
-    Transform.h[eid] = MEMBER.size * UNIT * CharScale.v[eid]!
-    sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
-    if (sim.characters.every((x) => !Alive.v[x])) sim.over = true
-  }
+/** 无敌窗口只能延长，不能缩短 */
+export function grantIframe(sim: Sim, eid: number, ms: number): void {
+  Iframe.last[eid] = Math.max(Iframe.last[eid]!, sim.elapsedMs + ms - Iframe.ms[eid]!)
 }
 
 export function reviveCharacter(sim: Sim, eid: number): void {
@@ -195,7 +137,7 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   playSfx('revive')
   Alive.v[eid] = 1
   Anim.frames[eid] = 0
-  CharHp.hp[eid] = CharHp.max[eid]!
+  Hp.v[eid] = Hp.max[eid]!
   Iframe.last[eid] = now
   Tint.color[eid] = 0xffffff
   Tint.alpha[eid] = 1
@@ -204,4 +146,3 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   Transform.w[eid] = MEMBER.size * UNIT * 0.3 * CharScale.v[eid]!
   Transform.h[eid] = MEMBER.size * UNIT * 0.3 * CharScale.v[eid]!
 }
-

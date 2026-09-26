@@ -2,10 +2,11 @@ import { strongestTarget } from '../utils/assassinate'
 import { blinkFlash } from './shared/assassinate'
 import { hasComponent } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
-import { Aim, Assassinate, Blink, Execute, Followup, Hp, Iframe, Owner, VisOff } from '../components'
+import { Aim, Assassinate, Blink, Execute, Followup, Hp, Owner, VisOff } from '../components'
+import { grantIframe } from './shared/combat'
 import { abilityOnHit } from '../store'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
-import { damageTarget } from './shared/damage'
+import { hit } from './shared/damage'
 import { applyAbilityEffects } from './shared/effects'
 import { sourceOf } from '../utils/source'
 import { castScan } from './shared/castScan'
@@ -36,7 +37,7 @@ export function castAssassinates(sim: Sim): void {
     VisOff.y[m] = Blink.y[e]!
     const strikeMs = Assassinate.strikeMs[e]!
     Followup.left[e] = strikeMs
-    Iframe.last[m] = sim.elapsedMs + strikeMs + 200 - Iframe.ms[m]!
+    grantIframe(sim, m, strikeMs + 200)
     playSfx('whoosh')
     blinkFlash(sim, landX, landY)
 
@@ -46,7 +47,7 @@ export function castAssassinates(sim: Sim): void {
       const maxHp = Hp.max[target.eid] ?? 0
       if (maxHp > 0 && hp / maxHp <= Execute.hpRatio[e]!) damage = Math.round(damage * Execute.mul[e]!)
     }
-    damageTarget(sim, src, target.eid, damage, Assassinate.knockback[e]!, landX, landY)
+    hit(sim, src, target.eid, damage, { knockback: Assassinate.knockback[e]!, from: { x: landX, y: landY } })
     applyAbilityEffects(sim, src, abilityOnHit[e], {
       x: target.x,
       y: target.y,

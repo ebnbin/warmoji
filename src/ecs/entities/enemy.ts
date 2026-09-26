@@ -8,6 +8,9 @@ import {
   Alive,
   Anchored,
   Anim,
+  AtkSlow,
+  DmgBuff,
+  Guard,
   BaseOrbit,
   Boss,
   BreaksWalls,
@@ -175,6 +178,9 @@ export function spawnEnemy(
   addComponent(world, eid, Boss)
   addComponent(world, eid, Radius)
   addComponent(world, eid, DmgMul)
+  addComponent(world, eid, DmgBuff)
+  addComponent(world, eid, AtkSlow)
+  addComponent(world, eid, Guard)
   addComponent(world, eid, SpMul)
   addComponent(world, eid, Phys)
   addComponent(world, eid, Drive)
@@ -231,8 +237,13 @@ export function spawnEnemy(
   if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
   Despawn.at[eid] = 0
   Morph.until[eid] = 0
-  Morph.vuln[eid] = 1
   Morph.cdUntil[eid] = 0
+  Guard.until[eid] = 0
+  Guard.mul[eid] = 1
+  DmgBuff.until[eid] = 0
+  DmgBuff.mul[eid] = 1
+  AtkSlow.until[eid] = 0
+  AtkSlow.mul[eid] = 1
   Thief.eaten[eid] = 0
   Thief.nextEatAt[eid] = 0
   enemyCarries[eid] = undefined
@@ -368,7 +379,8 @@ export function applyMorph(
   const until = sim.elapsedMs + spec.durationMs
   Morph.cdUntil[eid] = until + MORPH_RECAST_CD
   Morph.until[eid] = until
-  Morph.vuln[eid] = spec.vulnMul ?? 1
+  Guard.until[eid] = until
+  Guard.mul[eid] = spec.vulnMul ?? 1
   if (!wasMorphed) {
     const outline = Elite.v[eid] ? 'elite' : 'enemy'
     Sprite.frame[eid] = atlas.index(spec.morphEmoji, outline)
@@ -395,6 +407,7 @@ export function restoreMorphVisual(sim: Sim, atlas: FrameIndex, eid: number): vo
     addComponent(sim.world, eid, Anchored)
     Morph.anchored[eid] = 0
   }
+  Guard.until[eid] = 0
   const outline = Elite.v[eid] ? 'elite' : 'enemy'
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)

@@ -76,9 +76,9 @@ export const Alive = { v: u8() }
 
 export const CharPerk = { thorns: f32(), killHeal: f32(), regenPerSec: f32() }
 
-export const CharAtkSlow = { until: f32(), mul: f32() }
+/** 攻击冷却的倍率状态，任何持有能力的身体都可以有 */
+export const AtkSlow = { until: f32(), mul: f32() }
 
-export const CharHp = { hp: f32(), max: f32() }
 export const CharScale = { v: f32() }
 export const Iframe = { ms: f32(), last: f32() }
 export const Revive = { ms: f32(), at: f32() }
@@ -87,6 +87,9 @@ export const CharFlash = { until: f32() }
 export const Enemy = {}
 
 export const Hp = { v: f32(), max: f32() }
+
+/** 受到伤害的倍率：嘲讽者的减伤、变形者的脆弱都是它 */
+export const Guard = { mul: f32(), until: f32() }
 
 export const Speed = { v: f32() }
 
@@ -125,14 +128,14 @@ export const ETurn = { at: f32() }
 
 export const Slow = { until: f32(), mul: f32() }
 
-export const Poison = { until: f32(), nextTick: f32(), dmg: f32(), tickMs: f32(), slot: i32() }
+export const Poison = { until: f32(), nextTick: f32(), dmg: f32(), tickMs: f32() }
 
 export const Charge = { windupUntil: f32(), dashUntil: f32(), coolUntil: f32(), nextDashAt: f32() }
 
 export const Despawn = { at: f32() }
 
 /** anchored：变形前是否锚定，恢复时还回去 */
-export const Morph = { until: f32(), vuln: f32(), cdUntil: f32(), anchored: u8() }
+export const Morph = { until: f32(), cdUntil: f32(), anchored: u8() }
 
 export const Anim = {
   base: i32(),
@@ -269,7 +272,7 @@ export const Weapon = {}
 
 export const Owner = { eid: i32() }
 
-export const FACTION = { team: 0, enemy: 1 } as const
+export const FACTION = { team: 0, enemy: 1, world: 2 } as const
 
 export const Faction = { v: u8() }
 
@@ -464,9 +467,6 @@ export const RushHit = { stamp: f32() }
 
 /** 跳跃中的身体：沿 from→to 的抛物线前进，落地那帧 landed 为 1 */
 export const Leaping = { active: u8(), landed: u8(), msLeft: f32(), ms: f32(), fromX: f32(), fromY: f32(), toX: f32(), toY: f32(), skill: i32() }
-
-/** 嘲讽者自己的减伤 */
-export const Taunting = { until: f32(), mul: f32() }
 
 /** 被嘲讽的敌人只追嘲讽者，直到到期或嘲讽者阵亡 */
 export const Taunted = { until: f32(), by: i32() }

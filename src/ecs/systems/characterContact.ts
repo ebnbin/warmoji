@@ -1,8 +1,8 @@
-import { hasComponent, query } from 'bitecs'
-import { Alive, DmgMul, Dormant, Enemy, ENEMY_SET, Iframe, Morph, CharPerk, Radius, Slot, Transform } from '../components'
-import { applyDamage, hurtCharacter } from './shared/combat'
+import { query } from 'bitecs'
+import { Alive, DmgMul, Dormant, ENEMY_SET, Morph, CharPerk, Radius, Slot, Transform } from '../components'
+import { hit } from './shared/damage'
 import { applyAbilityEffects } from './shared/effects'
-import { enemySource } from '../utils/source'
+import { boltSource, enemySource } from '../utils/source'
 import { enemyDef } from '../store'
 import type { Sim } from '../sim'
 
@@ -13,7 +13,6 @@ export function characterContact(sim: Sim): void {
   const now = sim.elapsedMs
   for (const m of sim.characters) {
     if (!Alive.v[m]) continue
-    if (now - Iframe.last[m]! < Iframe.ms[m]!) continue
     const mx = Transform.x[m]!
     const my = Transform.y[m]!
     const hr = Radius.v[m]!
@@ -26,11 +25,8 @@ export function characterContact(sim: Sim): void {
       if (!def) continue
       if (def.damage <= 0) continue
       if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue
-      Iframe.last[m] = now
-      hurtCharacter(sim, m, Math.max(1, Math.round(def.damage * DmgMul.v[eid]!)), def.kind)
-      if (CharPerk.thorns[m]! > 0 && hasComponent(sim.world, eid, Enemy)) {
-        applyDamage(sim, eid, CharPerk.thorns[m]!, 0, undefined, undefined, Slot.v[m]!)
-      }
+      if (!hit(sim, enemySource(def.kind, DmgMul.v[eid]!), m, Math.max(1, Math.round(def.damage * DmgMul.v[eid]!)))) continue
+      if (CharPerk.thorns[m]! > 0) hit(sim, boltSource(Slot.v[m]!), eid, CharPerk.thorns[m]!)
       if (def.onContact && def.onContact.length > 0) {
         applyAbilityEffects(sim, enemySource(def.kind, 1), def.onContact, {
           x: mx,

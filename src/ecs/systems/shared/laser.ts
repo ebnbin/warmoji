@@ -2,7 +2,7 @@ import { playSfx } from '../../../audio/sfx'
 import { thrustHitIndices } from '../../utils/hit'
 import { Laser } from '../../components'
 import { damageMul, ownerX, ownerY } from '../../utils/amp'
-import { damageTarget } from './damage'
+import { hit } from './damage'
 import { sourceOf } from '../../utils/source'
 import { targetsNear } from '../../utils/targets'
 import type { Sim } from '../../sim'
@@ -18,7 +18,7 @@ export function fireBeam(sim: Sim, e: number, angle: number, ratio: number): voi
   const oy = ownerY(e)
   const list = targetsNear(sim, src, ox, oy, range + beamRadius)
   for (const i of thrustHitIndices({ x: ox, y: oy }, angle, range, beamRadius, list)) {
-    damageTarget(sim, src, list[i]!.eid, damage, Laser.knockback[e]!, ox, oy)
+    hit(sim, src, list[i]!.eid, damage, { knockback: Laser.knockback[e]!, from: { x: ox, y: oy } })
   }
   spawnFxBeam(sim, ox, oy, angle, range, beamRadius, Laser.color[e]!)
 }

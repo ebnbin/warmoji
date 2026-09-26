@@ -1,11 +1,12 @@
 import { hasComponent } from 'bitecs'
 import type { Effect } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
-import { Enemy, CharAtkSlow, Morph, Poison, Slow } from '../../components'
+import { Enemy, AtkSlow, Morph, Poison, Slow } from '../../components'
+import { poisonSrc } from '../../store'
 import { applyMorph } from '../../entities/enemy'
 import { spawnEnemyProjectile } from '../../entities/projectile'
 import { spawnZone } from '../../entities/zone'
-import { damageTarget } from './damage'
+import { hit } from './damage'
 import { FACTION } from '../../components'
 import { healEnemies, healCharacters } from './heal'
 import { nearestAngle, targetsNear } from '../../utils/targets'
@@ -37,64 +38,64 @@ export function applyBlast(
   for (const i of circleHitIndices({ x, y }, radius, list)) {
     const t = list[i]!
     if (exclude?.has(t.eid)) continue
-    damageTarget(sim, src, t.eid, damage, knockback, x, y)
+    hit(sim, src, t.eid, damage, { knockback: knockback, from: { x: x, y: y } })
   }
 }
 
-function eachCapable(sim: Sim, hit: HitCtx, comp: object, apply: (t: number) => void): void {
-  for (const t of hit.targets ?? []) {
+function eachCapable(sim: Sim, at: HitCtx, comp: object, apply: (t: number) => void): void {
+  for (const t of at.targets ?? []) {
     if (hasComponent(sim.world, t, comp)) apply(t)
   }
 }
 
 type EffectOf = ByKind<Effect>
 
-type Handler<K extends keyof EffectOf> = (sim: Sim, src: Source, fx: EffectOf[K], hit: HitCtx) => void
+type Handler<K extends keyof EffectOf> = (sim: Sim, src: Source, fx: EffectOf[K], at: HitCtx) => void
 
 const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
-  blast: (sim, src, fx, hit) => {
-    const dmg = Math.max(1, Math.round(hit.baseDamage * fx.ratio))
-    applyBlast(sim, src, hit.x, hit.y, dmg, fx.radius, fx.knockback, hit.exclude)
-    if (fx.ring) spawnFxRing(sim, hit.x, hit.y, fx.radius, fx.ring)
+  blast: (sim, src, fx, at) => {
+    const dmg = Math.max(1, Math.round(at.baseDamage * fx.ratio))
+    applyBlast(sim, src, at.x, at.y, dmg, fx.radius, fx.knockback, at.exclude)
+    if (fx.ring) spawnFxRing(sim, at.x, at.y, fx.radius, fx.ring)
   },
 
-  slow: (sim, _src, fx, hit) => {
+  slow: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, hit, Slow, (t) => {
+    eachCapable(sim, at, Slow, (t) => {
       Slow.until[t] = until
       Slow.mul[t] = fx.factor
     })
   },
 
-  poison: (sim, src, fx, hit) => {
+  poison: (sim, src, fx, at) => {
     const now = sim.elapsedMs
-    eachCapable(sim, hit, Poison, (t) => {
+    eachCapable(sim, at, Poison, (t) => {
       Poison.until[t] = now + fx.durationMs
       Poison.nextTick[t] = now + fx.tickMs
       Poison.dmg[t] = fx.damage
       Poison.tickMs[t] = fx.tickMs
-      Poison.slot[t] = src.slot
+      poisonSrc[t] = src
     })
   },
 
-  morph: (sim, _src, fx, hit) => {
-    eachCapable(sim, hit, Morph, (t) => {
+  morph: (sim, _src, fx, at) => {
+    eachCapable(sim, at, Morph, (t) => {
       if (hasComponent(sim.world, t, Enemy)) applyMorph(sim, sim.frames, t, fx)
     })
   },
 
-  attackSlow: (sim, _src, fx, hit) => {
+  attackSlow: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, hit, CharAtkSlow, (t) => {
-      CharAtkSlow.until[t] = until
-      CharAtkSlow.mul[t] = fx.mul
+    eachCapable(sim, at, AtkSlow, (t) => {
+      AtkSlow.until[t] = until
+      AtkSlow.mul[t] = fx.mul
     })
   },
 
-  ground: (sim, src, fx, hit) => {
+  ground: (sim, src, fx, at) => {
     spawnZone(sim, {
-      x: hit.x,
-      y: hit.y,
+      x: at.x,
+      y: at.y,
       radius: fx.def.radius,
       faction: src.faction,
       durationMs: fx.def.durationMs,
@@ -112,17 +113,17 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     })
   },
 
-  heal: (sim, src, fx, hit) => {
+  heal: (sim, src, fx, at) => {
     const all = fx.all ?? true
-    if (src.faction === FACTION.team) healCharacters(sim, hit.x, hit.y, fx.range, fx.amount, all)
-    else healEnemies(sim, hit.x, hit.y, fx.range, fx.amount, all, hit.source)
+    if (src.faction === FACTION.team) healCharacters(sim, at.x, at.y, fx.range, fx.amount, all)
+    else healEnemies(sim, at.x, at.y, fx.range, fx.amount, all, at.source)
   },
 
-  spawnProjectile: (sim, src, fx, hit) => {
+  spawnProjectile: (sim, src, fx, at) => {
     if (src.faction === FACTION.team) return
-    const angle = nearestAngle(sim, src, hit.x, hit.y, Infinity)
+    const angle = nearestAngle(sim, src, at.x, at.y, Infinity)
     if (angle === null) return
-    spawnEnemyProjectile(sim, hit.x, hit.y, angle, {
+    spawnEnemyProjectile(sim, at.x, at.y, angle, {
       frame: sim.frames.index(fx.projectile.emoji, 'enemyProjectile'),
       size: fx.projectile.size,
       radius: fx.projectile.radius,
@@ -138,12 +139,12 @@ export function applyAbilityEffects(
   sim: Sim,
   src: Source,
   effects: readonly Effect[] | undefined,
-  hit: HitCtx,
+  at: HitCtx,
 ): void {
   if (!effects) return
-  for (const fx of effects) applyEffect(sim, src, fx, hit)
+  for (const fx of effects) applyEffect(sim, src, fx, at)
 }
 
-function applyEffect<K extends keyof EffectOf>(sim: Sim, src: Source, fx: EffectOf[K] & { readonly kind: K }, hit: HitCtx): void {
-  EFFECT_KINDS[fx.kind](sim, src, fx, hit)
+function applyEffect<K extends keyof EffectOf>(sim: Sim, src: Source, fx: EffectOf[K] & { readonly kind: K }, at: HitCtx): void {
+  EFFECT_KINDS[fx.kind](sim, src, fx, at)
 }

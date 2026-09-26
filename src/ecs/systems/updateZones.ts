@@ -16,9 +16,10 @@ import {
   ZoneBurn,
   ZoneFollow,
   ZoneMend,
-  CharHp,
+  Hp,
 } from '../components'
-import { applyDamage, hurtCharacter } from './shared/combat'
+import { hit } from './shared/damage'
+import { boltSource, enemySource, WORLD_SOURCE } from '../utils/source'
 import { backEaseOut } from '../utils/ease'
 import { zoneSrcEnemy } from '../store'
 import type { Sim } from '../sim'
@@ -84,7 +85,7 @@ function mendMembers(sim: Sim, mends: readonly number[]): void {
       const r = Zone.radius[z]!
       const d = sim.hooks.worldDelta(sim, Transform.x[z]!, Transform.y[z]!, Transform.x[m]!, Transform.y[m]!)
       if (d.x * d.x + d.y * d.y > r * r) continue
-      CharHp.hp[m] = Math.min(CharHp.max[m]!, CharHp.hp[m]! + ZoneMend.perSec[z]! * dt)
+      Hp.v[m] = Math.min(Hp.max[m]!, Hp.v[m]! + ZoneMend.perSec[z]! * dt)
     }
   }
 }
@@ -97,10 +98,10 @@ function burnEnemies(sim: Sim, burns: readonly number[], now: number): void {
     enemies ??= [...query(sim.world, ENEMY_SET)]
     const r = Zone.radius[z]!
     const damage = ZoneBurn.damage[z]!
-    const slot = ZoneBurn.srcSlot[z]!
+    const src = boltSource(ZoneBurn.srcSlot[z]!)
     for (const eid of enemies) {
       const d = sim.hooks.worldDelta(sim, Transform.x[z]!, Transform.y[z]!, Transform.x[eid]!, Transform.y[eid]!)
-      if (d.x * d.x + d.y * d.y <= r * r) applyDamage(sim, eid, damage, 0, undefined, undefined, slot)
+      if (d.x * d.x + d.y * d.y <= r * r) hit(sim, src, eid, damage, { tick: true })
     }
   }
 }
@@ -115,7 +116,8 @@ function burnMembers(sim: Sim, burns: readonly number[], now: number): void {
       if (d.x * d.x + d.y * d.y > r * r) continue
       if (now - GroundHit.last[m]! >= ZoneBurn.tickMs[z]!) {
         GroundHit.last[m] = now
-        hurtCharacter(sim, m, ZoneBurn.damage[z]!, zoneSrcEnemy[z], 0xa5d86a)
+        const kind = zoneSrcEnemy[z]
+        hit(sim, kind ? { ...enemySource(kind, 1), tint: 0xa5d86a } : WORLD_SOURCE, m, ZoneBurn.damage[z]!, { tick: true })
       }
       break
     }

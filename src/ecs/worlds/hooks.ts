@@ -17,7 +17,8 @@ import { Alive, BreaksWalls, Dormant, Due, ENEMY_SET, Meteor, Phasing, Radius, T
 import { meteorHit } from '../store'
 import { spawnMeteor } from '../entities/meteor'
 import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
-import { applyDamage, hurtByHazard } from '../systems/shared/combat'
+import { hit } from '../systems/shared/damage'
+import { hazardSource } from '../utils/source'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { fleeSteer } from '../systems/shared/steer'
@@ -183,12 +184,13 @@ const ice: WorldHooks = {
     const px = floePx(sim)
     const frac = cfg.waterTickMs / 1000
     const dmg = Math.round(cfg.waterTeamDps * frac)
+    const src = hazardSource('coldWater', 0x4fc3f7)
     for (const m of sim.characters) {
-      if (Alive.v[m] && !onFloe(Transform.x[m]!, Transform.y[m]!, px)) hurtByHazard(sim, m, dmg, 'coldWater', 0x4fc3f7)
+      if (Alive.v[m] && !onFloe(Transform.x[m]!, Transform.y[m]!, px)) hit(sim, src, m, dmg, { tick: true })
     }
     const edmg = Math.round(cfg.waterEnemyDps * frac)
     for (const eid of [...query(sim.world, ENEMY_SET)]) {
-      if (!onFloe(Transform.x[eid]!, Transform.y[eid]!, px)) applyDamage(sim, eid, edmg)
+      if (!onFloe(Transform.x[eid]!, Transform.y[eid]!, px)) hit(sim, src, eid, edmg, { tick: true })
     }
   },
 }
@@ -330,11 +332,10 @@ const infinite: WorldHooks = {
     zone.r = zoneRadiusAt(sim.elapsedMs, cfg) * UNIT
     if (sim.elapsedMs < sim.worldState.tickAt) return
     sim.worldState.tickAt = sim.elapsedMs + cfg.tickMs
+    const src = hazardSource('poisonFog', 0xef5350)
     for (const m of sim.characters) {
       if (!Alive.v[m]) continue
-      if (outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r)) {
-        hurtByHazard(sim, m, cfg.tickDamage, 'poisonFog', 0xef5350)
-      }
+      if (outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r)) hit(sim, src, m, cfg.tickDamage, { tick: true })
     }
   },
 }
@@ -390,19 +391,20 @@ const space: WorldHooks = {
     Transform.y[m] = y
     Transform.rot[m] = Transform.rot[m]! + (sim.dtMs / 1000) * 1.4
     Tint.alpha[m] = 1
-    const hit = meteorHit[m]!
+    const struck = meteorHit[m]!
+    const src = hazardSource('meteor', 0xffaa33)
     for (const mem of sim.characters) {
-      if (!Alive.v[mem] || hit.has(Uid.v[mem]!)) continue
+      if (!Alive.v[mem] || struck.has(Uid.v[mem]!)) continue
       if (Math.hypot(Transform.x[mem]! - x, Transform.y[mem]! - y) < rr) {
-        hit.add(Uid.v[mem]!)
-        hurtByHazard(sim, mem, cfg.damage, 'meteor', 0xffaa33)
+        struck.add(Uid.v[mem]!)
+        hit(sim, src, mem, cfg.damage, { tick: true })
       }
     }
     for (const eid of [...query(sim.world, ENEMY_SET)]) {
-      if (Dormant.v[eid] || hit.has(Uid.v[eid]!)) continue
+      if (Dormant.v[eid] || struck.has(Uid.v[eid]!)) continue
       if (Math.hypot(Transform.x[eid]! - x, Transform.y[eid]! - y) < rr) {
-        hit.add(Uid.v[eid]!)
-        applyDamage(sim, eid, cfg.damage)
+        struck.add(Uid.v[eid]!)
+        hit(sim, src, eid, cfg.damage, { tick: true })
       }
     }
     if (t < 1) return

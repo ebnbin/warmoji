@@ -4,7 +4,7 @@ import { playSfx } from '../../audio/sfx'
 import { Built, Frozen, Minion, Sprite, Summon, Swarmer, Tint, Transform } from '../components'
 import { abilityOnHit } from '../store'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
-import { damageTarget } from './shared/damage'
+import { hit } from './shared/damage'
 import { applyAbilityEffects } from './shared/effects'
 import { sourceOf } from '../utils/source'
 import type { Sim } from '../sim'
@@ -56,7 +56,7 @@ export function updateBees(sim: Sim): void {
     const ty = target.y - Transform.y[b]!
     if (tx * tx + ty * ty > rr * rr) continue
     const damage = Math.round(Summon.damage[e]! * damageMul(sim, e))
-    damageTarget(sim, src, target.eid, damage, Summon.knockback[e]!, Transform.x[b]!, Transform.y[b]!)
+    hit(sim, src, target.eid, damage, { knockback: Summon.knockback[e]!, from: { x: Transform.x[b]!, y: Transform.y[b]! } })
     applyAbilityEffects(sim, src, abilityOnHit[e], { x: target.x, y: target.y, baseDamage: damage, targets: [target.eid] })
     playSfx('hit')
     removeEntity(sim.world, b)
