@@ -45,9 +45,9 @@ function enemyStatLines(e: EnemyDef): string[] {
   if (e.guardedBy) lines.push(`依存无敌：自己召出的${ENEMIES[e.guardedBy].name}还有一座活着，就打不动它`)
   if (e.mount) lines.push(`坐骑：先扛 ${e.mount.hp} 伤害，扣光后变成${e.forms?.[e.mount.form]?.name ?? '下马形态'}`)
   if (e.grow) lines.push(`成长：出生 ${e.grow.ms / 1000} 秒后还活着就长成${e.grow.into.name}`)
-  if (e.onLethal) lines.push(`致命一击时不死，改为：${e.onLethal.map(effectLine).join('，')}`)
-  if (e.onLowHp) lines.push(`生命第一次低于 ${Math.round(e.onLowHp.ratio * 100)}% 时：${e.onLowHp.effects.map(effectLine).join('，')}`)
-  if (e.onIdle) lines.push(`${e.onIdle.ms / 1000} 秒没出手${e.onIdle.still ? '也没动' : ''}：${e.onIdle.effects.map(effectLine).join('，')}`)
+  if (e.onLethal) lines.push(`致命一击时不死，改为：${e.onLethal.map((x) => effectLine(x, true)).join('，')}`)
+  if (e.onLowHp) lines.push(`生命第一次低于 ${Math.round(e.onLowHp.ratio * 100)}% 时：${e.onLowHp.effects.map((x) => effectLine(x, true)).join('，')}`)
+  if (e.onIdle) lines.push(`${e.onIdle.ms / 1000} 秒没出手${e.onIdle.still ? '也没动' : ''}：${e.onIdle.effects.map((x) => effectLine(x, true)).join('，')}`)
   for (const [i, f] of (e.forms ?? []).entries()) {
     if (e.mount?.form === i && !f.abilities) continue
     const traits = [f.speedMul !== undefined ? `移速 ×${f.speedMul}` : '', f.sizeMul !== undefined ? `体型 ×${f.sizeMul}` : '', f.anchored ? '原地不动' : ''].filter(Boolean).join(' · ')
