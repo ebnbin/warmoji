@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
-import { Aim, Blink, Bob, Drop, EDir, ENEMY_SET, Facing, Flyer, Leaping, Minion, Phys, PICKUP_SET, PROJ_SET, Rushing, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
+import { Aim, Blink, Drop, EDir, ENEMY_SET, Facing, Flyer, Leaping, Minion, Phys, PICKUP_SET, PROJ_SET, Rushing, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 
@@ -74,16 +74,11 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     EDir.x[eid] = d.x
     EDir.y[eid] = d.y
   }
-  for (const eid of query(sim.world, PICKUP_SET)) {
-    if (Bob.amp[eid]! > 0) Transform.y[eid] = Bob.y0[eid]!
+  for (const eid of query(sim.world, PROJ_SET)) {
+    movePos(eid)
+    moveVel(eid)
   }
-  for (const set of [PROJ_SET, PICKUP_SET]) {
-    for (const eid of query(sim.world, set)) {
-      movePos(eid)
-      moveVel(eid)
-    }
-  }
-  for (const eid of query(sim.world, PICKUP_SET)) Bob.y0[eid] = Transform.y[eid]!
+  for (const eid of query(sim.world, PICKUP_SET)) movePos(eid)
   for (const eid of query(sim.world, [Telegraph, Transform])) movePos(eid)
   for (const eid of query(sim.world, ZONE_SET)) movePos(eid)
   for (const eid of query(sim.world, [Minion, Transform])) movePos(eid)

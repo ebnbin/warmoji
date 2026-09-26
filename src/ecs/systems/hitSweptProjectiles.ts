@@ -45,15 +45,6 @@ export function hitSweptProjectiles(sim: Sim): void {
       found.push({ enemy: en, t: proj, d2: w.x * w.x + w.y * w.y })
     }
     found.sort((p, q) => p.t - q.t)
-    const wall = sim.hooks.wallHit(sim, sx, sy, bx, by)
-    if (wall !== null) {
-      const dw = (wall.x - sx) ** 2 + (wall.y - sy) ** 2
-      const first = found[0]
-      if (!first || dw <= first.d2) {
-        cullProjectile(sim, eid)
-        continue
-      }
-    }
     const f = found[0]
     if (f === undefined) continue
     hit.add(Uid.v[f.enemy]!)

@@ -157,7 +157,6 @@ export const MAPS = {
       viewScale: 1.2,
       width: 12,
       flow: 1,
-      coinCullPad: 2,
       driftCount: 18,
       driftSpeedMul: [0.75, 1.3],
       waveSlow: 0.6,

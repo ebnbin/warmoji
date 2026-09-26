@@ -1,10 +1,10 @@
-import { addComponent, addComponents, hasComponent } from 'bitecs'
+import { addComponents, hasComponent } from 'bitecs'
 import { newEntity } from './entity'
 import { DEG2RAD } from '../../util/units'
 import { playSfx } from '../../audio/sfx'
 import {
   Bolt, Depth, FACTION, Faction, Pierce, PrevPos, Proj, Projectile, Quad, Shoot,
-  Sprite, SweptHit, Tint, Transform, Vel, ViewCull, VisOff, WallStop, WorldCull,
+  Sprite, SweptHit, Tint, Transform, Vel, VisOff,
 } from '../components'
 import { abilityOnHit, projHitUids, projOnHit, projSrcEnemy } from '../store'
 import type { EnemyKind } from '../../types/enemies'
@@ -56,7 +56,7 @@ export function spawnProjectile(
     speed: Bolt.speed[src]!,
     rot: angle + rotOffset * DEG2RAD,
   })
-  addComponents(sim.world, eid, SweptHit, WallStop)
+  addComponents(sim.world, eid, SweptHit)
   Proj.damage[eid] = damage
   Proj.radius[eid] = Bolt.radius[src]!
   Proj.kb[eid] = Shoot.knockback[src]!
@@ -66,7 +66,6 @@ export function spawnProjectile(
   const mapLife = sim.hooks.projectileLifeMs(sim)
   const life = mapLife > 0 ? Math.min(mapLife, Shoot.lifeMs[src]!) : Shoot.lifeMs[src]!
   Proj.dieAt[eid] = sim.elapsedMs + life
-  if (mapLife <= 0) addComponent(sim.world, eid, ViewCull)
   Depth.z[eid] = 8
   projOnHit[eid] = abilityOnHit[src]
   projHitUids[eid] = new Set()
@@ -97,7 +96,6 @@ export function spawnEnemyProjectile(
     speed: spec.speed,
     rot: 0,
   })
-  addComponent(sim.world, eid, WorldCull)
   Proj.damage[eid] = Math.round(spec.damage)
   Proj.radius[eid] = spec.radius
   Proj.kb[eid] = 0

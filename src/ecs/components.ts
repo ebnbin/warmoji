@@ -97,6 +97,21 @@ export const Boss = { v: u8() }
 
 export const Radius = { v: f32() }
 
+/** 身体：驱动与阻力同乘抓地（鞋 × 地面），阻力再乘介质黏度、按相对介质的速度算 */
+export const Phys = { vx: f32(), vy: f32(), thrust: f32(), drag: f32(), mass: f32(), grip: f32() }
+
+/** 驱动层每帧写入的期望速度，身体按抓地趋近它 */
+export const Drive = { x: f32(), y: f32() }
+
+/** 1 = 按真实时间积分（队伍身体），0 = 按世界时间（其余一切） */
+export const Clock = { v: u8() }
+
+/** 不吃冲量的身体 */
+export const Anchored = {}
+
+/** 无视墙体的身体 */
+export const Phasing = {}
+
 export const DmgMul = { v: f32() }
 
 export const SpMul = { v: f32() }
@@ -140,7 +155,7 @@ export const Spin = { rate: f32() }
 
 export const Drift = { u: f32(), cross: f32(), speedMul: f32(), swayPhase: f32(), swayAmp: f32() }
 
-export const Shard = { vx: f32(), vy: f32(), startMs: f32(), until: f32(), rot: f32(), size: f32() }
+export const Shard = { startMs: f32(), until: f32(), rot: f32(), size: f32() }
 export const SHARD_SET: QueryTerm[] = [Shard, Transform, Sprite, Tint, Depth]
 
 export const ENEMY_SET: QueryTerm[] = [Enemy, Transform, Speed, Hp]
@@ -162,12 +177,6 @@ export const Proj = {
 export const PrevPos = { x: f32(), y: f32() }
 
 export const SweptHit = {}
-
-export const WallStop = {}
-
-export const ViewCull = {}
-
-export const WorldCull = {}
 
 export const PROJ_SET: QueryTerm[] = [Projectile, Transform, Vel, Proj]
 
@@ -211,7 +220,7 @@ export const Modifier = { totalMs: f32() }
 
 export const Due = { at: f32() }
 
-export const Bob = { y0: f32(), amp: f32(), halfMs: f32(), born: f32() }
+export const Bob = { amp: f32(), halfMs: f32(), born: f32() }
 
 export const Ring = {
   color: u32(),
@@ -225,7 +234,7 @@ export const Ring = {
   breathe: u8(),
 }
 
-export const PICKUP_SET: QueryTerm[] = [Pickup, Transform, Vel]
+export const PICKUP_SET: QueryTerm[] = [Pickup, Transform, Phys]
 
 export const RING_SET: QueryTerm[] = [Ring, Transform, Tint]
 
@@ -432,21 +441,6 @@ export const Followup = { left: f32(), damage: f32() }
 export const Manual = {}
 
 export const CastRequest = {}
-
-/** 身体：驱动与阻力同乘抓地（鞋 × 地面），阻力再乘介质黏度、按相对介质的速度算 */
-export const Phys = { vx: f32(), vy: f32(), thrust: f32(), drag: f32(), mass: f32(), grip: f32() }
-
-/** 驱动层每帧写入的期望速度，身体按抓地趋近它 */
-export const Drive = { x: f32(), y: f32() }
-
-/** 1 = 按真实时间积分（队伍身体），0 = 按世界时间（其余一切） */
-export const Clock = { v: u8() }
-
-/** 不吃冲量的身体 */
-export const Anchored = {}
-
-/** 无视墙体的身体 */
-export const Phasing = {}
 
 /** ghost：0 存活；1 阵亡且已预订目标位、正在归位；2 阵亡且已停靠 */
 export const Seat = { v: i32Fill(-1), ghost: u8() }

@@ -21,10 +21,6 @@ export function flowVector(horizontal: boolean, speed: number): Point {
   return horizontal ? { x: -speed, y: 0 } : { x: 0, y: speed }
 }
 
-export function pastDownstream(p: Point, viewW: number, viewH: number, pad: number): boolean {
-  return isHorizontal(viewW, viewH) ? p.x < -pad : p.y > viewH + pad
-}
-
 export function clampToRiver(p: Point, rect: RiverRect, pad: number): Point {
   return {
     x: Math.min(Math.max(p.x, rect.x + pad), rect.x + rect.w - pad),

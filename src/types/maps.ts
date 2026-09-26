@@ -53,7 +53,6 @@ export interface RiverConfig {
   readonly viewScale: number
   readonly width: number
   readonly flow: number
-  readonly coinCullPad: number
   readonly driftCount: number
   readonly driftSpeedMul: readonly [number, number]
   readonly waveSlow: number

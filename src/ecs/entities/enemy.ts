@@ -199,7 +199,8 @@ export function spawnEnemy(
   addComponent(world, eid, VisOff)
   if (def.kbImmune) addComponent(world, eid, Anchored)
   if (def.phasesWalls) addComponent(world, eid, Phasing)
-  const born = sim.hooks.constrainSpawn(sim, x, y, def.radius)
+  Radius.v[eid] = def.radius
+  const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
   Transform.x[eid] = born.x
   Transform.y[eid] = born.y
   Transform.rot[eid] = 0
@@ -237,7 +238,6 @@ export function spawnEnemy(
   enemyCarries[eid] = undefined
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
-  Radius.v[eid] = def.radius
   DmgMul.v[eid] = elite ? ELITE.damageMul : 1
   SpMul.v[eid] = elite ? ELITE.speedMul : 1
   Nest.of[eid] = -1
