@@ -71,10 +71,17 @@ interface AttackSlowEffect {
   readonly mul: number
   readonly durationMs: number
 }
+/** 倍率增益：不写 durationMs 就是永久 */
 interface BuffEffect {
   readonly kind: 'buff'
-  readonly damageMul: number
-  readonly durationMs: number
+  readonly damageMul?: number
+  readonly speedMul?: number
+  readonly durationMs?: number
+}
+/** 直接造成一笔伤害 */
+interface DamageEffect {
+  readonly kind: 'damage'
+  readonly amount: number
 }
 /** 定身：失去行动 */
 interface StunEffect {
@@ -133,6 +140,7 @@ export type Effect =
   | HealEffect
   | AttackSlowEffect
   | BuffEffect
+  | DamageEffect
   | StunEffect
   | HideEffect
   | TauntEffect

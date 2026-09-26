@@ -140,8 +140,17 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   buff: (sim, _src, fx, at) => {
-    const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.dmg, TAG.effect, until, fx.damageMul))
+    const until = fx.durationMs === undefined ? Infinity : sim.elapsedMs + fx.durationMs
+    const tag = fx.durationMs === undefined ? TAG.perk : TAG.effect
+    eachCapable(sim, at, Mark, (t) => {
+      if (fx.damageMul !== undefined) addMark(t, MARK.dmg, tag, until, fx.damageMul)
+      if (fx.speedMul !== undefined) addMark(t, MARK.speed, tag, until, fx.speedMul)
+    })
+  },
+
+  damage: (sim, src, fx, at) => {
+    const dmg = Math.max(1, Math.round(fx.amount * src.dmgMul))
+    for (const t of at.targets ?? []) hit(sim, src, t, dmg)
   },
 
   stun: (sim, _src, fx, at) => {

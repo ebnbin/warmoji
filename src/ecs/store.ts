@@ -1,5 +1,5 @@
 import { INITIAL_CAPACITY } from './world'
-import type { EnemyDef, EnemyKind } from '../types/enemies'
+import type { BodyRules, EnemyDef, EnemyKind } from '../types/enemies'
 import type { FieldPickupDef } from '../types/battlefield'
 import type { AbilityDef, Effect } from '../types/abilityDefs'
 import type { Source } from './utils/source'
@@ -49,8 +49,8 @@ export const projSrcEnemy = slots<EnemyKind>()
 
 export const poisonSrc = slots<Source>()
 
-/** 接触命中后施加的效果 */
-export const contactEffects = slots<readonly Effect[]>()
+/** 身体自己的规则：敌人是它的定义，角色是出生时按道具拼出来的包，造物只有接触效果 */
+export const bodyRules = slots<BodyRules>()
 
 export const zoneEffects = slots<readonly Effect[]>()
 

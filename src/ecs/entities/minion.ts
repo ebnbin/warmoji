@@ -37,7 +37,7 @@ import {
 } from '../components'
 import type { Sim } from '../sim'
 import { ANIM_DEF } from '../../emoji/anim'
-import { abilityArtEmoji, abilityOnHit, contactEffects, emplaceAbility } from '../store'
+import { abilityArtEmoji, abilityOnHit, bodyRules, emplaceAbility } from '../store'
 import { ownerX, ownerY } from '../utils/amp'
 import { equipAbility } from '../entities/ability'
 import { liveOnes } from '../utils/turret'
@@ -125,7 +125,7 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
   Contact.damage[m] = Payload.damage[e]!
   Contact.knockback[m] = Payload.knockback[e]!
   Contact.vanish[m] = 1
-  contactEffects[m] = abilityOnHit[e]
+  bodyRules[m] = { onTouch: abilityOnHit[e] }
   VisOff.y[m] = -8
 }
 

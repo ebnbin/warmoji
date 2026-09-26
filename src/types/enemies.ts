@@ -8,12 +8,7 @@ export type DriveDef =
   | { readonly kind: 'flee'; readonly range: number }
   | { readonly kind: 'coinThief' }
   | { readonly kind: 'standoff'; readonly detectRange: number; readonly standoffDist: number }
-  | {
-      readonly kind: 'orbit'
-      readonly radius: number
-      readonly aggroRange: number
-      readonly orphan: { readonly speedMul: number; readonly damageMul: number }
-    }
+  | { readonly kind: 'orbit'; readonly radius: number; readonly aggroRange: number }
 export interface SplitEffect {
   readonly kind: 'split'
   readonly into: EnemyDef
@@ -26,6 +21,15 @@ export interface DecoyEffect {
   readonly alpha: number
 }
 export type DeathEffect = Effect | SplitEffect | DecoyEffect
+/** 身体自己的规则：被命中、击杀、锚点消失时施于自身；被接触时施于碰我的人；接触时施于被我碰到的人；死亡以尸体位置为落点 */
+export interface BodyRules {
+  readonly onHurt?: readonly Effect[]
+  readonly onTouched?: readonly Effect[]
+  readonly onTouch?: readonly Effect[]
+  readonly onKill?: readonly Effect[]
+  readonly onDeath?: readonly DeathEffect[]
+  readonly onAnchorLost?: readonly Effect[]
+}
 export type EnemyKind =
   | 'zombie'
   | 'ghost'
@@ -55,7 +59,7 @@ export type EnemyKind =
   | 'alien'
   | 'comet'
   | 'blackhole'
-export interface EnemyDef {
+export interface EnemyDef extends BodyRules {
   readonly kind: EnemyKind
   readonly emoji: string
   readonly name: string
@@ -69,8 +73,6 @@ export interface EnemyDef {
   readonly coins: number
   readonly drive: DriveDef
   readonly abilities?: readonly AbilityDef[]
-  readonly onDeath?: readonly DeathEffect[]
-  readonly onContact?: readonly Effect[]
   readonly spawner?: {
     readonly into: EnemyDef
     readonly intervalMs: number

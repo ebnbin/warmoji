@@ -7,9 +7,11 @@ import type { EnemyDef } from '../../../types/enemies'
 import { MEMBER } from '../../../data/characters'
 import { UNIT } from '../../../util/units'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, Hp, Iframe, CharScale, CharPerk, MARK, Nest, Orphan, Pop, Revive, Slot, Sprite, TAG, Thief, Tint, Transform } from '../../components'
+import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, Hp, CharScale, MARK, Nest, Pop, Revive, Slot, Sprite, TAG, Thief, Tint, Transform } from '../../components'
 import { addMark, dmgMul, hasMark } from '../../utils/marks'
-import { enemyCarries, enemyDef } from '../../store'
+import { bodyRules, enemyCarries, enemyDef } from '../../store'
+import { selfSource } from '../../utils/source'
+import { applyAbilityEffects } from './effects'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
 import type { Source } from '../../utils/source'
@@ -48,8 +50,9 @@ function killEnemy(sim: Sim, eid: number, srcSlot: number, flingVx: number, flin
   const st = sim.run.stats
   if (srcSlot >= 0 && srcSlot < st.kills.length) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
   const killer = sim.characters[srcSlot]
-  if (killer !== undefined && Alive.v[killer] && CharPerk.killHeal[killer]! > 0) {
-    Hp.v[killer] = Math.min(Hp.max[killer]!, Hp.v[killer]! + CharPerk.killHeal[killer]!)
+  const onKill = killer !== undefined && Alive.v[killer] ? bodyRules[killer]?.onKill : undefined
+  if (killer !== undefined && onKill) {
+    applyAbilityEffects(sim, selfSource(sim, killer), onKill, { x: Transform.x[killer]!, y: Transform.y[killer]!, baseDamage: 0, targets: [killer] })
   }
   playSfx('kill')
   const def = enemyDef[eid]
@@ -112,10 +115,8 @@ function orphanBrood(sim: Sim, nestEid: number, rage = true): void {
   for (const eid of query(sim.world, ENEMY_SET)) {
     if (Nest.of[eid] !== nestEid) continue
     Nest.of[eid] = -1
-    if (rage && hasComponent(sim.world, eid, Orphan)) {
-      addMark(eid, MARK.speed, TAG.rage, Infinity, Orphan.speedMul[eid]!)
-      addMark(eid, MARK.dmg, TAG.rage, Infinity, Orphan.damageMul[eid]!)
-    }
+    const lost = rage ? bodyRules[eid]?.onAnchorLost : undefined
+    if (lost) applyAbilityEffects(sim, selfSource(sim, eid), lost, { x: Transform.x[eid]!, y: Transform.y[eid]!, baseDamage: 0, targets: [eid] })
   }
 }
 
@@ -134,12 +135,13 @@ export function grantIframe(sim: Sim, eid: number, ms: number): void {
 }
 
 export function reviveCharacter(sim: Sim, eid: number): void {
-  const now = sim.elapsedMs
   playSfx('revive')
   Alive.v[eid] = 1
   Anim.frames[eid] = 0
   Hp.v[eid] = Hp.max[eid]!
-  addMark(eid, MARK.invuln, TAG.effect, now + Iframe.ms[eid]!)
+  // 复活视同被命中一次的保护
+  const back = bodyRules[eid]?.onHurt
+  if (back) applyAbilityEffects(sim, selfSource(sim, eid), back, { x: Transform.x[eid]!, y: Transform.y[eid]!, baseDamage: 0, targets: [eid] })
   Tint.color[eid] = 0xffffff
   Tint.alpha[eid] = 1
   Tint.effect[eid] = 0

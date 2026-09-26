@@ -17,7 +17,6 @@ import { tickSkillCooldowns } from '../tickSkillCooldowns'
 import { tickSkillStates } from '../tickSkillStates'
 import { popInEnemies } from '../popInEnemies'
 import { refoldBattleFx } from '../refoldBattleFx'
-import { regenCharacters } from '../regenCharacters'
 import { reviveCharacters } from '../reviveCharacters'
 import { steerBodies } from '../steerBodies'
 import { updateBees } from '../updateBees'
@@ -45,7 +44,6 @@ export const SIM_PIPELINE = pipeline([
   { run: driveTeam, after: [stepHandover, updateSpeedMuls] },
   { run: layoutTeam, after: [driveTeam] },
   reviveCharacters,
-  regenCharacters,
   { run: popInEnemies, after: [updateDormancy] },
   { run: despawnExpired, after: [updateDormancy] },
   { run: fadeEnemyFlash, after: [updateDormancy] },

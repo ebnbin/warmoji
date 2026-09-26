@@ -175,7 +175,7 @@ const SLIME = {
   damage: 5,
   xp: 4,
   coins: 3,
-  onContact: [{ kind: 'attackSlow', mul: 1.6, durationMs: 3000 }],
+  onTouch: [{ kind: 'attackSlow', mul: 1.6, durationMs: 3000 }],
 } satisfies EnemyDef
 
 const BLOBLING = {
@@ -211,7 +211,8 @@ const BLOB = {
 
 const LARVA = {
   kind: 'larva',
-  drive: { kind: 'orbit', radius: 2.5, aggroRange: 6, orphan: { speedMul: 1.7, damageMul: 2.5 } },
+  drive: { kind: 'orbit', radius: 2.5, aggroRange: 6 },
+  onAnchorLost: [{ kind: 'buff', speedMul: 1.7, damageMul: 2.5 }],
   emoji: '1f99f',
   name: '小飞虫',
   desc: '绕着虫巢盘旋守卫，玩家逼近巢就扑击；巢被拆后暴走直扑玩家',

@@ -1,5 +1,5 @@
 import { hasComponent, query } from 'bitecs'
-import { Dormant, MARK, MARK_SLOTS, Mark, Transform } from '../components'
+import { Alive, Dormant, Hp, MARK, MARK_SLOTS, Mark, Transform } from '../components'
 import { restoreMorph } from '../entities/enemy'
 import { poisonSrc } from '../store'
 import { WORLD_SOURCE } from '../utils/source'
@@ -18,9 +18,10 @@ function expire(sim: Sim, eid: number, kind: number, s: number): void {
   }
 }
 
-/** 标记的时钟：跳伤的按节拍扣血，到期的清掉并执行到期反应；休眠的身体不走 */
+/** 标记的时钟：跳伤的按节拍扣血，回复的按秒回血，到期的清掉并执行到期反应；休眠的身体不走 */
 export function tickMarks(sim: Sim): void {
   const now = sim.elapsedMs
+  const dt = sim.wdtMs / 1000
   for (const eid of query(sim.world, [Mark])) {
     if (Dormant.v[eid]) continue
     const base = eid * MARK_SLOTS
@@ -33,6 +34,9 @@ export function tickMarks(sim: Sim): void {
         Mark.c[s] = Mark.c[s]! + Mark.b[s]!
         hit(sim, poisonSrc[eid] ?? WORLD_SOURCE, eid, Mark.a[s]!, { tick: true })
         if (!hasComponent(sim.world, eid, Mark)) break
+      }
+      if (kind === MARK.regen && Alive.v[eid] && Hp.v[eid]! < Hp.max[eid]!) {
+        Hp.v[eid] = Math.min(Hp.max[eid]!, Hp.v[eid]! + Mark.a[s]! * dt)
       }
       if (now >= until) {
         Mark.kind[s] = MARK.none

@@ -1,7 +1,9 @@
-import { Amp, Anchor, FACTION, Faction, Owner, WallBlocked } from '../components'
+import { hasComponent } from 'bitecs'
+import { Amp, Anchor, FACTION, Faction, Owner, Slot, WallBlocked } from '../components'
 import { Transform } from '../components'
 import { enemyDef } from '../store'
 import { attributionSlot, damageMul } from './amp'
+import { dmgMul } from './marks'
 import type { Sim } from '../sim'
 import type { EnemyKind } from '../../types/enemies'
 import type { Hazard } from '../../types/maps'
@@ -41,6 +43,13 @@ export function sourceOf(sim: Sim, e: number): Source {
 /** 身体自己在看：转向与接触用 */
 export function bodySource(eid: number): Source {
   return { faction: Faction.v[eid]!, slot: -1, kb: 1, crit: 0, dmgMul: 1, viewer: eid }
+}
+
+/** 身体自己作为伤害来源：角色归因到槽位，敌人归因到种类并带身上的伤害倍率 */
+export function selfSource(sim: Sim, eid: number): Source {
+  if (hasComponent(sim.world, eid, Slot)) return boltSource(Slot.v[eid]!)
+  const def = enemyDef[eid]
+  return def ? enemySource(def.kind, dmgMul(sim, eid)) : bodySource(eid)
 }
 
 export function boltSource(slot: number): Source {

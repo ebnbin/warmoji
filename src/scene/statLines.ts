@@ -69,8 +69,12 @@ export function effectLine(e: Effect): string {
       return `${e.scope === 'lowest' ? '治疗血量比例最低的同伴' : '治疗全体同伴'} ${e.amount}${e.ratio && e.ratio !== 1 ? ` 的 ${pct(e.ratio)}` : ''}`
     case 'attackSlow':
       return `攻击冷却 ×${e.mul} 持续 ${sec(e.durationMs)}`
-    case 'buff':
-      return `伤害 ×${e.damageMul} 持续 ${sec(e.durationMs)}`
+    case 'buff': {
+      const parts = [e.damageMul !== undefined ? `伤害 ×${e.damageMul}` : '', e.speedMul !== undefined ? `移速 ×${e.speedMul}` : ''].filter(Boolean)
+      return `${parts.join('、')}${e.durationMs === undefined ? '，永久' : ` 持续 ${sec(e.durationMs)}`}`
+    }
+    case 'damage':
+      return `造成 ${e.amount} 点伤害`
     case 'stun':
       return `定身 ${sec(e.durationMs)}`
     case 'hide':

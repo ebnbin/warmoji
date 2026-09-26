@@ -84,11 +84,7 @@ export const Pop = { until: f32(), ms: f32(), size: f32(), back: u8(), alpha: f3
 
 export const Alive = { v: u8() }
 
-export const CharPerk = { thorns: f32(), killHeal: f32(), regenPerSec: f32() }
-
 export const CharScale = { v: f32() }
-/** 被命中后免伤的时长；为 0 的身体没有无敌帧 */
-export const Iframe = { ms: f32() }
 export const Revive = { ms: f32(), at: f32() }
 
 export const MARK_SLOTS = 8
@@ -100,10 +96,10 @@ const strided = <T extends Column>(ctor: new (length: number) => T): T => {
 }
 
 /** 标记的种类决定它折叠成哪个有效值：slow 取最小、speed/guard/dmg/cd 相乘、dot 按节拍扣血、其余是有无 */
-export const MARK = { none: 0, slow: 1, speed: 2, guard: 3, dmg: 4, cd: 5, dot: 6, stun: 7, hide: 8, taunt: 9, invuln: 10, morph: 11, morphImmune: 12 } as const
+export const MARK = { none: 0, slow: 1, speed: 2, guard: 3, dmg: 4, cd: 5, dot: 6, stun: 7, hide: 8, taunt: 9, invuln: 10, morph: 11, morphImmune: 12, regen: 13 } as const
 
 /** 标记的来源：同种同源的标记刷新而不叠加 */
-export const TAG = { effect: 0, morph: 1, elite: 2, rage: 3 } as const
+export const TAG = { effect: 0, morph: 1, elite: 2, perk: 3 } as const
 
 /** 身体上的标记列表：每个身体 MARK_SLOTS 个槽位；until 为 Infinity 时永久；a/b/c 按种类解释（倍率、跳伤、节拍、下次跳的时刻、嘲讽者、是否曾锚定） */
 export const Mark = {
@@ -408,8 +404,6 @@ export const Telegraph = { hp: f32(), elite: u8(), boss: u8(), bornMs: f32() }
 export const Surge = { hpMul: f32(), forceElite: u8() }
 
 export const Carrier = {}
-
-export const Orphan = { speedMul: f32(), damageMul: f32() }
 
 export const Thief = { eaten: i32(), nextEatAt: f32() }
 

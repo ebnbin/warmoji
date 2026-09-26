@@ -1,13 +1,13 @@
 import { query, removeEntity } from 'bitecs'
 import { Alive, Built, Drive, Frozen, Minion, Phys, Sprite, Steering, Swarmer, Tint } from '../components'
-import { contactEffects } from '../store'
+import { bodyRules } from '../store'
 import type { Sim } from '../sim'
 
 /** 蜜蜂：到寿命就消散；主人倒下时隐去、停飞、不蜇人；朝向跟着飞行方向 */
 export function updateBees(sim: Sim): void {
   for (const b of [...query(sim.world, [Swarmer, Minion, Built, Steering])]) {
     if (sim.elapsedMs >= Minion.dieAt[b]!) {
-      contactEffects[b] = undefined
+      bodyRules[b] = undefined
       removeEntity(sim.world, b)
       continue
     }

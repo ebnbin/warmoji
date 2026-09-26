@@ -16,7 +16,9 @@ import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox/knobs
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
-import { Alive, Anim, Breath, Casting, Clock, Depth, Drive, FACTION, Faction, Hp, VisOff, Iframe, Character, CharFlash, CharPerk, CharScale, Facing, Leaping, Magnet, Mark, Phys, Pop, Quad, Radius, Revive, Rushing, Seat, Slot, Slowed, Sprite, Tint, Transform } from '../components'
+import { Alive, Anim, Breath, Casting, Clock, Depth, Drive, FACTION, Faction, Hp, VisOff, Character, CharFlash, CharScale, Facing, Leaping, Magnet, MARK, Mark, Phys, Pop, Quad, Radius, Revive, Rushing, Seat, Slot, Slowed, Sprite, TAG, Tint, Transform } from '../components'
+import { addMark } from '../utils/marks'
+import { bodyRules } from '../store'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
@@ -56,8 +58,6 @@ export function spawnCharacter(
   addComponent(world, eid, Faction)
   addComponent(world, eid, Seat)
   addComponent(world, eid, Facing)
-  addComponent(world, eid, CharPerk)
-  addComponent(world, eid, Iframe)
   addComponent(world, eid, Revive)
   addComponent(world, eid, Radius)
   addComponent(world, eid, CharFlash)
@@ -90,10 +90,13 @@ export function spawnCharacter(
   const maxHp = sandbox ? sandboxHp : memberMaxHp(fx.hpAdd)
   Hp.v[eid] = sandbox ? sandboxHp : waveStartHp(run.memberHp[slot] ?? MEMBER.maxHp, maxHp)
   Hp.max[eid] = maxHp
-  CharPerk.thorns[eid] = fx.thorns
-  CharPerk.killHeal[eid] = fx.killHeal
-  CharPerk.regenPerSec[eid] = fx.regenPerSec
-  Iframe.ms[eid] = MEMBER.iframesMs + fx.iframesAddMs
+  // 角色的默认规则包：受击无敌帧、荆棘、击杀回血都是数据，回复是一条永久标记
+  bodyRules[eid] = {
+    onHurt: [{ kind: 'invuln', ms: MEMBER.iframesMs + fx.iframesAddMs }],
+    onTouched: fx.thorns > 0 ? [{ kind: 'damage', amount: fx.thorns }] : undefined,
+    onKill: fx.killHeal > 0 ? [{ kind: 'heal', amount: fx.killHeal, scope: 'all' }] : undefined,
+  }
+  if (fx.regenPerSec > 0) addMark(eid, MARK.regen, TAG.perk, Infinity, fx.regenPerSec)
   Revive.ms[eid] = Math.max(1000, TEAM.reviveMs + fx.reviveAddMs)
   Revive.at[eid] = 0
   Radius.v[eid] = MEMBER.radius * UNIT * place.sizeMul

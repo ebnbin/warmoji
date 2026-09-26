@@ -63,11 +63,8 @@ function enemyStatLines(e: EnemyDef): string[] {
     if (fx.kind === 'heal') lines.push(`亡语治疗周围同伴 ${fx.amount}（范围 ${grid(fx.range ?? 0)}）`)
     if (fx.kind === 'decoy') lines.push(`死亡留半透明尸壳诱火 ${fx.durationMs / 1000} 秒`)
   }
-  for (const fx of e.onContact ?? []) {
-    if (fx.kind === 'attackSlow') {
-      lines.push(`接触附黏：命中队员攻击冷却 ×${fx.mul}，持续 ${fx.durationMs / 1000} 秒`)
-    }
-  }
+  for (const fx of e.onTouch ?? []) lines.push(`接触附加：${effectLine(fx)}`)
+  for (const fx of e.onAnchorLost ?? []) lines.push(`失巢暴走：${effectLine(fx)}`)
   if (e.spawner) {
     lines.push(`巢穴：每 ${e.spawner.intervalMs / 1000} 秒生成 ${e.spawner.count} 只${e.spawner.into.name}`)
   }

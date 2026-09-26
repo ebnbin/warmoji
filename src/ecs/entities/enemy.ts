@@ -1,4 +1,4 @@
-import { addComponent, addComponents, hasComponent, query, removeComponent } from 'bitecs'
+import { addComponent, hasComponent, query, removeComponent } from 'bitecs'
 import { newEntity } from './entity'
 import { AI, ELITE, SPAWN, SURGE } from '../../data/enemies'
 import { ENEMY_BODY } from '../../data/abilities'
@@ -35,7 +35,6 @@ import {
   Mark,
   Nest,
   Orbit,
-  Orphan,
   Phasing,
   Phys,
   Pop,
@@ -56,7 +55,7 @@ import {
   Transform,
   VisOff,
 } from '../components'
-import { contactEffects, enemyCarries, enemyDef } from '../store'
+import { bodyRules, enemyCarries, enemyDef } from '../store'
 import { interrupt } from '../systems/shared/ability'
 import { addMark, hasMark } from '../utils/marks'
 import { spawnTelegraph, telegraphCount } from './telegraph'
@@ -92,14 +91,12 @@ const DRIVES: { [K in keyof DriveOf]: DriveAttach<K> } = {
     Standoff.standoffDist[eid] = d.standoffDist
   },
   orbit: (sim, eid, d) => {
-    addComponents(sim.world, eid, Orbit, Orphan)
+    addComponent(sim.world, eid, Orbit)
     Orbit.radius[eid] = d.radius
     Orbit.spin[eid] = 0
     Orbit.aggro[eid] = d.aggroRange
     Orbit.seek[eid] = Infinity
     Orbit.fresh[eid] = 0
-    Orphan.speedMul[eid] = d.orphan.speedMul
-    Orphan.damageMul[eid] = d.orphan.damageMul
   },
 }
 
@@ -184,7 +181,7 @@ export function spawnEnemy(
     Contact.knockback[eid] = 0
     Contact.vanish[eid] = 0
   }
-  contactEffects[eid] = def.onContact
+  bodyRules[eid] = def
   if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
   Despawn.at[eid] = 0
   Thief.eaten[eid] = 0

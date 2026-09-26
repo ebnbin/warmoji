@@ -2,8 +2,11 @@ import { hasComponent } from 'bitecs'
 import { CRIT_MUL } from '../../../data/items'
 import { norm } from '../../../util/vec'
 import { playSfx } from '../../../audio/sfx'
-import { Alive, CharFlash, Dormant, FACTION, Faction, Flash, Hp, Iframe, MARK, Slot, TAG, Tint, Transform } from '../../components'
-import { addMark, guardMul, hasMark } from '../../utils/marks'
+import { Alive, CharFlash, Dormant, FACTION, Faction, Flash, Hp, MARK, Slot, Tint, Transform } from '../../components'
+import { guardMul, hasMark } from '../../utils/marks'
+import { bodyRules } from '../../store'
+import { selfSource } from '../../utils/source'
+import { applyAbilityEffects } from './effects'
 import { impulse } from './body'
 import { die } from './combat'
 import { spawnDamageNumber } from '../../entities/fx'
@@ -36,10 +39,7 @@ function record(sim: Sim, src: Source, target: number, dmg: number): void {
 export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
   if (sim.over || !hasComponent(sim.world, target, Hp) || Dormant.v[target] || Alive.v[target] === 0) return false
   const now = sim.elapsedMs
-  if (!o.tick) {
-    if (hasMark(sim, target, MARK.invuln)) return false
-    if (Iframe.ms[target]! > 0) addMark(target, MARK.invuln, TAG.effect, now + Iframe.ms[target]!)
-  }
+  if (!o.tick && hasMark(sim, target, MARK.invuln)) return false
   let dmg = damage
   const guard = guardMul(sim, target)
   if (guard !== 1) dmg = Math.max(1, Math.round(dmg * guard))
@@ -47,6 +47,9 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   if (crit) dmg = Math.round(dmg * CRIT_MUL)
   spawnDamageNumber(sim, Transform.x[target]!, Transform.y[target]!, dmg, crit)
   record(sim, src, target, dmg)
+  // 被命中反应先于扣血：无敌帧从这一下起算
+  const back = o.tick ? undefined : bodyRules[target]?.onHurt
+  if (back) applyAbilityEffects(sim, selfSource(sim, target), back, { x: Transform.x[target]!, y: Transform.y[target]!, baseDamage: dmg, targets: [target] })
   const team = Faction.v[target] === FACTION.team
   if (team) sim.characterHitCount++
   let jx = 0
