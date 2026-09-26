@@ -52,7 +52,7 @@ import {
   Idle,
   Mirror,
 } from '../../components'
-import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, ammoLast } from '../../store'
+import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, zoneRules } from '../../store'
 import { clearMarks, markSlot } from '../../utils/marks'
 import { damageMul, anchorX, anchorY, waveScale } from '../../utils/amp'
 import { flying, sourceOf } from '../../utils/source'
@@ -391,13 +391,14 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       mend: ZoneShape.mend[e]!,
       effects: onHit,
       follow: follow ? { of: Anchor.eid[e]!, owner: e } : undefined,
+      rules: zoneRules[e],
     }
     const pulseMs = ZoneShape.pulseMs[e]!
     // 须先落局部变量：spawnZone 可能扩容替换 Aura.zone
     const zone = spawnZone(sim, spec)
     if (follow) Aura.zone[e] = zone
     if (pulseMs > 0) {
-      spawnZone(sim, { ...spec, tickMs: pulseMs, damage: 0, mend: 0, effects: abilityPulse[e], pulse: spec.color, fillAlpha: 0, lineAlpha: 0, lineWidth: 0 })
+      spawnZone(sim, { ...spec, tickMs: pulseMs, damage: 0, mend: 0, effects: abilityPulse[e], pulse: spec.color, fillAlpha: 0, lineAlpha: 0, lineWidth: 0, rules: undefined })
     }
     return true
   }

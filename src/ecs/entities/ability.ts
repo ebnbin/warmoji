@@ -62,7 +62,7 @@ import {
   ZoneFollow,
   ZoneShape,
 } from '../components'
-import { abilityArtEmoji, abilityBoost, abilityDef, abilityFireSfx, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, emplaceAbility } from '../store'
+import { abilityArtEmoji, abilityBoost, abilityDef, abilityFireSfx, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, emplaceAbility, zoneRules } from '../store'
 import type { AbilityDef, Shape } from '../../types/abilityDefs'
 import { ACQUIRE, abilityPiercesWalls } from '../../data/abilities'
 import { UNIT } from '../../util/units'
@@ -89,6 +89,8 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
       Bolt.rotOffset[e] = s.projectile.rotationOffsetDeg
       Bolt.lifeMs[e] = s.lifeMs
       Bolt.pierce[e] = s.pierce ?? 0
+      Bolt.homingDeg[e] = s.projectile.homingDeg ?? 0
+      Bolt.linger[e] = s.projectile.linger ?? 0
     },
   },
   segment: {
@@ -195,6 +197,7 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
       ZoneShape.lineWidth[e] = s.visual.lineWidth
       ZoneShape.color[e] = s.visual.color
       abilityPulse[e] = s.pulse?.onHit
+      zoneRules[e] = s
     },
   },
   summon: {

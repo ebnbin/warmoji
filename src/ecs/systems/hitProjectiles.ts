@@ -1,5 +1,6 @@
 import { query } from 'bitecs'
-import { PrevPos, Proj, PROJ_SET, Transform, Uid } from '../components'
+import { Linger, PrevPos, Proj, PROJ_SET, Transform, Uid } from '../components'
+import { hasComponent } from 'bitecs'
 import { applyOnHit, struckOf } from './shared/effects'
 import { WORLD_SOURCE } from '../utils/source'
 import { eachTargetBody } from '../utils/targets'
@@ -20,10 +21,11 @@ function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, b
   return (px - cx) * (px - cx) + (py - cy) * (py - cy)
 }
 
-/** 弹体这一帧扫过的线段碰到来源阵营的敌人即命中，沿线最先碰到的先算；每个身体只吃一次；敌我同一条 */
+/** 弹体这一帧扫过的线段碰到来源阵营的敌人即命中，沿线最先碰到的先算；每个身体只吃一次；落在地上的不打；敌我同一条 */
 export function hitProjectiles(sim: Sim): void {
   if (sim.over) return
   for (const eid of [...query(sim.world, PROJ_SET)]) {
+    if (hasComponent(sim.world, eid, Linger) && !Linger.back[eid] && Linger.until[eid]! > 0) continue
     const sx = PrevPos.x[eid]!
     const sy = PrevPos.y[eid]!
     const bx = Transform.x[eid]!

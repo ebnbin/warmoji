@@ -11,12 +11,15 @@ import { applyMorph } from '../../entities/enemy'
 import { applyForm } from '../../entities/form'
 import { nearestSummoned, raiseDead, spawnAround, spawnClones } from '../../entities/summon'
 import { spawnShadow, swapShadow } from '../../entities/shadow'
+import { spawnBarrier } from '../../entities/barrier'
+import { spawnTether } from '../../entities/tether'
+import { recallShots } from './projectile'
 import { rescale } from './scale'
 import { historyAt } from './history'
 import { devour } from './gut'
 import { stealAbility } from './steal'
 import { spawnBolt } from '../../entities/projectile'
-import { spawnZone } from '../../entities/zone'
+import { openPortals, spawnZone } from '../../entities/zone'
 import { spawnCoins } from '../../entities/pickup'
 import { hit } from './damage'
 import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
@@ -231,6 +234,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       tickMs: fx.def.tickMs,
       damage: fx.def.damage,
       effects: fx.def.effects,
+      rules: fx.def,
     })
   },
 
@@ -268,6 +272,8 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       knockback: 0,
       src: flying(src),
       onHit: fx.onHit,
+      homingDeg: fx.projectile.homingDeg,
+      linger: fx.projectile.linger,
     })
   },
 
@@ -684,6 +690,47 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   shadowSwap: (sim, src) => {
     const by = casterOf(sim, src)
     if (by >= 0) swapShadow(sim, by)
+  },
+
+  barrier: (sim, src, fx, at) => {
+    const by = casterOf(sim, src)
+    const angle = at.angle ?? 0
+    const off = fx.shape === 'wall' ? (fx.offset ?? 0) : 0
+    spawnBarrier(sim, {
+      shape: fx.shape,
+      x: at.x + Math.cos(angle) * off,
+      y: at.y + Math.sin(angle) * off,
+      angle,
+      length: fx.length,
+      durationMs: fx.durationMs,
+      bodies: fx.bodies,
+      shots: fx.shots,
+      reflect: fx.reflect === true,
+      follow: fx.follow && by >= 0 ? by : -1,
+      onCross: fx.onCross,
+      color: fx.color,
+      src: flying(src),
+    })
+  },
+
+  portal: (sim, src, fx, at) => {
+    const by = casterOf(sim, src)
+    const x0 = by >= 0 ? Transform.x[by]! : at.x
+    const y0 = by >= 0 ? Transform.y[by]! : at.y
+    const a = at.angle ?? 0
+    const far = by >= 0 ? sim.hooks.constrainBody(sim, by, { x: x0, y: y0 }, { x: x0 + Math.cos(a) * fx.distance, y: y0 + Math.sin(a) * fx.distance }) : { x: x0 + Math.cos(a) * fx.distance, y: y0 + Math.sin(a) * fx.distance }
+    openPortals(sim, flying(src), { x: x0, y: y0 }, far, fx.radius, fx.durationMs, fx.cdMs, fx.color)
+  },
+
+  tether: (sim, src, fx, at) => {
+    const by = casterOf(sim, src)
+    if (by < 0) return
+    for (const t of at.targets ?? []) if (t !== by) spawnTether(sim, src, by, t, fx.ms, fx.range, fx.color, fx.onHold, fx.onBreak)
+  },
+
+  recall: (sim, src, fx) => {
+    const by = casterOf(sim, src)
+    if (by >= 0) recallShots(sim, by, fx.speed)
   },
 
   undead: (sim, _src, fx, at) => {

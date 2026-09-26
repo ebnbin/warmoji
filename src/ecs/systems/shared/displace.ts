@@ -7,9 +7,10 @@ import type { Effect } from '../../../types/abilityDefs'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 
-/** 一段位移：push 是冲量；dash 沿直线按速度走；arc 腾空飞到落点；follow 贴着另一个身体；place 直接落到新位置 */
+/** 一段位移：push 是冲量；drift 是这一帧被一股稳定的流带着（持续牵引），折成与阻力相当的冲量；dash 沿直线按速度走；arc 腾空飞到落点；follow 贴着另一个身体；place 直接落到新位置 */
 export type Displacement =
   | { readonly kind: 'push'; readonly x: number; readonly y: number }
+  | { readonly kind: 'drift'; readonly vx: number; readonly vy: number; readonly dt: number }
   | { readonly kind: 'dash'; readonly angle: number; readonly distance: number; readonly ms: number }
   | { readonly kind: 'arc'; readonly x: number; readonly y: number; readonly ms: number; readonly height: number }
   | { readonly kind: 'follow'; readonly host: number; readonly ox: number; readonly oy: number; readonly ms: number }
@@ -68,6 +69,13 @@ export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boo
   if (d.kind === 'push') {
     if (hasMark(sim, eid, MARK.unstoppable)) return false
     impulse(sim, eid, d.x, d.y)
+    return true
+  }
+  if (d.kind === 'drift') {
+    if (hasMark(sim, eid, MARK.unstoppable) || !hasComponent(sim.world, eid, Phys) || Motion.kind[eid] !== MOTION.none) return false
+    const s = sim.hooks.surface(sim, Transform.x[eid]!, Transform.y[eid]!)
+    const k = Phys.drag[eid]! * Phys.grip[eid]! * s.traction * s.viscosity * d.dt
+    impulse(sim, eid, d.vx * k, d.vy * k)
     return true
   }
   if (!movable(sim, eid, by)) return false

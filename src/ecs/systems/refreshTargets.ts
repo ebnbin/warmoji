@@ -1,6 +1,6 @@
 import { hasComponent, query } from 'bitecs'
-import { Alive, Dormant, Faction, Hp, Radius, Revive, Transform, Uid } from '../components'
-import { isHidden, isUntargetable, realmOf } from '../utils/marks'
+import { Alive, Dormant, Faction, Hp, MARK, Mark, Radius, Revive, Transform, Uid } from '../components'
+import { isHidden, isUntargetable, markSlot, realmOf } from '../utils/marks'
 import type { Target } from '../utils/targets'
 import type { Sim } from '../sim'
 
@@ -13,6 +13,7 @@ export function refreshTargets(sim: Sim): void {
     if (!alive && !hasComponent(sim.world, eid, Revive)) continue
     const list = lists[Faction.v[eid]!]
     if (!list) continue
+    const mist = markSlot(sim, eid, MARK.mist)
     list.push({
       eid,
       uid: Uid.v[eid]!,
@@ -22,6 +23,8 @@ export function refreshTargets(sim: Sim): void {
       hidden: isHidden(sim, eid),
       untargetable: isUntargetable(sim, eid),
       realm: realmOf(sim, eid),
+      mist: mist < 0 ? -1 : Mark.a[mist]!,
+      mistUid: mist < 0 ? 0 : Mark.ref[mist]!,
       alive,
     })
   }

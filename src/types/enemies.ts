@@ -118,6 +118,8 @@ export interface NpcDef extends BodyRules {
   readonly mount?: { readonly hp: number; readonly form: number; readonly emoji?: string }
   /** 延时成长：出生 ms 后还活着就长成 into */
   readonly grow?: { readonly ms: number; readonly into: EnemyDef }
+  /** 依存无敌：自己召出的这种身体还有活着的，就打不动 */
+  readonly guardedBy?: EnemyKind
 }
 export interface EnemyDef extends NpcDef {
   readonly kind: EnemyKind

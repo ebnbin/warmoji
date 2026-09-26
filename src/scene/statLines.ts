@@ -7,6 +7,7 @@ import { tiersForLevel } from '../data/charLevel'
 import { levelStatsFor } from '../data/levels'
 import type { ItemId } from '../types/items'
 import type { AbilityDef, Cond, Effect, MarkName, Shape, ShapeKind } from '../types/abilityDefs'
+import type { ZoneRules } from '../types/groundEffects'
 import type { StatGroup } from '../types/statLines'
 
 export const SHAPE_LABEL: Record<ShapeKind, string> = {
@@ -60,7 +61,7 @@ export function effectLine(e: Effect): string {
     case 'poison':
       return `中毒 ${e.damage}/${sec(e.tickMs)}×${sec(e.durationMs)}`
     case 'ground':
-      return `留下 ${grid(e.def.radius)} 的灼地 ${sec(e.def.durationMs)}，每 ${sec(e.def.tickMs)} ${e.def.damage} 伤`
+      return `留下 ${grid(e.def.radius)} 的${e.def.trap ? '陷阱' : '场地'} ${sec(e.def.durationMs)}${e.def.damage && e.def.tickMs ? `，每 ${sec(e.def.tickMs)} ${e.def.damage} 伤` : ''}${e.def.effects && !e.def.trap ? `，每 ${sec(e.def.tickMs)} ${e.def.effects.map(effectLine).join('、')}` : ''}${zoneRuleLine(e.def, e.def.effects)}`
     case 'morph':
       return `变羊 ${sec(e.durationMs)}${e.vulnMul ? `，受伤 ×${e.vulnMul}` : ''}`
     case 'spawnProjectile':
@@ -193,7 +194,32 @@ export function effectLine(e: Effect): string {
       return '与最新的影子换位'
     case 'undead':
       return `生命回到 ${pct(e.hpRatio)}，之后 ${sec(e.ms)} 内流失殆尽，期间照常行动`
+    case 'barrier': {
+      const what = [e.bodies === 'all' ? '挡住所有身体' : e.bodies === 'foes' ? '挡住敌人' : '', e.shots ? (e.reflect ? '把敌方弹体反弹回去' : '吞掉敌方弹体') : ''].filter(Boolean).join('、')
+      const where = e.shape === 'wall' ? `在前方${e.offset ? ` ${grid(e.offset)} 处` : ''}立起 ${grid(e.length)} 长的墙` : `${e.follow ? '身周' : '落点'}围起半径 ${grid(e.length)} 的一圈`
+      return `${where} ${sec(e.durationMs)}${what ? `，${what}` : ''}${e.onCross ? `；敌人越过时${e.onCross.map(effectLine).join('、')}` : ''}`
+    }
+    case 'portal':
+      return `脚下与前方 ${grid(e.distance)} 处各开一扇门 ${sec(e.durationMs)}，谁踏进一扇就从另一扇出来（敌我都算）`
+    case 'tether':
+      return `牵住目标 ${sec(e.ms)}${e.onHold ? `，撑满时${e.onHold.map(effectLine).join('、')}` : ''}${e.onBreak ? `；跑出 ${grid(e.range)} 就断，断时${e.onBreak.map(effectLine).join('、')}` : `；跑出 ${grid(e.range)} 就断`}`
+    case 'recall':
+      return '把落在地上的弹体全部召回，沿途再打一遍'
   }
+}
+
+/** 场的对象与判定 */
+function zoneRuleLine(r: ZoneRules, effects: readonly Effect[] | undefined): string {
+  const parts: string[] = []
+  if (r.trap) parts.push(`敌人踏入即触发${effects ? `：${effects.map(effectLine).join('、')}` : ''}，触发后消失`)
+  if (r.who === 'allies') parts.push('作用于己方')
+  if (r.who === 'all') parts.push('敌我都作用')
+  if (r.pull) parts.push(`把场内敌人以每秒 ${grid(r.pull)} 拉向圆心`)
+  if (r.traction !== undefined) parts.push(r.traction < 1 ? `地面打滑（抓地 ×${r.traction}）` : `地面抓地 ×${r.traction}`)
+  if (r.mist) parts.push('场内同伴只会被同在场内的出手打到')
+  if (r.dwell) parts.push(`连续待满 ${sec(r.dwell.ms)}：${r.dwell.effects.map(effectLine).join('、')}`)
+  if (r.onExpire) parts.push(`到期时仍在场内：${r.onExpire.map(effectLine).join('、')}`)
+  return parts.length > 0 ? `；${parts.join('；')}` : ''
 }
 
 function condLine(c: Cond): string {
@@ -231,7 +257,7 @@ const MARK_LABEL: Record<MarkName, string> = {
 function shapeLine(w: AbilityDef, s: Shape): string {
   switch (s.kind) {
     case 'bolt':
-      return `弹速 ${grid(s.projectile.speed)}/秒 · 弹体 ${grid(s.projectile.radius * 2)}${s.pierce ? ` · 贯穿 ${s.pierce} 名` : ''}`
+      return `弹速 ${grid(s.projectile.speed)}/秒 · 弹体 ${grid(s.projectile.radius * 2)}${s.pierce ? ` · 贯穿 ${s.pierce} 名` : ''}${s.projectile.homingDeg ? ` · 追踪（每秒转 ${s.projectile.homingDeg}°）` : ''}${s.projectile.linger ? ` · 飞完落地 ${sec(s.projectile.linger)} 等召回` : ''}`
     case 'segment':
       return s.beam
         ? `射程 ${grid(s.reach)} · 束宽 ${grid(s.radius * 2)} · 贯穿直线全部敌人`
@@ -257,7 +283,7 @@ function shapeLine(w: AbilityDef, s: Shape): string {
     case 'all':
       return s.of === 'foes' ? '全场敌人（含 Boss）' : '全队'
     case 'zone':
-      return `${s.follow ? '以自己为圆心持续生效' : `领域 ${grid(s.radius)} · 持续 ${sec(s.durationMs)}`}${s.tickMs && w.damage ? ` · 每 ${sec(s.tickMs)} ${w.damage} 伤` : ''}${s.mend ? ` · 队友每秒回复 ${s.mend}` : ''}${s.pulse ? ` · 每 ${sec(s.pulse.intervalMs)} 脉冲一次：${s.pulse.onHit.map(effectLine).join('，')}` : ''}${s.follow ? '' : ''}`
+      return `${s.follow ? '以自己为圆心持续生效' : `领域 ${grid(s.radius)} · 持续 ${sec(s.durationMs)}`}${s.tickMs && w.damage ? ` · 每 ${sec(s.tickMs)} ${w.damage} 伤` : ''}${s.mend ? ` · 队友每秒回复 ${s.mend}` : ''}${s.pulse ? ` · 每 ${sec(s.pulse.intervalMs)} 脉冲一次：${s.pulse.onHit.map(effectLine).join('，')}` : ''}${zoneRuleLine(s, w.onHit)}`
     case 'summon':
       return `每波 ${s.count} 只 · 撞击后自毁 · 存活 ${sec(s.lifeMs)}`
     case 'emplace':

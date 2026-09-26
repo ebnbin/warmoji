@@ -80,6 +80,18 @@ function walkEffects(list: readonly Effect[] | undefined, side: Side): void {
       case 'throw':
         walkEffects(fx.onLand, side)
         break
+      case 'ground':
+        walkEffects(fx.def.effects, side)
+        walkEffects(fx.def.onExpire, side)
+        walkEffects(fx.def.dwell?.effects, side)
+        break
+      case 'barrier':
+        walkEffects(fx.onCross, side)
+        break
+      case 'tether':
+        walkEffects(fx.onHold, side)
+        walkEffects(fx.onBreak, side)
+        break
       default:
         break
     }
@@ -100,7 +112,11 @@ function walkAbility(a: AbilityDef, side: Side): void {
   }
   if (sh.kind === 'summon') s.body.add(sh.minion.emoji)
   if (sh.kind === 'drop') s.body.add(sh.emoji)
-  if (sh.kind === 'zone') walkEffects(sh.pulse?.onHit, side)
+  if (sh.kind === 'zone') {
+    walkEffects(sh.pulse?.onHit, side)
+    walkEffects(sh.onExpire, side)
+    walkEffects(sh.dwell?.effects, side)
+  }
   if (a.recast) walkAbility(a.recast.ability, side)
   for (const c of a.cycle ?? []) walkAbility(c, side)
   walkEffects(a.onHit, side)

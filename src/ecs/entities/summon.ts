@@ -1,7 +1,7 @@
-import { hasComponent, query } from 'bitecs'
+import { addComponent, hasComponent, query } from 'bitecs'
 import { CHARACTERS } from '../../data/characters'
 import { waveAt } from '../../data/waves'
-import { Ability, Alive, Amp, Borrowed, Boss, Despawn, ENEMY_SET, EnemyArm, FACTION, Faction, Hp, Manual, Nest, Owner, Phys, Radius, Slot, Transform } from '../components'
+import { Ability, Alive, Amp, Borrowed, Boss, Despawn, ENEMY_SET, EnemyArm, FACTION, Faction, Hp, Link, Manual, Nest, Owner, Phys, Radius, Slot, Transform, Uid } from '../components'
 import { abilityDef, bodyLook, enemyDef, enemyOf } from '../store'
 import { charSize } from '../systems/shared/scale'
 import { equipAbility } from './ability'
@@ -15,6 +15,12 @@ export function summonBody(sim: Sim, def: NpcDef, x: number, y: number, hp: numb
   const who = faction === FACTION.enemy && def.kind !== undefined ? (def as EnemyDef) : undefined
   const eid = who ? spawnEnemy(sim, sim.frames, who, x, y, hp, false, false) : spawnNpc(sim, sim.frames, def, x, y, hp, { faction })
   Nest.of[eid] = by
+  if (by >= 0 && def.kind !== undefined && enemyDef[by]?.guardedBy === def.kind) {
+    addComponent(sim.world, eid, Link)
+    Link.to[eid] = by
+    Link.toUid[eid] = Uid.v[by]!
+    Link.color[eid] = 0x80d8ff
+  }
   return eid
 }
 

@@ -30,6 +30,8 @@ export interface Source {
   /** 出手的那条能力 */
   readonly ability?: number
   readonly sight?: { readonly x: number; readonly y: number }
+  /** 出手的位置：迷雾里的身体只能被同在迷雾里出手的打到 */
+  readonly from?: { readonly x: number; readonly y: number }
 }
 
 /** 出手者眼里的敌方阵营：倒戈时是自己的阵营 */
@@ -53,6 +55,7 @@ export function sourceOf(sim: Sim, e: number): Source {
     ability: e,
     foes: foesOf(sim, o, Faction.v[e]!),
     realm: realmOf(sim, o),
+    from: { x: Transform.x[Anchor.eid[e]!]!, y: Transform.y[Anchor.eid[e]!]! },
     sight:
       sim.worldState.walls !== null && WallBlocked.v[e]
         ? { x: Transform.x[Anchor.eid[e]!]!, y: Transform.y[Anchor.eid[e]!]! }
@@ -63,12 +66,12 @@ export function sourceOf(sim: Sim, e: number): Source {
 /** 身体自己在看：转向用 */
 export function bodySource(sim: Sim, eid: number): Source {
   const faction = Faction.v[eid]!
-  return { faction, slot: -1, kb: 1, crit: 0, dmgMul: 1, viewer: eid, body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, faction), realm: realmOf(sim, eid) }
+  return { faction, slot: -1, kb: 1, crit: 0, dmgMul: 1, viewer: eid, body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, faction), realm: realmOf(sim, eid), from: { x: Transform.x[eid]!, y: Transform.y[eid]! } }
 }
 
 /** 身体自己作为伤害来源：角色归因到槽位，敌人归因到种类并带身上的伤害倍率 */
 export function selfSource(sim: Sim, eid: number): Source {
-  const own = { body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, Faction.v[eid]!), realm: realmOf(sim, eid) }
+  const own = { body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, Faction.v[eid]!), realm: realmOf(sim, eid), from: { x: Transform.x[eid]!, y: Transform.y[eid]! } }
   if (hasComponent(sim.world, eid, Slot)) return { ...boltSource(Slot.v[eid]!), ...own }
   const def = enemyDef[eid]
   return def ? { ...enemySource(def.kind, dmgMul(sim, eid)), faction: Faction.v[eid]!, ...own } : bodySource(sim, eid)

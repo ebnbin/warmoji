@@ -1,4 +1,5 @@
-import { FACTION, Radius, Transform, Uid } from '../components'
+import { FACTION, Radius, Transform, Uid, Zone } from '../components'
+import { isSameEntity } from './identity'
 import { tauntedBy } from './marks'
 import type { Source } from './source'
 import type { Sim } from '../sim'
@@ -13,6 +14,9 @@ export interface Target {
   readonly hidden: boolean
   readonly untargetable: boolean
   readonly realm: number
+  /** 身在哪片迷雾里（场的编号与 Uid），不在是 -1 */
+  readonly mist: number
+  readonly mistUid: number
   readonly alive: boolean
 }
 
@@ -25,12 +29,20 @@ function foeFactions(src: Source): readonly number[] {
   return src.foes ?? FOES[src.faction]!
 }
 
+/** 迷雾里的身体只让同在这片迷雾里出手的打到；迷雾散了就不算 */
+function shrouded(sim: Sim, t: Target, from: Source['from']): boolean {
+  if (t.mist < 0 || !from || !isSameEntity(sim.world, t.mist, t.mistUid)) return false
+  const d = sim.hooks.worldDelta(sim, Transform.x[t.mist]!, Transform.y[t.mist]!, from.x, from.y)
+  const r = Zone.radius[t.mist]!
+  return d.x * d.x + d.y * d.y > r * r
+}
+
 function eachFoe(sim: Sim, src: Source, cx: number, cy: number, reach: number, seeing: boolean, visit: Visit): void {
   const sight = src.sight
   const realm = src.realm ?? 0
   for (const f of foeFactions(src)) {
     for (const t of sim.targets[f]!) {
-      if (!t.alive || t.untargetable || t.realm !== realm || Uid.v[t.eid] !== t.uid || (seeing && t.hidden) || t.eid === src.body) continue
+      if (!t.alive || t.untargetable || t.realm !== realm || Uid.v[t.eid] !== t.uid || (seeing && t.hidden) || t.eid === src.body || shrouded(sim, t, src.from)) continue
       const d = sim.hooks.worldDelta(sim, cx, cy, t.x, t.y)
       const rr = reach + t.radius
       if (d.x * d.x + d.y * d.y > rr * rr) continue
@@ -42,7 +54,7 @@ function eachFoe(sim: Sim, src: Source, cx: number, cy: number, reach: number, s
   }
 }
 
-/** 看：来源能打的身体里瞄得到的。世界打所有人；倒戈的打自己人；被嘲讽的观察者只看得见嘲讽者；隐匿的谁也看不见；碰不到的、不在同一个界的不算；有视线要求时墙后不算 */
+/** 看：来源能打的身体里瞄得到的。世界打所有人；倒戈的打自己人；被嘲讽的观察者只看得见嘲讽者；隐匿的谁也看不见；碰不到的、不在同一个界的、躲在迷雾里而出手者在雾外的不算；有视线要求时墙后不算 */
 export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
   const by = src.viewer === undefined ? -1 : tauntedBy(sim, src.viewer)
   if (by >= 0) {

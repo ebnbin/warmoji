@@ -24,6 +24,7 @@ import type { Point } from '../../util/vec'
 import { fleeSteer } from '../systems/shared/steer'
 import { leaderX, leaderY, leaderPoint } from '../utils/team'
 import { iceTraction } from '../systems/shared/squad'
+import { withBuilt } from './built'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -521,10 +522,17 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   infinite,
 }
 
+const BUILT = new Map<WorldHooks, WorldHooks>()
+
+/** 地图的规则，叠上能力造出的地形 */
 export function worldFor(mapId: MapId): WorldHooks {
   const def = MAPS[mapId]
-  if (def.ice) return ice
-  if (def.walls) return ruins
-  return BY_KIND[def.kind]!
+  const base = def.ice ? ice : def.walls ? ruins : BY_KIND[def.kind]!
+  let hooks = BUILT.get(base)
+  if (!hooks) {
+    hooks = withBuilt(base)
+    BUILT.set(base, hooks)
+  }
+  return hooks
 }
 

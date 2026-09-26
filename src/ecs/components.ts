@@ -221,6 +221,7 @@ export const Proj = {
   pierce: i32(),
   spin: f32(),
   dieAt: f32(),
+  rotOffset: f32(),
 }
 
 export const PrevPos = { x: f32(), y: f32() }
@@ -285,8 +286,48 @@ export const PICKUP_SET: QueryTerm[] = [Pickup, Transform, Phys]
 
 export const RING_SET: QueryTerm[] = [Ring, Transform, Tint]
 
-/** 场：每隔 tickMs 对场内敌方扣 damage 再施加效果，场内己方每秒回复 mend，pulse 非零时每次 tick 闪一圈 */
-export const Zone = { radius: f32(), enterMs: f32(), on: u8(), fadeAt: f32(), tickMs: f32(), nextAt: f32(), damage: f32(), mend: f32(), pulse: u32() }
+/** 场：每隔 tickMs 对场内敌方扣 damage 再施加效果，场内己方每秒回复 mend，pulse 非零时每次 tick 闪一圈；who、pull、traction、mist、trap 见 ZoneRules */
+export const Zone = { radius: f32(), enterMs: f32(), on: u8(), fadeAt: f32(), tickMs: f32(), nextAt: f32(), damage: f32(), mend: f32(), pulse: u32(), who: u8(), pull: f32(), traction: f32(), mist: u8(), trap: u8() }
+
+export const ZONE_WHO = { foes: 0, allies: 1, all: 2 } as const
+
+/** 传送门：另一扇门与它的编号、同一个身体再传的间隔 */
+export const Portal = { other: i32(), otherUid: u32(), cdMs: f32() }
+
+/** 身体下次能被传送门传的时刻 */
+export const PortCd = { until: f32() }
+
+/** 墙：shape 0 是一段（a 到 b），1 是一圈（圆心 c、半径 r）；bodies 0 不挡、1 挡敌方、2 都挡；shots 挡敌方弹体；reflect 反弹；跟着 of 走；到 until 消失 */
+export const Barrier = {
+  shape: u8(),
+  ax: f32(),
+  ay: f32(),
+  bx: f32(),
+  by: f32(),
+  cx: f32(),
+  cy: f32(),
+  r: f32(),
+  thick: f32(),
+  until: f32(),
+  bodies: u8(),
+  shots: u8(),
+  reflect: u8(),
+  of: i32(),
+  ofUid: u32(),
+  color: u32(),
+}
+
+/** 牵绳：两端与编号、到期时刻、断开距离、颜色 */
+export const Tether = { a: i32(), aUid: u32(), b: i32(), bUid: u32(), until: f32(), range: f32(), color: u32() }
+
+/** 画一条连到另一个身体的线：依存无敌的护卫连着被护的身体 */
+export const Link = { to: i32(), toUid: u32(), color: u32() }
+
+/** 追踪弹：每秒最多转多少弧度 */
+export const Homing = { turn: f32() }
+
+/** 落地的弹体：躺到 until；召回中 back 为 1，飞向 to */
+export const Linger = { ms: f32(), until: f32(), back: u8(), to: i32(), toUid: u32(), speed: f32() }
 
 export const ZoneFollow = { of: i32() }
 
@@ -345,7 +386,7 @@ export const Shots = { n: i32() }
 
 export const Swing = { startMs: f32(), durMs: f32() }
 
-export const Bolt = { frame: i32(), size: f32(), radius: f32(), speed: f32(), rotOffset: f32(), lifeMs: f32(), pierce: i32() }
+export const Bolt = { frame: i32(), size: f32(), radius: f32(), speed: f32(), rotOffset: f32(), lifeMs: f32(), pierce: i32(), homingDeg: f32(), linger: f32() }
 
 export const Segment = { reach: f32(), radius: f32(), ms: f32(), lunge: f32(), beam: u8() }
 

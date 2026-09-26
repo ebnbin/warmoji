@@ -1,5 +1,5 @@
 import type { SfxId } from './sfx'
-import type { GroundEffectDef } from './groundEffects'
+import type { GroundEffectDef, ZoneRules } from './groundEffects'
 import type { EnemyDef, EnemyKind } from './enemies'
 
 interface ProjectileSpec {
@@ -8,6 +8,10 @@ interface ProjectileSpec {
   readonly radius: number
   readonly speed: number
   readonly rotationOffsetDeg: number
+  /** 追踪：每秒最多转这么多度，转向最近的敌人 */
+  readonly homingDeg?: number
+  /** 飞完不消失，落在地上 ms，等着被召回 */
+  readonly linger?: number
 }
 export interface HeldVisual {
   readonly emoji: string
@@ -421,6 +425,43 @@ interface UndeadEffect {
   readonly ms: number
   readonly hpRatio: number
 }
+/** 墙：wall 垂直于出手方向、中心在前方 offset 处、长 length；ring 以落点为心、半径 length；bodies 与 shots 是挡谁的身体与弹体（挡弹只挡敌方的）；reflect 把挡下的弹体反弹成自己的；follow 让墙跟着施法者；onCross 是敌方身体越过它时施加的 */
+interface BarrierEffect {
+  readonly kind: 'barrier'
+  readonly shape: 'wall' | 'ring'
+  readonly length: number
+  readonly offset?: number
+  readonly durationMs: number
+  readonly bodies: 'all' | 'foes' | 'none'
+  readonly shots: boolean
+  readonly reflect?: boolean
+  readonly follow?: boolean
+  readonly onCross?: readonly Effect[]
+  readonly color: number
+}
+/** 传送门：施法者脚下与出手方向 distance 处各开一个，任何身体踏进一个就从另一个出来，同一个身体 cdMs 内不再传 */
+interface PortalEffect {
+  readonly kind: 'portal'
+  readonly distance: number
+  readonly radius: number
+  readonly durationMs: number
+  readonly cdMs: number
+  readonly color: number
+}
+/** 牵绳：把施法者与目标连起来 ms；目标离开 range 就断并施加 onBreak，撑满 ms 施加 onHold */
+interface TetherEffect {
+  readonly kind: 'tether'
+  readonly ms: number
+  readonly range: number
+  readonly onHold?: readonly Effect[]
+  readonly onBreak?: readonly Effect[]
+  readonly color: number
+}
+/** 召回：自己落在地上的弹体全部飞回施法者，沿途再打一遍 */
+interface RecallEffect {
+  readonly kind: 'recall'
+  readonly speed: number
+}
 export type Effect =
   | BlastEffect
   | SlowEffect
@@ -490,6 +531,10 @@ export type Effect =
   | ShadowEffect
   | ShadowSwapEffect
   | UndeadEffect
+  | BarrierEffect
+  | PortalEffect
+  | TetherEffect
+  | RecallEffect
 
 interface ZoneVisual {
   readonly color: number
@@ -528,7 +573,7 @@ export type Shape =
   | { readonly kind: 'sprint'; readonly distance: number; readonly ms: number; readonly radius?: number }
   | { readonly kind: 'leap'; readonly distance: number; readonly ms: number; readonly height: number; readonly radius: number }
   | { readonly kind: 'all'; readonly of: 'foes' | 'allies'; readonly downed?: boolean }
-  | {
+  | (ZoneRules & {
       readonly kind: 'zone'
       readonly radius: number
       readonly durationMs: number
@@ -537,7 +582,7 @@ export type Shape =
       readonly follow?: boolean
       readonly pulse?: { readonly intervalMs: number; readonly onHit: readonly Effect[] }
       readonly visual: ZoneVisual
-    }
+    })
   | {
       readonly kind: 'summon'
       readonly count: number

@@ -75,6 +75,22 @@ export const abilityDef = slots<AbilityDef>()
 /** 形态到时切回本体时施加的效果 */
 export const formEnd = slots<readonly Effect[]>()
 
+/** 场的对象与判定：场实体上是它自己的，能力实体上是它造出的场的 */
+export const zoneRules = slots<import('../types/groundEffects').ZoneRules>()
+
+/** 场内每个身体（按 Uid）连续待着的起始时刻，已触发过的记 -1 */
+export const zoneDwellIn = slots<Map<number, number>>()
+
+/** 墙的来源与越过时的效果、每个身体上次在哪一边 */
+export const barrierSrc = slots<Source>()
+export const barrierCross = slots<readonly Effect[]>()
+export const barrierSide = slots<Map<number, number>>()
+
+/** 牵绳的来源与撑满、断开时的效果 */
+export const tetherSrc = slots<Source>()
+export const tetherHold = slots<readonly Effect[]>()
+export const tetherBreak = slots<readonly Effect[]>()
+
 /** 身体自己的规则：敌人是它的定义，角色是出生时按道具拼出来的包，造物只有接触效果 */
 export const bodyRules = slots<BodyRules>()
 
