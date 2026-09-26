@@ -1,51 +1,19 @@
 import type { AbilityDef, Effect } from './abilityDefs'
 
-type DashTrigger =
-  | { readonly kind: 'detect'; readonly range: number; readonly cooldownMs: number }
-  | { readonly kind: 'timer'; readonly intervalMs: number; readonly firstDelayMs?: number }
-type DashLength =
-  | { readonly kind: 'dist'; readonly dist: number }
-  | { readonly kind: 'time'; readonly durationMs: number }
-interface DashLocomotion {
-  readonly kind: 'dash'
-  readonly windupMs: number
-  readonly dashSpeed: number
-  readonly trigger: DashTrigger
-  readonly length: DashLength
-  readonly idle: 'wander' | 'chase'
-  readonly aim: 'nearest' | 'leader'
-  readonly lockAt: 'windup' | 'launch'
-  readonly sfx?: 'whoosh'
-}
-interface StandoffLocomotion {
-  readonly kind: 'standoff'
-  readonly detectRange: number
-  readonly standoffDist: number
-}
-interface DetonateLocomotion {
-  readonly kind: 'detonate'
-  readonly triggerRange: number
-  readonly windupMs: number
-  readonly blastRadius: number
-  readonly blastDamage: number
-}
-interface BaseOrbitLocomotion {
-  readonly kind: 'baseOrbit'
-  readonly orbitRadius: number
-  readonly aggroRange: number
-  readonly orphanSpeedMul: number
-  readonly orphanDamageMul: number
-}
-export type LocomotionDef =
+/** 驱动：身体没事时怎么走；蓄力突刺、自爆这类"动作"是能力，不在这里 */
+export type DriveDef =
   | { readonly kind: 'chase' }
   | { readonly kind: 'wander' }
-  | { readonly kind: 'static' }
+  | { readonly kind: 'stay' }
   | { readonly kind: 'flee'; readonly range: number }
   | { readonly kind: 'coinThief' }
-  | StandoffLocomotion
-  | DetonateLocomotion
-  | BaseOrbitLocomotion
-  | DashLocomotion
+  | { readonly kind: 'standoff'; readonly detectRange: number; readonly standoffDist: number }
+  | {
+      readonly kind: 'orbit'
+      readonly radius: number
+      readonly aggroRange: number
+      readonly orphan: { readonly speedMul: number; readonly damageMul: number }
+    }
 export interface SplitEffect {
   readonly kind: 'split'
   readonly into: EnemyDef
@@ -99,7 +67,7 @@ export interface EnemyDef {
   readonly damage: number
   readonly xp: number
   readonly coins: number
-  readonly locomotion: LocomotionDef
+  readonly drive: DriveDef
   readonly abilities?: readonly AbilityDef[]
   readonly onDeath?: readonly DeathEffect[]
   readonly onContact?: readonly Effect[]

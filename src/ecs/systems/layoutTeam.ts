@@ -2,12 +2,11 @@ import { UNIT } from '../../util/units'
 import { SQUAD } from '../../data/feel'
 import { TEAM } from '../../data/characters'
 import { fanSlots } from '../../data/formation'
-import { Alive, Drive, Phys, Seat, Transform } from '../components'
+import { Alive, Drive, Phys, Seat, Slowed, Transform } from '../components'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { leaderX, leaderY } from '../utils/team'
 import { fanDistance, fanSpreadDeg, recallDist, reverseGain, seatHysteresis, turnRate } from './shared/squad'
-import { slowMul } from './shared/status'
 
 const HEADING_MIN = 0.5
 
@@ -117,7 +116,7 @@ export function layoutTeam(sim: Sim): void {
     const nx = d.x / dist
     const ny = d.y / dist
     const gain = Phys.vx[f]! * nx + Phys.vy[f]! * ny < 0 ? reverseGain() : 1
-    const want = (Phys.thrust[f]! / Phys.drag[f]!) * sim.battleFx.moveSpeedMul * slowMul(sim, f) * gain
+    const want = (Phys.thrust[f]! / Phys.drag[f]!) * Slowed.v[f]! * gain
     Drive.x[f] = nx * want
     Drive.y[f] = ny * want
   }

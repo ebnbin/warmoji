@@ -7,6 +7,7 @@ import type { AbilityId, CombatTuning } from '../types/abilities'
 const CT = fromJson<CombatTuning>(combatJson)
 export const KNOCKBACK = CT.knockback
 export const ENEMY_BODY = CT.enemyBody
+export const MINION_BODY = CT.minionBody
 export const BODY_MAX_SPEED = CT.knockback.maxSpeed
 /** 击退位移 = 冲量 × 身体时间常数 */
 export const KNOCKBACK_TAU_MS = (ENEMY_BODY.mass / (ENEMY_BODY.drag * ENEMY_BODY.grip)) * 1000

@@ -43,6 +43,10 @@ import {
   ZoneShape,
   WorldShape,
   Bolt,
+  Casting,
+  Slowed,
+  Windup,
+  WindupState,
 } from '../../components'
 import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse } from '../../store'
 import { damageMul, ownerX, ownerY, waveScale } from '../../utils/amp'
@@ -65,17 +69,17 @@ import { spawnZone } from '../../entities/zone'
 import { spawnFxBeam, spawnFxBolt, spawnFxBoom, spawnFxCircle, spawnFxSlash } from '../../entities/fx'
 import type { Sim } from '../../sim'
 
-/** 正在做的事没做完就不出手：延迟重复未打完、飞返体未回收、瞬袭未闪回 */
+/** 正在做的事没做完就不出手：延迟重复未打完、飞返体未回收、瞬袭未闪回、蓄力未到点 */
 export function busy(sim: Sim, e: number): boolean {
-  return RepeatState.left[e]! > 0 || Thrown.n[e]! > 0 || BlinkState.until[e]! > sim.elapsedMs
+  return RepeatState.left[e]! > 0 || Thrown.n[e]! > 0 || BlinkState.until[e]! > sim.elapsedMs || WindupState.until[e]! > 0
 }
 
-interface Shot {
+export interface Shot {
   readonly angle: number
   readonly target: Found | null
 }
 
-function aimAt(sim: Sim, e: number, src: Source): Shot | null {
+export function aimAt(sim: Sim, e: number, src: Source): Shot | null {
   const ox = ownerX(e)
   const oy = ownerY(e)
   switch (Aim.kind[e]) {
@@ -279,14 +283,14 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
 
   if (hasComponent(w, e, SprintShape)) {
     const m = Owner.eid[e]!
-    const speed = SprintShape.distance[e]! / (SprintShape.ms[e]! / 1000)
+    const speed = (SprintShape.distance[e]! / (SprintShape.ms[e]! / 1000)) * Slowed.v[m]!
     Rushing.active[m] = 1
     Rushing.msLeft[m] = SprintShape.ms[e]!
     Rushing.vx[m] = Math.cos(angle) * speed
     Rushing.vy[m] = Math.sin(angle) * speed
     Rushing.skill[m] = e
     Rushing.stamp[m] = sim.elapsedMs
-    spawnFxCircle(sim, ox, oy, SprintShape.radius[e]!, {
+    if (color !== 0) spawnFxCircle(sim, ox, oy, SprintShape.radius[e]!, {
       fill: color,
       fillAlpha: 0.35,
       stroke: color,
@@ -407,13 +411,27 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
   return false
 }
 
-/** 出手：瞄准、第一发、即时重复或安排延迟重复、施法者自身的效果、音效 */
-export function fireAbility(sim: Sim, e: number): boolean {
+/** 蓄力：记下方向，让宿主停下并显出预兆，到点由 tickWindups 出手 */
+function startWindup(sim: Sim, e: number, shot: Shot): void {
+  const until = sim.elapsedMs + Windup.ms[e]!
+  WindupState.until[e] = until
+  WindupState.angle[e] = shot.angle
+  const o = Owner.eid[e]!
+  Casting.until[o] = until
+  Casting.telegraph[o] = Windup.telegraph[e]!
+}
+
+/** 出手：瞄准、第一发、即时重复或安排延迟重复、音效、施法者自身的效果；有蓄力的先蓄力，到点再带着方向回到这里 */
+export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   const w = sim.world
   const src = sourceOf(sim, e)
-  const shot = aimAt(sim, e, src)
+  const shot = preset ?? aimAt(sim, e, src)
   if (!shot) return false
   Aim.rad[e] = shot.angle
+  if (!preset && hasComponent(w, e, Windup)) {
+    startWindup(sim, e, shot)
+    return true
+  }
   let count = 1
   let spread = 0
   let delay = 0
@@ -448,12 +466,13 @@ export function fireAbility(sim: Sim, e: number): boolean {
     }
     if (!fired) return false
   }
-  const self = abilityOnSelf[e]
-  if (self) applyAbilityEffects(sim, src, self, { x: ownerX(e), y: ownerY(e), baseDamage: damage, targets: [Owner.eid[e]!] })
   const sfx = abilityFireSfx[e]
   if (sfx) playSfx(sfx)
   const anchor = Anchor.eid[e]!
   if (hasComponent(w, anchor, Fired)) Fired.v[anchor] = 1
+  // 自身效果放最后：消散会把宿主连同这条能力一起移除
+  const self = abilityOnSelf[e]
+  if (self) applyAbilityEffects(sim, src, self, { x: ownerX(e), y: ownerY(e), baseDamage: damage, targets: [Owner.eid[e]!] })
   return true
 }
 

@@ -13,16 +13,14 @@ function grid(units: number): string {
   return `${+units.toFixed(1)}格`
 }
 
-const LOCOMOTION_LABEL: Record<EnemyDef['locomotion']['kind'], string> = {
+const DRIVE_LABEL: Record<EnemyDef['drive']['kind'], string> = {
   chase: '追击',
   wander: '游荡',
-  static: '原地不动',
-  dash: '蓄力突刺',
+  stay: '原地不动',
   flee: '逃跑',
   coinThief: '偷金币',
   standoff: '定距吐弹',
-  detonate: '自爆冲锋',
-  baseOrbit: '护巢环绕',
+  orbit: '护巢环绕',
 }
 
 const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> = {
@@ -39,7 +37,7 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
 function enemyStatLines(e: EnemyDef): string[] {
   const lines = [
     `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
-    `行为 ${LOCOMOTION_LABEL[e.locomotion.kind]} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}`,
+    `行为 ${DRIVE_LABEL[e.drive.kind]} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}`,
   ]
   for (const w of e.abilities ?? []) {
     const s = w.shape
@@ -49,15 +47,14 @@ function enemyStatLines(e: EnemyDef): string[] {
       lines.push(`放枪：子弹 ${w.damage ?? 0} 伤 · 弹速 ${grid(s.projectile.speed)}/秒${rep}${cd}`)
     } else if (s.kind === 'drop') {
       lines.push(`空袭：坠物砸向最近 ${s.targets} 名队员 · 每记 ${w.damage ?? 0} 伤${cd}`)
+    } else if (s.kind === 'sprint') {
+      lines.push(`蓄力突刺：冲 ${grid(s.distance)}${w.range !== undefined ? ` · 探测 ${grid(w.range)}` : ''}${cd}`)
+    } else if (s.kind === 'disc' && w.onSelf?.some((fx) => fx.kind === 'vanish')) {
+      lines.push(`自爆：范围 ${grid(s.radius)} · 伤害 ${w.damage ?? 0}`)
     } else {
       lines.push(`${SHAPE_LABEL[s.kind]}：${(w.onHit ?? []).map(effectLine).join('，')}${s.kind === 'disc' ? ` · 范围 ${grid(s.radius)}` : ''}${cd}`)
     }
   }
-  const lm = e.locomotion
-  if (lm.kind === 'dash' && lm.trigger.kind === 'detect' && lm.length.kind === 'dist') {
-    lines.push(`探测 ${grid(lm.trigger.range)} · 突刺 ${grid(lm.length.dist)}`)
-  }
-  if (lm.kind === 'detonate') lines.push(`自爆：范围 ${grid(lm.blastRadius)} · 伤害 ${lm.blastDamage}`)
   if (e.phasesWalls) lines.push('穿墙：无视断壁直取队伍')
   if (e.breaksWalls) lines.push('破墙：冲撞碾碎沿途断壁')
   for (const fx of e.onDeath ?? []) {

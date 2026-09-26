@@ -49,6 +49,9 @@ export const projSrcEnemy = slots<EnemyKind>()
 
 export const poisonSrc = slots<Source>()
 
+/** 接触命中后施加的效果 */
+export const contactEffects = slots<readonly Effect[]>()
+
 export const zoneEffects = slots<readonly Effect[]>()
 
 export const zoneSrc = slots<Source>()

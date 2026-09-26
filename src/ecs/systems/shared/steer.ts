@@ -1,15 +1,37 @@
 import { AI } from '../../../data/enemies'
-import { EDir, ETurn, Transform } from '../../components'
+import { EDir, ETurn, Poison } from '../../components'
 import type { Point } from '../../../util/vec'
 import type { Sim } from '../../sim'
-import { leaderPoint } from '../../utils/team'
 import { bodySource } from '../../utils/source'
-import { nearestTarget } from '../../utils/targets'
+import { eachTarget, nearestTarget } from '../../utils/targets'
+import type { Found } from '../../utils/targets'
 
 /** 身体眼里最近的敌人：嘲讽、隐匿、视线都由索敌快照统一处理 */
-export function nearestFoe(sim: Sim, eid: number, x: number, y: number): Point | null {
-  const t = nearestTarget(sim, bodySource(eid), x, y, Infinity)
-  return t ? { x: t.x, y: t.y } : null
+export function nearestFoe(sim: Sim, eid: number, x: number, y: number, range = Infinity): Found | null {
+  return nearestTarget(sim, bodySource(eid), x, y, range)
+}
+
+/** 优先还没中毒的最近敌人，都中了毒就取最近的 */
+export function freshFoe(sim: Sim, eid: number, x: number, y: number, range: number): Found | null {
+  const now = sim.elapsedMs
+  let fresh: Found | null = null
+  let freshD = range * range
+  let any: Found | null = null
+  let anyD = range * range
+  eachTarget(sim, bodySource(eid), x, y, range, (t, tx, ty, radius) => {
+    const dx = tx - x
+    const dy = ty - y
+    const d = dx * dx + dy * dy
+    if (d < anyD) {
+      anyD = d
+      any = { eid: t, x: tx, y: ty, radius }
+    }
+    if (Poison.until[t]! <= now && d < freshD) {
+      freshD = d
+      fresh = { eid: t, x: tx, y: ty, radius }
+    }
+  })
+  return fresh ?? any
 }
 
 export function wanderDir(sim: Sim, eid: number): Point {
@@ -23,15 +45,6 @@ export function wanderDir(sim: Sim, eid: number): Point {
   EDir.x[eid] = d.x
   EDir.y[eid] = d.y
   return d
-}
-
-export function aimPoint(sim: Sim, eid: number, atLeader: boolean): Point | null {
-  const x = Transform.x[eid]!
-  const y = Transform.y[eid]!
-  if (!atLeader) return nearestFoe(sim, eid, x, y)
-  const c = leaderPoint(sim)
-  const d = sim.hooks.worldDelta(sim, x, y, c.x, c.y)
-  return { x: x + d.x, y: y + d.y }
 }
 
 export function fleeSteer(

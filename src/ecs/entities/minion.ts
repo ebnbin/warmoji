@@ -1,12 +1,43 @@
 import { addComponent, addComponents, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
+import { UNIT } from '../../util/units'
+import { ACQUIRE, MINION_BODY } from '../../data/abilities'
 import { armIdle } from '../systems/shared/anim'
 import { attachDrawable } from './drawable'
 import { holderOutline } from './weapon'
-import { Amp, Anim, Built, Emplacement, EmplaceShape, Faction, Fired, Minion, Owner, Retiring, Sprite, SummonShape, Swarmer } from '../components'
+import {
+  Airborne,
+  Alive,
+  Amp,
+  Anim,
+  Built,
+  Clock,
+  Contact,
+  Drive,
+  Emplacement,
+  EmplaceShape,
+  Faction,
+  Fired,
+  Minion,
+  Nest,
+  Orbit,
+  Owner,
+  Payload,
+  Phasing,
+  Phys,
+  Radius,
+  Retiring,
+  Slowed,
+  Speed,
+  Sprite,
+  Steering,
+  SummonShape,
+  Swarmer,
+  VisOff,
+} from '../components'
 import type { Sim } from '../sim'
 import { ANIM_DEF } from '../../emoji/anim'
-import { abilityArtEmoji, emplaceAbility } from '../store'
+import { abilityArtEmoji, abilityOnHit, contactEffects, emplaceAbility } from '../store'
 import { ownerX, ownerY } from '../utils/amp'
 import { equipAbility } from '../entities/ability'
 import { liveOnes } from '../utils/turret'
@@ -20,7 +51,6 @@ interface MinionSpec {
   y: number
   z: number
   lifeMs: number
-  phase: number
   animOffsetMs?: number
 }
 
@@ -40,7 +70,6 @@ function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
   Built.by[m] = weaponEid
   Minion.bornMs[m] = sim.fxMs
   Minion.dieAt[m] = spec.lifeMs > 0 ? sim.elapsedMs + spec.lifeMs : 0
-  Minion.phase[m] = spec.phase
   Minion.size[m] = spec.size
   Minion.ability[m] = 0
   if (spec.animOffsetMs !== undefined) {
@@ -50,20 +79,54 @@ function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
   return m
 }
 
+/** 一只蜜蜂：飞在空中、无视墙的身体，绕着主人转，看见敌人就扑上去蜇一下然后消散 */
 export function spawnBee(sim: Sim, e: number, index: number): void {
+  const world = sim.world
   const count = SummonShape.count[e]!
-  spawnMinion(sim, e, {
+  const size = SummonShape.size[e]!
+  const owner = Owner.eid[e]!
+  const phase = (index * Math.PI * 2) / count
+  const r = SummonShape.orbitRadius[e]!
+  const m = spawnMinion(sim, e, {
     tag: Swarmer,
     emoji: abilityArtEmoji[e]!,
-    size: SummonShape.size[e]!,
+    size,
     bornScale: 1,
-    x: ownerX(e),
-    y: ownerY(e),
+    x: ownerX(e) + Math.cos(phase) * r,
+    y: ownerY(e) + Math.sin(phase) * r,
     z: 12,
     lifeMs: SummonShape.lifeMs[e]!,
-    phase: (index * Math.PI * 2) / count,
     animOffsetMs: (index * ANIM_DEF.durMs) / count,
   })
+  addComponents(world, m, Phys, Drive, Clock, Radius, Faction, Alive, Speed, Slowed, Steering, Nest, Orbit, Contact, Phasing, Airborne)
+  const speed = SummonShape.speed[e]!
+  Phys.vx[m] = 0
+  Phys.vy[m] = 0
+  Phys.thrust[m] = speed * MINION_BODY.drag
+  Phys.drag[m] = MINION_BODY.drag
+  Phys.mass[m] = MINION_BODY.mass
+  Phys.grip[m] = MINION_BODY.grip
+  Drive.x[m] = 0
+  Drive.y[m] = 0
+  Clock.v[m] = 0
+  Radius.v[m] = size * 0.35
+  Faction.v[m] = Faction.v[e]!
+  Alive.v[m] = 1
+  Speed.v[m] = speed
+  Slowed.v[m] = 1
+  Steering.v[m] = 1
+  Nest.of[m] = owner
+  Nest.nextSpawnAt[m] = 0
+  Orbit.radius[m] = r
+  Orbit.spin[m] = SummonShape.orbitSpin[e]!
+  Orbit.aggro[m] = 0
+  Orbit.seek[m] = ACQUIRE.range * UNIT
+  Orbit.fresh[m] = 1
+  Contact.damage[m] = Payload.damage[e]!
+  Contact.knockback[m] = Payload.knockback[e]!
+  Contact.vanish[m] = 1
+  contactEffects[m] = abilityOnHit[e]
+  VisOff.y[m] = -8
 }
 
 export const RETIRE_MS = 240
@@ -93,7 +156,6 @@ export function place(sim: Sim, e: number, at?: { x: number; y: number }, lifeMs
     y: at ? at.y : ownerY(e) + 6,
     z: 5,
     lifeMs,
-    phase: 0,
     animOffsetMs: live.length * 311,
   })
   addComponent(sim.world, m, Fired)

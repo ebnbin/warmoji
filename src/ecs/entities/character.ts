@@ -16,7 +16,7 @@ import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox/knobs
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
-import { Alive, Anim, AtkSlow, Breath, Clock, Depth, DmgBuff, DmgMul, Drive, FACTION, Faction, Guard, Hidden, Hp, VisOff, Iframe, Character, CharFlash, CharPerk, CharScale, Facing, Leaping, Magnet, Phys, Poison, Pop, Quad, Radius, Revive, Rushing, Seat, Slot, Slow, Sprite, Tint, Transform } from '../components'
+import { Alive, Anim, AtkSlow, Breath, Casting, Clock, Depth, DmgBuff, DmgMul, Drive, FACTION, Faction, Guard, Hidden, Hp, VisOff, Iframe, Character, CharFlash, CharPerk, CharScale, Facing, Leaping, Magnet, Phys, Poison, Pop, Quad, Radius, Revive, Rushing, Seat, Slot, Slow, Slowed, Sprite, Tint, Transform } from '../components'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
@@ -40,7 +40,7 @@ export function spawnCharacter(
   const def = CHARACTERS[run.roster[slot]!]
   const sandboxHp = sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
   const size = MEMBER.size * UNIT * place.sizeMul
-    const eid = newEntity(world)
+  const eid = newEntity(world)
   addComponent(world, eid, Character)
   addComponent(world, eid, Slot)
   addComponent(world, eid, VisOff)
@@ -75,7 +75,12 @@ export function spawnCharacter(
   addComponent(world, eid, Hidden)
   addComponent(world, eid, Rushing)
   addComponent(world, eid, Leaping)
+  addComponent(world, eid, Slowed)
+  addComponent(world, eid, Casting)
   Slot.v[eid] = slot
+  Slowed.v[eid] = 1
+  Casting.until[eid] = 0
+  Casting.telegraph[eid] = 0
   VisOff.x[eid] = 0
   VisOff.y[eid] = 0
   Breath.phase[eid] = slot * 1.3

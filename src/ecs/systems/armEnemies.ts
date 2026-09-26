@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { Dancing, Dormant, ENEMY_SET, EnemyArm, FACTION, Morph, Transform } from '../components'
+import { Dancing, DmgMul, Dormant, ENEMY_SET, EnemyArm, FACTION, Morph, Transform } from '../components'
 import { equipAbility, NEUTRAL_AMP } from '../entities/ability'
 import { postponeAbilities } from './shared/ability'
 import { restoreMorphVisual } from '../entities/enemy'
@@ -19,13 +19,15 @@ export function armEnemies(sim: Sim): void {
   }
 }
 
+/** 精英的所有伤害同一个倍率：接触、能力都乘 DmgMul */
 function armEnemy(sim: Sim, eid: number): void {
   const rows = enemyDef[eid]?.abilities
   EnemyArm.armed[eid] = 1
   if (!rows) return
   const fireDelay = EnemyArm.fireDelayMs[eid]!
+  const amp = { ...NEUTRAL_AMP, dmg: DmgMul.v[eid]! }
   rows.forEach((w, i) => {
     const delay = ('firstDelayMs' in w ? w.firstDelayMs : undefined) ?? fireDelay ?? 600 + i * 230
-    equipAbility(sim, eid, w, FACTION.enemy, delay, NEUTRAL_AMP)
+    equipAbility(sim, eid, w, FACTION.enemy, delay, amp)
   })
 }

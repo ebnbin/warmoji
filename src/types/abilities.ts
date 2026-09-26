@@ -2,6 +2,7 @@ import type abilitiesJson from '../assets/abilities.json'
 
 export interface CombatTuning {
   readonly enemyBody: { readonly mass: number; readonly drag: number; readonly grip: number }
+  readonly minionBody: { readonly mass: number; readonly drag: number; readonly grip: number }
   readonly knockback: {
     readonly maxSpeed: number
     readonly deathSlideMs: number

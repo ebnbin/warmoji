@@ -1,14 +1,15 @@
 import { hasComponent } from 'bitecs'
 import type { Effect } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
-import { Alive, AtkSlow, Boss, Dancing, DmgBuff, Enemy, EState, FACTION, Guard, Hidden, Hp, Iframe, Morph, Poison, Revive, Rushing, Slow, Taunted, Tint } from '../../components'
+import { Alive, AtkSlow, Dancing, DmgBuff, Enemy, FACTION, Guard, Hidden, Hp, Iframe, Morph, Poison, Revive, Slow, Taunted } from '../../components'
 import { poisonSrc } from '../../store'
 import { applyMorph } from '../../entities/enemy'
 import { spawnBolt } from '../../entities/projectile'
 import { spawnZone } from '../../entities/zone'
 import { spawnCoins } from '../../entities/pickup'
 import { hit } from './damage'
-import { grantIframe, reviveCharacter } from './combat'
+import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
+import { interrupt } from './ability'
 import { healAllies } from './heal'
 import { nearestAngle, targetsNear } from '../../utils/targets'
 import type { Source } from '../../utils/source'
@@ -160,11 +161,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const until = sim.elapsedMs + fx.durationMs
     eachCapable(sim, at, Dancing, (t) => {
       Dancing.until[t] = until
-      Rushing.active[t] = 0
-      if (EState.v[t] !== 2 && EState.v[t] !== 3) return
-      EState.v[t] = Boss.v[t] ? 1 : 0
-      Tint.effect[t] = 0
-      Tint.color[t] = 0xffffff
+      interrupt(sim, t)
     })
   },
 
@@ -226,6 +223,10 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   coins: (sim, src, fx, at) => {
     if (src.faction === FACTION.team) spawnCoins(sim, at.x, at.y, fx.count)
+  },
+
+  vanish: (sim, _src, _fx, at) => {
+    eachCapable(sim, at, Enemy, (t) => despawnEnemy(sim, t))
   },
 }
 

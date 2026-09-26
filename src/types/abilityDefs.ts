@@ -119,6 +119,10 @@ interface CoinsEffect {
   readonly kind: 'coins'
   readonly count: number
 }
+/** 消散：目标身体不算击杀地移除，自爆者对自己用 */
+interface VanishEffect {
+  readonly kind: 'vanish'
+}
 export type Effect =
   | BlastEffect
   | SlowEffect
@@ -139,6 +143,7 @@ export type Effect =
   | ReviveCutEffect
   | TimeStopEffect
   | CoinsEffect
+  | VanishEffect
 
 export interface ZoneVisual {
   readonly color: number
@@ -174,7 +179,7 @@ export type Shape =
       readonly staggerMs: number
     }
   | { readonly kind: 'blink'; readonly behindDist: number; readonly strikeMs: number; readonly execute?: { readonly hpRatio: number; readonly mul: number } }
-  | { readonly kind: 'sprint'; readonly distance: number; readonly ms: number; readonly radius: number }
+  | { readonly kind: 'sprint'; readonly distance: number; readonly ms: number; readonly radius?: number }
   | { readonly kind: 'leap'; readonly distance: number; readonly ms: number; readonly height: number; readonly radius: number }
   | { readonly kind: 'all'; readonly of: 'foes' | 'allies'; readonly downed?: boolean }
   | {
@@ -187,7 +192,17 @@ export type Shape =
       readonly pulse?: { readonly intervalMs: number; readonly onHit: readonly Effect[] }
       readonly visual: ZoneVisual
     }
-  | { readonly kind: 'summon'; readonly count: number; readonly minion: { readonly emoji: string; readonly size: number; readonly speed: number }; readonly lifeMs: number }
+  | {
+      readonly kind: 'summon'
+      readonly count: number
+      readonly minion: {
+        readonly emoji: string
+        readonly size: number
+        readonly speed: number
+        readonly orbit: { readonly radius: number; readonly spinRadPerSec: number }
+      }
+      readonly lifeMs: number
+    }
   | {
       readonly kind: 'emplace'
       readonly count: number
@@ -213,8 +228,16 @@ export interface Repeat {
   readonly reaim?: 'same' | 'nearest' | 'random'
 }
 
+/** 蓄力：出手前停下 ms 毫秒；方向在蓄力开始或结束时锁定；telegraph 是蓄力期间身体上的预兆 */
+export interface Windup {
+  readonly ms: number
+  readonly lockAt: 'start' | 'end'
+  readonly telegraph: 'shake' | 'blink'
+}
+
 interface AbilityBase {
   readonly aim: Aim
+  readonly windup?: Windup
   readonly range?: number
   readonly shape: Shape
   readonly damage?: number

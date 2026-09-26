@@ -24,18 +24,13 @@ const SPATIAL: ReadonlySet<string> = new Set<FieldName<EnemyDef | AbilityDef>>([
   'restOffset',
   'mountGap',
   'coinMagnetRadius',
-  'dashSpeed',
-  'dist',
   'fxRadius',
   'fromAbove',
   'standoffDist',
-  'triggerRange',
-  'orbitRadius',
   'aggroRange',
   'distance',
   'height',
   'spread',
-  'blastRadius',
   'detectRange',
 ])
 

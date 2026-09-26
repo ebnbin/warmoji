@@ -27,6 +27,7 @@ import {
   FlyerShape,
   Frozen,
   LeapShape,
+  LOCK_AT,
   Manual,
   Minion,
   Owner,
@@ -40,9 +41,12 @@ import {
   SprintShape,
   SummonShape,
   Swing,
+  TELEGRAPH,
   Thrown,
   WallBlocked,
   Weapon,
+  Windup,
+  WindupState,
   WorldShape,
   ZoneFollow,
   ZoneShape,
@@ -145,7 +149,7 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
     attach: (_sim, e, s) => {
       SprintShape.distance[e] = s.distance
       SprintShape.ms[e] = s.ms
-      SprintShape.radius[e] = s.radius
+      SprintShape.radius[e] = s.radius ?? 0
     },
   },
   leap: {
@@ -188,6 +192,8 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
       SummonShape.size[e] = s.minion.size
       SummonShape.speed[e] = s.minion.speed
       SummonShape.lifeMs[e] = s.lifeMs
+      SummonShape.orbitRadius[e] = s.minion.orbit.radius
+      SummonShape.orbitSpin[e] = s.minion.orbit.spinRadPerSec
       abilityArtEmoji[e] = s.minion.emoji
     },
   },
@@ -273,6 +279,14 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
     Repeat.everyN[e] = def.repeat.everyN ?? 0
     Repeat.reaim[e] = REAIM[def.repeat.reaim ?? 'same']
   }
+  if (def.windup) {
+    addComponents(world, e, Windup, WindupState)
+    Windup.ms[e] = def.windup.ms
+    Windup.lockAt[e] = LOCK_AT[def.windup.lockAt]
+    Windup.telegraph[e] = TELEGRAPH[def.windup.telegraph]
+    WindupState.until[e] = 0
+    WindupState.angle[e] = 0
+  }
   abilityOnHit[e] = def.onHit
   abilityOnSelf[e] = def.onSelf
   abilityFireSfx[e] = def.fireSfx
@@ -311,6 +325,8 @@ export function unequipAbilities(sim: Sim, ownerEid: number): void {
     abilityOnHit[e] = undefined
     abilityOnSelf[e] = undefined
     abilityPulse[e] = undefined
+    abilityArtEmoji[e] = undefined
+    abilityFireSfx[e] = undefined
     emplaceAbility[e] = undefined
     removeEntity(world, e)
   }

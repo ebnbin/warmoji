@@ -93,8 +93,6 @@ export const Guard = { mul: f32(), until: f32() }
 
 export const Speed = { v: f32() }
 
-export const EState = { v: u8() }
-
 export const Elite = { v: u8() }
 export const Boss = { v: u8() }
 
@@ -127,8 +125,6 @@ export const ETurn = { at: f32() }
 export const Slow = { until: f32(), mul: f32() }
 
 export const Poison = { until: f32(), nextTick: f32(), dmg: f32(), tickMs: f32() }
-
-export const Charge = { windupUntil: f32(), dashUntil: f32(), coolUntil: f32(), nextDashAt: f32() }
 
 export const Despawn = { at: f32() }
 
@@ -324,7 +320,7 @@ export const AllShape = { of: u8(), downed: u8() }
 
 export const ZoneShape = { radius: f32(), durationMs: f32(), tickMs: f32(), mend: f32(), follow: u8(), pulseMs: f32(), enterMs: f32(), fillAlpha: f32(), lineAlpha: f32(), lineWidth: f32(), color: u32() }
 
-export const SummonShape = { count: f32(), size: f32(), speed: f32(), lifeMs: f32() }
+export const SummonShape = { count: f32(), size: f32(), speed: f32(), lifeMs: f32(), orbitRadius: f32(), orbitSpin: f32() }
 
 export const EmplaceShape = { count: f32(), spread: f32(), maxAlive: f32(), lifeMs: f32(), size: f32() }
 
@@ -354,7 +350,7 @@ export const DmgBuff = { mul: f32(), until: f32() }
 /** 蹦迪是每个敌人身上的状态，施法之后刷出来的敌人不受影响 */
 export const Dancing = { until: f32() }
 
-/** 冲刺中的身体：位移由 moveTeam 推进，撞击按 stamp 去重 */
+/** 冲刺中的身体：位移由 moveBodies 按脚本速度推进，撞击按 stamp 去重 */
 export const Rushing = { active: u8(), msLeft: f32(), vx: f32(), vy: f32(), skill: i32(), stamp: f32() }
 
 /** 敌人记下最近一次撞到自己的冲刺，同一次冲刺不重复吃伤害 */
@@ -385,7 +381,7 @@ export const Flyer = {
 }
 
 /** ability：装置自己那条能力的实体，0 = 没有 */
-export const Minion = { bornMs: f32(), dieAt: f32(), phase: f32(), size: f32(), ability: i32() }
+export const Minion = { bornMs: f32(), dieAt: f32(), size: f32(), ability: i32() }
 
 export const Built = { by: i32() }
 
@@ -415,7 +411,7 @@ export const Chase = {}
 
 export const Roam = {}
 
-export const Stationary = {}
+export const Stay = {}
 
 export const Flee = { range: f32() }
 
@@ -423,25 +419,30 @@ export const CoinThief = {}
 
 export const Standoff = { detectRange: f32(), standoffDist: f32() }
 
-export const Detonate = { triggerRange: f32(), windupMs: f32(), blastRadius: f32(), blastDamage: f32() }
+/** 环绕 Nest 里的身体：spin 为 0 时全速绕行；aggro 为 0 时看见目标就扑，否则目标须在锚点 aggro 内；seek 是自己的索敌距离；fresh 优先扑还没中毒的 */
+export const Orbit = { radius: f32(), spin: f32(), aggro: f32(), seek: f32(), fresh: u8() }
 
-export const BaseOrbit = { orbitRadius: f32(), aggroRange: f32() }
+/** 接触载荷：碰到敌方身体就打一下；vanish 的身体打中即消散 */
+export const Contact = { damage: f32(), knockback: f32(), vanish: u8() }
 
-export const Dash = {
-  windupMs: f32(),
-  dashSpeed: f32(),
-  idleChase: u8(),
-  aimLeader: u8(),
-  lockAtLaunch: u8(),
-  whoosh: u8(),
-}
-export const DashTimer = { intervalMs: f32() }
-export const DashDetect = { range: f32(), cooldownMs: f32() }
-export const DashTime = { durationMs: f32() }
-export const DashDist = { dist: f32() }
+export const TELEGRAPH = { shake: 0, blink: 1 } as const
+
+/** 蓄力中的身体：until 之前不走，telegraph 是身上的预兆 */
+export const Casting = { until: f32(), telegraph: u8() }
+
+export const LOCK_AT = { start: 0, end: 1 } as const
+
+/** 蓄力：出手前停 ms 毫秒，方向在蓄力开始或结束时锁定 */
+export const Windup = { ms: f32(), lockAt: u8(), telegraph: u8() }
+
+export const WindupState = { until: f32(), angle: f32() }
+
+/** 飞在空中的身体：不受地面与介质影响 */
+export const Airborne = {}
 
 export const BreaksWalls = {}
 
+/** 这一帧的速度倍率：减速状态 × 固有倍率 × 战场效果，每个会走的身体一份 */
 export const Slowed = { v: f32() }
 
 export const Steering = { v: u8() }

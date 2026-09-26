@@ -42,6 +42,19 @@ export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach:
   }
 }
 
+/** 敌方身体的实体接触：不看隐匿、嘲讽与视线，倒地的不算 */
+export function eachFoeBody(sim: Sim, faction: number, cx: number, cy: number, reach: number, visit: Visit): void {
+  for (const f of FOES[faction]!) {
+    for (const t of sim.targets[f]!) {
+      if (!t.alive || Uid.v[t.eid] !== t.uid) continue
+      const d = sim.hooks.worldDelta(sim, cx, cy, t.x, t.y)
+      const rr = reach + t.radius
+      if (d.x * d.x + d.y * d.y > rr * rr) continue
+      if (visit(t.eid, cx + d.x, cy + d.y, t.radius)) return
+    }
+  }
+}
+
 /** 同阵营的身体，隐匿的也算；downed 为真时倒地的也算 */
 export function eachAlly(sim: Sim, faction: number, cx: number, cy: number, reach: number, downed: boolean, visit: Visit): void {
   for (const t of sim.targets[faction]!) {

@@ -1,6 +1,5 @@
-import { Drive, LeapShape, Leaping, Phys, Rushing, Transform, VisOff } from '../components'
+import { Drive, LeapShape, Leaping, Phys, Rushing, Slowed, Transform, VisOff } from '../components'
 import { leaderGrip } from './shared/squad'
-import { slowMul } from './shared/status'
 import type { Sim } from '../sim'
 
 /** 队长的驱动来自摇杆；冲刺与跳跃期间不听摇杆，按技能给定的轨迹走 */
@@ -31,7 +30,7 @@ export function driveTeam(sim: Sim): void {
     }
     return
   }
-  const speed = (Phys.thrust[mover]! / Phys.drag[mover]!) * sim.battleFx.moveSpeedMul * slowMul(sim, mover)
+  const speed = (Phys.thrust[mover]! / Phys.drag[mover]!) * Slowed.v[mover]!
   Drive.x[mover] = sim.teamDir.x * speed
   Drive.y[mover] = sim.teamDir.y * speed
 }

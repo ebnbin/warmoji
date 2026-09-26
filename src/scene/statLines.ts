@@ -89,6 +89,8 @@ export function effectLine(e: Effect): string {
       return `阵亡同伴的复活倒计时减 ${sec(e.ms)}`
     case 'timeStop':
       return `时停 ${sec(e.durationMs)}（按世界时长计，静止时同步放慢）`
+    case 'vanish':
+      return '自身消散'
     case 'coins':
       return `每次命中掉 ${e.count} 枚金币`
   }
@@ -117,7 +119,7 @@ function shapeLine(w: AbilityDef, s: Shape): string {
     case 'blink':
       return `索敌 ${grid(w.range ?? 0)} · 瞬移背刺血最厚的敌人 · 出手 ${sec(s.strikeMs)} 无敌${s.execute ? ` · 目标血量低于 ${pct(s.execute.hpRatio)} 时伤害 ×${s.execute.mul}` : ''}`
     case 'sprint':
-      return `朝瞄准方向冲刺 ${grid(s.distance)} · 用时 ${sec(s.ms)} · 判定 ${grid(s.radius)}`
+      return `朝瞄准方向冲刺 ${grid(s.distance)} · 用时 ${sec(s.ms)}${s.radius ? ` · 判定 ${grid(s.radius)}` : ''}`
     case 'leap':
       return `朝瞄准方向跃出 ${grid(s.distance)} · 用时 ${sec(s.ms)} · 落地范围 ${grid(s.radius)}`
     case 'all':

@@ -21,7 +21,7 @@ function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): 
     speed: 0,
     xp: 0,
     coins: 0,
-    locomotion: { kind: 'wander' as const },
+    drive: { kind: 'wander' as const },
     abilities: undefined,
     onDeath: undefined,
     kbImmune: true,

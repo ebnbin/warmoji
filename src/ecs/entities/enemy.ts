@@ -1,75 +1,70 @@
-import { addComponent, hasComponent, query, removeComponent } from 'bitecs'
+import { addComponent, addComponents, hasComponent, query, removeComponent } from 'bitecs'
 import { newEntity } from './entity'
 import { AI, ELITE, SPAWN, SURGE } from '../../data/enemies'
 import { ENEMY_BODY } from '../../data/abilities'
-import type { EnemyDef, LocomotionDef } from '../../types/enemies'
+import type { DriveDef, EnemyDef } from '../../types/enemies'
 import { waveAt } from '../../data/waves'
 import {
   Alive,
   Anchored,
   Anim,
   AtkSlow,
-  DmgBuff,
-  Guard,
-  BaseOrbit,
   Boss,
   BreaksWalls,
+  Casting,
   Chase,
   Clock,
-  Drive,
-  FACTION,
-  Faction,
-  Phasing,
-  Phys,
-  Rushing,
-  VisOff,
   CoinThief,
-  Dash,
-  DashDetect,
-  DashDist,
-  DashTime,
-  DashTimer,
-  Detonate,
-  Flee,
-  Roam,
-  Slowed,
-  Standoff,
-  Stationary,
-  Steering,
-  Charge,
+  Contact,
+  Dancing,
   Depth,
   Despawn,
+  DmgBuff,
   DmgMul,
   Dormant,
+  Drive,
   EDir,
   Elite,
   Enemy,
   ENEMY_SET,
   EnemyArm,
-  Dancing,
   EnemyPhase,
-  RushHit,
-  Taunted,
-  EState,
   ETurn,
+  FACTION,
+  Faction,
   Flash,
+  Flee,
+  Guard,
   Hp,
   Morph,
   Nest,
+  Orbit,
   Orphan,
+  Phasing,
+  Phys,
   Poison,
   Pop,
   Quad,
   Radius,
+  Roam,
+  RushHit,
+  Rushing,
   Slow,
+  Slowed,
   Speed,
   SpMul,
   Sprite,
+  Standoff,
+  Stay,
+  Steering,
+  Taunted,
   Thief,
   Tint,
   Transform,
+  VisOff,
 } from '../components'
-import { enemyCarries, enemyDef } from '../store'
+import { contactEffects, enemyCarries, enemyDef } from '../store'
+import { interrupt } from '../systems/shared/ability'
 import { spawnTelegraph, telegraphCount } from './telegraph'
 import { scheduleSurge } from './schedule'
 import { armIdle } from '../systems/shared/anim'
@@ -84,73 +79,38 @@ import type { FieldPickupDef } from '../../types/battlefield'
 import { enemyMixAt, pickEnemy } from '../utils/spawnMix'
 import type { ByKind } from '../../util/record'
 
+type DriveOf = ByKind<DriveDef>
 
+type DriveAttach<K extends keyof DriveOf> = (sim: Sim, eid: number, d: DriveOf[K]) => void
 
-
-
-type LocomotionOf = ByKind<LocomotionDef>
-
-type LocoAttach<K extends keyof LocomotionOf> = (sim: Sim, eid: number, lm: LocomotionOf[K]) => void
-
-const LOCOMOTIONS: { [K in keyof LocomotionOf]: LocoAttach<K> } = {
+const DRIVES: { [K in keyof DriveOf]: DriveAttach<K> } = {
   chase: (sim, eid) => addComponent(sim.world, eid, Chase),
   wander: (sim, eid) => addComponent(sim.world, eid, Roam),
-  static: (sim, eid) => addComponent(sim.world, eid, Stationary),
-  flee: (sim, eid, lm) => {
+  stay: (sim, eid) => addComponent(sim.world, eid, Stay),
+  flee: (sim, eid, d) => {
     addComponent(sim.world, eid, Flee)
-    Flee.range[eid] = lm.range
+    Flee.range[eid] = d.range
   },
   coinThief: (sim, eid) => addComponent(sim.world, eid, CoinThief),
-  standoff: (sim, eid, lm) => {
+  standoff: (sim, eid, d) => {
     addComponent(sim.world, eid, Standoff)
-    Standoff.detectRange[eid] = lm.detectRange
-    Standoff.standoffDist[eid] = lm.standoffDist
+    Standoff.detectRange[eid] = d.detectRange
+    Standoff.standoffDist[eid] = d.standoffDist
   },
-  detonate: (sim, eid, lm) => {
-    addComponent(sim.world, eid, Detonate)
-    Detonate.triggerRange[eid] = lm.triggerRange
-    Detonate.windupMs[eid] = lm.windupMs
-    Detonate.blastRadius[eid] = lm.blastRadius
-    Detonate.blastDamage[eid] = lm.blastDamage
-  },
-  baseOrbit: (sim, eid, lm) => {
-    addComponent(sim.world, eid, BaseOrbit)
-    BaseOrbit.orbitRadius[eid] = lm.orbitRadius
-    BaseOrbit.aggroRange[eid] = lm.aggroRange
-    addComponent(sim.world, eid, Orphan)
-    Orphan.speedMul[eid] = lm.orphanSpeedMul
-    Orphan.damageMul[eid] = lm.orphanDamageMul
-  },
-  dash: (sim, eid, lm) => {
-    addComponent(sim.world, eid, Dash)
-    Dash.windupMs[eid] = lm.windupMs
-    Dash.dashSpeed[eid] = lm.dashSpeed
-    Dash.idleChase[eid] = lm.idle === 'chase' ? 1 : 0
-    Dash.aimLeader[eid] = lm.aim === 'leader' ? 1 : 0
-    Dash.lockAtLaunch[eid] = lm.lockAt === 'launch' ? 1 : 0
-    Dash.whoosh[eid] = lm.sfx ? 1 : 0
-    EState.v[eid] = lm.idle === 'chase' ? 1 : 0
-    if (lm.trigger.kind === 'timer') {
-      addComponent(sim.world, eid, DashTimer)
-      DashTimer.intervalMs[eid] = lm.trigger.intervalMs
-      Charge.nextDashAt[eid] = sim.elapsedMs + (lm.trigger.firstDelayMs ?? lm.trigger.intervalMs)
-    } else {
-      addComponent(sim.world, eid, DashDetect)
-      DashDetect.range[eid] = lm.trigger.range
-      DashDetect.cooldownMs[eid] = lm.trigger.cooldownMs
-    }
-    if (lm.length.kind === 'time') {
-      addComponent(sim.world, eid, DashTime)
-      DashTime.durationMs[eid] = lm.length.durationMs
-    } else {
-      addComponent(sim.world, eid, DashDist)
-      DashDist.dist[eid] = lm.length.dist
-    }
+  orbit: (sim, eid, d) => {
+    addComponents(sim.world, eid, Orbit, Orphan)
+    Orbit.radius[eid] = d.radius
+    Orbit.spin[eid] = 0
+    Orbit.aggro[eid] = d.aggroRange
+    Orbit.seek[eid] = Infinity
+    Orbit.fresh[eid] = 0
+    Orphan.speedMul[eid] = d.orphan.speedMul
+    Orphan.damageMul[eid] = d.orphan.damageMul
   },
 }
 
-function attachLocomotion<K extends keyof LocomotionOf>(sim: Sim, eid: number, lm: LocomotionOf[K] & { readonly kind: K }): void {
-  LOCOMOTIONS[lm.kind](sim, eid, lm)
+function attachDrive<K extends keyof DriveOf>(sim: Sim, eid: number, d: DriveOf[K] & { readonly kind: K }): void {
+  DRIVES[d.kind](sim, eid, d)
 }
 
 export function spawnEnemy(
@@ -173,7 +133,6 @@ export function spawnEnemy(
   addComponent(world, eid, Transform)
   addComponent(world, eid, Speed)
   addComponent(world, eid, Hp)
-  addComponent(world, eid, EState)
   addComponent(world, eid, Elite)
   addComponent(world, eid, Boss)
   addComponent(world, eid, Radius)
@@ -191,7 +150,8 @@ export function spawnEnemy(
   addComponent(world, eid, Flash)
   addComponent(world, eid, Slow)
   addComponent(world, eid, Poison)
-  addComponent(world, eid, Charge)
+  addComponent(world, eid, Casting)
+  addComponent(world, eid, Nest)
   addComponent(world, eid, Despawn)
   addComponent(world, eid, Morph)
   addComponent(world, eid, EDir)
@@ -215,11 +175,8 @@ export function spawnEnemy(
   Speed.v[eid] = def.speed
   Hp.v[eid] = hp
   Hp.max[eid] = hp
-  EState.v[eid] = 0
-  Charge.windupUntil[eid] = 0
-  Charge.dashUntil[eid] = 0
-  Charge.coolUntil[eid] = 0
-  Charge.nextDashAt[eid] = 0
+  Casting.until[eid] = 0
+  Casting.telegraph[eid] = 0
   Phys.vx[eid] = 0
   Phys.vy[eid] = 0
   Phys.thrust[eid] = def.speed * ENEMY_BODY.drag
@@ -233,7 +190,14 @@ export function spawnEnemy(
   Rushing.active[eid] = 0
   Slowed.v[eid] = 1
   Steering.v[eid] = 0
-  attachLocomotion(sim, eid, def.locomotion)
+  attachDrive(sim, eid, def.drive)
+  if (def.damage > 0) {
+    addComponent(world, eid, Contact)
+    Contact.damage[eid] = def.damage
+    Contact.knockback[eid] = 0
+    Contact.vanish[eid] = 0
+  }
+  contactEffects[eid] = def.onContact
   if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
   Despawn.at[eid] = 0
   Morph.until[eid] = 0
@@ -385,12 +349,7 @@ export function applyMorph(
     const outline = Elite.v[eid] ? 'elite' : 'enemy'
     Sprite.frame[eid] = atlas.index(spec.morphEmoji, outline)
     armIdle(eid, spec.morphEmoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
-    if (EState.v[eid] === 2) {
-      Tint.effect[eid] = 0
-      Tint.color[eid] = 0xffffff
-    }
-    EState.v[eid] = 0
-    Rushing.active[eid] = 0
+    interrupt(sim, eid)
     Transform.rot[eid] = 0
     if (hasComponent(sim.world, eid, Anchored)) {
       removeComponent(sim.world, eid, Anchored)

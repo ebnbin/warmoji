@@ -1,9 +1,9 @@
 import { query } from 'bitecs'
-import { Drive, Dancing, Dormant, ENEMY_SET, EnemyPhase, Morph, Slowed, Speed, SpMul, Steering, Transform } from '../components'
+import { Casting, Drive, Dancing, Dormant, ENEMY_SET, EnemyPhase, Morph, Slowed, Speed, Steering, Transform } from '../components'
 import { wanderDir } from './shared/steer'
-import { slowMul } from './shared/status'
 import type { Sim } from '../sim'
 
+/** 敌人这一帧能不能自己走：休眠、蹦迪、蓄力都不走，变形中只会慢速乱逛 */
 export function updateEnemyGates(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, ENEMY_SET)) {
@@ -17,8 +17,6 @@ export function updateEnemyGates(sim: Sim): void {
       Steering.v[eid] = 0
       continue
     }
-    const slow = slowMul(sim, eid) * SpMul.v[eid]! * sim.battleFx.enemySlowMul
-    Slowed.v[eid] = slow
     if (Dancing.until[eid] !== 0) {
       Transform.rot[eid] = Math.sin(now / 80 + EnemyPhase.v[eid]!) * 0.3
       Steering.v[eid] = 0
@@ -26,9 +24,13 @@ export function updateEnemyGates(sim: Sim): void {
     }
     if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) {
       const d = wanderDir(sim, eid)
-      const sp = Speed.v[eid]! * slow * 0.5
+      const sp = Speed.v[eid]! * Slowed.v[eid]! * 0.5
       Drive.x[eid] = d.x * sp
       Drive.y[eid] = d.y * sp
+      Steering.v[eid] = 0
+      continue
+    }
+    if (now < Casting.until[eid]!) {
       Steering.v[eid] = 0
       continue
     }

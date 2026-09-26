@@ -191,7 +191,12 @@ const BASE = {
     aim: 'self',
     damage: 5,
     knockback: 2,
-    shape: { kind: 'summon', count: 3, minion: { emoji: '1f41d', size: 0.5, speed: 8 }, lifeMs: 4000 },
+    shape: {
+      kind: 'summon',
+      count: 3,
+      minion: { emoji: '1f41d', size: 0.5, speed: 8, orbit: { radius: 0.625, spinRadPerSec: 3 } },
+      lifeMs: 4000,
+    },
     onHit: [{ kind: 'poison', damage: 8, tickMs: 1000, durationMs: 5000 }],
   } satisfies AbilityDef,
   fieldMedkit: {

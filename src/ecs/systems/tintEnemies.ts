@@ -1,6 +1,11 @@
 import { query } from 'bitecs'
-import { Dancing, Dormant, ENEMY_SET, EState, Flash, Poison, Slow, Tint } from '../components'
+import { Casting, Dancing, Dormant, ENEMY_SET, Flash, Poison, Slow, TELEGRAPH, Tint } from '../components'
 import type { Sim } from '../sim'
+
+function castingTint(now: number, eid: number): number {
+  if (Casting.telegraph[eid] === TELEGRAPH.blink) return now % 240 < 120 ? 0xffffff : 0xff5252
+  return 0xffb74d
+}
 
 export function tintEnemies(sim: Sim): void {
   const now = sim.elapsedMs
@@ -11,8 +16,8 @@ export function tintEnemies(sim: Sim): void {
       ? 0xff9ff3
       : now < Poison.until[eid]!
         ? 0x7bff5a
-        : EState.v[eid] === 2
-          ? 0xffb74d
+        : now < Casting.until[eid]!
+          ? castingTint(now, eid)
           : now < Slow.until[eid]! && Slow.mul[eid]! < 1
             ? 0xa5d8ff
             : 0xffffff

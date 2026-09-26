@@ -8,7 +8,7 @@ import { animateCharacters } from '../animateCharacters'
 import { despawnExpired } from '../despawnExpired'
 import { fadeEnemyFlash } from '../fadeEnemyFlash'
 import { layoutTeam } from '../layoutTeam'
-import { characterContact } from '../characterContact'
+import { touchBodies } from '../touchBodies'
 import { characterVisual } from '../characterVisual'
 import { driveTeam } from '../driveTeam'
 import { moveBodies } from '../moveBodies'
@@ -19,15 +19,10 @@ import { popInEnemies } from '../popInEnemies'
 import { refoldBattleFx } from '../refoldBattleFx'
 import { regenCharacters } from '../regenCharacters'
 import { reviveCharacters } from '../reviveCharacters'
-import { steerBaseOrbit } from '../steerBaseOrbit'
-import { steerChase } from '../steerChase'
-import { steerCoinThief } from '../steerCoinThief'
-import { steerDash } from '../steerDash'
-import { steerDetonate } from '../steerDetonate'
-import { steerFlee } from '../steerFlee'
-import { steerRoam } from '../steerRoam'
-import { steerStandoff } from '../steerStandoff'
+import { steerBodies } from '../steerBodies'
+import { updateBees } from '../updateBees'
 import { updateEnemyGates } from '../updateEnemyGates'
+import { updateSpeedMuls } from '../updateSpeedMuls'
 import { tickPoison } from '../tickPoison'
 import { tintEnemies } from '../tintEnemies'
 import { updateDormancy } from '../updateDormancy'
@@ -39,15 +34,14 @@ import { updateShards } from '../updateShards'
 import { worldTick } from '../worldTick'
 import { pipeline } from './step'
 
-const STEERERS = [steerChase, steerRoam, steerFlee, steerStandoff, steerDetonate, steerBaseOrbit, steerCoinThief, steerDash]
-
-// 时标是身体的属性（Clock）：驱动层只写期望速度，积分只在 moveBodies 一处
+// 先算每个身体的速度倍率与门控，再由驱动写期望速度，积分只在 moveBodies 一处；时标是身体的属性（Clock）
 export const SIM_PIPELINE = pipeline([
   refoldBattleFx,
   updateDormancy,
   tickSkillCooldowns,
   stepHandover,
-  { run: driveTeam, after: [stepHandover] },
+  { run: updateSpeedMuls, after: [refoldBattleFx] },
+  { run: driveTeam, after: [stepHandover, updateSpeedMuls] },
   { run: layoutTeam, after: [driveTeam] },
   reviveCharacters,
   regenCharacters,
@@ -56,16 +50,17 @@ export const SIM_PIPELINE = pipeline([
   { run: despawnExpired, after: [updateDormancy] },
   { run: fadeEnemyFlash, after: [updateDormancy] },
   { run: tintEnemies, after: [updateDormancy] },
-  { run: updateEnemyGates, after: [updateDormancy] },
-  ...STEERERS.map((run) => ({ run, after: [updateEnemyGates] })),
-  { run: moveBodies, after: [layoutTeam, ...STEERERS] },
+  { run: updateEnemyGates, after: [updateDormancy, updateSpeedMuls] },
+  { run: updateBees, after: [updateDormancy] },
+  { run: steerBodies, after: [updateEnemyGates, updateBees] },
+  { run: moveBodies, after: [layoutTeam, steerBodies] },
   { run: refreshTargets, after: [moveBodies] },
   { run: tickSkillStates, after: [refreshTargets] },
   { run: animateCharacters, after: [moveBodies] },
   { run: animateEnemies, after: [moveBodies] },
   { run: moveProjectiles, after: [moveBodies] },
   { run: hitProjectiles, after: [moveProjectiles, refreshTargets] },
-  { run: characterContact, after: [refreshTargets, tickSkillStates] },
+  { run: touchBodies, after: [refreshTargets, tickSkillStates] },
   { run: cullProjectiles, after: [hitProjectiles] },
   characterVisual,
   blinkTelegraphs,
@@ -74,5 +69,5 @@ export const SIM_PIPELINE = pipeline([
   driftDecor,
   { run: spinDecor, after: [driftDecor] },
   { run: expireFx, after: [animateBooms] },
-  { run: worldTick, after: [moveBodies, characterContact] },
+  { run: worldTick, after: [moveBodies, touchBodies] },
 ])

@@ -1,9 +1,12 @@
-import { query } from 'bitecs'
-import { Alive, Dormant, Drive, Leaping, Phys, Radius, Rushing, Transform } from '../components'
+import { hasComponent, query } from 'bitecs'
+import { Airborne, Alive, BreaksWalls, Dormant, Drive, Leaping, Phys, Radius, Rushing, Transform } from '../components'
+import { GROUND } from '../worlds/hooks'
 import { bodyDt } from './shared/body'
 import type { Sim } from '../sim'
 
-/** 所有身体同一条积分；冲刺中的身体按脚本速度走，跳跃中的身体不落地；位置经场地修正后速度按实际位移回推 */
+const STILL = { x: 0, y: 0 }
+
+/** 所有身体同一条积分；冲刺中的身体按脚本速度走，跳跃中的身体不落地，空中的身体不受地面与介质影响；位置经场地修正后速度按实际位移回推 */
 export function moveBodies(sim: Sim): void {
   for (const eid of query(sim.world, [Phys, Transform, Radius])) {
     if (Dormant.v[eid] || Alive.v[eid] === 0 || Leaping.active[eid]) continue
@@ -21,8 +24,9 @@ export function moveBodies(sim: Sim): void {
       next = { x: x + vx * dt, y: y + vy * dt }
     } else {
       // 线性阻力的精确解：速度按 exp 衰减趋近终速（介质速度 + 驱动 / 黏度），与帧率无关
-      const s = sim.hooks.surface(sim, x, y)
-      const medium = sim.hooks.mediumVelocity(sim, x, y)
+      const air = hasComponent(sim.world, eid, Airborne)
+      const s = air ? GROUND : sim.hooks.surface(sim, x, y)
+      const medium = air ? STILL : sim.hooks.mediumVelocity(sim, x, y)
       const k = (Phys.drag[eid]! * Phys.grip[eid]! * s.traction * s.viscosity) / Phys.mass[eid]!
       const tx = medium.x + Drive.x[eid]! / s.viscosity
       const ty = medium.y + Drive.y[eid]! / s.viscosity
@@ -44,6 +48,8 @@ export function moveBodies(sim: Sim): void {
     Transform.x[eid] = to.x
     Transform.y[eid] = to.y
     if (!rushing) continue
+    // 破墙的身体冲刺时碾碎所在的墙
+    if (hasComponent(sim.world, eid, BreaksWalls)) sim.hooks.smashWall(sim, to.x, to.y)
     Rushing.msLeft[eid] = Rushing.msLeft[eid]! - dt * 1000
     // 被墙挡住就提前结束
     if (Math.hypot(d.x, d.y) < Math.hypot(next.x - x, next.y - y) * 0.5) Rushing.msLeft[eid] = 0

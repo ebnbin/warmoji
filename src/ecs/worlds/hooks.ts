@@ -32,7 +32,7 @@ export interface Surface {
   readonly traction: number
   readonly viscosity: number
 }
-const GROUND: Surface = { traction: 1, viscosity: 1 }
+export const GROUND: Surface = { traction: 1, viscosity: 1 }
 
 interface Walls {
   grid: WallGrid
