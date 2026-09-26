@@ -537,7 +537,7 @@ export const CHARACTERS = {
   peacock: {
     emoji: '1f99a',
     name: '孔雀',
-    desc: '翎羽射出去落在地上，每第四下把满地羽毛一齐收回，沿途再扎一遍',
+    desc: '翎羽射出去落在地上，每射四根就把满地羽毛一齐收回，沿途再扎一遍',
     body: { thrust: 29, drag: 5, mass: 0.8 },
     magnet: 2.25,
     skill: { name: '开屏', icon: '1faad', desc: '朝指定方向展开一道四格半的羽屏三秒半，吞掉敌方弹体', cdMs: 12_000, ability: 'peacockFan', aim: true },
