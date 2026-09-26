@@ -2,6 +2,7 @@ import { addComponent, addComponents, query, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
 import {
   Ability,
+  AbilityClass,
   AIM,
   Aim,
   ALL_OF,
@@ -246,8 +247,9 @@ interface AbilityInit {
 function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit): void {
   const world = sim.world
   const spec = SHAPES[def.shape.kind]
-  addComponents(world, e, Ability, Owner, Anchor, Faction, Amp, Frozen, Disarmed, WallBlocked, Cd, Aim, Payload, ...spec.comps)
+  addComponents(world, e, Ability, AbilityClass, Owner, Anchor, Faction, Amp, Frozen, Disarmed, WallBlocked, Cd, Aim, Payload, ...spec.comps)
   if (init.manual) addComponent(world, e, Manual)
+  AbilityClass.skill[e] = (def.class ?? (def.trigger === 'manual' ? 'skill' : 'attack')) === 'skill' ? 1 : 0
   Owner.eid[e] = init.owner
   Anchor.eid[e] = init.anchor
   Faction.v[e] = init.faction

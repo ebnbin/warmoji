@@ -85,7 +85,7 @@ export const Alive = { v: u8() }
 export const CharScale = { v: f32() }
 export const Revive = { ms: f32(), at: f32() }
 
-export const MARK_SLOTS = 8
+export const MARK_SLOTS = 12
 
 const strided = <T extends Column>(ctor: new (length: number) => T): T => {
   const col = new ctor(INITIAL_CAPACITY * MARK_SLOTS)
@@ -93,8 +93,49 @@ const strided = <T extends Column>(ctor: new (length: number) => T): T => {
   return col
 }
 
-/** 标记的种类决定它折叠成哪个有效值：slow 取最小、speed/guard/dmg/cd 相乘、poison 按节拍扣血、其余是有无 */
-export const MARK = { none: 0, slow: 1, speed: 2, guard: 3, dmg: 4, cd: 5, poison: 6, stun: 7, hide: 8, taunt: 9, invuln: 10, morph: 11, morphImmune: 12, regen: 13 } as const
+/** 标记的种类决定它折叠成哪个有效值：slow 取最小、speed/guard/dmg/cd 相乘、poison 按节拍扣血、regen/undead 按秒增减血、其余是有无；a/b/c/ref 按种类解释，见 utils/marks */
+export const MARK = {
+  none: 0,
+  slow: 1,
+  speed: 2,
+  guard: 3,
+  dmg: 4,
+  cd: 5,
+  poison: 6,
+  stun: 7,
+  hide: 8,
+  taunt: 9,
+  invuln: 10,
+  morph: 11,
+  morphImmune: 12,
+  regen: 13,
+  root: 14,
+  silence: 15,
+  disarm: 16,
+  ground: 17,
+  sleep: 18,
+  fear: 19,
+  charm: 20,
+  berserk: 21,
+  stasis: 22,
+  untargetable: 23,
+  unstoppable: 24,
+  spellShield: 25,
+  frontGuard: 26,
+  reveal: 27,
+  undying: 28,
+  realm: 29,
+  parry: 30,
+  stealth: 31,
+  stack: 32,
+  fuse: 33,
+  store: 34,
+  empower: 35,
+  deathMark: 36,
+  mist: 37,
+  devoured: 38,
+  undead: 39,
+} as const
 
 /** 标记的来源：同种同源的标记刷新而不叠加 */
 export const TAG = { effect: 0, morph: 1, elite: 2, perk: 3 } as const
@@ -342,6 +383,9 @@ export const Aura = { zone: i32() }
 export const BlinkState = { until: f32(), x: f32(), y: f32(), back: u8() }
 
 export const Manual = {}
+
+/** 能力的类别：1 是技能（沉默挡它），0 是普通出手（缴械挡它、强化下一击加在它上） */
+export const AbilityClass = { skill: u8() }
 
 export const CastRequest = {}
 

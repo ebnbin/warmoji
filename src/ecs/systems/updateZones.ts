@@ -70,7 +70,7 @@ export function updateZones(sim: Sim): void {
     if (mend > 0) {
       eachAlly(sim, src.faction, x, y, r, false, (eid, tx, ty) => {
         if (inside(x, y, r, tx, ty)) Hp.v[eid] = Math.min(Hp.max[eid]!, Hp.v[eid]! + mend * dt)
-      })
+      }, src.realm)
     }
     const tickMs = Zone.tickMs[z]!
     if (tickMs <= 0 || now < Zone.nextAt[z]!) continue

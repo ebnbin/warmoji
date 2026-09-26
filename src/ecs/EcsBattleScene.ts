@@ -210,7 +210,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     g.lineStyle(2, 0xffdc5d, 0.7)
     for (const m of sim.characters) {
       if (!Alive.v[m]) continue
-      const t = nearestTarget(sim, bodySource(m), Transform.x[m]!, Transform.y[m]!, Infinity)
+      const t = nearestTarget(sim, bodySource(sim, m), Transform.x[m]!, Transform.y[m]!, Infinity)
       if (!t) continue
       g.lineBetween(Transform.x[m]!, Transform.y[m]!, t.x, t.y)
       g.strokeCircle(t.x, t.y, Math.max(6, t.radius))

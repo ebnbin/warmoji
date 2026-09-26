@@ -97,6 +97,52 @@ export function effectLine(e: Effect): string {
       return '自身消散'
     case 'coins':
       return `每次命中掉 ${e.count} 枚金币`
+    case 'root':
+      return `定身 ${sec(e.durationMs)}（不能走，能出手）`
+    case 'silence':
+      return `沉默 ${sec(e.durationMs)}（放不了技能）`
+    case 'disarm':
+      return `致盲 ${sec(e.durationMs)}（普通出手与接触都打不出去）`
+    case 'grounded':
+      return `禁锢 ${sec(e.durationMs)}（不能冲刺、跳跃、闪现）`
+    case 'sleep':
+      return `催眠 ${sec(e.durationMs)}，挨打即醒，醒来那一下伤害 ×${e.wakeMul}`
+    case 'fear':
+      return `恐惧 ${sec(e.durationMs)}（背离施加者逃跑）`
+    case 'charm':
+      return `魅惑 ${sec(e.durationMs)}（朝施加者走来）`
+    case 'berserk':
+      return `倒戈 ${sec(e.durationMs)}（攻击自己人）`
+    case 'stasis':
+      return `静止 ${sec(e.durationMs)}（无敌、不可选中、不能行动）`
+    case 'untargetable':
+      return `不可选中 ${sec(e.durationMs)}`
+    case 'unstoppable':
+      return `霸体 ${sec(e.durationMs)}（解除并免疫控制与被摆布）`
+    case 'cleanse':
+      return '解除控制与减速'
+    case 'spellShield':
+      return `法术护盾：挡下接下来 ${e.count} 次命中，持续 ${sec(e.durationMs)}`
+    case 'frontGuard':
+      return `正面格挡 ${sec(e.durationMs)}：挡下前方 ${e.arcDeg}° 内来的命中`
+    case 'reveal':
+      return `揭示 ${sec(e.durationMs)}（隐匿失效）`
+    case 'stealth':
+      return `潜行${e.durationMs === undefined ? '' : ` ${sec(e.durationMs)}`}，出手即现形`
+    case 'undying':
+      return `不死 ${sec(e.durationMs)}（生命不低于 1）`
+    case 'parry':
+      return `招架 ${sec(e.durationMs)}：挡下所有命中，对出手者 ${e.then.map(effectLine).join('、')}`
+    case 'pull':
+      return `拉到身前${e.heavy === 'self' ? '，拉不动时把自己拽过去' : ''}`
+    case 'knockup':
+      return `击飞 ${sec(e.durationMs)}`
+    case 'shove':
+      return `推出 ${grid(e.distance)}${e.onWall ? `，撞墙时${e.onWall.map(effectLine).join('、')}` : ''}`
+    case 'throw':
+      return `摔向${e.to === 'foe' ? '最近的另一个敌人' : '身后'}${e.onLand ? `，落地时${e.onLand.map(effectLine).join('、')}` : ''}`
+    case 'swap':
+      return '与目标互换位置'
   }
 }
 

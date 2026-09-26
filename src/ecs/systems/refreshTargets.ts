@@ -1,10 +1,10 @@
 import { hasComponent, query } from 'bitecs'
-import { Alive, Dormant, Faction, Hp, MARK, Radius, Revive, Transform, Uid } from '../components'
-import { hasMark } from '../utils/marks'
+import { Alive, Dormant, Faction, Hp, Radius, Revive, Transform, Uid } from '../components'
+import { isHidden, isUntargetable, realmOf } from '../utils/marks'
 import type { Target } from '../utils/targets'
 import type { Sim } from '../sim'
 
-/** 每个阵营一份有生命的身体的快照：不在休眠；倒地等待复活的也在，带 alive 标记 */
+/** 每个阵营一份有生命的身体的快照：不在休眠；倒地等待复活的也在，带 alive 标记；看不见、碰不到与所在的界在这里定 */
 export function refreshTargets(sim: Sim): void {
   const lists: Target[][] = [[], []]
   for (const eid of query(sim.world, [Hp, Faction, Transform, Radius, Alive])) {
@@ -19,7 +19,9 @@ export function refreshTargets(sim: Sim): void {
       x: Transform.x[eid]!,
       y: Transform.y[eid]!,
       radius: Radius.v[eid]!,
-      hidden: hasMark(sim, eid, MARK.hide),
+      hidden: isHidden(sim, eid),
+      untargetable: isUntargetable(sim, eid),
+      realm: realmOf(sim, eid),
       alive,
     })
   }

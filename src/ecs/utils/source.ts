@@ -1,9 +1,9 @@
 import { hasComponent } from 'bitecs'
-import { Amp, Anchor, FACTION, Faction, Owner, Slot, Uid, WallBlocked } from '../components'
+import { Amp, Anchor, FACTION, Faction, MARK, Owner, Slot, Uid, WallBlocked } from '../components'
 import { Transform } from '../components'
 import { enemyDef } from '../store'
 import { attributionSlot, damageMul } from './amp'
-import { dmgMul } from './marks'
+import { dmgMul, hasMark, realmOf } from './marks'
 import type { Sim } from '../sim'
 import type { EnemyKind } from '../../types/enemies'
 import type { Hazard } from '../../types/maps'
@@ -23,11 +23,21 @@ export interface Source {
   /** 出手的身体与它的编号：击杀反应、施于施法者的效果都找它 */
   readonly body?: number
   readonly bodyUid?: number
+  /** 能打哪些阵营：不写按阵营的敌人算，倒戈时是自己的阵营 */
+  readonly foes?: readonly number[]
+  /** 所在的界：只打得到同一个界里的身体，0 是大家共处的世界 */
+  readonly realm?: number
   readonly sight?: { readonly x: number; readonly y: number }
+}
+
+/** 出手者眼里的敌方阵营：倒戈时是自己的阵营 */
+function foesOf(sim: Sim, body: number, faction: number): readonly number[] | undefined {
+  return hasMark(sim, body, MARK.berserk) ? [faction] : undefined
 }
 
 export function sourceOf(sim: Sim, e: number): Source {
   const enemySide = Faction.v[e] === FACTION.enemy
+  const o = Owner.eid[e]!
   return {
     faction: Faction.v[e]!,
     slot: attributionSlot(sim, e),
@@ -36,8 +46,10 @@ export function sourceOf(sim: Sim, e: number): Source {
     dmgMul: damageMul(sim, e),
     enemy: enemySide ? enemyDef[Owner.eid[e]!]?.kind : undefined,
     viewer: Owner.eid[e]!,
-    body: Owner.eid[e]!,
-    bodyUid: Uid.v[Owner.eid[e]!]!,
+    body: o,
+    bodyUid: Uid.v[o]!,
+    foes: foesOf(sim, o, Faction.v[e]!),
+    realm: realmOf(sim, o),
     sight:
       sim.worldState.walls !== null && WallBlocked.v[e]
         ? { x: Transform.x[Anchor.eid[e]!]!, y: Transform.y[Anchor.eid[e]!]! }
@@ -46,16 +58,17 @@ export function sourceOf(sim: Sim, e: number): Source {
 }
 
 /** 身体自己在看：转向用 */
-export function bodySource(eid: number): Source {
-  return { faction: Faction.v[eid]!, slot: -1, kb: 1, crit: 0, dmgMul: 1, viewer: eid, body: eid, bodyUid: Uid.v[eid]! }
+export function bodySource(sim: Sim, eid: number): Source {
+  const faction = Faction.v[eid]!
+  return { faction, slot: -1, kb: 1, crit: 0, dmgMul: 1, viewer: eid, body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, faction), realm: realmOf(sim, eid) }
 }
 
 /** 身体自己作为伤害来源：角色归因到槽位，敌人归因到种类并带身上的伤害倍率 */
 export function selfSource(sim: Sim, eid: number): Source {
-  const own = { body: eid, bodyUid: Uid.v[eid]! }
+  const own = { body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, Faction.v[eid]!), realm: realmOf(sim, eid) }
   if (hasComponent(sim.world, eid, Slot)) return { ...boltSource(Slot.v[eid]!), ...own }
   const def = enemyDef[eid]
-  return def ? { ...enemySource(def.kind, dmgMul(sim, eid)), faction: Faction.v[eid]!, ...own } : bodySource(eid)
+  return def ? { ...enemySource(def.kind, dmgMul(sim, eid)), faction: Faction.v[eid]!, ...own } : bodySource(sim, eid)
 }
 
 /** 飞出去的身体自己看：不带发射者的视角与视线 */

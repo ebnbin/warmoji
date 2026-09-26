@@ -65,6 +65,6 @@ export function settleMotions(sim: Sim): void {
     motionFx[m] = undefined
     Motion.skill[m] = 0
     const then = landed === 2 ? after?.onWall : after?.onLand
-    if (after && then) applyAbilityEffects(sim, after.src, then, { x: Transform.x[m]!, y: Transform.y[m]!, baseDamage: 0, targets: [m] })
+    if (after && then) applyAbilityEffects(sim, after.src, then, { x: Transform.x[m]!, y: Transform.y[m]!, baseDamage: after.base, targets: [m], exclude: new Set([m]) })
   }
 }

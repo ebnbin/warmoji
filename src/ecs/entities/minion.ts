@@ -114,6 +114,7 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
   Alive.v[m] = 1
   SpeedMul.v[m] = 1
   Ctl.move[m] = 1
+  Ctl.act[m] = 1
   Nest.of[m] = owner
   Nest.nextSpawnAt[m] = 0
   Orbit.radius[m] = r

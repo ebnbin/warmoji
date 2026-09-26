@@ -2,14 +2,15 @@ import { hasComponent } from 'bitecs'
 import { CRIT_MUL } from '../../../data/items'
 import { norm } from '../../../util/vec'
 import { playSfx } from '../../../audio/sfx'
-import { Alive, CharFlash, Dormant, FACTION, Faction, Flash, Hp, MARK, Slot, Tint, Transform } from '../../components'
-import { guardMul, hasMark } from '../../utils/marks'
+import { Alive, CharFlash, Dormant, FACTION, Faction, Flash, Hp, MARK, MARK_SLOTS, Mark, Slot, Tint, Transform } from '../../components'
+import { guardMul, hasMark, isUntargetable, markSlot } from '../../utils/marks'
+import { facingAngle } from '../../utils/facing'
 import { bodyRules } from '../../store'
 import { selfSource } from '../../utils/source'
-import { applyAbilityEffects } from './effects'
+import { applyAbilityEffects, casterOf, PARRY_FX } from './effects'
 import { displace, FORCED } from './displace'
 import { die } from './combat'
-import { spawnDamageNumber } from '../../entities/fx'
+import { spawnDamageNumber, spawnFxCircle } from '../../entities/fx'
 import type { Point } from '../../../util/vec'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
@@ -35,12 +36,57 @@ function record(sim: Sim, src: Source, target: number, dmg: number): void {
   }
 }
 
-/** 唯一的伤害入口：无敌帧、护盾倍率、暴击、扣血、死亡、受击反馈、击退冲量，敌我同一条；持续伤害不暴击；返回是否命中 */
+function blockFx(sim: Sim, target: number, color: number): void {
+  spawnFxCircle(sim, Transform.x[target]!, Transform.y[target]!, 18, { fill: color, fillAlpha: 0.45, stroke: 0xffffff, lineWidth: 3, lineAlpha: 0.9, fromScale: 0.6, toScale: 1.6, durationMs: 220, depth: 14 })
+}
+
+/** 挡下这一下：法术护盾扣一次，招架反制出手的身体，正面格挡挡住从前方来的 */
+function blocked(sim: Sim, src: Source, target: number, o: HitOpts): boolean {
+  const shield = markSlot(sim, target, MARK.spellShield)
+  if (shield >= 0) {
+    Mark.a[shield] = Mark.a[shield]! - 1
+    if (Mark.a[shield]! <= 0) Mark.kind[shield] = MARK.none
+    blockFx(sim, target, 0xb388ff)
+    return true
+  }
+  const parry = markSlot(sim, target, MARK.parry)
+  if (parry >= 0) {
+    const then = PARRY_FX.get(Mark.b[parry]!)
+    const by = casterOf(sim, src)
+    if (then && by >= 0) applyAbilityEffects(sim, selfSource(sim, target), then, { x: Transform.x[by]!, y: Transform.y[by]!, baseDamage: 0, targets: [by] })
+    blockFx(sim, target, 0xffffff)
+    return true
+  }
+  const guard = markSlot(sim, target, MARK.frontGuard)
+  if (guard >= 0 && o.from) {
+    const d = sim.hooks.worldDelta(sim, Transform.x[target]!, Transform.y[target]!, o.from.x, o.from.y)
+    const off = Math.atan2(d.y, d.x) - facingAngle(sim, target)
+    if (Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) <= Mark.b[guard]!) {
+      blockFx(sim, target, 0x90caf9)
+      return true
+    }
+  }
+  return false
+}
+
+/** 存伤的身体记下这一下 */
+function store(target: number, dmg: number): void {
+  const base = target * MARK_SLOTS
+  for (let i = 0; i < MARK_SLOTS; i++) if (Mark.kind[base + i] === MARK.store) Mark.a[base + i] = Mark.a[base + i]! + dmg
+}
+
+/** 唯一的伤害入口：静止与碰不到、无敌、挡格、睡眠惊醒、护盾倍率、暴击、存伤、扣血、不死、死亡、受击反馈、击退冲量，敌我同一条；持续伤害不暴击、不看也不消耗无敌与挡格；返回是否命中 */
 export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
   if (sim.over || !hasComponent(sim.world, target, Hp) || Dormant.v[target] || Alive.v[target] === 0) return false
+  if (hasMark(sim, target, MARK.stasis) || (!o.tick && isUntargetable(sim, target))) return false
   const now = sim.elapsedMs
-  if (!o.tick && hasMark(sim, target, MARK.invuln)) return false
+  if (!o.tick && (hasMark(sim, target, MARK.invuln) || blocked(sim, src, target, o))) return false
   let dmg = damage
+  const sleep = markSlot(sim, target, MARK.sleep)
+  if (sleep >= 0) {
+    dmg = Math.round(dmg * Mark.a[sleep]!)
+    Mark.kind[sleep] = MARK.none
+  }
   const guard = guardMul(sim, target)
   if (guard !== 1) dmg = Math.max(1, Math.round(dmg * guard))
   const crit = !o.tick && src.crit > 0 && sim.rng.next() < Math.min(0.5, src.crit)
@@ -48,6 +94,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   const team = Faction.v[target] === FACTION.team
   if (!team) spawnDamageNumber(sim, Transform.x[target]!, Transform.y[target]!, dmg, crit)
   record(sim, src, target, dmg)
+  store(target, dmg)
   // 被命中反应先于扣血：无敌帧从这一下起算
   const back = o.tick ? undefined : bodyRules[target]?.onHurt
   if (back) applyAbilityEffects(sim, selfSource(sim, target), back, { x: Transform.x[target]!, y: Transform.y[target]!, baseDamage: dmg, targets: [target] })
@@ -61,7 +108,8 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
     jx = dir.x * kb
     jy = dir.y * kb
   }
-  const hp = Hp.v[target]! - dmg
+  let hp = Hp.v[target]! - dmg
+  if (hp <= 0 && hasMark(sim, target, MARK.undying)) hp = 1
   if (hp <= 0) {
     die(sim, target, src, jx, jy)
     return true

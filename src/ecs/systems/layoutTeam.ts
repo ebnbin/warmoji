@@ -97,8 +97,6 @@ export function layoutTeam(sim: Sim): void {
   for (const f of followers) {
     if (!Alive.v[f]) continue
     Phys.grip[f] = TEAM.followerGrip
-    Drive.x[f] = 0
-    Drive.y[f] = 0
     if (!Ctl.move[f]) continue
     const seat = seats[Seat.v[f]!]!
     const x = Transform.x[f]!

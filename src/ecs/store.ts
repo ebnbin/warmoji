@@ -56,7 +56,7 @@ export const bodyRules = slots<BodyRules>()
 export const zoneEffects = slots<readonly Effect[]>()
 
 /** 被摆布的身体落地、撞墙时的后续与来源 */
-export const motionFx = slots<{ readonly src: Source; readonly onLand?: readonly Effect[]; readonly onWall?: readonly Effect[] }>()
+export const motionFx = slots<{ readonly src: Source; readonly onLand?: readonly Effect[]; readonly onWall?: readonly Effect[]; readonly base: number }>()
 
 export const zoneSrc = slots<Source>()
 

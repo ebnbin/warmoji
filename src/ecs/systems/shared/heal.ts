@@ -12,6 +12,7 @@ export function healAllies(
   amount: number,
   all: boolean,
   exclude = -1,
+  realm = 0,
 ): number {
   const hurt: number[] = []
   eachAlly(sim, faction, x, y, range, false, (eid, tx, ty) => {
@@ -20,7 +21,7 @@ export function healAllies(
     const dy = ty - y
     if (dx * dx + dy * dy > range * range) return
     hurt.push(eid)
-  })
+  }, realm)
   if (hurt.length === 0) return 0
   let targets: number[]
   if (all) {

@@ -131,6 +131,132 @@ interface CoinsEffect {
 interface VanishEffect {
   readonly kind: 'vanish'
 }
+/** 定身：走不了、位移不了，还能出手 */
+interface RootEffect {
+  readonly kind: 'root'
+  readonly durationMs: number
+}
+/** 沉默：放不了技能，普通出手照旧 */
+interface SilenceEffect {
+  readonly kind: 'silence'
+  readonly durationMs: number
+}
+/** 致盲缴械：普通出手与接触都打不出去，技能照旧 */
+interface DisarmEffect {
+  readonly kind: 'disarm'
+  readonly durationMs: number
+}
+/** 禁锢：做不了冲刺、跳跃、闪现这类自己的位移 */
+interface GroundedEffect {
+  readonly kind: 'grounded'
+  readonly durationMs: number
+}
+/** 睡眠：什么都做不了，挨一下就醒，醒来那一下伤害 × wakeMul */
+interface SleepEffect {
+  readonly kind: 'sleep'
+  readonly durationMs: number
+  readonly wakeMul: number
+}
+/** 恐惧：背离施加者逃跑，做不了别的 */
+interface FearEffect {
+  readonly kind: 'fear'
+  readonly durationMs: number
+}
+/** 魅惑：朝施加者走去，做不了别的 */
+interface CharmEffect {
+  readonly kind: 'charm'
+  readonly durationMs: number
+}
+/** 倒戈：把自己人当敌人打，接触也伤自己人 */
+interface BerserkEffect {
+  readonly kind: 'berserk'
+  readonly durationMs: number
+}
+/** 静止：无敌、不可选中、什么都做不了 */
+interface StasisEffect {
+  readonly kind: 'stasis'
+  readonly durationMs: number
+}
+/** 不可选中：谁也打不到它，它自己照常行动 */
+interface UntargetableEffect {
+  readonly kind: 'untargetable'
+  readonly durationMs: number
+}
+/** 霸体：先解除身上的控制，期间免疫控制与被摆布 */
+interface UnstoppableEffect {
+  readonly kind: 'unstoppable'
+  readonly durationMs: number
+}
+/** 净化：解除身上的控制与减速 */
+interface CleanseEffect {
+  readonly kind: 'cleanse'
+}
+/** 法术护盾：挡下接下来 count 次命中 */
+interface SpellShieldEffect {
+  readonly kind: 'spellShield'
+  readonly count: number
+  readonly durationMs: number
+}
+/** 正面格挡：来自朝向前方 arcDeg 以内的命中全部挡下，弹体在正面碎掉 */
+interface FrontGuardEffect {
+  readonly kind: 'frontGuard'
+  readonly arcDeg: number
+  readonly durationMs: number
+}
+/** 揭示：隐匿与潜行失效 */
+interface RevealEffect {
+  readonly kind: 'reveal'
+  readonly durationMs: number
+}
+/** 潜行：看不见，直到自己出手；不写时长就一直潜着 */
+interface StealthEffect {
+  readonly kind: 'stealth'
+  readonly durationMs?: number
+}
+/** 不死：生命不会降到 1 以下 */
+interface UndyingEffect {
+  readonly kind: 'undying'
+  readonly durationMs: number
+}
+/** 招架：挡下所有命中，并对出手的身体施加 then */
+interface ParryEffect {
+  readonly kind: 'parry'
+  readonly durationMs: number
+  readonly then: readonly Effect[]
+}
+/** 拉拽：把目标拉到施法者身前 gap 处；拉不动（锚定）时，heavy 为 self 就把施法者拉过去 */
+interface PullEffect {
+  readonly kind: 'pull'
+  readonly speed: number
+  readonly gap: number
+  readonly heavy?: 'self'
+}
+/** 击飞：原地腾空 durationMs，期间什么都做不了 */
+interface KnockupEffect {
+  readonly kind: 'knockup'
+  readonly durationMs: number
+  readonly height: number
+}
+/** 推撞：沿施法者到目标的方向推出 distance，撞到墙施加 onWall */
+interface ShoveEffect {
+  readonly kind: 'shove'
+  readonly distance: number
+  readonly ms: number
+  readonly onWall?: readonly Effect[]
+}
+/** 投掷：把目标抛向 to（身后或最近的另一个敌人），落地时对落点施加 onLand */
+interface ThrowEffect {
+  readonly kind: 'throw'
+  readonly to: 'behind' | 'foe'
+  readonly distance: number
+  readonly ms: number
+  readonly height: number
+  readonly onLand?: readonly Effect[]
+}
+/** 换位：施法者与目标互换位置 */
+interface SwapEffect {
+  readonly kind: 'swap'
+}
 export type Effect =
   | BlastEffect
   | SlowEffect
@@ -153,6 +279,29 @@ export type Effect =
   | TimeStopEffect
   | CoinsEffect
   | VanishEffect
+  | RootEffect
+  | SilenceEffect
+  | DisarmEffect
+  | GroundedEffect
+  | SleepEffect
+  | FearEffect
+  | CharmEffect
+  | BerserkEffect
+  | StasisEffect
+  | UntargetableEffect
+  | UnstoppableEffect
+  | CleanseEffect
+  | SpellShieldEffect
+  | FrontGuardEffect
+  | RevealEffect
+  | StealthEffect
+  | UndyingEffect
+  | ParryEffect
+  | PullEffect
+  | KnockupEffect
+  | ShoveEffect
+  | ThrowEffect
+  | SwapEffect
 
 interface ZoneVisual {
   readonly color: number
@@ -245,6 +394,8 @@ export interface Windup {
 }
 
 interface AbilityBase {
+  /** skill 是技能：沉默挡它；attack 是普通出手：缴械挡它。不写时手动的是技能、自动的是普通出手 */
+  readonly class?: 'attack' | 'skill'
   readonly aim: Aim
   readonly windup?: Windup
   readonly range?: number

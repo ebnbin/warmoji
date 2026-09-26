@@ -24,6 +24,7 @@ import {
   FlyerShape,
   Hp,
   LeapShape,
+  MARK,
   Owner,
   Payload,
   REAIM,
@@ -46,6 +47,7 @@ import {
   WindupState,
 } from '../../components'
 import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse } from '../../store'
+import { clearMarks } from '../../utils/marks'
 import { damageMul, anchorX, anchorY, waveScale } from '../../utils/amp'
 import { flying, sourceOf } from '../../utils/source'
 import type { Source } from '../../utils/source'
@@ -68,6 +70,8 @@ import { spawnZone } from '../../entities/zone'
 import { spawnFxBeam, spawnFxBolt, spawnFxBoom, spawnFxCircle, spawnFxSlash } from '../../entities/fx'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
+
+const STEALTH = [MARK.stealth]
 
 /** 正在做的事没做完就不出手：延迟重复未打完、飞返体未回收、瞬袭未闪回、蓄力未到点 */
 export function busy(sim: Sim, e: number): boolean {
@@ -195,7 +199,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
         const dy = y - cy
         if (dx * dx + dy * dy > r * r) return
         if (!Alive.v[t] || Hp.v[t]! < Hp.max[t]!) hurt.push(t)
-      })
+      }, src.realm)
       if (hurt.length === 0) return false
       applyOnHit(sim, src, onHit, cx, cy, damage, hurt.map(struckOf))
       if (color !== 0) burst(sim, cx, cy, r, color, false)
@@ -335,7 +339,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       const allies: number[] = []
       eachAlly(sim, src.faction, ox, oy, Infinity, AllShape.downed[e] === 1, (t) => {
         allies.push(t)
-      })
+      }, src.realm)
       applyOnHit(sim, src, onHit, ox, oy, damage, allies.map(struckOf))
       for (const t of allies) {
         if (!Alive.v[t]) continue
@@ -469,6 +473,8 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   if (sfx) playSfx(sfx)
   const anchor = Anchor.eid[e]!
   if (hasComponent(w, anchor, Fired)) Fired.v[anchor] = 1
+  // 潜行出手即现形
+  clearMarks(Owner.eid[e]!, STEALTH)
   // 自身效果放最后：消散会把宿主连同这条能力一起移除
   const self = abilityOnSelf[e]
   if (self) applyAbilityEffects(sim, src, self, { x: anchorX(e), y: anchorY(e), baseDamage: damage, targets: [Owner.eid[e]!] })

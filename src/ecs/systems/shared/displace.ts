@@ -1,6 +1,7 @@
 import { hasComponent } from 'bitecs'
 import { BODY_MAX_SPEED } from '../../../data/abilities'
-import { Anchored, Ctl, Motion, MOTION, Phys, Transform, Uid, VisOff } from '../../components'
+import { Anchored, Ctl, MARK, Motion, MOTION, Phys, Transform, Uid, VisOff } from '../../components'
+import { hasMark } from '../../utils/marks'
 import { motionFx } from '../../store'
 import type { Effect } from '../../../types/abilityDefs'
 import type { Source } from '../../utils/source'
@@ -23,9 +24,10 @@ export interface Mover {
   readonly src?: Source
   readonly onLand?: readonly Effect[]
   readonly onWall?: readonly Effect[]
+  /** 落地、撞墙效果的基础伤害 */
+  readonly base?: number
 }
 
-export const SELF: Mover = { self: true }
 export const FORCED: Mover = { self: false }
 
 /** 冲量按质量折成速度；只封顶冲量带来的增量，不压低本来就更快的身体 */
@@ -46,10 +48,11 @@ function impulse(sim: Sim, eid: number, jx: number, jy: number): void {
   Phys.vy[eid] = vy
 }
 
+/** 能不能这样动：自己的动作看 Ctl.dash；被摆布时锚定与霸体的身体不吃 */
 export function movable(sim: Sim, eid: number, by: Mover): boolean {
   if (!hasComponent(sim.world, eid, Phys)) return false
   if (by.free) return true
-  return by.self ? Ctl.dash[eid] === 1 : !hasComponent(sim.world, eid, Anchored)
+  return by.self ? Ctl.dash[eid] === 1 : !hasComponent(sim.world, eid, Anchored) && !hasMark(sim, eid, MARK.unstoppable)
 }
 
 /** 结束手头的脚本位移：弧线中的身体落回地面 */
@@ -63,6 +66,7 @@ export function endMotion(eid: number): void {
 /** 唯一的位移入口：敌我、角色与敌人、自己的动作与被摆布都从这里改变身体的位置 */
 export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boolean {
   if (d.kind === 'push') {
+    if (hasMark(sim, eid, MARK.unstoppable)) return false
     impulse(sim, eid, d.x, d.y)
     return true
   }
@@ -83,7 +87,7 @@ export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boo
   Motion.landed[eid] = 0
   Motion.skill[eid] = by.skill ?? 0
   Motion.stamp[eid] = sim.elapsedMs
-  if (by.src) motionFx[eid] = { src: by.src, onLand: by.onLand, onWall: by.onWall }
+  if (by.src) motionFx[eid] = { src: by.src, onLand: by.onLand, onWall: by.onWall, base: by.base ?? 0 }
   if (d.kind === 'dash') {
     const speed = d.distance / Math.max(1e-3, d.ms / 1000)
     Motion.kind[eid] = MOTION.dash
