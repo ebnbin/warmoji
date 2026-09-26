@@ -14,7 +14,7 @@ import type { Point } from '../../../util/vec'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 
-export interface HitOpts {
+interface HitOpts {
   readonly knockback?: number
   readonly from?: Point
   /** 持续伤害与场地危害：不看也不消耗无敌帧 */

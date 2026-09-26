@@ -89,7 +89,7 @@ function details(scene: Phaser.Scene, o: Phaser.GameObjects.GameObject, b: Phase
   return bits.filter((x) => x !== '').join(' · ')
 }
 
-export function setPickMode(on: boolean): void {
+function setPickMode(on: boolean): void {
   pickMode = on
 }
 

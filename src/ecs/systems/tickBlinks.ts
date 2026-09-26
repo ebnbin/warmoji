@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { Ability, BlinkShape, BlinkState, Frozen, Owner, VisOff } from '../components'
-import { ownerX, ownerY } from '../utils/amp'
+import { anchorX, anchorY } from '../utils/amp'
 import { blinkFlash } from './shared/fire'
 import type { Sim } from '../sim'
 
@@ -14,6 +14,6 @@ export function tickBlinks(sim: Sim): void {
     const m = Owner.eid[e]!
     VisOff.x[m] = 0
     VisOff.y[m] = 0
-    blinkFlash(sim, ownerX(e), ownerY(e))
+    blinkFlash(sim, anchorX(e), anchorY(e))
   }
 }

@@ -26,7 +26,7 @@ export function freshFoe(sim: Sim, eid: number, x: number, y: number, range: num
       anyD = d
       any = { eid: t, x: tx, y: ty, radius }
     }
-    if (!hasMark(sim, t, MARK.dot) && d < freshD) {
+    if (!hasMark(sim, t, MARK.poison) && d < freshD) {
       freshD = d
       fresh = { eid: t, x: tx, y: ty, radius }
     }

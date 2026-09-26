@@ -1,12 +1,9 @@
 import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { norm } from '../../util/vec'
-import { KNOCKBACK } from '../../data/abilities'
+import { KNOCKBACK, SHARD_BODY } from '../../data/abilities'
 import { Alive, Clock, Depth, Drive, Phys, Quad, Radius, Shard, Sprite, Tint, Transform, VisOff } from '../components'
 import type { Sim } from '../sim'
-
-/** 碎片是没有驱动的轻身体：飞出去后被地面阻力慢慢刹住 */
-const SHARD_BODY = { mass: 1, drag: 5, grip: 0.2 }
 
 export function spawnShards(
   sim: Sim,

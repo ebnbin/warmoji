@@ -1,7 +1,7 @@
 import type { SfxId } from './sfx'
 import type { GroundEffectDef } from './groundEffects'
 
-export interface ProjectileSpec {
+interface ProjectileSpec {
   readonly emoji: string
   readonly size: number
   readonly radius: number
@@ -154,7 +154,7 @@ export type Effect =
   | CoinsEffect
   | VanishEffect
 
-export interface ZoneVisual {
+interface ZoneVisual {
   readonly color: number
   readonly fillAlpha: number
   readonly lineAlpha: number

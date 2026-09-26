@@ -1,7 +1,7 @@
 import { hasComponent, query } from 'bitecs'
 import { DEG2RAD } from '../../util/units'
 import { Ability, Aim, Frozen, Held, Owner, Sector, Segment, Swing, Thrown, Tint, Transform, VisOff } from '../components'
-import { ownerX, ownerY } from '../utils/amp'
+import { anchorX, anchorY } from '../utils/amp'
 import { muzzle } from '../utils/projectile'
 import { lungeT, sweepT } from '../utils/swing'
 import type { Sim } from '../sim'
@@ -17,13 +17,13 @@ export function placeHeld(sim: Sim): void {
     if (hasComponent(w, e, Segment) && !Segment.beam[e]) {
       const t = frozen ? 0 : lungeT(sim, e, Segment.ms[e]!)
       const dist = rest + t * (Segment.reach[e]! - rest)
-      Transform.x[e] = ownerX(e) + Math.cos(aim) * dist
-      Transform.y[e] = ownerY(e) + Math.sin(aim) * dist
+      Transform.x[e] = anchorX(e) + Math.cos(aim) * dist
+      Transform.y[e] = anchorY(e) + Math.sin(aim) * dist
       Transform.rot[e] = aim + Held.rotOffset[e]!
     } else if (hasComponent(w, e, Sector)) {
       const angle = aim + (sweepT(sim, e, Sector.ms[e]!) * Sector.arcDeg[e]! * DEG2RAD) / 2
-      Transform.x[e] = ownerX(e) + Math.cos(angle) * rest
-      Transform.y[e] = ownerY(e) + Math.sin(angle) * rest
+      Transform.x[e] = anchorX(e) + Math.cos(angle) * rest
+      Transform.y[e] = anchorY(e) + Math.sin(angle) * rest
       Transform.rot[e] = angle + Held.rotOffset[e]!
     } else {
       const p = muzzle(sim, e)

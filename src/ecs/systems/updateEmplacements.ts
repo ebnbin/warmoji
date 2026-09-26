@@ -1,5 +1,6 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { POP_MS, RETIRE_MS, retireEmplacement } from '../entities/minion'
+import { EMPLACE } from '../../data/feel'
+import { retireEmplacement } from '../entities/minion'
 import { Aim, Cd, Emplacement, Fired, Frozen, Minion, Retiring, Tint, Transform } from '../components'
 import { playClip } from './shared/anim'
 import { backEaseOut } from '../utils/ease'
@@ -13,7 +14,7 @@ export function updateEmplacements(sim: Sim): void {
         removeEntity(sim.world, t)
         continue
       }
-      const p = 1 - left / RETIRE_MS
+      const p = 1 - left / EMPLACE.retireMs
       const k = Minion.size[t]! * (1 - 0.7 * p)
       Transform.w[t] = k
       Transform.h[t] = k
@@ -30,8 +31,8 @@ export function updateEmplacements(sim: Sim): void {
       continue
     }
     const age = sim.fxMs - Minion.bornMs[t]!
-    if (age < POP_MS) {
-      const k = Minion.size[t]! * (0.2 + 0.8 * backEaseOut(age / POP_MS))
+    if (age < EMPLACE.popMs) {
+      const k = Minion.size[t]! * (0.2 + 0.8 * backEaseOut(age / EMPLACE.popMs))
       Transform.w[t] = k
       Transform.h[t] = k
     } else if (Transform.w[t] !== Minion.size[t]) {

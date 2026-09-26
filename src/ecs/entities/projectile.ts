@@ -7,7 +7,7 @@ import type { Effect } from '../../types/abilityDefs'
 import type { Source } from '../utils/source'
 import type { Sim } from '../sim'
 
-export interface BoltSpec {
+interface BoltSpec {
   readonly faction: number
   readonly frame: number
   readonly size: number

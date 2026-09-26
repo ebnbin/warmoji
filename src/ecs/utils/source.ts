@@ -57,7 +57,7 @@ export function flying(src: Source): Source {
   return { ...src, viewer: undefined, sight: undefined }
 }
 
-export function boltSource(slot: number): Source {
+function boltSource(slot: number): Source {
   return { faction: FACTION.team, slot, kb: 1, crit: 0, dmgMul: 1 }
 }
 

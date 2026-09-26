@@ -1,6 +1,6 @@
 import { UNIT } from '../../../util/units'
 import { MEMBER, TEAM } from '../../../data/characters'
-import { Alive, CharScale, Facing, Leaping, Radius, Rushing, Seat, Transform } from '../../components'
+import { Alive, CharScale, Facing, Leaping, Radius, Sprinting, Seat, Transform } from '../../components'
 import { grantIframe } from './combat'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
@@ -50,7 +50,7 @@ export function canSwitchLeader(sim: Sim, eid: number): boolean {
     lead >= 0 &&
     !sim.over &&
     !sim.handover &&
-    !Rushing.active[lead] &&
+    !Sprinting.active[lead] &&
     !Leaping.active[lead] &&
     eid !== lead &&
     sim.characters.includes(eid) &&

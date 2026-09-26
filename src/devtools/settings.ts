@@ -2,9 +2,9 @@ import Phaser from 'phaser'
 import { devConfig, maybeDevConfig } from './config'
 import type { DevScope } from './types'
 
-export type DevSide = 'left' | 'right'
+type DevSide = 'left' | 'right'
 
-export interface DevSettings {
+interface DevSettings {
   side: DevSide
   /** 胶囊在可用高度上的位置比例 */
   y: number

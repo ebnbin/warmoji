@@ -1,5 +1,6 @@
 import { hasComponent, query } from 'bitecs'
 import { Alive, Dormant, Hp, MARK, MARK_SLOTS, Mark, Transform } from '../components'
+import { MORPH } from '../../data/abilities'
 import { restoreMorph } from '../entities/enemy'
 import { poisonSrc } from '../store'
 import { WORLD_SOURCE } from '../utils/source'
@@ -12,7 +13,7 @@ function expire(sim: Sim, eid: number, kind: number, s: number): void {
   if (kind === MARK.morph) {
     restoreMorph(sim, sim.frames, eid, Mark.a[s] === 1)
     sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'puff' })
-    postponeAbilities(sim, eid, 700)
+    postponeAbilities(sim, eid, MORPH.recoverMs)
   } else if (kind === MARK.stun) {
     Transform.rot[eid] = 0
   }
@@ -30,7 +31,7 @@ export function tickMarks(sim: Sim): void {
       const kind = Mark.kind[s]!
       if (kind === MARK.none) continue
       const until = Mark.until[s]!
-      if (kind === MARK.dot && now >= Mark.c[s]! && Mark.c[s]! <= until) {
+      if (kind === MARK.poison && now >= Mark.c[s]! && Mark.c[s]! <= until) {
         Mark.c[s] = Mark.c[s]! + Mark.b[s]!
         hit(sim, poisonSrc[eid] ?? WORLD_SOURCE, eid, Mark.a[s]!, { tick: true })
         if (!hasComponent(sim.world, eid, Mark)) break

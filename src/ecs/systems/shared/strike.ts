@@ -1,7 +1,7 @@
 import { Alive, Drop, Owner, Payload, Transform } from '../../components'
 import { abilityOnHit } from '../../store'
 import { isSameEntity } from '../../utils/identity'
-import { damageMul, ownerX, ownerY } from '../../utils/amp'
+import { damageMul, anchorX, anchorY } from '../../utils/amp'
 import { hit } from './damage'
 import { applyOnHit, struckOf } from './effects'
 import { sourceOf } from '../../utils/source'
@@ -17,5 +17,5 @@ export function land(sim: Sim, d: number): void {
   const x = Transform.x[d]!
   const y = Drop.toY[d]!
   const s = struckOf(target)
-  if (hit(sim, src, target, damage, { knockback: Payload.knockback[e]!, from: { x: ownerX(e), y: ownerY(e) } })) applyOnHit(sim, src, abilityOnHit[e], x, y, damage, [s])
+  if (hit(sim, src, target, damage, { knockback: Payload.knockback[e]!, from: { x: anchorX(e), y: anchorY(e) } })) applyOnHit(sim, src, abilityOnHit[e], x, y, damage, [s])
 }

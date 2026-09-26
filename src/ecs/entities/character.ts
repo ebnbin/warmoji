@@ -23,7 +23,7 @@ import { bodyRules } from '../store'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
 
-export interface CharacterPlacement {
+interface CharacterPlacement {
   slot: number
   x: number
   y: number

@@ -68,7 +68,7 @@ export interface Sim {
 }
 
 /** 换队长的过渡期：尺寸插值、相机偏移收敛、新队长免伤；camX/camY 是旧中心相对新中心的偏移 */
-export interface Handover {
+interface Handover {
   msLeft: number
   ms: number
   from: number

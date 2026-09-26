@@ -1,6 +1,7 @@
 import { hasComponent } from 'bitecs'
 import { playSfx } from '../../../audio/sfx'
 import { DEG2RAD } from '../../../util/units'
+import { BLINK_IFRAME_PAD_MS } from '../../../data/abilities'
 import {
   AIM,
   Aim,
@@ -29,7 +30,7 @@ import {
   REAIM,
   Repeat,
   RepeatState,
-  Rushing,
+  Sprinting,
   Sector,
   Segment,
   Shots,
@@ -48,7 +49,7 @@ import {
   WindupState,
 } from '../../components'
 import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse } from '../../store'
-import { damageMul, ownerX, ownerY, waveScale } from '../../utils/amp'
+import { damageMul, anchorX, anchorY, waveScale } from '../../utils/amp'
 import { flying, sourceOf } from '../../utils/source'
 import type { Source } from '../../utils/source'
 import { eachAlly, nearestTarget, targetsNear, targetsWithin } from '../../utils/targets'
@@ -81,8 +82,8 @@ export interface Shot {
 }
 
 export function aimAt(sim: Sim, e: number, src: Source): Shot | null {
-  const ox = ownerX(e)
-  const oy = ownerY(e)
+  const ox = anchorX(e)
+  const oy = anchorY(e)
   switch (Aim.kind[e]) {
     case AIM.nearest: {
       const t = nearestTarget(sim, src, ox, oy, Aim.range[e]!)
@@ -144,10 +145,10 @@ function strikeAll(sim: Sim, src: Source, found: readonly Found[], damage: numbe
 }
 
 /** 一次出手：按形状覆盖目标，先伤害后效果，效果只施于真正打中的身体；返回是否真的出了手 */
-export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found | null, damage: number): boolean {
+function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found | null, damage: number): boolean {
   const w = sim.world
-  const ox = ownerX(e)
-  const oy = ownerY(e)
+  const ox = anchorX(e)
+  const oy = anchorY(e)
   const kb = Payload.knockback[e]!
   const color = Payload.color[e]!
   const onHit = abilityOnHit[e]
@@ -276,7 +277,7 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
     VisOff.y[m] = landY - Transform.y[m]!
     const strikeMs = BlinkShape.strikeMs[e]!
     BlinkState.until[e] = sim.elapsedMs + strikeMs
-    grantIframe(sim, m, strikeMs + 200)
+    grantIframe(sim, m, strikeMs + BLINK_IFRAME_PAD_MS)
     blinkFlash(sim, landX, landY)
     let dmg = damage
     const execHp = BlinkShape.execHp[e]!
@@ -292,12 +293,12 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
   if (hasComponent(w, e, SprintShape)) {
     const m = Owner.eid[e]!
     const speed = SprintShape.distance[e]! / (SprintShape.ms[e]! / 1000)
-    Rushing.active[m] = 1
-    Rushing.msLeft[m] = SprintShape.ms[e]!
-    Rushing.vx[m] = Math.cos(angle) * speed
-    Rushing.vy[m] = Math.sin(angle) * speed
-    Rushing.skill[m] = e
-    Rushing.stamp[m] = sim.elapsedMs
+    Sprinting.active[m] = 1
+    Sprinting.msLeft[m] = SprintShape.ms[e]!
+    Sprinting.vx[m] = Math.cos(angle) * speed
+    Sprinting.vy[m] = Math.sin(angle) * speed
+    Sprinting.skill[m] = e
+    Sprinting.stamp[m] = sim.elapsedMs
     if (color !== 0) spawnFxCircle(sim, ox, oy, SprintShape.radius[e]!, {
       fill: color,
       fillAlpha: 0.35,
@@ -486,7 +487,7 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   if (hasComponent(w, anchor, Fired)) Fired.v[anchor] = 1
   // 自身效果放最后：消散会把宿主连同这条能力一起移除
   const self = abilityOnSelf[e]
-  if (self) applyAbilityEffects(sim, src, self, { x: ownerX(e), y: ownerY(e), baseDamage: damage, targets: [Owner.eid[e]!] })
+  if (self) applyAbilityEffects(sim, src, self, { x: anchorX(e), y: anchorY(e), baseDamage: damage, targets: [Owner.eid[e]!] })
   return true
 }
 
@@ -497,8 +498,8 @@ export function fireRepeat(sim: Sim, e: number): boolean {
   const i = count - RepeatState.left[e]!
   let angle = RepeatState.angle[e]!
   let target: Found | null = null
-  const ox = ownerX(e)
-  const oy = ownerY(e)
+  const ox = anchorX(e)
+  const oy = anchorY(e)
   switch (Repeat.reaim[e]) {
     case REAIM.nearest: {
       const t = nearestTarget(sim, src, ox, oy, Aim.range[e]!)

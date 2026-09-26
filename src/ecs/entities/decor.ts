@@ -7,7 +7,7 @@ import type { EcsWorld } from '../world'
 import type { FrameIndex } from '../frames'
 
 
-export interface DecorInit extends DrawableInit {
+interface DecorInit extends DrawableInit {
   spin?: number
 }
 

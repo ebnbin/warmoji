@@ -41,7 +41,7 @@ export let viewport: Viewport = computeViewport(
   window.devicePixelRatio,
 )
 
-export interface SafeInsets {
+interface SafeInsets {
   top: number
   right: number
   bottom: number

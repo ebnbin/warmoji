@@ -16,7 +16,7 @@ export function tintEnemies(sim: Sim): void {
     Tint.effect[eid] = 0
     Tint.color[eid] = hasMark(sim, eid, MARK.stun)
       ? 0xff9ff3
-      : hasMark(sim, eid, MARK.dot)
+      : hasMark(sim, eid, MARK.poison)
         ? 0x7bff5a
         : now < Casting.until[eid]!
           ? castingTint(now, eid)

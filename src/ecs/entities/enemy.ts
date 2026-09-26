@@ -1,7 +1,9 @@
 import { addComponent, addComponents, hasComponent, query, removeComponent } from 'bitecs'
 import { spawnBody } from './body'
 import { AI, ELITE, SPAWN, SURGE } from '../../data/enemies'
-import { ENEMY_BODY } from '../../data/abilities'
+import { ENEMY_BODY, MORPH } from '../../data/abilities'
+import { POP } from '../../data/feel'
+import { startPop } from '../utils/pop'
 import type { DriveDef, EnemyDef } from '../../types/enemies'
 import { waveAt } from '../../data/waves'
 import {
@@ -30,8 +32,8 @@ import {
   Orbit,
   Phasing,
   Pop,
-  Roam,
-  RushHit,
+  Wander,
+  SprintHit,
   Sprite,
   Standoff,
   Steering,
@@ -65,7 +67,7 @@ const DRIVES: { [K in keyof DriveOf]: DriveAttach<K> } = {
     addComponent(sim.world, eid, Chase)
     Chase.leader[eid] = d.at === 'leader' ? 1 : 0
   },
-  wander: (sim, eid) => addComponent(sim.world, eid, Roam),
+  wander: (sim, eid) => addComponent(sim.world, eid, Wander),
   stay: () => {},
   flee: (sim, eid, d) => {
     addComponent(sim.world, eid, Flee)
@@ -144,14 +146,13 @@ export function spawnEnemy(
   EDir.x[eid] = Math.cos(heading)
   EDir.y[eid] = Math.sin(heading)
   ETurn.at[eid] = sim.elapsedMs + AI.wander.spawnTurnMinMs + sim.rng.next() * AI.wander.spawnTurnJitterMs
-  EnemyArm.fireDelayMs[eid] = 900 + sim.rng.next() * 1500
+  EnemyArm.fireDelayMs[eid] = AI.firstShot.minMs + sim.rng.next() * AI.firstShot.jitterMs
   EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2
-  RushHit.stamp[eid] = -1
+  SprintHit.stamp[eid] = -1
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (EnemyPhase.v[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
   Tint.alpha[eid] = boss ? 0.2 : 0.3
-  Pop.until[eid] = sim.elapsedMs + (boss ? 320 : 130)
-  Pop.ms[eid] = boss ? 320 : 130
+  startPop(sim, eid, boss ? POP.bossMs : POP.enemyMs)
   Pop.size[eid] = size
   Pop.back[eid] = boss ? 1 : 0
   Pop.alpha[eid] = alpha
@@ -238,8 +239,6 @@ export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
   spawnTelegraph(sim, def, pos.x, pos.y, hp, false, false, pickup)
 }
 
-const MORPH_RECAST_CD = 5000
-
 /** 变形：换外观、打断动作、解除锚定并记在标记里；变形期间与结束后一段时间免疫再次变形；脆弱是同期的承伤标记 */
 export function applyMorph(
   sim: Sim,
@@ -250,7 +249,7 @@ export function applyMorph(
   if (Boss.v[eid] || hasMark(sim, eid, MARK.morphImmune)) return
   const until = sim.elapsedMs + spec.durationMs
   const anchored = hasComponent(sim.world, eid, Anchored)
-  addMark(eid, MARK.morphImmune, TAG.morph, until + MORPH_RECAST_CD)
+  addMark(eid, MARK.morphImmune, TAG.morph, until + MORPH.recastMs)
   addMark(eid, MARK.morph, TAG.morph, until, anchored ? 1 : 0)
   addMark(eid, MARK.guard, TAG.morph, until, spec.vulnMul ?? 1)
   const outline = Elite.v[eid] ? 'elite' : 'enemy'

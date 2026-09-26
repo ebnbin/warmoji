@@ -49,7 +49,7 @@ export async function emojiSvgText(id: string): Promise<string> {
   return padSvg(svg, EMOJI_PAD)
 }
 
-export interface EmojiTextureStats {
+interface EmojiTextureStats {
   readonly textures: number
   readonly tracked: number
   readonly pinned: number

@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 
 export type DevLogLevel = 'info' | 'warn' | 'error'
 
-export interface DevLogEntry {
+interface DevLogEntry {
   readonly at: number
   readonly level: DevLogLevel
   readonly text: string

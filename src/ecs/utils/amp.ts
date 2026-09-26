@@ -6,12 +6,12 @@ import { cdMul, dmgMul } from './marks'
 import type { Sim } from '../sim'
 
 /** 能力从宿主的画面位置出手：身体位置加视觉偏移 */
-export function ownerX(e: number): number {
+export function anchorX(e: number): number {
   const a = Anchor.eid[e]!
   return Transform.x[a]! + VisOff.x[a]!
 }
 
-export function ownerY(e: number): number {
+export function anchorY(e: number): number {
   const a = Anchor.eid[e]!
   return Transform.y[a]! + VisOff.y[a]!
 }

@@ -15,8 +15,8 @@ import {
   Phys,
   PICKUP_SET,
   Radius,
-  Roam,
-  Slowed,
+  Wander,
+  SpeedMul,
   Standoff,
   Steering,
   Thief,
@@ -33,12 +33,12 @@ function drive(eid: number, dx: number, dy: number, speed: number): void {
 
 /** 巡航速度：推力除以阻力，再乘这一帧的速度倍率 */
 function cruise(eid: number): number {
-  return (Phys.thrust[eid]! / Phys.drag[eid]!) * Slowed.v[eid]!
+  return (Phys.thrust[eid]! / Phys.drag[eid]!) * SpeedMul.v[eid]!
 }
 
 /** 追最近的敌人，盯队长的追队长；没有就慢速游荡 */
 function chase(sim: Sim): void {
-  for (const eid of query(sim.world, [Chase, Steering, Transform, Phys, Slowed])) {
+  for (const eid of query(sim.world, [Chase, Steering, Transform, Phys, SpeedMul])) {
     if (!Steering.v[eid]) continue
     const speed = cruise(eid)
     const ex = Transform.x[eid]!
@@ -53,7 +53,7 @@ function chase(sim: Sim): void {
     }
     if (!target) {
       const d = wanderDir(sim, eid)
-      drive(eid, d.x, d.y, speed * 0.5)
+      drive(eid, d.x, d.y, speed * AI.idleSpeedMul.chase)
       continue
     }
     const dir = sim.hooks.chaseDir(sim, eid, target.x, target.y)
@@ -61,8 +61,8 @@ function chase(sim: Sim): void {
   }
 }
 
-function roam(sim: Sim): void {
-  for (const eid of query(sim.world, [Roam, Steering, Phys, Slowed])) {
+function wander(sim: Sim): void {
+  for (const eid of query(sim.world, [Wander, Steering, Phys, SpeedMul])) {
     if (!Steering.v[eid]) continue
     const d = wanderDir(sim, eid)
     drive(eid, d.x, d.y, cruise(eid))
@@ -71,7 +71,7 @@ function roam(sim: Sim): void {
 
 /** 敌人进到 range 内就逃，否则慢速游荡 */
 function flee(sim: Sim): void {
-  for (const eid of query(sim.world, [Flee, Steering, Transform, Phys, Slowed])) {
+  for (const eid of query(sim.world, [Flee, Steering, Transform, Phys, SpeedMul])) {
     if (!Steering.v[eid]) continue
     const speed = cruise(eid)
     const ex = Transform.x[eid]!
@@ -88,14 +88,14 @@ function flee(sim: Sim): void {
       }
     }
     const w = wanderDir(sim, eid)
-    drive(eid, w.x, w.y, speed * AI.fleeIdleSpeedMul)
+    drive(eid, w.x, w.y, speed * AI.idleSpeedMul.flee)
   }
 }
 
 /** 探测到敌人后保持在 standoffDist 附近：远了靠近，近了后退，带内不动 */
 function standoff(sim: Sim): void {
   const band = AI.standoffBandU * UNIT
-  for (const eid of query(sim.world, [Standoff, Steering, Transform, Phys, Slowed])) {
+  for (const eid of query(sim.world, [Standoff, Steering, Transform, Phys, SpeedMul])) {
     if (!Steering.v[eid]) continue
     const sp = cruise(eid)
     const ex = Transform.x[eid]!
@@ -106,7 +106,7 @@ function standoff(sim: Sim): void {
     const dist = target ? Math.hypot(dx, dy) : Infinity
     if (dist > Standoff.detectRange[eid]!) {
       const d = wanderDir(sim, eid)
-      drive(eid, d.x, d.y, sp * 0.5)
+      drive(eid, d.x, d.y, sp * AI.idleSpeedMul.standoff)
       continue
     }
     const stand = Standoff.standoffDist[eid]!
@@ -125,7 +125,7 @@ function standoff(sim: Sim): void {
 
 /** 绕着锚点转；该扑的时候扑向目标；锚点没了就只剩追 */
 function orbit(sim: Sim): void {
-  for (const eid of query(sim.world, [Orbit, Nest, Steering, Transform, Phys, Slowed])) {
+  for (const eid of query(sim.world, [Orbit, Nest, Steering, Transform, Phys, SpeedMul])) {
     if (!Steering.v[eid]) continue
     const sp = cruise(eid)
     const ex = Transform.x[eid]!
@@ -171,7 +171,7 @@ function orbit(sim: Sim): void {
 
 /** 奔向最近的金币吃掉，没有金币就慢速游荡 */
 function coinThief(sim: Sim): void {
-  const thieves = query(sim.world, [CoinThief, Steering, Transform, Phys, Slowed, Radius])
+  const thieves = query(sim.world, [CoinThief, Steering, Transform, Phys, SpeedMul, Radius])
   if (thieves.length === 0) return
   const coins: number[] = []
   for (const c of query(sim.world, PICKUP_SET)) {
@@ -202,7 +202,7 @@ function coinThief(sim: Sim): void {
     }
     if (coin < 0) {
       const d = wanderDir(sim, eid)
-      drive(eid, d.x, d.y, sp * 0.3)
+      drive(eid, d.x, d.y, sp * AI.idleSpeedMul.coinThief)
       continue
     }
     const eatR = Radius.v[eid]! + PICKUPS.coin.radius * UNIT
@@ -223,7 +223,7 @@ function coinThief(sim: Sim): void {
 /** 驱动：每种走法把期望速度写进 Drive，积分交给 moveBodies；Steering 为 0 的身体这一帧不动 */
 export function steerBodies(sim: Sim): void {
   chase(sim)
-  roam(sim)
+  wander(sim)
   flee(sim)
   standoff(sim)
   orbit(sim)

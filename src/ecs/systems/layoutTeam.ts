@@ -2,7 +2,7 @@ import { UNIT } from '../../util/units'
 import { SQUAD } from '../../data/feel'
 import { TEAM } from '../../data/characters'
 import { fanSlots } from '../../data/formation'
-import { Alive, Casting, Drive, Phys, Seat, Slowed, Transform } from '../components'
+import { Alive, Casting, Drive, Phys, Seat, SpeedMul, Transform } from '../components'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { leaderX, leaderY } from '../utils/team'
@@ -117,7 +117,7 @@ export function layoutTeam(sim: Sim): void {
     const nx = d.x / dist
     const ny = d.y / dist
     const gain = Phys.vx[f]! * nx + Phys.vy[f]! * ny < 0 ? reverseGain() : 1
-    const want = (Phys.thrust[f]! / Phys.drag[f]!) * Slowed.v[f]! * gain
+    const want = (Phys.thrust[f]! / Phys.drag[f]!) * SpeedMul.v[f]! * gain
     Drive.x[f] = nx * want
     Drive.y[f] = ny * want
   }

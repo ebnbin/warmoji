@@ -1,5 +1,5 @@
 import { hasComponent, query } from 'bitecs'
-import { Airborne, Alive, BreaksWalls, Dormant, Drive, Leaping, Phys, Radius, Rushing, Transform } from '../components'
+import { Airborne, Alive, BreaksWalls, Dormant, Drive, Leaping, Phys, Radius, Sprinting, Transform } from '../components'
 import { GROUND } from '../worlds/hooks'
 import { bodyDt } from './shared/body'
 import type { Sim } from '../sim'
@@ -16,11 +16,11 @@ export function moveBodies(sim: Sim): void {
     const y = Transform.y[eid]!
     let vx = Phys.vx[eid]!
     let vy = Phys.vy[eid]!
-    const rushing = Rushing.active[eid] === 1
+    const sprinting = Sprinting.active[eid] === 1
     let next: { x: number; y: number }
-    if (rushing) {
-      vx = Rushing.vx[eid]!
-      vy = Rushing.vy[eid]!
+    if (sprinting) {
+      vx = Sprinting.vx[eid]!
+      vy = Sprinting.vy[eid]!
       next = { x: x + vx * dt, y: y + vy * dt }
     } else {
       // 线性阻力的精确解：速度按 exp 衰减趋近终速（介质速度 + 驱动 / 黏度），与帧率无关
@@ -47,11 +47,11 @@ export function moveBodies(sim: Sim): void {
     Phys.vy[eid] = vy
     Transform.x[eid] = to.x
     Transform.y[eid] = to.y
-    if (!rushing) continue
+    if (!sprinting) continue
     if (hasComponent(sim.world, eid, BreaksWalls)) sim.hooks.smashWall(sim, to.x, to.y)
-    Rushing.msLeft[eid] = Rushing.msLeft[eid]! - dt * 1000
+    Sprinting.msLeft[eid] = Sprinting.msLeft[eid]! - dt * 1000
     // 被墙挡住就提前结束
-    if (Math.hypot(d.x, d.y) < Math.hypot(next.x - x, next.y - y) * 0.5) Rushing.msLeft[eid] = 0
-    if (Rushing.msLeft[eid]! <= 0) Rushing.active[eid] = 0
+    if (Math.hypot(d.x, d.y) < Math.hypot(next.x - x, next.y - y) * 0.5) Sprinting.msLeft[eid] = 0
+    if (Sprinting.msLeft[eid]! <= 0) Sprinting.active[eid] = 0
   }
 }

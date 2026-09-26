@@ -1,4 +1,6 @@
 import { addComponent, addComponents } from 'bitecs'
+import { PICKUP_BODY } from '../../data/abilities'
+import { startPop } from '../utils/pop'
 import { newEntity } from './entity'
 import {
   Alive,
@@ -49,9 +51,6 @@ interface PickupSpec {
   fx?: { burst: number; sfx: SfxId }
 }
 
-/** 拾取物是响应极快的轻身体：磁吸是它的驱动，河流之类的介质自然带着它走 */
-const PICKUP_BODY = { mass: 1, drag: 5, grip: 8 }
-
 function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
   const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Pickup, Pull, Grab, Lifetime, Phys, Drive, Clock, Alive, Radius, Pop, Bob)
@@ -78,8 +77,7 @@ function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
   Drive.y[eid] = 0
   Clock.v[eid] = 1
   Alive.v[eid] = 1
-  Pop.until[eid] = spec.popMs > 0 ? sim.fxMs + spec.popMs : 0
-  Pop.ms[eid] = spec.popMs
+  if (spec.popMs > 0) startPop(sim, eid, spec.popMs)
   Pop.size[eid] = spec.size
   Pop.back[eid] = 1
   Pop.alpha[eid] = 1

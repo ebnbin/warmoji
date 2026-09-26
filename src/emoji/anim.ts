@@ -384,7 +384,7 @@ export interface AnimClip extends AnimRecipe {
   readonly frames: number
 }
 
-export interface AnimSet {
+interface AnimSet {
   readonly emoji: string
   readonly name: string
   readonly desc: string
@@ -729,7 +729,7 @@ export function parseSvgTree(svg: string): SvgTree {
   return { open, nodes: buildNodes(body, '', true) }
 }
 
-export interface ComposeState {
+interface ComposeState {
   readonly hidden?: ReadonlySet<string>
 }
 

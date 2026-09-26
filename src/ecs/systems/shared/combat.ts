@@ -1,4 +1,6 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
+import { POP } from '../../../data/feel'
+import { startPop } from '../../utils/pop'
 import { playSfx } from '../../../audio/sfx'
 import { gainXp } from '../../../run/xp'
 import { coinDropChance } from '../../../data/waves'
@@ -7,7 +9,7 @@ import type { EnemyDef } from '../../../types/enemies'
 import { MEMBER } from '../../../data/characters'
 import { UNIT } from '../../../util/units'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, Hp, CharScale, MARK, Nest, Pop, Revive, Slot, Sprite, TAG, Thief, Tint, Transform } from '../../components'
+import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, Hp, CharScale, MARK, Nest, Revive, Slot, Sprite, TAG, Thief, Tint, Transform } from '../../components'
 import { addMark, dmgMul, hasMark } from '../../utils/marks'
 import { bodyRules, enemyCarries, enemyDef } from '../../store'
 import { selfSource } from '../../utils/source'
@@ -145,7 +147,7 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   Tint.color[eid] = 0xffffff
   Tint.alpha[eid] = 1
   Tint.effect[eid] = 0
-  Pop.until[eid] = sim.fxMs + 200
+  startPop(sim, eid, POP.reviveMs)
   Transform.w[eid] = MEMBER.size * UNIT * 0.3 * CharScale.v[eid]!
   Transform.h[eid] = MEMBER.size * UNIT * 0.3 * CharScale.v[eid]!
 }

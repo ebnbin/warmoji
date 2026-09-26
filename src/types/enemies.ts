@@ -20,7 +20,7 @@ export interface DecoyEffect {
   readonly durationMs: number
   readonly alpha: number
 }
-export type DeathEffect = Effect | SplitEffect | DecoyEffect
+type DeathEffect = Effect | SplitEffect | DecoyEffect
 /** 身体自己的规则：被命中、击杀、锚点消失时施于自身；被接触时施于碰我的人；接触时施于被我碰到的人；死亡以尸体位置为落点 */
 export interface BodyRules {
   readonly onHurt?: readonly Effect[]
@@ -100,6 +100,7 @@ export interface Difficulty {
     readonly rampSeconds: number
     readonly hpGrowthPerMin: number
     readonly maxAlive: number
+    readonly dormantTtlMs: number
     readonly teamFactorBase: number
     readonly teamFactorPerMember: number
     readonly telegraphMs: number
@@ -134,7 +135,8 @@ export interface AiTuning {
   }
   readonly standoffBandU: number
   readonly coinThiefEatCdMs: number
-  readonly fleeIdleSpeedMul: number
+  readonly idleSpeedMul: { readonly chase: number; readonly standoff: number; readonly coinThief: number; readonly flee: number }
+  readonly firstShot: { readonly minMs: number; readonly jitterMs: number }
 }
 export interface EnemyMixEntry {
   def: EnemyDef

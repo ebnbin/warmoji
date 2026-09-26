@@ -1,10 +1,9 @@
 import { query } from 'bitecs'
+import { SPAWN } from '../../data/enemies'
 import { Boss, Dormant, ENEMY_SET, Transform } from '../components'
 import type { Sim } from '../sim'
 import { leaderX, leaderY } from '../utils/team'
 import { despawnEnemy } from './shared/combat'
-
-const DORMANT_TTL_MS = 30000
 
 export function updateDormancy(sim: Sim): void {
   const half = sim.hooks.activeHalf(sim)
@@ -20,7 +19,7 @@ export function updateDormancy(sim: Sim): void {
     } else if (!Dormant.v[eid]) {
       Dormant.v[eid] = 1
       Dormant.since[eid] = now
-    } else if (now - Dormant.since[eid]! >= DORMANT_TTL_MS) {
+    } else if (now - Dormant.since[eid]! >= SPAWN.dormantTtlMs) {
       expired.push(eid)
     }
   }

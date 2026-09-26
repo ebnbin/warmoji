@@ -93,8 +93,8 @@ const strided = <T extends Column>(ctor: new (length: number) => T): T => {
   return col
 }
 
-/** 标记的种类决定它折叠成哪个有效值：slow 取最小、speed/guard/dmg/cd 相乘、dot 按节拍扣血、其余是有无 */
-export const MARK = { none: 0, slow: 1, speed: 2, guard: 3, dmg: 4, cd: 5, dot: 6, stun: 7, hide: 8, taunt: 9, invuln: 10, morph: 11, morphImmune: 12, regen: 13 } as const
+/** 标记的种类决定它折叠成哪个有效值：slow 取最小、speed/guard/dmg/cd 相乘、poison 按节拍扣血、其余是有无 */
+export const MARK = { none: 0, slow: 1, speed: 2, guard: 3, dmg: 4, cd: 5, poison: 6, stun: 7, hide: 8, taunt: 9, invuln: 10, morph: 11, morphImmune: 12, regen: 13 } as const
 
 /** 标记的来源：同种同源的标记刷新而不叠加 */
 export const TAG = { effect: 0, morph: 1, elite: 2, perk: 3 } as const
@@ -354,10 +354,10 @@ export const Facing = { x: f32(), y: f32(), vx: f32(), vy: f32() }
 export const Magnet = { radius: f32() }
 
 /** 冲刺中的身体：位移由 moveBodies 按脚本速度推进，撞击按 stamp 去重 */
-export const Rushing = { active: u8(), msLeft: f32(), vx: f32(), vy: f32(), skill: i32(), stamp: f32() }
+export const Sprinting = { active: u8(), msLeft: f32(), vx: f32(), vy: f32(), skill: i32(), stamp: f32() }
 
 /** 敌人记下最近一次撞到自己的冲刺，同一次冲刺不重复吃伤害 */
-export const RushHit = { stamp: f32() }
+export const SprintHit = { stamp: f32() }
 
 /** 跳跃中的身体：沿 from→to 的抛物线前进，落地那帧 landed 为 1 */
 export const Leaping = { active: u8(), landed: u8(), msLeft: f32(), ms: f32(), fromX: f32(), fromY: f32(), toX: f32(), toY: f32(), skill: i32() }
@@ -405,7 +405,7 @@ export const Thief = { eaten: i32(), nextEatAt: f32() }
 /** 追击：leader 为 1 时盯着队长而不是最近的敌人 */
 export const Chase = { leader: u8() }
 
-export const Roam = {}
+export const Wander = {}
 
 export const Flee = { range: f32() }
 
@@ -437,6 +437,6 @@ export const Airborne = {}
 export const BreaksWalls = {}
 
 /** 这一帧的速度倍率：减速状态 × 固有倍率 × 战场效果，每个会走的身体一份 */
-export const Slowed = { v: f32() }
+export const SpeedMul = { v: f32() }
 
 export const Steering = { v: u8() }

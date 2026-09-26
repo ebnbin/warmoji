@@ -12,7 +12,7 @@ const HEADING_MIN = 0.5
 function popping(sim: Sim, eid: number, charSize: number): boolean {
   const left = Pop.until[eid]! - sim.fxMs
   if (left <= 0) return false
-  const pop = charSize * (0.3 + 0.7 * backEaseOut(1 - left / 200))
+  const pop = charSize * (0.3 + 0.7 * backEaseOut(1 - left / Pop.ms[eid]!))
   Transform.w[eid] = pop
   Transform.h[eid] = pop
   return true

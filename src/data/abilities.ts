@@ -12,6 +12,11 @@ export const BODY_MAX_SPEED = CT.knockback.maxSpeed
 /** 击退位移 = 冲量 × 身体时间常数 */
 export const KNOCKBACK_TAU_MS = (ENEMY_BODY.mass / (ENEMY_BODY.drag * ENEMY_BODY.grip)) * 1000
 export const ACQUIRE = CT.acquire
+export const PICKUP_BODY = CT.pickupBody
+export const SHARD_BODY = CT.shardBody
+export const MORPH = CT.morph
+export const BLINK_IFRAME_PAD_MS = CT.blinkIframePadMs
+export const MINION_FIRST_SHOT_MS = CT.minionFirstShotMs
 
 export const ABILITIES = fromJson<Record<AbilityId, AbilityDef>>(abilitiesJson)
 

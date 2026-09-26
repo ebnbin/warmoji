@@ -1,7 +1,8 @@
 import { addComponent, addComponents, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
 import { UNIT } from '../../util/units'
-import { ACQUIRE, MINION_BODY } from '../../data/abilities'
+import { ACQUIRE, MINION_BODY, MINION_FIRST_SHOT_MS } from '../../data/abilities'
+import { EMPLACE } from '../../data/feel'
 import { armIdle } from '../systems/shared/anim'
 import { attachDrawable } from './drawable'
 import { holderOutline } from './weapon'
@@ -27,7 +28,7 @@ import {
   Phys,
   Radius,
   Retiring,
-  Slowed,
+  SpeedMul,
   Sprite,
   Steering,
   SummonShape,
@@ -37,7 +38,7 @@ import {
 import type { Sim } from '../sim'
 import { ANIM_DEF } from '../../emoji/anim'
 import { abilityArtEmoji, abilityOnHit, bodyRules, emplaceAbility } from '../store'
-import { ownerX, ownerY } from '../utils/amp'
+import { anchorX, anchorY } from '../utils/amp'
 import { equipAbility } from '../entities/ability'
 import { liveOnes } from '../utils/turret'
 
@@ -91,13 +92,13 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
     emoji: abilityArtEmoji[e]!,
     size,
     bornScale: 1,
-    x: ownerX(e) + Math.cos(phase) * r,
-    y: ownerY(e) + Math.sin(phase) * r,
+    x: anchorX(e) + Math.cos(phase) * r,
+    y: anchorY(e) + Math.sin(phase) * r,
     z: 12,
     lifeMs: SummonShape.lifeMs[e]!,
     animOffsetMs: (index * ANIM_DEF.durMs) / count,
   })
-  addComponents(world, m, Phys, Drive, Clock, Radius, Faction, Alive, Slowed, Steering, Nest, Orbit, Contact, Phasing, Airborne)
+  addComponents(world, m, Phys, Drive, Clock, Radius, Faction, Alive, SpeedMul, Steering, Nest, Orbit, Contact, Phasing, Airborne)
   const speed = SummonShape.speed[e]!
   Phys.vx[m] = 0
   Phys.vy[m] = 0
@@ -111,7 +112,7 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
   Radius.v[m] = size * 0.35
   Faction.v[m] = Faction.v[e]!
   Alive.v[m] = 1
-  Slowed.v[m] = 1
+  SpeedMul.v[m] = 1
   Steering.v[m] = 1
   Nest.of[m] = owner
   Nest.nextSpawnAt[m] = 0
@@ -127,14 +128,10 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
   VisOff.y[m] = -8
 }
 
-export const RETIRE_MS = 240
-export const POP_MS = 220
-const FIRST_SHOT_MS = 200
-
 /** 装置退场：先撤它的能力，再缩小淡出 */
 export function retireEmplacement(sim: Sim, t: number): void {
   addComponent(sim.world, t, Retiring)
-  Retiring.until[t] = sim.fxMs + RETIRE_MS
+  Retiring.until[t] = sim.fxMs + EMPLACE.retireMs
   const a = Minion.ability[t]!
   if (a !== 0) {
     removeEntity(sim.world, a)
@@ -150,8 +147,8 @@ export function place(sim: Sim, e: number, at?: { x: number; y: number }, lifeMs
     emoji: abilityArtEmoji[e]!,
     size: EmplaceShape.size[e]!,
     bornScale: 0.2,
-    x: at ? at.x : ownerX(e),
-    y: at ? at.y : ownerY(e) + 6,
+    x: at ? at.x : anchorX(e),
+    y: at ? at.y : anchorY(e) + 6,
     z: 5,
     lifeMs,
     animOffsetMs: live.length * 311,
@@ -159,7 +156,7 @@ export function place(sim: Sim, e: number, at?: { x: number; y: number }, lifeMs
   addComponent(sim.world, m, Fired)
   Fired.v[m] = 0
   const def = emplaceAbility[e]!
-  const a = equipAbility(sim, m, def, Faction.v[e]!, FIRST_SHOT_MS, {
+  const a = equipAbility(sim, m, def, Faction.v[e]!, MINION_FIRST_SHOT_MS, {
     dmg: Amp.dmg[e]!,
     cd: Amp.cd[e]!,
     crit: Amp.crit[e]!,

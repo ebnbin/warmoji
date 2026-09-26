@@ -7,7 +7,7 @@ export interface OverlayCtx {
   canvasToLocal(px: number, py: number): { x: number; y: number }
 }
 
-export type OverlayPainter = (g: Phaser.GameObjects.Graphics, ctx: OverlayCtx) => void
+type OverlayPainter = (g: Phaser.GameObjects.Graphics, ctx: OverlayCtx) => void
 
 const painters = new Set<OverlayPainter>()
 

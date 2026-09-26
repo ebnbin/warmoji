@@ -21,7 +21,7 @@ import {
 } from '../components'
 import type { Sim } from '../sim'
 import { flyerHits } from '../store'
-import { ownerX, ownerY } from '../utils/amp'
+import { anchorX, anchorY } from '../utils/amp'
 
 export function holderOutline(faction: number, holderEid: number): OutlineKind {
   return faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? 'elite' : 'enemy') : 'player'
@@ -76,8 +76,8 @@ export function catchFlyer(sim: Sim, e: number, f: number): void {
 /** 掷出一枚飞返体：飞到射程尽头再飞回持有者 */
 export function launch(sim: Sim, e: number, angle: number, damage: number): void {
   const range = FlyerShape.range[e]!
-  const ox = ownerX(e)
-  const oy = ownerY(e)
+  const ox = anchorX(e)
+  const oy = anchorY(e)
   Thrown.n[e] = Thrown.n[e]! + 1
   const f = spawnFlyerBody(sim, e)
   addComponent(sim.world, f, Flyer)

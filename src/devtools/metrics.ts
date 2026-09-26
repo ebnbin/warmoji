@@ -110,7 +110,7 @@ function percentile(sorted: readonly number[], p: number): number {
   return sorted[i]!
 }
 
-export interface MetricsReport {
+interface MetricsReport {
   samples: number
   warming: boolean
   total: { p50: number; p95: number; p99: number; max: number }

@@ -27,7 +27,7 @@ export const SHAPE_LABEL: Record<ShapeKind, string> = {
   world: '时停',
 }
 
-export function abilityLabel(w: AbilityDef): string {
+function abilityLabel(w: AbilityDef): string {
   const s = w.shape
   if (s.kind === 'segment' && s.beam) return '激光'
   if (s.kind === 'disc') return s.at === 'target' ? '轰炸' : s.of === 'hurt' ? '治疗' : '爆发'

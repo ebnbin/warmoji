@@ -38,7 +38,7 @@ export function addMark(eid: number, kind: number, tag: number, until: number, a
 }
 
 /** 第一条还在生效的某种标记的槽位，没有则 -1 */
-export function markSlot(sim: Sim, eid: number, kind: number): number {
+function markSlot(sim: Sim, eid: number, kind: number): number {
   const now = sim.elapsedMs
   const base = eid * MARK_SLOTS
   for (let i = 0; i < MARK_SLOTS; i++) {

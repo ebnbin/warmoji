@@ -1,5 +1,5 @@
 import { playSfx } from '../../audio/sfx'
-import { Alive, LeapShape, Leaping, MARK, Payload, RushHit, Rushing, SprintShape, Tint, Transform, VisOff } from '../components'
+import { Alive, LeapShape, Leaping, MARK, Payload, SprintHit, Sprinting, SprintShape, Tint, Transform, VisOff } from '../components'
 import { hasMark } from '../utils/marks'
 import { damageMul } from '../utils/amp'
 import { sourceOf } from '../utils/source'
@@ -14,30 +14,30 @@ import type { Sim } from '../sim'
 export function tickSkillStates(sim: Sim): void {
   for (const m of sim.characters) {
     if (m !== sim.leader) {
-      Rushing.active[m] = 0
+      Sprinting.active[m] = 0
       if (Leaping.active[m]) {
         Leaping.active[m] = 0
         Leaping.landed[m] = 0
         VisOff.y[m] = 0
       }
     } else {
-      if (Rushing.active[m]) rushHits(sim, m)
+      if (Sprinting.active[m]) sprintHits(sim, m)
       if (Leaping.landed[m]) land(sim, m)
     }
     if (Alive.v[m]) Tint.alpha[m] = hasMark(sim, m, MARK.hide) ? 0.45 : 1
   }
 }
 
-function rushHits(sim: Sim, m: number): void {
-  const e = Rushing.skill[m]!
+function sprintHits(sim: Sim, m: number): void {
+  const e = Sprinting.skill[m]!
   const src = sourceOf(sim, e)
   const x = Transform.x[m]!
   const y = Transform.y[m]!
-  const stamp = Rushing.stamp[m]!
+  const stamp = Sprinting.stamp[m]!
   const damage = Math.round(Payload.damage[e]! * damageMul(sim, e))
   for (const t of targetsWithin(sim, src, x, y, SprintShape.radius[e]!)) {
-    if (RushHit.stamp[t.eid] === stamp) continue
-    RushHit.stamp[t.eid] = stamp
+    if (SprintHit.stamp[t.eid] === stamp) continue
+    SprintHit.stamp[t.eid] = stamp
     const s = struckOf(t.eid)
     if (hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x, y } })) applyOnHit(sim, src, abilityOnHit[e], x, y, damage, [s])
   }

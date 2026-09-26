@@ -20,7 +20,7 @@ import type { Sim } from '../../sim'
 import type { ByKind } from '../../../util/record'
 import { spawnFxRing } from '../../entities/fx'
 
-export interface HitCtx {
+interface HitCtx {
   readonly x: number
   readonly y: number
   readonly baseDamage: number
@@ -93,7 +93,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   poison: (sim, src, fx, at) => {
     const now = sim.elapsedMs
     eachCapable(sim, at, Mark, (t) => {
-      addMark(t, MARK.dot, TAG.effect, now + fx.durationMs, fx.damage, fx.tickMs, now + fx.tickMs)
+      addMark(t, MARK.poison, TAG.effect, now + fx.durationMs, fx.damage, fx.tickMs, now + fx.tickMs)
       poisonSrc[t] = src
     })
   },

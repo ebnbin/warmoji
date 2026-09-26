@@ -28,7 +28,7 @@ import { iceTraction } from '../systems/shared/squad'
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
 
-export interface Surface {
+interface Surface {
   readonly traction: number
   readonly viscosity: number
 }

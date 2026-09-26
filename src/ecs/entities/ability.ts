@@ -223,7 +223,7 @@ function attachShape<K extends keyof ShapeOf>(sim: Sim, e: number, s: ShapeOf[K]
   SHAPES[s.kind].attach(sim, e, s, faction)
 }
 
-export interface AmpInit {
+interface AmpInit {
   dmg: number
   cd: number
   crit: number
@@ -233,7 +233,7 @@ export interface AmpInit {
 
 export const NEUTRAL_AMP: AmpInit = { dmg: 1, cd: 1, crit: 0, kb: 1, battle: false }
 
-export interface AbilityInit {
+interface AbilityInit {
   owner: number
   anchor: number
   faction: number

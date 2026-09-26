@@ -3,7 +3,7 @@ import { catchFlyer } from '../entities/weapon'
 import { DEG2RAD } from '../../util/units'
 import { Flyer, FlyerShape, Frozen, Payload, Transform, Uid } from '../components'
 import { abilityOnHit, flyerHits } from '../store'
-import { ownerX, ownerY } from '../utils/amp'
+import { anchorX, anchorY } from '../utils/amp'
 import { hit } from './shared/damage'
 import { applyOnHit, struckOf } from './shared/effects'
 import { sourceOf } from '../utils/source'
@@ -30,7 +30,7 @@ export function updateFlyers(sim: Sim): void {
         flyerHits[f]!.clear()
       }
     } else {
-      const d = sim.hooks.worldDelta(sim, Transform.x[f]!, Transform.y[f]!, ownerX(e), ownerY(e))
+      const d = sim.hooks.worldDelta(sim, Transform.x[f]!, Transform.y[f]!, anchorX(e), anchorY(e))
       const dist = Math.hypot(d.x, d.y)
       const step = (FlyerShape.returnSpeed[e]! * dt) / 1000
       if (dist <= Math.max(step, 20)) {

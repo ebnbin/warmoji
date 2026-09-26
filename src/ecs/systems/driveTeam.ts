@@ -1,4 +1,4 @@
-import { Casting, Drive, LeapShape, Leaping, Phys, Rushing, Slowed, Transform, VisOff } from '../components'
+import { Casting, Drive, LeapShape, Leaping, Phys, Sprinting, SpeedMul, Transform, VisOff } from '../components'
 import { leaderGrip } from './shared/squad'
 import type { Sim } from '../sim'
 
@@ -8,7 +8,7 @@ export function driveTeam(sim: Sim): void {
   Phys.grip[mover] = leaderGrip()
   Drive.x[mover] = 0
   Drive.y[mover] = 0
-  if (Rushing.active[mover] || sim.elapsedMs < Casting.until[mover]!) return
+  if (Sprinting.active[mover] || sim.elapsedMs < Casting.until[mover]!) return
   if (Leaping.active[mover]) {
     const dt = Math.min(sim.dtMs, 50)
     Leaping.msLeft[mover] = Leaping.msLeft[mover]! - dt
@@ -30,7 +30,7 @@ export function driveTeam(sim: Sim): void {
     }
     return
   }
-  const speed = (Phys.thrust[mover]! / Phys.drag[mover]!) * Slowed.v[mover]!
+  const speed = (Phys.thrust[mover]! / Phys.drag[mover]!) * SpeedMul.v[mover]!
   Drive.x[mover] = sim.teamDir.x * speed
   Drive.y[mover] = sim.teamDir.y * speed
 }
