@@ -17,8 +17,8 @@ function armEnemy(sim: Sim, eid: number): void {
   EnemyArm.armed[eid] = 1
   if (!rows) return
   const fireDelay = EnemyArm.fireDelayMs[eid]!
-  rows.forEach((w, i) => {
-    const delay = ('firstDelayMs' in w ? w.firstDelayMs : undefined) ?? fireDelay ?? 600 + i * 230
+  for (const w of rows) {
+    const delay = ('firstDelayMs' in w ? w.firstDelayMs : undefined) ?? fireDelay
     equipAbility(sim, eid, w, FACTION.enemy, delay, NEUTRAL_AMP)
-  })
+  }
 }

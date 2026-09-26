@@ -5,7 +5,7 @@ import { Flyer, FlyerShape, Frozen, Payload, Transform, Uid } from '../component
 import { abilityOnHit, flyerHits } from '../store'
 import { ownerX, ownerY } from '../utils/amp'
 import { hit } from './shared/damage'
-import { applyOnHit } from './shared/effects'
+import { applyOnHit, struckOf } from './shared/effects'
 import { sourceOf } from '../utils/source'
 import { targetsNear } from '../utils/targets'
 import type { Sim } from '../sim'
@@ -56,7 +56,8 @@ export function updateFlyers(sim: Sim): void {
       const fx = Transform.x[f]!
       const fy = Transform.y[f]!
       const damage = Flyer.damage[f]!
-      if (hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x: fx, y: fy } })) applyOnHit(sim, src, abilityOnHit[e], fx, fy, damage, [t.eid])
+      const s = struckOf(t.eid)
+      if (hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x: fx, y: fy } })) applyOnHit(sim, src, abilityOnHit[e], fx, fy, damage, [s])
     }
   }
 }

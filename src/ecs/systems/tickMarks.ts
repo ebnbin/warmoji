@@ -22,8 +22,8 @@ function expire(sim: Sim, eid: number, kind: number, s: number): void {
 export function tickMarks(sim: Sim): void {
   const now = sim.elapsedMs
   const dt = sim.wdtMs / 1000
-  for (const eid of query(sim.world, [Mark])) {
-    if (Dormant.v[eid]) continue
+  for (const eid of [...query(sim.world, [Mark])]) {
+    if (!hasComponent(sim.world, eid, Mark) || Dormant.v[eid]) continue
     const base = eid * MARK_SLOTS
     for (let i = 0; i < MARK_SLOTS; i++) {
       const s = base + i

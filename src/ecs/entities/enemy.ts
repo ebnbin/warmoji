@@ -32,7 +32,6 @@ import {
   Pop,
   Roam,
   RushHit,
-  Speed,
   Sprite,
   Standoff,
   Stay,
@@ -116,7 +115,7 @@ export function spawnEnemy(
     grip: ENEMY_BODY.grip,
     ownClock: false,
   })
-  addComponents(world, eid, Enemy, Speed, Elite, Boss, Dormant, Flash, Nest, Despawn, EDir, ETurn, Steering, Anim)
+  addComponents(world, eid, Enemy, Elite, Boss, Dormant, Flash, Nest, Despawn, EDir, ETurn, Steering, Anim)
   if (def.kbImmune) addComponent(world, eid, Anchored)
   if (def.phasesWalls) addComponent(world, eid, Phasing)
   const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
@@ -124,7 +123,6 @@ export function spawnEnemy(
   Transform.y[eid] = born.y
   Transform.w[eid] = size * (boss ? 0.2 : 0.3)
   Transform.h[eid] = Transform.w[eid]!
-  Speed.v[eid] = def.speed
   attachDrive(sim, eid, def.drive)
   if (def.damage > 0) {
     addComponent(world, eid, Contact)

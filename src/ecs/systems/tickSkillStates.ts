@@ -5,7 +5,7 @@ import { damageMul } from '../utils/amp'
 import { sourceOf } from '../utils/source'
 import { targetsNear } from '../utils/targets'
 import { hit } from './shared/damage'
-import { applyBlast, applyOnHit } from './shared/effects'
+import { applyBlast, applyOnHit, struckOf } from './shared/effects'
 import { abilityOnHit } from '../store'
 import { spawnFxBoom, spawnFxCircle } from '../entities/fx'
 import type { Sim } from '../sim'
@@ -38,7 +38,8 @@ function rushHits(sim: Sim, m: number): void {
   for (const t of targetsNear(sim, src, x, y, SprintShape.radius[e]!)) {
     if (RushHit.stamp[t.eid] === stamp) continue
     RushHit.stamp[t.eid] = stamp
-    if (hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x, y } })) applyOnHit(sim, src, abilityOnHit[e], x, y, damage, [t.eid])
+    const s = struckOf(t.eid)
+    if (hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x, y } })) applyOnHit(sim, src, abilityOnHit[e], x, y, damage, [s])
   }
 }
 

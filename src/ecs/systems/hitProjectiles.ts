@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { PrevPos, Proj, PROJ_SET, Transform, Uid } from '../components'
-import { applyOnHit } from './shared/effects'
+import { applyOnHit, struckOf } from './shared/effects'
 import { WORLD_SOURCE } from '../utils/source'
 import { eachTarget } from '../utils/targets'
 import { hit } from './shared/damage'
@@ -47,7 +47,8 @@ export function hitProjectiles(sim: Sim): void {
     const f = found[0]!
     struck.add(Uid.v[f.eid]!)
     const damage = Proj.damage[eid]!
-    if (hit(sim, src, f.eid, damage, { knockback: Proj.kb[eid]!, from: { x: sx, y: sy } })) applyOnHit(sim, src, projOnHit[eid], f.x, f.y, damage, [f.eid])
+    const s = struckOf(f.eid)
+    if (hit(sim, src, f.eid, damage, { knockback: Proj.kb[eid]!, from: { x: sx, y: sy } })) applyOnHit(sim, src, projOnHit[eid], f.x, f.y, damage, [s])
     if (Proj.pierce[eid]! <= 0) cullProjectile(sim, eid)
     else Proj.pierce[eid] = Proj.pierce[eid]! - 1
   }

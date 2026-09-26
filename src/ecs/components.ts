@@ -101,7 +101,7 @@ export const MARK = { none: 0, slow: 1, speed: 2, guard: 3, dmg: 4, cd: 5, dot: 
 /** 标记的来源：同种同源的标记刷新而不叠加 */
 export const TAG = { effect: 0, morph: 1, elite: 2, perk: 3 } as const
 
-/** 身体上的标记列表：每个身体 MARK_SLOTS 个槽位；until 为 Infinity 时永久；a/b/c 按种类解释（倍率、跳伤、节拍、下次跳的时刻、嘲讽者、是否曾锚定） */
+/** 身体上的标记列表：每个身体 MARK_SLOTS 个槽位；until 为 Infinity 时永久；a/b/c 按种类解释（倍率、跳伤、节拍、下次跳的时刻、嘲讽者、是否曾锚定）；ref 是所引用身体的 Uid */
 export const Mark = {
   kind: strided(Uint8Array),
   tag: strided(Uint8Array),
@@ -109,14 +109,13 @@ export const Mark = {
   a: strided(Float32Array),
   b: strided(Float32Array),
   c: strided(Float32Array),
+  ref: strided(Uint32Array),
 }
 export const CharFlash = { until: f32() }
 
 export const Enemy = {}
 
 export const Hp = { v: f32(), max: f32() }
-
-export const Speed = { v: f32() }
 
 export const Elite = { v: u8() }
 export const Boss = { v: u8() }
@@ -169,7 +168,7 @@ export const Drift = { u: f32(), cross: f32(), speedMul: f32(), swayPhase: f32()
 export const Shard = { startMs: f32(), until: f32(), rot: f32(), size: f32() }
 export const SHARD_SET: QueryTerm[] = [Shard, Transform, Sprite, Tint, Depth]
 
-export const ENEMY_SET: QueryTerm[] = [Enemy, Transform, Speed, Hp]
+export const ENEMY_SET: QueryTerm[] = [Enemy, Transform, Phys, Hp]
 
 export const Projectile = {}
 

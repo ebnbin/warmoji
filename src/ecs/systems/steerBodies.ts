@@ -12,11 +12,11 @@ import {
   GrantCoins,
   Nest,
   Orbit,
+  Phys,
   PICKUP_SET,
   Radius,
   Roam,
   Slowed,
-  Speed,
   Standoff,
   Steering,
   Thief,
@@ -30,11 +30,16 @@ function drive(eid: number, dx: number, dy: number, speed: number): void {
   Drive.y[eid] = dy * speed
 }
 
+/** 巡航速度：推力除以阻力，再乘这一帧的速度倍率 */
+function cruise(eid: number): number {
+  return (Phys.thrust[eid]! / Phys.drag[eid]!) * Slowed.v[eid]!
+}
+
 /** 追最近的敌人，没有就慢速游荡 */
 function chase(sim: Sim): void {
-  for (const eid of query(sim.world, [Chase, Steering, Transform, Speed, Slowed])) {
+  for (const eid of query(sim.world, [Chase, Steering, Transform, Phys, Slowed])) {
     if (!Steering.v[eid]) continue
-    const speed = Speed.v[eid]! * Slowed.v[eid]!
+    const speed = cruise(eid)
     const target = nearestFoe(sim, eid, Transform.x[eid]!, Transform.y[eid]!)
     if (!target) {
       const d = wanderDir(sim, eid)
@@ -47,18 +52,18 @@ function chase(sim: Sim): void {
 }
 
 function roam(sim: Sim): void {
-  for (const eid of query(sim.world, [Roam, Steering, Speed, Slowed])) {
+  for (const eid of query(sim.world, [Roam, Steering, Phys, Slowed])) {
     if (!Steering.v[eid]) continue
     const d = wanderDir(sim, eid)
-    drive(eid, d.x, d.y, Speed.v[eid]! * Slowed.v[eid]!)
+    drive(eid, d.x, d.y, cruise(eid))
   }
 }
 
 /** 敌人进到 range 内就逃，否则慢速游荡 */
 function flee(sim: Sim): void {
-  for (const eid of query(sim.world, [Flee, Steering, Transform, Speed, Slowed])) {
+  for (const eid of query(sim.world, [Flee, Steering, Transform, Phys, Slowed])) {
     if (!Steering.v[eid]) continue
-    const speed = Speed.v[eid]! * Slowed.v[eid]!
+    const speed = cruise(eid)
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
     const target = nearestFoe(sim, eid, ex, ey)
@@ -80,9 +85,9 @@ function flee(sim: Sim): void {
 /** 探测到敌人后保持在 standoffDist 附近：远了靠近，近了后退，带内不动 */
 function standoff(sim: Sim): void {
   const band = AI.standoffBandU * UNIT
-  for (const eid of query(sim.world, [Standoff, Steering, Transform, Speed, Slowed])) {
+  for (const eid of query(sim.world, [Standoff, Steering, Transform, Phys, Slowed])) {
     if (!Steering.v[eid]) continue
-    const sp = Speed.v[eid]! * Slowed.v[eid]!
+    const sp = cruise(eid)
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
     const target = nearestFoe(sim, eid, ex, ey)
@@ -110,9 +115,9 @@ function standoff(sim: Sim): void {
 
 /** 绕着锚点转；该扑的时候扑向目标；锚点没了就只剩追 */
 function orbit(sim: Sim): void {
-  for (const eid of query(sim.world, [Orbit, Nest, Steering, Transform, Speed, Slowed])) {
+  for (const eid of query(sim.world, [Orbit, Nest, Steering, Transform, Phys, Slowed])) {
     if (!Steering.v[eid]) continue
-    const sp = Speed.v[eid]! * Slowed.v[eid]!
+    const sp = cruise(eid)
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
     const seek = Orbit.seek[eid]!
@@ -156,7 +161,7 @@ function orbit(sim: Sim): void {
 
 /** 奔向最近的金币吃掉，没有金币就慢速游荡 */
 function coinThief(sim: Sim): void {
-  const thieves = query(sim.world, [CoinThief, Steering, Transform, Speed, Slowed, Radius])
+  const thieves = query(sim.world, [CoinThief, Steering, Transform, Phys, Slowed, Radius])
   if (thieves.length === 0) return
   const coins: number[] = []
   for (const c of query(sim.world, PICKUP_SET)) {
@@ -164,7 +169,7 @@ function coinThief(sim: Sim): void {
   }
   for (const eid of thieves) {
     if (!Steering.v[eid]) continue
-    const sp = Speed.v[eid]! * Slowed.v[eid]!
+    const sp = cruise(eid)
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
     let coin = -1

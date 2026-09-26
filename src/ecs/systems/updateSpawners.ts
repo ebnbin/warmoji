@@ -19,7 +19,7 @@ export function updateSpawners(sim: Sim): void {
   const atlas = sim.frames
   if (sim.over) return
   const now = sim.elapsedMs
-  const eids = query(sim.world, ENEMY_SET)
+  const eids = [...query(sim.world, ENEMY_SET)]
   let active = awakeCount(sim)
   for (const eid of eids) {
     if (Dormant.v[eid]) continue

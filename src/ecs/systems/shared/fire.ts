@@ -50,7 +50,7 @@ import {
 } from '../../components'
 import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse } from '../../store'
 import { damageMul, ownerX, ownerY, waveScale } from '../../utils/amp'
-import { sourceOf } from '../../utils/source'
+import { flying, sourceOf } from '../../utils/source'
 import type { Source } from '../../utils/source'
 import { eachAlly, nearestTarget, targetsNear } from '../../utils/targets'
 import type { Found } from '../../utils/targets'
@@ -59,7 +59,8 @@ import { strongestTarget } from '../../utils/assassinate'
 import { headingOf, muzzle } from '../../utils/projectile'
 import { leaderPoint } from '../../utils/team'
 import { hit } from './damage'
-import { applyAbilityEffects, applyOnHit } from './effects'
+import { applyAbilityEffects, applyOnHit, struckOf } from './effects'
+import type { Struck } from './effects'
 import { grantIframe } from './combat'
 import { shoot } from './projectile'
 import { launch } from '../../entities/weapon'
@@ -134,10 +135,11 @@ function burst(sim: Sim, x: number, y: number, radius: number, color: number, bo
 }
 
 /** 打一遍：返回真正吃到伤害的身体；不带伤害的形状只覆盖不打，覆盖到的都算 */
-function strikeAll(sim: Sim, src: Source, found: readonly Found[], damage: number, kb: number, from: Point): number[] {
-  const struck: number[] = []
+function strikeAll(sim: Sim, src: Source, found: readonly Found[], damage: number, kb: number, from: Point): Struck[] {
+  const struck: Struck[] = []
   for (const t of found) {
-    if (damage <= 0 || hit(sim, src, t.eid, damage, { knockback: kb, from })) struck.push(t.eid)
+    const s = struckOf(t.eid)
+    if (damage <= 0 || hit(sim, src, t.eid, damage, { knockback: kb, from })) struck.push(s)
   }
   return struck
 }
@@ -196,7 +198,7 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
         if (!Alive.v[t] || Hp.v[t]! < Hp.max[t]!) hurt.push(t)
       })
       if (hurt.length === 0) return false
-      applyOnHit(sim, src, onHit, cx, cy, damage, hurt)
+      applyOnHit(sim, src, onHit, cx, cy, damage, hurt.map(struckOf))
       if (color !== 0) burst(sim, cx, cy, r, color, false)
       return true
     }
@@ -212,7 +214,7 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
     let cur = target
     if (!cur) return false
     const visited = new Set<number>()
-    const struck: number[] = []
+    const struck: Struck[] = []
     const points: { x: number; y: number }[] = [{ x: ox, y: oy }]
     let dmg = damage
     let last: Found = cur
@@ -220,7 +222,8 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
       visited.add(cur.eid)
       const from = points[points.length - 1]!
       points.push({ x: cur.x, y: cur.y })
-      if (hit(sim, src, cur.eid, Math.max(1, Math.round(dmg)), { knockback: kb, from })) struck.push(cur.eid)
+      const s = struckOf(cur.eid)
+      if (hit(sim, src, cur.eid, Math.max(1, Math.round(dmg)), { knockback: kb, from })) struck.push(s)
       last = cur
       dmg *= Chain.decay[e]!
       cur = nearestTarget(sim, src, cur.x, cur.y, Chain.hopRange[e]!, visited)
@@ -280,7 +283,8 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
     if (execHp > 0 && Hp.max[target.eid]! > 0 && Hp.v[target.eid]! / Hp.max[target.eid]! <= execHp) {
       dmg = Math.round(dmg * BlinkShape.execMul[e]!)
     }
-    if (hit(sim, src, target.eid, dmg, { knockback: kb, from: { x: landX, y: landY } })) applyOnHit(sim, src, onHit, target.x, target.y, dmg, [target.eid])
+    const s = struckOf(target.eid)
+    if (hit(sim, src, target.eid, dmg, { knockback: kb, from: { x: landX, y: landY } })) applyOnHit(sim, src, onHit, target.x, target.y, dmg, [s])
     spawnFxSlash(sim, target.x, target.y, Aim.rad[e]!, 34)
     return true
   }
@@ -330,13 +334,16 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
   if (hasComponent(w, e, AllShape)) {
     if (AllShape.of[e] === ALL_OF.foes) {
       const list = targetsNear(sim, src, ox, oy, Infinity)
-      const struck: number[] = []
+      const struck: Struck[] = []
       if (damage > 0) {
         const bossRatio = Payload.bossRatio[e]!
-        for (const t of list) if (hit(sim, src, t.eid, Math.max(1, Math.round(damage * (Boss.v[t.eid] ? bossRatio : 1))))) struck.push(t.eid)
+        for (const t of list) {
+          const s = struckOf(t.eid)
+          if (hit(sim, src, t.eid, Math.max(1, Math.round(damage * (Boss.v[t.eid] ? bossRatio : 1))))) struck.push(s)
+        }
         sim.out.flash = { color: 0xffffff, alpha: 0.55, durationMs: 380 }
       } else {
-        for (const t of list) struck.push(t.eid)
+        for (const t of list) struck.push(struckOf(t.eid))
       }
       applyOnHit(sim, src, onHit, ox, oy, damage, struck)
     } else {
@@ -344,7 +351,7 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
       eachAlly(sim, src.faction, ox, oy, Infinity, AllShape.downed[e] === 1, (t) => {
         allies.push(t)
       })
-      applyOnHit(sim, src, onHit, ox, oy, damage, allies)
+      applyOnHit(sim, src, onHit, ox, oy, damage, allies.map(struckOf))
       for (const t of allies) {
         if (!Alive.v[t]) continue
         CharFlash.until[t] = sim.fxMs + 320
@@ -366,7 +373,7 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
       x: ox,
       y: oy,
       radius: ZoneShape.radius[e]!,
-      src,
+      src: flying(src),
       durationMs: ZoneShape.durationMs[e]!,
       enterMs: ZoneShape.enterMs[e]!,
       color: ZoneShape.color[e]!,

@@ -1,14 +1,14 @@
-import { Drive, LeapShape, Leaping, Phys, Rushing, Slowed, Transform, VisOff } from '../components'
+import { Casting, Drive, LeapShape, Leaping, Phys, Rushing, Slowed, Transform, VisOff } from '../components'
 import { leaderGrip } from './shared/squad'
 import type { Sim } from '../sim'
 
-/** 队长的驱动来自摇杆；冲刺与跳跃期间不听摇杆，按技能给定的轨迹走 */
+/** 队长的驱动来自摇杆；冲刺与跳跃期间不听摇杆，按技能给定的轨迹走；蓄力中停下 */
 export function driveTeam(sim: Sim): void {
   const mover = sim.leader
   Phys.grip[mover] = leaderGrip()
   Drive.x[mover] = 0
   Drive.y[mover] = 0
-  if (Rushing.active[mover]) return
+  if (Rushing.active[mover] || sim.elapsedMs < Casting.until[mover]!) return
   if (Leaping.active[mover]) {
     const dt = Math.min(sim.dtMs, 50)
     Leaping.msLeft[mover] = Leaping.msLeft[mover]! - dt

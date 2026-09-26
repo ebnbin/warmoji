@@ -1,7 +1,7 @@
 import { hasComponent } from 'bitecs'
 import type { Effect } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
-import { Alive, Enemy, FACTION, Hp, MARK, Mark, Revive, TAG } from '../../components'
+import { Alive, Enemy, FACTION, Hp, MARK, Mark, Revive, TAG, Uid } from '../../components'
 import { addMark } from '../../utils/marks'
 import { poisonSrc } from '../../store'
 import { applyMorph } from '../../entities/enemy'
@@ -14,6 +14,7 @@ import { interrupt } from './ability'
 import { healAllies } from './heal'
 import { nearestAngle, targetsNear } from '../../utils/targets'
 import { flying } from '../../utils/source'
+import { isSameEntity } from '../../utils/identity'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 import type { ByKind } from '../../../util/record'
@@ -37,21 +38,33 @@ export function applyBlast(
   radius: number,
   knockback: number,
   exclude?: ReadonlySet<number>,
-): number[] {
+): Struck[] {
   const list = targetsNear(sim, src, x, y, radius)
-  const struck: number[] = []
+  const struck: Struck[] = []
   for (const i of circleHitIndices({ x, y }, radius, list)) {
     const t = list[i]!
     if (exclude?.has(t.eid)) continue
-    if (hit(sim, src, t.eid, damage, { knockback, from: { x, y } })) struck.push(t.eid)
+    const s = struckOf(t.eid)
+    if (hit(sim, src, t.eid, damage, { knockback, from: { x, y } })) struck.push(s)
   }
   return struck
 }
 
-/** 命中后的效果：施于这次真正打中的身体，溅射不再打它们；谁也没打中就没有效果 */
-export function applyOnHit(sim: Sim, src: Source, effects: readonly Effect[] | undefined, x: number, y: number, baseDamage: number, struck: readonly number[]): void {
+/** 打中的身体：eid 被击杀后会立刻复用，靠 Uid 认出还是不是它 */
+export interface Struck {
+  readonly eid: number
+  readonly uid: number
+}
+
+export function struckOf(eid: number): Struck {
+  return { eid, uid: Uid.v[eid]! }
+}
+
+/** 命中后的效果：施于这次真正打中且编号未变的身体，溅射不再打它们；谁也没打中就没有效果 */
+export function applyOnHit(sim: Sim, src: Source, effects: readonly Effect[] | undefined, x: number, y: number, baseDamage: number, struck: readonly Struck[]): void {
   if (!effects || struck.length === 0) return
-  applyAbilityEffects(sim, src, effects, { x, y, baseDamage, targets: struck, exclude: new Set(struck) })
+  const live = struck.filter((s) => isSameEntity(sim.world, s.eid, s.uid)).map((s) => s.eid)
+  applyAbilityEffects(sim, src, effects, { x, y, baseDamage, targets: live, exclude: new Set(live) })
 }
 
 function eachCapable(sim: Sim, at: HitCtx, comp: object, apply: (t: number) => void): void {
@@ -99,7 +112,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       x: at.x,
       y: at.y,
       radius: fx.def.radius,
-      src: { ...src, tint: 0xa5d86a },
+      src: { ...flying(src), tint: 0xa5d86a },
       durationMs: fx.def.durationMs,
       enterMs: fx.def.enterMs,
       color: fx.def.color,
@@ -180,7 +193,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const by = src.viewer
     if (by === undefined) return
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.taunt, TAG.effect, until, by))
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.taunt, TAG.effect, until, by, 0, 0, Uid.v[by]!))
   },
 
   guard: (sim, _src, fx, at) => {
