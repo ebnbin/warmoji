@@ -6,10 +6,23 @@ import { poisonSrc } from '../store'
 import { WORLD_SOURCE } from '../utils/source'
 import { postponeAbilities } from './shared/ability'
 import { hit } from './shared/damage'
+import { applyAbilityEffects, FUSE_DEF, markSource, STORE_DEF } from './shared/effects'
 import type { Sim } from '../sim'
 
-/** 到期反应：只有变形要把外观、锚定还回去并让它缓一下，定身要把身体摆正 */
+/** 到期反应：变形要把外观、锚定还回去并让它缓一下，定身要把身体摆正；引信在身上引爆，存伤以存下的伤害为基础结算 */
 function expire(sim: Sim, eid: number, kind: number, s: number): void {
+  if (kind === MARK.fuse || kind === MARK.store) {
+    const src = markSource(eid, s)
+    const at = { x: Transform.x[eid]!, y: Transform.y[eid]!, targets: [eid] }
+    if (kind === MARK.fuse) {
+      const def = FUSE_DEF.get(Mark.b[s]!)
+      if (def && src) applyAbilityEffects(sim, src, def.then, { ...at, baseDamage: 0 })
+    } else {
+      const def = STORE_DEF.get(Mark.b[s]!)
+      if (def && src) applyAbilityEffects(sim, src, def.then, { ...at, baseDamage: Mark.a[s]! * def.ratio })
+    }
+    return
+  }
   if (kind === MARK.morph) {
     restoreMorph(sim, sim.frames, eid, Mark.a[s] === 1)
     sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'puff' })
@@ -42,6 +55,7 @@ export function tickMarks(sim: Sim): void {
       if (now >= until) {
         Mark.kind[s] = MARK.none
         expire(sim, eid, kind, s)
+        if (!hasComponent(sim.world, eid, Mark)) break
       }
     }
   }

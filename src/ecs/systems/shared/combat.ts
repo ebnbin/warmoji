@@ -9,12 +9,14 @@ import type { EnemyDef } from '../../../types/enemies'
 import { MEMBER } from '../../../data/characters'
 import { UNIT } from '../../../util/units'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Hp, CharScale, MARK, Nest, Revive, Slot, Sprite, TAG, Thief, Tint, Transform } from '../../components'
+import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Hp, CharScale, MARK, MARK_SLOTS, Mark, Nest, Revive, Slot, Sprite, TAG, Thief, Tint, Transform } from '../../components'
 import { isSameEntity } from '../../utils/identity'
 import { addMark, dmgMul, hasMark } from '../../utils/marks'
-import { bodyRules, enemyCarries, enemyDef } from '../../store'
-import { selfSource } from '../../utils/source'
-import { applyAbilityEffects } from './effects'
+import { abilityOnKill, bodyRules, enemyCarries, enemyDef, resDef } from '../../store'
+import { flying, selfSource } from '../../utils/source'
+import { nearestTarget } from '../../utils/targets'
+import { gainRes } from './resource'
+import { applyAbilityEffects, casterOf, DEATH_DEF, FUSE_DEF, markFrom, markSource } from './effects'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
 import { endMotion } from './displace'
@@ -24,6 +26,7 @@ import type { Sim } from '../../sim'
 /** 生命归零：击杀者先反应，带复活计时的身体倒地等待，其余身体死亡移除 */
 export function die(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: number): void {
   killerReacts(sim, src)
+  settleDeathMarks(sim, eid)
   if (hasComponent(sim.world, eid, Revive)) {
     down(sim, eid)
     return
@@ -32,12 +35,44 @@ export function die(sim: Sim, eid: number, src: Source, flingVx: number, flingVy
   killBody(sim, eid, src.slot, anchored ? 0 : flingVx, anchored ? 0 : flingVy)
 }
 
-/** 击杀反应施于出手的身体，敌我同一条 */
+/** 击杀反应施于出手的身体，敌我同一条：身体的击杀规则、出手那条能力的击杀效果、资源的击杀增长 */
 function killerReacts(sim: Sim, src: Source): void {
   const k = src.body
   if (k === undefined || !isSameEntity(sim.world, k, src.bodyUid ?? 0) || !Alive.v[k]) return
+  const at = { x: Transform.x[k]!, y: Transform.y[k]!, baseDamage: 0, targets: [k] }
   const onKill = bodyRules[k]?.onKill
-  if (onKill) applyAbilityEffects(sim, selfSource(sim, k), onKill, { x: Transform.x[k]!, y: Transform.y[k]!, baseDamage: 0, targets: [k] })
+  if (onKill) applyAbilityEffects(sim, selfSource(sim, k), onKill, at)
+  const byAbility = src.ability === undefined ? undefined : abilityOnKill[src.ability]
+  if (byAbility) applyAbilityEffects(sim, src, byAbility, at)
+  const grow = resDef[k]?.onKill
+  if (grow) gainRes(sim, k, grow)
+}
+
+/** 身上带着的死亡印记在死时结算：施于施加者；会跳的引信跳到最近的另一个敌人，不跳的就地引爆 */
+function settleDeathMarks(sim: Sim, eid: number): void {
+  const base = eid * MARK_SLOTS
+  const now = sim.elapsedMs
+  const x = Transform.x[eid]!
+  const y = Transform.y[eid]!
+  for (let i = 0; i < MARK_SLOTS; i++) {
+    const s = base + i
+    const kind = Mark.kind[s]!
+    if ((kind !== MARK.deathMark && kind !== MARK.fuse) || Mark.until[s]! <= now) continue
+    const src = markSource(eid, s)
+    Mark.kind[s] = MARK.none
+    if (!src) continue
+    if (kind === MARK.deathMark) {
+      const def = DEATH_DEF.get(Mark.b[s]!)
+      const by = casterOf(sim, src)
+      if (def) applyAbilityEffects(sim, src, def.then, { x, y, baseDamage: 0, targets: by >= 0 ? [by] : [], victim: eid })
+      continue
+    }
+    const def = FUSE_DEF.get(Mark.b[s]!)
+    if (!def) continue
+    const next = def.jump ? nearestTarget(sim, flying(src), x, y, Infinity, new Set([eid])) : null
+    if (next) markFrom(next.eid, MARK.fuse, Mark.until[s]!, 0, Mark.b[s]!, src)
+    else applyAbilityEffects(sim, src, def.then, { x, y, baseDamage: 0, targets: [], exclude: new Set([eid]) })
+  }
 }
 
 function down(sim: Sim, eid: number): void {

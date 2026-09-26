@@ -23,6 +23,7 @@ import { updateBees } from '../updateBees'
 import { updateControl } from '../updateControl'
 import { updateSpeedMuls } from '../updateSpeedMuls'
 import { tickMarks } from '../tickMarks'
+import { tickResources } from '../tickResources'
 import { tintEnemies } from '../tintEnemies'
 import { updateDormancy } from '../updateDormancy'
 import { cullProjectiles } from '../cullProjectiles'
@@ -41,6 +42,7 @@ export const SIM_PIPELINE = pipeline([
   stepHandover,
   { run: reviveCharacters, after: [stepHandover] },
   { run: tickMarks, after: [updateDormancy] },
+  { run: tickResources, after: [tickMarks] },
   { run: updateSpeedMuls, after: [refoldBattleFx, tickMarks] },
   { run: updateControl, after: [updateDormancy, updateSpeedMuls, tickMarks] },
   { run: driveTeam, after: [stepHandover, reviveCharacters, updateControl] },

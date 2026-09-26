@@ -19,6 +19,7 @@ import type { RunState } from '../../run/state'
 import { Anim, Breath, Depth, FACTION, Hp, CharFlash, CharScale, Facing, Magnet, MARK, Pop, Revive, Seat, Slot, Sprite, TAG, Transform } from '../components'
 import { addMark } from '../utils/marks'
 import { bodyRules } from '../store'
+import { attachResource } from './resource'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
@@ -63,11 +64,15 @@ export function spawnCharacter(
   Breath.phase[eid] = slot * 1.3
   Magnet.radius[eid] = def.magnet * UNIT
   Hp.v[eid] = sandbox ? sandboxHp : waveStartHp(run.memberHp[slot] ?? MEMBER.maxHp, maxHp)
+  const own = def.rules
   bodyRules[eid] = {
-    onHurt: [{ kind: 'invuln', ms: MEMBER.iframesMs + fx.iframesAddMs }],
-    onTouched: fx.thorns > 0 ? [{ kind: 'damage', amount: fx.thorns }] : undefined,
-    onKill: fx.killHeal > 0 ? [{ kind: 'heal', amount: fx.killHeal, scope: 'all' }] : undefined,
+    resource: def.resource,
+    onHurt: [{ kind: 'invuln', ms: MEMBER.iframesMs + fx.iframesAddMs }, ...(own?.onHurt ?? [])],
+    onTouched: [...(fx.thorns > 0 ? [{ kind: 'damage' as const, amount: fx.thorns }] : []), ...(own?.onTouched ?? [])],
+    onTouch: own?.onTouch,
+    onKill: [...(fx.killHeal > 0 ? [{ kind: 'heal' as const, amount: fx.killHeal, scope: 'all' as const }] : []), ...(own?.onKill ?? [])],
   }
+  attachResource(world, eid, def.resource)
   if (fx.regenPerSec > 0) addMark(eid, MARK.regen, TAG.perk, Infinity, fx.regenPerSec)
   Revive.ms[eid] = Math.max(1000, TEAM.reviveMs + fx.reviveAddMs)
   CharScale.v[eid] = place.sizeMul

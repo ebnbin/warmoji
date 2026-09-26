@@ -1,7 +1,7 @@
 import { INITIAL_CAPACITY } from './world'
-import type { BodyRules, EnemyDef } from '../types/enemies'
+import type { BodyRules, EnemyDef, ResourceDef } from '../types/enemies'
 import type { FieldPickupDef } from '../types/battlefield'
-import type { AbilityDef, Effect } from '../types/abilityDefs'
+import type { AbilityDef, Cond, Effect } from '../types/abilityDefs'
 import type { Source } from './utils/source'
 
 const slots = <T>(): (T | undefined)[] => new Array<T | undefined>(INITIAL_CAPACITY).fill(undefined)
@@ -49,6 +49,18 @@ export const emplaceAbility = slots<AbilityDef>()
 export const projSrc = slots<Source>()
 
 export const poisonSrc = slots<Source>()
+
+/** 每个身体每个标记槽位的来源：引信、存伤、叠层、死亡印记结算时用 */
+export const markSrcs = slots<(Source | undefined)[]>()
+
+/** 能力的附加定义：打死人时施于出手者、出手条件、资源强化、弹匣最后一发 */
+export const abilityOnKill = slots<readonly Effect[]>()
+export const abilityRequires = slots<Cond>()
+export const abilityBoost = slots<{ readonly at: number; readonly spend: number; readonly damageMul?: number; readonly onHit?: readonly Effect[] }>()
+export const ammoLast = slots<readonly Effect[]>()
+
+/** 身体的资源定义 */
+export const resDef = slots<ResourceDef>()
 
 /** 身体自己的规则：敌人是它的定义，角色是出生时按道具拼出来的包，造物只有接触效果 */
 export const bodyRules = slots<BodyRules>()

@@ -5,7 +5,8 @@ import { playSfx } from '../../../audio/sfx'
 import { Alive, CharFlash, Dormant, FACTION, Faction, Flash, Hp, MARK, MARK_SLOTS, Mark, Slot, Tint, Transform } from '../../components'
 import { guardMul, hasMark, isUntargetable, markSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
-import { bodyRules } from '../../store'
+import { bodyRules, resDef } from '../../store'
+import { gainRes } from './resource'
 import { selfSource } from '../../utils/source'
 import { applyAbilityEffects, casterOf, PARRY_FX } from './effects'
 import { displace, FORCED } from './displace'
@@ -69,6 +70,15 @@ function blocked(sim: Sim, src: Source, target: number, o: HitOpts): boolean {
   return false
 }
 
+/** 资源随命中涨：出手的涨 onHit，挨打的涨 onHurt */
+function fuel(sim: Sim, src: Source, target: number): void {
+  const by = casterOf(sim, src)
+  const give = by >= 0 ? resDef[by]?.onHit : undefined
+  if (give) gainRes(sim, by, give)
+  const take = resDef[target]?.onHurt
+  if (take) gainRes(sim, target, take)
+}
+
 /** 存伤的身体记下这一下 */
 function store(target: number, dmg: number): void {
   const base = target * MARK_SLOTS
@@ -95,6 +105,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   if (!team) spawnDamageNumber(sim, Transform.x[target]!, Transform.y[target]!, dmg, crit)
   record(sim, src, target, dmg)
   store(target, dmg)
+  if (!o.tick) fuel(sim, src, target)
   // 被命中反应先于扣血：无敌帧从这一下起算
   const back = o.tick ? undefined : bodyRules[target]?.onHurt
   if (back) applyAbilityEffects(sim, selfSource(sim, target), back, { x: Transform.x[target]!, y: Transform.y[target]!, baseDamage: dmg, targets: [target] })

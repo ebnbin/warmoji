@@ -6,7 +6,7 @@ import { aggregateCharacterEffects, resolveAbilityDef } from '../data/items'
 import { tiersForLevel } from '../data/charLevel'
 import { levelStatsFor } from '../data/levels'
 import type { ItemId } from '../types/items'
-import type { AbilityDef, Effect, Shape, ShapeKind } from '../types/abilityDefs'
+import type { AbilityDef, Cond, Effect, MarkName, Shape, ShapeKind } from '../types/abilityDefs'
 import type { StatGroup } from '../types/statLines'
 
 export const SHAPE_LABEL: Record<ShapeKind, string> = {
@@ -74,7 +74,7 @@ export function effectLine(e: Effect): string {
       return `${parts.join('、')}${e.durationMs === undefined ? '，永久' : ` 持续 ${sec(e.durationMs)}`}`
     }
     case 'damage':
-      return `造成 ${e.amount} 点伤害`
+      return e.ratio === undefined ? `造成 ${e.amount} 点伤害` : `造成${e.amount ? ` ${e.amount} +` : ''} ${pct(e.ratio)} 基础伤害`
     case 'stun':
       return `定身 ${sec(e.durationMs)}`
     case 'hide':
@@ -143,7 +143,63 @@ export function effectLine(e: Effect): string {
       return `摔向${e.to === 'foe' ? '最近的另一个敌人' : '身后'}${e.onLand ? `，落地时${e.onLand.map(effectLine).join('、')}` : ''}`
     case 'swap':
       return '与目标互换位置'
+    case 'if':
+      return `若目标${condLine(e.when)}：${e.then.map(effectLine).join('、')}${e.else ? `；否则${e.else.map(effectLine).join('、')}` : ''}`
+    case 'stack':
+      return `叠一层（${sec(e.durationMs)} 内同一目标叠满 ${e.max} 层：${e.then.map(effectLine).join('、')}）`
+    case 'detonate':
+      return `立刻引爆自己留下的${e.mark === 'fuse' ? '引信' : '存伤'}`
+    case 'fuse':
+      return `挂上引信，${sec(e.ms)} 后${e.then.map(effectLine).join('、')}${e.jump ? '；目标先死则跳到最近的敌人' : ''}`
+    case 'store':
+      return `${sec(e.ms)} 内记下受到的伤害，到时以其 ${pct(e.ratio)} 为基础：${e.then.map(effectLine).join('、')}`
+    case 'deathMark':
+      return `${sec(e.ms)} 内目标死亡则：${e.then.map(effectLine).join('、')}`
+    case 'refresh': {
+      const what = e.what === 'this' ? '这条能力' : e.what === 'skill' ? '主动技能' : '全部能力'
+      return `${e.who === 'team' ? '全队' : ''}${what}冷却${e.ms === undefined ? '转好' : `减 ${sec(e.ms)}`}`
+    }
+    case 'gain':
+      return `资源 ${e.amount >= 0 ? '+' : ''}${e.amount}`
+    case 'empower':
+      return `接下来 ${e.hits} 次普通出手附带：${e.then.map(effectLine).join('、')}`
+    case 'caster':
+      return `自身：${e.then.map(effectLine).join('、')}`
+    case 'area':
+      return `${grid(e.radius)} 内：${e.then.map(effectLine).join('、')}`
   }
+}
+
+function condLine(c: Cond): string {
+  switch (c.kind) {
+    case 'airborne':
+      return '在空中'
+    case 'marked':
+      return `带着${MARK_LABEL[c.mark]}`
+    case 'hpBelow':
+      return `生命低于 ${pct(c.ratio)}`
+    case 'boss':
+      return '是 Boss'
+    case 'not':
+      return `不${condLine(c.cond)}`
+  }
+}
+
+const MARK_LABEL: Record<MarkName, string> = {
+  stun: '眩晕',
+  root: '定身',
+  sleep: '睡眠',
+  fear: '恐惧',
+  charm: '魅惑',
+  slow: '减速',
+  poison: '中毒',
+  silence: '沉默',
+  disarm: '致盲',
+  stasis: '静止',
+  fuse: '你的引信',
+  stack: '你的叠层',
+  store: '你的存伤',
+  deathMark: '你的死亡印记',
 }
 
 function shapeLine(w: AbilityDef, s: Shape): string {
@@ -198,6 +254,23 @@ function repeatLine(w: AbilityDef): string | null {
   return `${when}${how}${r.ratio && r.ratio !== 1 ? `，每发 ${pct(r.ratio)} 伤害` : ''}`
 }
 
+/** 什么时候能出手：充能、连段、蓄力、弹匣、轮流、资源、以血施法、条件、击杀效果 */
+function availLines(w: AbilityDef): string[] {
+  const out: string[] = []
+  if (w.charges) out.push(`可攒 ${w.charges} 次，冷却按次恢复`)
+  if (w.recast) out.push(`出手后 ${sec(w.recast.windowMs)} 内可接下一段：${abilityLabel(w.recast.ability)}${w.recast.ability.onHit ? `，${w.recast.ability.onHit.map(effectLine).join('、')}` : ''}`)
+  if (w.hold) out.push(`按住蓄力，蓄满 ${sec(w.hold.maxMs)} 时距离 ×${w.hold.reachMul}、伤害 ×${w.hold.damageMul}`)
+  if (w.ammo) out.push(`弹匣 ${w.ammo.count} 发，打空换弹 ${sec(w.ammo.reloadMs)}${w.ammo.last ? `；最后一发${w.ammo.last.map(effectLine).join('、')}` : ''}`)
+  if (w.cycle) out.push(`轮流出手：${[w, ...w.cycle].map(abilityLabel).join(' → ')}`)
+  if (w.cost) out.push(`消耗资源 ${w.cost}`)
+  if (w.gain) out.push(`每次出手资源 +${w.gain}`)
+  if (w.boost) out.push(`资源到 ${w.boost.at} 时消耗 ${w.boost.spend} 强化${w.boost.damageMul ? `：伤害 ×${w.boost.damageMul}` : ''}${w.boost.onHit ? `，${w.boost.onHit.map(effectLine).join('、')}` : ''}`)
+  if (w.hpCost) out.push(`以血施法：每次扣 ${w.hpCost} 生命`)
+  if (w.requires) out.push(`只对${condLine(w.requires)}的目标出手`)
+  if (w.onKill) out.push(`打死目标时：${w.onKill.map(effectLine).join('、')}`)
+  return out
+}
+
 function abilityStatLines(w: AbilityDef): string[] {
   const base: string[] = []
   if (w.damage) base.push(`伤害 ${w.damage}${w.waveScale ? ' × 当前波次强度' : ''}`)
@@ -209,6 +282,7 @@ function abilityStatLines(w: AbilityDef): string[] {
   lines.push(shapeLine(w, w.shape))
   const rep = repeatLine(w)
   if (rep) lines.push(rep)
+  lines.push(...availLines(w))
   const fx = [...(w.onHit ?? []).map(effectLine), ...(w.onSelf ?? []).map((e) => `自身：${effectLine(e)}`)]
   if (fx.length > 0) lines.push(fx.join(' · '))
   return lines

@@ -27,6 +27,8 @@ export interface Source {
   readonly foes?: readonly number[]
   /** 所在的界：只打得到同一个界里的身体，0 是大家共处的世界 */
   readonly realm?: number
+  /** 出手的那条能力 */
+  readonly ability?: number
   readonly sight?: { readonly x: number; readonly y: number }
 }
 
@@ -48,6 +50,7 @@ export function sourceOf(sim: Sim, e: number): Source {
     viewer: Owner.eid[e]!,
     body: o,
     bodyUid: Uid.v[o]!,
+    ability: e,
     foes: foesOf(sim, o, Faction.v[e]!),
     realm: realmOf(sim, o),
     sight:

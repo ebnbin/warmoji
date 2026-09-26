@@ -79,10 +79,11 @@ interface BuffEffect {
   readonly speedMul?: number
   readonly durationMs?: number
 }
-/** 直接造成一笔伤害 */
+/** 直接造成一笔伤害：amount 加上基础伤害的 ratio 倍 */
 interface DamageEffect {
   readonly kind: 'damage'
   readonly amount: number
+  readonly ratio?: number
 }
 /** 定身：失去行动 */
 interface StunEffect {
@@ -257,6 +258,83 @@ interface ThrowEffect {
 interface SwapEffect {
   readonly kind: 'swap'
 }
+/** 身上能被条件认出来的标记 */
+export type MarkName = 'stun' | 'root' | 'sleep' | 'fear' | 'charm' | 'slow' | 'poison' | 'silence' | 'disarm' | 'stasis' | 'fuse' | 'stack' | 'store' | 'deathMark'
+/** 条件：对目标判断 */
+export type Cond =
+  | { readonly kind: 'airborne' }
+  | { readonly kind: 'marked'; readonly mark: MarkName }
+  | { readonly kind: 'hpBelow'; readonly ratio: number }
+  | { readonly kind: 'boss' }
+  | { readonly kind: 'not'; readonly cond: Cond }
+/** 条件效果：目标满足 when 施加 then，否则施加 else */
+interface IfEffect {
+  readonly kind: 'if'
+  readonly when: Cond
+  readonly then: readonly Effect[]
+  readonly else?: readonly Effect[]
+}
+/** 叠层：同一来源在目标身上叠满 max 层时施加 then 并清空 */
+interface StackEffect {
+  readonly kind: 'stack'
+  readonly max: number
+  readonly durationMs: number
+  readonly then: readonly Effect[]
+}
+/** 引爆：让目标身上这个来源的引信或存伤立刻到期，照常结算 */
+interface DetonateEffect {
+  readonly kind: 'detonate'
+  readonly mark: 'fuse' | 'store'
+}
+/** 引信：ms 后在目标所在处施加 then；jump 为真时目标先死了引信跳到最近的另一个敌人 */
+interface FuseEffect {
+  readonly kind: 'fuse'
+  readonly ms: number
+  readonly then: readonly Effect[]
+  readonly jump?: boolean
+}
+/** 存伤：ms 内目标受到的伤害记下来，到期以它的 ratio 倍为基础伤害施加 then */
+interface StoreEffect {
+  readonly kind: 'store'
+  readonly ms: number
+  readonly ratio: number
+  readonly then: readonly Effect[]
+}
+/** 死亡印记：ms 内目标死了，对施加者施加 then（死者是受害者） */
+interface DeathMarkEffect {
+  readonly kind: 'deathMark'
+  readonly ms: number
+  readonly then: readonly Effect[]
+}
+/** 冷却：this 是出手的这条能力，skill 是主动技能，all 是全部；给了 ms 就减这么多，否则直接转好；who 为 team 时整队的主动技能 */
+interface RefreshEffect {
+  readonly kind: 'refresh'
+  readonly what: 'this' | 'skill' | 'all'
+  readonly ms?: number
+  readonly who?: 'team'
+}
+/** 资源：给目标加（减）资源 */
+interface GainEffect {
+  readonly kind: 'gain'
+  readonly amount: number
+}
+/** 强化下一击：目标接下来 hits 次普通出手附带 then */
+interface EmpowerEffect {
+  readonly kind: 'empower'
+  readonly hits: number
+  readonly then: readonly Effect[]
+}
+/** 施于施法者自己 */
+interface CasterEffect {
+  readonly kind: 'caster'
+  readonly then: readonly Effect[]
+}
+/** 施于落点 radius 内能打的身体 */
+interface AreaEffect {
+  readonly kind: 'area'
+  readonly radius: number
+  readonly then: readonly Effect[]
+}
 export type Effect =
   | BlastEffect
   | SlowEffect
@@ -302,6 +380,17 @@ export type Effect =
   | ShoveEffect
   | ThrowEffect
   | SwapEffect
+  | IfEffect
+  | StackEffect
+  | DetonateEffect
+  | FuseEffect
+  | StoreEffect
+  | DeathMarkEffect
+  | RefreshEffect
+  | GainEffect
+  | EmpowerEffect
+  | CasterEffect
+  | AreaEffect
 
 interface ZoneVisual {
   readonly color: number
@@ -412,6 +501,26 @@ interface AbilityBase {
   readonly color?: number
   readonly fxRadius?: number
   readonly piercesWalls?: boolean
+  /** 可以攒几次：冷却按次恢复 */
+  readonly charges?: number
+  /** 出手后 windowMs 内可以接下一段；冷却在最后一段打完或窗口关闭后才走 */
+  readonly recast?: { readonly windowMs: number; readonly ability: AbilityDef }
+  /** 按住蓄力（只有手动的有）：按满 maxMs 时位移与判定距离 × reachMul、伤害 × damageMul */
+  readonly hold?: { readonly maxMs: number; readonly reachMul: number; readonly damageMul: number }
+  /** 弹匣：打完 count 发换弹 reloadMs；最后一发附带 last */
+  readonly ammo?: { readonly count: number; readonly reloadMs: number; readonly last?: readonly Effect[] }
+  /** 轮流出手：本身是第一式，之后依次换成这几式，冷却接着走 */
+  readonly cycle?: readonly AbilityDef[]
+  /** 资源：出手消耗 cost、获得 gain；boost 是资源到 at 时消耗 spend 的强化 */
+  readonly cost?: number
+  readonly gain?: number
+  readonly boost?: { readonly at: number; readonly spend: number; readonly damageMul?: number; readonly onHit?: readonly Effect[] }
+  /** 以血施法：出手扣这么多生命，不够就不出手 */
+  readonly hpCost?: number
+  /** 只对满足条件的目标出手 */
+  readonly requires?: Cond
+  /** 这条能力打死了谁，对出手者施加 */
+  readonly onKill?: readonly Effect[]
 }
 /** 一个能力 = 触发 × 瞄准 × 形状 × 载荷 × 重复 */
 export type AbilityDef =

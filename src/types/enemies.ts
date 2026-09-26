@@ -21,8 +21,22 @@ export interface DecoyEffect {
   readonly alpha: number
 }
 type DeathEffect = Effect | SplitEffect | DecoyEffect
+/** 资源：能量按秒回复、出手消耗；怒气打中人涨、闲了掉；热量出手涨、满了过热；成长击杀涨、满了触发 full；full 是攒满时施于自身的效果，lockMs 期间耗资源的能力出不了手 */
+export interface ResourceDef {
+  readonly kind: 'energy' | 'fury' | 'heat' | 'growth'
+  readonly max: number
+  readonly start?: number
+  readonly regen?: number
+  readonly decay?: number
+  readonly decayDelayMs?: number
+  readonly onHit?: number
+  readonly onHurt?: number
+  readonly onKill?: number
+  readonly full?: { readonly effects?: readonly Effect[]; readonly lockMs?: number; readonly reset?: boolean }
+}
 /** 身体自己的规则：被命中、击杀、锚点消失时施于自身；被接触时施于碰我的人；接触时施于被我碰到的人；死亡以尸体位置为落点 */
 export interface BodyRules {
+  readonly resource?: ResourceDef
   readonly onHurt?: readonly Effect[]
   readonly onTouched?: readonly Effect[]
   readonly onTouch?: readonly Effect[]

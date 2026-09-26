@@ -1,11 +1,12 @@
-import { hasComponent } from 'bitecs'
-import type { Effect } from '../../../types/abilityDefs'
+import type { Cond, Effect, MarkName } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
-import { Alive, Enemy, FACTION, Hp, MARK, Mark, Radius, Revive, TAG, Transform, Uid } from '../../components'
-import { addMark, CC_MARKS, hasMark, markSlot } from '../../utils/marks'
+import { hasComponent, query } from 'bitecs'
+import { Ability, Alive, Boss, Cd, Charges, Enemy, FACTION, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, TAG, Transform, Uid } from '../../components'
+import { addMark, CC_MARKS, hasMark, isAirborne, markSlot } from '../../utils/marks'
 import { Interned } from '../../utils/intern'
 import { displace } from './displace'
-import { poisonSrc } from '../../store'
+import { gainRes } from './resource'
+import { markSrcs, poisonSrc } from '../../store'
 import { applyMorph } from '../../entities/enemy'
 import { spawnBolt } from '../../entities/projectile'
 import { spawnZone } from '../../entities/zone'
@@ -29,6 +30,8 @@ interface HitCtx {
   readonly targets?: readonly number[]
   readonly exclude?: ReadonlySet<number>
   readonly source?: number
+  /** 死亡印记结算时的死者 */
+  readonly victim?: number
 }
 
 export function applyBlast(
@@ -62,8 +65,73 @@ export function struckOf(eid: number): Struck {
   return { eid, uid: Uid.v[eid]! }
 }
 
-/** 招架时施于出手者的效果，按号存在标记里 */
+/** 标记里按号存的定义：招架反制、叠层、引信、存伤、死亡印记、强化下一击 */
 export const PARRY_FX = new Interned<readonly Effect[]>()
+type EffectOfKind<K extends Effect['kind']> = Extract<Effect, { readonly kind: K }>
+export const STACK_DEF = new Interned<EffectOfKind<'stack'>>()
+export const FUSE_DEF = new Interned<EffectOfKind<'fuse'>>()
+export const STORE_DEF = new Interned<EffectOfKind<'store'>>()
+export const DEATH_DEF = new Interned<EffectOfKind<'deathMark'>>()
+export const EMPOWER_DEF = new Interned<EffectOfKind<'empower'>>()
+
+const MARK_OF: Record<MarkName, number> = {
+  stun: MARK.stun,
+  root: MARK.root,
+  sleep: MARK.sleep,
+  fear: MARK.fear,
+  charm: MARK.charm,
+  slow: MARK.slow,
+  poison: MARK.poison,
+  silence: MARK.silence,
+  disarm: MARK.disarm,
+  stasis: MARK.stasis,
+  fuse: MARK.fuse,
+  stack: MARK.stack,
+  store: MARK.store,
+  deathMark: MARK.deathMark,
+}
+
+/** 加一条记着来源的标记：按来源分开记的以来源身体的编号为 ref */
+export function markFrom(t: number, kind: number, until: number, a: number, b: number, src: Source): number {
+  const s = addMark(t, kind, TAG.effect, until, a, b, 0, src.bodyUid ?? 0)
+  if (s >= 0) (markSrcs[t] ??= [])[s - t * MARK_SLOTS] = src
+  return s
+}
+
+export function markSource(t: number, s: number): Source | undefined {
+  return markSrcs[t]?.[s - t * MARK_SLOTS]
+}
+
+/** 条件：对目标判断；叠层、引信、存伤、死亡印记只认这个来源的 */
+export function test(sim: Sim, src: Source, t: number, cond: Cond): boolean {
+  switch (cond.kind) {
+    case 'airborne':
+      return isAirborne(t)
+    case 'marked': {
+      const kind = MARK_OF[cond.mark]
+      const keyed = kind === MARK.fuse || kind === MARK.stack || kind === MARK.store || kind === MARK.deathMark
+      return markSlot(sim, t, kind, keyed ? (src.bodyUid ?? 0) : 0) >= 0
+    }
+    case 'hpBelow':
+      return Hp.max[t]! > 0 && Hp.v[t]! / Hp.max[t]! < cond.ratio
+    case 'boss':
+      return Boss.v[t] === 1
+    case 'not':
+      return !test(sim, src, t, cond.cond)
+  }
+}
+
+/** 冷却：转好或减少；充能的补一次 */
+function refreshOne(sim: Sim, e: number, ms: number | undefined): void {
+  if (hasComponent(sim.world, e, Charges)) {
+    if (ms === undefined) {
+      Charges.n[e] = Math.min(Charges.max[e]!, Charges.n[e]! + 1)
+      if (Charges.n[e]! >= Charges.max[e]!) Cd.left[e] = 0
+      return
+    }
+  }
+  Cd.left[e] = ms === undefined ? 0 : Math.max(0, Cd.left[e]! - ms)
+}
 
 /** 出手的身体还在就返回它，否则 -1 */
 export function casterOf(sim: Sim, src: Source): number {
@@ -204,7 +272,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   damage: (sim, src, fx, at) => {
-    const dmg = Math.max(1, Math.round(fx.amount * src.dmgMul))
+    const dmg = Math.max(1, Math.round((fx.amount + at.baseDamage * (fx.ratio ?? 0)) * (fx.ratio === undefined ? src.dmgMul : 1)))
     for (const t of at.targets ?? []) hit(sim, src, t, dmg)
   },
 
@@ -424,6 +492,86 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       }
       if (displace(sim, t, { kind: 'arc', x: to.x, y: to.y, ms: fx.ms, height: fx.height }, { self: false, src, onLand: fx.onLand, base: at.baseDamage })) interrupt(sim, t)
     }
+  },
+
+
+  if: (sim, src, fx, at) => {
+    for (const t of at.targets ?? []) {
+      const then = test(sim, src, t, fx.when) ? fx.then : fx.else
+      if (then) applyAbilityEffects(sim, src, then, { ...at, targets: [t] })
+    }
+  },
+
+  stack: (sim, src, fx, at) => {
+    const id = STACK_DEF.id(fx)
+    const until = sim.elapsedMs + fx.durationMs
+    for (const t of at.targets ?? []) {
+      if (!hasComponent(sim.world, t, Mark)) continue
+      const s = markSlot(sim, t, MARK.stack, src.bodyUid ?? 0)
+      const n = (s >= 0 && Mark.b[s] === id ? Mark.a[s]! : 0) + 1
+      if (n >= fx.max) {
+        if (s >= 0) Mark.kind[s] = MARK.none
+        applyAbilityEffects(sim, src, fx.then, { x: Transform.x[t]!, y: Transform.y[t]!, baseDamage: at.baseDamage, targets: [t] })
+        continue
+      }
+      markFrom(t, MARK.stack, until, n, id, src)
+    }
+  },
+
+  detonate: (sim, src, fx, at) => {
+    const kind = fx.mark === 'fuse' ? MARK.fuse : MARK.store
+    for (const t of at.targets ?? []) {
+      const s = markSlot(sim, t, kind, src.bodyUid ?? 0)
+      if (s >= 0) Mark.until[s] = sim.elapsedMs
+    }
+  },
+
+  fuse: (sim, src, fx, at) => {
+    const id = FUSE_DEF.id(fx)
+    const until = sim.elapsedMs + fx.ms
+    eachCapable(sim, at, Mark, (t) => markFrom(t, MARK.fuse, until, 0, id, src))
+  },
+
+  store: (sim, src, fx, at) => {
+    const id = STORE_DEF.id(fx)
+    const until = sim.elapsedMs + fx.ms
+    eachCapable(sim, at, Mark, (t) => markFrom(t, MARK.store, until, 0, id, src))
+  },
+
+  deathMark: (sim, src, fx, at) => {
+    const id = DEATH_DEF.id(fx)
+    const until = sim.elapsedMs + fx.ms
+    eachCapable(sim, at, Mark, (t) => markFrom(t, MARK.deathMark, until, 0, id, src))
+  },
+
+  refresh: (sim, src, fx) => {
+    const caster = casterOf(sim, src)
+    const bodies = fx.who === 'team' ? sim.characters : caster >= 0 ? [caster] : []
+    for (const e of query(sim.world, [Ability, Owner, Cd])) {
+      if (!bodies.includes(Owner.eid[e]!)) continue
+      if (fx.what === 'this' && e !== src.ability) continue
+      if (fx.what === 'skill' && !hasComponent(sim.world, e, Manual)) continue
+      refreshOne(sim, e, fx.ms)
+    }
+  },
+
+  gain: (sim, _src, fx, at) => {
+    for (const t of at.targets ?? []) gainRes(sim, t, fx.amount)
+  },
+
+  empower: (sim, _src, fx, at) => {
+    const id = EMPOWER_DEF.id(fx)
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.empower, TAG.effect, Infinity, fx.hits, id))
+  },
+
+  caster: (sim, src, fx, at) => {
+    const by = casterOf(sim, src)
+    if (by >= 0) applyAbilityEffects(sim, src, fx.then, { x: Transform.x[by]!, y: Transform.y[by]!, baseDamage: at.baseDamage, targets: [by] })
+  },
+
+  area: (sim, src, fx, at) => {
+    const found = targetsWithin(sim, src, at.x, at.y, fx.radius).map((t) => t.eid)
+    if (found.length > 0) applyAbilityEffects(sim, src, fx.then, { ...at, targets: found })
   },
 
   swap: (sim, src, _fx, at) => {

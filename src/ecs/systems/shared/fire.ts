@@ -25,6 +25,10 @@ import {
   Hp,
   LeapShape,
   MARK,
+  Mark,
+  AbilityClass,
+  Ammo,
+  Hold,
   Owner,
   Payload,
   REAIM,
@@ -46,8 +50,8 @@ import {
   Windup,
   WindupState,
 } from '../../components'
-import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse } from '../../store'
-import { clearMarks } from '../../utils/marks'
+import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, ammoLast } from '../../store'
+import { clearMarks, markSlot } from '../../utils/marks'
 import { damageMul, anchorX, anchorY, waveScale } from '../../utils/amp'
 import { flying, sourceOf } from '../../utils/source'
 import type { Source } from '../../utils/source'
@@ -58,7 +62,8 @@ import { strongestTarget } from '../../utils/assassinate'
 import { headingOf, muzzle } from '../../utils/projectile'
 import { leaderPoint } from '../../utils/team'
 import { hit } from './damage'
-import { applyAbilityEffects, applyOnHit, struckOf } from './effects'
+import { applyAbilityEffects, applyOnHit, EMPOWER_DEF, struckOf, test } from './effects'
+import { takeBoost } from './resource'
 import type { Struck } from './effects'
 import { grantIframe } from './combat'
 import { displace } from './displace'
@@ -70,6 +75,7 @@ import { spawnZone } from '../../entities/zone'
 import { spawnFxBeam, spawnFxBolt, spawnFxBoom, spawnFxCircle, spawnFxSlash } from '../../entities/fx'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
+import type { Effect } from '../../../types/abilityDefs'
 
 const STEALTH = [MARK.stealth]
 
@@ -86,14 +92,16 @@ export interface Shot {
 export function aimAt(sim: Sim, e: number, src: Source): Shot | null {
   const ox = anchorX(e)
   const oy = anchorY(e)
+  const cond = abilityRequires[e]
+  const accept = cond ? (t: number): boolean => test(sim, src, t, cond) : undefined
   switch (Aim.kind[e]) {
     case AIM.nearest: {
-      const t = nearestTarget(sim, src, ox, oy, Aim.range[e]!)
+      const t = nearestTarget(sim, src, ox, oy, Aim.range[e]!, undefined, accept)
       return t ? { angle: Math.atan2(t.y - oy, t.x - ox), target: t } : null
     }
     case AIM.strongest: {
       const r = Aim.range[e]!
-      const t = strongestTarget(ox, oy, targetsNear(sim, src, ox, oy, r), r)
+      const t = strongestTarget(ox, oy, targetsNear(sim, src, ox, oy, r).filter((f) => !accept || accept(f.eid)), r)
       return t ? { angle: Math.atan2(t.y - oy, t.x - ox), target: t } : null
     }
     case AIM.move: {
@@ -146,23 +154,29 @@ function strikeAll(sim: Sim, src: Source, found: readonly Found[], damage: numbe
   return struck
 }
 
+/** 这一下出手的附加：命中效果（基础的加上强化的）与距离倍率（按住蓄力） */
+interface Mods {
+  readonly onHit: readonly Effect[] | undefined
+  readonly reach: number
+}
+
 /** 一次出手：按形状覆盖目标，先伤害后效果，效果只施于真正打中的身体；返回是否真的出了手 */
-function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found | null, damage: number): boolean {
+function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found | null, damage: number, mods: Mods): boolean {
   const w = sim.world
   const ox = anchorX(e)
   const oy = anchorY(e)
   const kb = Payload.knockback[e]!
   const color = Payload.color[e]!
-  const onHit = abilityOnHit[e]
+  const onHit = mods.onHit
 
   if (hasComponent(w, e, Bolt)) {
     const from = muzzle(sim, e)
-    shoot(sim, e, from.x, from.y, angle, damage)
+    shoot(sim, e, from.x, from.y, angle, damage, onHit)
     return true
   }
 
   if (hasComponent(w, e, Segment)) {
-    const reach = Segment.reach[e]!
+    const reach = Segment.reach[e]! * mods.reach
     const radius = Segment.radius[e]!
     const list = targetsWithin(sim, src, ox, oy, reach + radius)
     const origin = { x: ox, y: oy }
@@ -190,7 +204,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     if (atTarget && !target) return false
     const cx = atTarget ? target!.x : ox
     const cy = atTarget ? target!.y : oy
-    const r = Disc.radius[e]!
+    const r = Disc.radius[e]! * mods.reach
     if (Disc.of[e] === DISC_OF.hurt) {
       const revives = onHit?.some((fx) => fx.kind === 'revive' || fx.kind === 'reviveCut') ?? false
       const hurt: number[] = []
@@ -298,7 +312,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
 
   if (hasComponent(w, e, SprintShape)) {
     const m = Owner.eid[e]!
-    if (!displace(sim, m, { kind: 'dash', angle, distance: SprintShape.distance[e]!, ms: SprintShape.ms[e]! }, { self: true, skill: e })) return false
+    if (!displace(sim, m, { kind: 'dash', angle, distance: SprintShape.distance[e]! * mods.reach, ms: SprintShape.ms[e]! * Math.sqrt(mods.reach) }, { self: true, skill: e })) return false
     if (color !== 0) spawnFxCircle(sim, ox, oy, SprintShape.radius[e]!, {
       fill: color,
       fillAlpha: 0.35,
@@ -315,7 +329,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
 
   if (hasComponent(w, e, LeapShape)) {
     const m = Owner.eid[e]!
-    const dist = LeapShape.distance[e]!
+    const dist = LeapShape.distance[e]! * mods.reach
     const to = { x: Transform.x[m]! + Math.cos(angle) * dist, y: Transform.y[m]! + Math.sin(angle) * dist }
     return displace(sim, m, { kind: 'arc', x: to.x, y: to.y, ms: LeapShape.ms[e]!, height: LeapShape.height[e]! }, { self: true, skill: e })
   }
@@ -424,6 +438,17 @@ function startWindup(sim: Sim, e: number, shot: Shot): void {
   Casting.telegraph[o] = Windup.telegraph[e]!
 }
 
+/** 强化下一击：普通出手时取走宿主身上的一次强化 */
+function empowered(sim: Sim, e: number): readonly Effect[] {
+  if (AbilityClass.skill[e]) return []
+  const s = markSlot(sim, Owner.eid[e]!, MARK.empower)
+  if (s < 0) return []
+  const def = EMPOWER_DEF.get(Mark.b[s]!)
+  Mark.a[s] = Mark.a[s]! - 1
+  if (Mark.a[s]! <= 0) Mark.kind[s] = MARK.none
+  return def?.then ?? []
+}
+
 /** 出手：瞄准、第一发、即时重复或安排延迟重复、音效、施法者自身的效果；有蓄力的先蓄力，到点再带着方向回到这里 */
 export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   const w = sim.world
@@ -451,9 +476,18 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
       delay = Repeat.delayMs[e]!
     }
   }
-  const damage = baseDamage(sim, e)
+  const hold = hasComponent(w, e, Hold) ? Hold.ratio[e]! : 0
+  const boost = takeBoost(sim, e)
+  const extra = [...(boost?.onHit ?? []), ...empowered(sim, e), ...(hasComponent(w, e, Ammo) && Ammo.n[e] === 1 ? (ammoLast[e] ?? []) : [])]
+  const base = abilityOnHit[e]
+  const mods: Mods = {
+    onHit: extra.length > 0 ? [...(base ?? []), ...extra] : base,
+    reach: hold > 0 ? 1 + (Hold.reachMul[e]! - 1) * hold : 1,
+  }
+  const holdMul = hold > 0 ? 1 + (Hold.damageMul[e]! - 1) * hold : 1
+  const damage = Math.round(baseDamage(sim, e) * holdMul * (boost?.damageMul ?? 1))
   if (count <= 1 || delay > 0) {
-    if (!fireOnce(sim, e, src, shot.angle, shot.target, damage)) return false
+    if (!fireOnce(sim, e, src, shot.angle, shot.target, damage, mods)) return false
     if (count > 1) {
       RepeatState.left[e] = count - 1
       RepeatState.nextAt[e] = sim.elapsedMs + delay
@@ -465,7 +499,7 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
     let fired = false
     for (let i = 0; i < count; i++) {
       const angle = ring ? shot.angle + (i * Math.PI * 2) / count : shot.angle + spread * DEG2RAD * (i / (count - 1) - 0.5)
-      if (fireOnce(sim, e, src, angle, shot.target, damage)) fired = true
+      if (fireOnce(sim, e, src, angle, shot.target, damage, mods)) fired = true
     }
     if (!fired) return false
   }
@@ -509,7 +543,7 @@ export function fireRepeat(sim: Sim, e: number): boolean {
       if (Repeat.spreadDeg[e]! >= 360 - 1e-9) angle = RepeatState.angle[e]! + (i * Math.PI * 2) / count
   }
   Aim.rad[e] = angle
-  if (!fireOnce(sim, e, src, angle, target, Math.max(1, Math.round(RepeatState.damage[e]! * Repeat.ratio[e]!)))) return false
+  if (!fireOnce(sim, e, src, angle, target, Math.max(1, Math.round(RepeatState.damage[e]! * Repeat.ratio[e]!)), { onHit: abilityOnHit[e], reach: 1 })) return false
   const sfx = abilityFireSfx[e]
   if (sfx) playSfx(sfx)
   return true

@@ -1,12 +1,13 @@
 import { removeEntity } from 'bitecs'
 import { Bolt, Faction, Payload } from '../../components'
-import { abilityOnHit, projHitUids, projOnHit, projSrc } from '../../store'
+import { projHitUids, projOnHit, projSrc } from '../../store'
+import type { Effect } from '../../../types/abilityDefs'
 import { spawnBolt } from '../../entities/projectile'
 import { flying, sourceOf } from '../../utils/source'
 import type { Sim } from '../../sim'
 
 /** 能力朝某个方向射出自己的弹体 */
-export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, damage: number): void {
+export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, damage: number, onHit: readonly Effect[] | undefined): void {
   spawnBolt(sim, x, y, angle, {
     faction: Faction.v[e]!,
     frame: Bolt.frame[e]!,
@@ -19,7 +20,7 @@ export function shoot(sim: Sim, e: number, x: number, y: number, angle: number, 
     damage,
     knockback: Payload.knockback[e]!,
     src: flying(sourceOf(sim, e)),
-    onHit: abilityOnHit[e],
+    onHit,
   })
 }
 

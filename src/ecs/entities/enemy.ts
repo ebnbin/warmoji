@@ -41,6 +41,7 @@ import {
   Transform,
 } from '../components'
 import { bodyRules, enemyDef } from '../store'
+import { attachResource } from './resource'
 import { interrupt } from '../systems/shared/ability'
 import { addMark, hasMark } from '../utils/marks'
 import { spawnTelegraph, telegraphCount } from './telegraph'
@@ -132,6 +133,7 @@ export function spawnEnemy(
     Contact.damage[eid] = def.damage
   }
   bodyRules[eid] = def
+  attachResource(world, eid, def.resource)
   if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0

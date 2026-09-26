@@ -106,6 +106,7 @@ export function nearestTarget(
   oy: number,
   maxRange: number,
   exclude?: ReadonlySet<number>,
+  accept?: (eid: number) => boolean,
 ): Found | null {
   let bestEid = -1
   let bestX = 0
@@ -113,7 +114,7 @@ export function nearestTarget(
   let bestR = 0
   let bestD = maxRange * maxRange
   eachTarget(sim, src, ox, oy, maxRange, (eid, x, y, radius) => {
-    if (exclude?.has(eid)) return
+    if (exclude?.has(eid) || (accept && !accept(eid))) return
     const dx = x - ox
     const dy = y - oy
     const d = dx * dx + dy * dy

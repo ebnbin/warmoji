@@ -387,6 +387,27 @@ export const Manual = {}
 /** 能力的类别：1 是技能（沉默挡它），0 是普通出手（缴械挡它、强化下一击加在它上） */
 export const AbilityClass = { skill: u8() }
 
+/** 充能：攒着的次数与上限，冷却按次恢复 */
+export const Charges = { n: f32(), max: f32() }
+
+/** 连段：next 是下一段的能力、window 是出手后给下一段留的窗口，open 是这一段可接的截止时刻，root 是第一段；只有第一段的 root 为 0 */
+export const Stage = { next: i32(), window: f32(), open: f32(), root: i32() }
+
+/** 弹匣：剩几发、容量、换弹时长、换好的时刻 */
+export const Ammo = { n: f32(), max: f32(), reloadMs: f32(), readyAt: f32() }
+
+/** 轮流出手：同组里只有 active 的那一式能出手，打完把出手权交给 next */
+export const Turn = { active: u8(), next: i32() }
+
+/** 按住蓄力：按满的时长、满蓄时的距离与伤害倍率，ratio 是这一次蓄了几成 */
+export const Hold = { maxMs: f32(), reachMul: f32(), damageMul: f32(), ratio: f32() }
+
+/** 资源的消耗：出手扣 cost、得 gain，以血施法扣 hp */
+export const Spend = { cost: f32(), gain: f32(), hp: f32() }
+
+/** 身体的资源：当前值、上限、锁到何时、最近一次增长的时刻 */
+export const Res = { v: f32(), max: f32(), lock: f32(), lastGain: f32() }
+
 export const CastRequest = {}
 
 /** ghost：0 存活；1 阵亡且已预订目标位、正在归位；2 阵亡且已停靠 */
