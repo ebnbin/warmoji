@@ -174,7 +174,7 @@ export function effectLine(e: Effect): string {
     case 'form':
       return `${e.to < 0 ? '变回本体' : '变身'}${e.ms === undefined ? '' : ` ${sec(e.ms)}`}${e.onEnd ? `，结束时${e.onEnd.map(effectLine).join('、')}` : ''}`
     case 'grow':
-      return `体型 ×${e.mul}${e.ms === undefined ? `（永久叠加${e.max ? `，最多 ×${e.max}` : ''}）` : ` ${sec(e.ms)}`}，受击与接触范围随之变化`
+      return `体型 ×${e.mul}${e.ms === undefined ? `（叠加且不消退${e.max ? `，最多 ×${e.max}` : ''}）` : ` ${sec(e.ms)}`}，受击与接触范围随之变化`
     case 'rewind':
       return `回到 ${sec(e.ms)} 前的位置，生命取那时与现在的较高者`
     case 'steal':
@@ -436,6 +436,7 @@ export function resourceLine(r: ResourceDef): string {
   if (r.onHurt) parts.push(`挨打 +${r.onHurt}`)
   if (r.onKill) parts.push(`击杀 +${r.onKill}`)
   if (r.decay) parts.push(`${r.decayDelayMs ? `${sec(r.decayDelayMs)} 没涨后` : ''}每秒掉 ${r.decay}`)
+  if (r.keep) parts.push('跨波保留')
   const full = r.full
   if (full) {
     const what = [...(full.effects ?? []).map(effectLine), full.lockMs ? `${sec(full.lockMs)} 内耗它的能力出不了手` : '', full.reset ? '随后清零' : ''].filter(Boolean)

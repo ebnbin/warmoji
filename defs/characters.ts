@@ -629,11 +629,11 @@ export const CHARACTERS = {
         base: 'caterSilk',
         upgrades: [
           { ability: 'caterSilk2', card: { icon: '1f578', name: '缠丝', desc: '三秒内被吐丝命中两次的敌人被缠住一秒半' } },
-          { ability: 'caterSilk3', card: { icon: '1f96c', name: '贪吃', desc: '吐丝打死敌人时体型永久长大一点，最多一倍三五' } },
+          { ability: 'caterSilk3', card: { icon: '1f96c', name: '贪吃', desc: '吐丝打死敌人时体型长大一点、这一波都不消退，最多一倍三五' } },
         ],
       },
     ],
-    resource: { kind: 'growth', max: 25, onKill: 1, full: { effects: [{ kind: 'form', to: 0 }] } },
+    resource: { kind: 'growth', max: 25, onKill: 1, keep: true, full: { effects: [{ kind: 'form', to: 0 }] } },
     forms: [
       {
         emoji: '1f98b',

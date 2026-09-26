@@ -34,8 +34,7 @@ export function spawnAround(sim: Sim, by: number, faction: number, def: EnemyDef
   for (let i = 0; i < count; i++) {
     const a = sim.rng.next() * Math.PI * 2
     const r = count > 1 || spread > 0 ? spread * (0.5 + sim.rng.next() * 0.5) : 0
-    const at = sim.hooks.constrainBody(sim, by, { x, y }, { x: x + Math.cos(a) * r, y: y + Math.sin(a) * r })
-    summonBody(sim, def, at.x, at.y, hp, faction, by)
+    summonBody(sim, def, x + Math.cos(a) * r, y + Math.sin(a) * r, hp, faction, by)
   }
 }
 

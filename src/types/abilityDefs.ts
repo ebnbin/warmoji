@@ -349,7 +349,7 @@ interface FormEffect {
   readonly ms?: number
   readonly onEnd?: readonly Effect[]
 }
-/** 体型：× mul，受击与接触的面积跟着变；给了 ms 到时还原，否则永久叠加，最多 max 倍 */
+/** 体型：× mul，受击与接触的面积跟着变；给了 ms 到时还原，否则叠加到这个身体消失，最多 max 倍 */
 interface GrowEffect {
   readonly kind: 'grow'
   readonly mul: number

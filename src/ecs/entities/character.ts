@@ -75,7 +75,7 @@ export function spawnCharacter(
     onLowHp: own?.onLowHp,
     onIdle: own?.onIdle,
   }
-  attachResource(world, eid, def.resource)
+  attachResource(world, eid, def.resource, run.memberRes[slot] ?? -1)
   if (fx.regenPerSec > 0) addMark(eid, MARK.regen, TAG.perk, Infinity, fx.regenPerSec)
   Revive.ms[eid] = Math.max(1000, TEAM.reviveMs + fx.reviveAddMs)
   CharScale.v[eid] = place.sizeMul

@@ -21,9 +21,10 @@ export interface DecoyEffect {
   readonly alpha: number
 }
 type DeathEffect = Effect | SplitEffect | DecoyEffect
-/** 资源：能量按秒回复、出手消耗；怒气打中人涨、闲了掉；热量出手涨、满了过热；成长击杀涨、满了触发 full；full 是攒满时施于自身的效果，lockMs 期间耗资源的能力出不了手 */
+/** 资源：能量按秒回复、出手消耗；怒气打中人涨、闲了掉；热量出手涨、满了过热；成长击杀涨、满了触发 full；full 是攒满时施于自身的效果，lockMs 期间耗资源的能力出不了手；keep 为真时角色的资源跨波保留 */
 export interface ResourceDef {
   readonly kind: 'energy' | 'fury' | 'heat' | 'growth'
+  readonly keep?: boolean
   readonly max: number
   readonly start?: number
   readonly regen?: number
