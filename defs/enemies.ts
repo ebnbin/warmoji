@@ -477,7 +477,6 @@ const COMET = {
   ],
 } satisfies EnemyDef
 
-
 const FOREST_BOSS = {
   kind: 'treant',
   role: 'boss',
@@ -521,7 +520,7 @@ const DESERT_BOSS = {
   xp: 60,
   coins: 60,
   kbImmune: true,
-  drive: { kind: 'chase' },
+  drive: { kind: 'chase', at: 'leader' },
   abilities: [
     {
       trigger: 'auto',
@@ -615,7 +614,6 @@ const FACTORY_BOSS = {
   ],
 } satisfies EnemyDef
 
-
 const RUINS_BOSS = {
   kind: 'rhino',
   role: 'boss',
@@ -631,7 +629,7 @@ const RUINS_BOSS = {
   coins: 60,
   kbImmune: true,
   breaksWalls: true,
-  drive: { kind: 'chase' },
+  drive: { kind: 'chase', at: 'leader' },
   abilities: [
     {
       trigger: 'auto',

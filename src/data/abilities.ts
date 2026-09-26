@@ -15,6 +15,7 @@ export const ACQUIRE = CT.acquire
 
 export const ABILITIES = fromJson<Record<AbilityId, AbilityDef>>(abilitiesJson)
 
+/** 空袭从天而降，不看遮挡 */
 export function abilityPiercesWalls(def: AbilityDef): boolean {
-  return 'piercesWalls' in def && def.piercesWalls === true
+  return def.shape.kind === 'drop' || ('piercesWalls' in def && def.piercesWalls === true)
 }

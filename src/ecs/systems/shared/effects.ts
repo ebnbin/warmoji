@@ -12,7 +12,7 @@ import { hit } from './damage'
 import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
 import { interrupt } from './ability'
 import { healAllies } from './heal'
-import { nearestAngle, targetsNear } from '../../utils/targets'
+import { nearestAngle, targetsWithin } from '../../utils/targets'
 import { flying } from '../../utils/source'
 import { isSameEntity } from '../../utils/identity'
 import type { Source } from '../../utils/source'
@@ -39,7 +39,7 @@ export function applyBlast(
   knockback: number,
   exclude?: ReadonlySet<number>,
 ): Struck[] {
-  const list = targetsNear(sim, src, x, y, radius)
+  const list = targetsWithin(sim, src, x, y, radius)
   const struck: Struck[] = []
   for (const i of circleHitIndices({ x, y }, radius, list)) {
     const t = list[i]!
@@ -77,7 +77,7 @@ type EffectOf = ByKind<Effect>
 
 type Handler<K extends keyof EffectOf> = (sim: Sim, src: Source, fx: EffectOf[K], at: HitCtx) => void
 
-/** 效果只看目标有没有对应的组件，不看阵营 */
+/** 效果只看目标有没有对应的组件；金币只对队伍来源生效 */
 const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   blast: (sim, src, fx, at) => {
     const dmg = Math.max(1, Math.round(at.baseDamage * fx.ratio))

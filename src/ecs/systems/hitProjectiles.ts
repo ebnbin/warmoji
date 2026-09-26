@@ -2,7 +2,7 @@ import { query } from 'bitecs'
 import { PrevPos, Proj, PROJ_SET, Transform, Uid } from '../components'
 import { applyOnHit, struckOf } from './shared/effects'
 import { WORLD_SOURCE } from '../utils/source'
-import { eachTarget } from '../utils/targets'
+import { eachTargetBody } from '../utils/targets'
 import { hit } from './shared/damage'
 import { cullProjectile } from './shared/projectile'
 import { projHitUids, projOnHit, projSrc } from '../store'
@@ -35,7 +35,7 @@ export function hitProjectiles(sim: Sim): void {
     const segY = by - sy
     const segLen2 = segX * segX + segY * segY
     const found: { eid: number; t: number; x: number; y: number }[] = []
-    eachTarget(sim, src, sx, sy, Math.sqrt(segLen2) + pr, (t, x, y, radius) => {
+    eachTargetBody(sim, src, sx, sy, Math.sqrt(segLen2) + pr, (t, x, y, radius) => {
       if (struck.has(Uid.v[t]!)) return
       const rr = pr + radius
       if (segDistSq(x, y, sx, sy, bx, by) > rr * rr) return

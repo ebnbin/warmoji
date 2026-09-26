@@ -35,7 +35,7 @@ function record(sim: Sim, src: Source, target: number, dmg: number): void {
   }
 }
 
-/** 唯一的伤害入口：无敌帧、护盾倍率、暴击、扣血、死亡、受击反馈、击退冲量，敌我同一条；返回是否命中 */
+/** 唯一的伤害入口：无敌帧、护盾倍率、暴击、扣血、死亡、受击反馈、击退冲量，敌我同一条；持续伤害不暴击；返回是否命中 */
 export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
   if (sim.over || !hasComponent(sim.world, target, Hp) || Dormant.v[target] || Alive.v[target] === 0) return false
   const now = sim.elapsedMs
@@ -43,14 +43,14 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   let dmg = damage
   const guard = guardMul(sim, target)
   if (guard !== 1) dmg = Math.max(1, Math.round(dmg * guard))
-  const crit = src.crit > 0 && sim.rng.next() < Math.min(0.5, src.crit)
+  const crit = !o.tick && src.crit > 0 && sim.rng.next() < Math.min(0.5, src.crit)
   if (crit) dmg = Math.round(dmg * CRIT_MUL)
-  spawnDamageNumber(sim, Transform.x[target]!, Transform.y[target]!, dmg, crit)
+  const team = Faction.v[target] === FACTION.team
+  if (!team) spawnDamageNumber(sim, Transform.x[target]!, Transform.y[target]!, dmg, crit)
   record(sim, src, target, dmg)
   // 被命中反应先于扣血：无敌帧从这一下起算
   const back = o.tick ? undefined : bodyRules[target]?.onHurt
   if (back) applyAbilityEffects(sim, selfSource(sim, target), back, { x: Transform.x[target]!, y: Transform.y[target]!, baseDamage: dmg, targets: [target] })
-  const team = Faction.v[target] === FACTION.team
   if (team) sim.characterHitCount++
   let jx = 0
   let jy = 0

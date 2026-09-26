@@ -18,7 +18,6 @@ import {
   Tint,
   Transform,
   VisOff,
-  Weapon,
 } from '../components'
 import type { Sim } from '../sim'
 import { flyerHits } from '../store'
@@ -31,7 +30,6 @@ export function holderOutline(faction: number, holderEid: number): OutlineKind {
 export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, faction: number): number {
   const world = sim.world
   const e = newEntity(world)
-  addComponent(world, e, Weapon)
   const outline = holderOutline(faction, holderEid)
   attachDrawable(world, e, sim.frames, {
     id: held.emoji,

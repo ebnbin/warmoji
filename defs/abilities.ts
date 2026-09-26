@@ -434,7 +434,8 @@ const boomerang3 = {
 const laserBeam2 = { ...BASE.laserBeam, repeat: { count: 2, spreadDeg: 360 } } satisfies AbilityDef
 const laserBeam3 = {
   ...BASE.laserBeam,
-  repeat: { count: 8, spreadDeg: 360, delayMs: 60, ratio: 0.6 },
+  damage: BASE.laserBeam.damage * 0.6,
+  repeat: { count: 8, spreadDeg: 360, delayMs: 60 },
 } satisfies AbilityDef
 
 const frostAura2 = { ...BASE.frostAura, damage: 3 } satisfies AbilityDef

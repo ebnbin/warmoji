@@ -1,9 +1,9 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Disarmed, Frozen, Hp, Lifetime, Owner, Ring, Tint, Transform, ZONE_SET, Zone, ZoneFollow } from '../components'
+import { Disarmed, Frozen, Hp, Lifetime, Owner, Ring, Tint, Transform, ZONE_SET, Zone, ZoneFollow, ZoneHit } from '../components'
 import { hit } from './shared/damage'
 import { applyAbilityEffects } from './shared/effects'
 import { backEaseOut } from '../utils/ease'
-import { eachAlly, targetsNear } from '../utils/targets'
+import { eachAlly, targetsWithin } from '../utils/targets'
 import { zoneEffects, zoneSrc } from '../store'
 import { spawnFxCircle } from '../entities/fx'
 import type { Sim } from '../sim'
@@ -37,7 +37,7 @@ function inside(x: number, y: number, r: number, tx: number, ty: number): boolea
   return dx * dx + dy * dy <= r * r
 }
 
-/** 场每帧给场内己方回复，每到节拍对场内敌方扣血再施加效果；敌我同一条 */
+/** 场每帧给场内己方回复，每到节拍对场内敌方扣血再施加效果；一个身体一个节拍内只吃一个场的血；敌我同一条 */
 export function updateZones(sim: Sim): void {
   const world = sim.world
   const zones = [...query(world, ZONE_SET)]
@@ -77,8 +77,15 @@ export function updateZones(sim: Sim): void {
     Zone.nextAt[z] = Zone.nextAt[z]! + tickMs
     const damage = Zone.damage[z]!
     const effects = zoneEffects[z]
-    const found = targetsNear(sim, src, x, y, r).filter((t) => inside(x, y, r, t.x, t.y))
-    if (damage > 0) for (const t of found) hit(sim, src, t.eid, damage, { tick: true })
+    const found = targetsWithin(sim, src, x, y, r).filter((t) => inside(x, y, r, t.x, t.y))
+    if (damage > 0) {
+      for (const t of found) {
+        const last = ZoneHit.last[t.eid]!
+        if (last !== 0 && now - last < tickMs) continue
+        ZoneHit.last[t.eid] = now
+        hit(sim, src, t.eid, damage, { tick: true })
+      }
+    }
     if (effects && effects.length > 0 && found.length > 0) {
       applyAbilityEffects(sim, src, effects, { x, y, baseDamage: damage, targets: found.map((t) => t.eid) })
     }

@@ -9,7 +9,7 @@ import { leaderX, leaderY } from '../utils/team'
 
 const FADE_MS = 250
 
-/** 金币被吸附范围内最近的存活角色吸走、碰到任何角色即拾取；不吸附的拾取物只有队长走过去才捡；位移由 moveBodies 负责 */
+/** 金币被吸附范围内最近的存活角色吸走、碰到任何角色即拾取；不吸附的拾取物只有队长走过去才捡；位移由 moveBodies 负责，漂出世界就消失 */
 export function updatePickups(sim: Sim): void {
   const eids = query(sim.world, PICKUP_SET)
   if (eids.length === 0) return
@@ -20,6 +20,10 @@ export function updatePickups(sim: Sim): void {
     animatePickup(sim, eid)
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
+    if (sim.hooks.outside(sim, x, y)) {
+      removeEntity(sim.world, eid)
+      continue
+    }
     const magnetic = Pull.on[eid] === 1
     if (sim.frameAttractors.length > 0 && magnetic) {
       let taken = false

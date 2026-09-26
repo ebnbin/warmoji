@@ -69,12 +69,10 @@ export const Depth = {
   z: f32(),
 }
 
-/** 画面位置 = Transform + VisOff；VisOff 只给渲染层用，任何判定都不看它 */
+/** 画面位置 = Transform + VisOff；能力从画面位置出手，命中判定只看 Transform */
 export const VisOff = { x: f32(), y: f32() }
 
 export const RENDERABLE: QueryTerm[] = [Transform, Sprite, Tint, Depth, VisOff]
-
-export const Character = {}
 
 export const Slot = { v: i32() }
 
@@ -246,9 +244,12 @@ export const PICKUP_SET: QueryTerm[] = [Pickup, Transform, Phys]
 export const RING_SET: QueryTerm[] = [Ring, Transform, Tint]
 
 /** 场：每隔 tickMs 对场内敌方扣 damage 再施加效果，场内己方每秒回复 mend，pulse 非零时每次 tick 闪一圈 */
-export const Zone = { radius: f32(), faction: u8(), enterMs: f32(), on: u8(), fadeAt: f32(), tickMs: f32(), nextAt: f32(), damage: f32(), mend: f32(), pulse: u32() }
+export const Zone = { radius: f32(), enterMs: f32(), on: u8(), fadeAt: f32(), tickMs: f32(), nextAt: f32(), damage: f32(), mend: f32(), pulse: u32() }
 
 export const ZoneFollow = { of: i32() }
+
+/** 身体最近一次吃到场的节拍伤的时刻，一个节拍内不重复扣血 */
+export const ZoneHit = { last: f32() }
 
 export const ZONE_SET: QueryTerm[] = [Zone, Transform]
 
@@ -265,9 +266,6 @@ export const Held = {
 }
 
 export const Ability = {}
-
-export const Weapon = {}
-
 
 export const Owner = { eid: i32() }
 
@@ -343,7 +341,6 @@ export const Aura = { zone: i32() }
 /** 瞬袭：身体已闪到 x/y 的画面偏移处，until 到点闪回 */
 export const BlinkState = { until: f32() }
 
-
 export const Manual = {}
 
 export const CastRequest = {}
@@ -405,11 +402,10 @@ export const Carrier = {}
 
 export const Thief = { eaten: i32(), nextEatAt: f32() }
 
-export const Chase = {}
+/** 追击：leader 为 1 时盯着队长而不是最近的敌人 */
+export const Chase = { leader: u8() }
 
 export const Roam = {}
-
-export const Stay = {}
 
 export const Flee = { range: f32() }
 

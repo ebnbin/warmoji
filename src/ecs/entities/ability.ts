@@ -1,4 +1,4 @@
-import { addComponent, addComponents, hasComponent, query, removeEntity } from 'bitecs'
+import { addComponent, addComponents, query, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
 import {
   Ability,
@@ -44,7 +44,6 @@ import {
   TELEGRAPH,
   Thrown,
   WallBlocked,
-  Weapon,
   Windup,
   WindupState,
   WorldShape,
@@ -212,10 +211,11 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
   world: { comps: [WorldShape], attach: () => {} },
 }
 
-/** 未指明索敌距离时，近战形状只在够得着时出手，其余用通用索敌距离 */
+/** 未指明索敌距离时，近战形状只在够得着时出手，空袭不限远，其余用通用索敌距离 */
 function shapeRange(s: Shape): number {
   if (s.kind === 'segment') return s.reach + s.radius
   if (s.kind === 'sector') return s.radius
+  if (s.kind === 'drop') return Infinity
   return ACQUIRE.range * UNIT
 }
 
@@ -330,8 +330,4 @@ export function unequipAbilities(sim: Sim, ownerEid: number): void {
     emplaceAbility[e] = undefined
     removeEntity(world, e)
   }
-}
-
-export function isWeaponBody(sim: Sim, e: number): boolean {
-  return hasComponent(sim.world, e, Weapon)
 }

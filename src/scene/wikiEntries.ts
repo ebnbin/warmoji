@@ -37,7 +37,7 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
 function enemyStatLines(e: EnemyDef): string[] {
   const lines = [
     `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
-    `行为 ${DRIVE_LABEL[e.drive.kind]} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}`,
+    `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}`,
   ]
   for (const w of e.abilities ?? []) {
     const s = w.shape

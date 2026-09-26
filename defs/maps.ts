@@ -157,6 +157,7 @@ export const MAPS = {
       viewScale: 1.2,
       width: 12,
       flow: 1,
+      coinCullPad: 2,
       driftCount: 18,
       driftSpeedMul: [0.75, 1.3],
       waveSlow: 0.6,
@@ -210,7 +211,7 @@ export const MAPS = {
       density: [0.05, 0.08],
     },
     mix: RUINS_MIX,
-    walls: { blocks: 15, maxLen: 4, centerClearU: 3.5, spawnMinCellDist: 5, reflowMs: 120 },
+    walls: { blocks: 15, maxLen: 4, centerClearU: 3.5, spawnMinCellDist: 5, reflowMs: 120, bodyRadiusCapU: 0.45 },
     boss: 'rhino',
   },
   daynight: {

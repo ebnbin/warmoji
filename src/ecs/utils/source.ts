@@ -40,7 +40,7 @@ export function sourceOf(sim: Sim, e: number): Source {
   }
 }
 
-/** 身体自己在看：转向与接触用 */
+/** 身体自己在看：转向用 */
 export function bodySource(eid: number): Source {
   return { faction: Faction.v[eid]!, slot: -1, kb: 1, crit: 0, dmgMul: 1, viewer: eid }
 }

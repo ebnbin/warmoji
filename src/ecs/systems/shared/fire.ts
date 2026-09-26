@@ -1,7 +1,6 @@
 import { hasComponent } from 'bitecs'
 import { playSfx } from '../../../audio/sfx'
-import { DEG2RAD, UNIT } from '../../../util/units'
-import { ACQUIRE } from '../../../data/abilities'
+import { DEG2RAD } from '../../../util/units'
 import {
   AIM,
   Aim,
@@ -27,6 +26,7 @@ import {
   Leaping,
   Owner,
   Payload,
+  REAIM,
   Repeat,
   RepeatState,
   Rushing,
@@ -44,7 +44,6 @@ import {
   WorldShape,
   Bolt,
   Casting,
-  Slowed,
   Windup,
   WindupState,
 } from '../../components'
@@ -52,7 +51,7 @@ import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPu
 import { damageMul, ownerX, ownerY, waveScale } from '../../utils/amp'
 import { flying, sourceOf } from '../../utils/source'
 import type { Source } from '../../utils/source'
-import { eachAlly, nearestTarget, targetsNear } from '../../utils/targets'
+import { eachAlly, nearestTarget, targetsNear, targetsWithin } from '../../utils/targets'
 import type { Found } from '../../utils/targets'
 import { circleHitIndices, sectorHitIndices, thrustHitIndices } from '../../utils/hit'
 import { strongestTarget } from '../../utils/assassinate'
@@ -162,7 +161,7 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
   if (hasComponent(w, e, Segment)) {
     const reach = Segment.reach[e]!
     const radius = Segment.radius[e]!
-    const list = targetsNear(sim, src, ox, oy, reach + radius)
+    const list = targetsWithin(sim, src, ox, oy, reach + radius)
     const origin = { x: ox, y: oy }
     const struck = strikeAll(sim, src, thrustHitIndices(origin, angle, reach, radius, list).map((i) => list[i]!), damage, kb, origin)
     applyOnHit(sim, src, onHit, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach, damage, struck)
@@ -174,7 +173,7 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
 
   if (hasComponent(w, e, Sector)) {
     const radius = Sector.radius[e]!
-    const list = targetsNear(sim, src, ox, oy, radius)
+    const list = targetsWithin(sim, src, ox, oy, radius)
     const origin = { x: ox, y: oy }
     const struck = strikeAll(sim, src, sectorHitIndices(origin, angle, Sector.arcDeg[e]! * DEG2RAD, radius, list).map((i) => list[i]!), damage, kb, origin)
     applyOnHit(sim, src, onHit, ox, oy, damage, struck)
@@ -190,8 +189,9 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
     const cy = atTarget ? target!.y : oy
     const r = Disc.radius[e]!
     if (Disc.of[e] === DISC_OF.hurt) {
+      const revives = onHit?.some((fx) => fx.kind === 'revive' || fx.kind === 'reviveCut') ?? false
       const hurt: number[] = []
-      eachAlly(sim, src.faction, cx, cy, r, true, (t, x, y) => {
+      eachAlly(sim, src.faction, cx, cy, r, revives, (t, x, y) => {
         const dx = x - cx
         const dy = y - cy
         if (dx * dx + dy * dy > r * r) return
@@ -202,7 +202,7 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
       if (color !== 0) burst(sim, cx, cy, r, color, false)
       return true
     }
-    const list = targetsNear(sim, src, cx, cy, r)
+    const list = targetsWithin(sim, src, cx, cy, r)
     const found = circleHitIndices({ x: cx, y: cy }, r, list).map((i) => list[i]!)
     const struck = strikeAll(sim, src, found, damage, kb, { x: cx, y: cy })
     applyOnHit(sim, src, onHit, cx, cy, damage, struck)
@@ -291,7 +291,7 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
 
   if (hasComponent(w, e, SprintShape)) {
     const m = Owner.eid[e]!
-    const speed = (SprintShape.distance[e]! / (SprintShape.ms[e]! / 1000)) * Slowed.v[m]!
+    const speed = SprintShape.distance[e]! / (SprintShape.ms[e]! / 1000)
     Rushing.active[m] = 1
     Rushing.msLeft[m] = SprintShape.ms[e]!
     Rushing.vx[m] = Math.cos(angle) * speed
@@ -333,7 +333,7 @@ export function fireOnce(sim: Sim, e: number, src: Source, angle: number, target
 
   if (hasComponent(w, e, AllShape)) {
     if (AllShape.of[e] === ALL_OF.foes) {
-      const list = targetsNear(sim, src, ox, oy, Infinity)
+      const list = targetsWithin(sim, src, ox, oy, Infinity)
       const struck: Struck[] = []
       if (damage > 0) {
         const bossRatio = Payload.bossRatio[e]!
@@ -500,15 +500,15 @@ export function fireRepeat(sim: Sim, e: number): boolean {
   const ox = ownerX(e)
   const oy = ownerY(e)
   switch (Repeat.reaim[e]) {
-    case 1: {
+    case REAIM.nearest: {
       const t = nearestTarget(sim, src, ox, oy, Aim.range[e]!)
       if (!t) return false
       target = t
       angle = Math.atan2(t.y - oy, t.x - ox)
       break
     }
-    case 2: {
-      const near = targetsNear(sim, src, ox, oy, ACQUIRE.range * UNIT)
+    case REAIM.random: {
+      const near = targetsNear(sim, src, ox, oy, Aim.range[e]!)
       if (near.length === 0) return false
       target = near[Math.floor(sim.rng.next() * near.length)]!
       angle = Math.atan2(target.y - oy, target.x - ox)

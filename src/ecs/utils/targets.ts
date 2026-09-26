@@ -1,4 +1,4 @@
-import { FACTION, Transform, Uid } from '../components'
+import { FACTION, Radius, Transform, Uid } from '../components'
 import { tauntedBy } from './marks'
 import type { Source } from './source'
 import type { Sim } from '../sim'
@@ -18,18 +18,11 @@ type Visit = (eid: number, x: number, y: number, radius: number) => boolean | vo
 
 const FOES: readonly (readonly number[])[] = [[FACTION.enemy], [FACTION.team], [FACTION.team, FACTION.enemy]]
 
-/** 来源阵营的敌人：世界打所有人；被嘲讽的观察者只看得见嘲讽者；隐匿的身体谁也看不见；有视线要求时墙后不算。visit 内不得施伤：击杀会原地改动正在遍历的快照 */
-export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
-  const by = src.viewer === undefined ? -1 : tauntedBy(sim, src.viewer)
-  if (by >= 0) {
-    const d = sim.hooks.worldDelta(sim, cx, cy, Transform.x[by]!, Transform.y[by]!)
-    visit(by, cx + d.x, cy + d.y, 0)
-    return
-  }
+function eachFoe(sim: Sim, src: Source, cx: number, cy: number, reach: number, seeing: boolean, visit: Visit): void {
   const sight = src.sight
   for (const f of FOES[src.faction]!) {
     for (const t of sim.targets[f]!) {
-      if (t.hidden || !t.alive || Uid.v[t.eid] !== t.uid) continue
+      if (!t.alive || Uid.v[t.eid] !== t.uid || (seeing && t.hidden)) continue
       const d = sim.hooks.worldDelta(sim, cx, cy, t.x, t.y)
       const rr = reach + t.radius
       if (d.x * d.x + d.y * d.y > rr * rr) continue
@@ -39,6 +32,24 @@ export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach:
       if (visit(t.eid, x, y, t.radius)) return
     }
   }
+}
+
+/** 看：来源阵营的敌人里瞄得到的身体。世界打所有人；被嘲讽的观察者只看得见嘲讽者；隐匿的身体谁也看不见；有视线要求时墙后不算 */
+export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
+  const by = src.viewer === undefined ? -1 : tauntedBy(sim, src.viewer)
+  if (by >= 0) {
+    const d = sim.hooks.worldDelta(sim, cx, cy, Transform.x[by]!, Transform.y[by]!)
+    const r = Radius.v[by]!
+    const rr = reach + r
+    if (d.x * d.x + d.y * d.y <= rr * rr) visit(by, cx + d.x, cy + d.y, r)
+    return
+  }
+  eachFoe(sim, src, cx, cy, reach, true, visit)
+}
+
+/** 碰：来源阵营的敌人里被覆盖到的身体，隐匿与嘲讽不算数，墙后仍不算 */
+export function eachTargetBody(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
+  eachFoe(sim, src, cx, cy, reach, false, visit)
 }
 
 /** 敌方身体的实体接触：不看隐匿、嘲讽与视线，倒地的不算 */
@@ -75,6 +86,14 @@ export interface Found {
 export function targetsNear(sim: Sim, src: Source, cx: number, cy: number, reach: number): Found[] {
   const out: Found[] = []
   eachTarget(sim, src, cx, cy, reach, (eid, x, y, radius) => {
+    out.push({ eid, x, y, radius })
+  })
+  return out
+}
+
+export function targetsWithin(sim: Sim, src: Source, cx: number, cy: number, reach: number): Found[] {
+  const out: Found[] = []
+  eachTargetBody(sim, src, cx, cy, reach, (eid, x, y, radius) => {
     out.push({ eid, x, y, radius })
   })
   return out

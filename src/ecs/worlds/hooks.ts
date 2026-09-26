@@ -8,12 +8,12 @@ import type { IceConfig, InfiniteConfig, MapDef, MapId, RiverConfig, ShrinkRingC
 import { onFloe } from '../worlds/ice'
 import { outsideZone, ringPoint, zoneRadiusAt } from '../worlds/infinite'
 import { clampToDisc, confineVelocity, meteorSweep } from '../worlds/space'
-import { clampToRiver, flowVector, riverRect } from '../worlds/river'
+import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/river'
 import { isHorizontal } from '../utils/remap'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Alive, BreaksWalls, Dormant, Due, ENEMY_SET, Meteor, Phasing, Radius, Tint, Transform, Uid } from '../components'
+import { Alive, Boss, BreaksWalls, Dormant, Due, ENEMY_SET, Meteor, Phasing, Pickup, Radius, Slot, Tint, Transform, Uid } from '../components'
 import { meteorHit } from '../store'
 import { spawnMeteor } from '../entities/meteor'
 import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
@@ -155,8 +155,11 @@ function floePx(sim: Sim): number {
 
 const ice: WorldHooks = {
   ...bounded,
-  constrainBody(_sim, _eid, _from, next) {
-    return next
+  constrainBody(sim, eid, _from, next) {
+    if (!hasComponent(sim.world, eid, Pickup)) return next
+    const r = Radius.v[eid]!
+    const max = floePx(sim) - r
+    return { x: Math.min(Math.max(next.x, r), max), y: Math.min(Math.max(next.y, r), max) }
   },
   surface(sim, x, y) {
     const cfg = iceCfg(sim)
@@ -216,7 +219,7 @@ const ruins: WorldHooks = {
     const box = bounded.constrainBody(sim, eid, from, next)
     const w = sim.worldState.walls
     if (!w || hasComponent(sim.world, eid, Phasing) || hasComponent(sim.world, eid, BreaksWalls)) return box
-    return w.grid.separateCircle(box.x, box.y, Radius.v[eid]!)
+    return w.grid.separateCircle(box.x, box.y, Math.min(Radius.v[eid]!, MAPS[sim.mapId].walls!.bodyRadiusCapU * UNIT))
   },
   chaseDir(sim, eid, tx, ty) {
     const w = sim.worldState.walls
@@ -431,7 +434,11 @@ const river: WorldHooks = {
     return flowOf(sim)
   },
   constrainBody(sim, eid, _from, next) {
-    return clampToRiver(next, riverOf(sim), Radius.v[eid]!)
+    const r = riverOf(sim)
+    const rad = Radius.v[eid]!
+    if (Boss.v[eid] === 1 || hasComponent(sim.world, eid, Slot)) return clampToRiver(next, r, rad)
+    if (r.horizontal) return { x: next.x, y: Math.min(Math.max(next.y, r.y + rad), r.y + r.h - rad) }
+    return { x: Math.min(Math.max(next.x, r.x + rad), r.x + r.w - rad), y: next.y }
   },
   wanderDir(_sim, _eid, dx, dy) {
     return { x: dx, y: dy }
@@ -439,8 +446,8 @@ const river: WorldHooks = {
   fleeDir(_sim, _eid, awayX, awayY) {
     return { x: awayX, y: awayY }
   },
-  outside() {
-    return false
+  outside(sim, x, y) {
+    return pastDownstream({ x, y }, sim.mapW, sim.mapH, riverCfg(sim).coinCullPad * UNIT)
   },
   spawnPoint(sim, boss) {
     const r = riverOf(sim)

@@ -2,7 +2,7 @@ import type { AbilityDef, Effect } from './abilityDefs'
 
 /** 驱动：身体没事时怎么走；蓄力突刺、自爆这类"动作"是能力，不在这里 */
 export type DriveDef =
-  | { readonly kind: 'chase' }
+  | { readonly kind: 'chase'; readonly at?: 'leader' }
   | { readonly kind: 'wander' }
   | { readonly kind: 'stay' }
   | { readonly kind: 'flee'; readonly range: number }

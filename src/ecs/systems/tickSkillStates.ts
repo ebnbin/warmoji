@@ -3,7 +3,7 @@ import { Alive, LeapShape, Leaping, MARK, Payload, RushHit, Rushing, SprintShape
 import { hasMark } from '../utils/marks'
 import { damageMul } from '../utils/amp'
 import { sourceOf } from '../utils/source'
-import { targetsNear } from '../utils/targets'
+import { targetsWithin } from '../utils/targets'
 import { hit } from './shared/damage'
 import { applyBlast, applyOnHit, struckOf } from './shared/effects'
 import { abilityOnHit } from '../store'
@@ -35,7 +35,7 @@ function rushHits(sim: Sim, m: number): void {
   const y = Transform.y[m]!
   const stamp = Rushing.stamp[m]!
   const damage = Math.round(Payload.damage[e]! * damageMul(sim, e))
-  for (const t of targetsNear(sim, src, x, y, SprintShape.radius[e]!)) {
+  for (const t of targetsWithin(sim, src, x, y, SprintShape.radius[e]!)) {
     if (RushHit.stamp[t.eid] === stamp) continue
     RushHit.stamp[t.eid] = stamp
     const s = struckOf(t.eid)

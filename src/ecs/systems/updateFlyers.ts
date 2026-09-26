@@ -7,7 +7,7 @@ import { ownerX, ownerY } from '../utils/amp'
 import { hit } from './shared/damage'
 import { applyOnHit, struckOf } from './shared/effects'
 import { sourceOf } from '../utils/source'
-import { targetsNear } from '../utils/targets'
+import { targetsWithin } from '../utils/targets'
 import type { Sim } from '../sim'
 
 /** 飞返体：去程沿直线缓动到射程尽头，回程追着持有者；去程回程各打每个身体一次 */
@@ -46,7 +46,7 @@ export function updateFlyers(sim: Sim): void {
     const struck = flyerHits[f]!
     const src = sourceOf(sim, e)
     const radius = FlyerShape.radius[e]!
-    for (const t of targetsNear(sim, src, Transform.x[f]!, Transform.y[f]!, radius)) {
+    for (const t of targetsWithin(sim, src, Transform.x[f]!, Transform.y[f]!, radius)) {
       if (struck.has(Uid.v[t.eid]!)) continue
       const dx = t.x - Transform.x[f]!
       const dy = t.y - Transform.y[f]!

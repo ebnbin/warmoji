@@ -34,7 +34,6 @@ import {
   RushHit,
   Sprite,
   Standoff,
-  Stay,
   Steering,
   TAG,
   Tint,
@@ -62,9 +61,12 @@ type DriveOf = ByKind<DriveDef>
 type DriveAttach<K extends keyof DriveOf> = (sim: Sim, eid: number, d: DriveOf[K]) => void
 
 const DRIVES: { [K in keyof DriveOf]: DriveAttach<K> } = {
-  chase: (sim, eid) => addComponent(sim.world, eid, Chase),
+  chase: (sim, eid, d) => {
+    addComponent(sim.world, eid, Chase)
+    Chase.leader[eid] = d.at === 'leader' ? 1 : 0
+  },
   wander: (sim, eid) => addComponent(sim.world, eid, Roam),
-  stay: (sim, eid) => addComponent(sim.world, eid, Stay),
+  stay: () => {},
   flee: (sim, eid, d) => {
     addComponent(sim.world, eid, Flee)
     Flee.range[eid] = d.range

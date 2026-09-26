@@ -23,6 +23,7 @@ import {
   Transform,
 } from '../components'
 import { freshFoe, nearestFoe, wanderDir } from './shared/steer'
+import { leaderPoint } from '../utils/team'
 import type { Sim } from '../sim'
 
 function drive(eid: number, dx: number, dy: number, speed: number): void {
@@ -35,12 +36,21 @@ function cruise(eid: number): number {
   return (Phys.thrust[eid]! / Phys.drag[eid]!) * Slowed.v[eid]!
 }
 
-/** 追最近的敌人，没有就慢速游荡 */
+/** 追最近的敌人，盯队长的追队长；没有就慢速游荡 */
 function chase(sim: Sim): void {
   for (const eid of query(sim.world, [Chase, Steering, Transform, Phys, Slowed])) {
     if (!Steering.v[eid]) continue
     const speed = cruise(eid)
-    const target = nearestFoe(sim, eid, Transform.x[eid]!, Transform.y[eid]!)
+    const ex = Transform.x[eid]!
+    const ey = Transform.y[eid]!
+    let target: { x: number; y: number } | null
+    if (Chase.leader[eid]) {
+      const p = leaderPoint(sim)
+      const d = sim.hooks.worldDelta(sim, ex, ey, p.x, p.y)
+      target = { x: ex + d.x, y: ey + d.y }
+    } else {
+      target = nearestFoe(sim, eid, ex, ey)
+    }
     if (!target) {
       const d = wanderDir(sim, eid)
       drive(eid, d.x, d.y, speed * 0.5)

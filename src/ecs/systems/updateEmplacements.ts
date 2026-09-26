@@ -20,7 +20,6 @@ export function updateEmplacements(sim: Sim): void {
       Tint.alpha[t] = 1 - p
       continue
     }
-    // 限时的装置到点退场
     if (Minion.dieAt[t]! > 0 && sim.elapsedMs >= Minion.dieAt[t]!) {
       retireEmplacement(sim, t)
       continue

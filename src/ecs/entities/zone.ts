@@ -34,7 +34,6 @@ export function spawnZone(sim: Sim, spec: ZoneSpec): number {
   const eid = newEntity(world)
   addComponents(world, eid, Zone, Transform, Tint, Ring, Lifetime)
   Zone.radius[eid] = spec.radius
-  Zone.faction[eid] = spec.src.faction
   Zone.enterMs[eid] = spec.enterMs
   Zone.on[eid] = 1
   Zone.tickMs[eid] = spec.tickMs ?? 0

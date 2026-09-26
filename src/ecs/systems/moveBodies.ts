@@ -48,7 +48,6 @@ export function moveBodies(sim: Sim): void {
     Transform.x[eid] = to.x
     Transform.y[eid] = to.y
     if (!rushing) continue
-    // 破墙的身体冲刺时碾碎所在的墙
     if (hasComponent(sim.world, eid, BreaksWalls)) sim.hooks.smashWall(sim, to.x, to.y)
     Rushing.msLeft[eid] = Rushing.msLeft[eid]! - dt * 1000
     // 被墙挡住就提前结束
