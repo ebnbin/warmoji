@@ -972,7 +972,7 @@ const RUINS_BOSS = {
   role: 'boss',
   emoji: '1f98f',
   name: '拆迁鬼',
-  desc: '残垣头目：锁定最近的队员霸体冲锋，一路碾碎断壁、追着人拐弯，撞上就把人撞飞，撞到墙上的被砸晕；跺地掀飞周围；落石无视遮挡；击退免疫',
+  desc: '残垣头目：锁定最近的队员霸体冲锋，一路碾碎断壁、追着人拐弯，撞上就把人撞飞，撞到墙上的被砸晕；跺地震得周围的人两秒半内冲不动也闪不走；落石无视遮挡；击退免疫',
   size: 3.2,
   radius: 1.05,
   hp: 6000,
@@ -1010,7 +1010,7 @@ const RUINS_BOSS = {
       damage: 16,
       color: 0x8d6e63,
       shape: { kind: 'disc', radius: 3.4, at: 'self' },
-      onHit: [{ kind: 'knockup', durationMs: 900, height: 1.4 }],
+      onHit: [{ kind: 'grounded', durationMs: 2500 }, { kind: 'slow', factor: 0.5, durationMs: 1500 }],
     },
     {
       trigger: 'auto',
