@@ -282,8 +282,8 @@ export const ANIMATIONS: AnimResource = {
     },
     '1f479': {
       emoji: '1f479',
-      name: '赤鬼',
-      desc: '红脸怒气起伏，双瞳收缩瞪视，头顶两缕怒气蒸腾而上——Boss 的待机威压。',
+      name: '恶鬼',
+      desc: '红脸怒气起伏，双瞳收缩瞪视，头顶两缕怒气蒸腾而上——丢了座狼、怒火中烧的恶鬼骑手。',
       anatomy: '红脸 path 呼吸缩放；两只瞳孔是独立圆，各绕自身中心收放；蒸汽是新建的 S 形描边 path，升起淡出。',
       clips: {
         idle: {
@@ -327,66 +327,6 @@ export const ANIMATIONS: AnimResource = {
             { gen: 'steam', params: { wisps: [{ x: 10.5, y0: -0.5, phase: 0 }, { x: 25.5, y0: -0.5, phase: 0.5 }] } },
           ],
           viewBox: '0 -7 36 43',
-        },
-      },
-    },
-    '1f9dd': {
-      emoji: '1f9dd',
-      name: '林祭司',
-      desc: '长袍随呼吸沉沉起伏，闭目垂睫默诵祝祷——林间治疗者的待机。',
-      anatomy: '长袍 path 呼吸缩放；眼睛 path 绕自身收放（垂睫）。',
-      clips: {
-        idle: {
-          parts: [
-            {
-              indices: [1],
-              cx: 18,
-              cy: 30,
-              keyframes: [{ t: 0, scale: 1 }, { t: 0.5, scale: 1.02 }, { t: 1, scale: 1 }],
-            },
-            {
-              indices: [7],
-              cx: 14,
-              cy: 17,
-              keyframes: [
-                { t: 0, scale: 1 },
-                { t: 0.4, scale: 0.5 },
-                { t: 0.55, scale: 1.1 },
-                { t: 0.7, scale: 1 },
-                { t: 1, scale: 1 },
-              ],
-            },
-          ],
-        },
-      },
-    },
-    '1f422': {
-      emoji: '1f422',
-      name: '炮龟',
-      desc: '厚甲随呼吸微微起伏，独眼一开一合冷冷张望——重甲龟的待机。',
-      anatomy: '龟壳 path 呼吸缩放；眼睛圆点绕自身收放（眨眼）。',
-      clips: {
-        idle: {
-          parts: [
-            {
-              indices: [2],
-              cx: 18,
-              cy: 23,
-              keyframes: [{ t: 0, scale: 1 }, { t: 0.5, scale: 1.02 }, { t: 1, scale: 1 }],
-            },
-            {
-              indices: [3],
-              cx: 5,
-              cy: 18,
-              keyframes: [
-                { t: 0, scale: 1 },
-                { t: 0.4, scale: 0.4 },
-                { t: 0.55, scale: 1.1 },
-                { t: 0.7, scale: 1 },
-                { t: 1, scale: 1 },
-              ],
-            },
-          ],
         },
       },
     },
@@ -470,8 +410,8 @@ export const ANIMATIONS: AnimResource = {
     },
     '1f333': {
       emoji: '1f333',
-      name: '树妖',
-      desc: '庞大树冠随风沉沉招摇，枝叶簌簌起伏——黑森林之主的待机威压。',
+      name: '大树',
+      desc: '庞大树冠随风沉沉招摇，枝叶簌簌起伏。',
       anatomy: '树冠 path 绕树干基部小幅左右摇摆（招风）；叶簇 g 呼吸缩放（枝叶簌动）；树干静立。',
       clips: {
         idle: {
@@ -561,44 +501,6 @@ export const ANIMATIONS: AnimResource = {
               keyframes: [{ t: 0, scale: 1 }, { t: 0.5, scale: 1.05 }, { t: 1, scale: 1 }],
             },
           ],
-        },
-      },
-    },
-    '1f98f': {
-      emoji: '1f98f',
-      name: '拆迁鬼',
-      desc: '巨躯沉沉起伏，独角一低一昂似欲破墙，铜铃怒目骤缩瞪视，鼻息怒气蒸腾——蓄势冲撞的拆迁威压。',
-      anatomy: '主体 path 呼吸缩放；犀角 path 绕角根低昂（预告冲撞）；眼睛圆点绕自身收放怒瞪；蒸汽是新建 S 形描边 path，自头顶升起淡出。',
-      clips: {
-        idle: {
-          parts: [
-            {
-              indices: [1],
-              cx: 18,
-              cy: 20,
-              keyframes: [{ t: 0, scale: 1 }, { t: 0.5, scale: 1.02 }, { t: 1, scale: 1 }],
-            },
-            {
-              indices: [0],
-              cx: 22,
-              cy: 8,
-              keyframes: [{ t: 0, rotate: 0 }, { t: 0.45, rotate: -4 }, { t: 0.75, rotate: 2 }, { t: 1, rotate: 0 }],
-            },
-            {
-              indices: [6],
-              cx: 16.789,
-              cy: 21.006,
-              keyframes: [
-                { t: 0, scale: 1 },
-                { t: 0.35, scale: 0.7 },
-                { t: 0.55, scale: 1.15 },
-                { t: 0.75, scale: 1 },
-                { t: 1, scale: 1 },
-              ],
-            },
-          ],
-          fx: [{ gen: 'steam', params: { wisps: [{ x: 8, y0: 1, phase: 0 }, { x: 16, y0: 0, phase: 0.5 }] } }],
-          viewBox: '0 -7 36 43',
         },
       },
     },
@@ -730,8 +632,8 @@ export const ANIMATIONS: AnimResource = {
     },
     '1f9cc': {
       emoji: '1f9cc',
-      name: '巨魔',
-      desc: '整副身板沉重地喘，眉骨压下又抬起，龅牙一磨一磨。',
+      name: '巨魔萨满',
+      desc: '整副身板沉重地喘，眉骨压下又抬起，龅牙一磨一磨，像在默念咒语。',
       anatomy: '眉 = 3E721D 横条；牙口 = 744629 嘴 + FFEBA5 牙；躯干 = 大片 A6D388 绿。',
       clips: {
         idle: {
@@ -990,7 +892,7 @@ export const ANIMATIONS: AnimResource = {
     },
     '1f977': {
       emoji: '1f977',
-      name: '刺客',
+      name: '忍者',
       desc: '低伏静息，只有双眼在面罩里左右逡巡；周身偶有一闪的刃光。',
       anatomy: '眼 = 662113 横条（面罩露出的双目）；眼窗皮肤 = FFDC5D；其余黑衣整体压低呼吸。',
       clips: {
@@ -1718,29 +1620,10 @@ export const ANIMATIONS: AnimResource = {
         },
       },
     },
-    '1f40c': {
-      emoji: '1f40c',
-      name: '黏黏怪',
-      desc: '触角好奇地左右轻探，驮着螺壳的身子慢悠悠地一鼓一鼓往前挪。',
-      anatomy: '触角/眼柄 = 左上 9266CC 细杆；身体足 = AA8DD8 底座；螺壳 = FFCC4D/FFAC33 黄橙螺旋（足+壳同步起伏，勿分离）。',
-      clips: {
-        idle: {
-          parts: [
-            {
-              indices: [0],
-              keyframes: [{ t: 0, rotate: 0 }, { t: 0.3, rotate: 6 }, { t: 0.6, rotate: -4 }, { t: 1, rotate: 0 }],
-              cx: 9,
-              cy: 15,
-            },
-            { indices: [1, 2, 3], keyframes: [{ t: 0, ty: 0 }, { t: 0.5, ty: 0.5 }, { t: 1, ty: 0 }], cx: 20, cy: 28 },
-          ],
-        },
-      },
-    },
     '1faba': {
       emoji: '1faba',
-      name: '虫巢',
-      desc: '窝里的两枚蛋轻轻晃，边上的叶子随风微摆。',
+      name: '蛛卵',
+      desc: '窝里的两枚卵轻轻晃动，像随时要孵出什么；边上的叶子随风微摆。',
       anatomy: '巢碗 = 中部 DEAD74 编织；两枚蛋 = 蓝色组（右 11-13、左 14-16）；叶 = 77B255 绿。',
       clips: {
         idle: {
@@ -1762,52 +1645,6 @@ export const ANIMATIONS: AnimResource = {
               keyframes: [{ t: 0, rotate: 0 }, { t: 0.5, rotate: 5 }, { t: 1, rotate: 0 }],
               cx: 30,
               cy: 30,
-            },
-          ],
-        },
-      },
-    },
-    '1f99f': {
-      emoji: '1f99f',
-      name: '小飞虫',
-      desc: '翅膀高频振动嗡嗡作响，细腿在身下轻轻摇。',
-      anatomy: '身体 = 深色 31373D；右翅 = 8-9，左翅 = 10-11；腿 = 1-2 细杆。',
-      clips: {
-        idle: {
-          parts: [
-            {
-              indices: [8, 9],
-              keyframes: [
-                { t: 0, rotate: 0 },
-                { t: 0.166, rotate: -22 },
-                { t: 0.333, rotate: 0 },
-                { t: 0.5, rotate: -22 },
-                { t: 0.666, rotate: 0 },
-                { t: 0.833, rotate: -22 },
-                { t: 1, rotate: 0 },
-              ],
-              cx: 20,
-              cy: 11,
-            },
-            {
-              indices: [10, 11],
-              keyframes: [
-                { t: 0, rotate: 0 },
-                { t: 0.166, rotate: 22 },
-                { t: 0.333, rotate: 0 },
-                { t: 0.5, rotate: 22 },
-                { t: 0.666, rotate: 0 },
-                { t: 0.833, rotate: 22 },
-                { t: 1, rotate: 0 },
-              ],
-              cx: 16,
-              cy: 11,
-            },
-            {
-              indices: [1, 2],
-              keyframes: [{ t: 0, rotate: 0 }, { t: 0.5, rotate: 3 }, { t: 1, rotate: 0 }],
-              cx: 18,
-              cy: 24,
             },
           ],
         },
@@ -1855,36 +1692,6 @@ export const ANIMATIONS: AnimResource = {
                 { t: 0.75, ty: 0.4, rotate: 1.2, scale: 0.99 },
                 { t: 1, ty: 0, rotate: -1.2, scale: 1 },
               ],
-            },
-          ],
-        },
-      },
-    },
-    '1f317': {
-      emoji: '1f317',
-      name: '晦明',
-      desc: '半明半暗的月相之主：整轮如吐纳般缓缓起伏，阳面亮坑一明一灭，阴面大坑随之收放——昼夜在它面上永恒轮替。',
-      anatomy: '整轮 path[0,1] 呼吸缩放；阳面亮坑 circle[2] 明灭闪烁；阴面大坑 circle[4] 反相收放。',
-      clips: {
-        idle: {
-          parts: [
-            {
-              indices: [0, 1],
-              cx: 18,
-              cy: 18,
-              keyframes: [{ t: 0, scale: 1 }, { t: 0.5, scale: 1.03 }, { t: 1, scale: 1 }],
-            },
-            {
-              indices: [2],
-              cx: 10.5,
-              cy: 8.5,
-              keyframes: [{ t: 0, scale: 1 }, { t: 0.3, scale: 1.35 }, { t: 0.6, scale: 0.85 }, { t: 1, scale: 1 }],
-            },
-            {
-              indices: [4],
-              cx: 22.5,
-              cy: 27.5,
-              keyframes: [{ t: 0, scale: 1 }, { t: 0.5, scale: 0.8 }, { t: 1, scale: 1 }],
             },
           ],
         },
@@ -1968,8 +1775,8 @@ export const ANIMATIONS: AnimResource = {
     },
     '1f300': {
       emoji: '1f300',
-      name: '奇点',
-      desc: '螺旋星涡缓缓自转、一涨一缩地吞吐——沉在星海深处的坍缩之眼。',
+      name: '漩涡',
+      desc: '螺旋漩涡缓缓自转、一涨一缩地吞吐。',
       anatomy: '整涡 path[0] 缓转摆动 + 吞吐缩放（单元素旋涡，绕心自旋）。',
       clips: {
         idle: {
@@ -1985,6 +1792,355 @@ export const ANIMATIONS: AnimResource = {
                 { t: 0.75, rotate: -12, scale: 0.97 },
                 { t: 1, rotate: 0, scale: 1 },
               ],
+            },
+          ],
+        },
+      },
+    },
+    '1f9d1_200d_1f692': {
+      emoji: '1f9d1_200d_1f692',
+      name: '消防员',
+      desc: '肩膀随呼吸稳稳起伏，偶尔眨一下眼，头盔高光一闪一闪——随时准备冲进火场。',
+      anatomy: '外套与反光条 [0,1,2]、领口 [4]、脖子 [5,6]、背带 [12]、外套前襟 [15] 用同一套呼吸缩放（绕底边，各自留在原图层）；眼睛 [10] 眨眼；头盔高光 [14] 明灭。',
+      clips: {
+        idle: {
+          parts: [
+            { indices: [0, 1, 2], cx: 18, cy: 36, keyframes: [{ t: 0, scaleY: 1 }, { t: 0.5, scaleY: 1.02 }, { t: 1, scaleY: 1 }] },
+            { indices: [4], cx: 18, cy: 36, keyframes: [{ t: 0, scaleY: 1 }, { t: 0.5, scaleY: 1.02 }, { t: 1, scaleY: 1 }] },
+            { indices: [5, 6], cx: 18, cy: 36, keyframes: [{ t: 0, scaleY: 1 }, { t: 0.5, scaleY: 1.02 }, { t: 1, scaleY: 1 }] },
+            {
+              indices: [10],
+              cx: 18,
+              cy: 15.9,
+              keyframes: [{ t: 0, scaleY: 1 }, { t: 0.6, scaleY: 1 }, { t: 0.7, scaleY: 0.1 }, { t: 0.8, scaleY: 1 }, { t: 1, scaleY: 1 }],
+            },
+            { indices: [12], cx: 18, cy: 36, keyframes: [{ t: 0, scaleY: 1 }, { t: 0.5, scaleY: 1.02 }, { t: 1, scaleY: 1 }] },
+            { indices: [14], keyframes: [{ t: 0, opacity: 1 }, { t: 0.5, opacity: 0.5 }, { t: 1, opacity: 1 }] },
+            { indices: [15], cx: 18, cy: 36, keyframes: [{ t: 0, scaleY: 1 }, { t: 0.5, scaleY: 1.02 }, { t: 1, scaleY: 1 }] },
+          ],
+        },
+      },
+    },
+    '1f577': {
+      emoji: '1f577',
+      name: '蛛后',
+      desc: '长腿左右轮流屈伸，螯牙一开一合，圆鼓鼓的腹部一胀一缩——伏在网心的猎手。',
+      anatomy: '左侧三条腿 [0,1,2] 绕左胸根摆动；右侧三条腿 [4,5,6] 绕右胸根反相摆动；[3] 是左下与右上两条腿合成的一个 path，绕中心小幅扭动；腹部 ellipse[7] 缩放；螯牙 [9] 横向开合。',
+      clips: {
+        idle: {
+          parts: [
+            {
+              indices: [0, 1, 2],
+              cx: 16,
+              cy: 17,
+              keyframes: [{ t: 0, rotate: 0 }, { t: 0.25, rotate: 4 }, { t: 0.5, rotate: 0 }, { t: 0.75, rotate: -3 }, { t: 1, rotate: 0 }],
+            },
+            {
+              indices: [3],
+              cx: 18,
+              cy: 18,
+              keyframes: [{ t: 0, rotate: 0 }, { t: 0.25, rotate: -2 }, { t: 0.5, rotate: 0 }, { t: 0.75, rotate: 2 }, { t: 1, rotate: 0 }],
+            },
+            {
+              indices: [4, 5, 6],
+              cx: 20,
+              cy: 17,
+              keyframes: [{ t: 0, rotate: 0 }, { t: 0.25, rotate: -4 }, { t: 0.5, rotate: 0 }, { t: 0.75, rotate: 3 }, { t: 1, rotate: 0 }],
+            },
+            { indices: [7], cx: 18, cy: 25.2, keyframes: [{ t: 0, scale: 1 }, { t: 0.5, scale: 1.05 }, { t: 1, scale: 1 }] },
+            {
+              indices: [9],
+              cx: 18,
+              cy: 13,
+              keyframes: [{ t: 0, scaleX: 1 }, { t: 0.3, scaleX: 1 }, { t: 0.4, scaleX: 0.7 }, { t: 0.5, scaleX: 1 }, { t: 1, scaleX: 1 }],
+            },
+          ],
+        },
+      },
+    },
+    '1f996': {
+      emoji: '1f996',
+      name: '暴龙',
+      desc: '巨躯沉沉起伏，身子一俯一仰，像随时要扑出去——蓄势冲撞的残垣之主。',
+      anatomy: '整只 [0..10] 作为一个部件绕脚底呼吸缩放并微微前俯（单部件，图层顺序不变）。',
+      clips: {
+        idle: {
+          parts: [
+            {
+              indices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+              cx: 20,
+              cy: 35,
+              keyframes: [{ t: 0, rotate: 0, scaleY: 1 }, { t: 0.5, rotate: -1.5, scaleY: 1.02 }, { t: 1, rotate: 0, scaleY: 1 }],
+            },
+          ],
+        },
+      },
+    },
+    '2622': {
+      emoji: '2622',
+      name: '失控核心',
+      desc: '橙色外壳咚咚两下胀缩，三叶标志来回狂颤，中心灯忽明忽暗，外圈电弧噼啪乱窜——随时会炸的反应堆。',
+      anatomy: '外壳 circle[0] 两连跳缩放；三叶 path[1] 绕中心 (18,18) 来回扭转；中心圆 circle[2] 明灭；电弧是新建折线，贴着外壳边缘错时闪现。',
+      clips: {
+        idle: {
+          parts: [
+            {
+              indices: [0],
+              cx: 18,
+              cy: 18,
+              keyframes: [
+                { t: 0, scale: 1 },
+                { t: 0.1, scale: 1.035 },
+                { t: 0.2, scale: 1 },
+                { t: 0.3, scale: 1.035 },
+                { t: 0.4, scale: 1 },
+                { t: 1, scale: 1 },
+              ],
+            },
+            {
+              indices: [1],
+              cx: 18,
+              cy: 18,
+              keyframes: [{ t: 0, rotate: 0 }, { t: 0.25, rotate: 25 }, { t: 0.5, rotate: 0 }, { t: 0.75, rotate: -25 }, { t: 1, rotate: 0 }],
+            },
+            { indices: [2], keyframes: [{ t: 0, opacity: 1 }, { t: 0.3, opacity: 0.3 }, { t: 0.6, opacity: 1 }, { t: 1, opacity: 1 }] },
+          ],
+          fx: [
+            {
+              gen: 'bolts',
+              params: {
+                bolts: [
+                  { points: [[3.5, 12], [6.5, 13.5], [4.5, 16], [7.5, 18]], window: [0.05, 0.15], color: '#FFF59D', width: 1.3 },
+                  { points: [[32.5, 20], [29.5, 21.5], [31.5, 24], [28.5, 26]], window: [0.45, 0.55], color: '#FFF59D', width: 1.3 },
+                  { points: [[13, 32.5], [15.5, 29.5], [18, 32], [21, 29.5]], window: [0.75, 0.85], color: '#FFF59D', width: 1.3 },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    },
+    '1f9db': {
+      emoji: '1f9db',
+      name: '夜伯爵',
+      desc: '血红双瞳一明一暗，披风高领缓缓鼓起，嘴角一咧露出獠牙——暗夜里的猎食者。',
+      anatomy: '披风 path[1] 绕颈部横向鼓动；红瞳 path[8] 明灭；嘴 path[10] 绕上沿张合，四片獠牙 [11..14] 随嘴下移。',
+      clips: {
+        idle: {
+          parts: [
+            { indices: [1], cx: 18, cy: 20, keyframes: [{ t: 0, scaleX: 1 }, { t: 0.5, scaleX: 1.035 }, { t: 1, scaleX: 1 }] },
+            { indices: [8], keyframes: [{ t: 0, opacity: 1 }, { t: 0.5, opacity: 0.45 }, { t: 1, opacity: 1 }] },
+            {
+              indices: [10],
+              cx: 18,
+              cy: 21.3,
+              keyframes: [{ t: 0, scaleY: 1 }, { t: 0.5, scaleY: 1 }, { t: 0.7, scaleY: 1.15 }, { t: 0.9, scaleY: 1 }, { t: 1, scaleY: 1 }],
+            },
+            {
+              indices: [11, 12, 13, 14],
+              keyframes: [{ t: 0, ty: 0 }, { t: 0.5, ty: 0 }, { t: 0.7, ty: 0.45 }, { t: 0.9, ty: 0 }, { t: 1, ty: 0 }],
+            },
+          ],
+        },
+      },
+    },
+    '1f573': {
+      emoji: '1f573',
+      name: '奇点',
+      desc: '黑洞一胀一缩地吞吐，洞口一圈圈引力波向外荡开——沉在星海深处的坍缩之眼。',
+      anatomy: '洞口三层 [0,1,2] 绕中心整体吞吐缩放；引力波是新建的紫色椭圆环，叠在洞口前层向外扩散。',
+      clips: {
+        idle: {
+          parts: [{ indices: [0, 1, 2], cx: 18, cy: 18.5, keyframes: [{ t: 0, scale: 1 }, { t: 0.5, scale: 0.94 }, { t: 1, scale: 1 }] }],
+          fx: [
+            {
+              gen: 'ripples',
+              layer: 'front',
+              params: { cx: 18, cy: 18.5, color: '#B388FF', rings: [{ phase: 0 }, { phase: -0.5 }], window: [0, 0.5] },
+            },
+          ],
+        },
+      },
+    },
+    '1f9a0': {
+      emoji: '1f9a0',
+      name: '细菌',
+      desc: '整只菌体像果冻一样挤压拉伸，纤毛摆得比身子更欢——随时准备一分为二。',
+      anatomy: '纤毛 [0..6] 与菌体 [7..13]（描边、菌体、核、胞内小泡）各为一个部件，绕同一中心挤压拉伸；纤毛多转几度，看起来在划水。',
+      clips: {
+        idle: {
+          parts: [
+            {
+              indices: [0, 1, 2, 3, 4, 5, 6],
+              cx: 17.4,
+              cy: 18,
+              keyframes: [
+                { t: 0, scaleX: 1, scaleY: 1, rotate: 0 },
+                { t: 0.25, scaleX: 1.04, scaleY: 0.96, rotate: 5 },
+                { t: 0.5, scaleX: 1, scaleY: 1, rotate: 0 },
+                { t: 0.75, scaleX: 0.96, scaleY: 1.04, rotate: -5 },
+                { t: 1, scaleX: 1, scaleY: 1, rotate: 0 },
+              ],
+            },
+            {
+              indices: [7, 8, 9, 10, 11, 12, 13],
+              cx: 17.4,
+              cy: 18,
+              keyframes: [
+                { t: 0, scaleX: 1, scaleY: 1, rotate: 0 },
+                { t: 0.25, scaleX: 1.04, scaleY: 0.96, rotate: 2 },
+                { t: 0.5, scaleX: 1, scaleY: 1, rotate: 0 },
+                { t: 0.75, scaleX: 0.96, scaleY: 1.04, rotate: -2 },
+                { t: 1, scaleX: 1, scaleY: 1, rotate: 0 },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    '1fab1': {
+      emoji: '1fab1',
+      name: '黏液虫',
+      desc: '软趴趴的身子一缩一伸地蠕动，黏糊糊地往前挪。',
+      anatomy: '整条虫 [0..4] 作为一个部件绕底部中点做蠕动式挤压拉伸（单部件，图层顺序不变）。',
+      clips: {
+        idle: {
+          parts: [
+            {
+              indices: [0, 1, 2, 3, 4],
+              cx: 17.7,
+              cy: 35,
+              keyframes: [
+                { t: 0, scaleX: 1, scaleY: 1 },
+                { t: 0.3, scaleX: 1.05, scaleY: 0.94 },
+                { t: 0.6, scaleX: 0.97, scaleY: 1.02 },
+                { t: 1, scaleX: 1, scaleY: 1 },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    '1f5d1': {
+      emoji: '1f5d1',
+      name: '垃圾桶',
+      desc: '桶身时不时一阵乱晃，像里面有东西在翻腾，晃完又静下来。',
+      anatomy: '桶身 [0] 与桶沿、桶底 [1] 作为一个部件绕底部中点晃动（单部件，图层顺序不变）。',
+      clips: {
+        idle: {
+          parts: [
+            {
+              indices: [0, 1],
+              cx: 18,
+              cy: 34,
+              keyframes: [
+                { t: 0, rotate: 0 },
+                { t: 0.1, rotate: 3 },
+                { t: 0.2, rotate: -3 },
+                { t: 0.3, rotate: 2 },
+                { t: 0.4, rotate: 0 },
+                { t: 1, rotate: 0 },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    '1fab0': {
+      emoji: '1fab0',
+      name: '苍蝇',
+      desc: '一对翅膀嗡嗡高速振动，细腿在身下不安分地搓动。',
+      anatomy: '左翅 ellipse[2] 绕左翅根 (16.3,12.5) 摆动，右翅 ellipse[3] 绕右翅根 (19.8,12.5) 反向摆动；腿 g[0] 绕胸口小幅扭动。',
+      clips: {
+        idle: {
+          parts: [
+            { indices: [0], cx: 18, cy: 16, keyframes: [{ t: 0, rotate: 0 }, { t: 0.5, rotate: 2 }, { t: 1, rotate: 0 }] },
+            {
+              indices: [2],
+              cx: 16.3,
+              cy: 12.5,
+              keyframes: [
+                { t: 0, rotate: 0 },
+                { t: 0.1, rotate: 20 },
+                { t: 0.2, rotate: 0 },
+                { t: 0.3, rotate: 20 },
+                { t: 0.4, rotate: 0 },
+                { t: 0.5, rotate: 20 },
+                { t: 0.6, rotate: 0 },
+                { t: 0.7, rotate: 20 },
+                { t: 0.8, rotate: 0 },
+                { t: 0.9, rotate: 20 },
+                { t: 1, rotate: 0 },
+              ],
+            },
+            {
+              indices: [3],
+              cx: 19.8,
+              cy: 12.5,
+              keyframes: [
+                { t: 0, rotate: 0 },
+                { t: 0.1, rotate: -20 },
+                { t: 0.2, rotate: 0 },
+                { t: 0.3, rotate: -20 },
+                { t: 0.4, rotate: 0 },
+                { t: 0.5, rotate: -20 },
+                { t: 0.6, rotate: 0 },
+                { t: 0.7, rotate: -20 },
+                { t: 0.8, rotate: 0 },
+                { t: 0.9, rotate: -20 },
+                { t: 1, rotate: 0 },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    '1f30b': {
+      emoji: '1f30b',
+      name: '火山怪',
+      desc: '山口的岩浆柱一窜一窜往上喷，熔岩流忽明忽暗，头顶的烟云翻滚鼓胀，火星从山口蹦出来。',
+      anatomy: '熔岩流 [3] 与 [5,6] 错相明灭；山口岩浆柱 [10] 绕底部纵向伸缩；烟云 [11] 鼓胀，烟团 [12..21] 上下翻滚；火星是新建四芒星，自山口升起。',
+      clips: {
+        idle: {
+          parts: [
+            { indices: [3], keyframes: [{ t: 0, opacity: 1 }, { t: 0.5, opacity: 0.7 }, { t: 1, opacity: 1 }] },
+            { indices: [5, 6], keyframes: [{ t: 0, opacity: 0.8 }, { t: 0.5, opacity: 1 }, { t: 1, opacity: 0.8 }] },
+            {
+              indices: [10],
+              cx: 19.3,
+              cy: 13.7,
+              keyframes: [
+                { t: 0, scaleY: 1 },
+                { t: 0.2, scaleY: 1.4 },
+                { t: 0.4, scaleY: 0.9 },
+                { t: 0.6, scaleY: 1.25 },
+                { t: 0.8, scaleY: 1 },
+                { t: 1, scaleY: 1 },
+              ],
+            },
+            {
+              indices: [11],
+              cx: 18.1,
+              cy: 4.8,
+              keyframes: [{ t: 0, scaleX: 1, scaleY: 1 }, { t: 0.5, scaleX: 1.05, scaleY: 1.03 }, { t: 1, scaleX: 1, scaleY: 1 }],
+            },
+            {
+              indices: [12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
+              keyframes: [{ t: 0, ty: 0 }, { t: 0.5, ty: -0.8 }, { t: 1, ty: 0 }],
+            },
+          ],
+          fx: [
+            {
+              gen: 'rise',
+              params: {
+                particles: [
+                  { x: 16.5, phase: 0, size: 1.1, color: '#FFAC33' },
+                  { x: 20, phase: 0.33, size: 0.9, color: '#E95F28' },
+                  { x: 18.3, phase: 0.66, size: 1, color: '#FFD983' },
+                ],
+                y0: 12,
+                y1: 1,
+              },
             },
           ],
         },
