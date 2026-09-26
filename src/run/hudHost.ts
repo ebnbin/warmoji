@@ -36,6 +36,8 @@ export interface SquadMember {
   emoji: string
   name: string
   skillIcon: string
+  cdRemainMs: number
+  cdMs: number
   alive: boolean
   hp: number
   max: number

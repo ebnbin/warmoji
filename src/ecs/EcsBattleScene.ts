@@ -491,6 +491,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
           emoji: def.emoji,
           name: def.name,
           skillIcon: def.skill.icon,
+          cdRemainMs: this.run.skillCd[slot] ?? 0,
+          cdMs: def.skill.cdMs,
           alive: Alive.v[m] === 1,
           hp: CharHp.hp[m]!,
           max: CharHp.max[m]!,

@@ -6,7 +6,7 @@ export const CHARACTERS = {
     name: '杂耍演员',
     desc: '向最近的敌人连续抛掷番茄',
     body: { thrust: 30, drag: 5, mass: 0.9 },
-    skill: { name: '全场蹦迪', icon: '1f57a', desc: '全场敌人跟着蹦迪，短时间失去行动', cdMs: 30_000, ability: 'discoFever' },
+    skill: { name: '全场蹦迪', icon: '1f57a', desc: '全场敌人跟着蹦迪两秒半，期间失去行动', cdMs: 16_000, ability: 'jugglerDance' },
     weapons: [],
     innate: [
       {
@@ -25,7 +25,7 @@ export const CHARACTERS = {
     name: '独角兽',
     desc: '独角向前突刺，穿透沿途敌人',
     body: { thrust: 34, drag: 4.5, mass: 1 },
-    skill: { name: '彩虹冲锋', icon: '1f308', desc: '朝指定方向冲刺四格，沿途敌人受伤并被撞开', cdMs: 7000, ability: 'rainbowRush', aim: true },
+    skill: { name: '彩虹冲锋', icon: '1f308', desc: '朝指定方向冲刺三格半，沿途敌人受伤并被撞开', cdMs: 5000, ability: 'rainbowRush', aim: true },
     weapons: [],
     innate: [
       {
@@ -44,7 +44,7 @@ export const CHARACTERS = {
     name: '巨魔',
     desc: '挥舞巨斧，横扫身前扇形范围',
     body: { thrust: 17, drag: 4.5, mass: 1.8 },
-    skill: { name: '嘲讽怒吼', icon: '1f4e2', desc: '五格内的敌人三秒内只追巨魔，期间他受到的伤害减半', cdMs: 20_000, ability: 'trollRoar' },
+    skill: { name: '嘲讽怒吼', icon: '1f4e2', desc: '四格半内的敌人两秒半内只追巨魔，期间他受到的伤害减四成', cdMs: 12_000, ability: 'trollRoar' },
     weapons: ['axe'],
     innate: [],
   },
@@ -53,7 +53,7 @@ export const CHARACTERS = {
     name: '牛仔',
     desc: '左右双枪齐发，射出高速水弹',
     body: { thrust: 29, drag: 5, mass: 1 },
-    skill: { name: '天降横财', icon: '1f4b0', desc: '钱袋从天而降砸向最近的敌人，每次命中掉一枚金币', cdMs: 20_000, ability: 'goldRain' },
+    skill: { name: '天降横财', icon: '1f4b0', desc: '钱袋从天而降砸向最近的五个敌人，每次命中掉一枚金币', cdMs: 12_000, ability: 'cowboyStrike' },
     weapons: ['pistolLeft', 'pistolRight'],
     innate: [],
   },
@@ -62,7 +62,7 @@ export const CHARACTERS = {
     name: '法师',
     desc: '在远处敌人脚下引爆奥术轰炸',
     body: { thrust: 25, drag: 5, mass: 0.9 },
-    skill: { name: '弱点讲义', icon: '1f4d6', desc: '八秒内全队伤害提高六成', cdMs: 30_000, ability: 'weaknessLecture' },
+    skill: { name: '弱点讲义', icon: '1f4d6', desc: '六秒内全队伤害提高四成', cdMs: 16_000, ability: 'mageLecture' },
     weapons: [],
     innate: [
       {
@@ -81,7 +81,7 @@ export const CHARACTERS = {
     name: '袋鼠',
     desc: '掷出回旋镖，去程回程皆可伤敌',
     body: { thrust: 28, drag: 4, mass: 0.9 },
-    skill: { name: '弹跳践踏', icon: '1f4a5', desc: '朝指定方向跃出四格，落地时范围伤害并击退', cdMs: 14_000, ability: 'bounceStomp', aim: true },
+    skill: { name: '弹跳践踏', icon: '1f4a5', desc: '朝指定方向跃出四格，落地时范围伤害并击退', cdMs: 9000, ability: 'bounceStomp', aim: true },
     weapons: ['boomerang'],
     innate: [],
   },
@@ -90,7 +90,7 @@ export const CHARACTERS = {
     name: '机器人',
     desc: '手持激光器，灼穿一条直线上的所有敌人',
     body: { thrust: 21, drag: 5, mass: 1.4 },
-    skill: { name: '降维打击', icon: '2604', desc: '全场敌人受到一次巨额伤害，Boss 减半', cdMs: 45_000, ability: 'dimensionStrike' },
+    skill: { name: '降维打击', icon: '2604', desc: '全场敌人受到一次大额伤害，Boss 只吃四成', cdMs: 25_000, ability: 'robotNuke' },
     weapons: ['laserBeam'],
     innate: [],
   },
@@ -99,7 +99,7 @@ export const CHARACTERS = {
     name: '雪人',
     desc: '以队伍中心散发寒气，持续减速范围内的敌人',
     body: { thrust: 17.5, drag: 5, mass: 1.5 },
-    skill: { name: '时停', icon: '23f3', desc: '时间停止一段时间，静止时全场近乎凝固', cdMs: 45_000, ability: 'timeFreeze' },
+    skill: { name: '时停', icon: '23f3', desc: '时间停止八秒，静止时全场近乎凝固', cdMs: 25_000, ability: 'snowmanFreeze' },
     weapons: [],
     innate: [
       {
@@ -118,7 +118,7 @@ export const CHARACTERS = {
     name: '仙子',
     desc: '魔尘弹把敌人整个变成一只无能力的绵羊——暂时失去攻击、被动与亡语，只保留血量，一段时间后恢复；同一敌人变羊有冷却',
     body: { thrust: 32, drag: 5, mass: 0.5 },
-    skill: { name: '变形派对', icon: '1f411', desc: '三格半内的敌人全部变成绵羊四秒', cdMs: 30_000, ability: 'sheepParty' },
+    skill: { name: '变形派对', icon: '1f411', desc: '三格内的敌人全部变成绵羊三秒', cdMs: 16_000, ability: 'sheepParty' },
     weapons: [],
     innate: [
       {
@@ -137,7 +137,7 @@ export const CHARACTERS = {
     name: '刺客',
     desc: '瞬移到范围内血最厚的敌人背后重斩一刀，再闪回原位；出手瞬间无敌',
     body: { thrust: 32, drag: 4, mass: 0.7 },
-    skill: { name: '影遁', icon: '1f32b', desc: '三秒内全队不被敌人锁定，敌人只会乱走', cdMs: 25_000, ability: 'shadowVeil' },
+    skill: { name: '影遁', icon: '1f32b', desc: '两秒多内全队不被敌人锁定，敌人只会乱走', cdMs: 14_000, ability: 'shadowVeil' },
     weapons: ['dagger'],
     innate: [],
   },
@@ -146,7 +146,7 @@ export const CHARACTERS = {
     name: '河狸工程师',
     desc: '自己不动手，定期在脚下架起自动开火的弩塔',
     body: { thrust: 22, drag: 5.5, mass: 1.1 },
-    skill: { name: '工程速建', icon: '1f3d7', desc: '立刻在周围架起三座弩塔，持续十秒', cdMs: 20_000, ability: 'quickBuild' },
+    skill: { name: '工程速建', icon: '1f3d7', desc: '立刻在周围架起三座弩塔，持续八秒', cdMs: 12_000, ability: 'quickBuild' },
     weapons: [],
     innate: [
       {
@@ -165,7 +165,7 @@ export const CHARACTERS = {
     name: '蜂后',
     desc: '每隔一阵放出一群小蜂，自主寻路蜇敌施毒后自毁，优先扑向未中毒的目标',
     body: { thrust: 25, drag: 4.5, mass: 0.8 },
-    skill: { name: '蜜蜂王庭', icon: '1f36f', desc: '生成四格领域六秒：队友持续回血，敌人持续中毒', cdMs: 24_000, ability: 'beeCourt' },
+    skill: { name: '蜜蜂王庭', icon: '1f36f', desc: '生成四格领域五秒：队友持续回血，敌人持续中毒', cdMs: 14_000, ability: 'beeCourt' },
     weapons: [],
     innate: [
       {
@@ -184,7 +184,7 @@ export const CHARACTERS = {
     name: '军医',
     desc: '周期治疗附近血量最低的队友，顺手甩两支飞针',
     body: { thrust: 26, drag: 5, mass: 1 },
-    skill: { name: '急救包', icon: '2695', desc: '倒地队友立刻复活，存活者回血一半，全队无敌两秒', cdMs: 45_000, ability: 'holyLight' },
+    skill: { name: '急救包', icon: '2695', desc: '倒地队友立刻复活，存活者回血三成半，全队无敌一秒多', cdMs: 25_000, ability: 'medicRally' },
     weapons: [],
     innate: [
       {
@@ -204,7 +204,7 @@ export const CHARACTERS = {
     name: '水母',
     desc: '电弧在敌群间弹跳传导，敌人越密越疼',
     body: { thrust: 13.5, drag: 3, mass: 0.8 },
-    skill: { name: '电磁脉冲', icon: '1f329', desc: '六格内所有敌人受到一次电击并减速六成三秒', cdMs: 18_000, ability: 'emPulse' },
+    skill: { name: '电磁脉冲', icon: '1f329', desc: '六格内所有敌人受到一次电击并减速五成两秒半', cdMs: 10_000, ability: 'emPulse' },
     weapons: [],
     innate: [
       {

@@ -29,7 +29,15 @@ interface SquadIcon {
   dead: Phaser.GameObjects.Text
   shownHp: number
   shownSec: number
-  shownAlive: boolean
+  shownCd: number
+  shownState: IconState
+}
+
+type IconState = 'ready' | 'cooling' | 'dead'
+
+/** 阵亡优先于冷却：倒地的人不显示技能冷却 */
+function stateOf(m: SquadMember): IconState {
+  return !m.alive ? 'dead' : m.cdRemainMs > 0 ? 'cooling' : 'ready'
 }
 
 /** 右下角的队伍环：队长贴角落放大并显示他的主动技能，队员沿四分之一圆弧从正上方排到正左方 */
@@ -65,7 +73,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private squadShown = { leader: -1, switching: false }
   private squadTrack?: Phaser.GameObjects.Graphics
   private squadCenter = { x: 0, y: 0 }
-  private skillShown = { sec: -1, ready: false }
   private aimPointer: number | null = null
   private aimOrigin = { x: 0, y: 0 }
   private aimDir: { x: number; y: number } | null = null
@@ -141,7 +148,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.squadArc = []
     this.squadShown = { leader: -1, switching: false }
     this.squadTrack = undefined
-    this.skillShown = { sec: -1, ready: false }
     this.aimPointer = null
     this.aimDir = null
     this.aimGfx = undefined
@@ -463,8 +469,8 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       const emoji = emojiImage(this, 0, 0, isLeader ? member.skillIcon : member.emoji, RING.emoji, 'player')
       const hp = this.add.graphics()
       const cd = this.add.graphics()
-      const cdText = this.add.text(0, 0, '', label).setOrigin(0.5).setVisible(false)
-      const dead = this.add.text(0, 0, '', label).setOrigin(0.5).setVisible(false)
+      const cdText = this.add.text(0, 0, '', { ...label, color: '#ffdc5d' }).setOrigin(0.5).setVisible(false)
+      const dead = this.add.text(0, 0, '', { ...label, color: '#ffcdd2' }).setOrigin(0.5).setVisible(false)
       const badge = emojiImage(this, -18, -18, member.emoji, 18, 'player').setVisible(isLeader)
       const c = this.add
         .container(p.x, p.y, [base, emoji, hp, cd, cdText, dead, badge])
@@ -473,10 +479,9 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
         .setInteractive(new Phaser.Geom.Circle(0, 0, RING.r + 4), Phaser.Geom.Circle.Contains)
         .on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, (pointer: Phaser.Input.Pointer) => this.onIconDown(slot, pointer))
         .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.onIconUp(slot))
-      return { c, base, emoji, badge, hp, cd, cdText, dead, shownHp: -1, shownSec: -1, shownAlive: true }
+      return { c, base, emoji, badge, hp, cd, cdText, dead, shownHp: -1, shownSec: -1, shownCd: -1, shownState: 'ready' as IconState }
     })
     this.squadShown = { leader: s.leaderSlot, switching: false }
-    this.skillShown = { sec: -1, ready: false }
     this.squad.forEach((b, slot) => this.styleSquadIcon(b, s.members[slot]!, slot === s.leaderSlot, false))
   }
 
@@ -559,15 +564,27 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
 
   private styleSquadIcon(b: SquadIcon, m: SquadMember, isLeader: boolean, switching: boolean): void {
     const dim = switching ? 0.55 : 1
-    b.base.setAlpha(dim).setStrokeStyle(3, 0xffffff, isLeader ? 0.6 : 0.28)
-    b.emoji.setTexture(emojiKey(isLeader ? m.skillIcon : m.emoji, 'player')).setDisplaySize(RING.emoji, RING.emoji)
-    b.emoji.setAlpha(m.alive ? dim : 0.3 * dim)
-    b.badge.setVisible(isLeader).setAlpha(dim)
-    b.hp.setAlpha(dim).setVisible(m.alive)
-    b.dead.setVisible(!m.alive)
-    if (!isLeader) {
+    const state = stateOf(m)
+    const dead = state === 'dead'
+    b.base.setFillStyle(dead ? 0x3a0d0d : 0x000000, dead ? 0.85 : 0.38).setAlpha(dim)
+    b.base.setStrokeStyle(3, dead ? 0xef5350 : 0xffffff, dead ? 0.9 : isLeader ? 0.6 : 0.28)
+    b.emoji
+      .setTexture(emojiKey(isLeader ? m.skillIcon : m.emoji, 'player'))
+      .setDisplaySize(RING.emoji, RING.emoji)
+      .setAlpha(dead ? 0.25 : dim)
+    if (dead) b.emoji.setTint(0x777777)
+    else b.emoji.clearTint()
+    // 徽章：队长显示头像，阵亡显示骷髅，冷却中的队员显示技能图标
+    const badge = dead ? '1f480' : isLeader ? m.emoji : state === 'cooling' ? m.skillIcon : null
+    b.badge.setVisible(badge !== null).setAlpha(dim)
+    if (badge !== null) b.badge.setTexture(emojiKey(badge, 'player')).setDisplaySize(18, 18)
+    b.hp.setAlpha(dim).setVisible(!dead)
+    b.dead.setVisible(dead)
+    if (!dead) b.shownSec = -1
+    if (state !== 'cooling') {
       b.cd.clear()
       b.cdText.setVisible(false)
+      b.shownCd = -1
     }
   }
 
@@ -586,32 +603,19 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     g.strokePath()
   }
 
-  /** 队长按钮上的冷却扇形与倒计时，就绪时描边脉冲 */
-  private updateSkillCd(leaderSlot: number): void {
-    const b = this.squad[leaderSlot]
-    const sk = this.arena.leaderSkill()
-    if (!b || !sk) return
-    if (sk.remainMs > 0) {
-      const sec = Math.ceil(sk.remainMs / 1000)
-      const ratio = sk.cdMs > 0 ? sk.remainMs / sk.cdMs : 0
-      if (sec !== this.skillShown.sec || this.skillShown.ready) {
-        this.skillShown = { sec, ready: false }
-        b.cdText.setText(String(sec)).setVisible(true)
-        b.base.setStrokeStyle(3, 0xffffff, 0.6)
-      }
-      const g = b.cd
-      g.clear()
-      g.fillStyle(0x000000, 0.6)
-      g.slice(0, 0, RING.r - 1, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2, false)
-      g.fillPath()
-      return
+  /** 冷却扇形从十二点顺时针收拢，黄色数字；阵亡是红底浅红数字，两者不会同时出现 */
+  private drawCooldown(b: SquadIcon, remainMs: number, cdMs: number): void {
+    const sec = Math.ceil(remainMs / 1000)
+    if (sec !== b.shownCd) {
+      b.shownCd = sec
+      b.cdText.setText(String(sec)).setVisible(true)
     }
-    if (!this.skillShown.ready) {
-      this.skillShown = { sec: -1, ready: true }
-      b.cd.clear()
-      b.cdText.setVisible(false)
-    }
-    b.base.setStrokeStyle(3, 0xffdc5d, 0.55 + 0.4 * Math.sin(this.time.now / 240))
+    const ratio = cdMs > 0 ? remainMs / cdMs : 0
+    const g = b.cd
+    g.clear()
+    g.fillStyle(0x000000, 0.6)
+    g.slice(0, 0, RING.r - 1, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2, false)
+    g.fillPath()
   }
 
   private updateSquad(): void {
@@ -619,29 +623,31 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     if (!s) return
     if (s.members.length !== this.squad.length) this.createSquad(s, textRes())
     const leaderChanged = s.leaderSlot !== this.squadShown.leader
-    if (leaderChanged) {
-      this.swapLeader(this.squadShown.leader, s.leaderSlot)
-      this.skillShown = { sec: -1, ready: false }
-    }
+    if (leaderChanged) this.swapLeader(this.squadShown.leader, s.leaderSlot)
     const switchChanged = s.switching !== this.squadShown.switching
     this.squadShown = { leader: s.leaderSlot, switching: s.switching }
     s.members.forEach((m, i) => {
       const b = this.squad[i]!
-      const aliveChanged = m.alive !== b.shownAlive
-      if (leaderChanged || switchChanged || aliveChanged) {
-        b.shownAlive = m.alive
-        this.styleSquadIcon(b, m, i === s.leaderSlot, s.switching)
+      const isLeader = i === s.leaderSlot
+      const state = stateOf(m)
+      if (leaderChanged || switchChanged || state !== b.shownState) {
+        b.shownState = state
+        this.styleSquadIcon(b, m, isLeader, s.switching)
       }
-      if (!m.alive && m.reviveSec !== b.shownSec) {
-        b.shownSec = m.reviveSec
-        b.dead.setText(String(m.reviveSec))
+      if (state === 'dead') {
+        if (m.reviveSec !== b.shownSec) {
+          b.shownSec = m.reviveSec
+          b.dead.setText(String(m.reviveSec))
+        }
+        return
       }
+      if (state === 'cooling') this.drawCooldown(b, m.cdRemainMs, m.cdMs)
+      else if (isLeader) b.base.setStrokeStyle(3, 0xffdc5d, 0.55 + 0.4 * Math.sin(this.time.now / 240))
       const ratio = m.max > 0 ? Math.max(0, Math.min(1, m.hp / m.max)) : 0
       if (Math.abs(ratio - b.shownHp) < 0.005) return
       b.shownHp = ratio
       this.drawHpRing(b, ratio)
     })
-    this.updateSkillCd(s.leaderSlot)
   }
 
   private onLeaderChanged(e: LeaderChanged): void {
