@@ -83,7 +83,7 @@ function boltSource(slot: number): Source {
   return { faction: FACTION.team, slot, kb: 1, crit: 0, dmgMul: 1 }
 }
 
-export function enemySource(enemy: EnemyKind, dmgMul: number): Source {
+export function enemySource(enemy: EnemyKind | undefined, dmgMul: number): Source {
   return { faction: FACTION.enemy, slot: -1, kb: 1, crit: 0, dmgMul, enemy }
 }
 

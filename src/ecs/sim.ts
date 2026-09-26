@@ -83,7 +83,7 @@ interface Handover {
 
 export interface PendingDeath {
   eid: number
-  def: import('../types/enemies').EnemyDef
+  def: import('../types/enemies').NpcDef
   x: number
   y: number
   elite: boolean

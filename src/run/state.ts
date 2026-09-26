@@ -24,6 +24,8 @@ export interface RunState {
   memberHp: number[]
   memberItems: ItemId[][]
   skillCd: number[]
+  /** 永久形态（局内进化），-1 是本体 */
+  memberForm: number[]
   leaderId: CharacterId
   stats: {
     damage: number[]
@@ -55,6 +57,7 @@ export function beginRun(starters: readonly CharacterId[], mapId: MapId = MAP_ID
     memberHp: roster.map(() => MEMBER.maxHp),
     memberItems: roster.map(() => []),
     skillCd: roster.map(() => 0),
+    memberForm: roster.map(() => -1),
     leaderId: roster[0]!,
     stats: {
       damage: roster.map(() => 0),
@@ -111,6 +114,7 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   run.memberHp.push(MEMBER.maxHp)
   run.memberItems.push([])
   run.skillCd.push(0)
+  run.memberForm.push(-1)
   run.stats.damage.push(0)
   run.stats.kills.push(0)
   run.stats.deaths.push(0)

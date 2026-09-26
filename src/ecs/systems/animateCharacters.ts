@@ -1,7 +1,7 @@
 import { UNIT } from '../../util/units'
-import { MEMBER } from '../../data/characters'
+import { charSize } from './shared/scale'
 import { SQUAD } from '../../data/feel'
-import { Alive, Breath, CharScale, Depth, Facing, Phys, Pop, Sprite, Transform } from '../components'
+import { Alive, Breath, Depth, Facing, Phys, Pop, Sprite, Transform } from '../components'
 import { backEaseOut } from '../utils/ease'
 import { leaderX, leaderY } from '../utils/team'
 import type { Sim } from '../sim'
@@ -19,13 +19,12 @@ function popping(sim: Sim, eid: number, charSize: number): boolean {
 }
 
 export function finishCharacterPops(sim: Sim): void {
-  const baseSize = MEMBER.size * UNIT
   for (const eid of sim.characters) {
-    const charSize = baseSize * CharScale.v[eid]!
-    if (!Alive.v[eid] || Pop.until[eid] === 0 || popping(sim, eid, charSize)) continue
+    const size = charSize(eid)
+    if (!Alive.v[eid] || Pop.until[eid] === 0 || popping(sim, eid, size)) continue
     Pop.until[eid] = 0
-    Transform.w[eid] = charSize
-    Transform.h[eid] = charSize
+    Transform.w[eid] = size
+    Transform.h[eid] = size
   }
 }
 
@@ -45,7 +44,6 @@ function face(sim: Sim, eid: number): void {
 
 export function animateCharacters(sim: Sim): void {
   const delta = sim.dtMs
-  const baseSize = MEMBER.size * UNIT
   const lx = leaderX(sim)
   const ly = leaderY(sim)
   for (const eid of sim.characters) {
@@ -54,13 +52,13 @@ export function animateCharacters(sim: Sim): void {
     face(sim, eid)
     const vx = Phys.vx[eid]!
     const moving = Math.hypot(vx, Phys.vy[eid]!) > STRIDE
-    const charSize = baseSize * CharScale.v[eid]!
-    if (!popping(sim, eid, charSize)) {
+    const size = charSize(eid)
+    if (!popping(sim, eid, size)) {
       const bp = Breath.phase[eid]! + delta / (moving ? 85 : 140)
       Breath.phase[eid] = bp
       const s = Math.sin(bp) * (moving ? 0.13 : 0.09)
-      Transform.w[eid] = charSize * (1 - s * 0.6)
-      Transform.h[eid] = charSize * (1 + s)
+      Transform.w[eid] = size * (1 - s * 0.6)
+      Transform.h[eid] = size * (1 + s)
     }
     if (Math.abs(vx) > STRIDE) Sprite.flipX[eid] = vx > 0 ? 1 : 0
   }

@@ -2,7 +2,7 @@ import { hasComponent } from 'bitecs'
 import { CRIT_MUL } from '../../../data/items'
 import { norm } from '../../../util/vec'
 import { playSfx } from '../../../audio/sfx'
-import { Alive, CharFlash, Dormant, FACTION, Faction, Flash, Hp, MARK, MARK_SLOTS, Mark, Slot, Tint, Transform } from '../../components'
+import { Alive, CharFlash, Dormant, FACTION, Faction, Flash, Hp, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Tint, Transform } from '../../components'
 import { guardMul, hasMark, isUntargetable, markSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
 import { bodyRules, resDef } from '../../store'
@@ -11,6 +11,8 @@ import { selfSource } from '../../utils/source'
 import { applyAbilityEffects, casterOf, PARRY_FX } from './effects'
 import { displace, FORCED } from './displace'
 import { die } from './combat'
+import { feedGut } from './gut'
+import { applyForm } from '../../entities/form'
 import { spawnDamageNumber, spawnFxCircle } from '../../entities/fx'
 import type { Point } from '../../../util/vec'
 import type { Source } from '../../utils/source'
@@ -85,7 +87,37 @@ function store(target: number, dmg: number): void {
   for (let i = 0; i < MARK_SLOTS; i++) if (Mark.kind[base + i] === MARK.store) Mark.a[base + i] = Mark.a[base + i]! + dmg
 }
 
-/** 唯一的伤害入口：静止与碰不到、无敌、挡格、睡眠惊醒、护盾倍率、暴击、存伤、扣血、不死、死亡、受击反馈、击退冲量，敌我同一条；持续伤害不暴击、不看也不消耗无敌与挡格；返回是否命中 */
+function selfAt(target: number): { x: number; y: number; baseDamage: number; targets: number[] } {
+  return { x: Transform.x[target]!, y: Transform.y[target]!, baseDamage: 0, targets: [target] }
+}
+
+/** 致命一击：本条命第一次生命归零时不死，改施加身体的致命规则 */
+function lethal(sim: Sim, target: number): boolean {
+  const fx = bodyRules[target]?.onLethal
+  if (!fx || Lethal.used[target]) return false
+  Lethal.used[target] = 1
+  Hp.v[target] = 1
+  applyAbilityEffects(sim, selfSource(sim, target), fx, selfAt(target))
+  return true
+}
+
+/** 残血：本条命第一次生命低于比例时施加一次 */
+function lowHp(sim: Sim, target: number): void {
+  const rule = bodyRules[target]?.onLowHp
+  if (!rule || Lethal.low[target] || Hp.v[target]! >= Hp.max[target]! * rule.ratio) return
+  Lethal.low[target] = 1
+  applyAbilityEffects(sim, selfSource(sim, target), rule.effects, selfAt(target))
+}
+
+/** 坐骑先扣：扣光就换成下马的形态，这一下不伤本体 */
+function mounted(sim: Sim, target: number, dmg: number): boolean {
+  if (Mount.hp[target]! <= 0) return false
+  Mount.hp[target] = Math.max(0, Mount.hp[target]! - dmg)
+  if (Mount.hp[target] === 0) applyForm(sim, target, Mount.form[target]!)
+  return true
+}
+
+/** 唯一的伤害入口：静止与碰不到、无敌、挡格、睡眠惊醒、护盾倍率、暴击、存伤、吞噬者吐人、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量，敌我同一条；持续伤害不暴击、不看也不消耗无敌与挡格；返回是否命中 */
 export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
   if (sim.over || !hasComponent(sim.world, target, Hp) || Dormant.v[target] || Alive.v[target] === 0) return false
   if (hasMark(sim, target, MARK.stasis) || (!o.tick && isUntargetable(sim, target))) return false
@@ -105,6 +137,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
   if (!team) spawnDamageNumber(sim, Transform.x[target]!, Transform.y[target]!, dmg, crit)
   record(sim, src, target, dmg)
   store(target, dmg)
+  feedGut(sim, target, dmg)
   if (!o.tick) fuel(sim, src, target)
   // 被命中反应先于扣血：无敌帧从这一下起算
   const back = o.tick ? undefined : bodyRules[target]?.onHurt
@@ -119,13 +152,15 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
     jx = dir.x * kb
     jy = dir.y * kb
   }
-  let hp = Hp.v[target]! - dmg
+  let hp = mounted(sim, target, dmg) ? Hp.v[target]! : Hp.v[target]! - dmg
   if (hp <= 0 && hasMark(sim, target, MARK.undying)) hp = 1
+  if (hp <= 0 && lethal(sim, target)) hp = Hp.v[target]!
   if (hp <= 0) {
     die(sim, target, src, jx, jy)
     return true
   }
   Hp.v[target] = hp
+  lowHp(sim, target)
   if (team) {
     playSfx('hurt')
     CharFlash.until[target] = sim.fxMs + 120

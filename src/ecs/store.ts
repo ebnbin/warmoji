@@ -1,12 +1,19 @@
 import { INITIAL_CAPACITY } from './world'
-import type { BodyRules, EnemyDef, ResourceDef } from '../types/enemies'
+import type { BodyRules, EnemyDef, NpcDef, ResourceDef } from '../types/enemies'
 import type { FieldPickupDef } from '../types/battlefield'
 import type { AbilityDef, Cond, Effect } from '../types/abilityDefs'
 import type { Source } from './utils/source'
 
 const slots = <T>(): (T | undefined)[] => new Array<T | undefined>(INITIAL_CAPACITY).fill(undefined)
 
-export const enemyDef = slots<EnemyDef>()
+/** 非玩家身体的定义：敌人、分身、亡仆 */
+export const enemyDef = slots<NpcDef>()
+
+/** 敌人的身份（种类、经验、金币、Boss）：只有刷出来的敌人有，召唤出的身体没有 */
+export const enemyOf = slots<EnemyDef>()
+
+/** 身体当前的外观（形态切换后），没有就用定义里的；角色与非玩家身体同一个 */
+export const bodyLook = slots<string>()
 
 export const projOnHit = slots<readonly Effect[]>()
 
@@ -61,6 +68,12 @@ export const ammoLast = slots<readonly Effect[]>()
 
 /** 身体的资源定义 */
 export const resDef = slots<ResourceDef>()
+
+/** 能力实体装上时的定义：夺取、分身都照它复制 */
+export const abilityDef = slots<AbilityDef>()
+
+/** 形态到时切回本体时施加的效果 */
+export const formEnd = slots<readonly Effect[]>()
 
 /** 身体自己的规则：敌人是它的定义，角色是出生时按道具拼出来的包，造物只有接触效果 */
 export const bodyRules = slots<BodyRules>()

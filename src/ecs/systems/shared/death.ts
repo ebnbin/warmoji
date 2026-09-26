@@ -3,7 +3,7 @@ import { waveAt } from '../../../data/waves'
 import type { DecoyEffect, SplitEffect } from '../../../types/enemies'
 import type { Effect } from '../../../types/abilityDefs'
 import { Despawn } from '../../components'
-import { spawnBrood, spawnEnemy } from '../../entities/enemy'
+import { spawnBrood, spawnNpc } from '../../entities/enemy'
 import { applyAbilityEffects } from './effects'
 import { enemySource } from '../../utils/source'
 import type { PendingDeath, Sim } from '../../sim'
@@ -19,14 +19,12 @@ function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): 
     ...d.def,
     damage: 0,
     speed: 0,
-    xp: 0,
-    coins: 0,
     drive: { kind: 'wander' as const },
     abilities: undefined,
     onDeath: undefined,
     kbImmune: true,
   }
-  const eid = spawnEnemy(sim, sim.frames, husk, d.x, d.y, Math.round(fx.hp * hpMul), false, false, fx.alpha)
+  const eid = spawnNpc(sim, sim.frames, husk, d.x, d.y, Math.round(fx.hp * hpMul), { alpha: fx.alpha, faction: d.faction })
   Despawn.at[eid] = sim.elapsedMs + fx.durationMs
 }
 

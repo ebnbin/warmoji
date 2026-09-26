@@ -1,5 +1,6 @@
 import type { SfxId } from './sfx'
 import type { GroundEffectDef } from './groundEffects'
+import type { EnemyDef, EnemyKind } from './enemies'
 
 interface ProjectileSpec {
   readonly emoji: string
@@ -335,6 +336,91 @@ interface AreaEffect {
   readonly radius: number
   readonly then: readonly Effect[]
 }
+/** 形态：切到本体的第 to 个形态（-1 是本体）；给了 ms 就到时切回本体并施加 onEnd */
+interface FormEffect {
+  readonly kind: 'form'
+  readonly to: number
+  readonly ms?: number
+  readonly onEnd?: readonly Effect[]
+}
+/** 体型：× mul，受击与接触的面积跟着变；给了 ms 到时还原，否则永久叠加，最多 max 倍 */
+interface GrowEffect {
+  readonly kind: 'grow'
+  readonly mul: number
+  readonly ms?: number
+  readonly max?: number
+}
+/** 回溯：回到 ms 前的位置，生命取那时与现在的较高者 */
+interface RewindEffect {
+  readonly kind: 'rewind'
+  readonly ms: number
+}
+/** 夺取：把目标的一条能力复制给施法者用 ms，冷却 cooldownMs；skill 为真时夺它的主动技能，并让它的冷却重新走 */
+interface StealEffect {
+  readonly kind: 'steal'
+  readonly ms: number
+  readonly cooldownMs: number
+  readonly skill?: boolean
+}
+/** 分身：在施法者身边造 count 个复制体，生命为施法者上限的 hpRatio，带着它的普通出手（伤害 × dmgRatio），存在 lifeMs，死时施加 onDeath */
+interface CloneEffect {
+  readonly kind: 'clone'
+  readonly count: number
+  readonly lifeMs: number
+  readonly hpRatio: number
+  readonly dmgRatio: number
+  readonly onDeath?: readonly Effect[]
+}
+/** 亡者倒戈：死者（死亡印记结算时）以施法者的阵营站起来 lifeMs，生命为原来的 hpRatio */
+interface RaiseEffect {
+  readonly kind: 'raise'
+  readonly lifeMs: number
+  readonly hpRatio: number
+}
+/** 吞噬：把目标吞进施法者肚子里最多 ms，每秒消化 dps；施法者挨够 escape 伤害或死了就吐出来；spit 是吐出时抛出的距离 */
+interface DevourEffect {
+  readonly kind: 'devour'
+  readonly ms: number
+  readonly dps: number
+  readonly escape: number
+  readonly spit: number
+}
+/** 附身：目标贴到施法者身上 ms，期间不可选中，照常出手 */
+interface AttachEffect {
+  readonly kind: 'attach'
+  readonly ms: number
+}
+/** 召出 count 个 def 的身体，阵营随施法者，记在施法者名下 */
+interface SpawnEffect {
+  readonly kind: 'spawn'
+  readonly def: EnemyDef
+  readonly count: number
+  readonly spread: number
+}
+/** 瞬移到自己召出的 of 身边（最靠近目标的那个），落地施加 then */
+interface TeleportEffect {
+  readonly kind: 'teleport'
+  readonly of: EnemyKind
+  readonly then?: readonly Effect[]
+}
+/** 残影：沿出手方向冲出 dash 远处留一个影子，存在 lifeMs，最多 max 个；镜像的能力也从影子出手；taunt 给了就让影子嘲讽周围 */
+interface ShadowEffect {
+  readonly kind: 'shadow'
+  readonly lifeMs: number
+  readonly max: number
+  readonly dash: number
+  readonly taunt?: { readonly radius: number; readonly ms: number }
+}
+/** 与自己最新的影子换位 */
+interface ShadowSwapEffect {
+  readonly kind: 'shadowSwap'
+}
+/** 亡后残留：生命回到上限的 hpRatio，之后 ms 内流失殆尽，期间照常行动 */
+interface UndeadEffect {
+  readonly kind: 'undead'
+  readonly ms: number
+  readonly hpRatio: number
+}
 export type Effect =
   | BlastEffect
   | SlowEffect
@@ -391,6 +477,19 @@ export type Effect =
   | EmpowerEffect
   | CasterEffect
   | AreaEffect
+  | FormEffect
+  | GrowEffect
+  | RewindEffect
+  | StealEffect
+  | CloneEffect
+  | RaiseEffect
+  | DevourEffect
+  | AttachEffect
+  | SpawnEffect
+  | TeleportEffect
+  | ShadowEffect
+  | ShadowSwapEffect
+  | UndeadEffect
 
 interface ZoneVisual {
   readonly color: number
@@ -521,6 +620,10 @@ interface AbilityBase {
   readonly requires?: Cond
   /** 这条能力打死了谁，对出手者施加 */
   readonly onKill?: readonly Effect[]
+  /** 影子也照着出手 */
+  readonly mirror?: boolean
+  /** 施法锚点：这条能力从一个跟着宿主的物件上出手；orbit 绕宿主转、trail 落在宿主一秒半前的位置、ally 贴着血量最低的队友 */
+  readonly anchor?: { readonly emoji: string; readonly size: number; readonly mode: 'orbit' | 'trail' | 'ally'; readonly distance: number }
 }
 /** 一个能力 = 触发 × 瞄准 × 形状 × 载荷 × 重复 */
 export type AbilityDef =

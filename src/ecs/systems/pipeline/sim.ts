@@ -24,6 +24,14 @@ import { updateControl } from '../updateControl'
 import { updateSpeedMuls } from '../updateSpeedMuls'
 import { tickMarks } from '../tickMarks'
 import { tickResources } from '../tickResources'
+import { tickForms } from '../tickForms'
+import { tickIdle } from '../tickIdle'
+import { tickGrowUp } from '../tickGrowUp'
+import { tickPets } from '../tickPets'
+import { tickBorrowed } from '../shared/steal'
+import { tickGuts } from '../shared/gut'
+import { tickShadows } from '../../entities/shadow'
+import { recordHistory } from '../shared/history'
 import { tintEnemies } from '../tintEnemies'
 import { updateDormancy } from '../updateDormancy'
 import { cullProjectiles } from '../cullProjectiles'
@@ -43,6 +51,12 @@ export const SIM_PIPELINE = pipeline([
   { run: reviveCharacters, after: [stepHandover] },
   { run: tickMarks, after: [updateDormancy] },
   { run: tickResources, after: [tickMarks] },
+  { run: tickForms, after: [tickMarks] },
+  { run: tickBorrowed, after: [tickMarks] },
+  { run: tickGuts, after: [tickMarks] },
+  { run: tickShadows, after: [tickMarks] },
+  { run: tickGrowUp, after: [tickMarks] },
+  { run: tickIdle, after: [tickMarks] },
   { run: updateSpeedMuls, after: [refoldBattleFx, tickMarks] },
   { run: updateControl, after: [updateDormancy, updateSpeedMuls, tickMarks] },
   { run: driveTeam, after: [stepHandover, reviveCharacters, updateControl] },
@@ -55,6 +69,8 @@ export const SIM_PIPELINE = pipeline([
   { run: steerBodies, after: [updateControl, updateBees] },
   { run: moveBodies, after: [layoutTeam, steerBodies] },
   { run: refreshTargets, after: [moveBodies] },
+  { run: recordHistory, after: [moveBodies] },
+  { run: tickPets, after: [moveBodies] },
   { run: settleMotions, after: [refreshTargets] },
   { run: animateCharacters, after: [moveBodies] },
   { run: animateEnemies, after: [moveBodies] },

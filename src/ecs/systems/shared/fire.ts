@@ -49,6 +49,8 @@ import {
   Casting,
   Windup,
   WindupState,
+  Idle,
+  Mirror,
 } from '../../components'
 import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, ammoLast } from '../../store'
 import { clearMarks, markSlot } from '../../utils/marks'
@@ -69,6 +71,7 @@ import { grantIframe } from './combat'
 import { displace } from './displace'
 import { shoot } from './projectile'
 import { launch } from '../../entities/weapon'
+import { shadowsOf } from '../../entities/shadow'
 import { place, spawnBee } from '../../entities/minion'
 import { spawnDrop } from '../../entities/drop'
 import { spawnZone } from '../../entities/zone'
@@ -422,10 +425,27 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
   }
 
   if (hasComponent(w, e, WorldShape)) {
-    applyAbilityEffects(sim, src, onHit, { x: ox, y: oy, baseDamage: damage })
+    applyAbilityEffects(sim, src, onHit, { x: ox, y: oy, baseDamage: damage, angle })
     return true
   }
   return false
+}
+
+/** 能镜像的形状：从出手点打出去、不挪动施法者自己的 */
+const MIRRORED = [Bolt, Segment, Sector, Disc, Chain]
+
+/** 出手一次，影子照着再打：从每个影子朝同一个目标（没有目标就同一个方向）；返回本体这一下是否出了手 */
+function fireMirrored(sim: Sim, e: number, src: Source, angle: number, target: Found | null, damage: number, mods: Mods): boolean {
+  if (!fireOnce(sim, e, src, angle, target, damage, mods)) return false
+  if (!hasComponent(sim.world, e, Mirror) || !MIRRORED.some((c) => hasComponent(sim.world, e, c))) return true
+  const home = Anchor.eid[e]!
+  for (const s of shadowsOf(sim, Owner.eid[e]!)) {
+    Anchor.eid[e] = s
+    const d = target ? sim.hooks.worldDelta(sim, Transform.x[s]!, Transform.y[s]!, target.x, target.y) : null
+    fireOnce(sim, e, { ...src, sight: undefined }, d ? Math.atan2(d.y, d.x) : angle, target, damage, mods)
+  }
+  Anchor.eid[e] = home
+  return true
 }
 
 /** 蓄力：记下方向，让宿主停下并显出预兆，到点由 tickWindups 出手 */
@@ -487,7 +507,7 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   const holdMul = hold > 0 ? 1 + (Hold.damageMul[e]! - 1) * hold : 1
   const damage = Math.round(baseDamage(sim, e) * holdMul * (boost?.damageMul ?? 1))
   if (count <= 1 || delay > 0) {
-    if (!fireOnce(sim, e, src, shot.angle, shot.target, damage, mods)) return false
+    if (!fireMirrored(sim, e, src, shot.angle, shot.target, damage, mods)) return false
     if (count > 1) {
       RepeatState.left[e] = count - 1
       RepeatState.nextAt[e] = sim.elapsedMs + delay
@@ -499,7 +519,7 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
     let fired = false
     for (let i = 0; i < count; i++) {
       const angle = ring ? shot.angle + (i * Math.PI * 2) / count : shot.angle + spread * DEG2RAD * (i / (count - 1) - 0.5)
-      if (fireOnce(sim, e, src, angle, shot.target, damage, mods)) fired = true
+      if (fireMirrored(sim, e, src, angle, shot.target, damage, mods)) fired = true
     }
     if (!fired) return false
   }
@@ -507,8 +527,13 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   if (sfx) playSfx(sfx)
   const anchor = Anchor.eid[e]!
   if (hasComponent(w, anchor, Fired)) Fired.v[anchor] = 1
-  // 潜行出手即现形
-  clearMarks(Owner.eid[e]!, STEALTH)
+  // 潜行出手即现形，闲着的计时重来
+  const o = Owner.eid[e]!
+  clearMarks(o, STEALTH)
+  if (hasComponent(w, o, Idle)) {
+    Idle.since[o] = sim.elapsedMs
+    Idle.done[o] = 0
+  }
   // 自身效果放最后：消散会把宿主连同这条能力一起移除
   const self = abilityOnSelf[e]
   if (self) applyAbilityEffects(sim, src, self, { x: anchorX(e), y: anchorY(e), baseDamage: damage, targets: [Owner.eid[e]!] })
@@ -543,7 +568,7 @@ export function fireRepeat(sim: Sim, e: number): boolean {
       if (Repeat.spreadDeg[e]! >= 360 - 1e-9) angle = RepeatState.angle[e]! + (i * Math.PI * 2) / count
   }
   Aim.rad[e] = angle
-  if (!fireOnce(sim, e, src, angle, target, Math.max(1, Math.round(RepeatState.damage[e]! * Repeat.ratio[e]!)), { onHit: abilityOnHit[e], reach: 1 })) return false
+  if (!fireMirrored(sim, e, src, angle, target, Math.max(1, Math.round(RepeatState.damage[e]! * Repeat.ratio[e]!)), { onHit: abilityOnHit[e], reach: 1 })) return false
   const sfx = abilityFireSfx[e]
   if (sfx) playSfx(sfx)
   return true

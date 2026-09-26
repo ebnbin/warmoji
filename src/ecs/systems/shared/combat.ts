@@ -6,13 +6,11 @@ import { gainXp } from '../../../run/xp'
 import { coinDropChance } from '../../../data/waves'
 import { ELITE } from '../../../data/enemies'
 import type { EnemyDef } from '../../../types/enemies'
-import { MEMBER } from '../../../data/characters'
-import { UNIT } from '../../../util/units'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Hp, CharScale, MARK, MARK_SLOTS, Mark, Nest, Revive, Slot, Sprite, TAG, Thief, Tint, Transform } from '../../components'
+import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Hp, Lethal, MARK, MARK_SLOTS, Mark, Nest, Revive, Slot, Sprite, TAG, Thief, Tint, Transform } from '../../components'
 import { isSameEntity } from '../../utils/identity'
 import { addMark, dmgMul, hasMark } from '../../utils/marks'
-import { abilityOnKill, bodyRules, enemyCarries, enemyDef, resDef } from '../../store'
+import { abilityOnKill, bodyRules, enemyCarries, enemyDef, enemyOf, resDef } from '../../store'
 import { flying, selfSource } from '../../utils/source'
 import { nearestTarget } from '../../utils/targets'
 import { gainRes } from './resource'
@@ -20,6 +18,9 @@ import { applyAbilityEffects, casterOf, DEATH_DEF, FUSE_DEF, markFrom, markSourc
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
 import { endMotion } from './displace'
+import { charSize } from './scale'
+import { release } from './gut'
+import { returnBorrowed } from './steal'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 
@@ -27,6 +28,8 @@ import type { Sim } from '../../sim'
 export function die(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: number): void {
   killerReacts(sim, src)
   settleDeathMarks(sim, eid)
+  release(sim, eid)
+  returnBorrowed(sim, eid)
   if (hasComponent(sim.world, eid, Revive)) {
     down(sim, eid)
     return
@@ -88,8 +91,8 @@ function down(sim: Sim, eid: number): void {
   Anim.frames[eid] = -1
   Anim.onceFrames[eid] = 0
   Transform.rot[eid] = 0
-  Transform.w[eid] = MEMBER.size * UNIT * CharScale.v[eid]!
-  Transform.h[eid] = MEMBER.size * UNIT * CharScale.v[eid]!
+  Transform.w[eid] = charSize(eid)
+  Transform.h[eid] = charSize(eid)
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
   if (sim.characters.every((x) => !Alive.v[x])) sim.over = true
 }
@@ -104,21 +107,22 @@ function killBody(sim: Sim, eid: number, srcSlot: number, flingVx: number, fling
   }
   playSfx('kill')
   const def = enemyDef[eid]
+  const who = hostile ? enemyOf[eid] : undefined
   const elite = Elite.v[eid] === 1
   const boss = Boss.v[eid] === 1
-  if (hostile && def) st.enemyKills[def.kind] = (st.enemyKills[def.kind] ?? 0) + 1
+  if (who) st.enemyKills[who.kind] = (st.enemyKills[who.kind] ?? 0) + 1
   if (hostile && elite) st.eliteKills += 1
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'death' })
   if (boss) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 24, kind: 'death' })
   if (hostile && boss) sim.bossDown = true
-  if (hostile && def) grantKillRewards(sim, eid, def, elite)
+  if (who) grantKillRewards(sim, eid, who, elite)
   const hexed = hasMark(sim, eid, MARK.morph)
   if (!hexed && def?.onDeath) {
     const snap = { eid: -1, def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: dmgMul(sim, eid), faction: Faction.v[eid]! }
     if (sim.onDeathFx) sim.onDeathFx({ ...snap, eid })
     else sim.pendingDeaths.push(snap)
   }
-  if (def?.spawner) orphanBrood(sim, eid, !hexed)
+  orphanBrood(sim, eid, !hexed)
   const carries = enemyCarries[eid]
   if (carries) {
     dropFieldPickup(sim, Transform.x[eid]!, Transform.y[eid]!, carries)
@@ -137,6 +141,7 @@ function killBody(sim: Sim, eid: number, srcSlot: number, flingVx: number, fling
   )
   unequipAbilities(sim, eid)
   enemyDef[eid] = undefined
+  enemyOf[eid] = undefined
   removeEntity(sim.world, eid)
 }
 
@@ -170,7 +175,7 @@ function orphanBrood(sim: Sim, nestEid: number, rage = true): void {
 
 export function despawnEnemy(sim: Sim, eid: number, puff = true): void {
   if (puff) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
-  if (enemyDef[eid]?.spawner) orphanBrood(sim, eid)
+  orphanBrood(sim, eid)
   enemyCarries[eid] = undefined
   unequipAbilities(sim, eid)
   enemyDef[eid] = undefined
@@ -185,6 +190,8 @@ export function grantIframe(sim: Sim, eid: number, ms: number): void {
 export function reviveCharacter(sim: Sim, eid: number): void {
   playSfx('revive')
   Alive.v[eid] = 1
+  Lethal.used[eid] = 0
+  Lethal.low[eid] = 0
   Anim.frames[eid] = 0
   Hp.v[eid] = Hp.max[eid]!
   // 复活视同被命中一次的保护
@@ -194,6 +201,6 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   Tint.alpha[eid] = 1
   Tint.effect[eid] = 0
   startPop(sim, eid, POP.reviveMs)
-  Transform.w[eid] = MEMBER.size * UNIT * 0.3 * CharScale.v[eid]!
-  Transform.h[eid] = MEMBER.size * UNIT * 0.3 * CharScale.v[eid]!
+  Transform.w[eid] = charSize(eid) * 0.3
+  Transform.h[eid] = charSize(eid) * 0.3
 }

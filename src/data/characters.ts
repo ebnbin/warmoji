@@ -43,6 +43,7 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
     carriers: [...src.weapons.map(weaponCarrier), ...src.innate.map(innateCarrier)],
     resource: src.resource,
     rules: src.rules,
+    forms: src.forms,
   }
 }
 

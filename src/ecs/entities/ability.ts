@@ -37,6 +37,10 @@ import {
   LOCK_AT,
   Manual,
   Minion,
+  Built,
+  Mirror,
+  Pet,
+  PET,
   Owner,
   Payload,
   REAIM,
@@ -50,6 +54,7 @@ import {
   Swing,
   TELEGRAPH,
   Thrown,
+  Transform,
   WallBlocked,
   Windup,
   WindupState,
@@ -57,11 +62,12 @@ import {
   ZoneFollow,
   ZoneShape,
 } from '../components'
-import { abilityArtEmoji, abilityBoost, abilityFireSfx, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, emplaceAbility } from '../store'
+import { abilityArtEmoji, abilityBoost, abilityDef, abilityFireSfx, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, emplaceAbility } from '../store'
 import type { AbilityDef, Shape } from '../../types/abilityDefs'
 import { ACQUIRE, abilityPiercesWalls } from '../../data/abilities'
 import { UNIT } from '../../util/units'
-import { spawnWeaponBody } from './weapon'
+import { holderOutline, spawnWeaponBody } from './weapon'
+import { attachDrawable } from './drawable'
 import type { Sim } from '../sim'
 import type { ByKind } from '../../util/record'
 
@@ -326,7 +332,23 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
   abilityOnHit[e] = def.onHit
   abilityOnSelf[e] = def.onSelf
   abilityFireSfx[e] = def.fireSfx
+  abilityDef[e] = def
+  if (def.mirror) addComponent(world, e, Mirror)
+  if (def.anchor) Anchor.eid[e] = spawnPet(sim, e, init.anchor, def.anchor, init.faction)
   attachShape(sim, e, def.shape, init.faction)
+}
+
+/** 施法锚点物件：画在宿主身边，能力从它身上出手，由 tickPets 摆放 */
+function spawnPet(sim: Sim, e: number, host: number, a: NonNullable<AbilityDef['anchor']>, faction: number): number {
+  const p = newEntity(sim.world)
+  attachDrawable(sim.world, p, sim.frames, { id: a.emoji, outline: holderOutline(faction, host), x: Transform.x[host]!, y: Transform.y[host]!, size: a.size, z: 13 })
+  addComponent(sim.world, p, Pet)
+  Pet.of[p] = e
+  Pet.host[p] = host
+  Pet.mode[p] = PET[a.mode]
+  Pet.dist[p] = a.distance
+  Pet.phase[p] = 0
+  return p
 }
 
 export function equipAbility(
@@ -372,26 +394,16 @@ export function equipSkill(sim: Sim, host: number, def: AbilityDef, amp: AmpInit
   return equipAbility(sim, host, def, FACTION.team, leftMs, amp, { manual: true, baseMs: cdMs })
 }
 
-/** 撤掉一个身体的全部能力，连同它们造出来的场、召唤物、飞返体、坠物 */
-export function unequipAbilities(sim: Sim, ownerEid: number): void {
+/** 撤掉一个身体的能力（默认全部），连同它们造出来的场、召唤物、装置、飞返体、坠物与施法锚点 */
+export function unequipAbilities(sim: Sim, ownerEid: number, which: (e: number) => boolean = () => true): void {
   const world = sim.world
-  const owned: number[] = []
-  for (const e of query(world, [Ability, Owner])) if (Owner.eid[e] === ownerEid) owned.push(e)
-  for (const d of [...query(world, [Drop, Owner])]) if (owned.includes(Owner.eid[d]!)) removeEntity(world, d)
-  for (const z of [...query(world, [ZoneFollow, Owner])]) if (owned.includes(Owner.eid[z]!)) removeEntity(world, z)
-  for (const m of [...query(world, [Minion, Owner])]) if (Owner.eid[m] === ownerEid) removeEntity(world, m)
-  for (const f of [...query(world, [Flyer])]) if (owned.includes(Flyer.of[f]!)) removeEntity(world, f)
-  for (const e of owned) {
-    abilityOnKill[e] = undefined
-    abilityRequires[e] = undefined
-    abilityBoost[e] = undefined
-    ammoLast[e] = undefined
-    abilityOnHit[e] = undefined
-    abilityOnSelf[e] = undefined
-    abilityPulse[e] = undefined
-    abilityArtEmoji[e] = undefined
-    abilityFireSfx[e] = undefined
-    emplaceAbility[e] = undefined
-    removeEntity(world, e)
-  }
+  const owned = new Set<number>()
+  for (const e of query(world, [Ability, Owner])) if (Owner.eid[e] === ownerEid && which(e)) owned.add(e)
+  if (owned.size === 0) return
+  for (const d of [...query(world, [Drop, Owner])]) if (owned.has(Owner.eid[d]!)) removeEntity(world, d)
+  for (const z of [...query(world, [ZoneFollow, Owner])]) if (owned.has(Owner.eid[z]!)) removeEntity(world, z)
+  for (const m of [...query(world, [Minion, Built])]) if (owned.has(Built.by[m]!)) removeEntity(world, m)
+  for (const f of [...query(world, [Flyer])]) if (owned.has(Flyer.of[f]!)) removeEntity(world, f)
+  for (const p of [...query(world, [Pet])]) if (owned.has(Pet.of[p]!)) removeEntity(world, p)
+  for (const e of owned) removeEntity(world, e)
 }

@@ -16,7 +16,7 @@ import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox/knobs
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
-import { Anim, Breath, Depth, FACTION, Hp, CharFlash, CharScale, Facing, Magnet, MARK, Pop, Revive, Seat, Slot, Sprite, TAG, Transform } from '../components'
+import { Anim, Breath, Depth, FACTION, Grow, Hp, CharFlash, CharScale, Facing, Magnet, MARK, Pop, Revive, Seat, Slot, Sprite, TAG, Transform } from '../components'
 import { addMark } from '../utils/marks'
 import { bodyRules } from '../store'
 import { attachResource } from './resource'
@@ -71,11 +71,16 @@ export function spawnCharacter(
     onTouched: [...(fx.thorns > 0 ? [{ kind: 'damage' as const, amount: fx.thorns }] : []), ...(own?.onTouched ?? [])],
     onTouch: own?.onTouch,
     onKill: [...(fx.killHeal > 0 ? [{ kind: 'heal' as const, amount: fx.killHeal, scope: 'all' as const }] : []), ...(own?.onKill ?? [])],
+    onLethal: own?.onLethal,
+    onLowHp: own?.onLowHp,
+    onIdle: own?.onIdle,
   }
   attachResource(world, eid, def.resource)
   if (fx.regenPerSec > 0) addMark(eid, MARK.regen, TAG.perk, Infinity, fx.regenPerSec)
   Revive.ms[eid] = Math.max(1000, TEAM.reviveMs + fx.reviveAddMs)
   CharScale.v[eid] = place.sizeMul
+  Grow.r0[eid] = MEMBER.radius * UNIT
+  Grow.s0[eid] = MEMBER.size * UNIT
   Seat.v[eid] = -1
   Facing.y[eid] = -1
   Transform.w[eid] = size

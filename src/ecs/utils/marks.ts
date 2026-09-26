@@ -86,6 +86,15 @@ export function clearMarks(eid: number, kinds: readonly number[]): void {
   }
 }
 
+/** 清掉某种标记里带某个来源标签的，不触发到期反应 */
+export function clearMarksTagged(eid: number, kind: number, tag: number): void {
+  const base = eid * MARK_SLOTS
+  for (let i = 0; i < MARK_SLOTS; i++) {
+    const s = base + i
+    if (Mark.kind[s] === kind && Mark.tag[s] === tag) Mark.kind[s] = MARK.none
+  }
+}
+
 /** 某种倍率标记的乘积 */
 function product(sim: Sim, eid: number, kind: number): number {
   const now = sim.elapsedMs

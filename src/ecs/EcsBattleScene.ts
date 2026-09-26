@@ -23,14 +23,15 @@ import { bossFor, MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Cd, Charges, CharScale, Ctl, Dormant, Enemy, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
+import { Alive, Boss, Cd, Charges, Ctl, Dormant, Enemy, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
+import { charSize } from './systems/shared/scale'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
 import { viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
-import { modDef } from './store'
+import { bodyLook, modDef } from './store'
 import { resetEntityStorage } from './storage'
 import { armTeam } from './entities/loadout'
 import { requestCast } from './systems/shared/ability'
@@ -418,7 +419,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       if (key === this.shownHp[i]) continue
       this.shownHp[i] = key
       const w = 0.8 * UNIT
-      const y = MEMBER.size * UNIT * CharScale.v[m]! * 0.62
+      const y = charSize(m) * 0.62
       g.clear()
       g.fillStyle(0x000000, 0.45)
       g.fillRect(-w / 2, y, w, 6)
@@ -487,7 +488,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       members: sim.characters.map((m, slot) => {
         const def = CHARACTERS[this.run.roster[slot]!]
         return {
-          emoji: def.emoji,
+          emoji: bodyLook[m] ?? def.emoji,
           name: def.name,
           skillIcon: def.skill.icon,
           cdRemainMs: this.run.skillCd[slot] ?? 0,
@@ -521,7 +522,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     return {
       icon: def.skill.icon,
       name: def.skill.name,
-      emoji: def.emoji,
+      emoji: bodyLook[sim.leader] ?? def.emoji,
       remainMs: root === undefined ? 0 : skillRemainMs(sim, root),
       cdMs: def.skill.cdMs,
       aim: def.skill.aim,
@@ -690,7 +691,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.shownLeader = sim.leader
       const def = CHARACTERS[this.run.roster[sim.characters.indexOf(sim.leader)]!]
       playSfx('whoosh')
-      this.hud.emit(HudEvent.LeaderChanged, { emoji: def.emoji, name: def.name })
+      this.hud.emit(HudEvent.LeaderChanged, { emoji: bodyLook[sim.leader] ?? def.emoji, name: def.name })
     }
     this.cues?.step(sim.fxMs)
     this.rings?.step(sim.fxMs)

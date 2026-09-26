@@ -135,10 +135,11 @@ export const MARK = {
   mist: 37,
   devoured: 38,
   undead: 39,
+  grow: 40,
 } as const
 
 /** 标记的来源：同种同源的标记刷新而不叠加 */
-export const TAG = { effect: 0, morph: 1, elite: 2, perk: 3 } as const
+export const TAG = { effect: 0, morph: 1, elite: 2, perk: 3, form: 4 } as const
 
 /** 身体上的标记列表：每个身体 MARK_SLOTS 个槽位；until 为 Infinity 时永久；a/b/c 按种类解释（倍率、跳伤、节拍、下次跳的时刻、嘲讽者、是否曾锚定）；ref 是所引用身体的 Uid */
 export const Mark = {
@@ -407,6 +408,53 @@ export const Spend = { cost: f32(), gain: f32(), hp: f32() }
 
 /** 身体的资源：当前值、上限、锁到何时、最近一次增长的时刻 */
 export const Res = { v: f32(), max: f32(), lock: f32(), lastGain: f32() }
+
+/** 本条命里用过的一次性规则：致命一击、残血 */
+export const Lethal = { used: u8(), low: u8() }
+
+/** 体型：永久倍率、形态倍率与合起来的当前倍率；r0 是本来的判定半径，s0 是本来的画面尺寸 */
+export const Grow = { perm: f32(), form: f32(), v: f32(), r0: f32(), s0: f32() }
+
+export const HISTORY = 40
+export const HISTORY_MS = 100
+
+const stridedBy = <T extends Column>(ctor: new (length: number) => T, n: number): T => {
+  const col = new ctor(INITIAL_CAPACITY * n)
+  STRIDE.set(col, n)
+  return col
+}
+
+/** 位置与生命的历史：每 HISTORY_MS 记一格，环形，i 是下一格，n 是已记的格数，at 是下次记的时刻 */
+export const History = { x: stridedBy(Float32Array, HISTORY), y: stridedBy(Float32Array, HISTORY), hp: stridedBy(Float32Array, HISTORY), i: i32(), n: i32(), at: f32() }
+
+/** 借来的能力：到时撤掉；from 是被夺走的那条能力与它的编号，夺取者死了就还回去 */
+export const Borrowed = { until: f32(), from: i32(), fromUid: u32() }
+
+/** 肚子里装着的身体：victim 与编号、这期间挨了多少、挨够多少吐出、最多装到何时、每秒消化、吐出距离、下次消化的时刻 */
+export const Gut = { victim: i32(), uid: u32(), hurt: f32(), limit: f32(), until: f32(), dps: f32(), spit: f32(), nextAt: f32() }
+
+/** 影子：主人与编号、消失的时刻 */
+export const Shadow = { of: i32(), ofUid: u32(), until: f32() }
+
+export const PET = { orbit: 0, trail: 1, ally: 2 } as const
+
+/** 施法锚点物件：所属的能力、宿主、跟随方式、距离与转角 */
+export const Pet = { of: i32(), host: i32(), mode: u8(), dist: f32(), phase: f32() }
+
+/** 闲着的计时：最近一次出手或移动的时刻、这一轮是否已触发 */
+export const Idle = { since: f32(), done: u8() }
+
+/** 延时成长：到这个时刻长成 */
+export const GrowUp = { at: f32() }
+
+/** 形态：当前第几个（-1 是本体）、到何时切回（0 不切回） */
+export const Form = { idx: i32Fill(-1), until: f32() }
+
+/** 坐骑：剩余与总生命、扣光后切到的形态 */
+export const Mount = { hp: f32(), max: f32(), form: i32() }
+
+/** 能力镜像：影子照着出手 */
+export const Mirror = {}
 
 export const CastRequest = {}
 

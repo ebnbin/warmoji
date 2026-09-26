@@ -167,6 +167,32 @@ export function effectLine(e: Effect): string {
       return `自身：${e.then.map(effectLine).join('、')}`
     case 'area':
       return `${grid(e.radius)} 内：${e.then.map(effectLine).join('、')}`
+    case 'form':
+      return `${e.to < 0 ? '变回本体' : `切换到第 ${e.to + 1} 形态`}${e.ms === undefined ? '' : ` ${sec(e.ms)}`}${e.onEnd ? `，结束时${e.onEnd.map(effectLine).join('、')}` : ''}`
+    case 'grow':
+      return `体型 ×${e.mul}${e.ms === undefined ? `（永久叠加${e.max ? `，最多 ×${e.max}` : ''}）` : ` ${sec(e.ms)}`}，受击与接触范围随之变化`
+    case 'rewind':
+      return `回到 ${sec(e.ms)} 前的位置，生命取那时与现在的较高者`
+    case 'steal':
+      return `夺取目标的${e.skill ? '主动技能' : '一项能力'}，自己用 ${sec(e.ms)}（每 ${sec(e.cooldownMs)} 一次）${e.skill ? '；原主的冷却重新走，夺取者死了才还' : ''}`
+    case 'clone':
+      return `造出 ${e.count} 个分身 ${sec(e.lifeMs)}：${pct(e.hpRatio)} 生命、${pct(e.dmgRatio)} 伤害${e.onDeath ? `，分身死时${e.onDeath.map(effectLine).join('、')}` : ''}`
+    case 'raise':
+      return `死者为你而战 ${sec(e.lifeMs)}（${pct(e.hpRatio)} 生命）`
+    case 'devour':
+      return `吞下目标最多 ${sec(e.ms)}，每秒消化 ${e.dps}；挨够 ${e.escape} 伤害就吐出来`
+    case 'attach':
+      return `贴到施法者身上 ${sec(e.ms)}，期间不可选中，照常出手`
+    case 'spawn':
+      return `召出 ${e.count} 个${e.def.name}`
+    case 'teleport':
+      return `瞬移到离敌人最近的一个自己的${e.of}旁${e.then ? `，落地${e.then.map(effectLine).join('、')}` : ''}`
+    case 'shadow':
+      return `向前 ${grid(e.dash)} 留下影子 ${sec(e.lifeMs)}（最多 ${e.max} 个），镜像的出手从影子上再打一遍${e.taunt ? `；影子嘲讽 ${grid(e.taunt.radius)} 内的敌人 ${sec(e.taunt.ms)}` : ''}`
+    case 'shadowSwap':
+      return '与最新的影子换位'
+    case 'undead':
+      return `生命回到 ${pct(e.hpRatio)}，之后 ${sec(e.ms)} 内流失殆尽，期间照常行动`
   }
 }
 

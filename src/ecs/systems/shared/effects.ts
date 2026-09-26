@@ -1,13 +1,20 @@
 import type { Cond, Effect, MarkName } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
 import { hasComponent, query } from 'bitecs'
-import { Ability, Alive, Boss, Cd, Charges, Enemy, FACTION, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, TAG, Transform, Uid } from '../../components'
+import { Ability, Alive, Boss, Cd, Charges, Enemy, FACTION, Grow, History, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, TAG, Transform, Uid } from '../../components'
 import { addMark, CC_MARKS, hasMark, isAirborne, markSlot } from '../../utils/marks'
 import { Interned } from '../../utils/intern'
 import { displace } from './displace'
 import { gainRes } from './resource'
 import { markSrcs, poisonSrc } from '../../store'
 import { applyMorph } from '../../entities/enemy'
+import { applyForm } from '../../entities/form'
+import { nearestSummoned, raiseDead, spawnAround, spawnClones } from '../../entities/summon'
+import { spawnShadow, swapShadow } from '../../entities/shadow'
+import { rescale } from './scale'
+import { historyAt } from './history'
+import { devour } from './gut'
+import { stealAbility } from './steal'
 import { spawnBolt } from '../../entities/projectile'
 import { spawnZone } from '../../entities/zone'
 import { spawnCoins } from '../../entities/pickup'
@@ -21,7 +28,7 @@ import { isSameEntity } from '../../utils/identity'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 import type { ByKind } from '../../../util/record'
-import { spawnFxRing } from '../../entities/fx'
+import { spawnFxCircle, spawnFxRing } from '../../entities/fx'
 
 interface HitCtx {
   readonly x: number
@@ -32,6 +39,8 @@ interface HitCtx {
   readonly source?: number
   /** 死亡印记结算时的死者 */
   readonly victim?: number
+  /** 出手的方向 */
+  readonly angle?: number
 }
 
 export function applyBlast(
@@ -582,6 +591,107 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const byy = Transform.y[by]!
     if (!displace(sim, t, { kind: 'place', x: bx, y: byy }, { self: false, src })) return
     displace(sim, by, { kind: 'place', x: at.x, y: at.y }, { self: true, free: true })
+  },
+
+  form: (sim, _src, fx, at) => {
+    eachCapable(sim, at, Hp, (t) => {
+      if (Alive.v[t]) applyForm(sim, t, fx.to, fx.ms, fx.onEnd)
+    })
+  },
+
+  grow: (sim, _src, fx, at) => {
+    eachCapable(sim, at, Grow, (t) => {
+      if (fx.ms !== undefined) addMark(t, MARK.grow, TAG.effect, sim.elapsedMs + fx.ms, fx.mul)
+      else Grow.perm[t] = Math.min(fx.max ?? Infinity, Grow.perm[t]! * fx.mul)
+      rescale(sim, t)
+    })
+  },
+
+  rewind: (sim, _src, fx, at) => {
+    eachCapable(sim, at, History, (t) => {
+      const s = historyAt(t, fx.ms)
+      if (s < 0 || !Alive.v[t]) return
+      const x0 = Transform.x[t]!
+      const y0 = Transform.y[t]!
+      if (!displace(sim, t, { kind: 'place', x: History.x[s]!, y: History.y[s]! }, { self: true, free: true })) return
+      Hp.v[t] = Math.min(Hp.max[t]!, Math.max(Hp.v[t]!, History.hp[s]!))
+      spawnFxCircle(sim, x0, y0, 22, { fill: 0x80deea, fillAlpha: 0.4, fromScale: 1, toScale: 0.2, durationMs: 260, depth: 14 })
+      spawnFxCircle(sim, Transform.x[t]!, Transform.y[t]!, 26, { fill: 0x80deea, fillAlpha: 0.4, fromScale: 0.4, toScale: 1.8, durationMs: 300, depth: 14 })
+    })
+  },
+
+  steal: (sim, src, fx, at) => {
+    const by = casterOf(sim, src)
+    const t = at.targets?.[0]
+    if (by >= 0 && t !== undefined) stealAbility(sim, by, t, fx.ms, fx.cooldownMs, fx.skill === true)
+  },
+
+  clone: (sim, src, fx) => {
+    const by = casterOf(sim, src)
+    if (by >= 0) spawnClones(sim, by, fx.count, fx.lifeMs, fx.hpRatio, fx.dmgRatio, fx.onDeath)
+  },
+
+  raise: (sim, src, fx, at) => {
+    if (at.victim !== undefined) raiseDead(sim, at.victim, src.faction, casterOf(sim, src), fx.lifeMs, fx.hpRatio)
+  },
+
+  devour: (sim, src, fx, at) => {
+    const by = casterOf(sim, src)
+    const t = at.targets?.[0]
+    if (by >= 0 && t !== undefined) devour(sim, by, t, fx.ms, fx.dps, fx.escape, fx.spit)
+  },
+
+  attach: (sim, src, fx, at) => {
+    const by = casterOf(sim, src)
+    if (by < 0) return
+    const until = sim.elapsedMs + fx.ms
+    for (const t of at.targets ?? []) {
+      if (t === by || !Alive.v[t]) continue
+      const d = sim.hooks.worldDelta(sim, Transform.x[by]!, Transform.y[by]!, Transform.x[t]!, Transform.y[t]!)
+      const len = Math.hypot(d.x, d.y) || 1
+      const r = Radius.v[by]! * 0.7
+      if (!displace(sim, t, { kind: 'follow', host: by, ox: (d.x / len) * r, oy: (d.y / len) * r, ms: fx.ms }, { self: false, free: true })) continue
+      addMark(t, MARK.untargetable, TAG.effect, until)
+    }
+  },
+
+  spawn: (sim, src, fx, at) => {
+    const by = casterOf(sim, src)
+    const x = by >= 0 ? Transform.x[by]! : at.x
+    const y = by >= 0 ? Transform.y[by]! : at.y
+    spawnAround(sim, by, src.faction, fx.def, fx.count, fx.spread, x, y)
+  },
+
+  teleport: (sim, src, fx, at) => {
+    const by = casterOf(sim, src)
+    if (by < 0) return
+    const foe = nearestTarget(sim, flying(src), Transform.x[by]!, Transform.y[by]!, Infinity)
+    const dest = nearestSummoned(sim, by, fx.of, foe?.x ?? Transform.x[by]!, foe?.y ?? Transform.y[by]!)
+    if (dest < 0) return
+    const x0 = Transform.x[by]!
+    const y0 = Transform.y[by]!
+    if (!displace(sim, by, { kind: 'place', x: Transform.x[dest]!, y: Transform.y[dest]! + Radius.v[dest]! }, { self: true })) return
+    spawnFxCircle(sim, x0, y0, 30, { fill: 0x66bb6a, fillAlpha: 0.4, fromScale: 1, toScale: 0.2, durationMs: 280, depth: 14 })
+    spawnFxCircle(sim, Transform.x[by]!, Transform.y[by]!, 30, { fill: 0x66bb6a, fillAlpha: 0.4, fromScale: 0.3, toScale: 1.8, durationMs: 320, depth: 14 })
+    if (fx.then) applyAbilityEffects(sim, src, fx.then, { x: Transform.x[by]!, y: Transform.y[by]!, baseDamage: at.baseDamage })
+  },
+
+  shadow: (sim, src, fx, at) => {
+    const by = casterOf(sim, src)
+    if (by >= 0) spawnShadow(sim, src, by, at.angle ?? 0, fx.lifeMs, fx.max, fx.dash, fx.taunt)
+  },
+
+  shadowSwap: (sim, src) => {
+    const by = casterOf(sim, src)
+    if (by >= 0) swapShadow(sim, by)
+  },
+
+  undead: (sim, _src, fx, at) => {
+    const until = sim.elapsedMs + fx.ms
+    eachCapable(sim, at, Hp, (t) => {
+      Hp.v[t] = Math.max(1, Hp.max[t]! * fx.hpRatio)
+      addMark(t, MARK.undead, TAG.effect, until, Hp.v[t]! / (fx.ms / 1000))
+    })
   },
 }
 
