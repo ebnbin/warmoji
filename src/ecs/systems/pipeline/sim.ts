@@ -15,6 +15,8 @@ import { characterContact } from '../characterContact'
 import { characterVisual } from '../characterVisual'
 import { moveTeam } from '../moveTeam'
 import { stepHandover } from '../shared/leader'
+import { tickSkillCooldowns } from '../tickSkillCooldowns'
+import { tickSkillStates } from '../tickSkillStates'
 import { popInEnemies } from '../popInEnemies'
 import { refoldBattleFx } from '../refoldBattleFx'
 import { regenCharacters } from '../regenCharacters'
@@ -46,9 +48,11 @@ const STEERERS = [steerChase, steerRoam, steerFlee, steerStandoff, steerDetonate
 export const SIM_PIPELINE = pipeline([
   refoldBattleFx,
   updateDormancy,
+  tickSkillCooldowns,
   stepHandover,
   { run: moveTeam, after: [stepHandover] },
-  { run: layoutTeam, after: [moveTeam] },
+  { run: tickSkillStates, after: [moveTeam] },
+  { run: layoutTeam, after: [moveTeam, tickSkillStates] },
   { run: animateCharacters, after: [layoutTeam] },
   reviveCharacters,
   regenCharacters,

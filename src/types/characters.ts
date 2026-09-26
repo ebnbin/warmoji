@@ -14,11 +14,28 @@ export interface InnateSource {
   readonly base: AbilityId
   readonly upgrades: readonly AbilityTier[]
 }
+export interface SkillSource {
+  readonly name: string
+  readonly icon: string
+  readonly desc: string
+  readonly cdMs: number
+  readonly ability: AbilityId
+  readonly aim?: boolean
+}
+export interface SkillDef {
+  readonly name: string
+  readonly icon: string
+  readonly desc: string
+  readonly cdMs: number
+  readonly ability: AbilityDef
+  readonly aim: boolean
+}
 export interface CharacterAuthoring {
   readonly emoji: string
   readonly name: string
   readonly desc: string
   readonly body: BodyParams
+  readonly skill: SkillSource
   readonly weapons: readonly WeaponId[]
   readonly innate: readonly InnateSource[]
 }
@@ -33,6 +50,7 @@ export interface CharacterDef {
   readonly name: string
   readonly desc: string
   readonly body: BodyParams
+  readonly skill: SkillDef
   readonly carriers: readonly Carrier[]
 }
 export interface UpgradeTiers {

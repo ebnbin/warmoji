@@ -1,4 +1,5 @@
 import { addComponent, addComponents, hasComponent, query, removeEntity } from 'bitecs'
+import { newEntity } from './entity'
 import {
   Ability,
   Aim,
@@ -20,8 +21,15 @@ import {
   ChainArc,
   CoinMagnet,
   Dance,
+  Deploy,
   Disarmed,
   Drop,
+  Field,
+  Leap,
+  Nova,
+  Rush,
+  Stealth,
+  Taunt,
   EveryN,
   Execute,
   FACTION,
@@ -121,6 +129,8 @@ interface KindSpec<K extends keyof AbilityOf> {
   readonly state?: readonly StateSpec[]
   attach?(ctx: AttachCtx, e: number, def: AbilityOf[K]): void
 }
+
+const DEPLOY_SHOT_MS = 1500
 
 const KINDS: { [K in keyof AbilityOf]: KindSpec<K> } = {
 
@@ -343,6 +353,96 @@ const KINDS: { [K in keyof AbilityOf]: KindSpec<K> } = {
       Nuke.bossRatio[e] = d.bossRatio
     },
   },
+  rush: {
+    comp: Rush,
+    attach: (_c, e, d) => {
+      Rush.distance[e] = d.distance
+      Rush.ms[e] = d.ms
+      Rush.damage[e] = d.damage
+      Rush.knockback[e] = d.knockback
+      Rush.hitRadius[e] = d.hitRadius
+      Rush.color[e] = d.color
+    },
+  },
+  leap: {
+    comp: Leap,
+    attach: (_c, e, d) => {
+      Leap.distance[e] = d.distance
+      Leap.ms[e] = d.ms
+      Leap.height[e] = d.height
+      Leap.damage[e] = d.damage
+      Leap.knockback[e] = d.knockback
+      Leap.radius[e] = d.radius
+      Leap.color[e] = d.color
+    },
+  },
+  taunt: {
+    comp: Taunt,
+    attach: (_c, e, d) => {
+      Taunt.radius[e] = d.radius
+      Taunt.durationMs[e] = d.durationMs
+      Taunt.damageTakenMul[e] = d.damageTakenMul
+      Taunt.color[e] = d.color
+    },
+  },
+  stealth: {
+    comp: Stealth,
+    attach: (_c, e, d) => {
+      Stealth.durationMs[e] = d.durationMs
+    },
+  },
+  field: {
+    comp: Field,
+    attach: (_c, e, d) => {
+      Field.radius[e] = d.radius
+      Field.durationMs[e] = d.durationMs
+      Field.healPerSec[e] = d.healPerSec
+      Field.poisonDamage[e] = d.poison.damage
+      Field.poisonTickMs[e] = d.poison.tickMs
+      Field.color[e] = d.color
+    },
+  },
+  deploy: {
+    comp: Deploy,
+    // 借用弩塔的装配数据：place 只认 Turret 与 Bolt
+    attach: (c, e, d) => {
+      Deploy.count[e] = d.count
+      Deploy.spread[e] = d.spread
+      Deploy.lifeMs[e] = d.lifeMs
+      addComponent(c.world, e, Turret)
+      Turret.placeIntervalMs[e] = 0
+      Turret.maxTurrets[e] = d.count
+      Turret.fireIntervalMs[e] = d.fireIntervalMs
+      Turret.damage[e] = d.damage
+      Turret.knockback[e] = d.knockback
+      Turret.range[e] = d.range
+      Turret.lifeMs[e] = DEPLOY_SHOT_MS
+      Turret.size[e] = d.turret.size
+      abilityArtEmoji[e] = d.turret.emoji
+      assertFree(c.world, e, Bolt, '弹丸外形组件')
+      addComponent(c.world, e, Bolt)
+      Bolt.frame[e] = c.frames.index(d.projectile.emoji, 'player')
+      Bolt.size[e] = d.projectile.size
+      Bolt.radius[e] = d.projectile.radius
+      Bolt.speed[e] = d.projectile.speed
+      Bolt.rotOffset[e] = d.projectile.rotationOffsetDeg
+      if (d.burst) {
+        addComponent(c.world, e, Burst)
+        Burst.count[e] = d.burst.count
+        Burst.spreadDeg[e] = d.burst.spreadDeg
+      }
+    },
+  },
+  nova: {
+    comp: Nova,
+    attach: (_c, e, d) => {
+      Nova.radius[e] = d.radius
+      Nova.damage[e] = d.damage
+      Nova.knockback[e] = d.knockback
+      Nova.color[e] = d.color
+      abilityOnHit[e] = d.onHit
+    },
+  },
   heal: {
     comp: Heal,
     attach: (c, e, d) => {
@@ -485,6 +585,13 @@ export function equipAbility(
   const carrier = 'held' in def && def.held ? spawnWeaponBody(sim, host, def.held, faction) : host
   attachAbility(sim, carrier, def, { owner: host, anchor: host, faction, cooldownMs, amp, manual })
   return carrier
+}
+
+/** 主动技能住在自己的实体里：宿主身上已有同种能力也不冲突，所有者与锚点都是宿主 */
+export function equipSkill(sim: Sim, host: number, def: AbilityDef, amp: AmpInit): number {
+  const e = newEntity(sim.world)
+  attachAbility(sim, e, def, { owner: host, anchor: host, faction: FACTION.team, cooldownMs: 0, amp, manual: true })
+  return e
 }
 
 export function unequipAbilities(sim: Sim, ownerEid: number): void {

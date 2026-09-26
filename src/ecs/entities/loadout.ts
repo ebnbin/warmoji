@@ -6,7 +6,7 @@ import { characterLevel, tiersForLevel } from '../../data/charLevel'
 import { toPx } from '../../data/px'
 import { sandboxLevel } from '../sandbox/knobs'
 import { FACTION } from '../components'
-import { equipAbility, NEUTRAL_AMP } from './ability'
+import { equipAbility, equipSkill, NEUTRAL_AMP } from './ability'
 import type { RunState } from '../../run/state'
 import type { Sim } from '../sim'
 
@@ -28,6 +28,7 @@ export function armTeam(sim: Sim, run: RunState, sandbox: boolean): void {
     loadoutFor(def, tiers).forEach((w, i) => {
       equipAbility(sim, sim.characters[slot]!, toPx(resolveAbilityDef(w, fx)), FACTION.team, 300 + slot * 120 + i * 230, amp)
     })
+    equipSkill(sim, sim.characters[slot]!, toPx(def.skill.ability), amp)
   }
 }
 

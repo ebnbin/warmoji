@@ -111,6 +111,13 @@ export function resolveAbilityDef(w: AbilityDef, fx: CharacterEffects): AbilityD
     case 'buff':
     case 'nuke':
     case 'timeStop':
+    case 'rush':
+    case 'leap':
+    case 'taunt':
+    case 'stealth':
+    case 'field':
+    case 'deploy':
+    case 'nova':
       return w
   }
 }

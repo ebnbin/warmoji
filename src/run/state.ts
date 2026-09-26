@@ -29,6 +29,7 @@ export interface RunState {
   memberItems: ItemId[][]
   freeRefreshes: number
   skillCdMs: number
+  skillCd: number[]
   leaderId: CharacterId
   stats: {
     damage: number[]
@@ -70,6 +71,7 @@ export function beginRun(
     memberItems: roster.map(() => []),
     freeRefreshes: 0,
     skillCdMs: 0,
+    skillCd: roster.map(() => 0),
     leaderId: roster[0]!,
     stats: {
       damage: roster.map(() => 0),
@@ -133,6 +135,7 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   run.roster.push(id)
   run.memberHp.push(MEMBER.maxHp)
   run.memberItems.push([])
+  run.skillCd.push(0)
   run.stats.damage.push(0)
   run.stats.kills.push(0)
   run.stats.deaths.push(0)

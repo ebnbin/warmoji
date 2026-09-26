@@ -1,6 +1,6 @@
-import { hasComponent, query, removeEntity } from 'bitecs'
+import { addComponent, hasComponent, query, removeComponent, removeEntity } from 'bitecs'
 import { POP_MS, RETIRE_MS } from '../entities/minion'
-import { Aim, Emplacement, Fired, Frozen, Minion, Retiring, Shoot, Tint, Transform } from '../components'
+import { Ability, Aim, Emplacement, Fired, Frozen, Minion, Retiring, Shoot, Tint, Transform } from '../components'
 import { playClip } from './shared/anim'
 import { backEaseOut } from '../utils/ease'
 import type { Sim } from '../sim'
@@ -18,6 +18,13 @@ export function updateEmplacements(sim: Sim): void {
       Transform.w[t] = k
       Transform.h[t] = k
       Tint.alpha[t] = 1 - p
+      continue
+    }
+    // 限时的弩塔到点退场
+    if (Minion.dieAt[t]! > 0 && sim.elapsedMs >= Minion.dieAt[t]!) {
+      addComponent(sim.world, t, Retiring)
+      Retiring.until[t] = sim.fxMs + RETIRE_MS
+      removeComponent(sim.world, t, Ability)
       continue
     }
     if (Frozen.v[t]) {

@@ -36,6 +36,9 @@ const SPATIAL: ReadonlySet<string> = new Set<FieldName<EnemyDef | AbilityDef>>([
   'triggerRange',
   'orbitRadius',
   'aggroRange',
+  'distance',
+  'height',
+  'spread',
 ])
 
 const cache = new WeakMap<object, unknown>()

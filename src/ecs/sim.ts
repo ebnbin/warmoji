@@ -40,6 +40,12 @@ export interface Sim {
   physics: boolean
   heading: { x: number; y: number }
   handover: Handover | null
+  aim: { x: number; y: number }
+  rush: Rush | null
+  leap: Leap | null
+  taunt: { until: number; eid: number; mul: number; radius: number } | null
+  stealthUntil: number
+  stealthTinted: boolean
   characters: number[]
   mapId: import('../types/maps').MapId
   mapW: number
@@ -81,6 +87,27 @@ export interface Handover {
   toScale: number
   camX: number
   camY: number
+}
+
+/** 冲刺中：队长按 vx/vy 直线前进，撞墙或到时结束，hit 记录已撞过的敌人 */
+export interface Rush {
+  msLeft: number
+  vx: number
+  vy: number
+  e: number
+  hit: Set<number>
+}
+
+/** 跳跃中：队长沿 from→to 的抛物线前进，落地那帧 landed 为真 */
+export interface Leap {
+  msLeft: number
+  ms: number
+  fromX: number
+  fromY: number
+  toX: number
+  toY: number
+  e: number
+  landed: boolean
 }
 
 interface RewardConfig {
@@ -185,5 +212,11 @@ export function makeSim(
     physics: false,
     heading: { x: 0, y: -1 },
     handover: null,
+    aim: { x: 0, y: -1 },
+    rush: null,
+    leap: null,
+    taunt: null,
+    stealthUntil: 0,
+    stealthTinted: false,
   }
 }

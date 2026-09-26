@@ -12,6 +12,7 @@ import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
 import { UI_FONT, FONT } from '../util/fonts'
 import { norm } from '../util/vec'
+import type { Point } from '../util/vec'
 import { applyBackground } from '../util/background'
 import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
@@ -22,7 +23,7 @@ import { bossFor, MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, CharScale, Dormant, Enemy, GrantCoins, Hp, CharHp, PICKUP_SET, Projectile, Revive, Transform } from './components'
+import { Alive, Boss, CharScale, Dormant, Enemy, Facing, GrantCoins, Hp, CharHp, PICKUP_SET, Projectile, Revive, Transform } from './components'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
@@ -49,7 +50,7 @@ import { CAPTAINS } from '../data/captains'
 import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox/knobs'
 import { tickSkillCd } from '../run/state'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
-import type { HudEvents, HudHost, SquadSnapshot } from '../run/hudHost'
+import type { HudEvents, HudHost, LeaderSkill, SquadSnapshot } from '../run/hudHost'
 import type { HudSnapshot } from '../run/hudHost'
 import type { Sim } from './sim'
 import { drain } from './outbox'
@@ -103,6 +104,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private seenHitCount = 0
   private bossDownAt = -1
   private shownLeader = -1
+  private skillAim: Point | null = null
+  private aimGfx?: Phaser.GameObjects.Graphics
   private damageText?: DamageTextLayer
   private deathBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private coinBurst!: Phaser.GameObjects.Particles.ParticleEmitter
@@ -142,6 +145,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.seenHitCount = 0
     this.bossDownAt = -1
     this.shownLeader = -1
+    this.skillAim = null
+    this.aimGfx = undefined
     this.damageText = undefined
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
@@ -182,6 +187,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   devResetSkill(): void {
     this.run.skillCdMs = 0
+    this.run.skillCd.fill(0)
   }
 
   devEnemyCounts(): { name: string; n: number }[] {
@@ -484,6 +490,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
         return {
           emoji: def.emoji,
           name: def.name,
+          skillIcon: def.skill.icon,
           alive: Alive.v[m] === 1,
           hp: CharHp.hp[m]!,
           max: CharHp.max[m]!,
@@ -500,6 +507,68 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     if (eid === undefined || !canSwitchLeader(sim, eid)) return false
     switchLeader(sim, eid)
     return true
+  }
+
+  leaderSkill(): LeaderSkill | null {
+    const sim = this.sim
+    if (!sim) return null
+    const slot = sim.characters.indexOf(sim.leader)
+    const def = CHARACTERS[this.run.roster[slot]!]
+    const a = def.skill.ability
+    return {
+      icon: def.skill.icon,
+      name: def.skill.name,
+      emoji: def.emoji,
+      remainMs: this.run.skillCd[slot] ?? 0,
+      cdMs: def.skill.cdMs,
+      aim: def.skill.aim,
+      rangeU: a.kind === 'rush' || a.kind === 'leap' ? a.distance : 0,
+    }
+  }
+
+  /** 不给方向就用摇杆方向，摇杆没推就用队长朝向 */
+  castLeaderSkill(dir: Point | null): boolean {
+    const sim = this.sim
+    if (!sim || sim.over || this.ending) return false
+    const leader = sim.leader
+    if (!Alive.v[leader]) return false
+    const slot = sim.characters.indexOf(leader)
+    if ((this.run.skillCd[slot] ?? 0) > 0) return false
+    const def = CHARACTERS[this.run.roster[slot]!]
+    this.run.skillCd[slot] = def.skill.cdMs
+    const stick = sim.teamDir
+    const d = dir ?? (stick.x !== 0 || stick.y !== 0 ? norm(stick.x, stick.y) : { x: Facing.x[leader]!, y: Facing.y[leader]! })
+    sim.aim = { x: d.x, y: d.y }
+    requestCast(sim, leader)
+    playSfx('levelup')
+    this.hud.emit(HudEvent.SkillCast, def.skill.name)
+    return true
+  }
+
+  setSkillAim(dir: Point | null): void {
+    this.skillAim = dir
+  }
+
+  private drawSkillAim(sim: Sim): void {
+    const dir = this.skillAim
+    const sk = dir ? this.leaderSkill() : null
+    if (!dir || !sk || sk.rangeU <= 0) {
+      this.aimGfx?.clear()
+      return
+    }
+    this.aimGfx ??= this.add.graphics().setDepth(40)
+    const g = this.aimGfx
+    const x = Transform.x[sim.leader]!
+    const y = Transform.y[sim.leader]!
+    const ex = x + dir.x * sk.rangeU * UNIT
+    const ey = y + dir.y * sk.rangeU * UNIT
+    g.clear()
+    g.lineStyle(7, 0xffffff, 0.3)
+    g.lineBetween(x, y, ex, ey)
+    g.lineStyle(3, 0xffdc5d, 0.9)
+    g.lineBetween(x, y, ex, ey)
+    g.fillStyle(0xffdc5d, 0.9)
+    g.fillCircle(ex, ey, 10)
   }
 
   applySandboxInvincible(): void {
@@ -626,6 +695,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     }
     this.updateHpBars()
     this.drawDevTargets(sim)
+    this.drawSkillAim(sim)
     if (!this.sandbox && sim.bossDown) {
       sim.bossDown = false
       this.bossDownAt = sim.fxMs

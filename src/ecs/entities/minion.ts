@@ -132,17 +132,17 @@ function armTurret(sim: Sim, weapon: number, m: number): void {
   Anchor.eid[m] = m
 }
 
-export function place(sim: Sim, e: number): void {
+export function place(sim: Sim, e: number, at?: { x: number; y: number }, lifeMs = 0): void {
   const live = liveOnes(sim, e)
   spawnMinion(sim, e, {
     tag: Emplacement,
     emoji: abilityArtEmoji[e]!,
     size: Turret.size[e]!,
     bornScale: 0.2,
-    x: ownerX(e),
-    y: ownerY(e) + 6,
+    x: at ? at.x : ownerX(e),
+    y: at ? at.y : ownerY(e) + 6,
     z: 5,
-    lifeMs: 0,
+    lifeMs,
     phase: 0,
     cd: 0,
     animOffsetMs: live.length * 311,

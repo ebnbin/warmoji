@@ -35,6 +35,7 @@ export interface FieldCollected {
 export interface SquadMember {
   emoji: string
   name: string
+  skillIcon: string
   alive: boolean
   hp: number
   max: number
@@ -46,6 +47,17 @@ export interface SquadSnapshot {
   leaderSlot: number
   switching: boolean
   members: SquadMember[]
+}
+
+/** 当前队长的主动技能；aim 为真时按住按钮可拖出方向，rangeU 是瞄准线长度 */
+export interface LeaderSkill {
+  icon: string
+  name: string
+  emoji: string
+  remainMs: number
+  cdMs: number
+  aim: boolean
+  rangeU: number
 }
 
 export interface LeaderChanged {
@@ -94,6 +106,9 @@ export interface HudHost {
   castSkill(): boolean
   squadSnapshot(): SquadSnapshot | null
   switchLeader(slot: number): boolean
+  leaderSkill(): LeaderSkill | null
+  castLeaderSkill(dir: { x: number; y: number } | null): boolean
+  setSkillAim(dir: { x: number; y: number } | null): void
 }
 
 export interface HudInput {

@@ -17,6 +17,13 @@ import type {
   ThrustDef,
   TimeStopDef,
   TurretDef,
+  RushDef,
+  LeapDef,
+  TauntDef,
+  StealthDef,
+  FieldDef,
+  DeployDef,
+  NovaDef,
 } from '../src/types/abilityDefs'
 
 const pistol = {
@@ -266,6 +273,73 @@ const BASE = {
     cooldownMs: 45_000,
     durationMs: 15_000,
   } satisfies TimeStopDef,
+
+  rainbowRush: {
+    kind: 'rush',
+    distance: 4,
+    ms: 260,
+    damage: 40,
+    knockback: 14,
+    hitRadius: 0.8,
+    color: 0xff8ad8,
+  } satisfies RushDef,
+  bounceStomp: {
+    kind: 'leap',
+    distance: 4,
+    ms: 520,
+    height: 1.6,
+    damage: 55,
+    knockback: 16,
+    radius: 2,
+    color: 0xffb74d,
+  } satisfies LeapDef,
+  trollRoar: {
+    kind: 'taunt',
+    radius: 5,
+    durationMs: 3000,
+    damageTakenMul: 0.5,
+    color: 0xef5350,
+  } satisfies TauntDef,
+  shadowVeil: {
+    kind: 'stealth',
+    durationMs: 3000,
+  } satisfies StealthDef,
+  beeCourt: {
+    kind: 'field',
+    radius: 4,
+    durationMs: 6000,
+    healPerSec: 6,
+    poison: { damage: 5, tickMs: 500 },
+    color: 0xffca28,
+  } satisfies FieldDef,
+  quickBuild: {
+    kind: 'deploy',
+    count: 3,
+    spread: 1.2,
+    turret: { emoji: '1f3f9', size: 0.95 },
+    fireIntervalMs: 650,
+    damage: 13,
+    knockback: 2,
+    range: 5.5,
+    lifeMs: 10_000,
+    projectile: { emoji: '1f3f9', size: 0.5, radius: 0.16, speed: 14, rotationOffsetDeg: 45 },
+  } satisfies DeployDef,
+  sheepParty: {
+    kind: 'nova',
+    radius: 3.5,
+    damage: 0,
+    knockback: 0,
+    color: 0xf48fb1,
+    onHit: [{ kind: 'morph', durationMs: 4000, morphEmoji: '1f411' }],
+  } satisfies NovaDef,
+  emPulse: {
+    kind: 'nova',
+    radius: 6,
+    damage: 35,
+    knockback: 4,
+    color: 0x40c4ff,
+    onHit: [{ kind: 'slow', factor: 0.4, durationMs: 3000 }],
+  } satisfies NovaDef,
 } as const
 
 const tomatoThrow2 = {
@@ -449,5 +523,13 @@ export const ABILITIES = {
   weaknessLecture: BASE.weaknessLecture,
   dimensionStrike: BASE.dimensionStrike,
   timeFreeze: BASE.timeFreeze,
+  rainbowRush: BASE.rainbowRush,
+  bounceStomp: BASE.bounceStomp,
+  trollRoar: BASE.trollRoar,
+  shadowVeil: BASE.shadowVeil,
+  beeCourt: BASE.beeCourt,
+  quickBuild: BASE.quickBuild,
+  sheepParty: BASE.sheepParty,
+  emPulse: BASE.emPulse,
 } as const
 
