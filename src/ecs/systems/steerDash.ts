@@ -2,8 +2,8 @@ import { hasComponent, query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
 import { norm } from '../../util/vec'
 import {
-  BreaksWalls, BVel, Charge, Dash, DashDetect, DashDist, DashTime, DashTimer,
-  EDir, EState, Slowed, Speed, Sprite, Steering, Transform,
+  BreaksWalls, Charge, Dash, DashDetect, DashDist, DashTime, DashTimer, Drive,
+  EDir, EState, Rushing, Slowed, Speed, Sprite, Steering, Transform,
 } from '../components'
 import { aimPoint, nearestAlive, wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
@@ -16,6 +16,7 @@ function lockDir(sim: Sim, eid: number): void {
   EDir.y[eid] = dir.y
 }
 
+/** 突刺本身是身体上的冲刺脚本：速度精确、撞墙即止，与角色的冲刺同一条积分 */
 export function steerDash(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, [Dash, Steering, Transform, Speed])) {
@@ -30,16 +31,21 @@ export function steerDash(sim: Sim): void {
       if (now < Charge.windupUntil[eid]!) continue
       if (Dash.lockAtLaunch[eid]) lockDir(sim, eid)
       EState.v[eid] = 3
-      const speed = Dash.dashSpeed[eid]!
-      Charge.dashUntil[eid] =
-        now + (hasComponent(sim.world, eid, DashTime) ? DashTime.durationMs[eid]! : (DashDist.dist[eid]! / speed) * 1000)
+      const speed = Dash.dashSpeed[eid]! * slow
+      Rushing.active[eid] = 1
+      Rushing.msLeft[eid] = hasComponent(sim.world, eid, DashTime)
+        ? DashTime.durationMs[eid]!
+        : (DashDist.dist[eid]! / Dash.dashSpeed[eid]!) * 1000
+      Rushing.vx[eid] = EDir.x[eid]! * speed
+      Rushing.vy[eid] = EDir.y[eid]! * speed
+      Rushing.stamp[eid] = now
       Transform.rot[eid] = 0
       if (Dash.whoosh[eid]) playSfx('whoosh')
       continue
     }
 
     if (state === 3) {
-      if (now >= Charge.dashUntil[eid]!) {
+      if (!Rushing.active[eid]) {
         if (hasComponent(sim.world, eid, DashTimer)) {
           EState.v[eid] = 1
           Charge.nextDashAt[eid] = now + DashTimer.intervalMs[eid]!
@@ -47,13 +53,11 @@ export function steerDash(sim: Sim): void {
           EState.v[eid] = 4
           Charge.coolUntil[eid] = now + DashDetect.cooldownMs[eid]!
         }
+        continue
       }
       Transform.rot[eid] = EDir.x[eid]! * 0.3
       Sprite.flipX[eid] = EDir.x[eid]! > 0 ? 1 : 0
       if (hasComponent(sim.world, eid, BreaksWalls)) sim.hooks.smashWall(sim, ex, ey)
-      const v = Dash.dashSpeed[eid]! * slow
-      BVel.x[eid] = EDir.x[eid]! * v
-      BVel.y[eid] = EDir.y[eid]! * v
       continue
     }
 
@@ -82,12 +86,12 @@ export function steerDash(sim: Sim): void {
       const to = aimPoint(sim, eid, Dash.aimLeader[eid] === 1)
       if (!to) continue
       const dir = sim.hooks.chaseDir(sim, eid, to.x, to.y)
-      BVel.x[eid] = dir.x * speed
-      BVel.y[eid] = dir.y * speed
+      Drive.x[eid] = dir.x * speed
+      Drive.y[eid] = dir.y * speed
       continue
     }
     const d = wanderDir(sim, eid)
-    BVel.x[eid] = d.x * speed
-    BVel.y[eid] = d.y * speed
+    Drive.x[eid] = d.x * speed
+    Drive.y[eid] = d.y * speed
   }
 }

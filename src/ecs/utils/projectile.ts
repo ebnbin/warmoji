@@ -1,14 +1,12 @@
 import { hasComponent } from 'bitecs'
-import type { } from '../../types/abilityDefs'
-import { Aim, EnemyVel, Faction, FACTION, Held, Owner } from '../components'
-import { } from '../store'
+import { Aim, Faction, FACTION, Held, Owner, Phys } from '../components'
 import { ownerX, ownerY } from './amp'
 import type { Sim } from '../sim'
 
 export function headingOf(sim: Sim, e: number): { x: number; y: number } {
   if (Faction.v[e] !== FACTION.enemy) return sim.teamDir
   const o = Owner.eid[e]!
-  return { x: EnemyVel.x[o]!, y: EnemyVel.y[o]! }
+  return { x: Phys.vx[o]!, y: Phys.vy[o]! }
 }
 
 export function muzzle(sim: Sim, e: number): { x: number; y: number } {

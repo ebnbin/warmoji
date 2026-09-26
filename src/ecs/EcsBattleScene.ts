@@ -23,7 +23,7 @@ import { bossFor, MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, CharScale, Dormant, Enemy, Facing, GrantCoins, Hp, CharHp, PICKUP_SET, Projectile, Revive, Transform } from './components'
+import { Alive, Boss, CharScale, Dormant, Enemy, Facing, GrantCoins, Hp, CharHp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
@@ -385,7 +385,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
         g.setVisible(false)
         this.shownHp[i] = -1
         if (dead) {
-          dead.setVisible(true).setPosition(Transform.x[m]!, Transform.y[m]!)
+          dead.setVisible(true).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
           const remain = Math.ceil((Revive.at[m]! - sim.elapsedMs) / 1000)
           if (remain !== this.shownCountdown[i]) {
             this.shownCountdown[i] = remain
@@ -396,7 +396,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       }
       dead?.setVisible(false)
       this.shownCountdown[i] = -1
-      g.setVisible(true).setPosition(Transform.x[m]!, Transform.y[m]!)
+      g.setVisible(true).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
       const ratio = Math.max(0, CharHp.hp[m]! / CharHp.max[m]!)
       if (Math.abs(ratio - this.shownHp[i]!) < 0.005) continue
       this.shownHp[i] = ratio

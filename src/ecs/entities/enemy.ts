@@ -1,16 +1,25 @@
-import { addComponent, query } from 'bitecs'
+import { addComponent, hasComponent, query, removeComponent } from 'bitecs'
 import { newEntity } from './entity'
 import { AI, ELITE, SPAWN, SURGE } from '../../data/enemies'
+import { ENEMY_BODY } from '../../data/abilities'
 import type { EnemyDef, LocomotionDef } from '../../types/enemies'
 import { waveAt } from '../../data/waves'
 import {
   Alive,
+  Anchored,
   Anim,
   BaseOrbit,
   Boss,
   BreaksWalls,
-  BVel,
   Chase,
+  Clock,
+  Drive,
+  FACTION,
+  Faction,
+  Phasing,
+  Phys,
+  Rushing,
+  VisOff,
   CoinThief,
   Dash,
   DashDetect,
@@ -42,7 +51,6 @@ import {
   ETurn,
   Flash,
   Hp,
-  Kv,
   Morph,
   Nest,
   Orphan,
@@ -50,7 +58,6 @@ import {
   Pop,
   Quad,
   Radius,
-  Slide,
   Slow,
   Speed,
   SpMul,
@@ -169,8 +176,11 @@ export function spawnEnemy(
   addComponent(world, eid, Radius)
   addComponent(world, eid, DmgMul)
   addComponent(world, eid, SpMul)
-  addComponent(world, eid, Kv)
-  addComponent(world, eid, Slide)
+  addComponent(world, eid, Phys)
+  addComponent(world, eid, Drive)
+  addComponent(world, eid, Clock)
+  addComponent(world, eid, Faction)
+  addComponent(world, eid, Rushing)
   addComponent(world, eid, Dormant)
   addComponent(world, eid, Flash)
   addComponent(world, eid, Slow)
@@ -180,13 +190,15 @@ export function spawnEnemy(
   addComponent(world, eid, Morph)
   addComponent(world, eid, EDir)
   addComponent(world, eid, ETurn)
-  addComponent(world, eid, BVel)
   addComponent(world, eid, Slowed)
   addComponent(world, eid, Steering)
   addComponent(world, eid, Anim)
   addComponent(world, eid, Sprite)
   addComponent(world, eid, Tint)
   addComponent(world, eid, Depth)
+  addComponent(world, eid, VisOff)
+  if (def.kbImmune) addComponent(world, eid, Anchored)
+  if (def.phasesWalls) addComponent(world, eid, Phasing)
   const born = sim.hooks.constrainSpawn(sim, x, y, def.radius)
   Transform.x[eid] = born.x
   Transform.y[eid] = born.y
@@ -201,8 +213,17 @@ export function spawnEnemy(
   Charge.dashUntil[eid] = 0
   Charge.coolUntil[eid] = 0
   Charge.nextDashAt[eid] = 0
-  BVel.x[eid] = 0
-  BVel.y[eid] = 0
+  Phys.vx[eid] = 0
+  Phys.vy[eid] = 0
+  Phys.thrust[eid] = def.speed * ENEMY_BODY.drag
+  Phys.drag[eid] = ENEMY_BODY.drag
+  Phys.mass[eid] = ENEMY_BODY.mass
+  Phys.grip[eid] = ENEMY_BODY.grip
+  Drive.x[eid] = 0
+  Drive.y[eid] = 0
+  Clock.v[eid] = 0
+  Faction.v[eid] = FACTION.enemy
+  Rushing.active[eid] = 0
   Slowed.v[eid] = 1
   Steering.v[eid] = 0
   attachLocomotion(sim, eid, def.locomotion)
@@ -221,10 +242,6 @@ export function spawnEnemy(
   SpMul.v[eid] = elite ? ELITE.speedMul : 1
   Nest.of[eid] = -1
   Nest.nextSpawnAt[eid] = def.spawner ? sim.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
-  Kv.x[eid] = 0
-  Kv.y[eid] = 0
-  Slide.x[eid] = 0
-  Slide.y[eid] = 0
   Dormant.v[eid] = 0
   Dormant.since[eid] = 0
   EnemyArm.armed[eid] = 0
@@ -361,14 +378,23 @@ export function applyMorph(
       Tint.color[eid] = 0xffffff
     }
     EState.v[eid] = 0
+    Rushing.active[eid] = 0
     Transform.rot[eid] = 0
+    if (hasComponent(sim.world, eid, Anchored)) {
+      removeComponent(sim.world, eid, Anchored)
+      Morph.anchored[eid] = 1
+    }
     sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
   }
 }
 
-export function restoreMorphVisual(atlas: FrameIndex, eid: number): void {
+export function restoreMorphVisual(sim: Sim, atlas: FrameIndex, eid: number): void {
   const def = enemyDef[eid]
   if (!def) return
+  if (Morph.anchored[eid]) {
+    addComponent(sim.world, eid, Anchored)
+    Morph.anchored[eid] = 0
+  }
   const outline = Elite.v[eid] ? 'elite' : 'enemy'
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)

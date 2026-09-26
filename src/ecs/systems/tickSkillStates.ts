@@ -1,5 +1,5 @@
 import { playSfx } from '../../audio/sfx'
-import { Alive, Follow, Hidden, Leap, Leaping, Rush, RushHit, Rushing, Tint, VisOff } from '../components'
+import { Alive, Hidden, Leap, Leaping, Rush, RushHit, Rushing, Tint, Transform, VisOff } from '../components'
 import { damageMul } from '../utils/amp'
 import { sourceOf } from '../utils/source'
 import { targetsNear } from '../utils/targets'
@@ -8,7 +8,7 @@ import { applyBlast } from './shared/effects'
 import { spawnFxBoom, spawnFxCircle } from '../entities/fx'
 import type { Sim } from '../sim'
 
-/** 冲刺撞击、跳跃落地与隐匿半透明都在身体走完这一帧之后结算；不再是队长的身体立刻停下 */
+/** 冲刺撞击、跳跃落地与隐匿半透明都在身体走完这一帧之后结算；不再是队长的身体立刻停下；冲刺的结束由 moveBodies 判定 */
 export function tickSkillStates(sim: Sim): void {
   const now = sim.elapsedMs
   for (const m of sim.characters) {
@@ -34,8 +34,8 @@ export function tickSkillStates(sim: Sim): void {
 function rushHits(sim: Sim, m: number): void {
   const e = Rushing.skill[m]!
   const src = sourceOf(sim, e)
-  const x = Follow.x[m]!
-  const y = Follow.y[m]!
+  const x = Transform.x[m]!
+  const y = Transform.y[m]!
   const stamp = Rushing.stamp[m]!
   const damage = Math.round(Rush.damage[e]! * damageMul(sim, e))
   for (const t of targetsNear(sim, src, x, y, Rush.hitRadius[e]!)) {
@@ -43,14 +43,13 @@ function rushHits(sim: Sim, m: number): void {
     RushHit.stamp[t.eid] = stamp
     damageTarget(sim, src, t.eid, damage, Rush.knockback[e]!, x, y)
   }
-  if (Rushing.msLeft[m]! <= 0) Rushing.active[m] = 0
 }
 
 function land(sim: Sim, m: number): void {
   const e = Leaping.skill[m]!
   const src = sourceOf(sim, e)
-  const x = Follow.x[m]!
-  const y = Follow.y[m]!
+  const x = Transform.x[m]!
+  const y = Transform.y[m]!
   const radius = Leap.radius[e]!
   const color = Leap.color[e]!
   applyBlast(sim, src, x, y, Math.round(Leap.damage[e]! * damageMul(sim, e)), radius, Leap.knockback[e]!)

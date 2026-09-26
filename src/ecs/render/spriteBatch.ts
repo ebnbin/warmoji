@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { query } from 'bitecs'
-import { Depth, Quad, Sprite, Tint, Transform, RENDERABLE } from '../components'
+import { Depth, Quad, Sprite, Tint, Transform, VisOff, RENDERABLE } from '../components'
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
 import { EcsLayer, LayerType } from './layer'
@@ -67,7 +67,7 @@ export class EcsSpriteBatch extends EcsLayer {
       const frame = Sprite.frame[eid]!
       if (frame < 0) continue
 
-      spriteMatrix.applyITRS(Transform.x[eid]!, Transform.y[eid]!, Transform.rot[eid]!, 1, 1)
+      spriteMatrix.applyITRS(Transform.x[eid]! + VisOff.x[eid]!, Transform.y[eid]! + VisOff.y[eid]!, Transform.rot[eid]!, 1, 1)
       camMatrix.multiply(spriteMatrix, calc)
 
       const hw = (Sprite.flipX[eid]! ? -1 : 1) * Transform.w[eid]! * 0.5

@@ -4,7 +4,7 @@ import { DEG2RAD } from '../../util/units'
 import { playSfx } from '../../audio/sfx'
 import {
   Bolt, Depth, FACTION, Faction, Pierce, PrevPos, Proj, Projectile, Quad, Shoot,
-  Sprite, SweptHit, Tint, Transform, Vel, ViewCull, WallStop, WorldCull,
+  Sprite, SweptHit, Tint, Transform, Vel, ViewCull, VisOff, WallStop, WorldCull,
 } from '../components'
 import { abilityOnHit, projHitUids, projOnHit, projSrcEnemy } from '../store'
 import type { EnemyKind } from '../../types/enemies'
@@ -20,7 +20,7 @@ function spawnBolt(
   art: { frame: number; size: number; speed: number; rot: number },
 ): number {
   const eid = newEntity(sim.world)
-  addComponents(sim.world, eid, Projectile, Transform, Vel, Proj, PrevPos, Faction, Sprite, Tint, Depth)
+  addComponents(sim.world, eid, Projectile, Transform, Vel, Proj, PrevPos, Faction, Sprite, Tint, Depth, VisOff)
   Transform.x[eid] = x
   Transform.y[eid] = y
   Transform.rot[eid] = art.rot

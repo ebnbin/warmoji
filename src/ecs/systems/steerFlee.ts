@@ -1,7 +1,7 @@
 import { query } from 'bitecs'
 import { AI } from '../../data/enemies'
 import { norm } from '../../util/vec'
-import { BVel, Flee, Slowed, Speed, Steering, Transform } from '../components'
+import { Drive, Flee, Slowed, Speed, Steering, Transform } from '../components'
 import { nearestAlive, wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
 
@@ -19,14 +19,14 @@ export function steerFlee(sim: Sim): void {
       if (d.x * d.x + d.y * d.y <= r * r) {
         const away = norm(-d.x, -d.y)
         const dir = sim.hooks.fleeDir(sim, eid, away.x, away.y)
-        BVel.x[eid] = dir.x * speed * slow
-        BVel.y[eid] = dir.y * speed * slow
+        Drive.x[eid] = dir.x * speed * slow
+        Drive.y[eid] = dir.y * speed * slow
         continue
       }
     }
     const w = wanderDir(sim, eid)
     const sp = speed * AI.fleeIdleSpeedMul * slow
-    BVel.x[eid] = w.x * sp
-    BVel.y[eid] = w.y * sp
+    Drive.x[eid] = w.x * sp
+    Drive.y[eid] = w.y * sp
   }
 }

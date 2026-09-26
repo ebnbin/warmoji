@@ -59,15 +59,14 @@ export const Depth = {
   z: f32(),
 }
 
-export const RENDERABLE: QueryTerm[] = [Transform, Sprite, Tint, Depth]
+/** 画面位置 = Transform + VisOff；VisOff 只给渲染层用，任何判定都不看它 */
+export const VisOff = { x: f32(), y: f32() }
+
+export const RENDERABLE: QueryTerm[] = [Transform, Sprite, Tint, Depth, VisOff]
 
 export const Character = {}
 
 export const Slot = { v: i32() }
-
-export const Follow = { x: f32(), y: f32() }
-
-export const VisOff = { x: f32(), y: f32() }
 
 export const Breath = { phase: f32() }
 
@@ -83,7 +82,6 @@ export const CharHp = { hp: f32(), max: f32() }
 export const CharScale = { v: f32() }
 export const Iframe = { ms: f32(), last: f32() }
 export const Revive = { ms: f32(), at: f32() }
-export const Hurt = { radius: f32() }
 export const CharFlash = { until: f32() }
 
 export const Enemy = {}
@@ -103,10 +101,6 @@ export const DmgMul = { v: f32() }
 
 export const SpMul = { v: f32() }
 
-export const Kv = { x: f32(), y: f32() }
-
-export const Step = { x: f32(), y: f32() }
-
 export const ZoneSlow = { v: f32() }
 
 export const Flash = { until: f32() }
@@ -122,7 +116,8 @@ export const Charge = { windupUntil: f32(), dashUntil: f32(), coolUntil: f32(), 
 
 export const Despawn = { at: f32() }
 
-export const Morph = { until: f32(), vuln: f32(), cdUntil: f32() }
+/** anchored：变形前是否锚定，恢复时还回去 */
+export const Morph = { until: f32(), vuln: f32(), cdUntil: f32(), anchored: u8() }
 
 export const Anim = {
   base: i32(),
@@ -136,8 +131,6 @@ export const Anim = {
   still: i32(),
 }
 export const ANIM_SET: QueryTerm[] = [Anim, Sprite]
-
-export const Slide = { x: f32(), y: f32() }
 
 export const Dormant = { v: u8(), since: f32() }
 
@@ -440,7 +433,20 @@ export const Manual = {}
 
 export const CastRequest = {}
 
-export const Phys = { vx: f32(), vy: f32(), thrust: f32(), drag: f32(), mass: f32() }
+/** 身体：驱动与阻力同乘抓地（鞋 × 地面），阻力再乘介质黏度、按相对介质的速度算 */
+export const Phys = { vx: f32(), vy: f32(), thrust: f32(), drag: f32(), mass: f32(), grip: f32() }
+
+/** 驱动层每帧写入的期望速度，身体按抓地趋近它 */
+export const Drive = { x: f32(), y: f32() }
+
+/** 1 = 按真实时间积分（队伍身体），0 = 按世界时间（其余一切） */
+export const Clock = { v: u8() }
+
+/** 不吃冲量的身体 */
+export const Anchored = {}
+
+/** 无视墙体的身体 */
+export const Phasing = {}
 
 /** ghost：0 存活；1 阵亡且已预订目标位、正在归位；2 阵亡且已停靠 */
 export const Seat = { v: i32Fill(-1), ghost: u8() }
@@ -505,8 +511,6 @@ export const Swarmer = {}
 
 export const Emplacement = {}
 
-export const EnemyVel = { x: f32(), y: f32() }
-
 export const EnemyArm = { armed: u8(), fireDelayMs: f32() }
 
 export const EnemyPhase = { v: f32() }
@@ -553,8 +557,6 @@ export const DashTime = { durationMs: f32() }
 export const DashDist = { dist: f32() }
 
 export const BreaksWalls = {}
-
-export const BVel = { x: f32(), y: f32() }
 
 export const Slowed = { v: f32() }
 

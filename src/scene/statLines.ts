@@ -1,4 +1,4 @@
-import { KNOCKBACK } from '../data/abilities'
+import { KNOCKBACK_TAU_MS } from '../data/abilities'
 import { memberMaxHp } from '../data/stats'
 import { CHARACTERS, MEMBER, TEAM, loadoutFor, upgradeCardsFor } from '../data/characters'
 import type { CharacterId } from '../types/characters'
@@ -80,7 +80,7 @@ function abilityStatLines(w: AbilityDef): string[] {
   }
   if (w.kind === 'strike') {
     return [
-      `伤害 ${w.damage} · 击退 ${grid((w.knockback * KNOCKBACK.tauMs) / 1000)} · 砸向最近 ${w.targets} 个敌人`,
+      `伤害 ${w.damage} · 击退 ${grid((w.knockback * KNOCKBACK_TAU_MS) / 1000)} · 砸向最近 ${w.targets} 个敌人`,
       w.coinsPerHit ? `每次命中落地掉 ${w.coinsPerHit} 枚金币` : '被砸死的照常掉落',
     ]
   }
@@ -102,13 +102,13 @@ function abilityStatLines(w: AbilityDef): string[] {
   if (w.kind === 'rush') {
     return [
       `朝瞄准方向冲刺 ${grid(w.distance)} · 用时 ${sec(w.ms)} · 沿途伤害 ${w.damage}`,
-      `撞开 ${grid((w.knockback * KNOCKBACK.tauMs) / 1000)} · 判定 ${grid(w.hitRadius)}`,
+      `撞开 ${grid((w.knockback * KNOCKBACK_TAU_MS) / 1000)} · 判定 ${grid(w.hitRadius)}`,
     ]
   }
   if (w.kind === 'leap') {
     return [
       `朝瞄准方向跃出 ${grid(w.distance)} · 用时 ${sec(w.ms)} · 落地伤害 ${w.damage}`,
-      `落地范围 ${grid(w.radius)} · 击退 ${grid((w.knockback * KNOCKBACK.tauMs) / 1000)}`,
+      `落地范围 ${grid(w.radius)} · 击退 ${grid((w.knockback * KNOCKBACK_TAU_MS) / 1000)}`,
     ]
   }
   if (w.kind === 'taunt') {
@@ -135,7 +135,7 @@ function abilityStatLines(w: AbilityDef): string[] {
       .filter((s) => s !== '')
     return [`以自己为中心 ${grid(w.radius)}${w.damage > 0 ? ` · 伤害 ${w.damage}` : ''}`, fx.length > 0 ? fx.join(' · ') : '范围内全体生效']
   }
-  const base = `伤害 ${w.damage} · 冷却 ${sec(w.cooldownMs)} · 击退 ${grid((w.knockback * KNOCKBACK.tauMs) / 1000)}`
+  const base = `伤害 ${w.damage} · 冷却 ${sec(w.cooldownMs)} · 击退 ${grid((w.knockback * KNOCKBACK_TAU_MS) / 1000)}`
   switch (w.kind) {
     case 'projectile':
       return [base, `弹速 ${grid(w.projectile.speed)}/秒 · 弹体 ${grid(w.projectile.radius * 2)}`]

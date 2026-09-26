@@ -18,6 +18,7 @@ import {
   Thrown,
   Tint,
   Transform,
+  VisOff,
   Weapon,
 } from '../components'
 import type { Sim } from '../sim'
@@ -54,7 +55,7 @@ export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, f
 
 function spawnFlyerBody(sim: Sim, weaponEid: number): number {
   const t = newEntity(sim.world)
-  addComponents(sim.world, t, Transform, Sprite, Tint, Depth, Quad)
+  addComponents(sim.world, t, Transform, Sprite, Tint, Depth, VisOff, Quad)
   const size = Held.size[weaponEid]!
   Transform.x[t] = Transform.x[weaponEid]!
   Transform.y[t] = Transform.y[weaponEid]!

@@ -16,7 +16,7 @@ import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox/knobs
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
-import { Alive, Anim, Breath, Depth, DmgBuff, Follow, GroundHit, Hidden, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, CharScale, Facing, Leaping, Magnet, Phys, Pop, Quad, Revive, Rushing, Seat, Slot, Sprite, Taunting, Tint, Transform } from '../components'
+import { Alive, Anim, Breath, Clock, Depth, DmgBuff, Drive, FACTION, Faction, GroundHit, Hidden, VisOff, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, CharScale, Facing, Leaping, Magnet, Phys, Pop, Quad, Radius, Revive, Rushing, Seat, Slot, Sprite, Taunting, Tint, Transform } from '../components'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
@@ -43,7 +43,6 @@ export function spawnCharacter(
     const eid = newEntity(world)
   addComponent(world, eid, Character)
   addComponent(world, eid, Slot)
-  addComponent(world, eid, Follow)
   addComponent(world, eid, VisOff)
   addComponent(world, eid, Breath)
   addComponent(world, eid, Pop)
@@ -51,13 +50,16 @@ export function spawnCharacter(
   addComponent(world, eid, CharHp)
   addComponent(world, eid, CharScale)
   addComponent(world, eid, Phys)
+  addComponent(world, eid, Drive)
+  addComponent(world, eid, Clock)
+  addComponent(world, eid, Faction)
   addComponent(world, eid, Seat)
   addComponent(world, eid, Facing)
   addComponent(world, eid, CharAtkSlow)
   addComponent(world, eid, CharPerk)
   addComponent(world, eid, Iframe)
   addComponent(world, eid, Revive)
-  addComponent(world, eid, Hurt)
+  addComponent(world, eid, Radius)
   addComponent(world, eid, GroundHit)
   addComponent(world, eid, CharFlash)
   addComponent(world, eid, Transform)
@@ -72,8 +74,6 @@ export function spawnCharacter(
   addComponent(world, eid, Rushing)
   addComponent(world, eid, Leaping)
   Slot.v[eid] = slot
-  Follow.x[eid] = x
-  Follow.y[eid] = y
   VisOff.x[eid] = 0
   VisOff.y[eid] = 0
   Breath.phase[eid] = slot * 1.3
@@ -105,13 +105,18 @@ export function spawnCharacter(
   GroundHit.last[eid] = -1e9
   Revive.ms[eid] = Math.max(1000, TEAM.reviveMs + fx.reviveAddMs)
   Revive.at[eid] = 0
-  Hurt.radius[eid] = MEMBER.radius * UNIT * place.sizeMul
+  Radius.v[eid] = MEMBER.radius * UNIT * place.sizeMul
   CharScale.v[eid] = place.sizeMul
   Phys.vx[eid] = 0
   Phys.vy[eid] = 0
   Phys.thrust[eid] = def.body.thrust * UNIT
   Phys.drag[eid] = def.body.drag
   Phys.mass[eid] = def.body.mass
+  Phys.grip[eid] = TEAM.followerGrip
+  Drive.x[eid] = 0
+  Drive.y[eid] = 0
+  Clock.v[eid] = 1
+  Faction.v[eid] = FACTION.team
   Seat.v[eid] = -1
   Seat.ghost[eid] = 0
   Facing.x[eid] = 0

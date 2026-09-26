@@ -1,6 +1,6 @@
 import { UNIT } from '../../../util/units'
 import { MEMBER, TEAM } from '../../../data/characters'
-import { Alive, CharScale, Facing, Follow, Hurt, Iframe, Leaping, Rushing, Seat, Transform } from '../../components'
+import { Alive, CharScale, Facing, Iframe, Leaping, Radius, Rushing, Seat, Transform } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import { handoverMs } from './squad'
@@ -29,7 +29,7 @@ export function handoverCamOffset(sim: Sim): Point {
 /** 阵亡者不走动画系统，尺寸随倍率直接改 */
 function setScale(eid: number, s: number): void {
   CharScale.v[eid] = s
-  Hurt.radius[eid] = MEMBER.radius * UNIT * s
+  Radius.v[eid] = MEMBER.radius * UNIT * s
   if (Alive.v[eid]) return
   Transform.w[eid] = MEMBER.size * UNIT * s
   Transform.h[eid] = MEMBER.size * UNIT * s
@@ -61,7 +61,7 @@ export function canSwitchLeader(sim: Sim, eid: number): boolean {
 export function switchLeader(sim: Sim, eid: number): void {
   finishHandover(sim)
   const from = sim.leader
-  const d = sim.hooks.worldDelta(sim, Follow.x[eid]!, Follow.y[eid]!, Follow.x[from]!, Follow.y[from]!)
+  const d = sim.hooks.worldDelta(sim, Transform.x[eid]!, Transform.y[eid]!, Transform.x[from]!, Transform.y[from]!)
   sim.leader = eid
   const fx = Facing.x[eid]!
   const fy = Facing.y[eid]!
@@ -82,7 +82,7 @@ function nearestAlive(sim: Sim, x: number, y: number): number {
   let bestD = Infinity
   for (const m of sim.characters) {
     if (!Alive.v[m]) continue
-    const d = sim.hooks.worldDelta(sim, x, y, Follow.x[m]!, Follow.y[m]!)
+    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
     const dist = Math.hypot(d.x, d.y)
     if (dist < bestD) {
       bestD = dist
@@ -97,7 +97,7 @@ export function stepHandover(sim: Sim): void {
   const leader = sim.leader
   if (leader < 0 || sim.over) return
   if (!Alive.v[leader]) {
-    const next = nearestAlive(sim, Follow.x[leader]!, Follow.y[leader]!)
+    const next = nearestAlive(sim, Transform.x[leader]!, Transform.y[leader]!)
     if (next >= 0) switchLeader(sim, next)
   }
   const h = sim.handover

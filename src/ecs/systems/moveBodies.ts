@@ -1,0 +1,52 @@
+import { query } from 'bitecs'
+import { Alive, Dormant, Drive, Leaping, Phys, Radius, Rushing, Transform } from '../components'
+import { bodyDt } from './shared/body'
+import type { Sim } from '../sim'
+
+/** 所有身体同一条积分；冲刺中的身体按脚本速度走，跳跃中的身体不落地；位置经场地修正后速度按实际位移回推 */
+export function moveBodies(sim: Sim): void {
+  for (const eid of query(sim.world, [Phys, Transform, Radius])) {
+    if (Dormant.v[eid] || Alive.v[eid] === 0 || Leaping.active[eid]) continue
+    const dt = bodyDt(sim, eid)
+    if (dt <= 0) continue
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    let vx = Phys.vx[eid]!
+    let vy = Phys.vy[eid]!
+    const rushing = Rushing.active[eid] === 1
+    let next: { x: number; y: number }
+    if (rushing) {
+      vx = Rushing.vx[eid]!
+      vy = Rushing.vy[eid]!
+      next = { x: x + vx * dt, y: y + vy * dt }
+    } else {
+      // 线性阻力的精确解：速度按 exp 衰减趋近终速（介质速度 + 驱动 / 黏度），与帧率无关
+      const s = sim.hooks.surface(sim, x, y)
+      const medium = sim.hooks.mediumVelocity(sim, x, y)
+      const k = (Phys.drag[eid]! * Phys.grip[eid]! * s.traction * s.viscosity) / Phys.mass[eid]!
+      const tx = medium.x + Drive.x[eid]! / s.viscosity
+      const ty = medium.y + Drive.y[eid]! / s.viscosity
+      const e = Math.exp(-k * dt)
+      const glide = k > 1e-9 ? (1 - e) / k : dt
+      next = { x: x + tx * dt + (vx - tx) * glide, y: y + ty * dt + (vy - ty) * glide }
+      vx = tx + (vx - tx) * e
+      vy = ty + (vy - ty) * e
+    }
+    const to = sim.hooks.constrainBody(sim, eid, { x, y }, next)
+    const d = sim.hooks.worldDelta(sim, x, y, to.x, to.y)
+    // 被场地修正过的位移才回推速度：撞墙的分量归零；环面回绕不算修正
+    if (Math.abs(d.x - (next.x - x)) > 1e-6 || Math.abs(d.y - (next.y - y)) > 1e-6) {
+      vx = d.x / dt
+      vy = d.y / dt
+    }
+    Phys.vx[eid] = vx
+    Phys.vy[eid] = vy
+    Transform.x[eid] = to.x
+    Transform.y[eid] = to.y
+    if (!rushing) continue
+    Rushing.msLeft[eid] = Rushing.msLeft[eid]! - dt * 1000
+    // 被墙挡住就提前结束
+    if (Math.hypot(d.x, d.y) < Math.hypot(next.x - x, next.y - y) * 0.5) Rushing.msLeft[eid] = 0
+    if (Rushing.msLeft[eid]! <= 0) Rushing.active[eid] = 0
+  }
+}

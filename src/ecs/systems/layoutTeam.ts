@@ -1,44 +1,19 @@
 import { UNIT } from '../../util/units'
 import { SQUAD } from '../../data/feel'
+import { TEAM } from '../../data/characters'
 import { fanSlots } from '../../data/formation'
-import { Alive, Depth, Facing, Follow, Phys, Seat, Transform, VisOff } from '../components'
+import { Alive, Drive, Phys, Seat, Transform } from '../components'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { leaderX, leaderY } from '../utils/team'
-import { settleBody, stepBody } from './shared/body'
 import { fanDistance, fanSpreadDeg, recallDist, reverseGain, seatHysteresis, turnRate } from './shared/squad'
 
 const HEADING_MIN = 0.5
 
-/** 相对介质的速度先低通滤波，滤波后快过阈值才更新朝向，静止时保留上一次的方向 */
-function face(sim: Sim, eid: number, vx: number, vy: number): void {
-  const medium = sim.hooks.mediumVelocity(sim, Follow.x[eid]!, Follow.y[eid]!)
-  const k = Math.min(1, sim.dtMs / SQUAD.facingTauMs)
-  const fvx = Facing.vx[eid]! + (vx - medium.x - Facing.vx[eid]!) * k
-  const fvy = Facing.vy[eid]! + (vy - medium.y - Facing.vy[eid]!) * k
-  Facing.vx[eid] = fvx
-  Facing.vy[eid] = fvy
-  const speed = Math.hypot(fvx, fvy)
-  if (speed <= HEADING_MIN * UNIT) return
-  Facing.x[eid] = fvx / speed
-  Facing.y[eid] = fvy / speed
-}
-
-function commit(sim: Sim): void {
-  for (const eid of sim.characters) {
-    const wrapped = sim.hooks.wrap(sim, Follow.x[eid]!, Follow.y[eid]!)
-    Follow.x[eid] = wrapped.x
-    Follow.y[eid] = wrapped.y
-    Transform.x[eid] = wrapped.x + VisOff.x[eid]!
-    Transform.y[eid] = wrapped.y + VisOff.y[eid]!
-    Depth.z[eid] = 10 + sim.hooks.worldDelta(sim, leaderX(sim), leaderY(sim), wrapped.x, wrapped.y).y / UNIT
-  }
-}
-
 /** 在空位里挑离自己最近的；只有近出滞后量才换，当前位已被别人占了则必须换 */
 function pickSeat(sim: Sim, eid: number, seats: readonly Point[], free: (i: number) => boolean): number {
-  const x = Follow.x[eid]!
-  const y = Follow.y[eid]!
+  const x = Transform.x[eid]!
+  const y = Transform.y[eid]!
   const distTo = (s: Point): number => {
     const d = sim.hooks.worldDelta(sim, x, y, s.x, s.y)
     return Math.hypot(d.x, d.y)
@@ -68,10 +43,9 @@ function turnHeading(sim: Sim, tx: number, ty: number, dt: number): void {
   sim.heading = { x: Math.cos(cur + step), y: Math.sin(cur + step) }
 }
 
-/** 队长贴中心，队员用物理跑向身后扇形上的目标位；进占位半径即占位、同位取最近，阵亡者停靠后紧跟 */
+/** 队员的驱动指向队长身后扇形上的目标位；进占位半径即占位、同位取最近，阵亡者停靠后紧跟 */
 export function layoutTeam(sim: Sim): void {
-  const delta = sim.dtMs
-  const dt = Math.min(delta, 50) / 1000
+  const dt = Math.min(sim.dtMs, 50) / 1000
   const leader = sim.leader
   const cx = leaderX(sim)
   const cy = leaderY(sim)
@@ -80,15 +54,14 @@ export function layoutTeam(sim: Sim): void {
   const hy = Phys.vy[leader]! - medium.y
   const speed = Math.hypot(hx, hy)
   if (speed > HEADING_MIN * UNIT) turnHeading(sim, hx / speed, hy / speed, dt)
-  face(sim, leader, Phys.vx[leader]!, Phys.vy[leader]!)
   const followers = sim.characters.filter((e) => e !== leader)
   // 目标位本身也受场地约束：贴墙时缩到可达处，否则队员永远到不了、也占不上
   const seats = fanSlots(followers.length, fanDistance(), fanSpreadDeg(), sim.heading.x, sim.heading.y).map((o) =>
-    sim.hooks.constrainBody(sim, { x: cx, y: cy }, { x: cx + o.x, y: cy + o.y }, delta),
+    sim.hooks.constrainBody(sim, leader, { x: cx, y: cy }, { x: cx + o.x, y: cy + o.y }),
   )
   const seatR = SQUAD.seatRadius * UNIT
   const distToSeat = (f: number, i: number): number => {
-    const d = sim.hooks.worldDelta(sim, Follow.x[f]!, Follow.y[f]!, seats[i]!.x, seats[i]!.y)
+    const d = sim.hooks.worldDelta(sim, Transform.x[f]!, Transform.y[f]!, seats[i]!.x, seats[i]!.y)
     return Math.hypot(d.x, d.y)
   }
   const claimR = SQUAD.claimRadius * UNIT
@@ -120,37 +93,32 @@ export function layoutTeam(sim: Sim): void {
     if (!Alive.v[f] || occupant[Seat.v[f]!] === f) continue
     Seat.v[f] = pickSeat(sim, f, seats, (i) => occupant[i]! < 0)
   }
-  const alive = followers.filter((e) => Alive.v[e] === 1)
   const recall = recallDist() > 0 ? recallDist() * UNIT : Infinity
-  for (const f of alive) {
+  for (const f of followers) {
+    if (!Alive.v[f]) continue
+    Phys.grip[f] = TEAM.followerGrip
+    Drive.x[f] = 0
+    Drive.y[f] = 0
     const seat = seats[Seat.v[f]!]!
-    const from = { x: Follow.x[f]!, y: Follow.y[f]! }
-    const away = sim.hooks.worldDelta(sim, from.x, from.y, cx, cy)
+    const x = Transform.x[f]!
+    const y = Transform.y[f]!
+    const away = sim.hooks.worldDelta(sim, x, y, cx, cy)
     if (Math.hypot(away.x, away.y) > recall) {
-      Follow.x[f] = seat.x
-      Follow.y[f] = seat.y
+      Transform.x[f] = seat.x
+      Transform.y[f] = seat.y
       Phys.vx[f] = 0
       Phys.vy[f] = 0
       continue
     }
-    const d = sim.hooks.worldDelta(sim, from.x, from.y, seat.x, seat.y)
+    const d = sim.hooks.worldDelta(sim, x, y, seat.x, seat.y)
     const dist = Math.hypot(d.x, d.y)
-    let driveX = 0
-    let driveY = 0
-    if (dist > seatR) {
-      const nx = d.x / dist
-      const ny = d.y / dist
-      const gain = Phys.vx[f]! * nx + Phys.vy[f]! * ny < 0 ? reverseGain() : 1
-      const thrust = Phys.thrust[f]! * sim.battleFx.moveSpeedMul * gain
-      driveX = nx * thrust
-      driveY = ny * thrust
-    }
-    const next = stepBody(sim, f, from.x, from.y, { driveX, driveY, extraX: 0, extraY: 0 }, 1, dt)
-    const to = sim.hooks.constrainBody(sim, from, next, delta)
-    settleBody(sim, f, from, to, dt)
-    Follow.x[f] = to.x
-    Follow.y[f] = to.y
-    face(sim, f, Phys.vx[f]!, Phys.vy[f]!)
+    if (dist <= seatR) continue
+    const nx = d.x / dist
+    const ny = d.y / dist
+    const gain = Phys.vx[f]! * nx + Phys.vy[f]! * ny < 0 ? reverseGain() : 1
+    const want = (Phys.thrust[f]! / Phys.drag[f]!) * sim.battleFx.moveSpeedMul * gain
+    Drive.x[f] = nx * want
+    Drive.y[f] = ny * want
   }
   const ghostStep = SQUAD.ghostSpeed * UNIT * dt
   for (const f of followers) {
@@ -159,17 +127,17 @@ export function layoutTeam(sim: Sim): void {
     Phys.vx[f] = 0
     Phys.vy[f] = 0
     if (Seat.ghost[f] !== 2) {
-      const d = sim.hooks.worldDelta(sim, Follow.x[f]!, Follow.y[f]!, seat.x, seat.y)
+      const d = sim.hooks.worldDelta(sim, Transform.x[f]!, Transform.y[f]!, seat.x, seat.y)
       const dist = Math.hypot(d.x, d.y)
       if (dist > seatR && dist > ghostStep) {
-        Follow.x[f] = Follow.x[f]! + (d.x / dist) * ghostStep
-        Follow.y[f] = Follow.y[f]! + (d.y / dist) * ghostStep
+        const p = sim.hooks.wrap(sim, Transform.x[f]! + (d.x / dist) * ghostStep, Transform.y[f]! + (d.y / dist) * ghostStep)
+        Transform.x[f] = p.x
+        Transform.y[f] = p.y
         continue
       }
       Seat.ghost[f] = 2
     }
-    Follow.x[f] = seat.x
-    Follow.y[f] = seat.y
+    Transform.x[f] = seat.x
+    Transform.y[f] = seat.y
   }
-  commit(sim)
 }

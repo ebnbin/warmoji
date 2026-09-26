@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
-import { Alive, BVel, Charge, Detonate, DmgMul, EState, Flash, Hurt, Iframe, Slowed, Speed, Steering, Tint, Transform } from '../components'
+import { Alive, Drive, Charge, Detonate, DmgMul, EState, Flash, Radius, Iframe, Slowed, Speed, Steering, Tint, Transform } from '../components'
 import { despawnEnemy, hurtCharacter } from './shared/combat'
 import { nearestAlive } from './shared/steer'
 import { enemyDef } from '../store'
@@ -26,7 +26,7 @@ export function steerDetonate(sim: Sim): void {
       for (const m of sim.characters) {
         if (!Alive.v[m]) continue
         const d = sim.hooks.worldDelta(sim, ex, ey, Transform.x[m]!, Transform.y[m]!)
-        const rr = r + Hurt.radius[m]!
+        const rr = r + Radius.v[m]!
         if (d.x * d.x + d.y * d.y > rr * rr) continue
         if (now - Iframe.last[m]! < Iframe.ms[m]!) continue
         Iframe.last[m] = now
@@ -49,7 +49,7 @@ export function steerDetonate(sim: Sim): void {
     }
     const dir = sim.hooks.chaseDir(sim, eid, target.x, target.y)
     const sp = Speed.v[eid]! * Slowed.v[eid]!
-    BVel.x[eid] = dir.x * sp
-    BVel.y[eid] = dir.y * sp
+    Drive.x[eid] = dir.x * sp
+    Drive.y[eid] = dir.y * sp
   }
 }

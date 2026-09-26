@@ -6,11 +6,11 @@ import { coinDropChance } from '../../../data/waves'
 import { ELITE } from '../../../data/enemies'
 import type { EnemyDef, EnemyKind } from '../../../types/enemies'
 import type { Hazard } from '../../../types/maps'
-import { KNOCKBACK } from '../../../data/abilities'
 import { MEMBER } from '../../../data/characters'
 import { UNIT } from '../../../util/units'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anim, Boss, DmgMul, Dormant, Elite, Enemy, ENEMY_SET, Flash, Hp, Iframe, Kv, CharFlash, CharHp, CharScale, Morph, CharPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Taunting, Thief, Tint, Transform } from '../../components'
+import { Alive, Anchored, Anim, Boss, DmgMul, Dormant, Elite, Enemy, ENEMY_SET, Flash, Hp, Iframe, CharFlash, CharHp, CharScale, Morph, CharPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Taunting, Thief, Tint, Transform } from '../../components'
+import { impulse } from './body'
 import { enemyCarries, enemyDef } from '../../store'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
@@ -28,7 +28,6 @@ export function applyDamage(
   crit = false,
 ): void {
   if (!hasComponent(sim.world, eid, Enemy) || Dormant.v[eid]) return
-  const def = enemyDef[eid]
   const morphed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
   const dmg = morphed && Morph.vuln[eid] !== 1 ? Math.round(damage * Morph.vuln[eid]!) : damage
   spawnDamageNumber(sim, Transform.x[eid]!, Transform.y[eid]!, dmg, crit)
@@ -37,11 +36,11 @@ export function applyDamage(
   if (srcSlot >= 0 && srcSlot < st.damage.length) {
     st.damage[srcSlot] = (st.damage[srcSlot] ?? 0) + Math.min(dmg, Math.max(0, Hp.v[eid]!))
   }
-  const kbImmune = def?.kbImmune === true && !morphed
+  const anchored = hasComponent(sim.world, eid, Anchored)
   if (hp <= 0) {
     let flingVx = 0
     let flingVy = 0
-    if (knockback > 0 && srcX !== undefined && srcY !== undefined && !kbImmune) {
+    if (knockback > 0 && srcX !== undefined && srcY !== undefined && !anchored) {
       const d = sim.hooks.worldDelta(sim, srcX, srcY, Transform.x[eid]!, Transform.y[eid]!)
       const dir = norm(d.x, d.y)
       flingVx = dir.x * knockback
@@ -55,19 +54,10 @@ export function applyDamage(
   Flash.until[eid] = sim.elapsedMs + 70
   Tint.effect[eid] = 1
   Tint.color[eid] = 0xffffff
-  const kb = kbImmune ? 0 : knockback
-  if (kb > 0 && srcX !== undefined && srcY !== undefined) {
+  if (knockback > 0 && srcX !== undefined && srcY !== undefined) {
     const d = sim.hooks.worldDelta(sim, srcX, srcY, Transform.x[eid]!, Transform.y[eid]!)
     const dir = norm(d.x, d.y)
-    let kvx = Kv.x[eid]! + dir.x * kb
-    let kvy = Kv.y[eid]! + dir.y * kb
-    const len = Math.hypot(kvx, kvy)
-    if (len > KNOCKBACK.maxSpeed) {
-      kvx = (kvx / len) * KNOCKBACK.maxSpeed
-      kvy = (kvy / len) * KNOCKBACK.maxSpeed
-    }
-    Kv.x[eid] = kvx
-    Kv.y[eid] = kvy
+    impulse(sim, eid, dir.x * knockback, dir.y * knockback)
   }
 }
 

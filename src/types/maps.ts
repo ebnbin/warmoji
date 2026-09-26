@@ -32,10 +32,6 @@ export interface IceConfig {
   readonly traction: number
   readonly waterTraction: number
   readonly waterViscosity: number
-  readonly waterTau: number
-  readonly enemyTauIce: number
-  readonly knockbackTauMul: number
-  readonly waterSpeedMul: number
   readonly waterTeamDps: number
   readonly waterEnemyDps: number
   readonly waterTickMs: number

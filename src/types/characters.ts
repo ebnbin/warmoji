@@ -68,6 +68,7 @@ export interface TeamBaseline {
     readonly leaderSizeMul: number
     readonly followerSizeMul: number
     readonly leaderGrip: number
+    readonly followerGrip: number
   }
   readonly member: {
     readonly size: number

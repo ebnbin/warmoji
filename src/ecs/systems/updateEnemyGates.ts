@@ -1,13 +1,13 @@
 import { query } from 'bitecs'
-import { BVel, Dancing, Dormant, ENEMY_SET, EnemyPhase, Morph, Slow, Slowed, Speed, SpMul, Steering, Transform, ZoneSlow } from '../components'
+import { Drive, Dancing, Dormant, ENEMY_SET, EnemyPhase, Morph, Slow, Slowed, Speed, SpMul, Steering, Transform, ZoneSlow } from '../components'
 import { wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
 
 export function updateEnemyGates(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, ENEMY_SET)) {
-    BVel.x[eid] = 0
-    BVel.y[eid] = 0
+    Drive.x[eid] = 0
+    Drive.y[eid] = 0
     if (Dancing.until[eid] !== 0 && now >= Dancing.until[eid]!) {
       Dancing.until[eid] = 0
       Transform.rot[eid] = 0
@@ -30,8 +30,8 @@ export function updateEnemyGates(sim: Sim): void {
     if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) {
       const d = wanderDir(sim, eid)
       const sp = Speed.v[eid]! * slow * 0.5
-      BVel.x[eid] = d.x * sp
-      BVel.y[eid] = d.y * sp
+      Drive.x[eid] = d.x * sp
+      Drive.y[eid] = d.y * sp
       Steering.v[eid] = 0
       continue
     }

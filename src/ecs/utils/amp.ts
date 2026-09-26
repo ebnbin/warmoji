@@ -1,17 +1,20 @@
 import { } from '../../data/items'
 import { waveAt } from '../../data/waves'
 import { sandboxFireRate } from '../sandbox/knobs'
-import { Anchor, DmgBuff, DmgMul, CharAtkSlow, Slot, Transform } from '../components'
+import { Anchor, DmgBuff, DmgMul, CharAtkSlow, Slot, Transform, VisOff } from '../components'
 import { Amp, FACTION, Faction, Owner } from '../components'
 import type { } from './source'
 import type { Sim } from '../sim'
 
+/** 能力从宿主的画面位置出手：身体位置加视觉偏移 */
 export function ownerX(e: number): number {
-  return Transform.x[Anchor.eid[e]!]!
+  const a = Anchor.eid[e]!
+  return Transform.x[a]! + VisOff.x[a]!
 }
 
 export function ownerY(e: number): number {
-  return Transform.y[Anchor.eid[e]!]!
+  const a = Anchor.eid[e]!
+  return Transform.y[a]! + VisOff.y[a]!
 }
 
 export function damageMul(sim: Sim, e: number): number {

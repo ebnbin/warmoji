@@ -3,7 +3,7 @@ import { AI } from '../../data/enemies'
 import { PICKUPS } from '../../data/pickups'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
-import { BVel, CoinThief, GrantCoins, PICKUP_SET, Radius, Slowed, Speed, Steering, Thief, Transform } from '../components'
+import { Drive, CoinThief, GrantCoins, PICKUP_SET, Radius, Slowed, Speed, Steering, Thief, Transform } from '../components'
 import { wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
 
@@ -40,8 +40,8 @@ export function steerCoinThief(sim: Sim): void {
     if (coin < 0) {
       const d = wanderDir(sim, eid)
       const sp = Speed.v[eid]! * 0.3 * slow
-      BVel.x[eid] = d.x * sp
-      BVel.y[eid] = d.y * sp
+      Drive.x[eid] = d.x * sp
+      Drive.y[eid] = d.y * sp
       continue
     }
     const eatR = Radius.v[eid]! + PICKUPS.coin.radius * UNIT
@@ -56,7 +56,7 @@ export function steerCoinThief(sim: Sim): void {
     }
     const dir = norm(coinX - ex, coinY - ey)
     const sp = Speed.v[eid]! * slow
-    BVel.x[eid] = dir.x * sp
-    BVel.y[eid] = dir.y * sp
+    Drive.x[eid] = dir.x * sp
+    Drive.y[eid] = dir.y * sp
   }
 }

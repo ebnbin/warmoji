@@ -13,7 +13,7 @@ export function armEnemies(sim: Sim): void {
     if (!EnemyArm.armed[eid]) armEnemy(sim, eid)
     if (Dancing.until[eid] !== 0) continue
     if (Morph.until[eid] === 0 || now < Morph.until[eid]!) continue
-    restoreMorphVisual(sim.frames, eid)
+    restoreMorphVisual(sim, sim.frames, eid)
     sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'puff' })
     postponeAbilities(sim, eid, 700)
   }

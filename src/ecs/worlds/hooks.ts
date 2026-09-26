@@ -1,12 +1,11 @@
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
-import { TEAM, MEMBER } from '../../data/characters'
 import { SPAWN } from '../../data/enemies'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
 import { MAPS } from '../../data/maps'
 import type { IceConfig, InfiniteConfig, MapDef, MapId, RiverConfig, ShrinkRingConfig, SpaceConfig } from '../../types/maps'
-import { approach, onFloe } from '../worlds/ice'
+import { onFloe } from '../worlds/ice'
 import { outsideZone, ringPoint, zoneRadiusAt } from '../worlds/infinite'
 import { clampToDisc, confineVelocity, meteorSweep } from '../worlds/space'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
@@ -14,9 +13,9 @@ import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/river'
 import { isHorizontal } from '../utils/remap'
 import { PICKUPS } from '../../data/pickups'
-import { query, removeEntity } from 'bitecs'
-import { Alive, Boss, Dormant, Due, ENEMY_SET, Meteor, Radius, Slide, Tint, Transform, Uid } from '../components'
-import { enemyDef, meteorHit } from '../store'
+import { hasComponent, query, removeEntity } from 'bitecs'
+import { Alive, BreaksWalls, Dormant, Due, ENEMY_SET, Meteor, Phasing, Radius, Tint, Transform, Uid } from '../components'
+import { meteorHit } from '../store'
 import { spawnMeteor } from '../entities/meteor'
 import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
 import { applyDamage, hurtByHazard } from '../systems/shared/combat'
@@ -25,9 +24,6 @@ import type { Point } from '../../util/vec'
 import { fleeSteer } from '../systems/shared/steer'
 import { leaderX, leaderY, leaderPoint } from '../utils/team'
 import { iceTraction } from '../systems/shared/squad'
-
-/** 场地夹取给身体留的边距：按队长的受击半径 */
-const BODY_MARGIN = MEMBER.radius * TEAM.leaderSizeMul * UNIT
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -66,17 +62,14 @@ export interface WorldHooks {
   projectileLifeMs(sim: Sim): number
   mediumVelocity(sim: Sim, x: number, y: number): Point
   surface(sim: Sim, x: number, y: number): Surface
-  constrainBody(sim: Sim, from: Point, next: Point, delta: number): Point
-  constrainEnemy(sim: Sim, eid: number, x: number, y: number): Point
+  /** 任何身体的位置修正：边界、障碍、环面回绕，按身体半径 */
+  constrainBody(sim: Sim, eid: number, from: Point, next: Point): Point
   constrainSpawn(sim: Sim, x: number, y: number, radius: number): Point
   chaseDir(sim: Sim, eid: number, tx: number, ty: number): Point
   wallHit(sim: Sim, ax: number, ay: number, bx: number, by: number): Point | null
   smashWall(sim: Sim, x: number, y: number): void
   wanderDir(sim: Sim, eid: number, dx: number, dy: number): Point
   fleeDir(sim: Sim, eid: number, awayX: number, awayY: number): Point
-  postSteerEnemy(sim: Sim, eid: number, vx: number, vy: number, delta: number): { vx: number; vy: number }
-  confineEnemyStep(sim: Sim, eid: number, dx: number, dy: number): Point
-  knockbackTauMul(sim: Sim): number
   constrainCoin(sim: Sim, x: number, y: number): Point
   coinIdleVelocity(sim: Sim): Point
   cullCoin(sim: Sim, x: number, y: number): boolean
@@ -109,18 +102,11 @@ const bounded: WorldHooks = {
   surface() {
     return GROUND
   },
-  constrainBody(sim, _from, next) {
-    const clampMin = BODY_MARGIN
-    return {
-      x: Math.min(Math.max(next.x, clampMin), sim.mapW - clampMin),
-      y: Math.min(Math.max(next.y, clampMin), sim.mapH - clampMin),
-    }
-  },
-  constrainEnemy(sim, eid, x, y) {
+  constrainBody(sim, eid, _from, next) {
     const r = Radius.v[eid]!
     return {
-      x: Math.min(Math.max(x, r), sim.mapW - r),
-      y: Math.min(Math.max(y, r), sim.mapH - r),
+      x: Math.min(Math.max(next.x, r), sim.mapW - r),
+      y: Math.min(Math.max(next.y, r), sim.mapH - r),
     }
   },
   constrainSpawn(sim, x, y) {
@@ -147,15 +133,6 @@ const bounded: WorldHooks = {
   },
   fleeDir(sim, eid, awayX, awayY) {
     return fleeSteer(Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, sim.mapW, sim.mapH, 1.5 * UNIT)
-  },
-  postSteerEnemy(_sim, _eid, vx, vy) {
-    return { vx, vy }
-  },
-  confineEnemyStep(_sim, _eid, dx, dy) {
-    return { x: dx, y: dy }
-  },
-  knockbackTauMul() {
-    return 1
   },
   constrainCoin(sim, x, y) {
     const r = PICKUPS.coin.radius * UNIT
@@ -207,16 +184,13 @@ function floePx(sim: Sim): number {
 
 const ice: WorldHooks = {
   ...bounded,
-  constrainBody(_sim, _from, next) {
+  constrainBody(_sim, _eid, _from, next) {
     return next
   },
   surface(sim, x, y) {
     const cfg = iceCfg(sim)
     if (onFloe(x, y, floePx(sim))) return { traction: iceTraction(), viscosity: 1 }
     return { traction: cfg.waterTraction, viscosity: cfg.waterViscosity }
-  },
-  constrainEnemy(_sim, _eid, x, y) {
-    return { x, y }
   },
   constrainSpawn(_sim, x, y) {
     return { x, y }
@@ -229,22 +203,6 @@ const ice: WorldHooks = {
   },
   fleeDir(_sim, _eid, awayX, awayY) {
     return { x: awayX, y: awayY }
-  },
-  postSteerEnemy(sim, eid, vx, vy, delta) {
-    const cfg = iceCfg(sim)
-    const dt = delta / 1000
-    if (dt <= 0) return { vx, vy }
-    const on = onFloe(Transform.x[eid]!, Transform.y[eid]!, floePx(sim))
-    const tau = on ? cfg.enemyTauIce : cfg.waterTau
-    const mul = on ? 1 : cfg.waterSpeedMul
-    const sx = approach(Slide.x[eid]!, vx * mul, dt, tau)
-    const sy = approach(Slide.y[eid]!, vy * mul, dt, tau)
-    Slide.x[eid] = sx
-    Slide.y[eid] = sy
-    return { vx: sx, vy: sy }
-  },
-  knockbackTauMul(sim) {
-    return iceCfg(sim).knockbackTauMul
   },
   constrainCoin(sim, x, y) {
     const r = PICKUPS.coin.radius * UNIT
@@ -293,21 +251,15 @@ const ruins: WorldHooks = {
     const spawnCells = [...reachableCells(grid, Math.floor(cols / 2), Math.floor(rows / 2))]
     sim.worldState.walls = { grid, flowCellX: -1, flowCellY: -1, reflowAcc: 0, spawnCells, smashed: [] }
   },
-  constrainBody(sim, from, next, delta) {
-    const box = bounded.constrainBody(sim, from, next, delta)
+  constrainBody(sim, eid, from, next) {
+    const box = bounded.constrainBody(sim, eid, from, next)
     const w = sim.worldState.walls
-    return w ? w.grid.resolveMove(from.x, from.y, box.x, box.y) : box
-  },
-  constrainEnemy(sim, eid, x, y) {
-    const box = bounded.constrainEnemy(sim, eid, x, y)
-    const w = sim.worldState.walls
-    const def = enemyDef[eid]
-    if (!w || def?.phasesWalls || def?.breaksWalls) return box
+    if (!w || hasComponent(sim.world, eid, Phasing) || hasComponent(sim.world, eid, BreaksWalls)) return box
     return w.grid.separateCircle(box.x, box.y, Radius.v[eid]!)
   },
   chaseDir(sim, eid, tx, ty) {
     const w = sim.worldState.walls
-    if (!w || enemyDef[eid]?.phasesWalls) return bounded.chaseDir(sim, eid, tx, ty)
+    if (!w || hasComponent(sim.world, eid, Phasing)) return bounded.chaseDir(sim, eid, tx, ty)
     const dir = w.flow?.sampleDir(Transform.x[eid]!, Transform.y[eid]!)
     if (dir && (dir.x !== 0 || dir.y !== 0)) return dir
     return bounded.chaseDir(sim, eid, tx, ty)
@@ -385,11 +337,8 @@ function ringCfg(sim: Sim): ShrinkRingConfig {
 
 const infinite: WorldHooks = {
   ...bounded,
-  constrainBody(_sim, _from, next) {
+  constrainBody(_sim, _eid, _from, next) {
     return next
-  },
-  constrainEnemy(_sim, _eid, x, y) {
-    return { x, y }
   },
   constrainSpawn(_sim, x, y) {
     return { x, y }
@@ -453,16 +402,13 @@ function fieldR(sim: Sim): number {
 
 const space: WorldHooks = {
   ...infinite,
-  constrainBody(sim, from, next) {
+  constrainBody(sim, _eid, from, next) {
     const r = fieldR(sim)
     const v = confineVelocity(from.x, from.y, 0, 0, next.x - from.x, next.y - from.y, r)
     return clampToDisc(from.x + v.x, from.y + v.y, 0, 0, r)
   },
   constrainSpawn(sim, x, y, radius) {
     return clampToDisc(x, y, 0, 0, fieldR(sim) - radius)
-  },
-  confineEnemyStep(sim, eid, dx, dy) {
-    return confineVelocity(Transform.x[eid]!, Transform.y[eid]!, 0, 0, dx, dy, fieldR(sim))
   },
   constrainCoin(sim, x, y) {
     return clampToDisc(x, y, 0, 0, fieldR(sim) - UNIT * 0.5)
@@ -541,39 +487,13 @@ const river: WorldHooks = {
   mediumVelocity(sim) {
     return flowOf(sim)
   },
-  constrainBody(sim, _from, next) {
-    return clampToRiver(next, riverOf(sim), BODY_MARGIN)
-  },
-  constrainEnemy(sim, eid, x, y) {
-    const r = riverOf(sim)
-    const rad = Radius.v[eid]!
-    if (Boss.v[eid] === 1) return clampToRiver({ x, y }, r, rad)
-    if (r.horizontal) return { x, y: Math.min(Math.max(y, r.y + rad), r.y + r.h - rad) }
-    return { x: Math.min(Math.max(x, r.x + rad), r.x + r.w - rad), y }
+  constrainBody(sim, eid, _from, next) {
+    return clampToRiver(next, riverOf(sim), Radius.v[eid]!)
   },
   constrainSpawn(sim, x, y, radius) {
     const r = riverOf(sim)
     if (r.horizontal) return { x, y: Math.min(Math.max(y, r.y + radius), r.y + r.h - radius) }
     return { x: Math.min(Math.max(x, r.x + radius), r.x + r.w - radius), y }
-  },
-  postSteerEnemy(sim, eid, vx, vy) {
-    const f = flowOf(sim)
-    const r = riverOf(sim)
-    let ox = vx + f.x
-    let oy = vy + f.y
-    const x = Transform.x[eid]!
-    const y = Transform.y[eid]!
-    const rad = Radius.v[eid]!
-    const boss = Boss.v[eid] === 1
-    if (boss || !r.horizontal) {
-      if (x <= r.x + rad && ox < 0) ox = 0
-      if (x >= r.x + r.w - rad && ox > 0) ox = 0
-    }
-    if (boss || r.horizontal) {
-      if (y <= r.y + rad && oy < 0) oy = 0
-      if (y >= r.y + r.h - rad && oy > 0) oy = 0
-    }
-    return { vx: ox, vy: oy }
   },
   wanderDir(_sim, _eid, dx, dy) {
     return { x: dx, y: dy }
@@ -636,11 +556,8 @@ const torus: WorldHooks = {
   projectileLifeMs(sim) {
     return MAPS[sim.mapId].torus!.projectileLifeMs
   },
-  constrainBody(sim, _from, next) {
+  constrainBody(sim, _eid, _from, next) {
     return wrapPoint(next, sim.mapW, sim.mapH)
-  },
-  constrainEnemy(sim, _eid, x, y) {
-    return wrapPoint({ x, y }, sim.mapW, sim.mapH)
   },
   constrainSpawn(sim, x, y) {
     return wrapPoint({ x, y }, sim.mapW, sim.mapH)

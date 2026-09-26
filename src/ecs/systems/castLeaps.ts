@@ -1,5 +1,5 @@
 import { playSfx } from '../../audio/sfx'
-import { Follow, Leap, Leaping, Owner } from '../components'
+import { Leap, Leaping, Owner, Transform } from '../components'
 import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 
@@ -7,9 +7,9 @@ import type { Sim } from '../sim'
 export function castLeaps(sim: Sim, scan = castScan): void {
   scan(sim, Leap, (e) => {
     const m = Owner.eid[e]!
-    const from = { x: Follow.x[m]!, y: Follow.y[m]! }
+    const from = { x: Transform.x[m]!, y: Transform.y[m]! }
     const dist = Leap.distance[e]!
-    const to = sim.hooks.constrainBody(sim, from, { x: from.x + sim.aim.x * dist, y: from.y + sim.aim.y * dist }, sim.dtMs)
+    const to = sim.hooks.constrainBody(sim, m, from, { x: from.x + sim.aim.x * dist, y: from.y + sim.aim.y * dist })
     const d = sim.hooks.worldDelta(sim, from.x, from.y, to.x, to.y)
     Leaping.active[m] = 1
     Leaping.landed[m] = 0

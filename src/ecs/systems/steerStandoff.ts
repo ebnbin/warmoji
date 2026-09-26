@@ -2,7 +2,7 @@ import { query } from 'bitecs'
 import { AI } from '../../data/enemies'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
-import { BVel, Slowed, Speed, Standoff, Steering, Transform } from '../components'
+import { Drive, Slowed, Speed, Standoff, Steering, Transform } from '../components'
 import { nearestAlive, wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
 
@@ -19,22 +19,22 @@ export function steerStandoff(sim: Sim): void {
     const dist = target ? Math.hypot(dx, dy) : Infinity
     if (dist > Standoff.detectRange[eid]!) {
       const d = wanderDir(sim, eid)
-      BVel.x[eid] = d.x * sp * 0.5
-      BVel.y[eid] = d.y * sp * 0.5
+      Drive.x[eid] = d.x * sp * 0.5
+      Drive.y[eid] = d.y * sp * 0.5
       continue
     }
     const stand = Standoff.standoffDist[eid]!
     if (dist > stand + band) {
       const d = norm(dx, dy)
-      BVel.x[eid] = d.x * sp
-      BVel.y[eid] = d.y * sp
+      Drive.x[eid] = d.x * sp
+      Drive.y[eid] = d.y * sp
       continue
     }
     if (dist < stand - band) {
       const away = norm(-dx, -dy)
       const d = sim.hooks.fleeDir(sim, eid, away.x, away.y)
-      BVel.x[eid] = d.x * sp
-      BVel.y[eid] = d.y * sp
+      Drive.x[eid] = d.x * sp
+      Drive.y[eid] = d.y * sp
       continue
     }
   }

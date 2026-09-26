@@ -2,7 +2,7 @@ import { addComponent } from 'bitecs'
 import { newEntity } from './entity'
 import { norm } from '../../util/vec'
 import { KNOCKBACK } from '../../data/abilities'
-import { Depth, Quad, Shard, Sprite, Tint, Transform } from '../components'
+import { Depth, Quad, Shard, Sprite, Tint, Transform, VisOff } from '../components'
 import type { Sim } from '../sim'
 
 export function spawnShards(
@@ -31,6 +31,7 @@ export function spawnShards(
     addComponent(sim.world, eid, Sprite)
     addComponent(sim.world, eid, Tint)
     addComponent(sim.world, eid, Depth)
+    addComponent(sim.world, eid, VisOff)
     Transform.x[eid] = x + ox
     Transform.y[eid] = y + oy
     Transform.rot[eid] = 0

@@ -1,6 +1,6 @@
 import { hasComponent, query } from 'bitecs'
 import { norm } from '../../util/vec'
-import { BaseOrbit, BVel, Enemy, Nest, Slowed, Speed, Steering, Transform } from '../components'
+import { BaseOrbit, Drive, Enemy, Nest, Slowed, Speed, Steering, Transform } from '../components'
 import { nearestAlive } from './shared/steer'
 import type { Sim } from '../sim'
 
@@ -21,8 +21,8 @@ export function steerBaseOrbit(sim: Sim): void {
     if (!orbit) {
       if (!target) continue
       const dir = sim.hooks.chaseDir(sim, eid, target.x, target.y)
-      BVel.x[eid] = dir.x * sp
-      BVel.y[eid] = dir.y * sp
+      Drive.x[eid] = dir.x * sp
+      Drive.y[eid] = dir.y * sp
       continue
     }
     const rel = sim.hooks.worldDelta(sim, Transform.x[nest]!, Transform.y[nest]!, ex, ey)
@@ -32,7 +32,7 @@ export function steerBaseOrbit(sim: Sim): void {
     const want = BaseOrbit.orbitRadius[eid]!
     const radial = (want - r) / want
     const dir = norm(-ry / r + (rx / r) * radial * 1.5, rx / r + (ry / r) * radial * 1.5)
-    BVel.x[eid] = dir.x * sp
-    BVel.y[eid] = dir.y * sp
+    Drive.x[eid] = dir.x * sp
+    Drive.y[eid] = dir.y * sp
   }
 }

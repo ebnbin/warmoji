@@ -1,5 +1,5 @@
 import { hasComponent, query } from 'bitecs'
-import { Alive, DmgMul, Dormant, Enemy, ENEMY_SET, Hurt, Iframe, Morph, CharPerk, Radius, Slot, Transform } from '../components'
+import { Alive, DmgMul, Dormant, Enemy, ENEMY_SET, Iframe, Morph, CharPerk, Radius, Slot, Transform } from '../components'
 import { applyDamage, hurtCharacter } from './shared/combat'
 import { applyAbilityEffects } from './shared/effects'
 import { enemySource } from '../utils/source'
@@ -16,7 +16,7 @@ export function characterContact(sim: Sim): void {
     if (now - Iframe.last[m]! < Iframe.ms[m]!) continue
     const mx = Transform.x[m]!
     const my = Transform.y[m]!
-    const hr = Hurt.radius[m]!
+    const hr = Radius.v[m]!
     for (const eid of enemies) {
       if (Dormant.v[eid]) continue
       const rr = hr + Radius.v[eid]!

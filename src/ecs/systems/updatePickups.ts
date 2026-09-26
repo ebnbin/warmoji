@@ -2,7 +2,7 @@ import { addComponent, query, removeEntity } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { PICKUP, PICKUPS } from '../../data/pickups'
-import { Alive, Bob, Collected, Grab, Hurt, Lifetime, Magnet, PICKUP_SET, Pull, Tint, Transform, Vel } from '../components'
+import { Alive, Bob, Collected, Grab, Radius, Lifetime, Magnet, PICKUP_SET, Pull, Tint, Transform, Vel } from '../components'
 import { animatePickup } from '../entities/pickup'
 import type { Sim } from '../sim'
 import { leaderX, leaderY } from '../utils/team'
@@ -80,7 +80,7 @@ function nearAliveCharacter(sim: Sim, x: number, y: number, grab: number): boole
   const cr = PICKUPS.coin.radius * UNIT
   for (const m of sim.characters) {
     if (!Alive.v[m]) continue
-    if (within(sim, x, y, Transform.x[m]!, Transform.y[m]!, Math.max(grab, Hurt.radius[m]! + cr))) return true
+    if (within(sim, x, y, Transform.x[m]!, Transform.y[m]!, Math.max(grab, Radius.v[m]! + cr))) return true
   }
   return false
 }

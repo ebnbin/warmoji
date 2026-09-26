@@ -1,5 +1,5 @@
 import { Not, query } from 'bitecs'
-import { Alive, Hurt, Iframe, Proj, Projectile, SweptHit, Transform } from '../components'
+import { Alive, Radius, Iframe, Proj, Projectile, SweptHit, Transform } from '../components'
 import { hurtCharacter } from './shared/combat'
 import { cullProjectile } from './shared/projectile'
 import { projSrcEnemy } from '../store'
@@ -14,7 +14,7 @@ export function hitDirectProjectiles(sim: Sim): void {
     const pr = Proj.radius[eid]!
     for (const m of sim.characters) {
       if (!Alive.v[m]) continue
-      const rr = pr + Hurt.radius[m]!
+      const rr = pr + Radius.v[m]!
       const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
       if (d.x * d.x + d.y * d.y > rr * rr) continue
       if (now - Iframe.last[m]! >= Iframe.ms[m]!) {

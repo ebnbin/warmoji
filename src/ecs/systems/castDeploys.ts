@@ -1,4 +1,4 @@
-import { Deploy } from '../components'
+import { Deploy, Owner } from '../components'
 import { ownerX, ownerY } from '../utils/amp'
 import { place } from '../entities/minion'
 import { castScan } from './shared/castScan'
@@ -14,7 +14,7 @@ export function castDeploys(sim: Sim, scan = castScan): void {
     const oy = ownerY(e)
     for (let i = 0; i < n; i++) {
       const a = -Math.PI / 2 + (i * Math.PI * 2) / n
-      const at = sim.hooks.constrainBody(sim, { x: ox, y: oy }, { x: ox + Math.cos(a) * r, y: oy + Math.sin(a) * r }, sim.dtMs)
+      const at = sim.hooks.constrainBody(sim, Owner.eid[e]!, { x: ox, y: oy }, { x: ox + Math.cos(a) * r, y: oy + Math.sin(a) * r })
       place(sim, e, at, life)
     }
   })
