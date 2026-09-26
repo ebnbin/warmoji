@@ -9,27 +9,39 @@ import type { EnemyDef } from '../../../types/enemies'
 import { MEMBER } from '../../../data/characters'
 import { UNIT } from '../../../util/units'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, Hp, CharScale, MARK, Nest, Revive, Slot, Sprite, TAG, Thief, Tint, Transform } from '../../components'
+import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Hp, CharScale, MARK, Nest, Revive, Slot, Sprite, TAG, Thief, Tint, Transform } from '../../components'
+import { isSameEntity } from '../../utils/identity'
 import { addMark, dmgMul, hasMark } from '../../utils/marks'
 import { bodyRules, enemyCarries, enemyDef } from '../../store'
 import { selfSource } from '../../utils/source'
 import { applyAbilityEffects } from './effects'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
+import { endMotion } from './displace'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 
-/** 生命归零：带复活计时的身体倒地等待，其余身体死亡移除 */
+/** 生命归零：击杀者先反应，带复活计时的身体倒地等待，其余身体死亡移除 */
 export function die(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: number): void {
+  killerReacts(sim, src)
   if (hasComponent(sim.world, eid, Revive)) {
     down(sim, eid)
     return
   }
   const anchored = hasComponent(sim.world, eid, Anchored)
-  killEnemy(sim, eid, src.slot, anchored ? 0 : flingVx, anchored ? 0 : flingVy)
+  killBody(sim, eid, src.slot, anchored ? 0 : flingVx, anchored ? 0 : flingVy)
+}
+
+/** 击杀反应施于出手的身体，敌我同一条 */
+function killerReacts(sim: Sim, src: Source): void {
+  const k = src.body
+  if (k === undefined || !isSameEntity(sim.world, k, src.bodyUid ?? 0) || !Alive.v[k]) return
+  const onKill = bodyRules[k]?.onKill
+  if (onKill) applyAbilityEffects(sim, selfSource(sim, k), onKill, { x: Transform.x[k]!, y: Transform.y[k]!, baseDamage: 0, targets: [k] })
 }
 
 function down(sim: Sim, eid: number): void {
+  endMotion(eid)
   Hp.v[eid] = 0
   Alive.v[eid] = 0
   Revive.at[eid] = sim.elapsedMs + Revive.ms[eid]!
@@ -47,28 +59,27 @@ function down(sim: Sim, eid: number): void {
   if (sim.characters.every((x) => !Alive.v[x])) sim.over = true
 }
 
-function killEnemy(sim: Sim, eid: number, srcSlot: number, flingVx: number, flingVy: number): void {
-  sim.run.kills++
+/** 死亡移除：战利品、击杀计数与 Boss 倒下只算敌方阵营的身体；亡语、巢穴、携带物、碎片敌我同一条 */
+function killBody(sim: Sim, eid: number, srcSlot: number, flingVx: number, flingVy: number): void {
+  const hostile = Faction.v[eid] === FACTION.enemy
   const st = sim.run.stats
-  if (srcSlot >= 0 && srcSlot < st.kills.length) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
-  const killer = sim.characters[srcSlot]
-  const onKill = killer !== undefined && Alive.v[killer] ? bodyRules[killer]?.onKill : undefined
-  if (killer !== undefined && onKill) {
-    applyAbilityEffects(sim, selfSource(sim, killer), onKill, { x: Transform.x[killer]!, y: Transform.y[killer]!, baseDamage: 0, targets: [killer] })
+  if (hostile) {
+    sim.run.kills++
+    if (srcSlot >= 0 && srcSlot < st.kills.length) st.kills[srcSlot] = (st.kills[srcSlot] ?? 0) + 1
   }
   playSfx('kill')
   const def = enemyDef[eid]
   const elite = Elite.v[eid] === 1
   const boss = Boss.v[eid] === 1
-  if (def) st.enemyKills[def.kind] = (st.enemyKills[def.kind] ?? 0) + 1
-  if (elite) st.eliteKills += 1
+  if (hostile && def) st.enemyKills[def.kind] = (st.enemyKills[def.kind] ?? 0) + 1
+  if (hostile && elite) st.eliteKills += 1
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 6, kind: 'death' })
   if (boss) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 24, kind: 'death' })
-  if (boss) sim.bossDown = true
-  if (def) grantKillRewards(sim, eid, def, elite)
+  if (hostile && boss) sim.bossDown = true
+  if (hostile && def) grantKillRewards(sim, eid, def, elite)
   const hexed = hasMark(sim, eid, MARK.morph)
   if (!hexed && def?.onDeath) {
-    const snap = { eid: -1, def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: dmgMul(sim, eid) }
+    const snap = { eid: -1, def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: dmgMul(sim, eid), faction: Faction.v[eid]! }
     if (sim.onDeathFx) sim.onDeathFx({ ...snap, eid })
     else sim.pendingDeaths.push(snap)
   }

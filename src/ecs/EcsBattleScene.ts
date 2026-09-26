@@ -23,7 +23,7 @@ import { bossFor, MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, CharScale, Dormant, Enemy, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
+import { Alive, Boss, CharScale, Ctl, Dormant, Enemy, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
@@ -514,7 +514,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const sim = this.sim
     if (!sim || sim.over || this.ending) return false
     const leader = sim.leader
-    if (!Alive.v[leader]) return false
+    if (!Alive.v[leader] || !Ctl.cast[leader]) return false
     const slot = sim.characters.indexOf(leader)
     if ((this.run.skillCd[slot] ?? 0) > 0) return false
     const def = CHARACTERS[this.run.roster[slot]!]

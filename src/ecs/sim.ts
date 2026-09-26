@@ -87,6 +87,7 @@ export interface PendingDeath {
   elite: boolean
   boss: boolean
   dmgMul: number
+  faction: number
 }
 
 export function initialLayout(sim: Sim): void {

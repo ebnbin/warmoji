@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
-import { Aim, Drop, EDir, ENEMY_SET, Facing, Flyer, Leaping, Minion, Phys, PICKUP_SET, PROJ_SET, Sprinting, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
+import { Aim, Drop, EDir, ENEMY_SET, Facing, Flyer, Minion, Motion, Phys, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 
@@ -31,10 +31,16 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     Phys.vx[b] = v.x
     Phys.vy[b] = v.y
   }
-  for (const b of query(sim.world, [Sprinting])) {
-    const rv = rot(Sprinting.vx[b]!, Sprinting.vy[b]!)
-    Sprinting.vx[b] = rv.x
-    Sprinting.vy[b] = rv.y
+  for (const b of query(sim.world, [Motion])) {
+    const rv = rot(Motion.vx[b]!, Motion.vy[b]!)
+    Motion.vx[b] = rv.x
+    Motion.vy[b] = rv.y
+    const mf = map(Motion.fx[b]!, Motion.fy[b]!)
+    const mt = map(Motion.tx[b]!, Motion.ty[b]!)
+    Motion.fx[b] = mf.x
+    Motion.fy[b] = mf.y
+    Motion.tx[b] = mt.x
+    Motion.ty[b] = mt.y
   }
   for (const m of sim.characters) {
     movePos(m)
@@ -47,12 +53,6 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     const fv = rot(Facing.vx[m]!, Facing.vy[m]!)
     Facing.vx[m] = fv.x
     Facing.vy[m] = fv.y
-    const lf = map(Leaping.fromX[m]!, Leaping.fromY[m]!)
-    const lt = map(Leaping.toX[m]!, Leaping.toY[m]!)
-    Leaping.fromX[m] = lf.x
-    Leaping.fromY[m] = lf.y
-    Leaping.toX[m] = lt.x
-    Leaping.toY[m] = lt.y
   }
   for (const e of query(sim.world, [Aim])) {
     const a = rot(Math.cos(Aim.rad[e]!), Math.sin(Aim.rad[e]!))

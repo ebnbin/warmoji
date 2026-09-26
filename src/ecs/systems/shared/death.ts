@@ -34,7 +34,7 @@ export function replayDeath(sim: Sim, d: PendingDeath): void {
   const effects = d.def.onDeath
   if (!effects) return
   const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
-  const src = enemySource(d.def.kind, d.dmgMul)
+  const src = { ...enemySource(d.def.kind, d.dmgMul), faction: d.faction }
   const at = { x: d.x, y: d.y, baseDamage: 0, source: d.eid }
   const generic: Effect[] = []
   for (const fx of effects) {

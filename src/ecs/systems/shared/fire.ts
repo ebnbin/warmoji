@@ -24,13 +24,11 @@ import {
   FlyerShape,
   Hp,
   LeapShape,
-  Leaping,
   Owner,
   Payload,
   REAIM,
   Repeat,
   RepeatState,
-  Sprinting,
   Sector,
   Segment,
   Shots,
@@ -40,7 +38,6 @@ import {
   Thrown,
   Tint,
   Transform,
-  VisOff,
   ZoneShape,
   WorldShape,
   Bolt,
@@ -62,6 +59,7 @@ import { hit } from './damage'
 import { applyAbilityEffects, applyOnHit, struckOf } from './effects'
 import type { Struck } from './effects'
 import { grantIframe } from './combat'
+import { displace } from './displace'
 import { shoot } from './projectile'
 import { launch } from '../../entities/weapon'
 import { place, spawnBee } from '../../entities/minion'
@@ -264,19 +262,23 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
 
   if (hasComponent(w, e, BlinkShape)) {
     if (!target) return false
+    const m = Owner.eid[e]!
     const dx = target.x - ox
     const dy = target.y - oy
     const d = Math.hypot(dx, dy) || 1
     const behind = target.radius + BlinkShape.behindDist[e]!
     const landX = target.x + (dx / d) * behind
     const landY = target.y + (dy / d) * behind
+    const backX = Transform.x[m]!
+    const backY = Transform.y[m]!
+    if (!displace(sim, m, { kind: 'place', x: landX, y: landY }, { self: true })) return false
     Aim.rad[e] = Math.atan2(target.y - landY, target.x - landX)
     blinkFlash(sim, ox, oy)
-    const m = Owner.eid[e]!
-    VisOff.x[m] = landX - Transform.x[m]!
-    VisOff.y[m] = landY - Transform.y[m]!
     const strikeMs = BlinkShape.strikeMs[e]!
     BlinkState.until[e] = sim.elapsedMs + strikeMs
+    BlinkState.x[e] = backX
+    BlinkState.y[e] = backY
+    BlinkState.back[e] = 1
     grantIframe(sim, m, strikeMs + BLINK_IFRAME_PAD_MS)
     blinkFlash(sim, landX, landY)
     let dmg = damage
@@ -292,13 +294,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
 
   if (hasComponent(w, e, SprintShape)) {
     const m = Owner.eid[e]!
-    const speed = SprintShape.distance[e]! / (SprintShape.ms[e]! / 1000)
-    Sprinting.active[m] = 1
-    Sprinting.msLeft[m] = SprintShape.ms[e]!
-    Sprinting.vx[m] = Math.cos(angle) * speed
-    Sprinting.vy[m] = Math.sin(angle) * speed
-    Sprinting.skill[m] = e
-    Sprinting.stamp[m] = sim.elapsedMs
+    if (!displace(sim, m, { kind: 'dash', angle, distance: SprintShape.distance[e]!, ms: SprintShape.ms[e]! }, { self: true, skill: e })) return false
     if (color !== 0) spawnFxCircle(sim, ox, oy, SprintShape.radius[e]!, {
       fill: color,
       fillAlpha: 0.35,
@@ -315,21 +311,9 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
 
   if (hasComponent(w, e, LeapShape)) {
     const m = Owner.eid[e]!
-    const from = { x: Transform.x[m]!, y: Transform.y[m]! }
     const dist = LeapShape.distance[e]!
-    // 落点先经场地约束，再折算回起点附近，环面上才不会跨图飞
-    const to = sim.hooks.constrainBody(sim, m, from, { x: from.x + Math.cos(angle) * dist, y: from.y + Math.sin(angle) * dist })
-    const d = sim.hooks.worldDelta(sim, from.x, from.y, to.x, to.y)
-    Leaping.active[m] = 1
-    Leaping.landed[m] = 0
-    Leaping.msLeft[m] = LeapShape.ms[e]!
-    Leaping.ms[m] = LeapShape.ms[e]!
-    Leaping.fromX[m] = from.x
-    Leaping.fromY[m] = from.y
-    Leaping.toX[m] = from.x + d.x
-    Leaping.toY[m] = from.y + d.y
-    Leaping.skill[m] = e
-    return true
+    const to = { x: Transform.x[m]! + Math.cos(angle) * dist, y: Transform.y[m]! + Math.sin(angle) * dist }
+    return displace(sim, m, { kind: 'arc', x: to.x, y: to.y, ms: LeapShape.ms[e]!, height: LeapShape.height[e]! }, { self: true, skill: e })
   }
 
   if (hasComponent(w, e, AllShape)) {

@@ -2,7 +2,7 @@ import { UNIT } from '../../util/units'
 import { SQUAD } from '../../data/feel'
 import { TEAM } from '../../data/characters'
 import { fanSlots } from '../../data/formation'
-import { Alive, Casting, Drive, Phys, Seat, SpeedMul, Transform } from '../components'
+import { Alive, Ctl, Drive, Phys, Seat, SpeedMul, Transform } from '../components'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { leaderX, leaderY } from '../utils/team'
@@ -43,7 +43,7 @@ function turnHeading(sim: Sim, tx: number, ty: number, dt: number): void {
   sim.heading = { x: Math.cos(cur + step), y: Math.sin(cur + step) }
 }
 
-/** 队员的驱动指向队长身后扇形上的目标位；进占位半径即占位、同位取最近，阵亡者停靠后紧跟；蓄力中停下 */
+/** 队员的驱动指向队长身后扇形上的目标位；进占位半径即占位、同位取最近，阵亡者停靠后紧跟；这一帧不能自己走时不动 */
 export function layoutTeam(sim: Sim): void {
   const dt = Math.min(sim.dtMs, 50) / 1000
   const leader = sim.leader
@@ -99,7 +99,7 @@ export function layoutTeam(sim: Sim): void {
     Phys.grip[f] = TEAM.followerGrip
     Drive.x[f] = 0
     Drive.y[f] = 0
-    if (sim.elapsedMs < Casting.until[f]!) continue
+    if (!Ctl.move[f]) continue
     const seat = seats[Seat.v[f]!]!
     const x = Transform.x[f]!
     const y = Transform.y[f]!

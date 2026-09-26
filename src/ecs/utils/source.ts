@@ -1,5 +1,5 @@
 import { hasComponent } from 'bitecs'
-import { Amp, Anchor, FACTION, Faction, Owner, Slot, WallBlocked } from '../components'
+import { Amp, Anchor, FACTION, Faction, Owner, Slot, Uid, WallBlocked } from '../components'
 import { Transform } from '../components'
 import { enemyDef } from '../store'
 import { attributionSlot, damageMul } from './amp'
@@ -20,6 +20,9 @@ export interface Source {
   readonly tint?: number
   /** 在看的身体：被嘲讽时只看得见嘲讽者 */
   readonly viewer?: number
+  /** 出手的身体与它的编号：击杀反应、施于施法者的效果都找它 */
+  readonly body?: number
+  readonly bodyUid?: number
   readonly sight?: { readonly x: number; readonly y: number }
 }
 
@@ -27,12 +30,14 @@ export function sourceOf(sim: Sim, e: number): Source {
   const enemySide = Faction.v[e] === FACTION.enemy
   return {
     faction: Faction.v[e]!,
-    slot: attributionSlot(e),
+    slot: attributionSlot(sim, e),
     kb: Amp.kb[e]!,
     crit: Amp.crit[e]! + (Amp.battle[e] ? sim.battleFx.critAdd : 0),
     dmgMul: damageMul(sim, e),
     enemy: enemySide ? enemyDef[Owner.eid[e]!]?.kind : undefined,
     viewer: Owner.eid[e]!,
+    body: Owner.eid[e]!,
+    bodyUid: Uid.v[Owner.eid[e]!]!,
     sight:
       sim.worldState.walls !== null && WallBlocked.v[e]
         ? { x: Transform.x[Anchor.eid[e]!]!, y: Transform.y[Anchor.eid[e]!]! }
@@ -42,14 +47,15 @@ export function sourceOf(sim: Sim, e: number): Source {
 
 /** 身体自己在看：转向用 */
 export function bodySource(eid: number): Source {
-  return { faction: Faction.v[eid]!, slot: -1, kb: 1, crit: 0, dmgMul: 1, viewer: eid }
+  return { faction: Faction.v[eid]!, slot: -1, kb: 1, crit: 0, dmgMul: 1, viewer: eid, body: eid, bodyUid: Uid.v[eid]! }
 }
 
 /** 身体自己作为伤害来源：角色归因到槽位，敌人归因到种类并带身上的伤害倍率 */
 export function selfSource(sim: Sim, eid: number): Source {
-  if (hasComponent(sim.world, eid, Slot)) return boltSource(Slot.v[eid]!)
+  const own = { body: eid, bodyUid: Uid.v[eid]! }
+  if (hasComponent(sim.world, eid, Slot)) return { ...boltSource(Slot.v[eid]!), ...own }
   const def = enemyDef[eid]
-  return def ? enemySource(def.kind, dmgMul(sim, eid)) : bodySource(eid)
+  return def ? { ...enemySource(def.kind, dmgMul(sim, eid)), faction: Faction.v[eid]!, ...own } : bodySource(eid)
 }
 
 /** 飞出去的身体自己看：不带发射者的视角与视线 */

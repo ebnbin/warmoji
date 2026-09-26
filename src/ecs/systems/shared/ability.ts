@@ -1,5 +1,6 @@
 import { addComponent, query } from 'bitecs'
-import { Ability, Casting, CastRequest, Cd, Manual, Owner, RepeatState, Sprinting, WindupState } from '../../components'
+import { Ability, Casting, CastRequest, Cd, Manual, Motion, MOTION, Owner, RepeatState, WindupState } from '../../components'
+import { endMotion } from './displace'
 import type { Sim } from '../../sim'
 
 export function requestCast(sim: Sim, ownerEid: number): void {
@@ -14,9 +15,9 @@ export function postponeAbilities(sim: Sim, ownerEid: number, ms: number): void 
   }
 }
 
-/** 打断：冲刺停下，蓄力与延迟重复作废 */
+/** 打断：自己的冲刺停下，蓄力与延迟重复作废 */
 export function interrupt(sim: Sim, eid: number): void {
-  Sprinting.active[eid] = 0
+  if (Motion.kind[eid] === MOTION.dash && Motion.self[eid]) endMotion(eid)
   Casting.until[eid] = 0
   for (const e of query(sim.world, [Ability, Owner])) {
     if (Owner.eid[e] !== eid) continue

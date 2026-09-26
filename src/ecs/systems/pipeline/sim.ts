@@ -14,13 +14,13 @@ import { driveTeam } from '../driveTeam'
 import { moveBodies } from '../moveBodies'
 import { stepHandover } from '../shared/leader'
 import { tickSkillCooldowns } from '../tickSkillCooldowns'
-import { tickSkillStates } from '../tickSkillStates'
+import { settleMotions } from '../settleMotions'
 import { popInEnemies } from '../popInEnemies'
 import { refoldBattleFx } from '../refoldBattleFx'
 import { reviveCharacters } from '../reviveCharacters'
 import { steerBodies } from '../steerBodies'
 import { updateBees } from '../updateBees'
-import { updateEnemyGates } from '../updateEnemyGates'
+import { updateControl } from '../updateControl'
 import { updateSpeedMuls } from '../updateSpeedMuls'
 import { tickMarks } from '../tickMarks'
 import { tintEnemies } from '../tintEnemies'
@@ -42,23 +42,23 @@ export const SIM_PIPELINE = pipeline([
   { run: reviveCharacters, after: [stepHandover] },
   { run: tickMarks, after: [updateDormancy] },
   { run: updateSpeedMuls, after: [refoldBattleFx, tickMarks] },
-  { run: driveTeam, after: [stepHandover, reviveCharacters, updateSpeedMuls] },
+  { run: updateControl, after: [updateDormancy, updateSpeedMuls, tickMarks] },
+  { run: driveTeam, after: [stepHandover, reviveCharacters, updateControl] },
   { run: layoutTeam, after: [driveTeam] },
   { run: popInEnemies, after: [updateDormancy] },
   { run: despawnExpired, after: [updateDormancy] },
   { run: fadeEnemyFlash, after: [updateDormancy] },
   { run: tintEnemies, after: [updateDormancy, fadeEnemyFlash] },
-  { run: updateEnemyGates, after: [updateDormancy, updateSpeedMuls] },
   { run: updateBees, after: [updateDormancy] },
-  { run: steerBodies, after: [updateEnemyGates, updateBees] },
+  { run: steerBodies, after: [updateControl, updateBees] },
   { run: moveBodies, after: [layoutTeam, steerBodies] },
   { run: refreshTargets, after: [moveBodies] },
-  { run: tickSkillStates, after: [refreshTargets] },
+  { run: settleMotions, after: [refreshTargets] },
   { run: animateCharacters, after: [moveBodies] },
   { run: animateEnemies, after: [moveBodies] },
   { run: moveProjectiles, after: [moveBodies] },
   { run: hitProjectiles, after: [moveProjectiles, refreshTargets] },
-  { run: touchBodies, after: [refreshTargets, tickSkillStates] },
+  { run: touchBodies, after: [refreshTargets, settleMotions] },
   { run: cullProjectiles, after: [hitProjectiles] },
   { run: characterVisual, after: [hitProjectiles, touchBodies] },
   blinkTelegraphs,

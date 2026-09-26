@@ -7,7 +7,7 @@ import { guardMul, hasMark } from '../../utils/marks'
 import { bodyRules } from '../../store'
 import { selfSource } from '../../utils/source'
 import { applyAbilityEffects } from './effects'
-import { impulse } from './body'
+import { displace, FORCED } from './displace'
 import { die } from './combat'
 import { spawnDamageNumber } from '../../entities/fx'
 import type { Point } from '../../../util/vec'
@@ -78,6 +78,6 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
     Tint.effect[target] = 1
     Tint.color[target] = 0xffffff
   }
-  if (jx !== 0 || jy !== 0) impulse(sim, target, jx, jy)
+  if (jx !== 0 || jy !== 0) displace(sim, target, { kind: 'push', x: jx, y: jy }, FORCED)
   return true
 }

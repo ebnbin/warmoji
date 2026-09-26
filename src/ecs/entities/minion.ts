@@ -30,7 +30,7 @@ import {
   Retiring,
   SpeedMul,
   Sprite,
-  Steering,
+  Ctl,
   SummonShape,
   Swarmer,
   VisOff,
@@ -98,7 +98,7 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
     lifeMs: SummonShape.lifeMs[e]!,
     animOffsetMs: (index * ANIM_DEF.durMs) / count,
   })
-  addComponents(world, m, Phys, Drive, Clock, Radius, Faction, Alive, SpeedMul, Steering, Nest, Orbit, Contact, Phasing, Airborne)
+  addComponents(world, m, Phys, Drive, Clock, Radius, Faction, Alive, SpeedMul, Ctl, Nest, Orbit, Contact, Phasing, Airborne)
   const speed = SummonShape.speed[e]!
   Phys.vx[m] = 0
   Phys.vy[m] = 0
@@ -113,7 +113,7 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
   Faction.v[m] = Faction.v[e]!
   Alive.v[m] = 1
   SpeedMul.v[m] = 1
-  Steering.v[m] = 1
+  Ctl.move[m] = 1
   Nest.of[m] = owner
   Nest.nextSpawnAt[m] = 0
   Orbit.radius[m] = r

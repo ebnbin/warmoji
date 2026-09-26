@@ -16,7 +16,7 @@ import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox/knobs
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
-import { Anim, Breath, Depth, FACTION, Hp, CharFlash, CharScale, Facing, Leaping, Magnet, MARK, Pop, Revive, Seat, Slot, Sprite, TAG, Transform } from '../components'
+import { Anim, Breath, Depth, FACTION, Hp, CharFlash, CharScale, Facing, Magnet, MARK, Pop, Revive, Seat, Slot, Sprite, TAG, Transform } from '../components'
 import { addMark } from '../utils/marks'
 import { bodyRules } from '../store'
 
@@ -58,7 +58,7 @@ export function spawnCharacter(
     grip: TEAM.followerGrip,
     ownClock: true,
   })
-  addComponents(world, eid, Slot, Breath, Pop, CharScale, Seat, Facing, Revive, CharFlash, Anim, Magnet, Leaping)
+  addComponents(world, eid, Slot, Breath, Pop, CharScale, Seat, Facing, Revive, CharFlash, Anim, Magnet)
   Slot.v[eid] = slot
   Breath.phase[eid] = slot * 1.3
   Magnet.radius[eid] = def.magnet * UNIT

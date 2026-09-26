@@ -25,6 +25,7 @@ import {
   EnemyPhase,
   ETurn,
   FACTION,
+  Faction,
   Flash,
   Flee,
   MARK,
@@ -33,10 +34,8 @@ import {
   Phasing,
   Pop,
   Wander,
-  SprintHit,
   Sprite,
   Standoff,
-  Steering,
   TAG,
   Tint,
   Transform,
@@ -119,7 +118,7 @@ export function spawnEnemy(
     grip: ENEMY_BODY.grip,
     ownClock: false,
   })
-  addComponents(world, eid, Enemy, Elite, Boss, Dormant, Flash, Nest, Despawn, EDir, ETurn, Steering, Anim)
+  addComponents(world, eid, Enemy, Elite, Boss, Dormant, Flash, Nest, Despawn, EDir, ETurn, Anim)
   if (def.kbImmune) addComponent(world, eid, Anchored)
   if (def.phasesWalls) addComponent(world, eid, Phasing)
   const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
@@ -148,7 +147,6 @@ export function spawnEnemy(
   ETurn.at[eid] = sim.elapsedMs + AI.wander.spawnTurnMinMs + sim.rng.next() * AI.wander.spawnTurnJitterMs
   EnemyArm.fireDelayMs[eid] = AI.firstShot.minMs + sim.rng.next() * AI.firstShot.jitterMs
   EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2
-  SprintHit.stamp[eid] = -1
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (EnemyPhase.v[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
   Tint.alpha[eid] = boss ? 0.2 : 0.3
@@ -201,9 +199,10 @@ function currentMix(sim: Sim): ReturnType<typeof enemyMixAt> {
   return enemyMixAt(rows, sim.run.wave)
 }
 
+/** 醒着的敌方身体数，刷怪上限只看它 */
 export function awakeCount(sim: Sim): number {
   let n = 0
-  for (const eid of query(sim.world, ENEMY_SET)) if (!Dormant.v[eid]) n++
+  for (const eid of query(sim.world, ENEMY_SET)) if (!Dormant.v[eid] && Faction.v[eid] === FACTION.enemy) n++
   return n
 }
 

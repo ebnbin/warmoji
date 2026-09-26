@@ -338,8 +338,8 @@ export const WorldShape = {}
 
 export const Aura = { zone: i32() }
 
-/** 瞬袭：身体已闪到 x/y 的画面偏移处，until 到点闪回 */
-export const BlinkState = { until: f32() }
+/** 瞬袭：身体已闪到目标背后，until 到点闪回 x/y；back 为 0 则不回 */
+export const BlinkState = { until: f32(), x: f32(), y: f32(), back: u8() }
 
 export const Manual = {}
 
@@ -353,14 +353,30 @@ export const Facing = { x: f32(), y: f32(), vx: f32(), vy: f32() }
 
 export const Magnet = { radius: f32() }
 
-/** 冲刺中的身体：位移由 moveBodies 按脚本速度推进，撞击按 stamp 去重 */
-export const Sprinting = { active: u8(), msLeft: f32(), vx: f32(), vy: f32(), skill: i32(), stamp: f32() }
+export const MOTION = { none: 0, dash: 1, arc: 2, follow: 3 } as const
 
-/** 敌人记下最近一次撞到自己的冲刺，同一次冲刺不重复吃伤害 */
-export const SprintHit = { stamp: f32() }
+/** 脚本位移：冲刺按速度走，弧线沿 f→t 腾空飞，跟随贴着 ref 偏移 t；self 为 1 是自己的动作，skill 是带来这段位移的能力，landed 在落地那帧为 1 */
+export const Motion = {
+  kind: u8(),
+  self: u8(),
+  landed: u8(),
+  t: f32(),
+  ms: f32(),
+  fx: f32(),
+  fy: f32(),
+  tx: f32(),
+  ty: f32(),
+  vx: f32(),
+  vy: f32(),
+  h: f32(),
+  skill: i32(),
+  stamp: f32(),
+  ref: i32(),
+  refUid: u32(),
+}
 
-/** 跳跃中的身体：沿 from→to 的抛物线前进，落地那帧 landed 为 1 */
-export const Leaping = { active: u8(), landed: u8(), msLeft: f32(), ms: f32(), fromX: f32(), fromY: f32(), toX: f32(), toY: f32(), skill: i32() }
+/** 身体最近一次被哪段冲刺撞过，同一段冲刺不重复吃伤害 */
+export const MotionHit = { stamp: f32() }
 
 export const Drop = { startMs: f32(), durMs: f32(), fromY: f32(), toY: f32(), target: i32(), targetUid: u32() }
 
@@ -439,4 +455,5 @@ export const BreaksWalls = {}
 /** 这一帧的速度倍率：减速状态 × 固有倍率 × 战场效果，每个会走的身体一份 */
 export const SpeedMul = { v: f32() }
 
-export const Steering = { v: u8() }
+/** 这一帧身体能做什么：move 自己走、act 普通出手、cast 施放技能、dash 自己位移；forced 非零时被迫朝 f 点走（1 逃离、2 靠近） */
+export const Ctl = { move: u8(), act: u8(), cast: u8(), dash: u8(), forced: u8(), fx: f32(), fy: f32() }
