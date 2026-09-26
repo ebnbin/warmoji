@@ -1,24 +1,20 @@
-import { addComponent, hasComponent, query, removeComponent } from 'bitecs'
-import { newEntity } from './entity'
+import { addComponent, addComponents, hasComponent, query, removeComponent } from 'bitecs'
+import { spawnBody } from './body'
 import { AI, ELITE, SPAWN, SURGE } from '../../data/enemies'
 import { ENEMY_BODY } from '../../data/abilities'
 import type { DriveDef, EnemyDef } from '../../types/enemies'
 import { waveAt } from '../../data/waves'
 import {
-  Alive,
   Anchored,
   Anim,
   Boss,
   BreaksWalls,
-  Casting,
   Chase,
-  Clock,
   CoinThief,
   Contact,
   Depth,
   Despawn,
   Dormant,
-  Drive,
   EDir,
   Elite,
   Enemy,
@@ -27,35 +23,25 @@ import {
   EnemyPhase,
   ETurn,
   FACTION,
-  Faction,
   Flash,
   Flee,
-  Hp,
   MARK,
-  Mark,
   Nest,
   Orbit,
   Phasing,
-  Phys,
   Pop,
-  Quad,
-  Radius,
   Roam,
   RushHit,
-  Rushing,
-  Slowed,
   Speed,
   Sprite,
   Standoff,
   Stay,
   Steering,
   TAG,
-  Thief,
   Tint,
   Transform,
-  VisOff,
 } from '../components'
-import { bodyRules, enemyCarries, enemyDef } from '../store'
+import { bodyRules, enemyDef } from '../store'
 import { interrupt } from '../systems/shared/ability'
 import { addMark, hasMark } from '../utils/marks'
 import { spawnTelegraph, telegraphCount } from './telegraph'
@@ -118,75 +104,34 @@ export function spawnEnemy(
   const world = sim.world
   const outline = elite || boss ? 'elite' : 'enemy'
   const size = def.size * (elite ? ELITE.sizeMul : 1)
-  const eid = newEntity(world)
-  addComponent(world, eid, Enemy)
-  addComponent(world, eid, Alive)
-  addComponent(world, eid, Transform)
-  addComponent(world, eid, Speed)
-  addComponent(world, eid, Hp)
-  addComponent(world, eid, Elite)
-  addComponent(world, eid, Boss)
-  addComponent(world, eid, Radius)
-  addComponent(world, eid, Mark)
-  addComponent(world, eid, Phys)
-  addComponent(world, eid, Drive)
-  addComponent(world, eid, Clock)
-  addComponent(world, eid, Faction)
-  addComponent(world, eid, Rushing)
-  addComponent(world, eid, Dormant)
-  addComponent(world, eid, Flash)
-  addComponent(world, eid, Casting)
-  addComponent(world, eid, Nest)
-  addComponent(world, eid, Despawn)
-  addComponent(world, eid, EDir)
-  addComponent(world, eid, ETurn)
-  addComponent(world, eid, Slowed)
-  addComponent(world, eid, Steering)
-  addComponent(world, eid, Anim)
-  addComponent(world, eid, Sprite)
-  addComponent(world, eid, Tint)
-  addComponent(world, eid, Depth)
-  addComponent(world, eid, VisOff)
+  const eid = spawnBody(world, {
+    faction: FACTION.enemy,
+    x,
+    y,
+    radius: def.radius,
+    hp,
+    thrust: def.speed * ENEMY_BODY.drag,
+    drag: ENEMY_BODY.drag,
+    mass: ENEMY_BODY.mass,
+    grip: ENEMY_BODY.grip,
+    ownClock: false,
+  })
+  addComponents(world, eid, Enemy, Speed, Elite, Boss, Dormant, Flash, Nest, Despawn, EDir, ETurn, Steering, Anim)
   if (def.kbImmune) addComponent(world, eid, Anchored)
   if (def.phasesWalls) addComponent(world, eid, Phasing)
-  Radius.v[eid] = def.radius
   const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
   Transform.x[eid] = born.x
   Transform.y[eid] = born.y
-  Transform.rot[eid] = 0
   Transform.w[eid] = size * (boss ? 0.2 : 0.3)
   Transform.h[eid] = Transform.w[eid]!
   Speed.v[eid] = def.speed
-  Hp.v[eid] = hp
-  Hp.max[eid] = hp
-  Casting.until[eid] = 0
-  Casting.telegraph[eid] = 0
-  Phys.vx[eid] = 0
-  Phys.vy[eid] = 0
-  Phys.thrust[eid] = def.speed * ENEMY_BODY.drag
-  Phys.drag[eid] = ENEMY_BODY.drag
-  Phys.mass[eid] = ENEMY_BODY.mass
-  Phys.grip[eid] = ENEMY_BODY.grip
-  Drive.x[eid] = 0
-  Drive.y[eid] = 0
-  Clock.v[eid] = 0
-  Faction.v[eid] = FACTION.enemy
-  Rushing.active[eid] = 0
-  Slowed.v[eid] = 1
-  Steering.v[eid] = 0
   attachDrive(sim, eid, def.drive)
   if (def.damage > 0) {
     addComponent(world, eid, Contact)
     Contact.damage[eid] = def.damage
-    Contact.knockback[eid] = 0
-    Contact.vanish[eid] = 0
   }
   bodyRules[eid] = def
   if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
-  Despawn.at[eid] = 0
-  Thief.eaten[eid] = 0
-  Thief.nextEatAt[eid] = 0
-  enemyCarries[eid] = undefined
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
   if (elite) {
@@ -195,11 +140,6 @@ export function spawnEnemy(
   }
   Nest.of[eid] = -1
   Nest.nextSpawnAt[eid] = def.spawner ? sim.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
-  Dormant.v[eid] = 0
-  Dormant.since[eid] = 0
-  EnemyArm.armed[eid] = 0
-  Alive.v[eid] = 1
-  Flash.until[eid] = 0
   const heading = sim.rng.next() * Math.PI * 2
   EDir.x[eid] = Math.cos(heading)
   EDir.y[eid] = Math.sin(heading)
@@ -208,10 +148,7 @@ export function spawnEnemy(
   EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2
   RushHit.stamp[eid] = -1
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
-  Sprite.flipX[eid] = 0
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (EnemyPhase.v[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
-  Tint.color[eid] = 0xffffff
-  Tint.effect[eid] = 0
   Tint.alpha[eid] = boss ? 0.2 : 0.3
   Pop.until[eid] = sim.elapsedMs + (boss ? 320 : 130)
   Pop.ms[eid] = boss ? 320 : 130
@@ -219,7 +156,6 @@ export function spawnEnemy(
   Pop.back[eid] = boss ? 1 : 0
   Pop.alpha[eid] = alpha
   Depth.z[eid] = boss ? 7 : 5
-  Quad.v[eid] = 0
   enemyDef[eid] = def
   return eid
 }
