@@ -13,6 +13,7 @@ import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
 import { interrupt } from './ability'
 import { healAllies } from './heal'
 import { nearestAngle, targetsNear } from '../../utils/targets'
+import { flying } from '../../utils/source'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 import type { ByKind } from '../../../util/record'
@@ -143,8 +144,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       pierce: 0,
       damage: fx.damage * src.dmgMul,
       knockback: 0,
-      srcSlot: src.slot,
-      srcEnemy: src.enemy,
+      src: flying(src),
       onHit: fx.onHit,
     })
   },

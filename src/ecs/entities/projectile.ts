@@ -2,9 +2,9 @@ import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { DEG2RAD } from '../../util/units'
 import { Depth, Faction, PrevPos, Proj, Projectile, Quad, Sprite, Tint, Transform, Vel, VisOff } from '../components'
-import { projHitUids, projOnHit, projSrcEnemy } from '../store'
+import { projHitUids, projOnHit, projSrc } from '../store'
 import type { Effect } from '../../types/abilityDefs'
-import type { EnemyKind } from '../../types/enemies'
+import type { Source } from '../utils/source'
 import type { Sim } from '../sim'
 
 export interface BoltSpec {
@@ -18,8 +18,7 @@ export interface BoltSpec {
   readonly pierce: number
   readonly damage: number
   readonly knockback: number
-  readonly srcSlot: number
-  readonly srcEnemy?: EnemyKind
+  readonly src: Source
   readonly onHit?: readonly Effect[]
 }
 
@@ -46,7 +45,6 @@ export function spawnBolt(sim: Sim, x: number, y: number, angle: number, spec: B
   Proj.damage[eid] = Math.round(spec.damage)
   Proj.radius[eid] = spec.radius
   Proj.kb[eid] = spec.knockback
-  Proj.srcSlot[eid] = spec.srcSlot
   Proj.pierce[eid] = spec.pierce
   Proj.spin[eid] = spec.rotOffsetDeg === 0 ? 9 : 0
   const mapLife = sim.hooks.projectileLifeMs(sim)
@@ -54,6 +52,6 @@ export function spawnBolt(sim: Sim, x: number, y: number, angle: number, spec: B
   Depth.z[eid] = 8
   projOnHit[eid] = spec.onHit
   projHitUids[eid] = new Set()
-  projSrcEnemy[eid] = spec.srcEnemy
+  projSrc[eid] = spec.src
   return eid
 }

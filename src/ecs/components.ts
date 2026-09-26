@@ -179,7 +179,6 @@ export const Proj = {
   damage: f32(),
   radius: f32(),
   kb: f32(),
-  srcSlot: i32(),
   pierce: i32(),
   spin: f32(),
   dieAt: f32(),

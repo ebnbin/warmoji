@@ -1,12 +1,11 @@
 import { query } from 'bitecs'
-import { FACTION, Faction, PrevPos, Proj, PROJ_SET, Transform, Uid } from '../components'
+import { PrevPos, Proj, PROJ_SET, Transform, Uid } from '../components'
 import { applyOnHit } from './shared/effects'
-import { boltSource, enemySource, WORLD_SOURCE } from '../utils/source'
-import type { Source } from '../utils/source'
+import { WORLD_SOURCE } from '../utils/source'
 import { eachTarget } from '../utils/targets'
 import { hit } from './shared/damage'
 import { cullProjectile } from './shared/projectile'
-import { projHitUids, projOnHit, projSrcEnemy } from '../store'
+import { projHitUids, projOnHit, projSrc } from '../store'
 import type { Sim } from '../sim'
 
 function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
@@ -21,12 +20,6 @@ function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, b
   return (px - cx) * (px - cx) + (py - cy) * (py - cy)
 }
 
-function projSource(eid: number): Source {
-  if (Faction.v[eid] === FACTION.team) return boltSource(Proj.srcSlot[eid]!)
-  const kind = projSrcEnemy[eid]
-  return kind ? enemySource(kind, 1) : WORLD_SOURCE
-}
-
 /** 弹体这一帧扫过的线段碰到来源阵营的敌人即命中，沿线最先碰到的先算；每个身体只吃一次；敌我同一条 */
 export function hitProjectiles(sim: Sim): void {
   if (sim.over) return
@@ -37,7 +30,7 @@ export function hitProjectiles(sim: Sim): void {
     const by = Transform.y[eid]!
     const struck = projHitUids[eid]!
     const pr = Proj.radius[eid]!
-    const src = projSource(eid)
+    const src = projSrc[eid] ?? WORLD_SOURCE
     const segX = bx - sx
     const segY = by - sy
     const segLen2 = segX * segX + segY * segY

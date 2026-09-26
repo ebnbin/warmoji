@@ -1,5 +1,5 @@
 import { INITIAL_CAPACITY } from './world'
-import type { BodyRules, EnemyDef, EnemyKind } from '../types/enemies'
+import type { BodyRules, EnemyDef } from '../types/enemies'
 import type { FieldPickupDef } from '../types/battlefield'
 import type { AbilityDef, Effect } from '../types/abilityDefs'
 import type { Source } from './utils/source'
@@ -45,7 +45,8 @@ export const abilityFireSfx = slots<import('../types/sfx').SfxId>()
 /** 装置自己的那条能力 */
 export const emplaceAbility = slots<AbilityDef>()
 
-export const projSrcEnemy = slots<EnemyKind>()
+/** 弹体出膛时记下的来源：归因与倍率跟着弹体走 */
+export const projSrc = slots<Source>()
 
 export const poisonSrc = slots<Source>()
 

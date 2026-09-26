@@ -52,6 +52,11 @@ export function selfSource(sim: Sim, eid: number): Source {
   return def ? enemySource(def.kind, dmgMul(sim, eid)) : bodySource(eid)
 }
 
+/** 飞出去的身体自己看：不带发射者的视角与视线 */
+export function flying(src: Source): Source {
+  return { ...src, viewer: undefined, sight: undefined }
+}
+
 export function boltSource(slot: number): Source {
   return { faction: FACTION.team, slot, kb: 1, crit: 0, dmgMul: 1 }
 }
