@@ -2,7 +2,7 @@ import { hasComponent } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
 import { Alive, FACTION, Faction, Heal, HealAoe, HealDefib, Revive, Transform } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
-import { healEnemies, healCharacters } from './shared/heal'
+import { healAllies } from './shared/heal'
 import { castScan } from './shared/castScan'
 import type { Sim } from '../sim'
 import { spawnFxCircle } from '../entities/fx'
@@ -25,9 +25,7 @@ export function castHeals(sim: Sim): void {
     const base = Math.max(1, Math.round(Heal.amount[e]! * damageMul(sim, e)))
     const all = hasComponent(sim.world, e, HealAoe)
     const amount = all ? Math.max(1, Math.round(base * HealAoe.ratio[e]!)) : base
-    const healed = team
-      ? healCharacters(sim, x, y, range, amount, all)
-      : healEnemies(sim, x, y, range, amount, all)
+    const healed = healAllies(sim, Faction.v[e]!, x, y, range, amount, all)
     if (healed === 0) {
       Heal.cdLeft[e] = 300
       return false

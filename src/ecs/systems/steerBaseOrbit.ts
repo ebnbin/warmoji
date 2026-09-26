@@ -1,7 +1,7 @@
 import { hasComponent, query } from 'bitecs'
 import { norm } from '../../util/vec'
 import { BaseOrbit, Drive, Enemy, Nest, Slowed, Speed, Steering, Transform } from '../components'
-import { nearestAlive } from './shared/steer'
+import { nearestFoe } from './shared/steer'
 import type { Sim } from '../sim'
 
 export function steerBaseOrbit(sim: Sim): void {
@@ -10,7 +10,7 @@ export function steerBaseOrbit(sim: Sim): void {
     const sp = Speed.v[eid]! * Slowed.v[eid]!
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
-    const target = nearestAlive(sim, eid, ex, ey)
+    const target = nearestFoe(sim, eid, ex, ey)
     const nest = Nest.of[eid]!
     let orbit = nest >= 0 && hasComponent(sim.world, nest, Enemy)
     if (orbit && target) {

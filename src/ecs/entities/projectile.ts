@@ -4,7 +4,7 @@ import { DEG2RAD } from '../../util/units'
 import { playSfx } from '../../audio/sfx'
 import {
   Bolt, Depth, FACTION, Faction, Pierce, PrevPos, Proj, Projectile, Quad, Shoot,
-  Sprite, SweptHit, Tint, Transform, Vel, VisOff,
+  Sprite, Tint, Transform, Vel, VisOff,
 } from '../components'
 import { abilityOnHit, projHitUids, projOnHit, projSrcEnemy } from '../store'
 import type { EnemyKind } from '../../types/enemies'
@@ -56,7 +56,6 @@ export function spawnProjectile(
     speed: Bolt.speed[src]!,
     rot: angle + rotOffset * DEG2RAD,
   })
-  addComponents(sim.world, eid, SweptHit)
   Proj.damage[eid] = damage
   Proj.radius[eid] = Bolt.radius[src]!
   Proj.kb[eid] = Shoot.knockback[src]!
@@ -105,6 +104,6 @@ export function spawnEnemyProjectile(
   Proj.dieAt[eid] = sim.elapsedMs + spec.lifeMs
   Depth.z[eid] = 6
   projOnHit[eid] = undefined
-  projHitUids[eid] = undefined
+  projHitUids[eid] = new Set()
   projSrcEnemy[eid] = spec.srcEnemy
 }

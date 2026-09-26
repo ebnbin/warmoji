@@ -7,7 +7,7 @@ import { applyAbilityEffects } from './shared/effects'
 import { sourceOf } from '../utils/source'
 import { castScan } from './shared/castScan'
 import { nearestTarget } from '../utils/targets'
-import type { Target } from '../utils/targets'
+import type { Found } from '../utils/targets'
 import type { Sim } from '../sim'
 import { spawnFxBolt } from '../entities/fx'
 
@@ -22,7 +22,7 @@ export function castChainArcs(sim: Sim): void {
     playSfx('zap')
     const points: { x: number; y: number }[] = [{ x: ox, y: oy }]
     let damage = ChainArc.damage[e]! * damageMul(sim, e)
-    let last: Target = cur
+    let last: Found = cur
     for (let hop = 0; hop <= ChainArc.bounces[e]! && cur; hop++) {
       visited.add(cur.eid)
       const from = points[points.length - 1]!

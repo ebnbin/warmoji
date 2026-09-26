@@ -1,5 +1,6 @@
 import { hasComponent } from 'bitecs'
-import { DEG2RAD } from '../../util/units'
+import { DEG2RAD, UNIT } from '../../util/units'
+import { ACQUIRE } from '../../data/abilities'
 import { playSfx } from '../../audio/sfx'
 import { Aim, AimMove, EveryN, Shoot, Shots, Volley } from '../components'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
@@ -20,7 +21,7 @@ export function castProjectiles(sim: Sim): void {
       Aim.rad[e] = Math.atan2(h.y, h.x)
     } else if (!fullRing) {
       const range = Shoot.range[e]!
-      const aim = nearestAngle(sim, sourceOf(sim, e), ownerX(e), ownerY(e), range > 0 ? range : undefined)
+      const aim = nearestAngle(sim, sourceOf(sim, e), ownerX(e), ownerY(e), range > 0 ? range : ACQUIRE.range * UNIT)
       if (aim === null) return false
       Aim.rad[e] = aim
     }

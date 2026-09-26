@@ -1,6 +1,7 @@
-import { hasComponent, query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
-import { Boss, Dormant, ENEMY_SET, Enemy, Nuke } from '../components'
+import { Boss, Nuke } from '../components'
+import { ownerX, ownerY } from '../utils/amp'
+import { targetsNear } from '../utils/targets'
 import { damageMul, waveScale } from '../utils/amp'
 import { hit } from './shared/damage'
 import { sourceOf } from '../utils/source'
@@ -14,9 +15,8 @@ export function castNukes(sim: Sim, scan = castScan): void {
     playSfx('boom')
     const base = Nuke.damage[e]! * waveScale(sim) * damageMul(sim, e)
     const bossRatio = Nuke.bossRatio[e]!
-    for (const t of [...query(sim.world, ENEMY_SET)]) {
-      if (Dormant.v[t] || !hasComponent(sim.world, t, Enemy)) continue
-      hit(sim, src, t, Math.max(1, Math.round(base * (Boss.v[t] ? bossRatio : 1))))
+    for (const t of targetsNear(sim, src, ownerX(e), ownerY(e), Infinity)) {
+      hit(sim, src, t.eid, Math.max(1, Math.round(base * (Boss.v[t.eid] ? bossRatio : 1))))
     }
   })
 }

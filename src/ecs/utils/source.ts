@@ -16,6 +16,8 @@ export interface Source {
   readonly enemy?: EnemyKind
   readonly hazard?: Hazard
   readonly tint?: number
+  /** 在看的身体：被嘲讽时只看得见嘲讽者 */
+  readonly viewer?: number
   readonly sight?: { readonly x: number; readonly y: number }
 }
 
@@ -28,11 +30,17 @@ export function sourceOf(sim: Sim, e: number): Source {
     crit: Amp.crit[e]! + (Amp.battle[e] ? sim.battleFx.critAdd : 0),
     dmgMul: 1,
     enemy: enemySide ? enemyDef[Owner.eid[e]!]?.kind : undefined,
+    viewer: Owner.eid[e]!,
     sight:
-      sim.worldState.walls !== null && WallBlocked.v[e] && !enemySide
+      sim.worldState.walls !== null && WallBlocked.v[e]
         ? { x: Transform.x[Anchor.eid[e]!]!, y: Transform.y[Anchor.eid[e]!]! }
         : undefined,
   }
+}
+
+/** 身体自己在看：转向与接触用 */
+export function bodySource(eid: number): Source {
+  return { faction: Faction.v[eid]!, slot: -1, kb: 1, crit: 0, dmgMul: 1, viewer: eid }
 }
 
 export function boltSource(slot: number): Source {

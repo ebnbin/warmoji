@@ -4,7 +4,7 @@ import { Alive, Drive, Charge, Detonate, DmgMul, EState, Flash, Radius, Slowed, 
 import { despawnEnemy } from './shared/combat'
 import { hit } from './shared/damage'
 import { enemySource } from '../utils/source'
-import { nearestAlive } from './shared/steer'
+import { nearestFoe } from './shared/steer'
 import { enemyDef } from '../store'
 import type { Sim } from '../sim'
 import { spawnFxRing } from '../entities/fx'
@@ -38,7 +38,7 @@ export function steerDetonate(sim: Sim): void {
       despawnEnemy(sim, eid)
       continue
     }
-    const target = nearestAlive(sim, eid, ex, ey)
+    const target = nearestFoe(sim, eid, ex, ey)
     if (!target) continue
     const dx = target.x - ex
     const dy = target.y - ey

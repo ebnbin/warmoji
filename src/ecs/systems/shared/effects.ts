@@ -8,7 +8,7 @@ import { spawnEnemyProjectile } from '../../entities/projectile'
 import { spawnZone } from '../../entities/zone'
 import { hit } from './damage'
 import { FACTION } from '../../components'
-import { healEnemies, healCharacters } from './heal'
+import { healAllies } from './heal'
 import { nearestAngle, targetsNear } from '../../utils/targets'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
@@ -114,9 +114,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   heal: (sim, src, fx, at) => {
-    const all = fx.all ?? true
-    if (src.faction === FACTION.team) healCharacters(sim, at.x, at.y, fx.range, fx.amount, all)
-    else healEnemies(sim, at.x, at.y, fx.range, fx.amount, all, at.source)
+    healAllies(sim, src.faction, at.x, at.y, fx.range, fx.amount, fx.all ?? true, at.source ?? -1)
   },
 
   spawnProjectile: (sim, src, fx, at) => {

@@ -2,15 +2,15 @@ import { UNIT } from '../../util/units'
 import { ACQUIRE } from '../../data/abilities'
 import { Poison } from '../components'
 import { eachTarget } from './targets'
-import type { Target } from './targets'
+import type { Found } from './targets'
 import type { Source } from './source'
 import type { Sim } from '../sim'
 
-export function pickTarget(sim: Sim, src: Source, bx: number, by: number): Target | null {
+export function pickTarget(sim: Sim, src: Source, bx: number, by: number): Found | null {
   const max = ACQUIRE.range * UNIT
-  let bestFresh: Target | null = null
+  let bestFresh: Found | null = null
   let bestFreshD = max * max
-  let bestAny: Target | null = null
+  let bestAny: Found | null = null
   let bestAnyD = max * max
   eachTarget(sim, src, bx, by, max, (eid, x, y, radius) => {
     const dx = x - bx

@@ -61,7 +61,8 @@ import { defineDevFlag } from '../devtools'
 import type { DevProvider, DevProviderHost } from '../devtools'
 import { gainTeamXp } from './systems/shared/combat'
 import { hit } from './systems/shared/damage'
-import { WORLD_SOURCE } from './utils/source'
+import { bodySource, WORLD_SOURCE } from './utils/source'
+import { nearestTarget } from './utils/targets'
 import { canSwitchLeader, handoverCamOffset, switchLeader } from './systems/shared/leader'
 import { telegraphOne } from './entities/enemy'
 import { enemyDef } from './store'
@@ -207,12 +208,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const g = this.devGfx
     g.clear()
     g.lineStyle(2, 0xffdc5d, 0.7)
-    sim.characters.forEach((m, i) => {
-      const t = sim.characterTargets[i]
-      if (!t || !Alive.v[m]) return
+    for (const m of sim.characters) {
+      if (!Alive.v[m]) continue
+      const t = nearestTarget(sim, bodySource(m), Transform.x[m]!, Transform.y[m]!, Infinity)
+      if (!t) continue
       g.lineBetween(Transform.x[m]!, Transform.y[m]!, t.x, t.y)
       g.strokeCircle(t.x, t.y, Math.max(6, t.radius))
-    })
+    }
   }
 
   create(): void {

@@ -2,7 +2,7 @@ import { query } from 'bitecs'
 import { AI } from '../../data/enemies'
 import { norm } from '../../util/vec'
 import { Drive, Flee, Slowed, Speed, Steering, Transform } from '../components'
-import { nearestAlive, wanderDir } from './shared/steer'
+import { nearestFoe, wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
 
 export function steerFlee(sim: Sim): void {
@@ -12,7 +12,7 @@ export function steerFlee(sim: Sim): void {
     const slow = Slowed.v[eid]!
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
-    const target = nearestAlive(sim, eid, ex, ey)
+    const target = nearestFoe(sim, eid, ex, ey)
     if (target) {
       const d = sim.hooks.worldDelta(sim, ex, ey, target.x, target.y)
       const r = Flee.range[eid]!

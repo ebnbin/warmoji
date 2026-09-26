@@ -1,7 +1,8 @@
-import { query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
-import { ENEMY_SET, Guard, Owner, Taunt, Taunted, Transform } from '../components'
+import { Guard, Owner, Taunt, Taunted } from '../components'
 import { ownerX, ownerY } from '../utils/amp'
+import { sourceOf } from '../utils/source'
+import { targetsNear } from '../utils/targets'
 import { castScan } from './shared/castScan'
 import { spawnFxCircle } from '../entities/fx'
 import type { Sim } from '../sim'
@@ -16,11 +17,9 @@ export function castTaunts(sim: Sim, scan = castScan): void {
     const r = Taunt.radius[e]!
     Guard.until[m] = until
     Guard.mul[m] = Taunt.damageTakenMul[e]!
-    for (const eid of query(sim.world, ENEMY_SET)) {
-      const d = sim.hooks.worldDelta(sim, x, y, Transform.x[eid]!, Transform.y[eid]!)
-      if (d.x * d.x + d.y * d.y > r * r) continue
-      Taunted.until[eid] = until
-      Taunted.by[eid] = m
+    for (const t of targetsNear(sim, sourceOf(sim, e), x, y, r)) {
+      Taunted.until[t.eid] = until
+      Taunted.by[t.eid] = m
     }
     playSfx('over')
     spawnFxCircle(sim, x, y, r, {

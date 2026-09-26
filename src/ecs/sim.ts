@@ -54,7 +54,8 @@ export interface Sim {
   chrono: number
   battleFx: BattleEffects
   frameAttractors: { x: number; y: number; r2: number }[]
-  characterTargets: Target[]
+  /** 按阵营的可被打身体快照，每帧开头与身体走完后各刷新一次 */
+  targets: Target[][]
   frames: FrameIndex
   rng: Rng
   sandbox: boolean
@@ -159,7 +160,7 @@ export function makeSim(
     chrono: 0,
     battleFx: { ...BATTLE_FX_IDENTITY },
     frameAttractors: [],
-    characterTargets: [],
+    targets: [[], []],
     frames: atlas,
     pendingDeaths: [],
     out: newOutbox(),

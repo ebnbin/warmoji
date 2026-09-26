@@ -33,8 +33,8 @@ import { tickPoison } from '../tickPoison'
 import { tintEnemies } from '../tintEnemies'
 import { updateDormancy } from '../updateDormancy'
 import { cullProjectiles } from '../cullProjectiles'
-import { hitDirectProjectiles } from '../hitDirectProjectiles'
-import { hitSweptProjectiles } from '../hitSweptProjectiles'
+import { hitProjectiles } from '../hitProjectiles'
+import { refreshTargets } from '../refreshTargets'
 import { moveProjectiles } from '../moveProjectiles'
 import { updateShards } from '../updateShards'
 import { worldTick } from '../worldTick'
@@ -61,14 +61,14 @@ export const SIM_PIPELINE = pipeline([
   { run: updateEnemyGates, after: [applySlowZones] },
   ...STEERERS.map((run) => ({ run, after: [updateEnemyGates] })),
   { run: moveBodies, after: [layoutTeam, ...STEERERS] },
-  { run: tickSkillStates, after: [moveBodies] },
+  { run: refreshTargets, after: [moveBodies] },
+  { run: tickSkillStates, after: [refreshTargets] },
   { run: animateCharacters, after: [moveBodies] },
   { run: animateEnemies, after: [moveBodies] },
   { run: moveProjectiles, after: [moveBodies] },
-  { run: hitSweptProjectiles, after: [moveProjectiles] },
-  { run: characterContact, after: [moveBodies, tickSkillStates] },
-  { run: hitDirectProjectiles, after: [characterContact, moveProjectiles] },
-  { run: cullProjectiles, after: [hitSweptProjectiles, hitDirectProjectiles] },
+  { run: hitProjectiles, after: [moveProjectiles, refreshTargets] },
+  { run: characterContact, after: [refreshTargets, tickSkillStates] },
+  { run: cullProjectiles, after: [hitProjectiles] },
   characterVisual,
   blinkTelegraphs,
   updateShards,

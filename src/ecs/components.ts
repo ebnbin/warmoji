@@ -179,8 +179,6 @@ export const Proj = {
 
 export const PrevPos = { x: f32(), y: f32() }
 
-export const SweptHit = {}
-
 export const PROJ_SET: QueryTerm[] = [Projectile, Transform, Vel, Proj]
 
 export const Pickup = { bornMs: f32() }

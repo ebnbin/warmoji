@@ -1,9 +1,9 @@
 import { Hp } from '../components'
-import type { Target } from './targets'
+import type { Found } from './targets'
 
-export function strongestTarget(ox: number, oy: number, list: readonly Target[], maxRange: number): Target | null {
+export function strongestTarget(ox: number, oy: number, list: readonly Found[], maxRange: number): Found | null {
   const r2 = maxRange * maxRange
-  let best: Target | null = null
+  let best: Found | null = null
   let bestHp = -1
   for (const t of list) {
     const dx = t.x - ox
