@@ -17,7 +17,7 @@ import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox/knobs
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
-import { Alive, Anim, Breath, Depth, DmgBuff, Follow, GroundHit, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, CharScale, Facing, Magnet, Phys, Pop, Quad, Revive, Seat, Slot, Sprite, Tint, Transform } from '../components'
+import { Alive, Anim, Breath, Depth, DmgBuff, Follow, GroundHit, Hidden, VisOff, Hurt, Iframe, CharAtkSlow, Character, CharFlash, CharHp, CharPerk, CharScale, Facing, Leaping, Magnet, Phys, Pop, Quad, Revive, Rushing, Seat, Slot, Sprite, Taunting, Tint, Transform } from '../components'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
@@ -68,6 +68,10 @@ export function spawnCharacter(
   addComponent(world, eid, Depth)
   addComponent(world, eid, Magnet)
   addComponent(world, eid, DmgBuff)
+  addComponent(world, eid, Hidden)
+  addComponent(world, eid, Taunting)
+  addComponent(world, eid, Rushing)
+  addComponent(world, eid, Leaping)
   Slot.v[eid] = slot
   Follow.x[eid] = x
   Follow.y[eid] = y
@@ -84,6 +88,13 @@ export function spawnCharacter(
   Magnet.radius[eid] = def.magnet * UNIT
   DmgBuff.mul[eid] = 1
   DmgBuff.until[eid] = 0
+  Hidden.until[eid] = 0
+  Hidden.tinted[eid] = 0
+  Taunting.until[eid] = 0
+  Taunting.mul[eid] = 1
+  Rushing.active[eid] = 0
+  Leaping.active[eid] = 0
+  Leaping.landed[eid] = 0
   const owned = sandbox ? [] : (run.memberItems[slot] ?? [])
   const level = sandbox ? sandboxLevel() + 1 : characterLevel(characterXp(owned))
   const fx = aggregateCharacterEffects(owned, levelStatsFor(run.roster[slot]!, level))

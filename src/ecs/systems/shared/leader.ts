@@ -1,6 +1,6 @@
 import { UNIT } from '../../../util/units'
 import { MEMBER, TEAM } from '../../../data/characters'
-import { Alive, CharScale, Facing, Follow, Hurt, Iframe, Seat, Transform } from '../../components'
+import { Alive, CharScale, Facing, Follow, Hurt, Iframe, Leaping, Rushing, Seat, Transform } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import { handoverMs } from './squad'
@@ -44,7 +44,17 @@ function finishHandover(sim: Sim): void {
 }
 
 export function canSwitchLeader(sim: Sim, eid: number): boolean {
-  return sim.leader >= 0 && !sim.over && !sim.handover && eid !== sim.leader && sim.characters.includes(eid) && Alive.v[eid] === 1
+  const lead = sim.leader
+  return (
+    lead >= 0 &&
+    !sim.over &&
+    !sim.handover &&
+    !Rushing.active[lead] &&
+    !Leaping.active[lead] &&
+    eid !== lead &&
+    sim.characters.includes(eid) &&
+    Alive.v[eid] === 1
+  )
 }
 
 /** 立刻换队长：中心、朝向与目标位当帧切到新队长；尺寸、相机与免伤在交接期内过渡 */

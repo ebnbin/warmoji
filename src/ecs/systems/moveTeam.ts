@@ -1,4 +1,4 @@
-import { Leap, Phys, VisOff } from '../components'
+import { Leap, Leaping, Phys, Rushing, VisOff } from '../components'
 import { leaderPoint, placeLeader } from '../utils/team'
 import { settleBody, stepBody } from './shared/body'
 import { leaderGrip } from './shared/squad'
@@ -10,32 +10,36 @@ export function moveTeam(sim: Sim): void {
   if (dt <= 0) return
   const mover = sim.leader
   const from = leaderPoint(sim)
-  const rush = sim.rush
-  if (rush) {
-    rush.msLeft -= dt * 1000
-    const next = { x: from.x + rush.vx * dt, y: from.y + rush.vy * dt }
+  if (Rushing.active[mover]) {
+    Rushing.msLeft[mover] = Rushing.msLeft[mover]! - dt * 1000
+    const vx = Rushing.vx[mover]!
+    const vy = Rushing.vy[mover]!
+    const next = { x: from.x + vx * dt, y: from.y + vy * dt }
     const to = sim.hooks.constrainBody(sim, from, next, sim.dtMs)
     const moved = sim.hooks.worldDelta(sim, from.x, from.y, to.x, to.y)
     // 被墙挡住就提前结束
-    if (Math.hypot(moved.x, moved.y) < Math.hypot(next.x - from.x, next.y - from.y) * 0.5) rush.msLeft = 0
-    Phys.vx[mover] = rush.vx
-    Phys.vy[mover] = rush.vy
+    if (Math.hypot(moved.x, moved.y) < Math.hypot(next.x - from.x, next.y - from.y) * 0.5) Rushing.msLeft[mover] = 0
+    Phys.vx[mover] = vx
+    Phys.vy[mover] = vy
     placeLeader(sim, to.x, to.y)
     return
   }
-  const leap = sim.leap
-  if (leap) {
-    leap.msLeft -= dt * 1000
-    const t = Math.min(1, 1 - leap.msLeft / leap.ms)
-    const next = { x: leap.fromX + (leap.toX - leap.fromX) * t, y: leap.fromY + (leap.toY - leap.fromY) * t }
-    const to = sim.hooks.wrap(sim, next.x, next.y)
-    VisOff.y[mover] = -Math.sin(Math.PI * t) * Leap.height[leap.e]!
-    Phys.vx[mover] = ((leap.toX - leap.fromX) / leap.ms) * 1000
-    Phys.vy[mover] = ((leap.toY - leap.fromY) / leap.ms) * 1000
+  if (Leaping.active[mover]) {
+    Leaping.msLeft[mover] = Leaping.msLeft[mover]! - dt * 1000
+    const ms = Leaping.ms[mover]!
+    const t = Math.min(1, 1 - Leaping.msLeft[mover]! / ms)
+    const fx = Leaping.fromX[mover]!
+    const fy = Leaping.fromY[mover]!
+    const tx = Leaping.toX[mover]!
+    const ty = Leaping.toY[mover]!
+    const to = sim.hooks.wrap(sim, fx + (tx - fx) * t, fy + (ty - fy) * t)
+    VisOff.y[mover] = -Math.sin(Math.PI * t) * Leap.height[Leaping.skill[mover]!]!
+    Phys.vx[mover] = ((tx - fx) / ms) * 1000
+    Phys.vy[mover] = ((ty - fy) / ms) * 1000
     placeLeader(sim, to.x, to.y)
     if (t >= 1) {
       VisOff.y[mover] = 0
-      leap.landed = true
+      Leaping.landed[mover] = 1
     }
     return
   }

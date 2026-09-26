@@ -37,7 +37,7 @@ export function steerDetonate(sim: Sim): void {
       despawnEnemy(sim, eid)
       continue
     }
-    const target = nearestAlive(sim, ex, ey)
+    const target = nearestAlive(sim, eid, ex, ey)
     if (!target) continue
     const dx = target.x - ex
     const dy = target.y - ey

@@ -1,23 +1,23 @@
 import { AI } from '../../../data/enemies'
-import { Alive, EDir, ETurn, Transform } from '../../components'
+import { Alive, EDir, ETurn, Hidden, Taunted, Transform } from '../../components'
 import type { Point } from '../../../util/vec'
 import type { Sim } from '../../sim'
 import { leaderPoint } from '../../utils/team'
 
-/** 影遁期间敌人找不到任何队员；嘲讽期间所有敌人都只看得见嘲讽者 */
-export function nearestAlive(sim: Sim, x: number, y: number): Point | null {
-  if (sim.elapsedMs < sim.stealthUntil) return null
-  const taunt = sim.taunt
-  if (taunt && sim.elapsedMs < taunt.until && Alive.v[taunt.eid]) {
-    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[taunt.eid]!, Transform.y[taunt.eid]!)
-    if (d.x * d.x + d.y * d.y <= taunt.radius * taunt.radius) return { x: x + d.x, y: y + d.y }
+/** 被嘲讽的敌人只看得见嘲讽者；隐匿中的角色谁都看不见 */
+export function nearestAlive(sim: Sim, eid: number, x: number, y: number): Point | null {
+  const now = sim.elapsedMs
+  const by = Taunted.by[eid]!
+  if (now < Taunted.until[eid]! && Alive.v[by]) {
+    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[by]!, Transform.y[by]!)
+    return { x: x + d.x, y: y + d.y }
   }
   let bestX = 0
   let bestY = 0
   let bestD = Infinity
-  for (const eid of sim.characters) {
-    if (!Alive.v[eid]) continue
-    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[eid]!, Transform.y[eid]!)
+  for (const m of sim.characters) {
+    if (!Alive.v[m] || now < Hidden.until[m]!) continue
+    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
     const d2 = d.x * d.x + d.y * d.y
     if (d2 < bestD) {
       bestD = d2
@@ -44,7 +44,7 @@ export function wanderDir(sim: Sim, eid: number): Point {
 export function aimPoint(sim: Sim, eid: number, atLeader: boolean): Point | null {
   const x = Transform.x[eid]!
   const y = Transform.y[eid]!
-  if (!atLeader) return nearestAlive(sim, x, y)
+  if (!atLeader) return nearestAlive(sim, eid, x, y)
   const c = leaderPoint(sim)
   const d = sim.hooks.worldDelta(sim, x, y, c.x, c.y)
   return { x: x + d.x, y: y + d.y }

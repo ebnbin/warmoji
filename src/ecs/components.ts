@@ -456,6 +456,24 @@ export const DmgBuff = { mul: f32(), until: f32() }
 /** 蹦迪是每个敌人身上的状态，施法之后刷出来的敌人不受影响 */
 export const Dancing = { until: f32() }
 
+/** 冲刺中的身体：位移由 moveTeam 推进，撞击按 stamp 去重 */
+export const Rushing = { active: u8(), msLeft: f32(), vx: f32(), vy: f32(), skill: i32(), stamp: f32() }
+
+/** 敌人记下最近一次撞到自己的冲刺，同一次冲刺不重复吃伤害 */
+export const RushHit = { stamp: f32() }
+
+/** 跳跃中的身体：沿 from→to 的抛物线前进，落地那帧 landed 为 1 */
+export const Leaping = { active: u8(), landed: u8(), msLeft: f32(), ms: f32(), fromX: f32(), fromY: f32(), toX: f32(), toY: f32(), skill: i32() }
+
+/** 嘲讽者自己的减伤 */
+export const Taunting = { until: f32(), mul: f32() }
+
+/** 被嘲讽的敌人只追嘲讽者，直到到期或嘲讽者阵亡 */
+export const Taunted = { until: f32(), by: i32() }
+
+/** 隐匿中的角色不被敌人锁定；tinted 记着半透明是否已套上 */
+export const Hidden = { until: f32(), tinted: u8() }
+
 export const Blink = { x: f32(), y: f32() }
 
 export const Drop = { startMs: f32(), durMs: f32(), fromY: f32(), toY: f32(), target: i32(), targetUid: u32() }

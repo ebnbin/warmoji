@@ -36,6 +36,8 @@ import {
   EnemyArm,
   Dancing,
   EnemyPhase,
+  RushHit,
+  Taunted,
   EState,
   ETurn,
   Flash,
@@ -238,6 +240,8 @@ export function spawnEnemy(
   EnemyArm.fireDelayMs[eid] = 900 + sim.rng.next() * 1500
   EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2
   Dancing.until[eid] = 0
+  Taunted.until[eid] = 0
+  RushHit.stamp[eid] = -1
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   Sprite.flipX[eid] = 0
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (EnemyPhase.v[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)

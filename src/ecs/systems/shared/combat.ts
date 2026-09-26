@@ -10,7 +10,7 @@ import { KNOCKBACK } from '../../../data/abilities'
 import { MEMBER } from '../../../data/characters'
 import { UNIT } from '../../../util/units'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anim, Boss, DmgMul, Dormant, Elite, Enemy, ENEMY_SET, Flash, Hp, Iframe, Kv, CharFlash, CharHp, CharScale, Morph, CharPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from '../../components'
+import { Alive, Anim, Boss, DmgMul, Dormant, Elite, Enemy, ENEMY_SET, Flash, Hp, Iframe, Kv, CharFlash, CharHp, CharScale, Morph, CharPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Taunting, Thief, Tint, Transform } from '../../components'
 import { enemyCarries, enemyDef } from '../../store'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
@@ -169,9 +169,8 @@ export function hurtByHazard(sim: Sim, eid: number, damage: number, hazard: Haza
 }
 
 function hurt(sim: Sim, eid: number, rawDamage: number, tint: number): void {
-  const taunt = sim.taunt
-  const shielded = taunt !== null && taunt.eid === eid && sim.elapsedMs < taunt.until
-  const damage = shielded ? Math.max(1, Math.round(rawDamage * taunt.mul)) : rawDamage
+  const shielded = sim.elapsedMs < Taunting.until[eid]!
+  const damage = shielded ? Math.max(1, Math.round(rawDamage * Taunting.mul[eid]!)) : rawDamage
   const st = sim.run.stats
   const slot = Slot.v[eid]!
   if (slot >= 0 && slot < st.damageTaken.length) {

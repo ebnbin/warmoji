@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
-import { Aim, Blink, Bob, Drop, EDir, ENEMY_SET, Facing, Flyer, Follow, Kv, Minion, Phys, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
+import { Aim, Blink, Bob, Drop, EDir, ENEMY_SET, Facing, Flyer, Follow, Kv, Leaping, Minion, Phys, PICKUP_SET, PROJ_SET, Rushing, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 
@@ -25,19 +25,6 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
   }
   const aim = rot(sim.aim.x, sim.aim.y)
   sim.aim = { x: aim.x, y: aim.y }
-  if (sim.rush) {
-    const v = rot(sim.rush.vx, sim.rush.vy)
-    sim.rush.vx = v.x
-    sim.rush.vy = v.y
-  }
-  if (sim.leap) {
-    const f = map(sim.leap.fromX, sim.leap.fromY)
-    const t = map(sim.leap.toX, sim.leap.toY)
-    sim.leap.fromX = f.x
-    sim.leap.fromY = f.y
-    sim.leap.toX = t.x
-    sim.leap.toY = t.y
-  }
 
   for (const m of sim.characters) {
     const p = map(Follow.x[m]!, Follow.y[m]!)
@@ -57,6 +44,15 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     const fv = rot(Facing.vx[m]!, Facing.vy[m]!)
     Facing.vx[m] = fv.x
     Facing.vy[m] = fv.y
+    const rv = rot(Rushing.vx[m]!, Rushing.vy[m]!)
+    Rushing.vx[m] = rv.x
+    Rushing.vy[m] = rv.y
+    const lf = map(Leaping.fromX[m]!, Leaping.fromY[m]!)
+    const lt = map(Leaping.toX[m]!, Leaping.toY[m]!)
+    Leaping.fromX[m] = lf.x
+    Leaping.fromY[m] = lf.y
+    Leaping.toX[m] = lt.x
+    Leaping.toY[m] = lt.y
   }
   for (const e of query(sim.world, [Blink])) {
     const b = rot(Blink.x[e]!, Blink.y[e]!)
