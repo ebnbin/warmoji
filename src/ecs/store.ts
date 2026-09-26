@@ -43,6 +43,8 @@ export const abilityOnHit = slots<readonly Effect[]>()
 
 export const abilityOnSelf = slots<readonly Effect[]>()
 
+export const abilityOnCast = slots<readonly Effect[]>()
+
 export const abilityPulse = slots<readonly Effect[]>()
 
 export const abilityArtEmoji = slots<string>()

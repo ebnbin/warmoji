@@ -1,5 +1,5 @@
 import { addComponent, hasComponent, query } from 'bitecs'
-import { Ability, Alive, Amp, Borrowed, Cd, Faction, Manual, Owner, Uid } from '../../components'
+import { Ability, Alive, Amp, Borrowed, Cd, Faction, Manual, Owner, Stage, Uid } from '../../components'
 import { abilityDef } from '../../store'
 import { equipAbility, NEUTRAL_AMP, unequipAbilities } from '../../entities/ability'
 import { isSameEntity } from '../../utils/identity'
@@ -18,12 +18,13 @@ function ampOf(sim: Sim, via: number | undefined): typeof NEUTRAL_AMP {
   return { dmg: Amp.dmg[via]!, cd: Amp.cd[via]!, crit: Amp.crit[via]!, kb: Amp.kb[via]!, battle: Amp.battle[via] === 1 }
 }
 
-/** 夺取：从目标身上复制一条能力给自己用一阵，同时只借一条；夺主动技能时它的冷却重新走，夺取者死前一直占着 */
+/** 夺取：从目标身上复制一条能力给自己用一阵，同时只借一条，连段的后续段不算；夺主动技能时原主的冷却重新走，夺取者死了原主立刻转好 */
 export function stealAbility(sim: Sim, by: number, t: number, ms: number, cooldownMs: number, skill: boolean, via?: number): void {
   if (by === t || !Alive.v[by]) return
   const pool: number[] = []
   for (const e of query(sim.world, [Ability, Owner])) {
     if (Owner.eid[e] !== t || !abilityDef[e] || hasComponent(sim.world, e, Borrowed)) continue
+    if (hasComponent(sim.world, e, Stage) && Stage.root[e] !== 0) continue
     if (skill !== hasComponent(sim.world, e, Manual)) continue
     pool.push(e)
   }

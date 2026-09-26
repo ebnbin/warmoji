@@ -47,7 +47,16 @@ function rearm(sim: Sim, eid: number, f: FormDef | undefined): void {
   }
   if (!EnemyArm.armed[eid]) return
   unequipAbilities(sim, eid, (e) => !isBorrowed(sim, e))
-  for (const w of npcAbilities(sim, eid) ?? []) equipAbility(sim, eid, w, Faction.v[eid]!, EnemyArm.fireDelayMs[eid]!, NEUTRAL_AMP)
+  armNpc(sim, eid)
+}
+
+/** 非玩家身体装上当前形态的能力：各自的首发延迟，没写的按身体的 */
+export function armNpc(sim: Sim, eid: number): void {
+  EnemyArm.armed[eid] = 1
+  for (const w of npcAbilities(sim, eid) ?? []) {
+    const delay = ('firstDelayMs' in w ? w.firstDelayMs : undefined) ?? EnemyArm.fireDelayMs[eid]!
+    equipAbility(sim, eid, w, Faction.v[eid]!, delay, NEUTRAL_AMP)
+  }
 }
 
 function isBorrowed(sim: Sim, e: number): boolean {

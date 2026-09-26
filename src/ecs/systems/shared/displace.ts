@@ -1,6 +1,6 @@
 import { hasComponent } from 'bitecs'
 import { BODY_MAX_SPEED } from '../../../data/abilities'
-import { Anchored, Ctl, MARK, Motion, MOTION, Phys, Transform, Uid, VisOff } from '../../components'
+import { Alive, Anchored, Ctl, MARK, Motion, MOTION, Phys, Transform, Uid, VisOff } from '../../components'
 import { hasMark } from '../../utils/marks'
 import { motionFx } from '../../store'
 import type { Effect } from '../../../types/abilityDefs'
@@ -65,8 +65,9 @@ export function endMotion(eid: number): void {
   motionFx[eid] = undefined
 }
 
-/** 唯一的位移入口：敌我、角色与敌人、自己的动作与被摆布都从这里改变身体的位置 */
+/** 唯一的位移入口：敌我、角色与敌人、自己的动作与被摆布都从这里改变身体的位置；倒下的身体不动 */
 export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boolean {
+  if (hasComponent(sim.world, eid, Alive) && !Alive.v[eid]) return false
   if (d.kind === 'push') {
     if (hasMark(sim, eid, MARK.unstoppable)) return false
     impulse(sim, eid, d.x, d.y)

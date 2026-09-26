@@ -44,6 +44,9 @@ function blockFx(sim: Sim, target: number, color: number): void {
   spawnFxCircle(sim, Transform.x[target]!, Transform.y[target]!, 18, { fill: color, fillAlpha: 0.45, stroke: 0xffffff, lineWidth: 3, lineAlpha: 0.9, fromScale: 0.6, toScale: 1.6, durationMs: 220, depth: 14 })
 }
 
+/** 正在结算的招架反制：反制本身不会再被招架 */
+let countering = false
+
 /** 挡下这一下：法术护盾扣一次，招架反制出手的身体，正面格挡挡住从前方来的 */
 function blocked(sim: Sim, src: Source, target: number, o: HitOpts): boolean {
   const shield = markSlot(sim, target, MARK.spellShield)
@@ -53,11 +56,15 @@ function blocked(sim: Sim, src: Source, target: number, o: HitOpts): boolean {
     blockFx(sim, target, 0xb388ff)
     return true
   }
-  const parry = markSlot(sim, target, MARK.parry)
+  const parry = countering ? -1 : markSlot(sim, target, MARK.parry)
   if (parry >= 0) {
     const then = PARRY_FX.get(Mark.b[parry]!)
     const by = casterOf(sim, src)
-    if (then && by >= 0) applyAbilityEffects(sim, selfSource(sim, target), then, { x: Transform.x[by]!, y: Transform.y[by]!, baseDamage: 0, targets: [by] })
+    if (then && by >= 0) {
+      countering = true
+      applyAbilityEffects(sim, selfSource(sim, target), then, { x: Transform.x[by]!, y: Transform.y[by]!, baseDamage: 0, targets: [by] })
+      countering = false
+    }
     blockFx(sim, target, 0xffffff)
     return true
   }
@@ -124,16 +131,31 @@ function guarded(sim: Sim, target: number): boolean {
   return kind !== undefined && nearestSummoned(sim, target, kind, Transform.x[target]!, Transform.y[target]!) >= 0
 }
 
-/** 唯一的伤害入口：静止与碰不到、依存无敌、无敌、挡格、睡眠惊醒、护盾倍率、暴击、存伤、吞噬者吐人、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量，敌我同一条；持续伤害不暴击、不看也不消耗无敌与挡格；返回是否命中 */
-export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
+/** 这一下能不能落到目标身上：静止与碰不到、依存无敌、挡格；带伤害的还看无敌；持续伤害不看也不消耗无敌与挡格 */
+function lands(sim: Sim, src: Source, target: number, o: HitOpts, harmful: boolean): boolean {
   if (sim.over || !hasComponent(sim.world, target, Hp) || Dormant.v[target] || Alive.v[target] === 0) return false
   if (hasMark(sim, target, MARK.stasis) || (!o.tick && isUntargetable(sim, target))) return false
   if (guarded(sim, target)) {
     if (!o.tick) blockFx(sim, target, 0x80d8ff)
     return false
   }
+  return o.tick === true || !((harmful && hasMark(sim, target, MARK.invuln)) || blocked(sim, src, target, o))
+}
+
+/** 不带伤害的一下：挡格与依存无敌照挡，无敌只挡伤害；返回是否碰到 */
+export function touch(sim: Sim, src: Source, target: number, o: HitOpts = {}): boolean {
+  return lands(sim, src, target, o, false)
+}
+
+/** 一下：带伤害的走 hit，不带的只碰 */
+export function strike(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
+  return damage > 0 ? hit(sim, src, target, damage, o) : touch(sim, src, target, o)
+}
+
+/** 唯一的伤害入口：先过 lands，再睡眠惊醒、护盾倍率、暴击、存伤、吞噬者吐人、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量，敌我同一条；持续伤害不暴击；返回是否命中 */
+export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
+  if (!lands(sim, src, target, o, true)) return false
   const now = sim.elapsedMs
-  if (!o.tick && (hasMark(sim, target, MARK.invuln) || blocked(sim, src, target, o))) return false
   let dmg = damage
   const sleep = markSlot(sim, target, MARK.sleep)
   if (sleep >= 0) {

@@ -188,7 +188,7 @@ export function effectLine(e: Effect, self = false): string {
     case 'rewind':
       return `回到 ${sec(e.ms)} 前的位置，生命取那时与现在的较高者`
     case 'steal':
-      return `夺取目标的${e.skill ? '主动技能' : '一项能力'}，自己用 ${sec(e.ms)}（每 ${sec(e.cooldownMs)} 一次）${e.skill ? '；原主的冷却重新走，夺取者死了才还' : ''}`
+      return `夺取目标的${e.skill ? '主动技能' : '一项能力'}，自己用 ${sec(e.ms)}（每 ${sec(e.cooldownMs)} 一次）${e.skill ? '；原主的冷却重新走，夺取者死了原主立刻转好' : ''}`
     case 'clone':
       return `造出 ${e.count} 个分身 ${sec(e.lifeMs)}：${pct(e.hpRatio)} 生命、${pct(e.dmgRatio)} 伤害${e.onDeath ? lead('，分身死时', joinFx(e.onDeath)) : ''}`
     case 'raise':
@@ -335,7 +335,7 @@ function availLines(w: AbilityDef): string[] {
   if (w.hold) out.push(`按住蓄力，蓄满 ${sec(w.hold.maxMs)} 时距离 ×${w.hold.reachMul}、伤害 ×${w.hold.damageMul}`)
   if (w.ammo) out.push(`弹匣 ${w.ammo.count} 发，打空换弹 ${sec(w.ammo.reloadMs)}${w.ammo.last ? lead('；最后一发', joinFx(w.ammo.last)) : ''}`)
   if (w.cycle) {
-    const own = (c: AbilityDef): string => [...(c.onHit ?? []).map((e) => effectLine(e)), ...(c.onSelf ?? []).map((e) => `自身：${effectLine(e, true)}`)].join('、')
+    const own = (c: AbilityDef): string => selfAndHit(c).join('、')
     const step = (c: AbilityDef): string => {
       const fx = c === w ? '' : own(c)
       return `${abilityLabel(c)}${fx && fx !== own(w) ? `（${fx}）` : ''}`
@@ -353,6 +353,11 @@ function availLines(w: AbilityDef): string[] {
   return out
 }
 
+/** 出手前的自身效果、命中效果、出手后的自身效果 */
+function selfAndHit(w: AbilityDef): string[] {
+  return [...(w.onCast ?? []).map((e) => `出手前自身：${effectLine(e, true)}`), ...(w.onHit ?? []).map((e) => effectLine(e)), ...(w.onSelf ?? []).map((e) => `自身：${effectLine(e, true)}`)]
+}
+
 export function abilityStatLines(w: AbilityDef): string[] {
   const base: string[] = []
   if (w.damage) base.push(`伤害 ${w.damage}${w.waveScale ? ' × 当前波次强度' : ''}`)
@@ -366,7 +371,7 @@ export function abilityStatLines(w: AbilityDef): string[] {
   const rep = repeatLine(w)
   if (rep) lines.push(rep)
   lines.push(...availLines(w))
-  const fx = [...(w.onHit ?? []).map((e) => effectLine(e)), ...(w.onSelf ?? []).map((e) => `自身：${effectLine(e, true)}`)]
+  const fx = selfAndHit(w)
   if (fx.length > 0) lines.push(fx.join(' · '))
   return lines
 }

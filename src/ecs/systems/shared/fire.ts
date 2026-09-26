@@ -52,7 +52,8 @@ import {
   Idle,
   Mirror,
 } from '../../components'
-import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, zoneRules } from '../../store'
+import { abilityArtEmoji, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, zoneRules } from '../../store'
+import { controlBody } from '../updateControl'
 import { clearMarks, markSlot } from '../../utils/marks'
 import { damageMul, anchorX, anchorY, waveScale } from '../../utils/amp'
 import { flying, sourceOf } from '../../utils/source'
@@ -63,7 +64,7 @@ import { circleHitIndices, sectorHitIndices, thrustHitIndices } from '../../util
 import { strongestTarget } from '../../utils/assassinate'
 import { headingOf, muzzle } from '../../utils/projectile'
 import { leaderPoint } from '../../utils/team'
-import { hit } from './damage'
+import { hit, strike, touch } from './damage'
 import { applyAbilityEffects, applyOnHit, EMPOWER_DEF, struckOf, test } from './effects'
 import { takeBoost } from './resource'
 import type { Struck } from './effects'
@@ -147,12 +148,12 @@ function burst(sim: Sim, x: number, y: number, radius: number, color: number, bo
   if (boom) spawnFxBoom(sim, x, y, radius * 1.5)
 }
 
-/** 打一遍：返回真正吃到伤害的身体；不带伤害的形状只覆盖不打，覆盖到的都算 */
+/** 打一遍：返回真正落到身上的身体；不带伤害的形状只碰不打 */
 function strikeAll(sim: Sim, src: Source, found: readonly Found[], damage: number, kb: number, from: Point): Struck[] {
   const struck: Struck[] = []
   for (const t of found) {
     const s = struckOf(t.eid)
-    if (damage <= 0 || hit(sim, src, t.eid, damage, { knockback: kb, from })) struck.push(s)
+    if (strike(sim, src, t.eid, damage, { knockback: kb, from })) struck.push(s)
   }
   return struck
 }
@@ -350,7 +351,10 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
         }
         sim.out.flash = { color: 0xffffff, alpha: 0.55, durationMs: 380 }
       } else {
-        for (const t of list) struck.push(struckOf(t.eid))
+        for (const t of list) {
+          const s = struckOf(t.eid)
+          if (touch(sim, src, t.eid)) struck.push(s)
+        }
       }
       applyOnHit(sim, src, onHit, ox, oy, damage, struck, angle)
     } else {
@@ -481,6 +485,12 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   if (!preset && hasComponent(w, e, Windup)) {
     startWindup(sim, e, shot)
     return true
+  }
+  const cast = abilityOnCast[e]
+  if (cast) {
+    const o = Owner.eid[e]!
+    applyAbilityEffects(sim, src, cast, { x: anchorX(e), y: anchorY(e), baseDamage: 0, targets: [o], angle: shot.angle })
+    controlBody(sim, o)
   }
   let count = 1
   let spread = 0

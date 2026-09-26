@@ -62,7 +62,7 @@ import {
   ZoneFollow,
   ZoneShape,
 } from '../components'
-import { abilityArtEmoji, abilityBoost, abilityDef, abilityFireSfx, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, emplaceAbility, zoneRules } from '../store'
+import { abilityArtEmoji, abilityBoost, abilityDef, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, emplaceAbility, zoneRules } from '../store'
 import type { AbilityDef, Shape } from '../../types/abilityDefs'
 import { ACQUIRE, abilityPiercesWalls } from '../../data/abilities'
 import { UNIT } from '../../util/units'
@@ -335,10 +335,14 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
   }
   abilityOnHit[e] = def.onHit
   abilityOnSelf[e] = def.onSelf
+  abilityOnCast[e] = def.onCast
   abilityFireSfx[e] = def.fireSfx
   abilityDef[e] = def
   if (def.mirror) addComponent(world, e, Mirror)
-  if (def.anchor) Anchor.eid[e] = spawnPet(sim, e, init.anchor, def.anchor, init.faction)
+  if (def.anchor) {
+    const pet = spawnPet(sim, e, init.anchor, def.anchor, init.faction)
+    Anchor.eid[e] = pet
+  }
   attachShape(sim, e, def.shape, init.faction)
 }
 

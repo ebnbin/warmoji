@@ -1,8 +1,8 @@
 import type { Cond, Effect, MarkName } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
 import { hasComponent, query } from 'bitecs'
-import { Ability, Alive, Boss, Cd, Charges, Enemy, FACTION, Faction, Grow, History, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, TAG, Transform, Uid } from '../../components'
-import { addMark, CC_MARKS, hasMark, isAirborne, markSlot } from '../../utils/marks'
+import { Ability, Alive, Anchored, Boss, Cd, Charges, Enemy, FACTION, Faction, Grow, History, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, TAG, Transform, Uid } from '../../components'
+import { addCc, addMark, CC_MARKS, hasMark, isAirborne, markSlot } from '../../utils/marks'
 import { Interned } from '../../utils/intern'
 import { displace } from './displace'
 import { gainRes } from './resource'
@@ -151,12 +151,6 @@ export function casterOf(sim: Sim, src: Source): number {
   return b !== undefined && isSameEntity(sim.world, b, src.bodyUid ?? 0) && Alive.v[b] ? b : -1
 }
 
-/** 加一条控制：霸体的身体不吃 */
-function addCc(sim: Sim, t: number, kind: number, until: number, a = 0, b = 0, c = 0, ref = 0): boolean {
-  if (hasMark(sim, t, MARK.unstoppable)) return false
-  return addMark(t, kind, TAG.effect, until, a, b, c, ref) >= 0
-}
-
 /** 让一组控制在这一帧到期：到期反应照常执行 */
 export function expireMarks(sim: Sim, eid: number, kinds: readonly number[]): void {
   for (const kind of kinds) {
@@ -211,7 +205,9 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   morph: (sim, _src, fx, at) => {
-    eachCapable(sim, at, Enemy, (t) => applyMorph(sim, sim.frames, t, fx))
+    eachCapable(sim, at, Enemy, (t) => {
+      if (!hasMark(sim, t, MARK.unstoppable)) applyMorph(sim, sim.frames, t, fx)
+    })
   },
 
   attackSlow: (sim, _src, fx, at) => {
@@ -294,8 +290,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   stun: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
     eachCapable(sim, at, Mark, (t) => {
-      addMark(t, MARK.stun, TAG.effect, until)
-      interrupt(sim, t)
+      if (addCc(sim, t, MARK.stun, until)) interrupt(sim, t)
     })
   },
 
@@ -308,7 +303,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const by = src.viewer
     if (by === undefined) return
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.taunt, TAG.effect, until, by, 0, 0, Uid.v[by]!))
+    eachCapable(sim, at, Mark, (t) => addCc(sim, t, MARK.taunt, until, by, 0, 0, Uid.v[by]!))
   },
 
   guard: (sim, _src, fx, at) => {
@@ -522,8 +517,8 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const until = sim.elapsedMs + fx.durationMs
     for (const t of at.targets ?? []) {
       if (!hasComponent(sim.world, t, Mark)) continue
-      const s = markSlot(sim, t, MARK.stack, src.bodyUid ?? 0)
-      const n = (s >= 0 && Mark.b[s] === id ? Mark.a[s]! : 0) + 1
+      const s = markSlot(sim, t, MARK.stack, src.bodyUid ?? 0, id)
+      const n = (s >= 0 ? Mark.a[s]! : 0) + 1
       if (n >= fx.max) {
         if (s >= 0) Mark.kind[s] = MARK.none
         applyAbilityEffects(sim, src, fx.then, { x: Transform.x[t]!, y: Transform.y[t]!, baseDamage: at.baseDamage, targets: [t] })
@@ -535,9 +530,11 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   detonate: (sim, src, fx, at) => {
     const kind = fx.mark === 'fuse' ? MARK.fuse : MARK.store
+    const ref = src.bodyUid ?? 0
     for (const t of at.targets ?? []) {
-      const s = markSlot(sim, t, kind, src.bodyUid ?? 0)
-      if (s >= 0) Mark.until[s] = sim.elapsedMs
+      for (let s = t * MARK_SLOTS; s < (t + 1) * MARK_SLOTS; s++) {
+        if (Mark.kind[s] === kind && Mark.ref[s] === ref && Mark.until[s]! > sim.elapsedMs) Mark.until[s] = sim.elapsedMs
+      }
     }
   },
 
@@ -593,10 +590,10 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const by = casterOf(sim, src)
     const t = at.targets?.[0]
     if (by < 0 || t === undefined || t === by || hasMark(sim, t, MARK.unstoppable)) return
-    const bx = Transform.x[by]!
-    const byy = Transform.y[by]!
-    if (!displace(sim, t, { kind: 'place', x: bx, y: byy }, { self: false, src })) return
-    displace(sim, by, { kind: 'place', x: at.x, y: at.y }, { self: true, free: true })
+    const tx = Transform.x[t]!
+    const ty = Transform.y[t]!
+    if (!displace(sim, t, { kind: 'place', x: Transform.x[by]!, y: Transform.y[by]! }, { self: false, src })) return
+    displace(sim, by, { kind: 'place', x: tx, y: ty }, { self: true, free: true })
   },
 
   form: (sim, _src, fx, at) => {
@@ -652,7 +649,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     if (by < 0) return
     const until = sim.elapsedMs + fx.ms
     for (const t of at.targets ?? []) {
-      if (t === by || !Alive.v[t]) continue
+      if (t === by || !Alive.v[t] || hasComponent(sim.world, t, Anchored)) continue
       const d = sim.hooks.worldDelta(sim, Transform.x[by]!, Transform.y[by]!, Transform.x[t]!, Transform.y[t]!)
       const len = Math.hypot(d.x, d.y) || 1
       const r = Radius.v[by]! * 0.7
@@ -788,9 +785,16 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 }
 
+/** 一组效果依次施加：每一条都只施于编号未变的目标，前一条打死而被复用的编号不再吃后面的 */
 export function applyAbilityEffects(sim: Sim, src: Source, effects: readonly Effect[] | undefined, at: HitCtx): void {
   if (!effects) return
-  for (const fx of effects) applyEffect(sim, src, fx, at)
+  const targets = at.targets
+  const uids = targets && effects.length > 1 ? targets.map((t) => Uid.v[t]!) : undefined
+  const same = (t: number, i: number): boolean => isSameEntity(sim.world, t, uids![i]!)
+  for (const fx of effects) {
+    const changed = targets !== undefined && uids !== undefined && !targets.every(same)
+    applyEffect(sim, src, fx, changed ? { ...at, targets: targets.filter(same) } : at)
+  }
 }
 
 function applyEffect<K extends keyof EffectOf>(sim: Sim, src: Source, fx: EffectOf[K] & { readonly kind: K }, at: HitCtx): void {

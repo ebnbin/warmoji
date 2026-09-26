@@ -31,6 +31,7 @@ import {
   Flee,
   Grow,
   GrowUp,
+  Idle,
   Mount,
   MARK,
   Nest,
@@ -179,6 +180,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
     addComponent(world, eid, GrowUp)
     GrowUp.at[eid] = sim.elapsedMs + def.grow.ms
   }
+  Idle.since[eid] = sim.elapsedMs
   if (def.mount) {
     addComponent(world, eid, Mount)
     Mount.max[eid] = Math.round(def.mount.hp * (hp / Math.max(1, def.hp)))

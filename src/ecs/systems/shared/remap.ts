@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
-import { Aim, Drop, EDir, ENEMY_SET, Facing, Flyer, Minion, Motion, Phys, PICKUP_SET, PROJ_SET, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
+import { Aim, Barrier, Drop, EDir, ENEMY_SET, Facing, Flyer, History, HISTORY, MARK, MARK_SLOTS, Mark, Minion, Motion, MOTION, Phys, PICKUP_SET, PROJ_SET, Shadow, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 
@@ -36,7 +36,8 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     Motion.vx[b] = rv.x
     Motion.vy[b] = rv.y
     const mf = map(Motion.fx[b]!, Motion.fy[b]!)
-    const mt = map(Motion.tx[b]!, Motion.ty[b]!)
+    // 跟随的 tx/ty 是相对宿主的偏移，其余是落点
+    const mt = Motion.kind[b] === MOTION.follow ? rot(Motion.tx[b]!, Motion.ty[b]!) : map(Motion.tx[b]!, Motion.ty[b]!)
     Motion.fx[b] = mf.x
     Motion.fy[b] = mf.y
     Motion.tx[b] = mt.x
@@ -77,6 +78,34 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
   for (const eid of query(sim.world, [Telegraph, Transform])) movePos(eid)
   for (const eid of query(sim.world, ZONE_SET)) movePos(eid)
   for (const eid of query(sim.world, [Minion, Transform])) movePos(eid)
+  for (const eid of query(sim.world, [Shadow, Transform])) movePos(eid)
+  for (const w of query(sim.world, [Barrier])) {
+    const a = map(Barrier.ax[w]!, Barrier.ay[w]!)
+    const b = map(Barrier.bx[w]!, Barrier.by[w]!)
+    const c = map(Barrier.cx[w]!, Barrier.cy[w]!)
+    Barrier.ax[w] = a.x
+    Barrier.ay[w] = a.y
+    Barrier.bx[w] = b.x
+    Barrier.by[w] = b.y
+    Barrier.cx[w] = c.x
+    Barrier.cy[w] = c.y
+  }
+  for (const eid of query(sim.world, [History])) {
+    for (let s = eid * HISTORY; s < (eid + 1) * HISTORY; s++) {
+      const p = map(History.x[s]!, History.y[s]!)
+      History.x[s] = p.x
+      History.y[s] = p.y
+    }
+  }
+  // 恐惧与魅惑记着施加者最后的位置
+  for (const eid of query(sim.world, [Mark])) {
+    for (let s = eid * MARK_SLOTS; s < (eid + 1) * MARK_SLOTS; s++) {
+      if (Mark.kind[s] !== MARK.fear && Mark.kind[s] !== MARK.charm) continue
+      const p = map(Mark.b[s]!, Mark.c[s]!)
+      Mark.b[s] = p.x
+      Mark.c[s] = p.y
+    }
+  }
   for (const f of query(sim.world, [Flyer, Transform])) {
     movePos(f)
     const from = map(Flyer.launchX[f]!, Flyer.launchY[f]!)

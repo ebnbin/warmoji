@@ -980,7 +980,7 @@ const penguinSlide = {
   knockback: 8,
   color: 0x81d4fa,
   shape: { kind: 'sprint', distance: 6, ms: 600, radius: 0.8 },
-  onSelf: [{ kind: 'cleanse' }, { kind: 'unstoppable', durationMs: 700 }],
+  onCast: [{ kind: 'cleanse' }, { kind: 'unstoppable', durationMs: 700 }],
 } satisfies AbilityDef
 
 // 🐛 毛毛虫：吃够了就羽化

@@ -51,6 +51,7 @@ export function canSwitchLeader(sim: Sim, eid: number): boolean {
     !sim.over &&
     !sim.handover &&
     Motion.kind[lead] === MOTION.none &&
+    Motion.kind[eid] === MOTION.none &&
     eid !== lead &&
     sim.characters.includes(eid) &&
     Alive.v[eid] === 1

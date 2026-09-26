@@ -84,6 +84,11 @@ function dwell(sim: Sim, z: number, list: readonly number[], x: number, y: numbe
   for (const uid of [...seen.keys()]) if (!here.has(uid)) seen.delete(uid)
 }
 
+/** 结算伤害前记下的身体里编号未变的：打死而被复用的编号不再吃后面的效果 */
+function unchanged(sim: Sim, found: readonly number[], uids: readonly number[]): number[] {
+  return found.filter((t, i) => isSameEntity(sim.world, t, uids[i]!))
+}
+
 /** 传送门：踏进来的身体（谁都算）从另一扇门出来 */
 function port(sim: Sim, z: number, x: number, y: number, r: number): void {
   const other = Portal.other[z]!
@@ -164,9 +169,10 @@ export function updateZones(sim: Sim): void {
     if (Zone.trap[z]) {
       const found = foesIn(sim, src, x, y, r)
       if (found.length === 0) continue
+      const uids = found.map((t) => Uid.v[t]!)
       const damage = Zone.damage[z]!
       if (damage > 0) for (const t of found) hit(sim, src, t, damage)
-      applyAbilityEffects(sim, src, zoneEffects[z], { x, y, baseDamage: damage, targets: found })
+      applyAbilityEffects(sim, src, zoneEffects[z], { x, y, baseDamage: damage, targets: unchanged(sim, found, uids) })
       spawnFxCircle(sim, x, y, r * 1.4, { fill: Ring.color[z]!, fillAlpha: 0.4, stroke: 0xffffff, lineWidth: 3, lineAlpha: 0.9, fromScale: 0.3, toScale: 1, durationMs: 320, depth: 8 })
       Lifetime.until[z] = now
       continue
@@ -177,6 +183,7 @@ export function updateZones(sim: Sim): void {
     const damage = Zone.damage[z]!
     const effects = zoneEffects[z]
     const found = whoIn(sim, z, src, x, y, r)
+    const uids = found.map((t) => Uid.v[t]!)
     if (damage > 0) {
       for (const t of Zone.who[z] === ZONE_WHO.allies ? [] : foesIn(sim, src, x, y, r)) {
         const last = ZoneHit.last[t]!
@@ -186,7 +193,7 @@ export function updateZones(sim: Sim): void {
       }
     }
     if (effects && effects.length > 0 && found.length > 0) {
-      applyAbilityEffects(sim, src, effects, { x, y, baseDamage: damage, targets: found.filter((t) => Alive.v[t]) })
+      applyAbilityEffects(sim, src, effects, { x, y, baseDamage: damage, targets: unchanged(sim, found, uids).filter((t) => Alive.v[t]) })
     }
     const pulse = Zone.pulse[z]!
     if (pulse !== 0) {

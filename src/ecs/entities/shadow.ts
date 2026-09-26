@@ -1,8 +1,8 @@
 import { addComponents, hasComponent, query, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
 import { attachDrawable } from './drawable'
-import { Alive, Anim, FACTION, Faction, MARK, Radius, Shadow, Slot, Sprite, TAG, Transform, Uid } from '../components'
-import { addMark } from '../utils/marks'
+import { Alive, Anim, FACTION, Faction, MARK, Radius, Shadow, Slot, Sprite, Transform, Uid } from '../components'
+import { addCc } from '../utils/marks'
 import { isSameEntity } from '../utils/identity'
 import { targetsWithin } from '../utils/targets'
 import { armIdle } from '../systems/shared/anim'
@@ -47,7 +47,7 @@ export function spawnShadow(sim: Sim, src: Source, by: number, angle: number, li
   blinkFlash(sim, at.x, at.y)
   if (!taunt) return
   const until = sim.elapsedMs + taunt.ms
-  for (const t of targetsWithin(sim, src, at.x, at.y, taunt.radius)) addMark(t.eid, MARK.taunt, TAG.effect, until, s, 0, 0, Uid.v[s]!)
+  for (const t of targetsWithin(sim, src, at.x, at.y, taunt.radius)) addCc(sim, t.eid, MARK.taunt, until, s, 0, 0, Uid.v[s]!)
 }
 
 /** 与最新的影子换位 */

@@ -121,6 +121,7 @@ function walkAbility(a: AbilityDef, side: Side): void {
   for (const c of a.cycle ?? []) walkAbility(c, side)
   walkEffects(a.onHit, side)
   walkEffects(a.onSelf, side)
+  walkEffects(a.onCast, side)
   walkEffects(a.onKill, side)
   walkEffects(a.boost?.onHit, side)
   walkEffects(a.ammo?.last, side)

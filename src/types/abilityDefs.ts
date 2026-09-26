@@ -665,6 +665,8 @@ interface AbilityBase {
   readonly bossRatio?: number
   readonly onHit?: readonly Effect[]
   readonly onSelf?: readonly Effect[]
+  /** 出手前先施于自己的效果：结算后按新的状态判定这一下出不出得去（先解控再冲出去） */
+  readonly onCast?: readonly Effect[]
   readonly repeat?: Repeat
   readonly held?: HeldVisual
   readonly fireSfx?: SfxId

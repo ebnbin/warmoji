@@ -17,9 +17,9 @@ function victimOf(sim: Sim, by: number): number {
   return isSameEntity(sim.world, v, Gut.uid[by]!) ? v : -1
 }
 
-/** 吞下：目标进肚子，贴着吞噬者走，碰不到也做不了事；肚子满了吞不下 */
+/** 吞下：目标进肚子，贴着吞噬者走，碰不到也做不了事；肚子满了或目标霸体都吞不下 */
 export function devour(sim: Sim, by: number, t: number, ms: number, dps: number, escape: number, spit: number): void {
-  if (t === by || victimOf(sim, by) >= 0 || hasMark(sim, t, MARK.devoured) || !Alive.v[t]) return
+  if (t === by || victimOf(sim, by) >= 0 || hasMark(sim, t, MARK.devoured) || hasMark(sim, t, MARK.unstoppable) || !Alive.v[t]) return
   if (!hasComponent(sim.world, by, Gut)) addComponent(sim.world, by, Gut)
   const now = sim.elapsedMs
   Gut.victim[by] = t

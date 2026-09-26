@@ -1,8 +1,8 @@
-import { Alive, MARK, MARK_SLOTS, Mark, Motion, MOTION } from '../components'
+import { Alive, MARK, MARK_SLOTS, Mark, Motion, MOTION, TAG } from '../components'
 import { isSameEntity } from './identity'
 import type { Sim } from '../sim'
 
-/** 按来源分开记的标记：同一种、不同来源各占一格（叠层、引信、存伤、死亡印记） */
+/** 按来源分开记的标记：同一种、来源或定义不同的各占一格（叠层、引信、存伤、死亡印记） */
 const KEYED: ReadonlySet<number> = new Set([MARK.stack, MARK.fuse, MARK.store, MARK.deathMark])
 
 /** 控制：霸体挡它们，净化解它们 */
@@ -21,7 +21,7 @@ export const CC_MARKS: readonly number[] = [
 ]
 
 /**
- * 加一条标记，返回槽位下标，加不上返回 -1：同种同源的已存在则刷新，时长只延长不缩短、参数取新值；按来源分开记的还要同一个 ref；
+ * 加一条标记，返回槽位下标，加不上返回 -1：同种同源的已存在则刷新，时长只延长不缩短、参数取新值；按来源分开记的还要同一个 ref 与定义号 b；
  * 槽位满了顶掉最先到期的一条，变形的两条不顶（顶掉就没有到期反应）。
  * a/b/c 的含义：slow/speed/guard/dmg/cd 是倍率；poison 是跳伤、节拍、下次跳的时刻；regen 是每秒回复；taunt/fear/charm 是施加者的 eid 与最后见到它的位置；
  * morph 是是否曾锚定；sleep 是醒来那一下的倍率；spellShield 是剩余次数；frontGuard 是朝向与半角；stack 是层数与定义号；fuse/deathMark/parry/empower 是定义号；
@@ -39,7 +39,7 @@ export function addMark(eid: number, kind: number, tag: number, until: number, a
       if (free < 0) free = i
       continue
     }
-    if (k === kind && Mark.tag[s] === tag && (!keyed || Mark.ref[s] === ref)) {
+    if (k === kind && Mark.tag[s] === tag && (!keyed || (Mark.ref[s] === ref && Mark.b[s] === b))) {
       Mark.until[s] = Math.max(Mark.until[s]!, until)
       Mark.a[s] = a
       Mark.b[s] = b
@@ -62,19 +62,25 @@ export function addMark(eid: number, kind: number, tag: number, until: number, a
   return s
 }
 
-/** 第一条还在生效的某种标记的槽位，没有则 -1；给了 ref 就只认这个来源的 */
-export function markSlot(sim: Sim, eid: number, kind: number, ref = 0): number {
+/** 第一条还在生效的某种标记的槽位，没有则 -1；给了 ref 就只认这个来源的，给了 def 就只认这个定义号的 */
+export function markSlot(sim: Sim, eid: number, kind: number, ref = 0, def = -1): number {
   const now = sim.elapsedMs
   const base = eid * MARK_SLOTS
   for (let i = 0; i < MARK_SLOTS; i++) {
     const s = base + i
-    if (Mark.kind[s] === kind && Mark.until[s]! > now && (ref === 0 || Mark.ref[s] === ref)) return s
+    if (Mark.kind[s] === kind && Mark.until[s]! > now && (ref === 0 || Mark.ref[s] === ref) && (def < 0 || Mark.b[s] === def)) return s
   }
   return -1
 }
 
 export function hasMark(sim: Sim, eid: number, kind: number): boolean {
   return markSlot(sim, eid, kind) >= 0
+}
+
+/** 加一条控制：霸体的身体不吃 */
+export function addCc(sim: Sim, t: number, kind: number, until: number, a = 0, b = 0, c = 0, ref = 0): boolean {
+  if (hasMark(sim, t, MARK.unstoppable)) return false
+  return addMark(t, kind, TAG.effect, until, a, b, c, ref) >= 0
 }
 
 /** 清掉某几种标记，不触发到期反应 */
