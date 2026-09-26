@@ -1,19 +1,21 @@
-import { spawnCoins } from '../../entities/pickup'
-import { Alive, Drop, FACTION, Faction, Owner, Strike, Transform } from '../../components'
+import { Alive, Drop, Owner, Payload, Transform } from '../../components'
+import { abilityOnHit } from '../../store'
 import { isSameEntity } from '../../utils/identity'
 import { damageMul, ownerX, ownerY } from '../../utils/amp'
 import { hit } from './damage'
+import { applyAbilityEffects } from './effects'
 import { sourceOf } from '../../utils/source'
 import type { Sim } from '../../sim'
 
+/** 坠物落地：目标还在就砸中它，再施加命中效果 */
 export function land(sim: Sim, d: number): void {
   const e = Owner.eid[d]!
   const target = Drop.target[d]!
-  const team = Faction.v[e] === FACTION.team
-  if (!isSameEntity(sim.world, target, Drop.targetUid[d]!) || (!team && !Alive.v[target])) return
+  if (!isSameEntity(sim.world, target, Drop.targetUid[d]!) || !Alive.v[target]) return
   const src = sourceOf(sim, e)
-  const coins = Strike.coinsPerHit[e]!
-  if (team && coins > 0) spawnCoins(sim, Transform.x[d]!, Drop.toY[d]!, coins)
-  const damage = Math.max(1, Math.round(Strike.damage[e]! * damageMul(sim, e)))
-  hit(sim, src, target, damage, { knockback: Strike.knockback[e]!, from: { x: ownerX(e), y: ownerY(e) } })
+  const damage = Math.max(1, Math.round(Payload.damage[e]! * damageMul(sim, e)))
+  const x = Transform.x[d]!
+  const y = Drop.toY[d]!
+  hit(sim, src, target, damage, { knockback: Payload.knockback[e]!, from: { x: ownerX(e), y: ownerY(e) } })
+  applyAbilityEffects(sim, src, abilityOnHit[e], { x, y, baseDamage: damage, targets: [target] })
 }

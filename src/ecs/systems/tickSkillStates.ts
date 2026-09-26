@@ -1,5 +1,5 @@
 import { playSfx } from '../../audio/sfx'
-import { Alive, Hidden, Leap, Leaping, Rush, RushHit, Rushing, Tint, Transform, VisOff } from '../components'
+import { Alive, Hidden, LeapShape, Leaping, Payload, RushHit, Rushing, SprintShape, Tint, Transform, VisOff } from '../components'
 import { damageMul } from '../utils/amp'
 import { sourceOf } from '../utils/source'
 import { targetsNear } from '../utils/targets'
@@ -37,11 +37,11 @@ function rushHits(sim: Sim, m: number): void {
   const x = Transform.x[m]!
   const y = Transform.y[m]!
   const stamp = Rushing.stamp[m]!
-  const damage = Math.round(Rush.damage[e]! * damageMul(sim, e))
-  for (const t of targetsNear(sim, src, x, y, Rush.hitRadius[e]!)) {
+  const damage = Math.round(Payload.damage[e]! * damageMul(sim, e))
+  for (const t of targetsNear(sim, src, x, y, SprintShape.radius[e]!)) {
     if (RushHit.stamp[t.eid] === stamp) continue
     RushHit.stamp[t.eid] = stamp
-    hit(sim, src, t.eid, damage, { knockback: Rush.knockback[e]!, from: { x: x, y: y } })
+    hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x, y } })
   }
 }
 
@@ -50,9 +50,9 @@ function land(sim: Sim, m: number): void {
   const src = sourceOf(sim, e)
   const x = Transform.x[m]!
   const y = Transform.y[m]!
-  const radius = Leap.radius[e]!
-  const color = Leap.color[e]!
-  applyBlast(sim, src, x, y, Math.round(Leap.damage[e]! * damageMul(sim, e)), radius, Leap.knockback[e]!)
+  const radius = LeapShape.radius[e]!
+  const color = Payload.color[e]!
+  applyBlast(sim, src, x, y, Math.round(Payload.damage[e]! * damageMul(sim, e)), radius, Payload.knockback[e]!)
   playSfx('boom')
   spawnFxCircle(sim, x, y, radius, {
     fill: color,

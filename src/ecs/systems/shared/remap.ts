@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
-import { Aim, Blink, Drop, EDir, ENEMY_SET, Facing, Flyer, Leaping, Minion, Phys, PICKUP_SET, PROJ_SET, Rushing, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
+import { Aim, Drop, EDir, ENEMY_SET, Facing, Flyer, Leaping, Minion, Phys, PICKUP_SET, PROJ_SET, Rushing, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 
@@ -53,11 +53,6 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     Leaping.fromY[m] = lf.y
     Leaping.toX[m] = lt.x
     Leaping.toY[m] = lt.y
-  }
-  for (const e of query(sim.world, [Blink])) {
-    const b = rot(Blink.x[e]!, Blink.y[e]!)
-    Blink.x[e] = b.x
-    Blink.y[e] = b.y
   }
   for (const e of query(sim.world, [Aim])) {
     const a = rot(Math.cos(Aim.rad[e]!), Math.sin(Aim.rad[e]!))

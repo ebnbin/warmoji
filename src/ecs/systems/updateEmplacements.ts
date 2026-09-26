@@ -1,6 +1,6 @@
-import { addComponent, hasComponent, query, removeComponent, removeEntity } from 'bitecs'
-import { POP_MS, RETIRE_MS } from '../entities/minion'
-import { Ability, Aim, Emplacement, Fired, Frozen, Minion, Retiring, Shoot, Tint, Transform } from '../components'
+import { hasComponent, query, removeEntity } from 'bitecs'
+import { POP_MS, RETIRE_MS, retireEmplacement } from '../entities/minion'
+import { Aim, Cd, Emplacement, Fired, Frozen, Minion, Retiring, Tint, Transform } from '../components'
 import { playClip } from './shared/anim'
 import { backEaseOut } from '../utils/ease'
 import type { Sim } from '../sim'
@@ -20,14 +20,13 @@ export function updateEmplacements(sim: Sim): void {
       Tint.alpha[t] = 1 - p
       continue
     }
-    // 限时的弩塔到点退场
+    // 限时的装置到点退场
     if (Minion.dieAt[t]! > 0 && sim.elapsedMs >= Minion.dieAt[t]!) {
-      addComponent(sim.world, t, Retiring)
-      Retiring.until[t] = sim.fxMs + RETIRE_MS
-      removeComponent(sim.world, t, Ability)
+      retireEmplacement(sim, t)
       continue
     }
-    if (Frozen.v[t]) {
+    const a = Minion.ability[t]!
+    if (a !== 0 && Frozen.v[a]) {
       Tint.alpha[t] = 0
       continue
     }
@@ -41,10 +40,10 @@ export function updateEmplacements(sim: Sim): void {
       Transform.h[t] = Minion.size[t]!
     }
     Tint.alpha[t] = 1
-    if (Fired.v[t]) {
+    if (Fired.v[t] && a !== 0) {
       Fired.v[t] = 0
-      Transform.rot[t] = Aim.rad[t]! - Math.PI / 4
-      playClip(sim, sim.frames, t, 'attack', Shoot.cdLeft[t]!)
+      Transform.rot[t] = Aim.rad[a]! - Math.PI / 4
+      playClip(sim, sim.frames, t, 'attack', Cd.left[a]!)
     }
   }
 }

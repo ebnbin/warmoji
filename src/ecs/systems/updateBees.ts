@@ -1,7 +1,7 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
 import { pickTarget } from '../utils/summon'
 import { playSfx } from '../../audio/sfx'
-import { Built, Frozen, Minion, Sprite, Summon, Swarmer, Tint, Transform } from '../components'
+import { Built, Frozen, Minion, Payload, Sprite, SummonShape, Swarmer, Tint, Transform } from '../components'
 import { abilityOnHit } from '../store'
 import { damageMul, ownerX, ownerY } from '../utils/amp'
 import { hit } from './shared/damage'
@@ -41,7 +41,7 @@ export function updateBees(sim: Sim): void {
     const dx = destX - bx
     const dy = destY - by
     const d = Math.hypot(dx, dy)
-    const step = (Summon.speed[e]! * Math.min(dt, 50)) / 1000
+    const step = (SummonShape.speed[e]! * Math.min(dt, 50)) / 1000
     if (d > step) {
       Transform.x[b] = bx + (dx / d) * step
       Transform.y[b] = by + (dy / d) * step
@@ -51,12 +51,12 @@ export function updateBees(sim: Sim): void {
     }
     Sprite.flipX[b] = dx < 0 ? 1 : 0
     if (!target) continue
-    const rr = target.radius + Summon.size[e]! * 0.35
+    const rr = target.radius + SummonShape.size[e]! * 0.35
     const tx = target.x - Transform.x[b]!
     const ty = target.y - Transform.y[b]!
     if (tx * tx + ty * ty > rr * rr) continue
-    const damage = Math.round(Summon.damage[e]! * damageMul(sim, e))
-    hit(sim, src, target.eid, damage, { knockback: Summon.knockback[e]!, from: { x: Transform.x[b]!, y: Transform.y[b]! } })
+    const damage = Math.round(Payload.damage[e]! * damageMul(sim, e))
+    hit(sim, src, target.eid, damage, { knockback: Payload.knockback[e]!, from: { x: Transform.x[b]!, y: Transform.y[b]! } })
     applyAbilityEffects(sim, src, abilityOnHit[e], { x: target.x, y: target.y, baseDamage: damage, targets: [target.eid] })
     playSfx('hit')
     removeEntity(sim.world, b)

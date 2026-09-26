@@ -1,13 +1,12 @@
 import { UNIT } from '../../../util/units'
 import { waveAt } from '../../../data/waves'
-import type { DeathEffect, DecoyEffect, SplitEffect } from '../../../types/enemies'
+import type { DecoyEffect, SplitEffect } from '../../../types/enemies'
 import type { Effect } from '../../../types/abilityDefs'
 import { Despawn } from '../../components'
 import { spawnBrood, spawnEnemy } from '../../entities/enemy'
 import { applyAbilityEffects } from './effects'
 import { enemySource } from '../../utils/source'
 import type { PendingDeath, Sim } from '../../sim'
-import type { ByKind } from '../../../util/record'
 
 function spawnSplit(sim: Sim, d: PendingDeath, fx: SplitEffect): void {
   if (sim.over) return
@@ -31,40 +30,17 @@ function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): 
   Despawn.at[eid] = sim.elapsedMs + fx.durationMs
 }
 
-type DeathOf = ByKind<DeathEffect>
-
-type DeathHandler<K extends keyof DeathOf> = (sim: Sim, d: PendingDeath, fx: DeathOf[K], hpMul: number) => void
-
-const toEffectLayer = (sim: Sim, d: PendingDeath, fx: Effect): void => {
-  applyAbilityEffects(sim, enemySource(d.def.kind, d.dmgMul), [fx], {
-    x: d.x,
-    y: d.y,
-    baseDamage: 0,
-    source: d.eid,
-  })
-}
-
-const DEATH_KINDS: { [K in keyof DeathOf]: DeathHandler<K> } = {
-  split: spawnSplit,
-  decoy: spawnDecoy,
-  blast: toEffectLayer,
-  slow: toEffectLayer,
-  poison: toEffectLayer,
-  morph: toEffectLayer,
-  attackSlow: toEffectLayer,
-  ground: toEffectLayer,
-  heal: toEffectLayer,
-  spawnProjectile: toEffectLayer,
-}
-
 export function replayDeath(sim: Sim, d: PendingDeath): void {
   const effects = d.def.onDeath
   if (!effects) return
   const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
-  for (const fx of effects) replayEffect(sim, d, fx, hpMul)
+  const src = enemySource(d.def.kind, d.dmgMul)
+  const at = { x: d.x, y: d.y, baseDamage: 0, source: d.eid }
+  const generic: Effect[] = []
+  for (const fx of effects) {
+    if (fx.kind === 'split') spawnSplit(sim, d, fx)
+    else if (fx.kind === 'decoy') spawnDecoy(sim, d, fx, hpMul)
+    else generic.push(fx)
+  }
+  if (generic.length > 0) applyAbilityEffects(sim, src, generic, at)
 }
-
-function replayEffect<K extends keyof DeathOf>(sim: Sim, d: PendingDeath, fx: DeathOf[K] & { readonly kind: K }, hpMul: number): void {
-  DEATH_KINDS[fx.kind](sim, d, fx, hpMul)
-}
-

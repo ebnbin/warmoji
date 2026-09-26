@@ -505,7 +505,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       remainMs: this.run.skillCd[slot] ?? 0,
       cdMs: def.skill.cdMs,
       aim: def.skill.aim,
-      rangeU: a.kind === 'rush' || a.kind === 'leap' ? a.distance : 0,
+      rangeU: a.shape.kind === 'sprint' || a.shape.kind === 'leap' ? a.shape.distance : 0,
     }
   }
 

@@ -3,7 +3,7 @@ import economyJson from '../assets/economy.json'
 import { fromJson } from './json'
 import { keysOf } from '../util/record'
 import type { CharacterEffects, Economy, ItemRarity, ItemDef, ItemId } from '../types/items'
-import type { AbilityDef } from '../types/abilityDefs'
+import type { AbilityDef, Shape } from '../types/abilityDefs'
 
 const ECON = fromJson<Economy>(economyJson)
 
@@ -73,53 +73,40 @@ export function aggregateCharacterEffects(
 }
 
 
-/** 只缩放空间参数与弹速；伤害/冷却由运行时倍率处理，此处不得再乘 */
+/** 只缩放形状的空间参数、索敌距离与弹速；伤害/冷却由运行时倍率处理，此处不得再乘 */
 export function resolveAbilityDef(w: AbilityDef, fx: CharacterEffects): AbilityDef {
   const r = fx.rangeMul
-  switch (w.kind) {
-    case 'thrust':
-      return { ...w, reach: w.reach * r, hitRadius: w.hitRadius * r, lungeDist: w.lungeDist * r }
-    case 'projectile':
-      return { ...w, projectile: { ...w.projectile, speed: w.projectile.speed * fx.projSpeedMul } }
-    case 'sweep':
-      return { ...w, radius: w.radius * r }
-    case 'areaBlast':
-      return { ...w, detectRange: w.detectRange * r, blastRadius: w.blastRadius * r }
-    case 'boomerang':
-      return { ...w, range: w.range * r, hitRadius: w.hitRadius * r, returnSpeed: w.returnSpeed * r }
-    case 'laser':
-      return { ...w, range: w.range * r, beamRadius: w.beamRadius * r }
-    case 'slowAura':
-      return { ...w, radius: w.radius * r }
-    case 'assassinate':
-      return { ...w, range: w.range * r }
-    case 'turret':
-      return {
-        ...w,
-        range: w.range * r,
-        projectile: { ...w.projectile, speed: w.projectile.speed * fx.projSpeedMul },
-      }
+  const v = fx.projSpeedMul
+  const s = w.shape
+  let shape: Shape
+  switch (s.kind) {
+    case 'bolt':
+      shape = { ...s, projectile: { ...s.projectile, speed: s.projectile.speed * v } }
+      break
+    case 'segment':
+      shape = { ...s, reach: s.reach * r, radius: s.radius * r, ...(s.lungeDist === undefined ? {} : { lungeDist: s.lungeDist * r }) }
+      break
+    case 'sector':
+    case 'disc':
+    case 'zone':
+      shape = { ...s, radius: s.radius * r }
+      break
+    case 'chain':
+      shape = { ...s, hopRange: s.hopRange * r }
+      break
+    case 'flyer':
+      shape = { ...s, range: s.range * r, radius: s.radius * r, returnSpeed: s.returnSpeed * r }
+      break
     case 'summon':
-      return { ...w, minion: { ...w.minion, speed: w.minion.speed * fx.projSpeedMul } }
-    case 'heal':
-      return { ...w, range: w.range * r }
-    case 'chainArc':
-      return { ...w, range: w.range * r, arcRange: w.arcRange * r }
-    case 'rally':
-    case 'strike':
-    case 'dance':
-    case 'buff':
-    case 'nuke':
-    case 'timeStop':
-    case 'rush':
-    case 'leap':
-    case 'taunt':
-    case 'stealth':
-    case 'field':
-    case 'deploy':
-    case 'nova':
-      return w
+      shape = { ...s, minion: { ...s.minion, speed: s.minion.speed * v } }
+      break
+    case 'emplace':
+      shape = { ...s, ability: resolveAbilityDef(s.ability, fx) }
+      break
+    default:
+      shape = s
   }
+  return { ...w, shape, ...(w.range === undefined ? {} : { range: w.range * r }) }
 }
 
 export const SHOP = ECON.shop

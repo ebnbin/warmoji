@@ -2,496 +2,220 @@ import { addComponent, addComponents, hasComponent, query, removeEntity } from '
 import { newEntity } from './entity'
 import {
   Ability,
+  AIM,
   Aim,
-  AimMove,
+  ALL_OF,
+  AllShape,
   Amp,
   Anchor,
-  AreaBlast,
-  Assassinate,
   Aura,
-  AuraDps,
-  AuraFreeze,
-  BlastEcho,
-  Blink,
+  BlinkShape,
+  BlinkState,
   Bolt,
-  Boomerang,
-  BoomerangTwin,
-  Buff,
-  Burst,
-  ChainArc,
-  CoinMagnet,
-  Dance,
-  Deploy,
+  Cd,
+  Chain,
   Disarmed,
+  DISC_AT,
+  DISC_OF,
+  Disc,
   Drop,
-  Field,
-  Leap,
-  Nova,
-  Rush,
-  Stealth,
-  Taunt,
-  EveryN,
-  Execute,
+  DropShape,
+  EmplaceShape,
   FACTION,
   Faction,
   Flyer,
-  Followup,
+  FlyerShape,
   Frozen,
-  Heal,
-  HealAoe,
-  HealDefib,
-  Laser,
-  LaserBackBeam,
-  LaserRadial,
+  LeapShape,
   Manual,
   Minion,
-  Nuke,
   Owner,
-  Pierce,
-  Radial,
-  Rally,
-  Shoot,
+  Payload,
+  REAIM,
+  Repeat,
+  RepeatState,
+  Sector,
+  Segment,
   Shots,
-  SlowAura,
-  Strike,
-  Summon,
-  Sweep,
+  SprintShape,
+  SummonShape,
   Swing,
   Thrown,
-  Thrust,
-  ThrustCombo,
-  TimeStop,
-  Turret,
-  Volley,
   WallBlocked,
   Weapon,
+  WorldShape,
   ZoneFollow,
+  ZoneShape,
 } from '../components'
-import { abilityArtEmoji, abilityFireSfx, abilityOnHit } from '../store'
-import type { FrameIndex } from '../frames'
-import type { EcsWorld } from '../world'
-import type { CdComp } from '../components'
-import type { AbilityDef } from '../../types/abilityDefs'
-import { abilityPiercesWalls } from '../../data/abilities'
-import { spawnWeaponBody } from '../entities/weapon'
+import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse, emplaceAbility } from '../store'
+import type { AbilityDef, Shape } from '../../types/abilityDefs'
+import { ACQUIRE, abilityPiercesWalls } from '../../data/abilities'
+import { UNIT } from '../../util/units'
+import { spawnWeaponBody } from './weapon'
 import type { Sim } from '../sim'
 import type { ByKind } from '../../util/record'
 
-interface StateSpec {
-  readonly comp: object
-  reset(eid: number): void
+type ShapeOf = ByKind<Shape>
+
+interface ShapeSpec<K extends keyof ShapeOf> {
+  readonly comps: readonly object[]
+  attach(sim: Sim, e: number, s: ShapeOf[K], faction: number): void
 }
 
-const SwingState: StateSpec = {
-  comp: Swing,
-  reset: (e) => {
-    Swing.startMs[e] = 0
-    Swing.durMs[e] = 0
-  },
-}
-const FollowupState: StateSpec = {
-  comp: Followup,
-  reset: (e) => {
-    Followup.left[e] = 0
-    Followup.damage[e] = 0
-  },
-}
-const RadialState: StateSpec = { comp: Radial, reset: (e) => { Radial.left[e] = 0 } }
-const BlinkState: StateSpec = {
-  comp: Blink,
-  reset: (e) => {
-    Blink.x[e] = 0
-    Blink.y[e] = 0
-  },
-}
-const ShotsState: StateSpec = { comp: Shots, reset: (e) => { Shots.n[e] = 0 } }
-const AuraState: StateSpec = { comp: Aura, reset: (e) => { Aura.zone[e] = 0 } }
-const AimState: StateSpec = { comp: Aim, reset: (e) => { Aim.rad[e] = 0 } }
-const ThrownState: StateSpec = { comp: Thrown, reset: (e) => { Thrown.n[e] = 0 } }
-
-interface AttachCtx {
-  readonly world: EcsWorld
-  readonly frames: FrameIndex
-}
-
-type AbilityOf = ByKind<AbilityDef>
-
-interface KindSpec<K extends keyof AbilityOf> {
-  readonly comp: object & CdComp
-  readonly state?: readonly StateSpec[]
-  attach?(ctx: AttachCtx, e: number, def: AbilityOf[K]): void
-}
-
-const DEPLOY_SHOT_MS = 1500
-
-const KINDS: { [K in keyof AbilityOf]: KindSpec<K> } = {
-
-  rally: {
-    comp: Rally,
-    attach: (_c, e, d) => {
-      Rally.healRatio[e] = d.healRatio
-      Rally.invulnMs[e] = d.invulnMs
-      Rally.ringRadius[e] = d.ringRadius
-      Rally.color[e] = d.color
+const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
+  bolt: {
+    comps: [Bolt, Shots],
+    attach: (sim, e, s, faction) => {
+      Bolt.frame[e] = sim.frames.index(s.projectile.emoji, faction === FACTION.enemy ? 'enemyProjectile' : 'player')
+      Bolt.size[e] = s.projectile.size
+      Bolt.radius[e] = s.projectile.radius
+      Bolt.speed[e] = s.projectile.speed
+      Bolt.rotOffset[e] = s.projectile.rotationOffsetDeg
+      Bolt.lifeMs[e] = s.lifeMs
+      Bolt.pierce[e] = s.pierce ?? 0
     },
   },
-  dance: {
-    comp: Dance,
-    attach: (_c, e, d) => {
-      Dance.durationMs[e] = d.durationMs
+  segment: {
+    comps: [Segment, Swing],
+    attach: (_sim, e, s) => {
+      Segment.reach[e] = s.reach
+      Segment.radius[e] = s.radius
+      Segment.ms[e] = s.ms
+      Segment.lunge[e] = s.lungeDist ?? 0
+      Segment.beam[e] = s.beam ? 1 : 0
     },
   },
-  buff: {
-    comp: Buff,
-    attach: (_c, e, d) => {
-      Buff.damageMul[e] = d.damageMul
-      Buff.durationMs[e] = d.durationMs
+  sector: {
+    comps: [Sector, Swing],
+    attach: (_sim, e, s) => {
+      Sector.radius[e] = s.radius
+      Sector.arcDeg[e] = s.arcDeg
+      Sector.ms[e] = s.ms
     },
   },
-  chainArc: {
-    comp: ChainArc,
-    attach: (_c, e, d) => {
-      ChainArc.damage[e] = d.damage
-      ChainArc.knockback[e] = d.knockback
-      ChainArc.range[e] = d.range
-      ChainArc.arcRange[e] = d.arcRange
-      ChainArc.bounces[e] = d.bounces
-      ChainArc.decay[e] = d.decay
-      ChainArc.color[e] = d.color
-      abilityOnHit[e] = d.onHit
+  disc: {
+    comps: [Disc],
+    attach: (_sim, e, s) => {
+      Disc.radius[e] = s.radius
+      Disc.at[e] = DISC_AT[s.at]
+      Disc.of[e] = DISC_OF[s.of ?? 'foes']
     },
   },
-  sweep: {
-    comp: Sweep,
-    state: [AimState, SwingState],
-    attach: (_c, e, d) => {
-      Sweep.damage[e] = d.damage
-      Sweep.knockback[e] = d.knockback
-      Sweep.radius[e] = d.radius
-      Sweep.arcDeg[e] = d.arcDeg
-      Sweep.sweepMs[e] = d.sweepMs
-      abilityOnHit[e] = d.onHit
+  chain: {
+    comps: [Chain],
+    attach: (_sim, e, s) => {
+      Chain.hops[e] = s.hops
+      Chain.hopRange[e] = s.hopRange
+      Chain.decay[e] = s.decay
     },
   },
-  areaBlast: {
-    comp: AreaBlast,
-    state: [FollowupState],
-    attach: (c, e, d) => {
-      AreaBlast.damage[e] = d.damage
-      AreaBlast.knockback[e] = d.knockback
-      AreaBlast.detectRange[e] = d.detectRange
-      AreaBlast.blastRadius[e] = d.blastRadius
-      AreaBlast.color[e] = d.color
-      abilityOnHit[e] = d.onHit
-      if (d.echo) {
-        addComponent(c.world, e, BlastEcho)
-        BlastEcho.delayMs[e] = d.echo.delayMs
-        BlastEcho.ratio[e] = d.echo.ratio
-      }
+  flyer: {
+    comps: [FlyerShape, Thrown],
+    attach: (_sim, e, s) => {
+      FlyerShape.range[e] = s.range
+      FlyerShape.outMs[e] = s.outMs
+      FlyerShape.returnSpeed[e] = s.returnSpeed
+      FlyerShape.radius[e] = s.radius
+      FlyerShape.spinDegPerSec[e] = s.spinDegPerSec
+      FlyerShape.coinMagnet[e] = s.coinMagnetRadius ?? 0
     },
   },
-  thrust: {
-    comp: Thrust,
-    state: [AimState, SwingState, FollowupState],
-    attach: (c, e, d) => {
-      Thrust.damage[e] = d.damage
-      Thrust.knockback[e] = d.knockback
-      Thrust.reach[e] = d.reach
-      Thrust.hitRadius[e] = d.hitRadius
-      Thrust.thrustMs[e] = d.thrustMs
-      Thrust.lungeDist[e] = d.lungeDist
-      abilityOnHit[e] = d.onHit
-      if (d.combo) {
-        addComponent(c.world, e, ThrustCombo)
-        ThrustCombo.delayMs[e] = d.combo.delayMs
-      }
+  drop: {
+    comps: [DropShape],
+    attach: (_sim, e, s) => {
+      DropShape.targets[e] = s.targets
+      DropShape.size[e] = s.size
+      DropShape.fromAbove[e] = s.fromAbove
+      DropShape.dropMs[e] = s.dropMs
+      DropShape.staggerMs[e] = s.staggerMs
+      abilityArtEmoji[e] = s.emoji
     },
   },
-  strike: {
-    comp: Strike,
-    attach: (_c, e, d) => {
-      Strike.damage[e] = d.damage
-      Strike.knockback[e] = d.knockback
-      Strike.targets[e] = d.targets
-      Strike.coinsPerHit[e] = d.coinsPerHit ?? 0
-      abilityArtEmoji[e] = d.drop.emoji
-      Strike.size[e] = d.drop.size
-      Strike.fromAbove[e] = d.drop.fromAbove
-      Strike.dropMs[e] = d.drop.dropMs
-      Strike.staggerMs[e] = d.drop.staggerMs
+  blink: {
+    comps: [BlinkShape, BlinkState],
+    attach: (_sim, e, s) => {
+      BlinkShape.behindDist[e] = s.behindDist
+      BlinkShape.strikeMs[e] = s.strikeMs
+      BlinkShape.execHp[e] = s.execute?.hpRatio ?? 0
+      BlinkShape.execMul[e] = s.execute?.mul ?? 1
     },
   },
-  assassinate: {
-    comp: Assassinate,
-    state: [AimState, FollowupState, BlinkState],
-    attach: (c, e, d) => {
-      Assassinate.damage[e] = d.damage
-      Assassinate.knockback[e] = d.knockback
-      Assassinate.range[e] = d.range
-      Assassinate.behindDist[e] = d.behindDist
-      Assassinate.strikeMs[e] = d.strikeMs
-      abilityOnHit[e] = d.onHit
-      if (d.execute) {
-        addComponent(c.world, e, Execute)
-        Execute.hpRatio[e] = d.execute.hpRatio
-        Execute.mul[e] = d.execute.mul
-      }
-    },
-  },
-  boomerang: {
-    comp: Boomerang,
-    state: [AimState, ThrownState],
-    attach: (c, e, d) => {
-      Boomerang.damage[e] = d.damage
-      Boomerang.knockback[e] = d.knockback
-      Boomerang.range[e] = d.range
-      Boomerang.outMs[e] = d.outMs
-      Boomerang.returnSpeed[e] = d.returnSpeed
-      Boomerang.hitRadius[e] = d.hitRadius
-      Boomerang.spinDegPerSec[e] = d.spinDegPerSec
-      if (d.twin) addComponent(c.world, e, BoomerangTwin)
-      if (d.coinMagnetRadius !== undefined) {
-        addComponent(c.world, e, CoinMagnet)
-        CoinMagnet.radius[e] = d.coinMagnetRadius
-      }
-    },
-  },
-  summon: {
-    comp: Summon,
-    attach: (_c, e, d) => {
-      Summon.count[e] = d.count
-      Summon.damage[e] = d.damage
-      Summon.knockback[e] = d.knockback
-      Summon.intervalMs[e] = d.intervalMs
-      Summon.lifeMs[e] = d.lifeMs
-      abilityArtEmoji[e] = d.minion.emoji
-      Summon.size[e] = d.minion.size
-      Summon.speed[e] = d.minion.speed
-      abilityOnHit[e] = d.onHit
-    },
-  },
-  projectile: {
-    comp: Shoot,
-    state: [AimState, ShotsState],
-    attach: (c, e, d) => {
-      Shoot.damage[e] = d.damage
-      Shoot.knockback[e] = d.knockback
-      Shoot.range[e] = d.range ?? 0
-      Shoot.lifeMs[e] = d.lifeMs
-      if (d.aim === 'move') addComponent(c.world, e, AimMove)
-      assertFree(c.world, e, Bolt, '弹丸外形组件')
-      addComponent(c.world, e, Bolt)
-      Bolt.frame[e] = c.frames.index(d.projectile.emoji, Faction.v[e] === FACTION.enemy ? 'enemyProjectile' : 'player')
-      Bolt.size[e] = d.projectile.size
-      Bolt.radius[e] = d.projectile.radius
-      Bolt.speed[e] = d.projectile.speed
-      Bolt.rotOffset[e] = d.projectile.rotationOffsetDeg
-      if (d.volley) {
-        addComponent(c.world, e, Volley)
-        Volley.count[e] = d.volley.count
-        Volley.spreadDeg[e] = d.volley.spreadDeg
-        Volley.randomRotate[e] = d.volley.randomRotate ? 1 : 0
-      }
-      if (d.everyN) {
-        addComponent(c.world, e, EveryN)
-        EveryN.n[e] = d.everyN.n
-        EveryN.count[e] = d.everyN.count
-        EveryN.spreadDeg[e] = d.everyN.spreadDeg
-      }
-      if (d.pierce !== undefined) {
-        addComponent(c.world, e, Pierce)
-        Pierce.n[e] = d.pierce
-      }
-      abilityOnHit[e] = d.onHit
-      abilityFireSfx[e] = d.fireSfx
-    },
-  },
-  turret: {
-    comp: Turret,
-    attach: (c, e, d) => {
-      Turret.placeIntervalMs[e] = d.placeIntervalMs
-      Turret.maxTurrets[e] = d.maxTurrets
-      Turret.fireIntervalMs[e] = d.fireIntervalMs
-      Turret.damage[e] = d.damage
-      Turret.knockback[e] = d.knockback
-      Turret.range[e] = d.range
-      Turret.lifeMs[e] = d.lifeMs
-      abilityArtEmoji[e] = d.turret.emoji
-      Turret.size[e] = d.turret.size
-      assertFree(c.world, e, Bolt, '弹丸外形组件')
-      addComponent(c.world, e, Bolt)
-      Bolt.frame[e] = c.frames.index(d.projectile.emoji, Faction.v[e] === FACTION.enemy ? 'enemyProjectile' : 'player')
-      Bolt.size[e] = d.projectile.size
-      Bolt.radius[e] = d.projectile.radius
-      Bolt.speed[e] = d.projectile.speed
-      Bolt.rotOffset[e] = d.projectile.rotationOffsetDeg
-      if (d.burst) {
-        addComponent(c.world, e, Burst)
-        Burst.count[e] = d.burst.count
-        Burst.spreadDeg[e] = d.burst.spreadDeg
-      }
-    },
-  },
-  timeStop: {
-    comp: TimeStop,
-    attach: (_c, e, d) => {
-      TimeStop.durationMs[e] = d.durationMs
-    },
-  },
-  nuke: {
-    comp: Nuke,
-    attach: (_c, e, d) => {
-      Nuke.damage[e] = d.damage
-      Nuke.bossRatio[e] = d.bossRatio
-    },
-  },
-  rush: {
-    comp: Rush,
-    attach: (_c, e, d) => {
-      Rush.distance[e] = d.distance
-      Rush.ms[e] = d.ms
-      Rush.damage[e] = d.damage
-      Rush.knockback[e] = d.knockback
-      Rush.hitRadius[e] = d.hitRadius
-      Rush.color[e] = d.color
+  sprint: {
+    comps: [SprintShape],
+    attach: (_sim, e, s) => {
+      SprintShape.distance[e] = s.distance
+      SprintShape.ms[e] = s.ms
+      SprintShape.radius[e] = s.radius
     },
   },
   leap: {
-    comp: Leap,
-    attach: (_c, e, d) => {
-      Leap.distance[e] = d.distance
-      Leap.ms[e] = d.ms
-      Leap.height[e] = d.height
-      Leap.damage[e] = d.damage
-      Leap.knockback[e] = d.knockback
-      Leap.radius[e] = d.radius
-      Leap.color[e] = d.color
+    comps: [LeapShape],
+    attach: (_sim, e, s) => {
+      LeapShape.distance[e] = s.distance
+      LeapShape.ms[e] = s.ms
+      LeapShape.height[e] = s.height
+      LeapShape.radius[e] = s.radius
     },
   },
-  taunt: {
-    comp: Taunt,
-    attach: (_c, e, d) => {
-      Taunt.radius[e] = d.radius
-      Taunt.durationMs[e] = d.durationMs
-      Taunt.damageTakenMul[e] = d.damageTakenMul
-      Taunt.color[e] = d.color
+  all: {
+    comps: [AllShape],
+    attach: (_sim, e, s) => {
+      AllShape.of[e] = ALL_OF[s.of]
+      AllShape.downed[e] = s.downed ? 1 : 0
     },
   },
-  stealth: {
-    comp: Stealth,
-    attach: (_c, e, d) => {
-      Stealth.durationMs[e] = d.durationMs
+  zone: {
+    comps: [ZoneShape, Aura],
+    attach: (_sim, e, s) => {
+      ZoneShape.radius[e] = s.radius
+      ZoneShape.durationMs[e] = s.durationMs
+      ZoneShape.tickMs[e] = s.tickMs ?? 0
+      ZoneShape.mend[e] = s.mend ?? 0
+      ZoneShape.follow[e] = s.follow ? 1 : 0
+      ZoneShape.pulseMs[e] = s.pulse?.intervalMs ?? 0
+      ZoneShape.enterMs[e] = s.visual.enterMs
+      ZoneShape.fillAlpha[e] = s.visual.fillAlpha
+      ZoneShape.lineAlpha[e] = s.visual.lineAlpha
+      ZoneShape.lineWidth[e] = s.visual.lineWidth
+      ZoneShape.color[e] = s.visual.color
+      abilityPulse[e] = s.pulse?.onHit
     },
   },
-  field: {
-    comp: Field,
-    attach: (_c, e, d) => {
-      Field.radius[e] = d.radius
-      Field.durationMs[e] = d.durationMs
-      Field.healPerSec[e] = d.healPerSec
-      Field.poisonDamage[e] = d.poison.damage
-      Field.poisonTickMs[e] = d.poison.tickMs
-      Field.color[e] = d.color
+  summon: {
+    comps: [SummonShape],
+    attach: (_sim, e, s) => {
+      SummonShape.count[e] = s.count
+      SummonShape.size[e] = s.minion.size
+      SummonShape.speed[e] = s.minion.speed
+      SummonShape.lifeMs[e] = s.lifeMs
+      abilityArtEmoji[e] = s.minion.emoji
     },
   },
-  deploy: {
-    comp: Deploy,
-    // 借用弩塔的装配数据：place 只认 Turret 与 Bolt
-    attach: (c, e, d) => {
-      Deploy.count[e] = d.count
-      Deploy.spread[e] = d.spread
-      Deploy.lifeMs[e] = d.lifeMs
-      addComponent(c.world, e, Turret)
-      Turret.placeIntervalMs[e] = 0
-      Turret.maxTurrets[e] = d.count
-      Turret.fireIntervalMs[e] = d.fireIntervalMs
-      Turret.damage[e] = d.damage
-      Turret.knockback[e] = d.knockback
-      Turret.range[e] = d.range
-      Turret.lifeMs[e] = DEPLOY_SHOT_MS
-      Turret.size[e] = d.turret.size
-      abilityArtEmoji[e] = d.turret.emoji
-      assertFree(c.world, e, Bolt, '弹丸外形组件')
-      addComponent(c.world, e, Bolt)
-      Bolt.frame[e] = c.frames.index(d.projectile.emoji, 'player')
-      Bolt.size[e] = d.projectile.size
-      Bolt.radius[e] = d.projectile.radius
-      Bolt.speed[e] = d.projectile.speed
-      Bolt.rotOffset[e] = d.projectile.rotationOffsetDeg
-      if (d.burst) {
-        addComponent(c.world, e, Burst)
-        Burst.count[e] = d.burst.count
-        Burst.spreadDeg[e] = d.burst.spreadDeg
-      }
+  emplace: {
+    comps: [EmplaceShape],
+    attach: (_sim, e, s) => {
+      EmplaceShape.count[e] = s.count
+      EmplaceShape.spread[e] = s.spread ?? 0
+      EmplaceShape.maxAlive[e] = s.maxAlive
+      EmplaceShape.lifeMs[e] = s.lifeMs
+      EmplaceShape.size[e] = s.turret.size
+      abilityArtEmoji[e] = s.turret.emoji
+      emplaceAbility[e] = s.ability
     },
   },
-  nova: {
-    comp: Nova,
-    attach: (_c, e, d) => {
-      Nova.radius[e] = d.radius
-      Nova.damage[e] = d.damage
-      Nova.knockback[e] = d.knockback
-      Nova.color[e] = d.color
-      abilityOnHit[e] = d.onHit
-    },
-  },
-  heal: {
-    comp: Heal,
-    attach: (c, e, d) => {
-      Heal.amount[e] = d.amount
-      Heal.range[e] = d.range
-      if (d.aoe) {
-        addComponent(c.world, e, HealAoe)
-        HealAoe.ratio[e] = d.aoe.ratio
-      }
-      if (d.defib) {
-        addComponent(c.world, e, HealDefib)
-        HealDefib.reviveCutMs[e] = d.defib.reviveCutMs
-      }
-    },
-  },
-  slowAura: {
-    comp: SlowAura,
-    state: [AuraState],
-    attach: (c, e, d) => {
-      SlowAura.cdLeft[e] = 0
-      SlowAura.radius[e] = d.radius
-      SlowAura.slowFactor[e] = d.slowFactor
-      SlowAura.color[e] = d.color
-      if (d.dps !== undefined) {
-        addComponent(c.world, e, AuraDps)
-        AuraDps.perSec[e] = d.dps
-      }
-      if (d.freeze) {
-        addComponent(c.world, e, AuraFreeze)
-        AuraFreeze.intervalMs[e] = d.freeze.intervalMs
-        AuraFreeze.durationMs[e] = d.freeze.durationMs
-      }
-    },
-  },
-  laser: {
-    comp: Laser,
-    state: [AimState, RadialState],
-    attach: (c, e, d) => {
-      Laser.damage[e] = d.damage
-      Laser.knockback[e] = d.knockback
-      Laser.range[e] = d.range
-      Laser.beamRadius[e] = d.beamRadius
-      Laser.color[e] = d.color
-      if (d.backBeam) addComponent(c.world, e, LaserBackBeam)
-      if (d.radial) {
-        addComponent(c.world, e, LaserRadial)
-        LaserRadial.beams[e] = d.radial.beams
-        LaserRadial.ratio[e] = d.radial.ratio
-        LaserRadial.stepMs[e] = d.radial.stepMs
-      }
-    },
-  },
+  world: { comps: [WorldShape], attach: () => {} },
 }
 
-export const ABILITY_COMPS: readonly (object & CdComp)[] = Object.values(KINDS).map((k) => k.comp)
+/** 未指明索敌距离时，近战形状只在够得着时出手，其余用通用索敌距离 */
+function shapeRange(s: Shape): number {
+  if (s.kind === 'segment') return s.reach + s.radius
+  if (s.kind === 'sector') return s.radius
+  return ACQUIRE.range * UNIT
+}
 
-
+function attachShape<K extends keyof ShapeOf>(sim: Sim, e: number, s: ShapeOf[K] & { readonly kind: K }, faction: number): void {
+  SHAPES[s.kind].attach(sim, e, s, faction)
+}
 
 export interface AmpInit {
   dmg: number
@@ -509,60 +233,50 @@ export interface AbilityInit {
   faction: number
   cooldownMs: number
   amp: AmpInit
-  manual?: boolean
-  baseMs: number
-  piercesWalls?: boolean
+  manual: boolean
 }
 
-export function attachAbilityCore(
-  sim: Sim,
-  eid: number,
-  comp: object & CdComp,
-  state: readonly { comp: object; reset(eid: number): void }[],
-  init: AbilityInit,
-): void {
+/** 每条能力住在自己的实体里：持械的住在武器身体上，其余住在空实体上；宿主是所有者，锚点是出手位置 */
+function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit): void {
   const world = sim.world
-  assertFree(world, eid, comp, 'kind 组件')
-  for (const st of state) assertFree(world, eid, st.comp, '状态组件')
-  addComponents(world, eid, Ability, Owner, Anchor, Faction, Amp, Frozen, Disarmed, WallBlocked, comp)
-  for (const st of state) {
-    addComponent(world, eid, st.comp)
-    st.reset(eid)
+  const spec = SHAPES[def.shape.kind]
+  addComponents(world, e, Ability, Owner, Anchor, Faction, Amp, Frozen, Disarmed, WallBlocked, Cd, Aim, Payload, ...spec.comps)
+  if (init.manual) addComponent(world, e, Manual)
+  Owner.eid[e] = init.owner
+  Anchor.eid[e] = init.anchor
+  Faction.v[e] = init.faction
+  Cd.left[e] = init.cooldownMs
+  Cd.base[e] = def.trigger === 'auto' ? def.cooldownMs : 0
+  Amp.dmg[e] = init.amp.dmg
+  Amp.cd[e] = init.amp.cd
+  Amp.crit[e] = init.amp.crit
+  Amp.kb[e] = init.amp.kb
+  Amp.battle[e] = init.amp.battle ? 1 : 0
+  Frozen.v[e] = 0
+  Disarmed.v[e] = 0
+  WallBlocked.v[e] = init.manual || abilityPiercesWalls(def) ? 0 : 1
+  Aim.kind[e] = AIM[def.aim]
+  Aim.rad[e] = 0
+  Aim.range[e] = def.range ?? shapeRange(def.shape)
+  Payload.damage[e] = def.damage ?? 0
+  Payload.knockback[e] = def.knockback ?? 0
+  Payload.bossRatio[e] = def.bossRatio ?? 1
+  Payload.waveScale[e] = def.waveScale ? 1 : 0
+  Payload.color[e] = def.color ?? 0
+  Payload.fxRadius[e] = def.fxRadius ?? 0
+  if (def.repeat) {
+    addComponents(world, e, Repeat, RepeatState)
+    Repeat.count[e] = def.repeat.count
+    Repeat.spreadDeg[e] = def.repeat.spreadDeg ?? 0
+    Repeat.delayMs[e] = def.repeat.delayMs ?? 0
+    Repeat.ratio[e] = def.repeat.ratio ?? 1
+    Repeat.everyN[e] = def.repeat.everyN ?? 0
+    Repeat.reaim[e] = REAIM[def.repeat.reaim ?? 'same']
   }
-  if (init.manual) addComponent(world, eid, Manual)
-  Owner.eid[eid] = init.owner
-  Anchor.eid[eid] = init.anchor
-  Faction.v[eid] = init.faction
-  comp.cdLeft[eid] = init.cooldownMs
-  comp.cdBase[eid] = init.baseMs
-  Amp.dmg[eid] = init.amp.dmg
-  Amp.cd[eid] = init.amp.cd
-  Amp.crit[eid] = init.amp.crit
-  Amp.kb[eid] = init.amp.kb
-  Amp.battle[eid] = init.amp.battle ? 1 : 0
-  Frozen.v[eid] = 0
-  Disarmed.v[eid] = 0
-  WallBlocked.v[eid] = init.piercesWalls ? 0 : 1
-}
-
-function assertFree(world: EcsWorld, eid: number, comp: object, what: string): void {
-  if (hasComponent(world, eid, comp)) {
-    throw new Error(`实体 ${eid} 上已有这条能力的${what}：同一宿主不能挂两份同种能力，请让其中一份住进独立实体`)
-  }
-}
-
-function attachAbility(sim: Sim, eid: number, def: AbilityDef, init: Omit<AbilityInit, 'baseMs' | 'piercesWalls'>): void {
-  const spec = KINDS[def.kind]
-  attachAbilityCore(sim, eid, spec.comp, spec.state ?? [], {
-    ...init,
-    baseMs: 'cooldownMs' in def ? def.cooldownMs : 0,
-    piercesWalls: init.manual === true || abilityPiercesWalls(def),
-  })
-  attachKind({ world: sim.world, frames: sim.frames }, eid, def)
-}
-
-function attachKind<K extends keyof AbilityOf>(ctx: AttachCtx, eid: number, def: AbilityOf[K] & { readonly kind: K }): void {
-  KINDS[def.kind].attach?.(ctx, eid, def)
+  abilityOnHit[e] = def.onHit
+  abilityOnSelf[e] = def.onSelf
+  abilityFireSfx[e] = def.fireSfx
+  attachShape(sim, e, def.shape, init.faction)
 }
 
 export function equipAbility(
@@ -572,29 +286,36 @@ export function equipAbility(
   faction: number,
   cooldownMs: number,
   amp: AmpInit,
-  manual = false,
+  opts: { manual?: boolean; owner?: number } = {},
 ): number {
-  const carrier = 'held' in def && def.held ? spawnWeaponBody(sim, host, def.held, faction) : host
-  attachAbility(sim, carrier, def, { owner: host, anchor: host, faction, cooldownMs, amp, manual })
-  return carrier
-}
-
-/** 主动技能住在自己的实体里：宿主身上已有同种能力也不冲突，所有者与锚点都是宿主 */
-export function equipSkill(sim: Sim, host: number, def: AbilityDef, amp: AmpInit): number {
-  const e = newEntity(sim.world)
-  attachAbility(sim, e, def, { owner: host, anchor: host, faction: FACTION.team, cooldownMs: 0, amp, manual: true })
+  const e = def.held ? spawnWeaponBody(sim, host, def.held, faction) : newEntity(sim.world)
+  attachAbility(sim, e, def, { owner: opts.owner ?? host, anchor: host, faction, cooldownMs, amp, manual: opts.manual === true })
   return e
 }
 
+/** 主动技能：所有者与锚点都是宿主，由附身者按键触发 */
+export function equipSkill(sim: Sim, host: number, def: AbilityDef, amp: AmpInit): number {
+  return equipAbility(sim, host, def, FACTION.team, 0, amp, { manual: true })
+}
+
+/** 撤掉一个身体的全部能力，连同它们造出来的场、召唤物、飞返体、坠物 */
 export function unequipAbilities(sim: Sim, ownerEid: number): void {
   const world = sim.world
-  const weapons: number[] = []
-  for (const e of query(world, [Weapon, Owner])) if (Owner.eid[e] === ownerEid) weapons.push(e)
-  // 徒手能力挂在持有者自己身上，归属须连本人一起查
-  const hosts = [...weapons, ownerEid]
-  for (const d of query(world, [Drop, Owner])) if (hosts.includes(Owner.eid[d]!)) removeEntity(world, d)
-  for (const z of [...query(world, [ZoneFollow, Owner])]) if (hosts.includes(Owner.eid[z]!)) removeEntity(world, z)
+  const owned: number[] = []
+  for (const e of query(world, [Ability, Owner])) if (Owner.eid[e] === ownerEid) owned.push(e)
+  for (const d of [...query(world, [Drop, Owner])]) if (owned.includes(Owner.eid[d]!)) removeEntity(world, d)
+  for (const z of [...query(world, [ZoneFollow, Owner])]) if (owned.includes(Owner.eid[z]!)) removeEntity(world, z)
   for (const m of [...query(world, [Minion, Owner])]) if (Owner.eid[m] === ownerEid) removeEntity(world, m)
-  for (const f of [...query(world, [Flyer])]) if (weapons.includes(Flyer.of[f]!)) removeEntity(world, f)
-  for (const e of weapons) removeEntity(world, e)
+  for (const f of [...query(world, [Flyer])]) if (owned.includes(Flyer.of[f]!)) removeEntity(world, f)
+  for (const e of owned) {
+    abilityOnHit[e] = undefined
+    abilityOnSelf[e] = undefined
+    abilityPulse[e] = undefined
+    emplaceAbility[e] = undefined
+    removeEntity(world, e)
+  }
+}
+
+export function isWeaponBody(sim: Sim, e: number): boolean {
+  return hasComponent(sim.world, e, Weapon)
 }

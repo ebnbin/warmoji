@@ -10,6 +10,7 @@ export interface Target {
   readonly y: number
   readonly radius: number
   readonly hidden: boolean
+  readonly alive: boolean
 }
 
 type Visit = (eid: number, x: number, y: number, radius: number) => boolean | void
@@ -29,7 +30,7 @@ export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach:
   const sight = src.sight
   for (const f of FOES[src.faction]!) {
     for (const t of sim.targets[f]!) {
-      if (t.hidden || Uid.v[t.eid] !== t.uid) continue
+      if (t.hidden || !t.alive || Uid.v[t.eid] !== t.uid) continue
       const d = sim.hooks.worldDelta(sim, cx, cy, t.x, t.y)
       const rr = reach + t.radius
       if (d.x * d.x + d.y * d.y > rr * rr) continue
@@ -41,10 +42,10 @@ export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach:
   }
 }
 
-/** 同阵营的活着的身体，隐匿的也算 */
-export function eachAlly(sim: Sim, faction: number, cx: number, cy: number, reach: number, visit: Visit): void {
+/** 同阵营的身体，隐匿的也算；downed 为真时倒地的也算 */
+export function eachAlly(sim: Sim, faction: number, cx: number, cy: number, reach: number, downed: boolean, visit: Visit): void {
   for (const t of sim.targets[faction]!) {
-    if (Uid.v[t.eid] !== t.uid) continue
+    if (Uid.v[t.eid] !== t.uid || (!t.alive && !downed)) continue
     const d = sim.hooks.worldDelta(sim, cx, cy, t.x, t.y)
     const rr = reach + t.radius
     if (d.x * d.x + d.y * d.y > rr * rr) continue

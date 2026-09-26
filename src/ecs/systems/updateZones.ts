@@ -68,7 +68,7 @@ export function updateZones(sim: Sim): void {
     const src = zoneSrc[z]!
     const mend = Zone.mend[z]!
     if (mend > 0) {
-      eachAlly(sim, src.faction, x, y, r, (eid, tx, ty) => {
+      eachAlly(sim, src.faction, x, y, r, false, (eid, tx, ty) => {
         if (inside(x, y, r, tx, ty)) Hp.v[eid] = Math.min(Hp.max[eid]!, Hp.v[eid]! + mend * dt)
       })
     }

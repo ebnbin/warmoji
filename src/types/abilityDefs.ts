@@ -1,7 +1,7 @@
 import type { SfxId } from './sfx'
 import type { GroundEffectDef } from './groundEffects'
 
-interface ProjectileSpec {
+export interface ProjectileSpec {
   readonly emoji: string
   readonly size: number
   readonly radius: number
@@ -58,16 +58,66 @@ interface SpawnProjectileEffect {
   readonly lifeMs: number
   readonly aim: 'nearest'
 }
+/** 有目标列表时治列表里的人（全体或血量比例最低者），否则治落点周围 range 内的同伴 */
 interface HealEffect {
   readonly kind: 'heal'
-  readonly range: number
   readonly amount: number
-  readonly all?: boolean
+  readonly scope?: 'all' | 'lowest'
+  readonly ratio?: number
+  readonly range?: number
 }
 interface AttackSlowEffect {
   readonly kind: 'attackSlow'
   readonly mul: number
   readonly durationMs: number
+}
+interface BuffEffect {
+  readonly kind: 'buff'
+  readonly damageMul: number
+  readonly durationMs: number
+}
+/** 定身：失去行动 */
+interface StunEffect {
+  readonly kind: 'stun'
+  readonly durationMs: number
+}
+/** 隐匿：敌人看不见 */
+interface HideEffect {
+  readonly kind: 'hide'
+  readonly durationMs: number
+}
+/** 嘲讽：目标只看得见施法者 */
+interface TauntEffect {
+  readonly kind: 'taunt'
+  readonly durationMs: number
+}
+interface GuardEffect {
+  readonly kind: 'guard'
+  readonly mul: number
+  readonly durationMs: number
+}
+interface ReviveEffect {
+  readonly kind: 'revive'
+}
+interface HealRatioEffect {
+  readonly kind: 'healRatio'
+  readonly ratio: number
+}
+interface InvulnEffect {
+  readonly kind: 'invuln'
+  readonly ms: number
+}
+interface ReviveCutEffect {
+  readonly kind: 'reviveCut'
+  readonly ms: number
+}
+interface TimeStopEffect {
+  readonly kind: 'timeStop'
+  readonly durationMs: number
+}
+interface CoinsEffect {
+  readonly kind: 'coins'
+  readonly count: number
 }
 export type Effect =
   | BlastEffect
@@ -78,282 +128,109 @@ export type Effect =
   | SpawnProjectileEffect
   | HealEffect
   | AttackSlowEffect
-export interface ThrustDef {
-  readonly kind: 'thrust'
-  readonly damage: number
-  readonly cooldownMs: number
-  readonly knockback: number
-  readonly reach: number
-  readonly hitRadius: number
-  readonly thrustMs: number
-  readonly lungeDist: number
-  readonly held?: HeldVisual
-  readonly combo?: { readonly delayMs: number }
-  readonly onHit?: readonly Effect[]
+  | BuffEffect
+  | StunEffect
+  | HideEffect
+  | TauntEffect
+  | GuardEffect
+  | ReviveEffect
+  | HealRatioEffect
+  | InvulnEffect
+  | ReviveCutEffect
+  | TimeStopEffect
+  | CoinsEffect
+
+export interface ZoneVisual {
+  readonly color: number
+  readonly fillAlpha: number
+  readonly lineAlpha: number
+  readonly lineWidth: number
+  readonly enterMs: number
 }
-export interface ProjectileDef {
-  readonly kind: 'projectile'
-  readonly damage: number
-  readonly cooldownMs: number
-  readonly knockback: number
-  readonly aim?: 'nearest' | 'move'
+
+/** 形状：一次出手覆盖谁 */
+export type Shape =
+  | { readonly kind: 'bolt'; readonly projectile: ProjectileSpec; readonly lifeMs: number; readonly pierce?: number }
+  | { readonly kind: 'segment'; readonly reach: number; readonly radius: number; readonly ms: number; readonly lungeDist?: number; readonly beam?: boolean }
+  | { readonly kind: 'sector'; readonly radius: number; readonly arcDeg: number; readonly ms: number }
+  | { readonly kind: 'disc'; readonly radius: number; readonly at: 'self' | 'target'; readonly of?: 'foes' | 'hurt' }
+  | { readonly kind: 'chain'; readonly hops: number; readonly hopRange: number; readonly decay: number }
+  | {
+      readonly kind: 'flyer'
+      readonly range: number
+      readonly outMs: number
+      readonly returnSpeed: number
+      readonly radius: number
+      readonly spinDegPerSec: number
+      readonly coinMagnetRadius?: number
+    }
+  | {
+      readonly kind: 'drop'
+      readonly targets: number
+      readonly emoji: string
+      readonly size: number
+      readonly fromAbove: number
+      readonly dropMs: number
+      readonly staggerMs: number
+    }
+  | { readonly kind: 'blink'; readonly behindDist: number; readonly strikeMs: number; readonly execute?: { readonly hpRatio: number; readonly mul: number } }
+  | { readonly kind: 'sprint'; readonly distance: number; readonly ms: number; readonly radius: number }
+  | { readonly kind: 'leap'; readonly distance: number; readonly ms: number; readonly height: number; readonly radius: number }
+  | { readonly kind: 'all'; readonly of: 'foes' | 'allies'; readonly downed?: boolean }
+  | {
+      readonly kind: 'zone'
+      readonly radius: number
+      readonly durationMs: number
+      readonly tickMs?: number
+      readonly mend?: number
+      readonly follow?: boolean
+      readonly pulse?: { readonly intervalMs: number; readonly onHit: readonly Effect[] }
+      readonly visual: ZoneVisual
+    }
+  | { readonly kind: 'summon'; readonly count: number; readonly minion: { readonly emoji: string; readonly size: number; readonly speed: number }; readonly lifeMs: number }
+  | {
+      readonly kind: 'emplace'
+      readonly count: number
+      readonly spread?: number
+      readonly maxAlive: number
+      readonly lifeMs: number
+      readonly turret: { readonly emoji: string; readonly size: number }
+      readonly ability: AbilityDef
+    }
+  | { readonly kind: 'world' }
+export type ShapeKind = Shape['kind']
+
+/** 瞄准：出手的方向或落点从哪来 */
+export type Aim = 'nearest' | 'strongest' | 'move' | 'leader' | 'self' | 'stick'
+
+/** 重复出手：一次几发、隔多久、每发打几折、每第 N 次才触发、追加的几发怎么重新瞄准 */
+export interface Repeat {
+  readonly count: number
+  readonly spreadDeg?: number
+  readonly delayMs?: number
+  readonly ratio?: number
+  readonly everyN?: number
+  readonly reaim?: 'same' | 'nearest' | 'random'
+}
+
+interface AbilityBase {
+  readonly aim: Aim
   readonly range?: number
-  readonly lifeMs: number
-  readonly firstDelayMs?: number
-  readonly fireSfx?: SfxId
+  readonly shape: Shape
+  readonly damage?: number
+  readonly knockback?: number
+  readonly waveScale?: boolean
+  readonly bossRatio?: number
+  readonly onHit?: readonly Effect[]
+  readonly onSelf?: readonly Effect[]
+  readonly repeat?: Repeat
   readonly held?: HeldVisual
-  readonly projectile: ProjectileSpec
-  readonly volley?: { readonly count: number; readonly spreadDeg: number; readonly randomRotate?: boolean }
-  readonly everyN?: { readonly n: number; readonly count: number; readonly spreadDeg: number }
-  readonly pierce?: number
-  readonly onHit?: readonly Effect[]
-}
-export interface SweepDef {
-  readonly kind: 'sweep'
-  readonly damage: number
-  readonly cooldownMs: number
-  readonly knockback: number
-  readonly radius: number
-  readonly arcDeg: number
-  readonly sweepMs: number
-  readonly held: HeldVisual
-  readonly onHit?: readonly Effect[]
-}
-export interface AreaBlastDef {
-  readonly kind: 'areaBlast'
-  readonly damage: number
-  readonly cooldownMs: number
-  readonly knockback: number
-  readonly detectRange: number
-  readonly blastRadius: number
-  readonly color: number
-  readonly onHit?: readonly Effect[]
-  readonly echo?: { readonly delayMs: number; readonly ratio: number }
-}
-export interface BoomerangDef {
-  readonly kind: 'boomerang'
-  readonly damage: number
-  readonly cooldownMs: number
-  readonly knockback: number
-  readonly range: number
-  readonly outMs: number
-  readonly returnSpeed: number
-  readonly hitRadius: number
-  readonly spinDegPerSec: number
-  readonly held: HeldVisual
-  readonly twin?: boolean
-  readonly coinMagnetRadius?: number
-}
-export interface LaserDef {
-  readonly kind: 'laser'
-  readonly damage: number
-  readonly cooldownMs: number
-  readonly knockback: number
-  readonly range: number
-  readonly beamRadius: number
-  readonly color: number
-  readonly held: HeldVisual
-  readonly backBeam?: boolean
-  readonly radial?: { readonly beams: number; readonly ratio: number; readonly stepMs: number }
+  readonly fireSfx?: SfxId
+  readonly color?: number
+  readonly fxRadius?: number
   readonly piercesWalls?: boolean
 }
-export interface SlowAuraDef {
-  readonly kind: 'slowAura'
-  readonly radius: number
-  readonly slowFactor: number
-  readonly color: number
-  readonly dps?: number
-  readonly freeze?: { readonly intervalMs: number; readonly durationMs: number }
-}
-export interface AssassinateDef {
-  readonly kind: 'assassinate'
-  readonly damage: number
-  readonly cooldownMs: number
-  readonly knockback: number
-  readonly range: number
-  readonly behindDist: number
-  readonly strikeMs: number
-  readonly held?: HeldVisual
-  readonly onHit?: readonly Effect[]
-  readonly execute?: { readonly hpRatio: number; readonly mul: number }
-}
-export interface TurretDef {
-  readonly kind: 'turret'
-  readonly placeIntervalMs: number
-  readonly maxTurrets: number
-  readonly turret: { readonly emoji: string; readonly size: number }
-  readonly fireIntervalMs: number
-  readonly damage: number
-  readonly knockback: number
-  readonly range: number
-  readonly lifeMs: number
-  readonly projectile: ProjectileSpec
-  readonly burst?: { readonly count: number; readonly spreadDeg: number }
-}
-export interface SummonDef {
-  readonly kind: 'summon'
-  readonly count: number
-  readonly minion: { readonly emoji: string; readonly size: number; readonly speed: number }
-  readonly damage: number
-  readonly knockback: number
-  readonly intervalMs: number
-  readonly lifeMs: number
-  readonly onHit?: readonly Effect[]
-}
-export interface HealDef {
-  readonly kind: 'heal'
-  readonly amount: number
-  readonly cooldownMs: number
-  readonly range: number
-  readonly aoe?: { readonly ratio: number }
-  readonly defib?: { readonly reviveCutMs: number }
-}
-export interface ChainArcDef {
-  readonly kind: 'chainArc'
-  readonly damage: number
-  readonly cooldownMs: number
-  readonly knockback: number
-  readonly range: number
-  readonly arcRange: number
-  readonly bounces: number
-  readonly decay: number
-  readonly color: number
-  readonly onHit?: readonly Effect[]
-}
-export interface RallyDef {
-  readonly kind: 'rally'
-  readonly cooldownMs: number
-  readonly healRatio: number
-  readonly invulnMs: number
-  readonly ringRadius: number
-  readonly color: number
-}
-export interface StrikeDef {
-  readonly kind: 'strike'
-  readonly damage: number
-  readonly cooldownMs: number
-  readonly knockback: number
-  readonly targets: number
-  readonly coinsPerHit?: number
-  readonly drop: {
-    readonly emoji: string
-    readonly size: number
-    readonly fromAbove: number
-    readonly dropMs: number
-    readonly staggerMs: number
-  }
-}
-export interface DanceDef {
-  readonly kind: 'dance'
-  readonly cooldownMs: number
-  readonly durationMs: number
-}
-export interface BuffDef {
-  readonly kind: 'buff'
-  readonly cooldownMs: number
-  readonly damageMul: number
-  readonly durationMs: number
-}
-export interface NukeDef {
-  readonly kind: 'nuke'
-  readonly damage: number
-  readonly cooldownMs: number
-  readonly bossRatio: number
-}
-export interface TimeStopDef {
-  readonly kind: 'timeStop'
-  readonly cooldownMs: number
-  readonly durationMs: number
-}
-/** 朝施法方向冲刺，沿途敌人受伤并被撞开；只有队长能放的手动技能 */
-export interface RushDef {
-  readonly kind: 'rush'
-  readonly distance: number
-  readonly ms: number
-  readonly damage: number
-  readonly knockback: number
-  readonly hitRadius: number
-  readonly color: number
-}
-/** 朝施法方向跃起，落地范围伤害并击退 */
-export interface LeapDef {
-  readonly kind: 'leap'
-  readonly distance: number
-  readonly ms: number
-  readonly height: number
-  readonly damage: number
-  readonly knockback: number
-  readonly radius: number
-  readonly color: number
-}
-/** 范围内敌人一段时间只追施法者，施法者期间受伤按倍率折算 */
-export interface TauntDef {
-  readonly kind: 'taunt'
-  readonly radius: number
-  readonly durationMs: number
-  readonly damageTakenMul: number
-  readonly color: number
-}
-/** 全队一段时间不被敌人锁定 */
-export interface StealthDef {
-  readonly kind: 'stealth'
-  readonly durationMs: number
-}
-/** 以施法者为中心的领域：队友持续回血，敌人持续中毒 */
-export interface FieldDef {
-  readonly kind: 'field'
-  readonly radius: number
-  readonly durationMs: number
-  readonly healPerSec: number
-  readonly poison: { readonly damage: number; readonly tickMs: number }
-  readonly color: number
-}
-/** 一次在施法者周围架起多座弩塔 */
-export interface DeployDef {
-  readonly kind: 'deploy'
-  readonly count: number
-  readonly spread: number
-  readonly turret: { readonly emoji: string; readonly size: number }
-  readonly fireIntervalMs: number
-  readonly damage: number
-  readonly knockback: number
-  readonly range: number
-  readonly lifeMs: number
-  readonly projectile: ProjectileSpec
-  readonly burst?: { readonly count: number; readonly spreadDeg: number }
-}
-/** 以施法者为中心的一次爆发，命中效果施加给范围内所有敌人 */
-export interface NovaDef {
-  readonly kind: 'nova'
-  readonly radius: number
-  readonly damage: number
-  readonly knockback: number
-  readonly color: number
-  readonly onHit?: readonly Effect[]
-}
+/** 一个能力 = 触发 × 瞄准 × 形状 × 载荷 × 重复 */
 export type AbilityDef =
-  | ThrustDef
-  | ProjectileDef
-  | SweepDef
-  | AreaBlastDef
-  | BoomerangDef
-  | LaserDef
-  | SlowAuraDef
-  | AssassinateDef
-  | TurretDef
-  | SummonDef
-  | HealDef
-  | ChainArcDef
-  | RallyDef
-  | StrikeDef
-  | DanceDef
-  | BuffDef
-  | NukeDef
-  | TimeStopDef
-  | RushDef
-  | LeapDef
-  | TauntDef
-  | StealthDef
-  | FieldDef
-  | DeployDef
-  | NovaDef
+  | (AbilityBase & { readonly trigger: 'auto'; readonly cooldownMs: number; readonly firstDelayMs?: number })
+  | (AbilityBase & { readonly trigger: 'manual' })

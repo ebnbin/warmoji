@@ -267,12 +267,8 @@ export const FACTION = { team: 0, enemy: 1, world: 2 } as const
 
 export const Faction = { v: u8() }
 
-const cd = (): CdComp => ({ cdLeft: f32(), cdBase: f32() })
-
-export interface CdComp {
-  readonly cdLeft: Float32Array
-  readonly cdBase: Float32Array
-}
+/** 冷却：left 递减到 0 才能出手，base 是每次出手后重置的值 */
+export const Cd = { left: f32(), base: f32() }
 
 export const Amp = { dmg: f32(), cd: f32(), crit: f32(), kb: f32(), battle: u8() }
 
@@ -282,150 +278,63 @@ export const Disarmed = { v: u8() }
 
 export const WallBlocked = { v: u8() }
 
-export const Aim = { rad: f32() }
+export const AIM = { nearest: 0, strongest: 1, move: 2, leader: 3, self: 4, stick: 5 } as const
+
+/** 瞄准：kind 决定方向从哪来，range 是索敌距离，rad 是最近一次出手的方向 */
+export const Aim = { rad: f32(), kind: u8(), range: f32() }
+
+/** 载荷：伤害、击退、Boss 承伤比、是否按波次强度缩放、施法特效的颜色与半径 */
+export const Payload = { damage: f32(), knockback: f32(), bossRatio: f32(), waveScale: u8(), color: u32(), fxRadius: f32() }
+
+export const REAIM = { same: 0, nearest: 1, random: 2 } as const
+
+/** 重复出手；delayMs 为 0 时一次出手即打完，否则由 RepeatState 逐发推进 */
+export const Repeat = { count: f32(), spreadDeg: f32(), delayMs: f32(), ratio: f32(), everyN: f32(), reaim: u8() }
+
+export const RepeatState = { left: i32(), nextAt: f32(), angle: f32(), damage: f32() }
+
+export const Shots = { n: i32() }
 
 export const Swing = { startMs: f32(), durMs: f32() }
 
-export const Laser = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  range: f32(),
-  beamRadius: f32(),
-  color: u32(),
-}
-export const LaserBackBeam = {}
-export const LaserRadial = { beams: f32(), ratio: f32(), stepMs: f32() }
+export const Bolt = { frame: i32(), size: f32(), radius: f32(), speed: f32(), rotOffset: f32(), lifeMs: f32(), pierce: i32() }
 
-export const Heal = { ...cd(), amount: f32(), range: f32() }
-export const HealAoe = { ratio: f32() }
-export const HealDefib = { reviveCutMs: f32() }
+export const Segment = { reach: f32(), radius: f32(), ms: f32(), lunge: f32(), beam: u8() }
 
-export const SlowAura = { ...cd(), radius: f32(), slowFactor: f32(), color: u32() }
-export const AuraDps = { perSec: f32() }
-export const AuraFreeze = { intervalMs: f32(), durationMs: f32() }
+export const Sector = { radius: f32(), arcDeg: f32(), ms: f32() }
 
-export const Thrust = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  reach: f32(),
-  hitRadius: f32(),
-  thrustMs: f32(),
-  lungeDist: f32(),
-}
-export const ThrustCombo = { delayMs: f32() }
+export const DISC_AT = { self: 0, target: 1 } as const
+export const DISC_OF = { foes: 0, hurt: 1 } as const
+export const Disc = { radius: f32(), at: u8(), of: u8() }
 
-export const Sweep = { ...cd(), damage: f32(), knockback: f32(), radius: f32(), arcDeg: f32(), sweepMs: f32() }
+export const Chain = { hops: f32(), hopRange: f32(), decay: f32() }
 
-export const AreaBlast = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  detectRange: f32(),
-  blastRadius: f32(),
-  color: u32(),
-}
-export const BlastEcho = { delayMs: f32(), ratio: f32() }
+export const FlyerShape = { range: f32(), outMs: f32(), returnSpeed: f32(), radius: f32(), spinDegPerSec: f32(), coinMagnet: f32() }
 
-export const ChainArc = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  range: f32(),
-  arcRange: f32(),
-  bounces: f32(),
-  decay: f32(),
-  color: u32(),
-}
+export const DropShape = { targets: f32(), size: f32(), fromAbove: f32(), dropMs: f32(), staggerMs: f32() }
 
-export const Boomerang = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  range: f32(),
-  outMs: f32(),
-  returnSpeed: f32(),
-  hitRadius: f32(),
-  spinDegPerSec: f32(),
-}
-export const BoomerangTwin = {}
-export const CoinMagnet = { radius: f32() }
+export const BlinkShape = { behindDist: f32(), strikeMs: f32(), execHp: f32(), execMul: f32() }
 
-export const Assassinate = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  range: f32(),
-  behindDist: f32(),
-  strikeMs: f32(),
-}
-export const Execute = { hpRatio: f32(), mul: f32() }
+export const SprintShape = { distance: f32(), ms: f32(), radius: f32() }
 
-export const Strike = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  targets: f32(),
-  coinsPerHit: f32(),
-  size: f32(),
-  fromAbove: f32(),
-  dropMs: f32(),
-  staggerMs: f32(),
-}
+export const LeapShape = { distance: f32(), ms: f32(), height: f32(), radius: f32() }
 
-export const Rally = { ...cd(), healRatio: f32(), invulnMs: f32(), ringRadius: f32(), color: u32() }
+export const ALL_OF = { foes: 0, allies: 1 } as const
+export const AllShape = { of: u8(), downed: u8() }
 
-export const Dance = { ...cd(), durationMs: f32() }
+export const ZoneShape = { radius: f32(), durationMs: f32(), tickMs: f32(), mend: f32(), follow: u8(), pulseMs: f32(), enterMs: f32(), fillAlpha: f32(), lineAlpha: f32(), lineWidth: f32(), color: u32() }
 
-export const Buff = { ...cd(), damageMul: f32(), durationMs: f32() }
+export const SummonShape = { count: f32(), size: f32(), speed: f32(), lifeMs: f32() }
 
-export const Shoot = { ...cd(), damage: f32(), knockback: f32(), range: f32(), lifeMs: f32() }
-export const AimMove = {}
-export const Bolt = { frame: i32(), size: f32(), radius: f32(), speed: f32(), rotOffset: f32() }
-export const Volley = { count: f32(), spreadDeg: f32(), randomRotate: u8() }
-export const EveryN = { n: f32(), count: f32(), spreadDeg: f32() }
-export const Pierce = { n: f32() }
+export const EmplaceShape = { count: f32(), spread: f32(), maxAlive: f32(), lifeMs: f32(), size: f32() }
 
-export const Summon = {
-  ...cd(),
-  count: f32(),
-  damage: f32(),
-  knockback: f32(),
-  intervalMs: f32(),
-  lifeMs: f32(),
-  size: f32(),
-  speed: f32(),
-}
-
-export const Turret = {
-  ...cd(),
-  placeIntervalMs: f32(),
-  maxTurrets: f32(),
-  fireIntervalMs: f32(),
-  damage: f32(),
-  knockback: f32(),
-  range: f32(),
-  lifeMs: f32(),
-  size: f32(),
-}
-export const Burst = { count: f32(), spreadDeg: f32() }
-
-export const Nuke = { ...cd(), damage: f32(), bossRatio: f32() }
-
-export const TimeStop = { ...cd(), durationMs: f32() }
-
-export const Rush = { ...cd(), distance: f32(), ms: f32(), damage: f32(), knockback: f32(), hitRadius: f32(), color: u32() }
-export const Leap = { ...cd(), distance: f32(), ms: f32(), height: f32(), damage: f32(), knockback: f32(), radius: f32(), color: u32() }
-export const Taunt = { ...cd(), radius: f32(), durationMs: f32(), damageTakenMul: f32(), color: u32() }
-export const Stealth = { ...cd(), durationMs: f32() }
-export const Field = { ...cd(), radius: f32(), durationMs: f32(), healPerSec: f32(), poisonDamage: f32(), poisonTickMs: f32(), color: u32() }
-export const Deploy = { ...cd(), count: f32(), spread: f32(), lifeMs: f32() }
-export const Nova = { ...cd(), radius: f32(), damage: f32(), knockback: f32(), color: u32() }
+export const WorldShape = {}
 
 export const Aura = { zone: i32() }
 
-export const Followup = { left: f32(), damage: f32() }
+/** 瞬袭：身体已闪到 x/y 的画面偏移处，until 到点闪回 */
+export const BlinkState = { until: f32() }
+
 
 export const Manual = {}
 
@@ -460,13 +369,7 @@ export const Taunted = { until: f32(), by: i32() }
 /** 隐匿中的角色不被敌人锁定；tinted 记着半透明是否已套上 */
 export const Hidden = { until: f32(), tinted: u8() }
 
-export const Blink = { x: f32(), y: f32() }
-
 export const Drop = { startMs: f32(), durMs: f32(), fromY: f32(), toY: f32(), target: i32(), targetUid: u32() }
-
-export const Shots = { n: i32() }
-
-export const Radial = { left: i32(), nextAt: f32(), angle: f32() }
 
 export const Thrown = { n: i32() }
 
@@ -481,7 +384,8 @@ export const Flyer = {
   damage: f32(),
 }
 
-export const Minion = { bornMs: f32(), dieAt: f32(), cd: f32(), phase: f32(), size: f32() }
+/** ability：装置自己那条能力的实体，0 = 没有 */
+export const Minion = { bornMs: f32(), dieAt: f32(), phase: f32(), size: f32(), ability: i32() }
 
 export const Built = { by: i32() }
 

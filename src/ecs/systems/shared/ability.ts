@@ -1,6 +1,5 @@
 import { addComponent, query } from 'bitecs'
-import { Ability, CastRequest, Manual, Owner } from '../../components'
-import { ABILITY_COMPS } from '../../entities/ability'
+import { Ability, CastRequest, Cd, Manual, Owner } from '../../components'
 import type { Sim } from '../../sim'
 
 export function requestCast(sim: Sim, ownerEid: number): void {
@@ -10,10 +9,7 @@ export function requestCast(sim: Sim, ownerEid: number): void {
 }
 
 export function postponeAbilities(sim: Sim, ownerEid: number, ms: number): void {
-  for (const comp of ABILITY_COMPS) {
-    for (const e of query(sim.world, [Ability, comp, Owner])) {
-      if (Owner.eid[e] === ownerEid) comp.cdLeft[e] = Math.max(comp.cdLeft[e]!, ms)
-    }
+  for (const e of query(sim.world, [Ability, Cd, Owner])) {
+    if (Owner.eid[e] === ownerEid) Cd.left[e] = Math.max(Cd.left[e]!, ms)
   }
 }
-

@@ -1,7 +1,7 @@
 import { CHARACTERS } from './data/characters'
 import type { CharacterDef } from './types/characters'
 import type { OutlineKind } from './emoji/svg'
-import type { AbilityDef } from './types/abilityDefs'
+import type { AbilityDef, Effect } from './types/abilityDefs'
 import { BOSSES, ENEMY_DEFS, SPAWN } from './data/enemies'
 import { PICKUPS } from './data/pickups'
 import { FIELD_PICKUPS } from './data/battlefield'
@@ -17,17 +17,31 @@ const teamAbilities: readonly AbilityDef[] = [
   ...roster.map((c) => c.skill.ability),
 ]
 
+/** 能力画在场上的身体：持械、装置、召唤物、坠物 */
 function abilityBodyEmojis(w: AbilityDef): string[] {
+  const s = w.shape
   return [
-    ...('held' in w && w.held ? [w.held.emoji] : []),
-    ...(w.kind === 'turret' || w.kind === 'deploy' ? [w.turret.emoji] : []),
-    ...(w.kind === 'summon' ? [w.minion.emoji] : []),
-    ...(w.kind === 'strike' ? [w.drop.emoji] : []),
+    ...(w.held ? [w.held.emoji] : []),
+    ...(s.kind === 'emplace' ? [s.turret.emoji, ...abilityBodyEmojis(s.ability)] : []),
+    ...(s.kind === 'summon' ? [s.minion.emoji] : []),
+    ...(s.kind === 'drop' ? [s.emoji] : []),
   ]
 }
 
+/** 能力射出的弹体 */
 function abilityShotEmojis(w: AbilityDef): string[] {
-  return w.kind === 'projectile' || w.kind === 'turret' || w.kind === 'deploy' ? [w.projectile.emoji] : []
+  const s = w.shape
+  return s.kind === 'bolt' ? [s.projectile.emoji] : s.kind === 'emplace' ? abilityShotEmojis(s.ability) : []
+}
+
+function effectEmojis(effects: readonly Effect[] | undefined): { morph: string[]; shot: string[] } {
+  const morph: string[] = []
+  const shot: string[] = []
+  for (const e of effects ?? []) {
+    if (e.kind === 'morph') morph.push(e.morphEmoji)
+    if (e.kind === 'spawnProjectile') shot.push(e.projectile.emoji)
+  }
+  return { morph, shot }
 }
 
 export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
@@ -62,15 +76,11 @@ function armedShotEmojis(): string[] {
 }
 
 function deathShotEmojis(): string[] {
-  return [...ENEMY_DEFS, ...BOSSES].flatMap((e) =>
-    (e.onDeath ?? []).flatMap((fx) => (fx.kind === 'spawnProjectile' ? [fx.projectile.emoji] : [])),
-  )
+  return [...ENEMY_DEFS, ...BOSSES].flatMap((e) => effectEmojis(e.onDeath?.filter((fx) => fx.kind !== 'split' && fx.kind !== 'decoy') as readonly Effect[] | undefined).shot)
 }
 
 function morphEmojis(): string[] {
-  return teamAbilities.flatMap((w) =>
-    'onHit' in w && w.onHit ? w.onHit.flatMap((e) => (e.kind === 'morph' ? [e.morphEmoji] : [])) : [],
-  )
+  return teamAbilities.flatMap((w) => [...effectEmojis(w.onHit).morph, ...effectEmojis(w.onSelf).morph])
 }
 
 export const PRELOAD_EMOJIS: readonly string[] = [

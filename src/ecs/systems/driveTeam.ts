@@ -1,4 +1,4 @@
-import { Drive, Leap, Leaping, Phys, Rushing, Transform, VisOff } from '../components'
+import { Drive, LeapShape, Leaping, Phys, Rushing, Transform, VisOff } from '../components'
 import { leaderGrip } from './shared/squad'
 import { slowMul } from './shared/status'
 import type { Sim } from '../sim'
@@ -20,7 +20,7 @@ export function driveTeam(sim: Sim): void {
     const tx = Leaping.toX[mover]!
     const ty = Leaping.toY[mover]!
     const to = sim.hooks.wrap(sim, fx + (tx - fx) * t, fy + (ty - fy) * t)
-    VisOff.y[mover] = -Math.sin(Math.PI * t) * Leap.height[Leaping.skill[mover]!]!
+    VisOff.y[mover] = -Math.sin(Math.PI * t) * LeapShape.height[Leaping.skill[mover]!]!
     Phys.vx[mover] = ((tx - fx) / ms) * 1000
     Phys.vy[mover] = ((ty - fy) / ms) * 1000
     Transform.x[mover] = to.x

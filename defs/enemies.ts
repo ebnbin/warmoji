@@ -29,7 +29,7 @@ const GHOST = {
   damage: 5,
   xp: 2,
   coins: 2,
-  onDeath: [{ kind: 'heal', range: 3, amount: 12, all: true }],
+  onDeath: [{ kind: 'heal', amount: 12, scope: 'all', range: 3 }],
 } satisfies EnemyDef
 
 const INVADER = {
@@ -47,13 +47,11 @@ const INVADER = {
   coins: 3,
   abilities: [
     {
-      kind: 'projectile',
-      damage: 6,
+      trigger: 'auto',
       cooldownMs: 2800,
-      knockback: 0,
       aim: 'move',
-      lifeMs: 4500,
-      projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3, rotationOffsetDeg: 0 },
+      damage: 6,
+      shape: { kind: 'bolt', projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3, rotationOffsetDeg: 0 }, lifeMs: 4500 },
     },
   ],
   onDeath: [
@@ -107,13 +105,12 @@ const SNAKE = {
   locomotion: { kind: 'standoff', detectRange: 8, standoffDist: 5 },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 5,
+      trigger: 'auto',
       cooldownMs: 2600,
-      knockback: 0,
+      aim: 'nearest',
       range: 8,
-      lifeMs: 4500,
-      projectile: { emoji: '1f7e2', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
+      damage: 5,
+      shape: { kind: 'bolt', projectile: { emoji: '1f7e2', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 }, lifeMs: 4500 },
     },
   ],
 } satisfies EnemyDef
@@ -282,7 +279,16 @@ const ELF = {
   damage: 5,
   xp: 5,
   coins: 4,
-  abilities: [{ kind: 'heal', amount: 13, cooldownMs: 2600, range: 3.5, aoe: { ratio: 1 } }],
+  abilities: [
+    {
+      trigger: 'auto',
+      cooldownMs: 2600,
+      aim: 'self',
+      fireSfx: 'upgrade',
+      shape: { kind: 'disc', radius: 3.5, at: 'self', of: 'hurt' },
+      onHit: [{ kind: 'heal', amount: 13, scope: 'all' }],
+    },
+  ],
 } satisfies EnemyDef
 
 const TURTLE = {
@@ -301,15 +307,13 @@ const TURTLE = {
   kbImmune: true,
   abilities: [
     {
-      kind: 'projectile',
-      damage: 7,
+      trigger: 'auto',
       cooldownMs: 3000,
-      knockback: 0,
-      aim: 'nearest',
       firstDelayMs: 1500,
-      lifeMs: 5000,
-      volley: { count: 3, spreadDeg: 36 },
-      projectile: { emoji: '1faa8', size: 0.4, radius: 0.15, speed: 2.6, rotationOffsetDeg: 0 },
+      aim: 'nearest',
+      damage: 7,
+      shape: { kind: 'bolt', projectile: { emoji: '1faa8', size: 0.4, radius: 0.15, speed: 2.6, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      repeat: { count: 3, spreadDeg: 36 },
     },
   ],
 } satisfies EnemyDef
@@ -405,13 +409,12 @@ const UFO = {
   locomotion: { kind: 'standoff', detectRange: 9, standoffDist: 6 },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 6,
+      trigger: 'auto',
       cooldownMs: 2400,
-      knockback: 0,
+      aim: 'nearest',
       range: 9,
-      lifeMs: 4500,
-      projectile: { emoji: '1f4ab', size: 0.45, radius: 0.15, speed: 3.4, rotationOffsetDeg: 0 },
+      damage: 6,
+      shape: { kind: 'bolt', projectile: { emoji: '1f4ab', size: 0.45, radius: 0.15, speed: 3.4, rotationOffsetDeg: 0 }, lifeMs: 4500 },
     },
   ],
 } satisfies EnemyDef
@@ -475,14 +478,13 @@ const FOREST_BOSS = {
   spawner: { into: MUSHROOM, intervalMs: 5200, count: 2, maxAlive: 6, firstDelayMs: 3000 },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 8,
+      trigger: 'auto',
       cooldownMs: 3200,
-      knockback: 0,
       firstDelayMs: 2000,
-      lifeMs: 6000,
-      volley: { count: 7, spreadDeg: 160 },
-      projectile: { emoji: '1f7e2', size: 0.42, radius: 0.15, speed: 2.4, rotationOffsetDeg: 0 },
+      aim: 'nearest',
+      damage: 8,
+      shape: { kind: 'bolt', projectile: { emoji: '1f7e2', size: 0.42, radius: 0.15, speed: 2.4, rotationOffsetDeg: 0 }, lifeMs: 6000 },
+      repeat: { count: 7, spreadDeg: 160 },
     },
   ],
 } satisfies EnemyDef
@@ -514,15 +516,13 @@ const DESERT_BOSS = {
   },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 8,
+      trigger: 'auto',
       cooldownMs: 3000,
-      knockback: 0,
       firstDelayMs: 1800,
-      lifeMs: 5000,
       aim: 'nearest',
-      volley: { count: 5, spreadDeg: 70 },
-      projectile: { emoji: '1f7e3', size: 0.42, radius: 0.15, speed: 3.2, rotationOffsetDeg: 0 },
+      damage: 8,
+      shape: { kind: 'bolt', projectile: { emoji: '1f7e3', size: 0.42, radius: 0.15, speed: 3.2, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      repeat: { count: 5, spreadDeg: 70 },
     },
   ],
 } satisfies EnemyDef
@@ -544,23 +544,20 @@ const RIVER_BOSS = {
   locomotion: { kind: 'chase' },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 9,
+      trigger: 'auto',
       cooldownMs: 3200,
-      knockback: 0,
       firstDelayMs: 1800,
-      lifeMs: 5000,
       aim: 'nearest',
-      volley: { count: 6, spreadDeg: 90 },
-      projectile: { emoji: '1f4a7', size: 0.5, radius: 0.18, speed: 2.6, rotationOffsetDeg: 0 },
+      damage: 9,
+      shape: { kind: 'bolt', projectile: { emoji: '1f4a7', size: 0.5, radius: 0.18, speed: 2.6, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      repeat: { count: 6, spreadDeg: 90 },
     },
     {
-      kind: 'strike',
-      damage: 22,
+      trigger: 'auto',
       cooldownMs: 5000,
-      knockback: 0,
-      targets: 4,
-      drop: { emoji: '1f4a7', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+      aim: 'nearest',
+      damage: 22,
+      shape: { kind: 'drop', targets: 4, emoji: '1f4a7', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
   ],
 } satisfies EnemyDef
@@ -582,24 +579,21 @@ const FACTORY_BOSS = {
   locomotion: { kind: 'chase' },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 8,
+      trigger: 'auto',
       cooldownMs: 2400,
-      knockback: 0,
       firstDelayMs: 1600,
-      lifeMs: 6000,
       aim: 'nearest',
+      damage: 8,
       fireSfx: 'boom',
-      everyN: { n: 3, count: 12, spreadDeg: 360 },
-      projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
+      shape: { kind: 'bolt', projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 }, lifeMs: 6000 },
+      repeat: { everyN: 3, count: 12, spreadDeg: 360 },
     },
     {
-      kind: 'strike',
-      damage: 24,
+      trigger: 'auto',
       cooldownMs: 4800,
-      knockback: 0,
-      targets: 5,
-      drop: { emoji: '1f528', size: 1.1, fromAbove: 4, dropMs: 220, staggerMs: 80 },
+      aim: 'nearest',
+      damage: 24,
+      shape: { kind: 'drop', targets: 5, emoji: '1f528', size: 1.1, fromAbove: 4, dropMs: 220, staggerMs: 80 },
     },
   ],
 } satisfies EnemyDef
@@ -633,12 +627,11 @@ const RUINS_BOSS = {
   },
   abilities: [
     {
-      kind: 'strike',
-      damage: 24,
+      trigger: 'auto',
       cooldownMs: 4500,
-      knockback: 0,
-      targets: 5,
-      drop: { emoji: '1faa8', size: 1.1, fromAbove: 4, dropMs: 240, staggerMs: 90 },
+      aim: 'nearest',
+      damage: 24,
+      shape: { kind: 'drop', targets: 5, emoji: '1faa8', size: 1.1, fromAbove: 4, dropMs: 240, staggerMs: 90 },
     },
   ],
 } satisfies EnemyDef
@@ -660,23 +653,20 @@ const DAYNIGHT_BOSS = {
   locomotion: { kind: 'chase' },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 8,
+      trigger: 'auto',
       cooldownMs: 3000,
-      knockback: 0,
       firstDelayMs: 1600,
-      lifeMs: 5000,
       aim: 'nearest',
-      volley: { count: 14, spreadDeg: 360 },
-      projectile: { emoji: '1f31f', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 },
+      damage: 8,
+      shape: { kind: 'bolt', projectile: { emoji: '1f31f', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      repeat: { count: 14, spreadDeg: 360 },
     },
     {
-      kind: 'strike',
-      damage: 22,
+      trigger: 'auto',
       cooldownMs: 4600,
-      knockback: 0,
-      targets: 4,
-      drop: { emoji: '1f319', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+      aim: 'nearest',
+      damage: 22,
+      shape: { kind: 'drop', targets: 4, emoji: '1f319', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
   ],
 } satisfies EnemyDef
@@ -698,23 +688,20 @@ const SPACE_BOSS = {
   locomotion: { kind: 'chase' },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 8,
+      trigger: 'auto',
       cooldownMs: 2800,
-      knockback: 0,
       firstDelayMs: 1600,
-      lifeMs: 5000,
       aim: 'nearest',
-      volley: { count: 16, spreadDeg: 360 },
-      projectile: { emoji: '1f4ab', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 },
+      damage: 8,
+      shape: { kind: 'bolt', projectile: { emoji: '1f4ab', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      repeat: { count: 16, spreadDeg: 360 },
     },
     {
-      kind: 'strike',
-      damage: 22,
+      trigger: 'auto',
       cooldownMs: 4600,
-      knockback: 0,
-      targets: 4,
-      drop: { emoji: '1f311', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+      aim: 'nearest',
+      damage: 22,
+      shape: { kind: 'drop', targets: 4, emoji: '1f311', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
   ],
 } satisfies EnemyDef

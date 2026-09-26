@@ -14,7 +14,7 @@ export function healAllies(
   exclude = -1,
 ): number {
   const hurt: number[] = []
-  eachAlly(sim, faction, x, y, range, (eid, tx, ty) => {
+  eachAlly(sim, faction, x, y, range, false, (eid, tx, ty) => {
     if (eid === exclude || Hp.v[eid]! >= Hp.max[eid]!) return
     const dx = tx - x
     const dy = ty - y

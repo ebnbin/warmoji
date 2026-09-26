@@ -1,7 +1,7 @@
 import { Amp, Anchor, FACTION, Faction, Owner, WallBlocked } from '../components'
 import { Transform } from '../components'
 import { enemyDef } from '../store'
-import { attributionSlot } from './amp'
+import { attributionSlot, damageMul } from './amp'
 import type { Sim } from '../sim'
 import type { EnemyKind } from '../../types/enemies'
 import type { Hazard } from '../../types/maps'
@@ -28,7 +28,7 @@ export function sourceOf(sim: Sim, e: number): Source {
     slot: attributionSlot(e),
     kb: Amp.kb[e]!,
     crit: Amp.crit[e]! + (Amp.battle[e] ? sim.battleFx.critAdd : 0),
-    dmgMul: 1,
+    dmgMul: damageMul(sim, e),
     enemy: enemySide ? enemyDef[Owner.eid[e]!]?.kind : undefined,
     viewer: Owner.eid[e]!,
     sight:

@@ -6,7 +6,7 @@ import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
 import { ITEMS, RARITIES } from '../data/items'
 import type { ItemDef } from '../types/items'
-import { characterStatGroups, ABILITY_KIND_LABEL } from './statLines'
+import { characterStatGroups, effectLine, SHAPE_LABEL } from './statLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
 
 function grid(units: number): string {
@@ -42,13 +42,15 @@ function enemyStatLines(e: EnemyDef): string[] {
     `行为 ${LOCOMOTION_LABEL[e.locomotion.kind]} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}`,
   ]
   for (const w of e.abilities ?? []) {
-    if (w.kind === 'projectile') {
-      const volley = w.volley ? ` · ${w.volley.spreadDeg >= 360 ? '环形' : '扇形'} ${w.volley.count} 发` : ''
-      lines.push(`放枪：子弹 ${w.damage} 伤 · 弹速 ${grid(w.projectile.speed)}/秒${volley}`)
-    } else if (w.kind === 'strike') {
-      lines.push(`空袭：坠物砸向最近 ${w.targets} 名队员 · 每记 ${w.damage} 伤`)
-    } else if (w.kind === 'heal') {
-      lines.push(`群体治疗同伴 ${w.amount} · 间隔 ${w.cooldownMs / 1000} 秒 · 范围 ${grid(w.range)}`)
+    const s = w.shape
+    const cd = w.trigger === 'auto' ? ` · 间隔 ${w.cooldownMs / 1000} 秒` : ''
+    if (s.kind === 'bolt') {
+      const rep = w.repeat ? ` · ${(w.repeat.spreadDeg ?? 0) >= 360 ? '环形' : '扇形'} ${w.repeat.count} 发` : ''
+      lines.push(`放枪：子弹 ${w.damage ?? 0} 伤 · 弹速 ${grid(s.projectile.speed)}/秒${rep}${cd}`)
+    } else if (s.kind === 'drop') {
+      lines.push(`空袭：坠物砸向最近 ${s.targets} 名队员 · 每记 ${w.damage ?? 0} 伤${cd}`)
+    } else {
+      lines.push(`${SHAPE_LABEL[s.kind]}：${(w.onHit ?? []).map(effectLine).join('，')}${s.kind === 'disc' ? ` · 范围 ${grid(s.radius)}` : ''}${cd}`)
     }
   }
   const lm = e.locomotion
@@ -61,7 +63,7 @@ function enemyStatLines(e: EnemyDef): string[] {
   for (const fx of e.onDeath ?? []) {
     if (fx.kind === 'ground') lines.push(`死亡留毒 ${grid(fx.def.radius)} · 每 ${fx.def.tickMs / 1000} 秒 ${fx.def.damage} 伤`)
     if (fx.kind === 'split') lines.push(`死亡分裂 ${fx.count} 只${fx.into.name}`)
-    if (fx.kind === 'heal') lines.push(`亡语治疗周围同伴 ${fx.amount}（范围 ${grid(fx.range)}）`)
+    if (fx.kind === 'heal') lines.push(`亡语治疗周围同伴 ${fx.amount}（范围 ${grid(fx.range ?? 0)}）`)
     if (fx.kind === 'decoy') lines.push(`死亡留半透明尸壳诱火 ${fx.durationMs / 1000} 秒`)
   }
   for (const fx of e.onContact ?? []) {
@@ -136,7 +138,7 @@ export function wikiGroups(): WikiGroup[] {
           desc: i.desc,
           lines: [
             `道具 · ${RARITIES[i.rarity].label} · 价格 ${i.price} 金币 · ${i.maxStacks === undefined ? '无限堆叠' : `上限 ${i.maxStacks} 件`}`,
-            `池归属 ${i.pool === 'all' ? '通用' : ABILITY_KIND_LABEL[i.pool]} · 角色经验 +${i.upgradeXp}${i.minLevel && i.minLevel > 1 ? ` · ${i.minLevel} 级解锁` : ''}`,
+            `池归属 ${i.pool === 'all' ? '通用' : SHAPE_LABEL[i.pool]} · 角色经验 +${i.upgradeXp}${i.minLevel && i.minLevel > 1 ? ` · ${i.minLevel} 级解锁` : ''}`,
           ],
         })),
 
@@ -165,14 +167,14 @@ export function usedEmojiSet(): Set<string> {
       for (const card of carrier.cards) if (card) used.add(card.icon)
     }
     for (const w of baseLoadout(c)) {
-      if ('held' in w && w.held) used.add(w.held.emoji)
-      if (w.kind === 'projectile') used.add(w.projectile.emoji)
+      if (w.held) used.add(w.held.emoji)
+      if (w.shape.kind === 'bolt') used.add(w.shape.projectile.emoji)
     }
   }
   for (const e of [...ENEMY_DEFS, ...BOSSES]) {
     for (const w of e.abilities ?? []) {
-      if (w.kind === 'projectile') used.add(w.projectile.emoji)
-      if (w.kind === 'strike') used.add(w.drop.emoji)
+      if (w.shape.kind === 'bolt') used.add(w.shape.projectile.emoji)
+      if (w.shape.kind === 'drop') used.add(w.shape.emoji)
     }
   }
   used.add(PICKUPS.coin.emoji)

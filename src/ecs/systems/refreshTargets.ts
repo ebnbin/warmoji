@@ -1,14 +1,16 @@
-import { query } from 'bitecs'
-import { Alive, Dormant, Faction, Hidden, Hp, Radius, Transform, Uid } from '../components'
+import { hasComponent, query } from 'bitecs'
+import { Alive, Dormant, Faction, Hidden, Hp, Radius, Revive, Transform, Uid } from '../components'
 import type { Target } from '../utils/targets'
 import type { Sim } from '../sim'
 
-/** 每个阵营一份可被打的身体的快照：有生命、活着、不在休眠 */
+/** 每个阵营一份有生命的身体的快照：不在休眠；倒地等待复活的也在，带 alive 标记 */
 export function refreshTargets(sim: Sim): void {
   const now = sim.elapsedMs
   const lists: Target[][] = [[], []]
   for (const eid of query(sim.world, [Hp, Faction, Transform, Radius, Alive])) {
-    if (Alive.v[eid] === 0 || Dormant.v[eid]) continue
+    if (Dormant.v[eid]) continue
+    const alive = Alive.v[eid] === 1
+    if (!alive && !hasComponent(sim.world, eid, Revive)) continue
     const list = lists[Faction.v[eid]!]
     if (!list) continue
     list.push({
@@ -18,6 +20,7 @@ export function refreshTargets(sim: Sim): void {
       y: Transform.y[eid]!,
       radius: Radius.v[eid]!,
       hidden: now < Hidden.until[eid]!,
+      alive,
     })
   }
   sim.targets = lists

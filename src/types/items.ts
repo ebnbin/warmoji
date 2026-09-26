@@ -1,5 +1,5 @@
 import type itemsJson from '../assets/items.json'
-import type { AbilityDef } from './abilityDefs'
+import type { ShapeKind } from './abilityDefs'
 
 export interface CharacterEffects {
   hpAdd: number
@@ -25,7 +25,7 @@ export interface Economy {
   readonly shop: { readonly refreshPrice: number }
 }
 export type ItemRarity = 'common' | 'rare' | 'epic'
-type ItemPool = 'all' | AbilityDef['kind']
+type ItemPool = 'all' | ShapeKind
 export interface ItemDef {
   readonly emoji: string
   readonly name: string
