@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
-import { query } from 'bitecs'
+import { entityExists, query } from 'bitecs'
 import { cubicEaseIn, cubicEaseOut } from '../utils/ease'
-import { Depth, Fx, FxBeam, FxBolt, FxCircle, FxSlash, Transform } from '../components'
+import { Barrier, Depth, Fx, FxBeam, FxBolt, FxCircle, FxSlash, Link, Tether, Transform, Uid } from '../components'
 import { boltPts } from '../store'
 import type { EcsWorld } from '../world'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment } from './tri'
@@ -94,6 +94,24 @@ export class CueLayer {
       }
     }
 
+    if (zMin === -Infinity) {
+      for (const k of query(this.world, [Barrier])) {
+        const color = Barrier.color[k]!
+        const w = Barrier.thick[k]! * 2
+        if (Barrier.shape[k] === 1) {
+          ringStrip(o, m, Barrier.cx[k]!, Barrier.cy[k]!, Barrier.r[k]!, w, packTint(color, 0.7))
+          continue
+        }
+        segment(o, m, Barrier.ax[k]!, Barrier.ay[k]!, Barrier.bx[k]!, Barrier.by[k]!, w, packTint(color, 0.8))
+        segment(o, m, Barrier.ax[k]!, Barrier.ay[k]!, Barrier.bx[k]!, Barrier.by[k]!, w * 0.35, packTint(0xffffff, 0.7))
+      }
+      for (const k of query(this.world, [Link, Transform])) {
+        const to = Link.to[k]!
+        if (!entityExists(this.world, to) || Uid.v[to] !== Link.toUid[k]) continue
+        segment(o, m, Transform.x[k]!, Transform.y[k]!, Transform.x[to]!, Transform.y[to]!, 3, packTint(Link.color[k]!, 0.55))
+      }
+    }
+
     const outer = zMin < 8
     const core = zMin >= 8 && zMax <= 9
     if (outer || core) {
@@ -128,6 +146,13 @@ export class CueLayer {
         for (let p = 1; p < FxBolt.n[k]!; p++) {
           segment(o, m, pts[(p - 1) * 2]!, pts[(p - 1) * 2 + 1]!, pts[p * 2]!, pts[p * 2 + 1]!, 3, color)
         }
+      }
+      const pulse = 0.55 + 0.35 * Math.sin(fx / 90)
+      for (const k of query(this.world, [Tether])) {
+        const a = Tether.a[k]!
+        const b = Tether.b[k]!
+        if (!entityExists(this.world, a) || !entityExists(this.world, b)) continue
+        segment(o, m, Transform.x[a]!, Transform.y[a]!, Transform.x[b]!, Transform.y[b]!, 4, packTint(Tether.color[k]!, pulse))
       }
       for (const k of query(this.world, [Fx, FxSlash, Transform])) {
         const a = Transform.rot[k]!

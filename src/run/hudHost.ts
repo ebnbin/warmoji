@@ -51,7 +51,7 @@ export interface SquadSnapshot {
   members: SquadMember[]
 }
 
-/** 当前队长的主动技能；aim 为真时按住按钮可拖出方向，rangeU 是瞄准线长度 */
+/** 当前队长的主动技能；aim 为真时按住按钮可拖出方向，rangeU 是瞄准线长度；charges 为 -1 表示不攒次数；recastMs 是下一段还能接多久；holdMs 非零时按住蓄力 */
 export interface LeaderSkill {
   icon: string
   name: string
@@ -60,6 +60,9 @@ export interface LeaderSkill {
   cdMs: number
   aim: boolean
   rangeU: number
+  charges: number
+  recastMs: number
+  holdMs: number
 }
 
 export interface LeaderChanged {
@@ -107,7 +110,7 @@ export interface HudHost {
   squadSnapshot(): SquadSnapshot | null
   switchLeader(slot: number): boolean
   leaderSkill(): LeaderSkill | null
-  castLeaderSkill(dir: { x: number; y: number } | null): boolean
+  castLeaderSkill(dir: { x: number; y: number } | null, holdRatio?: number): boolean
   setSkillAim(dir: { x: number; y: number } | null): void
 }
 

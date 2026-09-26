@@ -23,17 +23,24 @@ import { bossFor, MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, CharScale, Dormant, Enemy, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
+import { Alive, Boss, Cd, Charges, Ctl, Dormant, Enemy, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
+import { charSize } from './systems/shared/scale'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
 import { viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
-import { modDef } from './store'
+import { abilityRequires, bodyLook, modDef } from './store'
+import { aimAt } from './systems/shared/fire'
+import { sourceOf } from './utils/source'
 import { resetEntityStorage } from './storage'
 import { armTeam } from './entities/loadout'
 import { requestCast } from './systems/shared/ability'
+import { resDef } from './store'
+import type { ResourceDef } from '../types/enemies'
+import { openStage, ready } from './systems/shared/avail'
+import { skillRemainMs } from './systems/tickSkillCooldowns'
 import { stepFrame } from './systems/pipeline/frame'
 import { replayDeath } from './systems/shared/death'
 import { spawnBoss, spawnSurge } from './entities/enemy'
@@ -50,6 +57,7 @@ import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, SquadSnapshot } from '../run/hudHost'
 import type { HudSnapshot } from '../run/hudHost'
+import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
 import { drain } from './outbox'
 import type { Burst } from './outbox'
@@ -81,6 +89,22 @@ function liveCoins(world: EcsWorld): number {
     if (hasComponent(world, eid, GrantCoins)) n++
   }
   return n
+}
+
+const RES_COLOR: Record<ResourceDef['kind'], number> = { energy: 0xffee58, fury: 0xef5350, heat: 0xff9800, growth: 0x9ccc65 }
+
+/** 瞄准线的长度：位移走多远，或效果把东西放出去多远 */
+function aimReach(a: AbilityDef): number {
+  const s = a.shape
+  if (s.kind === 'sprint' || s.kind === 'leap') return s.distance
+  if (s.kind === 'segment') return s.reach
+  let r = 0
+  for (const fx of a.onHit ?? []) {
+    if (fx.kind === 'portal' || fx.kind === 'warp') r = Math.max(r, fx.distance)
+    if (fx.kind === 'shadow') r = Math.max(r, fx.dash)
+    if (fx.kind === 'barrier' && fx.shape === 'wall') r = Math.max(r, fx.offset ?? 0)
+  }
+  return r
 }
 
 export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProviderHost {
@@ -188,6 +212,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   devResetSkill(): void {
     this.run.skillCd.fill(0)
+    for (const e of this.sim?.skills ?? []) {
+      Cd.left[e] = 0
+      if (hasComponent(this.world, e, Charges)) Charges.n[e] = Charges.max[e]!
+    }
   }
 
   devEnemyCounts(): { name: string; n: number }[] {
@@ -210,7 +238,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     g.lineStyle(2, 0xffdc5d, 0.7)
     for (const m of sim.characters) {
       if (!Alive.v[m]) continue
-      const t = nearestTarget(sim, bodySource(m), Transform.x[m]!, Transform.y[m]!, Infinity)
+      const t = nearestTarget(sim, bodySource(sim, m), Transform.x[m]!, Transform.y[m]!, Infinity)
       if (!t) continue
       g.lineBetween(Transform.x[m]!, Transform.y[m]!, t.x, t.y)
       g.strokeCircle(t.x, t.y, Math.max(6, t.radius))
@@ -401,16 +429,24 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       dead?.setVisible(false)
       this.shownCountdown[i] = -1
       g.setVisible(true).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
-      const ratio = Math.max(0, Hp.v[m]! / Hp.max[m]!)
-      if (Math.abs(ratio - this.shownHp[i]!) < 0.005) continue
-      this.shownHp[i] = ratio
+      const ratio = Math.max(0, Math.min(1, Hp.v[m]! / Hp.max[m]!))
+      const res = hasComponent(this.world, m, Res) ? Res.v[m]! / Math.max(1, Res.max[m]!) : -1
+      const locked = res >= 0 && sim.elapsedMs < Res.lock[m]!
+      const key = Math.round(ratio * 200) * 1000 + (res < 0 ? 999 : Math.round(res * 100)) * 2 + (locked ? Math.floor(sim.fxMs / 150) % 2 : 0)
+      if (key === this.shownHp[i]) continue
+      this.shownHp[i] = key
       const w = 0.8 * UNIT
-      const y = MEMBER.size * UNIT * CharScale.v[m]! * 0.62
+      const y = charSize(m) * 0.62
       g.clear()
       g.fillStyle(0x000000, 0.45)
       g.fillRect(-w / 2, y, w, 6)
       g.fillStyle(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffdc5d : 0xef5350, 1)
       g.fillRect(-w / 2 + 1, y + 1, (w - 2) * ratio, 4)
+      if (res < 0) continue
+      g.fillStyle(0x000000, 0.45)
+      g.fillRect(-w / 2, y + 7, w, 5)
+      g.fillStyle(locked ? (Math.floor(sim.fxMs / 150) % 2 ? 0xffffff : 0xff5722) : RES_COLOR[resDef[m]!.kind], 1)
+      g.fillRect(-w / 2 + 1, y + 8, (w - 2) * res, 3)
     }
   }
 
@@ -469,7 +505,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       members: sim.characters.map((m, slot) => {
         const def = CHARACTERS[this.run.roster[slot]!]
         return {
-          emoji: def.emoji,
+          emoji: bodyLook[m] ?? def.emoji,
           name: def.name,
           skillIcon: def.skill.icon,
           cdRemainMs: this.run.skillCd[slot] ?? 0,
@@ -498,31 +534,39 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const slot = sim.characters.indexOf(sim.leader)
     const def = CHARACTERS[this.run.roster[slot]!]
     const a = def.skill.ability
+    const root = sim.skills[slot]
+    const open = root === undefined ? 0 : openStage(sim, root)
     return {
       icon: def.skill.icon,
       name: def.skill.name,
-      emoji: def.emoji,
-      remainMs: this.run.skillCd[slot] ?? 0,
+      emoji: bodyLook[sim.leader] ?? def.emoji,
+      remainMs: root === undefined ? 0 : skillRemainMs(sim, root),
       cdMs: def.skill.cdMs,
       aim: def.skill.aim,
-      rangeU: a.shape.kind === 'sprint' || a.shape.kind === 'leap' ? a.shape.distance : 0,
+      rangeU: aimReach(a),
+      charges: root !== undefined && hasComponent(this.world, root, Charges) ? Charges.n[root]! : -1,
+      recastMs: open !== 0 ? Math.max(0, Stage.open[open]! - sim.elapsedMs) : 0,
+      holdMs: a.hold?.maxMs ?? 0,
     }
   }
 
-  /** 不给方向就用摇杆方向，摇杆没推就用队长朝向 */
-  castLeaderSkill(dir: Point | null): boolean {
+  /** 不给方向就用摇杆方向，摇杆没推就用队长朝向；连段开着时接下一段；按住蓄力的带上蓄了几成 */
+  castLeaderSkill(dir: Point | null, holdRatio = 0): boolean {
     const sim = this.sim
     if (!sim || sim.over || this.ending) return false
     const leader = sim.leader
-    if (!Alive.v[leader]) return false
+    if (!Alive.v[leader] || !Ctl.cast[leader]) return false
     const slot = sim.characters.indexOf(leader)
-    if ((this.run.skillCd[slot] ?? 0) > 0) return false
+    const root = sim.skills[slot]
+    if (root === undefined) return false
+    const e = openStage(sim, root) || root
+    if (!ready(sim, e)) return false
+    if (abilityRequires[e] && !aimAt(sim, e, sourceOf(sim, e))) return false
     const def = CHARACTERS[this.run.roster[slot]!]
-    this.run.skillCd[slot] = def.skill.cdMs
     const stick = sim.teamDir
     const d = dir ?? (stick.x !== 0 || stick.y !== 0 ? norm(stick.x, stick.y) : { x: Facing.x[leader]!, y: Facing.y[leader]! })
     sim.aim = { x: d.x, y: d.y }
-    requestCast(sim, leader)
+    requestCast(sim, e, holdRatio)
     playSfx('levelup')
     this.hud.emit(HudEvent.SkillCast, def.skill.name)
     return true
@@ -665,7 +709,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.shownLeader = sim.leader
       const def = CHARACTERS[this.run.roster[sim.characters.indexOf(sim.leader)]!]
       playSfx('whoosh')
-      this.hud.emit(HudEvent.LeaderChanged, { emoji: def.emoji, name: def.name })
+      this.hud.emit(HudEvent.LeaderChanged, { emoji: bodyLook[sim.leader] ?? def.emoji, name: def.name })
     }
     this.cues?.step(sim.fxMs)
     this.rings?.step(sim.fxMs)

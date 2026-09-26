@@ -1,3 +1,4 @@
+import { hasComponent } from 'bitecs'
 import { waveAt } from '../../data/waves'
 import { sandboxFireRate } from '../sandbox/knobs'
 import { Anchor, Slot, Transform, VisOff } from '../components'
@@ -32,6 +33,8 @@ export function waveScale(sim: Sim): number {
   return waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
 }
 
-export function attributionSlot(e: number): number {
-  return Faction.v[e] === FACTION.enemy ? -1 : Slot.v[Owner.eid[e]!]!
+/** 伤害记在哪个角色名下：宿主是角色才记，敌人与召唤出的身体不记 */
+export function attributionSlot(sim: Sim, e: number): number {
+  const o = Owner.eid[e]!
+  return Faction.v[e] === FACTION.team && hasComponent(sim.world, o, Slot) ? Slot.v[o]! : -1
 }

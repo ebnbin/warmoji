@@ -1,7 +1,9 @@
 import { playSfx } from '../../../audio/sfx'
 import { gainXp, waveBonusXp } from '../../../run/xp'
 import { isFinalWave } from '../../../data/waves'
-import { Alive, Hp } from '../../components'
+import { hasComponent } from 'bitecs'
+import { Alive, Hp, Res } from '../../components'
+import { resDef } from '../../store'
 import type { Sim } from '../../sim'
 
 export function settleWave(sim: Sim): boolean {
@@ -15,5 +17,6 @@ export function settleWave(sim: Sim): boolean {
   run.combatMs += sim.elapsedMs
   run.wave += 1
   run.memberHp = sim.characters.map((m) => (Alive.v[m] ? Math.max(1, Math.round(Hp.v[m]!)) : 0))
+  run.memberRes = sim.characters.map((m) => (resDef[m]?.keep && hasComponent(sim.world, m, Res) ? Res.v[m]! : -1))
   return finished
 }

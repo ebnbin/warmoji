@@ -1,6 +1,6 @@
 import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
-import { Alive, Casting, Clock, Depth, Drive, Faction, Hp, Mark, Phys, Radius, Sprinting, SpeedMul, Sprite, Tint, Transform, VisOff } from '../components'
+import { Alive, Casting, Clock, Ctl, Depth, Drive, Faction, Grow, History, Hp, Idle, Lethal, Mark, Motion, MotionHit, Phys, Radius, SpeedMul, Sprite, Tint, Transform, VisOff } from '../components'
 import type { EcsWorld } from '../world'
 
 interface BodySpec {
@@ -20,7 +20,7 @@ interface BodySpec {
 /** 一个身体：有位置、阵营、体积、血量、力学和标记，能施法、能被画；角色和敌人都从这里出生，再各自加上身份 */
 export function spawnBody(world: EcsWorld, spec: BodySpec): number {
   const eid = newEntity(world)
-  addComponents(world, eid, Alive, Hp, Mark, Phys, Drive, Clock, Faction, Radius, Sprinting, SpeedMul, Casting, Transform, Sprite, Tint, Depth, VisOff)
+  addComponents(world, eid, Alive, Hp, Mark, Phys, Drive, Clock, Faction, Radius, Motion, MotionHit, Ctl, SpeedMul, Casting, Transform, Sprite, Tint, Depth, VisOff, Lethal, Grow, History, Idle)
   Alive.v[eid] = 1
   Hp.v[eid] = spec.hp
   Hp.max[eid] = spec.hp
@@ -31,7 +31,16 @@ export function spawnBody(world: EcsWorld, spec: BodySpec): number {
   Clock.v[eid] = spec.ownClock ? 1 : 0
   Faction.v[eid] = spec.faction
   Radius.v[eid] = spec.radius
+  Grow.perm[eid] = 1
+  Grow.form[eid] = 1
+  Grow.v[eid] = 1
+  Grow.r0[eid] = spec.radius
   SpeedMul.v[eid] = 1
+  MotionHit.stamp[eid] = -1
+  Ctl.move[eid] = 1
+  Ctl.act[eid] = 1
+  Ctl.cast[eid] = 1
+  Ctl.dash[eid] = 1
   Transform.x[eid] = spec.x
   Transform.y[eid] = spec.y
   Tint.color[eid] = 0xffffff

@@ -1,8 +1,15 @@
-import { addComponent, addComponents, query, removeEntity } from 'bitecs'
+import { addComponent, addComponents, hasComponent, query, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
 import {
   Ability,
+  AbilityClass,
   AIM,
+  Ammo,
+  Charges,
+  Hold,
+  Spend,
+  Stage,
+  Turn,
   Aim,
   ALL_OF,
   AllShape,
@@ -30,6 +37,10 @@ import {
   LOCK_AT,
   Manual,
   Minion,
+  Built,
+  Mirror,
+  Pet,
+  PET,
   Owner,
   Payload,
   REAIM,
@@ -43,6 +54,7 @@ import {
   Swing,
   TELEGRAPH,
   Thrown,
+  Transform,
   WallBlocked,
   Windup,
   WindupState,
@@ -50,11 +62,12 @@ import {
   ZoneFollow,
   ZoneShape,
 } from '../components'
-import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse, emplaceAbility } from '../store'
+import { abilityArtEmoji, abilityBoost, abilityDef, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, emplaceAbility, zoneRules } from '../store'
 import type { AbilityDef, Shape } from '../../types/abilityDefs'
 import { ACQUIRE, abilityPiercesWalls } from '../../data/abilities'
 import { UNIT } from '../../util/units'
-import { spawnWeaponBody } from './weapon'
+import { holderOutline, spawnWeaponBody } from './weapon'
+import { attachDrawable } from './drawable'
 import type { Sim } from '../sim'
 import type { ByKind } from '../../util/record'
 
@@ -76,6 +89,8 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
       Bolt.rotOffset[e] = s.projectile.rotationOffsetDeg
       Bolt.lifeMs[e] = s.lifeMs
       Bolt.pierce[e] = s.pierce ?? 0
+      Bolt.homingDeg[e] = s.projectile.homingDeg ?? 0
+      Bolt.linger[e] = s.projectile.linger ?? 0
     },
   },
   segment: {
@@ -149,6 +164,7 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
       SprintShape.distance[e] = s.distance
       SprintShape.ms[e] = s.ms
       SprintShape.radius[e] = s.radius ?? 0
+      SprintShape.seek[e] = s.seek ? 1 : 0
     },
   },
   leap: {
@@ -182,6 +198,7 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
       ZoneShape.lineWidth[e] = s.visual.lineWidth
       ZoneShape.color[e] = s.visual.color
       abilityPulse[e] = s.pulse?.onHit
+      zoneRules[e] = s
     },
   },
   summon: {
@@ -238,6 +255,8 @@ interface AbilityInit {
   anchor: number
   faction: number
   cooldownMs: number
+  /** 冷却基数：自动能力取定义里的，主动技能由角色给 */
+  baseMs?: number
   amp: AmpInit
   manual: boolean
 }
@@ -246,13 +265,40 @@ interface AbilityInit {
 function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit): void {
   const world = sim.world
   const spec = SHAPES[def.shape.kind]
-  addComponents(world, e, Ability, Owner, Anchor, Faction, Amp, Frozen, Disarmed, WallBlocked, Cd, Aim, Payload, ...spec.comps)
+  addComponents(world, e, Ability, AbilityClass, Owner, Anchor, Faction, Amp, Frozen, Disarmed, WallBlocked, Cd, Aim, Payload, Spend, ...spec.comps)
   if (init.manual) addComponent(world, e, Manual)
+  AbilityClass.skill[e] = (def.class ?? (def.trigger === 'manual' ? 'skill' : 'attack')) === 'skill' ? 1 : 0
   Owner.eid[e] = init.owner
   Anchor.eid[e] = init.anchor
   Faction.v[e] = init.faction
   Cd.left[e] = init.cooldownMs
-  Cd.base[e] = def.trigger === 'auto' ? def.cooldownMs : 0
+  Cd.base[e] = init.baseMs ?? (def.trigger === 'auto' ? def.cooldownMs : 0)
+  Spend.cost[e] = def.cost ?? 0
+  Spend.gain[e] = def.gain ?? 0
+  Spend.hp[e] = def.hpCost ?? 0
+  abilityBoost[e] = def.boost
+  abilityRequires[e] = def.requires
+  abilityOnKill[e] = def.onKill
+  if (def.charges) {
+    addComponent(world, e, Charges)
+    Charges.max[e] = def.charges
+    Charges.n[e] = init.cooldownMs > 0 ? def.charges - 1 : def.charges
+  }
+  if (def.ammo) {
+    addComponent(world, e, Ammo)
+    Ammo.max[e] = def.ammo.count
+    Ammo.n[e] = def.ammo.count
+    Ammo.reloadMs[e] = def.ammo.reloadMs
+    Ammo.readyAt[e] = 0
+    ammoLast[e] = def.ammo.last
+  }
+  if (def.hold) {
+    addComponent(world, e, Hold)
+    Hold.maxMs[e] = def.hold.maxMs
+    Hold.reachMul[e] = def.hold.reachMul
+    Hold.damageMul[e] = def.hold.damageMul
+    Hold.ratio[e] = 0
+  }
   Amp.dmg[e] = init.amp.dmg
   Amp.cd[e] = init.amp.cd
   Amp.crit[e] = init.amp.crit
@@ -289,8 +335,28 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
   }
   abilityOnHit[e] = def.onHit
   abilityOnSelf[e] = def.onSelf
+  abilityOnCast[e] = def.onCast
   abilityFireSfx[e] = def.fireSfx
+  abilityDef[e] = def
+  if (def.mirror) addComponent(world, e, Mirror)
+  if (def.anchor) {
+    const pet = spawnPet(sim, e, init.anchor, def.anchor, init.faction)
+    Anchor.eid[e] = pet
+  }
   attachShape(sim, e, def.shape, init.faction)
+}
+
+/** 施法锚点物件：画在宿主身边，能力从它身上出手，由 tickPets 摆放 */
+function spawnPet(sim: Sim, e: number, host: number, a: NonNullable<AbilityDef['anchor']>, faction: number): number {
+  const p = newEntity(sim.world)
+  attachDrawable(sim.world, p, sim.frames, { id: a.emoji, outline: holderOutline(faction, host), x: Transform.x[host]!, y: Transform.y[host]!, size: a.size, z: 13 })
+  addComponent(sim.world, p, Pet)
+  Pet.of[p] = e
+  Pet.host[p] = host
+  Pet.mode[p] = PET[a.mode]
+  Pet.dist[p] = a.distance
+  Pet.phase[p] = 0
+  return p
 }
 
 export function equipAbility(
@@ -300,34 +366,52 @@ export function equipAbility(
   faction: number,
   cooldownMs: number,
   amp: AmpInit,
-  opts: { manual?: boolean; owner?: number } = {},
+  opts: { manual?: boolean; owner?: number; baseMs?: number } = {},
 ): number {
   const e = def.held ? spawnWeaponBody(sim, host, def.held, faction) : newEntity(sim.world)
-  attachAbility(sim, e, def, { owner: opts.owner ?? host, anchor: host, faction, cooldownMs, amp, manual: opts.manual === true })
+  const manual = opts.manual === true
+  attachAbility(sim, e, def, { owner: opts.owner ?? host, anchor: host, faction, cooldownMs, baseMs: opts.baseMs, amp, manual })
+  if (def.recast) chainStage(sim, e, def.recast.windowMs, equipAbility(sim, host, def.recast.ability, faction, 0, amp, { manual, owner: opts.owner }))
+  if (def.cycle) {
+    const members = [e, ...def.cycle.map((d) => equipAbility(sim, host, d, faction, cooldownMs, amp, { manual, owner: opts.owner }))]
+    members.forEach((m, i) => {
+      addComponent(sim.world, m, Turn)
+      Turn.active[m] = i === 0 ? 1 : 0
+      Turn.next[m] = members[(i + 1) % members.length]!
+    })
+  }
   return e
 }
 
-/** 主动技能：所有者与锚点都是宿主，由附身者按键触发 */
-export function equipSkill(sim: Sim, host: number, def: AbilityDef, amp: AmpInit): number {
-  return equipAbility(sim, host, def, FACTION.team, 0, amp, { manual: true })
+/** 把 next 接成 e 的下一段：整条连段的第一段都记在 root 上 */
+function chainStage(sim: Sim, e: number, windowMs: number, next: number): void {
+  const w = sim.world
+  if (!hasComponent(w, e, Stage)) addComponent(w, e, Stage)
+  Stage.next[e] = next
+  Stage.window[e] = windowMs
+  const root = Stage.root[e] !== 0 ? Stage.root[e]! : e
+  for (let s = next; s !== 0; s = hasComponent(w, s, Stage) ? Stage.next[s]! : 0) {
+    if (!hasComponent(w, s, Stage)) addComponent(w, s, Stage)
+    Stage.root[s] = root
+    Stage.open[s] = 0
+  }
 }
 
-/** 撤掉一个身体的全部能力，连同它们造出来的场、召唤物、飞返体、坠物 */
-export function unequipAbilities(sim: Sim, ownerEid: number): void {
+/** 主动技能：所有者与锚点都是宿主，由附身者按键触发；冷却基数与剩余冷却由角色给 */
+export function equipSkill(sim: Sim, host: number, def: AbilityDef, amp: AmpInit, cdMs: number, leftMs: number): number {
+  return equipAbility(sim, host, def, FACTION.team, leftMs, amp, { manual: true, baseMs: cdMs })
+}
+
+/** 撤掉一个身体的能力（默认全部），连同它们造出来的场、召唤物、装置、飞返体、坠物与施法锚点 */
+export function unequipAbilities(sim: Sim, ownerEid: number, which: (e: number) => boolean = () => true): void {
   const world = sim.world
-  const owned: number[] = []
-  for (const e of query(world, [Ability, Owner])) if (Owner.eid[e] === ownerEid) owned.push(e)
-  for (const d of [...query(world, [Drop, Owner])]) if (owned.includes(Owner.eid[d]!)) removeEntity(world, d)
-  for (const z of [...query(world, [ZoneFollow, Owner])]) if (owned.includes(Owner.eid[z]!)) removeEntity(world, z)
-  for (const m of [...query(world, [Minion, Owner])]) if (Owner.eid[m] === ownerEid) removeEntity(world, m)
-  for (const f of [...query(world, [Flyer])]) if (owned.includes(Flyer.of[f]!)) removeEntity(world, f)
-  for (const e of owned) {
-    abilityOnHit[e] = undefined
-    abilityOnSelf[e] = undefined
-    abilityPulse[e] = undefined
-    abilityArtEmoji[e] = undefined
-    abilityFireSfx[e] = undefined
-    emplaceAbility[e] = undefined
-    removeEntity(world, e)
-  }
+  const owned = new Set<number>()
+  for (const e of query(world, [Ability, Owner])) if (Owner.eid[e] === ownerEid && which(e)) owned.add(e)
+  if (owned.size === 0) return
+  for (const d of [...query(world, [Drop, Owner])]) if (owned.has(Owner.eid[d]!)) removeEntity(world, d)
+  for (const z of [...query(world, [ZoneFollow, Owner])]) if (owned.has(Owner.eid[z]!)) removeEntity(world, z)
+  for (const m of [...query(world, [Minion, Built])]) if (owned.has(Built.by[m]!)) removeEntity(world, m)
+  for (const f of [...query(world, [Flyer])]) if (owned.has(Flyer.of[f]!)) removeEntity(world, f)
+  for (const p of [...query(world, [Pet])]) if (owned.has(Pet.of[p]!)) removeEntity(world, p)
+  for (const e of owned) removeEntity(world, e)
 }

@@ -4,7 +4,8 @@ import { AI, ELITE, SPAWN, SURGE } from '../../data/enemies'
 import { ENEMY_BODY, MORPH } from '../../data/abilities'
 import { POP } from '../../data/feel'
 import { startPop } from '../utils/pop'
-import type { DriveDef, EnemyDef } from '../../types/enemies'
+import type { DriveDef, EnemyDef, NpcDef } from '../../types/enemies'
+import type { OutlineKind } from '../../emoji/svg'
 import { waveAt } from '../../data/waves'
 import {
   Anchored,
@@ -25,23 +26,27 @@ import {
   EnemyPhase,
   ETurn,
   FACTION,
+  Faction,
   Flash,
   Flee,
+  Grow,
+  GrowUp,
+  Idle,
+  Mount,
   MARK,
   Nest,
   Orbit,
   Phasing,
   Pop,
   Wander,
-  SprintHit,
   Sprite,
   Standoff,
-  Steering,
   TAG,
   Tint,
   Transform,
 } from '../components'
-import { bodyRules, enemyDef } from '../store'
+import { bodyRules, enemyDef, enemyOf, bodyLook } from '../store'
+import { attachResource } from './resource'
 import { interrupt } from '../systems/shared/ability'
 import { addMark, hasMark } from '../utils/marks'
 import { spawnTelegraph, telegraphCount } from './telegraph'
@@ -89,8 +94,15 @@ const DRIVES: { [K in keyof DriveOf]: DriveAttach<K> } = {
   },
 }
 
-function attachDrive<K extends keyof DriveOf>(sim: Sim, eid: number, d: DriveOf[K] & { readonly kind: K }): void {
+export function attachDrive<K extends keyof DriveOf>(sim: Sim, eid: number, d: DriveOf[K] & { readonly kind: K }): void {
   DRIVES[d.kind](sim, eid, d)
+}
+
+const DRIVE_COMPS = [Chase, Wander, Flee, CoinThief, Standoff, Orbit]
+
+/** 换走法：先拆掉旧的 */
+export function detachDrive(sim: Sim, eid: number): void {
+  for (const c of DRIVE_COMPS) if (hasComponent(sim.world, eid, c)) removeComponent(sim.world, eid, c)
 }
 
 export function spawnEnemy(
@@ -104,11 +116,34 @@ export function spawnEnemy(
   boss: boolean,
   alpha = 1,
 ): number {
+  const eid = spawnNpc(sim, atlas, def, x, y, hp, { elite, boss, alpha })
+  enemyOf[eid] = def
+  return eid
+}
+
+interface NpcOpts {
+  readonly elite?: boolean
+  readonly boss?: boolean
+  readonly alpha?: number
+  readonly faction?: number
+}
+
+/** 非玩家身体的描边：己方的按角色描，敌方的按精英与否 */
+export function npcOutline(eid: number): OutlineKind {
+  return Faction.v[eid] === FACTION.team ? 'player' : Elite.v[eid] || Boss.v[eid] ? 'elite' : 'enemy'
+}
+
+/** 一个非玩家身体：敌人、分身、亡仆同一条出生路径，阵营由出生时给 */
+export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y: number, hp: number, o: NpcOpts = {}): number {
   const world = sim.world
-  const outline = elite || boss ? 'elite' : 'enemy'
+  const elite = o.elite === true
+  const boss = o.boss === true
+  const alpha = o.alpha ?? 1
+  const faction = o.faction ?? FACTION.enemy
+  const outline: OutlineKind = faction === FACTION.team ? 'player' : elite || boss ? 'elite' : 'enemy'
   const size = def.size * (elite ? ELITE.sizeMul : 1)
   const eid = spawnBody(world, {
-    faction: FACTION.enemy,
+    faction,
     x,
     y,
     radius: def.radius,
@@ -119,7 +154,7 @@ export function spawnEnemy(
     grip: ENEMY_BODY.grip,
     ownClock: false,
   })
-  addComponents(world, eid, Enemy, Elite, Boss, Dormant, Flash, Nest, Despawn, EDir, ETurn, Steering, Anim)
+  addComponents(world, eid, Enemy, Elite, Boss, Dormant, Flash, Nest, Despawn, EDir, ETurn, Anim)
   if (def.kbImmune) addComponent(world, eid, Anchored)
   if (def.phasesWalls) addComponent(world, eid, Phasing)
   const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
@@ -133,12 +168,24 @@ export function spawnEnemy(
     Contact.damage[eid] = def.damage
   }
   bodyRules[eid] = def
+  attachResource(world, eid, def.resource)
   if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
   if (elite) {
     addMark(eid, MARK.dmg, TAG.elite, Infinity, ELITE.damageMul)
     addMark(eid, MARK.speed, TAG.elite, Infinity, ELITE.speedMul)
+  }
+  if (def.grow) {
+    addComponent(world, eid, GrowUp)
+    GrowUp.at[eid] = sim.elapsedMs + def.grow.ms
+  }
+  Idle.since[eid] = sim.elapsedMs
+  if (def.mount) {
+    addComponent(world, eid, Mount)
+    Mount.max[eid] = Math.round(def.mount.hp * (hp / Math.max(1, def.hp)))
+    Mount.hp[eid] = Mount.max[eid]!
+    Mount.form[eid] = def.mount.form
   }
   Nest.of[eid] = -1
   Nest.nextSpawnAt[eid] = def.spawner ? sim.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
@@ -148,12 +195,12 @@ export function spawnEnemy(
   ETurn.at[eid] = sim.elapsedMs + AI.wander.spawnTurnMinMs + sim.rng.next() * AI.wander.spawnTurnJitterMs
   EnemyArm.fireDelayMs[eid] = AI.firstShot.minMs + sim.rng.next() * AI.firstShot.jitterMs
   EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2
-  SprintHit.stamp[eid] = -1
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (EnemyPhase.v[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
   Tint.alpha[eid] = boss ? 0.2 : 0.3
   startPop(sim, eid, boss ? POP.bossMs : POP.enemyMs)
   Pop.size[eid] = size
+  Grow.s0[eid] = size
   Pop.back[eid] = boss ? 1 : 0
   Pop.alpha[eid] = alpha
   Depth.z[eid] = boss ? 7 : 5
@@ -201,9 +248,10 @@ function currentMix(sim: Sim): ReturnType<typeof enemyMixAt> {
   return enemyMixAt(rows, sim.run.wave)
 }
 
+/** 醒着的敌方身体数，刷怪上限只看它 */
 export function awakeCount(sim: Sim): number {
   let n = 0
-  for (const eid of query(sim.world, ENEMY_SET)) if (!Dormant.v[eid]) n++
+  for (const eid of query(sim.world, ENEMY_SET)) if (!Dormant.v[eid] && Faction.v[eid] === FACTION.enemy) n++
   return n
 }
 
@@ -252,7 +300,7 @@ export function applyMorph(
   addMark(eid, MARK.morphImmune, TAG.morph, until + MORPH.recastMs)
   addMark(eid, MARK.morph, TAG.morph, until, anchored ? 1 : 0)
   addMark(eid, MARK.guard, TAG.morph, until, spec.vulnMul ?? 1)
-  const outline = Elite.v[eid] ? 'elite' : 'enemy'
+  const outline = npcOutline(eid)
   Sprite.frame[eid] = atlas.index(spec.morphEmoji, outline)
   armIdle(eid, spec.morphEmoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
   interrupt(sim, eid)
@@ -266,7 +314,8 @@ export function restoreMorph(sim: Sim, atlas: FrameIndex, eid: number, anchored:
   const def = enemyDef[eid]
   if (!def) return
   if (anchored) addComponent(sim.world, eid, Anchored)
-  const outline = Elite.v[eid] ? 'elite' : 'enemy'
-  Sprite.frame[eid] = atlas.index(def.emoji, outline)
-  armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
+  const outline = npcOutline(eid)
+  const emoji = bodyLook[eid] ?? def.emoji
+  Sprite.frame[eid] = atlas.index(emoji, outline)
+  armIdle(eid, emoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
 }

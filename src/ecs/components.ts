@@ -85,7 +85,7 @@ export const Alive = { v: u8() }
 export const CharScale = { v: f32() }
 export const Revive = { ms: f32(), at: f32() }
 
-export const MARK_SLOTS = 8
+export const MARK_SLOTS = 12
 
 const strided = <T extends Column>(ctor: new (length: number) => T): T => {
   const col = new ctor(INITIAL_CAPACITY * MARK_SLOTS)
@@ -93,11 +93,53 @@ const strided = <T extends Column>(ctor: new (length: number) => T): T => {
   return col
 }
 
-/** 标记的种类决定它折叠成哪个有效值：slow 取最小、speed/guard/dmg/cd 相乘、poison 按节拍扣血、其余是有无 */
-export const MARK = { none: 0, slow: 1, speed: 2, guard: 3, dmg: 4, cd: 5, poison: 6, stun: 7, hide: 8, taunt: 9, invuln: 10, morph: 11, morphImmune: 12, regen: 13 } as const
+/** 标记的种类决定它折叠成哪个有效值：slow 取最小、speed/guard/dmg/cd 相乘、poison 按节拍扣血、regen/undead 按秒增减血、其余是有无；a/b/c/ref 按种类解释，见 utils/marks */
+export const MARK = {
+  none: 0,
+  slow: 1,
+  speed: 2,
+  guard: 3,
+  dmg: 4,
+  cd: 5,
+  poison: 6,
+  stun: 7,
+  hide: 8,
+  taunt: 9,
+  invuln: 10,
+  morph: 11,
+  morphImmune: 12,
+  regen: 13,
+  root: 14,
+  silence: 15,
+  disarm: 16,
+  ground: 17,
+  sleep: 18,
+  fear: 19,
+  charm: 20,
+  berserk: 21,
+  stasis: 22,
+  untargetable: 23,
+  unstoppable: 24,
+  spellShield: 25,
+  frontGuard: 26,
+  reveal: 27,
+  undying: 28,
+  realm: 29,
+  parry: 30,
+  stealth: 31,
+  stack: 32,
+  fuse: 33,
+  store: 34,
+  empower: 35,
+  deathMark: 36,
+  mist: 37,
+  devoured: 38,
+  undead: 39,
+  grow: 40,
+} as const
 
 /** 标记的来源：同种同源的标记刷新而不叠加 */
-export const TAG = { effect: 0, morph: 1, elite: 2, perk: 3 } as const
+export const TAG = { effect: 0, morph: 1, elite: 2, perk: 3, form: 4 } as const
 
 /** 身体上的标记列表：每个身体 MARK_SLOTS 个槽位；until 为 Infinity 时永久；a/b/c 按种类解释（倍率、跳伤、节拍、下次跳的时刻、嘲讽者、是否曾锚定）；ref 是所引用身体的 Uid */
 export const Mark = {
@@ -179,6 +221,7 @@ export const Proj = {
   pierce: i32(),
   spin: f32(),
   dieAt: f32(),
+  rotOffset: f32(),
 }
 
 export const PrevPos = { x: f32(), y: f32() }
@@ -243,8 +286,48 @@ export const PICKUP_SET: QueryTerm[] = [Pickup, Transform, Phys]
 
 export const RING_SET: QueryTerm[] = [Ring, Transform, Tint]
 
-/** 场：每隔 tickMs 对场内敌方扣 damage 再施加效果，场内己方每秒回复 mend，pulse 非零时每次 tick 闪一圈 */
-export const Zone = { radius: f32(), enterMs: f32(), on: u8(), fadeAt: f32(), tickMs: f32(), nextAt: f32(), damage: f32(), mend: f32(), pulse: u32() }
+/** 场：每隔 tickMs 对场内敌方扣 damage 再施加效果，场内己方每秒回复 mend，pulse 非零时每次 tick 闪一圈；who、pull、traction、mist、trap 见 ZoneRules */
+export const Zone = { radius: f32(), enterMs: f32(), on: u8(), fadeAt: f32(), tickMs: f32(), nextAt: f32(), damage: f32(), mend: f32(), pulse: u32(), who: u8(), pull: f32(), traction: f32(), mist: u8(), trap: u8() }
+
+export const ZONE_WHO = { foes: 0, allies: 1, all: 2 } as const
+
+/** 传送门：另一扇门与它的编号、同一个身体再传的间隔 */
+export const Portal = { other: i32(), otherUid: u32(), cdMs: f32() }
+
+/** 身体下次能被传送门传的时刻 */
+export const PortCd = { until: f32() }
+
+/** 墙：shape 0 是一段（a 到 b），1 是一圈（圆心 c、半径 r）；bodies 0 不挡、1 挡敌方、2 都挡；shots 挡敌方弹体；reflect 反弹；跟着 of 走；到 until 消失 */
+export const Barrier = {
+  shape: u8(),
+  ax: f32(),
+  ay: f32(),
+  bx: f32(),
+  by: f32(),
+  cx: f32(),
+  cy: f32(),
+  r: f32(),
+  thick: f32(),
+  until: f32(),
+  bodies: u8(),
+  shots: u8(),
+  reflect: u8(),
+  of: i32(),
+  ofUid: u32(),
+  color: u32(),
+}
+
+/** 牵绳：两端与编号、到期时刻、断开距离、颜色 */
+export const Tether = { a: i32(), aUid: u32(), b: i32(), bUid: u32(), until: f32(), range: f32(), color: u32() }
+
+/** 画一条连到另一个身体的线：依存无敌的护卫连着被护的身体 */
+export const Link = { to: i32(), toUid: u32(), color: u32() }
+
+/** 追踪弹：每秒最多转多少弧度 */
+export const Homing = { turn: f32() }
+
+/** 落地的弹体：躺到 until；召回中 back 为 1，飞向 to */
+export const Linger = { ms: f32(), until: f32(), back: u8(), to: i32(), toUid: u32(), speed: f32() }
 
 export const ZoneFollow = { of: i32() }
 
@@ -303,7 +386,7 @@ export const Shots = { n: i32() }
 
 export const Swing = { startMs: f32(), durMs: f32() }
 
-export const Bolt = { frame: i32(), size: f32(), radius: f32(), speed: f32(), rotOffset: f32(), lifeMs: f32(), pierce: i32() }
+export const Bolt = { frame: i32(), size: f32(), radius: f32(), speed: f32(), rotOffset: f32(), lifeMs: f32(), pierce: i32(), homingDeg: f32(), linger: f32() }
 
 export const Segment = { reach: f32(), radius: f32(), ms: f32(), lunge: f32(), beam: u8() }
 
@@ -321,7 +404,7 @@ export const DropShape = { targets: f32(), size: f32(), fromAbove: f32(), dropMs
 
 export const BlinkShape = { behindDist: f32(), strikeMs: f32(), execHp: f32(), execMul: f32() }
 
-export const SprintShape = { distance: f32(), ms: f32(), radius: f32() }
+export const SprintShape = { distance: f32(), ms: f32(), radius: f32(), seek: u8() }
 
 export const LeapShape = { distance: f32(), ms: f32(), height: f32(), radius: f32() }
 
@@ -338,10 +421,81 @@ export const WorldShape = {}
 
 export const Aura = { zone: i32() }
 
-/** 瞬袭：身体已闪到 x/y 的画面偏移处，until 到点闪回 */
-export const BlinkState = { until: f32() }
+/** 瞬袭：身体已闪到目标背后，until 到点闪回 x/y；back 为 0 则不回 */
+export const BlinkState = { until: f32(), x: f32(), y: f32(), back: u8() }
 
 export const Manual = {}
+
+/** 能力的类别：1 是技能（沉默挡它），0 是普通出手（缴械挡它、强化下一击加在它上） */
+export const AbilityClass = { skill: u8() }
+
+/** 充能：攒着的次数与上限，冷却按次恢复 */
+export const Charges = { n: f32(), max: f32() }
+
+/** 连段：next 是下一段的能力、window 是出手后给下一段留的窗口，open 是这一段可接的截止时刻，root 是第一段；只有第一段的 root 为 0 */
+export const Stage = { next: i32(), window: f32(), open: f32(), root: i32() }
+
+/** 弹匣：剩几发、容量、换弹时长、换好的时刻 */
+export const Ammo = { n: f32(), max: f32(), reloadMs: f32(), readyAt: f32() }
+
+/** 轮流出手：同组里只有 active 的那一式能出手，打完把出手权交给 next */
+export const Turn = { active: u8(), next: i32() }
+
+/** 按住蓄力：按满的时长、满蓄时的距离与伤害倍率，ratio 是这一次蓄了几成 */
+export const Hold = { maxMs: f32(), reachMul: f32(), damageMul: f32(), ratio: f32() }
+
+/** 资源的消耗：出手扣 cost、得 gain，以血施法扣 hp */
+export const Spend = { cost: f32(), gain: f32(), hp: f32() }
+
+/** 身体的资源：当前值、上限、锁到何时、最近一次增长的时刻 */
+export const Res = { v: f32(), max: f32(), lock: f32(), lastGain: f32() }
+
+/** 本条命里用过的一次性规则：致命一击、残血 */
+export const Lethal = { used: u8(), low: u8() }
+
+/** 体型：永久倍率、形态倍率与合起来的当前倍率；r0 是本来的判定半径，s0 是本来的画面尺寸 */
+export const Grow = { perm: f32(), form: f32(), v: f32(), r0: f32(), s0: f32() }
+
+export const HISTORY = 40
+export const HISTORY_MS = 100
+
+const stridedBy = <T extends Column>(ctor: new (length: number) => T, n: number): T => {
+  const col = new ctor(INITIAL_CAPACITY * n)
+  STRIDE.set(col, n)
+  return col
+}
+
+/** 位置与生命的历史：每 HISTORY_MS 记一格，环形，i 是下一格，n 是已记的格数，at 是下次记的时刻 */
+export const History = { x: stridedBy(Float32Array, HISTORY), y: stridedBy(Float32Array, HISTORY), hp: stridedBy(Float32Array, HISTORY), i: i32(), n: i32(), at: f32() }
+
+/** 借来的能力：到时撤掉；from 是被夺走的那条能力与它的编号，夺取者死了就还回去 */
+export const Borrowed = { until: f32(), from: i32(), fromUid: u32() }
+
+/** 肚子里装着的身体：victim 与编号、这期间挨了多少、挨够多少吐出、最多装到何时、每秒消化、吐出距离、下次消化的时刻 */
+export const Gut = { victim: i32(), uid: u32(), hurt: f32(), limit: f32(), until: f32(), dps: f32(), spit: f32(), nextAt: f32() }
+
+/** 影子：主人与编号、消失的时刻 */
+export const Shadow = { of: i32(), ofUid: u32(), until: f32() }
+
+export const PET = { orbit: 0, trail: 1, ally: 2 } as const
+
+/** 施法锚点物件：所属的能力、宿主、跟随方式、距离与转角 */
+export const Pet = { of: i32(), host: i32(), mode: u8(), dist: f32(), phase: f32() }
+
+/** 闲着的计时：最近一次出手或移动的时刻、这一轮是否已触发 */
+export const Idle = { since: f32(), done: u8() }
+
+/** 延时成长：到这个时刻长成 */
+export const GrowUp = { at: f32() }
+
+/** 形态：当前第几个（-1 是本体）、到何时切回（0 不切回） */
+export const Form = { idx: i32Fill(-1), until: f32() }
+
+/** 坐骑：剩余与总生命、扣光后切到的形态 */
+export const Mount = { hp: f32(), max: f32(), form: i32() }
+
+/** 能力镜像：影子照着出手 */
+export const Mirror = {}
 
 export const CastRequest = {}
 
@@ -353,14 +507,31 @@ export const Facing = { x: f32(), y: f32(), vx: f32(), vy: f32() }
 
 export const Magnet = { radius: f32() }
 
-/** 冲刺中的身体：位移由 moveBodies 按脚本速度推进，撞击按 stamp 去重 */
-export const Sprinting = { active: u8(), msLeft: f32(), vx: f32(), vy: f32(), skill: i32(), stamp: f32() }
+export const MOTION = { none: 0, dash: 1, arc: 2, follow: 3 } as const
 
-/** 敌人记下最近一次撞到自己的冲刺，同一次冲刺不重复吃伤害 */
-export const SprintHit = { stamp: f32() }
+/** 脚本位移：冲刺按速度走（seek 为 1 时追着 ref 转向、碰到就停），弧线沿 f→t 腾空飞，跟随贴着 ref 偏移 t；self 为 1 是自己的动作，skill 是带来这段位移的能力，landed 在落地那帧为 1 */
+export const Motion = {
+  kind: u8(),
+  self: u8(),
+  landed: u8(),
+  t: f32(),
+  ms: f32(),
+  fx: f32(),
+  fy: f32(),
+  tx: f32(),
+  ty: f32(),
+  vx: f32(),
+  vy: f32(),
+  h: f32(),
+  skill: i32(),
+  stamp: f32(),
+  ref: i32(),
+  refUid: u32(),
+  seek: u8(),
+}
 
-/** 跳跃中的身体：沿 from→to 的抛物线前进，落地那帧 landed 为 1 */
-export const Leaping = { active: u8(), landed: u8(), msLeft: f32(), ms: f32(), fromX: f32(), fromY: f32(), toX: f32(), toY: f32(), skill: i32() }
+/** 身体最近一次被哪段冲刺撞过，同一段冲刺不重复吃伤害 */
+export const MotionHit = { stamp: f32() }
 
 export const Drop = { startMs: f32(), durMs: f32(), fromY: f32(), toY: f32(), target: i32(), targetUid: u32() }
 
@@ -439,4 +610,5 @@ export const BreaksWalls = {}
 /** 这一帧的速度倍率：减速状态 × 固有倍率 × 战场效果，每个会走的身体一份 */
 export const SpeedMul = { v: f32() }
 
-export const Steering = { v: u8() }
+/** 这一帧身体能做什么：move 自己走、act 普通出手、cast 施放技能、dash 自己位移；forced 非零时被迫朝 f 点走（1 逃离、2 靠近） */
+export const Ctl = { move: u8(), act: u8(), cast: u8(), dash: u8(), forced: u8(), fx: f32(), fy: f32() }

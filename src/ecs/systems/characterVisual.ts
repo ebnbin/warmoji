@@ -1,12 +1,16 @@
 import { Alive, CharFlash, MARK, Tint } from '../components'
 import { hasMark } from '../utils/marks'
+import { presence, statusTint } from '../utils/statusTint'
 import type { Sim } from '../sim'
 
-/** 角色的底色：受击闪色期间不改，其余按攻速下降与否 */
+/** 角色的底色：受击闪色期间不改，其余按控制、攻速下降排；透明度随存在感 */
 export function characterVisual(sim: Sim): void {
   for (const m of sim.characters) {
     if (!Alive.v[m]) continue
+    Tint.alpha[m] = presence(sim, m)
     if (CharFlash.until[m] !== 0 && sim.fxMs >= CharFlash.until[m]!) CharFlash.until[m] = 0
-    if (CharFlash.until[m] === 0) Tint.color[m] = hasMark(sim, m, MARK.cd) ? 0x9ccc65 : 0xffffff
+    if (CharFlash.until[m] !== 0) continue
+    const cc = statusTint(sim, m)
+    Tint.color[m] = cc !== 0 ? cc : hasMark(sim, m, MARK.cd) ? 0x9ccc65 : 0xffffff
   }
 }

@@ -37,6 +37,8 @@ export interface Sim {
   handover: Handover | null
   aim: { x: number; y: number }
   characters: number[]
+  /** 每个角色的主动技能（连段的第一段），按槽位 */
+  skills: number[]
   mapId: import('../types/maps').MapId
   mapW: number
   mapH: number
@@ -81,12 +83,13 @@ interface Handover {
 
 export interface PendingDeath {
   eid: number
-  def: import('../types/enemies').EnemyDef
+  def: import('../types/enemies').NpcDef
   x: number
   y: number
   elite: boolean
   boss: boolean
   dmgMul: number
+  faction: number
 }
 
 export function initialLayout(sim: Sim): void {
@@ -143,6 +146,7 @@ export function makeSim(
     teamDir: { x: 0, y: 0 },
     moveInputRaw: 0,
     characters,
+    skills: [],
     mapId: run.mapId,
     mapW,
     mapH,

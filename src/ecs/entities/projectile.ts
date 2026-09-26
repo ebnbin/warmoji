@@ -1,7 +1,7 @@
 import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { DEG2RAD } from '../../util/units'
-import { Depth, Faction, PrevPos, Proj, Projectile, Quad, Sprite, Tint, Transform, Vel, VisOff } from '../components'
+import { Depth, Faction, Homing, Linger, PrevPos, Proj, Projectile, Quad, Sprite, Tint, Transform, Vel, VisOff } from '../components'
 import { projHitUids, projOnHit, projSrc } from '../store'
 import type { Effect } from '../../types/abilityDefs'
 import type { Source } from '../utils/source'
@@ -20,9 +20,11 @@ interface BoltSpec {
   readonly knockback: number
   readonly src: Source
   readonly onHit?: readonly Effect[]
+  readonly homingDeg?: number
+  readonly linger?: number
 }
 
-/** 弹体：直线飞行、一帧扫掠一段的飞行物，敌我同一种；无朝向的弹体自转 */
+/** 弹体：直线飞行（追踪的会转向）、一帧扫掠一段的飞行物，敌我同一种；无朝向的弹体自转；会落地的飞完躺在地上等召回 */
 export function spawnBolt(sim: Sim, x: number, y: number, angle: number, spec: BoltSpec): number {
   const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Projectile, Transform, Vel, Proj, PrevPos, Faction, Sprite, Tint, Depth, VisOff)
@@ -47,6 +49,15 @@ export function spawnBolt(sim: Sim, x: number, y: number, angle: number, spec: B
   Proj.kb[eid] = spec.knockback
   Proj.pierce[eid] = spec.pierce
   Proj.spin[eid] = spec.rotOffsetDeg === 0 ? 9 : 0
+  Proj.rotOffset[eid] = spec.rotOffsetDeg * DEG2RAD
+  if (spec.homingDeg) {
+    addComponents(sim.world, eid, Homing)
+    Homing.turn[eid] = spec.homingDeg * DEG2RAD
+  }
+  if (spec.linger) {
+    addComponents(sim.world, eid, Linger)
+    Linger.ms[eid] = spec.linger
+  }
   const mapLife = sim.hooks.projectileLifeMs(sim)
   Proj.dieAt[eid] = sim.elapsedMs + (mapLife > 0 ? Math.min(mapLife, spec.lifeMs) : spec.lifeMs)
   Depth.z[eid] = 8

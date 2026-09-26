@@ -1,6 +1,6 @@
-import { UNIT } from '../../../util/units'
-import { MEMBER, TEAM } from '../../../data/characters'
-import { Alive, CharScale, Facing, Leaping, Radius, Sprinting, Seat, Transform } from '../../components'
+import { TEAM } from '../../../data/characters'
+import { Alive, CharScale, Facing, Motion, MOTION, Seat, Transform } from '../../components'
+import { charSize, rescale } from './scale'
 import { grantIframe } from './combat'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
@@ -28,19 +28,19 @@ export function handoverCamOffset(sim: Sim): Point {
 }
 
 /** 阵亡者不走动画系统，尺寸随倍率直接改 */
-function setScale(eid: number, s: number): void {
+function setScale(sim: Sim, eid: number, s: number): void {
   CharScale.v[eid] = s
-  Radius.v[eid] = MEMBER.radius * UNIT * s
+  rescale(sim, eid)
   if (Alive.v[eid]) return
-  Transform.w[eid] = MEMBER.size * UNIT * s
-  Transform.h[eid] = MEMBER.size * UNIT * s
+  Transform.w[eid] = charSize(eid)
+  Transform.h[eid] = charSize(eid)
 }
 
 function finishHandover(sim: Sim): void {
   const h = sim.handover
   if (!h) return
-  setScale(h.from, TEAM.followerSizeMul)
-  setScale(h.to, TEAM.leaderSizeMul)
+  setScale(sim, h.from, TEAM.followerSizeMul)
+  setScale(sim, h.to, TEAM.leaderSizeMul)
   sim.handover = null
 }
 
@@ -50,8 +50,8 @@ export function canSwitchLeader(sim: Sim, eid: number): boolean {
     lead >= 0 &&
     !sim.over &&
     !sim.handover &&
-    !Sprinting.active[lead] &&
-    !Leaping.active[lead] &&
+    Motion.kind[lead] === MOTION.none &&
+    Motion.kind[eid] === MOTION.none &&
     eid !== lead &&
     sim.characters.includes(eid) &&
     Alive.v[eid] === 1
@@ -106,6 +106,6 @@ export function stepHandover(sim: Sim): void {
   h.msLeft -= sim.dtMs
   if (h.msLeft <= 0) return finishHandover(sim)
   const s = handoverEase(sim)
-  setScale(h.from, h.fromScale + (TEAM.followerSizeMul - h.fromScale) * s)
-  setScale(h.to, h.toScale + (TEAM.leaderSizeMul - h.toScale) * s)
+  setScale(sim, h.from, h.fromScale + (TEAM.followerSizeMul - h.fromScale) * s)
+  setScale(sim, h.to, h.toScale + (TEAM.leaderSizeMul - h.toScale) * s)
 }

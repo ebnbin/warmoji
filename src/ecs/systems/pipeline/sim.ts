@@ -14,15 +14,26 @@ import { driveTeam } from '../driveTeam'
 import { moveBodies } from '../moveBodies'
 import { stepHandover } from '../shared/leader'
 import { tickSkillCooldowns } from '../tickSkillCooldowns'
-import { tickSkillStates } from '../tickSkillStates'
+import { settleMotions } from '../settleMotions'
 import { popInEnemies } from '../popInEnemies'
 import { refoldBattleFx } from '../refoldBattleFx'
 import { reviveCharacters } from '../reviveCharacters'
 import { steerBodies } from '../steerBodies'
 import { updateBees } from '../updateBees'
-import { updateEnemyGates } from '../updateEnemyGates'
+import { updateControl } from '../updateControl'
 import { updateSpeedMuls } from '../updateSpeedMuls'
 import { tickMarks } from '../tickMarks'
+import { tickResources } from '../tickResources'
+import { tickForms } from '../tickForms'
+import { tickIdle } from '../tickIdle'
+import { tickGrowUp } from '../tickGrowUp'
+import { tickPets } from '../tickPets'
+import { tickBorrowed } from '../shared/steal'
+import { tickGuts } from '../shared/gut'
+import { tickShadows } from '../../entities/shadow'
+import { recordHistory } from '../shared/history'
+import { tickBarriers } from '../../entities/barrier'
+import { tickTethers } from '../../entities/tether'
 import { tintEnemies } from '../tintEnemies'
 import { updateDormancy } from '../updateDormancy'
 import { cullProjectiles } from '../cullProjectiles'
@@ -41,24 +52,35 @@ export const SIM_PIPELINE = pipeline([
   stepHandover,
   { run: reviveCharacters, after: [stepHandover] },
   { run: tickMarks, after: [updateDormancy] },
+  { run: tickResources, after: [tickMarks] },
+  { run: tickForms, after: [tickMarks] },
+  { run: tickBorrowed, after: [tickMarks] },
+  { run: tickGuts, after: [tickMarks] },
+  { run: tickShadows, after: [tickMarks] },
+  { run: tickGrowUp, after: [tickMarks] },
+  { run: tickIdle, after: [tickMarks] },
+  { run: tickBarriers, after: [tickMarks] },
   { run: updateSpeedMuls, after: [refoldBattleFx, tickMarks] },
-  { run: driveTeam, after: [stepHandover, reviveCharacters, updateSpeedMuls] },
+  { run: updateControl, after: [updateDormancy, updateSpeedMuls, tickMarks] },
+  { run: driveTeam, after: [stepHandover, reviveCharacters, updateControl] },
   { run: layoutTeam, after: [driveTeam] },
   { run: popInEnemies, after: [updateDormancy] },
   { run: despawnExpired, after: [updateDormancy] },
   { run: fadeEnemyFlash, after: [updateDormancy] },
   { run: tintEnemies, after: [updateDormancy, fadeEnemyFlash] },
-  { run: updateEnemyGates, after: [updateDormancy, updateSpeedMuls] },
   { run: updateBees, after: [updateDormancy] },
-  { run: steerBodies, after: [updateEnemyGates, updateBees] },
+  { run: steerBodies, after: [updateControl, updateBees] },
   { run: moveBodies, after: [layoutTeam, steerBodies] },
   { run: refreshTargets, after: [moveBodies] },
-  { run: tickSkillStates, after: [refreshTargets] },
+  { run: recordHistory, after: [moveBodies] },
+  { run: tickPets, after: [moveBodies] },
+  { run: tickTethers, after: [refreshTargets] },
+  { run: settleMotions, after: [refreshTargets] },
   { run: animateCharacters, after: [moveBodies] },
   { run: animateEnemies, after: [moveBodies] },
   { run: moveProjectiles, after: [moveBodies] },
   { run: hitProjectiles, after: [moveProjectiles, refreshTargets] },
-  { run: touchBodies, after: [refreshTargets, tickSkillStates] },
+  { run: touchBodies, after: [refreshTargets, settleMotions] },
   { run: cullProjectiles, after: [hitProjectiles] },
   { run: characterVisual, after: [hitProjectiles, touchBodies] },
   blinkTelegraphs,

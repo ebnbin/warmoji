@@ -9,7 +9,7 @@ import type { Found } from '../../utils/targets'
 
 /** 身体眼里最近的敌人：嘲讽、隐匿、视线都由索敌快照统一处理 */
 export function nearestFoe(sim: Sim, eid: number, x: number, y: number, range = Infinity): Found | null {
-  return nearestTarget(sim, bodySource(eid), x, y, range)
+  return nearestTarget(sim, bodySource(sim, eid), x, y, range)
 }
 
 /** 优先还没中毒的最近敌人，都中了毒就取最近的 */
@@ -18,7 +18,7 @@ export function freshFoe(sim: Sim, eid: number, x: number, y: number, range: num
   let freshD = range * range
   let any: Found | null = null
   let anyD = range * range
-  eachTarget(sim, bodySource(eid), x, y, range, (t, tx, ty, radius) => {
+  eachTarget(sim, bodySource(sim, eid), x, y, range, (t, tx, ty, radius) => {
     const dx = tx - x
     const dy = ty - y
     const d = dx * dx + dy * dy

@@ -24,13 +24,16 @@ import {
   FlyerShape,
   Hp,
   LeapShape,
-  Leaping,
+  MARK,
+  Mark,
+  AbilityClass,
+  Ammo,
+  Hold,
   Owner,
   Payload,
   REAIM,
   Repeat,
   RepeatState,
-  Sprinting,
   Sector,
   Segment,
   Shots,
@@ -40,15 +43,18 @@ import {
   Thrown,
   Tint,
   Transform,
-  VisOff,
   ZoneShape,
   WorldShape,
   Bolt,
   Casting,
   Windup,
   WindupState,
+  Idle,
+  Mirror,
 } from '../../components'
-import { abilityArtEmoji, abilityFireSfx, abilityOnHit, abilityOnSelf, abilityPulse } from '../../store'
+import { abilityArtEmoji, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, zoneRules } from '../../store'
+import { controlBody } from '../updateControl'
+import { clearMarks, markSlot } from '../../utils/marks'
 import { damageMul, anchorX, anchorY, waveScale } from '../../utils/amp'
 import { flying, sourceOf } from '../../utils/source'
 import type { Source } from '../../utils/source'
@@ -58,18 +64,24 @@ import { circleHitIndices, sectorHitIndices, thrustHitIndices } from '../../util
 import { strongestTarget } from '../../utils/assassinate'
 import { headingOf, muzzle } from '../../utils/projectile'
 import { leaderPoint } from '../../utils/team'
-import { hit } from './damage'
-import { applyAbilityEffects, applyOnHit, struckOf } from './effects'
+import { hit, strike, touch } from './damage'
+import { applyAbilityEffects, applyOnHit, EMPOWER_DEF, struckOf, test } from './effects'
+import { takeBoost } from './resource'
 import type { Struck } from './effects'
 import { grantIframe } from './combat'
+import { displace } from './displace'
 import { shoot } from './projectile'
 import { launch } from '../../entities/weapon'
+import { shadowsOf } from '../../entities/shadow'
 import { place, spawnBee } from '../../entities/minion'
 import { spawnDrop } from '../../entities/drop'
 import { spawnZone } from '../../entities/zone'
 import { spawnFxBeam, spawnFxBolt, spawnFxBoom, spawnFxCircle, spawnFxSlash } from '../../entities/fx'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
+import type { Effect } from '../../../types/abilityDefs'
+
+const STEALTH = [MARK.stealth]
 
 /** 正在做的事没做完就不出手：延迟重复未打完、飞返体未回收、瞬袭未闪回、蓄力未到点 */
 export function busy(sim: Sim, e: number): boolean {
@@ -84,14 +96,16 @@ export interface Shot {
 export function aimAt(sim: Sim, e: number, src: Source): Shot | null {
   const ox = anchorX(e)
   const oy = anchorY(e)
+  const cond = abilityRequires[e]
+  const accept = cond ? (t: number): boolean => test(sim, src, t, cond) : undefined
   switch (Aim.kind[e]) {
     case AIM.nearest: {
-      const t = nearestTarget(sim, src, ox, oy, Aim.range[e]!)
+      const t = nearestTarget(sim, src, ox, oy, Aim.range[e]!, undefined, accept)
       return t ? { angle: Math.atan2(t.y - oy, t.x - ox), target: t } : null
     }
     case AIM.strongest: {
       const r = Aim.range[e]!
-      const t = strongestTarget(ox, oy, targetsNear(sim, src, ox, oy, r), r)
+      const t = strongestTarget(ox, oy, targetsNear(sim, src, ox, oy, r).filter((f) => !accept || accept(f.eid)), r)
       return t ? { angle: Math.atan2(t.y - oy, t.x - ox), target: t } : null
     }
     case AIM.move: {
@@ -134,38 +148,44 @@ function burst(sim: Sim, x: number, y: number, radius: number, color: number, bo
   if (boom) spawnFxBoom(sim, x, y, radius * 1.5)
 }
 
-/** 打一遍：返回真正吃到伤害的身体；不带伤害的形状只覆盖不打，覆盖到的都算 */
+/** 打一遍：返回真正落到身上的身体；不带伤害的形状只碰不打 */
 function strikeAll(sim: Sim, src: Source, found: readonly Found[], damage: number, kb: number, from: Point): Struck[] {
   const struck: Struck[] = []
   for (const t of found) {
     const s = struckOf(t.eid)
-    if (damage <= 0 || hit(sim, src, t.eid, damage, { knockback: kb, from })) struck.push(s)
+    if (strike(sim, src, t.eid, damage, { knockback: kb, from })) struck.push(s)
   }
   return struck
 }
 
+/** 这一下出手的附加：命中效果（基础的加上强化的）与距离倍率（按住蓄力） */
+interface Mods {
+  readonly onHit: readonly Effect[] | undefined
+  readonly reach: number
+}
+
 /** 一次出手：按形状覆盖目标，先伤害后效果，效果只施于真正打中的身体；返回是否真的出了手 */
-function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found | null, damage: number): boolean {
+function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found | null, damage: number, mods: Mods): boolean {
   const w = sim.world
   const ox = anchorX(e)
   const oy = anchorY(e)
   const kb = Payload.knockback[e]!
   const color = Payload.color[e]!
-  const onHit = abilityOnHit[e]
+  const onHit = mods.onHit
 
   if (hasComponent(w, e, Bolt)) {
     const from = muzzle(sim, e)
-    shoot(sim, e, from.x, from.y, angle, damage)
+    shoot(sim, e, from.x, from.y, angle, damage, onHit)
     return true
   }
 
   if (hasComponent(w, e, Segment)) {
-    const reach = Segment.reach[e]!
+    const reach = Segment.reach[e]! * mods.reach
     const radius = Segment.radius[e]!
     const list = targetsWithin(sim, src, ox, oy, reach + radius)
     const origin = { x: ox, y: oy }
     const struck = strikeAll(sim, src, thrustHitIndices(origin, angle, reach, radius, list).map((i) => list[i]!), damage, kb, origin)
-    applyOnHit(sim, src, onHit, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach, damage, struck)
+    applyOnHit(sim, src, onHit, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach, damage, struck, angle)
     if (Segment.beam[e]) spawnFxBeam(sim, ox, oy, angle, reach, radius, color)
     Swing.startMs[e] = sim.fxMs
     Swing.durMs[e] = Segment.ms[e]!
@@ -177,7 +197,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     const list = targetsWithin(sim, src, ox, oy, radius)
     const origin = { x: ox, y: oy }
     const struck = strikeAll(sim, src, sectorHitIndices(origin, angle, Sector.arcDeg[e]! * DEG2RAD, radius, list).map((i) => list[i]!), damage, kb, origin)
-    applyOnHit(sim, src, onHit, ox, oy, damage, struck)
+    applyOnHit(sim, src, onHit, ox, oy, damage, struck, angle)
     Swing.startMs[e] = sim.fxMs
     Swing.durMs[e] = Sector.ms[e]!
     return true
@@ -188,7 +208,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     if (atTarget && !target) return false
     const cx = atTarget ? target!.x : ox
     const cy = atTarget ? target!.y : oy
-    const r = Disc.radius[e]!
+    const r = Disc.radius[e]! * mods.reach
     if (Disc.of[e] === DISC_OF.hurt) {
       const revives = onHit?.some((fx) => fx.kind === 'revive' || fx.kind === 'reviveCut') ?? false
       const hurt: number[] = []
@@ -197,16 +217,16 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
         const dy = y - cy
         if (dx * dx + dy * dy > r * r) return
         if (!Alive.v[t] || Hp.v[t]! < Hp.max[t]!) hurt.push(t)
-      })
+      }, src.realm)
       if (hurt.length === 0) return false
-      applyOnHit(sim, src, onHit, cx, cy, damage, hurt.map(struckOf))
+      applyOnHit(sim, src, onHit, cx, cy, damage, hurt.map(struckOf), angle)
       if (color !== 0) burst(sim, cx, cy, r, color, false)
       return true
     }
     const list = targetsWithin(sim, src, cx, cy, r)
     const found = circleHitIndices({ x: cx, y: cy }, r, list).map((i) => list[i]!)
     const struck = strikeAll(sim, src, found, damage, kb, { x: cx, y: cy })
-    applyOnHit(sim, src, onHit, cx, cy, damage, struck)
+    applyOnHit(sim, src, onHit, cx, cy, damage, struck, angle)
     if (color !== 0) burst(sim, cx, cy, r, color, damage > 0)
     return true
   }
@@ -229,7 +249,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       dmg *= Chain.decay[e]!
       cur = nearestTarget(sim, src, cur.x, cur.y, Chain.hopRange[e]!, visited)
     }
-    applyOnHit(sim, src, onHit, last.x, last.y, dmg, struck)
+    applyOnHit(sim, src, onHit, last.x, last.y, dmg, struck, angle)
     spawnFxBolt(sim, points, color)
     return true
   }
@@ -264,19 +284,23 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
 
   if (hasComponent(w, e, BlinkShape)) {
     if (!target) return false
+    const m = Owner.eid[e]!
     const dx = target.x - ox
     const dy = target.y - oy
     const d = Math.hypot(dx, dy) || 1
     const behind = target.radius + BlinkShape.behindDist[e]!
     const landX = target.x + (dx / d) * behind
     const landY = target.y + (dy / d) * behind
+    const backX = Transform.x[m]!
+    const backY = Transform.y[m]!
+    if (!displace(sim, m, { kind: 'place', x: landX, y: landY }, { self: true })) return false
     Aim.rad[e] = Math.atan2(target.y - landY, target.x - landX)
     blinkFlash(sim, ox, oy)
-    const m = Owner.eid[e]!
-    VisOff.x[m] = landX - Transform.x[m]!
-    VisOff.y[m] = landY - Transform.y[m]!
     const strikeMs = BlinkShape.strikeMs[e]!
     BlinkState.until[e] = sim.elapsedMs + strikeMs
+    BlinkState.x[e] = backX
+    BlinkState.y[e] = backY
+    BlinkState.back[e] = 1
     grantIframe(sim, m, strikeMs + BLINK_IFRAME_PAD_MS)
     blinkFlash(sim, landX, landY)
     let dmg = damage
@@ -285,20 +309,15 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       dmg = Math.round(dmg * BlinkShape.execMul[e]!)
     }
     const s = struckOf(target.eid)
-    if (hit(sim, src, target.eid, dmg, { knockback: kb, from: { x: landX, y: landY } })) applyOnHit(sim, src, onHit, target.x, target.y, dmg, [s])
+    if (hit(sim, src, target.eid, dmg, { knockback: kb, from: { x: landX, y: landY } })) applyOnHit(sim, src, onHit, target.x, target.y, dmg, [s], angle)
     spawnFxSlash(sim, target.x, target.y, Aim.rad[e]!, 34)
     return true
   }
 
   if (hasComponent(w, e, SprintShape)) {
     const m = Owner.eid[e]!
-    const speed = SprintShape.distance[e]! / (SprintShape.ms[e]! / 1000)
-    Sprinting.active[m] = 1
-    Sprinting.msLeft[m] = SprintShape.ms[e]!
-    Sprinting.vx[m] = Math.cos(angle) * speed
-    Sprinting.vy[m] = Math.sin(angle) * speed
-    Sprinting.skill[m] = e
-    Sprinting.stamp[m] = sim.elapsedMs
+    const seek = SprintShape.seek[e] && target ? target.eid : undefined
+    if (!displace(sim, m, { kind: 'dash', angle, distance: SprintShape.distance[e]! * mods.reach, ms: SprintShape.ms[e]! * Math.sqrt(mods.reach), seek }, { self: true, skill: e })) return false
     if (color !== 0) spawnFxCircle(sim, ox, oy, SprintShape.radius[e]!, {
       fill: color,
       fillAlpha: 0.35,
@@ -315,21 +334,9 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
 
   if (hasComponent(w, e, LeapShape)) {
     const m = Owner.eid[e]!
-    const from = { x: Transform.x[m]!, y: Transform.y[m]! }
-    const dist = LeapShape.distance[e]!
-    // 落点先经场地约束，再折算回起点附近，环面上才不会跨图飞
-    const to = sim.hooks.constrainBody(sim, m, from, { x: from.x + Math.cos(angle) * dist, y: from.y + Math.sin(angle) * dist })
-    const d = sim.hooks.worldDelta(sim, from.x, from.y, to.x, to.y)
-    Leaping.active[m] = 1
-    Leaping.landed[m] = 0
-    Leaping.msLeft[m] = LeapShape.ms[e]!
-    Leaping.ms[m] = LeapShape.ms[e]!
-    Leaping.fromX[m] = from.x
-    Leaping.fromY[m] = from.y
-    Leaping.toX[m] = from.x + d.x
-    Leaping.toY[m] = from.y + d.y
-    Leaping.skill[m] = e
-    return true
+    const dist = LeapShape.distance[e]! * mods.reach
+    const to = { x: Transform.x[m]! + Math.cos(angle) * dist, y: Transform.y[m]! + Math.sin(angle) * dist }
+    return displace(sim, m, { kind: 'arc', x: to.x, y: to.y, ms: LeapShape.ms[e]!, height: LeapShape.height[e]! }, { self: true, skill: e })
   }
 
   if (hasComponent(w, e, AllShape)) {
@@ -344,15 +351,18 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
         }
         sim.out.flash = { color: 0xffffff, alpha: 0.55, durationMs: 380 }
       } else {
-        for (const t of list) struck.push(struckOf(t.eid))
+        for (const t of list) {
+          const s = struckOf(t.eid)
+          if (touch(sim, src, t.eid)) struck.push(s)
+        }
       }
-      applyOnHit(sim, src, onHit, ox, oy, damage, struck)
+      applyOnHit(sim, src, onHit, ox, oy, damage, struck, angle)
     } else {
       const allies: number[] = []
       eachAlly(sim, src.faction, ox, oy, Infinity, AllShape.downed[e] === 1, (t) => {
         allies.push(t)
-      })
-      applyOnHit(sim, src, onHit, ox, oy, damage, allies.map(struckOf))
+      }, src.realm)
+      applyOnHit(sim, src, onHit, ox, oy, damage, allies.map(struckOf), angle)
       for (const t of allies) {
         if (!Alive.v[t]) continue
         CharFlash.until[t] = sim.fxMs + 320
@@ -386,13 +396,14 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       mend: ZoneShape.mend[e]!,
       effects: onHit,
       follow: follow ? { of: Anchor.eid[e]!, owner: e } : undefined,
+      rules: zoneRules[e],
     }
     const pulseMs = ZoneShape.pulseMs[e]!
     // 须先落局部变量：spawnZone 可能扩容替换 Aura.zone
     const zone = spawnZone(sim, spec)
     if (follow) Aura.zone[e] = zone
     if (pulseMs > 0) {
-      spawnZone(sim, { ...spec, tickMs: pulseMs, damage: 0, mend: 0, effects: abilityPulse[e], pulse: spec.color, fillAlpha: 0, lineAlpha: 0, lineWidth: 0 })
+      spawnZone(sim, { ...spec, tickMs: pulseMs, damage: 0, mend: 0, effects: abilityPulse[e], pulse: spec.color, fillAlpha: 0, lineAlpha: 0, lineWidth: 0, rules: undefined })
     }
     return true
   }
@@ -420,10 +431,27 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
   }
 
   if (hasComponent(w, e, WorldShape)) {
-    applyAbilityEffects(sim, src, onHit, { x: ox, y: oy, baseDamage: damage })
+    applyAbilityEffects(sim, src, onHit, { x: ox, y: oy, baseDamage: damage, angle })
     return true
   }
   return false
+}
+
+/** 能镜像的形状：从出手点打出去、不挪动施法者自己的 */
+const MIRRORED = [Bolt, Segment, Sector, Disc, Chain]
+
+/** 出手一次，影子照着再打：从每个影子朝同一个目标（没有目标就同一个方向）；返回本体这一下是否出了手 */
+function fireMirrored(sim: Sim, e: number, src: Source, angle: number, target: Found | null, damage: number, mods: Mods): boolean {
+  if (!fireOnce(sim, e, src, angle, target, damage, mods)) return false
+  if (!hasComponent(sim.world, e, Mirror) || !MIRRORED.some((c) => hasComponent(sim.world, e, c))) return true
+  const home = Anchor.eid[e]!
+  for (const s of shadowsOf(sim, Owner.eid[e]!)) {
+    Anchor.eid[e] = s
+    const d = target ? sim.hooks.worldDelta(sim, Transform.x[s]!, Transform.y[s]!, target.x, target.y) : null
+    fireOnce(sim, e, { ...src, sight: undefined }, d ? Math.atan2(d.y, d.x) : angle, target, damage, mods)
+  }
+  Anchor.eid[e] = home
+  return true
 }
 
 /** 蓄力：记下方向，让宿主停下并显出预兆，到点由 tickWindups 出手 */
@@ -436,6 +464,17 @@ function startWindup(sim: Sim, e: number, shot: Shot): void {
   Casting.telegraph[o] = Windup.telegraph[e]!
 }
 
+/** 强化下一击：普通出手时取走宿主身上的一次强化 */
+function empowered(sim: Sim, e: number): readonly Effect[] {
+  if (AbilityClass.skill[e]) return []
+  const s = markSlot(sim, Owner.eid[e]!, MARK.empower)
+  if (s < 0) return []
+  const def = EMPOWER_DEF.get(Mark.b[s]!)
+  Mark.a[s] = Mark.a[s]! - 1
+  if (Mark.a[s]! <= 0) Mark.kind[s] = MARK.none
+  return def?.then ?? []
+}
+
 /** 出手：瞄准、第一发、即时重复或安排延迟重复、音效、施法者自身的效果；有蓄力的先蓄力，到点再带着方向回到这里 */
 export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   const w = sim.world
@@ -446,6 +485,12 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   if (!preset && hasComponent(w, e, Windup)) {
     startWindup(sim, e, shot)
     return true
+  }
+  const cast = abilityOnCast[e]
+  if (cast) {
+    const o = Owner.eid[e]!
+    applyAbilityEffects(sim, src, cast, { x: anchorX(e), y: anchorY(e), baseDamage: 0, targets: [o], angle: shot.angle })
+    controlBody(sim, o)
   }
   let count = 1
   let spread = 0
@@ -463,9 +508,18 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
       delay = Repeat.delayMs[e]!
     }
   }
-  const damage = baseDamage(sim, e)
+  const hold = hasComponent(w, e, Hold) ? Hold.ratio[e]! : 0
+  const boost = takeBoost(sim, e)
+  const extra = [...(boost?.onHit ?? []), ...empowered(sim, e), ...(hasComponent(w, e, Ammo) && Ammo.n[e] === 1 ? (ammoLast[e] ?? []) : [])]
+  const base = abilityOnHit[e]
+  const mods: Mods = {
+    onHit: extra.length > 0 ? [...(base ?? []), ...extra] : base,
+    reach: hold > 0 ? 1 + (Hold.reachMul[e]! - 1) * hold : 1,
+  }
+  const holdMul = hold > 0 ? 1 + (Hold.damageMul[e]! - 1) * hold : 1
+  const damage = Math.round(baseDamage(sim, e) * holdMul * (boost?.damageMul ?? 1))
   if (count <= 1 || delay > 0) {
-    if (!fireOnce(sim, e, src, shot.angle, shot.target, damage)) return false
+    if (!fireMirrored(sim, e, src, shot.angle, shot.target, damage, mods)) return false
     if (count > 1) {
       RepeatState.left[e] = count - 1
       RepeatState.nextAt[e] = sim.elapsedMs + delay
@@ -477,7 +531,7 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
     let fired = false
     for (let i = 0; i < count; i++) {
       const angle = ring ? shot.angle + (i * Math.PI * 2) / count : shot.angle + spread * DEG2RAD * (i / (count - 1) - 0.5)
-      if (fireOnce(sim, e, src, angle, shot.target, damage)) fired = true
+      if (fireMirrored(sim, e, src, angle, shot.target, damage, mods)) fired = true
     }
     if (!fired) return false
   }
@@ -485,9 +539,16 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   if (sfx) playSfx(sfx)
   const anchor = Anchor.eid[e]!
   if (hasComponent(w, anchor, Fired)) Fired.v[anchor] = 1
+  // 潜行出手即现形，闲着的计时重来
+  const o = Owner.eid[e]!
+  clearMarks(o, STEALTH)
+  if (hasComponent(w, o, Idle)) {
+    Idle.since[o] = sim.elapsedMs
+    Idle.done[o] = 0
+  }
   // 自身效果放最后：消散会把宿主连同这条能力一起移除
   const self = abilityOnSelf[e]
-  if (self) applyAbilityEffects(sim, src, self, { x: anchorX(e), y: anchorY(e), baseDamage: damage, targets: [Owner.eid[e]!] })
+  if (self) applyAbilityEffects(sim, src, self, { x: anchorX(e), y: anchorY(e), baseDamage: damage, targets: [Owner.eid[e]!], angle: shot.angle })
   return true
 }
 
@@ -519,7 +580,7 @@ export function fireRepeat(sim: Sim, e: number): boolean {
       if (Repeat.spreadDeg[e]! >= 360 - 1e-9) angle = RepeatState.angle[e]! + (i * Math.PI * 2) / count
   }
   Aim.rad[e] = angle
-  if (!fireOnce(sim, e, src, angle, target, Math.max(1, Math.round(RepeatState.damage[e]! * Repeat.ratio[e]!)))) return false
+  if (!fireMirrored(sim, e, src, angle, target, Math.max(1, Math.round(RepeatState.damage[e]! * Repeat.ratio[e]!)), { onHit: abilityOnHit[e], reach: 1 })) return false
   const sfx = abilityFireSfx[e]
   if (sfx) playSfx(sfx)
   return true

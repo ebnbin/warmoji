@@ -1,10 +1,21 @@
-import { query } from 'bitecs'
+import { hasComponent, query } from 'bitecs'
 import { UNIT } from '../../util/units'
-import { PrevPos, Proj, PROJ_SET, Transform } from '../components'
+import { Linger, PrevPos, Proj, PROJ_SET, Transform, Vel } from '../components'
 import { cullProjectile } from './shared/projectile'
 import type { Sim } from '../sim'
 
-/** 弹体到寿命、飞出画面、飞出世界、穿过墙体就消失，敌我同一条 */
+/** 会落地的弹体飞完就停在原地躺着 */
+function settle(sim: Sim, eid: number): boolean {
+  if (!hasComponent(sim.world, eid, Linger) || Linger.back[eid] || Linger.until[eid]! > 0 || Linger.ms[eid]! <= 0) return false
+  Vel.x[eid] = 0
+  Vel.y[eid] = 0
+  Proj.spin[eid] = 0
+  Linger.until[eid] = sim.elapsedMs + Linger.ms[eid]!
+  Proj.dieAt[eid] = Linger.until[eid]!
+  return true
+}
+
+/** 弹体到寿命、飞出画面、飞出世界、穿过墙体就消失（会落地的先躺一阵），敌我同一条 */
 export function cullProjectiles(sim: Sim): void {
   const now = sim.elapsedMs
   const view = sim.view
@@ -21,6 +32,7 @@ export function cullProjectiles(sim: Sim): void {
       sim.hooks.outside(sim, x, y) ||
       sim.hooks.wallHit(sim, PrevPos.x[eid]!, PrevPos.y[eid]!, x, y) !== null
     ) {
+      if (now >= Proj.dieAt[eid]! && settle(sim, eid)) continue
       cullProjectile(sim, eid)
     }
   }
