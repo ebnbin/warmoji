@@ -6,6 +6,13 @@ export type Column = Float32Array | Int32Array | Uint32Array | Uint8Array
 
 const FILL = new WeakMap<Column, number>()
 
+/** 每个实体占几个连续元素的列，按 eid*stride+i 索引 */
+const STRIDE = new WeakMap<Column, number>()
+
+export function columnStride(col: Column): number {
+  return STRIDE.get(col) ?? 1
+}
+
 export function columnFill(col: Column): number {
   return FILL.get(col) ?? 0
 }
@@ -21,13 +28,16 @@ const i32Fill = (v: number): Int32Array => {
 }
 
 export function resizeColumn<T extends Column>(old: T, length: number): T {
-  const next = new (old.constructor as new (length: number) => T)(length)
-  next.set(length >= old.length ? old : old.subarray(0, length))
+  const stride = columnStride(old)
+  const size = length * stride
+  const next = new (old.constructor as new (length: number) => T)(size)
+  next.set(size >= old.length ? old : old.subarray(0, size))
   const fill = FILL.get(old)
   if (fill !== undefined) {
-    if (length > old.length) next.fill(fill, old.length)
+    if (size > old.length) next.fill(fill, old.length)
     FILL.set(next, fill)
   }
+  if (stride !== 1) STRIDE.set(next, stride)
   return next
 }
 
@@ -76,20 +86,39 @@ export const Alive = { v: u8() }
 
 export const CharPerk = { thorns: f32(), killHeal: f32(), regenPerSec: f32() }
 
-/** 攻击冷却的倍率状态，任何持有能力的身体都可以有 */
-export const AtkSlow = { until: f32(), mul: f32() }
-
 export const CharScale = { v: f32() }
-export const Iframe = { ms: f32(), last: f32() }
+/** 被命中后免伤的时长；为 0 的身体没有无敌帧 */
+export const Iframe = { ms: f32() }
 export const Revive = { ms: f32(), at: f32() }
+
+export const MARK_SLOTS = 8
+
+const strided = <T extends Column>(ctor: new (length: number) => T): T => {
+  const col = new ctor(INITIAL_CAPACITY * MARK_SLOTS)
+  STRIDE.set(col, MARK_SLOTS)
+  return col
+}
+
+/** 标记的种类决定它折叠成哪个有效值：slow 取最小、speed/guard/dmg/cd 相乘、dot 按节拍扣血、其余是有无 */
+export const MARK = { none: 0, slow: 1, speed: 2, guard: 3, dmg: 4, cd: 5, dot: 6, stun: 7, hide: 8, taunt: 9, invuln: 10, morph: 11, morphImmune: 12 } as const
+
+/** 标记的来源：同种同源的标记刷新而不叠加 */
+export const TAG = { effect: 0, morph: 1, elite: 2, rage: 3 } as const
+
+/** 身体上的标记列表：每个身体 MARK_SLOTS 个槽位；until 为 Infinity 时永久；a/b/c 按种类解释（倍率、跳伤、节拍、下次跳的时刻、嘲讽者、是否曾锚定） */
+export const Mark = {
+  kind: strided(Uint8Array),
+  tag: strided(Uint8Array),
+  until: strided(Float32Array),
+  a: strided(Float32Array),
+  b: strided(Float32Array),
+  c: strided(Float32Array),
+}
 export const CharFlash = { until: f32() }
 
 export const Enemy = {}
 
 export const Hp = { v: f32(), max: f32() }
-
-/** 受到伤害的倍率：嘲讽者的减伤、变形者的脆弱都是它 */
-export const Guard = { mul: f32(), until: f32() }
 
 export const Speed = { v: f32() }
 
@@ -113,23 +142,12 @@ export const Anchored = {}
 /** 无视墙体的身体 */
 export const Phasing = {}
 
-export const DmgMul = { v: f32() }
-
-export const SpMul = { v: f32() }
-
 export const Flash = { until: f32() }
 
 export const EDir = { x: f32(), y: f32() }
 export const ETurn = { at: f32() }
 
-export const Slow = { until: f32(), mul: f32() }
-
-export const Poison = { until: f32(), nextTick: f32(), dmg: f32(), tickMs: f32() }
-
 export const Despawn = { at: f32() }
-
-/** anchored：变形前是否锚定，恢复时还回去 */
-export const Morph = { until: f32(), cdUntil: f32(), anchored: u8() }
 
 export const Anim = {
   base: i32(),
@@ -344,12 +362,6 @@ export const Facing = { x: f32(), y: f32(), vx: f32(), vy: f32() }
 
 export const Magnet = { radius: f32() }
 
-/** 全队增益不挂在队伍上，而是给每个角色各写一份 */
-export const DmgBuff = { mul: f32(), until: f32() }
-
-/** 蹦迪是每个敌人身上的状态，施法之后刷出来的敌人不受影响 */
-export const Dancing = { until: f32() }
-
 /** 冲刺中的身体：位移由 moveBodies 按脚本速度推进，撞击按 stamp 去重 */
 export const Rushing = { active: u8(), msLeft: f32(), vx: f32(), vy: f32(), skill: i32(), stamp: f32() }
 
@@ -358,12 +370,6 @@ export const RushHit = { stamp: f32() }
 
 /** 跳跃中的身体：沿 from→to 的抛物线前进，落地那帧 landed 为 1 */
 export const Leaping = { active: u8(), landed: u8(), msLeft: f32(), ms: f32(), fromX: f32(), fromY: f32(), toX: f32(), toY: f32(), skill: i32() }
-
-/** 被嘲讽的敌人只追嘲讽者，直到到期或嘲讽者阵亡 */
-export const Taunted = { until: f32(), by: i32() }
-
-/** 隐匿中的角色不被敌人锁定；tinted 记着半透明是否已套上 */
-export const Hidden = { until: f32(), tinted: u8() }
 
 export const Drop = { startMs: f32(), durMs: f32(), fromY: f32(), toY: f32(), target: i32(), targetUid: u32() }
 

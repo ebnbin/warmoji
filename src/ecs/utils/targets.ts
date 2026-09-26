@@ -1,4 +1,5 @@
-import { Alive, FACTION, Taunted, Transform, Uid } from '../components'
+import { FACTION, Transform, Uid } from '../components'
+import { tauntedBy } from './marks'
 import type { Source } from './source'
 import type { Sim } from '../sim'
 
@@ -19,10 +20,8 @@ const FOES: readonly (readonly number[])[] = [[FACTION.enemy], [FACTION.team], [
 
 /** 来源阵营的敌人：世界打所有人；被嘲讽的观察者只看得见嘲讽者；隐匿的身体谁也看不见；有视线要求时墙后不算。visit 内不得施伤：击杀会原地改动正在遍历的快照 */
 export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
-  const now = sim.elapsedMs
-  const v = src.viewer
-  if (v !== undefined && now < Taunted.until[v]! && Alive.v[Taunted.by[v]!]) {
-    const by = Taunted.by[v]!
+  const by = src.viewer === undefined ? -1 : tauntedBy(sim, src.viewer)
+  if (by >= 0) {
     const d = sim.hooks.worldDelta(sim, cx, cy, Transform.x[by]!, Transform.y[by]!)
     visit(by, cx + d.x, cy + d.y, 0)
     return

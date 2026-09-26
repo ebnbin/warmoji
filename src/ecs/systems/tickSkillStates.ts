@@ -1,5 +1,6 @@
 import { playSfx } from '../../audio/sfx'
-import { Alive, Hidden, LeapShape, Leaping, Payload, RushHit, Rushing, SprintShape, Tint, Transform, VisOff } from '../components'
+import { Alive, LeapShape, Leaping, MARK, Payload, RushHit, Rushing, SprintShape, Tint, Transform, VisOff } from '../components'
+import { hasMark } from '../utils/marks'
 import { damageMul } from '../utils/amp'
 import { sourceOf } from '../utils/source'
 import { targetsNear } from '../utils/targets'
@@ -10,7 +11,6 @@ import type { Sim } from '../sim'
 
 /** 冲刺撞击、跳跃落地与隐匿半透明都在身体走完这一帧之后结算；不再是队长的身体立刻停下；冲刺的结束由 moveBodies 判定 */
 export function tickSkillStates(sim: Sim): void {
-  const now = sim.elapsedMs
   for (const m of sim.characters) {
     if (m !== sim.leader) {
       Rushing.active[m] = 0
@@ -23,11 +23,7 @@ export function tickSkillStates(sim: Sim): void {
       if (Rushing.active[m]) rushHits(sim, m)
       if (Leaping.landed[m]) land(sim, m)
     }
-    const hidden = now < Hidden.until[m]!
-    if (hidden !== (Hidden.tinted[m] === 1)) {
-      Hidden.tinted[m] = hidden ? 1 : 0
-      if (Alive.v[m]) Tint.alpha[m] = hidden ? 0.45 : 1
-    }
+    if (Alive.v[m]) Tint.alpha[m] = hasMark(sim, m, MARK.hide) ? 0.45 : 1
   }
 }
 

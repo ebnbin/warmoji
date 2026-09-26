@@ -1,5 +1,6 @@
 import { query } from 'bitecs'
-import { Casting, Dancing, Dormant, ENEMY_SET, Flash, Poison, Slow, TELEGRAPH, Tint } from '../components'
+import { Casting, Dormant, ENEMY_SET, Flash, MARK, TELEGRAPH, Tint } from '../components'
+import { hasMark, slowFactor } from '../utils/marks'
 import type { Sim } from '../sim'
 
 function castingTint(now: number, eid: number): number {
@@ -7,18 +8,19 @@ function castingTint(now: number, eid: number): number {
   return 0xffb74d
 }
 
+/** 敌人的底色按状态优先级：定身、中毒、蓄力、减速、正常；受击闪白期间不改 */
 export function tintEnemies(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, ENEMY_SET)) {
     if (Dormant.v[eid] || Flash.until[eid] !== 0) continue
     Tint.effect[eid] = 0
-    Tint.color[eid] = Dancing.until[eid] !== 0
+    Tint.color[eid] = hasMark(sim, eid, MARK.stun)
       ? 0xff9ff3
-      : now < Poison.until[eid]!
+      : hasMark(sim, eid, MARK.dot)
         ? 0x7bff5a
         : now < Casting.until[eid]!
           ? castingTint(now, eid)
-          : now < Slow.until[eid]! && Slow.mul[eid]! < 1
+          : slowFactor(sim, eid) < 1
             ? 0xa5d8ff
             : 0xffffff
   }

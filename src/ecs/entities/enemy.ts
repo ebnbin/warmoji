@@ -8,7 +8,6 @@ import {
   Alive,
   Anchored,
   Anim,
-  AtkSlow,
   Boss,
   BreaksWalls,
   Casting,
@@ -16,11 +15,8 @@ import {
   Clock,
   CoinThief,
   Contact,
-  Dancing,
   Depth,
   Despawn,
-  DmgBuff,
-  DmgMul,
   Dormant,
   Drive,
   EDir,
@@ -34,30 +30,27 @@ import {
   Faction,
   Flash,
   Flee,
-  Guard,
   Hp,
-  Morph,
+  MARK,
+  Mark,
   Nest,
   Orbit,
   Orphan,
   Phasing,
   Phys,
-  Poison,
   Pop,
   Quad,
   Radius,
   Roam,
   RushHit,
   Rushing,
-  Slow,
   Slowed,
   Speed,
-  SpMul,
   Sprite,
   Standoff,
   Stay,
   Steering,
-  Taunted,
+  TAG,
   Thief,
   Tint,
   Transform,
@@ -65,6 +58,7 @@ import {
 } from '../components'
 import { contactEffects, enemyCarries, enemyDef } from '../store'
 import { interrupt } from '../systems/shared/ability'
+import { addMark, hasMark } from '../utils/marks'
 import { spawnTelegraph, telegraphCount } from './telegraph'
 import { scheduleSurge } from './schedule'
 import { armIdle } from '../systems/shared/anim'
@@ -136,11 +130,7 @@ export function spawnEnemy(
   addComponent(world, eid, Elite)
   addComponent(world, eid, Boss)
   addComponent(world, eid, Radius)
-  addComponent(world, eid, DmgMul)
-  addComponent(world, eid, DmgBuff)
-  addComponent(world, eid, AtkSlow)
-  addComponent(world, eid, Guard)
-  addComponent(world, eid, SpMul)
+  addComponent(world, eid, Mark)
   addComponent(world, eid, Phys)
   addComponent(world, eid, Drive)
   addComponent(world, eid, Clock)
@@ -148,14 +138,9 @@ export function spawnEnemy(
   addComponent(world, eid, Rushing)
   addComponent(world, eid, Dormant)
   addComponent(world, eid, Flash)
-  addComponent(world, eid, Slow)
-  addComponent(world, eid, Poison)
   addComponent(world, eid, Casting)
   addComponent(world, eid, Nest)
-  addComponent(world, eid, Dancing)
-  addComponent(world, eid, Taunted)
   addComponent(world, eid, Despawn)
-  addComponent(world, eid, Morph)
   addComponent(world, eid, EDir)
   addComponent(world, eid, ETurn)
   addComponent(world, eid, Slowed)
@@ -202,21 +187,15 @@ export function spawnEnemy(
   contactEffects[eid] = def.onContact
   if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
   Despawn.at[eid] = 0
-  Morph.until[eid] = 0
-  Morph.cdUntil[eid] = 0
-  Guard.until[eid] = 0
-  Guard.mul[eid] = 1
-  DmgBuff.until[eid] = 0
-  DmgBuff.mul[eid] = 1
-  AtkSlow.until[eid] = 0
-  AtkSlow.mul[eid] = 1
   Thief.eaten[eid] = 0
   Thief.nextEatAt[eid] = 0
   enemyCarries[eid] = undefined
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
-  DmgMul.v[eid] = elite ? ELITE.damageMul : 1
-  SpMul.v[eid] = elite ? ELITE.speedMul : 1
+  if (elite) {
+    addMark(eid, MARK.dmg, TAG.elite, Infinity, ELITE.damageMul)
+    addMark(eid, MARK.speed, TAG.elite, Infinity, ELITE.speedMul)
+  }
   Nest.of[eid] = -1
   Nest.nextSpawnAt[eid] = def.spawner ? sim.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
   Dormant.v[eid] = 0
@@ -224,17 +203,12 @@ export function spawnEnemy(
   EnemyArm.armed[eid] = 0
   Alive.v[eid] = 1
   Flash.until[eid] = 0
-  Slow.until[eid] = 0
-  Slow.mul[eid] = 1
-  Poison.until[eid] = 0
   const heading = sim.rng.next() * Math.PI * 2
   EDir.x[eid] = Math.cos(heading)
   EDir.y[eid] = Math.sin(heading)
   ETurn.at[eid] = sim.elapsedMs + AI.wander.spawnTurnMinMs + sim.rng.next() * AI.wander.spawnTurnJitterMs
   EnemyArm.fireDelayMs[eid] = 900 + sim.rng.next() * 1500
   EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2
-  Dancing.until[eid] = 0
-  Taunted.until[eid] = 0
   RushHit.stamp[eid] = -1
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   Sprite.flipX[eid] = 0
@@ -333,44 +307,34 @@ export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
 
 const MORPH_RECAST_CD = 5000
 
+/** 变形：换外观、打断动作、解除锚定并记在标记里；变形期间与结束后一段时间免疫再次变形；脆弱是同期的承伤标记 */
 export function applyMorph(
   sim: Sim,
   atlas: FrameIndex,
   eid: number,
   spec: { durationMs: number; morphEmoji: string; vulnMul?: number },
 ): void {
-  if (Boss.v[eid]) return
-  if (sim.elapsedMs < Morph.cdUntil[eid]!) return
-  const wasMorphed = Morph.until[eid] !== 0
+  if (Boss.v[eid] || hasMark(sim, eid, MARK.morphImmune)) return
   const until = sim.elapsedMs + spec.durationMs
-  Morph.cdUntil[eid] = until + MORPH_RECAST_CD
-  Morph.until[eid] = until
-  Guard.until[eid] = until
-  Guard.mul[eid] = spec.vulnMul ?? 1
-  if (!wasMorphed) {
-    const outline = Elite.v[eid] ? 'elite' : 'enemy'
-    Sprite.frame[eid] = atlas.index(spec.morphEmoji, outline)
-    armIdle(eid, spec.morphEmoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
-    interrupt(sim, eid)
-    Transform.rot[eid] = 0
-    if (hasComponent(sim.world, eid, Anchored)) {
-      removeComponent(sim.world, eid, Anchored)
-      Morph.anchored[eid] = 1
-    }
-    sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
-  }
+  const anchored = hasComponent(sim.world, eid, Anchored)
+  addMark(eid, MARK.morphImmune, TAG.morph, until + MORPH_RECAST_CD)
+  addMark(eid, MARK.morph, TAG.morph, until, anchored ? 1 : 0)
+  addMark(eid, MARK.guard, TAG.morph, until, spec.vulnMul ?? 1)
+  const outline = Elite.v[eid] ? 'elite' : 'enemy'
+  Sprite.frame[eid] = atlas.index(spec.morphEmoji, outline)
+  armIdle(eid, spec.morphEmoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
+  interrupt(sim, eid)
+  Transform.rot[eid] = 0
+  if (anchored) removeComponent(sim.world, eid, Anchored)
+  sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
 }
 
-export function restoreMorphVisual(sim: Sim, atlas: FrameIndex, eid: number): void {
+/** 变形到期：外观换回，曾锚定的重新锚定 */
+export function restoreMorph(sim: Sim, atlas: FrameIndex, eid: number, anchored: boolean): void {
   const def = enemyDef[eid]
   if (!def) return
-  if (Morph.anchored[eid]) {
-    addComponent(sim.world, eid, Anchored)
-    Morph.anchored[eid] = 0
-  }
-  Guard.until[eid] = 0
+  if (anchored) addComponent(sim.world, eid, Anchored)
   const outline = Elite.v[eid] ? 'elite' : 'enemy'
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
-  Morph.until[eid] = 0
 }

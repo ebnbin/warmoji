@@ -1,5 +1,5 @@
 import * as components from './components'
-import { columnFill, resizeColumn } from './components'
+import { columnFill, columnStride, resizeColumn } from './components'
 import type { Column } from './components'
 import * as store from './store'
 import { INITIAL_CAPACITY } from './world'
@@ -22,22 +22,22 @@ function eachColumn(fn: (fields: Record<string, unknown>, key: string, col: Colu
 }
 
 interface Columns {
-  f32: Float32Array[]
-  u32: Uint32Array[]
-  u8: Uint8Array[]
-  i32: Int32Array[]
-  i32Fill: number[]
+  plain: Column[]
+  plainFill: number[]
+  strided: Column[]
+  stride: number[]
 }
 
 function collectColumns(): Columns {
-  const out: Columns = { f32: [], u32: [], u8: [], i32: [], i32Fill: [] }
+  const out: Columns = { plain: [], plainFill: [], strided: [], stride: [] }
   eachColumn((_fields, _key, col) => {
-    if (col instanceof Float32Array) out.f32.push(col)
-    else if (col instanceof Uint32Array) out.u32.push(col)
-    else if (col instanceof Uint8Array) out.u8.push(col)
-    else {
-      out.i32.push(col)
-      out.i32Fill.push(columnFill(col))
+    const stride = columnStride(col)
+    if (stride === 1) {
+      out.plain.push(col)
+      out.plainFill.push(columnFill(col))
+    } else {
+      out.strided.push(col)
+      out.stride.push(stride)
     }
   })
   return out
@@ -66,10 +66,8 @@ export function ensureCapacity(eid: number): void {
 
 export function clearEntity(eid: number): void {
   const c = columns
-  for (let i = 0; i < c.f32.length; i++) c.f32[i]![eid] = 0
-  for (let i = 0; i < c.u32.length; i++) c.u32[i]![eid] = 0
-  for (let i = 0; i < c.u8.length; i++) c.u8[i]![eid] = 0
-  for (let i = 0; i < c.i32.length; i++) c.i32[i]![eid] = c.i32Fill[i]!
+  for (let i = 0; i < c.plain.length; i++) c.plain[i]![eid] = c.plainFill[i]!
+  for (let i = 0; i < c.strided.length; i++) c.strided[i]!.fill(0, eid * c.stride[i]!, (eid + 1) * c.stride[i]!)
   for (let i = 0; i < STORE.length; i++) STORE[i]![eid] = undefined
 }
 

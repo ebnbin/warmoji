@@ -1,5 +1,6 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Alive, Built, CharPerk, Contact, DmgMul, Dormant, Faction, Morph, Radius, Slot, Transform } from '../components'
+import { Alive, Built, CharPerk, Contact, Dormant, Faction, MARK, Radius, Slot, Transform } from '../components'
+import { dmgMul, hasMark } from '../utils/marks'
 import { contactEffects, enemyDef } from '../store'
 import { hit } from './shared/damage'
 import { applyAbilityEffects } from './shared/effects'
@@ -12,16 +13,15 @@ import type { Sim } from '../sim'
 function contactSource(sim: Sim, eid: number): Source {
   if (hasComponent(sim.world, eid, Built)) return sourceOf(sim, Built.by[eid]!)
   const def = enemyDef[eid]
-  return def ? enemySource(def.kind, DmgMul.v[eid]!) : bodySource(eid)
+  return def ? enemySource(def.kind, dmgMul(sim, eid)) : bodySource(eid)
 }
 
 /** 接触：带接触载荷的身体碰到敌方身体就打一下，每帧最多一下；被碰者的荆棘反弹给碰的人；接触不看隐匿与视线 */
 export function touchBodies(sim: Sim): void {
   if (sim.over) return
-  const now = sim.elapsedMs
   for (const eid of [...query(sim.world, [Contact, Transform, Radius, Alive, Faction])]) {
     if (!hasComponent(sim.world, eid, Contact)) continue
-    if (!Alive.v[eid] || Dormant.v[eid] || (Morph.until[eid] !== 0 && now < Morph.until[eid]!)) continue
+    if (!Alive.v[eid] || Dormant.v[eid] || hasMark(sim, eid, MARK.morph)) continue
     const src = contactSource(sim, eid)
     const dmg = Math.max(1, Math.round(Contact.damage[eid]! * src.dmgMul))
     const kb = Contact.knockback[eid]!

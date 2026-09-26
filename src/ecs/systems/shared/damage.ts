@@ -2,7 +2,8 @@ import { hasComponent } from 'bitecs'
 import { CRIT_MUL } from '../../../data/items'
 import { norm } from '../../../util/vec'
 import { playSfx } from '../../../audio/sfx'
-import { Alive, CharFlash, Dormant, FACTION, Faction, Flash, Guard, Hp, Iframe, Slot, Tint, Transform } from '../../components'
+import { Alive, CharFlash, Dormant, FACTION, Faction, Flash, Hp, Iframe, MARK, Slot, TAG, Tint, Transform } from '../../components'
+import { addMark, guardMul, hasMark } from '../../utils/marks'
 import { impulse } from './body'
 import { die } from './combat'
 import { spawnDamageNumber } from '../../entities/fx'
@@ -35,12 +36,13 @@ function record(sim: Sim, src: Source, target: number, dmg: number): void {
 export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
   if (sim.over || !hasComponent(sim.world, target, Hp) || Dormant.v[target] || Alive.v[target] === 0) return false
   const now = sim.elapsedMs
-  if (!o.tick && hasComponent(sim.world, target, Iframe)) {
-    if (now - Iframe.last[target]! < Iframe.ms[target]!) return false
-    Iframe.last[target] = now
+  if (!o.tick) {
+    if (hasMark(sim, target, MARK.invuln)) return false
+    if (Iframe.ms[target]! > 0) addMark(target, MARK.invuln, TAG.effect, now + Iframe.ms[target]!)
   }
   let dmg = damage
-  if (Guard.until[target]! > now) dmg = Math.max(1, Math.round(dmg * Guard.mul[target]!))
+  const guard = guardMul(sim, target)
+  if (guard !== 1) dmg = Math.max(1, Math.round(dmg * guard))
   const crit = src.crit > 0 && sim.rng.next() < Math.min(0.5, src.crit)
   if (crit) dmg = Math.round(dmg * CRIT_MUL)
   spawnDamageNumber(sim, Transform.x[target]!, Transform.y[target]!, dmg, crit)

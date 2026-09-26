@@ -1,5 +1,6 @@
 import { AI } from '../../../data/enemies'
-import { EDir, ETurn, Poison } from '../../components'
+import { EDir, ETurn, MARK } from '../../components'
+import { hasMark } from '../../utils/marks'
 import type { Point } from '../../../util/vec'
 import type { Sim } from '../../sim'
 import { bodySource } from '../../utils/source'
@@ -13,7 +14,6 @@ export function nearestFoe(sim: Sim, eid: number, x: number, y: number, range = 
 
 /** 优先还没中毒的最近敌人，都中了毒就取最近的 */
 export function freshFoe(sim: Sim, eid: number, x: number, y: number, range: number): Found | null {
-  const now = sim.elapsedMs
   let fresh: Found | null = null
   let freshD = range * range
   let any: Found | null = null
@@ -26,7 +26,7 @@ export function freshFoe(sim: Sim, eid: number, x: number, y: number, range: num
       anyD = d
       any = { eid: t, x: tx, y: ty, radius }
     }
-    if (Poison.until[t]! <= now && d < freshD) {
+    if (!hasMark(sim, t, MARK.dot) && d < freshD) {
       freshD = d
       fresh = { eid: t, x: tx, y: ty, radius }
     }

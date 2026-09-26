@@ -1,19 +1,12 @@
-import { Alive, AtkSlow, CharFlash, Tint } from '../components'
+import { Alive, CharFlash, MARK, Tint } from '../components'
+import { hasMark } from '../utils/marks'
 import type { Sim } from '../sim'
 
+/** 角色的底色：受击闪色期间不改，其余按攻速下降与否 */
 export function characterVisual(sim: Sim): void {
-  const now = sim.elapsedMs
   for (const m of sim.characters) {
     if (!Alive.v[m]) continue
-    if (AtkSlow.until[m]! > now) {
-      Tint.color[m] = 0x9ccc65
-    } else if (AtkSlow.until[m]! !== 0) {
-      AtkSlow.until[m] = 0
-      CharFlash.until[m] = 0
-      Tint.color[m] = 0xffffff
-    } else if (CharFlash.until[m] !== 0 && sim.fxMs >= CharFlash.until[m]!) {
-      CharFlash.until[m] = 0
-      Tint.color[m] = 0xffffff
-    }
+    if (CharFlash.until[m] !== 0 && sim.fxMs >= CharFlash.until[m]!) CharFlash.until[m] = 0
+    if (CharFlash.until[m] === 0) Tint.color[m] = hasMark(sim, m, MARK.cd) ? 0x9ccc65 : 0xffffff
   }
 }

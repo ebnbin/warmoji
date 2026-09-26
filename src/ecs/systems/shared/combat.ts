@@ -7,7 +7,8 @@ import type { EnemyDef } from '../../../types/enemies'
 import { MEMBER } from '../../../data/characters'
 import { UNIT } from '../../../util/units'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anchored, Anim, Boss, DmgMul, Elite, ENEMY_SET, Hp, Iframe, CharScale, Morph, CharPerk, Nest, Orphan, Pop, Revive, Slot, SpMul, Sprite, Thief, Tint, Transform } from '../../components'
+import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, Hp, Iframe, CharScale, CharPerk, MARK, Nest, Orphan, Pop, Revive, Slot, Sprite, TAG, Thief, Tint, Transform } from '../../components'
+import { addMark, dmgMul, hasMark } from '../../utils/marks'
 import { enemyCarries, enemyDef } from '../../store'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
@@ -60,9 +61,9 @@ function killEnemy(sim: Sim, eid: number, srcSlot: number, flingVx: number, flin
   if (boss) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 24, kind: 'death' })
   if (boss) sim.bossDown = true
   if (def) grantKillRewards(sim, eid, def, elite)
-  const hexed = Morph.until[eid] !== 0 && sim.elapsedMs < Morph.until[eid]!
+  const hexed = hasMark(sim, eid, MARK.morph)
   if (!hexed && def?.onDeath) {
-    const snap = { eid: -1, def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: DmgMul.v[eid]! }
+    const snap = { eid: -1, def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: dmgMul(sim, eid) }
     if (sim.onDeathFx) sim.onDeathFx({ ...snap, eid })
     else sim.pendingDeaths.push(snap)
   }
@@ -112,8 +113,8 @@ function orphanBrood(sim: Sim, nestEid: number, rage = true): void {
     if (Nest.of[eid] !== nestEid) continue
     Nest.of[eid] = -1
     if (rage && hasComponent(sim.world, eid, Orphan)) {
-      SpMul.v[eid] = SpMul.v[eid]! * Orphan.speedMul[eid]!
-      DmgMul.v[eid] = DmgMul.v[eid]! * Orphan.damageMul[eid]!
+      addMark(eid, MARK.speed, TAG.rage, Infinity, Orphan.speedMul[eid]!)
+      addMark(eid, MARK.dmg, TAG.rage, Infinity, Orphan.damageMul[eid]!)
     }
   }
 }
@@ -129,7 +130,7 @@ export function despawnEnemy(sim: Sim, eid: number, puff = true): void {
 
 /** 无敌窗口只能延长，不能缩短 */
 export function grantIframe(sim: Sim, eid: number, ms: number): void {
-  Iframe.last[eid] = Math.max(Iframe.last[eid]!, sim.elapsedMs + ms - Iframe.ms[eid]!)
+  addMark(eid, MARK.invuln, TAG.effect, sim.elapsedMs + ms)
 }
 
 export function reviveCharacter(sim: Sim, eid: number): void {
@@ -138,7 +139,7 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   Alive.v[eid] = 1
   Anim.frames[eid] = 0
   Hp.v[eid] = Hp.max[eid]!
-  Iframe.last[eid] = now
+  addMark(eid, MARK.invuln, TAG.effect, now + Iframe.ms[eid]!)
   Tint.color[eid] = 0xffffff
   Tint.alpha[eid] = 1
   Tint.effect[eid] = 0

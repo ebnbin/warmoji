@@ -1,7 +1,8 @@
 import { hasComponent } from 'bitecs'
 import type { Effect } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
-import { Alive, AtkSlow, Dancing, DmgBuff, Enemy, FACTION, Guard, Hidden, Hp, Iframe, Morph, Poison, Revive, Slow, Taunted } from '../../components'
+import { Alive, Enemy, FACTION, Hp, MARK, Mark, Revive, TAG } from '../../components'
+import { addMark } from '../../utils/marks'
 import { poisonSrc } from '../../store'
 import { applyMorph } from '../../entities/enemy'
 import { spawnBolt } from '../../entities/projectile'
@@ -64,35 +65,24 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   slow: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, at, Slow, (t) => {
-      Slow.until[t] = until
-      Slow.mul[t] = fx.factor
-    })
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.slow, TAG.effect, until, fx.factor))
   },
 
   poison: (sim, src, fx, at) => {
     const now = sim.elapsedMs
-    eachCapable(sim, at, Poison, (t) => {
-      Poison.until[t] = now + fx.durationMs
-      Poison.nextTick[t] = now + fx.tickMs
-      Poison.dmg[t] = fx.damage
-      Poison.tickMs[t] = fx.tickMs
+    eachCapable(sim, at, Mark, (t) => {
+      addMark(t, MARK.dot, TAG.effect, now + fx.durationMs, fx.damage, fx.tickMs, now + fx.tickMs)
       poisonSrc[t] = src
     })
   },
 
   morph: (sim, _src, fx, at) => {
-    eachCapable(sim, at, Morph, (t) => {
-      if (hasComponent(sim.world, t, Enemy)) applyMorph(sim, sim.frames, t, fx)
-    })
+    eachCapable(sim, at, Enemy, (t) => applyMorph(sim, sim.frames, t, fx))
   },
 
   attackSlow: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, at, AtkSlow, (t) => {
-      AtkSlow.until[t] = until
-      AtkSlow.mul[t] = fx.mul
-    })
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.cd, TAG.effect, until, fx.mul))
   },
 
   ground: (sim, src, fx, at) => {
@@ -151,43 +141,32 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   buff: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, at, DmgBuff, (t) => {
-      DmgBuff.mul[t] = fx.damageMul
-      DmgBuff.until[t] = until
-    })
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.dmg, TAG.effect, until, fx.damageMul))
   },
 
   stun: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, at, Dancing, (t) => {
-      Dancing.until[t] = until
+    eachCapable(sim, at, Mark, (t) => {
+      addMark(t, MARK.stun, TAG.effect, until)
       interrupt(sim, t)
     })
   },
 
   hide: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, at, Hidden, (t) => {
-      Hidden.until[t] = until
-    })
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.hide, TAG.effect, until))
   },
 
   taunt: (sim, src, fx, at) => {
     const by = src.viewer
     if (by === undefined) return
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, at, Taunted, (t) => {
-      Taunted.until[t] = until
-      Taunted.by[t] = by
-    })
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.taunt, TAG.effect, until, by))
   },
 
   guard: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, at, Guard, (t) => {
-      Guard.mul[t] = fx.mul
-      Guard.until[t] = until
-    })
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.guard, TAG.effect, until, fx.mul))
   },
 
   revive: (sim, _src, _fx, at) => {
@@ -203,7 +182,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   invuln: (sim, _src, fx, at) => {
-    eachCapable(sim, at, Iframe, (t) => {
+    eachCapable(sim, at, Mark, (t) => {
       if (Alive.v[t]) grantIframe(sim, t, fx.ms)
     })
   },
