@@ -45,7 +45,9 @@ export const abilityFireSfx: (import('../types/sfx').SfxId | undefined)[] =
 
 export const projSrcEnemy: (EnemyKind | undefined)[] = new Array<EnemyKind | undefined>(INITIAL_CAPACITY).fill(undefined)
 
-export const zoneSrcEnemy: (EnemyKind | undefined)[] = new Array<EnemyKind | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const zoneEffects: (readonly Effect[] | undefined)[] = new Array<readonly Effect[] | undefined>(INITIAL_CAPACITY).fill(undefined)
+
+export const zoneSrc: (import('./utils/source').Source | undefined)[] = new Array<import('./utils/source').Source | undefined>(INITIAL_CAPACITY).fill(undefined)
 
 export const poisonSrc: (import('./utils/source').Source | undefined)[] = new Array<import('./utils/source').Source | undefined>(INITIAL_CAPACITY).fill(undefined)
 

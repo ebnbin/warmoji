@@ -1,6 +1,7 @@
 import { query } from 'bitecs'
-import { Drive, Dancing, Dormant, ENEMY_SET, EnemyPhase, Morph, Slow, Slowed, Speed, SpMul, Steering, Transform, ZoneSlow } from '../components'
+import { Drive, Dancing, Dormant, ENEMY_SET, EnemyPhase, Morph, Slowed, Speed, SpMul, Steering, Transform } from '../components'
 import { wanderDir } from './shared/steer'
+import { slowMul } from './shared/status'
 import type { Sim } from '../sim'
 
 export function updateEnemyGates(sim: Sim): void {
@@ -16,11 +17,7 @@ export function updateEnemyGates(sim: Sim): void {
       Steering.v[eid] = 0
       continue
     }
-    const slow =
-      ZoneSlow.v[eid]! *
-      (now < Slow.until[eid]! ? Slow.mul[eid]! : 1) *
-      SpMul.v[eid]! *
-      sim.battleFx.enemySlowMul
+    const slow = slowMul(sim, eid) * SpMul.v[eid]! * sim.battleFx.enemySlowMul
     Slowed.v[eid] = slow
     if (Dancing.until[eid] !== 0) {
       Transform.rot[eid] = Math.sin(now / 80 + EnemyPhase.v[eid]!) * 0.3

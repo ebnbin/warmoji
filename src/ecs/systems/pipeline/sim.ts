@@ -5,7 +5,6 @@ import { driftDecor } from '../driftDecor'
 import { spinDecor } from '../spinDecor'
 import { expireFx } from '../expireFx'
 import { animateCharacters } from '../animateCharacters'
-import { applySlowZones } from '../applySlowZones'
 import { despawnExpired } from '../despawnExpired'
 import { fadeEnemyFlash } from '../fadeEnemyFlash'
 import { layoutTeam } from '../layoutTeam'
@@ -56,9 +55,8 @@ export const SIM_PIPELINE = pipeline([
   { run: popInEnemies, after: [updateDormancy] },
   { run: despawnExpired, after: [updateDormancy] },
   { run: fadeEnemyFlash, after: [updateDormancy] },
-  { run: applySlowZones, after: [updateDormancy] },
-  { run: tintEnemies, after: [applySlowZones] },
-  { run: updateEnemyGates, after: [applySlowZones] },
+  { run: tintEnemies, after: [updateDormancy] },
+  { run: updateEnemyGates, after: [updateDormancy] },
   ...STEERERS.map((run) => ({ run, after: [updateEnemyGates] })),
   { run: moveBodies, after: [layoutTeam, ...STEERERS] },
   { run: refreshTargets, after: [moveBodies] },

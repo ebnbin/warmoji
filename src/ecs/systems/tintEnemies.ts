@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { Dancing, Dormant, ENEMY_SET, EState, Flash, Poison, Tint, ZoneSlow } from '../components'
+import { Dancing, Dormant, ENEMY_SET, EState, Flash, Poison, Slow, Tint } from '../components'
 import type { Sim } from '../sim'
 
 export function tintEnemies(sim: Sim): void {
@@ -13,7 +13,7 @@ export function tintEnemies(sim: Sim): void {
         ? 0x7bff5a
         : EState.v[eid] === 2
           ? 0xffb74d
-          : ZoneSlow.v[eid]! < 1
+          : now < Slow.until[eid]! && Slow.mul[eid]! < 1
             ? 0xa5d8ff
             : 0xffffff
   }

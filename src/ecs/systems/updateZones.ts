@@ -1,29 +1,12 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
-import {
-  Alive,
-  Disarmed,
-  ENEMY_SET,
-  FACTION,
-  Frozen,
-  GroundHit,
-  Lifetime,
-  Owner,
-  Ring,
-  Tint,
-  Transform,
-  ZONE_SET,
-  Zone,
-  ZoneBurn,
-  ZoneFollow,
-  ZoneMend,
-  Hp,
-} from '../components'
+import { Disarmed, Frozen, Hp, Lifetime, Owner, Ring, Tint, Transform, ZONE_SET, Zone, ZoneFollow } from '../components'
 import { hit } from './shared/damage'
-import { boltSource, enemySource, WORLD_SOURCE } from '../utils/source'
+import { applyAbilityEffects } from './shared/effects'
 import { backEaseOut } from '../utils/ease'
-import { zoneSrcEnemy } from '../store'
+import { eachAlly, targetsNear } from '../utils/targets'
+import { zoneEffects, zoneSrc } from '../store'
+import { spawnFxCircle } from '../entities/fx'
 import type { Sim } from '../sim'
-
 
 const FADE_MS = 250
 
@@ -31,6 +14,8 @@ function fadeExpired(sim: Sim, z: number): boolean {
   if (Zone.fadeAt[z] === 0) Zone.fadeAt[z] = sim.fxMs
   const over = sim.fxMs - Zone.fadeAt[z]!
   if (over >= FADE_MS) {
+    zoneEffects[z] = undefined
+    zoneSrc[z] = undefined
     removeEntity(sim.world, z)
     return true
   }
@@ -45,11 +30,20 @@ export function finishZoneFades(sim: Sim): void {
   }
 }
 
+/** 场内的身体：圆心落在场内 */
+function inside(x: number, y: number, r: number, tx: number, ty: number): boolean {
+  const dx = tx - x
+  const dy = ty - y
+  return dx * dx + dy * dy <= r * r
+}
+
+/** 场每帧给场内己方回复，每到节拍对场内敌方扣血再施加效果；敌我同一条 */
 export function updateZones(sim: Sim): void {
   const world = sim.world
   const zones = [...query(world, ZONE_SET)]
   if (zones.length === 0) return
   const now = sim.elapsedMs
+  const dt = sim.wdtMs / 1000
   for (const z of zones) {
     if (hasComponent(world, z, ZoneFollow)) {
       const a = ZoneFollow.of[z]!
@@ -67,59 +61,40 @@ export function updateZones(sim: Sim): void {
     const enter = Zone.enterMs[z]!
     const age = sim.fxMs - Ring.born[z]!
     Ring.radius[z] = Zone.radius[z]! * (enter > 0 && age < enter ? 0.3 + 0.7 * backEaseOut(age / enter) : 1)
-  }
-  mendMembers(sim, [...query(world, [Zone, ZoneMend, Transform])])
-  const burns = [...query(world, [Zone, ZoneBurn, Transform])]
-  if (burns.length === 0) return
-  burnEnemies(sim, burns, now)
-  burnMembers(sim, burns, now)
-}
-
-function mendMembers(sim: Sim, mends: readonly number[]): void {
-  if (mends.length === 0) return
-  const dt = sim.wdtMs / 1000
-  for (const m of sim.characters) {
-    if (!Alive.v[m]) continue
-    for (const z of mends) {
-      if (Zone.on[z] === 0) continue
-      const r = Zone.radius[z]!
-      const d = sim.hooks.worldDelta(sim, Transform.x[z]!, Transform.y[z]!, Transform.x[m]!, Transform.y[m]!)
-      if (d.x * d.x + d.y * d.y > r * r) continue
-      Hp.v[m] = Math.min(Hp.max[m]!, Hp.v[m]! + ZoneMend.perSec[z]! * dt)
-    }
-  }
-}
-
-function burnEnemies(sim: Sim, burns: readonly number[], now: number): void {
-  let enemies: readonly number[] | undefined
-  for (const z of burns) {
-    if (Zone.on[z] === 0 || Zone.faction[z] === FACTION.enemy || now < ZoneBurn.nextAt[z]!) continue
-    ZoneBurn.nextAt[z] = now + ZoneBurn.tickMs[z]!
-    enemies ??= [...query(sim.world, ENEMY_SET)]
+    if (Zone.on[z] === 0) continue
+    const x = Transform.x[z]!
+    const y = Transform.y[z]!
     const r = Zone.radius[z]!
-    const damage = ZoneBurn.damage[z]!
-    const src = boltSource(ZoneBurn.srcSlot[z]!)
-    for (const eid of enemies) {
-      const d = sim.hooks.worldDelta(sim, Transform.x[z]!, Transform.y[z]!, Transform.x[eid]!, Transform.y[eid]!)
-      if (d.x * d.x + d.y * d.y <= r * r) hit(sim, src, eid, damage, { tick: true })
+    const src = zoneSrc[z]!
+    const mend = Zone.mend[z]!
+    if (mend > 0) {
+      eachAlly(sim, src.faction, x, y, r, (eid, tx, ty) => {
+        if (inside(x, y, r, tx, ty)) Hp.v[eid] = Math.min(Hp.max[eid]!, Hp.v[eid]! + mend * dt)
+      })
     }
-  }
-}
-
-function burnMembers(sim: Sim, burns: readonly number[], now: number): void {
-  for (const m of sim.characters) {
-    if (!Alive.v[m]) continue
-    for (const z of burns) {
-      if (Zone.on[z] === 0 || Zone.faction[z] !== FACTION.enemy) continue
-      const r = Zone.radius[z]!
-      const d = sim.hooks.worldDelta(sim, Transform.x[z]!, Transform.y[z]!, Transform.x[m]!, Transform.y[m]!)
-      if (d.x * d.x + d.y * d.y > r * r) continue
-      if (now - GroundHit.last[m]! >= ZoneBurn.tickMs[z]!) {
-        GroundHit.last[m] = now
-        const kind = zoneSrcEnemy[z]
-        hit(sim, kind ? { ...enemySource(kind, 1), tint: 0xa5d86a } : WORLD_SOURCE, m, ZoneBurn.damage[z]!, { tick: true })
-      }
-      break
+    const tickMs = Zone.tickMs[z]!
+    if (tickMs <= 0 || now < Zone.nextAt[z]!) continue
+    Zone.nextAt[z] = Zone.nextAt[z]! + tickMs
+    const damage = Zone.damage[z]!
+    const effects = zoneEffects[z]
+    const found = targetsNear(sim, src, x, y, r).filter((t) => inside(x, y, r, t.x, t.y))
+    if (damage > 0) for (const t of found) hit(sim, src, t.eid, damage, { tick: true })
+    if (effects && effects.length > 0 && found.length > 0) {
+      applyAbilityEffects(sim, src, effects, { x, y, baseDamage: damage, targets: found.map((t) => t.eid) })
+    }
+    const pulse = Zone.pulse[z]!
+    if (pulse !== 0) {
+      spawnFxCircle(sim, x, y, r, {
+        fill: 0xffffff,
+        fillAlpha: 0.18,
+        stroke: pulse,
+        lineWidth: 4,
+        lineAlpha: 0.9,
+        fromScale: 0.2,
+        toScale: 1,
+        durationMs: 420,
+        depth: 7,
+      })
     }
   }
 }

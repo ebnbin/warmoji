@@ -1,13 +1,12 @@
 import { hasComponent } from 'bitecs'
 import type { Effect } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
-import { Enemy, AtkSlow, Morph, Poison, Slow } from '../../components'
+import { Enemy, AtkSlow, FACTION, Morph, Poison, Slow } from '../../components'
 import { poisonSrc } from '../../store'
 import { applyMorph } from '../../entities/enemy'
 import { spawnEnemyProjectile } from '../../entities/projectile'
 import { spawnZone } from '../../entities/zone'
 import { hit } from './damage'
-import { FACTION } from '../../components'
 import { healAllies } from './heal'
 import { nearestAngle, targetsNear } from '../../utils/targets'
 import type { Source } from '../../utils/source'
@@ -97,19 +96,15 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       x: at.x,
       y: at.y,
       radius: fx.def.radius,
-      faction: src.faction,
+      src: { ...src, tint: 0xa5d86a },
       durationMs: fx.def.durationMs,
       enterMs: fx.def.enterMs,
       color: fx.def.color,
       fillAlpha: fx.def.fillAlpha,
       lineAlpha: fx.def.lineAlpha,
       lineWidth: 2,
-      burn: {
-        damage: fx.def.damage,
-        tickMs: fx.def.tickMs,
-        srcSlot: src.slot,
-        srcEnemy: src.faction === FACTION.team ? undefined : src.enemy,
-      },
+      tickMs: fx.def.tickMs,
+      damage: fx.def.damage,
     })
   },
 

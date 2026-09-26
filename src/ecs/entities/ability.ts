@@ -48,7 +48,6 @@ import {
   Nuke,
   Owner,
   Pierce,
-  Pulse,
   Radial,
   Rally,
   Shoot,
@@ -103,13 +102,6 @@ const BlinkState: StateSpec = {
   reset: (e) => {
     Blink.x[e] = 0
     Blink.y[e] = 0
-  },
-}
-const PulseState: StateSpec = {
-  comp: Pulse,
-  reset: (e) => {
-    Pulse.dps[e] = 0
-    Pulse.freeze[e] = 0
   },
 }
 const ShotsState: StateSpec = { comp: Shots, reset: (e) => { Shots.n[e] = 0 } }
@@ -460,7 +452,7 @@ const KINDS: { [K in keyof AbilityOf]: KindSpec<K> } = {
   },
   slowAura: {
     comp: SlowAura,
-    state: [PulseState, AuraState],
+    state: [AuraState],
     attach: (c, e, d) => {
       SlowAura.cdLeft[e] = 0
       SlowAura.radius[e] = d.radius

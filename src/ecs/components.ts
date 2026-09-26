@@ -119,8 +119,6 @@ export const DmgMul = { v: f32() }
 
 export const SpMul = { v: f32() }
 
-export const ZoneSlow = { v: f32() }
-
 export const Flash = { until: f32() }
 
 export const EDir = { x: f32(), y: f32() }
@@ -239,17 +237,12 @@ export const PICKUP_SET: QueryTerm[] = [Pickup, Transform, Phys]
 
 export const RING_SET: QueryTerm[] = [Ring, Transform, Tint]
 
-export const Zone = { radius: f32(), faction: u8(), enterMs: f32(), on: u8(), fadeAt: f32() }
-
-export const ZoneBurn = { damage: f32(), tickMs: f32(), nextAt: f32(), srcSlot: i32() }
-
-export const ZoneChill = { factor: f32() }
+/** 场：每隔 tickMs 对场内敌方扣 damage 再施加效果，场内己方每秒回复 mend，pulse 非零时每次 tick 闪一圈 */
+export const Zone = { radius: f32(), faction: u8(), enterMs: f32(), on: u8(), fadeAt: f32(), tickMs: f32(), nextAt: f32(), damage: f32(), mend: f32(), pulse: u32() }
 
 export const ZoneFollow = { of: i32() }
 
 export const ZONE_SET: QueryTerm[] = [Zone, Transform]
-
-export const GroundHit = { last: f32() }
 
 export const Anchor = { eid: i32() }
 
@@ -429,11 +422,6 @@ export const Stealth = { ...cd(), durationMs: f32() }
 export const Field = { ...cd(), radius: f32(), durationMs: f32(), healPerSec: f32(), poisonDamage: f32(), poisonTickMs: f32(), color: u32() }
 export const Deploy = { ...cd(), count: f32(), spread: f32(), lifeMs: f32() }
 export const Nova = { ...cd(), radius: f32(), damage: f32(), knockback: f32(), color: u32() }
-
-/** 领域内的队友每秒回复的生命 */
-export const ZoneMend = { perSec: f32() }
-
-export const Pulse = { dps: f32(), freeze: f32() }
 
 export const Aura = { zone: i32() }
 

@@ -16,7 +16,7 @@ import { INVINCIBLE_HP, sandboxInvincible, sandboxLevel } from '../sandbox/knobs
 import { armIdle } from '../systems/shared/anim'
 
 import type { RunState } from '../../run/state'
-import { Alive, Anim, AtkSlow, Breath, Clock, Depth, DmgBuff, DmgMul, Drive, FACTION, Faction, GroundHit, Guard, Hidden, Hp, VisOff, Iframe, Character, CharFlash, CharPerk, CharScale, Facing, Leaping, Magnet, Phys, Poison, Pop, Quad, Radius, Revive, Rushing, Seat, Slot, Slow, Sprite, Tint, Transform } from '../components'
+import { Alive, Anim, AtkSlow, Breath, Clock, Depth, DmgBuff, DmgMul, Drive, FACTION, Faction, Guard, Hidden, Hp, VisOff, Iframe, Character, CharFlash, CharPerk, CharScale, Facing, Leaping, Magnet, Phys, Poison, Pop, Quad, Radius, Revive, Rushing, Seat, Slot, Slow, Sprite, Tint, Transform } from '../components'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
@@ -64,7 +64,6 @@ export function spawnCharacter(
   addComponent(world, eid, Iframe)
   addComponent(world, eid, Revive)
   addComponent(world, eid, Radius)
-  addComponent(world, eid, GroundHit)
   addComponent(world, eid, CharFlash)
   addComponent(world, eid, Transform)
   addComponent(world, eid, Anim)
@@ -109,7 +108,6 @@ export function spawnCharacter(
   CharPerk.regenPerSec[eid] = fx.regenPerSec
   Iframe.ms[eid] = MEMBER.iframesMs + fx.iframesAddMs
   Iframe.last[eid] = -1e9
-  GroundHit.last[eid] = -1e9
   Revive.ms[eid] = Math.max(1000, TEAM.reviveMs + fx.reviveAddMs)
   Revive.at[eid] = 0
   Radius.v[eid] = MEMBER.radius * UNIT * place.sizeMul
