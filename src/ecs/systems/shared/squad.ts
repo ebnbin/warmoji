@@ -1,17 +1,7 @@
-import { defineDevChoice, defineDevFlag } from '../../../devtools'
+import { defineDevChoice } from '../../../devtools'
 import { SQUAD } from '../../../data/feel'
 import { TEAM } from '../../../data/characters'
 import { MAPS } from '../../../data/maps'
-
-export const SQUAD_FLAGS = { physics: 'team.physics' } as const
-
-export const physicsOn = defineDevFlag({
-  id: SQUAD_FLAGS.physics,
-  group: '队伍',
-  label: '物理跟随',
-  desc: '队员靠推力、阻力、斥力跑向目标位；关闭则弹簧粘到目标位',
-  default: true,
-})
 
 function numChoice(
   id: string,

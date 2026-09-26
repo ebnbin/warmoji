@@ -1,10 +1,4 @@
 export interface FeelTuning {
-  readonly follow: {
-    readonly kBase: number
-    readonly kJitter: number
-    readonly zeta: number
-    readonly maxLag: number
-  }
   readonly squad: {
     readonly fanDistance: number
     readonly fanSpreadDeg: number

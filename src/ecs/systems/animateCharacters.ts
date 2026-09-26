@@ -28,13 +28,11 @@ export function finishCharacterPops(sim: Sim): void {
 
 export function animateCharacters(sim: Sim): void {
   const delta = sim.dtMs
-  const teamMoving = sim.teamDir.x !== 0 || sim.teamDir.y !== 0
   const baseSize = MEMBER.size * UNIT
   for (const eid of sim.characters) {
     if (!Alive.v[eid]) continue
-    const own = sim.physics
-    const vx = own ? Phys.vx[eid]! : sim.teamDir.x
-    const moving = own ? Math.hypot(Phys.vx[eid]!, Phys.vy[eid]!) > STRIDE : teamMoving
+    const vx = Phys.vx[eid]!
+    const moving = Math.hypot(vx, Phys.vy[eid]!) > STRIDE
     const charSize = baseSize * CharScale.v[eid]!
     if (!popping(sim, eid, charSize)) {
       const bp = Breath.phase[eid]! + delta / (moving ? 85 : 140)
@@ -43,6 +41,6 @@ export function animateCharacters(sim: Sim): void {
       Transform.w[eid] = charSize * (1 - s * 0.6)
       Transform.h[eid] = charSize * (1 + s)
     }
-    if (Math.abs(vx) > (own ? STRIDE : 0.2)) Sprite.flipX[eid] = vx > 0 ? 1 : 0
+    if (Math.abs(vx) > STRIDE) Sprite.flipX[eid] = vx > 0 ? 1 : 0
   }
 }

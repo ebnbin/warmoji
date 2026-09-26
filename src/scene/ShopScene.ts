@@ -103,7 +103,6 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     this.run = getRun()
     this.lineup = [...this.run.roster]
     if (!preserved) {
-      this.run.freeRefreshes = 0
       this.offers = this.lineup.map((_, slot) =>
         rollItem(this.poolFor(slot), this.ownedFor(slot), Math.random, this.run.wave, this.levelOf(slot)),
       )
@@ -307,10 +306,8 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
   private refreshFocused(): void {
     const idx = this.focusedIndex()
     if (idx < 0) return
-    const free = this.run.freeRefreshes > 0
-    if (!free && this.run.coins < SHOP.refreshPrice) return
-    if (free) this.run.freeRefreshes -= 1
-    else this.run.coins -= SHOP.refreshPrice
+    if (this.run.coins < SHOP.refreshPrice) return
+    this.run.coins -= SHOP.refreshPrice
     playSfx('click')
     this.offers[idx] = rollItem(this.poolFor(idx), this.ownedFor(idx), Math.random, this.run.wave, this.levelOf(idx))
     this.refresh()
@@ -594,8 +591,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
         .setOrigin(0.5),
     )
 
-    const free = this.run.freeRefreshes > 0
-    const canRefresh = free || this.run.coins >= SHOP.refreshPrice
+    const canRefresh = this.run.coins >= SHOP.refreshPrice
     const rb = this.refreshRect
     const refBg = this.add.graphics()
     roundRect(refBg, rb.x, rb.y, rb.w, rb.h, 27, { fill: 0xffffff, fillAlpha: canRefresh ? 0.14 : 0.07 })
@@ -609,7 +605,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
         .text(
           rb.x + rb.w / 2,
           rb.y + rb.h / 2,
-          free ? `刷新 免费×${this.run.freeRefreshes}` : `刷新 ${SHOP.refreshPrice}`,
+          `刷新 ${SHOP.refreshPrice}`,
           {
             fontFamily: UI_FONT,
             fontSize: FONT.small,
@@ -764,13 +760,6 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
                   run: (): void => {
                     this.run.coins += 1000
                     this.refresh()
-                  },
-                },
-                {
-                  label: '免费刷新当前格',
-                  run: (): void => {
-                    this.run.freeRefreshes += 1
-                    this.refreshFocused()
                   },
                 },
               ],

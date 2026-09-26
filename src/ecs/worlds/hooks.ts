@@ -26,6 +26,9 @@ import { fleeSteer } from '../systems/shared/steer'
 import { leaderX, leaderY, leaderPoint } from '../utils/team'
 import { iceTraction } from '../systems/shared/squad'
 
+/** 场地夹取给身体留的边距：按队长的受击半径 */
+const BODY_MARGIN = MEMBER.radius * TEAM.leaderSizeMul * UNIT
+
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
 
@@ -107,7 +110,7 @@ const bounded: WorldHooks = {
     return GROUND
   },
   constrainBody(sim, _from, next) {
-    const clampMin = (TEAM.ringRadius + MEMBER.radius) * UNIT
+    const clampMin = BODY_MARGIN
     return {
       x: Math.min(Math.max(next.x, clampMin), sim.mapW - clampMin),
       y: Math.min(Math.max(next.y, clampMin), sim.mapH - clampMin),
@@ -539,7 +542,7 @@ const river: WorldHooks = {
     return flowOf(sim)
   },
   constrainBody(sim, _from, next) {
-    return clampToRiver(next, riverOf(sim), (TEAM.ringRadius + MEMBER.radius) * UNIT)
+    return clampToRiver(next, riverOf(sim), BODY_MARGIN)
   },
   constrainEnemy(sim, eid, x, y) {
     const r = riverOf(sim)

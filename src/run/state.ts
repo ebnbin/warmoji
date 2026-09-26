@@ -23,7 +23,6 @@ export interface RunState {
   roster: CharacterId[]
   memberHp: number[]
   memberItems: ItemId[][]
-  freeRefreshes: number
   skillCd: number[]
   leaderId: CharacterId
   stats: {
@@ -55,7 +54,6 @@ export function beginRun(starters: readonly CharacterId[], mapId: MapId = MAP_ID
     roster,
     memberHp: roster.map(() => MEMBER.maxHp),
     memberItems: roster.map(() => []),
-    freeRefreshes: 0,
     skillCd: roster.map(() => 0),
     leaderId: roster[0]!,
     stats: {

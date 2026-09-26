@@ -65,7 +65,7 @@ export const Character = {}
 
 export const Slot = { v: i32() }
 
-export const Follow = { x: f32(), y: f32(), vx: f32(), vy: f32(), k: f32() }
+export const Follow = { x: f32(), y: f32() }
 
 export const VisOff = { x: f32(), y: f32() }
 
