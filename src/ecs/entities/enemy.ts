@@ -152,6 +152,8 @@ export function spawnEnemy(
   addComponent(world, eid, Poison)
   addComponent(world, eid, Casting)
   addComponent(world, eid, Nest)
+  addComponent(world, eid, Dancing)
+  addComponent(world, eid, Taunted)
   addComponent(world, eid, Despawn)
   addComponent(world, eid, Morph)
   addComponent(world, eid, EDir)
