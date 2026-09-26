@@ -458,11 +458,11 @@ const shot = (emoji: string, speed: number, rotationOffsetDeg = 0) => ({ emoji, 
 // 🐸 青蛙：舌头把远处的敌人拽到身边
 const frogTongue = {
   trigger: 'auto',
-  cooldownMs: 1500,
+  cooldownMs: 1300,
   aim: 'nearest',
   fireSfx: 'whoosh',
   range: 4.8,
-  damage: 14,
+  damage: 20,
   color: 0xf48fb1,
   shape: { kind: 'segment', reach: 4.5, radius: 0.35, ms: 200, beam: true },
   onHit: [{ kind: 'pull', speed: 14, gap: 0.3 }],
@@ -480,10 +480,10 @@ const frogLily = {
 // 🦊 狐仙：迷惑，让敌人不由自主地走向你
 const foxCharm = {
   trigger: 'auto',
-  cooldownMs: 1600,
+  cooldownMs: 1300,
   aim: 'nearest',
   fireSfx: 'shoot',
-  damage: 12,
+  damage: 18,
   knockback: 1,
   shape: { kind: 'bolt', projectile: shot('1f496', 10), lifeMs: 1600 },
   onHit: [{ kind: 'charm', durationMs: 1300 }],
@@ -576,10 +576,10 @@ const slothRewind = {
 // 🐈‍⬛ 黑猫：影子，同时在两个地方出手
 const catPaw = {
   trigger: 'auto',
-  cooldownMs: 800,
+  cooldownMs: 750,
   aim: 'nearest',
   fireSfx: 'shoot',
-  damage: 12,
+  damage: 14,
   knockback: 1.5,
   mirror: true,
   shape: { kind: 'bolt', projectile: shot('1f43e', 12), lifeMs: 1500 },
@@ -607,7 +607,7 @@ const gorillaSlam = {
   aim: 'nearest',
   fireSfx: 'whoosh',
   range: 2.2,
-  damage: 24,
+  damage: 28,
   knockback: 5,
   shape: { kind: 'sector', radius: 2.1, arcDeg: 140, ms: 240 },
   boost: { at: 100, spend: 100, damageMul: 2, onHit: [{ kind: 'knockup', durationMs: 600, height: 1.2 }] },
@@ -629,10 +629,10 @@ const gorillaRage = {
 const caseClosed = [{ kind: 'stun', durationMs: 1200 }, { kind: 'reveal', durationMs: 5000 }, { kind: 'damage', amount: 0, ratio: 2.5 }] as const
 const detectiveLens = {
   trigger: 'auto',
-  cooldownMs: 900,
+  cooldownMs: 850,
   aim: 'nearest',
   fireSfx: 'shoot',
-  damage: 10,
+  damage: 12,
   knockback: 1,
   shape: { kind: 'bolt', projectile: shot('1f50d', 11), lifeMs: 1800 },
   onHit: [{ kind: 'stack', max: 3, durationMs: 4000, then: caseClosed }],
@@ -778,10 +778,10 @@ const genieWish = {
 // 🦜 鹦鹉：学舌，借敌人的招来用
 const parrotMimic = {
   trigger: 'auto',
-  cooldownMs: 1300,
+  cooldownMs: 1100,
   aim: 'nearest',
   fireSfx: 'shoot',
-  damage: 10,
+  damage: 14,
   knockback: 1,
   shape: { kind: 'bolt', projectile: shot('1f3b5', 11), lifeMs: 1800 },
   onHit: [{ kind: 'steal', ms: 6000, cooldownMs: 1400 }],
@@ -805,9 +805,9 @@ const pandaPalm = {
   aim: 'nearest',
   fireSfx: 'whoosh',
   range: 1.9,
-  damage: 13,
+  damage: 16,
   knockback: 2,
-  cost: 12,
+  cost: 10,
   shape: { kind: 'segment', reach: 1.7, radius: 0.5, ms: 140, lungeDist: 0.4 },
 } satisfies AbilityDef
 const pandaPalm2 = { ...pandaPalm, onHit: [{ kind: 'shove', distance: 1.2, ms: 160 }] } satisfies AbilityDef
@@ -851,11 +851,11 @@ const guardShield = { emoji: '1f6e1', size: 0.7, restOffset: 0.45, rotationOffse
 const guardStun = [{ kind: 'stun', durationMs: 1400 }, { kind: 'damage', amount: 0, ratio: 0.8 }] as const
 const guardBash = {
   trigger: 'auto',
-  cooldownMs: 1400,
+  cooldownMs: 1200,
   aim: 'nearest',
   fireSfx: 'whoosh',
   range: 1.9,
-  damage: 18,
+  damage: 24,
   held: guardShield,
   shape: { kind: 'segment', reach: 1.6, radius: 0.6, ms: 180, lungeDist: 0.4 },
   onHit: [{ kind: 'shove', distance: 2.4, ms: 260, onWall: guardStun }],
@@ -904,10 +904,10 @@ const peacockFan = {
 // 🐨 考拉：让敌人睡着，让队友抱住你
 const koalaLeaf = {
   trigger: 'auto',
-  cooldownMs: 1500,
+  cooldownMs: 1200,
   aim: 'nearest',
   fireSfx: 'shoot',
-  damage: 8,
+  damage: 14,
   shape: { kind: 'bolt', projectile: shot('1f343', 9), lifeMs: 2000 },
   onHit: [{ kind: 'sleep', durationMs: 3000, wakeMul: 2 }],
 } satisfies AbilityDef
@@ -936,10 +936,10 @@ const koalaHug = {
 const inkPuddle = { kind: 'ground', def: { radius: 1.4, durationMs: 3000, tickMs: 500, damage: 0, color: 0x37474f, fillAlpha: 0.3, lineAlpha: 0.5, enterMs: 200, effects: [{ kind: 'disarm', durationMs: 700 }] } } as const
 const octoInk = {
   trigger: 'auto',
-  cooldownMs: 1200,
+  cooldownMs: 1000,
   aim: 'nearest',
   fireSfx: 'shoot',
-  damage: 12,
+  damage: 18,
   knockback: 1,
   shape: { kind: 'bolt', projectile: shot('26ab', 10), lifeMs: 1800 },
   onHit: [{ kind: 'disarm', durationMs: 1600 }],
@@ -962,10 +962,10 @@ const octoMist = {
 const icePatch = { radius: 1.7, durationMs: 4000, tickMs: 0, damage: 0, color: 0xb3e5fc, fillAlpha: 0.3, lineAlpha: 0.6, enterMs: 150, traction: 0.12 } as const
 const penguinIce = {
   trigger: 'auto',
-  cooldownMs: 1300,
+  cooldownMs: 1100,
   aim: 'nearest',
   fireSfx: 'shoot',
-  damage: 12,
+  damage: 18,
   knockback: 3,
   shape: { kind: 'bolt', projectile: shot('1f9ca', 10), lifeMs: 1800 },
   onHit: [{ kind: 'ground', def: icePatch }],

@@ -629,7 +629,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   steal: (sim, src, fx, at) => {
     const by = casterOf(sim, src)
     const t = at.targets?.[0]
-    if (by >= 0 && t !== undefined) stealAbility(sim, by, t, fx.ms, fx.cooldownMs, fx.skill === true)
+    if (by >= 0 && t !== undefined) stealAbility(sim, by, t, fx.ms, fx.cooldownMs, fx.skill === true, src.ability)
   },
 
   clone: (sim, src, fx) => {

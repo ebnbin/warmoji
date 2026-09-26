@@ -492,7 +492,7 @@ export const CHARACTERS = {
         ],
       },
     ],
-    resource: { kind: 'energy', max: 100, start: 100, regen: 14 },
+    resource: { kind: 'energy', max: 100, start: 100, regen: 18 },
   },
   chipmunk: {
     emoji: '1f43f',
