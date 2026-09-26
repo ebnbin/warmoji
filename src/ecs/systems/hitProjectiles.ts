@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { FACTION, Faction, PrevPos, Proj, PROJ_SET, Transform, Uid } from '../components'
-import { applyAbilityEffects } from './shared/effects'
+import { applyOnHit } from './shared/effects'
 import { boltSource, enemySource, WORLD_SOURCE } from '../utils/source'
 import type { Source } from '../utils/source'
 import { eachTarget } from '../utils/targets'
@@ -54,12 +54,7 @@ export function hitProjectiles(sim: Sim): void {
     const f = found[0]!
     struck.add(Uid.v[f.eid]!)
     const damage = Proj.damage[eid]!
-    if (hit(sim, src, f.eid, damage, { knockback: Proj.kb[eid]!, from: { x: sx, y: sy } })) {
-      const onHit = projOnHit[eid]
-      if (onHit && onHit.length > 0) {
-        applyAbilityEffects(sim, src, onHit, { x: f.x, y: f.y, baseDamage: damage, targets: [f.eid], exclude: new Set([f.eid]) })
-      }
-    }
+    if (hit(sim, src, f.eid, damage, { knockback: Proj.kb[eid]!, from: { x: sx, y: sy } })) applyOnHit(sim, src, projOnHit[eid], f.x, f.y, damage, [f.eid])
     if (Proj.pierce[eid]! <= 0) cullProjectile(sim, eid)
     else Proj.pierce[eid] = Proj.pierce[eid]! - 1
   }

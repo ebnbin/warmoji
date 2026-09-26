@@ -57,6 +57,7 @@ interface SpawnProjectileEffect {
   readonly damage: number
   readonly lifeMs: number
   readonly aim: 'nearest'
+  readonly onHit?: readonly Effect[]
 }
 /** 有目标列表时治列表里的人（全体或血量比例最低者），否则治落点周围 range 内的同伴 */
 interface HealEffect {

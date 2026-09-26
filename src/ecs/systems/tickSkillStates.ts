@@ -5,7 +5,8 @@ import { damageMul } from '../utils/amp'
 import { sourceOf } from '../utils/source'
 import { targetsNear } from '../utils/targets'
 import { hit } from './shared/damage'
-import { applyBlast } from './shared/effects'
+import { applyBlast, applyOnHit } from './shared/effects'
+import { abilityOnHit } from '../store'
 import { spawnFxBoom, spawnFxCircle } from '../entities/fx'
 import type { Sim } from '../sim'
 
@@ -37,7 +38,7 @@ function rushHits(sim: Sim, m: number): void {
   for (const t of targetsNear(sim, src, x, y, SprintShape.radius[e]!)) {
     if (RushHit.stamp[t.eid] === stamp) continue
     RushHit.stamp[t.eid] = stamp
-    hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x, y } })
+    if (hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x, y } })) applyOnHit(sim, src, abilityOnHit[e], x, y, damage, [t.eid])
   }
 }
 
@@ -48,7 +49,8 @@ function land(sim: Sim, m: number): void {
   const y = Transform.y[m]!
   const radius = LeapShape.radius[e]!
   const color = Payload.color[e]!
-  applyBlast(sim, src, x, y, Math.round(Payload.damage[e]! * damageMul(sim, e)), radius, Payload.knockback[e]!)
+  const damage = Math.round(Payload.damage[e]! * damageMul(sim, e))
+  applyOnHit(sim, src, abilityOnHit[e], x, y, damage, applyBlast(sim, src, x, y, damage, radius, Payload.knockback[e]!))
   playSfx('boom')
   spawnFxCircle(sim, x, y, radius, {
     fill: color,

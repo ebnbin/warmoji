@@ -3,7 +3,7 @@ import { Alive, Built, Contact, Dormant, Faction, MARK, Radius, Transform } from
 import { hasMark } from '../utils/marks'
 import { bodyRules } from '../store'
 import { hit } from './shared/damage'
-import { applyAbilityEffects } from './shared/effects'
+import { applyAbilityEffects, applyOnHit } from './shared/effects'
 import { selfSource, sourceOf } from '../utils/source'
 import type { Source } from '../utils/source'
 import { eachFoeBody } from '../utils/targets'
@@ -33,7 +33,7 @@ export function touchBodies(sim: Sim): void {
       landed = true
       const back = bodyRules[t]?.onTouched
       if (back) applyAbilityEffects(sim, selfSource(sim, t), back, { x: tx, y: ty, baseDamage: dmg, targets: [eid] })
-      if (touch) applyAbilityEffects(sim, src, touch, { x: tx, y: ty, baseDamage: 0, targets: [t] })
+      applyOnHit(sim, src, touch, tx, ty, dmg, [t])
       return true
     })
     if (landed && Contact.vanish[eid]) {

@@ -36,13 +36,21 @@ export function applyBlast(
   radius: number,
   knockback: number,
   exclude?: ReadonlySet<number>,
-): void {
+): number[] {
   const list = targetsNear(sim, src, x, y, radius)
+  const struck: number[] = []
   for (const i of circleHitIndices({ x, y }, radius, list)) {
     const t = list[i]!
     if (exclude?.has(t.eid)) continue
-    hit(sim, src, t.eid, damage, { knockback, from: { x, y } })
+    if (hit(sim, src, t.eid, damage, { knockback, from: { x, y } })) struck.push(t.eid)
   }
+  return struck
+}
+
+/** 命中后的效果：施于这次真正打中的身体，溅射不再打它们；谁也没打中就没有效果 */
+export function applyOnHit(sim: Sim, src: Source, effects: readonly Effect[] | undefined, x: number, y: number, baseDamage: number, struck: readonly number[]): void {
+  if (!effects || struck.length === 0) return
+  applyAbilityEffects(sim, src, effects, { x, y, baseDamage, targets: struck, exclude: new Set(struck) })
 }
 
 function eachCapable(sim: Sim, at: HitCtx, comp: object, apply: (t: number) => void): void {
@@ -99,6 +107,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       lineWidth: 2,
       tickMs: fx.def.tickMs,
       damage: fx.def.damage,
+      effects: fx.def.effects,
     })
   },
 
@@ -136,6 +145,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       knockback: 0,
       srcSlot: src.slot,
       srcEnemy: src.enemy,
+      onHit: fx.onHit,
     })
   },
 

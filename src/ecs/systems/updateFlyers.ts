@@ -1,22 +1,22 @@
 import { query } from 'bitecs'
 import { catchFlyer } from '../entities/weapon'
 import { DEG2RAD } from '../../util/units'
-import { Cd, Flyer, FlyerShape, Frozen, Payload, Thrown, Transform, Uid } from '../components'
-import { flyerHits } from '../store'
-import { cooldownMul, ownerX, ownerY } from '../utils/amp'
+import { Flyer, FlyerShape, Frozen, Payload, Transform, Uid } from '../components'
+import { abilityOnHit, flyerHits } from '../store'
+import { ownerX, ownerY } from '../utils/amp'
 import { hit } from './shared/damage'
+import { applyOnHit } from './shared/effects'
 import { sourceOf } from '../utils/source'
 import { targetsNear } from '../utils/targets'
 import type { Sim } from '../sim'
 
-/** 飞返体：去程沿直线缓动到射程尽头，回程追着持有者；全部回收后才开始冷却 */
+/** 飞返体：去程沿直线缓动到射程尽头，回程追着持有者；去程回程各打每个身体一次 */
 export function updateFlyers(sim: Sim): void {
   const dt = sim.wdtMs
   for (const f of [...query(sim.world, [Flyer, Transform])]) {
     const e = Flyer.of[f]!
     if (Frozen.v[e]) {
       catchFlyer(sim, e, f)
-      Cd.left[e] = Cd.base[e]!
       continue
     }
     Transform.rot[f] = Transform.rot[f]! + (FlyerShape.spinDegPerSec[e]! * DEG2RAD * dt) / 1000
@@ -35,7 +35,6 @@ export function updateFlyers(sim: Sim): void {
       const step = (FlyerShape.returnSpeed[e]! * dt) / 1000
       if (dist <= Math.max(step, 20)) {
         catchFlyer(sim, e, f)
-        if (Thrown.n[e] === 0) Cd.left[e] = Cd.base[e]! * cooldownMul(sim, e)
         continue
       }
       const p = sim.hooks.wrap(sim, Transform.x[f]! + (d.x / dist) * step, Transform.y[f]! + (d.y / dist) * step)
@@ -54,7 +53,10 @@ export function updateFlyers(sim: Sim): void {
       const rr = radius + t.radius
       if (dx * dx + dy * dy > rr * rr) continue
       struck.add(Uid.v[t.eid]!)
-      hit(sim, src, t.eid, Flyer.damage[f]!, { knockback: Payload.knockback[e]!, from: { x: Transform.x[f]!, y: Transform.y[f]! } })
+      const fx = Transform.x[f]!
+      const fy = Transform.y[f]!
+      const damage = Flyer.damage[f]!
+      if (hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x: fx, y: fy } })) applyOnHit(sim, src, abilityOnHit[e], fx, fy, damage, [t.eid])
     }
   }
 }
