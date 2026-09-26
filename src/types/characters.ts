@@ -63,9 +63,6 @@ export interface UpgradeTiers {
 export type CharacterId = keyof typeof charactersJson
 export interface TeamBaseline {
   readonly team: {
-    readonly ringRadius: number
-    readonly smallRingRadius: number
-    readonly pairGap: number
     readonly maxSize: number
     readonly reviveMs: number
     readonly leaderSizeMul: number

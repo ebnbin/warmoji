@@ -3,7 +3,6 @@ import { newEntity } from './entity'
 
 import { UNIT } from '../../util/units'
 
-import { FOLLOW } from '../../data/feel'
 import { CHARACTERS } from '../../data/characters'
 import { MEMBER, TEAM } from '../../data/characters'
 import { memberMaxHp } from '../../data/stats'
@@ -75,11 +74,8 @@ export function spawnCharacter(
   Slot.v[eid] = slot
   Follow.x[eid] = x
   Follow.y[eid] = y
-  Follow.vx[eid] = 0
-  Follow.vy[eid] = 0
   VisOff.x[eid] = 0
   VisOff.y[eid] = 0
-  Follow.k[eid] = FOLLOW.kBase * (1 + FOLLOW.kJitter * Math.sin(slot * 12.9898))
   Breath.phase[eid] = slot * 1.3
   Pop.until[eid] = 0
   Alive.v[eid] = 1

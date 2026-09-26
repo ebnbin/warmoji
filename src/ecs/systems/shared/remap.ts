@@ -28,12 +28,9 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
 
   for (const m of sim.characters) {
     const p = map(Follow.x[m]!, Follow.y[m]!)
-    const v = rot(Follow.vx[m]!, Follow.vy[m]!)
     const off = rot(VisOff.x[m]!, VisOff.y[m]!)
     Follow.x[m] = p.x
     Follow.y[m] = p.y
-    Follow.vx[m] = v.x
-    Follow.vy[m] = v.y
     VisOff.x[m] = off.x
     VisOff.y[m] = off.y
     Transform.x[m] = p.x + off.x

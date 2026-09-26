@@ -33,7 +33,6 @@ export interface Sim {
   teamDir: { x: number; y: number }
   moveInputRaw: number
   leader: number
-  physics: boolean
   heading: { x: number; y: number }
   handover: Handover | null
   aim: { x: number; y: number }
@@ -170,7 +169,6 @@ export function makeSim(
     spawnCooldownMs: 300,
     run,
     leader,
-    physics: false,
     heading: { x: 0, y: -1 },
     handover: null,
     aim: { x: 0, y: -1 },

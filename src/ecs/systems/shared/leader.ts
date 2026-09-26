@@ -13,7 +13,7 @@ function smooth(t: number): number {
 }
 
 /** 交接进度的缓动值 0→1；不在交接中为 1 */
-export function handoverEase(sim: Sim): number {
+function handoverEase(sim: Sim): number {
   const h = sim.handover
   return h ? smooth(1 - h.msLeft / h.ms) : 1
 }

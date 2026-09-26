@@ -44,7 +44,7 @@ export interface SquadMember {
   reviveSec: number
 }
 
-/** 满员才有队长；members 按入队顺序 */
+/** 队长就是玩家附身的角色；members 按入队顺序 */
 export interface SquadSnapshot {
   leaderSlot: number
   switching: boolean

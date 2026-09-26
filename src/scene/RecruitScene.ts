@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { CHARACTERS } from '../data/characters'
 import type { CharacterId } from '../types/characters'
-import { ringPosts } from '../data/formation'
+import { UNIT } from '../util/units'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { unlockAt } from '../run/recruit'
@@ -38,6 +38,24 @@ import {
 import type { TeamLayout } from './teamPage'
 import { SceneKey } from './keys'
 import type { DevProvider, DevProviderHost } from '../devtools'
+
+/** 头像预览的环形排版，单位格：两人并排，三人小环，更多人大环 */
+const PREVIEW_RING = { pairGap: 1.1, small: 0.58, large: 0.8 } as const
+
+function ringPosts(count: number, phase = 0): { x: number; y: number }[] {
+  if (count <= 1) return Array.from({ length: count }, () => ({ x: 0, y: 0 }))
+  if (count === 2) {
+    return [
+      { x: (-PREVIEW_RING.pairGap / 2) * UNIT, y: 0 },
+      { x: (PREVIEW_RING.pairGap / 2) * UNIT, y: 0 },
+    ]
+  }
+  const r = (count === 3 ? PREVIEW_RING.small : PREVIEW_RING.large) * UNIT
+  return Array.from({ length: count }, (_, post) => {
+    const a = -Math.PI / 2 + (post * 2 * Math.PI) / count + phase
+    return { x: Math.cos(a) * r, y: Math.sin(a) * r }
+  })
+}
 
 export class RecruitScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
