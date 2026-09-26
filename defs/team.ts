@@ -7,6 +7,7 @@ export const TEAM_BASELINE = {
     leaderSizeMul: 1.25,
     followerSizeMul: 0.75,
     leaderGrip: 8,
+    followerGrip: 1,
   },
   member: {
     size: 1.2,

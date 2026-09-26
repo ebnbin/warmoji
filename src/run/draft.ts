@@ -15,7 +15,7 @@ function rarityWeights(wave: number, level = 1): Record<ItemRarity, number> {
 }
 export function characterPoolFor(def: CharacterDef, level: number): ItemId[] {
   const tiers: UpgradeTiers = { u1: level >= 2, u2: level >= 3 }
-  const kinds = new Set(loadoutFor(def, tiers).map((w) => w.kind))
+  const kinds = new Set(loadoutFor(def, tiers).map((w) => w.shape.kind))
   return ITEM_IDS.filter((iid) => {
     const item: ItemDef = ITEMS[iid]
     if ((item.minLevel ?? 1) > level) return false

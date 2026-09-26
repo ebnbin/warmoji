@@ -53,14 +53,14 @@ export type FxDecl<G extends FxGen = FxGen> = {
 }[G]
 export type AnimClipKind = 'loop' | 'cycle'
 export type AnimClipId = 'idle' | 'attack'
-export interface AnimClipEntry {
+interface AnimClipEntry {
   readonly kind?: AnimClipKind
   readonly frames?: number
   readonly viewBox?: string
   readonly parts: readonly AnimPart[]
   readonly fx?: readonly FxDecl[]
 }
-export interface AnimResourceEntry {
+interface AnimResourceEntry {
   readonly emoji: string
   readonly name: string
   readonly desc: string

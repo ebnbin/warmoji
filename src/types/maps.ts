@@ -14,6 +14,8 @@ interface WallsConfig {
   readonly centerClearU: number
   readonly spawnMinCellDist: number
   readonly reflowMs: number
+  /** 身体撞墙时的半径上限，过道一格宽 */
+  readonly bodyRadiusCapU: number
 }
 export interface DayNightConfig {
   readonly cycleSec: number
@@ -32,10 +34,6 @@ export interface IceConfig {
   readonly traction: number
   readonly waterTraction: number
   readonly waterViscosity: number
-  readonly waterTau: number
-  readonly enemyTauIce: number
-  readonly knockbackTauMul: number
-  readonly waterSpeedMul: number
   readonly waterTeamDps: number
   readonly waterEnemyDps: number
   readonly waterTickMs: number
@@ -57,6 +55,7 @@ export interface RiverConfig {
   readonly viewScale: number
   readonly width: number
   readonly flow: number
+  /** 拾取物漂过下游边多远消失 */
   readonly coinCullPad: number
   readonly driftCount: number
   readonly driftSpeedMul: readonly [number, number]

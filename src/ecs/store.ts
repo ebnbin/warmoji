@@ -1,52 +1,61 @@
 import { INITIAL_CAPACITY } from './world'
-import type { EnemyDef, EnemyKind } from '../types/enemies'
+import type { BodyRules, EnemyDef } from '../types/enemies'
 import type { FieldPickupDef } from '../types/battlefield'
-import type { Effect } from '../types/abilityDefs'
+import type { AbilityDef, Effect } from '../types/abilityDefs'
+import type { Source } from './utils/source'
 
-export const enemyDef: (EnemyDef | undefined)[] = new Array<EnemyDef | undefined>(INITIAL_CAPACITY).fill(undefined).fill(undefined)
+const slots = <T>(): (T | undefined)[] => new Array<T | undefined>(INITIAL_CAPACITY).fill(undefined)
 
-export const projOnHit: (readonly Effect[] | undefined)[] =
-  new Array<readonly Effect[] | undefined>(INITIAL_CAPACITY).fill(undefined).fill(undefined)
+export const enemyDef = slots<EnemyDef>()
 
-export const projHitUids: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(INITIAL_CAPACITY).fill(undefined).fill(undefined)
+export const projOnHit = slots<readonly Effect[]>()
 
-export const flyerHits: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(INITIAL_CAPACITY).fill(undefined).fill(undefined)
+export const projHitUids = slots<Set<number>>()
 
-export const boltPts: (Float32Array | undefined)[] = new Array<Float32Array | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const flyerHits = slots<Set<number>>()
 
-export const meteorHit: (Set<number> | undefined)[] = new Array<Set<number> | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const boltPts = slots<Float32Array>()
 
-export const modDef: (FieldPickupDef | undefined)[] = new Array<FieldPickupDef | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const meteorHit = slots<Set<number>>()
 
-export const telegraphDef: (EnemyDef | undefined)[] = new Array<EnemyDef | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const modDef = slots<FieldPickupDef>()
 
-export const telegraphCarries: (FieldPickupDef | undefined)[] =
-  new Array<FieldPickupDef | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const telegraphDef = slots<EnemyDef>()
 
-export const carrierPickup: (FieldPickupDef | undefined)[] =
-  new Array<FieldPickupDef | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const telegraphCarries = slots<FieldPickupDef>()
 
-export const enemyCarries: (FieldPickupDef | undefined)[] =
-  new Array<FieldPickupDef | undefined>(INITIAL_CAPACITY).fill(undefined).fill(undefined)
+export const carrierPickup = slots<FieldPickupDef>()
 
-export const pickupDef: (FieldPickupDef | undefined)[] =
-  new Array<FieldPickupDef | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const enemyCarries = slots<FieldPickupDef>()
 
-export const pickupSfx: (import('../types/sfx').SfxId | undefined)[] =
-  new Array<import('../types/sfx').SfxId | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const pickupDef = slots<FieldPickupDef>()
 
-export const abilityOnHit: (readonly Effect[] | undefined)[] =
-  new Array<readonly Effect[] | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const pickupSfx = slots<import('../types/sfx').SfxId>()
 
-export const abilityArtEmoji: (string | undefined)[] = new Array<string | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const abilityOnHit = slots<readonly Effect[]>()
 
-export const abilityFireSfx: (import('../types/sfx').SfxId | undefined)[] =
-  new Array<import('../types/sfx').SfxId | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const abilityOnSelf = slots<readonly Effect[]>()
 
-export const projSrcEnemy: (EnemyKind | undefined)[] = new Array<EnemyKind | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const abilityPulse = slots<readonly Effect[]>()
 
-export const zoneSrcEnemy: (EnemyKind | undefined)[] = new Array<EnemyKind | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const abilityArtEmoji = slots<string>()
 
-export const animId: (string | undefined)[] = new Array<string | undefined>(INITIAL_CAPACITY).fill(undefined)
-export const animOutline: (import('../emoji/svg').OutlineKind | undefined)[] =
-  new Array<import('../emoji/svg').OutlineKind | undefined>(INITIAL_CAPACITY).fill(undefined)
+export const abilityFireSfx = slots<import('../types/sfx').SfxId>()
+
+/** 装置自己的那条能力 */
+export const emplaceAbility = slots<AbilityDef>()
+
+/** 弹体出膛时记下的来源：归因与倍率跟着弹体走 */
+export const projSrc = slots<Source>()
+
+export const poisonSrc = slots<Source>()
+
+/** 身体自己的规则：敌人是它的定义，角色是出生时按道具拼出来的包，造物只有接触效果 */
+export const bodyRules = slots<BodyRules>()
+
+export const zoneEffects = slots<readonly Effect[]>()
+
+export const zoneSrc = slots<Source>()
+
+export const animId = slots<string>()
+export const animOutline = slots<import('../emoji/svg').OutlineKind>()

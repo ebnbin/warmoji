@@ -1,3 +1,6 @@
+import type { Effect } from './abilityDefs'
+
+/** 每次节拍先扣 damage 再施加 effects */
 export interface GroundEffectDef {
   readonly radius: number
   readonly durationMs: number
@@ -7,4 +10,5 @@ export interface GroundEffectDef {
   readonly fillAlpha: number
   readonly lineAlpha: number
   readonly enterMs: number
+  readonly effects?: readonly Effect[]
 }

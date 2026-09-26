@@ -1,30 +1,27 @@
-import { addComponent, addComponents, hasComponent, removeEntity } from 'bitecs'
+import { addComponent, addComponents, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
 import { DEG2RAD } from '../../util/units'
 import type { HeldVisual } from '../../types/abilityDefs'
 import type { OutlineKind } from '../../emoji/svg'
 import { attachDrawable } from './drawable'
 import {
-  Boomerang,
-  BoomerangTwin,
   Boss,
   Depth,
   Elite,
   FACTION,
   Flyer,
+  FlyerShape,
   Held,
   Quad,
   Sprite,
   Thrown,
   Tint,
   Transform,
-  Weapon,
+  VisOff,
 } from '../components'
 import type { Sim } from '../sim'
-import { playSfx } from '../../audio/sfx'
 import { flyerHits } from '../store'
-import { damageMul, ownerX, ownerY } from '../utils/amp'
-
+import { anchorX, anchorY } from '../utils/amp'
 
 export function holderOutline(faction: number, holderEid: number): OutlineKind {
   return faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? 'elite' : 'enemy') : 'player'
@@ -33,7 +30,6 @@ export function holderOutline(faction: number, holderEid: number): OutlineKind {
 export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, faction: number): number {
   const world = sim.world
   const e = newEntity(world)
-  addComponent(world, e, Weapon)
   const outline = holderOutline(faction, holderEid)
   attachDrawable(world, e, sim.frames, {
     id: held.emoji,
@@ -54,7 +50,7 @@ export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, f
 
 function spawnFlyerBody(sim: Sim, weaponEid: number): number {
   const t = newEntity(sim.world)
-  addComponents(sim.world, t, Transform, Sprite, Tint, Depth, Quad)
+  addComponents(sim.world, t, Transform, Sprite, Tint, Depth, VisOff, Quad)
   const size = Held.size[weaponEid]!
   Transform.x[t] = Transform.x[weaponEid]!
   Transform.y[t] = Transform.y[weaponEid]!
@@ -77,29 +73,24 @@ export function catchFlyer(sim: Sim, e: number, f: number): void {
   Thrown.n[e] = Math.max(0, Thrown.n[e]! - 1)
 }
 
-export function launch(sim: Sim, e: number, aim: number): void {
-  playSfx('whoosh')
-  const damage = Math.round(Boomerang.damage[e]! * damageMul(sim, e))
-  const range = Boomerang.range[e]!
-  const ox = ownerX(e)
-  const oy = ownerY(e)
-  const count = hasComponent(sim.world, e, BoomerangTwin) ? 2 : 1
-  Thrown.n[e] = count
-  for (let i = 0; i < count; i++) {
-    const angle = aim + i * Math.PI
-    const f = spawnFlyerBody(sim, e)
-    addComponent(sim.world, f, Flyer)
-    Flyer.of[f] = e
-    Flyer.phase[f] = 0
-    Flyer.t[f] = 0
-    Flyer.launchX[f] = ox
-    Flyer.launchY[f] = oy
-    Flyer.destX[f] = ox + Math.cos(angle) * range
-    Flyer.destY[f] = oy + Math.sin(angle) * range
-    Flyer.damage[f] = damage
-    Transform.x[f] = ox
-    Transform.y[f] = oy
-    Tint.alpha[f] = 1
-    flyerHits[f] = new Set()
-  }
+/** 掷出一枚飞返体：飞到射程尽头再飞回持有者 */
+export function launch(sim: Sim, e: number, angle: number, damage: number): void {
+  const range = FlyerShape.range[e]!
+  const ox = anchorX(e)
+  const oy = anchorY(e)
+  Thrown.n[e] = Thrown.n[e]! + 1
+  const f = spawnFlyerBody(sim, e)
+  addComponent(sim.world, f, Flyer)
+  Flyer.of[f] = e
+  Flyer.phase[f] = 0
+  Flyer.t[f] = 0
+  Flyer.launchX[f] = ox
+  Flyer.launchY[f] = oy
+  Flyer.destX[f] = ox + Math.cos(angle) * range
+  Flyer.destY[f] = oy + Math.sin(angle) * range
+  Flyer.damage[f] = damage
+  Transform.x[f] = ox
+  Transform.y[f] = oy
+  Tint.alpha[f] = 1
+  flyerHits[f] = new Set()
 }

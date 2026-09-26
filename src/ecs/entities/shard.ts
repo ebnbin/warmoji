@@ -1,8 +1,8 @@
-import { addComponent } from 'bitecs'
+import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { norm } from '../../util/vec'
-import { KNOCKBACK } from '../../data/abilities'
-import { Depth, Quad, Shard, Sprite, Tint, Transform } from '../components'
+import { KNOCKBACK, SHARD_BODY } from '../../data/abilities'
+import { Alive, Clock, Depth, Drive, Phys, Quad, Radius, Shard, Sprite, Tint, Transform, VisOff } from '../components'
 import type { Sim } from '../sim'
 
 export function spawnShards(
@@ -26,11 +26,7 @@ export function spawnShards(
     const dir = norm(ox, oy)
     const scatter = 45 + sim.rng.next() * 65
     const eid = newEntity(sim.world)
-    addComponent(sim.world, eid, Shard)
-    addComponent(sim.world, eid, Transform)
-    addComponent(sim.world, eid, Sprite)
-    addComponent(sim.world, eid, Tint)
-    addComponent(sim.world, eid, Depth)
+    addComponents(sim.world, eid, Shard, Transform, Sprite, Tint, Depth, VisOff, Phys, Drive, Clock, Alive, Radius)
     Transform.x[eid] = x + ox
     Transform.y[eid] = y + oy
     Transform.rot[eid] = 0
@@ -43,8 +39,14 @@ export function spawnShards(
     Tint.effect[eid] = 0
     Tint.alpha[eid] = 1
     Depth.z[eid] = 6
-    Shard.vx[eid] = flingVx + dir.x * scatter
-    Shard.vy[eid] = flingVy + dir.y * scatter
+    Phys.vx[eid] = flingVx + dir.x * scatter
+    Phys.vy[eid] = flingVy + dir.y * scatter
+    Phys.mass[eid] = SHARD_BODY.mass
+    Phys.drag[eid] = SHARD_BODY.drag
+    Phys.grip[eid] = SHARD_BODY.grip
+    Clock.v[eid] = 1
+    Alive.v[eid] = 1
+    Radius.v[eid] = 0
     Shard.startMs[eid] = now
     Shard.until[eid] = now + KNOCKBACK.deathSlideMs
     Shard.rot[eid] = (sim.rng.next() - 0.5) * 6

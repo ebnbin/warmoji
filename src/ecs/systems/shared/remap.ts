@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
-import { Aim, Blink, Bob, Drop, EDir, ENEMY_SET, Facing, Flyer, Follow, Kv, Leaping, Minion, Phys, PICKUP_SET, PROJ_SET, Rushing, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
+import { Aim, Drop, EDir, ENEMY_SET, Facing, Flyer, Leaping, Minion, Phys, PICKUP_SET, PROJ_SET, Sprinting, Telegraph, Transform, Vel, VisOff, ZONE_SET } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 
@@ -10,11 +10,6 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
   const map = (x: number, y: number): Point => remapPoint({ x, y }, fromW, fromH, toW, toH)
   const rot = (x: number, y: number): Point => remapVector({ x, y }, fromH0, toH0)
 
-  for (const b of sim.characters) {
-    const v = rot(Phys.vx[b]!, Phys.vy[b]!)
-    Phys.vx[b] = v.x
-    Phys.vy[b] = v.y
-  }
   const h = rot(sim.heading.x, sim.heading.y)
   sim.heading = { x: h.x, y: h.y }
   const ho = sim.handover
@@ -26,24 +21,32 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
   const aim = rot(sim.aim.x, sim.aim.y)
   sim.aim = { x: aim.x, y: aim.y }
 
+  const movePos = (eid: number): void => {
+    const p = map(Transform.x[eid]!, Transform.y[eid]!)
+    Transform.x[eid] = p.x
+    Transform.y[eid] = p.y
+  }
+  for (const b of query(sim.world, [Phys])) {
+    const v = rot(Phys.vx[b]!, Phys.vy[b]!)
+    Phys.vx[b] = v.x
+    Phys.vy[b] = v.y
+  }
+  for (const b of query(sim.world, [Sprinting])) {
+    const rv = rot(Sprinting.vx[b]!, Sprinting.vy[b]!)
+    Sprinting.vx[b] = rv.x
+    Sprinting.vy[b] = rv.y
+  }
   for (const m of sim.characters) {
-    const p = map(Follow.x[m]!, Follow.y[m]!)
+    movePos(m)
     const off = rot(VisOff.x[m]!, VisOff.y[m]!)
-    Follow.x[m] = p.x
-    Follow.y[m] = p.y
     VisOff.x[m] = off.x
     VisOff.y[m] = off.y
-    Transform.x[m] = p.x + off.x
-    Transform.y[m] = p.y + off.y
     const f = rot(Facing.x[m]!, Facing.y[m]!)
     Facing.x[m] = f.x
     Facing.y[m] = f.y
     const fv = rot(Facing.vx[m]!, Facing.vy[m]!)
     Facing.vx[m] = fv.x
     Facing.vy[m] = fv.y
-    const rv = rot(Rushing.vx[m]!, Rushing.vy[m]!)
-    Rushing.vx[m] = rv.x
-    Rushing.vy[m] = rv.y
     const lf = map(Leaping.fromX[m]!, Leaping.fromY[m]!)
     const lt = map(Leaping.toX[m]!, Leaping.toY[m]!)
     Leaping.fromX[m] = lf.x
@@ -51,20 +54,9 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     Leaping.toX[m] = lt.x
     Leaping.toY[m] = lt.y
   }
-  for (const e of query(sim.world, [Blink])) {
-    const b = rot(Blink.x[e]!, Blink.y[e]!)
-    Blink.x[e] = b.x
-    Blink.y[e] = b.y
-  }
   for (const e of query(sim.world, [Aim])) {
     const a = rot(Math.cos(Aim.rad[e]!), Math.sin(Aim.rad[e]!))
     Aim.rad[e] = Math.atan2(a.y, a.x)
-  }
-
-  const movePos = (eid: number): void => {
-    const p = map(Transform.x[eid]!, Transform.y[eid]!)
-    Transform.x[eid] = p.x
-    Transform.y[eid] = p.y
   }
   const moveVel = (eid: number): void => {
     const v = rot(Vel.x[eid]!, Vel.y[eid]!)
@@ -76,20 +68,12 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     const d = rot(EDir.x[eid]!, EDir.y[eid]!)
     EDir.x[eid] = d.x
     EDir.y[eid] = d.y
-    const k = rot(Kv.x[eid]!, Kv.y[eid]!)
-    Kv.x[eid] = k.x
-    Kv.y[eid] = k.y
   }
-  for (const eid of query(sim.world, PICKUP_SET)) {
-    if (Bob.amp[eid]! > 0) Transform.y[eid] = Bob.y0[eid]!
+  for (const eid of query(sim.world, PROJ_SET)) {
+    movePos(eid)
+    moveVel(eid)
   }
-  for (const set of [PROJ_SET, PICKUP_SET]) {
-    for (const eid of query(sim.world, set)) {
-      movePos(eid)
-      moveVel(eid)
-    }
-  }
-  for (const eid of query(sim.world, PICKUP_SET)) Bob.y0[eid] = Transform.y[eid]!
+  for (const eid of query(sim.world, PICKUP_SET)) movePos(eid)
   for (const eid of query(sim.world, [Telegraph, Transform])) movePos(eid)
   for (const eid of query(sim.world, ZONE_SET)) movePos(eid)
   for (const eid of query(sim.world, [Minion, Transform])) movePos(eid)

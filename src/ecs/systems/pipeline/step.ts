@@ -5,7 +5,7 @@ const profiling = defineDevFlag({ id: 'ecs.profile', group: '战斗', label: '�
 const acc = new Map<string, { ms: number; calls: number }>()
 let profiledFrames = 0
 
-export type System = (sim: Sim) => void
+type System = (sim: Sim) => void
 export type Step = System | { readonly run: System; readonly after: readonly System[] }
 
 export function pipeline(steps: readonly Step[]): readonly System[] {

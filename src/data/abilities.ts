@@ -6,10 +6,21 @@ import type { AbilityId, CombatTuning } from '../types/abilities'
 
 const CT = fromJson<CombatTuning>(combatJson)
 export const KNOCKBACK = CT.knockback
+export const ENEMY_BODY = CT.enemyBody
+export const MINION_BODY = CT.minionBody
+export const BODY_MAX_SPEED = CT.knockback.maxSpeed
+/** 击退位移 = 冲量 × 身体时间常数 */
+export const KNOCKBACK_TAU_MS = (ENEMY_BODY.mass / (ENEMY_BODY.drag * ENEMY_BODY.grip)) * 1000
 export const ACQUIRE = CT.acquire
+export const PICKUP_BODY = CT.pickupBody
+export const SHARD_BODY = CT.shardBody
+export const MORPH = CT.morph
+export const BLINK_IFRAME_PAD_MS = CT.blinkIframePadMs
+export const MINION_FIRST_SHOT_MS = CT.minionFirstShotMs
 
 export const ABILITIES = fromJson<Record<AbilityId, AbilityDef>>(abilitiesJson)
 
+/** 空袭从天而降，不看遮挡 */
 export function abilityPiercesWalls(def: AbilityDef): boolean {
-  return 'piercesWalls' in def && def.piercesWalls === true
+  return def.shape.kind === 'drop' || ('piercesWalls' in def && def.piercesWalls === true)
 }

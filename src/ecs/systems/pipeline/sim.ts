@@ -5,80 +5,67 @@ import { driftDecor } from '../driftDecor'
 import { spinDecor } from '../spinDecor'
 import { expireFx } from '../expireFx'
 import { animateCharacters } from '../animateCharacters'
-import { applyKnockback } from '../applyKnockback'
-import { applySlowZones } from '../applySlowZones'
-import { commitEnemySteps } from '../commitEnemySteps'
 import { despawnExpired } from '../despawnExpired'
 import { fadeEnemyFlash } from '../fadeEnemyFlash'
 import { layoutTeam } from '../layoutTeam'
-import { characterContact } from '../characterContact'
+import { touchBodies } from '../touchBodies'
 import { characterVisual } from '../characterVisual'
-import { moveTeam } from '../moveTeam'
+import { driveTeam } from '../driveTeam'
+import { moveBodies } from '../moveBodies'
 import { stepHandover } from '../shared/leader'
 import { tickSkillCooldowns } from '../tickSkillCooldowns'
 import { tickSkillStates } from '../tickSkillStates'
 import { popInEnemies } from '../popInEnemies'
 import { refoldBattleFx } from '../refoldBattleFx'
-import { regenCharacters } from '../regenCharacters'
 import { reviveCharacters } from '../reviveCharacters'
-import { applyEnemySteps } from '../applyEnemySteps'
-import { steerBaseOrbit } from '../steerBaseOrbit'
-import { steerChase } from '../steerChase'
-import { steerCoinThief } from '../steerCoinThief'
-import { steerDash } from '../steerDash'
-import { steerDetonate } from '../steerDetonate'
-import { steerFlee } from '../steerFlee'
-import { steerRoam } from '../steerRoam'
-import { steerStandoff } from '../steerStandoff'
+import { steerBodies } from '../steerBodies'
+import { updateBees } from '../updateBees'
 import { updateEnemyGates } from '../updateEnemyGates'
-import { tickPoison } from '../tickPoison'
+import { updateSpeedMuls } from '../updateSpeedMuls'
+import { tickMarks } from '../tickMarks'
 import { tintEnemies } from '../tintEnemies'
 import { updateDormancy } from '../updateDormancy'
 import { cullProjectiles } from '../cullProjectiles'
-import { hitDirectProjectiles } from '../hitDirectProjectiles'
-import { hitSweptProjectiles } from '../hitSweptProjectiles'
+import { hitProjectiles } from '../hitProjectiles'
+import { refreshTargets } from '../refreshTargets'
 import { moveProjectiles } from '../moveProjectiles'
 import { updateShards } from '../updateShards'
 import { worldTick } from '../worldTick'
 import { pipeline } from './step'
 
-const STEERERS = [steerChase, steerRoam, steerFlee, steerStandoff, steerDetonate, steerBaseOrbit, steerCoinThief, steerDash]
-
-// 时停期敌人移速与弹体位移都按 sim.wdtMs 积分，任何一步不得另乘时标
+// 先走标记的时钟，再算每个身体的速度倍率与门控，再由驱动写期望速度，积分只在 moveBodies 一处；时标是身体的属性（Clock）
 export const SIM_PIPELINE = pipeline([
   refoldBattleFx,
   updateDormancy,
   tickSkillCooldowns,
   stepHandover,
-  { run: moveTeam, after: [stepHandover] },
-  { run: tickSkillStates, after: [moveTeam] },
-  { run: layoutTeam, after: [moveTeam, tickSkillStates] },
-  { run: animateCharacters, after: [layoutTeam] },
-  reviveCharacters,
-  regenCharacters,
-  tickPoison,
+  { run: reviveCharacters, after: [stepHandover] },
+  { run: tickMarks, after: [updateDormancy] },
+  { run: updateSpeedMuls, after: [refoldBattleFx, tickMarks] },
+  { run: driveTeam, after: [stepHandover, reviveCharacters, updateSpeedMuls] },
+  { run: layoutTeam, after: [driveTeam] },
   { run: popInEnemies, after: [updateDormancy] },
   { run: despawnExpired, after: [updateDormancy] },
   { run: fadeEnemyFlash, after: [updateDormancy] },
-  { run: applySlowZones, after: [updateDormancy] },
-  { run: tintEnemies, after: [applySlowZones] },
-  { run: updateEnemyGates, after: [applySlowZones] },
-  ...STEERERS.map((run) => ({ run, after: [updateEnemyGates] })),
-  { run: applyEnemySteps, after: STEERERS },
-  { run: applyKnockback, after: [applyEnemySteps] },
-  { run: commitEnemySteps, after: [applyKnockback] },
-  { run: animateEnemies, after: [commitEnemySteps] },
-  { run: moveProjectiles, after: [commitEnemySteps] },
-  { run: hitSweptProjectiles, after: [moveProjectiles] },
-  { run: characterContact, after: [commitEnemySteps] },
-  { run: hitDirectProjectiles, after: [characterContact, moveProjectiles] },
-  { run: cullProjectiles, after: [hitSweptProjectiles, hitDirectProjectiles] },
-  characterVisual,
+  { run: tintEnemies, after: [updateDormancy, fadeEnemyFlash] },
+  { run: updateEnemyGates, after: [updateDormancy, updateSpeedMuls] },
+  { run: updateBees, after: [updateDormancy] },
+  { run: steerBodies, after: [updateEnemyGates, updateBees] },
+  { run: moveBodies, after: [layoutTeam, steerBodies] },
+  { run: refreshTargets, after: [moveBodies] },
+  { run: tickSkillStates, after: [refreshTargets] },
+  { run: animateCharacters, after: [moveBodies] },
+  { run: animateEnemies, after: [moveBodies] },
+  { run: moveProjectiles, after: [moveBodies] },
+  { run: hitProjectiles, after: [moveProjectiles, refreshTargets] },
+  { run: touchBodies, after: [refreshTargets, tickSkillStates] },
+  { run: cullProjectiles, after: [hitProjectiles] },
+  { run: characterVisual, after: [hitProjectiles, touchBodies] },
   blinkTelegraphs,
   updateShards,
   animateBooms,
   driftDecor,
   { run: spinDecor, after: [driftDecor] },
   { run: expireFx, after: [animateBooms] },
-  { run: worldTick, after: [commitEnemySteps, characterContact] },
+  { run: worldTick, after: [moveBodies, touchBodies] },
 ])

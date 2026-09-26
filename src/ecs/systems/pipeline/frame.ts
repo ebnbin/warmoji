@@ -7,7 +7,7 @@ import { grantFlash } from '../grantFlash'
 import { grantMods } from '../grantMods'
 import { playPickupFx } from '../playPickupFx'
 import { reapCollected } from '../reapCollected'
-import { refreshCharacterTargets } from '../refreshCharacterTargets'
+import { refreshTargets } from '../refreshTargets'
 import { runDeathEffects } from '../runDeathEffects'
 import { spawnStep } from '../spawnStep'
 import { updateAnims } from '../updateAnims'
@@ -20,11 +20,11 @@ import type { Sim } from '../../sim'
 import { pipeline, runPipeline } from './step'
 
 const FRAME_PIPELINE = pipeline([
-  castRequests,
+  refreshTargets,
+  { run: castRequests, after: [refreshTargets] },
   { run: stepSim, after: [castRequests] },
-  refreshCharacterTargets,
   armEnemies,
-  { run: stepAbilities, after: [stepSim, refreshCharacterTargets, armEnemies] },
+  { run: stepAbilities, after: [stepSim, armEnemies] },
   updateAnims,
   runDeathEffects,
   updateZones,

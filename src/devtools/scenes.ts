@@ -11,7 +11,7 @@ const STATUS: Readonly<Record<number, string>> = {
   [Phaser.Scenes.SLEEPING]: '休眠',
 }
 
-export function sceneStatus(s: Phaser.Scene): string {
+function sceneStatus(s: Phaser.Scene): string {
   return STATUS[s.sys.settings.status] ?? '停止'
 }
 

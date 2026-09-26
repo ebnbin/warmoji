@@ -1,31 +1,37 @@
 import { AI } from '../../../data/enemies'
-import { Alive, EDir, ETurn, Hidden, Taunted, Transform } from '../../components'
+import { EDir, ETurn, MARK } from '../../components'
+import { hasMark } from '../../utils/marks'
 import type { Point } from '../../../util/vec'
 import type { Sim } from '../../sim'
-import { leaderPoint } from '../../utils/team'
+import { bodySource } from '../../utils/source'
+import { eachTarget, nearestTarget } from '../../utils/targets'
+import type { Found } from '../../utils/targets'
 
-/** 被嘲讽的敌人只看得见嘲讽者；隐匿中的角色谁都看不见 */
-export function nearestAlive(sim: Sim, eid: number, x: number, y: number): Point | null {
-  const now = sim.elapsedMs
-  const by = Taunted.by[eid]!
-  if (now < Taunted.until[eid]! && Alive.v[by]) {
-    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[by]!, Transform.y[by]!)
-    return { x: x + d.x, y: y + d.y }
-  }
-  let bestX = 0
-  let bestY = 0
-  let bestD = Infinity
-  for (const m of sim.characters) {
-    if (!Alive.v[m] || now < Hidden.until[m]!) continue
-    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
-    const d2 = d.x * d.x + d.y * d.y
-    if (d2 < bestD) {
-      bestD = d2
-      bestX = x + d.x
-      bestY = y + d.y
+/** 身体眼里最近的敌人：嘲讽、隐匿、视线都由索敌快照统一处理 */
+export function nearestFoe(sim: Sim, eid: number, x: number, y: number, range = Infinity): Found | null {
+  return nearestTarget(sim, bodySource(eid), x, y, range)
+}
+
+/** 优先还没中毒的最近敌人，都中了毒就取最近的 */
+export function freshFoe(sim: Sim, eid: number, x: number, y: number, range: number): Found | null {
+  let fresh: Found | null = null
+  let freshD = range * range
+  let any: Found | null = null
+  let anyD = range * range
+  eachTarget(sim, bodySource(eid), x, y, range, (t, tx, ty, radius) => {
+    const dx = tx - x
+    const dy = ty - y
+    const d = dx * dx + dy * dy
+    if (d < anyD) {
+      anyD = d
+      any = { eid: t, x: tx, y: ty, radius }
     }
-  }
-  return bestD === Infinity ? null : { x: bestX, y: bestY }
+    if (!hasMark(sim, t, MARK.poison) && d < freshD) {
+      freshD = d
+      fresh = { eid: t, x: tx, y: ty, radius }
+    }
+  })
+  return fresh ?? any
 }
 
 export function wanderDir(sim: Sim, eid: number): Point {
@@ -39,15 +45,6 @@ export function wanderDir(sim: Sim, eid: number): Point {
   EDir.x[eid] = d.x
   EDir.y[eid] = d.y
   return d
-}
-
-export function aimPoint(sim: Sim, eid: number, atLeader: boolean): Point | null {
-  const x = Transform.x[eid]!
-  const y = Transform.y[eid]!
-  if (!atLeader) return nearestAlive(sim, eid, x, y)
-  const c = leaderPoint(sim)
-  const d = sim.hooks.worldDelta(sim, x, y, c.x, c.y)
-  return { x: x + d.x, y: y + d.y }
 }
 
 export function fleeSteer(

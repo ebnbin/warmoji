@@ -1,19 +1,26 @@
 import { addComponent, addComponents } from 'bitecs'
+import { PICKUP_BODY } from '../../data/abilities'
+import { startPop } from '../utils/pop'
 import { newEntity } from './entity'
 import {
+  Alive,
   Bob,
+  Clock,
+  Drive,
   GrantCoins,
   GrantFlash,
   GrantMod,
   Grab,
   Lifetime,
+  Phys,
   Pickup,
   PickupFx,
   Pop,
   Pull,
+  Radius,
   Ring,
   Transform,
-  Vel,
+  VisOff,
 } from '../components'
 import { attachDrawable } from './drawable'
 import { pickupDef, pickupSfx } from '../store'
@@ -45,9 +52,10 @@ interface PickupSpec {
 }
 
 function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
-  const p = sim.hooks.constrainCoin(sim, x, y)
   const eid = newEntity(sim.world)
-  addComponents(sim.world, eid, Pickup, Pull, Grab, Lifetime, Vel, Pop, Bob)
+  addComponents(sim.world, eid, Pickup, Pull, Grab, Lifetime, Phys, Drive, Clock, Alive, Radius, Pop, Bob)
+  Radius.v[eid] = PICKUPS.coin.radius * UNIT
+  const p = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
   attachDrawable(sim.world, eid, sim.frames, {
     id: spec.emoji,
     outline: 'player',
@@ -60,14 +68,19 @@ function spawnPickup(sim: Sim, x: number, y: number, spec: PickupSpec): number {
   Pull.on[eid] = spec.magnetic ? 1 : 0
   Grab.radius[eid] = spec.grab
   Lifetime.until[eid] = spec.groundMs > 0 ? sim.elapsedMs + spec.groundMs : 0
-  Vel.x[eid] = 0
-  Vel.y[eid] = 0
-  Pop.until[eid] = spec.popMs > 0 ? sim.fxMs + spec.popMs : 0
-  Pop.ms[eid] = spec.popMs
+  Phys.vx[eid] = 0
+  Phys.vy[eid] = 0
+  Phys.mass[eid] = PICKUP_BODY.mass
+  Phys.drag[eid] = PICKUP_BODY.drag
+  Phys.grip[eid] = PICKUP_BODY.grip
+  Drive.x[eid] = 0
+  Drive.y[eid] = 0
+  Clock.v[eid] = 1
+  Alive.v[eid] = 1
+  if (spec.popMs > 0) startPop(sim, eid, spec.popMs)
   Pop.size[eid] = spec.size
   Pop.back[eid] = 1
   Pop.alpha[eid] = 1
-  Bob.y0[eid] = p.y
   Bob.amp[eid] = spec.bob
   Bob.halfMs[eid] = 620
   Bob.born[eid] = sim.fxMs
@@ -178,9 +191,7 @@ export function animatePickup(sim: Sim, eid: number): void {
   if (Bob.amp[eid]! > 0) {
     const half = Bob.halfMs[eid]!
     const t = ((sim.fxMs - Bob.born[eid]!) % (half * 2)) / half
-    const off = -Bob.amp[eid]! * sineEaseInOut(t <= 1 ? t : 2 - t)
-    Transform.y[eid] = Bob.y0[eid]! + off
-    Ring.dy[eid] = -off
+    VisOff.y[eid] = -Bob.amp[eid]! * sineEaseInOut(t <= 1 ? t : 2 - t)
   }
 }
 

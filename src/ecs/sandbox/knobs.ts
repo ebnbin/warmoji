@@ -14,15 +14,15 @@ let level: SandboxLevel = 0
 
 export const INVINCIBLE_HP = 10_000_000
 
-export interface SpawnParams {
+interface SpawnParams {
   readonly intervalMs: number
   readonly cap: number
   readonly batch: number
 }
 
-export type SandboxScale = 'low' | 'mid' | 'high' | 'max' | 'k2' | 'k4' | 'k8'
+type SandboxScale = 'low' | 'mid' | 'high' | 'max' | 'k2' | 'k4' | 'k8'
 
-export interface ScaleStep {
+interface ScaleStep {
   readonly id: SandboxScale
   readonly label: string
   readonly spawn: SpawnParams
@@ -53,9 +53,9 @@ export function spawnParams(): SpawnParams {
   return scaleStep().spawn
 }
 
-export type SandboxPresetId = 'normal' | 'busy' | 'heavy' | 'k2' | 'k4' | 'k8'
+type SandboxPresetId = 'normal' | 'busy' | 'heavy' | 'k2' | 'k4' | 'k8'
 
-export interface SandboxPreset {
+interface SandboxPreset {
   readonly id: SandboxPresetId
   readonly label: string
   readonly desc: string

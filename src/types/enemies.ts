@@ -1,51 +1,14 @@
 import type { AbilityDef, Effect } from './abilityDefs'
 
-type DashTrigger =
-  | { readonly kind: 'detect'; readonly range: number; readonly cooldownMs: number }
-  | { readonly kind: 'timer'; readonly intervalMs: number; readonly firstDelayMs?: number }
-type DashLength =
-  | { readonly kind: 'dist'; readonly dist: number }
-  | { readonly kind: 'time'; readonly durationMs: number }
-interface DashLocomotion {
-  readonly kind: 'dash'
-  readonly windupMs: number
-  readonly dashSpeed: number
-  readonly trigger: DashTrigger
-  readonly length: DashLength
-  readonly idle: 'wander' | 'chase'
-  readonly aim: 'nearest' | 'leader'
-  readonly lockAt: 'windup' | 'launch'
-  readonly sfx?: 'whoosh'
-}
-interface StandoffLocomotion {
-  readonly kind: 'standoff'
-  readonly detectRange: number
-  readonly standoffDist: number
-}
-interface DetonateLocomotion {
-  readonly kind: 'detonate'
-  readonly triggerRange: number
-  readonly windupMs: number
-  readonly blastRadius: number
-  readonly blastDamage: number
-}
-interface BaseOrbitLocomotion {
-  readonly kind: 'baseOrbit'
-  readonly orbitRadius: number
-  readonly aggroRange: number
-  readonly orphanSpeedMul: number
-  readonly orphanDamageMul: number
-}
-export type LocomotionDef =
-  | { readonly kind: 'chase' }
+/** 驱动：身体没事时怎么走；蓄力突刺、自爆这类"动作"是能力，不在这里 */
+export type DriveDef =
+  | { readonly kind: 'chase'; readonly at?: 'leader' }
   | { readonly kind: 'wander' }
-  | { readonly kind: 'static' }
+  | { readonly kind: 'stay' }
   | { readonly kind: 'flee'; readonly range: number }
   | { readonly kind: 'coinThief' }
-  | StandoffLocomotion
-  | DetonateLocomotion
-  | BaseOrbitLocomotion
-  | DashLocomotion
+  | { readonly kind: 'standoff'; readonly detectRange: number; readonly standoffDist: number }
+  | { readonly kind: 'orbit'; readonly radius: number; readonly aggroRange: number }
 export interface SplitEffect {
   readonly kind: 'split'
   readonly into: EnemyDef
@@ -57,7 +20,16 @@ export interface DecoyEffect {
   readonly durationMs: number
   readonly alpha: number
 }
-export type DeathEffect = Effect | SplitEffect | DecoyEffect
+type DeathEffect = Effect | SplitEffect | DecoyEffect
+/** 身体自己的规则：被命中、击杀、锚点消失时施于自身；被接触时施于碰我的人；接触时施于被我碰到的人；死亡以尸体位置为落点 */
+export interface BodyRules {
+  readonly onHurt?: readonly Effect[]
+  readonly onTouched?: readonly Effect[]
+  readonly onTouch?: readonly Effect[]
+  readonly onKill?: readonly Effect[]
+  readonly onDeath?: readonly DeathEffect[]
+  readonly onAnchorLost?: readonly Effect[]
+}
 export type EnemyKind =
   | 'zombie'
   | 'ghost'
@@ -87,7 +59,7 @@ export type EnemyKind =
   | 'alien'
   | 'comet'
   | 'blackhole'
-export interface EnemyDef {
+export interface EnemyDef extends BodyRules {
   readonly kind: EnemyKind
   readonly emoji: string
   readonly name: string
@@ -99,10 +71,8 @@ export interface EnemyDef {
   readonly damage: number
   readonly xp: number
   readonly coins: number
-  readonly locomotion: LocomotionDef
+  readonly drive: DriveDef
   readonly abilities?: readonly AbilityDef[]
-  readonly onDeath?: readonly DeathEffect[]
-  readonly onContact?: readonly Effect[]
   readonly spawner?: {
     readonly into: EnemyDef
     readonly intervalMs: number
@@ -130,6 +100,7 @@ export interface Difficulty {
     readonly rampSeconds: number
     readonly hpGrowthPerMin: number
     readonly maxAlive: number
+    readonly dormantTtlMs: number
     readonly teamFactorBase: number
     readonly teamFactorPerMember: number
     readonly telegraphMs: number
@@ -164,7 +135,8 @@ export interface AiTuning {
   }
   readonly standoffBandU: number
   readonly coinThiefEatCdMs: number
-  readonly fleeIdleSpeedMul: number
+  readonly idleSpeedMul: { readonly chase: number; readonly standoff: number; readonly coinThief: number; readonly flee: number }
+  readonly firstShot: { readonly minMs: number; readonly jitterMs: number }
 }
 export interface EnemyMixEntry {
   def: EnemyDef

@@ -1,7 +1,8 @@
 import { query } from 'bitecs'
 import { SPAWN } from '../../data/enemies'
 import { UNIT } from '../../util/units'
-import { Dancing, Dormant, ENEMY_SET, Morph, Nest, Transform } from '../components'
+import { Dormant, ENEMY_SET, MARK, Nest, Transform } from '../components'
+import { hasMark } from '../utils/marks'
 import { awakeCount, spawnBrood } from '../entities/enemy'
 import { enemyDef } from '../store'
 import type { Sim } from '../sim'
@@ -18,14 +19,13 @@ export function updateSpawners(sim: Sim): void {
   const atlas = sim.frames
   if (sim.over) return
   const now = sim.elapsedMs
-  const eids = query(sim.world, ENEMY_SET)
+  const eids = [...query(sim.world, ENEMY_SET)]
   let active = awakeCount(sim)
   for (const eid of eids) {
     if (Dormant.v[eid]) continue
     const spawner = enemyDef[eid]?.spawner
     if (!spawner) continue
-    if (Dancing.until[eid] !== 0) continue
-    if (Morph.until[eid] !== 0 && now < Morph.until[eid]!) continue
+    if (hasMark(sim, eid, MARK.stun) || hasMark(sim, eid, MARK.morph)) continue
     if (now < Nest.nextSpawnAt[eid]!) continue
     Nest.nextSpawnAt[eid] = now + spawner.intervalMs
     if (active >= SPAWN.maxAlive) continue

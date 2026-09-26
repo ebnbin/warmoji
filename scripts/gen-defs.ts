@@ -50,7 +50,7 @@ const withNested = (e: EnemyDef): EnemyDef[] => [
   ...(e.onDeath ?? []).flatMap((fx) => (fx.kind === 'split' ? withNested(fx.into) : [])),
 ]
 for (const e of Object.values(ENEMIES).flatMap(withNested)) {
-  const lm = e.locomotion
+  const lm = e.drive
   if (lm.kind !== 'standoff') continue
   for (const a of e.abilities ?? []) {
     const range = 'range' in a ? a.range : undefined

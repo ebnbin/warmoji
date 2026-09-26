@@ -1,32 +1,30 @@
-import { } from '../../data/items'
 import { waveAt } from '../../data/waves'
 import { sandboxFireRate } from '../sandbox/knobs'
-import { Anchor, DmgBuff, DmgMul, CharAtkSlow, Slot, Transform } from '../components'
+import { Anchor, Slot, Transform, VisOff } from '../components'
 import { Amp, FACTION, Faction, Owner } from '../components'
-import type { } from './source'
+import { cdMul, dmgMul } from './marks'
 import type { Sim } from '../sim'
 
-export function ownerX(e: number): number {
-  return Transform.x[Anchor.eid[e]!]!
+/** 能力从宿主的画面位置出手：身体位置加视觉偏移 */
+export function anchorX(e: number): number {
+  const a = Anchor.eid[e]!
+  return Transform.x[a]! + VisOff.x[a]!
 }
 
-export function ownerY(e: number): number {
-  return Transform.y[Anchor.eid[e]!]!
+export function anchorY(e: number): number {
+  const a = Anchor.eid[e]!
+  return Transform.y[a]! + VisOff.y[a]!
 }
 
+/** 伤害倍率 = 宿主身上伤害标记的乘积 × 能力自身倍率 × 战场增益 */
 export function damageMul(sim: Sim, e: number): number {
-  if (Faction.v[e] === FACTION.enemy) return DmgMul.v[Owner.eid[e]!]!
-  const o = Owner.eid[e]!
-  const buff = sim.elapsedMs < DmgBuff.until[o]! ? DmgBuff.mul[o]! : 1
-  return Amp.dmg[e]! * (Amp.battle[e] ? sim.battleFx.teamDamageMul : 1) * buff
+  return dmgMul(sim, Owner.eid[e]!) * Amp.dmg[e]! * (Amp.battle[e] ? sim.battleFx.teamDamageMul : 1)
 }
 
+/** 冷却倍率 = 能力自身倍率 × 战场增益 × 宿主身上冷却标记的乘积 */
 export function cooldownMul(sim: Sim, e: number): number {
-  if (Faction.v[e] === FACTION.enemy) return 1
-  const o = Owner.eid[e]!
-  const atk = CharAtkSlow.until[o]! > sim.elapsedMs ? CharAtkSlow.mul[o]! : 1
   const sandboxMul = sim.sandbox && Amp.battle[e] ? 1 / sandboxFireRate() : 1
-  return Amp.cd[e]! * sim.battleFx.teamCooldownMul * atk * sandboxMul
+  return Amp.cd[e]! * (Amp.battle[e] ? sim.battleFx.teamCooldownMul : 1) * cdMul(sim, Owner.eid[e]!) * sandboxMul
 }
 
 export function waveScale(sim: Sim): number {
@@ -37,4 +35,3 @@ export function waveScale(sim: Sim): number {
 export function attributionSlot(e: number): number {
   return Faction.v[e] === FACTION.enemy ? -1 : Slot.v[Owner.eid[e]!]!
 }
-

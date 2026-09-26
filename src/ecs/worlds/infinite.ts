@@ -98,7 +98,7 @@ export function chunkDecor(
   return out
 }
 
-export interface ZoneDef {
+interface ZoneDef {
   readonly r0: number
   readonly rMin: number
   readonly holdMs: number

@@ -6,6 +6,13 @@ export type Column = Float32Array | Int32Array | Uint32Array | Uint8Array
 
 const FILL = new WeakMap<Column, number>()
 
+/** 每个实体占几个连续元素的列，按 eid*stride+i 索引 */
+const STRIDE = new WeakMap<Column, number>()
+
+export function columnStride(col: Column): number {
+  return STRIDE.get(col) ?? 1
+}
+
 export function columnFill(col: Column): number {
   return FILL.get(col) ?? 0
 }
@@ -21,13 +28,16 @@ const i32Fill = (v: number): Int32Array => {
 }
 
 export function resizeColumn<T extends Column>(old: T, length: number): T {
-  const next = new (old.constructor as new (length: number) => T)(length)
-  next.set(length >= old.length ? old : old.subarray(0, length))
+  const stride = columnStride(old)
+  const size = length * stride
+  const next = new (old.constructor as new (length: number) => T)(size)
+  next.set(size >= old.length ? old : old.subarray(0, size))
   const fill = FILL.get(old)
   if (fill !== undefined) {
-    if (length > old.length) next.fill(fill, old.length)
+    if (size > old.length) next.fill(fill, old.length)
     FILL.set(next, fill)
   }
+  if (stride !== 1) STRIDE.set(next, stride)
   return next
 }
 
@@ -59,15 +69,12 @@ export const Depth = {
   z: f32(),
 }
 
-export const RENDERABLE: QueryTerm[] = [Transform, Sprite, Tint, Depth]
+/** 画面位置 = Transform + VisOff；能力从画面位置出手，命中判定只看 Transform */
+export const VisOff = { x: f32(), y: f32() }
 
-export const Character = {}
+export const RENDERABLE: QueryTerm[] = [Transform, Sprite, Tint, Depth, VisOff]
 
 export const Slot = { v: i32() }
-
-export const Follow = { x: f32(), y: f32() }
-
-export const VisOff = { x: f32(), y: f32() }
 
 export const Breath = { phase: f32() }
 
@@ -75,54 +82,65 @@ export const Pop = { until: f32(), ms: f32(), size: f32(), back: u8(), alpha: f3
 
 export const Alive = { v: u8() }
 
-export const CharPerk = { thorns: f32(), killHeal: f32(), regenPerSec: f32() }
-
-export const CharAtkSlow = { until: f32(), mul: f32() }
-
-export const CharHp = { hp: f32(), max: f32() }
 export const CharScale = { v: f32() }
-export const Iframe = { ms: f32(), last: f32() }
 export const Revive = { ms: f32(), at: f32() }
-export const Hurt = { radius: f32() }
+
+export const MARK_SLOTS = 8
+
+const strided = <T extends Column>(ctor: new (length: number) => T): T => {
+  const col = new ctor(INITIAL_CAPACITY * MARK_SLOTS)
+  STRIDE.set(col, MARK_SLOTS)
+  return col
+}
+
+/** 标记的种类决定它折叠成哪个有效值：slow 取最小、speed/guard/dmg/cd 相乘、poison 按节拍扣血、其余是有无 */
+export const MARK = { none: 0, slow: 1, speed: 2, guard: 3, dmg: 4, cd: 5, poison: 6, stun: 7, hide: 8, taunt: 9, invuln: 10, morph: 11, morphImmune: 12, regen: 13 } as const
+
+/** 标记的来源：同种同源的标记刷新而不叠加 */
+export const TAG = { effect: 0, morph: 1, elite: 2, perk: 3 } as const
+
+/** 身体上的标记列表：每个身体 MARK_SLOTS 个槽位；until 为 Infinity 时永久；a/b/c 按种类解释（倍率、跳伤、节拍、下次跳的时刻、嘲讽者、是否曾锚定）；ref 是所引用身体的 Uid */
+export const Mark = {
+  kind: strided(Uint8Array),
+  tag: strided(Uint8Array),
+  until: strided(Float32Array),
+  a: strided(Float32Array),
+  b: strided(Float32Array),
+  c: strided(Float32Array),
+  ref: strided(Uint32Array),
+}
 export const CharFlash = { until: f32() }
 
 export const Enemy = {}
 
 export const Hp = { v: f32(), max: f32() }
 
-export const Speed = { v: f32() }
-
-export const EState = { v: u8() }
-
 export const Elite = { v: u8() }
 export const Boss = { v: u8() }
 
 export const Radius = { v: f32() }
 
-export const DmgMul = { v: f32() }
+/** 身体：驱动与阻力同乘抓地（鞋 × 地面），阻力再乘介质黏度、按相对介质的速度算 */
+export const Phys = { vx: f32(), vy: f32(), thrust: f32(), drag: f32(), mass: f32(), grip: f32() }
 
-export const SpMul = { v: f32() }
+/** 驱动层每帧写入的期望速度，身体按抓地趋近它 */
+export const Drive = { x: f32(), y: f32() }
 
-export const Kv = { x: f32(), y: f32() }
+/** 1 = 按真实时间积分（队伍身体），0 = 按世界时间（其余一切） */
+export const Clock = { v: u8() }
 
-export const Step = { x: f32(), y: f32() }
+/** 不吃冲量的身体 */
+export const Anchored = {}
 
-export const ZoneSlow = { v: f32() }
+/** 无视墙体的身体 */
+export const Phasing = {}
 
 export const Flash = { until: f32() }
 
 export const EDir = { x: f32(), y: f32() }
 export const ETurn = { at: f32() }
 
-export const Slow = { until: f32(), mul: f32() }
-
-export const Poison = { until: f32(), nextTick: f32(), dmg: f32(), tickMs: f32(), slot: i32() }
-
-export const Charge = { windupUntil: f32(), dashUntil: f32(), coolUntil: f32(), nextDashAt: f32() }
-
 export const Despawn = { at: f32() }
-
-export const Morph = { until: f32(), vuln: f32(), cdUntil: f32() }
 
 export const Anim = {
   base: i32(),
@@ -137,8 +155,6 @@ export const Anim = {
 }
 export const ANIM_SET: QueryTerm[] = [Anim, Sprite]
 
-export const Slide = { x: f32(), y: f32() }
-
 export const Dormant = { v: u8(), since: f32() }
 
 export const Quad = { v: u8() }
@@ -147,10 +163,10 @@ export const Spin = { rate: f32() }
 
 export const Drift = { u: f32(), cross: f32(), speedMul: f32(), swayPhase: f32(), swayAmp: f32() }
 
-export const Shard = { vx: f32(), vy: f32(), startMs: f32(), until: f32(), rot: f32(), size: f32() }
+export const Shard = { startMs: f32(), until: f32(), rot: f32(), size: f32() }
 export const SHARD_SET: QueryTerm[] = [Shard, Transform, Sprite, Tint, Depth]
 
-export const ENEMY_SET: QueryTerm[] = [Enemy, Transform, Speed, Hp]
+export const ENEMY_SET: QueryTerm[] = [Enemy, Transform, Phys, Hp]
 
 export const Projectile = {}
 
@@ -160,21 +176,12 @@ export const Proj = {
   damage: f32(),
   radius: f32(),
   kb: f32(),
-  srcSlot: i32(),
   pierce: i32(),
   spin: f32(),
   dieAt: f32(),
 }
 
 export const PrevPos = { x: f32(), y: f32() }
-
-export const SweptHit = {}
-
-export const WallStop = {}
-
-export const ViewCull = {}
-
-export const WorldCull = {}
 
 export const PROJ_SET: QueryTerm[] = [Projectile, Transform, Vel, Proj]
 
@@ -218,7 +225,7 @@ export const Modifier = { totalMs: f32() }
 
 export const Due = { at: f32() }
 
-export const Bob = { y0: f32(), amp: f32(), halfMs: f32(), born: f32() }
+export const Bob = { amp: f32(), halfMs: f32(), born: f32() }
 
 export const Ring = {
   color: u32(),
@@ -232,21 +239,19 @@ export const Ring = {
   breathe: u8(),
 }
 
-export const PICKUP_SET: QueryTerm[] = [Pickup, Transform, Vel]
+export const PICKUP_SET: QueryTerm[] = [Pickup, Transform, Phys]
 
 export const RING_SET: QueryTerm[] = [Ring, Transform, Tint]
 
-export const Zone = { radius: f32(), faction: u8(), enterMs: f32(), on: u8(), fadeAt: f32() }
-
-export const ZoneBurn = { damage: f32(), tickMs: f32(), nextAt: f32(), srcSlot: i32() }
-
-export const ZoneChill = { factor: f32() }
+/** 场：每隔 tickMs 对场内敌方扣 damage 再施加效果，场内己方每秒回复 mend，pulse 非零时每次 tick 闪一圈 */
+export const Zone = { radius: f32(), enterMs: f32(), on: u8(), fadeAt: f32(), tickMs: f32(), nextAt: f32(), damage: f32(), mend: f32(), pulse: u32() }
 
 export const ZoneFollow = { of: i32() }
 
-export const ZONE_SET: QueryTerm[] = [Zone, Transform]
+/** 身体最近一次吃到场的节拍伤的时刻，一个节拍内不重复扣血 */
+export const ZoneHit = { last: f32() }
 
-export const GroundHit = { last: f32() }
+export const ZONE_SET: QueryTerm[] = [Zone, Transform]
 
 export const Anchor = { eid: i32() }
 
@@ -262,21 +267,14 @@ export const Held = {
 
 export const Ability = {}
 
-export const Weapon = {}
-
-
 export const Owner = { eid: i32() }
 
-export const FACTION = { team: 0, enemy: 1 } as const
+export const FACTION = { team: 0, enemy: 1, world: 2 } as const
 
 export const Faction = { v: u8() }
 
-const cd = (): CdComp => ({ cdLeft: f32(), cdBase: f32() })
-
-export interface CdComp {
-  readonly cdLeft: Float32Array
-  readonly cdBase: Float32Array
-}
+/** 冷却：left 递减到 0 才能出手，base 是每次出手后重置的值 */
+export const Cd = { left: f32(), base: f32() }
 
 export const Amp = { dmg: f32(), cd: f32(), crit: f32(), kb: f32(), battle: u8() }
 
@@ -286,161 +284,66 @@ export const Disarmed = { v: u8() }
 
 export const WallBlocked = { v: u8() }
 
-export const Aim = { rad: f32() }
+export const AIM = { nearest: 0, strongest: 1, move: 2, leader: 3, self: 4, stick: 5 } as const
+
+/** 瞄准：kind 决定方向从哪来，range 是索敌距离，rad 是最近一次出手的方向 */
+export const Aim = { rad: f32(), kind: u8(), range: f32() }
+
+/** 载荷：伤害、击退、Boss 承伤比、是否按波次强度缩放、施法特效的颜色与半径 */
+export const Payload = { damage: f32(), knockback: f32(), bossRatio: f32(), waveScale: u8(), color: u32(), fxRadius: f32() }
+
+export const REAIM = { same: 0, nearest: 1, random: 2 } as const
+
+/** 重复出手；delayMs 为 0 时一次出手即打完，否则由 RepeatState 逐发推进 */
+export const Repeat = { count: f32(), spreadDeg: f32(), delayMs: f32(), ratio: f32(), everyN: f32(), reaim: u8() }
+
+export const RepeatState = { left: i32(), nextAt: f32(), angle: f32(), damage: f32() }
+
+export const Shots = { n: i32() }
 
 export const Swing = { startMs: f32(), durMs: f32() }
 
-export const Laser = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  range: f32(),
-  beamRadius: f32(),
-  color: u32(),
-}
-export const LaserBackBeam = {}
-export const LaserRadial = { beams: f32(), ratio: f32(), stepMs: f32() }
+export const Bolt = { frame: i32(), size: f32(), radius: f32(), speed: f32(), rotOffset: f32(), lifeMs: f32(), pierce: i32() }
 
-export const Heal = { ...cd(), amount: f32(), range: f32() }
-export const HealAoe = { ratio: f32() }
-export const HealDefib = { reviveCutMs: f32() }
+export const Segment = { reach: f32(), radius: f32(), ms: f32(), lunge: f32(), beam: u8() }
 
-export const SlowAura = { ...cd(), radius: f32(), slowFactor: f32(), color: u32() }
-export const AuraDps = { perSec: f32() }
-export const AuraFreeze = { intervalMs: f32(), durationMs: f32() }
+export const Sector = { radius: f32(), arcDeg: f32(), ms: f32() }
 
-export const Thrust = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  reach: f32(),
-  hitRadius: f32(),
-  thrustMs: f32(),
-  lungeDist: f32(),
-}
-export const ThrustCombo = { delayMs: f32() }
+export const DISC_AT = { self: 0, target: 1 } as const
+export const DISC_OF = { foes: 0, hurt: 1 } as const
+export const Disc = { radius: f32(), at: u8(), of: u8() }
 
-export const Sweep = { ...cd(), damage: f32(), knockback: f32(), radius: f32(), arcDeg: f32(), sweepMs: f32() }
+export const Chain = { hops: f32(), hopRange: f32(), decay: f32() }
 
-export const AreaBlast = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  detectRange: f32(),
-  blastRadius: f32(),
-  color: u32(),
-}
-export const BlastEcho = { delayMs: f32(), ratio: f32() }
+export const FlyerShape = { range: f32(), outMs: f32(), returnSpeed: f32(), radius: f32(), spinDegPerSec: f32(), coinMagnet: f32() }
 
-export const ChainArc = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  range: f32(),
-  arcRange: f32(),
-  bounces: f32(),
-  decay: f32(),
-  color: u32(),
-}
+export const DropShape = { targets: f32(), size: f32(), fromAbove: f32(), dropMs: f32(), staggerMs: f32() }
 
-export const Boomerang = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  range: f32(),
-  outMs: f32(),
-  returnSpeed: f32(),
-  hitRadius: f32(),
-  spinDegPerSec: f32(),
-}
-export const BoomerangTwin = {}
-export const CoinMagnet = { radius: f32() }
+export const BlinkShape = { behindDist: f32(), strikeMs: f32(), execHp: f32(), execMul: f32() }
 
-export const Assassinate = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  range: f32(),
-  behindDist: f32(),
-  strikeMs: f32(),
-}
-export const Execute = { hpRatio: f32(), mul: f32() }
+export const SprintShape = { distance: f32(), ms: f32(), radius: f32() }
 
-export const Strike = {
-  ...cd(),
-  damage: f32(),
-  knockback: f32(),
-  targets: f32(),
-  coinsPerHit: f32(),
-  size: f32(),
-  fromAbove: f32(),
-  dropMs: f32(),
-  staggerMs: f32(),
-}
+export const LeapShape = { distance: f32(), ms: f32(), height: f32(), radius: f32() }
 
-export const Rally = { ...cd(), healRatio: f32(), invulnMs: f32(), ringRadius: f32(), color: u32() }
+export const ALL_OF = { foes: 0, allies: 1 } as const
+export const AllShape = { of: u8(), downed: u8() }
 
-export const Dance = { ...cd(), durationMs: f32() }
+export const ZoneShape = { radius: f32(), durationMs: f32(), tickMs: f32(), mend: f32(), follow: u8(), pulseMs: f32(), enterMs: f32(), fillAlpha: f32(), lineAlpha: f32(), lineWidth: f32(), color: u32() }
 
-export const Buff = { ...cd(), damageMul: f32(), durationMs: f32() }
+export const SummonShape = { count: f32(), size: f32(), speed: f32(), lifeMs: f32(), orbitRadius: f32(), orbitSpin: f32() }
 
-export const Shoot = { ...cd(), damage: f32(), knockback: f32(), range: f32(), lifeMs: f32() }
-export const AimMove = {}
-export const Bolt = { frame: i32(), size: f32(), radius: f32(), speed: f32(), rotOffset: f32() }
-export const Volley = { count: f32(), spreadDeg: f32(), randomRotate: u8() }
-export const EveryN = { n: f32(), count: f32(), spreadDeg: f32() }
-export const Pierce = { n: f32() }
+export const EmplaceShape = { count: f32(), spread: f32(), maxAlive: f32(), lifeMs: f32(), size: f32() }
 
-export const Summon = {
-  ...cd(),
-  count: f32(),
-  damage: f32(),
-  knockback: f32(),
-  intervalMs: f32(),
-  lifeMs: f32(),
-  size: f32(),
-  speed: f32(),
-}
-
-export const Turret = {
-  ...cd(),
-  placeIntervalMs: f32(),
-  maxTurrets: f32(),
-  fireIntervalMs: f32(),
-  damage: f32(),
-  knockback: f32(),
-  range: f32(),
-  lifeMs: f32(),
-  size: f32(),
-}
-export const Burst = { count: f32(), spreadDeg: f32() }
-
-export const Nuke = { ...cd(), damage: f32(), bossRatio: f32() }
-
-export const TimeStop = { ...cd(), durationMs: f32() }
-
-export const Rush = { ...cd(), distance: f32(), ms: f32(), damage: f32(), knockback: f32(), hitRadius: f32(), color: u32() }
-export const Leap = { ...cd(), distance: f32(), ms: f32(), height: f32(), damage: f32(), knockback: f32(), radius: f32(), color: u32() }
-export const Taunt = { ...cd(), radius: f32(), durationMs: f32(), damageTakenMul: f32(), color: u32() }
-export const Stealth = { ...cd(), durationMs: f32() }
-export const Field = { ...cd(), radius: f32(), durationMs: f32(), healPerSec: f32(), poisonDamage: f32(), poisonTickMs: f32(), color: u32() }
-export const Deploy = { ...cd(), count: f32(), spread: f32(), lifeMs: f32() }
-export const Nova = { ...cd(), radius: f32(), damage: f32(), knockback: f32(), color: u32() }
-
-/** 领域内的队友每秒回复的生命 */
-export const ZoneMend = { perSec: f32() }
-
-export const Pulse = { dps: f32(), freeze: f32() }
+export const WorldShape = {}
 
 export const Aura = { zone: i32() }
 
-export const Followup = { left: f32(), damage: f32() }
+/** 瞬袭：身体已闪到 x/y 的画面偏移处，until 到点闪回 */
+export const BlinkState = { until: f32() }
 
 export const Manual = {}
 
 export const CastRequest = {}
-
-export const Phys = { vx: f32(), vy: f32(), thrust: f32(), drag: f32(), mass: f32() }
 
 /** ghost：0 存活；1 阵亡且已预订目标位、正在归位；2 阵亡且已停靠 */
 export const Seat = { v: i32Fill(-1), ghost: u8() }
@@ -450,37 +353,16 @@ export const Facing = { x: f32(), y: f32(), vx: f32(), vy: f32() }
 
 export const Magnet = { radius: f32() }
 
-/** 全队增益不挂在队伍上，而是给每个角色各写一份 */
-export const DmgBuff = { mul: f32(), until: f32() }
-
-/** 蹦迪是每个敌人身上的状态，施法之后刷出来的敌人不受影响 */
-export const Dancing = { until: f32() }
-
-/** 冲刺中的身体：位移由 moveTeam 推进，撞击按 stamp 去重 */
-export const Rushing = { active: u8(), msLeft: f32(), vx: f32(), vy: f32(), skill: i32(), stamp: f32() }
+/** 冲刺中的身体：位移由 moveBodies 按脚本速度推进，撞击按 stamp 去重 */
+export const Sprinting = { active: u8(), msLeft: f32(), vx: f32(), vy: f32(), skill: i32(), stamp: f32() }
 
 /** 敌人记下最近一次撞到自己的冲刺，同一次冲刺不重复吃伤害 */
-export const RushHit = { stamp: f32() }
+export const SprintHit = { stamp: f32() }
 
 /** 跳跃中的身体：沿 from→to 的抛物线前进，落地那帧 landed 为 1 */
 export const Leaping = { active: u8(), landed: u8(), msLeft: f32(), ms: f32(), fromX: f32(), fromY: f32(), toX: f32(), toY: f32(), skill: i32() }
 
-/** 嘲讽者自己的减伤 */
-export const Taunting = { until: f32(), mul: f32() }
-
-/** 被嘲讽的敌人只追嘲讽者，直到到期或嘲讽者阵亡 */
-export const Taunted = { until: f32(), by: i32() }
-
-/** 隐匿中的角色不被敌人锁定；tinted 记着半透明是否已套上 */
-export const Hidden = { until: f32(), tinted: u8() }
-
-export const Blink = { x: f32(), y: f32() }
-
 export const Drop = { startMs: f32(), durMs: f32(), fromY: f32(), toY: f32(), target: i32(), targetUid: u32() }
-
-export const Shots = { n: i32() }
-
-export const Radial = { left: i32(), nextAt: f32(), angle: f32() }
 
 export const Thrown = { n: i32() }
 
@@ -495,7 +377,8 @@ export const Flyer = {
   damage: f32(),
 }
 
-export const Minion = { bornMs: f32(), dieAt: f32(), cd: f32(), phase: f32(), size: f32() }
+/** ability：装置自己那条能力的实体，0 = 没有 */
+export const Minion = { bornMs: f32(), dieAt: f32(), size: f32(), ability: i32() }
 
 export const Built = { by: i32() }
 
@@ -504,8 +387,6 @@ export const Retiring = { until: f32() }
 export const Swarmer = {}
 
 export const Emplacement = {}
-
-export const EnemyVel = { x: f32(), y: f32() }
 
 export const EnemyArm = { armed: u8(), fireDelayMs: f32() }
 
@@ -519,15 +400,12 @@ export const Surge = { hpMul: f32(), forceElite: u8() }
 
 export const Carrier = {}
 
-export const Orphan = { speedMul: f32(), damageMul: f32() }
-
 export const Thief = { eaten: i32(), nextEatAt: f32() }
 
-export const Chase = {}
+/** 追击：leader 为 1 时盯着队长而不是最近的敌人 */
+export const Chase = { leader: u8() }
 
-export const Roam = {}
-
-export const Stationary = {}
+export const Wander = {}
 
 export const Flee = { range: f32() }
 
@@ -535,27 +413,30 @@ export const CoinThief = {}
 
 export const Standoff = { detectRange: f32(), standoffDist: f32() }
 
-export const Detonate = { triggerRange: f32(), windupMs: f32(), blastRadius: f32(), blastDamage: f32() }
+/** 环绕 Nest 里的身体：spin 为 0 时全速绕行；aggro 为 0 时看见目标就扑，否则目标须在锚点 aggro 内；seek 是自己的索敌距离；fresh 优先扑还没中毒的 */
+export const Orbit = { radius: f32(), spin: f32(), aggro: f32(), seek: f32(), fresh: u8() }
 
-export const BaseOrbit = { orbitRadius: f32(), aggroRange: f32() }
+/** 接触载荷：碰到敌方身体就打一下；vanish 的身体打中即消散 */
+export const Contact = { damage: f32(), knockback: f32(), vanish: u8() }
 
-export const Dash = {
-  windupMs: f32(),
-  dashSpeed: f32(),
-  idleChase: u8(),
-  aimLeader: u8(),
-  lockAtLaunch: u8(),
-  whoosh: u8(),
-}
-export const DashTimer = { intervalMs: f32() }
-export const DashDetect = { range: f32(), cooldownMs: f32() }
-export const DashTime = { durationMs: f32() }
-export const DashDist = { dist: f32() }
+export const TELEGRAPH = { shake: 0, blink: 1 } as const
+
+/** 蓄力中的身体：until 之前不走，telegraph 是身上的预兆 */
+export const Casting = { until: f32(), telegraph: u8() }
+
+export const LOCK_AT = { start: 0, end: 1 } as const
+
+/** 蓄力：出手前停 ms 毫秒，方向在蓄力开始或结束时锁定 */
+export const Windup = { ms: f32(), lockAt: u8(), telegraph: u8() }
+
+export const WindupState = { until: f32(), angle: f32() }
+
+/** 飞在空中的身体：不受地面与介质影响 */
+export const Airborne = {}
 
 export const BreaksWalls = {}
 
-export const BVel = { x: f32(), y: f32() }
-
-export const Slowed = { v: f32() }
+/** 这一帧的速度倍率：减速状态 × 固有倍率 × 战场效果，每个会走的身体一份 */
+export const SpeedMul = { v: f32() }
 
 export const Steering = { v: u8() }

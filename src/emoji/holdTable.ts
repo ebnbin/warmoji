@@ -1,4 +1,4 @@
-export interface TextureStore<S> {
+interface TextureStore<S> {
   exists(key: string): boolean
   add(key: string, source: S): void
   remove(key: string): void

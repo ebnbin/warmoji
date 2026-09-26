@@ -1,20 +1,26 @@
 import { hasComponent } from 'bitecs'
 import type { Effect } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
-import { Enemy, CharAtkSlow, Morph, Poison, Slow } from '../../components'
+import { Alive, Enemy, FACTION, Hp, MARK, Mark, Revive, TAG, Uid } from '../../components'
+import { addMark } from '../../utils/marks'
+import { poisonSrc } from '../../store'
 import { applyMorph } from '../../entities/enemy'
-import { spawnEnemyProjectile } from '../../entities/projectile'
+import { spawnBolt } from '../../entities/projectile'
 import { spawnZone } from '../../entities/zone'
-import { damageTarget } from './damage'
-import { FACTION } from '../../components'
-import { healEnemies, healCharacters } from './heal'
-import { nearestAngle, targetsNear } from '../../utils/targets'
+import { spawnCoins } from '../../entities/pickup'
+import { hit } from './damage'
+import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
+import { interrupt } from './ability'
+import { healAllies } from './heal'
+import { nearestAngle, targetsWithin } from '../../utils/targets'
+import { flying } from '../../utils/source'
+import { isSameEntity } from '../../utils/identity'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 import type { ByKind } from '../../../util/record'
 import { spawnFxRing } from '../../entities/fx'
 
-export interface HitCtx {
+interface HitCtx {
   readonly x: number
   readonly y: number
   readonly baseDamage: number
@@ -32,118 +38,214 @@ export function applyBlast(
   radius: number,
   knockback: number,
   exclude?: ReadonlySet<number>,
-): void {
-  const list = targetsNear(sim, src, x, y, radius)
+): Struck[] {
+  const list = targetsWithin(sim, src, x, y, radius)
+  const struck: Struck[] = []
   for (const i of circleHitIndices({ x, y }, radius, list)) {
     const t = list[i]!
     if (exclude?.has(t.eid)) continue
-    damageTarget(sim, src, t.eid, damage, knockback, x, y)
+    const s = struckOf(t.eid)
+    if (hit(sim, src, t.eid, damage, { knockback, from: { x, y } })) struck.push(s)
   }
+  return struck
 }
 
-function eachCapable(sim: Sim, hit: HitCtx, comp: object, apply: (t: number) => void): void {
-  for (const t of hit.targets ?? []) {
+/** 打中的身体：eid 被击杀后会立刻复用，靠 Uid 认出还是不是它 */
+export interface Struck {
+  readonly eid: number
+  readonly uid: number
+}
+
+export function struckOf(eid: number): Struck {
+  return { eid, uid: Uid.v[eid]! }
+}
+
+/** 命中后的效果：施于这次真正打中且编号未变的身体，溅射不再打它们；谁也没打中就没有效果 */
+export function applyOnHit(sim: Sim, src: Source, effects: readonly Effect[] | undefined, x: number, y: number, baseDamage: number, struck: readonly Struck[]): void {
+  if (!effects || struck.length === 0) return
+  const live = struck.filter((s) => isSameEntity(sim.world, s.eid, s.uid)).map((s) => s.eid)
+  applyAbilityEffects(sim, src, effects, { x, y, baseDamage, targets: live, exclude: new Set(live) })
+}
+
+function eachCapable(sim: Sim, at: HitCtx, comp: object, apply: (t: number) => void): void {
+  for (const t of at.targets ?? []) {
     if (hasComponent(sim.world, t, comp)) apply(t)
   }
 }
 
 type EffectOf = ByKind<Effect>
 
-type Handler<K extends keyof EffectOf> = (sim: Sim, src: Source, fx: EffectOf[K], hit: HitCtx) => void
+type Handler<K extends keyof EffectOf> = (sim: Sim, src: Source, fx: EffectOf[K], at: HitCtx) => void
 
+/** 效果只看目标有没有对应的组件；金币只对队伍来源生效 */
 const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
-  blast: (sim, src, fx, hit) => {
-    const dmg = Math.max(1, Math.round(hit.baseDamage * fx.ratio))
-    applyBlast(sim, src, hit.x, hit.y, dmg, fx.radius, fx.knockback, hit.exclude)
-    if (fx.ring) spawnFxRing(sim, hit.x, hit.y, fx.radius, fx.ring)
+  blast: (sim, src, fx, at) => {
+    const dmg = Math.max(1, Math.round(at.baseDamage * fx.ratio))
+    applyBlast(sim, src, at.x, at.y, dmg, fx.radius, fx.knockback, at.exclude)
+    if (fx.ring) spawnFxRing(sim, at.x, at.y, fx.radius, fx.ring)
   },
 
-  slow: (sim, _src, fx, hit) => {
+  slow: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, hit, Slow, (t) => {
-      Slow.until[t] = until
-      Slow.mul[t] = fx.factor
-    })
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.slow, TAG.effect, until, fx.factor))
   },
 
-  poison: (sim, src, fx, hit) => {
+  poison: (sim, src, fx, at) => {
     const now = sim.elapsedMs
-    eachCapable(sim, hit, Poison, (t) => {
-      Poison.until[t] = now + fx.durationMs
-      Poison.nextTick[t] = now + fx.tickMs
-      Poison.dmg[t] = fx.damage
-      Poison.tickMs[t] = fx.tickMs
-      Poison.slot[t] = src.slot
+    eachCapable(sim, at, Mark, (t) => {
+      addMark(t, MARK.poison, TAG.effect, now + fx.durationMs, fx.damage, fx.tickMs, now + fx.tickMs)
+      poisonSrc[t] = src
     })
   },
 
-  morph: (sim, _src, fx, hit) => {
-    eachCapable(sim, hit, Morph, (t) => {
-      if (hasComponent(sim.world, t, Enemy)) applyMorph(sim, sim.frames, t, fx)
-    })
+  morph: (sim, _src, fx, at) => {
+    eachCapable(sim, at, Enemy, (t) => applyMorph(sim, sim.frames, t, fx))
   },
 
-  attackSlow: (sim, _src, fx, hit) => {
+  attackSlow: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
-    eachCapable(sim, hit, CharAtkSlow, (t) => {
-      CharAtkSlow.until[t] = until
-      CharAtkSlow.mul[t] = fx.mul
-    })
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.cd, TAG.effect, until, fx.mul))
   },
 
-  ground: (sim, src, fx, hit) => {
+  ground: (sim, src, fx, at) => {
     spawnZone(sim, {
-      x: hit.x,
-      y: hit.y,
+      x: at.x,
+      y: at.y,
       radius: fx.def.radius,
-      faction: src.faction,
+      src: { ...flying(src), tint: 0xa5d86a },
       durationMs: fx.def.durationMs,
       enterMs: fx.def.enterMs,
       color: fx.def.color,
       fillAlpha: fx.def.fillAlpha,
       lineAlpha: fx.def.lineAlpha,
       lineWidth: 2,
-      burn: {
-        damage: fx.def.damage,
-        tickMs: fx.def.tickMs,
-        srcSlot: src.slot,
-        srcEnemy: src.faction === FACTION.team ? undefined : src.enemy,
-      },
+      tickMs: fx.def.tickMs,
+      damage: fx.def.damage,
+      effects: fx.def.effects,
     })
   },
 
-  heal: (sim, src, fx, hit) => {
-    const all = fx.all ?? true
-    if (src.faction === FACTION.team) healCharacters(sim, hit.x, hit.y, fx.range, fx.amount, all)
-    else healEnemies(sim, hit.x, hit.y, fx.range, fx.amount, all, hit.source)
+  heal: (sim, src, fx, at) => {
+    const amount = Math.max(1, Math.round(fx.amount * src.dmgMul))
+    if (!at.targets) {
+      healAllies(sim, src.faction, at.x, at.y, fx.range ?? 0, amount, fx.scope !== 'lowest', at.source ?? -1)
+      return
+    }
+    const hurt = at.targets.filter((t) => hasComponent(sim.world, t, Hp) && Alive.v[t] === 1 && Hp.v[t]! < Hp.max[t]!)
+    if (hurt.length === 0) return
+    const each = Math.max(1, Math.round(amount * (fx.ratio ?? 1)))
+    if (fx.scope === 'lowest') {
+      let best = hurt[0]!
+      for (const t of hurt) if (Hp.v[t]! / Hp.max[t]! < Hp.v[best]! / Hp.max[best]!) best = t
+      Hp.v[best] = Math.min(Hp.max[best]!, Hp.v[best]! + each)
+      return
+    }
+    for (const t of hurt) Hp.v[t] = Math.min(Hp.max[t]!, Hp.v[t]! + each)
   },
 
-  spawnProjectile: (sim, src, fx, hit) => {
-    if (src.faction === FACTION.team) return
-    const angle = nearestAngle(sim, src, hit.x, hit.y, Infinity)
+  spawnProjectile: (sim, src, fx, at) => {
+    const angle = nearestAngle(sim, src, at.x, at.y, Infinity)
     if (angle === null) return
-    spawnEnemyProjectile(sim, hit.x, hit.y, angle, {
-      frame: sim.frames.index(fx.projectile.emoji, 'enemyProjectile'),
+    spawnBolt(sim, at.x, at.y, angle, {
+      faction: src.faction,
+      frame: sim.frames.index(fx.projectile.emoji, src.faction === FACTION.enemy ? 'enemyProjectile' : 'player'),
       size: fx.projectile.size,
       radius: fx.projectile.radius,
       speed: fx.projectile.speed,
-      damage: Math.round(fx.damage * src.dmgMul),
+      rotOffsetDeg: fx.projectile.rotationOffsetDeg,
       lifeMs: fx.lifeMs,
-      srcEnemy: src.enemy,
+      pierce: 0,
+      damage: fx.damage * src.dmgMul,
+      knockback: 0,
+      src: flying(src),
+      onHit: fx.onHit,
     })
+  },
+
+  buff: (sim, _src, fx, at) => {
+    const until = fx.durationMs === undefined ? Infinity : sim.elapsedMs + fx.durationMs
+    const tag = fx.durationMs === undefined ? TAG.perk : TAG.effect
+    eachCapable(sim, at, Mark, (t) => {
+      if (fx.damageMul !== undefined) addMark(t, MARK.dmg, tag, until, fx.damageMul)
+      if (fx.speedMul !== undefined) addMark(t, MARK.speed, tag, until, fx.speedMul)
+    })
+  },
+
+  damage: (sim, src, fx, at) => {
+    const dmg = Math.max(1, Math.round(fx.amount * src.dmgMul))
+    for (const t of at.targets ?? []) hit(sim, src, t, dmg)
+  },
+
+  stun: (sim, _src, fx, at) => {
+    const until = sim.elapsedMs + fx.durationMs
+    eachCapable(sim, at, Mark, (t) => {
+      addMark(t, MARK.stun, TAG.effect, until)
+      interrupt(sim, t)
+    })
+  },
+
+  hide: (sim, _src, fx, at) => {
+    const until = sim.elapsedMs + fx.durationMs
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.hide, TAG.effect, until))
+  },
+
+  taunt: (sim, src, fx, at) => {
+    const by = src.viewer
+    if (by === undefined) return
+    const until = sim.elapsedMs + fx.durationMs
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.taunt, TAG.effect, until, by, 0, 0, Uid.v[by]!))
+  },
+
+  guard: (sim, _src, fx, at) => {
+    const until = sim.elapsedMs + fx.durationMs
+    eachCapable(sim, at, Mark, (t) => addMark(t, MARK.guard, TAG.effect, until, fx.mul))
+  },
+
+  revive: (sim, _src, _fx, at) => {
+    eachCapable(sim, at, Revive, (t) => {
+      if (!Alive.v[t]) reviveCharacter(sim, t)
+    })
+  },
+
+  healRatio: (sim, _src, fx, at) => {
+    eachCapable(sim, at, Hp, (t) => {
+      if (Alive.v[t]) Hp.v[t] = Math.min(Hp.max[t]!, Hp.v[t]! + Hp.max[t]! * fx.ratio)
+    })
+  },
+
+  invuln: (sim, _src, fx, at) => {
+    eachCapable(sim, at, Mark, (t) => {
+      if (Alive.v[t]) grantIframe(sim, t, fx.ms)
+    })
+  },
+
+  reviveCut: (sim, _src, fx, at) => {
+    let best = -1
+    eachCapable(sim, at, Revive, (t) => {
+      if (Alive.v[t]) return
+      if (best < 0 || Revive.at[t]! > Revive.at[best]!) best = t
+    })
+    if (best >= 0) Revive.at[best] = Revive.at[best]! - fx.ms
+  },
+
+  timeStop: (sim, _src, fx) => {
+    sim.timeStopMsLeft = fx.durationMs
+  },
+
+  coins: (sim, src, fx, at) => {
+    if (src.faction === FACTION.team) spawnCoins(sim, at.x, at.y, fx.count)
+  },
+
+  vanish: (sim, _src, _fx, at) => {
+    eachCapable(sim, at, Enemy, (t) => despawnEnemy(sim, t))
   },
 }
 
-export function applyAbilityEffects(
-  sim: Sim,
-  src: Source,
-  effects: readonly Effect[] | undefined,
-  hit: HitCtx,
-): void {
+export function applyAbilityEffects(sim: Sim, src: Source, effects: readonly Effect[] | undefined, at: HitCtx): void {
   if (!effects) return
-  for (const fx of effects) applyEffect(sim, src, fx, hit)
+  for (const fx of effects) applyEffect(sim, src, fx, at)
 }
 
-function applyEffect<K extends keyof EffectOf>(sim: Sim, src: Source, fx: EffectOf[K] & { readonly kind: K }, hit: HitCtx): void {
-  EFFECT_KINDS[fx.kind](sim, src, fx, hit)
+function applyEffect<K extends keyof EffectOf>(sim: Sim, src: Source, fx: EffectOf[K] & { readonly kind: K }, at: HitCtx): void {
+  EFFECT_KINDS[fx.kind](sim, src, fx, at)
 }

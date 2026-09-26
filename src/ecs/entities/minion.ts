@@ -1,39 +1,46 @@
-import { addComponent, addComponents, removeComponent } from 'bitecs'
+import { addComponent, addComponents, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
+import { UNIT } from '../../util/units'
+import { ACQUIRE, MINION_BODY, MINION_FIRST_SHOT_MS } from '../../data/abilities'
+import { EMPLACE } from '../../data/feel'
 import { armIdle } from '../systems/shared/anim'
 import { attachDrawable } from './drawable'
 import { holderOutline } from './weapon'
 import {
-  Ability,
-  Aim,
+  Airborne,
+  Alive,
   Amp,
-  Anchor,
   Anim,
-  Bolt,
   Built,
-  Burst,
+  Clock,
+  Contact,
+  Drive,
   Emplacement,
+  EmplaceShape,
   Faction,
   Fired,
   Minion,
+  Nest,
+  Orbit,
   Owner,
+  Payload,
+  Phasing,
+  Phys,
+  Radius,
   Retiring,
-  Shoot,
-  Shots,
+  SpeedMul,
   Sprite,
-  Summon,
+  Steering,
+  SummonShape,
   Swarmer,
-  Turret,
-  Volley,
+  VisOff,
 } from '../components'
 import type { Sim } from '../sim'
 import { ANIM_DEF } from '../../emoji/anim'
-import { abilityArtEmoji } from '../store'
-import { ownerX, ownerY } from '../utils/amp'
-import { playSfx } from '../../audio/sfx'
-import { attachAbilityCore } from '../entities/ability'
+import { abilityArtEmoji, abilityOnHit, bodyRules, emplaceAbility } from '../store'
+import { anchorX, anchorY } from '../utils/amp'
+import { equipAbility } from '../entities/ability'
 import { liveOnes } from '../utils/turret'
-
 
 interface MinionSpec {
   tag: object
@@ -44,10 +51,7 @@ interface MinionSpec {
   y: number
   z: number
   lifeMs: number
-  phase: number
-  cd: number
   animOffsetMs?: number
-  arm?: (minion: number) => void
 }
 
 function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
@@ -66,97 +70,106 @@ function spawnMinion(sim: Sim, weaponEid: number, spec: MinionSpec): number {
   Built.by[m] = weaponEid
   Minion.bornMs[m] = sim.fxMs
   Minion.dieAt[m] = spec.lifeMs > 0 ? sim.elapsedMs + spec.lifeMs : 0
-  Minion.phase[m] = spec.phase
   Minion.size[m] = spec.size
-  Minion.cd[m] = spec.cd
+  Minion.ability[m] = 0
   if (spec.animOffsetMs !== undefined) {
     addComponent(sim.world, m, Anim)
     armIdle(m, spec.emoji, outline, Sprite.frame[m]!, spec.animOffsetMs)
   }
-  if (spec.arm) {
-    spec.arm(m)
-    addComponent(sim.world, m, Fired)
-  }
   return m
 }
 
+/** 一只蜜蜂：飞在空中、无视墙的身体，绕着主人转，看见敌人就扑上去蜇一下然后消散 */
 export function spawnBee(sim: Sim, e: number, index: number): void {
-  const count = Summon.count[e]!
-  spawnMinion(sim, e, {
+  const world = sim.world
+  const count = SummonShape.count[e]!
+  const size = SummonShape.size[e]!
+  const owner = Owner.eid[e]!
+  const phase = (index * Math.PI * 2) / count
+  const r = SummonShape.orbitRadius[e]!
+  const m = spawnMinion(sim, e, {
     tag: Swarmer,
     emoji: abilityArtEmoji[e]!,
-    size: Summon.size[e]!,
+    size,
     bornScale: 1,
-    x: ownerX(e),
-    y: ownerY(e),
+    x: anchorX(e) + Math.cos(phase) * r,
+    y: anchorY(e) + Math.sin(phase) * r,
     z: 12,
-    lifeMs: Summon.lifeMs[e]!,
-    phase: (index * Math.PI * 2) / count,
-    cd: 0,
+    lifeMs: SummonShape.lifeMs[e]!,
     animOffsetMs: (index * ANIM_DEF.durMs) / count,
   })
+  addComponents(world, m, Phys, Drive, Clock, Radius, Faction, Alive, SpeedMul, Steering, Nest, Orbit, Contact, Phasing, Airborne)
+  const speed = SummonShape.speed[e]!
+  Phys.vx[m] = 0
+  Phys.vy[m] = 0
+  Phys.thrust[m] = speed * MINION_BODY.drag
+  Phys.drag[m] = MINION_BODY.drag
+  Phys.mass[m] = MINION_BODY.mass
+  Phys.grip[m] = MINION_BODY.grip
+  Drive.x[m] = 0
+  Drive.y[m] = 0
+  Clock.v[m] = 0
+  Radius.v[m] = size * 0.35
+  Faction.v[m] = Faction.v[e]!
+  Alive.v[m] = 1
+  SpeedMul.v[m] = 1
+  Steering.v[m] = 1
+  Nest.of[m] = owner
+  Nest.nextSpawnAt[m] = 0
+  Orbit.radius[m] = r
+  Orbit.spin[m] = SummonShape.orbitSpin[e]!
+  Orbit.aggro[m] = 0
+  Orbit.seek[m] = ACQUIRE.range * UNIT
+  Orbit.fresh[m] = 1
+  Contact.damage[m] = Payload.damage[e]!
+  Contact.knockback[m] = Payload.knockback[e]!
+  Contact.vanish[m] = 1
+  bodyRules[m] = { onTouch: abilityOnHit[e] }
+  VisOff.y[m] = -8
 }
 
-export const RETIRE_MS = 240
-export const POP_MS = 220
-const FIRST_SHOT_MS = 200
-
-function armTurret(sim: Sim, weapon: number, m: number): void {
-  attachAbilityCore(sim, m, Shoot, [
-    { comp: Aim, reset: (x) => { Aim.rad[x] = 0 } },
-    { comp: Shots, reset: (x) => { Shots.n[x] = 0 } },
-  ], {
-    owner: Owner.eid[m]!,
-    anchor: m,
-    faction: Faction.v[weapon]!,
-    cooldownMs: FIRST_SHOT_MS,
-    baseMs: Turret.fireIntervalMs[weapon]!,
-    amp: { dmg: Amp.dmg[weapon]!, cd: Amp.cd[weapon]!, crit: Amp.crit[weapon]!, kb: Amp.kb[weapon]!, battle: Amp.battle[weapon] === 1 },
-  })
-  Shoot.damage[m] = Turret.damage[weapon]!
-  Shoot.knockback[m] = Turret.knockback[weapon]!
-  Shoot.range[m] = Turret.range[weapon]!
-  Shoot.lifeMs[m] = Turret.lifeMs[weapon]!
-  addComponent(sim.world, m, Bolt)
-  Bolt.frame[m] = Bolt.frame[weapon]!
-  Bolt.size[m] = Bolt.size[weapon]!
-  Bolt.radius[m] = Bolt.radius[weapon]!
-  Bolt.speed[m] = Bolt.speed[weapon]!
-  Bolt.rotOffset[m] = Bolt.rotOffset[weapon]!
-  if (Burst.count[weapon]! > 0) {
-    addComponent(sim.world, m, Volley)
-    Volley.count[m] = Burst.count[weapon]!
-    Volley.spreadDeg[m] = Burst.spreadDeg[weapon]!
-    Volley.randomRotate[m] = 0
+/** 装置退场：先撤它的能力，再缩小淡出 */
+export function retireEmplacement(sim: Sim, t: number): void {
+  addComponent(sim.world, t, Retiring)
+  Retiring.until[t] = sim.fxMs + EMPLACE.retireMs
+  const a = Minion.ability[t]!
+  if (a !== 0) {
+    removeEntity(sim.world, a)
+    Minion.ability[t] = 0
   }
-  Anchor.eid[m] = m
 }
 
+/** 架一座装置：一个固定身体，带着定义里那条能力，所有者仍是施法者 */
 export function place(sim: Sim, e: number, at?: { x: number; y: number }, lifeMs = 0): void {
   const live = liveOnes(sim, e)
-  spawnMinion(sim, e, {
+  const m = spawnMinion(sim, e, {
     tag: Emplacement,
     emoji: abilityArtEmoji[e]!,
-    size: Turret.size[e]!,
+    size: EmplaceShape.size[e]!,
     bornScale: 0.2,
-    x: at ? at.x : ownerX(e),
-    y: at ? at.y : ownerY(e) + 6,
+    x: at ? at.x : anchorX(e),
+    y: at ? at.y : anchorY(e) + 6,
     z: 5,
     lifeMs,
-    phase: 0,
-    cd: 0,
     animOffsetMs: live.length * 311,
-    arm: (m) => armTurret(sim, e, m),
   })
-  playSfx('recruit')
-  let over = live.length + 1 - Turret.maxTurrets[e]!
+  addComponent(sim.world, m, Fired)
+  Fired.v[m] = 0
+  const def = emplaceAbility[e]!
+  const a = equipAbility(sim, m, def, Faction.v[e]!, MINION_FIRST_SHOT_MS, {
+    dmg: Amp.dmg[e]!,
+    cd: Amp.cd[e]!,
+    crit: Amp.crit[e]!,
+    kb: Amp.kb[e]!,
+    battle: Amp.battle[e] === 1,
+  }, { owner: Owner.eid[e]! })
+  Minion.ability[m] = a
+  let over = live.length + 1 - EmplaceShape.maxAlive[e]!
   while (over-- > 0) {
     let oldest = -1
     for (const o of live) if (oldest < 0 || Minion.bornMs[o]! < Minion.bornMs[oldest]!) oldest = o
     if (oldest < 0) break
-    addComponent(sim.world, oldest, Retiring)
-    Retiring.until[oldest] = sim.fxMs + RETIRE_MS
-    removeComponent(sim.world, oldest, Ability)
+    retireEmplacement(sim, oldest)
     live.splice(live.indexOf(oldest), 1)
   }
 }

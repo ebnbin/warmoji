@@ -2,26 +2,28 @@ import { addComponent, query, removeEntity } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { PICKUP, PICKUPS } from '../../data/pickups'
-import { Alive, Bob, Collected, Grab, Hurt, Lifetime, Magnet, PICKUP_SET, Pull, Tint, Transform, Vel } from '../components'
+import { Alive, Collected, Drive, Grab, Radius, Lifetime, Magnet, PICKUP_SET, Pull, Tint, Transform } from '../components'
 import { animatePickup } from '../entities/pickup'
 import type { Sim } from '../sim'
 import { leaderX, leaderY } from '../utils/team'
 
 const FADE_MS = 250
 
-/** 金币被吸附范围内最近的存活角色吸走、碰到任何角色即拾取；不吸附的拾取物只有队长走过去才捡 */
+/** 金币被吸附范围内最近的存活角色吸走、碰到任何角色即拾取；不吸附的拾取物只有队长走过去才捡；位移由 moveBodies 负责，漂出世界就消失 */
 export function updatePickups(sim: Sim): void {
-  const delta = sim.dtMs
   const eids = query(sim.world, PICKUP_SET)
   if (eids.length === 0) return
-  const dt = delta / 1000
   const now = sim.elapsedMs
   const lx = leaderX(sim)
   const ly = leaderY(sim)
   for (const eid of eids) {
     animatePickup(sim, eid)
     const x = Transform.x[eid]!
-    const y = Bob.amp[eid]! > 0 ? Bob.y0[eid]! : Transform.y[eid]!
+    const y = Transform.y[eid]!
+    if (sim.hooks.outside(sim, x, y)) {
+      removeEntity(sim.world, eid)
+      continue
+    }
     const magnetic = Pull.on[eid] === 1
     if (sim.frameAttractors.length > 0 && magnetic) {
       let taken = false
@@ -50,20 +52,15 @@ export function updatePickups(sim: Sim): void {
       if (left < FADE_MS) Tint.alpha[eid] = left / FADE_MS
     }
     if (!magnetic) continue
-    const idle = sim.hooks.coinIdleVelocity(sim)
     const pull = magnetPull(sim, x, y)
     if (pull) {
       const dir = norm(pull.x, pull.y)
-      Vel.x[eid] = dir.x * PICKUP.magnetSpeed * UNIT + idle.x
-      Vel.y[eid] = dir.y * PICKUP.magnetSpeed * UNIT + idle.y
+      Drive.x[eid] = dir.x * PICKUP.magnetSpeed * UNIT
+      Drive.y[eid] = dir.y * PICKUP.magnetSpeed * UNIT
     } else {
-      Vel.x[eid] = idle.x
-      Vel.y[eid] = idle.y
+      Drive.x[eid] = 0
+      Drive.y[eid] = 0
     }
-    const moved = sim.hooks.wrap(sim, x + Vel.x[eid]! * dt, y + Vel.y[eid]! * dt)
-    Transform.x[eid] = moved.x
-    Transform.y[eid] = moved.y
-    if (sim.hooks.cullCoin(sim, moved.x, moved.y)) removeEntity(sim.world, eid)
   }
 }
 
@@ -80,7 +77,7 @@ function nearAliveCharacter(sim: Sim, x: number, y: number, grab: number): boole
   const cr = PICKUPS.coin.radius * UNIT
   for (const m of sim.characters) {
     if (!Alive.v[m]) continue
-    if (within(sim, x, y, Transform.x[m]!, Transform.y[m]!, Math.max(grab, Hurt.radius[m]! + cr))) return true
+    if (within(sim, x, y, Transform.x[m]!, Transform.y[m]!, Math.max(grab, Radius.v[m]! + cr))) return true
   }
   return false
 }

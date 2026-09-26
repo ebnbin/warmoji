@@ -13,4 +13,6 @@ export interface FeelTuning {
     readonly facingTauMs: number
   }
   readonly hitShake: { readonly durationMs: number; readonly intensity: number }
+  readonly pop: { readonly reviveMs: number; readonly enemyMs: number; readonly bossMs: number }
+  readonly emplace: { readonly popMs: number; readonly retireMs: number }
 }

@@ -1,6 +1,6 @@
 import type { Point } from '../../util/vec'
 
-export interface HitTarget {
+interface HitTarget {
   x: number
   y: number
   radius: number

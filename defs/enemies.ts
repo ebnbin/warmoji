@@ -2,7 +2,7 @@ import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 
 const ZOMBIE = {
   kind: 'zombie',
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   emoji: '1f9df',
   name: '僵尸',
   desc: '缓慢但成群，最基础的追击者',
@@ -17,7 +17,7 @@ const ZOMBIE = {
 
 const GHOST = {
   kind: 'ghost',
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   emoji: '1f47b',
   name: '幽灵',
   phasesWalls: true,
@@ -29,12 +29,12 @@ const GHOST = {
   damage: 5,
   xp: 2,
   coins: 2,
-  onDeath: [{ kind: 'heal', range: 3, amount: 12, all: true }],
+  onDeath: [{ kind: 'heal', amount: 12, scope: 'all', range: 3 }],
 } satisfies EnemyDef
 
 const INVADER = {
   kind: 'invader',
-  locomotion: { kind: 'wander' },
+  drive: { kind: 'wander' },
   emoji: '1f47e',
   name: '外星怪',
   desc: '不追人，游荡途中朝前方吐慢速弹，死亡放一记冷枪',
@@ -47,13 +47,11 @@ const INVADER = {
   coins: 3,
   abilities: [
     {
-      kind: 'projectile',
-      damage: 6,
+      trigger: 'auto',
       cooldownMs: 2800,
-      knockback: 0,
       aim: 'move',
-      lifeMs: 4500,
-      projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3, rotationOffsetDeg: 0 },
+      damage: 6,
+      shape: { kind: 'bolt', projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3, rotationOffsetDeg: 0 }, lifeMs: 4500 },
     },
   ],
   onDeath: [
@@ -79,16 +77,18 @@ const BOAR = {
   damage: 10,
   xp: 5,
   coins: 3,
-  locomotion: {
-    kind: 'dash',
-    trigger: { kind: 'detect', range: 4, cooldownMs: 1800 },
-    length: { kind: 'dist', dist: 3.5 },
-    windupMs: 550,
-    dashSpeed: 8,
-    idle: 'wander',
-    aim: 'nearest',
-    lockAt: 'windup',
-  },
+  drive: { kind: 'wander' },
+  abilities: [
+    {
+      trigger: 'auto',
+      cooldownMs: 1800,
+      firstDelayMs: 0,
+      aim: 'nearest',
+      range: 4,
+      windup: { ms: 550, lockAt: 'start', telegraph: 'shake' },
+      shape: { kind: 'sprint', distance: 3.5, ms: 437.5 },
+    },
+  ],
   onDeath: [{ kind: 'decoy', hp: 40, durationMs: 3000, alpha: 0.5 }],
 } satisfies EnemyDef
 
@@ -104,23 +104,22 @@ const SNAKE = {
   damage: 5,
   xp: 4,
   coins: 3,
-  locomotion: { kind: 'standoff', detectRange: 8, standoffDist: 5 },
+  drive: { kind: 'standoff', detectRange: 8, standoffDist: 5 },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 5,
+      trigger: 'auto',
       cooldownMs: 2600,
-      knockback: 0,
+      aim: 'nearest',
       range: 8,
-      lifeMs: 4500,
-      projectile: { emoji: '1f7e2', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
+      damage: 5,
+      shape: { kind: 'bolt', projectile: { emoji: '1f7e2', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 }, lifeMs: 4500 },
     },
   ],
 } satisfies EnemyDef
 
 const MUSHROOM = {
   kind: 'mushroom',
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   emoji: '1f344',
   name: '毒蘑菇',
   desc: '死亡时在原地留下一片毒液',
@@ -150,7 +149,7 @@ const MUSHROOM = {
 
 const RAT = {
   kind: 'rat',
-  locomotion: { kind: 'coinThief' },
+  drive: { kind: 'coinThief' },
   emoji: '1f400',
   name: '偷币鼠',
   desc: '专偷地上的金币，击杀可全额讨回并有利息',
@@ -165,7 +164,7 @@ const RAT = {
 
 const SLIME = {
   kind: 'slime',
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   emoji: '1f40c',
   name: '黏黏怪',
   desc: '缓慢肉盾，蹭到的队员会被黏住，攻速大降数秒',
@@ -176,12 +175,12 @@ const SLIME = {
   damage: 5,
   xp: 4,
   coins: 3,
-  onContact: [{ kind: 'attackSlow', mul: 1.6, durationMs: 3000 }],
+  onTouch: [{ kind: 'attackSlow', mul: 1.6, durationMs: 3000 }],
 } satisfies EnemyDef
 
 const BLOBLING = {
   kind: 'blobling',
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   emoji: '1fae7',
   name: '小泡泡',
   desc: '泡泡分裂出的迷你体，快而脆',
@@ -196,7 +195,7 @@ const BLOBLING = {
 
 const BLOB = {
   kind: 'blob',
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   emoji: '1fae7',
   name: '泡泡',
   desc: '被击破时分裂成两只小泡泡',
@@ -212,13 +211,8 @@ const BLOB = {
 
 const LARVA = {
   kind: 'larva',
-  locomotion: {
-    kind: 'baseOrbit',
-    orbitRadius: 2.5,
-    aggroRange: 6,
-    orphanSpeedMul: 1.7,
-    orphanDamageMul: 2.5,
-  },
+  drive: { kind: 'orbit', radius: 2.5, aggroRange: 6 },
+  onAnchorLost: [{ kind: 'buff', speedMul: 1.7, damageMul: 2.5 }],
   emoji: '1f99f',
   name: '小飞虫',
   desc: '绕着虫巢盘旋守卫，玩家逼近巢就扑击；巢被拆后暴走直扑玩家',
@@ -233,7 +227,7 @@ const LARVA = {
 
 const HIVE = {
   kind: 'hive',
-  locomotion: { kind: 'static' },
+  drive: { kind: 'stay' },
   emoji: '1faba',
   name: '虫巢',
   desc: '原地不动的巢穴，每隔几秒吐出小飞虫，不拆掉就一直刷',
@@ -260,18 +254,27 @@ const CREEPER = {
   damage: 6,
   xp: 6,
   coins: 4,
-  locomotion: {
-    kind: 'detonate',
-    triggerRange: 2.6,
-    windupMs: 800,
-    blastRadius: 3.8,
-    blastDamage: 32,
-  },
+  drive: { kind: 'chase' },
+  abilities: [
+    {
+      trigger: 'auto',
+      cooldownMs: 0,
+      firstDelayMs: 0,
+      aim: 'nearest',
+      range: 2.6,
+      windup: { ms: 800, lockAt: 'start', telegraph: 'blink' },
+      damage: 32,
+      color: 0xff5252,
+      fireSfx: 'boom',
+      shape: { kind: 'disc', radius: 3.8, at: 'self' },
+      onSelf: [{ kind: 'vanish' }],
+    },
+  ],
 } satisfies EnemyDef
 
 const ELF = {
   kind: 'elf',
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   emoji: '1f9dd',
   name: '林祭司',
   desc: '林间祭司，每隔几秒群体治疗周围受伤的同伴——不先清它，怪潮就一直被奶回来',
@@ -282,12 +285,21 @@ const ELF = {
   damage: 5,
   xp: 5,
   coins: 4,
-  abilities: [{ kind: 'heal', amount: 13, cooldownMs: 2600, range: 3.5, aoe: { ratio: 1 } }],
+  abilities: [
+    {
+      trigger: 'auto',
+      cooldownMs: 2600,
+      aim: 'self',
+      fireSfx: 'upgrade',
+      shape: { kind: 'disc', radius: 3.5, at: 'self', of: 'hurt' },
+      onHit: [{ kind: 'heal', amount: 13, scope: 'all' }],
+    },
+  ],
 } satisfies EnemyDef
 
 const TURTLE = {
   kind: 'turtle',
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   emoji: '1f422',
   name: '炮龟',
   desc: '缓慢的重甲龟，边逼近边朝队伍抛射一串硬壳弹，血厚、免疫击退',
@@ -301,15 +313,13 @@ const TURTLE = {
   kbImmune: true,
   abilities: [
     {
-      kind: 'projectile',
-      damage: 7,
+      trigger: 'auto',
       cooldownMs: 3000,
-      knockback: 0,
-      aim: 'nearest',
       firstDelayMs: 1500,
-      lifeMs: 5000,
-      volley: { count: 3, spreadDeg: 36 },
-      projectile: { emoji: '1faa8', size: 0.4, radius: 0.15, speed: 2.6, rotationOffsetDeg: 0 },
+      aim: 'nearest',
+      damage: 7,
+      shape: { kind: 'bolt', projectile: { emoji: '1faa8', size: 0.4, radius: 0.15, speed: 2.6, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      repeat: { count: 3, spreadDeg: 36 },
     },
   ],
 } satisfies EnemyDef
@@ -326,21 +336,22 @@ const LOCUST = {
   damage: 4,
   xp: 2,
   coins: 1,
-  locomotion: {
-    kind: 'dash',
-    trigger: { kind: 'timer', intervalMs: 1400, firstDelayMs: 600 },
-    length: { kind: 'dist', dist: 2.2 },
-    windupMs: 200,
-    dashSpeed: 7,
-    idle: 'chase',
-    aim: 'nearest',
-    lockAt: 'launch',
-  },
+  drive: { kind: 'chase' },
+  abilities: [
+    {
+      trigger: 'auto',
+      cooldownMs: 1400,
+      firstDelayMs: 600,
+      aim: 'nearest',
+      windup: { ms: 200, lockAt: 'end', telegraph: 'shake' },
+      shape: { kind: 'sprint', distance: 2.2, ms: 314.3 },
+    },
+  ],
 } satisfies EnemyDef
 
 const GARGOYLE = {
   kind: 'gargoyle',
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   emoji: '1f5ff',
   name: '石像鬼',
   desc: '沉重的石像守卫，血极厚、移速慢、免疫击退，硬生生压上来堵路吸火力',
@@ -366,13 +377,22 @@ const PUFFER = {
   damage: 5,
   xp: 5,
   coins: 4,
-  locomotion: {
-    kind: 'detonate',
-    triggerRange: 2.0,
-    windupMs: 700,
-    blastRadius: 2.8,
-    blastDamage: 22,
-  },
+  drive: { kind: 'chase' },
+  abilities: [
+    {
+      trigger: 'auto',
+      cooldownMs: 0,
+      firstDelayMs: 0,
+      aim: 'nearest',
+      range: 2.0,
+      windup: { ms: 700, lockAt: 'start', telegraph: 'blink' },
+      damage: 22,
+      color: 0xff5252,
+      fireSfx: 'boom',
+      shape: { kind: 'disc', radius: 2.8, at: 'self' },
+      onSelf: [{ kind: 'vanish' }],
+    },
+  ],
   onDeath: [
     {
       kind: 'ground',
@@ -402,16 +422,15 @@ const UFO = {
   damage: 6,
   xp: 5,
   coins: 4,
-  locomotion: { kind: 'standoff', detectRange: 9, standoffDist: 6 },
+  drive: { kind: 'standoff', detectRange: 9, standoffDist: 6 },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 6,
+      trigger: 'auto',
       cooldownMs: 2400,
-      knockback: 0,
+      aim: 'nearest',
       range: 9,
-      lifeMs: 4500,
-      projectile: { emoji: '1f4ab', size: 0.45, radius: 0.15, speed: 3.4, rotationOffsetDeg: 0 },
+      damage: 6,
+      shape: { kind: 'bolt', projectile: { emoji: '1f4ab', size: 0.45, radius: 0.15, speed: 3.4, rotationOffsetDeg: 0 }, lifeMs: 4500 },
     },
   ],
 } satisfies EnemyDef
@@ -428,7 +447,7 @@ const ALIEN = {
   damage: 7,
   xp: 4,
   coins: 2,
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
 } satisfies EnemyDef
 
 const COMET = {
@@ -443,19 +462,20 @@ const COMET = {
   damage: 12,
   xp: 5,
   coins: 3,
-  locomotion: {
-    kind: 'dash',
-    windupMs: 240,
-    dashSpeed: 8,
-    trigger: { kind: 'detect', range: 5, cooldownMs: 1600 },
-    length: { kind: 'dist', dist: 2.8 },
-    idle: 'chase',
-    aim: 'nearest',
-    lockAt: 'launch',
-    sfx: 'whoosh',
-  },
+  drive: { kind: 'chase' },
+  abilities: [
+    {
+      trigger: 'auto',
+      cooldownMs: 1600,
+      firstDelayMs: 0,
+      aim: 'nearest',
+      range: 5,
+      windup: { ms: 240, lockAt: 'end', telegraph: 'shake' },
+      fireSfx: 'whoosh',
+      shape: { kind: 'sprint', distance: 2.8, ms: 350 },
+    },
+  ],
 } satisfies EnemyDef
-
 
 const FOREST_BOSS = {
   kind: 'treant',
@@ -471,18 +491,17 @@ const FOREST_BOSS = {
   xp: 60,
   coins: 60,
   kbImmune: true,
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   spawner: { into: MUSHROOM, intervalMs: 5200, count: 2, maxAlive: 6, firstDelayMs: 3000 },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 8,
+      trigger: 'auto',
       cooldownMs: 3200,
-      knockback: 0,
       firstDelayMs: 2000,
-      lifeMs: 6000,
-      volley: { count: 7, spreadDeg: 160 },
-      projectile: { emoji: '1f7e2', size: 0.42, radius: 0.15, speed: 2.4, rotationOffsetDeg: 0 },
+      aim: 'nearest',
+      damage: 8,
+      shape: { kind: 'bolt', projectile: { emoji: '1f7e2', size: 0.42, radius: 0.15, speed: 2.4, rotationOffsetDeg: 0 }, lifeMs: 6000 },
+      repeat: { count: 7, spreadDeg: 160 },
     },
   ],
 } satisfies EnemyDef
@@ -501,28 +520,25 @@ const DESERT_BOSS = {
   xp: 60,
   coins: 60,
   kbImmune: true,
-  locomotion: {
-    kind: 'dash',
-    trigger: { kind: 'timer', intervalMs: 5000, firstDelayMs: 3500 },
-    length: { kind: 'time', durationMs: 500 },
-    windupMs: 650,
-    dashSpeed: 11,
-    idle: 'chase',
-    aim: 'leader',
-    lockAt: 'launch',
-    sfx: 'whoosh',
-  },
+  drive: { kind: 'chase', at: 'leader' },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 8,
+      trigger: 'auto',
+      cooldownMs: 5000,
+      firstDelayMs: 3500,
+      aim: 'leader',
+      windup: { ms: 650, lockAt: 'end', telegraph: 'shake' },
+      fireSfx: 'whoosh',
+      shape: { kind: 'sprint', distance: 5.5, ms: 500 },
+    },
+    {
+      trigger: 'auto',
       cooldownMs: 3000,
-      knockback: 0,
       firstDelayMs: 1800,
-      lifeMs: 5000,
       aim: 'nearest',
-      volley: { count: 5, spreadDeg: 70 },
-      projectile: { emoji: '1f7e3', size: 0.42, radius: 0.15, speed: 3.2, rotationOffsetDeg: 0 },
+      damage: 8,
+      shape: { kind: 'bolt', projectile: { emoji: '1f7e3', size: 0.42, radius: 0.15, speed: 3.2, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      repeat: { count: 5, spreadDeg: 70 },
     },
   ],
 } satisfies EnemyDef
@@ -541,26 +557,23 @@ const RIVER_BOSS = {
   xp: 60,
   coins: 60,
   kbImmune: true,
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 9,
+      trigger: 'auto',
       cooldownMs: 3200,
-      knockback: 0,
       firstDelayMs: 1800,
-      lifeMs: 5000,
       aim: 'nearest',
-      volley: { count: 6, spreadDeg: 90 },
-      projectile: { emoji: '1f4a7', size: 0.5, radius: 0.18, speed: 2.6, rotationOffsetDeg: 0 },
+      damage: 9,
+      shape: { kind: 'bolt', projectile: { emoji: '1f4a7', size: 0.5, radius: 0.18, speed: 2.6, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      repeat: { count: 6, spreadDeg: 90 },
     },
     {
-      kind: 'strike',
-      damage: 22,
+      trigger: 'auto',
       cooldownMs: 5000,
-      knockback: 0,
-      targets: 4,
-      drop: { emoji: '1f4a7', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+      aim: 'nearest',
+      damage: 22,
+      shape: { kind: 'drop', targets: 4, emoji: '1f4a7', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
   ],
 } satisfies EnemyDef
@@ -579,31 +592,27 @@ const FACTORY_BOSS = {
   xp: 60,
   coins: 60,
   kbImmune: true,
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 8,
+      trigger: 'auto',
       cooldownMs: 2400,
-      knockback: 0,
       firstDelayMs: 1600,
-      lifeMs: 6000,
       aim: 'nearest',
+      damage: 8,
       fireSfx: 'boom',
-      everyN: { n: 3, count: 12, spreadDeg: 360 },
-      projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 },
+      shape: { kind: 'bolt', projectile: { emoji: '1f534', size: 0.4, radius: 0.14, speed: 3.2, rotationOffsetDeg: 0 }, lifeMs: 6000 },
+      repeat: { everyN: 3, count: 12, spreadDeg: 360 },
     },
     {
-      kind: 'strike',
-      damage: 24,
+      trigger: 'auto',
       cooldownMs: 4800,
-      knockback: 0,
-      targets: 5,
-      drop: { emoji: '1f528', size: 1.1, fromAbove: 4, dropMs: 220, staggerMs: 80 },
+      aim: 'nearest',
+      damage: 24,
+      shape: { kind: 'drop', targets: 5, emoji: '1f528', size: 1.1, fromAbove: 4, dropMs: 220, staggerMs: 80 },
     },
   ],
 } satisfies EnemyDef
-
 
 const RUINS_BOSS = {
   kind: 'rhino',
@@ -620,25 +629,23 @@ const RUINS_BOSS = {
   coins: 60,
   kbImmune: true,
   breaksWalls: true,
-  locomotion: {
-    kind: 'dash',
-    trigger: { kind: 'timer', intervalMs: 5000, firstDelayMs: 3200 },
-    length: { kind: 'time', durationMs: 600 },
-    windupMs: 700,
-    dashSpeed: 10,
-    idle: 'chase',
-    aim: 'leader',
-    lockAt: 'launch',
-    sfx: 'whoosh',
-  },
+  drive: { kind: 'chase', at: 'leader' },
   abilities: [
     {
-      kind: 'strike',
-      damage: 24,
+      trigger: 'auto',
+      cooldownMs: 5000,
+      firstDelayMs: 3200,
+      aim: 'leader',
+      windup: { ms: 700, lockAt: 'end', telegraph: 'shake' },
+      fireSfx: 'whoosh',
+      shape: { kind: 'sprint', distance: 6, ms: 600 },
+    },
+    {
+      trigger: 'auto',
       cooldownMs: 4500,
-      knockback: 0,
-      targets: 5,
-      drop: { emoji: '1faa8', size: 1.1, fromAbove: 4, dropMs: 240, staggerMs: 90 },
+      aim: 'nearest',
+      damage: 24,
+      shape: { kind: 'drop', targets: 5, emoji: '1faa8', size: 1.1, fromAbove: 4, dropMs: 240, staggerMs: 90 },
     },
   ],
 } satisfies EnemyDef
@@ -657,26 +664,23 @@ const DAYNIGHT_BOSS = {
   xp: 60,
   coins: 60,
   kbImmune: true,
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 8,
+      trigger: 'auto',
       cooldownMs: 3000,
-      knockback: 0,
       firstDelayMs: 1600,
-      lifeMs: 5000,
       aim: 'nearest',
-      volley: { count: 14, spreadDeg: 360 },
-      projectile: { emoji: '1f31f', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 },
+      damage: 8,
+      shape: { kind: 'bolt', projectile: { emoji: '1f31f', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      repeat: { count: 14, spreadDeg: 360 },
     },
     {
-      kind: 'strike',
-      damage: 22,
+      trigger: 'auto',
       cooldownMs: 4600,
-      knockback: 0,
-      targets: 4,
-      drop: { emoji: '1f319', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+      aim: 'nearest',
+      damage: 22,
+      shape: { kind: 'drop', targets: 4, emoji: '1f319', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
   ],
 } satisfies EnemyDef
@@ -695,26 +699,23 @@ const SPACE_BOSS = {
   xp: 60,
   coins: 60,
   kbImmune: true,
-  locomotion: { kind: 'chase' },
+  drive: { kind: 'chase' },
   abilities: [
     {
-      kind: 'projectile',
-      damage: 8,
+      trigger: 'auto',
       cooldownMs: 2800,
-      knockback: 0,
       firstDelayMs: 1600,
-      lifeMs: 5000,
       aim: 'nearest',
-      volley: { count: 16, spreadDeg: 360 },
-      projectile: { emoji: '1f4ab', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 },
+      damage: 8,
+      shape: { kind: 'bolt', projectile: { emoji: '1f4ab', size: 0.5, radius: 0.18, speed: 2.5, rotationOffsetDeg: 0 }, lifeMs: 5000 },
+      repeat: { count: 16, spreadDeg: 360 },
     },
     {
-      kind: 'strike',
-      damage: 22,
+      trigger: 'auto',
       cooldownMs: 4600,
-      knockback: 0,
-      targets: 4,
-      drop: { emoji: '1f311', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
+      aim: 'nearest',
+      damage: 22,
+      shape: { kind: 'drop', targets: 4, emoji: '1f311', size: 1.0, fromAbove: 4, dropMs: 240, staggerMs: 80 },
     },
   ],
 } satisfies EnemyDef

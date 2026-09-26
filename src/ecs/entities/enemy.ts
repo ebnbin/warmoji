@@ -1,65 +1,49 @@
-import { addComponent, query } from 'bitecs'
-import { newEntity } from './entity'
+import { addComponent, addComponents, hasComponent, query, removeComponent } from 'bitecs'
+import { spawnBody } from './body'
 import { AI, ELITE, SPAWN, SURGE } from '../../data/enemies'
-import type { EnemyDef, LocomotionDef } from '../../types/enemies'
+import { ENEMY_BODY, MORPH } from '../../data/abilities'
+import { POP } from '../../data/feel'
+import { startPop } from '../utils/pop'
+import type { DriveDef, EnemyDef } from '../../types/enemies'
 import { waveAt } from '../../data/waves'
 import {
-  Alive,
+  Anchored,
   Anim,
-  BaseOrbit,
   Boss,
   BreaksWalls,
-  BVel,
   Chase,
   CoinThief,
-  Dash,
-  DashDetect,
-  DashDist,
-  DashTime,
-  DashTimer,
-  Detonate,
-  Flee,
-  Roam,
-  Slowed,
-  Standoff,
-  Stationary,
-  Steering,
-  Charge,
+  Contact,
   Depth,
   Despawn,
-  DmgMul,
   Dormant,
   EDir,
   Elite,
   Enemy,
   ENEMY_SET,
   EnemyArm,
-  Dancing,
   EnemyPhase,
-  RushHit,
-  Taunted,
-  EState,
   ETurn,
+  FACTION,
   Flash,
-  Hp,
-  Kv,
-  Morph,
+  Flee,
+  MARK,
   Nest,
-  Orphan,
-  Poison,
+  Orbit,
+  Phasing,
   Pop,
-  Quad,
-  Radius,
-  Slide,
-  Slow,
-  Speed,
-  SpMul,
+  Wander,
+  SprintHit,
   Sprite,
-  Thief,
+  Standoff,
+  Steering,
+  TAG,
   Tint,
   Transform,
 } from '../components'
-import { enemyCarries, enemyDef } from '../store'
+import { bodyRules, enemyDef } from '../store'
+import { interrupt } from '../systems/shared/ability'
+import { addMark, hasMark } from '../utils/marks'
 import { spawnTelegraph, telegraphCount } from './telegraph'
 import { scheduleSurge } from './schedule'
 import { armIdle } from '../systems/shared/anim'
@@ -74,73 +58,39 @@ import type { FieldPickupDef } from '../../types/battlefield'
 import { enemyMixAt, pickEnemy } from '../utils/spawnMix'
 import type { ByKind } from '../../util/record'
 
+type DriveOf = ByKind<DriveDef>
 
+type DriveAttach<K extends keyof DriveOf> = (sim: Sim, eid: number, d: DriveOf[K]) => void
 
-
-
-type LocomotionOf = ByKind<LocomotionDef>
-
-type LocoAttach<K extends keyof LocomotionOf> = (sim: Sim, eid: number, lm: LocomotionOf[K]) => void
-
-const LOCOMOTIONS: { [K in keyof LocomotionOf]: LocoAttach<K> } = {
-  chase: (sim, eid) => addComponent(sim.world, eid, Chase),
-  wander: (sim, eid) => addComponent(sim.world, eid, Roam),
-  static: (sim, eid) => addComponent(sim.world, eid, Stationary),
-  flee: (sim, eid, lm) => {
+const DRIVES: { [K in keyof DriveOf]: DriveAttach<K> } = {
+  chase: (sim, eid, d) => {
+    addComponent(sim.world, eid, Chase)
+    Chase.leader[eid] = d.at === 'leader' ? 1 : 0
+  },
+  wander: (sim, eid) => addComponent(sim.world, eid, Wander),
+  stay: () => {},
+  flee: (sim, eid, d) => {
     addComponent(sim.world, eid, Flee)
-    Flee.range[eid] = lm.range
+    Flee.range[eid] = d.range
   },
   coinThief: (sim, eid) => addComponent(sim.world, eid, CoinThief),
-  standoff: (sim, eid, lm) => {
+  standoff: (sim, eid, d) => {
     addComponent(sim.world, eid, Standoff)
-    Standoff.detectRange[eid] = lm.detectRange
-    Standoff.standoffDist[eid] = lm.standoffDist
+    Standoff.detectRange[eid] = d.detectRange
+    Standoff.standoffDist[eid] = d.standoffDist
   },
-  detonate: (sim, eid, lm) => {
-    addComponent(sim.world, eid, Detonate)
-    Detonate.triggerRange[eid] = lm.triggerRange
-    Detonate.windupMs[eid] = lm.windupMs
-    Detonate.blastRadius[eid] = lm.blastRadius
-    Detonate.blastDamage[eid] = lm.blastDamage
-  },
-  baseOrbit: (sim, eid, lm) => {
-    addComponent(sim.world, eid, BaseOrbit)
-    BaseOrbit.orbitRadius[eid] = lm.orbitRadius
-    BaseOrbit.aggroRange[eid] = lm.aggroRange
-    addComponent(sim.world, eid, Orphan)
-    Orphan.speedMul[eid] = lm.orphanSpeedMul
-    Orphan.damageMul[eid] = lm.orphanDamageMul
-  },
-  dash: (sim, eid, lm) => {
-    addComponent(sim.world, eid, Dash)
-    Dash.windupMs[eid] = lm.windupMs
-    Dash.dashSpeed[eid] = lm.dashSpeed
-    Dash.idleChase[eid] = lm.idle === 'chase' ? 1 : 0
-    Dash.aimLeader[eid] = lm.aim === 'leader' ? 1 : 0
-    Dash.lockAtLaunch[eid] = lm.lockAt === 'launch' ? 1 : 0
-    Dash.whoosh[eid] = lm.sfx ? 1 : 0
-    EState.v[eid] = lm.idle === 'chase' ? 1 : 0
-    if (lm.trigger.kind === 'timer') {
-      addComponent(sim.world, eid, DashTimer)
-      DashTimer.intervalMs[eid] = lm.trigger.intervalMs
-      Charge.nextDashAt[eid] = sim.elapsedMs + (lm.trigger.firstDelayMs ?? lm.trigger.intervalMs)
-    } else {
-      addComponent(sim.world, eid, DashDetect)
-      DashDetect.range[eid] = lm.trigger.range
-      DashDetect.cooldownMs[eid] = lm.trigger.cooldownMs
-    }
-    if (lm.length.kind === 'time') {
-      addComponent(sim.world, eid, DashTime)
-      DashTime.durationMs[eid] = lm.length.durationMs
-    } else {
-      addComponent(sim.world, eid, DashDist)
-      DashDist.dist[eid] = lm.length.dist
-    }
+  orbit: (sim, eid, d) => {
+    addComponent(sim.world, eid, Orbit)
+    Orbit.radius[eid] = d.radius
+    Orbit.spin[eid] = 0
+    Orbit.aggro[eid] = d.aggroRange
+    Orbit.seek[eid] = Infinity
+    Orbit.fresh[eid] = 0
   },
 }
 
-function attachLocomotion<K extends keyof LocomotionOf>(sim: Sim, eid: number, lm: LocomotionOf[K] & { readonly kind: K }): void {
-  LOCOMOTIONS[lm.kind](sim, eid, lm)
+function attachDrive<K extends keyof DriveOf>(sim: Sim, eid: number, d: DriveOf[K] & { readonly kind: K }): void {
+  DRIVES[d.kind](sim, eid, d)
 }
 
 export function spawnEnemy(
@@ -157,104 +107,56 @@ export function spawnEnemy(
   const world = sim.world
   const outline = elite || boss ? 'elite' : 'enemy'
   const size = def.size * (elite ? ELITE.sizeMul : 1)
-  const eid = newEntity(world)
-  addComponent(world, eid, Enemy)
-  addComponent(world, eid, Alive)
-  addComponent(world, eid, Transform)
-  addComponent(world, eid, Speed)
-  addComponent(world, eid, Hp)
-  addComponent(world, eid, EState)
-  addComponent(world, eid, Elite)
-  addComponent(world, eid, Boss)
-  addComponent(world, eid, Radius)
-  addComponent(world, eid, DmgMul)
-  addComponent(world, eid, SpMul)
-  addComponent(world, eid, Kv)
-  addComponent(world, eid, Slide)
-  addComponent(world, eid, Dormant)
-  addComponent(world, eid, Flash)
-  addComponent(world, eid, Slow)
-  addComponent(world, eid, Poison)
-  addComponent(world, eid, Charge)
-  addComponent(world, eid, Despawn)
-  addComponent(world, eid, Morph)
-  addComponent(world, eid, EDir)
-  addComponent(world, eid, ETurn)
-  addComponent(world, eid, BVel)
-  addComponent(world, eid, Slowed)
-  addComponent(world, eid, Steering)
-  addComponent(world, eid, Anim)
-  addComponent(world, eid, Sprite)
-  addComponent(world, eid, Tint)
-  addComponent(world, eid, Depth)
-  const born = sim.hooks.constrainSpawn(sim, x, y, def.radius)
+  const eid = spawnBody(world, {
+    faction: FACTION.enemy,
+    x,
+    y,
+    radius: def.radius,
+    hp,
+    thrust: def.speed * ENEMY_BODY.drag,
+    drag: ENEMY_BODY.drag,
+    mass: ENEMY_BODY.mass,
+    grip: ENEMY_BODY.grip,
+    ownClock: false,
+  })
+  addComponents(world, eid, Enemy, Elite, Boss, Dormant, Flash, Nest, Despawn, EDir, ETurn, Steering, Anim)
+  if (def.kbImmune) addComponent(world, eid, Anchored)
+  if (def.phasesWalls) addComponent(world, eid, Phasing)
+  const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
   Transform.x[eid] = born.x
   Transform.y[eid] = born.y
-  Transform.rot[eid] = 0
   Transform.w[eid] = size * (boss ? 0.2 : 0.3)
   Transform.h[eid] = Transform.w[eid]!
-  Speed.v[eid] = def.speed
-  Hp.v[eid] = hp
-  Hp.max[eid] = hp
-  EState.v[eid] = 0
-  Charge.windupUntil[eid] = 0
-  Charge.dashUntil[eid] = 0
-  Charge.coolUntil[eid] = 0
-  Charge.nextDashAt[eid] = 0
-  BVel.x[eid] = 0
-  BVel.y[eid] = 0
-  Slowed.v[eid] = 1
-  Steering.v[eid] = 0
-  attachLocomotion(sim, eid, def.locomotion)
+  attachDrive(sim, eid, def.drive)
+  if (def.damage > 0) {
+    addComponent(world, eid, Contact)
+    Contact.damage[eid] = def.damage
+  }
+  bodyRules[eid] = def
   if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
-  Despawn.at[eid] = 0
-  Morph.until[eid] = 0
-  Morph.vuln[eid] = 1
-  Morph.cdUntil[eid] = 0
-  Thief.eaten[eid] = 0
-  Thief.nextEatAt[eid] = 0
-  enemyCarries[eid] = undefined
   Elite.v[eid] = elite ? 1 : 0
   Boss.v[eid] = boss ? 1 : 0
-  Radius.v[eid] = def.radius
-  DmgMul.v[eid] = elite ? ELITE.damageMul : 1
-  SpMul.v[eid] = elite ? ELITE.speedMul : 1
+  if (elite) {
+    addMark(eid, MARK.dmg, TAG.elite, Infinity, ELITE.damageMul)
+    addMark(eid, MARK.speed, TAG.elite, Infinity, ELITE.speedMul)
+  }
   Nest.of[eid] = -1
   Nest.nextSpawnAt[eid] = def.spawner ? sim.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
-  Kv.x[eid] = 0
-  Kv.y[eid] = 0
-  Slide.x[eid] = 0
-  Slide.y[eid] = 0
-  Dormant.v[eid] = 0
-  Dormant.since[eid] = 0
-  EnemyArm.armed[eid] = 0
-  Alive.v[eid] = 1
-  Flash.until[eid] = 0
-  Slow.until[eid] = 0
-  Slow.mul[eid] = 1
-  Poison.until[eid] = 0
   const heading = sim.rng.next() * Math.PI * 2
   EDir.x[eid] = Math.cos(heading)
   EDir.y[eid] = Math.sin(heading)
   ETurn.at[eid] = sim.elapsedMs + AI.wander.spawnTurnMinMs + sim.rng.next() * AI.wander.spawnTurnJitterMs
-  EnemyArm.fireDelayMs[eid] = 900 + sim.rng.next() * 1500
+  EnemyArm.fireDelayMs[eid] = AI.firstShot.minMs + sim.rng.next() * AI.firstShot.jitterMs
   EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2
-  Dancing.until[eid] = 0
-  Taunted.until[eid] = 0
-  RushHit.stamp[eid] = -1
+  SprintHit.stamp[eid] = -1
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
-  Sprite.flipX[eid] = 0
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (EnemyPhase.v[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)
-  Tint.color[eid] = 0xffffff
-  Tint.effect[eid] = 0
   Tint.alpha[eid] = boss ? 0.2 : 0.3
-  Pop.until[eid] = sim.elapsedMs + (boss ? 320 : 130)
-  Pop.ms[eid] = boss ? 320 : 130
+  startPop(sim, eid, boss ? POP.bossMs : POP.enemyMs)
   Pop.size[eid] = size
   Pop.back[eid] = boss ? 1 : 0
   Pop.alpha[eid] = alpha
   Depth.z[eid] = boss ? 7 : 5
-  Quad.v[eid] = 0
   enemyDef[eid] = def
   return eid
 }
@@ -337,40 +239,34 @@ export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
   spawnTelegraph(sim, def, pos.x, pos.y, hp, false, false, pickup)
 }
 
-const MORPH_RECAST_CD = 5000
-
+/** 变形：换外观、打断动作、解除锚定并记在标记里；变形期间与结束后一段时间免疫再次变形；脆弱是同期的承伤标记 */
 export function applyMorph(
   sim: Sim,
   atlas: FrameIndex,
   eid: number,
   spec: { durationMs: number; morphEmoji: string; vulnMul?: number },
 ): void {
-  if (Boss.v[eid]) return
-  if (sim.elapsedMs < Morph.cdUntil[eid]!) return
-  const wasMorphed = Morph.until[eid] !== 0
+  if (Boss.v[eid] || hasMark(sim, eid, MARK.morphImmune)) return
   const until = sim.elapsedMs + spec.durationMs
-  Morph.cdUntil[eid] = until + MORPH_RECAST_CD
-  Morph.until[eid] = until
-  Morph.vuln[eid] = spec.vulnMul ?? 1
-  if (!wasMorphed) {
-    const outline = Elite.v[eid] ? 'elite' : 'enemy'
-    Sprite.frame[eid] = atlas.index(spec.morphEmoji, outline)
-    armIdle(eid, spec.morphEmoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
-    if (EState.v[eid] === 2) {
-      Tint.effect[eid] = 0
-      Tint.color[eid] = 0xffffff
-    }
-    EState.v[eid] = 0
-    Transform.rot[eid] = 0
-    sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
-  }
+  const anchored = hasComponent(sim.world, eid, Anchored)
+  addMark(eid, MARK.morphImmune, TAG.morph, until + MORPH.recastMs)
+  addMark(eid, MARK.morph, TAG.morph, until, anchored ? 1 : 0)
+  addMark(eid, MARK.guard, TAG.morph, until, spec.vulnMul ?? 1)
+  const outline = Elite.v[eid] ? 'elite' : 'enemy'
+  Sprite.frame[eid] = atlas.index(spec.morphEmoji, outline)
+  armIdle(eid, spec.morphEmoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
+  interrupt(sim, eid)
+  Transform.rot[eid] = 0
+  if (anchored) removeComponent(sim.world, eid, Anchored)
+  sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
 }
 
-export function restoreMorphVisual(atlas: FrameIndex, eid: number): void {
+/** 变形到期：外观换回，曾锚定的重新锚定 */
+export function restoreMorph(sim: Sim, atlas: FrameIndex, eid: number, anchored: boolean): void {
   const def = enemyDef[eid]
   if (!def) return
+  if (anchored) addComponent(sim.world, eid, Anchored)
   const outline = Elite.v[eid] ? 'elite' : 'enemy'
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, Anim.offset[eid]!)
-  Morph.until[eid] = 0
 }

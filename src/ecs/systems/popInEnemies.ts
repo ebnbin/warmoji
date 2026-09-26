@@ -17,7 +17,7 @@ export function finishEnemyPops(sim: Sim): void {
 }
 
 export function popInEnemies(sim: Sim): void {
-  const now = sim.elapsedMs
+  const now = sim.fxMs
   for (const eid of query(sim.world, ENEMY_SET)) {
     if (Pop.until[eid] === 0) continue
     const left = Pop.until[eid]! - now

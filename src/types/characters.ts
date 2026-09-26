@@ -3,7 +3,7 @@ import type { AbilityId } from './abilities'
 import type { AbilityDef } from './abilityDefs'
 import type { AbilityTier, UpgradeCard, WeaponId } from './weapons'
 
-export interface BodyParams {
+interface BodyParams {
   readonly thrust: number
   readonly drag: number
   readonly mass: number
@@ -14,7 +14,7 @@ export interface InnateSource {
   readonly base: AbilityId
   readonly upgrades: readonly AbilityTier[]
 }
-export interface SkillSource {
+interface SkillSource {
   readonly name: string
   readonly icon: string
   readonly desc: string
@@ -22,7 +22,7 @@ export interface SkillSource {
   readonly ability: AbilityId
   readonly aim?: boolean
 }
-export interface SkillDef {
+interface SkillDef {
   readonly name: string
   readonly icon: string
   readonly desc: string
@@ -68,6 +68,7 @@ export interface TeamBaseline {
     readonly leaderSizeMul: number
     readonly followerSizeMul: number
     readonly leaderGrip: number
+    readonly followerGrip: number
   }
   readonly member: {
     readonly size: number

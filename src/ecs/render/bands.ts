@@ -1,4 +1,4 @@
-export interface Band {
+interface Band {
   readonly depth: number
   readonly zMin: number
   readonly zMax: number

@@ -1,72 +1,99 @@
-import { query } from 'bitecs'
-import { UNIT } from '../../util/units'
-import { ACQUIRE } from '../../data/abilities'
-import { Dormant, ENEMY_SET, FACTION, Radius, Transform } from '../components'
+import { FACTION, Radius, Transform, Uid } from '../components'
+import { tauntedBy } from './marks'
 import type { Source } from './source'
 import type { Sim } from '../sim'
 
+/** 帧首快照里的一个可被打的身体；uid 用来识别快照后已死亡或被复用的编号 */
 export interface Target {
+  readonly eid: number
+  readonly uid: number
+  readonly x: number
+  readonly y: number
+  readonly radius: number
+  readonly hidden: boolean
+  readonly alive: boolean
+}
+
+type Visit = (eid: number, x: number, y: number, radius: number) => boolean | void
+
+const FOES: readonly (readonly number[])[] = [[FACTION.enemy], [FACTION.team], [FACTION.team, FACTION.enemy]]
+
+function eachFoe(sim: Sim, src: Source, cx: number, cy: number, reach: number, seeing: boolean, visit: Visit): void {
+  const sight = src.sight
+  for (const f of FOES[src.faction]!) {
+    for (const t of sim.targets[f]!) {
+      if (!t.alive || Uid.v[t.eid] !== t.uid || (seeing && t.hidden)) continue
+      const d = sim.hooks.worldDelta(sim, cx, cy, t.x, t.y)
+      const rr = reach + t.radius
+      if (d.x * d.x + d.y * d.y > rr * rr) continue
+      const x = cx + d.x
+      const y = cy + d.y
+      if (sight && sim.hooks.wallHit(sim, sight.x, sight.y, x, y) !== null) continue
+      if (visit(t.eid, x, y, t.radius)) return
+    }
+  }
+}
+
+/** 看：来源阵营的敌人里瞄得到的身体。世界打所有人；被嘲讽的观察者只看得见嘲讽者；隐匿的身体谁也看不见；有视线要求时墙后不算 */
+export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
+  const by = src.viewer === undefined ? -1 : tauntedBy(sim, src.viewer)
+  if (by >= 0) {
+    const d = sim.hooks.worldDelta(sim, cx, cy, Transform.x[by]!, Transform.y[by]!)
+    const r = Radius.v[by]!
+    const rr = reach + r
+    if (d.x * d.x + d.y * d.y <= rr * rr) visit(by, cx + d.x, cy + d.y, r)
+    return
+  }
+  eachFoe(sim, src, cx, cy, reach, true, visit)
+}
+
+/** 碰：来源阵营的敌人里被覆盖到的身体，隐匿与嘲讽不算数，墙后仍不算 */
+export function eachTargetBody(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
+  eachFoe(sim, src, cx, cy, reach, false, visit)
+}
+
+/** 敌方身体的实体接触：不看隐匿、嘲讽与视线，倒地的不算 */
+export function eachFoeBody(sim: Sim, faction: number, cx: number, cy: number, reach: number, visit: Visit): void {
+  for (const f of FOES[faction]!) {
+    for (const t of sim.targets[f]!) {
+      if (!t.alive || Uid.v[t.eid] !== t.uid) continue
+      const d = sim.hooks.worldDelta(sim, cx, cy, t.x, t.y)
+      const rr = reach + t.radius
+      if (d.x * d.x + d.y * d.y > rr * rr) continue
+      if (visit(t.eid, cx + d.x, cy + d.y, t.radius)) return
+    }
+  }
+}
+
+/** 同阵营的身体，隐匿的也算；downed 为真时倒地的也算 */
+export function eachAlly(sim: Sim, faction: number, cx: number, cy: number, reach: number, downed: boolean, visit: Visit): void {
+  for (const t of sim.targets[faction]!) {
+    if (Uid.v[t.eid] !== t.uid || (!t.alive && !downed)) continue
+    const d = sim.hooks.worldDelta(sim, cx, cy, t.x, t.y)
+    const rr = reach + t.radius
+    if (d.x * d.x + d.y * d.y > rr * rr) continue
+    if (visit(t.eid, cx + d.x, cy + d.y, t.radius)) return
+  }
+}
+
+export interface Found {
   readonly eid: number
   readonly x: number
   readonly y: number
   readonly radius: number
 }
 
-type Visit = (eid: number, x: number, y: number, radius: number) => boolean | void
-
-/** visit 内不得施伤：击杀会原地改动正在遍历的存活列表 */
-export function eachTarget(sim: Sim, src: Source, cx: number, cy: number, reach: number, visit: Visit): void {
-  if (src.faction === FACTION.enemy) {
-    for (const t of sim.characterTargets) {
-      const dx = t.x - cx
-      const dy = t.y - cy
-      const rr = reach + t.radius
-      if (dx * dx + dy * dy > rr * rr) continue
-      if (visit(t.eid, t.x, t.y, t.radius)) return
-    }
-    return
-  }
-  const sight = src.sight
-  const w = sim.mapW
-  const h = sim.mapH
-  const torus = sim.hooks.torus
-  const finite = Number.isFinite(reach)
-  for (const eid of query(sim.world, ENEMY_SET)) {
-    if (Dormant.v[eid]) continue
-    const r = Radius.v[eid]!
-    const rr = reach + r
-    const x = Transform.x[eid]!
-    const y = Transform.y[eid]!
-    if (!torus) {
-      const dx = x - cx
-      const dy = y - cy
-      if (dx * dx + dy * dy > rr * rr) continue
-      if (sight && sim.hooks.wallHit(sim, sight.x, sight.y, x, y) !== null) continue
-      if (visit(eid, x, y, r)) return
-      continue
-    }
-    let dx = x - cx
-    let dy = y - cy
-    dx -= Math.round(dx / w) * w
-    dy -= Math.round(dy / h) * h
-    for (let kx = 0; kx < 3; kx++) {
-      if (kx > 0 && !finite) break
-      const ix = dx + (kx === 0 ? 0 : kx === 1 ? -w : w)
-      if (Math.abs(ix) > rr) continue
-      for (let ky = 0; ky < 3; ky++) {
-        if (ky > 0 && !finite) break
-        const iy = dy + (ky === 0 ? 0 : ky === 1 ? -h : h)
-        if (ix * ix + iy * iy > rr * rr) continue
-        if (sight && sim.hooks.wallHit(sim, sight.x, sight.y, cx + ix, cy + iy) !== null) continue
-        if (visit(eid, cx + ix, cy + iy, r)) return
-      }
-    }
-  }
+export function targetsNear(sim: Sim, src: Source, cx: number, cy: number, reach: number): Found[] {
+  const out: Found[] = []
+  eachTarget(sim, src, cx, cy, reach, (eid, x, y, radius) => {
+    out.push({ eid, x, y, radius })
+  })
+  return out
 }
 
-export function targetsNear(sim: Sim, src: Source, cx: number, cy: number, reach: number): Target[] {
-  const out: Target[] = []
-  eachTarget(sim, src, cx, cy, reach, (eid, x, y, radius) => {
+export function targetsWithin(sim: Sim, src: Source, cx: number, cy: number, reach: number): Found[] {
+  const out: Found[] = []
+  eachTargetBody(sim, src, cx, cy, reach, (eid, x, y, radius) => {
     out.push({ eid, x, y, radius })
   })
   return out
@@ -79,7 +106,7 @@ export function nearestTarget(
   oy: number,
   maxRange: number,
   exclude?: ReadonlySet<number>,
-): Target | null {
+): Found | null {
   let bestEid = -1
   let bestX = 0
   let bestY = 0
@@ -101,13 +128,7 @@ export function nearestTarget(
   return bestEid < 0 ? null : { eid: bestEid, x: bestX, y: bestY, radius: bestR }
 }
 
-export function nearestAngle(
-  sim: Sim,
-  src: Source,
-  ox: number,
-  oy: number,
-  maxRange = ACQUIRE.range * UNIT,
-): number | null {
+export function nearestAngle(sim: Sim, src: Source, ox: number, oy: number, maxRange: number): number | null {
   const t = nearestTarget(sim, src, ox, oy, maxRange)
   return t ? Math.atan2(t.y - oy, t.x - ox) : null
 }

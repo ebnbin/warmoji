@@ -46,7 +46,7 @@ export function roundRect(
   }
 }
 
-export interface TextOpts {
+interface TextOpts {
   readonly color?: string
   readonly mono?: boolean
   readonly bold?: boolean

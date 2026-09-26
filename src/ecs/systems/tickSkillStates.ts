@@ -1,59 +1,57 @@
 import { playSfx } from '../../audio/sfx'
-import { Alive, Follow, Hidden, Leap, Leaping, Rush, RushHit, Rushing, Tint, VisOff } from '../components'
+import { Alive, LeapShape, Leaping, MARK, Payload, SprintHit, Sprinting, SprintShape, Tint, Transform, VisOff } from '../components'
+import { hasMark } from '../utils/marks'
 import { damageMul } from '../utils/amp'
 import { sourceOf } from '../utils/source'
-import { targetsNear } from '../utils/targets'
-import { damageTarget } from './shared/damage'
-import { applyBlast } from './shared/effects'
+import { targetsWithin } from '../utils/targets'
+import { hit } from './shared/damage'
+import { applyBlast, applyOnHit, struckOf } from './shared/effects'
+import { abilityOnHit } from '../store'
 import { spawnFxBoom, spawnFxCircle } from '../entities/fx'
 import type { Sim } from '../sim'
 
-/** 冲刺撞击、跳跃落地与隐匿半透明都在身体走完这一帧之后结算；不再是队长的身体立刻停下 */
+/** 冲刺撞击、跳跃落地与隐匿半透明都在身体走完这一帧之后结算；不再是队长的身体立刻停下；冲刺的结束由 moveBodies 判定 */
 export function tickSkillStates(sim: Sim): void {
-  const now = sim.elapsedMs
   for (const m of sim.characters) {
     if (m !== sim.leader) {
-      Rushing.active[m] = 0
+      Sprinting.active[m] = 0
       if (Leaping.active[m]) {
         Leaping.active[m] = 0
         Leaping.landed[m] = 0
         VisOff.y[m] = 0
       }
     } else {
-      if (Rushing.active[m]) rushHits(sim, m)
+      if (Sprinting.active[m]) sprintHits(sim, m)
       if (Leaping.landed[m]) land(sim, m)
     }
-    const hidden = now < Hidden.until[m]!
-    if (hidden !== (Hidden.tinted[m] === 1)) {
-      Hidden.tinted[m] = hidden ? 1 : 0
-      if (Alive.v[m]) Tint.alpha[m] = hidden ? 0.45 : 1
-    }
+    if (Alive.v[m]) Tint.alpha[m] = hasMark(sim, m, MARK.hide) ? 0.45 : 1
   }
 }
 
-function rushHits(sim: Sim, m: number): void {
-  const e = Rushing.skill[m]!
+function sprintHits(sim: Sim, m: number): void {
+  const e = Sprinting.skill[m]!
   const src = sourceOf(sim, e)
-  const x = Follow.x[m]!
-  const y = Follow.y[m]!
-  const stamp = Rushing.stamp[m]!
-  const damage = Math.round(Rush.damage[e]! * damageMul(sim, e))
-  for (const t of targetsNear(sim, src, x, y, Rush.hitRadius[e]!)) {
-    if (RushHit.stamp[t.eid] === stamp) continue
-    RushHit.stamp[t.eid] = stamp
-    damageTarget(sim, src, t.eid, damage, Rush.knockback[e]!, x, y)
+  const x = Transform.x[m]!
+  const y = Transform.y[m]!
+  const stamp = Sprinting.stamp[m]!
+  const damage = Math.round(Payload.damage[e]! * damageMul(sim, e))
+  for (const t of targetsWithin(sim, src, x, y, SprintShape.radius[e]!)) {
+    if (SprintHit.stamp[t.eid] === stamp) continue
+    SprintHit.stamp[t.eid] = stamp
+    const s = struckOf(t.eid)
+    if (hit(sim, src, t.eid, damage, { knockback: Payload.knockback[e]!, from: { x, y } })) applyOnHit(sim, src, abilityOnHit[e], x, y, damage, [s])
   }
-  if (Rushing.msLeft[m]! <= 0) Rushing.active[m] = 0
 }
 
 function land(sim: Sim, m: number): void {
   const e = Leaping.skill[m]!
   const src = sourceOf(sim, e)
-  const x = Follow.x[m]!
-  const y = Follow.y[m]!
-  const radius = Leap.radius[e]!
-  const color = Leap.color[e]!
-  applyBlast(sim, src, x, y, Math.round(Leap.damage[e]! * damageMul(sim, e)), radius, Leap.knockback[e]!)
+  const x = Transform.x[m]!
+  const y = Transform.y[m]!
+  const radius = LeapShape.radius[e]!
+  const color = Payload.color[e]!
+  const damage = Math.round(Payload.damage[e]! * damageMul(sim, e))
+  applyOnHit(sim, src, abilityOnHit[e], x, y, damage, applyBlast(sim, src, x, y, damage, radius, Payload.knockback[e]!))
   playSfx('boom')
   spawnFxCircle(sim, x, y, radius, {
     fill: color,

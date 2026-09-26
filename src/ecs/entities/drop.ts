@@ -6,7 +6,7 @@ import { holderOutline } from './weapon'
 import type { Sim } from '../sim'
 
 
-export interface DropSpec {
+interface DropSpec {
   emoji: string
   size: number
   target: number

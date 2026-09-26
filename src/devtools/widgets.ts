@@ -11,7 +11,7 @@ export interface RenderCtx {
 }
 
 /** objects 以条目左上角为原点 */
-export interface Rendered {
+interface Rendered {
   readonly objects: Phaser.GameObjects.GameObject[]
   readonly height: number
   readonly polled?: { readonly text: Phaser.GameObjects.Text; readonly read: () => string }

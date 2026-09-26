@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS: Settings = {
 
 type SettingKey = keyof Settings
 
-export interface SettingDef {
+interface SettingDef {
   readonly key: SettingKey
   readonly icon: string
   readonly label: string

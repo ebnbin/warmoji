@@ -1,34 +1,28 @@
-import { Phys } from '../../components'
+import { hasComponent } from 'bitecs'
+import { BODY_MAX_SPEED } from '../../../data/abilities'
+import { Anchored, Clock, Phys } from '../../components'
 import type { Sim } from '../../sim'
-import type { Point } from '../../../util/vec'
 
-export interface BodyForces {
-  readonly driveX: number
-  readonly driveY: number
-  readonly extraX: number
-  readonly extraY: number
+const MAX_STEP_MS = 50
+
+export function bodyDt(sim: Sim, eid: number): number {
+  return Math.min(Clock.v[eid] ? sim.dtMs : sim.wdtMs, MAX_STEP_MS) / 1000
 }
 
-/** 驱动力与地面阻力同乘抓地（鞋子 × 地面），阻力再乘介质黏度、相对介质速度计算 */
-export function stepBody(sim: Sim, eid: number, x: number, y: number, f: BodyForces, grip: number, dt: number): Point {
-  const s = sim.hooks.surface(sim, x, y)
-  const g = grip * s.traction
-  const medium = sim.hooks.mediumVelocity(sim, x, y)
-  const c = Phys.drag[eid]! * g * s.viscosity
+/** 冲量按质量折成速度；只封顶冲量带来的增量，不压低本来就更快的身体 */
+export function impulse(sim: Sim, eid: number, jx: number, jy: number): void {
+  if (!hasComponent(sim.world, eid, Phys) || hasComponent(sim.world, eid, Anchored)) return
   const m = Phys.mass[eid]!
-  let vx = Phys.vx[eid]!
-  let vy = Phys.vy[eid]!
-  vx += ((f.driveX * g - c * (vx - medium.x) + f.extraX) / m) * dt
-  vy += ((f.driveY * g - c * (vy - medium.y) + f.extraY) / m) * dt
+  const ox = Phys.vx[eid]!
+  const oy = Phys.vy[eid]!
+  let vx = ox + jx / m
+  let vy = oy + jy / m
+  const len = Math.hypot(vx, vy)
+  const cap = Math.max(BODY_MAX_SPEED, Math.hypot(ox, oy))
+  if (len > cap) {
+    vx = (vx / len) * cap
+    vy = (vy / len) * cap
+  }
   Phys.vx[eid] = vx
   Phys.vy[eid] = vy
-  return { x: x + vx * dt, y: y + vy * dt }
-}
-
-/** 位置被场地修正后，速度改按实际位移推算：撞墙的分量归零 */
-export function settleBody(sim: Sim, eid: number, from: Point, to: Point, dt: number): void {
-  if (dt <= 0) return
-  const d = sim.hooks.worldDelta(sim, from.x, from.y, to.x, to.y)
-  Phys.vx[eid] = d.x / dt
-  Phys.vy[eid] = d.y / dt
 }
