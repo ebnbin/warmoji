@@ -26,6 +26,21 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     ho.camX = c.x
     ho.camY = c.y
   }
+  const aim = rot(sim.aim.x, sim.aim.y)
+  sim.aim = { x: aim.x, y: aim.y }
+  if (sim.rush) {
+    const v = rot(sim.rush.vx, sim.rush.vy)
+    sim.rush.vx = v.x
+    sim.rush.vy = v.y
+  }
+  if (sim.leap) {
+    const f = map(sim.leap.fromX, sim.leap.fromY)
+    const t = map(sim.leap.toX, sim.leap.toY)
+    sim.leap.fromX = f.x
+    sim.leap.fromY = f.y
+    sim.leap.toX = t.x
+    sim.leap.toY = t.y
+  }
 
   for (const m of sim.characters) {
     const p = map(Follow.x[m]!, Follow.y[m]!)

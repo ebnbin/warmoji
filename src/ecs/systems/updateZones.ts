@@ -15,6 +15,8 @@ import {
   Zone,
   ZoneBurn,
   ZoneFollow,
+  ZoneMend,
+  CharHp,
 } from '../components'
 import { applyDamage, hurtCharacter } from './shared/combat'
 import { backEaseOut } from '../utils/ease'
@@ -65,10 +67,26 @@ export function updateZones(sim: Sim): void {
     const age = sim.fxMs - Ring.born[z]!
     Ring.radius[z] = Zone.radius[z]! * (enter > 0 && age < enter ? 0.3 + 0.7 * backEaseOut(age / enter) : 1)
   }
+  mendMembers(sim, [...query(world, [Zone, ZoneMend, Transform])])
   const burns = [...query(world, [Zone, ZoneBurn, Transform])]
   if (burns.length === 0) return
   burnEnemies(sim, burns, now)
   burnMembers(sim, burns, now)
+}
+
+function mendMembers(sim: Sim, mends: readonly number[]): void {
+  if (mends.length === 0) return
+  const dt = sim.wdtMs / 1000
+  for (const m of sim.characters) {
+    if (!Alive.v[m]) continue
+    for (const z of mends) {
+      if (Zone.on[z] === 0) continue
+      const r = Zone.radius[z]!
+      const d = sim.hooks.worldDelta(sim, Transform.x[z]!, Transform.y[z]!, Transform.x[m]!, Transform.y[m]!)
+      if (d.x * d.x + d.y * d.y > r * r) continue
+      CharHp.hp[m] = Math.min(CharHp.max[m]!, CharHp.hp[m]! + ZoneMend.perSec[z]! * dt)
+    }
+  }
 }
 
 function burnEnemies(sim: Sim, burns: readonly number[], now: number): void {

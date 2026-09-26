@@ -38,6 +38,7 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
     name: src.name,
     desc: src.desc,
     body: src.body,
+    skill: { ...src.skill, ability: ABILITIES[src.skill.ability], aim: src.skill.aim === true },
     carriers: [...src.weapons.map(weaponCarrier), ...src.innate.map(innateCarrier)],
   }
 }

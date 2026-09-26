@@ -4,33 +4,46 @@ import { PICKUPS } from '../data/pickups'
 import { formatTime } from '../util/format'
 import { endRun, getRun } from '../run/state'
 import { emojiImage } from '../emoji/hold'
+import { emojiKey } from '../emoji/textures'
 import { emojiText, iconLabel } from '../ui/emojiText'
 import { FONT, UI_FONT } from '../util/fonts'
 import { Joystick } from '../ui/Joystick'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
-import type { FieldCollected, HudInput, HudSnapshot, LeaderChanged, SquadSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
+import type { FieldCollected, HudInput, HudSnapshot, LeaderChanged, SquadMember, SquadSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
 import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import { roundRect } from '../ui/shapes'
 import { SceneKey } from './keys'
 import type { DevProvider, DevProviderHost } from '../devtools'
+import { handoverMs } from '../ecs/systems/shared/squad'
 
-interface SquadButton {
-  cx: number
-  cy: number
+interface SquadIcon {
+  c: Phaser.GameObjects.Container
   base: Phaser.GameObjects.Arc
   emoji: Phaser.GameObjects.Image
-  ring: Phaser.GameObjects.Arc
+  badge: Phaser.GameObjects.Image
   hp: Phaser.GameObjects.Graphics
+  cd: Phaser.GameObjects.Graphics
+  cdText: Phaser.GameObjects.Text
   dead: Phaser.GameObjects.Text
-  zone: Phaser.GameObjects.Zone
   shownHp: number
   shownSec: number
-  shownAlive: boolean
+  shownCd: number
+  shownState: IconState
 }
 
-const SQUAD_KEYS = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT'] as const
+type IconState = 'ready' | 'cooling' | 'dead'
+
+/** 阵亡优先于冷却：倒地的人不显示技能冷却 */
+function stateOf(m: SquadMember): IconState {
+  return !m.alive ? 'dead' : m.cdRemainMs > 0 ? 'cooling' : 'ready'
+}
+
+/** 右下角的队伍环：队长贴角落放大并显示他的主动技能，队员沿四分之一圆弧从正上方排到正左方 */
+const RING = { r: 27, emoji: 38, leaderScale: 2, radius: 140, inset: 24 } as const
+const SQUAD_KEYS = ['ONE', 'TWO', 'THREE', 'FOUR'] as const
+const AIM_DEADZONE = 24
 
 export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private joystick?: Joystick
@@ -55,8 +68,15 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private fxIcons: Phaser.GameObjects.Image[] = []
   private fxBars?: Phaser.GameObjects.Graphics
   private fxKey = ''
-  private squad: SquadButton[] = []
+  private squad: SquadIcon[] = []
+  private squadArc: number[] = []
   private squadShown = { leader: -1, switching: false }
+  private squadTrack?: Phaser.GameObjects.Graphics
+  private squadCenter = { x: 0, y: 0 }
+  private aimPointer: number | null = null
+  private aimOrigin = { x: 0, y: 0 }
+  private aimDir: { x: number; y: number } | null = null
+  private aimGfx?: Phaser.GameObjects.Graphics
 
   constructor() {
     super(SceneKey.Ui)
@@ -125,8 +145,23 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.createSkillButton(res)
     this.createFxIndicators()
     this.squad = []
+    this.squadArc = []
     this.squadShown = { leader: -1, switching: false }
-    SQUAD_KEYS.forEach((k, slot) => this.input.keyboard?.on(`keydown-${k}`, () => this.trySwitchLeader(slot)))
+    this.squadTrack = undefined
+    this.aimPointer = null
+    this.aimDir = null
+    this.aimGfx = undefined
+    SQUAD_KEYS.forEach((k, i) =>
+      this.input.keyboard?.on(`keydown-${k}`, () => {
+        const slot = this.squadArc.indexOf(i)
+        if (slot >= 0) this.trySwitchLeader(slot)
+      }),
+    )
+    this.input.keyboard?.on('keydown-Q', () => {
+      if (!this.paused) this.arena.castLeaderSkill(null)
+    })
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, this.onAimMove, this)
+    this.input.on(Phaser.Input.Events.POINTER_UP, this.onAimUp, this)
 
     const arenaEvents = this.arena.events
     arenaEvents.on(HudEvent.WaveComplete, this.onWaveComplete, this)
@@ -388,48 +423,66 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.skillRing?.setAlpha(0.5 + 0.4 * Math.sin(this.time.now / 240))
   }
 
+  private squadCorner(): { x: number; y: number } {
+    const r = RING.r * RING.leaderScale
+    return {
+      x: viewport.logicalWidth - safeInsets.right - RING.inset - r,
+      y: viewport.logicalHeight - safeInsets.bottom - RING.inset - r,
+    }
+  }
+
+  /** 弧上第 i 个位置（共 m 个）：含两端从正上方排到正左方，只有一个时居中 */
+  private arcPoint(i: number, m: number): { x: number; y: number } {
+    const t = m > 1 ? i / (m - 1) : 0.5
+    const a = -Math.PI / 2 - (Math.PI / 2) * t
+    return { x: this.squadCenter.x + Math.cos(a) * RING.radius, y: this.squadCenter.y + Math.sin(a) * RING.radius }
+  }
+
   private createSquad(s: SquadSnapshot, res: number): void {
-    for (const b of this.squad) for (const o of [b.base, b.emoji, b.ring, b.hp, b.dead, b.zone]) o.destroy()
-    this.squad = []
-    this.squadShown = { leader: -1, switching: false }
-    const n = s.members.length
-    const r = 27
-    const w = viewport.logicalWidth
-    const { left: sL, right: sR, bottom: sB } = safeInsets
-    // 技能按钮占着左下角：整排居中放不下就整体右移，再不够就收紧间距
-    const skillRight = sL + 55 * 2 + 24 + 16
-    const rightEdge = w - sR - 16
-    let step = 62
-    if (n * step > rightEdge - skillRight) step = Math.max(46, Math.floor((rightEdge - skillRight) / n))
-    const x0 = Math.max(skillRight, w / 2 - (n * step) / 2)
-    const cy = viewport.logicalHeight - sB - 46
-    s.members.forEach((m, slot) => {
-      const cx = x0 + step * slot + step / 2
-      const base = this.add.circle(cx, cy, r, 0x000000, 0.38).setStrokeStyle(3, 0xffffff, 0.28).setDepth(300)
-      const emoji = emojiImage(this, cx, cy, m.emoji, 40, 'player').setDepth(301)
-      const ring = this.add.circle(cx, cy, r + 5, 0x000000, 0).setStrokeStyle(4, 0xffdc5d, 0.95).setDepth(302).setVisible(false)
-      const hp = this.add.graphics().setDepth(302)
-      const dead = this.add
-        .text(cx, cy, '', {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          fontStyle: 'bold',
-          color: '#ffffff',
-          stroke: '#000000',
-          strokeThickness: 4,
-          resolution: res,
-        })
-        .setOrigin(0.5)
-        .setDepth(303)
-        .setVisible(false)
-      const zone = this.add
-        .zone(cx - step / 2, cy - r - 10, step, r * 2 + 30)
-        .setOrigin(0)
-        .setDepth(304)
-        .setInteractive({ useHandCursor: true })
-        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.trySwitchLeader(slot))
-      this.squad.push({ cx, cy, base, emoji, ring, hp, dead, zone, shownHp: -1, shownSec: -1, shownAlive: true })
+    for (const b of this.squad) b.c.destroy()
+    this.squadTrack?.destroy()
+    this.squadCenter = this.squadCorner()
+    const m = s.members.length - 1
+    this.squadTrack = this.add.graphics().setDepth(299)
+    if (m >= 2) {
+      const g = this.squadTrack
+      g.lineStyle((RING.r + 8) * 2, 0xffffff, 0.07)
+      g.beginPath()
+      g.arc(this.squadCenter.x, this.squadCenter.y, RING.radius, -Math.PI, -Math.PI / 2, false)
+      g.strokePath()
+    }
+    let arc = 0
+    this.squadArc = s.members.map((_, slot) => (slot === s.leaderSlot ? -1 : arc++))
+    const label = {
+      fontFamily: UI_FONT,
+      fontSize: FONT.small,
+      fontStyle: 'bold',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 4,
+      resolution: res,
+    }
+    this.squad = s.members.map((member, slot) => {
+      const isLeader = slot === s.leaderSlot
+      const p = isLeader ? this.squadCenter : this.arcPoint(this.squadArc[slot]!, m)
+      const base = this.add.circle(0, 0, RING.r, 0x000000, 0.38).setStrokeStyle(3, 0xffffff, 0.28)
+      const emoji = emojiImage(this, 0, 0, isLeader ? member.skillIcon : member.emoji, RING.emoji, 'player')
+      const hp = this.add.graphics()
+      const cd = this.add.graphics()
+      const cdText = this.add.text(0, 0, '', { ...label, color: '#ffdc5d' }).setOrigin(0.5).setVisible(false)
+      const dead = this.add.text(0, 0, '', { ...label, color: '#ffcdd2' }).setOrigin(0.5).setVisible(false)
+      const badge = emojiImage(this, -18, -18, member.emoji, 18, 'player').setVisible(isLeader)
+      const c = this.add
+        .container(p.x, p.y, [base, emoji, hp, cd, cdText, dead, badge])
+        .setScale(isLeader ? RING.leaderScale : 1)
+        .setDepth(isLeader ? 302 : 300)
+        .setInteractive(new Phaser.Geom.Circle(0, 0, RING.r + 4), Phaser.Geom.Circle.Contains)
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, (pointer: Phaser.Input.Pointer) => this.onIconDown(slot, pointer))
+        .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.onIconUp(slot))
+      return { c, base, emoji, badge, hp, cd, cdText, dead, shownHp: -1, shownSec: -1, shownCd: -1, shownState: 'ready' as IconState }
     })
+    this.squadShown = { leader: s.leaderSlot, switching: false }
+    this.squad.forEach((b, slot) => this.styleSquadIcon(b, s.members[slot]!, slot === s.leaderSlot, false))
   }
 
   private trySwitchLeader(slot: number): void {
@@ -437,26 +490,132 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.arena.switchLeader(slot)
   }
 
-  private styleSquadButton(b: SquadButton, alive: boolean, isLeader: boolean, switching: boolean): void {
-    const dim = switching ? 0.55 : 1
-    const size = isLeader ? 48 : 40
-    b.base.setAlpha(dim).setStrokeStyle(3, 0xffffff, isLeader ? 0.6 : 0.28)
-    b.emoji.setAlpha(alive ? dim : 0.3 * dim).setDisplaySize(size, size)
-    b.ring.setVisible(isLeader).setAlpha(dim)
-    b.hp.setVisible(alive).setAlpha(dim)
-    b.dead.setVisible(!alive)
+  /** 按住队长按钮开始瞄准，只对方向型技能有效 */
+  private onIconDown(slot: number, pointer: Phaser.Input.Pointer): void {
+    if (this.paused || slot !== this.squadShown.leader || this.aimPointer !== null) return
+    const sk = this.arena.leaderSkill()
+    if (!sk?.aim) return
+    this.aimPointer = pointer.id
+    this.aimOrigin = { x: pointer.worldX, y: pointer.worldY }
+    this.aimDir = null
   }
 
-  private drawSquadHp(b: SquadButton, ratio: number): void {
-    const g = b.hp
-    const w = 44
-    const x = b.cx - w / 2
-    const y = b.cy + 30
+  private onIconUp(slot: number): void {
+    if (this.paused) return
+    if (slot !== this.squadShown.leader) {
+      this.trySwitchLeader(slot)
+      return
+    }
+    // 瞄准中的抬起由 onAimUp 结算
+    if (this.aimPointer !== null) return
+    this.arena.castLeaderSkill(null)
+  }
+
+  private onAimMove(pointer: Phaser.Input.Pointer): void {
+    if (pointer.id !== this.aimPointer) return
+    const dx = pointer.worldX - this.aimOrigin.x
+    const dy = pointer.worldY - this.aimOrigin.y
+    const len = Math.hypot(dx, dy)
+    this.aimDir = len >= AIM_DEADZONE ? { x: dx / len, y: dy / len } : null
+    this.arena.setSkillAim(this.aimDir)
+    this.drawAim()
+  }
+
+  /** 松手即释放：拖出了方向就朝那个方向，没拖出就当作点按 */
+  private onAimUp(pointer: Phaser.Input.Pointer): void {
+    if (pointer.id !== this.aimPointer) return
+    this.aimPointer = null
+    this.arena.castLeaderSkill(this.aimDir)
+    this.aimDir = null
+    this.arena.setSkillAim(null)
+    this.drawAim()
+  }
+
+  private drawAim(): void {
+    this.aimGfx ??= this.add.graphics().setDepth(305)
+    const g = this.aimGfx
     g.clear()
-    roundRect(g, x, y, w, 6, 3, { fill: 0x000000, fillAlpha: 0.55 })
-    roundRect(g, x + 1, y + 1, Math.max(2, (w - 2) * ratio), 4, 2, {
-      fill: ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffdc5d : 0xef5350,
-    })
+    const d = this.aimDir
+    if (!d) return
+    const c = this.squadCenter
+    const len = RING.radius * 0.8
+    g.lineStyle(5, 0xffdc5d, 0.9)
+    g.lineBetween(c.x, c.y, c.x + d.x * len, c.y + d.y * len)
+    g.fillStyle(0xffdc5d, 0.9)
+    g.fillCircle(c.x + d.x * len, c.y + d.y * len, 9)
+  }
+
+  /** 新队长滑到角落放大，旧队长缩小滑到他空出的弧上位置，时长与交接期一致 */
+  private swapLeader(oldSlot: number, newSlot: number): void {
+    const a = this.squad[oldSlot]
+    const b = this.squad[newSlot]
+    if (!a || !b) return
+    const pos = this.squadArc[newSlot]!
+    this.squadArc[newSlot] = -1
+    this.squadArc[oldSlot] = pos
+    const p = this.arcPoint(pos, this.squad.length - 1)
+    const ms = handoverMs()
+    b.c.setDepth(302)
+    a.c.setDepth(300)
+    this.tweens.killTweensOf([a.c, b.c])
+    this.tweens.add({ targets: b.c, x: this.squadCenter.x, y: this.squadCenter.y, scale: RING.leaderScale, duration: ms, ease: 'Cubic.easeInOut' })
+    this.tweens.add({ targets: a.c, x: p.x, y: p.y, scale: 1, duration: ms, ease: 'Cubic.easeInOut' })
+  }
+
+  private styleSquadIcon(b: SquadIcon, m: SquadMember, isLeader: boolean, switching: boolean): void {
+    const dim = switching ? 0.55 : 1
+    const state = stateOf(m)
+    const dead = state === 'dead'
+    b.base.setFillStyle(dead ? 0x3a0d0d : 0x000000, dead ? 0.85 : 0.38).setAlpha(dim)
+    b.base.setStrokeStyle(3, dead ? 0xef5350 : 0xffffff, dead ? 0.9 : isLeader ? 0.6 : 0.28)
+    b.emoji
+      .setTexture(emojiKey(isLeader ? m.skillIcon : m.emoji, 'player'))
+      .setDisplaySize(RING.emoji, RING.emoji)
+      .setAlpha(dead ? 0.25 : dim)
+    if (dead) b.emoji.setTint(0x777777)
+    else b.emoji.clearTint()
+    // 徽章：队长显示头像，阵亡显示骷髅，冷却中的队员显示技能图标
+    const badge = dead ? '1f480' : isLeader ? m.emoji : state === 'cooling' ? m.skillIcon : null
+    b.badge.setVisible(badge !== null).setAlpha(dim)
+    if (badge !== null) b.badge.setTexture(emojiKey(badge, 'player')).setDisplaySize(18, 18)
+    b.hp.setAlpha(dim).setVisible(!dead)
+    b.dead.setVisible(dead)
+    if (!dead) b.shownSec = -1
+    if (state !== 'cooling') {
+      b.cd.clear()
+      b.cdText.setVisible(false)
+      b.shownCd = -1
+    }
+  }
+
+  private drawHpRing(b: SquadIcon, ratio: number): void {
+    const g = b.hp
+    const r = RING.r + 4
+    g.clear()
+    g.lineStyle(4, 0x000000, 0.45)
+    g.beginPath()
+    g.arc(0, 0, r, 0, Math.PI * 2, false)
+    g.strokePath()
+    if (ratio <= 0) return
+    g.lineStyle(4, ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffdc5d : 0xef5350, 1)
+    g.beginPath()
+    g.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2, false)
+    g.strokePath()
+  }
+
+  /** 冷却扇形从十二点顺时针收拢，黄色数字；阵亡是红底浅红数字，两者不会同时出现 */
+  private drawCooldown(b: SquadIcon, remainMs: number, cdMs: number): void {
+    const sec = Math.ceil(remainMs / 1000)
+    if (sec !== b.shownCd) {
+      b.shownCd = sec
+      b.cdText.setText(String(sec)).setVisible(true)
+    }
+    const ratio = cdMs > 0 ? remainMs / cdMs : 0
+    const g = b.cd
+    g.clear()
+    g.fillStyle(0x000000, 0.6)
+    g.slice(0, 0, RING.r - 1, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2, false)
+    g.fillPath()
   }
 
   private updateSquad(): void {
@@ -464,23 +623,30 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     if (!s) return
     if (s.members.length !== this.squad.length) this.createSquad(s, textRes())
     const leaderChanged = s.leaderSlot !== this.squadShown.leader
+    if (leaderChanged) this.swapLeader(this.squadShown.leader, s.leaderSlot)
     const switchChanged = s.switching !== this.squadShown.switching
     this.squadShown = { leader: s.leaderSlot, switching: s.switching }
     s.members.forEach((m, i) => {
       const b = this.squad[i]!
-      const aliveChanged = m.alive !== b.shownAlive
-      if (leaderChanged || switchChanged || aliveChanged) {
-        b.shownAlive = m.alive
-        this.styleSquadButton(b, m.alive, i === s.leaderSlot, s.switching)
+      const isLeader = i === s.leaderSlot
+      const state = stateOf(m)
+      if (leaderChanged || switchChanged || state !== b.shownState) {
+        b.shownState = state
+        this.styleSquadIcon(b, m, isLeader, s.switching)
       }
-      if (!m.alive && m.reviveSec !== b.shownSec) {
-        b.shownSec = m.reviveSec
-        b.dead.setText(String(m.reviveSec))
+      if (state === 'dead') {
+        if (m.reviveSec !== b.shownSec) {
+          b.shownSec = m.reviveSec
+          b.dead.setText(String(m.reviveSec))
+        }
+        return
       }
+      if (state === 'cooling') this.drawCooldown(b, m.cdRemainMs, m.cdMs)
+      else if (isLeader) b.base.setStrokeStyle(3, 0xffdc5d, 0.55 + 0.4 * Math.sin(this.time.now / 240))
       const ratio = m.max > 0 ? Math.max(0, Math.min(1, m.hp / m.max)) : 0
       if (Math.abs(ratio - b.shownHp) < 0.005) return
       b.shownHp = ratio
-      this.drawSquadHp(b, ratio)
+      this.drawHpRing(b, ratio)
     })
   }
 

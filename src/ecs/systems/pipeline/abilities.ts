@@ -19,6 +19,13 @@ import { castSweeps } from '../castSweeps'
 import { castThrusts } from '../castThrusts'
 import { castTimeStops } from '../castTimeStops'
 import { castTurrets } from '../castTurrets'
+import { castRushes } from '../castRushes'
+import { castLeaps } from '../castLeaps'
+import { castTaunts } from '../castTaunts'
+import { castStealths } from '../castStealths'
+import { castFields } from '../castFields'
+import { castDeploys } from '../castDeploys'
+import { castNovas } from '../castNovas'
 import { fireRadials } from '../fireRadials'
 import { placeAssassinBody } from '../placeAssassinBody'
 import { placeIdleBoomerangs } from '../placeIdleBoomerangs'
@@ -85,7 +92,21 @@ export function stepAbilities(sim: Sim): void {
   runPipeline(ABILITY_PIPELINE, sim)
 }
 
-const MANUAL_CASTS = [castRallies, castDances, castBuffs, castTimeStops, castNukes, castStrikes]
+const MANUAL_CASTS = [
+  castRallies,
+  castDances,
+  castBuffs,
+  castTimeStops,
+  castNukes,
+  castStrikes,
+  castRushes,
+  castLeaps,
+  castTaunts,
+  castStealths,
+  castFields,
+  castDeploys,
+  castNovas,
+]
 
 export function castRequests(sim: Sim): void {
   for (const cast of MANUAL_CASTS) cast(sim, castRequested)

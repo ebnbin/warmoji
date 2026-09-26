@@ -4,6 +4,10 @@ import type { Sim } from '../sim'
 
 export function refreshCharacterTargets(sim: Sim): void {
   const list: Target[] = []
+  if (sim.elapsedMs < sim.stealthUntil) {
+    sim.characterTargets = list
+    return
+  }
   for (const m of sim.characters) {
     if (!Alive.v[m]) continue
     const x = Transform.x[m]!

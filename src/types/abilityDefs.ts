@@ -265,6 +265,72 @@ export interface TimeStopDef {
   readonly cooldownMs: number
   readonly durationMs: number
 }
+/** 朝施法方向冲刺，沿途敌人受伤并被撞开；只有队长能放的手动技能 */
+export interface RushDef {
+  readonly kind: 'rush'
+  readonly distance: number
+  readonly ms: number
+  readonly damage: number
+  readonly knockback: number
+  readonly hitRadius: number
+  readonly color: number
+}
+/** 朝施法方向跃起，落地范围伤害并击退 */
+export interface LeapDef {
+  readonly kind: 'leap'
+  readonly distance: number
+  readonly ms: number
+  readonly height: number
+  readonly damage: number
+  readonly knockback: number
+  readonly radius: number
+  readonly color: number
+}
+/** 范围内敌人一段时间只追施法者，施法者期间受伤按倍率折算 */
+export interface TauntDef {
+  readonly kind: 'taunt'
+  readonly radius: number
+  readonly durationMs: number
+  readonly damageTakenMul: number
+  readonly color: number
+}
+/** 全队一段时间不被敌人锁定 */
+export interface StealthDef {
+  readonly kind: 'stealth'
+  readonly durationMs: number
+}
+/** 以施法者为中心的领域：队友持续回血，敌人持续中毒 */
+export interface FieldDef {
+  readonly kind: 'field'
+  readonly radius: number
+  readonly durationMs: number
+  readonly healPerSec: number
+  readonly poison: { readonly damage: number; readonly tickMs: number }
+  readonly color: number
+}
+/** 一次在施法者周围架起多座弩塔 */
+export interface DeployDef {
+  readonly kind: 'deploy'
+  readonly count: number
+  readonly spread: number
+  readonly turret: { readonly emoji: string; readonly size: number }
+  readonly fireIntervalMs: number
+  readonly damage: number
+  readonly knockback: number
+  readonly range: number
+  readonly lifeMs: number
+  readonly projectile: ProjectileSpec
+  readonly burst?: { readonly count: number; readonly spreadDeg: number }
+}
+/** 以施法者为中心的一次爆发，命中效果施加给范围内所有敌人 */
+export interface NovaDef {
+  readonly kind: 'nova'
+  readonly radius: number
+  readonly damage: number
+  readonly knockback: number
+  readonly color: number
+  readonly onHit?: readonly Effect[]
+}
 export type AbilityDef =
   | ThrustDef
   | ProjectileDef
@@ -284,3 +350,10 @@ export type AbilityDef =
   | BuffDef
   | NukeDef
   | TimeStopDef
+  | RushDef
+  | LeapDef
+  | TauntDef
+  | StealthDef
+  | FieldDef
+  | DeployDef
+  | NovaDef

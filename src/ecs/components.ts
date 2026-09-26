@@ -419,6 +419,17 @@ export const Nuke = { ...cd(), damage: f32(), bossRatio: f32() }
 
 export const TimeStop = { ...cd(), durationMs: f32() }
 
+export const Rush = { ...cd(), distance: f32(), ms: f32(), damage: f32(), knockback: f32(), hitRadius: f32(), color: u32() }
+export const Leap = { ...cd(), distance: f32(), ms: f32(), height: f32(), damage: f32(), knockback: f32(), radius: f32(), color: u32() }
+export const Taunt = { ...cd(), radius: f32(), durationMs: f32(), damageTakenMul: f32(), color: u32() }
+export const Stealth = { ...cd(), durationMs: f32() }
+export const Field = { ...cd(), radius: f32(), durationMs: f32(), healPerSec: f32(), poisonDamage: f32(), poisonTickMs: f32(), color: u32() }
+export const Deploy = { ...cd(), count: f32(), spread: f32(), lifeMs: f32() }
+export const Nova = { ...cd(), radius: f32(), damage: f32(), knockback: f32(), color: u32() }
+
+/** 领域内的队友每秒回复的生命 */
+export const ZoneMend = { perSec: f32() }
+
 export const Pulse = { dps: f32(), freeze: f32() }
 
 export const Aura = { zone: i32() }

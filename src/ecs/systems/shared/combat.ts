@@ -168,7 +168,10 @@ export function hurtByHazard(sim: Sim, eid: number, damage: number, hazard: Haza
   hurt(sim, eid, damage, tint)
 }
 
-function hurt(sim: Sim, eid: number, damage: number, tint: number): void {
+function hurt(sim: Sim, eid: number, rawDamage: number, tint: number): void {
+  const taunt = sim.taunt
+  const shielded = taunt !== null && taunt.eid === eid && sim.elapsedMs < taunt.until
+  const damage = shielded ? Math.max(1, Math.round(rawDamage * taunt.mul)) : rawDamage
   const st = sim.run.stats
   const slot = Slot.v[eid]!
   if (slot >= 0 && slot < st.damageTaken.length) {

@@ -64,6 +64,10 @@ need(
   'progression.loopFrom 须在 1 到总波数之间',
 )
 
+for (const [id, c] of Object.entries(CAPTAINS)) {
+  need(c.teamSize <= TEAM_BASELINE.team.maxSize, `captains.${id}.teamSize 须不超过 team.maxSize（${TEAM_BASELINE.team.maxSize}）`)
+}
+
 if (errors.length > 0) {
   console.error(errors.join('\n'))
   process.exit(1)

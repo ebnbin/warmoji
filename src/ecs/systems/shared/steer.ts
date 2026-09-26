@@ -4,7 +4,14 @@ import type { Point } from '../../../util/vec'
 import type { Sim } from '../../sim'
 import { teamCenter } from '../../utils/team'
 
+/** 影遁期间敌人找不到任何队员；嘲讽期间所有敌人都只看得见嘲讽者 */
 export function nearestAlive(sim: Sim, x: number, y: number): Point | null {
+  if (sim.elapsedMs < sim.stealthUntil) return null
+  const taunt = sim.taunt
+  if (taunt && sim.elapsedMs < taunt.until && Alive.v[taunt.eid]) {
+    const d = sim.hooks.worldDelta(sim, x, y, Transform.x[taunt.eid]!, Transform.y[taunt.eid]!)
+    if (d.x * d.x + d.y * d.y <= taunt.radius * taunt.radius) return { x: x + d.x, y: y + d.y }
+  }
   let bestX = 0
   let bestY = 0
   let bestD = Infinity

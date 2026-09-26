@@ -16,25 +16,27 @@ const roster: readonly CharacterDef[] = Object.values(CHARACTERS)
 
 const teamAbilities: readonly AbilityDef[] = [
   ...roster.flatMap((c) => c.carriers.flatMap((cr) => cr.tiers)),
+  ...roster.map((c) => c.skill.ability),
   ...Object.values<CaptainDef>(CAPTAINS).flatMap((c) => c.skill.abilities),
 ]
 
 function abilityBodyEmojis(w: AbilityDef): string[] {
   return [
     ...('held' in w && w.held ? [w.held.emoji] : []),
-    ...(w.kind === 'turret' ? [w.turret.emoji] : []),
+    ...(w.kind === 'turret' || w.kind === 'deploy' ? [w.turret.emoji] : []),
     ...(w.kind === 'summon' ? [w.minion.emoji] : []),
     ...(w.kind === 'strike' ? [w.drop.emoji] : []),
   ]
 }
 
 function abilityShotEmojis(w: AbilityDef): string[] {
-  return w.kind === 'projectile' || w.kind === 'turret' ? [w.projectile.emoji] : []
+  return w.kind === 'projectile' || w.kind === 'turret' || w.kind === 'deploy' ? [w.projectile.emoji] : []
 }
 
 export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
   player: [
     ...roster.map((c) => c.emoji),
+    ...roster.map((c) => c.skill.icon),
     ...Object.values<CaptainDef>(CAPTAINS).map((c) => c.emoji),
     ...teamAbilities.flatMap((w) => [...abilityBodyEmojis(w), ...abilityShotEmojis(w)]),
     ...Object.values(PICKUPS).map((p) => p.emoji),
