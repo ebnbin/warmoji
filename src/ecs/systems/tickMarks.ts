@@ -18,7 +18,7 @@ function expire(sim: Sim, eid: number, kind: number, s: number): void {
     const at = { x: Transform.x[eid]!, y: Transform.y[eid]!, targets: [eid] }
     if (kind === MARK.fuse) {
       const def = FUSE_DEF.get(Mark.b[s]!)
-      if (def && src) applyAbilityEffects(sim, src, def.then, { ...at, baseDamage: 0 })
+      if (def && src) applyAbilityEffects(sim, src, def.then, { ...at, baseDamage: Mark.a[s]! })
     } else {
       const def = STORE_DEF.get(Mark.b[s]!)
       if (def && src) applyAbilityEffects(sim, src, def.then, { ...at, baseDamage: Mark.a[s]! * def.ratio })

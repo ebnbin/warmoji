@@ -2,7 +2,7 @@ import { MARK } from '../components'
 import { hasMark, isAirborne, isHidden } from './marks'
 import type { Sim } from '../sim'
 
-/** 身上控制的底色，按轻重排：静止、亡后残留、眩晕、睡眠、恐惧、魅惑、倒戈、击飞、定身、沉默、致盲；没有控制返回 0 */
+/** 身上控制的底色，按轻重排：静止、亡后残留、眩晕、睡眠、恐惧、魅惑、倒戈、击飞、定身、沉默、致盲、身在异界；没有控制返回 0 */
 const TINTS: readonly (readonly [number, number])[] = [
   [MARK.stasis, 0xb3e5fc],
   [MARK.undead, 0x90a4ae],
@@ -16,6 +16,8 @@ const TINTS: readonly (readonly [number, number])[] = [
   [MARK.disarm, 0x9e9e9e],
 ]
 
+const REALM_TINT = 0x9575cd
+
 /** 存在感：被吞的几乎看不见，碰不到的半透明，看不见的只剩淡影 */
 export function presence(sim: Sim, eid: number): number {
   if (hasMark(sim, eid, MARK.devoured)) return 0.1
@@ -26,5 +28,6 @@ export function presence(sim: Sim, eid: number): number {
 
 export function statusTint(sim: Sim, eid: number): number {
   for (const [kind, color] of TINTS) if (hasMark(sim, eid, kind)) return color
-  return isAirborne(eid) ? 0xfff59d : 0
+  if (isAirborne(eid)) return 0xfff59d
+  return hasMark(sim, eid, MARK.realm) ? REALM_TINT : 0
 }

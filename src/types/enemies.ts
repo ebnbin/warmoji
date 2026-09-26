@@ -79,6 +79,16 @@ export type EnemyKind =
   | 'alien'
   | 'comet'
   | 'blackhole'
+  | 'chameleon'
+  | 'skeleton'
+  | 'knight'
+  | 'crab'
+  | 'raccoon'
+  | 'siren'
+  | 'sapling'
+  | 'tree'
+  | 'pylon'
+  | 'swan'
 /** 一种形态：换外观、换能力、换走法、换体型；不写的沿用本体 */
 export interface FormDef {
   readonly emoji?: string

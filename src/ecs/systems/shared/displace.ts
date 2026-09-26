@@ -11,7 +11,7 @@ import type { Sim } from '../../sim'
 export type Displacement =
   | { readonly kind: 'push'; readonly x: number; readonly y: number }
   | { readonly kind: 'drift'; readonly vx: number; readonly vy: number; readonly dt: number }
-  | { readonly kind: 'dash'; readonly angle: number; readonly distance: number; readonly ms: number }
+  | { readonly kind: 'dash'; readonly angle: number; readonly distance: number; readonly ms: number; readonly seek?: number }
   | { readonly kind: 'arc'; readonly x: number; readonly y: number; readonly ms: number; readonly height: number }
   | { readonly kind: 'follow'; readonly host: number; readonly ox: number; readonly oy: number; readonly ms: number }
   | { readonly kind: 'place'; readonly x: number; readonly y: number }
@@ -61,6 +61,7 @@ export function endMotion(eid: number): void {
   if (Motion.kind[eid] === MOTION.arc) VisOff.y[eid] = 0
   Motion.kind[eid] = MOTION.none
   Motion.skill[eid] = 0
+  Motion.seek[eid] = 0
   motionFx[eid] = undefined
 }
 
@@ -102,6 +103,11 @@ export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boo
     Motion.ms[eid] = d.ms
     Motion.vx[eid] = Math.cos(d.angle) * speed
     Motion.vy[eid] = Math.sin(d.angle) * speed
+    if (d.seek !== undefined) {
+      Motion.seek[eid] = 1
+      Motion.ref[eid] = d.seek
+      Motion.refUid[eid] = Uid.v[d.seek]!
+    }
     return true
   }
   if (d.kind === 'arc') {

@@ -6,7 +6,7 @@ import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
 import { ITEMS, RARITIES } from '../data/items'
 import type { ItemDef } from '../types/items'
-import { characterStatGroups, effectLine, SHAPE_LABEL } from './statLines'
+import { abilityLabel, abilityStatLines, characterStatGroups, effectLine, SHAPE_LABEL } from './statLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
 
 function grid(units: number): string {
@@ -39,31 +39,28 @@ function enemyStatLines(e: EnemyDef): string[] {
     `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
     `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}`,
   ]
-  for (const w of e.abilities ?? []) {
-    const s = w.shape
-    const cd = w.trigger === 'auto' ? ` · 间隔 ${w.cooldownMs / 1000} 秒` : ''
-    if (s.kind === 'bolt') {
-      const rep = w.repeat ? ` · ${(w.repeat.spreadDeg ?? 0) >= 360 ? '环形' : '扇形'} ${w.repeat.count} 发` : ''
-      lines.push(`放枪：子弹 ${w.damage ?? 0} 伤 · 弹速 ${grid(s.projectile.speed)}/秒${rep}${cd}`)
-    } else if (s.kind === 'drop') {
-      lines.push(`空袭：坠物砸向最近 ${s.targets} 名队员 · 每记 ${w.damage ?? 0} 伤${cd}`)
-    } else if (s.kind === 'sprint') {
-      lines.push(`蓄力突刺：冲 ${grid(s.distance)}${w.range !== undefined ? ` · 探测 ${grid(w.range)}` : ''}${cd}`)
-    } else if (s.kind === 'disc' && w.onSelf?.some((fx) => fx.kind === 'vanish')) {
-      lines.push(`自爆：范围 ${grid(s.radius)} · 伤害 ${w.damage ?? 0}`)
-    } else {
-      lines.push(`${SHAPE_LABEL[s.kind]}：${(w.onHit ?? []).map(effectLine).join('，')}${s.kind === 'disc' ? ` · 范围 ${grid(s.radius)}` : ''}${cd}`)
-    }
-  }
+  for (const w of e.abilities ?? []) lines.push(`${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   if (e.phasesWalls) lines.push('穿墙：无视断壁直取队伍')
   if (e.breaksWalls) lines.push('破墙：冲撞碾碎沿途断壁')
+  if (e.guardedBy) lines.push(`依存无敌：自己召出的${ENEMIES[e.guardedBy].name}还有一座活着，就打不动它`)
+  if (e.mount) lines.push(`坐骑：先扛 ${e.mount.hp} 伤害，扣光后变成${e.forms?.[e.mount.form]?.name ?? '下马形态'}`)
+  if (e.grow) lines.push(`成长：出生 ${e.grow.ms / 1000} 秒后还活着就长成${e.grow.into.name}`)
+  if (e.onLethal) lines.push(`致命一击时不死，改为：${e.onLethal.map(effectLine).join('，')}`)
+  if (e.onLowHp) lines.push(`生命第一次低于 ${Math.round(e.onLowHp.ratio * 100)}% 时：${e.onLowHp.effects.map(effectLine).join('，')}`)
+  if (e.onIdle) lines.push(`${e.onIdle.ms / 1000} 秒没出手${e.onIdle.still ? '也没动' : ''}：${e.onIdle.effects.map(effectLine).join('，')}`)
+  for (const [i, f] of (e.forms ?? []).entries()) {
+    if (e.mount?.form === i && !f.abilities) continue
+    const traits = [f.speedMul !== undefined ? `移速 ×${f.speedMul}` : '', f.sizeMul !== undefined ? `体型 ×${f.sizeMul}` : '', f.anchored ? '原地不动' : ''].filter(Boolean).join(' · ')
+    lines.push(`形态「${f.name ?? e.name}」${traits ? `：${traits}` : ''}`)
+    for (const w of f.abilities ?? []) lines.push(`  ${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
+  }
   for (const fx of e.onDeath ?? []) {
-    if (fx.kind === 'ground') lines.push(`死亡留毒 ${grid(fx.def.radius)} · 每 ${fx.def.tickMs / 1000} 秒 ${fx.def.damage} 伤`)
     if (fx.kind === 'split') lines.push(`死亡分裂 ${fx.count} 只${fx.into.name}`)
-    if (fx.kind === 'heal') lines.push(`亡语治疗周围同伴 ${fx.amount}（范围 ${grid(fx.range ?? 0)}）`)
-    if (fx.kind === 'decoy') lines.push(`死亡留半透明尸壳诱火 ${fx.durationMs / 1000} 秒`)
+    else if (fx.kind === 'decoy') lines.push(`死亡留半透明尸壳诱火 ${fx.durationMs / 1000} 秒`)
+    else lines.push(`亡语：${effectLine(fx)}`)
   }
   for (const fx of e.onTouch ?? []) lines.push(`接触附加：${effectLine(fx)}`)
+  for (const fx of e.onHurt ?? []) lines.push(`挨打时：${effectLine(fx)}`)
   for (const fx of e.onAnchorLost ?? []) lines.push(`失巢暴走：${effectLine(fx)}`)
   if (e.spawner) {
     lines.push(`巢穴：每 ${e.spawner.intervalMs / 1000} 秒生成 ${e.spawner.count} 只${e.spawner.into.name}`)
@@ -165,7 +162,9 @@ export function usedEmojiSet(): Set<string> {
       if (w.shape.kind === 'bolt') used.add(w.shape.projectile.emoji)
     }
   }
+  for (const c of Object.values(CHARACTERS)) for (const f of c.forms ?? []) if (f.emoji) used.add(f.emoji)
   for (const e of [...ENEMY_DEFS, ...BOSSES]) {
+    for (const f of e.forms ?? []) if (f.emoji) used.add(f.emoji)
     for (const w of e.abilities ?? []) {
       if (w.shape.kind === 'bolt') used.add(w.shape.projectile.emoji)
       if (w.shape.kind === 'drop') used.add(w.shape.emoji)

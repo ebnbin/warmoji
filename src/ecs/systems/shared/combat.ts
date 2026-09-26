@@ -73,8 +73,8 @@ function settleDeathMarks(sim: Sim, eid: number): void {
     const def = FUSE_DEF.get(Mark.b[s]!)
     if (!def) continue
     const next = def.jump ? nearestTarget(sim, flying(src), x, y, Infinity, new Set([eid])) : null
-    if (next) markFrom(next.eid, MARK.fuse, Mark.until[s]!, 0, Mark.b[s]!, src)
-    else applyAbilityEffects(sim, src, def.then, { x, y, baseDamage: 0, targets: [], exclude: new Set([eid]) })
+    if (next) markFrom(next.eid, MARK.fuse, Mark.until[s]!, Mark.a[s]!, Mark.b[s]!, src)
+    else applyAbilityEffects(sim, src, def.then, { x, y, baseDamage: Mark.a[s]!, targets: [], exclude: new Set([eid]) })
   }
 }
 

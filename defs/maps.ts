@@ -10,6 +10,7 @@ const FOREST_MIX: readonly EnemyMixRow[] = [
   { kind: 'boar', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
   { kind: 'mushroom', sinceWave: 4, base: 8, perWave: 0.4, min: 0, max: 16 },
   { kind: 'elf', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
+  { kind: 'chameleon', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
 ]
 
 const DESERT_MIX: readonly EnemyMixRow[] = [
@@ -20,6 +21,8 @@ const DESERT_MIX: readonly EnemyMixRow[] = [
   { kind: 'rat', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
   { kind: 'creeper', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
   { kind: 'turtle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'skeleton', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'raccoon', sinceWave: 5, base: 4, perWave: 0.2, min: 0, max: 8 },
 ]
 
 const RIVER_MIX: readonly EnemyMixRow[] = [
@@ -30,6 +33,8 @@ const RIVER_MIX: readonly EnemyMixRow[] = [
   { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
   { kind: 'puffer', sinceWave: 4, base: 6, perWave: 0.4, min: 0, max: 13 },
   { kind: 'turtle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'siren', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'crab', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
 ]
 
 const FACTORY_MIX: readonly EnemyMixRow[] = [
@@ -41,6 +46,8 @@ const FACTORY_MIX: readonly EnemyMixRow[] = [
   { kind: 'gargoyle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 11 },
   { kind: 'puffer', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 11 },
   { kind: 'hive', sinceWave: 7, base: 3, perWave: 0.15, min: 0, max: 6 },
+  { kind: 'raccoon', sinceWave: 3, base: 5, perWave: 0.3, min: 0, max: 10 },
+  { kind: 'knight', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
 ]
 
 const RUINS_MIX: readonly EnemyMixRow[] = [
@@ -51,6 +58,8 @@ const RUINS_MIX: readonly EnemyMixRow[] = [
   { kind: 'creeper', sinceWave: 4, base: 7, perWave: 0.3, min: 0, max: 13 },
   { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
   { kind: 'elf', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
+  { kind: 'skeleton', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'knight', sinceWave: 5, base: 4, perWave: 0.3, min: 0, max: 9 },
 ]
 
 const DAY_MIX: readonly EnemyMixRow[] = [
@@ -59,6 +68,7 @@ const DAY_MIX: readonly EnemyMixRow[] = [
   { kind: 'locust', sinceWave: 1, base: 16, perWave: 0.8, min: 12, max: 32 },
   { kind: 'slime', sinceWave: 2, base: 12, perWave: 0.4, min: 0, max: 22 },
   { kind: 'invader', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'knight', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
 ]
 
 const NIGHT_MIX: readonly EnemyMixRow[] = [
@@ -68,6 +78,8 @@ const NIGHT_MIX: readonly EnemyMixRow[] = [
   { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
   { kind: 'creeper', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
   { kind: 'rat', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 11 },
+  { kind: 'chameleon', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'skeleton', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
 ]
 
 const SPACE_MIX: readonly EnemyMixRow[] = [
@@ -77,6 +89,8 @@ const SPACE_MIX: readonly EnemyMixRow[] = [
   { kind: 'comet', sinceWave: 3, base: 9, perWave: 0.4, min: 0, max: 17 },
   { kind: 'ufo', sinceWave: 4, base: 7, perWave: 0.4, min: 0, max: 14 },
   { kind: 'gargoyle', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 11 },
+  { kind: 'chameleon', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'siren', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
 ]
 
 const ICE_MIX: readonly EnemyMixRow[] = [
@@ -87,6 +101,8 @@ const ICE_MIX: readonly EnemyMixRow[] = [
   { kind: 'snake', sinceWave: 3, base: 9, perWave: 0.3, min: 0, max: 14 },
   { kind: 'turtle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
   { kind: 'creeper', sinceWave: 5, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'crab', sinceWave: 2, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'knight', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
 ]
 
 export const MAPS = {
@@ -312,6 +328,6 @@ export const MAPS = {
       waterEnemyDps: 32,
       waterTickMs: 250,
     },
-    boss: 'croc',
+    boss: 'swan',
   },
 } as const satisfies Record<string, MapDef>

@@ -184,7 +184,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     const list = targetsWithin(sim, src, ox, oy, reach + radius)
     const origin = { x: ox, y: oy }
     const struck = strikeAll(sim, src, thrustHitIndices(origin, angle, reach, radius, list).map((i) => list[i]!), damage, kb, origin)
-    applyOnHit(sim, src, onHit, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach, damage, struck)
+    applyOnHit(sim, src, onHit, ox + Math.cos(angle) * reach, oy + Math.sin(angle) * reach, damage, struck, angle)
     if (Segment.beam[e]) spawnFxBeam(sim, ox, oy, angle, reach, radius, color)
     Swing.startMs[e] = sim.fxMs
     Swing.durMs[e] = Segment.ms[e]!
@@ -196,7 +196,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     const list = targetsWithin(sim, src, ox, oy, radius)
     const origin = { x: ox, y: oy }
     const struck = strikeAll(sim, src, sectorHitIndices(origin, angle, Sector.arcDeg[e]! * DEG2RAD, radius, list).map((i) => list[i]!), damage, kb, origin)
-    applyOnHit(sim, src, onHit, ox, oy, damage, struck)
+    applyOnHit(sim, src, onHit, ox, oy, damage, struck, angle)
     Swing.startMs[e] = sim.fxMs
     Swing.durMs[e] = Sector.ms[e]!
     return true
@@ -218,14 +218,14 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
         if (!Alive.v[t] || Hp.v[t]! < Hp.max[t]!) hurt.push(t)
       }, src.realm)
       if (hurt.length === 0) return false
-      applyOnHit(sim, src, onHit, cx, cy, damage, hurt.map(struckOf))
+      applyOnHit(sim, src, onHit, cx, cy, damage, hurt.map(struckOf), angle)
       if (color !== 0) burst(sim, cx, cy, r, color, false)
       return true
     }
     const list = targetsWithin(sim, src, cx, cy, r)
     const found = circleHitIndices({ x: cx, y: cy }, r, list).map((i) => list[i]!)
     const struck = strikeAll(sim, src, found, damage, kb, { x: cx, y: cy })
-    applyOnHit(sim, src, onHit, cx, cy, damage, struck)
+    applyOnHit(sim, src, onHit, cx, cy, damage, struck, angle)
     if (color !== 0) burst(sim, cx, cy, r, color, damage > 0)
     return true
   }
@@ -248,7 +248,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       dmg *= Chain.decay[e]!
       cur = nearestTarget(sim, src, cur.x, cur.y, Chain.hopRange[e]!, visited)
     }
-    applyOnHit(sim, src, onHit, last.x, last.y, dmg, struck)
+    applyOnHit(sim, src, onHit, last.x, last.y, dmg, struck, angle)
     spawnFxBolt(sim, points, color)
     return true
   }
@@ -308,14 +308,15 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       dmg = Math.round(dmg * BlinkShape.execMul[e]!)
     }
     const s = struckOf(target.eid)
-    if (hit(sim, src, target.eid, dmg, { knockback: kb, from: { x: landX, y: landY } })) applyOnHit(sim, src, onHit, target.x, target.y, dmg, [s])
+    if (hit(sim, src, target.eid, dmg, { knockback: kb, from: { x: landX, y: landY } })) applyOnHit(sim, src, onHit, target.x, target.y, dmg, [s], angle)
     spawnFxSlash(sim, target.x, target.y, Aim.rad[e]!, 34)
     return true
   }
 
   if (hasComponent(w, e, SprintShape)) {
     const m = Owner.eid[e]!
-    if (!displace(sim, m, { kind: 'dash', angle, distance: SprintShape.distance[e]! * mods.reach, ms: SprintShape.ms[e]! * Math.sqrt(mods.reach) }, { self: true, skill: e })) return false
+    const seek = SprintShape.seek[e] && target ? target.eid : undefined
+    if (!displace(sim, m, { kind: 'dash', angle, distance: SprintShape.distance[e]! * mods.reach, ms: SprintShape.ms[e]! * Math.sqrt(mods.reach), seek }, { self: true, skill: e })) return false
     if (color !== 0) spawnFxCircle(sim, ox, oy, SprintShape.radius[e]!, {
       fill: color,
       fillAlpha: 0.35,
@@ -351,13 +352,13 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       } else {
         for (const t of list) struck.push(struckOf(t.eid))
       }
-      applyOnHit(sim, src, onHit, ox, oy, damage, struck)
+      applyOnHit(sim, src, onHit, ox, oy, damage, struck, angle)
     } else {
       const allies: number[] = []
       eachAlly(sim, src.faction, ox, oy, Infinity, AllShape.downed[e] === 1, (t) => {
         allies.push(t)
       }, src.realm)
-      applyOnHit(sim, src, onHit, ox, oy, damage, allies.map(struckOf))
+      applyOnHit(sim, src, onHit, ox, oy, damage, allies.map(struckOf), angle)
       for (const t of allies) {
         if (!Alive.v[t]) continue
         CharFlash.until[t] = sim.fxMs + 320
@@ -537,7 +538,7 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
   }
   // 自身效果放最后：消散会把宿主连同这条能力一起移除
   const self = abilityOnSelf[e]
-  if (self) applyAbilityEffects(sim, src, self, { x: anchorX(e), y: anchorY(e), baseDamage: damage, targets: [Owner.eid[e]!] })
+  if (self) applyAbilityEffects(sim, src, self, { x: anchorX(e), y: anchorY(e), baseDamage: damage, targets: [Owner.eid[e]!], angle: shot.angle })
   return true
 }
 

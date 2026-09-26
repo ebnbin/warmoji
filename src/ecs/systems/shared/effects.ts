@@ -1,7 +1,7 @@
 import type { Cond, Effect, MarkName } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
 import { hasComponent, query } from 'bitecs'
-import { Ability, Alive, Boss, Cd, Charges, Enemy, FACTION, Grow, History, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, TAG, Transform, Uid } from '../../components'
+import { Ability, Alive, Boss, Cd, Charges, Enemy, FACTION, Faction, Grow, History, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, TAG, Transform, Uid } from '../../components'
 import { addMark, CC_MARKS, hasMark, isAirborne, markSlot } from '../../utils/marks'
 import { Interned } from '../../utils/intern'
 import { displace } from './displace'
@@ -25,7 +25,7 @@ import { hit } from './damage'
 import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
 import { interrupt } from './ability'
 import { healAllies } from './heal'
-import { nearestAngle, nearestTarget, targetsWithin } from '../../utils/targets'
+import { eachAlly, nearestAngle, nearestTarget, targetsWithin } from '../../utils/targets'
 import { flying } from '../../utils/source'
 import { isSameEntity } from '../../utils/identity'
 import type { Source } from '../../utils/source'
@@ -173,10 +173,10 @@ function addLed(sim: Sim, src: Source, t: number, kind: number, until: number, a
 }
 
 /** 命中后的效果：施于这次真正打中且编号未变的身体，溅射不再打它们；谁也没打中就没有效果 */
-export function applyOnHit(sim: Sim, src: Source, effects: readonly Effect[] | undefined, x: number, y: number, baseDamage: number, struck: readonly Struck[]): void {
+export function applyOnHit(sim: Sim, src: Source, effects: readonly Effect[] | undefined, x: number, y: number, baseDamage: number, struck: readonly Struck[], angle?: number): void {
   if (!effects || struck.length === 0) return
   const live = struck.filter((s) => isSameEntity(sim.world, s.eid, s.uid)).map((s) => s.eid)
-  applyAbilityEffects(sim, src, effects, { x, y, baseDamage, targets: live, exclude: new Set(live) })
+  applyAbilityEffects(sim, src, effects, { x, y, baseDamage, targets: live, exclude: new Set(live), angle })
 }
 
 function eachCapable(sim: Sim, at: HitCtx, comp: object, apply: (t: number) => void): void {
@@ -471,7 +471,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   knockup: (sim, src, fx, at) => {
     for (const t of at.targets ?? []) {
       if (hasMark(sim, t, MARK.unstoppable)) continue
-      if (displace(sim, t, { kind: 'arc', x: Transform.x[t]!, y: Transform.y[t]!, ms: fx.durationMs, height: fx.height }, { self: false, src })) interrupt(sim, t)
+      if (displace(sim, t, { kind: 'arc', x: Transform.x[t]!, y: Transform.y[t]!, ms: fx.durationMs, height: fx.height }, { self: false, src, onLand: fx.onLand, base: at.baseDamage })) interrupt(sim, t)
     }
   },
 
@@ -544,7 +544,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   fuse: (sim, src, fx, at) => {
     const id = FUSE_DEF.id(fx)
     const until = sim.elapsedMs + fx.ms
-    eachCapable(sim, at, Mark, (t) => markFrom(t, MARK.fuse, until, 0, id, src))
+    eachCapable(sim, at, Mark, (t) => markFrom(t, MARK.fuse, until, at.baseDamage, id, src))
   },
 
   store: (sim, src, fx, at) => {
@@ -561,9 +561,9 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   refresh: (sim, src, fx) => {
     const caster = casterOf(sim, src)
-    const bodies = fx.who === 'team' ? sim.characters : caster >= 0 ? [caster] : []
     for (const e of query(sim.world, [Ability, Owner, Cd])) {
-      if (!bodies.includes(Owner.eid[e]!)) continue
+      const o = Owner.eid[e]!
+      if (fx.who === 'team' ? Faction.v[o] !== src.faction : o !== caster) continue
       if (fx.what === 'this' && e !== src.ability) continue
       if (fx.what === 'skill' && !hasComponent(sim.world, e, Manual)) continue
       refreshOne(sim, e, fx.ms)
@@ -731,6 +731,52 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   recall: (sim, src, fx) => {
     const by = casterOf(sim, src)
     if (by >= 0) recallShots(sim, by, fx.speed)
+  },
+
+  interrupt: (sim, _src, _fx, at) => {
+    for (const t of at.targets ?? []) if (!hasMark(sim, t, MARK.unstoppable)) interrupt(sim, t)
+  },
+
+  warp: (sim, src, fx, at) => {
+    const a = at.angle ?? 0
+    const dx = Math.cos(a) * fx.distance
+    const dy = Math.sin(a) * fx.distance
+    const list: number[] = []
+    if (fx.allies) eachAlly(sim, src.faction, at.x, at.y, Infinity, false, (t) => void list.push(t), src.realm)
+    else list.push(...(at.targets ?? []))
+    for (const t of list) {
+      const x0 = Transform.x[t]!
+      const y0 = Transform.y[t]!
+      if (!displace(sim, t, { kind: 'place', x: x0 + dx, y: y0 + dy }, { self: false, free: true })) continue
+      spawnFxCircle(sim, x0, y0, Radius.v[t]! * 1.6, { fill: 0x9575cd, fillAlpha: 0.45, fromScale: 1, toScale: 0.2, durationMs: 260, depth: 14 })
+      spawnFxCircle(sim, Transform.x[t]!, Transform.y[t]!, Radius.v[t]! * 1.6, { fill: 0x9575cd, fillAlpha: 0.45, fromScale: 0.2, toScale: 1.5, durationMs: 300, depth: 14 })
+    }
+  },
+
+  drag: (sim, src, fx, at) => {
+    const by = casterOf(sim, src)
+    if (by < 0) return
+    const until = sim.elapsedMs + fx.ms
+    for (const t of at.targets ?? []) {
+      if (t === by) continue
+      const d = sim.hooks.worldDelta(sim, Transform.x[by]!, Transform.y[by]!, Transform.x[t]!, Transform.y[t]!)
+      const len = Math.hypot(d.x, d.y) || 1
+      const r = Radius.v[by]! + Radius.v[t]! + 4
+      if (!displace(sim, t, { kind: 'follow', host: by, ox: (d.x / len) * r, oy: (d.y / len) * r, ms: fx.ms }, { self: false, src })) continue
+      addCc(sim, t, MARK.stun, until)
+      interrupt(sim, t)
+    }
+  },
+
+  realm: (sim, src, fx, at) => {
+    const by = casterOf(sim, src)
+    const t = at.targets?.[0]
+    if (by < 0 || t === undefined || t === by) return
+    const until = sim.elapsedMs + fx.ms
+    const id = Uid.v[by]!
+    addMark(by, MARK.realm, TAG.effect, until, 0, 0, 0, id)
+    addMark(t, MARK.realm, TAG.effect, until, 0, 0, 0, id)
+    spawnFxCircle(sim, Transform.x[t]!, Transform.y[t]!, 60, { fill: 0x4a148c, fillAlpha: 0.5, fromScale: 0.2, toScale: 1.4, durationMs: 400, depth: 14 })
   },
 
   undead: (sim, _src, fx, at) => {

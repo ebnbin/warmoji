@@ -242,6 +242,8 @@ interface KnockupEffect {
   readonly kind: 'knockup'
   readonly durationMs: number
   readonly height: number
+  /** 落地时施于被击飞的身体 */
+  readonly onLand?: readonly Effect[]
 }
 /** 推撞：沿施法者到目标的方向推出 distance，撞到墙施加 onWall */
 interface ShoveEffect {
@@ -311,7 +313,7 @@ interface DeathMarkEffect {
   readonly ms: number
   readonly then: readonly Effect[]
 }
-/** 冷却：this 是出手的这条能力，skill 是主动技能，all 是全部；给了 ms 就减这么多，否则直接转好；who 为 team 时整队的主动技能 */
+/** 冷却：this 是出手的这条能力，skill 是主动技能，all 是全部；给了 ms 就减这么多，否则直接转好；who 为 team 时是施法者这一方所有身体的 */
 interface RefreshEffect {
   readonly kind: 'refresh'
   readonly what: 'this' | 'skill' | 'all'
@@ -462,6 +464,26 @@ interface RecallEffect {
   readonly kind: 'recall'
   readonly speed: number
 }
+/** 打断：取消目标正在蓄的力与没打完的连发，霸体不吃 */
+interface InterruptEffect {
+  readonly kind: 'interrupt'
+}
+/** 群体瞬移：目标（allies 为真时是全体同伴）沿出手方向平移 distance */
+interface WarpEffect {
+  readonly kind: 'warp'
+  readonly distance: number
+  readonly allies?: boolean
+}
+/** 拖行：目标被拴在施法者身后跟着走 ms，期间不能行动 */
+interface DragEffect {
+  readonly kind: 'drag'
+  readonly ms: number
+}
+/** 异界：施法者与目标一起进入只有彼此的界 ms，界外的谁也碰不到他们，他们也碰不到界外 */
+interface RealmEffect {
+  readonly kind: 'realm'
+  readonly ms: number
+}
 export type Effect =
   | BlastEffect
   | SlowEffect
@@ -535,6 +557,10 @@ export type Effect =
   | PortalEffect
   | TetherEffect
   | RecallEffect
+  | InterruptEffect
+  | WarpEffect
+  | DragEffect
+  | RealmEffect
 
 interface ZoneVisual {
   readonly color: number
@@ -570,7 +596,7 @@ export type Shape =
       readonly staggerMs: number
     }
   | { readonly kind: 'blink'; readonly behindDist: number; readonly strikeMs: number; readonly execute?: { readonly hpRatio: number; readonly mul: number } }
-  | { readonly kind: 'sprint'; readonly distance: number; readonly ms: number; readonly radius?: number }
+  | { readonly kind: 'sprint'; readonly distance: number; readonly ms: number; readonly radius?: number; readonly seek?: boolean }
   | { readonly kind: 'leap'; readonly distance: number; readonly ms: number; readonly height: number; readonly radius: number }
   | { readonly kind: 'all'; readonly of: 'foes' | 'allies'; readonly downed?: boolean }
   | (ZoneRules & {

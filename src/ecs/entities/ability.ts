@@ -164,6 +164,7 @@ const SHAPES: { [K in keyof ShapeOf]: ShapeSpec<K> } = {
       SprintShape.distance[e] = s.distance
       SprintShape.ms[e] = s.ms
       SprintShape.radius[e] = s.radius ?? 0
+      SprintShape.seek[e] = s.seek ? 1 : 0
     },
   },
   leap: {

@@ -404,7 +404,7 @@ export const DropShape = { targets: f32(), size: f32(), fromAbove: f32(), dropMs
 
 export const BlinkShape = { behindDist: f32(), strikeMs: f32(), execHp: f32(), execMul: f32() }
 
-export const SprintShape = { distance: f32(), ms: f32(), radius: f32() }
+export const SprintShape = { distance: f32(), ms: f32(), radius: f32(), seek: u8() }
 
 export const LeapShape = { distance: f32(), ms: f32(), height: f32(), radius: f32() }
 
@@ -509,7 +509,7 @@ export const Magnet = { radius: f32() }
 
 export const MOTION = { none: 0, dash: 1, arc: 2, follow: 3 } as const
 
-/** 脚本位移：冲刺按速度走，弧线沿 f→t 腾空飞，跟随贴着 ref 偏移 t；self 为 1 是自己的动作，skill 是带来这段位移的能力，landed 在落地那帧为 1 */
+/** 脚本位移：冲刺按速度走（seek 为 1 时追着 ref 转向、碰到就停），弧线沿 f→t 腾空飞，跟随贴着 ref 偏移 t；self 为 1 是自己的动作，skill 是带来这段位移的能力，landed 在落地那帧为 1 */
 export const Motion = {
   kind: u8(),
   self: u8(),
@@ -527,6 +527,7 @@ export const Motion = {
   stamp: f32(),
   ref: i32(),
   refUid: u32(),
+  seek: u8(),
 }
 
 /** 身体最近一次被哪段冲刺撞过，同一段冲刺不重复吃伤害 */

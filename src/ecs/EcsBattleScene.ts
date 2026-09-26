@@ -31,7 +31,9 @@ import { remapSim } from './systems/shared/remap'
 import { viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
-import { bodyLook, modDef } from './store'
+import { abilityRequires, bodyLook, modDef } from './store'
+import { aimAt } from './systems/shared/fire'
+import { sourceOf } from './utils/source'
 import { resetEntityStorage } from './storage'
 import { armTeam } from './entities/loadout'
 import { requestCast } from './systems/shared/ability'
@@ -55,6 +57,7 @@ import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, SquadSnapshot } from '../run/hudHost'
 import type { HudSnapshot } from '../run/hudHost'
+import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
 import { drain } from './outbox'
 import type { Burst } from './outbox'
@@ -89,6 +92,20 @@ function liveCoins(world: EcsWorld): number {
 }
 
 const RES_COLOR: Record<ResourceDef['kind'], number> = { energy: 0xffee58, fury: 0xef5350, heat: 0xff9800, growth: 0x9ccc65 }
+
+/** 瞄准线的长度：位移走多远，或效果把东西放出去多远 */
+function aimReach(a: AbilityDef): number {
+  const s = a.shape
+  if (s.kind === 'sprint' || s.kind === 'leap') return s.distance
+  if (s.kind === 'segment') return s.reach
+  let r = 0
+  for (const fx of a.onHit ?? []) {
+    if (fx.kind === 'portal' || fx.kind === 'warp') r = Math.max(r, fx.distance)
+    if (fx.kind === 'shadow') r = Math.max(r, fx.dash)
+    if (fx.kind === 'barrier' && fx.shape === 'wall') r = Math.max(r, fx.offset ?? 0)
+  }
+  return r
+}
 
 export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProviderHost {
   private world!: EcsWorld
@@ -526,7 +543,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       remainMs: root === undefined ? 0 : skillRemainMs(sim, root),
       cdMs: def.skill.cdMs,
       aim: def.skill.aim,
-      rangeU: a.shape.kind === 'sprint' || a.shape.kind === 'leap' ? a.shape.distance : 0,
+      rangeU: aimReach(a),
       charges: root !== undefined && hasComponent(this.world, root, Charges) ? Charges.n[root]! : -1,
       recastMs: open !== 0 ? Math.max(0, Stage.open[open]! - sim.elapsedMs) : 0,
       holdMs: a.hold?.maxMs ?? 0,
@@ -544,6 +561,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     if (root === undefined) return false
     const e = openStage(sim, root) || root
     if (!ready(sim, e)) return false
+    if (abilityRequires[e] && !aimAt(sim, e, sourceOf(sim, e))) return false
     const def = CHARACTERS[this.run.roster[slot]!]
     const stick = sim.teamDir
     const d = dir ?? (stick.x !== 0 || stick.y !== 0 ? norm(stick.x, stick.y) : { x: Facing.x[leader]!, y: Facing.y[leader]! })

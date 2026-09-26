@@ -1,6 +1,8 @@
 import { KNOCKBACK_TAU_MS } from '../data/abilities'
 import { memberMaxHp } from '../data/stats'
 import { CHARACTERS, MEMBER, TEAM, loadoutFor, upgradeCardsFor } from '../data/characters'
+import { ENEMIES } from '../data/enemies'
+import type { ResourceDef } from '../types/enemies'
 import type { CharacterId } from '../types/characters'
 import { aggregateCharacterEffects, resolveAbilityDef } from '../data/items'
 import { tiersForLevel } from '../data/charLevel'
@@ -25,14 +27,15 @@ export const SHAPE_LABEL: Record<ShapeKind, string> = {
   zone: '领域',
   summon: '召唤',
   emplace: '装置',
-  world: '时停',
+  world: '施放',
 }
 
-function abilityLabel(w: AbilityDef): string {
+export function abilityLabel(w: AbilityDef): string {
   const s = w.shape
   if (s.kind === 'segment' && s.beam) return '激光'
   if (s.kind === 'disc') return s.at === 'target' ? '轰炸' : s.of === 'hurt' ? '治疗' : '爆发'
   if (s.kind === 'zone' && s.follow) return '光环'
+  if (s.kind === 'world' && w.onHit?.some((e) => e.kind === 'timeStop')) return '时停'
   return SHAPE_LABEL[s.kind]
 }
 
@@ -61,13 +64,13 @@ export function effectLine(e: Effect): string {
     case 'poison':
       return `中毒 ${e.damage}/${sec(e.tickMs)}×${sec(e.durationMs)}`
     case 'ground':
-      return `留下 ${grid(e.def.radius)} 的${e.def.trap ? '陷阱' : '场地'} ${sec(e.def.durationMs)}${e.def.damage && e.def.tickMs ? `，每 ${sec(e.def.tickMs)} ${e.def.damage} 伤` : ''}${e.def.effects && !e.def.trap ? `，每 ${sec(e.def.tickMs)} ${e.def.effects.map(effectLine).join('、')}` : ''}${zoneRuleLine(e.def, e.def.effects)}`
+      return `留下 ${grid(e.def.radius)} 的${e.def.trap ? '陷阱' : '场地'} ${sec(e.def.durationMs)}${e.def.damage && e.def.tickMs ? `，每 ${sec(e.def.tickMs)} ${e.def.damage} 伤` : ''}${e.def.effects && !e.def.trap ? `，每 ${sec(e.def.tickMs)} ${e.def.effects.map(effectLine).join('、')}` : ''}${zoneRuleLine(e.def, e.def.effects, e.def.damage)}`
     case 'morph':
       return `变羊 ${sec(e.durationMs)}${e.vulnMul ? `，受伤 ×${e.vulnMul}` : ''}`
     case 'spawnProjectile':
       return `射出一发 ${e.damage} 伤的冷枪`
     case 'heal':
-      return `${e.scope === 'lowest' ? '治疗血量比例最低的同伴' : '治疗全体同伴'} ${e.amount}${e.ratio && e.ratio !== 1 ? ` 的 ${pct(e.ratio)}` : ''}`
+      return `${e.scope === 'lowest' ? '治疗血量比例最低的同伴' : e.scope === 'all' ? '治疗全体同伴' : '回复'} ${e.amount}${e.ratio && e.ratio !== 1 ? ` 的 ${pct(e.ratio)}` : ''}`
     case 'attackSlow':
       return `攻击冷却 ×${e.mul} 持续 ${sec(e.durationMs)}`
     case 'buff': {
@@ -77,7 +80,7 @@ export function effectLine(e: Effect): string {
     case 'damage':
       return e.ratio === undefined ? `造成 ${e.amount} 点伤害` : `造成${e.amount ? ` ${e.amount} +` : ''} ${pct(e.ratio)} 基础伤害`
     case 'stun':
-      return `定身 ${sec(e.durationMs)}`
+      return `眩晕 ${sec(e.durationMs)}`
     case 'hide':
       return `隐匿 ${sec(e.durationMs)}，敌人失去目标只会乱走`
     case 'taunt':
@@ -137,7 +140,7 @@ export function effectLine(e: Effect): string {
     case 'pull':
       return `拉到身前${e.heavy === 'self' ? '，拉不动时把自己拽过去' : ''}`
     case 'knockup':
-      return `击飞 ${sec(e.durationMs)}`
+      return `击飞 ${sec(e.durationMs)}${e.onLand ? `，落地时${e.onLand.map(effectLine).join('、')}` : ''}`
     case 'shove':
       return `推出 ${grid(e.distance)}${e.onWall ? `，撞墙时${e.onWall.map(effectLine).join('、')}` : ''}`
     case 'throw':
@@ -169,7 +172,7 @@ export function effectLine(e: Effect): string {
     case 'area':
       return `${grid(e.radius)} 内：${e.then.map(effectLine).join('、')}`
     case 'form':
-      return `${e.to < 0 ? '变回本体' : `切换到第 ${e.to + 1} 形态`}${e.ms === undefined ? '' : ` ${sec(e.ms)}`}${e.onEnd ? `，结束时${e.onEnd.map(effectLine).join('、')}` : ''}`
+      return `${e.to < 0 ? '变回本体' : '变身'}${e.ms === undefined ? '' : ` ${sec(e.ms)}`}${e.onEnd ? `，结束时${e.onEnd.map(effectLine).join('、')}` : ''}`
     case 'grow':
       return `体型 ×${e.mul}${e.ms === undefined ? `（永久叠加${e.max ? `，最多 ×${e.max}` : ''}）` : ` ${sec(e.ms)}`}，受击与接触范围随之变化`
     case 'rewind':
@@ -187,7 +190,7 @@ export function effectLine(e: Effect): string {
     case 'spawn':
       return `召出 ${e.count} 个${e.def.name}`
     case 'teleport':
-      return `瞬移到离敌人最近的一个自己的${e.of}旁${e.then ? `，落地${e.then.map(effectLine).join('、')}` : ''}`
+      return `瞬移到离敌人最近的一个自己召出的${ENEMIES[e.of]?.name ?? e.of}旁${e.then ? `，落地${e.then.map(effectLine).join('、')}` : ''}`
     case 'shadow':
       return `向前 ${grid(e.dash)} 留下影子 ${sec(e.lifeMs)}（最多 ${e.max} 个），镜像的出手从影子上再打一遍${e.taunt ? `；影子嘲讽 ${grid(e.taunt.radius)} 内的敌人 ${sec(e.taunt.ms)}` : ''}`
     case 'shadowSwap':
@@ -205,13 +208,21 @@ export function effectLine(e: Effect): string {
       return `牵住目标 ${sec(e.ms)}${e.onHold ? `，撑满时${e.onHold.map(effectLine).join('、')}` : ''}${e.onBreak ? `；跑出 ${grid(e.range)} 就断，断时${e.onBreak.map(effectLine).join('、')}` : `；跑出 ${grid(e.range)} 就断`}`
     case 'recall':
       return '把落在地上的弹体全部召回，沿途再打一遍'
+    case 'interrupt':
+      return '打断蓄力与连发'
+    case 'warp':
+      return `${e.allies ? '全队' : '目标'}沿出手方向瞬移 ${grid(e.distance)}`
+    case 'drag':
+      return `拴在身后拖行 ${sec(e.ms)}，期间不能行动`
+    case 'realm':
+      return `把目标与自己拉进只有彼此的异界 ${sec(e.ms)}，界外谁也插不了手`
   }
 }
 
 /** 场的对象与判定 */
-function zoneRuleLine(r: ZoneRules, effects: readonly Effect[] | undefined): string {
+function zoneRuleLine(r: ZoneRules, effects: readonly Effect[] | undefined, damage: number): string {
   const parts: string[] = []
-  if (r.trap) parts.push(`敌人踏入即触发${effects ? `：${effects.map(effectLine).join('、')}` : ''}，触发后消失`)
+  if (r.trap) parts.push(`敌人踏入即触发：${[damage > 0 ? `场内敌人受 ${damage} 伤` : '', ...(effects ?? []).map(effectLine)].filter(Boolean).join('、')}，触发后消失`)
   if (r.who === 'allies') parts.push('作用于己方')
   if (r.who === 'all') parts.push('敌我都作用')
   if (r.pull) parts.push(`把场内敌人以每秒 ${grid(r.pull)} 拉向圆心`)
@@ -283,13 +294,13 @@ function shapeLine(w: AbilityDef, s: Shape): string {
     case 'all':
       return s.of === 'foes' ? '全场敌人（含 Boss）' : '全队'
     case 'zone':
-      return `${s.follow ? '以自己为圆心持续生效' : `领域 ${grid(s.radius)} · 持续 ${sec(s.durationMs)}`}${s.tickMs && w.damage ? ` · 每 ${sec(s.tickMs)} ${w.damage} 伤` : ''}${s.mend ? ` · 队友每秒回复 ${s.mend}` : ''}${s.pulse ? ` · 每 ${sec(s.pulse.intervalMs)} 脉冲一次：${s.pulse.onHit.map(effectLine).join('，')}` : ''}${zoneRuleLine(s, w.onHit)}`
+      return `${s.follow ? '以自己为圆心持续生效' : `领域 ${grid(s.radius)} · 持续 ${sec(s.durationMs)}`}${s.tickMs && w.damage ? ` · 每 ${sec(s.tickMs)} ${w.damage} 伤` : ''}${s.mend ? ` · 队友每秒回复 ${s.mend}` : ''}${s.pulse ? ` · 每 ${sec(s.pulse.intervalMs)} 脉冲一次：${s.pulse.onHit.map(effectLine).join('，')}` : ''}${zoneRuleLine(s, w.onHit, w.damage ?? 0)}`
     case 'summon':
       return `每波 ${s.count} 只 · 撞击后自毁 · 存活 ${sec(s.lifeMs)}`
     case 'emplace':
       return `${s.count > 1 ? `一次架起 ${s.count} 座` : `同时最多 ${s.maxAlive} 座`}${s.lifeMs ? ` · 持续 ${sec(s.lifeMs)}` : ''} · 塔伤害 ${s.ability.damage ?? 0} · 射速 ${sec(s.ability.trigger === 'auto' ? s.ability.cooldownMs : 0)} · 射程 ${grid(s.ability.range ?? 0)}`
     case 'world':
-      return '静止则全场近乎凝固、移动则时间恢复流动'
+      return w.onHit?.some((e) => e.kind === 'timeStop') ? '静止则全场近乎凝固、移动则时间恢复流动' : ''
   }
 }
 
@@ -313,7 +324,15 @@ function availLines(w: AbilityDef): string[] {
   if (w.recast) out.push(`出手后 ${sec(w.recast.windowMs)} 内可接下一段：${abilityLabel(w.recast.ability)}${w.recast.ability.onHit ? `，${w.recast.ability.onHit.map(effectLine).join('、')}` : ''}`)
   if (w.hold) out.push(`按住蓄力，蓄满 ${sec(w.hold.maxMs)} 时距离 ×${w.hold.reachMul}、伤害 ×${w.hold.damageMul}`)
   if (w.ammo) out.push(`弹匣 ${w.ammo.count} 发，打空换弹 ${sec(w.ammo.reloadMs)}${w.ammo.last ? `；最后一发${w.ammo.last.map(effectLine).join('、')}` : ''}`)
-  if (w.cycle) out.push(`轮流出手：${[w, ...w.cycle].map(abilityLabel).join(' → ')}`)
+  if (w.cycle) {
+    const step = (c: AbilityDef): string => {
+      const fx = c === w ? [] : [...(c.onHit ?? []).map(effectLine), ...(c.onSelf ?? []).map((e) => `自身：${effectLine(e)}`)]
+      return `${abilityLabel(c)}${fx.length > 0 ? `（${fx.join('、')}）` : ''}`
+    }
+    out.push(`轮流出手：${[w, ...w.cycle].map(step).join(' → ')}，再从头来`)
+  }
+  if (w.mirror) out.push('影子也从自己的位置照着出手')
+  if (w.anchor) out.push(`从${w.anchor.mode === 'orbit' ? '绕身旋转的' : w.anchor.mode === 'trail' ? '落在一秒半前走过之处的' : '贴着血量最低的队友的'}物件上出手`)
   if (w.cost) out.push(`消耗资源 ${w.cost}`)
   if (w.gain) out.push(`每次出手资源 +${w.gain}`)
   if (w.boost) out.push(`资源到 ${w.boost.at} 时消耗 ${w.boost.spend} 强化${w.boost.damageMul ? `：伤害 ×${w.boost.damageMul}` : ''}${w.boost.onHit ? `，${w.boost.onHit.map(effectLine).join('、')}` : ''}`)
@@ -323,7 +342,7 @@ function availLines(w: AbilityDef): string[] {
   return out
 }
 
-function abilityStatLines(w: AbilityDef): string[] {
+export function abilityStatLines(w: AbilityDef): string[] {
   const base: string[] = []
   if (w.damage) base.push(`伤害 ${w.damage}${w.waveScale ? ' × 当前波次强度' : ''}`)
   if (w.trigger === 'auto' && w.cooldownMs > 0) base.push(`冷却 ${sec(w.cooldownMs)}`)
@@ -331,7 +350,8 @@ function abilityStatLines(w: AbilityDef): string[] {
   if (w.bossRatio !== undefined) base.push(`Boss 承伤 ${pct(w.bossRatio)}`)
   const lines: string[] = []
   if (base.length > 0) lines.push(base.join(' · '))
-  lines.push(shapeLine(w, w.shape))
+  const shape = shapeLine(w, w.shape)
+  if (shape) lines.push(shape)
   const rep = repeatLine(w)
   if (rep) lines.push(rep)
   lines.push(...availLines(w))
@@ -358,6 +378,7 @@ export function characterStatGroups(
   if (fx.killHeal > 0) baseLines.push(`击杀回复 ${fx.killHeal} 生命`)
   if (fx.thorns > 0) baseLines.push(`敌人接触反伤 ${fx.thorns}`)
   if (fx.critChance > 0) baseLines.push(`暴击率 ${Math.round(fx.critChance * 100)}%（伤害 ×2）`)
+  if (def.resource) baseLines.push(resourceLine(def.resource))
   const groups: StatGroup[] = [
     { icon: '2764', title: '基础', lines: baseLines },
     {
@@ -377,6 +398,16 @@ export function characterStatGroups(
       }),
     })
   }
+  for (const f of def.forms ?? []) {
+    groups.push({
+      icon: f.emoji ?? def.emoji,
+      title: `形态 · ${f.name ?? def.name}`,
+      lines: [
+        [f.sizeMul ? `体型 ×${f.sizeMul}` : '', f.speedMul ? `移速 ×${f.speedMul}` : '', '自动能力换成：'].filter(Boolean).join(' · '),
+        ...(f.abilities ?? []).flatMap((w) => [`「${abilityLabel(w)}」`, ...abilityStatLines(w)]),
+      ],
+    })
+  }
   const tier = tiers.u2 ? 2 : tiers.u1 ? 1 : 0
   for (const [i, carrier] of def.carriers.entries()) {
     const display = displayDef(resolveAbilityDef(loadout[i]!, fx), fx.damageMul, fx.cooldownMul, fx.knockbackMul)
@@ -392,6 +423,25 @@ export function characterStatGroups(
     })
   }
   return groups
+}
+
+const RES_LABEL: Record<ResourceDef['kind'], string> = { energy: '能量', fury: '怒气', heat: '热量', growth: '成长' }
+
+/** 资源怎么涨怎么落、攒满了会怎样 */
+export function resourceLine(r: ResourceDef): string {
+  const parts = [`${RES_LABEL[r.kind]} 上限 ${r.max}`]
+  if (r.start) parts.push(`开局 ${r.start}`)
+  if (r.regen) parts.push(`每秒回复 ${r.regen}`)
+  if (r.onHit) parts.push(`打中 +${r.onHit}`)
+  if (r.onHurt) parts.push(`挨打 +${r.onHurt}`)
+  if (r.onKill) parts.push(`击杀 +${r.onKill}`)
+  if (r.decay) parts.push(`${r.decayDelayMs ? `${sec(r.decayDelayMs)} 没涨后` : ''}每秒掉 ${r.decay}`)
+  const full = r.full
+  if (full) {
+    const what = [...(full.effects ?? []).map(effectLine), full.lockMs ? `${sec(full.lockMs)} 内耗它的能力出不了手` : '', full.reset ? '随后清零' : ''].filter(Boolean)
+    if (what.length > 0) parts.push(`攒满时${what.join('，')}`)
+  }
+  return parts.join(' · ')
 }
 
 /** 图鉴显示时把运行时倍率折进数值 */
