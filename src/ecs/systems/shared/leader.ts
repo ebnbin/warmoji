@@ -1,9 +1,8 @@
 import { UNIT } from '../../../util/units'
 import { MEMBER, TEAM } from '../../../data/characters'
-import { Alive, CharScale, Facing, Follow, Hurt, Iframe, Seat, Transform } from '../../components'
+import { Alive, CharScale, Facing, Follow, Hurt, Iframe, Leaping, Rushing, Seat, Transform } from '../../components'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
-import { centerX, centerY, setCenter } from '../../utils/team'
 import { handoverMs } from './squad'
 
 const ZERO: Point = { x: 0, y: 0 }
@@ -45,15 +44,24 @@ function finishHandover(sim: Sim): void {
 }
 
 export function canSwitchLeader(sim: Sim, eid: number): boolean {
-  return sim.leader >= 0 && !sim.over && !sim.handover && eid !== sim.leader && sim.characters.includes(eid) && Alive.v[eid] === 1
+  const lead = sim.leader
+  return (
+    lead >= 0 &&
+    !sim.over &&
+    !sim.handover &&
+    !Rushing.active[lead] &&
+    !Leaping.active[lead] &&
+    eid !== lead &&
+    sim.characters.includes(eid) &&
+    Alive.v[eid] === 1
+  )
 }
 
 /** 立刻换队长：中心、朝向与目标位当帧切到新队长；尺寸、相机与免伤在交接期内过渡 */
 export function switchLeader(sim: Sim, eid: number): void {
   finishHandover(sim)
   const from = sim.leader
-  const d = sim.hooks.worldDelta(sim, Follow.x[eid]!, Follow.y[eid]!, centerX(sim), centerY(sim))
-  setCenter(sim, Follow.x[eid]!, Follow.y[eid]!)
+  const d = sim.hooks.worldDelta(sim, Follow.x[eid]!, Follow.y[eid]!, Follow.x[from]!, Follow.y[from]!)
   sim.leader = eid
   const fx = Facing.x[eid]!
   const fy = Facing.y[eid]!
@@ -89,7 +97,7 @@ export function stepHandover(sim: Sim): void {
   const leader = sim.leader
   if (leader < 0 || sim.over) return
   if (!Alive.v[leader]) {
-    const next = nearestAlive(sim, centerX(sim), centerY(sim))
+    const next = nearestAlive(sim, Follow.x[leader]!, Follow.y[leader]!)
     if (next >= 0) switchLeader(sim, next)
   }
   const h = sim.handover

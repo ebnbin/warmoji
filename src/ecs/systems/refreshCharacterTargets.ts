@@ -1,15 +1,12 @@
-import { Alive, Hurt, Transform } from '../components'
+import { Alive, Hidden, Hurt, Transform } from '../components'
 import type { Target } from '../utils/targets'
 import type { Sim } from '../sim'
 
 export function refreshCharacterTargets(sim: Sim): void {
   const list: Target[] = []
-  if (sim.elapsedMs < sim.stealthUntil) {
-    sim.characterTargets = list
-    return
-  }
+  const now = sim.elapsedMs
   for (const m of sim.characters) {
-    if (!Alive.v[m]) continue
+    if (!Alive.v[m] || now < Hidden.until[m]!) continue
     const x = Transform.x[m]!
     const y = Transform.y[m]!
     const radius = Hurt.radius[m]!

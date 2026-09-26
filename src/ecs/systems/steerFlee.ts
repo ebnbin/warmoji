@@ -12,7 +12,7 @@ export function steerFlee(sim: Sim): void {
     const slow = Slowed.v[eid]!
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
-    const target = nearestAlive(sim, ex, ey)
+    const target = nearestAlive(sim, eid, ex, ey)
     if (target) {
       const d = sim.hooks.worldDelta(sim, ex, ey, target.x, target.y)
       const r = Flee.range[eid]!

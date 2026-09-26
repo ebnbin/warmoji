@@ -1,12 +1,11 @@
 import { CHARACTERS, loadoutFor } from '../../data/characters'
-import { CAPTAINS } from '../../data/captains'
 import { aggregateCharacterEffects, characterXp, resolveAbilityDef } from '../../data/items'
 import { levelStatsFor } from '../../data/levels'
 import { characterLevel, tiersForLevel } from '../../data/charLevel'
 import { toPx } from '../../data/px'
 import { sandboxLevel } from '../sandbox/knobs'
 import { FACTION } from '../components'
-import { equipAbility, equipSkill, NEUTRAL_AMP } from './ability'
+import { equipAbility, equipSkill } from './ability'
 import type { RunState } from '../../run/state'
 import type { Sim } from '../sim'
 
@@ -29,11 +28,5 @@ export function armTeam(sim: Sim, run: RunState, sandbox: boolean): void {
       equipAbility(sim, sim.characters[slot]!, toPx(resolveAbilityDef(w, fx)), FACTION.team, 300 + slot * 120 + i * 230, amp)
     })
     equipSkill(sim, sim.characters[slot]!, toPx(def.skill.ability), amp)
-  }
-}
-
-export function armCaptain(sim: Sim, run: RunState): void {
-  for (const a of CAPTAINS[run.captainId].skill.abilities) {
-    equipAbility(sim, sim.captain, toPx(a), FACTION.team, 0, NEUTRAL_AMP, true)
   }
 }

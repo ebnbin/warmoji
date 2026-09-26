@@ -3,7 +3,6 @@ import { ABILITIES } from '../defs/abilities.ts'
 import { AI } from '../defs/ai.ts'
 import { ANIMATIONS } from '../defs/animations.ts'
 import { BATTLEFIELD } from '../defs/battlefield.ts'
-import { CAPTAINS } from '../defs/captains.ts'
 import { CHARACTERS } from '../defs/characters.ts'
 import { COMBAT } from '../defs/combat.ts'
 import { DIFFICULTY } from '../defs/difficulty.ts'
@@ -64,10 +63,6 @@ need(
   'progression.loopFrom 须在 1 到总波数之间',
 )
 
-for (const [id, c] of Object.entries(CAPTAINS)) {
-  need(c.teamSize <= TEAM_BASELINE.team.maxSize, `captains.${id}.teamSize 须不超过 team.maxSize（${TEAM_BASELINE.team.maxSize}）`)
-}
-
 if (errors.length > 0) {
   console.error(errors.join('\n'))
   process.exit(1)
@@ -81,7 +76,6 @@ write('abilities', ABILITIES)
 write('ai', AI)
 write('animations', ANIMATIONS)
 write('battlefield', BATTLEFIELD)
-write('captains', CAPTAINS)
 write('characters', CHARACTERS)
 write('combat', COMBAT)
 write('difficulty', DIFFICULTY)

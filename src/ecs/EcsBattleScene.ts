@@ -32,7 +32,7 @@ import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
 import { modDef } from './store'
 import { resetEntityStorage } from './storage'
-import { armCaptain, armTeam } from './entities/loadout'
+import { armTeam } from './entities/loadout'
 import { requestCast } from './systems/shared/ability'
 import { stepFrame } from './systems/pipeline/frame'
 import { replayDeath } from './systems/shared/death'
@@ -46,9 +46,7 @@ import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
 import { settleWave } from './systems/shared/wave'
 import { isBossWave, isEliteWave, waveAt, waveDurationMs, WAVE } from '../data/waves'
 import { xpToNext } from '../run/xp'
-import { CAPTAINS } from '../data/captains'
 import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox/knobs'
-import { tickSkillCd } from '../run/state'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, SquadSnapshot } from '../run/hudHost'
 import type { HudSnapshot } from '../run/hudHost'
@@ -56,7 +54,7 @@ import type { Sim } from './sim'
 import { drain } from './outbox'
 import type { Burst } from './outbox'
 import { rollWaveCarriers } from './utils/battleFx'
-import { centerX, centerY } from './utils/team'
+import { leaderX, leaderY } from './utils/team'
 import { SceneKey } from '../scene/keys'
 import { battleDevProvider, watchSandboxSteady } from './devProvider'
 import { defineDevFlag } from '../devtools'
@@ -112,7 +110,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private puffBurst!: Phaser.GameObjects.Particles.ParticleEmitter
   private timeStopFx?: Phaser.GameObjects.Rectangle
   private timeStopFxAlpha = 0
-  private centerObj!: Phaser.GameObjects.Zone
+  private camAnchor!: Phaser.GameObjects.Zone
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private wasd?: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key>
   private mapW = 0
@@ -186,7 +184,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   }
 
   devResetSkill(): void {
-    this.run.skillCdMs = 0
     this.run.skillCd.fill(0)
   }
 
@@ -226,14 +223,14 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const mapDef = MAPS[run.mapId]
     applyBackground(mapDef.palette)
     this.map = viewFor(run.mapId)
-    this.centerObj = this.add.zone(0, 0, 1, 1)
-    this.ctx = { scene: this, world: this.world, run, def: mapDef, anchor: this.centerObj, w: 0, h: 0 }
+    this.camAnchor = this.add.zone(0, 0, 1, 1)
+    this.ctx = { scene: this, world: this.world, run, def: mapDef, anchor: this.camAnchor, w: 0, h: 0 }
     const { w, h, origin } = this.map.layout(this.ctx)
     this.ctx.w = this.mapW = w
     this.ctx.h = this.mapH = h
     this.map.build(this.ctx)
 
-    this.centerObj.setPosition(origin.x, origin.y)
+    this.camAnchor.setPosition(origin.x, origin.y)
     this.map.camera(this.ctx)
 
     this.timeStopFx = mainCameraOnly(
@@ -297,8 +294,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
     this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
-    const center = { x: this.centerObj.x, y: this.centerObj.y }
-    this.sim = makeSim(this.world, atlas, run, run.sandbox, center, this.mapW, this.mapH, settings.damageNumbers)
+    const origin = { x: this.camAnchor.x, y: this.camAnchor.y }
+    this.sim = makeSim(this.world, atlas, run, run.sandbox, origin, this.mapW, this.mapH, settings.damageNumbers)
     if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
     this.shownLeader = this.sim.leader
     initialLayout(this.sim)
@@ -307,7 +304,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const simRef = this.sim
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
     armTeam(this.sim, run, run.sandbox)
-    armCaptain(this.sim, run)
     for (let i = 0; i < this.sim.characters.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
@@ -437,14 +433,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     }
   }
 
-  skillSnapshot(): { remainMs: number; cdMs: number } {
-    const s = CAPTAINS[this.run.captainId].skill
-    return {
-      remainMs: this.run.skillCdMs,
-      cdMs: s.cdMs,
-    }
-  }
-
   perfSnapshot(): {
     enemies: number
     projectiles: number
@@ -466,17 +454,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       spawnIntervalMs: Math.round(this.sandbox ? spawnParams().intervalMs : wave.spawnIntervalMs),
       atlasPages: this.atlas?.pageCount ?? 0,
     }
-  }
-
-  castSkill(): boolean {
-    const sim = this.sim
-    if (!sim || sim.over || this.ending || this.run.skillCdMs > 0) return false
-    const s = CAPTAINS[this.run.captainId].skill
-    this.run.skillCdMs = s.cdMs
-    playSfx('levelup')
-    this.hud.emit(HudEvent.SkillCast, s.name)
-    requestCast(sim, sim.captain)
-    return true
   }
 
   squadSnapshot(): SquadSnapshot | null {
@@ -598,9 +575,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       sim.mapW = w
       sim.mapH = h
       remapSim(sim, fromW, fromH, w, h)
-      this.centerObj.setPosition(centerX(sim), centerY(sim))
+      this.camAnchor.setPosition(leaderX(sim), leaderY(sim))
     } else {
-      this.centerObj.setPosition(origin.x, origin.y)
+      this.camAnchor.setPosition(origin.x, origin.y)
     }
   }
 
@@ -668,7 +645,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const ky =
       (held(this.cursors?.up) || held(this.wasd?.W) ? -1 : 0) +
       (held(this.cursors?.down) || held(this.wasd?.S) ? 1 : 0)
-    this.run.skillCdMs = tickSkillCd(this.run.skillCdMs, delta)
 
     const keyed = kx !== 0 || ky !== 0
     const stick = hudMoveVector()
@@ -710,7 +686,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       return
     }
     const camOff = handoverCamOffset(sim)
-    this.centerObj.setPosition(centerX(sim) + camOff.x, centerY(sim) + camOff.y)
+    this.camAnchor.setPosition(leaderX(sim) + camOff.x, leaderY(sim) + camOff.y)
     this.map.step(this.ctx, sim, delta)
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)

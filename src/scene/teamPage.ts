@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-import { CAPTAINS } from '../data/captains'
 import { emojiImage } from '../emoji/hold'
 import { endRun } from '../run/state'
 import type { RunState } from '../run/state'
@@ -62,11 +61,11 @@ export function fitIconSize(posts: readonly { x: number; y: number }[], scale: n
 }
 
 export function isInitialWave(run: RunState): boolean {
-  return run.wave === CAPTAINS[run.captainId].startWave
+  return run.wave === 1
 }
 
 export function nextAfterTeam(run: RunState): SceneKey.Battle | SceneKey.Shop {
-  return isInitialWave(run) && !CAPTAINS[run.captainId].firstWaveShop ? SceneKey.Battle : SceneKey.Shop
+  return isInitialWave(run) ? SceneKey.Battle : SceneKey.Shop
 }
 
 export function addTeamFrame(
@@ -118,7 +117,7 @@ export function addRunExit(
   if (isInitialWave(run)) {
     const leave = (): void => {
       endRun()
-      scene.scene.start(SceneKey.Captain)
+      scene.scene.start(SceneKey.Map)
     }
     const back = scene.add.text(x, y, '← 返回', style).setOrigin(0, 0.5).setInteractive({ useHandCursor: true })
     back.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {

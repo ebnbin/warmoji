@@ -35,6 +35,8 @@ export interface CharacterAuthoring {
   readonly name: string
   readonly desc: string
   readonly body: BodyParams
+  /** 吸金币的半径，单位格 */
+  readonly magnet: number
   readonly skill: SkillSource
   readonly weapons: readonly WeaponId[]
   readonly innate: readonly InnateSource[]
@@ -50,6 +52,7 @@ export interface CharacterDef {
   readonly name: string
   readonly desc: string
   readonly body: BodyParams
+  readonly magnet: number
   readonly skill: SkillDef
   readonly carriers: readonly Carrier[]
 }

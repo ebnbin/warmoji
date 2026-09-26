@@ -234,45 +234,6 @@ const BASE = {
     color: 0x40c4ff,
   } satisfies ChainArcDef,
 
-  holyLight: {
-    kind: 'rally',
-    cooldownMs: 35_000,
-    healRatio: 0.5,
-    invulnMs: 2000,
-    ringRadius: 1.25,
-    color: 0xffe082,
-  } satisfies RallyDef,
-  goldRain: {
-    kind: 'strike',
-    damage: 60,
-    cooldownMs: 20_000,
-    knockback: 10,
-    targets: 8,
-    coinsPerHit: 1,
-    drop: { emoji: '1f4b0', size: 0.75, fromAbove: 3, dropMs: 180, staggerMs: 60 },
-  } satisfies StrikeDef,
-  discoFever: {
-    kind: 'dance',
-    cooldownMs: 30_000,
-    durationMs: 3500,
-  } satisfies DanceDef,
-  weaknessLecture: {
-    kind: 'buff',
-    cooldownMs: 30_000,
-    damageMul: 1.6,
-    durationMs: 8000,
-  } satisfies BuffDef,
-  dimensionStrike: {
-    kind: 'nuke',
-    damage: 70,
-    cooldownMs: 45_000,
-    bossRatio: 0.5,
-  } satisfies NukeDef,
-  timeFreeze: {
-    kind: 'timeStop',
-    cooldownMs: 45_000,
-    durationMs: 15_000,
-  } satisfies TimeStopDef,
 
   rainbowRush: {
     kind: 'rush',
@@ -556,12 +517,6 @@ export const ABILITIES = {
   voltArc: BASE.voltArc,
   voltArc2,
   voltArc3,
-  holyLight: BASE.holyLight,
-  goldRain: BASE.goldRain,
-  discoFever: BASE.discoFever,
-  weaknessLecture: BASE.weaknessLecture,
-  dimensionStrike: BASE.dimensionStrike,
-  timeFreeze: BASE.timeFreeze,
   rainbowRush: BASE.rainbowRush,
   bounceStomp: BASE.bounceStomp,
   trollRoar: BASE.trollRoar,

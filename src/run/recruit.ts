@@ -1,29 +1,21 @@
-import type { CaptainId } from '../types/captains'
 import type { CharacterId } from '../types/characters'
 import { StorageKey } from '../util/storage'
 import type { StringStorage } from '../util/storage'
 import { Rng } from '../util/rng'
 import { RECRUIT } from '../data/waves'
-import { CAPTAIN_IDS } from '../data/captains'
 
-function loadSeeds(storage: StringStorage | undefined): Partial<Record<CaptainId, number>> {
-  const seeds: Partial<Record<CaptainId, number>> = {}
+function loadSeed(storage: StringStorage | undefined): number {
   try {
     const raw: unknown = JSON.parse(storage?.getItem(StorageKey.Recruit) ?? 'null')
-    if (typeof raw !== 'object' || raw === null) return seeds
-    const obj = raw as Record<string, unknown>
-    for (const id of CAPTAIN_IDS) {
-      const v = obj[id]
-      if (typeof v === 'number') seeds[id] = v
-    }
+    return typeof raw === 'number' && Number.isFinite(raw) ? raw >>> 0 : 0
   } catch {
+    return 0
   }
-  return seeds
 }
 
-function saveSeeds(storage: StringStorage | undefined, seeds: Partial<Record<CaptainId, number>>): void {
+function saveSeed(storage: StringStorage | undefined, seed: number): void {
   try {
-    storage?.setItem(StorageKey.Recruit, JSON.stringify(seeds))
+    storage?.setItem(StorageKey.Recruit, JSON.stringify(seed))
   } catch {
   }
 }
@@ -32,22 +24,18 @@ function freshSeed(): number {
   return Math.max(1, Date.now() >>> 0)
 }
 
-export function recruitSeed(storage: StringStorage | undefined, captainId: CaptainId): number {
-  const seeds = loadSeeds(storage)
-  const stored = seeds[captainId]
-  let seed = typeof stored === 'number' && Number.isFinite(stored) ? stored >>> 0 : 0
+/** 候选池的种子一局之内固定，本局结束才换 */
+export function recruitSeed(storage: StringStorage | undefined): number {
+  let seed = loadSeed(storage)
   if (seed === 0) {
     seed = freshSeed()
-    seeds[captainId] = seed
-    saveSeeds(storage, seeds)
+    saveSeed(storage, seed)
   }
   return seed
 }
 
-export function refreshRecruitSeed(storage: StringStorage | undefined, captainId: CaptainId): void {
-  const seeds = loadSeeds(storage)
-  seeds[captainId] = freshSeed()
-  saveSeeds(storage, seeds)
+export function refreshRecruitSeed(storage: StringStorage | undefined): void {
+  saveSeed(storage, freshSeed())
 }
 
 export function drawRecruitPool(

@@ -4,7 +4,7 @@ import { fanSlots } from '../../data/formation'
 import { Alive, Depth, Facing, Follow, Phys, Seat, Transform, VisOff } from '../components'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
-import { centerX, centerY } from '../utils/team'
+import { leaderX, leaderY } from '../utils/team'
 import { settleBody, stepBody } from './shared/body'
 import { fanDistance, fanSpreadDeg, physicsOn, recallDist, reverseGain, seatHysteresis, turnRate } from './shared/squad'
 
@@ -65,7 +65,7 @@ function commit(sim: Sim): void {
     Follow.y[eid] = wrapped.y
     Transform.x[eid] = wrapped.x + VisOff.x[eid]!
     Transform.y[eid] = wrapped.y + VisOff.y[eid]!
-    Depth.z[eid] = 10 + sim.hooks.worldDelta(sim, centerX(sim), centerY(sim), wrapped.x, wrapped.y).y / UNIT
+    Depth.z[eid] = 10 + sim.hooks.worldDelta(sim, leaderX(sim), leaderY(sim), wrapped.x, wrapped.y).y / UNIT
   }
 }
 
@@ -107,10 +107,8 @@ export function layoutTeam(sim: Sim): void {
   const delta = sim.dtMs
   const dt = Math.min(delta, 50) / 1000
   const leader = sim.leader
-  const cx = centerX(sim)
-  const cy = centerY(sim)
-  Follow.x[leader] = cx
-  Follow.y[leader] = cy
+  const cx = leaderX(sim)
+  const cy = leaderY(sim)
   Follow.vx[leader] = 0
   Follow.vy[leader] = 0
   const medium = sim.hooks.mediumVelocity(sim, cx, cy)

@@ -7,7 +7,7 @@ import type { Sim } from '../../sim'
 export function settleWave(sim: Sim): boolean {
   const run = sim.run
   const finished = isFinalWave(run.wave)
-  const gained = gainXp(run.xp, Math.round(waveBonusXp(run.wave) * sim.reward.captainXpMul))
+  const gained = gainXp(run.xp, Math.round(waveBonusXp(run.wave)))
   run.xp = gained.state
   if (gained.levelsGained > 0) {
     playSfx('levelup')

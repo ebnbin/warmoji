@@ -13,7 +13,7 @@ interface DashLocomotion {
   readonly trigger: DashTrigger
   readonly length: DashLength
   readonly idle: 'wander' | 'chase'
-  readonly aim: 'nearest' | 'teamCenter'
+  readonly aim: 'nearest' | 'leader'
   readonly lockAt: 'windup' | 'launch'
   readonly sfx?: 'whoosh'
 }

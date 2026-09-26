@@ -3,6 +3,8 @@ import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
 import { beginSandboxRun } from '../ecs/sandbox/knobs'
+import { beginRun, teamStep } from '../run/state'
+import { nextAfterTeam } from './teamPage'
 import { randomPalette } from '../util/palette'
 import type { Palette } from '../util/palette'
 import { Rng } from '../util/rng'
@@ -169,7 +171,7 @@ export class MapScene extends Phaser.Scene {
     const btnBg = this.add.graphics()
     roundRect(btnBg, b.x, b.y, b.w, b.h, b.h / 2, { fill: 0xffdc5d })
     this.confirmLabel = this.add
-      .text(w / 2, oy + L.btn.y, '选择队长', {
+      .text(w / 2, oy + L.btn.y, '招募首发', {
         fontFamily: UI_FONT,
         fontSize: FONT.lead,
         fontStyle: 'bold',
@@ -184,7 +186,8 @@ export class MapScene extends Phaser.Scene {
         this.scene.start(SceneKey.Battle)
         return
       }
-      this.scene.start(SceneKey.Captain)
+      const run = beginRun([], this.selectedId)
+      this.scene.start(teamStep(run) ?? nextAfterTeam(run))
     }
     this.add
       .zone(b.x, b.y, b.w, b.h)
@@ -288,7 +291,7 @@ export class MapScene extends Phaser.Scene {
     })
     this.sandboxLabel.setText(on ? '试炼场：开' : '试炼场：关')
     this.sandboxLabel.setColor(on ? '#25262e' : '#c8c8d4')
-    this.confirmLabel.setText(on ? '进入试炼场' : '选择队长')
+    this.confirmLabel.setText(on ? '进入试炼场' : '招募首发')
     this.renderDetail(textRes())
   }
 

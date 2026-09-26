@@ -34,7 +34,10 @@ import {
   Enemy,
   ENEMY_SET,
   EnemyArm,
+  Dancing,
   EnemyPhase,
+  RushHit,
+  Taunted,
   EState,
   ETurn,
   Flash,
@@ -113,7 +116,7 @@ const LOCOMOTIONS: { [K in keyof LocomotionOf]: LocoAttach<K> } = {
     Dash.windupMs[eid] = lm.windupMs
     Dash.dashSpeed[eid] = lm.dashSpeed
     Dash.idleChase[eid] = lm.idle === 'chase' ? 1 : 0
-    Dash.aimTeamCenter[eid] = lm.aim === 'teamCenter' ? 1 : 0
+    Dash.aimLeader[eid] = lm.aim === 'leader' ? 1 : 0
     Dash.lockAtLaunch[eid] = lm.lockAt === 'launch' ? 1 : 0
     Dash.whoosh[eid] = lm.sfx ? 1 : 0
     EState.v[eid] = lm.idle === 'chase' ? 1 : 0
@@ -236,6 +239,9 @@ export function spawnEnemy(
   ETurn.at[eid] = sim.elapsedMs + AI.wander.spawnTurnMinMs + sim.rng.next() * AI.wander.spawnTurnJitterMs
   EnemyArm.fireDelayMs[eid] = 900 + sim.rng.next() * 1500
   EnemyPhase.v[eid] = sim.rng.next() * Math.PI * 2
+  Dancing.until[eid] = 0
+  Taunted.until[eid] = 0
+  RushHit.stamp[eid] = -1
   Sprite.frame[eid] = atlas.index(def.emoji, outline)
   Sprite.flipX[eid] = 0
   armIdle(eid, def.emoji, outline, Sprite.frame[eid]!, (EnemyPhase.v[eid]! / (Math.PI * 2)) * ANIM_DEF.durMs)

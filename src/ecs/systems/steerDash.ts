@@ -9,7 +9,7 @@ import { aimPoint, nearestAlive, wanderDir } from './shared/steer'
 import type { Sim } from '../sim'
 
 function lockDir(sim: Sim, eid: number): void {
-  const to = aimPoint(sim, eid, Dash.aimTeamCenter[eid] === 1)
+  const to = aimPoint(sim, eid, Dash.aimLeader[eid] === 1)
   if (!to) return
   const dir = norm(to.x - Transform.x[eid]!, to.y - Transform.y[eid]!)
   EDir.x[eid] = dir.x
@@ -61,7 +61,7 @@ export function steerDash(sim: Sim): void {
     if (hasComponent(sim.world, eid, DashTimer)) {
       launch = now >= Charge.nextDashAt[eid]!
     } else {
-      const target = state !== 4 ? nearestAlive(sim, ex, ey) : null
+      const target = state !== 4 ? nearestAlive(sim, eid, ex, ey) : null
       if (target) {
         const dx = target.x - ex
         const dy = target.y - ey
@@ -79,7 +79,7 @@ export function steerDash(sim: Sim): void {
 
     const speed = Speed.v[eid]! * slow
     if (Dash.idleChase[eid]) {
-      const to = aimPoint(sim, eid, Dash.aimTeamCenter[eid] === 1)
+      const to = aimPoint(sim, eid, Dash.aimLeader[eid] === 1)
       if (!to) continue
       const dir = sim.hooks.chaseDir(sim, eid, to.x, to.y)
       BVel.x[eid] = dir.x * speed

@@ -104,8 +104,6 @@ export interface HudHost {
   readonly events: HudEvents
   readonly scene: Phaser.Scenes.ScenePlugin
   hudSnapshot(): HudSnapshot
-  skillSnapshot(): { remainMs: number; cdMs: number }
-  castSkill(): boolean
   squadSnapshot(): SquadSnapshot | null
   switchLeader(slot: number): boolean
   leaderSkill(): LeaderSkill | null

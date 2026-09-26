@@ -1,4 +1,3 @@
-import { UNIT } from '../util/units'
 import { SIM_PIPELINE } from './systems/pipeline/sim'
 import { runPipeline } from './systems/pipeline/step'
 import { animateCharacters, finishCharacterPops } from './systems/animateCharacters'
@@ -22,10 +21,8 @@ import type { FrameIndex } from './frames'
 import { TIMESTOP } from '../data/timeStop'
 import { BATTLE_FX_IDENTITY } from '../data/battlefield'
 import type { BattleEffects } from '../types/battlefield'
-import { CAPTAINS } from '../data/captains'
 import { Rng } from '../util/rng'
-import { spawnCaptain } from './entities/captain'
-import { formTeam } from './entities/captain'
+import { formTeam } from './entities/team'
 import { newWorldState, worldFor } from './worlds/hooks'
 import { newOutbox } from './outbox'
 import { newDamageNumbers } from './damageNumbers'
@@ -35,17 +32,11 @@ export interface Sim {
   world: EcsWorld
   teamDir: { x: number; y: number }
   moveInputRaw: number
-  captain: number
   leader: number
   physics: boolean
   heading: { x: number; y: number }
   handover: Handover | null
   aim: { x: number; y: number }
-  rush: Rush | null
-  leap: Leap | null
-  taunt: { until: number; eid: number; mul: number; radius: number } | null
-  stealthUntil: number
-  stealthTinted: boolean
   characters: number[]
   mapId: import('../types/maps').MapId
   mapW: number
@@ -74,7 +65,6 @@ export interface Sim {
   damageNumbers: DamageNumbers | null
   onDeathFx?: (d: PendingDeath) => void
   run: RunState
-  reward: RewardConfig
 }
 
 /** 换队长的过渡期：尺寸插值、相机偏移收敛、新队长免伤；camX/camY 是旧中心相对新中心的偏移 */
@@ -87,31 +77,6 @@ export interface Handover {
   toScale: number
   camX: number
   camY: number
-}
-
-/** 冲刺中：队长按 vx/vy 直线前进，撞墙或到时结束，hit 记录已撞过的敌人 */
-export interface Rush {
-  msLeft: number
-  vx: number
-  vy: number
-  e: number
-  hit: Set<number>
-}
-
-/** 跳跃中：队长沿 from→to 的抛物线前进，落地那帧 landed 为真 */
-export interface Leap {
-  msLeft: number
-  ms: number
-  fromX: number
-  fromY: number
-  toX: number
-  toY: number
-  e: number
-  landed: boolean
-}
-
-interface RewardConfig {
-  captainXpMul: number
 }
 
 export interface PendingDeath {
@@ -166,14 +131,12 @@ export function makeSim(
   atlas: EcsAtlas,
   run: RunState,
   sandbox: boolean,
-  center: { x: number; y: number },
+  origin: { x: number; y: number },
   mapW: number,
   mapH: number,
   damageNumbers: boolean,
 ): Sim {
-  const captainDef = CAPTAINS[run.captainId]
-  const captain = spawnCaptain(world, center.x, center.y, captainDef.coinMagnet * UNIT)
-  const team = formTeam(world, atlas, run, sandbox, captain)
+  const team = formTeam(world, atlas, run, sandbox, origin.x, origin.y)
   const { characters, leader } = team
   return {
     world,
@@ -206,17 +169,10 @@ export function makeSim(
     sandbox,
     spawnCooldownMs: 300,
     run,
-    reward: { captainXpMul: captainDef.xpGainMul },
-    captain,
     leader,
     physics: false,
     heading: { x: 0, y: -1 },
     handover: null,
     aim: { x: 0, y: -1 },
-    rush: null,
-    leap: null,
-    taunt: null,
-    stealthUntil: 0,
-    stealthTinted: false,
   }
 }

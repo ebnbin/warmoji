@@ -23,7 +23,7 @@ import { applyDamage, hurtByHazard } from '../systems/shared/combat'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
 import { fleeSteer } from '../systems/shared/steer'
-import { centerX, centerY, teamCenter } from '../utils/team'
+import { leaderX, leaderY, leaderPoint } from '../utils/team'
 import { iceTraction } from '../systems/shared/squad'
 
 const ZERO: Point = { x: 0, y: 0 }
@@ -182,7 +182,7 @@ const bounded: WorldHooks = {
       sim.mapW,
       sim.mapH,
       (boss ? 2 : SPAWN.edgeInset) * UNIT,
-      teamCenter(sim),
+      leaderPoint(sim),
       SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1),
     )
   },
@@ -337,8 +337,8 @@ const ruins: WorldHooks = {
     if (!w || w.spawnCells.length === 0) return bounded.spawnPoint(sim, boss)
     const cfg = MAPS[sim.mapId].walls!
     const minCellDist = cfg.spawnMinCellDist + (boss ? 2 : 0)
-    const ccx = w.grid.cellX(centerX(sim))
-    const ccy = w.grid.cellY(centerY(sim))
+    const ccx = w.grid.cellX(leaderX(sim))
+    const ccy = w.grid.cellY(leaderY(sim))
     const min2 = minCellDist * minCellDist
     const cellCenter = (idx: number): Point => ({
       x: ((idx % w.grid.cols) + 0.5) * UNIT,
@@ -362,8 +362,8 @@ const ruins: WorldHooks = {
     const w = sim.worldState.walls
     if (!w) return
     w.reflowAcc += delta
-    const cx = w.grid.cellX(centerX(sim))
-    const cy = w.grid.cellY(centerY(sim))
+    const cx = w.grid.cellX(leaderX(sim))
+    const cy = w.grid.cellY(leaderY(sim))
     if (cx === w.flowCellX && cy === w.flowCellY && w.reflowAcc < MAPS[sim.mapId].walls!.reflowMs) return
     w.flow = new FlowField(w.grid, cx, cy)
     w.flowCellX = cx
@@ -408,9 +408,9 @@ const infinite: WorldHooks = {
   },
   spawnPoint(sim, boss) {
     const zone = sim.worldState.zone
-    if (boss) return ringPoint(sim.rng, zone ?? teamCenter(sim), 6 * UNIT, 8 * UNIT)
+    if (boss) return ringPoint(sim.rng, zone ?? leaderPoint(sim), 6 * UNIT, 8 * UNIT)
     const cfg = infCfg(sim)
-    const p = ringPoint(sim.rng, teamCenter(sim), cfg.spawnRingMin * UNIT, cfg.spawnRingMax * UNIT)
+    const p = ringPoint(sim.rng, leaderPoint(sim), cfg.spawnRingMin * UNIT, cfg.spawnRingMax * UNIT)
     if (!zone) return p
     const limit = zone.r - UNIT
     if (limit <= 0 || !outsideZone(p, zone, limit)) return p
@@ -421,7 +421,7 @@ const infinite: WorldHooks = {
     return infCfg(sim).activeHalf * UNIT
   },
   onFinalWave(sim) {
-    sim.worldState.zone = { x: centerX(sim), y: centerY(sim), r: ringCfg(sim).r0 * UNIT }
+    sim.worldState.zone = { x: leaderX(sim), y: leaderY(sim), r: ringCfg(sim).r0 * UNIT }
     sim.worldState.tickAt = ringCfg(sim).tickMs
   },
   tick(sim) {
@@ -468,7 +468,7 @@ const space: WorldHooks = {
     const cfg = infCfg(sim)
     const p = boss
       ? ringPoint(sim.rng, { x: 0, y: 0 }, 6 * UNIT, 8 * UNIT)
-      : ringPoint(sim.rng, teamCenter(sim), cfg.spawnRingMin * UNIT, cfg.spawnRingMax * UNIT)
+      : ringPoint(sim.rng, leaderPoint(sim), cfg.spawnRingMin * UNIT, cfg.spawnRingMax * UNIT)
     return clampToDisc(p.x, p.y, 0, 0, fieldR(sim) - UNIT)
   },
   onFinalWave() {},
@@ -484,7 +484,7 @@ const space: WorldHooks = {
       if (now < sim.worldState.tickAt) return
       const angle = sim.rng.next() * Math.PI * 2
       const offset = (sim.rng.next() * 2 - 1) * cfg.offsetU * UNIT
-      const s = meteorSweep(centerX(sim), centerY(sim), angle, offset, (cfg.travelU * UNIT) / 2)
+      const s = meteorSweep(leaderX(sim), leaderY(sim), angle, offset, (cfg.travelU * UNIT) / 2)
       spawnMeteor(sim, s, cfg.warnMs, rr * 2)
       return
     }
@@ -595,8 +595,8 @@ const river: WorldHooks = {
     if (!boss) return pos
     for (let i = 0; i < 24; i++) {
       pos = pick()
-      const dx = pos.x - centerX(sim)
-      const dy = pos.y - centerY(sim)
+      const dx = pos.x - leaderX(sim)
+      const dy = pos.y - leaderY(sim)
       if (dx * dx + dy * dy >= 5 * UNIT * (5 * UNIT)) break
     }
     return pos
@@ -660,7 +660,7 @@ const torus: WorldHooks = {
     if (!boss) return pos
     for (let i = 0; i < 24; i++) {
       pos = pick()
-      if (torusDist2(pos, teamCenter(sim), sim.mapW, sim.mapH) >= 5 * UNIT * (5 * UNIT)) break
+      if (torusDist2(pos, leaderPoint(sim), sim.mapW, sim.mapH) >= 5 * UNIT * (5 * UNIT)) break
     }
     return pos
   },

@@ -13,7 +13,7 @@ export function steerStandoff(sim: Sim): void {
     const sp = Speed.v[eid]! * Slowed.v[eid]!
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
-    const target = nearestAlive(sim, ex, ey)
+    const target = nearestAlive(sim, eid, ex, ey)
     const dx = target ? target.x - ex : 0
     const dy = target ? target.y - ey : 0
     const dist = target ? Math.hypot(dx, dy) : Infinity

@@ -14,7 +14,7 @@ import type { Sim } from './sim'
 import type { TorusConfig } from '../types/maps'
 import { query } from 'bitecs'
 import { Alive, Due, Meteor, Transform } from './components'
-import { centerX, centerY } from './utils/team'
+import { leaderX, leaderY } from './utils/team'
 import { spawnDriftDecor } from './entities/decor'
 import { chunkDecor, chunkKey, chunksInRect, outsideZone } from './worlds/infinite'
 import type { ChunkKey } from './worlds/infinite'
@@ -157,8 +157,8 @@ class DayNightView extends BoundedView {
     if (alpha <= 0.001) return void rect.setVisible(false)
     shape.clear()
     shape.fillStyle(0xffffff)
-    shape.fillCircle(centerX(sim), centerY(sim), fogRadiusAt(hour, dn) * UNIT)
-    rect.setPosition(centerX(sim), centerY(sim)).setFillStyle(FOG_COLOR, alpha).setVisible(true)
+    shape.fillCircle(leaderX(sim), leaderY(sim), fogRadiusAt(hour, dn) * UNIT)
+    rect.setPosition(leaderX(sim), leaderY(sim)).setFillStyle(FOG_COLOR, alpha).setVisible(true)
   }
 }
 
@@ -196,7 +196,7 @@ class IceView extends BoundedView {
 
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const px = v.def.ice!.floeU * UNIT
-    const inWater = !onFloe(centerX(sim), centerY(sim), px)
+    const inWater = !onFloe(leaderX(sim), leaderY(sim), px)
     if (this.vignette) setOverlayFill(this.vignette, WATER_VIGNETTE, inWater ? 0.18 + 0.06 * Math.sin(sim.elapsedMs / 140) : 0)
   }
 }

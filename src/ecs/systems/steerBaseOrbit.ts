@@ -10,7 +10,7 @@ export function steerBaseOrbit(sim: Sim): void {
     const sp = Speed.v[eid]! * Slowed.v[eid]!
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
-    const target = nearestAlive(sim, ex, ey)
+    const target = nearestAlive(sim, eid, ex, ey)
     const nest = Nest.of[eid]!
     let orbit = nest >= 0 && hasComponent(sim.world, nest, Enemy)
     if (orbit && target) {

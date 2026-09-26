@@ -7,7 +7,7 @@ export function steerChase(sim: Sim): void {
   for (const eid of query(sim.world, [Chase, Steering, Transform, Speed])) {
     if (!Steering.v[eid]) continue
     const speed = Speed.v[eid]! * Slowed.v[eid]!
-    const target = nearestAlive(sim, Transform.x[eid]!, Transform.y[eid]!)
+    const target = nearestAlive(sim, eid, Transform.x[eid]!, Transform.y[eid]!)
     if (!target) {
       const d = wanderDir(sim, eid)
       BVel.x[eid] = d.x * speed * 0.5

@@ -1,5 +1,5 @@
 import { playSfx } from '../../audio/sfx'
-import { Rush } from '../components'
+import { Owner, Rush, Rushing } from '../components'
 import { ownerX, ownerY } from '../utils/amp'
 import { castScan } from './shared/castScan'
 import { spawnFxCircle } from '../entities/fx'
@@ -8,8 +8,14 @@ import type { Sim } from '../sim'
 /** 冲刺的位移由 moveTeam 推进，沿途撞击由 tickSkillStates 结算 */
 export function castRushes(sim: Sim, scan = castScan): void {
   scan(sim, Rush, (e) => {
+    const m = Owner.eid[e]!
     const speed = Rush.distance[e]! / (Rush.ms[e]! / 1000)
-    sim.rush = { msLeft: Rush.ms[e]!, vx: sim.aim.x * speed, vy: sim.aim.y * speed, e, hit: new Set() }
+    Rushing.active[m] = 1
+    Rushing.msLeft[m] = Rush.ms[e]!
+    Rushing.vx[m] = sim.aim.x * speed
+    Rushing.vy[m] = sim.aim.y * speed
+    Rushing.skill[m] = e
+    Rushing.stamp[m] = sim.elapsedMs
     playSfx('whoosh')
     spawnFxCircle(sim, ownerX(e), ownerY(e), Rush.hitRadius[e]!, {
       fill: Rush.color[e]!,
