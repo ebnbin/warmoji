@@ -99,7 +99,7 @@ export const ITEMS = {
     effects: { thorns: 14 },
   },
   vampFang: {
-    emoji: '1f9db',
+    emoji: '1f9b7',
     name: '吸血獠牙',
     desc: '击杀敌人回复 3 生命',
     rarity: 'rare',

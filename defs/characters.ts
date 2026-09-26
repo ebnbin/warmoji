@@ -42,12 +42,12 @@ export const CHARACTERS = {
     ],
   },
   troll: {
-    emoji: '1f9cc',
-    name: '巨魔',
-    desc: '挥舞巨斧，横扫身前扇形范围',
+    emoji: '1f9d1_200d_1f692',
+    name: '消防员',
+    desc: '抡起消防斧，横扫身前扇形范围',
     body: { thrust: 17, drag: 4.5, mass: 1.8 },
     magnet: 2.25,
-    skill: { name: '嘲讽怒吼', icon: '1f4e2', desc: '四格半内的敌人两秒半内只追巨魔，期间他受到的伤害减四成', cdMs: 12_000, ability: 'trollRoar' },
+    skill: { name: '吸引火力', icon: '1f4e2', desc: '举起喇叭大喊一声，四格半内的敌人两秒半内只追消防员，期间自己受到的伤害减四成', cdMs: 12_000, ability: 'trollRoar' },
     weapons: ['axe'],
     innate: [],
   },
@@ -143,7 +143,7 @@ export const CHARACTERS = {
   },
   assassin: {
     emoji: '1f977',
-    name: '刺客',
+    name: '忍者',
     desc: '瞬移到范围内血最厚的敌人背后重斩一刀，再闪回原位；出手瞬间无敌',
     body: { thrust: 32, drag: 4, mass: 0.7 },
     magnet: 2.25,
@@ -186,7 +186,7 @@ export const CHARACTERS = {
         base: 'beeSwarm',
         upgrades: [
           { ability: 'beeSwarm2', card: { icon: '1f41d', name: '扩巢', desc: '每波小蜂 +1 只' } },
-          { ability: 'beeSwarm3', card: { icon: '1f9a0', name: '剧毒麻痹', desc: '毒素更烈，蜇中附带 45% 减速 1.2 秒' } },
+          { ability: 'beeSwarm3', card: { icon: '1f9ea', name: '剧毒麻痹', desc: '毒素更烈，蜇中附带 45% 减速 1.2 秒' } },
         ],
       },
     ],
@@ -218,7 +218,7 @@ export const CHARACTERS = {
     desc: '电弧在敌群间弹跳传导，敌人越密越疼',
     body: { thrust: 13.5, drag: 3, mass: 0.8 },
     magnet: 2.25,
-    skill: { name: '电网', icon: '1f578', desc: '五格内的敌人都被电丝连住两秒：撑到最后没挣断的被电晕一秒半，跑出六格半就挣断、只被减速', cdMs: 12_000, ability: 'jellyNet' },
+    skill: { name: '电网', icon: '1f945', desc: '五格内的敌人都被电丝连住两秒：撑到最后没挣断的被电晕一秒半，跑出六格半就挣断、只被减速', cdMs: 12_000, ability: 'jellyNet' },
     weapons: [],
     innate: [
       {
@@ -254,7 +254,7 @@ export const CHARACTERS = {
   },
   fox: {
     emoji: '1f98a',
-    name: '狐仙',
+    name: '灵狐',
     desc: '媚眼让敌人不由自主地走向她；九尾分身替她挨打',
     body: { thrust: 31, drag: 5, mass: 0.7 },
     magnet: 2.25,
@@ -313,8 +313,8 @@ export const CHARACTERS = {
     ],
   },
   blackCat: {
-    emoji: '1f408_200d_2b1b',
-    name: '黑猫',
+    emoji: '1f408',
+    name: '灵猫',
     desc: '放出影子，猫爪镖从本体和影子上同时飞出',
     body: { thrust: 33, drag: 4.5, mass: 0.6 },
     magnet: 2.25,
@@ -326,8 +326,8 @@ export const CHARACTERS = {
         icon: '1f43e',
         base: 'catPaw',
         upgrades: [
-          { ability: 'catPaw2', card: { icon: '1f578', name: '影缚', desc: '零点八秒内同一敌人被两枚猫爪镖命中就定身' } },
-          { ability: 'catPaw3', card: { icon: '1f47b', name: '影殇', desc: '猫爪镖打死敌人时在身边留下一个嘲讽周围敌人的影子' } },
+          { ability: 'catPaw2', card: { icon: '26d3', name: '影缚', desc: '零点八秒内同一敌人被两枚猫爪镖命中就定身' } },
+          { ability: 'catPaw3', card: { icon: '1f5e3', name: '影嘲', desc: '猫爪镖打死敌人时在身边留下一个嘲讽周围敌人的影子' } },
         ],
       },
     ],
@@ -388,7 +388,7 @@ export const CHARACTERS = {
         base: 'eagleGrab',
         upgrades: [
           { ability: 'eagleGrab2', card: { icon: '1f4ab', name: '摔晕', desc: '被摔的敌人落地时眩晕一秒' } },
-          { ability: 'eagleGrab3', card: { icon: '1f30b', name: '连摔', desc: '落地震起周围的敌人' } },
+          { ability: 'eagleGrab3', card: { icon: '1f4a5', name: '连摔', desc: '落地震起周围的敌人' } },
         ],
       },
     ],
@@ -414,21 +414,21 @@ export const CHARACTERS = {
     ],
   },
   vampire: {
-    emoji: '1f9db',
-    name: '伯爵',
-    desc: '每一刀都拿自己的血换，砍中了再吸回来；死去的敌人为他站起来',
+    emoji: '1f607',
+    name: '天使',
+    desc: '每支圣光箭都耗自己的生命，射中了再补回来；倒下的敌人被救赎，站起来为天使而战',
     body: { thrust: 28, drag: 5, mass: 0.9 },
     magnet: 2.25,
-    skill: { name: '血仆', icon: '26b0', desc: '付 20 生命在四格半内斩出血印，五秒内死去的敌人站起来为伯爵而战十二秒', cdMs: 16_000, ability: 'vampRaise' },
+    skill: { name: '救赎', icon: '1f54a', desc: '付 20 生命在四格半内洒下圣光，五秒内死去的敌人被救赎，站起来为天使而战十二秒', cdMs: 16_000, ability: 'vampRaise' },
     weapons: [],
     innate: [
       {
-        name: '血刃',
-        icon: '1fa78',
+        name: '圣光箭',
+        icon: '1f31f',
         base: 'vampBlade',
         upgrades: [
-          { ability: 'vampBlade2', card: { icon: '1f480', name: '血印', desc: '血刃打中残血敌人留下血印，它两秒内死去就站起来为伯爵而战' } },
-          { ability: 'vampBlade3', card: { icon: '1f9db', name: '血沸', desc: '自己生命低于一半时吸血翻倍' } },
+          { ability: 'vampBlade2', card: { icon: '1f64f', name: '感化', desc: '圣光箭打中残血敌人留下光印，它两秒内死去就被感化，站起来为天使而战' } },
+          { ability: 'vampBlade3', card: { icon: '1f47c', name: '神佑', desc: '自己生命低于一半时，圣光箭补回的生命翻倍' } },
         ],
       },
     ],
@@ -615,29 +615,29 @@ export const CHARACTERS = {
     ],
   },
   caterpillar: {
-    emoji: '1f41b',
-    name: '毛毛虫',
-    desc: '吐丝缠住敌人，吃够 25 个就羽化成蝴蝶，这一局都不再变回去',
+    emoji: '1f425',
+    name: '丑小鸭',
+    desc: '扑腾水花溅敌人一身，打倒 25 个敌人就长成白天鹅，这一局都不再变回去',
     body: { thrust: 19, drag: 5, mass: 1.1 },
     magnet: 2.25,
-    skill: { name: '结茧', icon: '1f9f6', desc: '结茧两秒半：期间无敌不可选中、不能行动，回三成半生命，破茧时震开周围敌人', cdMs: 15_000, ability: 'caterCocoon' },
+    skill: { name: '缩回蛋壳', icon: '1f423', desc: '缩回蛋壳两秒半：期间无敌不可选中、不能行动，回三成半生命，破壳时震开周围敌人', cdMs: 15_000, ability: 'caterCocoon' },
     weapons: [],
     innate: [
       {
-        name: '吐丝',
-        icon: '1f9f5',
+        name: '扑水花',
+        icon: '1f4a6',
         base: 'caterSilk',
         upgrades: [
-          { ability: 'caterSilk2', card: { icon: '1f578', name: '缠丝', desc: '三秒内被吐丝命中两次的敌人被缠住一秒半' } },
-          { ability: 'caterSilk3', card: { icon: '1f96c', name: '贪吃', desc: '吐丝打死敌人时体型长大一点、这一波都不消退，最多一倍三五' } },
+          { ability: 'caterSilk2', card: { icon: '1f33f', name: '水草缠身', desc: '三秒内被水花溅中两次的敌人被水草缠住一秒半' } },
+          { ability: 'caterSilk3', card: { icon: '1f35e', name: '贪吃', desc: '水花打死敌人时体型长大一点、这一波都不消退，最多一倍三五' } },
         ],
       },
     ],
     resource: { kind: 'growth', max: 25, onKill: 1, keep: true, full: { effects: [{ kind: 'form', to: 0 }] } },
     forms: [
       {
-        emoji: '1f98b',
-        name: '蝴蝶',
+        emoji: '1f9a2',
+        name: '白天鹅',
         sizeMul: 1.15,
         speedMul: 1.2,
         abilities: [
@@ -648,7 +648,7 @@ export const CHARACTERS = {
             fireSfx: 'shoot',
             damage: 14,
             knockback: 1,
-            shape: { kind: 'bolt', projectile: { emoji: '1f338', size: 0.45, radius: 0.16, speed: 7, rotationOffsetDeg: 0, homingDeg: 240 }, lifeMs: 2500 },
+            shape: { kind: 'bolt', projectile: { emoji: '1fabd', size: 0.45, radius: 0.16, speed: 7, rotationOffsetDeg: 0, homingDeg: 240 }, lifeMs: 2500 },
             repeat: { count: 3, spreadDeg: 60 },
             onHit: [{ kind: 'slow', factor: 0.7, durationMs: 1000 }],
           },
@@ -710,12 +710,12 @@ export const CHARACTERS = {
     ],
   },
   clown: {
-    emoji: '1f921',
-    name: '小丑',
-    desc: '一路丢下惊喜盒，敌人踩上就被吓跑；一瓶混乱药剂让它们自相残杀',
+    emoji: '1f412',
+    name: '捣蛋猴',
+    desc: '一路丢下惊喜盒，敌人踩上就被吓跑；一串香蕉让它们为了抢食自相残杀',
     body: { thrust: 29, drag: 5, mass: 0.8 },
     magnet: 2.25,
-    skill: { name: '混乱药剂', icon: '1f9ea', desc: '朝最近的敌人砸药瓶，两格半内的敌人倒戈三秒半，转头攻击自己人', cdMs: 16_000, ability: 'clownPotion' },
+    skill: { name: '香蕉乱斗', icon: '1f34c', desc: '朝最近的敌人丢一串香蕉，两格半内的敌人为了抢香蕉倒戈三秒半，转头攻击自己人', cdMs: 16_000, ability: 'clownPotion' },
     weapons: [],
     innate: [
       {
@@ -723,7 +723,7 @@ export const CHARACTERS = {
         icon: '1f381',
         base: 'clownBox',
         upgrades: [
-          { ability: 'clownBox2', card: { icon: '1f921', name: '弹簧拳', desc: '惊喜盒弹开时还把敌人弹上天' } },
+          { ability: 'clownBox2', card: { icon: '1f91b', name: '弹簧拳', desc: '惊喜盒弹开时还把敌人弹上天' } },
           { ability: 'clownBox3', card: { icon: '1f606', name: '笑气', desc: '惊喜盒弹开后留下一团笑气，吸进去的敌人倒戈' } },
         ],
       },

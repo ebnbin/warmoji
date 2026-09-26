@@ -3,7 +3,7 @@ import type { BattlefieldTuning } from '../src/types/battlefield'
 export const BATTLEFIELD = {
   pools: {
     forest: [
-      { id: 'forest_hunt', emoji: '1f43a', name: '狩猎本能', desc: '全队伤害 +35%（8 秒）', polarity: 'buff', durationMs: 8000, fx: { teamDamageMul: 1.35 } },
+      { id: 'forest_hunt', emoji: '1f43e', name: '狩猎本能', desc: '全队伤害 +35%（8 秒）', polarity: 'buff', durationMs: 8000, fx: { teamDamageMul: 1.35 } },
       { id: 'forest_swift', emoji: '1f342', name: '林间疾风', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { moveSpeedMul: 1.3 } },
       { id: 'forest_vines', emoji: '1f33f', name: '藤蔓缠足', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.7 } },
       { id: 'forest_spore', emoji: '1f344', name: '孢子狂化', desc: '敌人移速 +30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { enemySlowMul: 1.3 } },
@@ -15,10 +15,10 @@ export const BATTLEFIELD = {
       { id: 'desert_storm', emoji: '1f32a', name: '沙暴蔽日', desc: '全队伤害 -22%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamDamageMul: 0.78 } },
     ],
     river: [
-      { id: 'river_flow', emoji: '1f30a', name: '顺流而行', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { moveSpeedMul: 1.3 } },
+      { id: 'river_flow', emoji: '1f6f6', name: '顺流而行', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { moveSpeedMul: 1.3 } },
       { id: 'river_spring', emoji: '1f4a7', name: '活水灌注', desc: '全队攻速 +28%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { teamCooldownMul: 0.78 } },
       { id: 'river_under', emoji: '1f531', name: '逆流阻滞', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.7 } },
-      { id: 'river_whirl', emoji: '1fae7', name: '漩涡搅扰', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
+      { id: 'river_whirl', emoji: '1f300', name: '漩涡搅扰', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
     ],
     void: [
       { id: 'factory_grind', emoji: '2699', name: '齿轮咬滞', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemySlowMul: 0.65 } },
@@ -44,7 +44,7 @@ export const BATTLEFIELD = {
     space: [
       { id: 'space_starfuel', emoji: '1f31f', name: '星能灌注', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { teamDamageMul: 1.35 } },
       { id: 'space_warp', emoji: '1f4ab', name: '曲速跃迁', desc: '全队攻速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { teamCooldownMul: 0.77 } },
-      { id: 'space_slingshot', emoji: '2604', name: '引力弹弓', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { critAdd: 0.18 } },
+      { id: 'space_slingshot', emoji: '1f6f0', name: '引力弹弓', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { critAdd: 0.18 } },
       { id: 'space_drag', emoji: '1f300', name: '黑洞拖曳', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { moveSpeedMul: 0.7 } },
       { id: 'space_weightless', emoji: '1fa90', name: '失重打滑', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { teamCooldownMul: 1.3 } },
     ],

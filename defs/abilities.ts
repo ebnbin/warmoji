@@ -477,7 +477,7 @@ const frogLily = {
   onHit: [{ kind: 'portal', distance: 6, radius: 0.9, durationMs: 6000, cdMs: 1200, color: 0x66bb6a }],
 } satisfies AbilityDef
 
-// 🦊 狐仙：迷惑，让敌人不由自主地走向你
+// 🦊 灵狐：迷惑，让敌人不由自主地走向你
 const foxCharm = {
   trigger: 'auto',
   cooldownMs: 1300,
@@ -573,7 +573,7 @@ const slothRewind = {
   onSelf: [{ kind: 'rewind', ms: 3000 }, { kind: 'cleanse' }],
 } satisfies AbilityDef
 
-// 🐈‍⬛ 黑猫：影子，同时在两个地方出手
+// 🐈 灵猫：影子，同时在两个地方出手
 const catPaw = {
   trigger: 'auto',
   cooldownMs: 750,
@@ -723,7 +723,7 @@ const bearGrit = {
   ],
 } satisfies AbilityDef
 
-// 🧛 伯爵：以血为代价
+// 😇 天使：拿自己的生命换圣光，救赎倒下的敌人
 const vampBlade = {
   trigger: 'auto',
   cooldownMs: 700,
@@ -732,7 +732,7 @@ const vampBlade = {
   damage: 20,
   knockback: 1.5,
   hpCost: 3,
-  shape: { kind: 'bolt', projectile: shot('1fa78', 12), lifeMs: 1600 },
+  shape: { kind: 'bolt', projectile: shot('1f31f', 12), lifeMs: 1600 },
   onHit: [{ kind: 'caster', then: [{ kind: 'heal', amount: 5 }] }],
 } satisfies AbilityDef
 const vampMark = { kind: 'if', when: { kind: 'hpBelow', ratio: 0.35 }, then: [{ kind: 'deathMark', ms: 2000, then: [{ kind: 'raise', lifeMs: 8000, hpRatio: 0.4 }] }] } as const
@@ -745,7 +745,7 @@ const vampRaise = {
   trigger: 'manual',
   aim: 'self',
   fireSfx: 'boom',
-  color: 0xb71c1c,
+  color: 0xffe082,
   damage: 25,
   hpCost: 20,
   shape: { kind: 'disc', radius: 4.5, at: 'self' },
@@ -983,7 +983,7 @@ const penguinSlide = {
   onCast: [{ kind: 'cleanse' }, { kind: 'unstoppable', durationMs: 700 }],
 } satisfies AbilityDef
 
-// 🐛 毛毛虫：吃够了就羽化
+// 🐥 丑小鸭：长够了就变成白天鹅
 const caterSilk = {
   trigger: 'auto',
   cooldownMs: 1100,
@@ -991,7 +991,7 @@ const caterSilk = {
   fireSfx: 'shoot',
   damage: 11,
   knockback: 0.5,
-  shape: { kind: 'bolt', projectile: shot('1f9f5', 10), lifeMs: 1800 },
+  shape: { kind: 'bolt', projectile: shot('1f4a6', 10), lifeMs: 1800 },
   onHit: [{ kind: 'slow', factor: 0.6, durationMs: 1500 }],
 } satisfies AbilityDef
 const silkBind = { kind: 'stack', max: 2, durationMs: 3000, then: [{ kind: 'root', durationMs: 1500 }] } as const
@@ -1006,7 +1006,7 @@ const caterCocoon = {
   onSelf: [
     { kind: 'stasis', durationMs: 2500 },
     { kind: 'healRatio', ratio: 0.35 },
-    { kind: 'fuse', ms: 2500, then: [{ kind: 'blast', radius: 2.6, ratio: 1.5, knockback: 12, ring: RING(0xc5e1a5) }] },
+    { kind: 'fuse', ms: 2500, then: [{ kind: 'blast', radius: 2.6, ratio: 1.5, knockback: 12, ring: RING(0xfff9c4) }] },
   ],
 } satisfies AbilityDef
 
@@ -1034,7 +1034,7 @@ const dragonForm = {
   onSelf: [{ kind: 'form', to: 0, ms: 8000 }, { kind: 'gain', amount: -100 }],
 } satisfies AbilityDef
 
-// 🤡 小丑：满地惊喜盒，一瓶药让敌人自相残杀
+// 🐒 捣蛋猴：满地惊喜盒，一串香蕉让敌人自相残杀
 const surpriseBox = { radius: 1, durationMs: 15000, tickMs: 0, damage: 22, color: 0xff80ab, fillAlpha: 0.2, lineAlpha: 0.7, enterMs: 200, trap: true } as const
 const clownBox = {
   trigger: 'auto',
@@ -1066,7 +1066,7 @@ const clownPotion = {
   aim: 'nearest',
   range: 7,
   fireSfx: 'boom',
-  color: 0xce93d8,
+  color: 0xfff176,
   shape: { kind: 'disc', radius: 2.6, at: 'target' },
   onHit: [{ kind: 'berserk', durationMs: 3500 }],
 } satisfies AbilityDef

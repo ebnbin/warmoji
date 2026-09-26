@@ -2,11 +2,11 @@ import type { WeaponSource } from '../src/types/weapons'
 
 export const WEAPONS = {
   axe: {
-    name: '巨斧横扫',
+    name: '消防斧',
     emoji: '1fa93',
     base: 'axeSweep',
     upgrades: [
-      { ability: 'axeSweep2', card: { icon: '1f300', name: '全周横扫', desc: '巨斧扫过整整一圈，攻击四面八方的敌人' } },
+      { ability: 'axeSweep2', card: { icon: '1f300', name: '全周横扫', desc: '消防斧扫过整整一圈，攻击四面八方的敌人' } },
       { ability: 'axeSweep3', card: { icon: '1f976', name: '震慑余波', desc: '被横扫命中的敌人减速 45%，持续 1.2 秒' } },
     ],
   },
