@@ -151,10 +151,10 @@ export function casterOf(sim: Sim, src: Source): number {
   return b !== undefined && isSameEntity(sim.world, b, src.bodyUid ?? 0) && Alive.v[b] ? b : -1
 }
 
-/** 让一组控制在这一帧到期：到期反应照常执行 */
+/** 让一组标记当场失效、到期反应照常执行：到期时刻记 0，因为记成此刻会被 Float32 向上舍入而仍算生效 */
 export function expireMarks(sim: Sim, eid: number, kinds: readonly number[]): void {
-  for (const kind of kinds) {
-    for (let s = markSlot(sim, eid, kind); s >= 0; s = markSlot(sim, eid, kind)) Mark.until[s] = sim.elapsedMs
+  for (let s = eid * MARK_SLOTS; s < (eid + 1) * MARK_SLOTS; s++) {
+    if (kinds.includes(Mark.kind[s]!) && Mark.until[s]! > sim.elapsedMs) Mark.until[s] = 0
   }
 }
 
@@ -533,7 +533,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const ref = src.bodyUid ?? 0
     for (const t of at.targets ?? []) {
       for (let s = t * MARK_SLOTS; s < (t + 1) * MARK_SLOTS; s++) {
-        if (Mark.kind[s] === kind && Mark.ref[s] === ref && Mark.until[s]! > sim.elapsedMs) Mark.until[s] = sim.elapsedMs
+        if (Mark.kind[s] === kind && Mark.ref[s] === ref && Mark.until[s]! > sim.elapsedMs) Mark.until[s] = 0
       }
     }
   },
