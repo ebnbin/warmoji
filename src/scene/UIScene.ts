@@ -25,11 +25,13 @@ function stateOf(m: SquadMember): IconState {
   return !m.alive ? 'dead' : m.cdRemainMs > 0 ? 'cooling' : 'ready'
 }
 
-/** 右下角的队伍环：队长放大并显示他的主动技能，离屏幕边留出 buffer 给按住拖动施法；队员按固定间隔 spread 沿圆弧排在他左上方；wheel 是施法轮盘的半径 */
-const RING = { r: 34, emoji: 48, leaderScale: 1.6, radius: 135, spread: 42 * DEG2RAD, buffer: 70, wheel: 115 } as const
+/** 左下角的摇杆与右下角的队长按钮离屏幕边留出的余地，给按住后往边上拖留空间 */
+const EDGE = 70
+/** 右下角的队伍环：队长放大并显示他的主动技能；队员按固定间隔 spread 沿圆弧排在他左上方；wheel 是施法轮盘的半径 */
+const RING = { r: 34, emoji: 48, leaderScale: 1.6, radius: 135, spread: 42 * DEG2RAD, wheel: 115 } as const
 const SQUAD_KEYS = ['ONE', 'TWO', 'THREE', 'FOUR'] as const
 const AIM_DEADZONE = 24
-const DEPTH = { bar: LAYER.hud + 20, fx: LAYER.hud + 21, waveEnd: LAYER.toast + 10, squad: 300, leader: 302, aim: 305 } as const
+const DEPTH = { bar: LAYER.hud + 20, fx: LAYER.hud + 21, waveEnd: LAYER.toast + 10, stick: 150, squad: 300, leader: 302, aim: 305 } as const
 /** 这一场的目标排在右上角计数的下方，一条一行 */
 const GOALS = { top: 124, step: 42 } as const
 
@@ -72,7 +74,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   create(): void {
     applyCamera(this)
     const w = viewport.logicalWidth
-    const { top: sT, right: sR, left: sL } = safeInsets
+    const { top: sT, right: sR, bottom: sB, left: sL } = safeInsets
     this.last = {
       xp: -1,
       xpNext: -1,
@@ -87,7 +89,8 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       battleFx: [],
     }
 
-    this.joystick = new Joystick(this)
+    const stick = EDGE + Joystick.RADIUS
+    this.joystick = new Joystick(this, sL + stick, viewport.logicalHeight - sB - stick, DEPTH.stick)
     setActiveHudInput(this)
 
     this.xpBar = new ProgressBar(this, sL + 12, sT + 12, 200, 16, { tone: 'info' })
@@ -178,7 +181,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   }
 
   private squadCorner(): { x: number; y: number } {
-    const r = RING.r * RING.leaderScale + RING.buffer
+    const r = RING.r * RING.leaderScale + EDGE
     return {
       x: viewport.logicalWidth - safeInsets.right - r,
       y: viewport.logicalHeight - safeInsets.bottom - r,
