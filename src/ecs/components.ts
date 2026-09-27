@@ -573,8 +573,8 @@ export const Carrier = {}
 
 export const Thief = { eaten: i32(), nextEatAt: f32() }
 
-/** 追击：leader 为 1 时盯着队长而不是最近的敌人 */
-export const Chase = { leader: u8() }
+/** 追击：leader 为 1 时盯着队长而不是最近的敌人；目标在 seek 之外就当没看见 */
+export const Chase = { leader: u8(), seek: f32() }
 
 export const Wander = {}
 

@@ -6,7 +6,7 @@ import { spawnParams, sandboxDifficulty, sandboxEnemySet } from '../sandbox/knob
 import { mapEnemyRoster } from '../../data/maps'
 import { isDayAt } from '../worlds/daynight'
 import { attachCarrierRing } from '../entities/pickup'
-import { spawnEnemy } from '../entities/enemy'
+import { sightedSpawnPoint, spawnEnemy } from '../entities/enemy'
 import { awakeCount, dayNightOf, telegraphOne } from '../entities/enemy'
 import { spawnTelegraph, telegraphCount } from '../entities/telegraph'
 import { enemyCarries, telegraphCarries, telegraphDef } from '../store'
@@ -32,8 +32,9 @@ function spawnSandbox(sim: Sim): void {
     if (live >= d.cap) return
     const raw = ENEMIES[kinds[Math.floor(sim.rng.next() * kinds.length)]!]
     const def = toPx(raw)
-    const pos = sim.hooks.spawnPoint(sim, raw.role === 'boss')
-    spawnTelegraph(sim, def, pos.x, pos.y, Math.round(def.hp * hpMul), false, raw.role === 'boss')
+    const boss = raw.role === 'boss'
+    const pos = boss ? sim.hooks.spawnPoint(sim, true) : sightedSpawnPoint(sim)
+    spawnTelegraph(sim, def, pos.x, pos.y, Math.round(def.hp * hpMul), false, boss)
   }
 }
 
