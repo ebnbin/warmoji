@@ -5,6 +5,7 @@ import { MAP_IDS, MAPS, bossFor } from '../data/maps'
 import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
 import { ITEMS, RARITIES } from '../data/items'
+import { modTexts } from '../data/stats'
 import type { ItemDef } from '../types/items'
 import { abilityLabel, abilityStatLines, characterStatGroups, effectLine, SHAPE_LABEL } from './statLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
@@ -49,7 +50,7 @@ function enemyStatLines(e: EnemyDef): string[] {
   if (e.onIdle) lines.push(`${e.onIdle.ms / 1000} 秒没出手${e.onIdle.still ? '也没动' : ''}：${e.onIdle.effects.map((x) => effectLine(x, true)).join('，')}`)
   for (const [i, f] of (e.forms ?? []).entries()) {
     if (e.mount?.form === i && !f.abilities) continue
-    const traits = [f.speedMul !== undefined ? `移速 ×${f.speedMul}` : '', f.sizeMul !== undefined ? `体型 ×${f.sizeMul}` : '', f.anchored ? '原地不动' : ''].filter(Boolean).join(' · ')
+    const traits = [...(f.stats ? modTexts(f.stats) : []), f.anchored ? '原地不动' : ''].filter(Boolean).join(' · ')
     lines.push(`形态「${f.name ?? e.name}」${traits ? `：${traits}` : ''}`)
     for (const w of f.abilities ?? []) lines.push(`  ${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   }

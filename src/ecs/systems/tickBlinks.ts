@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { Ability, BlinkShape, BlinkState, Frozen, Owner } from '../components'
-import { anchorX, anchorY } from '../utils/amp'
+import { anchorX, anchorY } from '../utils/ability'
 import { blinkFlash } from './shared/fire'
 import { displace } from './shared/displace'
 import type { Sim } from '../sim'

@@ -1,9 +1,12 @@
 import { hasComponent } from 'bitecs'
-import { Amp, Anchor, FACTION, Faction, MARK, Owner, Slot, Uid, WallBlocked } from '../components'
+import { Anchor, FACTION, Faction, MARK, Owner, Slot, Uid, WallBlocked } from '../components'
 import { Transform } from '../components'
 import { enemyDef } from '../store'
-import { attributionSlot, damageMul } from './amp'
-import { dmgMul, hasMark, realmOf } from './marks'
+import { attributionSlot } from './ability'
+import { hasMark, realmOf } from './marks'
+import { isSameEntity } from './identity'
+import { NEUTRAL, offenseOf } from './stats'
+import type { Offense } from './stats'
 import type { Sim } from '../sim'
 import type { EnemyKind } from '../../types/enemies'
 import type { Hazard } from '../../types/maps'
@@ -12,9 +15,10 @@ import type { Hazard } from '../../types/maps'
 export interface Source {
   readonly faction: number
   readonly slot: number
-  readonly kb: number
-  readonly crit: number
-  readonly dmgMul: number
+  /** 出手者的属性：结算时出手的身体还在就按它此刻的属性表，不在了才用这份出手时记下的 */
+  readonly atk: Offense
+  /** 这一下不会暴击：场地 */
+  readonly noCrit?: boolean
   readonly enemy?: EnemyKind
   readonly hazard?: Hazard
   readonly tint?: number
@@ -45,9 +49,7 @@ export function sourceOf(sim: Sim, e: number): Source {
   return {
     faction: Faction.v[e]!,
     slot: attributionSlot(sim, e),
-    kb: Amp.kb[e]!,
-    crit: Amp.crit[e]! + (Amp.battle[e] ? sim.battleFx.critAdd : 0),
-    dmgMul: damageMul(sim, e),
+    atk: offenseOf(sim.world, o),
     enemy: enemySide ? enemyDef[Owner.eid[e]!]?.kind : undefined,
     viewer: Owner.eid[e]!,
     body: o,
@@ -66,15 +68,16 @@ export function sourceOf(sim: Sim, e: number): Source {
 /** 身体自己在看：转向用 */
 export function bodySource(sim: Sim, eid: number): Source {
   const faction = Faction.v[eid]!
-  return { faction, slot: -1, kb: 1, crit: 0, dmgMul: 1, viewer: eid, body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, faction), realm: realmOf(sim, eid), from: { x: Transform.x[eid]!, y: Transform.y[eid]! } }
+  return { faction, slot: -1, atk: NEUTRAL, viewer: eid, body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, faction), realm: realmOf(sim, eid), from: { x: Transform.x[eid]!, y: Transform.y[eid]! } }
 }
 
-/** 身体自己作为伤害来源：角色归因到槽位，敌人归因到种类并带身上的伤害倍率 */
+/** 身体自己作为伤害来源，按自己的属性表结算：角色归因到槽位，敌人归因到种类 */
 export function selfSource(sim: Sim, eid: number): Source {
   const own = { body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, Faction.v[eid]!), realm: realmOf(sim, eid), from: { x: Transform.x[eid]!, y: Transform.y[eid]! } }
-  if (hasComponent(sim.world, eid, Slot)) return { ...boltSource(Slot.v[eid]!), ...own }
+  const atk = offenseOf(sim.world, eid)
+  if (hasComponent(sim.world, eid, Slot)) return { faction: FACTION.team, slot: Slot.v[eid]!, atk, ...own }
   const def = enemyDef[eid]
-  return def ? { ...enemySource(def.kind, dmgMul(sim, eid)), faction: Faction.v[eid]!, ...own } : bodySource(sim, eid)
+  return def ? { ...enemySource(def.kind, atk), faction: Faction.v[eid]!, ...own } : bodySource(sim, eid)
 }
 
 /** 飞出去的身体自己看：不带发射者的视角与视线 */
@@ -82,16 +85,18 @@ export function flying(src: Source): Source {
   return { ...src, viewer: undefined, sight: undefined }
 }
 
-function boltSource(slot: number): Source {
-  return { faction: FACTION.team, slot, kb: 1, crit: 0, dmgMul: 1 }
-}
-
-export function enemySource(enemy: EnemyKind | undefined, dmgMul: number): Source {
-  return { faction: FACTION.enemy, slot: -1, kb: 1, crit: 0, dmgMul, enemy }
+export function enemySource(enemy: EnemyKind | undefined, atk: Offense): Source {
+  return { faction: FACTION.enemy, slot: -1, atk, enemy }
 }
 
 export function hazardSource(hazard: Hazard, tint: number): Source {
-  return { faction: FACTION.world, slot: -1, kb: 1, crit: 0, dmgMul: 1, hazard, tint }
+  return { faction: FACTION.world, slot: -1, atk: NEUTRAL, hazard, tint }
 }
 
-export const WORLD_SOURCE: Source = { faction: FACTION.world, slot: -1, kb: 1, crit: 0, dmgMul: 1 }
+export const WORLD_SOURCE: Source = { faction: FACTION.world, slot: -1, atk: NEUTRAL }
+
+/** 结算时用的出手属性：出手的身体还在就读它此刻的属性表，否则用出手时记下的 */
+export function attackOf(sim: Sim, src: Source): Offense {
+  const b = src.body
+  return b !== undefined && isSameEntity(sim.world, b, src.bodyUid ?? 0) ? offenseOf(sim.world, b) : src.atk
+}

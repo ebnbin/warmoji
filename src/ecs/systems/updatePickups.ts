@@ -2,7 +2,7 @@ import { addComponent, query, removeEntity } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { PICKUP, PICKUPS } from '../../data/pickups'
-import { Alive, Collected, Drive, Grab, Radius, Lifetime, Magnet, PICKUP_SET, Pull, Tint, Transform } from '../components'
+import { Alive, Collected, Drive, Grab, Radius, Lifetime, PICKUP_SET, Pull, Stats, Tint, Transform } from '../components'
 import { animatePickup } from '../entities/pickup'
 import type { Sim } from '../sim'
 import { leaderX, leaderY } from '../utils/team'
@@ -93,7 +93,7 @@ function magnetPull(sim: Sim, x: number, y: number): { x: number; y: number } | 
     const d2 = d.x * d.x + d.y * d.y
     if (d2 >= bestD2) continue
     bestD2 = d2
-    bestR = Magnet.radius[m]!
+    bestR = Stats.magnet[m]! * UNIT
     best = d
   }
   return best && bestD2 < bestR * bestR ? best : null

@@ -1,8 +1,9 @@
 import { hasComponent, query } from 'bitecs'
-import { Casting, Ctl, Drive, EDir, EnemyPhase, MARK, Mark, Motion, MOTION, Phys, SpeedMul, Transform } from '../components'
+import { Casting, Ctl, Drive, EDir, EnemyPhase, MARK, Mark, Motion, MOTION, Transform } from '../components'
 import { hasMark, isAirborne, markedBy, markSlot } from '../utils/marks'
 import { norm } from '../../util/vec'
 import { wanderDir } from './shared/steer'
+import { moveSpeed } from '../utils/stats'
 import type { Sim } from '../sim'
 
 const FLEE = 1
@@ -62,7 +63,7 @@ export function controlBody(sim: Sim, eid: number): void {
     move = 0
     if (hasComponent(sim.world, eid, EDir)) {
       const d = wanderDir(sim, eid)
-      const sp = (Phys.thrust[eid]! / Phys.drag[eid]!) * SpeedMul.v[eid]! * 0.5
+      const sp = moveSpeed(eid) * 0.5
       Drive.x[eid] = d.x * sp
       Drive.y[eid] = d.y * sp
       Drive.idle[eid] = 1
@@ -92,7 +93,7 @@ export function controlBody(sim: Sim, eid: number): void {
     const d = sim.hooks.worldDelta(sim, Transform.x[eid]!, Transform.y[eid]!, to.x, to.y)
     const toward = norm(d.x, d.y)
     const dir = forced === FLEE ? sim.hooks.fleeDir(sim, eid, -toward.x, -toward.y) : toward
-    const sp = (Phys.thrust[eid]! / Phys.drag[eid]!) * SpeedMul.v[eid]! * pace
+    const sp = moveSpeed(eid) * pace
     Drive.x[eid] = dir.x * sp
     Drive.y[eid] = dir.y * sp
     Ctl.forced[eid] = forced

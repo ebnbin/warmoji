@@ -1,6 +1,6 @@
 import { hasComponent } from 'bitecs'
 import { Aim, Faction, FACTION, Held, Owner, Phys } from '../components'
-import { anchorX, anchorY } from './amp'
+import { anchorX, anchorY } from './ability'
 import type { Sim } from '../sim'
 
 export function headingOf(sim: Sim, e: number): { x: number; y: number } {

@@ -8,6 +8,8 @@ import type { AbilityDef } from '../types/abilityDefs'
 import { WEAPONS } from './weapons'
 import type { UpgradeCard, WeaponId } from '../types/weapons'
 import type { Carrier, CharacterAuthoring, CharacterDef, CharacterId, InnateSource, TeamBaseline, UpgradeTiers } from '../types/characters'
+import { foldStats } from './stats'
+import type { StatBase, StatMods, StatValues } from '../types/stats'
 
 function tierLevel(tiers: UpgradeTiers): 0 | 1 | 2 {
   return tiers.u2 ? 2 : tiers.u1 ? 1 : 0
@@ -38,7 +40,7 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
     name: src.name,
     desc: src.desc,
     body: src.body,
-    magnet: src.magnet,
+    stats: src.stats,
     skill: { ...src.skill, ability: ABILITIES[src.skill.ability], aim: src.skill.aim === true },
     carriers: [...src.weapons.map(weaponCarrier), ...src.innate.map(innateCarrier)],
     resource: src.resource,
@@ -78,3 +80,13 @@ export function upgradeCardsFor(def: CharacterDef): readonly [UpgradeCard, Upgra
 const TB = fromJson<TeamBaseline>(teamJson)
 export const TEAM = TB.team
 export const MEMBER = TB.member
+
+/** 角色的基础属性：全队通用的一份，再盖上角色自己写的 */
+export function memberBase(def: CharacterDef): StatBase {
+  return { ...MEMBER.stats, ...def.stats }
+}
+
+/** 角色战斗外的属性表：基础属性加上道具与等级 */
+export function memberStats(def: CharacterDef, gear: readonly StatMods[] = []): StatValues {
+  return foldStats(memberBase(def), gear)
+}

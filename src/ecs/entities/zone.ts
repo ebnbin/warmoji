@@ -43,7 +43,7 @@ export function spawnZone(sim: Sim, spec: ZoneSpec): number {
   Zone.damage[eid] = spec.damage ?? 0
   Zone.mend[eid] = spec.mend ?? 0
   Zone.pulse[eid] = spec.pulse ?? 0
-  zoneSrc[eid] = { ...spec.src, crit: 0 }
+  zoneSrc[eid] = { ...spec.src, noCrit: true }
   zoneEffects[eid] = spec.effects
   const rules = spec.rules
   zoneRules[eid] = rules

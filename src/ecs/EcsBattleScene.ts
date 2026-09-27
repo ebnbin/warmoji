@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { UNIT } from '../util/units'
-import { CHARACTERS, MEMBER } from '../data/characters'
+import { CHARACTERS, memberBase } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
 import { burstEmitter, setOverlayFill } from '../util/fx'
@@ -33,7 +33,8 @@ import { remapSim } from './systems/shared/remap'
 import { viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
-import { abilityRequires, bodyLook, modDef } from './store'
+import { abilityRequires, bodyLook, modDef, statBase } from './store'
+import { foldBody } from './utils/stats'
 import { aimAt } from './systems/shared/fire'
 import { sourceOf } from './utils/source'
 import { resetEntityStorage } from './storage'
@@ -637,11 +638,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   applySandboxInvincible(): void {
     const sim = this.sim
     if (!sim) return
-    const mh = sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
-    for (const m of sim.characters) {
-      Hp.max[m] = mh
-      Hp.v[m] = sandboxInvincible() ? mh : Math.min(Hp.v[m]!, mh)
-    }
+    sim.run.roster.forEach((id, slot) => {
+      const m = sim.characters[slot]!
+      const base = memberBase(CHARACTERS[id])
+      statBase[m] = sandboxInvincible() ? { ...base, maxHp: INVINCIBLE_HP } : base
+      foldBody(sim.world, sim, m)
+      if (sandboxInvincible()) Hp.v[m] = Hp.max[m]!
+    })
   }
 
 

@@ -7,14 +7,16 @@ import { coinDropChance } from '../../../data/waves'
 import { ELITE } from '../../../data/enemies'
 import type { EnemyDef } from '../../../types/enemies'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Hp, Lethal, MARK, MARK_SLOTS, Mark, Nest, Revive, Slot, Sprite, TAG, Thief, Tint, Transform } from '../../components'
+import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Hp, Lethal, MARK, MARK_SLOTS, Mark, Nest, Revive, Slot, Sprite, Stats, TAG, Thief, Tint, Transform } from '../../components'
 import { isSameEntity } from '../../utils/identity'
-import { addMark, dmgMul, hasMark } from '../../utils/marks'
+import { addMark, hasMark } from '../../utils/marks'
+import { offenseOf } from '../../utils/stats'
 import { abilityOnKill, bodyRules, enemyCarries, enemyDef, enemyOf, resDef } from '../../store'
 import { flying, selfSource } from '../../utils/source'
 import { nearestTarget } from '../../utils/targets'
 import { gainRes } from './resource'
 import { applyAbilityEffects, casterOf, DEATH_DEF, FUSE_DEF, markFrom, markSource } from './effects'
+import { mend } from './heal'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
 import { endMotion } from './displace'
@@ -38,11 +40,12 @@ export function die(sim: Sim, eid: number, src: Source, flingVx: number, flingVy
   killBody(sim, eid, src.slot, anchored ? 0 : flingVx, anchored ? 0 : flingVy)
 }
 
-/** 击杀反应施于出手的身体，敌我同一条：身体的击杀规则、出手那条能力的击杀效果、资源的击杀增长 */
+/** 击杀反应施于出手的身体，敌我同一条：属性表的击杀回复、身体的击杀规则、出手那条能力的击杀效果、资源的击杀增长 */
 function killerReacts(sim: Sim, src: Source): void {
   const k = src.body
   if (k === undefined || !isSameEntity(sim.world, k, src.bodyUid ?? 0) || !Alive.v[k]) return
   const at = { x: Transform.x[k]!, y: Transform.y[k]!, baseDamage: 0, targets: [k] }
+  if (hasComponent(sim.world, k, Stats)) mend(k, Stats.killHeal[k]!)
   const onKill = bodyRules[k]?.onKill
   if (onKill) applyAbilityEffects(sim, selfSource(sim, k), onKill, at)
   const byAbility = src.ability === undefined ? undefined : abilityOnKill[src.ability]
@@ -82,7 +85,7 @@ function down(sim: Sim, eid: number): void {
   endMotion(eid)
   Hp.v[eid] = 0
   Alive.v[eid] = 0
-  Revive.at[eid] = sim.elapsedMs + Revive.ms[eid]!
+  Revive.at[eid] = sim.elapsedMs + Stats.revive[eid]!
   Tint.color[eid] = 0x888888
   Tint.alpha[eid] = 0.35
   const st = sim.run.stats
@@ -118,7 +121,7 @@ function killBody(sim: Sim, eid: number, srcSlot: number, flingVx: number, fling
   if (who) grantKillRewards(sim, eid, who, elite)
   const hexed = hasMark(sim, eid, MARK.morph)
   if (!hexed && def?.onDeath) {
-    const snap = { eid: -1, def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, dmgMul: dmgMul(sim, eid), faction: Faction.v[eid]! }
+    const snap = { eid: -1, def, x: Transform.x[eid]!, y: Transform.y[eid]!, elite, boss, atk: offenseOf(sim.world, eid), faction: Faction.v[eid]! }
     if (sim.onDeathFx) sim.onDeathFx({ ...snap, eid })
     else sim.pendingDeaths.push(snap)
   }
@@ -195,6 +198,7 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   Anim.frames[eid] = 0
   Hp.v[eid] = Hp.max[eid]!
   // 复活视同被命中一次的保护
+  grantIframe(sim, eid, Stats.iframes[eid]!)
   const back = bodyRules[eid]?.onHurt
   if (back) applyAbilityEffects(sim, selfSource(sim, eid), back, { x: Transform.x[eid]!, y: Transform.y[eid]!, baseDamage: 0, targets: [eid] })
   Tint.color[eid] = 0xffffff

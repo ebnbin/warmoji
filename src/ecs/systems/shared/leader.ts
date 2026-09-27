@@ -30,7 +30,7 @@ export function handoverCamOffset(sim: Sim): Point {
 /** 阵亡者不走动画系统，尺寸随倍率直接改 */
 function setScale(sim: Sim, eid: number, s: number): void {
   CharScale.v[eid] = s
-  rescale(sim, eid)
+  rescale(sim.world, eid)
   if (Alive.v[eid]) return
   Transform.w[eid] = charSize(eid)
   Transform.h[eid] = charSize(eid)

@@ -43,6 +43,8 @@ const SPATIAL: ReadonlySet<string> = new Set<FieldName<EnemyDef | AbilityDef>>([
 const cache = new WeakMap<object, unknown>()
 
 function walk(value: unknown, key: string | null): unknown {
+  // 属性修正用格这些自然单位，由属性表自己换算
+  if (key === 'stats') return value
   if (typeof value === 'number') return key !== null && SPATIAL.has(key) ? value * UNIT : value
   if (Array.isArray(value)) return value.map((v) => walk(v, null))
   if (value !== null && typeof value === 'object') {

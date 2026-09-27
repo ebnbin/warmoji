@@ -1,16 +1,17 @@
 import { KNOCKBACK_TAU_MS } from '../data/abilities'
-import { memberMaxHp } from '../data/stats'
-import { CHARACTERS, MEMBER, TEAM, loadoutFor, upgradeCardsFor } from '../data/characters'
+import { STAT_KEYS, STATS, modTexts, statText } from '../data/stats'
+import { CHARACTERS, loadoutFor, memberStats, upgradeCardsFor } from '../data/characters'
 import { ENEMIES } from '../data/enemies'
 import type { ResourceDef } from '../types/enemies'
 import type { CharacterId } from '../types/characters'
-import { aggregateCharacterEffects, resolveAbilityDef } from '../data/items'
+import { gearMods, resolveAbilityDef } from '../data/items'
 import { tiersForLevel } from '../data/charLevel'
 import { levelStatsFor } from '../data/levels'
 import type { ItemId } from '../types/items'
 import type { AbilityDef, Cond, Effect, MarkName, Shape, ShapeKind } from '../types/abilityDefs'
 import type { ZoneRules } from '../types/groundEffects'
 import type { StatGroup } from '../types/statLines'
+import type { StatKey } from '../types/stats'
 
 export const SHAPE_LABEL: Record<ShapeKind, string> = {
   bolt: '投掷',
@@ -363,10 +364,9 @@ function selfAndHit(w: AbilityDef): string[] {
 
 export function abilityStatLines(w: AbilityDef): string[] {
   const base: string[] = []
-  if (w.damage) base.push(`伤害 ${w.damage}${w.waveScale ? ' × 当前波次强度' : ''}`)
+  if (w.damage) base.push(`伤害 ${w.damage}`)
   if (w.trigger === 'auto' && w.cooldownMs > 0) base.push(`冷却 ${sec(w.cooldownMs)}`)
   if (w.knockback) base.push(`击退 ${kbGrid(w.knockback)}`)
-  if (w.bossRatio !== undefined) base.push(`Boss 承伤 ${pct(w.bossRatio)}`)
   const lines: string[] = []
   if (base.length > 0) lines.push(base.join(' · '))
   const shape = shapeLine(w, w.shape)
@@ -379,6 +379,9 @@ export function abilityStatLines(w: AbilityDef): string[] {
   return lines
 }
 
+/** 属性面板开头两行固定显示的属性，其余与默认值不同的排在后面 */
+const FIXED_LINES: readonly StatKey[] = ['maxHp', 'iframes', 'moveSpeed', 'revive']
+
 export function characterStatGroups(
   id: CharacterId,
   items: readonly ItemId[] = [],
@@ -386,17 +389,15 @@ export function characterStatGroups(
   opts: { path?: boolean } = {},
 ): StatGroup[] {
   const def = CHARACTERS[id]
-  const fx = aggregateCharacterEffects(items, levelStatsFor(id, level))
+  const stats = memberStats(def, gearMods(items, levelStatsFor(id, level)))
   const tiers = tiersForLevel(level)
   const loadout = loadoutFor(def, tiers)
   const baseLines = [
-    `生命上限 ${memberMaxHp(fx.hpAdd)} · 受击无敌 ${sec(MEMBER.iframesMs + fx.iframesAddMs)}`,
-    `极速 ${grid(def.body.thrust / def.body.drag)}/秒 · 质量 ${def.body.mass} · 复活 ${sec(Math.max(1000, TEAM.reviveMs + fx.reviveAddMs))}`,
+    `${statText('maxHp', stats.maxHp)} · ${statText('iframes', stats.iframes)}`,
+    `${statText('moveSpeed', stats.moveSpeed)} · 质量 ${def.body.mass} · ${statText('revive', stats.revive)}`,
   ]
-  if (fx.regenPerSec > 0) baseLines.push(`每秒回复 ${fx.regenPerSec} 生命`)
-  if (fx.killHeal > 0) baseLines.push(`击杀回复 ${fx.killHeal} 生命`)
-  if (fx.thorns > 0) baseLines.push(`敌人接触反伤 ${fx.thorns}`)
-  if (fx.critChance > 0) baseLines.push(`暴击率 ${Math.round(fx.critChance * 100)}%（伤害 ×2）`)
+  const rest = STAT_KEYS.filter((k) => !FIXED_LINES.includes(k) && stats[k] !== STATS[k].base).map((k) => statText(k, stats[k]))
+  if (rest.length > 0) baseLines.push(rest.join(' · '))
   if (def.resource) baseLines.push(resourceLine(def.resource))
   const groups: StatGroup[] = [
     { icon: '2764', title: '基础', lines: baseLines },
@@ -422,14 +423,14 @@ export function characterStatGroups(
       icon: f.emoji ?? def.emoji,
       title: `形态 · ${f.name ?? def.name}`,
       lines: [
-        [f.sizeMul ? `体型 ×${f.sizeMul}` : '', f.speedMul ? `移速 ×${f.speedMul}` : '', '自动能力换成：'].filter(Boolean).join(' · '),
+        [...(f.stats ? modTexts(f.stats) : []), '自动能力换成：'].join(' · '),
         ...(f.abilities ?? []).flatMap((w) => [`「${abilityLabel(w)}」`, ...abilityStatLines(w)]),
       ],
     })
   }
   const tier = tiers.u2 ? 2 : tiers.u1 ? 1 : 0
   for (const [i, carrier] of def.carriers.entries()) {
-    const display = displayDef(resolveAbilityDef(loadout[i]!, fx), fx.damageMul, fx.cooldownMul, fx.knockbackMul)
+    const display = displayDef(resolveAbilityDef(loadout[i]!, stats), stats.damage, stats.cooldown, stats.knockback)
     const traits: string[] = []
     for (let k = 0; k < tier; k += 1) {
       const card = carrier.cards[k]

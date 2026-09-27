@@ -1,16 +1,16 @@
 import Phaser from 'phaser'
-import { CHARACTERS } from '../data/characters'
+import { CHARACTERS, memberStats } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { SHOP } from '../data/items'
 import { PICKUPS } from '../data/pickups'
 import {
-  aggregateCharacterEffects,
+  gearMods,
   characterXp,
   ITEMS,
   RARITIES,
   itemPrice,
 } from '../data/items'
-import type { ItemId, ItemDef, CharacterEffects } from '../types/items'
+import type { ItemId, ItemDef } from '../types/items'
 import { characterLevel } from '../data/charLevel'
 import { levelStatsFor, LEVEL_STATS } from '../data/levels'
 import { upgradeCardsFor } from '../data/characters'
@@ -20,7 +20,7 @@ import { Rng } from '../util/rng'
 import { endRun, getRun, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
 import { characterStatGroups } from '../scene/statLines'
-import { memberMaxHp } from '../data/stats'
+import { modTexts } from '../data/stats'
 import { applyBackground } from '../util/background'
 import { emojiImage } from '../emoji/hold'
 import { EmojiGrid } from '../ui/grid'
@@ -316,7 +316,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
   private slotMaxHp(slot: number): number {
     const id = this.lineup[slot]!
     const owned = this.run.memberItems[slot] ?? []
-    return memberMaxHp(aggregateCharacterEffects(owned, levelStatsFor(id, this.levelOf(slot))).hpAdd)
+    return memberStats(CHARACTERS[id], gearMods(owned, levelStatsFor(id, this.levelOf(slot)))).maxHp
   }
 
   private buildSlotItems(): EmojiGridItem<CharacterId>[] {
@@ -617,16 +617,6 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     )
   }
 
-  private formatEffects(fx: Partial<CharacterEffects>): string {
-    const parts: string[] = []
-    if (fx.hpAdd) parts.push(`生命 ${fx.hpAdd > 0 ? '+' : ''}${fx.hpAdd}`)
-    if (fx.damageMul && fx.damageMul !== 1) parts.push(`伤害 ×${+fx.damageMul.toFixed(2)}`)
-    if (fx.cooldownMul && fx.cooldownMul !== 1) parts.push(`攻速 ×${+(1 / fx.cooldownMul).toFixed(2)}`)
-    if (fx.critChance) parts.push(`暴击 +${Math.round(fx.critChance * 100)}%`)
-    if (fx.rangeMul && fx.rangeMul !== 1) parts.push(`范围 ×${+fx.rangeMul.toFixed(2)}`)
-    return parts.join(' · ')
-  }
-
   private showLevelUp(slot: number, level: number): void {
     playSfx('levelup')
     const res = textRes()
@@ -635,7 +625,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     const id = this.lineup[slot]!
     const def = CHARACTERS[id]
     const card = upgradeCardsFor(def)[level - 2]
-    const statLine = level >= 2 ? this.formatEffects(LEVEL_STATS[id][level - 2]!) : ''
+    const statLine = level >= 2 ? modTexts(LEVEL_STATS[id][level - 2]!).join(' · ') : ''
     const pw = Math.min(560, viewport.logicalWidth - 60)
     const ph = 300
 

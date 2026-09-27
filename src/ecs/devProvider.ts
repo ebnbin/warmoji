@@ -91,13 +91,13 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
     },
     {
       kind: 'text',
-      label: '队伍物理 · 极速 = 推力 ÷ 阻力 · 响应 = 质量 ÷ 阻力 · 其余旋钮在"开关"页签',
+      label: '队伍物理 · 极速是属性表的移速 · 响应 = 质量 ÷ 阻力 · 其余旋钮在"开关"页签',
       mono: true,
       read: (): string =>
         battle.run.roster
           .map((id) => {
             const b = CHARACTERS[id].body
-            return `${CHARACTERS[id].name}  极速 ${(b.thrust / b.drag).toFixed(1)}  响应 ${(b.mass / b.drag).toFixed(2)}s  质量 ${b.mass}`
+            return `${CHARACTERS[id].name}  极速 ${CHARACTERS[id].stats.moveSpeed.toFixed(1)}  响应 ${(b.mass / b.drag).toFixed(2)}s  质量 ${b.mass}`
           })
           .join('\n'),
     },

@@ -1,13 +1,16 @@
 import { addComponent, hasComponent, query } from 'bitecs'
 import { CHARACTERS } from '../../data/characters'
 import { waveAt } from '../../data/waves'
-import { Ability, Alive, Amp, Borrowed, Boss, Despawn, ENEMY_SET, EnemyArm, FACTION, Faction, Hp, Link, Manual, Nest, Owner, Phys, Radius, Slot, Transform, Uid } from '../components'
-import { abilityDef, bodyLook, enemyDef, enemyOf } from '../store'
+import { UNIT } from '../../util/units'
+import { Ability, Alive, Borrowed, Boss, Despawn, ENEMY_SET, EnemyArm, FACTION, Faction, Hp, Link, Manual, Nest, Owner, Radius, Slot, Transform, Uid } from '../components'
+import { abilityDef, bodyLook, enemyDef, enemyOf, statBase, statLayers } from '../store'
+import { foldBody, setStatLayer } from '../utils/stats'
 import { charSize } from '../systems/shared/scale'
 import { equipAbility } from './ability'
 import { spawnEnemy, spawnNpc } from './enemy'
 import type { Effect } from '../../types/abilityDefs'
 import type { EnemyDef, NpcDef } from '../../types/enemies'
+import type { StatBase, StatKey, StatMods } from '../../types/stats'
 import type { Sim } from '../sim'
 
 /** 召出的身体同一条出生路径：敌方的算敌人（有战利品），己方的只是身体；都记在召唤者名下 */
@@ -60,10 +63,18 @@ function lookAlike(sim: Sim, by: number): NpcDef {
     size: charSize(by),
     radius: Radius.v[by]!,
     hp: Hp.max[by]!,
-    speed: Phys.thrust[by]! / Phys.drag[by]!,
+    speed: (statBase[by]?.moveSpeed ?? 0) * UNIT,
     damage: 0,
     drive,
   }
+}
+
+/** 分身只抄主人出手的属性，生命、回复这些身体上的不抄 */
+const OFFENSE: readonly StatKey[] = ['damage', 'cooldown', 'crit', 'knockback']
+
+function offenseOnly(mods: StatMods): StatMods {
+  const pick = (r: StatBase | undefined): StatBase => Object.fromEntries(OFFENSE.flatMap((k) => (r?.[k] === undefined ? [] : [[k, r[k]]])))
+  return { add: pick(mods.add), mul: pick(mods.mul) }
 }
 
 /** 分身：长得和施法者一样，带着它的普通出手（伤害打折），到时消失，死时施加 onDeath */
@@ -81,9 +92,9 @@ export function spawnClones(sim: Sim, by: number, count: number, lifeMs: number,
     Nest.of[eid] = by
     Despawn.at[eid] = sim.elapsedMs + lifeMs
     EnemyArm.armed[eid] = 1
-    for (const e of attacks) {
-      equipAbility(sim, eid, abilityDef[e]!, faction, 200 + i * 150, { dmg: Amp.dmg[e]! * dmgRatio, cd: Amp.cd[e]!, crit: Amp.crit[e]!, kb: Amp.kb[e]!, battle: Amp.battle[e] === 1 })
-    }
+    setStatLayer(eid, 'copy', [...(statLayers[by]?.gear ?? []).map(offenseOnly), { mul: { damage: dmgRatio } }])
+    foldBody(sim.world, sim, eid)
+    for (const e of attacks) equipAbility(sim, eid, abilityDef[e]!, faction, 200 + i * 150)
   }
 }
 

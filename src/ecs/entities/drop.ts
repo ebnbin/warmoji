@@ -7,6 +7,8 @@ import type { Sim } from '../sim'
 
 
 interface DropSpec {
+  /** 能力给的伤害，落地时按它结算 */
+  damage: number
   emoji: string
   size: number
   target: number
@@ -36,5 +38,6 @@ export function spawnDrop(sim: Sim, weaponEid: number, spec: DropSpec): number {
   Drop.toY[d] = spec.y
   Drop.target[d] = spec.target
   Drop.targetUid[d] = Uid.v[spec.target]!
+  Drop.damage[d] = spec.damage
   return d
 }

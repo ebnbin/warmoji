@@ -1,7 +1,6 @@
 import { hasComponent, query } from 'bitecs'
 import { playSfx } from '../../audio/sfx'
 import { Alive, LeapShape, Motion, MOTION, MotionHit, Payload, SprintShape, Transform } from '../components'
-import { damageMul } from '../utils/amp'
 import { sourceOf } from '../utils/source'
 import { targetsWithin } from '../utils/targets'
 import { hit } from './shared/damage'
@@ -16,7 +15,7 @@ function dashHits(sim: Sim, m: number, e: number): void {
   const x = Transform.x[m]!
   const y = Transform.y[m]!
   const stamp = Motion.stamp[m]!
-  const damage = Math.round(Payload.damage[e]! * damageMul(sim, e))
+  const damage = Motion.dmg[m]!
   for (const t of targetsWithin(sim, src, x, y, SprintShape.radius[e]!)) {
     if (MotionHit.stamp[t.eid] === stamp) continue
     MotionHit.stamp[t.eid] = stamp
@@ -32,7 +31,7 @@ function landHits(sim: Sim, m: number, e: number): void {
   const y = Transform.y[m]!
   const radius = LeapShape.radius[e]!
   const color = Payload.color[e]!
-  const damage = Math.round(Payload.damage[e]! * damageMul(sim, e))
+  const damage = Motion.dmg[m]!
   applyOnHit(sim, src, abilityOnHit[e], x, y, damage, applyBlast(sim, src, x, y, damage, radius, Payload.knockback[e]!))
   playSfx('boom')
   spawnFxCircle(sim, x, y, radius, {

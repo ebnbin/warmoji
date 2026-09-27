@@ -17,6 +17,7 @@ import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
 import { SFX } from '../defs/sfx.ts'
 import { STAMINA } from '../defs/stamina.ts'
+import { STATS } from '../defs/stats.ts'
 import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
@@ -105,6 +106,7 @@ write('pickups', PICKUPS)
 write('progression', PROGRESSION)
 write('sfx', SFX)
 write('stamina', STAMINA)
+write('stats', STATS)
 write('team', TEAM_BASELINE)
 write('timestop', TIMESTOP)
 write('weapons', WEAPONS)

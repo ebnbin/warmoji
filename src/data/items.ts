@@ -2,7 +2,8 @@ import itemsJson from '../assets/items.json'
 import economyJson from '../assets/economy.json'
 import { fromJson } from './json'
 import { keysOf } from '../util/record'
-import type { CharacterEffects, Economy, ItemRarity, ItemDef, ItemId } from '../types/items'
+import type { Economy, ItemRarity, ItemDef, ItemId } from '../types/items'
+import type { StatMods, StatValues } from '../types/stats'
 import type { AbilityDef, Shape } from '../types/abilityDefs'
 
 const ECON = fromJson<Economy>(economyJson)
@@ -34,49 +35,15 @@ export function itemPrice(id: ItemId, wave: number): number {
   return Math.max(1, Math.round(ITEMS[id].price * inflate * disc))
 }
 
-export function aggregateCharacterEffects(
-  owned: readonly ItemId[],
-  extra: readonly Partial<CharacterEffects>[] = [],
-): CharacterEffects {
-  const fx: CharacterEffects = {
-    hpAdd: 0,
-    damageMul: 1,
-    cooldownMul: 1,
-    rangeMul: 1,
-    projSpeedMul: 1,
-    iframesAddMs: 0,
-    reviveAddMs: 0,
-    regenPerSec: 0,
-    thorns: 0,
-    killHeal: 0,
-    critChance: 0,
-    knockbackMul: 1,
-  }
-  const apply = (e: Partial<CharacterEffects>): void => {
-    fx.hpAdd += e.hpAdd ?? 0
-    fx.damageMul *= e.damageMul ?? 1
-    fx.cooldownMul *= e.cooldownMul ?? 1
-    fx.rangeMul *= e.rangeMul ?? 1
-    fx.projSpeedMul *= e.projSpeedMul ?? 1
-    fx.iframesAddMs += e.iframesAddMs ?? 0
-    fx.reviveAddMs += e.reviveAddMs ?? 0
-    fx.regenPerSec += e.regenPerSec ?? 0
-    fx.thorns += e.thorns ?? 0
-    fx.killHeal += e.killHeal ?? 0
-    fx.critChance += e.critChance ?? 0
-    fx.knockbackMul *= e.knockbackMul ?? 1
-  }
-  for (const id of owned) apply(ITEMS[id].effects)
-  for (const e of extra) apply(e)
-  fx.critChance = Math.min(0.5, fx.critChance)
-  return fx
+/** 角色身上的常驻修正：买到的道具加上当前等级的成长 */
+export function gearMods(owned: readonly ItemId[], level: readonly StatMods[]): StatMods[] {
+  return [...owned.map((id) => ITEMS[id].effects), ...level]
 }
 
-
-/** 只缩放形状的空间参数、索敌距离与弹速；伤害/冷却由运行时倍率处理，此处不得再乘 */
-export function resolveAbilityDef(w: AbilityDef, fx: CharacterEffects): AbilityDef {
-  const r = fx.rangeMul
-  const v = fx.projSpeedMul
+/** 只缩放形状的空间参数、索敌距离与弹速；伤害/冷却在结算时按属性表乘，此处不得再乘 */
+export function resolveAbilityDef(w: AbilityDef, fx: Pick<StatValues, 'range' | 'projSpeed'>): AbilityDef {
+  const r = fx.range
+  const v = fx.projSpeed
   const s = w.shape
   let shape: Shape
   switch (s.kind) {

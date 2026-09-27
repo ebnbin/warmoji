@@ -88,7 +88,8 @@ export interface PendingDeath {
   y: number
   elite: boolean
   boss: boolean
-  dmgMul: number
+  /** 死者的出手属性：亡语按它结算 */
+  atk: import('./utils/stats').Offense
   faction: number
 }
 

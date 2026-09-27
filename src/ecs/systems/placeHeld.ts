@@ -1,7 +1,7 @@
 import { hasComponent, query } from 'bitecs'
 import { DEG2RAD } from '../../util/units'
 import { Ability, Aim, Frozen, Held, Owner, Sector, Segment, Swing, Thrown, Tint, Transform, VisOff } from '../components'
-import { anchorX, anchorY } from '../utils/amp'
+import { anchorX, anchorY } from '../utils/ability'
 import { muzzle } from '../utils/projectile'
 import { lungeT, sweepT } from '../utils/swing'
 import type { Sim } from '../sim'

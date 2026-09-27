@@ -16,13 +16,14 @@ import {
   PICKUP_SET,
   Radius,
   Wander,
-  SpeedMul,
   Standoff,
+  Stats,
   Ctl,
   Thief,
   Transform,
 } from '../components'
 import { freshFoe, nearestFoe, wanderDir } from './shared/steer'
+import { moveSpeed } from '../utils/stats'
 import { leaderPoint } from '../utils/team'
 import type { Sim } from '../sim'
 
@@ -38,16 +39,12 @@ function stroll(sim: Sim, eid: number, speed: number): void {
   Drive.idle[eid] = 1
 }
 
-/** 巡航速度：推力除以阻力，再乘这一帧的速度倍率 */
-function cruise(eid: number): number {
-  return (Phys.thrust[eid]! / Phys.drag[eid]!) * SpeedMul.v[eid]!
-}
 
 /** 追索敌距离内最近的敌人，盯队长的追队长；看不见就慢速游荡 */
 function chase(sim: Sim): void {
-  for (const eid of query(sim.world, [Chase, Ctl, Transform, Phys, SpeedMul])) {
+  for (const eid of query(sim.world, [Chase, Ctl, Transform, Phys, Stats])) {
     if (!Ctl.move[eid]) continue
-    const speed = cruise(eid)
+    const speed = moveSpeed(eid)
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
     const seek = Chase.seek[eid]!
@@ -69,17 +66,17 @@ function chase(sim: Sim): void {
 }
 
 function wander(sim: Sim): void {
-  for (const eid of query(sim.world, [Wander, Ctl, Phys, SpeedMul])) {
+  for (const eid of query(sim.world, [Wander, Ctl, Phys, Stats])) {
     if (!Ctl.move[eid]) continue
-    stroll(sim, eid, cruise(eid))
+    stroll(sim, eid, moveSpeed(eid))
   }
 }
 
 /** 敌人进到 range 内就逃，否则慢速游荡 */
 function flee(sim: Sim): void {
-  for (const eid of query(sim.world, [Flee, Ctl, Transform, Phys, SpeedMul])) {
+  for (const eid of query(sim.world, [Flee, Ctl, Transform, Phys, Stats])) {
     if (!Ctl.move[eid]) continue
-    const speed = cruise(eid)
+    const speed = moveSpeed(eid)
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
     const target = nearestFoe(sim, eid, ex, ey)
@@ -100,9 +97,9 @@ function flee(sim: Sim): void {
 /** 探测到敌人后保持在 standoffDist 附近：远了靠近，近了后退，带内不动 */
 function standoff(sim: Sim): void {
   const band = AI.standoffBandU * UNIT
-  for (const eid of query(sim.world, [Standoff, Ctl, Transform, Phys, SpeedMul])) {
+  for (const eid of query(sim.world, [Standoff, Ctl, Transform, Phys, Stats])) {
     if (!Ctl.move[eid]) continue
-    const sp = cruise(eid)
+    const sp = moveSpeed(eid)
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
     const target = nearestFoe(sim, eid, ex, ey)
@@ -129,9 +126,9 @@ function standoff(sim: Sim): void {
 
 /** 绕着锚点转（巡游不算赶路）；该扑的时候扑向目标；锚点没了就只剩追，看不见目标就慢速游荡 */
 function orbit(sim: Sim): void {
-  for (const eid of query(sim.world, [Orbit, Nest, Ctl, Transform, Phys, SpeedMul])) {
+  for (const eid of query(sim.world, [Orbit, Nest, Ctl, Transform, Phys, Stats])) {
     if (!Ctl.move[eid]) continue
-    const sp = cruise(eid)
+    const sp = moveSpeed(eid)
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
     const seek = Orbit.seek[eid]!
@@ -179,7 +176,7 @@ function orbit(sim: Sim): void {
 
 /** 奔向最近的金币吃掉，没有金币就慢速游荡 */
 function coinThief(sim: Sim): void {
-  const thieves = query(sim.world, [CoinThief, Ctl, Transform, Phys, SpeedMul, Radius])
+  const thieves = query(sim.world, [CoinThief, Ctl, Transform, Phys, Stats, Radius])
   if (thieves.length === 0) return
   const coins: number[] = []
   for (const c of query(sim.world, PICKUP_SET)) {
@@ -187,7 +184,7 @@ function coinThief(sim: Sim): void {
   }
   for (const eid of thieves) {
     if (!Ctl.move[eid]) continue
-    const sp = cruise(eid)
+    const sp = moveSpeed(eid)
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
     let coin = -1
