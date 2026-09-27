@@ -39,6 +39,8 @@ export interface ButtonOptions {
   readonly enabled?: boolean
   /** 呼吸缩放，吸引注意 */
   readonly pulse?: boolean
+  /** 出现后这段时间内不响应，防止上一页的连点落到这里 */
+  readonly armMs?: number
 }
 
 /** 卡通描边按钮；(x, y) 是按钮面的中心 */
@@ -62,6 +64,7 @@ export class Button extends Widget {
     this.add([this.bg, this.caption])
     this.redraw()
     const h = this.dims.h
+    const armedAt = scene.time.now + (opts.armMs ?? 0)
     pressable(this, {
       shape: new Phaser.Geom.Rectangle(-this.bw / 2, -h / 2, this.bw, h + SHAPE.drop),
       onTap: opts.onTap,
@@ -69,7 +72,7 @@ export class Button extends Widget {
         this.down = down
         this.redraw()
       },
-      enabled: () => this.usable,
+      enabled: () => this.usable && scene.time.now >= armedAt,
       sfx: opts.sfx,
       keys: opts.keys,
     })
