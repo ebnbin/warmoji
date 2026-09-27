@@ -3,8 +3,8 @@ import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
 import { beginSandboxRun } from '../ecs/sandbox/knobs'
-import { beginRun, teamStep } from '../run/state'
-import { nextAfterTeam } from './teamPage'
+import { beginRun, skipFilled } from '../run/state'
+import { goStep } from './teamPage'
 import { mapPlayLines } from './mapLines'
 import { loadMap, saveMap } from '../save/selection'
 import { preloadEmojis } from '../emoji/hold'
@@ -77,13 +77,9 @@ export class MapScene extends Phaser.Scene {
   }
 
   private start(): void {
-    if (this.sandbox) {
-      beginSandboxRun(this.selectedId)
-      this.scene.start(SceneKey.Battle)
-      return
-    }
-    const run = beginRun([], this.selectedId)
-    this.scene.start(teamStep(run) ?? nextAfterTeam(run))
+    const run = this.sandbox ? beginSandboxRun(this.selectedId) : beginRun('classic', this.selectedId)
+    skipFilled(run)
+    goStep(this, run)
   }
 
   private renderDetail(): void {

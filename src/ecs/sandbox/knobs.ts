@@ -3,7 +3,7 @@ import { ENEMY_DEFS } from '../../data/enemies'
 import type { CharacterId } from '../../types/characters'
 import type { MapId } from '../../types/maps'
 import type { EnemyKind } from '../../types/enemies'
-import { beginRun } from '../../run/state'
+import { addMember, beginRun } from '../../run/state'
 import type { RunState } from '../../run/state'
 
 const enemies = new Set<EnemyKind>()
@@ -184,11 +184,9 @@ export function sandboxStarters(): CharacterId[] {
   return r.length > 0 ? r : [ROSTER_IDS[0]!]
 }
 
-const SANDBOX_COINS = 999_999
-
 export function beginSandboxRun(mapId: MapId): RunState {
-  const run = beginRun(sandboxStarters(), mapId, true)
-  run.coins = SANDBOX_COINS
+  const run = beginRun('sandbox', mapId)
+  for (const id of sandboxStarters()) addMember(run, id)
   return run
 }
 

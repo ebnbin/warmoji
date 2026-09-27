@@ -2,9 +2,9 @@ import type Phaser from 'phaser'
 import type { DevProvider, DevSection } from '../devtools'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { MAP_IDS, MAPS } from '../data/maps'
-import { waveDurationMs } from '../data/waves'
+import { RUNS, timeLimitMs } from '../data/runs'
 import { beginSandboxRun } from '../ecs/sandbox/knobs'
-import { beginRun, currentRun, endRun } from '../run/state'
+import { addMember, beginRun, currentRun, endRun } from '../run/state'
 import { SceneKey } from '../scene/keys'
 import type { MapId } from '../types/maps'
 import { gotoScene } from './nav'
@@ -15,11 +15,23 @@ let startWave = 1
 const TEAM_SIZES = Array.from({ length: TEAM.maxSize }, (_, i) => i + 1)
 const START_WAVES = [1, 2, 3, 5, 8, 10]
 
+/** 正式局直接停在第 startWave 场：进度按前面各场的时长算 */
 function newRun(): void {
-  const run = beginRun(ROSTER_IDS.slice(0, teamSize), mapId)
-  run.wave = Math.max(run.wave, startWave)
+  const run = beginRun('classic', mapId)
+  for (const id of ROSTER_IDS.slice(0, teamSize)) addMember(run, id)
+  let seen = 0
   let skipped = 0
-  for (let w = 1; w < run.wave; w++) skipped += waveDurationMs(w)
+  RUNS.classic.steps.some((s, i) => {
+    if (s.kind !== 'fight') return false
+    seen++
+    if (seen < startWave) {
+      skipped += timeLimitMs(s.fight) ?? 0
+      return false
+    }
+    run.step = i
+    return true
+  })
+  run.wave = startWave
   run.combatMs = skipped
 }
 

@@ -17,7 +17,8 @@ import { applyBackground } from '../util/background'
 import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
-import { getRun, teamStep } from '../run/state'
+import { getRun, nextStep } from '../run/state'
+import { goStep } from '../scene/teamPage'
 import type { RunState } from '../run/state'
 import { bossFor, MAPS } from '../data/maps'
 import { makeWorld } from './world'
@@ -214,7 +215,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   devEndWave(): void {
     const sim = this.sim
     if (!sim || sim.over || this.ending || this.sandbox) return
-    this.scheduleWaveEnd(settleWave(sim))
+    settleWave(sim)
+    this.scheduleWaveEnd()
   }
 
   devResetSkill(): void {
@@ -716,7 +718,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     })
   }
 
-  private scheduleWaveEnd(finished: boolean): void {
+  /** 这一场赢了：记下队长、打出小结，稍后走到下一步 */
+  private scheduleWaveEnd(): void {
     this.ending = true
     const sim = this.sim!
     const run = sim.run
@@ -727,10 +730,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       kills: run.kills - this.waveBaseKills,
       coins: run.coins - this.waveBaseCoins,
     })
-    this.time.delayedCall(WAVE.summaryMs, () => {
-      if (finished) this.scene.start(SceneKey.Result, { win: true })
-      else this.scene.start(teamStep(run) ?? SceneKey.Shop)
-    })
+    nextStep(run)
+    this.time.delayedCall(WAVE.summaryMs, () => goStep(this, run))
   }
 
 
@@ -804,6 +805,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
     // 须在 stepFrame 与全灭判定之后：时限内全灭判负
     const bossSettle = this.bossDownAt >= 0 && sim.fxMs - this.bossDownAt >= BOSS_SETTLE_MS
-    if (lastFrame || bossSettle) this.scheduleWaveEnd(settleWave(sim))
+    if (lastFrame || bossSettle) {
+      settleWave(sim)
+      this.scheduleWaveEnd()
+    }
   }
 }

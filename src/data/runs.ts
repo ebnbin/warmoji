@@ -11,3 +11,9 @@ export const RUN_IDS: readonly RunId[] = keysOf(RUNS)
 export function fightsOf(def: RunDef): FightDef[] {
   return def.steps.flatMap((s) => (s.kind === 'fight' ? [s.fight] : []))
 }
+
+/** 这一场的时限：撑到它就结束；没有时限是 undefined */
+export function timeLimitMs(f: FightDef): number | undefined {
+  for (const e of f.ends) if (e.kind === 'time') return e.ms
+  return undefined
+}
