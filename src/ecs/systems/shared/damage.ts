@@ -1,21 +1,25 @@
 import { hasComponent } from 'bitecs'
-import { CRIT_MUL } from '../../../data/items'
+import { ARMOR_HALF, LIFESTEAL_CAP_PER_SEC } from '../../../data/abilities'
 import { norm } from '../../../util/vec'
 import { playSfx } from '../../../audio/sfx'
-import { Alive, CharFlash, FACTION, Faction, Flash, Hp, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Tint, Transform } from '../../components'
+import { Alive, Boss, CharFlash, Elite, FACTION, Faction, Flash, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Tint, Transform } from '../../components'
 import { hasMark, isUntargetable, markSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
 import { bodyRules, enemyDef, resDef } from '../../store'
 import { nearestSummoned } from '../../entities/summon'
 import { gainRes } from './resource'
 import { attackOf, selfSource } from '../../utils/source'
+import { HIT, hitTags } from '../../utils/hitTags'
+import { isSameEntity } from '../../utils/identity'
+import { mend } from './heal'
 import { applyAbilityEffects, casterOf, PARRY_FX } from './effects'
 import { displace, FORCED } from './displace'
 import { die, grantIframe } from './combat'
 import { feedGut } from './gut'
 import { applyForm } from '../../entities/form'
-import { spawnDamageNumber, spawnFxCircle } from '../../entities/fx'
+import { spawnDamageNumber, spawnFxCircle, spawnMissText } from '../../entities/fx'
 import type { Point } from '../../../util/vec'
+import type { Offense } from '../../utils/stats'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 
@@ -24,12 +28,14 @@ interface HitOpts {
   readonly from?: Point
   /** 持续伤害与场地危害：不看也不消耗无敌帧 */
   readonly tick?: boolean
+  /** 出手处补上的伤害标签（见 hitTags）：范围，或替换来源的出手方式 */
+  readonly tags?: number
 }
 
 function record(sim: Sim, src: Source, target: number, dmg: number): void {
   const st = sim.run.stats
   if (Faction.v[target] === FACTION.team) {
-    const slot = Slot.v[target]!
+    const slot = hasComponent(sim.world, target, Slot) ? Slot.v[target]! : -1
     if (slot >= 0 && slot < st.damageTaken.length) st.damageTaken[slot] = (st.damageTaken[slot] ?? 0) + dmg
     if (src.enemy) st.enemyDamage[src.enemy] = (st.enemyDamage[src.enemy] ?? 0) + dmg
     if (src.hazard) st.hazardDamage[src.hazard] = (st.hazardDamage[src.hazard] ?? 0) + dmg
@@ -152,24 +158,68 @@ export function strike(sim: Sim, src: Source, target: number, damage: number, o:
   return damage > 0 ? hit(sim, src, target, damage, o) : touch(sim, src, target, o)
 }
 
-/** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害，先过 lands，再乘出手方的伤害、睡眠惊醒、承受方的受到伤害、暴击，然后存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量；持续伤害不暴击；返回是否命中 */
+/** 护甲的减伤：正护甲越叠越不划算，负护甲增伤 */
+function armorTaken(armor: number): number {
+  return armor >= 0 ? 1 / (1 + armor / ARMOR_HALF) : (ARMOR_HALF - 2 * armor) / (ARMOR_HALF - armor)
+}
+
+/** 出手方的伤害按这一下的标签逐项相乘 */
+function tagMul(atk: Offense, tags: number): number {
+  let m = atk.damage
+  if (tags & HIT.melee) m *= atk.meleeDamage
+  if (tags & HIT.ranged) m *= atk.rangedDamage
+  if (tags & HIT.area) m *= atk.areaDamage
+  if (tags & HIT.dot) m *= atk.dotDamage
+  if (tags & HIT.summon) m *= atk.summonDamage
+  return m
+}
+
+/** 闪避：范围与持续伤害躲不开 */
+function dodged(sim: Sim, target: number, tags: number): boolean {
+  const chance = Stats.dodge[target]!
+  return chance > 0 && (tags & (HIT.area | HIT.dot)) === 0 && sim.rng.next() < chance
+}
+
+/** 吸血：出手的身体还在就按这一下的伤害回血，持续伤害不算，每秒回的有上限 */
+function leech(sim: Sim, src: Source, atk: Offense, dmg: number, tags: number): void {
+  const b = src.body
+  if (atk.lifesteal <= 0 || tags & HIT.dot || b === undefined || !isSameEntity(sim.world, b, src.bodyUid ?? 0) || !hasComponent(sim.world, b, Leech)) return
+  const now = sim.elapsedMs
+  if (now - Leech.at[b]! >= 1000) {
+    Leech.at[b] = now
+    Leech.hp[b] = 0
+  }
+  const amount = Math.min(dmg * atk.lifesteal, Hp.max[b]! * LIFESTEAL_CAP_PER_SEC - Leech.hp[b]!)
+  if (amount <= 0) return
+  mend(b, amount)
+  Leech.hp[b] = Leech.hp[b]! + amount
+}
+
+/** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands 与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、暴击，只在最后取整；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量；持续伤害不暴击、不吃护甲；返回是否命中 */
 export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
   if (!lands(sim, src, target, o, true)) return false
+  const tags = hitTags(src.tags ?? 0, o.tags ?? 0, o.tick === true)
+  if (dodged(sim, target, tags)) {
+    spawnMissText(sim, Transform.x[target]!, Transform.y[target]!)
+    return false
+  }
   const now = sim.elapsedMs
   const atk = attackOf(sim, src)
-  let dmg = Math.max(1, Math.round(damage * atk.damage))
+  let raw = damage * tagMul(atk, tags) * (Boss.v[target] || Elite.v[target] ? atk.bossDamage : 1)
   const sleep = markSlot(sim, target, MARK.sleep)
   if (sleep >= 0) {
-    dmg = Math.round(dmg * Mark.a[sleep]!)
+    raw *= Mark.a[sleep]!
     Mark.kind[sleep] = MARK.none
   }
-  const taken = Stats.taken[target]!
-  if (taken !== 1) dmg = Math.max(1, Math.round(dmg * taken))
+  if ((tags & HIT.dot) === 0) raw *= armorTaken(Stats.armor[target]!)
+  raw *= Stats.taken[target]!
   const crit = !o.tick && !src.noCrit && atk.crit > 0 && sim.rng.next() < atk.crit
-  if (crit) dmg = Math.round(dmg * CRIT_MUL)
+  if (crit) raw *= atk.critDamage
+  const dmg = Math.max(1, Math.round(raw))
   const team = Faction.v[target] === FACTION.team
   if (!team) spawnDamageNumber(sim, Transform.x[target]!, Transform.y[target]!, dmg, crit)
   record(sim, src, target, dmg)
+  leech(sim, src, atk, dmg, tags)
   store(target, dmg)
   feedGut(sim, target, dmg)
   // 被命中反应先于扣血：无敌帧从这一下起算

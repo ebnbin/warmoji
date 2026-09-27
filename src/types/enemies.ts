@@ -1,5 +1,5 @@
 import type { AbilityDef, Effect } from './abilityDefs'
-import type { StatMods } from './stats'
+import type { StatBase, StatMods } from './stats'
 
 /** 驱动：身体没事时怎么走；蓄力突刺、自爆这类"动作"是能力，不在这里 */
 export type DriveDef =
@@ -111,6 +111,8 @@ export interface NpcDef extends BodyRules {
   readonly hp: number
   readonly speed: number
   readonly damage: number
+  /** 生命与移速以外的基础属性，如护甲、闪避 */
+  readonly stats?: Omit<StatBase, 'maxHp' | 'moveSpeed'>
   readonly drive: DriveDef
   readonly abilities?: readonly AbilityDef[]
   readonly spawner?: {

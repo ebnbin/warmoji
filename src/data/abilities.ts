@@ -17,6 +17,8 @@ export const SHARD_BODY = CT.shardBody
 export const MORPH = CT.morph
 export const BLINK_IFRAME_PAD_MS = CT.blinkIframePadMs
 export const MINION_FIRST_SHOT_MS = CT.minionFirstShotMs
+export const ARMOR_HALF = CT.armorHalf
+export const LIFESTEAL_CAP_PER_SEC = CT.lifestealCapPerSec
 
 export const ABILITIES = fromJson<Record<AbilityId, AbilityDef>>(abilitiesJson)
 

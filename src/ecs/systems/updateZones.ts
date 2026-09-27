@@ -10,6 +10,7 @@ import { eachAlly, targetsWithin } from '../utils/targets'
 import { zoneDwellIn, zoneEffects, zoneRules, zoneSrc } from '../store'
 import { spawnFxCircle } from '../entities/fx'
 import { attackOf } from '../utils/source'
+import { HIT } from '../utils/hitTags'
 import type { Source } from '../utils/source'
 import type { Sim } from '../sim'
 
@@ -172,7 +173,7 @@ export function updateZones(sim: Sim): void {
       if (found.length === 0) continue
       const uids = found.map((t) => Uid.v[t]!)
       const damage = Zone.damage[z]!
-      if (damage > 0) for (const t of found) hit(sim, src, t, damage)
+      if (damage > 0) for (const t of found) hit(sim, src, t, damage, { tags: HIT.area })
       applyAbilityEffects(sim, src, zoneEffects[z], { x, y, baseDamage: damage, targets: unchanged(sim, found, uids) })
       spawnFxCircle(sim, x, y, r * 1.4, { fill: Ring.color[z]!, fillAlpha: 0.4, stroke: 0xffffff, lineWidth: 3, lineAlpha: 0.9, fromScale: 0.3, toScale: 1, durationMs: 320, depth: 8 })
       Lifetime.until[z] = now
@@ -190,7 +191,7 @@ export function updateZones(sim: Sim): void {
         const last = ZoneHit.last[t]!
         if (last !== 0 && now - last < tickMs) continue
         ZoneHit.last[t] = now
-        hit(sim, src, t, damage, { tick: true })
+        hit(sim, src, t, damage, { tick: true, tags: HIT.area })
       }
     }
     if (effects && effects.length > 0 && found.length > 0) {

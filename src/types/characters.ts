@@ -4,6 +4,7 @@ import type { AbilityDef } from './abilityDefs'
 import type { AbilityTier, UpgradeCard, WeaponId } from './weapons'
 import type { BodyRules, FormDef, ResourceDef } from './enemies'
 import type { StatBase } from './stats'
+import type { RoleId } from './roles'
 
 /** 身体的力学：阻力与质量决定起步和被推开时的手感 */
 interface BodyParams {
@@ -38,6 +39,7 @@ export interface CharacterAuthoring {
   readonly emoji: string
   readonly name: string
   readonly desc: string
+  readonly role: RoleId
   readonly body: BodyParams
   readonly stats: CharacterStats
   readonly skill: SkillSource
@@ -60,6 +62,7 @@ export interface CharacterDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
+  readonly role: RoleId
   readonly body: BodyParams
   readonly stats: CharacterStats
   readonly skill: SkillDef

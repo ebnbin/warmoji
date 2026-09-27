@@ -3,7 +3,6 @@ import type { ShapeKind } from './abilityDefs'
 import type { StatMods } from './stats'
 
 export interface Economy {
-  readonly critMul: number
   readonly price: {
     readonly perWave: number
     readonly earlyDiscount: number

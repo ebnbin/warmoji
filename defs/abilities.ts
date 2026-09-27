@@ -1021,6 +1021,7 @@ const dragonBreath = {
   knockback: 1,
   gain: 11,
   color: 0xff7043,
+  delivery: 'melee',
   shape: { kind: 'segment', reach: 2.8, radius: 0.5, ms: 180, beam: true },
 } satisfies AbilityDef
 const burn = { kind: 'ground', def: { radius: 1.1, durationMs: 2000, tickMs: 400, damage: 5, color: 0xff7043, fillAlpha: 0.22, lineAlpha: 0.5, enterMs: 150 } } as const

@@ -18,5 +18,7 @@ export interface CombatTuning {
   readonly morph: { readonly recastMs: number; readonly recoverMs: number }
   readonly blinkIframePadMs: number
   readonly minionFirstShotMs: number
+  readonly armorHalf: number
+  readonly lifestealCapPerSec: number
 }
 export type AbilityId = keyof typeof abilitiesJson

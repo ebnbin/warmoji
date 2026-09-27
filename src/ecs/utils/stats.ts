@@ -1,11 +1,12 @@
 import { addComponent, hasComponent } from 'bitecs'
 import { UNIT } from '../../util/units'
-import { STAT_KEYS, StatFold, foldStats } from '../../data/stats'
+import { STATS, STAT_KEYS, StatFold, foldStats } from '../../data/stats'
 import { sandboxFireRate } from '../sandbox/knobs'
-import { FACTION, Faction, Grow, Hp, MARK, MARK_SLOTS, Mark, Slot, Stamina, Stats } from '../components'
+import { FACTION, Faction, Grow, Hp, MARK, MARK_SLOTS, Mark, Slot, Stamina, Stats, Summoned } from '../components'
 import { statBase, statLayers } from '../store'
 import { rescale } from '../systems/shared/scale'
 import { fatigue, squadStamina } from '../systems/shared/stamina'
+import { isSameEntity } from './identity'
 import type { StatBase, StatKey, StatLayer, StatMods, StatValues } from '../../types/stats'
 import type { EcsWorld } from '../world'
 import type { Sim } from '../sim'
@@ -23,18 +24,26 @@ const FROM_MARK: Partial<Record<number, { readonly stat: StatKey; readonly stron
 const fold = new StatFold()
 
 /** 出手的一方在结算时用到的属性 */
-export interface Offense {
-  readonly damage: number
-  readonly crit: number
-  readonly knockback: number
-  readonly healing: number
+const OFFENSE = ['damage', 'meleeDamage', 'rangedDamage', 'areaDamage', 'dotDamage', 'summonDamage', 'bossDamage', 'crit', 'critDamage', 'knockback', 'healing', 'lifesteal'] as const satisfies readonly StatKey[]
+
+export type Offense = Readonly<Pick<StatValues, (typeof OFFENSE)[number]>>
+
+export const NEUTRAL: Offense = Object.fromEntries(OFFENSE.map((k) => [k, STATS[k].base])) as Offense
+
+/** 召出这个身体、此刻还在的召唤者，没有则 -1 */
+export function summonerOf(world: EcsWorld, eid: number): number {
+  if (!hasComponent(world, eid, Summoned)) return -1
+  const by = Summoned.by[eid]!
+  return isSameEntity(world, by, Summoned.byUid[eid]!) ? by : -1
 }
 
-export const NEUTRAL: Offense = { damage: 1, crit: 0, knockback: 1, healing: 1 }
-
+/** 召唤物的召唤物伤害取召唤者的 */
 export function offenseOf(world: EcsWorld, eid: number): Offense {
   if (!hasComponent(world, eid, Stats)) return NEUTRAL
-  return { damage: Stats.damage[eid]!, crit: Stats.crit[eid]!, knockback: Stats.knockback[eid]!, healing: Stats.healing[eid]! }
+  const o = Object.fromEntries(OFFENSE.map((k) => [k, Stats[k][eid]!])) as { -readonly [K in keyof Offense]: number }
+  const by = summonerOf(world, eid)
+  if (by >= 0 && hasComponent(world, by, Stats)) o.summonDamage = Stats.summonDamage[by]!
+  return o
 }
 
 /** 身体这一帧的属性表 */
@@ -91,7 +100,10 @@ function battleMods(sim: Sim, eid: number): void {
   const side = Faction.v[eid]
   const field = side === FACTION.team ? sim.battleFx.team : side === FACTION.enemy ? sim.battleFx.enemy : []
   for (const m of field) fold.apply(m)
-  if (sim.sandbox && side === FACTION.team) fold.times('cooldown', 1 / sandboxFireRate())
+  if (sim.sandbox && side === FACTION.team) {
+    fold.times('cooldown', 1 / sandboxFireRate())
+    fold.times('skillCooldown', 1 / sandboxFireRate())
+  }
   const tired = hasComponent(world, eid, Slot) ? fatigue(squadStamina(sim)) : hasComponent(world, eid, Stamina) ? fatigue(Stamina.v[eid]!) : 1
   fold.times('moveSpeed', tired)
 }

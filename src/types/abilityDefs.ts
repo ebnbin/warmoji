@@ -576,6 +576,8 @@ interface ZoneVisual {
 }
 
 /** 形状：一次出手覆盖谁 */
+export type Delivery = 'melee' | 'ranged'
+
 export type Shape =
   | { readonly kind: 'bolt'; readonly projectile: ProjectileSpec; readonly lifeMs: number; readonly pierce?: number }
   | { readonly kind: 'segment'; readonly reach: number; readonly radius: number; readonly ms: number; readonly lungeDist?: number; readonly beam?: boolean }
@@ -664,6 +666,8 @@ interface AbilityBase {
   readonly windup?: Windup
   readonly range?: number
   readonly shape: Shape
+  /** 出手方式，决定吃近战伤害还是远程伤害；不写按形状定 */
+  readonly delivery?: Delivery
   readonly damage?: number
   readonly knockback?: number
   readonly onHit?: readonly Effect[]

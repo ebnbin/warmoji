@@ -15,6 +15,7 @@ import { MAP_DEFAULTS } from '../defs/mapdefaults.ts'
 import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
+import { ROLES } from '../defs/roles.ts'
 import { SFX } from '../defs/sfx.ts'
 import { STAMINA } from '../defs/stamina.ts'
 import { STATS } from '../defs/stats.ts'
@@ -104,6 +105,7 @@ write('mapdefaults', MAP_DEFAULTS)
 write('maps', MAPS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
+write('roles', ROLES)
 write('sfx', SFX)
 write('stamina', STAMINA)
 write('stats', STATS)

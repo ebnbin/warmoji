@@ -103,7 +103,7 @@ export class TeamStatsPanel {
     const objs: Phaser.GameObjects.GameObject[] = [
       emojiImage(scene, 36, HEAD_H / 2, s.emoji, 56, 'player').setAlpha(s.alive ? 1 : 0.4),
       text(76, 26, s.name, FONT.head, '#ffffff', true).setOrigin(0, 0.5),
-      text(76, 62, `Lv.${s.level}${s.leader ? ' · 队长' : ''}`, FONT.small, '#ffdc5d').setOrigin(0, 0.5),
+      text(76, 62, `Lv.${s.level} · ${s.role}${s.leader ? ' · 队长' : ''}`, FONT.small, '#ffdc5d').setOrigin(0, 0.5),
       text(w - 14, HEAD_H / 2, s.alive ? `生命 ${Math.ceil(s.hp)} / ${s.max}` : `倒下 · ${s.reviveSec} 秒后复活`, FONT.body, s.alive ? '#ffffff' : '#ff8a80').setOrigin(1, 0.5),
     ]
 

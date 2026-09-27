@@ -5,7 +5,8 @@ import { MAP_IDS, MAPS, bossFor } from '../data/maps'
 import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
 import { ITEMS, RARITIES } from '../data/items'
-import { modTexts } from '../data/stats'
+import { modTexts, statText } from '../data/stats'
+import { keysOf } from '../util/record'
 import type { ItemDef } from '../types/items'
 import { abilityLabel, abilityStatLines, characterStatGroups, effectLine, SHAPE_LABEL } from './statLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
@@ -36,7 +37,7 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
 
 function enemyStatLines(e: EnemyDef): string[] {
   const lines = [
-    `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
+    [`生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`, ...keysOf(e.stats ?? {}).map((k) => statText(k, e.stats![k]!))].join(' · '),
     `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}${e.exertionMul === 0 ? ' · 不知疲倦' : e.exertionMul !== undefined ? ` · 赶路耗体力 ×${e.exertionMul}` : ''}`,
   ]
   for (const w of e.abilities ?? []) lines.push(`${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)

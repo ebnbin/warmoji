@@ -79,6 +79,7 @@ function valueText(unit: StatUnit, v: number): string {
     case 'rate':
       return `×${num(1 / v)}`
     case 'chance':
+    case 'percent':
       return `${Math.round(v * 100)}%`
     case 'ms':
       return `${num(v / 1000)}秒`
@@ -96,6 +97,7 @@ function addText(unit: StatUnit, v: number): string {
   const a = Math.abs(v)
   switch (unit) {
     case 'chance':
+    case 'percent':
       return `${sign}${Math.round(a * 100)}%`
     case 'ms':
       return `${sign}${num(a / 1000)}秒`

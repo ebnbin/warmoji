@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { UNIT } from '../util/units'
 import { CHARACTERS, memberBase } from '../data/characters'
+import { ROLES } from '../data/roles'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
 import { burstEmitter, setOverlayFill } from '../util/fx'
@@ -564,6 +565,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       return {
         emoji: bodyLook[m] ?? def.emoji,
         name: def.name,
+        role: ROLES[def.role].name,
         level: memberGear(this.run, slot, sim.sandbox).level,
         leader: m === sim.leader,
         alive: Alive.v[m] === 1,

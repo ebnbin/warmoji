@@ -26,6 +26,7 @@ import { interrupt } from './ability'
 import { healAllies } from './heal'
 import { eachAlly, nearestAngle, nearestTarget, targetsWithin } from '../../utils/targets'
 import { attackOf, flying } from '../../utils/source'
+import { HIT } from '../../utils/hitTags'
 import { layerMul, setStatLayer } from '../../utils/stats'
 import { isSameEntity } from '../../utils/identity'
 import type { Source } from '../../utils/source'
@@ -62,7 +63,7 @@ export function applyBlast(
     const t = list[i]!
     if (exclude?.has(t.eid)) continue
     const s = struckOf(t.eid)
-    if (hit(sim, src, t.eid, damage, { knockback, from: { x, y } })) struck.push(s)
+    if (hit(sim, src, t.eid, damage, { knockback, from: { x, y }, tags: HIT.area })) struck.push(s)
   }
   return struck
 }
