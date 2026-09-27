@@ -16,6 +16,7 @@ import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
 import { ROLES } from '../defs/roles.ts'
+import { RUNS } from '../defs/runs.ts'
 import { SFX } from '../defs/sfx.ts'
 import { STAMINA } from '../defs/stamina.ts'
 import { STATS } from '../defs/stats.ts'
@@ -26,6 +27,7 @@ import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef } from '../src/types/enemies'
 import type { ItemDef } from '../src/types/items'
 import type { MapDef } from '../src/types/maps'
+import type { FightDef, RunDef } from '../src/types/runs'
 
 const errors: string[] = []
 const need = (ok: boolean, msg: string): void => {
@@ -82,6 +84,35 @@ need(
   'progression.loopFrom 须在 1 到总波数之间',
 )
 
+/** 一场战斗的规则：数值在范围内，头目倒下才结束的战斗得有头目登场 */
+const checkFight = (f: FightDef, path: string): void => {
+  for (const s of f.spawns) {
+    if (s.kind === 'stream') {
+      need((s.intervalMul ?? 1) > 0, `${path} 的连续刷怪间隔倍率须为正`)
+      need((s.eliteChance ?? 0) >= 0 && (s.eliteChance ?? 0) <= 1, `${path} 的精英几率须在 [0, 1] 内`)
+    } else if (s.kind === 'batch') {
+      need(s.atMs >= 0 && s.squad.count >= 1 && (s.squad.spreadMs ?? 0) >= 0, `${path} 的一队敌人须至少一只，时刻与间隔不为负`)
+      need((s.squad.elites ?? 0) >= 0 && (s.squad.elites ?? 0) <= s.squad.count, `${path} 的精英数须在 0 到队伍人数之间`)
+    } else if (s.kind === 'carriers') {
+      need(s.buff >= 0 && s.debuff >= 0 && s.atMs >= 0 && s.spanMs >= 0, `${path} 的带光圈敌人数与时刻不为负`)
+    }
+  }
+  for (const e of f.ends) {
+    if (e.kind === 'time') need(e.ms > 0, `${path} 的时限须为正`)
+    if (e.kind === 'boss') need(f.spawns.some((s) => s.kind === 'boss' || s.kind === 'knobs'), `${path} 要打倒头目，须有头目登场`)
+  }
+}
+
+for (const [id, r] of Object.entries<RunDef>(RUNS)) {
+  const first = r.steps.findIndex((s) => s.kind === 'fight')
+  need(first >= 0, `runs.${id} 至少要有一场战斗`)
+  need(r.team !== undefined || r.steps.slice(0, first).some((s) => s.kind === 'recruit'), `runs.${id} 没有预设队伍，第一场战斗之前须有招募`)
+  r.steps.forEach((s, i) => {
+    if (s.kind === 'recruit') need(s.upTo >= 1 && s.upTo <= TEAM_BASELINE.team.maxSize, `runs.${id}.steps[${i}] 招募人数须在 1 到满编之间`)
+    if (s.kind === 'fight') checkFight(s.fight, `runs.${id}.steps[${i}]`)
+  })
+}
+
 const PACK = new Set(readFileSync('scripts/emoji/ordering.txt', 'utf8').split(/\s+/))
 const itemEmojis = new Map<string, string>()
 for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
@@ -118,6 +149,7 @@ write('maps', MAPS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
 write('roles', ROLES)
+write('runs', RUNS)
 write('sfx', SFX)
 write('stamina', STAMINA)
 write('stats', STATS)
