@@ -30,6 +30,7 @@ export function controlBody(sim: Sim, eid: number): void {
   const now = sim.elapsedMs
   Drive.x[eid] = 0
   Drive.y[eid] = 0
+  Drive.idle[eid] = 0
   Ctl.forced[eid] = 0
   let move = 1
   let act = 1
@@ -64,6 +65,7 @@ export function controlBody(sim: Sim, eid: number): void {
       const sp = (Phys.thrust[eid]! / Phys.drag[eid]!) * SpeedMul.v[eid]! * 0.5
       Drive.x[eid] = d.x * sp
       Drive.y[eid] = d.y * sp
+      Drive.idle[eid] = 1
     }
   }
   let forced = 0

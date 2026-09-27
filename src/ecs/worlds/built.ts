@@ -33,7 +33,7 @@ export function withBuilt(base: WorldHooks): WorldHooks {
     surface(sim, x, y) {
       const s = base.surface(sim, x, y)
       const k = tractionAt(sim, x, y)
-      return k === 1 ? s : { traction: s.traction * k, viscosity: s.viscosity }
+      return k === 1 ? s : { ...s, traction: s.traction * k }
     },
     constrainBody(sim, eid, from, next) {
       return blockBody(sim, eid, from, base.constrainBody(sim, eid, from, next))
