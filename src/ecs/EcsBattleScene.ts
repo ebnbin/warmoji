@@ -25,6 +25,8 @@ import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
 import { Alive, Boss, Cd, Charges, Ctl, Dormant, Enemy, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
 import { charSize } from './systems/shared/scale'
+import { squadStamina } from './systems/shared/stamina'
+import { STAMINA } from '../data/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
@@ -125,6 +127,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private shownHp: number[] = []
   private deadTexts: Phaser.GameObjects.Text[] = []
   private shownCountdown: number[] = []
+  private staminaGfx?: Phaser.GameObjects.Graphics
+  private shownStamina = -1
   private hitShakeOn = false
   private seenHitCount = 0
   private bossDownAt = -1
@@ -167,6 +171,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.shownHp = []
     this.deadTexts = []
     this.shownCountdown = []
+    this.staminaGfx = undefined
+    this.shownStamina = -1
     this.seenHitCount = 0
     this.bossDownAt = -1
     this.shownLeader = -1
@@ -356,6 +362,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       )
       this.shownCountdown.push(-1)
     }
+    this.staminaGfx = this.add.graphics().setDepth(11).setVisible(false)
     if (!run.sandbox) this.scheduleCarriers()
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
@@ -448,6 +455,35 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       g.fillStyle(locked ? (Math.floor(sim.fxMs / 150) % 2 ? 0xffffff : 0xff5722) : RES_COLOR[resDef[m]!.kind], 1)
       g.fillRect(-w / 2 + 1, y + 8, (w - 2) * res, 3)
     }
+  }
+
+  /** 队伍的体力圈：贴在队长右上方，满了就收起 */
+  private updateStaminaGauge(): void {
+    const sim = this.sim!
+    const g = this.staminaGfx
+    if (!g) return
+    const leader = sim.leader
+    const v = squadStamina(sim)
+    if (v >= 1 || !Alive.v[leader]) {
+      g.setVisible(false)
+      this.shownStamina = -1
+      return
+    }
+    const size = charSize(leader)
+    g.setVisible(true).setPosition(Transform.x[leader]! + VisOff.x[leader]! + size * 0.55, Transform.y[leader]! + VisOff.y[leader]! - size * 0.3)
+    const key = Math.round(v * 200)
+    if (key === this.shownStamina) return
+    this.shownStamina = key
+    const r = 0.2 * UNIT
+    g.clear()
+    g.lineStyle(6, 0x000000, 0.45)
+    g.beginPath()
+    g.arc(0, 0, r, 0, Math.PI * 2, false)
+    g.strokePath()
+    g.lineStyle(4, v >= STAMINA.slowFrom ? 0x80deea : v > 0.15 ? 0xffa726 : 0xef5350, 1)
+    g.beginPath()
+    g.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + v * Math.PI * 2, false)
+    g.strokePath()
   }
 
   hudSnapshot(): HudSnapshot {
@@ -720,6 +756,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       if (this.hitShakeOn) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     }
     this.updateHpBars()
+    this.updateStaminaGauge()
     this.drawDevTargets(sim)
     this.drawSkillAim(sim)
     if (!this.sandbox && sim.bossDown) {

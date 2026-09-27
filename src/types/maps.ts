@@ -89,6 +89,8 @@ export interface MapDef {
   readonly desc: string
   readonly kind: 'bounded' | 'infinite' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice'
   readonly size?: { readonly w: number; readonly h: number }
+  /** 地面费力：在这张图上赶路，每走一格扣掉的体力比例；不写就是不费力 */
+  readonly exertion?: number
   readonly palette: Palette
   readonly decor: MapDecor
   readonly drift?: readonly string[]

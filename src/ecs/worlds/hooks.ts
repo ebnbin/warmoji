@@ -32,8 +32,23 @@ const NO_GHOSTS: Point[] = []
 interface Surface {
   readonly traction: number
   readonly viscosity: number
+  /** 赶路每走一格扣掉的体力比例 */
+  readonly exertion: number
 }
-export const GROUND: Surface = { traction: 1, viscosity: 1 }
+/** 脚不沾地时的地面：不打滑、不黏、不费力 */
+export const GROUND: Surface = { traction: 1, viscosity: 1, exertion: 0 }
+
+const GROUNDS = new Map<MapId, Surface>()
+
+/** 这张图的地面：费力来自地图，其余同平地 */
+function groundOf(sim: Sim): Surface {
+  let g = GROUNDS.get(sim.mapId)
+  if (!g) {
+    g = { ...GROUND, exertion: MAPS[sim.mapId].exertion ?? 0 }
+    GROUNDS.set(sim.mapId, g)
+  }
+  return g
+}
 
 interface Walls {
   grid: WallGrid
@@ -96,8 +111,8 @@ const bounded: WorldHooks = {
   mediumVelocity() {
     return ZERO
   },
-  surface() {
-    return GROUND
+  surface(sim) {
+    return groundOf(sim)
   },
   constrainBody(sim, eid, _from, next) {
     const r = Radius.v[eid]!
@@ -164,8 +179,9 @@ const ice: WorldHooks = {
   },
   surface(sim, x, y) {
     const cfg = iceCfg(sim)
-    if (onFloe(x, y, floePx(sim))) return { traction: iceTraction(), viscosity: 1 }
-    return { traction: cfg.waterTraction, viscosity: cfg.waterViscosity }
+    const g = groundOf(sim)
+    if (onFloe(x, y, floePx(sim))) return { traction: iceTraction(), viscosity: 1, exertion: g.exertion }
+    return { traction: cfg.waterTraction, viscosity: cfg.waterViscosity, exertion: g.exertion }
   },
   wanderDir(_sim, _eid, dx, dy) {
     return { x: dx, y: dy }

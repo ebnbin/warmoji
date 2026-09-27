@@ -16,6 +16,7 @@ import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
 import { SFX } from '../defs/sfx.ts'
+import { STAMINA } from '../defs/stamina.ts'
 import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
@@ -34,7 +35,12 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(e !== undefined && e.role !== 'boss', `maps.${id} 的出怪配比须引用非 Boss 的敌人：${row.kind}`)
   }
   need(ENEMIES[m.boss]?.role === 'boss', `maps.${id}.boss 须引用 Boss：${m.boss}`)
+  need((m.exertion ?? 0) >= 0, `maps.${id}.exertion 不能为负`)
 }
+
+need(STAMINA.slowFrom > 0 && STAMINA.slowFrom <= 1, 'stamina.slowFrom 须在 (0, 1] 内')
+need(STAMINA.floor > 0 && STAMINA.floor < 1, 'stamina.floor 须在 (0, 1) 内')
+need(STAMINA.restDelayMs >= 0 && STAMINA.rampMs > 0 && STAMINA.regen > 0, 'stamina 的恢复参数须为正')
 
 for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
   for (const k of [0, 1]) {
@@ -89,6 +95,7 @@ write('maps', MAPS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
 write('sfx', SFX)
+write('stamina', STAMINA)
 write('team', TEAM_BASELINE)
 write('timestop', TIMESTOP)
 write('weapons', WEAPONS)

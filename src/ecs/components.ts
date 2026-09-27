@@ -165,8 +165,11 @@ export const Radius = { v: f32() }
 /** 身体：驱动与阻力同乘抓地（鞋 × 地面），阻力再乘介质黏度、按相对介质的速度算 */
 export const Phys = { vx: f32(), vy: f32(), thrust: f32(), drag: f32(), mass: f32(), grip: f32() }
 
-/** 驱动层每帧写入的期望速度，身体按抓地趋近它 */
-export const Drive = { x: f32(), y: f32() }
+/** 驱动层每帧写入的期望速度，身体按抓地趋近它；idle 为 1 是没有目标时的闲逛，不算赶路 */
+export const Drive = { x: f32(), y: f32(), idle: u8() }
+
+/** 体力：0 到 1；restMs 是连续没被扣体力的时长 */
+export const Stamina = { v: f32(), restMs: f32() }
 
 /** 1 = 按真实时间积分（队伍身体），0 = 按世界时间（其余一切） */
 export const Clock = { v: u8() }

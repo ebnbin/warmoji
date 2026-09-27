@@ -31,6 +31,13 @@ function drive(eid: number, dx: number, dy: number, speed: number): void {
   Drive.y[eid] = dy * speed
 }
 
+/** 没有目标时的游荡：不算赶路 */
+function stroll(sim: Sim, eid: number, speed: number): void {
+  const d = wanderDir(sim, eid)
+  drive(eid, d.x, d.y, speed)
+  Drive.idle[eid] = 1
+}
+
 /** 巡航速度：推力除以阻力，再乘这一帧的速度倍率 */
 function cruise(eid: number): number {
   return (Phys.thrust[eid]! / Phys.drag[eid]!) * SpeedMul.v[eid]!
@@ -52,8 +59,7 @@ function chase(sim: Sim): void {
       target = nearestFoe(sim, eid, ex, ey)
     }
     if (!target) {
-      const d = wanderDir(sim, eid)
-      drive(eid, d.x, d.y, speed * AI.idleSpeedMul.chase)
+      stroll(sim, eid, speed * AI.idleSpeedMul.chase)
       continue
     }
     const dir = sim.hooks.chaseDir(sim, eid, target.x, target.y)
@@ -64,8 +70,7 @@ function chase(sim: Sim): void {
 function wander(sim: Sim): void {
   for (const eid of query(sim.world, [Wander, Ctl, Phys, SpeedMul])) {
     if (!Ctl.move[eid]) continue
-    const d = wanderDir(sim, eid)
-    drive(eid, d.x, d.y, cruise(eid))
+    stroll(sim, eid, cruise(eid))
   }
 }
 
@@ -87,8 +92,7 @@ function flee(sim: Sim): void {
         continue
       }
     }
-    const w = wanderDir(sim, eid)
-    drive(eid, w.x, w.y, speed * AI.idleSpeedMul.flee)
+    stroll(sim, eid, speed * AI.idleSpeedMul.flee)
   }
 }
 
@@ -105,8 +109,7 @@ function standoff(sim: Sim): void {
     const dy = target ? target.y - ey : 0
     const dist = target ? Math.hypot(dx, dy) : Infinity
     if (dist > Standoff.detectRange[eid]!) {
-      const d = wanderDir(sim, eid)
-      drive(eid, d.x, d.y, sp * AI.idleSpeedMul.standoff)
+      stroll(sim, eid, sp * AI.idleSpeedMul.standoff)
       continue
     }
     const stand = Standoff.standoffDist[eid]!
@@ -123,7 +126,7 @@ function standoff(sim: Sim): void {
   }
 }
 
-/** 绕着锚点转；该扑的时候扑向目标；锚点没了就只剩追 */
+/** 绕着锚点转（巡游不算赶路）；该扑的时候扑向目标；锚点没了就只剩追 */
 function orbit(sim: Sim): void {
   for (const eid of query(sim.world, [Orbit, Nest, Ctl, Transform, Phys, SpeedMul])) {
     if (!Ctl.move[eid]) continue
@@ -166,6 +169,7 @@ function orbit(sim: Sim): void {
     }
     Drive.x[eid] = vx
     Drive.y[eid] = vy
+    Drive.idle[eid] = 1
   }
 }
 
@@ -201,8 +205,7 @@ function coinThief(sim: Sim): void {
       }
     }
     if (coin < 0) {
-      const d = wanderDir(sim, eid)
-      drive(eid, d.x, d.y, sp * AI.idleSpeedMul.coinThief)
+      stroll(sim, eid, sp * AI.idleSpeedMul.coinThief)
       continue
     }
     const eatR = Radius.v[eid]! + PICKUPS.coin.radius * UNIT

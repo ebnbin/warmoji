@@ -12,6 +12,7 @@ import { touchBodies } from '../touchBodies'
 import { characterVisual } from '../characterVisual'
 import { driveTeam } from '../driveTeam'
 import { moveBodies } from '../moveBodies'
+import { tickStamina } from '../tickStamina'
 import { stepHandover } from '../shared/leader'
 import { tickSkillCooldowns } from '../tickSkillCooldowns'
 import { settleMotions } from '../settleMotions'
@@ -71,6 +72,7 @@ export const SIM_PIPELINE = pipeline([
   { run: updateBees, after: [updateDormancy] },
   { run: steerBodies, after: [updateControl, updateBees] },
   { run: moveBodies, after: [layoutTeam, steerBodies] },
+  { run: tickStamina, after: [moveBodies] },
   { run: refreshTargets, after: [moveBodies] },
   { run: recordHistory, after: [moveBodies] },
   { run: tickPets, after: [moveBodies] },
