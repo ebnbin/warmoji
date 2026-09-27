@@ -1,22 +1,24 @@
 import { hasComponent } from 'bitecs'
 import { BODY_MAX_SPEED } from '../../../data/abilities'
-import { Alive, Anchored, Ctl, MARK, Motion, MOTION, Phys, Transform, Uid, VisOff } from '../../components'
-import { hasMark } from '../../utils/marks'
+import { Alive, Anchored, Ctl, MARK, Motion, MOTION, Phys, Radius, Transform, TRANSIT, Uid, VisOff } from '../../components'
+import { hasMark, inTransit } from '../../utils/marks'
 import { motionFx } from '../../store'
+import { spawnFxCircle } from '../../entities/fx'
 import type { Effect } from '../../../types/abilityDefs'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 
-/** 一段位移：push 是冲量；drift 是这一帧被一股稳定的流带着（持续牵引），折成与阻力相当的冲量；dash 沿直线按速度走；arc 腾空飞到落点；follow 贴着另一个身体；place 直接落到新位置 */
+/** 一段位移：push 是冲量；drift 是这一帧被一股稳定的流带着（持续牵引），折成与阻力相当的冲量；dash 沿直线按速度走；arc 腾空飞到落点；follow 先被拉过去再贴着另一个身体；transit 没有实体地沿直线移到落点；drop 从 height 高处落回脚下。位移都是连续的，没有瞬移 */
 export type Displacement =
   | { readonly kind: 'push'; readonly x: number; readonly y: number }
   | { readonly kind: 'drift'; readonly vx: number; readonly vy: number; readonly dt: number }
   | { readonly kind: 'dash'; readonly angle: number; readonly distance: number; readonly ms: number; readonly seek?: number }
   | { readonly kind: 'arc'; readonly x: number; readonly y: number; readonly ms: number; readonly height: number }
   | { readonly kind: 'follow'; readonly host: number; readonly ox: number; readonly oy: number; readonly ms: number }
-  | { readonly kind: 'place'; readonly x: number; readonly y: number }
+  | { readonly kind: 'transit'; readonly x: number; readonly y: number; readonly ms: number; readonly look: keyof typeof TRANSIT; readonly color: number }
+  | { readonly kind: 'drop'; readonly ms: number; readonly height: number }
 
-/** 谁在推：self 是自己的动作，做不做得出来看 Ctl.dash；否则是被摆布，锚定的身体不吃；skill 是带来位移的能力；src 与 onLand/onWall 是被摆布后落地、撞墙时的后续 */
+/** 谁在推：self 是自己的动作，做不做得出来看 Ctl.dash；否则是被摆布，锚定的身体不吃；skill 是带来位移的能力；src 与 onLand/onWall 是落地（穿行是现身）、撞墙时施于这个身体的后续 */
 export interface Mover {
   readonly self: boolean
   /** 一个动作的收尾（如瞬袭闪回）：不再看能不能动 */
@@ -65,9 +67,14 @@ export function endMotion(eid: number): void {
   motionFx[eid] = undefined
 }
 
-/** 唯一的位移入口：敌我、角色与敌人、自己的动作与被摆布都从这里改变身体的位置；倒下的身体不动 */
+/** 穿行的起点与落点各闪一下：起点收拢、落点散开 */
+export function transitFlash(sim: Sim, eid: number, x: number, y: number, arrive: boolean): void {
+  spawnFxCircle(sim, x, y, Radius.v[eid]! * 1.6, { fill: Motion.color[eid]!, fillAlpha: 0.45, fromScale: arrive ? 0.3 : 1, toScale: arrive ? 1.6 : 0.2, durationMs: arrive ? 300 : 260, depth: 14 })
+}
+
+/** 唯一的位移入口：敌我、角色与敌人、自己的动作与被摆布都从这里改变身体的位置；倒下的与穿行中的身体不动 */
 export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boolean {
-  if (hasComponent(sim.world, eid, Alive) && !Alive.v[eid]) return false
+  if ((hasComponent(sim.world, eid, Alive) && !Alive.v[eid]) || inTransit(eid)) return false
   if (d.kind === 'push') {
     if (hasMark(sim, eid, MARK.unstoppable)) return false
     impulse(sim, eid, d.x, d.y)
@@ -84,14 +91,6 @@ export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boo
   const x = Transform.x[eid]!
   const y = Transform.y[eid]!
   endMotion(eid)
-  if (d.kind === 'place') {
-    const to = sim.hooks.constrainBody(sim, eid, { x, y }, { x: d.x, y: d.y })
-    Transform.x[eid] = to.x
-    Transform.y[eid] = to.y
-    Phys.vx[eid] = 0
-    Phys.vy[eid] = 0
-    return true
-  }
   Motion.t[eid] = 0
   Motion.self[eid] = by.self ? 1 : 0
   Motion.landed[eid] = 0
@@ -111,25 +110,48 @@ export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boo
     }
     return true
   }
-  if (d.kind === 'arc') {
+  if (d.kind === 'drop') {
+    // 弧线从最高点起算，只走落下的那一半
+    Motion.kind[eid] = MOTION.arc
+    Motion.ms[eid] = Math.max(1, d.ms) * 2
+    Motion.t[eid] = Motion.ms[eid]! / 2
+    Motion.fx[eid] = x
+    Motion.fy[eid] = y
+    Motion.tx[eid] = x
+    Motion.ty[eid] = y
+    Motion.h[eid] = d.height
+    Motion.vx[eid] = 0
+    Motion.vy[eid] = 0
+    VisOff.y[eid] = -d.height
+    return true
+  }
+  if (d.kind === 'arc' || d.kind === 'transit') {
     // 落点先经场地约束，再折算回起点附近，环面上才不会跨图飞
     const to = sim.hooks.constrainBody(sim, eid, { x, y }, { x: d.x, y: d.y })
     const dd = sim.hooks.worldDelta(sim, x, y, to.x, to.y)
-    Motion.kind[eid] = MOTION.arc
+    Motion.kind[eid] = d.kind === 'arc' ? MOTION.arc : MOTION.transit
     Motion.ms[eid] = Math.max(1, d.ms)
     Motion.fx[eid] = x
     Motion.fy[eid] = y
     Motion.tx[eid] = x + dd.x
     Motion.ty[eid] = y + dd.y
-    Motion.h[eid] = d.height
     Motion.vx[eid] = (dd.x / Motion.ms[eid]!) * 1000
     Motion.vy[eid] = (dd.y / Motion.ms[eid]!) * 1000
+    if (d.kind === 'arc') {
+      Motion.h[eid] = d.height
+      return true
+    }
+    Motion.look[eid] = TRANSIT[d.look]
+    Motion.color[eid] = d.color
+    transitFlash(sim, eid, x, y, false)
     return true
   }
   Motion.kind[eid] = MOTION.follow
   Motion.ms[eid] = d.ms
   Motion.ref[eid] = d.host
   Motion.refUid[eid] = Uid.v[d.host]!
+  Motion.fx[eid] = x
+  Motion.fy[eid] = y
   Motion.tx[eid] = d.ox
   Motion.ty[eid] = d.oy
   return true

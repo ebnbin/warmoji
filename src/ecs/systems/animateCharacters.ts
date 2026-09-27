@@ -1,27 +1,59 @@
 import { UNIT } from '../../util/units'
+import { playSfx } from '../../audio/sfx'
 import { charSize } from './shared/scale'
-import { SQUAD } from '../../data/feel'
-import { Alive, Breath, Depth, Facing, Phys, Pop, Sprite, Transform } from '../components'
-import { backEaseOut } from '../utils/ease'
+import { endMotion } from './shared/displace'
+import { REJOIN, SQUAD } from '../../data/feel'
+import { Alive, Breath, Depth, Facing, Motion, MOTION, Phys, Pop, Revive, Sprite, Transform } from '../components'
+import { spawnFxCircle } from '../entities/fx'
+import { startPop } from '../utils/pop'
 import { leaderX, leaderY } from '../utils/team'
 import type { Sim } from '../sim'
 
 const STRIDE = 20
 const HEADING_MIN = 0.5
 
+/** 落地压扁再回弹，按阻尼振荡收回原样 */
 function popping(sim: Sim, eid: number, charSize: number): boolean {
   const left = Pop.until[eid]! - sim.fxMs
   if (left <= 0) return false
-  const pop = charSize * (0.3 + 0.7 * backEaseOut(1 - left / Pop.ms[eid]!))
-  Transform.w[eid] = pop
-  Transform.h[eid] = pop
+  const u = 1 - left / Pop.ms[eid]!
+  const s = REJOIN.squash * Math.exp(-4 * u) * Math.cos(3 * Math.PI * u)
+  Transform.w[eid] = charSize * (1 + s)
+  Transform.h[eid] = charSize * (1 - s)
   return true
 }
 
+/** 归队落地：脚下扩开一圈光环、扬起尘土，压扁再弹回 */
+function land(sim: Sim, eid: number): void {
+  Revive.drop[eid] = 0
+  const x = Transform.x[eid]!
+  const y = Transform.y[eid]!
+  playSfx('revive')
+  startPop(sim, eid, REJOIN.bounceMs)
+  spawnFxCircle(sim, x, y, REJOIN.ringRadius * UNIT, {
+    fill: 0xfff59d,
+    fillAlpha: 0.25,
+    stroke: 0xffffff,
+    lineWidth: 5,
+    lineAlpha: 0.95,
+    fromScale: 0.2,
+    toScale: 1,
+    durationMs: 420,
+    depth: 7,
+  })
+  sim.out.bursts.push({ x, y, count: 8, kind: 'puff' })
+}
+
+/** 画面停住时把还在进行的归队与回弹直接收尾 */
 export function finishCharacterPops(sim: Sim): void {
   for (const eid of sim.characters) {
+    if (!Alive.v[eid]) continue
+    if (Revive.drop[eid]) {
+      endMotion(eid)
+      Revive.drop[eid] = 0
+    }
     const size = charSize(eid)
-    if (!Alive.v[eid] || Pop.until[eid] === 0 || popping(sim, eid, size)) continue
+    if (Pop.until[eid] === 0 || popping(sim, eid, size)) continue
     Pop.until[eid] = 0
     Transform.w[eid] = size
     Transform.h[eid] = size
@@ -49,6 +81,7 @@ export function animateCharacters(sim: Sim): void {
   for (const eid of sim.characters) {
     Depth.z[eid] = 10 + sim.hooks.worldDelta(sim, lx, ly, Transform.x[eid]!, Transform.y[eid]!).y / UNIT
     if (!Alive.v[eid]) continue
+    if (Revive.drop[eid] && Motion.kind[eid] !== MOTION.arc) land(sim, eid)
     face(sim, eid)
     const vx = Phys.vx[eid]!
     const moving = Math.hypot(vx, Phys.vy[eid]!) > STRIDE

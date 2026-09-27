@@ -45,19 +45,36 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(ENEMIES[m.boss]?.role === 'boss', `maps.${id}.boss 须引用 Boss：${m.boss}`)
 }
 
-/** 地面费力、场内费力和身体的费力倍率，出现在哪都不能为负 */
+/** 地面费力、场内费力和身体的赶路耗体力，出现在哪都不能为负；属性修正的加值可以为负，由属性表的下限兜住 */
 const noNegativeExertion = (v: unknown, path: string): void => {
   if (typeof v !== 'object' || v === null) return
   for (const [k, x] of Object.entries(v)) {
-    if (k === 'exertion' || k === 'exertionMul') need(typeof x === 'number' && x >= 0, `${path}.${k} 不能为负`)
+    if (k === 'add') continue
+    if (k === 'exertion') need(typeof x === 'number' && x >= 0, `${path}.${k} 不能为负`)
     else noNegativeExertion(x, `${path}.${k}`)
   }
 }
-noNegativeExertion({ maps: MAPS, enemies: ENEMIES, abilities: ABILITIES, weapons: WEAPONS, characters: CHARACTERS }, 'defs')
+noNegativeExertion({ maps: MAPS, enemies: ENEMIES, abilities: ABILITIES, weapons: WEAPONS, characters: CHARACTERS, items: ITEMS }, 'defs')
 
 need(STAMINA.slowFrom > 0 && STAMINA.slowFrom <= 1, 'stamina.slowFrom 须在 (0, 1] 内')
 need(STAMINA.floor > 0 && STAMINA.floor < 1, 'stamina.floor 须在 (0, 1) 内')
-need(STAMINA.restDelayMs >= 0 && STAMINA.rampMs > 0 && STAMINA.regen > 0, 'stamina 的恢复参数须为正')
+need(STAMINA.warnAt > 0 && STAMINA.warnAt < STAMINA.slowFrom, 'stamina.warnAt 须在 0 与 slowFrom 之间')
+need(STAMINA.restDelayMs >= 0 && STAMINA.rampMs > 0, 'stamina 的恢复节奏须为正')
+need(STAMINA.draft > 0 && STAMINA.draft <= 1, 'stamina.draft 须在 (0, 1] 内')
+
+/** 每张图赶路都耗体力、歇着都能回；逆流比平地累，顺流比平地省 */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need(m.stamina.exertion > 0 && m.stamina.regen > 0, `maps.${id}.stamina 的费力与回复倍率须为正`)
+  if (m.river) need(m.river.upstream >= 1 && m.river.downstream >= 0 && m.river.downstream <= 1, `maps.${id}.river 的逆流倍率须不小于 1，顺流倍率须在 [0, 1] 内`)
+  if (m.ice) need(m.ice.waterExertion > 0 && m.ice.waterRegen >= 0, `maps.${id}.ice 的水里费力须为正、回复倍率不为负`)
+}
+
+/** 身体的体力上限须为正、体力回复不为负 */
+const checkStamina = (st: { readonly maxStamina?: number; readonly staminaRegen?: number } | undefined, path: string): void => {
+  need((st?.maxStamina ?? 1) > 0 && (st?.staminaRegen ?? 0) >= 0, `${path} 的体力上限须为正、体力回复不为负`)
+}
+for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) checkStamina(c.stats, `characters.${id}`)
+for (const [id, e] of Object.entries<EnemyDef>(ENEMIES)) checkStamina(e.stats, `enemies.${id}`)
 
 for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
   need(new Set(c.tags).size === c.tags.length, `characters.${id}.tags 不能重复`)

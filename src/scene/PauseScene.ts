@@ -50,7 +50,7 @@ import { itemLines } from './itemLines'
 import { mapPlayLines } from './mapLines'
 import { markPauseShown } from './pause'
 import type { PauseData, PauseFrom } from './pause'
-import { characterStatGroups } from './statLines'
+import { characterStatGroups, staminaTone } from './statLines'
 import { flowStatGroups } from './teamPage'
 import { enemyStatLines } from './wikiEntries'
 import { SceneKey } from './keys'
@@ -82,7 +82,7 @@ const NONE: TableCell = { text: '—', color: 'faint' }
 
 /** 战斗里的操作，键位与手势照着 HUD 与战斗场景写 */
 const CONTROLS: readonly string[] = [
-  '移动：WASD 或方向键；触屏在空白处按住拖动',
+  '移动：WASD 或方向键；触屏按住左下角的摇杆拖动',
   '放技能：Q，或点右下角的队长；能瞄准的按住拖出方向，能蓄力的按住蓄力，松手放出',
   '换队长：1～4 键依次对应弧上从上到左的队员，或直接点头像',
   '暂停：ESC，或点右上角的暂停键',
@@ -278,6 +278,7 @@ export class PauseScene extends Phaser.Scene {
         hp: waveStartHp(run.memberHp[slot] ?? stats.maxHp, stats.maxHp),
         max: stats.maxHp,
         reviveSec: 0,
+        stamina: 1,
         tired: false,
         now: stats,
         lasting: stats,
@@ -335,7 +336,7 @@ export class PauseScene extends Phaser.Scene {
     flow.finish()
   }
 
-  /** 角色头：头像、名字与身份，生命条与经验条 */
+  /** 角色头：头像、名字与身份，生命条、体力条与经验条 */
   private renderHead(m: Member): void {
     const D = this.frame.detail
     const def = CHARACTERS[m.id]
@@ -362,9 +363,10 @@ export class PauseScene extends Phaser.Scene {
       ? m.reviveSec === null
         ? '倒下 · 这一场不会自己起来'
         : `倒下 · ${m.reviveSec} 秒后复活`
-      : `生命 ${Math.ceil(m.hp)} / ${Math.round(m.max)}${this.opened.from === SceneKey.Battle ? '' : '（下一波开局）'}`
+      : `生命 ${Math.ceil(m.hp)} / ${Math.round(m.max)} · 体力 ${Math.round(m.stamina * m.now.maxStamina)} / ${Math.round(m.now.maxStamina)}${this.opened.from === SceneKey.Battle ? '' : '（下一波开局）'}`
     keep(new Label(this, x0, D.y + 68, hpText, { kind: 'label', bold: true, color: !m.alive ? 'bad' : ratio > 0.5 ? 'good' : 'warn' }).setOrigin(0, 0.5))
     keep(new ProgressBar(this, x0, D.y + 86, half, 14, { tone: 'hp', value: m.alive ? ratio : 0 }))
+    if (m.alive) keep(new ProgressBar(this, x0, D.y + 102, half, 6, { tone: staminaTone(m.stamina), value: m.stamina }))
 
     const top = levelCap(this.run)
     const prog = levelProgress(characterXp(m.items), this.run.minLevel, top)

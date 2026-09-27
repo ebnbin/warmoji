@@ -1,5 +1,5 @@
-import { MARK } from '../components'
-import { hasMark, isAirborne, isHidden } from './marks'
+import { MARK, Motion, TRANSIT } from '../components'
+import { hasMark, inTransit, isAirborne, isHidden } from './marks'
 import type { Sim } from '../sim'
 
 /** 身上控制的底色，按轻重排：静止、亡后残留、眩晕、睡眠、恐惧、魅惑、倒戈、击飞、定身、沉默、致盲、身在异界；没有控制返回 0 */
@@ -18,15 +18,20 @@ const TINTS: readonly (readonly [number, number])[] = [
 
 const REALM_TINT = 0x9575cd
 
-/** 存在感：被吞的几乎看不见，碰不到的半透明，看不见的只剩淡影 */
+const STREAK_ALPHA = 0.5
+
+/** 存在感：隐身穿行的看不见，残影穿行的半透明，被吞的几乎看不见，碰不到的半透明，看不见的只剩淡影 */
 export function presence(sim: Sim, eid: number): number {
+  if (inTransit(eid)) return Motion.look[eid] === TRANSIT.hidden ? 0 : STREAK_ALPHA
   if (hasMark(sim, eid, MARK.devoured)) return 0.1
   if (isHidden(sim, eid)) return 0.35
   if (hasMark(sim, eid, MARK.untargetable)) return 0.5
   return 1
 }
 
+/** 身上的底色：穿行中是穿行的颜色，其余按控制的轻重排 */
 export function statusTint(sim: Sim, eid: number): number {
+  if (inTransit(eid)) return Motion.color[eid]!
   for (const [kind, color] of TINTS) if (hasMark(sim, eid, kind)) return color
   if (isAirborne(eid)) return 0xfff59d
   return hasMark(sim, eid, MARK.realm) ? REALM_TINT : 0

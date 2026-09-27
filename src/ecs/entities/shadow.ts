@@ -10,6 +10,8 @@ import { displace } from '../systems/shared/displace'
 import { blinkFlash } from '../systems/shared/fire'
 import { bodyLook, enemyDef } from '../store'
 import { CHARACTERS } from '../../data/characters'
+import { TRANSIT_MS } from '../../data/abilities'
+import { sineEaseInOut } from '../utils/ease'
 import type { Source } from '../utils/source'
 import type { Sim } from '../sim'
 
@@ -20,7 +22,8 @@ export function shadowsOf(sim: Sim, by: number): number[] {
   return out.sort((a, b) => Uid.v[a]! - Uid.v[b]!)
 }
 
-function lookOf(sim: Sim, by: number): string {
+/** 身体此刻的样子 */
+export function lookOf(sim: Sim, by: number): string {
   if (bodyLook[by]) return bodyLook[by]!
   if (hasComponent(sim.world, by, Slot)) return CHARACTERS[sim.run.roster[Slot.v[by]!]!]!.emoji
   return enemyDef[by]?.emoji ?? '1f47b'
@@ -50,26 +53,36 @@ export function spawnShadow(sim: Sim, src: Source, by: number, angle: number, li
   for (const t of targetsWithin(sim, src, at.x, at.y, taunt.radius)) addCc(sim, t.eid, MARK.taunt, until, s, 0, 0, Uid.v[s]!)
 }
 
-/** 与最新的影子换位 */
+/** 与最新的影子换位：主人穿行到影子处，影子同时滑到主人原处 */
 export function swapShadow(sim: Sim, by: number): boolean {
   const list = shadowsOf(sim, by)
   const s = list[list.length - 1]
   if (s === undefined) return false
   const bx = Transform.x[by]!
   const bY = Transform.y[by]!
-  if (!displace(sim, by, { kind: 'place', x: Transform.x[s]!, y: Transform.y[s]! }, { self: true })) return false
-  blinkFlash(sim, bx, bY)
-  blinkFlash(sim, Transform.x[by]!, Transform.y[by]!)
-  Transform.x[s] = bx
-  Transform.y[s] = bY
+  if (!displace(sim, by, { kind: 'transit', x: Transform.x[s]!, y: Transform.y[s]!, ms: TRANSIT_MS.swap, look: 'streak', color: 0xb388ff }, { self: true })) return false
+  const d = sim.hooks.worldDelta(sim, Transform.x[s]!, Transform.y[s]!, bx, bY)
+  Shadow.fx[s] = Transform.x[s]!
+  Shadow.fy[s] = Transform.y[s]!
+  Shadow.tx[s] = Transform.x[s]! + d.x
+  Shadow.ty[s] = Transform.y[s]! + d.y
+  Shadow.slide[s] = sim.elapsedMs + TRANSIT_MS.swap
   return true
 }
 
-/** 影子到时或主人没了就散 */
+/** 影子换位时滑向主人原处；到时或主人没了就散 */
 export function tickShadows(sim: Sim): void {
+  const now = sim.elapsedMs
   for (const s of [...query(sim.world, [Shadow])]) {
     const by = Shadow.of[s]!
-    if (Shadow.until[s]! > sim.elapsedMs && isSameEntity(sim.world, by, Shadow.ofUid[s]!) && Alive.v[by]) continue
+    if (Shadow.slide[s] !== 0) {
+      const p = sineEaseInOut(Math.min(1, 1 - (Shadow.slide[s]! - now) / TRANSIT_MS.swap))
+      const to = sim.hooks.wrap(sim, Shadow.fx[s]! + (Shadow.tx[s]! - Shadow.fx[s]!) * p, Shadow.fy[s]! + (Shadow.ty[s]! - Shadow.fy[s]!) * p)
+      Transform.x[s] = to.x
+      Transform.y[s] = to.y
+      if (now >= Shadow.slide[s]!) Shadow.slide[s] = 0
+    }
+    if (Shadow.until[s]! > now && isSameEntity(sim.world, by, Shadow.ofUid[s]!) && Alive.v[by]) continue
     sim.out.bursts.push({ x: Transform.x[s]!, y: Transform.y[s]!, count: 5, kind: 'puff' })
     removeEntity(sim.world, s)
   }

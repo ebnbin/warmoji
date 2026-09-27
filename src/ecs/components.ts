@@ -85,7 +85,8 @@ export const Pop = { until: f32(), ms: f32(), size: f32(), back: u8(), alpha: f3
 export const Alive = { v: u8() }
 
 export const CharScale = { v: f32() }
-export const Revive = { at: f32() }
+/** 倒地与归队：at 是复活的时刻；fell、rose 是倒下、归队时的画面时钟；drop 为 1 是正从空中落回坑位 */
+export const Revive = { at: f32(), fell: f32(), rose: f32(), drop: u8() }
 
 export const MARK_SLOTS = 12
 
@@ -172,8 +173,8 @@ export const Phys = { vx: f32(), vy: f32(), drag: f32(), mass: f32(), grip: f32(
 /** 驱动层每帧写入的期望速度，身体按抓地趋近它；idle 为 1 是没有目标时的闲逛，不算赶路 */
 export const Drive = { x: f32(), y: f32(), idle: u8() }
 
-/** 体力：0 到 1；restMs 是连续没被扣体力的时长 */
-export const Stamina = { v: f32(), restMs: f32() }
+/** 体力：used 是用掉的点数，剩下的是属性表的体力上限减去它，所以出生就是满的；restMs 是连续没被扣体力的时长 */
+export const Stamina = { used: f32(), restMs: f32() }
 
 /** 1 = 按真实时间积分（队伍身体），0 = 按世界时间（其余一切） */
 export const Clock = { v: u8() }
@@ -424,8 +425,10 @@ export const WorldShape = {}
 
 export const Aura = { zone: i32() }
 
-/** 瞬袭：身体已闪到目标背后，until 到点闪回 x/y；back 为 0 则不回 */
-export const BlinkState = { until: f32(), x: f32(), y: f32(), back: u8() }
+export const BLINK = { none: 0, going: 1, striking: 2 } as const
+
+/** 瞬袭：going 是正穿行到目标背后，到了就斩；striking 是斩完等到 until 再穿行回 x/y */
+export const BlinkState = { phase: u8(), until: f32(), x: f32(), y: f32() }
 
 export const Manual = {}
 
@@ -465,17 +468,11 @@ export const Leech = { at: f32(), hp: f32() }
 /** 会随体型缩放的身体：r0 是本来的判定半径，s0 是本来的画面尺寸，v 是上一次按体型缩放时的倍率 */
 export const Grow = { r0: f32(), s0: f32(), v: f32() }
 
-export const HISTORY = 40
-export const HISTORY_MS = 100
+/** 记着自己走过的路的身体，路在 traces 里 */
+export const Trace = {}
 
-const stridedBy = <T extends Column>(ctor: new (length: number) => T, n: number): T => {
-  const col = new ctor(INITIAL_CAPACITY * n)
-  STRIDE.set(col, n)
-  return col
-}
-
-/** 位置与生命的历史：每 HISTORY_MS 记一格，环形，i 是下一格，n 是已记的格数，at 是下次记的时刻 */
-export const History = { x: stridedBy(Float32Array, HISTORY), y: stridedBy(Float32Array, HISTORY), hp: stridedBy(Float32Array, HISTORY), i: i32(), n: i32(), at: f32() }
+/** 倒带落点上的残影：of 是倒带的身体，它这段路画在地上；dim 是冷却中的淡化倍率 */
+export const Echo = { of: i32(), ofUid: u32(), dim: f32() }
 
 /** 借来的能力：到时撤掉；from 是被夺走的那条能力与它的编号，夺取者死了就还回去 */
 export const Borrowed = { until: f32(), from: i32(), fromUid: u32() }
@@ -483,8 +480,8 @@ export const Borrowed = { until: f32(), from: i32(), fromUid: u32() }
 /** 肚子里装着的身体：victim 与编号、这期间挨了多少、挨够多少吐出、最多装到何时、每秒消化、吐出距离、下次消化的时刻 */
 export const Gut = { victim: i32(), uid: u32(), hurt: f32(), limit: f32(), until: f32(), dps: f32(), spit: f32(), nextAt: f32() }
 
-/** 影子：主人与编号、消失的时刻 */
-export const Shadow = { of: i32(), ofUid: u32(), until: f32() }
+/** 影子：主人与编号、消失的时刻；换位时从 f 滑到 t，slide 是滑到的时刻，0 是没在滑 */
+export const Shadow = { of: i32(), ofUid: u32(), until: f32(), fx: f32(), fy: f32(), tx: f32(), ty: f32(), slide: f32() }
 
 export const PET = { orbit: 0, trail: 1, ally: 2 } as const
 
@@ -508,15 +505,18 @@ export const Mirror = {}
 
 export const CastRequest = {}
 
-/** ghost：0 存活；1 阵亡且已预订目标位、正在归位；2 阵亡且已停靠 */
-export const Seat = { v: i32Fill(-1), ghost: u8() }
+/** 队员占的坑位：队长身后扇形上的第几个，-1 是还没占 */
+export const Seat = { v: i32Fill(-1) }
 
 /** 朝向 x/y 是滤波速度 vx/vy 的方向，跟随时的往复抖动被平均掉；换队长时目标位扇形按它生成 */
 export const Facing = { x: f32(), y: f32(), vx: f32(), vy: f32() }
 
-export const MOTION = { none: 0, dash: 1, arc: 2, follow: 3 } as const
+export const MOTION = { none: 0, dash: 1, arc: 2, follow: 3, transit: 4 } as const
 
-/** 脚本位移：冲刺按速度走（seek 为 1 时追着 ref 转向、碰到就停），弧线沿 f→t 腾空飞，跟随贴着 ref 偏移 t；self 为 1 是自己的动作，skill 是带来这段位移的能力，landed 在落地那帧为 1 */
+/** 穿行的样子：隐身是起点消失、落点出现，残影是半透明的身体沿直线划过去 */
+export const TRANSIT = { hidden: 0, streak: 1 } as const
+
+/** 脚本位移：冲刺按速度走（seek 为 1 时追着 ref 转向、碰到就停），弧线沿 f→t 腾空飞，跟随从 f 被拉过去再贴着 ref 偏移 t，穿行没有实体地沿 f→t 移过去（look 是样子、color 是颜色）；self 为 1 是自己的动作，skill 是带来这段位移的能力，landed 在落地那帧为 1 */
 export const Motion = {
   kind: u8(),
   self: u8(),
@@ -537,6 +537,8 @@ export const Motion = {
   seek: u8(),
   /** 这段动作带着的伤害：冲刺撞人、跳跃落地按它结算 */
   dmg: f32(),
+  look: u8(),
+  color: u32(),
 }
 
 /** 身体最近一次被哪段冲刺撞过，同一段冲刺不重复吃伤害 */

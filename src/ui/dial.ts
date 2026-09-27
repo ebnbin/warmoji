@@ -5,7 +5,8 @@ import { CooldownPie, RingGauge } from './gauge'
 import { pressable } from './gesture'
 import { Icon } from './icon'
 import { Label } from './label'
-import { INK, SURFACE, TONE } from './theme'
+import { INK, MOTION, SURFACE, TONE } from './theme'
+import type { Tone } from './theme'
 import { Widget } from './widget'
 
 export interface DialOptions {
@@ -20,33 +21,18 @@ export interface DialOptions {
   readonly onRelease?: (dx: number, dy: number) => void
 }
 
-/** 弧形底带：一排技能钮沿它排开；(x, y) 是圆心，从 start 顺时针到 end（弧度） */
-export class ArcTrack extends Widget {
-  constructor(scene: Phaser.Scene, x: number, y: number, radius: number, thickness: number, start: number, end: number) {
-    super(scene, x, y)
-    const g = scene.add.graphics()
-    for (const [w, color, alpha] of [
-      [thickness + 6, SURFACE.outline, 0.3],
-      [thickness, INK.ink, 0.08],
-    ] as const) {
-      g.lineStyle(w, color, alpha)
-      g.beginPath()
-      g.arc(0, 0, radius, start, end, false)
-      g.strokePath()
-    }
-    this.add(g)
-  }
-}
-
 /** idle 普通，leader 队长呼吸光，recast 连段可接的快闪，dead 阵亡 */
 export type DialRim = 'idle' | 'leader' | 'recast' | 'dead'
 
-/** 圆形技能钮：图标、血量环、冷却扇形、角标与读数；(x, y) 是圆心 */
+/** 圆形技能钮：图标、血量环、贴着边缘内侧的体力环、冷却扇形、角标与读数；(x, y) 是圆心 */
 export class DialButton extends Widget {
   private readonly radius: number
+  /** 按下时整体缩放的一层；外层的缩放留给布局 */
+  private readonly content: Widget
   private readonly base: Phaser.GameObjects.Graphics
   private readonly face: Icon
   private readonly ring: RingGauge
+  private readonly stamina: RingGauge
   private readonly pie: CooldownPie
   private readonly cdText: Label
   private readonly deadText: Label
@@ -57,6 +43,7 @@ export class DialButton extends Widget {
   private pulse = 1
   private dimmed = false
   private dead = false
+  private pressed = false
   private holdId: number | null = null
   private holdX = 0
   private holdY = 0
@@ -69,6 +56,8 @@ export class DialButton extends Widget {
     this.face = new Icon(scene, 0, 0, opts.icon, opts.iconSize ?? Math.round(r * 1.4), opts.outline)
     this.ring = new RingGauge(scene, 0, 0, r + 5, { tone: 'hp', thickness: 4 })
     this.pie = new CooldownPie(scene, 0, 0, r - 2)
+    // 画在圆盘边缘内侧：排成弧的相邻圆盘之间放不下第二道外环
+    this.stamina = new RingGauge(scene, 0, 0, r - 4, { tone: 'info', thickness: 3 }).setVisible(false)
     const small = { kind: 'label', bold: true, outline: true } as const
     this.cdText = new Label(scene, 0, 0, '', { ...small, color: 'accent' }).setOrigin(0.5).setVisible(false)
     this.deadText = new Label(scene, 0, 0, '', { ...small, color: 'bad' }).setOrigin(0.5).setVisible(false)
@@ -76,7 +65,9 @@ export class DialButton extends Widget {
     this.badge = new Icon(scene, -corner, -corner, opts.icon, 20, opts.outline).setVisible(false)
     this.tired = new Icon(scene, corner, -corner, '1f4a6', 20, 'player').setVisible(false)
     this.charges = new Label(scene, corner, corner, '', { ...small, kind: 'caption', color: 'accent' }).setOrigin(0.5).setVisible(false)
-    this.add([this.base, this.face, this.ring, this.pie, this.cdText, this.deadText, this.badge, this.tired, this.charges])
+    this.content = new Widget(scene)
+    this.content.add([this.base, this.face, this.ring, this.pie, this.stamina, this.cdText, this.deadText, this.badge, this.tired, this.charges])
+    this.add(this.content)
     this.paintBase()
     pressable(this, {
       shape: new Phaser.Geom.Circle(0, 0, r + 6),
@@ -84,10 +75,14 @@ export class DialButton extends Widget {
       onDown: (p) => {
         if (opts.onHold?.(p)) this.beginHold(p, opts)
       },
+      onPress: (down) => this.press(down),
       onTap: () => {
-        if (this.holdId === null) opts.onTap?.()
+        if (this.holdId !== null) return
+        this.ripple()
+        opts.onTap?.()
       },
     })
+    this.once(Phaser.GameObjects.Events.DESTROY, () => scene.tweens.killTweensOf(this.content))
   }
 
   setIcon(id: string, outline?: OutlineKind): this {
@@ -110,6 +105,13 @@ export class DialButton extends Widget {
   setHp(ratio: number | null): this {
     if (ratio === null) return this.hideObj(this.ring)
     this.ring.setVisible(true).setValue(ratio)
+    return this
+  }
+
+  /** 体力环：满了或给 null 时收起 */
+  setStamina(ratio: number | null, tone: Tone): this {
+    if (ratio === null || ratio >= 1) return this.hideObj(this.stamina)
+    this.stamina.setVisible(true).setTone(tone).setValue(ratio)
     return this
   }
 
@@ -163,16 +165,43 @@ export class DialButton extends Widget {
 
   private paintBase(): void {
     const rim = this.dead ? 'dead' : this.rim
-    const color = rim === 'leader' ? TONE.accent.face : rim === 'recast' ? TONE.info.face : rim === 'dead' ? TONE.bad.face : SURFACE.outline
+    const rimColor = rim === 'leader' ? TONE.accent.face : rim === 'recast' ? TONE.info.face : rim === 'dead' ? TONE.bad.face : SURFACE.outline
+    const color = this.pressed ? INK.soft : rimColor
     const width = rim === 'recast' ? 5 : rim === 'idle' ? 3 : 4
-    const alpha = rim === 'idle' || rim === 'dead' ? 1 : 0.55 + 0.45 * this.pulse
+    const alpha = this.pressed || rim === 'idle' || rim === 'dead' ? 1 : 0.55 + 0.45 * this.pulse
     drawDisc(this.base.clear(), 0, 0, this.radius, {
-      face: this.dead ? TONE.bad.lip : SURFACE.bg,
-      faceAlpha: this.dead ? 0.7 : 0.88,
-      drop: 3,
+      face: this.dead ? TONE.bad.lip : this.pressed ? SURFACE.raisedHi : SURFACE.bg,
+      faceAlpha: this.pressed ? 0.75 : this.dead ? 0.55 : 0.45,
     })
     this.base.lineStyle(width, color, alpha)
     this.base.strokeCircle(0, 0, this.radius)
+  }
+
+  /** 按下时缩一点、底盘与描边提亮，松开时带一点回弹复原 */
+  private press(down: boolean): void {
+    this.pressed = down
+    this.paintBase()
+    this.scene.tweens.killTweensOf(this.content)
+    this.scene.tweens.add({
+      targets: this.content,
+      scale: down ? 0.9 : 1,
+      duration: down ? MOTION.press : MOTION.pop,
+      ease: down ? 'Quad.easeOut' : 'Back.easeOut',
+    })
+  }
+
+  /** 点按生效：从钮边扩出一圈淡出的细环 */
+  private ripple(): void {
+    const ring = this.scene.add.circle(0, 0, this.radius).setStrokeStyle(3, INK.ink, 0.7)
+    this.add(ring)
+    this.scene.tweens.add({
+      targets: ring,
+      scale: (this.radius + 10) / this.radius,
+      alpha: 0,
+      duration: MOTION.pop,
+      ease: 'Quad.easeOut',
+      onComplete: () => ring.destroy(),
+    })
   }
 
   private beginHold(p: Phaser.Input.Pointer, opts: DialOptions): void {

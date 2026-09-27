@@ -127,9 +127,14 @@ export function isHidden(sim: Sim, eid: number): boolean {
   return (hasMark(sim, eid, MARK.hide) || hasMark(sim, eid, MARK.stealth)) && !hasMark(sim, eid, MARK.reveal)
 }
 
-/** 碰不到：静止、不可选中、被吞进肚子 */
+/** 穿行中：没有实体，谁也碰不到它，它也碰不到谁 */
+export function inTransit(eid: number): boolean {
+  return Motion.kind[eid] === MOTION.transit
+}
+
+/** 碰不到：静止、不可选中、被吞进肚子、穿行中 */
 export function isUntargetable(sim: Sim, eid: number): boolean {
-  return hasMark(sim, eid, MARK.stasis) || hasMark(sim, eid, MARK.untargetable) || hasMark(sim, eid, MARK.devoured)
+  return hasMark(sim, eid, MARK.stasis) || hasMark(sim, eid, MARK.untargetable) || hasMark(sim, eid, MARK.devoured) || inTransit(eid)
 }
 
 /** 所在的界，0 是大家共处的世界 */

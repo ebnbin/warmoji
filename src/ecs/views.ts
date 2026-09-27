@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { removeEntity } from 'bitecs'
 import { UNIT } from '../util/units'
 import { MAP, MAPS, rollDecor } from '../data/maps'
-import { viewport } from '../util/apply'
+import { safeInsets, viewport } from '../util/apply'
 import { Rng } from '../util/rng'
 import { spawnDecor } from './entities/decor'
 import type { EcsAtlas } from './atlas'
@@ -55,8 +55,6 @@ export interface MapView {
   destroy(v: ViewCtx): void
 }
 
-const CAM_MARGIN = () => MAP.cameraMargin * UNIT
-
 class BoundedView implements MapView {
   protected visuals: Phaser.GameObjects.GameObject[] = []
   protected decorEids: number[] = []
@@ -77,11 +75,19 @@ class BoundedView implements MapView {
     this.visuals.push(g)
   }
 
+  /** 队伍能走到的范围 */
+  protected field(v: ViewCtx): Phaser.Geom.Rectangle {
+    return new Phaser.Geom.Rectangle(0, 0, v.w, v.h)
+  }
+
+  /** 镜头最多看到范围外多远：默认边距，再加上这一边的设备安全区 */
   camera(v: ViewCtx): void {
     const cam = v.scene.cameras.main
-    const m = CAM_MARGIN()
+    const f = this.field(v)
+    const m = MAP.cameraMargin * UNIT
+    const s = safeInsets
     cam.setZoom(viewport.renderScale)
-    cam.setBounds(-m, -m, v.w + m * 2, v.h + m * 2)
+    cam.setBounds(f.x - m - s.left, f.y - m - s.top, f.width + m * 2 + s.left + s.right, f.height + m * 2 + s.top + s.bottom)
     cam.startFollow(v.anchor)
   }
 
@@ -110,7 +116,7 @@ class BoundedView implements MapView {
   step(_v: ViewCtx, _sim: Sim, _delta: number): void {}
 
   resize(v: ViewCtx): void {
-    v.scene.cameras.main.setZoom(viewport.renderScale)
+    this.camera(v)
   }
 
   destroy(v: ViewCtx): void {
@@ -243,12 +249,9 @@ class SpaceView extends BoundedView {
     this.visuals.push(ring)
   }
 
-  camera(v: ViewCtx): void {
-    const cam = v.scene.cameras.main
-    const half = fieldRadius(v) + CAM_MARGIN()
-    cam.setZoom(viewport.renderScale)
-    cam.setBounds(-half, -half, half * 2, half * 2)
-    cam.startFollow(v.anchor)
+  protected field(v: ViewCtx): Phaser.Geom.Rectangle {
+    const r = fieldRadius(v)
+    return new Phaser.Geom.Rectangle(-r, -r, r * 2, r * 2)
   }
 
   /** 装饰只撒在圈里 */

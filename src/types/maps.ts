@@ -29,11 +29,19 @@ export interface DayNightConfig {
   readonly daySpawnScale: number
   readonly nightSpawnScale: number
 }
+/** 地面对体力的影响：赶路每走一格扣几点体力，歇着时体力回复乘多少 */
+export interface GroundStamina {
+  readonly exertion: number
+  readonly regen: number
+}
 export interface IceConfig {
   readonly floeU: number
   readonly traction: number
   readonly waterTraction: number
   readonly waterViscosity: number
+  /** 水里的体力：冰面按地图的体力算 */
+  readonly waterExertion: number
+  readonly waterRegen: number
   readonly waterTeamDps: number
   readonly waterEnemyDps: number
   readonly waterTickMs: number
@@ -55,6 +63,9 @@ export interface RiverConfig {
   readonly viewScale: number
   readonly width: number
   readonly flow: number
+  /** 正逆流、正顺流赶路时费力的倍率，斜着走按夹角插值 */
+  readonly upstream: number
+  readonly downstream: number
   /** 拾取物漂过下游边多远消失 */
   readonly coinCullPad: number
   /** 敌人漂过下游边多远就被冲走 */
@@ -76,8 +87,7 @@ export interface MapDef {
   readonly desc: string
   readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice'
   readonly size?: { readonly w: number; readonly h: number }
-  /** 地面费力：在这张图上赶路，每走一格扣掉的体力比例；不写就是不费力 */
-  readonly exertion?: number
+  readonly stamina: GroundStamina
   readonly palette: Palette
   readonly decor: MapDecor
   readonly drift?: readonly string[]

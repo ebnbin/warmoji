@@ -1,7 +1,8 @@
 import type { Cond, Effect, MarkName } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
+import { TRANSIT_MS } from '../../../data/abilities'
 import { hasComponent, query } from 'bitecs'
-import { Ability, Alive, Anchored, Boss, Cd, Charges, Elite, Enemy, FACTION, Faction, Grow, History, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, Stamina, TAG, Transform, Uid } from '../../components'
+import { Ability, Alive, Anchored, Boss, Cd, Charges, Elite, Enemy, FACTION, Faction, Grow, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, Stamina, Stats, TAG, Trace, Transform, Uid } from '../../components'
 import { addCc, addMark, CC_MARKS, hasMark, isAirborne, markSlot } from '../../utils/marks'
 import { Interned } from '../../utils/intern'
 import { displace } from './displace'
@@ -14,7 +15,7 @@ import { spawnShadow, swapShadow } from '../../entities/shadow'
 import { spawnBarrier } from '../../entities/barrier'
 import { spawnTether } from '../../entities/tether'
 import { recallShots } from './projectile'
-import { historyAt } from './history'
+import { rewindTrace } from './trace'
 import { devour } from './gut'
 import { stealAbility } from './steal'
 import { spawnBolt } from '../../entities/projectile'
@@ -304,7 +305,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   exhaust: (sim, _src, _fx, at) => {
     eachCapable(sim, at, Stamina, (t) => {
-      Stamina.v[t] = 0
+      Stamina.used[t] = Stats.maxStamina[t]!
       Stamina.restMs[t] = 0
     })
   },
@@ -611,8 +612,9 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     if (by < 0 || t === undefined || t === by || hasMark(sim, t, MARK.unstoppable)) return
     const tx = Transform.x[t]!
     const ty = Transform.y[t]!
-    if (!displace(sim, t, { kind: 'place', x: Transform.x[by]!, y: Transform.y[by]! }, { self: false, src })) return
-    displace(sim, by, { kind: 'place', x: tx, y: ty }, { self: true, free: true })
+    const ms = TRANSIT_MS.swap
+    if (!displace(sim, t, { kind: 'transit', x: Transform.x[by]!, y: Transform.y[by]!, ms, look: 'streak', color: 0xb388ff }, { self: false, src })) return
+    displace(sim, by, { kind: 'transit', x: tx, y: ty, ms, look: 'streak', color: 0xb388ff }, { self: true, free: true })
   },
 
   form: (sim, _src, fx, at) => {
@@ -629,16 +631,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   rewind: (sim, _src, fx, at) => {
-    eachCapable(sim, at, History, (t) => {
-      const s = historyAt(t, fx.ms)
-      if (s < 0 || !Alive.v[t]) return
-      const x0 = Transform.x[t]!
-      const y0 = Transform.y[t]!
-      if (!displace(sim, t, { kind: 'place', x: History.x[s]!, y: History.y[s]! }, { self: true, free: true })) return
-      Hp.v[t] = Math.min(Hp.max[t]!, Math.max(Hp.v[t]!, History.hp[s]!))
-      spawnFxCircle(sim, x0, y0, 22, { fill: 0x80deea, fillAlpha: 0.4, fromScale: 1, toScale: 0.2, durationMs: 260, depth: 14 })
-      spawnFxCircle(sim, Transform.x[t]!, Transform.y[t]!, 26, { fill: 0x80deea, fillAlpha: 0.4, fromScale: 0.4, toScale: 1.8, durationMs: 300, depth: 14 })
-    })
+    eachCapable(sim, at, Trace, (t) => rewindTrace(sim, t, fx.ms))
   },
 
   steal: (sim, src, fx, at) => {
@@ -689,12 +682,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const foe = nearestTarget(sim, flying(src), Transform.x[by]!, Transform.y[by]!, Infinity)
     const dest = nearestSummoned(sim, by, fx.of, foe?.x ?? Transform.x[by]!, foe?.y ?? Transform.y[by]!)
     if (dest < 0) return
-    const x0 = Transform.x[by]!
-    const y0 = Transform.y[by]!
-    if (!displace(sim, by, { kind: 'place', x: Transform.x[dest]!, y: Transform.y[dest]! + Radius.v[dest]! }, { self: true })) return
-    spawnFxCircle(sim, x0, y0, 30, { fill: 0x66bb6a, fillAlpha: 0.4, fromScale: 1, toScale: 0.2, durationMs: 280, depth: 14 })
-    spawnFxCircle(sim, Transform.x[by]!, Transform.y[by]!, 30, { fill: 0x66bb6a, fillAlpha: 0.4, fromScale: 0.3, toScale: 1.8, durationMs: 320, depth: 14 })
-    if (fx.then) applyAbilityEffects(sim, src, fx.then, { x: Transform.x[by]!, y: Transform.y[by]!, baseDamage: at.baseDamage })
+    displace(sim, by, { kind: 'transit', x: Transform.x[dest]!, y: Transform.y[dest]! + Radius.v[dest]!, ms: TRANSIT_MS.teleport, look: 'hidden', color: 0x66bb6a }, { self: true, src, onLand: fx.then, base: at.baseDamage })
   },
 
   shadow: (sim, src, fx, at) => {
@@ -760,11 +748,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     if (fx.allies) eachAlly(sim, src.faction, at.x, at.y, Infinity, false, (t) => void list.push(t), src.realm)
     else list.push(...(at.targets ?? []))
     for (const t of list) {
-      const x0 = Transform.x[t]!
-      const y0 = Transform.y[t]!
-      if (!displace(sim, t, { kind: 'place', x: x0 + dx, y: y0 + dy }, { self: false, free: true })) continue
-      spawnFxCircle(sim, x0, y0, Radius.v[t]! * 1.6, { fill: 0x9575cd, fillAlpha: 0.45, fromScale: 1, toScale: 0.2, durationMs: 260, depth: 14 })
-      spawnFxCircle(sim, Transform.x[t]!, Transform.y[t]!, Radius.v[t]! * 1.6, { fill: 0x9575cd, fillAlpha: 0.45, fromScale: 0.2, toScale: 1.5, durationMs: 300, depth: 14 })
+      displace(sim, t, { kind: 'transit', x: Transform.x[t]! + dx, y: Transform.y[t]! + dy, ms: TRANSIT_MS.teleport, look: 'hidden', color: 0x9575cd }, { self: false, free: true })
     }
   },
 

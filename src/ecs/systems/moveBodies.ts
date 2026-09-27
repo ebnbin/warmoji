@@ -1,9 +1,11 @@
 import { hasComponent, query } from 'bitecs'
+import { FOLLOW_IN_MS } from '../../data/abilities'
 import { Airborne, Alive, BreaksWalls, Drive, Motion, MOTION, Phys, Radius, Transform, VisOff } from '../components'
 import { GROUND } from '../worlds/hooks'
 import { bodyDt } from './shared/body'
-import { endMotion } from './shared/displace'
+import { endMotion, transitFlash } from './shared/displace'
 import { isSameEntity } from '../utils/identity'
+import { sineEaseInOut } from '../utils/ease'
 import type { Sim } from '../sim'
 
 const STILL = { x: 0, y: 0 }
@@ -27,7 +29,29 @@ function stepArc(sim: Sim, eid: number, dt: number): void {
   Motion.landed[eid] = 1
 }
 
-/** 跟随：贴着宿主的偏移处，宿主没了或到时就松开 */
+/** 穿行：沿直线缓入缓出地移到落点，途中没有实体；到点现身并记下 landed */
+function stepTransit(sim: Sim, eid: number, dt: number): void {
+  const t = Math.min(Motion.ms[eid]!, Motion.t[eid]! + dt * 1000)
+  Motion.t[eid] = t
+  const p = sineEaseInOut(t / Motion.ms[eid]!)
+  const fx = Motion.fx[eid]!
+  const fy = Motion.fy[eid]!
+  const to = sim.hooks.wrap(sim, fx + (Motion.tx[eid]! - fx) * p, fy + (Motion.ty[eid]! - fy) * p)
+  Transform.x[eid] = to.x
+  Transform.y[eid] = to.y
+  if (t < Motion.ms[eid]!) {
+    Phys.vx[eid] = Motion.vx[eid]!
+    Phys.vy[eid] = Motion.vy[eid]!
+    return
+  }
+  Phys.vx[eid] = 0
+  Phys.vy[eid] = 0
+  Motion.kind[eid] = MOTION.none
+  Motion.landed[eid] = 1
+  transitFlash(sim, eid, to.x, to.y, true)
+}
+
+/** 跟随：先从原处被拉到宿主的偏移处，再贴着走，宿主没了或到时就松开 */
 function stepFollow(sim: Sim, eid: number, dt: number): void {
   Motion.t[eid] = Motion.t[eid]! + dt * 1000
   const host = Motion.ref[eid]!
@@ -35,7 +59,11 @@ function stepFollow(sim: Sim, eid: number, dt: number): void {
     endMotion(eid)
     return
   }
-  const to = sim.hooks.wrap(sim, Transform.x[host]! + Motion.tx[eid]!, Transform.y[host]! + Motion.ty[eid]!)
+  const fx = Motion.fx[eid]!
+  const fy = Motion.fy[eid]!
+  const d = sim.hooks.worldDelta(sim, fx, fy, Transform.x[host]! + Motion.tx[eid]!, Transform.y[host]! + Motion.ty[eid]!)
+  const p = sineEaseInOut(Math.min(1, Motion.t[eid]! / FOLLOW_IN_MS))
+  const to = sim.hooks.wrap(sim, fx + d.x * p, fy + d.y * p)
   Transform.x[eid] = to.x
   Transform.y[eid] = to.y
   Phys.vx[eid] = Phys.vx[host]!
@@ -58,7 +86,7 @@ function seek(sim: Sim, eid: number): boolean {
   return false
 }
 
-/** 所有身体同一条积分；冲刺中的身体按脚本速度走，弧线中的身体腾空，跟随中的身体贴着宿主，空中的身体不受地面与介质影响；位置经场地修正后速度按实际位移回推 */
+/** 所有身体同一条积分；冲刺中的身体按脚本速度走，弧线中的身体腾空，穿行中的身体沿直线移过去，跟随中的身体贴着宿主，空中的身体不受地面与介质影响；位置经场地修正后速度按实际位移回推 */
 export function moveBodies(sim: Sim): void {
   for (const eid of query(sim.world, [Phys, Transform, Radius])) {
     if (Alive.v[eid] === 0) continue
@@ -67,6 +95,10 @@ export function moveBodies(sim: Sim): void {
     const kind = Motion.kind[eid]
     if (kind === MOTION.arc) {
       stepArc(sim, eid, dt)
+      continue
+    }
+    if (kind === MOTION.transit) {
+      stepTransit(sim, eid, dt)
       continue
     }
     if (kind === MOTION.follow) {

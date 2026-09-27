@@ -48,7 +48,7 @@ function landHits(sim: Sim, m: number, e: number): void {
   spawnFxBoom(sim, x, y, radius * 1.4)
 }
 
-/** 脚本位移的结算都在身体走完这一帧之后，敌我同一条：冲刺撞击、跳跃落地、被摆布后的落地与撞墙 */
+/** 脚本位移的结算都在身体走完这一帧之后，敌我同一条：冲刺撞击、跳跃落地、落地（穿行是现身）与撞墙的后续 */
 export function settleMotions(sim: Sim): void {
   for (const m of [...query(sim.world, [Motion, Transform])]) {
     const kind = Motion.kind[m]!

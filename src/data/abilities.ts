@@ -16,6 +16,8 @@ export const PICKUP_BODY = CT.pickupBody
 export const SHARD_BODY = CT.shardBody
 export const MORPH = CT.morph
 export const BLINK_IFRAME_PAD_MS = CT.blinkIframePadMs
+export const TRANSIT_MS = CT.transitMs
+export const FOLLOW_IN_MS = CT.followInMs
 export const MINION_FIRST_SHOT_MS = CT.minionFirstShotMs
 export const ARMOR_HALF = CT.armorHalf
 export const LIFESTEAL_CAP_PER_SEC = CT.lifestealCapPerSec
@@ -76,4 +78,21 @@ export function abilityEffects(a: AbilityDef): readonly EffectList[] {
 /** 能力里套着的能力：下一段、轮换的招式、装置出手用的 */
 export function childAbilities(a: AbilityDef): readonly AbilityDef[] {
   return [...(a.recast ? [a.recast.ability] : []), ...(a.cycle ?? []), ...(a.shape.kind === 'emplace' ? [a.shape.ability] : [])]
+}
+
+/** 尾随的施法锚点落在宿主多久前走过的地方 */
+export const PET_TRAIL_MS = 1500
+
+/** 能力要回看多久的路：倒带回看的最长时长，连同套着的能力；不倒带为 0 */
+export function rewindMs(a: AbilityDef): number {
+  let ms = 0
+  const walk = (list: EffectList): void => {
+    for (const fx of list ?? []) {
+      if (fx.kind === 'rewind') ms = Math.max(ms, fx.ms)
+      for (const c of childEffects(fx)) walk(c)
+    }
+  }
+  for (const list of abilityEffects(a)) walk(list)
+  for (const c of childAbilities(a)) ms = Math.max(ms, rewindMs(c))
+  return ms
 }
