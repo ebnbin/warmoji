@@ -9,6 +9,7 @@ export const STATS = {
   iframes: { name: '受击无敌', base: 0, min: 0, unit: 'ms' },
   revive: { name: '复活时间', base: 0, min: 1000, unit: 'ms' },
   taken: { name: '受到伤害', base: 1, min: 0, unit: 'ratio' },
+  blocks: { name: '每波护盾', base: 0, min: 0, unit: 'count' },
   thorns: { name: '接触反伤', base: 0, min: 0, unit: 'count' },
   killHeal: { name: '击杀回复', base: 0, min: 0, unit: 'count' },
   healing: { name: '治疗效果', base: 1, min: 0, unit: 'ratio' },
@@ -30,4 +31,10 @@ export const STATS = {
   scale: { name: '体型', base: 1, min: 0.05, unit: 'ratio' },
   magnet: { name: '拾取范围', base: 0, min: 0, unit: 'grid' },
   exertion: { name: '赶路耗体力', base: 1, min: 0, unit: 'ratio' },
+  harvest: { name: '每波收获', base: 0, min: 0, unit: 'count' },
+  luck: { name: '幸运', base: 0, unit: 'count' },
+  shopPrice: { name: '商店价格', base: 1, min: 0.1, unit: 'ratio' },
+  freeRerolls: { name: '进店免费刷新', base: 0, min: 0, unit: 'count' },
+  enemySpeed: { name: '敌人移速', base: 1, min: 0.1, unit: 'ratio' },
+  enemyCount: { name: '敌人数量', base: 1, min: 0.1, unit: 'ratio' },
 } as const satisfies Record<string, StatDef>

@@ -12,6 +12,7 @@ import { ROLES } from '../../data/roles'
 import { waveStartHp } from '../../run/state'
 import { INVINCIBLE_HP, sandboxInvincible } from '../sandbox/knobs'
 import { armIdle } from '../systems/shared/anim'
+import { armGear } from '../systems/shared/gear'
 
 import type { RunState } from '../../run/state'
 import { Anim, Breath, Depth, FACTION, Grow, Hp, CharFlash, CharScale, Facing, Pop, Revive, Seat, Slot, Sprite, Transform } from '../components'
@@ -42,7 +43,7 @@ export function spawnCharacter(
   const id = run.roster[slot]!
   const def = CHARACTERS[id]
   const size = MEMBER.size * UNIT * place.sizeMul
-  const { owned, level } = memberGear(run, slot, sandbox)
+  const { owned, growth, level } = memberGear(run, slot, sandbox)
   const base = memberBase(def)
   const eid = spawnBody(world, {
     faction: FACTION.team,
@@ -62,10 +63,11 @@ export function spawnCharacter(
   Grow.r0[eid] = MEMBER.radius * UNIT
   Grow.s0[eid] = MEMBER.size * UNIT
   setStatLayer(eid, 'role', [ROLES[def.role].stats])
-  setStatLayer(eid, 'gear', gearMods(owned, levelStatsFor(id, level)))
+  setStatLayer(eid, 'gear', gearMods(owned, levelStatsFor(id, level), growth))
   foldBody(world, undefined, eid)
   Hp.v[eid] = sandbox ? Hp.max[eid]! : waveStartHp(run.memberHp[slot] ?? Hp.max[eid]!, Hp.max[eid]!)
   bodyRules[eid] = { ...def.rules, resource: def.resource }
+  armGear(world, eid, owned)
   attachResource(world, eid, def.resource, run.memberRes[slot] ?? -1)
   Seat.v[eid] = -1
   Facing.y[eid] = -1

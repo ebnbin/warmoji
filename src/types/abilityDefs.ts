@@ -90,6 +90,12 @@ interface DamageEffect {
   readonly amount: number
   readonly ratio?: number
 }
+/** 按目标当前生命的比例造成伤害，首领与精英按 bossRatio */
+interface HpDamageEffect {
+  readonly kind: 'hpDamage'
+  readonly ratio: number
+  readonly bossRatio: number
+}
 /** 定身：失去行动 */
 interface StunEffect {
   readonly kind: 'stun'
@@ -136,6 +142,12 @@ interface TimeStopEffect {
 interface CoinsEffect {
   readonly kind: 'coins'
   readonly count: number
+}
+/** 结息：队伍按手上金币的 ratio 倍得金币，最多 max */
+interface InterestEffect {
+  readonly kind: 'interest'
+  readonly ratio: number
+  readonly max: number
 }
 /** 消散：目标身体不算击杀地移除，自爆者对自己用 */
 interface VanishEffect {
@@ -499,6 +511,7 @@ export type Effect =
   | AttackSlowEffect
   | BuffEffect
   | DamageEffect
+  | HpDamageEffect
   | StunEffect
   | ExhaustEffect
   | HideEffect
@@ -510,6 +523,7 @@ export type Effect =
   | ReviveCutEffect
   | TimeStopEffect
   | CoinsEffect
+  | InterestEffect
   | VanishEffect
   | RootEffect
   | SilenceEffect

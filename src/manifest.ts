@@ -7,8 +7,10 @@ import { BOSSES, ENEMY_DEFS, SPAWN } from './data/enemies'
 import { PICKUPS } from './data/pickups'
 import { FIELD_PICKUPS } from './data/battlefield'
 import { ITEMS } from './data/items'
+import { abilityEffects, childAbilities, childEffects } from './data/abilities'
 import { MAPS } from './data/maps'
 import type { MapDef } from './types/maps'
+import type { ItemDef } from './types/items'
 import { SETTING_DEFS } from './save/settings'
 
 const roster: readonly CharacterDef[] = Object.values(CHARACTERS)
@@ -40,7 +42,6 @@ function walkEffects(list: readonly Effect[] | undefined, side: Side): void {
         break
       case 'spawnProjectile':
         seen[side].shot.add(fx.projectile.emoji)
-        walkEffects(fx.onHit, side)
         break
       case 'spawn':
         walkNpc(fx.def, side)
@@ -51,50 +52,10 @@ function walkEffects(list: readonly Effect[] | undefined, side: Side): void {
       case 'raise':
         seen[side].raises = true
         break
-      case 'if':
-        walkEffects(fx.then, side)
-        walkEffects(fx.else, side)
-        break
-      case 'stack':
-      case 'fuse':
-      case 'store':
-      case 'deathMark':
-      case 'empower':
-      case 'caster':
-      case 'area':
-      case 'parry':
-        walkEffects(fx.then, side)
-        break
-      case 'teleport':
-        walkEffects(fx.then, side)
-        break
-      case 'form':
-        walkEffects(fx.onEnd, side)
-        break
-      case 'clone':
-        walkEffects(fx.onDeath, side)
-        break
-      case 'shove':
-        walkEffects(fx.onWall, side)
-        break
-      case 'throw':
-        walkEffects(fx.onLand, side)
-        break
-      case 'ground':
-        walkEffects(fx.def.effects, side)
-        walkEffects(fx.def.onExpire, side)
-        walkEffects(fx.def.dwell?.effects, side)
-        break
-      case 'barrier':
-        walkEffects(fx.onCross, side)
-        break
-      case 'tether':
-        walkEffects(fx.onHold, side)
-        walkEffects(fx.onBreak, side)
-        break
       default:
         break
     }
+    for (const sub of childEffects(fx)) walkEffects(sub, side)
   }
 }
 
@@ -106,25 +67,11 @@ function walkAbility(a: AbilityDef, side: Side): void {
   if (a.held) s.body.add(a.held.emoji)
   if (a.anchor) s.body.add(a.anchor.emoji)
   if (sh.kind === 'bolt') s.shot.add(sh.projectile.emoji)
-  if (sh.kind === 'emplace') {
-    s.body.add(sh.turret.emoji)
-    walkAbility(sh.ability, side)
-  }
+  if (sh.kind === 'emplace') s.body.add(sh.turret.emoji)
   if (sh.kind === 'summon') s.body.add(sh.minion.emoji)
   if (sh.kind === 'drop') s.body.add(sh.emoji)
-  if (sh.kind === 'zone') {
-    walkEffects(sh.pulse?.onHit, side)
-    walkEffects(sh.onExpire, side)
-    walkEffects(sh.dwell?.effects, side)
-  }
-  if (a.recast) walkAbility(a.recast.ability, side)
-  for (const c of a.cycle ?? []) walkAbility(c, side)
-  walkEffects(a.onHit, side)
-  walkEffects(a.onSelf, side)
-  walkEffects(a.onCast, side)
-  walkEffects(a.onKill, side)
-  walkEffects(a.boost?.onHit, side)
-  walkEffects(a.ammo?.last, side)
+  for (const c of childAbilities(a)) walkAbility(c, side)
+  for (const list of abilityEffects(a)) walkEffects(list, side)
 }
 
 function walkRules(r: BodyRules | undefined, side: Side): void {
@@ -150,6 +97,11 @@ function walkNpc(def: NpcDef, side: Side): void {
     if (fx.kind === 'split') walkNpc(fx.into, side)
     else if (fx.kind !== 'decoy') walkEffects([fx], side)
   }
+}
+
+for (const i of Object.values<ItemDef>(ITEMS)) {
+  for (const t of i.on ?? []) walkEffects(t.effects, 'team')
+  if (i.ability) walkAbility(i.ability, 'team')
 }
 
 for (const c of roster) {

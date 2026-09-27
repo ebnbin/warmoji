@@ -55,6 +55,18 @@ export class StatFold {
   }
 }
 
+/** 一组修正叠 n 份：加值乘份数，倍率的涨跌乘份数（冷却倍率按攻速的涨跌） */
+export function stackMods(m: StatMods, n: number): StatMods {
+  const add: StatBase = {}
+  const mul: StatBase = {}
+  for (const k of keysOf(m.add ?? {})) add[k] = m.add![k]! * n
+  for (const k of keysOf(m.mul ?? {})) {
+    const v = m.mul![k]!
+    mul[k] = STATS[k].unit === 'rate' ? 1 / (1 + (1 / v - 1) * n) : 1 + (v - 1) * n
+  }
+  return { add, mul }
+}
+
 const scratch = new StatFold()
 
 /** 战斗外的属性表：基础值加上常驻修正，商店与图鉴按它显示 */
@@ -96,9 +108,10 @@ function addText(unit: StatUnit, v: number): string {
   const sign = v < 0 ? '-' : '+'
   const a = Math.abs(v)
   switch (unit) {
+    case 'ratio':
     case 'chance':
     case 'percent':
-      return `${sign}${Math.round(a * 100)}%`
+      return `${sign}${num(a * 100, 1)}%`
     case 'ms':
       return `${sign}${num(a / 1000)}秒`
     case 'perSec':
@@ -122,12 +135,18 @@ export function statText(k: StatKey, v: number): string {
   return `${STATS[k].name} ${statValue(k, v)}`
 }
 
-/** 一组修正逐条的文字，如"生命上限 +25""攻速 ×1.15" */
+/** 倍率写成涨跌的百分比，冷却倍率按攻速的涨跌写 */
+function mulText(unit: StatUnit, v: number): string {
+  const d = (unit === 'rate' ? 1 / v : v) - 1
+  return `${d < 0 ? '-' : '+'}${Math.round(Math.abs(d) * 100)}%`
+}
+
+/** 一组修正逐条的文字，如"生命上限 +25""攻速 +15%" */
 export function modTexts(m: StatMods): string[] {
   const out: string[] = []
   const add = m.add ?? {}
   const mul = m.mul ?? {}
   for (const k of keysOf(add)) out.push(`${STATS[k].name} ${addText(STATS[k].unit, add[k]!)}`)
-  for (const k of keysOf(mul)) out.push(`${STATS[k].name} ${valueText(STATS[k].unit === 'rate' ? 'rate' : 'ratio', mul[k]!)}`)
+  for (const k of keysOf(mul)) out.push(`${STATS[k].name} ${mulText(STATS[k].unit, mul[k]!)}`)
   return out
 }

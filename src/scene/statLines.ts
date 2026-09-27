@@ -9,7 +9,7 @@ import { tiersForLevel } from '../data/charLevel'
 import { ROLES } from '../data/roles'
 import { deliveryOf, HIT } from '../ecs/utils/hitTags'
 import { levelStatsFor } from '../data/levels'
-import type { ItemId } from '../types/items'
+import type { GrowthProgress, ItemId } from '../types/items'
 import type { AbilityDef, Cond, Effect, MarkName, Shape, ShapeKind } from '../types/abilityDefs'
 import type { ZoneRules } from '../types/groundEffects'
 import type { StatGroup } from '../types/statLines'
@@ -42,15 +42,15 @@ export function abilityLabel(w: AbilityDef): string {
   return SHAPE_LABEL[s.kind]
 }
 
-function grid(units: number): string {
+export function grid(units: number): string {
   return `${+units.toFixed(1)}格`
 }
 
-function sec(ms: number): string {
+export function sec(ms: number): string {
   return `${+(ms / 1000).toFixed(2)}秒`
 }
 
-function pct(v: number): string {
+export function pct(v: number): string {
   return `${Math.round(v * 100)}%`
 }
 
@@ -92,6 +92,8 @@ export function effectLine(e: Effect, self = false): string {
     }
     case 'damage':
       return e.ratio === undefined ? `造成 ${e.amount} 点伤害` : `造成${e.amount ? ` ${e.amount} +` : ''} ${pct(e.ratio)} 基础伤害`
+    case 'hpDamage':
+      return `造成目标当前生命 ${pct(e.ratio)} 的伤害（首领与精英 ${pct(e.bossRatio)}）`
     case 'stun':
       return `眩晕 ${sec(e.durationMs)}`
     case 'exhaust':
@@ -116,6 +118,8 @@ export function effectLine(e: Effect, self = false): string {
       return '自身消散'
     case 'coins':
       return `每次命中掉 ${e.count} 枚金币`
+    case 'interest':
+      return `按手上金币的 ${pct(e.ratio)} 结息，最多 ${e.max}`
     case 'root':
       return `定身 ${sec(e.durationMs)}（不能走，能出手）`
     case 'silence':
@@ -392,10 +396,10 @@ export function characterStatGroups(
   id: CharacterId,
   items: readonly ItemId[] = [],
   level = 1,
-  opts: { path?: boolean } = {},
+  opts: { path?: boolean; growth?: GrowthProgress } = {},
 ): StatGroup[] {
   const def = CHARACTERS[id]
-  const stats = memberStats(def, gearMods(items, levelStatsFor(id, level)))
+  const stats = memberStats(def, gearMods(items, levelStatsFor(id, level), opts.growth))
   const tiers = tiersForLevel(level)
   const loadout = loadoutFor(def, tiers)
   const baseLines = [

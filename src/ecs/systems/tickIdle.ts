@@ -1,12 +1,10 @@
 import { query } from 'bitecs'
-import { UNIT } from '../../util/units'
 import { Alive, Idle, Phys, Transform } from '../components'
 import { bodyRules } from '../store'
 import { applyAbilityEffects } from './shared/effects'
 import { selfSource } from '../utils/source'
+import { STILL } from '../utils/stats'
 import type { Sim } from '../sim'
-
-const STILL = 0.3 * UNIT
 
 /** 闲着的规则：ms 内没出手（要求静止的还得没动）就施于自身一次，出手或走动后重新计 */
 export function tickIdle(sim: Sim): void {

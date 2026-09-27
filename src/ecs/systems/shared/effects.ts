@@ -1,7 +1,7 @@
 import type { Cond, Effect, MarkName } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
 import { hasComponent, query } from 'bitecs'
-import { Ability, Alive, Anchored, Boss, Cd, Charges, Enemy, FACTION, Faction, Grow, History, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, Stamina, TAG, Transform, Uid } from '../../components'
+import { Ability, Alive, Anchored, Boss, Cd, Charges, Elite, Enemy, FACTION, Faction, Grow, History, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, Stamina, TAG, Transform, Uid } from '../../components'
 import { addCc, addMark, CC_MARKS, hasMark, isAirborne, markSlot } from '../../utils/marks'
 import { Interned } from '../../utils/intern'
 import { displace } from './displace'
@@ -287,6 +287,14 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     for (const t of at.targets ?? []) hit(sim, src, t, dmg)
   },
 
+  hpDamage: (sim, src, fx, at) => {
+    for (const t of at.targets ?? []) {
+      if (!hasComponent(sim.world, t, Hp) || !Alive.v[t]) continue
+      const dmg = Hp.v[t]! * (Boss.v[t] || Elite.v[t] ? fx.bossRatio : fx.ratio)
+      if (dmg >= 1) hit(sim, src, t, dmg)
+    }
+  },
+
   stun: (sim, _src, fx, at) => {
     const until = sim.elapsedMs + fx.durationMs
     eachCapable(sim, at, Mark, (t) => {
@@ -351,6 +359,10 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
 
   coins: (sim, src, fx, at) => {
     if (src.faction === FACTION.team) spawnCoins(sim, at.x, at.y, fx.count)
+  },
+
+  interest: (sim, src, fx) => {
+    if (src.faction === FACTION.team) sim.run.coins += Math.min(fx.max, Math.floor(sim.run.coins * fx.ratio))
   },
 
   vanish: (sim, _src, _fx, at) => {

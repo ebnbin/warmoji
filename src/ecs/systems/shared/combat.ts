@@ -7,7 +7,7 @@ import { coinDropChance } from '../../../data/waves'
 import { ELITE } from '../../../data/enemies'
 import type { EnemyDef } from '../../../types/enemies'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Hp, Lethal, MARK, MARK_SLOTS, Mark, Nest, Revive, Slot, Sprite, Stats, TAG, Thief, Tint, Transform } from '../../components'
+import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Gear, Hp, Lethal, MARK, MARK_SLOTS, Mark, Nest, Revive, Slot, Sprite, Stats, TAG, Thief, Tint, Transform } from '../../components'
 import { isSameEntity } from '../../utils/identity'
 import { addMark, hasMark } from '../../utils/marks'
 import { offenseOf } from '../../utils/stats'
@@ -23,10 +23,11 @@ import { endMotion } from './displace'
 import { charSize } from './scale'
 import { release } from './gut'
 import { returnBorrowed } from './steal'
+import { gearKill } from './gear'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 
-/** 生命归零：击杀者先反应，带复活计时的身体倒地等待，其余身体死亡移除 */
+/** 生命归零：击杀者先反应，带复活计时的身体倒地等待，其余身体死亡移除，敌人移除后再触发击杀者道具的击杀规则 */
 export function die(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: number): void {
   killerReacts(sim, src)
   settleDeathMarks(sim, eid)
@@ -37,7 +38,10 @@ export function die(sim: Sim, eid: number, src: Source, flingVx: number, flingVy
     return
   }
   const anchored = hasComponent(sim.world, eid, Anchored)
+  const at = { x: Transform.x[eid]!, y: Transform.y[eid]! }
+  const hostile = Faction.v[eid] === FACTION.enemy
   killBody(sim, eid, src.slot, anchored ? 0 : flingVx, anchored ? 0 : flingVy)
+  if (hostile) gearKill(sim, src, at)
 }
 
 /** 击杀反应施于出手的身体，敌我同一条：属性表的击杀回复、身体的击杀规则、出手那条能力的击杀效果、资源的击杀增长 */
@@ -195,6 +199,8 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   Alive.v[eid] = 1
   Lethal.used[eid] = 0
   Lethal.low[eid] = 0
+  Gear.low[eid] = 0
+  Gear.lethal[eid] = 0
   Anim.frames[eid] = 0
   Hp.v[eid] = Hp.max[eid]!
   // 复活视同被命中一次的保护

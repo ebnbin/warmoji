@@ -97,6 +97,9 @@ export const tetherBreak = slots<readonly Effect[]>()
 /** 身体自己的规则：敌人是它的定义，角色是角色表里的，造物只有接触效果 */
 export const bodyRules = slots<BodyRules>()
 
+/** 角色身上道具汇总出的条件属性与触发 */
+export const gearRules = slots<import('./systems/shared/gear').GearRules>()
+
 /** 属性的基础值：出生时按定义写，没写的取属性目录里的默认值 */
 export const statBase = slots<StatBase>()
 

@@ -1,8 +1,15 @@
 import { hasComponent, query, removeComponent } from 'bitecs'
-import { Ability, CastRequest, Cd, Manual } from '../components'
+import { Ability, CastRequest, Cd, Manual, Owner, Stage } from '../components'
 import { fireAbility } from './shared/fire'
 import { ready, spend } from './shared/avail'
+import { gearSkill } from './shared/gear'
 import type { Sim } from '../sim'
+
+/** 出了手记账；手动能力的第一段算放了一次主动技能 */
+function fired(sim: Sim, e: number): void {
+  spend(sim, e)
+  if (hasComponent(sim.world, e, Manual) && !(hasComponent(sim.world, e, Stage) && Stage.root[e] !== 0)) gearSkill(sim, Owner.eid[e]!)
+}
 
 /** 自动能力：能出手就出手，出了手再记账；没出成手下一帧再试 */
 export function castAbilities(sim: Sim): void {
@@ -10,7 +17,7 @@ export function castAbilities(sim: Sim): void {
     if (!hasComponent(sim.world, e, Ability)) continue
     if (hasComponent(sim.world, e, CastRequest)) {
       removeComponent(sim.world, e, CastRequest)
-      if (ready(sim, e) && fireAbility(sim, e)) spend(sim, e)
+      if (ready(sim, e) && fireAbility(sim, e)) fired(sim, e)
       continue
     }
     if (hasComponent(sim.world, e, Manual)) continue
@@ -24,6 +31,6 @@ export function castRequests(sim: Sim): void {
   for (const e of [...query(sim.world, [Ability, Manual, CastRequest])]) {
     if (!hasComponent(sim.world, e, CastRequest)) continue
     removeComponent(sim.world, e, CastRequest)
-    if (ready(sim, e) && fireAbility(sim, e)) spend(sim, e)
+    if (ready(sim, e) && fireAbility(sim, e)) fired(sim, e)
   }
 }

@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { ABILITIES } from '../defs/abilities.ts'
 import { AI } from '../defs/ai.ts'
 import { ANIMATIONS } from '../defs/animations.ts'
@@ -24,6 +24,7 @@ import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef } from '../src/types/enemies'
+import type { ItemDef } from '../src/types/items'
 import type { MapDef } from '../src/types/maps'
 
 const errors: string[] = []
@@ -79,6 +80,16 @@ need(
   PROGRESSION.loopFrom >= 1 && PROGRESSION.loopFrom <= PROGRESSION.waveDurationsSec.length,
   'progression.loopFrom 须在 1 到总波数之间',
 )
+
+const PACK = new Set(readFileSync('scripts/emoji/ordering.txt', 'utf8').split(/\s+/))
+const itemEmojis = new Map<string, string>()
+for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
+  need(PACK.has(i.emoji), `items.${id} 的 emoji 不在表情包里：${i.emoji}`)
+  const dup = itemEmojis.get(i.emoji)
+  need(dup === undefined, `items.${id} 与 items.${dup} 用了同一个 emoji`)
+  itemEmojis.set(i.emoji, id)
+  need(i.maxStacks === undefined || i.maxStacks >= 1, `items.${id}.maxStacks 至少为 1`)
+}
 
 if (errors.length > 0) {
   console.error(errors.join('\n'))

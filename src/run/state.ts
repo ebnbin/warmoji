@@ -2,7 +2,7 @@ import { CHARACTERS, ROSTER_IDS, TEAM, memberStats } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { WAVE } from '../data/waves'
 import { browserStorage } from '../util/storage'
-import type { ItemId } from '../types/items'
+import type { GrowthProgress, ItemId } from '../types/items'
 import type { Hazard, MapId } from '../types/maps'
 import type { EnemyKind } from '../types/enemies'
 import { MAP_IDS } from '../data/maps'
@@ -28,6 +28,9 @@ export interface RunState {
   memberForm: number[]
   /** 跨波保留的资源值，-1 是没有 */
   memberRes: number[]
+  memberGrowth: GrowthProgress[]
+  /** 每人已计入成长的击杀数 */
+  growthKills: number[]
   leaderId: CharacterId
   stats: {
     damage: number[]
@@ -61,6 +64,8 @@ export function beginRun(starters: readonly CharacterId[], mapId: MapId = MAP_ID
     skillCd: roster.map(() => 0),
     memberForm: roster.map(() => -1),
     memberRes: roster.map(() => -1),
+    memberGrowth: roster.map(() => ({})),
+    growthKills: roster.map(() => 0),
     leaderId: roster[0]!,
     stats: {
       damage: roster.map(() => 0),
@@ -119,6 +124,8 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   run.skillCd.push(0)
   run.memberForm.push(-1)
   run.memberRes.push(-1)
+  run.memberGrowth.push({})
+  run.growthKills.push(0)
   run.stats.damage.push(0)
   run.stats.kills.push(0)
   run.stats.deaths.push(0)
