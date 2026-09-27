@@ -33,7 +33,8 @@ import { tickPets } from '../tickPets'
 import { tickBorrowed } from '../shared/steal'
 import { tickGuts } from '../shared/gut'
 import { tickShadows } from '../../entities/shadow'
-import { recordHistory } from '../shared/history'
+import { recordTraces } from '../shared/trace'
+import { tickEchoes } from '../../entities/echo'
 import { tickBarriers } from '../../entities/barrier'
 import { tickTethers } from '../../entities/tether'
 import { tintEnemies } from '../tintEnemies'
@@ -74,7 +75,8 @@ export const SIM_PIPELINE = pipeline([
   { run: moveBodies, after: [layoutTeam, steerBodies] },
   { run: tickStamina, after: [moveBodies] },
   { run: refreshTargets, after: [moveBodies] },
-  { run: recordHistory, after: [moveBodies] },
+  { run: recordTraces, after: [moveBodies] },
+  { run: tickEchoes, after: [recordTraces] },
   { run: tickPets, after: [moveBodies] },
   { run: tickTethers, after: [refreshTargets] },
   { run: settleMotions, after: [refreshTargets] },

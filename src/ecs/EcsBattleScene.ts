@@ -445,7 +445,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
         this.shownHp[i] = -1
         continue
       }
-      g.setVisible(true).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
+      g.setVisible(Tint.alpha[m]! > 0).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
       const ratio = Math.max(0, Math.min(1, Hp.v[m]! / Hp.max[m]!))
       const res = hasComponent(this.world, m, Res) ? Res.v[m]! / Math.max(1, Res.max[m]!) : -1
       const locked = res >= 0 && sim.elapsedMs < Res.lock[m]!

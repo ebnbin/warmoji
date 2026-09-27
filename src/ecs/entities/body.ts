@@ -1,6 +1,6 @@
 import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
-import { Alive, Casting, Clock, Ctl, Depth, Drive, Faction, Grow, History, Hp, Idle, Leech, Lethal, Mark, Motion, MotionHit, Phys, Radius, Sprite, Stamina, Tint, Transform, VisOff } from '../components'
+import { Alive, Casting, Clock, Ctl, Depth, Drive, Faction, Grow, Hp, Idle, Leech, Lethal, Mark, Motion, MotionHit, Phys, Radius, Sprite, Stamina, Tint, Transform, VisOff } from '../components'
 import { attachStats } from '../utils/stats'
 import type { StatBase } from '../../types/stats'
 import type { EcsWorld } from '../world'
@@ -22,7 +22,7 @@ interface BodySpec {
 /** 一个身体：有位置、阵营、体积、属性表、力学和标记，能施法、能被画；角色和敌人都从这里出生，再各自加上身份；出生满血满体力 */
 export function spawnBody(world: EcsWorld, spec: BodySpec): number {
   const eid = newEntity(world)
-  addComponents(world, eid, Alive, Hp, Mark, Phys, Drive, Clock, Faction, Radius, Motion, MotionHit, Ctl, Stamina, Casting, Transform, Sprite, Tint, Depth, VisOff, Lethal, Leech, Grow, History, Idle)
+  addComponents(world, eid, Alive, Hp, Mark, Phys, Drive, Clock, Faction, Radius, Motion, MotionHit, Ctl, Stamina, Casting, Transform, Sprite, Tint, Depth, VisOff, Lethal, Leech, Grow, Idle)
   Alive.v[eid] = 1
   Phys.drag[eid] = spec.drag
   Phys.mass[eid] = spec.mass

@@ -28,7 +28,7 @@ export function cooled(sim: Sim, e: number): boolean {
 
 /** 能不能出手：没被冻结缴械、手头没事、轮到它、冷却或充能好了、弹匣有弹、付得起；后续段要窗口开着，第一段要没有开着的后续段 */
 export function ready(sim: Sim, e: number): boolean {
-  if (Frozen.v[e] || Disarmed.v[e] || busy(sim, e)) return false
+  if (Frozen.v[e] || Disarmed.v[e] || busy(e)) return false
   if (hasComponent(sim.world, e, Turn) && !Turn.active[e]) return false
   if (hasComponent(sim.world, e, Stage)) {
     if (Stage.root[e] !== 0) return Stage.open[e]! > sim.elapsedMs && affordable(sim, e)

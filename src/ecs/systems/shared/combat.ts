@@ -201,18 +201,19 @@ export function grantIframe(sim: Sim, eid: number, ms: number): void {
 /** 归队的落下不看能不能动；算被摆布，落地前出不了手 */
 const REJOINING: Mover = { self: false, free: true }
 
-/** 归队：扇形多出一个坑位，随机分给他，他从空中落进去；队长原地落下 */
+/** 归队：扇形多出一个坑位，随机分给他，他从空中落进去；队长原地落下。倒下的人早已淡出、不在场上，在坑位重新登场不算位移 */
 function rejoin(sim: Sim, eid: number): void {
-  let at = { x: Transform.x[eid]!, y: Transform.y[eid]! }
   if (eid !== sim.leader) {
     const n = followersOf(sim).length
     const seat = Math.floor(sim.rng.next() * n)
     Seat.v[eid] = seat
-    at = seatPoints(sim, n)[seat]!
+    const at = sim.hooks.constrainBody(sim, eid, { x: Transform.x[eid]!, y: Transform.y[eid]! }, seatPoints(sim, n)[seat]!)
+    Transform.x[eid] = at.x
+    Transform.y[eid] = at.y
   }
   Revive.rose[eid] = sim.fxMs
   Revive.drop[eid] = 1
-  displace(sim, eid, { kind: 'drop', x: at.x, y: at.y, ms: REJOIN.dropMs, height: REJOIN.height * UNIT }, REJOINING)
+  displace(sim, eid, { kind: 'drop', ms: REJOIN.dropMs, height: REJOIN.height * UNIT }, REJOINING)
 }
 
 /** 复活：生命与体力回满，回到队伍里 */

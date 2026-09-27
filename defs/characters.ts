@@ -334,7 +334,7 @@ export const CHARACTERS = {
     tags: ['damage', 'ranged', 'area'],
     body: { drag: 5, mass: 1.2 },
     stats: { moveSpeed: 4, maxStamina: 60, staminaRegen: 30, exertion: 0.5 },
-    skill: { name: '倒带', icon: '23ea', desc: '回到三秒前的位置，生命取那时与现在的较高者，并解除控制', cdMs: 12_000, ability: 'slothRewind' },
+    skill: { name: '倒带', icon: '23ea', desc: '沿直线闪回三秒前的位置，途中无敌，生命取那时与现在的较高者，并解除控制', cdMs: 12_000, ability: 'slothRewind' },
     weapons: [],
     innate: [
       {

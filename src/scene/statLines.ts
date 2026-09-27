@@ -205,7 +205,7 @@ export function effectLine(e: Effect, self = false): string {
     case 'grow':
       return `体型 ×${e.mul}${e.ms === undefined ? `（叠加且不消退${e.max ? `，最多 ×${e.max}` : ''}）` : ` ${sec(e.ms)}`}，受击与接触范围随之变化`
     case 'rewind':
-      return `回到 ${sec(e.ms)} 前的位置，生命取那时与现在的较高者`
+      return `沿直线闪回 ${sec(e.ms)} 前的位置，途中无敌，生命取那时与现在的较高者`
     case 'steal':
       return `夺取目标的${e.skill ? '主动技能' : '一项能力'}，自己用 ${sec(e.ms)}（每 ${sec(e.cooldownMs)} 一次）${e.skill ? '；原主的冷却重新走，夺取者死了原主立刻转好' : ''}`
     case 'clone':

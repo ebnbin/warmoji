@@ -1,15 +1,15 @@
 import { hasComponent, query } from 'bitecs'
 import { Alive, Faction, Hp, MARK, Mark, Radius, Revive, Transform, Uid } from '../components'
-import { isHidden, isUntargetable, markSlot, realmOf } from '../utils/marks'
+import { inTransit, isHidden, isUntargetable, markSlot, realmOf } from '../utils/marks'
 import type { Target } from '../utils/targets'
 import type { Sim } from '../sim'
 
-/** 每个阵营一份有生命的身体的快照：倒地等待复活的也在，带 alive 标记；看不见、碰不到与所在的界在这里定 */
+/** 每个阵营一份有生命的身体的快照：倒地等待复活的也在，带 alive 标记；穿行中的没有实体，不在里面；看不见、碰不到与所在的界在这里定 */
 export function refreshTargets(sim: Sim): void {
   const lists: Target[][] = [[], []]
   for (const eid of query(sim.world, [Hp, Faction, Transform, Radius, Alive])) {
     const alive = Alive.v[eid] === 1
-    if (!alive && !hasComponent(sim.world, eid, Revive)) continue
+    if ((!alive && !hasComponent(sim.world, eid, Revive)) || inTransit(eid)) continue
     const list = lists[Faction.v[eid]!]
     if (!list) continue
     const mist = markSlot(sim, eid, MARK.mist)

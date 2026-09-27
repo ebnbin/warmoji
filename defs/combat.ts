@@ -13,6 +13,10 @@ export const COMBAT = {
   morph: { recastMs: 5000, recoverMs: 700 },
   // 瞬袭落地后的无敌帧比打击时间多出的部分
   blinkIframePadMs: 200,
+  // 穿行（没有实体地沿直线移到落点）的用时：传送、倒带、换位、瞬袭
+  transitMs: { teleport: 400, rewind: 400, swap: 300, blink: 150 },
+  // 被贴到别人身上之前先被拉过去的用时
+  followInMs: 150,
   // 装置架好后多久打第一发
   minionFirstShotMs: 200,
   // 受到伤害 × 1/(1+护甲/armorHalf)，负护甲为 (armorHalf−2×护甲)/(armorHalf−护甲)

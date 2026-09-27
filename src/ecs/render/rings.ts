@@ -1,7 +1,8 @@
 import Phaser from 'phaser'
 import { query } from 'bitecs'
-import { Ring, RING_SET, Tint, Transform } from '../components'
-import { fan, newScratch, resetScratch, ringStrip } from './tri'
+import { Echo, Ring, RING_SET, Tint, Transform } from '../components'
+import { echoPts } from '../store'
+import { fan, newScratch, resetScratch, ringStrip, segment } from './tri'
 import type { Scratch } from './tri'
 import type { EcsWorld } from '../world'
 import { EcsLayer, LayerType } from './layer'
@@ -20,6 +21,10 @@ const BREATHS: readonly Breath[] = [
   { ms: 700, scaleLo: 0.82, scaleHi: 1.12, alphaLo: 0.35, alphaHi: 0.9 },
   { ms: 650, scaleLo: 0.85, scaleHi: 1.12, alphaLo: 0.4, alphaHi: 0.85 },
 ]
+
+const TRAIL_WIDTH = 5
+const TRAIL_ALPHA_OLD = 0.16
+const TRAIL_ALPHA_NEW = 0.34
 
 const BANDS: readonly { depth: number; zMin: number; zMax: number }[] = [
   { depth: 2, zMin: -Infinity, zMax: 3 },
@@ -67,7 +72,22 @@ export class RingLayer {
       fan(o, m, x, y, r, packTint(color, Ring.fillAlpha[eid]! * a))
       ringStrip(o, m, x, y, r, Ring.lineWidth[eid]!, packTint(color, Ring.lineAlpha[eid]! * a))
     }
+    if (zMin === -Infinity) this.trails(o, m)
     return o
+  }
+
+  /** 残影底下的那段路：贴着地面，越新越清楚，冷却中一起淡下去 */
+  private trails(o: Scratch, m: Phaser.GameObjects.Components.TransformMatrix): void {
+    for (const eid of query(this.world, [Echo, Tint])) {
+      const pts = echoPts[eid]
+      if (!pts) continue
+      const n = pts.length / 2
+      const color = Tint.color[eid]!
+      for (let i = 1; i < n; i++) {
+        const a = (TRAIL_ALPHA_OLD + ((TRAIL_ALPHA_NEW - TRAIL_ALPHA_OLD) * i) / (n - 1)) * Echo.dim[eid]!
+        segment(o, m, pts[i * 2 - 2]!, pts[i * 2 - 1]!, pts[i * 2]!, pts[i * 2 + 1]!, TRAIL_WIDTH, packTint(color, a))
+      }
+    }
   }
 }
 
