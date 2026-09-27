@@ -16,6 +16,8 @@ interface SceneGestures {
   readonly dragged: Set<number>
   readonly events: Phaser.Events.EventEmitter
   readonly modals: GameObject[]
+  /** 最近一次关掉模态层的帧：同一按键在这一帧里不再触发别的处理 */
+  closedAt: number
 }
 
 const DRAG = 'drag'
@@ -26,7 +28,7 @@ const clips = new WeakMap<GameObject, Rect>()
 function gesturesOf(scene: Phaser.Scene): SceneGestures {
   const known = states.get(scene)
   if (known) return known
-  const state: SceneGestures = { dragged: new Set(), events: new Phaser.Events.EventEmitter(), modals: [] }
+  const state: SceneGestures = { dragged: new Set(), events: new Phaser.Events.EventEmitter(), modals: [], closedAt: -1 }
   states.set(scene, state)
   scene.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => state.dragged.delete(p.id))
   scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -81,25 +83,29 @@ export function pushModal(root: GameObject): void {
 }
 
 export function popModal(root: GameObject): void {
-  const modals = gesturesOf(root.scene).modals
-  const i = modals.indexOf(root)
-  if (i >= 0) modals.splice(i, 1)
+  const state = gesturesOf(root.scene)
+  const i = state.modals.indexOf(root)
+  if (i < 0) return
+  state.modals.splice(i, 1)
+  state.closedAt = root.scene.game.loop.frame
 }
 
 /** 有模态层打开时，模态层之外的控件不响应键盘 */
 export function blockedByModal(obj: GameObject): boolean {
-  const modals = gesturesOf(obj.scene).modals
-  const top = modals[modals.length - 1]
-  return top !== undefined && !within(obj, top)
+  const state = gesturesOf(obj.scene)
+  const top = state.modals[state.modals.length - 1]
+  return (top !== undefined && !within(obj, top)) || state.closedAt === obj.scene.game.loop.frame
 }
 
 export function hasModal(scene: Phaser.Scene): boolean {
-  return gesturesOf(scene).modals.length > 0
+  const state = gesturesOf(scene)
+  return state.modals.length > 0 || state.closedAt === scene.game.loop.frame
 }
 
 /** 指针按下处最上层的可交互对象是否属于 root（或者什么都没按到） */
 export function pressedOn(scene: Phaser.Scene, pointer: Phaser.Input.Pointer, root: GameObject): boolean {
-  const top = scene.input.hitTestPointer(pointer)[0]
+  const input = scene.input
+  const top = input.sortGameObjects(input.hitTestPointer(pointer), pointer)[0]
   return top === undefined || within(top, root)
 }
 
