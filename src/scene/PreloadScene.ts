@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import emojiOrderingUrl from '../assets/emoji/ordering.txt?url'
 import emojiBundleUrl from '../assets/emoji/twemoji.txt?url'
 import { loadEmojiTextures, primeEmojiPack } from '../emoji/textures'
-import { FONT, UI_FONT } from '../util/fonts'
+import { Label } from '../ui'
 import { OUTLINED_EMOJIS, PRELOAD_EMOJIS } from '../manifest'
 import { SceneKey } from './keys'
 
@@ -41,12 +41,6 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   private fail(message: string): void {
-    this.add
-      .text(this.scale.width / 2, this.scale.height / 2, message, {
-        fontFamily: UI_FONT,
-        fontSize: FONT.head,
-        color: '#ffffff',
-      })
-      .setOrigin(0.5)
+    new Label(this, this.scale.width / 2, this.scale.height / 2, message, { kind: 'heading' }).setOrigin(0.5)
   }
 }

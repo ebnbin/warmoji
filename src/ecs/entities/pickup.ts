@@ -24,15 +24,19 @@ import {
 } from '../components'
 import { attachDrawable } from './drawable'
 import { pickupDef, pickupSfx } from '../store'
-import type { FieldPickupDef } from '../../types/battlefield'
+import type { FieldPickupDef, Polarity } from '../../types/battlefield'
 import type { SfxId } from '../../types/sfx'
 import type { Sim } from '../sim'
 import { UNIT } from '../../util/units'
 import { playSfx } from '../../audio/sfx'
 import { PICKUP, PICKUPS } from '../../data/pickups'
-import { FIELD, POLARITY_COLOR } from '../../data/battlefield'
+import { FIELD } from '../../data/battlefield'
 import { backEaseOut, sineEaseInOut } from '../utils/ease'
 
+const POLARITY_COLOR: Record<Polarity, number> = {
+  buff: 0x66bb6a,
+  debuff: 0xef5350,
+}
 
 interface PickupSpec {
   emoji: string

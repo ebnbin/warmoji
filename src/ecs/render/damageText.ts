@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { UI_FONT } from '../../util/fonts'
+import { FONT_FAMILY } from '../../ui/theme'
 import { DAMAGE_NUMBER_RISE_MS, MISS } from '../damageNumbers'
 import type { DamageNumbers } from '../damageNumbers'
 import { EcsLayer, LayerType } from './layer'
@@ -22,7 +22,7 @@ function bakeDigits(scene: Phaser.Scene): void {
   canvas.width = TEX_W
   canvas.height = CHAR_H
   const ctx = canvas.getContext('2d')!
-  ctx.font = `bold 26px ${UI_FONT}`
+  ctx.font = `bold 26px ${FONT_FAMILY}`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.lineJoin = 'round'
@@ -34,7 +34,7 @@ function bakeDigits(scene: Phaser.Scene): void {
     ctx.strokeText(String(i), cx, CHAR_H / 2)
     ctx.fillText(String(i), cx, CHAR_H / 2)
   }
-  ctx.font = `bold 22px ${UI_FONT}`
+  ctx.font = `bold 22px ${FONT_FAMILY}`
   ctx.strokeText('闪避', CHAR_W * CHARS + MISS_W / 2, CHAR_H / 2)
   ctx.fillText('闪避', CHAR_W * CHARS + MISS_W / 2, CHAR_H / 2)
   scene.textures.addCanvas(TEX_KEY, canvas)

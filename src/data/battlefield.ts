@@ -1,7 +1,7 @@
 import battlefieldJson from '../assets/battlefield.json'
 import { fromJson } from './json'
 import type { MapId } from '../types/maps'
-import type { BattleEffects, BattlefieldTuning, FieldPickupDef, Polarity } from '../types/battlefield'
+import type { BattleEffects, BattlefieldTuning, FieldPickupDef } from '../types/battlefield'
 
 export const BATTLE_FX_IDENTITY: BattleEffects = { team: [], enemy: [] }
 
@@ -13,8 +13,3 @@ export const FIELD_PICKUPS: readonly FieldPickupDef[] = Object.values(POOLS).fla
 
 export const FIELD = BF.field
 export const CARRIER_BUDGET = BF.carrierBudget
-
-export const POLARITY_COLOR: Record<Polarity, number> = {
-  buff: 0x66bb6a,
-  debuff: 0xef5350,
-}

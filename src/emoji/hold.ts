@@ -136,15 +136,10 @@ function assertHeld(scene: Phaser.Scene, key: string): void {
   console.error(`${scene.scene.key} 未持有 emoji 纹理：${key}`)
 }
 
-export function emojiImage(
-  scene: Phaser.Scene,
-  x: number,
-  y: number,
-  id: string,
-  size: number,
-  outline?: OutlineKind,
-): Phaser.GameObjects.Image {
+/** 场景已持有的 emoji 纹理 key；未持有时报错一次 */
+export function heldEmojiKey(scene: Phaser.Scene, id: string, outline?: OutlineKind): string {
   const key = emojiKey(id, outline)
   assertHeld(scene, key)
-  return scene.add.image(x, y, key).setDisplaySize(size, size)
+  return key
 }
+

@@ -7,63 +7,30 @@ import { PICKUPS } from '../data/pickups'
 import { WAVE } from '../data/waves'
 import { submitScore } from '../save/highscore'
 import { ITEMS } from '../data/items'
-import { randomPalette } from '../util/palette'
-import type { Palette } from '../util/palette'
-import { Rng } from '../util/rng'
 import { endRun, getRun } from '../run/state'
 import type { RunState } from '../run/state'
 import { browserStorage } from '../util/storage'
-import { applyBackground } from '../util/background'
-import { emojiImage } from '../emoji/hold'
-import { emojiText } from '../ui/emojiText'
-import { burstEmitter } from '../util/fx'
-import { ScrollView } from '../ui/scroll'
-import { FONT, UI_FONT } from '../util/fonts'
+import { burstEmitter } from '../ui/fx'
 import { playSfx } from '../audio/sfx'
-import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
-import { roundRect } from '../ui/shapes'
+import { beginPage, Button, Label, pageFrame, RichLabel, Table, TONE } from '../ui'
+import type { PageFrame, Rect, TableCell, TableRow } from '../ui'
+import { VIEWPORT_CHANGED } from '../util/apply'
 import { stackCount } from '../run/draft'
 import { SceneKey } from './keys'
 
-interface ResultLayout {
-  content: { w: number; h: number }
-  titleY: number
-  subY: number
-  bestY: number
-  table: { x: number; y: number; w: number; h: number }
-  enemy: { x: number; y: number; w: number; h: number }
-  btnY: number
+/** 伤害、承伤一类的大数缩写 */
+function fmt(v: number): string {
+  return v >= 10000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`
 }
 
-const LANDSCAPE: ResultLayout = {
-  content: { w: 1280, h: 720 },
-  titleY: 64,
-  subY: 122,
-  bestY: 160,
-  table: { x: 56, y: 190, w: 690, h: 428 },
-  enemy: { x: 766, y: 190, w: 458, h: 428 },
-  btnY: 668,
-}
-
-const PORTRAIT: ResultLayout = {
-  content: { w: 720, h: 1280 },
-  titleY: 96,
-  subY: 158,
-  bestY: 198,
-  table: { x: 24, y: 236, w: 672, h: 496 },
-  enemy: { x: 24, y: 748, w: 672, h: 392 },
-  btnY: 1206,
-}
+const NONE: TableCell = { text: '—', color: 'faint' }
 
 export class ResultScene extends Phaser.Scene {
   private preserveOnRestart = false
-  private palette?: Palette
   private run!: RunState
   private win = false
   private submitted = false
   private best = { newBest: false, bestWave: 0, bestKills: 0 }
-  private againRect = { x: 0, y: 0, w: 0, h: 0 }
-  private menuRect = { x: 0, y: 0, w: 0, h: 0 }
 
   constructor() {
     super(SceneKey.Result)
@@ -74,11 +41,9 @@ export class ResultScene extends Phaser.Scene {
   }
 
   create(): void {
-    applyCamera(this)
+    beginPage(this)
     const preserved = this.preserveOnRestart
     this.preserveOnRestart = false
-    if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
-    applyBackground(this.palette)
     this.run = getRun()
 
     if (!this.submitted) {
@@ -89,69 +54,50 @@ export class ResultScene extends Phaser.Scene {
       playSfx(this.win ? 'levelup' : 'over')
     }
 
-    const w = viewport.logicalWidth
-    const h = viewport.logicalHeight
-    const res = textRes()
-    const L = h > w ? PORTRAIT : LANDSCAPE
-    const origin = { x: (w - L.content.w) / 2, y: (h - L.content.h) / 2 }
-    const oy = origin.y
-    const cx = w / 2
-
-    const title = emojiText(
-      this,
-      cx,
-      oy + L.titleY,
-      this.win ? '{1f3c6} 通关胜利！' : '{1f480} 全军覆没',
-      {
-        fontFamily: UI_FONT,
-        fontSize: FONT.display,
-        fontStyle: 'bold',
-        color: this.win ? '#ffdc5d' : '#ef9a9a',
-        resolution: res,
-      },
-      { origin: 0.5 },
-    )
-    title.setScale(0.6)
-    this.tweens.add({ targets: title, scale: 1, duration: 380, ease: 'Back.easeOut' })
+    const f = pageFrame({ footer: true })
+    const { content } = f
+    const cx = f.centerX
+    const titleY = content.y + (f.portrait ? 96 : 64)
+    const title = new RichLabel(this, cx, titleY, this.win ? '{1f3c6} 通关胜利！' : '{1f480} 全军覆没', {
+      kind: 'display',
+      color: this.win ? 'accent' : 'bad',
+      outline: true,
+      originX: 0.5,
+      maxWidth: content.w - 48,
+    })
+    const fullScale = title.scale
+    title.setScale(fullScale * 0.6)
+    this.tweens.add({ targets: title, scale: fullScale, duration: 380, ease: 'Back.easeOut' })
     if (this.win && !preserved) {
-      const confetti = burstEmitter(this, [0xffdc5d, 0x81d4fa, 0xef9a9a, 0xa5d6a7], 420, 900)
+      const confetti = burstEmitter(this, [TONE.accent.face, TONE.info.face, TONE.bad.face, TONE.good.face], 420, 900)
       confetti.setDepth(5)
-      this.time.delayedCall(120, () => confetti.explode(26, cx - 180, oy + L.titleY))
-      this.time.delayedCall(320, () => confetti.explode(26, cx + 180, oy + L.titleY))
+      this.time.delayedCall(120, () => confetti.explode(26, cx - 180, titleY))
+      this.time.delayedCall(320, () => confetti.explode(26, cx + 180, titleY))
     }
 
     const minutes = Math.floor(this.run.combatMs / 60000)
     const seconds = Math.round((this.run.combatMs % 60000) / 1000)
-    const waveText = this.win
-      ? `${WAVE.totalWaves} 波全部打完`
-      : `止步第 ${this.run.wave} 波`
-    emojiText(
+    const waveText = this.win ? `${WAVE.totalWaves} 波全部打完` : `止步第 ${this.run.wave} 波`
+    new RichLabel(
       this,
       cx,
-      oy + L.subY,
+      titleY + 62,
       `${this.run.roster.map((id) => `{${CHARACTERS[id].emoji}}`).join('')} · ${waveText} · 击杀 ${this.run.kills} · {${PICKUPS.coin.emoji}}${this.run.coins} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
-      { fontFamily: UI_FONT, fontSize: FONT.head, color: '#e8e8f0', resolution: res },
-      { origin: 0.5 },
+      { kind: 'heading', bold: false, color: 'soft', originX: 0.5, maxWidth: content.w - 48 },
     )
-    this.add
-      .text(
-        cx,
-        oy + L.bestY,
-        this.best.newBest
-          ? '新纪录！'
-          : `最佳：第 ${this.best.bestWave} 波 · 击杀 ${this.best.bestKills}`,
-        { fontFamily: UI_FONT, fontSize: FONT.strong, color: '#ffdc5d', resolution: res },
-      )
-      .setOrigin(0.5)
+    new Label(
+      this,
+      cx,
+      titleY + (f.portrait ? 102 : 100),
+      this.best.newBest ? '新纪录！' : `最佳：第 ${this.best.bestWave} 波 · 击杀 ${this.best.bestKills}`,
+      { kind: 'heading', bold: false, color: 'accent' },
+    ).setOrigin(0.5)
 
-    this.renderTable(origin.x + L.table.x, oy + L.table.y, L.table.w, L.table.h, res)
-    this.renderEnemyPanel(origin.x + L.enemy.x, oy + L.enemy.y, L.enemy.w, L.enemy.h, res)
+    const top = titleY + (f.portrait ? 140 : 126)
+    const [team, foes] = this.panels(f, top)
+    this.renderTeam(team)
+    this.renderFoes(foes)
 
-    const btnW = 300
-    const btnH = 68
-    const gap = 26
-    this.againRect = { x: cx - btnW - gap / 2, y: oy + L.btnY - btnH / 2, w: btnW, h: btnH }
-    this.menuRect = { x: cx + gap / 2, y: oy + L.btnY - btnH / 2, w: btnW, h: btnH }
     const again = (): void => {
       endRun()
       this.scene.start(SceneKey.Map)
@@ -160,12 +106,10 @@ export class ResultScene extends Phaser.Scene {
       endRun()
       this.scene.start(SceneKey.Menu)
     }
-    this.drawButton(this.againRect, '再来一局', true, again, res)
-    this.drawButton(this.menuRect, '回主菜单', false, menu, res)
-    this.time.delayedCall(500, () => {
-      this.input.keyboard?.once('keydown-ENTER', again)
-      this.input.keyboard?.once('keydown-SPACE', again)
-    })
+    const btnW = 300
+    const gap = 26
+    new Button(this, cx - btnW / 2 - gap / 2, f.footerY, { label: '再来一局', width: btnW, armMs: 500, keys: ['ENTER', 'SPACE'], onTap: again })
+    new Button(this, cx + btnW / 2 + gap / 2, f.footerY, { label: '回主菜单', width: btnW, variant: 'secondary', armMs: 500, onTap: menu })
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -173,230 +117,92 @@ export class ResultScene extends Phaser.Scene {
     })
   }
 
-  private renderTable(x: number, y: number, w: number, h: number, res: number): void {
-    const panel = this.add.graphics()
-    roundRect(panel, x, y, w, h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
-
-    const n = this.run.roster.length
-    const headerH = 46
-    const rowH = 64
-    const label = (tx: number, ty: number, text: string, color = '#9d9dad'): void => {
-      this.add
-        .text(tx, ty, text, { fontFamily: UI_FONT, fontSize: FONT.small, color, resolution: res })
-        .setOrigin(0.5)
+  /** 队伍表与敌情表的位置：横屏并排，竖屏上下 */
+  private panels(f: PageFrame, top: number): [Rect, Rect] {
+    const x = f.content.x + (f.portrait ? 24 : 40)
+    const w = f.content.w - (f.portrait ? 48 : 80)
+    const h = f.bodyBottom - top
+    if (f.portrait) {
+      const th = Math.round(h * 0.56)
+      return [
+        { x, y: top, w, h: th },
+        { x, y: top + th + 20, w, h: h - th - 20 },
+      ]
     }
-    label(x + w * 0.43, y + headerH / 2 + 4, '伤害')
-    label(x + w * 0.55, y + headerH / 2 + 4, '承伤')
-    label(x + w * 0.65, y + headerH / 2 + 4, '击杀')
-    label(x + w * 0.75, y + headerH / 2 + 4, '阵亡')
-    label(x + w * 0.88, y + headerH / 2 + 4, '道具')
+    const tw = Math.round(w * 0.59)
+    return [
+      { x, y: top, w: tw, h },
+      { x: x + tw + 20, y: top, w: w - tw - 20, h },
+    ]
+  }
 
-    const colDamage = w * 0.43
-    const colTaken = w * 0.55
-    const colKills = w * 0.65
-    const colDeaths = w * 0.75
-    const colItems = w * 0.88
-    const rows = new ScrollView(this, { x, y: y + headerH, w, h: h - headerH - 10 })
-    this.run.roster.forEach((id, slot) => {
-      const cy = rowH * slot + rowH / 2
-      const def = CHARACTERS[id]
-      rows.add(emojiImage(this, 46, cy, def.emoji, Math.min(58, rowH - 8), 'player'))
-      rows.add(
-        this.add
-          .text(82, cy, def.name, {
-            fontFamily: UI_FONT,
-            fontSize: FONT.small,
-            fontStyle: 'bold',
-            color: '#ffffff',
-            resolution: res,
-          })
-          .setOrigin(0, 0.5),
-      )
-      const cell = (tx: number, text: string, color = '#e4e4ec'): void => {
-        rows.add(
-          this.add
-            .text(tx, cy, text, { fontFamily: UI_FONT, fontSize: FONT.body, color, resolution: res })
-            .setOrigin(0.5),
-        )
-      }
-      const fmt = (v: number): string => (v >= 10000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`)
-      cell(colDamage, fmt(this.run.stats.damage[slot] ?? 0))
-      const taken = this.run.stats.damageTaken[slot] ?? 0
-      cell(colTaken, taken > 0 ? fmt(taken) : '—', taken > 0 ? '#ffab91' : '#6f6f7d')
-      cell(colKills, `${this.run.stats.kills[slot] ?? 0}`)
-      const deaths = this.run.stats.deaths[slot] ?? 0
-      cell(colDeaths, deaths > 0 ? `${deaths}` : '—', deaths > 0 ? '#ef9a9a' : '#6f6f7d')
+  private renderTeam(rect: Rect): void {
+    const st = this.run.stats
+    const rows: TableRow[] = this.run.roster.map((id, slot) => {
+      const taken = st.damageTaken[slot] ?? 0
+      const deaths = st.deaths[slot] ?? 0
       const owned = this.run.memberItems[slot] ?? []
       const unique = [...new Set(owned)]
-      const shown = unique.slice(0, 2)
-      shown.forEach((item, i) => {
-        const ix = colItems - ((shown.length - 1) / 2 - i) * 38
-        rows.add(emojiImage(this, ix, cy, ITEMS[item].emoji, 35))
-        const stacks = stackCount(owned, item)
-        if (stacks > 1) {
-          rows.add(
-            this.add
-              .text(ix + 12, cy + 10, `${stacks}`, {
-                fontFamily: UI_FONT,
-                fontSize: FONT.caption,
-                fontStyle: 'bold',
-                color: '#ffdc5d',
-                resolution: res,
-              })
-              .setOrigin(0.5),
-          )
-        }
-      })
-      if (unique.length > 2) {
-        rows.add(
-          this.add
-            .text(colItems + 52, cy, `+${unique.length - 2}`, {
-              fontFamily: UI_FONT,
-              fontSize: FONT.caption,
-              color: '#9d9dad',
-              resolution: res,
-            })
-            .setOrigin(0.5),
-        )
+      const items: TableCell =
+        unique.length === 0
+          ? NONE
+          : { icons: unique.slice(0, 2).map((item) => ({ id: ITEMS[item].emoji, count: stackCount(owned, item) })), more: Math.max(0, unique.length - 2) }
+      return {
+        icon: CHARACTERS[id].emoji,
+        outline: 'player',
+        name: CHARACTERS[id].name,
+        cells: [
+          fmt(st.damage[slot] ?? 0),
+          taken > 0 ? { text: fmt(taken), color: 'warn' } : NONE,
+          `${st.kills[slot] ?? 0}`,
+          deaths > 0 ? { text: `${deaths}`, color: 'bad' } : NONE,
+          items,
+        ],
       }
-      if (unique.length === 0) cell(colItems, '—', '#6f6f7d')
     })
-    rows.setContentHeight(rowH * n)
+    new Table(this, rect, {
+      columns: [
+        { label: '伤害', at: 0.42 },
+        { label: '承伤', at: 0.54 },
+        { label: '击杀', at: 0.64 },
+        { label: '阵亡', at: 0.74 },
+        { label: '道具', at: 0.88 },
+      ],
+      rows,
+      rowH: 62,
+      nameBold: true,
+    })
   }
 
-  private renderEnemyPanel(x: number, y: number, w: number, h: number, res: number): void {
-    const panel = this.add.graphics()
-    roundRect(panel, x, y, w, h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
-
+  private renderFoes(rect: Rect): void {
     const st = this.run.stats
-    emojiText(
-      this,
-      x + 20,
-      y + 24,
-      '{2694} 敌情',
-      {
-        fontFamily: UI_FONT,
-        fontSize: FONT.strong,
-        fontStyle: 'bold',
-        color: '#ffffff',
-        resolution: res,
-      },
-      { origin: 0 },
-    )
-    if (st.eliteKills > 0) {
-      emojiText(
-        this,
-        x + w - 20,
-        y + 24,
-        `{2b50} 精英 ×${st.eliteKills}`,
-        {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          color: '#ffdc5d',
-          resolution: res,
-        },
-        { origin: 1 },
-      )
-    }
-
-    const enemyKinds = [...new Set([...keysOf(st.enemyKills), ...keysOf(st.enemyDamage)])].sort(
+    const kinds = [...new Set([...keysOf(st.enemyKills), ...keysOf(st.enemyDamage)])].sort(
       (a, b) => (st.enemyKills[b] ?? 0) - (st.enemyKills[a] ?? 0),
     )
-    const lines: { name: string; emoji?: string; boss: boolean; kills: number; dmg: number }[] = [
-      ...enemyKinds.map((k) => {
+    const dmgCell = (dmg: number): TableCell => (dmg > 0 ? { text: fmt(dmg), color: 'warn' } : NONE)
+    const rows: TableRow[] = [
+      ...kinds.map((k): TableRow => {
         const e = ENEMIES[k]
-        return { name: e.name, emoji: e.emoji, boss: e.role === 'boss', kills: st.enemyKills[k] ?? 0, dmg: st.enemyDamage[k] ?? 0 }
+        const boss = e.role === 'boss'
+        return {
+          icon: e.emoji,
+          outline: boss ? 'elite' : 'enemy',
+          name: e.name,
+          nameColor: boss ? 'accent' : 'ink',
+          cells: [`${st.enemyKills[k] ?? 0}`, dmgCell(st.enemyDamage[k] ?? 0)],
+        }
       }),
-      ...keysOf(st.hazardDamage).map((h) => ({ name: HAZARD_NAMES[h], boss: false, kills: 0, dmg: st.hazardDamage[h] ?? 0 })),
+      ...keysOf(st.hazardDamage).map((h): TableRow => ({ name: HAZARD_NAMES[h], cells: ['0', dmgCell(st.hazardDamage[h] ?? 0)] })),
     ]
-    if (lines.length === 0) {
-      this.add
-        .text(x + w / 2, y + h / 2, '—', {
-          fontFamily: UI_FONT,
-          fontSize: FONT.head,
-          color: '#6f6f7d',
-          resolution: res,
-        })
-        .setOrigin(0.5)
-      return
-    }
-
-    const headerH = 48
-    const colKills = x + w * 0.56
-    const colDmg = x + w * 0.82
-    const label = (tx: number, text: string): void => {
-      this.add
-        .text(tx, y + headerH + 2, text, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          color: '#9d9dad',
-          resolution: res,
-        })
-        .setOrigin(0.5)
-    }
-    label(colKills, '击杀')
-    label(colDmg, '对我方伤害')
-    const top = y + headerH + 22
-    const rowH = 42
-    const fmt = (v: number): string => (v >= 10000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`)
-    const colKillsL = colKills - x
-    const colDmgL = colDmg - x
-    const rows = new ScrollView(this, { x, y: top, w, h: y + h - top - 12 })
-    lines.forEach((line, i) => {
-      const cy = rowH * i + rowH / 2
-      if (line.emoji) rows.add(emojiImage(this, 34, cy, line.emoji, Math.min(40, rowH - 5), line.boss ? 'elite' : 'enemy'))
-      rows.add(
-        this.add
-          .text(58, cy, line.name, {
-            fontFamily: UI_FONT,
-            fontSize: FONT.body,
-            color: line.boss ? '#ffdc5d' : '#e4e4ec',
-            resolution: res,
-          })
-          .setOrigin(0, 0.5),
-      )
-      const cell = (tx: number, text: string, color = '#e4e4ec'): void => {
-        rows.add(
-          this.add
-            .text(tx, cy, text, { fontFamily: UI_FONT, fontSize: FONT.body, color, resolution: res })
-            .setOrigin(0.5),
-        )
-      }
-      cell(colKillsL, `${line.kills}`)
-      cell(colDmgL, line.dmg > 0 ? fmt(line.dmg) : '—', line.dmg > 0 ? '#ffab91' : '#6f6f7d')
-    })
-    rows.setContentHeight(rowH * lines.length)
-  }
-
-  private drawButton(
-    rect: { x: number; y: number; w: number; h: number },
-    text: string,
-    filled: boolean,
-    onTap: () => void,
-    res: number,
-  ): void {
-    const g = this.add.graphics()
-    if (filled) {
-      roundRect(g, rect.x, rect.y, rect.w, rect.h, rect.h / 2, { fill: 0xffdc5d })
-    } else {
-      roundRect(g, rect.x, rect.y, rect.w, rect.h, rect.h / 2, { fill: 0xffffff, fillAlpha: 0.12, stroke: 0xffffff, strokeAlpha: 0.35 })
-    }
-    this.add
-      .text(rect.x + rect.w / 2, rect.y + rect.h / 2, text, {
-        fontFamily: UI_FONT,
-        fontSize: FONT.lead,
-        fontStyle: 'bold',
-        color: filled ? '#25262e' : '#f0f0f5',
-        resolution: res,
-      })
-      .setOrigin(0.5)
-    const zone = this.add.zone(rect.x, rect.y, rect.w, rect.h).setOrigin(0)
-    this.time.delayedCall(500, () => {
-      if (!zone.active) return
-      zone.setInteractive({ useHandCursor: true }).on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
-        playSfx('click')
-        onTap()
-      })
+    new Table(this, rect, {
+      title: '{2694} 敌情',
+      aside: st.eliteKills > 0 ? `{2b50} 精英 ×${st.eliteKills}` : undefined,
+      columns: [
+        { label: '击杀', at: 0.56 },
+        { label: '对我方伤害', at: 0.82 },
+      ],
+      rows,
+      rowH: 48,
     })
   }
 

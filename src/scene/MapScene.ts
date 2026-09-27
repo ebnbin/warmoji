@@ -5,18 +5,11 @@ import { bossFor, MAP_IDS, MAPS } from '../data/maps'
 import { beginSandboxRun } from '../ecs/sandbox/knobs'
 import { beginRun, teamStep } from '../run/state'
 import { nextAfterTeam } from './teamPage'
-import { randomPalette } from '../util/palette'
-import type { Palette } from '../util/palette'
-import { Rng } from '../util/rng'
 import { loadMap, saveMap } from '../save/selection'
-import { applyBackground } from '../util/background'
-import { emojiImage, preloadEmojis } from '../emoji/hold'
-import { EmojiGrid } from '../ui/grid'
-import { ScrollView } from '../ui/scroll'
-import { FONT, UI_FONT } from '../util/fonts'
-import { playSfx } from '../audio/sfx'
-import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
-import { roundRect } from '../ui/shapes'
+import { preloadEmojis } from '../emoji/hold'
+import { beginPage, Button, EmojiGrid, Flow, Label, PageHeader, pageFrame, Panel, RichLabel, ScrollView, Switch } from '../ui'
+import type { PageFrame } from '../ui'
+import { VIEWPORT_CHANGED } from '../util/apply'
 import { STAMINA } from '../data/stamina'
 import { SceneKey } from './keys'
 
@@ -32,44 +25,14 @@ const MAP_PLAY_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
 
 const GROUP_ICONS = { theme: '1f5fa', decor: '1f33f', play: '1f579' } as const
 
-interface MapLayout {
-  content: { w: number; h: number }
-  headerY: number
-  list: { x: number; y: number; w: number; h: number }
-  detail: { x: number; y: number; w: number; h: number }
-  btn: { y: number; w: number; h: number }
-}
-
-const LANDSCAPE: MapLayout = {
-  content: { w: 1280, h: 720 },
-  headerY: 44,
-  detail: { x: 40, y: 96, w: 730, h: 520 },
-  list: { x: 810, y: 96, w: 430, h: 520 },
-  btn: { y: 660, w: 340, h: 68 },
-}
-
-const PORTRAIT: MapLayout = {
-  content: { w: 720, h: 1280 },
-  headerY: 52,
-  detail: { x: 24, y: 100, w: 672, h: 480 },
-  list: { x: 24, y: 604, w: 672, h: 520 },
-  btn: { y: 1184, w: 360, h: 72 },
-}
-
 export class MapScene extends Phaser.Scene {
   private preserveOnRestart = false
-  private palette?: Palette
   private selectedId: MapId = MAP_IDS[0]!
-  private layout!: MapLayout
-  private origin = { x: 0, y: 0 }
-  private grid!: EmojiGrid<MapId>
-  private detailView!: ScrollView
-  private btnRect = { x: 0, y: 0, w: 0, h: 0 }
-  private confirmLabel!: Phaser.GameObjects.Text
   private sandbox = false
-  private sandboxRect = { x: 0, y: 0, w: 0, h: 0 }
-  private sandboxBg!: Phaser.GameObjects.Graphics
-  private sandboxLabel!: Phaser.GameObjects.Text
+  private frame!: PageFrame
+  private grid!: EmojiGrid<MapId>
+  private detail!: ScrollView
+  private confirm!: Button
 
   constructor() {
     super(SceneKey.Map)
@@ -86,117 +49,34 @@ export class MapScene extends Phaser.Scene {
   }
 
   create(): void {
-    applyCamera(this)
+    beginPage(this)
     const preserved = this.preserveOnRestart
     this.preserveOnRestart = false
-    if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
-    applyBackground(this.palette)
     if (!preserved) this.selectedId = loadMap(browserStorage())
 
-    const w = viewport.logicalWidth
-    const h = viewport.logicalHeight
-    const res = textRes()
-    const L = (this.layout = h > w ? PORTRAIT : LANDSCAPE)
-    this.origin = { x: (w - L.content.w) / 2, y: (h - L.content.h) / 2 }
-    const ox = this.origin.x
-    const oy = this.origin.y
-
-    this.add
-      .text(ox + 40, oy + L.headerY, '← 返回', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.strong,
-        color: '#c8c8d4',
-        resolution: res,
-      })
-      .setOrigin(0, 0.5)
-      .setInteractive({ useHandCursor: true })
-      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.scene.start(SceneKey.Menu))
-    this.add
-      .text(w / 2, oy + L.headerY, '选择地图', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.title,
-        fontStyle: 'bold',
-        color: '#f5f5f5',
-        resolution: res,
-      })
-      .setOrigin(0.5)
-
-    const tw = 210
-    const th = 46
-    this.sandboxRect = { x: ox + L.content.w - 40 - tw, y: oy + L.headerY - th / 2, w: tw, h: th }
-    const t = this.sandboxRect
-    this.sandboxBg = this.add.graphics()
-    this.sandboxLabel = this.add
-      .text(t.x + t.w / 2, oy + L.headerY, '', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.small,
-        fontStyle: 'bold',
-        color: '#ffffff',
-        resolution: res,
-      })
-      .setOrigin(0.5)
-    this.add
-      .zone(t.x, t.y, t.w, t.h)
-      .setOrigin(0)
-      .setInteractive({ useHandCursor: true })
-      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
-        playSfx('click')
-        this.sandbox = !this.sandbox
+    const f = (this.frame = pageFrame({ footer: true }))
+    new PageHeader(this, f, { title: '选择地图', back: () => this.scene.start(SceneKey.Menu) })
+    new Label(this, f.right - 100, f.headerY, '试炼场', { kind: 'label', bold: true, color: 'soft' }).setOrigin(1, 0.5)
+    new Switch(this, f.right - 42, f.headerY, {
+      value: this.sandbox,
+      onChange: (on) => {
+        this.sandbox = on
         this.refresh()
-      })
+      },
+    })
 
-    this.grid = new EmojiGrid(this, { x: ox + L.list.x, y: oy + L.list.y, w: L.list.w, h: L.list.h })
+    new Panel(this, f.detail.x, f.detail.y, f.detail.w, f.detail.h)
+    this.detail = new ScrollView(this, { x: f.detail.x, y: f.detail.y + 8, w: f.detail.w, h: f.detail.h - 16 })
+
+    this.grid = new EmojiGrid(this, f.list)
     this.grid.onTap = (key): void => {
-      playSfx('click')
       this.selectedId = key
       saveMap(browserStorage(), this.selectedId)
       this.refresh()
     }
     this.grid.setItems(MAP_IDS.map((id) => ({ key: id, emoji: MAPS[id].emoji })))
 
-    const D = L.detail
-    const dx = ox + D.x
-    const dy = oy + D.y
-    const panel = this.add.graphics()
-    roundRect(panel, dx, dy, D.w, D.h, 14, { fill: 0x000000, fillAlpha: 0.22, stroke: 0xffffff, strokeAlpha: 0.1 })
-    this.detailView = new ScrollView(this, { x: dx, y: dy, w: D.w, h: D.h })
-
-    this.btnRect = {
-      x: w / 2 - L.btn.w / 2,
-      y: oy + L.btn.y - L.btn.h / 2,
-      w: L.btn.w,
-      h: L.btn.h,
-    }
-    const b = this.btnRect
-    const btnBg = this.add.graphics()
-    roundRect(btnBg, b.x, b.y, b.w, b.h, b.h / 2, { fill: 0xffdc5d })
-    this.confirmLabel = this.add
-      .text(w / 2, oy + L.btn.y, '招募首发', {
-        fontFamily: UI_FONT,
-        fontSize: FONT.lead,
-        fontStyle: 'bold',
-        color: '#25262e',
-        resolution: res,
-      })
-      .setOrigin(0.5)
-    const confirm = (): void => {
-      playSfx('click')
-      if (this.sandbox) {
-        beginSandboxRun(this.selectedId)
-        this.scene.start(SceneKey.Battle)
-        return
-      }
-      const run = beginRun([], this.selectedId)
-      this.scene.start(teamStep(run) ?? nextAfterTeam(run))
-    }
-    this.add
-      .zone(b.x, b.y, b.w, b.h)
-      .setOrigin(0)
-      .setInteractive({ useHandCursor: true })
-      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, confirm)
-    this.input.keyboard?.on('keydown-ENTER', confirm)
-    this.input.keyboard?.on('keydown-SPACE', confirm)
-    this.input.keyboard?.on('keydown-ESC', () => this.scene.start(SceneKey.Menu))
+    this.confirm = new Button(this, f.centerX, f.footerY, { label: '', keys: ['ENTER', 'SPACE'], onTap: () => this.start() })
 
     this.refresh()
 
@@ -206,96 +86,38 @@ export class MapScene extends Phaser.Scene {
     })
   }
 
-  private renderDetail(res: number): void {
-    this.detailView.clear()
-    const D = this.layout.detail
+  private start(): void {
+    if (this.sandbox) {
+      beginSandboxRun(this.selectedId)
+      this.scene.start(SceneKey.Battle)
+      return
+    }
+    const run = beginRun([], this.selectedId)
+    this.scene.start(teamStep(run) ?? nextAfterTeam(run))
+  }
+
+  private renderDetail(): void {
+    const view = this.detail.clear()
     const def = MAPS[this.selectedId]
-
-    this.detailView.add([
-      emojiImage(this, 58, 58, def.emoji, 85),
-      this.add
-        .text(104, 58, def.name, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.lead,
-          fontStyle: 'bold',
-          color: '#ffffff',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5),
-    ])
-
-    let cursor = 132
-    const group = (icon: string, title: string): void => {
-      this.detailView.add([
-        emojiImage(this, 42, cursor, icon, 35),
-        this.add
-          .text(62, cursor, title, {
-            fontFamily: UI_FONT,
-            fontSize: FONT.strong,
-            fontStyle: 'bold',
-            color: '#ffffff',
-            resolution: res,
-          })
-          .setOrigin(0, 0.5),
-      ])
-      cursor += 40
-    }
-    const line = (text: string, color = '#d0d0d8'): void => {
-      const t = this.add
-        .text(62, cursor, text, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.body,
-          color,
-          wordWrap: { width: D.w - 104 },
-          lineSpacing: 6,
-          resolution: res,
-        })
-        .setOrigin(0, 0)
-      this.detailView.add(t)
-      cursor += Math.max(36, t.height + 8)
-    }
-
-    group(GROUP_ICONS.theme, '主题')
-    line(def.desc)
-    cursor += 14
-    group(GROUP_ICONS.decor, '地面装饰')
-    const startX = 62 + 16
-    const pitch = 46
-    const perRow = Math.max(1, Math.floor((D.w - startX - 16) / pitch))
-    let px = startX
-    let placed = 0
-    for (const e of def.decor.emojis) {
-      if (placed > 0 && placed % perRow === 0) {
-        px = startX
-        cursor += pitch
-      }
-      this.detailView.add(emojiImage(this, px, cursor + 10, e, 45, 'player'))
-      px += pitch
-      placed++
-    }
-    cursor += 44
-    group(GROUP_ICONS.play, '玩法')
-    line(MAP_PLAY_LABEL[def.kind])
+    const width = this.frame.detail.w - 48
+    const flow = new Flow(this, view, { x: 24, y: 12, width })
+    flow.put(new RichLabel(this, 24, 42, `{${def.emoji}} ${def.name}`, { kind: 'lead', iconSize: 76, gap: 14, originX: 0, maxWidth: width }), 90)
+    flow.heading('主题', GROUP_ICONS.theme).text(def.desc).gap(10)
+    flow.heading('地面装饰', GROUP_ICONS.decor).icons(def.decor.emojis, { outline: 'player' }).gap(4)
+    flow.heading('玩法', GROUP_ICONS.play).text(MAP_PLAY_LABEL[def.kind])
     if (def.exertion) {
-      line(`地面费力：赶路每走一格耗 ${+(def.exertion * 100).toFixed(1)}% 体力，体力低于 ${Math.round(STAMINA.slowFrom * 100)}% 开始变慢、见底只剩 ${Math.round(STAMINA.floor * 100)}% 速度；站定片刻开始回，歇得越久回得越快。全队按最累的人走，敌人也会累`)
+      flow.text(
+        `地面费力：赶路每走一格耗 ${+(def.exertion * 100).toFixed(1)}% 体力，体力低于 ${Math.round(STAMINA.slowFrom * 100)}% 开始变慢、见底只剩 ${Math.round(STAMINA.floor * 100)}% 速度；站定片刻开始回，歇得越久回得越快。全队按最累的人走，敌人也会累`,
+      )
     }
-    line(`终波头目 ${bossFor(this.selectedId).name}`, '#9a9aa8')
-    this.detailView.setContentHeight(cursor + 12)
+    flow.text(`终波头目 ${bossFor(this.selectedId).name}`, { color: 'muted' })
+    flow.finish()
   }
 
   private refresh(): void {
     this.grid.setSelected(this.selectedId)
-    const on = this.sandbox
-    const t = this.sandboxRect
-    this.sandboxBg.clear()
-    roundRect(this.sandboxBg, t.x, t.y, t.w, t.h, t.h / 2, {
-      fill: on ? 0xffdc5d : 0xffffff, fillAlpha: on ? 0.92 : 0.08,
-      stroke: 0xffffff, strokeAlpha: on ? 0 : 0.18,
-    })
-    this.sandboxLabel.setText(on ? '试炼场：开' : '试炼场：关')
-    this.sandboxLabel.setColor(on ? '#25262e' : '#c8c8d4')
-    this.confirmLabel.setText(on ? '进入试炼场' : '招募首发')
-    this.renderDetail(textRes())
+    this.confirm.setLabel(this.sandbox ? '进入试炼场' : '招募首发')
+    this.renderDetail()
   }
 
   private onViewportChanged(): void {
