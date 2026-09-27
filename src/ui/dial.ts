@@ -20,24 +20,6 @@ export interface DialOptions {
   readonly onRelease?: (dx: number, dy: number) => void
 }
 
-/** 弧形底带：一排技能钮沿它排开；(x, y) 是圆心，从 start 顺时针到 end（弧度） */
-export class ArcTrack extends Widget {
-  constructor(scene: Phaser.Scene, x: number, y: number, radius: number, thickness: number, start: number, end: number) {
-    super(scene, x, y)
-    const g = scene.add.graphics()
-    for (const [w, color, alpha] of [
-      [thickness + 6, SURFACE.outline, 0.3],
-      [thickness, INK.ink, 0.08],
-    ] as const) {
-      g.lineStyle(w, color, alpha)
-      g.beginPath()
-      g.arc(0, 0, radius, start, end, false)
-      g.strokePath()
-    }
-    this.add(g)
-  }
-}
-
 /** idle 普通，leader 队长呼吸光，recast 连段可接的快闪，dead 阵亡 */
 export type DialRim = 'idle' | 'leader' | 'recast' | 'dead'
 
@@ -168,8 +150,7 @@ export class DialButton extends Widget {
     const alpha = rim === 'idle' || rim === 'dead' ? 1 : 0.55 + 0.45 * this.pulse
     drawDisc(this.base.clear(), 0, 0, this.radius, {
       face: this.dead ? TONE.bad.lip : SURFACE.bg,
-      faceAlpha: this.dead ? 0.7 : 0.88,
-      drop: 3,
+      faceAlpha: this.dead ? 0.55 : 0.45,
     })
     this.base.lineStyle(width, color, alpha)
     this.base.strokeCircle(0, 0, this.radius)

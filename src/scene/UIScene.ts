@@ -6,7 +6,8 @@ import { applyCamera, safeInsets, viewport, VIEWPORT_CHANGED } from '../util/app
 import type { FieldCollected, HudInput, HudSnapshot, LeaderChanged, SquadMember, SquadSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
 import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
-import { AimGuide, Announcer, ArcTrack, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim } from '../ui'
+import { AimGuide, Announcer, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim } from '../ui'
+import { DEG2RAD } from '../util/units'
 import { SceneKey } from './keys'
 import { openPause } from './pause'
 import type { DevProvider, DevProviderHost } from '../devtools'
@@ -24,8 +25,8 @@ function stateOf(m: SquadMember): IconState {
   return !m.alive ? 'dead' : m.cdRemainMs > 0 ? 'cooling' : 'ready'
 }
 
-/** 右下角的队伍环：队长贴角落放大并显示他的主动技能，队员沿四分之一圆弧从正上方排到正左方 */
-const RING = { r: 27, emoji: 38, leaderScale: 2, radius: 140, inset: 24 } as const
+/** 右下角的队伍环：队长放大并显示他的主动技能，离屏幕边留出 buffer 给按住拖动施法；队员按固定间隔 spread 沿圆弧排在他左上方；wheel 是施法轮盘的半径 */
+const RING = { r: 34, emoji: 48, leaderScale: 1.6, radius: 135, spread: 42 * DEG2RAD, buffer: 70, wheel: 115 } as const
 const SQUAD_KEYS = ['ONE', 'TWO', 'THREE', 'FOUR'] as const
 const AIM_DEADZONE = 24
 const DEPTH = { bar: LAYER.hud + 20, fx: LAYER.hud + 21, waveEnd: LAYER.toast + 10, squad: 300, leader: 302, aim: 305 } as const
@@ -48,10 +49,10 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private squad: SquadIcon[] = []
   private squadArc: number[] = []
   private squadShown = { leader: -1, switching: false }
-  private squadTrack?: ArcTrack
   private squadCenter = { x: 0, y: 0 }
   private aiming = false
   private aimDir: { x: number; y: number } | null = null
+  private aimDrag = { x: 0, y: 0 }
   private holdStart = 0
   private holdMs = 0
   private aimGuide!: AimGuide
@@ -109,7 +110,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.squad = []
     this.squadArc = []
     this.squadShown = { leader: -1, switching: false }
-    this.squadTrack = undefined
     this.aiming = false
     this.aimDir = null
     SQUAD_KEYS.forEach((k, i) =>
@@ -178,29 +178,23 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   }
 
   private squadCorner(): { x: number; y: number } {
-    const r = RING.r * RING.leaderScale
+    const r = RING.r * RING.leaderScale + RING.buffer
     return {
-      x: viewport.logicalWidth - safeInsets.right - RING.inset - r,
-      y: viewport.logicalHeight - safeInsets.bottom - RING.inset - r,
+      x: viewport.logicalWidth - safeInsets.right - r,
+      y: viewport.logicalHeight - safeInsets.bottom - r,
     }
   }
 
-  /** 弧上第 i 个位置（共 m 个）：含两端从正上方排到正左方，只有一个时居中 */
+  /** 弧上第 i 个位置（共 m 个）：以左上方的对角线为中心排开，第 0 个最靠上 */
   private arcPoint(i: number, m: number): { x: number; y: number } {
-    const t = m > 1 ? i / (m - 1) : 0.5
-    const a = -Math.PI / 2 - (Math.PI / 2) * t
+    const a = (-3 * Math.PI) / 4 + ((m - 1) / 2 - i) * RING.spread
     return { x: this.squadCenter.x + Math.cos(a) * RING.radius, y: this.squadCenter.y + Math.sin(a) * RING.radius }
   }
 
   private createSquad(s: SquadSnapshot): void {
     for (const b of this.squad) b.dial.destroy()
-    this.squadTrack?.destroy()
-    this.squadTrack = undefined
     this.squadCenter = this.squadCorner()
     const m = s.members.length - 1
-    if (m >= 2) {
-      this.squadTrack = new ArcTrack(this, this.squadCenter.x, this.squadCenter.y, RING.radius, (RING.r + 8) * 2, -Math.PI, -Math.PI / 2).setDepth(DEPTH.squad - 1)
-    }
     let arc = 0
     this.squadArc = s.members.map((_, slot) => (slot === s.leaderSlot ? -1 : arc++))
     this.squad = s.members.map((member, slot) => {
@@ -240,13 +234,16 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     if (!sk || (!sk.aim && sk.holdMs <= 0)) return false
     this.aiming = true
     this.aimDir = null
+    this.aimDrag = { x: 0, y: 0 }
     this.holdStart = this.time.now
     this.holdMs = sk.holdMs
+    this.drawAim()
     return true
   }
 
   private moveAim(dx: number, dy: number): void {
     if (!this.aiming) return
+    this.aimDrag = { x: dx, y: dy }
     const len = Math.hypot(dx, dy)
     this.aimDir = len >= AIM_DEADZONE ? { x: dx / len, y: dy / len } : null
     this.arena.setSkillAim(this.aimDir)
@@ -268,9 +265,13 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   }
 
   private drawAim(): void {
+    if (!this.aiming) {
+      this.aimGuide.clear()
+      return
+    }
     const c = this.squadCenter
-    const hold = this.aiming && this.holdMs > 0 ? this.holdRatio() : null
-    this.aimGuide.draw(c.x, c.y, this.aimDir, RING.radius * 0.8, hold, RING.r * RING.leaderScale + 10)
+    const hold = this.holdMs > 0 ? this.holdRatio() : null
+    this.aimGuide.draw(c.x, c.y, RING.wheel, this.aimDrag.x, this.aimDrag.y, this.aimDir !== null, hold)
   }
 
   /** 新队长滑到角落放大，旧队长缩小滑到他空出的弧上位置，时长与交接期一致 */
