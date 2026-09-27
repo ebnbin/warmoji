@@ -103,9 +103,13 @@ const checkSquad = (sq: Squad, path: string): void => {
 
 const isBoss = (kind: EnemyKind | undefined): boolean => kind !== undefined && ENEMIES[kind]?.role === 'boss'
 
-/** 我方规则：救援的时长与范围、换队长的冷却为正 */
+/** 队长贴着倒下的队员站时两人中心的距离：身体互相挤开，靠不得更近 */
+const TOUCH = TEAM_BASELINE.member.radius * (TEAM_BASELINE.team.leaderSizeMul + TEAM_BASELINE.team.followerSizeMul)
+
+/** 我方规则：救援时长为正，救援范围大于队长贴着倒下队员的距离、小于队员跟在队长身后的距离（站着不动不会扶起来）；换队长的冷却为正 */
 const checkRules = (r: FightRules | undefined, path: string): void => {
-  need(r?.rescue === undefined || (r.rescue.ms > 0 && r.rescue.radius > 0), `${path} 的救援时长与范围须为正`)
+  need(r?.rescue === undefined || r.rescue.ms > 0, `${path} 的救援时长须为正`)
+  need(r?.rescue === undefined || (r.rescue.radius > TOUCH && r.rescue.radius < FEEL.squad.fanDistance), `${path} 的救援范围须在 ${TOUCH} 到 ${FEEL.squad.fanDistance} 格之间`)
   need((r?.leader?.switchCdMs ?? 1) > 0, `${path} 的换队长冷却须为正`)
 }
 

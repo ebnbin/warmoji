@@ -347,7 +347,7 @@ const LABS = {
     note: '倒下不再是等时间：去扶人要顶着火力，起来的次数有限，减员成了要管的资源',
     map: 'ice',
     team: { slots: ['medic', 'guard', 'jellyfish', 'fencer'], level: 2 },
-    rules: { revive: false, rescue: { ms: 2500, radius: 1.8 }, lives: 3 },
+    rules: { revive: false, rescue: { ms: 2500, radius: 1.2 }, lives: 3 },
     start: { wave: 5, sec: 120 },
     steps: [
       {

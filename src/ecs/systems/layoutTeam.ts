@@ -44,7 +44,7 @@ function turnHeading(sim: Sim, tx: number, ty: number, dt: number): void {
   sim.heading = { x: Math.cos(cur + step), y: Math.sin(cur + step) }
 }
 
-/** 队员的驱动指向队长身后扇形上的目标位；进占位半径即占位、同位取最近，阵亡者停靠后紧跟；这一帧不能自己走时不动 */
+/** 队员的驱动指向队长身后扇形上的目标位；进占位半径即占位、同位取最近，阵亡者停靠后紧跟，这一场能救人时阵亡者留在原地等队长；这一帧不能自己走时不动 */
 export function layoutTeam(sim: Sim): void {
   const dt = Math.min(sim.dtMs, 50) / 1000
   const leader = sim.leader
@@ -66,6 +66,7 @@ export function layoutTeam(sim: Sim): void {
     return Math.hypot(d.x, d.y)
   }
   const claimR = SQUAD.claimRadius * UNIT
+  const stay = sim.fight.rules.rescue !== undefined
   const claims: { f: number; s: number; d: number }[] = []
   for (const f of followers) {
     const dead = Alive.v[f] === 0
@@ -73,7 +74,7 @@ export function layoutTeam(sim: Sim): void {
     const s = Seat.v[f]!
     if (s < 0 || s >= seats.length) continue
     if (dead) {
-      if (Seat.ghost[f]) claims.push({ f, s, d: -1 })
+      if (Seat.ghost[f] && !stay) claims.push({ f, s, d: -1 })
       continue
     }
     const d = distToSeat(f, s)
@@ -84,7 +85,7 @@ export function layoutTeam(sim: Sim): void {
   for (const c of claims) if (occupant[c.s]! < 0) occupant[c.s] = c.f
   // 刚阵亡的当帧就预订最近的空位，归位途中不再换位，别人也不再挑它
   for (const f of followers) {
-    if (Alive.v[f] || Seat.ghost[f]) continue
+    if (Alive.v[f] || Seat.ghost[f] || stay) continue
     const s = pickSeat(sim, f, seats, (i) => occupant[i]! < 0)
     Seat.v[f] = s
     Seat.ghost[f] = 1
@@ -123,9 +124,10 @@ export function layoutTeam(sim: Sim): void {
   const ghostStep = SQUAD.ghostSpeed * UNIT * dt
   for (const f of followers) {
     if (Alive.v[f]) continue
-    const seat = seats[Seat.v[f]!]!
     Phys.vx[f] = 0
     Phys.vy[f] = 0
+    if (stay) continue
+    const seat = seats[Seat.v[f]!]!
     if (Seat.ghost[f] !== 2) {
       const d = sim.hooks.worldDelta(sim, Transform.x[f]!, Transform.y[f]!, seat.x, seat.y)
       const dist = Math.hypot(d.x, d.y)
