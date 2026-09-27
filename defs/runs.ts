@@ -59,6 +59,287 @@ function classicSteps(): StepDef[] {
   })
 }
 
+/** 远征：选一名首发出发，一局穿过黑森林、残垣与深空，每章几场各不相同的遭遇，以头目收尾 */
+const EXPEDITION = {
+  emoji: '1f9ed',
+  name: '远征',
+  desc: '选一名首发出发，穿过黑森林、残垣与深空三片地区，一路招人、买装备；每一场的敌人与目标都不一样，每章以头目收尾，击败深空的奇点就是胜利',
+  stars: [{ kind: 'downs', count: 3 }, { kind: 'time', ms: 840_000 }],
+  steps: [
+    { kind: 'recruit', upTo: 1 },
+    {
+      kind: 'fight',
+      fight: {
+        name: '1-1 林边',
+        map: 'forest',
+        intro: { title: '第一章 · 黑森林', sub: '清空林边的三小批敌人' },
+        mix: [
+          { kind: 'zombie', weight: 4 },
+          { kind: 'ghost', weight: 1 },
+        ],
+        spawns: [
+          {
+            kind: 'waves',
+            atMs: 2500,
+            gapMs: 2000,
+            squads: [
+              { count: 6, enemy: 'zombie', at: { kind: 'far' } },
+              { count: 8, at: { kind: 'point', dx: 8, dy: 2, spread: 2 }, banner: { title: '第二批', sub: '幽灵飘得快，血却薄' } },
+              { count: 12, spreadMs: 2000, at: { kind: 'ring', dist: 7 }, banner: { title: '最后一批', sub: '从四面围上来了' } },
+            ],
+          },
+        ],
+        ends: [{ kind: 'cleared' }],
+      },
+    },
+    { kind: 'recruit', upTo: 2 },
+    {
+      kind: 'fight',
+      fight: {
+        name: '1-2 蝗灾',
+        map: 'forest',
+        intro: { title: '蝗灾', sub: '击杀 45 只，跳蝗成群扑来' },
+        mix: [
+          { kind: 'locust', weight: 3 },
+          { kind: 'zombie', weight: 1 },
+        ],
+        spawns: [{ kind: 'stream', intervalMul: 0.7 }],
+        ends: [{ kind: 'kills', count: 45 }],
+      },
+    },
+    { kind: 'shop' },
+    {
+      kind: 'fight',
+      fight: {
+        name: '1-3 萨满营地',
+        map: 'forest',
+        intro: { title: '萨满营地', sub: '萨满会给同伴回血，先杀它' },
+        spawns: [
+          {
+            kind: 'waves',
+            atMs: 2500,
+            gapMs: 2500,
+            squads: [
+              { count: 10, enemy: 'zombie', escort: { enemy: 'elf', count: 2 }, at: { kind: 'point', dx: -7, dy: -6, spread: 2.5 } },
+              { count: 10, enemy: 'slime', escort: { enemy: 'elf', count: 2 }, at: { kind: 'point', dx: 7, dy: 5, spread: 2.5 }, banner: { title: '黏液虫', sub: '蹭到就糊住，攻速大降' } },
+              { count: 14, enemy: 'zombie', escort: { enemy: 'elf', count: 3 }, spreadMs: 1500, at: { kind: 'ring', dist: 7 }, banner: { title: '营地倾巢', sub: '三个萨满压阵' } },
+            ],
+          },
+        ],
+        ends: [{ kind: 'cleared' }],
+      },
+    },
+    { kind: 'recruit', upTo: 3 },
+    { kind: 'shop' },
+    {
+      kind: 'fight',
+      fight: {
+        name: '1-4 蛛卵林',
+        map: 'forest',
+        intro: { title: '蛛卵林', sub: '撑过 45 秒；蛛卵 6 秒不打破就结成缠人的网' },
+        mix: [
+          { kind: 'zombie', weight: 3 },
+          { kind: 'ghost', weight: 1 },
+          { kind: 'mushroom', weight: 1 },
+        ],
+        spawns: [
+          { kind: 'stream', intervalMul: 1.3 },
+          { kind: 'batch', atMs: 4000, squad: { count: 3, enemy: 'sapling', at: { kind: 'ring', dist: 4 } }, banner: { title: '蛛卵', sub: '6 秒内打破它们' } },
+          { kind: 'batch', atMs: 12_000, squad: { count: 3, enemy: 'sapling', at: { kind: 'ring', dist: 4 } } },
+          { kind: 'batch', atMs: 20_000, squad: { count: 4, enemy: 'sapling', at: { kind: 'ring', dist: 5 } } },
+          { kind: 'batch', atMs: 28_000, squad: { count: 4, enemy: 'sapling', at: { kind: 'ring', dist: 5 } } },
+          { kind: 'batch', atMs: 36_000, squad: { count: 5, enemy: 'sapling', at: { kind: 'ring', dist: 5 } }, banner: { title: '最后一窝', sub: '再撑一会儿' } },
+        ],
+        ends: [{ kind: 'time', ms: 45_000 }],
+      },
+    },
+    { kind: 'shop' },
+    {
+      kind: 'fight',
+      fight: {
+        name: '1-5 蛛后',
+        map: 'forest',
+        spawns: [
+          { kind: 'stream', intervalMul: 3 },
+          { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'treant', hpMul: 0.3 }, banner: { title: '蛛后现身', sub: '打破她产下的蛛卵，别被网缠住' } },
+        ],
+        ends: [{ kind: 'boss' }],
+        reward: { coins: 60, heal: true },
+      },
+    },
+    { kind: 'recruit', upTo: 4 },
+    { kind: 'shop' },
+    {
+      kind: 'fight',
+      fight: {
+        name: '2-1 断墙之间',
+        map: 'ruins',
+        intro: { title: '第二章 · 残垣', sub: '墙挡人、挡弹，也挡视线' },
+        spawns: [
+          {
+            kind: 'waves',
+            atMs: 2500,
+            gapMs: 2500,
+            squads: [
+              { count: 10, enemy: 'skeleton', at: { kind: 'point', dx: 0, dy: -9, spread: 2.5 }, banner: { title: '北面', sub: '骷髅兵打散了还会爬起来一次' } },
+              { count: 10, enemy: 'zombie', escort: { enemy: 'snake', count: 4 }, at: { kind: 'point', dx: 9, dy: 0, spread: 2.5 }, banner: { title: '东面', sub: '毒蛇躲在后面吐毒，借墙挡住' } },
+              { count: 12, enemy: 'skeleton', escort: { enemy: 'knight', count: 2 }, at: { kind: 'point', dx: -9, dy: 0, spread: 2.5 }, banner: { title: '西面', sub: '狼骑：先打狼，再打人' } },
+            ],
+          },
+        ],
+        ends: [{ kind: 'cleared' }],
+      },
+    },
+    { kind: 'shop' },
+    {
+      kind: 'fight',
+      fight: {
+        name: '2-2 引爆',
+        map: 'ruins',
+        intro: { title: '引爆', sub: '60 秒内依次踩过三个信标，自爆怪只追你' },
+        chaseLeader: true,
+        mix: [
+          { kind: 'creeper', weight: 2 },
+          { kind: 'zombie', weight: 3 },
+        ],
+        spawns: [{ kind: 'stream', intervalMul: 0.9 }],
+        ends: [
+          { kind: 'hold', ms: 6000, radius: 1.8, points: [{ dx: -8, dy: -8 }, { dx: 8, dy: -5 }, { dx: 0, dy: 8 }] },
+          { kind: 'time', ms: 60_000, lose: true },
+        ],
+      },
+    },
+    { kind: 'recruit', upTo: 5 },
+    { kind: 'shop' },
+    {
+      kind: 'fight',
+      fight: {
+        name: '2-3 石像鬼回廊',
+        map: 'ruins',
+        intro: { title: '石像鬼回廊', sub: '石像鬼掉到四成血会石化回血，一口气打穿它' },
+        spawns: [
+          {
+            kind: 'waves',
+            atMs: 2500,
+            gapMs: 2500,
+            squads: [
+              { count: 8, enemy: 'skeleton', escort: { enemy: 'gargoyle', count: 2 }, at: { kind: 'point', dx: -8, dy: -6, spread: 2 } },
+              { count: 10, enemy: 'skeleton', escort: { enemy: 'gargoyle', count: 3 }, at: { kind: 'point', dx: 8, dy: 6, spread: 2 }, banner: { title: '回廊深处', sub: '更多石像鬼' } },
+              { count: 4, enemy: 'gargoyle', escort: { enemy: 'elf', count: 2 }, at: { kind: 'ring', dist: 6 }, banner: { title: '萨满守像', sub: '萨满会把石像鬼奶回来，先杀萨满' } },
+            ],
+          },
+        ],
+        ends: [{ kind: 'cleared' }],
+      },
+    },
+    { kind: 'shop' },
+    {
+      kind: 'fight',
+      fight: {
+        name: '2-4 狼骑悬赏',
+        map: 'ruins',
+        intro: { title: '狼骑悬赏', sub: '75 秒内击倒三名逃窜的精英狼骑' },
+        mix: [
+          { kind: 'skeleton', weight: 2 },
+          { kind: 'zombie', weight: 2 },
+          { kind: 'snake', weight: 1 },
+        ],
+        spawns: [
+          { kind: 'stream', intervalMul: 1.2 },
+          { kind: 'batch', atMs: 3000, squad: { count: 3, enemy: 'knight', elites: 3, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true }, banner: { title: '悬赏发布', sub: '三名狼骑带着赏金逃窜' } },
+        ],
+        ends: [{ kind: 'bounty' }, { kind: 'time', ms: 75_000, lose: true }],
+        reward: { coins: 80 },
+      },
+    },
+    { kind: 'shop' },
+    {
+      kind: 'fight',
+      fight: {
+        name: '2-5 暴龙',
+        map: 'ruins',
+        spawns: [
+          { kind: 'stream', intervalMul: 2.5 },
+          { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'rhino', hpMul: 0.55 }, banner: { title: '暴龙现身', sub: '它会冲锋撞人，横着躲开' } },
+        ],
+        ends: [{ kind: 'boss' }],
+        reward: { coins: 80, heal: true },
+      },
+    },
+    { kind: 'shop' },
+    {
+      kind: 'fight',
+      fight: {
+        name: '3-1 陨石雨',
+        map: 'space',
+        intro: { title: '第三章 · 深空', sub: '撑过 50 秒；流星直线冲来，天体不时横扫' },
+        mix: [
+          { kind: 'alien', weight: 3 },
+          { kind: 'comet', weight: 2 },
+        ],
+        spawns: [{ kind: 'stream', intervalMul: 0.8 }],
+        ends: [{ kind: 'time', ms: 50_000 }],
+      },
+    },
+    { kind: 'shop' },
+    {
+      kind: 'fight',
+      fight: {
+        name: '3-2 迷魂哨线',
+        map: 'space',
+        intro: { title: '迷魂哨线', sub: '迷魂眼会把人勾过去，先拆掉它们' },
+        spawns: [
+          {
+            kind: 'waves',
+            atMs: 2500,
+            gapMs: 2500,
+            squads: [
+              { count: 10, enemy: 'invader', escort: { enemy: 'siren', count: 3 }, at: { kind: 'ring', dist: 8 } },
+              { count: 8, enemy: 'ufo', escort: { enemy: 'siren', count: 3 }, at: { kind: 'ring', dist: 8 }, banner: { title: '飞碟', sub: '远远地绕着你射' } },
+              { count: 16, enemy: 'alien', escort: { enemy: 'siren', count: 4 }, spreadMs: 1500, at: { kind: 'ring', dist: 8 }, banner: { title: '最后一道哨线', sub: '四只迷魂眼' } },
+            ],
+          },
+        ],
+        ends: [{ kind: 'cleared' }],
+      },
+    },
+    { kind: 'shop' },
+    {
+      kind: 'fight',
+      fight: {
+        name: '3-3 精英潮',
+        map: 'space',
+        intro: { title: '精英潮', sub: '100 秒内击杀 16 只，只只都是精英' },
+        mix: [
+          { kind: 'gargoyle', weight: 1 },
+          { kind: 'ufo', weight: 1 },
+          { kind: 'comet', weight: 1 },
+          { kind: 'alien', weight: 2 },
+        ],
+        spawns: [{ kind: 'stream', intervalMs: 1400, eliteChance: 1, cap: 10 }],
+        ends: [
+          { kind: 'kills', count: 16 },
+          { kind: 'time', ms: 100_000, lose: true },
+        ],
+        reward: { coins: 100 },
+      },
+    },
+    { kind: 'shop' },
+    {
+      kind: 'fight',
+      fight: {
+        name: '3-4 奇点',
+        map: 'space',
+        spawns: [
+          { kind: 'stream', intervalMul: 2.5 },
+          { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'blackhole' }, banner: { title: '奇点', sub: '最后一战：别踏进它的视界' } },
+        ],
+        ends: [{ kind: 'boss' }],
+      },
+    },
+  ],
+} as const satisfies RunDef
+
 /** 实验关：地图与队伍都预设好，开局就打；每一关试一种过关条件或规则组合 */
 const LABS = {
   sweep: {
@@ -649,6 +930,7 @@ export const RUNS = {
     record: true,
     steps: classicSteps(),
   },
+  expedition: EXPEDITION,
   sandbox: {
     emoji: '1f3af',
     name: '试炼场',
