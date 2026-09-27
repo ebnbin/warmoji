@@ -9,5 +9,4 @@ export const PROGRESSION = {
   coinDropChanceMin: 0.35,
   coinDropChanceHalfLifeSec: 220,
   xp: { base: 80, growth: 1.15, waveBonusBase: 40, waveBonusPerWave: 36 },
-  recruit: { poolSize: 10, unlocks: [4, 6, 8, 9, 10] },
 } as const satisfies Progression

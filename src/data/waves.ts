@@ -39,8 +39,6 @@ export function isFinalWave(wave: number): boolean {
 
 export const XP = P.xp
 
-export const RECRUIT = P.recruit
-
 export const WAVE = {
   durationsSec: P.waveDurationsSec,
   eliteWaves: P.eliteWaves,

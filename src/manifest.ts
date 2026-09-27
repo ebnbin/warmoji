@@ -12,6 +12,7 @@ import { MAPS } from './data/maps'
 import type { MapDef } from './types/maps'
 import type { ItemDef } from './types/items'
 import { SETTING_DEFS } from './save/settings'
+import { TAGS } from './data/tags'
 
 const roster: readonly CharacterDef[] = Object.values(CHARACTERS)
 
@@ -160,6 +161,7 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '1f5fa',
   '1f579',
   ...SETTING_DEFS.map((d) => d.icon),
+  ...Object.values(TAGS).map((t) => t.icon),
   '2b50',
   '2699',
   '1f4d6',

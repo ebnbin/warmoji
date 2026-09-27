@@ -55,6 +55,7 @@ need(STAMINA.floor > 0 && STAMINA.floor < 1, 'stamina.floor 须在 (0, 1) 内')
 need(STAMINA.restDelayMs >= 0 && STAMINA.rampMs > 0 && STAMINA.regen > 0, 'stamina 的恢复参数须为正')
 
 for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
+  need(new Set(c.tags).size === c.tags.length, `characters.${id}.tags 不能重复`)
   for (const k of [0, 1]) {
     const tiers = [...c.weapons.map((w) => WEAPONS[w].upgrades[k]), ...c.innate.map((i) => i.upgrades[k])]
     const names = new Set(tiers.flatMap((t) => (t ? [t.card.name] : [])))
