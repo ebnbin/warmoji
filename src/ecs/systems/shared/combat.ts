@@ -89,7 +89,7 @@ function down(sim: Sim, eid: number): void {
   endMotion(eid)
   Hp.v[eid] = 0
   Alive.v[eid] = 0
-  Revive.at[eid] = sim.elapsedMs + Stats.revive[eid]!
+  Revive.at[eid] = sim.fight.def.noRevive ? Infinity : sim.elapsedMs + Stats.revive[eid]!
   Tint.color[eid] = 0x888888
   Tint.alpha[eid] = 0.35
   const st = sim.run.stats

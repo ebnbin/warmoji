@@ -60,7 +60,7 @@ import { timeLimitMs } from '../data/runs'
 import { enterFight } from '../run/flow'
 import type { FightDef } from '../types/runs'
 import { callSquad, startFight } from './fight/spawns'
-import { fightMods, fightWon, timeLeftMs } from './fight/state'
+import { fightGoals, fightMods, fightVerdict, goalSpot, markFightBase, timeLeftMs } from './fight/state'
 import { xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
@@ -99,6 +99,12 @@ function liveCoins(world: EcsWorld): number {
 
 const RES_COLOR: Record<ResourceDef['kind'], number> = { energy: 0xffee58, fury: 0xef5350, heat: 0xff9800, growth: 0x9ccc65 }
 
+/** 倒下的队员几秒后起来；这一场不会自己起来是 null */
+function reviveSec(sim: Sim, m: number): number | null {
+  const at = Revive.at[m]!
+  return Number.isFinite(at) ? Math.max(0, Math.ceil((at - sim.elapsedMs) / 1000)) : null
+}
+
 /** 瞄准线的长度：位移走多远，或效果把东西放出去多远 */
 function aimReach(a: AbilityDef): number {
   const s = a.shape
@@ -131,7 +137,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private hpBars: Phaser.GameObjects.Graphics[] = []
   private shownHp: number[] = []
   private deadTexts: Phaser.GameObjects.Text[] = []
-  private shownCountdown: number[] = []
+  private shownCountdown: (number | null)[] = []
   private staminaGfx?: Phaser.GameObjects.Graphics
   private shownStamina = -1
   private hitShakeOn = false
@@ -152,6 +158,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private mapH = 0
   private bootGen = 0
   private devGfx?: Phaser.GameObjects.Graphics
+  private goalGfx?: Phaser.GameObjects.Graphics
 
   constructor() {
     super(SceneKey.Battle)
@@ -185,6 +192,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
     this.devGfx = undefined
+    this.goalGfx = undefined
   }
 
   devProvider(): DevProvider {
@@ -194,8 +202,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   devSpawn(kind: 'one' | 'elite' | 'surge' | 'boss'): void {
     const sim = this.sim
     if (!sim || sim.over) return
-    if (kind === 'one') telegraphOne(sim, 1)
-    else if (kind === 'elite') telegraphOne(sim, 1, true)
+    if (kind === 'one') telegraphOne(sim, { hpMul: 1 })
+    else if (kind === 'elite') telegraphOne(sim, { hpMul: 1, elite: true })
     else if (kind === 'surge') callSquad(sim, SURGE)
     else spawnBoss(sim)
   }
@@ -370,6 +378,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
     openWave(this.sim)
+    markFightBase(this.sim)
+    if (this.fightDef.intro) this.sim.out.banners.push(this.fightDef.intro)
     this.ready = true
     hint.destroy()
   }
@@ -411,10 +421,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
         this.shownHp[i] = -1
         if (dead) {
           dead.setVisible(true).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
-          const remain = Math.ceil((Revive.at[m]! - sim.elapsedMs) / 1000)
+          const remain = reviveSec(sim, m)
           if (remain !== this.shownCountdown[i]) {
             this.shownCountdown[i] = remain
-            dead.setText(String(Math.max(0, remain)))
+            dead.setText(remain === null ? '' : String(remain))
           }
         }
         continue
@@ -485,6 +495,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       label: this.fightDef.name ?? null,
       seconds: Math.floor(elapsed / 1000),
       remainMs: limit === undefined ? null : Math.max(0, limit - elapsed),
+      goals: sim ? fightGoals(sim) : [],
       bossHp: boss !== undefined ? Hp.v[boss]! : null,
       bossMaxHp: boss !== undefined ? Hp.max[boss]! : 1,
       battleFx: (sim ? activeMods(sim) : []).map((e) => ({
@@ -538,7 +549,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
           alive: Alive.v[m] === 1,
           hp: Hp.v[m]!,
           max: Hp.max[m]!,
-          reviveSec: Math.max(0, Math.ceil((Revive.at[m]! - sim.elapsedMs) / 1000)),
+          reviveSec: reviveSec(sim, m),
           tired: dragging(sim, m),
         }
       }),
@@ -557,7 +568,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
         alive: Alive.v[m] === 1,
         hp: Hp.v[m]!,
         max: Hp.max[m]!,
-        reviveSec: Math.max(0, Math.ceil((Revive.at[m]! - sim.elapsedMs) / 1000)),
+        reviveSec: reviveSec(sim, m),
         tired: dragging(sim, m),
         now: statsOf(m),
         lasting: lastingStats(m),
@@ -620,6 +631,31 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   setSkillAim(dir: Point | null): void {
     this.skillAim = dir
+  }
+
+  /** 目标在视野外时，在队长身边画一个指过去的箭头 */
+  private drawGoalPointer(sim: Sim): void {
+    const spot = goalSpot(sim)
+    const lx = leaderX(sim)
+    const ly = leaderY(sim)
+    const d = spot ? sim.hooks.worldDelta(sim, lx, ly, spot.x, spot.y) : null
+    const v = sim.view
+    if (!d || (lx + d.x >= v.x && lx + d.x <= v.right && ly + d.y >= v.y && ly + d.y <= v.bottom)) {
+      this.goalGfx?.clear()
+      return
+    }
+    this.goalGfx ??= this.add.graphics().setDepth(40)
+    const g = this.goalGfx
+    const u = norm(d.x, d.y)
+    const r = charSize(sim.leader) * 0.75 + 0.3 * UNIT
+    const tipX = lx + u.x * (r + 0.4 * UNIT)
+    const tipY = ly + u.y * (r + 0.4 * UNIT)
+    const w = 0.25 * UNIT
+    g.clear()
+    g.fillStyle(0x000000, 0.35)
+    g.fillTriangle(tipX + u.x * 3, tipY + u.y * 3, lx + u.x * r - u.y * (w + 3), ly + u.y * r + u.x * (w + 3), lx + u.x * r + u.y * (w + 3), ly + u.y * r - u.x * (w + 3))
+    g.fillStyle(0xffdc5d, 0.95)
+    g.fillTriangle(tipX, tipY, lx + u.x * r - u.y * w, ly + u.y * r + u.x * w, lx + u.x * r + u.y * w, ly + u.y * r - u.x * w)
   }
 
   private drawSkillAim(sim: Sim): void {
@@ -778,11 +814,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.updateStaminaGauge()
     this.drawDevTargets(sim)
     this.drawSkillAim(sim)
+    this.drawGoalPointer(sim)
     if (sim.over) {
-      this.ending = true
-      this.run.combatMs += sim.elapsedMs
-      playSfx('over')
-      this.time.delayedCall(900, () => this.scene.start(SceneKey.Result, { win: false }))
+      this.lose('全军覆没')
       return
     }
     const camOff = handoverCamOffset(sim)
@@ -792,9 +826,20 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
     if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
     // 须在 stepFrame 与全灭判定之后：时限内全灭判负
-    if (fightWon(sim, lastFrame)) {
+    const verdict = fightVerdict(sim, lastFrame)
+    if (verdict?.win) {
       settleWave(sim)
       this.scheduleWaveEnd()
+    } else if (verdict) {
+      this.lose(verdict.reason)
     }
+  }
+
+  /** 这一局输了：停在此刻，稍后去结算 */
+  private lose(reason: string): void {
+    this.ending = true
+    this.run.combatMs += this.sim!.elapsedMs
+    playSfx('over')
+    this.time.delayedCall(900, () => this.scene.start(SceneKey.Result, { win: false, reason }))
   }
 }

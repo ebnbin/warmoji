@@ -1,19 +1,18 @@
 import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { Call, Carrier, Due, Order } from '../components'
-import { callRule, carrierPickup } from '../store'
+import { callRule, carrierPickup, foeSpec } from '../store'
 import type { FieldPickupDef } from '../../types/battlefield'
 import type { BatchRule, BossRule } from '../../types/runs'
+import type { FoeSpec } from '../fight/state'
 import type { Sim } from '../sim'
 
-/** 到 atMs 放出一只敌人：forced 为真必是精英，否则有 chance 的几率 */
-export function scheduleOrder(sim: Sim, atMs: number, hpMul: number, forced: boolean, chance: number): number {
+/** 到 atMs 按要求放出一只敌人 */
+export function scheduleOrder(sim: Sim, atMs: number, spec: FoeSpec): number {
   const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Due, Order)
   Due.at[eid] = atMs
-  Order.hpMul[eid] = hpMul
-  Order.forced[eid] = forced ? 1 : 0
-  Order.chance[eid] = chance
+  foeSpec[eid] = spec
   return eid
 }
 

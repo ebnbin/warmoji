@@ -5,7 +5,7 @@ import { RUNS } from '../data/runs'
 import type { GrowthProgress, ItemId } from '../types/items'
 import type { Hazard, MapId } from '../types/maps'
 import type { EnemyKind } from '../types/enemies'
-import type { RunDef, RunId, StepDef } from '../types/runs'
+import type { RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
 import { MAP_IDS } from '../data/maps'
 import type { XpState } from '../types/xp'
 import { sandboxTeam } from '../ecs/sandbox/knobs'
@@ -56,19 +56,34 @@ export interface RunState {
 
 let current: RunState | undefined
 
-/** 开一局：玩法给了队伍就按它组队、满血开局，否则由招募步骤补上 */
+/** 预设队伍的名单：指定的直接入队，按标签的从别的位置都没占、带齐这些标签的角色里随机挑 */
+function pickTeam(slots: readonly TeamSlot[]): CharacterId[] {
+  const out: CharacterId[] = []
+  const fixed = new Set(slots.filter((s) => typeof s === 'string'))
+  for (const s of slots) {
+    if (typeof s === 'string') {
+      out.push(s)
+      continue
+    }
+    const pool = ROSTER_IDS.filter((c) => !fixed.has(c) && !out.includes(c) && s.tags.every((t) => CHARACTERS[c].tags.includes(t)))
+    out.push(pool[Math.floor(Math.random() * pool.length)]!)
+  }
+  return out
+}
+
+/** 开一局：地图固定的不看玩家选的；玩法给了队伍就按它组队、满血开局，否则由招募步骤补上；给了开局进度就从那里起 */
 export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
   const def = RUNS[id]
   const run: RunState = {
     runId: id,
     step: 0,
-    mapId,
+    mapId: def.map ?? mapId,
     decorSeed: (Math.random() * 0xffffffff) >>> 0,
-    wave: 1,
+    wave: def.start?.wave ?? 1,
     coins: def.coins ?? 0,
     kills: 0,
     xp: { level: 1, xp: 0 },
-    combatMs: 0,
+    combatMs: (def.start?.sec ?? 0) * 1000,
     roster: [],
     memberHp: [],
     memberItems: [],
@@ -96,6 +111,10 @@ export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
     for (const m of t.ids) addMember(run, m)
     run.minLevel = t.level
     run.invincible = t.invincible
+    run.memberHp.fill(Infinity)
+  } else if (def.team) {
+    for (const m of pickTeam(def.team.slots)) addMember(run, m)
+    run.minLevel = def.team.level ?? 1
     run.memberHp.fill(Infinity)
   }
   current = run

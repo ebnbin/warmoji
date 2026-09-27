@@ -146,7 +146,7 @@ export function makeSim(
   damageNumbers: boolean,
   fight: FightDef,
 ): Sim {
-  const state = newFight(fight)
+  const state = newFight(fight, run)
   const team = formTeam(world, atlas, run, origin.x, origin.y, fightMods(state, FACTION.team))
   const { characters, leader } = team
   return {

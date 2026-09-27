@@ -1,14 +1,14 @@
 import { playSfx } from '../../audio/sfx'
 import { attachCarrierRing } from '../entities/pickup'
-import { spawnEnemy } from '../entities/enemy'
+import { markBounty, spawnEnemy } from '../entities/enemy'
 import { enemyCarries, telegraphCarries, telegraphDef } from '../store'
-import { Due, Telegraph, Transform } from '../components'
-import { query, removeEntity } from 'bitecs'
-import { runStream } from '../fight/spawns'
+import { Bounty, Due, Telegraph, Transform } from '../components'
+import { hasComponent, query, removeEntity } from 'bitecs'
+import { runStream, runWaves } from '../fight/spawns'
 import { runKnobs } from '../sandbox/spawn'
 import type { Sim } from '../sim'
 
-/** 到点的预兆现身为敌人，再按这一场的规则连续刷怪 */
+/** 到点的预兆现身为敌人，再按这一场的规则连续刷怪、放出下一组 */
 export function spawnStep(sim: Sim): void {
   const atlas = sim.frames
   const now = sim.elapsedMs
@@ -23,9 +23,11 @@ export function spawnStep(sim: Sim): void {
       enemyCarries[eid] = carries
       attachCarrierRing(sim, eid, carries)
     }
+    if (hasComponent(sim.world, e, Bounty)) markBounty(sim, eid)
     removeEntity(sim.world, e)
   }
   const f = sim.fight
   for (const st of f.streams) runStream(sim, st, sim.wdtMs)
+  for (const w of f.waves) runWaves(sim, w)
   if (f.knobs) runKnobs(sim, f.knobs, sim.wdtMs)
 }

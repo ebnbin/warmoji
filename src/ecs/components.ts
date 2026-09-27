@@ -580,8 +580,11 @@ export const Summoned = { by: i32(), byUid: u32() }
 /** 刷怪预兆：loud 为 1 的在敌人现身时轰一声 */
 export const Telegraph = { hp: f32(), elite: u8(), boss: u8(), bornMs: f32(), loud: u8() }
 
-/** 一只待放出的敌人：到时按这一场的配比抽；forced 为 1 必是精英，否则有 chance 的几率 */
-export const Order = { hpMul: f32(), forced: u8(), chance: f32() }
+/** 一只待放出的敌人，要求记在 foeSpec */
+export const Order = {}
+
+/** 悬赏目标：预兆与现身后的敌人都带着 */
+export const Bounty = {}
 
 /** 到时登场的一队敌人或头目，规则记在 callRule */
 export const Call = {}

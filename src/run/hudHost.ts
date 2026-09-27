@@ -12,6 +12,8 @@ export interface HudSnapshot {
   seconds: number
   /** 离时限还有多久；没有时限是 null，显示已用时 */
   remainMs: number | null
+  /** 这一场的目标与进度：warn 为真的是提醒会输的 */
+  goals: readonly { readonly text: string; readonly warn: boolean }[]
   bossHp: number | null
   bossMaxHp: number
   battleFx: { emoji: string; name: string; desc: string; polarity: Polarity; remainMs: number; totalMs: number }[]
@@ -44,7 +46,8 @@ export interface SquadMember {
   alive: boolean
   hp: number
   max: number
-  reviveSec: number
+  /** 几秒后起来；这一场不会自己起来是 null */
+  reviveSec: number | null
   /** 正在拖慢全队 */
   tired: boolean
 }
@@ -64,7 +67,8 @@ export interface MemberSheet {
   alive: boolean
   hp: number
   max: number
-  reviveSec: number
+  /** 几秒后起来；这一场不会自己起来是 null */
+  reviveSec: number | null
   /** 正在拖慢全队 */
   tired: boolean
   now: StatValues

@@ -10,6 +10,7 @@ import { ITEMS } from '../data/items'
 import { beginRun, endRun, getRun, runDef, skipFilled } from '../run/state'
 import { fightsDone } from '../run/flow'
 import { goStep } from './teamPage'
+import { fightUnit } from './runLines'
 import type { RunState } from '../run/state'
 import { browserStorage } from '../util/storage'
 import { burstEmitter } from '../ui/fx'
@@ -27,6 +28,8 @@ export class ResultScene extends Phaser.Scene {
   private preserveOnRestart = false
   private run!: RunState
   private win = false
+  /** 输在哪；从别处直接跳来的没有 */
+  private reason: string | null = null
   private submitted = false
   private best = { newBest: false, bestWave: 0, bestKills: 0 }
 
@@ -34,8 +37,11 @@ export class ResultScene extends Phaser.Scene {
     super(SceneKey.Result)
   }
 
-  init(data?: { win?: boolean }): void {
-    if (data && 'win' in data) this.win = !!data.win
+  init(data?: { win?: boolean; reason?: string }): void {
+    if (data && 'win' in data) {
+      this.win = !!data.win
+      this.reason = data.reason ?? null
+    }
     if (!this.preserveOnRestart) this.submitted = false
   }
 
@@ -81,7 +87,8 @@ export class ResultScene extends Phaser.Scene {
 
     const minutes = Math.floor(this.run.combatMs / 60000)
     const seconds = Math.round((this.run.combatMs % 60000) / 1000)
-    const waveText = fights > 1 ? (this.win ? `${fights} 波全部打完` : `止步第 ${reached} 波`) : def.name
+    const unit = fightUnit(def)
+    const waveText = fights > 1 ? (this.win ? `${fights} ${unit}全部打完` : `止步第 ${reached} ${unit}`) : def.name
     new RichLabel(
       this,
       cx,
@@ -89,12 +96,19 @@ export class ResultScene extends Phaser.Scene {
       `${this.run.roster.map((id) => `{${CHARACTERS[id].emoji}}`).join('')} · ${waveText} · 击杀 ${this.run.kills} · {${PICKUPS.coin.emoji}}${this.run.coins} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
       { kind: 'heading', bold: false, color: 'soft', originX: 0.5, maxWidth: content.w - 48 },
     )
+    const lost = !def.record && !this.win && this.reason !== null
     new Label(
       this,
       cx,
       titleY + (f.portrait ? 102 : 100),
-      !def.record ? `${def.name}不计入最佳纪录` : this.best.newBest ? '新纪录！' : `最佳：第 ${this.best.bestWave} 波 · 击杀 ${this.best.bestKills}`,
-      { kind: 'heading', bold: false, color: 'accent' },
+      lost
+        ? `败因：${this.reason}`
+        : !def.record
+          ? `${def.name}不计入最佳纪录`
+          : this.best.newBest
+            ? '新纪录！'
+            : `最佳：第 ${this.best.bestWave} 波 · 击杀 ${this.best.bestKills}`,
+      { kind: 'heading', bold: false, color: lost ? 'bad' : 'accent' },
     ).setOrigin(0.5)
 
     const top = titleY + (f.portrait ? 140 : 126)

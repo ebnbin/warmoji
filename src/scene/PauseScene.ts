@@ -18,7 +18,9 @@ import type { RunState } from '../run/state'
 import type { CharacterId } from '../types/characters'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
 import type { GrowthProgress, ItemId } from '../types/items'
-import type { FightDef } from '../types/runs'
+import type { FightDef, RunDef, Squad } from '../types/runs'
+import type { MapId } from '../types/maps'
+import { fightGoalText, fightUnit } from './runLines'
 import { applyCamera, VIEWPORT_CHANGED } from '../util/apply'
 import { formatBig, formatTime } from '../util/format'
 import { keysOf } from '../util/record'
@@ -99,7 +101,7 @@ interface Foe {
   readonly since: number
 }
 
-/** 这一局会出的敌人：按首次出没的场次排，巢穴生出的与死后分裂出的跟着母体 */
+/** 这一局会出的敌人：按首次出没的场次排，巢穴生出的与死后分裂出的跟着母体；配比按这一场的，不写就按地图，地图的配比从开局的波数起算 */
 function runFoes(run: RunState): Foe[] {
   const since = new Map<EnemyKind, number>()
   const order: EnemyDef[] = []
@@ -114,21 +116,40 @@ function runFoes(run: RunState): Foe[] {
     if (def.spawner) add(def.spawner.into, n)
     for (const fx of def.onDeath ?? []) if (fx.kind === 'split') add(fx.into, n)
   }
-  fightsOf(runDef(run)).forEach((f, i) => {
+  const def = runDef(run)
+  const firstWave = def.start?.wave ?? 1
+  fightsOf(def).forEach((f, i) => {
     const n = i + 1
+    const mix = (): void => {
+      if (f.mix) for (const m of f.mix) add(ENEMIES[m.kind], n)
+      else for (const row of MAPS[run.mapId].mix) add(ENEMIES[row.kind], Math.max(n, row.sinceWave - firstWave + 1))
+    }
+    const squad = (sq: Squad): void => (sq.enemy ? add(ENEMIES[sq.enemy], n) : mix())
     for (const s of f.spawns) {
       if (s.kind === 'boss') add(bossFor(run.mapId), n)
       else if (s.kind === 'knobs') for (const e of mapEnemyRoster(run.mapId)) add(e, n)
-      else for (const row of MAPS[run.mapId].mix) add(ENEMIES[row.kind], Math.max(n, row.sinceWave))
+      else if (s.kind === 'batch') squad(s.squad)
+      else if (s.kind === 'waves') s.squads.forEach(squad)
+      else mix()
     }
   })
   return order.map((def) => ({ def, since: since.get(def.kind)! })).sort((a, b) => a.since - b.since)
 }
 
-/** 多场的一局里这一场的特别之处 */
-function fightTag(f: FightDef): string {
-  if (f.spawns.some((s) => s.kind === 'boss')) return '（首领波）'
-  return f.spawns.some((s) => s.kind === 'batch') ? '（精英波）' : ''
+/** 这一场登场的头目 */
+function fightBosses(f: FightDef, mapId: MapId): EnemyDef[] {
+  const squads = f.spawns.flatMap((s) => (s.kind === 'batch' ? [s.squad] : s.kind === 'waves' ? s.squads : []))
+  return [
+    ...f.spawns.flatMap((s) => (s.kind === 'boss' ? [bossFor(mapId)] : [])),
+    ...squads.flatMap((sq) => (sq.enemy && ENEMIES[sq.enemy].role === 'boss' ? [ENEMIES[sq.enemy]] : [])),
+  ]
+}
+
+/** 多场的一局里这一场的特别之处：有头目，或有一队必出精英 */
+function fightTag(def: RunDef, f: FightDef, mapId: MapId): string {
+  const unit = fightUnit(def)
+  if (fightBosses(f, mapId).length > 0) return `（首领${unit}）`
+  return f.spawns.some((s) => s.kind === 'batch' && (s.squad.elites ?? 0) > 0) ? `（精英${unit}）` : ''
 }
 
 /** 暂停页：一局之中的信息都在这里，盖在战斗、商店或招募页上，下层停住 */
@@ -337,7 +358,9 @@ export class PauseScene extends Phaser.Scene {
     const half = (right - x0 - 28) / 2
     const ratio = m.max > 0 ? Math.min(1, m.hp / m.max) : 0
     const hpText = !m.alive
-      ? `倒下 · ${m.reviveSec} 秒后复活`
+      ? m.reviveSec === null
+        ? '倒下 · 这一场不会自己起来'
+        : `倒下 · ${m.reviveSec} 秒后复活`
       : `生命 ${Math.ceil(m.hp)} / ${Math.round(m.max)}${this.opened.from === SceneKey.Battle ? '' : '（下一波开局）'}`
     keep(new Label(this, x0, D.y + 68, hpText, { kind: 'label', bold: true, color: !m.alive ? 'bad' : ratio > 0.5 ? 'good' : 'warn' }).setOrigin(0, 0.5))
     keep(new ProgressBar(this, x0, D.y + 86, half, 14, { tone: 'hp', value: m.alive ? ratio : 0 }))
@@ -415,28 +438,34 @@ export class PauseScene extends Phaser.Scene {
 
     flow.heading('进度', '1f3c1')
     const def = runDef(run)
+    const unit = fightUnit(def)
     const fights = fightsOf(def)
     const remain = snap?.remainMs ?? null
+    const cur = nextFight(run)
     if (fights.length > 1) {
       const done = fightsDone(run)
-      const cur = nextFight(run)
       const prev = lastFight(run)
+      const tag = (f: FightDef): string => fightTag(def, f, run.mapId)
       flow.text(
         snap && cur
-          ? `${cur.name ?? ''}进行中${fightTag(cur)}${remain === null ? '' : ` · 本波还剩 ${formatTime(Math.ceil(remain / 1000))}`}`
-          : `${prev ? `${prev.name ?? ''}已完成 · ` : ''}下一波是${cur?.name ?? ''}${cur ? fightTag(cur) : ''}`,
+          ? `${cur.name ?? ''}进行中${tag(cur)}${remain === null ? '' : ` · 本${unit}还剩 ${formatTime(Math.ceil(remain / 1000))}`}`
+          : `${prev ? `${prev.name ?? ''}已完成 · ` : ''}下一${unit}是${cur?.name ?? ''}${cur ? tag(cur) : ''}`,
         { color: 'ink', bold: true },
       )
-      const barText = new Label(this, 24 + width, flow.y + 10, `${done} / ${fights.length} 波`, { kind: 'label', color: 'soft' }).setOrigin(1, 0.5)
+      const barText = new Label(this, 24 + width, flow.y + 10, `${done} / ${fights.length} ${unit}`, { kind: 'label', color: 'soft' }).setOrigin(1, 0.5)
       const bar = new ProgressBar(this, flow.indent, flow.y + 2, 24 + width - barText.width - 16 - flow.indent, 16, { tone: 'accent', value: done / fights.length })
       flow.put(bar).put(barText, 34)
       const numbered = fights.map((f, i) => ({ f, n: i + 1 }))
-      const elites = numbered.filter(({ f, n }) => n > done && fightTag(f) === '（精英波）').map(({ n }) => n)
-      const bosses = numbered.filter(({ f }) => fightTag(f) === '（首领波）').map(({ n }) => `第 ${n} 波是首领波：${bossFor(run.mapId).name}`)
-      flow.text([elites.length > 0 ? `精英波还有第 ${elites.join('、')} 波` : '', ...bosses].filter(Boolean).join(' · '))
+      const elites = numbered.filter(({ f, n }) => n > done && tag(f) === `（精英${unit}）`).map(({ n }) => n)
+      const bosses = numbered.flatMap(({ f, n }) => {
+        const names = fightBosses(f, run.mapId).map((b) => b.name)
+        return names.length > 0 ? [`第 ${n} ${unit}是首领${unit}：${names.join('、')}`] : []
+      })
+      flow.text([elites.length > 0 ? `精英${unit}还有第 ${elites.join('、')} ${unit}` : '', ...bosses].filter(Boolean).join(' · '))
     } else {
       flow.text(`${def.name} · 已打 ${formatTime(snap?.seconds ?? 0)}${remain === null ? '' : ` · 还剩 ${formatTime(Math.ceil(remain / 1000))}`}`)
     }
+    if (cur) flow.text(`${snap ? '这一' : '下一'}${unit}的目标：${fightGoalText(cur)}`)
     flow.gap(6)
 
     flow.heading('收获', '1fa99')
@@ -548,8 +577,9 @@ export class PauseScene extends Phaser.Scene {
     const flow = new Flow(this, view, { x: 24, y: Math.max(136, desc.y + desc.height + 16), width: w - 48 })
     const st = this.run.stats
     flow.heading('本局', '1f3c6')
+    const unit = fightUnit(runDef(this.run))
     const many = fightsOf(runDef(this.run)).length > 1
-    const when = many ? (boss ? `第 ${since} 波登场的头目` : `第 ${since} 波起出没`) : boss ? '这一场的头目' : '这一场会出现'
+    const when = many ? (boss ? `第 ${since} ${unit}登场的头目` : `第 ${since} ${unit}起出没`) : boss ? '这一场的头目' : '这一场会出现'
     flow.text(since > fightsDone(this.run) + 1 ? `${when} · 还没登场` : when)
     flow.text(`击杀 ${st.enemyKills[def.kind] ?? 0} · 对我方造成 ${formatBig(st.enemyDamage[def.kind] ?? 0)} 伤害`)
     flow.gap(6)

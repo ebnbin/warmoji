@@ -7,13 +7,14 @@ import type { Point } from '../../util/vec'
 import { leaderX, leaderY } from '../utils/team'
 import { POP } from '../../data/feel'
 import { startPop } from '../utils/pop'
-import type { DriveDef, EnemyDef, NpcDef } from '../../types/enemies'
+import type { DriveDef, EnemyDef, EnemyMixEntry, NpcDef } from '../../types/enemies'
 import type { OutlineKind } from '../../emoji/svg'
 import { waveAt } from '../../data/waves'
 import {
   Anchored,
   Anim,
   Boss,
+  Bounty,
   BreaksWalls,
   Chase,
   CoinThief,
@@ -41,6 +42,8 @@ import {
   Orbit,
   Phasing,
   Pop,
+  Radius,
+  Ring,
   Wander,
   Sprite,
   Standoff,
@@ -66,6 +69,7 @@ import { hourAt, isDayAt } from '../worlds/daynight'
 import type { FieldPickupDef } from '../../types/battlefield'
 import { enemyMixAt, pickEnemy } from '../utils/spawnMix'
 import { fightMods } from '../fight/state'
+import type { FoeSpec } from '../fight/state'
 import type { ByKind } from '../../util/record'
 
 type DriveOf = ByKind<DriveDef>
@@ -80,7 +84,7 @@ function seekOf(eid: number): number {
 const DRIVES: { [K in keyof DriveOf]: DriveAttach<K> } = {
   chase: (sim, eid, d) => {
     addComponent(sim.world, eid, Chase)
-    Chase.leader[eid] = d.at === 'leader' ? 1 : 0
+    Chase.leader[eid] = d.at === 'leader' || (sim.fight.def.chaseLeader && Faction.v[eid] === FACTION.enemy) ? 1 : 0
     Chase.seek[eid] = seekOf(eid)
   },
   wander: (sim, eid) => addComponent(sim.world, eid, Wander),
@@ -251,7 +255,9 @@ export function dayNightOf(sim: Sim): { cfg: NonNullable<MapDef['dayNight']>; ho
   return { cfg, hour: hourAt((sim.run.combatMs + sim.elapsedMs) / 1000, cfg) }
 }
 
-function currentMix(sim: Sim): ReturnType<typeof enemyMixAt> {
+/** 这一场的配比，不写就按地图与波数，昼夜图按时辰 */
+function currentMix(sim: Sim): readonly EnemyMixEntry[] {
+  if (sim.fight.mix) return sim.fight.mix
   const m = MAPS[sim.mapId]
   const dn = dayNightOf(sim)
   const rows = dn ? ((isDayAt(dn.hour) ? m.dayMix : m.nightMix) ?? m.mix) : m.mix
@@ -281,13 +287,66 @@ export function sightedSpawnPoint(sim: Sim): Point {
   return p
 }
 
-/** 按这一场的配比预告一只敌人：forced 为真必是精英，否则有 chance 的几率 */
-export function telegraphOne(sim: Sim, hpMultiplier: number, forced = false, chance = 0): void {
-  const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
-  const elite = forced || (chance > 0 && sim.rng.next() < chance)
-  const hp = Math.round(def.hp * hpMultiplier)
-  const pos = sightedSpawnPoint(sim)
-  spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, false)
+/** 身后散开的扇面有多宽 */
+const BEHIND_ARC = 1.2
+
+/** 一只敌人的站位：不写就是看得见队伍的刷怪点，头目在远处；围圈按它在队里的次序均分一圈，身后按次序排成扇面 */
+function foeSpot(sim: Sim, foe: FoeSpec, boss: boolean): Point {
+  const at = foe.at
+  if (!at) return boss ? sim.hooks.spawnPoint(sim, true) : sightedSpawnPoint(sim)
+  const index = foe.index ?? 0
+  const count = foe.count ?? 1
+  switch (at.kind) {
+    case 'far':
+      return sim.hooks.spawnPoint(sim, true)
+    case 'ring': {
+      const a = (foe.phase ?? 0) + (Math.PI * 2 * index) / count
+      return sim.hooks.settle(sim, { x: leaderX(sim) + Math.cos(a) * at.dist * UNIT, y: leaderY(sim) + Math.sin(a) * at.dist * UNIT })
+    }
+    case 'behind': {
+      const a = Math.atan2(-sim.heading.y, -sim.heading.x) + (count > 1 ? (index / (count - 1) - 0.5) * BEHIND_ARC : 0)
+      return sim.hooks.settle(sim, { x: leaderX(sim) + Math.cos(a) * at.dist * UNIT, y: leaderY(sim) + Math.sin(a) * at.dist * UNIT })
+    }
+    case 'point': {
+      const c = sim.hooks.center(sim)
+      const r = (at.spread ?? 0) * UNIT * Math.sqrt(sim.rng.next())
+      const a = sim.rng.next() * Math.PI * 2
+      return sim.hooks.settle(sim, { x: c.x + at.dx * UNIT + Math.cos(a) * r, y: c.y + at.dy * UNIT + Math.sin(a) * r })
+    }
+  }
+}
+
+/** 按要求预告一只敌人：种类不指定就按这一场的配比抽，头目预告得久、现身时轰一声 */
+export function telegraphOne(sim: Sim, foe: FoeSpec): void {
+  const raw = foe.enemy ?? pickEnemy(currentMix(sim), () => sim.rng.next())
+  const def = toPx(raw)
+  const boss = raw.role === 'boss'
+  const chance = foe.chance ?? 0
+  const elite = !boss && (foe.elite === true || (chance > 0 && sim.rng.next() < chance))
+  const hp = Math.round(def.hp * foe.hpMul)
+  const pos = foeSpot(sim, foe, boss)
+  const t = spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, boss, undefined, boss ? SPAWN.telegraphMs * 1.6 : SPAWN.telegraphMs)
+  if (boss) Telegraph.loud[t] = 1
+  if (foe.bounty) {
+    addComponent(sim.world, t, Bounty)
+    sim.fight.bounties++
+  }
+}
+
+const BOUNTY_COLOR = 0xff5252
+
+/** 悬赏目标：带上标记，脚下一圈红光 */
+export function markBounty(sim: Sim, eid: number): void {
+  addComponents(sim.world, eid, Bounty, Ring)
+  Ring.color[eid] = BOUNTY_COLOR
+  Ring.radius[eid] = Radius.v[eid]! * 1.6 + 0.3 * UNIT
+  Ring.fillAlpha[eid] = 0.14
+  Ring.lineAlpha[eid] = 0.95
+  Ring.lineWidth[eid] = 3
+  Ring.born[eid] = sim.fxMs
+  Ring.dy[eid] = 0
+  Ring.z[eid] = 4
+  Ring.breathe[eid] = 1
 }
 
 export function spawnBoss(sim: Sim): void {
