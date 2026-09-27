@@ -137,6 +137,8 @@ export interface HudHost {
   /** 现在为什么不能手动换队长；能换是 null */
   switchBlock(): string | null
   leaderSkill(): LeaderSkill | null
+  /** 现在为什么不能放主动技能；规则上能放是 null */
+  skillBlock(): string | null
   castLeaderSkill(dir: { x: number; y: number } | null, holdRatio?: number): boolean
   setSkillAim(dir: { x: number; y: number } | null): void
 }

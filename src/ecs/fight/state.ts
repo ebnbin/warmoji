@@ -4,8 +4,10 @@ import { timeLimitMs } from '../../data/runs'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
 import type { EnemyDef, EnemyMixEntry } from '../../types/enemies'
-import type { EndRule, FightDef, FightRules, HoldPoint, RunRules, SpawnAt, StreamRule, WavesRule } from '../../types/runs'
+import type { EndRule, FightDef, HoldPoint, SpawnAt, StreamRule, WavesRule } from '../../types/runs'
 import type { StatMods } from '../../types/stats'
+import { activeRules, enemyModsOf, mutatorRules } from '../../run/rules'
+import type { ActiveRules } from '../../run/rules'
 import { runDef } from '../../run/state'
 import type { RunState } from '../../run/state'
 import { Bounty, Call, Due, ENEMY_SET, FACTION, Faction, Order, Telegraph, Transform } from '../components'
@@ -54,33 +56,13 @@ export interface HoldState {
   ring: number
 }
 
-/** 这一场生效的我方规则：一场写的盖过一局写的，修正两边叠加 */
-export interface ActiveRules {
-  readonly revive: boolean
-  readonly rescue: FightRules['rescue']
-  readonly lock: boolean
-  readonly critical: boolean
-  readonly switchCdMs: number
-  readonly surprise: boolean
-  readonly mods: readonly StatMods[]
-}
-
-function activeRules(run: RunRules | undefined, fight: FightRules | undefined): ActiveRules {
-  return {
-    revive: fight?.revive ?? run?.revive ?? true,
-    rescue: fight?.rescue ?? run?.rescue,
-    lock: fight?.leader?.lock ?? run?.leader?.lock ?? false,
-    critical: fight?.leader?.critical ?? run?.leader?.critical ?? false,
-    switchCdMs: fight?.leader?.switchCdMs ?? run?.leader?.switchCdMs ?? 0,
-    surprise: fight?.surprise ?? run?.surprise ?? false,
-    mods: [run?.mods, fight?.mods].flatMap((m) => (m ? [m] : [])),
-  }
-}
-
 /** 一场战斗进行中的状态 */
 export interface FightState {
   readonly def: FightDef
+  /** 我方在这一场的规则，词缀已经算进去 */
   readonly rules: ActiveRules
+  /** 这一场给敌人的常驻修正，词缀已经算进去 */
+  readonly enemyMods: readonly StatMods[]
   readonly streams: StreamState[]
   readonly waves: WavesState[]
   /** 试炼场按旋钮刷怪的冷却；没有这条规则是 null */
@@ -114,7 +96,8 @@ export function newFight(def: FightDef, run: RunState): FightState {
   const hold = def.ends.find((e) => e.kind === 'hold')
   return {
     def,
-    rules: activeRules(runDef(run).rules, def.rules),
+    rules: activeRules(runDef(run).rules, def.rules, mutatorRules(run)),
+    enemyMods: enemyModsOf(run, def),
     streams: def.spawns.flatMap((rule) => (rule.kind === 'stream' ? [{ rule, cooldownMs: FIRST_SPAWN_MS }] : [])),
     waves: def.spawns.flatMap((rule) => (rule.kind === 'waves' ? [{ rule, next: 0, calmAt: -1 }] : [])),
     knobs: def.spawns.some((rule) => rule.kind === 'knobs') ? { cooldownMs: FIRST_SPAWN_MS } : null,
@@ -136,10 +119,10 @@ export function markFightBase(sim: Sim): void {
   sim.fight.base = { kills: sim.run.kills, coins: sim.run.coins, downs: downsOf(sim.run) }
 }
 
-/** 这一场给一方身体的常驻修正：我方规则写的，加上试炼场的攻速旋钮给队伍；敌人的写在这一场上 */
+/** 这一场给一方身体的常驻修正：我方规则写的，加上试炼场的攻速旋钮给队伍；敌人的写在这一场上，都算上词缀 */
 export function fightMods(f: FightState, faction: number): StatMods[] {
   if (faction === FACTION.team) return [...f.rules.mods, ...(f.knobs ? sandboxTeamMods() : [])]
-  if (faction === FACTION.enemy) return f.def.enemyMods ? [f.def.enemyMods] : []
+  if (faction === FACTION.enemy) return [...f.enemyMods]
   return []
 }
 

@@ -131,35 +131,47 @@ abstract class SingleScreenView extends BoundedView {
 }
 
 
+/** 一片盖住全场的黑幕，只在一个圆里透出来 */
+export class Fog {
+  private readonly rect: Phaser.GameObjects.Rectangle
+  private readonly shape: Phaser.GameObjects.Graphics
+
+  constructor(scene: Phaser.Scene) {
+    // Phaser 4 的 GeometryMask 在 WebGL 无实现，须走 filters.internal.addMask
+    this.rect = scene.add.rectangle(0, 0, FOG_SPAN, FOG_SPAN, FOG_COLOR, 0).setDepth(FOG_DEPTH).setVisible(false)
+    this.shape = scene.add.graphics().setVisible(false)
+    this.rect.enableFilters()
+    this.rect.filters?.internal.addMask(this.shape, true)
+  }
+
+  get objects(): Phaser.GameObjects.GameObject[] {
+    return [this.rect, this.shape]
+  }
+
+  /** 以 (x, y) 为圆心、radius 为半径透出来，其余盖上 alpha 的黑 */
+  show(x: number, y: number, radius: number, alpha: number): void {
+    if (alpha <= 0.001) return void this.rect.setVisible(false)
+    this.shape.clear()
+    this.shape.fillStyle(0xffffff)
+    this.shape.fillCircle(x, y, radius)
+    this.rect.setPosition(x, y).setFillStyle(FOG_COLOR, alpha).setVisible(true)
+  }
+}
+
 class DayNightView extends BoundedView {
-  private fogRect?: Phaser.GameObjects.Rectangle
-  private fogMask?: Phaser.GameObjects.Graphics
+  private fog?: Fog
 
   build(v: ViewCtx): void {
     super.build(v)
-    // Phaser 4 的 GeometryMask 在 WebGL 无实现，须走 filters.internal.addMask
-    const rect = v.scene.add.rectangle(0, 0, FOG_SPAN, FOG_SPAN, FOG_COLOR, 0).setDepth(FOG_DEPTH).setVisible(false)
-    const shape = v.scene.add.graphics().setVisible(false)
-    rect.enableFilters()
-    rect.filters?.internal.addMask(shape, true)
-    this.fogRect = rect
-    this.fogMask = shape
-    this.visuals.push(rect, shape)
+    this.fog = new Fog(v.scene)
+    this.visuals.push(...this.fog.objects)
   }
 
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const dn = v.def.dayNight!
     const hour = hourAt((v.run.combatMs + sim.elapsedMs) / 1000, dn)
     v.scene.cameras.main.setZoom((viewport.renderScale * dn.visionMid) / visionGridsAt(hour, dn))
-    const rect = this.fogRect
-    const shape = this.fogMask
-    if (!rect || !shape) return
-    const alpha = fogAlphaAt(hour, dn)
-    if (alpha <= 0.001) return void rect.setVisible(false)
-    shape.clear()
-    shape.fillStyle(0xffffff)
-    shape.fillCircle(leaderX(sim), leaderY(sim), fogRadiusAt(hour, dn) * UNIT)
-    rect.setPosition(leaderX(sim), leaderY(sim)).setFillStyle(FOG_COLOR, alpha).setVisible(true)
+    this.fog?.show(leaderX(sim), leaderY(sim), fogRadiusAt(hour, dn) * UNIT, fogAlphaAt(hour, dn))
   }
 }
 

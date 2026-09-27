@@ -2,6 +2,8 @@ export enum StorageKey {
   Settings = 'warmoji.settings.v1',
   Map = 'warmoji.map.v1',
   Highscore = 'warmoji.highscore.v2',
+  Labs = 'warmoji.labs.v1',
+  Mutators = 'warmoji.mutators.v1',
   DevTools = 'warmoji.devtools.v1',
 }
 

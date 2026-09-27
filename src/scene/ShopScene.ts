@@ -1,17 +1,18 @@
 import Phaser from 'phaser'
 import { CHARACTERS, upgradeCardsFor } from '../data/characters'
-import { characterLevel } from '../data/charLevel'
-import { characterXp, ITEMS, itemPrice, itemXp, RARITIES, rerollPrice } from '../data/items'
+import { MAX_CHAR_LEVEL } from '../data/charLevel'
+import { characterXp, ITEMS, itemPrice, itemXp, RARITIES, RARITY_ORDER, rerollPrice } from '../data/items'
 import { LEVEL_STATS } from '../data/levels'
 import { PICKUPS } from '../data/pickups'
 import { modTexts } from '../data/stats'
 import { playSfx } from '../audio/sfx'
 import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
-import { memberLevel, memberLook, memberOutStats } from '../run/members'
-import { getRun } from '../run/state'
+import { levelCap, levelFor, memberLevel, memberLook, memberOutStats } from '../run/members'
+import { getRun, runDef } from '../run/state'
 import { lastFight, nextFight } from '../run/flow'
 import type { RunState } from '../run/state'
-import type { ItemDef, ItemId } from '../types/items'
+import type { ItemDef, ItemId, ItemRarity } from '../types/items'
+import type { ShopRules } from '../types/runs'
 import type { StatValues } from '../types/stats'
 import { beginPage, Button, Dialog, Icon, Label, OfferCard, PageHeader, pageFrame, Pill } from '../ui'
 import type { OfferGoods, OfferLine, OfferOwner, OfferState, PageFrame, Rect } from '../ui'
@@ -117,10 +118,21 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     return (this.run.memberItems[slot] ??= [])
   }
 
-  /** 给这名队员刷一件：道具池看他的打法与等级，稀有度看波次、等级与他的幸运 */
+  private get rules(): ShopRules {
+    return runDef(this.run).rules?.shop ?? {}
+  }
+
+  /** 这一局的商店摆得出这个稀有度 */
+  private stocks(rarity: ItemRarity): boolean {
+    const r = this.rules.rarity
+    const at = RARITY_ORDER.indexOf(rarity)
+    return at >= RARITY_ORDER.indexOf(r?.min ?? 'common') && at <= RARITY_ORDER.indexOf(r?.max ?? 'legendary')
+  }
+
+  /** 给这名队员刷一件：道具池看他的打法、等级与商店规则，稀有度看波次、等级与他的幸运 */
   private roll(slot: number): ItemId | null {
     const level = this.levelOf(slot)
-    const pool = characterPoolFor(CHARACTERS[this.run.roster[slot]!], level)
+    const pool = characterPoolFor(CHARACTERS[this.run.roster[slot]!], level).filter((id) => this.stocks(ITEMS[id].rarity))
     return rollItem(pool, this.ownedFor(slot), Math.random, this.run.wave, level, this.slotStats(slot).luck)
   }
 
@@ -159,8 +171,9 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     if (after > before) this.showLevelUp(slot, after)
   }
 
-  /** 全队一起换下一轮：买空了这一轮就免费，其次用免费次数，再次花钱 */
+  /** 全队一起换下一轮：买空了这一轮就免费，其次用免费次数，再次花钱；商店规则不许刷新就不换 */
   private reroll(): void {
+    if (this.rules.reroll === false) return
     if (!this.cleared()) {
       if (this.freeRerolls > 0) {
         this.freeRerolls -= 1
@@ -199,11 +212,16 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     this.freshSlot = -1
   }
 
-  /** 刷新键与它的提示：买空了这一轮就免费，其次用免费次数，再次按价 */
+  /** 刷新键与它的提示：买空了这一轮就免费，其次用免费次数，再次按价；商店规则不许刷新就压暗 */
   private renderRefresh(): void {
     const offered = this.offers.filter((o) => o.id !== null)
     const cleared = this.cleared()
     const sold = offered.filter((o) => o.sold).length
+    if (this.rules.reroll === false) {
+      this.hint.setText(`已买 ${sold}/${offered.length} · 这一局商店不能刷新`).setInk('faint')
+      this.rerollBtn.setLabel('{1f504} 不能刷新').setVariant('secondary').setEnabled(false)
+      return
+    }
     this.hint.setText(cleared ? '已买空 · 这次刷新免费' : `已买 ${sold}/${offered.length} · 买空后免费刷新`).setInk(cleared ? 'good' : 'faint')
     const btn = this.rerollBtn
     if (cleared) {
@@ -234,11 +252,13 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     return Array.from({ length: n }, (_, i) => ({ x: B.x + start + i * (size + gap), y: B.y + (B.h - h) / 2, w: size, h }))
   }
 
-  /** 主人一栏：等级与经验，经验条预告买下这件后涨到哪 */
+  /** 主人一栏：等级与经验，经验条预告买下这件后涨到哪；等级按这一局的上下限算 */
   private ownerOf(slot: number): OfferOwner {
     const xp = characterXp(this.ownedFor(slot))
-    const level = characterLevel(xp)
-    const prog = levelProgress(xp)
+    const level = this.levelOf(slot)
+    const floor = this.run.minLevel
+    const top = levelCap(this.run)
+    const prog = levelProgress(xp, floor, top)
     const base = {
       emoji: memberLook(this.run, slot),
       outline: 'player' as const,
@@ -246,15 +266,15 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
       level: `Lv ${level}`,
       onTap: () => this.inspect(slot),
     }
-    if (prog.maxed) return { ...base, xp: 1, xpTone: 'accent', note: '满级', noteColor: 'accent' }
+    if (prog.maxed) return { ...base, xp: 1, xpTone: 'accent', note: top < MAX_CHAR_LEVEL ? '等级上限' : '满级', noteColor: 'accent' }
     const offer = this.offers[slot]
     if (!offer?.id || offer.sold) return { ...base, xp: prog.ratio, xpTone: 'info' }
     const gain = itemXp(ITEMS[offer.id])
-    const up = characterLevel(xp + gain) > level
+    const up = levelFor(this.run, xp + gain) > level
     return {
       ...base,
       xp: prog.ratio,
-      xpAfter: up ? 1 : levelProgress(xp + gain).ratio,
+      xpAfter: up ? 1 : levelProgress(xp + gain, floor, top).ratio,
       xpTone: 'info',
       note: up ? '升级！' : `+${gain}`,
       noteColor: up ? 'accent' : 'info',

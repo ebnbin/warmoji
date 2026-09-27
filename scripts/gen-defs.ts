@@ -13,6 +13,7 @@ import { ITEMS } from '../defs/items.ts'
 import { LEVEL_STATS } from '../defs/levels.ts'
 import { MAP_DEFAULTS } from '../defs/mapdefaults.ts'
 import { MAPS } from '../defs/maps.ts'
+import { MUTATORS } from '../defs/mutators.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
 import { ROLES } from '../defs/roles.ts'
@@ -28,7 +29,8 @@ import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { ItemDef } from '../src/types/items'
 import type { MapDef } from '../src/types/maps'
-import type { FightDef, FightRules, RunDef, SpawnAt, Squad, TeamDef } from '../src/types/runs'
+import type { ItemRarity } from '../src/types/items'
+import type { FightDef, FightRules, MutatorDef, RunDef, SpawnAt, Squad, StarRule, TeamDef } from '../src/types/runs'
 
 const errors: string[] = []
 const need = (ok: boolean, msg: string): void => {
@@ -106,11 +108,25 @@ const isBoss = (kind: EnemyKind | undefined): boolean => kind !== undefined && E
 /** 队长贴着倒下的队员站时两人中心的距离：身体互相挤开，靠不得更近 */
 const TOUCH = TEAM_BASELINE.member.radius * (TEAM_BASELINE.team.leaderSizeMul + TEAM_BASELINE.team.followerSizeMul)
 
-/** 我方规则：救援时长为正，救援范围大于队长贴着倒下队员的距离、小于队员跟在队长身后的距离（站着不动不会扶起来）；换队长的冷却为正 */
+/** 队员跟在队长身后时离队长中心最远的身体边缘：视野至少得罩住它 */
+const SQUAD_REACH = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
+
+/** 我方规则：救援时长为正，救援范围大于队长贴着倒下队员的距离、小于队员跟在队长身后的距离（站着不动不会扶起来）；换队长的冷却为正；视野看得见跟在身后的队员 */
 const checkRules = (r: FightRules | undefined, path: string): void => {
   need(r?.rescue === undefined || r.rescue.ms > 0, `${path} 的救援时长须为正`)
   need(r?.rescue === undefined || (r.rescue.radius > TOUCH && r.rescue.radius < FEEL.squad.fanDistance), `${path} 的救援范围须在 ${TOUCH} 到 ${FEEL.squad.fanDistance} 格之间`)
   need((r?.leader?.switchCdMs ?? 1) > 0, `${path} 的换队长冷却须为正`)
+  need((r?.vision ?? Infinity) > SQUAD_REACH, `${path} 的视野须大于 ${SQUAD_REACH} 格，看得见跟在身后的队员`)
+}
+
+const RARITY_RANK: Record<ItemRarity, number> = { common: 0, rare: 1, epic: 2, legendary: 3 }
+
+/** 星级条件：次数不为负，用时为正，击杀至少一只；剩下几次起来的机会须在命数以内 */
+const checkStar = (s: StarRule, lives: number | undefined, path: string): void => {
+  if (s.kind === 'time') need(s.ms > 0, `${path} 的用时须为正`)
+  else if (s.kind === 'kills') need(s.count >= 1, `${path} 的击杀数至少为 1`)
+  else if (s.kind === 'lives') need(lives !== undefined && s.count >= 1 && s.count <= lives, `${path} 要剩下起来的机会，须有命数且不超过它`)
+  else need(s.count >= 0, `${path} 的次数不为负`)
 }
 
 /** 一场战斗的规则：数值在范围内，结束规则都有着落——要打倒的头目、悬赏目标得登场，要清场就不能一直刷，一组一组来的后面几组要等场上清空 */
@@ -184,6 +200,12 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
   checkRules(r.rules, `runs.${id}.rules`)
   const lives = r.rules?.lives
   need(lives === undefined || (Number.isInteger(lives) && lives >= 1), `runs.${id}.rules.lives 须是正整数`)
+  const rarity = r.rules?.shop?.rarity
+  need(rarity === undefined || RARITY_RANK[rarity.min ?? 'common'] <= RARITY_RANK[rarity.max ?? 'legendary'], `runs.${id}.rules.shop 的稀有度下限不能高于上限`)
+  const maxLevel = r.rules?.maxLevel
+  const floor = r.team && r.team !== 'knobs' ? (r.team.level ?? 1) : 1
+  need(maxLevel === undefined || (Number.isInteger(maxLevel) && maxLevel >= floor && maxLevel < MAX_CHAR_LEVEL), `runs.${id}.rules.maxLevel 须是整数，不低于队伍的等级下限、低于 ${MAX_CHAR_LEVEL}`)
+  r.stars?.forEach((s, i) => checkStar(s, lives, `runs.${id}.stars[${i}]`))
   const only = r.rules?.recruit?.tags
   if (only) {
     // 预设里随机的位置与招募都从这些角色里挑，按最坏情况也得够
@@ -197,6 +219,17 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
     if (s.kind === 'recruit') need(s.upTo >= 1 && s.upTo <= TEAM_BASELINE.team.maxSize, `runs.${id}.steps[${i}] 招募人数须在 1 到满编之间`)
     if (s.kind === 'fight') checkFight(s.fight, `runs.${id}.steps[${i}]`)
   })
+}
+
+const mutatorEmojis = new Map<string, string>()
+for (const [id, m] of Object.entries<MutatorDef>(MUTATORS)) {
+  need(PACK.has(m.emoji), `mutators.${id} 的 emoji 不在表情包里：${m.emoji}`)
+  const dup = mutatorEmojis.get(m.emoji)
+  need(dup === undefined, `mutators.${id} 与 mutators.${dup} 用了同一个 emoji`)
+  mutatorEmojis.set(m.emoji, id)
+  need(Number.isInteger(m.heat) && m.heat >= 1, `mutators.${id}.heat 须是正整数`)
+  need(m.rules !== undefined || m.enemyMods !== undefined, `mutators.${id} 至少要改一样东西`)
+  checkRules(m.rules, `mutators.${id}.rules`)
 }
 
 const itemEmojis = new Map<string, string>()
@@ -231,6 +264,7 @@ write('items', ITEMS)
 write('levels', LEVEL_STATS)
 write('mapdefaults', MAP_DEFAULTS)
 write('maps', MAPS)
+write('mutators', MUTATORS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
 write('roles', ROLES)

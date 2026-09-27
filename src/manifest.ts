@@ -141,6 +141,7 @@ export const OUTLINED_EMOJIS: Record<OutlineKind, readonly string[]> = {
       ...FIELD_PICKUPS.map((p) => p.emoji),
       '2795',
       '1f480',
+      '1f6ab',
       '1f4a6',
       '1fad8',
       ...Object.values<MapDef>(MAPS).flatMap((m) => [...m.decor.emojis, ...(m.drift ?? [])]),

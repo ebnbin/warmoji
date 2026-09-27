@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { CHARACTERS, TEAM } from '../data/characters'
-import { characterLevel } from '../data/charLevel'
+import { MAX_CHAR_LEVEL } from '../data/charLevel'
 import { ENEMIES } from '../data/enemies'
 import { FIELD, POOLS } from '../data/battlefield'
 import { characterXp, growthSteps, ITEMS, RARITIES, RARITY_ORDER } from '../data/items'
@@ -8,11 +8,12 @@ import { bossFor, HAZARD_NAMES, mapEnemyRoster, MAPS } from '../data/maps'
 import { ROLES } from '../data/roles'
 import { STAT_CATEGORIES, STAT_KEYS, STATS, statValue } from '../data/stats'
 import { fightsOf } from '../data/runs'
+import { heatOf, MUTATORS } from '../data/mutators'
 import { levelProgress, stackCount } from '../run/draft'
 import { activeHudHost } from '../run/hudHost'
 import type { HudSnapshot, MemberSheet } from '../run/hudHost'
-import { memberLevel, memberLook, memberOutStats } from '../run/members'
-import { endRun, getRun, leaderSlot, runDef, waveStartHp } from '../run/state'
+import { levelCap, memberLevel, memberLook, memberOutStats } from '../run/members'
+import { endRun, foughtMs, getRun, leaderSlot, runDef, waveStartHp } from '../run/state'
 import { fightAfterRecruit, fightsDone, lastFight, nextFight } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { CharacterId } from '../types/characters'
@@ -20,7 +21,7 @@ import type { EnemyDef, EnemyKind } from '../types/enemies'
 import type { GrowthProgress, ItemId } from '../types/items'
 import type { FightDef, RunDef, Squad } from '../types/runs'
 import type { MapId } from '../types/maps'
-import { fightGoalText, fightUnit, runRuleLines } from './runLines'
+import { fightGoalText, fightUnit, mutatorText, runRuleLines } from './runLines'
 import { applyCamera, VIEWPORT_CHANGED } from '../util/apply'
 import { formatBig, formatTime } from '../util/format'
 import { keysOf } from '../util/record'
@@ -365,13 +366,13 @@ export class PauseScene extends Phaser.Scene {
     keep(new Label(this, x0, D.y + 68, hpText, { kind: 'label', bold: true, color: !m.alive ? 'bad' : ratio > 0.5 ? 'good' : 'warn' }).setOrigin(0, 0.5))
     keep(new ProgressBar(this, x0, D.y + 86, half, 14, { tone: 'hp', value: m.alive ? ratio : 0 }))
 
-    const xp = characterXp(m.items)
-    const prog = levelProgress(xp)
+    const top = levelCap(this.run)
+    const prog = levelProgress(characterXp(m.items), this.run.minLevel, top)
     // 试炼场的等级是调出来的，不来自经验
-    const earned = characterLevel(xp) === m.level
-    const lvText = !earned ? `Lv ${m.level}` : prog.maxed ? `Lv ${m.level} · 满级` : `Lv ${m.level} · 经验 ${prog.cur}/${prog.need}`
+    const tuned = runDef(this.run).team === 'knobs'
+    const lvText = tuned ? `Lv ${m.level}` : prog.maxed ? `Lv ${m.level} · ${top < MAX_CHAR_LEVEL ? '等级上限' : '满级'}` : `Lv ${m.level} · 经验 ${prog.cur}/${prog.need}`
     keep(new Label(this, right, D.y + 68, lvText, { kind: 'label', bold: true, color: 'accent' }).setOrigin(1, 0.5))
-    keep(new ProgressBar(this, right - half, D.y + 86, half, 14, { tone: prog.maxed || !earned ? 'accent' : 'info', value: earned ? prog.ratio : 1 }))
+    keep(new ProgressBar(this, right - half, D.y + 86, half, 14, { tone: prog.maxed || tuned ? 'accent' : 'info', value: tuned ? 1 : prog.ratio }))
   }
 
   /** 属性表按分类列出；战斗中此刻值与常驻值不同的高亮并附常驻值，没有加成的压暗 */
@@ -469,15 +470,17 @@ export class PauseScene extends Phaser.Scene {
     flow.gap(6)
 
     const rules = runRuleLines(def)
-    if (rules.length > 0) {
+    const muts = run.mutators
+    if (rules.length > 0 || muts.length > 0) {
       flow.heading('队伍规则', '2696')
       for (const line of rules) flow.text(line)
+      if (muts.length > 0) flow.text(`词缀 · 热度 ${heatOf(muts)}：${muts.map((id) => `${MUTATORS[id].name}（${mutatorText(MUTATORS[id])}）`).join('、')}`, { color: 'warn' })
       if (Number.isFinite(run.lives)) flow.text(run.lives > 0 ? `眼下还能起来 ${run.lives} 次` : '命已经用完，倒下就再也起不来', { color: run.lives > 0 ? 'soft' : 'bad' })
       flow.gap(6)
     }
 
     flow.heading('收获', '1fa99')
-    const combatMs = run.combatMs + (snap ? snap.seconds * 1000 : 0)
+    const combatMs = foughtMs(run) + (snap ? snap.seconds * 1000 : 0)
     flow.text(`金币 ${run.coins} · 击杀 ${run.kills}${run.stats.eliteKills > 0 ? `（精英 ${run.stats.eliteKills}）` : ''} · 战斗用时 ${formatTime(combatMs / 1000)}`)
     const hazards = keysOf(run.stats.hazardDamage).map((h) => `${HAZARD_NAMES[h]} ${formatBig(run.stats.hazardDamage[h] ?? 0)}`)
     if (hazards.length > 0) flow.text(`地形伤害：${hazards.join(' · ')}`, { color: 'warn' })

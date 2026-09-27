@@ -5,7 +5,7 @@ import { RUNS } from '../data/runs'
 import type { GrowthProgress, ItemId } from '../types/items'
 import type { Hazard, MapId } from '../types/maps'
 import type { EnemyKind } from '../types/enemies'
-import type { RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
+import type { MutatorId, RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
 import { MAP_IDS } from '../data/maps'
 import type { XpState } from '../types/xp'
 import { sandboxTeam } from '../ecs/sandbox/knobs'
@@ -46,6 +46,8 @@ export interface RunState {
   lives: number
   /** 这一局回不来的队员，按名单位置 */
   fallen: boolean[]
+  /** 开局前自选的词缀 */
+  mutators: MutatorId[]
   stats: {
     damage: number[]
     kills: number[]
@@ -55,6 +57,10 @@ export interface RunState {
     enemyDamage: Partial<Record<EnemyKind, number>>
     hazardDamage: Partial<Record<Hazard, number>>
     eliteKills: number
+    /** 手动换队长的次数 */
+    switches: number
+    /** 放主动技能的次数 */
+    casts: number
   }
 }
 
@@ -75,8 +81,8 @@ function pickTeam(slots: readonly TeamSlot[]): CharacterId[] {
   return out
 }
 
-/** 开一局：地图固定的不看玩家选的；玩法给了队伍就按它组队、满血开局，否则由招募步骤补上；给了开局进度就从那里起 */
-export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
+/** 开一局：地图固定的不看玩家选的；玩法给了队伍就按它组队、满血开局，否则由招募步骤补上；给了开局进度就从那里起；带上自选的词缀 */
+export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!, mutators: readonly MutatorId[] = []): RunState {
   const def = RUNS[id]
   const run: RunState = {
     runId: id,
@@ -101,6 +107,7 @@ export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
     invincible: false,
     lives: def.rules?.lives ?? Infinity,
     fallen: [],
+    mutators: [...mutators],
     stats: {
       damage: [],
       kills: [],
@@ -110,6 +117,8 @@ export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
       enemyDamage: {},
       hazardDamage: {},
       eliteKills: 0,
+      switches: 0,
+      casts: 0,
     },
   }
   if (def.team === 'knobs') {
@@ -145,6 +154,11 @@ export function endRun(): void {
 
 export function runDef(run: RunState): RunDef {
   return RUNS[run.runId]
+}
+
+/** 这一局实际打了多久：开局进度给的秒数不算 */
+export function foughtMs(run: RunState): number {
+  return run.combatMs - (runDef(run).start?.sec ?? 0) * 1000
 }
 
 /** 当前这一步；步骤都走完了是 undefined */

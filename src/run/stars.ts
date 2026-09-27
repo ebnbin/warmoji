@@ -1,0 +1,21 @@
+import type { StarRule } from '../types/runs'
+import { foughtMs } from './state'
+import type { RunState } from './state'
+
+/** 这一局做到了这条星级条件 */
+export function starMet(run: RunState, s: StarRule): boolean {
+  switch (s.kind) {
+    case 'downs':
+      return run.stats.deaths.reduce((sum, n) => sum + n, 0) <= s.count
+    case 'time':
+      return foughtMs(run) <= s.ms
+    case 'switches':
+      return run.stats.switches <= s.count
+    case 'skills':
+      return run.stats.casts <= s.count
+    case 'kills':
+      return run.kills >= s.count
+    case 'lives':
+      return run.lives >= s.count
+  }
+}
