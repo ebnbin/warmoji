@@ -111,7 +111,7 @@ export interface NpcDef extends BodyRules {
   readonly hp: number
   readonly speed: number
   readonly damage: number
-  /** 生命与移速以外的基础属性，如护甲、闪避 */
+  /** 生命与移速以外的基础属性，如护甲、闪避、体力；赶路耗体力为 0 是不知疲倦 */
   readonly stats?: Omit<StatBase, 'maxHp' | 'moveSpeed'>
   readonly drive: DriveDef
   readonly abilities?: readonly AbilityDef[]
@@ -123,8 +123,6 @@ export interface NpcDef extends BodyRules {
     readonly firstDelayMs?: number
   }
   readonly kbImmune?: boolean
-  /** 赶路扣体力的倍率，0 是走多远都不累 */
-  readonly exertionMul?: number
   readonly phasesWalls?: boolean
   readonly breaksWalls?: boolean
   /** 可切换的形态，第 0 个是本体以外的第一个；form 效果按下标切换 */

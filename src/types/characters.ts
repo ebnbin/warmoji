@@ -19,8 +19,13 @@ interface BodyParams {
   readonly drag: number
   readonly mass: number
 }
-/** 角色自己的基础属性，盖过全队通用的那份；移速每人都要写 */
-type CharacterStats = StatBase & { readonly moveSpeed: number }
+/** 角色自己的基础属性，盖过全队通用的那份；移速与体力每人都要写 */
+type CharacterStats = StatBase & {
+  readonly moveSpeed: number
+  readonly maxStamina: number
+  readonly staminaRegen: number
+  readonly exertion: number
+}
 export interface InnateSource {
   readonly name: string
   readonly icon: string

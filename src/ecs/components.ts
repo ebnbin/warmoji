@@ -85,7 +85,8 @@ export const Pop = { until: f32(), ms: f32(), size: f32(), back: u8(), alpha: f3
 export const Alive = { v: u8() }
 
 export const CharScale = { v: f32() }
-export const Revive = { at: f32() }
+/** 倒地与归队：at 是复活的时刻；fell、rose 是倒下、归队时的画面时钟；drop 为 1 是正从空中落回坑位 */
+export const Revive = { at: f32(), fell: f32(), rose: f32(), drop: u8() }
 
 export const MARK_SLOTS = 12
 
@@ -172,8 +173,8 @@ export const Phys = { vx: f32(), vy: f32(), drag: f32(), mass: f32(), grip: f32(
 /** 驱动层每帧写入的期望速度，身体按抓地趋近它；idle 为 1 是没有目标时的闲逛，不算赶路 */
 export const Drive = { x: f32(), y: f32(), idle: u8() }
 
-/** 体力：0 到 1；restMs 是连续没被扣体力的时长 */
-export const Stamina = { v: f32(), restMs: f32() }
+/** 体力：used 是用掉的点数，剩下的是属性表的体力上限减去它，所以出生就是满的；restMs 是连续没被扣体力的时长 */
+export const Stamina = { used: f32(), restMs: f32() }
 
 /** 1 = 按真实时间积分（队伍身体），0 = 按世界时间（其余一切） */
 export const Clock = { v: u8() }
@@ -504,8 +505,8 @@ export const Mirror = {}
 
 export const CastRequest = {}
 
-/** ghost：0 存活；1 阵亡且已预订目标位、正在归位；2 阵亡且已停靠 */
-export const Seat = { v: i32Fill(-1), ghost: u8() }
+/** 队员占的坑位：队长身后扇形上的第几个，-1 是还没占 */
+export const Seat = { v: i32Fill(-1) }
 
 /** 朝向 x/y 是滤波速度 vx/vy 的方向，跟随时的往复抖动被平均掉；换队长时目标位扇形按它生成 */
 export const Facing = { x: f32(), y: f32(), vx: f32(), vy: f32() }

@@ -19,7 +19,7 @@ interface BodySpec {
   readonly ownClock: boolean
 }
 
-/** 一个身体：有位置、阵营、体积、属性表、力学和标记，能施法、能被画；角色和敌人都从这里出生，再各自加上身份；出生满血 */
+/** 一个身体：有位置、阵营、体积、属性表、力学和标记，能施法、能被画；角色和敌人都从这里出生，再各自加上身份；出生满血满体力 */
 export function spawnBody(world: EcsWorld, spec: BodySpec): number {
   const eid = newEntity(world)
   addComponents(world, eid, Alive, Hp, Mark, Phys, Drive, Clock, Faction, Radius, Motion, MotionHit, Ctl, Stamina, Casting, Transform, Sprite, Tint, Depth, VisOff, Lethal, Leech, Grow, Idle)
@@ -32,7 +32,7 @@ export function spawnBody(world: EcsWorld, spec: BodySpec): number {
   Radius.v[eid] = spec.radius
   Grow.r0[eid] = spec.radius
   Grow.v[eid] = 1
-  Stamina.v[eid] = 1
+  Stamina.used[eid] = 0
   Stamina.restMs[eid] = 0
   MotionHit.stamp[eid] = -1
   Ctl.move[eid] = 1

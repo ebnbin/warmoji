@@ -11,6 +11,20 @@ import { fanDistance, fanSpreadDeg, recallDist, reverseGain, seatHysteresis, tur
 
 const HEADING_MIN = 0.5
 
+/** 活着的队员，不含队长：倒下的人不跟队，也不占坑位 */
+export function followersOf(sim: Sim): number[] {
+  return sim.characters.filter((e) => e !== sim.leader && Alive.v[e] === 1)
+}
+
+/** 队长身后扇形上的 n 个坑位；坑位本身也受场地约束，贴墙时缩到可达处，否则队员永远到不了、也占不上 */
+export function seatPoints(sim: Sim, n: number): Point[] {
+  const cx = leaderX(sim)
+  const cy = leaderY(sim)
+  return fanSlots(n, fanDistance(), fanSpreadDeg(), sim.heading.x, sim.heading.y).map((o) =>
+    sim.hooks.constrainBody(sim, sim.leader, { x: cx, y: cy }, { x: cx + o.x, y: cy + o.y }),
+  )
+}
+
 /** 在空位里挑离自己最近的；只有近出滞后量才换，当前位已被别人占了则必须换 */
 function pickSeat(sim: Sim, eid: number, seats: readonly Point[], free: (i: number) => boolean): number {
   const x = Transform.x[eid]!
@@ -44,7 +58,7 @@ function turnHeading(sim: Sim, tx: number, ty: number, dt: number): void {
   sim.heading = { x: Math.cos(cur + step), y: Math.sin(cur + step) }
 }
 
-/** 队员的驱动指向队长身后扇形上的目标位；进占位半径即占位、同位取最近，阵亡者按魂速追着目标位、追上就停靠；这一帧不能自己走时不动 */
+/** 队员的驱动指向队长身后扇形上的目标位，扇形只给活着的队员留坑；进占位半径即占位、同位取最近；这一帧不能自己走时不动 */
 export function layoutTeam(sim: Sim): void {
   const dt = Math.min(sim.dtMs, 50) / 1000
   const leader = sim.leader
@@ -55,11 +69,8 @@ export function layoutTeam(sim: Sim): void {
   const hy = Phys.vy[leader]! - medium.y
   const speed = Math.hypot(hx, hy)
   if (speed > HEADING_MIN * UNIT) turnHeading(sim, hx / speed, hy / speed, dt)
-  const followers = sim.characters.filter((e) => e !== leader)
-  // 目标位本身也受场地约束：贴墙时缩到可达处，否则队员永远到不了、也占不上
-  const seats = fanSlots(followers.length, fanDistance(), fanSpreadDeg(), sim.heading.x, sim.heading.y).map((o) =>
-    sim.hooks.constrainBody(sim, leader, { x: cx, y: cy }, { x: cx + o.x, y: cy + o.y }),
-  )
+  const followers = followersOf(sim)
+  const seats = seatPoints(sim, followers.length)
   const seatR = SQUAD.seatRadius * UNIT
   const distToSeat = (f: number, i: number): number => {
     const d = sim.hooks.worldDelta(sim, Transform.x[f]!, Transform.y[f]!, seats[i]!.x, seats[i]!.y)
@@ -68,35 +79,20 @@ export function layoutTeam(sim: Sim): void {
   const claimR = SQUAD.claimRadius * UNIT
   const claims: { f: number; s: number; d: number }[] = []
   for (const f of followers) {
-    const dead = Alive.v[f] === 0
-    if (!dead && Seat.ghost[f]) Seat.ghost[f] = 0
     const s = Seat.v[f]!
     if (s < 0 || s >= seats.length) continue
-    if (dead) {
-      if (Seat.ghost[f]) claims.push({ f, s, d: -1 })
-      continue
-    }
     const d = distToSeat(f, s)
     if (d <= claimR) claims.push({ f, s, d })
   }
   claims.sort((a, b) => a.d - b.d)
   const occupant: number[] = seats.map(() => -1)
   for (const c of claims) if (occupant[c.s]! < 0) occupant[c.s] = c.f
-  // 刚阵亡的当帧就预订最近的空位，归位途中不再换位，别人也不再挑它
   for (const f of followers) {
-    if (Alive.v[f] || Seat.ghost[f]) continue
-    const s = pickSeat(sim, f, seats, (i) => occupant[i]! < 0)
-    Seat.v[f] = s
-    Seat.ghost[f] = 1
-    occupant[s] = f
-  }
-  for (const f of followers) {
-    if (!Alive.v[f] || occupant[Seat.v[f]!] === f) continue
+    if (occupant[Seat.v[f]!] === f) continue
     Seat.v[f] = pickSeat(sim, f, seats, (i) => occupant[i]! < 0)
   }
   const recall = recallDist() > 0 ? recallDist() * UNIT : Infinity
   for (const f of followers) {
-    if (!Alive.v[f]) continue
     Phys.grip[f] = TEAM.followerGrip
     if (!Ctl.move[f]) continue
     const seat = seats[Seat.v[f]!]!
@@ -119,25 +115,5 @@ export function layoutTeam(sim: Sim): void {
     const want = moveSpeed(f) * gain
     Drive.x[f] = nx * want
     Drive.y[f] = ny * want
-  }
-  // 停靠的魂也按魂速追：目标位跑得比魂快时跟不上，不会被队长一起带过去
-  const ghostStep = SQUAD.ghostSpeed * UNIT * dt
-  for (const f of followers) {
-    if (Alive.v[f]) continue
-    const seat = seats[Seat.v[f]!]!
-    Phys.vx[f] = 0
-    Phys.vy[f] = 0
-    const d = sim.hooks.worldDelta(sim, Transform.x[f]!, Transform.y[f]!, seat.x, seat.y)
-    const dist = Math.hypot(d.x, d.y)
-    if (dist > seatR && dist > ghostStep) {
-      const p = sim.hooks.wrap(sim, Transform.x[f]! + (d.x / dist) * ghostStep, Transform.y[f]! + (d.y / dist) * ghostStep)
-      Transform.x[f] = p.x
-      Transform.y[f] = p.y
-      Seat.ghost[f] = 1
-      continue
-    }
-    Seat.ghost[f] = 2
-    Transform.x[f] = seat.x
-    Transform.y[f] = seat.y
   }
 }

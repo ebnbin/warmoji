@@ -14,6 +14,9 @@ import type { AbilityDef, Cond, Effect, MarkName, Shape, ShapeKind } from '../ty
 import type { ZoneRules } from '../types/groundEffects'
 import type { StatGroup } from '../types/statLines'
 import type { StatKey } from '../types/stats'
+import { staminaTier } from '../data/stamina'
+import type { StaminaTier } from '../data/stamina'
+import type { Tone } from '../ui'
 
 export const SHAPE_LABEL: Record<ShapeKind, string> = {
   bolt: '投掷',
@@ -48,6 +51,13 @@ export function grid(units: number): string {
 
 export function sec(ms: number): string {
   return `${+(ms / 1000).toFixed(2)}秒`
+}
+
+const STAMINA_TONE: Readonly<Record<StaminaTier, Tone>> = { ok: 'info', slow: 'warn', low: 'bad' }
+
+/** 体力条与体力环的颜色：够用、已经在减速、快见底 */
+export function staminaTone(v: number): Tone {
+  return STAMINA_TONE[staminaTier(v)]
 }
 
 export function pct(v: number): string {
@@ -246,7 +256,7 @@ function zoneRuleLine(r: ZoneRules, effects: readonly Effect[] | undefined, dama
   if (r.who === 'all') parts.push('敌我都作用')
   if (r.pull) parts.push(`把场内敌人以每秒 ${grid(r.pull)} 拉向圆心`)
   if (r.traction !== undefined) parts.push(r.traction < 1 ? `地面打滑（抓地 ×${r.traction}）` : `地面抓地 ×${r.traction}`)
-  if (r.exertion) parts.push(`场内每走一格多耗 ${pct(r.exertion)} 体力（谁都算）`)
+  if (r.exertion) parts.push(`场内每走一格多耗 ${+r.exertion.toFixed(1)} 点体力（谁都算）`)
   if (r.mist) parts.push('场内同伴只会被同在场内的出手打到')
   if (r.dwell) parts.push(`连续待满 ${sec(r.dwell.ms)}：${joinFx(r.dwell.effects)}`)
   if (r.onExpire) parts.push(`到期时仍在场内：${joinFx(r.onExpire)}`)
@@ -389,8 +399,8 @@ export function abilityStatLines(w: AbilityDef): string[] {
   return lines
 }
 
-/** 属性面板开头两行固定显示的属性，其余与默认值不同的排在后面 */
-const FIXED_LINES: readonly StatKey[] = ['maxHp', 'iframes', 'moveSpeed', 'revive']
+/** 属性面板开头三行固定显示的属性：生命、行动与体力，其余与默认值不同的排在后面 */
+const FIXED_LINES: readonly StatKey[] = ['maxHp', 'iframes', 'moveSpeed', 'revive', 'maxStamina', 'staminaRegen', 'exertion']
 
 /** base 为假时不列基础属性（另有属性表的地方），资源单独成组 */
 export function characterStatGroups(
@@ -408,6 +418,7 @@ export function characterStatGroups(
     const baseLines = [
       `${statText('maxHp', stats.maxHp)} · ${statText('iframes', stats.iframes)}`,
       `${statText('moveSpeed', stats.moveSpeed)} · 质量 ${def.body.mass} · ${statText('revive', stats.revive)}`,
+      `${statText('maxStamina', stats.maxStamina)} · ${statText('staminaRegen', stats.staminaRegen)} · ${statText('exertion', stats.exertion)}`,
     ]
     const rest = STAT_KEYS.filter((k) => !FIXED_LINES.includes(k) && stats[k] !== STATS[k].base).map((k) => statText(k, stats[k]))
     if (rest.length > 0) baseLines.push(rest.join(' · '))

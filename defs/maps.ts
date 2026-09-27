@@ -111,6 +111,7 @@ export const MAPS = {
     name: '黑森林',
     desc: '苍郁密林，落叶与蕨草铺满林间空地',
     kind: 'bounded',
+    stamina: { exertion: 0.4, regen: 1.2 },
     palette: {
       bgFrom: 'hsl(150 30% 30%)',
       bgTo: 'hsl(170 32% 17%)',
@@ -129,10 +130,10 @@ export const MAPS = {
   desert: {
     emoji: '1f3dc',
     name: '荒漠',
-    desc: '烈日炙烤的荒漠，每走一步都在耗体力，累了就得停下喘口气；沙丘与枯骨之间潜伏着不知疲倦的毒物',
+    desc: '烈日炙烤的荒漠，赶路格外耗体力，歇着也回得慢；沙丘与枯骨之间潜伏着不知疲倦的毒物',
     kind: 'bounded',
     size: { w: 30, h: 30 },
-    exertion: 0.015,
+    stamina: { exertion: 1.5, regen: 0.7 },
     palette: {
       bgFrom: 'hsl(30 42% 36%)',
       bgTo: 'hsl(15 38% 20%)',
@@ -154,6 +155,7 @@ export const MAPS = {
     name: '奔流',
     desc: '一条永不停歇的大河，万物皆随波逐流；两岸静看你逆流而战',
     kind: 'river',
+    stamina: { exertion: 0.5, regen: 1 },
     palette: {
       bgFrom: 'hsl(28 32% 30%)',
       bgTo: 'hsl(205 38% 15%)',
@@ -173,6 +175,8 @@ export const MAPS = {
       viewScale: 1.2,
       width: 12,
       flow: 1,
+      upstream: 2.4,
+      downstream: 0.3,
       coinCullPad: 2,
       enemyCullPad: 6,
       driftCount: 18,
@@ -187,6 +191,7 @@ export const MAPS = {
     name: '工厂',
     desc: '轰鸣的自动化车间，四壁皆是传送闸口——出这头即现那头',
     kind: 'void',
+    stamina: { exertion: 0.35, regen: 1 },
     palette: {
       bgFrom: 'hsl(210 16% 20%)',
       bgTo: 'hsl(214 22% 8%)',
@@ -214,6 +219,7 @@ export const MAPS = {
     name: '残垣',
     desc: '断壁残垣的废墟回廊——墙挡人、挡弹、也挡视线；靠掩体、卡口与探头作战',
     kind: 'ruins',
+    stamina: { exertion: 0.6, regen: 1 },
     palette: {
       bgFrom: 'hsl(35 16% 28%)',
       bgTo: 'hsl(28 18% 12%)',
@@ -236,6 +242,7 @@ export const MAPS = {
     desc: '随昼夜轮转的旷野：正午视野纵览全场，午夜相机收窄、四合起以身为心的迷雾；昼夜各出一批怪',
     kind: 'daynight',
     size: { w: 30, h: 30 },
+    stamina: { exertion: 0.4, regen: 1 },
     palette: {
       bgFrom: 'hsl(245 30% 28%)',
       bgTo: 'hsl(258 34% 11%)',
@@ -271,6 +278,7 @@ export const MAPS = {
     name: '深空',
     desc: '被黑洞禁锢的圆形星域——全程困在一个圈里，越靠边缘引力越强、谁也逃不出去；天体不时拖着直线横扫战场（敌我通吃），终波奇点正面决战',
     kind: 'space',
+    stamina: { exertion: 0.3, regen: 0.8 },
     palette: {
       bgFrom: 'hsl(245 45% 14%)',
       bgTo: 'hsl(255 55% 4%)',
@@ -305,6 +313,7 @@ export const MAPS = {
     name: '浮冰',
     desc: '脚下是打滑的浮冰——不跟手、刹不住、会过冲；四周刺骨寒水，滑出冰面就掉血、越游越慢（敌我通吃）。低摩擦让击退格外突出，把敌人推下水淹死是这里的活路',
     kind: 'ice',
+    stamina: { exertion: 0.3, regen: 0.9 },
     palette: {
       bgFrom: 'hsl(205 45% 20%)',
       bgTo: 'hsl(215 55% 6%)',
@@ -323,6 +332,8 @@ export const MAPS = {
       traction: 0.12,
       waterTraction: 0.35,
       waterViscosity: 2.5,
+      waterExertion: 2.5,
+      waterRegen: 0.3,
       waterTeamDps: 16,
       waterEnemyDps: 32,
       waterTickMs: 250,

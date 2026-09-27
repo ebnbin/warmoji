@@ -4,7 +4,7 @@ import { STATS, STAT_KEYS, StatFold, foldStats, stackMods } from '../../data/sta
 import { Alive, FACTION, Faction, Gear, Grow, Hp, MARK, MARK_SLOTS, Mark, Phys, Slot, Stamina, Stats, Summoned, Transform, Uid } from '../components'
 import { gearRules, statBase, statLayers } from '../store'
 import { rescale } from '../systems/shared/scale'
-import { fatigue, squadStamina } from '../systems/shared/stamina'
+import { fatigue, squadStamina, staminaLeft } from '../systems/shared/stamina'
 import { isSameEntity } from './identity'
 import type { StatBase, StatKey, StatLayer, StatMods, StatValues } from '../../types/stats'
 import type { GearCond, GearWhen } from '../../types/items'
@@ -153,7 +153,7 @@ function battleMods(sim: Sim, eid: number): void {
   if (side === FACTION.enemy) fold.times('moveSpeed', sim.foes.speed)
   const gear = gearRules[eid]
   if (gear && Alive.v[eid]) condMods(sim, eid, gear.when)
-  const tired = hasComponent(world, eid, Slot) ? fatigue(squadStamina(sim)) : hasComponent(world, eid, Stamina) ? fatigue(Stamina.v[eid]!) : 1
+  const tired = hasComponent(world, eid, Slot) ? fatigue(squadStamina(sim)) : hasComponent(world, eid, Stamina) ? fatigue(staminaLeft(eid)) : 1
   fold.times('moveSpeed', tired)
 }
 

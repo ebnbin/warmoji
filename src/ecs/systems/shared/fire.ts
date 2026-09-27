@@ -212,10 +212,11 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     if (Disc.of[e] === DISC_OF.hurt) {
       const revives = onHit?.some((fx) => fx.kind === 'revive' || fx.kind === 'reviveCut') ?? false
       const hurt: number[] = []
-      eachAlly(sim, src.faction, cx, cy, r, revives, (t, x, y) => {
+      // 倒下的人留在倒下的地方、不跟队，复活类的效果够得着所有倒下的同伴
+      eachAlly(sim, src.faction, cx, cy, revives ? Infinity : r, revives, (t, x, y) => {
         const dx = x - cx
         const dy = y - cy
-        if (dx * dx + dy * dy > r * r) return
+        if (Alive.v[t] && dx * dx + dy * dy > r * r) return
         if (!Alive.v[t] || Hp.v[t]! < Hp.max[t]!) hurt.push(t)
       }, src.realm)
       if (hurt.length === 0) return false

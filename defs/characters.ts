@@ -8,7 +8,7 @@ export const CHARACTERS = {
     role: 'ranged',
     tags: ['damage', 'control', 'ranged'],
     body: { drag: 5, mass: 0.9 },
-    stats: { moveSpeed: 6 },
+    stats: { moveSpeed: 6, maxStamina: 110, staminaRegen: 70, exertion: 0.9 },
     skill: { name: '全场蹦迪', icon: '1f57a', desc: '全场敌人跟着蹦迪两秒半，期间失去行动', cdMs: 16_000, ability: 'jugglerDance' },
     weapons: [],
     innate: [
@@ -30,7 +30,7 @@ export const CHARACTERS = {
     role: 'bruiser',
     tags: ['damage', 'melee', 'mobile'],
     body: { drag: 4.5, mass: 1 },
-    stats: { moveSpeed: 7.56 },
+    stats: { moveSpeed: 7.56, maxStamina: 130, staminaRegen: 55, exertion: 0.9 },
     skill: { name: '彩虹冲锋', icon: '1f308', desc: '朝指定方向冲刺三格半，沿途敌人受伤并被撞开', cdMs: 5000, ability: 'rainbowRush', aim: true },
     weapons: [],
     innate: [
@@ -52,7 +52,7 @@ export const CHARACTERS = {
     role: 'tank',
     tags: ['defense', 'melee', 'area'],
     body: { drag: 4.5, mass: 1.8 },
-    stats: { moveSpeed: 3.78 },
+    stats: { moveSpeed: 3.78, maxStamina: 140, staminaRegen: 45, exertion: 1.3 },
     skill: { name: '吸引火力', icon: '1f4e2', desc: '举起喇叭大喊一声，四格半内的敌人两秒半内只追消防员，期间自己受到的伤害减四成', cdMs: 12_000, ability: 'trollRoar' },
     weapons: ['axe'],
     innate: [],
@@ -64,7 +64,7 @@ export const CHARACTERS = {
     role: 'ranged',
     tags: ['damage', 'control', 'ranged'],
     body: { drag: 5, mass: 1 },
-    stats: { moveSpeed: 5.8 },
+    stats: { moveSpeed: 5.8, maxStamina: 120, staminaRegen: 60, exertion: 1 },
     skill: { name: '套索', icon: '1faa2', desc: '甩出六格半的套索，套住的敌人被拴在身后拖行两秒半，期间动弹不得', cdMs: 12_000, ability: 'cowboyLasso' },
     weapons: ['pistolLeft', 'pistolRight'],
     innate: [],
@@ -76,7 +76,7 @@ export const CHARACTERS = {
     role: 'area',
     tags: ['damage', 'ranged', 'area', 'mobile'],
     body: { drag: 5, mass: 0.9 },
-    stats: { moveSpeed: 5 },
+    stats: { moveSpeed: 5, maxStamina: 80, staminaRegen: 60, exertion: 1.1 },
     skill: { name: '传送阵', icon: '1f300', desc: '全队随法师朝指定方向瞬移六格，原地炸开一圈减速，把追兵甩在身后', cdMs: 14_000, ability: 'mageGate', aim: true },
     weapons: [],
     innate: [
@@ -98,7 +98,7 @@ export const CHARACTERS = {
     role: 'ranged',
     tags: ['damage', 'ranged', 'mobile'],
     body: { drag: 4, mass: 0.9 },
-    stats: { moveSpeed: 7 },
+    stats: { moveSpeed: 7, maxStamina: 100, staminaRegen: 65, exertion: 0.6 },
     skill: { name: '弹跳践踏', icon: '1f4a5', desc: '朝指定方向跃出四格，落地时范围伤害并击退', cdMs: 9000, ability: 'bounceStomp', aim: true },
     weapons: ['boomerang'],
     innate: [],
@@ -110,7 +110,7 @@ export const CHARACTERS = {
     role: 'ranged',
     tags: ['damage', 'defense', 'ranged'],
     body: { drag: 5, mass: 1.4 },
-    stats: { moveSpeed: 4.2, armor: 3 },
+    stats: { moveSpeed: 4.2, maxStamina: 150, staminaRegen: 40, exertion: 0.7, armor: 3 },
     skill: { name: '镜面力场', icon: '1fa9e', desc: '身周张开五秒镜面，敌方弹体碰到就被反弹回去、归我方所有', cdMs: 16_000, ability: 'robotMirror' },
     weapons: ['laserBeam'],
     innate: [],
@@ -122,7 +122,7 @@ export const CHARACTERS = {
     role: 'controller',
     tags: ['control', 'area'],
     body: { drag: 5, mass: 1.5 },
-    stats: { moveSpeed: 3.5, armor: 3 },
+    stats: { moveSpeed: 3.5, maxStamina: 90, staminaRegen: 50, exertion: 1.1, armor: 3 },
     skill: { name: '时停', icon: '23f3', desc: '时间停止八秒，静止时全场近乎凝固', cdMs: 25_000, ability: 'snowmanFreeze' },
     weapons: [],
     innate: [
@@ -144,7 +144,7 @@ export const CHARACTERS = {
     role: 'controller',
     tags: ['control', 'ranged'],
     body: { drag: 5, mass: 0.5 },
-    stats: { moveSpeed: 6.4 },
+    stats: { moveSpeed: 6.4, maxStamina: 70, staminaRegen: 85, exertion: 0.6 },
     skill: { name: '变形派对', icon: '1f411', desc: '三格内的敌人全部变成绵羊三秒', cdMs: 16_000, ability: 'sheepParty' },
     weapons: [],
     innate: [
@@ -166,7 +166,7 @@ export const CHARACTERS = {
     role: 'assassin',
     tags: ['damage', 'melee', 'mobile'],
     body: { drag: 4, mass: 0.7 },
-    stats: { moveSpeed: 8 },
+    stats: { moveSpeed: 8, maxStamina: 80, staminaRegen: 95, exertion: 1 },
     skill: { name: '影遁', icon: '1f32b', desc: '两秒多内全队不被敌人锁定，敌人只会乱走', cdMs: 14_000, ability: 'shadowVeil' },
     weapons: ['dagger'],
     innate: [],
@@ -178,7 +178,7 @@ export const CHARACTERS = {
     role: 'summoner',
     tags: ['damage', 'summon'],
     body: { drag: 5.5, mass: 1.1 },
-    stats: { moveSpeed: 4 },
+    stats: { moveSpeed: 4, maxStamina: 120, staminaRegen: 55, exertion: 1 },
     skill: { name: '工程速建', icon: '1f3d7', desc: '立刻在周围架起三座弩塔，持续八秒', cdMs: 12_000, ability: 'quickBuild' },
     weapons: [],
     innate: [
@@ -200,7 +200,7 @@ export const CHARACTERS = {
     role: 'summoner',
     tags: ['damage', 'control', 'summon'],
     body: { drag: 4.5, mass: 0.8 },
-    stats: { moveSpeed: 5.56, dotDamage: 1.1 },
+    stats: { moveSpeed: 5.56, maxStamina: 90, staminaRegen: 60, exertion: 0.8, dotDamage: 1.1 },
     skill: { name: '蜂蜜陷阱', icon: '1f36f', desc: '在最近的敌人脚下泼一片三格蜂蜜：场内敌人减速挨蜇，三秒后仍陷在蜜里的被粘住两秒多', cdMs: 13_000, ability: 'beeHoney' },
     weapons: [],
     innate: [
@@ -222,7 +222,7 @@ export const CHARACTERS = {
     role: 'support',
     tags: ['support', 'ranged'],
     body: { drag: 5, mass: 1 },
-    stats: { moveSpeed: 5.2 },
+    stats: { moveSpeed: 5.2, maxStamina: 110, staminaRegen: 75, exertion: 1 },
     skill: { name: '急救包', icon: '2695', desc: '倒地队友立刻复活，存活者回血三成半，全队无敌一秒多', cdMs: 25_000, ability: 'medicRally' },
     weapons: [],
     innate: [
@@ -232,7 +232,7 @@ export const CHARACTERS = {
         base: 'fieldMedkit',
         upgrades: [
           { ability: 'fieldMedkit2', card: { icon: '1f97c', name: '群体处方', desc: '治疗改为范围内全体队友回复 60% 治疗量' } },
-          { ability: 'fieldMedkit3', card: { icon: '26a1', name: '电击起搏', desc: '范围内有阵亡队友时，优先为其减少 2 秒复活倒计时' } },
+          { ability: 'fieldMedkit3', card: { icon: '26a1', name: '电击起搏', desc: '每次治疗时，为复活倒计时最长的阵亡队友减少 2 秒，不论远近' } },
         ],
       },
       { name: '飞针', icon: '1f489', base: 'syringeDart', upgrades: [] },
@@ -245,7 +245,7 @@ export const CHARACTERS = {
     role: 'area',
     tags: ['damage', 'control', 'ranged', 'area'],
     body: { drag: 3, mass: 0.8 },
-    stats: { moveSpeed: 4.5 },
+    stats: { moveSpeed: 4.5, maxStamina: 70, staminaRegen: 70, exertion: 0.7 },
     skill: { name: '电网', icon: '1f945', desc: '五格内的敌人都被电丝连住两秒：撑到最后没挣断的被电晕一秒半，跑出六格半就挣断、只被减速', cdMs: 12_000, ability: 'jellyNet' },
     weapons: [],
     innate: [
@@ -267,7 +267,7 @@ export const CHARACTERS = {
     role: 'controller',
     tags: ['control', 'ranged', 'mobile'],
     body: { drag: 5, mass: 0.9 },
-    stats: { moveSpeed: 5.4 },
+    stats: { moveSpeed: 5.4, maxStamina: 90, staminaRegen: 70, exertion: 0.8 },
     skill: { name: '荷叶跳台', icon: '1fab7', desc: '脚下与前方六格各浮起一片荷叶，六秒内任何身体踏上一片就从另一片冒出来（敌我都算），青蛙自己先跳过去', cdMs: 12_000, ability: 'frogLily', aim: true },
     weapons: [],
     innate: [
@@ -289,7 +289,7 @@ export const CHARACTERS = {
     role: 'controller',
     tags: ['control', 'ranged', 'summon'],
     body: { drag: 5, mass: 0.7 },
-    stats: { moveSpeed: 6.2 },
+    stats: { moveSpeed: 6.2, maxStamina: 90, staminaRegen: 80, exertion: 0.9 },
     skill: { name: '九尾分身', icon: '1f3ad', desc: '身边化出两只分身六秒，带着她一半威力的媚眼，分身被打散时魅惑周围敌人；本体隐匿一秒半', cdMs: 15_000, ability: 'foxClones' },
     weapons: [],
     innate: [
@@ -311,7 +311,7 @@ export const CHARACTERS = {
     role: 'assassin',
     tags: ['damage', 'control', 'melee', 'mobile'],
     body: { drag: 4.5, mass: 0.9 },
-    stats: { moveSpeed: 7.11 },
+    stats: { moveSpeed: 7.11, maxStamina: 100, staminaRegen: 80, exertion: 0.9 },
     skill: { name: '追风斩', icon: '1f32a', desc: '只能对空中的敌人出手：瞬身到八格内一个被挑飞的敌人身后重斩，再把它挑高', cdMs: 8_000, ability: 'fencerLastBreath' },
     weapons: [],
     innate: [
@@ -333,7 +333,7 @@ export const CHARACTERS = {
     role: 'area',
     tags: ['damage', 'ranged', 'area'],
     body: { drag: 5, mass: 1.2 },
-    stats: { moveSpeed: 4 },
+    stats: { moveSpeed: 4, maxStamina: 60, staminaRegen: 30, exertion: 0.5 },
     skill: { name: '倒带', icon: '23ea', desc: '沿直线闪回三秒前的位置，途中无敌，生命取那时与现在的较高者，并解除控制', cdMs: 12_000, ability: 'slothRewind' },
     weapons: [],
     innate: [
@@ -355,7 +355,7 @@ export const CHARACTERS = {
     role: 'ranged',
     tags: ['damage', 'ranged', 'mobile'],
     body: { drag: 4.5, mass: 0.6 },
-    stats: { moveSpeed: 7.33 },
+    stats: { moveSpeed: 7.33, maxStamina: 70, staminaRegen: 90, exertion: 0.9 },
     skill: { name: '影子替身', icon: '1f311', desc: '朝指定方向四格外留下一个影子五秒（最多两个），猫爪镖也从影子上飞出；四秒内再按一次与最新的影子换位', cdMs: 10_000, ability: 'catShade', aim: true },
     weapons: [],
     innate: [
@@ -377,7 +377,7 @@ export const CHARACTERS = {
     role: 'bruiser',
     tags: ['damage', 'defense', 'melee'],
     body: { drag: 5, mass: 1.7 },
-    stats: { moveSpeed: 4.4 },
+    stats: { moveSpeed: 4.4, maxStamina: 130, staminaRegen: 50, exertion: 1.3 },
     skill: { name: '不灭之怒', icon: '1f4a2', desc: '五秒内生命不低于 1，怒气立刻攒满，移速提升', cdMs: 20_000, ability: 'gorillaRage' },
     weapons: [],
     innate: [
@@ -400,7 +400,7 @@ export const CHARACTERS = {
     role: 'ranged',
     tags: ['damage', 'support', 'ranged'],
     body: { drag: 5, mass: 1 },
-    stats: { moveSpeed: 5.2 },
+    stats: { moveSpeed: 5.2, maxStamina: 120, staminaRegen: 50, exertion: 0.9 },
     skill: { name: '悬赏令', icon: '1f4dc', desc: '给九格内血最厚的敌人下悬赏六秒：揭示它、它受伤增加三成；期间它死了，全队主动技能立刻转好', cdMs: 18_000, ability: 'detectiveWarrant' },
     weapons: [],
     innate: [
@@ -422,7 +422,7 @@ export const CHARACTERS = {
     role: 'assassin',
     tags: ['damage', 'melee', 'mobile'],
     body: { drag: 4.5, mass: 0.8 },
-    stats: { moveSpeed: 7.56 },
+    stats: { moveSpeed: 7.56, maxStamina: 90, staminaRegen: 70, exertion: 0.7 },
     skill: { name: '蓄势俯冲', icon: '1f3af', desc: '按住蓄力，松手朝指定方向俯冲，蓄满时距离与伤害翻倍，落地挑飞周围敌人', cdMs: 9_000, ability: 'eagleDive', aim: true },
     weapons: [],
     innate: [
@@ -444,7 +444,7 @@ export const CHARACTERS = {
     role: 'bruiser',
     tags: ['damage', 'defense', 'melee'],
     body: { drag: 5, mass: 1.6 },
-    stats: { moveSpeed: 4.6 },
+    stats: { moveSpeed: 4.6, maxStamina: 150, staminaRegen: 60, exertion: 1.2 },
     skill: { name: '硬吃一拳', icon: '1f94a', desc: '两秒半内受到的伤害减半并记下来，到时以记下的一倍六为伤害震开三格', cdMs: 13_000, ability: 'bearGrit' },
     weapons: [],
     innate: [
@@ -466,7 +466,7 @@ export const CHARACTERS = {
     role: 'ranged',
     tags: ['damage', 'ranged', 'summon'],
     body: { drag: 5, mass: 0.9 },
-    stats: { moveSpeed: 5.6 },
+    stats: { moveSpeed: 5.6, maxStamina: 100, staminaRegen: 65, exertion: 0.8 },
     skill: { name: '救赎', icon: '1f54a', desc: '付 20 生命在四格半内洒下圣光，五秒内死去的敌人被救赎，站起来为天使而战十二秒', cdMs: 16_000, ability: 'vampRaise' },
     weapons: [],
     innate: [
@@ -488,7 +488,7 @@ export const CHARACTERS = {
     role: 'support',
     tags: ['support', 'ranged'],
     body: { drag: 5, mass: 0.8 },
-    stats: { moveSpeed: 5.2 },
+    stats: { moveSpeed: 5.2, maxStamina: 90, staminaRegen: 80, exertion: 0.7 },
     skill: { name: '三个愿望', icon: '2728', desc: '全队获得三层法术护盾八秒，每层挡下一次命中', cdMs: 18_000, ability: 'genieWish' },
     weapons: [],
     innate: [
@@ -510,7 +510,7 @@ export const CHARACTERS = {
     role: 'controller',
     tags: ['control', 'ranged'],
     body: { drag: 5, mass: 0.6 },
-    stats: { moveSpeed: 6 },
+    stats: { moveSpeed: 6, maxStamina: 80, staminaRegen: 75, exertion: 0.8 },
     skill: { name: '喋喋不休', icon: '1f4ac', desc: '四格内的敌人被吵得沉默三秒半（放不出技能），正在蓄力的被打断', cdMs: 14_000, ability: 'parrotChatter' },
     weapons: [],
     innate: [
@@ -532,7 +532,7 @@ export const CHARACTERS = {
     role: 'bruiser',
     tags: ['defense', 'control', 'melee'],
     body: { drag: 5, mass: 1.5 },
-    stats: { moveSpeed: 4.8 },
+    stats: { moveSpeed: 4.8, maxStamina: 120, staminaRegen: 50, exertion: 1.1 },
     skill: { name: '太极', icon: '262f', desc: '一秒半内挡下所有命中，每挡一下就眩晕出手者并还击，还回五十能量', cdMs: 11_000, ability: 'pandaTaiji' },
     weapons: [],
     innate: [
@@ -555,7 +555,7 @@ export const CHARACTERS = {
     role: 'ranged',
     tags: ['damage', 'ranged', 'mobile'],
     body: { drag: 4.5, mass: 0.6 },
-    stats: { moveSpeed: 7.33 },
+    stats: { moveSpeed: 7.33, maxStamina: 70, staminaRegen: 95, exertion: 1 },
     skill: { name: '翻滚', icon: '1f4a8', desc: '朝指定方向翻滚三格、翻滚中无敌；可攒三次，每次单独恢复', cdMs: 3_500, ability: 'chipRoll', aim: true },
     weapons: [],
     innate: [
@@ -577,7 +577,7 @@ export const CHARACTERS = {
     role: 'tank',
     tags: ['defense', 'control', 'melee'],
     body: { drag: 5, mass: 1.7 },
-    stats: { moveSpeed: 4.2 },
+    stats: { moveSpeed: 4.2, maxStamina: 140, staminaRegen: 50, exertion: 1.3 },
     skill: { name: '城墙', icon: '1f9f1', desc: '在指定方向两格半处立起一道六格长的城墙五秒，挡住敌人和敌方弹体', cdMs: 14_000, ability: 'guardWall', aim: true },
     weapons: [],
     innate: [
@@ -599,7 +599,7 @@ export const CHARACTERS = {
     role: 'ranged',
     tags: ['damage', 'ranged'],
     body: { drag: 5, mass: 0.8 },
-    stats: { moveSpeed: 5.8 },
+    stats: { moveSpeed: 5.8, maxStamina: 90, staminaRegen: 60, exertion: 1.1 },
     skill: { name: '开屏', icon: '1faad', desc: '朝指定方向展开一道四格半的羽屏三秒半，吞掉敌方弹体', cdMs: 12_000, ability: 'peacockFan', aim: true },
     weapons: [],
     innate: [
@@ -621,7 +621,7 @@ export const CHARACTERS = {
     role: 'tank',
     tags: ['defense', 'support', 'control', 'ranged'],
     body: { drag: 5.5, mass: 1.4 },
-    stats: { moveSpeed: 3.64 },
+    stats: { moveSpeed: 3.64, maxStamina: 70, staminaRegen: 40, exertion: 0.9 },
     skill: { name: '抱紧', icon: '1f917', desc: '四秒内全体队友贴在考拉身上、不可选中但照常出手；考拉霸体并减伤四成', cdMs: 16_000, ability: 'koalaHug' },
     weapons: [],
     innate: [
@@ -643,7 +643,7 @@ export const CHARACTERS = {
     role: 'controller',
     tags: ['control', 'support', 'ranged'],
     body: { drag: 4.5, mass: 1 },
-    stats: { moveSpeed: 5.56 },
+    stats: { moveSpeed: 5.56, maxStamina: 80, staminaRegen: 70, exertion: 1.2 },
     skill: { name: '墨汁结界', icon: '1f32b', desc: '以自己为心张开三格半墨云五秒：云里的同伴只会被同在云里出手的敌人打到，云里的敌人一阵阵被致盲', cdMs: 15_000, ability: 'octoMist' },
     weapons: [],
     innate: [
@@ -665,7 +665,7 @@ export const CHARACTERS = {
     role: 'controller',
     tags: ['control', 'area', 'mobile'],
     body: { drag: 4, mass: 1.1 },
-    stats: { moveSpeed: 6 },
+    stats: { moveSpeed: 6, maxStamina: 100, staminaRegen: 60, exertion: 1.2 },
     skill: { name: '肚皮滑行', icon: '1f6f7', desc: '朝指定方向肚皮滑出六格，撞伤沿途敌人；出发时解除控制并霸体', cdMs: 10_000, ability: 'penguinSlide', aim: true },
     weapons: [],
     innate: [
@@ -687,7 +687,7 @@ export const CHARACTERS = {
     role: 'ranged',
     tags: ['damage', 'ranged'],
     body: { drag: 5, mass: 1.1 },
-    stats: { moveSpeed: 3.8 },
+    stats: { moveSpeed: 3.8, maxStamina: 70, staminaRegen: 70, exertion: 1.3 },
     skill: { name: '缩回蛋壳', icon: '1f423', desc: '缩回蛋壳两秒半：期间无敌不可选中、不能行动，回三成半生命，破壳时震开周围敌人', cdMs: 15_000, ability: 'caterCocoon' },
     weapons: [],
     innate: [
@@ -706,7 +706,7 @@ export const CHARACTERS = {
       {
         emoji: '1f9a2',
         name: '白天鹅',
-        stats: { mul: { scale: 1.15, moveSpeed: 1.2 } },
+        stats: { mul: { scale: 1.15, moveSpeed: 1.2, exertion: 0.6 } },
         abilities: [
           {
             trigger: 'auto',
@@ -730,7 +730,7 @@ export const CHARACTERS = {
     role: 'bruiser',
     tags: ['damage', 'melee', 'area'],
     body: { drag: 5, mass: 1.2 },
-    stats: { moveSpeed: 5 },
+    stats: { moveSpeed: 5, maxStamina: 110, staminaRegen: 55, exertion: 1 },
     skill: { name: '化龙', icon: '1f409', desc: '化成巨龙八秒：体型变大、热量清空，换上烧地的龙焰与三百六十度甩尾', cdMs: 22_000, ability: 'dragonForm' },
     weapons: [],
     innate: [
@@ -785,7 +785,7 @@ export const CHARACTERS = {
     role: 'controller',
     tags: ['control', 'area'],
     body: { drag: 5, mass: 0.8 },
-    stats: { moveSpeed: 5.8 },
+    stats: { moveSpeed: 5.8, maxStamina: 100, staminaRegen: 85, exertion: 0.9 },
     skill: { name: '香蕉乱斗', icon: '1f34c', desc: '朝最近的敌人丢一串香蕉，两格半内的敌人为了抢香蕉倒戈三秒半，转头攻击自己人', cdMs: 16_000, ability: 'clownPotion' },
     weapons: [],
     innate: [

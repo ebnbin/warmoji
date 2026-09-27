@@ -8,7 +8,7 @@ import type { Effect } from '../../../types/abilityDefs'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
 
-/** 一段位移：push 是冲量；drift 是这一帧被一股稳定的流带着（持续牵引），折成与阻力相当的冲量；dash 沿直线按速度走；arc 腾空飞到落点；follow 先被拉过去再贴着另一个身体；transit 没有实体地沿直线移到落点。身体的位置从不跳变，没有瞬移 */
+/** 一段位移：push 是冲量；drift 是这一帧被一股稳定的流带着（持续牵引），折成与阻力相当的冲量；dash 沿直线按速度走；arc 腾空飞到落点；follow 先被拉过去再贴着另一个身体；transit 没有实体地沿直线移到落点；drop 从 height 高处落回脚下。位移都是连续的，没有瞬移 */
 export type Displacement =
   | { readonly kind: 'push'; readonly x: number; readonly y: number }
   | { readonly kind: 'drift'; readonly vx: number; readonly vy: number; readonly dt: number }
@@ -16,6 +16,7 @@ export type Displacement =
   | { readonly kind: 'arc'; readonly x: number; readonly y: number; readonly ms: number; readonly height: number }
   | { readonly kind: 'follow'; readonly host: number; readonly ox: number; readonly oy: number; readonly ms: number }
   | { readonly kind: 'transit'; readonly x: number; readonly y: number; readonly ms: number; readonly look: keyof typeof TRANSIT; readonly color: number }
+  | { readonly kind: 'drop'; readonly ms: number; readonly height: number }
 
 /** 谁在推：self 是自己的动作，做不做得出来看 Ctl.dash；否则是被摆布，锚定的身体不吃；skill 是带来位移的能力；src 与 onLand/onWall 是落地（穿行是现身）、撞墙时施于这个身体的后续 */
 export interface Mover {
@@ -107,6 +108,21 @@ export function displace(sim: Sim, eid: number, d: Displacement, by: Mover): boo
       Motion.ref[eid] = d.seek
       Motion.refUid[eid] = Uid.v[d.seek]!
     }
+    return true
+  }
+  if (d.kind === 'drop') {
+    // 弧线从最高点起算，只走落下的那一半
+    Motion.kind[eid] = MOTION.arc
+    Motion.ms[eid] = Math.max(1, d.ms) * 2
+    Motion.t[eid] = Motion.ms[eid]! / 2
+    Motion.fx[eid] = x
+    Motion.fy[eid] = y
+    Motion.tx[eid] = x
+    Motion.ty[eid] = y
+    Motion.h[eid] = d.height
+    Motion.vx[eid] = 0
+    Motion.vy[eid] = 0
+    VisOff.y[eid] = -d.height
     return true
   }
   if (d.kind === 'arc' || d.kind === 'transit') {

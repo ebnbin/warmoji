@@ -107,7 +107,7 @@ export class RingGauge extends Widget {
   private readonly g: Phaser.GameObjects.Graphics
   private readonly radius: number
   private readonly thickness: number
-  private readonly tone: GaugeTone
+  private tone: GaugeTone
   private shown = -1
 
   constructor(scene: Phaser.Scene, x: number, y: number, radius: number, opts: RingOptions) {
@@ -124,12 +124,24 @@ export class RingGauge extends Widget {
     const v = clamp01(value)
     if (Math.abs(v - this.shown) < 0.004) return this
     this.shown = v
+    this.paint()
+    return this
+  }
+
+  setTone(tone: GaugeTone): this {
+    if (tone === this.tone) return this
+    this.tone = tone
+    this.paint()
+    return this
+  }
+
+  private paint(): void {
+    const v = this.shown
     const g = this.g.clear()
     g.lineStyle(this.thickness + 3, SURFACE.outline, 0.75)
     g.strokeCircle(0, 0, this.radius)
     g.lineStyle(this.thickness, toneFace(this.tone, v), 1)
     strokeArc(g, 0, 0, this.radius, v)
-    return this
   }
 }
 
