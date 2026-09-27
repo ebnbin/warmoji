@@ -39,7 +39,9 @@ export class ScrollView {
   private contentHeight = 0
   private maskGfx: Phaser.GameObjects.Graphics
   private mask?: Phaser.Filters.Mask
+  private frame?: Phaser.GameObjects.Graphics
   private bar?: Phaser.GameObjects.Graphics
+  private input: Phaser.Input.InputPlugin
   private dragging = false
   private dragMovedFlag = false
   private dragStartY = 0
@@ -54,8 +56,8 @@ export class ScrollView {
     this.scroll = opts.initialScroll ?? 0
 
     if (opts.frame) {
-      const f = scene.add.graphics()
-      roundRect(f, rect.x - 8, rect.y - 8, rect.w + 16, rect.h + 16, 14, { fill: 0x000000, fillAlpha: 0.18 })
+      this.frame = scene.add.graphics()
+      roundRect(this.frame, rect.x - 8, rect.y - 8, rect.w + 16, rect.h + 16, 14, { fill: 0x000000, fillAlpha: 0.18 })
     }
 
     this.content = scene.add.container(rect.x, rect.y - this.scroll)
@@ -66,28 +68,36 @@ export class ScrollView {
 
     if (opts.scrollbar !== false) this.bar = scene.add.graphics()
 
-    scene.input.on(Phaser.Input.Events.POINTER_WHEEL, (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
-      if (this.contains(p)) this.setScroll(this.scroll + dy * 0.6)
-    })
-    scene.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => {
-      this.dragMovedFlag = false
-      this.dragging = this.contains(p)
-      if (this.dragging) {
-        this.dragStartY = p.worldY
-        this.dragStartScroll = this.scroll
-      }
-    })
-    scene.input.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
-      if (!this.dragging || !p.isDown) return
-      const dy = this.dragStartY - p.worldY
-      if (this.max > 0 && Math.abs(dy) > TAP_SLOP) this.dragMovedFlag = true
-      if (this.dragMovedFlag) this.setScroll(this.dragStartScroll + dy)
-    })
-    const release = (): void => {
-      this.dragging = false
+    this.input = scene.input
+    this.input.on(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this)
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, this.onDown, this)
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, this.onMove, this)
+    this.input.on(Phaser.Input.Events.POINTER_UP, this.onRelease, this)
+    this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onRelease, this)
+  }
+
+  private onWheel(p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number): void {
+    if (this.contains(p)) this.setScroll(this.scroll + dy * 0.6)
+  }
+
+  private onDown(p: Phaser.Input.Pointer): void {
+    this.dragMovedFlag = false
+    this.dragging = this.contains(p)
+    if (this.dragging) {
+      this.dragStartY = p.worldY
+      this.dragStartScroll = this.scroll
     }
-    scene.input.on(Phaser.Input.Events.POINTER_UP, release)
-    scene.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, release)
+  }
+
+  private onMove(p: Phaser.Input.Pointer): void {
+    if (!this.dragging || !p.isDown) return
+    const dy = this.dragStartY - p.worldY
+    if (this.max > 0 && Math.abs(dy) > TAP_SLOP) this.dragMovedFlag = true
+    if (this.dragMovedFlag) this.setScroll(this.dragStartScroll + dy)
+  }
+
+  private onRelease(): void {
+    this.dragging = false
   }
 
   get wasDragged(): boolean {
@@ -138,8 +148,16 @@ export class ScrollView {
     return this
   }
 
+  /** 连同输入监听一起撤掉：随开随关的面板每次都新建 */
   destroy(): void {
+    this.input.off(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this)
+    this.input.off(Phaser.Input.Events.POINTER_DOWN, this.onDown, this)
+    this.input.off(Phaser.Input.Events.POINTER_MOVE, this.onMove, this)
+    this.input.off(Phaser.Input.Events.POINTER_UP, this.onRelease, this)
+    this.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onRelease, this)
     this.content.destroy()
+    this.maskGfx.destroy()
+    this.frame?.destroy()
     this.bar?.destroy()
   }
 

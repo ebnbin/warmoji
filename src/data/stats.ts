@@ -110,9 +110,14 @@ function addText(unit: StatUnit, v: number): string {
   }
 }
 
-/** 一项属性的值，如"生命上限 100""攻速 ×1.15" */
+/** 一项属性的值按单位写成文字，如"×1.15""40%""6格/秒" */
+export function statValue(k: StatKey, v: number): string {
+  return valueText(STATS[k].unit, v)
+}
+
+/** 一项属性的名字加值，如"生命上限 100""攻速 ×1.15" */
 export function statText(k: StatKey, v: number): string {
-  return `${STATS[k].name} ${valueText(STATS[k].unit, v)}`
+  return `${STATS[k].name} ${statValue(k, v)}`
 }
 
 /** 一组修正逐条的文字，如"生命上限 +25""攻速 ×1.15" */

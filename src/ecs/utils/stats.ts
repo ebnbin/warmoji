@@ -1,12 +1,12 @@
 import { addComponent, hasComponent } from 'bitecs'
 import { UNIT } from '../../util/units'
-import { STAT_KEYS, StatFold } from '../../data/stats'
+import { STAT_KEYS, StatFold, foldStats } from '../../data/stats'
 import { sandboxFireRate } from '../sandbox/knobs'
 import { FACTION, Faction, Grow, Hp, MARK, MARK_SLOTS, Mark, Slot, Stamina, Stats } from '../components'
 import { statBase, statLayers } from '../store'
 import { rescale } from '../systems/shared/scale'
 import { fatigue, squadStamina } from '../systems/shared/stamina'
-import type { StatBase, StatKey, StatLayer, StatMods } from '../../types/stats'
+import type { StatBase, StatKey, StatLayer, StatMods, StatValues } from '../../types/stats'
 import type { EcsWorld } from '../world'
 import type { Sim } from '../sim'
 
@@ -35,6 +35,18 @@ export const NEUTRAL: Offense = { damage: 1, crit: 0, knockback: 1, healing: 1 }
 export function offenseOf(world: EcsWorld, eid: number): Offense {
   if (!hasComponent(world, eid, Stats)) return NEUTRAL
   return { damage: Stats.damage[eid]!, crit: Stats.crit[eid]!, knockback: Stats.knockback[eid]!, healing: Stats.healing[eid]! }
+}
+
+/** 身体这一帧的属性表 */
+export function statsOf(eid: number): StatValues {
+  const out = {} as StatValues
+  for (const k of STAT_KEYS) out[k] = Stats[k][eid]!
+  return out
+}
+
+/** 身体的常驻属性：基础值加各层常驻修正，不算限时修正、战场效果与体力 */
+export function lastingStats(eid: number): StatValues {
+  return foldStats(statBase[eid], Object.values(statLayers[eid] ?? {}).flatMap((mods) => mods ?? []))
 }
 
 /** 这一帧的移速，像素每秒 */

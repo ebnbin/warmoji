@@ -1,5 +1,6 @@
 import type Phaser from 'phaser'
 import type { Polarity } from '../types/battlefield'
+import type { StatValues } from '../types/stats'
 
 export interface HudSnapshot {
   xp: number
@@ -51,6 +52,20 @@ export interface SquadSnapshot {
   leaderSlot: number
   switching: boolean
   members: SquadMember[]
+}
+
+/** 一名队员此刻的属性：now 是实际值，lasting 是不算限时修正、战场效果与体力的常驻值 */
+export interface MemberSheet {
+  emoji: string
+  name: string
+  level: number
+  leader: boolean
+  alive: boolean
+  hp: number
+  max: number
+  reviveSec: number
+  now: StatValues
+  lasting: StatValues
 }
 
 /** 当前队长的主动技能；aim 为真时按住按钮可拖出方向，rangeU 是瞄准线长度；charges 为 -1 表示不攒次数；recastMs 是下一段还能接多久；holdMs 非零时按住蓄力 */
@@ -110,6 +125,8 @@ export interface HudHost {
   readonly scene: Phaser.Scenes.ScenePlugin
   hudSnapshot(): HudSnapshot
   squadSnapshot(): SquadSnapshot | null
+  /** 按入队顺序 */
+  teamSheets(): MemberSheet[]
   switchLeader(slot: number): boolean
   leaderSkill(): LeaderSkill | null
   castLeaderSkill(dir: { x: number; y: number } | null, holdRatio?: number): boolean
