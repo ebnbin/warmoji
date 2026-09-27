@@ -157,7 +157,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
     x,
     y,
     radius: def.radius,
-    stats: { maxHp: hp, moveSpeed: def.speed / UNIT, exertion: def.exertionMul ?? 1 },
+    stats: { exertion: def.exertionMul ?? 1, ...def.stats, maxHp: hp, moveSpeed: def.speed / UNIT },
     drag: ENEMY_BODY.drag,
     mass: ENEMY_BODY.mass,
     grip: ENEMY_BODY.grip,

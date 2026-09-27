@@ -7,6 +7,7 @@ import { CHARACTERS, MEMBER, TEAM, memberBase } from '../../data/characters'
 
 import { gearMods } from '../../data/items'
 import { levelStatsFor } from '../../data/levels'
+import { ROLES } from '../../data/roles'
 
 import { waveStartHp } from '../../run/state'
 import { INVINCIBLE_HP, sandboxInvincible } from '../sandbox/knobs'
@@ -60,6 +61,7 @@ export function spawnCharacter(
   CharScale.v[eid] = place.sizeMul
   Grow.r0[eid] = MEMBER.radius * UNIT
   Grow.s0[eid] = MEMBER.size * UNIT
+  setStatLayer(eid, 'role', [ROLES[def.role].stats])
   setStatLayer(eid, 'gear', gearMods(owned, levelStatsFor(id, level)))
   foldBody(world, undefined, eid)
   Hp.v[eid] = sandbox ? Hp.max[eid]! : waveStartHp(run.memberHp[slot] ?? Hp.max[eid]!, Hp.max[eid]!)

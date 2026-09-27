@@ -6,6 +6,7 @@ import type { ResourceDef } from '../types/enemies'
 import type { CharacterId } from '../types/characters'
 import { gearMods, resolveAbilityDef } from '../data/items'
 import { tiersForLevel } from '../data/charLevel'
+import { ROLES } from '../data/roles'
 import { deliveryOf, HIT } from '../ecs/utils/hitTags'
 import { levelStatsFor } from '../data/levels'
 import type { ItemId } from '../types/items'
@@ -405,7 +406,7 @@ export function characterStatGroups(
   if (rest.length > 0) baseLines.push(rest.join(' · '))
   if (def.resource) baseLines.push(resourceLine(def.resource))
   const groups: StatGroup[] = [
-    { icon: '2764', title: '基础', lines: baseLines },
+    { icon: '2764', title: `基础 · ${ROLES[def.role].name}`, lines: baseLines },
     {
       icon: def.skill.icon,
       title: `主动技能 · ${def.skill.name}（${abilityLabel(def.skill.ability)}）`,

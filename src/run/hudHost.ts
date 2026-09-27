@@ -58,6 +58,8 @@ export interface SquadSnapshot {
 export interface MemberSheet {
   emoji: string
   name: string
+  /** 定位的名字 */
+  role: string
   level: number
   leader: boolean
   alive: boolean

@@ -9,6 +9,7 @@ import { WEAPONS } from './weapons'
 import type { UpgradeCard, WeaponId } from '../types/weapons'
 import type { Carrier, CharacterAuthoring, CharacterDef, CharacterId, InnateSource, TeamBaseline, UpgradeTiers } from '../types/characters'
 import { foldStats } from './stats'
+import { ROLES } from './roles'
 import type { StatBase, StatMods, StatValues } from '../types/stats'
 
 function tierLevel(tiers: UpgradeTiers): 0 | 1 | 2 {
@@ -39,6 +40,7 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
     emoji: src.emoji,
     name: src.name,
     desc: src.desc,
+    role: src.role,
     body: src.body,
     stats: src.stats,
     skill: { ...src.skill, ability: ABILITIES[src.skill.ability], aim: src.skill.aim === true },
@@ -86,7 +88,7 @@ export function memberBase(def: CharacterDef): StatBase {
   return { ...MEMBER.stats, ...def.stats }
 }
 
-/** 角色战斗外的属性表：基础属性加上道具与等级 */
+/** 角色战斗外的属性表：基础属性加上定位、道具与等级 */
 export function memberStats(def: CharacterDef, gear: readonly StatMods[] = []): StatValues {
-  return foldStats(memberBase(def), gear)
+  return foldStats(memberBase(def), [ROLES[def.role].stats, ...gear])
 }
