@@ -136,7 +136,7 @@ function condMods(sim: Sim, eid: number, when: readonly GearWhen[]): void {
   }
 }
 
-/** 身上限时的属性修正、所在阵营的战场效果、道具的条件属性与体力：队伍按最累的人走 */
+/** 身上限时的属性修正、所在阵营的战场效果、队伍道具定下的敌人移速、道具的条件属性与体力：队伍按最累的人走 */
 function battleMods(sim: Sim, eid: number): void {
   const world = sim.world
   if (hasComponent(world, eid, Mark)) {
@@ -151,6 +151,7 @@ function battleMods(sim: Sim, eid: number): void {
   const side = Faction.v[eid]
   const field = side === FACTION.team ? sim.battleFx.team : side === FACTION.enemy ? sim.battleFx.enemy : []
   for (const m of field) fold.apply(m)
+  if (side === FACTION.enemy) fold.times('moveSpeed', sim.foes.speed)
   const gear = gearRules[eid]
   if (gear && Alive.v[eid]) condMods(sim, eid, gear.when)
   if (sim.sandbox && side === FACTION.team) {

@@ -26,6 +26,7 @@ import { formTeam } from './entities/team'
 import { newWorldState, worldFor } from './worlds/hooks'
 import { newOutbox } from './outbox'
 import { newDamageNumbers } from './damageNumbers'
+import { Stats } from './components'
 import type { EcsAtlas } from './atlas'
 
 export interface Sim {
@@ -55,6 +56,8 @@ export interface Sim {
   timeStopMsLeft: number
   chrono: number
   battleFx: BattleEffects
+  /** 队伍道具定下的全场规则：敌人的移速与出怪速度的倍率 */
+  foes: { readonly speed: number; readonly count: number }
   frameAttractors: { x: number; y: number; r2: number }[]
   /** 按阵营的可被打身体快照，每帧开头与身体走完后各刷新一次 */
   targets: Target[][]
@@ -164,6 +167,10 @@ export function makeSim(
     timeStopMsLeft: 0,
     chrono: 0,
     battleFx: { ...BATTLE_FX_IDENTITY },
+    foes: {
+      speed: characters.reduce((v, m) => v * Stats.enemySpeed[m]!, 1),
+      count: characters.reduce((v, m) => v * Stats.enemyCount[m]!, 1),
+    },
     frameAttractors: [],
     targets: [[], []],
     frames: atlas,

@@ -31,11 +31,12 @@ type CountCond =
 export type GearCond = FlagCond | CountCond
 /** 条件属性：每层加一份 stats（倍率按涨跌线性叠加），可计数的最多 max 层 */
 export type GearWhen = { readonly if: FlagCond; readonly stats: StatMods } | { readonly if: CountCond; readonly stats: StatMods; readonly max: number }
-/** 触发的时机、几率与施于谁：self 持有者；foe 命中与暴击的目标，闪避与受伤时出手的身体；corpse 击杀时尸体所在处。残血与致命每条命各一次，不带几率 */
+/** 触发的时机、几率与施于谁：self 持有者；foe 命中与暴击的目标，闪避与受伤时出手的身体；corpse 击杀时尸体所在处。wave 是每波开始，残血与致命每条命各一次，这三种不带几率 */
 type GearOn =
   | { readonly on: 'hit' | 'crit' | 'dodge' | 'hurt'; readonly chance?: number; readonly to: 'self' | 'foe' }
   | { readonly on: 'kill'; readonly chance?: number; readonly to: 'self' | 'corpse' }
   | { readonly on: 'skill'; readonly chance?: number; readonly to: 'self' }
+  | { readonly on: 'wave'; readonly to: 'self' }
   | { readonly on: 'lowHp'; readonly ratio: number; readonly to: 'self' }
   | { readonly on: 'lethal'; readonly to: 'self' }
 /** 触发：damage 是效果的基础伤害，不写时命中与暴击取这一下的伤害、受伤取受到的伤害，其余为 0 */

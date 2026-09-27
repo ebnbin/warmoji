@@ -8,12 +8,14 @@ import type { AbilityDef, Effect } from '../types/abilityDefs'
 import type { CharacterDef } from '../types/characters'
 import type { LevelProgress } from '../types/charLevel'
 
-function rarityWeights(wave: number, level = 1): Record<ItemRarity, number> {
+/** 各稀有度的权重：随波次与等级升高，幸运按百分比放大普通以外的几率 */
+function rarityWeights(wave: number, level: number, luck: number): Record<ItemRarity, number> {
   const lv = Math.max(0, level - 1)
-  const rare = Math.min(0.5, 0.06 + 0.02 * wave + 0.14 * lv)
+  const up = Math.max(0, 1 + luck / 100)
+  const rare = Math.min(0.5, 0.06 + 0.02 * wave + 0.14 * lv) * up
   const epicBase = wave < 5 ? 0 : Math.min(0.2, 0.025 * (wave - 4))
-  const epic = Math.min(0.42, epicBase + 0.13 * lv + (lv > 0 ? 0.05 : 0))
-  const legendary = wave < 8 ? 0 : Math.min(0.08, 0.01 * (wave - 7) + 0.02 * lv)
+  const epic = Math.min(0.42, epicBase + 0.13 * lv + (lv > 0 ? 0.05 : 0)) * up
+  const legendary = (wave < 8 ? 0 : Math.min(0.08, 0.01 * (wave - 7) + 0.02 * lv)) * up
   const common = Math.max(0.05, 1 - rare - epic - legendary)
   return { common, rare, epic, legendary }
 }
@@ -121,10 +123,11 @@ export function rollItem(
   rand: () => number,
   wave = 1,
   level = 1,
+  luck = 0,
 ): ItemId | null {
   const avail = pool.filter((id) => !reachedStackLimit(owned, id))
   if (avail.length === 0) return null
-  const weights = rarityWeights(wave, level)
+  const weights = rarityWeights(wave, level, luck)
   const buckets = RARITY_ORDER.map((r) => ({
     items: avail.filter((id) => ITEMS[id].rarity === r),
     w: weights[r],

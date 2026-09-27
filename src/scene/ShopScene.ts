@@ -11,6 +11,7 @@ import {
   itemPrice,
 } from '../data/items'
 import type { ItemId, ItemDef } from '../types/items'
+import type { StatValues } from '../types/stats'
 import { characterLevel } from '../data/charLevel'
 import { levelStatsFor, LEVEL_STATS } from '../data/levels'
 import { upgradeCardsFor } from '../data/characters'
@@ -70,6 +71,8 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
   private lineup: CharacterId[] = []
   private focusedId: CharacterId = 'juggler'
   private offers: (ItemId | null)[] = []
+  /** 这次进店每人还剩几次免费刷新 */
+  private freeRerolls: number[] = []
   private layout!: ShopLayout
   private origin = { x: 0, y: 0 }
   private grid!: EmojiGrid<CharacterId>
@@ -104,9 +107,8 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     this.run = getRun()
     this.lineup = [...this.run.roster]
     if (!preserved) {
-      this.offers = this.lineup.map((_, slot) =>
-        rollItem(this.poolFor(slot), this.ownedFor(slot), Math.random, this.run.wave, this.levelOf(slot)),
-      )
+      this.offers = this.lineup.map((_, slot) => this.roll(slot))
+      this.freeRerolls = this.lineup.map((_, slot) => Math.floor(this.slotStats(slot).freeRerolls))
       this.focusedId = this.lineup[0] ?? this.focusedId
     }
     this.detailObjs = []
@@ -282,8 +284,14 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     return this.lineup.indexOf(this.focusedId)
   }
 
-  private price(offer: ItemId): number {
-    return Math.max(1, Math.round(itemPrice(offer, this.run.wave)))
+  /** 给这名队员刷一件：按等级与幸运定稀有度 */
+  private roll(slot: number): ItemId | null {
+    return rollItem(this.poolFor(slot), this.ownedFor(slot), Math.random, this.run.wave, this.levelOf(slot), this.slotStats(slot).luck)
+  }
+
+  /** 这名队员买它的价格：商店价格按队员自己的属性 */
+  private price(slot: number, offer: ItemId): number {
+    return Math.max(1, Math.round(itemPrice(offer, this.run.wave) * this.slotStats(slot).shopPrice))
   }
 
   private buyFocused(): void {
@@ -291,33 +299,40 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     if (idx < 0) return
     const offer = this.offers[idx]
     if (!offer) return
-    const price = this.price(offer)
+    const price = this.price(idx, offer)
     if (this.run.coins < price) return
     this.run.coins -= price
     playSfx('buy')
     const beforeLevel = this.levelOf(idx)
-    const owned = this.ownedFor(idx)
-    owned.push(offer)
+    this.ownedFor(idx).push(offer)
     const afterLevel = this.levelOf(idx)
-    this.offers[idx] = rollItem(this.poolFor(idx), owned, Math.random, this.run.wave, afterLevel)
+    this.offers[idx] = this.roll(idx)
     this.refresh()
     if (afterLevel > beforeLevel) this.showLevelUp(idx, afterLevel)
   }
 
+  /** 刷新：先用这次进店的免费次数，用完再花钱 */
   private refreshFocused(): void {
     const idx = this.focusedIndex()
     if (idx < 0) return
-    if (this.run.coins < SHOP.refreshPrice) return
-    this.run.coins -= SHOP.refreshPrice
+    const free = (this.freeRerolls[idx] ?? 0) > 0
+    if (!free && this.run.coins < SHOP.refreshPrice) return
+    if (free) this.freeRerolls[idx]! -= 1
+    else this.run.coins -= SHOP.refreshPrice
     playSfx('click')
-    this.offers[idx] = rollItem(this.poolFor(idx), this.ownedFor(idx), Math.random, this.run.wave, this.levelOf(idx))
+    this.offers[idx] = this.roll(idx)
     this.refresh()
   }
 
-  private slotMaxHp(slot: number): number {
+  /** 队员战斗外的属性：定位、道具、成长与等级 */
+  private slotStats(slot: number): StatValues {
     const id = this.lineup[slot]!
     const owned = this.run.memberItems[slot] ?? []
-    return memberStats(CHARACTERS[id], gearMods(owned, levelStatsFor(id, this.levelOf(slot)), this.run.memberGrowth[slot])).maxHp
+    return memberStats(CHARACTERS[id], gearMods(owned, levelStatsFor(id, this.levelOf(slot)), this.run.memberGrowth[slot]))
+  }
+
+  private slotMaxHp(slot: number): number {
+    return this.slotStats(slot).maxHp
   }
 
   private buildSlotItems(): EmojiGridItem<CharacterId>[] {
@@ -575,14 +590,14 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
       )
     }
 
-    const canBuy = offer !== null && this.run.coins >= this.price(offer)
+    const canBuy = offer !== null && this.run.coins >= this.price(idx, offer)
     const bb = this.buyRect
     const buyBg = this.add.graphics()
     roundRect(buyBg, bb.x, bb.y, bb.w, bb.h, 27, { fill: canBuy ? 0xffdc5d : 0xffffff, fillAlpha: canBuy ? 1 : 0.1 })
     this.detailObjs.push(
       buyBg,
       this.add
-        .text(bb.x + bb.w / 2, bb.y + bb.h / 2, offer ? `购买 ${this.price(offer)}` : '购买', {
+        .text(bb.x + bb.w / 2, bb.y + bb.h / 2, offer ? `购买 ${this.price(idx, offer)}` : '购买', {
           fontFamily: UI_FONT,
           fontSize: FONT.body,
           fontStyle: 'bold',
@@ -592,7 +607,8 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
         .setOrigin(0.5),
     )
 
-    const canRefresh = this.run.coins >= SHOP.refreshPrice
+    const free = this.freeRerolls[idx] ?? 0
+    const canRefresh = free > 0 || this.run.coins >= SHOP.refreshPrice
     const rb = this.refreshRect
     const refBg = this.add.graphics()
     roundRect(refBg, rb.x, rb.y, rb.w, rb.h, 27, { fill: 0xffffff, fillAlpha: canRefresh ? 0.14 : 0.07 })
@@ -606,7 +622,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
         .text(
           rb.x + rb.w / 2,
           rb.y + rb.h / 2,
-          `刷新 ${SHOP.refreshPrice}`,
+          free > 0 ? `免费刷新 ${free}` : `刷新 ${SHOP.refreshPrice}`,
           {
             fontFamily: UI_FONT,
             fontSize: FONT.small,

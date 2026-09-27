@@ -61,7 +61,7 @@ export function spawnStep(sim: Sim): void {
   const wave = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000)
   const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * sim.characters.length
   const relief = isBossWave(sim.run.wave) ? BOSS_SPAWN_RELIEF : 1
-  sim.spawnCooldownMs = (wave.spawnIntervalMs * relief * spawnIntervalScale(sim)) / teamFactor
+  sim.spawnCooldownMs = (wave.spawnIntervalMs * relief * spawnIntervalScale(sim)) / (teamFactor * sim.foes.count)
   if (foeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
   telegraphOne(sim, wave.hpMultiplier)
 }

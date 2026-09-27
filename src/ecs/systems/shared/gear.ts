@@ -126,6 +126,11 @@ export function gearLethal(sim: Sim, holder: number): boolean {
   return true
 }
 
+/** 新的一波开始了 */
+export function gearWave(sim: Sim, holder: number): void {
+  fire(sim, holder, gearRules[holder]?.on.wave, here(holder), -1, 0)
+}
+
 /** 持有者放了一次主动技能 */
 export function gearSkill(sim: Sim, holder: number): void {
   if (!hasComponent(sim.world, holder, Gear)) return

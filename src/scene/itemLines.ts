@@ -55,6 +55,8 @@ function onText(t: GearTrigger): string {
       return '闪避时'
     case 'skill':
       return '放主动技能时'
+    case 'wave':
+      return '每波开始时'
     case 'lowHp':
       return `每条命第一次生命低于 ${pct(t.ratio)} 时`
     case 'lethal':

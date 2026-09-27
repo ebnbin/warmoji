@@ -118,6 +118,8 @@ export function effectLine(e: Effect, self = false): string {
       return '自身消散'
     case 'coins':
       return `每次命中掉 ${e.count} 枚金币`
+    case 'interest':
+      return `按手上金币的 ${pct(e.ratio)} 结息，最多 ${e.max}`
     case 'root':
       return `定身 ${sec(e.durationMs)}（不能走，能出手）`
     case 'silence':

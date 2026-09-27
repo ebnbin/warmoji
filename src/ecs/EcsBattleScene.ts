@@ -54,7 +54,7 @@ import { activeMods } from './entities/modifier'
 import { Lifetime, Modifier } from './components'
 
 import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
-import { settleWave } from './systems/shared/wave'
+import { openWave, settleWave } from './systems/shared/wave'
 import { isBossWave, isEliteWave, waveAt, waveDurationMs, WAVE } from '../data/waves'
 import { xpToNext } from '../run/xp'
 import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox/knobs'
@@ -368,6 +368,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     if (!run.sandbox) this.scheduleCarriers()
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
+    openWave(this.sim)
     if (!run.sandbox && isEliteWave(run.wave)) {
       this.time.delayedCall(600, () => {
         const sim = this.sim

@@ -143,6 +143,12 @@ interface CoinsEffect {
   readonly kind: 'coins'
   readonly count: number
 }
+/** 结息：队伍按手上金币的 ratio 倍得金币，最多 max */
+interface InterestEffect {
+  readonly kind: 'interest'
+  readonly ratio: number
+  readonly max: number
+}
 /** 消散：目标身体不算击杀地移除，自爆者对自己用 */
 interface VanishEffect {
   readonly kind: 'vanish'
@@ -517,6 +523,7 @@ export type Effect =
   | ReviveCutEffect
   | TimeStopEffect
   | CoinsEffect
+  | InterestEffect
   | VanishEffect
   | RootEffect
   | SilenceEffect
