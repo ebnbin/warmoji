@@ -80,6 +80,12 @@ const SOLD_ALPHA = 0.4
 
 type Side = 'top' | 'left'
 
+/** 排好的效果文字与总高 */
+interface Lines {
+  readonly labels: Label[]
+  readonly height: number
+}
+
 /** 能整体调透明度的对象 */
 type Fadable = Phaser.GameObjects.GameObject & { readonly alpha: number; setAlpha(value?: number): unknown }
 
@@ -200,9 +206,10 @@ export class OfferCard extends Widget {
       return
     }
     const goods = state.goods
-    const lines = this.makeLines(goods, w - PAD * 2, 'center', w < 260 ? 'caption' : 'label')
+    const room = bottom - top - 58
+    const lines = this.fitLines(goods, w - PAD * 2, 'center', room - 56)
     // 效果写得长时图标让出地方
-    const size = Phaser.Math.Clamp(Math.min(Math.round(w * 0.36), bottom - top - 58 - lines.height), 56, 104)
+    const size = Phaser.Math.Clamp(Math.min(Math.round(w * 0.36), room - lines.height), 56, 104)
     const headH = size + 58
     const y0 = top + Math.max(0, (bottom - top - headH - lines.height) * 0.45)
     const head = this.goodsIcon(goods, w / 2, y0 + size / 2, size)
@@ -231,8 +238,8 @@ export class OfferCard extends Widget {
     }
     const goods = state.goods
     const size = Phaser.Math.Clamp(Math.round(h * 0.28), 48, 80)
-    const lines = this.makeLines(goods, right - x0, 'left', 'label', true)
     const gap = 8
+    const lines = this.fitLines(goods, right - x0, 'left', h - PAD - 10 - size - gap, true)
     const y0 = PAD + Math.max(0, (h - PAD * 2 - size - gap - lines.height) * 0.45)
     const rowY = y0 + size / 2
     const head = this.goodsIcon(goods, x0 + size / 2, rowY, size)
@@ -258,7 +265,7 @@ export class OfferCard extends Widget {
   }
 
   /** 效果逐条排好，先量出总高再定位置；pair 时条条都短就左右两列；小字另起一行 */
-  private makeLines(goods: OfferGoods, width: number, align: 'left' | 'center', kind: TextKind, pair = false): { labels: Label[]; height: number } {
+  private makeLines(goods: OfferGoods, width: number, align: 'left' | 'center', kind: TextKind, pair = false): Lines {
     const x = align === 'center' ? width / 2 : 0
     const originX = align === 'center' ? 0.5 : 0
     let labels: Label[] = []
@@ -292,9 +299,19 @@ export class OfferCard extends Widget {
     return { labels, height: Math.max(0, y - LINE_GAP) }
   }
 
-  /** 效果放进滚动区：通常放得下，放不下时可拖动 */
-  private placeLines(lines: { readonly labels: readonly Label[]; readonly height: number }, rect: Rect): void {
-    const view = (this.view = new ScrollView(this.scene, { x: this.x + rect.x, y: this.y + rect.y, w: rect.w, h: Math.max(0, rect.h) }))
+  /** 先用正文字号，放不进 room 高再换小一号 */
+  private fitLines(goods: OfferGoods, width: number, align: 'left' | 'center', room: number, pair = false): Lines {
+    const lines = this.makeLines(goods, width, align, 'label', pair)
+    if (lines.height <= room) return lines
+    for (const t of lines.labels) t.destroy()
+    return this.makeLines(goods, width, align, 'caption', pair)
+  }
+
+  /** 效果放进滚动区：通常放得下；放不下时在两条之间截住，余下的拖动查看 */
+  private placeLines(lines: Lines, rect: Rect): void {
+    const whole = lines.labels.map((t) => t.y + t.height).filter((bottom) => bottom <= rect.h)
+    const h = lines.height > rect.h && whole.length > 0 ? Math.max(...whole) + 2 : rect.h
+    const view = (this.view = new ScrollView(this.scene, { x: this.x + rect.x, y: this.y + rect.y, w: rect.w, h: Math.max(0, h) }))
     view.add([...lines.labels]).setContentSize(lines.height)
   }
 

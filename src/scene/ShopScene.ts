@@ -274,11 +274,12 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     return { kind: 'open', goods, price: `购买 ${COIN} ${price}`, canBuy: this.run.coins >= price, onBuy: () => this.buy(slot) }
   }
 
+  /** 唯一的道具与已经有了的道具才注明 */
   private stackNote(def: ItemDef, held: number): string | undefined {
     const max = def.maxStacks
-    if (max === undefined) return held > 0 ? `已持有 ×${held}` : undefined
-    if (held > 0) return `已持有 ${held}/${max}`
-    return max === 1 ? '唯一' : `最多持有 ${max} 件`
+    if (max === 1) return '唯一'
+    if (held === 0) return undefined
+    return max === undefined ? `已持有 ×${held}` : `已持有 ${held}/${max}`
   }
 
   private showLevelUp(slot: number, level: number): void {
