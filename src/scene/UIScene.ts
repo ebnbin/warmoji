@@ -25,7 +25,7 @@ function stateOf(m: SquadMember): IconState {
 }
 
 /** 右下角的队伍环：队长贴角落放大并显示他的主动技能，队员沿四分之一圆弧从正上方排到正左方 */
-const RING = { r: 27, emoji: 38, leaderScale: 2, radius: 140, inset: 24 } as const
+const RING = { r: 27, emoji: 38, memberScale: 1.4, leaderScale: 2.8, radius: 196, inset: 24 } as const
 const SQUAD_KEYS = ['ONE', 'TWO', 'THREE', 'FOUR'] as const
 const AIM_DEADZONE = 24
 const DEPTH = { bar: LAYER.hud + 20, fx: LAYER.hud + 21, waveEnd: LAYER.toast + 10, squad: 300, leader: 302, aim: 305 } as const
@@ -199,7 +199,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.squadCenter = this.squadCorner()
     const m = s.members.length - 1
     if (m >= 2) {
-      this.squadTrack = new ArcTrack(this, this.squadCenter.x, this.squadCenter.y, RING.radius, (RING.r + 8) * 2, -Math.PI, -Math.PI / 2).setDepth(DEPTH.squad - 1)
+      this.squadTrack = new ArcTrack(this, this.squadCenter.x, this.squadCenter.y, RING.radius, (RING.r + 8) * 2 * RING.memberScale, -Math.PI, -Math.PI / 2).setDepth(DEPTH.squad - 1)
     }
     let arc = 0
     this.squadArc = s.members.map((_, slot) => (slot === s.leaderSlot ? -1 : arc++))
@@ -216,7 +216,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
         onDrag: (dx, dy) => this.moveAim(dx, dy),
         onRelease: () => this.releaseAim(),
       })
-        .setScale(isLeader ? RING.leaderScale : 1)
+        .setScale(isLeader ? RING.leaderScale : RING.memberScale)
         .setDepth(isLeader ? DEPTH.leader : DEPTH.squad)
       return { dial, shownState: 'ready' as IconState }
     })
@@ -287,7 +287,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     a.setDepth(DEPTH.squad)
     this.tweens.killTweensOf([a, b])
     this.tweens.add({ targets: b, x: this.squadCenter.x, y: this.squadCenter.y, scale: RING.leaderScale, duration: ms, ease: 'Cubic.easeInOut' })
-    this.tweens.add({ targets: a, x: p.x, y: p.y, scale: 1, duration: ms, ease: 'Cubic.easeInOut' })
+    this.tweens.add({ targets: a, x: p.x, y: p.y, scale: RING.memberScale, duration: ms, ease: 'Cubic.easeInOut' })
   }
 
   private styleSquadIcon(b: SquadIcon, m: SquadMember, isLeader: boolean, switching: boolean): void {
