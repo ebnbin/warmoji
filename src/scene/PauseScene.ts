@@ -76,6 +76,14 @@ const HEAD_H = 112
 
 const NONE: TableCell = { text: '—', color: 'faint' }
 
+/** 战斗里的操作，键位与手势照着 HUD 与战斗场景写 */
+const CONTROLS: readonly string[] = [
+  '移动：WASD 或方向键；触屏在空白处按住拖动',
+  '放技能：Q，或点右下角的队长；能瞄准的按住拖出方向，能蓄力的按住蓄力，松手放出',
+  '换队长：1～4 键依次对应弧上从上到左的队员，或直接点头像',
+  '暂停：ESC，或点右上角的暂停键',
+]
+
 /** 暂停页上的一名队员：战斗中取此刻的样子，战斗外按本局记下的道具、成长与生命算 */
 interface Member extends MemberSheet {
   readonly slot: number
@@ -434,6 +442,9 @@ export class PauseScene extends Phaser.Scene {
     flow.heading('这张图的战场效果', '1f4e6')
     flow.text('携带者身上掉落，碰到就生效', { color: 'muted' })
     for (const p of POOLS[run.mapId]) this.flowEffect(flow, p.emoji, `${p.name}：${p.desc}`, p.polarity === 'buff')
+    flow.gap(6)
+    flow.heading('操作', '1f3ae')
+    for (const line of CONTROLS) flow.text(line)
     flow.finish()
 
     const st = run.stats

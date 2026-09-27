@@ -190,4 +190,5 @@ export const PRELOAD_EMOJIS: readonly string[] = [
   '1f3c1',
   '2728',
   '1f4e6',
+  '1f3ae',
 ]

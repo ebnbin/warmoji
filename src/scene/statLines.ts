@@ -427,7 +427,8 @@ export function characterStatGroups(
       lines: upgradeCardsFor(def).map((card, i) => {
         const atLevel = i + 2
         const reached = level >= atLevel
-        return `Lv${atLevel}「${card.name}」${card.desc}${reached ? ' ✓已获得' : `（Lv${atLevel} 解锁）`}`
+        const bonus = levelStatsFor(id, atLevel).flatMap(modTexts).join('、')
+        return `Lv${atLevel}「${card.name}」${card.desc}${bonus ? `；属性加成 ${bonus}` : ''}${reached ? ' ✓已获得' : `（Lv${atLevel} 解锁）`}`
       }),
     })
   }
