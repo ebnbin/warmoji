@@ -93,4 +93,9 @@ export function resolveAbilityDef(w: AbilityDef, fx: Pick<StatValues, 'range' | 
   return { ...w, shape, ...(w.range === undefined ? {} : { range: w.range * r }) }
 }
 
-export const SHOP = ECON.shop
+/** 打完第 wave 波的商店里已经花钱刷新过 paid 次，下一次刷新的价格 */
+export function rerollPrice(wave: number, paid: number): number {
+  const { base, step } = ECON.shop.reroll
+  const w = Math.max(1, wave)
+  return Math.floor(w * base) + Math.max(1, Math.floor(w * step)) * (paid + 1)
+}

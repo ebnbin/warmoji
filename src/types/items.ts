@@ -8,7 +8,8 @@ export interface Economy {
     readonly earlyDiscount: number
     readonly earlyFadeWaves: number
   }
-  readonly shop: { readonly refreshPrice: number }
+  /** 刷新价随刚打完的波次涨：base 定底价，step 定每刷一次的涨幅 */
+  readonly shop: { readonly reroll: { readonly base: number; readonly step: number } }
   /** 买一件道具给角色的经验：原价乘它 */
   readonly xpPerCoin: number
 }

@@ -1,4 +1,4 @@
-import type Phaser from 'phaser'
+import Phaser from 'phaser'
 import { strokeArc } from './draw'
 import { SURFACE, TONE } from './theme'
 import type { Tone } from './theme'
@@ -19,53 +19,82 @@ function clamp01(v: number): number {
 export interface GaugeOptions {
   readonly tone: GaugeTone
   readonly value?: number
+  /** 预告会涨到的值：从当前值到它的一段半透明闪烁 */
+  readonly preview?: number
 }
 
 /** 进度条；(x, y) 是左上角 */
 export class ProgressBar extends Widget {
-  private readonly g: Phaser.GameObjects.Graphics
+  private readonly track: Phaser.GameObjects.Graphics
+  private readonly ghost: Phaser.GameObjects.Graphics
+  private readonly fill: Phaser.GameObjects.Graphics
   private readonly barW: number
   private readonly barH: number
   private tone: GaugeTone
   private shown = -1
+  private ahead = 0
+  private blinking = false
 
   constructor(scene: Phaser.Scene, x: number, y: number, width: number, height: number, opts: GaugeOptions) {
     super(scene, x, y)
     this.barW = width
     this.barH = height
     this.tone = opts.tone
-    this.g = scene.add.graphics()
-    this.add(this.g)
+    this.track = scene.add.graphics()
+    this.ghost = scene.add.graphics()
+    this.fill = scene.add.graphics()
+    this.add([this.track, this.ghost, this.fill])
+    this.track.fillStyle(SURFACE.outline, 1).fillRoundedRect(0, 0, width, height, height / 2)
+    this.ahead = clamp01(opts.preview ?? 0)
     this.setValue(opts.value ?? 0)
+    this.once(Phaser.GameObjects.Events.DESTROY, () => scene.tweens.killTweensOf(this.ghost))
   }
 
   setValue(value: number): this {
     const v = clamp01(value)
     if (Math.abs(v - this.shown) < 0.002) return this
     this.shown = v
-    const { barW: w, barH: h } = this
-    const g = this.g.clear()
-    g.fillStyle(SURFACE.outline, 1)
-    g.fillRoundedRect(0, 0, w, h, h / 2)
-    if (v <= 0) return this
-    const inset = Math.max(2, Math.round(h * 0.18))
-    const ih = h - inset * 2
-    const fw = Math.max(ih, (w - inset * 2) * v)
-    g.fillStyle(toneFace(this.tone, v), 1)
-    g.fillRoundedRect(inset, inset, fw, ih, ih / 2)
-    if (ih >= 6) {
-      g.fillStyle(0xffffff, 0.3)
-      g.fillRoundedRect(inset + ih / 3, inset + 1, Math.max(0, fw - (ih * 2) / 3), Math.max(2, ih * 0.3), 1)
-    }
+    this.paint()
+    return this
+  }
+
+  setPreview(value: number): this {
+    this.ahead = clamp01(value)
+    this.paint()
     return this
   }
 
   setTone(tone: GaugeTone): this {
     if (tone === this.tone) return this
     this.tone = tone
+    this.paint()
+    return this
+  }
+
+  private paint(): void {
     const v = this.shown
-    this.shown = -1
-    return this.setValue(v)
+    const { barW: w, barH: h } = this
+    const inset = Math.max(2, Math.round(h * 0.18))
+    const ih = h - inset * 2
+    const span = (r: number): number => Math.max(ih, (w - inset * 2) * r)
+    const face = toneFace(this.tone, v)
+    const ghost = this.ghost.clear()
+    const blink = this.ahead > v
+    if (blink) ghost.fillStyle(face, 0.75).fillRoundedRect(inset, inset, span(this.ahead), ih, ih / 2)
+    if (blink !== this.blinking) {
+      this.blinking = blink
+      if (blink) this.scene.tweens.add({ targets: ghost, alpha: 0.3, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+      else this.scene.tweens.killTweensOf(ghost.setAlpha(1))
+    }
+    const g = this.fill.clear()
+    if (v <= 0) return
+    const fw = span(v)
+    g.fillStyle(face, 1)
+    g.fillRoundedRect(inset, inset, fw, ih, ih / 2)
+    if (ih >= 6) {
+      g.fillStyle(0xffffff, 0.3)
+      g.fillRoundedRect(inset + ih / 3, inset + 1, Math.max(0, fw - (ih * 2) / 3), Math.max(2, ih * 0.3), 1)
+    }
   }
 }
 
