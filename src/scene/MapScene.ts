@@ -17,6 +17,7 @@ import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { roundRect } from '../ui/shapes'
+import { STAMINA } from '../data/stamina'
 import { SceneKey } from './keys'
 
 const MAP_PLAY_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> = {
@@ -275,6 +276,9 @@ export class MapScene extends Phaser.Scene {
     cursor += 44
     group(GROUP_ICONS.play, '玩法')
     line(MAP_PLAY_LABEL[def.kind])
+    if (def.exertion) {
+      line(`地面费力：赶路每走一格耗 ${+(def.exertion * 100).toFixed(1)}% 体力，体力低于 ${Math.round(STAMINA.slowFrom * 100)}% 开始变慢、见底只剩 ${Math.round(STAMINA.floor * 100)}% 速度；站定片刻开始回，歇得越久回得越快。全队按最累的人走，敌人也会累`)
+    }
     line(`终波头目 ${bossFor(this.selectedId).name}`, '#9a9aa8')
     this.detailView.setContentHeight(cursor + 12)
   }

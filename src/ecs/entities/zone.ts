@@ -50,6 +50,7 @@ export function spawnZone(sim: Sim, spec: ZoneSpec): number {
   Zone.who[eid] = ZONE_WHO[rules?.who ?? 'foes']
   Zone.pull[eid] = rules?.pull ?? 0
   Zone.traction[eid] = rules?.traction ?? 0
+  Zone.exertion[eid] = rules?.exertion ?? 0
   Zone.mist[eid] = rules?.mist ? 1 : 0
   Zone.trap[eid] = rules?.trap ? 1 : 0
   if (rules?.dwell) zoneDwellIn[eid] = new Map()

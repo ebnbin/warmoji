@@ -29,7 +29,7 @@ import { withBuilt } from './built'
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
 
-interface Surface {
+export interface Surface {
   readonly traction: number
   readonly viscosity: number
   /** 赶路每走一格扣掉的体力比例 */

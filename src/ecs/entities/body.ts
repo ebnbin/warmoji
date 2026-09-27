@@ -38,6 +38,7 @@ export function spawnBody(world: EcsWorld, spec: BodySpec): number {
   SpeedMul.v[eid] = 1
   Stamina.v[eid] = 1
   Stamina.restMs[eid] = 0
+  Stamina.mul[eid] = 1
   MotionHit.stamp[eid] = -1
   Ctl.move[eid] = 1
   Ctl.act[eid] = 1

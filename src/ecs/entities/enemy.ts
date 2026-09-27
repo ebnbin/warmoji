@@ -42,6 +42,7 @@ import {
   Pop,
   Wander,
   Sprite,
+  Stamina,
   Standoff,
   TAG,
   Tint,
@@ -167,6 +168,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   Boss.v[eid] = boss ? 1 : 0
   if (def.kbImmune) addComponent(world, eid, Anchored)
   if (def.phasesWalls) addComponent(world, eid, Phasing)
+  Stamina.mul[eid] = def.exertionMul ?? 1
   const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
   Transform.x[eid] = born.x
   Transform.y[eid] = born.y

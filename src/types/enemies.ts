@@ -121,6 +121,8 @@ export interface NpcDef extends BodyRules {
     readonly firstDelayMs?: number
   }
   readonly kbImmune?: boolean
+  /** 赶路扣体力的倍率，0 是走多远都不累 */
+  readonly exertionMul?: number
   readonly phasesWalls?: boolean
   readonly breaksWalls?: boolean
   /** 可切换的形态，第 0 个是本体以外的第一个；form 效果按下标切换 */

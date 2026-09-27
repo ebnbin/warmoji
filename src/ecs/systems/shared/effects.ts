@@ -1,7 +1,7 @@
 import type { Cond, Effect, MarkName } from '../../../types/abilityDefs'
 import { circleHitIndices } from '../../utils/hit'
 import { hasComponent, query } from 'bitecs'
-import { Ability, Alive, Anchored, Boss, Cd, Charges, Enemy, FACTION, Faction, Grow, History, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, TAG, Transform, Uid } from '../../components'
+import { Ability, Alive, Anchored, Boss, Cd, Charges, Enemy, FACTION, Faction, Grow, History, Hp, Manual, MARK, MARK_SLOTS, Mark, Owner, Radius, Revive, Stamina, TAG, Transform, Uid } from '../../components'
 import { addCc, addMark, CC_MARKS, hasMark, isAirborne, markSlot } from '../../utils/marks'
 import { Interned } from '../../utils/intern'
 import { displace } from './displace'
@@ -291,6 +291,13 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
     const until = sim.elapsedMs + fx.durationMs
     eachCapable(sim, at, Mark, (t) => {
       if (addCc(sim, t, MARK.stun, until)) interrupt(sim, t)
+    })
+  },
+
+  exhaust: (sim, _src, _fx, at) => {
+    eachCapable(sim, at, Stamina, (t) => {
+      Stamina.v[t] = 0
+      Stamina.restMs[t] = 0
     })
   },
 

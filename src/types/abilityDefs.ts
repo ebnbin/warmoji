@@ -95,6 +95,10 @@ interface StunEffect {
   readonly kind: 'stun'
   readonly durationMs: number
 }
+/** 力竭：体力清空 */
+interface ExhaustEffect {
+  readonly kind: 'exhaust'
+}
 /** 隐匿：敌人看不见 */
 interface HideEffect {
   readonly kind: 'hide'
@@ -496,6 +500,7 @@ export type Effect =
   | BuffEffect
   | DamageEffect
   | StunEffect
+  | ExhaustEffect
   | HideEffect
   | TauntEffect
   | GuardEffect

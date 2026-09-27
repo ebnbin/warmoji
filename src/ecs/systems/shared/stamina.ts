@@ -9,6 +9,12 @@ export function squadStamina(sim: Sim): number {
   return v
 }
 
+/** 拖慢全队的队员：累到减速，还比队长更累 */
+export function dragging(sim: Sim, m: number): boolean {
+  const v = Stamina.v[m]!
+  return m !== sim.leader && Alive.v[m] === 1 && v < STAMINA.slowFrom && v < Stamina.v[sim.leader]! - 0.01
+}
+
 /** 体力决定的速度倍率：低于 slowFrom 线性降到 floor */
 export function fatigue(v: number): number {
   if (v >= STAMINA.slowFrom) return 1

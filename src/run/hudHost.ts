@@ -42,6 +42,8 @@ export interface SquadMember {
   hp: number
   max: number
   reviveSec: number
+  /** 正在拖慢全队 */
+  tired: boolean
 }
 
 /** 队长就是玩家附身的角色；members 按入队顺序 */

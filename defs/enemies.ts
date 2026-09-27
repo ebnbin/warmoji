@@ -104,6 +104,7 @@ const SNAKE = {
   damage: 5,
   xp: 4,
   coins: 3,
+  exertionMul: 0,
   drive: { kind: 'standoff', detectRange: 8, standoffDist: 5 },
   abilities: [
     {
@@ -336,6 +337,7 @@ const LOCUST = {
   damage: 4,
   xp: 2,
   coins: 1,
+  exertionMul: 0,
   drive: { kind: 'chase' },
   abilities: [
     {
@@ -758,7 +760,7 @@ const DESERT_BOSS = {
   role: 'boss',
   emoji: '1f982',
   name: '蝎王',
-  desc: '荒漠头目：遁入沙中不可选中地疾行，破土时掀飞周围的人；召出把人往中心卷的流沙漩涡；毒针叠满四层就麻痹；尾刺猛扑，击退免疫',
+  desc: '荒漠头目：走沙地不知疲倦；遁入沙中不可选中地疾行，破土时掀飞周围的人；召出把人往中心卷的流沙漩涡，越挣扎越累；毒针叠满四层就抽空体力；尾刺猛扑，击退免疫',
   size: 3.2,
   radius: 1.05,
   hp: 6000,
@@ -767,6 +769,7 @@ const DESERT_BOSS = {
   xp: 60,
   coins: 60,
   kbImmune: true,
+  exertionMul: 0,
   drive: { kind: 'chase', at: 'leader' },
   abilities: [
     {
@@ -787,7 +790,7 @@ const DESERT_BOSS = {
       damage: 8,
       shape: { kind: 'bolt', projectile: { emoji: '1f7e3', size: 0.42, radius: 0.15, speed: 3.2, rotationOffsetDeg: 0 }, lifeMs: 5000 },
       repeat: { count: 5, spreadDeg: 70 },
-      onHit: [{ kind: 'stack', max: 4, durationMs: 5000, then: [{ kind: 'stun', durationMs: 1500 }] }],
+      onHit: [{ kind: 'stack', max: 4, durationMs: 5000, then: [{ kind: 'exhaust' }] }],
     },
     {
       trigger: 'auto',
@@ -812,7 +815,7 @@ const DESERT_BOSS = {
       range: 12,
       fireSfx: 'boom',
       shape: { kind: 'disc', radius: 1, at: 'target' },
-      onHit: [{ kind: 'ground', def: { radius: 4.5, durationMs: 5000, tickMs: 500, damage: 4, color: 0xd7ccc8, fillAlpha: 0.25, lineAlpha: 0.6, enterMs: 400, pull: 1.6 } }],
+      onHit: [{ kind: 'ground', def: { radius: 4.5, durationMs: 5000, tickMs: 500, damage: 4, color: 0xd7ccc8, fillAlpha: 0.25, lineAlpha: 0.6, enterMs: 400, pull: 1.6, exertion: 0.05 } }],
     },
   ],
 } satisfies EnemyDef

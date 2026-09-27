@@ -129,9 +129,10 @@ export const MAPS = {
   desert: {
     emoji: '1f3dc',
     name: '荒漠',
-    desc: '烈日炙烤的一片荒漠，沙丘与枯骨之间处处潜伏着毒物',
+    desc: '烈日炙烤的荒漠，每走一步都在耗体力，累了就得停下喘口气；沙丘与枯骨之间潜伏着不知疲倦的毒物',
     kind: 'bounded',
     size: { w: 30, h: 30 },
+    exertion: 0.015,
     palette: {
       bgFrom: 'hsl(30 42% 36%)',
       bgTo: 'hsl(15 38% 20%)',
@@ -145,6 +146,7 @@ export const MAPS = {
       density: [0.08, 0.11],
     },
     mix: DESERT_MIX,
+    finalWaveSub: '蝎王不知疲倦，你会累——别在流沙里挣扎！',
     boss: 'scorpion',
   },
   river: {

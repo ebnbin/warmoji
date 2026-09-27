@@ -91,6 +91,8 @@ export function effectLine(e: Effect, self = false): string {
       return e.ratio === undefined ? `造成 ${e.amount} 点伤害` : `造成${e.amount ? ` ${e.amount} +` : ''} ${pct(e.ratio)} 基础伤害`
     case 'stun':
       return `眩晕 ${sec(e.durationMs)}`
+    case 'exhaust':
+      return '体力清空（累到减速，停下歇一会才回）'
     case 'hide':
       return `隐匿 ${sec(e.durationMs)}，敌人失去目标只会乱走`
     case 'taunt':
@@ -237,6 +239,7 @@ function zoneRuleLine(r: ZoneRules, effects: readonly Effect[] | undefined, dama
   if (r.who === 'all') parts.push('敌我都作用')
   if (r.pull) parts.push(`把场内敌人以每秒 ${grid(r.pull)} 拉向圆心`)
   if (r.traction !== undefined) parts.push(r.traction < 1 ? `地面打滑（抓地 ×${r.traction}）` : `地面抓地 ×${r.traction}`)
+  if (r.exertion) parts.push(`场内每走一格多耗 ${pct(r.exertion)} 体力（谁都算）`)
   if (r.mist) parts.push('场内同伴只会被同在场内的出手打到')
   if (r.dwell) parts.push(`连续待满 ${sec(r.dwell.ms)}：${joinFx(r.dwell.effects)}`)
   if (r.onExpire) parts.push(`到期时仍在场内：${joinFx(r.onExpire)}`)

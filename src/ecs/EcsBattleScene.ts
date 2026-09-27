@@ -25,7 +25,7 @@ import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
 import { Alive, Boss, Cd, Charges, Ctl, Enemy, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
 import { charSize } from './systems/shared/scale'
-import { squadStamina } from './systems/shared/stamina'
+import { dragging, squadStamina } from './systems/shared/stamina'
 import { STAMINA } from '../data/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
@@ -549,6 +549,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
           hp: Hp.v[m]!,
           max: Hp.max[m]!,
           reviveSec: Math.max(0, Math.ceil((Revive.at[m]! - sim.elapsedMs) / 1000)),
+          tired: dragging(sim, m),
         }
       }),
     }
