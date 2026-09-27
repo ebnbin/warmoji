@@ -239,7 +239,7 @@ export function fightGoals(sim: Sim): { readonly text: string; readonly warn: bo
         out.push({ text: `金币 ${Math.min(e.count, Math.max(0, sim.run.coins - f.base.coins))}/${e.count}`, warn: false })
         break
       case 'downs':
-        out.push({ text: `倒下 ${downsOf(sim.run) - f.base.downs}/${e.count} 次就输`, warn: true })
+        out.push({ text: e.count === 1 ? '有人倒下就输' : `倒下 ${downsOf(sim.run) - f.base.downs}/${e.count} 次就输`, warn: true })
         break
       case 'time':
         if (e.lose) out.push({ text: '时间到就输', warn: true })

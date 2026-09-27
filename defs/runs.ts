@@ -59,6 +59,400 @@ function classicSteps(): StepDef[] {
   })
 }
 
+/** 实验关：地图与队伍都预设好，开局就打；每一关试一种过关条件或规则组合 */
+const LABS = {
+  sweep: {
+    emoji: '1f9f9',
+    name: '歼灭战',
+    desc: '五批敌人一批接一批从不同方向压过来，清空全部就赢，不限时',
+    note: '清场当胜利条件：节奏跟着清怪的速度走，每批之间有喘息',
+    map: 'forest',
+    team: { slots: [{ tags: ['defense'] }, { tags: ['damage', 'area'] }, { tags: ['damage', 'ranged'] }], level: 2 },
+    start: { wave: 4, sec: 90 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '歼灭战',
+          intro: { title: '歼灭战', sub: '清空五批敌人' },
+          spawns: [
+            {
+              kind: 'waves',
+              atMs: 3000,
+              gapMs: 2500,
+              squads: [
+                { count: 10, at: { kind: 'point', dx: 0, dy: -9, spread: 2 }, banner: { title: '第一批', sub: '北面来敌' } },
+                { count: 14, at: { kind: 'point', dx: 9, dy: 0, spread: 2 }, banner: { title: '第二批', sub: '东面来敌' } },
+                { count: 18, elites: 2, at: { kind: 'point', dx: -9, dy: 0, spread: 2 }, banner: { title: '第三批', sub: '西面来敌，带着精英' } },
+                { count: 22, eliteChance: 0.15, at: { kind: 'ring', dist: 7 }, banner: { title: '第四批', sub: '四面合围' } },
+                { count: 30, elites: 4, spreadMs: 3000, at: { kind: 'point', dx: 0, dy: 9, spread: 3 }, banner: { title: '最后一批', sub: '南面的大部队' } },
+              ],
+            },
+          ],
+          ends: [{ kind: 'cleared' }],
+        },
+      },
+    ],
+  },
+  hunt: {
+    emoji: '23f1',
+    name: '猎杀令',
+    desc: '一分钟内击杀 150 只；二十秒后敌人变多，四十秒后开始有敌人从身后摸上来',
+    note: '击杀数当胜利条件、到点就输：逼着主动找怪打，躲着拖时间没用',
+    map: 'desert',
+    team: { slots: [{ tags: ['damage'] }, { tags: ['damage'] }, { tags: ['area'] }, { tags: ['mobile'] }], level: 2 },
+    start: { wave: 5, sec: 150 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '猎杀令',
+          intro: { title: '猎杀令', sub: '60 秒内击杀 150 只' },
+          spawns: [
+            { kind: 'stream', intervalMul: 0.7 },
+            { kind: 'stream', fromMs: 20_000, intervalMul: 1.2, eliteChance: 0.2 },
+            { kind: 'stream', fromMs: 40_000, intervalMul: 1.5, at: { kind: 'behind', dist: 5 } },
+          ],
+          ends: [
+            { kind: 'kills', count: 150 },
+            { kind: 'time', ms: 60_000, lose: true },
+          ],
+        },
+      },
+    ],
+  },
+  bounty: {
+    emoji: '1f4b0',
+    name: '悬赏',
+    desc: '五名悬赏目标混在敌群里，看见队伍就逃；九十秒内把它们全部击倒',
+    note: '指定目标当胜利条件：目标会逃，逼着队伍穿过敌群去追',
+    map: 'ruins',
+    team: { slots: ['detective', 'eagle', 'chipmunk'], level: 2 },
+    start: { wave: 4, sec: 100 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '悬赏',
+          intro: { title: '悬赏', sub: '击倒全部悬赏目标，它们会逃' },
+          spawns: [
+            { kind: 'stream', intervalMul: 1.3 },
+            {
+              kind: 'batch',
+              atMs: 3000,
+              squad: { count: 3, enemy: 'raccoon', elites: 3, hpMul: 2, drive: { kind: 'flee', range: 6 }, at: { kind: 'far' }, bounty: true },
+              banner: { title: '悬赏发布', sub: '三名怪盗带着赏金逃窜' },
+            },
+            {
+              kind: 'batch',
+              atMs: 30_000,
+              squad: { count: 2, enemy: 'knight', elites: 2, hpMul: 2, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true },
+              banner: { title: '追加悬赏', sub: '两名狼骑也上了榜' },
+            },
+          ],
+          ends: [{ kind: 'bounty' }, { kind: 'time', ms: 90_000, lose: true }],
+        },
+      },
+    ],
+  },
+  hill: {
+    emoji: '1f6a9',
+    name: '据点轮转',
+    desc: '队长在据点圈里站满 12 秒，据点就换到下一处，一共三处；敌人全都冲着队长来',
+    note: '站位当胜利条件：放风筝行不通，要在圈里顶住',
+    map: 'forest',
+    team: { slots: ['guard', 'panda', { tags: ['support'] }, { tags: ['area'] }], level: 2 },
+    start: { wave: 5, sec: 120 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '据点轮转',
+          intro: { title: '据点轮转', sub: '队长站进圈里，站满就换下一处' },
+          chaseLeader: true,
+          spawns: [
+            { kind: 'stream', intervalMul: 0.9 },
+            { kind: 'batch', atMs: 25_000, squad: { count: 12, eliteChance: 0.2, at: { kind: 'ring', dist: 6 } }, banner: { title: '反扑', sub: '敌人围住了队长' } },
+            { kind: 'batch', atMs: 50_000, squad: { count: 16, elites: 2, at: { kind: 'ring', dist: 6 } }, banner: { title: '再次反扑', sub: '精英带队' } },
+          ],
+          ends: [
+            { kind: 'hold', ms: 36_000, radius: 2.5, points: [{ dx: -6, dy: -5 }, { dx: 6, dy: -2 }, { dx: -2, dy: 7 }] },
+            { kind: 'time', ms: 120_000, lose: true },
+          ],
+        },
+      },
+    ],
+  },
+  dash: {
+    emoji: '1f3c3',
+    name: '突围',
+    desc: '依次踩过废墟里的五个信标，每个站一秒；敌人源源不断地扑向队长，限时 75 秒',
+    note: '把据点缩成一秒的信标：从守点变成跑图，考验穿插与走位',
+    map: 'ruins',
+    team: { slots: ['unicorn', 'kangaroo', 'frog'], level: 2 },
+    start: { wave: 6, sec: 180 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '突围',
+          intro: { title: '突围', sub: '依次踩过五个信标' },
+          chaseLeader: true,
+          spawns: [{ kind: 'stream', intervalMul: 0.6, cap: 120 }],
+          ends: [
+            { kind: 'hold', ms: 5000, radius: 1.6, points: [{ dx: -10, dy: -10 }, { dx: 10, dy: -10 }, { dx: 10, dy: 10 }, { dx: -10, dy: 10 }, { dx: 0, dy: 0 }] },
+            { kind: 'time', ms: 75_000, lose: true },
+          ],
+        },
+      },
+    ],
+  },
+  gold: {
+    emoji: '1fa99',
+    name: '淘金热',
+    desc: '75 秒内捡到 120 金币；偷币鼠会抢走地上的钱，打死它才吐出来',
+    note: '金币当胜利条件：拾取和抢钱的敌人成了主角，打怪只是手段',
+    map: 'void',
+    team: { slots: [{ tags: ['damage', 'area'] }, { tags: ['mobile'] }, { tags: ['ranged'] }], level: 2 },
+    start: { wave: 3, sec: 60 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '淘金热',
+          intro: { title: '淘金热', sub: '75 秒内捡到 120 金币' },
+          mix: [
+            { kind: 'zombie', weight: 3 },
+            { kind: 'slime', weight: 2 },
+            { kind: 'raccoon', weight: 2 },
+            { kind: 'rat', weight: 3 },
+          ],
+          spawns: [
+            { kind: 'stream', intervalMul: 0.8 },
+            { kind: 'stream', fromMs: 30_000, untilMs: 50_000, intervalMul: 0.5 },
+            { kind: 'batch', atMs: 30_000, squad: { count: 8, enemy: 'rat', at: { kind: 'far' } }, banner: { title: '淘金高峰', sub: '一群偷币鼠来抢钱了' } },
+          ],
+          ends: [
+            { kind: 'coins', count: 120 },
+            { kind: 'time', ms: 75_000, lose: true },
+          ],
+        },
+      },
+    ],
+  },
+  iron: {
+    emoji: '1f6e1',
+    name: '铁人',
+    desc: '撑过 60 秒，但只要有一名队员倒下就算输；敌人伤害提高三成，陨石照常横扫',
+    note: '倒下即负：从「打得快」变成「不失误」，护住脆皮比输出更要紧',
+    map: 'space',
+    team: { slots: [{ tags: ['defense'] }, { tags: ['support'] }, { tags: ['damage', 'ranged'] }], level: 2 },
+    start: { wave: 6, sec: 150 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '铁人',
+          intro: { title: '铁人', sub: '撑过 60 秒，谁都不许倒下' },
+          mods: { enemy: { mul: { damage: 1.3 } } },
+          spawns: [{ kind: 'stream' }, { kind: 'carriers', buff: 2, debuff: 2, atMs: 5000, spanMs: 40_000 }],
+          ends: [
+            { kind: 'time', ms: 60_000 },
+            { kind: 'downs', count: 1 },
+          ],
+        },
+      },
+    ],
+  },
+  ambush: {
+    emoji: '1f440',
+    name: '伏击',
+    desc: '没有常规刷怪，敌人一阵阵直接冒在队伍四周和身后；清空最后一阵就赢',
+    note: '刷怪位置当变量：敌人不再从远处走来，考验被包围时的反应',
+    map: 'daynight',
+    team: { slots: [{ tags: ['area'] }, { tags: ['control'] }, { tags: ['defense'] }], level: 2 },
+    start: { wave: 4, sec: 90 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '伏击',
+          intro: { title: '伏击', sub: '当心四周和身后' },
+          spawns: [
+            { kind: 'batch', atMs: 3000, squad: { count: 8, at: { kind: 'ring', dist: 4 } }, banner: { title: '包围', sub: '敌人从四面冒出来' } },
+            { kind: 'batch', atMs: 11_000, squad: { count: 6, eliteChance: 0.3, at: { kind: 'behind', dist: 3 } }, banner: { title: '背后！', sub: '有东西摸到了身后' } },
+            { kind: 'batch', atMs: 19_000, squad: { count: 12, elites: 1, at: { kind: 'ring', dist: 5 } }, banner: { title: '再次包围', sub: '圈子更大了' } },
+            { kind: 'batch', atMs: 27_000, squad: { count: 8, elites: 2, at: { kind: 'behind', dist: 3 } }, banner: { title: '背后！', sub: '精英摸上来了' } },
+            { kind: 'batch', atMs: 35_000, squad: { count: 20, eliteChance: 0.2, spreadMs: 1500, at: { kind: 'ring', dist: 6 } }, banner: { title: '最后的合围', sub: '清掉它们' } },
+          ],
+          ends: [{ kind: 'cleared' }],
+        },
+      },
+    ],
+  },
+  gauntlet: {
+    emoji: '1f451',
+    name: '头目连战',
+    desc: '连打三名别处的头目，只有六成血量；每场之前进一次商店，没有招募',
+    note: '一局的步骤不止「招募 → 商店 → 刷怪」：这里只有商店与头目战交替',
+    map: 'forest',
+    team: { slots: ['bear', 'mage', 'medic', 'cowboy'], level: 3 },
+    coins: 150,
+    start: { wave: 10, sec: 300 },
+    steps: [
+      { kind: 'shop' },
+      {
+        kind: 'fight',
+        fight: {
+          name: '第一战 · 暴龙',
+          spawns: [
+            { kind: 'stream', intervalMul: 3 },
+            { kind: 'batch', atMs: 800, squad: { count: 1, enemy: 'rhino', hpMul: 0.6 }, banner: { title: '暴龙出现', sub: '击败它！' } },
+          ],
+          ends: [{ kind: 'boss' }],
+        },
+      },
+      { kind: 'shop' },
+      {
+        kind: 'fight',
+        fight: {
+          name: '第二战 · 蝎王',
+          spawns: [
+            { kind: 'stream', intervalMul: 3 },
+            { kind: 'batch', atMs: 800, squad: { count: 1, enemy: 'scorpion', hpMul: 0.6 }, banner: { title: '蝎王出现', sub: '击败它！' } },
+          ],
+          ends: [{ kind: 'boss' }],
+        },
+      },
+      { kind: 'shop' },
+      {
+        kind: 'fight',
+        fight: {
+          name: '终战 · 夜伯爵',
+          spawns: [
+            { kind: 'stream', intervalMul: 3 },
+            { kind: 'batch', atMs: 800, squad: { count: 1, enemy: 'eclipse', hpMul: 0.6 }, banner: { title: '夜伯爵出现', sub: '最后一战！' } },
+          ],
+          ends: [{ kind: 'boss' }],
+        },
+      },
+    ],
+  },
+  attrition: {
+    emoji: '26b0',
+    name: '车轮战',
+    desc: '六轮敌人轮番上阵；这一局倒下的队员不会自己起来，只有军医的急救包能救',
+    note: '不再自动复活：每次倒下都是这一场的永久减员，治疗和站位的分量变重',
+    map: 'ice',
+    team: { slots: ['medic', 'guard', 'jellyfish', 'fencer'], level: 2 },
+    start: { wave: 5, sec: 120 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '车轮战',
+          intro: { title: '车轮战', sub: '倒下就起不来了' },
+          noRevive: true,
+          spawns: [
+            {
+              kind: 'waves',
+              atMs: 3000,
+              gapMs: 3000,
+              squads: [
+                { count: 10, banner: { title: '第一轮', sub: '热身' } },
+                { count: 14, elites: 1, banner: { title: '第二轮', sub: '来了个精英' } },
+                { count: 18, eliteChance: 0.1, banner: { title: '第三轮', sub: '越来越多' } },
+                { count: 12, elites: 4, banner: { title: '第四轮', sub: '精英小队' } },
+                { count: 26, eliteChance: 0.15, spreadMs: 2500, banner: { title: '第五轮', sub: '大部队' } },
+                { count: 1, enemy: 'swan', hpMul: 0.5, banner: { title: '最后一轮', sub: '霜鸦亲自上阵' } },
+              ],
+            },
+          ],
+          ends: [{ kind: 'cleared' }],
+        },
+      },
+    ],
+  },
+  triathlon: {
+    emoji: '1f3c5',
+    name: '三关连闯',
+    desc: '两人出发，连过猎杀、据点、头目三关；关与关之间招一名新队员、逛一次商店',
+    note: '同一局里每一场的过关条件都不同，招募和商店插在任意两场之间',
+    map: 'desert',
+    team: { slots: [{ tags: ['damage', 'ranged'] }, { tags: ['defense'] }], level: 1 },
+    coins: 40,
+    start: { wave: 3, sec: 60 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '第一关 · 猎杀',
+          intro: { title: '第一关 · 猎杀', sub: '45 秒内击杀 40 只' },
+          spawns: [{ kind: 'stream', intervalMul: 0.8 }],
+          ends: [
+            { kind: 'kills', count: 40 },
+            { kind: 'time', ms: 45_000, lose: true },
+          ],
+        },
+      },
+      { kind: 'recruit', upTo: 3 },
+      { kind: 'shop' },
+      {
+        kind: 'fight',
+        fight: {
+          name: '第二关 · 据点',
+          intro: { title: '第二关 · 据点', sub: '队长在圈里站满 15 秒' },
+          chaseLeader: true,
+          spawns: [{ kind: 'stream' }],
+          ends: [
+            { kind: 'hold', ms: 15_000, radius: 2.5, points: [{ dx: 6, dy: -6 }] },
+            { kind: 'time', ms: 60_000, lose: true },
+          ],
+        },
+      },
+      { kind: 'recruit', upTo: 4 },
+      { kind: 'shop' },
+      {
+        kind: 'fight',
+        fight: {
+          name: '第三关 · 头目',
+          spawns: [{ kind: 'stream', intervalMul: 2 }, { kind: 'boss', atMs: EVENT_MS }],
+          ends: [{ kind: 'boss' }, { kind: 'time', ms: 90_000 }],
+        },
+      },
+    ],
+  },
+  elite: {
+    emoji: '1f479',
+    name: '精英狩猎',
+    desc: '场上最多十二只敌人，但只只都是精英；两分钟内击杀 30 只',
+    note: '换掉配比、全员精英、固定刷怪间隔，再给队伍加伤：数量少质量高的节奏',
+    map: 'ruins',
+    team: { slots: [{ tags: ['damage'] }, { tags: ['damage'] }, { tags: ['support'] }], level: 3 },
+    start: { wave: 8, sec: 200 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '精英狩猎',
+          intro: { title: '精英狩猎', sub: '只只都是精英，击杀 30 只' },
+          mix: [
+            { kind: 'knight', weight: 2 },
+            { kind: 'skeleton', weight: 2 },
+            { kind: 'gargoyle', weight: 1 },
+          ],
+          mods: { team: { mul: { damage: 1.25 } } },
+          spawns: [{ kind: 'stream', intervalMs: 1500, eliteChance: 1, cap: 12 }],
+          ends: [
+            { kind: 'kills', count: 30 },
+            { kind: 'time', ms: 120_000, lose: true },
+          ],
+        },
+      },
+    ],
+  },
+} as const satisfies Record<string, RunDef>
+
 export const RUNS = {
   classic: {
     emoji: '2694',
@@ -75,4 +469,5 @@ export const RUNS = {
     coins: 999_999,
     steps: [{ kind: 'fight', fight: { spawns: [{ kind: 'knobs' }], ends: [] } }],
   },
+  ...LABS,
 } as const satisfies Record<string, RunDef>

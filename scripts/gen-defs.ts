@@ -23,6 +23,7 @@ import { STATS } from '../defs/stats.ts'
 import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
+import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { ItemDef } from '../src/types/items'
@@ -149,7 +150,7 @@ const checkTeam = (t: TeamDef, path: string): void => {
   const fixed = t.slots.filter((s) => typeof s === 'string')
   const taken = new Set<string>(fixed)
   need(taken.size === fixed.length, `${path} 的指定角色不能重复`)
-  need((t.level ?? 1) >= 1, `${path} 的等级下限至少为 1`)
+  need((t.level ?? 1) >= 1 && (t.level ?? 1) <= MAX_CHAR_LEVEL, `${path} 的等级下限须在 1 到 ${MAX_CHAR_LEVEL} 之间`)
   const picks = t.slots.length - fixed.length
   for (const s of t.slots) {
     if (typeof s === 'string') {
