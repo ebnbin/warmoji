@@ -94,7 +94,7 @@ export class KeyValueList extends Widget {
         zebra.fillStyle(SURFACE.raisedHi, 0.7)
         zebra.fillRoundedRect(cx, cy - ROW_H / 2, colW, ROW_H, SHAPE.radius.sm)
       }
-      const value = new Label(scene, cx + colW - 14, cy, r.value, { kind: 'body', bold: true, color: r.highlight ? 'warn' : 'ink' }).setOrigin(1, 0.5)
+      const value = new Label(scene, cx + colW - 14, cy, r.value, { kind: 'body', bold: true, color: r.highlight ? 'accent' : 'ink' }).setOrigin(1, 0.5)
       this.add([new Label(scene, cx + 14, cy, r.key, { kind: 'body', color: 'soft' }).setOrigin(0, 0.5), value])
       if (r.note) this.add(new Label(scene, value.x - value.width - 12, cy, r.note, { kind: 'caption', color: 'faint' }).setOrigin(1, 0.5))
     })
