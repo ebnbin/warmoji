@@ -1,27 +1,9 @@
-import { defineDevChoice } from '../../../devtools'
+import { numChoices } from './devNumbers'
 import { SQUAD } from '../../../data/feel'
 import { TEAM } from '../../../data/characters'
 import { MAPS } from '../../../data/maps'
 
-function numChoice(
-  id: string,
-  label: string,
-  desc: string,
-  values: readonly number[],
-  fallback: number,
-  fmt: (v: number) => string,
-): () => number {
-  const all = values.includes(fallback) ? values : [...values, fallback].sort((a, b) => a - b)
-  const get = defineDevChoice({
-    id,
-    group: '队伍',
-    label,
-    desc,
-    options: all.map((v) => ({ id: String(v), label: fmt(v) })),
-    default: String(fallback),
-  })
-  return () => Number(get())
-}
+const numChoice = numChoices('队伍')
 
 export const leaderGrip = numChoice('team.grip', '队长抓地', '推力与阻力同乘：极速不变，响应更快', [4, 8, 16], TEAM.leaderGrip, (v) => `×${v}`)
 export const reverseGain = numChoice('team.reverseGain', '回头倍率', '速度背离目标位时的驱动力倍数', [1, 2, 3], SQUAD.reverseGain, (v) => `×${v}`)

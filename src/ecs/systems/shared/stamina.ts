@@ -1,6 +1,13 @@
 import { STAMINA } from '../../../data/stamina'
 import { Alive, Stamina, Stats } from '../../components'
+import { numChoices } from './devNumbers'
 import type { Sim } from '../../sim'
+
+const numChoice = numChoices('体力')
+
+export const exertionScale = numChoice('stamina.exertion', '费力倍率', '所有地面每格扣的体力同乘，0 是关掉体力', [0, 0.5, 1, 1.5, 2], 1, (v) => `×${v}`)
+export const draftShare = numChoice('stamina.draft', '队员跟跑', '队员只扣队长那份的多少', [0.4, 0.6, 0.8, 1], STAMINA.draft, (v) => `${Math.round(v * 100)}%`)
+export const regenScale = numChoice('stamina.regen', '回复倍率', '所有身体的体力回复同乘', [0.5, 1, 1.5, 2], 1, (v) => `×${v}`)
 
 /** 剩下的体力占体力上限的比例 */
 export function staminaLeft(eid: number): number {

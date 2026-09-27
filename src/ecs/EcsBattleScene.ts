@@ -24,10 +24,10 @@ import { MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Tint, Transform, VisOff } from './components'
+import { Alive, Boss, Cd, Charges, Ctl, Enemy, ENEMY_SET, FACTION, Faction, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Tint, Transform, VisOff } from './components'
 import { charSize } from './systems/shared/scale'
 import { dragging, staminaLeft } from './systems/shared/stamina'
-import { staminaTier } from '../data/stamina'
+import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import { newEntity } from './entities/entity'
 import { attachDrawable } from './entities/drawable'
@@ -142,6 +142,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private shownHp: number[] = []
   /** 每名队员头上的 💦：拖慢全队时才显出来 */
   private sweats: number[] = []
+  /** 累到减速的敌人头上的 💦，按需从这里取 */
+  private foeSweats: number[] = []
   private hitShakeOn = false
   private seenHitCount = 0
   private shownLeader = -1
@@ -183,6 +185,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.hpBars = []
     this.shownHp = []
     this.sweats = []
+    this.foeSweats = []
     this.seenHitCount = 0
     this.shownLeader = -1
     this.skillAim = null
@@ -355,9 +358,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     for (let i = 0; i < this.sim.characters.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
-      const sweat = newEntity(this.world)
-      attachDrawable(this.world, sweat, atlas, { id: '1f4a6', outline: 'player', x: 0, y: 0, size: 0.42 * UNIT, alpha: 0, z: 29 })
-      this.sweats.push(sweat)
+      this.sweats.push(this.newSweat())
     }
     startFight(this.sim)
     this.waveBaseKills = run.kills
@@ -394,16 +395,41 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     }
   }
 
-  /** 拖慢全队的队员头上冒 💦，上下跳着 */
+  /** 一滴 💦：先藏着，要用时再摆到头上 */
+  private newSweat(): number {
+    const e = newEntity(this.world)
+    attachDrawable(this.world, e, this.atlas!, { id: '1f4a6', outline: 'player', x: 0, y: 0, size: 0.42 * UNIT, alpha: 0, z: 29 })
+    return e
+  }
+
+  /** 把 💦 摆在身体右上方，上下跳着 */
+  private placeSweat(sim: Sim, e: number, body: number, size: number): void {
+    Transform.x[e] = Transform.x[body]! + VisOff.x[body]! + size * 0.34
+    Transform.y[e] = Transform.y[body]! + VisOff.y[body]! - size * 0.42 - Math.abs(Math.sin(sim.fxMs / 160)) * 4
+  }
+
+  /** 拖慢全队的队员头上冒 💦 */
   private updateSweat(sim: Sim, i: number, m: number): void {
     const e = this.sweats[i]
     if (e === undefined) return
     const on = dragging(sim, m)
     Tint.alpha[e] = on ? 1 : 0
-    if (!on) return
-    const size = charSize(m)
-    Transform.x[e] = Transform.x[m]! + VisOff.x[m]! + size * 0.34
-    Transform.y[e] = Transform.y[m]! + VisOff.y[m]! - size * 0.42 - Math.abs(Math.sin(sim.fxMs / 160)) * 4
+    if (on) this.placeSweat(sim, e, m, charSize(m))
+  }
+
+  /** 累到减速的敌人头上也冒 💦，这是反打的时机；看不清的敌人汗也跟着淡 */
+  private updateFoeSweats(): void {
+    const sim = this.sim!
+    let used = 0
+    for (const eid of query(this.world, ENEMY_SET)) {
+      if (!Alive.v[eid] || staminaLeft(eid) >= STAMINA.slowFrom) continue
+      const e = this.foeSweats[used] ?? this.newSweat()
+      if (used === this.foeSweats.length) this.foeSweats.push(e)
+      used++
+      Tint.alpha[e] = Tint.alpha[eid]!
+      this.placeSweat(sim, e, eid, Transform.h[eid]!)
+    }
+    for (let i = used; i < this.foeSweats.length; i++) Tint.alpha[this.foeSweats[i]!] = 0
   }
 
   /** 队员的血条与资源条；队长再多一条体力条，满了收起 */
@@ -540,6 +566,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
         hp: Hp.v[m]!,
         max: Hp.max[m]!,
         reviveSec: reviveSec(sim, m),
+        stamina: staminaLeft(m),
         tired: dragging(sim, m),
         now: statsOf(m),
         lasting: lastingStats(m),
@@ -782,6 +809,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       if (this.hitShakeOn) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     }
     this.updateHpBars()
+    this.updateFoeSweats()
     this.drawDevTargets(sim)
     this.drawSkillAim(sim)
     this.drawGoalPointer(sim)
