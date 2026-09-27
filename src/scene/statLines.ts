@@ -392,31 +392,34 @@ export function abilityStatLines(w: AbilityDef): string[] {
 /** 属性面板开头两行固定显示的属性，其余与默认值不同的排在后面 */
 const FIXED_LINES: readonly StatKey[] = ['maxHp', 'iframes', 'moveSpeed', 'revive']
 
+/** base 为假时不列基础属性（另有属性表的地方），资源单独成组 */
 export function characterStatGroups(
   id: CharacterId,
   items: readonly ItemId[] = [],
   level = 1,
-  opts: { path?: boolean; growth?: GrowthProgress } = {},
+  opts: { path?: boolean; growth?: GrowthProgress; base?: boolean } = {},
 ): StatGroup[] {
   const def = CHARACTERS[id]
   const stats = memberStats(def, gearMods(items, levelStatsFor(id, level), opts.growth))
   const tiers = tiersForLevel(level)
   const loadout = loadoutFor(def, tiers)
-  const baseLines = [
-    `${statText('maxHp', stats.maxHp)} · ${statText('iframes', stats.iframes)}`,
-    `${statText('moveSpeed', stats.moveSpeed)} · 质量 ${def.body.mass} · ${statText('revive', stats.revive)}`,
-  ]
-  const rest = STAT_KEYS.filter((k) => !FIXED_LINES.includes(k) && stats[k] !== STATS[k].base).map((k) => statText(k, stats[k]))
-  if (rest.length > 0) baseLines.push(rest.join(' · '))
-  if (def.resource) baseLines.push(resourceLine(def.resource))
-  const groups: StatGroup[] = [
-    { icon: '2764', title: `基础 · ${ROLES[def.role].name}`, lines: baseLines },
-    {
-      icon: def.skill.icon,
-      title: `主动技能 · ${def.skill.name}（${abilityLabel(def.skill.ability)}）`,
-      lines: [def.skill.desc, `冷却 ${sec(def.skill.cdMs * stats.skillCooldown)} · 只有队长能放，当队员时冷却照走`, ...abilityStatLines(def.skill.ability)],
-    },
-  ]
+  const groups: StatGroup[] = []
+  if (opts.base !== false) {
+    const baseLines = [
+      `${statText('maxHp', stats.maxHp)} · ${statText('iframes', stats.iframes)}`,
+      `${statText('moveSpeed', stats.moveSpeed)} · 质量 ${def.body.mass} · ${statText('revive', stats.revive)}`,
+    ]
+    const rest = STAT_KEYS.filter((k) => !FIXED_LINES.includes(k) && stats[k] !== STATS[k].base).map((k) => statText(k, stats[k]))
+    if (rest.length > 0) baseLines.push(rest.join(' · '))
+    if (def.resource) baseLines.push(resourceLine(def.resource))
+    groups.push({ icon: '2764', title: `基础 · ${ROLES[def.role].name}`, lines: baseLines })
+  }
+  groups.push({
+    icon: def.skill.icon,
+    title: `主动技能 · ${def.skill.name}（${abilityLabel(def.skill.ability)}）`,
+    lines: [def.skill.desc, `冷却 ${sec(def.skill.cdMs * stats.skillCooldown)} · 只有队长能放，当队员时冷却照走`, ...abilityStatLines(def.skill.ability)],
+  })
+  if (opts.base === false && def.resource) groups.push({ icon: '26a1', title: `资源 · ${RES_LABEL[def.resource.kind]}`, lines: [resourceLine(def.resource)] })
   if (opts.path !== false) {
     groups.push({
       icon: '2b50',
@@ -424,7 +427,8 @@ export function characterStatGroups(
       lines: upgradeCardsFor(def).map((card, i) => {
         const atLevel = i + 2
         const reached = level >= atLevel
-        return `Lv${atLevel}「${card.name}」${card.desc}${reached ? ' ✓已获得' : `（Lv${atLevel} 解锁）`}`
+        const bonus = levelStatsFor(id, atLevel).flatMap(modTexts).join('、')
+        return `Lv${atLevel}「${card.name}」${card.desc}${bonus ? `；属性加成 ${bonus}` : ''}${reached ? ' ✓已获得' : `（Lv${atLevel} 解锁）`}`
       }),
     })
   }

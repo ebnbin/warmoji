@@ -79,7 +79,7 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     new PageHeader(this, f, {
       title: isInitialWave(this.run) ? '组建队伍' : '队伍整编',
       sub: this.due > 1 ? `本波招募 ${this.due} 名，点满空位后出发` : '招募一名新队员',
-      ...runExit(this, this.run),
+      ...runExit(this, this.run, () => ({ from: SceneKey.Recruit })),
     })
 
     const D = f.detail

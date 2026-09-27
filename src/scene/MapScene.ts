@@ -5,23 +5,13 @@ import { bossFor, MAP_IDS, MAPS } from '../data/maps'
 import { beginSandboxRun } from '../ecs/sandbox/knobs'
 import { beginRun, teamStep } from '../run/state'
 import { nextAfterTeam } from './teamPage'
+import { mapPlayLines } from './mapLines'
 import { loadMap, saveMap } from '../save/selection'
 import { preloadEmojis } from '../emoji/hold'
 import { beginPage, Button, EmojiGrid, Flow, Label, PageHeader, pageFrame, Panel, RichLabel, ScrollView, Switch } from '../ui'
 import type { PageFrame } from '../ui'
 import { VIEWPORT_CHANGED } from '../util/apply'
-import { STAMINA } from '../data/stamina'
 import { SceneKey } from './keys'
-
-const MAP_PLAY_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> = {
-  bounded: '有界竞技场：方形场地，边界围合',
-  river: '奔流河道：万物随水流漂移，逆流而战',
-  void: '环面战场：四壁皆传送门，出这头即现那头',
-  ruins: '断壁废墟：墙挡人 / 挡弹 / 挡视线，靠掩体与探头作战',
-  daynight: '昼夜原野：30×30 有界，视野随时间涨落——正午纵览全场、午夜相机收窄并四合迷雾；昼夜各出一批怪',
-  space: '深空星海：圆形禁锢场，越往外阻力越大、谁也逃不出；天体不时沿直线横扫（敌我通吃、有预警可躲）',
-  ice: '浮冰：25×25 方形浮冰，全场打滑——不跟手、刹不住、会过冲，击退也滑得更远；滑出冰面即落水，每秒掉血又游得慢（敌我通吃），把敌人推下水淹死是活路。相机永远跟随',
-}
 
 const GROUP_ICONS = { theme: '1f5fa', decor: '1f33f', play: '1f579' } as const
 
@@ -104,12 +94,8 @@ export class MapScene extends Phaser.Scene {
     flow.put(new RichLabel(this, 24, 42, `{${def.emoji}} ${def.name}`, { kind: 'lead', iconSize: 76, gap: 14, originX: 0, maxWidth: width }), 90)
     flow.heading('主题', GROUP_ICONS.theme).text(def.desc).gap(10)
     flow.heading('地面装饰', GROUP_ICONS.decor).icons(def.decor.emojis, { outline: 'player' }).gap(4)
-    flow.heading('玩法', GROUP_ICONS.play).text(MAP_PLAY_LABEL[def.kind])
-    if (def.exertion) {
-      flow.text(
-        `地面费力：赶路每走一格耗 ${+(def.exertion * 100).toFixed(1)}% 体力，体力低于 ${Math.round(STAMINA.slowFrom * 100)}% 开始变慢、见底只剩 ${Math.round(STAMINA.floor * 100)}% 速度；站定片刻开始回，歇得越久回得越快。全队按最累的人走，敌人也会累`,
-      )
-    }
+    flow.heading('玩法', GROUP_ICONS.play)
+    for (const line of mapPlayLines(def)) flow.text(line)
     flow.text(`终波头目 ${bossFor(this.selectedId).name}`, { color: 'muted' })
     flow.finish()
   }

@@ -16,12 +16,8 @@ import { beginPage, Button, Label, pageFrame, RichLabel, Table, TONE } from '../
 import type { PageFrame, Rect, TableCell, TableRow } from '../ui'
 import { VIEWPORT_CHANGED } from '../util/apply'
 import { stackCount } from '../run/draft'
+import { formatBig } from '../util/format'
 import { SceneKey } from './keys'
-
-/** 伤害、承伤一类的大数缩写 */
-function fmt(v: number): string {
-  return v >= 10000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`
-}
 
 const NONE: TableCell = { text: '—', color: 'faint' }
 
@@ -152,8 +148,8 @@ export class ResultScene extends Phaser.Scene {
         outline: 'player',
         name: CHARACTERS[id].name,
         cells: [
-          fmt(st.damage[slot] ?? 0),
-          taken > 0 ? { text: fmt(taken), color: 'warn' } : NONE,
+          formatBig(st.damage[slot] ?? 0),
+          taken > 0 ? { text: formatBig(taken), color: 'warn' } : NONE,
           `${st.kills[slot] ?? 0}`,
           deaths > 0 ? { text: `${deaths}`, color: 'bad' } : NONE,
           items,
@@ -179,7 +175,7 @@ export class ResultScene extends Phaser.Scene {
     const kinds = [...new Set([...keysOf(st.enemyKills), ...keysOf(st.enemyDamage)])].sort(
       (a, b) => (st.enemyKills[b] ?? 0) - (st.enemyKills[a] ?? 0),
     )
-    const dmgCell = (dmg: number): TableCell => (dmg > 0 ? { text: fmt(dmg), color: 'warn' } : NONE)
+    const dmgCell = (dmg: number): TableCell => (dmg > 0 ? { text: formatBig(dmg), color: 'warn' } : NONE)
     const rows: TableRow[] = [
       ...kinds.map((k): TableRow => {
         const e = ENEMIES[k]

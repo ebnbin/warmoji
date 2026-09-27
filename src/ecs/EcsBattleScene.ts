@@ -2,7 +2,6 @@ import Phaser from 'phaser'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { UNIT } from '../util/units'
 import { CHARACTERS, memberBase } from '../data/characters'
-import { ROLES } from '../data/roles'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
 import { burstEmitter } from '../ui/fx'
@@ -504,6 +503,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       bossMaxHp: bossFor(this.run.mapId).hp,
       battleFx: (sim ? activeMods(sim) : []).map((e) => ({
         emoji: modDef[e]!.emoji,
+        name: modDef[e]!.name,
+        desc: modDef[e]!.desc,
         polarity: modDef[e]!.polarity,
         remainMs: Math.max(0, Lifetime.until[e]! - elapsed),
         totalMs: Modifier.totalMs[e]!,
@@ -565,14 +566,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       const def = CHARACTERS[this.run.roster[slot]!]
       return {
         emoji: bodyLook[m] ?? def.emoji,
-        name: def.name,
-        role: ROLES[def.role].name,
         level: memberGear(this.run, slot, sim.sandbox).level,
         leader: m === sim.leader,
         alive: Alive.v[m] === 1,
         hp: Hp.v[m]!,
         max: Hp.max[m]!,
         reviveSec: Math.max(0, Math.ceil((Revive.at[m]! - sim.elapsedMs) / 1000)),
+        tired: dragging(sim, m),
         now: statsOf(m),
         lasting: lastingStats(m),
       }

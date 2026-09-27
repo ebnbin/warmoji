@@ -1,11 +1,21 @@
 import statsJson from '../assets/stats.json'
 import { fromJson } from './json'
 import { keysOf } from '../util/record'
-import type { StatBase, StatDef, StatKey, StatMods, StatUnit, StatValues } from '../types/stats'
+import { PICKUPS } from './pickups'
+import type { StatBase, StatCategory, StatDef, StatKey, StatMods, StatUnit, StatValues } from '../types/stats'
 
 export const STATS = fromJson<Record<StatKey, StatDef>>(statsJson)
 
 export const STAT_KEYS: readonly StatKey[] = keysOf(STATS)
+
+/** 属性分类的名字与图标，按这个顺序排 */
+export const STAT_CATEGORIES: Readonly<Record<StatCategory, { readonly name: string; readonly icon: string }>> = {
+  survival: { name: '生存', icon: '2764' },
+  offense: { name: '输出', icon: '2694' },
+  mobility: { name: '行动', icon: '1f45f' },
+  economy: { name: '经济', icon: PICKUPS.coin.emoji },
+  field: { name: '全场', icon: '1f310' },
+}
 
 const INDEX = Object.fromEntries(STAT_KEYS.map((k, i) => [k, i])) as Record<StatKey, number>
 

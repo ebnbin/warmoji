@@ -5,6 +5,9 @@ export type StatKey = keyof typeof statsJson
 /** 属性值的单位，决定怎么显示：count 整数、ratio 倍率、rate 冷却倍率（按攻速的倒数显示）、chance 概率、percent 百分比、ms 毫秒、perSec 每秒、grid 格、gridPerSec 格每秒 */
 export type StatUnit = 'count' | 'ratio' | 'rate' | 'chance' | 'percent' | 'ms' | 'perSec' | 'grid' | 'gridPerSec'
 
+/** 属性表里的分类：生存、输出、行动、经济、全场规则 */
+export type StatCategory = 'survival' | 'offense' | 'mobility' | 'economy' | 'field'
+
 export interface StatDef {
   readonly name: string
   /** 身体没写基础值时取它 */
@@ -12,6 +15,7 @@ export interface StatDef {
   readonly min?: number
   readonly max?: number
   readonly unit: StatUnit
+  readonly category: StatCategory
 }
 
 export type StatValues = Record<StatKey, number>

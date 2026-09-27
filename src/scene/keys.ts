@@ -11,4 +11,5 @@ export enum SceneKey {
   Ui = 'ui',
   DevTools = 'devtools',
   Result = 'result',
+  Pause = 'pause',
 }

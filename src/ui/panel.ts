@@ -100,9 +100,11 @@ export interface ScrimOptions {
   readonly alpha?: number
   /** 点遮罩的回调；不给就只拦截输入 */
   readonly onTap?: () => void
+  /** 为假时只压暗不拦输入：下层场景已经停住，遮罩上的滚动区照常拖动 */
+  readonly block?: boolean
 }
 
-/** 全屏压暗并拦住下层输入 */
+/** 全屏压暗，默认拦住下层输入 */
 export class Scrim extends Widget {
   constructor(scene: Phaser.Scene, opts: ScrimOptions) {
     super(scene, viewport.logicalWidth / 2, viewport.logicalHeight / 2)
@@ -110,6 +112,7 @@ export class Scrim extends Widget {
     const rect = scene.add.rectangle(0, 0, size, size, SURFACE.outline, opts.alpha ?? SCRIM_ALPHA)
     this.add(rect)
     this.setDepth(opts.depth)
+    if (opts.block === false) return
     const onTap = opts.onTap
     pressable(this, {
       shape: new Phaser.Geom.Rectangle(-size / 2, -size / 2, size, size),

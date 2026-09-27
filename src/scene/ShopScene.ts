@@ -1,12 +1,12 @@
 import Phaser from 'phaser'
-import { CHARACTERS, memberStats, upgradeCardsFor } from '../data/characters'
+import { CHARACTERS, upgradeCardsFor } from '../data/characters'
 import type { CharacterId } from '../types/characters'
-import { SHOP, gearMods, characterXp, ITEMS, RARITIES, itemPrice } from '../data/items'
+import { SHOP, characterXp, ITEMS, RARITIES, itemPrice } from '../data/items'
 import { PICKUPS } from '../data/pickups'
 import type { ItemId } from '../types/items'
 import type { StatValues } from '../types/stats'
-import { characterLevel } from '../data/charLevel'
-import { levelStatsFor, LEVEL_STATS } from '../data/levels'
+import { LEVEL_STATS } from '../data/levels'
+import { memberLevel, memberOutStats } from '../run/members'
 import { getRun, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
 import { characterStatGroups } from './statLines'
@@ -75,7 +75,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     this.detailObjs = []
 
     const f = (this.frame = pageFrame({ sub: true, footer: true }))
-    new PageHeader(this, f, { title: `第 ${this.run.wave - 1} 波完成`, ...runExit(this, this.run) })
+    new PageHeader(this, f, { title: `第 ${this.run.wave - 1} 波完成`, ...runExit(this, this.run, () => ({ from: SceneKey.Shop, slot: this.focusedIndex() })) })
     this.coins = new Pill(this, f.centerX, f.subY, { icon: PICKUPS.coin.emoji, outline: 'player', text: '', color: 'accent' })
 
     const D = f.detail
@@ -108,7 +108,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
   }
 
   private levelOf(slot: number): number {
-    return characterLevel(characterXp(this.run.memberItems[slot] ?? []))
+    return memberLevel(this.run, slot)
   }
 
   private poolFor(slot: number): ItemId[] {
@@ -163,11 +163,8 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     this.refresh()
   }
 
-  /** 队员战斗外的属性：定位、道具、成长与等级 */
   private slotStats(slot: number): StatValues {
-    const id = this.lineup[slot]!
-    const owned = this.run.memberItems[slot] ?? []
-    return memberStats(CHARACTERS[id], gearMods(owned, levelStatsFor(id, this.levelOf(slot)), this.run.memberGrowth[slot]))
+    return memberOutStats(this.run, slot)
   }
 
   private slotMaxHp(slot: number): number {
