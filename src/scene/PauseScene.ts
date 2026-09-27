@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { CHARACTERS, TEAM } from '../data/characters'
 import { characterLevel } from '../data/charLevel'
 import { ENEMIES } from '../data/enemies'
-import { POOLS } from '../data/battlefield'
+import { FIELD, POOLS } from '../data/battlefield'
 import { characterXp, growthSteps, ITEMS, RARITIES, RARITY_ORDER } from '../data/items'
 import { bossFor, HAZARD_NAMES, MAPS } from '../data/maps'
 import { ROLES } from '../data/roles'
@@ -440,7 +440,7 @@ export class PauseScene extends Phaser.Scene {
       flow.gap(6)
     }
     flow.heading('这张图的战场效果', '1f4e6')
-    flow.text('携带者身上掉落，碰到就生效', { color: 'muted' })
+    flow.text(`带光圈的敌人死后掉落，在地上留 ${FIELD.groundMs / 1000} 秒，队员碰到就生效`, { color: 'muted' })
     for (const p of POOLS[run.mapId]) this.flowEffect(flow, p.emoji, `${p.name}：${p.desc}`, p.polarity === 'buff')
     flow.gap(6)
     flow.heading('操作', '1f3ae')
