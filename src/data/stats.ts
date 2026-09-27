@@ -34,16 +34,6 @@ export class StatFold {
     if (m.mul) for (const k in m.mul) this.times(k as StatKey, m.mul[k as StatKey]!)
   }
 
-  /** 叠 n 层：加值乘层数，倍率的涨跌乘层数（冷却倍率按攻速的涨跌） */
-  layered(m: StatMods, n: number): void {
-    if (m.add) for (const k in m.add) this.plus(k as StatKey, m.add[k as StatKey]! * n)
-    if (!m.mul) return
-    for (const k in m.mul) {
-      const v = m.mul[k as StatKey]!
-      this.times(k as StatKey, STATS[k as StatKey].unit === 'rate' ? 1 / (1 + (1 / v - 1) * n) : 1 + (v - 1) * n)
-    }
-  }
-
   plus(k: StatKey, v: number): void {
     const i = INDEX[k]
     this.sum[i] = this.sum[i]! + v
@@ -63,6 +53,18 @@ export class StatFold {
   value(i: number): number {
     return clamp(STAT_KEYS[i]!, this.sum[i]! * this.mul[i]! * this.low[i]!)
   }
+}
+
+/** 一组修正叠 n 份：加值乘份数，倍率的涨跌乘份数（冷却倍率按攻速的涨跌） */
+export function stackMods(m: StatMods, n: number): StatMods {
+  const add: StatBase = {}
+  const mul: StatBase = {}
+  for (const k of keysOf(m.add ?? {})) add[k] = m.add![k]! * n
+  for (const k of keysOf(m.mul ?? {})) {
+    const v = m.mul![k]!
+    mul[k] = STATS[k].unit === 'rate' ? 1 / (1 + (1 / v - 1) * n) : 1 + (v - 1) * n
+  }
+  return { add, mul }
 }
 
 const scratch = new StatFold()
@@ -109,7 +111,7 @@ function addText(unit: StatUnit, v: number): string {
     case 'ratio':
     case 'chance':
     case 'percent':
-      return `${sign}${Math.round(a * 100)}%`
+      return `${sign}${num(a * 100, 1)}%`
     case 'ms':
       return `${sign}${num(a / 1000)}秒`
     case 'perSec':

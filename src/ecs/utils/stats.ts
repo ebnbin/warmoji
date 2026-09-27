@@ -1,6 +1,6 @@
 import { addComponent, hasComponent } from 'bitecs'
 import { UNIT } from '../../util/units'
-import { STATS, STAT_KEYS, StatFold, foldStats } from '../../data/stats'
+import { STATS, STAT_KEYS, StatFold, foldStats, stackMods } from '../../data/stats'
 import { sandboxFireRate } from '../sandbox/knobs'
 import { Alive, FACTION, Faction, Gear, Grow, Hp, MARK, MARK_SLOTS, Mark, Phys, Slot, Stamina, Stats, Summoned, Transform, Uid } from '../components'
 import { gearRules, statBase, statLayers } from '../store'
@@ -132,7 +132,7 @@ function gearCount(sim: Sim, eid: number, c: GearCond): number {
 function condMods(sim: Sim, eid: number, when: readonly GearWhen[]): void {
   for (const w of when) {
     const n = Math.min('max' in w ? w.max : 1, gearCount(sim, eid, w.if))
-    if (n > 0) fold.layered(w.stats, n)
+    if (n > 0) fold.apply(stackMods(w.stats, n))
   }
 }
 

@@ -43,7 +43,7 @@ export function spawnCharacter(
   const id = run.roster[slot]!
   const def = CHARACTERS[id]
   const size = MEMBER.size * UNIT * place.sizeMul
-  const { owned, level } = memberGear(run, slot, sandbox)
+  const { owned, growth, level } = memberGear(run, slot, sandbox)
   const base = memberBase(def)
   const eid = spawnBody(world, {
     faction: FACTION.team,
@@ -63,7 +63,7 @@ export function spawnCharacter(
   Grow.r0[eid] = MEMBER.radius * UNIT
   Grow.s0[eid] = MEMBER.size * UNIT
   setStatLayer(eid, 'role', [ROLES[def.role].stats])
-  setStatLayer(eid, 'gear', gearMods(owned, levelStatsFor(id, level)))
+  setStatLayer(eid, 'gear', gearMods(owned, levelStatsFor(id, level), growth))
   foldBody(world, undefined, eid)
   Hp.v[eid] = sandbox ? Hp.max[eid]! : waveStartHp(run.memberHp[slot] ?? Hp.max[eid]!, Hp.max[eid]!)
   bodyRules[eid] = { ...def.rules, resource: def.resource }

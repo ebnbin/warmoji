@@ -1,5 +1,5 @@
 import type itemsJson from '../assets/items.json'
-import type { Effect, ShapeKind } from './abilityDefs'
+import type { AbilityDef, Effect, ShapeKind } from './abilityDefs'
 import type { StatMods } from './stats'
 
 export interface Economy {
@@ -41,6 +41,10 @@ type GearOn =
 /** 触发：damage 是效果的基础伤害，不写时命中与暴击取这一下的伤害、受伤取受到的伤害，其余为 0 */
 export type GearTrigger = GearOn & { readonly damage?: number; readonly effects: readonly Effect[] }
 export type GearEvent = GearTrigger['on']
+/** 本局成长：每波结束、或这名角色每击杀 count 个敌人，永久多一份 stats（按份数线性叠加） */
+export type GearGrow = { readonly each: 'wave'; readonly stats: StatMods } | { readonly each: 'kills'; readonly count: number; readonly stats: StatMods }
+/** 每人每件成长道具攒下的进度：每波结束按件数加，击杀成长按件数乘击杀数加 */
+export type GrowthProgress = Partial<Record<ItemId, number>>
 export interface ItemDef {
   readonly emoji: string
   readonly name: string
@@ -54,5 +58,8 @@ export interface ItemDef {
   readonly stats?: StatMods
   readonly when?: readonly GearWhen[]
   readonly on?: readonly GearTrigger[]
+  /** 附带的装置：按自己的冷却自动出手，吃持有者的属性 */
+  readonly ability?: AbilityDef
+  readonly grow?: GearGrow
 }
 export type ItemId = keyof typeof itemsJson

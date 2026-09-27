@@ -2,7 +2,8 @@ import itemsJson from '../assets/items.json'
 import economyJson from '../assets/economy.json'
 import { fromJson } from './json'
 import { keysOf } from '../util/record'
-import type { Economy, ItemRarity, ItemDef, ItemId } from '../types/items'
+import { stackMods } from './stats'
+import type { Economy, GrowthProgress, ItemRarity, ItemDef, ItemId } from '../types/items'
 import type { StatMods, StatValues } from '../types/stats'
 import type { AbilityDef, Shape } from '../types/abilityDefs'
 
@@ -39,9 +40,20 @@ export function itemPrice(id: ItemId, wave: number): number {
   return Math.max(1, Math.round(ITEMS[id].price * inflate * disc))
 }
 
-/** 角色身上的常驻修正：买到的道具加上当前等级的成长 */
-export function gearMods(owned: readonly ItemId[], level: readonly StatMods[]): StatMods[] {
-  return [...owned.flatMap((id) => ITEMS[id].stats ?? []), ...level]
+/** 成长道具攒下的进度折成几份 */
+export function growthSteps(id: ItemId, progress: number): number {
+  const g = ITEMS[id].grow
+  return g ? Math.floor(progress / (g.each === 'kills' ? g.count : 1)) : 0
+}
+
+/** 角色身上的常驻修正：买到的道具、本局攒下的成长与当前等级的成长 */
+export function gearMods(owned: readonly ItemId[], level: readonly StatMods[], growth: GrowthProgress = {}): StatMods[] {
+  const grown = keysOf(growth).flatMap((id) => {
+    const g = ITEMS[id].grow
+    const n = growthSteps(id, growth[id] ?? 0)
+    return g && n > 0 ? [stackMods(g.stats, n)] : []
+  })
+  return [...owned.flatMap((id) => ITEMS[id].stats ?? []), ...grown, ...level]
 }
 
 /** 只缩放形状的空间参数、索敌距离与弹速；伤害/冷却在结算时按属性表乘，此处不得再乘 */

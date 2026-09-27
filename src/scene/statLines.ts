@@ -9,7 +9,7 @@ import { tiersForLevel } from '../data/charLevel'
 import { ROLES } from '../data/roles'
 import { deliveryOf, HIT } from '../ecs/utils/hitTags'
 import { levelStatsFor } from '../data/levels'
-import type { ItemId } from '../types/items'
+import type { GrowthProgress, ItemId } from '../types/items'
 import type { AbilityDef, Cond, Effect, MarkName, Shape, ShapeKind } from '../types/abilityDefs'
 import type { ZoneRules } from '../types/groundEffects'
 import type { StatGroup } from '../types/statLines'
@@ -394,10 +394,10 @@ export function characterStatGroups(
   id: CharacterId,
   items: readonly ItemId[] = [],
   level = 1,
-  opts: { path?: boolean } = {},
+  opts: { path?: boolean; growth?: GrowthProgress } = {},
 ): StatGroup[] {
   const def = CHARACTERS[id]
-  const stats = memberStats(def, gearMods(items, levelStatsFor(id, level)))
+  const stats = memberStats(def, gearMods(items, levelStatsFor(id, level), opts.growth))
   const tiers = tiersForLevel(level)
   const loadout = loadoutFor(def, tiers)
   const baseLines = [

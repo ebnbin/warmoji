@@ -317,7 +317,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
   private slotMaxHp(slot: number): number {
     const id = this.lineup[slot]!
     const owned = this.run.memberItems[slot] ?? []
-    return memberStats(CHARACTERS[id], gearMods(owned, levelStatsFor(id, this.levelOf(slot)))).maxHp
+    return memberStats(CHARACTERS[id], gearMods(owned, levelStatsFor(id, this.levelOf(slot)), this.run.memberGrowth[slot])).maxHp
   }
 
   private buildSlotItems(): EmojiGridItem<CharacterId>[] {
@@ -460,7 +460,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
       cursor += 40
     }
 
-    const groups = characterStatGroups(this.focusedId, owned, level)
+    const groups = characterStatGroups(this.focusedId, owned, level, { growth: this.run.memberGrowth[idx] })
     for (const group of groups) {
       statObjs.push(
         emojiImage(this, dx + 42, cursor, group.icon, 35),

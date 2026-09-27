@@ -1,7 +1,7 @@
 import { modTexts } from '../data/stats'
-import { effectLine, grid, pct, SHAPE_LABEL, sec } from './statLines'
+import { abilityStatLines, effectLine, grid, pct, SHAPE_LABEL, sec } from './statLines'
 import type { Effect } from '../types/abilityDefs'
-import type { GearCond, GearTrigger, GearWhen, ItemDef, Trait } from '../types/items'
+import type { GearCond, GearGrow, GearTrigger, GearWhen, ItemDef, Trait } from '../types/items'
 
 export const TRAIT_LABEL: Record<Trait, string> = {
   ...SHAPE_LABEL,
@@ -80,7 +80,17 @@ function triggerLine(t: GearTrigger): string {
   return `${onText(t)}${chance}${t.on === 'lethal' ? '，' : '：'}${who}${t.effects.map((e) => triggerEffect(t, e)).join('，')}`
 }
 
+function growLine(g: GearGrow): string {
+  return `${g.each === 'wave' ? '每波结束' : `这名角色每击杀 ${g.count} 个敌人`}：${modTexts(g.stats).join('，')}，本局永久`
+}
+
 /** 道具效果逐条的文字 */
 export function itemLines(def: ItemDef): string[] {
-  return [...(def.stats ? modTexts(def.stats) : []), ...(def.when ?? []).map(whenLine), ...(def.on ?? []).map(triggerLine)]
+  return [
+    ...(def.stats ? modTexts(def.stats) : []),
+    ...(def.when ?? []).map(whenLine),
+    ...(def.on ?? []).map(triggerLine),
+    ...(def.ability ? [`自动出手：${abilityStatLines(def.ability).join('，').replaceAll(' · ', '，')}`] : []),
+    ...(def.grow ? [growLine(def.grow)] : []),
+  ]
 }
