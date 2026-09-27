@@ -2,7 +2,7 @@ import { hasComponent } from 'bitecs'
 import { CRIT_MUL } from '../../../data/items'
 import { norm } from '../../../util/vec'
 import { playSfx } from '../../../audio/sfx'
-import { Alive, CharFlash, Dormant, FACTION, Faction, Flash, Hp, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Tint, Transform } from '../../components'
+import { Alive, CharFlash, FACTION, Faction, Flash, Hp, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Tint, Transform } from '../../components'
 import { guardMul, hasMark, isUntargetable, markSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
 import { bodyRules, enemyDef, resDef } from '../../store'
@@ -133,7 +133,7 @@ function guarded(sim: Sim, target: number): boolean {
 
 /** 这一下能不能落到目标身上：静止与碰不到、依存无敌、挡格；带伤害的还看无敌；持续伤害不看也不消耗无敌与挡格 */
 function lands(sim: Sim, src: Source, target: number, o: HitOpts, harmful: boolean): boolean {
-  if (sim.over || !hasComponent(sim.world, target, Hp) || Dormant.v[target] || Alive.v[target] === 0) return false
+  if (sim.over || !hasComponent(sim.world, target, Hp) || Alive.v[target] === 0) return false
   if (hasMark(sim, target, MARK.stasis) || (!o.tick && isUntargetable(sim, target))) return false
   if (guarded(sim, target)) {
     if (!o.tick) blockFx(sim, target, 0x80d8ff)

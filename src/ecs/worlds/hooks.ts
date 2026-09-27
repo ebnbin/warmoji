@@ -4,20 +4,20 @@ import { SPAWN } from '../../data/enemies'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
 import { MAPS } from '../../data/maps'
-import type { IceConfig, InfiniteConfig, MapDef, MapId, RiverConfig, ShrinkRingConfig, SpaceConfig } from '../../types/maps'
+import type { IceConfig, MapDef, MapId, RiverConfig, SpaceConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
-import { outsideZone, ringPoint, zoneRadiusAt } from '../worlds/infinite'
-import { clampToDisc, confineVelocity, meteorSweep } from '../worlds/space'
+import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/river'
 import { isHorizontal } from '../utils/remap'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Alive, Boss, BreaksWalls, Dormant, Due, ENEMY_SET, Meteor, Phasing, Pickup, Radius, Slot, Tint, Transform, Uid } from '../components'
+import { Alive, Boss, BreaksWalls, Due, ENEMY_SET, Meteor, Phasing, Pickup, Radius, Slot, Tint, Transform, Uid } from '../components'
 import { meteorHit } from '../store'
 import { spawnMeteor } from '../entities/meteor'
 import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
 import { hit } from '../systems/shared/damage'
+import { despawnEnemy } from '../systems/shared/combat'
 import { hazardSource } from '../utils/source'
 import type { Sim } from '../sim'
 import type { Point } from '../../util/vec'
@@ -47,12 +47,11 @@ interface Walls {
 
 export interface WorldState {
   tickAt: number
-  zone: { x: number; y: number; r: number } | null
   walls: Walls | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, zone: null, walls: null }
+  return { tickAt: 0, walls: null }
 }
 
 export interface WorldHooks {
@@ -73,9 +72,7 @@ export interface WorldHooks {
   /** 飞行物出了这里就消失 */
   outside(sim: Sim, x: number, y: number): boolean
   spawnPoint(sim: Sim, boss: boolean): Point
-  activeHalf(sim: Sim): number
   onStart(sim: Sim): void
-  onFinalWave(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }
 
@@ -138,11 +135,7 @@ const bounded: WorldHooks = {
       SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1),
     )
   },
-  activeHalf() {
-    return Infinity
-  },
   onStart() {},
-  onFinalWave() {},
   tick() {},
 }
 
@@ -289,18 +282,21 @@ const ruins: WorldHooks = {
   },
 }
 
-function infCfg(sim: Sim): InfiniteConfig {
-  return MAPS[sim.mapId].infinite!
+function spaceCfg(sim: Sim): SpaceConfig {
+  return MAPS[sim.mapId].space!
 }
 
-function ringCfg(sim: Sim): ShrinkRingConfig {
-  return MAPS[sim.mapId].shrinkRing!
+function fieldR(sim: Sim): number {
+  return spaceCfg(sim).blackholeRadiusU * UNIT
 }
 
-const infinite: WorldHooks = {
+/** 圆心在原点的禁锢圈：边界由圈约束，不按地图矩形反弹、剔除 */
+const space: WorldHooks = {
   ...bounded,
-  constrainBody(_sim, _eid, _from, next) {
-    return next
+  constrainBody(sim, _eid, from, next) {
+    const r = fieldR(sim)
+    const v = confineVelocity(from.x, from.y, 0, 0, next.x - from.x, next.y - from.y, r)
+    return clampToDisc(from.x + v.x, from.y + v.y, 0, 0, r)
   },
   wanderDir(_sim, _eid, dx, dy) {
     return { x: dx, y: dy }
@@ -312,61 +308,18 @@ const infinite: WorldHooks = {
     return false
   },
   spawnPoint(sim, boss) {
-    const zone = sim.worldState.zone
-    if (boss) return ringPoint(sim.rng, zone ?? leaderPoint(sim), 6 * UNIT, 8 * UNIT)
-    const cfg = infCfg(sim)
-    const p = ringPoint(sim.rng, leaderPoint(sim), cfg.spawnRingMin * UNIT, cfg.spawnRingMax * UNIT)
-    if (!zone) return p
-    const limit = zone.r - UNIT
-    if (limit <= 0 || !outsideZone(p, zone, limit)) return p
-    const d = Math.hypot(p.x - zone.x, p.y - zone.y) || 1
-    return { x: zone.x + ((p.x - zone.x) / d) * limit, y: zone.y + ((p.y - zone.y) / d) * limit }
-  },
-  activeHalf(sim) {
-    return infCfg(sim).activeHalf * UNIT
-  },
-  onFinalWave(sim) {
-    sim.worldState.zone = { x: leaderX(sim), y: leaderY(sim), r: ringCfg(sim).r0 * UNIT }
-    sim.worldState.tickAt = ringCfg(sim).tickMs
-  },
-  tick(sim) {
-    const zone = sim.worldState.zone
-    if (!zone) return
-    const cfg = ringCfg(sim)
-    zone.r = zoneRadiusAt(sim.elapsedMs, cfg) * UNIT
-    if (sim.elapsedMs < sim.worldState.tickAt) return
-    sim.worldState.tickAt = sim.elapsedMs + cfg.tickMs
-    const src = hazardSource('poisonFog', 0xef5350)
-    for (const m of sim.characters) {
-      if (!Alive.v[m]) continue
-      if (outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r)) hit(sim, src, m, cfg.tickDamage, { tick: true })
+    const inner = fieldR(sim) - UNIT
+    if (boss) {
+      const b = ringPoint(sim.rng, ZERO, 6 * UNIT, 8 * UNIT)
+      return clampToDisc(b.x, b.y, 0, 0, inner)
     }
+    const min2 = (SPAWN.minPlayerDist * UNIT) ** 2
+    const lx = leaderX(sim)
+    const ly = leaderY(sim)
+    let p = ringPoint(sim.rng, ZERO, 0, inner)
+    for (let i = 0; i < 20 && (p.x - lx) ** 2 + (p.y - ly) ** 2 < min2; i++) p = ringPoint(sim.rng, ZERO, 0, inner)
+    return p
   },
-}
-
-function spaceCfg(sim: Sim): SpaceConfig {
-  return MAPS[sim.mapId].space!
-}
-
-function fieldR(sim: Sim): number {
-  return spaceCfg(sim).blackholeRadiusU * UNIT
-}
-
-const space: WorldHooks = {
-  ...infinite,
-  constrainBody(sim, _eid, from, next) {
-    const r = fieldR(sim)
-    const v = confineVelocity(from.x, from.y, 0, 0, next.x - from.x, next.y - from.y, r)
-    return clampToDisc(from.x + v.x, from.y + v.y, 0, 0, r)
-  },
-  spawnPoint(sim, boss) {
-    const cfg = infCfg(sim)
-    const p = boss
-      ? ringPoint(sim.rng, { x: 0, y: 0 }, 6 * UNIT, 8 * UNIT)
-      : ringPoint(sim.rng, leaderPoint(sim), cfg.spawnRingMin * UNIT, cfg.spawnRingMax * UNIT)
-    return clampToDisc(p.x, p.y, 0, 0, fieldR(sim) - UNIT)
-  },
-  onFinalWave() {},
   onStart(sim) {
     sim.worldState.tickAt = 7000
   },
@@ -405,7 +358,7 @@ const space: WorldHooks = {
       }
     }
     for (const eid of [...query(sim.world, ENEMY_SET)]) {
-      if (Dormant.v[eid] || struck.has(Uid.v[eid]!)) continue
+      if (struck.has(Uid.v[eid]!)) continue
       if (Math.hypot(Transform.x[eid]! - x, Transform.y[eid]! - y) < rr) {
         struck.add(Uid.v[eid]!)
         hit(sim, src, eid, cfg.damage, { tick: true })
@@ -467,8 +420,13 @@ const river: WorldHooks = {
     }
     return pos
   },
-  activeHalf(sim) {
-    return MAPS[sim.mapId].infinite!.activeHalf * UNIT
+  /** 漂过下游太远的敌人被冲走 */
+  tick(sim) {
+    const pad = riverCfg(sim).enemyCullPad * UNIT
+    for (const eid of [...query(sim.world, ENEMY_SET)]) {
+      if (Boss.v[eid] === 1) continue
+      if (pastDownstream({ x: Transform.x[eid]!, y: Transform.y[eid]! }, sim.mapW, sim.mapH, pad)) despawnEnemy(sim, eid, false)
+    }
   },
 }
 
@@ -519,7 +477,6 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   river,
   void: torus,
   space,
-  infinite,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()

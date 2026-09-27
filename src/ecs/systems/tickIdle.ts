@@ -1,6 +1,6 @@
 import { query } from 'bitecs'
 import { UNIT } from '../../util/units'
-import { Alive, Dormant, Idle, Phys, Transform } from '../components'
+import { Alive, Idle, Phys, Transform } from '../components'
 import { bodyRules } from '../store'
 import { applyAbilityEffects } from './shared/effects'
 import { selfSource } from '../utils/source'
@@ -13,7 +13,7 @@ export function tickIdle(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, [Idle])) {
     const rule = bodyRules[eid]?.onIdle
-    if (!rule || !Alive.v[eid] || Dormant.v[eid]) continue
+    if (!rule || !Alive.v[eid]) continue
     if (rule.still && Math.hypot(Phys.vx[eid]!, Phys.vy[eid]!) > STILL) {
       Idle.since[eid] = now
       Idle.done[eid] = 0

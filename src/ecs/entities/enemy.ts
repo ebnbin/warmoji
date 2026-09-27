@@ -17,7 +17,6 @@ import {
   Contact,
   Depth,
   Despawn,
-  Dormant,
   EDir,
   Elite,
   Enemy,
@@ -154,7 +153,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
     grip: ENEMY_BODY.grip,
     ownClock: false,
   })
-  addComponents(world, eid, Enemy, Elite, Boss, Dormant, Flash, Nest, Despawn, EDir, ETurn, Anim)
+  addComponents(world, eid, Enemy, Elite, Boss, Flash, Nest, Despawn, EDir, ETurn, Anim)
   if (def.kbImmune) addComponent(world, eid, Anchored)
   if (def.phasesWalls) addComponent(world, eid, Phasing)
   const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
@@ -248,10 +247,10 @@ function currentMix(sim: Sim): ReturnType<typeof enemyMixAt> {
   return enemyMixAt(rows, sim.run.wave)
 }
 
-/** 醒着的敌方身体数，刷怪上限只看它 */
-export function awakeCount(sim: Sim): number {
+/** 敌方身体数，刷怪上限只看它 */
+export function foeCount(sim: Sim): number {
   let n = 0
-  for (const eid of query(sim.world, ENEMY_SET)) if (!Dormant.v[eid] && Faction.v[eid] === FACTION.enemy) n++
+  for (const eid of query(sim.world, ENEMY_SET)) if (Faction.v[eid] === FACTION.enemy) n++
   return n
 }
 
@@ -280,7 +279,7 @@ export function spawnBoss(sim: Sim): void {
 
 export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
   if (sim.over) return
-  if (awakeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
+  if (foeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
   const hp = Math.round(def.hp * waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier)
   const pos = sim.hooks.spawnPoint(sim, false)

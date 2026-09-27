@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { Casting, Dormant, ENEMY_SET, Flash, MARK, Pop, TELEGRAPH, Tint } from '../components'
+import { Casting, ENEMY_SET, Flash, MARK, Pop, TELEGRAPH, Tint } from '../components'
 import { hasMark, slowFactor } from '../utils/marks'
 import { presence, statusTint } from '../utils/statusTint'
 import type { Sim } from '../sim'
@@ -13,7 +13,6 @@ function castingTint(now: number, eid: number): number {
 export function tintEnemies(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, ENEMY_SET)) {
-    if (Dormant.v[eid]) continue
     if (Pop.until[eid] === 0) Tint.alpha[eid] = Pop.alpha[eid]! * presence(sim, eid)
     if (Flash.until[eid] !== 0) continue
     Tint.effect[eid] = 0

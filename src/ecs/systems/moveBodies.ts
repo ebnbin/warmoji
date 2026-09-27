@@ -1,5 +1,5 @@
 import { hasComponent, query } from 'bitecs'
-import { Airborne, Alive, BreaksWalls, Dormant, Drive, Motion, MOTION, Phys, Radius, Transform, VisOff } from '../components'
+import { Airborne, Alive, BreaksWalls, Drive, Motion, MOTION, Phys, Radius, Transform, VisOff } from '../components'
 import { GROUND } from '../worlds/hooks'
 import { bodyDt } from './shared/body'
 import { endMotion } from './shared/displace'
@@ -61,7 +61,7 @@ function seek(sim: Sim, eid: number): boolean {
 /** 所有身体同一条积分；冲刺中的身体按脚本速度走，弧线中的身体腾空，跟随中的身体贴着宿主，空中的身体不受地面与介质影响；位置经场地修正后速度按实际位移回推 */
 export function moveBodies(sim: Sim): void {
   for (const eid of query(sim.world, [Phys, Transform, Radius])) {
-    if (Dormant.v[eid] || Alive.v[eid] === 0) continue
+    if (Alive.v[eid] === 0) continue
     const dt = bodyDt(sim, eid)
     if (dt <= 0) continue
     const kind = Motion.kind[eid]

@@ -197,8 +197,6 @@ export const Anim = {
 }
 export const ANIM_SET: QueryTerm[] = [Anim, Sprite]
 
-export const Dormant = { v: u8(), since: f32() }
-
 export const Quad = { v: u8() }
 
 export const Spin = { rate: f32() }

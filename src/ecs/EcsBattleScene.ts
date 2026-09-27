@@ -23,7 +23,7 @@ import { bossFor, MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Cd, Charges, Ctl, Dormant, Enemy, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
+import { Alive, Boss, Cd, Charges, Ctl, Enemy, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
 import { charSize } from './systems/shared/scale'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
@@ -194,7 +194,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   devKillAll(): void {
     const sim = this.sim
     if (!sim || sim.over) return
-    for (const eid of [...query(this.world, [Enemy])]) if (!Dormant.v[eid]) hit(sim, WORLD_SOURCE, eid, 1e9, { tick: true })
+    for (const eid of [...query(this.world, [Enemy])]) hit(sim, WORLD_SOURCE, eid, 1e9, { tick: true })
   }
 
   devGrant(kind: 'coins' | 'level'): void {
@@ -368,7 +368,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       })
     }
     if (!run.sandbox && isBossWave(run.wave)) {
-      this.sim.hooks.onFinalWave(this.sim)
       this.time.delayedCall(600, () => {
         if (!this.sim || this.sim.over) return
         this.hud.emit(HudEvent.WaveWarning, {
@@ -486,7 +485,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const totalSec = (this.run.combatMs + (sim?.elapsedMs ?? 0)) / 1000
     const wave = waveAt(totalSec)
     return {
-      enemies: query(this.world, [Enemy]).filter((eid) => !Dormant.v[eid]).length,
+      enemies: query(this.world, [Enemy]).length,
       projectiles: query(this.world, [Projectile]).length,
       coins: liveCoins(this.world),
       pending: sim ? telegraphCount(sim) : 0,

@@ -7,7 +7,7 @@ import { mapEnemyRoster } from '../../data/maps'
 import { isDayAt } from '../worlds/daynight'
 import { attachCarrierRing } from '../entities/pickup'
 import { spawnEnemy } from '../entities/enemy'
-import { awakeCount, dayNightOf, telegraphOne } from '../entities/enemy'
+import { foeCount, dayNightOf, telegraphOne } from '../entities/enemy'
 import { spawnTelegraph, telegraphCount } from '../entities/telegraph'
 import { enemyCarries, telegraphCarries, telegraphDef } from '../store'
 import { Due, Telegraph, Transform } from '../components'
@@ -27,7 +27,7 @@ function spawnSandbox(sim: Sim): void {
   const kinds = [...sandboxEnemySet()].filter((k) => roster.has(k))
   if (kinds.length === 0) return
   const hpMul = sandboxDifficulty()
-  let live = awakeCount(sim) + telegraphCount(sim)
+  let live = foeCount(sim) + telegraphCount(sim)
   for (let i = 0; i < d.batch; i++, live++) {
     if (live >= d.cap) return
     const raw = ENEMIES[kinds[Math.floor(sim.rng.next() * kinds.length)]!]
@@ -61,6 +61,6 @@ export function spawnStep(sim: Sim): void {
   const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * sim.characters.length
   const relief = isBossWave(sim.run.wave) ? BOSS_SPAWN_RELIEF : 1
   sim.spawnCooldownMs = (wave.spawnIntervalMs * relief * spawnIntervalScale(sim)) / teamFactor
-  if (awakeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
+  if (foeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
   telegraphOne(sim, wave.hpMultiplier)
 }

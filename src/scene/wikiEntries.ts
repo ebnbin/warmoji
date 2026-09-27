@@ -24,13 +24,12 @@ const DRIVE_LABEL: Record<EnemyDef['drive']['kind'], string> = {
 }
 
 const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> = {
-  bounded: '有界竞技场（25×25 方场）',
-  infinite: '无限世界（终波毒雾收拢成圈）',
+  bounded: '有界竞技场（方形场地）',
   river: '单屏河道（万物随水流漂移）',
   void: '环面竞技场（四壁传送门，出这头即现那头）',
   ruins: '断壁废墟（墙挡人 / 挡弹 / 挡视线）',
   daynight: '昼夜原野（30×30；视野随晨昏涨落，夜幕四合起迷雾）',
-  space: '深空星海（无限世界；天体直线横扫敌我通吃，终波奇点禁锢场谁也逃不出）',
+  space: '深空星海（圆形禁锢场谁也逃不出；天体直线横扫敌我通吃）',
   ice: '浮冰（25×25 方形浮冰；全局打滑不跟手，滑出冰面落水掉血·敌我通吃，相机永远跟随）',
 }
 

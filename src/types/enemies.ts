@@ -154,7 +154,6 @@ export interface Difficulty {
     readonly rampSeconds: number
     readonly hpGrowthPerMin: number
     readonly maxAlive: number
-    readonly dormantTtlMs: number
     readonly teamFactorBase: number
     readonly teamFactorPerMember: number
     readonly telegraphMs: number

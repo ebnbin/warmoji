@@ -1,3 +1,12 @@
+import type { Rng } from '../../util/rng'
+import type { Point } from '../../util/vec'
+
+/** 圆环内按面积均匀取点 */
+export function ringPoint(rng: Rng, center: Point, rMin: number, rMax: number): Point {
+  const r = Math.sqrt(rMin * rMin + rng.next() * (rMax * rMax - rMin * rMin))
+  const a = rng.next() * Math.PI * 2
+  return { x: center.x + Math.cos(a) * r, y: center.y + Math.sin(a) * r }
+}
 
 export function confineVelocity(
   px: number,

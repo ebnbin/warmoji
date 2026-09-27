@@ -1,5 +1,5 @@
 import { hasComponent, query } from 'bitecs'
-import { Casting, Ctl, Dormant, Drive, EDir, EnemyPhase, MARK, Mark, Motion, MOTION, Phys, SpeedMul, Transform } from '../components'
+import { Casting, Ctl, Drive, EDir, EnemyPhase, MARK, Mark, Motion, MOTION, Phys, SpeedMul, Transform } from '../components'
 import { hasMark, isAirborne, markedBy, markSlot } from '../utils/marks'
 import { norm } from '../../util/vec'
 import { wanderDir } from './shared/steer'
@@ -31,13 +31,6 @@ export function controlBody(sim: Sim, eid: number): void {
   Drive.x[eid] = 0
   Drive.y[eid] = 0
   Ctl.forced[eid] = 0
-  if (Dormant.v[eid]) {
-    Ctl.move[eid] = 0
-    Ctl.act[eid] = 0
-    Ctl.cast[eid] = 0
-    Ctl.dash[eid] = 0
-    return
-  }
   let move = 1
   let act = 1
   let cast = 1
