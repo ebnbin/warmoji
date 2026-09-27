@@ -18,10 +18,7 @@ export const DIFFICULTY = {
   elite: {
     fromWave: 10,
     chance: 0.15,
-    hpMul: 4,
-    speedMul: 1.25,
-    damageMul: 2,
-    sizeMul: 1.2,
+    stats: { mul: { maxHp: 4, moveSpeed: 1.25, damage: 2, healing: 2, scale: 1.2 } },
     xpMul: 4,
     coinsMul: 3,
   },

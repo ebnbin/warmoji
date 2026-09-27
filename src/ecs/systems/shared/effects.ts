@@ -14,7 +14,6 @@ import { spawnShadow, swapShadow } from '../../entities/shadow'
 import { spawnBarrier } from '../../entities/barrier'
 import { spawnTether } from '../../entities/tether'
 import { recallShots } from './projectile'
-import { rescale } from './scale'
 import { historyAt } from './history'
 import { devour } from './gut'
 import { stealAbility } from './steal'
@@ -26,7 +25,8 @@ import { despawnEnemy, grantIframe, reviveCharacter } from './combat'
 import { interrupt } from './ability'
 import { healAllies } from './heal'
 import { eachAlly, nearestAngle, nearestTarget, targetsWithin } from '../../utils/targets'
-import { flying } from '../../utils/source'
+import { attackOf, flying } from '../../utils/source'
+import { layerMul, setStatLayer } from '../../utils/stats'
 import { isSameEntity } from '../../utils/identity'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
@@ -186,8 +186,7 @@ type Handler<K extends keyof EffectOf> = (sim: Sim, src: Source, fx: EffectOf[K]
 /** 效果只看目标有没有对应的组件；金币只对队伍来源生效 */
 const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   blast: (sim, src, fx, at) => {
-    const dmg = Math.max(1, Math.round(at.baseDamage * fx.ratio))
-    applyBlast(sim, src, at.x, at.y, dmg, fx.radius, fx.knockback, at.exclude)
+    applyBlast(sim, src, at.x, at.y, at.baseDamage * fx.ratio, fx.radius, fx.knockback, at.exclude)
     if (fx.ring) spawnFxRing(sim, at.x, at.y, fx.radius, fx.ring)
   },
 
@@ -235,7 +234,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   heal: (sim, src, fx, at) => {
-    const amount = Math.max(1, Math.round(fx.amount * src.dmgMul))
+    const amount = Math.max(1, Math.round(fx.amount * attackOf(sim, src).healing))
     if (!at.targets) {
       healAllies(sim, src.faction, at.x, at.y, fx.range ?? 0, amount, fx.scope !== 'lowest', at.source ?? -1, src.realm)
       return
@@ -264,7 +263,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
       rotOffsetDeg: fx.projectile.rotationOffsetDeg,
       lifeMs: fx.lifeMs,
       pierce: 0,
-      damage: fx.damage * src.dmgMul,
+      damage: fx.damage,
       knockback: 0,
       src: flying(src),
       onHit: fx.onHit,
@@ -283,7 +282,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   damage: (sim, src, fx, at) => {
-    const dmg = Math.max(1, Math.round((fx.amount + at.baseDamage * (fx.ratio ?? 0)) * (fx.ratio === undefined ? src.dmgMul : 1)))
+    const dmg = fx.amount + at.baseDamage * (fx.ratio ?? 0)
     for (const t of at.targets ?? []) hit(sim, src, t, dmg)
   },
 
@@ -612,8 +611,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   grow: (sim, _src, fx, at) => {
     eachCapable(sim, at, Grow, (t) => {
       if (fx.ms !== undefined) addMark(t, MARK.grow, TAG.effect, sim.elapsedMs + fx.ms, fx.mul)
-      else Grow.perm[t] = Math.min(fx.max ?? Infinity, Grow.perm[t]! * fx.mul)
-      rescale(sim, t)
+      else setStatLayer(t, 'grow', [{ mul: { scale: Math.min(fx.max ?? Infinity, layerMul(t, 'grow', 'scale') * fx.mul) } }])
     })
   },
 
@@ -633,7 +631,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   steal: (sim, src, fx, at) => {
     const by = casterOf(sim, src)
     const t = at.targets?.[0]
-    if (by >= 0 && t !== undefined) stealAbility(sim, by, t, fx.ms, fx.cooldownMs, fx.skill === true, src.ability)
+    if (by >= 0 && t !== undefined) stealAbility(sim, by, t, fx.ms, fx.cooldownMs, fx.skill === true)
   },
 
   clone: (sim, src, fx) => {

@@ -14,6 +14,7 @@ import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
 import { roundRect } from '../ui/shapes'
 import { SceneKey } from './keys'
+import { TeamStatsPanel } from './teamStats'
 import type { DevProvider, DevProviderHost } from '../devtools'
 import { handoverMs } from '../ecs/systems/shared/squad'
 
@@ -56,6 +57,9 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private last!: HudSnapshot
   private paused = false
   private pauseObjs: Phaser.GameObjects.GameObject[] = []
+  private statsPanel?: TeamStatsPanel
+  /** 暂停页正在看的队员；-1 表示下次打开时看队长 */
+  private statSlot = -1
   private fxIcons: Phaser.GameObjects.Image[] = []
   private fxBars?: Phaser.GameObjects.Graphics
   private fxKey = ''
@@ -183,25 +187,33 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       this.paused = false
       for (const o of this.pauseObjs) o.destroy()
       this.pauseObjs = []
+      this.statsPanel?.destroy()
+      this.statsPanel = undefined
       this.arena.scene.resume()
     } else {
       this.paused = true
       this.arena.scene.pause()
+      this.statSlot = -1
       this.showPauseOverlay()
     }
   }
 
+  /** 暂停页：标题在上，队伍属性面板居中，继续与结束本局在下 */
   private showPauseOverlay(): void {
     const res = textRes()
-    const cx = viewport.logicalWidth / 2
-    const cy = viewport.logicalHeight / 2
+    const w = viewport.logicalWidth
+    const h = viewport.logicalHeight
+    const cx = w / 2
+    const { top: sT, bottom: sB, left: sL, right: sR } = safeInsets
+    const btnY = h - sB - 60
     const button = (
+      x: number,
       y: number,
       label: string,
       filled: boolean,
       onTap: () => void,
     ): Phaser.GameObjects.GameObject[] => {
-      const rect = { x: cx - 150, y: y - 36, w: 300, h: 72 }
+      const rect = { x: x - 150, y: y - 36, w: 300, h: 72 }
       const g = this.add.graphics().setDepth(401)
       if (filled) {
         roundRect(g, rect.x, rect.y, rect.w, rect.h, 36, { fill: 0xffdc5d })
@@ -209,7 +221,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
         roundRect(g, rect.x, rect.y, rect.w, rect.h, 36, { fill: 0xffffff, fillAlpha: 0.12, stroke: 0xffffff, strokeAlpha: 0.35 })
       }
       const t = this.add
-        .text(cx, y, label, {
+        .text(x, y, label, {
           fontFamily: UI_FONT,
           fontSize: FONT.lead,
           fontStyle: 'bold',
@@ -227,23 +239,31 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       return [g, t, z]
     }
     this.pauseObjs = [
-      this.add.rectangle(cx, cy, 6000, 6000, 0x000000, 0.6).setDepth(400),
+      this.add.rectangle(cx, h / 2, 6000, 6000, 0x000000, 0.6).setDepth(400),
       this.add
-        .text(cx, cy - 116, '已暂停', {
+        .text(cx, sT + 92, '已暂停', {
           fontFamily: UI_FONT,
           fontSize: FONT.big,
           fontStyle: 'bold',
           color: '#ffffff',
-          resolution: textRes(),
+          resolution: res,
         })
         .setOrigin(0.5)
         .setDepth(401),
-      ...button(cy + 8, '继 续', true, () => this.togglePause()),
-      ...button(cy + 100, '结束本局', false, () => {
+      ...button(cx - 162, btnY, '继 续', true, () => this.togglePause()),
+      ...button(cx + 162, btnY, '结束本局', false, () => {
         endRun()
         this.arena.scene.start(SceneKey.Menu)
       }),
     ]
+    const sheets = this.arena.teamSheets()
+    if (sheets.length === 0) return
+    const top = sT + 136
+    const pw = Math.min(w - sL - sR - 48, 1120)
+    const slot = sheets[this.statSlot] ? this.statSlot : Math.max(0, sheets.findIndex((s) => s.leader))
+    this.statsPanel = new TeamStatsPanel(this, { x: cx - pw / 2, y: top, w: pw, h: btnY - 60 - top }, sheets, slot, 401, (s) => {
+      this.statSlot = s
+    })
   }
 
   update(): void {

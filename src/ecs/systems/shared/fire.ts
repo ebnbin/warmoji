@@ -12,7 +12,6 @@ import {
   Aura,
   BlinkShape,
   BlinkState,
-  Boss,
   Chain,
   CharFlash,
   Disc,
@@ -26,6 +25,7 @@ import {
   LeapShape,
   MARK,
   Mark,
+  Motion,
   AbilityClass,
   Ammo,
   Hold,
@@ -55,7 +55,7 @@ import {
 import { abilityArtEmoji, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, zoneRules } from '../../store'
 import { controlBody } from '../updateControl'
 import { clearMarks, markSlot } from '../../utils/marks'
-import { damageMul, anchorX, anchorY, waveScale } from '../../utils/amp'
+import { anchorX, anchorY } from '../../utils/ability'
 import { flying, sourceOf } from '../../utils/source'
 import type { Source } from '../../utils/source'
 import { eachAlly, nearestTarget, targetsNear, targetsWithin } from '../../utils/targets'
@@ -122,10 +122,6 @@ export function aimAt(sim: Sim, e: number, src: Source): Shot | null {
     default:
       return { angle: Aim.rad[e]!, target: null }
   }
-}
-
-function baseDamage(sim: Sim, e: number): number {
-  return Math.round(Payload.damage[e]! * damageMul(sim, e) * (Payload.waveScale[e] ? waveScale(sim) : 1))
 }
 
 export function blinkFlash(sim: Sim, x: number, y: number): void {
@@ -244,7 +240,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       const from = points[points.length - 1]!
       points.push({ x: cur.x, y: cur.y })
       const s = struckOf(cur.eid)
-      if (hit(sim, src, cur.eid, Math.max(1, Math.round(dmg)), { knockback: kb, from })) struck.push(s)
+      if (hit(sim, src, cur.eid, dmg, { knockback: kb, from })) struck.push(s)
       last = cur
       dmg *= Chain.decay[e]!
       cur = nearestTarget(sim, src, cur.x, cur.y, Chain.hopRange[e]!, visited)
@@ -269,6 +265,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     if (nearest.length === 0) return false
     nearest.forEach(({ t }, i) =>
       spawnDrop(sim, e, {
+        damage,
         emoji: abilityArtEmoji[e]!,
         size: DropShape.size[e]!,
         target: t.eid,
@@ -306,7 +303,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     let dmg = damage
     const execHp = BlinkShape.execHp[e]!
     if (execHp > 0 && Hp.max[target.eid]! > 0 && Hp.v[target.eid]! / Hp.max[target.eid]! <= execHp) {
-      dmg = Math.round(dmg * BlinkShape.execMul[e]!)
+      dmg *= BlinkShape.execMul[e]!
     }
     const s = struckOf(target.eid)
     if (hit(sim, src, target.eid, dmg, { knockback: kb, from: { x: landX, y: landY } })) applyOnHit(sim, src, onHit, target.x, target.y, dmg, [s], angle)
@@ -318,6 +315,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     const m = Owner.eid[e]!
     const seek = SprintShape.seek[e] && target ? target.eid : undefined
     if (!displace(sim, m, { kind: 'dash', angle, distance: SprintShape.distance[e]! * mods.reach, ms: SprintShape.ms[e]! * Math.sqrt(mods.reach), seek }, { self: true, skill: e })) return false
+    Motion.dmg[m] = damage
     if (color !== 0) spawnFxCircle(sim, ox, oy, SprintShape.radius[e]!, {
       fill: color,
       fillAlpha: 0.35,
@@ -336,7 +334,9 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     const m = Owner.eid[e]!
     const dist = LeapShape.distance[e]! * mods.reach
     const to = { x: Transform.x[m]! + Math.cos(angle) * dist, y: Transform.y[m]! + Math.sin(angle) * dist }
-    return displace(sim, m, { kind: 'arc', x: to.x, y: to.y, ms: LeapShape.ms[e]!, height: LeapShape.height[e]! }, { self: true, skill: e })
+    if (!displace(sim, m, { kind: 'arc', x: to.x, y: to.y, ms: LeapShape.ms[e]!, height: LeapShape.height[e]! }, { self: true, skill: e })) return false
+    Motion.dmg[m] = damage
+    return true
   }
 
   if (hasComponent(w, e, AllShape)) {
@@ -344,10 +344,9 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       const list = targetsWithin(sim, src, ox, oy, Infinity)
       const struck: Struck[] = []
       if (damage > 0) {
-        const bossRatio = Payload.bossRatio[e]!
         for (const t of list) {
           const s = struckOf(t.eid)
-          if (hit(sim, src, t.eid, Math.max(1, Math.round(damage * (Boss.v[t.eid] ? bossRatio : 1))))) struck.push(s)
+          if (hit(sim, src, t.eid, damage)) struck.push(s)
         }
         sim.out.flash = { color: 0xffffff, alpha: 0.55, durationMs: 380 }
       } else {
@@ -517,7 +516,7 @@ export function fireAbility(sim: Sim, e: number, preset?: Shot): boolean {
     reach: hold > 0 ? 1 + (Hold.reachMul[e]! - 1) * hold : 1,
   }
   const holdMul = hold > 0 ? 1 + (Hold.damageMul[e]! - 1) * hold : 1
-  const damage = Math.round(baseDamage(sim, e) * holdMul * (boost?.damageMul ?? 1))
+  const damage = Payload.damage[e]! * holdMul * (boost?.damageMul ?? 1)
   if (count <= 1 || delay > 0) {
     if (!fireMirrored(sim, e, src, shot.angle, shot.target, damage, mods)) return false
     if (count > 1) {
@@ -580,7 +579,7 @@ export function fireRepeat(sim: Sim, e: number): boolean {
       if (Repeat.spreadDeg[e]! >= 360 - 1e-9) angle = RepeatState.angle[e]! + (i * Math.PI * 2) / count
   }
   Aim.rad[e] = angle
-  if (!fireMirrored(sim, e, src, angle, target, Math.max(1, Math.round(RepeatState.damage[e]! * Repeat.ratio[e]!)), { onHit: abilityOnHit[e], reach: 1 })) return false
+  if (!fireMirrored(sim, e, src, angle, target, RepeatState.damage[e]! * Repeat.ratio[e]!, { onHit: abilityOnHit[e], reach: 1 })) return false
   const sfx = abilityFireSfx[e]
   if (sfx) playSfx(sfx)
   return true

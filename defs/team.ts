@@ -3,7 +3,6 @@ import type { TeamBaseline } from '../src/types/characters'
 export const TEAM_BASELINE = {
   team: {
     maxSize: 5,
-    reviveMs: 10_000,
     leaderSizeMul: 1.25,
     followerSizeMul: 0.75,
     leaderGrip: 8,
@@ -12,7 +11,6 @@ export const TEAM_BASELINE = {
   member: {
     size: 1.2,
     radius: 0.45,
-    maxHp: 100,
-    iframesMs: 700,
+    stats: { maxHp: 100, iframes: 700, revive: 10_000, magnet: 2.25 },
   },
 } as const satisfies TeamBaseline

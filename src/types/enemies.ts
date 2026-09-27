@@ -1,4 +1,5 @@
 import type { AbilityDef, Effect } from './abilityDefs'
+import type { StatMods } from './stats'
 
 /** 驱动：身体没事时怎么走；蓄力突刺、自爆这类"动作"是能力，不在这里 */
 export type DriveDef =
@@ -90,14 +91,13 @@ export type EnemyKind =
   | 'tree'
   | 'pylon'
   | 'swan'
-/** 一种形态：换外观、换能力、换走法、换体型；不写的沿用本体 */
+/** 一种形态：换外观、换能力、换走法、改属性；不写的沿用本体 */
 export interface FormDef {
   readonly emoji?: string
   readonly name?: string
   readonly abilities?: readonly AbilityDef[]
   readonly drive?: DriveDef
-  readonly sizeMul?: number
-  readonly speedMul?: number
+  readonly stats?: StatMods
   readonly anchored?: boolean
   readonly damage?: number
 }
@@ -167,10 +167,7 @@ export interface Difficulty {
   readonly elite: {
     readonly fromWave: number
     readonly chance: number
-    readonly hpMul: number
-    readonly speedMul: number
-    readonly damageMul: number
-    readonly sizeMul: number
+    readonly stats: StatMods
     readonly xpMul: number
     readonly coinsMul: number
   }

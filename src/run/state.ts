@@ -1,4 +1,4 @@
-import { CHARACTERS, MEMBER, ROSTER_IDS, TEAM } from '../data/characters'
+import { CHARACTERS, ROSTER_IDS, TEAM, memberStats } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { WAVE } from '../data/waves'
 import { browserStorage } from '../util/storage'
@@ -56,7 +56,7 @@ export function beginRun(starters: readonly CharacterId[], mapId: MapId = MAP_ID
     xp: { level: 1, xp: 0 },
     combatMs: 0,
     roster,
-    memberHp: roster.map(() => MEMBER.maxHp),
+    memberHp: roster.map((id) => memberStats(CHARACTERS[id]).maxHp),
     memberItems: roster.map(() => []),
     skillCd: roster.map(() => 0),
     memberForm: roster.map(() => -1),
@@ -114,7 +114,7 @@ function canRecruit(run: RunState, id: CharacterId): boolean {
 export function recruitMember(run: RunState, id: CharacterId): number {
   if (!canRecruit(run, id)) return -1
   run.roster.push(id)
-  run.memberHp.push(MEMBER.maxHp)
+  run.memberHp.push(memberStats(CHARACTERS[id]).maxHp)
   run.memberItems.push([])
   run.skillCd.push(0)
   run.memberForm.push(-1)

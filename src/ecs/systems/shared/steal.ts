@@ -1,7 +1,7 @@
 import { addComponent, hasComponent, query } from 'bitecs'
-import { Ability, Alive, Amp, Borrowed, Cd, Faction, Manual, Owner, Stage, Uid } from '../../components'
+import { Ability, Alive, Borrowed, Cd, Faction, Manual, Owner, Stage, Uid } from '../../components'
 import { abilityDef } from '../../store'
-import { equipAbility, NEUTRAL_AMP, unequipAbilities } from '../../entities/ability'
+import { equipAbility, unequipAbilities } from '../../entities/ability'
 import { isSameEntity } from '../../utils/identity'
 import type { AbilityDef } from '../../../types/abilityDefs'
 import type { Sim } from '../../sim'
@@ -12,14 +12,8 @@ function borrowedCopy(def: AbilityDef, cooldownMs: number): AbilityDef {
   return { ...def, trigger: 'auto', cooldownMs, aim, recast: undefined, cycle: undefined, hold: undefined }
 }
 
-/** 借来的能力按夺取那一下的能力倍率出手，身体直接夺的按中性倍率 */
-function ampOf(sim: Sim, via: number | undefined): typeof NEUTRAL_AMP {
-  if (via === undefined || !hasComponent(sim.world, via, Amp)) return NEUTRAL_AMP
-  return { dmg: Amp.dmg[via]!, cd: Amp.cd[via]!, crit: Amp.crit[via]!, kb: Amp.kb[via]!, battle: Amp.battle[via] === 1 }
-}
-
-/** 夺取：从目标身上复制一条能力给自己用一阵，同时只借一条，连段的后续段不算；夺主动技能时原主的冷却重新走，夺取者死了原主立刻转好 */
-export function stealAbility(sim: Sim, by: number, t: number, ms: number, cooldownMs: number, skill: boolean, via?: number): void {
+/** 夺取：从目标身上复制一条能力给自己用一阵，按夺取者的属性表出手；同时只借一条，连段的后续段不算；夺主动技能时原主的冷却重新走，夺取者死了原主立刻转好 */
+export function stealAbility(sim: Sim, by: number, t: number, ms: number, cooldownMs: number, skill: boolean): void {
   if (by === t || !Alive.v[by]) return
   const pool: number[] = []
   for (const e of query(sim.world, [Ability, Owner])) {
@@ -31,7 +25,7 @@ export function stealAbility(sim: Sim, by: number, t: number, ms: number, cooldo
   if (pool.length === 0) return
   const from = pool[Math.floor(sim.rng.next() * pool.length)]!
   unequipAbilities(sim, by, (e) => hasComponent(sim.world, e, Borrowed))
-  const e = equipAbility(sim, by, borrowedCopy(abilityDef[from]!, cooldownMs), Faction.v[by]!, 300, ampOf(sim, via))
+  const e = equipAbility(sim, by, borrowedCopy(abilityDef[from]!, cooldownMs), Faction.v[by]!, 300)
   addComponent(sim.world, e, Borrowed)
   Borrowed.until[e] = sim.elapsedMs + ms
   Borrowed.from[e] = skill ? from : -1

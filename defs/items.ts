@@ -9,7 +9,7 @@ export const ITEMS = {
     price: 15,
     pool: 'all',
     upgradeXp: 10,
-    effects: { hpAdd: 25 },
+    effects: { add: { maxHp: 25 } },
   },
   shellArmor: {
     emoji: '1f6e1',
@@ -20,7 +20,7 @@ export const ITEMS = {
     maxStacks: 3,
     pool: 'all',
     upgradeXp: 12,
-    effects: { hpAdd: 60, cooldownMul: 1.1 },
+    effects: { add: { maxHp: 60 }, mul: { cooldown: 1.1 } },
   },
   stimulant: {
     emoji: '26a1',
@@ -31,7 +31,7 @@ export const ITEMS = {
     maxStacks: 5,
     pool: 'all',
     upgradeXp: 13,
-    effects: { cooldownMul: 0.87, hpAdd: -10 },
+    effects: { add: { maxHp: -10 }, mul: { cooldown: 0.87 } },
   },
   whetstone: {
     emoji: '1f5e1',
@@ -41,7 +41,7 @@ export const ITEMS = {
     price: 25,
     pool: 'all',
     upgradeXp: 13,
-    effects: { damageMul: 1.12 },
+    effects: { mul: { damage: 1.12 } },
   },
   rageBracer: {
     emoji: '1f4aa',
@@ -52,7 +52,7 @@ export const ITEMS = {
     maxStacks: 3,
     pool: 'all',
     upgradeXp: 15,
-    effects: { damageMul: 1.25, hpAdd: -20 },
+    effects: { add: { maxHp: -20 }, mul: { damage: 1.25 } },
   },
   padHelmet: {
     emoji: '26d1',
@@ -63,7 +63,7 @@ export const ITEMS = {
     maxStacks: 3,
     pool: 'all',
     upgradeXp: 11,
-    effects: { iframesAddMs: 150 },
+    effects: { add: { iframes: 150 } },
   },
   reviveWatch: {
     emoji: '23f1',
@@ -74,7 +74,7 @@ export const ITEMS = {
     maxStacks: 3,
     pool: 'all',
     upgradeXp: 12,
-    effects: { reviveAddMs: -2000 },
+    effects: { add: { revive: -2000 } },
   },
   regenRing: {
     emoji: '1f48d',
@@ -85,7 +85,7 @@ export const ITEMS = {
     maxStacks: 3,
     pool: 'all',
     upgradeXp: 26,
-    effects: { regenPerSec: 2 },
+    effects: { add: { regen: 2 } },
   },
   thornVest: {
     emoji: '1f335',
@@ -96,7 +96,7 @@ export const ITEMS = {
     maxStacks: 3,
     pool: 'all',
     upgradeXp: 26,
-    effects: { thorns: 14 },
+    effects: { add: { thorns: 14 } },
   },
   vampFang: {
     emoji: '1f9b7',
@@ -107,7 +107,7 @@ export const ITEMS = {
     maxStacks: 2,
     pool: 'all',
     upgradeXp: 28,
-    effects: { killHeal: 3 },
+    effects: { add: { killHeal: 3 } },
   },
   hammerWeight: {
     emoji: '1f528',
@@ -118,7 +118,7 @@ export const ITEMS = {
     maxStacks: 2,
     pool: 'all',
     upgradeXp: 24,
-    effects: { knockbackMul: 1.35 },
+    effects: { mul: { knockback: 1.35 } },
   },
   fateDice: {
     emoji: '1f3b2',
@@ -130,7 +130,7 @@ export const ITEMS = {
     pool: 'all',
     upgradeXp: 55,
     minLevel: 2,
-    effects: { critChance: 0.2 },
+    effects: { add: { crit: 0.2 } },
   },
   giantHeart: {
     emoji: '1fac0',
@@ -142,7 +142,7 @@ export const ITEMS = {
     pool: 'all',
     upgradeXp: 52,
     minLevel: 3,
-    effects: { hpAdd: 150 },
+    effects: { add: { maxHp: 150 } },
   },
   phaseCloak: {
     emoji: '1f32b',
@@ -154,7 +154,7 @@ export const ITEMS = {
     pool: 'all',
     upgradeXp: 56,
     minLevel: 2,
-    effects: { iframesAddMs: 400 },
+    effects: { add: { iframes: 400 } },
   },
   blastPowder: {
     emoji: '1f4a5',
@@ -165,7 +165,7 @@ export const ITEMS = {
     maxStacks: 3,
     pool: 'disc',
     upgradeXp: 12,
-    effects: { rangeMul: 1.2 },
+    effects: { mul: { range: 1.2 } },
   },
   scope: {
     emoji: '1f3af',
@@ -176,7 +176,7 @@ export const ITEMS = {
     maxStacks: 2,
     pool: 'bolt',
     upgradeXp: 11,
-    effects: { projSpeedMul: 1.25 },
+    effects: { mul: { projSpeed: 1.25 } },
   },
   powerCell: {
     emoji: '1f50b',
@@ -187,7 +187,7 @@ export const ITEMS = {
     maxStacks: 3,
     pool: 'segment',
     upgradeXp: 11,
-    effects: { rangeMul: 1.2 },
+    effects: { mul: { range: 1.2 } },
   },
   longHaft: {
     emoji: '1f32a',
@@ -198,7 +198,7 @@ export const ITEMS = {
     maxStacks: 3,
     pool: 'sector',
     upgradeXp: 12,
-    effects: { rangeMul: 1.15, cooldownMul: 1.05 },
+    effects: { mul: { range: 1.15, cooldown: 1.05 } },
   },
   returnString: {
     emoji: '1f9f5',
@@ -209,7 +209,7 @@ export const ITEMS = {
     maxStacks: 3,
     pool: 'flyer',
     upgradeXp: 11,
-    effects: { rangeMul: 1.2 },
+    effects: { mul: { range: 1.2 } },
   },
   frostCore: {
     emoji: '1f9ca',
@@ -220,6 +220,6 @@ export const ITEMS = {
     maxStacks: 3,
     pool: 'zone',
     upgradeXp: 12,
-    effects: { rangeMul: 1.2 },
+    effects: { mul: { range: 1.2 } },
   },
 } as const satisfies Record<string, ItemDef>

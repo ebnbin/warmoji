@@ -9,6 +9,7 @@ import { isSameEntity } from '../utils/identity'
 import { eachAlly, targetsWithin } from '../utils/targets'
 import { zoneDwellIn, zoneEffects, zoneRules, zoneSrc } from '../store'
 import { spawnFxCircle } from '../entities/fx'
+import { attackOf } from '../utils/source'
 import type { Source } from '../utils/source'
 import type { Sim } from '../sim'
 
@@ -148,7 +149,7 @@ export function updateZones(sim: Sim): void {
       port(sim, z, x, y, r)
       continue
     }
-    const mend = Zone.mend[z]!
+    const mend = Zone.mend[z]! * attackOf(sim, src).healing
     if (mend > 0) {
       eachAlly(sim, src.faction, x, y, r, false, (eid, tx, ty) => {
         if (inside(x, y, r, tx, ty)) Hp.v[eid] = Math.min(Hp.max[eid]!, Hp.v[eid]! + mend * dt)

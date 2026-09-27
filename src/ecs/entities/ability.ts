@@ -13,7 +13,6 @@ import {
   Aim,
   ALL_OF,
   AllShape,
-  Amp,
   Anchor,
   Aura,
   BlinkShape,
@@ -240,16 +239,6 @@ function attachShape<K extends keyof ShapeOf>(sim: Sim, e: number, s: ShapeOf[K]
   SHAPES[s.kind].attach(sim, e, s, faction)
 }
 
-interface AmpInit {
-  dmg: number
-  cd: number
-  crit: number
-  kb: number
-  battle: boolean
-}
-
-export const NEUTRAL_AMP: AmpInit = { dmg: 1, cd: 1, crit: 0, kb: 1, battle: false }
-
 interface AbilityInit {
   owner: number
   anchor: number
@@ -257,7 +246,6 @@ interface AbilityInit {
   cooldownMs: number
   /** 冷却基数：自动能力取定义里的，主动技能由角色给 */
   baseMs?: number
-  amp: AmpInit
   manual: boolean
 }
 
@@ -265,7 +253,7 @@ interface AbilityInit {
 function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit): void {
   const world = sim.world
   const spec = SHAPES[def.shape.kind]
-  addComponents(world, e, Ability, AbilityClass, Owner, Anchor, Faction, Amp, Frozen, Disarmed, WallBlocked, Cd, Aim, Payload, Spend, ...spec.comps)
+  addComponents(world, e, Ability, AbilityClass, Owner, Anchor, Faction, Frozen, Disarmed, WallBlocked, Cd, Aim, Payload, Spend, ...spec.comps)
   if (init.manual) addComponent(world, e, Manual)
   AbilityClass.skill[e] = (def.class ?? (def.trigger === 'manual' ? 'skill' : 'attack')) === 'skill' ? 1 : 0
   Owner.eid[e] = init.owner
@@ -299,11 +287,6 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
     Hold.damageMul[e] = def.hold.damageMul
     Hold.ratio[e] = 0
   }
-  Amp.dmg[e] = init.amp.dmg
-  Amp.cd[e] = init.amp.cd
-  Amp.crit[e] = init.amp.crit
-  Amp.kb[e] = init.amp.kb
-  Amp.battle[e] = init.amp.battle ? 1 : 0
   Frozen.v[e] = 0
   Disarmed.v[e] = 0
   WallBlocked.v[e] = init.manual || abilityPiercesWalls(def) ? 0 : 1
@@ -312,8 +295,6 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
   Aim.range[e] = def.range ?? shapeRange(def.shape)
   Payload.damage[e] = def.damage ?? 0
   Payload.knockback[e] = def.knockback ?? 0
-  Payload.bossRatio[e] = def.bossRatio ?? 1
-  Payload.waveScale[e] = def.waveScale ? 1 : 0
   Payload.color[e] = def.color ?? 0
   Payload.fxRadius[e] = def.fxRadius ?? 0
   if (def.repeat) {
@@ -359,21 +340,21 @@ function spawnPet(sim: Sim, e: number, host: number, a: NonNullable<AbilityDef['
   return p
 }
 
+/** 装上一条能力：出手时按所有者的属性表结算，所有者默认是宿主 */
 export function equipAbility(
   sim: Sim,
   host: number,
   def: AbilityDef,
   faction: number,
   cooldownMs: number,
-  amp: AmpInit,
   opts: { manual?: boolean; owner?: number; baseMs?: number } = {},
 ): number {
   const e = def.held ? spawnWeaponBody(sim, host, def.held, faction) : newEntity(sim.world)
   const manual = opts.manual === true
-  attachAbility(sim, e, def, { owner: opts.owner ?? host, anchor: host, faction, cooldownMs, baseMs: opts.baseMs, amp, manual })
-  if (def.recast) chainStage(sim, e, def.recast.windowMs, equipAbility(sim, host, def.recast.ability, faction, 0, amp, { manual, owner: opts.owner }))
+  attachAbility(sim, e, def, { owner: opts.owner ?? host, anchor: host, faction, cooldownMs, baseMs: opts.baseMs, manual })
+  if (def.recast) chainStage(sim, e, def.recast.windowMs, equipAbility(sim, host, def.recast.ability, faction, 0, { manual, owner: opts.owner }))
   if (def.cycle) {
-    const members = [e, ...def.cycle.map((d) => equipAbility(sim, host, d, faction, cooldownMs, amp, { manual, owner: opts.owner }))]
+    const members = [e, ...def.cycle.map((d) => equipAbility(sim, host, d, faction, cooldownMs, { manual, owner: opts.owner }))]
     members.forEach((m, i) => {
       addComponent(sim.world, m, Turn)
       Turn.active[m] = i === 0 ? 1 : 0
@@ -398,8 +379,8 @@ function chainStage(sim: Sim, e: number, windowMs: number, next: number): void {
 }
 
 /** 主动技能：所有者与锚点都是宿主，由附身者按键触发；冷却基数与剩余冷却由角色给 */
-export function equipSkill(sim: Sim, host: number, def: AbilityDef, amp: AmpInit, cdMs: number, leftMs: number): number {
-  return equipAbility(sim, host, def, FACTION.team, leftMs, amp, { manual: true, baseMs: cdMs })
+export function equipSkill(sim: Sim, host: number, def: AbilityDef, cdMs: number, leftMs: number): number {
+  return equipAbility(sim, host, def, FACTION.team, leftMs, { manual: true, baseMs: cdMs })
 }
 
 /** 撤掉一个身体的能力（默认全部），连同它们造出来的场、召唤物、装置、飞返体、坠物与施法锚点 */

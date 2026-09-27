@@ -1,20 +1,7 @@
 import type itemsJson from '../assets/items.json'
 import type { ShapeKind } from './abilityDefs'
+import type { StatMods } from './stats'
 
-export interface CharacterEffects {
-  hpAdd: number
-  damageMul: number
-  cooldownMul: number
-  rangeMul: number
-  projSpeedMul: number
-  iframesAddMs: number
-  reviveAddMs: number
-  regenPerSec: number
-  thorns: number
-  killHeal: number
-  critChance: number
-  knockbackMul: number
-}
 export interface Economy {
   readonly critMul: number
   readonly price: {
@@ -36,6 +23,6 @@ export interface ItemDef {
   readonly pool: ItemPool
   readonly upgradeXp: number
   readonly minLevel?: 1 | 2 | 3
-  readonly effects: Partial<CharacterEffects>
+  readonly effects: StatMods
 }
 export type ItemId = keyof typeof itemsJson

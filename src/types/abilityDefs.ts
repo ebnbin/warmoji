@@ -666,8 +666,6 @@ interface AbilityBase {
   readonly shape: Shape
   readonly damage?: number
   readonly knockback?: number
-  readonly waveScale?: boolean
-  readonly bossRatio?: number
   readonly onHit?: readonly Effect[]
   readonly onSelf?: readonly Effect[]
   /** 出手前先施于自己的效果：结算后按新的状态判定这一下出不出得去（先解控再冲出去） */

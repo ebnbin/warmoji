@@ -33,6 +33,7 @@ import {
   Flee,
   Grow,
   GrowUp,
+  Hp,
   Idle,
   Mount,
   MARK,
@@ -42,7 +43,6 @@ import {
   Pop,
   Wander,
   Sprite,
-  Stamina,
   Standoff,
   TAG,
   Tint,
@@ -52,6 +52,7 @@ import { bodyRules, enemyDef, enemyOf, bodyLook } from '../store'
 import { attachResource } from './resource'
 import { interrupt } from '../systems/shared/ability'
 import { addMark, hasMark } from '../utils/marks'
+import { foldBody, setStatLayer } from '../utils/stats'
 import { spawnTelegraph, telegraphCount } from './telegraph'
 import { scheduleSurge } from './schedule'
 import { armIdle } from '../systems/shared/anim'
@@ -150,14 +151,13 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   const alpha = o.alpha ?? 1
   const faction = o.faction ?? FACTION.enemy
   const outline: OutlineKind = faction === FACTION.team ? 'player' : elite || boss ? 'elite' : 'enemy'
-  const size = def.size * (elite ? ELITE.sizeMul : 1)
+  const size = def.size
   const eid = spawnBody(world, {
     faction,
     x,
     y,
     radius: def.radius,
-    hp,
-    thrust: def.speed * ENEMY_BODY.drag,
+    stats: { maxHp: hp, moveSpeed: def.speed / UNIT, exertion: def.exertionMul ?? 1 },
     drag: ENEMY_BODY.drag,
     mass: ENEMY_BODY.mass,
     grip: ENEMY_BODY.grip,
@@ -168,7 +168,6 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   Boss.v[eid] = boss ? 1 : 0
   if (def.kbImmune) addComponent(world, eid, Anchored)
   if (def.phasesWalls) addComponent(world, eid, Phasing)
-  Stamina.mul[eid] = def.exertionMul ?? 1
   const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
   Transform.x[eid] = born.x
   Transform.y[eid] = born.y
@@ -182,21 +181,11 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   bodyRules[eid] = def
   attachResource(world, eid, def.resource)
   if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
-  if (elite) {
-    addMark(eid, MARK.dmg, TAG.elite, Infinity, ELITE.damageMul)
-    addMark(eid, MARK.speed, TAG.elite, Infinity, ELITE.speedMul)
-  }
   if (def.grow) {
     addComponent(world, eid, GrowUp)
     GrowUp.at[eid] = sim.elapsedMs + def.grow.ms
   }
   Idle.since[eid] = sim.elapsedMs
-  if (def.mount) {
-    addComponent(world, eid, Mount)
-    Mount.max[eid] = Math.round(def.mount.hp * (hp / Math.max(1, def.hp)))
-    Mount.hp[eid] = Mount.max[eid]!
-    Mount.form[eid] = def.mount.form
-  }
   Nest.of[eid] = -1
   Nest.nextSpawnAt[eid] = def.spawner ? sim.elapsedMs + (def.spawner.firstDelayMs ?? def.spawner.intervalMs) : 0
   const heading = sim.rng.next() * Math.PI * 2
@@ -215,6 +204,15 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   Pop.alpha[eid] = alpha
   Depth.z[eid] = boss ? 7 : 5
   enemyDef[eid] = def
+  if (elite) setStatLayer(eid, 'elite', [ELITE.stats])
+  foldBody(world, undefined, eid)
+  Hp.v[eid] = Hp.max[eid]!
+  if (def.mount) {
+    addComponent(world, eid, Mount)
+    Mount.max[eid] = Math.round(def.mount.hp * (Hp.max[eid]! / Math.max(1, def.hp)))
+    Mount.hp[eid] = Mount.max[eid]!
+    Mount.form[eid] = def.mount.form
+  }
   return eid
 }
 
@@ -284,7 +282,7 @@ export function sightedSpawnPoint(sim: Sim): Point {
 export function telegraphOne(sim: Sim, hpMultiplier: number, forceElite = false): void {
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
   const elite = !sim.sandbox && (forceElite || (sim.run.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance))
-  const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
+  const hp = Math.round(def.hp * hpMultiplier)
   const pos = sightedSpawnPoint(sim)
   spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, false)
 }

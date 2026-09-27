@@ -1,6 +1,6 @@
 import { hasComponent, query } from 'bitecs'
 import { Ability, Cd, Charges, Frozen, Manual, Motion, MOTION, Owner, Thrown, WindupState } from '../components'
-import { cooldownMul } from '../utils/amp'
+import { cooldownMul } from '../utils/ability'
 import { openStage } from './shared/avail'
 import type { Sim } from '../sim'
 

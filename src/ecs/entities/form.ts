@@ -1,13 +1,13 @@
 import { addComponent, hasComponent, removeComponent } from 'bitecs'
 import { CHARACTERS } from '../../data/characters'
-import { Anchored, Anim, Borrowed, Contact, EnemyArm, Faction, Form, Grow, Manual, MARK, Phys, Slot, Sprite, TAG, Transform } from '../components'
+import { Anchored, Anim, Borrowed, Contact, EnemyArm, Faction, Form, Manual, MARK, Phys, Slot, Sprite, Transform } from '../components'
 import { bodyLook, enemyDef, formEnd } from '../store'
-import { addMark, clearMarksTagged, hasMark } from '../utils/marks'
+import { hasMark } from '../utils/marks'
+import { foldBody, setStatLayer } from '../utils/stats'
 import { armIdle } from '../systems/shared/anim'
-import { rescale } from '../systems/shared/scale'
 import { interrupt } from '../systems/shared/ability'
 import { attachDrive, detachDrive, npcOutline } from './enemy'
-import { equipAbility, NEUTRAL_AMP, unequipAbilities } from './ability'
+import { equipAbility, unequipAbilities } from './ability'
 import { armCarriers } from './loadout'
 import type { Effect } from '../../types/abilityDefs'
 import type { FormDef } from '../../types/enemies'
@@ -55,7 +55,7 @@ export function armNpc(sim: Sim, eid: number): void {
   EnemyArm.armed[eid] = 1
   for (const w of npcAbilities(sim, eid) ?? []) {
     const delay = ('firstDelayMs' in w ? w.firstDelayMs : undefined) ?? EnemyArm.fireDelayMs[eid]!
-    equipAbility(sim, eid, w, Faction.v[eid]!, delay, NEUTRAL_AMP)
+    equipAbility(sim, eid, w, Faction.v[eid]!, delay)
   }
 }
 
@@ -70,7 +70,7 @@ export function npcAbilities(sim: Sim, eid: number): FormDef['abilities'] {
   return f?.abilities ?? enemyDef[eid]?.abilities
 }
 
-/** 切形态：外观、能力、走法、体型、速度、锚定、接触伤害一起换，没写的沿用本体；给了 ms 到时切回本体并施加 onEnd；角色的永久形态记进本局 */
+/** 切形态：外观、能力、走法、属性、锚定、接触伤害一起换，没写的沿用本体；给了 ms 到时切回本体并施加 onEnd；角色的永久形态记进本局 */
 export function applyForm(sim: Sim, eid: number, to: number, ms?: number, onEnd?: readonly Effect[]): void {
   const forms = formsOf(sim, eid)
   if (to >= 0 && !forms?.[to]) return
@@ -84,11 +84,9 @@ export function applyForm(sim: Sim, eid: number, to: number, ms?: number, onEnd?
   Form.idx[eid] = to
   const f = to >= 0 ? forms![to] : undefined
   relook(sim, eid, f?.emoji ?? baseLook(sim, eid))
+  setStatLayer(eid, 'form', f?.stats ? [f.stats] : undefined)
+  foldBody(sim.world, sim, eid)
   if (f?.abilities || was?.abilities) rearm(sim, eid, f)
-  Grow.form[eid] = f?.sizeMul ?? 1
-  rescale(sim, eid)
-  clearMarksTagged(eid, MARK.speed, TAG.form)
-  if (f?.speedMul !== undefined) addMark(eid, MARK.speed, TAG.form, Infinity, f.speedMul)
   if (!char) npcBody(sim, eid, f)
   interrupt(sim, eid)
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })

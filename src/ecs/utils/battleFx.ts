@@ -1,8 +1,6 @@
-import { BATTLE_FX_IDENTITY, CARRIER_BUDGET, POOLS } from '../../data/battlefield'
+import { CARRIER_BUDGET, POOLS } from '../../data/battlefield'
 import type { BattleEffects, FieldPickupDef, Polarity } from '../../types/battlefield'
 import type { MapId } from '../../types/maps'
-
-const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
 
 function pickPolarity(
   pool: readonly FieldPickupDef[],
@@ -14,22 +12,11 @@ function pickPolarity(
   return sub[Math.floor(rand() * sub.length) % sub.length]
 }
 
-export function foldBattleEffects(parts: readonly Partial<BattleEffects>[]): BattleEffects {
-  const fx = { ...BATTLE_FX_IDENTITY }
-  for (const p of parts) {
-    if (p.moveSpeedMul !== undefined) fx.moveSpeedMul *= p.moveSpeedMul
-    if (p.teamDamageMul !== undefined) fx.teamDamageMul *= p.teamDamageMul
-    if (p.teamCooldownMul !== undefined) fx.teamCooldownMul *= p.teamCooldownMul
-    if (p.critAdd !== undefined) fx.critAdd += p.critAdd
-    if (p.enemySlowMul !== undefined) fx.enemySlowMul *= p.enemySlowMul
-  }
-  fx.moveSpeedMul = clamp(fx.moveSpeedMul, 0.35, 2.2)
-  fx.teamDamageMul = clamp(fx.teamDamageMul, 0.35, 2.5)
-  fx.teamCooldownMul = clamp(fx.teamCooldownMul, 0.4, 2.2)
-  fx.critAdd = clamp(fx.critAdd, 0, 0.5)
-  fx.enemySlowMul = clamp(fx.enemySlowMul, 0.4, 2.2)
-  return fx
+/** 同时生效的战场效果：各自的修正按阵营收拢，交给属性表去叠 */
+export function foldBattleEffects(parts: readonly FieldPickupDef['fx'][]): BattleEffects {
+  return { team: parts.flatMap((p) => (p.team ? [p.team] : [])), enemy: parts.flatMap((p) => (p.enemy ? [p.enemy] : [])) }
 }
+
 function waveCarrierBudget(wave: number, isBoss: boolean): { buff: number; debuff: number } {
   const cb = CARRIER_BUDGET
   if (isBoss) return { buff: cb.boss.buff, debuff: cb.boss.debuff }

@@ -23,7 +23,7 @@ export const CC_MARKS: readonly number[] = [
 /**
  * 加一条标记，返回槽位下标，加不上返回 -1：同种同源的已存在则刷新，时长只延长不缩短、参数取新值；按来源分开记的还要同一个 ref 与定义号 b；
  * 槽位满了顶掉最先到期的一条，变形的两条不顶（顶掉就没有到期反应）。
- * a/b/c 的含义：slow/speed/guard/dmg/cd 是倍率；poison 是跳伤、节拍、下次跳的时刻；regen 是每秒回复；taunt/fear/charm 是施加者的 eid 与最后见到它的位置；
+ * a/b/c 的含义：slow/speed/guard/dmg/cd/grow 是倍率；poison 是跳伤、节拍、下次跳的时刻；taunt/fear/charm 是施加者的 eid 与最后见到它的位置；
  * morph 是是否曾锚定；sleep 是醒来那一下的倍率；spellShield 是剩余次数；frontGuard 是朝向与半角；stack 是层数与定义号；fuse/deathMark/parry/empower 是定义号；
  * store 是已存的伤害与定义号；undead 是每秒流失；ref 是所引用身体的 Uid 或所在界的编号
  */
@@ -92,28 +92,7 @@ export function clearMarks(eid: number, kinds: readonly number[]): void {
   }
 }
 
-/** 清掉某种标记里带某个来源标签的，不触发到期反应 */
-export function clearMarksTagged(eid: number, kind: number, tag: number): void {
-  const base = eid * MARK_SLOTS
-  for (let i = 0; i < MARK_SLOTS; i++) {
-    const s = base + i
-    if (Mark.kind[s] === kind && Mark.tag[s] === tag) Mark.kind[s] = MARK.none
-  }
-}
-
-/** 某种倍率标记的乘积 */
-function product(sim: Sim, eid: number, kind: number): number {
-  const now = sim.elapsedMs
-  const base = eid * MARK_SLOTS
-  let mul = 1
-  for (let i = 0; i < MARK_SLOTS; i++) {
-    const s = base + i
-    if (Mark.kind[s] === kind && Mark.until[s]! > now) mul *= Mark.a[s]!
-  }
-  return mul
-}
-
-/** 减速取最强的一条 */
+/** 身上最强的一条减速，没被减速是 1 */
 export function slowFactor(sim: Sim, eid: number): number {
   const now = sim.elapsedMs
   const base = eid * MARK_SLOTS
@@ -123,23 +102,6 @@ export function slowFactor(sim: Sim, eid: number): number {
     if (Mark.kind[s] === MARK.slow && Mark.until[s]! > now) mul = Math.min(mul, Mark.a[s]!)
   }
   return mul
-}
-
-/** 速度的有效倍率 = 最强减速 × 固有倍率的乘积 */
-export function speedMul(sim: Sim, eid: number): number {
-  return slowFactor(sim, eid) * product(sim, eid, MARK.speed)
-}
-
-export function guardMul(sim: Sim, eid: number): number {
-  return product(sim, eid, MARK.guard)
-}
-
-export function dmgMul(sim: Sim, eid: number): number {
-  return product(sim, eid, MARK.dmg)
-}
-
-export function cdMul(sim: Sim, eid: number): number {
-  return product(sim, eid, MARK.cd)
 }
 
 /** 标记指向的那个身体（嘲讽者、恐惧与魅惑的施加者），已倒下或编号已被复用则 -1 */

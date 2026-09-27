@@ -3,6 +3,7 @@ import type { BodyRules, EnemyDef, NpcDef, ResourceDef } from '../types/enemies'
 import type { FieldPickupDef } from '../types/battlefield'
 import type { AbilityDef, Cond, Effect } from '../types/abilityDefs'
 import type { Source } from './utils/source'
+import type { StatBase, StatLayer, StatMods } from '../types/stats'
 
 const slots = <T>(): (T | undefined)[] => new Array<T | undefined>(INITIAL_CAPACITY).fill(undefined)
 
@@ -93,8 +94,14 @@ export const tetherSrc = slots<Source>()
 export const tetherHold = slots<readonly Effect[]>()
 export const tetherBreak = slots<readonly Effect[]>()
 
-/** 身体自己的规则：敌人是它的定义，角色是出生时按道具拼出来的包，造物只有接触效果 */
+/** 身体自己的规则：敌人是它的定义，角色是角色表里的，造物只有接触效果 */
 export const bodyRules = slots<BodyRules>()
+
+/** 属性的基础值：出生时按定义写，没写的取属性目录里的默认值 */
+export const statBase = slots<StatBase>()
+
+/** 属性的常驻修正，按来源分层，换一层时整层替换 */
+export const statLayers = slots<Partial<Record<StatLayer, readonly StatMods[]>>>()
 
 export const zoneEffects = slots<readonly Effect[]>()
 

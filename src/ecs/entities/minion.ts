@@ -9,7 +9,6 @@ import { holderOutline } from './weapon'
 import {
   Airborne,
   Alive,
-  Amp,
   Anim,
   Built,
   Clock,
@@ -28,7 +27,6 @@ import {
   Phys,
   Radius,
   Retiring,
-  SpeedMul,
   Sprite,
   Ctl,
   SummonShape,
@@ -38,8 +36,9 @@ import {
 import type { Sim } from '../sim'
 import { ANIM_DEF } from '../../emoji/anim'
 import { abilityArtEmoji, abilityOnHit, bodyRules, emplaceAbility } from '../store'
-import { anchorX, anchorY } from '../utils/amp'
+import { anchorX, anchorY } from '../utils/ability'
 import { equipAbility } from '../entities/ability'
+import { attachStats } from '../utils/stats'
 import { liveOnes } from '../utils/turret'
 
 interface MinionSpec {
@@ -98,11 +97,9 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
     lifeMs: SummonShape.lifeMs[e]!,
     animOffsetMs: (index * ANIM_DEF.durMs) / count,
   })
-  addComponents(world, m, Phys, Drive, Clock, Radius, Faction, Alive, SpeedMul, Ctl, Nest, Orbit, Contact, Phasing, Airborne)
-  const speed = SummonShape.speed[e]!
+  addComponents(world, m, Phys, Drive, Clock, Radius, Faction, Alive, Ctl, Nest, Orbit, Contact, Phasing, Airborne)
   Phys.vx[m] = 0
   Phys.vy[m] = 0
-  Phys.thrust[m] = speed * MINION_BODY.drag
   Phys.drag[m] = MINION_BODY.drag
   Phys.mass[m] = MINION_BODY.mass
   Phys.grip[m] = MINION_BODY.grip
@@ -112,7 +109,7 @@ export function spawnBee(sim: Sim, e: number, index: number): void {
   Radius.v[m] = size * 0.35
   Faction.v[m] = Faction.v[e]!
   Alive.v[m] = 1
-  SpeedMul.v[m] = 1
+  attachStats(world, m, { moveSpeed: SummonShape.speed[e]! / UNIT })
   Ctl.move[m] = 1
   Ctl.act[m] = 1
   Nest.of[m] = owner
@@ -157,13 +154,7 @@ export function place(sim: Sim, e: number, at?: { x: number; y: number }, lifeMs
   addComponent(sim.world, m, Fired)
   Fired.v[m] = 0
   const def = emplaceAbility[e]!
-  const a = equipAbility(sim, m, def, Faction.v[e]!, MINION_FIRST_SHOT_MS, {
-    dmg: Amp.dmg[e]!,
-    cd: Amp.cd[e]!,
-    crit: Amp.crit[e]!,
-    kb: Amp.kb[e]!,
-    battle: Amp.battle[e] === 1,
-  }, { owner: Owner.eid[e]! })
+  const a = equipAbility(sim, m, def, Faction.v[e]!, MINION_FIRST_SHOT_MS, { owner: Owner.eid[e]! })
   Minion.ability[m] = a
   let over = live.length + 1 - EmplaceShape.maxAlive[e]!
   while (over-- > 0) {

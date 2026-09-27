@@ -1,7 +1,7 @@
 import { hasComponent, query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { STAMINA } from '../../data/stamina'
-import { Airborne, Alive, Drive, Motion, MOTION, Slot, Stamina, Transform } from '../components'
+import { Airborne, Alive, Drive, Motion, MOTION, Slot, Stamina, Stats, Transform } from '../components'
 import { bodyDt } from './shared/body'
 import type { Sim } from '../sim'
 
@@ -11,7 +11,7 @@ function walked(sim: Sim, eid: number, dt: number): number {
   return Math.hypot(Drive.x[eid]!, Drive.y[eid]!) * dt
 }
 
-/** 赶路按距离乘脚下的费力、再乘自己的倍率扣体力，队员最多扣到队伍这一帧前进的距离；这一帧没被扣就算在歇，歇满一阵后先慢后快地回 */
+/** 赶路按距离乘脚下的费力、再乘属性表的赶路耗体力扣体力，队员最多扣到队伍这一帧前进的距离；这一帧没被扣就算在歇，歇满一阵后先慢后快地回 */
 export function tickStamina(sim: Sim): void {
   const leader = sim.leader
   const squad = Alive.v[leader] ? walked(sim, leader, bodyDt(sim, leader)) : 0
@@ -21,7 +21,7 @@ export function tickStamina(sim: Sim): void {
     if (dt <= 0) continue
     const own = walked(sim, eid, dt)
     const dist = hasComponent(sim.world, eid, Slot) ? Math.min(own, squad) : own
-    const cost = dist > 0 ? (sim.hooks.surface(sim, Transform.x[eid]!, Transform.y[eid]!).exertion * Stamina.mul[eid]! * dist) / UNIT : 0
+    const cost = dist > 0 ? (sim.hooks.surface(sim, Transform.x[eid]!, Transform.y[eid]!).exertion * Stats.exertion[eid]! * dist) / UNIT : 0
     if (cost > 0) {
       Stamina.v[eid] = Math.max(0, Stamina.v[eid]! - cost)
       Stamina.restMs[eid] = 0

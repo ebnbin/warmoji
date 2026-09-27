@@ -3,13 +3,7 @@ import { fromJson } from './json'
 import type { MapId } from '../types/maps'
 import type { BattleEffects, BattlefieldTuning, FieldPickupDef, Polarity } from '../types/battlefield'
 
-export const BATTLE_FX_IDENTITY: BattleEffects = {
-  moveSpeedMul: 1,
-  teamDamageMul: 1,
-  teamCooldownMul: 1,
-  critAdd: 0,
-  enemySlowMul: 1,
-}
+export const BATTLE_FX_IDENTITY: BattleEffects = { team: [], enemy: [] }
 
 const BF = fromJson<BattlefieldTuning>(battlefieldJson)
 

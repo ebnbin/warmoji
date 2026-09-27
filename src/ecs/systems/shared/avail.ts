@@ -1,6 +1,6 @@
 import { hasComponent } from 'bitecs'
 import { Ammo, Cd, Charges, Disarmed, Frozen, Stage, Turn } from '../../components'
-import { cooldownMul } from '../../utils/amp'
+import { cooldownMul } from '../../utils/ability'
 import { busy } from './fire'
 import { affordable, payRes } from './resource'
 import type { Sim } from '../../sim'

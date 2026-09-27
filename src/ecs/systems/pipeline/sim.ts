@@ -22,7 +22,8 @@ import { reviveCharacters } from '../reviveCharacters'
 import { steerBodies } from '../steerBodies'
 import { updateBees } from '../updateBees'
 import { updateControl } from '../updateControl'
-import { updateSpeedMuls } from '../updateSpeedMuls'
+import { tickStats } from '../tickStats'
+import { tickRegen } from '../tickRegen'
 import { tickMarks } from '../tickMarks'
 import { tickResources } from '../tickResources'
 import { tickForms } from '../tickForms'
@@ -44,7 +45,7 @@ import { updateShards } from '../updateShards'
 import { worldTick } from '../worldTick'
 import { pipeline } from './step'
 
-// 先走标记的时钟，再算每个身体的速度倍率与门控，再由驱动写期望速度，积分只在 moveBodies 一处；时标是身体的属性（Clock）
+// 先走标记的时钟，再汇总每个身体的属性表与门控，再由驱动写期望速度，积分只在 moveBodies 一处；时标是身体的属性（Clock）
 export const SIM_PIPELINE = pipeline([
   refoldBattleFx,
   tickSkillCooldowns,
@@ -59,8 +60,9 @@ export const SIM_PIPELINE = pipeline([
   { run: tickGrowUp, after: [tickMarks] },
   { run: tickIdle, after: [tickMarks] },
   { run: tickBarriers, after: [tickMarks] },
-  { run: updateSpeedMuls, after: [refoldBattleFx, tickMarks] },
-  { run: updateControl, after: [updateSpeedMuls, tickMarks] },
+  { run: tickStats, after: [refoldBattleFx, tickMarks, tickForms] },
+  { run: tickRegen, after: [tickStats] },
+  { run: updateControl, after: [tickStats, tickMarks] },
   { run: driveTeam, after: [stepHandover, reviveCharacters, updateControl] },
   { run: layoutTeam, after: [driveTeam] },
   popInEnemies,

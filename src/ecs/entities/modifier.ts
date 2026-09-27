@@ -1,6 +1,5 @@
 import { addComponents, query, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
-import { BATTLE_FX_IDENTITY } from '../../data/battlefield'
 import { foldBattleEffects } from '../utils/battleFx'
 import { Lifetime, Modifier } from '../components'
 import { modDef } from '../store'
@@ -26,7 +25,5 @@ export function activeMods(sim: Sim): number[] {
 }
 
 export function foldMods(sim: Sim): BattleEffects {
-  const live = activeMods(sim)
-  if (live.length === 0) return { ...BATTLE_FX_IDENTITY }
-  return foldBattleEffects(live.map((e) => modDef[e]!.fx))
+  return foldBattleEffects(activeMods(sim).map((e) => modDef[e]!.fx))
 }

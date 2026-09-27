@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { UNIT } from '../util/units'
-import { CHARACTERS, MEMBER } from '../data/characters'
+import { CHARACTERS, memberBase } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
 import { burstEmitter, setOverlayFill } from '../util/fx'
@@ -33,11 +33,12 @@ import { remapSim } from './systems/shared/remap'
 import { viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
-import { abilityRequires, bodyLook, modDef } from './store'
+import { abilityRequires, bodyLook, modDef, statBase } from './store'
+import { foldBody, lastingStats, statsOf } from './utils/stats'
 import { aimAt } from './systems/shared/fire'
 import { sourceOf } from './utils/source'
 import { resetEntityStorage } from './storage'
-import { armTeam } from './entities/loadout'
+import { armTeam, memberGear } from './entities/loadout'
 import { requestCast } from './systems/shared/ability'
 import { resDef } from './store'
 import type { ResourceDef } from '../types/enemies'
@@ -57,7 +58,7 @@ import { isBossWave, isEliteWave, waveAt, waveDurationMs, WAVE } from '../data/w
 import { xpToNext } from '../run/xp'
 import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
-import type { HudEvents, HudHost, LeaderSkill, SquadSnapshot } from '../run/hudHost'
+import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
 import type { HudSnapshot } from '../run/hudHost'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
@@ -555,6 +556,26 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     }
   }
 
+  teamSheets(): MemberSheet[] {
+    const sim = this.sim
+    if (!sim) return []
+    return sim.characters.map((m, slot) => {
+      const def = CHARACTERS[this.run.roster[slot]!]
+      return {
+        emoji: bodyLook[m] ?? def.emoji,
+        name: def.name,
+        level: memberGear(this.run, slot, sim.sandbox).level,
+        leader: m === sim.leader,
+        alive: Alive.v[m] === 1,
+        hp: Hp.v[m]!,
+        max: Hp.max[m]!,
+        reviveSec: Math.max(0, Math.ceil((Revive.at[m]! - sim.elapsedMs) / 1000)),
+        now: statsOf(m),
+        lasting: lastingStats(m),
+      }
+    })
+  }
+
   switchLeader(slot: number): boolean {
     const sim = this.sim
     if (!sim || this.ending) return false
@@ -637,11 +658,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   applySandboxInvincible(): void {
     const sim = this.sim
     if (!sim) return
-    const mh = sandboxInvincible() ? INVINCIBLE_HP : MEMBER.maxHp
-    for (const m of sim.characters) {
-      Hp.max[m] = mh
-      Hp.v[m] = sandboxInvincible() ? mh : Math.min(Hp.v[m]!, mh)
-    }
+    sim.run.roster.forEach((id, slot) => {
+      const m = sim.characters[slot]!
+      const base = memberBase(CHARACTERS[id])
+      statBase[m] = sandboxInvincible() ? { ...base, maxHp: INVINCIBLE_HP } : base
+      foldBody(sim.world, sim, m)
+      if (sandboxInvincible()) Hp.v[m] = Hp.max[m]!
+    })
   }
 
 

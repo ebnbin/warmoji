@@ -1,6 +1,12 @@
-import { Hp } from '../../components'
+import { Alive, Hp } from '../../components'
 import { eachAlly } from '../../utils/targets'
 import type { Sim } from '../../sim'
+
+/** 直接给一个身体回血：活着且没满血才回 */
+export function mend(eid: number, amount: number): void {
+  if (amount <= 0 || !Alive.v[eid] || Hp.v[eid]! >= Hp.max[eid]!) return
+  Hp.v[eid] = Math.min(Hp.max[eid]!, Hp.v[eid]! + amount)
+}
 
 /** 治疗范围内受伤的同阵营身体：全体，或只治血量比例最低的一个；返回治到的人数 */
 export function healAllies(

@@ -559,7 +559,7 @@ const KNIGHT = {
     {
       emoji: '1f479',
       name: '恶鬼',
-      speedMul: 0.55,
+      stats: { mul: { moveSpeed: 0.55 } },
       abilities: [
         {
           trigger: 'auto',
@@ -932,7 +932,7 @@ const FACTORY_BOSS = {
     {
       emoji: '2623',
       name: '泄漏核心',
-      speedMul: 1.4,
+      stats: { mul: { moveSpeed: 1.4 } },
       abilities: [
         {
           trigger: 'auto',
@@ -1086,7 +1086,7 @@ const DAYNIGHT_BOSS = {
     {
       emoji: '1f987',
       name: '蝙蝠群',
-      speedMul: 1.3,
+      stats: { mul: { moveSpeed: 1.3 } },
       abilities: [
         {
           trigger: 'auto',
@@ -1235,7 +1235,7 @@ const ICE_BOSS = {
     },
   ],
   onLethal: [{ kind: 'healRatio', ratio: 0.2 }, { kind: 'form', to: 0, ms: 6000, onEnd: [{ kind: 'healRatio', ratio: 1 }] }],
-  forms: [{ emoji: '1f95a', name: '冰蛋', sizeMul: 0.7, speedMul: 0, anchored: true, drive: { kind: 'stay' }, abilities: [], damage: 0 }],
+  forms: [{ emoji: '1f95a', name: '冰蛋', stats: { mul: { scale: 0.7, moveSpeed: 0 } }, anchored: true, drive: { kind: 'stay' }, abilities: [], damage: 0 }],
 } satisfies EnemyDef
 
 type EnemyTable = { readonly [K in EnemyKind]: EnemyDef & { readonly kind: K } }

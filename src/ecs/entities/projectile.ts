@@ -44,7 +44,7 @@ export function spawnBolt(sim: Sim, x: number, y: number, angle: number, spec: B
   Tint.effect[eid] = 0
   Tint.alpha[eid] = 1
   Quad.v[eid] = 0
-  Proj.damage[eid] = Math.round(spec.damage)
+  Proj.damage[eid] = spec.damage
   Proj.radius[eid] = spec.radius
   Proj.kb[eid] = spec.knockback
   Proj.pierce[eid] = spec.pierce

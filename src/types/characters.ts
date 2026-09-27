@@ -3,12 +3,15 @@ import type { AbilityId } from './abilities'
 import type { AbilityDef } from './abilityDefs'
 import type { AbilityTier, UpgradeCard, WeaponId } from './weapons'
 import type { BodyRules, FormDef, ResourceDef } from './enemies'
+import type { StatBase } from './stats'
 
+/** 身体的力学：阻力与质量决定起步和被推开时的手感 */
 interface BodyParams {
-  readonly thrust: number
   readonly drag: number
   readonly mass: number
 }
+/** 角色自己的基础属性，盖过全队通用的那份；移速每人都要写 */
+type CharacterStats = StatBase & { readonly moveSpeed: number }
 export interface InnateSource {
   readonly name: string
   readonly icon: string
@@ -36,8 +39,7 @@ export interface CharacterAuthoring {
   readonly name: string
   readonly desc: string
   readonly body: BodyParams
-  /** 吸金币的半径，单位格 */
-  readonly magnet: number
+  readonly stats: CharacterStats
   readonly skill: SkillSource
   readonly weapons: readonly WeaponId[]
   readonly innate: readonly InnateSource[]
@@ -59,7 +61,7 @@ export interface CharacterDef {
   readonly name: string
   readonly desc: string
   readonly body: BodyParams
-  readonly magnet: number
+  readonly stats: CharacterStats
   readonly skill: SkillDef
   readonly carriers: readonly Carrier[]
   readonly resource?: ResourceDef
@@ -74,7 +76,6 @@ export type CharacterId = keyof typeof charactersJson
 export interface TeamBaseline {
   readonly team: {
     readonly maxSize: number
-    readonly reviveMs: number
     readonly leaderSizeMul: number
     readonly followerSizeMul: number
     readonly leaderGrip: number
@@ -83,7 +84,7 @@ export interface TeamBaseline {
   readonly member: {
     readonly size: number
     readonly radius: number
-    readonly maxHp: number
-    readonly iframesMs: number
+    /** 每个角色都有的基础属性 */
+    readonly stats: StatBase
   }
 }

@@ -21,7 +21,7 @@ import {
 } from '../components'
 import type { Sim } from '../sim'
 import { flyerHits } from '../store'
-import { anchorX, anchorY } from '../utils/amp'
+import { anchorX, anchorY } from '../utils/ability'
 
 export function holderOutline(faction: number, holderEid: number): OutlineKind {
   return faction === FACTION.enemy ? (Elite.v[holderEid] || Boss.v[holderEid] ? 'elite' : 'enemy') : 'player'
