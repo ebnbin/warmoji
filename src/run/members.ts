@@ -3,6 +3,7 @@ import { characterLevel } from '../data/charLevel'
 import { characterXp, gearMods } from '../data/items'
 import { levelStatsFor } from '../data/levels'
 import type { StatValues } from '../types/stats'
+import { runDef } from './state'
 import type { RunState } from './state'
 
 /** 队员的等级：买过的道具折成角色经验，不低于这一局的等级下限 */
@@ -10,10 +11,11 @@ export function memberLevel(run: RunState, slot: number): number {
   return Math.max(run.minLevel, characterLevel(characterXp(run.memberItems[slot] ?? [])))
 }
 
-/** 队员战斗外的属性：定位、道具、本局成长与等级 */
+/** 队员战斗外的属性：定位、道具、本局成长与等级，加上这一局规则给队伍的修正 */
 export function memberOutStats(run: RunState, slot: number): StatValues {
   const id = run.roster[slot]!
-  return memberStats(CHARACTERS[id], gearMods(run.memberItems[slot] ?? [], levelStatsFor(id, memberLevel(run, slot)), run.memberGrowth[slot]))
+  const rules = runDef(run).rules?.mods
+  return memberStats(CHARACTERS[id], [...gearMods(run.memberItems[slot] ?? [], levelStatsFor(id, memberLevel(run, slot)), run.memberGrowth[slot]), ...(rules ? [rules] : [])])
 }
 
 /** 队员战斗外的样子：局内进化过就是进化后的形态 */

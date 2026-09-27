@@ -4,8 +4,9 @@ import { timeLimitMs } from '../../data/runs'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
 import type { EnemyDef, EnemyMixEntry } from '../../types/enemies'
-import type { EndRule, FightDef, HoldPoint, SpawnAt, StreamRule, WavesRule } from '../../types/runs'
+import type { EndRule, FightDef, FightRules, HoldPoint, RunRules, SpawnAt, StreamRule, WavesRule } from '../../types/runs'
 import type { StatMods } from '../../types/stats'
+import { runDef } from '../../run/state'
 import type { RunState } from '../../run/state'
 import { Bounty, Call, Due, ENEMY_SET, FACTION, Faction, Order, Telegraph, Transform } from '../components'
 import { callRule, foeSpec } from '../store'
@@ -53,9 +54,33 @@ export interface HoldState {
   ring: number
 }
 
+/** 这一场生效的我方规则：一场写的盖过一局写的，修正两边叠加 */
+export interface ActiveRules {
+  readonly revive: boolean
+  readonly rescue: FightRules['rescue']
+  readonly lock: boolean
+  readonly critical: boolean
+  readonly switchCdMs: number
+  readonly surprise: boolean
+  readonly mods: readonly StatMods[]
+}
+
+function activeRules(run: RunRules | undefined, fight: FightRules | undefined): ActiveRules {
+  return {
+    revive: fight?.revive ?? run?.revive ?? true,
+    rescue: fight?.rescue ?? run?.rescue,
+    lock: fight?.leader?.lock ?? run?.leader?.lock ?? false,
+    critical: fight?.leader?.critical ?? run?.leader?.critical ?? false,
+    switchCdMs: fight?.leader?.switchCdMs ?? run?.leader?.switchCdMs ?? 0,
+    surprise: fight?.surprise ?? run?.surprise ?? false,
+    mods: [run?.mods, fight?.mods].flatMap((m) => (m ? [m] : [])),
+  }
+}
+
 /** 一场战斗进行中的状态 */
 export interface FightState {
   readonly def: FightDef
+  readonly rules: ActiveRules
   readonly streams: StreamState[]
   readonly waves: WavesState[]
   /** 试炼场按旋钮刷怪的冷却；没有这条规则是 null */
@@ -71,6 +96,14 @@ export interface FightState {
   bossDownAt: number
   /** 别的获胜条件满足的时刻，-1 是还没 */
   wonAt: number
+  /** 当过队长的有人倒下了 */
+  leaderFell: boolean
+  /** 上一次手动换队长的真实时刻 */
+  switchedAt: number
+  /** 每名队员被扶了多久，按名单位置 */
+  readonly rescueMs: number[]
+  /** 每名队员身边的救援圈，-1 是没有 */
+  readonly rescueRings: number[]
 }
 
 function downsOf(run: RunState): number {
@@ -81,6 +114,7 @@ export function newFight(def: FightDef, run: RunState): FightState {
   const hold = def.ends.find((e) => e.kind === 'hold')
   return {
     def,
+    rules: activeRules(runDef(run).rules, def.rules),
     streams: def.spawns.flatMap((rule) => (rule.kind === 'stream' ? [{ rule, cooldownMs: FIRST_SPAWN_MS }] : [])),
     waves: def.spawns.flatMap((rule) => (rule.kind === 'waves' ? [{ rule, next: 0, calmAt: -1 }] : [])),
     knobs: def.spawns.some((rule) => rule.kind === 'knobs') ? { cooldownMs: FIRST_SPAWN_MS } : null,
@@ -90,6 +124,10 @@ export function newFight(def: FightDef, run: RunState): FightState {
     bounties: 0,
     bossDownAt: -1,
     wonAt: -1,
+    leaderFell: false,
+    switchedAt: -Infinity,
+    rescueMs: run.roster.map(() => 0),
+    rescueRings: run.roster.map(() => -1),
   }
 }
 
@@ -98,12 +136,19 @@ export function markFightBase(sim: Sim): void {
   sim.fight.base = { kills: sim.run.kills, coins: sim.run.coins, downs: downsOf(sim.run) }
 }
 
-/** 这一场给一方身体的常驻修正：规则写的，加上试炼场的攻速旋钮给队伍 */
+/** 这一场给一方身体的常驻修正：我方规则写的，加上试炼场的攻速旋钮给队伍；敌人的写在这一场上 */
 export function fightMods(f: FightState, faction: number): StatMods[] {
-  const mods = f.def.mods
-  if (faction === FACTION.team) return [...(mods?.team ? [mods.team] : []), ...(f.knobs ? sandboxTeamMods() : [])]
-  if (faction === FACTION.enemy) return mods?.enemy ? [mods.enemy] : []
+  if (faction === FACTION.team) return [...f.rules.mods, ...(f.knobs ? sandboxTeamMods() : [])]
+  if (faction === FACTION.enemy) return f.def.enemyMods ? [f.def.enemyMods] : []
   return []
+}
+
+/** 现在为什么不能手动换队长；能换是 null */
+export function switchBlock(sim: Sim): string | null {
+  const f = sim.fight
+  if (f.rules.lock) return '这一场不能换队长'
+  const left = f.rules.switchCdMs - (sim.fxMs - f.switchedAt)
+  return left > 0 ? `还要 ${Math.ceil(left / 1000)} 秒才能换队长` : null
 }
 
 /** 离时限还有多久；没有时限是 Infinity */
@@ -183,9 +228,10 @@ export type Verdict = { readonly win: true } | { readonly win: false; readonly r
 
 const WIN: Verdict = { win: true }
 
-/** 这一场的结果，还没分出来是 null：倒下到数立刻输；撑到时限时已经达成目标或时限不算输就赢；头目倒下与别的获胜条件等敌人倒完 */
+/** 这一场的结果，还没分出来是 null：队长倒下就输的队长倒了、倒下到数，立刻输；撑到时限时已经达成目标或时限不算输就赢；头目倒下与别的获胜条件等敌人倒完 */
 export function fightVerdict(sim: Sim, timeUp: boolean): Verdict | null {
   const f = sim.fight
+  if (f.rules.critical && f.leaderFell) return { win: false, reason: '队长倒下了' }
   for (const e of f.def.ends) {
     if (e.kind === 'downs' && downsOf(sim.run) - f.base.downs >= e.count) return { win: false, reason: `队员倒下了 ${e.count} 次` }
   }
@@ -248,6 +294,9 @@ export function fightGoals(sim: Sim): { readonly text: string; readonly warn: bo
         break
     }
   }
+  if (f.rules.critical) out.push({ text: '队长倒下就输', warn: true })
+  const lives = sim.run.lives
+  if (Number.isFinite(lives)) out.push({ text: lives > 0 ? `还能起来 ${lives} 次` : '倒下就再也起不来', warn: lives === 0 })
   return out
 }
 

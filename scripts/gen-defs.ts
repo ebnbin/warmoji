@@ -28,7 +28,7 @@ import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { ItemDef } from '../src/types/items'
 import type { MapDef } from '../src/types/maps'
-import type { FightDef, RunDef, SpawnAt, Squad, TeamDef } from '../src/types/runs'
+import type { FightDef, FightRules, RunDef, SpawnAt, Squad, TeamDef } from '../src/types/runs'
 
 const errors: string[] = []
 const need = (ok: boolean, msg: string): void => {
@@ -103,6 +103,12 @@ const checkSquad = (sq: Squad, path: string): void => {
 
 const isBoss = (kind: EnemyKind | undefined): boolean => kind !== undefined && ENEMIES[kind]?.role === 'boss'
 
+/** 我方规则：救援的时长与范围、换队长的冷却为正 */
+const checkRules = (r: FightRules | undefined, path: string): void => {
+  need(r?.rescue === undefined || (r.rescue.ms > 0 && r.rescue.radius > 0), `${path} 的救援时长与范围须为正`)
+  need((r?.leader?.switchCdMs ?? 1) > 0, `${path} 的换队长冷却须为正`)
+}
+
 /** 一场战斗的规则：数值在范围内，结束规则都有着落——要打倒的头目、悬赏目标得登场，要清场就不能一直刷，一组一组来的后面几组要等场上清空 */
 const checkFight = (f: FightDef, path: string): void => {
   const squads = f.spawns.flatMap((s) => (s.kind === 'batch' ? [s.squad] : s.kind === 'waves' ? s.squads : []))
@@ -129,6 +135,7 @@ const checkFight = (f: FightDef, path: string): void => {
       need(s.buff >= 0 && s.debuff >= 0 && s.atMs >= 0 && s.spanMs >= 0, `${path} 的带光圈敌人数与时刻不为负`)
     }
   }
+  checkRules(f.rules, `${path}.rules`)
   need(f.ends.filter((e) => e.kind === 'time').length <= 1, `${path} 最多一条时限`)
   need(f.ends.length === 0 || f.ends.some((e) => e.kind !== 'downs' && !(e.kind === 'time' && e.lose)), `${path} 有结束规则就得有获胜条件`)
   for (const e of f.ends) {
@@ -170,6 +177,18 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
   need(r.map === undefined || MAPS[r.map] !== undefined, `runs.${id} 引用了不存在的地图：${r.map}`)
   need(r.start === undefined || (r.start.wave >= 1 && r.start.sec >= 0), `runs.${id} 的开局进度须从第 1 波、第 0 秒起`)
   if (r.team && r.team !== 'knobs') checkTeam(r.team, `runs.${id}.team`)
+  checkRules(r.rules, `runs.${id}.rules`)
+  const lives = r.rules?.lives
+  need(lives === undefined || (Number.isInteger(lives) && lives >= 1), `runs.${id}.rules.lives 须是正整数`)
+  const only = r.rules?.recruit?.tags
+  if (only) {
+    // 预设里随机的位置与招募都从这些角色里挑，按最坏情况也得够
+    const upTo = Math.max(0, ...r.steps.map((s) => (s.kind === 'recruit' ? s.upTo : 0)))
+    const fixed = new Set<string>(r.team && r.team !== 'knobs' ? r.team.slots.filter((s) => typeof s === 'string') : [])
+    const pool = Object.entries<CharacterAuthoring>(CHARACTERS).filter(([cid, c]) => !fixed.has(cid) && only.every((t) => c.tags.includes(t)))
+    need(only.length > 0 && upTo > 0, `runs.${id} 限定了招募就得有招募步骤与标签`)
+    need(pool.length >= upTo - fixed.size, `runs.${id} 限定的招募标签可挑的角色不够`)
+  }
   r.steps.forEach((s, i) => {
     if (s.kind === 'recruit') need(s.upTo >= 1 && s.upTo <= TEAM_BASELINE.team.maxSize, `runs.${id}.steps[${i}] 招募人数须在 1 到满编之间`)
     if (s.kind === 'fight') checkFight(s.fight, `runs.${id}.steps[${i}]`)

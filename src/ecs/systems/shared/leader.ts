@@ -5,6 +5,7 @@ import { grantIframe } from './combat'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import { handoverMs } from './squad'
+import { switchBlock } from '../../fight/state'
 
 const ZERO: Point = { x: 0, y: 0 }
 
@@ -44,10 +45,12 @@ function finishHandover(sim: Sim): void {
   sim.handover = null
 }
 
+/** 玩家这会儿能不能手动把队长换成 eid：这一场的规则许换、不在冷却，交接与动作都结束了 */
 export function canSwitchLeader(sim: Sim, eid: number): boolean {
   const lead = sim.leader
   return (
     lead >= 0 &&
+    switchBlock(sim) === null &&
     !sim.over &&
     !sim.handover &&
     Motion.kind[lead] === MOTION.none &&

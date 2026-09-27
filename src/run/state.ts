@@ -42,6 +42,10 @@ export interface RunState {
   minLevel: number
   /** 队伍无敌：生命上限锁在极大值 */
   invincible: boolean
+  /** 全队还能起来几次；Infinity 是不限 */
+  lives: number
+  /** 这一局回不来的队员，按名单位置 */
+  fallen: boolean[]
   stats: {
     damage: number[]
     kills: number[]
@@ -95,6 +99,8 @@ export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
     leaderId: ROSTER_IDS[0]!,
     minLevel: 1,
     invincible: false,
+    lives: def.rules?.lives ?? Infinity,
+    fallen: [],
     stats: {
       damage: [],
       kills: [],
@@ -157,9 +163,15 @@ export function nextStep(run: RunState): void {
   skipFilled(run)
 }
 
-/** 还没入队的角色都能招 */
+/** 这一局许招的角色：规则限定了标签就只许招同时带着它们的 */
+export function recruitPool(run: RunState): CharacterId[] {
+  const tags = runDef(run).rules?.recruit?.tags ?? []
+  return ROSTER_IDS.filter((id) => tags.every((t) => CHARACTERS[id].tags.includes(t)))
+}
+
+/** 许招又还没入队的角色 */
 export function recruitCandidates(run: RunState): CharacterId[] {
-  return ROSTER_IDS.filter((id) => !run.roster.includes(id))
+  return recruitPool(run).filter((id) => !run.roster.includes(id))
 }
 
 /** 当前这一步还要招几人：不是招募步骤就是 0 */
@@ -179,6 +191,7 @@ export function addMember(run: RunState, id: CharacterId): number {
   run.memberRes.push(-1)
   run.memberGrowth.push({})
   run.growthKills.push(0)
+  run.fallen.push(false)
   run.stats.damage.push(0)
   run.stats.kills.push(0)
   run.stats.deaths.push(0)
@@ -188,13 +201,14 @@ export function addMember(run: RunState, id: CharacterId): number {
 }
 
 export function recruitMember(run: RunState, id: CharacterId): number {
-  if (recruitDueCount(run) === 0 || !(id in CHARACTERS) || run.roster.includes(id)) return -1
+  if (recruitDueCount(run) === 0 || !recruitCandidates(run).includes(id)) return -1
   return addMember(run, id)
 }
 
-/** 队长所在的名单位置；名单里找不到就回到首位 */
+/** 队长所在的名单位置；名单里找不到或他回不来了，就交给第一个还在的 */
 export function leaderSlot(run: RunState): number {
-  return Math.max(0, run.roster.indexOf(run.leaderId))
+  const at = run.roster.indexOf(run.leaderId)
+  return at >= 0 && !run.fallen[at] ? at : Math.max(0, run.fallen.indexOf(false))
 }
 
 export function waveStartHp(storedHp: number, maxHp: number): number {

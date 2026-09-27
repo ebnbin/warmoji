@@ -103,16 +103,40 @@ export type EndRule =
   | { readonly kind: 'coins'; readonly count: number }
   | { readonly kind: 'downs'; readonly count: number }
 
-/** 一场战斗：刷什么怪、什么时候结束；intro 是开打时的横幅，mix 换掉地图的配比，mods 是这一场给两边的常驻修正，chaseLeader 让追人的敌人都盯着队长，noRevive 倒下的队员这一场不再起来；不写名字就只显示用时 */
+/**
+ * 我方在一场里的规则，写在一局上对每一场生效，写在一场上只管这一场、盖过一局写的：
+ * revive 为假时倒下的队员不会自己起来；rescue 让活着的队长在倒下的队员身边 radius 格内连续站满 ms 毫秒把他扶起来；
+ * leader 里 lock 不许手动换队长，critical 队长倒下就输，switchCdMs 是手动换队长的冷却；
+ * surprise 为真时敌人现身不打预兆；mods 是给队伍的常驻修正，一局与一场写的叠加。
+ */
+export interface FightRules {
+  readonly revive?: boolean
+  readonly rescue?: { readonly ms: number; readonly radius: number }
+  readonly leader?: { readonly lock?: boolean; readonly critical?: boolean; readonly switchCdMs?: number }
+  readonly surprise?: boolean
+  readonly mods?: StatMods
+}
+
+/** 场与场之间：carry 活着的带着残血、倒下的回三成血；full 每场满血；permadeath 活着的带着残血，一场打完时还倒着的这一局都回不来 */
+export type Between = 'carry' | 'full' | 'permadeath'
+
+/** 一局里我方的规则：每一场的规则之外，lives 是全队共享的起来次数（自己起来、被扶起来、被技能救起来都算一次），between 是场与场之间怎么恢复，recruit 只许招募同时带着这些标签的角色；mods 在商店里也算 */
+export interface RunRules extends FightRules {
+  readonly lives?: number
+  readonly between?: Between
+  readonly recruit?: { readonly tags: readonly CharacterTag[] }
+}
+
+/** 一场战斗：刷什么怪、什么时候结束；intro 是开打时的横幅，mix 换掉地图的配比，enemyMods 是这一场给敌人的常驻修正，chaseLeader 让追人的敌人都盯着队长，rules 是我方在这一场的规则；不写名字就只显示用时 */
 export interface FightDef {
   readonly name?: string
   readonly intro?: Banner
   readonly mix?: readonly MixEntry[]
   readonly spawns: readonly SpawnRule[]
   readonly ends: readonly EndRule[]
-  readonly mods?: { readonly team?: StatMods; readonly enemy?: StatMods }
+  readonly enemyMods?: StatMods
   readonly chaseLeader?: boolean
-  readonly noRevive?: boolean
+  readonly rules?: FightRules
 }
 
 /** 一步：招募到 upTo 人、进商店、打一场 */
@@ -129,7 +153,7 @@ export interface TeamDef {
 
 /**
  * 一局的玩法：按顺序走完这些步骤就赢，全灭就输。
- * map 固定地图，不写由玩家选；team 为 knobs 时队伍由试炼场的旋钮给出，是 TeamDef 时开局就按它组队，不写就靠招募步骤组建；start 是开局的进度，波数定配比、物价与稀有度，秒数定敌人的血量与刷怪间隔；record 为真时结算记最高分；note 写这一关在试什么。
+ * map 固定地图，不写由玩家选；team 为 knobs 时队伍由试炼场的旋钮给出，是 TeamDef 时开局就按它组队，不写就靠招募步骤组建；rules 是我方这一局的规则；start 是开局的进度，波数定配比、物价与稀有度，秒数定敌人的血量与刷怪间隔；record 为真时结算记最高分；note 写这一关在试什么。
  */
 export interface RunDef {
   readonly emoji: string
@@ -138,6 +162,7 @@ export interface RunDef {
   readonly note?: string
   readonly map?: MapId
   readonly team?: 'knobs' | TeamDef
+  readonly rules?: RunRules
   readonly start?: { readonly wave: number; readonly sec: number }
   readonly coins?: number
   readonly record?: boolean

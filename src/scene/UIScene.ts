@@ -224,8 +224,11 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.squad.forEach((b, slot) => this.styleSquadIcon(b, s.members[slot]!, slot === s.leaderSlot, false))
   }
 
+  /** 换不了队长时说明缘由：这一场不许换，或还在冷却 */
   private trySwitchLeader(slot: number): void {
-    this.arena.switchLeader(slot)
+    if (this.arena.switchLeader(slot)) return
+    const why = this.arena.switchBlock()
+    if (why) this.announcer.toast(why, { color: 'warn' })
   }
 
   private onIconTap(slot: number): void {

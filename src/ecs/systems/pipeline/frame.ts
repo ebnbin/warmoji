@@ -12,6 +12,7 @@ import { refreshTargets } from '../refreshTargets'
 import { runDeathEffects } from '../runDeathEffects'
 import { spawnStep } from '../spawnStep'
 import { tickHold } from '../tickHold'
+import { tickRescue } from '../tickRescue'
 import { updateAnims } from '../updateAnims'
 import { updatePickups } from '../updatePickups'
 import { updateSpawners } from '../updateSpawners'
@@ -43,6 +44,7 @@ const FRAME_PIPELINE = pipeline([
   fireCarriers,
   { run: spawnStep, after: [fireOrders, fireCarriers] },
   { run: tickHold, after: [stepSim] },
+  { run: tickRescue, after: [stepSim] },
 ])
 
 export function stepFrame(sim: Sim): void {

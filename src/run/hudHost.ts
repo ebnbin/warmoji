@@ -134,6 +134,8 @@ export interface HudHost {
   /** 按入队顺序 */
   teamSheets(): MemberSheet[]
   switchLeader(slot: number): boolean
+  /** 现在为什么不能手动换队长；能换是 null */
+  switchBlock(): string | null
   leaderSkill(): LeaderSkill | null
   castLeaderSkill(dir: { x: number; y: number } | null, holdRatio?: number): boolean
   setSkillAim(dir: { x: number; y: number } | null): void

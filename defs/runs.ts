@@ -254,7 +254,7 @@ const LABS = {
         fight: {
           name: '铁人',
           intro: { title: '铁人', sub: '撑过 60 秒，谁都不许倒下' },
-          mods: { enemy: { mul: { damage: 1.3 } } },
+          enemyMods: { mul: { damage: 1.3 } },
           spawns: [{ kind: 'stream' }, { kind: 'carriers', buff: 2, debuff: 2, atMs: 5000, spanMs: 40_000 }],
           ends: [
             { kind: 'time', ms: 60_000 },
@@ -352,7 +352,7 @@ const LABS = {
         fight: {
           name: '车轮战',
           intro: { title: '车轮战', sub: '倒下就起不来了' },
-          noRevive: true,
+          rules: { revive: false },
           spawns: [
             {
               kind: 'waves',
@@ -441,7 +441,7 @@ const LABS = {
             { kind: 'skeleton', weight: 2 },
             { kind: 'gargoyle', weight: 1 },
           ],
-          mods: { team: { mul: { damage: 1.25 } } },
+          rules: { mods: { mul: { damage: 1.25 } } },
           spawns: [{ kind: 'stream', intervalMs: 1500, eliteChance: 1, cap: 12 }],
           ends: [
             { kind: 'kills', count: 30 },

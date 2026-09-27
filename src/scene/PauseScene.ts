@@ -20,7 +20,7 @@ import type { EnemyDef, EnemyKind } from '../types/enemies'
 import type { GrowthProgress, ItemId } from '../types/items'
 import type { FightDef, RunDef, Squad } from '../types/runs'
 import type { MapId } from '../types/maps'
-import { fightGoalText, fightUnit } from './runLines'
+import { fightGoalText, fightUnit, runRuleLines } from './runLines'
 import { applyCamera, VIEWPORT_CHANGED } from '../util/apply'
 import { formatBig, formatTime } from '../util/format'
 import { keysOf } from '../util/record'
@@ -467,6 +467,14 @@ export class PauseScene extends Phaser.Scene {
     }
     if (cur) flow.text(`${snap ? '这一' : '下一'}${unit}的目标：${fightGoalText(cur)}`)
     flow.gap(6)
+
+    const rules = runRuleLines(def)
+    if (rules.length > 0) {
+      flow.heading('队伍规则', '2696')
+      for (const line of rules) flow.text(line)
+      if (Number.isFinite(run.lives)) flow.text(run.lives > 0 ? `眼下还能起来 ${run.lives} 次` : '命已经用完，倒下就再也起不来', { color: run.lives > 0 ? 'soft' : 'bad' })
+      flow.gap(6)
+    }
 
     flow.heading('收获', '1fa99')
     const combatMs = run.combatMs + (snap ? snap.seconds * 1000 : 0)

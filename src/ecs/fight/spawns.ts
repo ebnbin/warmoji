@@ -1,14 +1,12 @@
-import { addComponents } from 'bitecs'
 import { ENEMIES, SPAWN } from '../../data/enemies'
 import { bossFor, MAPS } from '../../data/maps'
 import { waveAt } from '../../data/waves'
 import { UNIT } from '../../util/units'
 import type { Banner, CarrierRule, Squad } from '../../types/runs'
 import { dayNightOf, foeCount, spawnBoss, telegraphOne } from '../entities/enemy'
-import { newEntity } from '../entities/entity'
+import { spawnGroundRing } from '../entities/groundRing'
 import { scheduleCall, scheduleCarrier, scheduleOrder } from '../entities/schedule'
 import { telegraphCount } from '../entities/telegraph'
-import { Ring, Tint, Transform } from '../components'
 import { rollCarriers } from '../utils/battleFx'
 import { isDayAt } from '../worlds/daynight'
 import type { Sim } from '../sim'
@@ -33,7 +31,7 @@ export function startFight(sim: Sim): void {
     }
   }
   const h = sim.fight.hold
-  if (h) h.ring = drawHoldRing(sim, h.rule.radius)
+  if (h) h.ring = spawnGroundRing(sim, holdSpot(sim, h.rule.points[0]!), h.rule.radius * UNIT)
 }
 
 function scheduleCarriers(sim: Sim, rule: CarrierRule): void {
@@ -41,23 +39,6 @@ function scheduleCarriers(sim: Sim, rule: CarrierRule): void {
   carriers.forEach((pickup, i) => {
     scheduleCarrier(sim, rule.atMs + (rule.spanMs * i) / carriers.length, pickup)
   })
-}
-
-/** 据点的圈：位置与颜色每帧由据点的进度更新 */
-function drawHoldRing(sim: Sim, radius: number): number {
-  const eid = newEntity(sim.world)
-  addComponents(sim.world, eid, Transform, Tint, Ring)
-  const p = holdSpot(sim, sim.fight.hold!.rule.points[0]!)
-  Transform.x[eid] = p.x
-  Transform.y[eid] = p.y
-  Tint.alpha[eid] = 1
-  Ring.radius[eid] = radius * UNIT
-  Ring.fillAlpha[eid] = 0.16
-  Ring.lineAlpha[eid] = 0.9
-  Ring.lineWidth[eid] = 4
-  Ring.born[eid] = sim.fxMs
-  Ring.z[eid] = 1
-  return eid
 }
 
 /** 一队敌人登场：打出横幅，按此刻的强度排好每一只；指定的头目血量不随进度涨，围圈的一队随机转一个起始角 */

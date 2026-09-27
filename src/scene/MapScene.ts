@@ -8,7 +8,7 @@ import type { RunId } from '../types/runs'
 import { beginRun, skipFilled } from '../run/state'
 import { goStep } from './teamPage'
 import { mapPlayLines } from './mapLines'
-import { runStepLines, teamText } from './runLines'
+import { runRuleLines, runStepLines, teamText } from './runLines'
 import { loadMap, saveMap } from '../save/selection'
 import { preloadEmojis } from '../emoji/hold'
 import { beginPage, Button, EmojiGrid, Flow, PageHeader, pageFrame, Panel, RichLabel, ScrollView, Tabs, TileGrid } from '../ui'
@@ -16,7 +16,7 @@ import type { PageFrame, TabItem } from '../ui'
 import { VIEWPORT_CHANGED } from '../util/apply'
 import { SceneKey } from './keys'
 
-const GROUP_ICONS = { theme: '1f5fa', decor: '1f33f', play: '1f579', note: '1f9ea', team: '1f465', steps: '1f4dc' } as const
+const GROUP_ICONS = { theme: '1f5fa', decor: '1f33f', play: '1f579', note: '1f9ea', team: '1f465', rules: '2696', steps: '1f4dc' } as const
 /** 预设队伍里随机挑的位置 */
 const RANDOM_SLOT = '2753'
 
@@ -159,6 +159,12 @@ export class MapScene extends Phaser.Scene {
       flow.heading('队伍', GROUP_ICONS.team)
       flow.icons(team.slots.map((s) => (typeof s === 'string' ? CHARACTERS[s].emoji : RANDOM_SLOT)), { size: 40, outline: 'player' })
       flow.text(teamText(team)).gap(6)
+    }
+    const rules = runRuleLines(run)
+    if (rules.length > 0) {
+      flow.heading('队伍规则', GROUP_ICONS.rules)
+      for (const line of rules) flow.text(line)
+      flow.gap(6)
     }
     flow.heading('流程', GROUP_ICONS.steps)
     for (const line of runStepLines(run)) flow.text(line)

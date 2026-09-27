@@ -60,7 +60,7 @@ import { timeLimitMs } from '../data/runs'
 import { enterFight } from '../run/flow'
 import type { FightDef } from '../types/runs'
 import { callSquad, startFight } from './fight/spawns'
-import { fightGoals, fightMods, fightVerdict, goalSpot, markFightBase, timeLeftMs } from './fight/state'
+import { fightGoals, fightMods, fightVerdict, goalSpot, markFightBase, switchBlock, timeLeftMs } from './fight/state'
 import { xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
@@ -75,7 +75,7 @@ import { SceneKey } from '../scene/keys'
 import { battleDevProvider, watchSandboxSteady } from './devProvider'
 import { defineDevFlag } from '../devtools'
 import type { DevProvider, DevProviderHost } from '../devtools'
-import { gainTeamXp } from './systems/shared/combat'
+import { gainTeamXp, revivable } from './systems/shared/combat'
 import { hit } from './systems/shared/damage'
 import { bodySource, WORLD_SOURCE } from './utils/source'
 import { nearestTarget } from './utils/targets'
@@ -103,6 +103,16 @@ const RES_COLOR: Record<ResourceDef['kind'], number> = { energy: 0xffee58, fury:
 function reviveSec(sim: Sim, m: number): number | null {
   const at = Revive.at[m]!
   return Number.isFinite(at) ? Math.max(0, Math.ceil((at - sim.elapsedMs) / 1000)) : null
+}
+
+/** 倒下的队员头上的字：正在被扶显示还要几秒，在等复活显示倒计时，只能等人扶显示「救」，起不来就空着 */
+function downLabel(sim: Sim, m: number, slot: number): string {
+  const r = sim.fight.rules.rescue
+  const held = sim.fight.rescueMs[slot] ?? 0
+  if (r && held > 0) return ((r.ms - held) / 1000).toFixed(1)
+  const sec = reviveSec(sim, m)
+  if (sec !== null) return String(sec)
+  return r && revivable(sim, m) ? '救' : ''
 }
 
 /** 瞄准线的长度：位移走多远，或效果把东西放出去多远 */
@@ -137,7 +147,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private hpBars: Phaser.GameObjects.Graphics[] = []
   private shownHp: number[] = []
   private deadTexts: Phaser.GameObjects.Text[] = []
-  private shownCountdown: (number | null)[] = []
+  /** 倒下的队员头上正显示的字；null 是还没显示过 */
+  private shownDead: (string | null)[] = []
   private staminaGfx?: Phaser.GameObjects.Graphics
   private shownStamina = -1
   private hitShakeOn = false
@@ -181,7 +192,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.hpBars = []
     this.shownHp = []
     this.deadTexts = []
-    this.shownCountdown = []
+    this.shownDead = []
     this.staminaGfx = undefined
     this.shownStamina = -1
     this.seenHitCount = 0
@@ -371,7 +382,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
           .setDepth(12)
           .setVisible(false),
       )
-      this.shownCountdown.push(-1)
+      this.shownDead.push(null)
     }
     this.staminaGfx = this.add.graphics().setDepth(11).setVisible(false)
     startFight(this.sim)
@@ -421,16 +432,16 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
         this.shownHp[i] = -1
         if (dead) {
           dead.setVisible(true).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
-          const remain = reviveSec(sim, m)
-          if (remain !== this.shownCountdown[i]) {
-            this.shownCountdown[i] = remain
-            dead.setText(remain === null ? '' : String(remain))
+          const label = downLabel(sim, m, i)
+          if (label !== this.shownDead[i]) {
+            this.shownDead[i] = label
+            dead.setText(label)
           }
         }
         continue
       }
       dead?.setVisible(false)
-      this.shownCountdown[i] = -1
+      this.shownDead[i] = null
       g.setVisible(true).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
       const ratio = Math.max(0, Math.min(1, Hp.v[m]! / Hp.max[m]!))
       const res = hasComponent(this.world, m, Res) ? Res.v[m]! / Math.max(1, Res.max[m]!) : -1
@@ -582,7 +593,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const eid = sim.characters[slot]
     if (eid === undefined || !canSwitchLeader(sim, eid)) return false
     switchLeader(sim, eid)
+    sim.fight.switchedAt = sim.fxMs
     return true
+  }
+
+  switchBlock(): string | null {
+    return this.sim ? switchBlock(this.sim) : null
   }
 
   leaderSkill(): LeaderSkill | null {

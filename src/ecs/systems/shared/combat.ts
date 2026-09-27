@@ -85,21 +85,32 @@ function settleDeathMarks(sim: Sim, eid: number): void {
   }
 }
 
-function down(sim: Sim, eid: number): void {
+/** 倒下的队员还能不能起来：这一局没回不来、全队还有命 */
+export function revivable(sim: Sim, eid: number): boolean {
+  return !sim.run.fallen[Slot.v[eid]!] && sim.run.lives > 0
+}
+
+/** 倒地的样子：不再动、变灰；这一场许自己起来又还能起来的开始复活计时，否则一直倒着 */
+export function layDown(sim: Sim, eid: number): void {
   endMotion(eid)
   Hp.v[eid] = 0
   Alive.v[eid] = 0
-  Revive.at[eid] = sim.fight.def.noRevive ? Infinity : sim.elapsedMs + Stats.revive[eid]!
+  Revive.at[eid] = sim.fight.rules.revive && revivable(sim, eid) ? sim.elapsedMs + Stats.revive[eid]! : Infinity
   Tint.color[eid] = 0x888888
   Tint.alpha[eid] = 0.35
-  const st = sim.run.stats
-  const slot = Slot.v[eid]!
-  if (slot >= 0 && slot < st.deaths.length) st.deaths[slot] = (st.deaths[slot] ?? 0) + 1
   Anim.frames[eid] = -1
   Anim.onceFrames[eid] = 0
   Transform.rot[eid] = 0
   Transform.w[eid] = charSize(eid)
   Transform.h[eid] = charSize(eid)
+}
+
+function down(sim: Sim, eid: number): void {
+  layDown(sim, eid)
+  const st = sim.run.stats
+  const slot = Slot.v[eid]!
+  if (slot >= 0 && slot < st.deaths.length) st.deaths[slot] = (st.deaths[slot] ?? 0) + 1
+  if (eid === sim.leader) sim.fight.leaderFell = true
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
   if (sim.characters.every((x) => !Alive.v[x])) sim.over = true
 }
@@ -194,7 +205,12 @@ export function grantIframe(sim: Sim, eid: number, ms: number): void {
   addMark(eid, MARK.invuln, TAG.effect, sim.elapsedMs + ms)
 }
 
+/** 倒下的队员起来：回不来的不行；用掉全队一条命，命用完了其余倒着的也不会再自己起来 */
 export function reviveCharacter(sim: Sim, eid: number): void {
+  if (!revivable(sim, eid)) return
+  const run = sim.run
+  run.lives -= 1
+  if (run.lives <= 0) for (const m of sim.characters) if (!Alive.v[m]) Revive.at[m] = Infinity
   playSfx('revive')
   Alive.v[eid] = 1
   Lethal.used[eid] = 0
