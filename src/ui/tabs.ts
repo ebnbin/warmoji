@@ -31,6 +31,9 @@ export interface TabsOptions<K> {
   /** 每个页签的固定宽度；不给就按内容 */
   readonly tabWidth?: number
   readonly depth?: number
+  /** 放进某个容器，row 用它的局部坐标；这时不横向滚动 */
+  readonly parent?: Phaser.GameObjects.Container
+  readonly align?: 'center' | 'left'
 }
 
 const DIMS: Readonly<Record<TabsSize, { readonly h: number; readonly kind: TextKind; readonly pad: number; readonly radius: number }>> = {
@@ -113,13 +116,14 @@ export class Tabs<K> {
     const size = opts.size ?? 'md'
     const h = DIMS[size].h
     this.holder = new Widget(scene)
+    opts.parent?.add(this.holder)
     for (const item of opts.items) {
       const tab: Tab<K> = new Tab(scene, item, size, opts.tabWidth, () => this.pick(tab.key))
       this.tabs.push(tab)
     }
     const total = this.tabs.reduce((s, t) => s + t.tabW, 0) + GAP * Math.max(0, this.tabs.length - 1)
     const pad = 6
-    if (total > row.w) {
+    if (total > row.w && !opts.parent) {
       const scroller = new ScrollView(scene, { x: row.x, y: row.y - h / 2 - pad, w: row.w, h: h + SHAPE.drop + pad * 2 }, { axis: 'x', scrollbar: false })
       let x = pad
       for (const t of this.tabs) {
@@ -130,7 +134,7 @@ export class Tabs<K> {
       this.scroller = scroller
       if (opts.depth !== undefined) scroller.setDepth(opts.depth)
     } else {
-      let x = row.x + (row.w - total) / 2
+      let x = opts.align === 'left' ? row.x : row.x + (row.w - total) / 2
       for (const t of this.tabs) {
         t.setPosition(x + t.tabW / 2, row.y)
         x += t.tabW + GAP

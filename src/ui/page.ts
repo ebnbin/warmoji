@@ -56,7 +56,7 @@ export function pageFrame(opts: FrameOptions = {}): PageFrame {
   const cy = (H - ch) / 2
   const margin = portrait ? 24 : 40
   const footerY = cy + (portrait ? 1196 : 662)
-  const bodyTop = cy + (opts.sub ? (portrait ? 156 : 140) : portrait ? 108 : 96)
+  const bodyTop = cy + (opts.sub ? (portrait ? 168 : 140) : portrait ? 108 : 96)
   const bodyBottom = opts.footer ? footerY - (portrait ? 60 : 58) : cy + ch - (portrait ? 30 : 32)
   let detail: Rect
   let list: Rect
@@ -75,7 +75,7 @@ export function pageFrame(opts: FrameOptions = {}): PageFrame {
     content: { x: cx, y: cy, w: cw, h: ch },
     centerX: W / 2,
     headerY: cy + (portrait ? 56 : 44),
-    subY: cy + (portrait ? 112 : 96),
+    subY: cy + (portrait ? 122 : 96),
     bodyTop,
     bodyBottom,
     detail,
