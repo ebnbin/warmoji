@@ -1,6 +1,6 @@
 import { hasComponent, query } from 'bitecs'
 import { Casting, Ctl, Drive, EDir, EnemyPhase, MARK, Mark, Motion, MOTION, Transform } from '../components'
-import { hasMark, isAirborne, markedBy, markSlot } from '../utils/marks'
+import { hasMark, inTransit, isAirborne, markedBy, markSlot } from '../utils/marks'
 import { norm } from '../../util/vec'
 import { wanderDir } from './shared/steer'
 import { moveSpeed } from '../utils/stats'
@@ -21,7 +21,7 @@ function ledPoint(sim: Sim, eid: number, kind: number): { x: number; y: number }
   return { x: Mark.b[s]!, y: Mark.c[s]! }
 }
 
-/** 每个身体这一帧能做什么，敌我同一条：静止、被吞、眩晕、睡眠什么都做不了；被抛在空中不能出手；定身不能走，沉默不能施放，致盲不能出手，禁锢不能位移；恐惧与魅惑被牵着走，嘲讽被拉向嘲讽者；变形中会走的只慢速乱逛；脚本位移与蓄力中不自己走 */
+/** 每个身体这一帧能做什么，敌我同一条：静止、被吞、穿行、眩晕、睡眠什么都做不了；被抛在空中不能出手；定身不能走，沉默不能施放，致盲不能出手，禁锢不能位移；恐惧与魅惑被牵着走，嘲讽被拉向嘲讽者；变形中会走的只慢速乱逛；脚本位移与蓄力中不自己走 */
 export function updateControl(sim: Sim): void {
   for (const eid of query(sim.world, [Ctl, Mark, Drive])) controlBody(sim, eid)
 }
@@ -38,7 +38,7 @@ export function controlBody(sim: Sim, eid: number): void {
   let cast = 1
   let dash = 1
   const stun = hasMark(sim, eid, MARK.stun)
-  if (stun || hasMark(sim, eid, MARK.sleep) || hasMark(sim, eid, MARK.stasis) || hasMark(sim, eid, MARK.devoured)) {
+  if (stun || hasMark(sim, eid, MARK.sleep) || hasMark(sim, eid, MARK.stasis) || hasMark(sim, eid, MARK.devoured) || inTransit(eid)) {
     if (stun) Transform.rot[eid] = Math.sin(now / 80 + EnemyPhase.v[eid]!) * 0.3
     move = 0
     act = 0

@@ -119,6 +119,15 @@ export const zoneEffects = slots<readonly Effect[]>()
 /** 被摆布的身体落地、撞墙时的后续与来源 */
 export const motionFx = slots<{ readonly src: Source; readonly onLand?: readonly Effect[]; readonly onWall?: readonly Effect[]; readonly base: number }>()
 
+/** 瞬袭穿行途中带着的那一斩，到了才结算 */
+export const blinkStrike = slots<{ readonly src: Source; readonly target: number; readonly uid: number; readonly damage: number; readonly knockback: number; readonly onHit: readonly Effect[] | undefined }>()
+
+/** 记路的身体走过的路 */
+export const traces = slots<import('./systems/shared/trace').TraceRec>()
+
+/** 残影底下的那段路：从残影到身体，依次展开、不回绕的 x,y */
+export const echoPts = slots<Float32Array>()
+
 export const zoneSrc = slots<Source>()
 
 export const animId = slots<string>()

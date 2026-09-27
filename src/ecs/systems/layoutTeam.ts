@@ -44,7 +44,7 @@ function turnHeading(sim: Sim, tx: number, ty: number, dt: number): void {
   sim.heading = { x: Math.cos(cur + step), y: Math.sin(cur + step) }
 }
 
-/** 队员的驱动指向队长身后扇形上的目标位；进占位半径即占位、同位取最近，阵亡者停靠后紧跟；这一帧不能自己走时不动 */
+/** 队员的驱动指向队长身后扇形上的目标位；进占位半径即占位、同位取最近，阵亡者按魂速追着目标位、追上就停靠；这一帧不能自己走时不动 */
 export function layoutTeam(sim: Sim): void {
   const dt = Math.min(sim.dtMs, 50) / 1000
   const leader = sim.leader
@@ -120,23 +120,23 @@ export function layoutTeam(sim: Sim): void {
     Drive.x[f] = nx * want
     Drive.y[f] = ny * want
   }
+  // 停靠的魂也按魂速追：目标位跑得比魂快时跟不上，不会被队长一起带过去
   const ghostStep = SQUAD.ghostSpeed * UNIT * dt
   for (const f of followers) {
     if (Alive.v[f]) continue
     const seat = seats[Seat.v[f]!]!
     Phys.vx[f] = 0
     Phys.vy[f] = 0
-    if (Seat.ghost[f] !== 2) {
-      const d = sim.hooks.worldDelta(sim, Transform.x[f]!, Transform.y[f]!, seat.x, seat.y)
-      const dist = Math.hypot(d.x, d.y)
-      if (dist > seatR && dist > ghostStep) {
-        const p = sim.hooks.wrap(sim, Transform.x[f]! + (d.x / dist) * ghostStep, Transform.y[f]! + (d.y / dist) * ghostStep)
-        Transform.x[f] = p.x
-        Transform.y[f] = p.y
-        continue
-      }
-      Seat.ghost[f] = 2
+    const d = sim.hooks.worldDelta(sim, Transform.x[f]!, Transform.y[f]!, seat.x, seat.y)
+    const dist = Math.hypot(d.x, d.y)
+    if (dist > seatR && dist > ghostStep) {
+      const p = sim.hooks.wrap(sim, Transform.x[f]! + (d.x / dist) * ghostStep, Transform.y[f]! + (d.y / dist) * ghostStep)
+      Transform.x[f] = p.x
+      Transform.y[f] = p.y
+      Seat.ghost[f] = 1
+      continue
     }
+    Seat.ghost[f] = 2
     Transform.x[f] = seat.x
     Transform.y[f] = seat.y
   }

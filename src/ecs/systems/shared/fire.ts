@@ -1,7 +1,7 @@
 import { hasComponent } from 'bitecs'
 import { playSfx } from '../../../audio/sfx'
 import { DEG2RAD } from '../../../util/units'
-import { BLINK_IFRAME_PAD_MS } from '../../../data/abilities'
+import { TRANSIT_MS } from '../../../data/abilities'
 import {
   AIM,
   Aim,
@@ -10,6 +10,7 @@ import {
   AllShape,
   Anchor,
   Aura,
+  BLINK,
   BlinkShape,
   BlinkState,
   Chain,
@@ -43,6 +44,7 @@ import {
   Thrown,
   Tint,
   Transform,
+  Uid,
   ZoneShape,
   WorldShape,
   Bolt,
@@ -52,7 +54,7 @@ import {
   Idle,
   Mirror,
 } from '../../components'
-import { abilityArtEmoji, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, zoneRules } from '../../store'
+import { abilityArtEmoji, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, blinkStrike, zoneRules } from '../../store'
 import { controlBody } from '../updateControl'
 import { clearMarks, markSlot } from '../../utils/marks'
 import { anchorX, anchorY } from '../../utils/ability'
@@ -69,7 +71,6 @@ import { hit, strike, touch } from './damage'
 import { applyAbilityEffects, applyOnHit, EMPOWER_DEF, struckOf, test } from './effects'
 import { takeBoost } from './resource'
 import type { Struck } from './effects'
-import { grantIframe } from './combat'
 import { displace } from './displace'
 import { shoot } from './projectile'
 import { launch } from '../../entities/weapon'
@@ -77,16 +78,16 @@ import { shadowsOf } from '../../entities/shadow'
 import { place, spawnBee } from '../../entities/minion'
 import { spawnDrop } from '../../entities/drop'
 import { spawnZone } from '../../entities/zone'
-import { spawnFxBeam, spawnFxBolt, spawnFxBoom, spawnFxCircle, spawnFxSlash } from '../../entities/fx'
+import { spawnFxBeam, spawnFxBolt, spawnFxBoom, spawnFxCircle } from '../../entities/fx'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 import type { Effect } from '../../../types/abilityDefs'
 
 const STEALTH = [MARK.stealth]
 
-/** 正在做的事没做完就不出手：延迟重复未打完、飞返体未回收、瞬袭未闪回、蓄力未到点 */
-export function busy(sim: Sim, e: number): boolean {
-  return RepeatState.left[e]! > 0 || Thrown.n[e]! > 0 || BlinkState.until[e]! > sim.elapsedMs || WindupState.until[e]! > 0
+/** 正在做的事没做完就不出手：延迟重复未打完、飞返体未回收、瞬袭未斩完、蓄力未到点 */
+export function busy(e: number): boolean {
+  return RepeatState.left[e]! > 0 || Thrown.n[e]! > 0 || BlinkState.phase[e] !== BLINK.none || WindupState.until[e]! > 0
 }
 
 export interface Shot {
@@ -125,8 +126,10 @@ export function aimAt(sim: Sim, e: number, src: Source): Shot | null {
   }
 }
 
+export const BLINK_COLOR = 0xb388ff
+
 export function blinkFlash(sim: Sim, x: number, y: number): void {
-  spawnFxCircle(sim, x, y, 26, { fill: 0xb388ff, fillAlpha: 0.4, fromScale: 1, toScale: 1.8, durationMs: 240, depth: 14 })
+  spawnFxCircle(sim, x, y, 26, { fill: BLINK_COLOR, fillAlpha: 0.4, fromScale: 1, toScale: 1.8, durationMs: 240, depth: 14 })
 }
 
 function burst(sim: Sim, x: number, y: number, radius: number, color: number, boom: boolean): void {
@@ -287,28 +290,13 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     const dy = target.y - oy
     const d = Math.hypot(dx, dy) || 1
     const behind = target.radius + BlinkShape.behindDist[e]!
-    const landX = target.x + (dx / d) * behind
-    const landY = target.y + (dy / d) * behind
     const backX = Transform.x[m]!
     const backY = Transform.y[m]!
-    if (!displace(sim, m, { kind: 'place', x: landX, y: landY }, { self: true })) return false
-    Aim.rad[e] = Math.atan2(target.y - landY, target.x - landX)
-    blinkFlash(sim, ox, oy)
-    const strikeMs = BlinkShape.strikeMs[e]!
-    BlinkState.until[e] = sim.elapsedMs + strikeMs
+    if (!displace(sim, m, { kind: 'transit', x: target.x + (dx / d) * behind, y: target.y + (dy / d) * behind, ms: TRANSIT_MS.blink, look: 'streak', color: BLINK_COLOR }, { self: true })) return false
+    BlinkState.phase[e] = BLINK.going
     BlinkState.x[e] = backX
     BlinkState.y[e] = backY
-    BlinkState.back[e] = 1
-    grantIframe(sim, m, strikeMs + BLINK_IFRAME_PAD_MS)
-    blinkFlash(sim, landX, landY)
-    let dmg = damage
-    const execHp = BlinkShape.execHp[e]!
-    if (execHp > 0 && Hp.max[target.eid]! > 0 && Hp.v[target.eid]! / Hp.max[target.eid]! <= execHp) {
-      dmg *= BlinkShape.execMul[e]!
-    }
-    const s = struckOf(target.eid)
-    if (hit(sim, src, target.eid, dmg, { knockback: kb, from: { x: landX, y: landY } })) applyOnHit(sim, src, onHit, target.x, target.y, dmg, [s], angle)
-    spawnFxSlash(sim, target.x, target.y, Aim.rad[e]!, 34)
+    blinkStrike[e] = { src, target: target.eid, uid: Uid.v[target.eid]!, damage, knockback: kb, onHit }
     return true
   }
 

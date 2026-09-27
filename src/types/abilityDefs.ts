@@ -277,7 +277,7 @@ interface ThrowEffect {
   readonly height: number
   readonly onLand?: readonly Effect[]
 }
-/** 换位：施法者与目标互换位置 */
+/** 换位：施法者与目标同时穿行到对方的位置 */
 interface SwapEffect {
   readonly kind: 'swap'
 }
@@ -372,7 +372,7 @@ interface GrowEffect {
   readonly ms?: number
   readonly max?: number
 }
-/** 回溯：回到 ms 前的位置，生命取那时与现在的较高者 */
+/** 回溯：沿直线穿行回 ms 前的位置，到了生命取那时与现在的较高者；只有记着路的身体回得去，带这个效果的能力装上时就给宿主记路 */
 interface RewindEffect {
   readonly kind: 'rewind'
   readonly ms: number
@@ -419,7 +419,7 @@ interface SpawnEffect {
   readonly count: number
   readonly spread: number
 }
-/** 瞬移到自己召出的 of 身边（最靠近目标的那个），落地施加 then */
+/** 隐身穿行到自己召出的 of 身边（最靠近目标的那个），现身时施加 then */
 interface TeleportEffect {
   readonly kind: 'teleport'
   readonly of: EnemyKind
@@ -457,7 +457,7 @@ interface BarrierEffect {
   readonly onCross?: readonly Effect[]
   readonly color: number
 }
-/** 传送门：施法者脚下与出手方向 distance 处各开一个，任何身体踏进一个就从另一个出来，同一个身体 cdMs 内不再传 */
+/** 传送门：施法者脚下与出手方向 distance 处各开一个，任何身体踏进一个就隐身穿行到另一个出来，同一个身体 cdMs 内不再传 */
 interface PortalEffect {
   readonly kind: 'portal'
   readonly distance: number
@@ -484,7 +484,7 @@ interface RecallEffect {
 interface InterruptEffect {
   readonly kind: 'interrupt'
 }
-/** 群体瞬移：目标（allies 为真时是全体同伴）沿出手方向平移 distance */
+/** 群体传送：目标（allies 为真时是全体同伴）沿出手方向隐身穿行 distance */
 interface WarpEffect {
   readonly kind: 'warp'
   readonly distance: number

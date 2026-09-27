@@ -17,6 +17,8 @@ export interface CombatTuning {
   readonly acquire: { readonly range: number }
   readonly morph: { readonly recastMs: number; readonly recoverMs: number }
   readonly blinkIframePadMs: number
+  readonly transitMs: { readonly teleport: number; readonly rewind: number; readonly swap: number; readonly blink: number }
+  readonly followInMs: number
   readonly minionFirstShotMs: number
   readonly armorHalf: number
   readonly lifestealCapPerSec: number

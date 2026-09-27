@@ -1,9 +1,10 @@
 import { query } from 'bitecs'
-import { Alive, Faction, HISTORY, History, Hp, Pet, PET, Transform } from '../components'
-import { historyAt } from './shared/history'
+import { PET_TRAIL_MS } from '../../data/abilities'
+import { Alive, Faction, Hp, Pet, PET, Tint, Transform } from '../components'
+import { presence } from '../utils/statusTint'
+import { traceAt } from './shared/trace'
 import type { Sim } from '../sim'
 
-const TRAIL_MS = 1500
 const SPIN = 2.2
 
 /** 同阵营血量比例最低的活着的身体，没有就是宿主 */
@@ -21,7 +22,7 @@ function lowestAlly(sim: Sim, host: number): number {
   return best
 }
 
-/** 施法锚点物件的摆放：绕宿主转、落在宿主一阵子前的位置、或贴着血量最低的同伴；都是平滑追过去 */
+/** 施法锚点物件的摆放：绕宿主转、落在宿主一阵子前的位置、或贴着血量最低的同伴；都是平滑追过去；宿主看不见时它也不画 */
 export function tickPets(sim: Sim): void {
   const dt = sim.wdtMs / 1000
   const k = Math.min(1, dt * 10)
@@ -38,10 +39,10 @@ export function tickPets(sim: Sim): void {
         break
       }
       case PET.trail: {
-        const s = historyAt(host, TRAIL_MS)
-        if (s >= 0 && History.n[host]! >= HISTORY / 4) {
-          tx = History.x[s]!
-          ty = History.y[s]!
+        const at = traceAt(sim, host, PET_TRAIL_MS)
+        if (at) {
+          tx = at.x
+          ty = at.y
         }
         break
       }
@@ -55,5 +56,6 @@ export function tickPets(sim: Sim): void {
     const to = sim.hooks.wrap(sim, Transform.x[p]! + d.x * k, Transform.y[p]! + d.y * k)
     Transform.x[p] = to.x
     Transform.y[p] = to.y
+    Tint.alpha[p] = presence(sim, host) === 0 ? 0 : 1
   }
 }

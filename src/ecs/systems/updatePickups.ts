@@ -4,12 +4,13 @@ import { norm } from '../../util/vec'
 import { PICKUP, PICKUPS } from '../../data/pickups'
 import { Alive, Collected, Drive, Grab, Radius, Lifetime, PICKUP_SET, Pull, Stats, Tint, Transform } from '../components'
 import { animatePickup } from '../entities/pickup'
+import { inTransit } from '../utils/marks'
 import type { Sim } from '../sim'
 import { leaderX, leaderY } from '../utils/team'
 
 const FADE_MS = 250
 
-/** 金币被吸附范围内最近的存活角色吸走、碰到任何角色即拾取；不吸附的拾取物只有队长走过去才捡；位移由 moveBodies 负责，漂出世界就消失 */
+/** 金币被吸附范围内最近的存活角色吸走、碰到任何角色即拾取；不吸附的拾取物只有队长走过去才捡；穿行中的角色没有实体，不捡也不吸；位移由 moveBodies 负责，漂出世界就消失 */
 export function updatePickups(sim: Sim): void {
   const eids = query(sim.world, PICKUP_SET)
   if (eids.length === 0) return
@@ -38,7 +39,7 @@ export function updatePickups(sim: Sim): void {
       if (taken) continue
     }
     const grab = Grab.radius[eid]!
-    const grabbed = magnetic ? nearAliveCharacter(sim, x, y, grab) : Alive.v[sim.leader] === 1 && within(sim, x, y, lx, ly, grab)
+    const grabbed = magnetic ? nearAliveCharacter(sim, x, y, grab) : present(sim.leader) && within(sim, x, y, lx, ly, grab)
     if (grabbed) {
       take(sim, eid)
       continue
@@ -73,10 +74,15 @@ function within(sim: Sim, x: number, y: number, tx: number, ty: number, r: numbe
   return d.x * d.x + d.y * d.y <= r * r
 }
 
+/** 在场上：活着且不在穿行 */
+function present(m: number): boolean {
+  return Alive.v[m] === 1 && !inTransit(m)
+}
+
 function nearAliveCharacter(sim: Sim, x: number, y: number, grab: number): boolean {
   const cr = PICKUPS.coin.radius * UNIT
   for (const m of sim.characters) {
-    if (!Alive.v[m]) continue
+    if (!present(m)) continue
     if (within(sim, x, y, Transform.x[m]!, Transform.y[m]!, Math.max(grab, Radius.v[m]! + cr))) return true
   }
   return false
@@ -88,7 +94,7 @@ function magnetPull(sim: Sim, x: number, y: number): { x: number; y: number } | 
   let bestD2 = Infinity
   let bestR = 0
   for (const m of sim.characters) {
-    if (!Alive.v[m]) continue
+    if (!present(m)) continue
     const d = sim.hooks.worldDelta(sim, x, y, Transform.x[m]!, Transform.y[m]!)
     const d2 = d.x * d.x + d.y * d.y
     if (d2 >= bestD2) continue

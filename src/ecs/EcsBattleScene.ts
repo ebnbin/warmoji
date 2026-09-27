@@ -24,7 +24,7 @@ import { MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Transform, VisOff } from './components'
+import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Tint, Transform, VisOff } from './components'
 import { charSize } from './systems/shared/scale'
 import { dragging, squadStamina } from './systems/shared/stamina'
 import { STAMINA } from '../data/stamina'
@@ -431,7 +431,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       }
       dead?.setVisible(false)
       this.shownCountdown[i] = -1
-      g.setVisible(true).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
+      g.setVisible(Tint.alpha[m]! > 0).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
       const ratio = Math.max(0, Math.min(1, Hp.v[m]! / Hp.max[m]!))
       const res = hasComponent(this.world, m, Res) ? Res.v[m]! / Math.max(1, Res.max[m]!) : -1
       const locked = res >= 0 && sim.elapsedMs < Res.lock[m]!

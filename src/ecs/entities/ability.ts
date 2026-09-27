@@ -63,9 +63,10 @@ import {
 } from '../components'
 import { abilityArtEmoji, abilityBoost, abilityDef, abilityFireSfx, abilityOnCast, abilityOnHit, abilityOnKill, abilityOnSelf, abilityPulse, abilityRequires, ammoLast, emplaceAbility, zoneRules } from '../store'
 import type { AbilityDef, Shape } from '../../types/abilityDefs'
-import { ACQUIRE, abilityPiercesWalls } from '../../data/abilities'
+import { ACQUIRE, abilityPiercesWalls, PET_TRAIL_MS, rewindMs } from '../../data/abilities'
 import { UNIT } from '../../util/units'
 import { holderOutline, spawnWeaponBody } from './weapon'
+import { keepTrace } from '../systems/shared/trace'
 import { attachDrawable } from './drawable'
 import type { Sim } from '../sim'
 import type { ByKind } from '../../util/record'
@@ -323,7 +324,10 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
   if (def.anchor) {
     const pet = spawnPet(sim, e, init.anchor, def.anchor, init.faction)
     Anchor.eid[e] = pet
+    if (def.anchor.mode === 'trail') keepTrace(sim, init.anchor, PET_TRAIL_MS)
   }
+  const back = rewindMs(def)
+  if (back > 0) keepTrace(sim, init.owner, back)
   attachShape(sim, e, def.shape, init.faction)
 }
 

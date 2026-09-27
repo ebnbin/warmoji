@@ -1,5 +1,6 @@
 import { addComponent, hasComponent, query, removeEntity } from 'bitecs'
 import { Alive, Disarmed, Frozen, Hp, Lifetime, MARK, Owner, Portal, PortCd, Radius, Ring, TAG, Tint, Transform, Uid, ZONE_SET, ZONE_WHO, Zone, ZoneFollow, ZoneHit } from '../components'
+import { TRANSIT_MS } from '../../data/abilities'
 import { hit } from './shared/damage'
 import { applyAbilityEffects } from './shared/effects'
 import { displace } from './shared/displace'
@@ -91,7 +92,7 @@ function unchanged(sim: Sim, found: readonly number[], uids: readonly number[]):
   return found.filter((t, i) => isSameEntity(sim.world, t, uids[i]!))
 }
 
-/** 传送门：踏进来的身体（谁都算）从另一扇门出来 */
+/** 传送门：踏进来的身体（谁都算）隐身穿行到另一扇门出来 */
 function port(sim: Sim, z: number, x: number, y: number, r: number): void {
   const other = Portal.other[z]!
   if (!isSameEntity(sim.world, other, Portal.otherUid[z]!) || Zone.on[other] === 0) return
@@ -100,13 +101,9 @@ function port(sim: Sim, z: number, x: number, y: number, r: number): void {
     for (const t of list) {
       if (!t.alive || Uid.v[t.eid] !== t.uid || !inside(x, y, r, t.x, t.y)) continue
       if (hasComponent(sim.world, t.eid, PortCd) && now < PortCd.until[t.eid]!) continue
-      const ox = Transform.x[other]!
-      const oy = Transform.y[other]!
-      if (!displace(sim, t.eid, { kind: 'place', x: ox, y: oy }, { self: false, free: true })) continue
+      if (!displace(sim, t.eid, { kind: 'transit', x: Transform.x[other]!, y: Transform.y[other]!, ms: TRANSIT_MS.teleport, look: 'hidden', color: Ring.color[z]! }, { self: false, free: true })) continue
       if (!hasComponent(sim.world, t.eid, PortCd)) addComponent(sim.world, t.eid, PortCd)
       PortCd.until[t.eid] = now + Portal.cdMs[z]!
-      spawnFxCircle(sim, t.x, t.y, Radius.v[t.eid]! * 1.6, { fill: Ring.color[z]!, fillAlpha: 0.5, fromScale: 1, toScale: 0.2, durationMs: 240, depth: 14 })
-      spawnFxCircle(sim, ox, oy, Radius.v[t.eid]! * 1.6, { fill: Ring.color[z]!, fillAlpha: 0.5, fromScale: 0.2, toScale: 1.4, durationMs: 280, depth: 14 })
     }
   }
 }

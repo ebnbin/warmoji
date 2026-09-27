@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { entityExists, query } from 'bitecs'
-import { cubicEaseIn, cubicEaseOut } from '../utils/ease'
-import { Barrier, Depth, Fx, FxBeam, FxBolt, FxCircle, FxSlash, Link, Tether, Transform, Uid } from '../components'
+import { cubicEaseIn, cubicEaseOut, sineEaseInOut } from '../utils/ease'
+import { Barrier, Depth, Fx, FxBeam, FxBolt, FxCircle, FxSlash, Link, Motion, MOTION, Radius, Tether, Transform, TRANSIT, Uid } from '../components'
 import { boltPts } from '../store'
 import type { EcsWorld } from '../world'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment } from './tri'
@@ -109,6 +109,17 @@ export class CueLayer {
         const to = Link.to[k]!
         if (!entityExists(this.world, to) || Uid.v[to] !== Link.toUid[k]) continue
         segment(o, m, Transform.x[k]!, Transform.y[k]!, Transform.x[to]!, Transform.y[to]!, 3, packTint(Link.color[k]!, 0.55))
+      }
+      for (const k of query(this.world, [Motion, Radius])) {
+        if (Motion.kind[k] !== MOTION.transit || Motion.look[k] !== TRANSIT.streak) continue
+        const fx = Motion.fx[k]!
+        const fy = Motion.fy[k]!
+        const p = sineEaseInOut(Motion.t[k]! / Motion.ms[k]!)
+        const x = fx + (Motion.tx[k]! - fx) * p
+        const y = fy + (Motion.ty[k]! - fy) * p
+        const w = Radius.v[k]! * 1.2
+        segment(o, m, fx, fy, x, y, w, packTint(Motion.color[k]!, 0.3))
+        segment(o, m, fx, fy, x, y, w * 0.3, packTint(0xffffff, 0.5))
       }
     }
 
