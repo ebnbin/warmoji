@@ -4,20 +4,21 @@ import { characterLevel } from '../data/charLevel'
 import { ENEMIES } from '../data/enemies'
 import { FIELD, POOLS } from '../data/battlefield'
 import { characterXp, growthSteps, ITEMS, RARITIES, RARITY_ORDER } from '../data/items'
-import { bossFor, HAZARD_NAMES, MAPS } from '../data/maps'
+import { bossFor, HAZARD_NAMES, mapEnemyRoster, MAPS } from '../data/maps'
 import { ROLES } from '../data/roles'
 import { STAT_CATEGORIES, STAT_KEYS, STATS, statValue } from '../data/stats'
-import { isBossWave, isEliteWave, WAVE } from '../data/waves'
+import { fightsOf } from '../data/runs'
 import { levelProgress, stackCount } from '../run/draft'
 import { activeHudHost } from '../run/hudHost'
 import type { HudSnapshot, MemberSheet } from '../run/hudHost'
 import { memberLevel, memberLook, memberOutStats } from '../run/members'
 import { endRun, getRun, leaderSlot, runDef, waveStartHp } from '../run/state'
+import { fightAfterRecruit, fightsDone, lastFight, nextFight } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { CharacterId } from '../types/characters'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
 import type { GrowthProgress, ItemId } from '../types/items'
-import type { MapId } from '../types/maps'
+import type { FightDef } from '../types/runs'
 import { applyCamera, VIEWPORT_CHANGED } from '../util/apply'
 import { formatBig, formatTime } from '../util/format'
 import { keysOf } from '../util/record'
@@ -94,28 +95,40 @@ interface Member extends MemberSheet {
 
 interface Foe {
   readonly def: EnemyDef
-  /** 从第几波起出没 */
+  /** 从第几场起出没 */
   readonly since: number
 }
 
-/** 这张图会出的敌人：按首次出没的波次排，巢穴生出的与死后分裂出的跟着母体，头目在终波 */
-function mapFoes(mapId: MapId): Foe[] {
+/** 这一局会出的敌人：按首次出没的场次排，巢穴生出的与死后分裂出的跟着母体 */
+function runFoes(run: RunState): Foe[] {
   const since = new Map<EnemyKind, number>()
   const order: EnemyDef[] = []
-  const add = (def: EnemyDef, wave: number): void => {
+  const add = (def: EnemyDef, n: number): void => {
     const known = since.get(def.kind)
     if (known !== undefined) {
-      since.set(def.kind, Math.min(known, wave))
+      since.set(def.kind, Math.min(known, n))
       return
     }
-    since.set(def.kind, wave)
+    since.set(def.kind, n)
     order.push(def)
-    if (def.spawner) add(def.spawner.into, wave)
-    for (const fx of def.onDeath ?? []) if (fx.kind === 'split') add(fx.into, wave)
+    if (def.spawner) add(def.spawner.into, n)
+    for (const fx of def.onDeath ?? []) if (fx.kind === 'split') add(fx.into, n)
   }
-  for (const row of MAPS[mapId].mix) add(ENEMIES[row.kind], row.sinceWave)
-  add(bossFor(mapId), WAVE.totalWaves)
+  fightsOf(runDef(run)).forEach((f, i) => {
+    const n = i + 1
+    for (const s of f.spawns) {
+      if (s.kind === 'boss') add(bossFor(run.mapId), n)
+      else if (s.kind === 'knobs') for (const e of mapEnemyRoster(run.mapId)) add(e, n)
+      else for (const row of MAPS[run.mapId].mix) add(ENEMIES[row.kind], Math.max(n, row.sinceWave))
+    }
+  })
   return order.map((def) => ({ def, since: since.get(def.kind)! })).sort((a, b) => a.since - b.since)
+}
+
+/** 多场的一局里这一场的特别之处 */
+function fightTag(f: FightDef): string {
+  if (f.spawns.some((s) => s.kind === 'boss')) return '（首领波）'
+  return f.spawns.some((s) => s.kind === 'batch') ? '（精英波）' : ''
 }
 
 /** 暂停页：一局之中的信息都在这里，盖在战斗、商店或招募页上，下层停住 */
@@ -155,7 +168,7 @@ export class PauseScene extends Phaser.Scene {
     this.headObjs = []
     this.run = getRun()
     this.members = this.readMembers()
-    this.foes = mapFoes(this.run.mapId)
+    this.foes = runFoes(this.run)
     if (!preserved) {
       this.tab = 'stats'
       const want = this.opened.slot
@@ -401,23 +414,28 @@ export class PauseScene extends Phaser.Scene {
     flow.gap(6)
 
     flow.heading('进度', '1f3c1')
-    if (runDef(run).team === 'knobs') {
-      flow.text(`试炼场 · 已打 ${formatTime(snap?.seconds ?? 0)}`)
-    } else {
-      const wave = run.wave
-      const tag = (w: number): string => (isBossWave(w) ? '（首领波）' : isEliteWave(w) ? '（精英波）' : '')
+    const def = runDef(run)
+    const fights = fightsOf(def)
+    const remain = snap?.remainMs ?? null
+    if (fights.length > 1) {
+      const done = fightsDone(run)
+      const cur = nextFight(run)
+      const prev = lastFight(run)
       flow.text(
-        snap
-          ? `第 ${wave} 波进行中${tag(wave)} · 本波还剩 ${formatTime(Math.ceil((snap.remainMs ?? 0) / 1000))}`
-          : `第 ${wave - 1} 波已完成 · 下一波是第 ${wave} 波${tag(wave)}`,
+        snap && cur
+          ? `${cur.name ?? ''}进行中${fightTag(cur)}${remain === null ? '' : ` · 本波还剩 ${formatTime(Math.ceil(remain / 1000))}`}`
+          : `${prev ? `${prev.name ?? ''}已完成 · ` : ''}下一波是${cur?.name ?? ''}${cur ? fightTag(cur) : ''}`,
         { color: 'ink', bold: true },
       )
-      const barText = new Label(this, 24 + width, flow.y + 10, `${wave - 1} / ${WAVE.totalWaves} 波`, { kind: 'label', color: 'soft' }).setOrigin(1, 0.5)
-      const bar = new ProgressBar(this, flow.indent, flow.y + 2, 24 + width - barText.width - 16 - flow.indent, 16, { tone: 'accent', value: (wave - 1) / WAVE.totalWaves })
+      const barText = new Label(this, 24 + width, flow.y + 10, `${done} / ${fights.length} 波`, { kind: 'label', color: 'soft' }).setOrigin(1, 0.5)
+      const bar = new ProgressBar(this, flow.indent, flow.y + 2, 24 + width - barText.width - 16 - flow.indent, 16, { tone: 'accent', value: done / fights.length })
       flow.put(bar).put(barText, 34)
-      const elites = WAVE.eliteWaves.filter((w) => w >= wave)
-      const lines = [elites.length > 0 ? `精英波还有第 ${elites.join('、')} 波` : '', `第 ${WAVE.totalWaves} 波是首领波：${bossFor(run.mapId).name}`]
-      flow.text(lines.filter(Boolean).join(' · '))
+      const numbered = fights.map((f, i) => ({ f, n: i + 1 }))
+      const elites = numbered.filter(({ f, n }) => n > done && fightTag(f) === '（精英波）').map(({ n }) => n)
+      const bosses = numbered.filter(({ f }) => fightTag(f) === '（首领波）').map(({ n }) => `第 ${n} 波是首领波：${bossFor(run.mapId).name}`)
+      flow.text([elites.length > 0 ? `精英波还有第 ${elites.join('、')} 波` : '', ...bosses].filter(Boolean).join(' · '))
+    } else {
+      flow.text(`${def.name} · 已打 ${formatTime(snap?.seconds ?? 0)}${remain === null ? '' : ` · 还剩 ${formatTime(Math.ceil(remain / 1000))}`}`)
     }
     flow.gap(6)
 
@@ -427,9 +445,14 @@ export class PauseScene extends Phaser.Scene {
     const hazards = keysOf(run.stats.hazardDamage).map((h) => `${HAZARD_NAMES[h]} ${formatBig(run.stats.hazardDamage[h] ?? 0)}`)
     if (hazards.length > 0) flow.text(`地形伤害：${hazards.join(' · ')}`, { color: 'warn' })
     const size = run.roster.length
-    // 战斗中的这一波已经开打，招募最早在下一波之前
-    const recruitAt = Math.max(size + 1, snap ? run.wave + 1 : run.wave)
-    flow.text(size >= TEAM.maxSize ? `队伍 ${size} / ${TEAM.maxSize} 人，已满员` : `队伍 ${size} / ${TEAM.maxSize} 人 · 第 ${recruitAt} 波开打前招募新队员`)
+    const joinAt = fightAfterRecruit(run)
+    flow.text(
+      size >= TEAM.maxSize
+        ? `队伍 ${size} / ${TEAM.maxSize} 人，已满员`
+        : joinAt
+          ? `队伍 ${size} / ${TEAM.maxSize} 人 · ${joinAt.name ?? '下一场'}开打前招募新队员`
+          : `队伍 ${size} 人`,
+    )
     flow.gap(6)
 
     if (snap) {
@@ -502,7 +525,7 @@ export class PauseScene extends Phaser.Scene {
     }
     grid.setItems(
       this.foes.map(
-        ({ def, since }): GridItem<EnemyKind> => ({ key: def.kind, emoji: def.emoji, outline: def.role === 'boss' ? 'elite' : 'enemy', dim: since > this.run.wave }),
+        ({ def, since }): GridItem<EnemyKind> => ({ key: def.kind, emoji: def.emoji, outline: def.role === 'boss' ? 'elite' : 'enemy', dim: since > fightsDone(this.run) + 1 }),
       ),
     )
     if (!this.foes.some((x) => x.def.kind === this.foe)) this.foe = this.foes[0]?.def.kind ?? null
@@ -525,8 +548,9 @@ export class PauseScene extends Phaser.Scene {
     const flow = new Flow(this, view, { x: 24, y: Math.max(136, desc.y + desc.height + 16), width: w - 48 })
     const st = this.run.stats
     flow.heading('本局', '1f3c6')
-    const when = boss ? `第 ${since} 波登场的头目` : `第 ${since} 波起出没`
-    flow.text(since > this.run.wave ? `${when} · 还没登场` : when)
+    const many = fightsOf(runDef(this.run)).length > 1
+    const when = many ? (boss ? `第 ${since} 波登场的头目` : `第 ${since} 波起出没`) : boss ? '这一场的头目' : '这一场会出现'
+    flow.text(since > fightsDone(this.run) + 1 ? `${when} · 还没登场` : when)
     flow.text(`击杀 ${st.enemyKills[def.kind] ?? 0} · 对我方造成 ${formatBig(st.enemyDamage[def.kind] ?? 0)} 伤害`)
     flow.gap(6)
     flow.heading('特性', '1f4d6')

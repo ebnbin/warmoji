@@ -2,22 +2,27 @@ import Phaser from 'phaser'
 import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
+import { RUN_IDS, RUNS } from '../data/runs'
+import type { RunId } from '../types/runs'
 import { beginRun, skipFilled } from '../run/state'
 import { goStep } from './teamPage'
 import { mapPlayLines } from './mapLines'
 import { loadMap, saveMap } from '../save/selection'
 import { preloadEmojis } from '../emoji/hold'
-import { beginPage, Button, EmojiGrid, Flow, Label, PageHeader, pageFrame, Panel, RichLabel, ScrollView, Switch } from '../ui'
+import { beginPage, Button, EmojiGrid, Flow, PageHeader, pageFrame, Panel, RichLabel, ScrollView, Tabs } from '../ui'
 import type { PageFrame } from '../ui'
 import { VIEWPORT_CHANGED } from '../util/apply'
 import { SceneKey } from './keys'
 
 const GROUP_ICONS = { theme: '1f5fa', decor: '1f33f', play: '1f579' } as const
 
+/** 选地图的玩法，一种一个页签 */
+const MODES: readonly RunId[] = RUN_IDS
+
 export class MapScene extends Phaser.Scene {
   private preserveOnRestart = false
   private selectedId: MapId = MAP_IDS[0]!
-  private sandbox = false
+  private mode: RunId = MODES[0]!
   private frame!: PageFrame
   private grid!: EmojiGrid<MapId>
   private detail!: ScrollView
@@ -30,6 +35,7 @@ export class MapScene extends Phaser.Scene {
   preload(): void {
     preloadEmojis(this, [
       ...Object.values(GROUP_ICONS).map((id) => ({ id })),
+      ...MODES.map((id) => ({ id: RUNS[id].emoji })),
       ...MAP_IDS.flatMap((id) => [
         { id: MAPS[id].emoji },
         ...MAPS[id].decor.emojis.map((e) => ({ id: e, outline: 'player' as const })),
@@ -43,13 +49,14 @@ export class MapScene extends Phaser.Scene {
     this.preserveOnRestart = false
     if (!preserved) this.selectedId = loadMap(browserStorage())
 
-    const f = (this.frame = pageFrame({ footer: true }))
+    const f = (this.frame = pageFrame({ sub: true, footer: true }))
     new PageHeader(this, f, { title: '选择地图', back: () => this.scene.start(SceneKey.Menu) })
-    new Label(this, f.right - 100, f.headerY, '试炼场', { kind: 'label', bold: true, color: 'soft' }).setOrigin(1, 0.5)
-    new Switch(this, f.right - 42, f.headerY, {
-      value: this.sandbox,
-      onChange: (on) => {
-        this.sandbox = on
+    new Tabs(this, { x: f.left, y: f.subY, w: f.right - f.left }, {
+      items: MODES.map((id) => ({ key: id, label: `{${RUNS[id].emoji}} ${RUNS[id].name}` })),
+      selected: this.mode,
+      size: 'sm',
+      onSelect: (id) => {
+        this.mode = id
         this.refresh()
       },
     })
@@ -76,7 +83,7 @@ export class MapScene extends Phaser.Scene {
   }
 
   private start(): void {
-    const run = beginRun(this.sandbox ? 'sandbox' : 'classic', this.selectedId)
+    const run = beginRun(this.mode, this.selectedId)
     skipFilled(run)
     goStep(this, run)
   }
@@ -92,12 +99,15 @@ export class MapScene extends Phaser.Scene {
     flow.heading('玩法', GROUP_ICONS.play)
     for (const line of mapPlayLines(def)) flow.text(line)
     flow.text(`终波头目 ${bossFor(this.selectedId).name}`, { color: 'muted' })
+    const run = RUNS[this.mode]
+    flow.gap(10).heading(run.name, run.emoji).text(run.desc)
     flow.finish()
   }
 
   private refresh(): void {
     this.grid.setSelected(this.selectedId)
-    this.confirm.setLabel(this.sandbox ? '进入试炼场' : '招募首发')
+    const run = RUNS[this.mode]
+    this.confirm.setLabel(run.steps[0]?.kind === 'recruit' ? '招募首发' : `进入${run.name}`)
     this.renderDetail()
   }
 

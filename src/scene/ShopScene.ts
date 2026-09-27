@@ -9,6 +9,7 @@ import { playSfx } from '../audio/sfx'
 import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
 import { memberLevel, memberLook, memberOutStats } from '../run/members'
 import { getRun, nextStep } from '../run/state'
+import { lastFight, nextFight } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { ItemDef, ItemId } from '../types/items'
 import type { StatValues } from '../types/stats'
@@ -73,7 +74,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
 
     const f = (this.frame = pageFrame({ sub: true, footer: true }))
     new PageHeader(this, f, {
-      title: `{1f6d2} 商店 · 第 ${this.run.wave - 1} 波完成`,
+      title: `{1f6d2} 商店${this.doneLabel()}`,
       ...runExit(this, this.run, () => ({ from: SceneKey.Shop, slot: this.lastSlot })),
     })
     this.shownCoins = this.run.coins
@@ -84,7 +85,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     const gap = 24
     this.rerollBtn = new Button(this, f.centerX - btnW / 2 - gap / 2, f.footerY, { label: '', variant: 'secondary', width: btnW, keys: ['R'], onTap: () => this.reroll() })
     new Button(this, f.centerX + btnW / 2 + gap / 2, f.footerY, {
-      label: `开始第 ${this.run.wave} 波`,
+      label: `开始${nextFight(this.run)?.name ?? '战斗'}`,
       width: btnW,
       keys: ['ENTER', 'SPACE'],
       onTap: () => {
@@ -99,6 +100,12 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
     })
+  }
+
+  /** 标题里刚打完的那一场 */
+  private doneLabel(): string {
+    const name = lastFight(this.run)?.name
+    return name ? ` · ${name}完成` : ''
   }
 
   private levelOf(slot: number): number {
