@@ -12,6 +12,7 @@ import { SceneKey } from './keys'
 import { openPause } from './pause'
 import type { DevProvider, DevProviderHost } from '../devtools'
 import { handoverMs } from '../ecs/systems/shared/squad'
+import { staminaTone } from './statLines'
 
 type IconState = 'ready' | 'cooling' | 'dead'
 
@@ -302,6 +303,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       .setIcon(isLeader ? m.skillIcon : m.emoji, 'player')
       .setDead(dead, m.reviveSec)
       .setHp(dead ? null : Math.max(0, Math.min(1, m.max > 0 ? m.hp / m.max : 0)))
+      .setStamina(dead ? null : m.stamina, staminaTone(m.stamina))
     // 徽章：队长显示头像，阵亡显示骷髅，冷却中的队员显示技能图标
     const badge = dead ? '1f480' : isLeader ? m.emoji : state === 'cooling' ? m.skillIcon : null
     b.dial.setBadge(badge, 'player')
@@ -339,6 +341,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
         else dial.setRim('leader', state === 'cooling' ? 0.1 : 0.5 + 0.5 * Math.sin(this.time.now / 240))
       }
       dial.setHp(m.max > 0 ? Math.max(0, Math.min(1, m.hp / m.max)) : 0)
+      dial.setStamina(m.stamina, staminaTone(m.stamina))
     })
   }
 

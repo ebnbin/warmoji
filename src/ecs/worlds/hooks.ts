@@ -32,19 +32,22 @@ const NO_GHOSTS: Point[] = []
 export interface Surface {
   readonly traction: number
   readonly viscosity: number
-  /** 赶路每走一格扣掉的体力比例 */
+  /** 赶路每走一格扣掉的体力点数 */
   readonly exertion: number
+  /** 歇着时体力回复的倍率 */
+  readonly regen: number
 }
 /** 脚不沾地时的地面：不打滑、不黏、不费力 */
-export const GROUND: Surface = { traction: 1, viscosity: 1, exertion: 0 }
+export const GROUND: Surface = { traction: 1, viscosity: 1, exertion: 0, regen: 1 }
 
 const GROUNDS = new Map<MapId, Surface>()
 
-/** 这张图的地面：费力来自地图，其余同平地 */
+/** 这张图的地面：费力与回复来自地图，其余同平地 */
 function groundOf(sim: Sim): Surface {
   let g = GROUNDS.get(sim.mapId)
   if (!g) {
-    g = { ...GROUND, exertion: MAPS[sim.mapId].exertion ?? 0 }
+    const { exertion, regen } = MAPS[sim.mapId].stamina
+    g = { ...GROUND, exertion, regen }
     GROUNDS.set(sim.mapId, g)
   }
   return g
@@ -77,6 +80,8 @@ export interface WorldHooks {
   projectileLifeMs(sim: Sim): number
   mediumVelocity(sim: Sim, x: number, y: number): Point
   surface(sim: Sim, x: number, y: number): Surface
+  /** 在这里朝 (dx, dy) 赶路的费力倍率：逆着介质更累，顺着更省力 */
+  effort(sim: Sim, x: number, y: number, dx: number, dy: number): number
   /** 任何身体的位置修正：边界、障碍、环面回绕，按身体半径 */
   constrainBody(sim: Sim, eid: number, from: Point, next: Point): Point
   chaseDir(sim: Sim, eid: number, tx: number, ty: number): Point
@@ -114,6 +119,9 @@ const bounded: WorldHooks = {
   },
   surface(sim) {
     return groundOf(sim)
+  },
+  effort() {
+    return 1
   },
   constrainBody(sim, eid, _from, next) {
     const r = Radius.v[eid]!
@@ -184,8 +192,8 @@ const ice: WorldHooks = {
   surface(sim, x, y) {
     const cfg = iceCfg(sim)
     const g = groundOf(sim)
-    if (onFloe(x, y, floePx(sim))) return { traction: iceTraction(), viscosity: 1, exertion: g.exertion }
-    return { traction: cfg.waterTraction, viscosity: cfg.waterViscosity, exertion: g.exertion }
+    if (onFloe(x, y, floePx(sim))) return { ...g, traction: iceTraction() }
+    return { traction: cfg.waterTraction, viscosity: cfg.waterViscosity, exertion: cfg.waterExertion, regen: cfg.waterRegen }
   },
   wanderDir(_sim, _eid, dx, dy) {
     return { x: dx, y: dy }
@@ -438,6 +446,15 @@ const river: WorldHooks = {
   ...bounded,
   mediumVelocity(sim) {
     return flowOf(sim)
+  },
+  /** 按行进方向与水流夹角的余弦在逆流与顺流的倍率之间插值，横渡不变 */
+  effort(sim, _x, _y, dx, dy) {
+    const f = flowOf(sim)
+    const len = Math.hypot(dx, dy) * Math.hypot(f.x, f.y)
+    if (len === 0) return 1
+    const c = (dx * f.x + dy * f.y) / len
+    const cfg = riverCfg(sim)
+    return c < 0 ? 1 + (cfg.upstream - 1) * -c : 1 + (cfg.downstream - 1) * c
   },
   constrainBody(sim, eid, _from, next) {
     const r = riverOf(sim)

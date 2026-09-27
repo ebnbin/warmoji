@@ -6,4 +6,6 @@ const FEEL = fromJson<FeelTuning>(feelJson)
 export const SQUAD = FEEL.squad
 export const HIT_SHAKE = FEEL.hitShake
 export const POP = FEEL.pop
+export const DOWN = FEEL.down
+export const REJOIN = FEEL.rejoin
 export const EMPLACE = FEEL.emplace

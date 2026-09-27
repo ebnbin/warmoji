@@ -6,6 +6,7 @@ import { pressable } from './gesture'
 import { Icon } from './icon'
 import { Label } from './label'
 import { INK, MOTION, SURFACE, TONE } from './theme'
+import type { Tone } from './theme'
 import { Widget } from './widget'
 
 export interface DialOptions {
@@ -23,7 +24,7 @@ export interface DialOptions {
 /** idle 普通，leader 队长呼吸光，recast 连段可接的快闪，dead 阵亡 */
 export type DialRim = 'idle' | 'leader' | 'recast' | 'dead'
 
-/** 圆形技能钮：图标、血量环、冷却扇形、角标与读数；(x, y) 是圆心 */
+/** 圆形技能钮：图标、血量环、贴着边缘内侧的体力环、冷却扇形、角标与读数；(x, y) 是圆心 */
 export class DialButton extends Widget {
   private readonly radius: number
   /** 按下时整体缩放的一层；外层的缩放留给布局 */
@@ -31,6 +32,7 @@ export class DialButton extends Widget {
   private readonly base: Phaser.GameObjects.Graphics
   private readonly face: Icon
   private readonly ring: RingGauge
+  private readonly stamina: RingGauge
   private readonly pie: CooldownPie
   private readonly cdText: Label
   private readonly deadText: Label
@@ -54,6 +56,8 @@ export class DialButton extends Widget {
     this.face = new Icon(scene, 0, 0, opts.icon, opts.iconSize ?? Math.round(r * 1.4), opts.outline)
     this.ring = new RingGauge(scene, 0, 0, r + 5, { tone: 'hp', thickness: 4 })
     this.pie = new CooldownPie(scene, 0, 0, r - 2)
+    // 画在圆盘边缘内侧：排成弧的相邻圆盘之间放不下第二道外环
+    this.stamina = new RingGauge(scene, 0, 0, r - 4, { tone: 'info', thickness: 3 }).setVisible(false)
     const small = { kind: 'label', bold: true, outline: true } as const
     this.cdText = new Label(scene, 0, 0, '', { ...small, color: 'accent' }).setOrigin(0.5).setVisible(false)
     this.deadText = new Label(scene, 0, 0, '', { ...small, color: 'bad' }).setOrigin(0.5).setVisible(false)
@@ -62,7 +66,7 @@ export class DialButton extends Widget {
     this.tired = new Icon(scene, corner, -corner, '1f4a6', 20, 'player').setVisible(false)
     this.charges = new Label(scene, corner, corner, '', { ...small, kind: 'caption', color: 'accent' }).setOrigin(0.5).setVisible(false)
     this.content = new Widget(scene)
-    this.content.add([this.base, this.face, this.ring, this.pie, this.cdText, this.deadText, this.badge, this.tired, this.charges])
+    this.content.add([this.base, this.face, this.ring, this.pie, this.stamina, this.cdText, this.deadText, this.badge, this.tired, this.charges])
     this.add(this.content)
     this.paintBase()
     pressable(this, {
@@ -101,6 +105,13 @@ export class DialButton extends Widget {
   setHp(ratio: number | null): this {
     if (ratio === null) return this.hideObj(this.ring)
     this.ring.setVisible(true).setValue(ratio)
+    return this
+  }
+
+  /** 体力环：满了或给 null 时收起 */
+  setStamina(ratio: number | null, tone: Tone): this {
+    if (ratio === null || ratio >= 1) return this.hideObj(this.stamina)
+    this.stamina.setVisible(true).setTone(tone).setValue(ratio)
     return this
   }
 

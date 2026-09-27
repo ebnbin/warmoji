@@ -1,13 +1,13 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { POP } from '../../../data/feel'
-import { startPop } from '../../utils/pop'
+import { REJOIN } from '../../../data/feel'
+import { UNIT } from '../../../util/units'
 import { playSfx } from '../../../audio/sfx'
 import { gainXp } from '../../../run/xp'
 import { coinDropChance } from '../../../data/waves'
 import { ELITE } from '../../../data/enemies'
 import type { EnemyDef } from '../../../types/enemies'
 import { spawnShards } from '../../entities/shard'
-import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Gear, Hp, Lethal, MARK, MARK_SLOTS, Mark, Nest, Revive, Slot, Sprite, Stats, TAG, Thief, Tint, Transform } from '../../components'
+import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Gear, Hp, Lethal, MARK, MARK_SLOTS, Mark, Nest, Revive, Seat, Slot, Sprite, Stamina, Stats, TAG, Thief, Tint, Transform } from '../../components'
 import { isSameEntity } from '../../utils/identity'
 import { addMark, hasMark } from '../../utils/marks'
 import { offenseOf } from '../../utils/stats'
@@ -19,7 +19,9 @@ import { applyAbilityEffects, casterOf, DEATH_DEF, FUSE_DEF, markFrom, markSourc
 import { mend } from './heal'
 import { dropCoins, dropFieldPickup } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
-import { endMotion } from './displace'
+import { displace, endMotion } from './displace'
+import type { Mover } from './displace'
+import { followersOf, seatPoints } from '../layoutTeam'
 import { charSize } from './scale'
 import { release } from './gut'
 import { returnBorrowed } from './steal'
@@ -85,19 +87,21 @@ function settleDeathMarks(sim: Sim, eid: number): void {
   }
 }
 
+/** 倒地：留在原地歪倒、淡出，不再跟队，扇形也不再给他留坑 */
 function down(sim: Sim, eid: number): void {
   endMotion(eid)
   Hp.v[eid] = 0
   Alive.v[eid] = 0
   Revive.at[eid] = sim.fight.def.noRevive ? Infinity : sim.elapsedMs + Stats.revive[eid]!
+  Revive.fell[eid] = sim.fxMs
+  Revive.drop[eid] = 0
+  Seat.v[eid] = -1
   Tint.color[eid] = 0x888888
-  Tint.alpha[eid] = 0.35
   const st = sim.run.stats
   const slot = Slot.v[eid]!
   if (slot >= 0 && slot < st.deaths.length) st.deaths[slot] = (st.deaths[slot] ?? 0) + 1
   Anim.frames[eid] = -1
   Anim.onceFrames[eid] = 0
-  Transform.rot[eid] = 0
   Transform.w[eid] = charSize(eid)
   Transform.h[eid] = charSize(eid)
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
@@ -194,8 +198,25 @@ export function grantIframe(sim: Sim, eid: number, ms: number): void {
   addMark(eid, MARK.invuln, TAG.effect, sim.elapsedMs + ms)
 }
 
+/** 归队的落下不看能不能动；算被摆布，落地前出不了手 */
+const REJOINING: Mover = { self: false, free: true }
+
+/** 归队：扇形多出一个坑位，随机分给他，他从空中落进去；队长原地落下 */
+function rejoin(sim: Sim, eid: number): void {
+  let at = { x: Transform.x[eid]!, y: Transform.y[eid]! }
+  if (eid !== sim.leader) {
+    const n = followersOf(sim).length
+    const seat = Math.floor(sim.rng.next() * n)
+    Seat.v[eid] = seat
+    at = seatPoints(sim, n)[seat]!
+  }
+  Revive.rose[eid] = sim.fxMs
+  Revive.drop[eid] = 1
+  displace(sim, eid, { kind: 'drop', x: at.x, y: at.y, ms: REJOIN.dropMs, height: REJOIN.height * UNIT }, REJOINING)
+}
+
+/** 复活：生命与体力回满，回到队伍里 */
 export function reviveCharacter(sim: Sim, eid: number): void {
-  playSfx('revive')
   Alive.v[eid] = 1
   Lethal.used[eid] = 0
   Lethal.low[eid] = 0
@@ -203,14 +224,17 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   Gear.lethal[eid] = 0
   Anim.frames[eid] = 0
   Hp.v[eid] = Hp.max[eid]!
+  Stamina.used[eid] = 0
+  Stamina.restMs[eid] = 0
+  Tint.color[eid] = 0xffffff
+  Tint.alpha[eid] = 0
+  Tint.effect[eid] = 0
+  Transform.rot[eid] = 0
+  Transform.w[eid] = charSize(eid)
+  Transform.h[eid] = charSize(eid)
+  rejoin(sim, eid)
   // 复活视同被命中一次的保护
   grantIframe(sim, eid, Stats.iframes[eid]!)
   const back = bodyRules[eid]?.onHurt
   if (back) applyAbilityEffects(sim, selfSource(sim, eid), back, { x: Transform.x[eid]!, y: Transform.y[eid]!, baseDamage: 0, targets: [eid] })
-  Tint.color[eid] = 0xffffff
-  Tint.alpha[eid] = 1
-  Tint.effect[eid] = 0
-  startPop(sim, eid, POP.reviveMs)
-  Transform.w[eid] = charSize(eid) * 0.3
-  Transform.h[eid] = charSize(eid) * 0.3
 }
