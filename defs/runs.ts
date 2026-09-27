@@ -267,10 +267,11 @@ const LABS = {
   ambush: {
     emoji: '1f440',
     name: '伏击',
-    desc: '没有常规刷怪，敌人一阵阵直接冒在队伍四周和身后；清空最后一阵就赢',
-    note: '刷怪位置当变量：敌人不再从远处走来，考验被包围时的反应',
+    desc: '没有常规刷怪，敌人一阵阵直接冒在队伍四周和身后，现身前没有预兆；清空最后一阵就赢',
+    note: '刷怪位置与预兆当变量：敌人不再从远处走来、也不提前示警，考验被包围时的反应',
     map: 'daynight',
     team: { slots: [{ tags: ['area'] }, { tags: ['control'] }, { tags: ['defense'] }], level: 2 },
+    rules: { surprise: true },
     start: { wave: 4, sec: 90 },
     steps: [
       {
@@ -293,10 +294,11 @@ const LABS = {
   gauntlet: {
     emoji: '1f451',
     name: '头目连战',
-    desc: '连打三名别处的头目，只有六成血量；每场之前进一次商店，没有招募',
-    note: '一局的步骤不止「招募 → 商店 → 刷怪」：这里只有商店与头目战交替',
+    desc: '连打三名别处的头目，只有六成血量；每场之前进一次商店、满血开打，换队长要冷却 8 秒',
+    note: '步骤只有商店与头目战交替；换人冷却让「轮着换人放技能」变成要算计的事',
     map: 'forest',
     team: { slots: ['bear', 'mage', 'medic', 'cowboy'], level: 3 },
+    rules: { between: 'full', leader: { switchCdMs: 8000 } },
     coins: 150,
     start: { wave: 10, sec: 300 },
     steps: [
@@ -341,18 +343,18 @@ const LABS = {
   attrition: {
     emoji: '26b0',
     name: '车轮战',
-    desc: '六轮敌人轮番上阵；这一局倒下的队员不会自己起来，只有军医的急救包能救',
-    note: '不再自动复活：每次倒下都是这一场的永久减员，治疗和站位的分量变重',
+    desc: '六轮敌人轮番上阵；倒下的队员不会自己起来，队长到身边站 2.5 秒能扶起来，军医的急救包也能救，但全队一共只能起来 3 次',
+    note: '倒下不再是等时间：去扶人要顶着火力，起来的次数有限，减员成了要管的资源',
     map: 'ice',
     team: { slots: ['medic', 'guard', 'jellyfish', 'fencer'], level: 2 },
+    rules: { revive: false, rescue: { ms: 2500, radius: 1.8 }, lives: 3 },
     start: { wave: 5, sec: 120 },
     steps: [
       {
         kind: 'fight',
         fight: {
           name: '车轮战',
-          intro: { title: '车轮战', sub: '倒下就起不来了' },
-          rules: { revive: false },
+          intro: { title: '车轮战', sub: '倒下要队长去扶，全队只能起来 3 次' },
           spawns: [
             {
               kind: 'waves',
@@ -376,10 +378,11 @@ const LABS = {
   triathlon: {
     emoji: '1f3c5',
     name: '三关连闯',
-    desc: '两人出发，连过猎杀、据点、头目三关；关与关之间招一名新队员、逛一次商店',
-    note: '同一局里每一场的过关条件都不同，招募和商店插在任意两场之间',
+    desc: '两人出发，连过猎杀、据点、头目三关；关与关之间招一名新队员、逛一次商店；一关打完时还倒着的队员，这一局都回不来',
+    note: '同一局里每一场的过关条件都不同；永久减员让每一关的伤亡都带到后面',
     map: 'desert',
     team: { slots: [{ tags: ['damage', 'ranged'] }, { tags: ['defense'] }], level: 1 },
+    rules: { between: 'permadeath' },
     coins: 40,
     start: { wave: 3, sec: 60 },
     steps: [
@@ -447,6 +450,86 @@ const LABS = {
             { kind: 'kills', count: 30 },
             { kind: 'time', ms: 120_000, lose: true },
           ],
+        },
+      },
+    ],
+  },
+  focus: {
+    emoji: '1f3f9',
+    name: '众矢之的',
+    desc: '你操控的法师就是队长，不能换人；所有敌人都冲着他来，他倒下就输。撑过 60 秒',
+    note: '队长倒下就输、不能换人：玩家本人成了要护住的目标，躲闪比输出要紧',
+    map: 'desert',
+    team: { slots: ['mage', 'guard', 'panda', 'medic'], level: 2 },
+    rules: { leader: { lock: true, critical: true } },
+    start: { wave: 5, sec: 120 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '众矢之的',
+          intro: { title: '众矢之的', sub: '你倒下就输，撑过 60 秒' },
+          chaseLeader: true,
+          spawns: [
+            { kind: 'stream', intervalMul: 0.9 },
+            { kind: 'batch', atMs: 20_000, squad: { count: 10, elites: 1, at: { kind: 'ring', dist: 5 } }, banner: { title: '合围', sub: '敌人围住了你' } },
+            { kind: 'batch', atMs: 40_000, squad: { count: 8, eliteChance: 0.3, at: { kind: 'behind', dist: 3 } }, banner: { title: '背后！', sub: '有东西摸到了身后' } },
+          ],
+          ends: [{ kind: 'time', ms: 60_000 }],
+        },
+      },
+    ],
+  },
+  brawl: {
+    emoji: '1f93c',
+    name: '近身肉搏',
+    desc: '只能招募近战角色，全队自带吸血；一名近战出发，打三场，场与场之间招人、逛商店',
+    note: '招募限定加一局级别的修正：阵容被规则锁成一种打法，回血只能靠贴身输出',
+    map: 'forest',
+    team: { slots: [{ tags: ['melee'] }], level: 1 },
+    rules: { recruit: { tags: ['melee'] }, mods: { add: { lifesteal: 0.06 } } },
+    coins: 40,
+    start: { wave: 3, sec: 60 },
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '第一场 · 立足',
+          intro: { title: '第一场 · 立足', sub: '一个人撑过 40 秒' },
+          spawns: [{ kind: 'stream' }],
+          ends: [{ kind: 'time', ms: 40_000 }],
+        },
+      },
+      { kind: 'recruit', upTo: 3 },
+      { kind: 'shop' },
+      {
+        kind: 'fight',
+        fight: {
+          name: '第二场 · 清场',
+          intro: { title: '第二场 · 清场', sub: '清空三批敌人' },
+          spawns: [
+            {
+              kind: 'waves',
+              atMs: 3000,
+              gapMs: 2500,
+              squads: [
+                { count: 12, banner: { title: '第一批', sub: '贴上去打' } },
+                { count: 16, elites: 1, banner: { title: '第二批', sub: '来了个精英' } },
+                { count: 20, eliteChance: 0.15, banner: { title: '最后一批', sub: '清掉它们' } },
+              ],
+            },
+          ],
+          ends: [{ kind: 'cleared' }],
+        },
+      },
+      { kind: 'recruit', upTo: 4 },
+      { kind: 'shop' },
+      {
+        kind: 'fight',
+        fight: {
+          name: '第三场 · 头目',
+          spawns: [{ kind: 'stream', intervalMul: 2 }, { kind: 'boss', atMs: EVENT_MS }],
+          ends: [{ kind: 'boss' }, { kind: 'time', ms: 75_000 }],
         },
       },
     ],
