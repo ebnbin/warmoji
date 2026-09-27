@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 
 const DOT_KEY = 'fx-dot'
 
+/** 白色圆点纹理，粒子靠着色得到颜色 */
 function ensureFxDot(scene: Phaser.Scene): string {
   if (scene.textures.exists(DOT_KEY)) return DOT_KEY
   const size = 16
@@ -33,8 +34,4 @@ export function burstEmitter(
       emitting: false,
     })
     .setDepth(20)
-}
-
-export function setOverlayFill(rect: Phaser.GameObjects.Rectangle, color: number, alpha: number): void {
-  rect.setFillStyle(color, alpha).setVisible(alpha > 0.001)
 }

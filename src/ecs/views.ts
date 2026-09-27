@@ -20,7 +20,6 @@ import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynigh
 import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/river'
 import { fitAspectRect } from './worlds/torus'
-import { setOverlayFill } from '../util/fx'
 
 const FOG_COLOR = 0x0a0a1a
 const FOG_DEPTH = 90
@@ -29,6 +28,10 @@ const WATER_COLOR = 0x0b2a45
 const WATER_VIGNETTE = 0x1e6fd0
 const BANK_COLOR = 0x54402a
 const BANK_FAR_COLOR = 0x40301f
+
+export function setOverlayFill(rect: Phaser.GameObjects.Rectangle, color: number, alpha: number): void {
+  rect.setFillStyle(color, alpha).setVisible(alpha > 0.001)
+}
 
 export interface ViewCtx {
   readonly scene: Phaser.Scene

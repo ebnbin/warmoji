@@ -143,13 +143,3 @@ export function heldEmojiKey(scene: Phaser.Scene, id: string, outline?: OutlineK
   return key
 }
 
-export function emojiImage(
-  scene: Phaser.Scene,
-  x: number,
-  y: number,
-  id: string,
-  size: number,
-  outline?: OutlineKind,
-): Phaser.GameObjects.Image {
-  return scene.add.image(x, y, heldEmojiKey(scene, id, outline)).setDisplaySize(size, size)
-}

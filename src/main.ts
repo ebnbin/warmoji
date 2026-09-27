@@ -16,7 +16,7 @@ import { loadSettings } from './save/settings'
 import { initBgm, playBgm, setBgmEnabled } from './audio/bgm'
 import { initSfx, playSfx, setSfxEnabled } from './audio/sfx'
 import { applyCamera, isStandalone, nudgeIosViewport, refreshViewport, safeInsets, textRes, viewport } from './util/apply'
-import { UI_FONT } from './util/fonts'
+import { FONT_FAMILY, TONE } from './ui/theme'
 import { installDevTools, registerGameProvider } from './devtools'
 import { appProvider } from './dev/app'
 import { audioProvider } from './dev/audio'
@@ -51,8 +51,8 @@ const game = new Phaser.Game({
 installDevTools(game, {
   key: SceneKey.DevTools,
   storageKey: StorageKey.DevTools,
-  accent: 0xffdc5d,
-  font: { family: UI_FONT, size: 22 },
+  accent: TONE.accent.face,
+  font: { family: FONT_FAMILY, size: 22 },
   layout: (scene) => {
     applyCamera(scene)
     return { width: viewport.logicalWidth, height: viewport.logicalHeight, insets: safeInsets, textResolution: textRes() }
