@@ -1,3 +1,5 @@
+import { css, FONT_FAMILY, INK } from './ui/theme'
+
 // 检测须与 Phaser 的一致（phaser/src/device/Features.js）
 function webglAvailable(): boolean {
   if (!('WebGLRenderingContext' in window)) return false
@@ -21,8 +23,8 @@ function showUnsupported(): void {
     boxSizing: 'border-box',
     padding: '24px',
     textAlign: 'center',
-    color: '#e6e6e6',
-    font: '16px/1.6 system-ui, sans-serif',
+    color: css(INK.soft),
+    font: `16px/1.6 ${FONT_FAMILY}`,
   })
 }
 

@@ -2,10 +2,7 @@ import Phaser from 'phaser'
 import { CHARACTERS } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { UNIT } from '../util/units'
-import { randomPalette } from '../util/palette'
-import type { Palette } from '../util/palette'
 import { unlockAt } from '../run/recruit'
-import { Rng } from '../util/rng'
 import {
   getRun,
   recruitCandidates,
@@ -15,27 +12,12 @@ import {
   teamStep,
 } from '../run/state'
 import type { RunState } from '../run/state'
-import { applyBackground } from '../util/background'
-import { emojiImage } from '../emoji/hold'
-import { EmojiGrid } from '../ui/grid'
-import type { EmojiGridItem } from '../ui/grid'
-import { ScrollView } from '../ui/scroll'
-import type { ScrollRect } from '../ui/scroll'
-import { FONT, UI_FONT } from '../util/fonts'
 import { playSfx } from '../audio/sfx'
-import { applyCamera, textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
-import {
-  addConfirmButton,
-  addRunExit,
-  addTeamFrame,
-  fitIconSize,
-  isInitialWave,
-  nextAfterTeam,
-  PREVIEW_SPIN,
-  renderStatGroups,
-  teamLayout,
-} from './teamPage'
-import type { TeamLayout } from './teamPage'
+import { characterStatGroups } from './statLines'
+import { AvatarSlot, beginPage, Button, Divider, EmojiGrid, Flow, Icon, Label, PageHeader, pageFrame, Panel, RichLabel, ScrollView } from '../ui'
+import type { GridItem, Rect } from '../ui'
+import { VIEWPORT_CHANGED } from '../util/apply'
+import { fitIconSize, flowStatGroups, isInitialWave, nextAfterTeam, PREVIEW_SPIN, runExit } from './teamPage'
 import { SceneKey } from './keys'
 import type { DevProvider, DevProviderHost } from '../devtools'
 
@@ -59,84 +41,61 @@ function ringPosts(count: number, phase = 0): { x: number; y: number }[] {
 
 export class RecruitScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
-  private palette?: Palette
   private run!: RunState
   private selectedKey: CharacterId | number | null = null
   private due = 0
   private pool: CharacterId[] = []
   private unlocked = 0
   private picked: CharacterId[] = []
-  private layout!: TeamLayout
-  private origin = { x: 0, y: 0 }
   private grid!: EmojiGrid<CharacterId | number>
-  private detailView!: ScrollView
-  private detailRect: ScrollRect = { x: 0, y: 0, w: 0, h: 0 }
+  private detail!: ScrollView
+  private previewRect: Rect = { x: 0, y: 0, w: 0, h: 0 }
   private previewPhase = 0
   private previewGeom = { cx: 0, cy: 0, scale: 1 }
-  private previewTokens: { c: Phaser.GameObjects.Container; zone?: Phaser.GameObjects.Zone; post: number }[] = []
-  private previewObjs: Phaser.GameObjects.GameObject[] = []
-  private btnBg!: Phaser.GameObjects.Graphics
-  private btnLabel!: Phaser.GameObjects.Text
+  private previewSlots: { slot: AvatarSlot; post: number }[] = []
+  private previewCaption?: Label
+  private confirmBtn!: Button
 
   constructor() {
     super(SceneKey.Recruit)
   }
 
   create(): void {
-    applyCamera(this)
+    beginPage(this)
     const preserved = this.preserveOnRestart
     this.preserveOnRestart = false
-    if (!preserved || !this.palette) this.palette = randomPalette(new Rng(Date.now() >>> 0))
-    applyBackground(this.palette)
     this.run = getRun()
-    this.previewTokens = []
-    this.previewObjs = []
+    this.previewSlots = []
+    this.previewCaption = undefined
 
     this.due = recruitDueCount(this.run)
     this.pool = [...this.run.recruitPool]
     this.unlocked = recruitUnlocked(this.run)
     const open = recruitCandidates(this.run)
-    this.picked = preserved
-      ? this.picked.filter((id) => open.includes(id)).slice(0, this.due)
-      : []
-    if (!preserved || !this.validSelected()) {
-      this.selectedKey = open[0] ?? null
-    }
+    this.picked = preserved ? this.picked.filter((id) => open.includes(id)).slice(0, this.due) : []
+    if (!preserved || !this.validSelected()) this.selectedKey = open[0] ?? null
 
-    const w = viewport.logicalWidth
-    const h = viewport.logicalHeight
-    const res = textRes()
-    const L = (this.layout = teamLayout(w, h))
-    this.origin = { x: (w - L.content.w) / 2, y: (h - L.content.h) / 2 }
-    const oy = this.origin.y
-    const dragged = (): boolean => this.grid.wasDragged
-
-    addTeamFrame(this, L, this.origin, isInitialWave(this.run) ? '组建队伍' : '队伍整编', this.stepBanner(), res)
-    addRunExit(this, this.run, this.origin.x + 40, oy + L.headerY, res, dragged)
-
-    const T = L.detailText
-    this.detailRect = { x: this.origin.x + T.x, y: oy + T.y, w: T.w, h: T.h }
-    this.detailView = new ScrollView(this, this.detailRect)
-
-    const pv = L.preview
-    const div = this.add.graphics()
-    div.lineStyle(1, 0xffffff, 0.12)
-    if (h > w) {
-      const yy = oy + pv.y + pv.h + 6
-      div.lineBetween(this.origin.x + pv.x + 14, yy, this.origin.x + pv.x + pv.w - 14, yy)
-    } else {
-      const xx = this.origin.x + pv.x + pv.w + 8
-      div.lineBetween(xx, oy + pv.y + 14, xx, oy + pv.y + pv.h - 14)
-    }
-
-    this.grid = new EmojiGrid(this, {
-      x: this.origin.x + L.list.x,
-      y: oy + L.list.y,
-      w: L.list.w,
-      h: L.list.h,
+    const f = pageFrame({ sub: true, footer: true })
+    new PageHeader(this, f, {
+      title: isInitialWave(this.run) ? '组建队伍' : '队伍整编',
+      sub: this.due > 1 ? `本波招募 ${this.due} 名，点满空位后出发` : '招募一名新队员',
+      ...runExit(this, this.run),
     })
+
+    const D = f.detail
+    new Panel(this, D.x, D.y, D.w, D.h)
+    if (f.portrait) {
+      this.previewRect = { x: D.x, y: D.y, w: D.w, h: 196 }
+      new Divider(this, D.x + 16, D.y + 202, D.w - 32)
+      this.detail = new ScrollView(this, { x: D.x, y: D.y + 212, w: D.w, h: D.h - 220 })
+    } else {
+      this.previewRect = { x: D.x, y: D.y, w: 264, h: D.h }
+      new Divider(this, D.x + 272, D.y + 16, D.h - 32, true)
+      this.detail = new ScrollView(this, { x: D.x + 280, y: D.y + 8, w: D.w - 280, h: D.h - 16 })
+    }
+
+    this.grid = new EmojiGrid(this, f.list)
     this.grid.onTap = (key): void => {
-      playSfx('click')
       this.selectedKey = key
       if (typeof key !== 'number' && this.cardState(key) === 'open') {
         const at = this.picked.indexOf(key)
@@ -146,11 +105,13 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
       }
       this.refresh()
     }
-    this.grid.setItems(this.buildItems())
 
-    const btn = addConfirmButton(this, L, this.origin, this.confirmLabel(), res, () => this.confirm(), dragged)
-    this.btnBg = btn.bg
-    this.btnLabel = btn.label
+    this.confirmBtn = new Button(this, f.centerX, f.footerY, {
+      label: this.confirmLabel(),
+      keys: ['ENTER', 'SPACE'],
+      sfx: null,
+      onTap: () => this.confirm(),
+    })
 
     this.refresh()
 
@@ -160,25 +121,12 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     })
   }
 
-  private stepBanner(): string {
-    return this.due > 1 ? `本波招募 ${this.due} 名，点满空位后出发` : '招募一名新队员'
-  }
-
   private confirmLabel(): string {
-    return this.due > 1 ? `全员入队 0/${this.due}` : '招募入队'
+    return this.due > 1 ? `全员入队 ${this.picked.length}/${this.due}` : '招募入队'
   }
 
   private confirmEnabled(): boolean {
     return this.due > 0 && this.picked.length === this.due
-  }
-
-  private updateConfirm(): void {
-    const enabled = this.confirmEnabled()
-    this.btnBg.setAlpha(enabled ? 1 : 0.35)
-    this.btnLabel.setAlpha(enabled ? 1 : 0.55)
-    if (this.due > 1) {
-      this.btnLabel.setText(`全员入队 ${this.picked.length}/${this.due}`)
-    }
   }
 
   private cardState(id: CharacterId): 'locked' | 'taken' | 'open' {
@@ -194,18 +142,14 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     return this.pool.includes(sel)
   }
 
-  private buildItems(): EmojiGridItem<CharacterId | number>[] {
+  private buildItems(): GridItem<CharacterId | number>[] {
     return this.pool.map((id, i) => {
-      if (i >= this.unlocked) return { key: i, emoji: '2753' }
+      if (i >= this.unlocked) return { key: i, emoji: '2753', dim: true }
       return {
         key: id,
         emoji: CHARACTERS[id].emoji,
         outline: 'player' as const,
-        ...(this.run.roster.includes(id)
-          ? { badge: '1f396' }
-          : this.picked.includes(id)
-            ? { badge: '2705' }
-            : {}),
+        badge: this.run.roster.includes(id) ? '1f396' : this.picked.includes(id) ? '2705' : undefined,
       }
     })
   }
@@ -226,90 +170,44 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     this.layoutPreview()
   }
 
-  private renderDetail(res: number): void {
-    this.detailView.clear()
+  private renderDetail(): void {
+    const view = this.detail.clear()
     const sel = this.selectedKey
-    if (sel === null) {
-      this.detailView.setContentHeight(0)
-      return
-    }
-    const D = this.detailRect
-
+    if (sel === null) return
+    const w = view.viewport.w
+    const flow = new Flow(this, view, { x: 16, y: 8, width: w - 40 })
     if (typeof sel === 'number') {
-      const idx = sel
-      this.detailView.add([
-        emojiImage(this, 46, 48, '2753', 74),
-        this.add
-          .text(90, 36, '命运牌 · 未解锁', {
-            fontFamily: UI_FONT,
-            fontSize: FONT.lead,
-            fontStyle: 'bold',
-            color: '#c8c8d4',
-            resolution: res,
-          })
-          .setOrigin(0, 0.5),
-        this.add
-          .text(90, 70, `队伍规模达到 ${unlockAt(idx)} 人时揭晓这张牌的真身`, {
-            fontFamily: UI_FONT,
-            fontSize: FONT.small,
-            color: '#b9b9c6',
-            wordWrap: { width: D.w - 110 },
-            resolution: res,
-          })
-          .setOrigin(0, 0),
-      ])
-      this.detailView.setContentHeight(150)
+      flow.put(new Icon(this, 16 + 37, 45, '2753', 74))
+      flow.put(new Label(this, 104, 30, '命运牌 · 未解锁', { kind: 'lead', color: 'muted' }).setOrigin(0, 0.5))
+      flow.put(new Label(this, 104, 58, `队伍规模达到 ${unlockAt(sel)} 人时揭晓这张牌的真身`, { kind: 'label', color: 'muted', wrap: w - 124 }))
+      flow.finish(112)
       return
     }
-
-    const id = sel
-    const def = CHARACTERS[id]
-    const state = this.cardState(id)
-    const tag = state === 'taken' ? ' · 已入队' : this.picked.includes(id) ? ' · 已选' : ''
-    const tagColor = state === 'taken' ? '#a5d6a7' : '#81d4fa'
-    const desc = this.add
-      .text(90, 70, def.desc, {
-        fontFamily: UI_FONT,
-        fontSize: FONT.small,
-        color: '#b9b9c6',
-        wordWrap: { width: D.w - 110 },
-        resolution: res,
-      })
-      .setOrigin(0, 0)
-    this.detailView.add([
-      emojiImage(this, 46, 48, def.emoji, 74, 'player'),
-      this.add
-        .text(90, 36, def.name + tag, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.lead,
-          fontStyle: 'bold',
-          color: tag ? tagColor : '#ffffff',
-          resolution: res,
-        })
-        .setOrigin(0, 0.5),
-      desc,
-    ])
-    const start = Math.max(112, 70 + desc.height + 10)
-    const end = renderStatGroups(this, this.detailView, this.detailRect.w, id, [], res, start)
-    this.detailView.setContentHeight(end + 12)
+    const def = CHARACTERS[sel]
+    const state = this.cardState(sel)
+    const tag = state === 'taken' ? { text: ' · 已入队', color: 'good' as const } : this.picked.includes(sel) ? { text: ' · 已选', color: 'info' as const } : null
+    flow.put(new Icon(this, 16 + 37, 45, def.emoji, 74, 'player'))
+    flow.put(new RichLabel(this, 104, 30, tag ? [def.name, tag] : def.name, { kind: 'lead', gap: 0, originX: 0, maxWidth: w - 124 }))
+    const desc = new Label(this, 104, 58, def.desc, { kind: 'label', color: 'muted', wrap: w - 124 })
+    flow.put(desc)
+    flow.y = Math.max(104, desc.y + desc.height + 12)
+    flowStatGroups(flow, characterStatGroups(sel, [], 1, { path: false }))
+    flow.finish()
   }
 
   private refresh(): void {
     this.grid.setItems(this.buildItems())
     this.grid.setSelected(this.selectedKey)
-    this.renderDetail(textRes())
+    this.renderDetail()
     this.rebuildPreview()
-    this.updateConfirm()
+    this.confirmBtn.setLabel(this.confirmLabel()).setEnabled(this.confirmEnabled())
   }
 
   private rebuildPreview(): void {
-    for (const t of this.previewTokens) t.zone?.destroy()
-    for (const o of this.previewObjs) o.destroy()
-    this.previewTokens = []
-    this.previewObjs = []
-    const P = this.layout.preview
-    const px = this.origin.x + P.x
-    const py = this.origin.y + P.y
+    for (const s of this.previewSlots) s.slot.destroy()
+    this.previewCaption?.destroy()
+    this.previewSlots = []
+    const P = this.previewRect
     const n = this.run.roster.length
     const total = n + this.due
     if (total === 0) return
@@ -319,82 +217,43 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     const fit = Math.min(P.w, P.h) / 2 - base / 2 - 24
     const scale = Math.min(2.2, fit / maxR)
     const size = fitIconSize(posts, scale, base)
-    const cx = px + P.w / 2
-    const cy = py + P.h / 2 - 6
+    const cx = P.x + P.w / 2
+    const cy = P.y + P.h / 2 - 6
     this.previewGeom = { cx, cy, scale }
-
     posts.forEach((p, post) => {
-      const c = this.add.container(cx + p.x * scale, cy + p.y * scale)
-      this.previewObjs.push(c)
-      const token: { c: Phaser.GameObjects.Container; zone?: Phaser.GameObjects.Zone; post: number } = { c, post }
+      const x = cx + p.x * scale
+      const y = cy + p.y * scale
+      let slot: AvatarSlot
       if (post < n) {
-        c.add(emojiImage(this, 0, 0, CHARACTERS[this.run.roster[post]!].emoji, size, 'player'))
+        slot = new AvatarSlot(this, x, y, size, { mode: 'member', emoji: CHARACTERS[this.run.roster[post]!].emoji, outline: 'player' })
       } else {
         const id = this.picked[post - n]
-        if (id) {
-          const halo = this.add.graphics()
-          halo.lineStyle(3, 0x81d4fa, 0.95)
-          halo.strokeCircle(0, 0, size / 2 + 5)
-          c.add(halo)
-          c.add(emojiImage(this, 0, 0, CHARACTERS[id].emoji, size, 'player'))
-          const zone = this.add
-            .zone(c.x - size / 2, c.y - size / 2, size, size)
-            .setOrigin(0)
-            .setInteractive({ useHandCursor: true })
-            .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
-              if (this.grid.wasDragged) return
-              playSfx('click')
-              const at = this.picked.indexOf(id)
-              if (at >= 0) this.picked.splice(at, 1)
-              this.selectedKey = id
-              this.refresh()
+        slot = id
+          ? new AvatarSlot(this, x, y, size, {
+              mode: 'picked',
+              emoji: CHARACTERS[id].emoji,
+              outline: 'player',
+              onTap: () => {
+                const at = this.picked.indexOf(id)
+                if (at >= 0) this.picked.splice(at, 1)
+                this.selectedKey = id
+                this.refresh()
+              },
             })
-          token.zone = zone
-        } else {
-          const dash = this.add.graphics()
-          dash.lineStyle(2.5, 0xffffff, 0.5)
-          const R = size / 2 + 3
-          const dashes = 12
-          for (let i = 0; i < dashes; i++) {
-            const a0 = (i / dashes) * Math.PI * 2
-            dash.beginPath()
-            dash.arc(0, 0, R, a0, a0 + ((Math.PI * 2) / dashes) * 0.55)
-            dash.strokePath()
-          }
-          c.add(dash)
-          const plus = emojiImage(this, 0, 0, '2795', 20)
-          plus.setAlpha(0.4)
-          c.add(plus)
-        }
+          : new AvatarSlot(this, x, y, size, { mode: 'empty' })
       }
-      this.previewTokens.push(token)
+      this.previewSlots.push({ slot, post })
     })
-
-    this.previewObjs.push(
-      this.add
-        .text(cx, py + P.h - 12, `队伍 ${n} 人 → ${total} 人`, {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
-          color: '#b3e5fc',
-          resolution: textRes(),
-        })
-        .setOrigin(0.5, 1)
-        .setAlpha(0.85),
-    )
+    this.previewCaption = new Label(this, cx, P.y + P.h - 14, `队伍 ${n} 人 → ${total} 人`, { kind: 'label', color: 'info' }).setOrigin(0.5, 1)
   }
 
   private layoutPreview(): void {
-    if (this.previewTokens.length === 0) return
-    const total = this.run.roster.length + this.due
-    const posts = ringPosts(total, this.previewPhase)
+    if (this.previewSlots.length === 0) return
+    const posts = ringPosts(this.run.roster.length + this.due, this.previewPhase)
     const { cx, cy, scale } = this.previewGeom
-    for (const t of this.previewTokens) {
-      const p = posts[t.post]
-      if (!p) continue
-      const x = cx + p.x * scale
-      const y = cy + p.y * scale
-      t.c.setPosition(x, y)
-      t.zone?.setPosition(x - t.zone.width / 2, y - t.zone.height / 2)
+    for (const s of this.previewSlots) {
+      const p = posts[s.post]
+      if (p) s.slot.setPosition(cx + p.x * scale, cy + p.y * scale)
     }
   }
 

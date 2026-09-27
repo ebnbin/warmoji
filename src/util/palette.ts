@@ -1,5 +1,3 @@
-import type { Rng } from './rng'
-
 export interface Palette {
   bgFrom: string
   bgTo: string
@@ -22,13 +20,4 @@ export function hslToInt(h: number, s: number, l: number): number {
   const m = l - c / 2
   const to255 = (v: number): number => Math.round((v + m) * 255)
   return (to255(r) << 16) | (to255(g) << 8) | to255(b)
-}
-
-export function randomPalette(_rng: Rng): Palette {
-  return {
-    bgFrom: '#292f33',
-    bgTo: '#292f33',
-    map: hslToInt(205, 0.06, 0.42),
-    shadow: 0x000000,
-  }
 }

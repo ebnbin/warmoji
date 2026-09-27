@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { INK, SHAPE, SURFACE } from './theme'
 
 const RADIUS = 56
 const THUMB_RADIUS = 24
@@ -32,11 +33,12 @@ export class Joystick {
     this.originX = pointer.worldX
     this.originY = pointer.worldY
     this.base = this.scene.add
-      .circle(this.originX, this.originY, RADIUS, 0xffffff, 0.06)
-      .setStrokeStyle(2, 0xffffff, 0.2)
+      .circle(this.originX, this.originY, RADIUS, INK.ink, 0.1)
+      .setStrokeStyle(SHAPE.line, SURFACE.outline, 0.45)
       .setDepth(150)
     this.thumb = this.scene.add
-      .circle(this.originX, this.originY, THUMB_RADIUS, 0xffffff, 0.18)
+      .circle(this.originX, this.originY, THUMB_RADIUS, INK.ink, 0.85)
+      .setStrokeStyle(SHAPE.line, SURFACE.outline, 0.7)
       .setDepth(151)
   }
 

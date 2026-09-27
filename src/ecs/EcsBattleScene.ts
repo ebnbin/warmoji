@@ -5,13 +5,13 @@ import { CHARACTERS, memberBase } from '../data/characters'
 import { ROLES } from '../data/roles'
 import { HIT_SHAKE } from '../data/feel'
 import { TIMESTOP } from '../data/timeStop'
-import { burstEmitter, setOverlayFill } from '../util/fx'
+import { burstEmitter } from '../ui/fx'
 import { CueLayer } from './render/cues'
 import { RingLayer } from './render/rings'
 import { DamageTextLayer } from './render/damageText'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
-import { UI_FONT, FONT } from '../util/fonts'
+import { FONT_FAMILY, TEXT } from '../ui/theme'
 import { norm } from '../util/vec'
 import type { Point } from '../util/vec'
 import { applyBackground } from '../util/background'
@@ -31,7 +31,7 @@ import { STAMINA } from '../data/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
-import { viewFor } from './views'
+import { setOverlayFill, viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
 import { abilityRequires, bodyLook, modDef, statBase } from './store'
@@ -287,8 +287,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const hint = mainCameraOnly(
       this.add
         .text(viewport.logicalWidth / 2, 40, '构建图集…', {
-          fontFamily: UI_FONT,
-          fontSize: FONT.small,
+          fontFamily: FONT_FAMILY,
+          fontSize: `${TEXT.label.size}px`,
           color: '#8fa1b5',
         })
         .setOrigin(0.5)
@@ -350,8 +350,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.deadTexts.push(
         this.add
           .text(0, 0, '', {
-            fontFamily: UI_FONT,
-            fontSize: '26px',
+            fontFamily: FONT_FAMILY,
+            fontSize: `${TEXT.body.size}px`,
             fontStyle: 'bold',
             color: '#ffffff',
             stroke: '#000000',

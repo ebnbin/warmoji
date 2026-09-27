@@ -6,15 +6,16 @@ import { stackMods } from './stats'
 import type { Economy, GrowthProgress, ItemRarity, ItemDef, ItemId } from '../types/items'
 import type { StatMods, StatValues } from '../types/stats'
 import type { AbilityDef, Shape } from '../types/abilityDefs'
+import type { Tone } from '../ui/theme'
 
 const ECON = fromJson<Economy>(economyJson)
 
 export const RARITY_ORDER: readonly ItemRarity[] = ['common', 'rare', 'epic', 'legendary']
-export const RARITIES: Record<ItemRarity, { label: string; color: string }> = {
-  common: { label: '普通', color: '#c8c8d4' },
-  rare: { label: '稀有', color: '#4fc3f7' },
-  epic: { label: '史诗', color: '#ce93d8' },
-  legendary: { label: '传说', color: '#ffb74d' },
+export const RARITIES: Record<ItemRarity, { label: string; tone: Tone }> = {
+  common: { label: '普通', tone: 'steel' },
+  rare: { label: '稀有', tone: 'info' },
+  epic: { label: '史诗', tone: 'epic' },
+  legendary: { label: '传说', tone: 'warn' },
 }
 
 export const ITEMS = fromJson<Record<ItemId, ItemDef>>(itemsJson)
