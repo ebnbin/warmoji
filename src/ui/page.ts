@@ -1,7 +1,6 @@
 import type Phaser from 'phaser'
 import { applyCamera, safeInsets, viewport } from '../util/apply'
-import { Button } from './button'
-import { confirmDialog } from './dialog'
+import { Button, IconButton } from './button'
 import { hasModal } from './gesture'
 import type { Rect } from './gesture'
 import { RichLabel } from './label'
@@ -87,42 +86,35 @@ export function pageFrame(opts: FrameOptions = {}): PageFrame {
   }
 }
 
-export interface QuitOptions {
-  readonly title: string
-  readonly message?: string
-  readonly confirmLabel: string
-  readonly onConfirm: () => void
-}
-
 export interface PageHeaderOptions {
   /** 可含 {emoji} 占位 */
   readonly title: string
   /** 左上角“返回”，ESC 同效 */
   readonly back?: () => void
-  /** 左上角“结束”，先弹确认；ESC 同效 */
-  readonly quit?: QuitOptions
+  /** 右上角的暂停键，ESC 同效 */
+  readonly pause?: () => void
   /** 标题下一行，可含 {emoji} 占位 */
   readonly sub?: string
   readonly subColor?: TextColor
 }
 
 const HEAD_BTN_W = 132
+/** 暂停键与战斗 HUD 上的一样大 */
+const PAUSE_SIZE = 56
 
-/** 页头：左侧返回或结束，居中标题，可选副标题 */
+/** 页头：左侧返回或右侧暂停，居中标题，可选副标题 */
 export class PageHeader {
   readonly title: RichLabel
   readonly sub?: RichLabel
 
   constructor(scene: Phaser.Scene, frame: PageFrame, opts: PageHeaderOptions) {
-    const leave = opts.back ?? (opts.quit ? (): void => void confirmDialog(scene, { ...opts.quit!, danger: true }) : undefined)
+    const { back, pause } = opts
+    if (back) {
+      new Button(scene, frame.left + HEAD_BTN_W / 2, frame.headerY, { label: '‹ 返回', size: 'sm', variant: 'secondary', width: HEAD_BTN_W, onTap: back })
+    }
+    if (pause) new IconButton(scene, frame.right - PAUSE_SIZE / 2, frame.headerY, { glyph: 'pause', size: PAUSE_SIZE, onTap: pause })
+    const leave = back ?? pause
     if (leave) {
-      new Button(scene, frame.left + HEAD_BTN_W / 2, frame.headerY, {
-        label: opts.back ? '‹ 返回' : '✕ 结束',
-        size: 'sm',
-        variant: 'secondary',
-        width: HEAD_BTN_W,
-        onTap: leave,
-      })
       scene.input.keyboard?.on('keydown-ESC', () => {
         if (!hasModal(scene)) leave()
       })

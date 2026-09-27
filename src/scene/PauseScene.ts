@@ -150,7 +150,8 @@ export class PauseScene extends Phaser.Scene {
     this.foes = mapFoes(this.run.mapId)
     if (!preserved) {
       this.tab = 'stats'
-      this.slot = this.opened.slot ?? Math.max(0, this.members.findIndex((m) => m.leader))
+      const want = this.opened.slot
+      this.slot = want !== undefined && this.members[want] ? want : Math.max(0, this.members.findIndex((m) => m.leader))
       this.foe = null
     }
 
