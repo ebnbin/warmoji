@@ -112,6 +112,10 @@ export class TileGrid<K> {
     return this.view.scroll
   }
 
+  get columns(): number {
+    return this.cols
+  }
+
   setItems(items: readonly TileItem<K>[]): void {
     const keep = this.view.scroll
     this.view.clear()

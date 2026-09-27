@@ -8,7 +8,7 @@ import { memberLook } from '../run/members'
 import { getRun, recruitDueCount, recruitMember } from '../run/state'
 import type { RunState } from '../run/state'
 import type { CharacterId, CharacterTag } from '../types/characters'
-import { AvatarSlot, beginPage, Button, Chip, Divider, Flow, Icon, Label, PageHeader, pageFrame, Panel, RichLabel, ScrollView, TagChip, TileGrid } from '../ui'
+import { AvatarSlot, beginPage, Button, Chip, Divider, Flow, hasModal, Icon, Label, PageHeader, pageFrame, Panel, RichLabel, ScrollView, TagChip, TileGrid } from '../ui'
 import type { PageFrame, Rect, TileItem } from '../ui'
 import { VIEWPORT_CHANGED } from '../util/apply'
 import { characterStatGroups } from './statLines'
@@ -84,6 +84,16 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
 
     this.renderGrid()
     this.renderFocus()
+    const keyboard = this.input.keyboard
+    if (keyboard) {
+      const moves: readonly (readonly [string, () => number])[] = [
+        ['LEFT', () => -1],
+        ['RIGHT', () => 1],
+        ['UP', () => -this.grid.columns],
+        ['DOWN', () => this.grid.columns],
+      ]
+      for (const [key, by] of moves) keyboard.on(`keydown-${key}`, () => this.step(by()))
+    }
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -150,6 +160,14 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     this.filters = new Set(tags)
     this.renderGrid()
     this.grid.scrollTo(0)
+  }
+
+  /** 方向键在列出的角色里挪动焦点 */
+  private step(by: number): void {
+    const list = this.matching([...this.filters])
+    if (list.length === 0 || hasModal(this)) return
+    const at = this.focus === null ? -1 : list.indexOf(this.focus)
+    this.setFocus(list[at < 0 ? 0 : Phaser.Math.Clamp(at + by, 0, list.length - 1)]!)
   }
 
   private setFocus(id: CharacterId | null): void {
