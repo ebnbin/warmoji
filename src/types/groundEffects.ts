@@ -1,6 +1,6 @@
 import type { Effect } from './abilityDefs'
 
-/** 场的对象与判定：who 是节拍、到期与停留的效果施于谁（伤害只打敌方）；onExpire 到期时施于场内；dwell 连续待满 ms 施加一次；pull 每秒把场内敌方往圆心带多远；traction 是场内地面的抓地倍率（谁都算）；exertion 是场内每走一格额外扣的体力（谁都算）；mist 让场内己方只能被同在场内的出手打到；trap 让场等着，第一个敌方踏进来就对场内敌方结算一次后消失 */
+/** 场的对象与判定：who 是节拍、到期与停留的效果施于谁（伤害只打敌方）；onExpire 到期时施于场内；dwell 连续待满 ms 施加一次；pull 每秒把场内敌方往圆心带多远；traction 是场内地面的抓地倍率（谁都算）；exertion 是场内每走一格额外扣的体力点数（谁都算）；mist 让场内己方只能被同在场内的出手打到；trap 让场等着，第一个敌方踏进来就对场内敌方结算一次后消失 */
 export interface ZoneRules {
   readonly who?: 'foes' | 'allies' | 'all'
   readonly onExpire?: readonly Effect[]

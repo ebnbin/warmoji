@@ -10,6 +10,7 @@ import { keysOf } from '../util/record'
 import type { ItemDef } from '../types/items'
 import { abilityLabel, abilityStatLines, characterStatGroups, effectLine } from './statLines'
 import { itemLines, TRAIT_LABEL } from './itemLines'
+import { mapStaminaLine } from './mapLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
 
 function grid(units: number): string {
@@ -37,9 +38,15 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
 }
 
 export function enemyStatLines(e: EnemyDef): string[] {
+  const tireless = e.stats?.exertion === 0
   const lines = [
-    [`生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`, ...keysOf(e.stats ?? {}).map((k) => statText(k, e.stats![k]!))].join(' · '),
-    `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}${e.exertionMul === 0 ? ' · 不知疲倦' : e.exertionMul !== undefined ? ` · 赶路耗体力 ×${e.exertionMul}` : ''}`,
+    [
+      `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
+      ...keysOf(e.stats ?? {})
+        .filter((k) => !(k === 'exertion' && tireless))
+        .map((k) => statText(k, e.stats![k]!)),
+    ].join(' · '),
+    `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}${tireless ? ' · 不知疲倦' : ''}`,
   ]
   for (const w of e.abilities ?? []) lines.push(`${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   if (e.phasesWalls) lines.push('穿墙：无视断壁直取队伍')
@@ -76,7 +83,7 @@ function mapStatLines(id: (typeof MAP_IDS)[number]): string[] {
   const names = [...new Set(m.mix.map((r) => ENEMIES[r.kind]?.name).filter(Boolean))]
   return [
     `世界规则 ${MAP_KIND_LABEL[m.kind]}`,
-    ...(m.exertion ? [`地面费力 每走一格耗 ${+(m.exertion * 100).toFixed(1)}% 体力（敌我通吃）`] : []),
+    mapStaminaLine(m),
     `终波头目 ${boss.name}`,
     `出没敌人 ${names.join('、')}`,
   ]

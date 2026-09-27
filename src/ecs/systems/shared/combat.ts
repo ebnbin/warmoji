@@ -224,7 +224,7 @@ export function reviveCharacter(sim: Sim, eid: number): void {
   Gear.lethal[eid] = 0
   Anim.frames[eid] = 0
   Hp.v[eid] = Hp.max[eid]!
-  Stamina.v[eid] = 1
+  Stamina.used[eid] = 0
   Stamina.restMs[eid] = 0
   Tint.color[eid] = 0xffffff
   Tint.alpha[eid] = 0

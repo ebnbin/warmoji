@@ -11,13 +11,21 @@ const MAP_PLAY_LABEL: Record<MapDef['kind'], string> = {
   ice: '浮冰：25×25 方形浮冰，全场打滑——不跟手、刹不住、会过冲，击退也滑得更远；滑出冰面即落水，每秒掉血又游得慢（敌我通吃），把敌人推下水淹死是活路。相机永远跟随',
 }
 
-/** 地图的玩法：世界规则，地面费力的再讲体力怎么掉怎么回 */
+const num = (v: number): string => `${+v.toFixed(2)}`
+const pct = (v: number): string => `${Math.round(v * 100)}%`
+
+/** 这张图的地面怎么耗体力、怎么回 */
+export function mapStaminaLine(def: MapDef): string {
+  const s = def.stamina
+  const parts = [`赶路每走一格耗 ${num(s.exertion)} 点，歇着回复 ×${num(s.regen)}`]
+  if (def.river) parts.push(`逆流 ×${num(def.river.upstream)}、顺流 ×${num(def.river.downstream)}`)
+  if (def.ice) parts.push(`落水后每格耗 ${num(def.ice.waterExertion)} 点、回复 ×${num(def.ice.waterRegen)}`)
+  return `体力：${parts.join('；')}（敌我通吃）`
+}
+
+const STAMINA_RULE = `体力低于 ${pct(STAMINA.slowFrom)} 开始变慢、见底只剩 ${pct(STAMINA.floor)} 速度；站定片刻开始回，歇得越久回得越快。队长决定全队跑多快，队员跟在后面只耗队长那份的 ${pct(STAMINA.draft)}；全队按最累的活人减速，敌人也会累`
+
+/** 地图的玩法：世界规则、这张图的体力，再讲体力怎么掉怎么回 */
 export function mapPlayLines(def: MapDef): string[] {
-  const lines = [MAP_PLAY_LABEL[def.kind]]
-  if (def.exertion) {
-    lines.push(
-      `地面费力：赶路每走一格耗 ${+(def.exertion * 100).toFixed(1)}% 体力，体力低于 ${Math.round(STAMINA.slowFrom * 100)}% 开始变慢、见底只剩 ${Math.round(STAMINA.floor * 100)}% 速度；站定片刻开始回，歇得越久回得越快。全队按最累的人走，敌人也会累`,
-    )
-  }
-  return lines
+  return [MAP_PLAY_LABEL[def.kind], mapStaminaLine(def), STAMINA_RULE]
 }

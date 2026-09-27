@@ -48,6 +48,8 @@ export interface SquadMember {
   max: number
   /** 几秒后起来；这一场不会自己起来是 null */
   reviveSec: number | null
+  /** 剩下的体力占上限的比例 */
+  stamina: number
   /** 正在拖慢全队 */
   tired: boolean
 }

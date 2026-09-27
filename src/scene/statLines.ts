@@ -246,7 +246,7 @@ function zoneRuleLine(r: ZoneRules, effects: readonly Effect[] | undefined, dama
   if (r.who === 'all') parts.push('敌我都作用')
   if (r.pull) parts.push(`把场内敌人以每秒 ${grid(r.pull)} 拉向圆心`)
   if (r.traction !== undefined) parts.push(r.traction < 1 ? `地面打滑（抓地 ×${r.traction}）` : `地面抓地 ×${r.traction}`)
-  if (r.exertion) parts.push(`场内每走一格多耗 ${pct(r.exertion)} 体力（谁都算）`)
+  if (r.exertion) parts.push(`场内每走一格多耗 ${+r.exertion.toFixed(1)} 点体力（谁都算）`)
   if (r.mist) parts.push('场内同伴只会被同在场内的出手打到')
   if (r.dwell) parts.push(`连续待满 ${sec(r.dwell.ms)}：${joinFx(r.dwell.effects)}`)
   if (r.onExpire) parts.push(`到期时仍在场内：${joinFx(r.onExpire)}`)

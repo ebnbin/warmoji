@@ -24,10 +24,13 @@ import { MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Transform, VisOff } from './components'
+import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Tint, Transform, VisOff } from './components'
 import { charSize } from './systems/shared/scale'
-import { dragging, squadStamina } from './systems/shared/stamina'
-import { STAMINA } from '../data/stamina'
+import { dragging, staminaLeft } from './systems/shared/stamina'
+import { staminaTier } from '../data/stamina'
+import type { StaminaTier } from '../data/stamina'
+import { newEntity } from './entities/entity'
+import { attachDrawable } from './entities/drawable'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
@@ -98,6 +101,7 @@ function liveCoins(world: EcsWorld): number {
 }
 
 const RES_COLOR: Record<ResourceDef['kind'], number> = { energy: 0xffee58, fury: 0xef5350, heat: 0xff9800, growth: 0x9ccc65 }
+const STAMINA_COLOR: Record<StaminaTier, number> = { ok: 0x4dd0e1, slow: 0xffa726, low: 0xef5350 }
 
 /** 倒下的队员几秒后起来；这一场不会自己起来是 null */
 function reviveSec(sim: Sim, m: number): number | null {
@@ -136,8 +140,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private waveBaseCoins = 0
   private hpBars: Phaser.GameObjects.Graphics[] = []
   private shownHp: number[] = []
-  private staminaGfx?: Phaser.GameObjects.Graphics
-  private shownStamina = -1
+  /** 每名队员头上的 💦：拖慢全队时才显出来 */
+  private sweats: number[] = []
   private hitShakeOn = false
   private seenHitCount = 0
   private shownLeader = -1
@@ -178,8 +182,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.waveBaseCoins = 0
     this.hpBars = []
     this.shownHp = []
-    this.staminaGfx = undefined
-    this.shownStamina = -1
+    this.sweats = []
     this.seenHitCount = 0
     this.shownLeader = -1
     this.skillAim = null
@@ -353,7 +356,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
     }
-    this.staminaGfx = this.add.graphics().setDepth(11).setVisible(false)
+    for (let i = 0; i < this.sim.characters.length; i++) {
+      const e = newEntity(this.world)
+      attachDrawable(this.world, e, atlas, { id: '1f4a6', outline: 'player', x: 0, y: 0, size: 0.42 * UNIT, alpha: 0, z: 29 })
+      this.sweats.push(e)
+    }
     startFight(this.sim)
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
@@ -389,10 +396,24 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     }
   }
 
+  /** 拖慢全队的队员头上冒 💦，上下跳着 */
+  private updateSweat(sim: Sim, i: number, m: number): void {
+    const e = this.sweats[i]
+    if (e === undefined) return
+    const on = dragging(sim, m)
+    Tint.alpha[e] = on ? 1 : 0
+    if (!on) return
+    const size = charSize(m)
+    Transform.x[e] = Transform.x[m]! + VisOff.x[m]! + size * 0.34
+    Transform.y[e] = Transform.y[m]! + VisOff.y[m]! - size * 0.42 - Math.abs(Math.sin(sim.fxMs / 160)) * 4
+  }
+
+  /** 队员的血条与资源条；队长再多一条体力条，满了收起 */
   private updateHpBars(): void {
     const sim = this.sim!
     for (let i = 0; i < sim.characters.length; i++) {
       const m = sim.characters[i]!
+      this.updateSweat(sim, i, m)
       const g = this.hpBars[i]
       if (!g) continue
       if (!Alive.v[m]) {
@@ -404,51 +425,33 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       const ratio = Math.max(0, Math.min(1, Hp.v[m]! / Hp.max[m]!))
       const res = hasComponent(this.world, m, Res) ? Res.v[m]! / Math.max(1, Res.max[m]!) : -1
       const locked = res >= 0 && sim.elapsedMs < Res.lock[m]!
-      const key = Math.round(ratio * 200) * 1000 + (res < 0 ? 999 : Math.round(res * 100)) * 2 + (locked ? Math.floor(sim.fxMs / 150) % 2 : 0)
+      const sta = m === sim.leader ? staminaLeft(m) : 1
+      const key =
+        (Math.round(ratio * 200) * 1000 + (res < 0 ? 999 : Math.round(res * 100)) * 2 + (locked ? Math.floor(sim.fxMs / 150) % 2 : 0)) * 1000 +
+        (sta < 1 ? Math.round(sta * 100) : 999)
       if (key === this.shownHp[i]) continue
       this.shownHp[i] = key
       const w = 0.8 * UNIT
-      const y = charSize(m) * 0.62
+      let y = charSize(m) * 0.62
       g.clear()
       g.fillStyle(0x000000, 0.45)
       g.fillRect(-w / 2, y, w, 6)
       g.fillStyle(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffdc5d : 0xef5350, 1)
       g.fillRect(-w / 2 + 1, y + 1, (w - 2) * ratio, 4)
-      if (res < 0) continue
+      y += 7
+      if (res >= 0) {
+        g.fillStyle(0x000000, 0.45)
+        g.fillRect(-w / 2, y, w, 5)
+        g.fillStyle(locked ? (Math.floor(sim.fxMs / 150) % 2 ? 0xffffff : 0xff5722) : RES_COLOR[resDef[m]!.kind], 1)
+        g.fillRect(-w / 2 + 1, y + 1, (w - 2) * res, 3)
+        y += 6
+      }
+      if (sta >= 1) continue
       g.fillStyle(0x000000, 0.45)
-      g.fillRect(-w / 2, y + 7, w, 5)
-      g.fillStyle(locked ? (Math.floor(sim.fxMs / 150) % 2 ? 0xffffff : 0xff5722) : RES_COLOR[resDef[m]!.kind], 1)
-      g.fillRect(-w / 2 + 1, y + 8, (w - 2) * res, 3)
+      g.fillRect(-w / 2, y, w, 6)
+      g.fillStyle(STAMINA_COLOR[staminaTier(sta)], 1)
+      g.fillRect(-w / 2 + 1, y + 1, (w - 2) * sta, 4)
     }
-  }
-
-  /** 队伍的体力圈：贴在队长右上方，满了就收起 */
-  private updateStaminaGauge(): void {
-    const sim = this.sim!
-    const g = this.staminaGfx
-    if (!g) return
-    const leader = sim.leader
-    const v = squadStamina(sim)
-    if (v >= 1 || !Alive.v[leader]) {
-      g.setVisible(false)
-      this.shownStamina = -1
-      return
-    }
-    const size = charSize(leader)
-    g.setVisible(true).setPosition(Transform.x[leader]! + VisOff.x[leader]! + size * 0.55, Transform.y[leader]! + VisOff.y[leader]! - size * 0.3)
-    const key = Math.round(v * 200)
-    if (key === this.shownStamina) return
-    this.shownStamina = key
-    const r = 0.2 * UNIT
-    g.clear()
-    g.lineStyle(6, 0x000000, 0.45)
-    g.beginPath()
-    g.arc(0, 0, r, 0, Math.PI * 2, false)
-    g.strokePath()
-    g.lineStyle(4, v >= STAMINA.slowFrom ? 0x80deea : v > 0.15 ? 0xffa726 : 0xef5350, 1)
-    g.beginPath()
-    g.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + v * Math.PI * 2, false)
-    g.strokePath()
   }
 
   hudSnapshot(): HudSnapshot {
@@ -519,6 +522,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
           hp: Hp.v[m]!,
           max: Hp.max[m]!,
           reviveSec: reviveSec(sim, m),
+          stamina: staminaLeft(m),
           tired: dragging(sim, m),
         }
       }),
@@ -780,7 +784,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       if (this.hitShakeOn) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     }
     this.updateHpBars()
-    this.updateStaminaGauge()
     this.drawDevTargets(sim)
     this.drawSkillAim(sim)
     this.drawGoalPointer(sim)

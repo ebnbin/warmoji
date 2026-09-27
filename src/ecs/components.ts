@@ -173,8 +173,8 @@ export const Phys = { vx: f32(), vy: f32(), drag: f32(), mass: f32(), grip: f32(
 /** 驱动层每帧写入的期望速度，身体按抓地趋近它；idle 为 1 是没有目标时的闲逛，不算赶路 */
 export const Drive = { x: f32(), y: f32(), idle: u8() }
 
-/** 体力：0 到 1；restMs 是连续没被扣体力的时长 */
-export const Stamina = { v: f32(), restMs: f32() }
+/** 体力：used 是用掉的点数，剩下的是属性表的体力上限减去它，所以出生就是满的；restMs 是连续没被扣体力的时长 */
+export const Stamina = { used: f32(), restMs: f32() }
 
 /** 1 = 按真实时间积分（队伍身体），0 = 按世界时间（其余一切） */
 export const Clock = { v: u8() }

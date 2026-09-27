@@ -11,6 +11,9 @@ import { SceneKey } from './keys'
 import { openPause } from './pause'
 import type { DevProvider, DevProviderHost } from '../devtools'
 import { handoverMs } from '../ecs/systems/shared/squad'
+import { staminaTier } from '../data/stamina'
+import type { StaminaTier } from '../data/stamina'
+import type { Tone } from '../ui'
 
 type IconState = 'ready' | 'cooling' | 'dead'
 
@@ -31,6 +34,8 @@ const AIM_DEADZONE = 24
 const DEPTH = { bar: LAYER.hud + 20, fx: LAYER.hud + 21, waveEnd: LAYER.toast + 10, squad: 300, leader: 302, aim: 305 } as const
 /** 这一场的目标排在右上角计数的下方，一条一行 */
 const GOALS = { top: 124, step: 42 } as const
+/** 面板上体力环的颜色 */
+const STAMINA_TONE: Readonly<Record<StaminaTier, Tone>> = { ok: 'info', slow: 'warn', low: 'bad' }
 
 export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private joystick?: Joystick
@@ -298,6 +303,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       .setIcon(isLeader ? m.skillIcon : m.emoji, 'player')
       .setDead(dead, m.reviveSec)
       .setHp(dead ? null : Math.max(0, Math.min(1, m.max > 0 ? m.hp / m.max : 0)))
+      .setStamina(dead ? null : m.stamina, STAMINA_TONE[staminaTier(m.stamina)])
     // 徽章：队长显示头像，阵亡显示骷髅，冷却中的队员显示技能图标
     const badge = dead ? '1f480' : isLeader ? m.emoji : state === 'cooling' ? m.skillIcon : null
     b.dial.setBadge(badge, 'player')
@@ -335,6 +341,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
         else dial.setRim('leader', state === 'cooling' ? 0.1 : 0.5 + 0.5 * Math.sin(this.time.now / 240))
       }
       dial.setHp(m.max > 0 ? Math.max(0, Math.min(1, m.hp / m.max)) : 0)
+      dial.setStamina(m.stamina, STAMINA_TONE[staminaTier(m.stamina)])
     })
   }
 
