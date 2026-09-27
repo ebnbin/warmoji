@@ -3,6 +3,7 @@ import { Alive, Built, Contact, Ctl, Faction, MARK, Radius, Stats, Transform } f
 import { hasMark } from '../utils/marks'
 import { bodyRules } from '../store'
 import { hit } from './shared/damage'
+import { HIT } from '../utils/hitTags'
 import { applyAbilityEffects, applyOnHit, struckOf } from './shared/effects'
 import { selfSource, sourceOf } from '../utils/source'
 import type { Source } from '../utils/source'
@@ -30,7 +31,7 @@ export function touchBodies(sim: Sim): void {
     let landed = false
     eachFoeBody(sim, src, x, y, Radius.v[eid]!, (t, tx, ty) => {
       const s = struckOf(t)
-      if (!hit(sim, src, t, dmg, { knockback: kb, from: { x, y } })) return
+      if (!hit(sim, src, t, dmg, { knockback: kb, from: { x, y }, tags: HIT.melee })) return
       landed = true
       const thorns = Stats.thorns[t]!
       if (thorns > 0) hit(sim, selfSource(sim, t), eid, thorns)

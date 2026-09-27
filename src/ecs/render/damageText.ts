@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { UI_FONT } from '../../util/fonts'
-import { DAMAGE_NUMBER_RISE_MS } from '../damageNumbers'
+import { DAMAGE_NUMBER_RISE_MS, MISS } from '../damageNumbers'
 import type { DamageNumbers } from '../damageNumbers'
 import { EcsLayer, LayerType } from './layer'
 import { packTint } from './tint'
@@ -10,13 +10,16 @@ const TEX_KEY = 'ecs-damage-digits'
 const CHARS = 10
 const CHAR_W = 24
 const CHAR_H = 36
+/** 数字后面接一块"闪避"的字形 */
+const MISS_W = 52
+const TEX_W = CHAR_W * CHARS + MISS_W
 
 
 
 function bakeDigits(scene: Phaser.Scene): void {
   if (scene.textures.exists(TEX_KEY)) return
   const canvas = document.createElement('canvas')
-  canvas.width = CHAR_W * CHARS
+  canvas.width = TEX_W
   canvas.height = CHAR_H
   const ctx = canvas.getContext('2d')!
   ctx.font = `bold 26px ${UI_FONT}`
@@ -31,6 +34,9 @@ function bakeDigits(scene: Phaser.Scene): void {
     ctx.strokeText(String(i), cx, CHAR_H / 2)
     ctx.fillText(String(i), cx, CHAR_H / 2)
   }
+  ctx.font = `bold 22px ${UI_FONT}`
+  ctx.strokeText('闪避', CHAR_W * CHARS + MISS_W / 2, CHAR_H / 2)
+  ctx.fillText('闪避', CHAR_W * CHARS + MISS_W / 2, CHAR_H / 2)
   scene.textures.addCanvas(TEX_KEY, canvas)
 }
 
@@ -78,9 +84,28 @@ export class DamageTextLayer {
       const gh = size
       const gw = (CHAR_W * size) / CHAR_H
       const cy = buf.y[i]! - 26 * t
-      const tint = packTint(crit ? 0xffdc5d : 0xffffff, 1 - t)
-
       const n = buf.value[i]!
+      if (n === MISS) {
+        const tint = packTint(0x9ad7ff, 1 - t)
+        const w = (MISS_W * size) / CHAR_H
+        const x0 = buf.x[i]! - w / 2
+        const x1 = x0 + w
+        const y0 = cy - gh / 2
+        const y1 = cy + gh / 2
+        node.batch(
+          ctx, tex,
+          m.getX(x0, y0), m.getY(x0, y0),
+          m.getX(x0, y1), m.getY(x0, y1),
+          m.getX(x1, y0), m.getY(x1, y0),
+          m.getX(x1, y1), m.getY(x1, y1),
+          (CHAR_W * CHARS) / TEX_W, 1, MISS_W / TEX_W, -1,
+          0,
+          tint, tint, tint, tint,
+          opts,
+        )
+        continue
+      }
+      const tint = packTint(crit ? 0xffdc5d : 0xffffff, 1 - t)
       let digits = 1
       for (let v = n; v >= 10; v = Math.floor(v / 10)) digits++
       let left = buf.x[i]! - (digits * gw) / 2
@@ -93,14 +118,14 @@ export class DamageTextLayer {
         const x1 = left + gw
         const y0 = cy - gh / 2
         const y1 = cy + gh / 2
-        const u = digit / CHARS
+        const u = (digit * CHAR_W) / TEX_W
         node.batch(
           ctx, tex,
           m.getX(x0, y0), m.getY(x0, y0),
           m.getX(x0, y1), m.getY(x0, y1),
           m.getX(x1, y0), m.getY(x1, y0),
           m.getX(x1, y1), m.getY(x1, y1),
-          u, 1, 1 / CHARS, -1,
+          u, 1, CHAR_W / TEX_W, -1,
           0,
           tint, tint, tint, tint,
           opts,

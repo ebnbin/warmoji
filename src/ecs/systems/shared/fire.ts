@@ -57,6 +57,7 @@ import { controlBody } from '../updateControl'
 import { clearMarks, markSlot } from '../../utils/marks'
 import { anchorX, anchorY } from '../../utils/ability'
 import { flying, sourceOf } from '../../utils/source'
+import { HIT } from '../../utils/hitTags'
 import type { Source } from '../../utils/source'
 import { eachAlly, nearestTarget, targetsNear, targetsWithin } from '../../utils/targets'
 import type { Found } from '../../utils/targets'
@@ -145,11 +146,11 @@ function burst(sim: Sim, x: number, y: number, radius: number, color: number, bo
 }
 
 /** 打一遍：返回真正落到身上的身体；不带伤害的形状只碰不打 */
-function strikeAll(sim: Sim, src: Source, found: readonly Found[], damage: number, kb: number, from: Point): Struck[] {
+function strikeAll(sim: Sim, src: Source, found: readonly Found[], damage: number, kb: number, from: Point, tags = 0): Struck[] {
   const struck: Struck[] = []
   for (const t of found) {
     const s = struckOf(t.eid)
-    if (strike(sim, src, t.eid, damage, { knockback: kb, from })) struck.push(s)
+    if (strike(sim, src, t.eid, damage, { knockback: kb, from, tags })) struck.push(s)
   }
   return struck
 }
@@ -221,7 +222,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
     }
     const list = targetsWithin(sim, src, cx, cy, r)
     const found = circleHitIndices({ x: cx, y: cy }, r, list).map((i) => list[i]!)
-    const struck = strikeAll(sim, src, found, damage, kb, { x: cx, y: cy })
+    const struck = strikeAll(sim, src, found, damage, kb, { x: cx, y: cy }, HIT.area)
     applyOnHit(sim, src, onHit, cx, cy, damage, struck, angle)
     if (color !== 0) burst(sim, cx, cy, r, color, damage > 0)
     return true
@@ -346,7 +347,7 @@ function fireOnce(sim: Sim, e: number, src: Source, angle: number, target: Found
       if (damage > 0) {
         for (const t of list) {
           const s = struckOf(t.eid)
-          if (hit(sim, src, t.eid, damage)) struck.push(s)
+          if (hit(sim, src, t.eid, damage, { tags: HIT.area })) struck.push(s)
         }
         sim.out.flash = { color: 0xffffff, alpha: 0.55, durationMs: 380 }
       } else {

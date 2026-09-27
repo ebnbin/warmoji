@@ -6,6 +6,7 @@ import type { ResourceDef } from '../types/enemies'
 import type { CharacterId } from '../types/characters'
 import { gearMods, resolveAbilityDef } from '../data/items'
 import { tiersForLevel } from '../data/charLevel'
+import { deliveryOf, HIT } from '../ecs/utils/hitTags'
 import { levelStatsFor } from '../data/levels'
 import type { ItemId } from '../types/items'
 import type { AbilityDef, Cond, Effect, MarkName, Shape, ShapeKind } from '../types/abilityDefs'
@@ -362,9 +363,13 @@ function selfAndHit(w: AbilityDef): string[] {
   return [...(w.onCast ?? []).map((e) => `出手前自身：${effectLine(e, true)}`), ...(w.onHit ?? []).map((e) => effectLine(e)), ...(w.onSelf ?? []).map((e) => `自身：${effectLine(e, true)}`)]
 }
 
+/** 伤害按出手方式吃近战或远程伤害 */
+const DELIVERY_NAME: Partial<Record<number, string>> = { [HIT.melee]: '近战', [HIT.ranged]: '远程' }
+
 export function abilityStatLines(w: AbilityDef): string[] {
   const base: string[] = []
-  if (w.damage) base.push(`伤害 ${w.damage}`)
+  const how = DELIVERY_NAME[deliveryOf(w)]
+  if (w.damage) base.push(`伤害 ${w.damage}${how ? `（${how}）` : ''}`)
   if (w.trigger === 'auto' && w.cooldownMs > 0) base.push(`冷却 ${sec(w.cooldownMs)}`)
   if (w.knockback) base.push(`击退 ${kbGrid(w.knockback)}`)
   const lines: string[] = []
@@ -404,7 +409,7 @@ export function characterStatGroups(
     {
       icon: def.skill.icon,
       title: `主动技能 · ${def.skill.name}（${abilityLabel(def.skill.ability)}）`,
-      lines: [def.skill.desc, `冷却 ${sec(def.skill.cdMs)} · 只有队长能放，当队员时冷却照走`, ...abilityStatLines(def.skill.ability)],
+      lines: [def.skill.desc, `冷却 ${sec(def.skill.cdMs * stats.skillCooldown)} · 只有队长能放，当队员时冷却照走`, ...abilityStatLines(def.skill.ability)],
     },
   ]
   if (opts.path !== false) {
@@ -430,7 +435,10 @@ export function characterStatGroups(
   }
   const tier = tiers.u2 ? 2 : tiers.u1 ? 1 : 0
   for (const [i, carrier] of def.carriers.entries()) {
-    const display = displayDef(resolveAbilityDef(loadout[i]!, stats), stats.damage, stats.cooldown, stats.knockback)
+    const w = resolveAbilityDef(loadout[i]!, stats)
+    const how = deliveryOf(w)
+    const dmgMul = stats.damage * (how === HIT.melee ? stats.meleeDamage : how === HIT.ranged ? stats.rangedDamage : 1)
+    const display = displayDef(w, dmgMul, stats.cooldown, stats.knockback)
     const traits: string[] = []
     for (let k = 0; k < tier; k += 1) {
       const card = carrier.cards[k]

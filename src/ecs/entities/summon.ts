@@ -2,7 +2,7 @@ import { addComponent, hasComponent, query } from 'bitecs'
 import { CHARACTERS } from '../../data/characters'
 import { waveAt } from '../../data/waves'
 import { UNIT } from '../../util/units'
-import { Ability, Alive, Borrowed, Boss, Despawn, ENEMY_SET, EnemyArm, FACTION, Faction, Hp, Link, Manual, Nest, Owner, Radius, Slot, Transform, Uid } from '../components'
+import { Ability, Alive, Borrowed, Boss, Despawn, ENEMY_SET, EnemyArm, FACTION, Faction, Hp, Link, Manual, Nest, Owner, Radius, Slot, Summoned, Transform, Uid } from '../components'
 import { abilityDef, bodyLook, enemyDef, enemyOf, statBase, statLayers } from '../store'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { charSize } from '../systems/shared/scale'
@@ -13,11 +13,20 @@ import type { EnemyDef, NpcDef } from '../../types/enemies'
 import type { StatBase, StatKey, StatMods } from '../../types/stats'
 import type { Sim } from '../sim'
 
+/** 记下召唤者：召唤物的伤害吃它的召唤物伤害、记在它名下 */
+function markSummoned(sim: Sim, eid: number, by: number): void {
+  Nest.of[eid] = by
+  if (by < 0) return
+  addComponent(sim.world, eid, Summoned)
+  Summoned.by[eid] = by
+  Summoned.byUid[eid] = Uid.v[by]!
+}
+
 /** 召出的身体同一条出生路径：敌方的算敌人（有战利品），己方的只是身体；都记在召唤者名下 */
 export function summonBody(sim: Sim, def: NpcDef, x: number, y: number, hp: number, faction: number, by: number): number {
   const who = faction === FACTION.enemy && def.kind !== undefined ? (def as EnemyDef) : undefined
   const eid = who ? spawnEnemy(sim, sim.frames, who, x, y, hp, false, false) : spawnNpc(sim, sim.frames, def, x, y, hp, { faction })
-  Nest.of[eid] = by
+  markSummoned(sim, eid, by)
   if (by >= 0 && def.kind !== undefined && enemyDef[by]?.guardedBy === def.kind) {
     addComponent(sim.world, eid, Link)
     Link.to[eid] = by
@@ -69,8 +78,8 @@ function lookAlike(sim: Sim, by: number): NpcDef {
   }
 }
 
-/** 分身只抄主人出手的属性，生命、回复这些身体上的不抄 */
-const OFFENSE: readonly StatKey[] = ['damage', 'cooldown', 'crit', 'knockback']
+/** 分身只抄主人出手的属性，生命、回复这些身体上的不抄；召唤物伤害按召唤者实时算，不用抄 */
+const OFFENSE: readonly StatKey[] = ['damage', 'meleeDamage', 'rangedDamage', 'areaDamage', 'dotDamage', 'bossDamage', 'cooldown', 'crit', 'critDamage', 'knockback']
 
 function offenseOnly(mods: StatMods): StatMods {
   const pick = (r: StatBase | undefined): StatBase => Object.fromEntries(OFFENSE.flatMap((k) => (r?.[k] === undefined ? [] : [[k, r[k]]])))
@@ -89,10 +98,11 @@ export function spawnClones(sim: Sim, by: number, count: number, lifeMs: number,
     const y0 = Transform.y[by]!
     const at = sim.hooks.constrainBody(sim, by, { x: x0, y: y0 }, { x: x0 + Math.cos(a) * r, y: y0 + Math.sin(a) * r })
     const eid = spawnNpc(sim, sim.frames, def, at.x, at.y, Math.max(1, Math.round(Hp.max[by]! * hpRatio)), { faction })
-    Nest.of[eid] = by
+    markSummoned(sim, eid, by)
     Despawn.at[eid] = sim.elapsedMs + lifeMs
     EnemyArm.armed[eid] = 1
-    setStatLayer(eid, 'copy', [...(statLayers[by]?.gear ?? []).map(offenseOnly), { mul: { damage: dmgRatio } }])
+    const layers = statLayers[by]
+    setStatLayer(eid, 'copy', [...[...(layers?.role ?? []), ...(layers?.gear ?? [])].map(offenseOnly), { mul: { damage: dmgRatio } }])
     foldBody(sim.world, sim, eid)
     for (const e of attacks) equipAbility(sim, eid, abilityDef[e]!, faction, 200 + i * 150)
   }
@@ -104,7 +114,7 @@ export function raiseDead(sim: Sim, victim: number, faction: number, by: number,
   if (!def || Boss.v[victim] || Faction.v[victim] === faction) return
   const raised: NpcDef = { ...def, kind: undefined, spawner: undefined, grow: undefined, mount: undefined, onLethal: undefined, onLowHp: undefined, onDeath: undefined }
   const eid = spawnNpc(sim, sim.frames, raised, Transform.x[victim]!, Transform.y[victim]!, Math.max(1, Math.round(Hp.max[victim]! * hpRatio)), { faction })
-  Nest.of[eid] = by
+  markSummoned(sim, eid, by)
   Despawn.at[eid] = sim.elapsedMs + lifeMs
   sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 10, kind: 'puff' })
 }

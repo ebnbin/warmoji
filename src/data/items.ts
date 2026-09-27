@@ -8,8 +8,6 @@ import type { AbilityDef, Shape } from '../types/abilityDefs'
 
 const ECON = fromJson<Economy>(economyJson)
 
-export const CRIT_MUL = ECON.critMul
-
 export const RARITY_ORDER: readonly ItemRarity[] = ['common', 'rare', 'epic']
 export const RARITIES: Record<ItemRarity, { label: string; color: string }> = {
   common: { label: '普通', color: '#c8c8d4' },

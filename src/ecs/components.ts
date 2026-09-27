@@ -456,6 +456,9 @@ export const Res = { v: f32(), max: f32(), lock: f32(), lastGain: f32() }
 /** 本条命里用过的一次性规则：致命一击、残血 */
 export const Lethal = { used: u8(), low: u8() }
 
+/** 吸血的每秒上限：at 是这一秒从何时算起，hp 是这一秒已经吸回的量 */
+export const Leech = { at: f32(), hp: f32() }
+
 /** 会随体型缩放的身体：r0 是本来的判定半径，s0 是本来的画面尺寸，v 是上一次按体型缩放时的倍率 */
 export const Grow = { r0: f32(), s0: f32(), v: f32() }
 
@@ -567,6 +570,9 @@ export const EnemyArm = { armed: u8(), fireDelayMs: f32() }
 export const EnemyPhase = { v: f32() }
 
 export const Nest = { of: i32Fill(-1), nextSpawnAt: f32() }
+
+/** 被别的身体召出来的：召唤者与它的编号；召唤物的伤害吃召唤者的召唤物伤害，记在召唤者名下 */
+export const Summoned = { by: i32(), byUid: u32() }
 
 export const Telegraph = { hp: f32(), elite: u8(), boss: u8(), bornMs: f32() }
 

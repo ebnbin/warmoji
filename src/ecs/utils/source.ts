@@ -1,8 +1,9 @@
 import { hasComponent } from 'bitecs'
-import { Anchor, FACTION, Faction, MARK, Owner, Slot, Uid, WallBlocked } from '../components'
+import { Anchor, FACTION, Faction, MARK, Minion, Owner, Slot, SummonShape, Summoned, Uid, WallBlocked } from '../components'
 import { Transform } from '../components'
-import { enemyDef } from '../store'
-import { attributionSlot } from './ability'
+import { abilityDef, enemyDef } from '../store'
+import { attributionSlot, creditSlot } from './ability'
+import { deliveryOf, HIT } from './hitTags'
 import { hasMark, realmOf } from './marks'
 import { isSameEntity } from './identity'
 import { NEUTRAL, offenseOf } from './stats'
@@ -36,6 +37,8 @@ export interface Source {
   readonly sight?: { readonly x: number; readonly y: number }
   /** 出手的位置：迷雾里的身体只能被同在迷雾里出手的打到 */
   readonly from?: { readonly x: number; readonly y: number }
+  /** 伤害标签（见 hitTags）：出手方式与是否来自召唤物；范围与持续由出手处补上 */
+  readonly tags?: number
 }
 
 /** 出手者眼里的敌方阵营：倒戈时是自己的阵营 */
@@ -43,9 +46,12 @@ function foesOf(sim: Sim, body: number, faction: number): readonly number[] | un
   return hasMark(sim, body, MARK.berserk) ? [faction] : undefined
 }
 
+/** 能力出手的来源：出手方式按能力定；蜂群、装置与被召出的身体出的手带召唤标签 */
 export function sourceOf(sim: Sim, e: number): Source {
   const enemySide = Faction.v[e] === FACTION.enemy
   const o = Owner.eid[e]!
+  const w = sim.world
+  const summon = hasComponent(w, e, SummonShape) || hasComponent(w, Anchor.eid[e]!, Minion) || hasComponent(w, o, Summoned)
   return {
     faction: Faction.v[e]!,
     slot: attributionSlot(sim, e),
@@ -62,6 +68,7 @@ export function sourceOf(sim: Sim, e: number): Source {
       sim.worldState.walls !== null && WallBlocked.v[e]
         ? { x: Transform.x[Anchor.eid[e]!]!, y: Transform.y[Anchor.eid[e]!]! }
         : undefined,
+    tags: deliveryOf(abilityDef[e]) | (summon ? HIT.summon : 0),
   }
 }
 
@@ -71,13 +78,15 @@ export function bodySource(sim: Sim, eid: number): Source {
   return { faction, slot: -1, atk: NEUTRAL, viewer: eid, body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, faction), realm: realmOf(sim, eid), from: { x: Transform.x[eid]!, y: Transform.y[eid]! } }
 }
 
-/** 身体自己作为伤害来源，按自己的属性表结算：角色归因到槽位，敌人归因到种类 */
+/** 身体自己作为伤害来源，按自己的属性表结算：角色归因到槽位，我方召唤物归因到召唤者，敌人归因到种类；不带出手方式，由出手处给 */
 export function selfSource(sim: Sim, eid: number): Source {
-  const own = { body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, Faction.v[eid]!), realm: realmOf(sim, eid), from: { x: Transform.x[eid]!, y: Transform.y[eid]! } }
+  const tags = hasComponent(sim.world, eid, Summoned) ? HIT.summon : 0
+  const own = { body: eid, bodyUid: Uid.v[eid]!, foes: foesOf(sim, eid, Faction.v[eid]!), realm: realmOf(sim, eid), from: { x: Transform.x[eid]!, y: Transform.y[eid]! }, tags }
   const atk = offenseOf(sim.world, eid)
   if (hasComponent(sim.world, eid, Slot)) return { faction: FACTION.team, slot: Slot.v[eid]!, atk, ...own }
   const def = enemyDef[eid]
-  return def ? { ...enemySource(def.kind, atk), faction: Faction.v[eid]!, ...own } : bodySource(sim, eid)
+  const faction = Faction.v[eid]!
+  return def ? { ...enemySource(def.kind, atk), faction, slot: faction === FACTION.team ? creditSlot(sim, eid) : -1, ...own } : bodySource(sim, eid)
 }
 
 /** 飞出去的身体自己看：不带发射者的视角与视线 */

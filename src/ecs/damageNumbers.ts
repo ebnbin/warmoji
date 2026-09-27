@@ -1,5 +1,7 @@
 const INITIAL_CAP = 256
 export const DAMAGE_NUMBER_RISE_MS = 350
+/** value 为它时画"闪避"而不是数字 */
+export const MISS = -1
 
 export interface DamageNumbers {
   x: Float32Array

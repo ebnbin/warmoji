@@ -15,4 +15,8 @@ export const COMBAT = {
   blinkIframePadMs: 200,
   // 装置架好后多久打第一发
   minionFirstShotMs: 200,
+  // 受到伤害 × 1/(1+护甲/armorHalf)，负护甲为 (armorHalf−2×护甲)/(armorHalf−护甲)
+  armorHalf: 15,
+  // 吸血每秒最多回复生命上限的这个比例
+  lifestealCapPerSec: 0.05,
 } as const satisfies CombatTuning
