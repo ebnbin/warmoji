@@ -9,6 +9,7 @@ export const STATS = {
   iframes: { name: '受击无敌', base: 0, min: 0, unit: 'ms' },
   revive: { name: '复活时间', base: 0, min: 1000, unit: 'ms' },
   taken: { name: '受到伤害', base: 1, min: 0, unit: 'ratio' },
+  blocks: { name: '每波护盾', base: 0, min: 0, unit: 'count' },
   thorns: { name: '接触反伤', base: 0, min: 0, unit: 'count' },
   killHeal: { name: '击杀回复', base: 0, min: 0, unit: 'count' },
   healing: { name: '治疗效果', base: 1, min: 0, unit: 'ratio' },

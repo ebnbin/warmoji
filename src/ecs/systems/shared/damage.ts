@@ -2,7 +2,7 @@ import { hasComponent } from 'bitecs'
 import { ARMOR_HALF, LIFESTEAL_CAP_PER_SEC } from '../../../data/abilities'
 import { norm } from '../../../util/vec'
 import { playSfx } from '../../../audio/sfx'
-import { Alive, Boss, CharFlash, Elite, FACTION, Faction, Flash, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Tint, Transform } from '../../components'
+import { Alive, Boss, CharFlash, Elite, FACTION, Faction, Flash, Hp, Leech, Lethal, MARK, MARK_SLOTS, Mark, Mount, Slot, Stats, Tint, Transform, Uid } from '../../components'
 import { hasMark, isUntargetable, markSlot } from '../../utils/marks'
 import { facingAngle } from '../../utils/facing'
 import { bodyRules, enemyDef, resDef } from '../../store'
@@ -17,6 +17,7 @@ import { displace, FORCED } from './displace'
 import { die, grantIframe } from './combat'
 import { feedGut } from './gut'
 import { applyForm } from '../../entities/form'
+import { gearDodged, gearHurt, gearLethal, gearLowHp, gearStruck } from './gear'
 import { spawnDamageNumber, spawnFxCircle, spawnMissText } from '../../entities/fx'
 import type { Point } from '../../../util/vec'
 import type { Offense } from '../../utils/stats'
@@ -195,12 +196,13 @@ function leech(sim: Sim, src: Source, atk: Offense, dmg: number, tags: number): 
   Leech.hp[b] = Leech.hp[b]! + amount
 }
 
-/** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands 与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、暴击，只在最后取整；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量；持续伤害不暴击、不吃护甲；返回是否命中 */
+/** 唯一的伤害入口，敌我同一条：damage 是能力给的伤害。先过 lands 与闪避，再乘出手方按标签的伤害与首领伤害、睡眠惊醒、承受方的护甲与受到伤害、暴击，只在最后取整；然后吸血、存伤、吞噬者吐人、受击反应与无敌帧、扣血（坐骑先扣）、不死、致命与残血规则、死亡、受击反馈、击退冲量，最后是出手方道具的命中触发；持续伤害不暴击、不吃护甲；返回是否命中 */
 export function hit(sim: Sim, src: Source, target: number, damage: number, o: HitOpts = {}): boolean {
   if (!lands(sim, src, target, o, true)) return false
   const tags = hitTags(src.tags ?? 0, o.tags ?? 0, o.tick === true)
   if (dodged(sim, target, tags)) {
     spawnMissText(sim, Transform.x[target]!, Transform.y[target]!)
+    gearDodged(sim, src, target)
     return false
   }
   const now = sim.elapsedMs
@@ -230,6 +232,7 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
     const back = bodyRules[target]?.onHurt
     if (back) applyAbilityEffects(sim, selfSource(sim, target), back, { x: Transform.x[target]!, y: Transform.y[target]!, baseDamage: dmg, targets: [target] })
   }
+  gearHurt(sim, src, target, dmg, o.tick === true)
   if (team) sim.characterHitCount++
   let jx = 0
   let jy = 0
@@ -240,15 +243,20 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
     jx = dir.x * kb
     jy = dir.y * kb
   }
+  const at = { x: Transform.x[target]!, y: Transform.y[target]! }
+  const uid = Uid.v[target]!
   let hp = mounted(sim, target, dmg) ? Hp.v[target]! : Hp.v[target]! - dmg
   if (hp <= 0 && hasMark(sim, target, MARK.undying)) hp = 1
   if (hp <= 0 && lethal(sim, target)) hp = Hp.v[target]!
+  if (hp <= 0 && gearLethal(sim, target)) hp = Hp.v[target]!
   if (hp <= 0) {
     die(sim, target, src, jx, jy)
+    gearStruck(sim, src, target, uid, at, damage, tags, crit)
     return true
   }
   Hp.v[target] = hp
   lowHp(sim, target)
+  gearLowHp(sim, target)
   if (team) {
     playSfx('hurt')
     CharFlash.until[target] = sim.fxMs + 120
@@ -261,5 +269,6 @@ export function hit(sim: Sim, src: Source, target: number, damage: number, o: Hi
     Tint.color[target] = 0xffffff
   }
   if (jx !== 0 || jy !== 0) displace(sim, target, { kind: 'push', x: jx, y: jy }, FORCED)
+  gearStruck(sim, src, target, uid, at, damage, tags, crit)
   return true
 }

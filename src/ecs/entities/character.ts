@@ -12,6 +12,7 @@ import { ROLES } from '../../data/roles'
 import { waveStartHp } from '../../run/state'
 import { INVINCIBLE_HP, sandboxInvincible } from '../sandbox/knobs'
 import { armIdle } from '../systems/shared/anim'
+import { armGear } from '../systems/shared/gear'
 
 import type { RunState } from '../../run/state'
 import { Anim, Breath, Depth, FACTION, Grow, Hp, CharFlash, CharScale, Facing, Pop, Revive, Seat, Slot, Sprite, Transform } from '../components'
@@ -66,6 +67,7 @@ export function spawnCharacter(
   foldBody(world, undefined, eid)
   Hp.v[eid] = sandbox ? Hp.max[eid]! : waveStartHp(run.memberHp[slot] ?? Hp.max[eid]!, Hp.max[eid]!)
   bodyRules[eid] = { ...def.rules, resource: def.resource }
+  armGear(world, eid, owned)
   attachResource(world, eid, def.resource, run.memberRes[slot] ?? -1)
   Seat.v[eid] = -1
   Facing.y[eid] = -1

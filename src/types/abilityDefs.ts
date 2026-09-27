@@ -90,6 +90,12 @@ interface DamageEffect {
   readonly amount: number
   readonly ratio?: number
 }
+/** 按目标当前生命的比例造成伤害，首领与精英按 bossRatio */
+interface HpDamageEffect {
+  readonly kind: 'hpDamage'
+  readonly ratio: number
+  readonly bossRatio: number
+}
 /** 定身：失去行动 */
 interface StunEffect {
   readonly kind: 'stun'
@@ -499,6 +505,7 @@ export type Effect =
   | AttackSlowEffect
   | BuffEffect
   | DamageEffect
+  | HpDamageEffect
   | StunEffect
   | ExhaustEffect
   | HideEffect

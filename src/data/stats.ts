@@ -34,6 +34,16 @@ export class StatFold {
     if (m.mul) for (const k in m.mul) this.times(k as StatKey, m.mul[k as StatKey]!)
   }
 
+  /** 叠 n 层：加值乘层数，倍率的涨跌乘层数（冷却倍率按攻速的涨跌） */
+  layered(m: StatMods, n: number): void {
+    if (m.add) for (const k in m.add) this.plus(k as StatKey, m.add[k as StatKey]! * n)
+    if (!m.mul) return
+    for (const k in m.mul) {
+      const v = m.mul[k as StatKey]!
+      this.times(k as StatKey, STATS[k as StatKey].unit === 'rate' ? 1 / (1 + (1 / v - 1) * n) : 1 + (v - 1) * n)
+    }
+  }
+
   plus(k: StatKey, v: number): void {
     const i = INDEX[k]
     this.sum[i] = this.sum[i]! + v

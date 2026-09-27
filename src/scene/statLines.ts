@@ -42,15 +42,15 @@ export function abilityLabel(w: AbilityDef): string {
   return SHAPE_LABEL[s.kind]
 }
 
-function grid(units: number): string {
+export function grid(units: number): string {
   return `${+units.toFixed(1)}格`
 }
 
-function sec(ms: number): string {
+export function sec(ms: number): string {
   return `${+(ms / 1000).toFixed(2)}秒`
 }
 
-function pct(v: number): string {
+export function pct(v: number): string {
   return `${Math.round(v * 100)}%`
 }
 
@@ -92,6 +92,8 @@ export function effectLine(e: Effect, self = false): string {
     }
     case 'damage':
       return e.ratio === undefined ? `造成 ${e.amount} 点伤害` : `造成${e.amount ? ` ${e.amount} +` : ''} ${pct(e.ratio)} 基础伤害`
+    case 'hpDamage':
+      return `造成目标当前生命 ${pct(e.ratio)} 的伤害（首领与精英 ${pct(e.bossRatio)}）`
     case 'stun':
       return `眩晕 ${sec(e.durationMs)}`
     case 'exhaust':

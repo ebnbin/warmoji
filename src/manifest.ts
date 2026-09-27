@@ -10,6 +10,7 @@ import { ITEMS } from './data/items'
 import { abilityEffects, childAbilities, childEffects } from './data/abilities'
 import { MAPS } from './data/maps'
 import type { MapDef } from './types/maps'
+import type { ItemDef } from './types/items'
 import { SETTING_DEFS } from './save/settings'
 
 const roster: readonly CharacterDef[] = Object.values(CHARACTERS)
@@ -97,6 +98,8 @@ function walkNpc(def: NpcDef, side: Side): void {
     else if (fx.kind !== 'decoy') walkEffects([fx], side)
   }
 }
+
+for (const i of Object.values<ItemDef>(ITEMS)) for (const t of i.on ?? []) walkEffects(t.effects, 'team')
 
 for (const c of roster) {
   const s = seen.team
