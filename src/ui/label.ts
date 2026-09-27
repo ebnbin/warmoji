@@ -75,6 +75,11 @@ function wrapCjk(text: string, ctx: CanvasRenderingContext2D, width: number): st
   return out
 }
 
+/** 描边字的描边宽度；它也会把文字画布左右各撑宽一半 */
+function outlineWidth(kind: TextKind): number {
+  return Math.max(4, Math.round(TEXT[kind].size / 6))
+}
+
 function toPhaserStyle(s: LabelStyle): Phaser.Types.GameObjects.Text.TextStyle {
   const kind = TEXT[s.kind ?? 'body']
   const style: Phaser.Types.GameObjects.Text.TextStyle = {
@@ -97,7 +102,7 @@ function toPhaserStyle(s: LabelStyle): Phaser.Types.GameObjects.Text.TextStyle {
   const outline = css(SURFACE.outline)
   if (s.outline) {
     style.stroke = outline
-    style.strokeThickness = Math.max(4, Math.round(kind.size / 6))
+    style.strokeThickness = outlineWidth(s.kind ?? 'body')
     style.shadow = { offsetX: 0, offsetY: Math.max(2, Math.round(kind.size / 14)), color: outline, blur: 0, stroke: true, fill: true }
   } else if (s.shadow) {
     style.shadow = { offsetX: 0, offsetY: Math.max(2, Math.round(kind.size / 12)), color: outline, blur: 0, stroke: false, fill: true }
@@ -182,23 +187,25 @@ export class RichLabel extends Widget {
     const size = TEXT[s.kind ?? 'body'].size
     const iconSize = s.iconSize ?? Math.round(size * 1.15)
     const gap = s.gap ?? Math.round(iconSize * 0.15)
+    // 描边把文字画布撑宽，排版按字形本身的宽度算
+    const bleed = s.outline ? outlineWidth(s.kind ?? 'body') / 2 : 0
     const parts: { obj: Icon | Label; w: number }[] = []
     for (const seg of typeof content === 'string' ? parse(content) : content) {
       if (typeof seg === 'string') {
         const t = new Label(this.scene, 0, 0, seg, s).setOrigin(0, 0.5)
-        parts.push({ obj: t, w: t.width })
+        parts.push({ obj: t, w: t.width - bleed * 2 })
       } else if ('icon' in seg) {
         const side = seg.size ?? iconSize
         parts.push({ obj: new Icon(this.scene, 0, 0, seg.icon, side, seg.outline), w: side })
       } else {
         const t = new Label(this.scene, 0, 0, seg.text, { ...s, color: seg.color ?? s.color, bold: seg.bold ?? s.bold }).setOrigin(0, 0.5)
-        parts.push({ obj: t, w: t.width })
+        parts.push({ obj: t, w: t.width - bleed * 2 })
       }
     }
     this.span = parts.reduce((a, p) => a + p.w, 0) + gap * Math.max(0, parts.length - 1)
     let cursor = -this.span * (s.originX ?? 0.5)
     for (const p of parts) {
-      p.obj.setX(p.obj instanceof Icon ? cursor + p.w / 2 : cursor)
+      p.obj.setX(p.obj instanceof Icon ? cursor + p.w / 2 : cursor - bleed)
       cursor += p.w + gap
       this.add(p.obj)
     }
