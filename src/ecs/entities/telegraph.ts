@@ -29,7 +29,7 @@ export function spawnTelegraph(
   Telegraph.elite[eid] = elite ? 1 : 0
   Telegraph.boss[eid] = boss ? 1 : 0
   Telegraph.bornMs[eid] = sim.elapsedMs
-  Due.at[eid] = sim.elapsedMs + delayMs
+  Due.at[eid] = sim.elapsedMs + (sim.fight.rules.surprise && !boss ? 0 : delayMs)
   telegraphDef[eid] = def
   telegraphCarries[eid] = carries
   attachDrawable(sim.world, eid, sim.frames, {

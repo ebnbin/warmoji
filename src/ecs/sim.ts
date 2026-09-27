@@ -30,6 +30,7 @@ import { FACTION, Stats } from './components'
 import type { EcsAtlas } from './atlas'
 import type { FightDef } from '../types/runs'
 import { fightMods, newFight } from './fight/state'
+import { layDown } from './systems/shared/combat'
 import type { FightState } from './fight/state'
 
 export interface Sim {
@@ -149,7 +150,7 @@ export function makeSim(
   const state = newFight(fight, run)
   const team = formTeam(world, atlas, run, origin.x, origin.y, fightMods(state, FACTION.team))
   const { characters, leader } = team
-  return {
+  const sim: Sim = {
     world,
     teamDir: { x: 0, y: 0 },
     moveInputRaw: 0,
@@ -172,8 +173,8 @@ export function makeSim(
     chrono: 0,
     battleFx: { ...BATTLE_FX_IDENTITY },
     foes: {
-      speed: characters.reduce((v, m) => v * Stats.enemySpeed[m]!, 1),
-      count: characters.reduce((v, m) => v * Stats.enemyCount[m]!, 1),
+      speed: characters.reduce((v, m, slot) => (run.fallen[slot] ? v : v * Stats.enemySpeed[m]!), 1),
+      count: characters.reduce((v, m, slot) => (run.fallen[slot] ? v : v * Stats.enemyCount[m]!), 1),
     },
     frameAttractors: [],
     targets: [[], []],
@@ -189,4 +190,9 @@ export function makeSim(
     handover: null,
     aim: { x: 0, y: -1 },
   }
+  // 这一局回不来的队员倒着上场
+  characters.forEach((m, slot) => {
+    if (run.fallen[slot]) layDown(sim, m)
+  })
+  return sim
 }

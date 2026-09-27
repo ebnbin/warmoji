@@ -53,6 +53,8 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private squadArc: number[] = []
   private squadShown = { leader: -1, switching: false }
   private squadCenter = { x: 0, y: 0 }
+  /** 这一场不能放主动技能 */
+  private noSkill = false
   private aiming = false
   private aimDir: { x: number; y: number } | null = null
   private aimDrag = { x: 0, y: 0 }
@@ -114,6 +116,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.squad = []
     this.squadArc = []
     this.squadShown = { leader: -1, switching: false }
+    this.noSkill = false
     this.aiming = false
     this.aimDir = null
     SQUAD_KEYS.forEach((k, i) =>
@@ -122,7 +125,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
         if (slot >= 0) this.trySwitchLeader(slot)
       }),
     )
-    this.input.keyboard?.on('keydown-Q', () => this.arena.castLeaderSkill(null))
+    this.input.keyboard?.on('keydown-Q', () => this.tryCast())
 
     const arenaEvents = this.arena.events
     arenaEvents.on(HudEvent.WaveComplete, this.onWaveComplete, this)
@@ -196,6 +199,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   }
 
   private createSquad(s: SquadSnapshot): void {
+    this.noSkill = this.arena.skillBlock() !== null
     for (const b of this.squad) b.dial.destroy()
     this.squadCenter = this.squadCorner()
     const m = s.members.length - 1
@@ -206,7 +210,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       const p = isLeader ? this.squadCenter : this.arcPoint(this.squadArc[slot]!, m)
       const dial = new DialButton(this, p.x, p.y, {
         radius: RING.r,
-        icon: isLeader ? member.skillIcon : member.emoji,
+        icon: isLeader && !this.noSkill ? member.skillIcon : member.emoji,
         outline: 'player',
         iconSize: RING.emoji,
         onTap: () => this.onIconTap(slot),
@@ -222,18 +226,28 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.squad.forEach((b, slot) => this.styleSquadIcon(b, s.members[slot]!, slot === s.leaderSlot, false))
   }
 
+  /** 换不了队长时说明缘由：这一场不许换，或还在冷却 */
   private trySwitchLeader(slot: number): void {
-    this.arena.switchLeader(slot)
+    if (this.arena.switchLeader(slot)) return
+    const why = this.arena.switchBlock()
+    if (why) this.announcer.toast(why, { color: 'warn' })
   }
 
   private onIconTap(slot: number): void {
     if (slot !== this.squadShown.leader) this.trySwitchLeader(slot)
-    else this.arena.castLeaderSkill(null)
+    else this.tryCast()
+  }
+
+  /** 放不了技能时说明缘由：这一场不许放 */
+  private tryCast(): void {
+    if (this.arena.castLeaderSkill(null)) return
+    const why = this.arena.skillBlock()
+    if (why) this.announcer.toast(why, { color: 'warn' })
   }
 
   /** 按住队长按钮开始瞄准或蓄力，只对方向型或蓄力型技能有效 */
   private beginAim(slot: number): boolean {
-    if (slot !== this.squadShown.leader || this.aiming) return false
+    if (slot !== this.squadShown.leader || this.aiming || this.noSkill) return false
     const sk = this.arena.leaderSkill()
     if (!sk || (!sk.aim && sk.holdMs <= 0)) return false
     this.aiming = true
@@ -295,17 +309,24 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.tweens.add({ targets: a, x: p.x, y: p.y, scale: 1, duration: ms, ease: 'Cubic.easeInOut' })
   }
 
-  private styleSquadIcon(b: SquadIcon, m: SquadMember, isLeader: boolean, switching: boolean): void {
+  /** 不能放技能的场次里不显示技能冷却 */
+  private iconState(m: SquadMember): IconState {
     const state = stateOf(m)
+    return state === 'cooling' && this.noSkill ? 'ready' : state
+  }
+
+  private styleSquadIcon(b: SquadIcon, m: SquadMember, isLeader: boolean, switching: boolean): void {
+    const state = this.iconState(m)
     const dead = state === 'dead'
+    const skill = isLeader && !this.noSkill
     b.dial
       .setDim(switching)
-      .setIcon(isLeader ? m.skillIcon : m.emoji, 'player')
+      .setIcon(skill ? m.skillIcon : m.emoji, 'player')
       .setDead(dead, m.reviveSec)
       .setHp(dead ? null : Math.max(0, Math.min(1, m.max > 0 ? m.hp / m.max : 0)))
       .setStamina(dead ? null : m.stamina, staminaTone(m.stamina))
-    // 徽章：队长显示头像，阵亡显示骷髅，冷却中的队员显示技能图标
-    const badge = dead ? '1f480' : isLeader ? m.emoji : state === 'cooling' ? m.skillIcon : null
+    // 徽章：队长显示头像，不能放技能时显示禁止，阵亡显示骷髅，冷却中的队员显示技能图标
+    const badge = dead ? '1f480' : isLeader ? (skill ? m.emoji : '1f6ab') : state === 'cooling' ? m.skillIcon : null
     b.dial.setBadge(badge, 'player')
     if (state !== 'cooling') b.dial.setCooldown(0, null)
     if (!isLeader) b.dial.setRim('idle')
@@ -323,7 +344,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     s.members.forEach((m, i) => {
       const b = this.squad[i]!
       const isLeader = i === s.leaderSlot
-      const state = stateOf(m)
+      const state = this.iconState(m)
       if (leaderChanged || switchChanged || state !== b.shownState) {
         b.shownState = state
         this.styleSquadIcon(b, m, isLeader, s.switching)
@@ -334,7 +355,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
         return
       }
       if (state === 'cooling') dial.setCooldown(m.cdMs > 0 ? m.cdRemainMs / m.cdMs : 0, Math.ceil(m.cdRemainMs / 1000))
-      const charges = isLeader ? (sk?.charges ?? -1) : -1
+      const charges = isLeader && !this.noSkill ? (sk?.charges ?? -1) : -1
       dial.setCharges(charges >= 0 ? charges : null)
       if (isLeader) {
         if (sk && sk.recastMs > 0) dial.setRim('recast', 0.5 + 0.5 * Math.sin(this.time.now / 90))

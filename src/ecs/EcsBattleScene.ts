@@ -34,7 +34,7 @@ import { attachDrawable } from './entities/drawable'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
-import { setOverlayFill, viewFor } from './views'
+import { Fog, setOverlayFill, viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
 import { abilityRequires, bodyLook, modDef, statBase } from './store'
@@ -63,7 +63,7 @@ import { timeLimitMs } from '../data/runs'
 import { enterFight } from '../run/flow'
 import type { FightDef } from '../types/runs'
 import { callSquad, startFight } from './fight/spawns'
-import { fightGoals, fightMods, fightVerdict, goalSpot, markFightBase, timeLeftMs } from './fight/state'
+import { fightGoals, fightMods, fightVerdict, goalSpot, markFightBase, switchBlock, timeLeftMs } from './fight/state'
 import { xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
@@ -101,6 +101,8 @@ function liveCoins(world: EcsWorld): number {
 }
 
 const RES_COLOR: Record<ResourceDef['kind'], number> = { energy: 0xffee58, fury: 0xef5350, heat: 0xff9800, growth: 0x9ccc65 }
+/** 视野规则的黑幕有多黑 */
+const VISION_FOG_ALPHA = 0.92
 const STAMINA_COLOR: Record<StaminaTier, number> = { ok: 0x4dd0e1, slow: 0xffa726, low: 0xef5350 }
 
 /** 倒下的队员几秒后起来；这一场不会自己起来是 null */
@@ -163,6 +165,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private bootGen = 0
   private devGfx?: Phaser.GameObjects.Graphics
   private goalGfx?: Phaser.GameObjects.Graphics
+  /** 这一场看得见的范围之外的黑幕；没有视野规则就没有 */
+  private fog?: Fog
 
   constructor() {
     super(SceneKey.Battle)
@@ -195,6 +199,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.timeStopFxAlpha = 0
     this.devGfx = undefined
     this.goalGfx = undefined
+    this.fog = undefined
   }
 
   devProvider(): DevProvider {
@@ -360,6 +365,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.shownHp.push(-1)
       this.sweats.push(this.newSweat())
     }
+    if (Number.isFinite(this.sim.fight.rules.vision)) this.fog = new Fog(this)
     startFight(this.sim)
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
@@ -580,7 +586,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const eid = sim.characters[slot]
     if (eid === undefined || !canSwitchLeader(sim, eid)) return false
     switchLeader(sim, eid)
+    sim.fight.switchedAt = sim.fxMs
+    sim.run.stats.switches += 1
     return true
+  }
+
+  switchBlock(): string | null {
+    return this.sim ? switchBlock(this.sim) : null
+  }
+
+  skillBlock(): string | null {
+    return this.sim && !this.sim.fight.rules.skills ? '这一场不能放主动技能' : null
   }
 
   leaderSkill(): LeaderSkill | null {
@@ -608,7 +624,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   /** 不给方向就用摇杆方向，摇杆没推就用队长朝向；连段开着时接下一段；按住蓄力的带上蓄了几成 */
   castLeaderSkill(dir: Point | null, holdRatio = 0): boolean {
     const sim = this.sim
-    if (!sim || sim.over || this.ending) return false
+    if (!sim || sim.over || this.ending || this.skillBlock()) return false
     const leader = sim.leader
     if (!Alive.v[leader] || !Ctl.cast[leader]) return false
     const slot = sim.characters.indexOf(leader)
@@ -622,6 +638,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const d = dir ?? (stick.x !== 0 || stick.y !== 0 ? norm(stick.x, stick.y) : { x: Facing.x[leader]!, y: Facing.y[leader]! })
     sim.aim = { x: d.x, y: d.y }
     requestCast(sim, e, holdRatio)
+    sim.run.stats.casts += 1
     playSfx('levelup')
     this.hud.emit(HudEvent.SkillCast, def.skill.name)
     return true
@@ -631,14 +648,15 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.skillAim = dir
   }
 
-  /** 目标在视野外时，在队长身边画一个指过去的箭头 */
+  /** 目标在屏幕外或黑幕里时，在队长身边画一个指过去的箭头 */
   private drawGoalPointer(sim: Sim): void {
     const spot = goalSpot(sim)
     const lx = leaderX(sim)
     const ly = leaderY(sim)
     const d = spot ? sim.hooks.worldDelta(sim, lx, ly, spot.x, spot.y) : null
     const v = sim.view
-    if (!d || (lx + d.x >= v.x && lx + d.x <= v.right && ly + d.y >= v.y && ly + d.y <= v.bottom)) {
+    const lit = d !== null && Math.hypot(d.x, d.y) <= sim.fight.rules.vision * UNIT
+    if (!d || (lit && lx + d.x >= v.x && lx + d.x <= v.right && ly + d.y >= v.y && ly + d.y <= v.bottom)) {
       this.goalGfx?.clear()
       return
     }
@@ -820,6 +838,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const camOff = handoverCamOffset(sim)
     this.camAnchor.setPosition(leaderX(sim) + camOff.x, leaderY(sim) + camOff.y)
     this.map.step(this.ctx, sim, delta)
+    this.fog?.show(leaderX(sim), leaderY(sim), sim.fight.rules.vision * UNIT, VISION_FOG_ALPHA)
     const chillTarget = sim.timeStopMsLeft > 0 ? (1 - sim.chrono) * TIMESTOP.chillMaxAlpha : 0
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
     if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)

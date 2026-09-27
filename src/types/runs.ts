@@ -1,10 +1,13 @@
 import type runsJson from '../assets/runs.json'
+import type mutatorsJson from '../assets/mutators.json'
 import type { CharacterId, CharacterTag } from './characters'
 import type { DriveDef, EnemyKind } from './enemies'
+import type { ItemRarity } from './items'
 import type { MapId } from './maps'
 import type { StatMods } from './stats'
 
 export type RunId = keyof typeof runsJson
+export type MutatorId = keyof typeof mutatorsJson
 
 /** 横幅：标题与一句提示 */
 export interface Banner {
@@ -103,16 +106,79 @@ export type EndRule =
   | { readonly kind: 'coins'; readonly count: number }
   | { readonly kind: 'downs'; readonly count: number }
 
-/** 一场战斗：刷什么怪、什么时候结束；intro 是开打时的横幅，mix 换掉地图的配比，mods 是这一场给两边的常驻修正，chaseLeader 让追人的敌人都盯着队长，noRevive 倒下的队员这一场不再起来；不写名字就只显示用时 */
+/**
+ * 我方在一场里的规则，写在一局上对每一场生效，写在一场上只管这一场、盖过一局写的：
+ * revive 为假时倒下的队员不会自己起来；rescue 让活着的队长在倒下的队员身边 radius 格内连续站满 ms 毫秒把他扶起来；
+ * leader 里 lock 不许手动换队长，critical 队长倒下就输，switchCdMs 是手动换队长的冷却；
+ * surprise 为真时敌人现身不打预兆；skills 为假时不能放主动技能；vision 是队长看得见的半径（格），外面一片漆黑；
+ * mods 是给队伍的常驻修正，一局与一场写的叠加。
+ */
+export interface FightRules {
+  readonly revive?: boolean
+  readonly rescue?: { readonly ms: number; readonly radius: number }
+  readonly leader?: { readonly lock?: boolean; readonly critical?: boolean; readonly switchCdMs?: number }
+  readonly surprise?: boolean
+  readonly skills?: boolean
+  readonly vision?: number
+  readonly mods?: StatMods
+}
+
+/** 场与场之间：carry 活着的带着残血、倒下的回三成血；full 每场满血；permadeath 活着的带着残血，一场打完时还倒着的这一局都回不来 */
+export type Between = 'carry' | 'full' | 'permadeath'
+
+/** 商店：rarity 只摆出这个范围里的稀有度，两头都含；reroll 为假时不能刷新 */
+export interface ShopRules {
+  readonly rarity?: { readonly min?: ItemRarity; readonly max?: ItemRarity }
+  readonly reroll?: boolean
+}
+
+/** 一局里我方的规则：每一场的规则之外，lives 是全队共享的起来次数（自己起来、被扶起来、被技能救起来都算一次），between 是场与场之间怎么恢复，recruit 只许招募同时带着这些标签的角色，shop 是商店规则，maxLevel 是队员的等级上限；mods 在商店里也算 */
+export interface RunRules extends FightRules {
+  readonly lives?: number
+  readonly between?: Between
+  readonly recruit?: { readonly tags: readonly CharacterTag[] }
+  readonly shop?: ShopRules
+  readonly maxLevel?: number
+}
+
+/** 星级条件，赢下一局时按整局评定：downs 队员倒下不超过 count 次，time 战斗用时不超过 ms，switches 手动换队长不超过 count 次，skills 放主动技能不超过 count 次，kills 击杀至少 count，lives 剩下至少 count 次起来的机会 */
+export type StarRule =
+  | { readonly kind: 'downs'; readonly count: number }
+  | { readonly kind: 'time'; readonly ms: number }
+  | { readonly kind: 'switches'; readonly count: number }
+  | { readonly kind: 'skills'; readonly count: number }
+  | { readonly kind: 'kills'; readonly count: number }
+  | { readonly kind: 'lives'; readonly count: number }
+
+/** 词缀对我方规则的改动，只能往难里改 */
+export interface MutatorRules {
+  readonly revive?: false
+  readonly leader?: { readonly lock?: true; readonly critical?: true }
+  readonly surprise?: true
+  readonly skills?: false
+  readonly vision?: number
+  readonly mods?: StatMods
+}
+
+/** 开局前玩家自选的词缀：rules 盖在每一场的我方规则上，视野取更小的；enemyMods 加给每一场的敌人；heat 是它算几点热度 */
+export interface MutatorDef {
+  readonly emoji: string
+  readonly name: string
+  readonly heat: number
+  readonly rules?: MutatorRules
+  readonly enemyMods?: StatMods
+}
+
+/** 一场战斗：刷什么怪、什么时候结束；intro 是开打时的横幅，mix 换掉地图的配比，enemyMods 是这一场给敌人的常驻修正，chaseLeader 让追人的敌人都盯着队长，rules 是我方在这一场的规则；不写名字就只显示用时 */
 export interface FightDef {
   readonly name?: string
   readonly intro?: Banner
   readonly mix?: readonly MixEntry[]
   readonly spawns: readonly SpawnRule[]
   readonly ends: readonly EndRule[]
-  readonly mods?: { readonly team?: StatMods; readonly enemy?: StatMods }
+  readonly enemyMods?: StatMods
   readonly chaseLeader?: boolean
-  readonly noRevive?: boolean
+  readonly rules?: FightRules
 }
 
 /** 一步：招募到 upTo 人、进商店、打一场 */
@@ -129,7 +195,7 @@ export interface TeamDef {
 
 /**
  * 一局的玩法：按顺序走完这些步骤就赢，全灭就输。
- * map 固定地图，不写由玩家选；team 为 knobs 时队伍由试炼场的旋钮给出，是 TeamDef 时开局就按它组队，不写就靠招募步骤组建；start 是开局的进度，波数定配比、物价与稀有度，秒数定敌人的血量与刷怪间隔；record 为真时结算记最高分；note 写这一关在试什么。
+ * map 固定地图，不写由玩家选；team 为 knobs 时队伍由试炼场的旋钮给出，是 TeamDef 时开局就按它组队，不写就靠招募步骤组建；rules 是我方这一局的规则；start 是开局的进度，波数定配比、物价与稀有度，秒数定敌人的血量与刷怪间隔；record 为真时结算记最高分；note 写这一关在试什么；stars 是赢下后再各得一星的两条条件。
  */
 export interface RunDef {
   readonly emoji: string
@@ -138,8 +204,10 @@ export interface RunDef {
   readonly note?: string
   readonly map?: MapId
   readonly team?: 'knobs' | TeamDef
+  readonly rules?: RunRules
   readonly start?: { readonly wave: number; readonly sec: number }
   readonly coins?: number
   readonly record?: boolean
+  readonly stars?: readonly [StarRule, StarRule]
   readonly steps: readonly StepDef[]
 }

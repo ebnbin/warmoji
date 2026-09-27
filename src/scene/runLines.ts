@@ -1,8 +1,10 @@
 import { CHARACTERS } from '../data/characters'
+import { RARITIES } from '../data/items'
+import { modTexts } from '../data/stats'
 import { TAGS } from '../data/tags'
-import type { EndRule, FightDef, RunDef, StepDef, TeamDef } from '../types/runs'
+import type { EndRule, FightDef, FightRules, MutatorDef, RunDef, ShopRules, StarRule, StepDef, TeamDef } from '../types/runs'
 
-const sec = (ms: number): string => `${Math.round(ms / 1000)} 秒`
+const sec = (ms: number): string => `${+(ms / 1000).toFixed(1)} 秒`
 
 /** 记最高分的一局按波数排名，一场就叫一波，别的叫场 */
 export function fightUnit(def: RunDef): string {
@@ -39,9 +41,74 @@ export function fightGoalText(f: FightDef): string {
     if (e.kind === 'time' && e.lose) rules.push(`限时 ${sec(e.ms)}`)
     if (e.kind === 'downs') rules.push(e.count === 1 ? '有人倒下就输' : `累计倒下 ${e.count} 次就输`)
   }
-  if (f.noRevive) rules.push('倒下的队员不会自己起来')
+  rules.push(...ruleLines(f.rules))
   if (f.chaseLeader) rules.push('敌人都盯着队长')
   return [wins.length === 0 ? '不会结束' : wins.join('，或'), ...rules].join(' · ')
+}
+
+/** 我方规则的说法 */
+function ruleLines(r: FightRules | undefined): string[] {
+  if (!r) return []
+  const out: string[] = []
+  if (r.revive === false) out.push('倒下的队员不会自己起来')
+  if (r.rescue) out.push(`队长在倒下的队员身边 ${r.rescue.radius} 格内站满 ${sec(r.rescue.ms)}能把他扶起来`)
+  if (r.leader?.lock) out.push('不能换队长')
+  if (r.leader?.critical) out.push('队长倒下就输')
+  if (r.leader?.switchCdMs) out.push(`换队长要冷却 ${sec(r.leader.switchCdMs)}`)
+  if (r.surprise) out.push('敌人现身没有预兆')
+  if (r.skills === false) out.push('不能放主动技能')
+  if (r.vision !== undefined) out.push(`只看得见队长身边 ${r.vision} 格`)
+  if (r.mods) out.push(`全队${modTexts(r.mods).join('、')}`)
+  return out
+}
+
+/** 商店规则的说法 */
+function shopLines(s: ShopRules): string[] {
+  const out: string[] = []
+  if (s.rarity) {
+    const lo = RARITIES[s.rarity.min ?? 'common'].label
+    const hi = RARITIES[s.rarity.max ?? 'legendary'].label
+    out.push(lo === hi ? `商店只卖${lo}道具` : `商店只卖${lo}到${hi}的道具`)
+  }
+  if (s.reroll === false) out.push('商店不能刷新')
+  return out
+}
+
+/** 一局的我方规则：每一场都照这些，外加命数、场间恢复、招募限定、商店与等级上限 */
+export function runRuleLines(def: RunDef): string[] {
+  const r = def.rules
+  if (!r) return []
+  const out = ruleLines(r)
+  if (r.lives !== undefined) out.push(`全队一共只能起来 ${r.lives} 次，自己起来、被扶起来、被技能救起来都算`)
+  if (r.between === 'full') out.push('每一场满血开局')
+  if (r.between === 'permadeath') out.push('一场打完时还倒着的队员，这一局都回不来')
+  if (r.recruit) out.push(`只能招募${r.recruit.tags.map((t) => TAGS[t].name).join('、')}角色`)
+  if (r.shop) out.push(...shopLines(r.shop))
+  if (r.maxLevel !== undefined) out.push(r.maxLevel === 1 ? '队员不能升级' : `队员最高只能升到 ${r.maxLevel} 级`)
+  return out
+}
+
+/** 一条星级条件的说法 */
+export function starText(s: StarRule): string {
+  switch (s.kind) {
+    case 'downs':
+      return s.count === 0 ? '没有队员倒下' : `队员倒下不超过 ${s.count} 次`
+    case 'time':
+      return `${sec(s.ms)}内打完`
+    case 'switches':
+      return s.count === 0 ? '不换队长' : `换队长不超过 ${s.count} 次`
+    case 'skills':
+      return s.count === 0 ? '不放主动技能' : `主动技能最多放 ${s.count} 次`
+    case 'kills':
+      return `击杀至少 ${s.count} 只`
+    case 'lives':
+      return `至少还剩 ${s.count} 次起来的机会`
+  }
+}
+
+/** 一个词缀改了什么 */
+export function mutatorText(m: MutatorDef): string {
+  return [...ruleLines(m.rules), ...(m.enemyMods ? [`敌人${modTexts(m.enemyMods).join('、')}`] : [])].join('，')
 }
 
 function stepText(s: StepDef): string {

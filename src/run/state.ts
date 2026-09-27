@@ -5,7 +5,7 @@ import { RUNS } from '../data/runs'
 import type { GrowthProgress, ItemId } from '../types/items'
 import type { Hazard, MapId } from '../types/maps'
 import type { EnemyKind } from '../types/enemies'
-import type { RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
+import type { MutatorId, RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
 import { MAP_IDS } from '../data/maps'
 import type { XpState } from '../types/xp'
 import { sandboxTeam } from '../ecs/sandbox/knobs'
@@ -42,6 +42,12 @@ export interface RunState {
   minLevel: number
   /** 队伍无敌：生命上限锁在极大值 */
   invincible: boolean
+  /** 全队还能起来几次；Infinity 是不限 */
+  lives: number
+  /** 这一局回不来的队员，按名单位置 */
+  fallen: boolean[]
+  /** 开局前自选的词缀 */
+  mutators: MutatorId[]
   stats: {
     damage: number[]
     kills: number[]
@@ -51,6 +57,10 @@ export interface RunState {
     enemyDamage: Partial<Record<EnemyKind, number>>
     hazardDamage: Partial<Record<Hazard, number>>
     eliteKills: number
+    /** 手动换队长的次数 */
+    switches: number
+    /** 放主动技能的次数 */
+    casts: number
   }
 }
 
@@ -71,8 +81,8 @@ function pickTeam(slots: readonly TeamSlot[]): CharacterId[] {
   return out
 }
 
-/** 开一局：地图固定的不看玩家选的；玩法给了队伍就按它组队、满血开局，否则由招募步骤补上；给了开局进度就从那里起 */
-export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
+/** 开一局：地图固定的不看玩家选的；玩法给了队伍就按它组队、满血开局，否则由招募步骤补上；给了开局进度就从那里起；带上自选的词缀 */
+export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!, mutators: readonly MutatorId[] = []): RunState {
   const def = RUNS[id]
   const run: RunState = {
     runId: id,
@@ -95,6 +105,9 @@ export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
     leaderId: ROSTER_IDS[0]!,
     minLevel: 1,
     invincible: false,
+    lives: def.rules?.lives ?? Infinity,
+    fallen: [],
+    mutators: [...mutators],
     stats: {
       damage: [],
       kills: [],
@@ -104,6 +117,8 @@ export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
       enemyDamage: {},
       hazardDamage: {},
       eliteKills: 0,
+      switches: 0,
+      casts: 0,
     },
   }
   if (def.team === 'knobs') {
@@ -141,6 +156,11 @@ export function runDef(run: RunState): RunDef {
   return RUNS[run.runId]
 }
 
+/** 这一局实际打了多久：开局进度给的秒数不算 */
+export function foughtMs(run: RunState): number {
+  return run.combatMs - (runDef(run).start?.sec ?? 0) * 1000
+}
+
 /** 当前这一步；步骤都走完了是 undefined */
 export function stepOf(run: RunState): StepDef | undefined {
   return runDef(run).steps[run.step]
@@ -157,9 +177,15 @@ export function nextStep(run: RunState): void {
   skipFilled(run)
 }
 
-/** 还没入队的角色都能招 */
+/** 这一局许招的角色：规则限定了标签就只许招同时带着它们的 */
+export function recruitPool(run: RunState): CharacterId[] {
+  const tags = runDef(run).rules?.recruit?.tags ?? []
+  return ROSTER_IDS.filter((id) => tags.every((t) => CHARACTERS[id].tags.includes(t)))
+}
+
+/** 许招又还没入队的角色 */
 export function recruitCandidates(run: RunState): CharacterId[] {
-  return ROSTER_IDS.filter((id) => !run.roster.includes(id))
+  return recruitPool(run).filter((id) => !run.roster.includes(id))
 }
 
 /** 当前这一步还要招几人：不是招募步骤就是 0 */
@@ -179,6 +205,7 @@ export function addMember(run: RunState, id: CharacterId): number {
   run.memberRes.push(-1)
   run.memberGrowth.push({})
   run.growthKills.push(0)
+  run.fallen.push(false)
   run.stats.damage.push(0)
   run.stats.kills.push(0)
   run.stats.deaths.push(0)
@@ -188,13 +215,14 @@ export function addMember(run: RunState, id: CharacterId): number {
 }
 
 export function recruitMember(run: RunState, id: CharacterId): number {
-  if (recruitDueCount(run) === 0 || !(id in CHARACTERS) || run.roster.includes(id)) return -1
+  if (recruitDueCount(run) === 0 || !recruitCandidates(run).includes(id)) return -1
   return addMember(run, id)
 }
 
-/** 队长所在的名单位置；名单里找不到就回到首位 */
+/** 队长所在的名单位置；名单里找不到或他回不来了，就交给第一个还在的 */
 export function leaderSlot(run: RunState): number {
-  return Math.max(0, run.roster.indexOf(run.leaderId))
+  const at = run.roster.indexOf(run.leaderId)
+  return at >= 0 && !run.fallen[at] ? at : Math.max(0, run.fallen.indexOf(false))
 }
 
 export function waveStartHp(storedHp: number, maxHp: number): number {
