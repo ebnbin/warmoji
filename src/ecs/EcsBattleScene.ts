@@ -355,11 +355,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     for (let i = 0; i < this.sim.characters.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
-    }
-    for (let i = 0; i < this.sim.characters.length; i++) {
-      const e = newEntity(this.world)
-      attachDrawable(this.world, e, atlas, { id: '1f4a6', outline: 'player', x: 0, y: 0, size: 0.42 * UNIT, alpha: 0, z: 29 })
-      this.sweats.push(e)
+      const sweat = newEntity(this.world)
+      attachDrawable(this.world, sweat, atlas, { id: '1f4a6', outline: 'player', x: 0, y: 0, size: 0.42 * UNIT, alpha: 0, z: 29 })
+      this.sweats.push(sweat)
     }
     startFight(this.sim)
     this.waveBaseKills = run.kills
