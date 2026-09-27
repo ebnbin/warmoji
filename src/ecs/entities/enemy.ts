@@ -1,6 +1,6 @@
 import { addComponent, addComponents, hasComponent, query, removeComponent } from 'bitecs'
 import { spawnBody } from './body'
-import { AI, ELITE, SPAWN, SURGE } from '../../data/enemies'
+import { AI, ELITE, SPAWN } from '../../data/enemies'
 import { ACQUIRE, ENEMY_BODY, MORPH } from '../../data/abilities'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
@@ -45,6 +45,7 @@ import {
   Sprite,
   Standoff,
   TAG,
+  Telegraph,
   Tint,
   Transform,
 } from '../components'
@@ -54,7 +55,6 @@ import { interrupt } from '../systems/shared/ability'
 import { addMark, hasMark } from '../utils/marks'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { spawnTelegraph, telegraphCount } from './telegraph'
-import { scheduleSurge } from './schedule'
 import { armIdle } from '../systems/shared/anim'
 import { ANIM_DEF } from '../../emoji/anim'
 import type { Sim } from '../sim'
@@ -279,27 +279,21 @@ export function sightedSpawnPoint(sim: Sim): Point {
   return p
 }
 
-export function telegraphOne(sim: Sim, hpMultiplier: number, forceElite = false): void {
+/** 按这一场的配比预告一只敌人：forced 为真必是精英，否则有 chance 的几率 */
+export function telegraphOne(sim: Sim, hpMultiplier: number, forced = false, chance = 0): void {
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
-  const elite = !sim.sandbox && (forceElite || (sim.run.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance))
+  const elite = forced || (chance > 0 && sim.rng.next() < chance)
   const hp = Math.round(def.hp * hpMultiplier)
   const pos = sightedSpawnPoint(sim)
   spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, false)
-}
-
-export function spawnSurge(sim: Sim): void {
-  if (sim.over) return
-  const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
-  for (let i = 0; i < SURGE.count; i++) {
-    scheduleSurge(sim, sim.elapsedMs + (i * SURGE.spreadMs) / SURGE.count, hpMul, i < SURGE.elites)
-  }
 }
 
 export function spawnBoss(sim: Sim): void {
   if (sim.over) return
   const def = toPx(bossFor(sim.mapId))
   const pos = sim.hooks.spawnPoint(sim, true)
-  spawnTelegraph(sim, def, pos.x, pos.y, def.hp, false, true, undefined, SPAWN.telegraphMs * 1.6)
+  const t = spawnTelegraph(sim, def, pos.x, pos.y, def.hp, false, true, undefined, SPAWN.telegraphMs * 1.6)
+  Telegraph.loud[t] = 1
 }
 
 export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {

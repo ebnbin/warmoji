@@ -93,6 +93,7 @@ const checkFight = (f: FightDef, path: string): void => {
     } else if (s.kind === 'batch') {
       need(s.atMs >= 0 && s.squad.count >= 1 && (s.squad.spreadMs ?? 0) >= 0, `${path} 的一队敌人须至少一只，时刻与间隔不为负`)
       need((s.squad.elites ?? 0) >= 0 && (s.squad.elites ?? 0) <= s.squad.count, `${path} 的精英数须在 0 到队伍人数之间`)
+      need((s.squad.eliteChance ?? 0) >= 0 && (s.squad.eliteChance ?? 0) <= 1, `${path} 的精英几率须在 [0, 1] 内`)
     } else if (s.kind === 'carriers') {
       need(s.buff >= 0 && s.debuff >= 0 && s.atMs >= 0 && s.spanMs >= 0, `${path} 的带光圈敌人数与时刻不为负`)
     }

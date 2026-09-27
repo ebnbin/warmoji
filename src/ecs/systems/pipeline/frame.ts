@@ -1,7 +1,8 @@
 import { armEnemies } from '../armEnemies'
 import { capCoins } from '../capCoins'
 import { fireCarriers } from '../fireCarriers'
-import { fireSurges } from '../fireSurges'
+import { fireCalls } from '../fireCalls'
+import { fireOrders } from '../fireOrders'
 import { grantCoins } from '../grantCoins'
 import { grantFlash } from '../grantFlash'
 import { grantMods } from '../grantMods'
@@ -36,9 +37,10 @@ const FRAME_PIPELINE = pipeline([
   { run: reapCollected, after: [grantCoins, grantMods, grantFlash, playPickupFx] },
   { run: capCoins, after: [reapCollected] },
   updateSpawners,
-  fireSurges,
+  fireCalls,
+  { run: fireOrders, after: [fireCalls] },
   fireCarriers,
-  { run: spawnStep, after: [fireSurges, fireCarriers] },
+  { run: spawnStep, after: [fireOrders, fireCarriers] },
 ])
 
 export function stepFrame(sim: Sim): void {

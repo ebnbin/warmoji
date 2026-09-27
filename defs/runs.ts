@@ -18,20 +18,15 @@ function carrierBudget(wave: number, boss: boolean): { buff: number; debuff: num
 /** 正式局的第 wave 波：撑过时长；第 2 波起有带光圈的敌人，精英波来一次精英潮，最后一波头目登场、打倒它也算过关 */
 function classicFight(wave: number, sec: number, last: boolean): FightDef {
   const ms = sec * 1000
-  const spawns: SpawnRule[] = [
-    {
-      kind: 'stream',
-      ...(last ? { intervalMul: DIFFICULTY.bossSpawnRelief } : {}),
-      ...(wave >= DIFFICULTY.elite.fromWave ? { eliteChance: DIFFICULTY.elite.chance } : {}),
-    },
-  ]
+  const eliteChance = wave >= DIFFICULTY.elite.fromWave ? { eliteChance: DIFFICULTY.elite.chance } : {}
+  const spawns: SpawnRule[] = [{ kind: 'stream', ...(last ? { intervalMul: DIFFICULTY.bossSpawnRelief } : {}), ...eliteChance }]
   if (wave >= 2) {
     const { buff, debuff } = carrierBudget(wave, last)
     spawns.push({ kind: 'carriers', buff, debuff, atMs: ms * 0.12, spanMs: ms * 0.7 })
   }
   if ((PROGRESSION.eliteWaves as readonly number[]).includes(wave)) {
     const { count, elites, spreadMs } = DIFFICULTY.surge
-    spawns.push({ kind: 'batch', atMs: EVENT_MS, squad: { count, elites, spreadMs }, banner: SURGE_BANNER })
+    spawns.push({ kind: 'batch', atMs: EVENT_MS, squad: { count, elites, spreadMs, ...eliteChance }, banner: SURGE_BANNER })
   }
   if (last) spawns.push({ kind: 'boss', atMs: EVENT_MS })
   return { name: `第 ${wave} 波`, spawns, ends: last ? [{ kind: 'time', ms }, { kind: 'boss' }] : [{ kind: 'time', ms }] }

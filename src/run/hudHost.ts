@@ -7,16 +7,18 @@ export interface HudSnapshot {
   xpNext: number
   kills: number
   coins: number
-  wave: number
+  /** 这一场的名字；没有就只显示用时 */
+  label: string | null
   seconds: number
-  remainMs: number
+  /** 离时限还有多久；没有时限是 null，显示已用时 */
+  remainMs: number | null
   bossHp: number | null
   bossMaxHp: number
   battleFx: { emoji: string; name: string; desc: string; polarity: Polarity; remainMs: number; totalMs: number }[]
 }
 
 export interface WaveSummary {
-  wave: number
+  title: string
   kills: number
   coins: number
 }
@@ -121,7 +123,6 @@ export function activeHudHost(): HudHost | undefined {
 }
 
 export interface HudHost {
-  readonly sandbox: boolean
   readonly events: HudEvents
   readonly scene: Phaser.Scenes.ScenePlugin
   hudSnapshot(): HudSnapshot

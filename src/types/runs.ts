@@ -8,10 +8,11 @@ export interface Banner {
   readonly sub: string
 }
 
-/** 一队敌人：按这一场的配比抽，前 elites 只是精英，spreadMs 内依次放出 */
+/** 一队敌人：按这一场的配比抽，前 elites 只必是精英、其余各有 eliteChance 的几率，spreadMs 内依次放出 */
 export interface Squad {
   readonly count: number
   readonly elites?: number
+  readonly eliteChance?: number
   readonly spreadMs?: number
 }
 

@@ -1,17 +1,28 @@
 import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
-import { Carrier, Due, Surge } from '../components'
-import { carrierPickup } from '../store'
+import { Call, Carrier, Due, Order } from '../components'
+import { callRule, carrierPickup } from '../store'
 import type { FieldPickupDef } from '../../types/battlefield'
+import type { BatchRule, BossRule } from '../../types/runs'
 import type { Sim } from '../sim'
 
-
-export function scheduleSurge(sim: Sim, atMs: number, hpMul: number, forceElite: boolean): number {
+/** 到 atMs 放出一只敌人：forced 为真必是精英，否则有 chance 的几率 */
+export function scheduleOrder(sim: Sim, atMs: number, hpMul: number, forced: boolean, chance: number): number {
   const eid = newEntity(sim.world)
-  addComponents(sim.world, eid, Due, Surge)
+  addComponents(sim.world, eid, Due, Order)
   Due.at[eid] = atMs
-  Surge.hpMul[eid] = hpMul
-  Surge.forceElite[eid] = forceElite ? 1 : 0
+  Order.hpMul[eid] = hpMul
+  Order.forced[eid] = forced ? 1 : 0
+  Order.chance[eid] = chance
+  return eid
+}
+
+/** 到 atMs 一队敌人或头目登场 */
+export function scheduleCall(sim: Sim, atMs: number, rule: BatchRule | BossRule): number {
+  const eid = newEntity(sim.world)
+  addComponents(sim.world, eid, Due, Call)
+  Due.at[eid] = atMs
+  callRule[eid] = rule
   return eid
 }
 

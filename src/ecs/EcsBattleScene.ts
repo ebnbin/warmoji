@@ -20,7 +20,7 @@ import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
 import { getRun, nextStep } from '../run/state'
 import { goStep } from '../scene/teamPage'
 import type { RunState } from '../run/state'
-import { bossFor, MAPS } from '../data/maps'
+import { MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
@@ -47,15 +47,20 @@ import { openStage, ready } from './systems/shared/avail'
 import { skillRemainMs } from './systems/tickSkillCooldowns'
 import { stepFrame } from './systems/pipeline/frame'
 import { replayDeath } from './systems/shared/death'
-import { spawnBoss, spawnSurge } from './entities/enemy'
-import { scheduleCarrier } from './entities/schedule'
+import { spawnBoss } from './entities/enemy'
 import { telegraphCount } from './entities/telegraph'
 import { activeMods } from './entities/modifier'
 import { Lifetime, Modifier } from './components'
 
 import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
 import { openWave, settleWave } from './systems/shared/wave'
-import { isBossWave, isEliteWave, waveAt, waveDurationMs, WAVE } from '../data/waves'
+import { waveAt, WAVE } from '../data/waves'
+import { SURGE } from '../data/enemies'
+import { timeLimitMs } from '../data/runs'
+import { enterFight } from '../run/flow'
+import type { FightDef } from '../types/runs'
+import { callSquad, startFight } from './fight/spawns'
+import { fightWon, timeLeftMs } from './fight/state'
 import { xpToNext } from '../run/xp'
 import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
@@ -65,7 +70,6 @@ import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
 import { drain } from './outbox'
 import type { Burst } from './outbox'
-import { rollWaveCarriers } from './utils/battleFx'
 import { leaderX, leaderY } from './utils/team'
 import { SceneKey } from '../scene/keys'
 import { battleDevProvider, watchSandboxSteady } from './devProvider'
@@ -80,8 +84,6 @@ import { telegraphOne } from './entities/enemy'
 import { enemyDef } from './store'
 
 const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
-
-const BOSS_SETTLE_MS = 700
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
@@ -122,6 +124,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private ready = false
   sandbox = false
   run!: RunState
+  /** 这一场的规则 */
+  private fightDef!: FightDef
   private ending = false
   private waveBaseKills = 0
   private waveBaseCoins = 0
@@ -133,7 +137,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private shownStamina = -1
   private hitShakeOn = false
   private seenHitCount = 0
-  private bossDownAt = -1
   private shownLeader = -1
   private skillAim: Point | null = null
   private aimGfx?: Phaser.GameObjects.Graphics
@@ -176,7 +179,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.staminaGfx = undefined
     this.shownStamina = -1
     this.seenHitCount = 0
-    this.bossDownAt = -1
     this.shownLeader = -1
     this.skillAim = null
     this.aimGfx = undefined
@@ -193,9 +195,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   devSpawn(kind: 'one' | 'elite' | 'surge' | 'boss'): void {
     const sim = this.sim
     if (!sim || sim.over) return
-    if (kind === 'one') telegraphOne(sim, 1, false)
+    if (kind === 'one') telegraphOne(sim, 1)
     else if (kind === 'elite') telegraphOne(sim, 1, true)
-    else if (kind === 'surge') spawnSurge(sim)
+    else if (kind === 'surge') callSquad(sim, SURGE)
     else spawnBoss(sim)
   }
 
@@ -214,7 +216,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   devEndWave(): void {
     const sim = this.sim
-    if (!sim || sim.over || this.ending || this.sandbox) return
+    if (!sim || sim.over || this.ending || sim.fight.def.ends.length === 0) return
     settleWave(sim)
     this.scheduleWaveEnd()
   }
@@ -260,6 +262,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
     const run = getRun()
     this.run = run
+    this.fightDef = enterFight(run)
     this.sandbox = run.sandbox
     const mapDef = MAPS[run.mapId]
     applyBackground(mapDef.palette)
@@ -336,7 +339,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
     const origin = { x: this.camAnchor.x, y: this.camAnchor.y }
-    this.sim = makeSim(this.world, atlas, run, run.sandbox, origin, this.mapW, this.mapH, settings.damageNumbers)
+    this.sim = makeSim(this.world, atlas, run, run.sandbox, origin, this.mapW, this.mapH, settings.damageNumbers, this.fightDef)
     if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
     this.shownLeader = this.sim.leader
     initialLayout(this.sim)
@@ -366,30 +369,10 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.shownCountdown.push(-1)
     }
     this.staminaGfx = this.add.graphics().setDepth(11).setVisible(false)
-    if (!run.sandbox) this.scheduleCarriers()
+    startFight(this.sim)
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
     openWave(this.sim)
-    if (!run.sandbox && isEliteWave(run.wave)) {
-      this.time.delayedCall(600, () => {
-        const sim = this.sim
-        if (!sim || sim.over) return
-        this.hud.emit(HudEvent.WaveWarning, { title: '精英来袭', sub: '敌人潮涌来，小心金边强敌！' })
-        spawnSurge(sim)
-      })
-    }
-    if (!run.sandbox && isBossWave(run.wave)) {
-      this.time.delayedCall(600, () => {
-        if (!this.sim || this.sim.over) return
-        this.hud.emit(HudEvent.WaveWarning, {
-          title: `${bossFor(run.mapId).name}出现`,
-          sub:
-            MAPS[run.mapId].finalWaveSub ??
-            `击败它，或撑过 ${Math.round(waveDurationMs(run.wave) / 1000)} 秒！`,
-        })
-        spawnBoss(this.sim)
-      })
-    }
     this.ready = true
     hint.destroy()
   }
@@ -397,6 +380,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   private drainOutbox(): void {
     const out = this.sim!.out
+    drain(out.banners, (bs) => {
+      for (const b of bs) this.hud.emit(HudEvent.WaveWarning, b)
+    })
     drain(out.collects, (defs) => {
       for (const d of defs) {
         this.hud.emit(HudEvent.FieldCollected, { emoji: d.emoji, name: d.name, desc: d.desc, polarity: d.polarity })
@@ -493,16 +479,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const sim = this.sim
     const elapsed = sim?.elapsedMs ?? 0
     const boss = sim ? query(this.world, [Enemy, Boss]).find((eid) => Boss.v[eid] === 1) : undefined
+    const limit = timeLimitMs(this.fightDef)
     return {
       xp: this.run.xp.xp,
       xpNext: xpToNext(this.run.xp.level),
       kills: this.run.kills,
       coins: this.run.coins,
-      wave: this.run.wave,
+      label: this.fightDef.name ?? null,
       seconds: Math.floor(elapsed / 1000),
-      remainMs: Math.max(0, waveDurationMs(this.run.wave) - elapsed),
+      remainMs: limit === undefined ? null : Math.max(0, limit - elapsed),
       bossHp: boss !== undefined ? Hp.v[boss]! : null,
-      bossMaxHp: bossFor(this.run.mapId).hp,
+      bossMaxHp: boss !== undefined ? Hp.max[boss]! : 1,
       battleFx: (sim ? activeMods(sim) : []).map((e) => ({
         emoji: modDef[e]!.emoji,
         name: modDef[e]!.name,
@@ -707,17 +694,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
 
 
-  private scheduleCarriers(): void {
-    const sim = this.sim
-    if (!sim || this.run.wave < 2) return
-    const carriers = rollWaveCarriers(this.run.mapId, this.run.wave, isBossWave(this.run.wave), () => sim.rng.next())
-    if (carriers.length === 0) return
-    const dur = waveDurationMs(this.run.wave)
-    carriers.forEach((pickup, i) => {
-      scheduleCarrier(sim, dur * 0.12 + (dur * 0.7 * i) / carriers.length, pickup)
-    })
-  }
-
   /** 这一场赢了：记下队长、打出小结，稍后走到下一步 */
   private scheduleWaveEnd(): void {
     this.ending = true
@@ -726,7 +702,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     run.leaderId = run.roster[sim.characters.indexOf(sim.leader)]!
     playSfx('wave')
     this.hud.emit(HudEvent.WaveComplete, {
-      wave: run.wave - 1,
+      title: `${this.fightDef.name ?? '本场'}完成！`,
       kills: run.kills - this.waveBaseKills,
       coins: run.coins - this.waveBaseCoins,
     })
@@ -747,7 +723,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.damageText?.step(sim.fxMs)
       return
     }
-    const leftMs = this.sandbox ? Infinity : waveDurationMs(sim.run.wave) - sim.elapsedMs
+    const leftMs = timeLeftMs(sim)
     const lastFrame = sim.wdtMs >= leftMs
     if (lastFrame) sim.wdtMs = leftMs
     const kx =
@@ -786,10 +762,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.updateStaminaGauge()
     this.drawDevTargets(sim)
     this.drawSkillAim(sim)
-    if (!this.sandbox && sim.bossDown) {
-      sim.bossDown = false
-      this.bossDownAt = sim.fxMs
-    }
     if (sim.over) {
       this.ending = true
       this.run.combatMs += sim.elapsedMs
@@ -804,8 +776,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.timeStopFxAlpha += (chillTarget - this.timeStopFxAlpha) * Math.min(1, delta / TIMESTOP.fadeMs)
     if (this.timeStopFx) setOverlayFill(this.timeStopFx, TIMESTOP.chillColor, this.timeStopFxAlpha)
     // 须在 stepFrame 与全灭判定之后：时限内全灭判负
-    const bossSettle = this.bossDownAt >= 0 && sim.fxMs - this.bossDownAt >= BOSS_SETTLE_MS
-    if (lastFrame || bossSettle) {
+    if (fightWon(sim, lastFrame)) {
       settleWave(sim)
       this.scheduleWaveEnd()
     }

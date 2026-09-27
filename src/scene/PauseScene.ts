@@ -407,7 +407,7 @@ export class PauseScene extends Phaser.Scene {
       const tag = (w: number): string => (isBossWave(w) ? '（首领波）' : isEliteWave(w) ? '（精英波）' : '')
       flow.text(
         snap
-          ? `第 ${wave} 波进行中${tag(wave)} · 本波还剩 ${formatTime(Math.ceil(snap.remainMs / 1000))}`
+          ? `第 ${wave} 波进行中${tag(wave)} · 本波还剩 ${formatTime(Math.ceil((snap.remainMs ?? 0) / 1000))}`
           : `第 ${wave - 1} 波已完成 · 下一波是第 ${wave} 波${tag(wave)}`,
         { color: 'ink', bold: true },
       )

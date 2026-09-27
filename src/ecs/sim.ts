@@ -28,6 +28,9 @@ import { newOutbox } from './outbox'
 import { newDamageNumbers } from './damageNumbers'
 import { Stats } from './components'
 import type { EcsAtlas } from './atlas'
+import type { FightDef } from '../types/runs'
+import { newFight } from './fight/state'
+import type { FightState } from './fight/state'
 
 export interface Sim {
   world: EcsWorld
@@ -64,7 +67,8 @@ export interface Sim {
   frames: FrameIndex
   rng: Rng
   sandbox: boolean
-  spawnCooldownMs: number
+  /** 这一场的规则与进行中的状态 */
+  fight: FightState
   pendingDeaths: PendingDeath[]
   out: Outbox
   damageNumbers: DamageNumbers | null
@@ -142,6 +146,7 @@ export function makeSim(
   mapW: number,
   mapH: number,
   damageNumbers: boolean,
+  fight: FightDef,
 ): Sim {
   const team = formTeam(world, atlas, run, sandbox, origin.x, origin.y)
   const { characters, leader } = team
@@ -179,7 +184,7 @@ export function makeSim(
     damageNumbers: damageNumbers ? newDamageNumbers() : null,
     rng: new Rng((run.decorSeed ^ 0x9e37 ^ Math.imul(run.wave, 0x9e3779b1)) >>> 0),
     sandbox,
-    spawnCooldownMs: 300,
+    fight: newFight(fight),
     run,
     leader,
     heading: { x: 0, y: -1 },

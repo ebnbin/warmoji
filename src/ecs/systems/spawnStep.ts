@@ -1,53 +1,23 @@
 import { playSfx } from '../../audio/sfx'
-import { toPx } from '../../data/px'
-import { isBossWave, waveAt } from '../../data/waves'
-import { BOSS_SPAWN_RELIEF, ENEMIES, SPAWN } from '../../data/enemies'
-import { spawnParams, sandboxDifficulty, sandboxEnemySet } from '../sandbox/knobs'
-import { mapEnemyRoster } from '../../data/maps'
-import { isDayAt } from '../worlds/daynight'
 import { attachCarrierRing } from '../entities/pickup'
-import { sightedSpawnPoint, spawnEnemy } from '../entities/enemy'
-import { foeCount, dayNightOf, telegraphOne } from '../entities/enemy'
-import { spawnTelegraph, telegraphCount } from '../entities/telegraph'
+import { spawnEnemy } from '../entities/enemy'
 import { enemyCarries, telegraphCarries, telegraphDef } from '../store'
 import { Due, Telegraph, Transform } from '../components'
 import { query, removeEntity } from 'bitecs'
+import { runStream } from '../fight/spawns'
+import { runKnobs } from '../sandbox/spawn'
 import type { Sim } from '../sim'
-import type { EnemyKind } from '../../types/enemies'
 
-function spawnIntervalScale(sim: Sim): number {
-  const dn = dayNightOf(sim)
-  return dn ? (isDayAt(dn.hour) ? dn.cfg.daySpawnScale : dn.cfg.nightSpawnScale) : 1
-}
-
-function spawnSandbox(sim: Sim): void {
-  const d = spawnParams()
-  sim.spawnCooldownMs = d.intervalMs
-  const roster = new Set<EnemyKind>(mapEnemyRoster(sim.mapId).map((e) => e.kind))
-  const kinds = [...sandboxEnemySet()].filter((k) => roster.has(k))
-  if (kinds.length === 0) return
-  const hpMul = sandboxDifficulty()
-  let live = foeCount(sim) + telegraphCount(sim)
-  for (let i = 0; i < d.batch; i++, live++) {
-    if (live >= d.cap) return
-    const raw = ENEMIES[kinds[Math.floor(sim.rng.next() * kinds.length)]!]
-    const def = toPx(raw)
-    const boss = raw.role === 'boss'
-    const pos = boss ? sim.hooks.spawnPoint(sim, true) : sightedSpawnPoint(sim)
-    spawnTelegraph(sim, def, pos.x, pos.y, Math.round(def.hp * hpMul), false, boss)
-  }
-}
-
+/** 到点的预兆现身为敌人，再按这一场的规则连续刷怪 */
 export function spawnStep(sim: Sim): void {
   const atlas = sim.frames
-  const delta = sim.wdtMs
   const now = sim.elapsedMs
   for (const e of [...query(sim.world, [Telegraph, Due])]) {
     if (now < Due.at[e]!) continue
     const boss = Telegraph.boss[e] === 1
     const eid = spawnEnemy(sim, atlas, telegraphDef[e]!, Transform.x[e]!, Transform.y[e]!,
       Telegraph.hp[e]!, Telegraph.elite[e] === 1, boss)
-    if (boss && !sim.sandbox) playSfx('boom')
+    if (Telegraph.loud[e]) playSfx('boom')
     const carries = telegraphCarries[e]
     if (carries) {
       enemyCarries[eid] = carries
@@ -55,13 +25,7 @@ export function spawnStep(sim: Sim): void {
     }
     removeEntity(sim.world, e)
   }
-  sim.spawnCooldownMs -= delta
-  if (sim.spawnCooldownMs > 0) return
-  if (sim.sandbox) return spawnSandbox(sim)
-  const wave = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000)
-  const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * sim.characters.length
-  const relief = isBossWave(sim.run.wave) ? BOSS_SPAWN_RELIEF : 1
-  sim.spawnCooldownMs = (wave.spawnIntervalMs * relief * spawnIntervalScale(sim)) / (teamFactor * sim.foes.count)
-  if (foeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
-  telegraphOne(sim, wave.hpMultiplier)
+  const f = sim.fight
+  for (const st of f.streams) runStream(sim, st, sim.wdtMs)
+  if (f.knobs) runKnobs(sim, f.knobs, sim.wdtMs)
 }

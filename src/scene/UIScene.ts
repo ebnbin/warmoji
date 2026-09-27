@@ -73,7 +73,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       xpNext: -1,
       kills: -1,
       coins: -1,
-      wave: -1,
+      label: null,
       seconds: -1,
       remainMs: -1,
       bossHp: null,
@@ -151,10 +151,11 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.xpBar.setValue(s.xpNext > 0 ? s.xp / s.xpNext : 0)
     if (s.kills !== this.last.kills) this.killsPill.setText(String(s.kills))
     if (s.coins !== this.last.coins) this.coinsPill.setText(String(s.coins))
-    const remainSec = Math.ceil(s.remainMs / 1000)
-    const lastRemainSec = Math.ceil(this.last.remainMs / 1000)
-    if (s.wave !== this.last.wave || remainSec !== lastRemainSec || s.seconds !== this.last.seconds) {
-      this.timePill.setText(this.arena.sandbox ? formatTime(s.seconds) : `第 ${s.wave} 波 ${formatTime(remainSec)}`)
+    const remainSec = s.remainMs === null ? null : Math.ceil(s.remainMs / 1000)
+    const lastRemainSec = this.last.remainMs === null ? null : Math.ceil(this.last.remainMs / 1000)
+    if (s.label !== this.last.label || remainSec !== lastRemainSec || s.seconds !== this.last.seconds) {
+      const clock = formatTime(remainSec ?? s.seconds)
+      this.timePill.setText(s.label ? `${s.label} ${clock}` : clock)
     }
     if (s.bossHp !== this.last.bossHp) {
       this.bossBar.setVisible(s.bossHp !== null)
@@ -371,7 +372,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     const cx = viewport.logicalWidth / 2
     const cy = viewport.logicalHeight / 2
     new Scrim(this, { depth: DEPTH.waveEnd, alpha: 0.55 })
-    const title = new Label(this, cx, cy - 76, `第 ${s.wave} 波完成！`, { kind: 'banner', color: 'accent', outline: true })
+    const title = new Label(this, cx, cy - 76, s.title, { kind: 'banner', color: 'accent', outline: true })
       .setOrigin(0.5)
       .setDepth(DEPTH.waveEnd + 1)
     title.setScale(0.6)
@@ -399,7 +400,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
                 { label: '拾取提示', run: () => this.onFieldCollected({ emoji: PICKUPS.coin.emoji, name: '预览拾取', desc: '开发者工具触发', polarity: 'buff' }) },
                 { label: '技能提示', run: () => this.onSkillCast('预览技能') },
                 { label: '队长交接', run: () => this.onLeaderChanged({ emoji: PICKUPS.coin.emoji, name: '预览' }) },
-                { label: '波次完成', run: () => this.onWaveComplete({ wave: 1, kills: 12, coins: 34 }) },
+                { label: '波次完成', run: () => this.onWaveComplete({ title: '第 1 波完成！', kills: 12, coins: 34 }) },
               ],
             },
           ],
