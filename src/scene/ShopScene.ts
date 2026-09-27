@@ -8,7 +8,7 @@ import { modTexts } from '../data/stats'
 import { playSfx } from '../audio/sfx'
 import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
 import { memberLevel, memberLook, memberOutStats } from '../run/members'
-import { getRun, nextStep } from '../run/state'
+import { getRun } from '../run/state'
 import { lastFight, nextFight } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { ItemDef, ItemId } from '../types/items'
@@ -18,7 +18,7 @@ import type { OfferGoods, OfferLine, OfferOwner, OfferState, PageFrame, Rect } f
 import { VIEWPORT_CHANGED } from '../util/apply'
 import { itemEffects } from './itemLines'
 import { openPause } from './pause'
-import { goStep, runExit } from './teamPage'
+import { finishStep, runExit } from './teamPage'
 import { SceneKey } from './keys'
 import type { DevProvider, DevProviderHost } from '../devtools'
 
@@ -88,10 +88,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
       label: `开始${nextFight(this.run)?.name ?? '战斗'}`,
       width: btnW,
       keys: ['ENTER', 'SPACE'],
-      onTap: () => {
-        nextStep(this.run)
-        goStep(this, this.run)
-      },
+      onTap: () => finishStep(this, this.run),
     })
 
     this.render(true)

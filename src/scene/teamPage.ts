@@ -1,5 +1,5 @@
-import type Phaser from 'phaser'
-import { endRun } from '../run/state'
+import Phaser from 'phaser'
+import { endRun, nextStep } from '../run/state'
 import type { RunState } from '../run/state'
 import { fought, stepScene } from '../run/flow'
 import type { StatGroup } from '../types/statLines'
@@ -13,6 +13,22 @@ export function goStep(scene: Phaser.Scene, run: RunState): void {
   const key = stepScene(run)
   if (key) scene.scene.start(key)
   else scene.scene.start(SceneKey.Result, { win: true })
+}
+
+/** 已经确认离开的页面：切走要到下一帧才生效，这之前再确认不能再走一步 */
+const leaving = new WeakSet<Phaser.Scene>()
+
+/** 当前这一步做完了：走到下一步并打开它的页面，同一页只走一次 */
+export function finishStep(scene: Phaser.Scene, run: RunState): void {
+  if (leaving.has(scene)) return
+  leaving.add(scene)
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => leaving.delete(scene))
+  nextStep(run)
+  goStep(scene, run)
+}
+
+export function isLeaving(scene: Phaser.Scene): boolean {
+  return leaving.has(scene)
 }
 
 /** 一局之中离开当前页：打第一场之前是返回选图，之后先进暂停页，在那里继续或结束本局 */
