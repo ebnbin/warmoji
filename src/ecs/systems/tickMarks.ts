@@ -1,5 +1,5 @@
 import { hasComponent, query } from 'bitecs'
-import { Alive, Dormant, Hp, MARK, MARK_SLOTS, Mark, Transform } from '../components'
+import { Alive, Hp, MARK, MARK_SLOTS, Mark, Transform } from '../components'
 import { MORPH } from '../../data/abilities'
 import { restoreMorph } from '../entities/enemy'
 import { poisonSrc } from '../store'
@@ -38,12 +38,12 @@ function expire(sim: Sim, eid: number, kind: number, s: number): void {
   }
 }
 
-/** 标记的时钟：跳伤的按节拍扣血，回复的按秒回血，亡后残留的按秒流失、流失殆尽即死，到期的清掉并执行到期反应；休眠的身体不走 */
+/** 标记的时钟：跳伤的按节拍扣血，回复的按秒回血，亡后残留的按秒流失、流失殆尽即死，到期的清掉并执行到期反应 */
 export function tickMarks(sim: Sim): void {
   const now = sim.elapsedMs
   const dt = sim.wdtMs / 1000
   for (const eid of [...query(sim.world, [Mark])]) {
-    if (!hasComponent(sim.world, eid, Mark) || Dormant.v[eid]) continue
+    if (!hasComponent(sim.world, eid, Mark)) continue
     const base = eid * MARK_SLOTS
     for (let i = 0; i < MARK_SLOTS; i++) {
       const s = base + i

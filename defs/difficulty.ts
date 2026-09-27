@@ -7,7 +7,6 @@ export const DIFFICULTY = {
     rampSeconds: 300,
     hpGrowthPerMin: 0.5,
     maxAlive: 400,
-    dormantTtlMs: 30000,
     teamFactorBase: 0.35,
     teamFactorPerMember: 0.13,
     telegraphMs: 900,

@@ -24,20 +24,19 @@ const DRIVE_LABEL: Record<EnemyDef['drive']['kind'], string> = {
 }
 
 const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> = {
-  bounded: '有界竞技场（25×25 方场）',
-  infinite: '无限世界（终波毒雾收拢成圈）',
+  bounded: '有界竞技场（方形场地）',
   river: '单屏河道（万物随水流漂移）',
   void: '环面竞技场（四壁传送门，出这头即现那头）',
   ruins: '断壁废墟（墙挡人 / 挡弹 / 挡视线）',
   daynight: '昼夜原野（30×30；视野随晨昏涨落，夜幕四合起迷雾）',
-  space: '深空星海（无限世界；天体直线横扫敌我通吃，终波奇点禁锢场谁也逃不出）',
+  space: '深空星海（圆形禁锢场谁也逃不出；天体直线横扫敌我通吃）',
   ice: '浮冰（25×25 方形浮冰；全局打滑不跟手，滑出冰面落水掉血·敌我通吃，相机永远跟随）',
 }
 
 function enemyStatLines(e: EnemyDef): string[] {
   const lines = [
     `生命 ${e.hp} · 移速 ${grid(e.speed)}/秒 · 接触伤害 ${e.damage}`,
-    `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}`,
+    `行为 ${DRIVE_LABEL[e.drive.kind]}${e.drive.kind === 'chase' && e.drive.at === 'leader' ? '（盯队长）' : ''} · 经验 ${e.xp} · 金币 ${e.coins}${e.kbImmune ? ' · 免疫击退' : ''}${e.exertionMul === 0 ? ' · 不知疲倦' : e.exertionMul !== undefined ? ` · 赶路耗体力 ×${e.exertionMul}` : ''}`,
   ]
   for (const w of e.abilities ?? []) lines.push(`${abilityLabel(w)}：${abilityStatLines(w).join(' · ')}`)
   if (e.phasesWalls) lines.push('穿墙：无视断壁直取队伍')
@@ -74,6 +73,7 @@ function mapStatLines(id: (typeof MAP_IDS)[number]): string[] {
   const names = [...new Set(m.mix.map((r) => ENEMIES[r.kind]?.name).filter(Boolean))]
   return [
     `世界规则 ${MAP_KIND_LABEL[m.kind]}`,
+    ...(m.exertion ? [`地面费力 每走一格耗 ${+(m.exertion * 100).toFixed(1)}% 体力（敌我通吃）`] : []),
     `终波头目 ${boss.name}`,
     `出没敌人 ${names.join('、')}`,
   ]

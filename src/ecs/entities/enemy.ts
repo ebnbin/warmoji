@@ -1,7 +1,10 @@
 import { addComponent, addComponents, hasComponent, query, removeComponent } from 'bitecs'
 import { spawnBody } from './body'
 import { AI, ELITE, SPAWN, SURGE } from '../../data/enemies'
-import { ENEMY_BODY, MORPH } from '../../data/abilities'
+import { ACQUIRE, ENEMY_BODY, MORPH } from '../../data/abilities'
+import { UNIT } from '../../util/units'
+import type { Point } from '../../util/vec'
+import { leaderX, leaderY } from '../utils/team'
 import { POP } from '../../data/feel'
 import { startPop } from '../utils/pop'
 import type { DriveDef, EnemyDef, NpcDef } from '../../types/enemies'
@@ -17,7 +20,6 @@ import {
   Contact,
   Depth,
   Despawn,
-  Dormant,
   EDir,
   Elite,
   Enemy,
@@ -40,6 +42,7 @@ import {
   Pop,
   Wander,
   Sprite,
+  Stamina,
   Standoff,
   TAG,
   Tint,
@@ -67,10 +70,16 @@ type DriveOf = ByKind<DriveDef>
 
 type DriveAttach<K extends keyof DriveOf> = (sim: Sim, eid: number, d: DriveOf[K]) => void
 
+/** 头目看得见全场，其余身体用通用索敌距离 */
+function seekOf(eid: number): number {
+  return Boss.v[eid] ? Infinity : ACQUIRE.range * UNIT
+}
+
 const DRIVES: { [K in keyof DriveOf]: DriveAttach<K> } = {
   chase: (sim, eid, d) => {
     addComponent(sim.world, eid, Chase)
     Chase.leader[eid] = d.at === 'leader' ? 1 : 0
+    Chase.seek[eid] = seekOf(eid)
   },
   wander: (sim, eid) => addComponent(sim.world, eid, Wander),
   stay: () => {},
@@ -89,7 +98,7 @@ const DRIVES: { [K in keyof DriveOf]: DriveAttach<K> } = {
     Orbit.radius[eid] = d.radius
     Orbit.spin[eid] = 0
     Orbit.aggro[eid] = d.aggroRange
-    Orbit.seek[eid] = Infinity
+    Orbit.seek[eid] = seekOf(eid)
     Orbit.fresh[eid] = 0
   },
 }
@@ -154,9 +163,12 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
     grip: ENEMY_BODY.grip,
     ownClock: false,
   })
-  addComponents(world, eid, Enemy, Elite, Boss, Dormant, Flash, Nest, Despawn, EDir, ETurn, Anim)
+  addComponents(world, eid, Enemy, Elite, Boss, Flash, Nest, Despawn, EDir, ETurn, Anim)
+  Elite.v[eid] = elite ? 1 : 0
+  Boss.v[eid] = boss ? 1 : 0
   if (def.kbImmune) addComponent(world, eid, Anchored)
   if (def.phasesWalls) addComponent(world, eid, Phasing)
+  Stamina.mul[eid] = def.exertionMul ?? 1
   const born = sim.hooks.constrainBody(sim, eid, { x, y }, { x, y })
   Transform.x[eid] = born.x
   Transform.y[eid] = born.y
@@ -170,8 +182,6 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   bodyRules[eid] = def
   attachResource(world, eid, def.resource)
   if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
-  Elite.v[eid] = elite ? 1 : 0
-  Boss.v[eid] = boss ? 1 : 0
   if (elite) {
     addMark(eid, MARK.dmg, TAG.elite, Infinity, ELITE.damageMul)
     addMark(eid, MARK.speed, TAG.elite, Infinity, ELITE.speedMul)
@@ -248,18 +258,34 @@ function currentMix(sim: Sim): ReturnType<typeof enemyMixAt> {
   return enemyMixAt(rows, sim.run.wave)
 }
 
-/** 醒着的敌方身体数，刷怪上限只看它 */
-export function awakeCount(sim: Sim): number {
+/** 敌方身体数，刷怪上限只看它 */
+export function foeCount(sim: Sim): number {
   let n = 0
-  for (const eid of query(sim.world, ENEMY_SET)) if (!Dormant.v[eid] && Faction.v[eid] === FACTION.enemy) n++
+  for (const eid of query(sim.world, ENEMY_SET)) if (Faction.v[eid] === FACTION.enemy) n++
   return n
+}
+
+const SIGHTED_TRIES = 16
+
+/** 从地图的刷怪点里挑落在队长通用索敌距离内的，一出生就看得见队伍；挑不到就取最后一个 */
+export function sightedSpawnPoint(sim: Sim): Point {
+  const reach = ACQUIRE.range * UNIT
+  const lx = leaderX(sim)
+  const ly = leaderY(sim)
+  let p = sim.hooks.spawnPoint(sim, false)
+  for (let i = 1; i < SIGHTED_TRIES; i++) {
+    const d = sim.hooks.worldDelta(sim, lx, ly, p.x, p.y)
+    if (d.x * d.x + d.y * d.y <= reach * reach) return p
+    p = sim.hooks.spawnPoint(sim, false)
+  }
+  return p
 }
 
 export function telegraphOne(sim: Sim, hpMultiplier: number, forceElite = false): void {
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
   const elite = !sim.sandbox && (forceElite || (sim.run.wave >= ELITE.fromWave && sim.rng.next() < ELITE.chance))
   const hp = Math.round(def.hp * hpMultiplier * (elite ? ELITE.hpMul : 1))
-  const pos = sim.hooks.spawnPoint(sim, false)
+  const pos = sightedSpawnPoint(sim)
   spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, false)
 }
 
@@ -280,10 +306,10 @@ export function spawnBoss(sim: Sim): void {
 
 export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
   if (sim.over) return
-  if (awakeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
+  if (foeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
   const hp = Math.round(def.hp * waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier)
-  const pos = sim.hooks.spawnPoint(sim, false)
+  const pos = sightedSpawnPoint(sim)
   spawnTelegraph(sim, def, pos.x, pos.y, hp, false, false, pickup)
 }
 

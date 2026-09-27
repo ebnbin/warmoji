@@ -129,8 +129,10 @@ export const MAPS = {
   desert: {
     emoji: '1f3dc',
     name: '荒漠',
-    desc: '无边的大漠，可朝任意方向走到天涯；终波蝎王降临时毒雾收拢成圈',
-    kind: 'infinite',
+    desc: '烈日炙烤的荒漠，每走一步都在耗体力，累了就得停下喘口气；沙丘与枯骨之间潜伏着不知疲倦的毒物',
+    kind: 'bounded',
+    size: { w: 30, h: 30 },
+    exertion: 0.015,
     palette: {
       bgFrom: 'hsl(30 42% 36%)',
       bgTo: 'hsl(15 38% 20%)',
@@ -144,9 +146,7 @@ export const MAPS = {
       density: [0.08, 0.11],
     },
     mix: DESERT_MIX,
-    finalWaveSub: '毒雾收拢成圈，圈外持续掉血——别想苟！',
-    infinite: { activeHalf: 32, spawnRingMin: 4, spawnRingMax: 16, chunkCells: 8, chunkPad: 1 },
-    shrinkRing: { r0: 16, rMin: 12, holdMs: 6000, shrinkEndMs: 38000, tickMs: 500, tickDamage: 6 },
+    finalWaveSub: '蝎王不知疲倦，你会累——别在流沙里挣扎！',
     boss: 'scorpion',
   },
   river: {
@@ -174,12 +174,12 @@ export const MAPS = {
       width: 12,
       flow: 1,
       coinCullPad: 2,
+      enemyCullPad: 6,
       driftCount: 18,
       driftSpeedMul: [0.75, 1.3],
       waveSlow: 0.6,
       waveFast: 1.2,
     },
-    infinite: { activeHalf: 32, spawnRingMin: 4, spawnRingMax: 16, chunkCells: 8, chunkPad: 1 },
     boss: 'croc',
   },
   void: {
@@ -298,7 +298,6 @@ export const MAPS = {
         damage: 30,
       },
     },
-    infinite: { activeHalf: 32, spawnRingMin: 4, spawnRingMax: 16, chunkCells: 8, chunkPad: 1 },
     boss: 'blackhole',
   },
   ice: {

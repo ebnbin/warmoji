@@ -23,8 +23,10 @@ import { bossFor, MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Cd, Charges, Ctl, Dormant, Enemy, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
+import { Alive, Boss, Cd, Charges, Ctl, Enemy, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
 import { charSize } from './systems/shared/scale'
+import { dragging, squadStamina } from './systems/shared/stamina'
+import { STAMINA } from '../data/stamina'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
@@ -125,6 +127,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private shownHp: number[] = []
   private deadTexts: Phaser.GameObjects.Text[] = []
   private shownCountdown: number[] = []
+  private staminaGfx?: Phaser.GameObjects.Graphics
+  private shownStamina = -1
   private hitShakeOn = false
   private seenHitCount = 0
   private bossDownAt = -1
@@ -167,6 +171,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.shownHp = []
     this.deadTexts = []
     this.shownCountdown = []
+    this.staminaGfx = undefined
+    this.shownStamina = -1
     this.seenHitCount = 0
     this.bossDownAt = -1
     this.shownLeader = -1
@@ -194,7 +200,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   devKillAll(): void {
     const sim = this.sim
     if (!sim || sim.over) return
-    for (const eid of [...query(this.world, [Enemy])]) if (!Dormant.v[eid]) hit(sim, WORLD_SOURCE, eid, 1e9, { tick: true })
+    for (const eid of [...query(this.world, [Enemy])]) hit(sim, WORLD_SOURCE, eid, 1e9, { tick: true })
   }
 
   devGrant(kind: 'coins' | 'level'): void {
@@ -356,6 +362,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       )
       this.shownCountdown.push(-1)
     }
+    this.staminaGfx = this.add.graphics().setDepth(11).setVisible(false)
     if (!run.sandbox) this.scheduleCarriers()
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
@@ -368,7 +375,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       })
     }
     if (!run.sandbox && isBossWave(run.wave)) {
-      this.sim.hooks.onFinalWave(this.sim)
       this.time.delayedCall(600, () => {
         if (!this.sim || this.sim.over) return
         this.hud.emit(HudEvent.WaveWarning, {
@@ -450,6 +456,35 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     }
   }
 
+  /** 队伍的体力圈：贴在队长右上方，满了就收起 */
+  private updateStaminaGauge(): void {
+    const sim = this.sim!
+    const g = this.staminaGfx
+    if (!g) return
+    const leader = sim.leader
+    const v = squadStamina(sim)
+    if (v >= 1 || !Alive.v[leader]) {
+      g.setVisible(false)
+      this.shownStamina = -1
+      return
+    }
+    const size = charSize(leader)
+    g.setVisible(true).setPosition(Transform.x[leader]! + VisOff.x[leader]! + size * 0.55, Transform.y[leader]! + VisOff.y[leader]! - size * 0.3)
+    const key = Math.round(v * 200)
+    if (key === this.shownStamina) return
+    this.shownStamina = key
+    const r = 0.2 * UNIT
+    g.clear()
+    g.lineStyle(6, 0x000000, 0.45)
+    g.beginPath()
+    g.arc(0, 0, r, 0, Math.PI * 2, false)
+    g.strokePath()
+    g.lineStyle(4, v >= STAMINA.slowFrom ? 0x80deea : v > 0.15 ? 0xffa726 : 0xef5350, 1)
+    g.beginPath()
+    g.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + v * Math.PI * 2, false)
+    g.strokePath()
+  }
+
   hudSnapshot(): HudSnapshot {
     const sim = this.sim
     const elapsed = sim?.elapsedMs ?? 0
@@ -486,7 +521,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const totalSec = (this.run.combatMs + (sim?.elapsedMs ?? 0)) / 1000
     const wave = waveAt(totalSec)
     return {
-      enemies: query(this.world, [Enemy]).filter((eid) => !Dormant.v[eid]).length,
+      enemies: query(this.world, [Enemy]).length,
       projectiles: query(this.world, [Projectile]).length,
       coins: liveCoins(this.world),
       pending: sim ? telegraphCount(sim) : 0,
@@ -514,6 +549,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
           hp: Hp.v[m]!,
           max: Hp.max[m]!,
           reviveSec: Math.max(0, Math.ceil((Revive.at[m]! - sim.elapsedMs) / 1000)),
+          tired: dragging(sim, m),
         }
       }),
     }
@@ -720,6 +756,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       if (this.hitShakeOn) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     }
     this.updateHpBars()
+    this.updateStaminaGauge()
     this.drawDevTargets(sim)
     this.drawSkillAim(sim)
     if (!this.sandbox && sim.bossDown) {

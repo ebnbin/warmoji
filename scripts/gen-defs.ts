@@ -16,6 +16,7 @@ import { MAPS } from '../defs/maps.ts'
 import { PICKUPS } from '../defs/pickups.ts'
 import { PROGRESSION } from '../defs/progression.ts'
 import { SFX } from '../defs/sfx.ts'
+import { STAMINA } from '../defs/stamina.ts'
 import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
@@ -35,6 +36,20 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   }
   need(ENEMIES[m.boss]?.role === 'boss', `maps.${id}.boss 须引用 Boss：${m.boss}`)
 }
+
+/** 地面费力、场内费力和身体的费力倍率，出现在哪都不能为负 */
+const noNegativeExertion = (v: unknown, path: string): void => {
+  if (typeof v !== 'object' || v === null) return
+  for (const [k, x] of Object.entries(v)) {
+    if (k === 'exertion' || k === 'exertionMul') need(typeof x === 'number' && x >= 0, `${path}.${k} 不能为负`)
+    else noNegativeExertion(x, `${path}.${k}`)
+  }
+}
+noNegativeExertion({ maps: MAPS, enemies: ENEMIES, abilities: ABILITIES, weapons: WEAPONS, characters: CHARACTERS }, 'defs')
+
+need(STAMINA.slowFrom > 0 && STAMINA.slowFrom <= 1, 'stamina.slowFrom 须在 (0, 1] 内')
+need(STAMINA.floor > 0 && STAMINA.floor < 1, 'stamina.floor 须在 (0, 1) 内')
+need(STAMINA.restDelayMs >= 0 && STAMINA.rampMs > 0 && STAMINA.regen > 0, 'stamina 的恢复参数须为正')
 
 for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) {
   for (const k of [0, 1]) {
@@ -89,6 +104,7 @@ write('maps', MAPS)
 write('pickups', PICKUPS)
 write('progression', PROGRESSION)
 write('sfx', SFX)
+write('stamina', STAMINA)
 write('team', TEAM_BASELINE)
 write('timestop', TIMESTOP)
 write('weapons', WEAPONS)

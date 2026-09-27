@@ -165,8 +165,11 @@ export const Radius = { v: f32() }
 /** 身体：驱动与阻力同乘抓地（鞋 × 地面），阻力再乘介质黏度、按相对介质的速度算 */
 export const Phys = { vx: f32(), vy: f32(), thrust: f32(), drag: f32(), mass: f32(), grip: f32() }
 
-/** 驱动层每帧写入的期望速度，身体按抓地趋近它 */
-export const Drive = { x: f32(), y: f32() }
+/** 驱动层每帧写入的期望速度，身体按抓地趋近它；idle 为 1 是没有目标时的闲逛，不算赶路 */
+export const Drive = { x: f32(), y: f32(), idle: u8() }
+
+/** 体力：0 到 1；restMs 是连续没被扣体力的时长；mul 是赶路扣体力的倍率 */
+export const Stamina = { v: f32(), restMs: f32(), mul: f32() }
 
 /** 1 = 按真实时间积分（队伍身体），0 = 按世界时间（其余一切） */
 export const Clock = { v: u8() }
@@ -196,8 +199,6 @@ export const Anim = {
   still: i32(),
 }
 export const ANIM_SET: QueryTerm[] = [Anim, Sprite]
-
-export const Dormant = { v: u8(), since: f32() }
 
 export const Quad = { v: u8() }
 
@@ -286,8 +287,8 @@ export const PICKUP_SET: QueryTerm[] = [Pickup, Transform, Phys]
 
 export const RING_SET: QueryTerm[] = [Ring, Transform, Tint]
 
-/** 场：每隔 tickMs 对场内敌方扣 damage 再施加效果，场内己方每秒回复 mend，pulse 非零时每次 tick 闪一圈；who、pull、traction、mist、trap 见 ZoneRules */
-export const Zone = { radius: f32(), enterMs: f32(), on: u8(), fadeAt: f32(), tickMs: f32(), nextAt: f32(), damage: f32(), mend: f32(), pulse: u32(), who: u8(), pull: f32(), traction: f32(), mist: u8(), trap: u8() }
+/** 场：每隔 tickMs 对场内敌方扣 damage 再施加效果，场内己方每秒回复 mend，pulse 非零时每次 tick 闪一圈；who、pull、traction、exertion、mist、trap 见 ZoneRules */
+export const Zone = { radius: f32(), enterMs: f32(), on: u8(), fadeAt: f32(), tickMs: f32(), nextAt: f32(), damage: f32(), mend: f32(), pulse: u32(), who: u8(), pull: f32(), traction: f32(), exertion: f32(), mist: u8(), trap: u8() }
 
 export const ZONE_WHO = { foes: 0, allies: 1, all: 2 } as const
 
@@ -573,8 +574,8 @@ export const Carrier = {}
 
 export const Thief = { eaten: i32(), nextEatAt: f32() }
 
-/** 追击：leader 为 1 时盯着队长而不是最近的敌人 */
-export const Chase = { leader: u8() }
+/** 追击：leader 为 1 时盯着队长而不是最近的敌人；目标在 seek 之外就当没看见 */
+export const Chase = { leader: u8(), seek: f32() }
 
 export const Wander = {}
 

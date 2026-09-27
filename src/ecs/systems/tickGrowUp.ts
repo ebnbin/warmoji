@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { Alive, Dormant, Faction, GrowUp, Hp, Nest, Transform } from '../components'
+import { Alive, Faction, GrowUp, Hp, Nest, Transform } from '../components'
 import { enemyDef } from '../store'
 import { despawnEnemy } from './shared/combat'
 import { summonBody } from '../entities/summon'
@@ -9,7 +9,7 @@ import type { Sim } from '../sim'
 export function tickGrowUp(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of [...query(sim.world, [GrowUp])]) {
-    if (now < GrowUp.at[eid]! || !Alive.v[eid] || Dormant.v[eid]) continue
+    if (now < GrowUp.at[eid]! || !Alive.v[eid]) continue
     const def = enemyDef[eid]
     const into = def?.grow?.into
     if (!def || !into) continue

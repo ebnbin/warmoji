@@ -57,6 +57,8 @@ export interface RiverConfig {
   readonly flow: number
   /** 拾取物漂过下游边多远消失 */
   readonly coinCullPad: number
+  /** 敌人漂过下游边多远就被冲走 */
+  readonly enemyCullPad: number
   readonly driftCount: number
   readonly driftSpeedMul: readonly [number, number]
   readonly waveSlow: number
@@ -68,27 +70,14 @@ export interface TorusConfig {
   readonly projectileLifeMs: number
   readonly frame: number
 }
-export interface InfiniteConfig {
-  readonly activeHalf: number
-  readonly spawnRingMin: number
-  readonly spawnRingMax: number
-  readonly chunkCells: number
-  readonly chunkPad: number
-}
-export interface ShrinkRingConfig {
-  readonly r0: number
-  readonly rMin: number
-  readonly holdMs: number
-  readonly shrinkEndMs: number
-  readonly tickMs: number
-  readonly tickDamage: number
-}
 export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'infinite' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice'
+  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice'
   readonly size?: { readonly w: number; readonly h: number }
+  /** 地面费力：在这张图上赶路，每走一格扣掉的体力比例；不写就是不费力 */
+  readonly exertion?: number
   readonly palette: Palette
   readonly decor: MapDecor
   readonly drift?: readonly string[]
@@ -101,14 +90,12 @@ export interface MapDef {
   readonly space?: SpaceConfig
   readonly river?: RiverConfig
   readonly torus?: TorusConfig
-  readonly infinite?: InfiniteConfig
-  readonly shrinkRing?: ShrinkRingConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'poisonFog' | 'meteor'
+export type Hazard = 'coldWater' | 'meteor'
 
 export interface DecorInstance {
   emoji: string

@@ -12,6 +12,7 @@ import { touchBodies } from '../touchBodies'
 import { characterVisual } from '../characterVisual'
 import { driveTeam } from '../driveTeam'
 import { moveBodies } from '../moveBodies'
+import { tickStamina } from '../tickStamina'
 import { stepHandover } from '../shared/leader'
 import { tickSkillCooldowns } from '../tickSkillCooldowns'
 import { settleMotions } from '../settleMotions'
@@ -35,7 +36,6 @@ import { recordHistory } from '../shared/history'
 import { tickBarriers } from '../../entities/barrier'
 import { tickTethers } from '../../entities/tether'
 import { tintEnemies } from '../tintEnemies'
-import { updateDormancy } from '../updateDormancy'
 import { cullProjectiles } from '../cullProjectiles'
 import { hitProjectiles } from '../hitProjectiles'
 import { refreshTargets } from '../refreshTargets'
@@ -47,11 +47,10 @@ import { pipeline } from './step'
 // 先走标记的时钟，再算每个身体的速度倍率与门控，再由驱动写期望速度，积分只在 moveBodies 一处；时标是身体的属性（Clock）
 export const SIM_PIPELINE = pipeline([
   refoldBattleFx,
-  updateDormancy,
   tickSkillCooldowns,
   stepHandover,
   { run: reviveCharacters, after: [stepHandover] },
-  { run: tickMarks, after: [updateDormancy] },
+  tickMarks,
   { run: tickResources, after: [tickMarks] },
   { run: tickForms, after: [tickMarks] },
   { run: tickBorrowed, after: [tickMarks] },
@@ -61,16 +60,17 @@ export const SIM_PIPELINE = pipeline([
   { run: tickIdle, after: [tickMarks] },
   { run: tickBarriers, after: [tickMarks] },
   { run: updateSpeedMuls, after: [refoldBattleFx, tickMarks] },
-  { run: updateControl, after: [updateDormancy, updateSpeedMuls, tickMarks] },
+  { run: updateControl, after: [updateSpeedMuls, tickMarks] },
   { run: driveTeam, after: [stepHandover, reviveCharacters, updateControl] },
   { run: layoutTeam, after: [driveTeam] },
-  { run: popInEnemies, after: [updateDormancy] },
-  { run: despawnExpired, after: [updateDormancy] },
-  { run: fadeEnemyFlash, after: [updateDormancy] },
-  { run: tintEnemies, after: [updateDormancy, fadeEnemyFlash] },
-  { run: updateBees, after: [updateDormancy] },
+  popInEnemies,
+  despawnExpired,
+  fadeEnemyFlash,
+  { run: tintEnemies, after: [fadeEnemyFlash] },
+  updateBees,
   { run: steerBodies, after: [updateControl, updateBees] },
   { run: moveBodies, after: [layoutTeam, steerBodies] },
+  { run: tickStamina, after: [moveBodies] },
   { run: refreshTargets, after: [moveBodies] },
   { run: recordHistory, after: [moveBodies] },
   { run: tickPets, after: [moveBodies] },

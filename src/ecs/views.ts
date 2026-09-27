@@ -13,11 +13,9 @@ import type { RunState } from '../run/state'
 import type { Sim } from './sim'
 import type { TorusConfig } from '../types/maps'
 import { query } from 'bitecs'
-import { Alive, Due, Meteor, Transform } from './components'
+import { Due, Meteor } from './components'
 import { leaderX, leaderY } from './utils/team'
 import { spawnDriftDecor } from './entities/decor'
-import { chunkDecor, chunkKey, chunksInRect, outsideZone } from './worlds/infinite'
-import type { ChunkKey } from './worlds/infinite'
 import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynight'
 import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/river'
@@ -201,16 +199,17 @@ class IceView extends BoundedView {
   }
 }
 
-class InfiniteView extends BoundedView {
-  protected atlas?: EcsAtlas
-  private zoneGfx?: Phaser.GameObjects.Graphics
-  private zoneVignette?: Phaser.GameObjects.Rectangle
-  private chunks = new Map<ChunkKey, number[]>()
-  private rangeKey = ''
+function fieldRadius(v: ViewCtx): number {
+  return v.def.space!.blackholeRadiusU * UNIT
+}
+
+/** 深空：圆心在原点的禁锢圈，地图是圈的外接正方形，镜头锁在圈外一点 */
+class SpaceView extends BoundedView {
+  private meteorFx?: { of: number; tele: Phaser.GameObjects.Graphics }
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
-    const { w, h } = super.layout(v)
-    return { w, h, origin: { x: 0, y: 0 } }
+    const d = fieldRadius(v) * 2
+    return { w: d, h: d, origin: { x: 0, y: 0 } }
   }
 
   build(v: ViewCtx): void {
@@ -220,116 +219,48 @@ class InfiniteView extends BoundedView {
         .setScrollFactor(0)
         .setDepth(-1),
     )
-  }
-
-  camera(v: ViewCtx): void {
-    v.scene.cameras.main.setZoom(viewport.renderScale)
-    v.scene.cameras.main.startFollow(v.anchor)
-  }
-
-  decor(_v: ViewCtx, atlas: EcsAtlas): void {
-    this.atlas = atlas
-  }
-
-  step(v: ViewCtx, sim: Sim, _delta: number): void {
-    this.ensureChunks(v)
-    this.drawZone(v, sim)
-  }
-
-  protected drawZone(v: ViewCtx, sim: Sim): void {
-    const zone = sim.worldState.zone
-    if (!zone) return
-    if (!this.zoneGfx) {
-      this.zoneGfx = v.scene.add.graphics().setDepth(2)
-      this.zoneVignette = v.scene.add
-        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 6000, 6000, 0xd32f2f, 0)
-        .setScrollFactor(0)
-        .setDepth(90)
-      this.visuals.push(this.zoneGfx, this.zoneVignette)
-    }
-    const g = this.zoneGfx
-    g.clear()
-    g.lineStyle(5, 0xef5350, 0.85)
-    g.strokeCircle(zone.x, zone.y, zone.r)
-    g.lineStyle(14, 0xd32f2f, 0.16)
-    g.strokeCircle(zone.x, zone.y, zone.r + 9)
-    const anyOutside = sim.characters.some(
-      (m) => Alive.v[m] && outsideZone({ x: Transform.x[m]!, y: Transform.y[m]! }, zone, zone.r),
-    )
-    if (this.zoneVignette) setOverlayFill(this.zoneVignette, 0xd32f2f, anyOutside ? 0.16 + 0.08 * Math.sin(sim.elapsedMs / 130) : 0)
-  }
-
-  private ensureChunks(v: ViewCtx): void {
-    const atlas = this.atlas
-    if (!atlas) return
-    const cfg = v.def.infinite!
-    const view = v.scene.cameras.main.worldView
-    const need = chunksInRect(view.x / UNIT, view.y / UNIT, view.right / UNIT, view.bottom / UNIT, cfg.chunkCells, cfg.chunkPad)
-    const first = need[0]!
-    const last = need[need.length - 1]!
-    const rangeKey = `${first.cx},${first.cy}:${last.cx},${last.cy}`
-    if (rangeKey === this.rangeKey) return
-    this.rangeKey = rangeKey
-    const needKeys = new Set(need.map((c) => chunkKey(c.cx, c.cy)))
-    for (const [key, eids] of this.chunks) {
-      if (needKeys.has(key)) continue
-      for (const eid of eids) removeEntity(v.world, eid)
-      this.chunks.delete(key)
-    }
-    for (const c of need) {
-      const key = chunkKey(c.cx, c.cy)
-      if (this.chunks.has(key)) continue
-      this.chunks.set(
-        key,
-        chunkDecor(v.def.decor, v.run.decorSeed, c.cx, c.cy, cfg.chunkCells).map((d) =>
-          spawnDecor(v.world, atlas, {
-            id: d.emoji,
-            outline: 'player',
-            x: d.xU * UNIT,
-            y: d.yU * UNIT,
-            size: d.sizeU * UNIT,
-            rot: d.rotation,
-            alpha: d.alpha,
-            z: 1,
-          }),
-        ),
-      )
-    }
-  }
-
-  destroy(v: ViewCtx): void {
-    for (const eids of this.chunks.values()) for (const eid of eids) removeEntity(v.world, eid)
-    this.chunks.clear()
-    this.rangeKey = ''
-    super.destroy(v)
-  }
-}
-
-class SpaceView extends InfiniteView {
-  private meteorFx?: { of: number; tele: Phaser.GameObjects.Graphics }
-
-  build(v: ViewCtx): void {
-    super.build(v)
-    const fieldR = (v.def.space?.blackholeRadiusU ?? 0) * UNIT
-    if (fieldR <= 0) return
+    const r = fieldRadius(v)
     const ring = v.scene.add.graphics().setDepth(2)
     ring.lineStyle(5, 0x9c6bff, 0.7)
-    ring.strokeCircle(0, 0, fieldR)
+    ring.strokeCircle(0, 0, r)
     ring.lineStyle(18, 0x6a3fbf, 0.13)
-    ring.strokeCircle(0, 0, fieldR - 9)
+    ring.strokeCircle(0, 0, r - 9)
     this.visuals.push(ring)
   }
 
   camera(v: ViewCtx): void {
-    super.camera(v)
-    const fieldR = (v.def.space?.blackholeRadiusU ?? 0) * UNIT
-    if (fieldR <= 0) return
-    const half = fieldR + MAP.cameraMargin * UNIT
-    v.scene.cameras.main.setBounds(-half, -half, half * 2, half * 2)
+    const cam = v.scene.cameras.main
+    const half = fieldRadius(v) + CAM_MARGIN()
+    cam.setZoom(viewport.renderScale)
+    cam.setBounds(-half, -half, half * 2, half * 2)
+    cam.startFollow(v.anchor)
   }
 
-  step(v: ViewCtx, sim: Sim, delta: number): void {
-    super.step(v, sim, delta)
+  /** 装饰只撒在圈里 */
+  decor(v: ViewCtx, atlas: EcsAtlas): void {
+    const rng = new Rng(v.run.decorSeed)
+    const rU = fieldRadius(v) / UNIT
+    const cells = Math.round(rU * 2)
+    for (const d of rollDecor(v.def.decor, () => rng.next(), cells, cells)) {
+      const xU = d.xU - rU
+      const yU = d.yU - rU
+      if (Math.hypot(xU, yU) > rU - d.sizeU / 2) continue
+      this.decorEids.push(
+        spawnDecor(v.world, atlas, {
+          id: d.emoji,
+          outline: 'player',
+          x: xU * UNIT,
+          y: yU * UNIT,
+          size: d.sizeU * UNIT,
+          rot: d.rotation,
+          alpha: d.alpha,
+          z: 1,
+        }),
+      )
+    }
+  }
+
+  step(v: ViewCtx, sim: Sim, _delta: number): void {
     this.drawMeteorLane(v, sim)
   }
 
@@ -780,5 +711,4 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   river: () => new RiverView(),
   void: () => new TorusView(),
   space: () => new SpaceView(),
-  infinite: () => new InfiniteView(),
 }

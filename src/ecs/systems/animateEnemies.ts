@@ -1,5 +1,5 @@
 import { query } from 'bitecs'
-import { Casting, Dormant, ENEMY_SET, EnemyPhase, MARK, Motion, MOTION, Phys, Sprite, TELEGRAPH, Transform } from '../components'
+import { Casting, ENEMY_SET, EnemyPhase, MARK, Motion, MOTION, Phys, Sprite, TELEGRAPH, Transform } from '../components'
 import { hasMark } from '../utils/marks'
 import type { Sim } from '../sim'
 
@@ -7,7 +7,7 @@ import type { Sim } from '../sim'
 export function animateEnemies(sim: Sim): void {
   const now = sim.elapsedMs
   for (const eid of query(sim.world, ENEMY_SET)) {
-    if (Dormant.v[eid] || hasMark(sim, eid, MARK.morph) || hasMark(sim, eid, MARK.stun)) continue
+    if (hasMark(sim, eid, MARK.morph) || hasMark(sim, eid, MARK.stun)) continue
     if (Motion.kind[eid] === MOTION.dash) {
       const vx = Motion.vx[eid]!
       Transform.rot[eid] = (vx / (Math.hypot(vx, Motion.vy[eid]!) || 1)) * 0.3

@@ -27,6 +27,7 @@ interface SquadIcon {
   cdText: Phaser.GameObjects.Text
   dead: Phaser.GameObjects.Text
   charges: Phaser.GameObjects.Text
+  sweat: Phaser.GameObjects.Image
   shownHp: number
   shownSec: number
   shownCd: number
@@ -373,14 +374,15 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       const dead = this.add.text(0, 0, '', { ...label, color: '#ffcdd2' }).setOrigin(0.5).setVisible(false)
       const badge = emojiImage(this, -18, -18, member.emoji, 18, 'player').setVisible(isLeader)
       const charges = this.add.text(18, 18, '', { ...label, color: '#ffe082' }).setOrigin(0.5).setVisible(false)
+      const sweat = emojiImage(this, 18, -18, '1f4a6', 18, 'player').setVisible(false)
       const c = this.add
-        .container(p.x, p.y, [base, emoji, hp, cd, cdText, dead, badge, charges])
+        .container(p.x, p.y, [base, emoji, hp, cd, cdText, dead, badge, charges, sweat])
         .setScale(isLeader ? RING.leaderScale : 1)
         .setDepth(isLeader ? 302 : 300)
         .setInteractive(new Phaser.Geom.Circle(0, 0, RING.r + 4), Phaser.Geom.Circle.Contains)
         .on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, (pointer: Phaser.Input.Pointer) => this.onIconDown(slot, pointer))
         .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.onIconUp(slot))
-      return { c, base, emoji, badge, hp, cd, cdText, dead, charges, shownHp: -1, shownSec: -1, shownCd: -1, shownState: 'ready' as IconState }
+      return { c, base, emoji, badge, hp, cd, cdText, dead, charges, sweat, shownHp: -1, shownSec: -1, shownCd: -1, shownState: 'ready' as IconState }
     })
     this.squadShown = { leader: s.leaderSlot, switching: false }
     this.squad.forEach((b, slot) => this.styleSquadIcon(b, s.members[slot]!, slot === s.leaderSlot, false))
@@ -557,6 +559,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
         b.shownState = state
         this.styleSquadIcon(b, m, isLeader, s.switching)
       }
+      b.sweat.setVisible(m.tired)
       if (state === 'dead') {
         if (m.reviveSec !== b.shownSec) {
           b.shownSec = m.reviveSec

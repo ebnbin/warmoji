@@ -1,5 +1,5 @@
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Alive, Built, Contact, Ctl, Dormant, Faction, MARK, Radius, Transform } from '../components'
+import { Alive, Built, Contact, Ctl, Faction, MARK, Radius, Transform } from '../components'
 import { hasMark } from '../utils/marks'
 import { bodyRules } from '../store'
 import { hit } from './shared/damage'
@@ -20,7 +20,7 @@ export function touchBodies(sim: Sim): void {
   if (sim.over) return
   for (const eid of [...query(sim.world, [Contact, Transform, Radius, Alive, Faction])]) {
     if (!hasComponent(sim.world, eid, Contact)) continue
-    if (!Alive.v[eid] || Dormant.v[eid] || hasMark(sim, eid, MARK.morph) || (hasComponent(sim.world, eid, Ctl) && !Ctl.act[eid])) continue
+    if (!Alive.v[eid] || hasMark(sim, eid, MARK.morph) || (hasComponent(sim.world, eid, Ctl) && !Ctl.act[eid])) continue
     const src = contactSource(sim, eid)
     const dmg = Math.max(1, Math.round(Contact.damage[eid]! * src.dmgMul))
     const kb = Contact.knockback[eid]!
