@@ -8,20 +8,26 @@ import type { AbilityDef, Shape } from '../types/abilityDefs'
 
 const ECON = fromJson<Economy>(economyJson)
 
-export const RARITY_ORDER: readonly ItemRarity[] = ['common', 'rare', 'epic']
+export const RARITY_ORDER: readonly ItemRarity[] = ['common', 'rare', 'epic', 'legendary']
 export const RARITIES: Record<ItemRarity, { label: string; color: string }> = {
   common: { label: '普通', color: '#c8c8d4' },
   rare: { label: '稀有', color: '#4fc3f7' },
   epic: { label: '史诗', color: '#ce93d8' },
+  legendary: { label: '传说', color: '#ffb74d' },
 }
 
 export const ITEMS = fromJson<Record<ItemId, ItemDef>>(itemsJson)
 
 export const ITEM_IDS: readonly ItemId[] = keysOf(ITEMS)
 
+/** 买下这件道具给角色的经验 */
+export function itemXp(def: ItemDef): number {
+  return Math.round(def.price * ECON.xpPerCoin)
+}
+
 export function characterXp(owned: readonly ItemId[]): number {
   let xp = 0
-  for (const id of owned) xp += ITEMS[id].upgradeXp
+  for (const id of owned) xp += itemXp(ITEMS[id])
   return xp
 }
 
@@ -35,7 +41,7 @@ export function itemPrice(id: ItemId, wave: number): number {
 
 /** 角色身上的常驻修正：买到的道具加上当前等级的成长 */
 export function gearMods(owned: readonly ItemId[], level: readonly StatMods[]): StatMods[] {
-  return [...owned.map((id) => ITEMS[id].effects), ...level]
+  return [...owned.flatMap((id) => ITEMS[id].stats ?? []), ...level]
 }
 
 /** 只缩放形状的空间参数、索敌距离与弹速；伤害/冷却在结算时按属性表乘，此处不得再乘 */

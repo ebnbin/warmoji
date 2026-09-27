@@ -20,6 +20,7 @@ import { Rng } from '../util/rng'
 import { endRun, getRun, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
 import { characterStatGroups } from '../scene/statLines'
+import { itemLines } from './itemLines'
 import { modTexts } from '../data/stats'
 import { applyBackground } from '../util/background'
 import { emojiImage } from '../emoji/hold'
@@ -548,7 +549,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
       )
       this.offerDescView.clear()
       const desc = this.add
-        .text(0, 0, `${item.desc}${stackNote}`, {
+        .text(0, 0, `${itemLines(item).join(' · ')}${stackNote}`, {
           fontFamily: UI_FONT,
           fontSize: FONT.caption,
           color: '#b9b9c6',

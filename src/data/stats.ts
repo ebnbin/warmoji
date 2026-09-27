@@ -96,6 +96,7 @@ function addText(unit: StatUnit, v: number): string {
   const sign = v < 0 ? '-' : '+'
   const a = Math.abs(v)
   switch (unit) {
+    case 'ratio':
     case 'chance':
     case 'percent':
       return `${sign}${Math.round(a * 100)}%`
@@ -122,12 +123,18 @@ export function statText(k: StatKey, v: number): string {
   return `${STATS[k].name} ${statValue(k, v)}`
 }
 
-/** 一组修正逐条的文字，如"生命上限 +25""攻速 ×1.15" */
+/** 倍率写成涨跌的百分比，冷却倍率按攻速的涨跌写 */
+function mulText(unit: StatUnit, v: number): string {
+  const d = (unit === 'rate' ? 1 / v : v) - 1
+  return `${d < 0 ? '-' : '+'}${Math.round(Math.abs(d) * 100)}%`
+}
+
+/** 一组修正逐条的文字，如"生命上限 +25""攻速 +15%" */
 export function modTexts(m: StatMods): string[] {
   const out: string[] = []
   const add = m.add ?? {}
   const mul = m.mul ?? {}
   for (const k of keysOf(add)) out.push(`${STATS[k].name} ${addText(STATS[k].unit, add[k]!)}`)
-  for (const k of keysOf(mul)) out.push(`${STATS[k].name} ${valueText(STATS[k].unit === 'rate' ? 'rate' : 'ratio', mul[k]!)}`)
+  for (const k of keysOf(mul)) out.push(`${STATS[k].name} ${mulText(STATS[k].unit, mul[k]!)}`)
   return out
 }

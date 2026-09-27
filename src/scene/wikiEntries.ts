@@ -4,11 +4,12 @@ import type { EnemyDef } from '../types/enemies'
 import { MAP_IDS, MAPS, bossFor } from '../data/maps'
 import { PICKUPS } from '../data/pickups'
 import { WEAPONS } from '../data/weapons'
-import { ITEMS, RARITIES } from '../data/items'
+import { ITEMS, RARITIES, RARITY_ORDER, itemXp } from '../data/items'
 import { modTexts, statText } from '../data/stats'
 import { keysOf } from '../util/record'
 import type { ItemDef } from '../types/items'
-import { abilityLabel, abilityStatLines, characterStatGroups, effectLine, SHAPE_LABEL } from './statLines'
+import { abilityLabel, abilityStatLines, characterStatGroups, effectLine } from './statLines'
+import { itemLines, TRAIT_LABEL } from './itemLines'
 import type { WikiEntry, WikiGroup } from '../types/wikiEntries'
 
 function grid(units: number): string {
@@ -124,18 +125,15 @@ export function wikiGroups(): WikiGroup[] {
     {
       icon: '1f6e1',
       title: '道具',
-      entries: [
-        ...Object.values<ItemDef>(ITEMS).map((i) => ({
-          emoji: i.emoji,
-          name: i.name,
-          desc: i.desc,
-          lines: [
-            `道具 · ${RARITIES[i.rarity].label} · 价格 ${i.price} 金币 · ${i.maxStacks === undefined ? '无限堆叠' : `上限 ${i.maxStacks} 件`}`,
-            `池归属 ${i.pool === 'all' ? '通用' : SHAPE_LABEL[i.pool]} · 角色经验 +${i.upgradeXp}${i.minLevel && i.minLevel > 1 ? ` · ${i.minLevel} 级解锁` : ''}`,
-          ],
-        })),
-
-      ],
+      entries: RARITY_ORDER.flatMap((r) => Object.values<ItemDef>(ITEMS).filter((i) => i.rarity === r)).map((i) => ({
+        emoji: i.emoji,
+        name: i.name,
+        desc: itemLines(i).join(' · '),
+        lines: [
+          `道具 · ${RARITIES[i.rarity].label} · 价格 ${i.price} 金币 · ${i.maxStacks === undefined ? '无限堆叠' : i.maxStacks === 1 ? '唯一' : `上限 ${i.maxStacks} 件`}`,
+          `${i.for ? `只刷给${i.for.map((t) => TRAIT_LABEL[t]).join('、')}角色` : '所有角色都能刷到'} · 角色经验 +${itemXp(i)}${i.minLevel && i.minLevel > 1 ? ` · ${i.minLevel} 级解锁` : ''}`,
+        ],
+      })),
     },
   ]
 }
