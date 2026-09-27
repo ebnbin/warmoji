@@ -232,7 +232,7 @@ export const CHARACTERS = {
         base: 'fieldMedkit',
         upgrades: [
           { ability: 'fieldMedkit2', card: { icon: '1f97c', name: '群体处方', desc: '治疗改为范围内全体队友回复 60% 治疗量' } },
-          { ability: 'fieldMedkit3', card: { icon: '26a1', name: '电击起搏', desc: '范围内有阵亡队友时，优先为其减少 2 秒复活倒计时' } },
+          { ability: 'fieldMedkit3', card: { icon: '26a1', name: '电击起搏', desc: '每次治疗时，为复活倒计时最长的阵亡队友减少 2 秒，不论远近' } },
         ],
       },
       { name: '飞针', icon: '1f489', base: 'syringeDart', upgrades: [] },

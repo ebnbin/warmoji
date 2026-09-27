@@ -67,12 +67,7 @@ export function switchLeader(sim: Sim, eid: number): void {
   const fx = Facing.x[eid]!
   const fy = Facing.y[eid]!
   if (fx !== 0 || fy !== 0) sim.heading = { x: fx, y: fy }
-  for (const e of [from, eid]) {
-    Seat.v[e] = -1
-    Seat.ghost[e] = 0
-  }
-  // 扇形整体搬家：阵亡者重新预订最近的空位，按归位速度过去而不是瞬移
-  for (const f of sim.characters) if (!Alive.v[f]) Seat.ghost[f] = 0
+  for (const e of [from, eid]) Seat.v[e] = -1
   const ms = handoverMs()
   grantIframe(sim, eid, ms)
   sim.handover = { msLeft: ms, ms, from, to: eid, fromScale: CharScale.v[from]!, toScale: CharScale.v[eid]!, camX: d.x, camY: d.y }

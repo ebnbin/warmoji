@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { textRes, viewport, VIEWPORT_CHANGED } from '../util/apply'
+import { viewport, VIEWPORT_CHANGED } from '../util/apply'
 import { UNIT } from '../util/units'
 import { CHARACTERS, memberBase } from '../data/characters'
 import { HIT_SHAKE } from '../data/feel'
@@ -136,8 +136,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private waveBaseCoins = 0
   private hpBars: Phaser.GameObjects.Graphics[] = []
   private shownHp: number[] = []
-  private deadTexts: Phaser.GameObjects.Text[] = []
-  private shownCountdown: (number | null)[] = []
   private staminaGfx?: Phaser.GameObjects.Graphics
   private shownStamina = -1
   private hitShakeOn = false
@@ -180,8 +178,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.waveBaseCoins = 0
     this.hpBars = []
     this.shownHp = []
-    this.deadTexts = []
-    this.shownCountdown = []
     this.staminaGfx = undefined
     this.shownStamina = -1
     this.seenHitCount = 0
@@ -356,22 +352,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     for (let i = 0; i < this.sim.characters.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
-      this.deadTexts.push(
-        this.add
-          .text(0, 0, '', {
-            fontFamily: FONT_FAMILY,
-            fontSize: `${TEXT.body.size}px`,
-            fontStyle: 'bold',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 5,
-            resolution: textRes(),
-          })
-          .setOrigin(0.5)
-          .setDepth(12)
-          .setVisible(false),
-      )
-      this.shownCountdown.push(-1)
     }
     this.staminaGfx = this.add.graphics().setDepth(11).setVisible(false)
     startFight(this.sim)
@@ -415,22 +395,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       const m = sim.characters[i]!
       const g = this.hpBars[i]
       if (!g) continue
-      const dead = this.deadTexts[i]
       if (!Alive.v[m]) {
         g.setVisible(false)
         this.shownHp[i] = -1
-        if (dead) {
-          dead.setVisible(true).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
-          const remain = reviveSec(sim, m)
-          if (remain !== this.shownCountdown[i]) {
-            this.shownCountdown[i] = remain
-            dead.setText(remain === null ? '' : String(remain))
-          }
-        }
         continue
       }
-      dead?.setVisible(false)
-      this.shownCountdown[i] = -1
       g.setVisible(true).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
       const ratio = Math.max(0, Math.min(1, Hp.v[m]! / Hp.max[m]!))
       const res = hasComponent(this.world, m, Res) ? Res.v[m]! / Math.max(1, Res.max[m]!) : -1
