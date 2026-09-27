@@ -37,7 +37,7 @@ export function summonBody(sim: Sim, def: NpcDef, x: number, y: number, hp: numb
 }
 
 function waveHp(sim: Sim): number {
-  return sim.sandbox ? 1 : waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
+  return waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
 }
 
 /** 召出 count 个 def：敌方的按波次放大生命 */

@@ -33,5 +33,5 @@ export interface StatMods {
   readonly mul?: StatBase
 }
 
-/** 常驻修正的来源：角色定位、装备与等级、精英、当前形态、复制来的、永久成长 */
-export type StatLayer = 'role' | 'gear' | 'elite' | 'form' | 'copy' | 'grow'
+/** 常驻修正的来源：角色定位、装备与等级、精英、当前形态、复制来的、永久成长、这一场的规则 */
+export type StatLayer = 'role' | 'gear' | 'elite' | 'form' | 'copy' | 'grow' | 'fight'

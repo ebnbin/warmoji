@@ -17,14 +17,14 @@ import { applyBackground } from '../util/background'
 import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
-import { getRun, nextStep } from '../run/state'
+import { getRun, INVINCIBLE_HP, nextStep, runDef } from '../run/state'
 import { goStep } from '../scene/teamPage'
 import type { RunState } from '../run/state'
 import { MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Cd, Charges, Ctl, Enemy, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Transform, VisOff } from './components'
+import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Transform, VisOff } from './components'
 import { charSize } from './systems/shared/scale'
 import { dragging, squadStamina } from './systems/shared/stamina'
 import { STAMINA } from '../data/stamina'
@@ -35,7 +35,7 @@ import { setOverlayFill, viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
 import { abilityRequires, bodyLook, modDef, statBase } from './store'
-import { foldBody, lastingStats, statsOf } from './utils/stats'
+import { foldBody, lastingStats, setStatLayer, statsOf } from './utils/stats'
 import { aimAt } from './systems/shared/fire'
 import { sourceOf } from './utils/source'
 import { resetEntityStorage } from './storage'
@@ -60,9 +60,9 @@ import { timeLimitMs } from '../data/runs'
 import { enterFight } from '../run/flow'
 import type { FightDef } from '../types/runs'
 import { callSquad, startFight } from './fight/spawns'
-import { fightWon, timeLeftMs } from './fight/state'
+import { fightMods, fightWon, timeLeftMs } from './fight/state'
 import { xpToNext } from '../run/xp'
-import { INVINCIBLE_HP, spawnParams, sandboxInvincible } from './sandbox/knobs'
+import { spawnParams } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
 import type { HudSnapshot } from '../run/hudHost'
@@ -122,7 +122,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private rings?: RingLayer
   private sim?: Sim
   private ready = false
-  sandbox = false
   run!: RunState
   /** 这一场的规则 */
   private fightDef!: FightDef
@@ -216,7 +215,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   devEndWave(): void {
     const sim = this.sim
-    if (!sim || sim.over || this.ending || sim.fight.def.ends.length === 0) return
+    if (!sim || sim.over || this.ending || this.endless) return
     settleWave(sim)
     this.scheduleWaveEnd()
   }
@@ -263,7 +262,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const run = getRun()
     this.run = run
     this.fightDef = enterFight(run)
-    this.sandbox = run.sandbox
     const mapDef = MAPS[run.mapId]
     applyBackground(mapDef.palette)
     this.map = viewFor(run.mapId)
@@ -308,7 +306,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
     setActiveHudHost(this)
     this.scene.launch(SceneKey.Ui)
-    if (this.sandbox) watchSandboxSteady(this)
+    if (this.knobs) watchSandboxSteady(this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.bootGen++
@@ -332,14 +330,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.rings = new RingLayer(this, this.world)
     this.ctx.atlas = atlas
     this.map.decor(this.ctx, atlas)
-    this.sandbox = run.sandbox
     const settings = loadSettings(browserStorage())
     this.hitShakeOn = settings.hitShake
     this.deathBurst = burstEmitter(this, [0x8e24aa, 0xab47bc, 0x6a1b9a, 0xf3e5f5], 230)
     this.coinBurst = burstEmitter(this, [0xffb300, 0xffdc5d, 0xfff8e1], 150, 340)
     this.puffBurst = burstEmitter(this, [0x757575, 0x9e9e9e, 0xe0e0e0], 130, 520)
     const origin = { x: this.camAnchor.x, y: this.camAnchor.y }
-    this.sim = makeSim(this.world, atlas, run, run.sandbox, origin, this.mapW, this.mapH, settings.damageNumbers, this.fightDef)
+    this.sim = makeSim(this.world, atlas, run, origin, this.mapW, this.mapH, settings.damageNumbers, this.fightDef)
     if (this.sim.damageNumbers) this.damageText = new DamageTextLayer(this, this.sim.damageNumbers)
     this.shownLeader = this.sim.leader
     initialLayout(this.sim)
@@ -347,7 +344,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.map.onSimReady(this.ctx, this.sim)
     const simRef = this.sim
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
-    armTeam(this.sim, run, run.sandbox)
+    armTeam(this.sim, run)
     for (let i = 0; i < this.sim.characters.length; i++) {
       this.hpBars.push(this.add.graphics().setDepth(11))
       this.shownHp.push(-1)
@@ -519,7 +516,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       coins: liveCoins(this.world),
       pending: sim ? telegraphCount(sim) : 0,
       objects: this.children.list.length,
-      spawnIntervalMs: Math.round(this.sandbox ? spawnParams().intervalMs : wave.spawnIntervalMs),
+      spawnIntervalMs: Math.round(sim?.fight.knobs ? spawnParams().intervalMs : wave.spawnIntervalMs),
       atlasPages: this.atlas?.pageCount ?? 0,
     }
   }
@@ -555,7 +552,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       const def = CHARACTERS[this.run.roster[slot]!]
       return {
         emoji: bodyLook[m] ?? def.emoji,
-        level: memberGear(this.run, slot, sim.sandbox).level,
+        level: memberGear(this.run, slot).level,
         leader: m === sim.leader,
         alive: Alive.v[m] === 1,
         hp: Hp.v[m]!,
@@ -647,16 +644,35 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     g.fillCircle(ex, ey, 10)
   }
 
-  applySandboxInvincible(): void {
+  /** 队伍由试炼场的旋钮给出 */
+  get knobs(): boolean {
+    return runDef(this.run).team === 'knobs'
+  }
+
+  /** 这一场没有结束规则，一直打下去 */
+  get endless(): boolean {
+    return this.fightDef.ends.length === 0
+  }
+
+  /** 无敌切换后立刻生效：换掉队员的生命上限，开无敌时补满 */
+  applyInvincible(): void {
     const sim = this.sim
     if (!sim) return
     sim.run.roster.forEach((id, slot) => {
       const m = sim.characters[slot]!
       const base = memberBase(CHARACTERS[id])
-      statBase[m] = sandboxInvincible() ? { ...base, maxHp: INVINCIBLE_HP } : base
+      statBase[m] = sim.run.invincible ? { ...base, maxHp: INVINCIBLE_HP } : base
       foldBody(sim.world, sim, m)
-      if (sandboxInvincible()) Hp.v[m] = Hp.max[m]!
+      if (sim.run.invincible) Hp.v[m] = Hp.max[m]!
     })
+  }
+
+  /** 旋钮改了这一场给队伍的常驻修正后立刻换上 */
+  applyKnobs(): void {
+    const sim = this.sim
+    if (!sim) return
+    const mods = fightMods(sim.fight, FACTION.team)
+    for (const eid of query(this.world, [Stats])) if (Faction.v[eid] === FACTION.team) setStatLayer(eid, 'fight', mods)
   }
 
 

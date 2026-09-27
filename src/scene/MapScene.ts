@@ -2,7 +2,6 @@ import Phaser from 'phaser'
 import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
-import { beginSandboxRun } from '../ecs/sandbox/knobs'
 import { beginRun, skipFilled } from '../run/state'
 import { goStep } from './teamPage'
 import { mapPlayLines } from './mapLines'
@@ -77,7 +76,7 @@ export class MapScene extends Phaser.Scene {
   }
 
   private start(): void {
-    const run = this.sandbox ? beginSandboxRun(this.selectedId) : beginRun('classic', this.selectedId)
+    const run = beginRun(this.sandbox ? 'sandbox' : 'classic', this.selectedId)
     skipFilled(run)
     goStep(this, run)
   }

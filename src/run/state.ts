@@ -8,6 +8,10 @@ import type { EnemyKind } from '../types/enemies'
 import type { RunDef, RunId, StepDef } from '../types/runs'
 import { MAP_IDS } from '../data/maps'
 import type { XpState } from '../types/xp'
+import { sandboxTeam } from '../ecs/sandbox/knobs'
+
+/** 无敌时的生命上限 */
+export const INVINCIBLE_HP = 10_000_000
 
 export interface RunState {
   /** 这一局的玩法 */
@@ -15,7 +19,6 @@ export interface RunState {
   /** 走到第几步 */
   step: number
   mapId: MapId
-  sandbox: boolean
   decorSeed: number
   wave: number
   coins: number
@@ -23,6 +26,7 @@ export interface RunState {
   xp: XpState
   combatMs: number
   roster: CharacterId[]
+  /** 每人带进下一场的生命；Infinity 是满血开局 */
   memberHp: number[]
   memberItems: ItemId[][]
   skillCd: number[]
@@ -34,6 +38,10 @@ export interface RunState {
   /** 每人已计入成长的击杀数 */
   growthKills: number[]
   leaderId: CharacterId
+  /** 队员的等级下限：买道具攒的等级比它低时按它算 */
+  minLevel: number
+  /** 队伍无敌：生命上限锁在极大值 */
+  invincible: boolean
   stats: {
     damage: number[]
     kills: number[]
@@ -48,14 +56,13 @@ export interface RunState {
 
 let current: RunState | undefined
 
-/** 开一局：队伍是空的，由招募步骤或玩法给的队伍补上 */
+/** 开一局：玩法给了队伍就按它组队、满血开局，否则由招募步骤补上 */
 export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
   const def = RUNS[id]
-  current = {
+  const run: RunState = {
     runId: id,
     step: 0,
     mapId,
-    sandbox: def.team === 'knobs',
     decorSeed: (Math.random() * 0xffffffff) >>> 0,
     wave: 1,
     coins: def.coins ?? 0,
@@ -71,6 +78,8 @@ export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
     memberGrowth: [],
     growthKills: [],
     leaderId: ROSTER_IDS[0]!,
+    minLevel: 1,
+    invincible: false,
     stats: {
       damage: [],
       kills: [],
@@ -82,7 +91,15 @@ export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
       eliteKills: 0,
     },
   }
-  return current
+  if (def.team === 'knobs') {
+    const t = sandboxTeam()
+    for (const m of t.ids) addMember(run, m)
+    run.minLevel = t.level
+    run.invincible = t.invincible
+    run.memberHp.fill(Infinity)
+  }
+  current = run
+  return run
 }
 
 export function currentRun(): RunState | undefined {

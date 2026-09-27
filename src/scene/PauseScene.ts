@@ -12,7 +12,7 @@ import { levelProgress, stackCount } from '../run/draft'
 import { activeHudHost } from '../run/hudHost'
 import type { HudSnapshot, MemberSheet } from '../run/hudHost'
 import { memberLevel, memberLook, memberOutStats } from '../run/members'
-import { endRun, getRun, leaderSlot, waveStartHp } from '../run/state'
+import { endRun, getRun, leaderSlot, runDef, waveStartHp } from '../run/state'
 import type { RunState } from '../run/state'
 import type { CharacterId } from '../types/characters'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
@@ -226,8 +226,8 @@ export class PauseScene extends Phaser.Scene {
     const sheets = this.opened.from === SceneKey.Battle ? (activeHudHost()?.teamSheets() ?? []) : []
     this.live = sheets.length > 0
     return run.roster.map((id, slot): Member => {
-      const items = run.sandbox ? [] : (run.memberItems[slot] ?? [])
-      const growth = run.sandbox ? {} : (run.memberGrowth[slot] ?? {})
+      const items = run.memberItems[slot] ?? []
+      const growth = run.memberGrowth[slot] ?? {}
       const sheet = sheets[slot]
       if (sheet) return { ...sheet, slot, id, items, growth }
       const stats = memberOutStats(run, slot)
@@ -362,7 +362,8 @@ export class PauseScene extends Phaser.Scene {
   private flowItems(flow: Flow, m: Member): void {
     const owned = m.items
     if (owned.length === 0) {
-      flow.text(this.run.sandbox ? '试炼场不带道具' : '还没有道具：在商店给这名队员购买', { color: 'muted', indent: false })
+      const def = runDef(this.run)
+      flow.text(def.steps.some((s) => s.kind === 'shop') ? '还没有道具：在商店给这名队员购买' : `${def.name}不带道具`, { color: 'muted', indent: false })
       return
     }
     flow.text(`共 ${owned.length} 件 · 角色经验 ${characterXp(owned)}`, { color: 'muted', indent: false })
@@ -400,7 +401,7 @@ export class PauseScene extends Phaser.Scene {
     flow.gap(6)
 
     flow.heading('进度', '1f3c1')
-    if (run.sandbox) {
+    if (runDef(run).team === 'knobs') {
       flow.text(`试炼场 · 已打 ${formatTime(snap?.seconds ?? 0)}`)
     } else {
       const wave = run.wave

@@ -1,5 +1,8 @@
 import { timeLimitMs } from '../../data/runs'
 import type { FightDef, StreamRule } from '../../types/runs'
+import type { StatMods } from '../../types/stats'
+import { FACTION } from '../components'
+import { sandboxTeamMods } from '../sandbox/knobs'
 import type { Sim } from '../sim'
 
 /** 开打后第一次刷怪之前的空档 */
@@ -30,6 +33,11 @@ export function newFight(def: FightDef): FightState {
     knobs: def.spawns.some((rule) => rule.kind === 'knobs') ? { cooldownMs: FIRST_SPAWN_MS } : null,
     bossDownAt: -1,
   }
+}
+
+/** 这一场给一方身体的常驻修正：试炼场的攻速旋钮给队伍 */
+export function fightMods(f: FightState, faction: number): StatMods[] {
+  return faction === FACTION.team && f.knobs ? sandboxTeamMods() : []
 }
 
 /** 离时限还有多久；没有时限是 Infinity */

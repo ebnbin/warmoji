@@ -26,10 +26,10 @@ import { formTeam } from './entities/team'
 import { newWorldState, worldFor } from './worlds/hooks'
 import { newOutbox } from './outbox'
 import { newDamageNumbers } from './damageNumbers'
-import { Stats } from './components'
+import { FACTION, Stats } from './components'
 import type { EcsAtlas } from './atlas'
 import type { FightDef } from '../types/runs'
-import { newFight } from './fight/state'
+import { fightMods, newFight } from './fight/state'
 import type { FightState } from './fight/state'
 
 export interface Sim {
@@ -66,7 +66,6 @@ export interface Sim {
   targets: Target[][]
   frames: FrameIndex
   rng: Rng
-  sandbox: boolean
   /** 这一场的规则与进行中的状态 */
   fight: FightState
   pendingDeaths: PendingDeath[]
@@ -141,14 +140,14 @@ export function makeSim(
   world: EcsWorld,
   atlas: EcsAtlas,
   run: RunState,
-  sandbox: boolean,
   origin: { x: number; y: number },
   mapW: number,
   mapH: number,
   damageNumbers: boolean,
   fight: FightDef,
 ): Sim {
-  const team = formTeam(world, atlas, run, sandbox, origin.x, origin.y)
+  const state = newFight(fight)
+  const team = formTeam(world, atlas, run, origin.x, origin.y, fightMods(state, FACTION.team))
   const { characters, leader } = team
   return {
     world,
@@ -183,8 +182,7 @@ export function makeSim(
     out: newOutbox(),
     damageNumbers: damageNumbers ? newDamageNumbers() : null,
     rng: new Rng((run.decorSeed ^ 0x9e37 ^ Math.imul(run.wave, 0x9e3779b1)) >>> 0),
-    sandbox,
-    fight: newFight(fight),
+    fight: state,
     run,
     leader,
     heading: { x: 0, y: -1 },

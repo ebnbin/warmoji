@@ -65,6 +65,7 @@ import type { MapDef } from '../../types/maps'
 import { hourAt, isDayAt } from '../worlds/daynight'
 import type { FieldPickupDef } from '../../types/battlefield'
 import { enemyMixAt, pickEnemy } from '../utils/spawnMix'
+import { fightMods } from '../fight/state'
 import type { ByKind } from '../../util/record'
 
 type DriveOf = ByKind<DriveDef>
@@ -205,6 +206,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   Depth.z[eid] = boss ? 7 : 5
   enemyDef[eid] = def
   if (elite) setStatLayer(eid, 'elite', [ELITE.stats])
+  setStatLayer(eid, 'fight', fightMods(sim.fight, faction))
   foldBody(world, undefined, eid)
   Hp.v[eid] = Hp.max[eid]!
   if (def.mount) {
