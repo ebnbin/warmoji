@@ -34,6 +34,8 @@ export interface PageFrame {
   readonly subY: number
   readonly bodyTop: number
   readonly bodyBottom: number
+  /** 标题与副标题之下、底部按钮之上的整块主体，左右留出版边 */
+  readonly body: Rect
   /** 左详情右列表（竖屏上下排） */
   readonly detail: Rect
   readonly list: Rect
@@ -77,6 +79,7 @@ export function pageFrame(opts: FrameOptions = {}): PageFrame {
     subY: cy + (portrait ? 122 : 96),
     bodyTop,
     bodyBottom,
+    body: { x: cx + margin, y: bodyTop, w: cw - margin * 2, h: bodyBottom - bodyTop },
     detail,
     list,
     column: { x: (W - colW) / 2, y: bodyTop, w: colW, h: bodyBottom - bodyTop },

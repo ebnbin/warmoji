@@ -1,4 +1,5 @@
-import { modTexts } from '../data/stats'
+import { modLines, modTexts } from '../data/stats'
+import type { ModLine } from '../data/stats'
 import { abilityStatLines, effectLine, grid, pct, SHAPE_LABEL, sec } from './statLines'
 import type { Effect } from '../types/abilityDefs'
 import type { GearCond, GearGrow, GearTrigger, GearWhen, ItemDef, Trait } from '../types/items'
@@ -86,13 +87,19 @@ function growLine(g: GearGrow): string {
   return `${g.each === 'wave' ? '每波结束' : `这名角色每击杀 ${g.count} 个敌人`}：${modTexts(g.stats).join('，')}，本局永久`
 }
 
+/** 道具效果逐条：直接的属性涨跌带好坏，条件、触发、装置与成长只是说明 */
+export function itemEffects(def: ItemDef): ModLine[] {
+  const note = (text: string): ModLine => ({ text, good: null })
+  return [
+    ...(def.stats ? modLines(def.stats) : []),
+    ...(def.when ?? []).map((w) => note(whenLine(w))),
+    ...(def.on ?? []).map((t) => note(triggerLine(t))),
+    ...(def.ability ? [note(`自动出手：${abilityStatLines(def.ability).join('，').replaceAll(' · ', '，')}`)] : []),
+    ...(def.grow ? [note(growLine(def.grow))] : []),
+  ]
+}
+
 /** 道具效果逐条的文字 */
 export function itemLines(def: ItemDef): string[] {
-  return [
-    ...(def.stats ? modTexts(def.stats) : []),
-    ...(def.when ?? []).map(whenLine),
-    ...(def.on ?? []).map(triggerLine),
-    ...(def.ability ? [`自动出手：${abilityStatLines(def.ability).join('，').replaceAll(' · ', '，')}`] : []),
-    ...(def.grow ? [growLine(def.grow)] : []),
-  ]
+  return itemEffects(def).map((l) => l.text)
 }

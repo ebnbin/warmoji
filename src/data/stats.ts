@@ -151,12 +151,30 @@ function mulText(unit: StatUnit, v: number): string {
   return `${d < 0 ? '-' : '+'}${Math.round(Math.abs(d) * 100)}%`
 }
 
-/** 一组修正逐条的文字，如"生命上限 +25""攻速 +15%" */
-export function modTexts(m: StatMods): string[] {
-  const out: string[] = []
+/** 一条修正的文字，连同它对持有者是好是坏；null 是说不上好坏 */
+export interface ModLine {
+  readonly text: string
+  readonly good: boolean | null
+}
+
+/** 原始值变了 delta 对持有者是好是坏 */
+function goodness(k: StatKey, delta: number): boolean | null {
+  const better = STATS[k].better
+  if (better === 'neither' || delta === 0) return null
+  return (delta > 0) === (better === 'higher')
+}
+
+/** 一组修正逐条的文字与好坏 */
+export function modLines(m: StatMods): ModLine[] {
+  const out: ModLine[] = []
   const add = m.add ?? {}
   const mul = m.mul ?? {}
-  for (const k of keysOf(add)) out.push(`${STATS[k].name} ${addText(STATS[k].unit, add[k]!)}`)
-  for (const k of keysOf(mul)) out.push(`${STATS[k].name} ${mulText(STATS[k].unit, mul[k]!)}`)
+  for (const k of keysOf(add)) out.push({ text: `${STATS[k].name} ${addText(STATS[k].unit, add[k]!)}`, good: goodness(k, add[k]!) })
+  for (const k of keysOf(mul)) out.push({ text: `${STATS[k].name} ${mulText(STATS[k].unit, mul[k]!)}`, good: goodness(k, mul[k]! - 1) })
   return out
+}
+
+/** 一组修正逐条的文字，如"生命上限 +25""攻速 +15%" */
+export function modTexts(m: StatMods): string[] {
+  return modLines(m).map((l) => l.text)
 }

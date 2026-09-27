@@ -8,6 +8,9 @@ export type StatUnit = 'count' | 'ratio' | 'rate' | 'chance' | 'percent' | 'ms' 
 /** 属性表里的分类：生存、输出、行动、经济、全场规则 */
 export type StatCategory = 'survival' | 'offense' | 'mobility' | 'economy' | 'field'
 
+/** 属性值往哪边变对持有者有利：higher 越大越好，lower 越小越好，neither 说不上好坏 */
+export type StatBetter = 'higher' | 'lower' | 'neither'
+
 export interface StatDef {
   readonly name: string
   /** 身体没写基础值时取它 */
@@ -16,6 +19,7 @@ export interface StatDef {
   readonly max?: number
   readonly unit: StatUnit
   readonly category: StatCategory
+  readonly better: StatBetter
 }
 
 export type StatValues = Record<StatKey, number>
