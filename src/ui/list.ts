@@ -24,16 +24,22 @@ export class ListItem extends Widget {
     drawBlock(bg, 0, 0, width, height, { face: SURFACE.raised, radius: SHAPE.radius.md, drop: 4 })
     const trailW = opts.trailing ? (opts.trailingWidth ?? 84) + 24 : 0
     const textX = 96
-    const title = new Label(scene, textX, opts.desc ? height / 2 - 18 : height / 2, opts.title, { kind: 'heading' }).setOrigin(0, 0.5)
+    const title = new Label(scene, textX, 0, opts.title, { kind: 'heading' })
     this.add([bg, new Icon(scene, 50, height / 2, opts.icon, 58), title])
     if (opts.desc) {
-      this.add(new Label(scene, textX, height / 2 + 2, opts.desc, { kind: 'label', color: 'muted', wrap: width - textX - trailW - 20 }))
+      const desc = new Label(scene, textX, 0, opts.desc, { kind: 'label', color: 'muted', wrap: width - textX - trailW - 12, spacing: 2 })
+      const top = (height - title.height - desc.height) / 2
+      title.setY(top)
+      desc.setY(top + title.height)
+      this.add(desc)
+    } else {
+      title.setY((height - title.height) / 2)
     }
     if (opts.trailing) {
       opts.trailing.setPosition(width - 24 - (opts.trailingWidth ?? 84) / 2, height / 2)
       this.add(opts.trailing)
     }
-    if (opts.onTap) pressable(this, { shape: new Phaser.Geom.Rectangle(0, 0, width, height + 4), onTap: opts.onTap, sfx: null })
+    if (opts.onTap) pressable(this, { shape: new Phaser.Geom.Rectangle(0, 0, width, height + 4), onTap: opts.onTap })
   }
 }
 
