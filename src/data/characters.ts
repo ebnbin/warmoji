@@ -41,6 +41,7 @@ function hydrateCharacter(src: CharacterAuthoring): CharacterDef {
     name: src.name,
     desc: src.desc,
     role: src.role,
+    tags: src.tags,
     body: src.body,
     stats: src.stats,
     skill: { ...src.skill, ability: ABILITIES[src.skill.ability], aim: src.skill.aim === true },

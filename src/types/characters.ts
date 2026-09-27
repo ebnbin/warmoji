@@ -6,6 +6,14 @@ import type { BodyRules, FormDef, ResourceDef } from './enemies'
 import type { StatBase } from './stats'
 import type { RoleId } from './roles'
 
+/** 职责：在队伍里干什么 */
+export type DutyTag = 'damage' | 'defense' | 'support' | 'control'
+/** 打法：怎么打 */
+export type StyleTag = 'melee' | 'ranged' | 'area' | 'summon' | 'mobile'
+/** 角色的标签，只用于展示与筛选，不改数值 */
+export type CharacterTag = DutyTag | StyleTag
+/** 一名角色的标签：先写职责，至少一项 */
+type CharacterTags = readonly [DutyTag, ...CharacterTag[]]
 /** 身体的力学：阻力与质量决定起步和被推开时的手感 */
 interface BodyParams {
   readonly drag: number
@@ -40,6 +48,7 @@ export interface CharacterAuthoring {
   readonly name: string
   readonly desc: string
   readonly role: RoleId
+  readonly tags: CharacterTags
   readonly body: BodyParams
   readonly stats: CharacterStats
   readonly skill: SkillSource
@@ -63,6 +72,7 @@ export interface CharacterDef {
   readonly name: string
   readonly desc: string
   readonly role: RoleId
+  readonly tags: CharacterTags
   readonly body: BodyParams
   readonly stats: CharacterStats
   readonly skill: SkillDef

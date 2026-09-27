@@ -1,59 +1,54 @@
 import Phaser from 'phaser'
-import { CHARACTERS } from '../data/characters'
-import type { CharacterId } from '../types/characters'
-import { UNIT } from '../util/units'
-import { unlockAt } from '../run/recruit'
-import {
-  getRun,
-  recruitCandidates,
-  recruitDueCount,
-  recruitMember,
-  recruitUnlocked,
-  teamStep,
-} from '../run/state'
-import type { RunState } from '../run/state'
+import { CHARACTERS, ROSTER_IDS } from '../data/characters'
+import { ROLES } from '../data/roles'
+import { modTexts } from '../data/stats'
+import { DUTY_TAGS, TAG_IDS, TAGS, tagsOf } from '../data/tags'
 import { playSfx } from '../audio/sfx'
-import { characterStatGroups } from './statLines'
-import { AvatarSlot, beginPage, Button, Divider, EmojiGrid, Flow, Icon, Label, PageHeader, pageFrame, Panel, RichLabel, ScrollView } from '../ui'
-import type { GridItem, Rect } from '../ui'
+import { memberLook } from '../run/members'
+import { getRun, recruitDueCount, recruitMember } from '../run/state'
+import type { RunState } from '../run/state'
+import type { CharacterId, CharacterTag } from '../types/characters'
+import { AvatarSlot, beginPage, Button, Chip, Divider, Flow, Icon, Label, PageHeader, pageFrame, Panel, RichLabel, ScrollView, TagChip, TileGrid } from '../ui'
+import type { PageFrame, Rect, TileItem } from '../ui'
 import { VIEWPORT_CHANGED } from '../util/apply'
-import { fitIconSize, flowStatGroups, isInitialWave, nextAfterTeam, PREVIEW_SPIN, runExit } from './teamPage'
+import { characterStatGroups } from './statLines'
+import { flowStatGroups, isInitialWave, nextAfterTeam, runExit } from './teamPage'
 import { SceneKey } from './keys'
 import type { DevProvider, DevProviderHost } from '../devtools'
 
-/** 头像预览的环形排版，单位格：两人并排，三人小环，更多人大环 */
-const PREVIEW_RING = { pairGap: 1.1, small: 0.58, large: 0.8 } as const
+/** 详情区顶上的队伍栏高度 */
+const STRIP_H = 84
+/** 队伍栏里的头像与间距 */
+const STRIP_AVATAR = 40
+const STRIP_PITCH = 54
+/** 名单与详情之间的空隙 */
+const GAP = 18
+/** 筛选标签之间与行间的空隙 */
+const CHIP_GAP = 8
+const CHIP_ROW = 54
+/** 标签行比副标题行低一点，离页头的按钮远些 */
+const CHIP_DROP = 8
 
-function ringPosts(count: number, phase = 0): { x: number; y: number }[] {
-  if (count <= 1) return Array.from({ length: count }, () => ({ x: 0, y: 0 }))
-  if (count === 2) {
-    return [
-      { x: (-PREVIEW_RING.pairGap / 2) * UNIT, y: 0 },
-      { x: (PREVIEW_RING.pairGap / 2) * UNIT, y: 0 },
-    ]
-  }
-  const r = (count === 3 ? PREVIEW_RING.small : PREVIEW_RING.large) * UNIT
-  return Array.from({ length: count }, (_, post) => {
-    const a = -Math.PI / 2 + (post * 2 * Math.PI) / count + phase
-    return { x: Math.cos(a) * r, y: Math.sin(a) * r }
-  })
+function tagLabel(t: CharacterTag): string {
+  return `{${TAGS[t].icon}} ${TAGS[t].name}`
 }
 
+/** 招募页：全部角色都能招；按标签筛选，点一名看详情，确认后招进队伍 */
 export class RecruitScene extends Phaser.Scene implements DevProviderHost {
   private preserveOnRestart = false
   private run!: RunState
-  private selectedKey: CharacterId | number | null = null
-  private due = 0
-  private pool: CharacterId[] = []
-  private unlocked = 0
-  private picked: CharacterId[] = []
-  private grid!: EmojiGrid<CharacterId | number>
+  private frame!: PageFrame
+  /** 正在看的角色；为空时详情区是队伍概况 */
+  private focus: CharacterId | null = null
+  /** 选中的标签：只列出同时带着这些标签的角色 */
+  private filters = new Set<CharacterTag>()
+  private gridScroll = 0
+  private allChip!: TagChip
+  private chips = new Map<CharacterTag, TagChip>()
+  private grid!: TileGrid<CharacterId>
+  private panel!: Rect
+  private strip: Phaser.GameObjects.GameObject[] = []
   private detail!: ScrollView
-  private previewRect: Rect = { x: 0, y: 0, w: 0, h: 0 }
-  private previewPhase = 0
-  private previewGeom = { cx: 0, cy: 0, scale: 1 }
-  private previewSlots: { slot: AvatarSlot; post: number }[] = []
-  private previewCaption?: Label
   private confirmBtn!: Button
 
   constructor() {
@@ -65,55 +60,30 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     const preserved = this.preserveOnRestart
     this.preserveOnRestart = false
     this.run = getRun()
-    this.previewSlots = []
-    this.previewCaption = undefined
+    if (!preserved) {
+      this.focus = null
+      this.filters = new Set()
+      this.gridScroll = 0
+    }
+    this.strip = []
+    this.chips = new Map()
 
-    this.due = recruitDueCount(this.run)
-    this.pool = [...this.run.recruitPool]
-    this.unlocked = recruitUnlocked(this.run)
-    const open = recruitCandidates(this.run)
-    this.picked = preserved ? this.picked.filter((id) => open.includes(id)).slice(0, this.due) : []
-    if (!preserved || !this.validSelected()) this.selectedKey = open[0] ?? null
-
-    const f = pageFrame({ sub: true, footer: true })
+    const f = (this.frame = pageFrame({ sub: true, footer: true }))
     new PageHeader(this, f, {
-      title: isInitialWave(this.run) ? '组建队伍' : '队伍整编',
-      sub: this.due > 1 ? `本波招募 ${this.due} 名，点满空位后出发` : '招募一名新队员',
+      title: isInitialWave(this.run) ? '组建队伍' : '招募新队员',
       ...runExit(this, this.run, () => ({ from: SceneKey.Recruit })),
     })
+    const { roster, panel } = this.bodyRects(this.createChips())
+    this.grid = new TileGrid<CharacterId>(this, roster, { minWidth: 118, height: 140, initialScroll: this.gridScroll, onScroll: (pos) => (this.gridScroll = pos) })
+    this.grid.onTap = (id): void => this.setFocus(id)
+    this.panel = panel
+    new Panel(this, panel.x, panel.y, panel.w, panel.h)
+    new Divider(this, panel.x + 16, panel.y + STRIP_H, panel.w - 32)
+    this.detail = new ScrollView(this, { x: panel.x, y: panel.y + STRIP_H + 6, w: panel.w, h: panel.h - STRIP_H - 14 })
+    this.confirmBtn = new Button(this, f.centerX, f.footerY, { label: '', keys: ['ENTER', 'SPACE'], sfx: null, onTap: () => this.confirm() })
 
-    const D = f.detail
-    new Panel(this, D.x, D.y, D.w, D.h)
-    if (f.portrait) {
-      this.previewRect = { x: D.x, y: D.y, w: D.w, h: 196 }
-      new Divider(this, D.x + 16, D.y + 202, D.w - 32)
-      this.detail = new ScrollView(this, { x: D.x, y: D.y + 212, w: D.w, h: D.h - 220 })
-    } else {
-      this.previewRect = { x: D.x, y: D.y, w: 264, h: D.h }
-      new Divider(this, D.x + 272, D.y + 16, D.h - 32, true)
-      this.detail = new ScrollView(this, { x: D.x + 280, y: D.y + 8, w: D.w - 280, h: D.h - 16 })
-    }
-
-    this.grid = new EmojiGrid(this, f.list)
-    this.grid.onTap = (key): void => {
-      this.selectedKey = key
-      if (typeof key !== 'number' && this.cardState(key) === 'open') {
-        const at = this.picked.indexOf(key)
-        if (at >= 0) this.picked.splice(at, 1)
-        else if (this.picked.length < this.due) this.picked.push(key)
-        else if (this.due === 1) this.picked = [key]
-      }
-      this.refresh()
-    }
-
-    this.confirmBtn = new Button(this, f.centerX, f.footerY, {
-      label: this.confirmLabel(),
-      keys: ['ENTER', 'SPACE'],
-      sfx: null,
-      onTap: () => this.confirm(),
-    })
-
-    this.refresh()
+    this.renderGrid()
+    this.renderFocus()
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -121,140 +91,218 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     })
   }
 
-  private confirmLabel(): string {
-    return this.due > 1 ? `全员入队 ${this.picked.length}/${this.due}` : '招募入队'
-  }
-
-  private confirmEnabled(): boolean {
-    return this.due > 0 && this.picked.length === this.due
-  }
-
-  private cardState(id: CharacterId): 'locked' | 'taken' | 'open' {
-    const idx = this.pool.indexOf(id)
-    if (idx < 0 || idx >= this.unlocked) return 'locked'
-    return this.run.roster.includes(id) ? 'taken' : 'open'
-  }
-
-  private validSelected(): boolean {
-    const sel = this.selectedKey
-    if (sel === null) return false
-    if (typeof sel === 'number') return sel >= this.unlocked && sel < this.pool.length
-    return this.pool.includes(sel)
-  }
-
-  private buildItems(): GridItem<CharacterId | number>[] {
-    return this.pool.map((id, i) => {
-      if (i >= this.unlocked) return { key: i, emoji: '2753', dim: true }
-      return {
-        key: id,
-        emoji: CHARACTERS[id].emoji,
-        outline: 'player' as const,
-        badge: this.run.roster.includes(id) ? '1f396' : this.picked.includes(id) ? '2705' : undefined,
+  /** 筛选标签排在标题下，一行放不下就折行、每行居中；返回最下一行的底 */
+  private createChips(): number {
+    const f = this.frame
+    const B = f.body
+    this.allChip = new TagChip(this, 0, 0, { label: '全部', tone: 'accent', onTap: () => this.setFilters([]) })
+    for (const t of TAG_IDS) this.chips.set(t, new TagChip(this, 0, 0, { label: tagLabel(t), tone: TAGS[t].tone, onTap: () => this.toggle(t) }))
+    const rows: TagChip[][] = [[]]
+    let used = 0
+    for (const chip of [this.allChip, ...this.chips.values()]) {
+      const row = rows[rows.length - 1]!
+      if (row.length > 0 && used + CHIP_GAP + chip.chipWidth > B.w) {
+        rows.push([chip])
+        used = chip.chipWidth
+      } else {
+        used += (row.length > 0 ? CHIP_GAP : 0) + chip.chipWidth
+        row.push(chip)
+      }
+    }
+    rows.forEach((row, r) => {
+      const span = row.reduce((s, c) => s + c.chipWidth, 0) + CHIP_GAP * (row.length - 1)
+      let x = B.x + (B.w - span) / 2
+      for (const chip of row) {
+        chip.setPosition(x + chip.chipWidth / 2, f.subY + CHIP_DROP + r * CHIP_ROW)
+        x += chip.chipWidth + CHIP_GAP
       }
     })
+    return f.subY + CHIP_DROP + (rows.length - 1) * CHIP_ROW + 25
   }
 
-  private confirm(): void {
-    if (!this.confirmEnabled()) return
-    for (const id of this.picked) {
-      if (recruitMember(this.run, id) < 0) return
+  /** 横屏左名单右详情，竖屏上名单下详情 */
+  private bodyRects(chipsBottom: number): { roster: Rect; panel: Rect } {
+    const f = this.frame
+    const B = f.body
+    const y = Math.max(B.y, chipsBottom + 16)
+    const h = B.y + B.h - y
+    if (f.portrait) {
+      const rh = Math.round(h * 0.46)
+      return { roster: { x: B.x, y, w: B.w, h: rh }, panel: { x: B.x, y: y + rh + GAP, w: B.w, h: h - rh - GAP } }
     }
-    playSfx('recruit')
-    this.picked = []
-    this.selectedKey = null
-    this.scene.start(teamStep(this.run) ?? nextAfterTeam(this.run))
+    const rw = 720
+    return { roster: { x: B.x, y, w: rw, h }, panel: { x: B.x + rw + GAP, y, w: B.w - rw - GAP, h } }
   }
 
-  update(_time: number, delta: number): void {
-    this.previewPhase += (delta / 1000) * PREVIEW_SPIN
-    this.layoutPreview()
+  /** 同时带着这些标签的角色 */
+  private matching(tags: readonly CharacterTag[]): CharacterId[] {
+    return ROSTER_IDS.filter((id) => tags.every((t) => CHARACTERS[id].tags.includes(t)))
   }
 
-  private renderDetail(): void {
+  private toggle(t: CharacterTag): void {
+    const next = new Set(this.filters)
+    if (next.has(t)) next.delete(t)
+    else next.add(t)
+    this.setFilters([...next])
+  }
+
+  private setFilters(tags: readonly CharacterTag[]): void {
+    this.filters = new Set(tags)
+    this.renderGrid()
+    this.grid.scrollTo(0)
+  }
+
+  private setFocus(id: CharacterId | null): void {
+    this.focus = id
+    this.grid.setSelected(id)
+    if (id) this.grid.reveal(id)
+    this.renderFocus()
+  }
+
+  /** 名单按筛选列出；加上哪个标签会一个都不剩，那个标签就压暗 */
+  private renderGrid(): void {
+    const tags = [...this.filters]
+    this.allChip.setOn(tags.length === 0)
+    for (const [t, chip] of this.chips) {
+      const on = this.filters.has(t)
+      chip.setOn(on).setDim(!on && this.matching([...tags, t]).length === 0)
+    }
+    const roster = this.run.roster
+    this.grid.setItems(
+      this.matching(tags).map((id): TileItem<CharacterId> => {
+        const def = CHARACTERS[id]
+        const joined = roster.includes(id)
+        return { key: id, emoji: def.emoji, outline: 'player', title: def.name, icons: tagsOf(def).map((t) => TAGS[t].icon), badge: joined ? '1f396' : undefined, dim: joined }
+      }),
+    )
+    this.grid.setSelected(this.focus)
+  }
+
+  private renderFocus(): void {
+    this.renderStrip()
     const view = this.detail.clear()
-    const sel = this.selectedKey
-    if (sel === null) return
-    const w = view.viewport.w
-    const flow = new Flow(this, view, { x: 16, y: 8, width: w - 40 })
-    if (typeof sel === 'number') {
-      flow.put(new Icon(this, 16 + 37, 45, '2753', 74))
-      flow.put(new Label(this, 104, 30, '命运牌 · 未解锁', { kind: 'lead', color: 'muted' }).setOrigin(0, 0.5))
-      flow.put(new Label(this, 104, 58, `队伍规模达到 ${unlockAt(sel)} 人时揭晓这张牌的真身`, { kind: 'label', color: 'muted', wrap: w - 124 }))
-      flow.finish(112)
-      return
+    if (this.focus) this.flowCharacter(view, this.focus)
+    else this.flowOverview(view)
+    this.renderConfirm()
+  }
+
+  /** 队伍栏：现有队员与待补的空位；正在看的角色能招，就先摆进第一个空位 */
+  private renderStrip(): void {
+    this.tweens.killTweensOf(this.strip)
+    for (const o of this.strip) o.destroy()
+    this.strip = []
+    const P = this.panel
+    const cy = P.y + STRIP_H / 2
+    const roster = this.run.roster
+    const due = recruitDueCount(this.run)
+    const title = new Label(this, P.x + 20, cy, '队伍', { kind: 'label', bold: true, color: 'soft' }).setOrigin(0, 0.5)
+    const count = new Label(this, P.x + P.w - 20, cy, due > 0 ? `${roster.length} → ${roster.length + due} 人` : `${roster.length} 人`, { kind: 'label', color: 'info' }).setOrigin(1, 0.5)
+    this.strip.push(title, count)
+    let x = title.x + title.width + 16 + STRIP_AVATAR / 2
+    roster.forEach((id, slot) => {
+      this.strip.push(new AvatarSlot(this, x, cy, STRIP_AVATAR, { mode: 'member', emoji: memberLook(this.run, slot), outline: 'player', onTap: () => this.setFocus(id) }))
+      x += STRIP_PITCH
+    })
+    const candidate = this.focus !== null && !roster.includes(this.focus) ? this.focus : null
+    for (let i = 0; i < due; i++) {
+      const id = i === 0 ? candidate : null
+      const slot = id ? new AvatarSlot(this, x, cy, STRIP_AVATAR, { mode: 'picked', emoji: CHARACTERS[id].emoji, outline: 'player' }) : new AvatarSlot(this, x, cy, STRIP_AVATAR, { mode: 'empty' })
+      if (id) {
+        slot.setScale(0.6)
+        this.tweens.add({ targets: slot, scale: 1, duration: 180, ease: 'Back.easeOut' })
+      }
+      this.strip.push(slot)
+      x += STRIP_PITCH
     }
-    const def = CHARACTERS[sel]
-    const state = this.cardState(sel)
-    const tag = state === 'taken' ? { text: ' · 已入队', color: 'good' as const } : this.picked.includes(sel) ? { text: ' · 已选', color: 'info' as const } : null
-    flow.put(new Icon(this, 16 + 37, 45, def.emoji, 74, 'player'))
-    flow.put(new RichLabel(this, 104, 30, tag ? [def.name, tag] : def.name, { kind: 'lead', gap: 0, originX: 0, maxWidth: w - 124 }))
-    const desc = new Label(this, 104, 58, def.desc, { kind: 'label', color: 'muted', wrap: w - 124 })
-    flow.put(desc)
-    flow.y = Math.max(104, desc.y + desc.height + 12)
-    flowStatGroups(flow, characterStatGroups(sel, [], 1, { path: false }))
+  }
+
+  /** 角色详情：头像、名字、定位与标签，其后是属性、技能、普攻与升级路径 */
+  private flowCharacter(view: ScrollView, id: CharacterId): void {
+    const def = CHARACTERS[id]
+    const w = view.viewport.w
+    const x = 118
+    view.add(new Icon(this, 62, 54, def.emoji, 84, 'player'))
+    const name = new Label(this, x, 30, def.name, { kind: 'lead' }).setOrigin(0, 0.5)
+    view.add([name, new Chip(this, name.x + name.width + 12, 30, ROLES[def.role].name, { tone: 'steel', originX: 0 })])
+    const desc = new Label(this, x, 54, def.desc, { kind: 'label', color: 'muted', wrap: w - x - 20 })
+    view.add(desc)
+    let y = Math.max(114, desc.y + desc.height + 14)
+    let tx = 24
+    for (const t of tagsOf(def)) {
+      const chip = new TagChip(this, 0, 0, { label: tagLabel(t), tone: TAGS[t].tone, on: true, size: 'sm', originX: 0 })
+      if (tx > 24 && tx + chip.chipWidth > w - 20) {
+        tx = 24
+        y += 40
+      }
+      view.add(chip.setPosition(tx, y + 15))
+      tx += chip.chipWidth + 8
+    }
+    const flow = new Flow(this, view, { x: 24, y: y + 46, width: w - 48 })
+    const mods = modTexts(ROLES[def.role].stats)
+    flow.text(`定位「${ROLES[def.role].name}」：${mods.length > 0 ? mods.join('、') : '没有额外的属性修正'}`, { kind: 'label', color: 'muted', indent: false })
+    flow.gap(6)
+    flowStatGroups(flow, characterStatGroups(id))
     flow.finish()
   }
 
-  private refresh(): void {
-    this.grid.setItems(this.buildItems())
-    this.grid.setSelected(this.selectedKey)
-    this.renderDetail()
-    this.rebuildPreview()
-    this.confirmBtn.setLabel(this.confirmLabel()).setEnabled(this.confirmEnabled())
-  }
-
-  private rebuildPreview(): void {
-    for (const s of this.previewSlots) s.slot.destroy()
-    this.previewCaption?.destroy()
-    this.previewSlots = []
-    const P = this.previewRect
-    const n = this.run.roster.length
-    const total = n + this.due
-    if (total === 0) return
-    const posts = ringPosts(total, this.previewPhase)
-    const maxR = Math.max(...posts.map((p) => Math.hypot(p.x, p.y)), 1)
-    const base = Math.min(P.w, P.h) >= 240 ? 58 : 50
-    const fit = Math.min(P.w, P.h) / 2 - base / 2 - 24
-    const scale = Math.min(2.2, fit / maxR)
-    const size = fitIconSize(posts, scale, base)
-    const cx = P.x + P.w / 2
-    const cy = P.y + P.h / 2 - 6
-    this.previewGeom = { cx, cy, scale }
-    posts.forEach((p, post) => {
-      const x = cx + p.x * scale
-      const y = cy + p.y * scale
-      let slot: AvatarSlot
-      if (post < n) {
-        slot = new AvatarSlot(this, x, y, size, { mode: 'member', emoji: CHARACTERS[this.run.roster[post]!].emoji, outline: 'player' })
+  /** 还没点角色时：队伍还缺什么职责、怎么挑、各个标签指什么 */
+  private flowOverview(view: ScrollView): void {
+    const w = view.viewport.w
+    const roster = this.run.roster
+    const flow = new Flow(this, view, { x: 24, y: 16, width: w - 48 })
+    flow.put(new Label(this, 24, 16, roster.length === 0 ? '挑一名首发队员' : '给队伍补一名新队员', { kind: 'heading' }), 46)
+    if (roster.length > 0) {
+      const count = (t: CharacterTag): number => roster.filter((id) => CHARACTERS[id].tags.includes(t)).length
+      const lack = DUTY_TAGS.filter((t) => count(t) === 0)
+      const have = DUTY_TAGS.filter((t) => count(t) > 0).map((t) => `${TAGS[t].name} ×${count(t)}`)
+      flow.text(`现有职责：${have.join(' · ')}`, { kind: 'label', indent: false })
+      if (lack.length === 0) {
+        flow.text('四种职责都齐了', { kind: 'label', color: 'good', indent: false })
       } else {
-        const id = this.picked[post - n]
-        slot = id
-          ? new AvatarSlot(this, x, y, size, {
-              mode: 'picked',
-              emoji: CHARACTERS[id].emoji,
-              outline: 'player',
-              onTap: () => {
-                const at = this.picked.indexOf(id)
-                if (at >= 0) this.picked.splice(at, 1)
-                this.selectedKey = id
-                this.refresh()
-              },
-            })
-          : new AvatarSlot(this, x, y, size, { mode: 'empty' })
+        flow.text('还缺这些职责，点一下只看这一类：', { kind: 'label', color: 'muted', indent: false })
+        let x = 24
+        for (const t of lack) {
+          const chip = new TagChip(this, x, flow.y + 16, { label: tagLabel(t), tone: TAGS[t].tone, size: 'sm', originX: 0, onTap: () => this.setFilters([t]) })
+          flow.put(chip)
+          x += chip.chipWidth + 10
+        }
+        flow.gap(42)
       }
-      this.previewSlots.push({ slot, post })
-    })
-    this.previewCaption = new Label(this, cx, P.y + P.h - 14, `队伍 ${n} 人 → ${total} 人`, { kind: 'label', color: 'info' }).setOrigin(0.5, 1)
+      flow.gap(8)
+    }
+    flow.text('点角色看详情，满意就按下方按钮招进队伍；上方的标签可以筛选，选了几个就只列出同时带着它们的角色', { kind: 'label', color: 'muted', indent: false })
+    flow.gap(10).heading('标签说明', '1f4d6')
+    for (const t of TAG_IDS) {
+      flow.put(new RichLabel(this, flow.indent, flow.y + 16, [{ icon: TAGS[t].icon, size: 26 }, { text: TAGS[t].name, color: TAGS[t].tone, bold: true }, { text: TAGS[t].desc, color: 'soft' }], { kind: 'label', originX: 0, gap: 10, maxWidth: w - 24 - flow.indent }), 38)
+    }
+    flow.finish()
   }
 
-  private layoutPreview(): void {
-    if (this.previewSlots.length === 0) return
-    const posts = ringPosts(this.run.roster.length + this.due, this.previewPhase)
-    const { cx, cy, scale } = this.previewGeom
-    for (const s of this.previewSlots) {
-      const p = posts[s.post]
-      if (p) s.slot.setPosition(cx + p.x * scale, cy + p.y * scale)
+  private renderConfirm(): void {
+    const btn = this.confirmBtn
+    const id = this.focus
+    if (recruitDueCount(this.run) === 0) btn.setLabel('继续').setEnabled(true)
+    else if (id === null) btn.setLabel('先挑一名角色').setEnabled(false)
+    else if (this.run.roster.includes(id)) btn.setLabel(`${CHARACTERS[id].name} 已在队中`).setEnabled(false)
+    else btn.setLabel(`招募 ${CHARACTERS[id].name}`).setEnabled(true)
+  }
+
+  /** 招进队伍；还有空位就留在这页接着挑 */
+  private confirm(): void {
+    if (recruitDueCount(this.run) === 0) {
+      this.scene.start(nextAfterTeam(this.run))
+      return
     }
+    const id = this.focus
+    if (id === null || recruitMember(this.run, id) < 0) return
+    playSfx('recruit')
+    if (recruitDueCount(this.run) === 0) {
+      this.scene.start(nextAfterTeam(this.run))
+      return
+    }
+    this.focus = null
+    this.renderGrid()
+    this.renderFocus()
   }
 
   private onViewportChanged(): void {
@@ -274,14 +322,13 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
             {
               kind: 'action',
               label: '自动补齐并入队',
-              desc: '按候选顺序把空位填满后直接确认，省去逐个点选',
+              desc: '按名单顺序把空位招满后直接继续，省去逐个点选',
               run: (): void => {
-                for (const id of this.pool.slice(0, this.unlocked)) {
-                  if (this.picked.length >= this.due) break
-                  if (this.cardState(id) === 'open' && !this.picked.includes(id)) this.picked.push(id)
+                for (const id of ROSTER_IDS) {
+                  if (recruitDueCount(this.run) === 0) break
+                  recruitMember(this.run, id)
                 }
-                this.refresh()
-                this.confirm()
+                this.scene.start(nextAfterTeam(this.run))
               },
             },
           ],

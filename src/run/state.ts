@@ -1,12 +1,10 @@
 import { CHARACTERS, ROSTER_IDS, TEAM, memberStats } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { WAVE } from '../data/waves'
-import { browserStorage } from '../util/storage'
 import type { GrowthProgress, ItemId } from '../types/items'
 import type { Hazard, MapId } from '../types/maps'
 import type { EnemyKind } from '../types/enemies'
 import { MAP_IDS } from '../data/maps'
-import { drawRecruitPool, recruitSeed, refreshRecruitSeed, unlockedCount } from './recruit'
 import type { XpState } from '../types/xp'
 import { SceneKey } from '../scene/keys'
 
@@ -19,7 +17,6 @@ export interface RunState {
   kills: number
   xp: XpState
   combatMs: number
-  recruitPool: CharacterId[]
   roster: CharacterId[]
   memberHp: number[]
   memberItems: ItemId[][]
@@ -49,7 +46,6 @@ let current: RunState | undefined
 export function beginRun(starters: readonly CharacterId[], mapId: MapId = MAP_IDS[0]!, sandbox = false): RunState {
   const roster = [...starters]
   current = {
-    recruitPool: drawRecruitPool(recruitSeed(browserStorage()), ROSTER_IDS),
     mapId,
     sandbox,
     decorSeed: (Math.random() * 0xffffffff) >>> 0,
@@ -91,16 +87,12 @@ export function getRun(): RunState {
 }
 
 export function endRun(): void {
-  if (current) refreshRecruitSeed(browserStorage())
   current = undefined
 }
 
-export function recruitUnlocked(run: RunState): number {
-  return Math.min(unlockedCount(Math.min(TEAM.maxSize, run.wave)), run.recruitPool.length)
-}
-
+/** 还没入队的角色都能招 */
 export function recruitCandidates(run: RunState): CharacterId[] {
-  return run.recruitPool.slice(0, recruitUnlocked(run)).filter((id) => !run.roster.includes(id))
+  return ROSTER_IDS.filter((id) => !run.roster.includes(id))
 }
 
 function recruitDue(run: RunState): boolean {

@@ -7,19 +7,6 @@ import { SceneKey } from './keys'
 import { openPause } from './pause'
 import type { PauseData } from './pause'
 
-export const PREVIEW_SPIN = 0.18
-
-export function fitIconSize(posts: readonly { x: number; y: number }[], scale: number, base: number): number {
-  let minD = Infinity
-  for (let i = 0; i < posts.length; i++) {
-    for (let j = i + 1; j < posts.length; j++) {
-      minD = Math.min(minD, Math.hypot(posts[i]!.x - posts[j]!.x, posts[i]!.y - posts[j]!.y))
-    }
-  }
-  if (!Number.isFinite(minD)) return base
-  return Math.max(24, Math.min(base, minD * scale * 0.92))
-}
-
 export function isInitialWave(run: RunState): boolean {
   return run.wave === 1
 }

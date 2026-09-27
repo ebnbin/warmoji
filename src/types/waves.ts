@@ -16,8 +16,4 @@ export interface Progression {
     readonly waveBonusBase: number
     readonly waveBonusPerWave: number
   }
-  readonly recruit: {
-    readonly poolSize: number
-    readonly unlocks: readonly number[]
-  }
 }
