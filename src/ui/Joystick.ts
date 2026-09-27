@@ -64,7 +64,11 @@ export class Joystick {
   }
 
   private onUp(pointer: Phaser.Input.Pointer): void {
-    if (pointer.id !== this.pointerId) return
+    if (pointer.id === this.pointerId) this.release()
+  }
+
+  /** 当作松手：场景要停住时手指可能还按着，停住期间收不到抬起 */
+  release(): void {
     this.pointerId = null
     this.vecX = 0
     this.vecY = 0

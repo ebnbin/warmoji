@@ -12,7 +12,7 @@ export interface HudSnapshot {
   remainMs: number
   bossHp: number | null
   bossMaxHp: number
-  battleFx: { emoji: string; polarity: Polarity; remainMs: number; totalMs: number }[]
+  battleFx: { emoji: string; name: string; desc: string; polarity: Polarity; remainMs: number; totalMs: number }[]
 }
 
 export interface WaveSummary {
@@ -57,15 +57,14 @@ export interface SquadSnapshot {
 /** 一名队员此刻的属性：now 是实际值，lasting 是不算限时修正、战场效果与体力的常驻值 */
 export interface MemberSheet {
   emoji: string
-  name: string
-  /** 定位的名字 */
-  role: string
   level: number
   leader: boolean
   alive: boolean
   hp: number
   max: number
   reviveSec: number
+  /** 正在拖慢全队 */
+  tired: boolean
   now: StatValues
   lasting: StatValues
 }

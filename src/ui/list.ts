@@ -71,6 +71,8 @@ export interface KeyValue {
   /** 与常驻值不同：数值高亮，旁边附上 note */
   readonly highlight?: boolean
   readonly note?: string
+  /** 还是默认值：整行压暗 */
+  readonly dim?: boolean
 }
 
 const ROW_H = 46
@@ -94,9 +96,13 @@ export class KeyValueList extends Widget {
         zebra.fillStyle(SURFACE.raisedHi, 0.7)
         zebra.fillRoundedRect(cx, cy - ROW_H / 2, colW, ROW_H, SHAPE.radius.sm)
       }
-      const value = new Label(scene, cx + colW - 14, cy, r.value, { kind: 'body', bold: true, color: r.highlight ? 'accent' : 'ink' }).setOrigin(1, 0.5)
-      this.add([new Label(scene, cx + 14, cy, r.key, { kind: 'body', color: 'soft' }).setOrigin(0, 0.5), value])
-      if (r.note) this.add(new Label(scene, value.x - value.width - 12, cy, r.note, { kind: 'caption', color: 'faint' }).setOrigin(1, 0.5))
+      const value = new Label(scene, cx + colW - 14, cy, r.value, { kind: 'body', bold: true, color: r.highlight ? 'accent' : r.dim ? 'faint' : 'ink' }).setOrigin(1, 0.5)
+      const key = new Label(scene, cx + 14, cy, r.key, { kind: 'body', color: r.dim ? 'faint' : 'soft' }).setOrigin(0, 0.5)
+      this.add([key, value])
+      if (r.note) {
+        const right = value.x - value.width - 12
+        this.add(new Label(scene, right, cy, r.note, { kind: 'caption', color: 'faint' }).setOrigin(1, 0.5).fit(Math.max(0, right - key.x - key.width - 10)))
+      }
     })
     this.listHeight = perCol * ROW_H
   }

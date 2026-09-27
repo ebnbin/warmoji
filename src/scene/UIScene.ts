@@ -1,32 +1,14 @@
 import Phaser from 'phaser'
 import { PICKUPS } from '../data/pickups'
 import { formatTime } from '../util/format'
-import { endRun } from '../run/state'
 import { playSfx } from '../audio/sfx'
 import { applyCamera, safeInsets, viewport, VIEWPORT_CHANGED } from '../util/apply'
 import type { FieldCollected, HudInput, HudSnapshot, LeaderChanged, SquadMember, SquadSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
 import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
-import {
-  AimGuide,
-  Announcer,
-  ArcTrack,
-  Button,
-  confirmDialog,
-  DialButton,
-  hasModal,
-  Icon,
-  IconButton,
-  Joystick,
-  Label,
-  LAYER,
-  pageFrame,
-  Pill,
-  ProgressBar,
-  Scrim,
-} from '../ui'
+import { AimGuide, Announcer, ArcTrack, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim } from '../ui'
 import { SceneKey } from './keys'
-import { TeamStatsPanel } from './teamStats'
+import { openPause } from './pause'
 import type { DevProvider, DevProviderHost } from '../devtools'
 import { handoverMs } from '../ecs/systems/shared/squad'
 
@@ -57,11 +39,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private coinsPill!: Pill
   private announcer!: Announcer
   private last!: HudSnapshot
-  private paused = false
-  private pauseObjs: Phaser.GameObjects.GameObject[] = []
-  private statsPanel?: TeamStatsPanel
-  /** 暂停页正在看的队员；-1 表示下次打开时看队长 */
-  private statSlot = -1
   private fxIcons: { icon: Icon; bar: ProgressBar }[] = []
   private fxKey = ''
   private squad: SquadIcon[] = []
@@ -113,9 +90,9 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     const right = w - sR - 88
     this.killsPill = new Pill(this, right, sT + 32, { icon: '1f480', outline: 'player', text: '0', originX: 1 })
     this.coinsPill = new Pill(this, right, sT + 84, { icon: PICKUPS.coin.emoji, outline: 'player', text: '0', color: 'accent', originX: 1 })
-    new IconButton(this, w - sR - 42, sT + 42, { glyph: 'pause', size: 56, onTap: () => this.togglePause() }).setDepth(DEPTH.aim + 1)
+    new IconButton(this, w - sR - 42, sT + 42, { glyph: 'pause', size: 56, onTap: () => this.pause() }).setDepth(DEPTH.aim + 1)
     this.input.keyboard?.on('keydown-ESC', () => {
-      if (!hasModal(this)) this.togglePause()
+      if (!hasModal(this)) this.pause()
     })
 
     this.announcer = new Announcer(this)
@@ -134,9 +111,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
         if (slot >= 0) this.trySwitchLeader(slot)
       }),
     )
-    this.input.keyboard?.on('keydown-Q', () => {
-      if (!this.paused) this.arena.castLeaderSkill(null)
-    })
+    this.input.keyboard?.on('keydown-Q', () => this.arena.castLeaderSkill(null))
 
     const arenaEvents = this.arena.events
     arenaEvents.on(HudEvent.WaveComplete, this.onWaveComplete, this)
@@ -154,66 +129,18 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
       setActiveHudInput(undefined)
     })
-
-    if (this.arena.scene.isPaused()) {
-      this.paused = true
-      this.showPauseOverlay()
-    }
   }
 
-  private togglePause(): void {
-    if (this.paused) {
-      this.paused = false
-      for (const o of this.pauseObjs) o.destroy()
-      this.pauseObjs = []
-      this.statsPanel?.destroy()
-      this.statsPanel = undefined
-      this.arena.scene.resume()
-    } else {
-      this.paused = true
-      this.arena.scene.pause()
-      this.statSlot = -1
-      this.showPauseOverlay()
+  /** 打开暂停页：战斗与 HUD 一起停住，停住前放掉摇杆与瞄准，免得恢复时还按着 */
+  private pause(): void {
+    this.joystick?.release()
+    if (this.aiming) {
+      this.aiming = false
+      this.aimDir = null
+      this.arena.setSkillAim(null)
+      this.drawAim()
     }
-  }
-
-  /** 暂停页：标题在上，队伍属性面板居中，继续与结束本局在下 */
-  private showPauseOverlay(): void {
-    // 顶上一行留给压暗的 HUD，标题放在副标题行
-    const f = pageFrame({ sub: true, footer: true })
-    const depth = LAYER.overlay
-    const cx = f.centerX
-    const btnW = 300
-    const gap = 24
-    this.pauseObjs = [
-      new Scrim(this, { depth }),
-      new Label(this, cx, f.subY - 4, '已暂停', { kind: 'title', shadow: true }).setOrigin(0.5).setDepth(depth + 1),
-      new Button(this, cx - btnW / 2 - gap / 2, f.footerY, { label: '继 续', width: btnW, keys: ['SPACE'], onTap: () => this.togglePause() }).setDepth(depth + 2),
-      new Button(this, cx + btnW / 2 + gap / 2, f.footerY, {
-        label: '结束本局',
-        width: btnW,
-        variant: 'secondary',
-        onTap: () =>
-          confirmDialog(this, {
-            title: '结束本局？',
-            message: '本局进度不会保存',
-            confirmLabel: '结束本局',
-            danger: true,
-            onConfirm: () => {
-              endRun()
-              this.arena.scene.start(SceneKey.Menu)
-            },
-          }),
-      }).setDepth(depth + 2),
-    ]
-    const sheets = this.arena.teamSheets()
-    if (sheets.length === 0) return
-    const top = f.bodyTop
-    const pw = Math.min(f.right - f.left, 1160)
-    const slot = sheets[this.statSlot] ? this.statSlot : Math.max(0, sheets.findIndex((s) => s.leader))
-    this.statsPanel = new TeamStatsPanel(this, { x: cx - pw / 2, y: top, w: pw, h: f.bodyBottom - top }, sheets, slot, depth + 1, (s) => {
-      this.statSlot = s
-    })
+    openPause(this, { from: SceneKey.Battle })
   }
 
   update(): void {
@@ -289,19 +216,17 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   }
 
   private trySwitchLeader(slot: number): void {
-    if (this.paused) return
     this.arena.switchLeader(slot)
   }
 
   private onIconTap(slot: number): void {
-    if (this.paused) return
     if (slot !== this.squadShown.leader) this.trySwitchLeader(slot)
     else this.arena.castLeaderSkill(null)
   }
 
   /** 按住队长按钮开始瞄准或蓄力，只对方向型或蓄力型技能有效 */
   private beginAim(slot: number): boolean {
-    if (this.paused || slot !== this.squadShown.leader || this.aiming) return false
+    if (slot !== this.squadShown.leader || this.aiming) return false
     const sk = this.arena.leaderSkill()
     if (!sk || (!sk.aim && sk.holdMs <= 0)) return false
     this.aiming = true
