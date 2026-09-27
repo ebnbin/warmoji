@@ -1,6 +1,6 @@
 import { SceneKey } from '../scene/keys'
 import type { FightDef } from '../types/runs'
-import { runDef, stepOf } from './state'
+import { fightMap, runDef, stepOf } from './state'
 import type { RunState } from './state'
 
 /** 一步对应的页面 */
@@ -25,13 +25,14 @@ export function fought(run: RunState): boolean {
   return runDef(run).steps.slice(0, run.step).some((s) => s.kind === 'fight')
 }
 
-/** 当前这一场；步骤停在别处时往后找到下一场并停在那里 */
+/** 当前这一场；步骤停在别处时往后找到下一场并停在那里，地图换成这一场的 */
 export function enterFight(run: RunState): FightDef {
   const steps = runDef(run).steps
   for (let i = run.step; i < steps.length; i++) {
     const s = steps[i]!
     if (s.kind !== 'fight') continue
     run.step = i
+    run.mapId = fightMap(run, s.fight)
     return s.fight
   }
   throw new Error(`${runDef(run).name}已经没有战斗了`)

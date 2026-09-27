@@ -117,6 +117,8 @@ const checkSquad = (sq: Squad, path: string): void => {
   need((sq.hpMul ?? 1) > 0, `${path} 的血量倍率须为正`)
   need(sq.enemy === undefined || ENEMIES[sq.enemy] !== undefined, `${path} 引用了不存在的敌人：${sq.enemy}`)
   need(sq.drive === undefined || sq.enemy !== undefined, `${path} 换走法须指定敌人`)
+  const e = sq.escort
+  need(e === undefined || (ENEMIES[e.enemy] !== undefined && !isBoss(e.enemy) && e.count >= 1), `${path} 的护卫须引用非头目的敌人、至少一只`)
   checkAt(sq.at, path)
 }
 
@@ -173,6 +175,8 @@ const checkFight = (f: FightDef, path: string): void => {
     }
   }
   checkRules(f.rules, `${path}.rules`)
+  need(f.map === undefined || MAPS[f.map] !== undefined, `${path} 引用了不存在的地图：${f.map}`)
+  need((f.reward?.coins ?? 0) >= 0 && Number.isInteger(f.reward?.coins ?? 0), `${path} 的奖励金币须是非负整数`)
   need(f.ends.filter((e) => e.kind === 'time').length <= 1, `${path} 最多一条时限`)
   need(f.ends.length === 0 || f.ends.some((e) => e.kind !== 'downs' && !(e.kind === 'time' && e.lose)), `${path} 有结束规则就得有获胜条件`)
   for (const e of f.ends) {
@@ -212,6 +216,7 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
   need(r.team !== undefined || r.steps.slice(0, first).some((s) => s.kind === 'recruit'), `runs.${id} 没有预设队伍，第一场战斗之前须有招募`)
   need(PACK.has(r.emoji), `runs.${id} 的 emoji 不在表情包里：${r.emoji}`)
   need(r.map === undefined || MAPS[r.map] !== undefined, `runs.${id} 引用了不存在的地图：${r.map}`)
+  need(r.map === undefined || r.steps.every((s) => s.kind !== 'fight' || s.fight.map === undefined), `runs.${id} 固定了地图，各场就不能再换地图`)
   need(r.start === undefined || (r.start.wave >= 1 && r.start.sec >= 0), `runs.${id} 的开局进度须从第 1 波、第 0 秒起`)
   if (r.team && r.team !== 'knobs') checkTeam(r.team, `runs.${id}.team`)
   checkRules(r.rules, `runs.${id}.rules`)

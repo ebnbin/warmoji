@@ -3,14 +3,15 @@ import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
 import { CHARACTERS } from '../data/characters'
-import { RUN_IDS, RUNS } from '../data/runs'
+import { chaptersOf, fightsOf, RUN_IDS, RUNS } from '../data/runs'
+import type { Chapter } from '../data/runs'
 import { heatOf, MUTATOR_IDS, MUTATORS } from '../data/mutators'
 import type { MutatorId, RunId } from '../types/runs'
 import { beginRun, skipFilled } from '../run/state'
 import { mutatorFits } from '../run/rules'
 import { goStep } from './teamPage'
 import { mapPlayLines } from './mapLines'
-import { mutatorText, runRuleLines, runStepLines, starText, teamText } from './runLines'
+import { mutatorText, runRuleLines, runStepLines, starText, stepText, teamText } from './runLines'
 import { loadMap, loadMutators, saveMap, saveMutators } from '../save/selection'
 import { loadLabs } from '../save/labs'
 import type { LabBests } from '../save/labs'
@@ -20,15 +21,19 @@ import type { PageFrame, TabItem } from '../ui'
 import { VIEWPORT_CHANGED } from '../util/apply'
 import { SceneKey } from './keys'
 
-const GROUP_ICONS = { theme: '1f5fa', decor: '1f33f', play: '1f579', note: '1f9ea', team: '1f465', rules: '2696', steps: '1f4dc', stars: '2b50', heat: '1f525' } as const
+const GROUP_ICONS = { theme: '1f5fa', decor: '1f33f', play: '1f579', note: '1f9ea', team: '1f465', rules: '2696', steps: '1f4dc', stars: '2b50', heat: '1f525', fight: '2694' } as const
 /** 预设队伍里随机挑的位置 */
 const RANDOM_SLOT = '2753'
 
-/** 要选地图的玩法一种一个页签；地图固定的是关卡，都在实验关页签里挑 */
-const FREE_RUNS: readonly RunId[] = RUN_IDS.filter((id) => RUNS[id].map === undefined)
+/** 一局固定一张地图的是关卡，都在实验关页签里挑；各场都写了地图的是远征，按章挑着看；其余的要玩家选地图；关卡以外的一种一个页签 */
 const LABS: readonly RunId[] = RUN_IDS.filter((id) => RUNS[id].map !== undefined)
+const JOURNEYS: readonly RunId[] = RUN_IDS.filter((id) => RUNS[id].map === undefined && fightsOf(RUNS[id]).every((f) => f.map !== undefined))
+const TAB_RUNS: readonly RunId[] = RUN_IDS.filter((id) => !LABS.includes(id))
 const LAB_TAB = { key: 'labs', emoji: '1f9ea', name: '实验关' } as const
 type Mode = RunId | typeof LAB_TAB.key
+const isJourney = (mode: Mode): mode is RunId => JOURNEYS.some((id) => id === mode)
+const CHAPTER_NUMS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'] as const
+const chapterName = (i: number, c: Chapter): string => `第${CHAPTER_NUMS[i] ?? i + 1}章 · ${MAPS[c.map].name}`
 /** 词缀一行：勾选框、图标、名字与热度、改了什么 */
 const MUTATOR_ROW = { h: 68, gap: 8 } as const
 
@@ -36,10 +41,13 @@ export class MapScene extends Phaser.Scene {
   private preserveOnRestart = false
   private selectedId: MapId = MAP_IDS[0]!
   private labId: RunId | undefined = LABS[0]
-  private mode: Mode = FREE_RUNS[0]!
+  private mode: Mode = TAB_RUNS[0]!
+  /** 远征页签里正在看的章 */
+  private chapter = 0
   private frame!: PageFrame
   private mapGrid?: EmojiGrid<MapId>
   private labGrid?: TileGrid<RunId>
+  private chapterGrid?: TileGrid<number>
   private detail!: ScrollView
   private confirm!: Button
   /** 勾选的词缀，按词缀表的顺序；对当前关卡没用的开局时不带 */
@@ -79,11 +87,13 @@ export class MapScene extends Phaser.Scene {
     }
     this.bests = loadLabs(browserStorage())
     this.heatLine = undefined
-    const labs = this.mode === LAB_TAB.key
+    const mode = this.mode
+    const labs = mode === LAB_TAB.key
+    const journey = isJourney(mode)
 
     const f = (this.frame = pageFrame({ sub: true, footer: true }))
-    new PageHeader(this, f, { title: labs ? '选择关卡' : '选择地图', back: () => this.scene.start(SceneKey.Menu) })
-    const tabs: TabItem<Mode>[] = FREE_RUNS.map((id) => ({ key: id, label: `{${RUNS[id].emoji}} ${RUNS[id].name}` }))
+    new PageHeader(this, f, { title: labs ? '选择关卡' : journey ? `${RUNS[mode].name}路线` : '选择地图', back: () => this.scene.start(SceneKey.Menu) })
+    const tabs: TabItem<Mode>[] = TAB_RUNS.map((id) => ({ key: id, label: `{${RUNS[id].emoji}} ${RUNS[id].name}` }))
     if (LABS.length > 0) tabs.push({ key: LAB_TAB.key, label: `{${LAB_TAB.emoji}} ${LAB_TAB.name}` })
     new Tabs<Mode>(this, { x: f.left, y: f.subY, w: f.right - f.left }, {
       items: tabs,
@@ -102,7 +112,22 @@ export class MapScene extends Phaser.Scene {
 
     this.mapGrid = undefined
     this.labGrid = undefined
-    if (labs) {
+    this.chapterGrid = undefined
+    if (journey) {
+      const chapters = chaptersOf(RUNS[mode])
+      this.chapter = Math.min(this.chapter, chapters.length - 1)
+      const grid = (this.chapterGrid = new TileGrid<number>(this, f.list, { minWidth: 150, height: 132 }))
+      grid.onTap = (i): void => {
+        this.chapter = i
+        this.refresh()
+      }
+      grid.setItems(
+        chapters.map((c, i) => {
+          const fights = c.steps.filter((s) => s.step.kind === 'fight').length
+          return { key: i, emoji: MAPS[c.map].emoji, title: chapterName(i, c), icons: Array.from({ length: fights }, () => GROUP_ICONS.fight) }
+        }),
+      )
+    } else if (labs) {
       const grid = (this.labGrid = new TileGrid<RunId>(this, f.list, { minWidth: 150, height: 132 }))
       grid.onTap = (id): void => {
         this.labId = id
@@ -130,6 +155,7 @@ export class MapScene extends Phaser.Scene {
 
     this.refresh()
     if (labs && this.labId) this.labGrid?.reveal(this.labId)
+    if (journey) this.chapterGrid?.reveal(this.chapter)
 
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -141,7 +167,7 @@ export class MapScene extends Phaser.Scene {
     const mode = this.mode
     const id = mode === LAB_TAB.key ? this.labId : mode
     if (!id) return
-    const run = beginRun(id, this.selectedId, mode === LAB_TAB.key ? this.applied(id) : [])
+    const run = beginRun(id, this.selectedId, mode === LAB_TAB.key || isJourney(mode) ? this.applied(id) : [])
     skipFilled(run)
     goStep(this, run)
   }
@@ -151,20 +177,22 @@ export class MapScene extends Phaser.Scene {
     return this.mutators.filter((m) => mutatorFits(RUNS[id], MUTATORS[m]))
   }
 
-  private toggleMutator(id: MutatorId, on: boolean): void {
+  private toggleMutator(mutator: MutatorId, on: boolean): void {
     const chosen = new Set(this.mutators)
-    if (on) chosen.add(id)
-    else chosen.delete(id)
+    if (on) chosen.add(mutator)
+    else chosen.delete(mutator)
     this.mutators = MUTATOR_IDS.filter((m) => chosen.has(m))
     saveMutators(browserStorage(), this.mutators)
-    if (this.labId) this.showHeat(this.labId)
+    const id = this.mode === LAB_TAB.key ? this.labId : this.mode
+    if (id) this.showHeat(id)
   }
 
   /** 热度的一行与开始键跟着勾选变 */
   private showHeat(id: RunId): void {
     const heat = heatOf(this.applied(id))
+    const go = isJourney(this.mode) ? `开始${RUNS[id].name}` : '开始挑战'
     this.heatLine?.setText(heat > 0 ? `这一局热度 ${heat}` : '没有勾选词缀，热度 0').setInk(heat > 0 ? 'warn' : 'muted')
-    this.confirm.setLabel(heat > 0 ? `开始挑战 · 热度 ${heat}` : '开始挑战')
+    this.confirm.setLabel(heat > 0 ? `${go} · 热度 ${heat}` : go)
   }
 
   private renderMap(mode: RunId): void {
@@ -208,14 +236,47 @@ export class MapScene extends Phaser.Scene {
     }
     flow.heading('流程', GROUP_ICONS.steps)
     for (const line of runStepLines(run)) flow.text(line)
-    if (run.stars) {
-      const best = this.bests[id]
-      flow.gap(6).heading('星级', GROUP_ICONS.stars)
-      flow.text(`过关得一星，下面每做到一条再得一星：${run.stars.map(starText).join('；')}`)
-      flow.text(best ? `最好成绩 ${best.stars}/${1 + run.stars.length} 星${best.heat > 0 ? ` · 最高热度 ${best.heat}` : ''}` : '还没有过关', { color: best ? 'accent' : 'muted' })
-    }
+    this.flowStars(flow, id)
     this.flowMutators(flow, id)
     flow.finish()
+  }
+
+  /** 远征：说明、这一章的每一步，外加整局的规则、星级与词缀 */
+  private renderJourney(id: RunId): void {
+    const view = this.detail.clear()
+    const run = RUNS[id]
+    const chapters = chaptersOf(run)
+    const c = chapters[this.chapter]!
+    const map = MAPS[c.map]
+    const width = this.frame.detail.w - 48
+    const flow = new Flow(this, view, { x: 24, y: 12, width })
+    flow.put(new RichLabel(this, 24, 42, `{${run.emoji}} ${run.name}`, { kind: 'lead', iconSize: 76, gap: 14, originX: 0, maxWidth: width }), 90)
+    flow.text(run.desc, { color: 'ink', indent: false }).gap(6)
+    flow.heading(chapterName(this.chapter, c), map.emoji).text(mapPlayLines(map)[0]!, { color: 'muted' })
+    for (const { step, index } of c.steps) flow.text(`${index + 1}. ${stepText(step)}`)
+    flow.gap(6)
+    const rules = runRuleLines(run)
+    if (rules.length > 0) {
+      flow.heading('队伍规则', GROUP_ICONS.rules)
+      for (const line of rules) flow.text(line)
+      flow.gap(6)
+    }
+    this.flowStars(flow, id)
+    this.flowMutators(flow, id)
+    flow.finish()
+  }
+
+  /** 星级条件与最好成绩：赢过的写星数与最高热度，没赢过的写最远打过了几场 */
+  private flowStars(flow: Flow, id: RunId): void {
+    const run = RUNS[id]
+    if (!run.stars) return
+    const best = this.bests[id]
+    const won = best !== undefined && best.stars > 0
+    const fights = fightsOf(run).length
+    flow.gap(6).heading('星级', GROUP_ICONS.stars)
+    flow.text(`过关得一星，下面每做到一条再得一星：${run.stars.map(starText).join('；')}`)
+    const tried = best && best.reached > 0 && fights > 1 ? `还没有通关，最远打过了 ${best.reached}/${fights} 场` : '还没有过关'
+    flow.text(won ? `最好成绩 ${best.stars}/${1 + run.stars.length} 星${best.heat > 0 ? ` · 最高热度 ${best.heat}` : ''}` : tried, { color: won ? 'accent' : 'muted' })
   }
 
   /** 词缀：对这一关有用的一个一行，勾上就在开局时带上 */
@@ -245,6 +306,14 @@ export class MapScene extends Phaser.Scene {
   }
 
   private refresh(): void {
+    const mode = this.mode
+    if (isJourney(mode)) {
+      this.chapterGrid?.setSelected(this.chapter)
+      this.heatLine = undefined
+      this.confirm.setLabel(`开始${RUNS[mode].name}`).setEnabled(true)
+      this.renderJourney(mode)
+      return
+    }
     if (this.mode === LAB_TAB.key) {
       const id = this.labId
       this.labGrid?.setSelected(id ?? null)

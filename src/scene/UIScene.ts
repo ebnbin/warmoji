@@ -428,6 +428,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     new Pill(this, cx + 12, cy + 16, { icon: PICKUPS.coin.emoji, outline: 'player', text: `金币 +${s.coins}`, color: 'accent', size: 'lg', originX: 0 }).setDepth(
       DEPTH.waveEnd + 1,
     )
+    if (s.reward) new Label(this, cx, cy + 84, s.reward, { kind: 'heading', color: 'good', outline: true }).setOrigin(0.5).setDepth(DEPTH.waveEnd + 1)
   }
 
   devProvider(): DevProvider {
@@ -447,7 +448,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
                 { label: '拾取提示', run: () => this.onFieldCollected({ emoji: PICKUPS.coin.emoji, name: '预览拾取', desc: '开发者工具触发', polarity: 'buff' }) },
                 { label: '技能提示', run: () => this.onSkillCast('预览技能') },
                 { label: '队长交接', run: () => this.onLeaderChanged({ emoji: PICKUPS.coin.emoji, name: '预览' }) },
-                { label: '波次完成', run: () => this.onWaveComplete({ title: '第 1 波完成！', kills: 12, coins: 34 }) },
+                { label: '波次完成', run: () => this.onWaveComplete({ title: '第 1 波完成！', kills: 12, coins: 34, reward: '过关奖励 金币 +60、全队回满血' }) },
               ],
             },
           ],

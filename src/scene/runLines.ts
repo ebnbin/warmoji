@@ -2,7 +2,7 @@ import { CHARACTERS } from '../data/characters'
 import { RARITIES } from '../data/items'
 import { modTexts } from '../data/stats'
 import { TAGS } from '../data/tags'
-import type { EndRule, FightDef, FightRules, MutatorDef, RunDef, ShopRules, StarRule, StepDef, TeamDef } from '../types/runs'
+import type { EndRule, FightDef, FightReward, FightRules, MutatorDef, RunDef, ShopRules, StarRule, StepDef, TeamDef } from '../types/runs'
 
 const sec = (ms: number): string => `${+(ms / 1000).toFixed(1)} 秒`
 
@@ -33,7 +33,13 @@ function winText(e: EndRule): string | null {
   }
 }
 
-/** 一场怎么赢、怎么输，外加这一场的特别规则 */
+/** 过关奖励的说法；没有奖励是 null */
+export function rewardText(r: FightReward | undefined): string | null {
+  const parts = [r?.coins ? `金币 +${r.coins}` : '', r?.heal ? '全队回满血' : ''].filter(Boolean)
+  return parts.length > 0 ? `过关奖励 ${parts.join('、')}` : null
+}
+
+/** 一场怎么赢、怎么输，外加这一场的特别规则与过关奖励 */
 export function fightGoalText(f: FightDef): string {
   const wins = f.ends.flatMap((e) => winText(e) ?? [])
   const rules: string[] = []
@@ -43,6 +49,8 @@ export function fightGoalText(f: FightDef): string {
   }
   rules.push(...ruleLines(f.rules))
   if (f.chaseLeader) rules.push('敌人都盯着队长')
+  const reward = rewardText(f.reward)
+  if (reward) rules.push(reward)
   return [wins.length === 0 ? '不会结束' : wins.join('，或'), ...rules].join(' · ')
 }
 
@@ -111,10 +119,11 @@ export function mutatorText(m: MutatorDef): string {
   return [...ruleLines(m.rules), ...(m.enemyMods ? [`敌人${modTexts(m.enemyMods).join('、')}`] : [])].join('，')
 }
 
-function stepText(s: StepDef): string {
+/** 一步的说法 */
+export function stepText(s: StepDef): string {
   switch (s.kind) {
     case 'recruit':
-      return `招募到 ${s.upTo} 人`
+      return s.upTo === 1 ? '招募首发' : `招募到 ${s.upTo} 人`
     case 'shop':
       return '商店'
     case 'fight':

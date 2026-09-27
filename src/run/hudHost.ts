@@ -23,6 +23,8 @@ export interface WaveSummary {
   title: string
   kills: number
   coins: number
+  /** 过关奖励的说法；没有奖励是 null */
+  reward: string | null
 }
 
 export interface WaveWarning {

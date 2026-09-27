@@ -13,7 +13,7 @@ import { levelProgress, stackCount } from '../run/draft'
 import { activeHudHost } from '../run/hudHost'
 import type { HudSnapshot, MemberSheet } from '../run/hudHost'
 import { levelCap, memberLevel, memberLook, memberOutStats } from '../run/members'
-import { endRun, foughtMs, getRun, leaderSlot, runDef, waveStartHp } from '../run/state'
+import { endRun, fightMap, foughtMs, getRun, leaderSlot, runDef, waveStartHp } from '../run/state'
 import { fightAfterRecruit, fightsDone, lastFight, nextFight } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { CharacterId } from '../types/characters'
@@ -121,14 +121,19 @@ function runFoes(run: RunState): Foe[] {
   const firstWave = def.start?.wave ?? 1
   fightsOf(def).forEach((f, i) => {
     const n = i + 1
+    const map = fightMap(run, f)
     const mix = (): void => {
       if (f.mix) for (const m of f.mix) add(ENEMIES[m.kind], n)
-      else for (const row of MAPS[run.mapId].mix) add(ENEMIES[row.kind], Math.max(n, row.sinceWave - firstWave + 1))
+      else for (const row of MAPS[map].mix) add(ENEMIES[row.kind], Math.max(n, row.sinceWave - firstWave + 1))
     }
-    const squad = (sq: Squad): void => (sq.enemy ? add(ENEMIES[sq.enemy], n) : mix())
+    const squad = (sq: Squad): void => {
+      if (sq.enemy) add(ENEMIES[sq.enemy], n)
+      else mix()
+      if (sq.escort) add(ENEMIES[sq.escort.enemy], n)
+    }
     for (const s of f.spawns) {
-      if (s.kind === 'boss') add(bossFor(run.mapId), n)
-      else if (s.kind === 'knobs') for (const e of mapEnemyRoster(run.mapId)) add(e, n)
+      if (s.kind === 'boss') add(bossFor(map), n)
+      else if (s.kind === 'knobs') for (const e of mapEnemyRoster(map)) add(e, n)
       else if (s.kind === 'batch') squad(s.squad)
       else if (s.kind === 'waves') s.squads.forEach(squad)
       else mix()
@@ -448,7 +453,7 @@ export class PauseScene extends Phaser.Scene {
     if (fights.length > 1) {
       const done = fightsDone(run)
       const prev = lastFight(run)
-      const tag = (f: FightDef): string => fightTag(def, f, run.mapId)
+      const tag = (f: FightDef): string => fightTag(def, f, fightMap(run, f))
       flow.text(
         snap && cur
           ? `${cur.name ?? ''}进行中${tag(cur)}${remain === null ? '' : ` · 本${unit}还剩 ${formatTime(Math.ceil(remain / 1000))}`}`
@@ -461,7 +466,7 @@ export class PauseScene extends Phaser.Scene {
       const numbered = fights.map((f, i) => ({ f, n: i + 1 }))
       const elites = numbered.filter(({ f, n }) => n > done && tag(f) === `（精英${unit}）`).map(({ n }) => n)
       const bosses = numbered.flatMap(({ f, n }) => {
-        const names = fightBosses(f, run.mapId).map((b) => b.name)
+        const names = fightBosses(f, fightMap(run, f)).map((b) => b.name)
         return names.length > 0 ? [`第 ${n} ${unit}是首领${unit}：${names.join('、')}`] : []
       })
       flow.text([elites.length > 0 ? `精英${unit}还有第 ${elites.join('、')} ${unit}` : '', ...bosses].filter(Boolean).join(' · '))

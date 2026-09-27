@@ -28,7 +28,7 @@ export interface MixEntry {
   readonly weight: number
 }
 
-/** 一队敌人：不写 enemy 就按这一场的配比抽，指定头目时血量不随进度涨；前 elites 只必是精英、其余各有 eliteChance 的几率；spreadMs 内依次放出；hpMul 乘在血量上；drive 换掉指定敌人的走法；bounty 为真时是悬赏目标 */
+/** 一队敌人：不写 enemy 就按这一场的配比抽，指定头目时血量不随进度涨；前 elites 只必是精英、其余各有 eliteChance 的几率；spreadMs 内依次放出；hpMul 乘在血量上；drive 换掉指定敌人的走法；bounty 为真时是悬赏目标；escort 是跟着这一队一起放出的另一种敌人，不算悬赏目标 */
 export interface Squad {
   readonly count: number
   readonly enemy?: EnemyKind
@@ -39,6 +39,14 @@ export interface Squad {
   readonly hpMul?: number
   readonly drive?: DriveDef
   readonly bounty?: boolean
+  readonly escort?: Escort
+}
+
+/** 护卫：count 只 enemy，elite 为真时都是精英 */
+export interface Escort {
+  readonly enemy: EnemyKind
+  readonly count: number
+  readonly elite?: boolean
 }
 
 /** 连续刷怪：间隔不写 intervalMs 就按进度与队伍人数算，再乘 intervalMul；每只有 eliteChance 的几率是精英；只在开打后 fromMs 到 untilMs 之间刷；场上敌人到 cap 就这一轮不刷 */
@@ -169,9 +177,16 @@ export interface MutatorDef {
   readonly enemyMods?: StatMods
 }
 
-/** 一场战斗：刷什么怪、什么时候结束；intro 是开打时的横幅，mix 换掉地图的配比，enemyMods 是这一场给敌人的常驻修正，chaseLeader 让追人的敌人都盯着队长，rules 是我方在这一场的规则；不写名字就只显示用时 */
+/** 过关奖励：coins 是额外的金币，heal 为真时全队回满血进下一场 */
+export interface FightReward {
+  readonly coins?: number
+  readonly heal?: boolean
+}
+
+/** 一场战斗：刷什么怪、什么时候结束；map 让这一场换到这张地图上打，不写就在一局的地图上；intro 是开打时的横幅，mix 换掉地图的配比，enemyMods 是这一场给敌人的常驻修正，chaseLeader 让追人的敌人都盯着队长，rules 是我方在这一场的规则，reward 是过关奖励；不写名字就只显示用时 */
 export interface FightDef {
   readonly name?: string
+  readonly map?: MapId
   readonly intro?: Banner
   readonly mix?: readonly MixEntry[]
   readonly spawns: readonly SpawnRule[]
@@ -179,6 +194,7 @@ export interface FightDef {
   readonly enemyMods?: StatMods
   readonly chaseLeader?: boolean
   readonly rules?: FightRules
+  readonly reward?: FightReward
 }
 
 /** 一步：招募到 upTo 人、进商店、打一场 */

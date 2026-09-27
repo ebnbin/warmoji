@@ -7,7 +7,7 @@ import { PICKUPS } from '../data/pickups'
 import { fightsOf } from '../data/runs'
 import { heatOf } from '../data/mutators'
 import { submitScore } from '../save/highscore'
-import { submitLab } from '../save/labs'
+import { reachLab, submitLab } from '../save/labs'
 import { ITEMS } from '../data/items'
 import { beginRun, endRun, foughtMs, getRun, runDef, skipFilled } from '../run/state'
 import { starMet } from '../run/stars'
@@ -71,8 +71,10 @@ export class ResultScene extends Phaser.Scene {
         const met = def.stars.map((s) => starMet(this.run, s))
         const stars = 1 + met.filter(Boolean).length
         const heat = heatOf(this.run.mutators)
-        const r = submitLab(browserStorage(), this.run.runId, stars, heat)
+        const r = submitLab(browserStorage(), this.run.runId, stars, heat, fights)
         this.lab = { met, stars, heat, newBest: r.newStars || r.newHeat }
+      } else if (def.stars) {
+        reachLab(browserStorage(), this.run.runId, reached - 1)
       }
       playSfx(this.win ? 'levelup' : 'over')
     }
@@ -149,9 +151,9 @@ export class ResultScene extends Phaser.Scene {
       this.scene.start(SceneKey.Map)
     }
     const retry = (): void => {
-      const { runId, mapId, mutators } = this.run
+      const { runId, homeMap, mutators } = this.run
       endRun()
-      const run = beginRun(runId, mapId, mutators)
+      const run = beginRun(runId, homeMap, mutators)
       skipFilled(run)
       goStep(this, run)
     }

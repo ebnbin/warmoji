@@ -4,7 +4,7 @@ import { timeLimitMs } from '../../data/runs'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
 import type { EnemyDef, EnemyMixEntry } from '../../types/enemies'
-import type { EndRule, FightDef, HoldPoint, SpawnAt, StreamRule, WavesRule } from '../../types/runs'
+import type { EndRule, FightDef, HoldPoint, SpawnAt, Squad, StreamRule, WavesRule } from '../../types/runs'
 import type { StatMods } from '../../types/stats'
 import { activeRules, enemyModsOf, mutatorRules } from '../../run/rules'
 import type { ActiveRules } from '../../run/rules'
@@ -153,16 +153,22 @@ function onField(sim: Sim): number {
   return n + query(sim.world, [Telegraph]).length
 }
 
-/** 还没放出的敌人：排着的单只、没登场的一队、没来的组 */
+/** 一队连同护卫一共几只 */
+export function squadSize(squad: Squad): number {
+  return squad.count + (squad.escort?.count ?? 0)
+}
+
+/** 还没放出的敌人：排着的单只、没登场的一队、没来的组；只数悬赏目标时护卫不算 */
 function pendingCount(sim: Sim, bountyOnly: boolean): number {
   let n = 0
+  const size = (sq: Squad): number => (bountyOnly ? (sq.bounty ? sq.count : 0) : squadSize(sq))
   for (const e of query(sim.world, [Due, Order])) if (!bountyOnly || foeSpec[e]?.bounty) n++
   for (const e of query(sim.world, [Due, Call])) {
     const r = callRule[e]
-    if (r?.kind === 'batch' && (!bountyOnly || r.squad.bounty)) n += r.squad.count
+    if (r?.kind === 'batch') n += size(r.squad)
     if (r?.kind === 'boss' && !bountyOnly) n++
   }
-  for (const w of sim.fight.waves) for (const sq of w.rule.squads.slice(w.next)) if (!bountyOnly || sq.bounty) n += sq.count
+  for (const w of sim.fight.waves) for (const sq of w.rule.squads.slice(w.next)) n += size(sq)
   return n
 }
 
