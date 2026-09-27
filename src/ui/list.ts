@@ -43,6 +43,28 @@ export class ListItem extends Widget {
   }
 }
 
+export interface RowOptions {
+  readonly onTap?: () => void
+  /** 压暗：例如被隐藏的条目 */
+  readonly dim?: boolean
+}
+
+/** 可点的一条横栏；(x, y) 是左上角，子对象用行内局部坐标 */
+export class Row extends Widget {
+  constructor(scene: Phaser.Scene, x: number, y: number, width: number, height: number, opts: RowOptions = {}) {
+    super(scene, x, y)
+    const bg = scene.add.graphics()
+    drawBlock(bg, 0, 0, width, height, {
+      face: opts.dim ? SURFACE.sunken : SURFACE.raised,
+      radius: SHAPE.radius.sm + 2,
+      drop: opts.dim ? 0 : 3,
+      lineW: 2,
+    })
+    this.add(bg)
+    if (opts.onTap) pressable(this, { shape: new Phaser.Geom.Rectangle(0, 0, width, height + 3), onTap: opts.onTap })
+  }
+}
+
 export interface KeyValue {
   readonly key: string
   readonly value: string

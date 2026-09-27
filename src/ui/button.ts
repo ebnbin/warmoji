@@ -127,7 +127,8 @@ export class Button extends Widget {
 export interface IconButtonOptions {
   /** emoji；和 glyph 二选一 */
   readonly icon?: string
-  readonly glyph?: 'pause'
+  /** 画出来的符号：暂停、展开（朝右）、收起（朝下） */
+  readonly glyph?: 'pause' | 'expand' | 'collapse'
   /** 直径 */
   readonly size?: number
   readonly variant?: 'light' | 'dark'
@@ -153,13 +154,19 @@ export class IconButton extends Widget {
     this.face = scene.add.container(0, 0)
     if (opts.icon) {
       this.face.add(new Icon(scene, 0, 0, opts.icon, Math.round(size * 0.6)))
-    } else if (opts.glyph === 'pause') {
-      const g = scene.add.graphics()
-      const bw = Math.round(size * 0.13)
-      const bh = Math.round(size * 0.38)
-      g.fillStyle(opts.variant === 'dark' ? INK.ink : INK.dark, 1)
-      g.fillRoundedRect(-bw * 1.4, -bh / 2, bw, bh, bw / 2)
-      g.fillRoundedRect(bw * 0.4, -bh / 2, bw, bh, bw / 2)
+    } else if (opts.glyph) {
+      const g = scene.add.graphics().fillStyle(opts.variant === 'dark' ? INK.ink : INK.dark, 1)
+      const u = size * 0.19
+      if (opts.glyph === 'pause') {
+        const bw = Math.round(size * 0.13)
+        const bh = Math.round(size * 0.38)
+        g.fillRoundedRect(-bw * 1.4, -bh / 2, bw, bh, bw / 2)
+        g.fillRoundedRect(bw * 0.4, -bh / 2, bw, bh, bw / 2)
+      } else if (opts.glyph === 'expand') {
+        g.fillTriangle(-u * 0.6, -u, -u * 0.6, u, u, 0)
+      } else {
+        g.fillTriangle(-u, -u * 0.6, u, -u * 0.6, 0, u)
+      }
       this.face.add(g)
     }
     this.add([this.bg, this.face])
