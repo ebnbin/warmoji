@@ -57,12 +57,4 @@ export const BATTLEFIELD = {
     ],
   },
   field: { grabRadiusU: 0.9, groundMs: 9000, auraRadiusU: 0.85 },
-  carrierBudget: {
-    boss: { buff: 1, debuff: 2 },
-    waveTiers: [
-      { upToWave: 3, buff: 2, debuff: 1 },
-      { upToWave: 8, buff: 2, debuff: 2 },
-    ],
-    fallback: { buff: 3, debuff: 3 },
-  },
 } as const satisfies BattlefieldTuning

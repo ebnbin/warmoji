@@ -14,6 +14,5 @@ const DIFF = fromJson<Difficulty>(difficultyJson)
 export const SPAWN = DIFF.spawn
 export const ELITE = DIFF.elite
 export const SURGE = DIFF.surge
-export const BOSS_SPAWN_RELIEF = DIFF.bossSpawnRelief
 
 export const AI = fromJson<AiTuning>(aiJson)

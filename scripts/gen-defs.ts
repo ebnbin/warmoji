@@ -79,11 +79,6 @@ for (const e of Object.values(ENEMIES).flatMap(withNested)) {
   }
 }
 
-need(
-  PROGRESSION.loopFrom >= 1 && PROGRESSION.loopFrom <= PROGRESSION.waveDurationsSec.length,
-  'progression.loopFrom 须在 1 到总波数之间',
-)
-
 /** 一场战斗的规则：数值在范围内，头目倒下才结束的战斗得有头目登场 */
 const checkFight = (f: FightDef, path: string): void => {
   for (const s of f.spawns) {

@@ -3,9 +3,6 @@ export interface WaveState {
   hpMultiplier: number
 }
 export interface Progression {
-  readonly waveDurationsSec: readonly number[]
-  readonly eliteWaves: readonly number[]
-  readonly loopFrom: number
   readonly reviveHpRatio: number
   readonly summaryMs: number
   readonly coinDropChanceMin: number

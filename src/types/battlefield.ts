@@ -23,13 +23,4 @@ export interface BattlefieldTuning {
     readonly groundMs: number
     readonly auraRadiusU: number
   }
-  readonly carrierBudget: {
-    readonly boss: { readonly buff: number; readonly debuff: number }
-    readonly waveTiers: readonly {
-      readonly upToWave: number
-      readonly buff: number
-      readonly debuff: number
-    }[]
-    readonly fallback: { readonly buff: number; readonly debuff: number }
-  }
 }
