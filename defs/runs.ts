@@ -69,6 +69,7 @@ const LABS = {
     map: 'forest',
     team: { slots: [{ tags: ['defense'] }, { tags: ['damage', 'area'] }, { tags: ['damage', 'ranged'] }], level: 2 },
     start: { wave: 4, sec: 90 },
+    stars: [{ kind: 'downs', count: 0 }, { kind: 'time', ms: 90_000 }],
     steps: [
       {
         kind: 'fight',
@@ -102,6 +103,7 @@ const LABS = {
     map: 'desert',
     team: { slots: [{ tags: ['damage'] }, { tags: ['damage'] }, { tags: ['area'] }, { tags: ['mobile'] }], level: 2 },
     start: { wave: 5, sec: 150 },
+    stars: [{ kind: 'time', ms: 50_000 }, { kind: 'downs', count: 0 }],
     steps: [
       {
         kind: 'fight',
@@ -129,6 +131,7 @@ const LABS = {
     map: 'ruins',
     team: { slots: ['detective', 'eagle', 'chipmunk'], level: 2 },
     start: { wave: 4, sec: 100 },
+    stars: [{ kind: 'time', ms: 60_000 }, { kind: 'downs', count: 0 }],
     steps: [
       {
         kind: 'fight',
@@ -163,6 +166,7 @@ const LABS = {
     map: 'forest',
     team: { slots: ['guard', 'panda', { tags: ['support'] }, { tags: ['area'] }], level: 2 },
     start: { wave: 5, sec: 120 },
+    stars: [{ kind: 'time', ms: 80_000 }, { kind: 'switches', count: 0 }],
     steps: [
       {
         kind: 'fight',
@@ -191,6 +195,7 @@ const LABS = {
     map: 'ruins',
     team: { slots: ['unicorn', 'kangaroo', 'frog'], level: 2 },
     start: { wave: 6, sec: 180 },
+    stars: [{ kind: 'time', ms: 50_000 }, { kind: 'skills', count: 0 }],
     steps: [
       {
         kind: 'fight',
@@ -215,6 +220,7 @@ const LABS = {
     map: 'void',
     team: { slots: [{ tags: ['damage', 'area'] }, { tags: ['mobile'] }, { tags: ['ranged'] }], level: 2 },
     start: { wave: 3, sec: 60 },
+    stars: [{ kind: 'time', ms: 55_000 }, { kind: 'downs', count: 0 }],
     steps: [
       {
         kind: 'fight',
@@ -248,6 +254,7 @@ const LABS = {
     map: 'space',
     team: { slots: [{ tags: ['defense'] }, { tags: ['support'] }, { tags: ['damage', 'ranged'] }], level: 2 },
     start: { wave: 6, sec: 150 },
+    stars: [{ kind: 'kills', count: 100 }, { kind: 'skills', count: 0 }],
     steps: [
       {
         kind: 'fight',
@@ -273,6 +280,7 @@ const LABS = {
     team: { slots: [{ tags: ['area'] }, { tags: ['control'] }, { tags: ['defense'] }], level: 2 },
     rules: { surprise: true },
     start: { wave: 4, sec: 90 },
+    stars: [{ kind: 'downs', count: 0 }, { kind: 'time', ms: 55_000 }],
     steps: [
       {
         kind: 'fight',
@@ -301,6 +309,7 @@ const LABS = {
     rules: { between: 'full', leader: { switchCdMs: 8000 } },
     coins: 150,
     start: { wave: 10, sec: 300 },
+    stars: [{ kind: 'downs', count: 0 }, { kind: 'time', ms: 150_000 }],
     steps: [
       { kind: 'shop' },
       {
@@ -349,6 +358,7 @@ const LABS = {
     team: { slots: ['medic', 'guard', 'jellyfish', 'fencer'], level: 2 },
     rules: { revive: false, rescue: { ms: 2500, radius: 1.2 }, lives: 3 },
     start: { wave: 5, sec: 120 },
+    stars: [{ kind: 'lives', count: 2 }, { kind: 'time', ms: 120_000 }],
     steps: [
       {
         kind: 'fight',
@@ -385,6 +395,7 @@ const LABS = {
     rules: { between: 'permadeath' },
     coins: 40,
     start: { wave: 3, sec: 60 },
+    stars: [{ kind: 'downs', count: 0 }, { kind: 'time', ms: 150_000 }],
     steps: [
       {
         kind: 'fight',
@@ -433,6 +444,7 @@ const LABS = {
     map: 'ruins',
     team: { slots: [{ tags: ['damage'] }, { tags: ['damage'] }, { tags: ['support'] }], level: 3 },
     start: { wave: 8, sec: 200 },
+    stars: [{ kind: 'time', ms: 80_000 }, { kind: 'downs', count: 0 }],
     steps: [
       {
         kind: 'fight',
@@ -463,6 +475,7 @@ const LABS = {
     team: { slots: ['mage', 'guard', 'panda', 'medic'], level: 2 },
     rules: { leader: { lock: true, critical: true } },
     start: { wave: 5, sec: 120 },
+    stars: [{ kind: 'downs', count: 0 }, { kind: 'kills', count: 80 }],
     steps: [
       {
         kind: 'fight',
@@ -490,6 +503,7 @@ const LABS = {
     rules: { recruit: { tags: ['melee'] }, mods: { add: { lifesteal: 0.06 } } },
     coins: 40,
     start: { wave: 3, sec: 60 },
+    stars: [{ kind: 'downs', count: 0 }, { kind: 'time', ms: 150_000 }],
     steps: [
       {
         kind: 'fight',
@@ -514,6 +528,97 @@ const LABS = {
               gapMs: 2500,
               squads: [
                 { count: 12, banner: { title: '第一批', sub: '贴上去打' } },
+                { count: 16, elites: 1, banner: { title: '第二批', sub: '来了个精英' } },
+                { count: 20, eliteChance: 0.15, banner: { title: '最后一批', sub: '清掉它们' } },
+              ],
+            },
+          ],
+          ends: [{ kind: 'cleared' }],
+        },
+      },
+      { kind: 'recruit', upTo: 4 },
+      { kind: 'shop' },
+      {
+        kind: 'fight',
+        fight: {
+          name: '第三场 · 头目',
+          spawns: [{ kind: 'stream', intervalMul: 2 }, { kind: 'boss', atMs: EVENT_MS }],
+          ends: [{ kind: 'boss' }, { kind: 'time', ms: 75_000 }],
+        },
+      },
+    ],
+  },
+  night: {
+    emoji: '1f319',
+    name: '夜猎',
+    desc: '四下一片漆黑，只看得见队长身边 5 格；四名悬赏目标藏在黑暗里，看见队伍就逃，箭头指向最近的一个。90 秒内把它们全部击倒',
+    note: '视野缩小：远处的敌人和预兆都看不见，追目标只能跟着箭头摸黑走',
+    map: 'forest',
+    team: { slots: [{ tags: ['damage', 'ranged'] }, { tags: ['mobile'] }, { tags: ['support'] }], level: 2 },
+    rules: { vision: 5 },
+    start: { wave: 4, sec: 100 },
+    stars: [{ kind: 'time', ms: 60_000 }, { kind: 'downs', count: 0 }],
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '夜猎',
+          intro: { title: '夜猎', sub: '摸黑击倒全部悬赏目标' },
+          spawns: [
+            { kind: 'stream', intervalMul: 1.2 },
+            {
+              kind: 'batch',
+              atMs: 3000,
+              squad: { count: 2, enemy: 'raccoon', elites: 2, hpMul: 1.5, drive: { kind: 'flee', range: 6 }, at: { kind: 'far' }, bounty: true },
+              banner: { title: '悬赏发布', sub: '两名怪盗躲进了黑暗' },
+            },
+            {
+              kind: 'batch',
+              atMs: 25_000,
+              squad: { count: 2, enemy: 'knight', elites: 2, hpMul: 1.5, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true },
+              banner: { title: '追加悬赏', sub: '两名狼骑也摸黑逃窜' },
+            },
+          ],
+          ends: [{ kind: 'bounty' }, { kind: 'time', ms: 90_000, lose: true }],
+        },
+      },
+    ],
+  },
+  bootcamp: {
+    emoji: '1f530',
+    name: '新兵营',
+    desc: '队员永远是 1 级、不能放主动技能；商店只卖普通和稀有道具、不能刷新。两人出发打三场，场与场之间招人、逛商店',
+    note: '把升级、技能和刷新都锁住：成长只剩买什么，打法只剩走位和站位',
+    map: 'desert',
+    team: { slots: [{ tags: ['damage'] }, { tags: ['defense'] }], level: 1 },
+    rules: { maxLevel: 1, skills: false, shop: { rarity: { max: 'rare' }, reroll: false } },
+    coins: 60,
+    start: { wave: 3, sec: 60 },
+    stars: [{ kind: 'downs', count: 0 }, { kind: 'switches', count: 0 }],
+    steps: [
+      {
+        kind: 'fight',
+        fight: {
+          name: '第一场 · 列队',
+          intro: { title: '第一场 · 列队', sub: '撑过 40 秒' },
+          spawns: [{ kind: 'stream' }],
+          ends: [{ kind: 'time', ms: 40_000 }],
+        },
+      },
+      { kind: 'recruit', upTo: 3 },
+      { kind: 'shop' },
+      {
+        kind: 'fight',
+        fight: {
+          name: '第二场 · 清场',
+          intro: { title: '第二场 · 清场', sub: '清空三批敌人' },
+          spawns: [
+            {
+              kind: 'waves',
+              atMs: 3000,
+              gapMs: 2500,
+              squads: [
+                { count: 12, banner: { title: '第一批', sub: '稳住阵脚' } },
                 { count: 16, elites: 1, banner: { title: '第二批', sub: '来了个精英' } },
                 { count: 20, eliteChance: 0.15, banner: { title: '最后一批', sub: '清掉它们' } },
               ],
