@@ -43,20 +43,21 @@ function cruise(eid: number): number {
   return (Phys.thrust[eid]! / Phys.drag[eid]!) * SpeedMul.v[eid]!
 }
 
-/** 追最近的敌人，盯队长的追队长；没有就慢速游荡 */
+/** 追索敌距离内最近的敌人，盯队长的追队长；看不见就慢速游荡 */
 function chase(sim: Sim): void {
   for (const eid of query(sim.world, [Chase, Ctl, Transform, Phys, SpeedMul])) {
     if (!Ctl.move[eid]) continue
     const speed = cruise(eid)
     const ex = Transform.x[eid]!
     const ey = Transform.y[eid]!
+    const seek = Chase.seek[eid]!
     let target: { x: number; y: number } | null
     if (Chase.leader[eid]) {
       const p = leaderPoint(sim)
       const d = sim.hooks.worldDelta(sim, ex, ey, p.x, p.y)
-      target = { x: ex + d.x, y: ey + d.y }
+      target = d.x * d.x + d.y * d.y <= seek * seek ? { x: ex + d.x, y: ey + d.y } : null
     } else {
-      target = nearestFoe(sim, eid, ex, ey)
+      target = nearestFoe(sim, eid, ex, ey, seek)
     }
     if (!target) {
       stroll(sim, eid, speed * AI.idleSpeedMul.chase)
@@ -126,7 +127,7 @@ function standoff(sim: Sim): void {
   }
 }
 
-/** 绕着锚点转（巡游不算赶路）；该扑的时候扑向目标；锚点没了就只剩追 */
+/** 绕着锚点转（巡游不算赶路）；该扑的时候扑向目标；锚点没了就只剩追，看不见目标就慢速游荡 */
 function orbit(sim: Sim): void {
   for (const eid of query(sim.world, [Orbit, Nest, Ctl, Transform, Phys, SpeedMul])) {
     if (!Ctl.move[eid]) continue
@@ -147,7 +148,10 @@ function orbit(sim: Sim): void {
       }
     }
     if (!circling) {
-      if (!target) continue
+      if (!target) {
+        stroll(sim, eid, sp * AI.idleSpeedMul.chase)
+        continue
+      }
       const dir = sim.hooks.chaseDir(sim, eid, target.x, target.y)
       drive(eid, dir.x, dir.y, sp)
       continue
