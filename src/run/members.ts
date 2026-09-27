@@ -5,9 +5,9 @@ import { levelStatsFor } from '../data/levels'
 import type { StatValues } from '../types/stats'
 import type { RunState } from './state'
 
-/** 队员的等级：买过的道具折成角色经验 */
+/** 队员的等级：买过的道具折成角色经验，不低于这一局的等级下限 */
 export function memberLevel(run: RunState, slot: number): number {
-  return characterLevel(characterXp(run.memberItems[slot] ?? []))
+  return Math.max(run.minLevel, characterLevel(characterXp(run.memberItems[slot] ?? [])))
 }
 
 /** 队员战斗外的属性：定位、道具、本局成长与等级 */

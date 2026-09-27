@@ -3,9 +3,9 @@ import { devFlagItem, markPerf, resetPerf } from '../devtools'
 import type { DevItem, DevProvider } from '../devtools'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { mapEnemyRoster } from '../data/maps'
+import { beginRun } from '../run/state'
 import {
   applySandboxPreset,
-  beginSandboxRun,
   isSandboxCharacterOn,
   isSandboxEnemyOn,
   sandboxDifficulty,
@@ -86,7 +86,7 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
         { label: '金币 +1000', run: () => battle.devGrant('coins') },
         { label: '升一级', run: () => battle.devGrant('level') },
         { label: '技能冷却清零', run: () => battle.devResetSkill() },
-        ...(battle.sandbox ? [] : [{ label: '结束本波', run: (): void => battle.devEndWave() }]),
+        ...(battle.endless ? [] : [{ label: '结束本波', run: (): void => battle.devEndWave() }]),
       ],
     },
     {
@@ -123,7 +123,7 @@ function mulChoice(label: string, get: () => SandboxMul, set: (m: SandboxMul) =>
 
 function sandboxItems(battle: EcsBattleScene): DevItem[] {
   const restart = (): void => {
-    beginSandboxRun(battle.run.mapId)
+    beginRun('sandbox', battle.run.mapId)
     resetPerf()
     battle.scene.restart()
   }
@@ -175,14 +175,18 @@ function sandboxItems(battle: EcsBattleScene): DevItem[] {
       },
     },
     mulChoice('难度 · 敌人血量', sandboxDifficulty, setSandboxDifficulty),
-    mulChoice('攻速 · 我方冷却 ÷ 它', sandboxFireRate, setSandboxFireRate),
+    mulChoice('攻速 · 我方冷却 ÷ 它', sandboxFireRate, (m) => {
+      setSandboxFireRate(m)
+      battle.applyKnobs()
+    }),
     {
       kind: 'toggle',
       label: '无敌',
       get: sandboxInvincible,
       set: (on): void => {
         setSandboxInvincible(on)
-        battle.applySandboxInvincible()
+        battle.run.invincible = on
+        battle.applyInvincible()
       },
     },
     {
@@ -220,7 +224,7 @@ export function battleDevProvider(battle: EcsBattleScene): DevProvider {
     title: '战斗',
     sections: [
       { id: 'battle', title: '战斗', items: () => battleItems(battle) },
-      ...(battle.sandbox ? [{ id: 'sandbox', title: '试炼场', items: (): DevItem[] => sandboxItems(battle) }] : []),
+      ...(battle.knobs ? [{ id: 'sandbox', title: '试炼场', items: (): DevItem[] => sandboxItems(battle) }] : []),
     ],
   }
 }

@@ -6,13 +6,14 @@ import { DUTY_TAGS, TAG_IDS, TAGS, tagsOf } from '../data/tags'
 import { playSfx } from '../audio/sfx'
 import { memberLook } from '../run/members'
 import { getRun, recruitDueCount, recruitMember } from '../run/state'
+import { fought } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { CharacterId, CharacterTag } from '../types/characters'
 import { AvatarSlot, beginPage, Button, Chip, Divider, Flow, hasModal, Icon, Label, PageHeader, pageFrame, Panel, RichLabel, ScrollView, TagChip, TileGrid } from '../ui'
 import type { PageFrame, Rect, TileItem } from '../ui'
 import { VIEWPORT_CHANGED } from '../util/apply'
 import { characterStatGroups } from './statLines'
-import { flowStatGroups, isInitialWave, nextAfterTeam, runExit } from './teamPage'
+import { finishStep, flowStatGroups, isLeaving, runExit } from './teamPage'
 import { SceneKey } from './keys'
 import type { DevProvider, DevProviderHost } from '../devtools'
 
@@ -70,7 +71,7 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
 
     const f = (this.frame = pageFrame({ sub: true, footer: true }))
     new PageHeader(this, f, {
-      title: isInitialWave(this.run) ? '组建队伍' : '招募新队员',
+      title: fought(this.run) ? '招募新队员' : '组建队伍',
       ...runExit(this, this.run, () => ({ from: SceneKey.Recruit })),
     })
     const { roster, panel } = this.bodyRects(this.createChips())
@@ -307,20 +308,26 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
 
   /** 招进队伍；还有空位就留在这页接着挑 */
   private confirm(): void {
+    if (isLeaving(this)) return
     if (recruitDueCount(this.run) === 0) {
-      this.scene.start(nextAfterTeam(this.run))
+      this.proceed()
       return
     }
     const id = this.focus
     if (id === null || recruitMember(this.run, id) < 0) return
     playSfx('recruit')
     if (recruitDueCount(this.run) === 0) {
-      this.scene.start(nextAfterTeam(this.run))
+      this.proceed()
       return
     }
     this.focus = null
     this.renderGrid()
     this.renderFocus()
+  }
+
+  /** 招够了：走到下一步 */
+  private proceed(): void {
+    finishStep(this, this.run)
   }
 
   private onViewportChanged(): void {
@@ -346,7 +353,7 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
                   if (recruitDueCount(this.run) === 0) break
                   recruitMember(this.run, id)
                 }
-                this.scene.start(nextAfterTeam(this.run))
+                this.proceed()
               },
             },
           ],

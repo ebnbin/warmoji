@@ -1,4 +1,4 @@
-import { CARRIER_BUDGET, POOLS } from '../../data/battlefield'
+import { POOLS } from '../../data/battlefield'
 import type { BattleEffects, FieldPickupDef, Polarity } from '../../types/battlefield'
 import type { MapId } from '../../types/maps'
 
@@ -17,26 +17,15 @@ export function foldBattleEffects(parts: readonly FieldPickupDef['fx'][]): Battl
   return { team: parts.flatMap((p) => (p.team ? [p.team] : [])), enemy: parts.flatMap((p) => (p.enemy ? [p.enemy] : [])) }
 }
 
-function waveCarrierBudget(wave: number, isBoss: boolean): { buff: number; debuff: number } {
-  const cb = CARRIER_BUDGET
-  if (isBoss) return { buff: cb.boss.buff, debuff: cb.boss.debuff }
-  for (const t of cb.waveTiers) if (wave <= t.upToWave) return { buff: t.buff, debuff: t.debuff }
-  return { buff: cb.fallback.buff, debuff: cb.fallback.debuff }
-}
-export function rollWaveCarriers(
-  mapId: MapId,
-  wave: number,
-  isBoss: boolean,
-  rand: () => number,
-): FieldPickupDef[] {
-  const budget = waveCarrierBudget(wave, isBoss)
+/** 带光圈的敌人各自带什么效果：先 buff 个增益，再 debuff 个减益，都从地图的效果池里抽 */
+export function rollCarriers(mapId: MapId, buff: number, debuff: number, rand: () => number): FieldPickupDef[] {
   const pool = POOLS[mapId]
   const out: FieldPickupDef[] = []
-  for (let i = 0; i < budget.buff; i++) {
+  for (let i = 0; i < buff; i++) {
     const d = pickPolarity(pool, 'buff', rand)
     if (d) out.push(d)
   }
-  for (let i = 0; i < budget.debuff; i++) {
+  for (let i = 0; i < debuff; i++) {
     const d = pickPolarity(pool, 'debuff', rand)
     if (d) out.push(d)
   }

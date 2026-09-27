@@ -14,36 +14,9 @@ export function waveAt(elapsedSec: number): WaveState {
   }
 }
 
-function cycleWave(wave: number): number {
-  const last = WAVE.durationsSec.length
-  if (wave <= last) return wave
-  const span = last - WAVE.loopFrom + 1
-  return WAVE.loopFrom + ((wave - WAVE.loopFrom) % span)
-}
-
-export function waveDurationMs(wave: number): number {
-  return WAVE.durationsSec[cycleWave(wave) - 1]! * 1000
-}
-
-export function isEliteWave(wave: number): boolean {
-  return WAVE.eliteWaves.includes(cycleWave(wave))
-}
-
-export function isBossWave(wave: number): boolean {
-  return cycleWave(wave) === WAVE.durationsSec.length
-}
-
-export function isFinalWave(wave: number): boolean {
-  return wave >= WAVE.totalWaves
-}
-
 export const XP = P.xp
 
 export const WAVE = {
-  durationsSec: P.waveDurationsSec,
-  eliteWaves: P.eliteWaves,
-  loopFrom: P.loopFrom,
-  totalWaves: P.waveDurationsSec.length,
   reviveHpRatio: P.reviveHpRatio,
   summaryMs: P.summaryMs,
 } as const

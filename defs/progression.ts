@@ -1,9 +1,6 @@
 import type { Progression } from '../src/types/waves'
 
 export const PROGRESSION = {
-  waveDurationsSec: [20, 20, 25, 25, 30, 30, 40, 40, 40, 60, 50, 50, 50, 50, 70, 60, 60, 90],
-  eliteWaves: [10, 15],
-  loopFrom: 7,
   reviveHpRatio: 0.3,
   summaryMs: 1600,
   coinDropChanceMin: 0.35,

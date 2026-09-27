@@ -167,8 +167,6 @@ export interface Difficulty {
     readonly edgeInset: number
   }
   readonly elite: {
-    readonly fromWave: number
-    readonly chance: number
     readonly stats: StatMods
     readonly xpMul: number
     readonly coinsMul: number
@@ -178,7 +176,6 @@ export interface Difficulty {
     readonly elites: number
     readonly spreadMs: number
   }
-  readonly bossSpawnRelief: number
 }
 export interface AiTuning {
   readonly wander: {

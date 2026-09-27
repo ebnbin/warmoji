@@ -577,9 +577,17 @@ export const Nest = { of: i32Fill(-1), nextSpawnAt: f32() }
 /** 被别的身体召出来的：召唤者与它的编号；召唤物的伤害吃召唤者的召唤物伤害，记在召唤者名下 */
 export const Summoned = { by: i32(), byUid: u32() }
 
-export const Telegraph = { hp: f32(), elite: u8(), boss: u8(), bornMs: f32() }
+/** 刷怪预兆：loud 为 1 的在敌人现身时轰一声 */
+export const Telegraph = { hp: f32(), elite: u8(), boss: u8(), bornMs: f32(), loud: u8() }
 
-export const Surge = { hpMul: f32(), forceElite: u8() }
+/** 一只待放出的敌人，要求记在 foeSpec */
+export const Order = {}
+
+/** 悬赏目标：预兆与现身后的敌人都带着 */
+export const Bounty = {}
+
+/** 到时登场的一队敌人或头目，规则记在 callRule */
+export const Call = {}
 
 export const Carrier = {}
 

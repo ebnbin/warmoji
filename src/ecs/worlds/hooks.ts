@@ -87,6 +87,10 @@ export interface WorldHooks {
   /** 飞行物出了这里就消失 */
   outside(sim: Sim, x: number, y: number): boolean
   spawnPoint(sim: Sim, boss: boolean): Point
+  /** 地图的中心：据点与定点刷怪从这里起算 */
+  center(sim: Sim): Point
+  /** 把一个点收进敌人能站、能走到队伍的范围 */
+  settle(sim: Sim, p: Point): Point
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }
@@ -149,6 +153,13 @@ const bounded: WorldHooks = {
       leaderPoint(sim),
       SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1),
     )
+  },
+  center(sim) {
+    return { x: sim.mapW / 2, y: sim.mapH / 2 }
+  },
+  settle(sim, p) {
+    const inset = SPAWN.edgeInset * UNIT
+    return { x: Math.min(Math.max(p.x, inset), sim.mapW - inset), y: Math.min(Math.max(p.y, inset), sim.mapH - inset) }
   },
   onStart() {},
   tick() {},
@@ -284,6 +295,25 @@ const ruins: WorldHooks = {
     }
     return fallback
   },
+  settle(sim, p) {
+    const box = bounded.settle(sim, p)
+    const w = sim.worldState.walls
+    if (!w || w.spawnCells.length === 0) return box
+    const cols = w.grid.cols
+    const at = w.grid.cellY(box.y) * cols + w.grid.cellX(box.x)
+    if (w.spawnCells.includes(at)) return box
+    let best = w.spawnCells[0]!
+    let bestD = Infinity
+    for (const idx of w.spawnCells) {
+      const dx = ((idx % cols) + 0.5) * UNIT - box.x
+      const dy = (Math.floor(idx / cols) + 0.5) * UNIT - box.y
+      if (dx * dx + dy * dy < bestD) {
+        bestD = dx * dx + dy * dy
+        best = idx
+      }
+    }
+    return { x: ((best % cols) + 0.5) * UNIT, y: (Math.floor(best / cols) + 0.5) * UNIT }
+  },
   tick(sim, delta) {
     const w = sim.worldState.walls
     if (!w) return
@@ -335,6 +365,12 @@ const space: WorldHooks = {
     let p = ringPoint(sim.rng, ZERO, 0, inner)
     for (let i = 0; i < 20 && (p.x - lx) ** 2 + (p.y - ly) ** 2 < min2; i++) p = ringPoint(sim.rng, ZERO, 0, inner)
     return p
+  },
+  center() {
+    return ZERO
+  },
+  settle(sim, p) {
+    return clampToDisc(p.x, p.y, 0, 0, fieldR(sim) - UNIT)
   },
   onStart(sim) {
     sim.worldState.tickAt = 7000
@@ -436,6 +472,9 @@ const river: WorldHooks = {
     }
     return pos
   },
+  settle(sim, p) {
+    return clampToRiver(p, riverOf(sim), 0.5 * UNIT)
+  },
   /** 漂过下游太远的敌人被冲走 */
   tick(sim) {
     const pad = riverCfg(sim).enemyCullPad * UNIT
@@ -482,6 +521,9 @@ const torus: WorldHooks = {
       if (torusDist2(pos, leaderPoint(sim), sim.mapW, sim.mapH) >= 5 * UNIT * (5 * UNIT)) break
     }
     return pos
+  },
+  settle(sim, p) {
+    return wrapPoint(p, sim.mapW, sim.mapH)
   },
 }
 

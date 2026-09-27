@@ -1,18 +1,14 @@
 import { ROSTER_IDS, TEAM } from '../../data/characters'
 import { ENEMY_DEFS } from '../../data/enemies'
 import type { CharacterId } from '../../types/characters'
-import type { MapId } from '../../types/maps'
 import type { EnemyKind } from '../../types/enemies'
-import { beginRun } from '../../run/state'
-import type { RunState } from '../../run/state'
+import type { StatMods } from '../../types/stats'
 
 const enemies = new Set<EnemyKind>()
 let roster: CharacterId[] = [...ROSTER_IDS.slice(0, 1)]
 
 export type SandboxLevel = 0 | 1 | 2
 let level: SandboxLevel = 0
-
-export const INVINCIBLE_HP = 10_000_000
 
 interface SpawnParams {
   readonly intervalMs: number
@@ -184,12 +180,14 @@ export function sandboxStarters(): CharacterId[] {
   return r.length > 0 ? r : [ROSTER_IDS[0]!]
 }
 
-const SANDBOX_COINS = 999_999
+/** 试炼场开局的队伍：名单、等级与无敌都看旋钮 */
+export function sandboxTeam(): { readonly ids: readonly CharacterId[]; readonly level: number; readonly invincible: boolean } {
+  return { ids: sandboxStarters(), level: level + 1, invincible }
+}
 
-export function beginSandboxRun(mapId: MapId): RunState {
-  const run = beginRun(sandboxStarters(), mapId, true)
-  run.coins = SANDBOX_COINS
-  return run
+/** 攻速旋钮给队伍的常驻修正：冷却与技能冷却都除以它 */
+export function sandboxTeamMods(): StatMods[] {
+  return fireRate === 1 ? [] : [{ mul: { cooldown: 1 / fireRate, skillCooldown: 1 / fireRate } }]
 }
 
 applySandboxPreset(SANDBOX_PRESETS[0]!.id)

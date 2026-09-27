@@ -1,16 +1,24 @@
-import { CHARACTERS, ROSTER_IDS, TEAM, memberStats } from '../data/characters'
+import { CHARACTERS, ROSTER_IDS, memberStats } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { WAVE } from '../data/waves'
+import { RUNS } from '../data/runs'
 import type { GrowthProgress, ItemId } from '../types/items'
 import type { Hazard, MapId } from '../types/maps'
 import type { EnemyKind } from '../types/enemies'
+import type { RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
 import { MAP_IDS } from '../data/maps'
 import type { XpState } from '../types/xp'
-import { SceneKey } from '../scene/keys'
+import { sandboxTeam } from '../ecs/sandbox/knobs'
+
+/** 无敌时的生命上限 */
+export const INVINCIBLE_HP = 10_000_000
 
 export interface RunState {
+  /** 这一局的玩法 */
+  runId: RunId
+  /** 走到第几步 */
+  step: number
   mapId: MapId
-  sandbox: boolean
   decorSeed: number
   wave: number
   coins: number
@@ -18,6 +26,7 @@ export interface RunState {
   xp: XpState
   combatMs: number
   roster: CharacterId[]
+  /** 每人带进下一场的生命；Infinity 是满血开局 */
   memberHp: number[]
   memberItems: ItemId[][]
   skillCd: number[]
@@ -29,6 +38,10 @@ export interface RunState {
   /** 每人已计入成长的击杀数 */
   growthKills: number[]
   leaderId: CharacterId
+  /** 队员的等级下限：买道具攒的等级比它低时按它算 */
+  minLevel: number
+  /** 队伍无敌：生命上限锁在极大值 */
+  invincible: boolean
   stats: {
     damage: number[]
     kills: number[]
@@ -43,38 +56,69 @@ export interface RunState {
 
 let current: RunState | undefined
 
-export function beginRun(starters: readonly CharacterId[], mapId: MapId = MAP_IDS[0]!, sandbox = false): RunState {
-  const roster = [...starters]
-  current = {
-    mapId,
-    sandbox,
+/** 预设队伍的名单：指定的直接入队，按标签的从别的位置都没占、带齐这些标签的角色里随机挑 */
+function pickTeam(slots: readonly TeamSlot[]): CharacterId[] {
+  const out: CharacterId[] = []
+  const fixed = new Set(slots.filter((s) => typeof s === 'string'))
+  for (const s of slots) {
+    if (typeof s === 'string') {
+      out.push(s)
+      continue
+    }
+    const pool = ROSTER_IDS.filter((c) => !fixed.has(c) && !out.includes(c) && s.tags.every((t) => CHARACTERS[c].tags.includes(t)))
+    out.push(pool[Math.floor(Math.random() * pool.length)]!)
+  }
+  return out
+}
+
+/** 开一局：地图固定的不看玩家选的；玩法给了队伍就按它组队、满血开局，否则由招募步骤补上；给了开局进度就从那里起 */
+export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!): RunState {
+  const def = RUNS[id]
+  const run: RunState = {
+    runId: id,
+    step: 0,
+    mapId: def.map ?? mapId,
     decorSeed: (Math.random() * 0xffffffff) >>> 0,
-    wave: 1,
-    coins: 0,
+    wave: def.start?.wave ?? 1,
+    coins: def.coins ?? 0,
     kills: 0,
     xp: { level: 1, xp: 0 },
-    combatMs: 0,
-    roster,
-    memberHp: roster.map((id) => memberStats(CHARACTERS[id]).maxHp),
-    memberItems: roster.map(() => []),
-    skillCd: roster.map(() => 0),
-    memberForm: roster.map(() => -1),
-    memberRes: roster.map(() => -1),
-    memberGrowth: roster.map(() => ({})),
-    growthKills: roster.map(() => 0),
-    leaderId: roster[0]!,
+    combatMs: (def.start?.sec ?? 0) * 1000,
+    roster: [],
+    memberHp: [],
+    memberItems: [],
+    skillCd: [],
+    memberForm: [],
+    memberRes: [],
+    memberGrowth: [],
+    growthKills: [],
+    leaderId: ROSTER_IDS[0]!,
+    minLevel: 1,
+    invincible: false,
     stats: {
-      damage: roster.map(() => 0),
-      kills: roster.map(() => 0),
-      deaths: roster.map(() => 0),
-      damageTaken: roster.map(() => 0),
+      damage: [],
+      kills: [],
+      deaths: [],
+      damageTaken: [],
       enemyKills: {},
       enemyDamage: {},
       hazardDamage: {},
       eliteKills: 0,
     },
   }
-  return current
+  if (def.team === 'knobs') {
+    const t = sandboxTeam()
+    for (const m of t.ids) addMember(run, m)
+    run.minLevel = t.level
+    run.invincible = t.invincible
+    run.memberHp.fill(Infinity)
+  } else if (def.team) {
+    for (const m of pickTeam(def.team.slots)) addMember(run, m)
+    run.minLevel = def.team.level ?? 1
+    run.memberHp.fill(Infinity)
+  }
+  current = run
+  return run
 }
 
 export function currentRun(): RunState | undefined {
@@ -82,12 +126,35 @@ export function currentRun(): RunState | undefined {
 }
 
 export function getRun(): RunState {
-  if (!current) return beginRun(ROSTER_IDS.slice(0, 1))
-  return current
+  if (current) return current
+  const run = beginRun('classic')
+  addMember(run, ROSTER_IDS[0]!)
+  skipFilled(run)
+  return run
 }
 
 export function endRun(): void {
   current = undefined
+}
+
+export function runDef(run: RunState): RunDef {
+  return RUNS[run.runId]
+}
+
+/** 当前这一步；步骤都走完了是 undefined */
+export function stepOf(run: RunState): StepDef | undefined {
+  return runDef(run).steps[run.step]
+}
+
+/** 已经招够人的招募步骤直接跳过 */
+export function skipFilled(run: RunState): void {
+  while (stepOf(run)?.kind === 'recruit' && recruitDueCount(run) === 0) run.step++
+}
+
+/** 当前这一步做完了，走到下一个要做的步骤 */
+export function nextStep(run: RunState): void {
+  run.step++
+  skipFilled(run)
 }
 
 /** 还没入队的角色都能招 */
@@ -95,21 +162,15 @@ export function recruitCandidates(run: RunState): CharacterId[] {
   return ROSTER_IDS.filter((id) => !run.roster.includes(id))
 }
 
-function recruitDue(run: RunState): boolean {
-  return run.roster.length < Math.min(TEAM.maxSize, run.wave)
-}
-
+/** 当前这一步还要招几人：不是招募步骤就是 0 */
 export function recruitDueCount(run: RunState): number {
-  const due = Math.min(TEAM.maxSize, run.wave) - run.roster.length
-  return Math.max(0, Math.min(due, recruitCandidates(run).length))
+  const step = stepOf(run)
+  if (step?.kind !== 'recruit') return 0
+  return Math.max(0, Math.min(step.upTo - run.roster.length, recruitCandidates(run).length))
 }
 
-function canRecruit(run: RunState, id: CharacterId): boolean {
-  return recruitDue(run) && id in CHARACTERS && !run.roster.includes(id)
-}
-
-export function recruitMember(run: RunState, id: CharacterId): number {
-  if (!canRecruit(run, id)) return -1
+/** 队员入队：第一个入队的就是队长 */
+export function addMember(run: RunState, id: CharacterId): number {
   run.roster.push(id)
   run.memberHp.push(memberStats(CHARACTERS[id]).maxHp)
   run.memberItems.push([])
@@ -122,7 +183,13 @@ export function recruitMember(run: RunState, id: CharacterId): number {
   run.stats.kills.push(0)
   run.stats.deaths.push(0)
   run.stats.damageTaken.push(0)
+  if (run.roster.length === 1) run.leaderId = id
   return run.roster.length - 1
+}
+
+export function recruitMember(run: RunState, id: CharacterId): number {
+  if (recruitDueCount(run) === 0 || !(id in CHARACTERS) || run.roster.includes(id)) return -1
+  return addMember(run, id)
 }
 
 /** 队长所在的名单位置；名单里找不到就回到首位 */
@@ -130,12 +197,7 @@ export function leaderSlot(run: RunState): number {
   return Math.max(0, run.roster.indexOf(run.leaderId))
 }
 
-export function teamStep(run: RunState): SceneKey.Recruit | null {
-  return recruitDueCount(run) > 0 ? SceneKey.Recruit : null
-}
-
 export function waveStartHp(storedHp: number, maxHp: number): number {
   if (storedHp > 0) return Math.min(storedHp, maxHp)
   return Math.round(maxHp * WAVE.reviveHpRatio)
 }
-

@@ -12,4 +12,3 @@ export const POOLS: Record<MapId, readonly FieldPickupDef[]> = BF.pools
 export const FIELD_PICKUPS: readonly FieldPickupDef[] = Object.values(POOLS).flat()
 
 export const FIELD = BF.field
-export const CARRIER_BUDGET = BF.carrierBudget

@@ -1,7 +1,6 @@
 import { addComponent, hasComponent } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { STATS, STAT_KEYS, StatFold, foldStats, stackMods } from '../../data/stats'
-import { sandboxFireRate } from '../sandbox/knobs'
 import { Alive, FACTION, Faction, Gear, Grow, Hp, MARK, MARK_SLOTS, Mark, Phys, Slot, Stamina, Stats, Summoned, Transform, Uid } from '../components'
 import { gearRules, statBase, statLayers } from '../store'
 import { rescale } from '../systems/shared/scale'
@@ -154,10 +153,6 @@ function battleMods(sim: Sim, eid: number): void {
   if (side === FACTION.enemy) fold.times('moveSpeed', sim.foes.speed)
   const gear = gearRules[eid]
   if (gear && Alive.v[eid]) condMods(sim, eid, gear.when)
-  if (sim.sandbox && side === FACTION.team) {
-    fold.times('cooldown', 1 / sandboxFireRate())
-    fold.times('skillCooldown', 1 / sandboxFireRate())
-  }
   const tired = hasComponent(world, eid, Slot) ? fatigue(squadStamina(sim)) : hasComponent(world, eid, Stamina) ? fatigue(Stamina.v[eid]!) : 1
   fold.times('moveSpeed', tired)
 }

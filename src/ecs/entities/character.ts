@@ -9,12 +9,12 @@ import { gearMods } from '../../data/items'
 import { levelStatsFor } from '../../data/levels'
 import { ROLES } from '../../data/roles'
 
-import { waveStartHp } from '../../run/state'
-import { INVINCIBLE_HP, sandboxInvincible } from '../sandbox/knobs'
+import { INVINCIBLE_HP, waveStartHp } from '../../run/state'
 import { armIdle } from '../systems/shared/anim'
 import { armGear } from '../systems/shared/gear'
 
 import type { RunState } from '../../run/state'
+import type { StatMods } from '../../types/stats'
 import { Anim, Breath, Depth, FACTION, Grow, Hp, CharFlash, CharScale, Facing, Pop, Revive, Seat, Slot, Sprite, Transform } from '../components'
 import { bodyRules } from '../store'
 import { foldBody, setStatLayer } from '../utils/stats'
@@ -36,21 +36,21 @@ export function spawnCharacter(
   world: EcsWorld,
   atlas: EcsAtlas,
   run: RunState,
-  sandbox: boolean,
   place: CharacterPlacement,
+  mods: readonly StatMods[],
 ): number {
   const { slot, x, y } = place
   const id = run.roster[slot]!
   const def = CHARACTERS[id]
   const size = MEMBER.size * UNIT * place.sizeMul
-  const { owned, growth, level } = memberGear(run, slot, sandbox)
+  const { owned, growth, level } = memberGear(run, slot)
   const base = memberBase(def)
   const eid = spawnBody(world, {
     faction: FACTION.team,
     x,
     y,
     radius: MEMBER.radius * UNIT * place.sizeMul,
-    stats: sandbox && sandboxInvincible() ? { ...base, maxHp: INVINCIBLE_HP } : base,
+    stats: run.invincible ? { ...base, maxHp: INVINCIBLE_HP } : base,
     drag: def.body.drag,
     mass: def.body.mass,
     grip: TEAM.followerGrip,
@@ -64,8 +64,9 @@ export function spawnCharacter(
   Grow.s0[eid] = MEMBER.size * UNIT
   setStatLayer(eid, 'role', [ROLES[def.role].stats])
   setStatLayer(eid, 'gear', gearMods(owned, levelStatsFor(id, level), growth))
+  setStatLayer(eid, 'fight', mods)
   foldBody(world, undefined, eid)
-  Hp.v[eid] = sandbox ? Hp.max[eid]! : waveStartHp(run.memberHp[slot] ?? Hp.max[eid]!, Hp.max[eid]!)
+  Hp.v[eid] = waveStartHp(run.memberHp[slot] ?? Hp.max[eid]!, Hp.max[eid]!)
   bodyRules[eid] = { ...def.rules, resource: def.resource }
   armGear(world, eid, owned)
   attachResource(world, eid, def.resource, run.memberRes[slot] ?? -1)

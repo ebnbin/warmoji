@@ -121,11 +121,10 @@ export class DialButton extends Widget {
     return this
   }
 
-  /** 阵亡时给出复活倒计时，复活后传 null */
-  setDead(seconds: number | null): this {
-    const dead = seconds !== null
-    this.deadText.setVisible(dead)
-    if (dead && this.deadText.text !== String(seconds)) this.deadText.setText(String(seconds))
+  /** 阵亡时 dead 为真并给出复活倒计时，不会自己复活时倒计时为 null */
+  setDead(dead: boolean, seconds: number | null): this {
+    this.deadText.setVisible(dead && seconds !== null)
+    if (dead && seconds !== null && this.deadText.text !== String(seconds)) this.deadText.setText(String(seconds))
     if (dead === this.dead) return this
     this.dead = dead
     this.face.setAlpha(dead ? 0.25 : this.dimmed ? 0.55 : 1)

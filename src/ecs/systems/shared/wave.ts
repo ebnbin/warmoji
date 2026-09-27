@@ -1,6 +1,5 @@
 import { playSfx } from '../../../audio/sfx'
 import { gainXp, waveBonusXp } from '../../../run/xp'
-import { isFinalWave } from '../../../data/waves'
 import { hasComponent } from 'bitecs'
 import { Alive, Hp, Res, Stats } from '../../components'
 import { resDef } from '../../store'
@@ -10,9 +9,8 @@ import type { RunState } from '../../../run/state'
 import type { Sim } from '../../sim'
 
 /** 一波结束：经验、生命与资源带走，成长道具攒进度，收获进账 */
-export function settleWave(sim: Sim): boolean {
+export function settleWave(sim: Sim): void {
   const run = sim.run
-  const finished = isFinalWave(run.wave)
   const gained = gainXp(run.xp, Math.round(waveBonusXp(run.wave)))
   run.xp = gained.state
   if (gained.levelsGained > 0) {
@@ -22,16 +20,13 @@ export function settleWave(sim: Sim): boolean {
   run.wave += 1
   run.memberHp = sim.characters.map((m) => (Alive.v[m] ? Math.max(1, Math.round(Hp.v[m]!)) : 0))
   run.memberRes = sim.characters.map((m) => (resDef[m]?.keep && hasComponent(sim.world, m, Res) ? Res.v[m]! : -1))
-  if (!sim.sandbox) {
-    run.roster.forEach((_, slot) => grow(run, slot))
-    run.coins += Math.round(sim.characters.reduce((sum, m) => sum + Stats.harvest[m]!, 0))
-  }
-  return finished
+  run.roster.forEach((_, slot) => grow(run, slot))
+  run.coins += Math.round(sim.characters.reduce((sum, m) => sum + Stats.harvest[m]!, 0))
 }
 
 /** 新的一波开始：触发道具的开波规则 */
 export function openWave(sim: Sim): void {
-  if (!sim.sandbox) for (const m of sim.characters) gearWave(sim, m)
+  for (const m of sim.characters) gearWave(sim, m)
 }
 
 /** 成长道具攒进度：每波成长按件数加，击杀成长按件数乘这一波新添的击杀数加 */

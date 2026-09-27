@@ -16,8 +16,6 @@ export const DIFFICULTY = {
     edgeInset: 0.5,
   },
   elite: {
-    fromWave: 10,
-    chance: 0.15,
     stats: { mul: { maxHp: 4, moveSpeed: 1.25, damage: 2, healing: 2, scale: 1.2 } },
     xpMul: 4,
     coinsMul: 3,
@@ -27,5 +25,4 @@ export const DIFFICULTY = {
     elites: 3,
     spreadMs: 2600,
   },
-  bossSpawnRelief: 2,
 } as const satisfies Difficulty

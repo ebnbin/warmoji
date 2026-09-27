@@ -4,6 +4,8 @@ import type { FieldPickupDef } from '../types/battlefield'
 import type { AbilityDef, Cond, Effect } from '../types/abilityDefs'
 import type { Source } from './utils/source'
 import type { StatBase, StatLayer, StatMods } from '../types/stats'
+import type { BatchRule, BossRule } from '../types/runs'
+import type { FoeSpec } from './fight/state'
 
 const slots = <T>(): (T | undefined)[] => new Array<T | undefined>(INITIAL_CAPACITY).fill(undefined)
 
@@ -33,6 +35,12 @@ export const telegraphDef = slots<EnemyDef>()
 export const telegraphCarries = slots<FieldPickupDef>()
 
 export const carrierPickup = slots<FieldPickupDef>()
+
+/** 到时登场的一队敌人或头目 */
+export const callRule = slots<BatchRule | BossRule>()
+
+/** 待放出的一只敌人的要求 */
+export const foeSpec = slots<FoeSpec>()
 
 export const enemyCarries = slots<FieldPickupDef>()
 
