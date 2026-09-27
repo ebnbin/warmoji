@@ -1,8 +1,10 @@
 import type Phaser from 'phaser'
 import { strokeArc } from './draw'
-import { SURFACE, TONE } from './theme'
+import { INK, SURFACE, TONE } from './theme'
 
-/** 技能瞄准的指示：蓄力圈与方向线 */
+const KNOB = 24
+
+/** 技能的施法轮盘：半透明的底盘、跟着手指并限在盘里的摇杆头，与沿盘边的蓄力进度 */
 export class AimGuide {
   private readonly g: Phaser.GameObjects.Graphics
 
@@ -10,27 +12,27 @@ export class AimGuide {
     this.g = scene.add.graphics().setDepth(depth)
   }
 
-  /** hold 为 null 时不画蓄力圈，dir 为 null 时不画方向线 */
-  draw(x: number, y: number, dir: { readonly x: number; readonly y: number } | null, len: number, hold: number | null, holdRadius: number): void {
+  /** (x, y) 是盘心，(dx, dy) 是手指从按下处拖出的位移；aimed 为真时摇杆头用强调色，hold 为 null 时不画蓄力进度 */
+  draw(x: number, y: number, radius: number, dx: number, dy: number, aimed: boolean, hold: number | null): void {
     const g = this.g.clear()
     const accent = TONE.accent.face
+    g.fillStyle(SURFACE.outline, 0.25)
+    g.fillCircle(x, y, radius)
+    g.lineStyle(3, INK.ink, 0.4)
+    g.strokeCircle(x, y, radius)
     if (hold !== null) {
       g.lineStyle(10, SURFACE.outline, 0.9)
-      strokeArc(g, x, y, holdRadius, hold)
+      strokeArc(g, x, y, radius, hold)
       g.lineStyle(6, accent, 1)
-      strokeArc(g, x, y, holdRadius, hold)
+      strokeArc(g, x, y, radius, hold)
     }
-    if (!dir) return
-    const ex = x + dir.x * len
-    const ey = y + dir.y * len
-    g.lineStyle(9, SURFACE.outline, 0.9)
-    g.lineBetween(x, y, ex, ey)
-    g.lineStyle(5, accent, 1)
-    g.lineBetween(x, y, ex, ey)
+    const k = Math.min(1, (radius - KNOB) / Math.max(1, Math.hypot(dx, dy)))
+    const kx = x + dx * k
+    const ky = y + dy * k
     g.fillStyle(SURFACE.outline, 0.9)
-    g.fillCircle(ex, ey, 12)
-    g.fillStyle(accent, 1)
-    g.fillCircle(ex, ey, 9)
+    g.fillCircle(kx, ky, KNOB + 3)
+    g.fillStyle(aimed ? accent : INK.soft, 1)
+    g.fillCircle(kx, ky, KNOB)
   }
 
   clear(): void {
