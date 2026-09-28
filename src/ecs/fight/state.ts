@@ -361,7 +361,8 @@ export function goalSpot(sim: Sim): Point | null {
   return nearestTo(sim, query(sim.world, ENEMY_SET).filter((eid) => Faction.v[eid] === FACTION.enemy))
 }
 
-function nearestTo(sim: Sim, eids: ArrayLike<number>): Point | null {
+/** 离队长最近的一个 */
+export function nearestTo(sim: Sim, eids: ArrayLike<number>): Point | null {
   const lx = leaderX(sim)
   const ly = leaderY(sim)
   let best: Point | null = null

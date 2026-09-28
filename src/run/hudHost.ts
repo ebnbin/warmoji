@@ -5,6 +5,10 @@ import type { StatValues } from '../types/stats'
 export interface HudSnapshot {
   xp: number
   xpNext: number
+  /** 全队等级；不靠全队升级的一局是 null */
+  level: number | null
+  /** 升上去了还没领的次数 */
+  levelUps: number
   kills: number
   coins: number
   /** 这一场的名字；没有就只显示用时 */

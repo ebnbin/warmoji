@@ -35,10 +35,14 @@ const AIM_DEADZONE = 24
 const DEPTH = { bar: LAYER.hud + 20, fx: LAYER.hud + 21, waveEnd: LAYER.toast + 10, stick: 150, squad: 300, leader: 302, aim: 305 } as const
 /** 这一场的目标排在右上角计数的下方，一条一行 */
 const GOALS = { top: 124, step: 42 } as const
+/** 左上角的全队经验条，右边跟着等级与还没领的升级 */
+const XP_BAR = { x: 12, y: 12, w: 200, h: 16, gap: 12 } as const
 
 export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private joystick?: Joystick
   private xpBar!: ProgressBar
+  private levelLabel!: Label
+  private levelUpsPill!: Pill
   private timePill!: Pill
   private bossBar!: ProgressBar
   private killsPill!: Pill
@@ -81,6 +85,8 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.last = {
       xp: -1,
       xpNext: -1,
+      level: null,
+      levelUps: -1,
       kills: -1,
       coins: -1,
       label: null,
@@ -96,7 +102,10 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.joystick = new Joystick(this, sL + stick, viewport.logicalHeight - sB - stick, DEPTH.stick)
     setActiveHudInput(this)
 
-    this.xpBar = new ProgressBar(this, sL + 12, sT + 12, 200, 16, { tone: 'info' })
+    this.xpBar = new ProgressBar(this, sL + XP_BAR.x, sT + XP_BAR.y, XP_BAR.w, XP_BAR.h, { tone: 'info' })
+    const barMid = sT + XP_BAR.y + XP_BAR.h / 2
+    this.levelLabel = new Label(this, sL + XP_BAR.x + XP_BAR.w + XP_BAR.gap, barMid, '', { kind: 'label', bold: true, color: 'info', outline: true }).setOrigin(0, 0.5).setVisible(false)
+    this.levelUpsPill = new Pill(this, 0, barMid + 4, { icon: PICKUPS.levelUp.emoji, outline: 'player', text: '', color: 'info', originX: 0 }).setVisible(false)
     this.timePill = new Pill(this, w / 2, sT + 32, { text: '' })
     this.bossBar = new ProgressBar(this, w / 2 - 160, sT + 64, 320, 18, { tone: 'bad' }).setDepth(DEPTH.bar).setVisible(false)
     const right = w - sR - 88
@@ -126,6 +135,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       }),
     )
     this.input.keyboard?.on('keydown-Q', () => this.tryCast())
+    this.events.on(Phaser.Scenes.Events.PAUSE, this.releaseInput, this)
 
     const arenaEvents = this.arena.events
     arenaEvents.on(HudEvent.WaveComplete, this.onWaveComplete, this)
@@ -141,12 +151,19 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       arenaEvents.off(HudEvent.FieldCollected, this.onFieldCollected, this)
       arenaEvents.off(HudEvent.LeaderChanged, this.onLeaderChanged, this)
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
+      this.events.off(Phaser.Scenes.Events.PAUSE, this.releaseInput, this)
       setActiveHudInput(undefined)
     })
   }
 
-  /** 打开暂停页：战斗与 HUD 一起停住，停住前放掉摇杆与瞄准，免得恢复时还按着 */
+  /** 打开暂停页：战斗与 HUD 一起停住 */
   private pause(): void {
+    this.releaseInput()
+    openPause(this, { from: SceneKey.Battle })
+  }
+
+  /** 停住时放掉摇杆与瞄准，免得恢复时还按着 */
+  private releaseInput(): void {
     this.joystick?.release()
     if (this.aiming) {
       this.aiming = false
@@ -154,7 +171,6 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       this.arena.setSkillAim(null)
       this.drawAim()
     }
-    openPause(this, { from: SceneKey.Battle })
   }
 
   update(): void {
@@ -164,6 +180,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.updateFxIndicators(s.battleFx)
     this.updateGoals(s.goals)
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.xpBar.setValue(s.xpNext > 0 ? s.xp / s.xpNext : 0)
+    if (s.level !== this.last.level || s.levelUps !== this.last.levelUps) this.updateLevel(s.level, s.levelUps)
     if (s.kills !== this.last.kills) this.killsPill.setText(String(s.kills))
     if (s.coins !== this.last.coins) this.coinsPill.setText(String(s.coins))
     const remainSec = s.remainMs === null ? null : Math.ceil(s.remainMs / 1000)
@@ -177,6 +194,15 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       if (s.bossHp !== null) this.bossBar.setValue(s.bossHp / s.bossMaxHp)
     }
     this.last = s
+  }
+
+  /** 经验条右边的等级，再往右是还没领的升级 */
+  private updateLevel(level: number | null, levelUps: number): void {
+    this.levelLabel.setVisible(level !== null).setText(level === null ? '' : `Lv ${level}`)
+    this.levelUpsPill
+      .setText(`×${levelUps}`)
+      .setX(this.levelLabel.x + this.levelLabel.width + XP_BAR.gap)
+      .setVisible(level !== null && levelUps > 0)
   }
 
   private onWaveWarning(w: WaveWarning): void {

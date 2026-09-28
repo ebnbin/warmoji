@@ -101,6 +101,7 @@ export function runRuleLines(def: RunDef): string[] {
   if (r.recruit) out.push(`只能招募${r.recruit.tags.map((t) => TAGS[t].name).join('、')}角色`)
   if (r.shop) out.push(...shopLines(r.shop))
   if (r.maxLevel !== undefined) out.push(r.maxLevel === 1 ? '队员不能升级' : `队员最高只能升到 ${r.maxLevel} 级`)
+  if (r.teamLevel) out.push('击杀攒全队经验，每升一级掉一个升级道具，队长走过去捡起来，招一名新队员或给一名队员升一级；进商店前没捡的替你捡起；买道具不再涨角色经验')
   return out
 }
 

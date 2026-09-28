@@ -3,6 +3,7 @@ import { REJOIN } from '../../../data/feel'
 import { UNIT } from '../../../util/units'
 import { playSfx } from '../../../audio/sfx'
 import { gainXp } from '../../../run/xp'
+import { teamLeveled } from '../../../run/members'
 import { coinDropChance } from '../../../data/waves'
 import { ELITE } from '../../../data/enemies'
 import type { EnemyDef } from '../../../types/enemies'
@@ -17,7 +18,7 @@ import { nearestTarget } from '../../utils/targets'
 import { gainRes } from './resource'
 import { applyAbilityEffects, casterOf, DEATH_DEF, FUSE_DEF, markFrom, markSource } from './effects'
 import { mend } from './heal'
-import { dropCoins, dropFieldPickup } from '../../entities/pickup'
+import { dropCoins, dropFieldPickup, dropLevelUp } from '../../entities/pickup'
 import { unequipAbilities } from '../../entities/ability'
 import { displace, endMotion } from './displace'
 import type { Mover } from './displace'
@@ -167,17 +168,27 @@ function killBody(sim: Sim, eid: number, srcSlot: number, flingVx: number, fling
   removeEntity(sim.world, eid)
 }
 
-export function gainTeamXp(sim: Sim, amount: number): void {
+/** 全队攒经验；靠全队升级的一局每升一级在 (x, y) 掉一个升级道具，不给位置就掉在队长身边，否则只响一声 */
+export function gainTeamXp(sim: Sim, amount: number, x?: number, y?: number): void {
   const gained = gainXp(sim.run.xp, amount)
   sim.run.xp = gained.state
-  if (gained.levelsGained > 0) {
+  if (gained.levelsGained === 0) return
+  if (!teamLeveled(sim.run)) {
     playSfx('levelup')
+    return
+  }
+  const cx = x ?? Transform.x[sim.leader]! + UNIT
+  const cy = y ?? Transform.y[sim.leader]!
+  for (let i = 0; i < gained.levelsGained; i++) {
+    const a = (i / gained.levelsGained) * Math.PI * 2
+    const r = gained.levelsGained > 1 ? 0.6 * UNIT : 0
+    dropLevelUp(sim, cx + Math.cos(a) * r, cy + Math.sin(a) * r)
   }
 }
 
 function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean): void {
   const xpMul = elite ? ELITE.xpMul : 1
-  gainTeamXp(sim, Math.round(def.xp * xpMul))
+  gainTeamXp(sim, Math.round(def.xp * xpMul), Transform.x[eid]!, Transform.y[eid]!)
   const dropRoll = sim.rng.next()
   const dropped = dropRoll < coinDropChance(clockSec(sim))
   const baseCoins = dropped ? Math.round(def.coins * (elite ? ELITE.coinsMul : 1)) : 0

@@ -6,5 +6,5 @@ export const PROGRESSION = {
   summaryMs: 1600,
   coinDropChanceMin: 0.35,
   coinDropChanceHalfLifeSec: 220,
-  xp: { base: 80, growth: 1.15, waveBonusBase: 40, waveBonusPerWave: 36 },
+  xp: { base: 80, growth: 1.15, maxLevel: 15 },
 } as const satisfies Progression

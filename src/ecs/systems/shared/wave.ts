@@ -1,5 +1,3 @@
-import { playSfx } from '../../../audio/sfx'
-import { gainXp, waveBonusXp } from '../../../run/xp'
 import { hasComponent } from 'bitecs'
 import { Alive, Hp, Res, Stats } from '../../components'
 import { resDef } from '../../store'
@@ -10,14 +8,9 @@ import { WAVE } from '../../../data/waves'
 import type { RunState } from '../../../run/state'
 import type { Sim } from '../../sim'
 
-/** 一波结束：经验、生命与资源带走，成长道具攒进度，收获与过关奖励进账；生命按场间规则带走，奖励回满血时全队满血，永久减员时还倒着的这一局都回不来 */
+/** 一波结束：生命与资源带走，成长道具攒进度，收获与过关奖励进账；生命按场间规则带走，奖励回满血时全队满血，永久减员时还倒着的这一局都回不来 */
 export function settleWave(sim: Sim): void {
   const run = sim.run
-  const gained = gainXp(run.xp, Math.round(waveBonusXp(run.wave)))
-  run.xp = gained.state
-  if (gained.levelsGained > 0) {
-    playSfx('levelup')
-  }
   run.combatMs += sim.elapsedMs
   run.wave += 1
   const between = runDef(run).rules?.between ?? 'carry'

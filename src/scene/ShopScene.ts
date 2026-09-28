@@ -7,7 +7,7 @@ import { PICKUPS } from '../data/pickups'
 import { modTexts } from '../data/stats'
 import { playSfx } from '../audio/sfx'
 import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
-import { levelCap, levelFor, memberLevel, memberLook, memberOutStats } from '../run/members'
+import { levelCap, levelFor, memberLevel, memberLook, memberOutStats, teamLeveled } from '../run/members'
 import { getRun, runDef } from '../run/state'
 import { lastFight, nextFight } from '../run/flow'
 import type { RunState } from '../run/state'
@@ -252,7 +252,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     return Array.from({ length: n }, (_, i) => ({ x: B.x + start + i * (size + gap), y: B.y + (B.h - h) / 2, w: size, h }))
   }
 
-  /** 主人一栏：等级与经验，经验条预告买下这件后涨到哪；等级按这一局的上下限算 */
+  /** 主人一栏：等级与经验，经验条预告买下这件后涨到哪；等级按这一局的上下限算；靠全队升级的一局买道具不涨经验，条上是等级 */
   private ownerOf(slot: number): OfferOwner {
     const xp = characterXp(this.ownedFor(slot))
     const level = this.levelOf(slot)
@@ -266,7 +266,9 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
       level: `Lv ${level}`,
       onTap: () => this.inspect(slot),
     }
-    if (prog.maxed) return { ...base, xp: 1, xpTone: 'accent', note: top < MAX_CHAR_LEVEL ? '等级上限' : '满级', noteColor: 'accent' }
+    const maxed: OfferOwner = { ...base, xp: 1, xpTone: 'accent', note: top < MAX_CHAR_LEVEL ? '等级上限' : '满级', noteColor: 'accent' }
+    if (teamLeveled(this.run)) return level >= top ? maxed : { ...base, xp: (level - 1) / (top - 1), xpTone: 'info' }
+    if (prog.maxed) return maxed
     const offer = this.offers[slot]
     if (!offer?.id || offer.sold) return { ...base, xp: prog.ratio, xpTone: 'info' }
     const gain = itemXp(ITEMS[offer.id])

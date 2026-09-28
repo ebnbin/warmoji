@@ -12,7 +12,9 @@ import { heatOf, MUTATORS } from '../data/mutators'
 import { levelProgress, stackCount } from '../run/draft'
 import { activeHudHost } from '../run/hudHost'
 import type { HudSnapshot, MemberSheet } from '../run/hudHost'
-import { levelCap, memberLevel, memberLook, memberOutStats } from '../run/members'
+import { levelCap, memberLevel, memberLook, memberOutStats, teamLeveled } from '../run/members'
+import { pendingLevelUps } from '../run/levelUp'
+import { xpMaxed, xpToNext } from '../run/xp'
 import { endRun, fightMap, foughtMs, getRun, leaderSlot, runDef, waveStartHp } from '../run/state'
 import { fightAfterRecruit, fightsDone, lastFight, nextFight } from '../run/flow'
 import type { RunState } from '../run/state'
@@ -379,11 +381,20 @@ export class PauseScene extends Phaser.Scene {
 
     const top = levelCap(this.run)
     const prog = levelProgress(characterXp(m.items), this.run.minLevel, top)
-    // 试炼场的等级是调出来的，不来自经验
+    const capText = top < MAX_CHAR_LEVEL ? '等级上限' : '满级'
+    // 试炼场的等级是调出来的，靠全队升级的一局按升级时的选择，都不来自买道具攒的经验
     const tuned = runDef(this.run).team === 'knobs'
-    const lvText = tuned ? `Lv ${m.level}` : prog.maxed ? `Lv ${m.level} · ${top < MAX_CHAR_LEVEL ? '等级上限' : '满级'}` : `Lv ${m.level} · 经验 ${prog.cur}/${prog.need}`
+    const picked = teamLeveled(this.run)
+    const lvText = tuned
+      ? `Lv ${m.level}`
+      : picked
+        ? `Lv ${m.level}${m.level >= top ? ` · ${capText}` : ''}`
+        : prog.maxed
+          ? `Lv ${m.level} · ${capText}`
+          : `Lv ${m.level} · 经验 ${prog.cur}/${prog.need}`
+    const lvRatio = tuned ? 1 : picked ? (top > 1 ? (m.level - 1) / (top - 1) : 1) : prog.ratio
     keep(new Label(this, right, D.y + 68, lvText, { kind: 'label', bold: true, color: 'accent' }).setOrigin(1, 0.5))
-    keep(new ProgressBar(this, right - half, D.y + 86, half, 14, { tone: prog.maxed || tuned ? 'accent' : 'info', value: tuned ? 1 : prog.ratio }))
+    keep(new ProgressBar(this, right - half, D.y + 86, half, 14, { tone: lvRatio >= 1 ? 'accent' : 'info', value: lvRatio }))
   }
 
   /** 属性表按分类列出；战斗中此刻值与常驻值不同的高亮并附常驻值，没有加成的压暗 */
@@ -414,7 +425,7 @@ export class PauseScene extends Phaser.Scene {
       flow.text(def.steps.some((s) => s.kind === 'shop') ? '还没有道具：在商店给这名队员购买' : `${def.name}不带道具`, { color: 'muted', indent: false })
       return
     }
-    flow.text(`共 ${owned.length} 件 · 角色经验 ${characterXp(owned)}`, { color: 'muted', indent: false })
+    flow.text(teamLeveled(this.run) ? `共 ${owned.length} 件` : `共 ${owned.length} 件 · 角色经验 ${characterXp(owned)}`, { color: 'muted', indent: false })
     flow.gap(6)
     const rank = (id: ItemId): number => RARITY_ORDER.indexOf(ITEMS[id].rarity)
     for (const id of [...new Set(owned)].sort((a, b) => rank(b) - rank(a))) {
@@ -497,13 +508,21 @@ export class PauseScene extends Phaser.Scene {
     if (hazards.length > 0) flow.text(`地形伤害：${hazards.join(' · ')}`, { color: 'warn' })
     const size = run.roster.length
     const joinAt = fightAfterRecruit(run)
+    const picked = teamLeveled(run)
     flow.text(
       size >= TEAM.maxSize
         ? `队伍 ${size} / ${TEAM.maxSize} 人，已满员`
-        : joinAt
-          ? `队伍 ${size} / ${TEAM.maxSize} 人 · ${joinAt.name ?? '下一场'}开打前招募新队员`
-          : `队伍 ${size} 人`,
+        : picked
+          ? `队伍 ${size} / ${TEAM.maxSize} 人 · 全队升级时可以招募新队员`
+          : joinAt
+            ? `队伍 ${size} / ${TEAM.maxSize} 人 · ${joinAt.name ?? '下一场'}开打前招募新队员`
+            : `队伍 ${size} 人`,
     )
+    if (picked) {
+      const xp = xpMaxed(run.xp) ? '满级' : `经验 ${run.xp.xp}/${xpToNext(run.xp.level)}`
+      const waiting = pendingLevelUps(run)
+      flow.text(`全队 Lv ${run.xp.level} · ${xp}${waiting > 0 ? ` · 还有 ${waiting} 次升级没领` : ''}`, { color: 'info' })
+    }
     flow.gap(6)
 
     if (snap) {

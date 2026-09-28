@@ -237,6 +237,13 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
   const maxLevel = r.rules?.maxLevel
   const floor = r.team && r.team !== 'knobs' ? (r.team.level ?? 1) : 1
   need(maxLevel === undefined || (Number.isInteger(maxLevel) && maxLevel >= floor && maxLevel < MAX_CHAR_LEVEL), `runs.${id}.rules.maxLevel 须是整数，不低于队伍的等级下限、低于 ${MAX_CHAR_LEVEL}`)
+  if (r.rules?.teamLevel) {
+    // 每一次全队升级都得有得选：不靠升级就入队的人之外，补满队伍的人数加上每人还能升的级数，够用完升到满级的次数
+    const size = TEAM_BASELINE.team.maxSize
+    const free = Math.max(r.team && r.team !== 'knobs' ? r.team.slots.length : 0, ...r.steps.map((s) => (s.kind === 'recruit' ? s.upTo : 0)))
+    const room = size - free + size * ((maxLevel ?? MAX_CHAR_LEVEL) - floor)
+    need(room >= PROGRESSION.xp.maxLevel - 1, `runs.${id} 靠全队升级，招满人、升满级只用得掉 ${room} 次，不够升到 ${PROGRESSION.xp.maxLevel} 级的 ${PROGRESSION.xp.maxLevel - 1} 次`)
+  }
   r.stars?.forEach((s, i) => checkStar(s, lives, `runs.${id}.stars[${i}]`))
   const only = r.rules?.recruit?.tags
   if (only) {
@@ -274,6 +281,8 @@ for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
 }
 
 need(PROGRESSION.restRatio > 0 && PROGRESSION.restRatio <= 1, 'progression.restRatio 须在 (0, 1] 内')
+need(PROGRESSION.xp.base > 0 && PROGRESSION.xp.growth >= 1, 'progression.xp 的底数须为正，增长不小于 1：越往后升级越难')
+need(Number.isInteger(PROGRESSION.xp.maxLevel) && PROGRESSION.xp.maxLevel >= 2, 'progression.xp.maxLevel 须是不小于 2 的整数')
 
 if (errors.length > 0) {
   console.error(errors.join('\n'))

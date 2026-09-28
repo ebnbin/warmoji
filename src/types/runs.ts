@@ -140,13 +140,14 @@ export interface ShopRules {
   readonly reroll?: boolean
 }
 
-/** 一局里我方的规则：每一场的规则之外，lives 是全队共享的起来次数（自己起来、被扶起来、被技能救起来都算一次），between 是场与场之间怎么恢复，recruit 只许招募同时带着这些标签的角色，shop 是商店规则，maxLevel 是队员的等级上限；mods 在商店里也算 */
+/** 一局里我方的规则：每一场的规则之外，lives 是全队共享的起来次数（自己起来、被扶起来、被技能救起来都算一次），between 是场与场之间怎么恢复，recruit 只许招募同时带着这些标签的角色，shop 是商店规则，maxLevel 是队员的等级上限；teamLevel 为真时队员不靠买道具升级，而是击杀攒全队经验，每升一级掉一个升级道具，队长捡起来招一名新队员或给一名队员升一级；mods 在商店里也算 */
 export interface RunRules extends FightRules {
   readonly lives?: number
   readonly between?: Between
   readonly recruit?: { readonly tags: readonly CharacterTag[] }
   readonly shop?: ShopRules
   readonly maxLevel?: number
+  readonly teamLevel?: boolean
 }
 
 /** 星级条件，赢下一局时按整局评定：downs 队员倒下不超过 count 次，time 战斗用时不超过 ms，switches 手动换队长不超过 count 次，skills 放主动技能不超过 count 次，kills 击杀至少 count，lives 剩下至少 count 次起来的机会 */

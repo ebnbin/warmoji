@@ -50,6 +50,12 @@ function rearm(sim: Sim, eid: number, f: FormDef | undefined): void {
   armNpc(sim, eid)
 }
 
+/** 角色按当前形态重新装上自动能力：升级换了载体的档位时用 */
+export function rearmCharacter(sim: Sim, eid: number): void {
+  const idx = formOf(sim, eid)
+  rearm(sim, eid, idx >= 0 ? formsOf(sim, eid)?.[idx] : undefined)
+}
+
 /** 非玩家身体装上当前形态的能力：各自的首发延迟，没写的按身体的 */
 export function armNpc(sim: Sim, eid: number): void {
   EnemyArm.armed[eid] = 1

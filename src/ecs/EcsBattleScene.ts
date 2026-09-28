@@ -18,7 +18,10 @@ import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
 import { getRun, INVINCIBLE_HP, nextStep, runDef } from '../run/state'
+import { claimNothing, levelUpOptions, pendingLevelUps } from '../run/levelUp'
+import { memberLevel, teamLeveled } from '../run/members'
 import { goStep } from '../scene/teamPage'
+import { openLevelUp } from '../scene/levelUp'
 import { rewardText } from '../scene/runLines'
 import type { RunState } from '../run/state'
 import { MAPS } from '../data/maps'
@@ -43,6 +46,8 @@ import { aimAt } from './systems/shared/fire'
 import { sourceOf } from './utils/source'
 import { resetEntityStorage } from './storage'
 import { armTeam, memberGear } from './entities/loadout'
+import { levelUpsOnField, sweepLevelUps } from './entities/pickup'
+import { joinTeam, relevel } from './entities/team'
 import { requestCast } from './systems/shared/ability'
 import { openStage, ready } from './systems/shared/avail'
 import { skillRemainMs } from './systems/tickSkillCooldowns'
@@ -62,7 +67,7 @@ import { enterFight } from '../run/flow'
 import type { FightDef } from '../types/runs'
 import { callSquad } from './fight/spawns'
 import { fightGoals, fightMods, fightVerdict, lastPhase, markFightBase, nextPhase, phaseOf, startPhase, switchBlock, timeLeftMs } from './fight/state'
-import { xpToNext } from '../run/xp'
+import { xpMaxed, xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
@@ -157,6 +162,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private devGfx?: Phaser.GameObjects.Graphics
   /** 这一场看得见的范围之外的黑幕；没有视野规则就没有 */
   private fog?: Fog
+  /** 升级弹窗开着，战斗停着 */
+  private choosing = false
+  /** 这一场赢了、小结放完，正在领剩下的升级 */
+  private settling = false
+  /** 每名队员装上能力时的等级，按名单位置 */
+  private armedLevels: number[] = []
 
   constructor() {
     super(SceneKey.Battle)
@@ -186,6 +197,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.timeStopFxAlpha = 0
     this.devGfx = undefined
     this.fog = undefined
+    this.choosing = false
+    this.settling = false
+    this.armedLevels = []
   }
 
   devProvider(): DevProvider {
@@ -316,9 +330,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.scene.launch(SceneKey.Ui)
     if (this.knobs) watchSandboxSteady(this)
     this.game.events.on(VIEWPORT_CHANGED, this.onViewportChanged, this)
+    this.events.on(Phaser.Scenes.Events.RESUME, this.onResume, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.bootGen++
       this.game.events.off(VIEWPORT_CHANGED, this.onViewportChanged, this)
+      this.events.off(Phaser.Scenes.Events.RESUME, this.onResume, this)
       this.scene.stop(SceneKey.Ui)
       this.atlas?.dispose()
       this.cues?.destroy()
@@ -357,6 +373,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const simRef = this.sim
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
     armTeam(this.sim, run)
+    this.armedLevels = run.roster.map((_, slot) => memberLevel(run, slot))
     if (Number.isFinite(this.sim.fight.rules.vision)) this.fog = new Fog(this)
     startPhase(this.sim)
     this.waveBaseKills = run.kills
@@ -399,9 +416,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const left = sim ? timeLeftMs(sim) : (timeLimitMs(this.fightDef) ?? Infinity)
     const phases = phasesOf(this.fightDef).length
     const name = this.fightDef.name
+    const xpNext = xpToNext(this.run.xp.level)
     return {
-      xp: this.run.xp.xp,
-      xpNext: xpToNext(this.run.xp.level),
+      xp: xpMaxed(this.run.xp) ? xpNext : this.run.xp.xp,
+      xpNext,
+      level: teamLeveled(this.run) ? this.run.xp.level : null,
+      levelUps: pendingLevelUps(this.run),
       kills: this.run.kills,
       coins: this.run.coins,
       label: name === undefined ? null : phases > 1 ? `${name} ${(sim?.fight.phase ?? 0) + 1}/${phases}` : name,
@@ -659,7 +679,64 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       reward: rewardText(this.fightDef.reward),
     })
     nextStep(run)
-    this.time.delayedCall(WAVE.summaryMs, () => goStep(this, run))
+    this.time.delayedCall(WAVE.summaryMs, () => this.settle())
+  }
+
+  /** 小结之后：地上没捡的升级替玩家捡起来，逐个选完再走到下一步 */
+  private settle(): void {
+    this.settling = true
+    if (this.sim) {
+      sweepLevelUps(this.sim)
+      this.drainOutbox()
+    }
+    this.proceed()
+  }
+
+  private proceed(): void {
+    while (pendingLevelUps(this.run) > 0) if (this.chooseLevelUp()) return
+    goStep(this, this.run)
+  }
+
+  /** 领下一次升级：已经没有能选的就作废，否则战斗停住、弹出升级弹窗；返回弹没弹出来 */
+  private chooseLevelUp(): boolean {
+    if (levelUpOptions(this.run).length === 0) {
+      claimNothing(this.run)
+      return false
+    }
+    this.choosing = true
+    const onField = this.sim ? levelUpsOnField(this.sim).length : 0
+    openLevelUp(this, { settling: this.settling, queued: pendingLevelUps(this.run) - onField })
+    return true
+  }
+
+  /** 队长捡起了升级道具：捡起来还没选的就先选 */
+  private takeLevelUps(sim: Sim): void {
+    if (this.choosing || pendingLevelUps(this.run) <= levelUpsOnField(sim).length) return
+    this.chooseLevelUp()
+  }
+
+  /** 从升级弹窗回来：领到的升级当场生效；小结之后接着领下一次 */
+  private onResume(): void {
+    if (!this.choosing) return
+    this.choosing = false
+    if (this.settling) this.proceed()
+    else this.syncTeam()
+  }
+
+  /** 按本局的名单与等级补上新招的队员，给升了级的队员换上新能力 */
+  private syncTeam(): void {
+    const sim = this.sim
+    if (!sim || !this.atlas) return
+    for (let slot = sim.characters.length; slot < this.run.roster.length; slot++) {
+      joinTeam(sim, this.atlas, slot)
+      this.armedLevels[slot] = memberLevel(this.run, slot)
+    }
+    this.run.roster.forEach((_, slot) => {
+      const level = memberLevel(this.run, slot)
+      if (this.armedLevels[slot] === level) return
+      relevel(sim, slot)
+      this.armedLevels[slot] = level
+    })
   }
 
 
@@ -731,6 +808,8 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.scheduleWaveEnd()
     } else if (verdict) {
       this.lose(verdict.reason)
+    } else {
+      this.takeLevelUps(sim)
     }
   }
 
