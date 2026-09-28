@@ -35,6 +35,7 @@ import { attachDrawable } from './entities/drawable'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
 import { remapSim } from './systems/shared/remap'
+import { clockSec } from './fight/clock'
 import { Fog, setOverlayFill, viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
@@ -522,8 +523,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     atlasPages: number
   } {
     const sim = this.sim
-    const totalSec = (this.run.combatMs + (sim?.elapsedMs ?? 0)) / 1000
-    const wave = waveAt(totalSec)
+    const wave = waveAt(sim ? clockSec(sim) : this.run.combatMs / 1000)
     return {
       enemies: query(this.world, [Enemy]).length,
       projectiles: query(this.world, [Projectile]).length,

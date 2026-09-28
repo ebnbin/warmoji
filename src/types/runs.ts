@@ -183,7 +183,7 @@ export interface FightReward {
   readonly heal?: boolean
 }
 
-/** 一场战斗：刷什么怪、什么时候结束；map 让这一场换到这张地图上打，不写就在一局的地图上；intro 是开打时的横幅，mix 换掉地图的配比，enemyMods 是这一场给敌人的常驻修正，chaseLeader 让追人的敌人都盯着队长，rules 是我方在这一场的规则，reward 是过关奖励；不写名字就只显示用时 */
+/** 一场战斗：刷什么怪、什么时候结束；map 让这一场换到这张地图上打，不写就在一局的地图上；intro 是开打时的横幅，mix 换掉地图的配比，enemyMods 是这一场给敌人的常驻修正，chaseLeader 让追人的敌人都盯着队长，rules 是我方在这一场的规则，reward 是过关奖励，clockSec 让这一场从难度时钟的这一秒开打（敌人的血量、刷怪间隔与掉币率都从这一秒往后算），不写就接着一局累计打过的时长；不写名字就只显示用时 */
 export interface FightDef {
   readonly name?: string
   readonly map?: MapId
@@ -195,6 +195,7 @@ export interface FightDef {
   readonly chaseLeader?: boolean
   readonly rules?: FightRules
   readonly reward?: FightReward
+  readonly clockSec?: number
 }
 
 /** 一步：招募到 upTo 人、进商店、打一场 */

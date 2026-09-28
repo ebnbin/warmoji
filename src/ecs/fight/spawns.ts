@@ -10,6 +10,7 @@ import { telegraphCount } from '../entities/telegraph'
 import { rollCarriers } from '../utils/battleFx'
 import { isDayAt } from '../worlds/daynight'
 import type { Sim } from '../sim'
+import { clockSec } from './clock'
 import { calm, holdSpot, squadSize } from './state'
 import type { StreamState, WavesState } from './state'
 
@@ -47,7 +48,7 @@ export function callSquad(sim: Sim, squad: Squad, banner?: Banner): void {
   if (banner) sim.out.banners.push(banner)
   const raw = squad.enemy ? ENEMIES[squad.enemy] : undefined
   const enemy = raw && squad.drive ? { ...raw, drive: squad.drive } : raw
-  const clock = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
+  const clock = waveAt(clockSec(sim)).hpMultiplier
   const hpMul = (raw?.role === 'boss' ? 1 : clock) * (squad.hpMul ?? 1)
   const phase = squad.at?.kind === 'ring' ? sim.rng.next() * Math.PI * 2 : 0
   const spread = squad.spreadMs ?? 0
@@ -90,7 +91,7 @@ export function runStream(sim: Sim, st: StreamState, deltaMs: number): void {
   if (sim.elapsedMs < (rule.fromMs ?? 0) || sim.elapsedMs >= (rule.untilMs ?? Infinity)) return
   st.cooldownMs -= deltaMs
   if (st.cooldownMs > 0) return
-  const wave = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000)
+  const wave = waveAt(clockSec(sim))
   const mul = rule.intervalMul ?? 1
   if (rule.intervalMs !== undefined) {
     st.cooldownMs = (rule.intervalMs * mul) / sim.foes.count

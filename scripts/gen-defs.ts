@@ -177,6 +177,7 @@ const checkFight = (f: FightDef, path: string): void => {
   checkRules(f.rules, `${path}.rules`)
   need(f.map === undefined || MAPS[f.map] !== undefined, `${path} 引用了不存在的地图：${f.map}`)
   need((f.reward?.coins ?? 0) >= 0 && Number.isInteger(f.reward?.coins ?? 0), `${path} 的奖励金币须是非负整数`)
+  need(f.clockSec === undefined || (Number.isFinite(f.clockSec) && f.clockSec >= 0), `${path} 的难度时钟不为负`)
   need(f.ends.filter((e) => e.kind === 'time').length <= 1, `${path} 最多一条时限`)
   need(f.ends.length === 0 || f.ends.some((e) => e.kind !== 'downs' && !(e.kind === 'time' && e.lose)), `${path} 有结束规则就得有获胜条件`)
   for (const e of f.ends) {
@@ -217,6 +218,8 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
   need(PACK.has(r.emoji), `runs.${id} 的 emoji 不在表情包里：${r.emoji}`)
   need(r.map === undefined || MAPS[r.map] !== undefined, `runs.${id} 引用了不存在的地图：${r.map}`)
   need(r.map === undefined || r.steps.every((s) => s.kind !== 'fight' || s.fight.map === undefined), `runs.${id} 固定了地图，各场就不能再换地图`)
+  const clocked = r.steps.flatMap((s) => (s.kind === 'fight' ? [s.fight.clockSec !== undefined] : []))
+  need(clocked.every((c) => c === clocked[0]), `runs.${id} 的难度时钟要么每场都定，要么都不定`)
   need(r.start === undefined || (r.start.wave >= 1 && r.start.sec >= 0), `runs.${id} 的开局进度须从第 1 波、第 0 秒起`)
   if (r.team && r.team !== 'knobs') checkTeam(r.team, `runs.${id}.team`)
   checkRules(r.rules, `runs.${id}.rules`)

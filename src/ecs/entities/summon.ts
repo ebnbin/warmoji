@@ -12,6 +12,7 @@ import type { Effect } from '../../types/abilityDefs'
 import type { EnemyDef, NpcDef } from '../../types/enemies'
 import type { StatBase, StatKey, StatMods } from '../../types/stats'
 import type { Sim } from '../sim'
+import { clockSec } from '../fight/clock'
 
 /** 记下召唤者：召唤物的伤害吃它的召唤物伤害、记在它名下 */
 function markSummoned(sim: Sim, eid: number, by: number): void {
@@ -37,7 +38,7 @@ export function summonBody(sim: Sim, def: NpcDef, x: number, y: number, hp: numb
 }
 
 function waveHp(sim: Sim): number {
-  return waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
+  return waveAt(clockSec(sim)).hpMultiplier
 }
 
 /** 召出 count 个 def：敌方的按波次放大生命 */
