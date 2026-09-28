@@ -38,6 +38,7 @@ import {
   Minion,
   Built,
   Mirror,
+  Mounted,
   Pet,
   PET,
   Owner,
@@ -335,9 +336,10 @@ function attachAbility(sim: Sim, e: number, def: AbilityDef, init: AbilityInit):
 function spawnPet(sim: Sim, e: number, host: number, a: NonNullable<AbilityDef['anchor']>, faction: number): number {
   const p = newEntity(sim.world)
   attachDrawable(sim.world, p, sim.frames, { id: a.emoji, outline: holderOutline(faction, host), x: Transform.x[host]!, y: Transform.y[host]!, size: a.size, z: 13 })
-  addComponent(sim.world, p, Pet)
+  addComponents(sim.world, p, Pet, Mounted)
   Pet.of[p] = e
-  Pet.host[p] = host
+  Mounted.host[p] = host
+  Mounted.show[p] = 1
   Pet.mode[p] = PET[a.mode]
   Pet.dist[p] = a.distance
   Pet.phase[p] = 0

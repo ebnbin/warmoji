@@ -25,15 +25,13 @@ import { MAPS } from '../data/maps'
 import { makeWorld } from './world'
 import type { EcsWorld } from './world'
 import { hasComponent, query } from 'bitecs'
-import { Alive, Boss, Cd, Charges, Ctl, Enemy, ENEMY_SET, FACTION, Faction, Res, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Tint, Transform, VisOff } from './components'
-import { charSize } from './systems/shared/scale'
+import { Alive, Boss, Cd, Charges, Ctl, Enemy, FACTION, Faction, Stage, Facing, GrantCoins, Hp, PICKUP_SET, Projectile, Revive, Stats, Transform } from './components'
 import { dragging, staminaLeft } from './systems/shared/stamina'
-import { STAMINA, staminaTier } from '../data/stamina'
-import type { StaminaTier } from '../data/stamina'
-import { newEntity } from './entities/entity'
-import { attachDrawable } from './entities/drawable'
 import { EcsAtlas } from './atlas'
 import { EcsSpriteBatch, SPRITE_BANDS } from './render/spriteBatch'
+import { LayerType, TriBatch } from './render/layer'
+import { place } from './render/tri'
+import { Presentation } from './presentation'
 import { remapSim } from './systems/shared/remap'
 import { clockSec } from './fight/clock'
 import { Fog, setOverlayFill, viewFor } from './views'
@@ -46,8 +44,6 @@ import { sourceOf } from './utils/source'
 import { resetEntityStorage } from './storage'
 import { armTeam, memberGear } from './entities/loadout'
 import { requestCast } from './systems/shared/ability'
-import { resDef } from './store'
-import type { ResourceDef } from '../types/enemies'
 import { openStage, ready } from './systems/shared/avail'
 import { skillRemainMs } from './systems/tickSkillCooldowns'
 import { stepFrame } from './systems/pipeline/frame'
@@ -65,7 +61,7 @@ import { timeLimitMs } from '../data/runs'
 import { enterFight } from '../run/flow'
 import type { FightDef } from '../types/runs'
 import { callSquad, startFight } from './fight/spawns'
-import { fightGoals, fightMods, fightVerdict, goalSpot, markFightBase, switchBlock, timeLeftMs } from './fight/state'
+import { fightGoals, fightMods, fightVerdict, markFightBase, switchBlock, timeLeftMs } from './fight/state'
 import { xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
@@ -102,10 +98,8 @@ function liveCoins(world: EcsWorld): number {
   return n
 }
 
-const RES_COLOR: Record<ResourceDef['kind'], number> = { energy: 0xffee58, fury: 0xef5350, heat: 0xff9800, growth: 0x9ccc65 }
 /** 视野规则的黑幕有多黑 */
 const VISION_FOG_ALPHA = 0.92
-const STAMINA_COLOR: Record<StaminaTier, number> = { ok: 0x4dd0e1, slow: 0xffa726, low: 0xef5350 }
 
 /** 倒下的队员几秒后起来；这一场不会自己起来是 null */
 function reviveSec(sim: Sim, m: number): number | null {
@@ -134,6 +128,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private atlas?: EcsAtlas
   private cues?: CueLayer
   private rings?: RingLayer
+  private paint?: Presentation
   private sim?: Sim
   private ready = false
   run!: RunState
@@ -142,12 +137,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private ending = false
   private waveBaseKills = 0
   private waveBaseCoins = 0
-  private hpBars: Phaser.GameObjects.Graphics[] = []
-  private shownHp: number[] = []
-  /** 每名队员头上的 💦：拖慢全队时才显出来 */
-  private sweats: number[] = []
-  /** 累到减速的敌人头上的 💦，按需从这里取 */
-  private foeSweats: number[] = []
   private hitShakeOn = false
   private seenHitCount = 0
   private shownLeader = -1
@@ -166,7 +155,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private mapH = 0
   private bootGen = 0
   private devGfx?: Phaser.GameObjects.Graphics
-  private goalGfx?: Phaser.GameObjects.Graphics
   /** 这一场看得见的范围之外的黑幕；没有视野规则就没有 */
   private fog?: Fog
 
@@ -183,15 +171,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.atlas = undefined
     this.cues = undefined
     this.rings = undefined
+    this.paint = undefined
     this.sim = undefined
     this.ready = false
     this.ending = false
     this.waveBaseKills = 0
     this.waveBaseCoins = 0
-    this.hpBars = []
-    this.shownHp = []
-    this.sweats = []
-    this.foeSweats = []
     this.seenHitCount = 0
     this.shownLeader = -1
     this.skillAim = null
@@ -200,7 +185,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
     this.devGfx = undefined
-    this.goalGfx = undefined
     this.fog = undefined
   }
 
@@ -342,9 +326,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     if (gen !== this.bootGen) return
     this.atlas = atlas
     resetEntityStorage()
-    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax)
+    const paint = new Presentation()
+    this.paint = paint
+    for (const b of SPRITE_BANDS) new EcsSpriteBatch(this, this.world, atlas, b.depth, b.zMin, b.zMax, paint.sprites)
     this.cues = new CueLayer(this, this.world)
-    this.rings = new RingLayer(this, this.world)
+    this.rings = new RingLayer(this, this.world, { below: paint.marks, above: paint.trail })
+    new TriBatch(this, LayerType.Paint, 11, (o, m) => place(o, m, paint.bars))
+    new TriBatch(this, LayerType.Paint, 40, (o, m) => place(o, m, paint.pointer))
     this.ctx.atlas = atlas
     this.map.decor(this.ctx, atlas)
     const settings = loadSettings(browserStorage())
@@ -362,11 +350,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const simRef = this.sim
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
     armTeam(this.sim, run)
-    for (let i = 0; i < this.sim.characters.length; i++) {
-      this.hpBars.push(this.add.graphics().setDepth(11))
-      this.shownHp.push(-1)
-      this.sweats.push(this.newSweat())
-    }
     if (Number.isFinite(this.sim.fight.rules.vision)) this.fog = new Fog(this)
     startFight(this.sim)
     this.waveBaseKills = run.kills
@@ -400,89 +383,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     if (out.flash) {
       this.cues?.screenFlash(out.flash.color, out.flash.alpha, out.flash.durationMs)
       out.flash = null
-    }
-  }
-
-  /** 一滴 💦：先藏着，要用时再摆到头上 */
-  private newSweat(): number {
-    const e = newEntity(this.world)
-    attachDrawable(this.world, e, this.atlas!, { id: '1f4a6', outline: 'player', x: 0, y: 0, size: 0.42 * UNIT, alpha: 0, z: 29 })
-    return e
-  }
-
-  /** 把 💦 摆在身体右上方，上下跳着 */
-  private placeSweat(sim: Sim, e: number, body: number, size: number): void {
-    Transform.x[e] = Transform.x[body]! + VisOff.x[body]! + size * 0.34
-    Transform.y[e] = Transform.y[body]! + VisOff.y[body]! - size * 0.42 - Math.abs(Math.sin(sim.fxMs / 160)) * 4
-  }
-
-  /** 拖慢全队的队员头上冒 💦 */
-  private updateSweat(sim: Sim, i: number, m: number): void {
-    const e = this.sweats[i]
-    if (e === undefined) return
-    const on = dragging(sim, m)
-    Tint.alpha[e] = on ? 1 : 0
-    if (on) this.placeSweat(sim, e, m, charSize(m))
-  }
-
-  /** 累到减速的敌人头上也冒 💦，这是反打的时机；看不清的敌人汗也跟着淡 */
-  private updateFoeSweats(): void {
-    const sim = this.sim!
-    let used = 0
-    for (const eid of query(this.world, ENEMY_SET)) {
-      if (!Alive.v[eid] || staminaLeft(eid) >= STAMINA.slowFrom) continue
-      const e = this.foeSweats[used] ?? this.newSweat()
-      if (used === this.foeSweats.length) this.foeSweats.push(e)
-      used++
-      Tint.alpha[e] = Tint.alpha[eid]!
-      this.placeSweat(sim, e, eid, Transform.h[eid]!)
-    }
-    for (let i = used; i < this.foeSweats.length; i++) Tint.alpha[this.foeSweats[i]!] = 0
-  }
-
-  /** 队员的血条与资源条；队长再多一条体力条，满了收起 */
-  private updateHpBars(): void {
-    const sim = this.sim!
-    for (let i = 0; i < sim.characters.length; i++) {
-      const m = sim.characters[i]!
-      this.updateSweat(sim, i, m)
-      const g = this.hpBars[i]
-      if (!g) continue
-      if (!Alive.v[m]) {
-        g.setVisible(false)
-        this.shownHp[i] = -1
-        continue
-      }
-      g.setVisible(Tint.alpha[m]! > 0).setPosition(Transform.x[m]! + VisOff.x[m]!, Transform.y[m]! + VisOff.y[m]!)
-      const ratio = Math.max(0, Math.min(1, Hp.v[m]! / Hp.max[m]!))
-      const res = hasComponent(this.world, m, Res) ? Res.v[m]! / Math.max(1, Res.max[m]!) : -1
-      const locked = res >= 0 && sim.elapsedMs < Res.lock[m]!
-      const sta = m === sim.leader ? staminaLeft(m) : 1
-      const key =
-        (Math.round(ratio * 200) * 1000 + (res < 0 ? 999 : Math.round(res * 100)) * 2 + (locked ? Math.floor(sim.fxMs / 150) % 2 : 0)) * 1000 +
-        (sta < 1 ? Math.round(sta * 100) : 999)
-      if (key === this.shownHp[i]) continue
-      this.shownHp[i] = key
-      const w = 0.8 * UNIT
-      let y = charSize(m) * 0.62
-      g.clear()
-      g.fillStyle(0x000000, 0.45)
-      g.fillRect(-w / 2, y, w, 6)
-      g.fillStyle(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffdc5d : 0xef5350, 1)
-      g.fillRect(-w / 2 + 1, y + 1, (w - 2) * ratio, 4)
-      y += 7
-      if (res >= 0) {
-        g.fillStyle(0x000000, 0.45)
-        g.fillRect(-w / 2, y, w, 5)
-        g.fillStyle(locked ? (Math.floor(sim.fxMs / 150) % 2 ? 0xffffff : 0xff5722) : RES_COLOR[resDef[m]!.kind], 1)
-        g.fillRect(-w / 2 + 1, y + 1, (w - 2) * res, 3)
-        y += 6
-      }
-      if (sta >= 1) continue
-      g.fillStyle(0x000000, 0.45)
-      g.fillRect(-w / 2, y, w, 6)
-      g.fillStyle(STAMINA_COLOR[staminaTier(sta)], 1)
-      g.fillRect(-w / 2 + 1, y + 1, (w - 2) * sta, 4)
     }
   }
 
@@ -649,32 +549,6 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.skillAim = dir
   }
 
-  /** 目标在屏幕外或黑幕里时，在队长身边画一个指过去的箭头 */
-  private drawGoalPointer(sim: Sim): void {
-    const spot = goalSpot(sim)
-    const lx = leaderX(sim)
-    const ly = leaderY(sim)
-    const d = spot ? sim.hooks.worldDelta(sim, lx, ly, spot.x, spot.y) : null
-    const v = sim.view
-    const lit = d !== null && Math.hypot(d.x, d.y) <= sim.fight.rules.vision * UNIT
-    if (!d || (lit && lx + d.x >= v.x && lx + d.x <= v.right && ly + d.y >= v.y && ly + d.y <= v.bottom)) {
-      this.goalGfx?.clear()
-      return
-    }
-    this.goalGfx ??= this.add.graphics().setDepth(40)
-    const g = this.goalGfx
-    const u = norm(d.x, d.y)
-    const r = charSize(sim.leader) * 0.75 + 0.3 * UNIT
-    const tipX = lx + u.x * (r + 0.4 * UNIT)
-    const tipY = ly + u.y * (r + 0.4 * UNIT)
-    const w = 0.25 * UNIT
-    g.clear()
-    g.fillStyle(0x000000, 0.35)
-    g.fillTriangle(tipX + u.x * 3, tipY + u.y * 3, lx + u.x * r - u.y * (w + 3), ly + u.y * r + u.x * (w + 3), lx + u.x * r + u.y * (w + 3), ly + u.y * r - u.x * (w + 3))
-    g.fillStyle(0xffdc5d, 0.95)
-    g.fillTriangle(tipX, tipY, lx + u.x * r - u.y * w, ly + u.y * r + u.x * w, lx + u.x * r + u.y * w, ly + u.y * r - u.x * w)
-  }
-
   private drawSkillAim(sim: Sim): void {
     const dir = this.skillAim
     const sk = dir ? this.leaderSkill() : null
@@ -828,11 +702,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       this.seenHitCount = sim.characterHitCount
       if (this.hitShakeOn) this.cameras.main.shake(HIT_SHAKE.durationMs, HIT_SHAKE.intensity)
     }
-    this.updateHpBars()
-    this.updateFoeSweats()
+    this.paint?.step(sim)
     this.drawDevTargets(sim)
     this.drawSkillAim(sim)
-    this.drawGoalPointer(sim)
     if (sim.over) {
       this.lose('全军覆没')
       return

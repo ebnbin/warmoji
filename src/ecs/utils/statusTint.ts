@@ -1,4 +1,4 @@
-import { MARK, Motion, TRANSIT } from '../components'
+import { MARK, Motion, Tint, TRANSIT } from '../components'
 import { hasMark, inTransit, isAirborne, isHidden } from './marks'
 import type { Sim } from '../sim'
 
@@ -27,6 +27,11 @@ export function presence(sim: Sim, eid: number): number {
   if (isHidden(sim, eid)) return 0.35
   if (hasMark(sim, eid, MARK.untargetable)) return 0.5
   return 1
+}
+
+/** 挂在身体上的东西随宿主显隐的那一份：宿主画出来多透明，它就多透明 */
+export function hostShown(host: number): number {
+  return Tint.alpha[host]!
 }
 
 /** 身上的底色：穿行中是穿行的颜色，其余按控制的轻重排 */

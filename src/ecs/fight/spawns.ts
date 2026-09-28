@@ -1,20 +1,18 @@
 import { ENEMIES, SPAWN } from '../../data/enemies'
 import { bossFor, MAPS } from '../../data/maps'
 import { waveAt } from '../../data/waves'
-import { UNIT } from '../../util/units'
 import type { Banner, CarrierRule, Squad } from '../../types/runs'
 import { dayNightOf, foeCount, spawnBoss, telegraphOne } from '../entities/enemy'
-import { spawnGroundRing } from '../entities/groundRing'
 import { scheduleCall, scheduleCarrier, scheduleOrder } from '../entities/schedule'
 import { telegraphCount } from '../entities/telegraph'
 import { rollCarriers } from '../utils/battleFx'
 import { isDayAt } from '../worlds/daynight'
 import type { Sim } from '../sim'
 import { clockSec } from './clock'
-import { calm, holdSpot, squadSize } from './state'
+import { calm, squadSize } from './state'
 import type { StreamState, WavesState } from './state'
 
-/** 开打：定时登场的排好，带光圈的敌人抽好效果排好，据点画出来 */
+/** 开打：定时登场的排好，带光圈的敌人抽好效果排好 */
 export function startFight(sim: Sim): void {
   for (const rule of sim.fight.def.spawns) {
     switch (rule.kind) {
@@ -31,8 +29,6 @@ export function startFight(sim: Sim): void {
         break
     }
   }
-  const h = sim.fight.hold
-  if (h) h.ring = spawnGroundRing(sim, holdSpot(sim, h.rule.points[0]!), h.rule.radius * UNIT)
 }
 
 function scheduleCarriers(sim: Sim, rule: CarrierRule): void {

@@ -47,13 +47,12 @@ export interface WavesState {
   calmAt: number
 }
 
-/** 据点的进度：第几处、这一处站了多久、队长在不在圈里、画圈的实体（-1 是还没画） */
+/** 据点的进度：第几处、这一处站了多久、队长在不在圈里 */
 export interface HoldState {
   readonly rule: Extract<EndRule, { kind: 'hold' }>
   point: number
   heldMs: number
   inside: boolean
-  ring: number
 }
 
 /** 一场战斗进行中的状态 */
@@ -84,8 +83,6 @@ export interface FightState {
   switchedAt: number
   /** 每名队员被扶了多久，按名单位置 */
   readonly rescueMs: number[]
-  /** 每名队员身边的救援圈，-1 是没有 */
-  readonly rescueRings: number[]
 }
 
 function downsOf(run: RunState): number {
@@ -102,7 +99,7 @@ export function newFight(def: FightDef, run: RunState): FightState {
     waves: def.spawns.flatMap((rule) => (rule.kind === 'waves' ? [{ rule, next: 0, calmAt: -1 }] : [])),
     knobs: def.spawns.some((rule) => rule.kind === 'knobs') ? { cooldownMs: FIRST_SPAWN_MS } : null,
     mix: def.mix ? def.mix.map((m) => ({ def: ENEMIES[m.kind], weight: m.weight })) : null,
-    hold: hold?.kind === 'hold' ? { rule: hold, point: 0, heldMs: 0, inside: false, ring: -1 } : null,
+    hold: hold?.kind === 'hold' ? { rule: hold, point: 0, heldMs: 0, inside: false } : null,
     base: { kills: run.kills, coins: run.coins, downs: downsOf(run) },
     bounties: 0,
     bossDownAt: -1,
@@ -110,7 +107,6 @@ export function newFight(def: FightDef, run: RunState): FightState {
     leaderFell: false,
     switchedAt: -Infinity,
     rescueMs: run.roster.map(() => 0),
-    rescueRings: run.roster.map(() => -1),
   }
 }
 

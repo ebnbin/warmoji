@@ -19,7 +19,7 @@ export function resetScratch(o: Scratch): void {
   o.i.length = 0
 }
 
-function tri(
+export function tri(
   o: Scratch, m: Matrix,
   x0: number, y0: number, x1: number, y1: number, x2: number, y2: number,
   color: number,
@@ -96,4 +96,13 @@ export function segment(
   const nx = (-dy / len) * (width / 2)
   const ny = (dx / len) * (width / 2)
   quad(o, m, x0 + nx, y0 + ny, x0 - nx, y0 - ny, x1 - nx, y1 - ny, x1 + nx, y1 + ny, color)
+}
+
+/** 把按世界坐标画好的三角形乘上镜头，接到 o 后面 */
+export function place(o: Scratch, m: Matrix, src: Scratch): void {
+  const base = o.c.length
+  const v = src.v
+  for (let k = 0; k < v.length; k += 2) o.v.push(m.getX(v[k]!, v[k + 1]!), m.getY(v[k]!, v[k + 1]!))
+  for (const c of src.c) o.c.push(c)
+  for (const i of src.i) o.i.push(base + i)
 }

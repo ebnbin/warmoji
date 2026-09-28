@@ -34,7 +34,6 @@ import { tickBorrowed } from '../shared/steal'
 import { tickGuts } from '../shared/gut'
 import { tickShadows } from '../../entities/shadow'
 import { recordTraces } from '../shared/trace'
-import { tickEchoes } from '../../entities/echo'
 import { tickBarriers } from '../../entities/barrier'
 import { tickTethers } from '../../entities/tether'
 import { tintEnemies } from '../tintEnemies'
@@ -76,7 +75,6 @@ export const SIM_PIPELINE = pipeline([
   { run: tickStamina, after: [moveBodies] },
   { run: refreshTargets, after: [moveBodies] },
   { run: recordTraces, after: [moveBodies] },
-  { run: tickEchoes, after: [recordTraces] },
   { run: tickPets, after: [moveBodies] },
   { run: tickTethers, after: [refreshTargets] },
   { run: settleMotions, after: [refreshTargets] },
