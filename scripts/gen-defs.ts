@@ -25,11 +25,12 @@ import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
 import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
+import { shellPull } from '../src/data/nebula.ts'
 import { cycleOf, roundsOf, roundSteps } from '../src/data/rounds.ts'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { ItemDef } from '../src/types/items'
-import type { MapDef } from '../src/types/maps'
+import type { MapDef, NebulaConfig } from '../src/types/maps'
 import type { ItemRarity } from '../src/types/items'
 import type { MapId } from '../src/types/maps'
 import type { FightDef, FightRules, GroupTraits, LegacyPhaseDef, LegacySquad, LevelPick, MixEntry, MutatorDef, RepeatDef, Rounds, RunDef, SpawnAt, StarRule, StepDef, TeamDef } from '../src/types/runs'
@@ -72,18 +73,21 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   if (m.ice) need(m.ice.waterExertion > 0 && m.ice.waterRegen >= 0, `maps.${id}.ice 的水里费力须为正、回复倍率不为负`)
 }
 
-/** 星云：黑洞整个落在星域里，视界外还有能站的地方；流星的积分步长能在时限里走完 */
+/** 星云：壳层包着空腔，黑洞整个落在空腔里，视界外还有能站的地方；流星的积分步长能在时限里走完 */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need((m.kind === 'nebula') === (m.nebula !== undefined), `maps.${id} 是星云当且仅当写了 nebula`)
   const n = m.nebula
   if (!n) continue
   const [near, far] = n.hole.fromCenterU
+  need(n.shell.innerU > 0 && n.shell.outerU > n.shell.innerU && n.shell.gm > 0, `maps.${id}.nebula.shell 须内径为正、外径大于内径、引力为正`)
+  need(n.contain.speedMul >= 1 && n.contain.leapU >= 0, `maps.${id}.nebula.contain 的速度余量不小于 1、瞬移余量不为负`)
   need(n.hole.gm > 0 && n.hole.softeningU > 0, `maps.${id}.nebula.hole 的引力与软化长度须为正`)
   need(n.hole.horizonU > n.hole.softeningU / Math.SQRT2, `maps.${id}.nebula.hole.horizonU 须大于软化长度的 1/√2，视界外的引力才随距离单调减小`)
-  need(near >= 0 && near <= far && far + n.hole.horizonU < n.radiusU, `maps.${id}.nebula.hole 的位置范围须落在星域里`)
+  need(near >= 0 && near <= far && far + n.hole.horizonU < n.shell.innerU, `maps.${id}.nebula.hole 的位置范围须落在空腔里`)
   need(n.hole.clearU > n.hole.horizonU, `maps.${id}.nebula.hole.clearU 须大于视界`)
   need(n.meteor.stepMs > 0 && n.meteor.maxFlightMs >= n.meteor.stepMs, `maps.${id}.nebula.meteor 的积分步长须为正且不超过最长飞行时间`)
-  need(n.meteor.speedU > 0 && n.meteor.radiusU > 0 && n.meteor.warnMs >= 0, `maps.${id}.nebula.meteor 的速度与半径须为正`)
+  need(n.meteor.speedU > 0 && n.meteor.radiusU > 0 && n.meteor.warnMs >= 0 && n.meteor.offsetU >= 0, `maps.${id}.nebula.meteor 的速度与半径须为正`)
+  need(n.meteor.radiusU < n.shell.innerU, `maps.${id}.nebula.meteor.radiusU 须小于空腔半径，瞄准点才收得进空腔`)
 }
 
 /** 身体的体力上限须为正、体力回复不为负 */
@@ -113,6 +117,35 @@ for (const e of Object.values(ENEMIES).flatMap(withNested)) {
   for (const a of e.abilities ?? []) {
     const range = 'range' in a ? a.range : undefined
     need(range === undefined || range > lm.standoffDist, `enemies.${e.kind} 的能力射程须大于 standoffDist`)
+  }
+}
+
+/** 走进壳层停下的半径：终端漂移 g·fall 追上速度的地方，壳层里引力随半径单调增大；外缘都追不上就停不下 */
+const shellStopU = (shell: NebulaConfig['shell'], fall: number, speedU: number): number => {
+  if (shellPull(shell, shell.outerU) * fall < speedU) return Infinity
+  let lo = shell.innerU
+  let hi = shell.outerU
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2
+    if (shellPull(shell, mid) * fall >= speedU) hi = mid
+    else lo = mid
+  }
+  return hi
+}
+/** 星云壳层困得住每个角色与敌人：停下处再往外瞬移，仍在壳外引力重新追不上它的逃逸半径以内 */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  const n = m.nebula
+  if (!n) continue
+  const bodies = [
+    ...Object.entries<CharacterAuthoring>(CHARACTERS).map(([k, c]) => ({ path: `characters.${k}`, fall: c.body.mass / c.body.drag, speedU: c.stats.moveSpeed })),
+    ...Object.values(ENEMIES)
+      .flatMap(withNested)
+      .map((e) => ({ path: `enemies.${e.kind}`, fall: COMBAT.enemyBody.mass / COMBAT.enemyBody.drag, speedU: e.speed })),
+  ]
+  for (const b of bodies) {
+    const v = b.speedU * n.contain.speedMul
+    const escapeU = Math.sqrt((n.shell.gm * b.fall) / v)
+    need(shellStopU(n.shell, b.fall, v) + n.contain.leapU <= escapeU, `maps.${id}.nebula.shell 困不住 ${b.path}：走到停下处再往外瞬移 ${n.contain.leapU} 格就逃出引力`)
   }
 }
 

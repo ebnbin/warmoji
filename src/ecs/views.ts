@@ -320,20 +320,27 @@ class SpaceView extends BoundedView {
   }
 }
 
-function nebulaRadius(v: ViewCtx): number {
-  return v.def.nebula!.radiusU * UNIT
+/** 空腔半径与星云外缘，像素 */
+function nebulaRadii(v: ViewCtx): { wall: number; rim: number } {
+  const s = v.def.nebula!.shell
+  return { wall: s.innerU * UNIT, rim: s.outerU * UNIT }
 }
 
 const GAS_COLORS = [0xff5fa2, 0x7c4dff, 0x40c4ff, 0xb388ff, 0xff8a65]
+const SHELL_INNER = 0x4fc3f7
+const SHELL_OUTER = 0xff5f8f
 
-/** 星云：圆心在原点的星域和一团团星云气体；黑洞画出视界、光子球与吸积盘，虚线圈是当前队长走路逃不出的范围，流星的预警沿引力弯曲的轨迹 */
+/**
+ * 星云：圆心在原点的空腔里飘着一团团气体，壳层按俯视的柱密度着色，内壁最亮、往外渐暗到外缘为零；
+ * 黑洞画出视界、光子球与吸积盘，虚线圈是当前队长走路逃不出的范围，流星的预警沿引力弯曲的轨迹
+ */
 class NebulaView extends BoundedView {
   private capture?: Phaser.GameObjects.Graphics
   private captureU = -1
   private meteorFx?: { of: number; tele: Phaser.GameObjects.Graphics }
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
-    const d = nebulaRadius(v) * 2
+    const d = nebulaRadii(v).rim * 2
     return { w: d, h: d, origin: { x: 0, y: 0 } }
   }
 
@@ -344,32 +351,36 @@ class NebulaView extends BoundedView {
         .setScrollFactor(0)
         .setDepth(-1),
     )
-    const r = nebulaRadius(v)
+    const { wall, rim } = nebulaRadii(v)
     const gas = v.scene.add.graphics().setDepth(-0.9)
     const rng = new Rng(v.run.decorSeed ^ 0x9a5)
-    for (let i = 0; i < 10; i++) {
-      const p = ringPoint(rng, { x: 0, y: 0 }, 0, r * 0.85)
+    for (let i = 0; i < 14; i++) {
+      const p = ringPoint(rng, { x: 0, y: 0 }, 0, wall * 0.85)
       gas.fillStyle(GAS_COLORS[i % GAS_COLORS.length]!, 0.05 + rng.next() * 0.06)
       gas.fillCircle(p.x, p.y, (3 + rng.next() * 4) * UNIT)
     }
     this.visuals.push(gas)
-    const rim = v.scene.add.graphics().setDepth(2)
-    rim.lineStyle(5, 0xff7ac8, 0.6)
-    rim.strokeCircle(0, 0, r)
-    rim.lineStyle(18, 0xb04fff, 0.12)
-    rim.strokeCircle(0, 0, r - 9)
-    this.visuals.push(rim)
+    const shell = v.scene.add.graphics().setDepth(-0.8)
+    const n = 36
+    const w = (rim - wall) / n
+    const peak = Math.sqrt(rim * rim - wall * wall)
+    for (let i = 0; i < n; i++) {
+      const r = wall + (i + 0.5) * w
+      shell.lineStyle(w, mix(SHELL_INNER, SHELL_OUTER, i / (n - 1)), (0.4 * Math.sqrt(rim * rim - r * r)) / peak)
+      shell.strokeCircle(0, 0, r)
+    }
+    this.visuals.push(shell)
   }
 
   protected field(v: ViewCtx): Phaser.Geom.Rectangle {
-    const r = nebulaRadius(v)
-    return new Phaser.Geom.Rectangle(-r, -r, r * 2, r * 2)
+    const { rim } = nebulaRadii(v)
+    return new Phaser.Geom.Rectangle(-rim, -rim, rim * 2, rim * 2)
   }
 
-  /** 装饰只撒在星域里 */
+  /** 装饰只撒在空腔里 */
   decor(v: ViewCtx, atlas: EcsAtlas): void {
     const rng = new Rng(v.run.decorSeed)
-    const rU = nebulaRadius(v) / UNIT
+    const rU = nebulaRadii(v).wall / UNIT
     const cells = Math.round(rU * 2)
     for (const d of rollDecor(v.def.decor, () => rng.next(), cells, cells)) {
       const xU = d.xU - rU
@@ -423,7 +434,7 @@ class NebulaView extends BoundedView {
     const lead = sim.leader
     if (!g || !hole || lead < 0) return
     const cfg = v.def.nebula!
-    const rU = captureRadiusU(cfg, Phys.mass[lead]! / Phys.drag[lead]!, Stats.moveSpeed[lead]!, cfg.radiusU * 2)
+    const rU = captureRadiusU(cfg, Phys.mass[lead]! / Phys.drag[lead]!, Stats.moveSpeed[lead]!, cfg.shell.innerU * 2)
     if (Math.abs(rU - this.captureU) < 0.02) return
     this.captureU = rU
     g.clear()
@@ -871,6 +882,14 @@ function ensureDashTexture(scene: Phaser.Scene, cfg: TorusConfig): void {
     else ctx.fillRect(10, th * 0.3, 14, th * 0.4)
     canvas.refresh()
   }
+}
+
+function mix(from: number, to: number, t: number): number {
+  const ch = (at: number): number => {
+    const a = (from >> at) & 0xff
+    return Math.round(a + (((to >> at) & 0xff) - a) * t)
+  }
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0)
 }
 
 function shade(color: number, mul: number): number {

@@ -343,7 +343,7 @@ export const MAPS = {
   nebula: {
     emoji: '1f573',
     name: '星云',
-    desc: '一团圆形的星云，某处藏着一个黑洞：人、怪、子弹、流星、掉落物都受它的万有引力，越近越强，中心掉进视界就被吞噬；星云气体给一切移动加上阻力，谁也离不开这团星云',
+    desc: '一团空心的星云，空腔里某处藏着一个黑洞：人、怪、子弹、流星、掉落物都受它的万有引力，越近越强，中心掉进视界就被吞噬；空腔外是厚重的星云壳层，越往外走被它拉回得越狠，谁也出不去；壳层里落下的碎块化作流星横穿空腔',
     kind: 'nebula',
     stamina: { exertion: 0.3, regen: 0.8 },
     palette: {
@@ -361,8 +361,9 @@ export const MAPS = {
     mix: SPACE_MIX,
     finalWaveSub: '奇点降临——别被它逼进黑洞的视界！',
     nebula: {
-      radiusU: 15,
-      hole: { gm: 110, softeningU: 0.6, horizonU: 1.2, fromCenterU: [7, 11], clearU: 5 },
+      shell: { innerU: 18, outerU: 30, gm: 120_000 },
+      contain: { speedMul: 1.5, leapU: 8 },
+      hole: { gm: 110, softeningU: 0.6, horizonU: 1.2, fromCenterU: [8, 12], clearU: 5 },
       meteor: {
         firstMs: 7000,
         intervalMs: 15000,
@@ -370,7 +371,6 @@ export const MAPS = {
         warnMs: 1800,
         radiusU: 1.3,
         speedU: 12,
-        leadU: 20,
         offsetU: 6,
         damage: 30,
         stepMs: 16,

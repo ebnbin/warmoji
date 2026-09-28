@@ -35,7 +35,7 @@ const MAP_KIND_LABEL: Record<(typeof MAPS)[keyof typeof MAPS]['kind'], string> =
   daynight: '昼夜原野（30×30；视野随晨昏涨落，夜幕四合起迷雾）',
   space: '深空星海（圆形禁锢场谁也逃不出；天体直线横扫敌我通吃）',
   ice: '浮冰（25×25 方形浮冰；全局打滑不跟手，滑出冰面落水掉血·敌我通吃，相机永远跟随）',
-  nebula: '星云（圆形星域；黑洞的万有引力作用于一切，越近越强，掉进视界被吞噬·敌我通吃）',
+  nebula: '星云（空心的星云；黑洞的万有引力作用于一切，越近越强，掉进视界被吞噬·敌我通吃；壳层的引力越往外越强，谁也出不去）',
 }
 
 export function enemyStatLines(e: EnemyDef): string[] {

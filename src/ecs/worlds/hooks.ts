@@ -7,7 +7,7 @@ import { MAPS } from '../../data/maps'
 import type { IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, SpaceConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
-import { gravity, holeAt, inHorizon, meteorTrajectory } from '../worlds/nebula'
+import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebula'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/river'
@@ -443,8 +443,9 @@ function nebulaCfg(sim: Sim): NebulaConfig {
   return MAPS[sim.mapId].nebula!
 }
 
-function nebulaR(sim: Sim): number {
-  return nebulaCfg(sim).radiusU * UNIT
+/** 空腔的边：壳层从这里开始 */
+function nebulaWall(sim: Sim): number {
+  return nebulaCfg(sim).shell.innerU * UNIT
 }
 
 /** 黑洞的位置由布景种子定下，视图从这里读 */
@@ -486,7 +487,7 @@ function swallow(sim: Sim): void {
   }
 }
 
-/** 朝队长附近放一颗流星：初速对准队长身旁的瞄准点，之后只受引力 */
+/** 壳层落下的碎块从内壁冲进空腔，初速对准队长身旁的瞄准点，之后只受引力 */
 function launchNebulaMeteor(sim: Sim): void {
   const cfg = nebulaCfg(sim)
   const mc = cfg.meteor
@@ -494,32 +495,31 @@ function launchNebulaMeteor(sim: Sim): void {
   const dx = Math.cos(a)
   const dy = Math.sin(a)
   const off = (sim.rng.next() * 2 - 1) * mc.offsetU * UNIT
-  const ax = leaderX(sim) - dy * off
-  const ay = leaderY(sim) + dx * off
-  const lead = mc.leadU * UNIT
+  const s = meteorStart(cfg, leaderX(sim) - dy * off, leaderY(sim) + dx * off, dx, dy)
   const v = mc.speedU * UNIT
-  const path = meteorTrajectory(holeOf(sim), cfg, ax - dx * lead, ay - dy * lead, dx * v, dy * v)
+  const path = meteorTrajectory(holeOf(sim), cfg, s.x, s.y, dx * v, dy * v)
   const last = path.length - 2
   const eid = spawnMeteor(sim, { sx: path[0]!, sy: path[1]!, ex: path[last]!, ey: path[last + 1]! }, mc.warnMs, mc.radiusU * UNIT * 2)
   meteorPath[eid] = path
 }
 
-/** 流星本体扫到的敌我各挨一下 */
-function nebulaMeteorStrike(sim: Sim, m: number, x: number, y: number): void {
+/** 流星本体扫到的敌我各挨一下，伤害与此刻的动能成正比，即随速度的平方变化 */
+function nebulaMeteorStrike(sim: Sim, m: number, x: number, y: number, speed: number): void {
   const mc = nebulaCfg(sim).meteor
   const rr = mc.radiusU * UNIT
+  const damage = mc.damage * (speed / (mc.speedU * UNIT)) ** 2
   const struck = meteorHit[m]!
   const src = hazardSource('meteor', METEOR_TINT)
   const strike = (eid: number): void => {
     if (struck.has(Uid.v[eid]!) || Math.hypot(Transform.x[eid]! - x, Transform.y[eid]! - y) >= rr) return
     struck.add(Uid.v[eid]!)
-    hit(sim, src, eid, mc.damage, { tick: true })
+    hit(sim, src, eid, damage, { tick: true })
   }
   for (const mem of sim.characters) if (Alive.v[mem]) strike(mem)
   for (const eid of [...query(sim.world, ENEMY_SET)]) strike(eid)
 }
 
-/** 星云的流星：预警后沿积分好的轨迹飞，轨迹走完（飞出星域或掉进视界）就消失 */
+/** 星云的流星：预警后沿积分好的轨迹飞，轨迹走完（扎回壳层或掉进视界）就消失 */
 function nebulaMeteors(sim: Sim, delta: number): void {
   const mc = nebulaCfg(sim).meteor
   const now = sim.elapsedMs
@@ -542,29 +542,31 @@ function nebulaMeteors(sim: Sim, delta: number): void {
     return
   }
   const w = f - i
-  const x = path[i * 2]! + (path[i * 2 + 2]! - path[i * 2]!) * w
-  const y = path[i * 2 + 1]! + (path[i * 2 + 3]! - path[i * 2 + 1]!) * w
+  const dx = path[i * 2 + 2]! - path[i * 2]!
+  const dy = path[i * 2 + 3]! - path[i * 2 + 1]!
+  const x = path[i * 2]! + dx * w
+  const y = path[i * 2 + 1]! + dy * w
   Transform.x[m] = x
   Transform.y[m] = y
   Transform.rot[m] = Transform.rot[m]! + (sim.dtMs / 1000) * 1.4
   Tint.alpha[m] = 1
-  nebulaMeteorStrike(sim, m, x, y)
+  nebulaMeteorStrike(sim, m, x, y, Math.hypot(dx, dy) / (mc.stepMs / 1000))
 }
 
-/** 星云：圆心在原点的星域，黑洞的万有引力作用于一切，星域的圆是边界 */
+/** 星云：圆心在原点的空心星云，黑洞与壳层的万有引力作用于一切；没有墙，走进壳层的都被它的引力拉回空腔 */
 const nebula: WorldHooks = {
   ...bounded,
   pull(sim, x, y) {
     return gravity(holeOf(sim), nebulaCfg(sim), x, y)
   },
-  constrainBody(sim, eid, _from, next) {
-    return clampToDisc(next.x, next.y, 0, 0, nebulaR(sim) - Radius.v[eid]!)
+  constrainBody(_sim, _eid, _from, next) {
+    return next
   },
   wanderDir(sim, eid, dx, dy) {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const d = Math.hypot(x, y)
-    if (d < nebulaR(sim) - 0.6 * UNIT || x * dx + y * dy <= 0) return { x: dx, y: dy }
+    if (d < nebulaWall(sim) - 0.6 * UNIT || x * dx + y * dy <= 0) return { x: dx, y: dy }
     const dot = (dx * x + dy * y) / d
     return { x: dx - (2 * dot * x) / d, y: dy - (2 * dot * y) / d }
   },
@@ -572,13 +574,13 @@ const nebula: WorldHooks = {
     return { x: awayX, y: awayY }
   },
   outside(sim, x, y) {
-    return Math.hypot(x, y) > nebulaR(sim) + UNIT
+    return Math.hypot(x, y) > nebulaCfg(sim).shell.outerU * UNIT
   },
   spawnPoint(sim, boss) {
     const hole = holeOf(sim)
     const clear2 = (nebulaCfg(sim).hole.clearU * UNIT) ** 2
     const near2 = (SPAWN.minPlayerDist * UNIT * (boss ? 2 : 1)) ** 2
-    const inner = nebulaR(sim) - UNIT
+    const inner = nebulaWall(sim) - UNIT
     const lx = leaderX(sim)
     const ly = leaderY(sim)
     let p = ringPoint(sim.rng, ZERO, 0, inner)
@@ -598,7 +600,7 @@ const nebula: WorldHooks = {
     const dy = p.y - hole.y
     const d = Math.hypot(dx, dy)
     const q = d >= clear ? p : d < 1e-6 ? { x: hole.x + clear, y: hole.y } : { x: hole.x + (dx / d) * clear, y: hole.y + (dy / d) * clear }
-    return clampToDisc(q.x, q.y, 0, 0, nebulaR(sim) - UNIT)
+    return clampToDisc(q.x, q.y, 0, 0, nebulaWall(sim) - UNIT)
   },
   onStart(sim) {
     holeOf(sim)
