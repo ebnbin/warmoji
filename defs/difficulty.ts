@@ -1,14 +1,18 @@
 import type { Difficulty } from '../src/types/enemies'
 
 export const DIFFICULTY = {
-  spawn: {
+  curve: {
+    hpGrowthPerMin: 0.5,
     startIntervalMs: 450,
     minIntervalMs: 80,
     rampSeconds: 300,
-    hpGrowthPerMin: 0.5,
-    maxAlive: 400,
     teamFactorBase: 0.35,
     teamFactorPerMember: 0.13,
+    coinDropChanceMin: 0.35,
+    coinDropChanceHalfLifeSec: 220,
+  },
+  spawn: {
+    maxAlive: 400,
     telegraphMs: 900,
     markEmoji: '26a0',
     markSize: 1.0,

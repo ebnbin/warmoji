@@ -5,7 +5,7 @@ import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
 import type { Polarity } from '../../types/battlefield'
 import type { EnemyDef, EnemyKind, EnemyMixEntry } from '../../types/enemies'
-import type { BossRule, CarrierRule, EndRule, FightDef, GroupTraits, HoldPoint, LegacyBatchRule, LegacyPhaseDef, LegacySquad, LegacyStreamRule, LegacyWavesRule, Loot, MixEntry, SpawnAt } from '../../types/runs'
+import type { BossRule, CarrierRule, EndRule, FightDef, GroupTraits, HoldPoint, LegacyBatchRule, LegacyPhaseDef, LegacySquad, LegacyWavesRule, Loot, MixEntry, SpawnAt, StreamRule } from '../../types/runs'
 import type { StatMods } from '../../types/stats'
 import { activeRules, enemyModsOf, mutatorRules } from '../../run/rules'
 import type { ActiveRules } from '../../run/rules'
@@ -69,7 +69,7 @@ export function foeOf(t: GroupTraits): Omit<FoeSpec, 'hpMul'> {
 
 /** 一条连续刷怪：冷却、已经放出几只，与折好的每只的要求 */
 export interface StreamState {
-  readonly rule: LegacyStreamRule
+  readonly rule: StreamRule
   readonly foe: Omit<FoeSpec, 'hpMul'>
   cooldownMs: number
   spawned: number

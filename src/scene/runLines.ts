@@ -5,9 +5,21 @@ import { modTexts } from '../data/stats'
 import { TAGS } from '../data/tags'
 import { phasesOf } from '../data/runs'
 import { WAVE } from '../data/waves'
-import type { EndRule, FightDef, FightReward, FightRules, LegacyPhaseDef, LevelPick, MutatorDef, RunDef, ShopRules, StarRule, StepDef, TeamDef } from '../types/runs'
+import type { EndRule, FightDef, FightReward, FightRules, Gated, LevelPick, MutatorDef, RepeatDef, Rounds, RunDef, ShopRules, StarRule, StepDef, TeamDef } from '../types/runs'
 
 const sec = (ms: number): string => `${+(ms / 1000).toFixed(1)} 秒`
+
+/** 重复里哪几轮有它的说法 */
+function roundsText(r: Rounds): string {
+  const from = r.from ?? 1
+  const span = r.to === undefined ? `第 ${from} 轮起` : from === r.to ? `第 ${from} 轮` : `第 ${from} 到 ${r.to} 轮`
+  return (r.every ?? 1) > 1 ? `${span}每 ${r.every} 轮一次` : span
+}
+
+/** 只在某几轮才有的，说法后面注明轮次 */
+function gatedText(text: string, r: Rounds | undefined): string {
+  return r ? `${text}（${roundsText(r)}）` : text
+}
 
 /** 记最高分的一局按波数排名，一场就叫一波，别的叫场 */
 export function fightUnit(def: RunDef): string {
@@ -44,13 +56,16 @@ export function rewardText(r: FightReward | undefined): string | null {
   return parts.length > 0 ? `过关奖励 ${parts.join('、')}` : null
 }
 
-/** 一个阶段怎么达成、怎么输 */
-function phaseGoalText(p: LegacyPhaseDef): string {
-  const wins = p.ends.flatMap((e) => winText(e) ?? [])
+/** 一个阶段怎么达成、怎么输；重复里只在某几轮才有的注明轮次 */
+function phaseGoalText(p: { readonly ends: readonly Gated<EndRule>[]; readonly need?: 'all' }): string {
+  const wins = p.ends.flatMap((e) => {
+    const win = winText(e)
+    return win === null ? [] : [gatedText(win, e.rounds)]
+  })
   const lose: string[] = []
   for (const e of p.ends) {
-    if (e.kind === 'time' && e.lose) lose.push(`限时 ${sec(e.ms)}`)
-    if (e.kind === 'downs') lose.push(e.count === 1 ? '有人倒下就输' : `累计倒下 ${e.count} 次就输`)
+    if (e.kind === 'time' && e.lose) lose.push(gatedText(`限时 ${sec(e.ms)}`, e.rounds))
+    if (e.kind === 'downs') lose.push(gatedText(e.count === 1 ? '有人倒下就输' : `累计倒下 ${e.count} 次就输`, e.rounds))
   }
   return [wins.length === 0 ? '不会结束' : wins.join(p.need === 'all' ? '，并且' : '，或'), ...lose].join(' · ')
 }
@@ -146,9 +161,15 @@ export function stepText(s: StepDef): string {
   }
 }
 
+/** 一步的说法：重复的一段头一行说重复几轮，后面一行一步是每一轮要走的，只在某几轮才有的注明轮次 */
+export function stepLines(s: StepDef | RepeatDef): string[] {
+  if (s.kind !== 'repeat') return [stepText(s)]
+  return [s.times === undefined ? '一直重复下面几步：' : `重复 ${s.times} 轮下面几步：`, ...s.steps.map((b) => `· ${gatedText(stepText(b), b.rounds)}`)]
+}
+
 /** 一局按顺序的每一步 */
 export function runStepLines(def: RunDef): string[] {
-  return def.steps.map((s, i) => `${i + 1}. ${stepText(s)}`)
+  return def.steps.flatMap((s, i) => stepLines(s).map((line, k) => (k === 0 ? `${i + 1}. ${line}` : line)))
 }
 
 /** 预设队伍：指定的写名字，随机的写要带的标签 */

@@ -7,7 +7,7 @@ import { characterXp, growthSteps, ITEMS, RARITIES, RARITY_ORDER } from '../data
 import { bossFor, HAZARD_NAMES, mapEnemyRoster, MAPS } from '../data/maps'
 import { ROLES } from '../data/roles'
 import { STAT_CATEGORIES, STAT_KEYS, STATS, statValue } from '../data/stats'
-import { fightsOf, phasesOf } from '../data/runs'
+import { fightCount, phasesOf } from '../data/runs'
 import { heatOf, MUTATORS } from '../data/mutators'
 import { levelProgress, stackCount } from '../run/draft'
 import { activeHudHost } from '../run/hudHost'
@@ -15,8 +15,8 @@ import type { HudSnapshot, MemberSheet } from '../run/hudHost'
 import { levelCap, memberLevel, memberLook, memberOutStats, teamLeveled } from '../run/members'
 import { pendingLevelUps } from '../run/levelUp'
 import { xpMaxed, xpToNext } from '../run/xp'
-import { endRun, fightMap, foughtMs, getRun, leaderSlot, runDef, waveStartHp } from '../run/state'
-import { fightAfterRecruit, fightsDone, lastFight, nextFight } from '../run/flow'
+import { endRun, fightMap, foughtMs, getRun, leaderSlot, runDef, stepsOf, waveStartHp } from '../run/state'
+import { fightAfterRecruit, fightsDone, lastFight, nextFight, plannedFights } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { CharacterId } from '../types/characters'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
@@ -119,9 +119,8 @@ function runFoes(run: RunState): Foe[] {
     if (def.spawner) add(def.spawner.into, n)
     for (const fx of def.onDeath ?? []) if (fx.kind === 'split') add(fx.into, n)
   }
-  const def = runDef(run)
-  const firstWave = def.start?.wave ?? 1
-  fightsOf(def).forEach((f, i) => {
+  const firstWave = runDef(run).start?.wave ?? 1
+  plannedFights(run).forEach((f, i) => {
     const n = i + 1
     const map = fightMap(run, f)
     for (const p of phasesOf(f)) {
@@ -423,7 +422,7 @@ export class PauseScene extends Phaser.Scene {
     const owned = m.items
     if (owned.length === 0) {
       const def = runDef(this.run)
-      flow.text(def.steps.some((s) => s.kind === 'shop') ? '还没有道具：在商店给这名队员购买' : `${def.name}不带道具`, { color: 'muted', indent: false })
+      flow.text(stepsOf(this.run).some((s) => s.kind === 'shop') ? '还没有道具：在商店给这名队员购买' : `${def.name}不带道具`, { color: 'muted', indent: false })
       return
     }
     flow.text(teamLeveled(this.run) ? `共 ${owned.length} 件` : `共 ${owned.length} 件 · 角色经验 ${characterXp(owned)}`, { color: 'muted', indent: false })
@@ -463,10 +462,10 @@ export class PauseScene extends Phaser.Scene {
     flow.heading('进度', '1f3c1')
     const def = runDef(run)
     const unit = fightUnit(def)
-    const fights = fightsOf(def)
+    const total = fightCount(def)
     const remain = snap?.remainMs ?? null
     const cur = nextFight(run)
-    if (fights.length > 1) {
+    if (total > 1) {
       const done = fightsDone(run)
       const prev = lastFight(run)
       const tag = (f: FightDef): string => fightTag(def, f, fightMap(run, f))
@@ -476,16 +475,20 @@ export class PauseScene extends Phaser.Scene {
           : `${prev ? `${prev.name ?? ''}已完成 · ` : ''}下一${unit}是${cur?.name ?? ''}${cur ? tag(cur) : ''}`,
         { color: 'ink', bold: true },
       )
-      const barText = new Label(this, 24 + width, flow.y + 10, `${done} / ${fights.length} ${unit}`, { kind: 'label', color: 'soft' }).setOrigin(1, 0.5)
-      const bar = new ProgressBar(this, flow.indent, flow.y + 2, 24 + width - barText.width - 16 - flow.indent, 16, { tone: 'accent', value: done / fights.length })
-      flow.put(bar).put(barText, 34)
-      const numbered = fights.map((f, i) => ({ f, n: i + 1 }))
-      const elites = numbered.filter(({ f, n }) => n > done && tag(f) === `（精英${unit}）`).map(({ n }) => n)
-      const bosses = numbered.flatMap(({ f, n }) => {
-        const names = fightBosses(f, fightMap(run, f)).map((b) => b.name)
-        return names.length > 0 ? [`第 ${n} ${unit}是首领${unit}：${names.join('、')}`] : []
-      })
-      flow.text([elites.length > 0 ? `精英${unit}还有第 ${elites.join('、')} ${unit}` : '', ...bosses].filter(Boolean).join(' · '))
+      if (Number.isFinite(total)) {
+        const barText = new Label(this, 24 + width, flow.y + 10, `${done} / ${total} ${unit}`, { kind: 'label', color: 'soft' }).setOrigin(1, 0.5)
+        const bar = new ProgressBar(this, flow.indent, flow.y + 2, 24 + width - barText.width - 16 - flow.indent, 16, { tone: 'accent', value: done / total })
+        flow.put(bar).put(barText, 34)
+        const numbered = plannedFights(run).map((f, i) => ({ f, n: i + 1 }))
+        const elites = numbered.filter(({ f, n }) => n > done && tag(f) === `（精英${unit}）`).map(({ n }) => n)
+        const bosses = numbered.flatMap(({ f, n }) => {
+          const names = fightBosses(f, fightMap(run, f)).map((b) => b.name)
+          return names.length > 0 ? [`第 ${n} ${unit}是首领${unit}：${names.join('、')}`] : []
+        })
+        flow.text([elites.length > 0 ? `精英${unit}还有第 ${elites.join('、')} ${unit}` : '', ...bosses].filter(Boolean).join(' · '))
+      } else {
+        flow.text(`已打完 ${done} ${unit}，一直打到全灭为止`, { color: 'soft' })
+      }
     } else {
       flow.text(`${def.name} · 已打 ${formatTime(snap?.seconds ?? 0)}${remain === null ? '' : ` · 还剩 ${formatTime(Math.ceil(remain / 1000))}`}`)
     }
@@ -620,7 +623,7 @@ export class PauseScene extends Phaser.Scene {
     const st = this.run.stats
     flow.heading('本局', '1f3c6')
     const unit = fightUnit(runDef(this.run))
-    const many = fightsOf(runDef(this.run)).length > 1
+    const many = fightCount(runDef(this.run)) > 1
     const when = many ? (boss ? `第 ${since} ${unit}登场的头目` : `第 ${since} ${unit}起出没`) : boss ? '这一场的头目' : '这一场会出现'
     flow.text(since > fightsDone(this.run) + 1 ? `${when} · 还没登场` : when)
     flow.text(`击杀 ${st.enemyKills[def.kind] ?? 0} · 对我方造成 ${formatBig(st.enemyDamage[def.kind] ?? 0)} 伤害`)

@@ -1,6 +1,5 @@
 import { addComponent, hasComponent, query } from 'bitecs'
 import { CHARACTERS } from '../../data/characters'
-import { waveAt } from '../../data/waves'
 import { UNIT } from '../../util/units'
 import { Ability, Alive, Borrowed, Boss, Despawn, ENEMY_SET, EnemyArm, FACTION, Faction, Hp, Link, Manual, Nest, Owner, Radius, Slot, Summoned, Transform, Uid } from '../components'
 import { abilityDef, bodyLook, enemyDef, enemyOf, statBase, statLayers } from '../store'
@@ -12,7 +11,7 @@ import type { Effect } from '../../types/abilityDefs'
 import type { EnemyDef, NpcDef } from '../../types/enemies'
 import type { StatBase, StatKey, StatMods } from '../../types/stats'
 import type { Sim } from '../sim'
-import { clockSec } from '../fight/clock'
+import { clockWave } from '../fight/clock'
 
 /** 记下召唤者：召唤物的伤害吃它的召唤物伤害、记在它名下 */
 function markSummoned(sim: Sim, eid: number, by: number): void {
@@ -38,7 +37,7 @@ export function summonBody(sim: Sim, def: NpcDef, x: number, y: number, hp: numb
 }
 
 function waveHp(sim: Sim): number {
-  return waveAt(clockSec(sim)).hpMultiplier
+  return clockWave(sim).hpMultiplier
 }
 
 /** 召出 count 个 def：敌方的按波次放大生命 */

@@ -4,7 +4,7 @@ import { ENEMIES } from '../data/enemies'
 import { HAZARD_NAMES } from '../data/maps'
 import { keysOf } from '../util/record'
 import { PICKUPS } from '../data/pickups'
-import { fightsOf } from '../data/runs'
+import { fightCount } from '../data/runs'
 import { heatOf } from '../data/mutators'
 import { submitScore } from '../save/highscore'
 import { reachLab, submitLab } from '../save/labs'
@@ -60,7 +60,7 @@ export class ResultScene extends Phaser.Scene {
     this.preserveOnRestart = false
     this.run = getRun()
     const def = runDef(this.run)
-    const fights = fightsOf(def).length
+    const fights = fightCount(def)
     const reached = this.win ? fights : fightsDone(this.run) + 1
 
     if (!this.submitted) {

@@ -11,6 +11,7 @@ export const BOSSES = ALL_ENEMIES.filter((e) => e.role === 'boss')
 
 const DIFF = fromJson<Difficulty>(difficultyJson)
 
+export const CURVE = DIFF.curve
 export const SPAWN = DIFF.spawn
 export const ELITE = DIFF.elite
 export const SURGE = DIFF.surge

@@ -10,7 +10,6 @@ import { startPop } from '../utils/pop'
 import type { DriveDef, EnemyDef, EnemyMixEntry, NpcDef } from '../../types/enemies'
 import type { StatMods } from '../../types/stats'
 import type { OutlineKind } from '../../emoji/svg'
-import { waveAt } from '../../data/waves'
 import {
   Anchored,
   Anim,
@@ -73,7 +72,7 @@ import { enemyMixAt, pickEnemy } from '../utils/spawnMix'
 import { rollCarry } from '../utils/battleFx'
 import { fightMods } from '../fight/state'
 import type { FoeSpec } from '../fight/state'
-import { clockSec } from '../fight/clock'
+import { clockSec, clockWave } from '../fight/clock'
 import type { ByKind } from '../../util/record'
 
 type DriveOf = ByKind<DriveDef>
@@ -243,7 +242,7 @@ export function spawnBrood(
   scatter: number,
   ownerEid: number,
 ): void {
-  const hpMul = waveAt(clockSec(sim)).hpMultiplier
+  const hpMul = clockWave(sim).hpMultiplier
   for (let i = 0; i < count; i++) {
     const ang = sim.rng.next() * Math.PI * 2
     const child = spawnEnemy(
@@ -374,7 +373,7 @@ export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
   if (sim.over) return
   if (foeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
-  const hp = Math.round(def.hp * waveAt(clockSec(sim)).hpMultiplier)
+  const hp = Math.round(def.hp * clockWave(sim).hpMultiplier)
   const pos = sightedSpawnPoint(sim)
   spawnTelegraph(sim, def, pos.x, pos.y, hp, false, false, { carries: pickup })
 }

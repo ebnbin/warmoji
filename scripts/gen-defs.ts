@@ -25,13 +25,15 @@ import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
 import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
+import { cycleOf, roundsOf, roundSteps } from '../src/data/rounds.ts'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { ItemDef } from '../src/types/items'
 import type { MapDef } from '../src/types/maps'
 import type { ItemRarity } from '../src/types/items'
 import type { MapId } from '../src/types/maps'
-import type { FightDef, FightRules, GroupTraits, LegacyPhaseDef, LegacySquad, LevelPick, MixEntry, MutatorDef, RunDef, SpawnAt, StarRule, TeamDef } from '../src/types/runs'
+import type { FightDef, FightRules, GroupTraits, LegacyPhaseDef, LegacySquad, LevelPick, MixEntry, MutatorDef, RepeatDef, Rounds, RunDef, SpawnAt, StarRule, StepDef, TeamDef } from '../src/types/runs'
+import type { DifficultyCurve } from '../src/types/waves'
 
 const errors: string[] = []
 const need = (ok: boolean, msg: string): void => {
@@ -211,6 +213,7 @@ const checkPhase = (p: LegacyPhaseDef, last: boolean, bossBefore: boolean, where
   for (const s of p.spawns) {
     if (s.kind === 'stream') {
       need((s.intervalMul ?? 1) > 0 && (s.intervalMs ?? 1) > 0, `${path} 的连续刷怪间隔须为正`)
+      need(s.intervalMs === undefined || s.intervalMul === undefined, `${path} 写了刷怪间隔就不用再写倍率`)
       need(s.ramp === undefined || (s.intervalMs !== undefined && s.ramp.toMs > 0 && s.ramp.overMs > 0), `${path} 的间隔变化须有起始间隔，目标间隔与时长为正`)
       need((s.fromMs ?? 0) >= 0 && (s.untilMs ?? Infinity) > (s.fromMs ?? 0), `${path} 的连续刷怪时段须从不早于这一阶段开始的时刻到更晚的时刻`)
       need(s.total === undefined || (Number.isInteger(s.total) && s.total >= 1), `${path} 的连续刷怪总数须是正整数`)
@@ -284,16 +287,58 @@ const checkTeam = (t: TeamDef, path: string): void => {
   }
 }
 
+/** 难度曲线：刷怪间隔从起点收紧到为正的终点、收紧时长为正，敌人血量不随时间变少，人数系数为正，掉金币的几率下限在 [0, 1] 内、衰减时长为正 */
+const checkCurve = (c: DifficultyCurve, path: string): void => {
+  need(c.minIntervalMs > 0 && c.startIntervalMs >= c.minIntervalMs && c.rampSeconds > 0, `${path} 的刷怪间隔须从起点收紧到为正的终点，收紧时长为正`)
+  need(c.hpGrowthPerMin >= 0, `${path} 的血量增长不为负`)
+  need(c.teamFactorBase > 0 && c.teamFactorPerMember >= 0, `${path} 的人数系数须为正`)
+  need(c.coinDropChanceMin >= 0 && c.coinDropChanceMin <= 1 && c.coinDropChanceHalfLifeSec > 0, `${path} 的掉金币几率下限须在 [0, 1] 内，衰减时长为正`)
+}
+checkCurve(DIFFICULTY.curve, 'difficulty.curve')
+
+/** 轮次条件的每一项都是正整数，起点不晚于终点 */
+const roundsOk = (g: Rounds): boolean => [g.from, g.to, g.every].every((n) => n === undefined || (Number.isInteger(n) && n >= 1)) && (g.from ?? 1) <= (g.to ?? Infinity)
+
+/** 一段重复要查的轮数：有限的查全部轮次，一直重复的查到每一种轮次组合都出现过；轮数或轮次写错了就不展开 */
+const roundsToCheck = (s: RepeatDef): number => {
+  if (!roundsOf(s).every(roundsOk)) return 0
+  if (s.times === undefined) return cycleOf(s)
+  return Number.isInteger(s.times) && s.times >= 1 ? s.times : 0
+}
+
+/** 按轮重复：轮数是正整数，一直重复的只能是最后一步；轮次条件是正整数、起点不晚于终点、落在轮数以内；每一轮都得有一场战斗 */
+const checkRepeat = (s: RepeatDef, last: boolean, path: string): void => {
+  need(s.times === undefined || (Number.isInteger(s.times) && s.times >= 1), `${path} 的轮数须是正整数`)
+  need(s.times !== undefined || last, `${path} 一直重复，只能是最后一步`)
+  for (const g of roundsOf(s)) {
+    need(roundsOk(g), `${path} 的轮次须是正整数，起点不晚于终点`)
+    need(s.times === undefined || Math.max(g.from ?? 1, g.to ?? 1) <= s.times, `${path} 的轮次超出了 ${s.times} 轮`)
+  }
+  for (let k = 1; k <= roundsToCheck(s); k++) need(roundSteps(s, k).some((b) => b.kind === 'fight'), `${path} 第 ${k} 轮没有战斗`)
+}
+
+/** 一局要走的每一步和它在定义里的位置：重复的按轮展开；inRepeat 说它在不在重复里 */
+const planned = (r: RunDef, id: string): { step: StepDef; path: string; inRepeat: boolean }[] =>
+  r.steps.flatMap((s, i) => {
+    const path = `runs.${id}.steps[${i}]`
+    if (s.kind !== 'repeat') return [{ step: s, path, inRepeat: false }]
+    return Array.from({ length: roundsToCheck(s) }, (_, k) => roundSteps(s, k + 1).map((step) => ({ step, path: `${path} 第 ${k + 1} 轮`, inRepeat: true }))).flat()
+  })
+
 for (const [id, r] of Object.entries<RunDef>(RUNS)) {
-  const first = r.steps.findIndex((s) => s.kind === 'fight')
+  const plan = planned(r, id)
+  const steps = plan.map((p) => p.step)
+  const fights = steps.flatMap((s) => (s.kind === 'fight' ? [s.fight] : []))
+  const first = steps.findIndex((s) => s.kind === 'fight')
   need(first >= 0, `runs.${id} 至少要有一场战斗`)
-  need(r.team !== undefined || r.steps.slice(0, first).some((s) => s.kind === 'recruit'), `runs.${id} 没有预设队伍，第一场战斗之前须有招募`)
+  need(r.team !== undefined || steps.slice(0, first).some((s) => s.kind === 'recruit'), `runs.${id} 没有预设队伍，第一场战斗之前须有招募`)
   need(PACK.has(r.emoji), `runs.${id} 的 emoji 不在表情包里：${r.emoji}`)
   need(r.map === undefined || MAPS[r.map] !== undefined, `runs.${id} 引用了不存在的地图：${r.map}`)
-  need(r.map === undefined || r.steps.every((s) => s.kind !== 'fight' || s.fight.map === undefined), `runs.${id} 固定了地图，各场就不能再换地图`)
-  const clocked = r.steps.flatMap((s) => (s.kind === 'fight' ? [s.fight.clockSec !== undefined] : []))
+  need(r.map === undefined || fights.every((f) => f.map === undefined), `runs.${id} 固定了地图，各场就不能再换地图`)
+  const clocked = fights.map((f) => f.clockSec !== undefined)
   need(clocked.every((c) => c === clocked[0]), `runs.${id} 的难度时钟要么每场都定，要么都不定`)
   need(r.start === undefined || (r.start.wave >= 1 && r.start.sec >= 0), `runs.${id} 的开局进度须从第 1 波、第 0 秒起`)
+  if (r.curve) checkCurve(r.curve, `runs.${id}.curve`)
   if (r.team && r.team !== 'knobs') checkTeam(r.team, `runs.${id}.team`)
   checkRules(r.rules, `runs.${id}.rules`)
   const lives = r.rules?.lives
@@ -311,31 +356,34 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
     need(picks.length > 0 && new Set(picks).size === picks.length, `runs.${id}.teamLevel.picks 不能为空，也不能重复`)
     // 每一次全队升级都得有得选：许招人时补满队伍的人数，加上许升级时每人还能升的级数，够用完升到满级的次数
     const size = TEAM_BASELINE.team.maxSize
-    const free = Math.max(r.team && r.team !== 'knobs' ? r.team.slots.length : 0, ...r.steps.map((s) => (s.kind === 'recruit' ? s.upTo : 0)))
+    const free = Math.max(r.team && r.team !== 'knobs' ? r.team.slots.length : 0, ...steps.map((s) => (s.kind === 'recruit' ? s.upTo : 0)))
     const recruit = picks.includes('recruit')
     const room = (recruit ? size - free : 0) + (picks.includes('upgrade') ? (recruit ? size : free) * ((maxLevel ?? MAX_CHAR_LEVEL) - floor) : 0)
     need(room >= t.maxLevel - 1, `runs.${id} 靠全队升级，能选的只用得掉 ${room} 次，不够升到 ${t.maxLevel} 级的 ${t.maxLevel - 1} 次`)
   }
-  const fights = r.steps.flatMap((s) => (s.kind === 'fight' ? [s.fight] : []))
   if (fights.some((f) => f.phases !== undefined)) {
     need(fights.every((f) => f.phases !== undefined), `runs.${id} 的各场要么都按阶段写，要么都不按`)
     need(r.map === undefined && r.start === undefined && r.record === undefined, `runs.${id} 按阶段写的一局不固定地图、不给开局进度、不记最高分：地图与难度时钟写在每一场上`)
-    need(r.steps.every((s) => s.kind !== 'shop' || s.tier !== undefined), `runs.${id} 按阶段写的一局，每家商店都要写物价档位`)
+    need(plan.every((p) => p.inRepeat || p.step.kind !== 'shop' || p.step.tier !== undefined), `runs.${id} 按阶段写的一局，重复之外的每家商店都要写物价档位`)
   }
+  need(r.stars === undefined || r.steps.every((s) => s.kind !== 'repeat' || s.times !== undefined), `runs.${id} 一直重复的一局赢不了，不能有星级`)
   r.stars?.forEach((s, i) => checkStar(s, lives, `runs.${id}.stars[${i}]`))
   const only = r.rules?.recruit?.tags
   if (only) {
     // 预设里随机的位置与招募都从这些角色里挑，按最坏情况也得够
-    const upTo = Math.max(0, ...r.steps.map((s) => (s.kind === 'recruit' ? s.upTo : 0)))
+    const upTo = Math.max(0, ...steps.map((s) => (s.kind === 'recruit' ? s.upTo : 0)))
     const fixed = new Set<string>(r.team && r.team !== 'knobs' ? r.team.slots.filter((s) => typeof s === 'string') : [])
     const pool = Object.entries<CharacterAuthoring>(CHARACTERS).filter(([cid, c]) => !fixed.has(cid) && only.every((t) => c.tags.includes(t)))
     need(only.length > 0 && upTo > 0, `runs.${id} 限定了招募就得有招募步骤与标签`)
     need(pool.length >= upTo - fixed.size, `runs.${id} 限定的招募标签可挑的角色不够`)
   }
   r.steps.forEach((s, i) => {
-    if (s.kind === 'recruit') need(s.upTo >= 1 && s.upTo <= TEAM_BASELINE.team.maxSize, `runs.${id}.steps[${i}] 招募人数须在 1 到满编之间`)
-    if (s.kind === 'shop') need(s.tier === undefined || (Number.isInteger(s.tier) && s.tier >= 1), `runs.${id}.steps[${i}] 商店的物价档位须是正整数`)
-    if (s.kind === 'fight') checkFight(s.fight, r.map, `runs.${id}.steps[${i}]`)
+    if (s.kind === 'repeat') checkRepeat(s, i === r.steps.length - 1, `runs.${id}.steps[${i}]`)
+  })
+  plan.forEach(({ step: s, path }) => {
+    if (s.kind === 'recruit') need(s.upTo >= 1 && s.upTo <= TEAM_BASELINE.team.maxSize, `${path} 招募人数须在 1 到满编之间`)
+    if (s.kind === 'shop') need(s.tier === undefined || (Number.isInteger(s.tier) && s.tier >= 1), `${path} 商店的物价档位须是正整数`)
+    if (s.kind === 'fight') checkFight(s.fight, r.map, path)
   })
 }
 

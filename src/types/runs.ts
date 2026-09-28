@@ -6,6 +6,7 @@ import type { DriveDef, EnemyKind } from './enemies'
 import type { ItemRarity } from './items'
 import type { MapId } from './maps'
 import type { StatMods } from './stats'
+import type { DifficultyCurve } from './waves'
 import type { XpCurve } from './xp'
 
 export type RunId = keyof typeof runsJson
@@ -71,10 +72,11 @@ export interface Escort {
   readonly stats?: StatMods
 }
 
-/** 连续刷怪：每隔 intervalMs 放一只，ramp 让间隔在 overMs 内匀速变到 toMs；只在这一阶段开始后 fromMs 到 untilMs 之间刷，放满 total 只就停；场上敌人到 cap 就这一轮不刷 */
+/** 连续刷怪：每隔 intervalMs 放一只，ramp 让间隔在 overMs 内匀速变到 toMs；不写间隔就按这一局的难度曲线、队伍人数与昼夜算，再乘 intervalMul；只在这一阶段开始后 fromMs 到 untilMs 之间刷，放满 total 只就停；场上敌人到 cap 就这一轮不刷 */
 export interface StreamRule extends GroupTraits {
   readonly kind: 'stream'
-  readonly intervalMs: number
+  readonly intervalMs?: number
+  readonly intervalMul?: number
   readonly ramp?: { readonly toMs: number; readonly overMs: number }
   readonly fromMs?: number
   readonly untilMs?: number
@@ -107,11 +109,6 @@ export type SpawnRule = StreamRule | BatchRule | WavesRule
 export interface LegacySquad extends Squad {
   readonly hpMul?: number
 }
-/** 旧写法的连续刷怪：不写间隔就按难度时钟与队伍人数算，再乘 intervalMul */
-export interface LegacyStreamRule extends Omit<StreamRule, 'intervalMs'> {
-  readonly intervalMs?: number
-  readonly intervalMul?: number
-}
 export interface LegacyBatchRule extends Omit<BatchRule, 'squad'> {
   readonly squad: LegacySquad
 }
@@ -135,7 +132,7 @@ export interface CarrierRule {
 export interface KnobRule {
   readonly kind: 'knobs'
 }
-export type LegacySpawnRule = LegacyStreamRule | LegacyBatchRule | LegacyWavesRule | BossRule | CarrierRule | KnobRule
+export type LegacySpawnRule = StreamRule | LegacyBatchRule | LegacyWavesRule | BossRule | CarrierRule | KnobRule
 
 /** 据点的一处：地图中心起偏 dx、dy 格 */
 export interface HoldPoint {
@@ -242,7 +239,7 @@ export interface LegacyPhaseDef extends Omit<PhaseDef, 'spawns'> {
   readonly spawns: readonly LegacySpawnRule[]
 }
 
-/** 一场的设定，各阶段共用：map 是在哪张地图上打，enemyMods 是给这一场敌人的常驻修正，chaseLeader 让追人的敌人都盯着队长，rules 是我方在这一场的规则，reward 是过关奖励，clockSec 是开打时难度时钟走到的秒数（敌人的血量、刷怪间隔与掉币率都从这一秒往后算） */
+/** 一场的设定，各阶段共用：map 是在哪张地图上打，enemyMods 是给这一场敌人的常驻修正，chaseLeader 让追人的敌人都盯着队长，rules 是我方在这一场的规则，reward 是过关奖励，clockSec 是开打时难度时钟走到的秒数（敌人的血量、刷怪间隔与掉币率都从这一秒往后算），不写就接着一局累计打过的时长 */
 interface FightBase {
   readonly name?: string
   readonly map?: MapId
@@ -257,11 +254,10 @@ interface FightBase {
 export interface StageDef extends FightBase {
   readonly name: string
   readonly map: MapId
-  readonly clockSec: number
   readonly phases: readonly PhaseDef[]
 }
 
-/** 旧写法的一场：它自己就是唯一的阶段；不写地图就在一局的地图上，不写难度时钟就接着一局累计打过的时长，不写名字就只显示用时 */
+/** 旧写法的一场：它自己就是唯一的阶段；不写地图就在一局的地图上，不写名字就只显示用时 */
 export interface LegacyFightDef extends FightBase, LegacyPhaseDef {
   readonly phases?: undefined
 }
@@ -270,6 +266,37 @@ export type FightDef = StageDef | LegacyFightDef
 
 /** 一步：招募到 upTo 人；进商店，物价与稀有度按第 tier 波算，不写就按一局走到的波数；打一场 */
 export type StepDef = { readonly kind: 'recruit'; readonly upTo: number } | { readonly kind: 'shop'; readonly tier?: number } | { readonly kind: 'fight'; readonly fight: FightDef }
+
+/** 重复里哪几轮有它：第 from 轮到第 to 轮之间（两头都含），从 from 起每 every 轮一次；不写 from 从第 1 轮起，不写 to 一直到最后，不写 every 每轮都有 */
+export interface Rounds {
+  readonly from?: number
+  readonly to?: number
+  readonly every?: number
+}
+
+/** 重复里可以只在某几轮才有的：写了 rounds 就只在选中的轮次有 */
+export type Gated<T> = T & { readonly rounds?: Rounds }
+
+/** 重复里一场的阶段：刷怪与结束规则可以只在某几轮才有 */
+export interface RoundPhaseDef extends Omit<PhaseDef, 'spawns' | 'ends'> {
+  readonly spawns: readonly Gated<SpawnRule>[]
+  readonly ends: readonly Gated<EndRule>[]
+}
+
+/** 重复里的一场，按阶段写 */
+export interface RoundStageDef extends Omit<StageDef, 'phases'> {
+  readonly phases: readonly RoundPhaseDef[]
+}
+
+/** 重复里的一步：招募、商店或打一场，可以只在某几轮才有 */
+export type RoundStepDef = Gated<Exclude<StepDef, { readonly kind: 'fight' }> | { readonly kind: 'fight'; readonly fight: RoundStageDef }>
+
+/** 按轮重复：每一轮按先后走一遍 steps，一共 times 轮，不写 times 就一直重复下去；每一轮的战斗名字后面加上第几轮 */
+export interface RepeatDef {
+  readonly kind: 'repeat'
+  readonly times?: number
+  readonly steps: readonly RoundStepDef[]
+}
 
 /** 全队升级时能选的一项：招一名新队员，给一名队员升一级 */
 export type LevelPick = 'recruit' | 'upgrade'
@@ -289,8 +316,8 @@ export interface TeamDef {
 }
 
 /**
- * 一局的玩法：按顺序走完这些步骤就赢，全灭就输。
- * map 固定地图，不写由玩家选；team 为 knobs 时队伍由试炼场的旋钮给出，是 TeamDef 时开局就按它组队，不写就靠招募步骤组建；rules 是我方这一局的规则；teamLevel 让队员靠全队升级成长；start 是开局的进度，波数定配比、物价与稀有度，秒数定敌人的血量与刷怪间隔；record 为真时结算记最高分；note 写这一关在试什么；stars 是赢下后再各得一星的两条条件。
+ * 一局的玩法：按顺序走完这些步骤就赢，全灭就输；步骤里可以有按轮重复的一段，一直重复的一局走不完，打到全灭为止。
+ * map 固定地图，不写由玩家选；team 为 knobs 时队伍由试炼场的旋钮给出，是 TeamDef 时开局就按它组队，不写就靠招募步骤组建；rules 是我方这一局的规则；teamLevel 让队员靠全队升级成长；curve 是这一局的难度曲线，不写按默认的；start 是开局的进度，波数定配比、物价与稀有度，秒数定敌人的血量与刷怪间隔；record 为真时结算记最高分；note 写这一关在试什么；stars 是赢下后再各得一星的两条条件。
  */
 export interface RunDef {
   readonly emoji: string
@@ -301,9 +328,10 @@ export interface RunDef {
   readonly team?: 'knobs' | TeamDef
   readonly rules?: RunRules
   readonly teamLevel?: TeamLevelDef
+  readonly curve?: DifficultyCurve
   readonly start?: { readonly wave: number; readonly sec: number }
   readonly coins?: number
   readonly record?: boolean
   readonly stars?: readonly [StarRule, StarRule]
-  readonly steps: readonly StepDef[]
+  readonly steps: readonly (StepDef | RepeatDef)[]
 }
