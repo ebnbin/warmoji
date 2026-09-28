@@ -70,6 +70,7 @@ import type { FieldPickupDef } from '../../types/battlefield'
 import { enemyMixAt, pickEnemy } from '../utils/spawnMix'
 import { fightMods } from '../fight/state'
 import type { FoeSpec } from '../fight/state'
+import { clockSec } from '../fight/clock'
 import type { ByKind } from '../../util/record'
 
 type DriveOf = ByKind<DriveDef>
@@ -232,7 +233,7 @@ export function spawnBrood(
   scatter: number,
   ownerEid: number,
 ): void {
-  const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
+  const hpMul = waveAt(clockSec(sim)).hpMultiplier
   for (let i = 0; i < count; i++) {
     const ang = sim.rng.next() * Math.PI * 2
     const child = spawnEnemy(
@@ -252,7 +253,7 @@ export function spawnBrood(
 export function dayNightOf(sim: Sim): { cfg: NonNullable<MapDef['dayNight']>; hour: number } | undefined {
   const cfg = MAPS[sim.mapId].dayNight
   if (!cfg) return undefined
-  return { cfg, hour: hourAt((sim.run.combatMs + sim.elapsedMs) / 1000, cfg) }
+  return { cfg, hour: hourAt(clockSec(sim), cfg) }
 }
 
 /** 这一场的配比，不写就按地图与波数，昼夜图按时辰 */
@@ -361,7 +362,7 @@ export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
   if (sim.over) return
   if (foeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
-  const hp = Math.round(def.hp * waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier)
+  const hp = Math.round(def.hp * waveAt(clockSec(sim)).hpMultiplier)
   const pos = sightedSpawnPoint(sim)
   spawnTelegraph(sim, def, pos.x, pos.y, hp, false, false, pickup)
 }

@@ -11,6 +11,7 @@ import type { MapDef, MapId } from '../types/maps'
 import type { Point } from '../util/vec'
 import type { RunState } from '../run/state'
 import type { Sim } from './sim'
+import { clockSec } from './fight/clock'
 import type { TorusConfig } from '../types/maps'
 import { query } from 'bitecs'
 import { Due, Meteor } from './components'
@@ -175,7 +176,7 @@ class DayNightView extends BoundedView {
 
   step(v: ViewCtx, sim: Sim, _delta: number): void {
     const dn = v.def.dayNight!
-    const hour = hourAt((v.run.combatMs + sim.elapsedMs) / 1000, dn)
+    const hour = hourAt(clockSec(sim), dn)
     v.scene.cameras.main.setZoom((viewport.renderScale * dn.visionMid) / visionGridsAt(hour, dn))
     this.fog?.show(leaderX(sim), leaderY(sim), fogRadiusAt(hour, dn) * UNIT, fogAlphaAt(hour, dn))
   }

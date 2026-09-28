@@ -7,6 +7,7 @@ import { spawnBrood, spawnNpc } from '../../entities/enemy'
 import { applyAbilityEffects } from './effects'
 import { enemySource } from '../../utils/source'
 import type { PendingDeath, Sim } from '../../sim'
+import { clockSec } from '../../fight/clock'
 
 function spawnSplit(sim: Sim, d: PendingDeath, fx: SplitEffect): void {
   if (sim.over) return
@@ -31,7 +32,7 @@ function spawnDecoy(sim: Sim, d: PendingDeath, fx: DecoyEffect, hpMul: number): 
 export function replayDeath(sim: Sim, d: PendingDeath): void {
   const effects = d.def.onDeath
   if (!effects) return
-  const hpMul = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
+  const hpMul = waveAt(clockSec(sim)).hpMultiplier
   const src = { ...enemySource(d.def.kind, d.atk), faction: d.faction }
   const at = { x: d.x, y: d.y, baseDamage: 0, source: d.eid }
   const generic: Effect[] = []

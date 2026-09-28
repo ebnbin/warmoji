@@ -19,6 +19,7 @@ import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
 import { getRun, INVINCIBLE_HP, nextStep, runDef } from '../run/state'
 import { goStep } from '../scene/teamPage'
+import { rewardText } from '../scene/runLines'
 import type { RunState } from '../run/state'
 import { MAPS } from '../data/maps'
 import { makeWorld } from './world'
@@ -32,6 +33,7 @@ import { LayerType, TriBatch } from './render/layer'
 import { place } from './render/tri'
 import { Presentation } from './presentation'
 import { remapSim } from './systems/shared/remap'
+import { clockSec } from './fight/clock'
 import { Fog, setOverlayFill, viewFor } from './views'
 import type { MapView, ViewCtx } from './views'
 import { makeSim } from './sim'
@@ -421,8 +423,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     atlasPages: number
   } {
     const sim = this.sim
-    const totalSec = (this.run.combatMs + (sim?.elapsedMs ?? 0)) / 1000
-    const wave = waveAt(totalSec)
+    const wave = waveAt(sim ? clockSec(sim) : this.run.combatMs / 1000)
     return {
       enemies: query(this.world, [Enemy]).length,
       projectiles: query(this.world, [Projectile]).length,
@@ -647,6 +648,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       title: `${this.fightDef.name ?? '本场'}完成！`,
       kills: run.kills - this.waveBaseKills,
       coins: run.coins - this.waveBaseCoins,
+      reward: rewardText(this.fightDef.reward),
     })
     nextStep(run)
     this.time.delayedCall(WAVE.summaryMs, () => goStep(this, run))

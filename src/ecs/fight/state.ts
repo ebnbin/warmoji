@@ -4,7 +4,7 @@ import { timeLimitMs } from '../../data/runs'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
 import type { EnemyDef, EnemyMixEntry } from '../../types/enemies'
-import type { EndRule, FightDef, HoldPoint, SpawnAt, StreamRule, WavesRule } from '../../types/runs'
+import type { EndRule, FightDef, HoldPoint, SpawnAt, Squad, StreamRule, WavesRule } from '../../types/runs'
 import type { StatMods } from '../../types/stats'
 import { activeRules, enemyModsOf, mutatorRules } from '../../run/rules'
 import type { ActiveRules } from '../../run/rules'
@@ -149,16 +149,22 @@ function onField(sim: Sim): number {
   return n + query(sim.world, [Telegraph]).length
 }
 
-/** 还没放出的敌人：排着的单只、没登场的一队、没来的组 */
+/** 一队连同护卫一共几只 */
+export function squadSize(squad: Squad): number {
+  return squad.count + (squad.escort?.count ?? 0)
+}
+
+/** 还没放出的敌人：排着的单只、没登场的一队、没来的组；只数悬赏目标时护卫不算 */
 function pendingCount(sim: Sim, bountyOnly: boolean): number {
   let n = 0
+  const size = (sq: Squad): number => (bountyOnly ? (sq.bounty ? sq.count : 0) : squadSize(sq))
   for (const e of query(sim.world, [Due, Order])) if (!bountyOnly || foeSpec[e]?.bounty) n++
   for (const e of query(sim.world, [Due, Call])) {
     const r = callRule[e]
-    if (r?.kind === 'batch' && (!bountyOnly || r.squad.bounty)) n += r.squad.count
+    if (r?.kind === 'batch') n += size(r.squad)
     if (r?.kind === 'boss' && !bountyOnly) n++
   }
-  for (const w of sim.fight.waves) for (const sq of w.rule.squads.slice(w.next)) if (!bountyOnly || sq.bounty) n += sq.count
+  for (const w of sim.fight.waves) for (const sq of w.rule.squads.slice(w.next)) n += size(sq)
   return n
 }
 
@@ -279,15 +285,22 @@ export function fightGoals(sim: Sim): { readonly text: string; readonly warn: bo
   return out
 }
 
-/** 目标不在视野里时指过去的点：据点这一处，或离队长最近的悬赏目标 */
+/** 目标不在视野里时指过去的点：据点这一处，或离队长最近的悬赏目标；要清场又没有悬赏时是最近的敌人 */
 export function goalSpot(sim: Sim): Point | null {
   const h = sim.fight.hold
   if (h && h.point < h.rule.points.length) return holdSpot(sim, h.rule.points[h.point]!)
+  const bounty = nearestTo(sim, query(sim.world, [Bounty, Transform]))
+  if (bounty || !sim.fight.def.ends.some((e) => e.kind === 'cleared')) return bounty
+  return nearestTo(sim, query(sim.world, ENEMY_SET).filter((eid) => Faction.v[eid] === FACTION.enemy))
+}
+
+function nearestTo(sim: Sim, eids: ArrayLike<number>): Point | null {
   const lx = leaderX(sim)
   const ly = leaderY(sim)
   let best: Point | null = null
   let bestD = Infinity
-  for (const eid of query(sim.world, [Bounty, Transform])) {
+  for (let i = 0; i < eids.length; i++) {
+    const eid = eids[i]!
     const d = sim.hooks.worldDelta(sim, lx, ly, Transform.x[eid]!, Transform.y[eid]!)
     const d2 = d.x * d.x + d.y * d.y
     if (d2 < bestD) {

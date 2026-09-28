@@ -8,7 +8,8 @@ import { telegraphCount } from '../entities/telegraph'
 import { rollCarriers } from '../utils/battleFx'
 import { isDayAt } from '../worlds/daynight'
 import type { Sim } from '../sim'
-import { calm } from './state'
+import { clockSec } from './clock'
+import { calm, squadSize } from './state'
 import type { StreamState, WavesState } from './state'
 
 /** 开打：定时登场的排好，带光圈的敌人抽好效果排好 */
@@ -37,27 +38,30 @@ function scheduleCarriers(sim: Sim, rule: CarrierRule): void {
   })
 }
 
-/** 一队敌人登场：打出横幅，按此刻的强度排好每一只；指定的头目血量不随进度涨，围圈的一队随机转一个起始角 */
+/** 一队敌人登场：打出横幅，按此刻的强度排好每一只，护卫排在后面、和这一队一起摆；指定的头目血量不随进度涨，围圈的一队随机转一个起始角 */
 export function callSquad(sim: Sim, squad: Squad, banner?: Banner): void {
   if (sim.over) return
   if (banner) sim.out.banners.push(banner)
   const raw = squad.enemy ? ENEMIES[squad.enemy] : undefined
   const enemy = raw && squad.drive ? { ...raw, drive: squad.drive } : raw
-  const clock = raw?.role === 'boss' ? 1 : waveAt((sim.run.combatMs + sim.elapsedMs) / 1000).hpMultiplier
-  const hpMul = squad.hpMul === undefined ? clock : clock * squad.hpMul
+  const clock = waveAt(clockSec(sim)).hpMultiplier
+  const hpMul = (raw?.role === 'boss' ? 1 : clock) * (squad.hpMul ?? 1)
   const phase = squad.at?.kind === 'ring' ? sim.rng.next() * Math.PI * 2 : 0
   const spread = squad.spreadMs ?? 0
-  for (let i = 0; i < squad.count; i++) {
-    scheduleOrder(sim, sim.elapsedMs + (i * spread) / squad.count, {
-      hpMul,
-      elite: i < (squad.elites ?? 0),
-      chance: squad.eliteChance ?? 0,
-      enemy,
+  const escort = squad.escort
+  const total = squadSize(squad)
+  for (let i = 0; i < total; i++) {
+    const main = i < squad.count
+    scheduleOrder(sim, sim.elapsedMs + (i * spread) / total, {
+      hpMul: main ? hpMul : clock * (squad.hpMul ?? 1),
+      elite: main ? i < (squad.elites ?? 0) : !!escort?.elite,
+      chance: main ? (squad.eliteChance ?? 0) : 0,
+      enemy: main ? enemy : ENEMIES[escort!.enemy],
       at: squad.at,
       index: i,
-      count: squad.count,
+      count: total,
       phase,
-      bounty: squad.bounty,
+      bounty: main && squad.bounty,
     })
   }
 }
@@ -83,7 +87,7 @@ export function runStream(sim: Sim, st: StreamState, deltaMs: number): void {
   if (sim.elapsedMs < (rule.fromMs ?? 0) || sim.elapsedMs >= (rule.untilMs ?? Infinity)) return
   st.cooldownMs -= deltaMs
   if (st.cooldownMs > 0) return
-  const wave = waveAt((sim.run.combatMs + sim.elapsedMs) / 1000)
+  const wave = waveAt(clockSec(sim))
   const mul = rule.intervalMul ?? 1
   if (rule.intervalMs !== undefined) {
     st.cooldownMs = (rule.intervalMs * mul) / sim.foes.count

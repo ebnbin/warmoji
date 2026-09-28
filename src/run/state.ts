@@ -5,7 +5,7 @@ import { RUNS } from '../data/runs'
 import type { GrowthProgress, ItemId } from '../types/items'
 import type { Hazard, MapId } from '../types/maps'
 import type { EnemyKind } from '../types/enemies'
-import type { MutatorId, RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
+import type { FightDef, MutatorId, RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
 import { MAP_IDS } from '../data/maps'
 import type { XpState } from '../types/xp'
 import { sandboxTeam } from '../ecs/sandbox/knobs'
@@ -18,7 +18,10 @@ export interface RunState {
   runId: RunId
   /** 走到第几步 */
   step: number
+  /** 这一场或接下来那一场在哪张地图上打 */
   mapId: MapId
+  /** 这一局的地图：玩家选的或玩法固定的，没写地图的场次在这里打 */
+  homeMap: MapId
   decorSeed: number
   wave: number
   coins: number
@@ -84,10 +87,12 @@ function pickTeam(slots: readonly TeamSlot[]): CharacterId[] {
 /** 开一局：地图固定的不看玩家选的；玩法给了队伍就按它组队、满血开局，否则由招募步骤补上；给了开局进度就从那里起；带上自选的词缀 */
 export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!, mutators: readonly MutatorId[] = []): RunState {
   const def = RUNS[id]
+  const home = def.map ?? mapId
   const run: RunState = {
     runId: id,
     step: 0,
-    mapId: def.map ?? mapId,
+    mapId: home,
+    homeMap: home,
     decorSeed: (Math.random() * 0xffffffff) >>> 0,
     wave: def.start?.wave ?? 1,
     coins: def.coins ?? 0,
@@ -132,6 +137,7 @@ export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!, mutators: readon
     run.minLevel = def.team.level ?? 1
     run.memberHp.fill(Infinity)
   }
+  syncMap(run)
   current = run
   return run
 }
@@ -169,12 +175,24 @@ export function stepOf(run: RunState): StepDef | undefined {
 /** 已经招够人的招募步骤直接跳过 */
 export function skipFilled(run: RunState): void {
   while (stepOf(run)?.kind === 'recruit' && recruitDueCount(run) === 0) run.step++
+  syncMap(run)
 }
 
 /** 当前这一步做完了，走到下一个要做的步骤 */
 export function nextStep(run: RunState): void {
   run.step++
   skipFilled(run)
+}
+
+/** 这一场在哪张地图上打 */
+export function fightMap(run: RunState, fight: FightDef): MapId {
+  return fight.map ?? run.homeMap
+}
+
+/** 地图跟着当前或接下来那一场走；后面没有战斗了就留在最后一场的地图上 */
+function syncMap(run: RunState): void {
+  const next = runDef(run).steps.slice(run.step).find((s) => s.kind === 'fight')
+  if (next?.kind === 'fight') run.mapId = fightMap(run, next.fight)
 }
 
 /** 这一局许招的角色：规则限定了标签就只许招同时带着它们的 */
