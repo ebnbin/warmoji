@@ -14,7 +14,10 @@ import type { Sim } from './sim'
 import { clockSec } from './fight/clock'
 import type { TorusConfig } from '../types/maps'
 import { query } from 'bitecs'
-import { Due, Meteor } from './components'
+import { Due, Meteor, Phys, Stats } from './components'
+import { meteorPath } from './store'
+import { captureRadiusU } from './worlds/nebula'
+import { ringPoint } from './worlds/space'
 import { leaderX, leaderY } from './utils/team'
 import { spawnDriftDecor } from './entities/decor'
 import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynight'
@@ -313,6 +316,165 @@ class SpaceView extends BoundedView {
   destroy(v: ViewCtx): void {
     this.meteorFx?.tele.destroy()
     this.meteorFx = undefined
+    super.destroy(v)
+  }
+}
+
+function nebulaRadius(v: ViewCtx): number {
+  return v.def.nebula!.radiusU * UNIT
+}
+
+const GAS_COLORS = [0xff5fa2, 0x7c4dff, 0x40c4ff, 0xb388ff, 0xff8a65]
+
+/** 星云：圆心在原点的星域和一团团星云气体；黑洞画出视界、光子球与吸积盘，虚线圈是当前队长走路逃不出的范围，流星的预警沿引力弯曲的轨迹 */
+class NebulaView extends BoundedView {
+  private capture?: Phaser.GameObjects.Graphics
+  private captureU = -1
+  private meteorFx?: { of: number; tele: Phaser.GameObjects.Graphics }
+
+  layout(v: ViewCtx): { w: number; h: number; origin: Point } {
+    const d = nebulaRadius(v) * 2
+    return { w: d, h: d, origin: { x: 0, y: 0 } }
+  }
+
+  build(v: ViewCtx): void {
+    this.visuals.push(
+      v.scene.add
+        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, v.def.palette.map)
+        .setScrollFactor(0)
+        .setDepth(-1),
+    )
+    const r = nebulaRadius(v)
+    const gas = v.scene.add.graphics().setDepth(-0.9)
+    const rng = new Rng(v.run.decorSeed ^ 0x9a5)
+    for (let i = 0; i < 10; i++) {
+      const p = ringPoint(rng, { x: 0, y: 0 }, 0, r * 0.85)
+      gas.fillStyle(GAS_COLORS[i % GAS_COLORS.length]!, 0.05 + rng.next() * 0.06)
+      gas.fillCircle(p.x, p.y, (3 + rng.next() * 4) * UNIT)
+    }
+    this.visuals.push(gas)
+    const rim = v.scene.add.graphics().setDepth(2)
+    rim.lineStyle(5, 0xff7ac8, 0.6)
+    rim.strokeCircle(0, 0, r)
+    rim.lineStyle(18, 0xb04fff, 0.12)
+    rim.strokeCircle(0, 0, r - 9)
+    this.visuals.push(rim)
+  }
+
+  protected field(v: ViewCtx): Phaser.Geom.Rectangle {
+    const r = nebulaRadius(v)
+    return new Phaser.Geom.Rectangle(-r, -r, r * 2, r * 2)
+  }
+
+  /** 装饰只撒在星域里 */
+  decor(v: ViewCtx, atlas: EcsAtlas): void {
+    const rng = new Rng(v.run.decorSeed)
+    const rU = nebulaRadius(v) / UNIT
+    const cells = Math.round(rU * 2)
+    for (const d of rollDecor(v.def.decor, () => rng.next(), cells, cells)) {
+      const xU = d.xU - rU
+      const yU = d.yU - rU
+      if (Math.hypot(xU, yU) > rU - d.sizeU / 2) continue
+      this.decorEids.push(
+        spawnDecor(v.world, atlas, {
+          id: d.emoji,
+          outline: 'player',
+          x: xU * UNIT,
+          y: yU * UNIT,
+          size: d.sizeU * UNIT,
+          rot: d.rotation,
+          alpha: d.alpha,
+          z: 1,
+        }),
+      )
+    }
+  }
+
+  /** 吸积盘从最内稳定圆轨道（3 倍视界）往外，光子球在 1.5 倍视界 */
+  onSimReady(v: ViewCtx, sim: Sim): void {
+    const hole = sim.worldState.hole
+    if (!hole) return
+    const h = v.def.nebula!.hole.horizonU * UNIT
+    const g = v.scene.add.graphics().setDepth(2.5)
+    for (let i = 0; i < 6; i++) {
+      g.lineStyle(h * 0.4, i % 2 === 0 ? 0xffa040 : 0xff6ec7, 0.1 - i * 0.012)
+      g.strokeCircle(hole.x, hole.y, h * (3 + i * 0.35))
+    }
+    g.lineStyle(3, 0xfff3c4, 0.9)
+    g.strokeCircle(hole.x, hole.y, h * 1.5)
+    g.fillStyle(0x000000, 1)
+    g.fillCircle(hole.x, hole.y, h)
+    g.lineStyle(2, 0x7c4dff, 0.9)
+    g.strokeCircle(hole.x, hole.y, h)
+    this.visuals.push(g)
+    this.capture = v.scene.add.graphics().setDepth(3)
+    this.visuals.push(this.capture)
+  }
+
+  step(v: ViewCtx, sim: Sim, _delta: number): void {
+    this.drawCapture(v, sim)
+    this.drawMeteorPath(v, sim)
+  }
+
+  /** 当前队长走路逃不出的范围：终端漂移追上它最快速度的地方，随换人与体力变化 */
+  private drawCapture(v: ViewCtx, sim: Sim): void {
+    const g = this.capture
+    const hole = sim.worldState.hole
+    const lead = sim.leader
+    if (!g || !hole || lead < 0) return
+    const cfg = v.def.nebula!
+    const rU = captureRadiusU(cfg, Phys.mass[lead]! / Phys.drag[lead]!, Stats.moveSpeed[lead]!, cfg.radiusU * 2)
+    if (Math.abs(rU - this.captureU) < 0.02) return
+    this.captureU = rU
+    g.clear()
+    if (rU <= cfg.hole.horizonU) return
+    const r = rU * UNIT
+    const n = 48
+    g.lineStyle(2, 0xffffff, 0.45)
+    for (let i = 0; i < n; i += 2) {
+      g.beginPath()
+      g.arc(hole.x, hole.y, r, (i / n) * Math.PI * 2, ((i + 1) / n) * Math.PI * 2)
+      g.strokePath()
+    }
+  }
+
+  private drawMeteorPath(v: ViewCtx, sim: Sim): void {
+    const m = query(v.world, [Meteor])[0]
+    const fx = this.meteorFx
+    if (fx && fx.of !== m) {
+      fx.tele.destroy()
+      this.meteorFx = undefined
+    }
+    if (m === undefined) return
+    const path = meteorPath[m]
+    if (!path) return
+    let cur = this.meteorFx
+    if (!cur) {
+      const rr = v.def.nebula!.meteor.radiusU * UNIT
+      const tele = v.scene.add.graphics().setDepth(3)
+      const trace = (): void => {
+        tele.beginPath()
+        tele.moveTo(path[0]!, path[1]!)
+        for (let i = 2; i < path.length; i += 2) tele.lineTo(path[i]!, path[i + 1]!)
+        tele.strokePath()
+      }
+      tele.lineStyle(rr * 2, 0xff5252, 0.16)
+      trace()
+      tele.lineStyle(3, 0xff8a80, 0.8)
+      trace()
+      tele.fillStyle(0xff5252, 0.35)
+      tele.fillCircle(path[0]!, path[1]!, rr)
+      cur = { of: m, tele }
+      this.meteorFx = cur
+    }
+    cur.tele.setAlpha(sim.elapsedMs < Due.at[m]! ? 0.28 + 0.24 * Math.abs(Math.sin(sim.elapsedMs / 110)) : 0.22)
+  }
+
+  destroy(v: ViewCtx): void {
+    this.meteorFx?.tele.destroy()
+    this.meteorFx = undefined
+    this.capture = undefined
+    this.captureU = -1
     super.destroy(v)
   }
 }
@@ -730,4 +892,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   river: () => new RiverView(),
   void: () => new TorusView(),
   space: () => new SpaceView(),
+  nebula: () => new NebulaView(),
 }

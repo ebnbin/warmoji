@@ -72,6 +72,20 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   if (m.ice) need(m.ice.waterExertion > 0 && m.ice.waterRegen >= 0, `maps.${id}.ice 的水里费力须为正、回复倍率不为负`)
 }
 
+/** 星云：黑洞整个落在星域里，视界外还有能站的地方；流星的积分步长能在时限里走完 */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'nebula') === (m.nebula !== undefined), `maps.${id} 是星云当且仅当写了 nebula`)
+  const n = m.nebula
+  if (!n) continue
+  const [near, far] = n.hole.fromCenterU
+  need(n.hole.gm > 0 && n.hole.softeningU > 0, `maps.${id}.nebula.hole 的引力与软化长度须为正`)
+  need(n.hole.horizonU > n.hole.softeningU / Math.SQRT2, `maps.${id}.nebula.hole.horizonU 须大于软化长度的 1/√2，视界外的引力才随距离单调减小`)
+  need(near >= 0 && near <= far && far + n.hole.horizonU < n.radiusU, `maps.${id}.nebula.hole 的位置范围须落在星域里`)
+  need(n.hole.clearU > n.hole.horizonU, `maps.${id}.nebula.hole.clearU 须大于视界`)
+  need(n.meteor.stepMs > 0 && n.meteor.maxFlightMs >= n.meteor.stepMs, `maps.${id}.nebula.meteor 的积分步长须为正且不超过最长飞行时间`)
+  need(n.meteor.speedU > 0 && n.meteor.radiusU > 0 && n.meteor.warnMs >= 0, `maps.${id}.nebula.meteor 的速度与半径须为正`)
+}
+
 /** 身体的体力上限须为正、体力回复不为负 */
 const checkStamina = (st: { readonly maxStamina?: number; readonly staminaRegen?: number } | undefined, path: string): void => {
   need((st?.maxStamina ?? 1) > 0 && (st?.staminaRegen ?? 0) >= 0, `${path} 的体力上限须为正、体力回复不为负`)

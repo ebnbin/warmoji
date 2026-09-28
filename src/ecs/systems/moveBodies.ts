@@ -86,7 +86,7 @@ function seek(sim: Sim, eid: number): boolean {
   return false
 }
 
-/** 所有身体同一条积分；冲刺中的身体按脚本速度走，弧线中的身体腾空，穿行中的身体沿直线移过去，跟随中的身体贴着宿主，空中的身体不受地面与介质影响；位置经场地修正后速度按实际位移回推 */
+/** 所有身体同一条积分；冲刺中的身体按脚本速度走、受引力加速，弧线中的身体腾空，穿行中的身体沿直线移过去，跟随中的身体贴着宿主，空中的身体不受地面与介质影响、照样受引力；位置经场地修正后速度按实际位移回推 */
 export function moveBodies(sim: Sim): void {
   for (const eid of query(sim.world, [Phys, Transform, Radius])) {
     if (Alive.v[eid] === 0) continue
@@ -117,18 +117,23 @@ export function moveBodies(sim: Sim): void {
       continue
     }
     let next: { x: number; y: number }
+    const g = sim.hooks.pull(sim, x, y)
     if (dashing) {
+      // 冲刺按自己的速度走，引力照样加速它
+      Motion.vx[eid] = Motion.vx[eid]! + g.x * dt
+      Motion.vy[eid] = Motion.vy[eid]! + g.y * dt
       vx = Motion.vx[eid]!
       vy = Motion.vy[eid]!
       next = { x: x + vx * dt, y: y + vy * dt }
     } else {
-      // 线性阻力的精确解：速度按 exp 衰减趋近终速（介质速度 + 驱动 / 黏度），与帧率无关
+      // 线性阻力的精确解：速度按 exp 衰减趋近终速（介质速度 + 驱动 / 黏度 + 引力的终端漂移 g·质量/阻力），与帧率无关
       const air = hasComponent(sim.world, eid, Airborne)
       const s = air ? GROUND : sim.hooks.surface(sim, x, y)
       const medium = air ? STILL : sim.hooks.mediumVelocity(sim, x, y)
       const k = (Phys.drag[eid]! * Phys.grip[eid]! * s.traction * s.viscosity) / Phys.mass[eid]!
-      const tx = medium.x + Drive.x[eid]! / s.viscosity
-      const ty = medium.y + Drive.y[eid]! / s.viscosity
+      const fall = g.x === 0 && g.y === 0 ? 0 : Phys.mass[eid]! / Phys.drag[eid]!
+      const tx = medium.x + Drive.x[eid]! / s.viscosity + g.x * fall
+      const ty = medium.y + Drive.y[eid]! / s.viscosity + g.y * fall
       const e = Math.exp(-k * dt)
       const glide = k > 1e-9 ? (1 - e) / k : dt
       next = { x: x + tx * dt + (vx - tx) * glide, y: y + ty * dt + (vy - ty) * glide }

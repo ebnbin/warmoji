@@ -59,6 +59,37 @@ export interface SpaceConfig {
     readonly damage: number
   }
 }
+/** 星云：圆心在原点、半径 radiusU 格的星域里有一个黑洞，引力按普卢默软化的万有引力 g = GM·r/(r²+ε²)^{3/2} 作用于一切 */
+export interface NebulaConfig {
+  readonly radiusU: number
+  readonly hole: {
+    /** 引力常数乘黑洞质量，格³/秒² */
+    readonly gm: number
+    readonly softeningU: number
+    /** 视界半径：中心进了这个圈就被吞噬 */
+    readonly horizonU: number
+    /** 黑洞离星域中心的距离范围，方向随机 */
+    readonly fromCenterU: readonly [number, number]
+    /** 刷怪点与据点离黑洞至少多远 */
+    readonly clearU: number
+  }
+  readonly meteor: {
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly intervalJitterMs: number
+    readonly warnMs: number
+    /** 流星本体半径：中心距小于它就被砸中 */
+    readonly radiusU: number
+    readonly speedU: number
+    /** 起点在瞄准点后方多远，瞄准点在队长两侧最多偏多远 */
+    readonly leadU: number
+    readonly offsetU: number
+    readonly damage: number
+    /** 轨迹按这个步长积分，最长飞这么久 */
+    readonly stepMs: number
+    readonly maxFlightMs: number
+  }
+}
 export interface RiverConfig {
   readonly viewScale: number
   readonly width: number
@@ -85,7 +116,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice'
+  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -98,6 +129,7 @@ export interface MapDef {
   readonly dayNight?: DayNightConfig
   readonly ice?: IceConfig
   readonly space?: SpaceConfig
+  readonly nebula?: NebulaConfig
   readonly river?: RiverConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
@@ -105,7 +137,7 @@ export interface MapDef {
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole'
 
 export interface DecorInstance {
   emoji: string
