@@ -6,6 +6,7 @@ import { finishEnemyPops } from './systems/popInEnemies'
 import { hideTelegraphs } from './systems/blinkTelegraphs'
 import { finishZoneFades } from './systems/updateZones'
 import { updateEmplacements } from './systems/updateEmplacements'
+import { showMounted } from './systems/showMounted'
 import { stepPickupVisuals } from './systems/stepPickupVisuals'
 import { updateShards } from './systems/updateShards'
 import { animateBooms } from './systems/animateBooms'
@@ -124,6 +125,7 @@ export function stepFrozenVisuals(sim: Sim): void {
   characterVisual(sim)
   finishCharacterPops(sim)
   finishEnemyPops(sim)
+  showMounted(sim)
   hideTelegraphs(sim)
   finishZoneFades(sim)
   updateEmplacements(sim)

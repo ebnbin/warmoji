@@ -6,7 +6,7 @@ import { rewindMs } from '../data/abilities'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
 import type { ResourceDef } from '../types/enemies'
-import { Alive, ENEMY_SET, Hp, Res, Tint, Transform, VisOff } from './components'
+import { Alive, ENEMY_SET, Hp, Res, Transform, VisOff } from './components'
 import { abilityDef, resDef } from './store'
 import { lookOf } from './entities/shadow'
 import { goalSpot, holdSpot } from './fight/state'
@@ -16,6 +16,7 @@ import { charSize } from './systems/shared/scale'
 import { dragging, staminaLeft } from './systems/shared/stamina'
 import { traceAt, tracePath } from './systems/shared/trace'
 import { rescuing } from './systems/tickRescue'
+import { hostShown } from './utils/statusTint'
 import { leaderX, leaderY } from './utils/team'
 import { fan, newScratch, quad, resetScratch, ringStrip, segment, tri } from './render/tri'
 import type { Scratch } from './render/tri'
@@ -31,7 +32,6 @@ const SWEAT_SIZE = 0.42 * UNIT
 const SWEAT_Z = 29
 
 const BAR_W = 0.8 * UNIT
-const BAR_BACK = packTint(0x000000, 0.45)
 const RES_COLOR: Record<ResourceDef['kind'], number> = { energy: 0xffee58, fury: 0xef5350, heat: 0xff9800, growth: 0x9ccc65 }
 const STAMINA_COLOR: Record<StaminaTier, number> = { ok: 0x4dd0e1, slow: 0xffa726, low: 0xef5350 }
 
@@ -57,7 +57,7 @@ interface Mark {
   readonly color: number
 }
 
-/** 呈现：身体、队长与这一场的目标的数据画出来的样子，不是实体、不存位置；每帧推进后按数据重画，收尾时停在最后一帧 */
+/** 呈现：身体、队长与这一场的目标的数据画出来的样子，不是实体、不存位置，画在身体上的随身体显隐；每帧推进后按数据重画，收尾时停在最后一帧 */
 export class Presentation {
   /** 按 z 排好的精灵：身体头上的汗、队长的倒带残影 */
   readonly sprites: PaintSprite[] = []
@@ -93,7 +93,7 @@ export class Presentation {
 }
 
 /** 💦 摆在身体右上方，上下跳着 */
-function sweat(sim: Sim, out: PaintSprite[], body: number, size: number, alpha: number): void {
+function sweat(sim: Sim, out: PaintSprite[], body: number, size: number): void {
   out.push({
     z: SWEAT_Z,
     frame: sim.frames.index(SWEAT, 'player'),
@@ -102,16 +102,16 @@ function sweat(sim: Sim, out: PaintSprite[], body: number, size: number, alpha: 
     w: SWEAT_SIZE,
     h: SWEAT_SIZE,
     color: 0xffffff,
-    alpha,
+    alpha: hostShown(body),
   })
 }
 
-/** 拖慢全队的队员头上冒 💦；累到减速的敌人头上也冒，这是反打的时机，看不清的敌人汗也跟着淡 */
+/** 拖慢全队的队员头上冒 💦；累到减速的敌人头上也冒，这是反打的时机 */
 function sweats(sim: Sim, out: PaintSprite[]): void {
-  for (const m of sim.characters) if (dragging(sim, m)) sweat(sim, out, m, charSize(m), 1)
+  for (const m of sim.characters) if (dragging(sim, m)) sweat(sim, out, m, charSize(m))
   for (const eid of query(sim.world, ENEMY_SET)) {
     if (!Alive.v[eid] || staminaLeft(eid) >= STAMINA.slowFrom) continue
-    sweat(sim, out, eid, Transform.h[eid]!, Tint.alpha[eid]!)
+    sweat(sim, out, eid, Transform.h[eid]!)
   }
 }
 
@@ -119,27 +119,29 @@ function rect(o: Scratch, x: number, y: number, w: number, h: number, color: num
   quad(o, WORLD, x, y, x + w, y, x + w, y + h, x, y + h, color)
 }
 
-/** 队员的血条与资源条，队长再多一条体力条、满了收起；倒下或整个看不见时不画 */
+/** 队员的血条与资源条，队长再多一条体力条、满了收起；倒下的不画 */
 function bars(sim: Sim, o: Scratch): void {
   for (const m of sim.characters) {
-    if (!Alive.v[m] || !(Tint.alpha[m]! > 0)) continue
+    if (!Alive.v[m]) continue
+    const a = hostShown(m)
+    const back = packTint(0x000000, 0.45 * a)
     const ratio = Math.max(0, Math.min(1, Hp.v[m]! / Hp.max[m]!))
     const res = hasComponent(sim.world, m, Res) ? Res.v[m]! / Math.max(1, Res.max[m]!) : -1
     const locked = res >= 0 && sim.elapsedMs < Res.lock[m]!
     const sta = m === sim.leader ? staminaLeft(m) : 1
     const x = Transform.x[m]! + VisOff.x[m]! - BAR_W / 2
     let y = Transform.y[m]! + VisOff.y[m]! + charSize(m) * 0.62
-    rect(o, x, y, BAR_W, 6, BAR_BACK)
-    rect(o, x + 1, y + 1, (BAR_W - 2) * ratio, 4, packTint(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffdc5d : 0xef5350, 1))
+    rect(o, x, y, BAR_W, 6, back)
+    rect(o, x + 1, y + 1, (BAR_W - 2) * ratio, 4, packTint(ratio > 0.5 ? 0x66bb6a : ratio > 0.25 ? 0xffdc5d : 0xef5350, a))
     y += 7
     if (res >= 0) {
-      rect(o, x, y, BAR_W, 5, BAR_BACK)
-      rect(o, x + 1, y + 1, (BAR_W - 2) * res, 3, packTint(locked ? (Math.floor(sim.fxMs / 150) % 2 ? 0xffffff : 0xff5722) : RES_COLOR[resDef[m]!.kind], 1))
+      rect(o, x, y, BAR_W, 5, back)
+      rect(o, x + 1, y + 1, (BAR_W - 2) * res, 3, packTint(locked ? (Math.floor(sim.fxMs / 150) % 2 ? 0xffffff : 0xff5722) : RES_COLOR[resDef[m]!.kind], a))
       y += 6
     }
     if (sta >= 1) continue
-    rect(o, x, y, BAR_W, 6, BAR_BACK)
-    rect(o, x + 1, y + 1, (BAR_W - 2) * sta, 4, packTint(STAMINA_COLOR[staminaTier(sta)], 1))
+    rect(o, x, y, BAR_W, 6, back)
+    rect(o, x + 1, y + 1, (BAR_W - 2) * sta, 4, packTint(STAMINA_COLOR[staminaTier(sta)], a))
   }
 }
 
@@ -157,11 +159,12 @@ function pointer(sim: Sim, o: Scratch): void {
   const tipX = lx + u.x * (r + 0.4 * UNIT)
   const tipY = ly + u.y * (r + 0.4 * UNIT)
   const w = 0.25 * UNIT
-  tri(o, WORLD, tipX + u.x * 3, tipY + u.y * 3, lx + u.x * r - u.y * (w + 3), ly + u.y * r + u.x * (w + 3), lx + u.x * r + u.y * (w + 3), ly + u.y * r - u.x * (w + 3), packTint(0x000000, 0.35))
-  tri(o, WORLD, tipX, tipY, lx + u.x * r - u.y * w, ly + u.y * r + u.x * w, lx + u.x * r + u.y * w, ly + u.y * r - u.x * w, packTint(0xffdc5d, 0.95))
+  const a = hostShown(sim.leader)
+  tri(o, WORLD, tipX + u.x * 3, tipY + u.y * 3, lx + u.x * r - u.y * (w + 3), ly + u.y * r + u.x * (w + 3), lx + u.x * r + u.y * (w + 3), ly + u.y * r - u.x * (w + 3), packTint(0x000000, 0.35 * a))
+  tri(o, WORLD, tipX, tipY, lx + u.x * r - u.y * w, ly + u.y * r + u.x * w, lx + u.x * r + u.y * w, ly + u.y * r - u.x * w, packTint(0xffdc5d, 0.95 * a))
 }
 
-/** 队长的主动技能会倒带时，在倒带的落点画一个它的残影，这段路画在地上，越新越清楚；冷却中一起淡下去 */
+/** 队长的主动技能会倒带时，在倒带的落点画一个它的残影，这段路画在地上，越新越清楚；冷却中一起淡下去，也随队长显隐 */
 function echo(sim: Sim, sprites: PaintSprite[], trail: Scratch): void {
   const lead = sim.leader
   const root = sim.skills[sim.characters.indexOf(lead)]
@@ -169,7 +172,7 @@ function echo(sim: Sim, sprites: PaintSprite[], trail: Scratch): void {
   const ms = def && Alive.v[lead] ? rewindMs(def) : 0
   const at = ms > 0 ? traceAt(sim, lead, ms) : null
   if (!at || root === undefined) return
-  const dim = cooled(sim, root) ? 1 : COOLING_DIM
+  const dim = (cooled(sim, root) ? 1 : COOLING_DIM) * hostShown(lead)
   sprites.push({
     z: ECHO_Z,
     frame: sim.frames.index(lookOf(sim, lead), 'player'),
