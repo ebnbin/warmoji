@@ -1,25 +1,34 @@
 import { XP } from '../data/waves'
-import type { XpState } from '../types/xp'
+import type { XpCurve } from '../types/xp'
+import { runDef } from './state'
+import type { RunState } from './state'
 
-/** 从 level 级升到下一级要的经验 */
-export function xpToNext(level: number): number {
-  return Math.round(XP.base * Math.pow(XP.growth, level - 1))
+/** 这一局的经验曲线：靠全队升级的一局按它自己写的 */
+function curveOf(run: RunState): XpCurve {
+  return runDef(run).teamLevel ?? XP
 }
 
-/** 满级了 */
-export function xpMaxed(state: XpState): boolean {
-  return state.level >= XP.maxLevel
+/** 全队从当前等级升到下一级要的经验 */
+export function xpToNext(run: RunState): number {
+  const c = curveOf(run)
+  return Math.round(c.base * Math.pow(c.growth, run.xp.level - 1))
 }
 
-/** 攒经验，够了就升级；满级后不再攒 */
-export function gainXp(state: XpState, amount: number): { state: XpState; levelsGained: number } {
-  let { level, xp } = state
-  xp += amount
-  let levelsGained = 0
-  while (level < XP.maxLevel && xp >= xpToNext(level)) {
-    xp -= xpToNext(level)
-    level++
-    levelsGained++
+/** 全队满级了 */
+export function xpMaxed(run: RunState): boolean {
+  return run.xp.level >= curveOf(run).maxLevel
+}
+
+/** 全队攒经验，够了就升级，返回升了几级；满级后不再攒 */
+export function gainXp(run: RunState, amount: number): number {
+  const top = curveOf(run).maxLevel
+  let gained = 0
+  run.xp.xp += amount
+  while (!xpMaxed(run) && run.xp.xp >= xpToNext(run)) {
+    run.xp.xp -= xpToNext(run)
+    run.xp.level++
+    gained++
   }
-  return { state: { level, xp: level >= XP.maxLevel ? 0 : xp }, levelsGained }
+  if (run.xp.level >= top) run.xp.xp = 0
+  return gained
 }

@@ -30,7 +30,8 @@ import type { EnemyDef, EnemyKind } from '../src/types/enemies'
 import type { ItemDef } from '../src/types/items'
 import type { MapDef } from '../src/types/maps'
 import type { ItemRarity } from '../src/types/items'
-import type { FightDef, FightRules, MutatorDef, PhaseDef, RunDef, SpawnAt, Squad, StarRule, TeamDef } from '../src/types/runs'
+import type { MapId } from '../src/types/maps'
+import type { FightDef, FightRules, GroupTraits, LegacyPhaseDef, LegacySquad, LevelPick, MixEntry, MutatorDef, RunDef, SpawnAt, StarRule, TeamDef } from '../src/types/runs'
 
 const errors: string[] = []
 const need = (ok: boolean, msg: string): void => {
@@ -109,20 +110,67 @@ const checkAt = (at: SpawnAt | undefined, path: string): void => {
   if (at?.kind === 'point') need((at.spread ?? 0) >= 0, `${path} 的散开范围不为负`)
 }
 
-/** 一队敌人：数量、精英、间隔与血量倍率在范围内，指定的敌人存在，换走法须指定敌人 */
-const checkSquad = (sq: Squad, path: string): void => {
+const isBoss = (kind: EnemyKind | undefined): boolean => kind !== undefined && ENEMIES[kind]?.role === 'boss'
+
+/** 配比：不为空，引用非头目的敌人，权重为正 */
+const checkMix = (mix: readonly MixEntry[], path: string): void => {
+  need(mix.length > 0, `${path} 的配比不能为空`)
+  for (const m of mix) need(ENEMIES[m.kind] !== undefined && !isBoss(m.kind) && m.weight > 0, `${path} 的配比须引用非头目的敌人、权重为正：${m.kind}`)
+}
+
+/** 查一批敌人时的上下文：在哪张图上打（一场、一局都没写是 undefined），这一场是不是按阶段写的，这一阶段的配比 */
+type Where = { readonly map: MapId | undefined; readonly staged: boolean; readonly mix: readonly MixEntry[] | undefined }
+
+/** 一批敌人的特征：指定的敌人存在，指定了就不再写配比；按阶段写的一场里没指定敌人的得有配比可抽；换走法须指定敌人；几率与倍率在范围内；要带的效果这张图的效果池里有 */
+const checkTraits = (t: GroupTraits, where: Where, path: string): void => {
+  need(t.enemy === undefined || ENEMIES[t.enemy] !== undefined, `${path} 引用了不存在的敌人：${t.enemy}`)
+  need(t.enemy === undefined || t.mix === undefined, `${path} 指定了敌人就不用再写配比`)
+  if (t.mix) checkMix(t.mix, path)
+  need(!where.staged || t.enemy !== undefined || (t.mix ?? where.mix) !== undefined, `${path} 没指定敌人，这一批和这一阶段都没写配比`)
+  need(t.drive === undefined || t.enemy !== undefined, `${path} 换走法须指定敌人`)
+  need(inUnit(t.eliteChance), `${path} 的精英几率须在 [0, 1] 内`)
+  need((t.stats?.mul?.maxHp ?? 1) > 0, `${path} 的血量倍率须为正`)
+  need((t.loot?.xp ?? 0) >= 0 && (t.loot?.coins ?? 0) >= 0, `${path} 的战利品倍率不为负`)
+  const pool = where.map === undefined ? undefined : BATTLEFIELD.pools[where.map]
+  need(t.carry === undefined || pool === undefined || pool.some((d) => d.polarity === t.carry), `${path} 要带的效果在 ${where.map} 的效果池里没有`)
+}
+
+/** 一队敌人：数量、精英、间隔与血量倍率在范围内，特征合规，护卫引用非头目的敌人 */
+const checkSquad = (sq: LegacySquad, where: Where, path: string): void => {
   need(sq.count >= 1 && (sq.spreadMs ?? 0) >= 0, `${path} 的一队敌人须至少一只，间隔不为负`)
   need((sq.elites ?? 0) >= 0 && (sq.elites ?? 0) <= sq.count, `${path} 的精英数须在 0 到队伍人数之间`)
-  need(inUnit(sq.eliteChance), `${path} 的精英几率须在 [0, 1] 内`)
   need((sq.hpMul ?? 1) > 0, `${path} 的血量倍率须为正`)
-  need(sq.enemy === undefined || ENEMIES[sq.enemy] !== undefined, `${path} 引用了不存在的敌人：${sq.enemy}`)
-  need(sq.drive === undefined || sq.enemy !== undefined, `${path} 换走法须指定敌人`)
+  checkTraits(sq, where, path)
   const e = sq.escort
-  need(e === undefined || (ENEMIES[e.enemy] !== undefined && !isBoss(e.enemy) && e.count >= 1), `${path} 的护卫须引用非头目的敌人、至少一只`)
+  need(e === undefined || (ENEMIES[e.enemy] !== undefined && !isBoss(e.enemy) && e.count >= 1 && (e.stats?.mul?.maxHp ?? 1) > 0), `${path} 的护卫须引用非头目的敌人、至少一只，血量倍率为正`)
   checkAt(sq.at, path)
 }
 
-const isBoss = (kind: EnemyKind | undefined): boolean => kind !== undefined && ENEMIES[kind]?.role === 'boss'
+/** 这一阶段可能出现的敌人种类，连同巢穴生出的与死后分裂出的；有按地图抽的就说不准，是 null */
+const phaseKinds = (p: LegacyPhaseDef): Set<string> | null => {
+  const out = new Set<string>()
+  let open = false
+  const kind = (k: EnemyKind): void => {
+    const e = ENEMIES[k]
+    if (e) for (const x of withNested(e)) out.add(x.kind)
+  }
+  const pool = (own: readonly MixEntry[] | undefined): void => {
+    const rows = own ?? p.mix
+    if (rows) for (const m of rows) kind(m.kind)
+    else open = true
+  }
+  const group = (g: GroupTraits): void => (g.enemy ? kind(g.enemy) : pool(g.mix))
+  for (const s of p.spawns) {
+    if (s.kind === 'stream') group(s)
+    else if (s.kind === 'batch' || s.kind === 'waves') {
+      for (const sq of s.kind === 'batch' ? [s.squad] : s.squads) {
+        group(sq)
+        if (sq.escort) kind(sq.escort.enemy)
+      }
+    } else open = true
+  }
+  return open ? null : out
+}
 
 /** 队长贴着倒下的队员站时两人中心的距离：身体互相挤开，靠不得更近 */
 const TOUCH = TEAM_BASELINE.member.radius * (TEAM_BASELINE.team.leaderSizeMul + TEAM_BASELINE.team.followerSizeMul)
@@ -148,26 +196,37 @@ const checkStar = (s: StarRule, lives: number | undefined, path: string): void =
   else need(s.count >= 0, `${path} 的次数不为负`)
 }
 
-/** 一个阶段：数值在范围内，结束规则都有着落——要打倒的头目、悬赏目标得在这一阶段登场，要清场就不能一直刷，一组一组来的后面几组要等场上清空；只有最后一个阶段可以不结束 */
-const checkPhase = (p: PhaseDef, last: boolean, path: string): void => {
+/**
+ * 一个阶段：数值在范围内，结束规则都有着落——要打倒的头目得在这一阶段或这一场更早的阶段登场，悬赏目标与要数的那种敌人得在这一阶段出现，要清场就不能一直刷，一组一组来的后面几组要等场上清空，要全部达成的不能有到点就算达成的时限；只有最后一个阶段可以不结束。
+ * 返回这一阶段有没有头目登场。
+ */
+const checkPhase = (p: LegacyPhaseDef, last: boolean, bossBefore: boolean, where: Where, path: string): boolean => {
+  const at: Where = { ...where, mix: p.mix }
   const squads = p.spawns.flatMap((s) => (s.kind === 'batch' ? [s.squad] : s.kind === 'waves' ? s.squads : []))
-  const endless = p.spawns.some((s) => s.kind === 'knobs' || (s.kind === 'stream' && s.untilMs === undefined))
-  for (const m of p.mix ?? []) need(ENEMIES[m.kind] !== undefined && !isBoss(m.kind) && m.weight > 0, `${path} 的配比须引用非头目的敌人、权重为正：${m.kind}`)
-  need(p.mix === undefined || p.mix.length > 0, `${path} 的配比不能为空`)
+  const endless = p.spawns.some(
+    (s) => s.kind === 'knobs' || (s.kind === 'stream' && s.untilMs === undefined && s.total === undefined) || (s.kind === 'batch' && s.every !== undefined && s.times === undefined),
+  )
+  const boss = p.spawns.some((s) => s.kind === 'boss' || s.kind === 'knobs') || squads.some((sq) => isBoss(sq.enemy))
+  if (p.mix) checkMix(p.mix, path)
   for (const s of p.spawns) {
     if (s.kind === 'stream') {
       need((s.intervalMul ?? 1) > 0 && (s.intervalMs ?? 1) > 0, `${path} 的连续刷怪间隔须为正`)
-      need(inUnit(s.eliteChance), `${path} 的精英几率须在 [0, 1] 内`)
+      need(s.ramp === undefined || (s.intervalMs !== undefined && s.ramp.toMs > 0 && s.ramp.overMs > 0), `${path} 的间隔变化须有起始间隔，目标间隔与时长为正`)
       need((s.fromMs ?? 0) >= 0 && (s.untilMs ?? Infinity) > (s.fromMs ?? 0), `${path} 的连续刷怪时段须从不早于这一阶段开始的时刻到更晚的时刻`)
+      need(s.total === undefined || (Number.isInteger(s.total) && s.total >= 1), `${path} 的连续刷怪总数须是正整数`)
       need((s.cap ?? 1) >= 1, `${path} 的连续刷怪上限至少为 1`)
+      need(!isBoss(s.enemy), `${path} 连续刷怪不能刷头目，头目按一队放出`)
+      checkTraits(s, at, path)
       checkAt(s.at, path)
     } else if (s.kind === 'batch') {
       need(s.atMs >= 0, `${path} 的一队敌人登场时刻不为负`)
-      checkSquad(s.squad, path)
+      need(s.every === undefined || s.every > 0, `${path} 一再放出的间隔须为正`)
+      need(s.times === undefined || (Number.isInteger(s.times) && s.times >= 1 && (s.times === 1 || s.every !== undefined)), `${path} 放出的次数须是正整数，多于一次要写间隔`)
+      checkSquad(s.squad, at, path)
     } else if (s.kind === 'waves') {
       need(s.atMs >= 0 && s.gapMs >= 0 && s.squads.length > 0, `${path} 的成组敌人须至少一组，时刻与间隔不为负`)
       need(s.squads.length === 1 || !endless, `${path} 一直在刷怪时场上不会清空，成组的敌人只能有一组`)
-      s.squads.forEach((sq, i) => checkSquad(sq, `${path} 第 ${i + 1} 组`))
+      s.squads.forEach((sq, i) => checkSquad(sq, at, `${path} 第 ${i + 1} 组`))
     } else if (s.kind === 'boss') {
       need(s.atMs >= 0, `${path} 的头目登场时刻不为负`)
     } else if (s.kind === 'carriers') {
@@ -177,23 +236,30 @@ const checkPhase = (p: PhaseDef, last: boolean, path: string): void => {
   need(p.ends.filter((e) => e.kind === 'time').length <= 1, `${path} 最多一条时限`)
   need(p.ends.length > 0 || last, `${path} 不是最后一个阶段，须有结束规则`)
   need(p.ends.length === 0 || p.ends.some((e) => e.kind !== 'downs' && !(e.kind === 'time' && e.lose)), `${path} 有结束规则就得有达成条件`)
+  need(p.need !== 'all' || !p.ends.some((e) => e.kind === 'time' && !e.lose), `${path} 要全部达成时，时限只能是到点就输的`)
+  const kinds = phaseKinds(p)
   for (const e of p.ends) {
     if (e.kind === 'time') need(e.ms > 0, `${path} 的时限须为正`)
-    if (e.kind === 'boss') {
-      const boss = p.spawns.some((s) => s.kind === 'boss' || s.kind === 'knobs') || squads.some((sq) => isBoss(sq.enemy))
-      need(boss, `${path} 要打倒头目，须有头目登场`)
-    }
+    if (e.kind === 'boss' || e.kind === 'bossHp') need(boss || bossBefore, `${path} 要打头目，须有头目在这一阶段或这一场更早的阶段登场`)
+    if (e.kind === 'bossHp') need(e.below > 0 && e.below < 1, `${path} 头目血量的比例须在 (0, 1) 内`)
     if (e.kind === 'bounty') need(squads.some((sq) => sq.bounty), `${path} 要击倒悬赏目标，须有悬赏目标登场`)
-    if (e.kind === 'cleared') need(!endless, `${path} 要清场，连续刷怪须有停下的时刻`)
+    if (e.kind === 'cleared') need(!endless, `${path} 要清场，刷怪须有停下的时刻`)
     if (e.kind === 'hold') need(e.ms > 0 && e.radius > 0 && e.points.length > 0, `${path} 的据点须至少一处，时长与半径为正`)
     if (e.kind === 'kills' || e.kind === 'coins' || e.kind === 'downs') need(e.count >= 1, `${path} 的${e.kind}数至少为 1`)
+    if (e.kind === 'kills' && e.enemy !== undefined) need(ENEMIES[e.enemy] !== undefined && (kinds === null || kinds.has(e.enemy)), `${path} 要击杀的${e.enemy}不在这一阶段出现`)
   }
+  return boss
 }
 
 /** 一场战斗：各阶段按先后查，外加这一场的规则、地图、奖励与难度时钟 */
-const checkFight = (f: FightDef, path: string): void => {
-  const phases: readonly PhaseDef[] = [f, ...(f.then ?? [])]
-  phases.forEach((p, i) => checkPhase(p, i === phases.length - 1, phases.length > 1 ? `${path} 第 ${i + 1} 阶段` : path))
+const checkFight = (f: FightDef, runMap: MapId | undefined, path: string): void => {
+  const phases: readonly LegacyPhaseDef[] = f.phases === undefined ? [f] : f.phases
+  const where: Where = { map: f.map ?? runMap, staged: f.phases !== undefined, mix: undefined }
+  need(phases.length > 0, `${path} 至少要有一个阶段`)
+  let boss = false
+  phases.forEach((p, i) => {
+    boss = checkPhase(p, i === phases.length - 1, boss, where, phases.length > 1 ? `${path} 第 ${i + 1} 阶段` : path) || boss
+  })
   checkRules(f.rules, `${path}.rules`)
   need(f.map === undefined || MAPS[f.map] !== undefined, `${path} 引用了不存在的地图：${f.map}`)
   need((f.reward?.coins ?? 0) >= 0 && Number.isInteger(f.reward?.coins ?? 0), `${path} 的奖励金币须是非负整数`)
@@ -237,12 +303,24 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
   const maxLevel = r.rules?.maxLevel
   const floor = r.team && r.team !== 'knobs' ? (r.team.level ?? 1) : 1
   need(maxLevel === undefined || (Number.isInteger(maxLevel) && maxLevel >= floor && maxLevel < MAX_CHAR_LEVEL), `runs.${id}.rules.maxLevel 须是整数，不低于队伍的等级下限、低于 ${MAX_CHAR_LEVEL}`)
-  if (r.rules?.teamLevel) {
-    // 每一次全队升级都得有得选：不靠升级就入队的人之外，补满队伍的人数加上每人还能升的级数，够用完升到满级的次数
+  const t = r.teamLevel
+  if (t) {
+    need(t.base > 0 && t.growth >= 1, `runs.${id}.teamLevel 的底数须为正，增长不小于 1：越往后升级越难`)
+    need(Number.isInteger(t.maxLevel) && t.maxLevel >= 2, `runs.${id}.teamLevel.maxLevel 须是不小于 2 的整数`)
+    const picks: readonly LevelPick[] = t.picks ?? ['recruit', 'upgrade']
+    need(picks.length > 0 && new Set(picks).size === picks.length, `runs.${id}.teamLevel.picks 不能为空，也不能重复`)
+    // 每一次全队升级都得有得选：许招人时补满队伍的人数，加上许升级时每人还能升的级数，够用完升到满级的次数
     const size = TEAM_BASELINE.team.maxSize
     const free = Math.max(r.team && r.team !== 'knobs' ? r.team.slots.length : 0, ...r.steps.map((s) => (s.kind === 'recruit' ? s.upTo : 0)))
-    const room = size - free + size * ((maxLevel ?? MAX_CHAR_LEVEL) - floor)
-    need(room >= PROGRESSION.xp.maxLevel - 1, `runs.${id} 靠全队升级，招满人、升满级只用得掉 ${room} 次，不够升到 ${PROGRESSION.xp.maxLevel} 级的 ${PROGRESSION.xp.maxLevel - 1} 次`)
+    const recruit = picks.includes('recruit')
+    const room = (recruit ? size - free : 0) + (picks.includes('upgrade') ? (recruit ? size : free) * ((maxLevel ?? MAX_CHAR_LEVEL) - floor) : 0)
+    need(room >= t.maxLevel - 1, `runs.${id} 靠全队升级，能选的只用得掉 ${room} 次，不够升到 ${t.maxLevel} 级的 ${t.maxLevel - 1} 次`)
+  }
+  const fights = r.steps.flatMap((s) => (s.kind === 'fight' ? [s.fight] : []))
+  if (fights.some((f) => f.phases !== undefined)) {
+    need(fights.every((f) => f.phases !== undefined), `runs.${id} 的各场要么都按阶段写，要么都不按`)
+    need(r.map === undefined && r.start === undefined && r.record === undefined, `runs.${id} 按阶段写的一局不固定地图、不给开局进度、不记最高分：地图与难度时钟写在每一场上`)
+    need(r.steps.every((s) => s.kind !== 'shop' || s.tier !== undefined), `runs.${id} 按阶段写的一局，每家商店都要写物价档位`)
   }
   r.stars?.forEach((s, i) => checkStar(s, lives, `runs.${id}.stars[${i}]`))
   const only = r.rules?.recruit?.tags
@@ -256,7 +334,8 @@ for (const [id, r] of Object.entries<RunDef>(RUNS)) {
   }
   r.steps.forEach((s, i) => {
     if (s.kind === 'recruit') need(s.upTo >= 1 && s.upTo <= TEAM_BASELINE.team.maxSize, `runs.${id}.steps[${i}] 招募人数须在 1 到满编之间`)
-    if (s.kind === 'fight') checkFight(s.fight, `runs.${id}.steps[${i}]`)
+    if (s.kind === 'shop') need(s.tier === undefined || (Number.isInteger(s.tier) && s.tier >= 1), `runs.${id}.steps[${i}] 商店的物价档位须是正整数`)
+    if (s.kind === 'fight') checkFight(s.fight, r.map, `runs.${id}.steps[${i}]`)
   })
 }
 

@@ -68,6 +68,7 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
         ].join('\n')
       },
     },
+    { kind: 'text', label: '关卡', mono: true, read: () => battle.devPhaseText() },
     {
       kind: 'buttons',
       label: '生成',

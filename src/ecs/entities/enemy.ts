@@ -8,6 +8,7 @@ import { leaderX, leaderY } from '../utils/team'
 import { POP } from '../../data/feel'
 import { startPop } from '../utils/pop'
 import type { DriveDef, EnemyDef, EnemyMixEntry, NpcDef } from '../../types/enemies'
+import type { StatMods } from '../../types/stats'
 import type { OutlineKind } from '../../emoji/svg'
 import { waveAt } from '../../data/waves'
 import {
@@ -52,12 +53,13 @@ import {
   Tint,
   Transform,
 } from '../components'
-import { bodyRules, enemyDef, enemyOf, bodyLook } from '../store'
+import { bodyRules, enemyDef, enemyLoot, enemyOf, bodyLook } from '../store'
 import { attachResource } from './resource'
 import { interrupt } from '../systems/shared/ability'
 import { addMark, hasMark } from '../utils/marks'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { spawnTelegraph, telegraphCount } from './telegraph'
+import type { SpawnTraits } from './telegraph'
 import { armIdle } from '../systems/shared/anim'
 import { ANIM_DEF } from '../../emoji/anim'
 import type { Sim } from '../sim'
@@ -68,6 +70,7 @@ import type { MapDef } from '../../types/maps'
 import { hourAt, isDayAt } from '../worlds/daynight'
 import type { FieldPickupDef } from '../../types/battlefield'
 import { enemyMixAt, pickEnemy } from '../utils/spawnMix'
+import { rollCarry } from '../utils/battleFx'
 import { fightMods } from '../fight/state'
 import type { FoeSpec } from '../fight/state'
 import { clockSec } from '../fight/clock'
@@ -121,6 +124,7 @@ export function detachDrive(sim: Sim, eid: number): void {
   for (const c of DRIVE_COMPS) if (hasComponent(sim.world, eid, c)) removeComponent(sim.world, eid, c)
 }
 
+/** 一只敌人：带上关卡给这一批的属性修正、盯着队长与战利品倍率 */
 export function spawnEnemy(
   sim: Sim,
   atlas: FrameIndex,
@@ -130,18 +134,22 @@ export function spawnEnemy(
   hp: number,
   elite: boolean,
   boss: boolean,
-  alpha = 1,
+  traits: SpawnTraits = {},
 ): number {
-  const eid = spawnNpc(sim, atlas, def, x, y, hp, { elite, boss, alpha })
+  const eid = spawnNpc(sim, atlas, def, x, y, hp, { elite, boss, group: traits.stats, huntLeader: traits.huntLeader })
   enemyOf[eid] = def
+  enemyLoot[eid] = traits.loot
   return eid
 }
 
+/** group 是关卡给这一批的属性修正，huntLeader 让追人的盯着队长 */
 interface NpcOpts {
   readonly elite?: boolean
   readonly boss?: boolean
   readonly alpha?: number
   readonly faction?: number
+  readonly group?: StatMods
+  readonly huntLeader?: boolean
 }
 
 /** 非玩家身体的描边：己方的按角色描，敌方的按精英与否 */
@@ -180,6 +188,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   Transform.w[eid] = size * (boss ? 0.2 : 0.3)
   Transform.h[eid] = Transform.w[eid]!
   attachDrive(sim, eid, def.drive)
+  if (o.huntLeader && hasComponent(world, eid, Chase)) Chase.leader[eid] = 1
   if (def.damage > 0) {
     addComponent(world, eid, Contact)
     Contact.damage[eid] = def.damage
@@ -212,6 +221,7 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   enemyDef[eid] = def
   if (elite) setStatLayer(eid, 'elite', [ELITE.stats])
   setStatLayer(eid, 'fight', fightMods(sim.fight, faction))
+  setStatLayer(eid, 'group', o.group ? [o.group] : undefined)
   foldBody(world, undefined, eid)
   Hp.v[eid] = Hp.max[eid]!
   if (def.mount) {
@@ -256,7 +266,7 @@ export function dayNightOf(sim: Sim): { cfg: NonNullable<MapDef['dayNight']>; ho
   return { cfg, hour: hourAt(clockSec(sim), cfg) }
 }
 
-/** 这一场的配比，不写就按地图与波数，昼夜图按时辰 */
+/** 这一阶段的配比，不写就按地图与波数，昼夜图按时辰 */
 function currentMix(sim: Sim): readonly EnemyMixEntry[] {
   if (sim.fight.mix) return sim.fight.mix
   const m = MAPS[sim.mapId]
@@ -317,16 +327,18 @@ function foeSpot(sim: Sim, foe: FoeSpec, boss: boolean): Point {
   }
 }
 
-/** 按要求预告一只敌人：种类不指定就按这一场的配比抽，头目预告得久、现身时轰一声 */
+/** 按要求预告一只敌人：种类不指定就按它这一批的配比抽，再没有就按这一阶段的；要带效果的从地图的效果池里抽；头目预告得久、现身时轰一声 */
 export function telegraphOne(sim: Sim, foe: FoeSpec): void {
-  const raw = foe.enemy ?? pickEnemy(currentMix(sim), () => sim.rng.next())
+  const raw = foe.enemy ?? pickEnemy(foe.mix ?? currentMix(sim), () => sim.rng.next())
   const def = toPx(raw)
   const boss = raw.role === 'boss'
   const chance = foe.chance ?? 0
   const elite = !boss && (foe.elite === true || (chance > 0 && sim.rng.next() < chance))
   const hp = Math.round(def.hp * foe.hpMul)
   const pos = foeSpot(sim, foe, boss)
-  const t = spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, boss, undefined, boss ? SPAWN.telegraphMs * 1.6 : SPAWN.telegraphMs)
+  const carries = foe.carry ? rollCarry(sim.mapId, foe.carry, () => sim.rng.next()) : undefined
+  const traits: SpawnTraits = { stats: foe.stats, huntLeader: foe.huntLeader, loot: foe.loot, carries }
+  const t = spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, boss, traits, boss ? SPAWN.telegraphMs * 1.6 : SPAWN.telegraphMs)
   if (boss) Telegraph.loud[t] = 1
   if (foe.bounty) {
     addComponent(sim.world, t, Bounty)
@@ -354,7 +366,7 @@ export function spawnBoss(sim: Sim): void {
   if (sim.over) return
   const def = toPx(bossFor(sim.mapId))
   const pos = sim.hooks.spawnPoint(sim, true)
-  const t = spawnTelegraph(sim, def, pos.x, pos.y, def.hp, false, true, undefined, SPAWN.telegraphMs * 1.6)
+  const t = spawnTelegraph(sim, def, pos.x, pos.y, def.hp, false, true, {}, SPAWN.telegraphMs * 1.6)
   Telegraph.loud[t] = 1
 }
 
@@ -364,7 +376,7 @@ export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
   const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
   const hp = Math.round(def.hp * waveAt(clockSec(sim)).hpMultiplier)
   const pos = sightedSpawnPoint(sim)
-  spawnTelegraph(sim, def, pos.x, pos.y, hp, false, false, pickup)
+  spawnTelegraph(sim, def, pos.x, pos.y, hp, false, false, { carries: pickup })
 }
 
 /** 变形：换外观、打断动作、解除锚定并记在标记里；变形期间与结束后一段时间免疫再次变形；脆弱是同期的承伤标记 */

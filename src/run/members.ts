@@ -14,7 +14,7 @@ export function levelCap(run: RunState): number {
 
 /** 这一局靠全队升级：队员的等级来自升级时的选择，买道具不给角色经验 */
 export function teamLeveled(run: RunState): boolean {
-  return runDef(run).rules?.teamLevel === true
+  return runDef(run).teamLevel !== undefined
 }
 
 /** 攒了 xp 经验的队员是几级：不低于这一局的等级下限，不高于上限 */

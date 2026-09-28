@@ -2,7 +2,7 @@ import type Phaser from 'phaser'
 import type { DevProvider, DevSection } from '../devtools'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { MAP_IDS, MAPS } from '../data/maps'
-import { RUNS, timeLimitMs } from '../data/runs'
+import { phasesOf, RUNS, timeLimitMs } from '../data/runs'
 import { addMember, beginRun, currentRun, endRun } from '../run/state'
 import { SceneKey } from '../scene/keys'
 import type { MapId } from '../types/maps'
@@ -24,7 +24,7 @@ function newRun(): void {
     if (s.kind !== 'fight') return false
     seen++
     if (seen < startWave) {
-      skipped += timeLimitMs(s.fight) ?? 0
+      for (const p of phasesOf(s.fight)) skipped += timeLimitMs(p) ?? 0
       return false
     }
     run.step = i

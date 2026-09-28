@@ -8,7 +8,7 @@ import { modTexts } from '../data/stats'
 import { playSfx } from '../audio/sfx'
 import { characterPoolFor, levelProgress, rollItem, stackCount } from '../run/draft'
 import { levelCap, levelFor, memberLevel, memberLook, memberOutStats, teamLeveled } from '../run/members'
-import { getRun, runDef } from '../run/state'
+import { getRun, runDef, stepOf } from '../run/state'
 import { lastFight, nextFight } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { ItemDef, ItemId, ItemRarity } from '../types/items'
@@ -122,6 +122,12 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
     return runDef(this.run).rules?.shop ?? {}
   }
 
+  /** 物价与稀有度按第几波算：这一步写了就按它，否则按一局走到的波数 */
+  private get tier(): number {
+    const step = stepOf(this.run)
+    return (step?.kind === 'shop' ? step.tier : undefined) ?? this.run.wave
+  }
+
   /** 这一局的商店摆得出这个稀有度 */
   private stocks(rarity: ItemRarity): boolean {
     const r = this.rules.rarity
@@ -133,7 +139,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
   private roll(slot: number): ItemId | null {
     const level = this.levelOf(slot)
     const pool = characterPoolFor(CHARACTERS[this.run.roster[slot]!], level).filter((id) => this.stocks(ITEMS[id].rarity))
-    return rollItem(pool, this.ownedFor(slot), Math.random, this.run.wave, level, this.slotStats(slot).luck)
+    return rollItem(pool, this.ownedFor(slot), Math.random, this.tier, level, this.slotStats(slot).luck)
   }
 
   private rollAll(): Offer[] {
@@ -142,7 +148,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
 
   /** 这名队员买它的价格：按他自己的商店价格 */
   private price(slot: number, id: ItemId): number {
-    return Math.max(1, Math.round(itemPrice(id, this.run.wave) * this.slotStats(slot).shopPrice))
+    return Math.max(1, Math.round(itemPrice(id, this.tier) * this.slotStats(slot).shopPrice))
   }
 
   /** 这一轮的货都买下了：下一次刷新免费 */
@@ -151,7 +157,7 @@ export class ShopScene extends Phaser.Scene implements DevProviderHost {
   }
 
   private nextRerollPrice(): number {
-    return rerollPrice(this.run.wave - 1, this.paidRerolls)
+    return rerollPrice(this.tier - 1, this.paidRerolls)
   }
 
   private buy(slot: number): void {
