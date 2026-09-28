@@ -3,7 +3,7 @@ import { browserStorage } from '../util/storage'
 import type { MapId } from '../types/maps'
 import { bossFor, MAP_IDS, MAPS } from '../data/maps'
 import { CHARACTERS } from '../data/characters'
-import { chaptersOf, fightsOf, RUN_IDS, RUNS } from '../data/runs'
+import { chaptersOf, fightCount, fightsOf, RUN_IDS, RUNS } from '../data/runs'
 import type { Chapter } from '../data/runs'
 import { heatOf, MUTATOR_IDS, MUTATORS } from '../data/mutators'
 import type { MutatorId, RunId } from '../types/runs'
@@ -11,7 +11,7 @@ import { beginRun, skipFilled } from '../run/state'
 import { mutatorFits } from '../run/rules'
 import { goStep } from './teamPage'
 import { mapPlayLines } from './mapLines'
-import { mutatorText, runRuleLines, runStepLines, starText, stepText, teamText } from './runLines'
+import { mutatorText, runRuleLines, runStepLines, starText, stepLines, teamText } from './runLines'
 import { loadMap, loadMutators, saveMap, saveMutators } from '../save/selection'
 import { loadLabs } from '../save/labs'
 import type { LabBests } from '../save/labs'
@@ -123,7 +123,7 @@ export class MapScene extends Phaser.Scene {
       }
       grid.setItems(
         chapters.map((c, i) => {
-          const fights = c.steps.filter((s) => s.step.kind === 'fight').length
+          const fights = c.steps.filter((s) => s.step.kind === 'fight' || s.step.kind === 'repeat').length
           return { key: i, emoji: MAPS[c.map].emoji, title: chapterName(i, c), icons: Array.from({ length: fights }, () => GROUP_ICONS.fight) }
         }),
       )
@@ -253,7 +253,7 @@ export class MapScene extends Phaser.Scene {
     flow.put(new RichLabel(this, 24, 42, `{${run.emoji}} ${run.name}`, { kind: 'lead', iconSize: 76, gap: 14, originX: 0, maxWidth: width }), 90)
     flow.text(run.desc, { color: 'ink', indent: false }).gap(6)
     flow.heading(chapterName(this.chapter, c), map.emoji).text(mapPlayLines(map)[0]!, { color: 'muted' })
-    for (const { step, index } of c.steps) flow.text(`${index + 1}. ${stepText(step)}`)
+    for (const { step, index } of c.steps) stepLines(step).forEach((line, k) => flow.text(k === 0 ? `${index + 1}. ${line}` : line))
     flow.gap(6)
     const rules = runRuleLines(run)
     if (rules.length > 0) {
@@ -272,7 +272,7 @@ export class MapScene extends Phaser.Scene {
     if (!run.stars) return
     const best = this.bests[id]
     const won = best !== undefined && best.stars > 0
-    const fights = fightsOf(run).length
+    const fights = fightCount(run)
     flow.gap(6).heading('星级', GROUP_ICONS.stars)
     flow.text(`过关得一星，下面每做到一条再得一星：${run.stars.map(starText).join('；')}`)
     const tried = best && best.reached > 0 && fights > 1 ? `还没有通关，最远打过了 ${best.reached}/${fights} 场` : '还没有过关'

@@ -62,7 +62,7 @@ import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
 import { openWave, settleWave } from './systems/shared/wave'
 import { waveAt, WAVE } from '../data/waves'
 import { SURGE } from '../data/enemies'
-import { phasesOf, timeLimitMs } from '../data/runs'
+import { curveOf, phasesOf, timeLimitMs } from '../data/runs'
 import { enterFight } from '../run/flow'
 import type { FightDef } from '../types/runs'
 import { callSquad, streamInterval } from './fight/spawns'
@@ -463,7 +463,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     atlasPages: number
   } {
     const sim = this.sim
-    const wave = waveAt(sim ? clockSec(sim) : this.run.combatMs / 1000)
+    const wave = waveAt(curveOf(runDef(this.run)), sim ? clockSec(sim) : this.run.combatMs / 1000)
     return {
       enemies: query(this.world, [Enemy]).length,
       projectiles: query(this.world, [Projectile]).length,

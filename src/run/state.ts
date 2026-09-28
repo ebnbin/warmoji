@@ -2,6 +2,7 @@ import { CHARACTERS, ROSTER_IDS, memberStats } from '../data/characters'
 import type { CharacterId } from '../types/characters'
 import { WAVE } from '../data/waves'
 import { RUNS } from '../data/runs'
+import { planOf } from '../data/rounds'
 import type { GrowthProgress, ItemId } from '../types/items'
 import type { Hazard, MapId } from '../types/maps'
 import type { EnemyKind } from '../types/enemies'
@@ -174,9 +175,14 @@ export function foughtMs(run: RunState): number {
   return run.combatMs - (runDef(run).start?.sec ?? 0) * 1000
 }
 
+/** 这一局要走的步骤：按轮重复的展开成一轮一轮的，一直重复的展开到眼下之后几轮 */
+export function stepsOf(run: RunState): readonly StepDef[] {
+  return planOf(runDef(run), run.step)
+}
+
 /** 当前这一步；步骤都走完了是 undefined */
 export function stepOf(run: RunState): StepDef | undefined {
-  return runDef(run).steps[run.step]
+  return stepsOf(run)[run.step]
 }
 
 /** 已经招够人的招募步骤直接跳过 */
@@ -198,7 +204,7 @@ export function fightMap(run: RunState, fight: FightDef): MapId {
 
 /** 地图跟着当前或接下来那一场走；后面没有战斗了就留在最后一场的地图上 */
 function syncMap(run: RunState): void {
-  const next = runDef(run).steps.slice(run.step).find((s) => s.kind === 'fight')
+  const next = stepsOf(run).slice(run.step).find((s) => s.kind === 'fight')
   if (next?.kind === 'fight') run.mapId = fightMap(run, next.fight)
 }
 

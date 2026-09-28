@@ -1,13 +1,12 @@
 import { ENEMIES, SPAWN } from '../../data/enemies'
 import { bossFor, MAPS } from '../../data/maps'
-import { waveAt } from '../../data/waves'
 import type { Banner, LegacySquad } from '../../types/runs'
 import { dayNightOf, foeCount, spawnBoss, telegraphOne } from '../entities/enemy'
 import { scheduleOrder } from '../entities/schedule'
 import { telegraphCount } from '../entities/telegraph'
 import { isDayAt } from '../worlds/daynight'
 import type { Sim } from '../sim'
-import { clockSec } from './clock'
+import { clockWave, runCurve } from './clock'
 import { calm, foeOf, phaseMs, phaseOf, squadSize } from './state'
 import type { FoeSpec, StreamState, WavesState } from './state'
 
@@ -16,7 +15,7 @@ export function callSquad(sim: Sim, squad: LegacySquad, banner?: Banner): void {
   if (sim.over) return
   if (banner) sim.out.banners.push(banner)
   const main = foeOf(squad)
-  const clock = waveAt(clockSec(sim)).hpMultiplier
+  const clock = clockWave(sim).hpMultiplier
   const hpMul = (main.enemy?.role === 'boss' ? 1 : clock) * (squad.hpMul ?? 1)
   const phase = squad.at?.kind === 'ring' ? sim.rng.next() * Math.PI * 2 : 0
   const spread = squad.spreadMs ?? 0
@@ -47,13 +46,14 @@ function spawnIntervalScale(sim: Sim): number {
   return dn ? (isDayAt(dn.hour) ? dn.cfg.daySpawnScale : dn.cfg.nightSpawnScale) : 1
 }
 
-/** 这条连续刷怪此刻的间隔：写了就按它，从它开刷起匀速变到 ramp 的间隔；不写就随进度缩短、人越多刷得越快、昼夜图按时辰；敌人变多的效果都再除一道 */
+/** 这条连续刷怪此刻的间隔：写了就按它，从它开刷起匀速变到 ramp 的间隔；不写就按这一局的难度曲线随进度缩短、人越多刷得越快、昼夜图按时辰；敌人变多的效果都再除一道 */
 export function streamInterval(sim: Sim, st: StreamState): number {
   const rule = st.rule
   const mul = rule.intervalMul ?? 1
   if (rule.intervalMs === undefined) {
-    const teamFactor = SPAWN.teamFactorBase + SPAWN.teamFactorPerMember * sim.characters.length
-    return (waveAt(clockSec(sim)).spawnIntervalMs * mul * spawnIntervalScale(sim)) / (teamFactor * sim.foes.count)
+    const curve = runCurve(sim)
+    const teamFactor = curve.teamFactorBase + curve.teamFactorPerMember * sim.characters.length
+    return (clockWave(sim).spawnIntervalMs * mul * spawnIntervalScale(sim)) / (teamFactor * sim.foes.count)
   }
   const ramp = rule.ramp
   const since = Math.max(0, phaseMs(sim) - (rule.fromMs ?? 0))
@@ -71,7 +71,7 @@ export function runStream(sim: Sim, st: StreamState, deltaMs: number): void {
   st.cooldownMs = streamInterval(sim, st)
   if (foeCount(sim) + telegraphCount(sim) >= Math.min(rule.cap ?? Infinity, SPAWN.maxAlive)) return
   st.spawned++
-  telegraphOne(sim, { ...st.foe, hpMul: waveAt(clockSec(sim)).hpMultiplier, at: rule.at })
+  telegraphOne(sim, { ...st.foe, hpMul: clockWave(sim).hpMultiplier, at: rule.at })
 }
 
 /** 一组一组来：第一组到点就来，之后等场上清空再隔一阵来下一组 */

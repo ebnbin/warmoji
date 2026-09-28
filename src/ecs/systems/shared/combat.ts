@@ -29,7 +29,7 @@ import { returnBorrowed } from './steal'
 import { gearKill } from './gear'
 import type { Source } from '../../utils/source'
 import type { Sim } from '../../sim'
-import { clockSec } from '../../fight/clock'
+import { clockSec, runCurve } from '../../fight/clock'
 
 /** 生命归零：击杀者先反应，带复活计时的身体倒地等待，其余身体死亡移除，敌人移除后再触发击杀者道具的击杀规则 */
 export function die(sim: Sim, eid: number, src: Source, flingVx: number, flingVy: number): void {
@@ -192,7 +192,7 @@ function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean):
   const xpMul = (elite ? ELITE.xpMul : 1) * (loot?.xp ?? 1)
   gainTeamXp(sim, Math.round(def.xp * xpMul), Transform.x[eid]!, Transform.y[eid]!)
   const dropRoll = sim.rng.next()
-  const dropped = dropRoll < coinDropChance(clockSec(sim))
+  const dropped = dropRoll < coinDropChance(runCurve(sim), clockSec(sim))
   const baseCoins = dropped ? Math.round(def.coins * (elite ? ELITE.coinsMul : 1) * (loot?.coins ?? 1)) : 0
   const eaten = Thief.eaten[eid]!
   const total = baseCoins + eaten + (eaten > 0 ? 1 : 0)

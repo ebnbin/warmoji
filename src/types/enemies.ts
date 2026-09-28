@@ -1,5 +1,6 @@
 import type { AbilityDef, Effect } from './abilityDefs'
 import type { StatBase, StatMods } from './stats'
+import type { DifficultyCurve } from './waves'
 
 /** 驱动：身体没事时怎么走；蓄力突刺、自爆这类"动作"是能力，不在这里 */
 export type DriveDef =
@@ -150,14 +151,10 @@ export interface EnemyMixRow {
   readonly max: number
 }
 export interface Difficulty {
+  /** 没写难度曲线的一局按这一条 */
+  readonly curve: DifficultyCurve
   readonly spawn: {
-    readonly startIntervalMs: number
-    readonly minIntervalMs: number
-    readonly rampSeconds: number
-    readonly hpGrowthPerMin: number
     readonly maxAlive: number
-    readonly teamFactorBase: number
-    readonly teamFactorPerMember: number
     readonly telegraphMs: number
     readonly markEmoji: string
     readonly markSize: number
