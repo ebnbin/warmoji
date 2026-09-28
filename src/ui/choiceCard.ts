@@ -32,7 +32,7 @@ export interface ChoiceCardOptions {
 
 const RADIUS = SHAPE.radius.md + 2
 const PAD = 14
-const ICON = 52
+const ICON = 48
 const LINE_GAP = 4
 
 /** 一个可选项：图标与标题一行，下面几行说明；点一下选中，选中时描边与图标光晕亮起来。rect 是卡片外沿 */
@@ -65,7 +65,7 @@ export class ChoiceCard extends Widget {
       room -= aside.width + 8
     }
     title.fit(room)
-    this.layLines(opts.lines, PAD + ICON + 10)
+    this.layLines(opts.lines, PAD + ICON + 6)
     this.paint()
     const armedAt = scene.time.now + (opts.armMs ?? 0)
     pressable(this, {

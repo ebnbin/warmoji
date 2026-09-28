@@ -22,12 +22,12 @@ const HOSTS = [SceneKey.Battle, SceneKey.Ui] as const
 const KEYS = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX'] as const
 /** 横屏最多三列、竖屏两列；弹窗贴着屏幕底边，head 与 foot 是标题与确定键占的高 */
 const LAYOUT = {
-  landscape: { cols: 3, cardH: 172, maxW: 1180, side: 40 },
-  portrait: { cols: 2, cardH: 200, maxW: 720, side: 16 },
+  landscape: { cols: 3, cardH: 200, maxW: 1180, side: 40 },
+  portrait: { cols: 2, cardH: 224, maxW: 720, side: 16 },
   gap: 16,
   pad: 24,
-  head: 104,
-  foot: 104,
+  head: 92,
+  foot: 92,
   bottom: 16,
   soloW: 520,
 } as const
@@ -97,8 +97,8 @@ export class LevelUpScene extends Phaser.Scene {
     const more = this.opened.queued - 1
     const sub = [`全队 Lv ${this.run.xp.level}`, '选一项，立刻生效', ...(more > 0 ? [`还有 ${more} 次待选`] : [])].join(' · ')
     panel.add([
-      new RichLabel(this, panelW / 2, 42, `{${PICKUPS.levelUp.emoji}} 升级！`, { kind: 'title', shadow: true, originX: 0.5, maxWidth: innerW }),
-      new Label(this, panelW / 2, 84, sub, { kind: 'label', color: 'muted' }).setOrigin(0.5).fit(innerW),
+      new RichLabel(this, panelW / 2, 38, `{${PICKUPS.levelUp.emoji}} 升级！`, { kind: 'title', shadow: true, originX: 0.5, maxWidth: innerW }),
+      new Label(this, panelW / 2, 76, sub, { kind: 'label', color: 'muted' }).setOrigin(0.5).fit(innerW),
     ])
     this.cards = this.options.map((o, i) => {
       const row = Math.floor(i / cols)
@@ -116,7 +116,7 @@ export class LevelUpScene extends Phaser.Scene {
     this.tweens.add({ targets: panel, y, alpha: 1, duration: MOTION.pop, ease: 'Cubic.easeOut' })
   }
 
-  /** 一项的卡片：招人写队伍会到几人、还缺什么职责；升级写新能力与这一级的加成 */
+  /** 一项的卡片：招人写队伍会到几人、还缺什么职责；升级写新能力与升到这一级的等级加成 */
   private cardOf(o: LevelUpOption): Pick<ChoiceCardOptions, 'icon' | 'outline' | 'title' | 'aside' | 'lines' | 'tone'> {
     const run = this.run
     if (o.kind === 'recruit') {
@@ -146,7 +146,7 @@ export class LevelUpScene extends Phaser.Scene {
       tone: 'accent',
       lines: [
         ...(card ? [{ text: `新能力「${card.name}」`, color: 'epic' as const }, { text: card.desc }] : []),
-        ...(stats ? [{ text: `Lv ${lv + 1} 加成：${modTexts(stats).join('、')}`, color: 'good' as const }] : []),
+        ...(stats ? [{ text: modTexts(stats).join('、'), color: 'good' as const }] : []),
       ],
     }
   }
