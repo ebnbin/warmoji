@@ -4,10 +4,10 @@ import { cubicEaseIn, cubicEaseOut, sineEaseInOut } from '../utils/ease'
 import { Barrier, Depth, Fx, FxBeam, FxBolt, FxCircle, FxSlash, Link, Motion, MOTION, Radius, Tether, Transform, TRANSIT, Uid } from '../components'
 import { boltPts } from '../store'
 import type { EcsWorld } from '../world'
-import { fan, newScratch, quad, resetScratch, ringStrip, segment } from './tri'
+import { fan, quad, ringStrip, segment } from './tri'
 import type { Scratch } from './tri'
 import { SHAPE_BANDS as BANDS } from './bands'
-import { EcsLayer, LayerType } from './layer'
+import { LayerType, TriBatch } from './layer'
 import { packTint } from './tint'
 import { mainCameraOnly } from '../../util/camera'
 
@@ -36,8 +36,7 @@ export class CueLayer {
   private flashDur = 0
   private flashAlpha = 0
 
-  private readonly batches: EcsShapeBatch[] = []
-  private readonly scratch: Scratch = newScratch()
+  private readonly batches: TriBatch[] = []
 
   private now = 0
 
@@ -49,7 +48,7 @@ export class CueLayer {
         .setDepth(200)
         .setVisible(false),
     )
-    for (let b = 0; b < BANDS.length; b++) this.batches.push(new EcsShapeBatch(scene, this, b))
+    for (let b = 0; b < BANDS.length; b++) this.batches.push(new TriBatch(scene, LayerType.Shape, BANDS[b]!.depth, (o, m) => this.buildBand(b, o, m)))
   }
 
   destroy(): void {
@@ -71,9 +70,7 @@ export class CueLayer {
     }
   }
 
-  buildBand(band: number, m: Matrix): Scratch {
-    const o = this.scratch
-    resetScratch(o)
+  private buildBand(band: number, o: Scratch, m: Matrix): void {
     const { zMin, zMax } = BANDS[band]!
     const fx = this.now
     const age = (k: number): number => (fx - Fx.bornMs[k]!) / Fx.durMs[k]!
@@ -174,7 +171,6 @@ export class CueLayer {
         )
       }
     }
-    return o
   }
 
 
@@ -185,30 +181,3 @@ export class CueLayer {
     this.flashAlpha = alpha
   }
 }
-
-class EcsShapeBatch extends EcsLayer {
-  private readonly camMatrix = new Phaser.GameObjects.Components.TransformMatrix()
-
-  constructor(scene: Phaser.Scene, private readonly layer: CueLayer, private readonly band: number) {
-    super(scene, LayerType.Shape, BANDS[band]!.depth)
-    scene.add.existing(this)
-  }
-
-  renderWebGL(
-    renderer: Phaser.Renderer.WebGL.WebGLRenderer,
-    self: EcsShapeBatch,
-    drawingContext: Phaser.Renderer.WebGL.DrawingContext,
-  ): void {
-    const camera = drawingContext.camera
-    if (!camera) return
-    const node = renderer.renderNodes.getNode('BatchHandlerTriFlat') as
-      | { batch: (ctx: unknown, i: number[], v: number[], c: number[], l: null) => void }
-      | null
-    if (!node) return
-    const m = self.camMatrix.copyFrom(camera.getViewMatrix(!drawingContext.useCanvas))
-    const o = self.layer.buildBand(self.band, m)
-    if (o.i.length === 0) return
-    node.batch(drawingContext, o.i, o.v, o.c, null)
-  }
-}
-

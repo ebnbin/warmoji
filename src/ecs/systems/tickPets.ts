@@ -1,7 +1,6 @@
 import { query } from 'bitecs'
 import { PET_TRAIL_MS } from '../../data/abilities'
-import { Alive, Faction, Hp, Pet, PET, Tint, Transform } from '../components'
-import { presence } from '../utils/statusTint'
+import { Alive, Faction, Hp, Mounted, Pet, PET, Transform } from '../components'
 import { traceAt } from './shared/trace'
 import type { Sim } from '../sim'
 
@@ -22,12 +21,12 @@ function lowestAlly(sim: Sim, host: number): number {
   return best
 }
 
-/** 施法锚点物件的摆放：绕宿主转、落在宿主一阵子前的位置、或贴着血量最低的同伴；都是平滑追过去；宿主看不见时它也不画 */
+/** 施法锚点物件的摆放：绕宿主转、落在宿主一阵子前的位置、或贴着血量最低的同伴；都是平滑追过去 */
 export function tickPets(sim: Sim): void {
   const dt = sim.wdtMs / 1000
   const k = Math.min(1, dt * 10)
   for (const p of query(sim.world, [Pet, Transform])) {
-    const host = Pet.host[p]!
+    const host = Mounted.host[p]!
     const dist = Pet.dist[p]!
     let tx = Transform.x[host]!
     let ty = Transform.y[host]!
@@ -56,6 +55,5 @@ export function tickPets(sim: Sim): void {
     const to = sim.hooks.wrap(sim, Transform.x[p]! + d.x * k, Transform.y[p]! + d.y * k)
     Transform.x[p] = to.x
     Transform.y[p] = to.y
-    Tint.alpha[p] = presence(sim, host) === 0 ? 0 : 1
   }
 }

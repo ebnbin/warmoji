@@ -125,9 +125,6 @@ export const blinkStrike = slots<{ readonly src: Source; readonly target: number
 /** 记路的身体走过的路 */
 export const traces = slots<import('./systems/shared/trace').TraceRec>()
 
-/** 残影底下的那段路：从残影到身体，依次展开、不回绕的 x,y */
-export const echoPts = slots<Float32Array>()
-
 export const zoneSrc = slots<Source>()
 
 export const animId = slots<string>()

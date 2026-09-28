@@ -1,13 +1,12 @@
 import { hasComponent, query } from 'bitecs'
 import { DEG2RAD } from '../../util/units'
-import { Ability, Aim, Frozen, Held, Motion, MOTION, Owner, Sector, Segment, Swing, Thrown, Tint, Transform, VisOff } from '../components'
+import { Ability, Aim, Frozen, Held, Motion, MOTION, Mounted, Owner, Sector, Segment, Swing, Thrown, Transform, VisOff } from '../components'
 import { anchorX, anchorY } from '../utils/ability'
-import { presence } from '../utils/statusTint'
 import { muzzle } from '../utils/projectile'
 import { lungeT, sweepT } from '../utils/swing'
 import type { Sim } from '../sim'
 
-/** 持械的能力把武器画在宿主手上：突刺随挥动前伸，横扫沿弧线转，其余停在握持位；宿主看不见时武器也不画；徒手突刺则由宿主自己前冲 */
+/** 持械的能力把武器画在宿主手上：突刺随挥动前伸，横扫沿弧线转，其余停在握持位，宿主倒下或扔出去了就不出现；徒手突刺则由宿主自己前冲 */
 export function placeHeld(sim: Sim): void {
   const w = sim.world
   for (const e of query(w, [Ability, Held, Transform])) {
@@ -32,7 +31,7 @@ export function placeHeld(sim: Sim): void {
       Transform.y[e] = p.y
       Transform.rot[e] = aim + Held.rotOffset[e]!
     }
-    Tint.alpha[e] = frozen || Thrown.n[e]! > 0 || presence(sim, Owner.eid[e]!) === 0 ? 0 : 1
+    Mounted.show[e] = frozen || Thrown.n[e]! > 0 ? 0 : 1
   }
   for (const e of query(w, [Ability, Segment, Swing])) {
     if (hasComponent(w, e, Held) || Segment.lunge[e] === 0) continue
