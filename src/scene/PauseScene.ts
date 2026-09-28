@@ -247,12 +247,14 @@ export class PauseScene extends Phaser.Scene {
     this.scene.stop()
   }
 
+  /** 结束本局：回到这一局的来处，没有就回主菜单 */
   private quit(): void {
     if (this.leaving) return
     this.leaving = true
+    const origin = this.run.origin
     endRun()
     for (const k of HOSTS[this.opened.from].pause) this.scene.stop(k)
-    this.scene.start(SceneKey.Menu)
+    this.scene.start(origin ?? SceneKey.Menu)
   }
 
   private selectTab(tab: Tab): void {

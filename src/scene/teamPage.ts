@@ -31,13 +31,13 @@ export function isLeaving(scene: Phaser.Scene): boolean {
   return leaving.has(scene)
 }
 
-/** 一局之中离开当前页：打第一场之前是返回选图，之后先进暂停页，在那里继续或结束本局 */
+/** 一局之中离开当前页：打第一场之前是返回这一局的来处（没有就返回选图），之后先进暂停页，在那里继续或结束本局 */
 export function runExit(scene: Phaser.Scene, run: RunState, pause: () => PauseData): Pick<PageHeaderOptions, 'back' | 'pause'> {
   if (!fought(run)) {
     return {
       back: (): void => {
         endRun()
-        scene.scene.start(SceneKey.Map)
+        scene.scene.start(run.origin ?? SceneKey.Map)
       },
     }
   }

@@ -8,6 +8,9 @@ import { LAYER, MOTION } from './theme'
 import type { TextColor } from './theme'
 import { Widget } from './widget'
 
+/** 带标题的对话框：内容区从面板顶上往下这么多开始 */
+export const DIALOG_HEAD = 90
+
 export interface DialogOptions {
   readonly width: number
   readonly height: number
@@ -46,7 +49,7 @@ export class Dialog extends Widget {
     this.input!.cursor = 'default'
     if (opts.title) {
       this.add(new Label(scene, 0, -h / 2 + 44, opts.title, { kind: 'title', color: opts.titleColor, shadow: true }).setOrigin(0.5))
-      this.bodyTop = -h / 2 + 90
+      this.bodyTop = -h / 2 + DIALOG_HEAD
     } else {
       this.bodyTop = -h / 2 + 28
     }

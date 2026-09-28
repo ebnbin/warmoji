@@ -9,7 +9,7 @@ import { heatOf } from '../data/mutators'
 import { submitScore } from '../save/highscore'
 import { reachLab, submitLab } from '../save/labs'
 import { ITEMS } from '../data/items'
-import { beginRun, endRun, foughtMs, getRun, runDef, skipFilled } from '../run/state'
+import { endRun, foughtMs, getRun, restartRun, runDef, skipFilled } from '../run/state'
 import { starMet } from '../run/stars'
 import { teamLeveled } from '../run/members'
 import { fightsDone } from '../run/flow'
@@ -65,17 +65,20 @@ export class ResultScene extends Phaser.Scene {
 
     if (!this.submitted) {
       this.submitted = true
-      if (def.record) {
-        const r = submitScore(browserStorage(), reached, this.run.kills)
-        this.best = { newBest: r.newBest, bestWave: r.score.bestWave, bestKills: r.score.bestKills }
-      } else if (this.win && def.stars) {
-        const met = def.stars.map((s) => starMet(this.run, s))
-        const stars = 1 + met.filter(Boolean).length
-        const heat = heatOf(this.run.mutators)
-        const r = submitLab(browserStorage(), this.run.runId, stars, heat, fights)
-        this.lab = { met, stars, heat, newBest: r.newStars || r.newHeat }
-      } else if (def.stars) {
-        reachLab(browserStorage(), this.run.runId, reached - 1)
+      const id = this.run.runId
+      if (id !== undefined) {
+        if (def.record) {
+          const r = submitScore(browserStorage(), reached, this.run.kills)
+          this.best = { newBest: r.newBest, bestWave: r.score.bestWave, bestKills: r.score.bestKills }
+        } else if (this.win && def.stars) {
+          const met = def.stars.map((s) => starMet(this.run, s))
+          const stars = 1 + met.filter(Boolean).length
+          const heat = heatOf(this.run.mutators)
+          const r = submitLab(browserStorage(), id, stars, heat, fights)
+          this.lab = { met, stars, heat, newBest: r.newStars || r.newHeat }
+        } else if (def.stars) {
+          reachLab(browserStorage(), id, reached - 1)
+        }
       }
       playSfx(this.win ? 'levelup' : 'over')
     }
@@ -147,14 +150,15 @@ export class ResultScene extends Phaser.Scene {
     this.renderTeam(team)
     this.renderFoes(foes)
 
+    const origin = this.run.origin
     const again = (): void => {
       endRun()
-      this.scene.start(SceneKey.Map)
+      this.scene.start(origin ?? SceneKey.Map)
     }
     const retry = (): void => {
-      const { runId, homeMap, mutators } = this.run
+      const prev = this.run
       endRun()
-      const run = beginRun(runId, homeMap, mutators)
+      const run = restartRun(prev)
       skipFilled(run)
       goStep(this, run)
     }
@@ -165,7 +169,7 @@ export class ResultScene extends Phaser.Scene {
     const btnW = 300
     const gap = 26
     const first = def.record ? { label: '再来一局', onTap: again } : { label: '再试一次', onTap: retry }
-    const second = def.record ? { label: '回主菜单', onTap: menu } : { label: '返回选图', onTap: again }
+    const second = def.record ? { label: '回主菜单', onTap: menu } : { label: origin === SceneKey.Editor ? '返回编辑器' : '返回选图', onTap: again }
     new Button(this, cx - btnW / 2 - gap / 2, f.footerY, { ...first, width: btnW, armMs: 500, keys: ['ENTER', 'SPACE'] })
     new Button(this, cx + btnW / 2 + gap / 2, f.footerY, { ...second, width: btnW, variant: 'secondary', armMs: 500 })
 
