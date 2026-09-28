@@ -74,7 +74,7 @@ const EXPEDITION = {
         name: '1-1 林边',
         map: 'forest',
         clockSec: 0,
-        intro: { title: '第一章 · 黑森林', sub: '清空林边的三小批敌人，或撑过 45 秒' },
+        intro: { title: '第一章 · 黑森林', sub: '清空林边的三小批敌人，或撑过 40 秒' },
         mix: [
           { kind: 'zombie', weight: 4 },
           { kind: 'ghost', weight: 1 },
@@ -85,13 +85,13 @@ const EXPEDITION = {
             atMs: 2500,
             gapMs: 2000,
             squads: [
-              { count: 5, enemy: 'zombie', at: { kind: 'far' } },
+              { count: 4, enemy: 'zombie', at: { kind: 'far' } },
               { count: 6, at: { kind: 'point', dx: 8, dy: 2, spread: 2 }, banner: { title: '第二批', sub: '幽灵飘得快，血却薄' } },
               { count: 8, spreadMs: 3000, at: { kind: 'ring', dist: 7 }, banner: { title: '最后一批', sub: '从四面围上来了' } },
             ],
           },
         ],
-        ends: [{ kind: 'cleared' }, { kind: 'time', ms: 45_000 }],
+        ends: [{ kind: 'cleared' }, { kind: 'time', ms: 40_000 }],
       },
     },
     { kind: 'recruit', upTo: 2 },
@@ -346,7 +346,7 @@ const EXPEDITION = {
         clockSec: 500,
         spawns: [
           { kind: 'stream', intervalMs: 1500 },
-          { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'blackhole', hpMul: 0.75 }, banner: { title: '奇点', sub: '最后一战：别踏进它的视界' } },
+          { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'blackhole', hpMul: 0.65 }, banner: { title: '奇点', sub: '最后一战：别踏进它的视界' } },
         ],
         ends: [{ kind: 'boss' }],
       },
