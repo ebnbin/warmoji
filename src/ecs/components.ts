@@ -346,6 +346,9 @@ export const Anchor = { eid: i32() }
 
 export const Fired = { v: u8() }
 
+/** 挂在宿主身上的实体（武器、施法锚点物件）：show 是它自己该不该出现，画出来的透明度由 showMounted 再随宿主算 */
+export const Mounted = { host: i32(), show: f32() }
+
 export const Held = {
   restOffset: f32(),
   rotOffset: f32(),
@@ -471,9 +474,6 @@ export const Grow = { r0: f32(), s0: f32(), v: f32() }
 /** 记着自己走过的路的身体，路在 traces 里 */
 export const Trace = {}
 
-/** 倒带落点上的残影：of 是倒带的身体，它这段路画在地上；dim 是冷却中的淡化倍率 */
-export const Echo = { of: i32(), ofUid: u32(), dim: f32() }
-
 /** 借来的能力：到时撤掉；from 是被夺走的那条能力与它的编号，夺取者死了就还回去 */
 export const Borrowed = { until: f32(), from: i32(), fromUid: u32() }
 
@@ -485,8 +485,8 @@ export const Shadow = { of: i32(), ofUid: u32(), until: f32(), fx: f32(), fy: f3
 
 export const PET = { orbit: 0, trail: 1, ally: 2 } as const
 
-/** 施法锚点物件：所属的能力、宿主、跟随方式、距离与转角 */
-export const Pet = { of: i32(), host: i32(), mode: u8(), dist: f32(), phase: f32() }
+/** 施法锚点物件：所属的能力、跟随方式、距离与转角；宿主记在 Mounted */
+export const Pet = { of: i32(), mode: u8(), dist: f32(), phase: f32() }
 
 /** 闲着的计时：最近一次出手或移动的时刻、这一轮是否已触发 */
 export const Idle = { since: f32(), done: u8() }

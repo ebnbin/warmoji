@@ -12,6 +12,7 @@ import {
   Flyer,
   FlyerShape,
   Held,
+  Mounted,
   Quad,
   Sprite,
   Thrown,
@@ -39,7 +40,9 @@ export function spawnWeaponBody(sim: Sim, holderEid: number, held: HeldVisual, f
     size: held.size,
     z: 13,
   })
-  addComponent(world, e, Held)
+  addComponents(world, e, Held, Mounted)
+  Mounted.host[e] = holderEid
+  Mounted.show[e] = 1
   Held.restOffset[e] = held.restOffset
   Held.rotOffset[e] = held.rotationOffsetDeg * DEG2RAD
   Held.side[e] = held.mountSide ?? 0

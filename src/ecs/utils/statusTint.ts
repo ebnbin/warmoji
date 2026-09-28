@@ -29,6 +29,11 @@ export function presence(sim: Sim, eid: number): number {
   return 1
 }
 
+/** 挂在身体上的实体随宿主显隐的那一份：宿主看不见就不画 */
+export function hostShown(sim: Sim, host: number): number {
+  return presence(sim, host) === 0 ? 0 : 1
+}
+
 /** 身上的底色：穿行中是穿行的颜色，其余按控制的轻重排 */
 export function statusTint(sim: Sim, eid: number): number {
   if (inTransit(eid)) return Motion.color[eid]!
