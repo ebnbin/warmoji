@@ -266,6 +266,8 @@ for (const [id, i] of Object.entries<ItemDef>(ITEMS)) {
   need(i.maxStacks === undefined || i.maxStacks >= 1, `items.${id}.maxStacks 至少为 1`)
 }
 
+need(PROGRESSION.restRatio > 0 && PROGRESSION.restRatio <= 1, 'progression.restRatio 须在 (0, 1] 内')
+
 if (errors.length > 0) {
   console.error(errors.join('\n'))
   process.exit(1)

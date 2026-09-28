@@ -2,6 +2,7 @@ import { CHARACTERS } from '../data/characters'
 import { RARITIES } from '../data/items'
 import { modTexts } from '../data/stats'
 import { TAGS } from '../data/tags'
+import { WAVE } from '../data/waves'
 import type { EndRule, FightDef, FightReward, FightRules, MutatorDef, RunDef, ShopRules, StarRule, StepDef, TeamDef } from '../types/runs'
 
 const sec = (ms: number): string => `${+(ms / 1000).toFixed(1)} 秒`
@@ -88,6 +89,7 @@ export function runRuleLines(def: RunDef): string[] {
   if (!r) return []
   const out = ruleLines(r)
   if (r.lives !== undefined) out.push(`全队一共只能起来 ${r.lives} 次，自己起来、被扶起来、被技能救起来都算`)
+  if (r.between === 'rest') out.push(`场与场之间，每人回复 ${Math.round(WAVE.restRatio * 100)}% 损失的生命，倒下的也起来`)
   if (r.between === 'full') out.push('每一场满血开局')
   if (r.between === 'permadeath') out.push('一场打完时还倒着的队员，这一局都回不来')
   if (r.recruit) out.push(`只能招募${r.recruit.tags.map((t) => TAGS[t].name).join('、')}角色`)

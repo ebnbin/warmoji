@@ -4,6 +4,7 @@ export interface WaveState {
 }
 export interface Progression {
   readonly reviveHpRatio: number
+  readonly restRatio: number
   readonly summaryMs: number
   readonly coinDropChanceMin: number
   readonly coinDropChanceHalfLifeSec: number

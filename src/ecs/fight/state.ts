@@ -289,15 +289,22 @@ export function fightGoals(sim: Sim): { readonly text: string; readonly warn: bo
   return out
 }
 
-/** 目标不在视野里时指过去的点：据点这一处，或离队长最近的悬赏目标 */
+/** 目标不在视野里时指过去的点：据点这一处，或离队长最近的悬赏目标；要清场又没有悬赏时是最近的敌人 */
 export function goalSpot(sim: Sim): Point | null {
   const h = sim.fight.hold
   if (h && h.point < h.rule.points.length) return holdSpot(sim, h.rule.points[h.point]!)
+  const bounty = nearestTo(sim, query(sim.world, [Bounty, Transform]))
+  if (bounty || !sim.fight.def.ends.some((e) => e.kind === 'cleared')) return bounty
+  return nearestTo(sim, query(sim.world, ENEMY_SET).filter((eid) => Faction.v[eid] === FACTION.enemy))
+}
+
+function nearestTo(sim: Sim, eids: ArrayLike<number>): Point | null {
   const lx = leaderX(sim)
   const ly = leaderY(sim)
   let best: Point | null = null
   let bestD = Infinity
-  for (const eid of query(sim.world, [Bounty, Transform])) {
+  for (let i = 0; i < eids.length; i++) {
+    const eid = eids[i]!
     const d = sim.hooks.worldDelta(sim, lx, ly, Transform.x[eid]!, Transform.y[eid]!)
     const d2 = d.x * d.x + d.y * d.y
     if (d2 < bestD) {

@@ -131,8 +131,8 @@ export interface FightRules {
   readonly mods?: StatMods
 }
 
-/** 场与场之间：carry 活着的带着残血、倒下的回三成血；full 每场满血；permadeath 活着的带着残血，一场打完时还倒着的这一局都回不来 */
-export type Between = 'carry' | 'full' | 'permadeath'
+/** 场与场之间：carry 活着的带着残血、倒下的回三成血；rest 每人回复一部分损失的生命，倒下的也起来；full 每场满血；permadeath 活着的带着残血，一场打完时还倒着的这一局都回不来 */
+export type Between = 'carry' | 'rest' | 'full' | 'permadeath'
 
 /** 商店：rarity 只摆出这个范围里的稀有度，两头都含；reroll 为假时不能刷新 */
 export interface ShopRules {
