@@ -29,6 +29,9 @@ export const boltPts = slots<Float32Array>()
 
 export const meteorHit = slots<Set<number>>()
 
+/** 星云的流星按引力积分好的轨迹，x、y 交替 */
+export const meteorPath = slots<Float32Array>()
+
 export const modDef = slots<FieldPickupDef>()
 
 export const telegraphDef = slots<EnemyDef>()

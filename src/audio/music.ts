@@ -494,6 +494,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   daynight: buildDayNight,
   space: buildSpace,
   ice: buildSpace,
+  nebula: buildSpace,
 }
 
 const cache = new Map<BgmId, BgmScore>()

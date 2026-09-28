@@ -14,7 +14,10 @@ import type { Sim } from './sim'
 import { clockSec } from './fight/clock'
 import type { TorusConfig } from '../types/maps'
 import { query } from 'bitecs'
-import { Due, Meteor } from './components'
+import { Due, Meteor, Phys, Stats } from './components'
+import { meteorPath } from './store'
+import { captureRadiusU } from './worlds/nebula'
+import { ringPoint } from './worlds/space'
 import { leaderX, leaderY } from './utils/team'
 import { spawnDriftDecor } from './entities/decor'
 import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynight'
@@ -313,6 +316,176 @@ class SpaceView extends BoundedView {
   destroy(v: ViewCtx): void {
     this.meteorFx?.tele.destroy()
     this.meteorFx = undefined
+    super.destroy(v)
+  }
+}
+
+/** 空腔半径与星云外缘，像素 */
+function nebulaRadii(v: ViewCtx): { wall: number; rim: number } {
+  const s = v.def.nebula!.shell
+  return { wall: s.innerU * UNIT, rim: s.outerU * UNIT }
+}
+
+const GAS_COLORS = [0xff5fa2, 0x7c4dff, 0x40c4ff, 0xb388ff, 0xff8a65]
+const SHELL_INNER = 0x4fc3f7
+const SHELL_OUTER = 0xff5f8f
+
+/**
+ * 星云：圆心在原点的空腔里飘着一团团气体，壳层按俯视的柱密度着色，内壁最亮、往外渐暗到外缘为零；
+ * 黑洞画出视界、光子球与吸积盘，虚线圈是当前队长走路逃不出的范围，流星的预警沿引力弯曲的轨迹
+ */
+class NebulaView extends BoundedView {
+  private capture?: Phaser.GameObjects.Graphics
+  private captureU = -1
+  private meteorFx?: { of: number; tele: Phaser.GameObjects.Graphics }
+
+  layout(v: ViewCtx): { w: number; h: number; origin: Point } {
+    const d = nebulaRadii(v).rim * 2
+    return { w: d, h: d, origin: { x: 0, y: 0 } }
+  }
+
+  build(v: ViewCtx): void {
+    this.visuals.push(
+      v.scene.add
+        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, v.def.palette.map)
+        .setScrollFactor(0)
+        .setDepth(-1),
+    )
+    const { wall, rim } = nebulaRadii(v)
+    const gas = v.scene.add.graphics().setDepth(-0.9)
+    const rng = new Rng(v.run.decorSeed ^ 0x9a5)
+    for (let i = 0; i < 14; i++) {
+      const p = ringPoint(rng, { x: 0, y: 0 }, 0, wall * 0.85)
+      gas.fillStyle(GAS_COLORS[i % GAS_COLORS.length]!, 0.05 + rng.next() * 0.06)
+      gas.fillCircle(p.x, p.y, (3 + rng.next() * 4) * UNIT)
+    }
+    this.visuals.push(gas)
+    const shell = v.scene.add.graphics().setDepth(-0.8)
+    const n = 36
+    const w = (rim - wall) / n
+    const peak = Math.sqrt(rim * rim - wall * wall)
+    for (let i = 0; i < n; i++) {
+      const r = wall + (i + 0.5) * w
+      shell.lineStyle(w, mix(SHELL_INNER, SHELL_OUTER, i / (n - 1)), (0.4 * Math.sqrt(rim * rim - r * r)) / peak)
+      shell.strokeCircle(0, 0, r)
+    }
+    this.visuals.push(shell)
+  }
+
+  protected field(v: ViewCtx): Phaser.Geom.Rectangle {
+    const { rim } = nebulaRadii(v)
+    return new Phaser.Geom.Rectangle(-rim, -rim, rim * 2, rim * 2)
+  }
+
+  /** 装饰只撒在空腔里 */
+  decor(v: ViewCtx, atlas: EcsAtlas): void {
+    const rng = new Rng(v.run.decorSeed)
+    const rU = nebulaRadii(v).wall / UNIT
+    const cells = Math.round(rU * 2)
+    for (const d of rollDecor(v.def.decor, () => rng.next(), cells, cells)) {
+      const xU = d.xU - rU
+      const yU = d.yU - rU
+      if (Math.hypot(xU, yU) > rU - d.sizeU / 2) continue
+      this.decorEids.push(
+        spawnDecor(v.world, atlas, {
+          id: d.emoji,
+          outline: 'player',
+          x: xU * UNIT,
+          y: yU * UNIT,
+          size: d.sizeU * UNIT,
+          rot: d.rotation,
+          alpha: d.alpha,
+          z: 1,
+        }),
+      )
+    }
+  }
+
+  /** 吸积盘从最内稳定圆轨道（3 倍视界）往外，光子球在 1.5 倍视界 */
+  onSimReady(v: ViewCtx, sim: Sim): void {
+    const hole = sim.worldState.hole
+    if (!hole) return
+    const h = v.def.nebula!.hole.horizonU * UNIT
+    const g = v.scene.add.graphics().setDepth(2.5)
+    for (let i = 0; i < 6; i++) {
+      g.lineStyle(h * 0.4, i % 2 === 0 ? 0xffa040 : 0xff6ec7, 0.1 - i * 0.012)
+      g.strokeCircle(hole.x, hole.y, h * (3 + i * 0.35))
+    }
+    g.lineStyle(3, 0xfff3c4, 0.9)
+    g.strokeCircle(hole.x, hole.y, h * 1.5)
+    g.fillStyle(0x000000, 1)
+    g.fillCircle(hole.x, hole.y, h)
+    g.lineStyle(2, 0x7c4dff, 0.9)
+    g.strokeCircle(hole.x, hole.y, h)
+    this.visuals.push(g)
+    this.capture = v.scene.add.graphics().setDepth(3)
+    this.visuals.push(this.capture)
+  }
+
+  step(v: ViewCtx, sim: Sim, _delta: number): void {
+    this.drawCapture(v, sim)
+    this.drawMeteorPath(v, sim)
+  }
+
+  /** 当前队长走路逃不出的范围：终端漂移追上它最快速度的地方，随换人与体力变化 */
+  private drawCapture(v: ViewCtx, sim: Sim): void {
+    const g = this.capture
+    const hole = sim.worldState.hole
+    const lead = sim.leader
+    if (!g || !hole || lead < 0) return
+    const cfg = v.def.nebula!
+    const rU = captureRadiusU(cfg, Phys.mass[lead]! / Phys.drag[lead]!, Stats.moveSpeed[lead]!, cfg.shell.innerU * 2)
+    if (Math.abs(rU - this.captureU) < 0.02) return
+    this.captureU = rU
+    g.clear()
+    if (rU <= cfg.hole.horizonU) return
+    const r = rU * UNIT
+    const n = 48
+    g.lineStyle(2, 0xffffff, 0.45)
+    for (let i = 0; i < n; i += 2) {
+      g.beginPath()
+      g.arc(hole.x, hole.y, r, (i / n) * Math.PI * 2, ((i + 1) / n) * Math.PI * 2)
+      g.strokePath()
+    }
+  }
+
+  private drawMeteorPath(v: ViewCtx, sim: Sim): void {
+    const m = query(v.world, [Meteor])[0]
+    const fx = this.meteorFx
+    if (fx && fx.of !== m) {
+      fx.tele.destroy()
+      this.meteorFx = undefined
+    }
+    if (m === undefined) return
+    const path = meteorPath[m]
+    if (!path) return
+    let cur = this.meteorFx
+    if (!cur) {
+      const rr = v.def.nebula!.meteor.radiusU * UNIT
+      const tele = v.scene.add.graphics().setDepth(3)
+      const trace = (): void => {
+        tele.beginPath()
+        tele.moveTo(path[0]!, path[1]!)
+        for (let i = 2; i < path.length; i += 2) tele.lineTo(path[i]!, path[i + 1]!)
+        tele.strokePath()
+      }
+      tele.lineStyle(rr * 2, 0xff5252, 0.16)
+      trace()
+      tele.lineStyle(3, 0xff8a80, 0.8)
+      trace()
+      tele.fillStyle(0xff5252, 0.35)
+      tele.fillCircle(path[0]!, path[1]!, rr)
+      cur = { of: m, tele }
+      this.meteorFx = cur
+    }
+    cur.tele.setAlpha(sim.elapsedMs < Due.at[m]! ? 0.28 + 0.24 * Math.abs(Math.sin(sim.elapsedMs / 110)) : 0.22)
+  }
+
+  destroy(v: ViewCtx): void {
+    this.meteorFx?.tele.destroy()
+    this.meteorFx = undefined
+    this.capture = undefined
+    this.captureU = -1
     super.destroy(v)
   }
 }
@@ -711,6 +884,14 @@ function ensureDashTexture(scene: Phaser.Scene, cfg: TorusConfig): void {
   }
 }
 
+function mix(from: number, to: number, t: number): number {
+  const ch = (at: number): number => {
+    const a = (from >> at) & 0xff
+    return Math.round(a + (((to >> at) & 0xff) - a) * t)
+  }
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0)
+}
+
 function shade(color: number, mul: number): number {
   const r = Math.min(255, Math.round(((color >> 16) & 0xff) * mul))
   const g = Math.min(255, Math.round(((color >> 8) & 0xff) * mul))
@@ -730,4 +911,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   river: () => new RiverView(),
   void: () => new TorusView(),
   space: () => new SpaceView(),
+  nebula: () => new NebulaView(),
 }

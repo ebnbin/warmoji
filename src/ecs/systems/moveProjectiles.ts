@@ -67,7 +67,7 @@ function barriers(sim: Sim, eid: number, x0: number, y0: number, x1: number, y1:
   return true
 }
 
-/** 弹体飞行：追踪弹转向、召回的飞向主人、落地的不动，穿过挡弹的墙时消失或被反弹 */
+/** 弹体飞行：追踪弹转向、召回的飞向主人、落地的不动，飞行中受引力加速，穿过挡弹的墙时消失或被反弹 */
 export function moveProjectiles(sim: Sim): void {
   const dt = sim.wdtMs / 1000
   for (const eid of [...query(sim.world, PROJ_SET)]) {
@@ -81,6 +81,12 @@ export function moveProjectiles(sim: Sim): void {
     if (hasComponent(sim.world, eid, Homing)) steer(sim, eid, dt)
     const ax = Transform.x[eid]!
     const ay = Transform.y[eid]!
+    const g = sim.hooks.pull(sim, ax, ay)
+    if (g.x !== 0 || g.y !== 0) {
+      Vel.x[eid] = Vel.x[eid]! + g.x * dt
+      Vel.y[eid] = Vel.y[eid]! + g.y * dt
+      if (Proj.spin[eid] === 0) Transform.rot[eid] = Math.atan2(Vel.y[eid]!, Vel.x[eid]!) + Proj.rotOffset[eid]!
+    }
     const stepX = Vel.x[eid]! * dt
     const stepY = Vel.y[eid]! * dt
     const moved = sim.hooks.wrap(sim, ax + stepX, ay + stepY)
