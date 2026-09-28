@@ -4,16 +4,15 @@ import { resDef } from '../../store'
 import { ITEMS } from '../../../data/items'
 import { gearWave } from './gear'
 import { runDef } from '../../../run/state'
-import { phasesOf } from '../../../data/runs'
 import { WAVE } from '../../../data/waves'
 import type { RunState } from '../../../run/state'
 import type { Sim } from '../../sim'
 
-/** 一场结束：生命与资源带走，成长道具攒进度，收获与过关奖励进账；波数按这一场的阶段数往前走，商店的物价与稀有度跟着涨；生命按场间规则带走，奖励回满血时全队满血，永久减员时还倒着的这一局都回不来 */
+/** 一场结束：生命与资源带走，成长道具攒进度，收获与过关奖励进账，波数加一；生命按场间规则带走，奖励回满血时全队满血，永久减员时还倒着的这一局都回不来 */
 export function settleWave(sim: Sim): void {
   const run = sim.run
   run.combatMs += sim.elapsedMs
-  run.wave += phasesOf(sim.fight.def).length
+  run.wave += 1
   const between = runDef(run).rules?.between ?? 'carry'
   const reward = sim.fight.def.reward
   run.memberHp = sim.characters.map((m) => carriedHp(m, between === 'full' || !!reward?.heal, between === 'rest'))

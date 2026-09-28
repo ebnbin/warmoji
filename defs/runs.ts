@@ -1,4 +1,4 @@
-import type { Banner, FightDef, RunDef, SpawnRule, StepDef } from '../src/types/runs'
+import type { Banner, LegacyFightDef, LegacySpawnRule, RunDef, StepDef } from '../src/types/runs'
 import { DIFFICULTY } from './difficulty.ts'
 import { TEAM_BASELINE } from './team.ts'
 
@@ -31,10 +31,10 @@ function carrierBudget(wave: number, boss: boolean): { buff: number; debuff: num
 }
 
 /** 正式局的第 wave 波：撑过时长；第 2 波起有带光圈的敌人，精英波来一次精英潮，最后一波头目登场、打倒它也算过关 */
-function classicFight(wave: number, sec: number, last: boolean): FightDef {
+function classicFight(wave: number, sec: number, last: boolean): LegacyFightDef {
   const ms = sec * 1000
   const eliteChance = wave >= CLASSIC.eliteFrom ? { eliteChance: CLASSIC.eliteChance } : {}
-  const spawns: SpawnRule[] = [{ kind: 'stream', ...(last ? { intervalMul: CLASSIC.bossRelief } : {}), ...eliteChance }]
+  const spawns: LegacySpawnRule[] = [{ kind: 'stream', ...(last ? { intervalMul: CLASSIC.bossRelief } : {}), ...eliteChance }]
   if (wave >= 2) {
     const { buff, debuff } = carrierBudget(wave, last)
     spawns.push({ kind: 'carriers', buff, debuff, atMs: ms * 0.12, spanMs: ms * 0.7 })
@@ -65,7 +65,8 @@ const EXPEDITION = {
   name: '远征',
   desc: '选一名首发出发，穿过黑森林、残垣与深空三片地区；每关连着打几段，目标一段接一段地换，关与关之间逛商店；击杀攒全队经验，升级时捡起掉落的升级道具，招人或给队员升级；每章以头目收尾，击败深空的奇点就是胜利',
   stars: [{ kind: 'downs', count: 15 }, { kind: 'time', ms: 660_000 }],
-  rules: { between: 'rest', teamLevel: true },
+  rules: { between: 'rest' },
+  teamLevel: { base: 26, growth: 1.24, maxLevel: 15 },
   steps: [
     { kind: 'recruit', upTo: 1 },
     {
@@ -74,66 +75,80 @@ const EXPEDITION = {
         name: '1-1 林边',
         map: 'forest',
         clockSec: 0,
-        intro: { title: '第一章 · 黑森林', sub: '清空林边的三小批敌人；升级时走过去捡起掉落的升级道具' },
-        mix: [
-          { kind: 'zombie', weight: 4 },
-          { kind: 'ghost', weight: 1 },
-        ],
-        spawns: [
+        phases: [
           {
-            kind: 'waves',
-            atMs: 2500,
-            gapMs: 2000,
-            squads: [
-              { count: 3, enemy: 'zombie', at: { kind: 'far' } },
-              { count: 5, at: { kind: 'point', dx: 8, dy: 2, spread: 2 }, banner: { title: '第二批', sub: '幽灵飘得快，血却薄' } },
-              { count: 6, spreadMs: 3000, at: { kind: 'ring', dist: 7 }, banner: { title: '最后一批', sub: '从四面围上来了' } },
-            ],
-          },
-        ],
-        ends: [{ kind: 'cleared' }, { kind: 'time', ms: 45_000 }],
-        then: [
-          {
-            intro: { title: '蝗灾', sub: '跳蝗成群扑来：击杀 35 只，或撑过 45 秒' },
+            intro: { title: '第一章 · 黑森林', sub: '清空林边的三小批敌人；升级时走过去捡起掉落的升级道具' },
             mix: [
-              { kind: 'locust', weight: 3 },
-              { kind: 'zombie', weight: 1 },
+              { kind: 'zombie', weight: 4 },
+              { kind: 'ghost', weight: 1 },
             ],
-            spawns: [{ kind: 'stream', intervalMs: 600 }],
-            ends: [{ kind: 'kills', count: 35 }, { kind: 'time', ms: 45_000 }],
+            spawns: [
+              {
+                kind: 'waves',
+                atMs: 2500,
+                gapMs: 2000,
+                squads: [
+                  { count: 3, enemy: 'zombie', at: { kind: 'far' } },
+                  { count: 5, at: { kind: 'point', dx: 8, dy: 2, spread: 2 }, banner: { title: '第二批', sub: '幽灵飘得快，血却薄' } },
+                  { count: 6, spreadMs: 3000, at: { kind: 'ring', dist: 7 }, banner: { title: '最后一批', sub: '从四面围上来了' } },
+                ],
+              },
+            ],
+            ends: [{ kind: 'cleared' }, { kind: 'time', ms: 45_000 }],
           },
           {
-            intro: { title: '精英野猪', sub: '金边的精英更硬、撞人更疼，经验多四倍；清场过关' },
+            intro: { title: '蝗灾', sub: '五十只跳蝗成群扑来，一只不留' },
             spawns: [
-              { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'boar', elites: 1, escort: { enemy: 'zombie', count: 5 }, at: { kind: 'point', dx: 0, dy: -7, spread: 2 } } },
+              {
+                kind: 'stream',
+                intervalMs: 600,
+                total: 50,
+                mix: [
+                  { kind: 'locust', weight: 3 },
+                  { kind: 'zombie', weight: 1 },
+                ],
+              },
+            ],
+            ends: [{ kind: 'cleared' }],
+          },
+          {
+            intro: { title: '精英野猪', sub: '金边的精英更硬、撞人更疼，经验多四倍，打倒它还会掉下增益；清场过关' },
+            spawns: [
+              {
+                kind: 'batch',
+                atMs: 1500,
+                squad: { count: 1, enemy: 'boar', elites: 1, carry: 'buff', escort: { enemy: 'zombie', count: 5 }, at: { kind: 'point', dx: 0, dy: -7, spread: 2 } },
+              },
             ],
             ends: [{ kind: 'cleared' }],
           },
         ],
       },
     },
-    { kind: 'shop' },
+    { kind: 'shop', tier: 4 },
     {
       kind: 'fight',
       fight: {
         name: '1-2 蛛后',
         map: 'forest',
         clockSec: 90,
-        intro: { title: '萨满营地', sub: '萨满会给同伴回血，先杀它' },
-        spawns: [
+        phases: [
           {
-            kind: 'waves',
-            atMs: 2500,
-            gapMs: 2500,
-            squads: [
-              { count: 8, enemy: 'zombie', escort: { enemy: 'elf', count: 1 }, at: { kind: 'point', dx: -7, dy: -6, spread: 2.5 } },
-              { count: 8, enemy: 'slime', escort: { enemy: 'elf', count: 2 }, at: { kind: 'point', dx: 7, dy: 5, spread: 2.5 }, banner: { title: '黏液虫', sub: '蹭到就糊住，攻速大降' } },
-              { count: 8, enemy: 'zombie', escort: { enemy: 'elf', count: 2 }, spreadMs: 1500, at: { kind: 'ring', dist: 7 }, banner: { title: '营地倾巢', sub: '两个萨满压阵' } },
+            intro: { title: '萨满营地', sub: '萨满会给同伴回血，先杀它' },
+            spawns: [
+              {
+                kind: 'waves',
+                atMs: 2500,
+                gapMs: 2500,
+                squads: [
+                  { count: 8, enemy: 'zombie', escort: { enemy: 'elf', count: 1 }, at: { kind: 'point', dx: -7, dy: -6, spread: 2.5 } },
+                  { count: 8, enemy: 'slime', escort: { enemy: 'elf', count: 2 }, at: { kind: 'point', dx: 7, dy: 5, spread: 2.5 }, banner: { title: '黏液虫', sub: '蹭到就糊住，攻速大降' } },
+                  { count: 8, enemy: 'zombie', escort: { enemy: 'elf', count: 2 }, spreadMs: 1500, at: { kind: 'ring', dist: 7 }, banner: { title: '营地倾巢', sub: '两个萨满压阵' } },
+                ],
+              },
             ],
+            ends: [{ kind: 'cleared' }, { kind: 'time', ms: 70_000 }],
           },
-        ],
-        ends: [{ kind: 'cleared' }, { kind: 'time', ms: 70_000 }],
-        then: [
           {
             intro: { title: '蛛卵林', sub: '蛛卵 6 秒不打破就结成缠人的网；撑到不再产卵，再清空林子' },
             mix: [
@@ -143,16 +158,13 @@ const EXPEDITION = {
             ],
             spawns: [
               { kind: 'stream', intervalMs: 900, untilMs: 24_000 },
-              { kind: 'batch', atMs: 2000, squad: { count: 3, enemy: 'sapling', at: { kind: 'ring', dist: 4 } } },
-              { kind: 'batch', atMs: 9000, squad: { count: 4, enemy: 'sapling', at: { kind: 'ring', dist: 5 } } },
-              { kind: 'batch', atMs: 16_000, squad: { count: 4, enemy: 'sapling', at: { kind: 'ring', dist: 5 } }, banner: { title: '又一窝', sub: '趁它们还是卵' } },
-              { kind: 'batch', atMs: 23_000, squad: { count: 4, enemy: 'sapling', at: { kind: 'ring', dist: 5 } } },
+              { kind: 'batch', atMs: 2000, every: 7000, times: 4, squad: { count: 4, enemy: 'sapling', at: { kind: 'ring', dist: 5 } } },
             ],
             ends: [{ kind: 'cleared' }],
           },
           {
             spawns: [
-              { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'treant', hpMul: 0.35 }, banner: { title: '蛛后现身', sub: '打破她产下的蛛卵，别被网缠住' } },
+              { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'treant', stats: { mul: { maxHp: 0.35 } } }, banner: { title: '蛛后现身', sub: '打破她产下的蛛卵，别被网缠住' } },
             ],
             ends: [{ kind: 'boss' }],
           },
@@ -160,35 +172,36 @@ const EXPEDITION = {
         reward: { coins: 60, heal: true },
       },
     },
-    { kind: 'shop' },
+    { kind: 'shop', tier: 7 },
     {
       kind: 'fight',
       fight: {
         name: '2-1 断墙之间',
         map: 'ruins',
         clockSec: 190,
-        intro: { title: '第二章 · 残垣', sub: '墙挡人、挡弹，也挡视线；清空三面来敌' },
-        spawns: [
+        phases: [
           {
-            kind: 'waves',
-            atMs: 2500,
-            gapMs: 2500,
-            squads: [
-              { count: 8, enemy: 'skeleton', at: { kind: 'point', dx: 0, dy: -9, spread: 2.5 }, banner: { title: '北面', sub: '骷髅兵打散了还会爬起来一次' } },
-              { count: 8, enemy: 'zombie', escort: { enemy: 'snake', count: 3 }, at: { kind: 'point', dx: 9, dy: 0, spread: 2.5 }, banner: { title: '东面', sub: '毒蛇躲在后面吐毒，借墙挡住' } },
-              { count: 10, enemy: 'skeleton', escort: { enemy: 'knight', count: 2 }, at: { kind: 'point', dx: -9, dy: 0, spread: 2.5 }, banner: { title: '西面', sub: '狼骑：先打狼，再打人' } },
+            intro: { title: '第二章 · 残垣', sub: '墙挡人、挡弹，也挡视线；清空三面来敌' },
+            spawns: [
+              {
+                kind: 'waves',
+                atMs: 2500,
+                gapMs: 2500,
+                squads: [
+                  { count: 8, enemy: 'skeleton', at: { kind: 'point', dx: 0, dy: -9, spread: 2.5 }, banner: { title: '北面', sub: '骷髅兵打散了还会爬起来一次' } },
+                  { count: 8, enemy: 'zombie', escort: { enemy: 'snake', count: 3 }, at: { kind: 'point', dx: 9, dy: 0, spread: 2.5 }, banner: { title: '东面', sub: '毒蛇躲在后面吐毒，借墙挡住' } },
+                  { count: 10, enemy: 'skeleton', escort: { enemy: 'knight', count: 2 }, at: { kind: 'point', dx: -9, dy: 0, spread: 2.5 }, banner: { title: '西面', sub: '狼骑：先打狼，再打人' } },
+                ],
+              },
             ],
+            ends: [{ kind: 'cleared' }],
           },
-        ],
-        ends: [{ kind: 'cleared' }],
-        then: [
           {
-            intro: { title: '引爆', sub: '60 秒内依次踩过三个信标，别让自爆怪贴身' },
-            mix: [
-              { kind: 'creeper', weight: 1 },
-              { kind: 'zombie', weight: 3 },
+            intro: { title: '引爆', sub: '60 秒内依次踩过三个信标；自爆怪专找你，别让它贴身' },
+            spawns: [
+              { kind: 'stream', intervalMs: 1200, enemy: 'zombie' },
+              { kind: 'stream', intervalMs: 3600, enemy: 'creeper', huntLeader: true },
             ],
-            spawns: [{ kind: 'stream', intervalMs: 900 }],
             ends: [
               { kind: 'hold', ms: 12_000, radius: 1.8, points: [{ dx: -8, dy: -8 }, { dx: 8, dy: -5 }, { dx: 0, dy: 8 }] },
               { kind: 'time', ms: 60_000, lose: true },
@@ -198,27 +211,29 @@ const EXPEDITION = {
         reward: { coins: 40 },
       },
     },
-    { kind: 'shop' },
+    { kind: 'shop', tier: 9 },
     {
       kind: 'fight',
       fight: {
         name: '2-2 暴龙',
         map: 'ruins',
         clockSec: 280,
-        intro: { title: '石像鬼回廊', sub: '石像鬼掉到四成血会石化回血，一口气打穿它' },
-        spawns: [
+        phases: [
           {
-            kind: 'waves',
-            atMs: 2500,
-            gapMs: 2500,
-            squads: [
-              { count: 10, enemy: 'skeleton', escort: { enemy: 'gargoyle', count: 2 }, at: { kind: 'point', dx: -8, dy: -6, spread: 2 } },
-              { count: 3, enemy: 'gargoyle', escort: { enemy: 'elf', count: 2 }, at: { kind: 'ring', dist: 6 }, banner: { title: '萨满守像', sub: '萨满会把石像鬼奶回来，先杀萨满' } },
+            intro: { title: '石像鬼回廊', sub: '石像鬼掉到四成血会石化回血，一口气打穿它' },
+            spawns: [
+              {
+                kind: 'waves',
+                atMs: 2500,
+                gapMs: 2500,
+                squads: [
+                  { count: 10, enemy: 'skeleton', escort: { enemy: 'gargoyle', count: 2 }, at: { kind: 'point', dx: -8, dy: -6, spread: 2 } },
+                  { count: 3, enemy: 'gargoyle', escort: { enemy: 'elf', count: 2 }, at: { kind: 'ring', dist: 6 }, banner: { title: '萨满守像', sub: '萨满会把石像鬼奶回来，先杀萨满' } },
+                ],
+              },
             ],
+            ends: [{ kind: 'cleared' }],
           },
-        ],
-        ends: [{ kind: 'cleared' }],
-        then: [
           {
             intro: { title: '狼骑悬赏', sub: '75 秒内击倒四名带着赏金逃窜的狼骑' },
             mix: [
@@ -231,7 +246,7 @@ const EXPEDITION = {
               {
                 kind: 'batch',
                 atMs: 3000,
-                squad: { count: 4, enemy: 'knight', hpMul: 1.5, drive: { kind: 'flee', range: 5.5 }, at: { kind: 'far' }, bounty: true },
+                squad: { count: 4, enemy: 'knight', stats: { mul: { maxHp: 1.5 } }, drive: { kind: 'flee', range: 5.5 }, at: { kind: 'far' }, bounty: true },
                 banner: { title: '悬赏发布', sub: '四名狼骑带着赏金逃窜，把它们逼到墙角' },
               },
             ],
@@ -239,30 +254,42 @@ const EXPEDITION = {
           },
           {
             spawns: [
-              { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'rhino', hpMul: 0.55 }, banner: { title: '暴龙现身', sub: '它会冲锋撞人，横着躲开；跺地前退出圈外' } },
+              {
+                kind: 'batch',
+                atMs: 1500,
+                squad: { count: 1, enemy: 'rhino', stats: { mul: { maxHp: 0.55, damage: 0.8 } } },
+                banner: { title: '暴龙现身', sub: '它会冲锋撞人，横着躲开；跺地前退出圈外' },
+              },
             ],
             ends: [{ kind: 'boss' }],
           },
         ],
-        enemyMods: { mul: { damage: 0.8 } },
         reward: { coins: 120, heal: true },
       },
     },
-    { kind: 'shop' },
+    { kind: 'shop', tier: 12 },
     {
       kind: 'fight',
       fight: {
         name: '3-1 迷魂哨线',
         map: 'space',
         clockSec: 370,
-        intro: { title: '第三章 · 深空', sub: '流星直线冲来，天体不时横扫：击杀 45 只，或撑过 40 秒' },
-        mix: [
-          { kind: 'alien', weight: 3 },
-          { kind: 'comet', weight: 2 },
-        ],
-        spawns: [{ kind: 'stream', intervalMs: 300 }],
-        ends: [{ kind: 'kills', count: 45 }, { kind: 'time', ms: 40_000 }],
-        then: [
+        phases: [
+          {
+            intro: { title: '第三章 · 深空', sub: '流星越来越密，天体不时横扫：击杀 45 只，或撑过 40 秒' },
+            spawns: [
+              {
+                kind: 'stream',
+                intervalMs: 450,
+                ramp: { toMs: 250, overMs: 30_000 },
+                mix: [
+                  { kind: 'alien', weight: 3 },
+                  { kind: 'comet', weight: 2 },
+                ],
+              },
+            ],
+            ends: [{ kind: 'kills', count: 45 }, { kind: 'time', ms: 40_000 }],
+          },
           {
             intro: { title: '迷魂哨线', sub: '迷魂眼会把人勾过去，先拆掉它们' },
             spawns: [
@@ -296,37 +323,55 @@ const EXPEDITION = {
         reward: { coins: 100, heal: true },
       },
     },
-    { kind: 'shop' },
+    { kind: 'shop', tier: 15 },
     {
       kind: 'fight',
       fight: {
         name: '3-2 奇点',
         map: 'space',
         clockSec: 450,
-        intro: { title: '精英潮', sub: '三波精英接连压上，只只都是金边' },
-        mix: [
-          { kind: 'ufo', weight: 1 },
-          { kind: 'comet', weight: 1 },
-          { kind: 'alien', weight: 2 },
-        ],
-        spawns: [
+        phases: [
           {
-            kind: 'waves',
-            atMs: 2000,
-            gapMs: 2000,
-            squads: [
-              { count: 4, elites: 4, spreadMs: 1200 },
-              { count: 4, elites: 4, spreadMs: 1200, at: { kind: 'ring', dist: 7 }, banner: { title: '第二波精英', sub: '从四面压上来' } },
-              { count: 4, elites: 4, spreadMs: 1200, banner: { title: '最后一波精英', sub: '清掉它们，奇点就要现身' } },
+            intro: { title: '精英潮', sub: '三波精英接连压上，只只都是金边' },
+            mix: [
+              { kind: 'ufo', weight: 1 },
+              { kind: 'comet', weight: 1 },
+              { kind: 'alien', weight: 2 },
             ],
+            spawns: [
+              {
+                kind: 'waves',
+                atMs: 2000,
+                gapMs: 2000,
+                squads: [
+                  { count: 4, elites: 4, spreadMs: 1200 },
+                  { count: 4, elites: 4, spreadMs: 1200, at: { kind: 'ring', dist: 7 }, banner: { title: '第二波精英', sub: '从四面压上来' } },
+                  { count: 4, elites: 4, spreadMs: 1200, banner: { title: '最后一波精英', sub: '清掉它们，奇点就要现身' } },
+                ],
+              },
+            ],
+            ends: [{ kind: 'cleared' }],
           },
-        ],
-        ends: [{ kind: 'cleared' }],
-        then: [
           {
+            mix: [
+              { kind: 'alien', weight: 2 },
+              { kind: 'comet', weight: 1 },
+            ],
             spawns: [
               { kind: 'stream', intervalMs: 3000 },
-              { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'blackhole', hpMul: 0.7 }, banner: { title: '奇点', sub: '最后一战：别踏进它的视界' } },
+              { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'blackhole', stats: { mul: { maxHp: 0.7 } } }, banner: { title: '奇点', sub: '最后一战：别踏进它的视界' } },
+            ],
+            ends: [{ kind: 'bossHp', below: 0.5 }],
+          },
+          {
+            intro: { title: '奇点暴走', sub: '它只剩一半了，碎片从四面涌来；一口气打倒它' },
+            mix: [
+              { kind: 'alien', weight: 1 },
+              { kind: 'comet', weight: 2 },
+            ],
+            spawns: [
+              { kind: 'stream', intervalMs: 1800 },
+              { kind: 'batch', atMs: 800, squad: { count: 6, enemy: 'comet', at: { kind: 'ring', dist: 6 } } },
             ],
             ends: [{ kind: 'boss' }],
           },

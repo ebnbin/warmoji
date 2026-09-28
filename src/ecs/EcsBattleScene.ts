@@ -65,8 +65,8 @@ import { SURGE } from '../data/enemies'
 import { phasesOf, timeLimitMs } from '../data/runs'
 import { enterFight } from '../run/flow'
 import type { FightDef } from '../types/runs'
-import { callSquad } from './fight/spawns'
-import { fightGoals, fightMods, fightVerdict, lastPhase, markFightBase, nextPhase, phaseOf, startPhase, switchBlock, timeLeftMs } from './fight/state'
+import { callSquad, streamInterval } from './fight/spawns'
+import { fightGoals, fightMods, fightVerdict, lastPhase, markFightBase, nextPhase, phaseMs, phaseOf, startPhase, switchBlock, timeLeftMs } from './fight/state'
 import { xpMaxed, xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
@@ -225,7 +225,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const sim = this.sim
     if (!sim) return
     if (kind === 'coins') this.run.coins += 1000
-    else gainTeamXp(sim, Math.max(1, xpToNext(this.run.xp.level) - this.run.xp.xp))
+    else gainTeamXp(sim, Math.max(1, xpToNext(this.run) - this.run.xp.xp))
   }
 
   devEndWave(): void {
@@ -240,6 +240,18 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const sim = this.sim
     if (!sim || sim.over || this.ending || lastPhase(sim.fight)) return
     nextPhase(sim)
+  }
+
+  /** 这一阶段的进度：第几个阶段、开始了多久、难度时钟，每条连续刷怪此刻的间隔与放出了几只，各条目标 */
+  devPhaseText(): string {
+    const sim = this.sim
+    if (!sim) return '不在战斗中'
+    const f = sim.fight
+    return [
+      `阶段 ${f.phase + 1}/${phasesOf(f.def).length} · 已 ${(phaseMs(sim) / 1000).toFixed(1)} 秒 · 难度时钟 ${Math.round(clockSec(sim))} 秒`,
+      ...f.streams.map((st, i) => `连续刷怪 ${i + 1} · 间隔 ${Math.round(streamInterval(sim, st))} ms · 已放 ${st.spawned}${st.rule.total === undefined ? '' : `/${st.rule.total}`}`),
+      ...fightGoals(sim).map((g) => `目标 · ${g.text}`),
+    ].join('\n')
   }
 
   devResetSkill(): void {
@@ -413,12 +425,12 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const sim = this.sim
     const elapsed = sim?.elapsedMs ?? 0
     const boss = sim ? query(this.world, [Enemy, Boss]).find((eid) => Boss.v[eid] === 1) : undefined
-    const left = sim ? timeLeftMs(sim) : (timeLimitMs(this.fightDef) ?? Infinity)
+    const left = sim ? timeLeftMs(sim) : (timeLimitMs(phasesOf(this.fightDef)[0]!) ?? Infinity)
     const phases = phasesOf(this.fightDef).length
     const name = this.fightDef.name
-    const xpNext = xpToNext(this.run.xp.level)
+    const xpNext = xpToNext(this.run)
     return {
-      xp: xpMaxed(this.run.xp) ? xpNext : this.run.xp.xp,
+      xp: xpMaxed(this.run) ? xpNext : this.run.xp.xp,
       xpNext,
       level: teamLeveled(this.run) ? this.run.xp.level : null,
       levelUps: pendingLevelUps(this.run),
@@ -606,7 +618,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
 
   /** 这一阶段没有结束规则，一直打下去 */
   get endless(): boolean {
-    return (this.sim ? phaseOf(this.sim.fight) : this.fightDef).ends.length === 0
+    return (this.sim ? phaseOf(this.sim.fight) : phasesOf(this.fightDef)[0]!).ends.length === 0
   }
 
   /** 无敌切换后立刻生效：换掉队员的生命上限，开无敌时补满 */

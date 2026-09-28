@@ -56,6 +56,7 @@ export interface Sim {
   dtMs: number
   wdtMs: number
   over: boolean
+  /** 这一场有头目倒下过 */
   bossDown: boolean
   characterHitCount: number
   timeStopMsLeft: number
@@ -184,7 +185,7 @@ export function makeSim(
     pendingDeaths: [],
     out: newOutbox(),
     damageNumbers: damageNumbers ? newDamageNumbers() : null,
-    rng: new Rng((run.decorSeed ^ 0x9e37 ^ Math.imul(run.wave, 0x9e3779b1)) >>> 0),
+    rng: new Rng((run.decorSeed ^ 0x9e37 ^ Math.imul(run.step, 0x9e3779b1)) >>> 0),
     fight: state,
     run,
     leader,

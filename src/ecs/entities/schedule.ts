@@ -1,9 +1,9 @@
 import { addComponents } from 'bitecs'
 import { newEntity } from './entity'
 import { Call, Carrier, Due, Order } from '../components'
-import { callRule, carrierPickup, foeSpec } from '../store'
+import { callSpec, carrierPickup, foeSpec } from '../store'
 import type { FieldPickupDef } from '../../types/battlefield'
-import type { BatchRule, BossRule } from '../../types/runs'
+import type { BossRule, LegacyBatchRule } from '../../types/runs'
 import type { FoeSpec } from '../fight/state'
 import type { Sim } from '../sim'
 
@@ -16,12 +16,12 @@ export function scheduleOrder(sim: Sim, atMs: number, spec: FoeSpec): number {
   return eid
 }
 
-/** 到 atMs 一队敌人或头目登场 */
-export function scheduleCall(sim: Sim, atMs: number, rule: BatchRule | BossRule): number {
+/** 到 atMs 一队敌人或头目登场；round 是一再放出的一队这是第几次，从 0 算 */
+export function scheduleCall(sim: Sim, atMs: number, rule: LegacyBatchRule | BossRule, round = 0): number {
   const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Due, Call)
   Due.at[eid] = atMs
-  callRule[eid] = rule
+  callSpec[eid] = { rule, round }
   return eid
 }
 

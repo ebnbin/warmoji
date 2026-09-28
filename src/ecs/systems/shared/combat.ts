@@ -12,7 +12,7 @@ import { Alive, Anchored, Anim, Boss, Elite, ENEMY_SET, FACTION, Faction, Gear, 
 import { isSameEntity } from '../../utils/identity'
 import { addMark, hasMark } from '../../utils/marks'
 import { offenseOf } from '../../utils/stats'
-import { abilityOnKill, bodyRules, enemyCarries, enemyDef, enemyOf, resDef } from '../../store'
+import { abilityOnKill, bodyRules, enemyCarries, enemyDef, enemyLoot, enemyOf, resDef } from '../../store'
 import { flying, selfSource } from '../../utils/source'
 import { nearestTarget } from '../../utils/targets'
 import { gainRes } from './resource'
@@ -165,33 +165,35 @@ function killBody(sim: Sim, eid: number, srcSlot: number, flingVx: number, fling
   unequipAbilities(sim, eid)
   enemyDef[eid] = undefined
   enemyOf[eid] = undefined
+  enemyLoot[eid] = undefined
   removeEntity(sim.world, eid)
 }
 
 /** 全队攒经验；靠全队升级的一局每升一级在 (x, y) 掉一个升级道具，不给位置就掉在队长身边，否则只响一声 */
 export function gainTeamXp(sim: Sim, amount: number, x?: number, y?: number): void {
-  const gained = gainXp(sim.run.xp, amount)
-  sim.run.xp = gained.state
-  if (gained.levelsGained === 0) return
+  const gained = gainXp(sim.run, amount)
+  if (gained === 0) return
   if (!teamLeveled(sim.run)) {
     playSfx('levelup')
     return
   }
   const cx = x ?? Transform.x[sim.leader]! + UNIT
   const cy = y ?? Transform.y[sim.leader]!
-  for (let i = 0; i < gained.levelsGained; i++) {
-    const a = (i / gained.levelsGained) * Math.PI * 2
-    const r = gained.levelsGained > 1 ? 0.6 * UNIT : 0
+  for (let i = 0; i < gained; i++) {
+    const a = (i / gained) * Math.PI * 2
+    const r = gained > 1 ? 0.6 * UNIT : 0
     dropLevelUp(sim, cx + Math.cos(a) * r, cy + Math.sin(a) * r)
   }
 }
 
+/** 击杀的经验与金币：精英与关卡给这一批的倍率都乘上 */
 function grantKillRewards(sim: Sim, eid: number, def: EnemyDef, elite: boolean): void {
-  const xpMul = elite ? ELITE.xpMul : 1
+  const loot = enemyLoot[eid]
+  const xpMul = (elite ? ELITE.xpMul : 1) * (loot?.xp ?? 1)
   gainTeamXp(sim, Math.round(def.xp * xpMul), Transform.x[eid]!, Transform.y[eid]!)
   const dropRoll = sim.rng.next()
   const dropped = dropRoll < coinDropChance(clockSec(sim))
-  const baseCoins = dropped ? Math.round(def.coins * (elite ? ELITE.coinsMul : 1)) : 0
+  const baseCoins = dropped ? Math.round(def.coins * (elite ? ELITE.coinsMul : 1) * (loot?.coins ?? 1)) : 0
   const eaten = Thief.eaten[eid]!
   const total = baseCoins + eaten + (eaten > 0 ? 1 : 0)
   if (total > 0) dropCoins(sim, Transform.x[eid]!, Transform.y[eid]!, total)
@@ -210,6 +212,7 @@ export function despawnEnemy(sim: Sim, eid: number, puff = true): void {
   if (puff) sim.out.bursts.push({ x: Transform.x[eid]!, y: Transform.y[eid]!, count: 8, kind: 'puff' })
   orphanBrood(sim, eid)
   enemyCarries[eid] = undefined
+  enemyLoot[eid] = undefined
   unequipAbilities(sim, eid)
   enemyDef[eid] = undefined
   removeEntity(sim.world, eid)

@@ -1,10 +1,11 @@
 import { CHARACTERS } from '../data/characters'
+import { ENEMIES } from '../data/enemies'
 import { RARITIES } from '../data/items'
 import { modTexts } from '../data/stats'
 import { TAGS } from '../data/tags'
 import { phasesOf } from '../data/runs'
 import { WAVE } from '../data/waves'
-import type { EndRule, FightDef, FightReward, FightRules, MutatorDef, PhaseDef, RunDef, ShopRules, StarRule, StepDef, TeamDef } from '../types/runs'
+import type { EndRule, FightDef, FightReward, FightRules, LegacyPhaseDef, LevelPick, MutatorDef, RunDef, ShopRules, StarRule, StepDef, TeamDef } from '../types/runs'
 
 const sec = (ms: number): string => `${+(ms / 1000).toFixed(1)} 秒`
 
@@ -20,10 +21,12 @@ function winText(e: EndRule): string | null {
       return e.lose ? null : `撑过 ${sec(e.ms)}`
     case 'boss':
       return '打倒头目'
+    case 'bossHp':
+      return `把头目打到 ${Math.round(e.below * 100)}% 血`
     case 'cleared':
       return '清空所有敌人'
     case 'kills':
-      return `击杀 ${e.count} 只`
+      return `击杀 ${e.count} 只${e.enemy ? ENEMIES[e.enemy].name : ''}`
     case 'bounty':
       return '击倒全部悬赏目标'
     case 'hold':
@@ -42,14 +45,14 @@ export function rewardText(r: FightReward | undefined): string | null {
 }
 
 /** 一个阶段怎么达成、怎么输 */
-function phaseGoalText(p: PhaseDef): string {
+function phaseGoalText(p: LegacyPhaseDef): string {
   const wins = p.ends.flatMap((e) => winText(e) ?? [])
   const lose: string[] = []
   for (const e of p.ends) {
     if (e.kind === 'time' && e.lose) lose.push(`限时 ${sec(e.ms)}`)
     if (e.kind === 'downs') lose.push(e.count === 1 ? '有人倒下就输' : `累计倒下 ${e.count} 次就输`)
   }
-  return [wins.length === 0 ? '不会结束' : wins.join('，或'), ...lose].join(' · ')
+  return [wins.length === 0 ? '不会结束' : wins.join(p.need === 'all' ? '，并且' : '，或'), ...lose].join(' · ')
 }
 
 /** 一场怎么赢、怎么输：分阶段的按先后连起来，外加这一场的特别规则与过关奖励 */
@@ -89,10 +92,12 @@ function shopLines(s: ShopRules): string[] {
   return out
 }
 
-/** 一局的我方规则：每一场都照这些，外加命数、场间恢复、招募限定、商店与等级上限 */
+/** 全队升级时能选什么 */
+const PICK_TEXT: Record<LevelPick, string> = { recruit: '招一名新队员', upgrade: '给一名队员升一级' }
+
+/** 一局的我方规则：每一场都照这些，外加命数、场间恢复、招募限定、商店、等级上限与全队升级 */
 export function runRuleLines(def: RunDef): string[] {
-  const r = def.rules
-  if (!r) return []
+  const r = def.rules ?? {}
   const out = ruleLines(r)
   if (r.lives !== undefined) out.push(`全队一共只能起来 ${r.lives} 次，自己起来、被扶起来、被技能救起来都算`)
   if (r.between === 'rest') out.push(`场与场之间，每人回复 ${Math.round(WAVE.restRatio * 100)}% 损失的生命，倒下的也起来`)
@@ -101,7 +106,8 @@ export function runRuleLines(def: RunDef): string[] {
   if (r.recruit) out.push(`只能招募${r.recruit.tags.map((t) => TAGS[t].name).join('、')}角色`)
   if (r.shop) out.push(...shopLines(r.shop))
   if (r.maxLevel !== undefined) out.push(r.maxLevel === 1 ? '队员不能升级' : `队员最高只能升到 ${r.maxLevel} 级`)
-  if (r.teamLevel) out.push('击杀攒全队经验，每升一级掉一个升级道具，队长走过去捡起来，招一名新队员或给一名队员升一级；进商店前没捡的替你捡起；买道具不再涨角色经验')
+  const t = def.teamLevel
+  if (t) out.push(`击杀攒全队经验，最高 ${t.maxLevel} 级；每升一级掉一个升级道具，队长走过去捡起来，${(t.picks ?? ['recruit', 'upgrade']).map((k) => PICK_TEXT[k]).join('或')}；进商店前没捡的替你捡起；买道具不再涨角色经验`)
   return out
 }
 

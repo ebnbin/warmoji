@@ -21,7 +21,7 @@ import type { RunState } from '../run/state'
 import type { CharacterId } from '../types/characters'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
 import type { GrowthProgress, ItemId } from '../types/items'
-import type { FightDef, RunDef, Squad } from '../types/runs'
+import type { FightDef, GroupTraits, LegacySquad, MixEntry, RunDef } from '../types/runs'
 import type { MapId } from '../types/maps'
 import { fightGoalText, fightUnit, mutatorText, runRuleLines } from './runLines'
 import { applyCamera, VIEWPORT_CHANGED } from '../util/apply'
@@ -104,7 +104,7 @@ interface Foe {
   readonly since: number
 }
 
-/** 这一局会出的敌人：按首次出没的场次排，巢穴生出的与死后分裂出的跟着母体；配比按这一场的，不写就按地图，地图的配比从开局的波数起算 */
+/** 这一局会出的敌人：按首次出没的场次排，巢穴生出的与死后分裂出的跟着母体；配比按这一批的，再按这一阶段的，都不写就按地图，地图的配比从开局的波数起算 */
 function runFoes(run: RunState): Foe[] {
   const since = new Map<EnemyKind, number>()
   const order: EnemyDef[] = []
@@ -125,14 +125,14 @@ function runFoes(run: RunState): Foe[] {
     const n = i + 1
     const map = fightMap(run, f)
     for (const p of phasesOf(f)) {
-      const mix = (): void => {
-        const rows = p.mix ?? f.mix
+      const mix = (own?: readonly MixEntry[]): void => {
+        const rows = own ?? p.mix
         if (rows) for (const m of rows) add(ENEMIES[m.kind], n)
         else for (const row of MAPS[map].mix) add(ENEMIES[row.kind], Math.max(n, row.sinceWave - firstWave + 1))
       }
-      const squad = (sq: Squad): void => {
-        if (sq.enemy) add(ENEMIES[sq.enemy], n)
-        else mix()
+      const group = (g: GroupTraits): void => (g.enemy ? add(ENEMIES[g.enemy], n) : mix(g.mix))
+      const squad = (sq: LegacySquad): void => {
+        group(sq)
         if (sq.escort) add(ENEMIES[sq.escort.enemy], n)
       }
       for (const s of p.spawns) {
@@ -140,6 +140,7 @@ function runFoes(run: RunState): Foe[] {
         else if (s.kind === 'knobs') for (const e of mapEnemyRoster(map)) add(e, n)
         else if (s.kind === 'batch') squad(s.squad)
         else if (s.kind === 'waves') s.squads.forEach(squad)
+        else if (s.kind === 'stream') group(s)
         else mix()
       }
     }
@@ -519,7 +520,7 @@ export class PauseScene extends Phaser.Scene {
             : `队伍 ${size} 人`,
     )
     if (picked) {
-      const xp = xpMaxed(run.xp) ? '满级' : `经验 ${run.xp.xp}/${xpToNext(run.xp.level)}`
+      const xp = xpMaxed(run) ? '满级' : `经验 ${run.xp.xp}/${xpToNext(run)}`
       const waiting = pendingLevelUps(run)
       flow.text(`全队 Lv ${run.xp.level} · ${xp}${waiting > 0 ? ` · 还有 ${waiting} 次升级没领` : ''}`, { color: 'info' })
     }

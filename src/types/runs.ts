@@ -1,10 +1,12 @@
 import type runsJson from '../assets/runs.json'
 import type mutatorsJson from '../assets/mutators.json'
+import type { Polarity } from './battlefield'
 import type { CharacterId, CharacterTag } from './characters'
 import type { DriveDef, EnemyKind } from './enemies'
 import type { ItemRarity } from './items'
 import type { MapId } from './maps'
 import type { StatMods } from './stats'
+import type { XpCurve } from './xp'
 
 export type RunId = keyof typeof runsJson
 export type MutatorId = keyof typeof mutatorsJson
@@ -28,45 +30,69 @@ export interface MixEntry {
   readonly weight: number
 }
 
-/** 一队敌人：不写 enemy 就按这一场的配比抽，指定头目时血量不随进度涨；前 elites 只必是精英、其余各有 eliteChance 的几率；spreadMs 内依次放出；hpMul 乘在血量上；drive 换掉指定敌人的走法；bounty 为真时是悬赏目标；escort 是跟着这一队一起放出的另一种敌人，不算悬赏目标 */
-export interface Squad {
-  readonly count: number
+/** 战利品倍率：乘在敌人掉的经验与金币上 */
+export interface Loot {
+  readonly xp?: number
+  readonly coins?: number
+}
+
+/**
+ * 一批敌人共有的特征：
+ * enemy 指定种类，指定头目时血量不随难度时钟涨；mix 按这份配比抽；都不写就按这一阶段的配比。
+ * drive 换掉指定敌人的走法；stats 是给它们的属性修正；eliteChance 是每只是精英的几率；
+ * huntLeader 让它们里追人的都盯着队长；loot 乘在它们的经验与金币上；carry 让每只身上带一个这张地图效果池里这种极性的效果，打死掉在地上。
+ */
+export interface GroupTraits {
   readonly enemy?: EnemyKind
-  readonly elites?: number
+  readonly mix?: readonly MixEntry[]
+  readonly drive?: DriveDef
+  readonly stats?: StatMods
   readonly eliteChance?: number
+  readonly huntLeader?: boolean
+  readonly loot?: Loot
+  readonly carry?: Polarity
+}
+
+/** 一队敌人：count 只，前 elites 只必是精英；spreadMs 内依次放出；bounty 为真时是悬赏目标；escort 是跟着这一队一起放出的另一种敌人，不算悬赏目标，也不带这一队的特征 */
+export interface Squad extends GroupTraits {
+  readonly count: number
+  readonly elites?: number
   readonly spreadMs?: number
   readonly at?: SpawnAt
-  readonly hpMul?: number
-  readonly drive?: DriveDef
   readonly bounty?: boolean
   readonly escort?: Escort
 }
 
-/** 护卫：count 只 enemy，elite 为真时都是精英 */
+/** 护卫：count 只 enemy，elite 为真时都是精英，stats 是给它们的属性修正 */
 export interface Escort {
   readonly enemy: EnemyKind
   readonly count: number
   readonly elite?: boolean
+  readonly stats?: StatMods
 }
 
-/** 连续刷怪：间隔不写 intervalMs 就按进度与队伍人数算，再乘 intervalMul；每只有 eliteChance 的几率是精英；只在这一阶段开始后 fromMs 到 untilMs 之间刷；场上敌人到 cap 就这一轮不刷 */
-export interface StreamRule {
+/** 连续刷怪：每隔 intervalMs 放一只，ramp 让间隔在 overMs 内匀速变到 toMs；只在这一阶段开始后 fromMs 到 untilMs 之间刷，放满 total 只就停；场上敌人到 cap 就这一轮不刷 */
+export interface StreamRule extends GroupTraits {
   readonly kind: 'stream'
-  readonly intervalMs?: number
-  readonly intervalMul?: number
-  readonly eliteChance?: number
+  readonly intervalMs: number
+  readonly ramp?: { readonly toMs: number; readonly overMs: number }
   readonly fromMs?: number
   readonly untilMs?: number
+  readonly total?: number
   readonly cap?: number
   readonly at?: SpawnAt
 }
-/** 这一阶段开始 atMs 后打出横幅，放出一队 */
+
+/** 这一阶段开始 atMs 后打出横幅，放出一队；写了 every 就每隔 every 再放一队，一共 times 队，不写 times 就一直放到这一阶段结束，横幅只在第一队打 */
 export interface BatchRule {
   readonly kind: 'batch'
   readonly atMs: number
   readonly squad: Squad
   readonly banner?: Banner
+  readonly every?: number
+  readonly times?: number
 }
+
 /** 一组一组来：第一组在这一阶段开始 atMs 后，之后每次场上清空再隔 gapMs 来下一组 */
 export interface WavesRule {
   readonly kind: 'waves'
@@ -74,7 +100,25 @@ export interface WavesRule {
   readonly gapMs: number
   readonly squads: readonly (Squad & { readonly banner?: Banner })[]
 }
-/** 这一阶段开始 atMs 后这张图的头目登场；别的头目按一队敌人指定 */
+
+export type SpawnRule = StreamRule | BatchRule | WavesRule
+
+/** 旧写法的一队敌人：hpMul 乘在这一队和护卫的血量上 */
+export interface LegacySquad extends Squad {
+  readonly hpMul?: number
+}
+/** 旧写法的连续刷怪：不写间隔就按难度时钟与队伍人数算，再乘 intervalMul */
+export interface LegacyStreamRule extends Omit<StreamRule, 'intervalMs'> {
+  readonly intervalMs?: number
+  readonly intervalMul?: number
+}
+export interface LegacyBatchRule extends Omit<BatchRule, 'squad'> {
+  readonly squad: LegacySquad
+}
+export interface LegacyWavesRule extends Omit<WavesRule, 'squads'> {
+  readonly squads: readonly (LegacySquad & { readonly banner?: Banner })[]
+}
+/** 这一阶段开始 atMs 后这张图的头目登场 */
 export interface BossRule {
   readonly kind: 'boss'
   readonly atMs: number
@@ -91,7 +135,7 @@ export interface CarrierRule {
 export interface KnobRule {
   readonly kind: 'knobs'
 }
-export type SpawnRule = StreamRule | BatchRule | WavesRule | BossRule | CarrierRule | KnobRule
+export type LegacySpawnRule = LegacyStreamRule | LegacyBatchRule | LegacyWavesRule | BossRule | CarrierRule | KnobRule
 
 /** 据点的一处：地图中心起偏 dx、dy 格 */
 export interface HoldPoint {
@@ -101,14 +145,15 @@ export interface HoldPoint {
 
 /**
  * 一个阶段的结束规则，时刻与进度都从这一阶段开始时算，全灭永远是输。
- * 达成：time 撑到时间，boss 头目倒下，cleared 定时与成组的敌人都放完、连续刷怪也停了、场上一个不剩，kills 击杀到数，bounty 悬赏目标都倒下，hold 队长在据点圈里累计站满 ms、圈按 points 依次换位置、每处分到一样长，coins 捡到的金币到数。
+ * 达成：time 撑到时间，boss 头目倒下，bossHp 场上的头目血量降到上限的 below 以下，cleared 定时与成组的敌人都放完、连续刷怪也停了、场上一个不剩，kills 击杀到数（写了 enemy 只数这一种），bounty 悬赏目标都倒下，hold 队长在据点圈里累计站满 ms、圈按 points 依次换位置、每处分到一样长，coins 捡到的金币到数。
  * 失败：time 带 lose 时到点就输，downs 队员累计倒下到数就输。
  */
 export type EndRule =
   | { readonly kind: 'time'; readonly ms: number; readonly lose?: boolean }
   | { readonly kind: 'boss' }
+  | { readonly kind: 'bossHp'; readonly below: number }
   | { readonly kind: 'cleared' }
-  | { readonly kind: 'kills'; readonly count: number }
+  | { readonly kind: 'kills'; readonly count: number; readonly enemy?: EnemyKind }
   | { readonly kind: 'bounty' }
   | { readonly kind: 'hold'; readonly ms: number; readonly radius: number; readonly points: readonly HoldPoint[] }
   | { readonly kind: 'coins'; readonly count: number }
@@ -140,14 +185,13 @@ export interface ShopRules {
   readonly reroll?: boolean
 }
 
-/** 一局里我方的规则：每一场的规则之外，lives 是全队共享的起来次数（自己起来、被扶起来、被技能救起来都算一次），between 是场与场之间怎么恢复，recruit 只许招募同时带着这些标签的角色，shop 是商店规则，maxLevel 是队员的等级上限；teamLevel 为真时队员不靠买道具升级，而是击杀攒全队经验，每升一级掉一个升级道具，队长捡起来招一名新队员或给一名队员升一级；mods 在商店里也算 */
+/** 一局里我方的规则：每一场的规则之外，lives 是全队共享的起来次数（自己起来、被扶起来、被技能救起来都算一次），between 是场与场之间怎么恢复，recruit 只许招募同时带着这些标签的角色，shop 是商店规则，maxLevel 是队员的等级上限；mods 在商店里也算 */
 export interface RunRules extends FightRules {
   readonly lives?: number
   readonly between?: Between
   readonly recruit?: { readonly tags: readonly CharacterTag[] }
   readonly shop?: ShopRules
   readonly maxLevel?: number
-  readonly teamLevel?: boolean
 }
 
 /** 星级条件，赢下一局时按整局评定：downs 队员倒下不超过 count 次，time 战斗用时不超过 ms，switches 手动换队长不超过 count 次，skills 放主动技能不超过 count 次，kills 击杀至少 count，lives 剩下至少 count 次起来的机会 */
@@ -184,19 +228,24 @@ export interface FightReward {
   readonly heal?: boolean
 }
 
-/** 一个阶段：刷什么怪、达成什么目标；intro 是这一阶段开始时的横幅，mix 换掉配比，不写时第一个阶段按地图、后面的阶段沿用这一场写的 */
+/** 一个阶段：intro 是开始时的横幅，mix 是没指定敌人的那批按的配比，spawns 刷什么怪，ends 怎么结束；need 为 all 时达成条件要全部达成，不写达成一条就算 */
 export interface PhaseDef {
   readonly intro?: Banner
   readonly mix?: readonly MixEntry[]
   readonly spawns: readonly SpawnRule[]
   readonly ends: readonly EndRule[]
+  readonly need?: 'all'
 }
 
-/** 一场战斗：它自己是第一个阶段，then 里的阶段在前一个达成后不停顿地接上，场上的敌人留着，最后一个阶段达成才算这一场赢；map 让这一场换到这张地图上打，不写就在一局的地图上；enemyMods 是这一场给敌人的常驻修正，chaseLeader 让追人的敌人都盯着队长，rules 是我方在这一场的规则，reward 是过关奖励，clockSec 让这一场从难度时钟的这一秒开打（敌人的血量、刷怪间隔与掉币率都从这一秒往后算），不写就接着一局累计打过的时长；不写名字就只显示用时 */
-export interface FightDef extends PhaseDef {
+/** 旧写法的阶段：刷怪规则多几种，没指定敌人又没有配比的按地图与波数抽 */
+export interface LegacyPhaseDef extends Omit<PhaseDef, 'spawns'> {
+  readonly spawns: readonly LegacySpawnRule[]
+}
+
+/** 一场的设定，各阶段共用：map 是在哪张地图上打，enemyMods 是给这一场敌人的常驻修正，chaseLeader 让追人的敌人都盯着队长，rules 是我方在这一场的规则，reward 是过关奖励，clockSec 是开打时难度时钟走到的秒数（敌人的血量、刷怪间隔与掉币率都从这一秒往后算） */
+interface FightBase {
   readonly name?: string
   readonly map?: MapId
-  readonly then?: readonly PhaseDef[]
   readonly enemyMods?: StatMods
   readonly chaseLeader?: boolean
   readonly rules?: FightRules
@@ -204,8 +253,31 @@ export interface FightDef extends PhaseDef {
   readonly clockSec?: number
 }
 
-/** 一步：招募到 upTo 人、进商店、打一场 */
-export type StepDef = { readonly kind: 'recruit'; readonly upTo: number } | { readonly kind: 'shop' } | { readonly kind: 'fight'; readonly fight: FightDef }
+/** 一场战斗：phases 按先后不停顿地接上，场上的敌人留着，最后一个阶段达成才算这一场赢 */
+export interface StageDef extends FightBase {
+  readonly name: string
+  readonly map: MapId
+  readonly clockSec: number
+  readonly phases: readonly PhaseDef[]
+}
+
+/** 旧写法的一场：它自己就是唯一的阶段；不写地图就在一局的地图上，不写难度时钟就接着一局累计打过的时长，不写名字就只显示用时 */
+export interface LegacyFightDef extends FightBase, LegacyPhaseDef {
+  readonly phases?: undefined
+}
+
+export type FightDef = StageDef | LegacyFightDef
+
+/** 一步：招募到 upTo 人；进商店，物价与稀有度按第 tier 波算，不写就按一局走到的波数；打一场 */
+export type StepDef = { readonly kind: 'recruit'; readonly upTo: number } | { readonly kind: 'shop'; readonly tier?: number } | { readonly kind: 'fight'; readonly fight: FightDef }
+
+/** 全队升级时能选的一项：招一名新队员，给一名队员升一级 */
+export type LevelPick = 'recruit' | 'upgrade'
+
+/** 全队升级：队员不靠买道具升级，而是击杀攒全队经验、按这条曲线升级，每升一级掉一个升级道具，队长捡起来从 picks 里选一项，不写两样都能选 */
+export interface TeamLevelDef extends XpCurve {
+  readonly picks?: readonly LevelPick[]
+}
 
 /** 预设队伍的一个位置：指定角色，或从同时带着这些标签的角色里随机一名 */
 export type TeamSlot = CharacterId | { readonly tags: readonly CharacterTag[] }
@@ -218,7 +290,7 @@ export interface TeamDef {
 
 /**
  * 一局的玩法：按顺序走完这些步骤就赢，全灭就输。
- * map 固定地图，不写由玩家选；team 为 knobs 时队伍由试炼场的旋钮给出，是 TeamDef 时开局就按它组队，不写就靠招募步骤组建；rules 是我方这一局的规则；start 是开局的进度，波数定配比、物价与稀有度，秒数定敌人的血量与刷怪间隔；record 为真时结算记最高分；note 写这一关在试什么；stars 是赢下后再各得一星的两条条件。
+ * map 固定地图，不写由玩家选；team 为 knobs 时队伍由试炼场的旋钮给出，是 TeamDef 时开局就按它组队，不写就靠招募步骤组建；rules 是我方这一局的规则；teamLevel 让队员靠全队升级成长；start 是开局的进度，波数定配比、物价与稀有度，秒数定敌人的血量与刷怪间隔；record 为真时结算记最高分；note 写这一关在试什么；stars 是赢下后再各得一星的两条条件。
  */
 export interface RunDef {
   readonly emoji: string
@@ -228,6 +300,7 @@ export interface RunDef {
   readonly map?: MapId
   readonly team?: 'knobs' | TeamDef
   readonly rules?: RunRules
+  readonly teamLevel?: TeamLevelDef
   readonly start?: { readonly wave: number; readonly sec: number }
   readonly coins?: number
   readonly record?: boolean

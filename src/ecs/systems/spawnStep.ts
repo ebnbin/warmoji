@@ -1,7 +1,7 @@
 import { playSfx } from '../../audio/sfx'
 import { attachCarrierRing } from '../entities/pickup'
 import { markBounty, spawnEnemy } from '../entities/enemy'
-import { enemyCarries, telegraphCarries, telegraphDef } from '../store'
+import { enemyCarries, telegraphDef, telegraphTraits } from '../store'
 import { Bounty, Due, Telegraph, Transform } from '../components'
 import { hasComponent, query, removeEntity } from 'bitecs'
 import { runStream, runWaves } from '../fight/spawns'
@@ -15,15 +15,16 @@ export function spawnStep(sim: Sim): void {
   for (const e of [...query(sim.world, [Telegraph, Due])]) {
     if (now < Due.at[e]!) continue
     const boss = Telegraph.boss[e] === 1
+    const traits = telegraphTraits[e] ?? {}
     const eid = spawnEnemy(sim, atlas, telegraphDef[e]!, Transform.x[e]!, Transform.y[e]!,
-      Telegraph.hp[e]!, Telegraph.elite[e] === 1, boss)
+      Telegraph.hp[e]!, Telegraph.elite[e] === 1, boss, traits)
     if (Telegraph.loud[e]) playSfx('boom')
-    const carries = telegraphCarries[e]
-    if (carries) {
-      enemyCarries[eid] = carries
-      attachCarrierRing(sim, eid, carries)
+    if (traits.carries) {
+      enemyCarries[eid] = traits.carries
+      attachCarrierRing(sim, eid, traits.carries)
     }
     if (hasComponent(sim.world, e, Bounty)) markBounty(sim, eid)
+    telegraphTraits[e] = undefined
     removeEntity(sim.world, e)
   }
   const f = sim.fight

@@ -3,12 +3,21 @@ import { newEntity } from './entity'
 import { UNIT } from '../../util/units'
 import { SPAWN } from '../../data/enemies'
 import { Due, Telegraph } from '../components'
-import { telegraphCarries, telegraphDef } from '../store'
+import { telegraphDef, telegraphTraits } from '../store'
 import { attachDrawable } from './drawable'
 import type { EnemyDef } from '../../types/enemies'
 import type { FieldPickupDef } from '../../types/battlefield'
+import type { Loot } from '../../types/runs'
+import type { StatMods } from '../../types/stats'
 import type { Sim } from '../sim'
 
+/** 敌人现身时带上的：这一批的属性修正、盯着队长、战利品倍率、身上带的战场效果 */
+export interface SpawnTraits {
+  readonly stats?: StatMods
+  readonly huntLeader?: boolean
+  readonly loot?: Loot
+  readonly carries?: FieldPickupDef
+}
 
 const MARK_Z = 4
 
@@ -20,7 +29,7 @@ export function spawnTelegraph(
   hp: number,
   elite: boolean,
   boss: boolean,
-  carries?: FieldPickupDef,
+  traits: SpawnTraits = {},
   delayMs = SPAWN.telegraphMs,
 ): number {
   const eid = newEntity(sim.world)
@@ -31,7 +40,7 @@ export function spawnTelegraph(
   Telegraph.bornMs[eid] = sim.elapsedMs
   Due.at[eid] = sim.elapsedMs + (sim.fight.rules.surprise && !boss ? 0 : delayMs)
   telegraphDef[eid] = def
-  telegraphCarries[eid] = carries
+  telegraphTraits[eid] = traits
   attachDrawable(sim.world, eid, sim.frames, {
     id: SPAWN.markEmoji,
     outline: undefined,

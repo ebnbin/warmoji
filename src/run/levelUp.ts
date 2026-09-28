@@ -1,7 +1,8 @@
 import { TEAM } from '../data/characters'
 import type { CharacterId } from '../types/characters'
+import type { LevelPick } from '../types/runs'
 import { levelCap, memberLevel, teamLeveled } from './members'
-import { addMember, recruitCandidates } from './state'
+import { addMember, recruitCandidates, runDef } from './state'
 import type { RunState } from './state'
 
 /** 一次全队升级能选的一项：招一名新队员，或给一名队员升一级 */
@@ -12,10 +13,14 @@ export function pendingLevelUps(run: RunState): number {
   return teamLeveled(run) ? run.xp.level - 1 - run.claimed : 0
 }
 
-/** 这一次升级能选的：队伍没满又有人可招就能招人，回得来又没到等级上限的队员都能升一级 */
+const ALL_PICKS: readonly LevelPick[] = ['recruit', 'upgrade']
+
+/** 这一次升级能选的，只在这一局许选的几样里：队伍没满又有人可招就能招人，回得来又没到等级上限的队员都能升一级 */
 export function levelUpOptions(run: RunState): LevelUpOption[] {
+  const picks = runDef(run).teamLevel?.picks ?? ALL_PICKS
   const out: LevelUpOption[] = []
-  if (run.roster.length < TEAM.maxSize && recruitCandidates(run).length > 0) out.push({ kind: 'recruit' })
+  if (picks.includes('recruit') && run.roster.length < TEAM.maxSize && recruitCandidates(run).length > 0) out.push({ kind: 'recruit' })
+  if (!picks.includes('upgrade')) return out
   run.roster.forEach((_, slot) => {
     if (!run.fallen[slot] && memberLevel(run, slot) < levelCap(run)) out.push({ kind: 'upgrade', slot })
   })

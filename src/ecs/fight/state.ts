@@ -3,16 +3,17 @@ import { ENEMIES } from '../../data/enemies'
 import { phasesOf, timeLimitMs } from '../../data/runs'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
-import type { EnemyDef, EnemyMixEntry } from '../../types/enemies'
-import type { CarrierRule, EndRule, FightDef, HoldPoint, PhaseDef, SpawnAt, Squad, StreamRule, WavesRule } from '../../types/runs'
+import type { Polarity } from '../../types/battlefield'
+import type { EnemyDef, EnemyKind, EnemyMixEntry } from '../../types/enemies'
+import type { BossRule, CarrierRule, EndRule, FightDef, GroupTraits, HoldPoint, LegacyBatchRule, LegacyPhaseDef, LegacySquad, LegacyStreamRule, LegacyWavesRule, Loot, MixEntry, SpawnAt } from '../../types/runs'
 import type { StatMods } from '../../types/stats'
 import { activeRules, enemyModsOf, mutatorRules } from '../../run/rules'
 import type { ActiveRules } from '../../run/rules'
 import { runDef } from '../../run/state'
 import type { RunState } from '../../run/state'
-import { Bounty, Call, Carrier, Due, ENEMY_SET, FACTION, Faction, Order, Telegraph, Transform } from '../components'
+import { Boss, Bounty, Call, Carrier, Due, Enemy, ENEMY_SET, FACTION, Faction, Hp, Order, Telegraph, Transform } from '../components'
 import { scheduleCall, scheduleCarrier } from '../entities/schedule'
-import { callRule, carrierPickup, foeSpec } from '../store'
+import { callSpec, carrierPickup, foeSpec } from '../store'
 import { sandboxTeamMods } from '../sandbox/knobs'
 import { rollCarriers } from '../utils/battleFx'
 import { leaderX, leaderY } from '../utils/team'
@@ -23,28 +24,60 @@ const FIRST_SPAWN_MS = 300
 /** 获胜条件满足后等倒下的敌人倒完再收尾 */
 const SETTLE_MS = 700
 
-/** 一只敌人的要求：hpMul 乘在种类的血量上；elite 为真必是精英，否则有 chance 的几率；enemy 指定种类（已换好走法），不写按配比抽；at 是站位，index、count 与 phase 是它在一队里的次序与这一队围圈的起始角；bounty 为真是悬赏目标 */
+/** 一只敌人的要求：hpMul 乘在种类的血量上；elite 为真必是精英，否则有 chance 的几率；enemy 指定种类（已换好走法），不写就按 mix 抽，再不写按这一阶段的配比；at 是站位，index、count 与 phase 是它在一队里的次序与这一队围圈的起始角；bounty 为真是悬赏目标；stats、huntLeader、loot 与 carry 是这一批敌人的特征 */
 export interface FoeSpec {
   readonly hpMul: number
   readonly elite?: boolean
   readonly chance?: number
   readonly enemy?: EnemyDef
+  readonly mix?: readonly EnemyMixEntry[]
   readonly at?: SpawnAt
   readonly index?: number
   readonly count?: number
   readonly phase?: number
   readonly bounty?: boolean
+  readonly stats?: StatMods
+  readonly huntLeader?: boolean
+  readonly loot?: Loot
+  readonly carry?: Polarity
 }
 
-/** 一条连续刷怪与它的冷却 */
+/** 到时登场的一队敌人或头目；round 是一再放出的一队这是第几次，从 0 算 */
+export interface CallSpec {
+  readonly rule: LegacyBatchRule | BossRule
+  readonly round: number
+}
+
+/** 配比换成敌人的定义 */
+function mixOf(rows: readonly MixEntry[]): EnemyMixEntry[] {
+  return rows.map((m) => ({ def: ENEMIES[m.kind], weight: m.weight }))
+}
+
+/** 一批敌人的特征折成每只的要求：指定的种类换好走法，配比换成定义 */
+export function foeOf(t: GroupTraits): Omit<FoeSpec, 'hpMul'> {
+  const raw = t.enemy ? ENEMIES[t.enemy] : undefined
+  return {
+    enemy: raw && t.drive ? { ...raw, drive: t.drive } : raw,
+    mix: t.mix ? mixOf(t.mix) : undefined,
+    chance: t.eliteChance,
+    stats: t.stats,
+    huntLeader: t.huntLeader,
+    loot: t.loot,
+    carry: t.carry,
+  }
+}
+
+/** 一条连续刷怪：冷却、已经放出几只，与折好的每只的要求 */
 export interface StreamState {
-  readonly rule: StreamRule
+  readonly rule: LegacyStreamRule
+  readonly foe: Omit<FoeSpec, 'hpMul'>
   cooldownMs: number
+  spawned: number
 }
 
 /** 一组一组来的进度：下一组的序号，场上清空的时刻（-1 是还没清空） */
 export interface WavesState {
-  readonly rule: WavesRule
+  readonly rule: LegacyWavesRule
   next: number
   calmAt: number
 }
@@ -75,12 +108,10 @@ export interface FightState {
   /** 这一阶段的配比；不写就按地图 */
   mix: EnemyMixEntry[] | null
   hold: HoldState | null
-  /** 这一阶段开始时的击杀、金币与倒下次数，进度从这里算 */
-  base: { kills: number; coins: number; downs: number }
+  /** 这一阶段开始时的击杀、各种敌人的击杀、金币与倒下次数，进度从这里算 */
+  base: PhaseBase
   /** 放出过几个悬赏目标 */
   bounties: number
-  /** 头目倒下的时刻，-1 是还没 */
-  bossDownAt: number
   /** 别的获胜条件满足的时刻，-1 是还没 */
   wonAt: number
   /** 当过队长的有人倒下了 */
@@ -91,26 +122,36 @@ export interface FightState {
   readonly rescueMs: number[]
 }
 
+/** 阶段开始时的计数 */
+interface PhaseBase {
+  readonly kills: number
+  readonly enemyKills: Partial<Record<EnemyKind, number>>
+  readonly coins: number
+  readonly downs: number
+}
+
 function downsOf(run: RunState): number {
   return run.stats.deaths.reduce((s, n) => s + n, 0)
 }
 
+function baseOf(run: RunState): PhaseBase {
+  return { kills: run.kills, enemyKills: { ...run.stats.enemyKills }, coins: run.coins, downs: downsOf(run) }
+}
+
 /** 阶段自己的状态：刷怪、配比与据点换成这一阶段的，进度从 at 这一刻、run 此刻的计数算起 */
-function phaseState(def: FightDef, phase: number, run: RunState, at: number): Pick<FightState, 'phase' | 'phaseAt' | 'streams' | 'waves' | 'knobs' | 'mix' | 'hold' | 'base' | 'bounties' | 'bossDownAt' | 'wonAt'> {
+function phaseState(def: FightDef, phase: number, run: RunState, at: number): Pick<FightState, 'phase' | 'phaseAt' | 'streams' | 'waves' | 'knobs' | 'mix' | 'hold' | 'base' | 'bounties' | 'wonAt'> {
   const p = phasesOf(def)[phase]!
   const hold = p.ends.find((e) => e.kind === 'hold')
-  const mix = p.mix ?? def.mix
   return {
     phase,
     phaseAt: at,
-    streams: p.spawns.flatMap((rule) => (rule.kind === 'stream' ? [{ rule, cooldownMs: FIRST_SPAWN_MS }] : [])),
+    streams: p.spawns.flatMap((rule) => (rule.kind === 'stream' ? [{ rule, foe: foeOf(rule), cooldownMs: FIRST_SPAWN_MS, spawned: 0 }] : [])),
     waves: p.spawns.flatMap((rule) => (rule.kind === 'waves' ? [{ rule, next: 0, calmAt: -1 }] : [])),
     knobs: p.spawns.some((rule) => rule.kind === 'knobs') ? { cooldownMs: FIRST_SPAWN_MS } : null,
-    mix: mix ? mix.map((m) => ({ def: ENEMIES[m.kind], weight: m.weight })) : null,
+    mix: p.mix ? mixOf(p.mix) : null,
     hold: hold?.kind === 'hold' ? { rule: hold, point: 0, heldMs: 0, inside: false } : null,
-    base: { kills: run.kills, coins: run.coins, downs: downsOf(run) },
+    base: baseOf(run),
     bounties: 0,
-    bossDownAt: -1,
     wonAt: -1,
   }
 }
@@ -128,7 +169,7 @@ export function newFight(def: FightDef, run: RunState): FightState {
 }
 
 /** 当前阶段 */
-export function phaseOf(f: FightState): PhaseDef {
+export function phaseOf(f: FightState): LegacyPhaseDef {
   return phasesOf(f.def)[f.phase]!
 }
 
@@ -163,21 +204,20 @@ export function lastPhase(f: FightState): boolean {
 /** 这一阶段达成，不停顿地接上下一阶段：还没登场的一队、头目与带光圈的敌人不再来，场上的留着 */
 export function nextPhase(sim: Sim): void {
   for (const e of [...query(sim.world, [Due, Call])]) {
-    callRule[e] = undefined
+    callSpec[e] = undefined
     removeEntity(sim.world, e)
   }
   for (const e of [...query(sim.world, [Due, Carrier])]) {
     carrierPickup[e] = undefined
     removeEntity(sim.world, e)
   }
-  sim.bossDown = false
   Object.assign(sim.fight, phaseState(sim.fight.def, sim.fight.phase + 1, sim.run, sim.elapsedMs))
   startPhase(sim)
 }
 
 /** 这一阶段的收获从此刻起算：开波的道具规则可能已经进账 */
 export function markFightBase(sim: Sim): void {
-  sim.fight.base = { kills: sim.run.kills, coins: sim.run.coins, downs: downsOf(sim.run) }
+  sim.fight.base = baseOf(sim.run)
 }
 
 /** 这一场给一方身体的常驻修正：我方规则写的，加上试炼场的攻速旋钮给队伍；敌人的写在这一场上，都算上词缀 */
@@ -215,19 +255,19 @@ function onField(sim: Sim): number {
 }
 
 /** 一队连同护卫一共几只 */
-export function squadSize(squad: Squad): number {
+export function squadSize(squad: LegacySquad): number {
   return squad.count + (squad.escort?.count ?? 0)
 }
 
-/** 还没放出的敌人：排着的单只、没登场的一队、没来的组；只数悬赏目标时护卫不算 */
+/** 还没放出的敌人：排着的单只、没登场的一队连同它还要再放的几次、没来的组；只数悬赏目标时护卫不算，一直放下去的一队只算下一次 */
 function pendingCount(sim: Sim, bountyOnly: boolean): number {
   let n = 0
-  const size = (sq: Squad): number => (bountyOnly ? (sq.bounty ? sq.count : 0) : squadSize(sq))
+  const size = (sq: LegacySquad): number => (bountyOnly ? (sq.bounty ? sq.count : 0) : squadSize(sq))
   for (const e of query(sim.world, [Due, Order])) if (!bountyOnly || foeSpec[e]?.bounty) n++
   for (const e of query(sim.world, [Due, Call])) {
-    const r = callRule[e]
-    if (r?.kind === 'batch') n += size(r.squad)
-    if (r?.kind === 'boss' && !bountyOnly) n++
+    const c = callSpec[e]
+    if (c?.rule.kind === 'batch') n += size(c.rule.squad) * (c.rule.every === undefined || c.rule.times === undefined ? 1 : c.rule.times - c.round)
+    if (c?.rule.kind === 'boss' && !bountyOnly) n++
   }
   for (const w of sim.fight.waves) for (const sq of w.rule.squads.slice(w.next)) n += size(sq)
   return n
@@ -243,10 +283,44 @@ export function calm(sim: Sim): boolean {
   return onField(sim) === 0 && query(sim.world, [Due, Order]).length === 0
 }
 
-/** 连续刷怪还在刷 */
+/** 连续刷怪还在刷：没过它的时段、也没放满 */
 function streaming(sim: Sim): boolean {
   const f = sim.fight
-  return f.knobs !== null || f.streams.some((st) => st.rule.untilMs === undefined || phaseMs(sim) < st.rule.untilMs)
+  return f.knobs !== null || f.streams.some((st) => phaseMs(sim) < (st.rule.untilMs ?? Infinity) && st.spawned < (st.rule.total ?? Infinity))
+}
+
+/** 场上活着的头目 */
+function livingBosses(sim: Sim): number[] {
+  return [...query(sim.world, [Enemy, Boss])].filter((eid) => Boss.v[eid] === 1 && Faction.v[eid] === FACTION.enemy)
+}
+
+/** 场上活着的与还没放出的头目 */
+function bossesLeft(sim: Sim): number {
+  let n = livingBosses(sim).length
+  for (const t of query(sim.world, [Telegraph])) if (Telegraph.boss[t]) n++
+  for (const e of query(sim.world, [Due, Order])) if (foeSpec[e]?.enemy?.role === 'boss') n++
+  for (const e of query(sim.world, [Due, Call])) {
+    const r = callSpec[e]?.rule
+    if (r?.kind === 'boss' || (r?.squad.enemy !== undefined && ENEMIES[r.squad.enemy].role === 'boss')) n++
+  }
+  return n
+}
+
+/** 头目都打倒了：这一场倒下过头目，眼下也没有活着或还没放出的 */
+function bossesBeaten(sim: Sim): boolean {
+  return sim.bossDown && bossesLeft(sim) === 0
+}
+
+/** 场上有头目的血量降到上限的 below 以下 */
+function bossBelow(sim: Sim, below: number): boolean {
+  return livingBosses(sim).some((eid) => Hp.v[eid]! < Hp.max[eid]! * below)
+}
+
+/** 这一阶段里击杀了几只：写了种类就只数这一种 */
+function killsOf(sim: Sim, enemy: EnemyKind | undefined): number {
+  const f = sim.fight
+  if (enemy === undefined) return sim.run.kills - f.base.kills
+  return (sim.run.stats.enemyKills[enemy] ?? 0) - (f.base.enemyKills[enemy] ?? 0)
 }
 
 /** 还活着或还没放出的悬赏目标 */
@@ -254,13 +328,18 @@ function bountiesLeft(sim: Sim): number {
   return query(sim.world, [Bounty]).length + pendingCount(sim, true)
 }
 
+/** 一条达成条件眼下满足了：头目在更早的阶段就已打倒也算 */
 function won(sim: Sim, e: EndRule): boolean {
   const f = sim.fight
   switch (e.kind) {
+    case 'boss':
+      return bossesBeaten(sim)
+    case 'bossHp':
+      return bossBelow(sim, e.below) || bossesBeaten(sim)
     case 'cleared':
       return !streaming(sim) && foesLeft(sim) === 0
     case 'kills':
-      return sim.run.kills - f.base.kills >= e.count
+      return killsOf(sim, e.enemy) >= e.count
     case 'bounty':
       return f.bounties > 0 && bountiesLeft(sim) === 0
     case 'hold':
@@ -268,41 +347,42 @@ function won(sim: Sim, e: EndRule): boolean {
     case 'coins':
       return sim.run.coins - f.base.coins >= e.count
     case 'time':
-    case 'boss':
     case 'downs':
       return false
   }
+}
+
+/** 这一阶段的目标达成了：时限之外的达成条件，要全部达成的全都满足，否则满足一条就算 */
+function goalsMet(sim: Sim, p: LegacyPhaseDef): boolean {
+  const wins = p.ends.filter((e) => e.kind !== 'time' && e.kind !== 'downs')
+  return p.need === 'all' ? wins.length > 0 && wins.every((e) => won(sim, e)) : wins.some((e) => won(sim, e))
 }
 
 export type Verdict = { readonly win: true } | { readonly win: false; readonly reason: string }
 
 const WIN: Verdict = { win: true }
 
-/** 这一场的结果，还没分出来是 null：队长倒下就输的队长倒了、倒下到数，立刻输；撑到时限时已经达成目标或时限不算输就算达成；不是最后一个阶段的达成了就立刻接上下一阶段，最后一个阶段达成就赢，头目倒下与别的目标等敌人倒完 */
+/** 这一场的结果，还没分出来是 null：队长倒下就输的队长倒了、倒下到数，立刻输；撑到时限时已经达成目标或时限不算输就算达成；不是最后一个阶段的达成了就立刻接上下一阶段，最后一个阶段达成就赢，等倒下的敌人倒完 */
 export function fightVerdict(sim: Sim, timeUp: boolean): Verdict | null {
   const f = sim.fight
   if (f.rules.critical && f.leaderFell) return { win: false, reason: '队长倒下了' }
-  const ends = phaseOf(f).ends
-  for (const e of ends) {
+  const p = phaseOf(f)
+  for (const e of p.ends) {
     if (e.kind === 'downs' && downsOf(sim.run) - f.base.downs >= e.count) return { win: false, reason: `队员倒下了 ${e.count} 次` }
   }
-  if (ends.some((e) => e.kind === 'boss') && sim.bossDown) {
-    sim.bossDown = false
-    f.bossDownAt = sim.fxMs
-  }
-  if (ends.some((e) => won(sim, e))) {
+  const met = goalsMet(sim, p)
+  if (met) {
     if (f.wonAt < 0) f.wonAt = sim.fxMs
   } else {
     f.wonAt = -1
   }
-  if (timeUp && ends.some((e) => e.kind === 'time' && e.lose) && f.wonAt < 0 && f.bossDownAt < 0) return { win: false, reason: '时间到了' }
+  if (timeUp && p.ends.some((e) => e.kind === 'time' && e.lose) && !met) return { win: false, reason: '时间到了' }
   if (!lastPhase(f)) {
-    if (timeUp || f.wonAt >= 0 || f.bossDownAt >= 0) nextPhase(sim)
+    if (timeUp || met) nextPhase(sim)
     return null
   }
   if (timeUp) return WIN
-  if (f.bossDownAt >= 0 && sim.fxMs - f.bossDownAt >= SETTLE_MS) return WIN
-  return f.wonAt >= 0 && sim.fxMs - f.wonAt >= SETTLE_MS ? WIN : null
+  return met && sim.fxMs - f.wonAt >= SETTLE_MS ? WIN : null
 }
 
 /** 顶部显示的这一阶段目标：warn 为真的是提醒会输的 */
@@ -317,7 +397,10 @@ export function fightGoals(sim: Sim): { readonly text: string; readonly warn: bo
         break
       }
       case 'kills':
-        out.push({ text: `击杀 ${Math.min(e.count, sim.run.kills - f.base.kills)}/${e.count}`, warn: false })
+        out.push({ text: `击杀${e.enemy ? ENEMIES[e.enemy].name : ''} ${Math.min(e.count, killsOf(sim, e.enemy))}/${e.count}`, warn: false })
+        break
+      case 'bossHp':
+        out.push({ text: `把头目打到 ${Math.round(e.below * 100)}% 血`, warn: false })
         break
       case 'bounty': {
         const left = bountiesLeft(sim)
