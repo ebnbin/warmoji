@@ -26,11 +26,16 @@ export function fightUnit(def: RunDef): string {
   return def.record ? '波' : '场'
 }
 
-/** 怎么算赢；只管输的规则是 null */
-function winText(e: EndRule): string | null {
+/** 失败条件：到点就输的时限，倒下的次数 */
+function isLose(e: EndRule): boolean {
+  return (e.kind === 'time' && e.lose === true) || e.kind === 'downs'
+}
+
+/** 一条结束规则的说法：达成条件说怎么算赢，失败条件说怎么算输 */
+export function endText(e: EndRule): string {
   switch (e.kind) {
     case 'time':
-      return e.lose ? null : `撑过 ${sec(e.ms)}`
+      return e.lose ? `限时 ${sec(e.ms)}` : `撑过 ${sec(e.ms)}`
     case 'boss':
       return '打倒头目'
     case 'bossHp':
@@ -46,7 +51,7 @@ function winText(e: EndRule): string | null {
     case 'coins':
       return `捡到 ${e.count} 金币`
     case 'downs':
-      return null
+      return e.count === 1 ? '有人倒下就输' : `累计倒下 ${e.count} 次就输`
   }
 }
 
@@ -58,15 +63,8 @@ export function rewardText(r: FightReward | undefined): string | null {
 
 /** 一个阶段怎么达成、怎么输；重复里只在某几轮才有的注明轮次 */
 function phaseGoalText(p: { readonly ends: readonly Gated<EndRule>[]; readonly need?: 'all' }): string {
-  const wins = p.ends.flatMap((e) => {
-    const win = winText(e)
-    return win === null ? [] : [gatedText(win, e.rounds)]
-  })
-  const lose: string[] = []
-  for (const e of p.ends) {
-    if (e.kind === 'time' && e.lose) lose.push(gatedText(`限时 ${sec(e.ms)}`, e.rounds))
-    if (e.kind === 'downs') lose.push(gatedText(e.count === 1 ? '有人倒下就输' : `累计倒下 ${e.count} 次就输`, e.rounds))
-  }
+  const wins = p.ends.flatMap((e) => (isLose(e) ? [] : [gatedText(endText(e), e.rounds)]))
+  const lose = p.ends.flatMap((e) => (isLose(e) ? [gatedText(endText(e), e.rounds)] : []))
   return [wins.length === 0 ? '不会结束' : wins.join(p.need === 'all' ? '，并且' : '，或'), ...lose].join(' · ')
 }
 

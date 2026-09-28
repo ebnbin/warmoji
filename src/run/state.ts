@@ -9,6 +9,7 @@ import type { EnemyKind } from '../types/enemies'
 import type { FightDef, MutatorId, RunDef, RunId, StepDef, TeamSlot } from '../types/runs'
 import { MAP_IDS } from '../data/maps'
 import type { XpState } from '../types/xp'
+import type { SceneKey } from '../scene/keys'
 import { sandboxTeam } from '../ecs/sandbox/knobs'
 
 /** 无敌时的生命上限 */
@@ -16,7 +17,11 @@ export const INVINCIBLE_HP = 10_000_000
 
 export interface RunState {
   /** 这一局的玩法 */
-  runId: RunId
+  def: RunDef
+  /** 内置关卡的 id，记成绩要用；按一份关卡数据开的局没有 */
+  runId?: RunId
+  /** 离开这一局时回到的页面；不写就按各个出口原本去的地方 */
+  origin?: SceneKey
   /** 走到第几步 */
   step: number
   /** 这一场或接下来那一场在哪张地图上打 */
@@ -90,12 +95,28 @@ function pickTeam(slots: readonly TeamSlot[]): CharacterId[] {
   return out
 }
 
-/** 开一局：地图固定的不看玩家选的；玩法给了队伍就按它组队、满血开局，否则由招募步骤补上；给了开局进度就从那里起；带上自选的词缀 */
+/** 开一局内置关卡，带上玩家选的地图与自选的词缀 */
 export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!, mutators: readonly MutatorId[] = []): RunState {
-  const def = RUNS[id]
-  const home = def.map ?? mapId
+  return openRun(RUNS[id], { runId: id, mapId, mutators })
+}
+
+/** 按一份关卡数据开一局，离开时回到 origin */
+export function beginCustomRun(def: RunDef, origin: SceneKey): RunState {
+  return openRun(def, { origin })
+}
+
+/** 按同样的玩法、地图、词缀与来处再开一局 */
+export function restartRun(run: RunState): RunState {
+  return openRun(run.def, { runId: run.runId, mapId: run.homeMap, mutators: run.mutators, origin: run.origin })
+}
+
+/** 开一局：地图固定的不看选的；玩法给了队伍就按它组队、满血开局，否则由招募步骤补上；给了开局进度就从那里起；带上自选的词缀 */
+function openRun(def: RunDef, opts: { readonly runId?: RunId; readonly mapId?: MapId; readonly mutators?: readonly MutatorId[]; readonly origin?: SceneKey }): RunState {
+  const home = def.map ?? opts.mapId ?? MAP_IDS[0]!
   const run: RunState = {
-    runId: id,
+    def,
+    runId: opts.runId,
+    origin: opts.origin,
     step: 0,
     mapId: home,
     homeMap: home,
@@ -120,7 +141,7 @@ export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!, mutators: readon
     invincible: false,
     lives: def.rules?.lives ?? Infinity,
     fallen: [],
-    mutators: [...mutators],
+    mutators: [...(opts.mutators ?? [])],
     stats: {
       damage: [],
       kills: [],
@@ -167,7 +188,7 @@ export function endRun(): void {
 }
 
 export function runDef(run: RunState): RunDef {
-  return RUNS[run.runId]
+  return run.def
 }
 
 /** 这一局实际打了多久：开局进度给的秒数不算 */

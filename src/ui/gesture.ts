@@ -14,6 +14,8 @@ type GameObject = Phaser.GameObjects.GameObject
 interface SceneGestures {
   /** 本次按下后已拖动过的指针：松手时不再算作点按 */
   readonly dragged: Set<number>
+  /** 被控件接管拖动的指针：滚动区不再跟着它滚，松手后放开 */
+  readonly grabbed: Set<number>
   readonly events: Phaser.Events.EventEmitter
   readonly modals: GameObject[]
   /** 最近一次关掉模态层的帧：同一按键在这一帧里不再触发别的处理 */
@@ -28,9 +30,12 @@ const clips = new WeakMap<GameObject, Rect>()
 function gesturesOf(scene: Phaser.Scene): SceneGestures {
   const known = states.get(scene)
   if (known) return known
-  const state: SceneGestures = { dragged: new Set(), events: new Phaser.Events.EventEmitter(), modals: [], closedAt: -1 }
+  const state: SceneGestures = { dragged: new Set(), grabbed: new Set(), events: new Phaser.Events.EventEmitter(), modals: [], closedAt: -1 }
   states.set(scene, state)
   scene.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => state.dragged.delete(p.id))
+  const release = (p: Phaser.Input.Pointer): void => void state.grabbed.delete(p.id)
+  scene.input.on(Phaser.Input.Events.POINTER_UP, release)
+  scene.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, release)
   scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
     states.delete(scene)
     state.events.destroy()
@@ -47,6 +52,16 @@ export function markDragged(scene: Phaser.Scene, pointer: Phaser.Input.Pointer):
 
 export function wasDragged(scene: Phaser.Scene, pointer: Phaser.Input.Pointer): boolean {
   return gesturesOf(scene).dragged.has(pointer.id)
+}
+
+/** 控件接管这次按压的拖动，直到松手：外面的滚动区不跟着滚，按下处的点按也不再触发 */
+export function grabPointer(scene: Phaser.Scene, pointer: Phaser.Input.Pointer): void {
+  gesturesOf(scene).grabbed.add(pointer.id)
+  markDragged(scene, pointer)
+}
+
+export function isGrabbed(scene: Phaser.Scene, pointer: Phaser.Input.Pointer): boolean {
+  return gesturesOf(scene).grabbed.has(pointer.id)
 }
 
 /** 容器只显示 rect 内的部分：其中的控件在 rect 外既不可见也点不中 */
