@@ -178,7 +178,7 @@ export class LevelUpScene extends Phaser.Scene {
       return
     }
     claimUpgrade(this.run, o.slot)
-    playSfx('levelup')
+    playSfx('upgrade')
     this.close()
   }
 
