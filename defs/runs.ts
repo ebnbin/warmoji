@@ -72,7 +72,8 @@ const EXPEDITION = {
       fight: {
         name: '1-1 林边',
         map: 'forest',
-        intro: { title: '第一章 · 黑森林', sub: '清空林边的三小批敌人' },
+        clockSec: 0,
+        intro: { title: '第一章 · 黑森林', sub: '清空林边的三小批敌人，或撑过 50 秒' },
         mix: [
           { kind: 'zombie', weight: 4 },
           { kind: 'ghost', weight: 1 },
@@ -83,13 +84,13 @@ const EXPEDITION = {
             atMs: 2500,
             gapMs: 2000,
             squads: [
-              { count: 6, enemy: 'zombie', at: { kind: 'far' } },
-              { count: 8, at: { kind: 'point', dx: 8, dy: 2, spread: 2 }, banner: { title: '第二批', sub: '幽灵飘得快，血却薄' } },
-              { count: 12, spreadMs: 2000, at: { kind: 'ring', dist: 7 }, banner: { title: '最后一批', sub: '从四面围上来了' } },
+              { count: 5, enemy: 'zombie', at: { kind: 'far' } },
+              { count: 7, at: { kind: 'point', dx: 8, dy: 2, spread: 2 }, banner: { title: '第二批', sub: '幽灵飘得快，血却薄' } },
+              { count: 9, spreadMs: 3000, at: { kind: 'ring', dist: 7 }, banner: { title: '最后一批', sub: '从四面围上来了' } },
             ],
           },
         ],
-        ends: [{ kind: 'cleared' }],
+        ends: [{ kind: 'cleared' }, { kind: 'time', ms: 50_000 }],
       },
     },
     { kind: 'recruit', upTo: 2 },
@@ -98,12 +99,13 @@ const EXPEDITION = {
       fight: {
         name: '1-2 蝗灾',
         map: 'forest',
+        clockSec: 30,
         intro: { title: '蝗灾', sub: '击杀 45 只，跳蝗成群扑来' },
         mix: [
           { kind: 'locust', weight: 3 },
           { kind: 'zombie', weight: 1 },
         ],
-        spawns: [{ kind: 'stream', intervalMul: 0.7 }],
+        spawns: [{ kind: 'stream', intervalMs: 480 }],
         ends: [{ kind: 'kills', count: 45 }],
       },
     },
@@ -113,6 +115,7 @@ const EXPEDITION = {
       fight: {
         name: '1-3 萨满营地',
         map: 'forest',
+        clockSec: 60,
         intro: { title: '萨满营地', sub: '萨满会给同伴回血，先杀它' },
         spawns: [
           {
@@ -120,9 +123,9 @@ const EXPEDITION = {
             atMs: 2500,
             gapMs: 2500,
             squads: [
-              { count: 10, enemy: 'zombie', escort: { enemy: 'elf', count: 2 }, at: { kind: 'point', dx: -7, dy: -6, spread: 2.5 } },
-              { count: 10, enemy: 'slime', escort: { enemy: 'elf', count: 2 }, at: { kind: 'point', dx: 7, dy: 5, spread: 2.5 }, banner: { title: '黏液虫', sub: '蹭到就糊住，攻速大降' } },
-              { count: 14, enemy: 'zombie', escort: { enemy: 'elf', count: 3 }, spreadMs: 1500, at: { kind: 'ring', dist: 7 }, banner: { title: '营地倾巢', sub: '三个萨满压阵' } },
+              { count: 8, enemy: 'zombie', escort: { enemy: 'elf', count: 2 }, at: { kind: 'point', dx: -7, dy: -6, spread: 2.5 } },
+              { count: 8, enemy: 'slime', escort: { enemy: 'elf', count: 2 }, at: { kind: 'point', dx: 7, dy: 5, spread: 2.5 }, banner: { title: '黏液虫', sub: '蹭到就糊住，攻速大降' } },
+              { count: 10, enemy: 'zombie', escort: { enemy: 'elf', count: 3 }, spreadMs: 1500, at: { kind: 'ring', dist: 7 }, banner: { title: '营地倾巢', sub: '三个萨满压阵' } },
             ],
           },
         ],
@@ -136,6 +139,7 @@ const EXPEDITION = {
       fight: {
         name: '1-4 蛛卵林',
         map: 'forest',
+        clockSec: 100,
         intro: { title: '蛛卵林', sub: '撑过 45 秒；蛛卵 6 秒不打破就结成缠人的网' },
         mix: [
           { kind: 'zombie', weight: 3 },
@@ -143,7 +147,7 @@ const EXPEDITION = {
           { kind: 'mushroom', weight: 1 },
         ],
         spawns: [
-          { kind: 'stream', intervalMul: 1.3 },
+          { kind: 'stream', intervalMs: 700 },
           { kind: 'batch', atMs: 4000, squad: { count: 3, enemy: 'sapling', at: { kind: 'ring', dist: 4 } }, banner: { title: '蛛卵', sub: '6 秒内打破它们' } },
           { kind: 'batch', atMs: 12_000, squad: { count: 3, enemy: 'sapling', at: { kind: 'ring', dist: 4 } } },
           { kind: 'batch', atMs: 20_000, squad: { count: 4, enemy: 'sapling', at: { kind: 'ring', dist: 5 } } },
@@ -151,6 +155,7 @@ const EXPEDITION = {
           { kind: 'batch', atMs: 36_000, squad: { count: 5, enemy: 'sapling', at: { kind: 'ring', dist: 5 } }, banner: { title: '最后一窝', sub: '再撑一会儿' } },
         ],
         ends: [{ kind: 'time', ms: 45_000 }],
+        reward: { heal: true },
       },
     },
     { kind: 'shop' },
@@ -159,8 +164,8 @@ const EXPEDITION = {
       fight: {
         name: '1-5 蛛后',
         map: 'forest',
+        clockSec: 140,
         spawns: [
-          { kind: 'stream', intervalMul: 3 },
           { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'treant', hpMul: 0.3 }, banner: { title: '蛛后现身', sub: '打破她产下的蛛卵，别被网缠住' } },
         ],
         ends: [{ kind: 'boss' }],
@@ -174,6 +179,7 @@ const EXPEDITION = {
       fight: {
         name: '2-1 断墙之间',
         map: 'ruins',
+        clockSec: 180,
         intro: { title: '第二章 · 残垣', sub: '墙挡人、挡弹，也挡视线' },
         spawns: [
           {
@@ -196,15 +202,16 @@ const EXPEDITION = {
       fight: {
         name: '2-2 引爆',
         map: 'ruins',
+        clockSec: 215,
         intro: { title: '引爆', sub: '60 秒内依次踩过三个信标，自爆怪只追你' },
         chaseLeader: true,
         mix: [
-          { kind: 'creeper', weight: 2 },
+          { kind: 'creeper', weight: 1 },
           { kind: 'zombie', weight: 3 },
         ],
-        spawns: [{ kind: 'stream', intervalMul: 0.9 }],
+        spawns: [{ kind: 'stream', intervalMs: 900 }],
         ends: [
-          { kind: 'hold', ms: 6000, radius: 1.8, points: [{ dx: -8, dy: -8 }, { dx: 8, dy: -5 }, { dx: 0, dy: 8 }] },
+          { kind: 'hold', ms: 15_000, radius: 1.8, points: [{ dx: -8, dy: -8 }, { dx: 8, dy: -5 }, { dx: 0, dy: 8 }] },
           { kind: 'time', ms: 60_000, lose: true },
         ],
       },
@@ -216,6 +223,7 @@ const EXPEDITION = {
       fight: {
         name: '2-3 石像鬼回廊',
         map: 'ruins',
+        clockSec: 250,
         intro: { title: '石像鬼回廊', sub: '石像鬼掉到四成血会石化回血，一口气打穿它' },
         spawns: [
           {
@@ -238,6 +246,7 @@ const EXPEDITION = {
       fight: {
         name: '2-4 狼骑悬赏',
         map: 'ruins',
+        clockSec: 285,
         intro: { title: '狼骑悬赏', sub: '75 秒内击倒三名逃窜的精英狼骑' },
         mix: [
           { kind: 'skeleton', weight: 2 },
@@ -245,8 +254,8 @@ const EXPEDITION = {
           { kind: 'snake', weight: 1 },
         ],
         spawns: [
-          { kind: 'stream', intervalMul: 1.2 },
-          { kind: 'batch', atMs: 3000, squad: { count: 3, enemy: 'knight', elites: 3, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true }, banner: { title: '悬赏发布', sub: '三名狼骑带着赏金逃窜' } },
+          { kind: 'stream', intervalMs: 800 },
+          { kind: 'batch', atMs: 3000, squad: { count: 3, enemy: 'knight', elites: 3, hpMul: 0.35, drive: { kind: 'flee', range: 7 }, at: { kind: 'far' }, bounty: true }, banner: { title: '悬赏发布', sub: '三名狼骑带着赏金逃窜' } },
         ],
         ends: [{ kind: 'bounty' }, { kind: 'time', ms: 75_000, lose: true }],
         reward: { coins: 80 },
@@ -258,8 +267,9 @@ const EXPEDITION = {
       fight: {
         name: '2-5 暴龙',
         map: 'ruins',
+        clockSec: 320,
         spawns: [
-          { kind: 'stream', intervalMul: 2.5 },
+          { kind: 'stream', intervalMs: 1500 },
           { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'rhino', hpMul: 0.55 }, banner: { title: '暴龙现身', sub: '它会冲锋撞人，横着躲开' } },
         ],
         ends: [{ kind: 'boss' }],
@@ -272,12 +282,13 @@ const EXPEDITION = {
       fight: {
         name: '3-1 陨石雨',
         map: 'space',
+        clockSec: 370,
         intro: { title: '第三章 · 深空', sub: '撑过 50 秒；流星直线冲来，天体不时横扫' },
         mix: [
           { kind: 'alien', weight: 3 },
           { kind: 'comet', weight: 2 },
         ],
-        spawns: [{ kind: 'stream', intervalMul: 0.8 }],
+        spawns: [{ kind: 'stream', intervalMs: 350 }],
         ends: [{ kind: 'time', ms: 50_000 }],
       },
     },
@@ -287,6 +298,7 @@ const EXPEDITION = {
       fight: {
         name: '3-2 迷魂哨线',
         map: 'space',
+        clockSec: 410,
         intro: { title: '迷魂哨线', sub: '迷魂眼会把人勾过去，先拆掉它们' },
         spawns: [
           {
@@ -309,6 +321,7 @@ const EXPEDITION = {
       fight: {
         name: '3-3 精英潮',
         map: 'space',
+        clockSec: 450,
         intro: { title: '精英潮', sub: '100 秒内击杀 16 只，只只都是精英' },
         mix: [
           { kind: 'gargoyle', weight: 1 },
@@ -330,8 +343,9 @@ const EXPEDITION = {
       fight: {
         name: '3-4 奇点',
         map: 'space',
+        clockSec: 500,
         spawns: [
-          { kind: 'stream', intervalMul: 2.5 },
+          { kind: 'stream', intervalMs: 1500 },
           { kind: 'batch', atMs: 1500, squad: { count: 1, enemy: 'blackhole' }, banner: { title: '奇点', sub: '最后一战：别踏进它的视界' } },
         ],
         ends: [{ kind: 'boss' }],
