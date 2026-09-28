@@ -3,7 +3,7 @@ import type { DevProvider, DevSection } from '../devtools'
 import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { MAP_IDS, MAPS } from '../data/maps'
 import { fightCount, phasesOf, RUNS, timeLimitMs } from '../data/runs'
-import { addMember, beginRun, currentRun, endRun, stepsOf } from '../run/state'
+import { addMember, beginRun, currentRun, endRun, runDef, stepsOf } from '../run/state'
 import { SceneKey } from '../scene/keys'
 import type { MapId } from '../types/maps'
 import { gotoScene } from './nav'
@@ -42,7 +42,7 @@ function runText(): string {
   const run = currentRun()
   if (!run) return '当前没有进行中的一局'
   return [
-    `${MAPS[run.mapId].name} · ${RUNS[run.runId].name} · 第 ${run.step + 1}${Number.isFinite(fightCount(RUNS[run.runId])) ? `/${stepsOf(run).length}` : ''} 步`,
+    `${MAPS[run.mapId].name} · ${runDef(run).name} · 第 ${run.step + 1}${Number.isFinite(fightCount(runDef(run))) ? `/${stepsOf(run).length}` : ''} 步`,
     `第 ${run.wave} 波 · 金币 ${run.coins} · 击杀 ${run.kills} · 等级 ${run.xp.level}（${run.xp.xp} xp）`,
     `队伍 ${run.roster.map((id) => CHARACTERS[id].name).join('、')} · 队长 ${CHARACTERS[run.leaderId].name}`,
     `累计战斗 ${Math.round(run.combatMs / 1000)} s`,

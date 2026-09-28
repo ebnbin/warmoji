@@ -9,6 +9,7 @@ import { ResultScene } from './scene/ResultScene'
 import { SettingsScene } from './scene/SettingsScene'
 import { ShopScene } from './scene/ShopScene'
 import { StudioScene } from './scene/StudioScene'
+import { EditorScene } from './scene/EditorScene'
 import { UIScene } from './scene/UIScene'
 import { WikiScene } from './scene/WikiScene'
 import { EcsBattleScene } from './ecs/EcsBattleScene'
@@ -47,7 +48,7 @@ const game = new Phaser.Game({
   height: Math.round(viewport.cssHeight * viewport.dpr),
   input: { activePointers: 3 },
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / viewport.dpr },
-  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, SettingsScene, RecruitScene, ShopScene, EcsBattleScene, UIScene, ResultScene, PauseScene, LevelUpScene, LevelUpRecruitScene],
+  scene: [PreloadScene, MenuScene, MapScene, WikiScene, StudioScene, EditorScene, SettingsScene, RecruitScene, ShopScene, EcsBattleScene, UIScene, ResultScene, PauseScene, LevelUpScene, LevelUpRecruitScene],
 })
 
 installDevTools(game, {
@@ -78,6 +79,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
     SceneKey.Map,
     SceneKey.Wiki,
     SceneKey.Studio,
+    SceneKey.Editor,
     SceneKey.Settings,
     SceneKey.Recruit,
     SceneKey.Shop,

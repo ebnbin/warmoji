@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { clipTo, markDirty } from '../util/mask'
 import { TAP_SLOP } from '../util/units'
-import { markDragged, pressedOn, setClip } from './gesture'
+import { isGrabbed, markDragged, pressedOn, setClip } from './gesture'
 import type { Rect } from './gesture'
 import { INK } from './theme'
 
@@ -165,7 +165,7 @@ export class ScrollView {
   }
 
   private onDown(p: Phaser.Input.Pointer): void {
-    if (this.dragId !== null || !this.contains(p) || !pressedOn(this.scene, p, this.content)) return
+    if (this.dragId !== null || !this.contains(p) || !pressedOn(this.scene, p, this.content) || isGrabbed(this.scene, p)) return
     if (Math.abs(this.velocity) >= FLING_CATCH) markDragged(this.scene, p)
     this.velocity = 0
     this.dragId = p.id
@@ -176,7 +176,7 @@ export class ScrollView {
   }
 
   private onMove(p: Phaser.Input.Pointer): void {
-    if (p.id !== this.dragId || !p.isDown) return
+    if (p.id !== this.dragId || !p.isDown || isGrabbed(this.scene, p)) return
     const c = this.coord(p)
     if (!this.moved) {
       if (this.max <= 0 || Math.abs(c - this.dragFrom) <= TAP_SLOP) return

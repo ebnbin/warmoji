@@ -7,19 +7,34 @@ function inRound(r: Rounds | undefined, round: number): boolean {
   return round >= from && round <= (r.to ?? Infinity) && (round - from) % (r.every ?? 1) === 0
 }
 
+/** 某一轮要走的一步，index 是它在每一轮写的步骤里排第几（从 0 算） */
+export interface RoundPick {
+  readonly step: StepDef
+  readonly index: number
+}
+
 /** 第 round 轮有的那些，去掉轮次条件 */
 function pick<T extends { readonly rounds?: Rounds }>(items: readonly T[], round: number): T[] {
   return items.filter((x) => inRound(x.rounds, round)).map((x) => ({ ...x, rounds: undefined }))
 }
 
 /** 重复的第 round 轮要走的步骤：只留这一轮有的，每场只留这一轮有的刷怪与结束规则，名字后面加上第几轮 */
-export function roundSteps(rep: RepeatDef, round: number): StepDef[] {
-  return pick(rep.steps, round).map((s): StepDef => {
-    if (s.kind !== 'fight') return s
+export function roundPicks(rep: RepeatDef, round: number): RoundPick[] {
+  return rep.steps.flatMap((s, index): RoundPick[] => {
+    if (!inRound(s.rounds, round)) return []
+    if (s.kind !== 'fight') {
+      const step = { ...s, rounds: undefined }
+      return [{ step, index }]
+    }
     const f = s.fight
     const phases = f.phases.map((p) => ({ ...p, spawns: pick(p.spawns, round), ends: pick(p.ends, round) }))
-    return { kind: 'fight', fight: { ...f, name: `${f.name} · 第 ${round} 轮`, phases } }
+    return [{ step: { kind: 'fight', fight: { ...f, name: `${f.name} · 第 ${round} 轮`, phases } }, index }]
   })
+}
+
+/** 重复的第 round 轮要走的步骤 */
+export function roundSteps(rep: RepeatDef, round: number): StepDef[] {
+  return roundPicks(rep, round).map((p) => p.step)
 }
 
 /** 重复里写的每一个轮次条件 */

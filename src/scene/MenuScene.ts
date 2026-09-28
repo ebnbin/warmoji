@@ -33,11 +33,12 @@ function vignetteCast(): { heroes: string[]; foes: string[] } {
   }
 }
 
-/** 右上角的入口：Studio、图鉴、设置 */
+/** 右上角的入口：关卡编辑器、Studio、图鉴、设置 */
 const NAV: readonly { readonly icon: string; readonly scene: SceneKey }[] = [
   { icon: '2699', scene: SceneKey.Settings },
   { icon: '1f4d6', scene: SceneKey.Wiki },
   { icon: '1f9ea', scene: SceneKey.Studio },
+  { icon: '1f6e0', scene: SceneKey.Editor },
 ]
 
 export class MenuScene extends Phaser.Scene {

@@ -4,6 +4,7 @@ export enum SceneKey {
   Map = 'map',
   Wiki = 'wiki',
   Studio = 'studio',
+  Editor = 'editor',
   Settings = 'settings',
   Recruit = 'recruit',
   Shop = 'shop',
