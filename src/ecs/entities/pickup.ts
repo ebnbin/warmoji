@@ -33,6 +33,7 @@ import { UNIT } from '../../util/units'
 import { playSfx } from '../../audio/sfx'
 import { PICKUP, PICKUPS } from '../../data/pickups'
 import { FIELD } from '../../data/battlefield'
+import { leaderX, leaderY } from '../utils/team'
 import { backEaseOut, sineEaseInOut } from '../utils/ease'
 
 const POLARITY_COLOR: Record<Polarity, number> = {
@@ -176,6 +177,8 @@ export function dropFieldPickup(sim: Sim, x: number, y: number, def: FieldPickup
 
 /** 升级道具的光圈与指向它的箭头 */
 export const LEVEL_UP_COLOR = 0x4fc3f7
+/** 升级道具离队长至少这么远（格）落地：得走过去才捡得到，不会一掉就被脚下踩到 */
+const LEVEL_UP_AWAY = 2
 
 /** 升级道具：比金币大、带光圈上下跳，不吸附也不消失，和场上的增益一样只有队长走上去才捡 */
 function levelUpSpec(): PickupSpec {
@@ -197,8 +200,18 @@ function levelUpSpec(): PickupSpec {
   }
 }
 
-/** 掉一个升级道具，叮一声提醒 */
+/** 掉一个升级道具，叮一声提醒；离队长太近就顺着队长到它的方向推远，贴着队长时推到队长侧面 */
 export function dropLevelUp(sim: Sim, x: number, y: number): void {
+  const lx = leaderX(sim)
+  const ly = leaderY(sim)
+  const d = sim.hooks.worldDelta(sim, lx, ly, x, y)
+  const len = Math.hypot(d.x, d.y)
+  const away = LEVEL_UP_AWAY * UNIT
+  if (len < away) {
+    const u = len > 1 ? { x: d.x / len, y: d.y / len } : { x: -sim.heading.y, y: sim.heading.x }
+    x = lx + u.x * away
+    y = ly + u.y * away
+  }
   sim.out.bursts.push({ x, y, count: 10, kind: 'coin' })
   playSfx('upgrade')
   spawnPickup(sim, x, y, levelUpSpec())

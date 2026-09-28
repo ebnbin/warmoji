@@ -17,7 +17,7 @@ import { applyBackground } from '../util/background'
 import { mainCameraOnly } from '../util/camera'
 import { playSfx } from '../audio/sfx'
 import { OUTLINED_EMOJIS, PLAIN_EMOJIS } from '../manifest'
-import { getRun, INVINCIBLE_HP, nextStep, runDef } from '../run/state'
+import { getRun, INVINCIBLE_HP, nextStep, runDef, stepOf } from '../run/state'
 import { claimNothing, levelUpOptions, pendingLevelUps } from '../run/levelUp'
 import { memberLevel, teamLeveled } from '../run/members'
 import { goStep } from '../scene/teamPage'
@@ -692,8 +692,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.proceed()
   }
 
+  /** 后面还有步骤才领：最后一场打完直接去结算 */
   private proceed(): void {
-    while (pendingLevelUps(this.run) > 0) if (this.chooseLevelUp()) return
+    while (stepOf(this.run) && pendingLevelUps(this.run) > 0) if (this.chooseLevelUp()) return
     goStep(this, this.run)
   }
 
