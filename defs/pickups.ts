@@ -7,6 +7,11 @@ export const PICKUPS = {
       size: 0.6,
       radius: 0.22,
     },
+    levelUp: {
+      emoji: '1f199',
+      size: 1,
+      radius: 0.3,
+    },
   },
   pipeline: {
     magnetSpeed: 8,

@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { hasComponent, query } from 'bitecs'
 import { UNIT } from '../util/units'
 import { norm } from '../util/vec'
+import type { Point } from '../util/vec'
 import { rewindMs } from '../data/abilities'
 import { STAMINA, staminaTier } from '../data/stamina'
 import type { StaminaTier } from '../data/stamina'
@@ -9,7 +10,8 @@ import type { ResourceDef } from '../types/enemies'
 import { Alive, ENEMY_SET, Hp, Res, Transform, VisOff } from './components'
 import { abilityDef, resDef } from './store'
 import { lookOf } from './entities/shadow'
-import { goalSpot, holdSpot } from './fight/state'
+import { LEVEL_UP_COLOR, levelUpsOnField } from './entities/pickup'
+import { goalSpot, holdSpot, nearestTo } from './fight/state'
 import { cooled } from './systems/shared/avail'
 import { revivable } from './systems/shared/combat'
 import { charSize } from './systems/shared/scale'
@@ -48,6 +50,7 @@ const MARK_LINE = 0.9
 const MARK_WIDTH = 4
 const INSIDE_COLOR = 0x66bb6a
 const OUTSIDE_COLOR = 0xffdc5d
+const GOAL_COLOR = 0xffdc5d
 
 /** 地上的一圈：据点或救援的范围 */
 interface Mark {
@@ -79,7 +82,8 @@ export class Presentation {
     echo(sim, this.sprites, this.trail)
     this.sprites.sort((a, b) => a.z - b.z)
     bars(sim, this.bars)
-    pointer(sim, this.pointer)
+    pointer(sim, this.pointer, goalSpot(sim), GOAL_COLOR)
+    pointer(sim, this.pointer, nearestTo(sim, levelUpsOnField(sim)), LEVEL_UP_COLOR)
     const r = sim.fight.rules.rescue
     if (!r) this.rescue = []
     else if (!sim.over) this.rescue = rescueMarks(sim, r.radius * UNIT)
@@ -145,9 +149,8 @@ function bars(sim: Sim, o: Scratch): void {
   }
 }
 
-/** 目标在屏幕外或黑幕里时，在队长身边画一个指过去的箭头 */
-function pointer(sim: Sim, o: Scratch): void {
-  const spot = goalSpot(sim)
+/** 目标或最近的升级道具在屏幕外或黑幕里时，在队长身边画一个指过去的箭头 */
+function pointer(sim: Sim, o: Scratch, spot: Point | null, color: number): void {
   const lx = leaderX(sim)
   const ly = leaderY(sim)
   const d = spot ? sim.hooks.worldDelta(sim, lx, ly, spot.x, spot.y) : null
@@ -161,7 +164,7 @@ function pointer(sim: Sim, o: Scratch): void {
   const w = 0.25 * UNIT
   const a = hostShown(sim.leader)
   tri(o, WORLD, tipX + u.x * 3, tipY + u.y * 3, lx + u.x * r - u.y * (w + 3), ly + u.y * r + u.x * (w + 3), lx + u.x * r + u.y * (w + 3), ly + u.y * r - u.x * (w + 3), packTint(0x000000, 0.35 * a))
-  tri(o, WORLD, tipX, tipY, lx + u.x * r - u.y * w, ly + u.y * r + u.x * w, lx + u.x * r + u.y * w, ly + u.y * r - u.x * w, packTint(0xffdc5d, 0.95 * a))
+  tri(o, WORLD, tipX, tipY, lx + u.x * r - u.y * w, ly + u.y * r + u.x * w, lx + u.x * r + u.y * w, ly + u.y * r - u.x * w, packTint(color, 0.95 * a))
 }
 
 /** 队长的主动技能会倒带时，在倒带的落点画一个它的残影，这段路画在地上，越新越清楚；冷却中一起淡下去，也随队长显隐 */

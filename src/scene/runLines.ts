@@ -2,8 +2,9 @@ import { CHARACTERS } from '../data/characters'
 import { RARITIES } from '../data/items'
 import { modTexts } from '../data/stats'
 import { TAGS } from '../data/tags'
+import { phasesOf } from '../data/runs'
 import { WAVE } from '../data/waves'
-import type { EndRule, FightDef, FightReward, FightRules, MutatorDef, RunDef, ShopRules, StarRule, StepDef, TeamDef } from '../types/runs'
+import type { EndRule, FightDef, FightReward, FightRules, MutatorDef, PhaseDef, RunDef, ShopRules, StarRule, StepDef, TeamDef } from '../types/runs'
 
 const sec = (ms: number): string => `${+(ms / 1000).toFixed(1)} 秒`
 
@@ -28,7 +29,7 @@ function winText(e: EndRule): string | null {
     case 'hold':
       return e.points.length > 1 ? `队长在 ${e.points.length} 处据点里依次各站满 ${sec(e.ms / e.points.length)}` : `队长在据点里累计站满 ${sec(e.ms)}`
     case 'coins':
-      return `本场捡到 ${e.count} 金币`
+      return `捡到 ${e.count} 金币`
     case 'downs':
       return null
   }
@@ -40,19 +41,24 @@ export function rewardText(r: FightReward | undefined): string | null {
   return parts.length > 0 ? `过关奖励 ${parts.join('、')}` : null
 }
 
-/** 一场怎么赢、怎么输，外加这一场的特别规则与过关奖励 */
-export function fightGoalText(f: FightDef): string {
-  const wins = f.ends.flatMap((e) => winText(e) ?? [])
-  const rules: string[] = []
-  for (const e of f.ends) {
-    if (e.kind === 'time' && e.lose) rules.push(`限时 ${sec(e.ms)}`)
-    if (e.kind === 'downs') rules.push(e.count === 1 ? '有人倒下就输' : `累计倒下 ${e.count} 次就输`)
+/** 一个阶段怎么达成、怎么输 */
+function phaseGoalText(p: PhaseDef): string {
+  const wins = p.ends.flatMap((e) => winText(e) ?? [])
+  const lose: string[] = []
+  for (const e of p.ends) {
+    if (e.kind === 'time' && e.lose) lose.push(`限时 ${sec(e.ms)}`)
+    if (e.kind === 'downs') lose.push(e.count === 1 ? '有人倒下就输' : `累计倒下 ${e.count} 次就输`)
   }
-  rules.push(...ruleLines(f.rules))
-  if (f.chaseLeader) rules.push('敌人都盯着队长')
+  return [wins.length === 0 ? '不会结束' : wins.join('，或'), ...lose].join(' · ')
+}
+
+/** 一场怎么赢、怎么输：分阶段的按先后连起来，外加这一场的特别规则与过关奖励 */
+export function fightGoalText(f: FightDef): string {
+  const parts = [phasesOf(f).map(phaseGoalText).join(' → '), ...ruleLines(f.rules)]
+  if (f.chaseLeader) parts.push('敌人都盯着队长')
   const reward = rewardText(f.reward)
-  if (reward) rules.push(reward)
-  return [wins.length === 0 ? '不会结束' : wins.join('，或'), ...rules].join(' · ')
+  if (reward) parts.push(reward)
+  return parts.join(' · ')
 }
 
 /** 我方规则的说法 */
@@ -95,6 +101,7 @@ export function runRuleLines(def: RunDef): string[] {
   if (r.recruit) out.push(`只能招募${r.recruit.tags.map((t) => TAGS[t].name).join('、')}角色`)
   if (r.shop) out.push(...shopLines(r.shop))
   if (r.maxLevel !== undefined) out.push(r.maxLevel === 1 ? '队员不能升级' : `队员最高只能升到 ${r.maxLevel} 级`)
+  if (r.teamLevel) out.push('击杀攒全队经验，每升一级掉一个升级道具，队长走过去捡起来，招一名新队员或给一名队员升一级；进商店前没捡的替你捡起；买道具不再涨角色经验')
   return out
 }
 

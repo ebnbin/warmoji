@@ -5,8 +5,6 @@ import { UNIT } from '../../util/units'
 
 import { CHARACTERS, MEMBER, TEAM, memberBase } from '../../data/characters'
 
-import { gearMods } from '../../data/items'
-import { levelStatsFor } from '../../data/levels'
 import { ROLES } from '../../data/roles'
 
 import { INVINCIBLE_HP, waveStartHp } from '../../run/state'
@@ -19,7 +17,7 @@ import { Anim, Breath, Depth, FACTION, Grow, Hp, CharFlash, CharScale, Facing, P
 import { bodyRules } from '../store'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { attachResource } from './resource'
-import { memberGear } from './loadout'
+import { memberGear, memberGearMods } from './loadout'
 
 import type { EcsWorld } from '../world'
 import type { EcsAtlas } from '../atlas'
@@ -43,7 +41,7 @@ export function spawnCharacter(
   const id = run.roster[slot]!
   const def = CHARACTERS[id]
   const size = MEMBER.size * UNIT * place.sizeMul
-  const { owned, growth, level } = memberGear(run, slot)
+  const { owned } = memberGear(run, slot)
   const base = memberBase(def)
   const eid = spawnBody(world, {
     faction: FACTION.team,
@@ -63,7 +61,7 @@ export function spawnCharacter(
   Grow.r0[eid] = MEMBER.radius * UNIT
   Grow.s0[eid] = MEMBER.size * UNIT
   setStatLayer(eid, 'role', [ROLES[def.role].stats])
-  setStatLayer(eid, 'gear', gearMods(owned, levelStatsFor(id, level), growth))
+  setStatLayer(eid, 'gear', memberGearMods(run, slot))
   setStatLayer(eid, 'fight', mods)
   foldBody(world, undefined, eid)
   Hp.v[eid] = waveStartHp(run.memberHp[slot] ?? Hp.max[eid]!, Hp.max[eid]!)

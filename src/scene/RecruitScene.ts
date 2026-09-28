@@ -1,17 +1,19 @@
 import Phaser from 'phaser'
-import { CHARACTERS, ROSTER_IDS } from '../data/characters'
+import { CHARACTERS, ROSTER_IDS, TEAM } from '../data/characters'
 import { ROLES } from '../data/roles'
 import { modTexts } from '../data/stats'
 import { DUTY_TAGS, TAG_IDS, TAGS, tagsOf } from '../data/tags'
 import { playSfx } from '../audio/sfx'
+import { claimRecruit } from '../run/levelUp'
 import { memberLook } from '../run/members'
-import { getRun, recruitDueCount, recruitMember, recruitPool, runDef } from '../run/state'
+import { getRun, recruitCandidates, recruitDueCount, recruitMember, recruitPool, runDef } from '../run/state'
 import { fought } from '../run/flow'
 import type { RunState } from '../run/state'
 import type { CharacterId, CharacterTag } from '../types/characters'
-import { AvatarSlot, beginPage, Button, Chip, Divider, Flow, hasModal, Icon, Label, PageHeader, pageFrame, Panel, RichLabel, ScrollView, TagChip, TileGrid } from '../ui'
+import { AvatarSlot, beginPage, Button, Chip, Divider, Flow, hasModal, Icon, Label, PageHeader, pageFrame, Panel, RichLabel, Scrim, ScrollView, TagChip, TileGrid } from '../ui'
 import type { PageFrame, Rect, TileItem } from '../ui'
-import { VIEWPORT_CHANGED } from '../util/apply'
+import { applyCamera, VIEWPORT_CHANGED } from '../util/apply'
+import type { LevelUpWake } from './levelUp'
 import { characterStatGroups } from './statLines'
 import { finishStep, flowStatGroups, isLeaving, runExit } from './teamPage'
 import { SceneKey } from './keys'
@@ -34,9 +36,12 @@ function tagLabel(t: CharacterTag): string {
   return `{${TAGS[t].icon}} ${TAGS[t].name}`
 }
 
-/** 招募页：全部角色都能招；按标签筛选，点一名看详情，确认后招进队伍 */
+/** 招募页：全部角色都能招；按标签筛选，点一名看详情，确认后招进队伍。升级时来招人的盖在停住的战斗上，招一人就回去 */
 export class RecruitScene extends Phaser.Scene implements DevProviderHost {
+  /** 升级时来招人 */
+  private readonly forLevelUp: boolean
   private preserveOnRestart = false
+  private leaving = false
   private run!: RunState
   private frame!: PageFrame
   /** 正在看的角色；为空时详情区是队伍概况 */
@@ -52,14 +57,21 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
   private detail!: ScrollView
   private confirmBtn!: Button
 
-  constructor() {
-    super(SceneKey.Recruit)
+  constructor(key: SceneKey.Recruit | SceneKey.LevelUpRecruit = SceneKey.Recruit) {
+    super(key)
+    this.forLevelUp = key === SceneKey.LevelUpRecruit
   }
 
   create(): void {
-    beginPage(this)
+    if (this.forLevelUp) {
+      applyCamera(this)
+      new Scrim(this, { depth: -1, alpha: 0.92, block: false })
+    } else {
+      beginPage(this)
+    }
     const preserved = this.preserveOnRestart
     this.preserveOnRestart = false
+    this.leaving = false
     this.run = getRun()
     if (!preserved) {
       this.focus = null
@@ -71,8 +83,8 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
 
     const f = (this.frame = pageFrame({ sub: true, footer: true }))
     new PageHeader(this, f, {
-      title: fought(this.run) ? '招募新队员' : '组建队伍',
-      ...runExit(this, this.run, () => ({ from: SceneKey.Recruit })),
+      title: this.forLevelUp || fought(this.run) ? '招募新队员' : '组建队伍',
+      ...(this.forLevelUp ? { back: () => this.backToLevelUp(false) } : runExit(this, this.run, () => ({ from: SceneKey.Recruit }))),
     })
     const { roster, panel } = this.bodyRects(this.createChips())
     this.grid = new TileGrid<CharacterId>(this, roster, { minWidth: 118, height: 140, initialScroll: this.gridScroll, onScroll: (pos) => (this.gridScroll = pos) })
@@ -214,7 +226,7 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     const P = this.panel
     const cy = P.y + STRIP_H / 2
     const roster = this.run.roster
-    const due = recruitDueCount(this.run)
+    const due = this.due()
     const title = new Label(this, P.x + 20, cy, '队伍', { kind: 'label', bold: true, color: 'soft' }).setOrigin(0, 0.5)
     const count = new Label(this, P.x + P.w - 20, cy, due > 0 ? `${roster.length} → ${roster.length + due} 人` : `${roster.length} 人`, { kind: 'label', color: 'info' }).setOrigin(1, 0.5)
     this.strip.push(title, count)
@@ -303,21 +315,34 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
   private renderConfirm(): void {
     const btn = this.confirmBtn
     const id = this.focus
-    if (recruitDueCount(this.run) === 0) btn.setLabel('继续').setEnabled(true)
+    if (this.due() === 0) btn.setLabel('继续').setEnabled(true)
     else if (id === null) btn.setLabel('先挑一名角色').setEnabled(false)
     else if (this.run.roster.includes(id)) btn.setLabel(`${CHARACTERS[id].name} 已在队中`).setEnabled(false)
     else btn.setLabel(`招募 ${CHARACTERS[id].name}`).setEnabled(true)
   }
 
-  /** 招进队伍；还有空位就留在这页接着挑 */
+  /** 还要招几人：升级时来招的就一人 */
+  private due(): number {
+    if (!this.forLevelUp) return recruitDueCount(this.run)
+    return Math.min(1, TEAM.maxSize - this.run.roster.length, recruitCandidates(this.run).length)
+  }
+
+  /** 招进队伍；还有空位就留在这页接着挑，升级时来招的招到就回去 */
   private confirm(): void {
-    if (isLeaving(this)) return
-    if (recruitDueCount(this.run) === 0) {
+    if (isLeaving(this) || this.leaving) return
+    if (this.due() === 0) {
       this.proceed()
       return
     }
     const id = this.focus
-    if (id === null || recruitMember(this.run, id) < 0) return
+    if (id === null) return
+    if (this.forLevelUp) {
+      if (claimRecruit(this.run, id) < 0) return
+      playSfx('recruit')
+      this.backToLevelUp(true)
+      return
+    }
+    if (recruitMember(this.run, id) < 0) return
     playSfx('recruit')
     if (recruitDueCount(this.run) === 0) {
       this.proceed()
@@ -328,9 +353,19 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
     this.renderFocus()
   }
 
-  /** 招够了：走到下一步 */
+  /** 招够了：走到下一步；升级时来招的回到升级弹窗 */
   private proceed(): void {
-    finishStep(this, this.run)
+    if (this.forLevelUp) this.backToLevelUp(false)
+    else finishStep(this, this.run)
+  }
+
+  /** 回到升级弹窗，带上招到人没有 */
+  private backToLevelUp(recruited: boolean): void {
+    if (this.leaving) return
+    this.leaving = true
+    const wake: LevelUpWake = { recruited }
+    this.scene.wake(SceneKey.LevelUp, wake)
+    this.scene.stop()
   }
 
   private onViewportChanged(): void {
@@ -340,7 +375,7 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
 
   devProvider(): DevProvider {
     return {
-      id: 'recruit',
+      id: this.forLevelUp ? 'levelUpRecruit' : 'recruit',
       title: '招募页',
       sections: [
         {
@@ -352,6 +387,11 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
               label: '自动补齐并入队',
               desc: '按名单顺序把空位招满后直接继续，省去逐个点选',
               run: (): void => {
+                if (this.forLevelUp) {
+                  this.focus = recruitCandidates(this.run)[0] ?? null
+                  this.confirm()
+                  return
+                }
                 for (const id of ROSTER_IDS) {
                   if (recruitDueCount(this.run) === 0) break
                   recruitMember(this.run, id)
@@ -363,5 +403,12 @@ export class RecruitScene extends Phaser.Scene implements DevProviderHost {
         },
       ],
     }
+  }
+}
+
+/** 升级时来招人的招募页 */
+export class LevelUpRecruitScene extends RecruitScene {
+  constructor() {
+    super(SceneKey.LevelUpRecruit)
   }
 }

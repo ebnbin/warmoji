@@ -1,25 +1,19 @@
-import { playSfx } from '../../../audio/sfx'
-import { gainXp, waveBonusXp } from '../../../run/xp'
 import { hasComponent } from 'bitecs'
 import { Alive, Hp, Res, Stats } from '../../components'
 import { resDef } from '../../store'
 import { ITEMS } from '../../../data/items'
 import { gearWave } from './gear'
 import { runDef } from '../../../run/state'
+import { phasesOf } from '../../../data/runs'
 import { WAVE } from '../../../data/waves'
 import type { RunState } from '../../../run/state'
 import type { Sim } from '../../sim'
 
-/** 一波结束：经验、生命与资源带走，成长道具攒进度，收获与过关奖励进账；生命按场间规则带走，奖励回满血时全队满血，永久减员时还倒着的这一局都回不来 */
+/** 一场结束：生命与资源带走，成长道具攒进度，收获与过关奖励进账；波数按这一场的阶段数往前走，商店的物价与稀有度跟着涨；生命按场间规则带走，奖励回满血时全队满血，永久减员时还倒着的这一局都回不来 */
 export function settleWave(sim: Sim): void {
   const run = sim.run
-  const gained = gainXp(run.xp, Math.round(waveBonusXp(run.wave)))
-  run.xp = gained.state
-  if (gained.levelsGained > 0) {
-    playSfx('levelup')
-  }
   run.combatMs += sim.elapsedMs
-  run.wave += 1
+  run.wave += phasesOf(sim.fight.def).length
   const between = runDef(run).rules?.between ?? 'carry'
   const reward = sim.fight.def.reward
   run.memberHp = sim.characters.map((m) => carriedHp(m, between === 'full' || !!reward?.heal, between === 'rest'))

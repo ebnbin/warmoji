@@ -242,6 +242,9 @@ export const GrantCoins = { n: f32() }
 
 export const GrantMod = {}
 
+/** 升级道具：队长捡起来领一次全队升级 */
+export const LevelUp = {}
+
 export const GrantFlash = { color: u32(), ms: f32() }
 
 export const PickupFx = { burst: i32() }

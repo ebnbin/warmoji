@@ -12,4 +12,6 @@ export enum SceneKey {
   DevTools = 'devtools',
   Result = 'result',
   Pause = 'pause',
+  LevelUp = 'levelUp',
+  LevelUpRecruit = 'levelUpRecruit',
 }

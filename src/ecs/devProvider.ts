@@ -87,6 +87,7 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
         { label: '升一级', run: () => battle.devGrant('level') },
         { label: '技能冷却清零', run: () => battle.devResetSkill() },
         ...(battle.endless ? [] : [{ label: '结束本波', run: (): void => battle.devEndWave() }]),
+        { label: '下一阶段', run: () => battle.devNextPhase() },
       ],
     },
     {

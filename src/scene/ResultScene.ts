@@ -11,6 +11,7 @@ import { reachLab, submitLab } from '../save/labs'
 import { ITEMS } from '../data/items'
 import { beginRun, endRun, foughtMs, getRun, runDef, skipFilled } from '../run/state'
 import { starMet } from '../run/stars'
+import { teamLeveled } from '../run/members'
 import { fightsDone } from '../run/flow'
 import { goStep } from './teamPage'
 import { fightUnit, starText } from './runLines'
@@ -110,7 +111,7 @@ export class ResultScene extends Phaser.Scene {
       this,
       cx,
       titleY + 62,
-      `${this.run.roster.map((id) => `{${CHARACTERS[id].emoji}}`).join('')} · ${waveText} · 击杀 ${this.run.kills} · {${PICKUPS.coin.emoji}}${this.run.coins} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
+      `${this.run.roster.map((id) => `{${CHARACTERS[id].emoji}}`).join('')} · ${waveText}${teamLeveled(this.run) ? ` · 全队 Lv ${this.run.xp.level}` : ''} · 击杀 ${this.run.kills} · {${PICKUPS.coin.emoji}}${this.run.coins} · 用时 ${minutes}:${String(seconds).padStart(2, '0')}`,
       { kind: 'heading', bold: false, color: 'soft', originX: 0.5, maxWidth: content.w - 48 },
     )
     const lost = !def.record && !this.win && this.reason !== null

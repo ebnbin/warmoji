@@ -12,13 +12,19 @@ export function levelCap(run: RunState): number {
   return runDef(run).rules?.maxLevel ?? MAX_CHAR_LEVEL
 }
 
+/** 这一局靠全队升级：队员的等级来自升级时的选择，买道具不给角色经验 */
+export function teamLeveled(run: RunState): boolean {
+  return runDef(run).rules?.teamLevel === true
+}
+
 /** 攒了 xp 经验的队员是几级：不低于这一局的等级下限，不高于上限 */
 export function levelFor(run: RunState, xp: number): number {
   return Math.min(levelCap(run), Math.max(run.minLevel, characterLevel(xp)))
 }
 
-/** 队员的等级：买过的道具折成角色经验 */
+/** 队员的等级：靠全队升级的一局按升级时的选择，否则按买过的道具折成的角色经验 */
 export function memberLevel(run: RunState, slot: number): number {
+  if (teamLeveled(run)) return Math.min(levelCap(run), Math.max(run.minLevel, run.memberLevels[slot] ?? 1))
   return levelFor(run, characterXp(run.memberItems[slot] ?? []))
 }
 

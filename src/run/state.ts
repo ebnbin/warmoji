@@ -26,7 +26,10 @@ export interface RunState {
   wave: number
   coins: number
   kills: number
+  /** 全队经验：满了升级 */
   xp: XpState
+  /** 全队升级已经领了几次：靠全队升级的一局里，每次招一名新队员或给一名队员升一级算一次 */
+  claimed: number
   combatMs: number
   roster: CharacterId[]
   /** 每人带进下一场的生命；Infinity 是满血开局 */
@@ -38,6 +41,8 @@ export interface RunState {
   /** 跨波保留的资源值，-1 是没有 */
   memberRes: number[]
   memberGrowth: GrowthProgress[]
+  /** 靠全队升级的一局里每人升到了几级 */
+  memberLevels: number[]
   /** 每人已计入成长的击杀数 */
   growthKills: number[]
   leaderId: CharacterId
@@ -98,6 +103,7 @@ export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!, mutators: readon
     coins: def.coins ?? 0,
     kills: 0,
     xp: { level: 1, xp: 0 },
+    claimed: 0,
     combatMs: (def.start?.sec ?? 0) * 1000,
     roster: [],
     memberHp: [],
@@ -106,6 +112,7 @@ export function beginRun(id: RunId, mapId: MapId = MAP_IDS[0]!, mutators: readon
     memberForm: [],
     memberRes: [],
     memberGrowth: [],
+    memberLevels: [],
     growthKills: [],
     leaderId: ROSTER_IDS[0]!,
     minLevel: 1,
@@ -222,6 +229,7 @@ export function addMember(run: RunState, id: CharacterId): number {
   run.memberForm.push(-1)
   run.memberRes.push(-1)
   run.memberGrowth.push({})
+  run.memberLevels.push(1)
   run.growthKills.push(0)
   run.fallen.push(false)
   run.stats.damage.push(0)
