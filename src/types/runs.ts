@@ -49,7 +49,7 @@ export interface Escort {
   readonly elite?: boolean
 }
 
-/** 连续刷怪：间隔不写 intervalMs 就按进度与队伍人数算，再乘 intervalMul；每只有 eliteChance 的几率是精英；只在开打后 fromMs 到 untilMs 之间刷；场上敌人到 cap 就这一轮不刷 */
+/** 连续刷怪：间隔不写 intervalMs 就按进度与队伍人数算，再乘 intervalMul；每只有 eliteChance 的几率是精英；只在这一阶段开始后 fromMs 到 untilMs 之间刷；场上敌人到 cap 就这一轮不刷 */
 export interface StreamRule {
   readonly kind: 'stream'
   readonly intervalMs?: number
@@ -60,26 +60,26 @@ export interface StreamRule {
   readonly cap?: number
   readonly at?: SpawnAt
 }
-/** 开打 atMs 后打出横幅，放出一队 */
+/** 这一阶段开始 atMs 后打出横幅，放出一队 */
 export interface BatchRule {
   readonly kind: 'batch'
   readonly atMs: number
   readonly squad: Squad
   readonly banner?: Banner
 }
-/** 一组一组来：第一组在开打 atMs 后，之后每次场上清空再隔 gapMs 来下一组 */
+/** 一组一组来：第一组在这一阶段开始 atMs 后，之后每次场上清空再隔 gapMs 来下一组 */
 export interface WavesRule {
   readonly kind: 'waves'
   readonly atMs: number
   readonly gapMs: number
   readonly squads: readonly (Squad & { readonly banner?: Banner })[]
 }
-/** 开打 atMs 后这张图的头目登场；别的头目按一队敌人指定 */
+/** 这一阶段开始 atMs 后这张图的头目登场；别的头目按一队敌人指定 */
 export interface BossRule {
   readonly kind: 'boss'
   readonly atMs: number
 }
-/** 带光圈的敌人：从 atMs 起 spanMs 内依次放出，先增益后减益，效果从地图的效果池里抽 */
+/** 带光圈的敌人：这一阶段开始 atMs 后起 spanMs 内依次放出，先增益后减益，效果从地图的效果池里抽 */
 export interface CarrierRule {
   readonly kind: 'carriers'
   readonly buff: number
@@ -100,9 +100,9 @@ export interface HoldPoint {
 }
 
 /**
- * 结束规则，全灭永远是输。
- * 获胜：time 撑到时间，boss 头目倒下，cleared 定时与成组的敌人都放完、连续刷怪也停了、场上一个不剩，kills 本场击杀到数，bounty 悬赏目标都倒下，hold 队长在据点圈里累计站满 ms、圈按 points 依次换位置、每处分到一样长，coins 本场捡到的金币到数。
- * 失败：time 带 lose 时到点就输，downs 本场队员累计倒下到数就输。
+ * 一个阶段的结束规则，时刻与进度都从这一阶段开始时算，全灭永远是输。
+ * 达成：time 撑到时间，boss 头目倒下，cleared 定时与成组的敌人都放完、连续刷怪也停了、场上一个不剩，kills 击杀到数，bounty 悬赏目标都倒下，hold 队长在据点圈里累计站满 ms、圈按 points 依次换位置、每处分到一样长，coins 捡到的金币到数。
+ * 失败：time 带 lose 时到点就输，downs 队员累计倒下到数就输。
  */
 export type EndRule =
   | { readonly kind: 'time'; readonly ms: number; readonly lose?: boolean }
@@ -183,14 +183,19 @@ export interface FightReward {
   readonly heal?: boolean
 }
 
-/** 一场战斗：刷什么怪、什么时候结束；map 让这一场换到这张地图上打，不写就在一局的地图上；intro 是开打时的横幅，mix 换掉地图的配比，enemyMods 是这一场给敌人的常驻修正，chaseLeader 让追人的敌人都盯着队长，rules 是我方在这一场的规则，reward 是过关奖励，clockSec 让这一场从难度时钟的这一秒开打（敌人的血量、刷怪间隔与掉币率都从这一秒往后算），不写就接着一局累计打过的时长；不写名字就只显示用时 */
-export interface FightDef {
-  readonly name?: string
-  readonly map?: MapId
+/** 一个阶段：刷什么怪、达成什么目标；intro 是这一阶段开始时的横幅，mix 换掉配比，不写时第一个阶段按地图、后面的阶段沿用这一场写的 */
+export interface PhaseDef {
   readonly intro?: Banner
   readonly mix?: readonly MixEntry[]
   readonly spawns: readonly SpawnRule[]
   readonly ends: readonly EndRule[]
+}
+
+/** 一场战斗：它自己是第一个阶段，then 里的阶段在前一个达成后不停顿地接上，场上的敌人留着，最后一个阶段达成才算这一场赢；map 让这一场换到这张地图上打，不写就在一局的地图上；enemyMods 是这一场给敌人的常驻修正，chaseLeader 让追人的敌人都盯着队长，rules 是我方在这一场的规则，reward 是过关奖励，clockSec 让这一场从难度时钟的这一秒开打（敌人的血量、刷怪间隔与掉币率都从这一秒往后算），不写就接着一局累计打过的时长；不写名字就只显示用时 */
+export interface FightDef extends PhaseDef {
+  readonly name?: string
+  readonly map?: MapId
+  readonly then?: readonly PhaseDef[]
   readonly enemyMods?: StatMods
   readonly chaseLeader?: boolean
   readonly rules?: FightRules

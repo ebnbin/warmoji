@@ -7,7 +7,7 @@ import { characterXp, growthSteps, ITEMS, RARITIES, RARITY_ORDER } from '../data
 import { bossFor, HAZARD_NAMES, mapEnemyRoster, MAPS } from '../data/maps'
 import { ROLES } from '../data/roles'
 import { STAT_CATEGORIES, STAT_KEYS, STATS, statValue } from '../data/stats'
-import { fightsOf } from '../data/runs'
+import { fightsOf, phasesOf } from '../data/runs'
 import { heatOf, MUTATORS } from '../data/mutators'
 import { levelProgress, stackCount } from '../run/draft'
 import { activeHudHost } from '../run/hudHost'
@@ -122,31 +122,35 @@ function runFoes(run: RunState): Foe[] {
   fightsOf(def).forEach((f, i) => {
     const n = i + 1
     const map = fightMap(run, f)
-    const mix = (): void => {
-      if (f.mix) for (const m of f.mix) add(ENEMIES[m.kind], n)
-      else for (const row of MAPS[map].mix) add(ENEMIES[row.kind], Math.max(n, row.sinceWave - firstWave + 1))
-    }
-    const squad = (sq: Squad): void => {
-      if (sq.enemy) add(ENEMIES[sq.enemy], n)
-      else mix()
-      if (sq.escort) add(ENEMIES[sq.escort.enemy], n)
-    }
-    for (const s of f.spawns) {
-      if (s.kind === 'boss') add(bossFor(map), n)
-      else if (s.kind === 'knobs') for (const e of mapEnemyRoster(map)) add(e, n)
-      else if (s.kind === 'batch') squad(s.squad)
-      else if (s.kind === 'waves') s.squads.forEach(squad)
-      else mix()
+    for (const p of phasesOf(f)) {
+      const mix = (): void => {
+        const rows = p.mix ?? f.mix
+        if (rows) for (const m of rows) add(ENEMIES[m.kind], n)
+        else for (const row of MAPS[map].mix) add(ENEMIES[row.kind], Math.max(n, row.sinceWave - firstWave + 1))
+      }
+      const squad = (sq: Squad): void => {
+        if (sq.enemy) add(ENEMIES[sq.enemy], n)
+        else mix()
+        if (sq.escort) add(ENEMIES[sq.escort.enemy], n)
+      }
+      for (const s of p.spawns) {
+        if (s.kind === 'boss') add(bossFor(map), n)
+        else if (s.kind === 'knobs') for (const e of mapEnemyRoster(map)) add(e, n)
+        else if (s.kind === 'batch') squad(s.squad)
+        else if (s.kind === 'waves') s.squads.forEach(squad)
+        else mix()
+      }
     }
   })
   return order.map((def) => ({ def, since: since.get(def.kind)! })).sort((a, b) => a.since - b.since)
 }
 
-/** 这一场登场的头目 */
+/** 这一场登场的头目，各阶段的都算 */
 function fightBosses(f: FightDef, mapId: MapId): EnemyDef[] {
-  const squads = f.spawns.flatMap((s) => (s.kind === 'batch' ? [s.squad] : s.kind === 'waves' ? s.squads : []))
+  const spawns = phasesOf(f).flatMap((p) => p.spawns)
+  const squads = spawns.flatMap((s) => (s.kind === 'batch' ? [s.squad] : s.kind === 'waves' ? s.squads : []))
   return [
-    ...f.spawns.flatMap((s) => (s.kind === 'boss' ? [bossFor(mapId)] : [])),
+    ...spawns.flatMap((s) => (s.kind === 'boss' ? [bossFor(mapId)] : [])),
     ...squads.flatMap((sq) => (sq.enemy && ENEMIES[sq.enemy].role === 'boss' ? [ENEMIES[sq.enemy]] : [])),
   ]
 }
@@ -155,7 +159,7 @@ function fightBosses(f: FightDef, mapId: MapId): EnemyDef[] {
 function fightTag(def: RunDef, f: FightDef, mapId: MapId): string {
   const unit = fightUnit(def)
   if (fightBosses(f, mapId).length > 0) return `（首领${unit}）`
-  return f.spawns.some((s) => s.kind === 'batch' && (s.squad.elites ?? 0) > 0) ? `（精英${unit}）` : ''
+  return phasesOf(f).some((p) => p.spawns.some((s) => s.kind === 'batch' && (s.squad.elites ?? 0) > 0)) ? `（精英${unit}）` : ''
 }
 
 /** 暂停页：一局之中的信息都在这里，盖在战斗、商店或招募页上，下层停住 */
@@ -456,7 +460,7 @@ export class PauseScene extends Phaser.Scene {
       const tag = (f: FightDef): string => fightTag(def, f, fightMap(run, f))
       flow.text(
         snap && cur
-          ? `${cur.name ?? ''}进行中${tag(cur)}${remain === null ? '' : ` · 本${unit}还剩 ${formatTime(Math.ceil(remain / 1000))}`}`
+          ? `${cur.name ?? ''}进行中${tag(cur)}${remain === null ? '' : ` · 还剩 ${formatTime(Math.ceil(remain / 1000))}`}`
           : `${prev ? `${prev.name ?? ''}已完成 · ` : ''}下一${unit}是${cur?.name ?? ''}${cur ? tag(cur) : ''}`,
         { color: 'ink', bold: true },
       )

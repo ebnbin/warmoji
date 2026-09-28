@@ -1,18 +1,20 @@
-import { query } from 'bitecs'
+import { query, removeEntity } from 'bitecs'
 import { ENEMIES } from '../../data/enemies'
-import { timeLimitMs } from '../../data/runs'
+import { phasesOf, timeLimitMs } from '../../data/runs'
 import { UNIT } from '../../util/units'
 import type { Point } from '../../util/vec'
 import type { EnemyDef, EnemyMixEntry } from '../../types/enemies'
-import type { EndRule, FightDef, HoldPoint, SpawnAt, Squad, StreamRule, WavesRule } from '../../types/runs'
+import type { CarrierRule, EndRule, FightDef, HoldPoint, PhaseDef, SpawnAt, Squad, StreamRule, WavesRule } from '../../types/runs'
 import type { StatMods } from '../../types/stats'
 import { activeRules, enemyModsOf, mutatorRules } from '../../run/rules'
 import type { ActiveRules } from '../../run/rules'
 import { runDef } from '../../run/state'
 import type { RunState } from '../../run/state'
-import { Bounty, Call, Due, ENEMY_SET, FACTION, Faction, Order, Telegraph, Transform } from '../components'
-import { callRule, foeSpec } from '../store'
+import { Bounty, Call, Carrier, Due, ENEMY_SET, FACTION, Faction, Order, Telegraph, Transform } from '../components'
+import { scheduleCall, scheduleCarrier } from '../entities/schedule'
+import { callRule, carrierPickup, foeSpec } from '../store'
 import { sandboxTeamMods } from '../sandbox/knobs'
+import { rollCarriers } from '../utils/battleFx'
 import { leaderX, leaderY } from '../utils/team'
 import type { Sim } from '../sim'
 
@@ -55,21 +57,25 @@ export interface HoldState {
   inside: boolean
 }
 
-/** 一场战斗进行中的状态 */
+/** 一场战斗进行中的状态：刷怪、目标与进度都是当前阶段的 */
 export interface FightState {
   readonly def: FightDef
   /** 我方在这一场的规则，词缀已经算进去 */
   readonly rules: ActiveRules
   /** 这一场给敌人的常驻修正，词缀已经算进去 */
   readonly enemyMods: readonly StatMods[]
-  readonly streams: StreamState[]
-  readonly waves: WavesState[]
+  /** 第几个阶段 */
+  phase: number
+  /** 这一阶段开始的时刻，阶段里的时刻都从这里算 */
+  phaseAt: number
+  streams: StreamState[]
+  waves: WavesState[]
   /** 试炼场按旋钮刷怪的冷却；没有这条规则是 null */
-  readonly knobs: { cooldownMs: number } | null
-  /** 这一场的配比；不写就按地图 */
-  readonly mix: EnemyMixEntry[] | null
-  readonly hold: HoldState | null
-  /** 开打时的击杀、金币与倒下次数，本场的进度从这里算 */
+  knobs: { cooldownMs: number } | null
+  /** 这一阶段的配比；不写就按地图 */
+  mix: EnemyMixEntry[] | null
+  hold: HoldState | null
+  /** 这一阶段开始时的击杀、金币与倒下次数，进度从这里算 */
   base: { kills: number; coins: number; downs: number }
   /** 放出过几个悬赏目标 */
   bounties: number
@@ -89,28 +95,87 @@ function downsOf(run: RunState): number {
   return run.stats.deaths.reduce((s, n) => s + n, 0)
 }
 
-export function newFight(def: FightDef, run: RunState): FightState {
-  const hold = def.ends.find((e) => e.kind === 'hold')
+/** 阶段自己的状态：刷怪、配比与据点换成这一阶段的，进度从 at 这一刻、run 此刻的计数算起 */
+function phaseState(def: FightDef, phase: number, run: RunState, at: number): Pick<FightState, 'phase' | 'phaseAt' | 'streams' | 'waves' | 'knobs' | 'mix' | 'hold' | 'base' | 'bounties' | 'bossDownAt' | 'wonAt'> {
+  const p = phasesOf(def)[phase]!
+  const hold = p.ends.find((e) => e.kind === 'hold')
+  const mix = p.mix ?? def.mix
   return {
-    def,
-    rules: activeRules(runDef(run).rules, def.rules, mutatorRules(run)),
-    enemyMods: enemyModsOf(run, def),
-    streams: def.spawns.flatMap((rule) => (rule.kind === 'stream' ? [{ rule, cooldownMs: FIRST_SPAWN_MS }] : [])),
-    waves: def.spawns.flatMap((rule) => (rule.kind === 'waves' ? [{ rule, next: 0, calmAt: -1 }] : [])),
-    knobs: def.spawns.some((rule) => rule.kind === 'knobs') ? { cooldownMs: FIRST_SPAWN_MS } : null,
-    mix: def.mix ? def.mix.map((m) => ({ def: ENEMIES[m.kind], weight: m.weight })) : null,
+    phase,
+    phaseAt: at,
+    streams: p.spawns.flatMap((rule) => (rule.kind === 'stream' ? [{ rule, cooldownMs: FIRST_SPAWN_MS }] : [])),
+    waves: p.spawns.flatMap((rule) => (rule.kind === 'waves' ? [{ rule, next: 0, calmAt: -1 }] : [])),
+    knobs: p.spawns.some((rule) => rule.kind === 'knobs') ? { cooldownMs: FIRST_SPAWN_MS } : null,
+    mix: mix ? mix.map((m) => ({ def: ENEMIES[m.kind], weight: m.weight })) : null,
     hold: hold?.kind === 'hold' ? { rule: hold, point: 0, heldMs: 0, inside: false } : null,
     base: { kills: run.kills, coins: run.coins, downs: downsOf(run) },
     bounties: 0,
     bossDownAt: -1,
     wonAt: -1,
+  }
+}
+
+export function newFight(def: FightDef, run: RunState): FightState {
+  return {
+    def,
+    rules: activeRules(runDef(run).rules, def.rules, mutatorRules(run)),
+    enemyMods: enemyModsOf(run, def),
+    ...phaseState(def, 0, run, 0),
     leaderFell: false,
     switchedAt: -Infinity,
     rescueMs: run.roster.map(() => 0),
   }
 }
 
-/** 本场的收获从此刻起算：开波的道具规则可能已经进账 */
+/** 当前阶段 */
+export function phaseOf(f: FightState): PhaseDef {
+  return phasesOf(f.def)[f.phase]!
+}
+
+/** 当前阶段开始了多久 */
+export function phaseMs(sim: Sim): number {
+  return sim.elapsedMs - sim.fight.phaseAt
+}
+
+/** 这一阶段开始：定时登场的排好，带光圈的敌人抽好效果排好，打出这一阶段的横幅 */
+export function startPhase(sim: Sim): void {
+  const at = sim.fight.phaseAt
+  const p = phaseOf(sim.fight)
+  for (const rule of p.spawns) {
+    if (rule.kind === 'batch' || rule.kind === 'boss') scheduleCall(sim, at + rule.atMs, rule)
+    else if (rule.kind === 'carriers') scheduleCarriers(sim, at, rule)
+  }
+  if (p.intro) sim.out.banners.push(p.intro)
+}
+
+function scheduleCarriers(sim: Sim, at: number, rule: CarrierRule): void {
+  const carriers = rollCarriers(sim.mapId, rule.buff, rule.debuff, () => sim.rng.next())
+  carriers.forEach((pickup, i) => {
+    scheduleCarrier(sim, at + rule.atMs + (rule.spanMs * i) / carriers.length, pickup)
+  })
+}
+
+/** 已经是这一场的最后一个阶段 */
+export function lastPhase(f: FightState): boolean {
+  return f.phase === phasesOf(f.def).length - 1
+}
+
+/** 这一阶段达成，不停顿地接上下一阶段：还没登场的一队、头目与带光圈的敌人不再来，场上的留着 */
+export function nextPhase(sim: Sim): void {
+  for (const e of [...query(sim.world, [Due, Call])]) {
+    callRule[e] = undefined
+    removeEntity(sim.world, e)
+  }
+  for (const e of [...query(sim.world, [Due, Carrier])]) {
+    carrierPickup[e] = undefined
+    removeEntity(sim.world, e)
+  }
+  sim.bossDown = false
+  Object.assign(sim.fight, phaseState(sim.fight.def, sim.fight.phase + 1, sim.run, sim.elapsedMs))
+  startPhase(sim)
+}
+
+/** 这一阶段的收获从此刻起算：开波的道具规则可能已经进账 */
 export function markFightBase(sim: Sim): void {
   sim.fight.base = { kills: sim.run.kills, coins: sim.run.coins, downs: downsOf(sim.run) }
 }
@@ -130,10 +195,10 @@ export function switchBlock(sim: Sim): string | null {
   return left > 0 ? `还要 ${Math.ceil(left / 1000)} 秒才能换队长` : null
 }
 
-/** 离时限还有多久；没有时限是 Infinity */
+/** 离这一阶段的时限还有多久；没有时限是 Infinity */
 export function timeLeftMs(sim: Sim): number {
-  const limit = timeLimitMs(sim.fight.def)
-  return limit === undefined ? Infinity : limit - sim.elapsedMs
+  const limit = timeLimitMs(phaseOf(sim.fight))
+  return limit === undefined ? Infinity : limit - phaseMs(sim)
 }
 
 /** 据点这一处在地图上的位置 */
@@ -181,7 +246,7 @@ export function calm(sim: Sim): boolean {
 /** 连续刷怪还在刷 */
 function streaming(sim: Sim): boolean {
   const f = sim.fight
-  return f.knobs !== null || f.streams.some((st) => st.rule.untilMs === undefined || sim.elapsedMs < st.rule.untilMs)
+  return f.knobs !== null || f.streams.some((st) => st.rule.untilMs === undefined || phaseMs(sim) < st.rule.untilMs)
 }
 
 /** 还活着或还没放出的悬赏目标 */
@@ -213,14 +278,14 @@ export type Verdict = { readonly win: true } | { readonly win: false; readonly r
 
 const WIN: Verdict = { win: true }
 
-/** 这一场的结果，还没分出来是 null：队长倒下就输的队长倒了、倒下到数，立刻输；撑到时限时已经达成目标或时限不算输就赢；头目倒下与别的获胜条件等敌人倒完 */
+/** 这一场的结果，还没分出来是 null：队长倒下就输的队长倒了、倒下到数，立刻输；撑到时限时已经达成目标或时限不算输就算达成；不是最后一个阶段的达成了就立刻接上下一阶段，最后一个阶段达成就赢，头目倒下与别的目标等敌人倒完 */
 export function fightVerdict(sim: Sim, timeUp: boolean): Verdict | null {
   const f = sim.fight
   if (f.rules.critical && f.leaderFell) return { win: false, reason: '队长倒下了' }
-  for (const e of f.def.ends) {
+  const ends = phaseOf(f).ends
+  for (const e of ends) {
     if (e.kind === 'downs' && downsOf(sim.run) - f.base.downs >= e.count) return { win: false, reason: `队员倒下了 ${e.count} 次` }
   }
-  const ends = f.def.ends
   if (ends.some((e) => e.kind === 'boss') && sim.bossDown) {
     sim.bossDown = false
     f.bossDownAt = sim.fxMs
@@ -230,19 +295,21 @@ export function fightVerdict(sim: Sim, timeUp: boolean): Verdict | null {
   } else {
     f.wonAt = -1
   }
-  if (timeUp) {
-    const lose = ends.some((e) => e.kind === 'time' && e.lose)
-    return !lose || f.wonAt >= 0 || f.bossDownAt >= 0 ? WIN : { win: false, reason: '时间到了' }
+  if (timeUp && ends.some((e) => e.kind === 'time' && e.lose) && f.wonAt < 0 && f.bossDownAt < 0) return { win: false, reason: '时间到了' }
+  if (!lastPhase(f)) {
+    if (timeUp || f.wonAt >= 0 || f.bossDownAt >= 0) nextPhase(sim)
+    return null
   }
+  if (timeUp) return WIN
   if (f.bossDownAt >= 0 && sim.fxMs - f.bossDownAt >= SETTLE_MS) return WIN
   return f.wonAt >= 0 && sim.fxMs - f.wonAt >= SETTLE_MS ? WIN : null
 }
 
-/** 顶部显示的这一场目标：warn 为真的是提醒会输的 */
+/** 顶部显示的这一阶段目标：warn 为真的是提醒会输的 */
 export function fightGoals(sim: Sim): { readonly text: string; readonly warn: boolean }[] {
   const f = sim.fight
   const out: { text: string; warn: boolean }[] = []
-  for (const e of f.def.ends) {
+  for (const e of phaseOf(f).ends) {
     switch (e.kind) {
       case 'cleared': {
         const left = foesLeft(sim)
@@ -290,7 +357,7 @@ export function goalSpot(sim: Sim): Point | null {
   const h = sim.fight.hold
   if (h && h.point < h.rule.points.length) return holdSpot(sim, h.rule.points[h.point]!)
   const bounty = nearestTo(sim, query(sim.world, [Bounty, Transform]))
-  if (bounty || !sim.fight.def.ends.some((e) => e.kind === 'cleared')) return bounty
+  if (bounty || !phaseOf(sim.fight).ends.some((e) => e.kind === 'cleared')) return bounty
   return nearestTo(sim, query(sim.world, ENEMY_SET).filter((eid) => Faction.v[eid] === FACTION.enemy))
 }
 

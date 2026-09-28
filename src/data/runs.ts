@@ -2,7 +2,7 @@ import runsJson from '../assets/runs.json'
 import { fromJson } from './json'
 import { keysOf } from '../util/record'
 import type { MapId } from '../types/maps'
-import type { FightDef, RunDef, RunId, StepDef } from '../types/runs'
+import type { FightDef, PhaseDef, RunDef, RunId, StepDef } from '../types/runs'
 
 export const RUNS = fromJson<Record<RunId, RunDef>>(runsJson)
 
@@ -13,9 +13,14 @@ export function fightsOf(def: RunDef): FightDef[] {
   return def.steps.flatMap((s) => (s.kind === 'fight' ? [s.fight] : []))
 }
 
-/** 这一场的时限：撑到它就结束；没有时限是 undefined */
-export function timeLimitMs(f: FightDef): number | undefined {
-  for (const e of f.ends) if (e.kind === 'time') return e.ms
+/** 一场的各个阶段，按先后 */
+export function phasesOf(f: FightDef): readonly PhaseDef[] {
+  return [f, ...(f.then ?? [])]
+}
+
+/** 这一阶段的时限：撑到它就结束；没有时限是 undefined */
+export function timeLimitMs(p: PhaseDef): number | undefined {
+  for (const e of p.ends) if (e.kind === 'time') return e.ms
   return undefined
 }
 

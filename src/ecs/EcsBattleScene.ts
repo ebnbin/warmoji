@@ -57,11 +57,11 @@ import { initialLayout, stepFrozenVisuals, worldTimeScale } from './sim'
 import { openWave, settleWave } from './systems/shared/wave'
 import { waveAt, WAVE } from '../data/waves'
 import { SURGE } from '../data/enemies'
-import { timeLimitMs } from '../data/runs'
+import { phasesOf, timeLimitMs } from '../data/runs'
 import { enterFight } from '../run/flow'
 import type { FightDef } from '../types/runs'
-import { callSquad, startFight } from './fight/spawns'
-import { fightGoals, fightMods, fightVerdict, markFightBase, switchBlock, timeLeftMs } from './fight/state'
+import { callSquad } from './fight/spawns'
+import { fightGoals, fightMods, fightVerdict, lastPhase, markFightBase, nextPhase, phaseOf, startPhase, switchBlock, timeLeftMs } from './fight/state'
 import { xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
@@ -221,6 +221,13 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.scheduleWaveEnd()
   }
 
+  /** 跳过这一阶段，接上下一阶段；已是最后一个阶段就不动 */
+  devNextPhase(): void {
+    const sim = this.sim
+    if (!sim || sim.over || this.ending || lastPhase(sim.fight)) return
+    nextPhase(sim)
+  }
+
   devResetSkill(): void {
     this.run.skillCd.fill(0)
     for (const e of this.sim?.skills ?? []) {
@@ -351,12 +358,11 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     simRef.onDeathFx = (d) => replayDeath(simRef, d)
     armTeam(this.sim, run)
     if (Number.isFinite(this.sim.fight.rules.vision)) this.fog = new Fog(this)
-    startFight(this.sim)
+    startPhase(this.sim)
     this.waveBaseKills = run.kills
     this.waveBaseCoins = run.coins
     openWave(this.sim)
     markFightBase(this.sim)
-    if (this.fightDef.intro) this.sim.out.banners.push(this.fightDef.intro)
     this.ready = true
     hint.destroy()
   }
@@ -390,15 +396,17 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     const sim = this.sim
     const elapsed = sim?.elapsedMs ?? 0
     const boss = sim ? query(this.world, [Enemy, Boss]).find((eid) => Boss.v[eid] === 1) : undefined
-    const limit = timeLimitMs(this.fightDef)
+    const left = sim ? timeLeftMs(sim) : (timeLimitMs(this.fightDef) ?? Infinity)
+    const phases = phasesOf(this.fightDef).length
+    const name = this.fightDef.name
     return {
       xp: this.run.xp.xp,
       xpNext: xpToNext(this.run.xp.level),
       kills: this.run.kills,
       coins: this.run.coins,
-      label: this.fightDef.name ?? null,
+      label: name === undefined ? null : phases > 1 ? `${name} ${(sim?.fight.phase ?? 0) + 1}/${phases}` : name,
       seconds: Math.floor(elapsed / 1000),
-      remainMs: limit === undefined ? null : Math.max(0, limit - elapsed),
+      remainMs: Number.isFinite(left) ? Math.max(0, left) : null,
       goals: sim ? fightGoals(sim) : [],
       bossHp: boss !== undefined ? Hp.v[boss]! : null,
       bossMaxHp: boss !== undefined ? Hp.max[boss]! : 1,
@@ -576,9 +584,9 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     return runDef(this.run).team === 'knobs'
   }
 
-  /** 这一场没有结束规则，一直打下去 */
+  /** 这一阶段没有结束规则，一直打下去 */
   get endless(): boolean {
-    return this.fightDef.ends.length === 0
+    return (this.sim ? phaseOf(this.sim.fight) : this.fightDef).ends.length === 0
   }
 
   /** 无敌切换后立刻生效：换掉队员的生命上限，开无敌时补满 */
