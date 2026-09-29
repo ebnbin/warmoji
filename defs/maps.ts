@@ -115,6 +115,17 @@ const VOLCANO_MIX: readonly EnemyMixRow[] = [
   { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
 ]
 
+const SHIP_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 76, perWave: -2, min: 36, max: 76 },
+  { kind: 'skeleton', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
+  { kind: 'rat', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'ghost', sinceWave: 2, base: 10, perWave: 0.5, min: 0, max: 20 },
+  { kind: 'puffer', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'siren', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'creeper', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'raccoon', sinceWave: 5, base: 4, perWave: 0.2, min: 0, max: 8 },
+]
+
 export const MAPS = {
   forest: {
     emoji: '1f332',
@@ -445,5 +456,44 @@ export const MAPS = {
       },
     },
     boss: 'rhino',
+  },
+  ship: {
+    emoji: '26f5',
+    name: '帆船',
+    desc: '一艘在海上航行的三桅帆船，舷墙围着的甲板就是战场。甲板上的一切都有重量：人群挤到哪边，船就往哪边倾，海浪也推着它来回摇。船一倾，往高处走就吃力变慢、往低处走更快；站着不动会顺着甲板往低处滑，金币也跟着溜，散落的炮弹满甲板滚——别被怪物堵在低的那一侧',
+    kind: 'ship',
+    stamina: { exertion: 0.5, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(205 38% 22%)',
+      bgTo: 'hsl(222 45% 7%)',
+      map: hslToInt(28, 0.32, 0.34),
+      shadow: 0x000000,
+    },
+    decor: {
+      emojis: ['1faa2', '1faa3', '1f9ed'],
+      sizeU: [0.5, 0.8],
+      alpha: [0.8, 0.95],
+      density: [0.006, 0.009],
+    },
+    mix: SHIP_MIX,
+    finalWaveSub: '巨鳄爬上了甲板——它有一吨重，它往哪边走，船就往哪边倾！',
+    ship: {
+      meterPerU: 0.45,
+      hull: { lengthU: 48, beamU: 18, bow: 0.42, bowPow: 0.85, stern: 0.2, sternPow: 2.5, transom: 0.62, transomBulge: 0.05, bulwarkU: 0.45, seaU: 5, neckU: 0.6, masts: [0.22, 0.5, 0.76], mastU: 0.45 },
+      hydro: { draftM: 2, midship: 0.78, kgM: 2.5, depthM: 4.2, rho: 1025, rollGyration: 0.38, pitchGyration: 0.26, rollAdded: 0.2, pitchAdded: 0.8, rollDamping: 0.15, pitchDamping: 0.35 },
+      weight: { bodyKg: 75, bodyRadiusU: 0.45, bodyHeightM: 0.9, pickupKg: 0.05, ballKg: 14.5 },
+      sea: {
+        speedMs: 1.2,
+        swells: [
+          { heightM: 0.8, periodS: 8, towardDeg: 80 },
+          { heightM: 0.2, periodS: 5.5, towardDeg: 160 },
+          { heightM: 0.6, periodS: 11, towardDeg: 40 },
+        ],
+      },
+      friction: { body: { static: 0.08, kinetic: 0.06 }, coin: { static: 0.04, kinetic: 0.03 }, ballRolling: 0.005 },
+      gait: { flatResistance: 1.5, downhillMax: 1.3, effortMin: 0.4 },
+      balls: { count: 6, radiusU: 0.18, restitution: 0.35 },
+    },
+    boss: 'croc',
   },
 } as const satisfies Record<string, MapDef>

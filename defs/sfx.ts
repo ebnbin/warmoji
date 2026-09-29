@@ -19,4 +19,6 @@ export const SFX = {
   click: { wave: 'square', freq: 760, freqEnd: 660, duration: 0.035, volume: 0.12, throttleMs: 40 },
   rumble: { wave: 'noise', freq: 150, freqEnd: 45, duration: 2.2, volume: 0.95, attack: 0.6, decayPow: 1.1, throttleMs: 1500 },
   erupt: { wave: 'noise', freq: 700, freqEnd: 35, duration: 1.6, volume: 0.9, attack: 0.01, decayPow: 1.5, throttleMs: 1000 },
+  creak: { wave: 'sawtooth', freq: 132, freqEnd: 92, duration: 0.62, volume: 0.2, attack: 0.14, decayPow: 0.9, steps: [1, 1.07, 0.96, 1.09, 1, 1.05, 0.94, 1.08, 1, 1.04], throttleMs: 1800, jitter: 0.18 },
+  wash: { wave: 'noise', freq: 1900, freqEnd: 260, duration: 0.75, volume: 0.42, attack: 0.09, decayPow: 1.3, throttleMs: 650, jitter: 0.2 },
 } as const satisfies Record<string, SfxDef>

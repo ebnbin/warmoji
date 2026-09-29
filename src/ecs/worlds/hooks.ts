@@ -4,7 +4,7 @@ import { SPAWN } from '../../data/enemies'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
 import { MAP, MAPS } from '../../data/maps'
-import type { IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
+import type { IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
 import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebula'
@@ -12,12 +12,14 @@ import { around, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava }
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import type { Basin } from '../worlds/basin'
 import type { VolcanoState } from '../worlds/volcano'
+import { addWeight, bumpBalls, clearWeights, makeShip, paceOf, stepBalls, stepOnDeck, stepShip } from '../worlds/ship'
+import type { ShipState } from '../worlds/ship'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/river'
 import { isHorizontal } from '../utils/remap'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Alive, Boss, BreaksWalls, Due, ENEMY_SET, Hp, Meteor, Motion, MOTION, Phasing, Pickup, PICKUP_SET, PROJ_SET, Radius, Slot, Swarmer, Tint, Transform, Uid } from '../components'
+import { Airborne, Alive, Boss, BreaksWalls, Drive, Due, ENEMY_SET, Hp, Meteor, Motion, MOTION, Phasing, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Swarmer, Tint, Transform, Uid } from '../components'
 import { bodyRules, meteorHit, meteorPath } from '../store'
 import { spawnMeteor } from '../entities/meteor'
 import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
@@ -32,6 +34,7 @@ import { fleeSteer } from '../systems/shared/steer'
 import { leaderX, leaderY, leaderPoint } from '../utils/team'
 import { iceTraction } from '../systems/shared/squad'
 import { withBuilt } from './built'
+import type { BodyStep } from '../systems/shared/body'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -75,10 +78,11 @@ export interface WorldState {
   walls: Walls | null
   hole: Point | null
   volcano: VolcanoState | null
+  ship: ShipState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null }
 }
 
 export interface WorldHooks {
@@ -93,6 +97,8 @@ export interface WorldHooks {
   surface(sim: Sim, x: number, y: number): Surface
   /** 在这里朝 (dx, dy) 赶路的费力倍率：逆着介质更累，顺着更省力 */
   effort(sim: Sim, x: number, y: number, dx: number, dy: number): number
+  /** 地面自己的接触力学：接管这一步就把位置与速度写进 out 并返回 true，否则按常规积分 */
+  contact(sim: Sim, eid: number, dt: number, x: number, y: number, vx: number, vy: number, out: BodyStep): boolean
   /** 任何身体的位置修正：边界、障碍、环面回绕，按身体半径 */
   constrainBody(sim: Sim, eid: number, from: Point, next: Point): Point
   chaseDir(sim: Sim, eid: number, tx: number, ty: number): Point
@@ -136,6 +142,9 @@ const bounded: WorldHooks = {
   },
   effort() {
     return 1
+  },
+  contact() {
+    return false
   },
   constrainBody(sim, eid, _from, next) {
     const r = Radius.v[eid]!
@@ -648,6 +657,16 @@ function alongWall(b: Basin, x: number, y: number, dx: number, dy: number, reach
   return { x: -n.y * side, y: n.x * side }
 }
 
+/** 游荡着走到壁跟前就像撞上地图边一样折回来 */
+function wanderIn(b: Basin, eid: number, dx: number, dy: number): Point {
+  const x = Transform.x[eid]!
+  const y = Transform.y[eid]!
+  if (roomAt(b, x, y) > Radius.v[eid]! + 0.6 * UNIT) return { x: dx, y: dy }
+  const n = awayFromWall(b, x, y)
+  const dot = dx * n.x + dy * n.y
+  return dot >= 0 ? { x: dx, y: dy } : { x: dx - 2 * dot * n.x, y: dy - 2 * dot * n.y }
+}
+
 const LAVA_TINT = 0xff6d00
 
 /** 喷发的节奏：到点先起预兆并定下熔岩往哪几股漫出，预兆完了熔岩漫过口沿，流量先涨后落，出完回到平静 */
@@ -707,15 +726,8 @@ const volcano: WorldHooks = {
     const d = around(f, mountainPx(sim) + rad + 0.3 * UNIT, x, y, tx, ty)
     return alongWall(f.basin, x, y, d.x, d.y, rad + 0.3 * UNIT)
   },
-  /** 游荡着走到岩壁跟前就像撞上地图边一样折回来 */
   wanderDir(sim, eid, dx, dy) {
-    const b = volcanoOf(sim).field.basin
-    const x = Transform.x[eid]!
-    const y = Transform.y[eid]!
-    if (roomAt(b, x, y) > Radius.v[eid]! + 0.6 * UNIT) return { x: dx, y: dy }
-    const n = awayFromWall(b, x, y)
-    const dot = dx * n.x + dy * n.y
-    return dot >= 0 ? { x: dx, y: dy } : { x: dx - 2 * dot * n.x, y: dy - 2 * dot * n.y }
+    return wanderIn(volcanoOf(sim).field.basin, eid, dx, dy)
   },
   fleeDir(sim, eid, awayX, awayY) {
     return alongWall(volcanoOf(sim).field.basin, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + 1.5 * UNIT)
@@ -744,6 +756,111 @@ const volcano: WorldHooks = {
       stepLava(s.field, cfg.lava, step / 1000, now, erupting ? s.spill : NO_SPILL, erupting ? spillVolume(cfg, now - s.since) : 0)
     }
     burnOnLava(sim, s, cfg)
+  },
+}
+
+function shipCfg(sim: Sim): ShipConfig {
+  return MAPS[sim.mapId].ship!
+}
+
+/** 炮弹的位置与涌浪的相位由布景种子定下；船从正浮开始摇 */
+function shipOf(sim: Sim): ShipState {
+  let s = sim.worldState.ship
+  if (!s) {
+    s = makeShip(shipCfg(sim), sim.mapW, sim.mapH, new Rng(sim.run.decorSeed ^ 0x5b1d))
+    sim.worldState.ship = s
+  }
+  return s
+}
+
+/** 压在甲板上的重量，千克：身体按半径的三次方与身体的质量折算；腾空、被抛着、穿行中、死了的与碎片不压甲板 */
+function deckKg(sim: Sim, cfg: ShipConfig, eid: number): number {
+  if (!Alive.v[eid] || hasComponent(sim.world, eid, Airborne) || hasComponent(sim.world, eid, Shard)) return 0
+  const k = Motion.kind[eid]
+  if (k === MOTION.arc || k === MOTION.transit) return 0
+  if (hasComponent(sim.world, eid, Pickup)) return cfg.weight.pickupKg
+  return cfg.weight.bodyKg * Phys.mass[eid]! * (Radius.v[eid]! / (cfg.weight.bodyRadiusU * UNIT)) ** 3
+}
+
+/** 平地上赶路的阻力，像素/秒² */
+function resistPx(cfg: ShipConfig): number {
+  return (cfg.gait.flatResistance * UNIT) / cfg.meterPerU
+}
+
+/**
+ * 船：能走的是舷墙围着的甲板，舷墙与桅杆是硬边界。甲板上一切有重量的东西让船横摇、纵摇，海浪也推着它摇；
+ * 甲板倾斜后赶路按恒定功率上坡慢、下坡快，闲着的身体与掉落物按库仑摩擦滑，炮弹按滚动摩擦滚
+ */
+const ship: WorldHooks = {
+  ...bounded,
+  /** 恒定功率下每秒花的体力不变，每格的费力是功率之比：上坡照常花、走得慢，下坡快到顶就刹着走、花得少 */
+  effort(sim, _x, _y, dx, dy) {
+    const len = Math.hypot(dx, dy)
+    if (len === 0) return 1
+    const cfg = shipCfg(sim)
+    const s = shipOf(sim)
+    const c = resistPx(cfg)
+    const along = (s.gx * dx + s.gy * dy) / len
+    return Math.max(cfg.gait.effortMin, paceOf(s.gx, s.gy, dx, dy, c, cfg.gait.downhillMax) * (1 - along / c))
+  },
+  contact(sim, eid, dt, x, y, vx, vy, out) {
+    if (hasComponent(sim.world, eid, Shard)) return false
+    const cfg = shipCfg(sim)
+    const s = shipOf(sim)
+    const coin = hasComponent(sim.world, eid, Pickup)
+    const dx = Drive.x[eid]!
+    const dy = Drive.y[eid]!
+    const walking = dx !== 0 || dy !== 0
+    const f = walking && !coin ? paceOf(s.gx, s.gy, dx, dy, resistPx(cfg), cfg.gait.downhillMax) : 1
+    const g = sim.hooks.surface(sim, x, y)
+    const k = (Phys.drag[eid]! * Phys.grip[eid]! * g.traction * g.viscosity) / Phys.mass[eid]!
+    stepOnDeck(s, out, eid, Uid.v[eid]!, x, y, vx, vy, Radius.v[eid]!, dt, k, dx * f, dy * f, walking, coin ? cfg.friction.coin : cfg.friction.body)
+    return true
+  },
+  constrainBody(sim, eid, _from, next) {
+    return keepOut(shipOf(sim).deck.basin, next.x, next.y, Radius.v[eid]!)
+  },
+  chaseDir(sim, eid, tx, ty) {
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    const d = norm(tx - x, ty - y)
+    return alongWall(shipOf(sim).deck.basin, x, y, d.x, d.y, Radius.v[eid]! + 0.3 * UNIT)
+  },
+  wanderDir(sim, eid, dx, dy) {
+    return wanderIn(shipOf(sim).deck.basin, eid, dx, dy)
+  },
+  fleeDir(sim, eid, awayX, awayY) {
+    return alongWall(shipOf(sim).deck.basin, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + 1.5 * UNIT)
+  },
+  spawnPoint(sim, boss) {
+    const b = shipOf(sim).deck.basin
+    let p = bounded.spawnPoint(sim, boss)
+    for (let i = 0; i < 24 && roomAt(b, p.x, p.y) < UNIT; i++) p = bounded.spawnPoint(sim, boss)
+    return keepOut(b, p.x, p.y, UNIT)
+  },
+  settle(sim, p) {
+    return keepOut(shipOf(sim).deck.basin, p.x, p.y, SPAWN.edgeInset * UNIT)
+  },
+  onStart(sim) {
+    shipOf(sim)
+  },
+  /** 先称出甲板上的重量推进船的摇摆，再让炮弹顺着新的倾斜滚、被身体碰开 */
+  tick(sim, delta) {
+    const cfg = shipCfg(sim)
+    const s = shipOf(sim)
+    clearWeights(s)
+    for (const eid of query(sim.world, [Phys, Transform, Radius])) {
+      const kg = deckKg(sim, cfg, eid)
+      if (kg > 0) addWeight(s, cfg, kg, Transform.x[eid]!, Transform.y[eid]!)
+    }
+    for (const b of s.balls) addWeight(s, cfg, cfg.weight.ballKg, b.x, b.y)
+    const dt = Math.min(delta, 50) / 1000
+    stepShip(s, cfg, dt)
+    stepBalls(s, cfg, dt)
+    for (const eid of query(sim.world, [Phys, Transform, Radius])) {
+      if (deckKg(sim, cfg, eid) <= 0 || hasComponent(sim.world, eid, Pickup)) continue
+      bumpBalls(s, cfg, Transform.x[eid]!, Transform.y[eid]!, Radius.v[eid]!, Phys.vx[eid]!, Phys.vy[eid]!)
+    }
   },
 }
 
@@ -871,6 +988,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   space,
   nebula,
   volcano,
+  ship,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()

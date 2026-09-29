@@ -181,6 +181,93 @@ export interface VolcanoConfig {
     readonly tickMs: number
   }
 }
+/** 一列涌浪：波高（米）、周期（秒）、相对船头往哪个方向传（度，0 为顺着船头、90 为从左舷推向右舷） */
+export interface Swell {
+  readonly heightM: number
+  readonly periodS: number
+  readonly towardDeg: number
+}
+/** 身体脚下或金币与甲板之间的库仑摩擦系数 */
+export interface Friction {
+  readonly static: number
+  readonly kinetic: number
+}
+/**
+ * 船：海上航行的一艘帆船，能走的是舷墙围着的甲板，舷墙与桅杆是硬边界。甲板上的人、怪、召唤物、掉落物、炮弹都有重量，
+ * 船按静水力学与刚体动力学横摇、纵摇，海浪也推着它摇；甲板倾斜后重力沿甲板的分量让东西按库仑摩擦滑、炮弹按滚动摩擦滚，赶路按恒定功率上坡慢、下坡快。
+ * 物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface ShipConfig {
+  readonly meterPerU: number
+  /** 甲板的平面形状，格：船长沿地图的长边，船头朝右（竖屏朝上） */
+  readonly hull: {
+    /** 甲板从船尾横板到船首柱的长、最宽处的宽 */
+    readonly lengthU: number
+    readonly beamU: number
+    /** 船头从最宽处收到船首柱的那段占船长的比例，半宽按余弦的 bowPow 次方收拢 */
+    readonly bow: number
+    readonly bowPow: number
+    /** 船尾从最宽处收到横板的那段占船长的比例，按指数 sternPow 的超椭圆收拢；横板的半宽占最宽处的比例，横板中间往后鼓出船宽的 transomBulge 倍 */
+    readonly stern: number
+    readonly sternPow: number
+    readonly transom: number
+    readonly transomBulge: number
+    /** 舷墙的厚度；船壳外至少留多宽的海面 */
+    readonly bulwarkU: number
+    readonly seaU: number
+    /** 窄过两倍 neckU 的尖角填掉 */
+    readonly neckU: number
+    /** 桅杆立在船长方向的哪里（占船长的比例，从船尾算起），半径多少格；桅杆挡路 */
+    readonly masts: readonly number[]
+    readonly mastU: number
+  }
+  /** 空船的静水力学，米：吃水、舯剖面系数（横剖面面积占宽乘吃水的比例）、重心高、型深；海水密度，千克/米³ */
+  readonly hydro: {
+    readonly draftM: number
+    readonly midship: number
+    readonly kgM: number
+    readonly depthM: number
+    readonly rho: number
+    /** 横摇、纵摇的惯性半径占船宽、船长的比例；附加质量占惯量的比例；阻尼比 */
+    readonly rollGyration: number
+    readonly pitchGyration: number
+    readonly rollAdded: number
+    readonly pitchAdded: number
+    readonly rollDamping: number
+    readonly pitchDamping: number
+  }
+  /** 甲板上的重量，千克：身体按半径的三次方与身体的质量折算，重心离甲板 bodyHeightM 米 */
+  readonly weight: {
+    readonly bodyKg: number
+    readonly bodyRadiusU: number
+    readonly bodyHeightM: number
+    readonly pickupKg: number
+    readonly ballKg: number
+  }
+  /** 海：船速（米/秒）与几列涌浪 */
+  readonly sea: {
+    readonly speedMs: number
+    readonly swells: readonly Swell[]
+  }
+  /** 摩擦：身体脚下、金币的静与动摩擦系数；炮弹的滚动摩擦系数 */
+  readonly friction: {
+    readonly body: Friction
+    readonly coin: Friction
+    readonly ballRolling: number
+  }
+  /** 赶路按恒定功率 P = m·v·(c − g∥)：c 是平地上的阻力（米/秒²），下坡最多快到 downhillMax 倍；每格的费力按 1 − g∥/c，最少 effortMin */
+  readonly gait: {
+    readonly flatResistance: number
+    readonly downhillMax: number
+    readonly effortMin: number
+  }
+  /** 甲板上散着的炮弹：几颗、半径（格）、与舷墙桅杆和彼此相撞的恢复系数 */
+  readonly balls: {
+    readonly count: number
+    readonly radiusU: number
+    readonly restitution: number
+  }
+}
 export interface RiverConfig {
   readonly viewScale: number
   readonly width: number
@@ -207,7 +294,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula' | 'volcano'
+  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula' | 'volcano' | 'ship'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -222,6 +309,7 @@ export interface MapDef {
   readonly space?: SpaceConfig
   readonly nebula?: NebulaConfig
   readonly volcano?: VolcanoConfig
+  readonly ship?: ShipConfig
   readonly river?: RiverConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string

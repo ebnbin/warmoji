@@ -529,6 +529,56 @@ function buildVolcano(): BgmScore {
   )
 }
 
+/** 船：多利亚调式的水手号子，六八拍，手风琴似的方波领唱，低音按根音与五度踏步，脚跺与拍手打着节拍 */
+function buildShip(): BgmScore {
+  const chords = [0, 0, 6, 6, 0, 0, 4, 4, 2, 2, 6, 6, 0, 4, 0, 0]
+  return track(
+    {
+      bpm: 104,
+      stepsPerBeat: 3,
+      stepsPerBar: 6,
+      bars: 16,
+      rootMidi: 50,
+      scale: DORIAN,
+      echo: { delaySec: (60 / 104) * 0.5, feedback: 0.22, level: 0.2 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'triangle', vol: 0.16, attack: 0.01, release: 0.1, octave: -1 }
+      const drone: Voice = { wave: 'sine', vol: 0.05, attack: 0.25, release: 0.7, octave: 0 }
+      const lead: Voice = { wave: 'square', vol: 0.07, attack: 0.015, release: 0.1, octave: 1, echo: true }
+      const fiddle: Voice = { wave: 'sawtooth', vol: 0.035, attack: 0.06, release: 0.2, octave: 2 }
+      b.bass(bass, chords, 'r..f..')
+      b.pad(drone, chords, [0, 2], 0.003)
+      b.line(lead, [
+        [0, 0, 4, 2], [0, 2, 4, 1], [0, 3, 4, 2], [0, 5, 4, 1],
+        [1, 0, 4, 2], [1, 2, 0, 1], [1, 3, 2, 2], [1, 5, 4, 1],
+        [2, 0, 3, 2], [2, 2, 3, 1], [2, 3, 3, 2], [2, 5, 3, 1],
+        [3, 0, 3, 2], [3, 2, -1, 1], [3, 3, 1, 2], [3, 5, 3, 1],
+        [4, 0, 4, 2], [4, 2, 4, 1], [4, 3, 4, 2], [4, 5, 4, 1],
+        [5, 0, 4, 2], [5, 2, 5, 1], [5, 3, 6, 2], [5, 5, 7, 1],
+        [6, 0, 6, 3], [6, 3, 4, 3],
+        [7, 0, 2, 3], [7, 3, 0, 3],
+        [8, 0, 7, 3], [8, 3, 6, 2], [8, 5, 5, 1],
+        [9, 0, 4, 3], [9, 3, 2, 3],
+        [10, 0, 6, 3], [10, 3, 5, 2], [10, 5, 4, 1],
+        [11, 0, 3, 3], [11, 3, 1, 3],
+        [12, 0, 4, 2], [12, 2, 5, 1], [12, 3, 6, 2], [12, 5, 7, 1],
+        [13, 0, 8, 3], [13, 3, 7, 2], [13, 5, 6, 1],
+        [14, 0, 4, 2], [14, 2, 3, 1], [14, 3, 2, 2], [14, 5, 1, 1],
+        [15, 0, 0, 6],
+      ])
+      b.line(fiddle, [
+        [8, 0, 4, 6], [9, 0, 2, 6], [10, 0, 3, 6], [11, 0, 1, 6],
+        [12, 0, 2, 6], [13, 0, 4, 6], [14, 0, 1, 6], [15, 0, 0, 6],
+      ])
+      b.drums('kick', 'x..x..', 0, 16, 0.2)
+      b.drums('snare', '...x..', 4, 16, 0.1)
+      b.drums('hat', '.o..o.', 8, 16, 0.035)
+      b.drums('tom', 'x.xx..', 15, 16, 0.18)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -541,6 +591,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   ice: buildSpace,
   nebula: buildSpace,
   volcano: buildVolcano,
+  ship: buildShip,
 }
 
 const cache = new Map<BgmId, BgmScore>()

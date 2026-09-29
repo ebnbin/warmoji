@@ -71,7 +71,8 @@ import { xpMaxed, xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { HudSnapshot } from '../run/hudHost'
+import type { HudSnapshot, TiltSnapshot } from '../run/hudHost'
+import { deckTilt } from './worlds/ship'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
 import { drain } from './outbox'
@@ -450,6 +451,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
         remainMs: Math.max(0, Lifetime.until[e]! - elapsed),
         totalMs: Modifier.totalMs[e]!,
       })),
+      tilt: sim ? tiltSnapshot(sim) : null,
     }
   }
 
@@ -832,5 +834,19 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.run.combatMs += this.sim!.elapsedMs
     playSfx('over')
     this.time.delayedCall(900, () => this.scene.start(SceneKey.Result, { win: false, reason }))
+  }
+}
+
+/** 船上的一局：甲板此刻往哪边倾、倾多少，以及站着会滑的门槛 */
+function tiltSnapshot(sim: Sim): TiltSnapshot | null {
+  const ship = sim.worldState.ship
+  const cfg = MAPS[sim.mapId].ship
+  if (!ship || !cfg) return null
+  const t = deckTilt(ship)
+  return {
+    down: t.down,
+    deg: (t.angle * 180) / Math.PI,
+    bow: { x: ship.deck.bx, y: ship.deck.by },
+    slipDeg: (Math.atan(cfg.friction.body.static) * 180) / Math.PI,
   }
 }

@@ -6,7 +6,7 @@ import { applyCamera, safeInsets, viewport, VIEWPORT_CHANGED } from '../util/app
 import type { FieldCollected, HudInput, HudSnapshot, LeaderChanged, SquadMember, SquadSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
 import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
-import { AimGuide, Announcer, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim } from '../ui'
+import { AimGuide, Announcer, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim, TiltDial } from '../ui'
 import { DEG2RAD } from '../util/units'
 import { SceneKey } from './keys'
 import { openPause } from './pause'
@@ -37,6 +37,8 @@ const DEPTH = { bar: LAYER.hud + 20, fx: LAYER.hud + 21, waveEnd: LAYER.toast + 
 const GOALS = { top: 124, step: 42 } as const
 /** 左上角的全队经验条，右边跟着等级与还没领的升级 */
 const XP_BAR = { x: 12, y: 12, w: 200, h: 16, gap: 12 } as const
+/** 船上的一局在右上角计数下方放倾斜仪：盘心离右边与上边多远、盘的半径 */
+const TILT = { right: 64, top: 166, radius: 52 } as const
 
 export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private joystick?: Joystick
@@ -53,6 +55,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private fxKey = ''
   private goalChips: Chip[] = []
   private goalKey = ''
+  private tiltDial?: TiltDial
   private squad: SquadIcon[] = []
   private squadArc: number[] = []
   private squadShown = { leader: -1, switching: false }
@@ -96,6 +99,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       bossHp: null,
       bossMaxHp: 1,
       battleFx: [],
+      tilt: null,
     }
 
     const stick = EDGE + Joystick.RADIUS
@@ -122,6 +126,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.fxKey = ''
     this.goalChips = []
     this.goalKey = ''
+    this.tiltDial = undefined
     this.squad = []
     this.squadArc = []
     this.squadShown = { leader: -1, switching: false }
@@ -179,6 +184,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     const s = this.arena.hudSnapshot()
     this.updateFxIndicators(s.battleFx)
     this.updateGoals(s.goals)
+    this.updateTilt(s.tilt)
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.xpBar.setValue(s.xpNext > 0 ? s.xp / s.xpNext : 0)
     if (s.level !== this.last.level || s.levelUps !== this.last.levelUps) this.updateLevel(s.level, s.levelUps)
     if (s.kills !== this.last.kills) this.killsPill.setText(String(s.kills))
@@ -415,6 +421,13 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     list.forEach((f, i) => {
       this.fxIcons[i]?.bar.setValue(f.totalMs > 0 ? f.remainMs / f.totalMs : 0)
     })
+  }
+
+  /** 在船上打的一局：甲板往哪边倾、倾多少，随时看得见 */
+  private updateTilt(t: HudSnapshot['tilt']): void {
+    if (!t) return
+    this.tiltDial ??= new TiltDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius, t.bow, t.slipDeg)
+    this.tiltDial.setTilt(t.down, t.deg)
   }
 
   private updateGoals(goals: HudSnapshot['goals']): void {
