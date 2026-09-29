@@ -1,4 +1,5 @@
 import { UNIT } from '../../util/units'
+import { SUN } from '../../data/light'
 import { fbm, valueNoise } from '../../util/noise'
 import { Rng } from '../../util/rng'
 import type { ShipConfig } from '../../types/maps'
@@ -14,8 +15,6 @@ function smooth(e0: number, e1: number, x: number): number {
   return t * t * (3 - 2 * t)
 }
 
-/** 夕阳从画面左上方斜照过来：与火山同一个方向，指向太阳 */
-export const SUN = { x: -0.45, y: -0.6, z: 0.66 }
 /** 高 1 格的东西在甲板上投下的影子有多长，格 */
 export const SHADOW_PER_U = Math.hypot(SUN.x, SUN.y) / SUN.z
 

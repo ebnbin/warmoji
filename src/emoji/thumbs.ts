@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { setSvgSize } from './svg'
 import { emojiSvgText, svgToImage } from './textures'
+import { isPainted } from './style'
 
 export function emojiThumbSize(displayPx: number, renderScale: number): number {
   return Math.ceil((displayPx * renderScale) / 8) * 8
@@ -11,8 +12,9 @@ let generation = 0
 const ready = new Map<string, string>()
 const inflight = new Map<string, Promise<string | null>>()
 
-function keyOf(cp: string): string {
-  return `thumb-${cp}`
+/** 缓存与纹理按画风分开：新画风的另起一套 */
+function slotOf(cp: string): string {
+  return isPainted(cp) ? `p-${cp}` : cp
 }
 
 export function prepareEmojiThumbs(scene: Phaser.Scene, size: number): void {
@@ -29,13 +31,14 @@ export function emojiThumbStats(): { ready: number; inflight: number; size: numb
 }
 
 export function emojiThumbKey(cp: string): string | undefined {
-  return ready.get(cp)
+  return ready.get(slotOf(cp))
 }
 
 export function requestEmojiThumb(scene: Phaser.Scene, cp: string): Promise<string | null> {
-  const hit = ready.get(cp)
+  const slot = slotOf(cp)
+  const hit = ready.get(slot)
   if (hit) return Promise.resolve(hit)
-  const pending = inflight.get(cp)
+  const pending = inflight.get(slot)
   if (pending) return pending
   const gen = generation
   const size = thumbSize
@@ -44,18 +47,18 @@ export function requestEmojiThumb(scene: Phaser.Scene, cp: string): Promise<stri
       const svg = await emojiSvgText(cp)
       const img = await svgToImage(setSvgSize(svg, size))
       if (gen !== generation) return null
-      const key = keyOf(cp)
+      const key = `thumb-${slot}`
       if (!scene.textures.exists(key)) scene.textures.addImage(key, img)
-      ready.set(cp, key)
+      ready.set(slot, key)
       return key
     } catch (err) {
       console.warn(`emoji 缩略图渲染失败 ${cp}: ${String(err)}`)
       return null
     } finally {
-      inflight.delete(cp)
+      inflight.delete(slot)
     }
   })()
-  inflight.set(cp, p)
+  inflight.set(slot, p)
   return p
 }
 

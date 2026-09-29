@@ -1,4 +1,5 @@
 import { UNIT } from '../../util/units'
+import { SUN } from '../../data/light'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
 import { Rng } from '../../util/rng'
 import { awayFromWall, roomAt } from '../worlds/basin'
@@ -62,9 +63,9 @@ export function fumaroles(f: LavaField, cfg: VolcanoConfig, count: number): Poin
   return out
 }
 
-const LIGHT_X = -0.45
-const LIGHT_Y = -0.6
-const LIGHT_Z = 0.66
+const LIGHT_X = SUN.x
+const LIGHT_Y = SUN.y
+const LIGHT_Z = SUN.z
 
 /** 往光源方向看这么远（格）找挡光的地形 */
 const SHADOW_STEPS = [0.4, 0.9, 1.5, 2.3] as const

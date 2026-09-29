@@ -1,5 +1,7 @@
 import { ANIMATIONS } from '../data/animations'
 import { keysOf } from '../util/record'
+import { paintedDrawn, paintedRig } from './painted/index.ts'
+import { isPainted } from './style'
 import type { AnimClipId, AnimClipKind, AnimPart, AnimResource, FxDecl, FxGen, FxParams, FxSide, PartKeyframe } from '../types/anim'
 
 const OPEN_TAG = /<svg\b[^>]*>/
@@ -426,8 +428,39 @@ const ANIM_SETS: readonly AnimSet[] = loadAnimSets(ANIMATIONS)
 
 export const ANIM_RECIPES: readonly AnimClip[] = ANIM_SETS.map((s) => s.clips[0]!)
 
+const paintedSets = new Map<string, AnimSet | null>()
+
+/** 新画风的图按层画：配方里的每个部件换成图里绑定的层与转轴，特效有新位置就换掉；没绑的片段不播 */
+function paintSet(set: AnimSet): AnimSet | null {
+  const layers = paintedDrawn(set.emoji)!.layers
+  const clips = set.clips.flatMap((clip): AnimClip[] => {
+    const rig = paintedRig(set.emoji, clip.id)
+    if (!rig) return []
+    return [
+      {
+        ...clip,
+        anatomy: `新画风按层绑定：${rig.parts.map((r) => r.layers.join(' + ')).join('；')}`,
+        parts: clip.parts.map((part, i) => {
+          const r = rig.parts[i]!
+          return { ...part, indices: r.layers.map((n) => layers.indexOf(n)), cx: r.cx, cy: r.cy }
+        }),
+        fx: rig.fx ? rig.fx.map(restoreFx) : clip.fx,
+      },
+    ]
+  })
+  return clips.length > 0 ? { ...set, anatomy: clips[0]!.anatomy, clips } : null
+}
+
+/** 这个 emoji 此刻的动画：新画风开着且画了它时，换成按新图绑定的那一套 */
 export function animSetOf(emoji: string): AnimSet | undefined {
-  return ANIM_SETS.find((s) => s.emoji === emoji)
+  const set = ANIM_SETS.find((s) => s.emoji === emoji)
+  if (!set || !isPainted(emoji)) return set
+  let hit = paintedSets.get(emoji)
+  if (hit === undefined) {
+    hit = paintSet(set)
+    paintedSets.set(emoji, hit)
+  }
+  return hit ?? undefined
 }
 
 export function animClipOf(emoji: string, clipId: AnimClipId): AnimClip | undefined {

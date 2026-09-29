@@ -2,9 +2,11 @@ import Phaser from 'phaser'
 import { OUTLINE } from './svg'
 import type { OutlineKind } from './svg'
 import { keysOf } from '../util/record'
-import { packSvg, parseEmojiPack } from './pack'
+import { emojiSvg, packSvg, parseEmojiPack } from './pack'
 import type { EmojiPack } from './pack'
 import { EMOJI_PAD, outlineSvg, padSvg, setSvgSize } from './svg'
+import { paintedDrawn } from './painted/index.ts'
+import { isPainted } from './style'
 
 const RASTER = 256
 const LRU_LIMIT = 256
@@ -43,6 +45,7 @@ export function loadEmojiPack(): Promise<EmojiPack> {
 }
 
 export async function emojiSvgText(id: string): Promise<string> {
+  if (isPainted(id)) return padSvg(emojiSvg(paintedDrawn(id)!.body), EMOJI_PAD)
   const pack = await loadEmojiPack()
   const svg = packSvg(pack, id)
   if (!svg) throw new Error(`emoji 不在打包资源中: ${id}`)
@@ -74,8 +77,9 @@ const KIND_SUFFIX: Record<OutlineKind, string> = {
   elite: '-olg',
 }
 
+/** 纹理的 key：新画风的另起一套，切换画风后按新 key 重新生成 */
 export function emojiKey(id: string, outline?: OutlineKind): string {
-  return `emoji-${id}${outline ? KIND_SUFFIX[outline] : ''}`
+  return `emoji-${isPainted(id) ? 'p-' : ''}${id}${outline ? KIND_SUFFIX[outline] : ''}`
 }
 
 export async function svgToImage(svgText: string): Promise<HTMLImageElement> {

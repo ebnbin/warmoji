@@ -4,6 +4,7 @@ import type { OutlineKind } from '../emoji/svg'
 import { keysOf } from '../util/record'
 import { emojiSvgText, svgToImage } from '../emoji/textures'
 import { animClipOf, bakeAnimFrame } from '../emoji/anim'
+import { paintedEmojiOn } from '../emoji/style'
 import type { AnimClipId } from '../types/anim'
 
 const CELL = 256
@@ -46,6 +47,8 @@ export class EcsAtlas {
   private cursor = 0
   private scene?: Phaser.Scene
   private readonly serial = atlasSerial++
+  /** 建图集时新画风开没开：切换过画风就整张重建 */
+  private readonly painted = paintedEmojiOn()
   private disposed = false
 
   dispose(): void {
@@ -182,6 +185,10 @@ export class EcsAtlas {
     outlined: Record<OutlineKind, readonly string[]>,
     plain: readonly string[],
   ): Promise<EcsAtlas> {
+    if (shared && shared.painted !== paintedEmojiOn()) {
+      for (const page of shared.pages) scene.textures.remove(page)
+      shared = undefined
+    }
     if (!shared) {
       building ??= EcsAtlas.create(scene, outlined, plain)
         .then((a) => (shared = a))
