@@ -3,17 +3,21 @@ import { norm } from '../../util/vec'
 import { SPAWN } from '../../data/enemies'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
-import { MAPS } from '../../data/maps'
-import type { IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, SpaceConfig } from '../../types/maps'
+import { MAP, MAPS } from '../../data/maps'
+import type { IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
 import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebula'
+import { around, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava } from '../worlds/volcano'
+import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
+import type { Basin } from '../worlds/basin'
+import type { VolcanoState } from '../worlds/volcano'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/river'
 import { isHorizontal } from '../utils/remap'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Alive, Boss, BreaksWalls, Due, ENEMY_SET, Hp, Meteor, Phasing, Pickup, PICKUP_SET, PROJ_SET, Radius, Slot, Swarmer, Tint, Transform, Uid } from '../components'
+import { Alive, Boss, BreaksWalls, Due, ENEMY_SET, Hp, Meteor, Motion, MOTION, Phasing, Pickup, PICKUP_SET, PROJ_SET, Radius, Slot, Swarmer, Tint, Transform, Uid } from '../components'
 import { bodyRules, meteorHit, meteorPath } from '../store'
 import { spawnMeteor } from '../entities/meteor'
 import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
@@ -70,10 +74,11 @@ export interface WorldState {
   tickAt: number
   walls: Walls | null
   hole: Point | null
+  volcano: VolcanoState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null }
 }
 
 export interface WorldHooks {
@@ -612,6 +617,136 @@ const nebula: WorldHooks = {
   },
 }
 
+function volcanoCfg(sim: Sim): VolcanoConfig {
+  return MAPS[sim.mapId].volcano!
+}
+
+/** 火山的地形由布景种子定下，视图从这里读；喷发的时刻与熔岩往哪几股漫出由对局的随机数决定 */
+function volcanoOf(sim: Sim): VolcanoState {
+  let s = sim.worldState.volcano
+  if (!s) {
+    const cfg = volcanoCfg(sim)
+    const field = makeField(new Rng(sim.run.decorSeed ^ 0x7a1c), cfg, sim.mapW, sim.mapH, MAP.cameraMargin * UNIT)
+    s = { field, phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, spill: NO_SPILL, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
+    sim.worldState.volcano = s
+  }
+  return s
+}
+
+/** 山体最远伸到离火山口多远，像素 */
+function mountainPx(sim: Sim): number {
+  const c = volcanoCfg(sim).cone
+  return c.blockU * (1 + c.blockJitter) * UNIT
+}
+
+/** 离岩壁 reach 像素以内几乎正对着岩壁走时改为顺着壁面走，免得顶在壁上不动；斜着撞上的由碰撞自己滑开 */
+function alongWall(b: Basin, x: number, y: number, dx: number, dy: number, reach: number): Point {
+  if (roomAt(b, x, y) > reach) return { x: dx, y: dy }
+  const n = awayFromWall(b, x, y)
+  if (dx * n.x + dy * n.y > -0.9) return { x: dx, y: dy }
+  const side = dy * n.x - dx * n.y >= 0 ? 1 : -1
+  return { x: -n.y * side, y: n.x * side }
+}
+
+const LAVA_TINT = 0xff6d00
+
+/** 喷发的节奏：到点先起预兆并定下熔岩往哪几股漫出，预兆完了熔岩漫过口沿，流量先涨后落，出完回到平静 */
+function tickEruption(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
+  const e = cfg.eruption
+  const now = sim.elapsedMs
+  if (s.phase === 'dormant' && now >= s.nextAt) {
+    s.spill = spillOf(s.field, cfg, sim.rng)
+    s.phase = 'warn'
+    s.since = now
+    s.nextAt = now + e.intervalMs + (sim.rng.next() * 2 - 1) * e.intervalJitterMs
+  } else if (s.phase === 'warn' && now >= s.since + e.warnMs) {
+    s.phase = 'erupt'
+    s.since = now
+    s.count++
+  } else if (s.phase === 'erupt' && now >= s.since + e.effuseMs) {
+    s.phase = 'dormant'
+    s.since = now
+  }
+}
+
+/** 脚下的熔岩没凝固就挨烫：穿行、腾空的身体不沾地 */
+function burnOnLava(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
+  const now = sim.elapsedMs
+  if (now < s.hurtAt) return
+  s.hurtAt = now + cfg.lava.tickMs
+  const frac = cfg.lava.tickMs / 1000
+  const src = hazardSource('lava', LAVA_TINT)
+  const onLava = (eid: number): boolean =>
+    Motion.kind[eid] !== MOTION.transit && Motion.kind[eid] !== MOTION.arc && moltenAt(s.field, Transform.x[eid]!, Transform.y[eid]!)
+  const dmg = Math.round(cfg.lava.teamDps * frac)
+  for (const m of sim.characters) if (Alive.v[m] && onLava(m)) hit(sim, src, m, dmg, { tick: true })
+  const edmg = Math.round(cfg.lava.enemyDps * frac)
+  for (const eid of [...query(sim.world, ENEMY_SET)]) if (onLava(eid)) hit(sim, src, eid, edmg, { tick: true })
+}
+
+/** 刷怪点落在盆地里、离岩壁至少一格，避开熔岩 */
+function clearGround(sim: Sim, p: Point): boolean {
+  const f = volcanoOf(sim).field
+  return roomAt(f.basin, p.x, p.y) >= UNIT && !moltenAt(f, p.x, p.y)
+}
+
+/**
+ * 火山：能走的是崖壁围着的盆地，岩壁与山体是硬边界，身体走到跟前就停住、顺着壁面滑；火山定期喷发，
+ * 熔岩按地势往四面八方流、离火山口越远凉得越快，盖住的地方敌我都受伤
+ */
+const volcano: WorldHooks = {
+  ...bounded,
+  constrainBody(sim, eid, _from, next) {
+    return keepOut(volcanoOf(sim).field.basin, next.x, next.y, Radius.v[eid]!)
+  },
+  chaseDir(sim, eid, tx, ty) {
+    const f = volcanoOf(sim).field
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    const rad = Radius.v[eid]!
+    const d = around(f, mountainPx(sim) + rad + 0.3 * UNIT, x, y, tx, ty)
+    return alongWall(f.basin, x, y, d.x, d.y, rad + 0.3 * UNIT)
+  },
+  /** 游荡着走到岩壁跟前就像撞上地图边一样折回来 */
+  wanderDir(sim, eid, dx, dy) {
+    const b = volcanoOf(sim).field.basin
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    if (roomAt(b, x, y) > Radius.v[eid]! + 0.6 * UNIT) return { x: dx, y: dy }
+    const n = awayFromWall(b, x, y)
+    const dot = dx * n.x + dy * n.y
+    return dot >= 0 ? { x: dx, y: dy } : { x: dx - 2 * dot * n.x, y: dy - 2 * dot * n.y }
+  },
+  fleeDir(sim, eid, awayX, awayY) {
+    return alongWall(volcanoOf(sim).field.basin, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + 1.5 * UNIT)
+  },
+  spawnPoint(sim, boss) {
+    let p = bounded.spawnPoint(sim, boss)
+    for (let i = 0; i < 24 && !clearGround(sim, p); i++) p = bounded.spawnPoint(sim, boss)
+    return keepOut(volcanoOf(sim).field.basin, p.x, p.y, UNIT)
+  },
+  settle(sim, p) {
+    return keepOut(volcanoOf(sim).field.basin, p.x, p.y, SPAWN.edgeInset * UNIT)
+  },
+  onStart(sim) {
+    volcanoOf(sim)
+  },
+  tick(sim, delta) {
+    const cfg = volcanoCfg(sim)
+    const s = volcanoOf(sim)
+    tickEruption(sim, s, cfg)
+    const step = cfg.lava.stepMs
+    s.stepAcc = Math.min(s.stepAcc + delta, step * 4)
+    while (s.stepAcc >= step) {
+      s.stepAcc -= step
+      const now = sim.elapsedMs - s.stepAcc
+      const erupting = s.phase === 'erupt'
+      stepLava(s.field, cfg.lava, step / 1000, now, erupting ? s.spill : NO_SPILL, erupting ? spillVolume(cfg, now - s.since) : 0)
+    }
+    burnOnLava(sim, s, cfg)
+  },
+}
+
 function riverCfg(sim: Sim): RiverConfig {
   return MAPS[sim.mapId].river!
 }
@@ -735,6 +870,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   void: torus,
   space,
   nebula,
+  volcano,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()

@@ -102,6 +102,85 @@ export interface NebulaConfig {
     readonly maxFlightMs: number
   }
 }
+/**
+ * 火山：能走的是方形地图里一块边缘不规则的盆地，四周是崖壁与高地；一座火山背靠盆地边，山体谁也上不去。
+ * 火山定期从火山口喷发，熔岩往四面八方顺着地势流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人
+ */
+export interface VolcanoConfig {
+  /** 地形格子的边长，高度与厚度也以格计；地形铺满镜头能看到的地图外一圈 */
+  readonly cellU: number
+  readonly rim: {
+    /** 盆地的边离方形地图的边多远：按噪声在两者之间起伏，起伏的波长 waveU；方形的角按 cornerU 的半径磨圆 */
+    readonly insetU: readonly [number, number]
+    readonly waveU: number
+    readonly cornerU: number
+    /** 窄过两倍 neckU 的缝和尖角填成岩壁 */
+    readonly neckU: number
+    /** 崖壁从崖脚到崖顶 cliffU 格宽、高 cliffHeight；崖顶往外的高地每格降 backSlope */
+    readonly cliffU: number
+    readonly cliffHeight: number
+    readonly backSlope: number
+  }
+  readonly cone: {
+    /** 火山口圆心离最近的地图边多远 */
+    readonly insetU: readonly [number, number]
+    readonly craterU: number
+    /** 陡峭的山体：离火山口约这么远以内身体进不去，飞行物照飞；山脚的半径按方位角在 ±blockJitter 倍内起伏 */
+    readonly blockU: number
+    readonly blockJitter: number
+    /** 口沿的高度与山脚（挡路圈边上）的高度，其间按指数往下降，山脚的缓坡铺到 radiusU 处与平地齐平 */
+    readonly height: number
+    readonly footHeight: number
+    readonly radiusU: number
+    readonly craterDepth: number
+    /** 火山口里熔岩湖的液面比火山口底高多少 */
+    readonly lakeDepth: number
+    /** 山坡上放射状冲沟的深度 */
+    readonly gullyDepth: number
+  }
+  /** 地势：朝地图里整体下倾的坡度，起伏的幅度与波长 */
+  readonly terrain: {
+    readonly tilt: number
+    readonly relief: number
+    readonly waveU: number
+  }
+  readonly eruption: {
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly intervalJitterMs: number
+    /** 喷发前的预兆：冒烟、发红、地震 */
+    readonly warnMs: number
+    /** 熔岩漫过口沿的流量（格³/秒）：peakMs 内涨到 rate，之后按时间常数 waneMs 衰减，effuseMs 后停 */
+    readonly rate: number
+    readonly peakMs: number
+    readonly waneMs: number
+    readonly effuseMs: number
+    /** 每次喷发熔岩集中从口沿的几股漫出，股心落在朝盆地的方向两侧 lobeSpreadDeg 内，每股宽约几度；其余方向只漫出股心的 lobeFloor 倍 */
+    readonly lobes: readonly [number, number]
+    readonly lobeSpreadDeg: number
+    readonly lobeDeg: number
+    readonly lobeFloor: number
+    /** 开局前已经喷过几次，地图上留下旧熔岩 */
+    readonly history: number
+  }
+  readonly lava: {
+    readonly stepMs: number
+    /** 流动：每秒流走可流部分的比例，按温度的幂变慢 */
+    readonly mobility: number
+    readonly mobilityPow: number
+    /** 屈服强度（厚度乘坡度）：最热时与将凝固时；朝某个方向流要厚过它除以那个方向的坡度 */
+    readonly yieldHot: number
+    readonly yieldCold: number
+    /** 冷却：温度每秒降 cooling·(1+(r/coolRadiusU)²)，r 是离火山口的距离，离得越远冷得越快 */
+    readonly cooling: number
+    readonly coolRadiusU: number
+    /** 温度低于它就凝固成岩石 */
+    readonly solidus: number
+    readonly teamDps: number
+    readonly enemyDps: number
+    readonly tickMs: number
+  }
+}
 export interface RiverConfig {
   readonly viewScale: number
   readonly width: number
@@ -128,7 +207,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula'
+  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula' | 'volcano'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -142,6 +221,7 @@ export interface MapDef {
   readonly ice?: IceConfig
   readonly space?: SpaceConfig
   readonly nebula?: NebulaConfig
+  readonly volcano?: VolcanoConfig
   readonly river?: RiverConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
@@ -149,7 +229,7 @@ export interface MapDef {
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava'
 
 export interface DecorInstance {
   emoji: string

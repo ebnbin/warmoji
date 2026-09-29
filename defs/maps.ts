@@ -105,6 +105,16 @@ const ICE_MIX: readonly EnemyMixRow[] = [
   { kind: 'knight', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
 ]
 
+const VOLCANO_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 36, max: 74 },
+  { kind: 'turtle', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
+  { kind: 'creeper', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'skeleton', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'comet', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'boar', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+]
+
 export const MAPS = {
   forest: {
     emoji: '1f332',
@@ -378,5 +388,62 @@ export const MAPS = {
       },
     },
     boss: 'blackhole',
+  },
+  volcano: {
+    emoji: '1f30b',
+    name: '火山',
+    desc: '四周崖壁环绕的熔岩盆地，一座活火山背靠盆地边，陡峭的山体谁也上不去。它定期喷发：先冒烟发红、地动山摇，随后熔岩漫过火山口，往四面八方顺着地势流下来。熔岩盖住的地方敌我都受伤；离火山口越远凉得越快，凝成黑色的岩石后又能站人',
+    kind: 'volcano',
+    size: { w: 32, h: 32 },
+    stamina: { exertion: 0.5, regen: 0.9 },
+    palette: {
+      bgFrom: 'hsl(14 45% 18%)',
+      bgTo: 'hsl(5 40% 6%)',
+      map: hslToInt(18, 0.14, 0.26),
+      shadow: 0x000000,
+    },
+    decor: {
+      emojis: ['1faa8', '1f9b4', '1f480'],
+      sizeU: [0.3, 0.8],
+      alpha: [0.2, 0.34],
+      density: [0.03, 0.05],
+    },
+    mix: VOLCANO_MIX,
+    finalWaveSub: '暴龙踏着熔岩而来——别在火山脚下恋战！',
+    volcano: {
+      cellU: 0.5,
+      rim: { insetU: [0.5, 2.5], waveU: 7, cornerU: 5, neckU: 1, cliffU: 1.1, cliffHeight: 2.6, backSlope: 0.12 },
+      cone: { insetU: [0.5, 1.5], craterU: 1.6, blockU: 4, blockJitter: 0.1, height: 4, footHeight: 0.9, radiusU: 9, craterDepth: 1.4, lakeDepth: 0.8, gullyDepth: 0.45 },
+      terrain: { tilt: 0.2, relief: 1.2, waveU: 7 },
+      eruption: {
+        firstMs: 15000,
+        intervalMs: 60000,
+        intervalJitterMs: 6000,
+        warnMs: 5000,
+        rate: 5,
+        peakMs: 1200,
+        waneMs: 8000,
+        effuseMs: 30000,
+        lobes: [4, 6],
+        lobeSpreadDeg: 110,
+        lobeDeg: 16,
+        lobeFloor: 0.08,
+        history: 2,
+      },
+      lava: {
+        stepMs: 100,
+        mobility: 40,
+        mobilityPow: 2,
+        yieldHot: 0.015,
+        yieldCold: 0.1,
+        cooling: 0.012,
+        coolRadiusU: 6,
+        solidus: 0.3,
+        teamDps: 30,
+        enemyDps: 45,
+        tickMs: 250,
+      },
+    },
+    boss: 'rhino',
   },
 } as const satisfies Record<string, MapDef>

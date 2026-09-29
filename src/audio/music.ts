@@ -484,6 +484,51 @@ function buildSpace(): BgmScore {
   )
 }
 
+function buildVolcano(): BgmScore {
+  const chords = [0, 0, 1, 0, 5, 5, 1, 0, 0, 0, 1, 0, 5, 1, 6, 0]
+  return track(
+    {
+      bpm: 84,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 40,
+      scale: PHRYGIAN_DOM,
+      echo: { delaySec: (60 / 84) * 0.75, feedback: 0.34, level: 0.3 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sawtooth', vol: 0.13, attack: 0.01, release: 0.12, octave: -1 }
+      const drone: Voice = { wave: 'square', vol: 0.035, attack: 0.3, release: 0.9, octave: 0 }
+      const lead: Voice = { wave: 'sawtooth', vol: 0.085, attack: 0.02, release: 0.14, octave: 1, echo: true }
+      b.bass(bass, chords, 'r.r...ro')
+      b.pad(drone, chords, [0, 2], 0.004)
+      b.line(lead, [
+        [0, 0, 0, 3], [0, 3, 1, 1], [0, 4, 0, 4],
+        [1, 0, 4, 2], [1, 2, 3, 2], [1, 4, 1, 4],
+        [2, 0, 1, 3], [2, 3, 2, 1], [2, 4, 1, 4],
+        [3, 0, 0, 8],
+        [4, 0, 5, 3], [4, 3, 4, 1], [4, 4, 5, 4],
+        [5, 0, 7, 2], [5, 2, 6, 2], [5, 4, 5, 4],
+        [6, 0, 4, 3], [6, 3, 2, 1], [6, 4, 1, 4],
+        [7, 0, 0, 8],
+        [8, 0, 7, 3], [8, 3, 8, 1], [8, 4, 7, 4],
+        [9, 0, 5, 2], [9, 2, 4, 2], [9, 4, 1, 4],
+        [10, 0, 1, 3], [10, 3, 2, 1], [10, 4, 4, 4],
+        [11, 0, 0, 8],
+        [12, 0, 5, 2], [12, 2, 7, 2], [12, 4, 8, 4],
+        [13, 0, 7, 2], [13, 2, 5, 2], [13, 4, 4, 4],
+        [14, 0, 2, 4], [14, 4, 1, 4],
+        [15, 0, 0, 8],
+      ])
+      b.drums('tom', 'x..x..x.', 0, 16, 0.22)
+      b.drums('kick', 'x.......', 0, 16, 0.2)
+      b.drums('snare', '....x...', 4, 16, 0.12)
+      b.drums('hat', '..x...x.', 8, 16, 0.04)
+      b.drums('tom', 'x.x.xxx.', 15, 16, 0.24)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -495,6 +540,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   space: buildSpace,
   ice: buildSpace,
   nebula: buildSpace,
+  volcano: buildVolcano,
 }
 
 const cache = new Map<BgmId, BgmScore>()
