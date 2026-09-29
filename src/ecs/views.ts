@@ -28,10 +28,10 @@ import { drawBomb, drawPuff, drawSpark, encodeLava, fumaroles, GROUND_PPC, GROUN
 import type { RockMasks } from './render/volcano'
 import { effusion } from './worlds/volcano'
 import { roomAt } from './worlds/basin'
-import { DECK_PPU, deckFrame, drawEdgeField, drawRig, EDGE_PPU, drawRigShadow, drawWaveTile, paintDeck, rigOf, SEA_FRAG, SHADOW_PER_U, SUN, WAVE_TILE } from './render/ship'
+import { DECK_PPU, deckFrame, drawEdgeField, drawRig, EDGE_PPU, drawRigShadow, drawWaveTile, paintDeck, paintWet, rigOf, SEA_FRAG, SHADOW_PER_U, SUN, WAVE_TILE, WET_PPU } from './render/ship'
 import { deckPoint, makeDeck as makeDeckFrame, shipSizeU } from './worlds/ship'
 import type { ShipState } from './worlds/ship'
-import { halfBeamAt } from '../data/ship'
+import { GRAVITY, halfBeamAt } from '../data/ship'
 import type { ShipConfig } from '../types/maps'
 import type { EruptionPhase, VolcanoState } from './worlds/volcano'
 import { playSfx } from '../audio/sfx'
@@ -1349,6 +1349,7 @@ class VolcanoView extends BoundedView {
 const SHIP_BG = 0x04121a
 const WAVE_KEY = 'ship-wave'
 const EDGE_KEY = 'ship-edge'
+const WET_KEY = 'ship-wet'
 /** 每局都是同一艘船：甲板、海面的波纹与船形的距离场按横竖屏各画一次，之后一直留着 */
 const SHIP_SEED = 0x5eaf
 const DECK_KEY = 'ship-deck'
@@ -1479,6 +1480,8 @@ class ShipView extends BoundedView {
   private gulls: Gull[] = []
   private spray?: Phaser.GameObjects.Particles.ParticleEmitter
   private vignette?: Phaser.Filters.Vignette
+  /** 两舷的湿甲板：溅上浪花就湿，慢慢晾干 */
+  private wet: { side: number; img: Phaser.GameObjects.Image; level: number }[] = []
   private rate = { roll: 0, pitch: 0 }
   private sprayAt = 0
   private creakAt = 0
@@ -1542,6 +1545,8 @@ class ShipView extends BoundedView {
     const shadowPx = [away.x * shadowU * UNIT, away.y * shadowU * UNIT]
     const u = this.u
     const speedU = cfg.sea.speedMs / cfg.meterPerU
+    const sunLen = Math.hypot(SUN.x, SUN.y, SUN.z)
+    const sunDir = [SUN.x / sunLen, SUN.y / sunLen, SUN.z / sunLen]
     this.visuals.push(
       scene.add
         .shader(
@@ -1561,7 +1566,7 @@ class ShipView extends BoundedView {
               set('uHullC', [h.bulwarkU, freeU, speedU, HULL_BAND_M / cfg.meterPerU + 0.12])
               set('uTilt', [Math.sin(u.roll), Math.sin(u.pitch), 0, 0])
               set('uWind', [wind.x, wind.y, shadowPx[0], shadowPx[1]])
-              set('uSun', [SUN.x / Math.hypot(SUN.x, SUN.y, SUN.z), SUN.y / Math.hypot(SUN.x, SUN.y, SUN.z), SUN.z / Math.hypot(SUN.x, SUN.y, SUN.z)])
+              set('uSun', sunDir)
             },
           },
           rect[0]!,
@@ -1584,6 +1589,22 @@ class ShipView extends BoundedView {
       .setDisplaySize((dw / DECK_PPU) * UNIT, (dh / DECK_PPU) * UNIT)
       .setRotation(Math.atan2(deck.by, deck.bx))
       .setDepth(-1)
+    const ww = Math.ceil((fr.s1 - fr.s0) * WET_PPU)
+    const wh = Math.ceil(fr.t1 * WET_PPU)
+    for (const side of [-1, 1]) {
+      const key = `${WET_KEY}-${side > 0 ? 's' : 'p'}`
+      if (!scene.textures.exists(key)) canvasTexture(scene, key, ww, wh, (ctx) => paintWet(ctx, cfg, side))
+      const at = deckPoint(deck, fr.s0, side > 0 ? 0 : -fr.t1)
+      const img = scene.add
+        .image(at.x, at.y, key)
+        .setOrigin(0, 0)
+        .setDisplaySize((ww / WET_PPU) * UNIT, (wh / WET_PPU) * UNIT)
+        .setRotation(Math.atan2(deck.by, deck.bx))
+        .setDepth(-0.9)
+        .setAlpha(0)
+      this.wet.push({ side, img, level: 0 })
+      this.visuals.push(img)
+    }
     this.shade = scene.add.graphics().setDepth(-0.8)
     this.ballShade = scene.add.graphics().setDepth(-0.6)
     this.rig = scene.add.graphics().setDepth(31)
@@ -1595,11 +1616,8 @@ class ShipView extends BoundedView {
       if (!keep) removeEntity(v.world, eid)
       return keep
     })
-    for (const _ of s.balls) {
-      const img = scene.add.image(0, 0, BALL_KEY).setDepth(0.9).setDisplaySize(cfg.balls.radiusU * 2 * UNIT, cfg.balls.radiusU * 2 * UNIT)
-      this.balls.push(img)
-      this.visuals.push(img)
-    }
+    this.balls = s.balls.map(() => scene.add.image(0, 0, BALL_KEY).setDepth(0.9).setDisplaySize(cfg.balls.radiusU * 2 * UNIT, cfg.balls.radiusU * 2 * UNIT))
+    this.visuals.push(...this.balls)
     const masts = rigOf(cfg)
     const hangs: { s: number; t: number; hook: number; cord: number }[] = [
       { s: -h.transomBulge * h.beamU - h.bulwarkU - 0.5, t: 0, hook: 1.9, cord: 0.25 },
@@ -1657,10 +1675,12 @@ class ShipView extends BoundedView {
     drawRig(this.rig, cfg, deck, pose, now / 1000, wind)
     this.shade.clear()
     drawRigShadow(this.shade, cfg, deck, pose)
+    // 甲板的法线随倾斜偏向低的一侧，朝着太阳偏就亮一点
+    const sunLen = Math.hypot(SUN.x, SUN.y, SUN.z)
     const nx = Math.sin(pitch) * deck.bx + Math.sin(roll) * deck.sx
     const ny = Math.sin(pitch) * deck.by + Math.sin(roll) * deck.sy
-    const lambert = (nx * SUN.x + ny * SUN.y + Math.cos(roll) * Math.cos(pitch) * SUN.z) / Math.hypot(SUN.x, SUN.y, SUN.z)
-    const lit = Math.round(255 * Math.min(1, Math.max(0.6, 0.9 + (lambert - SUN.z / Math.hypot(SUN.x, SUN.y, SUN.z)) * 1.1)))
+    const lambert = (nx * SUN.x + ny * SUN.y + Math.cos(roll) * Math.cos(pitch) * SUN.z) / sunLen
+    const lit = Math.round(255 * Math.min(1, Math.max(0.6, 0.9 + (lambert - SUN.z / sunLen) * 1.1)))
     this.deckImg?.setTint((lit << 16) | (lit << 8) | lit)
     const bs = this.ballShade
     bs?.clear()
@@ -1671,7 +1691,8 @@ class ShipView extends BoundedView {
       bs?.fillEllipse(b.x - SUN.x * r * 0.9, b.y - SUN.y * r * 0.9, r * 2.3, r * 2)
     })
     const mpu = cfg.meterPerU
-    const g = 9.81
+    const g = GRAVITY
+    // 吊灯是单摆：相对铅垂线的角度按 θ'' = −(g/l)·sinθ − (r·φ''/l)·cosθ − cθ' 推进，挂钩随船横摇纵摇的角加速度甩它
     for (const l of this.lanterns) {
       const arm = l.hook + (cfg.hydro.depthM - cfg.hydro.draftM)
       const steps = Math.max(1, Math.ceil(dt / 0.008))
@@ -1705,6 +1726,11 @@ class ShipView extends BoundedView {
       gl.img.setPosition(x, y).setRotation(heading + Math.PI / 2).setScale(GULL_SCALE * flap, GULL_SCALE)
     }
     this.splash(cfg, s, now, roll, pitch)
+    for (const w of this.wet) {
+      const low = Math.max(0, Math.sin(roll) * w.side)
+      w.level = Math.max(0, w.level - dt / 7)
+      w.img.setAlpha(Math.min(1, w.level * (0.45 + low * 6)))
+    }
   }
 
   /** 低的一侧舷边往下压得快时溅起浪花，船头往下扎时船头也溅；船摇到头时木头吱呀一声 */
@@ -1728,6 +1754,7 @@ class ShipView extends BoundedView {
         em.emitParticleAt(p.x, p.y, 3)
       }
       if (n > 3) playSfx('wash')
+      for (const w of this.wet) if (w.side === side) w.level = Math.min(1, w.level + n * 0.05)
     }
     if (now >= this.creakAt && Math.abs(roll) > 0.03 && Math.abs(s.roll.rate) < 0.004) {
       this.creakAt = now + 2600
@@ -1742,6 +1769,7 @@ class ShipView extends BoundedView {
     this.balls = []
     this.lanterns = []
     this.gulls = []
+    this.wet = []
     this.rig = undefined
     this.shade = undefined
     this.ballShade = undefined

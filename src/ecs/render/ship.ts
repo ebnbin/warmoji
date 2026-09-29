@@ -791,6 +791,42 @@ function dressDeck(ctx: CanvasRenderingContext2D, cfg: ShipConfig, seed: number,
   }
 }
 
+/** 湿甲板贴图每格多少像素：只是柔和的水光 */
+export const WET_PPU = 16
+
+/**
+ * 一侧舷墙里的湿甲板：浪花打上来的水顺着倾斜流到低的一侧，贴着舷墙一窄条颜色变深、一片片积水映着天光，越靠舷墙越湿。
+ * 贴图只盖这一侧：船长方向与甲板贴图对齐，横向从中线到这一侧的外沿；side 为 1 是右舷
+ */
+export function paintWet(ctx: CanvasRenderingContext2D, cfg: ShipConfig, side: number): void {
+  const h = cfg.hull
+  const f = deckFrame(cfg)
+  const W = Math.ceil((f.s1 - f.s0) * WET_PPU)
+  const H = Math.ceil(f.t1 * WET_PPU)
+  const img = ctx.createImageData(W, H)
+  const band = 1.8
+  for (let px = 0; px < W; px++) {
+    const s = f.s0 + (px + 0.5) / WET_PPU
+    const b = halfBeamAt(h, s)
+    if (b <= 0) continue
+    const reach = band * (0.75 + 0.25 * valueNoise(s * 0.7, side * 3, 97))
+    for (let py = 0; py < H; py++) {
+      const at = side > 0 ? (py + 0.5) / WET_PPU : f.t1 - (py + 0.5) / WET_PPU
+      const inside = b - at
+      if (inside <= 0 || inside > reach) continue
+      const k = (1 - inside / reach) ** 1.3
+      const pool = valueNoise(s * 1.4, at * 1.4, 131)
+      const glint = smooth(0.84, 0.97, valueNoise(s * 1.8, at * 6, 137)) * k * 0.7
+      const o = (py * W + px) * 4
+      img.data[o] = Math.round(18 + 190 * glint)
+      img.data[o + 1] = Math.round(24 + 196 * glint)
+      img.data[o + 2] = Math.round(30 + 200 * glint)
+      img.data[o + 3] = Math.round(Math.min(1, k * (0.35 + 0.4 * pool) + glint * 0.4) * 255)
+    }
+  }
+  ctx.putImageData(img, 0, 0)
+}
+
 // ————————————————————————————— 桅杆、帆桁与索具 —————————————————————————————
 
 /** 船此刻的姿态：横摇右舷往下为正、纵摇船头往下为正，弧度 */
@@ -1080,7 +1116,9 @@ uniform vec4 uWind;
 uniform vec3 uSun;
 
 float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  vec3 q = fract(vec3(p.xyx) * 0.1031);
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
 }
 
 float vnoise(vec2 p) {
@@ -1101,6 +1139,11 @@ void main ()
 {
   vec2 tc = outTexCoord;
   vec2 world = uRect.xy + vec2(tc.x, 1.0 - tc.y) * uRect.zw;
+  float d = edgeAt(world);
+  if (d < -0.12) {
+    gl_FragColor = vec4(0.06, 0.045, 0.035, 1.0);
+    return;
+  }
   vec2 wu = world / uUnit;
   vec2 bow = uShip.zw;
   vec2 stb = vec2(-bow.y, bow.x);
@@ -1130,8 +1173,10 @@ void main ()
   col += vec3(1.0, 0.82, 0.58) * pow(max(dot(r, sun), 0.0), 140.0) * 0.8;
   col *= 0.88 + 0.22 * gust;
   float cap = smoothstep(0.9, 1.0, hgt + (vnoise(q * 0.18 + vec2(0.0, uTime * 0.05)) - 0.5) * 0.28) * (0.25 + 0.3 * gust);
+  vec2 across = vec2(-wind.y, wind.x);
+  float lane = smoothstep(0.62, 0.95, vnoise(vec2(dot(q, wind) * 0.035, dot(q, across) * 0.55))) * smoothstep(0.35, 0.8, vnoise(q * 0.09 + 7.0));
+  col = mix(col, vec3(0.38, 0.46, 0.47), lane * 0.12);
 
-  float d = edgeAt(world);
   vec2 nw = normalize(rel);
   if (d < 2.5) {
     float e = uGrid.z;
