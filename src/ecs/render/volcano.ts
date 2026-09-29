@@ -1,5 +1,5 @@
 import { UNIT } from '../../util/units'
-import { cellEdge, fbm, valueNoise } from '../../util/noise'
+import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
 import { Rng } from '../../util/rng'
 import type { LavaField } from '../worlds/volcano'
 import type { VolcanoConfig } from '../../types/maps'
@@ -47,14 +47,14 @@ function soften(src: ArrayLike<number>, cols: number, rows: number, out: Float32
   }
 }
 
-/** 冒硫磺蒸汽的喷气孔：火山锥上与山脚各几个，只是布景 */
+/** 冒硫磺蒸汽的喷气孔：山脚外朝地图里的那一侧有几个，只是布景 */
 export function fumaroles(f: LavaField, cfg: VolcanoConfig, count: number): Point[] {
   const rng = new Rng(f.seed ^ 0x51f0)
   const out: Point[] = []
   const base = Math.atan2(f.inY, f.inX)
   for (let k = 0; k < count; k++) {
-    const a = base + (rng.next() * 2 - 1) * 1.9
-    const r = (cfg.cone.craterU + 1 + rng.next() * (cfg.cone.radiusU + 4)) * UNIT
+    const a = base + (rng.next() * 2 - 1) * 1.3
+    const r = (cfg.cone.blockU + 0.8 + rng.next() * 5) * UNIT
     out.push({ x: f.craterX + Math.cos(a) * r, y: f.craterY + Math.sin(a) * r })
   }
   return out
@@ -65,8 +65,8 @@ const LIGHT_Y = -0.6
 const LIGHT_Z = 0.66
 
 /**
- * 地表：火山灰地面、火山锥的红褐色火山渣、凝固的玄武岩，按高度场打光；
- * 灰地上有干裂纹，喷气孔周围有硫磺，地图外一圈压暗。ppc 是每格多少像素，只画 [c0, c1) × [r0, r1) 的格子。
+ * 地表：火山灰地面、火山的红褐色火山渣、凝固的玄武岩，按高度场打光；陡峭的山体上有顺坡的碎石纹，
+ * 挡路圈边上堆着一圈大石块；灰地上有干裂纹，喷气孔周围有硫磺，地图外一圈压暗。ppc 是每格多少像素，只画 [c0, c1) × [r0, r1) 的格子。
  */
 export function paintGround(
   f: LavaField,
@@ -85,11 +85,15 @@ export function paintGround(
   const seed = f.seed
   const cone = cfg.cone
   const sulfur = vents.map((p) => ({ u: (p.x - f.x0) / f.cell - 0.5, v: (p.y - f.y0) / f.cell - 0.5 }))
-  const sr = 2.4 / cfg.cellU
+  const sr = 1.4 / cfg.cellU
+  const lxy = Math.hypot(LIGHT_X, LIGHT_Y)
   const rocky = new Float32Array(f.cols * f.rows)
+  const fresh = new Float32Array(f.cols * f.rows)
   const hard = new Float32Array(f.cols * f.rows)
   for (let i = 0; i < hard.length; i++) hard[i] = f.rockAt[i]! > -Infinity ? 1 : 0
   soften(hard, f.cols, f.rows, rocky)
+  for (let i = 0; i < hard.length; i++) hard[i] = f.rockAt[i]! >= 0 ? 1 : 0
+  soften(hard, f.cols, f.rows, fresh)
   for (let py = r0 * ppc; py < r1 * ppc; py++) {
     for (let px = c0 * ppc; px < c1 * ppc; px++) {
       const u = (px + 0.5) / ppc - 0.5
@@ -101,9 +105,13 @@ export function paintGround(
       const ny = -hy / (2 * e * cfg.cellU)
       const nl = 1 / Math.hypot(nx, ny, 1)
       const lambert = Math.max(0, (nx * LIGHT_X + ny * LIGHT_Y + LIGHT_Z) * nl)
-      const shade = 0.5 + lambert * 0.75
       const wx = (f.x0 + (u + 0.5) * f.cell) / UNIT
       const wy = (f.y0 + (v + 0.5) * f.cell) / UNIT
+      const ox = wx - f.craterX / UNIT
+      const oy = wy - f.craterY / UNIT
+      const dU = Math.hypot(ox, oy)
+      const steep = smooth(cone.blockU + 0.3, cone.blockU - 0.6, dU) * smooth(cone.craterU, cone.craterU + 0.5, dU)
+      const shade = 0.5 - steep * 0.18 + lambert * (0.75 + steep * 0.35)
       const big = fbm(wx / 5, wy / 5, seed + 3, 2)
       const grain = valueNoise(wx * 5.5, wy * 5.5, seed + 9) * 0.5 + valueNoise(wx * 13, wy * 13, seed + 11) * 0.5
       let r = 58 + big * 22 + grain * 13
@@ -116,12 +124,23 @@ export function paintGround(
         g *= k
         b *= k
       }
-      const dU = Math.hypot(wx - f.craterX / UNIT, wy - f.craterY / UNIT)
-      if (dU < cone.radiusU + 1.5) {
-        const cinder = smooth(cone.radiusU + 1.5, cone.craterU + 1, dU) * (0.8 + grain * 0.35)
+      const a = Math.atan2(oy, ox)
+      if (dU < cone.blockU + 3) {
+        const cinder = smooth(cone.blockU + 3, cone.blockU - 0.5, dU) * (0.8 + grain * 0.35)
         r += (118 - r) * cinder
         g += (58 - g) * cinder
         b += (40 - b) * cinder
+        const summit = smooth(cone.craterU + 1.6, cone.craterU + 0.1, dU) * 0.6
+        r += (140 - r) * summit
+        g += (112 - g) * summit
+        b += (98 - b) * summit
+        if (steep > 0) {
+          const scree = fbm(Math.cos(a) * 14 + 5, Math.sin(a) * 14 + dU * 0.35, seed + 81, 2)
+          const k = 1 + (scree - 0.5) * 0.7 * steep
+          r *= k
+          g *= k
+          b *= k
+        }
         const lip = Math.exp(-(((dU - cone.craterU) / 0.28) ** 2))
         r += (150 - r) * lip * 0.55
         g += (80 - g) * lip * 0.55
@@ -137,23 +156,51 @@ export function paintGround(
         const d = Math.hypot(u - s.u, v - s.v) / sr
         if (d >= 1) continue
         const stain = smooth(0.3, 0.75, valueNoise(wx * 2.6, wy * 2.6, seed + 41) * (1 - d) * 1.5) * (1 - d)
-        r += (196 - r) * stain * 0.75
-        g += (170 - g) * stain * 0.75
-        b += (58 - b) * stain * 0.75
+        r += (196 - r) * stain * 0.55
+        g += (170 - g) * stain * 0.55
+        b += (58 - b) * stain * 0.55
       }
-      const rock = smooth(0.35, 0.6, bilinear(rocky, f, u, v) + (valueNoise(wx * 2.2, wy * 2.2, seed + 61) - 0.5) * 0.35)
+      const rock = smooth(0.35, 0.6, bilinear(rocky, f, u, v) + (valueNoise(wx * 2.2, wy * 2.2, seed + 61) - 0.5) * 0.35) * (1 - steep * 0.6)
       if (rock > 0) {
         const ropes = 0.5 + 0.5 * Math.sin((wx * 0.8 + wy * 1.1) * 5 + fbm(wx * 0.9, wy * 0.9, seed + 51, 2) * 9)
-        const rr = 33 + grain * 10 + ropes * 7 + big * 6
-        const rg = 30 + grain * 9 + ropes * 6 + big * 5
-        const rb = 34 + grain * 10 + ropes * 8 + big * 6
+        const young = clamp01(bilinear(fresh, f, u, v) * 1.6)
+        const joint = 1 - 0.45 * smooth(0.07, 0, cellEdge(wx * 2.3, wy * 2.3, seed + 33))
+        const rr = (33 + grain * 16 + ropes * 7 + big * 6 + (1 - young) * (20 + big * 10)) * joint
+        const rg = (30 + grain * 14 + ropes * 6 + big * 5 + (1 - young) * (15 + big * 8)) * joint
+        const rb = (34 + grain * 15 + ropes * 8 + big * 6 + (1 - young) * (9 + big * 6)) * joint
         r += (rr - r) * rock
         g += (rg - g) * rock
         b += (rb - b) * rock
       }
-      r *= shade
-      g *= shade
-      b *= shade
+      const foot = 1 - 0.3 * Math.exp(-(((dU - cone.blockU - 0.3) / 0.4) ** 2))
+      const cast = smooth(cone.blockU + 0.7, cone.blockU - 0.2, Math.hypot(ox + (LIGHT_X / lxy) * 1.2, oy + (LIGHT_Y / lxy) * 1.2)) * smooth(cone.blockU - 0.4, cone.blockU + 0.2, dU)
+      const dark = shade * foot * (1 - 0.32 * cast)
+      r *= dark
+      g *= dark
+      b *= dark
+      const ring = Math.abs(dU - cone.blockU) < 1.2 ? cone.blockU - 0.1 + (fbm(Math.cos(a) * 3 + 2, Math.sin(a) * 3 + 5, seed + 91, 2) - 0.5) * 0.6 : cone.blockU
+      const band = smooth(0.8, 0.25, Math.abs(dU - ring))
+      if (band > 0) {
+        const q = cellNearest(wx * 1.6, wy * 1.6, seed + 71)
+        const size = (0.26 + 0.24 * q.h) * (0.5 + 0.5 * band)
+        const d = Math.hypot(q.dx, q.dy) / size
+        if (q.h > 0.1 && d < 1.4) {
+          if (d < 1) {
+            const lz = Math.sqrt(1 - d * d)
+            const lit = Math.max(0, (q.dx / size) * LIGHT_X + (q.dy / size) * LIGHT_Y + lz * LIGHT_Z)
+            const tone = 0.35 + lit * 0.95
+            const k = smooth(1, 0.82, d)
+            r += ((66 + q.h * 18) * tone - r) * k
+            g += ((56 + q.h * 12) * tone - g) * k
+            b += ((52 + q.h * 10) * tone - b) * k
+          } else {
+            const k = 1 - 0.35 * smooth(1.4, 1, d)
+            r *= k
+            g *= k
+            b *= k
+          }
+        }
+      }
       const outside = Math.max(
         smooth(0, -UNIT * 1.2, f.x0 + (u + 0.5) * f.cell),
         smooth(mapW, mapW + UNIT * 1.2, f.x0 + (u + 0.5) * f.cell),
@@ -169,7 +216,6 @@ export function paintGround(
     }
   }
 }
-
 
 /** 地面图层每格多少像素：地表是静的，只在有岩石新凝固时局部重画 */
 export const GROUND_PPC = 6
@@ -239,7 +285,8 @@ function blur(a: Float32Array, cols: number, rows: number, r: number): void {
 
 /**
  * 熔岩的片元着色器，四边形盖住整块场地，坐标以格计、y 朝下。四边形的纹理坐标 y 朝上，画布纹理上传时也上下翻了，所以直接按它采样。熔岩按温度从白黄到暗红，冷下来结出暗色硬壳，壳块之间的缝透出熔岩；
- * 壳块按流向图顺坡往下漂，火山口里的熔岩湖打着转。输出按预乘透明度：熔岩盖在地上，辉光、余烬、预兆的裂缝叠加发亮。
+ * 壳块与热熔岩上漂着的硬壳按流向图顺坡往下漂，火山口里的熔岩湖打着转，喷发时湖面随流量涨到口沿；按扭曲过的坐标采样，边缘不顺着格子走。
+ * 输出按预乘透明度：熔岩盖在地上，辉光、余烬叠加发亮。
  */
 export const LAVA_FRAG = `
 #pragma phaserTemplate(shaderName)
@@ -259,8 +306,7 @@ uniform sampler2D uAux;
 uniform float uTime;
 uniform vec2 uGrid;
 uniform vec3 uCrater;
-uniform vec4 uVent;
-uniform vec2 uWarn;
+uniform float uWarn;
 uniform float uErupt;
 
 vec2 hash2(vec2 p) {
@@ -318,8 +364,10 @@ void main ()
 {
   vec2 tc = outTexCoord;
   vec2 cell = vec2(tc.x, 1.0 - tc.y) * uGrid;
-  vec4 lv = texture2D(uLava, tc);
-  vec4 ax = texture2D(uAux, tc);
+  vec2 wob = vec2(vnoise(cell * 0.8 + 3.0), vnoise(cell * 0.8 + 21.0)) - 0.5;
+  vec2 at = tc + vec2(wob.x, -wob.y) * 0.9 / uGrid;
+  vec4 lv = texture2D(uLava, at);
+  vec4 ax = texture2D(uAux, at);
   float shape = lv.r;
   float heat = lv.g;
   float ember = lv.b;
@@ -330,6 +378,10 @@ void main ()
   float cover = smoothstep(0.42, 0.52, shape + ragged * smoothstep(0.0, 0.2, shape));
   vec2 rc = cell - uCrater.xy;
   float lake = 1.0 - smoothstep(uCrater.z * 0.6, uCrater.z * 0.95, length(rc));
+  float brim = uCrater.z * (0.8 + 0.32 * uErupt) + ragged * 0.6;
+  float swell = 1.0 - smoothstep(brim - 0.12, brim, length(rc));
+  cover = max(cover, swell);
+  heat = max(heat, swell);
   if (cover > 0.001) {
     vec2 dir = ax.gb * 2.0 - 1.0;
     vec2 swirl = vec2(-rc.y, rc.x) / max(length(rc), 0.001);
@@ -344,35 +396,24 @@ void main ()
     float e = mix(plates(b), plates(a), w);
     float fine = mix(plates(b * 2.3 + 1.7), plates(a * 2.3), w);
     float churn = mix(vnoise(b * 1.3 + 3.1), vnoise(a * 1.3), w);
-    float hot = clamp(heat * (0.72 + 0.4 * churn), 0.0, 1.0);
+    float hot = clamp(heat * (0.64 + 0.42 * churn), 0.0, 1.0);
     vec3 molten = ramp(hot);
     molten += vec3(0.25, 0.22, 0.12) * smoothstep(0.78, 0.95, churn) * smoothstep(0.85, 1.0, heat);
-    float skin = max(1.0 - smoothstep(0.4, 1.02, heat), lake * 0.92);
+    float rafts = smoothstep(0.6, 0.72, churn) * (1.0 - lake) * (1.0 - swell);
+    float skin = max(max(1.0 - smoothstep(0.4, 1.02, heat), lake * (0.92 - 0.55 * uErupt)), rafts * 0.9);
     float seam = mix(0.025 + 0.2 * heat * heat, 0.05 + 0.04 * sin(uTime * 1.3 + churn * 5.0), lake);
     float crust = skin * smoothstep(seam, seam + 0.06, e) * smoothstep(0.02, 0.07 + 0.1 * heat, fine + 0.05);
-    float rim = (1.0 - smoothstep(0.55, 0.8, shape)) * (1.0 - lake);
+    float rim = (1.0 - smoothstep(0.55, 0.8, shape)) * (1.0 - lake) * (1.0 - swell);
     crust = max(crust, rim * 0.85);
     vec3 crustCol = vec3(0.12, 0.075, 0.065) + vec3(0.08, 0.025, 0.0) * churn + vec3(0.25, 0.05, 0.0) * (1.0 - smoothstep(0.0, 0.08, e)) * heat;
     col = mix(molten, crustCol, crust);
     alpha = cover;
-    add += molten * (1.0 - crust) * cover * hot * (0.05 + 0.25 * lake * uWarn.x);
+    add += molten * (1.0 - crust) * cover * hot * (0.05 + 0.25 * lake * max(uWarn, uErupt));
   }
   if (ember > 0.004) {
     vec2 warp = cell * 0.8 + vec2(vnoise(cell * 0.7), vnoise(cell * 0.7 + 9.0)) * 1.3;
     float crack = (1.0 - smoothstep(0.0, 0.06, plates(warp + 5.3))) * smoothstep(0.25, 0.6, vnoise(cell * 1.1 + 2.0) + ember * 0.4);
     add += vec3(1.0, 0.28 + 0.35 * ember, 0.05) * crack * ember * (1.0 - cover) * 0.85;
-  }
-  if (uWarn.x > 0.0) {
-    vec2 rel = cell - uVent.xy;
-    float along = dot(rel, uVent.zw);
-    float across = dot(rel, vec2(-uVent.w, uVent.z));
-    float grow = uWarn.y * clamp(uWarn.x * 1.6, 0.0, 1.0);
-    float inside = step(0.0, along) * (1.0 - smoothstep(grow - 0.3, grow, along));
-    float jag = (vnoise(vec2(along * 2.5, 7.0)) - 0.5) * 0.5;
-    float line = (1.0 - smoothstep(0.0, 0.16, abs(across - jag))) * inside;
-    float pulse = 0.65 + 0.35 * sin(uTime * 13.0);
-    add += vec3(1.0, 0.5, 0.12) * line * pulse * (0.5 + 0.8 * uWarn.x);
-    add += vec3(1.0, 0.28, 0.05) * (1.0 - smoothstep(0.0, 1.4, abs(across))) * inside * 0.3 * uWarn.x;
   }
   gl_FragColor = vec4(col * alpha + add, alpha);
 }

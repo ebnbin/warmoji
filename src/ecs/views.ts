@@ -25,6 +25,7 @@ import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/river'
 import { fitAspectRect } from './worlds/torus'
 import { drawBomb, drawPuff, drawSpark, encodeLava, fumaroles, GROUND_PPC, LAVA_FRAG, paintGround } from './render/volcano'
+import { effusion } from './worlds/volcano'
 import type { EruptionPhase, VolcanoState } from './worlds/volcano'
 import { playSfx } from '../audio/sfx'
 import { loadSettings } from '../save/settings'
@@ -932,15 +933,15 @@ function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, d
 }
 
 /**
- * 火山：地表是按高度场打光的火山灰、火山渣与玄武岩，熔岩由着色器按每格的厚度、温度画出结壳与流动；
- * 火山口冒着烟，熔岩上飘火星，天上落灰，喷气孔冒蒸汽。预兆时山腰裂缝发光、地面抖动、天色发红，
- * 喷发时火山弹从火山口飞出、画面一闪一震。
+ * 火山：地表是按高度场打光的火山灰、火山渣与玄武岩，山体陡峭、山脚堆着一圈石块，熔岩由着色器按每格的厚度、温度画出结壳与流动；
+ * 火山口冒着烟，熔岩上飘火星，天上落灰，喷气孔冒蒸汽。预兆时浓烟翻滚、地面抖动、天色发红，
+ * 喷发时熔岩湖涨过口沿，火山弹随流量从火山口飞出，画面一闪一震。
  */
 class VolcanoView extends BoundedView {
   private ground?: { tex: Phaser.Textures.CanvasTexture; img: ImageData; seen: Float32Array }
   private data?: { lava: Phaser.Textures.CanvasTexture; aux: Phaser.Textures.CanvasTexture; lavaImg: ImageData; auxImg: ImageData; glow: Float32Array; soft: Float32Array }
   private rockAt = 0
-  private readonly u = { time: 0, erupt: 0, warn: 0, vent: [0, 0, 1, 0] as number[] }
+  private readonly u = { time: 0, erupt: 0, warn: 0 }
   private plume?: Phaser.GameObjects.Particles.ParticleEmitter
   private column?: Phaser.GameObjects.Particles.ParticleEmitter
   private embers?: Phaser.GameObjects.Particles.ParticleEmitter
@@ -1023,8 +1024,7 @@ class VolcanoView extends BoundedView {
             set('uTime', u.time)
             set('uGrid', [f.cols, f.rows])
             set('uCrater', crater)
-            set('uVent', u.vent)
-            set('uWarn', [u.warn, (cfg.eruption.fissureU * UNIT) / f.cell + 0.6])
+            set('uWarn', u.warn)
             set('uErupt', u.erupt)
           },
         },
@@ -1037,7 +1037,7 @@ class VolcanoView extends BoundedView {
       .setOrigin(0, 0)
       .setDepth(1.5)
     this.visuals.push(shader)
-    const clear = (cfg.cone.craterU + 1.5) * UNIT
+    const clear = (cfg.cone.blockU + 0.3) * UNIT
     this.decorEids = this.decorEids.filter((eid) => {
       const keep = Math.hypot(Transform.x[eid]! - f.craterX, Transform.y[eid]! - f.craterY) >= clear
       if (!keep) removeEntity(v.world, eid)
@@ -1195,14 +1195,10 @@ class VolcanoView extends BoundedView {
     this.repaintRock(v, s, now)
     const e = cfg.eruption
     const warn = s.phase === 'warn' ? Math.min(1, (now - s.since) / e.warnMs) : 0
-    const erupt = s.phase === 'erupt' ? 1 - Math.min(1, (now - s.since) / e.effuseMs) * 0.6 : 0
+    const erupt = s.phase === 'erupt' ? effusion(e, now - s.since) / e.rate : 0
     this.u.time = now / 1000
     this.u.warn = warn
     this.u.erupt = erupt
-    const vx = s.ventX - f.craterX
-    const vy = s.ventY - f.craterY
-    const vl = Math.hypot(vx, vy) || 1
-    this.u.vent = [(s.ventX - f.x0) / f.cell, (s.ventY - f.y0) / f.cell, vx / vl, vy / vl]
     if (s.phase !== this.phase) this.enterPhase(v, s)
     this.phase = s.phase
     const cam = v.scene.cameras.main
@@ -1275,9 +1271,7 @@ class VolcanoView extends BoundedView {
     const f = s.field
     const dt = delta / 1000
     if (s.phase === 'erupt') {
-      const e = v.def.volcano!.eruption
-      const k = (now - s.since) / e.effuseMs
-      this.bombAcc += dt * (k < 0.35 ? 12 : 4)
+      this.bombAcc += dt * 13 * this.u.erupt
       while (this.bombAcc >= 1) {
         this.bombAcc -= 1
         const b = this.bomb(v.scene)

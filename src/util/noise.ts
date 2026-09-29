@@ -55,3 +55,29 @@ export function cellEdge(x: number, y: number, seed: number): number {
   }
   return f2 - f1
 }
+
+/** 细胞噪声里最近的特征点：(x, y) 相对它的偏移，与它自己的哈希 */
+export function cellNearest(x: number, y: number, seed: number): { dx: number; dy: number; h: number } {
+  const ix = Math.floor(x)
+  const iy = Math.floor(y)
+  let best = 9
+  let dx = 0
+  let dy = 0
+  let h = 0
+  for (let j = -1; j <= 1; j++) {
+    for (let i = -1; i <= 1; i++) {
+      const cx = ix + i
+      const cy = iy + j
+      const ox = x - cx - hash(cx, cy, seed)
+      const oy = y - cy - hash(cx, cy, seed + 7)
+      const d = Math.hypot(ox, oy)
+      if (d < best) {
+        best = d
+        dx = ox
+        dy = oy
+        h = hash(cx, cy, seed + 13)
+      }
+    }
+  }
+  return { dx, dy, h }
+}

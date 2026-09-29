@@ -8,7 +8,7 @@ import type { IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, SpaceConfig, 
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
 import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebula'
-import { fissureCells, makeField, moltenAt, NO_VENT, pickVent, stepLava, ventVolume } from '../worlds/volcano'
+import { around, confine, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava } from '../worlds/volcano'
 import type { VolcanoState } from '../worlds/volcano'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
@@ -619,29 +619,30 @@ function volcanoCfg(sim: Sim): VolcanoConfig {
   return MAPS[sim.mapId].volcano!
 }
 
-/** 火山的地形由布景种子定下，视图从这里读；喷发的时刻与喷口由对局的随机数决定 */
+/** 火山的地形由布景种子定下，视图从这里读；喷发的时刻与熔岩往哪几股漫出由对局的随机数决定 */
 function volcanoOf(sim: Sim): VolcanoState {
   let s = sim.worldState.volcano
   if (!s) {
     const cfg = volcanoCfg(sim)
     const field = makeField(new Rng(sim.run.decorSeed ^ 0x7a1c), cfg, sim.mapW, sim.mapH, MAP.cameraMargin * UNIT)
-    s = { field, phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, ventX: 0, ventY: 0, vent: NO_VENT, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
+    s = { field, phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, spill: NO_SPILL, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
     sim.worldState.volcano = s
   }
   return s
 }
 
+function blockPx(sim: Sim): number {
+  return volcanoCfg(sim).cone.blockU * UNIT
+}
+
 const LAVA_TINT = 0xff6d00
 
-/** 喷发的节奏：到点先起预兆并定下喷口，预兆完了从喷口出熔岩，出完回到平静 */
+/** 喷发的节奏：到点先起预兆并定下熔岩往哪几股漫出，预兆完了熔岩漫过口沿，流量先涨后落，出完回到平静 */
 function tickEruption(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
   const e = cfg.eruption
   const now = sim.elapsedMs
   if (s.phase === 'dormant' && now >= s.nextAt) {
-    const v = pickVent(s.field, cfg, sim.rng)
-    s.ventX = v.x
-    s.ventY = v.y
-    s.vent = fissureCells(s.field, v.x, v.y, e.fissureU)
+    s.spill = spillOf(s.field, cfg, sim.rng)
     s.phase = 'warn'
     s.since = now
     s.nextAt = now + e.intervalMs + (sim.rng.next() * 2 - 1) * e.intervalJitterMs
@@ -670,20 +671,40 @@ function burnOnLava(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
   for (const eid of [...query(sim.world, ENEMY_SET)]) if (onLava(eid)) hit(sim, src, eid, edmg, { tick: true })
 }
 
-/** 刷怪点避开熔岩与火山口 */
+/** 刷怪点避开熔岩与山体 */
 function awayFromLava(sim: Sim, p: Point): boolean {
-  const s = volcanoOf(sim)
-  const clear = (volcanoCfg(sim).cone.craterU + 1) * UNIT
-  return !moltenAt(s.field, p.x, p.y) && Math.hypot(p.x - s.field.craterX, p.y - s.field.craterY) > clear
+  const f = volcanoOf(sim).field
+  return !moltenAt(f, p.x, p.y) && Math.hypot(p.x - f.craterX, p.y - f.craterY) > blockPx(sim) + UNIT
 }
 
-/** 火山：靠边的火山定期喷发，熔岩按地势流动、冷却凝固，盖住的地方敌我都受伤 */
+/** 火山：贴边的火山挡住身体，定期喷发，熔岩按地势往四面八方流、离火山口越远凉得越快，盖住的地方敌我都受伤 */
 const volcano: WorldHooks = {
   ...bounded,
+  constrainBody(sim, eid, _from, next) {
+    return confine(volcanoOf(sim).field, blockPx(sim), sim.mapW, sim.mapH, next.x, next.y, Radius.v[eid]!)
+  },
+  chaseDir(sim, eid, tx, ty) {
+    const r = blockPx(sim) + Radius.v[eid]! + 0.3 * UNIT
+    return around(volcanoOf(sim).field, r, Transform.x[eid]!, Transform.y[eid]!, tx, ty)
+  },
+  /** 游荡着撞上山体就像撞上地图边一样折回来 */
+  wanderDir(sim, eid, dx, dy) {
+    const d = bounded.wanderDir(sim, eid, dx, dy)
+    const f = volcanoOf(sim).field
+    const ox = Transform.x[eid]! - f.craterX
+    const oy = Transform.y[eid]! - f.craterY
+    const dist = Math.hypot(ox, oy)
+    const dot = (d.x * ox + d.y * oy) / dist
+    if (dist > blockPx(sim) + Radius.v[eid]! + 0.6 * UNIT || dot >= 0) return d
+    return { x: d.x - (2 * dot * ox) / dist, y: d.y - (2 * dot * oy) / dist }
+  },
   spawnPoint(sim, boss) {
     let p = bounded.spawnPoint(sim, boss)
     for (let i = 0; i < 12 && !awayFromLava(sim, p); i++) p = bounded.spawnPoint(sim, boss)
     return p
+  },
+  settle(sim, p) {
+    return confine(volcanoOf(sim).field, blockPx(sim), sim.mapW, sim.mapH, p.x, p.y, SPAWN.edgeInset * UNIT)
   },
   onStart(sim) {
     volcanoOf(sim)
@@ -696,7 +717,9 @@ const volcano: WorldHooks = {
     s.stepAcc = Math.min(s.stepAcc + delta, step * 4)
     while (s.stepAcc >= step) {
       s.stepAcc -= step
-      stepLava(s.field, cfg.lava, step / 1000, sim.elapsedMs - s.stepAcc, s.phase === 'erupt' ? s.vent : NO_VENT, ventVolume(cfg))
+      const now = sim.elapsedMs - s.stepAcc
+      const erupting = s.phase === 'erupt'
+      stepLava(s.field, cfg.lava, step / 1000, now, erupting ? s.spill : NO_SPILL, erupting ? spillVolume(cfg, now - s.since) : 0)
     }
     burnOnLava(sim, s, cfg)
   },

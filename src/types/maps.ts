@@ -102,16 +102,20 @@ export interface NebulaConfig {
     readonly maxFlightMs: number
   }
 }
-/** 火山：靠边的一座火山定期喷发，熔岩顺地势往低处流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人 */
+/** 火山：贴着地图边的一座火山，山体谁也上不去；定期从火山口喷发，熔岩往四面八方顺着地势流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人 */
 export interface VolcanoConfig {
   /** 地形格子的边长，高度与厚度也以格计；地形铺满镜头能看到的地图外一圈 */
   readonly cellU: number
   readonly cone: {
     /** 火山口圆心离最近的地图边多远 */
     readonly insetU: readonly [number, number]
-    readonly radiusU: number
-    readonly height: number
     readonly craterU: number
+    /** 陡峭的山体：离火山口这么远以内身体进不去，飞行物照飞 */
+    readonly blockU: number
+    /** 口沿的高度与山脚（挡路圈边上）的高度，其间按指数往下降，山脚的缓坡铺到 radiusU 处与平地齐平 */
+    readonly height: number
+    readonly footHeight: number
+    readonly radiusU: number
     readonly craterDepth: number
     /** 火山口里熔岩湖的液面比火山口底高多少 */
     readonly lakeDepth: number
@@ -128,16 +132,17 @@ export interface VolcanoConfig {
     readonly firstMs: number
     readonly intervalMs: number
     readonly intervalJitterMs: number
-    /** 喷发前的预兆：冒烟、发红、地震、山腰裂开 */
+    /** 喷发前的预兆：冒烟、发红、地震 */
     readonly warnMs: number
-    /** 喷口出熔岩的时长与每秒出多少，格³ */
-    readonly effuseMs: number
+    /** 熔岩漫过口沿的流量（格³/秒）：peakMs 内涨到 rate，之后按时间常数 waneMs 衰减，effuseMs 后停 */
     readonly rate: number
-    /** 喷口落在朝地图里的方向两侧多少度内、离火山口多远 */
-    readonly spreadDeg: number
-    readonly ventU: readonly [number, number]
-    /** 喷口顺着山坡裂开多长 */
-    readonly fissureU: number
+    readonly peakMs: number
+    readonly waneMs: number
+    readonly effuseMs: number
+    /** 每次喷发熔岩集中从口沿的几股漫出，每股宽约几度；其余方向只漫出股心的 lobeFloor 倍 */
+    readonly lobes: readonly [number, number]
+    readonly lobeDeg: number
+    readonly lobeFloor: number
     /** 开局前已经喷过几次，地图上留下旧熔岩 */
     readonly history: number
   }
@@ -149,9 +154,9 @@ export interface VolcanoConfig {
     /** 屈服强度（厚度乘坡度）：最热时与将凝固时；朝某个方向流要厚过它除以那个方向的坡度 */
     readonly yieldHot: number
     readonly yieldCold: number
-    /** 冷却：温度每秒降 cooling·(0.2+T²)/(厚度+coolDepth)，越薄冷得越快 */
+    /** 冷却：温度每秒降 cooling·(1+(r/coolRadiusU)²)，r 是离火山口的距离，离得越远冷得越快 */
     readonly cooling: number
-    readonly coolDepth: number
+    readonly coolRadiusU: number
     /** 温度低于它就凝固成岩石 */
     readonly solidus: number
     readonly teamDps: number
