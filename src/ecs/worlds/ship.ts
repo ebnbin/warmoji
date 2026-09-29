@@ -158,6 +158,13 @@ export function clearWeights(s: ShipState): void {
   s.spreadL = 0
 }
 
+/** 甲板此刻的倾斜：沿甲板往下的方向（地图坐标的单位向量）与倾角（甲板法线离铅垂线的角度，弧度） */
+export function deckTilt(s: ShipState): { down: Point; angle: number } {
+  const g = Math.hypot(s.gx, s.gy)
+  const angle = Math.acos(Math.min(1, Math.cos(s.roll.angle) * Math.cos(s.pitch.angle)))
+  return { down: g > 0 ? { x: s.gx / g, y: s.gy / g } : { x: 0, y: 0 }, angle }
+}
+
 const MAX_STEP_S = 1 / 60
 
 /**

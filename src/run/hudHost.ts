@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import type { Polarity } from '../types/battlefield'
 import type { StatValues } from '../types/stats'
+import type { Point } from '../util/vec'
 
 export interface HudSnapshot {
   xp: number
@@ -21,6 +22,16 @@ export interface HudSnapshot {
   bossHp: number | null
   bossMaxHp: number
   battleFx: { emoji: string; name: string; desc: string; polarity: Polarity; remainMs: number; totalMs: number }[]
+  /** 在船上打的一局才有：甲板此刻往哪边倾、倾多少 */
+  tilt: TiltSnapshot | null
+}
+
+/** 甲板的倾斜：往下的方向与船头的朝向是屏幕上的单位向量，倾角与站着会滑的门槛是度 */
+export interface TiltSnapshot {
+  readonly down: Point
+  readonly deg: number
+  readonly bow: Point
+  readonly slipDeg: number
 }
 
 export interface WaveSummary {
