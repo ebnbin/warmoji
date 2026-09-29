@@ -483,7 +483,7 @@ export const MAPS = {
       hydro: { draftM: 2, midship: 0.78, kgM: 2.5, depthM: 4.2, rho: 1025, rollGyration: 0.38, pitchGyration: 0.26, rollAdded: 0.2, pitchAdded: 0.8, rollDamping: 0.15, pitchDamping: 0.35 },
       weight: { bodyKg: 75, bodyRadiusU: 0.45, bodyHeightM: 0.9, pickupKg: 0.05, ballKg: 14.5 },
       sea: {
-        speedMs: 2.5,
+        speedMs: 1.2,
         swells: [
           { heightM: 0.8, periodS: 8, towardDeg: 80 },
           { heightM: 0.2, periodS: 5.5, towardDeg: 160 },
