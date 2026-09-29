@@ -111,7 +111,10 @@ export interface ShipState {
   gn: number
 }
 
-/** 空船正浮在涌浪里，炮弹散在甲板上离舷墙与桅杆至少一格的地方 */
+/** 开战前船已经在海上漂了这么久，秒：一开场就在随浪摇 */
+const WARM_S = 40
+
+/** 空船在涌浪里漂着，炮弹散在甲板上离舷墙与桅杆至少一格的地方 */
 export function makeShip(cfg: ShipConfig, mapW: number, mapH: number, rng: Rng): ShipState {
   const deck = makeDeck(cfg, mapW, mapH)
   const hs = hydrostatics(cfg)
@@ -130,7 +133,9 @@ export function makeShip(cfg: ShipConfig, mapW: number, mapH: number, rng: Rng):
     balls.push({ x: p.x, y: p.y, vx: 0, vy: 0 })
   }
   const g = (GRAVITY * UNIT) / cfg.meterPerU
-  return { deck, hs, waves, roll: { angle: 0, rate: 0 }, pitch: { angle: 0, rate: 0 }, balls, slips: new Map(), t: 0, load: 0, heelMoment: 0, trimMoment: 0, spreadT: 0, spreadL: 0, gx: 0, gy: 0, gn: g }
+  const s: ShipState = { deck, hs, waves, roll: { angle: 0, rate: 0 }, pitch: { angle: 0, rate: 0 }, balls, slips: new Map(), t: 0, load: 0, heelMoment: 0, trimMoment: 0, spreadT: 0, spreadL: 0, gx: 0, gy: 0, gn: g }
+  for (let k = 0; k < WARM_S * 30; k++) stepShip(s, cfg, 1 / 30)
+  return s
 }
 
 /** 一件东西压上甲板：记下它的重量与对船中线（右舷为正）、漂心（船头为正）的力矩，米 */
