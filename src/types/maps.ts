@@ -102,16 +102,32 @@ export interface NebulaConfig {
     readonly maxFlightMs: number
   }
 }
-/** 火山：贴着地图边的一座火山，山体谁也上不去；定期从火山口喷发，熔岩往四面八方顺着地势流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人 */
+/**
+ * 火山：能走的是方形地图里一块边缘不规则的盆地，四周是崖壁与高地；一座火山背靠盆地边，山体谁也上不去。
+ * 火山定期从火山口喷发，熔岩往四面八方顺着地势流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人
+ */
 export interface VolcanoConfig {
   /** 地形格子的边长，高度与厚度也以格计；地形铺满镜头能看到的地图外一圈 */
   readonly cellU: number
+  readonly rim: {
+    /** 盆地的边离方形地图的边多远：按噪声在两者之间起伏，起伏的波长 waveU；方形的角按 cornerU 的半径磨圆 */
+    readonly insetU: readonly [number, number]
+    readonly waveU: number
+    readonly cornerU: number
+    /** 窄过两倍 neckU 的缝和尖角填成岩壁 */
+    readonly neckU: number
+    /** 崖壁从崖脚到崖顶 cliffU 格宽、高 cliffHeight；崖顶往外的高地每格降 backSlope */
+    readonly cliffU: number
+    readonly cliffHeight: number
+    readonly backSlope: number
+  }
   readonly cone: {
     /** 火山口圆心离最近的地图边多远 */
     readonly insetU: readonly [number, number]
     readonly craterU: number
-    /** 陡峭的山体：离火山口这么远以内身体进不去，飞行物照飞 */
+    /** 陡峭的山体：离火山口约这么远以内身体进不去，飞行物照飞；山脚的半径按方位角在 ±blockJitter 倍内起伏 */
     readonly blockU: number
+    readonly blockJitter: number
     /** 口沿的高度与山脚（挡路圈边上）的高度，其间按指数往下降，山脚的缓坡铺到 radiusU 处与平地齐平 */
     readonly height: number
     readonly footHeight: number
@@ -139,8 +155,9 @@ export interface VolcanoConfig {
     readonly peakMs: number
     readonly waneMs: number
     readonly effuseMs: number
-    /** 每次喷发熔岩集中从口沿的几股漫出，每股宽约几度；其余方向只漫出股心的 lobeFloor 倍 */
+    /** 每次喷发熔岩集中从口沿的几股漫出，股心落在朝盆地的方向两侧 lobeSpreadDeg 内，每股宽约几度；其余方向只漫出股心的 lobeFloor 倍 */
     readonly lobes: readonly [number, number]
+    readonly lobeSpreadDeg: number
     readonly lobeDeg: number
     readonly lobeFloor: number
     /** 开局前已经喷过几次，地图上留下旧熔岩 */

@@ -1,6 +1,7 @@
 import { UNIT } from '../../util/units'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
 import { Rng } from '../../util/rng'
+import { awayFromWall, roomAt } from '../worlds/basin'
 import type { LavaField } from '../worlds/volcano'
 import type { VolcanoConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
@@ -47,15 +48,16 @@ function soften(src: ArrayLike<number>, cols: number, rows: number, out: Float32
   }
 }
 
-/** 冒硫磺蒸汽的喷气孔：山脚外朝地图里的那一侧有几个，只是布景 */
+/** 冒硫磺蒸汽的喷气孔：山脚外朝盆地的那一侧有几个，落在盆地里，只是布景 */
 export function fumaroles(f: LavaField, cfg: VolcanoConfig, count: number): Point[] {
   const rng = new Rng(f.seed ^ 0x51f0)
   const out: Point[] = []
   const base = Math.atan2(f.inY, f.inX)
-  for (let k = 0; k < count; k++) {
+  for (let k = 0; k < count * 8 && out.length < count; k++) {
     const a = base + (rng.next() * 2 - 1) * 1.3
     const r = (cfg.cone.blockU + 0.8 + rng.next() * 5) * UNIT
-    out.push({ x: f.craterX + Math.cos(a) * r, y: f.craterY + Math.sin(a) * r })
+    const p = { x: f.craterX + Math.cos(a) * r, y: f.craterY + Math.sin(a) * r }
+    if (roomAt(f.basin, p.x, p.y) >= 0.6 * UNIT) out.push(p)
   }
   return out
 }
@@ -64,17 +66,37 @@ const LIGHT_X = -0.45
 const LIGHT_Y = -0.6
 const LIGHT_Z = 0.66
 
+/** 往光源方向看这么远（格）找挡光的地形 */
+const SHADOW_STEPS = [0.4, 0.9, 1.5, 2.3] as const
+
+/** 岩石的遮罩：凝固过的格子与开局后才凝固的格子，都平滑过一遍 */
+export interface RockMasks {
+  readonly rocky: Float32Array
+  readonly fresh: Float32Array
+}
+
+export function rockMasks(f: LavaField): RockMasks {
+  const rocky = new Float32Array(f.cols * f.rows)
+  const fresh = new Float32Array(f.cols * f.rows)
+  const hard = new Float32Array(f.cols * f.rows)
+  for (let i = 0; i < hard.length; i++) hard[i] = f.rockAt[i]! > -Infinity ? 1 : 0
+  soften(hard, f.cols, f.rows, rocky)
+  for (let i = 0; i < hard.length; i++) hard[i] = f.rockAt[i]! >= 0 ? 1 : 0
+  soften(hard, f.cols, f.rows, fresh)
+  return { rocky, fresh }
+}
+
 /**
- * 地表：火山灰地面、火山的红褐色火山渣、凝固的玄武岩，按高度场打光；陡峭的山体上有顺坡的碎石纹，
- * 挡路圈边上堆着一圈大石块；灰地上有干裂纹，喷气孔周围有硫磺，地图外一圈压暗。ppc 是每格多少像素，只画 [c0, c1) × [r0, r1) 的格子。
+ * 地表：盆地里是火山灰地面，火山是红褐色的火山渣，凝固的熔岩是玄武岩；盆地外是崖壁与柱状节理的玄武岩高地，越往外越暗。
+ * 按高度场打光，高处朝背光一侧投下影子；所有岩壁脚下都堆着碎石，陡峭的山体上有顺坡的碎石纹，灰地上有干裂纹，喷气孔周围有硫磺。
+ * ppc 是每格多少像素，只画 [c0, c1) × [r0, r1) 的格子。
  */
 export function paintGround(
   f: LavaField,
   cfg: VolcanoConfig,
   ppc: number,
-  mapW: number,
-  mapH: number,
   vents: readonly Point[],
+  masks: RockMasks,
   out: Uint8ClampedArray,
   c0: number,
   r0: number,
@@ -84,34 +106,36 @@ export function paintGround(
   const w = f.cols * ppc
   const seed = f.seed
   const cone = cfg.cone
+  const mountain = cone.blockU * (1 + cone.blockJitter)
   const sulfur = vents.map((p) => ({ u: (p.x - f.x0) / f.cell - 0.5, v: (p.y - f.y0) / f.cell - 0.5 }))
   const sr = 1.4 / cfg.cellU
   const lxy = Math.hypot(LIGHT_X, LIGHT_Y)
-  const rocky = new Float32Array(f.cols * f.rows)
-  const fresh = new Float32Array(f.cols * f.rows)
-  const hard = new Float32Array(f.cols * f.rows)
-  for (let i = 0; i < hard.length; i++) hard[i] = f.rockAt[i]! > -Infinity ? 1 : 0
-  soften(hard, f.cols, f.rows, rocky)
-  for (let i = 0; i < hard.length; i++) hard[i] = f.rockAt[i]! >= 0 ? 1 : 0
-  soften(hard, f.cols, f.rows, fresh)
+  const sunU = LIGHT_X / lxy / cfg.cellU
+  const sunV = LIGHT_Y / lxy / cfg.cellU
+  const sunRise = LIGHT_Z / lxy
+  const { rocky, fresh } = masks
   for (let py = r0 * ppc; py < r1 * ppc; py++) {
     for (let px = c0 * ppc; px < c1 * ppc; px++) {
       const u = (px + 0.5) / ppc - 0.5
       const v = (py + 0.5) / ppc - 0.5
       const e = 0.5
+      const g0 = bilinear(f.ground, f, u, v)
       const hx = bilinear(f.ground, f, u + e, v) - bilinear(f.ground, f, u - e, v)
       const hy = bilinear(f.ground, f, u, v + e) - bilinear(f.ground, f, u, v - e)
       const nx = -hx / (2 * e * cfg.cellU)
       const ny = -hy / (2 * e * cfg.cellU)
-      const nl = 1 / Math.hypot(nx, ny, 1)
+      const nl = 1 / Math.sqrt(nx * nx + ny * ny + 1)
       const lambert = Math.max(0, (nx * LIGHT_X + ny * LIGHT_Y + LIGHT_Z) * nl)
       const wx = (f.x0 + (u + 0.5) * f.cell) / UNIT
       const wy = (f.y0 + (v + 0.5) * f.cell) / UNIT
       const ox = wx - f.craterX / UNIT
       const oy = wy - f.craterY / UNIT
-      const dU = Math.hypot(ox, oy)
+      const dU = Math.sqrt(ox * ox + oy * oy)
+      const roomU = roomAt(f.basin, wx * UNIT, wy * UNIT) / UNIT
+      const edgeU = roomU < 2.5 ? roomU + (fbm(wx * 1.3, wy * 1.3, seed + 141, 2) - 0.5) * 0.5 : roomU
       const steep = smooth(cone.blockU + 0.3, cone.blockU - 0.6, dU) * smooth(cone.craterU, cone.craterU + 0.5, dU)
-      const shade = 0.5 - steep * 0.18 + lambert * (0.75 + steep * 0.35)
+      const cliff = smooth(0, 0.3, -edgeU) * smooth(cfg.rim.cliffU + 0.4, cfg.rim.cliffU - 0.2, -edgeU)
+      const shade = 0.5 - steep * 0.18 - cliff * 0.12 + lambert * (0.75 + steep * 0.35 + cliff * 0.25)
       const big = fbm(wx / 5, wy / 5, seed + 3, 2)
       const grain = valueNoise(wx * 5.5, wy * 5.5, seed + 9) * 0.5 + valueNoise(wx * 13, wy * 13, seed + 11) * 0.5
       let r = 58 + big * 22 + grain * 13
@@ -124,7 +148,6 @@ export function paintGround(
         g *= k
         b *= k
       }
-      const a = Math.atan2(oy, ox)
       if (dU < cone.blockU + 3) {
         const cinder = smooth(cone.blockU + 3, cone.blockU - 0.5, dU) * (0.8 + grain * 0.35)
         r += (118 - r) * cinder
@@ -135,6 +158,7 @@ export function paintGround(
         g += (112 - g) * summit
         b += (98 - b) * summit
         if (steep > 0) {
+          const a = Math.atan2(oy, ox)
           const scree = fbm(Math.cos(a) * 14 + 5, Math.sin(a) * 14 + dU * 0.35, seed + 81, 2)
           const k = 1 + (scree - 0.5) * 0.7 * steep
           r *= k
@@ -151,6 +175,28 @@ export function paintGround(
           g += (15 - g) * pit
           b += (12 - b) * pit
         }
+      }
+      const high = smooth(0, 0.4, -edgeU) * smooth(mountain - 0.3, mountain + 1.5, dU)
+      if (high > 0) {
+        const q = cellNearest(wx * 1.7, wy * 1.7, seed + 121)
+        const joint = 0.5 + 0.5 * smooth(0, 0.07, cellEdge(wx * 1.7, wy * 1.7, seed + 121))
+        const rift = 0.45 + 0.55 * smooth(0, 0.035, cellEdge(wx * 0.45, wy * 0.45, seed + 171))
+        const dust = smooth(0.5, 0.78, fbm(wx / 3, wy / 3, seed + 131, 2)) * 0.35
+        let hr = (46 + q.h * 16 + grain * 10) * (1 - dust) + 92 * dust
+        let hg = (41 + q.h * 13 + grain * 9) * (1 - dust) + 84 * dust
+        let hb = (42 + q.h * 12 + grain * 9) * (1 - dust) + 78 * dust
+        if (cliff > 0) {
+          const n = awayFromWall(f.basin, wx * UNIT, wy * UNIT)
+          const fall = valueNoise((wx * -n.y + wy * n.x) * 4.5, (wx * n.x + wy * n.y) * 0.8, seed + 161)
+          const k = 1 + (fall - 0.5) * 0.6 * cliff
+          hr *= k
+          hg *= k
+          hb *= k
+        }
+        const k = joint * rift
+        r += (hr * k - r) * high
+        g += (hg * k - g) * high
+        b += (hb * k - b) * high
       }
       for (const s of sulfur) {
         const d = Math.hypot(u - s.u, v - s.v) / sr
@@ -172,19 +218,23 @@ export function paintGround(
         g += (rg - g) * rock
         b += (rb - b) * rock
       }
-      const foot = 1 - 0.3 * Math.exp(-(((dU - cone.blockU - 0.3) / 0.4) ** 2))
-      const cast = smooth(cone.blockU + 0.7, cone.blockU - 0.2, Math.hypot(ox + (LIGHT_X / lxy) * 1.2, oy + (LIGHT_Y / lxy) * 1.2)) * smooth(cone.blockU - 0.4, cone.blockU + 0.2, dU)
-      const dark = shade * foot * (1 - 0.32 * cast)
+      let over = 0
+      for (const k of SHADOW_STEPS) over = Math.max(over, bilinear(f.ground, f, u + sunU * k, v + sunV * k) - g0 - k * sunRise)
+      const foot = 1 - 0.25 * smooth(0.7, 0, edgeU) * smooth(-0.3, 0, edgeU)
+      const far = 1 - 0.45 * smooth(0.6, 4.5, -roomU)
+      const dark = shade * foot * far * (1 - 0.38 * smooth(0, 0.5, over))
       r *= dark
       g *= dark
       b *= dark
-      const ring = Math.abs(dU - cone.blockU) < 1.2 ? cone.blockU - 0.1 + (fbm(Math.cos(a) * 3 + 2, Math.sin(a) * 3 + 5, seed + 91, 2) - 0.5) * 0.6 : cone.blockU
-      const band = smooth(0.8, 0.25, Math.abs(dU - ring))
-      if (band > 0) {
+      const fan = edgeU < 2.2 && edgeU > -1.2 ? smooth(0.3, 0.75, fbm(wx / 2.5, wy / 2.5, seed + 151, 2)) : 0
+      const reach = 0.3 + 0.9 * fan
+      const band = smooth(reach + 0.3, reach * 0.4, Math.abs(edgeU + 0.05 - reach * 0.4))
+      const strays = edgeU > 0 && edgeU < 2.2 ? 1 : 0
+      if (band > 0 || strays > 0) {
         const q = cellNearest(wx * 1.6, wy * 1.6, seed + 71)
-        const size = (0.26 + 0.24 * q.h) * (0.5 + 0.5 * band)
+        const size = (0.26 + 0.24 * q.h) * (band > 0 ? 0.5 + 0.5 * band : 0.55)
         const d = Math.hypot(q.dx, q.dy) / size
-        if (q.h > 0.1 && d < 1.4) {
+        if ((band > 0 ? q.h > 0.1 + 0.5 * (1 - fan) : q.h > 0.93) && d < 1.4) {
           if (d < 1) {
             const lz = Math.sqrt(1 - d * d)
             const lit = Math.max(0, (q.dx / size) * LIGHT_X + (q.dy / size) * LIGHT_Y + lz * LIGHT_Z)
@@ -201,24 +251,36 @@ export function paintGround(
           }
         }
       }
-      const outside = Math.max(
-        smooth(0, -UNIT * 1.2, f.x0 + (u + 0.5) * f.cell),
-        smooth(mapW, mapW + UNIT * 1.2, f.x0 + (u + 0.5) * f.cell),
-        smooth(0, -UNIT * 1.2, f.y0 + (v + 0.5) * f.cell),
-        smooth(mapH, mapH + UNIT * 1.2, f.y0 + (v + 0.5) * f.cell),
-      )
-      const dim = 1 - outside * 0.5
       const o = (py * w + px) * 4
-      out[o] = r * dim
-      out[o + 1] = g * dim
-      out[o + 2] = b * dim
+      out[o] = r
+      out[o + 1] = g
+      out[o + 2] = b
       out[o + 3] = 255
     }
   }
 }
 
-/** 地面图层每格多少像素：地表是静的，只在有岩石新凝固时局部重画 */
+/** 地面图层每格多少像素：地表是静的，只在有岩石新凝固时分块重画 */
 export const GROUND_PPC = 6
+
+/** 地面图层按这么多格见方分块重画 */
+export const GROUND_TILE = 8
+
+/** 这一格的岩石变了，哪些块要重画：岩石的边平滑出去一格，影子朝背光一侧投出去 SHADOW_STEPS 那么远 */
+export function markGround(f: LavaField, cfg: VolcanoConfig, i: number, dirty: Uint8Array): void {
+  const tiles = Math.ceil(f.cols / GROUND_TILE)
+  const cx = i % f.cols
+  const cy = (i - cx) / f.cols
+  const reach = Math.ceil(SHADOW_STEPS[SHADOW_STEPS.length - 1]! / cfg.cellU) + 1
+  const lxy = Math.hypot(LIGHT_X, LIGHT_Y)
+  const sx = -Math.sign(LIGHT_X / lxy)
+  const sy = -Math.sign(LIGHT_Y / lxy)
+  const xa = Math.max(0, Math.floor((cx - 2 + Math.min(0, sx * reach)) / GROUND_TILE))
+  const xb = Math.min(tiles - 1, Math.floor((cx + 2 + Math.max(0, sx * reach)) / GROUND_TILE))
+  const ya = Math.max(0, Math.floor((cy - 2 + Math.min(0, sy * reach)) / GROUND_TILE))
+  const yb = Math.min(Math.ceil(f.rows / GROUND_TILE) - 1, Math.floor((cy + 2 + Math.max(0, sy * reach)) / GROUND_TILE))
+  for (let ty = ya; ty <= yb; ty++) for (let tx = xa; tx <= xb; tx++) dirty[ty * tiles + tx] = 1
+}
 
 
 /**
@@ -386,8 +448,8 @@ void main ()
     vec2 dir = ax.gb * 2.0 - 1.0;
     vec2 swirl = vec2(-rc.y, rc.x) / max(length(rc), 0.001);
     dir = mix(dir, swirl, lake);
-    float speed = (0.3 + 0.8 * heat) * 1.3 * (1.0 - lake * 0.8);
-    float ph = fract(uTime / 2.8);
+    float speed = (0.3 + 0.8 * heat) * 2.1 * (1.0 - lake * 0.8);
+    float ph = fract(uTime / 2.2);
     float ph2 = fract(ph + 0.5);
     float w = abs(1.0 - 2.0 * ph);
     vec2 p = cell * 0.55;

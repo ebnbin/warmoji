@@ -40,27 +40,29 @@ export function fbm(x: number, y: number, seed: number, octaves: number): number
 export function cellEdge(x: number, y: number, seed: number): number {
   const ix = Math.floor(x)
   const iy = Math.floor(y)
-  let f1 = 9
-  let f2 = 9
+  let f1 = 81
+  let f2 = 81
   for (let j = -1; j <= 1; j++) {
     for (let i = -1; i <= 1; i++) {
       const cx = ix + i
       const cy = iy + j
-      const d = Math.hypot(cx + hash(cx, cy, seed) - x, cy + hash(cx, cy, seed + 7) - y)
+      const dx = cx + hash(cx, cy, seed) - x
+      const dy = cy + hash(cx, cy, seed + 7) - y
+      const d = dx * dx + dy * dy
       if (d < f1) {
         f2 = f1
         f1 = d
       } else if (d < f2) f2 = d
     }
   }
-  return f2 - f1
+  return Math.sqrt(f2) - Math.sqrt(f1)
 }
 
 /** 细胞噪声里最近的特征点：(x, y) 相对它的偏移，与它自己的哈希 */
 export function cellNearest(x: number, y: number, seed: number): { dx: number; dy: number; h: number } {
   const ix = Math.floor(x)
   const iy = Math.floor(y)
-  let best = 9
+  let best = 81
   let dx = 0
   let dy = 0
   let h = 0
@@ -70,7 +72,7 @@ export function cellNearest(x: number, y: number, seed: number): { dx: number; d
       const cy = iy + j
       const ox = x - cx - hash(cx, cy, seed)
       const oy = y - cy - hash(cx, cy, seed + 7)
-      const d = Math.hypot(ox, oy)
+      const d = ox * ox + oy * oy
       if (d < best) {
         best = d
         dx = ox

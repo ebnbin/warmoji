@@ -24,8 +24,10 @@ import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynigh
 import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/river'
 import { fitAspectRect } from './worlds/torus'
-import { drawBomb, drawPuff, drawSpark, encodeLava, fumaroles, GROUND_PPC, LAVA_FRAG, paintGround } from './render/volcano'
+import { drawBomb, drawPuff, drawSpark, encodeLava, fumaroles, GROUND_PPC, GROUND_TILE, LAVA_FRAG, markGround, paintGround, rockMasks } from './render/volcano'
+import type { RockMasks } from './render/volcano'
 import { effusion } from './worlds/volcano'
+import { roomAt } from './worlds/basin'
 import type { EruptionPhase, VolcanoState } from './worlds/volcano'
 import { playSfx } from '../audio/sfx'
 import { loadSettings } from '../save/settings'
@@ -933,12 +935,12 @@ function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, d
 }
 
 /**
- * 火山：地表是按高度场打光的火山灰、火山渣与玄武岩，山体陡峭、山脚堆着一圈石块，熔岩由着色器按每格的厚度、温度画出结壳与流动；
+ * 火山：盆地的边不画线，靠崖壁、高地与岩壁脚下的碎石看出来；地表按高度场打光，熔岩由着色器按每格的厚度、温度画出结壳与流动；
  * 火山口冒着烟，熔岩上飘火星，天上落灰，喷气孔冒蒸汽。预兆时浓烟翻滚、地面抖动、天色发红，
  * 喷发时熔岩湖涨过口沿，火山弹随流量从火山口飞出，画面一闪一震。
  */
 class VolcanoView extends BoundedView {
-  private ground?: { tex: Phaser.Textures.CanvasTexture; img: ImageData; seen: Float32Array }
+  private ground?: { tex: Phaser.Textures.CanvasTexture; img: ImageData; seen: Float32Array; dirty: Uint8Array; vents: Point[] }
   private data?: { lava: Phaser.Textures.CanvasTexture; aux: Phaser.Textures.CanvasTexture; lavaImg: ImageData; auxImg: ImageData; glow: Float32Array; soft: Float32Array }
   private rockAt = 0
   private readonly u = { time: 0, erupt: 0, warn: 0 }
@@ -968,10 +970,6 @@ class VolcanoView extends BoundedView {
         .setScrollFactor(0)
         .setDepth(-2),
     )
-    const edge = v.scene.add.graphics().setDepth(-0.5)
-    edge.lineStyle(3, 0x0a0605, 0.55)
-    edge.strokeRect(0, 0, v.w, v.h)
-    this.visuals.push(edge)
     if (!v.scene.textures.exists(PUFF_KEY)) canvasTexture(v.scene, PUFF_KEY, 64, 64, (ctx) => drawPuff(ctx, 64))
     if (!v.scene.textures.exists(SPARK_KEY)) canvasTexture(v.scene, SPARK_KEY, 16, 16, (ctx) => drawSpark(ctx, 16))
     if (!v.scene.textures.exists(BOMB_KEY)) canvasTexture(v.scene, BOMB_KEY, 32, 32, (ctx) => drawBomb(ctx, 32))
@@ -995,10 +993,11 @@ class VolcanoView extends BoundedView {
     const gh = f.rows * GROUND_PPC
     const groundTex = canvasTexture(scene, GROUND_KEY, gw, gh)
     const img = groundTex.getContext().createImageData(gw, gh)
-    paintGround(f, cfg, GROUND_PPC, v.w, v.h, vents, img.data, 0, 0, f.cols, f.rows)
+    paintGround(f, cfg, GROUND_PPC, vents, rockMasks(f), img.data, 0, 0, f.cols, f.rows)
     groundTex.getContext().putImageData(img, 0, 0)
     groundTex.refresh()
-    this.ground = { tex: groundTex, img, seen: f.rockAt.slice() }
+    const dirty = new Uint8Array(Math.ceil(f.cols / GROUND_TILE) * Math.ceil(f.rows / GROUND_TILE))
+    this.ground = { tex: groundTex, img, seen: f.rockAt.slice(), dirty, vents }
     this.visuals.push(scene.add.image(f.x0, f.y0, GROUND_KEY).setOrigin(0, 0).setDisplaySize(f.cols * f.cell, f.rows * f.cell).setDepth(-1))
     const lava = canvasTexture(scene, LAVA_KEY, f.cols, f.rows)
     const aux = canvasTexture(scene, AUX_KEY, f.cols, f.rows)
@@ -1037,9 +1036,8 @@ class VolcanoView extends BoundedView {
       .setOrigin(0, 0)
       .setDepth(1.5)
     this.visuals.push(shader)
-    const clear = (cfg.cone.blockU + 0.3) * UNIT
     this.decorEids = this.decorEids.filter((eid) => {
-      const keep = Math.hypot(Transform.x[eid]! - f.craterX, Transform.y[eid]! - f.craterY) >= clear
+      const keep = roomAt(f.basin, Transform.x[eid]!, Transform.y[eid]!) >= 0.5 * UNIT
       if (!keep) removeEntity(v.world, eid)
       return keep
     })
@@ -1155,35 +1153,37 @@ class VolcanoView extends BoundedView {
     d.aux.refresh()
   }
 
-  /** 新凝固的岩石改变了地表：隔一会儿把攒下的变化一起重画，只画变了的那一片 */
+  /** 新凝固的岩石改变了地表：把受影响的块记下，每隔一会儿重画两块，免得一帧里画太多 */
   private repaintRock(v: ViewCtx, s: VolcanoState, now: number): void {
     const g = this.ground
-    if (!g || now < this.rockAt) return
-    this.rockAt = now + 400
+    if (!g) return
     const f = s.field
-    let c0 = f.cols
-    let r0 = f.rows
-    let c1 = -1
-    let r1 = -1
+    const cfg = v.def.volcano!
     for (let i = 0; i < f.rockAt.length; i++) {
       if (f.rockAt[i] === g.seen[i]) continue
       g.seen[i] = f.rockAt[i]!
-      const cx = i % f.cols
-      const cy = (i - cx) / f.cols
-      if (cx < c0) c0 = cx
-      if (cx > c1) c1 = cx
-      if (cy < r0) r0 = cy
-      if (cy > r1) r1 = cy
+      markGround(f, cfg, i, g.dirty)
     }
-    if (c1 < 0) return
-    c0 = Math.max(0, c0 - 2)
-    r0 = Math.max(0, r0 - 2)
-    c1 = Math.min(f.cols, c1 + 3)
-    r1 = Math.min(f.rows, r1 + 3)
-    paintGround(f, v.def.volcano!, GROUND_PPC, v.w, v.h, fumaroles(f, v.def.volcano!, 5), g.img.data, c0, r0, c1, r1)
-    g.tex.getContext().putImageData(g.img, 0, 0, c0 * GROUND_PPC, r0 * GROUND_PPC, (c1 - c0) * GROUND_PPC, (r1 - r0) * GROUND_PPC)
-    g.tex.refresh()
+    if (now < this.rockAt) return
+    this.rockAt = now + 100
+    const tiles = Math.ceil(f.cols / GROUND_TILE)
+    let masks: RockMasks | undefined
+    let done = 0
+    for (let k = 0; k < g.dirty.length && done < 2; k++) {
+      if (!g.dirty[k]) continue
+      g.dirty[k] = 0
+      done++
+      masks ??= rockMasks(f)
+      const c0 = (k % tiles) * GROUND_TILE
+      const r0 = Math.floor(k / tiles) * GROUND_TILE
+      const c1 = Math.min(f.cols, c0 + GROUND_TILE)
+      const r1 = Math.min(f.rows, r0 + GROUND_TILE)
+      paintGround(f, cfg, GROUND_PPC, g.vents, masks, g.img.data, c0, r0, c1, r1)
+      g.tex.getContext().putImageData(g.img, 0, 0, c0 * GROUND_PPC, r0 * GROUND_PPC, (c1 - c0) * GROUND_PPC, (r1 - r0) * GROUND_PPC)
+    }
+    if (done > 0) g.tex.refresh()
   }
+
 
   step(v: ViewCtx, sim: Sim, delta: number): void {
     const s = sim.worldState.volcano

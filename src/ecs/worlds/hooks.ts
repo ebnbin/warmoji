@@ -8,7 +8,9 @@ import type { IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, SpaceConfig, 
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
 import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebula'
-import { around, confine, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava } from '../worlds/volcano'
+import { around, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava } from '../worlds/volcano'
+import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
+import type { Basin } from '../worlds/basin'
 import type { VolcanoState } from '../worlds/volcano'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
@@ -631,8 +633,19 @@ function volcanoOf(sim: Sim): VolcanoState {
   return s
 }
 
-function blockPx(sim: Sim): number {
-  return volcanoCfg(sim).cone.blockU * UNIT
+/** 山体最远伸到离火山口多远，像素 */
+function mountainPx(sim: Sim): number {
+  const c = volcanoCfg(sim).cone
+  return c.blockU * (1 + c.blockJitter) * UNIT
+}
+
+/** 离岩壁 reach 像素以内几乎正对着岩壁走时改为顺着壁面走，免得顶在壁上不动；斜着撞上的由碰撞自己滑开 */
+function alongWall(b: Basin, x: number, y: number, dx: number, dy: number, reach: number): Point {
+  if (roomAt(b, x, y) > reach) return { x: dx, y: dy }
+  const n = awayFromWall(b, x, y)
+  if (dx * n.x + dy * n.y > -0.9) return { x: dx, y: dy }
+  const side = dy * n.x - dx * n.y >= 0 ? 1 : -1
+  return { x: -n.y * side, y: n.x * side }
 }
 
 const LAVA_TINT = 0xff6d00
@@ -671,40 +684,49 @@ function burnOnLava(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
   for (const eid of [...query(sim.world, ENEMY_SET)]) if (onLava(eid)) hit(sim, src, eid, edmg, { tick: true })
 }
 
-/** 刷怪点避开熔岩与山体 */
-function awayFromLava(sim: Sim, p: Point): boolean {
+/** 刷怪点落在盆地里、离岩壁至少一格，避开熔岩 */
+function clearGround(sim: Sim, p: Point): boolean {
   const f = volcanoOf(sim).field
-  return !moltenAt(f, p.x, p.y) && Math.hypot(p.x - f.craterX, p.y - f.craterY) > blockPx(sim) + UNIT
+  return roomAt(f.basin, p.x, p.y) >= UNIT && !moltenAt(f, p.x, p.y)
 }
 
-/** 火山：贴边的火山挡住身体，定期喷发，熔岩按地势往四面八方流、离火山口越远凉得越快，盖住的地方敌我都受伤 */
+/**
+ * 火山：能走的是崖壁围着的盆地，岩壁与山体是硬边界，身体走到跟前就停住、顺着壁面滑；火山定期喷发，
+ * 熔岩按地势往四面八方流、离火山口越远凉得越快，盖住的地方敌我都受伤
+ */
 const volcano: WorldHooks = {
   ...bounded,
   constrainBody(sim, eid, _from, next) {
-    return confine(volcanoOf(sim).field, blockPx(sim), sim.mapW, sim.mapH, next.x, next.y, Radius.v[eid]!)
+    return keepOut(volcanoOf(sim).field.basin, next.x, next.y, Radius.v[eid]!)
   },
   chaseDir(sim, eid, tx, ty) {
-    const r = blockPx(sim) + Radius.v[eid]! + 0.3 * UNIT
-    return around(volcanoOf(sim).field, r, Transform.x[eid]!, Transform.y[eid]!, tx, ty)
-  },
-  /** 游荡着撞上山体就像撞上地图边一样折回来 */
-  wanderDir(sim, eid, dx, dy) {
-    const d = bounded.wanderDir(sim, eid, dx, dy)
     const f = volcanoOf(sim).field
-    const ox = Transform.x[eid]! - f.craterX
-    const oy = Transform.y[eid]! - f.craterY
-    const dist = Math.hypot(ox, oy)
-    const dot = (d.x * ox + d.y * oy) / dist
-    if (dist > blockPx(sim) + Radius.v[eid]! + 0.6 * UNIT || dot >= 0) return d
-    return { x: d.x - (2 * dot * ox) / dist, y: d.y - (2 * dot * oy) / dist }
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    const rad = Radius.v[eid]!
+    const d = around(f, mountainPx(sim) + rad + 0.3 * UNIT, x, y, tx, ty)
+    return alongWall(f.basin, x, y, d.x, d.y, rad + 0.3 * UNIT)
+  },
+  /** 游荡着走到岩壁跟前就像撞上地图边一样折回来 */
+  wanderDir(sim, eid, dx, dy) {
+    const b = volcanoOf(sim).field.basin
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    if (roomAt(b, x, y) > Radius.v[eid]! + 0.6 * UNIT) return { x: dx, y: dy }
+    const n = awayFromWall(b, x, y)
+    const dot = dx * n.x + dy * n.y
+    return dot >= 0 ? { x: dx, y: dy } : { x: dx - 2 * dot * n.x, y: dy - 2 * dot * n.y }
+  },
+  fleeDir(sim, eid, awayX, awayY) {
+    return alongWall(volcanoOf(sim).field.basin, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + 1.5 * UNIT)
   },
   spawnPoint(sim, boss) {
     let p = bounded.spawnPoint(sim, boss)
-    for (let i = 0; i < 12 && !awayFromLava(sim, p); i++) p = bounded.spawnPoint(sim, boss)
-    return p
+    for (let i = 0; i < 24 && !clearGround(sim, p); i++) p = bounded.spawnPoint(sim, boss)
+    return keepOut(volcanoOf(sim).field.basin, p.x, p.y, UNIT)
   },
   settle(sim, p) {
-    return confine(volcanoOf(sim).field, blockPx(sim), sim.mapW, sim.mapH, p.x, p.y, SPAWN.edgeInset * UNIT)
+    return keepOut(volcanoOf(sim).field.basin, p.x, p.y, SPAWN.edgeInset * UNIT)
   },
   onStart(sim) {
     volcanoOf(sim)

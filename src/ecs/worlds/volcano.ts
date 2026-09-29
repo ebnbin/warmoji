@@ -1,14 +1,17 @@
 import { UNIT } from '../../util/units'
 import { fbm } from '../../util/noise'
+import { makeBasin, roomAt } from './basin'
+import type { Basin } from './basin'
 import type { VolcanoConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 import type { Rng } from '../../util/rng'
 
 /**
  * 地形与熔岩的格子场：地面高度、熔岩厚度都以格计，温度 1 是刚喷出。
- * 格子 (0, 0) 的左上角在 (x0, y0) 像素，场比地图大出镜头能看到的一圈。
+ * 格子 (0, 0) 的左上角在 (x0, y0) 像素，场比地图大出镜头能看到的一圈；能走的盆地另有更细的距离场。
  */
 export interface LavaField {
+  readonly basin: Basin
   readonly cols: number
   readonly rows: number
   readonly cell: number
@@ -104,7 +107,43 @@ function gully(cfg: VolcanoConfig, seed: number, dx: number, dy: number, dU: num
   return c.gullyDepth * ridge ** 3 * along
 }
 
-/** 按种子生成地形：火山加上朝地图里的整体下倾与起伏；火山口里灌上熔岩湖，再补上开局前那几次喷发留下的岩石 */
+/** 方形地图里离四条边多远，格，角按 cornerU 的半径磨圆；地图外为负 */
+function edgeDepthU(x: number, y: number, mapW: number, mapH: number, cornerU: number): number {
+  const qx = Math.min(x, mapW - x) / UNIT
+  const qy = Math.min(y, mapH - y) / UNIT
+  if (qx >= 0 && qy >= 0 && qx < cornerU && qy < cornerU) return cornerU - Math.hypot(cornerU - qx, cornerU - qy)
+  return Math.min(qx, qy)
+}
+
+/** 噪声拉开对比度落到 [0, 1]：分形噪声大多挤在中间 */
+function spread01(n: number): number {
+  return Math.min(1, Math.max(0, (n - 0.5) * 2.4 + 0.5))
+}
+
+/** 盆地的边在这里离方形地图的边多远，格 */
+function rimInsetU(cfg: VolcanoConfig, seed: number, x: number, y: number): number {
+  const r = cfg.rim
+  return r.insetU[0] + (r.insetU[1] - r.insetU[0]) * spread01(fbm(x / UNIT / r.waveU, y / UNIT / r.waveU, seed + 101, 2))
+}
+
+/** 山脚在方位角 a 上离火山口多远，格 */
+function footU(cfg: VolcanoConfig, seed: number, a: number): number {
+  const c = cfg.cone
+  return c.blockU * (1 + c.blockJitter * (spread01(fbm(Math.cos(a) * 1.6 + 3, Math.sin(a) * 1.6 + 7, seed + 111, 2)) * 2 - 1))
+}
+
+/** 陷进盆地边外 depthU 格处的崖壁与高地：从崖脚陡升到崖顶，再往外缓缓下降；崖高按 tall 在六成到一倍四之间起伏 */
+function rimRise(cfg: VolcanoConfig, depthU: number, tall: number): number {
+  const r = cfg.rim
+  if (depthU <= 0) return 0
+  const t = Math.min(1, depthU / r.cliffU)
+  return r.cliffHeight * (0.6 + 0.8 * tall) * t * t * (3 - 2 * t) - r.backSlope * Math.max(0, depthU - r.cliffU)
+}
+
+/**
+ * 按种子生成地形：先定下能走的盆地（方形里起伏的边，扣掉山体），再铺高度：火山加上朝地图里的整体下倾与起伏，
+ * 盆地边外立起崖壁与高地（靠近火山处让给山体）；火山口里灌上熔岩湖，再补上开局前那几次喷发留下的岩石。
+ */
 export function makeField(rng: Rng, cfg: VolcanoConfig, mapW: number, mapH: number, marginPx: number): LavaField {
   const cell = cfg.cellU * UNIT
   const cols = Math.ceil((mapW + marginPx * 2) / cell)
@@ -112,7 +151,13 @@ export function makeField(rng: Rng, cfg: VolcanoConfig, mapW: number, mapH: numb
   const n = cols * rows
   const c = craterOf(rng, cfg, mapW, mapH)
   const seed = Math.floor(rng.next() * 0x7fffffff)
+  const cone = cfg.cone
+  const open = (x: number, y: number): boolean =>
+    edgeDepthU(x, y, mapW, mapH, cfg.rim.cornerU) > rimInsetU(cfg, seed, x, y) &&
+    Math.hypot(x - c.x, y - c.y) / UNIT > footU(cfg, seed, Math.atan2(y - c.y, x - c.x))
+  const basin = makeBasin(open, -marginPx, -marginPx, cols * 2, rows * 2, cell / 2, { x: mapW / 2, y: mapH / 2 }, cfg.rim.neckU * UNIT)
   const f: LavaField = {
+    basin,
     cols,
     rows,
     cell,
@@ -134,7 +179,7 @@ export function makeField(rng: Rng, cfg: VolcanoConfig, mapW: number, mapH: numb
     nextHeat: new Float32Array(n),
   }
   const t = cfg.terrain
-  const lakeLevel = cfg.cone.height - cfg.cone.craterDepth + cfg.cone.lakeDepth
+  const lakeLevel = cone.height - cone.craterDepth + cone.lakeDepth
   for (let cy = 0; cy < rows; cy++) {
     for (let cx = 0; cx < cols; cx++) {
       const i = cy * cols + cx
@@ -143,12 +188,17 @@ export function makeField(rng: Rng, cfg: VolcanoConfig, mapW: number, mapH: numb
       const dx = (x - c.x) / UNIT
       const dy = (y - c.y) / UNIT
       const dU = Math.hypot(dx, dy)
+      const foot = footU(cfg, seed, Math.atan2(dy, dx))
+      const dCone = dU <= cone.craterU ? dU : cone.craterU + ((dU - cone.craterU) * (cone.blockU - cone.craterU)) / (foot - cone.craterU)
       const relief = (fbm(x / UNIT / t.waveU, y / UNIT / t.waveU, seed, 3) - 0.5) * 2 * t.relief
-      const outside = Math.min(1, Math.max(0, dU / cfg.cone.craterU - 1))
-      const g = coneHeight(cfg, dU) - gully(cfg, seed, dx, dy, dU) + (relief * Math.min(1, dU / cfg.cone.radiusU) - t.tilt * (dx * c.inX + dy * c.inY)) * outside
+      const outside = Math.min(1, Math.max(0, dU / cone.craterU - 1))
+      const tall = spread01(fbm(x / UNIT / 4, y / UNIT / 4, seed + 127, 2))
+      const bank = rimRise(cfg, -roomAt(basin, x, y) / UNIT, tall) * Math.min(1, Math.max(0, (dU - foot - 0.5) / 2))
+      const g =
+        coneHeight(cfg, dCone) - gully(cfg, seed, dx, dy, dCone) + (relief * Math.min(1, dU / cone.radiusU) - t.tilt * (dx * c.inX + dy * c.inY)) * outside + bank
       f.ground[i] = g
       f.cool[i] = cfg.lava.cooling * (1 + (dU / cfg.lava.coolRadiusU) ** 2)
-      if (dU < cfg.cone.craterU * 0.8) {
+      if (dU < cone.craterU * 0.8) {
         f.lake[i] = 1
         f.lakeFloor[i] = Math.max(EPS * 2, lakeLevel - g)
         f.lava[i] = f.lakeFloor[i]!
@@ -160,12 +210,13 @@ export function makeField(rng: Rng, cfg: VolcanoConfig, mapW: number, mapH: numb
   return f
 }
 
-/** 这次喷发熔岩从口沿外那一圈格子漫出：方位上随机几股集中，其余方向只漫出一点 */
+/** 这次喷发熔岩从口沿外那一圈格子漫出：随机几股集中、大多朝着盆地，其余方向只漫出一点 */
 export function spillOf(f: LavaField, cfg: VolcanoConfig, rng: Rng): Spill {
   const e = cfg.eruption
   const count = e.lobes[0] + Math.floor(rng.next() * (e.lobes[1] - e.lobes[0] + 1))
   const lobes: number[] = []
-  for (let k = 0; k < count; k++) lobes.push(rng.next() * Math.PI * 2)
+  const toward = Math.atan2(f.inY, f.inX)
+  for (let k = 0; k < count; k++) lobes.push(toward + (rng.next() * 2 - 1) * ((e.lobeSpreadDeg * Math.PI) / 180))
   const width = (e.lobeDeg * Math.PI) / 180
   const r0 = cfg.cone.craterU * UNIT
   const r1 = r0 + SPILL_CELLS * f.cell
@@ -314,35 +365,6 @@ export function moltenAt(f: LavaField, x: number, y: number): boolean {
   const cy = Math.floor((y - f.y0) / f.cell)
   if (cx < 0 || cy < 0 || cx >= f.cols || cy >= f.rows) return false
   return f.lava[cy * f.cols + cx]! > 0
-}
-
-/**
- * 半径 rad 的身体收进地图、挡在山体外：先收进地图，还在挡路圈里就沿着离火山口的方向推到圈外；
- * 推出了地图边就贴着那条边滑到边与圈的交点。
- */
-export function confine(f: LavaField, blockPx: number, mapW: number, mapH: number, x: number, y: number, rad: number): Point {
-  const bx = Math.min(Math.max(x, rad), mapW - rad)
-  const by = Math.min(Math.max(y, rad), mapH - rad)
-  const min = blockPx + rad
-  const ox = bx - f.craterX
-  const oy = by - f.craterY
-  const d = Math.hypot(ox, oy)
-  if (d >= min) return { x: bx, y: by }
-  const ux = d > 1e-6 ? ox / d : f.inX
-  const uy = d > 1e-6 ? oy / d : f.inY
-  const px = f.craterX + ux * min
-  const py = f.craterY + uy * min
-  if (px < rad || px > mapW - rad) {
-    const ex = px < rad ? rad : mapW - rad
-    const h = Math.sqrt(Math.max(0, min * min - (ex - f.craterX) ** 2))
-    return { x: ex, y: f.craterY + (oy >= 0 ? h : -h) }
-  }
-  if (py < rad || py > mapH - rad) {
-    const ey = py < rad ? rad : mapH - rad
-    const h = Math.sqrt(Math.max(0, min * min - (ey - f.craterY) ** 2))
-    return { x: f.craterX + (ox >= 0 ? h : -h), y: ey }
-  }
-  return { x: px, y: py }
 }
 
 /**
