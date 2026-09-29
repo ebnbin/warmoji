@@ -3,17 +3,19 @@ import { norm } from '../../util/vec'
 import { SPAWN } from '../../data/enemies'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
-import { MAPS } from '../../data/maps'
-import type { IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, SpaceConfig } from '../../types/maps'
+import { MAP, MAPS } from '../../data/maps'
+import type { IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
 import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebula'
+import { fissureCells, makeField, moltenAt, NO_VENT, pickVent, stepLava, ventVolume } from '../worlds/volcano'
+import type { VolcanoState } from '../worlds/volcano'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/river'
 import { isHorizontal } from '../utils/remap'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Alive, Boss, BreaksWalls, Due, ENEMY_SET, Hp, Meteor, Phasing, Pickup, PICKUP_SET, PROJ_SET, Radius, Slot, Swarmer, Tint, Transform, Uid } from '../components'
+import { Alive, Boss, BreaksWalls, Due, ENEMY_SET, Hp, Meteor, Motion, MOTION, Phasing, Pickup, PICKUP_SET, PROJ_SET, Radius, Slot, Swarmer, Tint, Transform, Uid } from '../components'
 import { bodyRules, meteorHit, meteorPath } from '../store'
 import { spawnMeteor } from '../entities/meteor'
 import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
@@ -70,10 +72,11 @@ export interface WorldState {
   tickAt: number
   walls: Walls | null
   hole: Point | null
+  volcano: VolcanoState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null }
 }
 
 export interface WorldHooks {
@@ -612,6 +615,93 @@ const nebula: WorldHooks = {
   },
 }
 
+function volcanoCfg(sim: Sim): VolcanoConfig {
+  return MAPS[sim.mapId].volcano!
+}
+
+/** 火山的地形由布景种子定下，视图从这里读；喷发的时刻与喷口由对局的随机数决定 */
+function volcanoOf(sim: Sim): VolcanoState {
+  let s = sim.worldState.volcano
+  if (!s) {
+    const cfg = volcanoCfg(sim)
+    const field = makeField(new Rng(sim.run.decorSeed ^ 0x7a1c), cfg, sim.mapW, sim.mapH, MAP.cameraMargin * UNIT)
+    s = { field, phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, ventX: 0, ventY: 0, vent: NO_VENT, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
+    sim.worldState.volcano = s
+  }
+  return s
+}
+
+const LAVA_TINT = 0xff6d00
+
+/** 喷发的节奏：到点先起预兆并定下喷口，预兆完了从喷口出熔岩，出完回到平静 */
+function tickEruption(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
+  const e = cfg.eruption
+  const now = sim.elapsedMs
+  if (s.phase === 'dormant' && now >= s.nextAt) {
+    const v = pickVent(s.field, cfg, sim.rng)
+    s.ventX = v.x
+    s.ventY = v.y
+    s.vent = fissureCells(s.field, v.x, v.y, e.fissureU)
+    s.phase = 'warn'
+    s.since = now
+    s.nextAt = now + e.intervalMs + (sim.rng.next() * 2 - 1) * e.intervalJitterMs
+  } else if (s.phase === 'warn' && now >= s.since + e.warnMs) {
+    s.phase = 'erupt'
+    s.since = now
+    s.count++
+  } else if (s.phase === 'erupt' && now >= s.since + e.effuseMs) {
+    s.phase = 'dormant'
+    s.since = now
+  }
+}
+
+/** 脚下的熔岩没凝固就挨烫：穿行、腾空的身体不沾地 */
+function burnOnLava(sim: Sim, s: VolcanoState, cfg: VolcanoConfig): void {
+  const now = sim.elapsedMs
+  if (now < s.hurtAt) return
+  s.hurtAt = now + cfg.lava.tickMs
+  const frac = cfg.lava.tickMs / 1000
+  const src = hazardSource('lava', LAVA_TINT)
+  const onLava = (eid: number): boolean =>
+    Motion.kind[eid] !== MOTION.transit && Motion.kind[eid] !== MOTION.arc && moltenAt(s.field, Transform.x[eid]!, Transform.y[eid]!)
+  const dmg = Math.round(cfg.lava.teamDps * frac)
+  for (const m of sim.characters) if (Alive.v[m] && onLava(m)) hit(sim, src, m, dmg, { tick: true })
+  const edmg = Math.round(cfg.lava.enemyDps * frac)
+  for (const eid of [...query(sim.world, ENEMY_SET)]) if (onLava(eid)) hit(sim, src, eid, edmg, { tick: true })
+}
+
+/** 刷怪点避开熔岩与火山口 */
+function awayFromLava(sim: Sim, p: Point): boolean {
+  const s = volcanoOf(sim)
+  const clear = (volcanoCfg(sim).cone.craterU + 1) * UNIT
+  return !moltenAt(s.field, p.x, p.y) && Math.hypot(p.x - s.field.craterX, p.y - s.field.craterY) > clear
+}
+
+/** 火山：靠边的火山定期喷发，熔岩按地势流动、冷却凝固，盖住的地方敌我都受伤 */
+const volcano: WorldHooks = {
+  ...bounded,
+  spawnPoint(sim, boss) {
+    let p = bounded.spawnPoint(sim, boss)
+    for (let i = 0; i < 12 && !awayFromLava(sim, p); i++) p = bounded.spawnPoint(sim, boss)
+    return p
+  },
+  onStart(sim) {
+    volcanoOf(sim)
+  },
+  tick(sim, delta) {
+    const cfg = volcanoCfg(sim)
+    const s = volcanoOf(sim)
+    tickEruption(sim, s, cfg)
+    const step = cfg.lava.stepMs
+    s.stepAcc = Math.min(s.stepAcc + delta, step * 4)
+    while (s.stepAcc >= step) {
+      s.stepAcc -= step
+      stepLava(s.field, cfg.lava, step / 1000, sim.elapsedMs - s.stepAcc, s.phase === 'erupt' ? s.vent : NO_VENT, ventVolume(cfg))
+    }
+    burnOnLava(sim, s, cfg)
+  },
+}
+
 function riverCfg(sim: Sim): RiverConfig {
   return MAPS[sim.mapId].river!
 }
@@ -735,6 +825,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   void: torus,
   space,
   nebula,
+  volcano,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()

@@ -102,6 +102,63 @@ export interface NebulaConfig {
     readonly maxFlightMs: number
   }
 }
+/** 火山：靠边的一座火山定期喷发，熔岩顺地势往低处流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人 */
+export interface VolcanoConfig {
+  /** 地形格子的边长，高度与厚度也以格计；地形铺满镜头能看到的地图外一圈 */
+  readonly cellU: number
+  readonly cone: {
+    /** 火山口圆心离最近的地图边多远 */
+    readonly insetU: readonly [number, number]
+    readonly radiusU: number
+    readonly height: number
+    readonly craterU: number
+    readonly craterDepth: number
+    /** 火山口里熔岩湖的液面比火山口底高多少 */
+    readonly lakeDepth: number
+    /** 山坡上放射状冲沟的深度 */
+    readonly gullyDepth: number
+  }
+  /** 地势：朝地图里整体下倾的坡度，起伏的幅度与波长 */
+  readonly terrain: {
+    readonly tilt: number
+    readonly relief: number
+    readonly waveU: number
+  }
+  readonly eruption: {
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly intervalJitterMs: number
+    /** 喷发前的预兆：冒烟、发红、地震、山腰裂开 */
+    readonly warnMs: number
+    /** 喷口出熔岩的时长与每秒出多少，格³ */
+    readonly effuseMs: number
+    readonly rate: number
+    /** 喷口落在朝地图里的方向两侧多少度内、离火山口多远 */
+    readonly spreadDeg: number
+    readonly ventU: readonly [number, number]
+    /** 喷口顺着山坡裂开多长 */
+    readonly fissureU: number
+    /** 开局前已经喷过几次，地图上留下旧熔岩 */
+    readonly history: number
+  }
+  readonly lava: {
+    readonly stepMs: number
+    /** 流动：每秒流走可流部分的比例，按温度的幂变慢 */
+    readonly mobility: number
+    readonly mobilityPow: number
+    /** 屈服强度（厚度乘坡度）：最热时与将凝固时；朝某个方向流要厚过它除以那个方向的坡度 */
+    readonly yieldHot: number
+    readonly yieldCold: number
+    /** 冷却：温度每秒降 cooling·(0.2+T²)/(厚度+coolDepth)，越薄冷得越快 */
+    readonly cooling: number
+    readonly coolDepth: number
+    /** 温度低于它就凝固成岩石 */
+    readonly solidus: number
+    readonly teamDps: number
+    readonly enemyDps: number
+    readonly tickMs: number
+  }
+}
 export interface RiverConfig {
   readonly viewScale: number
   readonly width: number
@@ -128,7 +185,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula'
+  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula' | 'volcano'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -142,6 +199,7 @@ export interface MapDef {
   readonly ice?: IceConfig
   readonly space?: SpaceConfig
   readonly nebula?: NebulaConfig
+  readonly volcano?: VolcanoConfig
   readonly river?: RiverConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
@@ -149,7 +207,7 @@ export interface MapDef {
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava'
 
 export interface DecorInstance {
   emoji: string

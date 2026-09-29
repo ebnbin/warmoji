@@ -17,4 +17,6 @@ export const SFX = {
   upgrade: { wave: 'square', freq: 523, duration: 0.16, volume: 0.2, steps: [1, 1.5], throttleMs: 80 },
   recruit: { wave: 'square', freq: 440, duration: 0.24, volume: 0.22, steps: [1, 1.26, 1.6], throttleMs: 120 },
   click: { wave: 'square', freq: 760, freqEnd: 660, duration: 0.035, volume: 0.12, throttleMs: 40 },
+  rumble: { wave: 'noise', freq: 150, freqEnd: 45, duration: 2.2, volume: 0.95, attack: 0.6, decayPow: 1.1, throttleMs: 1500 },
+  erupt: { wave: 'noise', freq: 700, freqEnd: 35, duration: 1.6, volume: 0.9, attack: 0.01, decayPow: 1.5, throttleMs: 1000 },
 } as const satisfies Record<string, SfxDef>

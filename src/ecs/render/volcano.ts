@@ -1,0 +1,447 @@
+import { UNIT } from '../../util/units'
+import { cellEdge, fbm, valueNoise } from '../../util/noise'
+import { Rng } from '../../util/rng'
+import type { LavaField } from '../worlds/volcano'
+import type { VolcanoConfig } from '../../types/maps'
+import type { Point } from '../../util/vec'
+
+/** 刚凝固的岩石裂缝里透出的红光多久褪尽 */
+export const EMBER_MS = 11000
+
+const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
+function smooth(e0: number, e1: number, x: number): number {
+  const t = clamp01((x - e0) / (e1 - e0))
+  return t * t * (3 - 2 * t)
+}
+
+/** 场里 (u, v) 处按格心双线性取值，u、v 以格计、格心在整数处 */
+function bilinear(a: ArrayLike<number>, f: LavaField, u: number, v: number): number {
+  const x = Math.min(f.cols - 1.001, Math.max(0, u))
+  const y = Math.min(f.rows - 1.001, Math.max(0, v))
+  const ix = Math.floor(x)
+  const iy = Math.floor(y)
+  const fx = x - ix
+  const fy = y - iy
+  const i = iy * f.cols + ix
+  const a00 = a[i]!
+  const a10 = a[i + 1]!
+  const a01 = a[i + f.cols]!
+  const a11 = a[i + f.cols + 1]!
+  return a00 + (a10 - a00) * fx + (a01 - a00) * fy + (a00 - a10 - a01 + a11) * fx * fy
+}
+
+/** 按 1-2-1 的核平滑一遍：格子上阶跃的量双线性插值后等值线是锯齿，先平滑再取等值线就圆了 */
+function soften(src: ArrayLike<number>, cols: number, rows: number, out: Float32Array): void {
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let s = 0
+      for (let j = -1; j <= 1; j++) {
+        const yy = Math.min(rows - 1, Math.max(0, y + j))
+        for (let i = -1; i <= 1; i++) {
+          const xx = Math.min(cols - 1, Math.max(0, x + i))
+          s += src[yy * cols + xx]! * (i === 0 ? 2 : 1) * (j === 0 ? 2 : 1)
+        }
+      }
+      out[y * cols + x] = s / 16
+    }
+  }
+}
+
+/** 冒硫磺蒸汽的喷气孔：火山锥上与山脚各几个，只是布景 */
+export function fumaroles(f: LavaField, cfg: VolcanoConfig, count: number): Point[] {
+  const rng = new Rng(f.seed ^ 0x51f0)
+  const out: Point[] = []
+  const base = Math.atan2(f.inY, f.inX)
+  for (let k = 0; k < count; k++) {
+    const a = base + (rng.next() * 2 - 1) * 1.9
+    const r = (cfg.cone.craterU + 1 + rng.next() * (cfg.cone.radiusU + 4)) * UNIT
+    out.push({ x: f.craterX + Math.cos(a) * r, y: f.craterY + Math.sin(a) * r })
+  }
+  return out
+}
+
+const LIGHT_X = -0.45
+const LIGHT_Y = -0.6
+const LIGHT_Z = 0.66
+
+/**
+ * 地表：火山灰地面、火山锥的红褐色火山渣、凝固的玄武岩，按高度场打光；
+ * 灰地上有干裂纹，喷气孔周围有硫磺，地图外一圈压暗。ppc 是每格多少像素，只画 [c0, c1) × [r0, r1) 的格子。
+ */
+export function paintGround(
+  f: LavaField,
+  cfg: VolcanoConfig,
+  ppc: number,
+  mapW: number,
+  mapH: number,
+  vents: readonly Point[],
+  out: Uint8ClampedArray,
+  c0: number,
+  r0: number,
+  c1: number,
+  r1: number,
+): void {
+  const w = f.cols * ppc
+  const seed = f.seed
+  const cone = cfg.cone
+  const sulfur = vents.map((p) => ({ u: (p.x - f.x0) / f.cell - 0.5, v: (p.y - f.y0) / f.cell - 0.5 }))
+  const sr = 2.4 / cfg.cellU
+  const rocky = new Float32Array(f.cols * f.rows)
+  const hard = new Float32Array(f.cols * f.rows)
+  for (let i = 0; i < hard.length; i++) hard[i] = f.rockAt[i]! > -Infinity ? 1 : 0
+  soften(hard, f.cols, f.rows, rocky)
+  for (let py = r0 * ppc; py < r1 * ppc; py++) {
+    for (let px = c0 * ppc; px < c1 * ppc; px++) {
+      const u = (px + 0.5) / ppc - 0.5
+      const v = (py + 0.5) / ppc - 0.5
+      const e = 0.5
+      const hx = bilinear(f.ground, f, u + e, v) - bilinear(f.ground, f, u - e, v)
+      const hy = bilinear(f.ground, f, u, v + e) - bilinear(f.ground, f, u, v - e)
+      const nx = -hx / (2 * e * cfg.cellU)
+      const ny = -hy / (2 * e * cfg.cellU)
+      const nl = 1 / Math.hypot(nx, ny, 1)
+      const lambert = Math.max(0, (nx * LIGHT_X + ny * LIGHT_Y + LIGHT_Z) * nl)
+      const shade = 0.5 + lambert * 0.75
+      const wx = (f.x0 + (u + 0.5) * f.cell) / UNIT
+      const wy = (f.y0 + (v + 0.5) * f.cell) / UNIT
+      const big = fbm(wx / 5, wy / 5, seed + 3, 2)
+      const grain = valueNoise(wx * 5.5, wy * 5.5, seed + 9) * 0.5 + valueNoise(wx * 13, wy * 13, seed + 11) * 0.5
+      let r = 58 + big * 22 + grain * 13
+      let g = 48 + big * 17 + grain * 10
+      let b = 44 + big * 13 + grain * 9
+      const crack = cellEdge(wx * 1.35, wy * 1.35, seed + 21)
+      if (crack < 0.05) {
+        const k = 1 - 0.3 * (1 - crack / 0.05)
+        r *= k
+        g *= k
+        b *= k
+      }
+      const dU = Math.hypot(wx - f.craterX / UNIT, wy - f.craterY / UNIT)
+      if (dU < cone.radiusU + 1.5) {
+        const cinder = smooth(cone.radiusU + 1.5, cone.craterU + 1, dU) * (0.8 + grain * 0.35)
+        r += (118 - r) * cinder
+        g += (58 - g) * cinder
+        b += (40 - b) * cinder
+        const lip = Math.exp(-(((dU - cone.craterU) / 0.28) ** 2))
+        r += (150 - r) * lip * 0.55
+        g += (80 - g) * lip * 0.55
+        b += (56 - b) * lip * 0.55
+        if (dU < cone.craterU) {
+          const pit = smooth(cone.craterU * 0.95, cone.craterU * 0.5, dU)
+          r += (30 - r) * pit
+          g += (15 - g) * pit
+          b += (12 - b) * pit
+        }
+      }
+      for (const s of sulfur) {
+        const d = Math.hypot(u - s.u, v - s.v) / sr
+        if (d >= 1) continue
+        const stain = smooth(0.3, 0.75, valueNoise(wx * 2.6, wy * 2.6, seed + 41) * (1 - d) * 1.5) * (1 - d)
+        r += (196 - r) * stain * 0.75
+        g += (170 - g) * stain * 0.75
+        b += (58 - b) * stain * 0.75
+      }
+      const rock = smooth(0.35, 0.6, bilinear(rocky, f, u, v) + (valueNoise(wx * 2.2, wy * 2.2, seed + 61) - 0.5) * 0.35)
+      if (rock > 0) {
+        const ropes = 0.5 + 0.5 * Math.sin((wx * 0.8 + wy * 1.1) * 5 + fbm(wx * 0.9, wy * 0.9, seed + 51, 2) * 9)
+        const rr = 33 + grain * 10 + ropes * 7 + big * 6
+        const rg = 30 + grain * 9 + ropes * 6 + big * 5
+        const rb = 34 + grain * 10 + ropes * 8 + big * 6
+        r += (rr - r) * rock
+        g += (rg - g) * rock
+        b += (rb - b) * rock
+      }
+      r *= shade
+      g *= shade
+      b *= shade
+      const outside = Math.max(
+        smooth(0, -UNIT * 1.2, f.x0 + (u + 0.5) * f.cell),
+        smooth(mapW, mapW + UNIT * 1.2, f.x0 + (u + 0.5) * f.cell),
+        smooth(0, -UNIT * 1.2, f.y0 + (v + 0.5) * f.cell),
+        smooth(mapH, mapH + UNIT * 1.2, f.y0 + (v + 0.5) * f.cell),
+      )
+      const dim = 1 - outside * 0.5
+      const o = (py * w + px) * 4
+      out[o] = r * dim
+      out[o + 1] = g * dim
+      out[o + 2] = b * dim
+      out[o + 3] = 255
+    }
+  }
+}
+
+
+/** 地面图层每格多少像素：地表是静的，只在有岩石新凝固时局部重画 */
+export const GROUND_PPC = 6
+
+
+/**
+ * 给熔岩着色器的两张数据图，每格一个像素、不透明（画布会按透明度预乘，数据必须满 alpha）：
+ * lava 的 R 是平滑过的有无熔岩（取 0.5 的等值线就是圆滑的边）、G 是温度（凝固温度处为 0）、B 是刚凝固岩石的余烬；
+ * aux 的 R 是模糊后的辉光、G、B 是熔岩顺坡往下流的方向。
+ */
+export function encodeLava(f: LavaField, cfg: VolcanoConfig, now: number, lava: Uint8ClampedArray, aux: Uint8ClampedArray, glow: Float32Array, soft: Float32Array): void {
+  const { cols, rows, ground } = f
+  const solidus = cfg.lava.solidus
+  for (let i = 0; i < cols * rows; i++) glow[i] = smooth(0.0005, 0.01, f.lava[i]!)
+  soften(glow, cols, rows, soft)
+  for (let i = 0; i < cols * rows; i++) {
+    const l = f.lava[i]!
+    const t = l > 0 ? clamp01((f.heat[i]! - solidus) / (1 - solidus)) : 0
+    const at = f.rockAt[i]!
+    const age = now - at
+    const ember = l <= 0 && at > -Infinity && age >= 0 && age < EMBER_MS ? (1 - age / EMBER_MS) ** 2 : 0
+    lava[i * 4] = soft[i]! * 255
+    lava[i * 4 + 1] = t * 255
+    lava[i * 4 + 2] = ember * 255
+    lava[i * 4 + 3] = 255
+    glow[i] = t ** 1.5 * smooth(0.002, 0.03, l)
+  }
+  blur(glow, cols, rows, 2)
+  for (let cy = 0; cy < rows; cy++) {
+    for (let cx = 0; cx < cols; cx++) {
+      const i = cy * cols + cx
+      const gx = ground[cy * cols + Math.max(0, cx - 1)]! - ground[cy * cols + Math.min(cols - 1, cx + 1)]!
+      const gy = ground[Math.max(0, cy - 1) * cols + cx]! - ground[Math.min(rows - 1, cy + 1) * cols + cx]!
+      const gl = Math.hypot(gx, gy) || 1
+      aux[i * 4] = Math.min(1, glow[i]! * 1.6) * 255
+      aux[i * 4 + 1] = (gx / gl) * 127.5 + 127.5
+      aux[i * 4 + 2] = (gy / gl) * 127.5 + 127.5
+      aux[i * 4 + 3] = 255
+    }
+  }
+}
+
+let blurLine = new Float32Array(0)
+
+/** 横竖各一遍的方框模糊，半径 r 格 */
+function blur(a: Float32Array, cols: number, rows: number, r: number): void {
+  if (blurLine.length < Math.max(cols, rows)) blurLine = new Float32Array(Math.max(cols, rows))
+  const line = blurLine
+  const k = 1 / (2 * r + 1)
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) line[x] = a[y * cols + x]!
+    for (let x = 0; x < cols; x++) {
+      let s = 0
+      for (let d = -r; d <= r; d++) s += line[Math.min(cols - 1, Math.max(0, x + d))]!
+      a[y * cols + x] = s * k
+    }
+  }
+  for (let x = 0; x < cols; x++) {
+    for (let y = 0; y < rows; y++) line[y] = a[y * cols + x]!
+    for (let y = 0; y < rows; y++) {
+      let s = 0
+      for (let d = -r; d <= r; d++) s += line[Math.min(rows - 1, Math.max(0, y + d))]!
+      a[y * cols + x] = s * k
+    }
+  }
+}
+
+/**
+ * 熔岩的片元着色器，四边形盖住整块场地，坐标以格计、y 朝下。四边形的纹理坐标 y 朝上，画布纹理上传时也上下翻了，所以直接按它采样。熔岩按温度从白黄到暗红，冷下来结出暗色硬壳，壳块之间的缝透出熔岩；
+ * 壳块按流向图顺坡往下漂，火山口里的熔岩湖打着转。输出按预乘透明度：熔岩盖在地上，辉光、余烬、预兆的裂缝叠加发亮。
+ */
+export const LAVA_FRAG = `
+#pragma phaserTemplate(shaderName)
+#pragma phaserTemplate(extensions)
+#pragma phaserTemplate(features)
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+#pragma phaserTemplate(fragmentDefine)
+varying vec2 outTexCoord;
+#pragma phaserTemplate(outVariables)
+#pragma phaserTemplate(fragmentHeader)
+uniform sampler2D uLava;
+uniform sampler2D uAux;
+uniform float uTime;
+uniform vec2 uGrid;
+uniform vec3 uCrater;
+uniform vec4 uVent;
+uniform vec2 uWarn;
+uniform float uErupt;
+
+vec2 hash2(vec2 p) {
+  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+  return fract(sin(p) * 43758.5453);
+}
+
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = hash2(i).x;
+  float b = hash2(i + vec2(1.0, 0.0)).x;
+  float c = hash2(i + vec2(0.0, 1.0)).x;
+  float d = hash2(i + vec2(1.0, 1.0)).x;
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+float plates(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  float d1 = 8.0;
+  float d2 = 8.0;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 g = vec2(float(x), float(y));
+      vec2 o = hash2(i + g) * 0.8 + 0.1;
+      float d = length(g + o - f);
+      if (d < d1) {
+        d2 = d1;
+        d1 = d;
+      } else if (d < d2) {
+        d2 = d;
+      }
+    }
+  }
+  return d2 - d1;
+}
+
+vec3 ramp(float t) {
+  vec3 c0 = vec3(0.30, 0.05, 0.03);
+  vec3 c1 = vec3(0.62, 0.10, 0.04);
+  vec3 c2 = vec3(0.90, 0.26, 0.05);
+  vec3 c3 = vec3(1.0, 0.47, 0.08);
+  vec3 c4 = vec3(1.0, 0.68, 0.20);
+  vec3 c5 = vec3(1.0, 0.88, 0.52);
+  if (t < 0.25) return mix(c0, c1, t / 0.25);
+  if (t < 0.5) return mix(c1, c2, (t - 0.25) / 0.25);
+  if (t < 0.72) return mix(c2, c3, (t - 0.5) / 0.22);
+  if (t < 0.9) return mix(c3, c4, (t - 0.72) / 0.18);
+  return mix(c4, c5, (t - 0.9) / 0.1);
+}
+
+void main ()
+{
+  vec2 tc = outTexCoord;
+  vec2 cell = vec2(tc.x, 1.0 - tc.y) * uGrid;
+  vec4 lv = texture2D(uLava, tc);
+  vec4 ax = texture2D(uAux, tc);
+  float shape = lv.r;
+  float heat = lv.g;
+  float ember = lv.b;
+  vec3 add = vec3(1.0, 0.36, 0.08) * ax.r * (0.3 + 0.3 * uErupt);
+  vec3 col = vec3(0.0);
+  float alpha = 0.0;
+  float ragged = (vnoise(cell * 1.9) - 0.5) * 0.22 + (vnoise(cell * 4.3 + 11.0) - 0.5) * 0.1;
+  float cover = smoothstep(0.42, 0.52, shape + ragged * smoothstep(0.0, 0.2, shape));
+  vec2 rc = cell - uCrater.xy;
+  float lake = 1.0 - smoothstep(uCrater.z * 0.6, uCrater.z * 0.95, length(rc));
+  if (cover > 0.001) {
+    vec2 dir = ax.gb * 2.0 - 1.0;
+    vec2 swirl = vec2(-rc.y, rc.x) / max(length(rc), 0.001);
+    dir = mix(dir, swirl, lake);
+    float speed = (0.3 + 0.8 * heat) * 1.3 * (1.0 - lake * 0.8);
+    float ph = fract(uTime / 2.8);
+    float ph2 = fract(ph + 0.5);
+    float w = abs(1.0 - 2.0 * ph);
+    vec2 p = cell * 0.55;
+    vec2 a = p - dir * ph * speed;
+    vec2 b = p - dir * ph2 * speed + vec2(0.37, 0.61);
+    float e = mix(plates(b), plates(a), w);
+    float fine = mix(plates(b * 2.3 + 1.7), plates(a * 2.3), w);
+    float churn = mix(vnoise(b * 1.3 + 3.1), vnoise(a * 1.3), w);
+    float hot = clamp(heat * (0.72 + 0.4 * churn), 0.0, 1.0);
+    vec3 molten = ramp(hot);
+    molten += vec3(0.25, 0.22, 0.12) * smoothstep(0.78, 0.95, churn) * smoothstep(0.85, 1.0, heat);
+    float skin = max(1.0 - smoothstep(0.4, 1.02, heat), lake * 0.92);
+    float seam = mix(0.025 + 0.2 * heat * heat, 0.05 + 0.04 * sin(uTime * 1.3 + churn * 5.0), lake);
+    float crust = skin * smoothstep(seam, seam + 0.06, e) * smoothstep(0.02, 0.07 + 0.1 * heat, fine + 0.05);
+    float rim = (1.0 - smoothstep(0.55, 0.8, shape)) * (1.0 - lake);
+    crust = max(crust, rim * 0.85);
+    vec3 crustCol = vec3(0.12, 0.075, 0.065) + vec3(0.08, 0.025, 0.0) * churn + vec3(0.25, 0.05, 0.0) * (1.0 - smoothstep(0.0, 0.08, e)) * heat;
+    col = mix(molten, crustCol, crust);
+    alpha = cover;
+    add += molten * (1.0 - crust) * cover * hot * (0.05 + 0.25 * lake * uWarn.x);
+  }
+  if (ember > 0.004) {
+    vec2 warp = cell * 0.8 + vec2(vnoise(cell * 0.7), vnoise(cell * 0.7 + 9.0)) * 1.3;
+    float crack = (1.0 - smoothstep(0.0, 0.06, plates(warp + 5.3))) * smoothstep(0.25, 0.6, vnoise(cell * 1.1 + 2.0) + ember * 0.4);
+    add += vec3(1.0, 0.28 + 0.35 * ember, 0.05) * crack * ember * (1.0 - cover) * 0.85;
+  }
+  if (uWarn.x > 0.0) {
+    vec2 rel = cell - uVent.xy;
+    float along = dot(rel, uVent.zw);
+    float across = dot(rel, vec2(-uVent.w, uVent.z));
+    float grow = uWarn.y * clamp(uWarn.x * 1.6, 0.0, 1.0);
+    float inside = step(0.0, along) * (1.0 - smoothstep(grow - 0.3, grow, along));
+    float jag = (vnoise(vec2(along * 2.5, 7.0)) - 0.5) * 0.5;
+    float line = (1.0 - smoothstep(0.0, 0.16, abs(across - jag))) * inside;
+    float pulse = 0.65 + 0.35 * sin(uTime * 13.0);
+    add += vec3(1.0, 0.5, 0.12) * line * pulse * (0.5 + 0.8 * uWarn.x);
+    add += vec3(1.0, 0.28, 0.05) * (1.0 - smoothstep(0.0, 1.4, abs(across))) * inside * 0.3 * uWarn.x;
+  }
+  gl_FragColor = vec4(col * alpha + add, alpha);
+}
+`
+
+/** 柔软的烟团：中心实、边缘淡出，带一点絮状的不均匀 */
+export function drawPuff(ctx: CanvasRenderingContext2D, size: number): void {
+  const img = ctx.createImageData(size, size)
+  const c = (size - 1) / 2
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const d = Math.hypot(x - c, y - c) / c
+      const fluff = 0.75 + 0.25 * fbm(x / 9, y / 9, 7, 3)
+      const a = clamp01(1 - d) ** 1.6 * fluff
+      const o = (y * size + x) * 4
+      img.data[o] = 255
+      img.data[o + 1] = 255
+      img.data[o + 2] = 255
+      img.data[o + 3] = a * 255
+    }
+  }
+  ctx.putImageData(img, 0, 0)
+}
+
+/** 发光的小点：火星、蒸汽里的水珠都用它，靠着色得到颜色 */
+export function drawSpark(ctx: CanvasRenderingContext2D, size: number): void {
+  const img = ctx.createImageData(size, size)
+  const c = (size - 1) / 2
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const d = Math.hypot(x - c, y - c) / c
+      const a = clamp01(1 - d) ** 2.2
+      const o = (y * size + x) * 4
+      img.data[o] = 255
+      img.data[o + 1] = 255
+      img.data[o + 2] = 255
+      img.data[o + 3] = a * 255
+    }
+  }
+  ctx.putImageData(img, 0, 0)
+}
+
+/** 火山弹：一块不规则的黑石头，裂缝和边缘透着红光 */
+export function drawBomb(ctx: CanvasRenderingContext2D, size: number): void {
+  const img = ctx.createImageData(size, size)
+  const c = (size - 1) / 2
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = (x - c) / c
+      const dy = (y - c) / c
+      const a = Math.atan2(dy, dx)
+      const edge = 0.72 + 0.16 * Math.sin(a * 3 + 0.7) + 0.08 * Math.sin(a * 7 + 2.1)
+      const d = Math.hypot(dx, dy) / edge
+      const o = (y * size + x) * 4
+      if (d > 1.25) {
+        img.data[o + 3] = 0
+        continue
+      }
+      const crack = cellEdge(x / 5, y / 5, 13)
+      const hot = Math.max(smooth(0.12, 0, crack) * 0.9, smooth(0.75, 1, d))
+      const shade = 0.75 + 0.35 * (-dx - dy) * 0.5
+      const rr = 40 * shade + (255 - 40 * shade) * hot
+      const gg = 28 * shade + (120 - 28 * shade) * hot
+      const bb = 24 * shade + (30 - 24 * shade) * hot
+      img.data[o] = rr
+      img.data[o + 1] = gg
+      img.data[o + 2] = bb
+      img.data[o + 3] = (d <= 1 ? 1 : smooth(1.25, 1, d) * 0.6) * 255
+    }
+  }
+  ctx.putImageData(img, 0, 0)
+}

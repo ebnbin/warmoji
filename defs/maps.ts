@@ -105,6 +105,16 @@ const ICE_MIX: readonly EnemyMixRow[] = [
   { kind: 'knight', sinceWave: 4, base: 5, perWave: 0.3, min: 0, max: 10 },
 ]
 
+const VOLCANO_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 36, max: 74 },
+  { kind: 'turtle', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
+  { kind: 'creeper', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'skeleton', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'comet', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'boar', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+]
+
 export const MAPS = {
   forest: {
     emoji: '1f332',
@@ -378,5 +388,58 @@ export const MAPS = {
       },
     },
     boss: 'blackhole',
+  },
+  volcano: {
+    emoji: '1f30b',
+    name: '火山',
+    desc: '一座靠在地图边上的活火山，定期喷发：先冒烟发红、地动山摇，山腰裂开后涌出熔岩，顺着地势往低处流。熔岩盖住的地方敌我都受伤，冷却后凝成黑色的岩石，又能站人',
+    kind: 'volcano',
+    size: { w: 32, h: 32 },
+    stamina: { exertion: 0.5, regen: 0.9 },
+    palette: {
+      bgFrom: 'hsl(14 45% 18%)',
+      bgTo: 'hsl(5 40% 6%)',
+      map: hslToInt(18, 0.14, 0.26),
+      shadow: 0x000000,
+    },
+    decor: {
+      emojis: ['1faa8', '1f9b4', '1f480'],
+      sizeU: [0.3, 0.8],
+      alpha: [0.2, 0.34],
+      density: [0.03, 0.05],
+    },
+    mix: VOLCANO_MIX,
+    finalWaveSub: '暴龙踏着熔岩而来——别在火山脚下恋战！',
+    volcano: {
+      cellU: 0.5,
+      cone: { insetU: [1.5, 3], radiusU: 7, height: 3, craterU: 1.6, craterDepth: 1.2, lakeDepth: 0.7, gullyDepth: 0.35 },
+      terrain: { tilt: 0.2, relief: 1.2, waveU: 7 },
+      eruption: {
+        firstMs: 15000,
+        intervalMs: 30000,
+        intervalJitterMs: 6000,
+        warnMs: 5000,
+        effuseMs: 8000,
+        rate: 1.2,
+        spreadDeg: 70,
+        ventU: [2.2, 3.4],
+        fissureU: 1.5,
+        history: 3,
+      },
+      lava: {
+        stepMs: 100,
+        mobility: 12,
+        mobilityPow: 2,
+        yieldHot: 0.004,
+        yieldCold: 0.05,
+        cooling: 0.012,
+        coolDepth: 0.03,
+        solidus: 0.3,
+        teamDps: 30,
+        enemyDps: 45,
+        tickMs: 250,
+      },
+    },
+    boss: 'rhino',
   },
 } as const satisfies Record<string, MapDef>

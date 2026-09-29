@@ -62,6 +62,13 @@ export const BATTLEFIELD = {
       { id: 'nebula_drag', emoji: '1f573', name: '潮汐拖拽', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
       { id: 'nebula_redshift', emoji: '1f534', name: '红移迟滞', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
     ],
+    volcano: [
+      { id: 'volcano_forge', emoji: '1f525', name: '熔炉淬火', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'volcano_obsidian', emoji: '1faa8', name: '黑曜护体', desc: '全队护甲 +4（8 秒）', polarity: 'buff', durationMs: 8000, fx: { team: { add: { armor: 4 } } } },
+      { id: 'volcano_ash', emoji: '1f32b', name: '火山灰', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'volcano_heat', emoji: '1f975', name: '热浪灼身', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
+      { id: 'volcano_sulfur', emoji: '2668', name: '硫磺毒雾', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+    ],
   },
   field: { grabRadiusU: 0.9, groundMs: 9000, auraRadiusU: 0.85 },
 } as const satisfies BattlefieldTuning
