@@ -69,6 +69,7 @@ export interface MapView {
   onSimReady(v: ViewCtx, sim: Sim): void
   step(v: ViewCtx, sim: Sim, delta: number): void
   resize(v: ViewCtx): void
+  /** 战斗场景关闭时也会调：那时主镜头连同它的滤镜已被 Phaser 拆掉，不能再碰镜头 */
   destroy(v: ViewCtx): void
 }
 
@@ -1334,7 +1335,6 @@ class VolcanoView extends BoundedView {
   }
 
   destroy(v: ViewCtx): void {
-    if (this.vignette) v.scene.cameras.main.filters?.internal.remove(this.vignette)
     this.vignette = undefined
     super.destroy(v)
     this.ground = undefined
@@ -1479,7 +1479,6 @@ class ShipView extends BoundedView {
   private lanterns: Lantern[] = []
   private gulls: Gull[] = []
   private spray?: Phaser.GameObjects.Particles.ParticleEmitter
-  private vignette?: Phaser.Filters.Vignette
   /** 两舷的湿甲板：溅上浪花就湿，慢慢晾干 */
   private wet: { side: number; img: Phaser.GameObjects.Image; level: number }[] = []
   private rate = { roll: 0, pitch: 0 }
@@ -1650,7 +1649,7 @@ class ShipView extends BoundedView {
       })
       .setDepth(34)
     this.visuals.push(this.spray)
-    this.vignette = scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.24, 0x000000)
+    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.24, 0x000000)
   }
 
   step(v: ViewCtx, sim: Sim, delta: number): void {
@@ -1763,8 +1762,6 @@ class ShipView extends BoundedView {
   }
 
   destroy(v: ViewCtx): void {
-    if (this.vignette) v.scene.cameras.main.filters?.internal.remove(this.vignette)
-    this.vignette = undefined
     super.destroy(v)
     this.balls = []
     this.lanterns = []
