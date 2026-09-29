@@ -87,15 +87,19 @@ export function makeBasin(open: (x: number, y: number) => boolean, x0: number, y
   const start = Math.min(rows - 1, Math.max(0, Math.floor((keep.y - y0) / cell))) * cols + Math.min(cols - 1, Math.max(0, Math.floor((keep.x - x0) / cell)))
   const stack = [start]
   reach[start] = opened[start]!
+  const visit = (j: number): void => {
+    if (j < 0 || j >= n || reach[j] || !opened[j]) return
+    reach[j] = 1
+    stack.push(j)
+  }
   while (stack.length > 0) {
     const i = stack.pop()!
     if (!reach[i]) continue
     const cx = i % cols
-    for (const j of [i - 1, i + 1, i - cols, i + cols]) {
-      if (j < 0 || j >= n || reach[j] || !opened[j] || (j === i - 1 && cx === 0) || (j === i + 1 && cx === cols - 1)) continue
-      reach[j] = 1
-      stack.push(j)
-    }
+    if (cx > 0) visit(i - 1)
+    if (cx < cols - 1) visit(i + 1)
+    visit(i - cols)
+    visit(i + cols)
   }
   const rock = new Uint8Array(n)
   for (let i = 0; i < n; i++) rock[i] = reach[i] ? 0 : 1
