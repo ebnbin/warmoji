@@ -24,8 +24,9 @@ import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynigh
 import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/river'
 import { fitAspectRect } from './worlds/torus'
-import { drawBomb, drawPuff, drawSpark, encodeLava, fumaroles, GROUND_PPC, GROUND_TILE, LAVA_FRAG, markGround, paintGround, rockMasks } from './render/volcano'
-import type { RockMasks } from './render/volcano'
+import { drawBomb, drawPuff, drawSpark, encodeLava, fumaroles, GROUND_TILE, groundPpc, LAVA_FRAG, markGround } from './render/volcano'
+import type { CellRect, GroundPiece } from './render/volcano'
+import { GroundPainter } from './render/groundPainter'
 import { effusion } from './worlds/volcano'
 import { roomAt } from './worlds/basin'
 import { DECK_PPU, deckFrame, drawEdgeField, drawRig, EDGE_PPU, drawRigShadow, drawWaveTile, paintDeck, paintWet, rigOf, SEA_FRAG, SHADOW_PER_U, WAVE_TILE, WET_PPU } from './render/ship'
@@ -67,7 +68,8 @@ export interface MapView {
   build(v: ViewCtx): void
   camera(v: ViewCtx): void
   decor(v: ViewCtx, atlas: EcsAtlas): void
-  onSimReady(v: ViewCtx, sim: Sim): void
+  /** 要画很久的地图可以返回 Promise：画完之前战斗不开始 */
+  onSimReady(v: ViewCtx, sim: Sim): void | Promise<void>
   step(v: ViewCtx, sim: Sim, delta: number): void
   resize(v: ViewCtx): void
   /** 战斗场景关闭时也会调：那时主镜头连同它的滤镜已被 Phaser 拆掉，不能再碰镜头 */
@@ -906,6 +908,10 @@ const BOMB_KEY = 'volcano-bomb'
 /** 火山弹落地后那块发红的地面多久暗下去 */
 const SPLAT_MS = 2600
 const GROUND_KEY = 'volcano-ground'
+/** 开局最多几个线程分着画地面 */
+const PAINT_THREADS = 4
+/** 岩石新凝固后至少隔这么久才交一批补画，毫秒 */
+const REPAINT_MS = 500
 const LAVA_KEY = 'volcano-lava'
 const AUX_KEY = 'volcano-aux'
 /** 风把烟和灰往哪吹，像素/秒 */
@@ -932,6 +938,23 @@ interface Splat {
   at: number
 }
 
+/** 画好的一块地面的像素，和它在地面贴图上的左上角 */
+function pieceImage(p: GroundPiece, ppc: number): { img: ImageData; x: number; y: number } {
+  return { img: new ImageData(p.pixels, (p.rect.c1 - p.rect.c0) * ppc, (p.rect.r1 - p.rect.r0) * ppc), x: p.rect.c0 * ppc, y: p.rect.r0 * ppc }
+}
+
+/** 贴图上换一块像素：画布跟着换（显卡丢了上下文时 Phaser 拿整张画布重建），显卡上只重传这一块 */
+function patchTexture(scene: Phaser.Scene, tex: Phaser.Textures.CanvasTexture, img: ImageData, x: number, y: number): void {
+  tex.getContext().putImageData(img, x, y)
+  const r = scene.renderer
+  const gt = tex.source[0]!.glTexture
+  if (!(r instanceof Phaser.Renderer.WebGL.WebGLRenderer) || !gt || r.gl.isContextLost()) return
+  const gl = r.gl
+  r.glTextureUnits.bind(gt, 0)
+  r.glWrapper.updateTexturing({ texturing: { flipY: gt.flipY, premultiplyAlpha: gt.pma } })
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, x, gt.flipY ? gt.height - y - img.height : y, gl.RGBA, gl.UNSIGNED_BYTE, img)
+}
+
 function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, draw?: (ctx: CanvasRenderingContext2D) => void): Phaser.Textures.CanvasTexture {
   if (scene.textures.exists(key)) scene.textures.remove(key)
   const tex = scene.textures.createCanvas(key, w, h)!
@@ -947,9 +970,10 @@ function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, d
  * 喷发时熔岩湖涨过口沿，火山弹随流量从火山口飞出，画面一闪一震。
  */
 class VolcanoView extends BoundedView {
-  private ground?: { tex: Phaser.Textures.CanvasTexture; img: ImageData; seen: Float32Array; dirty: Uint8Array; vents: Point[] }
+  private painter?: GroundPainter
+  private ground?: { tex: Phaser.Textures.CanvasTexture; ppc: number; seen: Float32Array; dirty: Uint8Array; busy: boolean }
   private data?: { lava: Phaser.Textures.CanvasTexture; aux: Phaser.Textures.CanvasTexture; lavaImg: ImageData; auxImg: ImageData; glow: Float32Array; soft: Float32Array }
-  private rockAt = 0
+  private repaintAt = 0
   private readonly u = { time: 0, erupt: 0, warn: 0 }
   private plume?: Phaser.GameObjects.Particles.ParticleEmitter
   private column?: Phaser.GameObjects.Particles.ParticleEmitter
@@ -989,23 +1013,29 @@ class VolcanoView extends BoundedView {
     this.shake = loadSettings(browserStorage()).hitShake
   }
 
-  onSimReady(v: ViewCtx, sim: Sim): void {
+  async onSimReady(v: ViewCtx, sim: Sim): Promise<void> {
     const s = sim.worldState.volcano
     if (!s) return
     const f = s.field
     const cfg = v.def.volcano!
     const scene = v.scene
     const vents = fumaroles(f, cfg, 5)
-    const gw = f.cols * GROUND_PPC
-    const gh = f.rows * GROUND_PPC
-    const groundTex = canvasTexture(scene, GROUND_KEY, gw, gh)
-    const img = groundTex.getContext().createImageData(gw, gh)
-    paintGround(f, cfg, GROUND_PPC, vents, rockMasks(f), img.data, 0, 0, f.cols, f.rows)
-    groundTex.getContext().putImageData(img, 0, 0)
-    groundTex.refresh()
-    const dirty = new Uint8Array(Math.ceil(f.cols / GROUND_TILE) * Math.ceil(f.rows / GROUND_TILE))
-    this.ground = { tex: groundTex, img, seen: f.rockAt.slice(), dirty, vents }
+    const ppc = groundPpc(cfg)
+    const field = { basin: f.basin, cols: f.cols, rows: f.rows, cell: f.cell, x0: f.x0, y0: f.y0, ground: f.ground, rockAt: f.rockAt, craterX: f.craterX, craterY: f.craterY, seed: f.seed }
+    const painter = new GroundPainter(field, cfg, vents, ppc, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
+    this.painter = painter
+    const tex = canvasTexture(scene, GROUND_KEY, f.cols * ppc, f.rows * ppc)
+    const rows = Array.from({ length: f.rows }, (_, r): CellRect => ({ c0: 0, r0: r, c1: f.cols, r1: r + 1 }))
+    await painter.paint(rows, f.ground.slice(), f.rockAt.slice(), (p) => {
+      const { img, x, y } = pieceImage(p, ppc)
+      tex.getContext().putImageData(img, x, y)
+    })
+    if (this.painter !== painter) return
+    tex.refresh()
+    painter.trim(1)
     this.visuals.push(scene.add.image(f.x0, f.y0, GROUND_KEY).setOrigin(0, 0).setDisplaySize(f.cols * f.cell, f.rows * f.cell).setDepth(-1))
+    const dirty = new Uint8Array(Math.ceil(f.cols / GROUND_TILE) * Math.ceil(f.rows / GROUND_TILE))
+    this.ground = { tex, ppc, seen: f.rockAt.slice(), dirty, busy: false }
     const lava = canvasTexture(scene, LAVA_KEY, f.cols, f.rows)
     const aux = canvasTexture(scene, AUX_KEY, f.cols, f.rows)
     this.data = {
@@ -1160,10 +1190,11 @@ class VolcanoView extends BoundedView {
     d.aux.refresh()
   }
 
-  /** 新凝固的岩石改变了地表：把受影响的块记下，每隔一会儿重画两块，免得一帧里画太多 */
+  /** 新凝固的岩石改变了地表：把受影响的块记下，上一批补画完了就把记下的块整批交出去重画，画好一块重传一块 */
   private repaintRock(v: ViewCtx, s: VolcanoState, now: number): void {
     const g = this.ground
-    if (!g) return
+    const painter = this.painter
+    if (!g || !painter) return
     const f = s.field
     const cfg = v.def.volcano!
     for (let i = 0; i < f.rockAt.length; i++) {
@@ -1171,24 +1202,27 @@ class VolcanoView extends BoundedView {
       g.seen[i] = f.rockAt[i]!
       markGround(f, cfg, i, g.dirty)
     }
-    if (now < this.rockAt) return
-    this.rockAt = now + 100
+    if (g.busy || now < this.repaintAt) return
     const tiles = Math.ceil(f.cols / GROUND_TILE)
-    let masks: RockMasks | undefined
-    let done = 0
-    for (let k = 0; k < g.dirty.length && done < 2; k++) {
+    const rects: CellRect[] = []
+    for (let k = 0; k < g.dirty.length; k++) {
       if (!g.dirty[k]) continue
       g.dirty[k] = 0
-      done++
-      masks ??= rockMasks(f)
       const c0 = (k % tiles) * GROUND_TILE
       const r0 = Math.floor(k / tiles) * GROUND_TILE
-      const c1 = Math.min(f.cols, c0 + GROUND_TILE)
-      const r1 = Math.min(f.rows, r0 + GROUND_TILE)
-      paintGround(f, cfg, GROUND_PPC, g.vents, masks, g.img.data, c0, r0, c1, r1)
-      g.tex.getContext().putImageData(g.img, 0, 0, c0 * GROUND_PPC, r0 * GROUND_PPC, (c1 - c0) * GROUND_PPC, (r1 - r0) * GROUND_PPC)
+      rects.push({ c0, r0, c1: Math.min(f.cols, c0 + GROUND_TILE), r1: Math.min(f.rows, r0 + GROUND_TILE) })
     }
-    if (done > 0) g.tex.refresh()
+    if (rects.length === 0) return
+    this.repaintAt = now + REPAINT_MS
+    g.busy = true
+    void painter
+      .paint(rects, f.ground.slice(), f.rockAt.slice(), (p) => {
+        const { img, x, y } = pieceImage(p, g.ppc)
+        if (this.ground === g) patchTexture(v.scene, g.tex, img, x, y)
+      })
+      .then(() => {
+        g.busy = false
+      })
   }
 
 
@@ -1337,6 +1371,8 @@ class VolcanoView extends BoundedView {
 
   destroy(v: ViewCtx): void {
     this.vignette = undefined
+    this.painter?.close()
+    this.painter = undefined
     super.destroy(v)
     this.ground = undefined
     this.data = undefined

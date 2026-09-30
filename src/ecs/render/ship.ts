@@ -1,5 +1,6 @@
 import { UNIT } from '../../util/units'
 import { SUN } from '../../data/light'
+import { GROUND_PPU } from '../../data/texel'
 import { fbm, valueNoise } from '../../util/noise'
 import { Rng } from '../../util/rng'
 import type { ShipConfig } from '../../types/maps'
@@ -18,8 +19,8 @@ function smooth(e0: number, e1: number, x: number): number {
 /** 高 1 格的东西在甲板上投下的影子有多长，格 */
 export const SHADOW_PER_U = Math.hypot(SUN.x, SUN.y) / SUN.z
 
-/** 甲板贴图每格多少像素 */
-export const DECK_PPU = 32
+/** 甲板贴图每格多少像素：和其他地图的地面一样细 */
+export const DECK_PPU = GROUND_PPU
 /** 舷墙外还要画链板、炮口与锚，贴图往外多留几格 */
 const OUTBOARD_U = 1.5
 
