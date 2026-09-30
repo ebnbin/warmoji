@@ -24,8 +24,8 @@ import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynigh
 import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/river'
 import { fitAspectRect } from './worlds/torus'
-import { drawBomb, drawPuff, drawSpark, encodeLava, fumaroles, GROUND_TILE, groundPpc, LAVA_FRAG, markGround } from './render/volcano'
-import type { CellRect, GroundPiece } from './render/volcano'
+import { drawBomb, drawPuff, drawSpark, encodeLava, fumaroles, GROUND_TILE, groundPpc, LAVA_FRAG, lavaShown, markGround } from './render/volcano'
+import type { CellRect, GroundPiece, LavaShown } from './render/volcano'
 import { GroundPainter } from './render/groundPainter'
 import { effusion } from './worlds/volcano'
 import { roomAt } from './worlds/basin'
@@ -972,7 +972,7 @@ function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, d
 class VolcanoView extends BoundedView {
   private painter?: GroundPainter
   private ground?: { tex: Phaser.Textures.CanvasTexture; ppc: number; seen: Float32Array; dirty: Uint8Array; busy: boolean }
-  private data?: { lava: Phaser.Textures.CanvasTexture; aux: Phaser.Textures.CanvasTexture; lavaImg: ImageData; auxImg: ImageData; glow: Float32Array; soft: Float32Array }
+  private data?: { lava: Phaser.Textures.CanvasTexture; aux: Phaser.Textures.CanvasTexture; lavaImg: ImageData; auxImg: ImageData; glow: Float32Array; soft: Float32Array; shown: LavaShown }
   private repaintAt = 0
   private readonly u = { time: 0, erupt: 0, warn: 0 }
   private plume?: Phaser.GameObjects.Particles.ParticleEmitter
@@ -1045,6 +1045,7 @@ class VolcanoView extends BoundedView {
       auxImg: aux.getContext().createImageData(f.cols, f.rows),
       glow: new Float32Array(f.cols * f.rows),
       soft: new Float32Array(f.cols * f.rows),
+      shown: lavaShown(f, sim.elapsedMs),
     }
     this.encode(v, s, sim.elapsedMs)
     const u = this.u
@@ -1183,7 +1184,7 @@ class VolcanoView extends BoundedView {
   private encode(v: ViewCtx, s: VolcanoState, now: number): void {
     const d = this.data
     if (!d) return
-    encodeLava(s.field, v.def.volcano!, now, d.lavaImg.data, d.auxImg.data, d.glow, d.soft)
+    encodeLava(s.field, v.def.volcano!, now, d.shown, d.lavaImg.data, d.auxImg.data, d.glow, d.soft)
     d.lava.getContext().putImageData(d.lavaImg, 0, 0)
     d.lava.refresh()
     d.aux.getContext().putImageData(d.auxImg, 0, 0)

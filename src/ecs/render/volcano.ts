@@ -11,6 +11,33 @@ import type { Point } from '../../util/vec'
 /** 刚凝固的岩石裂缝里透出的红光多久褪尽 */
 export const EMBER_MS = 11000
 
+/** 画面上算作有熔岩的最薄厚度 */
+const LAVA_THIN = 0.005
+
+/** 熔岩在画面上要连续有这么多步才显示、连续没有这么多步才消失：边缘的格子常在有无之间来回跳一两步（凝了又被邻格流进来） */
+const SETTLE_STEPS = { on: 1.5, off: 2.5 } as const
+
+/** 每格熔岩在画面上有没有：原始的有无从什么时候起没变过，以及最近一次有熔岩时的厚度与温度 */
+export interface LavaShown {
+  readonly on: Uint8Array
+  readonly raw: Uint8Array
+  readonly since: Float64Array
+  readonly depth: Float32Array
+  readonly heat: Float32Array
+}
+
+export function lavaShown(f: LavaField, now: number): LavaShown {
+  const n = f.cols * f.rows
+  const s = { on: new Uint8Array(n), raw: new Uint8Array(n), since: new Float64Array(n).fill(now), depth: new Float32Array(n), heat: new Float32Array(n) }
+  for (let i = 0; i < n; i++) {
+    if (f.lava[i]! < LAVA_THIN) continue
+    s.on[i] = s.raw[i] = 1
+    s.depth[i] = f.lava[i]!
+    s.heat[i] = f.heat[i]!
+  }
+  return s
+}
+
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 function smooth(e0: number, e1: number, x: number): number {
   const t = clamp01((x - e0) / (e1 - e0))
@@ -325,15 +352,30 @@ export function markGround(f: LavaField, cfg: VolcanoConfig, i: number, dirty: U
  * 给熔岩着色器的两张数据图，每格一个像素、不透明（画布会按透明度预乘，数据必须满 alpha）：
  * lava 的 R 是平滑过的有无熔岩（取 0.5 的等值线就是圆滑的边）、G 是温度（凝固温度处为 0）、B 是刚凝固岩石的余烬；
  * aux 的 R 是模糊后的辉光、G、B 是熔岩顺坡往下流的方向。
+ * 有无按 shown 去抖：短暂没了的格子照旧按最近一次的厚度与温度画，短暂冒出来的格子先不画。
  */
-export function encodeLava(f: LavaField, cfg: VolcanoConfig, now: number, lava: Uint8ClampedArray, aux: Uint8ClampedArray, glow: Float32Array, soft: Float32Array): void {
+export function encodeLava(f: LavaField, cfg: VolcanoConfig, now: number, shown: LavaShown, lava: Uint8ClampedArray, aux: Uint8ClampedArray, glow: Float32Array, soft: Float32Array): void {
   const { cols, rows, ground } = f
   const solidus = cfg.lava.solidus
-  for (let i = 0; i < cols * rows; i++) glow[i] = smooth(0.0005, 0.01, f.lava[i]!)
+  const onMs = SETTLE_STEPS.on * cfg.lava.stepMs
+  const offMs = SETTLE_STEPS.off * cfg.lava.stepMs
+  for (let i = 0; i < cols * rows; i++) {
+    const r = f.lava[i]! >= LAVA_THIN ? 1 : 0
+    if (r !== shown.raw[i]) {
+      shown.raw[i] = r
+      shown.since[i] = now
+    }
+    if (r !== shown.on[i] && now - shown.since[i]! >= (r ? onMs : offMs)) shown.on[i] = r
+    if (r) {
+      shown.depth[i] = f.lava[i]!
+      shown.heat[i] = f.heat[i]!
+    }
+    glow[i] = shown.on[i]!
+  }
   soften(glow, cols, rows, soft)
   for (let i = 0; i < cols * rows; i++) {
-    const l = f.lava[i]!
-    const t = l > 0 ? clamp01((f.heat[i]! - solidus) / (1 - solidus)) : 0
+    const l = shown.on[i] ? shown.depth[i]! : 0
+    const t = l > 0 ? clamp01((shown.heat[i]! - solidus) / (1 - solidus)) : 0
     const at = f.rockAt[i]!
     const age = now - at
     const ember = l <= 0 && at > -Infinity && age >= 0 && age < EMBER_MS ? (1 - age / EMBER_MS) ** 2 : 0
@@ -493,9 +535,9 @@ void main ()
     vec2 p = cell * 0.55;
     vec2 a = p - dir * ph * speed;
     vec2 b = p - dir * ph2 * speed + vec2(0.37, 0.61);
-    float e = mix(plates(b), plates(a), w);
-    float fine = mix(plates(b * 2.3 + 1.7), plates(a * 2.3), w);
-    float churn = mix(vnoise(b * 1.3 + 3.1), vnoise(a * 1.3), w);
+    float e = mix(plates(a), plates(b), w);
+    float fine = mix(plates(a * 2.3), plates(b * 2.3 + 1.7), w);
+    float churn = mix(vnoise(a * 1.3), vnoise(b * 1.3 + 3.1), w);
     float hot = clamp(heat * (0.64 + 0.42 * churn), 0.0, 1.0);
     vec3 molten = ramp(hot);
     molten += vec3(0.25, 0.22, 0.12) * smoothstep(0.78, 0.95, churn) * smoothstep(0.85, 1.0, heat);
