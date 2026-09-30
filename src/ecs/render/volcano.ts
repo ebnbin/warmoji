@@ -1,5 +1,6 @@
 import { UNIT } from '../../util/units'
 import { SUN } from '../../data/light'
+import { GROUND_PPU } from '../../data/texel'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
 import { Rng } from '../../util/rng'
 import { awayFromWall, roomAt } from '../worlds/basin'
@@ -17,7 +18,7 @@ function smooth(e0: number, e1: number, x: number): number {
 }
 
 /** 场里 (u, v) 处按格心双线性取值，u、v 以格计、格心在整数处 */
-function bilinear(a: ArrayLike<number>, f: LavaField, u: number, v: number): number {
+function bilinear(a: ArrayLike<number>, f: Pick<LavaField, 'cols' | 'rows'>, u: number, v: number): number {
   const x = Math.min(f.cols - 1.001, Math.max(0, u))
   const y = Math.min(f.rows - 1.001, Math.max(0, v))
   const ix = Math.floor(x)
@@ -76,7 +77,7 @@ export interface RockMasks {
   readonly fresh: Float32Array
 }
 
-export function rockMasks(f: LavaField): RockMasks {
+export function rockMasks(f: Pick<LavaField, 'cols' | 'rows' | 'rockAt'>): RockMasks {
   const rocky = new Float32Array(f.cols * f.rows)
   const fresh = new Float32Array(f.cols * f.rows)
   const hard = new Float32Array(f.cols * f.rows)
@@ -87,13 +88,42 @@ export function rockMasks(f: LavaField): RockMasks {
   return { rocky, fresh }
 }
 
+/** 画地面用到的那部分熔岩场：只有数据，能整个发给画地面的线程 */
+export type GroundField = Pick<LavaField, 'basin' | 'cols' | 'rows' | 'cell' | 'x0' | 'y0' | 'ground' | 'rockAt' | 'craterX' | 'craterY' | 'seed'>
+
+/** 地面上以格计的一块：[c0, c1) × [r0, r1) */
+export interface CellRect {
+  readonly c0: number
+  readonly r0: number
+  readonly c1: number
+  readonly r1: number
+}
+
+/** 发给画地面的线程：先 setup 一次，每批活先给 state（当下的地形与岩石），再一块一块要 paint */
+export type GroundJob =
+  | { readonly kind: 'setup'; readonly field: GroundField; readonly cfg: VolcanoConfig; readonly vents: readonly Point[]; readonly ppc: number }
+  | { readonly kind: 'state'; readonly ground: Float32Array; readonly rockAt: Float32Array }
+  | { readonly kind: 'paint'; readonly index: number; readonly rect: CellRect }
+
+/** 装得下一块地面像素的缓冲：按 paintGround 的排法 */
+export function groundBuffer(rect: CellRect, ppc: number): Uint8ClampedArray<ArrayBuffer> {
+  return new Uint8ClampedArray((rect.c1 - rect.c0) * (rect.r1 - rect.r0) * ppc * ppc * 4)
+}
+
+/** 画好的一块：像素在 rect 的范围里逐行排；index 是它在这批活里的序号 */
+export interface GroundPiece {
+  readonly index: number
+  readonly rect: CellRect
+  readonly pixels: Uint8ClampedArray<ArrayBuffer>
+}
+
 /**
  * 地表：盆地里是火山灰地面，火山是红褐色的火山渣，凝固的熔岩是玄武岩；盆地外是崖壁与柱状节理的玄武岩高地，越往外越暗。
  * 按高度场打光，高处朝背光一侧投下影子；所有岩壁脚下都堆着碎石，陡峭的山体上有顺坡的碎石纹，灰地上有干裂纹，喷气孔周围有硫磺。
- * ppc 是每格多少像素，只画 [c0, c1) × [r0, r1) 的格子。
+ * ppc 是每格多少像素，只画 [c0, c1) × [r0, r1) 的格子，out 里按这块的范围逐行排。
  */
 export function paintGround(
-  f: LavaField,
+  f: GroundField,
   cfg: VolcanoConfig,
   ppc: number,
   vents: readonly Point[],
@@ -104,7 +134,7 @@ export function paintGround(
   c1: number,
   r1: number,
 ): void {
-  const w = f.cols * ppc
+  const w = (c1 - c0) * ppc
   const seed = f.seed
   const cone = cfg.cone
   const mountain = cone.blockU * (1 + cone.blockJitter)
@@ -142,9 +172,11 @@ export function paintGround(
       let r = 58 + big * 22 + grain * 13
       let g = 48 + big * 17 + grain * 10
       let b = 44 + big * 13 + grain * 9
-      const crack = cellEdge(wx * 1.35, wy * 1.35, seed + 21)
-      if (crack < 0.05) {
-        const k = 1 - 0.3 * (1 - crack / 0.05)
+      const crust = smooth(0.45, 0.66, fbm(wx / 3.2, wy / 3.2, seed + 25, 2)) * smooth(cone.blockU, cone.blockU + 3, dU)
+      if (crust > 0) {
+        const wide = smooth(0.05, 0.012, cellEdge(wx * 0.55, wy * 0.55, seed + 21)) * (0.2 + 0.8 * valueNoise(wx * 1.3, wy * 1.3, seed + 29))
+        const fine = smooth(0.032, 0.008, cellEdge(wx * 1.35, wy * 1.35, seed + 23)) * smooth(0.45, 0.75, fbm(wx / 1.6, wy / 1.6, seed + 27, 2))
+        const k = 1 - Math.max(wide * 0.22, fine * 0.14) * crust
         r *= k
         g *= k
         b *= k
@@ -180,7 +212,7 @@ export function paintGround(
       const high = smooth(0, 0.4, -edgeU) * smooth(mountain - 0.3, mountain + 1.5, dU)
       if (high > 0) {
         const q = cellNearest(wx * 1.7, wy * 1.7, seed + 121)
-        const joint = 0.5 + 0.5 * smooth(0, 0.07, cellEdge(wx * 1.7, wy * 1.7, seed + 121))
+        const joint = 0.64 + 0.36 * smooth(0.008, 0.06, cellEdge(wx * 1.7, wy * 1.7, seed + 121))
         const rift = 0.45 + 0.55 * smooth(0, 0.035, cellEdge(wx * 0.45, wy * 0.45, seed + 171))
         const dust = smooth(0.5, 0.78, fbm(wx / 3, wy / 3, seed + 131, 2)) * 0.35
         let hr = (46 + q.h * 16 + grain * 10) * (1 - dust) + 92 * dust
@@ -211,7 +243,10 @@ export function paintGround(
       if (rock > 0) {
         const ropes = 0.5 + 0.5 * Math.sin((wx * 0.8 + wy * 1.1) * 5 + fbm(wx * 0.9, wy * 0.9, seed + 51, 2) * 9)
         const young = clamp01(bilinear(fresh, f, u, v) * 1.6)
-        const joint = 1 - 0.45 * smooth(0.07, 0, cellEdge(wx * 2.3, wy * 2.3, seed + 33))
+        const joint =
+          1 -
+          0.32 * smooth(0.05, 0.012, cellEdge(wx * 0.9, wy * 0.9, seed + 33)) * (0.45 + 0.55 * valueNoise(wx * 1.6, wy * 1.6, seed + 39)) -
+          0.14 * smooth(0.035, 0.008, cellEdge(wx * 2.1, wy * 2.1, seed + 35)) * smooth(0.5, 0.8, fbm(wx / 1.4, wy / 1.4, seed + 37, 2))
         const rr = (33 + grain * 16 + ropes * 7 + big * 6 + (1 - young) * (20 + big * 10)) * joint
         const rg = (30 + grain * 14 + ropes * 6 + big * 5 + (1 - young) * (15 + big * 8)) * joint
         const rb = (34 + grain * 15 + ropes * 8 + big * 6 + (1 - young) * (9 + big * 6)) * joint
@@ -252,7 +287,7 @@ export function paintGround(
           }
         }
       }
-      const o = (py * w + px) * 4
+      const o = ((py - r0 * ppc) * w + px - c0 * ppc) * 4
       out[o] = r
       out[o + 1] = g
       out[o + 2] = b
@@ -261,11 +296,13 @@ export function paintGround(
   }
 }
 
-/** 地面图层每格多少像素：地表是静的，只在有岩石新凝固时分块重画 */
-export const GROUND_PPC = 6
+/** 地面图层每个熔岩格多少像素：和其他地图的地面一样细 */
+export function groundPpc(cfg: VolcanoConfig): number {
+  return GROUND_PPU * cfg.cellU
+}
 
 /** 地面图层按这么多格见方分块重画 */
-export const GROUND_TILE = 8
+export const GROUND_TILE = 4
 
 /** 这一格的岩石变了，哪些块要重画：岩石的边平滑出去一格，影子朝背光一侧投出去 SHADOW_STEPS 那么远 */
 export function markGround(f: LavaField, cfg: VolcanoConfig, i: number, dirty: Uint8Array): void {
