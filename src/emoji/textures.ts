@@ -2,9 +2,11 @@ import Phaser from 'phaser'
 import { OUTLINE } from './svg'
 import type { OutlineKind } from './svg'
 import { keysOf } from '../util/record'
-import { packSvg, parseEmojiPack } from './pack'
+import { emojiSvg, packSvg, parseEmojiPack } from './pack'
 import type { EmojiPack } from './pack'
 import { EMOJI_PAD, outlineSvg, padSvg, setSvgSize } from './svg'
+import { paintedDrawn } from './painted/index.ts'
+import { isPainted } from './style'
 
 const RASTER = 256
 const LRU_LIMIT = 256
@@ -42,11 +44,23 @@ export function loadEmojiPack(): Promise<EmojiPack> {
   return packDeferred()
 }
 
-export async function emojiSvgText(id: string): Promise<string> {
+/** Twemoji 的原图，不看画风开关 */
+export async function twemojiSvgText(id: string): Promise<string> {
   const pack = await loadEmojiPack()
   const svg = packSvg(pack, id)
   if (!svg) throw new Error(`emoji 不在打包资源中: ${id}`)
   return padSvg(svg, EMOJI_PAD)
+}
+
+/** 新画风的原图，不看画风开关；没画过返回 undefined */
+export function paintedSvgText(id: string): string | undefined {
+  const d = paintedDrawn(id)
+  return d ? padSvg(emojiSvg(d.body), EMOJI_PAD) : undefined
+}
+
+/** 此刻该用的那一张：新画风开着且画过用新画风，否则 Twemoji */
+export async function emojiSvgText(id: string): Promise<string> {
+  return isPainted(id) ? paintedSvgText(id)! : twemojiSvgText(id)
 }
 
 interface EmojiTextureStats {
@@ -74,8 +88,9 @@ const KIND_SUFFIX: Record<OutlineKind, string> = {
   elite: '-olg',
 }
 
+/** 纹理的 key：新画风的另起一套，切换画风后按新 key 重新生成 */
 export function emojiKey(id: string, outline?: OutlineKind): string {
-  return `emoji-${id}${outline ? KIND_SUFFIX[outline] : ''}`
+  return `emoji-${isPainted(id) ? 'p-' : ''}${id}${outline ? KIND_SUFFIX[outline] : ''}`
 }
 
 export async function svgToImage(svgText: string): Promise<HTMLImageElement> {

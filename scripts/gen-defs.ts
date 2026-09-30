@@ -29,6 +29,8 @@ import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
 import { shellPull } from '../src/data/nebula.ts'
 import { deckEdgeAngle, halfBeamAt, hydrostatics, stability, staticHeel } from '../src/data/ship.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
+import { render } from '../src/emoji/painted/design.ts'
+import { PAINTED } from '../src/emoji/painted/index.ts'
 import type { Issue } from '../src/data/runCheck.ts'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef } from '../src/types/enemies'
@@ -252,6 +254,34 @@ for (const [id, m] of Object.entries<MutatorDef>(MUTATORS)) {
   need(Number.isInteger(m.heat) && m.heat >= 1, `mutators.${id}.heat 须是正整数`)
   need(m.rules !== undefined || m.enemyMods !== undefined, `mutators.${id} 至少要改一样东西`)
   report(`mutators.${id}.rules`, CHECKS.rules(m.rules))
+}
+
+/** 新画风：码位要在表情包里；配方里有的动画都得绑上，部件一一对应到图里的层，转过、缩放的部件给了转轴 */
+for (const [id, d] of Object.entries(PAINTED)) {
+  need(PACK.has(id), `新画风的 ${id} 不在表情包里`)
+  const layers = render(id, d).layers
+  const clips = ANIMATIONS.animations[id]?.clips ?? {}
+  for (const clipId of Object.keys(d.rig ?? {})) need(clipId in clips, `新画风的 ${id} 绑了配方里没有的 ${clipId} 动画`)
+  for (const [clipId, clip] of Object.entries(clips)) {
+    const rig = d.rig?.[clipId as keyof typeof clips]
+    const at = `新画风的 ${id} 的 ${clipId} 动画`
+    if (!rig) {
+      need(false, `${at} 没绑`)
+      continue
+    }
+    need(rig.parts.length === clip.parts.length, `${at} 绑了 ${rig.parts.length} 个部件，配方里有 ${clip.parts.length} 个`)
+    const used = new Set<string>()
+    rig.parts.forEach((r, i) => {
+      need(r.layers.length > 0, `${at} 的第 ${i} 个部件没绑层`)
+      for (const name of r.layers) {
+        need(layers.includes(name), `${at} 的第 ${i} 个部件绑了图里没有的层 ${name}`)
+        need(!used.has(name), `${at} 的层 ${name} 绑给了不止一个部件`)
+        used.add(name)
+      }
+      const turns = (clip.parts[i]?.keyframes ?? []).some((k) => (k.rotate ?? 0) !== 0 || (k.scale ?? 1) !== 1 || (k.scaleX ?? 1) !== 1 || (k.scaleY ?? 1) !== 1)
+      need(!turns || (r.cx !== undefined && r.cy !== undefined), `${at} 的第 ${i} 个部件会转或缩放，要给转轴`)
+    })
+  }
 }
 
 const itemEmojis = new Map<string, string>()
