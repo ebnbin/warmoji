@@ -104,6 +104,7 @@ function battleItems(battle: EcsBattleScene): DevItem[] {
           .join('\n'),
     },
     devFlagItem('battle.targets'),
+    devFlagItem('battle.walls'),
     devFlagItem('ecs.profile'),
     { kind: 'text', label: '流水线剖析 · 平均毫秒/帧 · 外层含内层', mono: true, read: profileText },
     { kind: 'buttons', buttons: [{ label: '重置剖析', run: resetPipelineProfile }] },

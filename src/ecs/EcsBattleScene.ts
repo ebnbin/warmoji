@@ -89,8 +89,10 @@ import { nearestTarget } from './utils/targets'
 import { canSwitchLeader, handoverCamOffset, switchLeader } from './systems/shared/leader'
 import { telegraphOne } from './entities/enemy'
 import { enemyDef } from './store'
+import { wallLoops } from './worlds/basin'
 
 const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
+const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体、舷墙与桅杆' })
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
@@ -161,6 +163,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private mapH = 0
   private bootGen = 0
   private devGfx?: Phaser.GameObjects.Graphics
+  private wallGfx?: Phaser.GameObjects.Graphics
   /** 这一场看得见的范围之外的黑幕；没有视野规则就没有 */
   private fog?: Fog
   /** 升级弹窗开着，战斗停着 */
@@ -197,6 +200,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.timeStopFx = undefined
     this.timeStopFxAlpha = 0
     this.devGfx = undefined
+    this.wallGfx = undefined
     this.fog = undefined
     this.choosing = false
     this.settling = false
@@ -288,6 +292,21 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       g.lineBetween(Transform.x[m]!, Transform.y[m]!, t.x, t.y)
       g.strokeCircle(t.x, t.y, Math.max(6, t.radius))
     }
+  }
+
+  /** 碰撞边界一局里不变：头一回打开时画好，之后只管显隐；盖在战斗画面一切之上 */
+  private drawDevWalls(sim: Sim): void {
+    if (!showWalls()) {
+      this.wallGfx?.setVisible(false)
+      return
+    }
+    if (!this.wallGfx) {
+      const g = (this.wallGfx = this.add.graphics().setDepth(1001))
+      g.lineStyle(0.05 * UNIT, 0xff00ff, 1)
+      const b = sim.hooks.basin(sim)
+      if (b) for (const loop of wallLoops(b)) g.strokePoints(loop, false, true)
+    }
+    this.wallGfx.setVisible(true)
   }
 
   create(): void {
@@ -806,6 +825,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     }
     this.paint?.step(sim)
     this.drawDevTargets(sim)
+    this.drawDevWalls(sim)
     this.drawSkillAim(sim)
     if (sim.over) {
       this.lose('全军覆没')

@@ -148,3 +148,73 @@ export function keepOut(b: Basin, x: number, y: number, rad: number): Point {
   }
   return { x: px, y: py }
 }
+
+/**
+ * 壁面：距离场为零的等值线，像素，每条连成首尾不重复的闭合环；
+ * 相邻四个格心围成的方格里按边上的线性插值切，四角正负交错时按四角平均的正负决定哪一对角连通。
+ */
+export function wallLoops(b: Basin): Point[][] {
+  const { cols, rows, cell, x0, y0, room } = b
+  // 格心 i 往右的边编号 2i，往下的边编号 2i + 1；每条被切到的边恰好连着两段线
+  const link = new Int32Array(cols * rows * 4).fill(-1)
+  const join = (a: number, c: number): void => {
+    link[a * 2 + (link[a * 2]! < 0 ? 0 : 1)] = c
+    link[c * 2 + (link[c * 2]! < 0 ? 0 : 1)] = a
+  }
+  const cut = new Int32Array(4)
+  for (let cy = 0; cy < rows - 1; cy++) {
+    for (let cx = 0; cx < cols - 1; cx++) {
+      const i = cy * cols + cx
+      const tl = room[i]! > 0
+      const tr = room[i + 1]! > 0
+      const br = room[i + cols + 1]! > 0
+      const bl = room[i + cols]! > 0
+      const top = 2 * i
+      const right = 2 * (i + 1) + 1
+      const bottom = 2 * (i + cols)
+      const left = 2 * i + 1
+      let n = 0
+      if (tl !== tr) cut[n++] = top
+      if (tr !== br) cut[n++] = right
+      if (bl !== br) cut[n++] = bottom
+      if (tl !== bl) cut[n++] = left
+      if (n === 2) join(cut[0]!, cut[1]!)
+      if (n < 4) continue
+      const mid = room[i]! + room[i + 1]! + room[i + cols]! + room[i + cols + 1]! > 0
+      if (tl !== mid) {
+        join(top, left)
+        join(right, bottom)
+      } else {
+        join(top, right)
+        join(bottom, left)
+      }
+    }
+  }
+  const at = (e: number): Point => {
+    const i = e >> 1
+    const cx = i % cols
+    const cy = (i - cx) / cols
+    const down = (e & 1) === 1
+    const t = room[i]! / (room[i]! - room[down ? i + cols : i + 1]!)
+    return { x: x0 + (cx + 0.5 + (down ? 0 : t)) * cell, y: y0 + (cy + 0.5 + (down ? t : 0)) * cell }
+  }
+  const loops: Point[][] = []
+  const seen = new Uint8Array(cols * rows * 2)
+  for (let start = 0; start < seen.length; start++) {
+    if (seen[start] || link[start * 2]! < 0) continue
+    const loop: Point[] = []
+    let prev = -1
+    let e = start
+    do {
+      seen[e] = 1
+      loop.push(at(e))
+      const a = link[e * 2]!
+      const next = a !== prev ? a : link[e * 2 + 1]!
+      if (next < 0) throw new Error('壁面的线没有闭合：格子最外一圈应当都是岩壁')
+      prev = e
+      e = next
+    } while (e !== start)
+    loops.push(loop)
+  }
+  return loops
+}

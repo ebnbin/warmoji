@@ -101,6 +101,8 @@ export interface WorldHooks {
   contact(sim: Sim, eid: number, dt: number, x: number, y: number, vx: number, vy: number, out: BodyStep): boolean
   /** 任何身体的位置修正：边界、障碍、环面回绕，按身体半径 */
   constrainBody(sim: Sim, eid: number, from: Point, next: Point): Point
+  /** 岩壁、舷墙这类硬边界围出的能走的地面，身体按它挡在壁外；边界不是这样定的地图没有 */
+  basin(sim: Sim): Basin | null
   chaseDir(sim: Sim, eid: number, tx: number, ty: number): Point
   wallHit(sim: Sim, ax: number, ay: number, bx: number, by: number): Point | null
   smashWall(sim: Sim, x: number, y: number): void
@@ -152,6 +154,9 @@ const bounded: WorldHooks = {
       x: Math.min(Math.max(next.x, r), sim.mapW - r),
       y: Math.min(Math.max(next.y, r), sim.mapH - r),
     }
+  },
+  basin() {
+    return null
   },
   chaseDir(_sim, eid, tx, ty) {
     return norm(tx - Transform.x[eid]!, ty - Transform.y[eid]!)
@@ -718,6 +723,9 @@ const volcano: WorldHooks = {
   constrainBody(sim, eid, _from, next) {
     return keepOut(volcanoOf(sim).field.basin, next.x, next.y, Radius.v[eid]!)
   },
+  basin(sim) {
+    return volcanoOf(sim).field.basin
+  },
   chaseDir(sim, eid, tx, ty) {
     const f = volcanoOf(sim).field
     const x = Transform.x[eid]!
@@ -819,6 +827,9 @@ const ship: WorldHooks = {
   },
   constrainBody(sim, eid, _from, next) {
     return keepOut(shipOf(sim).deck.basin, next.x, next.y, Radius.v[eid]!)
+  },
+  basin(sim) {
+    return shipOf(sim).deck.basin
   },
   chaseDir(sim, eid, tx, ty) {
     const x = Transform.x[eid]!
