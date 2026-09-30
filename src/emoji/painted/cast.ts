@@ -3,6 +3,7 @@ import { ellipse, INK, poly, RAMP, smooth } from './kit.ts'
 
 /** 🤹 杂耍演员：橘红的马戏衫，两手摊开往上托，头顶三只油亮的球 */
 export const JUGGLER = design({
+  name: '杂耍演员',
   draw: (p) => {
     const shirt = smooth([[5.6, 36.6], [6.2, 31.2], [9.2, 27.8], [14, 26.4], [21.4, 26.4], [26.4, 27.6], [29.6, 30.8], [30.4, 36.6]])
     const vest = smooth([[11.4, 36.6], [12.2, 30.6], [14.8, 27.4], [17.6, 30.4], [20.4, 27.4], [23.2, 30.6], [24.2, 36.6]])
@@ -60,6 +61,7 @@ export const JUGGLER = design({
 
 /** 🦄 独角兽：珍珠白的马头朝左，紫鬃顺着脖子披下来，额前一根金色螺纹的角 */
 export const UNICORN = design({
+  name: '独角兽',
   draw: (p) => {
     const head = smooth([
       [15.8, 5.6], [21.8, 5.8], [27.4, 9.2], [31.4, 15.4], [34.4, 23.6], [35.6, 32], [35.6, 36.6], [22.2, 36.6], [21.8, 31.4],
@@ -108,6 +110,7 @@ export const UNICORN = design({
 
 /** 🧑‍🚒 消防员：红头盔上一枚铜徽，黄棕防火外套配反光条，黑背带 */
 export const FIREFIGHTER = design({
+  name: '消防员',
   draw: (p) => {
     const coat = smooth([[3.6, 36.6], [4.2, 31.4], [7.8, 28.2], [13.4, 26.8], [22.6, 26.8], [28.2, 28.2], [31.8, 31.4], [32.4, 36.6]])
     const collar = poly([[14, 27.2], [22, 27.2], [20.6, 33.4], [18, 35], [15.4, 33.4]])
@@ -164,6 +167,7 @@ export const FIREFIGHTER = design({
 
 /** 🤠 牛仔：一张咧嘴笑的圆脸，戴一顶两边上翘的旧毡帽，帽带上别着一枚铜扣 */
 export const COWBOY = design({
+  name: '牛仔',
   draw: (p) => {
     const face = ellipse(18, 22.2, 15, 13.6)
     const mouth = smooth([[10.6, 26.2], [18, 27.6], [25.4, 26.2], [23.4, 30.6], [18, 32.6], [12.6, 30.6]], true, 0.8)

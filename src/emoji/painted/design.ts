@@ -16,11 +16,12 @@ export interface Rig<N extends string = string> {
 
 /** 一张新画风的 emoji：按层画出来（层的顺序就是叠放顺序），配方里要动的部件按层名绑定 */
 export interface Design<N extends string = string> {
+  readonly name: string
   readonly draw: (p: Painter) => Readonly<Record<N, string>>
   readonly rig?: Partial<Readonly<Record<AnimClipId, Rig<N>>>>
 }
 
-export function design<N extends string>(d: { readonly draw: (p: Painter) => Readonly<Record<N, string>>; readonly rig?: Partial<Readonly<Record<AnimClipId, Rig<NoInfer<N>>>>> }): Design<N> {
+export function design<N extends string>(d: { readonly name: string; readonly draw: (p: Painter) => Readonly<Record<N, string>>; readonly rig?: Partial<Readonly<Record<AnimClipId, Rig<NoInfer<N>>>>> }): Design<N> {
   return d
 }
 

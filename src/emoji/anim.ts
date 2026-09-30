@@ -451,16 +451,21 @@ function paintSet(set: AnimSet): AnimSet | null {
   return clips.length > 0 ? { ...set, anatomy: clips[0]!.anatomy, clips } : null
 }
 
-/** 这个 emoji 此刻的动画：新画风开着且画了它时，换成按新图绑定的那一套 */
-export function animSetOf(emoji: string): AnimSet | undefined {
+/** 新画风这张图的动画，不看画风开关；没画过或没有配方返回 undefined */
+export function paintedAnimSet(emoji: string): AnimSet | undefined {
   const set = ANIM_SETS.find((s) => s.emoji === emoji)
-  if (!set || !isPainted(emoji)) return set
+  if (!set || !paintedDrawn(emoji)) return undefined
   let hit = paintedSets.get(emoji)
   if (hit === undefined) {
     hit = paintSet(set)
     paintedSets.set(emoji, hit)
   }
   return hit ?? undefined
+}
+
+/** 这个 emoji 此刻的动画：新画风开着且画了它时，换成按新图绑定的那一套 */
+export function animSetOf(emoji: string): AnimSet | undefined {
+  return isPainted(emoji) ? paintedAnimSet(emoji) : ANIM_SETS.find((s) => s.emoji === emoji)
 }
 
 export function animClipOf(emoji: string, clipId: AnimClipId): AnimClip | undefined {

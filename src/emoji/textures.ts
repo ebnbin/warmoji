@@ -44,12 +44,23 @@ export function loadEmojiPack(): Promise<EmojiPack> {
   return packDeferred()
 }
 
-export async function emojiSvgText(id: string): Promise<string> {
-  if (isPainted(id)) return padSvg(emojiSvg(paintedDrawn(id)!.body), EMOJI_PAD)
+/** Twemoji 的原图，不看画风开关 */
+export async function twemojiSvgText(id: string): Promise<string> {
   const pack = await loadEmojiPack()
   const svg = packSvg(pack, id)
   if (!svg) throw new Error(`emoji 不在打包资源中: ${id}`)
   return padSvg(svg, EMOJI_PAD)
+}
+
+/** 新画风的原图，不看画风开关；没画过返回 undefined */
+export function paintedSvgText(id: string): string | undefined {
+  const d = paintedDrawn(id)
+  return d ? padSvg(emojiSvg(d.body), EMOJI_PAD) : undefined
+}
+
+/** 此刻该用的那一张：新画风开着且画过用新画风，否则 Twemoji */
+export async function emojiSvgText(id: string): Promise<string> {
+  return isPainted(id) ? paintedSvgText(id)! : twemojiSvgText(id)
 }
 
 interface EmojiTextureStats {

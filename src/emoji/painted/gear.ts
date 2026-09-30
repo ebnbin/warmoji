@@ -4,6 +4,7 @@ import type { Pt } from './kit.ts'
 
 /** 🍅 番茄：几瓣鼓起的红果，顶上一簇尖叶和一截短梗 */
 export const TOMATO = design({
+  name: '番茄',
   draw: (p) => {
     const body = smooth([
       [18, 8.4], [24.2, 7.2], [30.2, 9.6], [34.2, 14.8], [35.3, 21.2], [33.6, 27.6], [29.2, 32.3], [22.6, 34.8],
@@ -26,6 +27,7 @@ export const TOMATO = design({
 
 /** 🔵 巨鳄吐出的水球：一团打着转的清水，里面透着光 */
 export const BLUE_ORB = design({
+  name: '水球',
   draw: (p) => {
     const orb = ellipse(18, 18, 16.4, 16.4)
     return {
@@ -39,6 +41,7 @@ export const BLUE_ORB = design({
 
 /** 🪓 消防斧：木柄斜着伸向右下，末端缠着皮条；黑铁斧头横在柄头上，往左下张开一片磨亮的宽刃 */
 export const AXE = design({
+  name: '消防斧',
   draw: (p) => {
     const u = [0.69, 0.73] as const
     const v = [-0.73, 0.69] as const
@@ -63,6 +66,7 @@ export const AXE = design({
 
 /** 🔫 左轮水枪：朝左的玩具水枪，绿色枪身，顶上透明的水仓里晃着水，橙色枪口和扳机 */
 export const PISTOL = design({
+  name: '左轮水枪',
   draw: (p) => {
     const gun = smooth([[3.2, 6.4], [30.4, 4.4], [34.6, 6.6], [35.2, 10.4], [33.4, 14.4], [31.8, 20.6], [33.2, 29.6], [31.4, 32], [25.4, 32.2], [22.6, 28.4], [21.8, 20.4], [15.4, 16.2], [3.4, 15.4], [2.4, 11]], true, 0.75)
     const barrel = smooth([[3.6, 7.6], [22, 6.8], [24, 9.2], [22, 12], [3.8, 12.8]], true, 0.7)
@@ -88,6 +92,7 @@ export const PISTOL = design({
 
 /** 💧 水滴：尖头朝上的一颗清水，底下沉着深一点的蓝，左上一道亮 */
 export const DROP = design({
+  name: '水滴',
   draw: (p) => {
     const drop = smooth([[18, 1.2], [22.6, 9.4], [28.2, 17.8], [29.6, 24.4], [26.4, 31.6], [18, 35], [9.6, 31.6], [6.4, 24.4], [7.8, 17.8], [13.4, 9.4]], true, 0.9)
     return {
@@ -114,6 +119,7 @@ function spiral(cx: number, cy: number, grow: number, turns: number): string {
 
 /** 🟣 迷魂眼吐出的紫珠：一团旋着涡纹的紫光 */
 export const VIOLET_ORB = design({
+  name: '紫珠',
   draw: (p) => {
     const orb = ellipse(18, 18, 16.4, 16.4)
     return {
@@ -130,6 +136,7 @@ export const VIOLET_ORB = design({
 
 /** 🌊 浪：海青色的一道浪卷起来，浪头翻着白沫，卷里深一些 */
 export const WAVE = design({
+  name: '浪',
   draw: (p) => {
     const wave = smooth([
       [0.6, 35.6], [0.8, 26], [3.4, 16.4], [9, 8.2], [16.6, 3.6], [24.6, 3.2], [30.8, 6.2], [34, 10.4], [32.2, 12.6], [28.6, 10.4], [24.2, 10.2],
