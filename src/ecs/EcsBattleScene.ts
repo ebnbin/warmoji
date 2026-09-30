@@ -304,7 +304,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       const g = (this.wallGfx = this.add.graphics().setDepth(1001))
       g.lineStyle(0.05 * UNIT, 0xff00ff, 1)
       const b = sim.hooks.basin(sim)
-      if (b) for (const loop of wallLoops(b)) g.strokePoints(loop, false, true)
+      if (b) for (const loop of wallLoops(b)) g.strokePoints(loop.map((p) => new Phaser.Math.Vector2(p.x, p.y)), false, true)
     }
     this.wallGfx.setVisible(true)
   }
