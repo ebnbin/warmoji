@@ -1851,9 +1851,9 @@ const CAVE_FLOOR = [0.035, 0.026, 0.02] as const
 const CAVE_SCATTER = 0.012
 /** 天窗口那圈植物的贴图每格多少像素 */
 const CAVE_RIM_PPU = 24
-/** 黄昏太阳落到这个高度蝙蝠出洞，黎明升到这个高度回洞，度 */
-const BAT_OUT_DEG = -2
-const BAT_IN_DEG = -5
+/** 太阳落到这个高度蝙蝠出洞、黎明升到这个高度回洞，度：洞里还看得清，一群黑影预告天要黑了、天快亮了 */
+const BAT_OUT_DEG = 1
+const BAT_IN_DEG = -1
 const BAT_COUNT = 34
 
 /** 一名队员手里的火把在画面上的样子：uid 对不上就是换了人；pop 是刚点着时火光一涨的剩余时间 */
@@ -2344,7 +2344,7 @@ class CaveView extends BoundedView {
         continue
       }
       const flap = 0.55 + 0.45 * Math.abs(Math.sin(this.u.time * 18 + b.flap))
-      const size = ((0.55 + b.alt * 0.9) * UNIT) / 64
+      const size = ((0.7 + b.alt * 0.9) * UNIT) / 64
       b.img
         .setPosition(b.x, b.y)
         .setRotation(Math.atan2(b.vy, b.vx) + Math.PI / 2)
