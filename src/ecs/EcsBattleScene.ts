@@ -90,9 +90,14 @@ import { canSwitchLeader, handoverCamOffset, switchLeader } from './systems/shar
 import { telegraphOne } from './entities/enemy'
 import { enemyDef } from './store'
 import { wallLoops } from './worlds/basin'
+import { gateLoad, gatesNow, gateStats } from './worlds/gates'
 
 const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
 const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体、舷墙与桅杆' })
+const showGates = defineDevFlag({ id: 'battle.gates', group: '战斗', label: '显示出怪口', desc: '画出敌人从哪些地方进场，越亮的这十秒出得越多' })
+
+/** 出怪口按种类上色 */
+const GATE_COLORS = [0x00e5ff, 0xffd740, 0x69f0ae, 0xff6e40, 0xe040fb, 0xb2ff59, 0xff4081, 0x40c4ff] as const
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
@@ -164,6 +169,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
   private bootGen = 0
   private devGfx?: Phaser.GameObjects.Graphics
   private wallGfx?: Phaser.GameObjects.Graphics
+  private gateGfx?: Phaser.GameObjects.Graphics
   /** 这一场看得见的范围之外的黑幕；没有视野规则就没有 */
   private fog?: Fog
   /** 升级弹窗开着，战斗停着 */
@@ -201,6 +207,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.timeStopFxAlpha = 0
     this.devGfx = undefined
     this.wallGfx = undefined
+    this.gateGfx = undefined
     this.fog = undefined
     this.choosing = false
     this.settling = false
@@ -259,6 +266,18 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     ].join('\n')
   }
 
+  /** 出怪口的统计：每种眼下几处、一共出了几只、最近十秒出了几只，吸附不到在原地出来的与落点到时换地方的次数 */
+  devGateText(): string {
+    const sim = this.sim
+    if (!sim) return '不在战斗中'
+    const st = gateStats(sim)
+    if (!st) return '这张图没有出怪口：敌人在能站的地方原地冒出来'
+    return [
+      ...st.rows.map((r) => `${r.name.padEnd(4, '　')} ${String(r.n).padStart(3)} 处 · 共 ${String(r.total).padStart(5)} · 十秒 ${String(r.recent).padStart(4)}`),
+      `够不着出怪口、原地出来 ${st.misses} · 落点站不住换地方 ${st.moves}`,
+    ].join('\n')
+  }
+
   devResetSkill(): void {
     this.run.skillCd.fill(0)
     for (const e of this.sim?.skills ?? []) {
@@ -307,6 +326,33 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
       if (b) for (const loop of wallLoops(b)) g.strokePoints(loop.map((p) => new Phaser.Math.Vector2(p.x, p.y)), false, true)
     }
     this.wallGfx.setVisible(true)
+  }
+
+  /** 出怪口会随地图变（火山口只在喷发时有）：开着就每帧重画；口子画圈、边画线、抛入画它抛得到的圈，越亮这十秒出得越多 */
+  private drawDevGates(sim: Sim): void {
+    if (!showGates()) {
+      this.gateGfx?.setVisible(false)
+      return
+    }
+    const g = (this.gateGfx ??= this.add.graphics().setDepth(1002))
+    g.clear()
+    g.setVisible(true)
+    const kinds = Object.keys(MAPS[sim.mapId].gates?.kinds ?? {})
+    for (const gate of gatesNow(sim)) {
+      if (gate.shape === 'area') continue
+      const color = GATE_COLORS[kinds.indexOf(gate.kind) % GATE_COLORS.length]!
+      const alpha = Math.min(1, 0.35 + gateLoad(sim, gate) * 0.08)
+      g.lineStyle(0.06 * UNIT, color, alpha)
+      if (gate.shape === 'segment') {
+        g.lineBetween(gate.ax, gate.ay, gate.bx, gate.by)
+        const mx = (gate.ax + gate.bx) / 2
+        const my = (gate.ay + gate.by) / 2
+        g.lineBetween(mx, my, mx + gate.nx * 0.5 * UNIT, my + gate.ny * 0.5 * UNIT)
+      } else {
+        g.strokeCircle(gate.ax, gate.ay, Math.max(0.25 * UNIT, gate.r))
+        if (gate.nx !== 0 || gate.ny !== 0) g.lineBetween(gate.ax, gate.ay, gate.ax + gate.nx * 0.8 * UNIT, gate.ay + gate.ny * 0.8 * UNIT)
+      }
+    }
   }
 
   create(): void {
@@ -826,6 +872,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
     this.paint?.step(sim)
     this.drawDevTargets(sim)
     this.drawDevWalls(sim)
+    this.drawDevGates(sim)
     this.drawSkillAim(sim)
     if (sim.over) {
       this.lose('全军覆没')

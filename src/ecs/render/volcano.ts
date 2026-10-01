@@ -2,7 +2,6 @@ import { UNIT } from '../../util/units'
 import { SUN } from '../../data/light'
 import { GROUND_PPU } from '../../data/texel'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
-import { Rng } from '../../util/rng'
 import { awayFromWall, roomAt } from '../worlds/basin'
 import type { LavaField } from '../worlds/volcano'
 import type { VolcanoConfig } from '../../types/maps'
@@ -77,20 +76,6 @@ function soften(src: ArrayLike<number>, cols: number, rows: number, out: Float32
   }
 }
 
-/** 冒硫磺蒸汽的喷气孔：山脚外朝盆地的那一侧有几个，落在盆地里，只是布景 */
-export function fumaroles(f: LavaField, cfg: VolcanoConfig, count: number): Point[] {
-  const rng = new Rng(f.seed ^ 0x51f0)
-  const out: Point[] = []
-  const base = Math.atan2(f.inY, f.inX)
-  for (let k = 0; k < count * 8 && out.length < count; k++) {
-    const a = base + (rng.next() * 2 - 1) * 1.3
-    const r = (cfg.cone.blockU + 0.8 + rng.next() * 5) * UNIT
-    const p = { x: f.craterX + Math.cos(a) * r, y: f.craterY + Math.sin(a) * r }
-    if (roomAt(f.basin, p.x, p.y) >= 0.6 * UNIT) out.push(p)
-  }
-  return out
-}
-
 const LIGHT_X = SUN.x
 const LIGHT_Y = SUN.y
 const LIGHT_Z = SUN.z
@@ -126,9 +111,18 @@ export interface CellRect {
   readonly r1: number
 }
 
+/** 地面上要画的地标，像素：喷气孔，与崖脚的洞口（口子正中在崖脚，n 朝盆地，r 是口子的半宽） */
+export interface GroundMarks {
+  readonly vents: readonly Point[]
+  readonly caves: readonly { readonly x: number; readonly y: number; readonly nx: number; readonly ny: number; readonly r: number }[]
+}
+
+/** 洞往崖里伸进去多深，格 */
+const CAVE_DEPTH_U = 1
+
 /** 发给画地面的线程：先 setup 一次，每批活先给 state（当下的地形与岩石），再一块一块要 paint */
 export type GroundJob =
-  | { readonly kind: 'setup'; readonly field: GroundField; readonly cfg: VolcanoConfig; readonly vents: readonly Point[]; readonly ppc: number }
+  | { readonly kind: 'setup'; readonly field: GroundField; readonly cfg: VolcanoConfig; readonly marks: GroundMarks; readonly ppc: number }
   | { readonly kind: 'state'; readonly ground: Float32Array; readonly rockAt: Float32Array }
   | { readonly kind: 'paint'; readonly index: number; readonly rect: CellRect }
 
@@ -146,14 +140,14 @@ export interface GroundPiece {
 
 /**
  * 地表：盆地里是火山灰地面，火山是红褐色的火山渣，凝固的熔岩是玄武岩；盆地外是崖壁与柱状节理的玄武岩高地，越往外越暗。
- * 按高度场打光，高处朝背光一侧投下影子；所有岩壁脚下都堆着碎石，陡峭的山体上有顺坡的碎石纹，灰地上有干裂纹，喷气孔周围有硫磺。
+ * 按高度场打光，高处朝背光一侧投下影子；所有岩壁脚下都堆着碎石，陡峭的山体上有顺坡的碎石纹，灰地上有干裂纹，喷气孔周围有硫磺；崖脚的洞口黑洞洞的，深处透着熔岩的暗红。
  * ppc 是每格多少像素，只画 [c0, c1) × [r0, r1) 的格子，out 里按这块的范围逐行排。
  */
 export function paintGround(
   f: GroundField,
   cfg: VolcanoConfig,
   ppc: number,
-  vents: readonly Point[],
+  marks: GroundMarks,
   masks: RockMasks,
   out: Uint8ClampedArray,
   c0: number,
@@ -165,7 +159,8 @@ export function paintGround(
   const seed = f.seed
   const cone = cfg.cone
   const mountain = cone.blockU * (1 + cone.blockJitter)
-  const sulfur = vents.map((p) => ({ u: (p.x - f.x0) / f.cell - 0.5, v: (p.y - f.y0) / f.cell - 0.5 }))
+  const sulfur = marks.vents.map((p) => ({ u: (p.x - f.x0) / f.cell - 0.5, v: (p.y - f.y0) / f.cell - 0.5 }))
+  const caves = marks.caves.map((c) => ({ x: c.x / UNIT, y: c.y / UNIT, nx: c.nx, ny: c.ny, w: c.r / UNIT }))
   const sr = 1.4 / cfg.cellU
   const lxy = Math.hypot(LIGHT_X, LIGHT_Y)
   const sunU = LIGHT_X / lxy / cfg.cellU
@@ -289,6 +284,24 @@ export function paintGround(
       r *= dark
       g *= dark
       b *= dark
+      for (const c of caves) {
+        const dx = wx - c.x
+        const dy = wy - c.y
+        if (dx * dx + dy * dy > (c.w + CAVE_DEPTH_U) ** 2) continue
+        const into = -(dx * c.nx + dy * c.ny)
+        const across = (dx * -c.ny + dy * c.nx) / c.w
+        const e = Math.hypot(across, Math.max(0, into) / CAVE_DEPTH_U)
+        if (into < -0.15 || e > 1.1) continue
+        const hole = smooth(1, 0.78, e) * smooth(-0.15, 0.05, into)
+        const glow = smooth(0.25, 1, into / CAVE_DEPTH_U) * 0.6
+        r += (14 + 80 * glow - r) * hole
+        g += (10 + 24 * glow - g) * hole
+        b += (9 + 10 * glow - b) * hole
+        const lip = smooth(0.82, 0.97, e) * smooth(1.1, 0.97, e) * smooth(-0.15, 0.1, into)
+        r *= 1 + lip * 0.25
+        g *= 1 + lip * 0.25
+        b *= 1 + lip * 0.25
+      }
       const fan = edgeU < 2.2 && edgeU > -1.2 ? smooth(0.3, 0.75, fbm(wx / 2.5, wy / 2.5, seed + 151, 2)) : 0
       const reach = 0.3 + 0.9 * fan
       const band = smooth(reach + 0.3, reach * 0.4, Math.abs(edgeU + 0.05 - reach * 0.4))

@@ -420,6 +420,20 @@ export const MAPS = {
       density: [0.03, 0.05],
     },
     mix: VOLCANO_MIX,
+    // 崖脚的洞里走出来、崖顶跳下来、喷气孔里钻出来、喷发时火山口抛出来、骷髅从灰里爬起来；暴龙从山坡上下来
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      boss: 'foot',
+      kinds: {
+        cave: { name: '洞穴', at: { kind: 'nooks', spacingU: 6, away: { mark: 'cone', minU: 9 } }, enter: 'walk', weight: 3, perSec: 1.5, only: ['zombie', 'boar', 'creeper', 'skeleton'] },
+        cliff: { name: '崖顶', at: { kind: 'rim', segU: 3, away: { mark: 'cone', minU: 9 } }, enter: 'climb', weight: 1.5, perSec: 1, only: ['gargoyle', 'zombie'] },
+        vent: { name: '喷气孔', at: { kind: 'mark' }, enter: 'rise', weight: 2, perSec: 1, only: ['turtle', 'creeper'] },
+        crater: { name: '火山口', at: { kind: 'mark' }, enter: 'lob', weight: 4, perSec: 4, reachU: 14, only: ['comet', 'turtle'] },
+        ash: { name: '灰地', at: { kind: 'ground' }, enter: 'rise', weight: 1 },
+        foot: { name: '山坡', at: { kind: 'mark' }, enter: 'walk', weight: 1, only: ['rhino'] },
+      },
+    },
     finalWaveSub: '暴龙踏着熔岩而来——别在火山脚下恋战！',
     volcano: {
       cellU: 0.5,
@@ -476,6 +490,19 @@ export const MAPS = {
       density: [0.006, 0.009],
     },
     mix: SHIP_MIX,
+    // 舱底的从舱口与天窗爬上来、海里的翻过舷墙登船（船往哪边倾，低的那一舷来得多）、幽灵从索具上落下；巨鳄也翻舷墙上来
+    gates: {
+      snapU: 3,
+      fallback: 'drop',
+      boss: 'rail',
+      lowSide: { mul: 4, fullDeg: 4 },
+      kinds: {
+        hatch: { name: '舱口', at: { kind: 'mark' }, enter: 'rise', weight: 3, perSec: 2.5, only: ['zombie', 'skeleton', 'rat', 'raccoon', 'creeper'] },
+        skylight: { name: '天窗', at: { kind: 'mark' }, enter: 'rise', weight: 2, perSec: 1, only: ['ghost', 'rat'] },
+        rail: { name: '舷墙', at: { kind: 'rim', segU: 3 }, enter: 'climb', weight: 2, perSec: 1, only: ['zombie', 'skeleton', 'puffer', 'siren', 'croc'] },
+        rigging: { name: '索具', at: { kind: 'ground' }, enter: 'drop', weight: 1, only: ['ghost'] },
+      },
+    },
     finalWaveSub: '巨鳄爬上了甲板——它有一吨重，它往哪边走，船就往哪边倾！',
     ship: {
       meterPerU: 0.45,

@@ -8,10 +8,12 @@ import type { IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, ShipConfig, S
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
 import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebula'
-import { around, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava } from '../worlds/volcano'
+import { around, fumaroles, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava, VENT_COUNT, volcanoMarks } from '../worlds/volcano'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import type { Basin } from '../worlds/basin'
+import type { GateRuntime, Landmark } from '../worlds/gates'
 import type { VolcanoState } from '../worlds/volcano'
+import { GRAVITY } from '../../data/ship'
 import { addWeight, bumpBalls, clearWeights, makeShip, paceOf, stepBalls, stepOnDeck, stepShip } from '../worlds/ship'
 import type { ShipState } from '../worlds/ship'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
@@ -79,11 +81,14 @@ export interface WorldState {
   hole: Point | null
   volcano: VolcanoState | null
   ship: ShipState | null
+  gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, gates: null }
 }
+
+const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
 
 export interface WorldHooks {
   readonly torus: boolean
@@ -115,6 +120,12 @@ export interface WorldHooks {
   center(sim: Sim): Point
   /** 把一个点收进敌人能站、能走到队伍的范围 */
   settle(sim: Sim, p: Point): Point
+  /** 这里此刻能不能冒出一只敌人：在能走的地面上、脚下没有要命的东西；只有出怪口挑落点时用 */
+  canSpawn(sim: Sim, x: number, y: number): boolean
+  /** 地图自己的地标，按组：出怪口里摆在同名地标上的从这里取，有的组只在某些时候有东西（火山口只在喷发时） */
+  landmarks(sim: Sim): Readonly<Record<string, readonly Landmark[]>>
+  /** 地面往哪边倾、倾多少：沿地面的重力占重力的比例，朝下坡；平地为零 */
+  slope(sim: Sim): Point
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }
@@ -196,6 +207,15 @@ const bounded: WorldHooks = {
   settle(sim, p) {
     const inset = SPAWN.edgeInset * UNIT
     return { x: Math.min(Math.max(p.x, inset), sim.mapW - inset), y: Math.min(Math.max(p.y, inset), sim.mapH - inset) }
+  },
+  canSpawn() {
+    return true
+  },
+  landmarks() {
+    return NO_MARKS
+  },
+  slope() {
+    return ZERO
   },
   onStart() {},
   tick() {},
@@ -641,7 +661,8 @@ function volcanoOf(sim: Sim): VolcanoState {
   if (!s) {
     const cfg = volcanoCfg(sim)
     const field = makeField(new Rng(sim.run.decorSeed ^ 0x7a1c), cfg, sim.mapW, sim.mapH, MAP.cameraMargin * UNIT)
-    s = { field, phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, spill: NO_SPILL, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
+    const vents = fumaroles(field, cfg, VENT_COUNT)
+    s = { field, vents, marks: volcanoMarks(field, cfg, vents), phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, spill: NO_SPILL, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
     sim.worldState.volcano = s
   }
   return s
@@ -714,6 +735,9 @@ function clearGround(sim: Sim, p: Point): boolean {
   return roomAt(f.basin, p.x, p.y) >= UNIT && !moltenAt(f, p.x, p.y)
 }
 
+/** 出怪口的落点离岩壁至少这么远：一只身体放得下 */
+const LANDING_ROOM = 0.5 * UNIT
+
 /**
  * 火山：能走的是崖壁围着的盆地，岩壁与山体是硬边界，身体走到跟前就停住、顺着壁面滑；火山定期喷发，
  * 熔岩按地势往四面八方流、离火山口越远凉得越快，盖住的地方敌我都受伤
@@ -747,6 +771,15 @@ const volcano: WorldHooks = {
   },
   settle(sim, p) {
     return keepOut(volcanoOf(sim).field.basin, p.x, p.y, SPAWN.edgeInset * UNIT)
+  },
+  canSpawn(sim, x, y) {
+    const f = volcanoOf(sim).field
+    return roomAt(f.basin, x, y) >= LANDING_ROOM && !moltenAt(f, x, y)
+  },
+  /** 火山口只在喷发时抛出东西 */
+  landmarks(sim) {
+    const s = volcanoOf(sim)
+    return s.phase === 'erupt' ? s.marks.erupt : s.marks.calm
   },
   onStart(sim) {
     volcanoOf(sim)
@@ -851,6 +884,17 @@ const ship: WorldHooks = {
   },
   settle(sim, p) {
     return keepOut(shipOf(sim).deck.basin, p.x, p.y, SPAWN.edgeInset * UNIT)
+  },
+  canSpawn(sim, x, y) {
+    return roomAt(shipOf(sim).deck.basin, x, y) >= LANDING_ROOM
+  },
+  landmarks(sim) {
+    return shipOf(sim).deck.marks
+  },
+  slope(sim) {
+    const s = shipOf(sim)
+    const g = (GRAVITY * UNIT) / shipCfg(sim).meterPerU
+    return { x: s.gx / g, y: s.gy / g }
   },
   onStart(sim) {
     shipOf(sim)

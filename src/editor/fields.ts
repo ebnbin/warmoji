@@ -7,7 +7,8 @@ import { TAGS } from '../data/tags'
 import { WAVE } from '../data/waves'
 import type { OutlineKind } from '../emoji/svg'
 import type { EnemyDef, EnemyKind } from '../types/enemies'
-import type { BatchRule, Between, GroupTraits, RunRules, Squad, StreamRule } from '../types/runs'
+import type { MapDef } from '../types/maps'
+import type { BatchRule, Between, GroupTraits, RunRules, SpawnAt, Squad, StreamRule } from '../types/runs'
 import { keysOf } from '../util/record'
 import { defaultTeam, isStage } from './draft'
 import type { Draft, End, Mutable, Phase, Stage, Step, Waves } from './draft'
@@ -149,9 +150,47 @@ function traitRows(g: Mutable<GroupTraits>): Row[] {
   ]
 }
 
-function squadRows(sq: Mutable<Squad>): Row[] {
+/** 站位怎么说 */
+function atText(at: SpawnAt | undefined, map: MapDef): { readonly label: string; readonly icon: string } {
+  if (!at) return { label: '看得见队伍', icon: ICON.near }
+  switch (at.kind) {
+    case 'far':
+      return { label: '远处', icon: ICON.far }
+    case 'ring':
+      return { label: '围一圈', icon: ICON.ring }
+    case 'behind':
+      return { label: '身后', icon: ICON.behind }
+    case 'point':
+      return { label: '定点', icon: ICON.point }
+    case 'gate':
+      return { label: `出怪口 · ${map.gates?.kinds[at.gate]?.name ?? `${at.gate}（这张图没有）`}`, icon: ICON.gate }
+  }
+}
+
+/** 一批敌人从哪来：看得见队伍、远处、围一圈、身后，或这张图的一种出怪口；有出怪口的地图上，前几种定下的点会吸附到附近的出怪口 */
+function atRows(g: { at?: Mutable<SpawnAt> }, map: MapDef): Row[] {
+  const at = g.at
+  const set = (v: Mutable<SpawnAt> | undefined): void => put(g, 'at', v)
+  const now = atText(at, map)
+  const options: Option[] = [
+    { emoji: ICON.near, label: '看得见队伍', chosen: at === undefined, run: () => set(undefined) },
+    { emoji: ICON.far, label: '远处', chosen: at?.kind === 'far', run: () => set({ kind: 'far' }) },
+    { emoji: ICON.ring, label: '围一圈', chosen: at?.kind === 'ring', run: () => set({ kind: 'ring', dist: 6 }) },
+    { emoji: ICON.behind, label: '身后', chosen: at?.kind === 'behind', run: () => set({ kind: 'behind', dist: 4 }) },
+    ...Object.entries(map.gates?.kinds ?? {}).map(
+      ([id, k]): Option => ({ emoji: ICON.gate, label: `出怪口 · ${k.name}`, chosen: at?.kind === 'gate' && at.gate === id, run: () => set({ kind: 'gate', gate: id }) }),
+    ),
+  ]
+  const hint = map.gates ? '定下的点会吸附到附近的出怪口，按出怪口的样子进场' : '这张图没有出怪口，敌人在定下的点原地冒出来'
+  const rows: Row[] = [field({ kind: 'pick', label: '站位', value: now.label, title: '选站位', options, icon: now.icon, hint })]
+  if (at?.kind === 'ring' || at?.kind === 'behind') rows.push(num('离队长', at.dist, { min: 1, max: 15, step: 0.5, format: unit('格') }, (v) => (at.dist = v), { sub: true }))
+  return rows
+}
+
+function squadRows(sq: Mutable<Squad>, map: MapDef): Row[] {
   return [
     groupEnemy(sq, true),
+    ...atRows(sq, map),
     num('只数', sq.count, { min: 1, max: 80, step: 1, format: unit('只') }, (v) => (sq.count = v)),
     num('精英', sq.elites ?? 0, { min: 0, max: Math.max(1, sq.count), step: 1, format: unit('只') }, (v) => put(sq, 'elites', v > 0 ? v : undefined), { hint: '前几只必是精英' }),
     num('放出用时', (sq.spreadMs ?? 0) / 1000, { min: 0, max: 20, step: 0.5, format: sec }, (v) => put(sq, 'spreadMs', v > 0 ? Math.round(v * 1000) : undefined), {
@@ -378,9 +417,10 @@ function phaseRows(t: Extract<Target, { kind: 'phase' }>, node: Node): Row[] {
   ]
 }
 
-function streamRows(s: Mutable<StreamRule>): Row[] {
+function streamRows(s: Mutable<StreamRule>, map: MapDef): Row[] {
   return [
     groupEnemy(s, false),
+    ...atRows(s, map),
     field({
       kind: 'choice',
       label: '间隔',
@@ -418,10 +458,10 @@ function streamRows(s: Mutable<StreamRule>): Row[] {
   ]
 }
 
-function batchRows(s: Mutable<BatchRule>): Row[] {
+function batchRows(s: Mutable<BatchRule>, map: MapDef): Row[] {
   return [
     num('登场', s.atMs / 1000, { min: 0, max: 600, step: 1, format: moment }, (v) => (s.atMs = v * 1000), { hint: '这一阶段开始后第几秒放出' }),
-    ...squadRows(s.squad),
+    ...squadRows(s.squad, map),
     flag('一再放出', s.every !== undefined, (on) => {
       put(s, 'every', on ? 30_000 : undefined)
       if (!on) delete s.times
@@ -447,7 +487,8 @@ function wavesRows(s: Waves, node: Node): Row[] {
 
 function spawnRows(t: Extract<Target, { kind: 'spawn' }>, node: Node): Row[] {
   const s = t.spawn
-  const own = s.kind === 'stream' ? streamRows(s) : s.kind === 'batch' ? batchRows(s) : wavesRows(s, node)
+  const map = MAPS[t.stage.map]
+  const own = s.kind === 'stream' ? streamRows(s, map) : s.kind === 'batch' ? batchRows(s, map) : wavesRows(s, node)
   return [...own, heading('这一条'), listActions(t.list, t.index, node, '这一条')]
 }
 
@@ -503,7 +544,7 @@ export function inspect(d: Draft, node: Node): Row[] {
     case 'spawn':
       return spawnRows(t, node)
     case 'squad':
-      return [...squadRows(t.squad), heading('这一组'), listActions(t.list, t.index, node, '这一组')]
+      return [...squadRows(t.squad, MAPS[t.stage.map]), heading('这一组'), listActions(t.list, t.index, node, '这一组')]
     case 'end':
       return [...endOwnRows(t.end), heading('这一条'), listActions(t.list, t.index, node, '这一条')]
   }

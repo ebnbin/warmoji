@@ -1,7 +1,7 @@
 import { query } from 'bitecs'
 import { remapPoint, remapVector, isHorizontal } from '../../utils/remap'
 import { Aim, Barrier, Drop, EDir, ENEMY_SET, Facing, Flyer, MARK, MARK_SLOTS, Mark, Minion, Motion, MOTION, Phys, PICKUP_SET, PROJ_SET, Shadow, Telegraph, Trace, Transform, Vel, VisOff, ZONE_SET } from '../../components'
-import { traces } from '../../store'
+import { telegraphEntry, traces } from '../../store'
 import type { Sim } from '../../sim'
 import type { Point } from '../../../util/vec'
 
@@ -76,7 +76,13 @@ export function remapSim(sim: Sim, fromW: number, fromH: number, toW: number, to
     moveVel(eid)
   }
   for (const eid of query(sim.world, PICKUP_SET)) movePos(eid)
-  for (const eid of query(sim.world, [Telegraph, Transform])) movePos(eid)
+  for (const eid of query(sim.world, [Telegraph, Transform])) {
+    movePos(eid)
+    const e = telegraphEntry[eid]
+    if (!e) continue
+    const from = map(e.sx, e.sy)
+    telegraphEntry[eid] = { ...e, sx: from.x, sy: from.y, x: Transform.x[eid]!, y: Transform.y[eid]! }
+  }
   for (const eid of query(sim.world, ZONE_SET)) movePos(eid)
   for (const eid of query(sim.world, [Minion, Transform])) movePos(eid)
   for (const eid of query(sim.world, [Shadow, Transform])) {

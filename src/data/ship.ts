@@ -10,6 +10,32 @@ export function bulgeU(h: Hull): number {
   return h.transomBulge * h.beamU
 }
 
+/** 甲板上的一个舱口，格：中心在船长方向 s 格处、船宽中线上，沿船长 len 格、横过船宽 wid 格 */
+export interface Hatch {
+  readonly s: number
+  readonly len: number
+  readonly wid: number
+}
+
+/** 相邻两根桅杆正中各一个格栅舱口 */
+export function hatchesOf(h: Hull): Hatch[] {
+  const at = [...h.masts].sort((a, b) => a - b).map((f) => f * h.lengthU)
+  return at.slice(1).map((b, i) => {
+    const a = at[i]!
+    return { s: (a + b) / 2, len: Math.min(3.4, (b - a) * 0.34), wid: Math.min(3, h.beamU * 0.17) }
+  })
+}
+
+/** 船尾舵轮在船长方向几格处 */
+export function helmOf(h: Hull): number {
+  return Math.max(1.6, h.stern * h.lengthU * 0.3)
+}
+
+/** 舵轮往船头 3.6 格的天窗，透着舱里的灯光 */
+export function skylightOf(h: Hull): Hatch {
+  return { s: helmOf(h) + 3.6, len: 1.6, wid: 1.2 }
+}
+
 /** 甲板在船长方向 s 格处的半宽，格：船尾横板的中线为 0、船首柱为 lengthU，甲板外为 0 */
 export function halfBeamAt(h: Hull, s: number): number {
   const half = h.beamU / 2

@@ -7,7 +7,7 @@ import type { Point } from '../../util/vec'
 import { leaderX, leaderY } from '../utils/team'
 import { POP } from '../../data/feel'
 import { startPop } from '../utils/pop'
-import type { DriveDef, EnemyDef, EnemyMixEntry, NpcDef } from '../../types/enemies'
+import type { DriveDef, EnemyDef, EnemyKind, EnemyMixEntry, NpcDef } from '../../types/enemies'
 import type { StatMods } from '../../types/stats'
 import type { OutlineKind } from '../../emoji/svg'
 import {
@@ -58,6 +58,8 @@ import { interrupt } from '../systems/shared/ability'
 import { addMark, hasMark } from '../utils/marks'
 import { foldBody, setStatLayer } from '../utils/stats'
 import { spawnTelegraph, telegraphCount } from './telegraph'
+import { gateEntry } from '../worlds/gates'
+import type { Entry } from '../worlds/gates'
 import type { SpawnTraits } from './telegraph'
 import { armIdle } from '../systems/shared/anim'
 import { ANIM_DEF } from '../../emoji/anim'
@@ -300,10 +302,10 @@ export function sightedSpawnPoint(sim: Sim): Point {
 /** 身后散开的扇面有多宽 */
 const BEHIND_ARC = 1.2
 
-/** 一只敌人的站位：不写就是看得见队伍的刷怪点，头目在远处；围圈按它在队里的次序均分一圈，身后按次序排成扇面 */
+/** 一只敌人的站位：不写（或指定的出怪口这张图没有）就是看得见队伍的刷怪点，头目在远处；围圈按它在队里的次序均分一圈，身后按次序排成扇面 */
 function foeSpot(sim: Sim, foe: FoeSpec, boss: boolean): Point {
   const at = foe.at
-  if (!at) return boss ? sim.hooks.spawnPoint(sim, true) : sightedSpawnPoint(sim)
+  if (!at || at.kind === 'gate') return boss ? sim.hooks.spawnPoint(sim, true) : sightedSpawnPoint(sim)
   const index = foe.index ?? 0
   const count = foe.count ?? 1
   switch (at.kind) {
@@ -326,6 +328,18 @@ function foeSpot(sim: Sim, foe: FoeSpec, boss: boolean): Point {
   }
 }
 
+/** 预兆打在哪；有出怪口的地图上这是落点，entry 是它从哪个出怪口、怎么进场 */
+export interface Spot extends Point {
+  readonly entry?: Entry
+}
+
+/** 一只敌人在哪预兆、从哪进场：先按站位定点；有出怪口的地图上交给出怪口去定，没有的地图就是站位那一点 */
+export function placeFoe(sim: Sim, foe: FoeSpec, kind: EnemyKind, boss: boolean): Spot {
+  if (!MAPS[sim.mapId].gates) return foeSpot(sim, foe, boss)
+  const entry = gateEntry(sim, foe.at, kind, boss, () => foeSpot(sim, foe, boss))
+  return { x: entry.x, y: entry.y, entry }
+}
+
 /** 按要求预告一只敌人：种类不指定就按它这一批的配比抽，再没有就按这一阶段的；要带效果的从地图的效果池里抽；头目预告得久、现身时轰一声 */
 export function telegraphOne(sim: Sim, foe: FoeSpec): void {
   const raw = foe.enemy ?? pickEnemy(foe.mix ?? currentMix(sim), () => sim.rng.next())
@@ -334,10 +348,10 @@ export function telegraphOne(sim: Sim, foe: FoeSpec): void {
   const chance = foe.chance ?? 0
   const elite = !boss && (foe.elite === true || (chance > 0 && sim.rng.next() < chance))
   const hp = Math.round(def.hp * foe.hpMul)
-  const pos = foeSpot(sim, foe, boss)
+  const pos = placeFoe(sim, foe, raw.kind, boss)
   const carries = foe.carry ? rollCarry(sim.mapId, foe.carry, () => sim.rng.next()) : undefined
   const traits: SpawnTraits = { stats: foe.stats, huntLeader: foe.huntLeader, loot: foe.loot, carries }
-  const t = spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, boss, traits, boss ? SPAWN.telegraphMs * 1.6 : SPAWN.telegraphMs)
+  const t = spawnTelegraph(sim, def, pos.x, pos.y, hp, elite, boss, traits, boss ? SPAWN.telegraphMs * 1.6 : SPAWN.telegraphMs, pos.entry)
   if (boss) Telegraph.loud[t] = 1
   if (foe.bounty) {
     addComponent(sim.world, t, Bounty)
@@ -363,19 +377,21 @@ export function markBounty(sim: Sim, eid: number): void {
 
 export function spawnBoss(sim: Sim): void {
   if (sim.over) return
-  const def = toPx(bossFor(sim.mapId))
-  const pos = sim.hooks.spawnPoint(sim, true)
-  const t = spawnTelegraph(sim, def, pos.x, pos.y, def.hp, false, true, {}, SPAWN.telegraphMs * 1.6)
+  const raw = bossFor(sim.mapId)
+  const def = toPx(raw)
+  const pos = placeFoe(sim, { hpMul: 1 }, raw.kind, true)
+  const t = spawnTelegraph(sim, def, pos.x, pos.y, def.hp, false, true, {}, SPAWN.telegraphMs * 1.6, pos.entry)
   Telegraph.loud[t] = 1
 }
 
 export function spawnCarrier(sim: Sim, pickup: FieldPickupDef): void {
   if (sim.over) return
   if (foeCount(sim) + telegraphCount(sim) >= SPAWN.maxAlive) return
-  const def = toPx(pickEnemy(currentMix(sim), () => sim.rng.next()))
+  const raw = pickEnemy(currentMix(sim), () => sim.rng.next())
+  const def = toPx(raw)
   const hp = Math.round(def.hp * clockWave(sim).hpMultiplier)
-  const pos = sightedSpawnPoint(sim)
-  spawnTelegraph(sim, def, pos.x, pos.y, hp, false, false, { carries: pickup })
+  const pos = placeFoe(sim, { hpMul: 1 }, raw.kind, false)
+  spawnTelegraph(sim, def, pos.x, pos.y, hp, false, false, { carries: pickup }, SPAWN.telegraphMs, pos.entry)
 }
 
 /** 变形：换外观、打断动作、解除锚定并记在标记里；变形期间与结束后一段时间免疫再次变形；脆弱是同期的承伤标记 */

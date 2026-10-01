@@ -3,7 +3,9 @@ import { newEntity } from './entity'
 import { UNIT } from '../../util/units'
 import { SPAWN } from '../../data/enemies'
 import { Due, Telegraph } from '../components'
-import { telegraphDef, telegraphTraits } from '../store'
+import { telegraphDef, telegraphEntry, telegraphTraits } from '../store'
+import { entranceMs } from '../worlds/gates'
+import type { Entry } from '../worlds/gates'
 import { attachDrawable } from './drawable'
 import type { EnemyDef } from '../../types/enemies'
 import type { FieldPickupDef } from '../../types/battlefield'
@@ -21,6 +23,16 @@ export interface SpawnTraits {
 
 const MARK_Z = 4
 
+/** 从出怪口进场的预兆至少打这么久，看得清落在哪 */
+const MIN_MARK_MS = 300
+
+/** 预兆打多久：突袭时只有头目打；从出怪口进场的扣掉进场动作的时长，落地时正好是原本现身的时刻，进场动作太长的也至少打一会儿 */
+export function telegraphDelay(sim: Sim, boss: boolean, delayMs: number, entry: Entry | undefined): number {
+  if (sim.fight.rules.surprise && !boss) return 0
+  return entry ? Math.max(MIN_MARK_MS, delayMs - entranceMs(entry)) : delayMs
+}
+
+/** 在 (x, y) 打预兆；entry 是从出怪口进场的样子，此时 (x, y) 是它的落点 */
 export function spawnTelegraph(
   sim: Sim,
   def: EnemyDef,
@@ -31,6 +43,7 @@ export function spawnTelegraph(
   boss: boolean,
   traits: SpawnTraits = {},
   delayMs = SPAWN.telegraphMs,
+  entry?: Entry,
 ): number {
   const eid = newEntity(sim.world)
   addComponents(sim.world, eid, Telegraph, Due)
@@ -38,9 +51,10 @@ export function spawnTelegraph(
   Telegraph.elite[eid] = elite ? 1 : 0
   Telegraph.boss[eid] = boss ? 1 : 0
   Telegraph.bornMs[eid] = sim.elapsedMs
-  Due.at[eid] = sim.elapsedMs + (sim.fight.rules.surprise && !boss ? 0 : delayMs)
+  Due.at[eid] = sim.elapsedMs + telegraphDelay(sim, boss, delayMs, entry)
   telegraphDef[eid] = def
   telegraphTraits[eid] = traits
+  telegraphEntry[eid] = entry
   attachDrawable(sim.world, eid, sim.frames, {
     id: SPAWN.markEmoji,
     outline: undefined,

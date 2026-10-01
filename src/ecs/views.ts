@@ -24,16 +24,17 @@ import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynigh
 import { onFloe } from './worlds/ice'
 import { driftSpeed, riverRect } from './worlds/river'
 import { fitAspectRect } from './worlds/torus'
-import { drawBomb, drawPuff, drawSpark, encodeLava, fumaroles, GROUND_TILE, groundPpc, LAVA_FRAG, lavaShown, markGround } from './render/volcano'
+import { drawBomb, drawPuff, drawSpark, encodeLava, GROUND_TILE, groundPpc, LAVA_FRAG, lavaShown, markGround } from './render/volcano'
 import type { CellRect, GroundPiece, LavaShown } from './render/volcano'
 import { GroundPainter } from './render/groundPainter'
 import { effusion } from './worlds/volcano'
 import { roomAt } from './worlds/basin'
+import { gatesNow } from './worlds/gates'
 import { DECK_PPU, deckFrame, drawEdgeField, drawRig, EDGE_PPU, drawRigShadow, drawWaveTile, paintDeck, paintWet, rigOf, SEA_FRAG, SHADOW_PER_U, WAVE_TILE, WET_PPU } from './render/ship'
 import { SUN } from '../data/light'
 import { deckPoint, makeDeck as makeDeckFrame, shipSizeU } from './worlds/ship'
 import type { ShipState } from './worlds/ship'
-import { GRAVITY, halfBeamAt } from '../data/ship'
+import { GRAVITY, halfBeamAt, skylightOf } from '../data/ship'
 import type { ShipConfig } from '../types/maps'
 import type { EruptionPhase, VolcanoState } from './worlds/volcano'
 import { playSfx } from '../audio/sfx'
@@ -1019,10 +1020,13 @@ class VolcanoView extends BoundedView {
     const f = s.field
     const cfg = v.def.volcano!
     const scene = v.scene
-    const vents = fumaroles(f, cfg, 5)
+    const vents = s.vents
     const ppc = groundPpc(cfg)
     const field = { basin: f.basin, cols: f.cols, rows: f.rows, cell: f.cell, x0: f.x0, y0: f.y0, ground: f.ground, rockAt: f.rockAt, craterX: f.craterX, craterY: f.craterY, seed: f.seed }
-    const painter = new GroundPainter(field, cfg, vents, ppc, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
+    const caves = gatesNow(sim)
+      .filter((g) => g.def.at.kind === 'nooks')
+      .map((g) => ({ x: g.ax, y: g.ay, nx: g.nx, ny: g.ny, r: g.r }))
+    const painter = new GroundPainter(field, cfg, { vents, caves }, ppc, Math.max(1, Math.min(PAINT_THREADS, navigator.hardwareConcurrency - 1)))
     this.painter = painter
     const tex = canvasTexture(scene, GROUND_KEY, f.cols * ppc, f.rows * ppc)
     const rows = Array.from({ length: f.rows }, (_, r): CellRect => ({ c0: 0, r0: r, c1: f.cols, r1: r + 1 }))
@@ -1668,7 +1672,7 @@ class ShipView extends BoundedView {
       this.lanterns.push({ ...hg, across: 0, along: 0, vAcross: 0, vAlong: 0, body, glow, pool, flicker: rng.next() * 10 })
       this.visuals.push(pool, glow, body)
     }
-    const sky = deckPoint(deck, Math.max(1.6, h.stern * h.lengthU * 0.3) + 3.6, 0)
+    const sky = deckPoint(deck, skylightOf(h).s, 0)
     this.visuals.push(scene.add.image(sky.x, sky.y, SHIP_GLOW_KEY).setDepth(-0.7).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffa850).setAlpha(0.35).setScale((3 * UNIT) / 64))
     for (let i = 0; i < 3; i++) {
       const m = masts[Math.floor(rng.next() * masts.length)]!
