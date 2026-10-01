@@ -34,9 +34,11 @@ function buildOf(cfg: RiverConfig, radius: number, massMul: number): Build {
   return BUILD
 }
 
-/** 水对身体的力，牛：F = ½ρ·Cd·(宽 × 没进水里的高)·|w − v|·(w − v)，w 是水速、v 是身体的速度，米/秒 */
+/** dragOn 算出的力，牛 */
 let FX = 0
 let FY = 0
+
+/** 水对身体的力 F = ½ρ·Cd·(宽 × 没进水里的高)·|w − v|·(w − v)：c 是 ½ρ·Cd·迎水面积，w 是水速、v 是身体的速度，米/秒 */
 function dragOn(c: number, wx: number, wy: number, vx: number, vy: number): void {
   const rx = wx - vx
   const ry = wy - vy

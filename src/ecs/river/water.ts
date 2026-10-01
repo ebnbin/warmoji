@@ -51,6 +51,7 @@ function designAt(plan: RiverPlan, x: number, y: number, tmp: Along): { r: Reach
   return best ? { r: best, level, edge } : null
 }
 
+/** hll 算出的界面通量：质量、法向动量、切向动量 */
 let FH = 0
 let FN = 0
 let FT = 0
@@ -283,13 +284,14 @@ export function solveWater(cfg: RiverConfig, plan: RiverPlan): Water {
   return { cols, rows, cell: WATER_CELL_U, z: zf, h: hf, u: uf, v: vf, sink }
 }
 
-/** 水在 (x, y) 格处的水深（米）与流速（米/秒），按格心双线性插值 */
+/** 水深（米）与流速（米/秒，地图坐标） */
 export interface Flow {
   h: number
   u: number
   v: number
 }
 
+/** 水在 (x, y) 格处的水深与流速，按格心双线性插值 */
 export function flowAt(w: Water, x: number, y: number, out: Flow): Flow {
   const fu = Math.min(w.cols - 1.001, Math.max(0, x / w.cell - 0.5))
   const fv = Math.min(w.rows - 1.001, Math.max(0, y / w.cell - 0.5))

@@ -10,7 +10,7 @@ const DEG = Math.PI / 180
 /** 中线按这个弧长间隔取点，格 */
 const STEP_U = 0.2
 /** 地形铺到地图外多远，格：镜头边距再加设备安全区 */
-export const TERRAIN_PAD_U = 6
+const TERRAIN_PAD_U = 6
 /** 能走的地面按这么细的格子算距离场，格 */
 const BASIN_CELL_U = 0.25
 /** 上游的溪沟与下游的深谷从崖边往外伸多长，格：伸出镜头能看到的范围 */
@@ -73,7 +73,7 @@ export interface Reach {
 }
 
 /** 进水口：瀑布落在崖脚 (x, y)，朝空地里的方向 (nx, ny)；崖下深潭的中心与半径，格 */
-export interface Inlet {
+interface Inlet {
   readonly x: number
   readonly y: number
   readonly nx: number
@@ -81,13 +81,12 @@ export interface Inlet {
   readonly poolX: number
   readonly poolY: number
   readonly poolR: number
-  /** 落下的水帘半宽，格；崖顶溪沟的水面高程，米 */
+  /** 落下的水帘半宽，格 */
   readonly half: number
-  readonly top: number
 }
 
 /** 出水口：断崖边的中点、朝外（水流）方向、断崖边上水面半宽（格）与那里的设计水面高程（米） */
-export interface Outlet {
+interface Outlet {
   readonly x: number
   readonly y: number
   readonly nx: number
@@ -114,7 +113,7 @@ export interface Boulder {
 
 /**
  * 地形，格子 (0, 0) 的左上角在 (x0, y0) 格：高程（米）；画地面用的几张场：最近那段河道（或崖上溪沟）的设计水位（米）、
- * 离它水边多远（格，水里为负）、凸岸边滩有多显，离空地边多远（格，空地里为正）、林子的浓度、台地的高低（占崖高的比例）、离深谷边多远（格，谷里为正）
+ * 离它水边多远（格，水里为负）、凸岸边滩有多显，离空地边多远（格，空地里为正）、林子的浓度、离深谷边多远（格，谷里为正）
  */
 export interface Terrain {
   readonly cols: number
@@ -128,12 +127,11 @@ export interface Terrain {
   readonly bar: Float32Array
   readonly clear: Float32Array
   readonly forest: Float32Array
-  readonly up: Float32Array
   readonly gorge: Float32Array
 }
 
 /** 空地的轮廓：半径按方位角的谐波起伏，再加二维噪声的起伏；出入口两侧的噪声压平；进水口处另挖一个半圆的崖湾 */
-export interface Shape {
+interface Shape {
   readonly cx: number
   readonly cy: number
   readonly r0: number
@@ -150,7 +148,6 @@ export interface Shape {
  * 地形高程、能走的地面（像素，含河面与断崖外那一小段）、树与石头，开局时队伍站的地方
  */
 export interface RiverPlan {
-  readonly seed: number
   readonly w: number
   readonly h: number
   readonly shape: Shape
@@ -164,12 +161,6 @@ export interface RiverPlan {
   readonly trees: readonly Tree[]
   readonly boulders: readonly Boulder[]
   readonly start: Point
-  /** 能走的地面（含河面）有多大，格² */
-  readonly area: number
-  /** 林子与岩石的分界噪声的种子；进水口的方位与它背后台地满高的半张角，弧度 */
-  readonly forestSeed: number
-  readonly aIn: number
-  readonly span: number
 }
 
 function radiusAt(sh: Shape, a: number): number {
@@ -333,7 +324,7 @@ function conveyanceShape(p: number): number {
  * 按流量定河道：水面宽 W = a·√Q、平均水深 D = c·Q^0.4，断面 1 − |ξ|^p 的最深处是平均的 (p+1)/p 倍；
  * 坡降按曼宁公式 Q = (1/n)·∫h^(5/3)dy·√S 反算，宽浅河道的水力半径取当地水深
  */
-export function hydraulics(cfg: RiverConfig, q: number): { half: number; dmax: number; slope: number; speed: number } {
+function hydraulics(cfg: RiverConfig, q: number): { half: number; dmax: number; slope: number; speed: number } {
   const f = cfg.flow
   const W = f.widthCoef * Math.sqrt(q)
   const D = f.depthCoef * q ** 0.4
@@ -394,8 +385,12 @@ export function project(r: Reach, x: number, y: number, out: Along): Along {
   const n = r.x.length
   let best = Infinity
   let bi = 0
-  const scan = (from: number, to: number, step: number): void => {
-    for (let i = from; i <= to; i += step) {
+  for (let pass = 0; pass < 2; pass++) {
+    const from = pass === 0 ? 0 : Math.max(0, bi - PROBE)
+    const to = pass === 0 ? n - 1 + PROBE : Math.min(n - 1, bi + PROBE)
+    const step = pass === 0 ? PROBE : 1
+    for (let k = from; k <= to; k += step) {
+      const i = Math.min(k, n - 1)
       const dx = x - r.x[i]!
       const dy = y - r.y[i]!
       const d = dx * dx + dy * dy
@@ -405,9 +400,6 @@ export function project(r: Reach, x: number, y: number, out: Along): Along {
       }
     }
   }
-  scan(0, n - 1, PROBE)
-  scan(n - 1, n - 1, 1)
-  scan(Math.max(0, bi - PROBE), Math.min(n - 1, bi + PROBE), 1)
   let bestD = Infinity
   for (let i = Math.max(0, bi - 1); i <= Math.min(n - 2, bi); i++) {
     const ax = r.x[i]!
@@ -444,7 +436,7 @@ export function at(a: Float64Array, p: Along): number {
 }
 
 /** 断面上 ξ（半宽的倍数，朝左为正）处的水深占深泓的比例：深泓在 c，两侧按 1 − |u|^p 收到岸边为零 */
-export function profile(xi: number, c: number, p: number): number {
+function profile(xi: number, c: number, p: number): number {
   const u = xi >= c ? (xi - c) / (1 - c) : (c - xi) / (1 + c)
   return u >= 1 ? 0 : 1 - u ** p
 }
@@ -472,7 +464,7 @@ function reachGround(cfg: RiverConfig, r: Reach, p: Along): number {
  * 进水口背后的台地有多高（占崖高的比例）：从空地中心看去在进水口方位两侧 span 以内满高，再往外半个弧度降到零；
  * 崖上溪沟的岸外三格以内也是台地，溪沟一路伸出镜头
  */
-export function upland(plan: Pick<RiverPlan, 'shape' | 'upstream'>, aIn: number, span: number, x: number, y: number, tmp: Along): number {
+function upland(plan: Pick<RiverPlan, 'shape' | 'upstream'>, aIn: number, span: number, x: number, y: number, tmp: Along): number {
   const a = Math.atan2(y - plan.shape.cy, x - plan.shape.cx)
   const sector = smooth(span + 0.5, span, Math.abs(wrapAngle(a - aIn)))
   if (sector >= 1 || !nearBox(plan.upstream, x, y, 9)) return sector
@@ -522,14 +514,14 @@ export function stoneAt(seed: number, x: number, y: number, out: Stone): Stone {
 }
 
 /** 林子还是岩石：二维噪声大于阈值是林子；崖与深谷一带都是岩石 */
-export function forestness(cfg: RiverConfig, seed: number, x: number, y: number): number {
+function forestness(cfg: RiverConfig, seed: number, x: number, y: number): number {
   const n = fbm(x / 7 + 3.1, y / 7 + 11.7, seed, 3)
   const t = 1 - cfg.trees.forest
   return smooth(t - 0.035, t + 0.035, n * 0.5 + 0.25 + (fbm(x / 2.2, y / 2.2, seed + 17, 2) - 0.5) * 0.12)
 }
 
 /** 离一组深谷多近：深谷里（从断崖边往外、在谷宽以内）为正，格 */
-export function gorgeDepthAt(plan: Pick<RiverPlan, 'gorges'>, x: number, y: number, tmp: Along): number {
+function gorgeDepthAt(plan: Pick<RiverPlan, 'gorges'>, x: number, y: number, tmp: Along): number {
   let best = -Infinity
   for (const g of plan.gorges) {
     if (!nearBox(g, x, y, 4)) continue
@@ -653,7 +645,7 @@ function network(cfg: RiverConfig, rng: Rng, r0: number, seed: number): Draft | 
     }
     return g
   })
-  const inlet: Inlet = { x: foot.x, y: foot.y, nx: -nIn.x, ny: -nIn.y, poolX: pool.x, poolY: pool.y, poolR, half: main.half * 0.75, top: cfg.falls.cliffM }
+  const inlet: Inlet = { x: foot.x, y: foot.y, nx: -nIn.x, ny: -nIn.y, poolX: pool.x, poolY: pool.y, poolR, half: main.half * 0.75 }
   return { shape, reaches, upstream, gorges, inlet, outlets, aIn, span: (bayR * 1.3 + 2.5) / r0 }
 }
 
@@ -704,7 +696,6 @@ function terrainOf(cfg: RiverConfig, d: Draft, forestSeed: number, x0: number, y
   const barF = new Float32Array(n)
   const clear = new Float32Array(n)
   const forest = new Float32Array(n)
-  const upF = new Float32Array(n)
   const gorge = new Float32Array(n)
   const tmp: Along = { i: 0, t: 0, s: 0, n: 0, d: 0 }
   const f = cfg.flow
@@ -767,11 +758,10 @@ function terrainOf(cfg: RiverConfig, d: Draft, forestSeed: number, x0: number, y
       barF[i] = bar
       clear[i] = inside
       forest[i] = fo
-      upF[i] = up
       gorge[i] = Math.max(-20, gd)
     }
   }
-  return { cols, rows, cell, x0, y0, z, level, edge: edgeF, bar: barF, clear, forest, up: upF, gorge }
+  return { cols, rows, cell, x0, y0, z, level, edge: edgeF, bar: barF, clear, forest, gorge }
 }
 
 /** 石头顶出地面：圆顶，边上贴着地面 */
@@ -810,7 +800,7 @@ export function heightAt(t: Terrain, x: number, y: number): number {
 }
 
 /** 离河道多远：到最近一段河道水边的距离，格，水里为负 */
-export function waterEdgeAt(reaches: readonly Reach[], x: number, y: number, tmp: Along): number {
+function waterEdgeAt(reaches: readonly Reach[], x: number, y: number, tmp: Along): number {
   let best = Infinity
   for (const r of reaches) {
     project(r, x, y, tmp)
@@ -1124,8 +1114,8 @@ export function riverPlan(cfg: RiverConfig, seed: number): RiverPlan {
   const terrain = terrainOf(cfg, d, forestSeed, -TERRAIN_PAD_U, -TERRAIN_PAD_U, Math.ceil((w + TERRAIN_PAD_U * 2) / cfg.cellU), Math.ceil((h + TERRAIN_PAD_U * 2) / cfg.cellU))
   const boulders = k!.boulders.map((b) => (Number.isNaN(b.top) ? { ...b, top: heightAt(terrain, b.x, b.y) + between(rng, cfg.rocks.heightM) } : b))
   stampBoulders(terrain, boulders)
-  const { basin, area } = measured(cfg, { ...k!, boulders }, BASIN_CELL_U)
-  const plan: RiverPlan = { ...d, seed, w, h, terrain, basin, trees, boulders, start, area, forestSeed }
+  const { basin } = measured(cfg, { ...k!, boulders }, BASIN_CELL_U)
+  const plan: RiverPlan = { w, h, shape: d.shape, reaches: d.reaches, upstream: d.upstream, gorges: d.gorges, inlet: d.inlet, outlets: d.outlets, terrain, basin, trees, boulders, start }
   last = { cfg, seed, plan }
   return plan
 }

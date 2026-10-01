@@ -8,12 +8,12 @@ import type { RiverConfig } from '../../types/maps'
 export const Z_MIN = -12
 export const Z_SPAN = 20
 /** 流速按 ±这么多（米/秒）编码进一个通道 */
-export const SPEED_SPAN = 4
+const SPEED_SPAN = 4
 /** 干地上的水位从有水的格子往外推几圈：岸线才按地形的细格子切出来 */
 const SPREAD = 4
 
 /** 给水面着色器的三张数据图，不透明（画布会按透明度预乘，数据必须满 alpha）：地形高程（细格子）、水面高程、流速与乱流 */
-export interface WaterImages {
+interface WaterImages {
   readonly bed: Uint8ClampedArray<ArrayBuffer>
   readonly bedCols: number
   readonly bedRows: number

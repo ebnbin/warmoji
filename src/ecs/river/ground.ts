@@ -100,7 +100,7 @@ function terrainShade(sc: PaintScene): Float32Array {
 }
 
 /** 树按位置分桶：键是桶的行列 */
-export interface TreeIndex {
+interface TreeIndex {
   readonly cols: number
   readonly x0: number
   readonly y0: number
