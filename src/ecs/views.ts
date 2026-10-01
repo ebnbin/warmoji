@@ -22,7 +22,7 @@ import { leaderX, leaderY } from './utils/team'
 import { spawnDriftDecor } from './entities/decor'
 import { fogAlphaAt, fogRadiusAt, hourAt, visionGridsAt } from './worlds/daynight'
 import { onFloe } from './worlds/ice'
-import { driftSpeed, riverRect } from './worlds/river'
+import { driftSpeed, riverRect } from './worlds/oldRiver'
 import { fitAspectRect } from './worlds/torus'
 import { drawBomb, drawPuff, drawSpark, encodeLava, fumaroles, GROUND_TILE, groundPpc, LAVA_FRAG, lavaShown, markGround } from './render/volcano'
 import type { CellRect, GroundPiece, LavaShown } from './render/volcano'
@@ -553,18 +553,18 @@ class RuinsView extends BoundedView {
   }
 }
 
-class RiverView extends SingleScreenView {
+class OldRiverView extends SingleScreenView {
   private waveTiles: { tile: Phaser.GameObjects.TileSprite; speed: number }[] = []
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
-    const s = v.def.river!.viewScale
+    const s = v.def.oldRiver!.viewScale
     const w = viewport.logicalWidth * s
     const h = viewport.logicalHeight * s
     return { w, h, origin: { x: w / 2, y: h / 2 } }
   }
 
   build(v: ViewCtx): void {
-    const cfg = v.def.river!
+    const cfg = v.def.oldRiver!
     const vw = v.w
     const vh = v.h
     const r = riverRect(vw, vh, cfg.width * UNIT)
@@ -634,12 +634,12 @@ class RiverView extends SingleScreenView {
 
   camera(v: ViewCtx): void {
     const cam = v.scene.cameras.main
-    cam.setZoom(viewport.renderScale / v.def.river!.viewScale)
+    cam.setZoom(viewport.renderScale / v.def.oldRiver!.viewScale)
     cam.centerOn(v.w / 2, v.h / 2)
   }
 
   decor(v: ViewCtx, atlas: EcsAtlas): void {
-    const cfg = v.def.river!
+    const cfg = v.def.oldRiver!
     const r = riverRect(v.w, v.h, cfg.width * UNIT)
     const horizontal = r.horizontal
     const alongLen = horizontal ? v.w : v.h
@@ -711,7 +711,7 @@ class RiverView extends SingleScreenView {
   }
 
   step(v: ViewCtx, _sim: Sim, delta: number): void {
-    const cfg = v.def.river!
+    const cfg = v.def.oldRiver!
     const dt = delta / 1000
     const r = riverRect(v.w, v.h, cfg.width * UNIT)
     for (const w of this.waveTiles) {
@@ -1837,7 +1837,7 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   daynight: () => new DayNightView(),
   ruins: () => new RuinsView(),
   ice: () => new IceView(),
-  river: () => new RiverView(),
+  oldRiver: () => new OldRiverView(),
   void: () => new TorusView(),
   space: () => new SpaceView(),
   nebula: () => new NebulaView(),

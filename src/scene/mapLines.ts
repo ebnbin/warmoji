@@ -3,7 +3,7 @@ import type { MapDef } from '../types/maps'
 
 const MAP_PLAY_LABEL: Record<MapDef['kind'], string> = {
   bounded: '有界竞技场：方形场地，边界围合',
-  river: '奔流河道：万物随水流漂移，逆流而战',
+  oldRiver: '奔流河道：万物随水流漂移，逆流而战',
   void: '环面战场：四壁皆传送门，出这头即现那头',
   ruins: '断壁废墟：墙挡人 / 挡弹 / 挡视线，靠掩体与探头作战',
   daynight: '昼夜原野：30×30 有界，视野随时间涨落——正午纵览全场、午夜相机收窄并四合迷雾；昼夜各出一批怪',
@@ -21,7 +21,7 @@ const pct = (v: number): string => `${Math.round(v * 100)}%`
 export function mapStaminaLine(def: MapDef): string {
   const s = def.stamina
   const parts = [`赶路每走一格耗 ${num(s.exertion)} 点，歇着回复 ×${num(s.regen)}`]
-  if (def.river) parts.push(`逆流 ×${num(def.river.upstream)}、顺流 ×${num(def.river.downstream)}`)
+  if (def.oldRiver) parts.push(`逆流 ×${num(def.oldRiver.upstream)}、顺流 ×${num(def.oldRiver.downstream)}`)
   if (def.ice) parts.push(`落水后每格耗 ${num(def.ice.waterExertion)} 点、回复 ×${num(def.ice.waterRegen)}`)
   if (def.ship) parts.push('甲板倾斜时按恒定功率赶路，每秒耗的不变：上坡走得慢、每格更费，下坡快到顶就刹着走、耗得少')
   return `体力：${parts.join('；')}（敌我通吃）`

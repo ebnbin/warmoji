@@ -171,11 +171,11 @@ export const MAPS = {
     finalWaveSub: '蝎王不知疲倦，你会累——别在流沙里挣扎！',
     boss: 'scorpion',
   },
-  river: {
+  oldRiver: {
     emoji: '1f30a',
-    name: '奔流',
+    name: '奔流（旧）',
     desc: '一条永不停歇的大河，万物皆随波逐流；两岸静看你逆流而战',
-    kind: 'river',
+    kind: 'oldRiver',
     stamina: { exertion: 0.5, regen: 1 },
     palette: {
       bgFrom: 'hsl(28 32% 30%)',
@@ -192,7 +192,7 @@ export const MAPS = {
     drift: ['1f343', '1f338', '1fae7', '1f342'],
     mix: RIVER_MIX,
     finalWaveSub: '大河没有退路，正面迎战！',
-    river: {
+    oldRiver: {
       viewScale: 1.2,
       width: 12,
       flow: 1,

@@ -268,7 +268,7 @@ export interface ShipConfig {
     readonly restitution: number
   }
 }
-export interface RiverConfig {
+export interface OldRiverConfig {
   readonly viewScale: number
   readonly width: number
   readonly flow: number
@@ -294,7 +294,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula' | 'volcano' | 'ship'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula' | 'volcano' | 'ship'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -310,7 +310,7 @@ export interface MapDef {
   readonly nebula?: NebulaConfig
   readonly volcano?: VolcanoConfig
   readonly ship?: ShipConfig
-  readonly river?: RiverConfig
+  readonly oldRiver?: OldRiverConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
