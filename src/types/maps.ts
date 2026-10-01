@@ -59,8 +59,8 @@ export interface SpaceConfig {
     readonly damage: number
   }
 }
-/** 星云：圆心在原点的空心厚球壳，空腔里有一个黑洞，引力按普卢默软化的万有引力 g = GM·r/(r²+ε²)^{3/2} 作用于一切 */
-export interface NebulaConfig {
+/** 旧星云：圆心在原点的空心厚球壳，空腔里有一个黑洞，引力按普卢默软化的万有引力 g = GM·r/(r²+ε²)^{3/2} 作用于一切 */
+export interface NebulaOldConfig {
   /** 壳层的引力按牛顿壳层定理：空腔里为零，壳层里只算内侧那部分质量，外缘以外如同全部质量在中心 */
   readonly shell: {
     readonly innerU: number
@@ -294,7 +294,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula' | 'volcano' | 'ship'
+  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'volcano' | 'ship'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -307,7 +307,7 @@ export interface MapDef {
   readonly dayNight?: DayNightConfig
   readonly ice?: IceConfig
   readonly space?: SpaceConfig
-  readonly nebula?: NebulaConfig
+  readonly nebulaOld?: NebulaOldConfig
   readonly volcano?: VolcanoConfig
   readonly ship?: ShipConfig
   readonly river?: RiverConfig

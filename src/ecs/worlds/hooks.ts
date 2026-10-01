@@ -4,10 +4,10 @@ import { SPAWN } from '../../data/enemies'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
 import { MAP, MAPS } from '../../data/maps'
-import type { IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
+import type { IceConfig, MapDef, MapId, NebulaOldConfig, RiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
-import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebula'
+import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebulaOld'
 import { around, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava } from '../worlds/volcano'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import type { Basin } from '../worlds/basin'
@@ -458,18 +458,18 @@ const space: WorldHooks = {
   },
 }
 
-function nebulaCfg(sim: Sim): NebulaConfig {
-  return MAPS[sim.mapId].nebula!
+function nebulaOldCfg(sim: Sim): NebulaOldConfig {
+  return MAPS[sim.mapId].nebulaOld!
 }
 
 /** 空腔的边：壳层从这里开始 */
-function nebulaWall(sim: Sim): number {
-  return nebulaCfg(sim).shell.innerU * UNIT
+function nebulaOldWall(sim: Sim): number {
+  return nebulaOldCfg(sim).shell.innerU * UNIT
 }
 
 /** 黑洞的位置由布景种子定下，视图从这里读 */
 function holeOf(sim: Sim): Point {
-  if (!sim.worldState.hole) sim.worldState.hole = holeAt(new Rng(sim.run.decorSeed ^ 0x6e62), nebulaCfg(sim))
+  if (!sim.worldState.hole) sim.worldState.hole = holeAt(new Rng(sim.run.decorSeed ^ 0x6e62), nebulaOldCfg(sim))
   return sim.worldState.hole
 }
 
@@ -478,7 +478,7 @@ const METEOR_TINT = 0xffaa33
 
 /** 中心进了视界的都被吞噬：角色倒下，敌人与召唤出的身体死去，掉落物、蜜蜂、弹体消失；穿行中没有实体，不吞 */
 function swallow(sim: Sim): void {
-  const cfg = nebulaCfg(sim)
+  const cfg = nebulaOldCfg(sim)
   const hole = holeOf(sim)
   const inside = (eid: number): boolean => inHorizon(hole, cfg, Transform.x[eid]!, Transform.y[eid]!)
   const src = hazardSource('blackhole', HOLE_TINT)
@@ -507,8 +507,8 @@ function swallow(sim: Sim): void {
 }
 
 /** 壳层落下的碎块从内壁冲进空腔，初速对准队长身旁的瞄准点，之后只受引力 */
-function launchNebulaMeteor(sim: Sim): void {
-  const cfg = nebulaCfg(sim)
+function launchNebulaOldMeteor(sim: Sim): void {
+  const cfg = nebulaOldCfg(sim)
   const mc = cfg.meteor
   const a = sim.rng.next() * Math.PI * 2
   const dx = Math.cos(a)
@@ -523,8 +523,8 @@ function launchNebulaMeteor(sim: Sim): void {
 }
 
 /** 流星本体扫到的敌我各挨一下，伤害与此刻的动能成正比，即随速度的平方变化 */
-function nebulaMeteorStrike(sim: Sim, m: number, x: number, y: number, speed: number): void {
-  const mc = nebulaCfg(sim).meteor
+function nebulaOldMeteorStrike(sim: Sim, m: number, x: number, y: number, speed: number): void {
+  const mc = nebulaOldCfg(sim).meteor
   const rr = mc.radiusU * UNIT
   const damage = mc.damage * (speed / (mc.speedU * UNIT)) ** 2
   const struck = meteorHit[m]!
@@ -538,13 +538,13 @@ function nebulaMeteorStrike(sim: Sim, m: number, x: number, y: number, speed: nu
   for (const eid of [...query(sim.world, ENEMY_SET)]) strike(eid)
 }
 
-/** 星云的流星：预警后沿积分好的轨迹飞，轨迹走完（扎回壳层或掉进视界）就消失 */
-function nebulaMeteors(sim: Sim, delta: number): void {
-  const mc = nebulaCfg(sim).meteor
+/** 旧星云的流星：预警后沿积分好的轨迹飞，轨迹走完（扎回壳层或掉进视界）就消失 */
+function nebulaOldMeteors(sim: Sim, delta: number): void {
+  const mc = nebulaOldCfg(sim).meteor
   const now = sim.elapsedMs
   const m = query(sim.world, [Meteor])[0]
   if (m === undefined) {
-    if (now >= sim.worldState.tickAt) launchNebulaMeteor(sim)
+    if (now >= sim.worldState.tickAt) launchNebulaOldMeteor(sim)
     return
   }
   if (now < Due.at[m]!) return
@@ -569,14 +569,14 @@ function nebulaMeteors(sim: Sim, delta: number): void {
   Transform.y[m] = y
   Transform.rot[m] = Transform.rot[m]! + (sim.dtMs / 1000) * 1.4
   Tint.alpha[m] = 1
-  nebulaMeteorStrike(sim, m, x, y, Math.hypot(dx, dy) / (mc.stepMs / 1000))
+  nebulaOldMeteorStrike(sim, m, x, y, Math.hypot(dx, dy) / (mc.stepMs / 1000))
 }
 
-/** 星云：圆心在原点的空心星云，黑洞与壳层的万有引力作用于一切；没有墙，走进壳层的都被它的引力拉回空腔 */
-const nebula: WorldHooks = {
+/** 旧星云：圆心在原点的空心星云，黑洞与壳层的万有引力作用于一切；没有墙，走进壳层的都被它的引力拉回空腔 */
+const nebulaOld: WorldHooks = {
   ...bounded,
   pull(sim, x, y) {
-    return gravity(holeOf(sim), nebulaCfg(sim), x, y)
+    return gravity(holeOf(sim), nebulaOldCfg(sim), x, y)
   },
   constrainBody(_sim, _eid, _from, next) {
     return next
@@ -585,7 +585,7 @@ const nebula: WorldHooks = {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
     const d = Math.hypot(x, y)
-    if (d < nebulaWall(sim) - 0.6 * UNIT || x * dx + y * dy <= 0) return { x: dx, y: dy }
+    if (d < nebulaOldWall(sim) - 0.6 * UNIT || x * dx + y * dy <= 0) return { x: dx, y: dy }
     const dot = (dx * x + dy * y) / d
     return { x: dx - (2 * dot * x) / d, y: dy - (2 * dot * y) / d }
   },
@@ -593,13 +593,13 @@ const nebula: WorldHooks = {
     return { x: awayX, y: awayY }
   },
   outside(sim, x, y) {
-    return Math.hypot(x, y) > nebulaCfg(sim).shell.outerU * UNIT
+    return Math.hypot(x, y) > nebulaOldCfg(sim).shell.outerU * UNIT
   },
   spawnPoint(sim, boss) {
     const hole = holeOf(sim)
-    const clear2 = (nebulaCfg(sim).hole.clearU * UNIT) ** 2
+    const clear2 = (nebulaOldCfg(sim).hole.clearU * UNIT) ** 2
     const near2 = (SPAWN.minPlayerDist * UNIT * (boss ? 2 : 1)) ** 2
-    const inner = nebulaWall(sim) - UNIT
+    const inner = nebulaOldWall(sim) - UNIT
     const lx = leaderX(sim)
     const ly = leaderY(sim)
     let p = ringPoint(sim.rng, ZERO, 0, inner)
@@ -614,20 +614,20 @@ const nebula: WorldHooks = {
   },
   settle(sim, p) {
     const hole = holeOf(sim)
-    const clear = nebulaCfg(sim).hole.clearU * UNIT
+    const clear = nebulaOldCfg(sim).hole.clearU * UNIT
     const dx = p.x - hole.x
     const dy = p.y - hole.y
     const d = Math.hypot(dx, dy)
     const q = d >= clear ? p : d < 1e-6 ? { x: hole.x + clear, y: hole.y } : { x: hole.x + (dx / d) * clear, y: hole.y + (dy / d) * clear }
-    return clampToDisc(q.x, q.y, 0, 0, nebulaWall(sim) - UNIT)
+    return clampToDisc(q.x, q.y, 0, 0, nebulaOldWall(sim) - UNIT)
   },
   onStart(sim) {
     holeOf(sim)
-    sim.worldState.tickAt = nebulaCfg(sim).meteor.firstMs
+    sim.worldState.tickAt = nebulaOldCfg(sim).meteor.firstMs
   },
   tick(sim, delta) {
     swallow(sim)
-    nebulaMeteors(sim, delta)
+    nebulaOldMeteors(sim, delta)
   },
 }
 
@@ -997,7 +997,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   river,
   void: torus,
   space,
-  nebula,
+  nebulaOld,
   volcano,
   ship,
 }

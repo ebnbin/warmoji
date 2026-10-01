@@ -26,7 +26,7 @@ import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
 import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
-import { shellPull } from '../src/data/nebula.ts'
+import { shellPull } from '../src/data/nebulaOld.ts'
 import { deckEdgeAngle, halfBeamAt, hydrostatics, stability, staticHeel } from '../src/data/ship.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -36,7 +36,7 @@ import type { Issue } from '../src/data/runCheck.ts'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef } from '../src/types/enemies'
 import type { ItemDef } from '../src/types/items'
-import type { MapDef, NebulaConfig } from '../src/types/maps'
+import type { MapDef, NebulaOldConfig } from '../src/types/maps'
 import type { MutatorDef, RunDef } from '../src/types/runs'
 
 const errors: string[] = []
@@ -76,21 +76,21 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   if (m.ice) need(m.ice.waterExertion > 0 && m.ice.waterRegen >= 0, `maps.${id}.ice 的水里费力须为正、回复倍率不为负`)
 }
 
-/** 星云：壳层包着空腔，黑洞整个落在空腔里，视界外还有能站的地方；流星的积分步长能在时限里走完 */
+/** 旧星云：壳层包着空腔，黑洞整个落在空腔里，视界外还有能站的地方；流星的积分步长能在时限里走完 */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'nebula') === (m.nebula !== undefined), `maps.${id} 是星云当且仅当写了 nebula`)
-  const n = m.nebula
+  need((m.kind === 'nebulaOld') === (m.nebulaOld !== undefined), `maps.${id} 是旧星云当且仅当写了 nebulaOld`)
+  const n = m.nebulaOld
   if (!n) continue
   const [near, far] = n.hole.fromCenterU
-  need(n.shell.innerU > 0 && n.shell.outerU > n.shell.innerU && n.shell.gm > 0, `maps.${id}.nebula.shell 须内径为正、外径大于内径、引力为正`)
-  need(n.contain.speedMul >= 1 && n.contain.leapU >= 0, `maps.${id}.nebula.contain 的速度余量不小于 1、瞬移余量不为负`)
-  need(n.hole.gm > 0 && n.hole.softeningU > 0, `maps.${id}.nebula.hole 的引力与软化长度须为正`)
-  need(n.hole.horizonU > n.hole.softeningU / Math.SQRT2, `maps.${id}.nebula.hole.horizonU 须大于软化长度的 1/√2，视界外的引力才随距离单调减小`)
-  need(near >= 0 && near <= far && far + n.hole.horizonU < n.shell.innerU, `maps.${id}.nebula.hole 的位置范围须落在空腔里`)
-  need(n.hole.clearU > n.hole.horizonU, `maps.${id}.nebula.hole.clearU 须大于视界`)
-  need(n.meteor.stepMs > 0 && n.meteor.maxFlightMs >= n.meteor.stepMs, `maps.${id}.nebula.meteor 的积分步长须为正且不超过最长飞行时间`)
-  need(n.meteor.speedU > 0 && n.meteor.radiusU > 0 && n.meteor.warnMs >= 0 && n.meteor.offsetU >= 0, `maps.${id}.nebula.meteor 的速度与半径须为正`)
-  need(n.meteor.radiusU < n.shell.innerU, `maps.${id}.nebula.meteor.radiusU 须小于空腔半径，瞄准点才收得进空腔`)
+  need(n.shell.innerU > 0 && n.shell.outerU > n.shell.innerU && n.shell.gm > 0, `maps.${id}.nebulaOld.shell 须内径为正、外径大于内径、引力为正`)
+  need(n.contain.speedMul >= 1 && n.contain.leapU >= 0, `maps.${id}.nebulaOld.contain 的速度余量不小于 1、瞬移余量不为负`)
+  need(n.hole.gm > 0 && n.hole.softeningU > 0, `maps.${id}.nebulaOld.hole 的引力与软化长度须为正`)
+  need(n.hole.horizonU > n.hole.softeningU / Math.SQRT2, `maps.${id}.nebulaOld.hole.horizonU 须大于软化长度的 1/√2，视界外的引力才随距离单调减小`)
+  need(near >= 0 && near <= far && far + n.hole.horizonU < n.shell.innerU, `maps.${id}.nebulaOld.hole 的位置范围须落在空腔里`)
+  need(n.hole.clearU > n.hole.horizonU, `maps.${id}.nebulaOld.hole.clearU 须大于视界`)
+  need(n.meteor.stepMs > 0 && n.meteor.maxFlightMs >= n.meteor.stepMs, `maps.${id}.nebulaOld.meteor 的积分步长须为正且不超过最长飞行时间`)
+  need(n.meteor.speedU > 0 && n.meteor.radiusU > 0 && n.meteor.warnMs >= 0 && n.meteor.offsetU >= 0, `maps.${id}.nebulaOld.meteor 的速度与半径须为正`)
+  need(n.meteor.radiusU < n.shell.innerU, `maps.${id}.nebulaOld.meteor.radiusU 须小于空腔半径，瞄准点才收得进空腔`)
 }
 
 /** 火山：盆地的边在地图边与中线之间、火山口贴着地图边的中段、山体够不着地图的角和中线；一次喷发的预兆与出熔岩都在下一次之前结束 */
@@ -191,7 +191,7 @@ for (const e of Object.values(ENEMIES).flatMap(withNested)) {
 }
 
 /** 走进壳层停下的半径：终端漂移 g·fall 追上速度的地方，壳层里引力随半径单调增大；外缘都追不上就停不下 */
-const shellStopU = (shell: NebulaConfig['shell'], fall: number, speedU: number): number => {
+const shellStopU = (shell: NebulaOldConfig['shell'], fall: number, speedU: number): number => {
   if (shellPull(shell, shell.outerU) * fall < speedU) return Infinity
   let lo = shell.innerU
   let hi = shell.outerU
@@ -202,9 +202,9 @@ const shellStopU = (shell: NebulaConfig['shell'], fall: number, speedU: number):
   }
   return hi
 }
-/** 星云壳层困得住每个角色与敌人：停下处再往外瞬移，仍在壳外引力重新追不上它的逃逸半径以内 */
+/** 旧星云壳层困得住每个角色与敌人：停下处再往外瞬移，仍在壳外引力重新追不上它的逃逸半径以内 */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  const n = m.nebula
+  const n = m.nebulaOld
   if (!n) continue
   const bodies = [
     ...Object.entries<CharacterAuthoring>(CHARACTERS).map(([k, c]) => ({ path: `characters.${k}`, fall: c.body.mass / c.body.drag, speedU: c.stats.moveSpeed })),
@@ -215,7 +215,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   for (const b of bodies) {
     const v = b.speedU * n.contain.speedMul
     const escapeU = Math.sqrt((n.shell.gm * b.fall) / v)
-    need(shellStopU(n.shell, b.fall, v) + n.contain.leapU <= escapeU, `maps.${id}.nebula.shell 困不住 ${b.path}：走到停下处再往外瞬移 ${n.contain.leapU} 格就逃出引力`)
+    need(shellStopU(n.shell, b.fall, v) + n.contain.leapU <= escapeU, `maps.${id}.nebulaOld.shell 困不住 ${b.path}：走到停下处再往外瞬移 ${n.contain.leapU} 格就逃出引力`)
   }
 }
 

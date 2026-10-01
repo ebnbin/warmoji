@@ -1,11 +1,11 @@
 import { UNIT } from '../../util/units'
-import { shellPull } from '../../data/nebula'
-import type { NebulaConfig } from '../../types/maps'
+import { shellPull } from '../../data/nebulaOld'
+import type { NebulaOldConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 import type { Rng } from '../../util/rng'
 
 /** 黑洞的位置：离星云中心 fromCenterU 之间、方向随机 */
-export function holeAt(rng: Rng, cfg: NebulaConfig): Point {
+export function holeAt(rng: Rng, cfg: NebulaOldConfig): Point {
   const [near, far] = cfg.hole.fromCenterU
   const r = (near + rng.next() * (far - near)) * UNIT
   const a = rng.next() * Math.PI * 2
@@ -13,7 +13,7 @@ export function holeAt(rng: Rng, cfg: NebulaConfig): Point {
 }
 
 /** 黑洞与壳层的引力相加，像素/秒²：黑洞按普卢默软化的 g = GM·d/(|d|²+ε²)^{3/2} 指向黑洞，壳层指向星云中心 */
-export function gravity(hole: Point, cfg: NebulaConfig, x: number, y: number): Point {
+export function gravity(hole: Point, cfg: NebulaOldConfig, x: number, y: number): Point {
   const dx = (hole.x - x) / UNIT
   const dy = (hole.y - y) / UNIT
   const eps = cfg.hole.softeningU
@@ -25,13 +25,13 @@ export function gravity(hole: Point, cfg: NebulaConfig, x: number, y: number): P
 }
 
 /** 离黑洞 rU 格处黑洞的引力大小，格/秒² */
-function holePull(cfg: NebulaConfig, rU: number): number {
+function holePull(cfg: NebulaOldConfig, rU: number): number {
   const eps = cfg.hole.softeningU
   const s = rU * rU + eps * eps
   return (cfg.hole.gm * rU) / (s * Math.sqrt(s))
 }
 
-export function inHorizon(hole: Point, cfg: NebulaConfig, x: number, y: number): boolean {
+export function inHorizon(hole: Point, cfg: NebulaOldConfig, x: number, y: number): boolean {
   const r = cfg.hole.horizonU * UNIT
   return (x - hole.x) ** 2 + (y - hole.y) ** 2 < r * r
 }
@@ -40,7 +40,7 @@ export function inHorizon(hole: Point, cfg: NebulaConfig, x: number, y: number):
  * 走路逃不出黑洞的半径（格）：终端漂移 g·fall 等于自己最快的速度 speedU 的地方，fall 是身体的质量除以阻力。
  * 视界外引力随距离单调减小，二分即可；视界处都追不上就只剩视界本身。
  */
-export function captureRadiusU(cfg: NebulaConfig, fall: number, speedU: number, maxU: number): number {
+export function captureRadiusU(cfg: NebulaOldConfig, fall: number, speedU: number, maxU: number): number {
   const lo0 = cfg.hole.horizonU
   if (holePull(cfg, lo0) * fall <= speedU) return lo0
   let lo = lo0
@@ -55,7 +55,7 @@ export function captureRadiusU(cfg: NebulaConfig, fall: number, speedU: number, 
 }
 
 /** 流星的起点：从瞄准点逆着单位方向 (dx, dy) 退到壳层内壁上，瞄准点先收进空腔 */
-export function meteorStart(cfg: NebulaConfig, ax: number, ay: number, dx: number, dy: number): Point {
+export function meteorStart(cfg: NebulaOldConfig, ax: number, ay: number, dx: number, dy: number): Point {
   const wall = cfg.shell.innerU * UNIT
   const lim = wall - cfg.meteor.radiusU * UNIT
   const r = Math.hypot(ax, ay)
@@ -67,7 +67,7 @@ export function meteorStart(cfg: NebulaConfig, ax: number, ay: number, dx: numbe
 }
 
 /** 流星在引力下的轨迹：速度韦尔莱积分，按 stepMs 采样的 x、y 交替数组；进了视界、扎回壳层烧毁或到了时限就停 */
-export function meteorTrajectory(hole: Point, cfg: NebulaConfig, sx: number, sy: number, vx0: number, vy0: number): Float32Array {
+export function meteorTrajectory(hole: Point, cfg: NebulaOldConfig, sx: number, sy: number, vx0: number, vy0: number): Float32Array {
   const m = cfg.meteor
   const h = m.stepMs / 1000
   const wall = cfg.shell.innerU * UNIT

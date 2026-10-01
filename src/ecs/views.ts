@@ -16,7 +16,7 @@ import type { TorusConfig } from '../types/maps'
 import { query } from 'bitecs'
 import { Due, Meteor, Phys, Stats, Transform } from './components'
 import { meteorPath } from './store'
-import { captureRadiusU } from './worlds/nebula'
+import { captureRadiusU } from './worlds/nebulaOld'
 import { ringPoint } from './worlds/space'
 import { leaderX, leaderY } from './utils/team'
 import { spawnDriftDecor } from './entities/decor'
@@ -338,8 +338,8 @@ class SpaceView extends BoundedView {
 }
 
 /** 空腔半径与星云外缘，像素 */
-function nebulaRadii(v: ViewCtx): { wall: number; rim: number } {
-  const s = v.def.nebula!.shell
+function nebulaOldRadii(v: ViewCtx): { wall: number; rim: number } {
+  const s = v.def.nebulaOld!.shell
   return { wall: s.innerU * UNIT, rim: s.outerU * UNIT }
 }
 
@@ -348,16 +348,16 @@ const SHELL_INNER = 0x4fc3f7
 const SHELL_OUTER = 0xff5f8f
 
 /**
- * 星云：圆心在原点的空腔里飘着一团团气体，壳层按俯视的柱密度着色，内壁最亮、往外渐暗到外缘为零；
+ * 旧星云：圆心在原点的空腔里飘着一团团气体，壳层按俯视的柱密度着色，内壁最亮、往外渐暗到外缘为零；
  * 黑洞画出视界、光子球与吸积盘，虚线圈是当前队长走路逃不出的范围，流星的预警沿引力弯曲的轨迹
  */
-class NebulaView extends BoundedView {
+class NebulaOldView extends BoundedView {
   private capture?: Phaser.GameObjects.Graphics
   private captureU = -1
   private meteorFx?: { of: number; tele: Phaser.GameObjects.Graphics }
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
-    const d = nebulaRadii(v).rim * 2
+    const d = nebulaOldRadii(v).rim * 2
     return { w: d, h: d, origin: { x: 0, y: 0 } }
   }
 
@@ -368,7 +368,7 @@ class NebulaView extends BoundedView {
         .setScrollFactor(0)
         .setDepth(-1),
     )
-    const { wall, rim } = nebulaRadii(v)
+    const { wall, rim } = nebulaOldRadii(v)
     const gas = v.scene.add.graphics().setDepth(-0.9)
     const rng = new Rng(v.run.decorSeed ^ 0x9a5)
     for (let i = 0; i < 14; i++) {
@@ -390,14 +390,14 @@ class NebulaView extends BoundedView {
   }
 
   protected field(v: ViewCtx): Phaser.Geom.Rectangle {
-    const { rim } = nebulaRadii(v)
+    const { rim } = nebulaOldRadii(v)
     return new Phaser.Geom.Rectangle(-rim, -rim, rim * 2, rim * 2)
   }
 
   /** 装饰只撒在空腔里 */
   decor(v: ViewCtx, atlas: EcsAtlas): void {
     const rng = new Rng(v.run.decorSeed)
-    const rU = nebulaRadii(v).wall / UNIT
+    const rU = nebulaOldRadii(v).wall / UNIT
     const cells = Math.round(rU * 2)
     for (const d of rollDecor(v.def.decor, () => rng.next(), cells, cells)) {
       const xU = d.xU - rU
@@ -422,7 +422,7 @@ class NebulaView extends BoundedView {
   onSimReady(v: ViewCtx, sim: Sim): void {
     const hole = sim.worldState.hole
     if (!hole) return
-    const h = v.def.nebula!.hole.horizonU * UNIT
+    const h = v.def.nebulaOld!.hole.horizonU * UNIT
     const g = v.scene.add.graphics().setDepth(2.5)
     for (let i = 0; i < 6; i++) {
       g.lineStyle(h * 0.4, i % 2 === 0 ? 0xffa040 : 0xff6ec7, 0.1 - i * 0.012)
@@ -450,7 +450,7 @@ class NebulaView extends BoundedView {
     const hole = sim.worldState.hole
     const lead = sim.leader
     if (!g || !hole || lead < 0) return
-    const cfg = v.def.nebula!
+    const cfg = v.def.nebulaOld!
     const rU = captureRadiusU(cfg, Phys.mass[lead]! / Phys.drag[lead]!, Stats.moveSpeed[lead]!, cfg.shell.innerU * 2)
     if (Math.abs(rU - this.captureU) < 0.02) return
     this.captureU = rU
@@ -478,7 +478,7 @@ class NebulaView extends BoundedView {
     if (!path) return
     let cur = this.meteorFx
     if (!cur) {
-      const rr = v.def.nebula!.meteor.radiusU * UNIT
+      const rr = v.def.nebulaOld!.meteor.radiusU * UNIT
       const tele = v.scene.add.graphics().setDepth(3)
       const trace = (): void => {
         tele.beginPath()
@@ -1840,7 +1840,7 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   river: () => new RiverView(),
   void: () => new TorusView(),
   space: () => new SpaceView(),
-  nebula: () => new NebulaView(),
+  nebulaOld: () => new NebulaOldView(),
   volcano: () => new VolcanoView(),
   ship: () => new ShipView(),
 }
