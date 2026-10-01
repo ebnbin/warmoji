@@ -249,7 +249,7 @@ function crack(r: Rng, poly: Vertex[], s: FloeConfig['shape'], used: Set<number>
   }
   const width = lerp(r, s.seamWidthU) / 2
   const wobble = Math.floor(r.next() * 1e6)
-  const half = line.map((_, k) => width * (0.55 + 0.9 * fbm(k * 0.11, 0.5, wobble, 2)))
+  const half = line.map((_, k) => width * (0.5 + 0.8 * fbm(k * 0.11, 0.5, wobble, 2) + 0.25 * (fbm(k * 0.9, 3.5, wobble + 7, 2) - 0.5)))
   if (r.next() >= s.leadChance) return { poly, seam: line, half }
   const leadLen = lerp(r, s.leadU)
   const mouth = lerp(r, s.leadWidthU)
@@ -536,7 +536,7 @@ const spread = (n: number): number => Math.min(1, Math.max(0, (n - 0.5) * 2.4 + 
 /** 新冰的覆盖：逐段在中线附近一圈里算到线段的距离，半宽沿线段插值，边缘留一点过渡 */
 function youngField(seams: readonly Seam[], cols: number, rows: number, cell: number): Float32Array {
   const out = new Float32Array(cols * rows)
-  const soft = 0.05 * UNIT
+  const soft = 0.2 * UNIT
   for (const s of seams) {
     for (let i = 0; i + 1 < s.line.length; i++) {
       const a = s.line[i]!
@@ -614,11 +614,11 @@ export function makeFloe(seed: number, cfg: FloeConfig): FloeField {
       }
       const xu = x / UNIT
       const yu = y / UNIT
-      const along = (xu * wc + yu * ws) / (sn.waveU * 2.2)
+      const along = (xu * wc + yu * ws) / (sn.waveU * 1.6)
       const across = (-xu * ws + yu * wc) / sn.waveU
-      const drift = smooth(1 - sn.cover - 0.1, 1 - sn.cover + 0.1, spread(fbm(along, across, noiseSeed, 3)))
-      const lumps = 0.45 + 0.55 * fbm(xu / 2.3, yu / 2.3, noiseSeed + 11, 2)
-      const depth = sn.maxM * drift * lumps * smooth(sn.bareU * 0.4, sn.bareU * 1.3, e) * (1 - yg)
+      const drift = smooth(1 - sn.cover - 0.2, 1 - sn.cover + 0.2, spread(fbm(along, across, noiseSeed, 3)))
+      const lumps = 0.5 + 0.5 * fbm(xu / 2.3, yu / 2.3, noiseSeed + 11, 2)
+      const depth = sn.maxM * drift ** 1.5 * lumps * smooth(sn.bareU * 0.4, sn.bareU * 1.3, e) * (1 - yg)
       snow[k] = depth
       snowSum += depth
       iceCells++

@@ -1121,6 +1121,7 @@ const floe: WorldHooks = {
     tickPaths(sim, s)
     chill(sim, s, cfg)
     sinkCoins(sim, s)
+    if (s.splashes.length > 64) s.splashes.splice(0, s.splashes.length - 64)
   },
 }
 

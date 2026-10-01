@@ -538,7 +538,7 @@ export const MAPS = {
         roundU: [0.8, 2.2],
       },
       ice: { thicknessM: 1.6, youngM: 0.25, density: 917, seaDensity: 1027 },
-      snow: { maxM: 0.3, cover: 0.5, density: 330, waveU: 3.5, bareU: 1.6 },
+      snow: { maxM: 0.18, cover: 0.5, density: 330, waveU: 3.5, bareU: 1.6 },
       friction: { snow: { static: 0.55, kinetic: 0.42 }, ice: { static: 0.22, kinetic: 0.16 }, young: { static: 0.11, kinetic: 0.07 }, loose: 0.12 },
       body: { footFrac: 0.6, swimRatio: 0.3, refRadiusU: 0.45, dragU: 1, freezeSec: 8, climbFrac: 0.5 },
       wind: {
