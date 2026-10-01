@@ -68,6 +68,37 @@ export function textureSize(t: Terrain, layer: PaintLayer): { w: number; h: numb
   return { w: Math.round(t.cols * t.cell * ppu), h: Math.round(t.rows * t.cell * ppu) }
 }
 
+/** 画之前先算一次的东西：树影与树冠的分桶，每个地形格被地形挡住多少太阳光 */
+export interface Prepared {
+  readonly shadows: TreeIndex
+  readonly crowns: TreeIndex
+  readonly shade: Float32Array
+}
+
+export function prepare(sc: PaintScene): Prepared {
+  return { shadows: indexTrees(sc, true), crowns: indexTrees(sc, false), shade: terrainShade(sc) }
+}
+
+/** 每个地形格往太阳方向找挡光的地形：挡得越高越暗，按格心算一次，画的时候插值 */
+function terrainShade(sc: PaintScene): Float32Array {
+  const t = sc.terrain
+  const out = new Float32Array(t.cols * t.rows)
+  const sx = LX / LXY
+  const sy = LY / LXY
+  const rise = (LZ / LXY) * sc.cfg.meterPerU
+  for (let cy = 0; cy < t.rows; cy++) {
+    for (let cx = 0; cx < t.cols; cx++) {
+      const x = t.x0 + (cx + 0.5) * t.cell
+      const y = t.y0 + (cy + 0.5) * t.cell
+      const z = t.z[cy * t.cols + cx]!
+      let over = 0
+      for (const st of SHADOW_STEPS) over = Math.max(over, field(t, t.z, x + sx * st, y + sy * st) - z - st * rise)
+      out[cy * t.cols + cx] = smooth(0.02, 0.3, over)
+    }
+  }
+  return out
+}
+
 /** 树按位置分桶：键是桶的行列 */
 export interface TreeIndex {
   readonly cols: number
@@ -77,7 +108,7 @@ export interface TreeIndex {
 }
 
 /** 把树按 (cx, cy) 分桶：树冠或树影能伸到的每一桶都记上它 */
-export function indexTrees(sc: PaintScene, shadow: boolean): TreeIndex {
+function indexTrees(sc: PaintScene, shadow: boolean): TreeIndex {
   const t = sc.terrain
   const cols = Math.ceil((t.cols * t.cell) / BUCKET_U) + 1
   const buckets = new Map<number, number[]>()
@@ -101,10 +132,28 @@ function near(ix: TreeIndex, x: number, y: number): readonly number[] {
 }
 const NONE: readonly number[] = []
 
+/** 这一点整个被树冠盖住了：离哪棵树的树干比树冠参差的边还近 */
+function hidden(sc: PaintScene, crowns: TreeIndex, x: number, y: number): boolean {
+  for (const k of near(crowns, x, y)) {
+    const tr = sc.trees[k]!
+    const r = tr.r * 0.7
+    if ((x - tr.x) ** 2 + (y - tr.y) ** 2 < r * r) return true
+  }
+  return false
+}
+
 /** 一棵树投在地上的影子：树冠中心离地约树高的六成半，背着太阳拖出去，最多 TREE_SHADOW_U 格 */
 function shadowOf(cfg: RiverConfig, tr: Tree): { x: number; y: number; r: number } {
   const off = Math.min(TREE_SHADOW_U, (tr.h * 0.65 * SHADOW_PER_M) / cfg.meterPerU)
   return { x: tr.x - (LX / LXY) * off, y: tr.y - (LY / LXY) * off, r: tr.r * 0.92 }
+}
+
+/** 格子 i 与右、下、右下三格之间按 (ax, ay) 双线性插值 */
+function lerp2(a: Float32Array, i: number, cols: number, ax: number, ay: number): number {
+  const p = a[i]!
+  const q = a[i + 1]!
+  const r = a[i + cols]!
+  return p + (q - p) * ax + (r - p) * ay + (p - q - r + a[i + cols + 1]!) * ax * ay
 }
 
 /** 场里 (x, y) 格处按格心双线性取值 */
@@ -179,7 +228,9 @@ const FLOWERS = [
  * 空地里的大石顶出地面。按高度场打光，小石头另按石面的弧度打光，往太阳方向找挡光的地形投影，树冠背着太阳投下软影；离空地越远越暗。
  * 只画 rect 那一块，out 里按这块的范围逐行排
  */
-export function paintGround(sc: PaintScene, ix: TreeIndex, out: Uint8ClampedArray, rect: PixelRect): void {
+export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
+  const ix = prep.shadows
+  const crowns = prep.crowns
   const t = sc.terrain
   const cfg = sc.cfg
   const mpu = cfg.meterPerU
@@ -187,53 +238,69 @@ export function paintGround(sc: PaintScene, ix: TreeIndex, out: Uint8ClampedArra
   const ppu = GROUND_PPU
   const w = rect.x1 - rect.x0
   const e = t.cell
-  const sx = LX / LXY
-  const sy = LY / LXY
-  const rise = (LZ / LXY) * mpu
   const shadows = sc.trees.map((tr) => shadowOf(cfg, tr))
   for (let py = rect.y0; py < rect.y1; py++) {
     for (let px = rect.x0; px < rect.x1; px++) {
       const x = t.x0 + (px + 0.5) / ppu
       const y = t.y0 + (py + 0.5) / ppu
-      const z = field(t, t.z, x, y)
+      const o = ((py - rect.y0) * w + px - rect.x0) * 4
+      if (hidden(sc, crowns, x, y)) {
+        out[o] = 34
+        out[o + 1] = 32
+        out[o + 2] = 24
+        out[o + 3] = 255
+        continue
+      }
+      const fu = Math.min(t.cols - 1.001, Math.max(0, (x - t.x0) / t.cell - 0.5))
+      const fv = Math.min(t.rows - 1.001, Math.max(0, (y - t.y0) / t.cell - 0.5))
+      const ci = Math.floor(fv) * t.cols + Math.floor(fu)
+      const ax = fu - Math.floor(fu)
+      const ay = fv - Math.floor(fv)
+      const z = lerp2(t.z, ci, t.cols, ax, ay)
       let zx = (field(t, t.z, x + e, y) - field(t, t.z, x - e, y)) / (2 * e * mpu)
       let zy = (field(t, t.z, x, y + e) - field(t, t.z, x, y - e)) / (2 * e * mpu)
-      const level = field(t, t.level, x, y)
-      const edge = field(t, t.edge, x, y)
-      const bar = field(t, t.bar, x, y)
-      const clear = field(t, t.clear, x, y)
-      const forest = field(t, t.forest, x, y)
-      const gorge = field(t, t.gorge, x, y)
+      const level = lerp2(t.level, ci, t.cols, ax, ay)
+      const edge = lerp2(t.edge, ci, t.cols, ax, ay)
+      const bar = lerp2(t.bar, ci, t.cols, ax, ay)
+      const clear = lerp2(t.clear, ci, t.cols, ax, ay)
+      const forest = lerp2(t.forest, ci, t.cols, ax, ay)
+      const gorge = lerp2(t.gorge, ci, t.cols, ax, ay)
       const under = level - z
-      const patch = fbm(x / 7, y / 7, seed + 3, 3)
+      const patch = fbm(x / 7, y / 7, seed + 3, 2)
       const mid = fbm(x / 2.2, y / 2.2, seed + 5, 2)
       const grain = valueNoise(x * 7, y * 7, seed + 9) * 0.5 + valueNoise(x * 17, y * 17, seed + 11) * 0.5
       const wob = (mid - 0.5) * 0.5
+      const outside = smooth(0.15 + wob * 0.4, -0.35, clear)
+      const bed = smooth(-0.01, 0.04, under) * smooth(-0.6, 0.2, -edge + 0.3)
+      let r = 0
+      let g = 0
+      let b = 0
 
       // 草地：大片的深浅按低频噪声，近水更绿、高处更干；草叶顺着风斜着长；野花成簇地开
-      const lush = smooth(3.5, 0.6, edge)
-      const dry = clamp01(smooth(0.4, 0.72, patch) * 0.85 - lush * 0.45 + smooth(0.5, 2, z - level) * 0.2)
-      const green = clamp01(0.5 + (mid - 0.5) * 1.2 + lush * 0.3)
-      let r = 92 + (66 - 92) * green + (148 - 92) * dry
-      let g = 124 + (106 - 124) * green + (138 - 124) * dry
-      let b = 50 + (42 - 50) * green + (76 - 50) * dry
-      const blade = valueNoise(x * 6 + y * 2, y * 22 - x * 2.5, seed + 13)
-      const tuft = cellNearest(x * 3.6, y * 3.6, seed + 15)
-      const between = smooth(0.0, 0.12, cellEdge(x * 3.6, y * 3.6, seed + 15))
-      const k = (0.91 + 0.13 * blade) * (0.95 + 0.1 * grain) * (0.94 + 0.12 * tuft.h) * (0.9 + 0.1 * between)
-      r *= k
-      g *= k
-      b *= k
-      const bloom = smooth(0.64, 0.7, fbm(x / 2.8, y / 2.8, seed + 19, 2))
-      if (bloom > 0) {
-        const dot = cellNearest(x * 5.5, y * 5.5, seed + 17)
-        const d = Math.sqrt(dot.dx * dot.dx + dot.dy * dot.dy)
-        if (d < 0.2 && dot.h < bloom * 0.85) {
-          const c = FLOWERS[Math.floor(fbm(x / 9, y / 9, seed + 21, 1) * 2.999)]!
-          const a = smooth(0.2, 0.1, d)
-          r += (c[0] - r) * a
-          g += (c[1] - g) * a
-          b += (c[2] - b) * a
+      if (outside < 0.999 && bed < 0.999) {
+        const lush = smooth(3.5, 0.6, edge)
+        const dry = clamp01(smooth(0.4, 0.72, patch) * 0.85 - lush * 0.45 + smooth(0.5, 2, z - level) * 0.2)
+        const green = clamp01(0.5 + (mid - 0.5) * 1.2 + lush * 0.3)
+        r = 92 + (66 - 92) * green + (148 - 92) * dry
+        g = 124 + (106 - 124) * green + (138 - 124) * dry
+        b = 50 + (42 - 50) * green + (76 - 50) * dry
+        const blade = valueNoise(x * 6 + y * 2, y * 22 - x * 2.5, seed + 13)
+        const tuft = valueNoise(x * 3.3 + 7.1, y * 3.3, seed + 15)
+        const k = (0.9 + 0.14 * blade) * (0.94 + 0.12 * grain) * (0.93 + 0.12 * tuft)
+        r *= k
+        g *= k
+        b *= k
+        const bloom = smooth(0.64, 0.7, fbm(x / 2.8, y / 2.8, seed + 19, 2))
+        if (bloom > 0) {
+          const dot = cellNearest(x * 5.5, y * 5.5, seed + 17)
+          const d = Math.sqrt(dot.dx * dot.dx + dot.dy * dot.dy)
+          if (d < 0.2 && dot.h < bloom * 0.85) {
+            const c = FLOWERS[Math.floor(fbm(x / 9, y / 9, seed + 21, 1) * 2.999)]!
+            const a = smooth(0.2, 0.1, d)
+            r += (c[0] - r) * a
+            g += (c[1] - g) * a
+            b += (c[2] - b) * a
+          }
         }
       }
 
@@ -256,7 +323,6 @@ export function paintGround(sc: PaintScene, ix: TreeIndex, out: Uint8ClampedArra
       }
 
       // 河床：卵石更大更圆，缓处、深处蒙着一层青苔
-      const bed = smooth(-0.01, 0.04, under) * smooth(-0.6, 0.2, -edge + 0.3)
       if (bed > 0) {
         const pb = cobble(x + 13.7, y + 5.1, 2.4, seed + 23, COBBLE)
         const moss = clamp01(smooth(0.2, 0.7, under) * 0.6 + smooth(0.55, 0.75, patch) * 0.4)
@@ -278,7 +344,6 @@ export function paintGround(sc: PaintScene, ix: TreeIndex, out: Uint8ClampedArra
       }
 
       // 空地外：林下是落叶与腐殖土；岩坡上堆着圆石，石面有细碎的斑点、顶上长地衣，石缝里是苔藓与泥；崖面上是竖着的水痕
-      const outside = smooth(0.15 + wob * 0.4, -0.35, clear)
       if (outside > 0) {
         const leaf = cellNearest(x * 4.5, y * 4.5, seed + 41)
         const ld = Math.sqrt(leaf.dx * leaf.dx + leaf.dy * leaf.dy)
@@ -367,9 +432,7 @@ export function paintGround(sc: PaintScene, ix: TreeIndex, out: Uint8ClampedArra
 
       // 光：朝太阳的坡亮、背阴的坡暗；往太阳方向找挡光的地形；树影；深谷里暗下去；离空地越远越暗
       const lambert = Math.max(0, (-zx * LX - zy * LY + LZ) / Math.sqrt(zx * zx + zy * zy + 1))
-      let over = 0
-      for (const st of SHADOW_STEPS) over = Math.max(over, field(t, t.z, x + sx * st, y + sy * st) - z - st * rise)
-      let shade = smooth(0.02, 0.3, over) * 0.55
+      let shade = lerp2(prep.shade, ci, t.cols, ax, ay) * 0.55
       for (const k2 of near(ix, x, y)) {
         const c = shadows[k2]!
         const tr = sc.trees[k2]!
@@ -380,7 +443,6 @@ export function paintGround(sc: PaintScene, ix: TreeIndex, out: Uint8ClampedArra
       const dark = 1 - 0.3 * smooth(1, 7, below) * inGorge
       const far = 1 - 0.32 * smooth(2, 9, -clear)
       const light = (0.44 + 0.84 * lambert) * (1 - shade) * dark * far
-      const o = ((py - rect.y0) * w + px - rect.x0) * 4
       out[o] = r * light
       out[o + 1] = g * light
       out[o + 2] = b * light
@@ -418,7 +480,8 @@ const LEAF = [
  * 树冠：每棵树由几团叶簇叠成，看得见的是最高的那团；叶簇按球面打光，光包着球面绕过来一点，向阳面偏暖偏黄、背阴面偏冷偏蓝，
  * 低处被上面的叶簇遮着更暗，叶面有细碎的明暗与亮斑；边缘柔和。像素带透明度，只画 rect 那一块
  */
-export function paintCanopy(sc: PaintScene, ix: TreeIndex, out: Uint8ClampedArray, rect: PixelRect): void {
+export function paintCanopy(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
+  const ix = prep.crowns
   const t = sc.terrain
   const seed = sc.seed
   const ppu = CANOPY_PPU

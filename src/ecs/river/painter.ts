@@ -1,4 +1,4 @@
-import { indexTrees, paintCanopy, paintGround, pixelBuffer } from './ground'
+import { paintCanopy, paintGround, pixelBuffer, prepare } from './ground'
 import type { PaintJob, PaintLayer, PaintPiece, PaintScene, PixelRect } from './ground'
 
 /** 退回主线程画时每画这么久让一次主线程，毫秒 */
@@ -51,15 +51,14 @@ export class RiverPainter {
       }
     }
     if (this.closed || done.every((d) => d === 1)) return
-    const shadows = indexTrees(this.scene, true)
-    const crowns = indexTrees(this.scene, false)
+    const prep = prepare(this.scene)
     let t = performance.now()
     for (let index = 0; index < tasks.length && !this.closed; index++) {
       if (done[index]) continue
       const { layer, rect } = tasks[index]!
       const pixels = pixelBuffer(rect)
-      if (layer === 'ground') paintGround(this.scene, shadows, pixels, rect)
-      else paintCanopy(this.scene, crowns, pixels, rect)
+      if (layer === 'ground') paintGround(this.scene, prep, pixels, rect)
+      else paintCanopy(this.scene, prep, pixels, rect)
       take({ index, layer, rect, pixels })
       if (performance.now() - t < SLICE_MS) continue
       await nextTick()
