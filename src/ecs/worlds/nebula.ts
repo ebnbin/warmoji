@@ -164,25 +164,26 @@ export function luminosity(s: NebulaState, cfg: NebulaConfig, at: number): numbe
   return l
 }
 
-/** 黑洞长大：吞下的质量扣掉化成光的 1/16 并进黑洞，开局的质量是下限、maxGm 是上限 */
-function grow(s: NebulaState, cfg: NebulaConfig, gm: number): void {
-  s.gm = Math.min(cfg.hole.maxGm, s.gm + (1 - ACCRETION_ETA) * gm)
+/** 黑洞长大：吞下的质量扣掉化成光的那份（eta）并进黑洞，开局的质量是下限、maxGm 是上限 */
+function grow(s: NebulaState, cfg: NebulaConfig, gm: number, eta: number): void {
+  s.gm = Math.min(cfg.hole.maxGm, s.gm + (1 - eta) * gm)
   s.rs = schwarzschildU(s.gm, cfg.hole.lightU)
 }
 
 /** 平时吸着周围稀薄的气体：邦迪吸积率随质量的平方涨 */
 export function accrete(s: NebulaState, cfg: NebulaConfig, dt: number): void {
-  grow(s, cfg, cfg.accretion.bondiGm * bondiLum(s, cfg) * dt)
+  grow(s, cfg, cfg.accretion.bondiGm * bondiLum(s, cfg) * dt, ACCRETION_ETA)
 }
 
 /** 画面每帧取走的事件最多攒这么多 */
 const MAX_EVENTS = 64
 
-/** 吞下一样东西：它的质量并进黑洞，放出的光能记成一次闪耀；差不多同时吞下的并成一次，记满了就丢掉此刻最暗的那次 */
+/** 吞下一样东西：放出的光能记成一次闪耀，其余的质量并进黑洞；差不多同时吞下的并成一次，记满了就丢掉此刻最暗的那次 */
 export function feed(s: NebulaState, cfg: NebulaConfig, gm: number, at: number, x: number, y: number): void {
   if (gm <= 0) return
-  grow(s, cfg, gm)
-  const k = gm / cfg.accretion.bondiGm
+  const eta = cfg.swallow.lightEta
+  grow(s, cfg, gm, eta)
+  const k = (eta * gm) / (ACCRETION_ETA * cfg.accretion.bondiGm)
   const last = s.flares[s.flares.length - 1]
   if (last && at - last.at < cfg.accretion.riseMs) s.flares[s.flares.length - 1] = { at: last.at, k: last.k + k }
   else {

@@ -31,7 +31,15 @@ export function approach(out: BodyStep, x: number, y: number, vx: number, vy: nu
 const SUBSTEP_PX = 0.2 * UNIT
 const TURN = 0.08
 const SLOW = 2 * UNIT
+/** 一步最多拆这么多小步：拆满了剩下的时间就不走了，免得在视界边上一大步把身体甩出去 */
 const MAX_SUBSTEPS = 32
+
+/** 速度 v 正以 k 的速率趋近终速、两者差 gap 时，走满 SUBSTEP_PX 要多久：h 时间内的位移不超过 v·h + gap·k·h²/2 */
+function driftStep(v: number, gap: number, k: number): number {
+  const a = gap * k
+  if (a <= 1e-9) return v > 0 ? SUBSTEP_PX / v : Infinity
+  return (Math.sqrt(v * v + 2 * a * SUBSTEP_PX) - v) / a
+}
 
 /**
  * 在引力里被拖着漂：终速是自己的驱动 (bx, by) 加上终端漂移 g·fall，引力随位置变，就按走过的路拆成小步、每步按起点的引力趋近；
@@ -48,8 +56,7 @@ export function drift(sim: Sim, out: BodyStep, x: number, y: number, vx: number,
   for (let i = 0; i < MAX_SUBSTEPS && left > 1e-6 && !sim.hooks.sink(sim, px, py); i++) {
     const tx = bx + gx * fall
     const ty = by + gy * fall
-    const sp = Math.max(Math.hypot(tx, ty), Math.hypot(pvx, pvy))
-    const h = i === MAX_SUBSTEPS - 1 || sp <= 0 ? left : Math.min(left, SUBSTEP_PX / sp)
+    const h = Math.min(left, driftStep(Math.hypot(pvx, pvy), Math.hypot(tx - pvx, ty - pvy), k))
     approach(out, px, py, pvx, pvy, tx, ty, k, h)
     px = out.x
     py = out.y
@@ -84,10 +91,8 @@ export function ballistic(sim: Sim, out: BodyStep, x: number, y: number, vx: num
     const v = Math.hypot(pvx, pvy)
     const a = Math.hypot(ax, ay)
     let h = left
-    if (i < MAX_SUBSTEPS - 1) {
-      if (v > 0) h = Math.min(h, SUBSTEP_PX / v)
-      if (a > 0) h = Math.min(h, (TURN * Math.max(v, SLOW)) / a)
-    }
+    if (v > 0) h = Math.min(h, SUBSTEP_PX / v)
+    if (a > 0) h = Math.min(h, (TURN * Math.max(v, SLOW)) / a)
     px += pvx * h + 0.5 * ax * h * h
     py += pvy * h + 0.5 * ay * h * h
     const g = sim.hooks.pull(sim, px, py)

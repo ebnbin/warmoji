@@ -530,9 +530,9 @@ export const MAPS = {
       shell: { innerU: 18, outerU: 26, gm: 320_000 },
       contain: { speedMul: 1.5, depthU: 1.5, leapU: 8 },
       hole: { gm: 360, maxGm: 560, lightU: 39, fromCenterU: [6, 9], startU: 7 },
-      swallow: { bodyGm: 4, bodyRadiusU: 0.45, pickupGm: 0.05, shotGm: 0.02 },
-      accretion: { bondiGm: 0.05, riseMs: 150, viscousMs: 1400 },
-      disk: { outerRs: 6, innerK: 3600 },
+      swallow: { bodyGm: 4, bodyRadiusU: 0.45, pickupGm: 0.05, shotGm: 0.02, lightEta: 1 / 256 },
+      accretion: { bondiGm: 0.05, riseMs: 200, viscousMs: 2500 },
+      disk: { outerRs: 6, innerK: 2800 },
       meteor: {
         firstMs: 9000,
         intervalMs: 16000,

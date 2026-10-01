@@ -129,23 +129,27 @@ export interface NebulaConfig {
     readonly fromCenterU: readonly [number, number]
     readonly startU: number
   }
-  /** 吞下的东西折成多少 GM：身体按 bodyGm·质量·(半径/bodyRadiusU)³，掉落物、弹体各算一份 */
+  /**
+   * 吞下的东西折成多少 GM：身体按 bodyGm·质量·(半径/bodyRadiusU)³，掉落物、弹体各算一份。
+   * 它们是被拖着几乎径直掉进去的，角动量远不够绕成盘，只有 lightEta 的静能化成光，其余全并进黑洞
+   */
   readonly swallow: {
     readonly bodyGm: number
     readonly bodyRadiusU: number
     readonly pickupGm: number
     readonly shotGm: number
+    readonly lightEta: number
   }
   /**
-   * 吸积发光：平时吸周围稀薄的气体，邦迪吸积率随质量的平方涨，开局每秒吸 bondiGm；吞下的东西先绕成盘，按 riseMs 亮起、按黏滞时标 viscousMs 暗下去。
-   * 放出的光能是吞下质量的 1/16 乘 c²，其余并进黑洞
+   * 吸积发光：平时吸周围带着湍流角动量的稀薄气体，在盘里转到最内稳定圆轨道才掉进去，放出质量的 1/16 乘 c²；邦迪吸积率随质量的平方涨，开局每秒吸 bondiGm。
+   * 吞下东西放出的光按 riseMs 亮起、按黏滞时标 viscousMs 暗下去
    */
   readonly accretion: {
     readonly bondiGm: number
     readonly riseMs: number
     readonly viscousMs: number
   }
-  /** 吸积盘从最内稳定圆轨道铺到 outerRs 个 r_s；平时最内圈的色温（开尔文），随光度的四分之一次方涨 */
+  /** 吸积盘从最内稳定圆轨道铺到 outerRs 个 r_s；innerK 是开局平时盘上最热那一圈（约 4 r_s）未计引力红移的色温，开尔文，随光度的四分之一次方涨 */
   readonly disk: {
     readonly outerRs: number
     readonly innerK: number

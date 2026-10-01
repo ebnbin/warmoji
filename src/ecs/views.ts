@@ -36,7 +36,7 @@ import type { ShipState } from './worlds/ship'
 import { GRAVITY, halfBeamAt } from '../data/ship'
 import type { ShipConfig } from '../types/maps'
 import type { EruptionPhase, VolcanoState } from './worlds/volcano'
-import { drawCloud, drawGlint, drawHalo, drawRock, NEBULA_FRAG, NEBULA_PPU, sheetPx } from './render/nebula'
+import { drawCloud, drawGlint, drawHalo, NEBULA_FRAG, NEBULA_PPU, sheetPx } from './render/nebula'
 import type { NebulaSheet, SheetBand } from './render/nebula'
 import { NebulaPainter } from './render/nebulaPainter'
 import { gravityAt, inHorizon as inNebulaHorizon, luminosity, MAX_FLARES, nebulaHalfU, nebulaLayout } from './worlds/nebula'
@@ -1824,7 +1824,6 @@ const NEBULA_SHEET_KEY = 'nebula-sheet'
 const NEBULA_CLOUD_KEY = 'nebula-cloud'
 const NEBULA_GLINT_KEY = 'nebula-glint'
 const NEBULA_HALO_KEY = 'nebula-halo'
-const NEBULA_ROCK_KEY = 'nebula-rock'
 /** 光晕贴图的半径是阴影半径的几倍 */
 const HALO_EDGE = 4
 /** 开局最多几个线程分着画星云 */
@@ -1839,6 +1838,15 @@ const STREAM_MS = 750
 /** 流星的尾巴：被吸积盘照着时多长、最长多长，格 */
 const TAIL_U = 2.4
 const TAIL_MAX_U = 7
+/** 流星身后的热迹多久冷却到看不见，毫秒 */
+const TRAIL_MS = 450
+
+/** 流星飞过的一点，像素与经过的时刻 */
+interface TrailPoint {
+  readonly x: number
+  readonly y: number
+  readonly at: number
+}
 
 /** 一粒星尘，像素与像素/秒 */
 interface Speck {
@@ -1863,7 +1871,7 @@ interface Stream {
  * 星云：没有太阳。底下是球壳下半部的内壁、壳层的尘埃与外面的深空，由着色器按黑洞的引力透镜、吸积盘的光与光回波画出来；
  * 黑洞是一块阴影，外面一圈光子环和正对着看的吸积盘，周围那圈被弯过来的星云光就是走不出来的地方。
  * 星尘按同一套引力往里漂，越近越快；被吞的身体拉成细流绕进去，吸积盘随之一亮。流星在内壁上先亮起来再冲进空腔，
- * 拖着背向黑洞的尾巴，照亮它经过的星云，扎进对面的壳层就碎掉
+ * 身后拖着冷却变红的热迹与背向黑洞的尾巴，照亮它经过的星云，扎进对面的壳层就碎掉
  */
 class NebulaView extends BoundedView {
   private size?: { w: number; h: number; origin: Point }
@@ -1883,8 +1891,9 @@ class NebulaView extends BoundedView {
   private streams: Stream[] = []
   private streamGfx?: Phaser.GameObjects.Graphics
   private tailGfx?: Phaser.GameObjects.Graphics
-  private rock?: Phaser.GameObjects.Image
-  private rockGlow?: Phaser.GameObjects.Image
+  private core?: Phaser.GameObjects.Image
+  private coma?: Phaser.GameObjects.Image
+  private trail: TrailPoint[] = []
   private knot?: Phaser.GameObjects.Image
   private wake?: Phaser.GameObjects.Particles.ParticleEmitter
   private sparks?: Phaser.GameObjects.Particles.ParticleEmitter
@@ -1913,7 +1922,6 @@ class NebulaView extends BoundedView {
     if (!scene.textures.exists(NEBULA_CLOUD_KEY)) canvasTexture(scene, NEBULA_CLOUD_KEY, 64, 64, (ctx) => drawCloud(ctx, 64))
     if (!scene.textures.exists(NEBULA_GLINT_KEY)) canvasTexture(scene, NEBULA_GLINT_KEY, 32, 32, (ctx) => drawGlint(ctx, 32))
     if (!scene.textures.exists(NEBULA_HALO_KEY)) canvasTexture(scene, NEBULA_HALO_KEY, 256, 256, (ctx) => drawHalo(ctx, 256, HALO_EDGE))
-    if (!scene.textures.exists(NEBULA_ROCK_KEY)) canvasTexture(scene, NEBULA_ROCK_KEY, 48, 48, (ctx) => drawRock(ctx, 48))
     this.shake = loadSettings(browserStorage()).hitShake
   }
 
@@ -1993,19 +2001,21 @@ class NebulaView extends BoundedView {
     this.tailGfx = scene.add.graphics().setDepth(33.5).setBlendMode(Phaser.BlendModes.ADD)
     this.halo = scene.add.image(L.hx, L.hy, NEBULA_HALO_KEY).setDepth(29).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffb27a)
     this.knot = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(33).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffa860).setVisible(false)
-    this.rockGlow = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(34).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff9a4a).setVisible(false)
-    this.rock = scene.add.image(0, 0, NEBULA_ROCK_KEY).setDepth(34.1).setVisible(false)
+    this.coma = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(34).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff9a4a).setVisible(false)
+    this.core = scene.add.image(0, 0, NEBULA_GLINT_KEY).setDepth(34.1).setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff1d6).setVisible(false)
     this.wake = scene.add
       .particles(0, 0, NEBULA_CLOUD_KEY, {
         lifespan: { min: 900, max: 1600 },
         speed: { min: 2, max: 14 },
         scale: { start: 0.12, end: 0.55 },
         alpha: { start: 0.32, end: 0 },
-        tint: [0xff8a4d, 0xd65a6e, 0x9a5bd0],
+        tint: [0xff8a4d, 0xd6604e, 0x8a4a5a],
         blendMode: Phaser.BlendModes.ADD,
+        frequency: 45,
         emitting: false,
       })
       .setDepth(32)
+    this.wake.startFollow(this.core)
     this.sparks = scene.add
       .particles(0, 0, NEBULA_GLINT_KEY, {
         lifespan: { min: 350, max: 900 },
@@ -2027,7 +2037,7 @@ class NebulaView extends BoundedView {
         emitting: false,
       })
       .setDepth(33.2)
-    this.visuals.push(this.dustGfx, this.streamGfx, this.tailGfx, this.halo, this.knot, this.rockGlow, this.rock, this.wake, this.sparks, this.debris)
+    this.visuals.push(this.dustGfx, this.streamGfx, this.tailGfx, this.halo, this.knot, this.coma, this.core, this.wake, this.sparks, this.debris)
     this.dust = []
     for (let i = 0; i < DUST_COUNT; i++) this.dust.push(this.speck(s, cfg, scene.cameras.main, true))
     scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.72, 0.26, 0x000000)
@@ -2083,16 +2093,19 @@ class NebulaView extends BoundedView {
     const shadow = SHADOW_RS * s.rs * UNIT
     if (this.halo) this.halo.setDisplaySize(shadow * HALO_EDGE * 2, shadow * HALO_EDGE * 2).setAlpha(Math.min(0.5, 0.1 * Math.sqrt(lum)))
     this.stepDust(s, cfg, cam, dt, lum)
-    this.stepStreams(v, s, now)
-    this.stepMeteor(v, s, cfg, now, dt, lum)
+    this.stepStreams(s, now)
+    this.stepMeteor(v, s, cfg, now, lum)
   }
 
-  /** 星尘在气体里被拖着漂：终速是引力乘停止时间，越靠近黑洞流得越快；漂进视界或出了空腔就在别处重撒。离黑洞越近被照得越亮 */
+  /** 星尘在气体里被拖着漂：终速是引力乘停止时间，越靠近黑洞流得越快；漂进视界或出了空腔就在别处重撒。离黑洞或飞过的流星越近被照得越亮 */
   private stepDust(s: NebulaState, cfg: NonNullable<MapDef['nebula']>, cam: Phaser.Cameras.Scene2D.Camera, dt: number, lum: number): void {
     const g = this.dustGfx!
     g.clear()
     const L = s.layout
     const lim = cfg.shell.innerU * UNIT
+    const mw = this.u.meteor[3]! * this.u.meteor[2]!
+    const mx = L.cx + this.u.meteor[0]! * UNIT
+    const my = L.cy + this.u.meteor[1]! * UNIT
     for (let i = 0; i < this.dust.length; i++) {
       let p = this.dust[i]!
       let left = dt
@@ -2112,7 +2125,8 @@ class NebulaView extends BoundedView {
         this.dust[i] = p
       }
       const dU = Math.hypot(p.x - L.hx, p.y - L.hy) / UNIT
-      const light = Math.min(1, (lum * 9) / (dU * dU + 4))
+      const dm = Math.hypot(p.x - mx, p.y - my) / UNIT
+      const light = Math.min(1, (lum * 9) / (dU * dU + 4) + (mw * 2) / (dm * dm + 1))
       const sp = Math.hypot(p.vx, p.vy)
       const tail = Math.min(sp * 0.045, 1.6 * UNIT)
       const alpha = Math.min(0.85, 0.12 + 0.75 * light)
@@ -2126,45 +2140,44 @@ class NebulaView extends BoundedView {
     }
   }
 
-  /** 被吞的身体拉成细流，绕着黑洞转进去；吞得越重，声越沉、画面越亮 */
-  private stepStreams(v: ViewCtx, s: NebulaState, now: number): void {
+  /** 被吞的身体拉成细流，绕着黑洞转进视界；越靠近视界引力红移越重，越暗 */
+  private stepStreams(s: NebulaState, now: number): void {
     const g = this.streamGfx!
     for (const e of s.swallows.splice(0)) {
       if (e.gm < 0.3) continue
       this.streams.push({ x: e.x, y: e.y, at: e.at, gm: e.gm, spin: Math.random() < 0.5 ? -1 : 1 })
       playSfx('gulp')
-      if (e.gm >= 20) {
-        v.scene.cameras.main.flash(220, 255, 190, 130)
-        if (this.shake) v.scene.cameras.main.shake(420, 0.004)
-      }
     }
     g.clear()
     const L = s.layout
     this.streams = this.streams.filter((st) => now - st.at < STREAM_MS)
+    const rh = s.rs * UNIT
     for (const st of this.streams) {
       const t = (now - st.at) / STREAM_MS
       const r0 = Math.hypot(st.x - L.hx, st.y - L.hy)
       const a0 = Math.atan2(st.y - L.hy, st.x - L.hx)
       const head = Math.pow(t, 0.6)
       const width = Math.max(1.5, Math.cbrt(st.gm) * 2.2)
+      const radius = (w: number): number => rh + Math.max(0, r0 - rh) * (1 - w) ** 1.6
+      const at = (w: number): Point => {
+        const r = radius(w)
+        const a = a0 + st.spin * w * 2.4
+        return { x: L.hx + Math.cos(a) * r, y: L.hy + Math.sin(a) * r }
+      }
       for (let k = 0; k < 10; k++) {
         const u0 = Math.max(0, head - 0.35 + (k * 0.35) / 10)
         const u1 = Math.max(0, head - 0.35 + ((k + 1) * 0.35) / 10)
-        const at = (w: number): Point => {
-          const r = r0 * (1 - w) ** 1.6
-          const a = a0 + st.spin * w * 2.4
-          return { x: L.hx + Math.cos(a) * r, y: L.hy + Math.sin(a) * r }
-        }
         const p0 = at(u0)
         const p1 = at(u1)
-        g.lineStyle(width * (0.4 + (0.6 * k) / 10), 0xffd2a0, (1 - t) * ((k + 1) / 10) * 0.9)
+        const redshift = (1 - rh / radius((u0 + u1) / 2)) ** 2
+        g.lineStyle(width * (0.4 + (0.6 * k) / 10), 0xffd2a0, (1 - t) * ((k + 1) / 10) * 0.9 * redshift)
         g.lineBetween(p0.x, p0.y, p1.x, p1.y)
       }
     }
   }
 
-  /** 流星：预兆时内壁上的团块渐渐亮起、朝要飞的方向冒出一截；飞的时候石头转着，拖着背向黑洞的尾巴，沿路留下电离的余迹；碎掉时溅出火星与烟 */
-  private stepMeteor(v: ViewCtx, s: NebulaState, cfg: NonNullable<MapDef['nebula']>, now: number, dt: number, lum: number): void {
+  /** 流星：预兆时内壁上的团块渐渐亮起、朝要飞的方向冒出一截；飞的时候团块迎着气体的那一面被冲压烧得发亮，身后留下一道冷却变红的热迹，被吸积盘的光推出一条背向黑洞的尾巴；碎掉时溅出火星与烟 */
+  private stepMeteor(v: ViewCtx, s: NebulaState, cfg: NonNullable<MapDef['nebula']>, now: number, lum: number): void {
     const m = s.meteor
     const g = this.tailGfx!
     g.clear()
@@ -2184,16 +2197,21 @@ class NebulaView extends BoundedView {
     if (phase !== this.phase && phase === 'warn') playSfx('streak')
     this.phase = phase
     this.u.meteor[3] = 0
+    this.trail = this.trail.filter((p) => now - p.at < TRAIL_MS)
+    if (m?.phase === 'fly') this.trail.push({ x: m.x, y: m.y, at: now })
+    this.drawTrail(g, now, mc.radiusU * UNIT)
+    if (m?.phase !== 'fly') this.wake?.stop()
+    else if (!this.wake?.emitting) this.wake?.start()
     if (!m) {
       this.knot?.setVisible(false)
-      this.rock?.setVisible(false)
-      this.rockGlow?.setVisible(false)
+      this.core?.setVisible(false)
+      this.coma?.setVisible(false)
       return
     }
     if (m.phase === 'warn') {
       const k = Math.min(1, (now - m.since) / mc.warnMs)
-      this.rock?.setVisible(false)
-      this.rockGlow?.setVisible(false)
+      this.core?.setVisible(false)
+      this.coma?.setVisible(false)
       this.knot?.setVisible(true).setPosition(m.x, m.y).setScale((0.5 + 1.6 * k) * (UNIT / 32)).setAlpha(0.35 + 0.65 * k * (0.85 + 0.15 * Math.sin(now / 60)))
       const len = 1.8 * UNIT * k
       for (let i = 0; i < 6; i++) {
@@ -2212,8 +2230,8 @@ class NebulaView extends BoundedView {
     const heat = Math.min(4, Math.max(0.3, (speed / (mc.speedU * UNIT)) ** 3))
     const size = mc.radiusU * 2 * UNIT
     this.knot?.setVisible(false)
-    this.rock?.setVisible(true).setPosition(m.x, m.y).setDisplaySize(size, size).setRotation((this.rock.rotation || 0) + dt * 2.2)
-    this.rockGlow?.setVisible(true).setPosition(m.x, m.y).setDisplaySize(size * (2.2 + heat), size * (2.2 + heat)).setAlpha(Math.min(1, 0.45 + 0.15 * heat))
+    this.core?.setVisible(true).setPosition(m.x, m.y).setDisplaySize(size * 0.9, size * 0.9).setAlpha(Math.min(1, 0.6 + 0.2 * heat))
+    this.coma?.setVisible(true).setPosition(m.x, m.y).setDisplaySize(size * (1.8 + 0.5 * heat), size * (1.8 + 0.5 * heat)).setAlpha(Math.min(0.9, 0.35 + 0.15 * heat))
     this.u.meteor[0] = (m.x - L.cx) / UNIT
     this.u.meteor[1] = (m.y - L.cy) / UNIT
     this.u.meteor[2] = heat
@@ -2228,7 +2246,7 @@ class NebulaView extends BoundedView {
     for (let layer = 0; layer < 3; layer++) {
       const w = halfW * (1 - layer * 0.28)
       const len = tail * (1 - layer * 0.22)
-      g.fillStyle(layer === 2 ? 0xffe2c0 : 0xff9a66, 0.1 + layer * 0.07)
+      g.fillStyle(layer === 2 ? 0xffe2c0 : 0xff9a66, 0.12 + layer * 0.08)
       g.fillPoints(
         [
           new Phaser.Math.Vector2(m.x + side.x * w, m.y + side.y * w),
@@ -2240,7 +2258,34 @@ class NebulaView extends BoundedView {
         true,
       )
     }
-    if (Math.random() < dt * 40) this.wake?.emitParticleAt(m.x, m.y, 1)
+  }
+
+  /** 流星身后被冲热的气体：刚经过的地方最宽最亮、发白，冷却着变窄、变红，TRAIL_MS 后看不见 */
+  private drawTrail(g: Phaser.GameObjects.Graphics, now: number, radius: number): void {
+    const pts = this.trail
+    if (pts.length < 2) return
+    const edge = (i: number, w: number, sign: number): Phaser.Math.Vector2 => {
+      const p = pts[i]!
+      const a = pts[Math.max(0, i - 1)]!
+      const b = pts[Math.min(pts.length - 1, i + 1)]!
+      const dx = b.x - a.x
+      const dy = b.y - a.y
+      const len = Math.hypot(dx, dy) || 1
+      return new Phaser.Math.Vector2(p.x - (dy / len) * w * sign, p.y + (dx / len) * w * sign)
+    }
+    for (const [widthK, alphaK] of [
+      [0.8, 0.2],
+      [0.32, 0.45],
+    ] as const) {
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const age0 = (now - pts[i]!.at) / TRAIL_MS
+        const age1 = (now - pts[i + 1]!.at) / TRAIL_MS
+        const w0 = radius * widthK * (1 - age0)
+        const w1 = radius * widthK * (1 - age1)
+        g.fillStyle(mix(0xffcf9a, 0xa83a28, Math.min(1, (age0 + age1) / 1.4)), alphaK * (1 - (age0 + age1) / 2))
+        g.fillPoints([edge(i, w0, 1), edge(i + 1, w1, 1), edge(i + 1, w1, -1), edge(i, w0, -1)], true)
+      }
+    }
   }
 
   destroy(v: ViewCtx): void {
@@ -2254,8 +2299,9 @@ class NebulaView extends BoundedView {
     this.tailGfx = undefined
     this.halo = undefined
     this.knot = undefined
-    this.rock = undefined
-    this.rockGlow = undefined
+    this.core = undefined
+    this.coma = undefined
+    this.trail = []
     this.wake = undefined
     this.sparks = undefined
     this.debris = undefined

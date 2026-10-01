@@ -1,4 +1,4 @@
-import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
+import { cellNearest, fbm, valueNoise } from '../../util/noise'
 
 /** 星云数据贴图每格多少像素：气体是软的，细节交给着色器 */
 export const NEBULA_PPU = 16
@@ -153,8 +153,9 @@ export function bandBuffer(s: NebulaSheet, band: SheetBand): Uint8ClampedArray<A
  * 空腔里看到的是球壳下半部的内壁：从这个像素竖直往下的光线先被黑洞按 α = 2r_s/b + (15π/16)(r_s/b)² 弯折，再打到内壁上，
  * 所以黑洞周围的星云被扭曲，正下方那一片成像成爱因斯坦环；b 小于阴影半径的光线掉进黑洞，是黑的。
  * 内壁只有被吸积盘照到的一层薄皮发光：亮度按到黑洞的距离平方反比、入射角与薄盘朝下更亮的辐射方向，光度取光传过来那一刻的（光回波）；
- * 薄皮斜着看光程更长，碗沿更亮。壳层在平面上是厚厚的尘埃，只有朝空腔那一面被照亮；外缘以外是深空的星。
- * 吸积盘是正对着看的薄盘：开普勒较差转动，温度按 T ∝ x^(−3/4)(1 − √(3/x))^(1/4) 随半径变，光度涨了温度按四分之一次方涨，颜色取黑体色
+ * 气体全电离了就不再更亮。薄皮斜着看光程更长，碗沿更亮。壳层在平面上是厚厚的尘埃，只有朝空腔那一面被照亮；外缘以外是深空的星。
+ * 吸积盘是正对着看的薄盘：开普勒较差转动，温度按 T ∝ x^(−3/4)(1 − √(3/x))^(1/4) 随半径变，光度涨了温度按四分之一次方涨；
+ * 盘面的光按引力红移与横向多普勒 g = √(1 − 3r_s/2r) 变红变暗，颜色取黑体色
  */
 export const NEBULA_FRAG = `
 #pragma phaserTemplate(shaderName)
@@ -187,8 +188,9 @@ uniform vec4 uMeteor;
 uniform float uSeed;
 uniform float uGlow;
 
-const float DISK_GAIN = 2.6;
+const float DISK_GAIN = 1.8;
 const float LIMB_MAX = 3.2;
+const float ION_SAT = 1.2;
 const vec4 SHEET_MEAN = vec4(0.3, 0.35, 0.0, 1.0);
 
 float hash(vec2 p) {
@@ -243,8 +245,8 @@ float stars(vec2 p) {
 
 vec3 litColor(float flux) {
   float heat = flux / (flux + 0.8);
-  vec3 c = mix(vec3(0.78, 0.26, 0.24), vec3(1.0, 0.58, 0.3), smoothstep(0.25, 0.75, heat));
-  return mix(c, vec3(1.0, 0.88, 0.72), smoothstep(0.8, 1.0, heat));
+  vec3 c = mix(vec3(0.78, 0.26, 0.24), vec3(1.0, 0.52, 0.26), smoothstep(0.25, 0.75, heat));
+  return mix(c, vec3(1.0, 0.82, 0.62), smoothstep(0.8, 1.0, heat));
 }
 
 /** 吸积盘上第 i 圈薄环里的湍流：整圈按环心的开普勒（Paczyński–Wiita）角速度转，里圈比外圈转得快 */
@@ -265,6 +267,11 @@ vec3 floorHit(vec2 p, vec2 hole, float rs, float a) {
   float kk = dot(k, k);
   float z = (pk + sqrt(max(0.0, pk * pk - (kk + 1.0) * (dot(p, p) - a * a)))) / (kk + 1.0);
   return vec3(p - k * z, z);
+}
+
+/** 电离气体的复合发光跟着照进来的光走；照得再亮，气体全电离了也就不再更亮 */
+float ionized(float flux) {
+  return ION_SAT * (1.0 - exp(-flux / ION_SAT));
 }
 
 vec4 sheetAt(vec2 s) {
@@ -324,8 +331,9 @@ void main ()
       float grain = mix(0.8 + 0.4 * vnoise(s * 4.3 + uSeed), 1.0, blur);
       float e = nb.r * limb * grain;
       float dustv = nb.g;
-      vec3 glow = e * (vec3(0.09, 0.035, 0.045) + litColor(flux) * flux * 0.6);
-      vec3 rim = nb.b * (flux * vec3(1.0, 0.62, 0.38) * 0.4 * (0.4 + 1.2 * vnoise(s * 3.1 + uSeed + 9.0)) + vec3(0.05, 0.015, 0.03));
+      float lit = ionized(flux);
+      vec3 glow = e * (vec3(0.09, 0.035, 0.045) + litColor(lit) * lit * 0.7);
+      vec3 rim = nb.b * (lit * vec3(1.0, 0.62, 0.38) * 0.4 * (0.4 + 1.2 * vnoise(s * 3.1 + uSeed + 9.0)) + vec3(0.05, 0.015, 0.03));
       vec3 scatter = dustv * flux * vec3(0.3, 0.17, 0.1) * 0.12;
       col = (glow + col) * (1.0 - 0.8 * dustv) + dustv * vec3(0.025, 0.016, 0.012) + rim + scatter;
       col += starTint(s) * stars(s) * 0.35 * (1.0 - dustv) * (1.0 - min(1.0, nb.r * 1.5)) * (1.0 - blur);
@@ -343,7 +351,8 @@ void main ()
       float dm = length(M);
       flux += uMeteor.z * max(dot(nIn, M / dm), 0.0) / (dm * dm + 1.0) * 40.0 * uMeteor.w;
       vec3 deep = vec3(0.045, 0.028, 0.024) * (0.4 + nb.r);
-      vec3 face = nb.r * LIMB_MAX * skin * (vec3(0.09, 0.035, 0.045) + litColor(flux) * flux * 0.6) + nb.b * flux * vec3(1.0, 0.62, 0.38) * 0.4 * skin;
+      float lit = ionized(flux);
+      vec3 face = nb.r * LIMB_MAX * skin * (vec3(0.09, 0.035, 0.045) + litColor(lit) * lit * 0.7) + nb.b * lit * vec3(1.0, 0.62, 0.38) * 0.4 * skin;
       float clear = smoothstep(outer - 2.5, outer, r) * (1.0 - nb.g);
       col = mix(deep, col, clear) + face;
       col += starTint(p) * stars(p) * clear;
@@ -437,34 +446,6 @@ export function drawHalo(ctx: CanvasRenderingContext2D, size: number, edge: numb
       img.data[o + 1] = 255
       img.data[o + 2] = 255
       img.data[o + 3] = clamp01(inner * fall * fade) * 255
-    }
-  }
-  ctx.putImageData(img, 0, 0)
-}
-
-/** 流星的本体：一块不规则的暗色石头，迎着黑洞的那一面被照亮，裂缝里透着被冲压烧红的光 */
-export function drawRock(ctx: CanvasRenderingContext2D, size: number): void {
-  const img = ctx.createImageData(size, size)
-  const c = (size - 1) / 2
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = (x - c) / c
-      const dy = (y - c) / c
-      const a = Math.atan2(dy, dx)
-      const edge = 0.74 + 0.14 * Math.sin(a * 3 + 1.1) + 0.07 * Math.sin(a * 7 + 0.4)
-      const d = Math.hypot(dx, dy) / edge
-      const o = (y * size + x) * 4
-      if (d > 1.2) {
-        img.data[o + 3] = 0
-        continue
-      }
-      const crack = cellEdge(x / 5, y / 5, 47)
-      const hot = Math.max(smooth(0.1, 0, crack) * 0.85, smooth(0.78, 1, d) * 0.7)
-      const shade = 0.7 + 0.3 * (dx * 0.6 - dy * 0.8)
-      img.data[o] = 46 * shade + (255 - 46 * shade) * hot
-      img.data[o + 1] = 34 * shade + (150 - 34 * shade) * hot
-      img.data[o + 2] = 32 * shade + (70 - 32 * shade) * hot
-      img.data[o + 3] = (d <= 1 ? 1 : smooth(1.2, 1, d) * 0.6) * 255
     }
   }
   ctx.putImageData(img, 0, 0)
