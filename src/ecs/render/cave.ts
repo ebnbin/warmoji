@@ -433,6 +433,11 @@ export const MAX_BLOCKS = 32
 /** 同时点着的火把最多几支 */
 export const MAX_TORCHES = SHADE_ROWS
 
+/** 日月的视半径，弧度：直射光斑的边按离天窗多远糊开一圈半影，太阳低时光斑投得远、边也更软 */
+const SUN_RADIUS_RAD = 0.0047
+/** 半影最窄多少米：再窄就看得出天窗图的像素 */
+const PENUMBRA_MIN_M = 0.06
+
 /** 光照层按 2 倍调制叠在画面上：画面 × 2 × 输出，输出 0.5 是原样，往上提亮、往下压暗 */
 const LIGHT_GAIN = 2
 
@@ -453,7 +458,7 @@ const TONE_KNEE = 0.7
 
 /**
  * 洞里的光，按 2 倍调制叠在整个战斗画面上（地面、角色、子弹、特效一起变亮变暗）：
- * 天光与反光从照度场来；直射看这一点朝太阳（月亮）的那条线在洞顶的高度上是不是落在天窗里，再看半路有没有石柱、石笋挡着；
+ * 天光与反光从照度场来；直射看这一点朝太阳（月亮）的那条线在洞顶的高度上是不是落在天窗里（按半影取几个点），再看半路有没有石柱、石笋挡着；
  * 火把按点光源 I·cosθ/d² 照（w 是火把的高度，米），沿影子图判断有没有被岩石挡住，坡面上的明暗只取一半，免得近处的火光把小坡照出一圈黑影；
  * 有方向的光按法线图照出起伏。
  * 照度除以眼睛适应的亮度后按色调曲线压成倍数，直射的光斑亮过原色；越暗越偏冷偏灰；最暗也留一点暖褐，不是纯黑；加一点抖动免得暗处出色带
@@ -503,8 +508,10 @@ float blocked(vec2 p, float z, vec2 dir, float cotE) {
 }
 float beam(vec2 p, float z, vec3 n, vec4 body) {
   if (body.w <= 0.0) return 0.0;
-  vec2 q = p + body.xy * (uCeil - z) * body.z * uUnit;
-  float open = skyAt(q);
+  float run = (uCeil - z) * body.z;
+  vec2 q = p + body.xy * run * uUnit;
+  float pen = max(${SUN_RADIUS_RAD.toFixed(4)} * length(vec2(run, uCeil - z)), ${PENUMBRA_MIN_M.toFixed(2)}) * uUnit;
+  float open = (2.0 * skyAt(q) + skyAt(q + vec2(pen, 0.0)) + skyAt(q - vec2(pen, 0.0)) + skyAt(q + vec2(0.0, pen)) + skyAt(q - vec2(0.0, pen))) / 6.0;
   if (open <= 0.0) return 0.0;
   vec3 l = normalize(vec3(body.xy, 1.0 / max(body.z, 0.0001)));
   return body.w * max(dot(n, l), 0.0) * open * blocked(p, z, body.xy, body.z);
