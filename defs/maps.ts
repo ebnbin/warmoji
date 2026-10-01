@@ -555,6 +555,7 @@ export const MAPS = {
         dragArea: 0.012,
         driftRatio: 0.02,
         driftDeg: 30,
+        fetchM: 150,
       },
       waterExertion: 1.5,
       waterRegen: 0.2,

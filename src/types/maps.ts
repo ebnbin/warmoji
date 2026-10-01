@@ -353,6 +353,8 @@ export interface FloeConfig {
     /** 浮冰顺风漂得比海水快，漂速占平时风速的比例，南半球漂向偏在风向左边 driftDeg 度：浮冰上看，海水往反方向流 */
     readonly driftRatio: number
     readonly driftDeg: number
+    /** 上风开阔水面的长度（风区），米：海面的风浪按它长成 */
+    readonly fetchM: number
   }
   /** 水里的体力：冰面按地图的体力算 */
   readonly waterExertion: number
