@@ -38,8 +38,8 @@ import type { ShipConfig } from '../types/maps'
 import type { EruptionPhase, VolcanoState } from './worlds/volcano'
 import { castShade, drawBat, drawFlame, drawHalo, drawRim, drawSmoke, encodeField, fieldOf, GLOW_FRAG, heightRange, LIGHT_FRAG, MAX_BLOCKS, MAX_TORCHES, modulateMode, paintSky, RELIEF_PPU, SHADE_BINS, SHADE_ROWS, SKY_PPU } from './render/cave'
 import { CavePainter } from './render/cavePainter'
-import { diffuseLux, directLux, heightM, torchesLux, torchSpot } from './worlds/cave'
-import type { CaveState } from './worlds/cave'
+import { diffuseLux, directLux, heightM, inPool, roomOf, torchesLux, torchSpot } from './worlds/cave'
+import type { CaveLayout, CaveState } from './worlds/cave'
 import { skyColor, sunColor, viewU, visibility } from '../data/cave'
 import { GROUND_PPU } from '../data/texel'
 import { charSize } from './systems/shared/scale'
@@ -1942,8 +1942,19 @@ class CaveView extends BoundedView {
     if (!scene.textures.exists(CAVE_BAT_KEY)) canvasTexture(scene, CAVE_BAT_KEY, 64, 32, (ctx) => drawBat(ctx, 64, 32))
   }
 
-  /** 洞里的石头与荧光都画在地面上，不另撒布景 */
+  /** 布景要等洞的形状生成以后才撒得下去，见 scatterProps */
   decor(): void {}
+
+  /** 骨头、蛛网、旧矿镐只撒在空着的洞底上：不进岩石、不落水潭、不压天窗下的碎石坡 */
+  private scatterProps(v: ViewCtx, atlas: EcsAtlas, L: CaveLayout): void {
+    const rng = new Rng(v.run.decorSeed)
+    for (const d of rollDecor(v.def.decor, () => rng.next(), Math.round(v.w / UNIT), Math.round(v.h / UNIT))) {
+      const x = d.xU * UNIT
+      const y = d.yU * UNIT
+      if (roomOf(L.rock, x, y) < (d.sizeU / 2 + 0.15) * UNIT || inPool(L, x, y) || L.mounds.some((m) => Math.hypot(x - m.x, y - m.y) < m.r)) continue
+      this.decorEids.push(spawnDecor(v.world, atlas, { id: d.emoji, outline: 'player', x, y, size: d.sizeU * UNIT, rot: d.rotation, alpha: d.alpha, z: 1 }))
+    }
+  }
 
   async onSimReady(v: ViewCtx, sim: Sim): Promise<void> {
     const s = sim.worldState.cave
@@ -1992,6 +2003,7 @@ class CaveView extends BoundedView {
       version: -1,
     }
     this.visuals.push(scene.add.image(f.x0, f.y0, CAVE_ALBEDO_KEY).setOrigin(0, 0).setDisplaySize(f.w, f.h).setDepth(-1))
+    if (v.atlas) this.scatterProps(v, v.atlas, L)
     // 天窗口的一圈植物：洞顶的边上长着蕨，树根与藤垂进天窗
     L.openings.forEach((o, i) => {
       const size = Math.ceil(((o.r * 1.6) / UNIT + 1.5) * 2 * CAVE_RIM_PPU)
