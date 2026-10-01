@@ -21,4 +21,7 @@ export const SFX = {
   erupt: { wave: 'noise', freq: 700, freqEnd: 35, duration: 1.6, volume: 0.9, attack: 0.01, decayPow: 1.5, throttleMs: 1000 },
   creak: { wave: 'sawtooth', freq: 132, freqEnd: 92, duration: 0.62, volume: 0.2, attack: 0.14, decayPow: 0.9, steps: [1, 1.07, 0.96, 1.09, 1, 1.05, 0.94, 1.08, 1, 1.04], throttleMs: 1800, jitter: 0.18 },
   wash: { wave: 'noise', freq: 1900, freqEnd: 260, duration: 0.75, volume: 0.42, attack: 0.09, decayPow: 1.3, throttleMs: 650, jitter: 0.2 },
+  gulp: { wave: 'sine', freq: 190, freqEnd: 38, duration: 0.9, volume: 0.5, attack: 0.03, decayPow: 1.4, throttleMs: 260, jitter: 0.12 },
+  streak: { wave: 'noise', freq: 260, freqEnd: 1700, duration: 1.4, volume: 0.36, attack: 0.9, decayPow: 0.8, throttleMs: 1200 },
+  shatter: { wave: 'noise', freq: 900, freqEnd: 60, duration: 0.8, volume: 0.6, attack: 0.005, decayPow: 1.8, throttleMs: 500, jitter: 0.1 },
 } as const satisfies Record<string, SfxDef>

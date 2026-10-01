@@ -1,13 +1,16 @@
 import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
-import { SPAWN } from '../../data/enemies'
+import { ENEMIES, SPAWN } from '../../data/enemies'
+import { ENEMY_BODY } from '../../data/abilities'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
 import { MAP, MAPS } from '../../data/maps'
-import type { IceConfig, MapDef, MapId, NebulaOldConfig, RiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
+import type { IceConfig, MapDef, MapId, NebulaConfig, NebulaOldConfig, RiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
 import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebulaOld'
+import { accrete, aroundCircle, endMeteor, feed, flyMeteor, fromCenterU, gravityAt, inHorizon as inNebulaHorizon, keepInCavity, launchMeteor, makeNebula, pruneFlares, reachPx, settleSpot, spawnSpot, sweepContact } from '../worlds/nebula'
+import type { NebulaMeteor, NebulaState } from '../worlds/nebula'
 import { around, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava } from '../worlds/volcano'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import type { Basin } from '../worlds/basin'
@@ -19,7 +22,7 @@ import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/river'
 import { isHorizontal } from '../utils/remap'
 import { hasComponent, query, removeEntity } from 'bitecs'
-import { Airborne, Alive, Boss, BreaksWalls, Drive, Due, ENEMY_SET, Hp, Meteor, Motion, MOTION, Phasing, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Swarmer, Tint, Transform, Uid } from '../components'
+import { Airborne, Alive, Boss, BreaksWalls, Drive, Due, ENEMY_SET, Hp, Meteor, Motion, MOTION, Phasing, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Stats, Swarmer, Tint, Transform, Uid } from '../components'
 import { bodyRules, meteorHit, meteorPath } from '../store'
 import { spawnMeteor } from '../entities/meteor'
 import { FlowField, generateRuins, reachableCells, WallGrid } from '../worlds/ruins'
@@ -79,10 +82,11 @@ export interface WorldState {
   hole: Point | null
   volcano: VolcanoState | null
   ship: ShipState | null
+  nebula: NebulaState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, nebula: null }
 }
 
 export interface WorldHooks {
@@ -94,6 +98,8 @@ export interface WorldHooks {
   mediumVelocity(sim: Sim, x: number, y: number): Point
   /** 这里的引力加速度，像素/秒² */
   pull(sim: Sim, x: number, y: number): Point
+  /** 这里是不是汇（黑洞的视界）：进了这里的身体、弹体就停下，由地图吞掉 */
+  sink(sim: Sim, x: number, y: number): boolean
   surface(sim: Sim, x: number, y: number): Surface
   /** 在这里朝 (dx, dy) 赶路的费力倍率：逆着介质更累，顺着更省力 */
   effort(sim: Sim, x: number, y: number, dx: number, dy: number): number
@@ -138,6 +144,9 @@ const bounded: WorldHooks = {
   },
   pull() {
     return ZERO
+  },
+  sink() {
+    return false
   },
   surface(sim) {
     return groundOf(sim)
@@ -875,6 +884,201 @@ const ship: WorldHooks = {
   },
 }
 
+function nebulaCfg(sim: Sim): NebulaConfig {
+  return MAPS[sim.mapId].nebula!
+}
+
+/** 星云的摆法由布景种子定下，视图开战前就按它摆镜头；黑洞的质量与流星由对局推进 */
+function nebulaOf(sim: Sim): NebulaState {
+  let s = sim.worldState.nebula
+  if (!s) {
+    s = makeNebula(nebulaCfg(sim), sim.run.decorSeed, sim.mapW / 2)
+    sim.worldState.nebula = s
+  }
+  return s
+}
+
+/** 敌人的身体都一样：终端漂移按质量/阻力 */
+const FOE_FALL = ENEMY_BODY.mass / ENEMY_BODY.drag
+const SLOWEST = new Map<MapId, number>()
+
+/** 这张图会刷出来的敌人里最慢的能走多快，格/秒 */
+function slowestFoeU(sim: Sim): number {
+  let v = SLOWEST.get(sim.mapId)
+  if (v === undefined) {
+    const def = MAPS[sim.mapId]
+    v = Math.min(...def.mix.map((r) => ENEMIES[r.kind].speed), ENEMIES[def.boss].speed) / UNIT
+    SLOWEST.set(sim.mapId, v)
+  }
+  return v
+}
+
+/** 刷怪点离黑洞至少多远，像素：这张图最慢的敌人此刻走不出来的半径，再加余量 */
+function nebulaClearPx(sim: Sim): number {
+  return reachPx(nebulaOf(sim), FOE_FALL, slowestFoeU(sim)) + nebulaCfg(sim).spawnClearU * UNIT
+}
+
+const ACCRETION_TINT = 0xffb36b
+const METEOR_GLOW_TINT = 0xff8a3d
+
+/** 吞下的身体折成多少 GM：按质量与半径的三次方 */
+function bodyGm(cfg: NebulaConfig, eid: number): number {
+  return cfg.swallow.bodyGm * Phys.mass[eid]! * (Radius.v[eid]! / (cfg.swallow.bodyRadiusU * UNIT)) ** 3
+}
+
+/** 不在活动的平面上：穿行中没有实体，跳起来的在空中 */
+function offPlane(eid: number): boolean {
+  return inTransit(eid) || Motion.kind[eid] === MOTION.arc
+}
+
+/** 中心进了视界的都被吞掉：角色倒下，敌人死去，掉落物、蜜蜂、碎片与弹体消失；吞下的质量让黑洞长大，放出的光能化作一阵闪耀 */
+function swallowNebula(sim: Sim, s: NebulaState, cfg: NebulaConfig): void {
+  const now = sim.elapsedMs
+  const src = hazardSource('blackhole', ACCRETION_TINT)
+  const st = sim.run.stats
+  const inside = (eid: number): boolean => inNebulaHorizon(s, Transform.x[eid]!, Transform.y[eid]!)
+  for (const m of sim.characters) {
+    if (!Alive.v[m] || offPlane(m) || !inside(m)) continue
+    const slot = Slot.v[m]!
+    if (slot >= 0 && slot < st.damageTaken.length) st.damageTaken[slot] = (st.damageTaken[slot] ?? 0) + Hp.v[m]!
+    st.hazardDamage.blackhole = (st.hazardDamage.blackhole ?? 0) + Hp.v[m]!
+    const x = Transform.x[m]!
+    const y = Transform.y[m]!
+    const gm = bodyGm(cfg, m)
+    die(sim, m, src, 0, 0)
+    feed(s, cfg, gm, now, x, y)
+  }
+  for (const eid of [...query(sim.world, ENEMY_SET)]) {
+    if (!Alive.v[eid] || offPlane(eid) || !inside(eid)) continue
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    const gm = bodyGm(cfg, eid)
+    die(sim, eid, src, 0, 0)
+    feed(s, cfg, gm, now, x, y)
+  }
+  for (const eid of [...query(sim.world, PICKUP_SET)]) {
+    if (!inside(eid)) continue
+    feed(s, cfg, cfg.swallow.pickupGm, now, Transform.x[eid]!, Transform.y[eid]!)
+    removeEntity(sim.world, eid)
+  }
+  for (const eid of [...query(sim.world, [Swarmer, Transform])]) {
+    if (!inside(eid)) continue
+    feed(s, cfg, bodyGm(cfg, eid), now, Transform.x[eid]!, Transform.y[eid]!)
+    bodyRules[eid] = undefined
+    removeEntity(sim.world, eid)
+  }
+  for (const eid of [...query(sim.world, [Shard, Transform])]) {
+    if (inside(eid)) removeEntity(sim.world, eid)
+  }
+  for (const eid of [...query(sim.world, PROJ_SET)]) {
+    if (!inside(eid)) continue
+    feed(s, cfg, cfg.swallow.shotGm, now, Transform.x[eid]!, Transform.y[eid]!)
+    cullProjectile(sim, eid)
+  }
+}
+
+/**
+ * 流星撞上身体：两者按完全非弹性碰撞交换动量，身体沿碰上那一刻的法线被撞开；
+ * 伤害按碰撞损耗的动能，随法向相对速度的平方变，正面以 speedU 撞上时是 damage
+ */
+function strikeNebula(sim: Sim, cfg: NebulaConfig, m: NebulaMeteor, x0: number, y0: number): void {
+  const mc = cfg.meteor
+  const src = hazardSource('meteor', METEOR_GLOW_TINT)
+  const meteorMass = mc.gm / cfg.swallow.bodyGm
+  const ref = mc.speedU * UNIT
+  const strike = (eid: number): void => {
+    if (m.hit.has(Uid.v[eid]!) || offPlane(eid)) return
+    const n = sweepContact(x0, y0, m.x, m.y, Transform.x[eid]!, Transform.y[eid]!, mc.radiusU * UNIT + Radius.v[eid]!)
+    if (!n) return
+    m.hit.add(Uid.v[eid]!)
+    const vn = Math.max(0, (m.vx - Phys.vx[eid]!) * n.x + (m.vy - Phys.vy[eid]!) * n.y)
+    const mass = Phys.mass[eid]!
+    const j = ((meteorMass * mass) / (meteorMass + mass)) * vn
+    hit(sim, src, eid, mc.damage * (vn / ref) ** 2, { tick: true, knockback: j, from: { x: Transform.x[eid]! - n.x, y: Transform.y[eid]! - n.y } })
+  }
+  for (const c of sim.characters) if (Alive.v[c]) strike(c)
+  for (const eid of [...query(sim.world, ENEMY_SET)]) if (Alive.v[eid]) strike(eid)
+}
+
+/** 流星：到点在内壁上起预兆，预兆完冲进空腔，只受引力；扎进壳层被撕碎、掉进视界被吞掉、飞到时限散掉，之后隔一阵再来 */
+function nebulaMeteors(sim: Sim, s: NebulaState, cfg: NebulaConfig, delta: number): void {
+  const mc = cfg.meteor
+  const now = sim.elapsedMs
+  const m = s.meteor
+  if (!m) {
+    if (now >= s.meteorAt) s.meteor = launchMeteor(s, cfg, sim.rng, leaderX(sim), leaderY(sim), now)
+    return
+  }
+  if (m.phase === 'warn') {
+    if (now < m.since + mc.warnMs) return
+    m.phase = 'fly'
+    m.since = now
+  }
+  const x0 = m.x
+  const y0 = m.y
+  const end = flyMeteor(s, cfg, m, delta / 1000)
+  strikeNebula(sim, cfg, m, x0, y0)
+  if (!end && now - m.since < mc.maxFlightMs) return
+  if (end === 'swallow') feed(s, cfg, mc.gm, now, m.x, m.y)
+  endMeteor(s, { kind: end ?? 'fade', x: m.x, y: m.y, vx: m.vx, vy: m.vy, at: now })
+  s.meteor = null
+  s.meteorAt = now + mc.intervalMs + (sim.rng.next() * 2 - 1) * mc.intervalJitterMs
+}
+
+/**
+ * 星云：一团空心星云的空腔，没有墙。黑洞（Paczyński–Wiita 势）与壳层（牛顿壳层定理）的万有引力作用于一切，走进壳层的都被拉回空腔；
+ * 中心进了视界的被吞掉，黑洞随吞下的质量长大；壳层不时甩出流星横穿空腔。敌人只顾着追人，头目会绕开自己走不出来的那一圈
+ */
+const nebula: WorldHooks = {
+  ...bounded,
+  pull(sim, x, y) {
+    return gravityAt(nebulaOf(sim), nebulaCfg(sim), x, y)
+  },
+  sink(sim, x, y) {
+    return inNebulaHorizon(nebulaOf(sim), x, y)
+  },
+  constrainBody(_sim, _eid, _from, next) {
+    return next
+  },
+  chaseDir(sim, eid, tx, ty) {
+    if (Boss.v[eid] !== 1) return bounded.chaseDir(sim, eid, tx, ty)
+    const s = nebulaOf(sim)
+    const r = reachPx(s, Phys.mass[eid]! / Phys.drag[eid]!, Stats.moveSpeed[eid]!) + UNIT
+    return aroundCircle(Transform.x[eid]!, Transform.y[eid]!, tx, ty, s.layout.hx, s.layout.hy, r)
+  },
+  wanderDir(sim, eid, dx, dy) {
+    return keepInCavity(nebulaOf(sim), nebulaCfg(sim), Transform.x[eid]!, Transform.y[eid]!, dx, dy, Radius.v[eid]! + 0.6 * UNIT)
+  },
+  fleeDir(sim, eid, awayX, awayY) {
+    return keepInCavity(nebulaOf(sim), nebulaCfg(sim), Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + 1.5 * UNIT)
+  },
+  outside(sim, x, y) {
+    return fromCenterU(nebulaOf(sim), x, y) > nebulaCfg(sim).shell.outerU
+  },
+  spawnPoint(sim, boss) {
+    const near = SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1)
+    return spawnSpot(nebulaOf(sim), nebulaCfg(sim), () => sim.rng.next(), nebulaClearPx(sim), (boss ? 2 : SPAWN.edgeInset) * UNIT, leaderX(sim), leaderY(sim), near)
+  },
+  center(sim) {
+    const L = nebulaOf(sim).layout
+    return { x: L.sx, y: L.sy }
+  },
+  settle(sim, p) {
+    return settleSpot(nebulaOf(sim), nebulaCfg(sim), p.x, p.y, nebulaClearPx(sim), SPAWN.edgeInset * UNIT)
+  },
+  onStart(sim) {
+    nebulaOf(sim)
+  },
+  tick(sim, delta) {
+    const cfg = nebulaCfg(sim)
+    const s = nebulaOf(sim)
+    accrete(s, cfg, delta / 1000)
+    swallowNebula(sim, s, cfg)
+    nebulaMeteors(sim, s, cfg, delta)
+    pruneFlares(s, cfg, sim.elapsedMs)
+  },
+}
+
 function riverCfg(sim: Sim): RiverConfig {
   return MAPS[sim.mapId].river!
 }
@@ -998,6 +1202,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   void: torus,
   space,
   nebulaOld,
+  nebula,
   volcano,
   ship,
 }

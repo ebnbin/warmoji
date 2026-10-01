@@ -103,6 +103,77 @@ export interface NebulaOldConfig {
   }
 }
 /**
+ * 星云：深空里一团空心的星云，活动的平面是它的赤道面，空腔里有一个黑洞。人、怪、掉落物、子弹与流星都受黑洞与星云壳层的万有引力：
+ * 身体在星云气体里按终速被拖着漂，子弹、冲刺与流星按弹道飞；中心进了视界就被吞掉，吞下的质量让黑洞长大。这里没有太阳，光来自吸积盘与流星
+ */
+export interface NebulaConfig {
+  /** 空心厚球壳：空腔半径、外缘半径与引力常数乘壳层质量（格³/秒²）。引力按牛顿壳层定理，空腔里为零，越往壳层里走越强，外缘以外如同全部质量在球心 */
+  readonly shell: {
+    readonly innerU: number
+    readonly outerU: number
+    readonly gm: number
+  }
+  /** 构建期校验的余量：任何身体以 speedMul 倍的最快速度往外走，最深只走进壳层 depthU 格；停下后再往外瞬移 leapU 格，引力仍把它拉回 */
+  readonly contain: {
+    readonly speedMul: number
+    readonly depthU: number
+    readonly leapU: number
+  }
+  readonly hole: {
+    /** 引力常数乘黑洞的质量，格³/秒²：开局是下限，吞得再多也不超过 maxGm */
+    readonly gm: number
+    readonly maxGm: number
+    /** 这片星域里的光速，格/秒：定出视界 r_s = 2GM/c²、透镜的偏折与光传过来要多久 */
+    readonly lightU: number
+    /** 黑洞离星云中心多远，方向随机；队伍从中心另一侧离中心 startU 格处出发 */
+    readonly fromCenterU: readonly [number, number]
+    readonly startU: number
+  }
+  /** 吞下的东西折成多少 GM：身体按 bodyGm·质量·(半径/bodyRadiusU)³，掉落物、弹体各算一份 */
+  readonly swallow: {
+    readonly bodyGm: number
+    readonly bodyRadiusU: number
+    readonly pickupGm: number
+    readonly shotGm: number
+  }
+  /**
+   * 吸积发光：平时吸周围稀薄的气体，邦迪吸积率随质量的平方涨，开局每秒吸 bondiGm；吞下的东西先绕成盘，按 riseMs 亮起、按黏滞时标 viscousMs 暗下去。
+   * 放出的光能是吞下质量的 1/16 乘 c²，其余并进黑洞
+   */
+  readonly accretion: {
+    readonly bondiGm: number
+    readonly riseMs: number
+    readonly viscousMs: number
+  }
+  /** 吸积盘从最内稳定圆轨道铺到 outerRs 个 r_s；平时最内圈的色温（开尔文），随光度的四分之一次方涨 */
+  readonly disk: {
+    readonly outerRs: number
+    readonly innerK: number
+  }
+  /**
+   * 流星：壳层的湍流甩出一个团块，以 speedU 上下 speedJitter 倍冲进空腔，之后只受引力；它被吸积盘照着，像彗星一样拖着背向黑洞的尾巴。
+   * 预警时团块先在内壁上亮起来；冲进对面的壳层就被冲压撕碎，掉进视界就被吞掉。伤害按动能随速度的平方变
+   */
+  readonly meteor: {
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly intervalJitterMs: number
+    readonly warnMs: number
+    readonly speedU: number
+    readonly speedJitter: number
+    /** 撞上身体的半径，格 */
+    readonly radiusU: number
+    /** 瞄准点在队长两侧最多偏多远 */
+    readonly offsetU: number
+    /** 以 speedU 撞上时的伤害 */
+    readonly damage: number
+    readonly gm: number
+    readonly maxFlightMs: number
+  }
+  /** 刷怪点离黑洞的余量：比这张图最慢的敌人走不出来的半径再远这么多格 */
+  readonly spawnClearU: number
+}
+/**
  * 火山：能走的是方形地图里一块边缘不规则的盆地，四周是崖壁与高地；一座火山背靠盆地边，山体谁也上不去。
  * 火山定期从火山口喷发，熔岩往四面八方顺着地势流，盖住的地方敌我都受伤，冷却凝固成岩石后又能站人
  */
@@ -294,7 +365,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'volcano' | 'ship'
+  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -308,6 +379,7 @@ export interface MapDef {
   readonly ice?: IceConfig
   readonly space?: SpaceConfig
   readonly nebulaOld?: NebulaOldConfig
+  readonly nebula?: NebulaConfig
   readonly volcano?: VolcanoConfig
   readonly ship?: ShipConfig
   readonly river?: RiverConfig

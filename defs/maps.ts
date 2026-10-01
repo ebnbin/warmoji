@@ -126,6 +126,16 @@ const SHIP_MIX: readonly EnemyMixRow[] = [
   { kind: 'raccoon', sinceWave: 5, base: 4, perWave: 0.2, min: 0, max: 8 },
 ]
 
+const NEBULA_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 72, perWave: -2, min: 34, max: 72 },
+  { kind: 'alien', sinceWave: 1, base: 16, perWave: 0.7, min: 12, max: 30 },
+  { kind: 'comet', sinceWave: 2, base: 11, perWave: 0.5, min: 0, max: 21 },
+  { kind: 'ufo', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 15 },
+  { kind: 'siren', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'chameleon', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'ghost', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 export const MAPS = {
   forest: {
     emoji: '1f332',
@@ -495,5 +505,49 @@ export const MAPS = {
       balls: { count: 6, radiusU: 0.18, restitution: 0.35 },
     },
     boss: 'croc',
+  },
+  nebula: {
+    emoji: '1f30c',
+    name: '星云',
+    desc: '深空里一团空心的星云，空腔里藏着一个黑洞。这里没有太阳，光来自黑洞吸积盘和偶尔划过的流星。人、怪、金币、子弹和流星都受万有引力：身体被拖着漂，子弹和流星的轨迹被引弯；黑洞周围那圈被弯过来的光就是走不出来的地方，掉进视界就被吞掉，吞下的东西让黑洞越长越大。空腔外是厚厚的星云壳层，往里走得越深被拉回得越狠，谁也出不去',
+    kind: 'nebula',
+    stamina: { exertion: 0.4, regen: 0.9 },
+    palette: {
+      bgFrom: 'hsl(330 26% 10%)',
+      bgTo: 'hsl(255 40% 3%)',
+      map: hslToInt(330, 0.24, 0.1),
+      shadow: 0x000000,
+    },
+    decor: {
+      emojis: ['2728'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: NEBULA_MIX,
+    finalWaveSub: '奇点从视界边上走来——别被它和黑洞夹在中间！',
+    nebula: {
+      shell: { innerU: 18, outerU: 26, gm: 320_000 },
+      contain: { speedMul: 1.5, depthU: 1.5, leapU: 8 },
+      hole: { gm: 360, maxGm: 560, lightU: 39, fromCenterU: [6, 9], startU: 7 },
+      swallow: { bodyGm: 4, bodyRadiusU: 0.45, pickupGm: 0.05, shotGm: 0.02 },
+      accretion: { bondiGm: 0.05, riseMs: 150, viscousMs: 1400 },
+      disk: { outerRs: 6, innerK: 3600 },
+      meteor: {
+        firstMs: 9000,
+        intervalMs: 16000,
+        intervalJitterMs: 5000,
+        warnMs: 1800,
+        speedU: 11,
+        speedJitter: 0.15,
+        radiusU: 0.85,
+        offsetU: 5,
+        damage: 24,
+        gm: 6,
+        maxFlightMs: 7000,
+      },
+      spawnClearU: 1.5,
+    },
+    boss: 'blackhole',
   },
 } as const satisfies Record<string, MapDef>
