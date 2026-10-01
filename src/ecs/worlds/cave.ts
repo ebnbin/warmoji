@@ -740,19 +740,35 @@ export interface CaveLight {
   version: number
 }
 
-/** 天光视角系数：从 (x, y) 高 z 米处仰看，天窗里每一小块天各占多少；被洞壁、石柱挡住的不算 */
-function viewFactor(L: CaveLayout, samples: readonly Point[], area: number, x: number, y: number, z: number, check: boolean): number {
+/** 一个天窗：按半格取的天空样点，与查遮挡用的探点（圆心与一圈） */
+interface SkyPatch {
+  readonly samples: readonly Point[]
+  readonly probes: readonly Point[]
+}
+
+/** 每个天窗查遮挡的探点：圆心之外再围一圈这么多个 */
+const SKY_PROBES = 8
+
+/** 天光视角系数：从 (x, y) 高 z 米处仰看，各个天窗里每一小块天各占多少；check 时按每个天窗的探点有几成被洞壁、石柱挡住打折 */
+function viewFactor(L: CaveLayout, patches: readonly SkyPatch[], area: number, x: number, y: number, z: number, check: boolean): number {
   const dz = Math.max(0.3, L.ceilingM - z)
   const dz2 = dz * dz
   let sum = 0
-  for (const s of samples) {
-    const dx = (s.x - x) / UNIT
-    const dy = (s.y - y) / UNIT
-    const r2 = dx * dx + dy * dy + dz2
-    const wgt = (dz2 / (Math.PI * r2 * r2)) * area
-    if (wgt < 1e-7) continue
-    if (check && rockHit(L.rock, x, y, s.x, s.y)) continue
-    sum += wgt
+  for (const p of patches) {
+    let part = 0
+    for (const s of p.samples) {
+      const dx = (s.x - x) / UNIT
+      const dy = (s.y - y) / UNIT
+      const r2 = dx * dx + dy * dy + dz2
+      part += (dz2 / (Math.PI * r2 * r2)) * area
+    }
+    if (part < 1e-7) continue
+    if (check) {
+      let seen = 0
+      for (const q of p.probes) if (!rockHit(L.rock, x, y, q.x, q.y)) seen++
+      part *= seen / p.probes.length
+    }
+    sum += part
   }
   return Math.min(1, sum)
 }
@@ -779,14 +795,21 @@ function makeLight(L: CaveLayout, cfg: CaveConfig, margin: number): CaveLight {
     }
     return false
   }
-  // 天窗按半格取样
-  const samples: Point[] = []
+  // 天窗按半格取样；探点是圆心与一圈四分之三半径上的点
   const ds = 0.5 * UNIT
-  for (const o of L.openings) {
+  const patches: SkyPatch[] = L.openings.map((o) => {
+    const samples: Point[] = []
     for (let y = o.y - o.r * 1.6; y <= o.y + o.r * 1.6; y += ds) {
-      for (let x = o.x - o.r * 1.6; x <= o.x + o.r * 1.6; x += ds) if (skyAbove(L, x, y, 0.01) > 0.5) samples.push({ x, y })
+      for (let x = o.x - o.r * 1.6; x <= o.x + o.r * 1.6; x += ds) if (Math.hypot(x - o.x, y - o.y) < openingRadius(o, Math.atan2(y - o.y, x - o.x))) samples.push({ x, y })
     }
-  }
+    const probes: Point[] = [{ x: o.x, y: o.y }]
+    for (let k = 0; k < SKY_PROBES; k++) {
+      const a = (k / SKY_PROBES) * Math.PI * 2
+      const r = openingRadius(o, a) * 0.75
+      probes.push({ x: o.x + Math.cos(a) * r, y: o.y + Math.sin(a) * r })
+    }
+    return { samples, probes }
+  })
   const area = (ds / UNIT) ** 2
   for (let cy = 0; cy < rows; cy++) {
     for (let cx = 0; cx < cols; cx++) {
@@ -801,7 +824,7 @@ function makeLight(L: CaveLayout, cfg: CaveConfig, margin: number): CaveLight {
       const room = roomOf(L.rock, x, y)
       alcove[i] = deep ? 1 : 0
       hall[i] = !deep && room > 0 && x > 0 && y > 0 && x < L.w && y < L.h ? 1 : 0
-      if (shell >= 0 && z[i]! < L.ceilingM) view[i] = viewFactor(L, samples, area, x, y, z[i]!, room > 0 && (deep || shell < 2.5 * UNIT))
+      if (shell >= 0 && z[i]! < L.ceilingM) view[i] = viewFactor(L, patches, area, x, y, z[i]!, room > 0 && (deep || shell < 2.5 * UNIT))
     }
   }
   // 洞壁上的天光从相邻的洞底往上一路变暗；石柱顶在洞顶里，按柱脚的地面算、略暗一点
