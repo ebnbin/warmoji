@@ -102,7 +102,7 @@ export function paintNebula(s: NebulaSheet, out: Uint8ClampedArray, r0: number, 
       const cloud = smooth(0.28, 0.78, fbm(x / 10, y / 10, s.seed + 1, 3))
       const churn = smooth(0.3, 0.85, fbm((x + wx) / 3.4, (y + wy) / 3.4, s.seed + 4, 4))
       const thread = ridge(fbm((x + wx * 0.7) / 2.1, (y + wy * 0.7) / 2.1, s.seed + 5, 3)) ** 6
-      let e = cloud * (0.3 + 0.7 * churn) + thread * (0.08 + 0.32 * cloud)
+      let e = (0.18 + 0.82 * cloud) * (0.3 + 0.7 * churn) + thread * (0.08 + 0.32 * cloud)
       const lanes = smooth(0.52, 0.8, fbm((x - wy) / 5, (y + wx) / 5, s.seed + 21, 4)) * 0.75
       const g = cellNearest(x / 2.6, y / 2.6, s.seed + 23)
       const globule = g.h > 0.94 ? smooth(0.32, 0.1, Math.hypot(g.dx, g.dy)) * 0.7 : 0
@@ -332,7 +332,7 @@ void main ()
       float e = nb.r * limb * grain;
       float dustv = nb.g;
       float lit = ionized(flux);
-      vec3 glow = e * (vec3(0.09, 0.035, 0.045) + litColor(lit) * lit * 0.7);
+      vec3 glow = e * (vec3(0.18, 0.085, 0.085) + litColor(lit) * lit * 0.7);
       vec3 rim = nb.b * (lit * vec3(1.0, 0.62, 0.38) * 0.4 * (0.4 + 1.2 * vnoise(s * 3.1 + uSeed + 9.0)) + vec3(0.05, 0.015, 0.03));
       vec3 scatter = dustv * flux * vec3(0.3, 0.17, 0.1) * 0.12;
       col = (glow + col) * (1.0 - 0.8 * dustv) + dustv * vec3(0.025, 0.016, 0.012) + rim + scatter;
@@ -352,7 +352,7 @@ void main ()
       flux += uMeteor.z * max(dot(nIn, M / dm), 0.0) / (dm * dm + 1.0) * 40.0 * uMeteor.w;
       vec3 deep = vec3(0.045, 0.028, 0.024) * (0.4 + nb.r);
       float lit = ionized(flux);
-      vec3 face = nb.r * LIMB_MAX * skin * (vec3(0.09, 0.035, 0.045) + litColor(lit) * lit * 0.7) + nb.b * lit * vec3(1.0, 0.62, 0.38) * 0.4 * skin;
+      vec3 face = nb.r * LIMB_MAX * skin * (vec3(0.18, 0.085, 0.085) + litColor(lit) * lit * 0.7) + nb.b * lit * vec3(1.0, 0.62, 0.38) * 0.4 * skin;
       float clear = smoothstep(outer - 2.5, outer, r) * (1.0 - nb.g);
       col = mix(deep, col, clear) + face;
       col += starTint(p) * stars(p) * clear;

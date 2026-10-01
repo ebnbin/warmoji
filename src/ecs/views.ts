@@ -1829,7 +1829,7 @@ const HALO_EDGE = 4
 /** 开局最多几个线程分着画星云 */
 const NEBULA_THREADS = 4
 /** 着色器的曝光：光的强度乘它再按 1 − e^(−x) 压进画面 */
-const NEBULA_EXPOSURE = 1.7
+const NEBULA_EXPOSURE = 1.9
 /** 星尘：多少粒，终端漂移 g·t 的停止时间（秒） */
 const DUST_COUNT = 240
 const DUST_STOP_S = 0.35
