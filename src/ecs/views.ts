@@ -1972,9 +1972,9 @@ class CaveView extends BoundedView {
     if (this.painter !== painter) return
     painter.close()
     this.painter = undefined
-    albedo.refresh()
-    geo.refresh()
-    norm.refresh()
+    refreshLinear(albedo)
+    refreshLinear(geo)
+    refreshLinear(norm)
     const SW = Math.round((f.w / UNIT) * SKY_PPU)
     const SH = Math.round((f.h / UNIT) * SKY_PPU)
     canvasTexture(scene, CAVE_SKY_KEY, SW, SH, (ctx) => {
@@ -2138,7 +2138,7 @@ class CaveView extends BoundedView {
       d.version = s.light.version
       encodeField(s.light, d.fieldImg.data)
       d.field.getContext().putImageData(d.fieldImg, 0, 0)
-      d.field.refresh()
+      refreshLinear(d.field)
     }
     // 眼睛按洞里的平均照度适应（对数上平滑地跟），最暗适应到 view.brightLux
     const target = Math.max(cfg.view.brightLux, s.light.hallLux)
@@ -2256,7 +2256,7 @@ class CaveView extends BoundedView {
     this.u.torchCount = n
     if (n > 0) {
       d.shade.getContext().putImageData(d.shadeImg, 0, 0)
-      d.shade.refresh()
+      refreshLinear(d.shade)
     }
   }
 
@@ -2438,6 +2438,12 @@ class CaveView extends BoundedView {
     this.smoke = undefined
     for (const key of [CAVE_ALBEDO_KEY, CAVE_GEO_KEY, CAVE_NORM_KEY, CAVE_SKY_KEY, CAVE_FIELD_KEY, CAVE_SHADE_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
+}
+
+/** 重传画布贴图：重传会按游戏的像素风设置退回最近邻取样，溶洞的地面与数据图都要线性插值 */
+function refreshLinear(tex: Phaser.Textures.CanvasTexture): void {
+  tex.refresh()
+  tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
 }
 
 /** 直射弱过眼睛适应亮度的这么多倍就当没有：着色器省下挡光的计算 */

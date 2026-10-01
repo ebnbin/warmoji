@@ -2,7 +2,7 @@ import type Phaser from 'phaser'
 import { UNIT } from '../../util/units'
 import { cellEdge, cellNearest, fbm, valueNoise } from '../../util/noise'
 import { Rng } from '../../util/rng'
-import { heightM, NEAR, nearAt, outward, poolField, roomOf, skyAbove } from '../worlds/cave'
+import { heightM, NEAR, nearAt, outward, poolField, roomOf, SHADOW_U, skyAbove } from '../worlds/cave'
 import type { CaveLayout, CaveLight, Opening, Rock } from '../worlds/cave'
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
@@ -37,9 +37,6 @@ export interface Field {
 export function fieldOf(L: CaveLayout): Field {
   return { x0: L.rock.x0, y0: L.rock.y0, w: L.w - 2 * L.rock.x0, h: L.h - 2 * L.rock.y0 }
 }
-
-/** 石笋背着天窗拖的影子最长几格 */
-export const STALAGMITE_SHADOW_U = 1.2
 
 /** 烘进固有色的小起伏（碎石、石块、石笋）按头顶略偏画面上方的光打：洞里的光多半从天窗往下来 */
 const BAKE_Y = -0.3 / Math.hypot(0.3, 1)
@@ -85,7 +82,7 @@ function pebble(c: Rgb, dx: number, dy: number, rad: number, r: number, g: numbe
   const d = Math.hypot(dx, dy) / rad
   if (d < 1) {
     const lit = Math.max(0, (dy / rad) * BAKE_Y + Math.sqrt(1 - d * d) * BAKE_Z)
-    const tone = 0.6 + 0.5 * lit
+    const tone = (0.72 + 0.42 * lit) * (1 - 0.18 * smooth(0.8, 1, d))
     mixTo(c, r * tone, g * tone, b * tone, w * smooth(1, 0.8, d))
     return
   }
@@ -117,7 +114,7 @@ function fern(c: Rgb, dx: number, dy: number, rad: number, h: number, w: number)
  * 地面的固有色（不含方向光，光照在着色器里随太阳、月亮与火把实时算），ppu 是每格多少像素，只画第 r0 到 r1 行。
  * 洞底是灰黄的流石，流石上有一道道细小的边石坝，低处积着褐色的泥、干了裂成小块，散着几块圆石；洞壁脚下潮湿、堆着碎石；
  * 天窗下是塌落的石块，长着苔藓与蕨；水潭是钙华坝围着的清水，潭底发白、越深越青；石笋是一圈圈长高的钙华锥，尖上湿亮；
- * 石柱是一截粗壮的钙华柱，顶面斑驳、边上一道道竖棱，脚下一圈流石裙；石笋与石柱朝天窗的一侧亮，背着天窗拖一条淡影；洞壁是垂下的石幔与一道道岩层，越往上越暗，再往外是岩体
+ * 石柱是一截粗壮的钙华柱，柱顶斑驳、边上一道道竖棱，脚下一圈流石裙；石笋与石柱朝天窗的一侧亮，背着天窗拖一条淡影；洞壁是垂下的石幔与一道道岩层，越往上越暗，再往外是岩体
  */
 export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, r0: number, r1: number): void {
   const f = fieldOf(L)
@@ -156,14 +153,14 @@ export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, 
         c[0] = 100 + 34 * big
         c[1] = 87 + 28 * big
         c[2] = 70 + 20 * big
-        const mud = smooth(0.56, 0.72, fbm(gx / 4.5, gy / 4.5, s + 21, 2))
+        const mud = smooth(0.6, 0.74, fbm(gx / 4.5, gy / 4.5, s + 21, 2))
         const step = frac(fbm(gx / 1.7 + 3, gy / 1.7, s + 31, 3) * 6.5)
         scale(c, 1 + (0.12 * smooth(0.8, 0.97, step) - 0.12 * smooth(0.1, 0, step)) * (1 - mud))
         // 泥：低处的褐色黏土，干了裂成小块
         if (mud > 0) {
           const k = 0.92 + 0.12 * grain
           mixTo(c, 82 * k, 64 * k, 49 * k, mud * 0.9)
-          scale(c, 1 - 0.38 * mud * smooth(0.07, 0.02, cellEdge(gx * 2.2, gy * 2.2, s + 23)))
+          scale(c, 1 - 0.3 * mud * smooth(0.07, 0.02, cellEdge(gx * 2.2, gy * 2.2, s + 23)))
         }
         // 洞壁脚下：潮湿发暗，堆着从壁上掉下的碎石，越贴着壁越多
         const shellU = shell / UNIT
@@ -225,12 +222,14 @@ export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, 
             const dd = Math.hypot(dx, dy)
             const light = skyward(L, col.x, col.y)
             if (dd < col.r) {
-              // 石柱从上往下看是一截粗壮的钙华柱：顶面是斑驳的石面，边上一道道竖棱，朝天窗的边亮、背着的边暗
+              // 石柱从上往下看是一截粗壮的钙华柱：柱顶斑驳，边上一道道竖棱；朝天窗的一侧亮、背着的一侧暗，最外一圈暗线收住轮廓
+              const u = dd / col.r
               const flute = 0.5 + 0.5 * Math.sin(Math.atan2(dy, dx) * 13 + 3 * fbm(gx * 2, gy * 2, s + 93, 2))
-              const bevel = smooth(0.72, 1, dd / col.r)
+              const bevel = smooth(0.7, 1, u)
               const facing = (dx * light.x + dy * light.y) / (dd || 1)
-              const k = (0.82 + 0.18 * fbm(gx * 2.6, gy * 2.6, s + 95, 3) + bevel * (0.34 * facing - 0.14)) * (1 - 0.14 * bevel * flute)
-              mixTo(c, 140 * k, 124 * k, 100 * k, smooth(col.r, col.r - 0.04 * UNIT, dd))
+              const slant = Math.min(1.6, Math.hypot(light.x, light.y) / Math.max(light.z, 0.3))
+              const k = (0.9 + 0.16 * fbm(gx * 2.6, gy * 2.6, s + 95, 3) + bevel * (0.3 * facing * slant - 0.18)) * (1 - 0.16 * bevel * flute) * (1 - 0.35 * smooth(0.93, 1, u))
+              mixTo(c, 150 * k, 134 * k, 108 * k, smooth(col.r, col.r - 0.04 * UNIT, dd))
             } else {
               // 柱脚一圈流石裙，贴着柱子的地方暗；背着天窗拖一条淡影
               const apron = 1 - (dd - col.r) / (0.6 * UNIT)
@@ -238,7 +237,7 @@ export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, 
                 mixTo(c, 146, 130, 106, apron * 0.45)
                 scale(c, 1 - 0.3 * smooth(0.5, 1, apron))
               }
-              castShadow(c, dx, dy, col.r, Math.min(1.6 * UNIT, (1.4 * UNIT * Math.hypot(light.x, light.y)) / Math.max(light.z, 0.3)), light, 0.32)
+              castShadow(c, dx, dy, col.r, Math.min(SHADOW_U.column * UNIT, (1.8 * UNIT * Math.hypot(light.x, light.y)) / Math.max(light.z, 0.3)), light, 0.38)
             }
           } else if (kind === NEAR.stalagmite) {
             const st = L.stalagmites[idx]!
@@ -254,14 +253,14 @@ export function paintAlbedo(L: CaveLayout, ppu: number, out: Uint8ClampedArray, 
               const uy = dy / (dd || 1)
               const lit = Math.max(0, (ux * slope * light.x + uy * slope * light.y + light.z) / Math.hypot(slope, 1))
               const ring = 0.5 + 0.5 * Math.sin((dd / UNIT) * 38 + st.h * 3)
-              const tip = (1 - d) ** 2
-              const tone = (0.55 + 0.7 * lit) * (0.94 + 0.06 * ring)
-              mixTo(c, (130 + 70 * tip) * tone, (112 + 74 * tip) * tone, (88 + 72 * tip) * tone, smooth(1, 0.9, d))
-              if (d < 0.2) mixTo(c, 228, 222, 204, smooth(0.2, 0.04, d) * 0.8)
+              const tip = (1 - d) ** 1.6
+              const tone = (0.78 + 0.45 * lit) * (0.95 + 0.05 * ring) * (1 - 0.3 * smooth(0.82, 1, d))
+              mixTo(c, (138 + 84 * tip) * tone, (120 + 86 * tip) * tone, (96 + 82 * tip) * tone, smooth(1, 0.9, d))
+              if (d < 0.24) mixTo(c, 240, 234, 216, smooth(0.24, 0.05, d) * 0.9)
             } else {
               // 脚下一圈接触阴影，背着天窗拖一条淡影，越高拖得越长
               if (d < 1.45) scale(c, 1 - 0.3 * smooth(1.45, 1, d))
-              castShadow(c, dx, dy, st.r, Math.min(STALAGMITE_SHADOW_U * UNIT, (0.5 * st.h * UNIT * Math.hypot(light.x, light.y)) / Math.max(light.z, 0.3)), light, 0.3)
+              castShadow(c, dx, dy, st.r, Math.min(SHADOW_U.stalagmite * UNIT, (0.5 * st.h * UNIT * Math.hypot(light.x, light.y)) / Math.max(light.z, 0.3)), light, 0.3)
             }
           } else if (kind === NEAR.glow) {
             const g = L.glows[idx]!
@@ -335,8 +334,8 @@ export function paintRelief(L: CaveLayout, geo: Uint8ClampedArray, norm: Uint8Cl
   }
 }
 
-/** 天窗图每格多少像素 */
-export const SKY_PPU = 4
+/** 天窗图每格多少像素：直射光斑的边很亮，太粗会在边上看出一格格的台阶 */
+export const SKY_PPU = 16
 
 /** 洞顶的天窗图：R 是正上方有多少天，边上柔和过渡 */
 export function paintSky(L: CaveLayout, out: Uint8ClampedArray): void {
@@ -348,7 +347,7 @@ export function paintSky(L: CaveLayout, out: Uint8ClampedArray): void {
     for (let px = 0; px < W; px++) {
       const wx = f.x0 + ((px + 0.5) / SKY_PPU) * UNIT
       const o = (py * W + px) * 4
-      out[o] = skyAbove(L, wx, wy, 0.12 * UNIT) * 255
+      out[o] = skyAbove(L, wx, wy, 0.1 * UNIT) * 255
       out[o + 1] = 0
       out[o + 2] = 0
       out[o + 3] = 255
@@ -429,7 +428,7 @@ varying vec2 outTexCoord;
 #pragma phaserTemplate(fragmentHeader)
 `
 
-/** 挡太阳与月光的石头最多几块：石柱一直挡，石笋只挡比它矮的光线 */
+/** 挡太阳与月光的石头最多几块：石柱一直挡到洞顶，石笋只挡比它矮的光线；光线高过洞顶就已经从天窗出去了，再远的石头挡不着 */
 export const MAX_BLOCKS = 32
 /** 同时点着的火把最多几支 */
 export const MAX_TORCHES = SHADE_ROWS
@@ -496,6 +495,7 @@ float blocked(vec2 p, float z, vec2 dir, float cotE) {
     float perp = abs(c.x * dir.y - c.y * dir.x);
     if (perp > b.z * 1.1) continue;
     float rise = max(along - sqrt(max(b.z * b.z - perp * perp, 0.0)), 0.0) / uUnit / cotE;
+    if (z + rise > uCeil) continue;
     float top = b.w < 0.0 ? 1e4 : b.w * pow(max(1.0 - perp / b.z, 0.0), 1.35);
     if (z + rise < top) lit *= smoothstep(b.z * 0.8, b.z * 1.1, perp);
   }

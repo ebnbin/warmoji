@@ -77,6 +77,9 @@ export interface Near {
 /** 桶里条目的种类 */
 export const NEAR = { mound: 0, pool: 1, column: 2, stalagmite: 3, glow: 4 } as const
 
+/** 石笋与石柱背着天窗拖的影子最长几格：画地面时桶要罩得住影子 */
+export const SHADOW_U = { stalagmite: 1.2, column: 2 } as const
+
 /** 一局的溶洞：按种子生成，模拟与画面都从这里读；全是数据，能整个发给画地面的线程 */
 export interface CaveLayout {
   readonly w: number
@@ -474,7 +477,7 @@ export function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, 
       lift = Math.max(lift, need * t * t * (3 - 2 * t))
     }
     // 让出的岩体边上也起伏，不是一道直墙
-    return Math.max(base, lift + (lift / need) * 0.9 * fbm(x / UNIT / 2.2, y / UNIT / 2.2, seed + 107, 2))
+    return Math.max(base, lift + (lift / need) * 1.5 * fbm(x / UNIT / 2.6, y / UNIT / 2.6, seed + 107, 2))
   }
   const inHall = (x: number, y: number): boolean => edgeDepthU(x, y, w, h, hall.cornerU) > insetAt(x, y)
   const alcoves: Alcove[] = anchors.map((a) => {
@@ -490,7 +493,7 @@ export function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, 
   })
   const inAlcove = (x: number, y: number): boolean => {
     // 洞道时宽时窄
-    const k = 0.85 + 0.3 * fbm(x / UNIT / 1.8, y / UNIT / 1.8, seed + 211, 2)
+    const k = 0.72 + 0.56 * fbm(x / UNIT / 1.5, y / UNIT / 1.5, seed + 211, 2)
     for (const a of alcoves) {
       const p = a.path
       for (let i = 0; i + 1 < p.length; i++) if (segDist(x, y, p[i]!, p[i + 1]!) < a.half * k) return true
@@ -649,8 +652,8 @@ export function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, 
   const near = makeNear(-margin, -margin, w + margin * 2, h + margin * 2, [
     mounds.map((m) => ({ x: m.x, y: m.y, reach: m.r })),
     pools.map((p) => ({ x: p.x, y: p.y, reach: Math.max(p.rx, p.ry) * 1.5 })),
-    columns.map((c) => ({ x: c.x, y: c.y, reach: Math.max(c.r + 0.6 * UNIT, c.r * 1.9) })),
-    stalagmites.map((st) => ({ x: st.x, y: st.y, reach: st.r * 1.5 })),
+    columns.map((c) => ({ x: c.x, y: c.y, reach: c.r * 1.3 + SHADOW_U.column * UNIT })),
+    stalagmites.map((st) => ({ x: st.x, y: st.y, reach: st.r * 1.5 + SHADOW_U.stalagmite * UNIT })),
     glows.map((g) => ({ x: g.x, y: g.y, reach: g.r * 1.3 })),
   ])
   const spawns: number[] = []
