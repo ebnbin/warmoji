@@ -579,6 +579,55 @@ function buildShip(): BgmScore {
   )
 }
 
+/** 溶洞：自然小调的慢板，长长的回声；低音缓缓踏着根音，空五度的持续音垫底，高处零星的拨音像水滴落进水潭 */
+function buildCave(): BgmScore {
+  const chords = [0, 0, 5, 5, 3, 3, 4, 4, 0, 0, 5, 5, 3, 4, 0, 0]
+  return track(
+    {
+      bpm: 64,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 45,
+      scale: AEOLIAN,
+      echo: { delaySec: (60 / 64) * 0.75, feedback: 0.5, level: 0.42 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.17, attack: 0.04, release: 0.5, octave: -1 }
+      const drone: Voice = { wave: 'triangle', vol: 0.03, attack: 0.7, release: 1.5, octave: 0 }
+      const lead: Voice = { wave: 'triangle', vol: 0.065, attack: 0.05, release: 0.4, octave: 1, echo: true }
+      const drip: Voice = { wave: 'sine', vol: 0.04, attack: 0.002, release: 0.22, octave: 2, echo: true }
+      b.bass(bass, chords, 'r-----..')
+      b.pad(drone, chords, [0, 2], 0.003)
+      b.line(lead, [
+        [0, 0, 4, 6],
+        [1, 2, 3, 4], [1, 6, 2, 2],
+        [2, 0, 2, 8],
+        [3, 4, 0, 4],
+        [4, 0, 5, 6],
+        [5, 0, 4, 4], [5, 4, 2, 4],
+        [6, 0, 3, 8],
+        [7, 0, 4, 8],
+        [8, 0, 7, 6],
+        [9, 0, 6, 4], [9, 4, 4, 4],
+        [10, 0, 5, 8],
+        [11, 0, 3, 6],
+        [12, 0, 2, 4], [12, 4, 4, 4],
+        [13, 0, 1, 8],
+        [14, 0, 0, 8],
+      ])
+      b.line(drip, [
+        [0, 5, 9, 1], [1, 3, 11, 1], [2, 6, 10, 1], [3, 1, 12, 1],
+        [4, 7, 9, 1], [5, 2, 11, 1], [6, 5, 14, 1], [7, 3, 9, 1],
+        [8, 6, 12, 1], [9, 1, 10, 1], [10, 4, 11, 1], [11, 7, 13, 1],
+        [12, 2, 9, 1], [13, 5, 12, 1], [14, 3, 10, 1], [15, 6, 9, 1],
+      ])
+      b.drums('kick', 'x.......', 0, 16, 0.1)
+      b.drums('tom', '....o...', 8, 16, 0.07)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -592,6 +641,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   nebula: buildSpace,
   volcano: buildVolcano,
   ship: buildShip,
+  cave: buildCave,
 }
 
 const cache = new Map<BgmId, BgmScore>()

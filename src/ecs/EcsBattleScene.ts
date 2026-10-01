@@ -71,7 +71,8 @@ import { xpMaxed, xpToNext } from '../run/xp'
 import { spawnParams } from './sandbox/knobs'
 import { HudEvent, hudMoveVector, setActiveHudHost } from '../run/hudHost'
 import type { HudEvents, HudHost, LeaderSkill, MemberSheet, SquadSnapshot } from '../run/hudHost'
-import type { HudSnapshot, TiltSnapshot } from '../run/hudHost'
+import type { ClockSnapshot, HudSnapshot, TiltSnapshot } from '../run/hudHost'
+import { crossings, elongation, hourAt, secsBetween, SYNODIC_DAYS } from '../data/cave'
 import { deckTilt } from './worlds/ship'
 import type { AbilityDef } from '../types/abilityDefs'
 import type { Sim } from './sim'
@@ -473,6 +474,7 @@ export class EcsBattleScene extends Phaser.Scene implements HudHost, DevProvider
         totalMs: Modifier.totalMs[e]!,
       })),
       tilt: sim ? tiltSnapshot(sim) : null,
+      clock: sim ? clockSnapshot(sim) : null,
     }
   }
 
@@ -870,5 +872,24 @@ function tiltSnapshot(sim: Sim): TiltSnapshot | null {
     deg: (t.angle * 180) / Math.PI,
     bow: { x: ship.deck.bx, y: ship.deck.by },
     slipDeg: (Math.atan(cfg.friction.body.static) * 180) / Math.PI,
+  }
+}
+
+/** 溶洞里的一局：太阳与月亮此刻的时角、月相，以及离天黑（太阳落到时间放慢的那个高度）或天亮还有几秒 */
+function clockSnapshot(sim: Sim): ClockSnapshot | null {
+  const cave = sim.worldState.cave
+  const cfg = MAPS[sim.mapId].cave
+  if (!cave || !cfg) return null
+  const hour = hourAt(cfg.sky, clockSec(sim))
+  const turn = crossings(cfg.sky, cfg.sky.dwellCenterDeg)
+  if (!turn) return null
+  const night = hour >= turn.set || hour < turn.rise
+  const sun = ((hour - 12) / 12) * Math.PI
+  return {
+    sun,
+    moon: sun - elongation(cave.sky.age),
+    phase: cave.sky.age / SYNODIC_DAYS,
+    night,
+    inSec: secsBetween(cfg.sky, hour, night ? turn.rise : turn.set),
   }
 }

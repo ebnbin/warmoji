@@ -24,6 +24,8 @@ export interface HudSnapshot {
   battleFx: { emoji: string; name: string; desc: string; polarity: Polarity; remainMs: number; totalMs: number }[]
   /** 在船上打的一局才有：甲板此刻往哪边倾、倾多少 */
   tilt: TiltSnapshot | null
+  /** 在溶洞里打的一局才有：太阳月亮在天上哪儿、离天黑或天亮还有多久 */
+  clock: ClockSnapshot | null
 }
 
 /** 甲板的倾斜：往下的方向与船头的朝向是屏幕上的单位向量，倾角与站着会滑的门槛是度 */
@@ -32,6 +34,15 @@ export interface TiltSnapshot {
   readonly deg: number
   readonly bow: Point
   readonly slipDeg: number
+}
+
+/** 天上此刻的样子：太阳与月亮的时角（弧度，正午为 0、往西为正），月龄占朔望月的比例；night 为真时下一件事是天亮，inSec 是还有几秒 */
+export interface ClockSnapshot {
+  readonly sun: number
+  readonly moon: number
+  readonly phase: number
+  readonly night: boolean
+  readonly inSec: number
 }
 
 export interface WaveSummary {

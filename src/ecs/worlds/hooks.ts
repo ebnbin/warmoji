@@ -4,7 +4,7 @@ import { SPAWN } from '../../data/enemies'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
 import { MAP, MAPS } from '../../data/maps'
-import type { IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
+import type { CaveConfig, IceConfig, MapDef, MapId, NebulaConfig, RiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
 import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebula'
@@ -14,6 +14,10 @@ import type { Basin } from '../worlds/basin'
 import type { VolcanoState } from '../worlds/volcano'
 import { addWeight, bumpBalls, clearWeights, makeShip, paceOf, stepBalls, stepOnDeck, stepShip } from '../worlds/ship'
 import type { ShipState } from '../worlds/ship'
+import { clearPath, diffuseLux, directLux, flowDir, flowFrom, inPool, makeCaveState, outward, pushOut, rockHit, roomOf, skyAt, stepLight, stepTorch, torchesLux, torchSpot } from '../worlds/cave'
+import type { CaveState, Rock } from '../worlds/cave'
+import { clockSec } from '../fight/clock'
+import { charSize } from '../systems/shared/scale'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
 import type { RiverRect } from '../worlds/river'
@@ -79,10 +83,11 @@ export interface WorldState {
   hole: Point | null
   volcano: VolcanoState | null
   ship: ShipState | null
+  cave: CaveState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, cave: null }
 }
 
 export interface WorldHooks {
@@ -875,6 +880,184 @@ const ship: WorldHooks = {
   },
 }
 
+function caveCfg(sim: Sim): CaveConfig {
+  return MAPS[sim.mapId].cave!
+}
+
+/** 溶洞的地形与这一局的月龄由布景种子定下，视图从这里读；光照按难度时钟走，同一局里接着上一场的钟点 */
+function caveOf(sim: Sim): CaveState {
+  let s = sim.worldState.cave
+  if (!s) {
+    s = makeCaveState(caveCfg(sim), sim.mapW, sim.mapH, MAP.cameraMargin * UNIT, new Rng(sim.run.decorSeed ^ 0x3c4e), clockSec(sim))
+    sim.worldState.cave = s
+  }
+  return s
+}
+
+/** 重算洞里的光、重算绕路的间隔，毫秒 */
+const CAVE_LIGHT_MS = 200
+const CAVE_FLOW_MS = 250
+
+const WADES = new Map<MapId, Surface>()
+
+/** 水潭里的地面：黏滞与费力来自地图，回复同平地 */
+function wadeOf(sim: Sim): Surface {
+  let w = WADES.get(sim.mapId)
+  if (!w) {
+    const p = caveCfg(sim).pools
+    w = { ...groundOf(sim), viscosity: p.viscosity, exertion: p.exertion }
+    WADES.set(sim.mapId, w)
+  }
+  return w
+}
+
+/** 离岩石 reach 以内、方向扎进岩石时改成顺着壁面走，免得顶在石头上不动 */
+function glide(r: Rock, x: number, y: number, dx: number, dy: number, reach: number): Point {
+  if (roomOf(r, x, y) > reach) return { x: dx, y: dy }
+  const n = outward(r, x, y)
+  const dot = dx * n.x + dy * n.y
+  if (dot >= -0.2) return { x: dx, y: dy }
+  const tx = dx - dot * n.x
+  const ty = dy - dot * n.y
+  const len = Math.hypot(tx, ty)
+  return len > 1e-6 ? { x: tx / len, y: ty / len } : { x: -n.y, y: n.x }
+}
+
+/** 队员的火把此刻在哪、多亮 */
+function caveTorches(sim: Sim, s: CaveState): { spots: Point[]; lits: number[] } {
+  const spots: Point[] = []
+  const lits: number[] = []
+  for (const m of sim.characters) {
+    const t = s.torches.get(m)
+    if (!t || t.uid !== Uid.v[m] || t.lit <= 0) continue
+    spots.push(torchSpot(Transform.x[m]!, Transform.y[m]!, charSize(m)))
+    lits.push(t.lit)
+  }
+  return { spots, lits }
+}
+
+/** 怪物只从照度不到 spawnLux 的地方出来，离队长至少 minPlayerDist 格；挑不到就挑最暗的 */
+function caveSpawn(sim: Sim, boss: boolean): Point {
+  const s = caveOf(sim)
+  const cfg = caveCfg(sim)
+  const cells = boss ? s.layout.bossSpawns : s.layout.spawns
+  const n = cells.length / 2
+  const lx = leaderX(sim)
+  const ly = leaderY(sim)
+  const near = SPAWN.minPlayerDist * UNIT * (boss ? 1.6 : 1)
+  const { spots, lits } = caveTorches(sim, s)
+  let best: Point = { x: cells[0]!, y: cells[1]! }
+  let bestLux = Infinity
+  for (let k = 0; k < 64; k++) {
+    const i = Math.floor(sim.rng.next() * n)
+    const x = cells[i * 2]!
+    const y = cells[i * 2 + 1]!
+    if (Math.hypot(x - lx, y - ly) < near) continue
+    const e = diffuseLux(s.light, x, y) + directLux(s.layout, s.sky, x, y, 0) + torchesLux(cfg.torch, spots, lits, x, y)
+    if (e < cfg.spawnLux) return { x, y }
+    if (e < bestLux) {
+      bestLux = e
+      best = { x, y }
+    }
+  }
+  return best
+}
+
+/**
+ * 溶洞：能走的是洞厅与支洞，洞壁、石柱与挡路的石笋是硬边界，挡人也挡子弹；绕不过去的按步数场绕。
+ * 光照随真实的太阳月亮走，队员天暗了点起火把；怪物只从暗处出来；水潭里蹚水更慢更累
+ */
+const cave: WorldHooks = {
+  ...bounded,
+  surface(sim, x, y) {
+    return inPool(caveOf(sim).layout, x, y) ? wadeOf(sim) : groundOf(sim)
+  },
+  constrainBody(sim, eid, from, next) {
+    if (hasComponent(sim.world, eid, Phasing)) return bounded.constrainBody(sim, eid, from, next)
+    return pushOut(caveOf(sim).layout.rock, next.x, next.y, Radius.v[eid]!)
+  },
+  basin(sim) {
+    return caveOf(sim).layout.rock
+  },
+  chaseDir(sim, eid, tx, ty) {
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    const d = norm(tx - x, ty - y)
+    if (hasComponent(sim.world, eid, Phasing)) return d
+    const s = caveOf(sim)
+    const rock = s.layout.rock
+    const rad = Radius.v[eid]!
+    if (clearPath(rock, x, y, tx, ty, rad * 0.9)) return glide(rock, x, y, d.x, d.y, rad + 0.3 * UNIT)
+    const f = flowDir(s.flow, x, y) ?? d
+    return glide(rock, x, y, f.x, f.y, rad + 0.3 * UNIT)
+  },
+  wallHit(sim, ax, ay, bx, by) {
+    return rockHit(caveOf(sim).layout.rock, ax, ay, bx, by)
+  },
+  wanderDir(sim, eid, dx, dy) {
+    const rock = caveOf(sim).layout.rock
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    if (roomOf(rock, x, y) > Radius.v[eid]! + 0.6 * UNIT) return { x: dx, y: dy }
+    const n = outward(rock, x, y)
+    const dot = dx * n.x + dy * n.y
+    return dot >= 0 ? { x: dx, y: dy } : { x: dx - 2 * dot * n.x, y: dy - 2 * dot * n.y }
+  },
+  fleeDir(sim, eid, awayX, awayY) {
+    return glide(caveOf(sim).layout.rock, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + 1.5 * UNIT)
+  },
+  spawnPoint(sim, boss) {
+    return caveSpawn(sim, boss)
+  },
+  settle(sim, p) {
+    const rock = caveOf(sim).layout.rock
+    const inset = SPAWN.edgeInset * UNIT
+    const q = pushOut(rock, p.x, p.y, inset)
+    if (roomOf(rock, q.x, q.y) >= inset * 0.9) return q
+    const cells = caveOf(sim).layout.spawns
+    let best = { x: cells[0]!, y: cells[1]! }
+    let bd = Infinity
+    for (let i = 0; i < cells.length; i += 2) {
+      const d = (cells[i]! - p.x) ** 2 + (cells[i + 1]! - p.y) ** 2
+      if (d < bd) {
+        bd = d
+        best = { x: cells[i]!, y: cells[i + 1]! }
+      }
+    }
+    return best
+  },
+  onStart(sim) {
+    const s = caveOf(sim)
+    flowFrom(s.flow, leaderX(sim), leaderY(sim))
+  },
+  /** 每隔一阵按此刻的天重算洞里的光；火把每帧推进；绕路的步数场跟着队长重算 */
+  tick(sim, delta) {
+    const cfg = caveCfg(sim)
+    const s = caveOf(sim)
+    s.lightIn -= delta
+    if (s.lightIn <= 0) {
+      s.lightIn += CAVE_LIGHT_MS
+      skyAt(cfg, clockSec(sim), s.age0, s.sky)
+      stepLight(s.light, s.layout, cfg, s.sky)
+    }
+    sim.characters.forEach((m, slot) => {
+      let t = s.torches.get(m)
+      if (!t || t.uid !== Uid.v[m]) {
+        t = { uid: Uid.v[m]!, on: false, lit: 0, due: 0, want: false }
+        s.torches.set(m, t)
+      }
+      const x = Transform.x[m]!
+      const y = Transform.y[m]!
+      stepTorch(t, cfg.torch, diffuseLux(s.light, x, y) + directLux(s.layout, s.sky, x, y, 0), Alive.v[m] === 1, slot, sim.elapsedMs, delta)
+    })
+    s.flowIn -= delta
+    if (s.flowIn <= 0) {
+      s.flowIn = CAVE_FLOW_MS
+      flowFrom(s.flow, leaderX(sim), leaderY(sim))
+    }
+  },
+}
+
 function riverCfg(sim: Sim): RiverConfig {
   return MAPS[sim.mapId].river!
 }
@@ -1000,6 +1183,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   nebula,
   volcano,
   ship,
+  cave,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()

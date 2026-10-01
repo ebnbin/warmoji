@@ -6,7 +6,7 @@ import { applyCamera, safeInsets, viewport, VIEWPORT_CHANGED } from '../util/app
 import type { FieldCollected, HudInput, HudSnapshot, LeaderChanged, SquadMember, SquadSnapshot, WaveSummary, WaveWarning } from '../run/hudHost'
 import { activeHudHost, HudEvent, setActiveHudInput } from '../run/hudHost'
 import type { HudHost } from '../run/hudHost'
-import { AimGuide, Announcer, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim, TiltDial } from '../ui'
+import { AimGuide, Announcer, Chip, DialButton, hasModal, Icon, IconButton, Joystick, Label, LAYER, Pill, ProgressBar, Scrim, Sundial, TiltDial } from '../ui'
 import { DEG2RAD } from '../util/units'
 import { SceneKey } from './keys'
 import { openPause } from './pause'
@@ -56,6 +56,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
   private goalChips: Chip[] = []
   private goalKey = ''
   private tiltDial?: TiltDial
+  private sundial?: Sundial
   private squad: SquadIcon[] = []
   private squadArc: number[] = []
   private squadShown = { leader: -1, switching: false }
@@ -100,6 +101,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
       bossMaxHp: 1,
       battleFx: [],
       tilt: null,
+      clock: null,
     }
 
     const stick = EDGE + Joystick.RADIUS
@@ -127,6 +129,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.goalChips = []
     this.goalKey = ''
     this.tiltDial = undefined
+    this.sundial = undefined
     this.squad = []
     this.squadArc = []
     this.squadShown = { leader: -1, switching: false }
@@ -185,6 +188,7 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     this.updateFxIndicators(s.battleFx)
     this.updateGoals(s.goals)
     this.updateTilt(s.tilt)
+    this.updateClock(s.clock)
     if (s.xp !== this.last.xp || s.xpNext !== this.last.xpNext) this.xpBar.setValue(s.xpNext > 0 ? s.xp / s.xpNext : 0)
     if (s.level !== this.last.level || s.levelUps !== this.last.levelUps) this.updateLevel(s.level, s.levelUps)
     if (s.kills !== this.last.kills) this.killsPill.setText(String(s.kills))
@@ -428,6 +432,13 @@ export class UIScene extends Phaser.Scene implements HudInput, DevProviderHost {
     if (!t) return
     this.tiltDial ??= new TiltDial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius, t.bow, t.slipDeg)
     this.tiltDial.setTilt(t.down, t.deg)
+  }
+
+  /** 在溶洞里打的一局：太阳月亮走到哪、离天黑或天亮还有多久，随时看得见 */
+  private updateClock(c: HudSnapshot['clock']): void {
+    if (!c) return
+    this.sundial ??= new Sundial(this, viewport.logicalWidth - safeInsets.right - TILT.right, safeInsets.top + TILT.top, TILT.radius)
+    this.sundial.setSky(c.sun, c.moon, c.phase, c.night, c.inSec)
   }
 
   private updateGoals(goals: HudSnapshot['goals']): void {
