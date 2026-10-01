@@ -1880,53 +1880,67 @@ interface Drop {
   life: number
 }
 
-/** 屏幕四边结起的霜：冰的枝晶从四边往里长，主枝每隔一段分出六十度的侧枝，越往里越细越淡；贴着边是一层白雾 */
+/**
+ * 屏幕四边结起的霜：贴着边是一层厚薄不匀的白霜，角上最厚；霜上长出一丛丛羽毛似的冰花，
+ * 主干微微打弯，两侧按六十度一路长出细刺，越往梢越短越淡
+ */
 function drawFrost(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const r = new Rng(0xf205)
   const m = Math.min(w, h)
   ctx.clearRect(0, 0, w, h)
-  const band = m * 0.1
-  for (const [x0, y0, x1, y1] of [
-    [0, 0, band, 0],
-    [w, 0, w - band, 0],
-    [0, 0, 0, band],
-    [0, h, 0, h - band],
-  ] as const) {
-    const g = ctx.createLinearGradient(x0, y0, x1, y1)
-    g.addColorStop(0, 'rgba(226,240,250,0.45)')
-    g.addColorStop(1, 'rgba(226,240,250,0)')
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, w, h)
-  }
-  ctx.lineCap = 'round'
-  const grow = (x: number, y: number, ang: number, len: number, width: number, depth: number): void => {
-    const ex = x + Math.cos(ang) * len
-    const ey = y + Math.sin(ang) * len
-    ctx.strokeStyle = `rgba(238,248,255,${0.22 + 0.22 * width})`
-    ctx.lineWidth = width
-    ctx.beginPath()
-    ctx.moveTo(x, y)
-    ctx.lineTo(ex, ey)
-    ctx.stroke()
-    if (depth <= 0) return
-    const steps = Math.max(2, Math.floor(len / 7))
-    for (let k = 1; k < steps; k++) {
-      const t = k / steps
-      const bx = x + (ex - x) * t
-      const by = y + (ey - y) * t
-      const bl = len * (1 - t) * (0.3 + 0.35 * r.next())
-      if (r.next() < 0.7) grow(bx, by, ang + Math.PI / 3, bl, width * 0.55, depth - 1)
-      if (r.next() < 0.7) grow(bx, by, ang - Math.PI / 3, bl, width * 0.55, depth - 1)
-    }
-  }
-  for (let k = 0; k < 90; k++) {
+  /** 四边上的一点：越靠角越容易取到 */
+  const rim = (k: number): { x: number; y: number; inward: number; corner: number } => {
     const side = k % 4
-    const t = r.next()
-    const x = side === 0 ? t * w : side === 1 ? t * w : side === 2 ? 0 : w
+    const u = r.next()
+    const t = r.next() < 0.5 ? u * u * 0.5 : 1 - u * u * 0.5
+    const x = side < 2 ? t * w : side === 2 ? 0 : w
     const y = side === 0 ? 0 : side === 1 ? h : t * h
     const inward = side === 0 ? Math.PI / 2 : side === 1 ? -Math.PI / 2 : side === 2 ? 0 : Math.PI
-    const corner = Math.min(t, 1 - t) < 0.2 ? 1.6 : 1
-    grow(x, y, inward + (r.next() * 2 - 1) * 0.7, m * (0.05 + 0.13 * r.next()) * corner, 1.6 + r.next() * 0.8, 2)
+    return { x, y, inward, corner: 1 + 0.8 * Math.max(0, 1 - Math.min(t, 1 - t) / 0.18) }
+  }
+  for (let k = 0; k < 180; k++) {
+    const p = rim(k)
+    const rad = m * (0.03 + 0.08 * r.next()) * p.corner
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad)
+    g.addColorStop(0, 'rgba(228,241,250,0.3)')
+    g.addColorStop(1, 'rgba(228,241,250,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(p.x - rad, p.y - rad, rad * 2, rad * 2)
+  }
+  ctx.lineCap = 'round'
+  const line = (x0: number, y0: number, x1: number, y1: number, width: number, alpha: number): void => {
+    ctx.strokeStyle = `rgba(240,249,255,${alpha})`
+    ctx.lineWidth = width
+    ctx.beginPath()
+    ctx.moveTo(x0, y0)
+    ctx.lineTo(x1, y1)
+    ctx.stroke()
+  }
+  const step = 3
+  for (let k = 0; k < 240; k++) {
+    const p = rim(k)
+    const len = m * (0.03 + 0.07 * r.next()) * p.corner
+    const curl = (r.next() - 0.5) * 0.05
+    let a = p.inward + (r.next() * 2 - 1) * 0.6
+    let x = p.x
+    let y = p.y
+    const segs = Math.ceil(len / step)
+    for (let i = 0; i < segs; i++) {
+      const t = i / segs
+      const nx = x + Math.cos(a) * step
+      const ny = y + Math.sin(a) * step
+      line(x, y, nx, ny, 0.5 + 0.9 * (1 - t), 0.5 * (1 - 0.6 * t))
+      if (i % 2 === 1) {
+        const barb = len * 0.26 * (1 - t) * (0.6 + 0.8 * r.next())
+        for (const side of [-1, 1]) {
+          const ba = a + side * (Math.PI / 3)
+          line(nx, ny, nx + Math.cos(ba) * barb, ny + Math.sin(ba) * barb, 0.9, 0.38 * (1 - 0.7 * t))
+        }
+      }
+      x = nx
+      y = ny
+      a += curl
+    }
   }
 }
 
@@ -1967,7 +1981,7 @@ class FloeView extends BoundedView {
         .setScrollFactor(0)
         .setDepth(-3),
     )
-    if (!v.scene.textures.exists(FROST_KEY)) canvasTexture(v.scene, FROST_KEY, 640, 360, (ctx) => drawFrost(ctx, 640, 360))
+    if (!v.scene.textures.exists(FROST_KEY)) canvasTexture(v.scene, FROST_KEY, 960, 540, (ctx) => drawFrost(ctx, 960, 540))
     this.frost = v.scene.add.image(0, 0, FROST_KEY).setDepth(89).setAlpha(0)
     this.visuals.push(this.frost)
   }
