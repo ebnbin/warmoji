@@ -5,6 +5,7 @@ import { MAP, rollDecor } from '../../data/maps'
 import { SUN } from '../../data/light'
 import { safeInsets, viewport } from '../../util/apply'
 import { Rng } from '../../util/rng'
+import { playSfx } from '../../audio/sfx'
 import { fbm } from '../../util/noise'
 import { spawnDecor } from '../entities/decor'
 import { Airborne, Alive, Phys, Pickup, Radius, Shard, Transform } from '../components'
@@ -105,7 +106,7 @@ const LEAF_PX = 32
 /**
  * 河流：地面与树冠是线程里按高度场画好的贴图，水面由着色器按解出来的水深与流速画：浅处透底、深处发暗，细浪顺水漂，急处翻白；
  * 进水口的崖上挂着水帘、崖脚砸起白沫和水雾，出水口的水从断崖边落进深谷，谷里升起水雾。水上漂着落叶，跟着水流走；
- * 站在水里的身体周围有一圈水纹，迎水的一面推起浪。树冠盖在一切之上
+ * 站在水里的身体脚下一圈水线，迎水的一面推起浪、背水的一面拖出两道尾迹；被冲倒的身体周围翻着白沫。树冠盖在一切之上
  */
 export class RiverView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -116,6 +117,8 @@ export class RiverView implements MapView {
   private leaves: Leaf[] = []
   private ripples?: Phaser.GameObjects.Graphics
   private spots: Point[] = []
+  /** 上一帧倒在水里的身体：新倒下的哗啦一声 */
+  private fallen = new Set<number>()
   private readonly flow: Flow = { h: 0, u: 0, v: 0 }
 
   private planOf(v: ViewCtx): RiverPlan {
@@ -250,8 +253,8 @@ export class RiverView implements MapView {
               set('uOut0', [a.x, a.y, a.nx, a.ny])
               set('uOut1', [b.x, b.y, b.nx, b.ny])
               set('uOutHalf', [a.half, b.half])
-              set('uIn', [inl.x, inl.y, inl.nx, inl.ny])
-              set('uInSize', [inl.half, cfg.falls.cliffU])
+              set('uIn', [inl.poolX, inl.poolY, inl.nx, inl.ny])
+              set('uInSize', [inl.half, cfg.falls.cliffU, Math.hypot(inl.x - inl.poolX, inl.y - inl.poolY)])
               set('uSun', [SUN.x / sunLen, SUN.y / sunLen, SUN.z / sunLen])
             },
           },
@@ -331,6 +334,9 @@ export class RiverView implements MapView {
     }
     const g = this.ripples
     g.clear()
+    const down = s.down
+    for (const eid of down.keys()) if (!this.fallen.has(eid)) playSfx('wash')
+    this.fallen = new Set(down.keys())
     for (const eid of query(sim.world, [Phys, Transform, Radius])) {
       if (!Alive.v[eid] || hasComponent(sim.world, eid, Airborne) || hasComponent(sim.world, eid, Pickup) || hasComponent(sim.world, eid, Shard)) continue
       const x = Transform.x[eid]!
@@ -339,19 +345,55 @@ export class RiverView implements MapView {
       if (f.h < cfg.body.wetM) continue
       const r = Radius.v[eid]!
       const deep = Math.min(1, f.h / 0.4)
-      const pulse = 1.12 + 0.08 * Math.sin(this.u.time * 3 + eid)
-      g.lineStyle(0.05 * UNIT, 0xe8f4f2, 0.18 + 0.25 * deep)
-      g.strokeEllipse(x, y + r * 0.35, r * 2 * pulse, r * 1.2 * pulse)
+      const fx = x
+      const fy = y + r * 0.45
       const rx = f.u * toPx - Phys.vx[eid]!
       const ry = f.v * toPx - Phys.vy[eid]!
       const rel = Math.hypot(rx, ry)
-      if (rel < 0.3 * UNIT) continue
-      const a = Math.atan2(-ry, -rx)
-      const push = Math.min(1, rel / (3 * UNIT))
-      g.lineStyle(0.08 * UNIT * (0.6 + push), 0xf4fbfa, 0.25 + 0.45 * push * deep)
+      const push = Math.min(1, rel / (2.5 * UNIT))
+      if (down.has(eid)) {
+        for (let k = 0; k < 6; k++) {
+          const a = k * 1.05 + this.u.time * (2 + (eid % 3))
+          const d = r * (0.7 + 0.3 * Math.sin(this.u.time * 5 + k * 2.1 + eid))
+          g.fillStyle(0xf2f8f6, 0.35 + 0.25 * Math.sin(this.u.time * 7 + k))
+          g.fillCircle(fx + Math.cos(a) * d, fy + Math.sin(a) * d * 0.55, r * (0.18 + 0.08 * Math.sin(k + this.u.time * 4)))
+        }
+        g.lineStyle(0.06 * UNIT, 0xf4fbfa, 0.5)
+        g.strokeEllipse(fx, fy, r * 2.4, r * 1.3)
+        continue
+      }
+      const pulse = 1 + 0.06 * Math.sin(this.u.time * 3 + eid)
+      g.lineStyle(0.045 * UNIT, 0xe8f4f2, 0.22 + 0.25 * deep)
+      g.strokeEllipse(fx, fy, r * 2.1 * pulse, r * 1.05 * pulse)
+      if (rel < 0.25 * UNIT) continue
+      const ux = rx / rel
+      const uy = ry / rel
+      const a = Math.atan2(-uy, -ux * 0.5)
+      g.lineStyle(0.07 * UNIT * (0.6 + push), 0xf6fcfb, 0.3 + 0.5 * push * deep)
       g.beginPath()
-      g.arc(x, y + r * 0.25, r * 1.05, a - 1.1, a + 1.1)
+      for (let k = 0; k <= 8; k++) {
+        const t = a - 1.2 + (2.4 * k) / 8
+        const px = fx + Math.cos(t) * r * 1.05
+        const py = fy + Math.sin(t) * r * 0.55
+        if (k === 0) g.moveTo(px, py)
+        else g.lineTo(px, py)
+      }
       g.strokePath()
+      const len = r * (0.7 + 1.5 * push)
+      for (const side of [-1, 1]) {
+        let px = fx - uy * side * r * 0.95
+        let py = fy + ux * side * r * 0.5
+        const dx = ux - uy * side * 0.45
+        const dy = (uy + ux * side * 0.45) * 0.6
+        for (let k = 0; k < 4; k++) {
+          const nx = px + (dx * len) / 4
+          const ny = py + (dy * len) / 4
+          g.lineStyle(0.05 * UNIT * (1 - k * 0.18), 0xeef8f6, (0.12 + 0.35 * push * deep) * (1 - k / 4))
+          g.lineBetween(px, py, nx, ny)
+          px = nx
+          py = ny
+        }
+      }
     }
   }
 
@@ -368,6 +410,7 @@ export class RiverView implements MapView {
     this.decorEids = []
     this.leaves = []
     this.spots = []
+    this.fallen.clear()
     this.ripples = undefined
     for (const key of [GROUND_KEY, CANOPY_KEY, BED_KEY, LEVEL_KEY, FLOW_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }

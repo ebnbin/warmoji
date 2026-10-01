@@ -15,6 +15,11 @@ export const TERRAIN_PAD_U = 6
 const BASIN_CELL_U = 0.25
 /** 上游的溪沟与下游的深谷从崖边往外伸多长，格：伸出镜头能看到的范围 */
 const REACH_OUT_U = 16
+/** 崖上的溪沟比崖下的河道窄：落差前的一段水更急 */
+const UPSTREAM_NARROW = 0.68
+/** 岩石区的石头最高高出地面多少米 */
+export const ROCK_M = 1.1
+const STONE: Stone = { h: 0, gx: 0, gy: 0, id: 0, big: false }
 /** 生成不出合格的河网就换一组随机数重来，最多这么多次 */
 const TRIES = 60
 
@@ -338,10 +343,10 @@ export function hydraulics(cfg: RiverConfig, q: number): { half: number; dmax: n
 }
 
 /**
- * 把中线做成河道：水面半宽沿程略有起伏，弯顶冲出深潭、两弯之间是浅滩，深泓偏向凹岸；
+ * 把中线做成河道：水面半宽沿程略有起伏，弯顶冲出深潭、两弯之间是浅滩，深泓偏向凹岸（按带正负的弯度平滑，过拐点时连续地换到另一岸）；
  * 水面从 level0 起按坡降往下游降，widen 让末端几格放宽（分叉处的河面更开阔）
  */
-function makeReach(cfg: RiverConfig, pts: readonly Point[], q: number, level0: number, seed: number, widen: number): Reach {
+function makeReach(cfg: RiverConfig, pts: readonly Point[], q: number, level0: number, seed: number, widen: number, narrow = 1): Reach {
   const g = resample(pts)
   const n = g.x.length
   const hy = hydraulics(cfg, q)
@@ -352,7 +357,7 @@ function makeReach(cfg: RiverConfig, pts: readonly Point[], q: number, level0: n
   const shift = new Float64Array(n)
   const level = new Float64Array(n)
   const bend = new Float64Array(n)
-  for (let i = 0; i < n; i++) bend[i] = Math.min(1, Math.abs(g.curv[i]!) * hy.half * 2 * 2.5)
+  for (let i = 0; i < n; i++) bend[i] = Math.max(-1, Math.min(1, g.curv[i]! * hy.half * 2 * 2.5))
   const w = Math.max(1, Math.round((hy.half * 2) / STEP_U))
   for (let i = 0; i < n; i++) {
     let sum = 0
@@ -365,9 +370,9 @@ function makeReach(cfg: RiverConfig, pts: readonly Point[], q: number, level0: n
     }
     const b = sum / cnt
     const s = g.s[i]!
-    half[i] = hy.half * (1 + (fbm(s / 4, 3.3, seed, 2) - 0.5) * 0.25) * (1 + widen * smooth(L - 4, L, s))
-    depth[i] = hy.dmax * (f.riffle + (f.pool - f.riffle) * b)
-    shift[i] = -Math.sign(g.curv[i]!) * f.thalwegShift * b
+    half[i] = hy.half * narrow * (1 + (fbm(s / 4, 3.3, seed, 2) - 0.5) * 0.25) * (1 + widen * smooth(L - 4, L, s))
+    depth[i] = hy.dmax * (f.riffle + (f.pool - f.riffle) * Math.abs(b))
+    shift[i] = -f.thalwegShift * b
     level[i] = level0 - hy.slope * s * cfg.meterPerU
   }
   return { ...g, half, depth, shift, level, box: boxOf(g.x, g.y), q, speed: hy.speed, slope: hy.slope }
@@ -465,14 +470,55 @@ function reachGround(cfg: RiverConfig, r: Reach, p: Along): number {
 
 /**
  * 进水口背后的台地有多高（占崖高的比例）：从空地中心看去在进水口方位两侧 span 以内满高，再往外半个弧度降到零；
- * 崖上溪沟两侧三格以内也是台地，溪沟一路伸出镜头
+ * 崖上溪沟的岸外三格以内也是台地，溪沟一路伸出镜头
  */
 export function upland(plan: Pick<RiverPlan, 'shape' | 'upstream'>, aIn: number, span: number, x: number, y: number, tmp: Along): number {
   const a = Math.atan2(y - plan.shape.cy, x - plan.shape.cx)
   const sector = smooth(span + 0.5, span, Math.abs(wrapAngle(a - aIn)))
-  if (sector >= 1 || !nearBox(plan.upstream, x, y, 4)) return sector
+  if (sector >= 1 || !nearBox(plan.upstream, x, y, 9)) return sector
   project(plan.upstream, x, y, tmp)
-  return Math.max(sector, smooth(4, 2.5, tmp.d))
+  const hw = at(plan.upstream.half, tmp)
+  return Math.max(sector, smooth(hw + 5, hw + 3, tmp.d))
+}
+
+/** 岩石区的一块石头：相对高（石缝里为零）、石面每格的坡（相对高）、它是哪块（哈希）、是不是大石 */
+export interface Stone {
+  h: number
+  gx: number
+  gy: number
+  id: number
+  big: boolean
+}
+
+function dome(q: { dx: number; dy: number; h: number }, scale: number, rad: number, lift: number, big: boolean, out: Stone): void {
+  const r = rad / scale
+  const x = q.dx / scale
+  const y = q.dy / scale
+  const d2 = (x * x + y * y) / (r * r)
+  if (d2 >= 1) return
+  const nz = Math.sqrt(1 - d2)
+  const h = lift * nz
+  if (h <= out.h) return
+  const k = lift / (r * r * Math.max(nz, 0.2))
+  out.h = h
+  out.gx = -x * k
+  out.gy = -y * k
+  out.id = q.h
+  out.big = big
+}
+
+/** 岩石区堆着大小两层圆顶的石头，每处取高的那块；地形与地面按同一个种子各算一次 */
+export function stoneAt(seed: number, x: number, y: number, out: Stone): Stone {
+  out.h = 0
+  out.gx = 0
+  out.gy = 0
+  out.id = 0
+  out.big = false
+  const a = cellNearest(x * 0.7, y * 0.7, seed)
+  dome(a, 0.7, 0.42 + 0.22 * a.h, 0.55 + 0.45 * a.h, true, out)
+  const b = cellNearest(x * 1.7, y * 1.7, seed + 7)
+  dome(b, 1.7, 0.36 + 0.16 * b.h, 0.22 + 0.2 * b.h, false, out)
+  return out
 }
 
 /** 林子还是岩石：二维噪声大于阈值是林子；崖与深谷一带都是岩石 */
@@ -594,7 +640,7 @@ function network(cfg: RiverConfig, rng: Rng, r0: number, seed: number): Draft | 
   const upA = aIn + (rng.next() * 2 - 1) * 0.5
   const far = { x: lip.x + Math.cos(upA) * REACH_OUT_U, y: lip.y + Math.sin(upA) * REACH_OUT_U }
   const upPts = route(rng, far, { x: -Math.cos(upA), y: -Math.sin(upA) }, lip, { x: -nIn.x, y: -nIn.y }, nw.meanderU * 0.8, seed + 54)
-  const upstream = makeReach(cfg, upPts, cfg.flow.discharge, 0, seed + 64, 0)
+  const upstream = makeReach(cfg, upPts, cfg.flow.discharge, 0, seed + 64, 0, UPSTREAM_NARROW)
   const lift = cfg.falls.cliffM - upstream.level[upstream.level.length - 1]!
   for (let i = 0; i < upstream.level.length; i++) upstream.level[i] = upstream.level[i]! + lift
   const gorges = outlets.map((o, k) => {
@@ -695,9 +741,8 @@ function terrainOf(cfg: RiverConfig, d: Draft, forestSeed: number, x0: number, y
       const i = cy * cols + cx
       if (out > 0) {
         const rise = smooth(0, fl.cliffU, out) * (fl.cliffM + (fbm(x / 3, y / 3, seed + 7, 2) - 0.5) * 0.5) * up
-        const q = cellNearest(x * 0.8, y * 0.8, seed + 9)
-        const block = (0.6 + 0.8 * q.h) * smooth(0, 1.4, out) * (1 - fo)
-        g = Math.max(g, nearLevel + f.bankM) + rise + block * 1.3 + fo * 0.08 * smooth(0, 1, out)
+        const block = stoneAt(seed + 9, x, y, STONE).h * smooth(0, 1.4, out) * (1 - fo)
+        g = Math.max(g, nearLevel + f.bankM) + rise + block * ROCK_M + fo * 0.08 * smooth(0, 1, out)
         if (up > 0 && out > fl.cliffU * 0.95) {
           project(d.upstream, x, y, tmp)
           if (tmp.s > 0.05) {

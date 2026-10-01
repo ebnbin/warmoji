@@ -522,7 +522,7 @@ export const MAPS = {
       clearing: { areaU2: [900, 1100], lobes: [0.18, 0.08, 0.04], wobbleU: 1.8, waveU: 6.5, padU: 2.5, neckU: 0.35 },
       network: { oppositeDeg: 34, spreadDeg: [52, 92], apartDeg: 80, splitAt: [0.38, 0.55], majorTurnDeg: [0, 14], minorTurnDeg: [32, 52], meanderU: 1.6, minBend: 1.4, edgeGapU: 1.5 },
       flow: { discharge: 2.5, share: 0.6, widthCoef: 2.21, depthCoef: 0.277, manning: 0.035, bedShape: 2.2, pool: 1.35, riffle: 0.8, thalwegShift: 0.35, bankM: 0.45, bankU: 1, floodSlope: 0.02, reliefM: 0.15 },
-      falls: { cliffM: 3.6, cliffU: 0.5, poolM: 1.1, poolR: 0.55, gorgeM: 7, lipU: 1.2 },
+      falls: { cliffM: 3.6, cliffU: 1.6, poolM: 1.1, poolR: 0.55, gorgeM: 7, lipU: 1.2 },
       trees: { crownU: [1.4, 2.6], overhangU: 0.4, forest: 0.55, tongues: [0, 2], groves: [1, 3], lone: [1, 3] },
       rocks: { inRiver: [1, 4], onLand: [1, 4], radiusU: [0.35, 0.75], heightM: [0.25, 0.6] },
       body: { kg: 60, radiusU: 0.45, heightM: 1.7, density: 985, drag: 1.1, grip: { static: 0.5, kinetic: 0.35 }, gait: 1.2, swim: 0.8, wetM: 0.02 },

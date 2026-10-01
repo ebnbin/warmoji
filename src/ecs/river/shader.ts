@@ -32,8 +32,9 @@ function put16(out: Uint8ClampedArray, o: number, z: number): void {
 }
 
 /**
- * 编码水面：地形高程照搬；水面高程与流速按 WATER_CELL_U 的格子铺满整片地形，地图里是解出来的稳态水流，
- * 地图外只有崖上的溪沟，按设计水位与曼宁流速（水深的三分之二次方）铺；干地上的水位从水边往外推几圈，让岸线落在地形上。
+ * 编码水面：地形高程照搬；水面高程与流速按 WATER_CELL_U 的格子铺满整片地形，有解出来的稳态水流就用它，
+ * 没有的地方只有崖上的溪沟（它不在解的范围里），按设计水位与曼宁流速（水深的三分之二次方）铺；干地上的水位从水边往外推几圈，让岸线落在地形上，
+ * 推出去的水位不高过那里的地面（崖壁、断崖底下没有水）。
  * 乱流取弗劳德数与流速的剪切：水急水浅的浅滩、绕过石头的水都翻白
  */
 export function encodeWater(cfg: RiverConfig, plan: RiverPlan, w: Water): WaterImages {
@@ -66,8 +67,8 @@ export function encodeWater(cfg: RiverConfig, plan: RiverPlan, w: Water): WaterI
           u[i] = w.u[j]!
           v[i] = w.v[j]!
           wet[i] = 1
+          continue
         }
-        continue
       }
       const x = t.x0 + (cx + 0.5) * WATER_CELL_U
       const y = t.y0 + (cy + 0.5) * WATER_CELL_U
@@ -99,6 +100,7 @@ export function encodeWater(cfg: RiverConfig, plan: RiverPlan, w: Water): WaterI
       rough[i] = Math.min(1, Math.max(0, (fr - 0.55) * 1.4) + Math.max(0, du - 1.2) * 0.12)
     }
   }
+  const bedAt = (cx: number, cy: number): number => t.z[cy * step * t.cols + cx * step]!
   const known = wet.slice()
   for (let k = 0; k < SPREAD; k++) {
     const next = known.slice()
@@ -114,7 +116,7 @@ export function encodeWater(cfg: RiverConfig, plan: RiverPlan, w: Water): WaterI
           cnt++
         }
         if (cnt === 0) continue
-        eta[i] = sum / cnt
+        eta[i] = Math.min(sum / cnt, bedAt(cx, cy) - 0.005)
         next[i] = 1
       }
     }
@@ -164,7 +166,7 @@ uniform vec4 uOut0;
 uniform vec4 uOut1;
 uniform vec2 uOutHalf;
 uniform vec4 uIn;
-uniform vec2 uInSize;
+uniform vec3 uInSize;
 uniform vec3 uSun;
 
 vec2 hash2(vec2 p) {
@@ -227,10 +229,12 @@ void main ()
   vec2 v = vel / uCode.z;
   float speed = length(vel);
 
-  vec4 inl = uIn;
-  float inAlong = dot(p - inl.xy, inl.zw);
-  float inSide = dot(p - inl.xy, vec2(-inl.w, inl.z));
-  float curtain = step(-uInSize.y, inAlong) * step(inAlong, 0.05) * (1.0 - smoothstep(uInSize.x - 0.2, uInSize.x + 0.1, abs(inSide)));
+  vec2 rel = p - uIn.xy;
+  vec2 back = -uIn.zw;
+  float inAlong = uInSize.z - length(rel);
+  float inSide = atan(back.x * rel.y - back.y * rel.x, dot(back, rel)) * uInSize.z;
+  float inEdge = 1.0 - smoothstep(uInSize.x - 0.3, uInSize.x + 0.1, abs(inSide));
+  float curtain = step(-uInSize.y, inAlong) * step(inAlong, 0.05) * inEdge * step(0.0, dot(back, rel));
   float plunge = (1.0 - smoothstep(0.0, 2.4, inAlong)) * step(0.0, inAlong) * (1.0 - smoothstep(uInSize.x * 0.5, uInSize.x * 1.5, abs(inSide)));
 
   float drop = 0.0;
@@ -288,9 +292,10 @@ void main ()
   col = mix(col, vec3(1.0, 0.97, 0.88), glint);
   alpha = max(alpha, glint);
 
-  float caust = (1.0 - smoothstep(0.0, 0.08, cells(p * 2.6 + vec2(uTime * 0.23, -uTime * 0.19) + slope * 4.0))) * (1.0 - od) * smoothstep(0.02, 0.06, depth);
-  col = mix(col, vec3(0.9, 1.0, 0.9), caust * 0.35);
-  alpha = max(alpha, caust * 0.22);
+  float shoal = (1.0 - smoothstep(0.06, 0.28, depth)) * smoothstep(0.02, 0.05, depth);
+  float caust = (1.0 - smoothstep(0.0, 0.045, cells(p * 3.1 + vec2(uTime * 0.23, -uTime * 0.19) + slope * 4.0))) * shoal;
+  col = mix(col, vec3(0.9, 1.0, 0.88), caust * 0.3);
+  alpha = max(alpha, caust * 0.18);
 
   vec2 la = vec2(dot(qa, dir) * 0.7, dot(qa, acr) * 7.0);
   vec2 lb = vec2(dot(qb, dir) * 0.7, dot(qb, acr) * 7.0);
@@ -307,9 +312,11 @@ void main ()
   alpha = max(alpha, white * 0.95);
 
   if (curtain > 0.0) {
-    float fall = vnoise(vec2(inSide * 6.0, inAlong * 1.2 - uTime * 4.0)) * 0.6 + vnoise(vec2(inSide * 15.0, inAlong * 2.5 - uTime * 7.0)) * 0.4;
-    vec3 sheet = mix(vec3(0.62, 0.74, 0.74), vec3(0.96, 0.98, 0.97), smoothstep(0.3, 0.8, fall));
-    float a = curtain * (0.78 + 0.22 * fall);
+    float h = clamp(-inAlong / uInSize.y, 0.0, 1.0);
+    float fall = vnoise(vec2(inSide * 5.0, inAlong * 1.4 + uTime * 4.5)) * 0.55 + vnoise(vec2(inSide * 13.0, inAlong * 3.0 + uTime * 8.0)) * 0.45;
+    vec3 sheet = mix(vec3(0.5, 0.64, 0.66), vec3(0.97, 0.99, 0.98), smoothstep(0.25, 0.75, fall) * (0.55 + 0.45 * (1.0 - h)));
+    sheet = mix(sheet, vec3(0.75, 0.86, 0.86), smoothstep(0.85, 1.0, h) * 0.6);
+    float a = curtain * (0.62 + 0.38 * fall) * (0.75 + 0.25 * (1.0 - h));
     col = (col * alpha * (1.0 - a) + sheet * a) / max(alpha + a * (1.0 - alpha), 0.001);
     alpha = alpha + a * (1.0 - alpha);
   }
