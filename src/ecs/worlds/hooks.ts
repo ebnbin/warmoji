@@ -35,6 +35,8 @@ import { leaderX, leaderY, leaderPoint } from '../utils/team'
 import { iceTraction } from '../systems/shared/squad'
 import { withBuilt } from './built'
 import type { BodyStep } from '../systems/shared/body'
+import { river } from '../river/world'
+import type { RiverState } from '../river/world'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -79,10 +81,11 @@ export interface WorldState {
   hole: Point | null
   volcano: VolcanoState | null
   ship: ShipState | null
+  river: RiverState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null }
 }
 
 export interface WorldHooks {
@@ -1000,6 +1003,7 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   nebula,
   volcano,
   ship,
+  river,
 }
 
 const BUILT = new Map<WorldHooks, WorldHooks>()

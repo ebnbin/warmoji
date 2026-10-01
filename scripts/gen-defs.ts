@@ -165,8 +165,47 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(Math.tan(heel) > f.body.static, `maps.${id}.ship ${DIFFICULTY.spawn.maxAlive} 个身体叠在舷墙边时只倾 ${deg(heel)}，闲着的身体滑不起来`)
 }
 
+/**
+ * 河流：空地的轮廓按方位角的起伏加起来也不会翻到圆心另一侧；两个出水口在进水口对面、彼此分开；大股分到的水多；
+ * 断面、深潭、浅滩说得通；瀑布落在比河道宽的深潭里，深谷比断崖边低得多，断崖外留出的那段够身体越过落下去的那条线；
+ * 身体在水里浮力、阻力、摩擦都说得通
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'river') === (m.river !== undefined), `maps.${id} 是河流当且仅当写了 river`)
+  const r = m.river
+  if (!r) continue
+  const c = r.clearing
+  const n = r.network
+  const f = r.flow
+  const fl = r.falls
+  const t = r.trees
+  const k = r.rocks
+  const b = r.body
+  const range = (v: readonly [number, number], int: boolean): boolean => v[0] >= 0 && v[0] <= v[1] && (!int || (Number.isInteger(v[0]) && Number.isInteger(v[1])))
+  need(r.meterPerU > 0 && r.cellU > 0, `maps.${id}.river 的米每格、地形格子须为正`)
+  need(c.areaU2[0] > 0 && range(c.areaU2, false), `maps.${id}.river.clearing.areaU2 须为正的范围`)
+  need(c.lobes.every((a) => a >= 0) && c.lobes.reduce((s, a) => s + a, 0) < 0.6, `maps.${id}.river.clearing.lobes 须不为负、加起来小于 0.6，空地的半径处处为正`)
+  need(c.wobbleU >= 0 && c.waveU > 0 && c.neckU > 0 && c.padU > fl.lipU, `maps.${id}.river.clearing 的起伏不为负、波长与窄缝为正，地图边离空地远过断崖外的那段`)
+  need(n.oppositeDeg >= 0 && n.oppositeDeg < 90 && n.spreadDeg[0] > 0 && range(n.spreadDeg, false) && n.spreadDeg[1] < 180 && n.apartDeg > 0, `maps.${id}.river.network 的出水口方位须在进水口对面、两个出水口分开`)
+  need(n.splitAt[0] > 0 && range(n.splitAt, false) && n.splitAt[1] < 1, `maps.${id}.river.network.splitAt 须在 (0, 1) 内`)
+  need(range(n.majorTurnDeg, false) && range(n.minorTurnDeg, false) && n.majorTurnDeg[1] <= n.minorTurnDeg[0], `maps.${id}.river.network 的分叉须大股偏得比小股少`)
+  need(n.meanderU >= 0 && n.minBend >= 1 && n.edgeGapU >= 0, `maps.${id}.river.network 的蜿蜒不为负、弯道半径至少一个河宽`)
+  need(f.discharge > 0 && f.share >= 0.5 && f.share < 1, `maps.${id}.river.flow 的流量须为正，大股分到一半以上`)
+  need(f.widthCoef > 0 && f.depthCoef > 0 && f.manning > 0 && f.bedShape >= 1, `maps.${id}.river.flow 的水力几何系数与糙率须为正，断面形状指数不小于 1`)
+  need(f.riffle > 0 && f.riffle <= 1 && f.pool >= 1 && f.thalwegShift >= 0 && f.thalwegShift < 1, `maps.${id}.river.flow 的浅滩不深过平均、深潭不浅过平均，深泓偏不出河岸`)
+  need(f.bankM > 0 && f.bankU > 0 && f.floodSlope >= 0 && f.reliefM >= 0, `maps.${id}.river.flow 的河岸须有高有宽，滩地不往河里倾`)
+  need(fl.cliffM > 0 && fl.cliffU > 0 && fl.poolM > 0 && fl.poolR > 0.5, `maps.${id}.river.falls 的崖须有高有进深，深潭有深、比河道宽`)
+  need(fl.gorgeM > 1 && fl.lipU > 0.5, `maps.${id}.river.falls 的深谷须比断崖边低出一米以上，断崖外留出的那段过半格`)
+  need(t.crownU[0] > 0 && range(t.crownU, false) && t.overhangU >= 0 && t.overhangU < t.crownU[0] && t.forest > 0 && t.forest < 1, `maps.${id}.river.trees 的树冠须为正、伸进空地的那截比树冠小，林子的占比在 (0, 1) 内`)
+  need(range(t.tongues, true) && range(t.groves, true) && range(t.lone, true), `maps.${id}.river.trees 的林舌、树丛、孤树须为非负整数范围`)
+  need(range(k.inRiver, true) && range(k.onLand, true) && k.radiusU[0] > 0 && range(k.radiusU, false) && k.heightM[0] > 0 && range(k.heightM, false), `maps.${id}.river.rocks 的数量须为非负整数范围，半径与高须为正`)
+  need(b.kg > 0 && b.radiusU > 0 && b.heightM > 0 && b.density > 0 && b.drag > 0, `maps.${id}.river.body 的体重、半径、身高、密度与阻力系数须为正`)
+  need(b.grip.kinetic > 0 && b.grip.kinetic <= b.grip.static, `maps.${id}.river.body.grip 的动摩擦须为正且不大于静摩擦`)
+  need(b.gait > 0 && b.swim >= 0 && b.wetM > 0, `maps.${id}.river.body 的赶路功率与湿地水深须为正，划水不为负`)
+}
+
 /** 身体的体力上限须为正、体力回复不为负 */
-const checkStamina = (st: { readonly maxStamina?: number; readonly staminaRegen?: number } | undefined, path: string): void => {
+const checkStamina =(st: { readonly maxStamina?: number; readonly staminaRegen?: number } | undefined, path: string): void => {
   need((st?.maxStamina ?? 1) > 0 && (st?.staminaRegen ?? 0) >= 0, `${path} 的体力上限须为正、体力回复不为负`)
 }
 for (const [id, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) checkStamina(c.stats, `characters.${id}`)

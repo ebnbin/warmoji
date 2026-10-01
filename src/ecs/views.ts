@@ -39,6 +39,7 @@ import type { EruptionPhase, VolcanoState } from './worlds/volcano'
 import { playSfx } from '../audio/sfx'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
+import { RiverView } from './river/view'
 
 const FOG_COLOR = 0x0a0a1a
 const FOG_DEPTH = 90
@@ -1843,4 +1844,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   nebula: () => new NebulaView(),
   volcano: () => new VolcanoView(),
   ship: () => new ShipView(),
+  river: () => new RiverView(),
 }
