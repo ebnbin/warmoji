@@ -296,7 +296,7 @@ function segDist(px: number, py: number, a: Point, b: Point): number {
 }
 
 /** 天窗在方位角 a 上的半径，像素 */
-export function openingRadius(o: Opening, a: number): number {
+function openingRadius(o: Opening, a: number): number {
   const w = o.wob
   return o.r * (1 + w[0]! * Math.sin(a + w[1]!) + w[2]! * Math.sin(2 * a + w[3]!) + w[4]! * Math.sin(3 * a + w[5]!))
 }
@@ -440,7 +440,7 @@ function nearestSide(x: number, y: number, w: number, h: number): number {
  * 按种子生成溶洞：先在四条边上挑出支洞的位置，洞厅的边在那里往里让出岩体；再开天窗（天窗下堆着碎石坡），
  * 放水潭、石柱与成丛的石笋，荧光长在洞壁脚下与支洞里；最后算出能走的地面与距离场
  */
-export function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rng): CaveLayout {
+function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rng): CaveLayout {
   const seed = Math.floor(rng.next() * 0x7fffffff)
   const hall = cfg.hall
   const al = cfg.alcoves
@@ -757,7 +757,7 @@ function viewFactor(L: CaveLayout, samples: readonly Point[], area: number, x: n
   return Math.min(1, sum)
 }
 
-export function makeLight(L: CaveLayout, cfg: CaveConfig, margin: number): CaveLight {
+function makeLight(L: CaveLayout, cfg: CaveConfig, margin: number): CaveLight {
   const cell = 0.5 * UNIT
   const cols = Math.ceil((L.w + margin * 2) / cell)
   const rows = Math.ceil((L.h + margin * 2) / cell)
@@ -1100,7 +1100,7 @@ export interface CaveFlow {
 }
 
 /** 半径 0.45 格的身体挤得过去的格子才算通 */
-export function makeFlow(L: CaveLayout): CaveFlow {
+function makeFlow(L: CaveLayout): CaveFlow {
   const cell = 0.5 * UNIT
   const cols = Math.ceil(L.w / cell)
   const rows = Math.ceil(L.h / cell)

@@ -1848,7 +1848,7 @@ const CAVE_LIMESTONE = [1, 0.86, 0.66] as const
 /** 最暗的地方也留一点暖褐 */
 const CAVE_FLOOR = [0.035, 0.026, 0.02] as const
 /** 光柱里水雾浮尘把多少直射光散向镜头 */
-const CAVE_SCATTER = 0.008
+const CAVE_SCATTER = 0.012
 /** 天窗口那圈植物的贴图每格多少像素 */
 const CAVE_RIM_PPU = 24
 /** 黄昏太阳落到这个高度蝙蝠出洞，黎明升到这个高度回洞，度 */

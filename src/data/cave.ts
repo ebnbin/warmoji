@@ -10,7 +10,7 @@ const SUN_LUX = 128000
 /** 满月在天顶时地面的照度，勒克斯 */
 const FULL_MOON_LUX = 0.3
 /** 晴夜只剩星光与气辉时地面的照度，勒克斯 */
-export const STARLIGHT_LUX = 0.001
+const STARLIGHT_LUX = 0.001
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 function smooth(e0: number, e1: number, x: number): number {
@@ -58,7 +58,7 @@ export function moonAt(sky: Sky, hour: number, age: number): SkyDir {
 }
 
 /** 太阳高度 elevDeg 度时的大气质量（Kasten–Young）：天顶为 1，越贴近地平线越厚 */
-export function airMass(elevDeg: number): number {
+function airMass(elevDeg: number): number {
   const h = Math.max(elevDeg, -0.5)
   return 1 / (Math.sin(h * DEG) + 0.50572 * (h + 6.07995) ** -1.6364)
 }

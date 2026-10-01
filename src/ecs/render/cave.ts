@@ -356,8 +356,8 @@ export function paintSky(L: CaveLayout, out: Uint8ClampedArray): void {
 }
 
 /** 照度场按对数存进 16 位：log10(勒克斯) 落在 [−5, 5] */
-export const LOG_LUX_MIN = -5
-export const LOG_LUX_SPAN = 10
+const LOG_LUX_MIN = -5
+const LOG_LUX_SPAN = 10
 
 /** 照度场编码成数据图：R、G 是 16 位的对数照度，B 是反光占的比例；必须满 alpha（画布会按透明度预乘） */
 export function encodeField(Lt: CaveLight, out: Uint8ClampedArray): void {
@@ -374,7 +374,7 @@ export function encodeField(Lt: CaveLight, out: Uint8ClampedArray): void {
 export const SHADE_BINS = 256
 export const SHADE_ROWS = 8
 /** 火把影子图记到多远，格 */
-export const SHADE_RANGE_U = 14
+const SHADE_RANGE_U = 14
 
 /** 从火把 (x, y) 朝每个方位角走到碰上岩石为止，把走了多远（占 SHADE_RANGE_U 的比例）写进第 row 行 */
 export function castShade(r: Rock, x: number, y: number, out: Uint8ClampedArray, row: number): void {
@@ -552,8 +552,12 @@ void main ()
 
 /**
  * 洞里会发光的空气与水面，按叠加画在光的上面：天窗射进来的光柱照亮半空里的水雾与浮尘，
- * 俯看时一根竖直的空气柱有多少段在光柱里，就亮多少（取样点按像素错开，免得出一道道条纹）；浮尘一闪一闪、水雾慢慢往上飘；天窗正下方的水潭倒映着天
+ * 俯看时一根竖直的空气柱有多少段在光柱里，就亮多少（取样点按像素错开，免得出一道道条纹）；太阳低时光柱又长又斜，散射的光到 SHAFT_MAX 就饱和，
+ * 免得一层白雾盖住整个洞；浮尘一闪一闪、水雾慢慢往上飘；天窗正下方的水潭倒映着天
  */
+/** 光柱里的散射最多叠上多亮 */
+const SHAFT_MAX = 0.4
+
 export const GLOW_FRAG = `${HEADER}
 uniform sampler2D uGeo;
 uniform sampler2D uSky;
@@ -590,7 +594,7 @@ float shaft(vec2 p, float z, vec4 body, float jitter) {
   for (int i = 0; i < 12; i++) {
     acc += skyAt(mix(p, end, (float(i) + jitter) / 12.0));
   }
-  return acc / 12.0 * body.w * uScatter;
+  return ${SHAFT_MAX.toFixed(2)} * (1.0 - exp(-acc / 12.0 * body.w * uScatter));
 }
 void main ()
 {
