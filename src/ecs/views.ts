@@ -36,6 +36,8 @@ import type { ShipState } from './worlds/ship'
 import { GRAVITY, halfBeamAt } from '../data/ship'
 import type { ShipConfig } from '../types/maps'
 import type { EruptionPhase, VolcanoState } from './worlds/volcano'
+import { edgeAt, floeFor } from './worlds/floe'
+import type { FloeField } from './worlds/floe'
 import { playSfx } from '../audio/sfx'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
@@ -1813,6 +1815,52 @@ class ShipView extends BoundedView {
   }
 }
 
+/** 这一局的浮冰：布景种子定下的形状，视图排版时就要用到 */
+function floeField(v: ViewCtx): FloeField {
+  return floeFor(v.run.decorSeed, v.def.floe!)
+}
+
+const FLOE_SEA = 0x0a2230
+
+/** 浮冰：地图是一片海，浮冰居中；镜头只跟着队长，不设边，游出去也看得见 */
+class FloeView extends BoundedView {
+  layout(v: ViewCtx): { w: number; h: number; origin: Point } {
+    const side = v.def.floe!.frameU * UNIT
+    const f = floeField(v)
+    return { w: side, h: side, origin: { x: f.heart.x, y: f.heart.y } }
+  }
+
+  build(v: ViewCtx): void {
+    this.visuals.push(
+      v.scene.add
+        .rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, FLOE_SEA)
+        .setScrollFactor(0)
+        .setDepth(-3),
+    )
+    const f = floeField(v)
+    const g = v.scene.add.graphics().setDepth(-1)
+    g.fillStyle(0xe8f1f6, 1)
+    g.fillPoints(f.outline.map((p) => new Phaser.Math.Vector2(p.x, p.y)), true)
+    this.visuals.push(g)
+  }
+
+  camera(v: ViewCtx): void {
+    v.scene.cameras.main.setZoom(viewport.renderScale)
+    v.scene.cameras.main.startFollow(v.anchor)
+  }
+
+  /** 装饰只撒在冰上，离冰缘留出它自己的大小 */
+  decor(v: ViewCtx, atlas: EcsAtlas): void {
+    const f = floeField(v)
+    const rng = new Rng(v.run.decorSeed)
+    const cells = Math.round(v.w / UNIT)
+    for (const d of rollDecor(v.def.decor, () => rng.next(), cells, cells)) {
+      if (edgeAt(f, d.xU * UNIT, d.yU * UNIT) < d.sizeU / 2 + 0.3) continue
+      this.decorEids.push(spawnDecor(v.world, atlas, { id: d.emoji, outline: 'player', x: d.xU * UNIT, y: d.yU * UNIT, size: d.sizeU * UNIT, rot: d.rotation, alpha: d.alpha, z: 1 }))
+    }
+  }
+}
+
 function mix(from: number, to: number, t: number): number {
   const ch = (at: number): number => {
     const a = (from >> at) & 0xff
@@ -1843,4 +1891,5 @@ const MAKE: Record<MapDef['kind'], () => MapView> = {
   nebula: () => new NebulaView(),
   volcano: () => new VolcanoView(),
   ship: () => new ShipView(),
+  floe: () => new FloeView(),
 }

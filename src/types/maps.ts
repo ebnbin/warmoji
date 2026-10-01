@@ -268,6 +268,97 @@ export interface ShipConfig {
     readonly restitution: number
   }
 }
+/**
+ * 浮冰：南极海上一块近似方形的浮冰，形状按断裂、碰撞的成因每局随机生成；冰面没有边，滑出冰缘就掉进冰点附近的海水里。
+ * 冰面上的一切按库仑摩擦走、滑、停，积雪、老冰、新冰的摩擦各不相同；海风一阵阵吹，风压超过脚下的摩擦就被吹着滑。
+ * 物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface FloeConfig {
+  readonly meterPerU: number
+  /** 地图是边长 frameU 的方形，浮冰居中；冰面的距离场、积雪与新冰的格子边长 cellU */
+  readonly frameU: number
+  readonly cellU: number
+  /** 平面形状，格 */
+  readonly shape: {
+    /** 冰面的面积，格² */
+    readonly areaU: number
+    /** 四条主断裂边：整块最多转 turnDeg 度，每条边再各自最多偏 sideDeg 度、离中心的距离最多差 sideU 格 */
+    readonly turnDeg: number
+    readonly sideDeg: number
+    readonly sideU: number
+    /** 每个角被一条斜裂缝切掉的概率与切进去的深度 */
+    readonly cutChance: number
+    readonly cutU: readonly [number, number]
+    /** 长边中途拐折的幅度：裂缝不是笔直的 */
+    readonly bendU: number
+    /** 边上掰掉一块留下的豁口：几个、多深、口多宽 */
+    readonly bites: readonly [number, number]
+    readonly biteDepthU: readonly [number, number]
+    readonly biteWidthU: readonly [number, number]
+    /** 一条横贯冰面的裂缝已重新冻住，成了一道新冰；它从冰缘裂开、还没冻上的那一段是伸进冰里的水道：概率、水道的长与口宽、新冰的宽 */
+    readonly leadChance: number
+    readonly leadU: readonly [number, number]
+    readonly leadWidthU: readonly [number, number]
+    readonly seamWidthU: readonly [number, number]
+    /** 断口的锯齿幅度；凸角被别的浮冰撞圆的半径 */
+    readonly jagU: number
+    readonly roundU: readonly [number, number]
+  }
+  /** 冰：老冰与新冰的厚度、冰与海水的密度，按阿基米德定出冰面高出海面多少 */
+  readonly ice: {
+    readonly thicknessM: number
+    readonly youngM: number
+    readonly density: number
+    readonly seaDensity: number
+  }
+  /** 积雪：最深多少米、盖住多大比例、雪的密度；雪堆沿风向拉长，尺度 waveU；冰缘这么宽一圈被浪花打湿、留不住雪 */
+  readonly snow: {
+    readonly maxM: number
+    readonly cover: number
+    readonly density: number
+    readonly waveU: number
+    readonly bareU: number
+  }
+  /** 脚下与冰面之间的静、动摩擦系数：积雪、老冰、新冰；金币与碎片在冰上的摩擦 */
+  readonly friction: {
+    readonly snow: { readonly static: number; readonly kinetic: number }
+    readonly ice: { readonly static: number; readonly kinetic: number }
+    readonly young: { readonly static: number; readonly kinetic: number }
+    readonly loose: number
+  }
+  /** 身体：脚下支撑圈占半径的比例；游泳的速度占走路的比例；半径 refRadiusU、质量 1 的身体在水里的阻力长度 m/c（格）与冻僵的时长（秒） */
+  readonly body: {
+    readonly footFrac: number
+    readonly swimRatio: number
+    readonly refRadiusU: number
+    readonly dragU: number
+    readonly freezeSec: number
+    /** 爬上冰面：重心要越过冰缘这么多个身体半径 */
+    readonly climbFrac: number
+  }
+  /** 风：平时的风速与阵风的峰值（米/秒）；阵风先起、再稳、后落，隔一阵来一次；风向每次偏一点 */
+  readonly wind: {
+    readonly meanMs: number
+    readonly gustMs: number
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly jitterMs: number
+    readonly riseMs: number
+    readonly holdMs: number
+    readonly fallMs: number
+    readonly veerDeg: number
+    /** 空气密度；半径 refRadiusU、质量 1 的身体的 Cd·A/m（米²/千克）：越小的身体越容易被吹动 */
+    readonly airDensity: number
+    readonly dragArea: number
+    /** 浮冰顺风漂得比海水快，漂速占平时风速的比例，南半球漂向偏在风向左边 driftDeg 度：浮冰上看，海水往反方向流 */
+    readonly driftRatio: number
+    readonly driftDeg: number
+  }
+  /** 水里的体力：冰面按地图的体力算 */
+  readonly waterExertion: number
+  readonly waterRegen: number
+  readonly coldTickMs: number
+}
 export interface RiverConfig {
   readonly viewScale: number
   readonly width: number
@@ -294,7 +385,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula' | 'volcano' | 'ship'
+  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula' | 'volcano' | 'ship' | 'floe'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -310,6 +401,7 @@ export interface MapDef {
   readonly nebula?: NebulaConfig
   readonly volcano?: VolcanoConfig
   readonly ship?: ShipConfig
+  readonly floe?: FloeConfig
   readonly river?: RiverConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
