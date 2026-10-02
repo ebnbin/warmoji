@@ -3,7 +3,7 @@ import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
-import { Airborne, Alive, Drive, Hp, Motion, MOTION, Phys, Pickup, Radius, Shard, Slot, Transform, Uid } from '../components'
+import { Airborne, Alive, CharScale, Drive, Hp, Motion, MOTION, Phys, Pickup, Radius, Shard, Slot, Transform, Uid } from '../components'
 import { die } from '../systems/shared/combat'
 import { fleeSteer } from '../systems/shared/steer'
 import { hazardSource } from '../utils/source'
@@ -11,7 +11,7 @@ import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { riverPlan } from './layout'
 import { flowAt, solveWater } from './water'
-import { wade } from './bodies'
+import { POSTURE, wade } from './bodies'
 import type { Flow, Water } from './water'
 import type { RiverPlan } from './layout'
 import type { MapId, RiverConfig } from '../../types/maps'
@@ -29,12 +29,13 @@ const FALLS_TINT = 0x9fd8ff
 
 /**
  * 河流此刻的状态：按种子生成的地图，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定，
- * 以及哪些身体正倒在水里被冲着走（按实体记，uid 对不上就是换了实体）
+ * 以及哪些身体正在水里打滑、哪些正倒在水里被冲着走（按实体记，uid 对不上就是换了实体）
  */
 export interface RiverState {
   readonly plan: RiverPlan
   water: Water | null
   ready: Promise<void>
+  readonly slip: Map<number, number>
   readonly down: Map<number, number>
 }
 
@@ -82,7 +83,7 @@ export function riverOf(sim: Sim): RiverState {
   let s = sim.worldState.river
   if (!s) {
     const cfg = cfgOf(sim)
-    const state: RiverState = { plan: riverPlanFor(cfg, sim.run.decorSeed), water: null, ready: Promise.resolve(), down: new Map() }
+    const state: RiverState = { plan: riverPlanFor(cfg, sim.run.decorSeed), water: null, ready: Promise.resolve(), slip: new Map(), down: new Map() }
     state.ready = solveAsync(cfg, state.plan).then((w) => {
       state.water = w
     })
@@ -106,6 +107,11 @@ function groundOf(sim: Sim): Surface {
 }
 
 const FLOW: Flow = { h: 0, u: 0, v: 0 }
+
+/** 身体本来的大小：角色的判定半径里乘了队长倍率，那只是画面上突出队长，受力不算它 */
+function bodyRadius(sim: Sim, eid: number): number {
+  return hasComponent(sim.world, eid, CharScale) ? Radius.v[eid]! / CharScale.v[eid]! : Radius.v[eid]!
+}
 
 /** (x, y) 像素处有没有水：水深够不够算湿 */
 function wetAt(sim: Sim, s: RiverState, x: number, y: number): boolean {
@@ -212,16 +218,16 @@ export const river: WorldHooks = {
     if (!w || hasComponent(sim.world, eid, Pickup) || hasComponent(sim.world, eid, Shard)) return false
     const cfg = cfgOf(sim)
     flowAt(w, x / UNIT, y / UNIT, FLOW)
-    if (FLOW.h < cfg.body.wetM) {
-      s.down.delete(eid)
-      return false
-    }
     const uid = Uid.v[eid]!
+    const was = s.down.get(eid) === uid ? POSTURE.down : s.slip.get(eid) === uid ? POSTURE.slip : POSTURE.walk
+    s.slip.delete(eid)
+    s.down.delete(eid)
+    if (FLOW.h < cfg.body.wetM) return false
     const g = sim.hooks.surface(sim, x, y)
     const k = (Phys.drag[eid]! * Phys.grip[eid]! * g.traction * g.viscosity) / Phys.mass[eid]!
-    const was = s.down.get(eid) === uid
-    if (wade(cfg, out, Radius.v[eid]!, Phys.mass[eid]!, x, y, vx, vy, FLOW.h, FLOW.u, FLOW.v, Drive.x[eid]!, Drive.y[eid]!, k, g.traction, was, dt)) s.down.set(eid, uid)
-    else s.down.delete(eid)
+    const now = wade(cfg, out, bodyRadius(sim, eid), Phys.mass[eid]!, x, y, vx, vy, FLOW.h, FLOW.u, FLOW.v, Drive.x[eid]!, Drive.y[eid]!, k, g.traction, was, dt)
+    if (now === POSTURE.slip) s.slip.set(eid, uid)
+    else if (now === POSTURE.down) s.down.set(eid, uid)
     return true
   },
   constrainBody(sim, eid, _from, next) {
@@ -285,6 +291,6 @@ export const river: WorldHooks = {
   tick(sim) {
     const s = riverOf(sim)
     plunge(sim, s)
-    for (const [eid, uid] of s.down) if (Uid.v[eid] !== uid || !Alive.v[eid]) s.down.delete(eid)
+    for (const m of [s.slip, s.down]) for (const [eid, uid] of m) if (Uid.v[eid] !== uid || !Alive.v[eid]) m.delete(eid)
   },
 }

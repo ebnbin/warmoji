@@ -201,6 +201,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(range(k.inRiver, true) && range(k.onLand, true) && k.radiusU[0] > 0 && range(k.radiusU, false) && k.heightM[0] > 0 && range(k.heightM, false), `maps.${id}.river.rocks 的数量须为非负整数范围，半径与高须为正`)
   need(b.kg > 0 && b.radiusU > 0 && b.heightM > 0 && b.density > 0 && b.drag > 0, `maps.${id}.river.body 的体重、半径、身高、密度与阻力系数须为正`)
   need(b.grip.kinetic > 0 && b.grip.kinetic <= b.grip.static, `maps.${id}.river.body.grip 的动摩擦须为正且不大于静摩擦`)
+  need(b.legs > 0 && b.legs <= 1 && b.hip > 0 && b.hip < 1 && b.lever > 0 && b.chest > 0 && b.chest <= 1, `maps.${id}.river.body 的腿宽、胸厚须在 (0, 1] 内，胯高在 (0, 1) 内，扶正力臂为正`)
   need(b.gait > 0 && b.swim >= 0 && b.wetM > 0, `maps.${id}.river.body 的赶路功率与湿地水深须为正，划水不为负`)
 }
 

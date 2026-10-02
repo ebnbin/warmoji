@@ -364,7 +364,7 @@ export interface RiverConfig {
     readonly heightM: readonly [number, number]
   }
   /**
-   * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克、高 heightM 米，别的身体质量按半径的三次方与质量倍率、身高按半径缩放；
+   * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克、高 heightM 米，别的身体质量按半径的三次方与质量倍率、身高按半径缩放（半径不算队长倍率）；
    * 身体的密度（千克/米³）与水里的阻力系数；脚下与河床的静、动摩擦系数
    */
   readonly body: {
@@ -374,6 +374,13 @@ export interface RiverConfig {
     readonly density: number
     readonly drag: number
     readonly grip: Friction
+    /** 站着时胯以下迎水的是两条腿：腿宽占身宽、胯高占身高的比例 */
+    readonly legs: number
+    readonly hip: number
+    /** 站着时重心到脚掌下游边的水平距离占身高的比例：水的冲力绕脚掌的力矩大过脚下的压力乘它就被推倒 */
+    readonly lever: number
+    /** 倒在水里时身体的厚占身宽的比例：顺着游的方向迎水的是身宽 × 厚，横着被冲的是身长 × 厚 */
+    readonly chest: number
     /** 赶路按恒定功率：平地上全速走时折算的阻力（米/秒²），定下这个身体的功率；浮起来以后划水的推力（米/秒²） */
     readonly gait: number
     readonly swim: number
