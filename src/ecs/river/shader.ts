@@ -175,7 +175,7 @@ uniform vec4 uIn;
 uniform vec4 uInSize;
 uniform vec3 uSun;
 
-/** 细浪按这么大（格）的块各取各的流向，块与块之间按方差不变混合 */
+/** 细浪按这么大（格）的块各取各的花纹，块与块之间按方差不变混合 */
 const float TILE = 1.5;
 
 vec2 hash2(vec2 p) {
@@ -303,22 +303,21 @@ void main ()
   vec2 gb = vec2(0.0);
   float lines = 0.0;
   float wsum = 0.0;
+  // 条纹的方向取这一点自己的流向：取块中心的，流向转得急的地方（石头周围、分叉口）就拼出折角
+  vec2 dir = speed > 0.02 ? vel / speed : vec2(0.7071, 0.7071);
+  vec2 acr = vec2(-dir.y, dir.x);
+  float stretch = 1.0 + 2.8 * clamp(speed / 1.6, 0.0, 1.0);
   for (int k = 0; k < 4; k++) {
     vec2 o = vec2(float(k - (k / 2) * 2), float(k / 2));
     vec2 cell = t0 + o;
     vec2 c = (cell + 0.5) * TILE;
-    vec2 cv = (texture2D(uFlow, vec2((c.x - uArea.x) / uArea.z, 1.0 - (c.y - uArea.y) / uArea.w)).rg - 0.5) * ${(SPEED_SPAN * 2).toFixed(1)};
-    float cs = length(cv);
-    vec2 cd = cs > 0.02 ? cv / cs : vec2(0.7071, 0.7071);
-    vec2 ca = vec2(-cd.y, cd.x);
-    float st = 1.0 + 2.8 * clamp(cs / 1.6, 0.0, 1.0);
     vec2 wo = mix(1.0 - tf, tf, o);
     float wk = wo.x * wo.y;
     vec2 jit = hash2(cell) * 41.0;
-    ga += waves(qa - c, cd, ca, st, jit) * wk;
-    gb += waves(qb - c, cd, ca, st, jit + 17.0) * wk;
-    float la = vnoise(vec2(dot(qa - c, cd) * 0.7, dot(qa - c, ca) * 7.0) + jit);
-    float lb = vnoise(vec2(dot(qb - c, cd) * 0.7, dot(qb - c, ca) * 7.0) + jit + 23.0);
+    ga += waves(qa - c, dir, acr, stretch, jit) * wk;
+    gb += waves(qb - c, dir, acr, stretch, jit + 17.0) * wk;
+    float la = vnoise(vec2(dot(qa - c, dir) * 0.7, dot(qa - c, acr) * 7.0) + jit);
+    float lb = vnoise(vec2(dot(qb - c, dir) * 0.7, dot(qb - c, acr) * 7.0) + jit + 23.0);
     lines += (mix(la, lb, w) - 0.5) * wk;
     wsum += wk * wk;
   }
@@ -353,7 +352,7 @@ void main ()
   float white = rough * smoothstep(0.5, 0.85, lines * 0.65 + churn * 0.35 + boil * 0.1);
   white += smoothstep(0.03, 0.0, depth) * wet * 0.35 * smoothstep(0.35, 0.8, churn);
   white += lip * smoothstep(0.35, 0.75, lines * 0.6 + churn * 0.5) * 0.85;
-  white += plunge * smoothstep(0.45, 0.85, churn * 0.5 + boil * 0.3 + vnoise(p * 2.7 - vec2(uTime * 1.1, uTime * 0.7)) * 0.4) * 1.3;
+  white += plunge * smoothstep(0.45, 0.85, churn * 0.5 + boil * 0.3 + vnoise(vec2(inSide * 2.7, inAlong * 2.7 - uTime * 1.3)) * 0.4) * 1.3;
   white = clamp(white, 0.0, 1.0) * wet;
   vec3 foam = vec3(0.88, 0.92, 0.9) * (0.8 + 0.25 * max(dot(n, uSun), 0.0));
   col = mix(col, foam, white);
@@ -361,7 +360,7 @@ void main ()
 
   if (curtain > 0.0) {
     float h = clamp(-inAlong / uInSize.z, 0.0, 1.0);
-    float fall = vnoise(vec2(inSide * 5.0, inAlong * 1.4 + uTime * 4.5)) * 0.55 + vnoise(vec2(inSide * 13.0, inAlong * 3.0 + uTime * 8.0)) * 0.45;
+    float fall = vnoise(vec2(inSide * 5.0, inAlong * 1.4 - uTime * 4.5)) * 0.55 + vnoise(vec2(inSide * 13.0, inAlong * 3.0 - uTime * 8.0)) * 0.45;
     vec3 sheet = mix(vec3(0.5, 0.64, 0.66), vec3(0.97, 0.99, 0.98), smoothstep(0.25, 0.75, fall) * (0.55 + 0.45 * (1.0 - h)));
     sheet = mix(sheet, vec3(0.75, 0.86, 0.86), smoothstep(0.85, 1.0, h) * 0.6);
     float a = curtain * (0.62 + 0.38 * fall) * (0.75 + 0.25 * (1.0 - h));

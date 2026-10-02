@@ -11,7 +11,7 @@ import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { riverPlan } from './layout'
 import { flowAt, solveWater } from './water'
-import { swept, swim } from './bodies'
+import { drift, swept } from './bodies'
 import type { Flow, Water } from './water'
 import type { RiverPlan } from './layout'
 import type { MapId, RiverConfig } from '../../types/maps'
@@ -182,7 +182,7 @@ function plunge(sim: Sim, s: RiverState): void {
 
 /**
  * 河流：能走的是林子、岩石与崖围着的一片空地，河面也能走；树、石头、崖与深谷是硬边界，身体走到跟前就停住、顺着壁面滑。
- * 水里站不住的身体随水漂、自己划水（见 swept 与 swim），站得住的跟在岸上一样；被冲过断崖边就落进深谷
+ * 水里站不住的身体随水漂、自己划水（见 swept 与 drift），站得住的跟在岸上一样，掉落物顺水漂；被冲过断崖边就落进深谷
  */
 export const river: WorldHooks = {
   torus: false,
@@ -210,13 +210,20 @@ export const river: WorldHooks = {
   effort() {
     return 1
   },
-  /** 金币沉在河床的卵石缝里，近床的流速推不动它；碎片照常 */
+  /** 掉落物落进水里跟落叶一样顺水漂，被吸向队伍的速度照加；碎片照常 */
   contact(sim, eid, dt, x, y, vx, vy, out) {
     const s = riverOf(sim)
     const w = s.water
-    if (!w || hasComponent(sim.world, eid, Pickup) || hasComponent(sim.world, eid, Shard)) return false
+    if (!w || hasComponent(sim.world, eid, Shard)) return false
     const cfg = cfgOf(sim)
     flowAt(w, x / UNIT, y / UNIT, FLOW)
+    const g = sim.hooks.surface(sim, x, y)
+    const k = (Phys.drag[eid]! * Phys.grip[eid]! * g.traction * g.viscosity) / Phys.mass[eid]!
+    if (hasComponent(sim.world, eid, Pickup)) {
+      if (FLOW.h < cfg.body.wetM) return false
+      drift(cfg, out, x, y, vx, vy, FLOW.u, FLOW.v, Drive.x[eid]!, Drive.y[eid]!, k, dt)
+      return true
+    }
     const uid = Uid.v[eid]!
     const was = s.swimming.get(eid) === uid
     if (FLOW.h < cfg.body.wetM || !swept(cfg, bodyRadius(sim, eid), Phys.mass[eid]!, FLOW.h, FLOW.u, FLOW.v, was)) {
@@ -224,9 +231,7 @@ export const river: WorldHooks = {
       return false
     }
     s.swimming.set(eid, uid)
-    const g = sim.hooks.surface(sim, x, y)
-    const k = (Phys.drag[eid]! * Phys.grip[eid]! * g.traction * g.viscosity) / Phys.mass[eid]!
-    swim(cfg, out, x, y, vx, vy, FLOW.u, FLOW.v, Drive.x[eid]!, Drive.y[eid]!, k, dt)
+    drift(cfg, out, x, y, vx, vy, FLOW.u, FLOW.v, Drive.x[eid]! * cfg.body.swim, Drive.y[eid]! * cfg.body.swim, k, dt)
     return true
   },
   constrainBody(sim, eid, _from, next) {

@@ -33,8 +33,8 @@ export function swept(cfg: RiverConfig, radius: number, massMul: number, depth: 
   return push * arm > upright * height * b.lever * (swimming ? STEADY : 1)
 }
 
-/** 站不住的身体随水漂：位置像素、速度像素/秒，速度以快慢 k 趋近水速 (wx, wy)（米/秒）加上自己划的速度——想走的速度 (dx, dy) 乘 swim，相对水 */
-export function swim(cfg: RiverConfig, out: BodyStep, x: number, y: number, vx: number, vy: number, wx: number, wy: number, dx: number, dy: number, k: number, dt: number): void {
+/** 随水漂：位置像素、速度像素/秒，速度以快慢 k 趋近水速 (wx, wy)（米/秒）加上自己相对水的速度 (dx, dy)（像素/秒） */
+export function drift(cfg: RiverConfig, out: BodyStep, x: number, y: number, vx: number, vy: number, wx: number, wy: number, dx: number, dy: number, k: number, dt: number): void {
   const toPx = UNIT / cfg.meterPerU
-  approach(out, x, y, vx, vy, wx * toPx + dx * cfg.body.swim, wy * toPx + dy * cfg.body.swim, k, dt)
+  approach(out, x, y, vx, vy, wx * toPx + dx, wy * toPx + dy, k, dt)
 }
