@@ -36,12 +36,13 @@ import type { ShipState } from './worlds/ship'
 import { GRAVITY, halfBeamAt } from '../data/ship'
 import type { ShipConfig } from '../types/maps'
 import type { EruptionPhase, VolcanoState } from './worlds/volcano'
-import { edgeAt, floeFor, GRAVITY as FLOE_GRAVITY, inWater, SWIMMING } from './worlds/floe'
+import { edgeAt, floeFor, GRAVITY as FLOE_GRAVITY, inWater, SWIMMING, windAt } from './worlds/floe'
 import type { FloeField, FloeState } from './worlds/floe'
 import { FLOE_PPU, floeFrame, floeHeights, LIGHT } from './render/floe'
 import type { FloeCanvas } from './render/floe'
-import { drawSeaNoise, drawShore, FLOE_SEA_FRAG, NOISE_TILE } from './render/floeSea'
+import { drawLee, drawSeaNoise, drawShore, FLOE_SEA_FRAG, LEE_CELL_U, NOISE_TILE, SEA_N, WindSea } from './render/floeSea'
 import { FloePainter } from './render/floePainter'
+import type { FloeConfig } from '../types/maps'
 import { playSfx } from '../audio/sfx'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
@@ -1827,7 +1828,10 @@ function floeField(v: ViewCtx): FloeField {
 const FLOE_SEA = 0x061820
 const FLOE_KEY = 'floe-ice'
 const SHORE_KEY = 'floe-shore'
+const LEE_KEY = 'floe-lee'
 const SEA_NOISE_KEY = 'floe-noise'
+const SEA_LONG_KEY = 'floe-sea-long'
+const SEA_SHORT_KEY = 'floe-sea-short'
 const FROST_KEY = 'floe-frost'
 /** 霜那张图长边多少像素 */
 const FROST_PX = 960
@@ -1835,11 +1839,26 @@ const FROST_PX = 960
 const FLOE_THREADS = 4
 /** 海面四边形往浮冰外铺多远，格：游再远也冻死在这以内了 */
 const SEA_PAD_U = 40
-/** 远处风暴传来的长涌：波长（格）与浪高（米），深水里按色散关系定周期 */
-const SWELL_U = 250
-const SWELL_HEIGHT_M = 0.6
+/** 风速过了 DRIFT_FROM_MS（米/秒）雪才扬得起来，扬起的雪按超出的部分的三次方变多，超出 DRIFT_SPAN_MS 时每格每秒撒 1.1 粒 */
+const DRIFT_FROM_MS = 4.5
+const DRIFT_SPAN_MS = 8.5
+/** 风浪图隔多久（毫秒）重算一次 */
+const SEA_FRAME_MS = 33
+/** 涌浪的波长，格：深水里按色散关系定周期 */
+const SWELL_U = 75
 /** 落水的人浮着时露在水面上的部分占贴图高度的比例 */
 const AFLOAT = 0.46
+
+/** 一粒被风吹着跑的雪：贴地的拖成一道短线，飞起来的是一个小点 */
+interface Flake {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  age: number
+  life: number
+  high: boolean
+}
 
 /** 水面上的一圈波纹 */
 interface Ripple {
@@ -1930,20 +1949,26 @@ function drawFrost(ctx: CanvasRenderingContext2D, w: number, h: number): void {
 
 /**
  * 浮冰：冰面是开局在后台线程画好的一张贴图，压在着色器画的南大洋上；海面延伸到镜头能去的任何地方，镜头只跟着队长、不设边。
- * 有人落水就溅起水花，浮着的人只露出上半身，一圈圈波纹在平静的水面上往外扩；
+ * 风吹着雪贴地跑，阵风来时雪流变密、飞得更快；有人落水就溅起水花，浮着的人只露出上半身，一圈圈波纹往外扩；
  * 队长泡在冰水里，屏幕四边就结起霜，上了冰慢慢化掉
  */
 class FloeView extends BoundedView {
   private painter?: FloePainter
-  private readonly u = { time: 0 }
+  private sea?: { sea: WindSea; long: Phaser.Textures.CanvasTexture; short: Phaser.Textures.CanvasTexture; longPx: ImageData; shortPx: ImageData; at: number }
+  private readonly u = { time: 0, wind: [1, 0, 0, 0] }
+  private low?: Phaser.GameObjects.Graphics
+  private high?: Phaser.GameObjects.Graphics
   private wet?: Phaser.GameObjects.Graphics
   private cover?: Phaser.GameObjects.Graphics
   private waterline?: Phaser.GameObjects.Graphics
   private spray?: Phaser.GameObjects.Graphics
   private frost?: Phaser.GameObjects.Image
+  private flakes: Flake[] = []
   private ripples: Ripple[] = []
   private drops: Drop[] = []
+  private flakeAcc = 0
   private chill = 0
+  private gustAt = -Infinity
   private frostAspect = 0
   private readonly rippleAt = new Map<number, number>()
 
@@ -1981,7 +2006,7 @@ class FloeView extends BoundedView {
     }
   }
 
-  /** 冰面交给后台线程画，画完才开战；海面与水花随后铺上 */
+  /** 冰面交给后台线程画，画完才开战；海面、风雪与水花随后铺上 */
   async onSimReady(v: ViewCtx, sim: Sim): Promise<void> {
     const s = sim.worldState.floe
     if (!s) return
@@ -1990,7 +2015,7 @@ class FloeView extends BoundedView {
     const scene = v.scene
     const frame = floeFrame(f, FLOE_PPU)
     const heights = floeHeights(f, frame.x0, frame.y0, (frame.w / FLOE_PPU) * UNIT, (frame.h / FLOE_PPU) * UNIT)
-    const canvas: FloeCanvas = { cols: f.cols, rows: f.rows, cell: f.cell, edge: f.edge, snow: f.snow, young: f.young, ...heights, ...frame, ppu: FLOE_PPU, driftAngle: f.driftAngle, seed: f.seed, meterPerU: cfg.meterPerU }
+    const canvas: FloeCanvas = { cols: f.cols, rows: f.rows, cell: f.cell, edge: f.edge, snow: f.snow, young: f.young, ...heights, ...frame, ppu: FLOE_PPU, windAngle: f.windAngle, seed: f.seed, meterPerU: cfg.meterPerU }
     const painter = new FloePainter(canvas, Math.max(1, Math.min(FLOE_THREADS, navigator.hardwareConcurrency - 1)))
     this.painter = painter
     const tex = canvasTexture(scene, FLOE_KEY, frame.w, frame.h)
@@ -2001,16 +2026,29 @@ class FloeView extends BoundedView {
     // 冰缘一圈留不住雪，投影按光冰高出海面的高度算
     const shadeU = (f.freeboard / cfg.meterPerU) * (Math.hypot(LIGHT.x, LIGHT.y) / LIGHT.z)
     canvasTexture(scene, SHORE_KEY, f.cols, f.rows, (ctx) => drawShore(ctx, f, shadeU))
+    canvasTexture(scene, LEE_KEY, Math.round(rect[2]! / (LEE_CELL_U * UNIT)), Math.round(rect[3]! / (LEE_CELL_U * UNIT)), (ctx) =>
+      drawLee(ctx, f, { x: rect[0]!, y: rect[1]!, w: rect[2]!, h: rect[3]! }, cfg.wind.fetchM / cfg.meterPerU),
+    )
     canvasTexture(scene, SEA_NOISE_KEY, NOISE_TILE, NOISE_TILE, (ctx) => drawSeaNoise(ctx, f.seed ^ 0x3a7)).setWrap(Phaser.Textures.WrapMode.REPEAT, Phaser.Textures.WrapMode.REPEAT)
+    const sea = new WindSea(f.windAngle, f.seed ^ 0x51a, cfg.wind.meanMs, cfg.wind.fetchM, cfg.meterPerU, FLOE_GRAVITY)
+    const long = canvasTexture(scene, SEA_LONG_KEY, SEA_N, SEA_N)
+    const short = canvasTexture(scene, SEA_SHORT_KEY, SEA_N, SEA_N)
+    for (const t of [long, short]) t.setWrap(Phaser.Textures.WrapMode.REPEAT, Phaser.Textures.WrapMode.REPEAT)
     await painting
     if (this.painter !== painter) return
     this.painter = undefined
     tex.refresh()
     this.visuals.push(scene.add.image(frame.x0, frame.y0, FLOE_KEY).setOrigin(0, 0).setDisplaySize((frame.w / FLOE_PPU) * UNIT, (frame.h / FLOE_PPU) * UNIT).setDepth(-1))
-    const swellAngle = new Rng(f.seed ^ 0x5e11).next() * Math.PI * 2
+    const swellAngle = f.windAngle + (new Rng(f.seed ^ 0x5e11).next() * 2 - 1) * 1.2
     const k = (Math.PI * 2) / SWELL_U
     const omega = Math.sqrt((FLOE_GRAVITY / cfg.meterPerU) * k)
-    const swellSlope = ((SWELL_HEIGHT_M / 2) / cfg.meterPerU) * k
+    const flow = [s.current.x / UNIT, s.current.y / UNIT, cfg.meterPerU]
+    const seaState = [cfg.wind.fetchM / cfg.meterPerU, sea.peakOmega, sea.sigmaU, cfg.wind.meanMs]
+    const tiles = [sea.long.size, sea.short.size, sea.long.omegaMean, sea.short.omegaMean]
+    const longScale = [...sea.long.sigma, sea.long.variance / (sea.long.variance + sea.short.variance)]
+    const shortScale = [...sea.short.sigma]
+    this.sea = { sea, long, short, longPx: new ImageData(SEA_N, SEA_N), shortPx: new ImageData(SEA_N, SEA_N), at: -Infinity }
+    this.waves(sim.elapsedMs)
     const u = this.u
     this.visuals.push(
       scene.add
@@ -2021,37 +2059,57 @@ class FloeView extends BoundedView {
             setupUniforms: (set: (name: string, value: unknown) => void) => {
               set('uNoise', 0)
               set('uShore', 1)
+              set('uLee', 2)
+              set('uLong', 3)
+              set('uShort', 4)
               set('uTime', u.time)
               set('uRect', rect)
               set('uGrid', [f.cols * f.cell, f.rows * f.cell, UNIT])
               set('uSun', [LIGHT.x, LIGHT.y, LIGHT.z])
+              set('uWind', u.wind)
+              set('uSeaState', seaState)
+              set('uTiles', tiles)
+              set('uLongScale', longScale)
+              set('uShortScale', shortScale)
+              set('uLeeRect', rect)
               set('uSwell', [Math.cos(swellAngle), Math.sin(swellAngle), k, omega])
-              set('uSwellSlope', swellSlope)
+              set('uFlow', flow)
             },
           },
           rect[0]!,
           rect[1]!,
           rect[2]!,
           rect[3]!,
-          [SEA_NOISE_KEY, SHORE_KEY],
+          [SEA_NOISE_KEY, SHORE_KEY, LEE_KEY, SEA_LONG_KEY, SEA_SHORT_KEY],
         )
         .setOrigin(0, 0)
         .setDepth(-2),
     )
     this.wet = scene.add.graphics().setDepth(-1.5)
+    this.low = scene.add.graphics().setDepth(-0.5)
     this.cover = scene.add.graphics().setDepth(8.5).setBlendMode(Phaser.BlendModes.MULTIPLY)
     this.waterline = scene.add.graphics().setDepth(8.6)
     this.spray = scene.add.graphics().setDepth(34)
-    this.visuals.push(this.wet, this.cover, this.waterline, this.spray)
+    this.high = scene.add.graphics().setDepth(36)
+    this.visuals.push(this.wet, this.low, this.cover, this.waterline, this.spray, this.high)
     scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.8, 0.08, 0x0a1622)
   }
 
   step(v: ViewCtx, sim: Sim, delta: number): void {
     const s = sim.worldState.floe
-    if (!s || !this.wet) return
+    if (!s || !this.low) return
+    const cfg = v.def.floe!
     const now = sim.elapsedMs
     const dt = Math.min(delta, 50) / 1000
+    const w = windAt(s.field, cfg, s.gust, now)
     this.u.time = now / 1000
+    this.u.wind = [Math.cos(w.angle), Math.sin(w.angle), w.speed, w.level]
+    this.waves(now)
+    if (s.gust.at !== this.gustAt) {
+      this.gustAt = s.gust.at
+      if (s.gust.at > 0) playSfx('gust')
+    }
+    this.blow(v, cfg, w.speed, w.angle, dt)
     for (const p of s.splashes) this.splash(p.x, p.y, p.r, p.sink)
     s.splashes.length = 0
     this.swimmers(v, s, now)
@@ -2072,6 +2130,64 @@ class FloeView extends BoundedView {
     const h = Math.round(aspect >= 1 ? FROST_PX / aspect : FROST_PX)
     canvasTexture(v.scene, FROST_KEY, w, h, (ctx) => drawFrost(ctx, w, h))
     this.frost?.setTexture(FROST_KEY)
+  }
+
+  /** 这一刻的风浪：做一遍逆变换写进两张风浪图，一秒三十次就够看了 */
+  private waves(now: number): void {
+    const w = this.sea
+    if (!w || Math.abs(now - w.at) < SEA_FRAME_MS) return
+    w.at = now
+    w.sea.frame(now / 1000, w.longPx.data, w.shortPx.data)
+    w.long.getContext().putImageData(w.longPx, 0, 0)
+    w.short.getContext().putImageData(w.shortPx, 0, 0)
+    w.long.refresh()
+    w.short.refresh()
+  }
+
+  /** 风吹雪：按风速的三次方在镜头里撒雪，从上风那一侧吹进来；贴地的拖成短线，少数飞起来的是小点 */
+  private blow(v: ViewCtx, cfg: FloeConfig, speed: number, angle: number, dt: number): void {
+    const cam = v.scene.cameras.main.worldView
+    const lift = Math.max(0, speed - DRIFT_FROM_MS) / DRIFT_SPAN_MS
+    const c = Math.cos(angle)
+    const s = Math.sin(angle)
+    const px = UNIT / cfg.meterPerU
+    this.flakeAcc += dt * ((cam.width * cam.height) / (UNIT * UNIT)) * (0.05 + 1.1 * lift * lift * lift)
+    for (; this.flakeAcc >= 1; this.flakeAcc--) {
+      const high = Math.random() < 0.22
+      const pace = speed * (high ? 0.9 : 0.5) * (0.7 + Math.random() * 0.5) * px
+      const back = Math.random() * 0.6
+      this.flakes.push({
+        x: cam.x + Math.random() * cam.width - c * back * cam.width,
+        y: cam.y + Math.random() * cam.height - s * back * cam.height,
+        vx: c * pace + (Math.random() - 0.5) * 0.4 * px,
+        vy: s * pace + (Math.random() - 0.5) * 0.4 * px,
+        age: 0,
+        life: 0.5 + Math.random() * 0.7,
+        high,
+      })
+    }
+    const low = this.low!
+    const high = this.high!
+    low.clear()
+    high.clear()
+    const kept: Flake[] = []
+    for (const f of this.flakes) {
+      f.age += dt
+      if (f.age >= f.life) continue
+      f.x += f.vx * dt
+      f.y += f.vy * dt
+      kept.push(f)
+      const a = Math.sin((f.age / f.life) * Math.PI)
+      if (f.high) {
+        high.fillStyle(0xf4f8fc, 0.55 * a)
+        high.fillCircle(f.x, f.y, 2.2)
+        continue
+      }
+      const tail = 0.028
+      low.lineStyle(1.6, 0xf2f7fb, 0.4 * a)
+      low.lineBetween(f.x, f.y, f.x - f.vx * tail, f.y - f.vy * tail)
+    }
+    this.flakes = kept
   }
 
   /** 落水溅起水花：两圈波纹、一团白沫、一把往外抛的水珠；金币沉下去只冒一个小圈 */
@@ -2159,15 +2275,19 @@ class FloeView extends BoundedView {
     this.painter?.close()
     this.painter = undefined
     super.destroy(v)
+    this.low = undefined
+    this.high = undefined
     this.wet = undefined
     this.cover = undefined
     this.waterline = undefined
     this.spray = undefined
     this.frost = undefined
+    this.flakes = []
     this.ripples = []
     this.drops = []
     this.rippleAt.clear()
-    for (const key of [FLOE_KEY, SHORE_KEY, SEA_NOISE_KEY, FROST_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+    this.sea = undefined
+    for (const key of [FLOE_KEY, SHORE_KEY, LEE_KEY, SEA_NOISE_KEY, SEA_LONG_KEY, SEA_SHORT_KEY, FROST_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
 }
 

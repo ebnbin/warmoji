@@ -270,7 +270,7 @@ export interface ShipConfig {
 }
 /**
  * 浮冰：南极海上一块近似方形的浮冰，形状按断裂、碰撞的成因每局随机生成；冰面没有边，滑出冰缘就掉进冰点附近的海水里。
- * 冰面上的一切按库仑摩擦走、滑、停，积雪、老冰、新冰的摩擦各不相同。
+ * 冰面上的一切按库仑摩擦走、滑、停，积雪、老冰、新冰的摩擦各不相同；海风一阵阵吹，风压超过脚下的摩擦就被吹着滑。
  * 物理量按米、千克、秒算，一格 meterPerU 米
  */
 export interface FloeConfig {
@@ -311,7 +311,7 @@ export interface FloeConfig {
     readonly density: number
     readonly seaDensity: number
   }
-  /** 积雪：最深多少米、盖住多大比例、雪的密度；雪堆被往年的风吹得顺着同一个方向拉长，尺度 waveU；冰缘这么宽一圈被浪花打湿、留不住雪 */
+  /** 积雪：最深多少米、盖住多大比例、雪的密度；雪堆沿风向拉长，尺度 waveU；冰缘这么宽一圈被浪花打湿、留不住雪 */
   readonly snow: {
     readonly maxM: number
     readonly cover: number
@@ -335,6 +335,26 @@ export interface FloeConfig {
     readonly freezeSec: number
     /** 爬上冰面：重心要越过冰缘这么多个身体半径 */
     readonly climbFrac: number
+  }
+  /** 风：平时的风速与阵风的峰值（米/秒）；阵风先起、再稳、后落，隔一阵来一次；风向每次偏一点 */
+  readonly wind: {
+    readonly meanMs: number
+    readonly gustMs: number
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly jitterMs: number
+    readonly riseMs: number
+    readonly holdMs: number
+    readonly fallMs: number
+    readonly veerDeg: number
+    /** 空气密度；半径 refRadiusU、质量 1 的身体的 Cd·A/m（米²/千克）：越小的身体越容易被吹动 */
+    readonly airDensity: number
+    readonly dragArea: number
+    /** 浮冰顺风漂得比海水快，漂速占平时风速的比例，南半球漂向偏在风向左边 driftDeg 度：浮冰上看，海水往反方向流 */
+    readonly driftRatio: number
+    readonly driftDeg: number
+    /** 上风开阔水面的长度（风区），米：海面的风浪按它长成 */
+    readonly fetchM: number
   }
   /** 水里的体力：冰面按地图的体力算 */
   readonly waterExertion: number

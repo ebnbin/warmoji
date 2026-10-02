@@ -580,7 +580,7 @@ function buildShip(): BgmScore {
   )
 }
 
-/** 浮冰：利底亚调式的慢三拍，像冰随涌浪起伏；正弦低音一小节一下，三角波铺底，三角波领一支孤单的调子，冰铃似的高音零星地响，回声拖得很长 */
+/** 浮冰：利底亚调式的慢三拍，像冰随浪起伏；正弦低音一小节一下，三角波铺底如风，三角波领一支孤单的调子，冰铃似的高音零星地响，回声拖得很长 */
 function buildFloe(): BgmScore {
   const chords = [0, 1, 0, 1, 5, 2, 4, 4, 0, 1, 0, 1, 5, 6, 4, 0]
   return track(
@@ -595,11 +595,11 @@ function buildFloe(): BgmScore {
     },
     (b) => {
       const bass: Voice = { wave: 'sine', vol: 0.18, attack: 0.08, release: 0.5, octave: -1 }
-      const pad: Voice = { wave: 'triangle', vol: 0.028, attack: 0.9, release: 1.6, octave: 0 }
+      const wind: Voice = { wave: 'triangle', vol: 0.028, attack: 0.9, release: 1.6, octave: 0 }
       const lead: Voice = { wave: 'triangle', vol: 0.07, attack: 0.04, release: 0.35, octave: 1, echo: true }
       const bell: Voice = { wave: 'sine', vol: 0.03, attack: 0.003, release: 0.25, octave: 2, echo: true }
       b.bass(bass, chords, 'r.....')
-      b.pad(pad, chords, [0, 2, 4], 0.007)
+      b.pad(wind, chords, [0, 2, 4], 0.007)
       b.line(lead, [
         [0, 0, 4, 3], [0, 3, 2, 3],
         [1, 0, 3, 4], [1, 4, 1, 2],

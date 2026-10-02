@@ -14,7 +14,7 @@ import type { Basin } from '../worlds/basin'
 import type { VolcanoState } from '../worlds/volcano'
 import { addWeight, bumpBalls, clearWeights, makeShip, paceOf, stepBalls, stepOnDeck, stepShip } from '../worlds/ship'
 import type { ShipState } from '../worlds/ship'
-import { ashore, bulk, edgeAt, FALLING, fallTime, floeFor, footingOf, frictionAt, GRAVITY, heightAt, ICE, inWater, newFloe, seaward, slideLoose, standing, stepInWater, stepOnIce, SWIMMING } from '../worlds/floe'
+import { ashore, bulk, edgeAt, FALLING, fallTime, floeFor, footingOf, frictionAt, GRAVITY, gustSpan, heightAt, ICE, inWater, newFloe, seaward, slideLoose, standing, stepInWater, stepOnIce, SWIMMING, windAt, windPush } from '../worlds/floe'
 import type { FloeField, FloeState } from '../worlds/floe'
 import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
@@ -883,7 +883,7 @@ function floeCfg(sim: Sim): FloeConfig {
   return MAPS[sim.mapId].floe!
 }
 
-/** 浮冰的形状由布景种子定下，视图从这里读 */
+/** 浮冰的形状由布景种子定下，视图从这里读；阵风哪一刻来、偏多少由对局的随机数定 */
 function floeOf(sim: Sim): FloeState {
   let s = sim.worldState.floe
   if (!s) {
@@ -901,7 +901,7 @@ const PATH_MS = 250
 const LINE_CLEAR_U = 0.35
 /** 离目标这么近（格）就直扑过去：冰缘边上的目标也够得着，扑过头就滑进海里 */
 const LUNGE_U = 1.5
-/** 漂在静水上的小东西慢慢停下：速度衰减的速率，每秒 */
+/** 漂在水上的小东西随海流漂：速度朝海流靠拢的速率，每秒 */
 const FLOAT_K = 2
 
 /** 离冰缘 reach 格以内还朝着海走，就改为顺着冰缘走；正对着海时转向一侧 */
@@ -940,6 +940,15 @@ function walkTo(s: FloeState, x: number, y: number, tx: number, ty: number, reac
   return alongEdge(f, x, y, d.x, d.y, reach)
 }
 
+/** 阵风：到点就起下一轮，风向偏一点；一轮没落尽不起新的 */
+function tickGust(sim: Sim, s: FloeState, cfg: FloeConfig): void {
+  const w = cfg.wind
+  const now = sim.elapsedMs
+  if (now < s.nextGust) return
+  s.gust = { at: now, veer: (sim.rng.next() * 2 - 1) * w.veerDeg * (Math.PI / 180) }
+  s.nextGust = now + Math.max(gustSpan(w), w.intervalMs + (sim.rng.next() * 2 - 1) * w.jitterMs)
+}
+
 /** 泡在冰水里的按体温往下掉血：冻僵的时长与体型成正比（散热按表面积、热容按体积），满血的标准身体 freezeSec 秒冻死 */
 function chill(sim: Sim, s: FloeState, cfg: FloeConfig): void {
   const now = sim.elapsedMs
@@ -956,7 +965,7 @@ function chill(sim: Sim, s: FloeState, cfg: FloeConfig): void {
   for (const eid of [...query(sim.world, ENEMY_SET)]) freeze(eid)
 }
 
-/** 掉进海里的金币沉下去；别的掉落物浮着 */
+/** 掉进海里的金币沉下去；别的掉落物浮着，随海流漂 */
 function sinkCoins(sim: Sim, s: FloeState): void {
   for (const eid of [...query(sim.world, [Pickup, GrantCoins, Transform])]) {
     if (!inWater(s, eid, Uid.v[eid]!)) continue
@@ -984,8 +993,8 @@ function landed(s: FloeState, cfg: FloeConfig): void {
 }
 
 /**
- * 浮冰：风平浪静的南极海上一块没有边的浮冰。冰上一切按库仑摩擦走、滑、停，摩擦随积雪、老冰、新冰变；
- * 重心探出冰缘就掉进海里，水里按二次阻力与推力游，游到冰缘爬上来；泡在冰水里的按体型冻得掉血，金币沉底
+ * 浮冰：南极海上一块没有边的浮冰。冰上一切按库仑摩擦走、滑、停，摩擦随积雪、老冰、新冰变，阵风按风压推着身体；
+ * 重心探出冰缘就掉进海里，水里按二次阻力与推力游、随海流漂，游到冰缘爬上来；泡在冰水里的按体型冻得掉血，金币沉底
  */
 const floe: WorldHooks = {
   ...bounded,
@@ -995,7 +1004,7 @@ const floe: WorldHooks = {
     return { ...GROUND, exertion: cfg.waterExertion, regen: cfg.waterRegen }
   },
   /**
-   * 一步：站在冰上的按摩擦走；重心撑不住就从冰缘往下掉，掉的这一下不受摩擦；落进水里按阻力与推力游，重心爬过冰缘一截就上了冰。
+   * 一步：站在冰上的按摩擦与风走；重心撑不住就从冰缘往下掉，掉的这一下不受摩擦；落进水里按阻力与推力游，重心爬过冰缘一截就上了冰。
    * 自己发动的冲刺、跳跃由能力推着走、也由能力刹住，收尾时还回冲之前的速度；被打飞、被扔出去的照样带着速度滑
    */
   contact(sim, eid, dt, x, y, vx, vy, out) {
@@ -1035,12 +1044,12 @@ const floe: WorldHooks = {
       }
     } else if (foot.mode === SWIMMING) {
       if (pulled) approach(out, x, y, vx, vy, dx, dy, k, dt)
-      else if (loose) approach(out, x, y, vx, vy, 0, 0, FLOAT_K, dt)
+      else if (loose) approach(out, x, y, vx, vy, s.current.x, s.current.y, FLOAT_K, dt)
       else {
         const len = cfg.body.dragU * UNIT * bulk(cfg, r, Phys.mass[eid]!)
         const sp = Math.hypot(dx, dy)
         const swim = sp * cfg.body.swimRatio
-        stepInWater(out, x, y, vx, vy, sp > 0 ? dx / sp : 0, sp > 0 ? dy / sp : 0, (swim * swim) / len, len, dt)
+        stepInWater(out, x, y, vx, vy, sp > 0 ? dx / sp : 0, sp > 0 ? dy / sp : 0, (swim * swim) / len, len, s.current.x, s.current.y, dt)
       }
       if (edgeAt(f, out.x, out.y) * UNIT >= r * cfg.body.climbFrac) {
         foot.mode = ICE
@@ -1052,7 +1061,9 @@ const floe: WorldHooks = {
       else if (loose) slideLoose(out, x, y, vx, vy, cfg.friction.loose * t, g, dt)
       else {
         const mu = frictionAt(f, cfg, x, y)
-        stepOnIce(out, foot, x, y, vx, vy, dx, dy, k, mu.s * t, mu.k * t, g, dt)
+        const w = windAt(f, cfg, s.gust, sim.elapsedMs)
+        const push = windPush(cfg, w.speed, w.angle, vx, vy, bulk(cfg, r, Phys.mass[eid]!))
+        stepOnIce(out, foot, x, y, vx, vy, dx, dy, k, mu.s * t, mu.k * t, g, push.x, push.y, dt)
       }
       foot.h = heightAt(f, out.x, out.y)
     }
@@ -1121,6 +1132,7 @@ const floe: WorldHooks = {
   tick(sim) {
     const cfg = floeCfg(sim)
     const s = floeOf(sim)
+    tickGust(sim, s, cfg)
     tickPaths(sim, s)
     landed(s, cfg)
     chill(sim, s, cfg)

@@ -33,8 +33,8 @@ export interface FloeField {
   /** 冰面的形心，像素 */
   readonly cx: number
   readonly cy: number
-  /** 雪堆、雪棱拉长的方向，弧度：往年的风把雪吹成这样 */
-  readonly driftAngle: number
+  /** 盛行风吹去的方向，弧度：雪堆顺着它拉长，阵风也从这边来 */
+  readonly windAngle: number
   /** 老冰（不算雪）与新冰的冰面高出海面多少，米 */
   readonly freeboard: number
   readonly youngFreeboard: number
@@ -576,7 +576,7 @@ function youngField(seams: readonly Seam[], cols: number, rows: number, cell: nu
 
 /**
  * 按种子生成一块浮冰：先定轮廓与新冰缝，摆到边长 frameU 的地图正中，再在格子上铺到冰缘的距离、新冰与积雪。
- * 积雪被往年的风吹成一条条顺着同一个方向拉长的雪堆，冰缘一圈被浪花打湿留不住雪，新冰上也没有雪；冰面高出海面多少按阿基米德由冰厚与平均雪载定
+ * 积雪沿盛行风拉长成一条条雪堆，冰缘一圈被浪花打湿留不住雪，新冰上也没有雪；冰面高出海面多少按阿基米德由冰厚与平均雪载定
  */
 export function makeFloe(seed: number, cfg: FloeConfig): FloeField {
   const { outline: shapeU, seams: seamsU } = floeOutline(seed, cfg)
@@ -592,9 +592,9 @@ export function makeFloe(seed: number, cfg: FloeConfig): FloeField {
   const young = youngField(seams, cols, rows, cell)
   const snow = new Float32Array(n)
   const r = new Rng(seed ^ 0x51ce)
-  const driftAngle = r.next() * Math.PI * 2
-  const wc = Math.cos(driftAngle)
-  const ws = Math.sin(driftAngle)
+  const windAngle = r.next() * Math.PI * 2
+  const wc = Math.cos(windAngle)
+  const ws = Math.sin(windAngle)
   const sn = cfg.snow
   const noiseSeed = Math.floor(r.next() * 0x7fffffff)
   let snowSum = 0
@@ -632,7 +632,7 @@ export function makeFloe(seed: number, cfg: FloeConfig): FloeField {
   const ice = cfg.ice
   const sink = 1 - ice.density / ice.seaDensity
   const freeboard = ice.thicknessM * sink - ((iceCells > 0 ? snowSum / iceCells : 0) * sn.density) / ice.seaDensity
-  return { outline, seams, cols, rows, cell, edge, snow, young, heart, cx: c.x, cy: c.y, driftAngle, freeboard, youngFreeboard: ice.youngM * sink, seed: noiseSeed }
+  return { outline, seams, cols, rows, cell, edge, snow, young, heart, cx: c.x, cy: c.y, windAngle, freeboard, youngFreeboard: ice.youngM * sink, seed: noiseSeed }
 }
 
 const fieldCache = new WeakMap<FloeConfig, { readonly seed: number; readonly field: FloeField }>()
@@ -757,11 +757,14 @@ export interface Splash {
   readonly sink: boolean
 }
 
-/** 一局里的浮冰：地形、各个身体的状态与冰上的路 */
+/** 一局里的浮冰：地形、各个身体的状态、冰上的路、海流与这一轮阵风 */
 export interface FloeState {
   readonly field: FloeField
   readonly feet: Map<number, Footing>
   readonly paths: IcePaths
+  readonly current: Point
+  gust: Gust
+  nextGust: number
   hurtAt: number
   pathAt: number
   splashes: Splash[]
@@ -776,6 +779,9 @@ export function newFloe(field: FloeField, cfg: FloeConfig): FloeState {
     field,
     feet: new Map(),
     paths: new IcePaths(field, PATH_CELL_U, PATH_CLEAR_U),
+    current: currentOf(field, cfg),
+    gust: { at: -Infinity, veer: 0 },
+    nextGust: cfg.wind.firstMs,
     hurtAt: cfg.coldTickMs,
     pathAt: 0,
     splashes: [],
@@ -807,16 +813,16 @@ export function fallTime(drop: number): number {
 const SUB_S = 1 / 120
 
 /**
- * 冰面上的一步，像素与秒。身体想以速率 k 趋近期望速度 (tx, ty)，靠脚下的摩擦力出力：
- * 脚要给的加速度 k·(t − v) 不超过最大静摩擦 μs·g 就踩得住，速度照常趋近；超过就打滑，只剩动摩擦 μk·g 朝着要用力的方向，
- * 直到要的力落回 μk·g 以内才重新踩住
+ * 冰面上的一步，像素与秒。身体想以速率 k 趋近期望速度 (tx, ty)，靠脚下的摩擦力出力，再加上风推的加速度 (wx, wy)：
+ * 脚要给的加速度 k·(t − v) − w 不超过最大静摩擦 μs·g 就踩得住，速度照常趋近；超过就打滑，只剩动摩擦 μk·g 朝着要用力的方向，
+ * 直到要的力落回 μk·g 以内才重新踩住。身体停着时要的力只有抵住风那一份：风压超过静摩擦就被吹着滑
  */
-export function stepOnIce(out: { x: number; y: number; vx: number; vy: number }, foot: Footing, x: number, y: number, vx: number, vy: number, tx: number, ty: number, k: number, mus: number, muk: number, g: number, dt: number): void {
+export function stepOnIce(out: { x: number; y: number; vx: number; vy: number }, foot: Footing, x: number, y: number, vx: number, vy: number, tx: number, ty: number, k: number, mus: number, muk: number, g: number, wx: number, wy: number, dt: number): void {
   let left = dt
   while (left > 1e-9) {
     const h = Math.min(SUB_S, left)
-    const ax = k * (tx - vx)
-    const ay = k * (ty - vy)
+    const ax = k * (tx - vx) - wx
+    const ay = k * (ty - vy) - wy
     const need = Math.hypot(ax, ay)
     const cap = (foot.slip ? muk : mus) * g
     if (need <= cap) {
@@ -830,8 +836,8 @@ export function stepOnIce(out: { x: number; y: number; vx: number; vy: number },
     } else {
       foot.slip = true
       const f = (muk * g) / need
-      const nx = vx + ax * f * h
-      const ny = vy + ay * f * h
+      const nx = vx + (ax * f + wx) * h
+      const ny = vy + (ay * f + wy) * h
       x += (vx + nx) * 0.5 * h
       y += (vy + ny) * 0.5 * h
       vx = nx
@@ -867,16 +873,18 @@ export function slideLoose(out: { x: number; y: number; vx: number; vy: number }
 }
 
 /**
- * 静水里的一步，像素与秒：速度 v 受二次阻力 |v|·v/L 减速（L = m/c 是阻力长度），游的身体朝 (dx, dy) 出推力 a；
- * 推力 a = vs²/L 让终速正好是游速 vs。隐式处理阻力，步长再大也不会冲过头
+ * 水里的一步，像素与秒：相对海水的速度 u 受二次阻力 |u|·u/L 减速（L = m/c 是阻力长度），游的身体朝 (dx, dy) 出推力 a；
+ * 推力 a = vs²/L 让静水里的终速正好是游速 vs。隐式处理阻力，步长再大也不会冲过头
  */
-export function stepInWater(out: { x: number; y: number; vx: number; vy: number }, x: number, y: number, vx: number, vy: number, dx: number, dy: number, a: number, len: number, dt: number): void {
+export function stepInWater(out: { x: number; y: number; vx: number; vy: number }, x: number, y: number, vx: number, vy: number, dx: number, dy: number, a: number, len: number, cx: number, cy: number, dt: number): void {
   let left = dt
   while (left > 1e-9) {
     const h = Math.min(SUB_S * 2, left)
-    const damp = 1 + (Math.hypot(vx, vy) * h) / len
-    const nx = (vx + dx * a * h) / damp
-    const ny = (vy + dy * a * h) / damp
+    const ux = vx - cx
+    const uy = vy - cy
+    const damp = 1 + (Math.hypot(ux, uy) * h) / len
+    const nx = (ux + dx * a * h) / damp + cx
+    const ny = (uy + dy * a * h) / damp + cy
     x += (vx + nx) * 0.5 * h
     y += (vy + ny) * 0.5 * h
     vx = nx
@@ -889,9 +897,55 @@ export function stepInWater(out: { x: number; y: number; vx: number; vy: number 
   out.vy = vy
 }
 
+/** 阵风的一轮：开始的时刻（毫秒）与这一轮风向偏了多少（弧度） */
+export interface Gust {
+  at: number
+  veer: number
+}
+
+/** 阵风此刻吹到几成：先按平滑的 S 形起来、稳住，再按 S 形落回平时的风 */
+export function gustLevel(w: FloeConfig['wind'], g: Gust, now: number): number {
+  const t = now - g.at
+  if (t <= 0) return 0
+  if (t < w.riseMs) return smooth(0, w.riseMs, t)
+  if (t < w.riseMs + w.holdMs) return 1
+  return 1 - smooth(w.riseMs + w.holdMs, w.riseMs + w.holdMs + w.fallMs, t)
+}
+
+/** 一轮阵风从开始到落尽多久，毫秒 */
+export function gustSpan(w: FloeConfig['wind']): number {
+  return w.riseMs + w.holdMs + w.fallMs
+}
+
+/** 此刻的风：风速（米/秒）与吹去的方向（弧度） */
+export function windAt(f: FloeField, cfg: FloeConfig, g: Gust, now: number): { speed: number; angle: number; level: number } {
+  const level = gustLevel(cfg.wind, g, now)
+  return { speed: cfg.wind.meanMs + (cfg.wind.gustMs - cfg.wind.meanMs) * level, angle: f.windAngle + g.veer * level, level }
+}
+
+/** 浮冰上看到的海流，像素/秒：浮冰顺风漂得比海水快，所以海水朝漂向的反方向流；南半球漂向偏在风向左边 */
+export function currentOf(f: FloeField, cfg: FloeConfig): Point {
+  const w = cfg.wind
+  const a = f.windAngle - w.driftDeg * DEG
+  const v = (w.driftRatio * w.meanMs * UNIT) / cfg.meterPerU
+  return { x: -Math.cos(a) * v, y: -Math.sin(a) * v }
+}
+
 /** 阻力的尺度：半径与质量相对标准身体的倍数，横截面按半径平方、质量按半径立方与密度 */
 export function bulk(cfg: FloeConfig, radiusPx: number, mass: number): number {
   return ((radiusPx / (cfg.body.refRadiusU * UNIT)) * mass)
+}
+
+/**
+ * 风推一个身体的加速度，像素/秒²：½·ρ·(Cd·A/m)·|w − v|·(w − v)，Cd·A/m 与半径、质量成反比（越小越轻吹得越动）；
+ * w 是风速，v 是身体的速度，都按米/秒算
+ */
+export function windPush(cfg: FloeConfig, speed: number, angle: number, vx: number, vy: number, size: number): Point {
+  const m = cfg.meterPerU / UNIT
+  const rx = Math.cos(angle) * speed - vx * m
+  const ry = Math.sin(angle) * speed - vy * m
+  const k = (0.5 * cfg.wind.airDensity * cfg.wind.dragArea * Math.hypot(rx, ry)) / size / m
+  return { x: k * rx, y: k * ry }
 }
 
 /** 把一点挪到冰上离冰缘至少 margin 格处：沿距离场的坡往冰里推，几次就到 */

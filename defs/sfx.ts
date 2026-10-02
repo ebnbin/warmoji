@@ -23,4 +23,5 @@ export const SFX = {
   wash: { wave: 'noise', freq: 1900, freqEnd: 260, duration: 0.75, volume: 0.42, attack: 0.09, decayPow: 1.3, throttleMs: 650, jitter: 0.2 },
   splash: { wave: 'noise', freq: 2600, freqEnd: 240, duration: 0.6, volume: 0.55, attack: 0.008, decayPow: 1.7, throttleMs: 110, jitter: 0.18 },
   plip: { wave: 'sine', freq: 1350, freqEnd: 520, duration: 0.08, volume: 0.12, decayPow: 1.4, throttleMs: 60, jitter: 0.2 },
+  gust: { wave: 'noise', freq: 260, freqEnd: 1100, duration: 3.4, volume: 0.42, attack: 1.6, decayPow: 1.1, throttleMs: 6000 },
 } as const satisfies Record<string, SfxDef>
