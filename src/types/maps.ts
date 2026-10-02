@@ -107,11 +107,17 @@ export interface NebulaOldConfig {
  * 身体在星云气体里按终速被拖着漂，子弹、冲刺与流星按弹道飞；中心进了视界就被吞掉，吞下的质量让黑洞长大。这里没有太阳，光来自吸积盘与流星
  */
 export interface NebulaConfig {
-  /** 空心厚球壳：空腔半径、外缘半径与引力常数乘壳层质量（格³/秒²）。引力按牛顿壳层定理，空腔里为零，越往壳层里走越强，外缘以外如同全部质量在球心 */
+  /**
+   * 空心厚球壳：空腔半径、外缘半径与引力常数乘壳层质量（格³/秒²）。被推开的气体堆在外面，密度从内壁的 0 按进壳层深度占壳厚比例的 rise 次方往外缘涨。
+   * 引力按牛顿壳层定理只算内侧的质量：空腔里为零，刚进壳层很弱、越往里越陡，外缘以外如同全部质量在球心。
+   * tau 是整层壳沿半径的光深：黑洞的光照进去，光深到 1 的那一层是被照亮的电离前沿，也就是看得见的内壁
+   */
   readonly shell: {
     readonly innerU: number
     readonly outerU: number
     readonly gm: number
+    readonly rise: number
+    readonly tau: number
   }
   /** 构建期校验的余量：任何身体以 speedMul 倍的最快速度往外走，最深只走进壳层 depthU 格；停下后再往外瞬移 leapU 格，引力仍把它拉回 */
   readonly contain: {
@@ -167,6 +173,8 @@ export interface NebulaConfig {
     readonly speedJitter: number
     /** 撞上身体的半径，格 */
     readonly radiusU: number
+    /** 冲进壳层多深才被撕碎，格：扫过的壳层气体和团块自己一样重的地方；还没到这么深就被引力拉回来的，落回空腔接着飞 */
+    readonly shatterU: number
     /** 瞄准点在队长两侧最多偏多远 */
     readonly offsetU: number
     /** 以 speedU 撞上时的伤害 */

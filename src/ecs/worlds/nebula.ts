@@ -1,6 +1,6 @@
 import { UNIT } from '../../util/units'
 import { Rng } from '../../util/rng'
-import { ACCRETION_ETA, captureU, holePull, schwarzschildU, shellPull } from '../../data/nebula'
+import { ACCRETION_ETA, captureU, holePull, schwarzschildU, shellPull, wallU } from '../../data/nebula'
 import type { NebulaConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 
@@ -212,7 +212,7 @@ export function pruneFlares(s: NebulaState, cfg: NebulaConfig, now: number): voi
   while (s.flares.length > 0 && now - s.flares[0]!.at > life) s.flares.shift()
 }
 
-/** 壳层的湍流甩出一个团块：瞄准队长身旁一点，方向随机，从这条直线与空腔内壁的交点冲进来 */
+/** 壳层的湍流甩出一个团块：瞄准队长身旁一点，方向随机，从这条直线与看得见的内壁的交点冲进来 */
 export function launchMeteor(s: NebulaState, cfg: NebulaConfig, rng: Rng, lx: number, ly: number, now: number): NebulaMeteor {
   const mc = cfg.meteor
   const L = s.layout
@@ -228,7 +228,7 @@ export function launchMeteor(s: NebulaState, cfg: NebulaConfig, rng: Rng, lx: nu
     px *= lim / r
     py *= lim / r
   }
-  const wall = cfg.shell.innerU * UNIT
+  const wall = wallU(cfg.shell) * UNIT
   const pd = px * ux + py * uy
   const t = pd + Math.sqrt(Math.max(0, pd * pd - (px * px + py * py) + wall * wall))
   const speed = mc.speedU * UNIT * (1 + (rng.next() * 2 - 1) * mc.speedJitter)
@@ -254,7 +254,7 @@ export function flyMeteor(s: NebulaState, cfg: NebulaConfig, m: NebulaMeteor, dt
     left -= h
     const ox = m.x - s.layout.cx
     const oy = m.y - s.layout.cy
-    if (Math.hypot(ox, oy) > cfg.shell.innerU * UNIT && ox * m.vx + oy * m.vy > 0) return 'shatter'
+    if (Math.hypot(ox, oy) > (cfg.shell.innerU + cfg.meteor.shatterU) * UNIT && ox * m.vx + oy * m.vy > 0) return 'shatter'
   }
   return null
 }

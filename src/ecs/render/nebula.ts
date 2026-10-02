@@ -3,13 +3,15 @@ import { cellNearest, fbm, valueNoise } from '../../util/noise'
 /** 星云数据贴图每格多少像素：气体是软的，细节交给着色器 */
 export const NEBULA_PPU = 16
 
-/** 要画的那一块，以球心为原点、格计：左上角与边长；hole 是黑洞离球心的偏移 */
+/** 要画的那一块，以球心为原点、格计：左上角与边长；壳层从 innerU 起有质量，密度按 rise 次方往外涨，wallU 是看得见的内壁；hole 是黑洞离球心的偏移 */
 export interface NebulaSheet {
   readonly x0: number
   readonly y0: number
   readonly sizeU: number
   readonly innerU: number
+  readonly wallU: number
   readonly outerU: number
+  readonly rise: number
   readonly holeX: number
   readonly holeY: number
   readonly seed: number
@@ -46,7 +48,7 @@ function pillarsOf(s: NebulaSheet): Pillar[] {
   for (let i = 0; i < n; i++) {
     const h = (k: number): number => valueNoise(i * 3.7 + k * 11.3, k * 5.1 + 0.5, s.seed + 61)
     const a = ((i + 0.5 + (h(1) - 0.5) * 0.7) / n) * Math.PI * 2
-    const r = s.innerU * (0.74 + 0.16 * h(2))
+    const r = s.wallU * (0.74 + 0.16 * h(2))
     const x = Math.cos(a) * r
     const y = Math.sin(a) * r
     const dx = x - s.holeX
@@ -55,7 +57,7 @@ function pillarsOf(s: NebulaSheet): Pillar[] {
     const ux = dx / d
     const uy = dy / d
     const along = x * ux + y * uy
-    const wall = -along + Math.sqrt(Math.max(0, along * along - r * r + s.innerU * s.innerU))
+    const wall = -along + Math.sqrt(Math.max(0, along * along - r * r + s.wallU * s.wallU))
     out.push({ x, y, ux, uy, len: wall + 0.8, width: 0.5 + 0.5 * h(4), seed: s.seed + 71 + i * 13 })
   }
   return out
@@ -136,11 +138,11 @@ export function paintNebula(s: NebulaSheet, out: Uint8ClampedArray, r0: number, 
         if (c.rim > rim) rim = c.rim
       }
       e *= 1 - 0.5 * d
-      if (r > s.innerU) {
-        const depth = smooth(s.innerU, s.innerU + 1.6, r)
-        d = d + (1 - d) * (0.55 + 0.35 * depth)
-        e = Math.max(e, 0.35 * soft) * (1 - 0.6 * depth)
-        rim *= 1 - depth
+      if (r > s.wallU) {
+        const lit = Math.exp(1 - ((r - s.innerU) / (s.wallU - s.innerU)) ** (s.rise + 1))
+        d = d + (1 - d) * (1 - 0.45 * lit)
+        e = Math.max(e, 0.35 * soft) * (0.4 + 0.6 * lit)
+        rim *= lit
       }
       const edge = smooth(s.outerU, s.outerU - 1.5, r)
       out[o] = clamp01(e * edge) * 255
@@ -177,7 +179,7 @@ export function bandBuffer(s: NebulaSheet, band: SheetBand): Uint8ClampedArray<A
  * 再打到内壁上，所以黑洞周围的星云被扭曲，正对黑洞后面那一片成像成爱因斯坦环；b 小于阴影半径的光线掉进黑洞，是黑的。
  * 内壁上是一层稀薄的电离气体，透过云团之间的空隙看得到后面暗的尘埃和嵌在星云里的星：气体被吸积盘照亮，亮度按到黑洞的距离平方反比、
  * 入射角与薄盘朝下更亮的辐射方向，光度取光传过来那一刻的（光回波）；发的是 Hα 的玫瑰红，全电离了就不再更亮。
- * 薄层斜着看光程更长，碗沿更亮。壳层在平面上是厚厚的尘埃，只有朝空腔那一面被照亮；外缘以外是无穷远处的星。
+ * 薄层斜着看光程更长，碗沿更亮。壳层的密度从内壁往外涨：光深到 1 的那一层是看得见的内壁（碗按它的半径画），再往外光照不进去，迅速暗成厚厚的尘埃；外缘以外是无穷远处的星。
  * 吸积盘是平面上的薄盘：开普勒较差转动，温度按 T ∝ x^(−3/4)(1 − √(3/x))^(1/4) 随半径变，光度涨了温度按四分之一次方涨；
  * 盘面的光按引力红移与横向多普勒 g = √(1 − 3r_s/2r) 变红变暗，颜色取黑体色
  */
@@ -201,7 +203,7 @@ uniform float uUnit;
 uniform vec2 uCenter;
 uniform vec3 uCam;
 uniform vec4 uSheet;
-uniform vec2 uShell;
+uniform vec4 uShell;
 uniform vec4 uHole;
 uniform vec4 uLight;
 uniform vec2 uShape;
@@ -326,6 +328,7 @@ void main ()
   float rs = uHole.z;
   float a = uShell.x;
   float outer = uShell.y;
+  float inner = uShell.z;
   vec2 q = p - hole;
   float b = length(q);
   float shadowR = 2.598 * rs;
@@ -347,7 +350,7 @@ void main ()
     vec3 n = floorOn > 0.5 ? -P / a : vec3(-p / max(r, 1e-3), 0.0);
     float blur = smoothstep(0.25, 0.35, rs / bp) * floorOn;
     vec4 nb = mix(sheetAt(s), SHEET_MEAN, blur) * (floorOn + shellOn);
-    float skin = mix(exp(-(r - a) / 0.7), 1.0, floorOn);
+    float skin = mix(exp(1.0 - pow(max(0.0, r - inner) / (a - inner), uShell.w + 1.0)), 1.0, floorOn);
     float limb = floorOn > 0.5 ? min(LIMB_MAX, 1.0 / max(0.05, abs(dot(normalize(vec3(-K, -1.0)), n)))) : LIMB_MAX * skin;
     vec3 L = vec3(hole, 0.0) - P;
     float d = length(L);

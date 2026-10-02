@@ -41,7 +41,7 @@ import type { NebulaSheet, SheetBand } from './render/nebula'
 import { NebulaPainter } from './render/nebulaPainter'
 import { gravityAt, inHorizon as inNebulaHorizon, luminosity, MAX_FLARES, nebulaHalfU, nebulaLayout } from './worlds/nebula'
 import type { NebulaState } from './worlds/nebula'
-import { SHADOW_RS } from '../data/nebula'
+import { SHADOW_RS, wallU } from '../data/nebula'
 import { playSfx } from '../audio/sfx'
 import { loadSettings } from '../save/settings'
 import { browserStorage } from '../util/storage'
@@ -1940,7 +1940,9 @@ class NebulaView extends BoundedView {
       y0: -reach,
       sizeU: reach * 2,
       innerU: cfg.shell.innerU,
+      wallU: wallU(cfg.shell),
       outerU: cfg.shell.outerU,
+      rise: cfg.shell.rise,
       holeX: (L.hx - L.cx) / UNIT,
       holeY: (L.hy - L.cy) / UNIT,
       seed: (v.run.decorSeed ^ 0x2b7) >>> 0,
@@ -1976,7 +1978,7 @@ class NebulaView extends BoundedView {
               const view = scene.cameras.main.worldView
               set('uCam', [view.centerX, view.centerY, cfg.cameraU])
               set('uSheet', [sheet.x0, sheet.y0, sheet.sizeU, sheet.sizeU])
-              set('uShell', [cfg.shell.innerU, cfg.shell.outerU])
+              set('uShell', [sheet.wallU, cfg.shell.outerU, cfg.shell.innerU, cfg.shell.rise])
               set('uHole', [sheet.holeX, sheet.holeY, u.rs, cfg.disk.outerRs])
               set('uLight', [cfg.hole.lightU, u.base, NEBULA_EXPOSURE, cfg.disk.innerK])
               set('uShape', [cfg.accretion.riseMs / 1000, cfg.accretion.viscousMs / 1000])

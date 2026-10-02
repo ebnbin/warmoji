@@ -527,8 +527,8 @@ export const MAPS = {
     mix: NEBULA_MIX,
     finalWaveSub: '奇点从视界边上走来——别被它和黑洞夹在中间！',
     nebula: {
-      shell: { innerU: 18, outerU: 26, gm: 320_000 },
-      contain: { speedMul: 1.5, depthU: 1.5, leapU: 8 },
+      shell: { innerU: 18, outerU: 26, gm: 3_000_000, rise: 1.5, tau: 90 },
+      contain: { speedMul: 1.5, depthU: 2, leapU: 8 },
       hole: { gm: 360, maxGm: 560, lightU: 33, fromCenterU: [6, 9], startU: 7 },
       swallow: { bodyGm: 4, bodyRadiusU: 0.45, pickupGm: 0.05, shotGm: 0.02, lightEta: 1 / 256 },
       accretion: { bondiGm: 0.05, riseMs: 200, viscousMs: 2500 },
@@ -541,6 +541,7 @@ export const MAPS = {
         speedU: 11,
         speedJitter: 0.15,
         radiusU: 0.85,
+        shatterU: 1.2,
         offsetU: 5,
         damage: 24,
         gm: 6,

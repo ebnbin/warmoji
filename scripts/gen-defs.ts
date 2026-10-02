@@ -27,7 +27,7 @@ import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
 import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
 import { shellPull } from '../src/data/nebulaOld.ts'
-import { ACCRETION_ETA, captureU, einsteinU, floorDepthU, ISCO_RS, schwarzschildU, SHADOW_RS, shellRecaptureU, stopRadiusU } from '../src/data/nebula.ts'
+import { ACCRETION_ETA, captureU, einsteinU, floorDepthU, ISCO_RS, schwarzschildU, SHADOW_RS, shellRecaptureU, stopRadiusU, wallU } from '../src/data/nebula.ts'
 import { deckEdgeAngle, halfBeamAt, hydrostatics, stability, staticHeel } from '../src/data/ship.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
@@ -232,6 +232,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   const [near, far] = hole.fromCenterU
   const at = `maps.${id}.nebula`
   need(shell.innerU > 0 && shell.outerU > shell.innerU && shell.gm > 0, `${at}.shell 须空腔半径为正、外缘大于空腔、引力为正`)
+  need(shell.rise >= 0 && shell.tau > 1, `${at}.shell 的密度只能往外涨、整层光深须大于 1：被照亮的内壁才落在壳层里`)
   need(contain.speedMul >= 1 && contain.depthU > 0 && contain.leapU >= 0, `${at}.contain 的速度余量不小于 1、深度为正、瞬移余量不为负`)
   need(hole.gm > 0 && hole.maxGm >= hole.gm && hole.lightU > 0, `${at}.hole 的引力须为正、上限不小于开局、光速为正`)
   need(near >= 0 && near <= far && hole.startU > 0 && hole.startU < shell.innerU, `${at}.hole 的位置范围与出发点须落在空腔里`)
@@ -242,6 +243,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(meteor.firstMs >= 0 && meteor.warnMs >= 0 && meteor.intervalJitterMs >= 0 && meteor.intervalMs - meteor.intervalJitterMs > meteor.warnMs, `${at}.meteor 的间隔减去抖动须长过预兆`)
   need(meteor.speedU > 0 && meteor.speedJitter >= 0 && meteor.speedJitter < 1 && meteor.radiusU > 0 && meteor.radiusU < shell.innerU, `${at}.meteor 的速度与半径须为正、半径小于空腔`)
   need(meteor.offsetU >= 0 && meteor.damage >= 0 && meteor.gm >= 0 && meteor.maxFlightMs > 0, `${at}.meteor 的偏移、伤害与质量不为负、飞行时限为正`)
+  need(meteor.shatterU > 0 && meteor.shatterU < shell.outerU - shell.innerU, `${at}.meteor.shatterU 须落在壳层里`)
   need(n.spawnClearU >= 0, `${at}.spawnClearU 不为负`)
   need(n.cameraU > 0, `${at}.cameraU 须为正：镜头在平面上方`)
   const rsMax = schwarzschildU(hole.maxGm, hole.lightU)
@@ -268,7 +270,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     const rs = schwarzschildU(gm, hole.lightU)
     const reach = captureU(gm, rs, median)
     for (const d of [near, far]) {
-      const ring = einsteinU(rs, floorDepthU(shell.innerU, d), n.cameraU)
+      const ring = einsteinU(rs, floorDepthU(wallU(shell), d), n.cameraU)
       need(Math.abs(ring - reach) <= reach * 0.15, `${at}.hole 的爱因斯坦环（${+ring.toFixed(2)} 格）须落在一般角色走不出来的半径（${+reach.toFixed(2)} 格）上下一成五以内：GM ${gm}、离中心 ${d} 格`)
       need(disk.outerRs * rs < ring, `${at}.disk 铺到 ${+(disk.outerRs * rs).toFixed(2)} 格，盖住了爱因斯坦环（${+ring.toFixed(2)} 格）：GM ${gm}、离中心 ${d} 格`)
     }

@@ -23,12 +23,21 @@ export function holePull(gm: number, rs: number, rU: number): number {
   return d > 0 ? gm / (d * d) : Infinity
 }
 
-/** 壳层在离星云中心 rU 格处的引力大小，格/秒²，指向中心：空腔里为零，壳层里只算内侧的质量，外缘以外如同全部质量在球心 */
+/**
+ * 壳层在离星云中心 rU 格处的引力大小，格/秒²，指向中心：空腔里为零，壳层里只算内侧的质量，外缘以外如同全部质量在球心。
+ * 密度 ∝ x^n（x 是进壳层的深度占壳厚 w 的比例），内侧质量 ∝ ∫(a + w·t)²·tⁿ dt，从 0 积到 x
+ */
 export function shellPull(shell: NebulaConfig['shell'], rU: number): number {
-  const { innerU: a, outerU: b, gm } = shell
+  const { innerU: a, outerU: b, gm, rise: n } = shell
   if (rU <= a) return 0
-  if (rU >= b) return gm / (rU * rU)
-  return (gm * (rU ** 3 - a ** 3)) / ((b ** 3 - a ** 3) * rU * rU)
+  const w = b - a
+  const mass = (x: number): number => (a * a * x ** (n + 1)) / (n + 1) + (2 * a * w * x ** (n + 2)) / (n + 2) + (w * w * x ** (n + 3)) / (n + 3)
+  return (gm * mass(Math.min(1, (rU - a) / w))) / mass(1) / (rU * rU)
+}
+
+/** 看得见的内壁离星云中心多远，格：从内壁往里沿半径的光深按 τ·x^(n+1) 涨，到 1 的那一层被黑洞的光照亮 */
+export function wallU(shell: NebulaConfig['shell']): number {
+  return shell.innerU + (shell.outerU - shell.innerU) * shell.tau ** (-1 / (shell.rise + 1))
 }
 
 /**
