@@ -1,4 +1,4 @@
-import { at, clearingDepth, heightAt, project } from './layout'
+import { at, clearingDepth, heightAt, poolAt, project } from './layout'
 import type { Along, Reach, RiverPlan } from './layout'
 import type { RiverConfig } from '../../types/maps'
 
@@ -140,7 +140,7 @@ export function solveWater(cfg: RiverConfig, plan: RiverPlan): Water {
         src[i] = 1
         splash++
       }
-      const pool = Math.hypot(x - inlet.poolX, y - inlet.poolY) < inlet.poolR
+      const pool = poolAt(inlet, plan.shape.seed, x, y) < 1
       const d = designAt(plan, x, y, tmp)
       if (!d || (d.edge > 0.5 && !pool)) continue
       const level = pool ? Math.max(0, d.level) : d.level

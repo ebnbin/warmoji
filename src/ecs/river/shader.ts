@@ -9,7 +9,7 @@ export const Z_MIN = -12
 export const Z_SPAN = 20
 /** 流速按 ±这么多（米/秒）编码进一个通道 */
 const SPEED_SPAN = 4
-/** 干地上的水位从有水的格子往外推几圈：岸线才按地形的细格子切出来 */
+/** 干地上的水位与流速从有水的格子往外推几圈：岸线才按地形的细格子切出来，细浪的块中心落在岸上也有流向 */
 const SPREAD = 4
 
 /** 给水面着色器的三张数据图，不透明（画布会按透明度预乘，数据必须满 alpha）：地形高程（细格子）、水面高程、流速与乱流 */
@@ -33,7 +33,7 @@ function put16(out: Uint8ClampedArray, o: number, z: number): void {
 
 /**
  * 编码水面：地形高程照搬；水面高程与流速按 WATER_CELL_U 的格子铺满整片地形，有解出来的稳态水流就用它，
- * 没有的地方只有崖上的溪沟（它不在解的范围里），按设计水位与曼宁流速（水深的三分之二次方）铺；干地上的水位从水边往外推几圈，让岸线落在地形上，
+ * 没有的地方只有崖上的溪沟（它不在解的范围里），按设计水位与曼宁流速（水深的三分之二次方）铺；干地上的水位与流速从水边往外推几圈，让岸线落在地形上，
  * 推出去的水位不高过那里的地面（崖壁、断崖底下没有水）。
  * 乱流取弗劳德数与流速的剪切：水急水浅的浅滩、绕过石头的水都翻白
  */
@@ -109,14 +109,20 @@ export function encodeWater(cfg: RiverConfig, plan: RiverPlan, w: Water): WaterI
         const i = cy * cols + cx
         if (known[i]) continue
         let sum = 0
+        let su = 0
+        let sv = 0
         let cnt = 0
         for (const j of [i - 1, i + 1, i - cols, i + cols]) {
           if (!known[j]) continue
           sum += eta[j]!
+          su += u[j]!
+          sv += v[j]!
           cnt++
         }
         if (cnt === 0) continue
         eta[i] = Math.min(sum / cnt, bedAt(cx, cy) - 0.005)
+        u[i] = su / cnt
+        v[i] = sv / cnt
         next[i] = 1
       }
     }
@@ -166,8 +172,11 @@ uniform vec4 uOut0;
 uniform vec4 uOut1;
 uniform vec2 uOutHalf;
 uniform vec4 uIn;
-uniform vec3 uInSize;
+uniform vec4 uInSize;
 uniform vec3 uSun;
+
+/** 细浪按这么大（格）的块各取各的流向，块与块之间按方差不变混合 */
+const float TILE = 1.5;
 
 vec2 hash2(vec2 p) {
   p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -210,10 +219,28 @@ float decode(vec4 c) {
   return uCode.x + (c.r * 65280.0 + c.g * 255.0) / 65535.0 * uCode.y;
 }
 
-/** 水面的细浪：在流向坐标里取噪声，顺流拉长，流得越急拉得越长 */
-float ripple(vec2 q, vec2 dir, vec2 acr, float stretch) {
-  vec2 f = vec2(dot(q, dir) / stretch, dot(q, acr));
-  return vnoise(f * 1.7) * 0.6 + vnoise(f * 4.3 + 7.3) * 0.3 + vnoise(f * 9.1 + 2.9) * 0.1;
+/** 值噪声与它的梯度 */
+vec3 vnoiseD(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  vec2 du = 6.0 * f * (1.0 - f);
+  float a = hash2(i).x;
+  float b = hash2(i + vec2(1.0, 0.0)).x;
+  float c = hash2(i + vec2(0.0, 1.0)).x;
+  float d = hash2(i + vec2(1.0, 1.0)).x;
+  float k = a - b - c + d;
+  return vec3(a + (b - a) * u.x + (c - a) * u.y + k * u.x * u.y, du * vec2(b - a + k * u.y, c - a + k * u.x));
+}
+
+/**
+ * 一块里的细浪的坡度：d 是离块中心的位移，在块中心的流向坐标里取噪声，顺流拉长，返回浪高对地图坐标的梯度。
+ * 流向坐标必须绕块中心转：绕远处的原点转，流向稍一变花纹就被挤成指纹
+ */
+vec2 waves(vec2 d, vec2 dir, vec2 acr, float stretch, vec2 jit) {
+  vec2 f = vec2(dot(d, dir) / stretch, dot(d, acr)) + jit;
+  vec2 g = vnoiseD(f * 1.7).yz * (0.65 * 1.7) + vnoiseD(f * 4.3 + 7.3).yz * (0.35 * 4.3);
+  return dir * (g.x / stretch) + acr * g.y;
 }
 
 void main ()
@@ -231,11 +258,13 @@ void main ()
 
   vec2 rel = p - uIn.xy;
   vec2 back = -uIn.zw;
-  float inAlong = uInSize.z - length(rel);
-  float inSide = atan(back.x * rel.y - back.y * rel.x, dot(back, rel)) * uInSize.z;
-  float inEdge = 1.0 - smoothstep(uInSize.x - 0.3, uInSize.x + 0.1, abs(inSide));
-  float curtain = step(-uInSize.y, inAlong) * step(inAlong, 0.05) * inEdge * step(0.0, dot(back, rel));
-  float plunge = (1.0 - smoothstep(0.0, 2.4, inAlong)) * step(0.0, inAlong) * (1.0 - smoothstep(uInSize.x * 0.5, uInSize.x * 1.5, abs(inSide)));
+  float rr = length(rel);
+  float inAlong = uInSize.w - rr;
+  float inSide = atan(back.x * rel.y - back.y * rel.x, dot(back, rel)) * rr;
+  float inHalf = mix(uInSize.y, uInSize.x, clamp(-inAlong / uInSize.z, 0.0, 1.0)) + (vnoise(vec2(inAlong * 2.3 - uTime * 3.0, sign(inSide) * 5.0)) - 0.5) * 0.35;
+  float inEdge = 1.0 - smoothstep(inHalf - 0.25, inHalf + 0.05, abs(inSide));
+  float curtain = step(-uInSize.z, inAlong) * step(inAlong, 0.05) * inEdge * step(0.0, dot(back, rel));
+  float plunge = (1.0 - smoothstep(0.0, 2.4, inAlong)) * step(0.0, inAlong) * (1.0 - smoothstep(uInSize.y * 0.5, uInSize.y * 1.5, abs(inSide)));
 
   float drop = 0.0;
   float lip = 0.0;
@@ -261,21 +290,42 @@ void main ()
     return;
   }
 
-  vec2 dir = speed > 0.02 ? vel / speed : vec2(0.7071, 0.7071);
-  vec2 acr = vec2(-dir.y, dir.x);
-  float period = 2.0;
+  float period = 1.2;
   float ph = fract(uTime / period);
   float ph2 = fract(ph + 0.5);
   float w = abs(1.0 - 2.0 * ph);
   vec2 qa = p - v * ph * period;
-  vec2 qb = p - v * ph2 * period + vec2(0.37, 0.61);
-  float stretch = 1.0 + 2.8 * clamp(speed / 1.6, 0.0, 1.0);
-  float e = 0.05;
-  float h0 = mix(ripple(qa, dir, acr, stretch), ripple(qb, dir, acr, stretch), w);
-  float hx = mix(ripple(qa + vec2(e, 0.0), dir, acr, stretch), ripple(qb + vec2(e, 0.0), dir, acr, stretch), w);
-  float hy = mix(ripple(qa + vec2(0.0, e), dir, acr, stretch), ripple(qb + vec2(0.0, e), dir, acr, stretch), w);
+  vec2 qb = p - v * ph2 * period;
+  vec2 tg = p / TILE - 0.5;
+  vec2 t0 = floor(tg);
+  vec2 tf = fract(tg);
+  vec2 ga = vec2(0.0);
+  vec2 gb = vec2(0.0);
+  float lines = 0.0;
+  float wsum = 0.0;
+  for (int k = 0; k < 4; k++) {
+    vec2 o = vec2(float(k - (k / 2) * 2), float(k / 2));
+    vec2 cell = t0 + o;
+    vec2 c = (cell + 0.5) * TILE;
+    vec2 cv = (texture2D(uFlow, vec2((c.x - uArea.x) / uArea.z, 1.0 - (c.y - uArea.y) / uArea.w)).rg - 0.5) * ${(SPEED_SPAN * 2).toFixed(1)};
+    float cs = length(cv);
+    vec2 cd = cs > 0.02 ? cv / cs : vec2(0.7071, 0.7071);
+    vec2 ca = vec2(-cd.y, cd.x);
+    float st = 1.0 + 2.8 * clamp(cs / 1.6, 0.0, 1.0);
+    vec2 wo = mix(1.0 - tf, tf, o);
+    float wk = wo.x * wo.y;
+    vec2 jit = hash2(cell) * 41.0;
+    ga += waves(qa - c, cd, ca, st, jit) * wk;
+    gb += waves(qb - c, cd, ca, st, jit + 17.0) * wk;
+    float la = vnoise(vec2(dot(qa - c, cd) * 0.7, dot(qa - c, ca) * 7.0) + jit);
+    float lb = vnoise(vec2(dot(qb - c, cd) * 0.7, dot(qb - c, ca) * 7.0) + jit + 23.0);
+    lines += (mix(la, lb, w) - 0.5) * wk;
+    wsum += wk * wk;
+  }
+  float keep = inversesqrt(wsum * (w * w + (1.0 - w) * (1.0 - w)));
+  lines = clamp(0.5 + lines * keep, 0.0, 1.0);
   float amp = 0.025 + 0.09 * clamp(speed / 2.0, 0.0, 1.0) + 0.16 * rough;
-  vec2 slope = vec2(hx - h0, hy - h0) / e * amp;
+  vec2 slope = mix(ga, gb, w) * keep * amp;
   vec3 n = normalize(vec3(-slope, 1.0));
   float wet = smoothstep(0.0, 0.012, depth);
 
@@ -283,8 +333,8 @@ void main ()
   vec3 col = mix(vec3(0.26, 0.47, 0.40), vec3(0.02, 0.13, 0.15), pow(od, 0.85));
   float alpha = (0.07 + 0.88 * od) * wet;
 
-  float tilt = length(slope);
-  float refl = (0.04 + clamp(tilt * 0.8, 0.0, 0.26)) * wet;
+  float face = dot(-slope, normalize(uSun.xy));
+  float refl = (0.08 + clamp(face * 0.55, -0.07, 0.26)) * wet;
   col = mix(col, vec3(0.66, 0.78, 0.84), refl / max(alpha + refl, 0.001));
   alpha = alpha + refl * (1.0 - alpha);
   vec3 r = reflect(vec3(0.0, 0.0, -1.0), n);
@@ -292,27 +342,25 @@ void main ()
   col = mix(col, vec3(1.0, 0.97, 0.88), glint);
   alpha = max(alpha, glint);
 
-  float shoal = (1.0 - smoothstep(0.06, 0.28, depth)) * smoothstep(0.02, 0.05, depth);
-  float caust = (1.0 - smoothstep(0.0, 0.045, cells(p * 3.1 + vec2(uTime * 0.23, -uTime * 0.19) + slope * 4.0))) * shoal;
-  col = mix(col, vec3(0.9, 1.0, 0.88), caust * 0.3);
-  alpha = max(alpha, caust * 0.18);
+  float shoal = (1.0 - smoothstep(0.06, 0.28, depth)) * smoothstep(0.02, 0.05, depth) * (1.0 - smoothstep(0.1, 0.4, rough));
+  float patchy = smoothstep(0.35, 0.7, vnoise(p * 0.6 + vec2(uTime * 0.05, 0.0)));
+  float caust = mix(1.0 - smoothstep(0.0, 0.08, cells(qa * 2.6 + slope * 3.0)), 1.0 - smoothstep(0.0, 0.08, cells(qb * 2.6 + slope * 3.0 + 2.1)), w) * shoal * patchy;
+  col = mix(col, vec3(0.9, 1.0, 0.88), caust * 0.16);
+  alpha = max(alpha, caust * 0.1);
 
-  vec2 la = vec2(dot(qa, dir) * 0.7, dot(qa, acr) * 7.0);
-  vec2 lb = vec2(dot(qb, dir) * 0.7, dot(qb, acr) * 7.0);
-  float lines = mix(vnoise(la), vnoise(lb + 3.7), w);
-  float boil = mix(1.0 - smoothstep(0.0, 0.25, cells(qa * 3.2)), 1.0 - smoothstep(0.0, 0.25, cells(qb * 3.2 + 1.3)), w);
+  float boil = mix(vnoise(qa * 2.2 + 5.1), vnoise(qb * 2.2 + 8.3), w);
   float churn = mix(vnoise(qa * 5.0), vnoise(qb * 5.0 + 1.9), w);
-  float white = rough * smoothstep(0.5, 0.85, lines * 0.65 + churn * 0.35 + boil * 0.25);
+  float white = rough * smoothstep(0.5, 0.85, lines * 0.65 + churn * 0.35 + boil * 0.1);
   white += smoothstep(0.03, 0.0, depth) * wet * 0.35 * smoothstep(0.35, 0.8, churn);
   white += lip * smoothstep(0.35, 0.75, lines * 0.6 + churn * 0.5) * 0.85;
-  white += plunge * smoothstep(0.15, 0.7, churn * 0.6 + boil * 0.5 + vnoise(p * 2.7 - vec2(uTime * 1.1, uTime * 0.7)) * 0.4) * 1.3;
+  white += plunge * smoothstep(0.45, 0.85, churn * 0.5 + boil * 0.3 + vnoise(p * 2.7 - vec2(uTime * 1.1, uTime * 0.7)) * 0.4) * 1.3;
   white = clamp(white, 0.0, 1.0) * wet;
   vec3 foam = vec3(0.88, 0.92, 0.9) * (0.8 + 0.25 * max(dot(n, uSun), 0.0));
   col = mix(col, foam, white);
   alpha = max(alpha, white * 0.95);
 
   if (curtain > 0.0) {
-    float h = clamp(-inAlong / uInSize.y, 0.0, 1.0);
+    float h = clamp(-inAlong / uInSize.z, 0.0, 1.0);
     float fall = vnoise(vec2(inSide * 5.0, inAlong * 1.4 + uTime * 4.5)) * 0.55 + vnoise(vec2(inSide * 13.0, inAlong * 3.0 + uTime * 8.0)) * 0.45;
     vec3 sheet = mix(vec3(0.5, 0.64, 0.66), vec3(0.97, 0.99, 0.98), smoothstep(0.25, 0.75, fall) * (0.55 + 0.45 * (1.0 - h)));
     sheet = mix(sheet, vec3(0.75, 0.86, 0.86), smoothstep(0.85, 1.0, h) * 0.6);

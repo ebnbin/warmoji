@@ -61,15 +61,15 @@ function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, d
   return tex
 }
 
-/** 一团水雾：中间实、边上淡出，带一点絮状的不均匀 */
+/** 一团水雾：边沿被噪声扰得参差，里面一絮一絮的浓淡；贴图边上一定透明 */
 function drawMist(ctx: CanvasRenderingContext2D, size: number): void {
   const img = ctx.createImageData(size, size)
   const c = (size - 1) / 2
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const d = Math.hypot(x - c, y - c) / c
-      const fluff = 0.7 + 0.3 * fbm(x / 8, y / 8, 29, 3)
-      const a = Math.max(0, 1 - d) ** 1.8 * fluff
+      const r = Math.hypot(x - c, y - c) / c
+      const d = r * (1 + (0.5 - fbm(x / 10, y / 10, 29, 4)) * 0.9)
+      const a = Math.min(1, Math.max(0, 1 - d) ** 1.1 * (0.55 + 0.6 * fbm(x / 6, y / 6, 33, 3))) * Math.min(1, Math.max(0, 1 - r) * 3)
       const o = (y * size + x) * 4
       img.data[o] = 255
       img.data[o + 1] = 255
@@ -254,7 +254,7 @@ export class RiverView implements MapView {
               set('uOut1', [b.x, b.y, b.nx, b.ny])
               set('uOutHalf', [a.half, b.half])
               set('uIn', [inl.poolX, inl.poolY, inl.nx, inl.ny])
-              set('uInSize', [inl.half, cfg.falls.cliffU, Math.hypot(inl.x - inl.poolX, inl.y - inl.poolY)])
+              set('uInSize', [inl.lip, inl.half, cfg.falls.cliffU, Math.hypot(inl.x - inl.poolX, inl.y - inl.poolY)])
               set('uSun', [SUN.x / sunLen, SUN.y / sunLen, SUN.z / sunLen])
             },
           },
@@ -276,12 +276,12 @@ export class RiverView implements MapView {
     const at = (x: number, y: number, w: number, d: number, nx: number, ny: number, rate: number, big: number): Phaser.GameObjects.Particles.ParticleEmitter =>
       scene.add
         .particles(0, 0, MIST_KEY, {
-          lifespan: { min: 1800, max: 3400 },
+          lifespan: { min: 2400, max: 4200 },
           frequency: rate,
           speedX: { min: WIND.x * 0.4, max: WIND.x * 1.2 },
           speedY: { min: WIND.y - 22, max: WIND.y - 8 },
-          scale: { start: 0.35 * big, end: 1.4 * big },
-          alpha: { start: 0.32, end: 0 },
+          scale: { start: 0.5 * big, end: 2.2 * big },
+          alpha: { start: 0.5, end: 0 },
           rotate: { min: 0, max: 360 },
           tint: [0xffffff, 0xe6f2f2, 0xd4e6e8],
           emitZone: {
@@ -297,8 +297,8 @@ export class RiverView implements MapView {
           },
         })
         .setDepth(34)
-    this.visuals.push(at(inl.x, inl.y, inl.half, 1.6, inl.nx, inl.ny, 70, 1.1))
-    for (const o of plan.outlets) this.visuals.push(at(o.x + o.nx * 0.6, o.y + o.ny * 0.6, o.half, 2.2, o.nx, o.ny, 120, 0.9))
+    this.visuals.push(at(inl.x, inl.y, inl.half, 1.6, inl.nx, inl.ny, 55, 1.3))
+    for (const o of plan.outlets) this.visuals.push(at(o.x + o.nx * 0.6, o.y + o.ny * 0.6, o.half, 2.8, o.nx, o.ny, 80, 1.2))
   }
 
   /** 叶子落在水上随便一处 */

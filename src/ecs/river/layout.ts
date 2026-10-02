@@ -17,6 +17,10 @@ const BASIN_CELL_U = 0.25
 const REACH_OUT_U = 16
 /** 崖上的溪沟比崖下的河道窄：落差前的一段水更急 */
 const UPSTREAM_NARROW = 0.68
+/** 水帘落到崖脚时比崖顶的溪面宽这么多倍 */
+const FALL_SPREAD = 1.15
+/** 深潭的边沿着方位角起伏，半径最多差这么多（比例） */
+const POOL_WOBBLE = 0.32
 /** 岩石区的石头最高高出地面多少米 */
 export const ROCK_M = 1.1
 const STONE: Stone = { h: 0, gx: 0, gy: 0, id: 0, big: false }
@@ -72,7 +76,7 @@ export interface Reach {
   readonly slope: number
 }
 
-/** 进水口：瀑布落在崖脚 (x, y)，朝空地里的方向 (nx, ny)；崖下深潭的中心与半径，格 */
+/** 进水口：瀑布落在崖脚 (x, y)，朝空地里的方向 (nx, ny)；崖下深潭的中心与平均半径，格 */
 interface Inlet {
   readonly x: number
   readonly y: number
@@ -81,7 +85,8 @@ interface Inlet {
   readonly poolX: number
   readonly poolY: number
   readonly poolR: number
-  /** 落下的水帘半宽，格 */
+  /** 崖顶溪面的半宽与水帘落到崖脚时的半宽，格 */
+  readonly lip: number
   readonly half: number
 }
 
@@ -184,6 +189,16 @@ export function clearingDepth(sh: Shape, x: number, y: number): number {
   const base = radiusAt(sh, a) + wob - len(dx, dy)
   if (!sh.bay) return base
   return -smin(-base, len(x - sh.bay.x, y - sh.bay.y) - sh.bay.r, 0.6)
+}
+
+/** 离深潭中心多远，按那个方位上潭边的半径算（潭里小于 1）：潭边沿着一圈噪声起伏，不是正圆 */
+export function poolAt(inlet: Inlet, seed: number, x: number, y: number): number {
+  const dx = x - inlet.poolX
+  const dy = y - inlet.poolY
+  const d = len(dx, dy)
+  if (d < 1e-9) return 0
+  const wob = (fbm((dx / d) * 1.3 + 4.1, (dy / d) * 1.3 + 2.7, seed + 13, 2) - 0.5) * POOL_WOBBLE
+  return d / (inlet.poolR * (1 + wob))
 }
 
 /** 从空地里的 (x, y) 沿方位角 a 走到边上 */
@@ -645,7 +660,8 @@ function network(cfg: RiverConfig, rng: Rng, r0: number, seed: number): Draft | 
     }
     return g
   })
-  const inlet: Inlet = { x: foot.x, y: foot.y, nx: -nIn.x, ny: -nIn.y, poolX: pool.x, poolY: pool.y, poolR, half: main.half * 0.75 }
+  const lipHalf = upstream.half[upstream.half.length - 1]!
+  const inlet: Inlet = { x: foot.x, y: foot.y, nx: -nIn.x, ny: -nIn.y, poolX: pool.x, poolY: pool.y, poolR, lip: lipHalf, half: lipHalf * FALL_SPREAD }
   return { shape, reaches, upstream, gorges, inlet, outlets, aIn, span: (bayR * 1.3 + 2.5) / r0 }
 }
 
@@ -723,7 +739,7 @@ function terrainOf(cfg: RiverConfig, d: Draft, forestSeed: number, x0: number, y
       }
       const relief = (fbm(x / 6, y / 6, seed + 5, 3) - 0.5) * 2 * f.reliefM + (fbm(x / 1.7, y / 1.7, seed + 6, 2) - 0.5) * 0.08
       g += relief * smooth(0.5, 2.5, nearD - f.bankU)
-      const pd = len(x - d.inlet.poolX, y - d.inlet.poolY) / d.inlet.poolR
+      const pd = poolAt(d.inlet, seed, x, y)
       if (pd < 1) g = Math.min(g, -fl.poolM * (1 - pd ** 2.4))
       const inside = clearingDepth(d.shape, x, y)
       const out = -inside
@@ -753,7 +769,7 @@ function terrainOf(cfg: RiverConfig, d: Draft, forestSeed: number, x0: number, y
         g = g + (Math.min(g, nearLevel) - fl.gorgeM - g) * wall
       }
       z[i] = g
-      level[i] = len(x - d.inlet.poolX, y - d.inlet.poolY) < d.inlet.poolR ? Math.max(0, nearLevel) : nearLevel
+      level[i] = pd < 1 ? Math.max(0, nearLevel) : nearLevel
       edgeF[i] = nearD
       barF[i] = bar
       clear[i] = inside
