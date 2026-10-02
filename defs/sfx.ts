@@ -24,4 +24,7 @@ export const SFX = {
   splash: { wave: 'noise', freq: 2600, freqEnd: 240, duration: 0.6, volume: 0.55, attack: 0.008, decayPow: 1.7, throttleMs: 110, jitter: 0.18 },
   plip: { wave: 'sine', freq: 1350, freqEnd: 520, duration: 0.08, volume: 0.12, decayPow: 1.4, throttleMs: 60, jitter: 0.2 },
   gust: { wave: 'noise', freq: 260, freqEnd: 1100, duration: 3.4, volume: 0.42, attack: 1.6, decayPow: 1.1, throttleMs: 6000 },
+  gulp: { wave: 'sine', freq: 190, freqEnd: 38, duration: 0.9, volume: 0.5, attack: 0.03, decayPow: 1.4, throttleMs: 260, jitter: 0.12 },
+  streak: { wave: 'noise', freq: 260, freqEnd: 1700, duration: 1.4, volume: 0.36, attack: 0.9, decayPow: 0.8, throttleMs: 1200 },
+  shatter: { wave: 'noise', freq: 900, freqEnd: 60, duration: 0.8, volume: 0.6, attack: 0.005, decayPow: 1.8, throttleMs: 500, jitter: 0.1 },
 } as const satisfies Record<string, SfxDef>

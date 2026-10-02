@@ -126,6 +126,16 @@ const SHIP_MIX: readonly EnemyMixRow[] = [
   { kind: 'raccoon', sinceWave: 5, base: 4, perWave: 0.2, min: 0, max: 8 },
 ]
 
+const NEBULA_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 72, perWave: -2, min: 34, max: 72 },
+  { kind: 'alien', sinceWave: 1, base: 16, perWave: 0.7, min: 12, max: 30 },
+  { kind: 'comet', sinceWave: 2, base: 11, perWave: 0.5, min: 0, max: 21 },
+  { kind: 'ufo', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 15 },
+  { kind: 'siren', sinceWave: 3, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'chameleon', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'ghost', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
+]
+
 export const MAPS = {
   forest: {
     emoji: '1f332',
@@ -361,11 +371,11 @@ export const MAPS = {
     },
     boss: 'swan',
   },
-  nebula: {
+  nebulaOld: {
     emoji: '1f573',
-    name: '星云',
+    name: '旧星云',
     desc: '一团空心的星云，空腔里某处藏着一个黑洞：人、怪、子弹、流星、掉落物都受它的万有引力，越近越强，中心掉进视界就被吞噬；空腔外是厚重的星云壳层，越往外走被它拉回得越狠，谁也出不去；壳层里落下的碎块化作流星横穿空腔',
-    kind: 'nebula',
+    kind: 'nebulaOld',
     stamina: { exertion: 0.3, regen: 0.8 },
     palette: {
       bgFrom: 'hsl(290 45% 17%)',
@@ -381,7 +391,7 @@ export const MAPS = {
     },
     mix: SPACE_MIX,
     finalWaveSub: '奇点降临——别被它逼进黑洞的视界！',
-    nebula: {
+    nebulaOld: {
       shell: { innerU: 18, outerU: 30, gm: 120_000 },
       contain: { speedMul: 1.5, leapU: 8 },
       hole: { gm: 110, softeningU: 0.6, horizonU: 1.2, fromCenterU: [8, 12], clearU: 5 },
@@ -562,5 +572,51 @@ export const MAPS = {
       coldTickMs: 250,
     },
     boss: 'swan',
+  },
+  nebula: {
+    emoji: '1f30c',
+    name: '星云',
+    desc: '深空里一团空心的星云，空腔里藏着一个黑洞。这里没有太阳，光来自黑洞吸积盘和偶尔划过的流星。人、怪、金币、子弹和流星都受万有引力：身体被拖着漂，子弹和流星的轨迹被引弯；黑洞周围那圈被弯过来的光就是走不出来的地方，掉进视界就被吞掉，吞下的东西让黑洞越长越大。空腔外是厚厚的星云壳层，往里走得越深被拉回得越狠，谁也出不去',
+    kind: 'nebula',
+    stamina: { exertion: 0.4, regen: 0.9 },
+    palette: {
+      bgFrom: 'hsl(330 26% 10%)',
+      bgTo: 'hsl(255 40% 3%)',
+      map: hslToInt(330, 0.24, 0.1),
+      shadow: 0x000000,
+    },
+    decor: {
+      emojis: ['2728'],
+      sizeU: [0.3, 0.5],
+      alpha: [0, 0],
+      density: [0, 0],
+    },
+    mix: NEBULA_MIX,
+    finalWaveSub: '奇点从视界边上走来——别被它和黑洞夹在中间！',
+    nebula: {
+      shell: { innerU: 18, outerU: 26, gm: 3_000_000, rise: 1.5, tau: 90 },
+      contain: { speedMul: 1.5, depthU: 2, leapU: 8 },
+      hole: { gm: 360, maxGm: 560, lightU: 33, fromCenterU: [6, 9], startU: 7 },
+      swallow: { bodyGm: 4, bodyRadiusU: 0.45, pickupGm: 0.05, shotGm: 0.02, lightEta: 1 / 256 },
+      accretion: { bondiGm: 0.05, riseMs: 200, viscousMs: 2500 },
+      disk: { outerRs: 4.5, innerK: 2800 },
+      meteor: {
+        firstMs: 9000,
+        intervalMs: 16000,
+        intervalJitterMs: 5000,
+        warnMs: 1800,
+        speedU: 11,
+        speedJitter: 0.15,
+        radiusU: 0.85,
+        shatterU: 1.2,
+        offsetU: 5,
+        damage: 24,
+        gm: 6,
+        maxFlightMs: 7000,
+      },
+      spawnClearU: 1.5,
+      cameraU: 40,
+    },
+    boss: 'blackhole',
   },
 } as const satisfies Record<string, MapDef>

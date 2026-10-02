@@ -26,7 +26,8 @@ import { TEAM_BASELINE } from '../defs/team.ts'
 import { TIMESTOP } from '../defs/timestop.ts'
 import { WEAPONS } from '../defs/weapons.ts'
 import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
-import { shellPull } from '../src/data/nebula.ts'
+import { shellPull } from '../src/data/nebulaOld.ts'
+import { ACCRETION_ETA, captureU, einsteinU, floorDepthU, ISCO_RS, schwarzschildU, SHADOW_RS, shellRecaptureU, stopRadiusU, wallU } from '../src/data/nebula.ts'
 import { deckEdgeAngle, halfBeamAt, hydrostatics, stability, staticHeel } from '../src/data/ship.ts'
 import { area, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
 import { WindSea } from '../src/ecs/render/floeSea.ts'
@@ -38,7 +39,7 @@ import type { Issue } from '../src/data/runCheck.ts'
 import type { CharacterAuthoring } from '../src/types/characters'
 import type { EnemyDef } from '../src/types/enemies'
 import type { ItemDef } from '../src/types/items'
-import type { MapDef, NebulaConfig } from '../src/types/maps'
+import type { MapDef, NebulaOldConfig } from '../src/types/maps'
 import type { MutatorDef, RunDef } from '../src/types/runs'
 
 const errors: string[] = []
@@ -78,21 +79,21 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   if (m.ice) need(m.ice.waterExertion > 0 && m.ice.waterRegen >= 0, `maps.${id}.ice 的水里费力须为正、回复倍率不为负`)
 }
 
-/** 星云：壳层包着空腔，黑洞整个落在空腔里，视界外还有能站的地方；流星的积分步长能在时限里走完 */
+/** 旧星云：壳层包着空腔，黑洞整个落在空腔里，视界外还有能站的地方；流星的积分步长能在时限里走完 */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  need((m.kind === 'nebula') === (m.nebula !== undefined), `maps.${id} 是星云当且仅当写了 nebula`)
-  const n = m.nebula
+  need((m.kind === 'nebulaOld') === (m.nebulaOld !== undefined), `maps.${id} 是旧星云当且仅当写了 nebulaOld`)
+  const n = m.nebulaOld
   if (!n) continue
   const [near, far] = n.hole.fromCenterU
-  need(n.shell.innerU > 0 && n.shell.outerU > n.shell.innerU && n.shell.gm > 0, `maps.${id}.nebula.shell 须内径为正、外径大于内径、引力为正`)
-  need(n.contain.speedMul >= 1 && n.contain.leapU >= 0, `maps.${id}.nebula.contain 的速度余量不小于 1、瞬移余量不为负`)
-  need(n.hole.gm > 0 && n.hole.softeningU > 0, `maps.${id}.nebula.hole 的引力与软化长度须为正`)
-  need(n.hole.horizonU > n.hole.softeningU / Math.SQRT2, `maps.${id}.nebula.hole.horizonU 须大于软化长度的 1/√2，视界外的引力才随距离单调减小`)
-  need(near >= 0 && near <= far && far + n.hole.horizonU < n.shell.innerU, `maps.${id}.nebula.hole 的位置范围须落在空腔里`)
-  need(n.hole.clearU > n.hole.horizonU, `maps.${id}.nebula.hole.clearU 须大于视界`)
-  need(n.meteor.stepMs > 0 && n.meteor.maxFlightMs >= n.meteor.stepMs, `maps.${id}.nebula.meteor 的积分步长须为正且不超过最长飞行时间`)
-  need(n.meteor.speedU > 0 && n.meteor.radiusU > 0 && n.meteor.warnMs >= 0 && n.meteor.offsetU >= 0, `maps.${id}.nebula.meteor 的速度与半径须为正`)
-  need(n.meteor.radiusU < n.shell.innerU, `maps.${id}.nebula.meteor.radiusU 须小于空腔半径，瞄准点才收得进空腔`)
+  need(n.shell.innerU > 0 && n.shell.outerU > n.shell.innerU && n.shell.gm > 0, `maps.${id}.nebulaOld.shell 须内径为正、外径大于内径、引力为正`)
+  need(n.contain.speedMul >= 1 && n.contain.leapU >= 0, `maps.${id}.nebulaOld.contain 的速度余量不小于 1、瞬移余量不为负`)
+  need(n.hole.gm > 0 && n.hole.softeningU > 0, `maps.${id}.nebulaOld.hole 的引力与软化长度须为正`)
+  need(n.hole.horizonU > n.hole.softeningU / Math.SQRT2, `maps.${id}.nebulaOld.hole.horizonU 须大于软化长度的 1/√2，视界外的引力才随距离单调减小`)
+  need(near >= 0 && near <= far && far + n.hole.horizonU < n.shell.innerU, `maps.${id}.nebulaOld.hole 的位置范围须落在空腔里`)
+  need(n.hole.clearU > n.hole.horizonU, `maps.${id}.nebulaOld.hole.clearU 须大于视界`)
+  need(n.meteor.stepMs > 0 && n.meteor.maxFlightMs >= n.meteor.stepMs, `maps.${id}.nebulaOld.meteor 的积分步长须为正且不超过最长飞行时间`)
+  need(n.meteor.speedU > 0 && n.meteor.radiusU > 0 && n.meteor.warnMs >= 0 && n.meteor.offsetU >= 0, `maps.${id}.nebulaOld.meteor 的速度与半径须为正`)
+  need(n.meteor.radiusU < n.shell.innerU, `maps.${id}.nebulaOld.meteor.radiusU 须小于空腔半径，瞄准点才收得进空腔`)
 }
 
 /** 火山：盆地的边在地图边与中线之间、火山口贴着地图边的中段、山体够不着地图的角和中线；一次喷发的预兆与出熔岩都在下一次之前结束 */
@@ -241,7 +242,7 @@ for (const e of Object.values(ENEMIES).flatMap(withNested)) {
 }
 
 /** 走进壳层停下的半径：终端漂移 g·fall 追上速度的地方，壳层里引力随半径单调增大；外缘都追不上就停不下 */
-const shellStopU = (shell: NebulaConfig['shell'], fall: number, speedU: number): number => {
+const shellStopU = (shell: NebulaOldConfig['shell'], fall: number, speedU: number): number => {
   if (shellPull(shell, shell.outerU) * fall < speedU) return Infinity
   let lo = shell.innerU
   let hi = shell.outerU
@@ -252,9 +253,9 @@ const shellStopU = (shell: NebulaConfig['shell'], fall: number, speedU: number):
   }
   return hi
 }
-/** 星云壳层困得住每个角色与敌人：停下处再往外瞬移，仍在壳外引力重新追不上它的逃逸半径以内 */
+/** 旧星云壳层困得住每个角色与敌人：停下处再往外瞬移，仍在壳外引力重新追不上它的逃逸半径以内 */
 for (const [id, m] of Object.entries<MapDef>(MAPS)) {
-  const n = m.nebula
+  const n = m.nebulaOld
   if (!n) continue
   const bodies = [
     ...Object.entries<CharacterAuthoring>(CHARACTERS).map(([k, c]) => ({ path: `characters.${k}`, fall: c.body.mass / c.body.drag, speedU: c.stats.moveSpeed })),
@@ -265,8 +266,68 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   for (const b of bodies) {
     const v = b.speedU * n.contain.speedMul
     const escapeU = Math.sqrt((n.shell.gm * b.fall) / v)
-    need(shellStopU(n.shell, b.fall, v) + n.contain.leapU <= escapeU, `maps.${id}.nebula.shell 困不住 ${b.path}：走到停下处再往外瞬移 ${n.contain.leapU} 格就逃出引力`)
+    need(shellStopU(n.shell, b.fall, v) + n.contain.leapU <= escapeU, `maps.${id}.nebulaOld.shell 困不住 ${b.path}：走到停下处再往外瞬移 ${n.contain.leapU} 格就逃出引力`)
   }
+}
+
+/**
+ * 星云：壳层包着空腔；黑洞连同吸积盘长到最大也整个落在空腔里，离队伍的出发点够远；最能走的身体只走进壳层一点就被拉住，瞬移出去也回得来；
+ * 爱因斯坦环落在一般角色走不出来的半径上；最慢的敌人也有刷怪的地方
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'nebula') === (m.nebula !== undefined), `maps.${id} 是星云当且仅当写了 nebula`)
+  const n = m.nebula
+  if (!n) continue
+  const { shell, contain, hole, swallow, accretion, disk, meteor } = n
+  const [near, far] = hole.fromCenterU
+  const at = `maps.${id}.nebula`
+  need(shell.innerU > 0 && shell.outerU > shell.innerU && shell.gm > 0, `${at}.shell 须空腔半径为正、外缘大于空腔、引力为正`)
+  need(shell.rise >= 0 && shell.tau > 1, `${at}.shell 的密度只能往外涨、整层光深须大于 1：被照亮的内壁才落在壳层里`)
+  need(contain.speedMul >= 1 && contain.depthU > 0 && contain.leapU >= 0, `${at}.contain 的速度余量不小于 1、深度为正、瞬移余量不为负`)
+  need(hole.gm > 0 && hole.maxGm >= hole.gm && hole.lightU > 0, `${at}.hole 的引力须为正、上限不小于开局、光速为正`)
+  need(near >= 0 && near <= far && hole.startU > 0 && hole.startU < shell.innerU, `${at}.hole 的位置范围与出发点须落在空腔里`)
+  need(disk.outerRs > ISCO_RS && disk.innerK > 0, `${at}.disk 须铺到最内稳定圆轨道以外、色温为正`)
+  need(swallow.bodyGm >= 0 && swallow.bodyRadiusU > 0 && swallow.pickupGm >= 0 && swallow.shotGm >= 0, `${at}.swallow 的质量不为负、身体的参考半径为正`)
+  need(swallow.lightEta > 0 && swallow.lightEta < ACCRETION_ETA, `${at}.swallow.lightEta 须在 0 与薄盘的 1/16 之间：径直掉进去的东西放的光不会比绕到最内稳定圆轨道的还多`)
+  need(accretion.bondiGm > 0 && accretion.riseMs > 0 && accretion.viscousMs > 0, `${at}.accretion 的吸积率与时标须为正：平时的吸积光度是光度的单位`)
+  need(meteor.firstMs >= 0 && meteor.warnMs >= 0 && meteor.intervalJitterMs >= 0 && meteor.intervalMs - meteor.intervalJitterMs > meteor.warnMs, `${at}.meteor 的间隔减去抖动须长过预兆`)
+  need(meteor.speedU > 0 && meteor.speedJitter >= 0 && meteor.speedJitter < 1 && meteor.radiusU > 0 && meteor.radiusU < shell.innerU, `${at}.meteor 的速度与半径须为正、半径小于空腔`)
+  need(meteor.offsetU >= 0 && meteor.damage >= 0 && meteor.gm >= 0 && meteor.maxFlightMs > 0, `${at}.meteor 的偏移、伤害与质量不为负、飞行时限为正`)
+  need(meteor.shatterU > 0 && meteor.shatterU < shell.outerU - shell.innerU, `${at}.meteor.shatterU 须落在壳层里`)
+  need(n.spawnClearU >= 0, `${at}.spawnClearU 不为负`)
+  need(n.cameraU > 0, `${at}.cameraU 须为正：镜头在平面上方`)
+  const rsMax = schwarzschildU(hole.maxGm, hole.lightU)
+  need(far + Math.max(disk.outerRs, SHADOW_RS) * rsMax < shell.innerU, `${at}.hole 长到最大时阴影与吸积盘须整个落在空腔里`)
+  const characters = Object.entries<CharacterAuthoring>(CHARACTERS).map(([k, c]) => ({ path: `characters.${k}`, fall: c.body.mass / c.body.drag, speedU: c.stats.moveSpeed }))
+  const enemyFall = COMBAT.enemyBody.mass / COMBAT.enemyBody.drag
+  const enemies = Object.values(ENEMIES)
+    .flatMap(withNested)
+    .map((e) => ({ path: `enemies.${e.kind}`, fall: enemyFall, speedU: e.speed }))
+  for (const b of [...characters, ...enemies]) {
+    if (b.speedU <= 0) continue
+    const q = b.fall / (b.speedU * contain.speedMul)
+    const stop = stopRadiusU(shell, q)
+    need(stop - shell.innerU <= contain.depthU, `${at}.shell 拦不住 ${b.path}：以 ${contain.speedMul} 倍速往外走会走进壳层 ${+(stop - shell.innerU).toFixed(2)} 格，超过 ${contain.depthU}`)
+    need(stop + contain.leapU <= shellRecaptureU(shell, q), `${at}.shell 困不住 ${b.path}：走到停下处再往外瞬移 ${contain.leapU} 格就逃出引力`)
+  }
+  for (const b of characters) {
+    const reach = captureU(hole.maxGm, rsMax, b.fall / b.speedU)
+    need(reach < near + hole.startU - 1, `${at}.hole 长到最大时 ${b.path} 在出发点就走不出来：离黑洞 ${near + hole.startU} 格，走不出来的半径 ${+reach.toFixed(2)}`)
+  }
+  const ratios = characters.map((b) => b.fall / b.speedU).sort((x, y) => x - y)
+  const median = ratios[Math.floor(ratios.length / 2)]!
+  for (const gm of [hole.gm, hole.maxGm]) {
+    const rs = schwarzschildU(gm, hole.lightU)
+    const reach = captureU(gm, rs, median)
+    for (const d of [near, far]) {
+      const ring = einsteinU(rs, floorDepthU(wallU(shell), d), n.cameraU)
+      need(Math.abs(ring - reach) <= reach * 0.15, `${at}.hole 的爱因斯坦环（${+ring.toFixed(2)} 格）须落在一般角色走不出来的半径（${+reach.toFixed(2)} 格）上下一成五以内：GM ${gm}、离中心 ${d} 格`)
+      need(disk.outerRs * rs < ring, `${at}.disk 铺到 ${+(disk.outerRs * rs).toFixed(2)} 格，盖住了爱因斯坦环（${+ring.toFixed(2)} 格）：GM ${gm}、离中心 ${d} 格`)
+    }
+  }
+  const slowest = Math.min(...[...m.mix.map((r) => ENEMIES[r.kind]!.speed), ENEMIES[m.boss]!.speed])
+  const clear = captureU(hole.maxGm, rsMax, enemyFall / slowest) + n.spawnClearU
+  need(slowest > 0 && clear + 2 < near + shell.innerU - 1, `${at} 最慢的敌人走不出来的半径（${+clear.toFixed(2)} 格）太大，空腔里没有刷怪的地方`)
 }
 
 const PACK = new Set(readFileSync('scripts/emoji/ordering.txt', 'utf8').split(/\s+/))
