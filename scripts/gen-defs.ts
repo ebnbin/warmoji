@@ -243,6 +243,7 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(meteor.speedU > 0 && meteor.speedJitter >= 0 && meteor.speedJitter < 1 && meteor.radiusU > 0 && meteor.radiusU < shell.innerU, `${at}.meteor 的速度与半径须为正、半径小于空腔`)
   need(meteor.offsetU >= 0 && meteor.damage >= 0 && meteor.gm >= 0 && meteor.maxFlightMs > 0, `${at}.meteor 的偏移、伤害与质量不为负、飞行时限为正`)
   need(n.spawnClearU >= 0, `${at}.spawnClearU 不为负`)
+  need(n.cameraU > 0, `${at}.cameraU 须为正：镜头在平面上方`)
   const rsMax = schwarzschildU(hole.maxGm, hole.lightU)
   need(far + Math.max(disk.outerRs, SHADOW_RS) * rsMax < shell.innerU, `${at}.hole 长到最大时阴影与吸积盘须整个落在空腔里`)
   const characters = Object.entries<CharacterAuthoring>(CHARACTERS).map(([k, c]) => ({ path: `characters.${k}`, fall: c.body.mass / c.body.drag, speedU: c.stats.moveSpeed }))
@@ -267,8 +268,9 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     const rs = schwarzschildU(gm, hole.lightU)
     const reach = captureU(gm, rs, median)
     for (const d of [near, far]) {
-      const ring = einsteinU(rs, floorDepthU(shell.innerU, d))
+      const ring = einsteinU(rs, floorDepthU(shell.innerU, d), n.cameraU)
       need(Math.abs(ring - reach) <= reach * 0.15, `${at}.hole 的爱因斯坦环（${+ring.toFixed(2)} 格）须落在一般角色走不出来的半径（${+reach.toFixed(2)} 格）上下一成五以内：GM ${gm}、离中心 ${d} 格`)
+      need(disk.outerRs * rs < ring, `${at}.disk 铺到 ${+(disk.outerRs * rs).toFixed(2)} 格，盖住了爱因斯坦环（${+ring.toFixed(2)} 格）：GM ${gm}、离中心 ${d} 格`)
     }
   }
   const slowest = Math.min(...[...m.mix.map((r) => ENEMIES[r.kind]!.speed), ENEMIES[m.boss]!.speed])

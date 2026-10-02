@@ -44,9 +44,12 @@ export function floorDepthU(innerU: number, dU: number): number {
   return Math.sqrt(Math.max(0, innerU * innerU - dU * dU))
 }
 
-/** 爱因斯坦环的半径，格：从正上方看，弱场偏折角 α = 2·r_s/b 把下方 depthU 格处正对黑洞的那一点成像成半径 √(2·r_s·D) 的环 */
-export function einsteinU(rs: number, depthU: number): number {
-  return Math.sqrt(2 * rs * depthU)
+/**
+ * 爱因斯坦环的半径，格：镜头在黑洞正上方 cameraU 格，弱场偏折角 α = 2·r_s/b 把下方 depthU 格处正对黑洞的那一点成像成环，
+ * b² = 2·r_s·D·H/(H + D)；镜头无限高时就是 √(2·r_s·D)
+ */
+export function einsteinU(rs: number, depthU: number, cameraU: number): number {
+  return Math.sqrt((2 * rs * depthU * cameraU) / (cameraU + depthU))
 }
 
 /** 往外走停下的半径，格：壳层里引力随半径单调增大，g·fall 追上 speed 的地方；外缘都追不上就停不下 */

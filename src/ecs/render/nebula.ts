@@ -28,7 +28,7 @@ function smooth(e0: number, e1: number, x: number): number {
 }
 const ridge = (n: number): number => 1 - Math.abs(2 * n - 1)
 
-/** 一根尘埃柱：尖端在 (x, y)，沿 (ux, uy) 往外伸 len 格，最宽 width 格；从黑洞那边看过去它正对着黑洞，是被它的光一点点削出来的 */
+/** 一根尘埃柱：尖端在 (x, y)，沿 (ux, uy) 往外伸 len 格直到埋进内壁，最宽 width 格；它正对着黑洞，是被它的光一点点削出来的 */
 interface Pillar {
   readonly x: number
   readonly y: number
@@ -39,51 +39,67 @@ interface Pillar {
   readonly seed: number
 }
 
-/** 尘埃柱立在空腔边上一圈，尖端朝着黑洞 */
+/** 尘埃柱立在空腔边上一圈，尖端朝着黑洞，根部埋进内壁 */
 function pillarsOf(s: NebulaSheet): Pillar[] {
   const out: Pillar[] = []
-  const n = 13
+  const n = 9
   for (let i = 0; i < n; i++) {
     const h = (k: number): number => valueNoise(i * 3.7 + k * 11.3, k * 5.1 + 0.5, s.seed + 61)
     const a = ((i + 0.5 + (h(1) - 0.5) * 0.7) / n) * Math.PI * 2
-    const r = s.innerU * (0.66 + 0.24 * h(2))
+    const r = s.innerU * (0.74 + 0.16 * h(2))
     const x = Math.cos(a) * r
     const y = Math.sin(a) * r
     const dx = x - s.holeX
     const dy = y - s.holeY
     const d = Math.hypot(dx, dy) || 1
-    out.push({ x, y, ux: dx / d, uy: dy / d, len: 3 + 4 * h(3), width: 0.55 + 0.75 * h(4), seed: s.seed + 71 + i * 13 })
+    const ux = dx / d
+    const uy = dy / d
+    const along = x * ux + y * uy
+    const wall = -along + Math.sqrt(Math.max(0, along * along - r * r + s.innerU * s.innerU))
+    out.push({ x, y, ux, uy, len: wall + 0.8, width: 0.5 + 0.5 * h(4), seed: s.seed + 71 + i * 13 })
   }
   return out
 }
 
-/** 一根柱子在 (x, y) 处的柱密度与被照亮的边：越往根部越粗，轮廓带着絮状的起伏，里面疏密不匀，尖端圆钝，根部埋进内壁；亮边是被光蒸发出来的气体，裹在朝着黑洞的尖端外面 */
+/**
+ * 一根柱子在 (x, y) 处的尘埃与被照亮的边：越往根部越粗，轮廓带着絮状的起伏，里面疏密不匀，尖端圆钝；
+ * 尘埃不是实心的，挡掉一部分后面的光；亮边是朝着黑洞的尖端被光蒸发出来的气体，裹在尖端外面，也透进尖端里
+ */
 function pillarAt(p: Pillar, x: number, y: number): { d: number; rim: number } {
   const ox = x - p.x
   const oy = y - p.y
   const t = ox * p.ux + oy * p.uy
-  if (t < -2.5 || t > p.len + 1.5) return { d: 0, rim: 0 }
+  if (t < -2 || t > p.len + 1) return { d: 0, rim: 0 }
   const across = ox * p.uy - oy * p.ux
   const side = Math.abs(across)
-  const grow = 0.35 + 0.65 * Math.sqrt(Math.max(0, Math.min(1, t / p.len)))
-  const ragged = (fbm(t * 0.9, across * 0.9, p.seed, 2) - 0.5) * 0.7 + (fbm(t * 2.6, across * 2.6, p.seed + 5, 2) - 0.5) * 0.35
+  const grow = 0.4 + 0.6 * Math.sqrt(Math.max(0, Math.min(1, t / p.len)))
+  const ragged = (fbm(t * 0.9, across * 0.9, p.seed, 2) - 0.5) * 0.6 + (fbm(t * 2.4, across * 2.4, p.seed + 5, 2) - 0.5) * 0.3
   const w = p.width * grow * (1 + ragged)
   const dist = t < 0 ? Math.hypot(t, side) : side
-  const core = 0.65 + 0.35 * fbm(t * 1.4, across * 1.4, p.seed + 9, 2)
-  const body = smooth(w * 1.05, w * 0.55, dist) * smooth(p.len + 1.5, p.len - 1, t) * core
-  const front = smooth(w * 1.6, w, dist) * (1 - smooth(w, w * 0.7, dist))
-  return { d: body, rim: front * smooth(p.len * 0.7, 0, t) }
+  const core = 0.55 + 0.45 * fbm(t * 1.2, across * 1.2, p.seed + 9, 3)
+  const body = smooth(w * 1.1, w * 0.45, dist) * core
+  const front = smooth(w * 1.7, w, dist) * (1 - smooth(w, w * 0.6, dist))
+  const head = smooth(p.len * 0.45, 0, t)
+  return { d: body * 0.75, rim: (front + body * 0.35) * head }
+}
+
+/** 气体的密度，0～1：大团柔软的云，按两层扭曲过的坐标采样，边缘被细碎的湍流撕成絮状，云团之间是空的 */
+function gasAt(s: NebulaSheet, x: number, y: number): number {
+  const wx = (fbm(x / 9, y / 9, s.seed + 2, 2) - 0.5) * 7
+  const wy = (fbm(x / 9 + 9, y / 9 - 7, s.seed + 3, 2) - 0.5) * 7
+  return fbm((x + wx) / 6.5, (y + wy) / 6.5, s.seed + 1, 4) + (fbm(x / 1.7, y / 1.7, s.seed + 6, 3) - 0.5) * 0.09
 }
 
 /**
- * 星云数据贴图：俯视时空腔下面是球壳下半部的内壁，壳层与外面的深空按离球心多远分开。逐像素：
- * R 是会发光的气体（大团的云、里面翻卷的湍流与细丝，按扭曲过的坐标采样），G 是尘埃的柱密度（暗带、零散的球状体与尘埃柱），
- * B 是尘埃柱尖端朝着黑洞那一圈被照亮的边。数据图必须满 alpha：画布会按透明度预乘
+ * 星云数据贴图：空腔下面是球壳下半部的内壁，壳层与外面的深空按离球心多远分开。逐像素：
+ * R 是电离气体的发光：密度适中的云团最亮，太稠的云核还没被电离，是暗的；云团之间几乎是空的。G 是尘埃（稠密的云核、暗带、球状体与尘埃柱）。
+ * B 是电离前沿：云团朝着黑洞的那一面（密度往背离黑洞的方向升高处）被光削出一条亮边，尘埃柱的尖端也是。数据图必须满 alpha：画布会按透明度预乘
  */
 export function paintNebula(s: NebulaSheet, out: Uint8ClampedArray, r0: number, r1: number): void {
   const size = sheetPx(s)
   const ppu = s.ppu
   const pillars = pillarsOf(s)
+  const step = 0.2
   for (let py = r0; py < r1; py++) {
     for (let px = 0; px < size; px++) {
       const x = s.x0 + (px + 0.5) / ppu
@@ -97,27 +113,33 @@ export function paintNebula(s: NebulaSheet, out: Uint8ClampedArray, r0: number, 
         out[o + 2] = 0
         continue
       }
-      const wx = (fbm(x / 7, y / 7, s.seed + 2, 2) - 0.5) * 5
-      const wy = (fbm(x / 7 + 9, y / 7 - 7, s.seed + 3, 2) - 0.5) * 5
-      const cloud = smooth(0.28, 0.78, fbm(x / 10, y / 10, s.seed + 1, 3))
-      const churn = smooth(0.3, 0.85, fbm((x + wx) / 3.4, (y + wy) / 3.4, s.seed + 4, 4))
-      const thread = ridge(fbm((x + wx * 0.7) / 2.1, (y + wy * 0.7) / 2.1, s.seed + 5, 3)) ** 6
-      let e = (0.18 + 0.82 * cloud) * (0.3 + 0.7 * churn) + thread * (0.08 + 0.32 * cloud)
-      const lanes = smooth(0.52, 0.8, fbm((x - wy) / 5, (y + wx) / 5, s.seed + 21, 4)) * 0.75
-      const g = cellNearest(x / 2.6, y / 2.6, s.seed + 23)
-      const globule = g.h > 0.94 ? smooth(0.32, 0.1, Math.hypot(g.dx, g.dy)) * 0.7 : 0
-      let d = Math.max(lanes, globule)
-      let rim = 0
+      const rho = gasAt(s, x, y)
+      const hx = x - s.holeX
+      const hy = y - s.holeY
+      const hd = Math.hypot(hx, hy) || 1
+      const rise = (gasAt(s, x + (hx / hd) * step, y + (hy / hd) * step) - rho) / step
+      const cloud = smooth(0.4, 0.56, rho)
+      const core = smooth(0.6, 0.74, rho)
+      const soft = fbm(x / 2.8, y / 2.8, s.seed + 4, 3)
+      const wisp = ridge(fbm(x / 4.6, y / 4.6, s.seed + 5, 3)) ** 3 * smooth(0.3, 0.46, rho)
+      let e = cloud * (1 - 0.7 * core) * (0.4 + 0.6 * soft) + wisp * 0.3
+      const facing = smooth(1.5, 6, hd)
+      const edgeBand = smooth(0.42, 0.46, rho) * (1 - smooth(0.48, 0.55, rho))
+      let rim = edgeBand * (facing * smooth(0.04, 0.16, rise) + (1 - facing) * 0.5)
+      const lanes = smooth(0.58, 0.78, fbm((x - 3) / 5.5, (y + 5) / 5.5, s.seed + 21, 4)) * 0.55
+      const g = cellNearest(x / 3, y / 3, s.seed + 23)
+      const globule = g.h > 0.965 ? smooth(0.3, 0.08, Math.hypot(g.dx, g.dy)) * 0.6 : 0
+      let d = Math.max(core * 0.8, lanes, globule)
       for (const p of pillars) {
         const c = pillarAt(p, x, y)
         if (c.d > d) d = c.d
         if (c.rim > rim) rim = c.rim
       }
-      e *= 1 - 0.6 * d
+      e *= 1 - 0.5 * d
       if (r > s.innerU) {
         const depth = smooth(s.innerU, s.innerU + 1.6, r)
         d = d + (1 - d) * (0.55 + 0.35 * depth)
-        e *= 1 - 0.6 * depth
+        e = Math.max(e, 0.35 * soft) * (1 - 0.6 * depth)
         rim *= 1 - depth
       }
       const edge = smooth(s.outerU, s.outerU - 1.5, r)
@@ -149,12 +171,14 @@ export function bandBuffer(s: NebulaSheet, band: SheetBand): Uint8ClampedArray<A
 }
 
 /**
- * 星云的片元着色器：四边形盖住镜头能到的整片，坐标以格计、以球心为原点。
- * 空腔里看到的是球壳下半部的内壁：从这个像素竖直往下的光线先被黑洞按 α = 2r_s/b + (15π/16)(r_s/b)² 弯折，再打到内壁上，
- * 所以黑洞周围的星云被扭曲，正下方那一片成像成爱因斯坦环；b 小于阴影半径的光线掉进黑洞，是黑的。
- * 内壁只有被吸积盘照到的一层薄皮发光：亮度按到黑洞的距离平方反比、入射角与薄盘朝下更亮的辐射方向，光度取光传过来那一刻的（光回波）；
- * 气体全电离了就不再更亮。薄皮斜着看光程更长，碗沿更亮。壳层在平面上是厚厚的尘埃，只有朝空腔那一面被照亮；外缘以外是深空的星。
- * 吸积盘是正对着看的薄盘：开普勒较差转动，温度按 T ∝ x^(−3/4)(1 − √(3/x))^(1/4) 随半径变，光度涨了温度按四分之一次方涨；
+ * 星云的片元着色器：四边形盖住镜头能到的整片，坐标以格计、以球心为原点。画面是透视相机拍的：镜头在活动的平面上方 H 格，
+ * 平面上的东西照原样，平面以下越深的东西在画面上越小、跟着镜头移得越慢。
+ * 空腔里看到的是球壳下半部的内壁：从镜头经过这个像素往下的光线先被黑洞按 α = 2r_s/b + (15π/16)(r_s/b)² 弯折（b 是光线离黑洞最近的距离），
+ * 再打到内壁上，所以黑洞周围的星云被扭曲，正对黑洞后面那一片成像成爱因斯坦环；b 小于阴影半径的光线掉进黑洞，是黑的。
+ * 内壁上是一层稀薄的电离气体，透过云团之间的空隙看得到后面暗的尘埃和嵌在星云里的星：气体被吸积盘照亮，亮度按到黑洞的距离平方反比、
+ * 入射角与薄盘朝下更亮的辐射方向，光度取光传过来那一刻的（光回波）；发的是 Hα 的玫瑰红，全电离了就不再更亮。
+ * 薄层斜着看光程更长，碗沿更亮。壳层在平面上是厚厚的尘埃，只有朝空腔那一面被照亮；外缘以外是无穷远处的星。
+ * 吸积盘是平面上的薄盘：开普勒较差转动，温度按 T ∝ x^(−3/4)(1 − √(3/x))^(1/4) 随半径变，光度涨了温度按四分之一次方涨；
  * 盘面的光按引力红移与横向多普勒 g = √(1 − 3r_s/2r) 变红变暗，颜色取黑体色
  */
 export const NEBULA_FRAG = `
@@ -175,6 +199,7 @@ uniform float uTime;
 uniform vec4 uRect;
 uniform float uUnit;
 uniform vec2 uCenter;
+uniform vec3 uCam;
 uniform vec4 uSheet;
 uniform vec2 uShell;
 uniform vec4 uHole;
@@ -189,9 +214,14 @@ uniform float uSeed;
 uniform float uGlow;
 
 const float DISK_GAIN = 1.8;
-const float LIMB_MAX = 3.2;
+const float LIMB_MAX = 2.4;
 const float ION_SAT = 1.2;
-const vec4 SHEET_MEAN = vec4(0.3, 0.35, 0.0, 1.0);
+const vec4 SHEET_MEAN = vec4(0.22, 0.3, 0.05, 1.0);
+const vec3 H_ALPHA = vec3(0.82, 0.24, 0.28);
+const vec3 FRONT = vec3(1.0, 0.46, 0.44);
+const vec3 SELF_GLOW = vec3(0.07, 0.03, 0.035);
+const vec3 WALL = vec3(0.02, 0.013, 0.013);
+const vec3 DUST = vec3(0.3, 0.19, 0.13);
 
 float hash(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -243,10 +273,9 @@ float stars(vec2 p) {
   return starLayer(p, 1.7, uSeed, 0.86) * 1.4 + starLayer(p, 3.9, uSeed + 7.0, 0.93) * 0.8 + starLayer(p, 0.6, uSeed + 3.0, 0.95) * 2.4;
 }
 
-vec3 litColor(float flux) {
-  float heat = flux / (flux + 0.8);
-  vec3 c = mix(vec3(0.78, 0.26, 0.24), vec3(1.0, 0.52, 0.26), smoothstep(0.25, 0.75, heat));
-  return mix(c, vec3(1.0, 0.82, 0.62), smoothstep(0.8, 1.0, heat));
+vec3 starTint(vec2 p) {
+  float h = hash(floor(p * 1.7) + uSeed + 5.0);
+  return mix(vec3(1.0, 0.82, 0.62), vec3(0.78, 0.86, 1.0), step(0.7, h));
 }
 
 /** 吸积盘上第 i 圈薄环里的湍流：整圈按环心的开普勒（Paczyński–Wiita）角速度转，里圈比外圈转得快 */
@@ -257,16 +286,24 @@ float diskBand(float i, float ang, float t, float rs, float c) {
   return vnoise(s) * 0.6 + vnoise(s * 2.6 + 11.0) * 0.4;
 }
 
-/** 从 p 竖直往下看的光线被黑洞弯折后打到内壁上的点：xy 是那一点在平面上的位置，z 是它在平面下多深 */
-vec3 floorHit(vec2 p, vec2 hole, float rs, float a) {
+/** 光线离黑洞最近的距离：它从镜头出发、在平面上过 p 点，每往下一格水平走 v */
+float impactAt(vec2 q, vec2 v) {
+  return sqrt(max(1e-6, dot(q, q) - pow(dot(q, v), 2.0) / (1.0 + dot(v, v))));
+}
+
+/** 光线被黑洞弯过之后，在平面以下每往下一格水平往回走多少：打到的点是 p − K·z */
+vec2 bentSlope(vec2 p, vec2 v, vec2 hole, float rs) {
   vec2 q = p - hole;
-  float b = length(q);
-  float u = rs / b;
-  vec2 k = q / b * tan(2.0 * u + 2.945 * u * u);
-  float pk = dot(p, k);
-  float kk = dot(k, k);
+  float u = rs / impactAt(q, v);
+  return q / length(q) * tan(2.0 * u + 2.945 * u * u) - v;
+}
+
+/** 沿 p − K·z 往下的光线打到空腔下半部内壁上的点：xy 是那一点在平面上的位置，z 是它在平面下多深 */
+vec3 floorHit(vec2 p, vec2 K, float a) {
+  float pk = dot(p, K);
+  float kk = dot(K, K);
   float z = (pk + sqrt(max(0.0, pk * pk - (kk + 1.0) * (dot(p, p) - a * a)))) / (kk + 1.0);
-  return vec3(p - k * z, z);
+  return vec3(p - K * z, z);
 }
 
 /** 电离气体的复合发光跟着照进来的光走；照得再亮，气体全电离了也就不再更亮 */
@@ -279,16 +316,12 @@ vec4 sheetAt(vec2 s) {
   return texture2D(uNeb, vec2(uv.x, 1.0 - uv.y));
 }
 
-vec3 starTint(vec2 p) {
-  float h = hash(floor(p * 1.7) + uSeed + 5.0);
-  return mix(vec3(1.0, 0.82, 0.62), vec3(0.78, 0.86, 1.0), step(0.7, h));
-}
-
 void main ()
 {
   vec2 tc = outTexCoord;
   vec2 world = uRect.xy + vec2(tc.x, 1.0 - tc.y) * uRect.zw;
   vec2 p = (world - uCenter) / uUnit;
+  vec2 v = (world - uCam.xy) / uUnit / uCam.z;
   vec2 hole = uHole.xy;
   float rs = uHole.z;
   float a = uShell.x;
@@ -296,93 +329,65 @@ void main ()
   vec2 q = p - hole;
   float b = length(q);
   float shadowR = 2.598 * rs;
+  float bp = impactAt(q, v);
   float now = uTime;
   float c = uLight.x;
-  vec3 col = vec3(0.01, 0.008, 0.01);
   vec2 hm = uMeteor.xy;
   float r = length(p);
+  vec3 col = vec3(0.0);
 
-  if (b > shadowR) {
-    if (r < a) {
-      vec3 hit = floorHit(p, hole, rs, a);
-      vec2 s = hit.xy;
-      float z = hit.z;
-      float blur = 0.0;
-      if (rs / b > 0.06) {
-        vec2 rq = q / b;
-        float px = 1.0 / uUnit;
-        float foot = max(length(floorHit(p + rq * px, hole, rs, a).xy - s), length(floorHit(p + vec2(-rq.y, rq.x) * px, hole, rs, a).xy - s));
-        blur = smoothstep(0.06, 0.4, foot);
-      }
-      vec4 nb = mix(sheetAt(s), SHEET_MEAN, blur);
-      vec3 P = vec3(s, -z);
-      vec3 L = vec3(hole, 0.0) - P;
-      float d = length(L);
-      vec3 Ld = L / d;
-      vec3 n = -P / a;
-      float inc = max(dot(n, Ld), 0.0);
-      float beam = 0.3 + 0.7 * abs(Ld.z);
-      float limb = min(LIMB_MAX, 1.0 / max(0.05, sqrt(max(0.0, 1.0 - dot(s, s) / (a * a)))));
-      float lum = lumAt(now - d / c);
-      float flux = lum * inc * beam / (d * d) * 260.0;
-      vec3 M = vec3(hm, 0.0) - P;
-      float dm = length(M);
-      flux += uMeteor.z * max(dot(n, M / dm), 0.0) / (dm * dm + 1.0) * 40.0 * uMeteor.w;
-      float grain = mix(0.8 + 0.4 * vnoise(s * 4.3 + uSeed), 1.0, blur);
-      float e = nb.r * limb * grain;
-      float dustv = nb.g;
-      float lit = ionized(flux);
-      vec3 glow = e * (vec3(0.18, 0.085, 0.085) + litColor(lit) * lit * 0.7);
-      vec3 rim = nb.b * (lit * vec3(1.0, 0.62, 0.38) * 0.4 * (0.4 + 1.2 * vnoise(s * 3.1 + uSeed + 9.0)) + vec3(0.05, 0.015, 0.03));
-      vec3 scatter = dustv * flux * vec3(0.3, 0.17, 0.1) * 0.12;
-      col = (glow + col) * (1.0 - 0.8 * dustv) + dustv * vec3(0.025, 0.016, 0.012) + rim + scatter;
-      col += starTint(s) * stars(s) * 0.35 * (1.0 - dustv) * (1.0 - min(1.0, nb.r * 1.5)) * (1.0 - blur);
-    } else if (r < outer) {
-      vec4 nb = sheetAt(p);
-      vec2 nIn = -p / r;
-      vec2 L = hole - p;
-      float d = length(L);
-      float inc = max(dot(nIn, L / d), 0.0);
-      float lum = lumAt(now - d / c);
-      float into = r - a;
-      float skin = exp(-into / 0.7);
-      float flux = lum * inc * 0.3 / (d * d) * 260.0;
-      vec2 M = hm - p;
-      float dm = length(M);
-      flux += uMeteor.z * max(dot(nIn, M / dm), 0.0) / (dm * dm + 1.0) * 40.0 * uMeteor.w;
-      vec3 deep = vec3(0.045, 0.028, 0.024) * (0.4 + nb.r);
-      float lit = ionized(flux);
-      vec3 face = nb.r * LIMB_MAX * skin * (vec3(0.18, 0.085, 0.085) + litColor(lit) * lit * 0.7) + nb.b * lit * vec3(1.0, 0.62, 0.38) * 0.4 * skin;
-      float clear = smoothstep(outer - 2.5, outer, r) * (1.0 - nb.g);
-      col = mix(deep, col, clear) + face;
-      col += starTint(p) * stars(p) * clear;
-    } else {
-      col += starTint(p) * stars(p);
-    }
+  if (bp > shadowR) {
+    vec2 K = bentSlope(p, v, hole, rs);
+    vec2 sky = -K * uCam.z;
+    float floorOn = step(r, a);
+    float shellOn = step(a, r) * step(r, outer);
+    vec3 hit = floorHit(p, K, a);
+    vec2 s = mix(p, hit.xy, floorOn);
+    vec3 P = vec3(s, -hit.z * floorOn);
+    vec3 n = floorOn > 0.5 ? -P / a : vec3(-p / max(r, 1e-3), 0.0);
+    float blur = smoothstep(0.25, 0.35, rs / bp) * floorOn;
+    vec4 nb = mix(sheetAt(s), SHEET_MEAN, blur) * (floorOn + shellOn);
+    float skin = mix(exp(-(r - a) / 0.7), 1.0, floorOn);
+    float limb = floorOn > 0.5 ? min(LIMB_MAX, 1.0 / max(0.05, abs(dot(normalize(vec3(-K, -1.0)), n)))) : LIMB_MAX * skin;
+    vec3 L = vec3(hole, 0.0) - P;
+    float d = length(L);
+    vec3 Ld = L / d;
+    float flux = lumAt(now - d / c) * max(dot(n, Ld), 0.0) * (0.3 + 0.7 * abs(Ld.z)) / (d * d) * 260.0;
+    vec3 M = vec3(hm, 0.0) - P;
+    float dm = length(M);
+    flux += uMeteor.z * max(dot(n, M / dm), 0.0) / (dm * dm + 1.0) * 40.0 * uMeteor.w;
+    float lit = ionized(flux);
+    vec3 gas = nb.r * limb * (SELF_GLOW + H_ALPHA * lit * 0.6);
+    vec3 front = nb.b * lit * FRONT * 0.6 * skin;
+    float dust = nb.g;
+    vec2 starAt = mix(sky, s, floorOn);
+    vec3 star = starTint(starAt) * stars(starAt);
+    vec3 onFloor = (WALL + star * 0.5 * (1.0 - blur)) * (1.0 - dust) + gas * (1.0 - 0.75 * dust) + DUST * dust * (0.05 + flux * 0.12) + front;
+    float clear = smoothstep(outer - 2.5, outer, r) * (1.0 - dust);
+    vec3 inShell = mix(DUST * 0.12 * (0.4 + nb.r), star, clear) + gas + front;
+    col = floorOn * onFloor + shellOn * inShell + (1.0 - floorOn - shellOn) * star;
+  }
 
-    float ri = 3.0 * rs;
-    float ro = uHole.w * rs;
-    float tq = uGlow;
-    if (b < ro * 1.15) {
-      float x = b / rs;
-      float prof = pow(3.0 / x, 0.75) * pow(max(0.0, 1.0 - sqrt(3.0 / x)), 0.25) / 0.488;
-      float temp = uLight.w * prof * sqrt(max(0.0, 1.0 - 1.5 / x)) * tq;
-      float ang = atan(q.y, q.x);
-      float rb = log(x) * 9.0 - 0.5;
-      float i = floor(rb);
-      float churn = mix(diskBand(i, ang, now, rs, c), diskBand(i + 1.0, ang, now, rs, c), smoothstep(0.0, 1.0, fract(rb)));
-      float heat = temp / uLight.w;
-      vec3 disk = blackbody(temp) * heat * heat * heat * heat * (0.6 + 0.8 * churn) * DISK_GAIN;
-      float cover = smoothstep(ri * 0.97, ri * 1.05, b) * (1.0 - smoothstep(ro * 0.55, ro * 1.15, b)) * (0.55 + 0.45 * churn);
-      col = mix(col, disk, cover);
-    }
-    if (b < shadowR * 1.2) {
-      float ring = exp(-pow((b - shadowR * 1.02) / (rs * 0.05), 2.0));
-      float tr = uLight.w * 0.8 * tq;
-      col += blackbody(tr) * pow(tr / uLight.w, 4.0) * DISK_GAIN * 0.5 * ring;
-    }
-  } else {
-    col = vec3(0.0);
+  float ri = 3.0 * rs;
+  float ro = uHole.w * rs;
+  float tq = uGlow;
+  if (b < ro && b > ri * 0.97) {
+    float x = b / rs;
+    float prof = pow(3.0 / x, 0.75) * pow(max(0.0, 1.0 - sqrt(3.0 / x)), 0.25) / 0.488;
+    float temp = uLight.w * prof * sqrt(max(0.0, 1.0 - 1.5 / x)) * tq;
+    float ang = atan(q.y, q.x);
+    float rb = log(x) * 9.0 - 0.5;
+    float i = floor(rb);
+    float churn = mix(diskBand(i, ang, now, rs, c), diskBand(i + 1.0, ang, now, rs, c), smoothstep(0.0, 1.0, fract(rb)));
+    float heat = temp / uLight.w;
+    vec3 disk = blackbody(temp) * heat * heat * heat * heat * (0.6 + 0.8 * churn) * DISK_GAIN;
+    float cover = smoothstep(ri * 0.97, ri * 1.05, b) * (1.0 - smoothstep(ro * 0.82, ro, b)) * (0.55 + 0.45 * churn);
+    col = mix(col, disk, cover);
+  }
+  if (bp < shadowR * 1.2) {
+    float ring = exp(-pow((bp - shadowR * 1.02) / (rs * 0.05), 2.0));
+    float tr = uLight.w * 0.8 * tq;
+    col += blackbody(tr) * pow(tr / uLight.w, 4.0) * DISK_GAIN * 0.5 * ring;
   }
 
   vec2 mq = p - hm;

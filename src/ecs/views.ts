@@ -1868,7 +1868,7 @@ interface Stream {
 }
 
 /**
- * 星云：没有太阳。底下是球壳下半部的内壁、壳层的尘埃与外面的深空，由着色器按黑洞的引力透镜、吸积盘的光与光回波画出来；
+ * 星云：没有太阳。底下是球壳下半部的内壁、壳层的尘埃与外面的深空，由着色器按透视、黑洞的引力透镜、吸积盘的光与光回波画出来；
  * 黑洞是一块阴影，外面一圈光子环和正对着看的吸积盘，周围那圈被弯过来的星云光就是走不出来的地方。
  * 星尘按同一套引力往里漂，越近越快；被吞的身体拉成细流绕进去，吸积盘随之一亮。流星在内壁上先亮起来再冲进空腔，
  * 身后拖着冷却变红的热迹与背向黑洞的尾巴，照亮它经过的星云，扎进对面的壳层就碎掉
@@ -1973,6 +1973,8 @@ class NebulaView extends BoundedView {
               set('uRect', [x0, y0, side, side])
               set('uUnit', UNIT)
               set('uCenter', [L.cx, L.cy])
+              const view = scene.cameras.main.worldView
+              set('uCam', [view.centerX, view.centerY, cfg.cameraU])
               set('uSheet', [sheet.x0, sheet.y0, sheet.sizeU, sheet.sizeU])
               set('uShell', [cfg.shell.innerU, cfg.shell.outerU])
               set('uHole', [sheet.holeX, sheet.holeY, u.rs, cfg.disk.outerRs])

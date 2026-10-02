@@ -176,6 +176,8 @@ export interface NebulaConfig {
   }
   /** 刷怪点离黑洞的余量：比这张图最慢的敌人走不出来的半径再远这么多格 */
   readonly spawnClearU: number
+  /** 画面是透视相机拍的：镜头在活动的平面上方多高，格；平面以下越深的东西在画面上越小、跟着镜头移得越慢 */
+  readonly cameraU: number
 }
 /**
  * 火山：能走的是方形地图里一块边缘不规则的盆地，四周是崖壁与高地；一座火山背靠盆地边，山体谁也上不去。
