@@ -499,7 +499,7 @@ export const MAPS = {
   river: {
     emoji: '1f30a',
     name: '河流',
-    desc: '林子与岩石围着的一片空地，一条山溪从崖上落进深潭，往下分成一大一小两股，各自从断崖边落进深谷。水是真的在流：越深越急越难走，脚下打滑就被推着往下游走，又深又急才会被冲倒、顺水漂走，漂到断崖边就落下去再也回不来——敌我都一样。逆流而上很慢，贴着浅处走',
+    desc: '林子与岩石围着的一片空地，一条山溪从崖上落进深潭，往下分成一大一小两股，各自从断崖边落进深谷。水是真的在流：越深越急越把人往下游带，站着不动也会被冲走，顺流快、逆流慢，过河要往上游斜着走；又深又急会被冲倒、顺水漂走，漂到断崖边就落下去再也回不来——敌我都一样',
     kind: 'river',
     stamina: { exertion: 0.5, regen: 1 },
     palette: {
@@ -525,7 +525,7 @@ export const MAPS = {
       falls: { cliffM: 3.6, cliffU: 1.6, poolM: 1.1, poolR: 0.55, gorgeM: 7, lipU: 1.2 },
       trees: { crownU: [1.4, 2.6], overhangU: 0.4, forest: 0.55, tongues: [0, 2], groves: [1, 3], lone: [1, 3] },
       rocks: { inRiver: [1, 4], onLand: [1, 4], radiusU: [0.35, 0.75], heightM: [0.25, 0.6] },
-      body: { kg: 60, radiusU: 0.45, heightM: 1.7, density: 985, drag: 1.1, grip: { static: 0.5, kinetic: 0.35 }, legs: 0.55, hip: 0.5, lever: 0.15, chest: 0.55, gait: 1.2, swim: 0.8, wetM: 0.02 },
+      body: { kg: 60, radiusU: 0.45, heightM: 1.7, density: 985, drag: 1.1, grip: 0.35, legs: 0.55, hip: 0.5, lever: 0.15, chest: 0.55, wade: 0.4, swim: 0.8, wetM: 0.02 },
     },
     boss: 'croc',
   },

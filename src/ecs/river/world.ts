@@ -11,7 +11,7 @@ import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { riverPlan } from './layout'
 import { flowAt, solveWater } from './water'
-import { POSTURE, wade } from './bodies'
+import { wade } from './bodies'
 import type { Flow, Water } from './water'
 import type { RiverPlan } from './layout'
 import type { MapId, RiverConfig } from '../../types/maps'
@@ -29,13 +29,12 @@ const FALLS_TINT = 0x9fd8ff
 
 /**
  * 河流此刻的状态：按种子生成的地图，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定，
- * 以及哪些身体正在水里打滑、哪些正倒在水里被冲着走（按实体记，uid 对不上就是换了实体）
+ * 以及哪些身体正倒在水里被冲着走（按实体记，uid 对不上就是换了实体）
  */
 export interface RiverState {
   readonly plan: RiverPlan
   water: Water | null
   ready: Promise<void>
-  readonly slip: Map<number, number>
   readonly down: Map<number, number>
 }
 
@@ -83,7 +82,7 @@ export function riverOf(sim: Sim): RiverState {
   let s = sim.worldState.river
   if (!s) {
     const cfg = cfgOf(sim)
-    const state: RiverState = { plan: riverPlanFor(cfg, sim.run.decorSeed), water: null, ready: Promise.resolve(), slip: new Map(), down: new Map() }
+    const state: RiverState = { plan: riverPlanFor(cfg, sim.run.decorSeed), water: null, ready: Promise.resolve(), down: new Map() }
     state.ready = solveAsync(cfg, state.plan).then((w) => {
       state.water = w
     })
@@ -218,16 +217,16 @@ export const river: WorldHooks = {
     if (!w || hasComponent(sim.world, eid, Pickup) || hasComponent(sim.world, eid, Shard)) return false
     const cfg = cfgOf(sim)
     flowAt(w, x / UNIT, y / UNIT, FLOW)
+    if (FLOW.h < cfg.body.wetM) {
+      s.down.delete(eid)
+      return false
+    }
     const uid = Uid.v[eid]!
-    const was = s.down.get(eid) === uid ? POSTURE.down : s.slip.get(eid) === uid ? POSTURE.slip : POSTURE.walk
-    s.slip.delete(eid)
-    s.down.delete(eid)
-    if (FLOW.h < cfg.body.wetM) return false
     const g = sim.hooks.surface(sim, x, y)
     const k = (Phys.drag[eid]! * Phys.grip[eid]! * g.traction * g.viscosity) / Phys.mass[eid]!
-    const now = wade(cfg, out, bodyRadius(sim, eid), Phys.mass[eid]!, x, y, vx, vy, FLOW.h, FLOW.u, FLOW.v, Drive.x[eid]!, Drive.y[eid]!, k, g.traction, was, dt)
-    if (now === POSTURE.slip) s.slip.set(eid, uid)
-    else if (now === POSTURE.down) s.down.set(eid, uid)
+    const was = s.down.get(eid) === uid
+    if (wade(cfg, out, bodyRadius(sim, eid), Phys.mass[eid]!, x, y, vx, vy, FLOW.h, FLOW.u, FLOW.v, Drive.x[eid]!, Drive.y[eid]!, k, g.traction, was, dt)) s.down.set(eid, uid)
+    else s.down.delete(eid)
     return true
   },
   constrainBody(sim, eid, _from, next) {
@@ -291,6 +290,6 @@ export const river: WorldHooks = {
   tick(sim) {
     const s = riverOf(sim)
     plunge(sim, s)
-    for (const m of [s.slip, s.down]) for (const [eid, uid] of m) if (Uid.v[eid] !== uid || !Alive.v[eid]) m.delete(eid)
+    for (const [eid, uid] of s.down) if (Uid.v[eid] !== uid || !Alive.v[eid]) s.down.delete(eid)
   },
 }
