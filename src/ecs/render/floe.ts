@@ -45,12 +45,12 @@ export interface FloeCanvas {
   readonly w: number
   readonly h: number
   readonly ppu: number
-  readonly windAngle: number
+  readonly driftAngle: number
   readonly seed: number
   readonly meterPerU: number
 }
 
-/** 雪棱：顺着风拉长的一道道棱，沿风向慢、横着风快，取山脊形；只在一片片风大的地方有 */
+/** 雪棱：往年的风刻出的一道道棱，顺着雪堆的走向拉长，取山脊形；只在一片片地方有 */
 function sastrugi(xu: number, yu: number, c: number, s: number, seed: number): number {
   const along = xu * c + yu * s
   const across = -xu * s + yu * c
@@ -60,7 +60,7 @@ function sastrugi(xu: number, yu: number, c: number, s: number, seed: number): n
 }
 
 /**
- * 冰面的高度图，米（海面为 0）：老冰的冰面加上雪，雪上有顺风的雪棱与小起伏，光冰有很浅的起伏，新冰缝低下去一截；
+ * 冰面的高度图，米（海面为 0）：老冰的冰面加上雪，雪上有顺着走向的雪棱与小起伏，光冰有很浅的起伏，新冰缝低下去一截；
  * 冰缘一圈落成圆肩，冰外是海面
  */
 export function floeHeights(f: FloeField, x0: number, y0: number, w: number, h: number): Pick<FloeCanvas, 'hcols' | 'hrows' | 'hcell' | 'hx0' | 'hy0' | 'height'> {
@@ -70,8 +70,8 @@ export function floeHeights(f: FloeField, x0: number, y0: number, w: number, h: 
   const hcols = Math.ceil(w / hcell) + 4
   const hrows = Math.ceil(h / hcell) + 4
   const height = new Float32Array(hcols * hrows)
-  const c = Math.cos(f.windAngle)
-  const s = Math.sin(f.windAngle)
+  const c = Math.cos(f.driftAngle)
+  const s = Math.sin(f.driftAngle)
   for (let j = 0; j < hrows; j++) {
     const y = hy0 + (j + 0.5) * hcell
     for (let i = 0; i < hcols; i++) {
@@ -141,14 +141,14 @@ function tone(c: number): number {
 
 /**
  * 冰面：一块积雪的海冰，按高度图在低低的太阳下打光，雪堆与雪棱朝阳的一面暖白、背阴的一面泛蓝，挡住阳光的地方拖出长影。
- * 雪上有细碎的闪光；风吹掉雪的地方露出老冰——乳白与半透明的蓝相间，冻在里面的气泡、一张发白的裂纹网，顺风扫过的一缕缕雪粉；
+ * 雪上有细碎的闪光；雪没盖住的地方露出老冰——乳白与半透明的蓝相间，冻在里面的气泡、一张发白的裂纹网，顺着雪堆走向的一缕缕雪粉；
  * 裂缝冻成的新冰发暗，上面开满霜花；冰缘一圈被浪花打湿，颜色发深，挂着白色的冻沫，陡的断口透出冰里的青蓝。只画 [r0, r1) 这几行，out 按这几行排
  */
 export function paintFloe(c: FloeCanvas, out: Uint8ClampedArray, r0: number, r1: number): void {
   const { ppu, seed } = c
   const px2w = UNIT / ppu
-  const wc = Math.cos(c.windAngle)
-  const ws = Math.sin(c.windAngle)
+  const wc = Math.cos(c.driftAngle)
+  const ws = Math.sin(c.driftAngle)
   const m = c.meterPerU / UNIT
   const d = c.hcell
   const shade: Rgb = [0, 0, 0]
