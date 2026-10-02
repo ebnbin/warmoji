@@ -1833,12 +1833,15 @@ const SEA_NOISE_KEY = 'floe-noise'
 const SEA_LONG_KEY = 'floe-sea-long'
 const SEA_SHORT_KEY = 'floe-sea-short'
 const FROST_KEY = 'floe-frost'
+/** 霜那张图长边多少像素 */
+const FROST_PX = 960
 /** 开局最多几个线程分着画冰面 */
 const FLOE_THREADS = 4
 /** 海面四边形往浮冰外铺多远，格：游再远也冻死在这以内了 */
 const SEA_PAD_U = 40
-/** 风速过了这个值（米/秒）雪才扬得起来，扬起的雪按风速的三次方变多 */
+/** 风速过了 DRIFT_FROM_MS（米/秒）雪才扬得起来，扬起的雪按超出的部分的三次方变多，超出 DRIFT_SPAN_MS 时每格每秒撒 1.1 粒 */
 const DRIFT_FROM_MS = 4.5
+const DRIFT_SPAN_MS = 8.5
 /** 风浪图隔多久（毫秒）重算一次 */
 const SEA_FRAME_MS = 33
 /** 涌浪的波长，格：深水里按色散关系定周期 */
@@ -1966,6 +1969,7 @@ class FloeView extends BoundedView {
   private flakeAcc = 0
   private chill = 0
   private gustAt = -Infinity
+  private frostAspect = 0
   private readonly rippleAt = new Map<number, number>()
 
   layout(v: ViewCtx): { w: number; h: number; origin: Point } {
@@ -1981,7 +1985,7 @@ class FloeView extends BoundedView {
         .setScrollFactor(0)
         .setDepth(-3),
     )
-    if (!v.scene.textures.exists(FROST_KEY)) canvasTexture(v.scene, FROST_KEY, 960, 540, (ctx) => drawFrost(ctx, 960, 540))
+    this.fitFrost(v, viewport.logicalWidth / viewport.logicalHeight)
     this.frost = v.scene.add.image(0, 0, FROST_KEY).setDepth(89).setAlpha(0)
     this.visuals.push(this.frost)
   }
@@ -2114,7 +2118,18 @@ class FloeView extends BoundedView {
     const cold = lead >= 0 && inWater(s, lead, Uid.v[lead]!)
     this.chill = Math.min(1, Math.max(0, this.chill + (cold ? dt / 3 : -dt / 2)))
     const view = v.scene.cameras.main.worldView
+    this.fitFrost(v, view.width / view.height)
     this.frost?.setAlpha(this.chill * 0.9).setPosition(view.centerX, view.centerY).setDisplaySize(view.width, view.height)
+  }
+
+  /** 霜按镜头的宽高比画：拉伸会把六十度的冰花拉歪 */
+  private fitFrost(v: ViewCtx, aspect: number): void {
+    if (Math.abs(aspect / this.frostAspect - 1) < 0.05) return
+    this.frostAspect = aspect
+    const w = Math.round(aspect >= 1 ? FROST_PX : FROST_PX * aspect)
+    const h = Math.round(aspect >= 1 ? FROST_PX / aspect : FROST_PX)
+    canvasTexture(v.scene, FROST_KEY, w, h, (ctx) => drawFrost(ctx, w, h))
+    this.frost?.setTexture(FROST_KEY)
   }
 
   /** 这一刻的风浪：做一遍逆变换写进两张风浪图，一秒三十次就够看了 */
@@ -2132,7 +2147,7 @@ class FloeView extends BoundedView {
   /** 风吹雪：按风速的三次方在镜头里撒雪，从上风那一侧吹进来；贴地的拖成短线，少数飞起来的是小点 */
   private blow(v: ViewCtx, cfg: FloeConfig, speed: number, angle: number, dt: number): void {
     const cam = v.scene.cameras.main.worldView
-    const lift = Math.max(0, (speed - DRIFT_FROM_MS) / (cfg.wind.gustMs - DRIFT_FROM_MS))
+    const lift = Math.max(0, speed - DRIFT_FROM_MS) / DRIFT_SPAN_MS
     const c = Math.cos(angle)
     const s = Math.sin(angle)
     const px = UNIT / cfg.meterPerU
@@ -2272,7 +2287,7 @@ class FloeView extends BoundedView {
     this.drops = []
     this.rippleAt.clear()
     this.sea = undefined
-    for (const key of [FLOE_KEY, SHORE_KEY, LEE_KEY, SEA_NOISE_KEY, SEA_LONG_KEY, SEA_SHORT_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
+    for (const key of [FLOE_KEY, SHORE_KEY, LEE_KEY, SEA_NOISE_KEY, SEA_LONG_KEY, SEA_SHORT_KEY, FROST_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }
 }
 

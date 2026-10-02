@@ -1,7 +1,8 @@
-import { UNIT } from '../../util/units'
-import { Rng } from '../../util/rng'
-import type { FloeField } from '../worlds/floe'
-import { bilinear, clamp01, smooth, TOWARD } from './floe'
+import { UNIT } from '../../util/units.ts'
+import { Rng } from '../../util/rng.ts'
+import { bilinear, smooth } from '../worlds/floe.ts'
+import type { FloeField } from '../worlds/floe.ts'
+import { clamp01, TOWARD } from './floe.ts'
 
 /** 冰缘图存的范围：水里离冰缘 −4 到 12 格（冰上为负） */
 const SHORE_MIN_U = -4
@@ -307,7 +308,7 @@ export class WindSea {
     }
   }
 
-  /** h̃(k, t) = h₀(k)·e^{iωt} + h₀*(−k)·e^{−iωt}：浪高是实数，谱共轭对称 */
+  /** h̃(k, t) = h₀(k)·e^{−iωt} + h₀*(−k)·e^{iωt}：每列波朝着自己的 k 走，浪高是实数，谱共轭对称 */
   private evolve(b: SeaBand, t: number, re: Float64Array, im: Float64Array): void {
     re.fill(0)
     im.fill(0)
@@ -322,8 +323,8 @@ export class WindSea {
       const d = b.im[i]!
       const a2 = b.re[m]!
       const d2 = b.im[m]!
-      re[i] = (a + a2) * c - (d + d2) * s
-      im[i] = (a - a2) * s + (d - d2) * c
+      re[i] = (a + a2) * c + (d + d2) * s
+      im[i] = (d - d2) * c - (a - a2) * s
     }
   }
 

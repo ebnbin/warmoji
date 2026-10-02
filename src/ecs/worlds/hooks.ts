@@ -897,8 +897,12 @@ function floeOf(sim: Sim): FloeState {
 const WATER_TINT = 0x4fc3f7
 /** 冰上的路多久按队长的位置重铺一次，毫秒 */
 const PATH_MS = 250
-/** 直线走过去时，沿途离冰缘至少留多远，格 */
+/** 直线走过去时，沿途离冰缘至少留多远，格；目标本身离冰缘更近就按目标的算 */
 const LINE_CLEAR_U = 0.35
+/** 离目标这么近（格）就直扑过去：冰缘边上的目标也够得着，扑过头就滑进海里 */
+const LUNGE_U = 1.5
+/** 漂在水上的小东西随海流漂：速度朝海流靠拢的速率，每秒 */
+const FLOAT_K = 2
 
 /** 离冰缘 reach 格以内还朝着海走，就改为顺着冰缘走；正对着海时转向一侧 */
 function alongEdge(f: FloeField, x: number, y: number, dx: number, dy: number, reach: number): Point {
@@ -919,11 +923,12 @@ function clearLine(f: FloeField, x: number, y: number, tx: number, ty: number, c
   return true
 }
 
-/** 在冰上从 (x, y) 去 (tx, ty)：看得到就直走；隔着水就顺着冰上的路绕（路通往队长那里），否则贴着冰缘走 */
+/** 在冰上从 (x, y) 去 (tx, ty)：贴近了直扑；看得到就直走；隔着水就顺着冰上的路绕（路通往队长那里），否则贴着冰缘走 */
 function walkTo(s: FloeState, x: number, y: number, tx: number, ty: number, reach: number): Point {
   const f = s.field
   const d = norm(tx - x, ty - y)
-  if (clearLine(f, x, y, tx, ty, LINE_CLEAR_U)) return alongEdge(f, x, y, d.x, d.y, reach)
+  if (Math.hypot(tx - x, ty - y) < LUNGE_U * UNIT) return d
+  if (clearLine(f, x, y, tx, ty, Math.min(LINE_CLEAR_U, edgeAt(f, tx, ty)))) return alongEdge(f, x, y, d.x, d.y, reach)
   const src = s.paths.source
   if (src >= 0) {
     const c = s.paths.center(src)
@@ -972,10 +977,19 @@ function sinkCoins(sim: Sim, s: FloeState): void {
 /** 冰上的路按队长的位置重铺：队长在水里就通往离他最近的冰 */
 function tickPaths(sim: Sim, s: FloeState): void {
   if (sim.elapsedMs < s.pathAt) return
-  const c = s.paths.nearest(leaderX(sim), leaderY(sim))
-  if (c === s.paths.source) return
   s.pathAt = sim.elapsedMs + PATH_MS
-  s.paths.build(c)
+  const c = s.paths.nearest(leaderX(sim), leaderY(sim))
+  if (c !== s.paths.source) s.paths.build(c)
+}
+
+/** 复活落座、跳跃这类脚本位移不走 contact：被它从水里带上冰的，脚下改回冰上 */
+function landed(s: FloeState, cfg: FloeConfig): void {
+  for (const [eid, foot] of s.feet) {
+    if (foot.mode !== SWIMMING || Uid.v[eid] !== foot.uid) continue
+    if (edgeAt(s.field, Transform.x[eid]!, Transform.y[eid]!) * UNIT < Radius.v[eid]! * cfg.body.climbFrac) continue
+    foot.mode = ICE
+    foot.slip = true
+  }
 }
 
 /**
@@ -1026,13 +1040,14 @@ const floe: WorldHooks = {
       if (standing(f, out.x, out.y, footR)) foot.mode = ICE
       else if (foot.fall >= fallTime(foot.drop)) {
         foot.mode = SWIMMING
-        s.splashes.push({ x: out.x, y: out.y, r, at: sim.elapsedMs, sink: false })
+        if (!loose) s.splashes.push({ x: out.x, y: out.y, r, at: sim.elapsedMs, sink: false })
       }
     } else if (foot.mode === SWIMMING) {
-      const len = cfg.body.dragU * UNIT * bulk(cfg, r, Phys.mass[eid]!)
       if (pulled) approach(out, x, y, vx, vy, dx, dy, k, dt)
+      else if (loose) approach(out, x, y, vx, vy, s.current.x, s.current.y, FLOAT_K, dt)
       else {
-        const sp = loose ? 0 : Math.hypot(dx, dy)
+        const len = cfg.body.dragU * UNIT * bulk(cfg, r, Phys.mass[eid]!)
+        const sp = Math.hypot(dx, dy)
         const swim = sp * cfg.body.swimRatio
         stepInWater(out, x, y, vx, vy, sp > 0 ? dx / sp : 0, sp > 0 ? dy / sp : 0, (swim * swim) / len, len, s.current.x, s.current.y, dt)
       }
@@ -1119,6 +1134,7 @@ const floe: WorldHooks = {
     const s = floeOf(sim)
     tickGust(sim, s, cfg)
     tickPaths(sim, s)
+    landed(s, cfg)
     chill(sim, s, cfg)
     sinkCoins(sim, s)
     if (s.splashes.length > 64) s.splashes.splice(0, s.splashes.length - 64)

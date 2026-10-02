@@ -41,15 +41,19 @@ export interface FloeField {
   readonly seed: number
 }
 
+/** 顶点的来历：大的角与豁口会被撞圆，长边中途的拐折圆得少，水道保持窄而尖 */
+const CORNER = 0
+const BEND = 1
+const LEAD = 2
+
 interface Vertex {
   x: number
   y: number
-  /** 0 是大的角与豁口，会被撞圆；1 是长边中途的拐折；2 是水道，保持窄而尖 */
-  k: number
+  k: typeof CORNER | typeof BEND | typeof LEAD
 }
 
 const lerp = (r: Rng, [a, b]: readonly [number, number]): number => a + (b - a) * r.next()
-const smooth = (e0: number, e1: number, x: number): number => {
+export function smooth(e0: number, e1: number, x: number): number {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)))
   return t * t * (3 - 2 * t)
 }
@@ -65,7 +69,7 @@ function clip(poly: Vertex[], nx: number, ny: number, d: number): Vertex[] {
     if (da <= 0) out.push(a)
     if ((da < 0 && db > 0) || (da > 0 && db < 0)) {
       const t = da / (da - db)
-      out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, k: 0 })
+      out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, k: CORNER })
     }
   }
   return out
@@ -101,10 +105,10 @@ function centroid(p: readonly Point[]): Point {
 function fractured(r: Rng, s: FloeConfig['shape'], half: number): Vertex[] {
   const big = half * 3
   let poly: Vertex[] = [
-    { x: -big, y: -big, k: 0 },
-    { x: big, y: -big, k: 0 },
-    { x: big, y: big, k: 0 },
-    { x: -big, y: big, k: 0 },
+    { x: -big, y: -big, k: CORNER },
+    { x: big, y: -big, k: CORNER },
+    { x: big, y: big, k: CORNER },
+    { x: -big, y: big, k: CORNER },
   ]
   const turn = (r.next() * 2 - 1) * s.turnDeg * DEG
   for (let i = 0; i < 4; i++) {
@@ -140,7 +144,7 @@ function bend(r: Rng, poly: Vertex[], bendU: number): Vertex[] {
     const at = len > 14 ? [0.2 + r.next() * 0.25, 0.55 + r.next() * 0.25] : [0.3 + r.next() * 0.4]
     for (const t of at) {
       const off = (r.next() * 2 - 1) * bendU * Math.min(1, len / 14)
-      out.push({ x: a.x + (b.x - a.x) * t + n.x * off, y: a.y + (b.y - a.y) * t + n.y * off, k: 1 })
+      out.push({ x: a.x + (b.x - a.x) * t + n.x * off, y: a.y + (b.y - a.y) * t + n.y * off, k: BEND })
     }
   }
   return out
@@ -152,7 +156,7 @@ function pickEdge(r: Rng, poly: readonly Vertex[], minLen: number, used: Readonl
   const lens = poly.map((a, i) => {
     const b = poly[(i + 1) % poly.length]!
     const l = Math.hypot(b.x - a.x, b.y - a.y)
-    const ok = l >= minLen && !used.has(i) && a.k !== 2 && b.k !== 2
+    const ok = l >= minLen && !used.has(i) && a.k !== LEAD && b.k !== LEAD
     if (ok) sum += l
     return ok ? l : 0
   })
@@ -179,7 +183,7 @@ function bite(r: Rng, poly: Vertex[], s: FloeConfig['shape'], used: Set<number>)
   const depth = lerp(r, s.biteDepthU)
   const lo = (w / 2 + 2) / len
   const mid = (lo + r.next() * (1 - 2 * lo)) * len
-  const at = (t: number, d: number): Vertex => ({ x: a.x + ux * t - n.x * d, y: a.y + uy * t - n.y * d, k: 0 })
+  const at = (t: number, d: number): Vertex => ({ x: a.x + ux * t - n.x * d, y: a.y + uy * t - n.y * d, k: CORNER })
   const skew = (r.next() * 2 - 1) * 0.25 * w
   const notch: Vertex[] = [at(mid - w / 2, 0)]
   if (r.next() < 0.4) notch.push(at(mid + skew, depth))
@@ -268,18 +272,18 @@ function crack(r: Rng, poly: Vertex[], s: FloeConfig['shape'], used: Set<number>
     const d = Math.hypot(o.x - p.x, o.y - p.y) || 1
     const px = -(o.y - p.y) / d
     const py = (o.x - p.x) / d
-    left.push({ x: q.x + px * w, y: q.y + py * w, k: 2 })
-    right.push({ x: q.x - px * w, y: q.y - py * w, k: 2 })
+    left.push({ x: q.x + px * w, y: q.y + py * w, k: LEAD })
+    right.push({ x: q.x - px * w, y: q.y - py * w, k: LEAD })
   }
   const end = line[tip]!
   const dir0x = line[1]!.x - start.x
   const dir0y = line[1]!.y - start.y
   const side = dir0x * -uy + dir0y * ux
-  const near = { x: start.x - ux * (mouth / 2), y: start.y - uy * (mouth / 2), k: 0 }
-  const far = { x: start.x + ux * (mouth / 2), y: start.y + uy * (mouth / 2), k: 0 }
+  const near: Vertex = { x: start.x - ux * (mouth / 2), y: start.y - uy * (mouth / 2), k: CORNER }
+  const far: Vertex = { x: start.x + ux * (mouth / 2), y: start.y + uy * (mouth / 2), k: CORNER }
   const first = side >= 0 ? left : right
   const second = side >= 0 ? right : left
-  const notch: Vertex[] = [near, ...first, { x: end.x, y: end.y, k: 2 }, ...second.slice().reverse(), far]
+  const notch: Vertex[] = [near, ...first, { x: end.x, y: end.y, k: LEAD }, ...second.slice().reverse(), far]
   const out = [...poly.slice(0, i + 1), ...notch, ...poly.slice(i + 1)]
   for (let k = 0; k <= notch.length; k++) used.add(i + k)
   const from = Math.max(0, tip - 3)
@@ -293,7 +297,7 @@ function rounded(r: Rng, poly: readonly Vertex[], s: FloeConfig['shape']): Verte
     const v = poly[i]!
     const p = poly[(i + poly.length - 1) % poly.length]!
     const q = poly[(i + 1) % poly.length]!
-    if (v.k === 2) {
+    if (v.k === LEAD) {
       out.push(v)
       continue
     }
@@ -309,7 +313,7 @@ function rounded(r: Rng, poly: readonly Vertex[], s: FloeConfig['shape']): Verte
       continue
     }
     const convex = d1x * d2y - d1y * d2x > 0
-    const radius = convex ? lerp(r, s.roundU) * (v.k === 1 ? 0.5 : 1) : 0.4
+    const radius = convex ? lerp(r, s.roundU) * (v.k === BEND ? 0.5 : 1) : 0.4
     const inner = Math.PI - turn
     const t = Math.min(radius / Math.tan(inner / 2), 0.42 * Math.min(l1, l2))
     const ax = v.x - d1x * t
@@ -360,7 +364,7 @@ function jagged(r: Rng, poly: readonly Vertex[], jagU: number): Point[] {
     const l = cum[seg + 1]! - cum[seg]!
     const t = l > 0 ? (s - cum[seg]!) / l : 0
     const o = outward(a, b)
-    const amp = a.k === 2 || b.k === 2 ? 0 : jagU
+    const amp = a.k === LEAD || b.k === LEAD ? 0 : jagU
     const d = amp * (wave(coarse, s) * 0.7 + wave(fine, s) * 0.45)
     out.push({ x: a.x + (b.x - a.x) * t + o.x * d, y: a.y + (b.y - a.y) * t + o.y * d })
   }
@@ -403,7 +407,7 @@ export function floeOutline(seed: number, cfg: FloeConfig): { outline: Point[]; 
     const r = new Rng((seed ^ Math.imul(attempt + 1, 0x9e3779b1)) >>> 0)
     let poly = bend(r, fractured(r, s, half), s.bendU)
     const used = new Set<number>()
-    const bites = s.bites[0] + Math.floor(r.next() * (s.bites[1] - s.bites[0] + 1))
+    const bites = r.int(s.bites[0], s.bites[1])
     for (let k = 0; k < bites; k++) poly = bite(r, poly, s, used)
     const c = crack(r, poly, s, used)
     poly = c.poly
@@ -631,35 +635,37 @@ export function makeFloe(seed: number, cfg: FloeConfig): FloeField {
   return { outline, seams, cols, rows, cell, edge, snow, young, heart, cx: c.x, cy: c.y, windAngle, freeboard, youngFreeboard: ice.youngM * sink, seed: noiseSeed }
 }
 
-const fieldCache = new Map<string, FloeField>()
+const fieldCache = new WeakMap<FloeConfig, { readonly seed: number; readonly field: FloeField }>()
 
 /** 同一个种子与配置只生成一次：视图排版时与模拟开局时各要一次 */
 export function floeFor(seed: number, cfg: FloeConfig): FloeField {
-  const key = `${seed}`
-  let f = fieldCache.get(key)
-  if (!f) {
-    fieldCache.clear()
-    f = makeFloe(seed, cfg)
-    fieldCache.set(key, f)
-  }
-  return f
+  const hit = fieldCache.get(cfg)
+  if (hit?.seed === seed) return hit.field
+  const field = makeFloe(seed, cfg)
+  fieldCache.set(cfg, { seed, field })
+  return field
 }
 
-/** 格子上 (x, y) 像素处双线性插值 */
-export function sample(f: Pick<FloeField, 'cols' | 'rows' | 'cell'>, a: Float32Array, x: number, y: number, outside: number): number {
-  const u = x / f.cell - 0.5
-  const v = y / f.cell - 0.5
-  if (u < 0 || v < 0 || u >= f.cols - 1 || v >= f.rows - 1) return outside
+/** 格子上 (x, y) 像素处双线性插值：格子 (i, j) 的格心在 (ox, oy) + ((i + 0.5)·cell, (j + 0.5)·cell)，越界取 outside */
+export function bilinear(a: Float32Array, cols: number, rows: number, cell: number, ox: number, oy: number, x: number, y: number, outside: number): number {
+  const u = (x - ox) / cell - 0.5
+  const v = (y - oy) / cell - 0.5
+  if (u < 0 || v < 0 || u >= cols - 1 || v >= rows - 1) return outside
   const ix = Math.floor(u)
   const iy = Math.floor(v)
   const fx = u - ix
   const fy = v - iy
-  const i = iy * f.cols + ix
+  const i = iy * cols + ix
   const p = a[i]!
   const q = a[i + 1]!
-  const s = a[i + f.cols]!
-  const t = a[i + f.cols + 1]!
+  const s = a[i + cols]!
+  const t = a[i + cols + 1]!
   return p + (q - p) * fx + (s - p) * fy + (p - q - s + t) * fx * fy
+}
+
+/** 浮冰的格子上 (x, y) 像素处双线性插值 */
+export function sample(f: Pick<FloeField, 'cols' | 'rows' | 'cell'>, a: Float32Array, x: number, y: number, outside: number): number {
+  return bilinear(a, f.cols, f.rows, f.cell, 0, 0, x, y, outside)
 }
 
 /** 离冰缘多远，格：冰上为正、水里为负，地图外按远海 */
@@ -724,8 +730,8 @@ export function standing(f: FloeField, x: number, y: number, foot: number): bool
 /** 一个身体在浮冰上的状态，按实体记；uid 对不上就是换了实体 */
 export interface Footing {
   uid: number
-  /** 0 站在冰上、1 正从冰缘往下掉、2 在水里 */
-  mode: number
+  /** 站在冰上、正从冰缘往下掉、在水里 */
+  mode: typeof ICE | typeof FALLING | typeof SWIMMING
   /** 脚底正打滑：动摩擦；没打滑时是静摩擦 */
   slip: boolean
   /** 已经掉了多久、从多高掉下去，秒、米；脚下的冰面高出海面多少，米 */
@@ -942,11 +948,6 @@ export function windPush(cfg: FloeConfig, speed: number, angle: number, vx: numb
   return { x: k * rx, y: k * ry }
 }
 
-/** 一个地方在不在冰上，留出 margin 格 */
-export function onIce(f: FloeField, x: number, y: number, margin: number): boolean {
-  return edgeAt(f, x, y) >= margin
-}
-
 /** 把一点挪到冰上离冰缘至少 margin 格处：沿距离场的坡往冰里推，几次就到 */
 export function ashore(f: FloeField, x: number, y: number, margin: number): Point {
   let px = x
@@ -974,6 +975,8 @@ export class IcePaths {
   private readonly cost: Float32Array
   readonly dist: Float32Array
   private readonly heap: Int32Array
+  /** 每个格子最近的能走的格子，查过才填：能走的格子不变，查一次就一直对 */
+  private readonly near: Int32Array
   source = -1
 
   constructor(f: FloeField, cellU: number, clearU: number) {
@@ -984,10 +987,11 @@ export class IcePaths {
     this.cost = new Float32Array(n)
     this.dist = new Float32Array(n).fill(Infinity)
     this.heap = new Int32Array(n * 8)
+    this.near = new Int32Array(n).fill(-2)
     for (let j = 0; j < this.rows; j++) {
       for (let i = 0; i < this.cols; i++) {
         const e = edgeAt(f, (i + 0.5) * this.cell, (j + 0.5) * this.cell)
-        this.cost[j * this.cols + i] = e < clearU ? Infinity : 1 + 2 * Math.max(0, 2 - e) / 2
+        this.cost[j * this.cols + i] = e < clearU ? Infinity : 1 + Math.max(0, 2 - e)
       }
     }
   }
@@ -1003,29 +1007,37 @@ export class IcePaths {
     return c >= 0 && this.cost[c]! < Infinity
   }
 
-  /** 离 (x, y) 最近的能走的格子：一圈圈往外找 */
+  /** 离 (x, y) 最近的能走的格子：沿着一圈圈方框的边往外找 */
   nearest(x: number, y: number): number {
     const c = this.cellOf(Math.min(Math.max(x, 0), this.cols * this.cell - 1), Math.min(Math.max(y, 0), this.rows * this.cell - 1))
-    if (this.walkable(c)) return c
+    const known = this.near[c]!
+    if (known !== -2) return known
+    let found = -1
+    if (this.walkable(c)) found = c
     const ci = c % this.cols
     const cj = Math.floor(c / this.cols)
-    for (let r = 1; r < this.cols; r++) {
-      let best = -1
-      let bd = Infinity
-      for (let j = cj - r; j <= cj + r; j++) {
-        for (let i = ci - r; i <= ci + r; i++) {
-          if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) !== r || i < 0 || j < 0 || i >= this.cols || j >= this.rows) continue
-          const k = j * this.cols + i
-          const d = (i - ci) ** 2 + (j - cj) ** 2
-          if (this.walkable(k) && d < bd) {
-            bd = d
-            best = k
-          }
-        }
+    let bd = Infinity
+    const visit = (i: number, j: number): void => {
+      if (i < 0 || j < 0 || i >= this.cols || j >= this.rows) return
+      const k = j * this.cols + i
+      const d = (i - ci) ** 2 + (j - cj) ** 2
+      if (d < bd && this.walkable(k)) {
+        bd = d
+        found = k
       }
-      if (best >= 0) return best
     }
-    return -1
+    for (let r = 1; found < 0 && r < this.cols; r++) {
+      for (let i = ci - r; i <= ci + r; i++) {
+        visit(i, cj - r)
+        visit(i, cj + r)
+      }
+      for (let j = cj - r + 1; j <= cj + r - 1; j++) {
+        visit(ci - r, j)
+        visit(ci + r, j)
+      }
+    }
+    this.near[c] = found
+    return found
   }
 
   /** 从 source 格往外铺一遍最短路（八邻域的 Dijkstra） */

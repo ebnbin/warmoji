@@ -1,13 +1,10 @@
-import { UNIT } from '../../util/units'
-import { SUN } from '../../data/light'
-import { cellNearest, fbm, valueNoise } from '../../util/noise'
-import type { FloeField } from '../worlds/floe'
+import { UNIT } from '../../util/units.ts'
+import { SUN } from '../../data/light.ts'
+import { cellNearest, fbm, valueNoise } from '../../util/noise.ts'
+import { bilinear, smooth } from '../worlds/floe.ts'
+import type { FloeField } from '../worlds/floe.ts'
 
 export const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
-export function smooth(e0: number, e1: number, x: number): number {
-  const t = clamp01((x - e0) / (e1 - e0))
-  return t * t * (3 - 2 * t)
-}
 
 /** 南极夏天的太阳整天贴着地平线绕：方位与角色的光一致，只是低得多，雪堆拖出长长的蓝影 */
 const SUN_ELEV = 24 * (Math.PI / 180)
@@ -51,23 +48,6 @@ export interface FloeCanvas {
   readonly windAngle: number
   readonly seed: number
   readonly meterPerU: number
-}
-
-/** 双线性取值；格心在 (i + 0.5)·cell + (ox, oy)，越界取 outside */
-export function bilinear(a: Float32Array, cols: number, rows: number, cell: number, ox: number, oy: number, x: number, y: number, outside: number): number {
-  const u = (x - ox) / cell - 0.5
-  const v = (y - oy) / cell - 0.5
-  if (u < 0 || v < 0 || u >= cols - 1 || v >= rows - 1) return outside
-  const ix = u | 0
-  const iy = v | 0
-  const fx = u - ix
-  const fy = v - iy
-  const i = iy * cols + ix
-  const p = a[i]!
-  const q = a[i + 1]!
-  const s = a[i + cols]!
-  const t = a[i + cols + 1]!
-  return p + (q - p) * fx + (s - p) * fy + (p - q - s + t) * fx * fy
 }
 
 /** 雪棱：顺着风拉长的一道道棱，沿风向慢、横着风快，取山脊形；只在一片片风大的地方有 */
