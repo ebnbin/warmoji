@@ -284,8 +284,12 @@ export interface CaveConfig {
     /** 洞壁从洞底弯上洞顶要横着走多宽，格 */
     readonly wallU: number
   }
-  /** 天窗：主天窗的半径与离地图中心多远，副天窗的个数与半径，格；轮廓按方位角在 ±jitter 倍内起伏；天窗之间的空隙至少 gapU 格 */
+  /**
+   * 天窗：大天窗几个、半径多大，第一个离地图中心 mainOffsetU 格，其余散在洞厅别处；小天窗的个数与半径，格；
+   * 轮廓按方位角在 ±jitter 倍内起伏；天窗之间的空隙至少 gapU 格
+   */
   readonly skylights: {
+    readonly mainCount: readonly [number, number]
     readonly mainU: readonly [number, number]
     readonly mainOffsetU: readonly [number, number]
     readonly minorCount: readonly [number, number]
@@ -304,11 +308,12 @@ export interface CaveConfig {
     readonly alongU: readonly [number, number]
     readonly pocketU: number
   }
-  /** 石柱（顶到洞顶）与石笋：个数、底半径（格）；石笋高多少米；底半径不到 blockU 的石笋矮小，人跨得过、子弹飞得过；出生点 clearU 格内不长 */
+  /** 石柱（顶到洞顶）与石笋：个数、底半径（格）；石笋多半长成 clusters 丛，高多少米；底半径不到 blockU 的石笋矮小，人跨得过、子弹飞得过；出生点 clearU 格内不长 */
   readonly formations: {
     readonly columns: readonly [number, number]
     readonly columnU: readonly [number, number]
     readonly stalagmites: readonly [number, number]
+    readonly clusters: readonly [number, number]
     readonly stalagmiteU: readonly [number, number]
     readonly stalagmiteM: readonly [number, number]
     readonly blockU: number

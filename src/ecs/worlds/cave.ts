@@ -406,6 +406,9 @@ export function heightM(L: CaveLayout, x: number, y: number): number {
   return Math.max(z, top)
 }
 
+/** 每放一样东西最多试多少个随机位置：放不下的就少放 */
+const PLACE_TRIES = 40
+
 /** 挑一个 [a, b] 里的数 */
 function pick(rng: Rng, r: readonly [number, number]): number {
   return r[0] + rng.next() * (r[1] - r[0])
@@ -437,7 +440,7 @@ function nearestSide(x: number, y: number, w: number, h: number): number {
 }
 
 /**
- * 按种子生成溶洞：先在四条边上挑出支洞的位置，洞厅的边在那里往里让出岩体；再开天窗（天窗下堆着碎石坡），
+ * 按种子生成溶洞：先在四条边上挑出支洞的位置，洞厅的边在那里往里让出岩体；再开大小天窗（天窗下堆着碎石坡），
  * 放水潭、石柱与成丛的石笋，荧光长在洞壁脚下与支洞里；最后算出能走的地面与距离场
  */
 function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rng): CaveLayout {
@@ -516,7 +519,7 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
     const j = cfg.skylights.jitter
     return [(raw[0]! / sum) * j, rng.next() * 6.283, (raw[1]! / sum) * j, rng.next() * 6.283, (raw[2]! / sum) * j, rng.next() * 6.283]
   }
-  // 天窗：主天窗离地图中心不远，副天窗散在洞厅别处，彼此隔开
+  // 天窗：第一个大天窗离地图中心不远，其余大天窗与小天窗散在洞厅别处，彼此隔开
   const sky = cfg.skylights
   const openings: Opening[] = []
   for (let tries = 0; tries < 60 && openings.length === 0; tries++) {
@@ -526,22 +529,33 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
     const o = { x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, r, wob: wobble() }
     if (hallHolds(o.x, o.y, r * (1 + sky.jitter), sky.gapU * UNIT * 0.5) || tries === 59) openings.push(o)
   }
-  const minors = pickInt(rng, sky.minorCount)
-  for (let tries = 0; tries < 200 && openings.length < 1 + minors; tries++) {
-    const r = pick(rng, sky.minorU) * UNIT
-    const x = rng.next() * w
-    const y = rng.next() * h
-    if (!hallHolds(x, y, r * (1 + sky.jitter), UNIT)) continue
-    if (openings.some((o) => Math.hypot(o.x - x, o.y - y) < (o.r + r) * (1 + sky.jitter) + sky.gapU * UNIT)) continue
-    openings.push({ x, y, r, wob: wobble() })
+  // 每个天窗在一批落得进洞厅的候选位置里挑离已有天窗最远的一处：大天窗能放下的地方往往只剩洞厅的角上
+  const scatter = (count: number, radiusU: readonly [number, number]): void => {
+    for (let k = 0; k < count; k++) {
+      const r = pick(rng, radiusU) * UNIT
+      let best: Opening | null = null
+      let bestGap = sky.gapU * UNIT
+      for (let tries = 0; tries < PLACE_TRIES * 4; tries++) {
+        const x = rng.next() * w
+        const y = rng.next() * h
+        if (!hallHolds(x, y, r * (1 + sky.jitter), UNIT)) continue
+        const gap = Math.min(...openings.map((o) => Math.hypot(o.x - x, o.y - y) - (o.r + r) * (1 + sky.jitter)))
+        if (gap < bestGap) continue
+        bestGap = gap
+        best = { x, y, r, wob: [] }
+      }
+      if (best) openings.push({ ...best, wob: wobble() })
+    }
   }
+  scatter(pickInt(rng, sky.mainCount) - 1, sky.mainU)
+  scatter(pickInt(rng, sky.minorCount), sky.minorU)
   const mainR = openings[0]!.r
   const mounds: Mound[] = openings.map((o) => ({ x: o.x, y: o.y, r: o.r * sky.rubbleSpread, h: (sky.rubbleM * o.r) / mainR }))
   const underSky = (x: number, y: number, pad: number): boolean => openings.some((o) => Math.hypot(o.x - x, o.y - y) < o.r * (1 + sky.jitter) + pad)
   // 水潭：在洞厅里低洼的地方，不压碎石坡
   const pools: Pool[] = []
   const poolCount = pickInt(rng, cfg.pools.count)
-  for (let tries = 0; tries < 200 && pools.length < poolCount; tries++) {
+  for (let tries = 0; tries < poolCount * PLACE_TRIES && pools.length < poolCount; tries++) {
     const size = pick(rng, cfg.pools.sizeU) * UNIT
     const x = rng.next() * w
     const y = rng.next() * h
@@ -556,7 +570,7 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
   // 石柱：洞顶还在的地方才有，离出生点与彼此都远一些
   const columns: Circle[] = []
   const columnCount = pickInt(rng, f.columns)
-  for (let tries = 0; tries < 300 && columns.length < columnCount; tries++) {
+  for (let tries = 0; tries < columnCount * PLACE_TRIES && columns.length < columnCount; tries++) {
     const r = pick(rng, f.columnU) * UNIT
     const x = rng.next() * w
     const y = rng.next() * h
@@ -568,7 +582,8 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
   // 石笋：多数长成几丛（洞顶的裂缝下滴水多），少数零散；越粗的越高
   const stalagmites: Stalagmite[] = []
   const clusters: Point[] = []
-  for (let tries = 0; tries < 80 && clusters.length < 4; tries++) {
+  const clusterCount = pickInt(rng, f.clusters)
+  for (let tries = 0; tries < clusterCount * PLACE_TRIES && clusters.length < clusterCount; tries++) {
     const x = rng.next() * w
     const y = rng.next() * h
     if (hallHolds(x, y, 0, 0.8 * UNIT) && !underSky(x, y, UNIT) && Math.hypot(x - cx, y - cy) > clear) clusters.push({ x, y })
@@ -576,7 +591,7 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
   const stalagmiteCount = pickInt(rng, f.stalagmites)
   const [r0, r1] = f.stalagmiteU
   const [m0, m1] = f.stalagmiteM
-  for (let tries = 0; tries < 900 && stalagmites.length < stalagmiteCount; tries++) {
+  for (let tries = 0; tries < stalagmiteCount * PLACE_TRIES && stalagmites.length < stalagmiteCount; tries++) {
     const k = rng.next() * rng.next()
     const r = (r0 + (r1 - r0) * k) * UNIT
     let x: number
@@ -630,7 +645,7 @@ function makeCave(cfg: CaveConfig, w: number, h: number, margin: number, rng: Rn
   // 荧光：长在洞壁脚下的潮湿处与支洞里
   const glows: Glow[] = []
   const glowCount = pickInt(rng, cfg.light.glowCount)
-  for (let tries = 0; tries < 400 && glows.length < glowCount; tries++) {
+  for (let tries = 0; tries < glowCount * PLACE_TRIES && glows.length < glowCount; tries++) {
     const deep = rng.next() < 0.4 && alcoves.length > 0
     let x: number
     let y: number
