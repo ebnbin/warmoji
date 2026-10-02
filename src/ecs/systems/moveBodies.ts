@@ -2,7 +2,7 @@ import { hasComponent, query } from 'bitecs'
 import { FOLLOW_IN_MS } from '../../data/abilities'
 import { Airborne, Alive, BreaksWalls, Drive, Motion, MOTION, Phys, Radius, Transform, VisOff } from '../components'
 import { GROUND } from '../worlds/hooks'
-import { approach, bodyDt } from './shared/body'
+import { approach, ballistic, bodyDt, drift } from './shared/body'
 import type { BodyStep } from './shared/body'
 import { endMotion, transitFlash } from './shared/displace'
 import { isSameEntity } from '../utils/identity'
@@ -120,13 +120,17 @@ export function moveBodies(sim: Sim): void {
     }
     let next: { x: number; y: number }
     const g = sim.hooks.pull(sim, x, y)
+    const pulled = g.x !== 0 || g.y !== 0
     if (dashing) {
       // 冲刺按自己的速度走，引力照样加速它
-      Motion.vx[eid] = Motion.vx[eid]! + g.x * dt
-      Motion.vy[eid] = Motion.vy[eid]! + g.y * dt
+      if (pulled) {
+        ballistic(sim, STEP, x, y, Motion.vx[eid]!, Motion.vy[eid]!, g, dt)
+        Motion.vx[eid] = STEP.vx
+        Motion.vy[eid] = STEP.vy
+        next = { x: STEP.x, y: STEP.y }
+      } else next = { x: x + Motion.vx[eid]! * dt, y: y + Motion.vy[eid]! * dt }
       vx = Motion.vx[eid]!
       vy = Motion.vy[eid]!
-      next = { x: x + vx * dt, y: y + vy * dt }
     } else {
       const air = hasComponent(sim.world, eid, Airborne)
       if (air || !sim.hooks.contact(sim, eid, dt, x, y, vx, vy, STEP)) {
@@ -134,8 +138,10 @@ export function moveBodies(sim: Sim): void {
         const s = air ? GROUND : sim.hooks.surface(sim, x, y)
         const medium = air ? STILL : sim.hooks.mediumVelocity(sim, x, y)
         const k = (Phys.drag[eid]! * Phys.grip[eid]! * s.traction * s.viscosity) / Phys.mass[eid]!
-        const fall = g.x === 0 && g.y === 0 ? 0 : Phys.mass[eid]! / Phys.drag[eid]!
-        approach(STEP, x, y, vx, vy, medium.x + Drive.x[eid]! / s.viscosity + g.x * fall, medium.y + Drive.y[eid]! / s.viscosity + g.y * fall, k, dt)
+        const bx = medium.x + Drive.x[eid]! / s.viscosity
+        const by = medium.y + Drive.y[eid]! / s.viscosity
+        if (pulled) drift(sim, STEP, x, y, vx, vy, bx, by, g, Phys.mass[eid]! / Phys.drag[eid]!, k, dt)
+        else approach(STEP, x, y, vx, vy, bx, by, k, dt)
       }
       next = { x: STEP.x, y: STEP.y }
       vx = STEP.vx

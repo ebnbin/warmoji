@@ -55,12 +55,12 @@ export const BATTLEFIELD = {
       { id: 'ice_thin', emoji: '1f4a6', name: '薄冰失足', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
       { id: 'ice_numb', emoji: '1f976', name: '霜冻僵手', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
     ],
-    nebula: [
-      { id: 'nebula_glow', emoji: '2728', name: '星云辉映', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
-      { id: 'nebula_lens', emoji: '1f52d', name: '引力透镜', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
-      { id: 'nebula_dust', emoji: '1f32b', name: '星尘迷障', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
-      { id: 'nebula_drag', emoji: '1f573', name: '潮汐拖拽', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
-      { id: 'nebula_redshift', emoji: '1f534', name: '红移迟滞', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+    nebulaOld: [
+      { id: 'nebulaOld_glow', emoji: '2728', name: '星云辉映', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'nebulaOld_lens', emoji: '1f52d', name: '引力透镜', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'nebulaOld_dust', emoji: '1f32b', name: '星尘迷障', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'nebulaOld_drag', emoji: '1f573', name: '潮汐拖拽', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
+      { id: 'nebulaOld_redshift', emoji: '1f534', name: '红移迟滞', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
     ],
     volcano: [
       { id: 'volcano_forge', emoji: '1f525', name: '熔炉淬火', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
@@ -82,6 +82,13 @@ export const BATTLEFIELD = {
       { id: 'cave_bats', emoji: '1f987', name: '蝠群扑面', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
       { id: 'cave_slick', emoji: '1f4a7', name: '湿滑岩面', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
       { id: 'cave_chill', emoji: '1f976', name: '洞穴寒气', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+    ],
+    nebula: [
+      { id: 'nebula_flare', emoji: '1f31f', name: '吸积闪耀', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'nebula_lensing', emoji: '1f52d', name: '引力透镜', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'nebula_tide', emoji: '1f300', name: '潮汐撕扯', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'nebula_dust', emoji: '1f32b', name: '星尘拖曳', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
+      { id: 'nebula_redshift', emoji: '1f534', name: '红移', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
     ],
   },
   field: { grabRadiusU: 0.9, groundMs: 9000, auraRadiusU: 0.85 },

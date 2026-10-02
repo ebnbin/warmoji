@@ -6,9 +6,12 @@ import { cullProjectile } from './shared/projectile'
 import { isSameEntity } from '../utils/identity'
 import { nearestTarget } from '../utils/targets'
 import { flying, WORLD_SOURCE } from '../utils/source'
+import { ballistic } from './shared/body'
+import type { BodyStep } from './shared/body'
 import type { Sim } from '../sim'
 
 const REFLECT_LIFE_MS = 1400
+const FLIGHT: BodyStep = { x: 0, y: 0, vx: 0, vy: 0 }
 
 /** 追踪弹转向最近的敌人，每秒最多转 Homing.turn */
 function steer(sim: Sim, eid: number, dt: number): void {
@@ -82,13 +85,16 @@ export function moveProjectiles(sim: Sim): void {
     const ax = Transform.x[eid]!
     const ay = Transform.y[eid]!
     const g = sim.hooks.pull(sim, ax, ay)
+    let stepX = Vel.x[eid]! * dt
+    let stepY = Vel.y[eid]! * dt
     if (g.x !== 0 || g.y !== 0) {
-      Vel.x[eid] = Vel.x[eid]! + g.x * dt
-      Vel.y[eid] = Vel.y[eid]! + g.y * dt
-      if (Proj.spin[eid] === 0) Transform.rot[eid] = Math.atan2(Vel.y[eid]!, Vel.x[eid]!) + Proj.rotOffset[eid]!
+      ballistic(sim, FLIGHT, ax, ay, Vel.x[eid]!, Vel.y[eid]!, g, dt)
+      Vel.x[eid] = FLIGHT.vx
+      Vel.y[eid] = FLIGHT.vy
+      stepX = FLIGHT.x - ax
+      stepY = FLIGHT.y - ay
+      if (Proj.spin[eid] === 0 && (FLIGHT.vx !== 0 || FLIGHT.vy !== 0)) Transform.rot[eid] = Math.atan2(Vel.y[eid]!, Vel.x[eid]!) + Proj.rotOffset[eid]!
     }
-    const stepX = Vel.x[eid]! * dt
-    const stepY = Vel.y[eid]! * dt
     const moved = sim.hooks.wrap(sim, ax + stepX, ay + stepY)
     Transform.x[eid] = moved.x
     Transform.y[eid] = moved.y

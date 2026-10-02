@@ -59,8 +59,8 @@ export interface SpaceConfig {
     readonly damage: number
   }
 }
-/** 星云：圆心在原点的空心厚球壳，空腔里有一个黑洞，引力按普卢默软化的万有引力 g = GM·r/(r²+ε²)^{3/2} 作用于一切 */
-export interface NebulaConfig {
+/** 旧星云：圆心在原点的空心厚球壳，空腔里有一个黑洞，引力按普卢默软化的万有引力 g = GM·r/(r²+ε²)^{3/2} 作用于一切 */
+export interface NebulaOldConfig {
   /** 壳层的引力按牛顿壳层定理：空腔里为零，壳层里只算内侧那部分质量，外缘以外如同全部质量在中心 */
   readonly shell: {
     readonly innerU: number
@@ -101,6 +101,91 @@ export interface NebulaConfig {
     readonly stepMs: number
     readonly maxFlightMs: number
   }
+}
+/**
+ * 星云：深空里一团空心的星云，活动的平面是它的赤道面，空腔里有一个黑洞。人、怪、掉落物、子弹与流星都受黑洞与星云壳层的万有引力：
+ * 身体在星云气体里按终速被拖着漂，子弹、冲刺与流星按弹道飞；中心进了视界就被吞掉，吞下的质量让黑洞长大。这里没有太阳，光来自吸积盘与流星
+ */
+export interface NebulaConfig {
+  /**
+   * 空心厚球壳：空腔半径、外缘半径与引力常数乘壳层质量（格³/秒²）。被推开的气体堆在外面，密度从内壁的 0 按进壳层深度占壳厚比例的 rise 次方往外缘涨。
+   * 引力按牛顿壳层定理只算内侧的质量：空腔里为零，刚进壳层很弱、越往里越陡，外缘以外如同全部质量在球心。
+   * tau 是整层壳沿半径的光深：黑洞的光照进去，光深到 1 的那一层是被照亮的电离前沿，也就是看得见的内壁
+   */
+  readonly shell: {
+    readonly innerU: number
+    readonly outerU: number
+    readonly gm: number
+    readonly rise: number
+    readonly tau: number
+  }
+  /** 构建期校验的余量：任何身体以 speedMul 倍的最快速度往外走，最深只走进壳层 depthU 格；停下后再往外瞬移 leapU 格，引力仍把它拉回 */
+  readonly contain: {
+    readonly speedMul: number
+    readonly depthU: number
+    readonly leapU: number
+  }
+  readonly hole: {
+    /** 引力常数乘黑洞的质量，格³/秒²：开局是下限，吞得再多也不超过 maxGm */
+    readonly gm: number
+    readonly maxGm: number
+    /** 这片星域里的光速，格/秒：定出视界 r_s = 2GM/c²、透镜的偏折与光传过来要多久 */
+    readonly lightU: number
+    /** 黑洞离星云中心多远，方向随机；队伍从中心另一侧离中心 startU 格处出发 */
+    readonly fromCenterU: readonly [number, number]
+    readonly startU: number
+  }
+  /**
+   * 吞下的东西折成多少 GM：身体按 bodyGm·质量·(半径/bodyRadiusU)³，掉落物、弹体各算一份。
+   * 它们是被拖着几乎径直掉进去的，角动量远不够绕成盘，只有 lightEta 的静能化成光，其余全并进黑洞
+   */
+  readonly swallow: {
+    readonly bodyGm: number
+    readonly bodyRadiusU: number
+    readonly pickupGm: number
+    readonly shotGm: number
+    readonly lightEta: number
+  }
+  /**
+   * 吸积发光：平时吸周围带着湍流角动量的稀薄气体，在盘里转到最内稳定圆轨道才掉进去，放出质量的 1/16 乘 c²；邦迪吸积率随质量的平方涨，开局每秒吸 bondiGm。
+   * 吞下东西放出的光按 riseMs 亮起、按黏滞时标 viscousMs 暗下去
+   */
+  readonly accretion: {
+    readonly bondiGm: number
+    readonly riseMs: number
+    readonly viscousMs: number
+  }
+  /** 吸积盘从最内稳定圆轨道铺到 outerRs 个 r_s；innerK 是开局平时盘上最热那一圈（约 4 r_s）未计引力红移的色温，开尔文，随光度的四分之一次方涨 */
+  readonly disk: {
+    readonly outerRs: number
+    readonly innerK: number
+  }
+  /**
+   * 流星：壳层的湍流甩出一个团块，以 speedU 上下 speedJitter 倍冲进空腔，之后只受引力；它被吸积盘照着，像彗星一样拖着背向黑洞的尾巴。
+   * 预警时团块先在内壁上亮起来；冲进对面的壳层就被冲压撕碎，掉进视界就被吞掉。伤害按动能随速度的平方变
+   */
+  readonly meteor: {
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly intervalJitterMs: number
+    readonly warnMs: number
+    readonly speedU: number
+    readonly speedJitter: number
+    /** 撞上身体的半径，格 */
+    readonly radiusU: number
+    /** 冲进壳层多深才被撕碎，格：扫过的壳层气体和团块自己一样重的地方；还没到这么深就被引力拉回来的，落回空腔接着飞 */
+    readonly shatterU: number
+    /** 瞄准点在队长两侧最多偏多远 */
+    readonly offsetU: number
+    /** 以 speedU 撞上时的伤害 */
+    readonly damage: number
+    readonly gm: number
+    readonly maxFlightMs: number
+  }
+  /** 刷怪点离黑洞的余量：比这张图最慢的敌人走不出来的半径再远这么多格 */
+  readonly spawnClearU: number
+  /** 画面是透视相机拍的：镜头在活动的平面上方多高，格；平面以下越深的东西在画面上越小、跟着镜头移得越慢 */
+  readonly cameraU: number
 }
 /**
  * 火山：能走的是方形地图里一块边缘不规则的盆地，四周是崖壁与高地；一座火山背靠盆地边，山体谁也上不去。
@@ -392,7 +477,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebula' | 'volcano' | 'ship' | 'cave'
+  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'cave'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -405,6 +490,7 @@ export interface MapDef {
   readonly dayNight?: DayNightConfig
   readonly ice?: IceConfig
   readonly space?: SpaceConfig
+  readonly nebulaOld?: NebulaOldConfig
   readonly nebula?: NebulaConfig
   readonly volcano?: VolcanoConfig
   readonly ship?: ShipConfig
