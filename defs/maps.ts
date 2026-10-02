@@ -499,7 +499,7 @@ export const MAPS = {
   river: {
     emoji: '1f30a',
     name: '河流',
-    desc: '林子与岩石围着的一片空地，一条山溪从崖上落进深潭，往下分成一大一小两股，各自从断崖边落进深谷。水是真的在流：越深越急越把人往下游带，站着不动也会被冲走，顺流快、逆流慢，过河要往上游斜着走；又深又急会被冲倒、顺水漂走，漂到断崖边就落下去再也回不来——敌我都一样',
+    desc: '林子与岩石围着的一片空地，一条山溪从崖上落进深潭，往下分成一大一小两股，各自从断崖边落进深谷。河又深又急：站不住的地方就像落叶一样顺水漂走，只能划水往两边挣一挣，逆流基本划不动；漂到断崖边就落下去再也回不来——敌我都一样。巨鳄个子大，蹚得过去',
     kind: 'river',
     stamina: { exertion: 0.5, regen: 1 },
     palette: {
@@ -521,11 +521,11 @@ export const MAPS = {
       cellU: 0.25,
       clearing: { areaU2: [900, 1100], lobes: [0.18, 0.08, 0.04], wobbleU: 1.8, waveU: 6.5, padU: 2.5, neckU: 0.35 },
       network: { oppositeDeg: 34, spreadDeg: [52, 92], apartDeg: 80, splitAt: [0.38, 0.55], majorTurnDeg: [0, 14], minorTurnDeg: [32, 52], meanderU: 1.6, minBend: 1.4, edgeGapU: 1.5 },
-      flow: { discharge: 2, share: 0.6, widthCoef: 2.6, depthCoef: 0.3, manning: 0.035, bedShape: 2.2, pool: 1.35, riffle: 0.8, thalwegShift: 0.35, bankM: 0.45, bankU: 1, floodSlope: 0.02, reliefM: 0.15 },
-      falls: { cliffM: 3.6, cliffU: 1.6, poolM: 1.1, poolR: 0.55, gorgeM: 7, lipU: 1.2 },
+      flow: { discharge: 6, share: 0.6, widthCoef: 1.55, depthCoef: 0.59, manning: 0.035, bedShape: 8, pool: 1.35, riffle: 0.8, thalwegShift: 0.35, bankM: 0.45, bankU: 1, floodSlope: 0.02, reliefM: 0.15 },
+      falls: { cliffM: 3.6, cliffU: 1.6, poolM: 2.5, poolR: 0.55, gorgeM: 7, lipU: 1.2 },
       trees: { crownU: [1.4, 2.6], overhangU: 0.4, forest: 0.55, tongues: [0, 2], groves: [1, 3], lone: [1, 3] },
       rocks: { inRiver: [1, 4], onLand: [1, 4], radiusU: [0.35, 0.75], heightM: [0.25, 0.6] },
-      body: { kg: 60, radiusU: 0.45, heightM: 1.7, density: 985, drag: 1.1, grip: 0.35, legs: 0.55, hip: 0.5, lever: 0.15, chest: 0.55, wade: 0.4, swim: 0.8, wetM: 0.02 },
+      body: { kg: 60, radiusU: 0.45, heightM: 1.7, density: 985, drag: 1.1, legs: 0.55, hip: 0.5, lever: 0.15, swim: 0.4, wetM: 0.02 },
     },
     boss: 'croc',
   },

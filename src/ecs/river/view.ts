@@ -106,7 +106,7 @@ const LEAF_PX = 32
 /**
  * 河流：地面与树冠是线程里按高度场画好的贴图，水面由着色器按解出来的水深与流速画：浅处透底、深处发暗，细浪顺水漂，急处翻白；
  * 进水口的崖上挂着水帘、崖脚砸起白沫和水雾，出水口的水从断崖边落进深谷，谷里升起水雾。水上漂着落叶，跟着水流走；
- * 站在水里的身体脚下一圈水线，迎水的一面推起浪、背水的一面拖出两道尾迹；被冲倒的身体周围翻着白沫。树冠盖在一切之上
+ * 站在水里的身体脚下一圈水线，迎水的一面推起浪、背水的一面拖出两道尾迹；随水漂着的身体周围翻着白沫。树冠盖在一切之上
  */
 export class RiverView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -117,8 +117,8 @@ export class RiverView implements MapView {
   private leaves: Leaf[] = []
   private ripples?: Phaser.GameObjects.Graphics
   private spots: Point[] = []
-  /** 上一帧倒在水里的身体：新倒下的哗啦一声 */
-  private fallen = new Set<number>()
+  /** 上一帧随水漂着的身体：新落水的哗啦一声 */
+  private afloat = new Set<number>()
   private readonly flow: Flow = { h: 0, u: 0, v: 0 }
 
   private planOf(v: ViewCtx): RiverPlan {
@@ -334,9 +334,9 @@ export class RiverView implements MapView {
     }
     const g = this.ripples
     g.clear()
-    const down = s.down
-    for (const eid of down.keys()) if (!this.fallen.has(eid)) playSfx('wash')
-    this.fallen = new Set(down.keys())
+    const swimming = s.swimming
+    for (const eid of swimming.keys()) if (!this.afloat.has(eid)) playSfx('wash')
+    this.afloat = new Set(swimming.keys())
     for (const eid of query(sim.world, [Phys, Transform, Radius])) {
       if (!Alive.v[eid] || hasComponent(sim.world, eid, Airborne) || hasComponent(sim.world, eid, Pickup) || hasComponent(sim.world, eid, Shard)) continue
       const x = Transform.x[eid]!
@@ -351,7 +351,7 @@ export class RiverView implements MapView {
       const ry = f.v * toPx - Phys.vy[eid]!
       const rel = Math.hypot(rx, ry)
       const push = Math.min(1, rel / (2.5 * UNIT))
-      if (down.has(eid)) {
+      if (swimming.has(eid)) {
         for (let k = 0; k < 6; k++) {
           const a = k * 1.05 + this.u.time * (2 + (eid % 3))
           const d = r * (0.7 + 0.3 * Math.sin(this.u.time * 5 + k * 2.1 + eid))
@@ -410,7 +410,7 @@ export class RiverView implements MapView {
     this.decorEids = []
     this.leaves = []
     this.spots = []
-    this.fallen.clear()
+    this.afloat.clear()
     this.ripples = undefined
     for (const key of [GROUND_KEY, CANOPY_KEY, BED_KEY, LEVEL_KEY, FLOW_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
   }

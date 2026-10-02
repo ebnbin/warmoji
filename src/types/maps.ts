@@ -365,7 +365,7 @@ export interface RiverConfig {
   }
   /**
    * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克、高 heightM 米，别的身体质量按半径的三次方与质量倍率、身高按半径缩放（半径不算队长倍率）；
-   * 身体的密度（千克/米³）与水里的阻力系数；脚下与河床的摩擦系数：水带走人的比例 = 推力 ÷（推力 + 它 × 脚下的压力），倒下后贴着河床滑也按它
+   * 身体的密度（千克/米³）与水里的阻力系数。水的推力绕脚掌的力矩大过（体重 − 浮力）乘扶正力臂，或者干脆浮起来，就站不住、随水漂
    */
   readonly body: {
     readonly kg: number
@@ -373,16 +373,12 @@ export interface RiverConfig {
     readonly heightM: number
     readonly density: number
     readonly drag: number
-    readonly grip: number
     /** 站着时胯以下迎水的是两条腿：腿宽占身宽、胯高占身高的比例 */
     readonly legs: number
     readonly hip: number
-    /** 站着时重心到脚掌下游边的水平距离占身高的比例：水的推力绕脚掌的力矩大过脚下的压力乘它就被推倒 */
+    /** 站着时重心到脚掌下游边的水平距离占身高的比例 */
     readonly lever: number
-    /** 倒在水里时身体的厚占身宽的比例：顺着游的方向迎水的是身宽 × 厚，横着被冲的是身长 × 厚 */
-    readonly chest: number
-    /** 蹚水本身的减速：水深到胯时自己走的速度慢这么多（比例），水浅按比例少；倒下以后划水的推力（米/秒²） */
-    readonly wade: number
+    /** 随水漂着时自己划水的速度（相对水）占想走的速度的比例 */
     readonly swim: number
     /** 水深不到这个（米）算干地 */
     readonly wetM: number
