@@ -76,6 +76,13 @@ export const BATTLEFIELD = {
       { id: 'ship_seasick', emoji: '1f922', name: '晕船', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
       { id: 'ship_fog', emoji: '1f32b', name: '海雾', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
     ],
+    floe: [
+      { id: 'floe_glide', emoji: '26f8', name: '疾滑突进', desc: '队伍移速 +30%（6 秒）', polarity: 'buff', durationMs: 6000, fx: { team: { mul: { moveSpeed: 1.3 } } } },
+      { id: 'floe_shard', emoji: '2744', name: '冰棱贯穿', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'floe_frost', emoji: '1f9ca', name: '寒霜锁敌', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'floe_thin', emoji: '1f4a6', name: '薄冰失足', desc: '队伍移速 -28%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.72 } } } },
+      { id: 'floe_numb', emoji: '1f976', name: '霜冻僵手', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+    ],
     nebula: [
       { id: 'nebula_flare', emoji: '1f31f', name: '吸积闪耀', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
       { id: 'nebula_lensing', emoji: '1f52d', name: '引力透镜', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },

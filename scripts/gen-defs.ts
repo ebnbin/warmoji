@@ -29,6 +29,8 @@ import { MAX_CHAR_LEVEL } from '../src/data/charLevel.ts'
 import { shellPull } from '../src/data/nebulaOld.ts'
 import { ACCRETION_ETA, captureU, einsteinU, floorDepthU, ISCO_RS, schwarzschildU, SHADOW_RS, shellRecaptureU, stopRadiusU, wallU } from '../src/data/nebula.ts'
 import { deckEdgeAngle, halfBeamAt, hydrostatics, stability, staticHeel } from '../src/data/ship.ts'
+import { area, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
+import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
 import { render } from '../src/emoji/painted/design.ts'
@@ -164,6 +166,54 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(st.gmT > 0, `maps.${id}.ship 压上 ${DIFFICULTY.spawn.maxAlive} 个身体后初稳性高须仍为正`)
   need(heel < deckEdgeAngle(c, st), `maps.${id}.ship ${DIFFICULTY.spawn.maxAlive} 个身体叠在舷墙边时倾 ${deg(heel)}，超过甲板边入水的 ${deg(deckEdgeAngle(c, st))}`)
   need(Math.tan(heel) > f.body.static, `maps.${id}.ship ${DIFFICULTY.spawn.maxAlive} 个身体叠在舷墙边时只倾 ${deg(heel)}，闲着的身体滑不起来`)
+}
+
+/**
+ * 浮冰：参数合理，冰比海水轻、压满雪也还浮在海面上；摩擦是雪最大、新冰最小。按标准身体：平时的风吹不动站在新冰上的，
+ * 阵风吹得动站在新冰上的、吹不动站在雪上的（雪是避风的地方）；每个角色都游得过海流。抽一批种子生成轮廓：面积对、不自交，冰面离地图边留出海面
+ */
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'floe') === (m.floe !== undefined), `maps.${id} 是浮冰当且仅当写了 floe`)
+  const f = m.floe
+  if (!f) continue
+  const s = f.shape
+  const span = (r: readonly [number, number]): boolean => r[0] > 0 && r[0] <= r[1]
+  const at = `maps.${id}.floe`
+  need(f.meterPerU > 0 && f.cellU > 0 && f.frameU > Math.sqrt(s.areaU), `${at} 的尺度、格子须为正，地图比冰面大`)
+  need(s.areaU > 0 && s.turnDeg >= 0 && s.sideDeg >= 0 && s.sideU >= 0 && s.bendU >= 0 && s.jagU >= 0, `${at}.shape 的面积须为正，偏转、拐折与锯齿不为负`)
+  need(s.cutChance >= 0 && s.cutChance <= 1 && s.leadChance >= 0 && s.leadChance <= 1, `${at}.shape 的概率须在 [0, 1] 内`)
+  need(Number.isInteger(s.bites[0]) && Number.isInteger(s.bites[1]) && s.bites[0] >= 0 && s.bites[0] <= s.bites[1], `${at}.shape.bites 须为非负整数范围`)
+  need([s.cutU, s.biteDepthU, s.biteWidthU, s.leadU, s.leadWidthU, s.seamWidthU, s.roundU].every(span), `${at}.shape 的范围须为正且下限不大于上限`)
+  const ice = f.ice
+  need(ice.thicknessM > 0 && ice.youngM > 0 && ice.youngM < ice.thicknessM && ice.density > 0 && ice.density < ice.seaDensity, `${at}.ice 须新冰比老冰薄、冰比海水轻`)
+  need(ice.thicknessM * (1 - ice.density / ice.seaDensity) > (f.snow.maxM * f.snow.density) / ice.seaDensity, `${at} 的冰面压满最深的雪也须高出海面`)
+  need(f.snow.maxM >= 0 && f.snow.cover >= 0 && f.snow.cover <= 1 && f.snow.density > 0 && f.snow.waveU > 0 && f.snow.bareU >= 0, `${at}.snow 的雪深、覆盖与尺度须合理`)
+  const fr = f.friction
+  need([fr.snow, fr.ice, fr.young].every((v) => v.static >= v.kinetic && v.kinetic > 0) && fr.loose > 0, `${at}.friction 的静摩擦须不小于动摩擦、动摩擦为正`)
+  need(fr.young.kinetic <= fr.ice.kinetic && fr.ice.kinetic <= fr.snow.kinetic && fr.young.static <= fr.ice.static && fr.ice.static <= fr.snow.static, `${at}.friction 须雪最不滑、新冰最滑`)
+  const b = f.body
+  need(b.footFrac > 0 && b.footFrac <= 1 && b.swimRatio > 0 && b.swimRatio < 1 && b.refRadiusU > 0 && b.dragU > 0 && b.freezeSec > 0 && b.climbFrac >= 0 && b.climbFrac <= 1, `${at}.body 的比例在 (0, 1] 内、尺度与冻僵时长为正`)
+  const w = f.wind
+  need(w.meanMs >= 0 && w.gustMs >= w.meanMs && w.firstMs >= 0 && w.riseMs > 0 && w.holdMs >= 0 && w.fallMs > 0 && w.jitterMs >= 0, `${at}.wind 的风速与时长须合理，阵风不弱于平时`)
+  need(w.intervalMs - w.jitterMs > w.riseMs + w.holdMs + w.fallMs, `${at}.wind 的间隔减去抖动须长过一轮阵风`)
+  need(w.airDensity > 0 && w.dragArea > 0 && w.driftRatio >= 0 && w.veerDeg >= 0 && w.driftDeg >= 0, `${at}.wind 的空气、风阻与漂流须不为负`)
+  need(w.meanMs > 0 && w.fetchM > 0, `${at}.wind 的平时风速与风区须为正：海面的风浪按它们长成`)
+  const sea = new WindSea(0, 1, w.meanMs, w.fetchM, f.meterPerU, GRAVITY)
+  need(sea.long.variance > 0 && sea.short.variance > 0, `${at}.wind 的风浪谱须在长浪、短浪两张图上都有浪：平时的风速与风区让谱峰落在图能画出的波长里`)
+  need(f.waterExertion > 0 && f.waterRegen >= 0 && f.coldTickMs > 0, `${at} 的水里费力与结算间隔须为正、回复倍率不为负`)
+  const push = (v: number): number => 0.5 * w.airDensity * w.dragArea * v * v
+  need(push(w.meanMs) < fr.young.static * GRAVITY, `${at} 平时的风须吹不动站在新冰上的标准身体`)
+  need(push(w.gustMs) > fr.young.static * GRAVITY, `${at} 的阵风须吹得动站在新冰上的标准身体`)
+  need(push(w.gustMs) < fr.snow.static * GRAVITY, `${at} 的阵风须吹不动站在雪上的标准身体`)
+  const current = (w.driftRatio * w.meanMs) / f.meterPerU
+  for (const [cid, c] of Object.entries<CharacterAuthoring>(CHARACTERS)) need(c.stats.moveSpeed * b.swimRatio > current * 1.2, `${at} 的海流（${current.toFixed(2)} 格/秒）快得让 characters.${cid} 游不回来`)
+  for (let k = 0; k < 16; k++) {
+    const { outline } = floeOutline(k * 7919 + 13, f)
+    const reach = Math.max(...outline.map((p) => Math.max(Math.abs(p.x), Math.abs(p.y))))
+    need(simple(outline), `${at} 第 ${k} 个样本的轮廓自交`)
+    need(Math.abs(area(outline) - s.areaU) < 1, `${at} 第 ${k} 个样本的面积不对`)
+    need(reach + 6 <= f.frameU / 2, `${at} 第 ${k} 个样本的冰面离地图边不到 6 格`)
+  }
 }
 
 /** 身体的体力上限须为正、体力回复不为负 */

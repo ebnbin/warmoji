@@ -580,6 +580,56 @@ function buildShip(): BgmScore {
   )
 }
 
+/** 浮冰：利底亚调式的慢三拍，像冰随浪起伏；正弦低音一小节一下，三角波铺底如风，三角波领一支孤单的调子，冰铃似的高音零星地响，回声拖得很长 */
+function buildFloe(): BgmScore {
+  const chords = [0, 1, 0, 1, 5, 2, 4, 4, 0, 1, 0, 1, 5, 6, 4, 0]
+  return track(
+    {
+      bpm: 66,
+      stepsPerBeat: 2,
+      stepsPerBar: 6,
+      bars: 16,
+      rootMidi: 52,
+      scale: LYDIAN,
+      echo: { delaySec: (60 / 66) * 0.75, feedback: 0.5, level: 0.42 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.18, attack: 0.08, release: 0.5, octave: -1 }
+      const wind: Voice = { wave: 'triangle', vol: 0.028, attack: 0.9, release: 1.6, octave: 0 }
+      const lead: Voice = { wave: 'triangle', vol: 0.07, attack: 0.04, release: 0.35, octave: 1, echo: true }
+      const bell: Voice = { wave: 'sine', vol: 0.03, attack: 0.003, release: 0.25, octave: 2, echo: true }
+      b.bass(bass, chords, 'r.....')
+      b.pad(wind, chords, [0, 2, 4], 0.007)
+      b.line(lead, [
+        [0, 0, 4, 3], [0, 3, 2, 3],
+        [1, 0, 3, 4], [1, 4, 1, 2],
+        [2, 0, 4, 2], [2, 2, 6, 2], [2, 4, 7, 2],
+        [3, 0, 8, 6],
+        [4, 0, 9, 3], [4, 3, 7, 3],
+        [5, 0, 6, 4], [5, 4, 4, 2],
+        [6, 0, 5, 3], [6, 3, 4, 3],
+        [7, 0, 4, 6],
+        [8, 0, 7, 3], [8, 3, 9, 3],
+        [9, 0, 10, 4], [9, 4, 8, 2],
+        [10, 0, 9, 2], [10, 2, 7, 2], [10, 4, 6, 2],
+        [11, 0, 8, 6],
+        [12, 0, 9, 3], [12, 3, 5, 3],
+        [13, 0, 6, 3], [13, 3, 3, 3],
+        [14, 0, 4, 4], [14, 4, 1, 2],
+        [15, 0, 0, 6],
+      ])
+      for (let bar = 0; bar < chords.length; bar++) {
+        b.note(bell, bar, 1, chords[bar]! + 4, 1)
+        if (bar % 2 === 1) b.note(bell, bar, 4, chords[bar]! + 2, 1)
+      }
+      b.drums('kick', 'x.....', 0, 16, 0.12)
+      b.drums('hat', '...o..', 4, 16, 0.025)
+      b.drums('tom', '....x.', 7, 8, 0.1)
+      b.drums('tom', '...x.x', 15, 16, 0.12)
+    },
+  )
+}
+
 /** 星云：利底亚调式的深空，正弦低音像引力一样慢慢拖着走，三角波长音铺底，钟声似的琶音带着长回声，底鼓像隔着很远的心跳 */
 function buildNebula(): BgmScore {
   const chords = [0, 0, 1, 1, 5, 5, 4, 3, 0, 0, 1, 1, 2, 4, 5, 0]
@@ -639,6 +689,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   nebula: buildNebula,
   volcano: buildVolcano,
   ship: buildShip,
+  floe: buildFloe,
 }
 
 const cache = new Map<BgmId, BgmScore>()
