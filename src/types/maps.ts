@@ -446,6 +446,104 @@ export interface FloeConfig {
   readonly waterRegen: number
   readonly coldTickMs: number
 }
+/**
+ * 溶洞：方形地图里一座部分露天的石灰岩溶洞。阳光、天光、月光从洞顶的天窗照进洞里，随真实的太阳与月亮移动；入夜后队员点起火把。
+ * 光照按勒克斯算，一格 1 米；镜头短边看到多少格由洞里的亮度决定；怪物只从暗处出来；洞壁、石柱与大石笋挡人也挡子弹
+ */
+export interface CaveConfig {
+  /** 洞厅：边离方形地图的边 insetU 格之间按噪声起伏、波长 waveU，角按 cornerU 的半径磨圆；窄过两倍 neckU 的缝与尖角填成岩壁 */
+  readonly hall: {
+    readonly insetU: readonly [number, number]
+    readonly waveU: number
+    readonly cornerU: number
+    readonly neckU: number
+    /** 洞顶离洞底多高，米：天窗开在洞顶上 */
+    readonly ceilingM: number
+    /** 洞壁从洞底弯上洞顶要横着走多宽，格 */
+    readonly wallU: number
+  }
+  /**
+   * 天窗：大天窗几个、半径多大，第一个离地图中心 mainOffsetU 格，其余散在洞厅别处；小天窗的个数与半径，格；
+   * 轮廓按方位角在 ±jitter 倍内起伏；天窗之间的空隙至少 gapU 格
+   */
+  readonly skylights: {
+    readonly mainCount: readonly [number, number]
+    readonly mainU: readonly [number, number]
+    readonly mainOffsetU: readonly [number, number]
+    readonly minorCount: readonly [number, number]
+    readonly minorU: readonly [number, number]
+    readonly jitter: number
+    readonly gapU: number
+    /** 天窗正下方塌落的碎石坡：中间高多少米，铺到天窗半径的几倍 */
+    readonly rubbleM: number
+    readonly rubbleSpread: number
+  }
+  /** 支洞：从洞厅边往岩体里走 outU 格再顺着洞壁拐 alongU 格，宽 widthU，尽头是半径 pocketU 的暗室；天光与反光都照不进拐角后面 */
+  readonly alcoves: {
+    readonly count: readonly [number, number]
+    readonly widthU: number
+    readonly outU: number
+    readonly alongU: readonly [number, number]
+    readonly pocketU: number
+  }
+  /** 石柱（顶到洞顶）与石笋：个数、底半径（格）；石笋多半长成 clusters 丛，高多少米；底半径不到 blockU 的石笋矮小，人跨得过、子弹飞得过；出生点 clearU 格内不长 */
+  readonly formations: {
+    readonly columns: readonly [number, number]
+    readonly columnU: readonly [number, number]
+    readonly stalagmites: readonly [number, number]
+    readonly clusters: readonly [number, number]
+    readonly stalagmiteU: readonly [number, number]
+    readonly stalagmiteM: readonly [number, number]
+    readonly blockU: number
+    readonly clearU: number
+  }
+  /** 边石坝水潭：几片、每片多大（格）；蹚水时的黏滞与每走一格耗的体力 */
+  readonly pools: {
+    readonly count: readonly [number, number]
+    readonly sizeU: readonly [number, number]
+    readonly viscosity: number
+    readonly exertion: number
+  }
+  /**
+   * 天：纬度与太阳赤纬（度），一天多少秒，开局在几点；大气消光系数（直射光按 exp(−消光·大气质量) 衰减）。
+   * 太阳高度在 dwellCenterDeg 附近时时间放慢到 1/(1+dwell)，按高度的高斯窗、宽 dwellWidthDeg：天黑天亮仍连续，只是看得清
+   */
+  readonly sky: {
+    readonly latitudeDeg: number
+    readonly declinationDeg: number
+    readonly dayS: number
+    readonly startHour: number
+    readonly extinction: number
+    readonly dwell: number
+    readonly dwellCenterDeg: number
+    readonly dwellWidthDeg: number
+  }
+  /** 光照：洞底与洞顶的反照率，经洞顶反射的光铺开多远（格）；荧光苔与发光蘑菇的丛数，贴近时的照度（勒克斯） */
+  readonly light: {
+    readonly albedo: number
+    readonly bounceU: number
+    readonly glowCount: readonly [number, number]
+    readonly glowLux: number
+  }
+  /** 火把：发光强度（坎德拉）、举多高（米）；身边的光暗过 igniteLux 就点起、亮过 douseLux 才熄灭；一个个点起时最多相差几毫秒 */
+  readonly torch: {
+    readonly candela: number
+    readonly heightM: number
+    readonly igniteLux: number
+    readonly douseLux: number
+    readonly staggerMs: number
+  }
+  /** 看多远：洞里的平均照度从 darkLux 到 brightLux（按对数）时，镜头短边从 nightU 格拉到 dayU 格；眼睛最暗只适应到 brightLux，照度不到 clearLux 就看不清 */
+  readonly view: {
+    readonly dayU: number
+    readonly nightU: number
+    readonly darkLux: number
+    readonly brightLux: number
+    readonly clearLux: number
+  }
+  /** 怪物只刷在照度不到 spawnLux 的地方 */
+  readonly spawnLux: number
+}
 export interface RiverConfig {
   readonly viewScale: number
   readonly width: number
@@ -472,7 +570,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe'
+  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -490,6 +588,7 @@ export interface MapDef {
   readonly volcano?: VolcanoConfig
   readonly ship?: ShipConfig
   readonly floe?: FloeConfig
+  readonly cave?: CaveConfig
   readonly river?: RiverConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string

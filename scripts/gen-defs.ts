@@ -31,6 +31,7 @@ import { ACCRETION_ETA, captureU, einsteinU, floorDepthU, ISCO_RS, schwarzschild
 import { deckEdgeAngle, halfBeamAt, hydrostatics, stability, staticHeel } from '../src/data/ship.ts'
 import { area, floeOutline, GRAVITY, simple } from '../src/ecs/worlds/floe.ts'
 import { WindSea } from '../src/ecs/render/floeSea.ts'
+import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
 import { render } from '../src/emoji/painted/design.ts'
@@ -214,6 +215,56 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
     need(Math.abs(area(outline) - s.areaU) < 1, `${at} 第 ${k} 个样本的面积不对`)
     need(reach + 6 <= f.frameU / 2, `${at} 第 ${k} 个样本的冰面离地图边不到 6 格`)
   }
+}
+
+/**
+ * 溶洞：洞厅能走的地方约有标准的 32×32 那么大；洞厅、支洞与天窗都落得进地图；太阳每天升起又落下，时间放慢的窗口罩住天黑那段；正午天窗下的天光亮过熄火把的门槛，
+ * 星光暗过刷怪的门槛；火把照得清的范围盖得住夜里的镜头，夜里的镜头又看得见整个队伍
+ */
+const DEG = Math.PI / 180
+/** 新地图有效场地的标准边长，格 */
+const STANDARD_SIDE_U = 32
+for (const [id, m] of Object.entries<MapDef>(MAPS)) {
+  need((m.kind === 'cave') === (m.cave !== undefined), `maps.${id} 是溶洞当且仅当写了 cave`)
+  const c = m.cave
+  if (!c) continue
+  const mapW = m.size?.w ?? MAP_DEFAULTS.width
+  const mapH = m.size?.h ?? MAP_DEFAULTS.height
+  const side = Math.min(mapW, mapH)
+  const span = (r: readonly [number, number]): boolean => r[0] <= r[1]
+  const ints = (r: readonly [number, number]): boolean => Number.isInteger(r[0]) && Number.isInteger(r[1]) && r[0] >= 0 && span(r)
+  const { hall, skylights: s, alcoves: a, formations: f, pools: p, sky, light, torch, view } = c
+  need(hall.insetU[0] > 0 && span(hall.insetU) && hall.waveU > 0 && hall.cornerU >= 0 && hall.neckU > 0 && hall.wallU > 0, `maps.${id}.cave.hall 的边距、波长、窄缝与洞壁宽须为正，磨角不为负`)
+  need(hall.ceilingM > f.stalagmiteM[1] && hall.ceilingM > s.rubbleM, `maps.${id}.cave.hall.ceilingM 须高过最高的石笋与碎石坡`)
+  const inset = hall.insetU[0] + hall.insetU[1]
+  const floor = (mapW - inset) * (mapH - inset)
+  need(floor >= 0.9 * STANDARD_SIDE_U ** 2 && floor <= 1.15 * STANDARD_SIDE_U ** 2, `maps.${id}.cave 洞厅按平均边距算约 ${Math.round(floor)} 格²，须在 ${STANDARD_SIDE_U}×${STANDARD_SIDE_U} 上下`)
+  need(a.outU + a.pocketU + 1.2 < side / 2 - 4, `maps.${id}.cave.alcoves 往外走的深度须让洞厅中间留得出地方`)
+  need(s.mainU[0] > 0 && span(s.mainU) && s.mainOffsetU[0] >= 0 && span(s.mainOffsetU) && s.jitter >= 0 && s.jitter < 0.5 && s.gapU >= 0, `maps.${id}.cave.skylights 的半径与偏移须为正、起伏在 0 到 0.5 之间`)
+  need(s.mainOffsetU[1] + s.mainU[1] * (1 + s.jitter) < side / 2 - Math.max(hall.insetU[1], a.outU + a.pocketU + 1.2) - 1, `maps.${id}.cave.skylights 的主天窗须整个开在洞厅上方`)
+  need(ints(s.mainCount) && s.mainCount[0] >= 1, `maps.${id}.cave.skylights 至少一个大天窗：出生点附近要有天光`)
+  need(ints(s.minorCount) && s.minorU[0] > 0 && span(s.minorU) && s.rubbleM >= 0 && s.rubbleSpread >= 1, `maps.${id}.cave.skylights 的小天窗个数须为非负整数、半径为正，碎石坡不比天窗小`)
+  need(ints(a.count) && a.count[0] >= 1, `maps.${id}.cave.alcoves 至少一条：白天怪物要有暗处出来`)
+  need(a.widthU > 2 * hall.neckU && a.outU > a.widthU / 2 && a.alongU[0] > 0 && span(a.alongU) && a.pocketU * 2 >= a.widthU, `maps.${id}.cave.alcoves 须宽过窄缝、拐进岩体、尽头的暗室不比通道窄`)
+  need(ints(f.columns) && ints(f.stalagmites) && ints(f.clusters) && f.columnU[0] > f.blockU && span(f.columnU), `maps.${id}.cave.formations 的个数须为非负整数，石柱挡路`)
+  need(f.stalagmiteU[0] > 0 && span(f.stalagmiteU) && f.stalagmiteM[0] > 0 && span(f.stalagmiteM) && f.clearU > 0, `maps.${id}.cave.formations 的石笋尺寸与出生点的空地须为正`)
+  need(ints(p.count) && p.sizeU[0] > 0 && span(p.sizeU) && p.viscosity >= 1 && p.exertion >= 0, `maps.${id}.cave.pools 的个数须为非负整数、尺寸为正，水里不比平地快`)
+  need(Math.abs(Math.tan(sky.latitudeDeg * DEG) * Math.tan(sky.declinationDeg * DEG)) < 1, `maps.${id}.cave.sky 须让太阳每天升起又落下`)
+  need(sky.dayS > 0 && sky.startHour >= 0 && sky.startHour < 24 && sky.extinction > 0 && sky.dwell >= 0 && sky.dwellWidthDeg > 0, `maps.${id}.cave.sky 的一天须为正、开局的钟点在一天里`)
+  const dusk = crossings(sky, sky.dwellCenterDeg)
+  need(dusk !== null && sky.dwellCenterDeg < 0, `maps.${id}.cave.sky.dwellCenterDeg 须落在日落之后、太阳每天都经过的高度`)
+  need(light.albedo > 0 && light.albedo < 1 && light.bounceU > 0 && ints(light.glowCount) && light.glowLux >= 0 && light.glowLux < c.spawnLux, `maps.${id}.cave.light 的反照率在 0 到 1 之间，荧光暗过刷怪的门槛`)
+  need(torch.candela > 0 && torch.heightM > 0 && torch.staggerMs >= 0 && torch.igniteLux > c.spawnLux && torch.douseLux > torch.igniteLux, `maps.${id}.cave.torch 须比刷怪的门槛亮时就点起，熄火的门槛高过点火的（不来回闪）`)
+  need(view.darkLux > 0 && view.brightLux > view.darkLux && view.clearLux > 0 && view.nightU > 0 && view.dayU > view.nightU, `maps.${id}.cave.view 须白天比夜里看得远、照度门槛为正`)
+  const noon = noonElevDeg(sky)
+  const noonSky = skyLux(noon) * discViewFactor(s.mainU[0], hall.ceilingM)
+  need(noonSky > torch.douseLux, `maps.${id}.cave 正午主天窗正下方的天光只有 ${Math.round(noonSky)} 勒克斯，熄不了火把`)
+  need(skyLux(-18) < c.spawnLux, `maps.${id}.cave 深夜的星光须暗过刷怪的门槛`)
+  const reach = torchReachU(torch, view.clearLux)
+  need(reach >= view.nightU / 2, `maps.${id}.cave 火把只照得清 ${reach.toFixed(1)} 格，盖不住夜里镜头短边的一半 ${view.nightU / 2} 格`)
+  const squad = FEEL.squad.fanDistance + TEAM_BASELINE.member.radius * TEAM_BASELINE.team.followerSizeMul
+  need(view.nightU / 2 > squad, `maps.${id}.cave.view.nightU 的一半须大于 ${squad} 格，夜里看得见跟在身后的队员`)
+  need(view.dayU / 2 <= side / 2 + MAP_DEFAULTS.cameraMargin, `maps.${id}.cave.view.dayU 须让白天的镜头落在地图与边距以内`)
 }
 
 /** 身体的体力上限须为正、体力回复不为负 */

@@ -90,6 +90,13 @@ export const BATTLEFIELD = {
       { id: 'nebula_dust', emoji: '1f32b', name: '星尘拖曳', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
       { id: 'nebula_redshift', emoji: '1f534', name: '红移', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
     ],
+    cave: [
+      { id: 'cave_echo', emoji: '1f514', name: '钟乳回响', desc: '全队伤害 +35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { mul: { damage: 1.35 } } } },
+      { id: 'cave_glow', emoji: '1f344', name: '萤光指路', desc: '暴击率 +18%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { team: { add: { crit: 0.18 } } } },
+      { id: 'cave_bats', emoji: '1f987', name: '蝠群扑面', desc: '敌人移速 -35%（7 秒）', polarity: 'buff', durationMs: 7000, fx: { enemy: { mul: { moveSpeed: 0.65 } } } },
+      { id: 'cave_slick', emoji: '1f4a7', name: '湿滑岩面', desc: '队伍移速 -30%（5 秒）', polarity: 'debuff', durationMs: 5000, fx: { team: { mul: { moveSpeed: 0.7 } } } },
+      { id: 'cave_chill', emoji: '1f976', name: '洞穴寒气', desc: '全队攻速 -30%（6 秒）', polarity: 'debuff', durationMs: 6000, fx: { team: { mul: { cooldown: 1.3 } } } },
+    ],
   },
   field: { grabRadiusU: 0.9, groundMs: 9000, auraRadiusU: 0.85 },
 } as const satisfies BattlefieldTuning

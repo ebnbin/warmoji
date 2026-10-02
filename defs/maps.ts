@@ -136,6 +136,17 @@ const NEBULA_MIX: readonly EnemyMixRow[] = [
   { kind: 'ghost', sinceWave: 5, base: 5, perWave: 0.3, min: 0, max: 10 },
 ]
 
+const CAVE_MIX: readonly EnemyMixRow[] = [
+  { kind: 'zombie', sinceWave: 1, base: 74, perWave: -2, min: 36, max: 74 },
+  { kind: 'skeleton', sinceWave: 1, base: 14, perWave: 0.6, min: 10, max: 26 },
+  { kind: 'rat', sinceWave: 2, base: 9, perWave: 0.4, min: 0, max: 16 },
+  { kind: 'slime', sinceWave: 2, base: 10, perWave: 0.4, min: 0, max: 18 },
+  { kind: 'mushroom', sinceWave: 3, base: 8, perWave: 0.4, min: 0, max: 15 },
+  { kind: 'creeper', sinceWave: 3, base: 7, perWave: 0.3, min: 0, max: 13 },
+  { kind: 'gargoyle', sinceWave: 4, base: 6, perWave: 0.3, min: 0, max: 12 },
+  { kind: 'siren', sinceWave: 5, base: 4, perWave: 0.2, min: 0, max: 8 },
+]
+
 export const MAPS = {
   forest: {
     emoji: '1f332',
@@ -618,5 +629,40 @@ export const MAPS = {
       cameraU: 40,
     },
     boss: 'blackhole',
+  },
+  cave: {
+    emoji: '1f987',
+    name: '溶洞',
+    desc: '一座部分露天的石灰岩溶洞。阳光从洞顶的天窗照进来，随太阳东升西落：白天整个洞厅亮堂，看得到大半个洞；黄昏光柱变红、爬上洞壁，洞里一点点暗下来；入夜后只看得清火把照亮的那一圈。怪物只从暗处出来：白天从深处的支洞里，夜里可能就在火光外不远处。石柱与大石笋挡人也挡子弹，水潭里蹚水更慢',
+    kind: 'cave',
+    size: { w: 40, h: 40 },
+    stamina: { exertion: 0.5, regen: 1 },
+    palette: {
+      bgFrom: 'hsl(30 28% 13%)',
+      bgTo: 'hsl(22 34% 5%)',
+      map: hslToInt(34, 0.24, 0.34),
+      shadow: 0x000000,
+    },
+    decor: {
+      emojis: ['1f9b4', '1f578', '26cf'],
+      sizeU: [0.35, 0.7],
+      alpha: [0.55, 0.8],
+      density: [0.03, 0.05],
+    },
+    mix: CAVE_MIX,
+    finalWaveSub: '夜伯爵从黑暗里来——守住火光！',
+    cave: {
+      hall: { insetU: [2.5, 5.5], waveU: 8, cornerU: 6, neckU: 0.8, ceilingM: 10, wallU: 2.2 },
+      skylights: { mainCount: [2, 2], mainU: [3.6, 4.4], mainOffsetU: [1, 3.5], minorCount: [2, 3], minorU: [1.4, 2.2], jitter: 0.22, gapU: 3, rubbleM: 1.4, rubbleSpread: 1.25 },
+      alcoves: { count: [4, 4], widthU: 2.6, outU: 2.6, alongU: [3.5, 5.5], pocketU: 1.5 },
+      formations: { columns: [7, 11], columnU: [0.55, 0.95], stalagmites: [48, 66], clusters: [7, 8], stalagmiteU: [0.16, 0.6], stalagmiteM: [0.6, 2.8], blockU: 0.32, clearU: 4 },
+      pools: { count: [5, 8], sizeU: [1.6, 3.2], viscosity: 1.35, exertion: 1.2 },
+      sky: { latitudeDeg: 24, declinationDeg: 6, dayS: 108, startHour: 9.5, extinction: 0.21, dwell: 10, dwellCenterDeg: -2.5, dwellWidthDeg: 4 },
+      light: { albedo: 0.42, bounceU: 5, glowCount: [8, 15], glowLux: 0.4 },
+      torch: { candela: 110, heightM: 1.4, igniteLux: 15, douseLux: 40, staggerMs: 1400 },
+      view: { dayU: 18, nightU: 7, darkLux: 0.5, brightLux: 30, clearLux: 2 },
+      spawnLux: 1,
+    },
+    boss: 'eclipse',
   },
 } as const satisfies Record<string, MapDef>
