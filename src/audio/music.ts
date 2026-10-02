@@ -32,6 +32,7 @@ const MAJOR = [0, 2, 4, 5, 7, 9, 11] as const
 const DORIAN = [0, 2, 3, 5, 7, 9, 10] as const
 const AEOLIAN = [0, 2, 3, 5, 7, 8, 10] as const
 const PHRYGIAN_DOM = [0, 1, 4, 5, 7, 8, 10] as const
+const LYDIAN = [0, 2, 4, 6, 7, 9, 11] as const
 
 interface Voice {
   wave: BgmNote['wave']
@@ -579,6 +580,51 @@ function buildShip(): BgmScore {
   )
 }
 
+/** 星云：利底亚调式的深空，正弦低音像引力一样慢慢拖着走，三角波长音铺底，钟声似的琶音带着长回声，底鼓像隔着很远的心跳 */
+function buildNebula(): BgmScore {
+  const chords = [0, 0, 1, 1, 5, 5, 4, 3, 0, 0, 1, 1, 2, 4, 5, 0]
+  return track(
+    {
+      bpm: 60,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 38,
+      scale: LYDIAN,
+      echo: { delaySec: 0.75, feedback: 0.52, level: 0.46 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.22, attack: 0.25, release: 0.9, octave: -1 }
+      const pad: Voice = { wave: 'triangle', vol: 0.028, attack: 0.9, release: 1.8, octave: 0 }
+      const bell: Voice = { wave: 'sine', vol: 0.03, attack: 0.003, release: 0.6, octave: 2, echo: true }
+      const lead: Voice = { wave: 'triangle', vol: 0.06, attack: 0.08, release: 0.5, octave: 1, echo: true }
+      b.bass(bass, chords, 'r---o---')
+      b.pad(pad, chords, [0, 2, 4], 0.004)
+      b.arp(bell, chords, [4, 2, 0, 5, 3, 1], 4, 16)
+      b.line(lead, [
+        [0, 0, 4, 6], [0, 6, 3, 2],
+        [1, 0, 4, 8],
+        [2, 0, 7, 4], [2, 4, 6, 4],
+        [3, 0, 4, 8],
+        [4, 0, 9, 6], [4, 6, 8, 2],
+        [5, 0, 7, 8],
+        [6, 0, 6, 4], [6, 4, 4, 4],
+        [7, 0, 3, 8],
+        [8, 0, 4, 4], [8, 4, 6, 4],
+        [9, 0, 7, 8],
+        [10, 0, 9, 4], [10, 4, 11, 4],
+        [11, 0, 10, 8],
+        [12, 0, 9, 4], [12, 4, 7, 4],
+        [13, 0, 6, 8],
+        [14, 0, 4, 6], [14, 6, 3, 2],
+        [15, 0, 4, 8],
+      ])
+      b.drums('kick', 'x..x....', 0, 16, 0.14)
+      b.drums('tom', '......x.', 8, 16, 0.06)
+    },
+  )
+}
+
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
@@ -589,7 +635,8 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   daynight: buildDayNight,
   space: buildSpace,
   ice: buildSpace,
-  nebula: buildSpace,
+  nebulaOld: buildSpace,
+  nebula: buildNebula,
   volcano: buildVolcano,
   ship: buildShip,
 }
