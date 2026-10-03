@@ -691,6 +691,19 @@ export const MAPS = {
       density: [0, 0],
     },
     mix: NEBULA_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'glow',
+      boss: 'horizon',
+      kinds: {
+        shell: { name: '壳层', at: { kind: 'rim', segU: 3, away: { mark: 'hole', minU: 10 } }, enter: 'climb', look: 'glow', weight: 3, perSec: 1.5, only: ['zombie', 'alien', 'chameleon', 'siren', 'ghost'] },
+        sky: { name: '上空', at: { kind: 'ground' }, enter: 'drop', look: 'glow', weight: 1.5, only: ['ufo', 'siren'] },
+        meteor: { name: '流星', at: { kind: 'mark' }, enter: 'lob', look: 'sparks', weight: 4, perSec: 3, reachU: 20, only: ['comet'] },
+        horizon: { name: '视界边', at: { kind: 'mark' }, enter: 'walk', look: 'glow', weight: 1, only: ['blackhole'] },
+        dust: { name: '星尘', at: { kind: 'ground' }, enter: 'rise', look: 'glow', weight: 1 },
+      },
+    },
     finalWaveSub: '奇点从视界边上走来——别被它和黑洞夹在中间！',
     nebula: {
       shell: { innerU: 18, outerU: 26, gm: 3_000_000, rise: 1.5, tau: 90 },

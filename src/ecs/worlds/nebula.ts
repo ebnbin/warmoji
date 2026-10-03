@@ -3,6 +3,7 @@ import { Rng } from '../../util/rng'
 import { ACCRETION_ETA, captureU, holePull, schwarzschildU, shellPull, wallU } from '../../data/nebula'
 import type { NebulaConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
+import type { Basin } from './basin'
 
 /** 地图的半边长，格：镜头往外再看 marginU 格正好到壳层外缘 */
 export function nebulaHalfU(cfg: NebulaConfig, marginU: number): number {
@@ -78,6 +79,8 @@ export interface MeteorEnd {
 
 export interface NebulaState {
   readonly layout: NebulaLayout
+  /** 空腔当作出怪口能站的地面：壳层没有硬墙，出怪口沿空腔的内壁摆 */
+  readonly cavity: Basin
   /** 黑洞此刻的引力常数乘质量（格³/秒²）与视界（格） */
   gm: number
   rs: number
@@ -87,14 +90,36 @@ export interface NebulaState {
   /** 下一颗流星开始预警的时刻 */
   meteorAt: number
   readonly ends: MeteorEnd[]
+  /** 上一颗在壳层上撞碎的流星：在哪（像素）、什么时候 */
+  shatter: { readonly x: number; readonly y: number; readonly at: number } | null
 }
 
 /** 着色器给光回波留了这么多次闪耀 */
 export const MAX_FLARES = 8
 
+/** 空腔的距离场按这么细的格子铺，格 */
+const CAVITY_CELL_U = 0.25
+
+/** 空腔：离内壁多远就是离球心的距离差，格子铺到内壁外一格 */
+function cavityOf(cfg: NebulaConfig, L: NebulaLayout): Basin {
+  const cell = CAVITY_CELL_U * UNIT
+  const r = cfg.shell.innerU * UNIT
+  const span = r + UNIT
+  const cols = Math.ceil((span * 2) / cell)
+  const x0 = L.cx - (cols * cell) / 2
+  const y0 = L.cy - (cols * cell) / 2
+  const room = new Float32Array(cols * cols)
+  for (let j = 0; j < cols; j++) {
+    for (let i = 0; i < cols; i++) room[j * cols + i] = r - Math.hypot(x0 + (i + 0.5) * cell - L.cx, y0 + (j + 0.5) * cell - L.cy)
+  }
+  return { cols, rows: cols, cell, x0, y0, room }
+}
+
 export function makeNebula(cfg: NebulaConfig, seed: number, halfPx: number): NebulaState {
+  const layout = nebulaLayout(cfg, seed, halfPx)
   return {
-    layout: nebulaLayout(cfg, seed, halfPx),
+    layout,
+    cavity: cavityOf(cfg, layout),
     gm: cfg.hole.gm,
     rs: schwarzschildU(cfg.hole.gm, cfg.hole.lightU),
     flares: [],
@@ -102,6 +127,7 @@ export function makeNebula(cfg: NebulaConfig, seed: number, halfPx: number): Neb
     meteor: null,
     meteorAt: cfg.meteor.firstMs,
     ends: [],
+    shatter: null,
   }
 }
 

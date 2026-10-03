@@ -982,6 +982,9 @@ function nebulaClearPx(sim: Sim): number {
 
 const ACCRETION_TINT = 0xffb36b
 const METEOR_GLOW_TINT = 0xff8a3d
+/** 流星撞碎后这么久里碎块还会被甩进空腔，毫秒；碎块从内壁往里这么远处甩出，格 */
+const SHARDS_MS = 3000
+const SHARDS_IN_U = 0.5
 
 /** 吞下的身体折成多少 GM：按质量与半径的三次方 */
 function bodyGm(cfg: NebulaConfig, eid: number): number {
@@ -1082,6 +1085,7 @@ function nebulaMeteors(sim: Sim, s: NebulaState, cfg: NebulaConfig, delta: numbe
   strikeNebula(sim, cfg, m, x0, y0)
   if (!end && now - m.since < mc.maxFlightMs) return
   if (end === 'swallow') feed(s, cfg, mc.gm, now, m.x, m.y)
+  if (end === 'shatter') s.shatter = { x: m.x, y: m.y, at: now }
   endMeteor(s, { kind: end ?? 'fade', x: m.x, y: m.y, vx: m.vx, vy: m.vy, at: now })
   s.meteor = null
   s.meteorAt = now + mc.intervalMs + (sim.rng.next() * 2 - 1) * mc.intervalJitterMs
@@ -1127,6 +1131,40 @@ const nebula: WorldHooks = {
   },
   settle(sim, p) {
     return settleSpot(nebulaOf(sim), nebulaCfg(sim), p.x, p.y, nebulaClearPx(sim), SPAWN.edgeInset * UNIT)
+  },
+  ground(sim) {
+    return nebulaOf(sim).cavity
+  },
+  /** 和刷怪点一样：在空腔里离内壁留得出身体，离黑洞在最慢的敌人走得出来的地方 */
+  canSpawn(sim, x, y, radius) {
+    const s = nebulaOf(sim)
+    return roomFor(s.cavity, x, y, radius) && Math.hypot(x - s.layout.hx, y - s.layout.hy) >= nebulaClearPx(sim)
+  },
+  /**
+   * hole 是黑洞；meteor 是刚撞碎在壳层上的流星，碎块从那里的内壁甩进来，撞碎后一阵就没了；
+   * horizon 是黑洞朝着队长那一侧、最慢的敌人刚好走得出来的地方，朝着队长
+   */
+  landmarks(sim) {
+    const s = nebulaOf(sim)
+    const L = s.layout
+    const sh = s.shatter
+    const meteor: Landmark[] = []
+    if (sh && sim.elapsedMs - sh.at <= SHARDS_MS) {
+      const ox = sh.x - L.cx
+      const oy = sh.y - L.cy
+      const d = Math.hypot(ox, oy) || 1
+      const r = (nebulaCfg(sim).shell.innerU - SHARDS_IN_U) * UNIT
+      meteor.push({ x: L.cx + (ox / d) * r, y: L.cy + (oy / d) * r, r: 0, nx: -ox / d, ny: -oy / d })
+    }
+    const lx = leaderX(sim) - L.hx
+    const ly = leaderY(sim) - L.hy
+    const away = Math.hypot(lx, ly) > 1e-6 ? norm(lx, ly) : norm(L.sx - L.hx, L.sy - L.hy)
+    const clear = nebulaClearPx(sim)
+    return {
+      hole: [{ x: L.hx, y: L.hy, r: 0, nx: 0, ny: 0 }],
+      meteor,
+      horizon: [{ x: L.hx + away.x * clear, y: L.hy + away.y * clear, r: 0, nx: away.x, ny: away.y }],
+    }
   },
   onStart(sim) {
     nebulaOf(sim)
