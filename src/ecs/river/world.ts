@@ -129,7 +129,7 @@ function alongWall(s: RiverState, x: number, y: number, dx: number, dy: number, 
   return { x: -n.y * side, y: n.x * side }
 }
 
-/** 干地上离壁至少 room 像素的一点：从 p 往外一圈圈找，找不到就原样退回壁外 */
+/** 干地上离壁至少 room 像素、没越过断崖边的一点：从 p 往外一圈圈找，找不到就原样退回壁外 */
 function dryNear(sim: Sim, s: RiverState, p: Point, room: number): Point {
   const b = s.plan.basin
   for (let r = 0; r <= 6 * UNIT; r += 0.5 * UNIT) {
@@ -137,7 +137,7 @@ function dryNear(sim: Sim, s: RiverState, p: Point, room: number): Point {
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2
       const q = { x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r }
-      if (roomAt(b, q.x, q.y) >= room && !wetAt(sim, s, q.x, q.y)) return q
+      if (roomAt(b, q.x, q.y) >= room && !wetAt(sim, s, q.x, q.y) && overFalls(s, q.x, q.y) < 0) return q
     }
   }
   return keepOut(b, p.x, p.y, room)
