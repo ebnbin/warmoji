@@ -1,8 +1,7 @@
-import { at, clearingDepth, heightAt, poolAt, project } from './layout'
+import { at, clearingDepth, GRAVITY, heightAt, poolAt, project } from './layout'
 import type { Along, Reach, RiverPlan } from './layout'
 import type { RiverConfig } from '../../types/maps'
 
-export const GRAVITY = 9.81
 /** 浅水方程的格子边长，格 */
 export const WATER_CELL_U = 0.5
 /** 薄过这个（米）算干 */
@@ -291,7 +290,7 @@ export interface Flow {
   v: number
 }
 
-/** 水在 (x, y) 格处的水深与流速，按格心双线性插值 */
+/** 水在 (x, y) 格处的水深与流速，按格心双线性插值；深谷格不算：水在那里已经落下去了，断崖边的水一直按崖边的流到深谷格为止 */
 export function flowAt(w: Water, x: number, y: number, out: Flow): Flow {
   const fu = Math.min(w.cols - 1.001, Math.max(0, x / w.cell - 0.5))
   const fv = Math.min(w.rows - 1.001, Math.max(0, y / w.cell - 0.5))
@@ -300,12 +299,26 @@ export function flowAt(w: Water, x: number, y: number, out: Flow): Flow {
   const fx = fu - ix
   const fy = fv - iy
   const i = iy * w.cols + ix
-  const a = (1 - fx) * (1 - fy)
-  const b = fx * (1 - fy)
-  const c = (1 - fx) * fy
-  const d = fx * fy
-  out.h = w.h[i]! * a + w.h[i + 1]! * b + w.h[i + w.cols]! * c + w.h[i + w.cols + 1]! * d
-  out.u = w.u[i]! * a + w.u[i + 1]! * b + w.u[i + w.cols]! * c + w.u[i + w.cols + 1]! * d
-  out.v = w.v[i]! * a + w.v[i + 1]! * b + w.v[i + w.cols]! * c + w.v[i + w.cols + 1]! * d
+  const a = w.sink[i]! < 0 ? (1 - fx) * (1 - fy) : 0
+  const b = w.sink[i + 1]! < 0 ? fx * (1 - fy) : 0
+  const c = w.sink[i + w.cols]! < 0 ? (1 - fx) * fy : 0
+  const d = w.sink[i + w.cols + 1]! < 0 ? fx * fy : 0
+  const sum = a + b + c + d
+  if (sum <= 0) {
+    out.h = 0
+    out.u = 0
+    out.v = 0
+    return out
+  }
+  out.h = (w.h[i]! * a + w.h[i + 1]! * b + w.h[i + w.cols]! * c + w.h[i + w.cols + 1]! * d) / sum
+  out.u = (w.u[i]! * a + w.u[i + 1]! * b + w.u[i + w.cols]! * c + w.u[i + w.cols + 1]! * d) / sum
+  out.v = (w.v[i]! * a + w.v[i + 1]! * b + w.v[i + w.cols]! * c + w.v[i + w.cols + 1]! * d) / sum
   return out
+}
+
+/** (x, y) 格处是第几个出水口的深谷格，-1 是不在深谷里 */
+export function sinkAt(w: Water, x: number, y: number): number {
+  const cx = Math.floor(x / w.cell)
+  const cy = Math.floor(y / w.cell)
+  return cx >= 0 && cy >= 0 && cx < w.cols && cy < w.rows ? w.sink[cy * w.cols + cx]! : -1
 }

@@ -10,7 +10,7 @@ import { hazardSource } from '../utils/source'
 import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import { riverPlan } from './layout'
-import { flowAt, solveWater } from './water'
+import { flowAt, sinkAt, solveWater } from './water'
 import { drift, swept } from './bodies'
 import type { Flow, Water } from './water'
 import type { RiverPlan } from './layout'
@@ -141,8 +141,11 @@ function dryNear(sim: Sim, s: RiverState, p: Point, room: number): Point {
   return keepOut(b, p.x, p.y, room)
 }
 
-/** 越过了哪个出水口的断崖边：-1 是没有 */
-function overFalls(plan: RiverPlan, x: number, y: number): number {
+/** 越过了哪个出水口的断崖边：-1 是没有；脚下已经是深谷格（那里的水已经落下去了）也算越过 */
+function overFalls(s: RiverState, x: number, y: number): number {
+  const sunk = s.water ? sinkAt(s.water, x / UNIT, y / UNIT) : -1
+  if (sunk >= 0) return sunk
+  const plan = s.plan
   for (let k = 0; k < plan.outlets.length; k++) {
     const o = plan.outlets[k]!
     const ax = x / UNIT - o.x
@@ -160,7 +163,7 @@ function plunge(sim: Sim, s: RiverState): void {
   const src = hazardSource('falls', FALLS_TINT)
   const st = sim.run.stats
   for (const eid of [...query(sim.world, [Phys, Transform, Radius])]) {
-    const k = overFalls(s.plan, Transform.x[eid]!, Transform.y[eid]!)
+    const k = overFalls(s, Transform.x[eid]!, Transform.y[eid]!)
     if (k < 0 || hasComponent(sim.world, eid, Shard)) continue
     if (hasComponent(sim.world, eid, Pickup)) {
       removeEntity(sim.world, eid)

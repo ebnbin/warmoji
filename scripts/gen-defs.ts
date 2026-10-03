@@ -195,12 +195,12 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(f.riffle > 0 && f.riffle <= 1 && f.pool >= 1 && f.thalwegShift >= 0 && f.thalwegShift < 1, `maps.${id}.river.flow 的浅滩不深过平均、深潭不浅过平均，深泓偏不出河岸`)
   need(f.bankM > 0 && f.bankU > 0 && f.floodSlope >= 0 && f.reliefM >= 0, `maps.${id}.river.flow 的河岸须有高有宽，滩地不往河里倾`)
   need(fl.cliffM > 0 && fl.cliffU > 0 && fl.poolM > 0 && fl.poolR > 0.5, `maps.${id}.river.falls 的崖须有高有进深，深潭有深、比河道宽`)
-  need(fl.gorgeM > 1 && fl.lipU > 0.5, `maps.${id}.river.falls 的深谷须比断崖边低出一米以上，断崖外留出的那段过半格`)
+  need(fl.gorgeM > 1 && fl.lipU > 0.5 && fl.sillU > 0, `maps.${id}.river.falls 的深谷须比断崖边低出一米以上，断崖外留出的那段过半格，断崖边前的岩坎有长度`)
   need(t.crownU[0] > 0 && range(t.crownU, false) && t.overhangU >= 0 && t.overhangU < t.crownU[0] && t.forest > 0 && t.forest < 1, `maps.${id}.river.trees 的树冠须为正、伸进空地的那截比树冠小，林子的占比在 (0, 1) 内`)
   need(range(t.tongues, true) && range(t.groves, true) && range(t.lone, true), `maps.${id}.river.trees 的林舌、树丛、孤树须为非负整数范围`)
   need(range(k.inRiver, true) && range(k.onLand, true) && k.radiusU[0] > 0 && range(k.radiusU, false) && k.heightM[0] > 0 && range(k.heightM, false), `maps.${id}.river.rocks 的数量须为非负整数范围，半径与高须为正`)
   need(b.kg > 0 && b.radiusU > 0 && b.heightM > 0 && b.density > 0 && b.drag > 0, `maps.${id}.river.body 的体重、半径、身高、密度与阻力系数须为正`)
-  need(b.legs > 0 && b.legs <= 1 && b.hip > 0 && b.hip < 1 && b.lever > 0, `maps.${id}.river.body 的腿宽须在 (0, 1] 内，胯高在 (0, 1) 内，扶正力臂为正`)
+  need(b.legs > 0 && b.legs <= 1 && b.hip > 0 && b.hip < 1 && b.lever > 0 && b.mu > 0, `maps.${id}.river.body 的腿宽须在 (0, 1] 内，胯高在 (0, 1) 内，扶正力臂与脚底摩擦系数为正`)
   need(b.swim >= 0 && b.wetM > 0, `maps.${id}.river.body 的划水不为负，湿地水深为正`)
 }
 

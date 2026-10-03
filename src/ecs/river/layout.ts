@@ -23,6 +23,10 @@ const FALL_SPREAD = 1.15
 const POOL_WOBBLE = 0.32
 /** 岩石区的石头最高高出地面多少米 */
 export const ROCK_M = 1.1
+/** 重力加速度，米/秒² */
+export const GRAVITY = 9.81
+/** 出水口的岩坎前这么多（比例）是从河床升上来的坡，其余是平的坎顶 */
+const SILL_RAMP = 0.6
 const STONE: Stone = { h: 0, gx: 0, gy: 0, id: 0, big: false }
 /** 生成不出合格的河网就换一组随机数重来，最多这么多次 */
 const TRIES = 60
@@ -90,7 +94,7 @@ interface Inlet {
   readonly half: number
 }
 
-/** 出水口：断崖边的中点、朝外（水流）方向、断崖边上水面半宽（格）与那里的设计水面高程（米） */
+/** 出水口：断崖边的中点、朝外（水流）方向、断崖边上水面半宽（格）与那里的设计水面高程、断崖边前那道岩坎的坎顶高程（米） */
 interface Outlet {
   readonly x: number
   readonly y: number
@@ -98,6 +102,7 @@ interface Outlet {
   readonly ny: number
   readonly half: number
   readonly level: number
+  readonly crest: number
 }
 
 /** 一棵树：树冠的圆心、半径（格）与树高（米） */
@@ -346,6 +351,15 @@ function hydraulics(cfg: RiverConfig, q: number): { half: number; dmax: number; 
   const dmax = (D * (f.bedShape + 1)) / f.bedShape
   const K = (dmax ** (5 / 3) * (W / 2) * conveyanceShape(f.bedShape)) / f.manning
   return { half: W / 2 / cfg.meterPerU, dmax, slope: (q / K) ** 2, speed: q / (W * D) }
+}
+
+/**
+ * 出水口岩坎的坎顶高程（米）：流量 q 按临界流漫过半宽 half 格的坎顶时，坎上游的比能比坎顶高 1.5 倍临界水深 (q²/g)^(1/3)（q 按单宽），
+ * 坎顶取设计水位 level 往下这么多，坎上游的水面就托在设计水位上（差一个几厘米的流速水头）
+ */
+function crestOf(cfg: RiverConfig, q: number, half: number, level: number): number {
+  const unit = q / (2 * half * cfg.meterPerU)
+  return level - 1.5 * Math.cbrt((unit * unit) / GRAVITY)
 }
 
 /**
@@ -641,7 +655,8 @@ function network(cfg: RiverConfig, rng: Rng, r0: number, seed: number): Draft | 
     const p = ex[k === 0 ? major : minor]!
     const o = exN[k === 0 ? major : minor]!
     const last = r.x.length - 1
-    return { x: p.x, y: p.y, nx: o.x, ny: o.y, half: r.half[last]!, level: r.level[last]! }
+    const crest = crestOf(cfg, k === 0 ? qMajor : qMinor, r.half[last]!, r.level[last]!)
+    return { x: p.x, y: p.y, nx: o.x, ny: o.y, half: r.half[last]!, level: r.level[last]!, crest }
   })
   const lip = { x: foot.x + nIn.x * cfg.falls.cliffU, y: foot.y + nIn.y * cfg.falls.cliffU }
   const upA = aIn + (rng.next() * 2 - 1) * 0.5
@@ -701,7 +716,7 @@ function fits(cfg: RiverConfig, sh: Shape, reaches: readonly Reach[], ports: rea
 
 /**
  * 地形高程（米）：每段河道各自算出断面、岸坡与滩地，平滑取最低；崖下挖出深潭；进水口背后的空地外立起崖与崖顶的台地，台地上刻出溪沟；
- * 出水口外是深谷；空地外的岩石区隆起成块的岩石，林子里地面略高
+ * 出水口外是深谷，断崖边前垫起一道岩坎；空地外的岩石区隆起成块的岩石，林子里地面略高
  */
 function terrainOf(cfg: RiverConfig, d: Draft, forestSeed: number, x0: number, y0: number, cols: number, rows: number): Terrain {
   const cell = cfg.cellU
@@ -762,6 +777,11 @@ function terrainOf(cfg: RiverConfig, d: Draft, forestSeed: number, x0: number, y
             }
           }
         }
+      }
+      for (const o of d.outlets) {
+        const along = (x - o.x) * o.nx + (y - o.y) * o.ny
+        if (along <= -fl.sillU || along >= 0 || Math.abs((x - o.x) * -o.ny + (y - o.y) * o.nx) >= o.half + f.bankU) continue
+        if (o.crest > g) g += (o.crest - g) * smooth(-fl.sillU, -fl.sillU * (1 - SILL_RAMP), along)
       }
       const gd = gorgeDepthAt(d, x, y, tmp)
       if (gd > -0.7) {

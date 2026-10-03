@@ -338,7 +338,7 @@ export interface RiverConfig {
     readonly floodSlope: number
     readonly reliefM: number
   }
-  /** 瀑布：进水口的崖高与崖面的进深、崖下深潭的深（米）与半径（相对主河道水面宽）；出水口外深谷的深，断崖外还能被冲过去的那一段多长（格） */
+  /** 瀑布：进水口的崖高与崖面的进深、崖下深潭的深（米）与半径（相对主河道水面宽）；出水口外深谷的深，断崖外还能被冲过去的那一段多长（格），断崖边前那道岩坎多长（格） */
   readonly falls: {
     readonly cliffM: number
     readonly cliffU: number
@@ -346,6 +346,7 @@ export interface RiverConfig {
     readonly poolR: number
     readonly gorgeM: number
     readonly lipU: number
+    readonly sillU: number
   }
   /** 树：树冠半径（格）、伸进空地的树冠下有多宽能走；林子按二维噪声和岩石分地盘，林子占多少；伸进空地的林舌、空地里的树丛与孤树各几处 */
   readonly trees: {
@@ -365,7 +366,8 @@ export interface RiverConfig {
   }
   /**
    * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克、高 heightM 米，别的身体质量按半径的三次方与质量倍率、身高按半径缩放（半径不算队长倍率）；
-   * 身体的密度（千克/米³）与水里的阻力系数。水的推力绕脚掌的力矩大过（体重 − 浮力）乘扶正力臂，或者干脆浮起来，就站不住、随水漂
+   * 身体的密度（千克/米³）与水里的阻力系数。水的推力绕脚掌的力矩大过（体重 − 浮力）乘扶正力臂（推倒），推力大过（体重 − 浮力）乘脚底的摩擦系数（滑走），
+   * 或者干脆浮起来，就站不住、随水漂
    */
   readonly body: {
     readonly kg: number
@@ -378,6 +380,8 @@ export interface RiverConfig {
     readonly hip: number
     /** 站着时重心到脚掌下游边的水平距离占身高的比例 */
     readonly lever: number
+    /** 脚底踩在湿河床上的静摩擦系数 */
+    readonly mu: number
     /** 随水漂着时自己划水的速度（相对水）占想走的速度的比例 */
     readonly swim: number
     /** 水深不到这个（米）算干地 */
