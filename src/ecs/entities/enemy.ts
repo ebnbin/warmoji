@@ -15,7 +15,6 @@ import {
   Anim,
   Boss,
   Bounty,
-  BreaksWalls,
   Chase,
   CoinThief,
   Contact,
@@ -194,7 +193,6 @@ export function spawnNpc(sim: Sim, atlas: FrameIndex, def: NpcDef, x: number, y:
   }
   bodyRules[eid] = def
   attachResource(world, eid, def.resource)
-  if (def.breaksWalls) addComponent(world, eid, BreaksWalls)
   if (def.grow) {
     addComponent(world, eid, GrowUp)
     GrowUp.at[eid] = sim.elapsedMs + def.grow.ms

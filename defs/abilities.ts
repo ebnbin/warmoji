@@ -46,7 +46,7 @@ const BASE = {
     knockback: 3.5,
     shape: {
       kind: 'bolt',
-      projectile: { emoji: '1f345', size: 0.55, radius: 0.18, speed: 12, rotationOffsetDeg: 0 },
+      projectile: { emoji: '1f345', size: 0.55, radius: 0.18, speed: 12, rotationOffsetDeg: 0, arc: 1.4 },
       lifeMs: 2000,
     },
   } satisfies AbilityDef,
@@ -546,7 +546,7 @@ const fencerLastBreath = {
 } satisfies AbilityDef
 
 // 🦥 树懒：时间差——延时炸弹与倒带
-const slothFuse = { kind: 'fuse', ms: 2500, then: [{ kind: 'blast', radius: 1.6, ratio: 4, knockback: 6, ring: RING(0xffb74d) }] } as const
+const slothFuse = { kind: 'fuse', ms: 2500, then: [{ kind: 'blast', radius: 1.6, ratio: 4, knockback: 6, ring: RING(0xffb74d), breach: 0.6 }] } as const
 const slothBomb = {
   trigger: 'auto',
   cooldownMs: 1700,
@@ -980,6 +980,7 @@ const penguinSlide = {
   knockback: 8,
   color: 0x81d4fa,
   shape: { kind: 'sprint', distance: 6, ms: 600, radius: 0.8 },
+  breach: 1,
   onCast: [{ kind: 'cleanse' }, { kind: 'unstoppable', durationMs: 700 }],
 } satisfies AbilityDef
 

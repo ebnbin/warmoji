@@ -1,6 +1,7 @@
 import { hasComponent, query } from 'bitecs'
 import { FOLLOW_IN_MS } from '../../data/abilities'
-import { Airborne, Alive, BreaksWalls, Drive, Motion, MOTION, Phys, Radius, Transform, VisOff } from '../components'
+import { Airborne, Alive, Drive, Motion, MOTION, Phys, Radius, Transform, VisOff } from '../components'
+import { bodyHeightM, breachAt } from '../utils/pass'
 import { GROUND } from '../worlds/hooks'
 import { approach, ballistic, bodyDt, drift } from './shared/body'
 import type { BodyStep } from './shared/body'
@@ -147,6 +148,12 @@ export function moveBodies(sim: Sim): void {
       vx = STEP.vx
       vy = STEP.vy
     }
+    // 带破坏力的冲刺先把前方撞上的障碍打掉，打不穿的剩下的照样挡住它
+    if (dashing && Motion.breach[eid]! > 0) {
+      const sp = Math.hypot(vx, vy) || 1
+      const r = Radius.v[eid]!
+      Motion.breach[eid] = Motion.breach[eid]! - breachAt(sim, next.x + (vx / sp) * r * 0.6, next.y + (vy / sp) * r * 0.6, bodyHeightM(sim.world, eid) * 0.5, r, Motion.breach[eid]!)
+    }
     const to = sim.hooks.constrainBody(sim, eid, { x, y }, next)
     const d = sim.hooks.worldDelta(sim, x, y, to.x, to.y)
     // 被场地修正过的位移才回推速度：撞墙的分量归零；环面回绕不算修正
@@ -159,7 +166,6 @@ export function moveBodies(sim: Sim): void {
     Transform.x[eid] = to.x
     Transform.y[eid] = to.y
     if (!dashing) continue
-    if (hasComponent(sim.world, eid, BreaksWalls)) sim.hooks.smashWall(sim, to.x, to.y)
     Motion.t[eid] = Motion.t[eid]! + dt * 1000
     // 被墙挡住就提前结束，被摆布的身体记下撞墙
     if (Math.hypot(d.x, d.y) < Math.hypot(next.x - x, next.y - y) * 0.5) {

@@ -1,6 +1,7 @@
 import { addComponents, hasComponent, query, removeEntity } from 'bitecs'
 import { newEntity } from './entity'
 import { Alive, Barrier, FACTION, Faction, Hp, Phasing, Radius, Transform, Uid } from '../components'
+import { MATERIALS } from '../../data/obstacles'
 import { barrierCross, barrierSide, barrierSrc } from '../store'
 import { isSameEntity } from '../utils/identity'
 import { applyAbilityEffects } from '../systems/shared/effects'
@@ -138,7 +139,7 @@ function separate(sim: Sim, e: number, from: Point, p: Point, r: number): Point 
 
 /** 所有挡身体的墙对这个身体的位置修正 */
 export function blockBody(sim: Sim, eid: number, from: Point, p: Point): Point {
-  if (!hasComponent(sim.world, eid, Hp) || hasComponent(sim.world, eid, Phasing)) return p
+  if (!hasComponent(sim.world, eid, Hp) || (MATERIALS.barrier.phase && hasComponent(sim.world, eid, Phasing))) return p
   let q = p
   for (const e of query(sim.world, [Barrier])) {
     if (!blocksBody(e, eid)) continue
@@ -215,4 +216,34 @@ export function crossing(sim: Sim, e: number, x0: number, y0: number, x1: number
   if (t < 0 || t > 1) return null
   const len = Math.sqrt(l2)
   return { x: -aby / len, y: abx / len }
+}
+
+/** 一段飞行轨迹在哪里穿过这面墙：沿轨迹的比例（0 到 1），不穿过为 null */
+export function barrierHit(sim: Sim, e: number, x0: number, y0: number, x1: number, y1: number): number | null {
+  if (Barrier.shape[e] === 1) {
+    const R = Barrier.r[e]!
+    const d0 = sim.hooks.worldDelta(sim, Barrier.cx[e]!, Barrier.cy[e]!, x0, y0)
+    const ex = x1 - x0
+    const ey = y1 - y0
+    const a = ex * ex + ey * ey
+    const b = 2 * (d0.x * ex + d0.y * ey)
+    const c = d0.x * d0.x + d0.y * d0.y - R * R
+    const disc = b * b - 4 * a * c
+    if (a <= 0 || disc < 0) return null
+    const q = Math.sqrt(disc)
+    for (const t of c < 0 ? [(-b + q) / (2 * a)] : [(-b - q) / (2 * a)]) if (t >= 0 && t <= 1) return t
+    return null
+  }
+  const ax = Barrier.ax[e]!
+  const ay = Barrier.ay[e]!
+  const abx = Barrier.bx[e]! - ax
+  const aby = Barrier.by[e]! - ay
+  const d0 = sim.hooks.worldDelta(sim, ax, ay, x0, y0)
+  const c0 = abx * d0.y - aby * d0.x
+  const c1 = abx * (d0.y + y1 - y0) - aby * (d0.x + x1 - x0)
+  if ((c0 > 0) === (c1 > 0)) return null
+  const k = c0 / (c0 - c1)
+  const l2 = abx * abx + aby * aby
+  const u = l2 > 0 ? ((d0.x + (x1 - x0) * k) * abx + (d0.y + (y1 - y0) * k) * aby) / l2 : -1
+  return u >= 0 && u <= 1 ? k : null
 }

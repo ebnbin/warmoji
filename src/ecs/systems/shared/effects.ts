@@ -27,6 +27,7 @@ import { interrupt } from './ability'
 import { healAllies } from './heal'
 import { eachAlly, nearestAngle, nearestTarget, targetsWithin } from '../../utils/targets'
 import { attackOf, flying } from '../../utils/source'
+import { BLAST_M, breachAt, covered } from '../../utils/pass'
 import { HIT } from '../../utils/hitTags'
 import { layerMul, setStatLayer } from '../../utils/stats'
 import { isSameEntity } from '../../utils/identity'
@@ -58,7 +59,7 @@ export function applyBlast(
   knockback: number,
   exclude?: ReadonlySet<number>,
 ): Struck[] {
-  const list = targetsWithin(sim, src, x, y, radius)
+  const list = covered(sim, src, x, y, targetsWithin(sim, src, x, y, radius))
   const struck: Struck[] = []
   for (const i of circleHitIndices({ x, y }, radius, list)) {
     const t = list[i]!
@@ -189,6 +190,7 @@ type Handler<K extends keyof EffectOf> = (sim: Sim, src: Source, fx: EffectOf[K]
 const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   blast: (sim, src, fx, at) => {
     applyBlast(sim, src, at.x, at.y, at.baseDamage * fx.ratio, fx.radius, fx.knockback, at.exclude)
+    breachAt(sim, at.x, at.y, BLAST_M, fx.radius, fx.breach ?? 0)
     if (fx.ring) spawnFxRing(sim, at.x, at.y, fx.radius, fx.ring)
   },
 
@@ -602,7 +604,7 @@ const EFFECT_KINDS: { [K in keyof EffectOf]: Handler<K> } = {
   },
 
   area: (sim, src, fx, at) => {
-    const found = targetsWithin(sim, src, at.x, at.y, fx.radius).map((t) => t.eid)
+    const found = covered(sim, src, at.x, at.y, targetsWithin(sim, src, at.x, at.y, fx.radius)).map((t) => t.eid)
     if (found.length > 0) applyAbilityEffects(sim, src, fx.then, { ...at, targets: found })
   },
 

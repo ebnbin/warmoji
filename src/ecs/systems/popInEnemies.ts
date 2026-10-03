@@ -1,13 +1,14 @@
 import { query } from 'bitecs'
 import { Boss, ENEMY_SET, Pop, Tint, Transform } from '../components'
 import { backEaseOut } from '../utils/ease'
+import { shownToTeam } from '../utils/statusTint'
 import type { Sim } from '../sim'
 
 function finishPop(eid: number): void {
   Pop.until[eid] = 0
   Transform.w[eid] = Pop.size[eid]!
   Transform.h[eid] = Pop.size[eid]!
-  Tint.alpha[eid] = Pop.alpha[eid]!
+  Tint.alpha[eid] = Pop.alpha[eid]! * shownToTeam(eid)
 }
 
 export function finishEnemyPops(sim: Sim): void {
@@ -31,6 +32,6 @@ export function popInEnemies(sim: Sim): void {
     const k = Pop.size[eid]! * (from + (1 - from) * t)
     Transform.w[eid] = k
     Transform.h[eid] = k
-    Tint.alpha[eid] = from + (Pop.alpha[eid]! - from) * t
+    Tint.alpha[eid] = (from + (Pop.alpha[eid]! - from) * t) * shownToTeam(eid)
   }
 }

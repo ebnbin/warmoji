@@ -8,6 +8,7 @@ import { strike } from './shared/damage'
 import { HIT } from '../utils/hitTags'
 import { cullProjectile } from './shared/projectile'
 import { projHitUids, projOnHit, projSrc } from '../store'
+import { bodyHeightM, lobZ } from '../utils/pass'
 import type { Sim } from '../sim'
 
 function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
@@ -22,7 +23,7 @@ function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, b
   return (px - cx) * (px - cx) + (py - cy) * (py - cy)
 }
 
-/** 弹体这一帧扫过的线段碰到来源阵营的敌人即命中，沿线最先碰到的先算；每个身体只吃一次；落在地上的不打；敌我同一条 */
+/** 弹体这一帧扫过的线段碰到来源阵营的敌人即命中，沿线最先碰到的先算；每个身体只吃一次；落在地上的不打；抛射的只打落到身体高度以下那一段；敌我同一条 */
 export function hitProjectiles(sim: Sim): void {
   if (sim.over) return
   for (const eid of [...query(sim.world, PROJ_SET)]) {
@@ -37,12 +38,16 @@ export function hitProjectiles(sim: Sim): void {
     const segX = bx - sx
     const segY = by - sy
     const segLen2 = segX * segX + segY * segY
+    const segLen = Math.sqrt(segLen2)
+    const arc = Proj.arc[eid]!
     const found: { eid: number; t: number; x: number; y: number }[] = []
-    eachTargetBody(sim, src, sx, sy, Math.sqrt(segLen2) + pr, (t, x, y, radius) => {
+    eachTargetBody(sim, src, sx, sy, segLen + pr, (t, x, y, radius) => {
       if (struck.has(Uid.v[t]!)) return
       const rr = pr + radius
       if (segDistSq(x, y, sx, sy, bx, by) > rr * rr) return
       const along = segLen2 > 0 ? Math.max(0, Math.min(1, ((x - sx) * segX + (y - sy) * segY) / segLen2)) : 0
+      // 抛射的从头顶飞过，落得比身体矮了才打得到
+      if (arc > 0 && lobZ(arc, Math.min(1, (Proj.flown[eid]! - segLen * (1 - along)) / Proj.reach[eid]!)) > bodyHeightM(sim.world, t)) return
       found.push({ eid: t, t: along, x, y })
     })
     if (found.length === 0) continue

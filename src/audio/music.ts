@@ -351,7 +351,7 @@ function buildVoid(): BgmScore {
   )
 }
 
-function buildRuins(): BgmScore {
+function buildOldRuins(): BgmScore {
   const chords = [0, 6, 3, 5, 0, 6, 4, 5, 3, 6, 0, 5, 4, 6, 3, 0]
   return track(
     {
@@ -391,6 +391,54 @@ function buildRuins(): BgmScore {
       b.drums('kick', 'x.......', 0, 16, 0.22)
       b.drums('hat', '....x...', 0, 16, 0.04)
       b.drums('tom', '......x.', 8, 16, 0.1)
+    },
+  )
+}
+
+function buildRuins(): BgmScore {
+  const chords = [0, 0, 3, 3, 6, 6, 4, 4, 0, 0, 5, 3, 6, 4, 0, 0]
+  return track(
+    {
+      bpm: 72,
+      stepsPerBeat: 2,
+      stepsPerBar: 8,
+      bars: 16,
+      rootMidi: 50,
+      scale: DORIAN,
+      echo: { delaySec: (60 / 72) * 0.75, feedback: 0.38, level: 0.36 },
+    },
+    (b) => {
+      const bass: Voice = { wave: 'sine', vol: 0.16, attack: 0.03, release: 0.4, octave: -1 }
+      const drone: Voice = { wave: 'sine', vol: 0.035, attack: 0.9, release: 1.6, octave: 0 }
+      const lute: Voice = { wave: 'triangle', vol: 0.05, attack: 0.003, release: 0.18, octave: 0 }
+      const pipe: Voice = { wave: 'sine', vol: 0.085, attack: 0.06, release: 0.3, octave: 1, echo: true }
+      const bell: Voice = { wave: 'sine', vol: 0.035, attack: 0.002, release: 1.2, octave: 2, echo: true }
+      b.bass(bass, chords, 'r---o---')
+      b.pad(drone, chords, [0, 4], 0.004)
+      b.arp(lute, chords, [0, 1, 2, 1, 3, 1, 2, 1], 2, 14)
+      b.line(pipe, [
+        [0, 4, 4, 4],
+        [1, 0, 3, 2], [1, 2, 2, 2], [1, 4, 0, 4],
+        [2, 0, 3, 6], [2, 6, 4, 2],
+        [3, 0, 5, 4], [3, 4, 3, 4],
+        [4, 0, 6, 4], [4, 4, 5, 2], [4, 6, 4, 2],
+        [5, 0, 3, 8],
+        [6, 0, 4, 3], [6, 3, 5, 1], [6, 4, 6, 4],
+        [7, 0, 4, 8],
+        [8, 4, 7, 4],
+        [9, 0, 6, 2], [9, 2, 5, 2], [9, 4, 4, 4],
+        [10, 0, 5, 6], [10, 6, 3, 2],
+        [11, 0, 2, 4], [11, 4, 3, 4],
+        [12, 0, 1, 4], [12, 4, 2, 4],
+        [13, 0, 4, 6],
+        [14, 0, 0, 8],
+      ])
+      b.line(bell, [
+        [0, 0, 7, 4], [4, 0, 9, 4], [8, 0, 7, 4], [12, 0, 6, 4], [15, 4, 7, 4],
+      ])
+      b.drums('tom', 'o.......', 0, 16, 0.08)
+      b.drums('kick', '....x...', 4, 14, 0.07)
+      b.drums('hat', '......o.', 8, 14, 0.03)
     },
   )
 }
@@ -730,6 +778,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   desert: buildDesert,
   oldRiver: buildRiver,
   void: buildVoid,
+  oldRuins: buildOldRuins,
   ruins: buildRuins,
   daynight: buildDayNight,
   space: buildSpace,
