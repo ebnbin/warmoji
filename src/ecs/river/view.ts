@@ -56,9 +56,14 @@ function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, d
   if (scene.textures.exists(key)) scene.textures.remove(key)
   const tex = scene.textures.createCanvas(key, w, h)!
   if (draw) draw(tex.getContext())
+  upload(tex)
+  return tex
+}
+
+/** 把画布传上显卡并按线性插值采样：每次上传都会把过滤重设成游戏的默认值，高分屏开了 pixelArt 就是最近点，所以上传完要重新设 */
+function upload(tex: Phaser.Textures.CanvasTexture): void {
   tex.refresh()
   tex.setFilter(Phaser.Textures.FilterMode.LINEAR)
-  return tex
 }
 
 /** 一团水雾：边沿被噪声扰得参差，里面一絮一絮的浓淡；贴图边上一定透明 */
@@ -187,8 +192,8 @@ export class RiverView implements MapView {
     this.painter = undefined
     const water = s.water
     if (!water) return
-    ground.refresh()
-    canopy.refresh()
+    upload(ground)
+    upload(canopy)
     const x0 = t.x0 * UNIT
     const y0 = t.y0 * UNIT
     const wPx = t.cols * t.cell * UNIT
@@ -225,9 +230,7 @@ export class RiverView implements MapView {
     const scene = v.scene
     const img = encodeWater(cfg, plan, water)
     const put = (key: string, data: Uint8ClampedArray<ArrayBuffer>, w: number, h: number): void => {
-      const tex = canvasTexture(scene, key, w, h)
-      tex.getContext().putImageData(new ImageData(data, w, h), 0, 0)
-      tex.refresh()
+      canvasTexture(scene, key, w, h, (ctx) => ctx.putImageData(new ImageData(data, w, h), 0, 0))
     }
     put(BED_KEY, img.bed, img.bedCols, img.bedRows)
     put(LEVEL_KEY, img.level, img.cols, img.rows)
