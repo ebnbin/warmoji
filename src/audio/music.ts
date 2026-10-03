@@ -727,7 +727,7 @@ function buildCave(): BgmScore {
 const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
-  desert: buildDesert,
+  oldDesert: buildDesert,
   oldRiver: buildRiver,
   void: buildVoid,
   ruins: buildRuins,

@@ -169,9 +169,9 @@ export const MAPS = {
     mix: FOREST_MIX,
     boss: 'treant',
   },
-  desert: {
+  oldDesert: {
     emoji: '1f3dc',
-    name: '荒漠',
+    name: '旧荒漠',
     desc: '烈日炙烤的荒漠，赶路格外耗体力，歇着也回得慢；沙丘与枯骨之间潜伏着不知疲倦的毒物',
     kind: 'bounded',
     size: { w: 30, h: 30 },
