@@ -315,7 +315,7 @@ export const MAPS = {
       },
       masonry: { courseM: 0.28, density: 2200, bond: 1, heightM: { outer: [4.2, 5.6], inner: [3, 4.2], tower: [7, 9], parapet: 0.84, column: 3.4 } },
       arcade: { radiusU: 0.42, spacingU: 2.8, entries: [1, 1] },
-      decay: { waveU: 6, keep: [0.1, 1], razed: [2, 4], razeU: [1.6, 3], breaches: [2, 4], breachM3: [0.6, 1.6], broken: 0.35, fallen: 0.25, rubble: 0.1 },
+      decay: { waveU: 6, keep: [0.1, 1], razed: [2, 4], razeU: [1.6, 3], breaches: [2, 4], breachM3: [0.6, 1.6], broken: 0.35, fallen: 0.2, rubble: 0.06 },
       timber: { doors: [1, 3], heightM: 1.9, thickU: 0.3 },
       rubble: { reposeDeg: 36, fullM: 0.4, viscosity: 1.6, exertion: 0.5 },
       fall: { damagePerKJ: 8, radiusU: 0.35 },

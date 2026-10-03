@@ -37,6 +37,8 @@ const DUST_SPREAD = 0.06
 const FALL_TINT = 0xb9a888
 /** 落石分桶的边长，格：一桶里落下的能量一起砸 */
 const FALL_BIN_U = 0.5
+/** 一帧走得比这（格）还远的是跳、瞬移、放置这类一次算好的落点：只看落点，不按路径挡 */
+const WALK_STEP_U = 1
 /** 给画面的事件最多攒这么多条 */
 const EVENT_CAP = 64
 const STRENGTH: Strength = { masonry: MATERIALS.masonry.strength ?? Infinity, timber: MATERIALS.timber.strength ?? Infinity }
@@ -128,9 +130,14 @@ export function ruinsOf(sim: Sim): RuinsState {
   return s
 }
 
+/** 跨得过 m 米的身体跨得过几层石块 */
+export function levelFor(cfg: RuinsConfig, m: number): number {
+  return Math.max(0, Math.min(LEVELS - 1, Math.floor(m / cfg.masonry.courseM + 1e-6)))
+}
+
 /** 这具身体跨得过几层石块 */
 function levelOf(sim: Sim, eid: number): number {
-  return Math.max(0, Math.min(LEVELS - 1, Math.floor(stepM(sim.world, eid) / cfgOf(sim).masonry.courseM + 1e-6)))
+  return levelFor(cfgOf(sim), stepM(sim.world, eid))
 }
 
 /** 跨得过 level 层的身体按的距离场（格）：砌体变了就重算 */
@@ -573,7 +580,8 @@ export const ruins: WorldHooks = {
     const field = fieldOf(s, level)
     const lf = local(s, from.x, from.y)
     let lp = local(s, p.x, p.y)
-    if (Math.hypot(lp.u - lf.u, lp.v - lf.v) > s.m.grid.cell) {
+    const step = Math.hypot(lp.u - lf.u, lp.v - lf.v)
+    if (step > s.m.grid.cell && step < WALK_STEP_U) {
       const t = walkStop(s.m, level, lf.u, lf.v, lp.u, lp.v)
       if (t < 1) lp = { u: lf.u + (lp.u - lf.u) * t * 0.9, v: lf.v + (lp.v - lf.v) * t * 0.9 }
     }

@@ -569,7 +569,7 @@ function pathAt(sc: PaintScene, u: number, v: number): number {
 
 /** 地上的碎石：盖住多少看深浅，薄处零零星星，厚处堆满；碎块是有棱角的多边形，每个面朝向不一、按太阳打光，大块夹着小块；石块之间是灰白的灰浆粉 */
 function rubbleOn(o: Px, f: Frame, x: number, y: number, depth: number, seed: number): void {
-  const cover = smooth(0.012, 0.12, depth)
+  const cover = smooth(0.025, 0.15, depth)
   if (cover <= 0) return
   const dust = 0.88 + 0.2 * valueNoise(x * 11, y * 11, seed + 51)
   mix(o, 182 * dust, 166 * dust, 138 * dust, cover * 0.6)
@@ -698,20 +698,18 @@ function masonryTop(o: Px, sc: PaintScene, s: number, n: number, u: number, v: n
     const dv = (v - cv) / rad
     const rr = Math.sqrt(du * du + dv * dv)
     const ang = Math.atan2(dv, du)
-    const flute = smooth(0.7, 0.95, rr) * (0.5 + 0.5 * Math.cos(ang * 16))
-    id = k
-    edgeA = (1 - rr) * rad
-    edgeB = 1
-    na = rr > 0.75 ? du * smooth(0.75, 1, rr) : 0
-    nb = rr > 0.75 ? dv * smooth(0.75, 1, rr) : 0
-    const rough = n < Math.round(sc.cfg.masonry.heightM.column / sc.cfg.masonry.courseM) ? 0.35 : 0
+    // 柱顶：断口粗糙、完整的磨平；边上一圈凹槽，最外一圈倒角往下斜
+    const rough = n < Math.round(sc.cfg.masonry.heightM.column / sc.cfg.masonry.courseM) ? 0.45 : 0.08
+    const flute = smooth(0.74, 0.86, rr) * smooth(0.98, 0.9, rr) * smooth(0.55, 0.95, Math.cos(ang * 16))
     const c = STONES[2]!
-    const grain = 0.9 + 0.14 * valueNoise(x * 18, y * 18, seed + 71) + rough * (valueNoise(x * 6, y * 6, seed + 73) - 0.5)
+    const grain = 0.92 + 0.12 * valueNoise(x * 18, y * 18, seed + 71) + rough * (valueNoise(x * 6, y * 6, seed + 73) - 0.5)
     set(o, c[0] * grain, c[1] * grain, c[2] * grain)
-    mix(o, 120, 112, 96, flute * 0.35)
-    const w = toWorldDir(sc.frame, na, nb)
-    o.nx = w.x * 0.9
-    o.ny = w.y * 0.9
+    mix(o, 112, 102, 84, flute * 0.55)
+    mix(o, 96, 88, 72, smooth(0.9, 1, rr) * 0.5)
+    const bevel = smooth(0.82, 1, rr)
+    const w = toWorldDir(sc.frame, du * bevel * 1.4, dv * bevel * 1.4)
+    o.nx = w.x + (valueNoise(x * 7, y * 7, seed + 75) - 0.5) * rough
+    o.ny = w.y + (valueNoise(x * 7 + 3, y * 7, seed + 75) - 0.5) * rough
     o.nz = 1
     return
   }

@@ -11,6 +11,8 @@ import { loadSettings } from '../../save/settings'
 import { browserStorage } from '../../util/storage'
 import { spawnDecor } from '../entities/decor'
 import { Alive, Transform } from '../components'
+import { devFlag } from '../../devtools'
+import { OBSTACLES } from '../../data/obstacles'
 import { eyeM } from '../utils/pass'
 import { roomAt } from '../worlds/basin'
 import { CANOPY_PPU, PAINT_PAD_U, textureSize } from './ground'
@@ -18,7 +20,7 @@ import { toLocal, toWorld } from './layout'
 import { cellAt, GRAVITY } from './masonry'
 import { RuinsPainter } from './painter'
 import { drawChip, drawDust, drawPigeon, drawSplinter, SIGHT_BINS, SIGHT_FRAG, SIGHT_RANGE_U, sightRing } from './shader'
-import { ruinsOf, ruinsPlanFor } from './world'
+import { fieldOf, levelFor, ruinsOf, ruinsPlanFor } from './world'
 import type { PaintPiece, PaintScene, PaintState } from './ground'
 import type { RuinsPlan } from './layout'
 import type { PaintTask } from './painter'
@@ -53,6 +55,8 @@ const WIND = { x: 10, y: -4 }
 const LIFT_PX_PER_M = UNIT * 0.5
 /** 视线环所在的深度：盖在身体之上、树冠之上 */
 const SIGHT_DEPTH = 25
+/** 开发者工具里「显示碰撞边界」的开关 */
+const DEV_WALLS = 'battle.walls'
 /** 鸽子停在多高（米）以上的墙头 */
 const PERCH_M = 2
 const PIGEONS = 9
@@ -140,6 +144,8 @@ export class RuinsView implements MapView {
   private pigeons: Pigeon[] = []
   private perches: Point[] = []
   private shake = true
+  private devWalls?: Phaser.GameObjects.Graphics
+  private devVersion = -1
 
   private planOf(v: ViewCtx): RuinsPlan {
     if (!this.plan) this.plan = ruinsPlanFor(v.def.ruins!, v.run.decorSeed)
@@ -277,10 +283,10 @@ export class RuinsView implements MapView {
         lifespan: { min: 3200, max: 6000 },
         speedX: { min: WIND.x * 0.3 - 10, max: WIND.x * 1.2 + 10 },
         speedY: { min: WIND.y - 14, max: WIND.y + 8 },
-        scale: { start: 0.9, end: 3.2 },
-        alpha: { start: 0.36, end: 0 },
+        scale: { start: 1, end: 3.4 },
+        alpha: { start: 0.46, end: 0 },
         rotate: { min: 0, max: 360 },
-        tint: [0xb9ab90, 0xa89a80, 0xc6b9a0, 0x9c8f78],
+        tint: [0xd6c8ac, 0xc8b99c, 0xe2d6bf, 0xbcae92],
         emitting: false,
       })
       .setDepth(33)
@@ -360,6 +366,47 @@ export class RuinsView implements MapView {
     this.stepStones(dt)
     this.stepSight(v, sim, s)
     this.stepPigeons(sim, s, dt)
+    this.stepDevWalls(v, s)
+  }
+
+  /** 开发者工具的碰撞边界：标准身高的身体跨不过的墙，墙塌了就重画；盖在一切之上 */
+  private stepDevWalls(v: ViewCtx, s: RuinsState): void {
+    if (!devFlag(DEV_WALLS)) {
+      this.devWalls?.setVisible(false)
+      return
+    }
+    this.devWalls ??= v.scene.add.graphics().setDepth(1002)
+    this.devWalls.setVisible(true)
+    if (this.devVersion === s.version) return
+    this.devVersion = s.version
+    const gfx = this.devWalls
+    gfx.clear()
+    gfx.lineStyle(0.05 * UNIT, 0xff00ff, 1)
+    const B = OBSTACLES.body
+    const field = fieldOf(s, levelFor(v.def.ruins!, B.heightM * B.step))
+    const g = s.m.grid
+    const f = s.plan.frame
+    const at = (i: number, j: number, k: number, l: number): Point => {
+      const a = field[j * g.cols + i]!
+      const b = field[l * g.cols + k]!
+      const t = a / (a - b)
+      const w = toWorld(f, g.u0 + (i + 0.5 + (k - i) * t) * g.cell, g.v0 + (j + 0.5 + (l - j) * t) * g.cell)
+      return { x: w.x * UNIT, y: w.y * UNIT }
+    }
+    for (let j = 0; j + 1 < g.rows; j++) {
+      for (let i = 0; i + 1 < g.cols; i++) {
+        const cuts: Point[] = []
+        const tl = field[j * g.cols + i]! > 0
+        const tr = field[j * g.cols + i + 1]! > 0
+        const bl = field[(j + 1) * g.cols + i]! > 0
+        const br = field[(j + 1) * g.cols + i + 1]! > 0
+        if (tl !== tr) cuts.push(at(i, j, i + 1, j))
+        if (tr !== br) cuts.push(at(i + 1, j, i + 1, j + 1))
+        if (bl !== br) cuts.push(at(i, j + 1, i + 1, j + 1))
+        if (tl !== bl) cuts.push(at(i, j, i, j + 1))
+        for (let k = 0; k + 1 < cuts.length; k += 2) gfx.lineBetween(cuts[k]!.x, cuts[k]!.y, cuts[k + 1]!.x, cuts[k + 1]!.y)
+      }
+    }
   }
 
   /** 砌体改动过的格子：它所在的块与四周一圈要补画，原来或现在的墙有多高，背着太阳那边影子能拖到的块也要补画 */
@@ -587,6 +634,9 @@ export class RuinsView implements MapView {
     this.painter = undefined
     for (const o of this.visuals) o.destroy()
     for (const st of this.stones) st.img.destroy()
+    this.devWalls?.destroy()
+    this.devWalls = undefined
+    this.devVersion = -1
     for (const eid of this.decorEids) removeEntity(v.world, eid)
     this.visuals = []
     this.decorEids = []

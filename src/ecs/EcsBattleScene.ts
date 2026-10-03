@@ -93,7 +93,7 @@ import { enemyDef } from './store'
 import { wallLoops } from './worlds/basin'
 
 const showTargets = defineDevFlag({ id: 'battle.targets', group: '战斗', label: '显示队员目标连线', desc: '从每个队员画到其当前目标' })
-const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体、舷墙与桅杆' })
+const showWalls = defineDevFlag({ id: 'battle.walls', group: '战斗', label: '显示碰撞边界', desc: '勾出身体走不进去的岩壁、山体、舷墙与桅杆，残垣里标准身高跨不过的墙' })
 
 function held(key?: Phaser.Input.Keyboard.Key): boolean {
   return key?.isDown ?? false
