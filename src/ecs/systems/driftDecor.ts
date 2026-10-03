@@ -1,12 +1,12 @@
 import { query } from 'bitecs'
 import { UNIT } from '../../util/units'
 import { MAPS } from '../../data/maps'
-import { driftSpeed, riverRect } from '../worlds/river'
+import { driftSpeed, riverRect } from '../worlds/oldRiver'
 import { Drift, Transform } from '../components'
 import type { Sim } from '../sim'
 
 export function driftDecor(sim: Sim): void {
-  const cfg = MAPS[sim.mapId].river
+  const cfg = MAPS[sim.mapId].oldRiver
   if (!cfg) return
   const r = riverRect(sim.mapW, sim.mapH, cfg.width * UNIT)
   const alongLen = r.horizontal ? sim.mapW : sim.mapH
