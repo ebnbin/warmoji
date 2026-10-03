@@ -563,6 +563,20 @@ export const MAPS = {
       density: [0.008, 0.012],
     },
     mix: RIVER_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      boss: 'deep',
+      kinds: {
+        grove: { name: '林间', at: { kind: 'nooks', spacingU: 7, away: { mark: 'ports', minU: 7.5 } }, enter: 'walk', look: 'leaves', weight: 3, perSec: 1.5, only: ['zombie', 'ghost', 'blob', 'slime', 'snake'] },
+        thicket: { name: '林缘', at: { kind: 'rim', segU: 3, away: { mark: 'ports', minU: 7.5 } }, enter: 'climb', look: 'leaves', weight: 1.5, perSec: 1, only: ['zombie', 'blob', 'slime', 'snake'] },
+        bank: { name: '河岸', at: { kind: 'mark' }, enter: 'climb', look: 'splash', weight: 3, perSec: 1.5, only: ['snake', 'puffer', 'turtle', 'siren', 'crab'] },
+        falls: { name: '瀑布', at: { kind: 'mark' }, enter: 'lob', look: 'splash', weight: 2, perSec: 2, reachU: 12, only: ['zombie', 'blob', 'slime', 'snake', 'crab', 'turtle', 'puffer'] },
+        mist: { name: '谷雾', at: { kind: 'mark' }, enter: 'climb', look: 'steam', weight: 2, perSec: 1, only: ['ghost'] },
+        deep: { name: '急流', at: { kind: 'mark' }, enter: 'rise', look: 'splash', weight: 1, only: ['croc'] },
+        meadow: { name: '草地', at: { kind: 'ground' }, enter: 'rise', look: 'leaves', weight: 1 },
+      },
+    },
     finalWaveSub: '巨鳄稳稳站在急流里——别跟它在深水里纠缠！',
     river: {
       meterPerU: 0.5,
