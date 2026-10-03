@@ -14,8 +14,8 @@ import type { Sim } from './sim'
 import { clockSec } from './fight/clock'
 import type { TorusConfig } from '../types/maps'
 import { query } from 'bitecs'
-import { Alive, Due, ENEMY_SET, Meteor, Phys, Pickup, Stats, Transform, Uid, VisOff } from './components'
-import { meteorPath } from './store'
+import { Alive, Due, ENEMY_SET, Meteor, Phys, Pickup, Stats, Telegraph, Transform, Uid, VisOff } from './components'
+import { meteorPath, telegraphDef, telegraphEntry } from './store'
 import { captureRadiusU } from './worlds/nebulaOld'
 import { ringPoint } from './worlds/space'
 import { leaderX, leaderY } from './utils/team'
@@ -3255,7 +3255,7 @@ class CaveView extends BoundedView {
     }
   }
 
-  /** 黑暗里的敌人：被火把照到一点、自己又在暗处时，眼睛把火光反回来，露出一对亮点；偶尔眨一下 */
+  /** 黑暗里的敌人与快要出来的敌人（在它进场的起点）：被火把照到一点、自己又在暗处时，眼睛把火光反回来，露出一对亮点；偶尔眨一下 */
   private stepEyes(scene: Phaser.Scene, sim: Sim, s: CaveState, adapt: number): void {
     const cfg = MAPS[sim.mapId].cave!
     const spots: Point[] = []
@@ -3269,17 +3269,18 @@ class CaveView extends BoundedView {
     let used = 0
     if (spots.length > 0) {
       const view = sim.view
-      for (const eid of query(sim.world, ENEMY_SET)) {
-        if (!Alive.v[eid]) continue
-        const x = Transform.x[eid]!
-        const y = Transform.y[eid]!
+      // 从上面落下来的还不在地上
+      const lurking = [...query(sim.world, [Telegraph, Transform])]
+        .filter((t) => telegraphEntry[t]?.enter !== 'drop')
+        .map((t) => ({ eid: t, x: telegraphEntry[t]?.sx ?? Transform.x[t]!, y: telegraphEntry[t]?.sy ?? Transform.y[t]!, h: telegraphDef[t]!.size * (Telegraph.boss[t] ? 0.2 : 0.3) }))
+      const bodies = [...query(sim.world, ENEMY_SET)].filter((eid) => Alive.v[eid]).map((eid) => ({ eid, x: Transform.x[eid]!, y: Transform.y[eid]!, h: Transform.h[eid]! }))
+      for (const { eid, x, y, h } of [...bodies, ...lurking]) {
         if (x < view.x || x > view.right || y < view.y || y > view.bottom) continue
         const torch = torchesLux(cfg.torch, spots, lits, x, y)
         const e = (diffuseLux(s.light, x, y) + directLux(s.layout, s.sky, x, y, 0) + torch) / adapt
         const shown = (1 - smoothCave(0.06, 0.25, e)) * smoothCave(0.004, 0.05, torch)
         if (shown <= 0.02) continue
         const blink = Math.sin(sim.elapsedMs / 1700 + eid * 1.7) > 0.96 ? 0 : 1
-        const h = Transform.h[eid]!
         for (const side of [-1, 1]) {
           let img = this.eyes[used]
           if (!img) {

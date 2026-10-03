@@ -751,6 +751,20 @@ export const MAPS = {
       density: [0.03, 0.05],
     },
     mix: CAVE_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      boss: 'main',
+      kinds: {
+        alcove: { name: '支洞', at: { kind: 'mark' }, enter: 'walk', weight: 3, perSec: 1.5 },
+        crack: { name: '石缝', at: { kind: 'nooks', spacingU: 6, away: { mark: 'tunnel', minU: 2.5 } }, enter: 'walk', weight: 2, perSec: 1, only: ['rat', 'slime', 'creeper', 'zombie', 'skeleton'] },
+        pool: { name: '水潭', at: { kind: 'mark' }, enter: 'rise', look: 'splash', weight: 2, perSec: 1, only: ['slime', 'siren'] },
+        glow: { name: '荧光丛', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 2, perSec: 1, only: ['mushroom', 'slime'] },
+        skylight: { name: '天窗', at: { kind: 'mark' }, enter: 'drop', weight: 1.5, perSec: 1, only: ['gargoyle', 'zombie', 'skeleton'] },
+        main: { name: '主天窗', at: { kind: 'mark' }, enter: 'drop', weight: 1, only: ['eclipse'] },
+        dark: { name: '暗处', at: { kind: 'ground' }, enter: 'rise', weight: 1 },
+      },
+    },
     finalWaveSub: '夜伯爵从黑暗里来——守住火光！',
     cave: {
       hall: { insetU: [2.5, 5.5], waveU: 8, cornerU: 6, neckU: 0.8, ceilingM: 10, wallU: 2.2 },

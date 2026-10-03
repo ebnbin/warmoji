@@ -1594,6 +1594,15 @@ const cave: WorldHooks = {
   spawnPoint(sim, boss) {
     return caveSpawn(sim, boss)
   },
+  /** 只看站不站得下：暗处由刷怪点挑，白天亮着的地标整组不出 */
+  canSpawn(sim, x, y, radius) {
+    return roomFor(caveOf(sim).layout.rock, x, y, radius)
+  },
+  /** 洞里暗到看不清了，水潭、荧光丛与天窗才出怪：白天那里亮堂堂的，怪只从暗处出来 */
+  landmarks(sim) {
+    const s = caveOf(sim)
+    return s.light.hallLux < caveCfg(sim).view.clearLux ? s.marks : s.dayMarks
+  },
   settle(sim, p) {
     const rock = caveOf(sim).layout.rock
     const inset = SPAWN.edgeInset * UNIT
