@@ -544,7 +544,7 @@ export interface CaveConfig {
   /** 怪物只刷在照度不到 spawnLux 的地方 */
   readonly spawnLux: number
 }
-export interface RiverConfig {
+export interface OldRiverConfig {
   readonly viewScale: number
   readonly width: number
   readonly flow: number
@@ -560,6 +560,110 @@ export interface RiverConfig {
   readonly waveSlow: number
   readonly waveFast: number
 }
+/**
+ * 河流：林子与岩石围着的一片空地，一条山溪从崖上落进深潭，往下分成一大一小两股，各自从断崖边落进深谷。
+ * 河道按流量定宽深、按曼宁公式定坡降，水流是浅水方程在这副河床上的稳态解；空地的形状、河的走向与出入口都由种子定。
+ * 物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface RiverConfig {
+  readonly meterPerU: number
+  /** 地形格子的边长，格；地形铺满镜头能看到的地图外一圈 */
+  readonly cellU: number
+  /** 空地：能走的地面连同河面的面积，格²；轮廓按方位角的低阶起伏（相对半径，从二阶起）加二维噪声的起伏（格，波长 waveU） */
+  readonly clearing: {
+    readonly areaU2: readonly [number, number]
+    readonly lobes: readonly number[]
+    readonly wobbleU: number
+    readonly waveU: number
+    /** 地图的边离空地最远处多远 */
+    readonly padU: number
+    /** 窄过两倍 neckU 的缝和尖角不能走 */
+    readonly neckU: number
+  }
+  /** 河网：进水口在空地边上随机的方位；两个出水口在它对面 oppositeDeg 以内的一个、与旁边隔开 spreadDeg 的另一个，离进水口都至少 apartDeg */
+  readonly network: {
+    readonly oppositeDeg: number
+    readonly spreadDeg: readonly [number, number]
+    readonly apartDeg: number
+    /** 分叉点在进水口到两出水口中点的哪一段 */
+    readonly splitAt: readonly [number, number]
+    /** 大股、小股在分叉处偏离主河道的角度 */
+    readonly majorTurnDeg: readonly [number, number]
+    readonly minorTurnDeg: readonly [number, number]
+    /** 河道蜿蜒的幅度，格；弯道半径至少是河宽的 minBend 倍；河岸离空地边至少 edgeGapU */
+    readonly meanderU: number
+    readonly minBend: number
+    readonly edgeGapU: number
+  }
+  /** 水力几何：流量（米³/秒）按 share 分给大股；水面宽 W = widthCoef·√Q、平均水深 D = depthCoef·Q^0.4（米）；坡降由曼宁糙率反算 */
+  readonly flow: {
+    readonly discharge: number
+    readonly share: number
+    readonly widthCoef: number
+    readonly depthCoef: number
+    readonly manning: number
+    /** 横断面的形状指数：水深按 1 − |ξ|^bedShape 从深泓往两岸收 */
+    readonly bedShape: number
+    /** 弯顶的深潭、过渡段的浅滩相对平均的水深倍率；深泓往凹岸偏到半宽的 thalwegShift 倍 */
+    readonly pool: number
+    readonly riffle: number
+    readonly thalwegShift: number
+    /** 河岸高出水面多少米、岸坡多宽（格）；岸顶以外的滩地每格升多少米，起伏多少米 */
+    readonly bankM: number
+    readonly bankU: number
+    readonly floodSlope: number
+    readonly reliefM: number
+  }
+  /** 瀑布：进水口的崖高与崖面的进深、崖下深潭的深（米）与半径（相对主河道水面宽）；出水口外深谷的深，断崖外还能被冲过去的那一段多长（格），断崖边前那道岩坎多长（格） */
+  readonly falls: {
+    readonly cliffM: number
+    readonly cliffU: number
+    readonly poolM: number
+    readonly poolR: number
+    readonly gorgeM: number
+    readonly lipU: number
+    readonly sillU: number
+  }
+  /** 树：树冠半径（格）、伸进空地的树冠下有多宽能走；林子按二维噪声和岩石分地盘，林子占多少；伸进空地的林舌、空地里的树丛与孤树各几处 */
+  readonly trees: {
+    readonly crownU: readonly [number, number]
+    readonly overhangU: number
+    readonly forest: number
+    readonly tongues: readonly [number, number]
+    readonly groves: readonly [number, number]
+    readonly lone: readonly [number, number]
+  }
+  /** 石头：河里与空地上各几块，半径（格），露出水面或地面多高（米） */
+  readonly rocks: {
+    readonly inRiver: readonly [number, number]
+    readonly onLand: readonly [number, number]
+    readonly radiusU: readonly [number, number]
+    readonly heightM: readonly [number, number]
+  }
+  /**
+   * 水里的身体：半径 radiusU 格、质量倍率为 1 的身体重 kg 千克、高 heightM 米，别的身体质量按半径的三次方与质量倍率、身高按半径缩放（半径不算队长倍率）；
+   * 身体的密度（千克/米³）与水里的阻力系数。水的推力绕脚掌的力矩大过（体重 − 浮力）乘扶正力臂（推倒），推力大过（体重 − 浮力）乘脚底的摩擦系数（滑走），
+   * 或者干脆浮起来，就站不住、随水漂
+   */
+  readonly body: {
+    readonly kg: number
+    readonly radiusU: number
+    readonly heightM: number
+    readonly density: number
+    readonly drag: number
+    /** 站着时胯以下迎水的是两条腿：腿宽占身宽、胯高占身高的比例 */
+    readonly legs: number
+    readonly hip: number
+    /** 站着时重心到脚掌下游边的水平距离占身高的比例 */
+    readonly lever: number
+    /** 脚底踩在湿河床上的静摩擦系数 */
+    readonly mu: number
+    /** 随水漂着时自己划水的速度（相对水）占想走的速度的比例 */
+    readonly swim: number
+    /** 水深不到这个（米）算干地 */
+    readonly wetM: number
+  }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -570,7 +674,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'river' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'floe' | 'cave'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -587,6 +691,7 @@ export interface MapDef {
   readonly nebula?: NebulaConfig
   readonly volcano?: VolcanoConfig
   readonly ship?: ShipConfig
+  readonly oldRiver?: OldRiverConfig
   readonly floe?: FloeConfig
   readonly cave?: CaveConfig
   readonly river?: RiverConfig
@@ -596,7 +701,7 @@ export interface MapDef {
 }
 export type MapId = keyof typeof mapsJson
 
-export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava'
+export type Hazard = 'coldWater' | 'meteor' | 'blackhole' | 'lava' | 'falls'
 
 export interface DecorInstance {
   emoji: string

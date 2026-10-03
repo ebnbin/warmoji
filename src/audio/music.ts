@@ -728,7 +728,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   lobby: buildLobby,
   forest: buildForest,
   desert: buildDesert,
-  river: buildRiver,
+  oldRiver: buildRiver,
   void: buildVoid,
   ruins: buildRuins,
   daynight: buildDayNight,
@@ -738,6 +738,7 @@ const BUILDERS: Record<BgmId, () => BgmScore> = {
   nebula: buildNebula,
   volcano: buildVolcano,
   ship: buildShip,
+  river: buildRiver,
   floe: buildFloe,
   cave: buildCave,
 }

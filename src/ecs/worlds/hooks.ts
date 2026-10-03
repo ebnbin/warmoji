@@ -5,7 +5,7 @@ import { ENEMY_BODY } from '../../data/abilities'
 import { randomMapPoint } from '../utils/spawn'
 import { Rng } from '../../util/rng'
 import { MAP, MAPS } from '../../data/maps'
-import type { CaveConfig, FloeConfig, IceConfig, MapDef, MapId, NebulaConfig, NebulaOldConfig, RiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
+import type { CaveConfig, FloeConfig, IceConfig, MapDef, MapId, NebulaConfig, NebulaOldConfig, OldRiverConfig, ShipConfig, SpaceConfig, VolcanoConfig } from '../../types/maps'
 import { onFloe } from '../worlds/ice'
 import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/space'
 import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebulaOld'
@@ -23,9 +23,9 @@ import { clearPath, diffuseLux, directLux, flowDir, flowFrom, inPool, makeCaveSt
 import type { CaveState, Rock } from '../worlds/cave'
 import { clockSec } from '../fight/clock'
 import { charSize } from '../systems/shared/scale'
-import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/river'
+import { clampToRiver, flowVector, pastDownstream, riverRect } from '../worlds/oldRiver'
 import { ghostImages, torusDelta, torusDist2, wrapPoint } from '../worlds/torus'
-import type { RiverRect } from '../worlds/river'
+import type { RiverRect } from '../worlds/oldRiver'
 import { isHorizontal } from '../utils/remap'
 import { hasComponent, query, removeEntity } from 'bitecs'
 import { Airborne, Alive, Boss, BreaksWalls, Drive, Due, ENEMY_SET, GrantCoins, Hp, Meteor, Motion, MOTION, Phasing, Phys, Pickup, PICKUP_SET, PROJ_SET, Radius, Shard, Slot, Stats, Swarmer, Tint, Transform, Uid } from '../components'
@@ -45,6 +45,8 @@ import { iceTraction } from '../systems/shared/squad'
 import { withBuilt } from './built'
 import { approach } from '../systems/shared/body'
 import type { BodyStep } from '../systems/shared/body'
+import { river } from '../river/world'
+import type { RiverState } from '../river/world'
 
 const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
@@ -89,13 +91,14 @@ export interface WorldState {
   hole: Point | null
   volcano: VolcanoState | null
   ship: ShipState | null
+  river: RiverState | null
   nebula: NebulaState | null
   floe: FloeState | null
   cave: CaveState | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, nebula: null, floe: null, cave: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, nebula: null, floe: null, cave: null }
 }
 
 export interface WorldHooks {
@@ -1528,34 +1531,34 @@ const cave: WorldHooks = {
   },
 }
 
-function riverCfg(sim: Sim): RiverConfig {
-  return MAPS[sim.mapId].river!
+function oldRiverCfg(sim: Sim): OldRiverConfig {
+  return MAPS[sim.mapId].oldRiver!
 }
 
-function riverOf(sim: Sim): RiverRect {
-  return riverRect(sim.mapW, sim.mapH, riverCfg(sim).width * UNIT)
+function oldRiverOf(sim: Sim): RiverRect {
+  return riverRect(sim.mapW, sim.mapH, oldRiverCfg(sim).width * UNIT)
 }
 
-function flowOf(sim: Sim): Point {
-  return flowVector(isHorizontal(sim.mapW, sim.mapH), riverCfg(sim).flow * UNIT)
+function oldFlowOf(sim: Sim): Point {
+  return flowVector(isHorizontal(sim.mapW, sim.mapH), oldRiverCfg(sim).flow * UNIT)
 }
 
-const river: WorldHooks = {
+const oldRiver: WorldHooks = {
   ...bounded,
   mediumVelocity(sim) {
-    return flowOf(sim)
+    return oldFlowOf(sim)
   },
   /** 按行进方向与水流夹角的余弦在逆流与顺流的倍率之间插值，横渡不变 */
   effort(sim, _x, _y, dx, dy) {
-    const f = flowOf(sim)
+    const f = oldFlowOf(sim)
     const len = Math.hypot(dx, dy) * Math.hypot(f.x, f.y)
     if (len === 0) return 1
     const c = (dx * f.x + dy * f.y) / len
-    const cfg = riverCfg(sim)
+    const cfg = oldRiverCfg(sim)
     return c < 0 ? 1 + (cfg.upstream - 1) * -c : 1 + (cfg.downstream - 1) * c
   },
   constrainBody(sim, eid, _from, next) {
-    const r = riverOf(sim)
+    const r = oldRiverOf(sim)
     const rad = Radius.v[eid]!
     if (Boss.v[eid] === 1 || hasComponent(sim.world, eid, Slot)) return clampToRiver(next, r, rad)
     if (r.horizontal) return { x: next.x, y: Math.min(Math.max(next.y, r.y + rad), r.y + r.h - rad) }
@@ -1568,10 +1571,10 @@ const river: WorldHooks = {
     return { x: awayX, y: awayY }
   },
   outside(sim, x, y) {
-    return pastDownstream({ x, y }, sim.mapW, sim.mapH, riverCfg(sim).coinCullPad * UNIT)
+    return pastDownstream({ x, y }, sim.mapW, sim.mapH, oldRiverCfg(sim).coinCullPad * UNIT)
   },
   spawnPoint(sim, boss) {
-    const r = riverOf(sim)
+    const r = oldRiverOf(sim)
     const pad = 0.5 * UNIT
     const pick = (): Point => ({
       x: r.x + pad + sim.rng.next() * (r.w - pad * 2),
@@ -1588,11 +1591,11 @@ const river: WorldHooks = {
     return pos
   },
   settle(sim, p) {
-    return clampToRiver(p, riverOf(sim), 0.5 * UNIT)
+    return clampToRiver(p, oldRiverOf(sim), 0.5 * UNIT)
   },
   /** 漂过下游太远的敌人被冲走 */
   tick(sim) {
-    const pad = riverCfg(sim).enemyCullPad * UNIT
+    const pad = oldRiverCfg(sim).enemyCullPad * UNIT
     for (const eid of [...query(sim.world, ENEMY_SET)]) {
       if (Boss.v[eid] === 1) continue
       if (pastDownstream({ x: Transform.x[eid]!, y: Transform.y[eid]! }, sim.mapW, sim.mapH, pad)) despawnEnemy(sim, eid, false)
@@ -1647,13 +1650,14 @@ const BY_KIND: Record<MapDef['kind'], WorldHooks> = {
   daynight: bounded,
   ruins: ruins,
   ice,
-  river,
+  oldRiver,
   void: torus,
   space,
   nebulaOld,
   nebula,
   volcano,
   ship,
+  river,
   floe,
   cave,
 }
