@@ -1,6 +1,5 @@
 /**
- * 首尾相接的噪声：格点的坐标按 period 取模再哈希，整圈正好 period 个格点，左右、上下两条边拼得严丝合缝。
- * 坐标以格点计；同一套哈希给值噪声和细胞噪声用
+ * 首尾相接的噪声：格点的坐标按 period 取模再哈希，整圈正好 period 个格点，左右、上下两条边拼得严丝合缝。坐标以格点计
  */
 
 /** 整数格点上的哈希，落在 [0, 1) */
@@ -44,53 +43,4 @@ export function tileFbm(x: number, y: number, period: number, seed: number, octa
     f *= 2
   }
   return sum / norm
-}
-
-/** 细胞噪声里最近的特征点：(x, y) 相对它的偏移与它自己的哈希；每格一个特征点，格子按 period 回绕 */
-export function tileCell(x: number, y: number, period: number, seed: number, out: { dx: number; dy: number; h: number }): { dx: number; dy: number; h: number } {
-  const ix = Math.floor(x)
-  const iy = Math.floor(y)
-  let best = 81
-  for (let j = -1; j <= 1; j++) {
-    for (let i = -1; i <= 1; i++) {
-      const cx = ix + i
-      const cy = iy + j
-      const wx = wrap(cx, period)
-      const wy = wrap(cy, period)
-      const ox = x - cx - hash(wx, wy, seed)
-      const oy = y - cy - hash(wx, wy, seed + 7)
-      const d = ox * ox + oy * oy
-      if (d < best) {
-        best = d
-        out.dx = ox
-        out.dy = oy
-        out.h = hash(wx, wy, seed + 13)
-      }
-    }
-  }
-  return out
-}
-
-/** 细胞噪声里到次近与最近特征点的距离差：细胞交界处为 0，画裂纹用 */
-export function tileEdge(x: number, y: number, period: number, seed: number): number {
-  const ix = Math.floor(x)
-  const iy = Math.floor(y)
-  let f1 = 81
-  let f2 = 81
-  for (let j = -1; j <= 1; j++) {
-    for (let i = -1; i <= 1; i++) {
-      const cx = ix + i
-      const cy = iy + j
-      const wx = wrap(cx, period)
-      const wy = wrap(cy, period)
-      const dx = cx + hash(wx, wy, seed) - x
-      const dy = cy + hash(wx, wy, seed + 7) - y
-      const d = dx * dx + dy * dy
-      if (d < f1) {
-        f2 = f1
-        f1 = d
-      } else if (d < f2) f2 = d
-    }
-  }
-  return Math.sqrt(f2) - Math.sqrt(f1)
 }

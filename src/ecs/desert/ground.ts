@@ -1,22 +1,18 @@
-import { tileCell, tileEdge, tileFbm, tileNoise } from './noise'
-import { duneAt, duneShape, floorAt, smooth, swellAt, wrapU } from './terrain'
+import { tileFbm, tileNoise } from './noise'
+import { duneCover, duneGrad, flatLooseAt, heightAt, smooth, swellAt, twinFbm, wrapU } from './terrain'
 import { shadowBox, shadowCover, slabAt } from './landmarks'
 import type { DesertPlan, Landmark } from './terrain'
 
-/** 往太阳方向找挡光的沙丘，每步走多远（格） */
+/** 往太阳方向找挡光的地面，每步走多远（格） */
 const MARCH_U = 0.1
-/** 背阴、起伏与丘间地面先按这么细的格子算好，画的时候双线性插值，每格分几份 */
+/** 挡出来的背阴先按这么细的格子算好，画的时候双线性插值，每格分几份 */
 const SUN_SPLIT = 16
-const FIELD_SPLIT = 8
 /** 风纹的间距，格：十几厘米一道 */
 const RIPPLE_U = 0.24
 /** 风纹的高，米 */
 const RIPPLE_M = 0.0018
-/** 求坡度时左右各取多远，格 */
+/** 求起伏的坡度时左右各取多远，格 */
 const SLOPE_E = 0.03
-/** 盐壳一圈里龟裂成多少块，粗的与细的 */
-const CRACKS = 45
-const CRACKS_FINE = 106
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 
@@ -26,21 +22,17 @@ type Rgb = [number, number, number]
 const SUN_COL: Rgb = [1.0, 0.92, 0.79]
 const SKY_COL: Rgb = [0.7, 0.76, 0.92]
 const BOUNCE_COL: Rgb = [0.95, 0.74, 0.52]
-const SUN_I = 0.52
-const SKY_I = 0.48
+const SUN_I = 0.6
+const SKY_I = 0.4
 const BOUNCE_I = 0.09
 
-/** 几种沙与地面的固有色 */
-const DUNE: Rgb = [0.84, 0.68, 0.46]
-const DUNE_RED: Rgb = [0.82, 0.6, 0.4]
-const DUNE_PALE: Rgb = [0.88, 0.75, 0.56]
-const SHEET: Rgb = [0.8, 0.61, 0.41]
-const GRAVEL: Rgb = [0.64, 0.49, 0.36]
-const VARNISH: Rgb = [0.34, 0.25, 0.19]
-const RUST: Rgb = [0.57, 0.37, 0.26]
-const QUARTZ: Rgb = [0.76, 0.69, 0.58]
-const CRUST: Rgb = [0.86, 0.79, 0.68]
-const CRACK: Rgb = [0.58, 0.48, 0.38]
+/** 沙的固有色：丘间实一点的沙偏红偏深、松沙偏橙，沙丘上的细沙金黄，有的偏红、有的偏白；风纹的凹里积着一层深色的重矿物 */
+const FLAT_FIRM: Rgb = [0.75, 0.54, 0.36]
+const FLAT_LOOSE: Rgb = [0.8, 0.61, 0.41]
+const DUNE: Rgb = [0.83, 0.65, 0.44]
+const DUNE_RED: Rgb = [0.8, 0.59, 0.4]
+const DUNE_PALE: Rgb = [0.86, 0.71, 0.5]
+const MINERAL: Rgb = [0.5, 0.38, 0.3]
 const BARK: Rgb = [0.3, 0.23, 0.18]
 const BONE: Rgb = [0.93, 0.9, 0.82]
 const STONE_A: Rgb = [0.62, 0.55, 0.47]
@@ -76,12 +68,8 @@ export function pixelBuffer(rect: PixelRect): Uint8ClampedArray<ArrayBuffer> {
   return new Uint8ClampedArray((rect.x1 - rect.x0) * (rect.y1 - rect.y0) * 4)
 }
 
-/** 先算一次的东西：起伏与丘间地面的格子，沙丘挡出来的背阴（1 是晒得到） */
+/** 先算一次的东西：沙丘与起伏挡出来的背阴（1 是晒得到） */
 export interface Prepared {
-  readonly fieldCols: number
-  readonly swell: Float32Array
-  readonly gravel: Float32Array
-  readonly crust: Float32Array
   readonly sunCols: number
   readonly sun: Float32Array
 }
@@ -105,144 +93,43 @@ function sample(a: Float32Array, cols: number, per: number, x: number, y: number
   return a00 + (a10 - a00) * fu + (a01 - a00) * fv + (a00 - a10 - a01 + a11) * fu * fv
 }
 
-const FLOOR = { gravel: 0, crust: 0, sheet: 0 }
-
 export function prepare(sc: PaintScene): Prepared {
   const p = sc.plan
-  const fc = p.sizeU * FIELD_SPLIT
-  const swell = new Float32Array(fc * fc)
-  const gravel = new Float32Array(fc * fc)
-  const crust = new Float32Array(fc * fc)
-  for (let j = 0; j < fc; j++) {
-    for (let i = 0; i < fc; i++) {
-      const x = (i + 0.5) / FIELD_SPLIT
-      const y = (j + 0.5) / FIELD_SPLIT
-      swell[j * fc + i] = swellAt(p, x, y)
-      floorAt(p, x, y, FLOOR)
-      gravel[j * fc + i] = FLOOR.gravel
-      crust[j * fc + i] = FLOOR.crust
-    }
-  }
-  const sc2 = p.sizeU * SUN_SPLIT
-  const height = new Float32Array(sc2 * sc2)
-  for (let j = 0; j < sc2; j++) {
-    for (let i = 0; i < sc2; i++) {
-      const x = (i + 0.5) / SUN_SPLIT
-      const y = (j + 0.5) / SUN_SPLIT
-      height[j * sc2 + i] = sample(swell, fc, FIELD_SPLIT, x, y) + duneAt(p, x, y)
-    }
-  }
+  const n = p.sizeU * SUN_SPLIT
+  const height = new Float32Array(n * n)
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) height[j * n + i] = heightAt(p, (i + 0.5) / SUN_SPLIT, (j + 0.5) / SUN_SPLIT)
   const lxy = Math.hypot(p.light.x, p.light.y)
   const sx = p.light.x / lxy
   const sy = p.light.y / lxy
   const rise = (p.light.z / lxy) * p.meterPerU
   let top = 0
-  for (const d of p.dunes) top = Math.max(top, d.h)
+  for (const d of p.dunes) top = Math.max(top, d.top)
   const reach = ((top + 2 * p.swellM) / rise) * 1.05
-  const sun = new Float32Array(sc2 * sc2)
-  for (let j = 0; j < sc2; j++) {
-    for (let i = 0; i < sc2; i++) {
+  const sun = new Float32Array(n * n)
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
       const x = (i + 0.5) / SUN_SPLIT
       const y = (j + 0.5) / SUN_SPLIT
-      const z = height[j * sc2 + i]!
+      const z = height[j * n + i]!
       let over = -Infinity
-      for (let d = MARCH_U; d <= reach; d += MARCH_U) over = Math.max(over, sample(height, sc2, SUN_SPLIT, x + sx * d, y + sy * d) - z - d * rise)
-      sun[j * sc2 + i] = 1 - smooth(-0.003, 0.012, over)
+      for (let d = MARCH_U; d <= reach; d += MARCH_U) over = Math.max(over, sample(height, n, SUN_SPLIT, x + sx * d, y + sy * d) - z - d * rise)
+      sun[j * n + i] = 1 - smooth(-0.006, 0.03, over)
     }
   }
-  return { fieldCols: fc, swell, gravel, crust, sunCols: sc2, sun }
+  return { sunCols: n, sun }
 }
 
-/** 一处的石子：大小两层，取高的那颗；lit 是它朝太阳的亮度（平地为 1）、h 是哪颗（哈希）、inside 是石面的覆盖（石缝里为零）、shade 是落在别的石子影子里有多深 */
-interface Pebble {
-  lit: number
-  h: number
-  inside: number
-  top: number
-  shade: number
-}
-
-const CELL = { dx: 0, dy: 0, h: 0 }
-
-/** 第 period 层细胞里这一格有没有石子、多大：砾石地边上 dense 小，石子稀 */
-function pebbleRad(h: number, dense: number): number {
-  return (h * 7.31) % 1 < dense ? 0.24 + 0.2 * h : 0
-}
-
-/** 石子的高与长半径之比、短半径与长半径之比：扁的卵石，各朝各的方向 */
-const PEBBLE_FLAT = 0.45
-const PEBBLE_NARROW = 0.72
-
-function onePebble(p: DesertPlan, x: number, y: number, period: number, seed: number, lift: number, dense: number, out: Pebble): void {
-  const q = tileCell((x * period) / p.sizeU, (y * period) / p.sizeU, period, seed, CELL)
-  const rad = pebbleRad(q.h, dense)
-  if (rad === 0) return
-  const ca = Math.cos(q.h * 40)
-  const sa = Math.sin(q.h * 40)
-  const u = (q.dx * ca + q.dy * sa) / rad
-  const v = (-q.dx * sa + q.dy * ca) / (rad * PEBBLE_NARROW)
-  const d2 = u * u + v * v
-  if (d2 >= 1) return
-  const dome = Math.sqrt(1 - d2)
-  if (dome * lift <= out.top) return
-  const nu = PEBBLE_FLAT * u
-  const nv = (PEBBLE_FLAT / PEBBLE_NARROW) * v
-  const nx = nu * ca - nv * sa
-  const ny = nu * sa + nv * ca
-  out.lit = Math.max(0, nx * p.light.x + ny * p.light.y + dome * p.light.z) / Math.sqrt(nx * nx + ny * ny + dome * dome) / p.light.z
-  out.h = q.h
-  out.inside = smooth(1, 0.8, Math.sqrt(d2))
-  out.top = dome * lift
-}
-
-const PEB: Pebble = { lit: 0, h: 0, inside: 0, top: 0, shade: 0 }
-
-function pebble(p: DesertPlan, x: number, y: number, period: number, seed: number, dense: number): Pebble {
-  PEB.lit = 0
-  PEB.h = 0
-  PEB.inside = 0
-  PEB.top = 0
-  PEB.shade = 0
-  onePebble(p, x, y, period * 2, seed + 3, 0.5, dense * 0.55, PEB)
-  onePebble(p, x, y, period, seed, 1, dense, PEB)
-  if (PEB.inside < 1) {
-    // 往太阳那边挪一点就落在大石子上，这里就在它的影子里
-    const lxy = Math.hypot(p.light.x, p.light.y)
-    const reach = (0.22 * p.sizeU) / period
-    const sx = x + (p.light.x / lxy) * reach
-    const sy = y + (p.light.y / lxy) * reach
-    const q = tileCell((sx * period) / p.sizeU, (sy * period) / p.sizeU, period, seed, CELL)
-    const rad = pebbleRad(q.h, dense)
-    if (rad > 0) PEB.shade = smooth(1.05, 0.7, Math.sqrt(q.dx * q.dx + q.dy * q.dy) / (rad * 0.86)) * (1 - PEB.inside)
-  }
-  return PEB
-}
+/** 风纹绕着沙丘弯：沙丘每高一米，风纹的相位挪这么多弧度 */
+const RIPPLE_BEND = 30
 
 /**
- * 风纹：横着风向一道接一道，迎风缓、背风陡；波矢取整数，正好一圈里排整数道，左右上下拼得上；
- * 一道道风纹被低频的噪声扭弯，偶尔分叉。返回高（米）
+ * 风纹：横着风向一道接一道，迎风缓、背风陡；被低频的噪声扭弯、间距时疏时密，爬上沙丘时顺着等高线绕过去。
+ * 波矢取整数、两个分量之和是偶数，一圈里排整数道，横竖各挪半圈也接得上。dune 是这里沙丘的高（米）；返回高（米）
  */
-function rippleAt(p: DesertPlan, kx: number, ky: number, x: number, y: number): number {
-  const s = p.sizeU
-  const warp = (tileFbm((x * 6) / s, (y * 6) / s, 6, p.seed + 41, 2) - 0.5) * 9 + (tileNoise((x * 24) / s, (y * 24) / s, 24, p.seed + 43) - 0.5) * 1.6
-  const ph = ((kx * x + ky * y) / s) * Math.PI * 2 + warp
+function rippleAt(p: DesertPlan, kx: number, ky: number, x: number, y: number, dune: number): number {
+  const warp = (twinFbm(p, x, y, 5, p.seed + 41, 2) - 0.5) * 14 + (twinFbm(p, x, y, 22, p.seed + 43, 1) - 0.5) * 2.6 + dune * RIPPLE_BEND
+  const ph = ((kx * x + ky * y) / p.sizeU) * Math.PI * 2 + warp
   return RIPPLE_M * (Math.sin(ph) + 0.28 * Math.sin(2 * ph + 0.6))
-}
-
-/** 离 (x, y) 处最高的那座沙丘的脊线中点，横着它的下风方向有多远（格）：落沙坡上的沙流顺着它排，接缝两边也接得上 */
-function acrossDune(p: DesertPlan, x: number, y: number): number {
-  let best = 0
-  let across = 0
-  const m = p.meterPerU
-  for (const d of p.dunes) {
-    const dx = wrapU(x - d.x, p.sizeU)
-    const dy = wrapU(y - d.y, p.sizeU)
-    const h = duneShape(p, d, dx * m, dy * m)
-    if (h <= best) continue
-    best = h
-    across = -dx * d.s + dy * d.c
-  }
-  return across
 }
 
 /** 标志物在地上的那部分：画在地面贴图里的颜色、透明度与它顶面的法线；没有就是 null */
@@ -405,9 +292,10 @@ function tone(c: number): number {
 }
 
 /**
- * 地面：沙丘是细而亮的金黄松沙，脊线往下是平整的落沙坡，迎风坡与丘间的薄沙上排着一道道风纹；丘间是砾石地（黑亮的荒漠漆石子、红褐的碎石、白石英）
- * 与龟裂的盐壳。斜阳从左上照来：向阳坡亮而暖，背阴的落沙坡与沙丘、标志物投下的长影偏蓝；标志物在地上的那部分（树根与落枝、石头、驼骨、岩盘）一起画进来，
- * 背风处拖着一条沙尾。贴图左右、上下首尾相接。只画 rect 那一块，out 里按这块的范围逐行排
+ * 地面：几乎全是沙。沙丘是金黄的细沙，有的偏红、有的偏白，顶上更淡；丘间的沙成片地实一些、松一些，实的偏红偏深。
+ * 迎风坡与丘间排着一道道风纹，凹里积着深色的重矿物，背风坡的沙更平整。斜阳从左上照来：向阳坡亮而暖，背着太阳的坡与影子偏蓝；
+ * 标志物在地上的那部分（树根与落枝、石头、驼骨、岩盘）一起画进来，背风处拖着一条沙尾。贴图左右、上下首尾相接，横竖各挪半圈也一模一样。
+ * 只画 rect 那一块，out 里按这块的范围逐行排
  */
 export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArray, rect: PixelRect): void {
   const p = sc.plan
@@ -418,120 +306,83 @@ export function paintGround(sc: PaintScene, prep: Prepared, out: Uint8ClampedArr
   const mpu = p.meterPerU
   const rk = size / RIPPLE_U
   const kx = Math.round(Math.cos(p.windAngle) * rk)
-  const ky = Math.round(Math.sin(p.windAngle) * rk)
+  let ky = Math.round(Math.sin(p.windAngle) * rk)
+  if ((kx + ky) % 2 !== 0) ky += ky < 0 ? -1 : 1
+  const wc = Math.cos(p.windAngle)
+  const ws = Math.sin(p.windAngle)
+  const span = p.flatLoose[1] - p.flatLoose[0]
   const boxes = p.landmarks.map((l) => shadowBox(l.shape, p.offX, p.offY))
   const drifts = p.landmarks.map((l) => driftBox(p, l))
-  const fc = prep.fieldCols
+  const dune = { h: 0, x: 0, y: 0 }
   for (let py = rect.y0; py < rect.y1; py++) {
     for (let px = rect.x0; px < rect.x1; px++) {
       const x = (px + 0.5) / ppu
       const y = (py + 0.5) / ppu
       const o = ((py - rect.y0) * w + px - rect.x0) * 4
       const e = SLOPE_E
-      const dune = duneAt(p, x, y)
-      const hx0 = duneAt(p, x - e, y)
-      const hx1 = duneAt(p, x + e, y)
-      const hy0 = duneAt(p, x, y - e)
-      const hy1 = duneAt(p, x, y + e)
-      let zx = (hx1 - hx0 + sample(prep.swell, fc, FIELD_SPLIT, x + e, y) - sample(prep.swell, fc, FIELD_SPLIT, x - e, y)) / (2 * e * mpu)
-      let zy = (hy1 - hy0 + sample(prep.swell, fc, FIELD_SPLIT, x, y + e) - sample(prep.swell, fc, FIELD_SPLIT, x, y - e)) / (2 * e * mpu)
-      const cover = smooth(0.012, 0.06, dune)
-      const steep = Math.sqrt(((hx1 - hx0) / (2 * e * mpu)) ** 2 + ((hy1 - hy0) / (2 * e * mpu)) ** 2)
-      const slip = smooth(0.42, 0.55, steep) * cover
-      const crest = smooth(0.002, 0.008, Math.abs(hx1 + hx0 + hy1 + hy0 - 4 * dune)) * smooth(0.08, 0.25, dune)
-      const gravel = sample(prep.gravel, fc, FIELD_SPLIT, x, y)
-      const crust = sample(prep.crust, fc, FIELD_SPLIT, x, y)
-      const sheet = Math.max(0, 1 - gravel - crust) * (1 - cover)
-      const tint = tileFbm((x * 5) / size, (y * 5) / size, 5, p.seed + 31, 3)
-      const grain = tileNoise(x * 9, y * 9, size * 9, p.seed + 33) * 0.5 + tileNoise(x * 23, y * 23, size * 23, p.seed + 35) * 0.5
+      duneGrad(p, x, y, dune)
+      let zx = dune.x + (swellAt(p, x + e, y) - swellAt(p, x - e, y)) / (2 * e * mpu)
+      let zy = dune.y + (swellAt(p, x, y + e) - swellAt(p, x, y - e)) / (2 * e * mpu)
+      const cover = duneCover(dune.h)
+      const steep = Math.hypot(dune.x, dune.y)
+      const lee = smooth(0.12, 0.4, -(dune.x * wc + dune.y * ws))
+      const crest = smooth(0.15, 0.45, dune.h) * (1 - smooth(0.03, 0.15, steep))
+      const firm = span > 0 ? (p.flatLoose[1] - flatLooseAt(p, x, y)) / span : 0
+      const tint = twinFbm(p, x, y, 5, p.seed + 31, 3)
+      const wide = twinFbm(p, x, y, 2, p.seed + 33, 2)
+      const grain = twinFbm(p, x, y, size * 9, p.seed + 35, 1) * 0.5 + twinFbm(p, x, y, size * 23, p.seed + 37, 1) * 0.5
 
-      // 沙丘：金黄的松沙，有的偏红、有的偏白；落沙坡更白更平整，一溜溜的沙流顺坡往下
-      let r = DUNE[0] + (tint < 0.5 ? (DUNE_RED[0] - DUNE[0]) * (0.5 - tint) * 2 : (DUNE_PALE[0] - DUNE[0]) * (tint - 0.5) * 2)
-      let g = DUNE[1] + (tint < 0.5 ? (DUNE_RED[1] - DUNE[1]) * (0.5 - tint) * 2 : (DUNE_PALE[1] - DUNE[1]) * (tint - 0.5) * 2)
-      let b = DUNE[2] + (tint < 0.5 ? (DUNE_RED[2] - DUNE[2]) * (0.5 - tint) * 2 : (DUNE_PALE[2] - DUNE[2]) * (tint - 0.5) * 2)
-      if (slip > 0) {
-        const across = acrossDune(p, x, y)
-        const flow = tileNoise(across * 7, 0.5, 4096, p.seed + 37) * 0.6 + tileNoise(across * 19, 3.5, 4096, p.seed + 39) * 0.4
-        const k = 1.03 + (flow - 0.5) * 0.08
-        r += (r * k - r) * slip
-        g += (g * k - g) * slip
-        b += (b * k - b) * slip
-      }
-      r *= 1 + crest * 0.05
-      g *= 1 + crest * 0.06
-      b *= 1 + crest * 0.07
+      // 沙丘的细沙与丘间的沙按盖住的程度混；整片沙漠的色调大片地偏红、偏淡；顶上的沙更细更淡
+      const dr = DUNE[0] + (tint < 0.5 ? (DUNE_RED[0] - DUNE[0]) * (0.5 - tint) * 2 : (DUNE_PALE[0] - DUNE[0]) * (tint - 0.5) * 2)
+      const dg = DUNE[1] + (tint < 0.5 ? (DUNE_RED[1] - DUNE[1]) * (0.5 - tint) * 2 : (DUNE_PALE[1] - DUNE[1]) * (tint - 0.5) * 2)
+      const db = DUNE[2] + (tint < 0.5 ? (DUNE_RED[2] - DUNE[2]) * (0.5 - tint) * 2 : (DUNE_PALE[2] - DUNE[2]) * (tint - 0.5) * 2)
+      const fr = FLAT_LOOSE[0] + (FLAT_FIRM[0] - FLAT_LOOSE[0]) * firm
+      const fg = FLAT_LOOSE[1] + (FLAT_FIRM[1] - FLAT_LOOSE[1]) * firm
+      const fb = FLAT_LOOSE[2] + (FLAT_FIRM[2] - FLAT_LOOSE[2]) * firm
+      const drift = (wide - 0.5) * 0.12
+      const k = (0.96 + 0.08 * grain) * (1 + crest * 0.04)
+      let r = (fr + (dr - fr) * cover) * (1 + drift) * k
+      let g = (fg + (dg - fg) * cover) * (1 + drift * 0.4) * k
+      let b = (fb + (db - fb) * cover) * (1 - drift * 0.3) * k
 
-      // 丘间：薄松沙偏橙；砾石地上石子越往中间铺得越密，石缝里是粗沙；盐壳发白，龟裂成多边形，翘起的边缘发亮
-      if (cover < 0.999) {
-        const k = (0.93 + 0.12 * grain) * (0.95 + 0.1 * tint)
-        let fr = SHEET[0] * k
-        let fg = SHEET[1] * k
-        let fb = SHEET[2] * k
-        if (gravel > 0.001) {
-          fr += (GRAVEL[0] * k - fr) * gravel
-          fg += (GRAVEL[1] * k - fg) * gravel
-          fb += (GRAVEL[2] * k - fb) * gravel
-          const pb = pebble(p, x, y, size * 3, p.seed + 51, Math.min(1, gravel * 1.15) * 0.68)
-          if (pb.inside > 0) {
-            const c = pb.h < 0.5 ? VARNISH : pb.h < 0.92 ? RUST : QUARTZ
-            const lit = (0.7 + 0.4 * pb.lit) * (0.94 + 0.12 * grain)
-            fr += (c[0] * lit - fr) * pb.inside
-            fg += (c[1] * lit - fg) * pb.inside
-            fb += (c[2] * lit - fb) * pb.inside
-          }
-          const dim = 1 - 0.42 * pb.shade
-          fr *= dim
-          fg *= dim
-          fb *= dim
-        }
-        if (crust > 0.001) {
-          const edge = tileEdge((x * CRACKS) / size, (y * CRACKS) / size, CRACKS, p.seed + 55)
-          const crack = smooth(0.045, 0.012, edge)
-          const fine = smooth(0.03, 0.007, tileEdge((x * CRACKS_FINE) / size, (y * CRACKS_FINE) / size, CRACKS_FINE, p.seed + 57)) * 0.35
-          const curl = smooth(0.14, 0.05, edge) * (1 - crack) * 0.06
-          const k2 = Math.max(crack, fine)
-          const blot = (0.96 + 0.08 * tileFbm((x * 8) / size, (y * 8) / size, 8, p.seed + 59, 2)) * (1 + curl)
-          fr += (CRUST[0] * blot + (CRACK[0] - CRUST[0] * blot) * k2 - fr) * crust
-          fg += (CRUST[1] * blot + (CRACK[1] - CRUST[1] * blot) * k2 - fg) * crust
-          fb += (CRUST[2] * blot + (CRACK[2] - CRUST[2] * blot) * k2 - fb) * crust
-        }
-        r = r * cover + fr * (1 - cover)
-        g = g * cover + fg * (1 - cover)
-        b = b * cover + fb * (1 - cover)
-      }
-
-      // 风纹：沙丘的迎风坡与丘间的薄沙上才有，落沙坡上的沙一直在往下流、留不住
-      const fresh = smooth(0.32, 0.68, tileFbm((x * 3) / size, (y * 3) / size, 3, p.seed + 45, 2))
-      const rip = (1 - slip) * (cover * (1 - crest * 0.7) + sheet * 0.8) * (0.7 + 0.3 * tint) * (0.35 + 0.65 * fresh)
+      // 风纹：背风坡上的沙一直在往下滑、留不住，顶上被风削平；成片地有的新鲜清楚、有的被吹糊了；凹里积着深色的重矿物
+      const fresh = smooth(0.3, 0.7, twinFbm(p, x, y, 3, p.seed + 45, 2))
+      const rip = (1 - 0.85 * lee) * (1 - 0.6 * crest) * (0.35 + 0.65 * fresh)
       if (rip > 0.01) {
         const re = 0.5 / ppu
-        const rzx = (rippleAt(p, kx, ky, x + re, y) - rippleAt(p, kx, ky, x - re, y)) / (2 * re * mpu)
-        const rzy = (rippleAt(p, kx, ky, x, y + re) - rippleAt(p, kx, ky, x, y - re)) / (2 * re * mpu)
-        zx += rzx * rip
-        zy += rzy * rip
+        const h = dune.h
+        const hx = dune.x * re * mpu
+        const hy = dune.y * re * mpu
+        const r0 = rippleAt(p, kx, ky, x, y, h)
+        zx += ((rippleAt(p, kx, ky, x + re, y, h + hx) - rippleAt(p, kx, ky, x - re, y, h - hx)) / (2 * re * mpu)) * rip
+        zy += ((rippleAt(p, kx, ky, x, y + re, h + hy) - rippleAt(p, kx, ky, x, y - re, h - hy)) / (2 * re * mpu)) * rip
+        const dark = smooth(0.2, 1, -r0 / RIPPLE_M) * rip * (0.16 - 0.08 * cover)
+        r += (MINERAL[0] - r) * dark
+        g += (MINERAL[1] - g) * dark
+        b += (MINERAL[2] - b) * dark
       }
 
-      // 标志物：先算它在地上那部分与它拖出的沙尾，再算它投下的影子
+      // 标志物：先算它拖出的沙尾，再算它在地上那部分与它投下的影子
       let shadow = 1 - sample(prep.sun, prep.sunCols, SUN_SPLIT, x, y)
       let prop: Prop | null = null
-      for (let k = 0; k < p.landmarks.length; k++) {
-        const l = p.landmarks[k]!
+      for (let n = 0; n < p.landmarks.length; n++) {
+        const l = p.landmarks[n]!
         const qx = wrapU(x - l.x, size)
         const qy = wrapU(y - l.y, size)
-        const db = drifts[k]!
-        if (qx >= db.x0 && qx <= db.x1 && qy >= db.y0 && qy <= db.y1) {
-          const dr = 1 / ppu
-          zx += (driftAt(p, l, qx + dr, qy) - driftAt(p, l, qx - dr, qy)) / (2 * dr * mpu)
-          zy += (driftAt(p, l, qx, qy + dr) - driftAt(p, l, qx, qy - dr)) / (2 * dr * mpu)
+        const db2 = drifts[n]!
+        if (qx >= db2.x0 && qx <= db2.x1 && qy >= db2.y0 && qy <= db2.y1) {
+          const dr2 = 1 / ppu
+          zx += (driftAt(p, l, qx + dr2, qy) - driftAt(p, l, qx - dr2, qy)) / (2 * dr2 * mpu)
+          zy += (driftAt(p, l, qx, qy + dr2) - driftAt(p, l, qx, qy - dr2)) / (2 * dr2 * mpu)
         }
-        const bx = boxes[k]!
+        const bx = boxes[n]!
         if (qx < bx.x0 || qx > bx.x1 || qy < bx.y0 || qy > bx.y1) continue
         const pr = propAt(p, l, qx, qy, PROP)
         if (pr) prop = pr
         shadow = Math.max(shadow, shadowCover(l.shape, p.offX, p.offY, qx, qy, 0.025) * (pr ? 0.25 : 1))
       }
 
-      // 光：斜阳按坡向打亮，影子里只剩天光与沙地反上来的暖光；砾石地的石子各自已经打过光
+      // 光：斜阳按坡向打亮，影子里只剩天光与沙地反上来的暖光
       const nl = 1 / Math.sqrt(zx * zx + zy * zy + 1)
       let lambert = Math.max(0, (-zx * L.x - zy * L.y + L.z) * nl) / L.z
       let up = nl

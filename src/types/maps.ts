@@ -680,24 +680,24 @@ export interface DesertConfig {
   /** 太阳的仰角（度），方位与角色的光一致 */
   readonly sunDeg: number
   /**
-   * 新月形沙丘：几对、高（米）。迎风坡按抛物线从坡脚升到脊线，坡脚的坡度是 stossSlope（正切）；背风的落沙坡是休止角 reposeDeg 的斜面；
-   * 两角之间宽是沙丘长的 width 倍，两角往下风伸出沙丘长的 sweep 倍；各个沙丘的朝向在盛行风两侧最多偏 turnDeg 度
+   * 沙丘：几对、每座最高处多高（米）；每座由几团圆润的沙包横着风排开、融成一道缓丘，沙包迎风坡最陡处的坡度是 stossSlope、背风坡最陡处是 leeSlope（正切）；
+   * 沙包横着风的半宽是它顺风长的 width 倍；各座沙丘在盛行风两侧最多偏 turnDeg 度
    */
   readonly dunes: {
     readonly pairs: readonly [number, number]
     readonly heightM: readonly [number, number]
+    readonly lobes: readonly [number, number]
     readonly stossSlope: number
-    readonly reposeDeg: number
+    readonly leeSlope: number
     readonly width: number
-    readonly sweep: number
     readonly turnDeg: number
   }
-  /** 盛行风吹去的方向在背着太阳的方向两侧最多偏多少度：落沙坡多半背着太阳，丘后有阴影 */
+  /** 盛行风吹去的方向在背着太阳的方向两侧最多偏多少度：背风坡多半背着太阳 */
   readonly windSpreadDeg: number
   /** 丘间的缓缓起伏：幅度（米）与一圈里起伏几次 */
   readonly swell: { readonly heightM: number; readonly waves: number }
-  /** 丘间的地面：一圈里有几片斑块；砾石地与盐壳各占丘间的多少，其余是一层薄薄的松沙 */
-  readonly floor: { readonly patches: number; readonly gravel: number; readonly crust: number }
+  /** 丘间的沙：松的程度在 loose 的范围里按一圈 patches 片斑块起伏，实一点的地方颜色偏深偏红、走起来省力 */
+  readonly flats: { readonly loose: readonly [number, number]; readonly patches: number }
   /** 标志物：几对（每对一模一样，横竖各隔半圈），彼此至少隔多远（格） */
   readonly landmarks: { readonly pairs: number; readonly gapU: number }
   /**

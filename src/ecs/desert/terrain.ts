@@ -15,16 +15,28 @@ const CELL_U = 0.25
 const MARCH_U = 0.2
 /** 摆沙丘与标志物，挑不出合格的位置就放宽一点再挑，每轮最多试这么多次 */
 const TRIES = 120
+/** 剖面 (1 − t²)² 最陡处的坡度是高除以半长再乘这个数 */
+const BUMP_SLOPE = 8 / (3 * Math.sqrt(3))
 
-/** 一座新月形沙丘：脊线中点（格）、下风方向的余弦与正弦、脊线最高处高（米），两角之间的半宽与两角往下风伸出多远（米） */
+/** 一团沙包：中心相对沙丘中心顺风、横风的偏移（米），最高处多高（米），迎风、背风的半长与横风的半宽（米） */
+export interface Lobe {
+  readonly du: number
+  readonly dv: number
+  readonly h: number
+  readonly back: number
+  readonly front: number
+  readonly half: number
+}
+
+/** 一座沙丘：中心（格）、下风方向的余弦与正弦、几团沙包、伸出中心多远（格）、最高处多高（米） */
 export interface Dune {
   readonly x: number
   readonly y: number
   readonly c: number
   readonly s: number
-  readonly h: number
-  readonly half: number
-  readonly sweep: number
+  readonly lobes: readonly Lobe[]
+  readonly reach: number
+  readonly top: number
 }
 
 /** 一样标志物：种类、中心（格）与形状；一对里的两个形状一模一样 */
@@ -36,8 +48,8 @@ export interface Landmark {
 }
 
 /**
- * 这一局的沙漠：只有数据，能整个发给画地面的线程。沙丘与标志物都成对，一对相隔横竖各半圈；
- * 背阴（1 是晒着太阳、0 是全在阴影里）与沙的松软（1 是松沙）按 CELL_U 的格子铺满一圈
+ * 这一局的沙漠：只有数据，能整个发给画地面的线程。沙丘与标志物都成对，一对相隔横竖各半圈，起伏与沙的松实也按同样的平移对称，
+ * 成对的两处连周围的沙地都一模一样；晒得到几成太阳（平地为 1、阴影里为 0）与沙的松软（1 是松沙）按 CELL_U 的格子铺满一圈
  */
 export interface DesertPlan {
   readonly sizeU: number
@@ -50,14 +62,11 @@ export interface DesertPlan {
   /** 离地每高一米，影子背着太阳往外挪多少格 */
   readonly offX: number
   readonly offY: number
-  readonly stoss: number
-  readonly tanRepose: number
   readonly swellM: number
   readonly swellWaves: number
-  readonly patches: number
-  /** 丘间的地面按两张噪声分：砾石噪声高过 gravelAt 是砾石地，盐壳噪声高过 crustAt 是盐壳 */
-  readonly gravelAt: number
-  readonly crustAt: number
+  /** 丘间的沙最实与最松各是多松，一圈里成片起伏几次 */
+  readonly flatLoose: readonly [number, number]
+  readonly flatPatches: number
   readonly dunes: readonly Dune[]
   readonly landmarks: readonly Landmark[]
   /** 队伍出发的地方，格：离第一样标志物几步远 */
@@ -79,35 +88,68 @@ export function wrapU(d: number, size: number): number {
   return d - Math.round(d / size) * size
 }
 
-/** 一座沙丘在离脊线中点 (dx, dy)（米）处的高（米）：脊线往两角压低、往下风弯，迎风坡是抛物线，背风是休止角的落沙坡 */
-export function duneShape(p: DesertPlan, d: Dune, dx: number, dy: number): number {
-  const u = dx * d.c + dy * d.s
-  const v = -dx * d.s + dy * d.c
-  const t = v / d.half
-  if (t <= -1 || t >= 1) return 0
-  const k = 1 - t * t
-  const hc = d.h * Math.pow(k, 0.75)
-  const s = u - d.sweep * t * t
-  if (s >= 0) return Math.max(0, hc - s * p.tanRepose)
-  const q = (-s * p.stoss) / (2 * hc)
-  return q >= 1 ? 0 : hc * (1 - q * q)
+/** 成对对称的噪声：按 (x − y, x + y) 取一圈有 waves 个格点的噪声，横竖各挪半圈不变 */
+export function twinFbm(p: DesertPlan, x: number, y: number, waves: number, seed: number, octaves: number): number {
+  const k = waves / p.sizeU
+  return tileFbm((x - y) * k, (x + y) * k, waves, seed, octaves)
 }
 
-/** (x, y) 格处最高的那座沙丘有多高，米 */
-export function duneAt(p: DesertPlan, x: number, y: number): number {
-  let best = 0
+const GRAD = { h: 0, x: 0, y: 0 }
+
+/**
+ * (x, y) 格处沙丘的高（米）与坡度（高对水平距离，米/米）：每团沙包是迎风长、背风短的圆顶，剖面 (1 − r²)² 处处圆滑；
+ * 各团按四次方合起来，两团之间的鞍部比两边的顶低，又没有折痕
+ */
+export function duneGrad(p: DesertPlan, x: number, y: number, out: { h: number; x: number; y: number }): { h: number; x: number; y: number } {
   const m = p.meterPerU
+  let sum = 0
+  let gx = 0
+  let gy = 0
   for (const d of p.dunes) {
-    const h = duneShape(p, d, wrapU(x - d.x, p.sizeU) * m, wrapU(y - d.y, p.sizeU) * m)
-    if (h > best) best = h
+    const ex = wrapU(x - d.x, p.sizeU)
+    const ey = wrapU(y - d.y, p.sizeU)
+    if (ex * ex + ey * ey >= d.reach * d.reach) continue
+    const u0 = (ex * d.c + ey * d.s) * m
+    const v0 = (-ex * d.s + ey * d.c) * m
+    for (const l of d.lobes) {
+      const u = u0 - l.du
+      const v = v0 - l.dv
+      const len = u < 0 ? l.back : l.front
+      const r2 = (u / len) ** 2 + (v / l.half) ** 2
+      if (r2 >= 1) continue
+      const k = 1 - r2
+      const h = l.h * k * k
+      const fall = -4 * l.h * k
+      const hu = (fall * u) / (len * len)
+      const hv = (fall * v) / (l.half * l.half)
+      const h3 = h * h * h
+      sum += h3 * h
+      gx += h3 * (hu * d.c - hv * d.s)
+      gy += h3 * (hu * d.s + hv * d.c)
+    }
   }
-  return best
+  if (sum <= 0) {
+    out.h = 0
+    out.x = 0
+    out.y = 0
+    return out
+  }
+  const top = Math.sqrt(Math.sqrt(sum))
+  const t3 = top * top * top
+  out.h = top
+  out.x = gx / t3
+  out.y = gy / t3
+  return out
+}
+
+/** (x, y) 格处沙丘有多高，米 */
+export function duneAt(p: DesertPlan, x: number, y: number): number {
+  return duneGrad(p, x, y, GRAD).h
 }
 
 /** 丘间缓缓的起伏，米 */
 export function swellAt(p: DesertPlan, x: number, y: number): number {
-  const k = p.swellWaves / p.sizeU
-  return (tileFbm(x * k, y * k, p.swellWaves, p.seed + 1, 3) - 0.5) * 2 * p.swellM
+  return (twinFbm(p, x, y, p.swellWaves, p.seed + 1, 3) - 0.5) * 2 * p.swellM
 }
 
 /** 地面的高，米 */
@@ -115,24 +157,20 @@ export function heightAt(p: DesertPlan, x: number, y: number): number {
   return swellAt(p, x, y) + duneAt(p, x, y)
 }
 
-/** 地面的坡度（高对水平距离的导数，都按米）：沿 x 与沿 y */
+/** 地面的坡度（高对水平距离的导数，都按米）：沙丘按解析式，起伏左右各取一点 */
 export function slopeAt(p: DesertPlan, x: number, y: number, out: { x: number; y: number }): { x: number; y: number } {
   const e = 0.06
   const m = 2 * e * p.meterPerU
-  out.x = (heightAt(p, x + e, y) - heightAt(p, x - e, y)) / m
-  out.y = (heightAt(p, x, y + e) - heightAt(p, x, y - e)) / m
+  duneGrad(p, x, y, GRAD)
+  out.x = GRAD.x + (swellAt(p, x + e, y) - swellAt(p, x - e, y)) / m
+  out.y = GRAD.y + (swellAt(p, x, y + e) - swellAt(p, x, y - e)) / m
   return out
 }
 
-/** 丘间地面的组成：砾石地、盐壳与薄松沙各占几成 */
-export function floorAt(p: DesertPlan, x: number, y: number, out: { gravel: number; crust: number; sheet: number }): { gravel: number; crust: number; sheet: number } {
-  const k = p.patches / p.sizeU
-  const gn = tileFbm(x * k, y * k, p.patches, p.seed + 11, 3)
-  const cn = tileFbm(x * k, y * k, p.patches, p.seed + 23, 3)
-  out.gravel = smooth(p.gravelAt - 0.035, p.gravelAt + 0.035, gn)
-  out.crust = smooth(p.crustAt - 0.025, p.crustAt + 0.025, cn) * (1 - out.gravel)
-  out.sheet = 1 - out.gravel - out.crust
-  return out
+/** 丘间的沙有多松：在 flatLoose 的范围里成片起伏 */
+export function flatLooseAt(p: DesertPlan, x: number, y: number): number {
+  const n = twinFbm(p, x, y, p.flatPatches, p.seed + 11, 3)
+  return p.flatLoose[0] + (p.flatLoose[1] - p.flatLoose[0]) * smooth(0.3, 0.7, n)
 }
 
 /** 沙丘把丘间的地面盖住了几成：高过几厘米就全是沙丘的松沙 */
@@ -140,14 +178,10 @@ export function duneCover(h: number): number {
   return smooth(0.012, 0.06, h)
 }
 
-const FLOOR = { gravel: 0, crust: 0, sheet: 0 }
-
-/** 这里的沙有多松：沙丘上全是松沙，丘间的薄松沙半松，砾石地很实，盐壳最硬 */
+/** 这里的沙有多松：沙丘上全是松沙，丘间成片地松一些、实一些 */
 export function looseAt(p: DesertPlan, x: number, y: number): number {
   const cover = duneCover(duneAt(p, x, y))
-  if (cover >= 1) return 1
-  const f = floorAt(p, x, y, FLOOR)
-  return cover + (1 - cover) * (0.6 * f.sheet + 0.15 * f.gravel)
+  return cover + (1 - cover) * flatLooseAt(p, x, y)
 }
 
 /** 格子上 (x, y) 格处双线性取值，格子首尾相接 */
@@ -170,7 +204,7 @@ export function gridAt(p: DesertPlan, a: Float32Array, x: number, y: number): nu
   return a00 + (a10 - a00) * fu + (a01 - a00) * fv + (a00 - a10 - a01 + a11) * fu * fv
 }
 
-/** 这里晒得到几成太阳：沙丘与标志物的影子 */
+/** 这里晒得到几成太阳：背着太阳的坡斜着受光少，再扣掉沙丘与标志物的影子 */
 export function sunAt(p: DesertPlan, x: number, y: number): number {
   return gridAt(p, p.sun, x, y)
 }
@@ -184,39 +218,46 @@ function between(rng: Rng, r: readonly [number, number]): number {
   return r[0] + (r[1] - r[0]) * rng.next()
 }
 
-/** 噪声在一圈里取到的值从小到大第 q 成那个：丘间的砾石地、盐壳按它切，占的比例才对 */
-function quantile(k: number, period: number, seed: number, size: number, q: number): number {
-  const n = 96
-  const vals = new Float32Array(n * n)
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) vals[j * n + i] = tileFbm(((i + 0.5) / n) * size * k, ((j + 0.5) / n) * size * k, period, seed, 3)
-  vals.sort()
-  return vals[Math.min(n * n - 1, Math.floor(q * n * n))]!
+/** 一座沙丘的几团沙包：横着风排开，中间那团最高，两头矮一点、往下风偏一点，连成一道微弯的缓丘；相邻两团隔它们半宽之和的一半多一点 */
+function lobesOf(cfg: DesertConfig, rng: Rng, top: number): Lobe[] {
+  const dc = cfg.dunes
+  const n = dc.lobes[0] + Math.floor(rng.next() * (dc.lobes[1] - dc.lobes[0] + 1))
+  const out: Lobe[] = []
+  let v = 0
+  for (let i = 0; i < n; i++) {
+    const f = n === 1 ? 0 : (i / (n - 1)) * 2 - 1
+    const h = top * (1 - 0.35 * f * f) * (0.88 + 0.12 * rng.next())
+    const back = (BUMP_SLOPE * h) / dc.stossSlope
+    const front = (BUMP_SLOPE * h) / dc.leeSlope
+    const half = (dc.width * (back + front)) / 2
+    if (i > 0) v += (out[i - 1]!.half + half) * 0.55
+    out.push({ du: f * f * front * 0.5 + (rng.next() * 2 - 1) * front * 0.15, dv: v, h, back, front, half })
+  }
+  return out.map((l) => ({ ...l, dv: l.dv - v / 2 }))
 }
 
-/** 摆沙丘：一对一对地摆，彼此（连同对方的另一半）离得开，按高定下迎风坡与落沙坡的长 */
+/** 摆沙丘：一对一对地摆，彼此（连同对方的另一半）离得开 */
 function placeDunes(cfg: DesertConfig, rng: Rng, windAngle: number, size: number): Dune[] {
   const dc = cfg.dunes
   const m = cfg.meterPerU
-  const tanRep = Math.tan(dc.reposeDeg * DEG)
   const pairs = dc.pairs[0] + Math.floor(rng.next() * (dc.pairs[1] - dc.pairs[0] + 1))
   const out: Dune[] = []
-  const lengthU = (h: number): number => ((2 * h) / dc.stossSlope + h / tanRep) / m
   for (let k = 0; k < pairs; k++) {
-    const h = between(rng, dc.heightM)
     const a = windAngle + (rng.next() * 2 - 1) * dc.turnDeg * DEG
-    const len = (2 * h) / dc.stossSlope + h / tanRep
-    let spacing = 0.6
+    const lobes = lobesOf(cfg, rng, between(rng, dc.heightM))
+    const reach = Math.max(...lobes.map((l) => Math.hypot(Math.abs(l.du) + Math.max(l.back, l.front), Math.abs(l.dv) + l.half))) / m
+    let spacing = 0.75
     let at: Point | null = null
     for (let round = 0; round < 8 && !at; round++, spacing *= 0.85) {
       for (let i = 0; i < TRIES && !at; i++) {
         const x = rng.next() * size
         const y = rng.next() * size
-        const ok = out.every((d) => torusDist(size, x, y, d.x, d.y) >= spacing * (lengthU(h) + lengthU(d.h)) && torusDist(size, x + size / 2, y + size / 2, d.x, d.y) >= spacing * (lengthU(h) + lengthU(d.h)))
+        const ok = out.every((d) => torusDist(size, x, y, d.x, d.y) >= spacing * (reach + d.reach) && torusDist(size, x + size / 2, y + size / 2, d.x, d.y) >= spacing * (reach + d.reach))
         if (ok) at = { x, y }
       }
     }
     const p = at ?? { x: rng.next() * size, y: rng.next() * size }
-    const dune = { c: Math.cos(a), s: Math.sin(a), h, half: (dc.width * len) / 2, sweep: dc.sweep * len }
+    const dune = { c: Math.cos(a), s: Math.sin(a), lobes, reach, top: Math.max(...lobes.map((l) => l.h)) }
     out.push({ x: p.x, y: p.y, ...dune }, { x: (p.x + size / 2) % size, y: (p.y + size / 2) % size, ...dune })
   }
   return out
@@ -241,7 +282,7 @@ function placeLandmarks(cfg: DesertConfig, rng: Rng, windAngle: number, size: nu
       for (let i = 0; i < TRIES && !at; i++) {
         const x = rng.next() * size
         const y = rng.next() * size
-        if (high(x, y) > 0.12) continue
+        if (high(x, y) > 0.08) continue
         const ok = out.every((l) => torusDist(size, x, y, l.x, l.y) >= gap && torusDist(size, x + size / 2, y + size / 2, l.x, l.y) >= gap)
         if (ok) at = { x, y }
       }
@@ -252,16 +293,19 @@ function placeLandmarks(cfg: DesertConfig, rng: Rng, windAngle: number, size: nu
   return out
 }
 
-/** 每个格子晒得到几成太阳：往太阳方向找比光线高的沙丘，再扣掉标志物的影子；背着太阳的陡坡自己就在阴影里 */
+const SLOPE = { x: 0, y: 0 }
+
+/** 每个格子晒得到几成太阳：背着太阳的坡按斜射少受的光算，往太阳方向找比光线高的地面，再扣掉标志物的影子 */
 function sunGrid(p: DesertPlan, heights: Float32Array): Float32Array {
   const n = p.cols
   const out = new Float32Array(n * n)
-  const lxy = Math.hypot(p.light.x, p.light.y)
-  const sx = p.light.x / lxy
-  const sy = p.light.y / lxy
-  const rise = (p.light.z / lxy) * p.meterPerU
+  const L = p.light
+  const lxy = Math.hypot(L.x, L.y)
+  const sx = L.x / lxy
+  const sy = L.y / lxy
+  const rise = (L.z / lxy) * p.meterPerU
   let top = 0
-  for (const d of p.dunes) top = Math.max(top, d.h)
+  for (const d of p.dunes) top = Math.max(top, d.top)
   const reach = ((top + 2 * p.swellM) / rise) * 1.05
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
@@ -270,7 +314,9 @@ function sunGrid(p: DesertPlan, heights: Float32Array): Float32Array {
       const z = heights[j * n + i]!
       let over = -Infinity
       for (let d = MARCH_U; d <= reach; d += MARCH_U) over = Math.max(over, gridAt(p, heights, x + sx * d, y + sy * d) - z - d * rise)
-      out[j * n + i] = 1 - smooth(-0.004, 0.02, over)
+      slopeAt(p, x, y, SLOPE)
+      const lit = Math.max(0, -SLOPE.x * L.x - SLOPE.y * L.y + L.z) / Math.sqrt(SLOPE.x * SLOPE.x + SLOPE.y * SLOPE.y + 1) / L.z
+      out[j * n + i] = Math.min(1, lit) * (1 - smooth(-0.004, 0.02, over))
     }
   }
   for (const l of p.landmarks) {
@@ -306,7 +352,7 @@ function startNear(p: DesertPlan, rng: Rng): Point {
   return best
 }
 
-/** 按种子生成这一局的沙漠：盛行风大体背着太阳吹，一对对的沙丘与标志物，再铺背阴与沙的松实 */
+/** 按种子生成这一局的沙漠：盛行风大体背着太阳吹，一对对的沙丘与标志物，再铺晒到的太阳与沙的松实 */
 export function makePlan(cfg: DesertConfig, sizeU: number, decorSeed: number): DesertPlan {
   const seed = (decorSeed ^ PLAN_SEED) >>> 0
   const rng = new Rng(seed)
@@ -317,24 +363,18 @@ export function makePlan(cfg: DesertConfig, sizeU: number, decorSeed: number): D
   const light = { x: (SUN.x / sxy) * Math.cos(elev), y: (SUN.y / sxy) * Math.cos(elev), z: Math.sin(elev) }
   const per = 1 / Math.tan(elev) / cfg.meterPerU
   const dunes = placeDunes(cfg, rng, windAngle, sizeU)
-  const noiseSeed = Math.floor(rng.next() * 0x7fffffff)
-  const patches = cfg.floor.patches
-  const k = patches / sizeU
   const base = {
     sizeU,
-    seed: noiseSeed,
+    seed: Math.floor(rng.next() * 0x7fffffff),
     meterPerU: cfg.meterPerU,
     windAngle,
     light,
     offX: -(SUN.x / sxy) * per,
     offY: -(SUN.y / sxy) * per,
-    stoss: cfg.dunes.stossSlope,
-    tanRepose: Math.tan(cfg.dunes.reposeDeg * DEG),
     swellM: cfg.swell.heightM,
     swellWaves: cfg.swell.waves,
-    patches,
-    gravelAt: quantile(k, patches, noiseSeed + 11, sizeU, 1 - cfg.floor.gravel),
-    crustAt: quantile(k, patches, noiseSeed + 23, sizeU, 1 - cfg.floor.crust),
+    flatLoose: cfg.flats.loose,
+    flatPatches: cfg.flats.patches,
     dunes,
     landmarks: [] as Landmark[],
     start: { x: sizeU / 2, y: sizeU / 2 },

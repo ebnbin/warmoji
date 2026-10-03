@@ -328,17 +328,18 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(d.meterPerU > 0 && d.sunDeg > 5 && d.sunDeg < 85, `${at} 的米每格须为正、太阳的仰角在 5 到 85 度之间`)
   need(d.viewMaxU >= VIEW.minLong / UNIT && d.viewMaxU <= w - 4, `${at}.viewMaxU 须不小于平常屏幕的长边 ${VIEW.minLong / UNIT} 格、比一圈小 4 格以上：每样东西只画一份`)
   const dc = d.dunes
-  const tanRep = Math.tan((dc.reposeDeg * Math.PI) / 180)
-  need(ints(dc.pairs) && span(dc.heightM), `${at}.dunes 的对数须为正整数范围、高为正的范围`)
-  need(dc.reposeDeg >= 25 && dc.reposeDeg <= 40 && dc.stossSlope > 0 && dc.stossSlope < tanRep, `${at}.dunes 的休止角须在 25 到 40 度之间，迎风坡比落沙坡缓`)
-  need(dc.width > 0 && dc.sweep >= 0 && dc.turnDeg >= 0 && dc.turnDeg < 90, `${at}.dunes 的宽须为正、两角往下风伸出不为负、朝向的偏离在 0 到 90 度之间`)
-  const top = dc.heightM[1]
-  const len = (2 * top) / dc.stossSlope + top / tanRep
-  const reachU = Math.max((2 * top) / dc.stossSlope, dc.sweep * len + top / tanRep, (dc.width * len) / 2) / d.meterPerU
-  need(reachU < w / 2 - 1, `${at}.dunes 最大的沙丘伸出脊线中点 ${reachU.toFixed(1)} 格，须不到半圈 ${w / 2} 格`)
+  need(ints(dc.pairs) && ints(dc.lobes) && span(dc.heightM), `${at}.dunes 的对数与沙包数须为正整数范围、高为正的范围`)
+  need(dc.stossSlope > 0 && dc.stossSlope < dc.leeSlope && dc.leeSlope < Math.tan((33 * Math.PI) / 180), `${at}.dunes 迎风坡须比背风坡缓，背风坡须缓过 33 度的休止角：沙丘是圆的，没有落沙坡`)
+  need(dc.width > 0 && dc.turnDeg >= 0 && dc.turnDeg < 90, `${at}.dunes 的宽须为正、朝向的偏离在 0 到 90 度之间`)
+  const bump = 8 / (3 * Math.sqrt(3))
+  const back = (bump * dc.heightM[1]) / dc.stossSlope
+  const front = (bump * dc.heightM[1]) / dc.leeSlope
+  const half = (dc.width * (back + front)) / 2
+  const reachU = Math.hypot(front * 0.65 + Math.max(back, front), ((dc.lobes[1] - 1) * half * 1.1) / 2 + half) / d.meterPerU
+  need(reachU < w / 2 - 1, `${at}.dunes 最大的沙丘伸出中心 ${reachU.toFixed(1)} 格，须不到半圈 ${w / 2} 格`)
   need(d.windSpreadDeg >= 0 && d.windSpreadDeg <= 180, `${at}.windSpreadDeg 须在 0 到 180 度之间`)
   need(d.swell.heightM >= 0 && Number.isInteger(d.swell.waves) && d.swell.waves >= 1, `${at}.swell 的幅度不为负、一圈起伏的次数为正整数`)
-  need(Number.isInteger(d.floor.patches) && d.floor.patches >= 1 && d.floor.gravel >= 0 && d.floor.crust >= 0 && d.floor.gravel + d.floor.crust <= 1, `${at}.floor 的斑块数为正整数，砾石地与盐壳的比例不为负、加起来不超过 1`)
+  need(span(d.flats.loose) && d.flats.loose[1] < 1 && Number.isInteger(d.flats.patches) && d.flats.patches >= 1, `${at}.flats 的松实须在 (0, 1) 内由实到松、斑块数为正整数`)
   need(Number.isInteger(d.landmarks.pairs) && d.landmarks.pairs >= 1 && d.landmarks.gapU > 0, `${at}.landmarks 的对数为正整数、间隔为正`)
   need(2 * d.landmarks.pairs * Math.PI * (d.landmarks.gapU / 2) ** 2 < w * h, `${at}.landmarks 摆不下：${2 * d.landmarks.pairs} 样标志物彼此隔 ${d.landmarks.gapU} 格`)
   const g = d.gait
