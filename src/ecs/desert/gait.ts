@@ -23,28 +23,13 @@ export interface Pace {
 }
 
 /**
- * 在坡度 i、松软 loose（1 是松沙）、踩实 pack 的沙上，顺着风的加速度 tail（米/秒²，顶风为负）朝前走：
- * 每米的代谢按坡度、沙的松软与顶风多做的功算，折成平地硬地的倍数 demand；
- * 要出的力不超过 maxPower 倍就照常速度走、只是更累，超过了就按 maxPower 倍的力走慢；省力时（下坡、顺风）走得快一些，最多 downhillMax 倍
+ * 在坡度 i、松软 loose（1 是松沙）、踩实 pack 的沙上朝前走：每米的代谢按坡度与沙的松软算，折成平地硬地的倍数 demand；
+ * 要出的力不超过 maxPower 倍就照常速度走、只是更累，超过了就按 maxPower 倍的力走慢；下坡省力时走得快一些，最多 downhillMax 倍
  */
-export function paceOf(g: DesertConfig['gait'], i: number, loose: number, pack: number, tail: number, out: Pace): Pace {
+export function paceOf(g: DesertConfig['gait'], i: number, loose: number, pack: number, out: Pace): Pace {
   const sand = 1 + (g.softSand - 1) * loose * (1 - g.packRelief * pack)
-  const wind = tail < 0 ? -tail / g.efficiency : (-g.tailRelief * tail) / g.efficiency
-  const demand = Math.max(LEAST, (walkCost(i) * sand + wind) / FLAT_COST)
+  const demand = Math.max(LEAST, (walkCost(i) * sand) / FLAT_COST)
   out.demand = demand
   out.speed = demand <= 1 ? Math.min(g.downhillMax, 1 / demand) : demand <= g.maxPower ? 1 : g.maxPower / demand
   return out
-}
-
-/**
- * 风拖着一个身体的加速度沿前进方向的分量，米/秒²：½·ρ·(Cd·A/m)·|w − v|·(w − v) 点乘前进方向；
- * Cd·A/m 按标准身体的值除以 bulk（半径与质量倍率相对标准身体的倍数：迎风面按半径平方、质量按半径立方）
- */
-export function windAlong(w: DesertConfig['wind'], speed: number, angle: number, vx: number, vy: number, bulk: number): number {
-  const rx = Math.cos(angle) * speed - vx
-  const ry = Math.sin(angle) * speed - vy
-  const len = Math.hypot(vx, vy)
-  if (len < 1e-6) return 0
-  const k = (0.5 * w.airDensity * w.dragArea * Math.hypot(rx, ry)) / bulk
-  return (k * (rx * vx + ry * vy)) / len
 }

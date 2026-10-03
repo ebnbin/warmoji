@@ -34,7 +34,7 @@ import { WindSea } from '../src/ecs/render/floeSea.ts'
 import { crossings, discViewFactor, noonElevDeg, skyLux, torchReachU } from '../src/data/cave.ts'
 import { GROUND_PPU } from '../src/data/texel.ts'
 import { UNIT, VIEW } from '../src/util/units.ts'
-import { FILL_QUANT, HEIGHT_SPAN } from '../src/ecs/desert/stamp.ts'
+import { HEIGHT_SPAN, TIME_QUANT } from '../src/ecs/desert/stamp.ts'
 import { pathText, runChecks, withNested } from '../src/data/runCheck.ts'
 import { render } from '../src/emoji/painted/design.ts'
 import { PAINTED } from '../src/emoji/painted/index.ts'
@@ -344,22 +344,12 @@ for (const [id, m] of Object.entries<MapDef>(MAPS)) {
   need(2 * d.landmarks.pairs * Math.PI * (d.landmarks.gapU / 2) ** 2 < w * h, `${at}.landmarks 摆不下：${2 * d.landmarks.pairs} 样标志物彼此隔 ${d.landmarks.gapU} 格`)
   const g = d.gait
   need(g.softSand >= 1 && g.packRelief >= 0 && g.packRelief < 1 && g.maxPower > 1 && g.downhillMax >= 1, `${at}.gait 的松沙倍率不小于 1、踩实在 [0, 1) 内、最大出力大于 1、下坡倍率不小于 1`)
-  need(g.efficiency > 0 && g.efficiency <= 1 && g.tailRelief >= 0 && g.tailRelief <= 1, `${at}.gait 的肌肉效率在 (0, 1] 内、顺风省下的比例在 [0, 1] 内`)
   need(d.shadeRegen > m.stamina.regen, `${at}.shadeRegen 须大于向阳处的回复 ${m.stamina.regen}`)
-  const wd = d.wind
-  need(wd.breezeMs > 0 && wd.thresholdMs > wd.breezeMs * 1.2 && wd.stormMs > wd.thresholdMs, `${at}.wind 须平时的风（阵风最多高出两成）吹不起沙、沙暴吹得起`)
-  need(wd.firstMs >= 0 && wd.riseMs > 0 && wd.holdMs >= 0 && wd.fallMs > 0 && wd.jitterMs >= 0, `${at}.wind 的时长须合理`)
-  need(wd.intervalMs - wd.jitterMs > wd.riseMs + wd.holdMs + wd.fallMs, `${at}.wind 的间隔减去抖动须长过一场沙暴`)
-  need(wd.veerDeg >= 0 && wd.veerDeg <= 180 && wd.airDensity > 0 && wd.dragArea > 0 && wd.refRadiusU > 0, `${at}.wind 的转向、空气密度与风阻须合理`)
   const t = d.tracks
-  need(t.depthM > 0 && t.firm > 0 && t.firm <= 1 && t.tired >= 1 && t.dragFrom > 0 && t.dragFrom <= 1, `${at}.tracks 的深浅须为正，硬地的比例在 (0, 1] 内，累的倍率不小于 1`)
+  need(t.depthM > 0 && t.firm > 0 && t.firm <= 1 && t.tired >= 1 && t.dragFrom > 0 && t.dragFrom <= 1, `${at}.tracks 的深浅须为正，实沙的比例在 (0, 1] 内，累的倍率不小于 1`)
   need(t.depthM * t.tired * 1.15 < HEIGHT_SPAN, `${at}.tracks 标准身体累到见底时冲刺踩出的印子须浅于印子贴图记得下的 ${HEIGHT_SPAN} 米`)
-  need(t.stride > 0 && t.foot > 0 && t.pack > 0 && t.pack <= 1 && t.packFillM > 0, `${at}.tracks 的步幅、脚长与踩实须为正`)
-  need(t.calmFill > 0 && t.stormFill > t.calmFill, `${at}.tracks 的填平须为正、沙暴时比平时快`)
-  need(t.depthM / t.calmFill >= 20, `${at}.tracks 平时标准身体的印子只留得住 ${(t.depthM / t.calmFill).toFixed(0)} 秒，须至少 20 秒`)
-  need((t.depthM * t.tired) / t.stormFill <= wd.holdMs / 1000, `${at}.tracks 沙暴最猛的那一阵里须填得平累到见底的印子`)
-  const perHour = (3600_000 / (wd.intervalMs - wd.jitterMs)) * ((t.calmFill * wd.intervalMs + t.stormFill * (wd.riseMs / 2 + wd.holdMs + wd.fallMs / 2)) / 1000)
-  need(FILL_QUANT * 65535 >= perHour, `${at}.tracks 一小时里风沙落下 ${perHour.toFixed(1)} 米，超过印子贴图记得下的 ${(FILL_QUANT * 65535).toFixed(1)} 米`)
+  need(t.stride > 0 && t.foot > 0 && t.pack > 0 && t.pack <= 1 && t.lifeS > 0, `${at}.tracks 的步幅、脚长、踩实与留存的秒数须为正`)
+  need(TIME_QUANT * 65535 >= 3600, `${at}.tracks 印子贴图记得下的时刻只够 ${((TIME_QUANT * 65535) / 60).toFixed(0)} 分钟，须够打满一个钟头`)
 }
 
 /** 身体的体力上限须为正、体力回复不为负 */

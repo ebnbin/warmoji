@@ -702,40 +702,19 @@ export interface DesertConfig {
   readonly landmarks: { readonly pairs: number; readonly gapU: number }
   /**
    * 走路的代谢按 Minetti 的坡度曲线：松沙上每米是硬地的 softSand 倍，被踩实的沙最多省掉多出来的 packRelief；
-   * 吃力时最多出到平地正常走路的 maxPower 倍功率，再吃力就走慢；下坡最多快到 downhillMax 倍；顶风多做的功按肌肉效率 efficiency 折成代谢，顺风省下其中的 tailRelief
+   * 吃力时最多出到平地正常走路的 maxPower 倍功率，再吃力就走慢；下坡最多快到 downhillMax 倍
    */
   readonly gait: {
     readonly softSand: number
     readonly packRelief: number
     readonly maxPower: number
     readonly downhillMax: number
-    readonly efficiency: number
-    readonly tailRelief: number
   }
-  /** 背阴处歇着的体力回复倍率；向阳处按地图的体力回复，沙暴遮住太阳时到处都算背阴 */
+  /** 背阴处歇着的体力回复倍率；向阳处按地图的体力回复 */
   readonly shadeRegen: number
   /**
-   * 风：平时、沙暴与起沙的风速（离地一米，米/秒）；沙暴先起、再稳、后落，隔一阵来一次，风向相对盛行风最多偏 veerDeg 度。
-   * 空气密度；半径 refRadiusU 格、质量倍率 1 的身体的 Cd·A/m（米²/千克）：小而轻的身体顶风更费力
-   */
-  readonly wind: {
-    readonly breezeMs: number
-    readonly stormMs: number
-    readonly thresholdMs: number
-    readonly firstMs: number
-    readonly intervalMs: number
-    readonly jitterMs: number
-    readonly riseMs: number
-    readonly holdMs: number
-    readonly fallMs: number
-    readonly veerDeg: number
-    readonly airDensity: number
-    readonly dragArea: number
-    readonly refRadiusU: number
-  }
-  /**
-   * 脚印：印子贴图每格多少个格子。标准身体在松沙上一步踩多深（米），硬地上只踩下去 firm 倍，累到见底时深到 tired 倍，体力低于 dragFrom 开始拖着脚；
-   * 步幅与脚长占身体半径的比例；风把印子填平的速度（米/秒），平时与沙暴最猛时；一步把那里的沙踩实多少，落进多深的沙就又松了；各种敌人的步态，没写的按光脚，队员穿着靴子
+   * 脚印：印子贴图每格多少个格子。标准身体在松沙上一步踩多深（米），实沙上只踩下去 firm 倍，累到见底时深到 tired 倍，体力低于 dragFrom 开始拖着脚；
+   * 步幅与脚长占身体半径的比例；印子与踩实的沙过多少秒被风吹平；一步把那里的沙踩实多少；各种敌人的步态，没写的按光脚，队员穿着靴子
    */
   readonly tracks: {
     readonly perU: number
@@ -745,10 +724,8 @@ export interface DesertConfig {
     readonly dragFrom: number
     readonly stride: number
     readonly foot: number
-    readonly calmFill: number
-    readonly stormFill: number
+    readonly lifeS: number
     readonly pack: number
-    readonly packFillM: number
     readonly gaits: Partial<Record<EnemyKind, DesertGait>>
   }
 }

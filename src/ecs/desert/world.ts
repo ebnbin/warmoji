@@ -3,16 +3,14 @@ import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
-import { Barrier, Drive, Drop, Flyer, Motion, MOTION, Phys, Pickup, PrevPos, Radius, Shadow, Shard, CharScale, Transform } from '../components'
+import { Barrier, Drive, Drop, Flyer, Motion, MOTION, Phys, Pickup, PrevPos, Shadow, Shard, Transform } from '../components'
 import { traces } from '../store'
 import { approach } from '../systems/shared/body'
 import { leaderX, leaderY } from '../utils/team'
 import { desertPlanFor, gridAt, slopeAt, sunAt, wrapU } from './terrain'
-import { fillRate, nextStorm, windAt } from './weather'
-import { paceOf, windAlong } from './gait'
+import { paceOf } from './gait'
 import { newTracks, packAt, stepTracks } from './tracks'
 import type { DesertPlan } from './terrain'
-import type { Storm, Wind } from './weather'
 import type { Pace } from './gait'
 import type { Tracks } from './tracks'
 import type { DesertConfig } from '../../types/maps'
@@ -25,17 +23,10 @@ const NO_GHOSTS: Point[] = []
 /** 弹体飞到离队长这么近（格）的对面那一半就消失：再往前就该从背后绕回来了 */
 const FAR_EDGE_U = 0.5
 
-/**
- * 沙漠此刻的状态：按种子生成的地形，沙上的印子与踩实，此刻的风，正在刮或刚刮过的沙暴与下一场的时刻；
- * storms 是开局以来起过几场沙暴，画面按它起风声
- */
+/** 沙漠此刻的状态：按种子生成的地形，沙上的印子与踩实 */
 export interface DesertState {
   readonly plan: DesertPlan
   readonly tracks: Tracks
-  readonly wind: Wind
-  storm: Storm | null
-  nextStorm: number
-  storms: number
 }
 
 function cfgOf(sim: Sim): DesertConfig {
@@ -52,7 +43,7 @@ export function desertOf(sim: Sim): DesertState {
   if (!s) {
     const cfg = cfgOf(sim)
     const plan = desertPlanOf(cfg, sim.mapW / UNIT, sim.run.decorSeed)
-    s = { plan, tracks: newTracks(plan.sizeU), wind: { speed: cfg.wind.breezeMs, angle: plan.windAngle, level: 0, flux: 0 }, storm: null, nextStorm: cfg.wind.firstMs, storms: 0 }
+    s = { plan, tracks: newTracks(plan.sizeU) }
     sim.worldState.desert = s
   }
   return s
@@ -136,30 +127,20 @@ function rewrap(sim: Sim): void {
 const SLOPE = { x: 0, y: 0 }
 const PACE: Pace = { demand: 1, speed: 1 }
 
-/**
- * 在 (x, y) 像素处朝 (dx, dy)（像素/秒，按它的大小算速度）走：坡度沿前进方向取，沙的松实按格子取，顶风按风拖着这个身体的加速度算
- */
-function paceAt(s: DesertState, cfg: DesertConfig, x: number, y: number, dx: number, dy: number, bulk: number): Pace {
+/** 在 (x, y) 像素处朝 (dx, dy) 走：坡度沿前进方向取，沙的松实按格子取，再算上被踩实的程度 */
+function paceAt(s: DesertState, cfg: DesertConfig, x: number, y: number, dx: number, dy: number): Pace {
   const len = Math.hypot(dx, dy)
   const xu = x / UNIT
   const yu = y / UNIT
   slopeAt(s.plan, xu, yu, SLOPE)
   const i = (SLOPE.x * dx + SLOPE.y * dy) / len
   const loose = gridAt(s.plan, s.plan.soft, xu, yu)
-  const m = cfg.meterPerU / UNIT
-  const tail = windAlong(cfg.wind, s.wind.speed, s.wind.angle, dx * m, dy * m, bulk)
-  return paceOf(cfg.gait, i, loose, packAt(s.tracks, cfg, x, y), tail, PACE)
-}
-
-/** 身体相对标准身体的块头：迎风面按半径平方、质量按半径立方乘质量倍率，风拖它的加速度按这个比例变小 */
-function bulkOf(sim: Sim, cfg: DesertConfig, eid: number): number {
-  const r = hasComponent(sim.world, eid, CharScale) ? Radius.v[eid]! / CharScale.v[eid]! : Radius.v[eid]!
-  return Math.max(0.2, (r / (cfg.wind.refRadiusU * UNIT)) * Phys.mass[eid]!)
+  return paceOf(cfg.gait, i, loose, packAt(s.tracks, cfg, x, y), PACE)
 }
 
 /**
  * 沙漠：一片首尾相接的沙海，没有墙，四边是回绕的接缝；距离一律按环面上的最短差算，每样东西都挪到离队长最近的那一份上。
- * 赶路按坡度、沙的松实与风出力，吃力时走慢；背阴处歇着回得快；沙上留下印子，踩实的地方省力；风把印子慢慢填平，隔一阵来一场沙暴
+ * 赶路按坡度与沙的松实出力，吃力时走慢；背阴处歇着回得快；沙上留下印子，踩实的地方省力，过一阵被风吹平
  */
 export const desert: WorldHooks = {
   torus: true,
@@ -184,18 +165,18 @@ export const desert: WorldHooks = {
   sink() {
     return false
   },
-  /** 赶路的费力按地图的体力算；歇着时向阳处按地图的体力回复，背阴处或沙暴遮住太阳时回得快 */
+  /** 赶路的费力按地图的体力算；歇着时向阳处按地图的体力回复，背阴处回得快 */
   surface(sim, x, y) {
     const cfg = cfgOf(sim)
     const s = desertOf(sim)
     const st = MAPS[sim.mapId].stamina
-    const shade = Math.max(1 - sunAt(s.plan, x / UNIT, y / UNIT), s.wind.level)
+    const shade = 1 - sunAt(s.plan, x / UNIT, y / UNIT)
     return { traction: 1, viscosity: 1, exertion: st.exertion, regen: st.regen + (cfg.shadeRegen - st.regen) * shade } satisfies Surface
   },
   /** 每走一格的费力是出力乘走得多快：照常的速度出更多力，走慢了每秒出的力封顶 */
   effort(sim, x, y, dx, dy) {
     if (dx === 0 && dy === 0) return 1
-    const p = paceAt(desertOf(sim), cfgOf(sim), x, y, dx, dy, 1)
+    const p = paceAt(desertOf(sim), cfgOf(sim), x, y, dx, dy)
     return p.demand * p.speed
   },
   contact(sim, eid, dt, x, y, vx, vy, out) {
@@ -203,7 +184,7 @@ export const desert: WorldHooks = {
     const cfg = cfgOf(sim)
     const dx = Drive.x[eid]!
     const dy = Drive.y[eid]!
-    const f = dx === 0 && dy === 0 ? 1 : paceAt(desertOf(sim), cfg, x, y, dx, dy, bulkOf(sim, cfg, eid)).speed
+    const f = dx === 0 && dy === 0 ? 1 : paceAt(desertOf(sim), cfg, x, y, dx, dy).speed
     const g = sim.hooks.surface(sim, x, y)
     const k = (Phys.drag[eid]! * Phys.grip[eid]! * g.traction * g.viscosity) / Phys.mass[eid]!
     approach(out, x, y, vx, vy, dx * f, dy * f, k, dt)
@@ -255,20 +236,12 @@ export const desert: WorldHooks = {
   onStart(sim) {
     desertOf(sim)
   },
-  /** 先把一切挪到离队长最近的那一份上，再推进风与沙暴、风沙落下的深度，最后按这一帧走过的路落印子 */
+  /** 先把一切挪到离队长最近的那一份上，再按这一帧走过的路落印子 */
   tick(sim, delta) {
     const cfg = cfgOf(sim)
     const s = desertOf(sim)
     rewrap(sim)
-    const now = sim.elapsedMs
-    if (now >= s.nextStorm) {
-      const n = nextStorm(cfg.wind, s.plan.windAngle, now, () => sim.rng.next())
-      s.storm = n.storm
-      s.nextStorm = n.next
-      s.storms++
-    }
-    windAt(cfg.wind, s.plan.windAngle, s.storm, now, s.wind)
-    s.tracks.fill += (fillRate(cfg, s.wind.flux) * delta) / 1000
+    s.tracks.now = sim.elapsedMs / 1000
     const plan = s.plan
     stepTracks(sim, s.tracks, cfg, plan.sizeU, (x, y) => gridAt(plan, plan.soft, x / UNIT, y / UNIT), delta / 1000)
   },

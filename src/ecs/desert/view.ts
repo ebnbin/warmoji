@@ -5,15 +5,14 @@ import { rollDecor } from '../../data/maps'
 import { GROUND_PPU } from '../../data/texel'
 import { viewport } from '../../util/apply'
 import { Rng } from '../../util/rng'
-import { playSfx } from '../../audio/sfx'
 import { fbm } from '../../util/noise'
 import { spawnDecor } from '../entities/decor'
 import { canopySize, drawCanopy, CANOPY_PPU } from './canopy'
 import { DesertPainter } from './painter'
-import { encodeInfo, GROUND_FRAG, STORM_FRAG } from './shader'
-import { FILL_QUANT, HEIGHT_SPAN, newTrackTex, stampPrint, TRACK_TILE } from './stamp'
+import { encodeInfo, GROUND_FRAG } from './shader'
+import { HEIGHT_SPAN, newTrackTex, stampPrint, TIME_QUANT, TRACK_TILE } from './stamp'
 import { desertOf, desertPlanOf } from './world'
-import { smooth, wrapU } from './terrain'
+import { wrapU } from './terrain'
 import type { PixelRect } from './ground'
 import type { DesertPlan, Landmark } from './terrain'
 import type { TrackTex } from './stamp'
@@ -29,7 +28,6 @@ const GROUND_KEY = 'desert-ground'
 const TRACKS_KEY = 'desert-tracks'
 const INFO_KEY = 'desert-info'
 const CANOPY_KEY = 'desert-canopy'
-const GRAIN_KEY = 'desert-grain'
 const DUST_KEY = 'desert-dust'
 /** 开局最多几个线程分着画沙地 */
 const PAINT_THREADS = 4
@@ -43,8 +41,6 @@ const TRACK_UPLOAD_MS = 50
 const CANOPY_DEPTH = 20
 const RAG_DEPTH = 21
 const RAG_SHADOW_DEPTH = -0.5
-/** 沙暴压在实体与特效上面、提示的箭头与伤害数字下面 */
-const STORM_DEPTH = 39
 /** 脚下扬起的沙最多每秒这么多团：人多的时候不糊成一片 */
 const PUFFS_PER_S = 40
 
@@ -82,25 +78,6 @@ function patchTexture(scene: Phaser.Scene, tex: Phaser.Textures.CanvasTexture, i
   gl.texSubImage2D(gl.TEXTURE_2D, 0, x, gt.flipY ? gt.height - y - img.height : y, gl.RGBA, gl.UNSIGNED_BYTE, img)
 }
 
-/** 一粒被风吹着贴地跑的沙：头朝右、拖着尾巴的一道细亮线 */
-function drawGrain(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-  const img = ctx.createImageData(w, h)
-  const cy = (h - 1) / 2
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const t = x / (w - 1)
-      const along = t < 0.85 ? t / 0.85 : (1 - t) / 0.15
-      const across = Math.max(0, 1 - Math.abs(y - cy) / (h / 2))
-      const o = (y * w + x) * 4
-      img.data[o] = 255
-      img.data[o + 1] = 255
-      img.data[o + 2] = 255
-      img.data[o + 3] = along ** 1.5 * across ** 1.6 * 255
-    }
-  }
-  ctx.putImageData(img, 0, 0)
-}
-
 /** 一团扬起的沙尘：边缘被噪声扰得参差，里面一絮一絮的浓淡；贴图边上一定透明 */
 function drawDust(ctx: CanvasRenderingContext2D, size: number): void {
   const img = ctx.createImageData(size, size)
@@ -122,9 +99,8 @@ function drawDust(ctx: CanvasRenderingContext2D, size: number): void {
 
 /**
  * 沙漠：地面是一张后台线程画好、四方连续的沙地贴图，由跟着镜头走的着色器按一圈平铺，镜头连续地跟着队长、看不到边；
- * 印子画在另一张首尾相接的贴图里，有人踩下去就盖上一笔、只重传改过的块，着色器按太阳打出阴阳面、按落下的沙把它们慢慢抹平。
- * 枯树的枝杈与路标杆头画在实体上面，杆头的破布条顺着风飘、影子落在杆影的尽头；起沙时沙粒贴地跑，脚下扬起一小团沙；
- * 沙暴来时风声大作，另一个跟着镜头的着色器在一切之上画出顺风翻滚的沙云，离镜头远处浓得看不清，标志物隐没在里面
+ * 印子画在另一张首尾相接的贴图里，有人踩下去就盖上一笔、只重传改过的块，着色器按太阳打出阴阳面、按过了多久把它们慢慢抹平。
+ * 枯树的枝杈与路标杆头画在实体上面，杆头的破布条顺着风飘、影子落在杆影的尽头；脚下扬起一小团沙
  */
 export class DesertView implements MapView {
   private visuals: Phaser.GameObjects.GameObject[] = []
@@ -133,18 +109,12 @@ export class DesertView implements MapView {
   private painter?: DesertPainter
   private ground?: Phaser.GameObjects.Shader
   private tracks?: { tex: Phaser.Textures.CanvasTexture; data: TrackTex; at: number }
-  private readonly u = { rect: [0, 0, 1, 1], time: 0, wind: [1, 0, 0, 0], storm: 0, track: [1, HEIGHT_SPAN, FILL_QUANT, 0], focus: [0, 0, 1] }
+  private readonly u = { rect: [0, 0, 1, 1], track: [1, HEIGHT_SPAN, TIME_QUANT, 0] }
   private marks: LandmarkFx[] = []
   private ragGfx?: Phaser.GameObjects.Graphics
   private ragShadow?: Phaser.GameObjects.Graphics
-  private grains?: Phaser.GameObjects.Particles.ParticleEmitter
   private puffs?: Phaser.GameObjects.Particles.ParticleEmitter
-  private stormFx?: Phaser.GameObjects.Shader
-  private vignette?: Phaser.Filters.Vignette
-  private grainAcc = 0
   private puffBudget = 0
-  private storms = 0
-  private roarAt = 0
 
   private cfgOf(v: ViewCtx): DesertConfig {
     return v.def.desert!
@@ -167,7 +137,6 @@ export class DesertView implements MapView {
   build(v: ViewCtx): void {
     const scene = v.scene
     this.visuals.push(scene.add.rectangle(viewport.logicalWidth / 2, viewport.logicalHeight / 2, 8000, 8000, BG).setScrollFactor(0).setDepth(-3))
-    if (!scene.textures.exists(GRAIN_KEY)) canvasTexture(scene, GRAIN_KEY, 32, 8, (ctx) => drawGrain(ctx, 32, 8))
     if (!scene.textures.exists(DUST_KEY)) canvasTexture(scene, DUST_KEY, 64, 64, (ctx) => drawDust(ctx, 64))
   }
 
@@ -216,7 +185,7 @@ export class DesertView implements MapView {
     upload(tex)
     const info = encodeInfo(plan)
     canvasTexture(scene, INFO_KEY, plan.cols, plan.cols, (ctx) => ctx.putImageData(new ImageData(info, plan.cols, plan.cols), 0, 0))
-    const data = newTrackTex(plan.sizeU, cfg.tracks.perU)
+    const data = newTrackTex(plan.sizeU, cfg.tracks.perU, cfg.tracks.lifeS)
     const tracks = canvasTexture(scene, TRACKS_KEY, data.cells, data.cells, (ctx) => ctx.putImageData(new ImageData(data.data, data.cells, data.cells), 0, 0))
     this.tracks = { tex: tracks, data, at: 0 }
     const u = this.u
@@ -235,11 +204,8 @@ export class DesertView implements MapView {
             set('uRect', u.rect)
             set('uPeriod', [plan.sizeU * UNIT, plan.sizeU * UNIT])
             set('uTrack', u.track)
-            set('uScale', [plan.sizeU, plan.meterPerU])
+            set('uScale', [plan.sizeU, plan.meterPerU, cfg.tracks.lifeS])
             set('uSun', [plan.light.x / sunLen, plan.light.y / sunLen, plan.light.z / sunLen])
-            set('uTime', u.time)
-            set('uWind', u.wind)
-            set('uStorm', u.storm)
           },
         },
         0,
@@ -254,14 +220,6 @@ export class DesertView implements MapView {
     this.landmarks(v, plan)
     this.ragShadow = scene.add.graphics().setDepth(RAG_SHADOW_DEPTH)
     this.ragGfx = scene.add.graphics().setDepth(RAG_DEPTH)
-    this.grains = scene.add
-      .particles(0, 0, GRAIN_KEY, {
-        lifespan: { min: 300, max: 700 },
-        alpha: { start: 0.7, end: 0 },
-        tint: [0xf3dfb8, 0xe9cc98, 0xfff1d6],
-        emitting: false,
-      })
-      .setDepth(2)
     this.puffs = scene.add
       .particles(0, 0, DUST_KEY, {
         lifespan: { min: 420, max: 760 },
@@ -272,31 +230,8 @@ export class DesertView implements MapView {
         emitting: false,
       })
       .setDepth(1.5)
-    this.stormFx = scene.add
-      .shader(
-        {
-          name: 'DesertStorm',
-          fragmentSource: STORM_FRAG,
-          setupUniforms: (set: (name: string, value: unknown) => void) => {
-            set('uRect', u.rect)
-            set('uTime', u.time)
-            set('uWind', u.wind)
-            set('uLevel', u.storm)
-            set('uFocus', u.focus)
-            set('uMeter', plan.meterPerU)
-          },
-        },
-        0,
-        0,
-        side,
-        side,
-      )
-      .setOrigin(0, 0)
-      .setDepth(STORM_DEPTH)
-      .setVisible(false)
-    this.visuals.push(this.ragShadow, this.ragGfx, this.grains, this.puffs, this.stormFx)
-    this.vignette = scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.75, 0.2, 0x140a04)
-    this.storms = s.storms
+    this.visuals.push(this.ragShadow, this.ragGfx, this.puffs)
+    scene.cameras.main.filters?.internal.addVignette(0.5, 0.5, 0.75, 0.2, 0x140a04)
     this.step(v, sim, 0)
   }
 
@@ -338,35 +273,23 @@ export class DesertView implements MapView {
     const x0 = mid.x - side / 2
     const y0 = mid.y - side / 2
     g.setPosition(x0, y0)
-    this.stormFx?.setPosition(x0, y0)
     const u = this.u
     u.rect[0] = x0
     u.rect[1] = y0
     u.rect[2] = side
     u.rect[3] = side
-    u.time = now / 1000
-    u.wind[0] = Math.cos(s.wind.angle)
-    u.wind[1] = Math.sin(s.wind.angle)
-    u.wind[2] = s.wind.speed
-    u.wind[3] = s.wind.flux
-    u.storm = s.wind.level
-    u.track[3] = s.tracks.fill
-    u.focus[0] = mid.x
-    u.focus[1] = mid.y
-    u.focus[2] = (Math.min(view.width, view.height) / 2) * (1.2 - 0.4 * s.wind.level)
+    u.track[3] = s.tracks.now
     this.stampTracks(v, s, view, dt)
-    this.placeLandmarks(v, s, mid, now)
-    this.blow(v, s, view, dt)
-    this.storm(v, s, now)
+    this.placeLandmarks(s, mid, now)
   }
 
   /** 把新踩的印子盖进贴图，改过的块攒一会儿再一起重传；镜头里松沙上的脚步扬起一小团沙 */
   private stampTracks(v: ViewCtx, s: DesertState, view: Phaser.Geom.Rectangle, dt: number): void {
     const t = this.tracks!
-    const fill = s.tracks.fill
+    const at = s.tracks.now
     this.puffBudget = Math.min(PUFFS_PER_S, this.puffBudget + dt * PUFFS_PER_S)
     for (const p of s.tracks.prints) {
-      stampPrint(t.data, p, UNIT, fill)
+      stampPrint(t.data, p, UNIT, at)
       if (this.puffBudget >= 1 && p.depth > 0.012 && p.gait !== 'slither' && view.contains(p.x, p.y)) {
         this.puffBudget--
         this.puffs?.emitParticleAt(p.x, p.y, p.drag > 0.3 || p.gait === 'burrow' ? 2 : 1)
@@ -390,23 +313,20 @@ export class DesertView implements MapView {
     }
   }
 
-  /** 每样标志物挪到离镜头最近的那一份上；破布条顺着风飘，越大的风飘得越平、抖得越急，影子落在杆影的尽头 */
-  private placeLandmarks(v: ViewCtx, s: DesertState, mid: Point, now: number): void {
+  /** 每样标志物挪到离镜头最近的那一份上；破布条顺着盛行风飘，微风一阵紧一阵松，紧时飘得平、抖得急，影子落在杆影的尽头 */
+  private placeLandmarks(s: DesertState, mid: Point, now: number): void {
     const size = s.plan.sizeU * UNIT
     const rag = this.ragGfx!
     const shade = this.ragShadow!
     rag.clear()
     shade.clear()
-    const wx = Math.cos(s.wind.angle)
-    const wy = Math.sin(s.wind.angle)
-    const gust = Math.min(1, s.wind.speed / this.cfgOf(v).wind.stormMs)
-    const hide = s.wind.level
+    const wx = Math.cos(s.plan.windAngle)
+    const wy = Math.sin(s.plan.windAngle)
+    const gust = 0.26 + 0.05 * Math.sin(now / 1700) + 0.03 * Math.sin(now / 430 + 1.1)
     for (const m of this.marks) {
       const x = mid.x + wrapU(m.land.x * UNIT - mid.x, size)
       const y = mid.y + wrapU(m.land.y * UNIT - mid.y, size)
-      const far = Math.min(1, Math.hypot(x - mid.x, y - mid.y) / (8 * UNIT))
-      const alpha = 1 - 0.85 * hide * smooth(0.15, 1, far)
-      m.img?.setPosition(x, y).setAlpha(alpha)
+      m.img?.setPosition(x, y)
       if (!m.rag) continue
       const pole = m.land.shape.limbs[0]!
       const top = pole.z1
@@ -429,48 +349,10 @@ export class DesertView implements MapView {
         }
       }
       const off = s.plan
-      ribbon(shade, off.offX * top * UNIT, off.offY * top * UNIT, 0x2a1a10, 0.28 * alpha * (1 - hide * 0.8))
-      ribbon(rag, 0, 0, 0xa8402c, 0.95 * alpha)
-      ribbon(rag, -0.012 * UNIT, -0.012 * UNIT, 0xd77a5c, 0.5 * alpha)
+      ribbon(shade, off.offX * top * UNIT, off.offY * top * UNIT, 0x2a1a10, 0.28)
+      ribbon(rag, 0, 0, 0xa8402c, 0.95)
+      ribbon(rag, -0.012 * UNIT, -0.012 * UNIT, 0xd77a5c, 0.5)
     }
-  }
-
-  /** 起沙的风把沙粒贴地吹着跑：每秒按镜头的面积与输沙率撒，从上风那边吹进来，顺着风拉成细线，风越紧拉得越长 */
-  private blow(v: ViewCtx, s: DesertState, view: Phaser.Geom.Rectangle, dt: number): void {
-    const cfg = this.cfgOf(v)
-    const px = UNIT / cfg.meterPerU
-    const c = Math.cos(s.wind.angle)
-    const sn = Math.sin(s.wind.angle)
-    const flux = s.wind.flux
-    const grains = this.grains!
-    const run = s.wind.speed * px * 0.45
-    grains.speedX = { min: c * run * 0.6 - 8, max: c * run * 1.2 + 8 }
-    grains.speedY = { min: sn * run * 0.6 - 8, max: sn * run * 1.2 + 8 }
-    grains.radial = false
-    grains.particleRotate = (s.wind.angle * 180) / Math.PI
-    grains.particleScaleX = 0.4 + 0.5 * Math.min(1.5, flux)
-    grains.particleScaleY = 0.5
-    this.grainAcc += dt * ((view.width * view.height) / (UNIT * UNIT)) * (0.04 + 2.6 * Math.min(1.5, flux))
-    for (; this.grainAcc >= 1; this.grainAcc--) {
-      const back = Math.random() * 0.3
-      grains.emitParticleAt(view.x + Math.random() * view.width - c * back * view.width, view.y + Math.random() * view.height - sn * back * view.height, 1)
-    }
-  }
-
-  /** 沙暴：来时一阵风声；刮得越紧沙云越浓、看得清的那一圈越小，暗角越重 */
-  private storm(v: ViewCtx, s: DesertState, now: number): void {
-    if (s.storms !== this.storms) {
-      this.storms = s.storms
-      playSfx('gust')
-      this.roarAt = now + v.def.desert!.wind.riseMs * 0.6
-    }
-    const level = s.wind.level
-    if (level > 0.6 && now >= this.roarAt) {
-      this.roarAt = now + 4200
-      playSfx('squall')
-    }
-    this.stormFx?.setVisible(level > 0.005)
-    if (this.vignette) this.vignette.strength = 0.2 + 0.18 * level
   }
 
   resize(v: ViewCtx): void {
@@ -480,7 +362,6 @@ export class DesertView implements MapView {
   destroy(v: ViewCtx): void {
     this.painter?.close()
     this.painter = undefined
-    this.vignette = undefined
     for (const o of this.visuals) o.destroy()
     for (const eid of this.decorEids) removeEntity(v.world, eid)
     this.visuals = []
@@ -490,9 +371,7 @@ export class DesertView implements MapView {
     this.tracks = undefined
     this.ragGfx = undefined
     this.ragShadow = undefined
-    this.grains = undefined
     this.puffs = undefined
-    this.stormFx = undefined
     for (const key of [GROUND_KEY, TRACKS_KEY, INFO_KEY]) if (v.scene.textures.exists(key)) v.scene.textures.remove(key)
     for (const key of v.scene.textures.getTextureKeys()) if (key.startsWith(CANOPY_KEY)) v.scene.textures.remove(key)
   }

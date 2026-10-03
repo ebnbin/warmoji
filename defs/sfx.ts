@@ -31,5 +31,4 @@ export const SFX = {
   flutter: { wave: 'noise', freq: 2600, freqEnd: 1500, duration: 1.4, volume: 0.16, attack: 0.25, decayPow: 0.9, steps: [1, 0.8, 1.1, 0.75, 1.05, 0.8, 1.12, 0.78, 1, 0.82, 1.08, 0.76], throttleMs: 2500, jitter: 0.15 },
   ignite: { wave: 'noise', freq: 260, freqEnd: 1400, duration: 0.42, volume: 0.24, attack: 0.03, decayPow: 1.4, throttleMs: 220, jitter: 0.2 },
   snuff: { wave: 'noise', freq: 900, freqEnd: 180, duration: 0.28, volume: 0.12, attack: 0.01, decayPow: 1.6, throttleMs: 220, jitter: 0.2 },
-  squall: { wave: 'noise', freq: 900, freqEnd: 320, duration: 4.6, volume: 0.34, attack: 1.8, decayPow: 0.9, throttleMs: 3800, jitter: 0.12 },
 } as const satisfies Record<string, SfxDef>

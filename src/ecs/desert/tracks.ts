@@ -43,7 +43,7 @@ interface Walker {
 }
 
 /**
- * 沙上的印子：新踩的印子排队等画面画上去；沙被踩实多少按 cell 格的格子记，记下时风沙已经落了多深（fill，米），之后按又落下的沙慢慢松开
+ * 沙上的印子：新踩的印子排队等画面画上去；沙被踩实多少按 cell 格的格子记，连同踩实那一下的时刻（秒），之后慢慢被风吹松
  */
 export interface Tracks {
   readonly walkers: Map<number, Walker>
@@ -51,9 +51,9 @@ export interface Tracks {
   readonly cols: number
   readonly cell: number
   readonly pack: Float32Array
-  readonly packFill: Float32Array
-  /** 开局以来风沙一共落了多深，米：印子与踩实都按它填平、松开 */
-  fill: number
+  readonly packT: Float32Array
+  /** 开局以来过了多少秒：印子与踩实都按它淡去 */
+  now: number
 }
 
 /** 踩实按这么大的格子记，格 */
@@ -67,7 +67,7 @@ const TRAIL_STEP_U = 0.12
 
 export function newTracks(sizeU: number): Tracks {
   const cols = Math.round(sizeU / PACK_CELL_U)
-  return { walkers: new Map(), prints: [], cols, cell: PACK_CELL_U, pack: new Float32Array(cols * cols), packFill: new Float32Array(cols * cols), fill: 0 }
+  return { walkers: new Map(), prints: [], cols, cell: PACK_CELL_U, pack: new Float32Array(cols * cols), packT: new Float32Array(cols * cols), now: 0 }
 }
 
 function packCell(t: Tracks, x: number, y: number): number {
@@ -77,16 +77,16 @@ function packCell(t: Tracks, x: number, y: number): number {
   return j * n + i
 }
 
-/** (x, y) 像素处的沙被踩实了几成 */
+/** (x, y) 像素处的沙被踩实了几成：踩实的沙过 lifeS 秒就被吹松 */
 export function packAt(t: Tracks, cfg: DesertConfig, x: number, y: number): number {
   const k = packCell(t, x, y)
-  return Math.max(0, t.pack[k]! - (t.fill - t.packFill[k]!) / cfg.tracks.packFillM)
+  return Math.max(0, t.pack[k]! - (t.now - t.packT[k]!) / cfg.tracks.lifeS)
 }
 
 function trample(t: Tracks, cfg: DesertConfig, x: number, y: number, amount: number): void {
   const k = packCell(t, x, y)
   t.pack[k] = Math.min(1, packAt(t, cfg, x, y) + amount)
-  t.packFill[k] = t.fill
+  t.packT[k] = t.now
 }
 
 /** 身体本来的大小：队长的判定半径里乘了突出队长的倍率，踩多深不算它 */
@@ -173,7 +173,10 @@ export function stepTracks(sim: Sim, t: Tracks, cfg: DesertConfig, sizeU: number
         const px = bx - uy * wave
         const py = by + ux * wave
         const soft = loose(px, py) * (1 - 0.6 * packAt(t, cfg, px, py))
-        emit(t, { x: px, y: py, angle, gait, side: 0, size: r, depth: deep(soft), drag, stride: step, fx: w.lx, fy: w.ly })
+        // 上一点取离这一点最近的那一份：身体被挪过整圈时，不从旧的那一份拉一道横穿整圈的线
+        const fx = px - wrapU(px - w.lx, size)
+        const fy = py - wrapU(py - w.ly, size)
+        emit(t, { x: px, y: py, angle, gait, side: 0, size: r, depth: deep(soft), drag, stride: step, fx, fy })
         w.lx = px
         w.ly = py
       }
