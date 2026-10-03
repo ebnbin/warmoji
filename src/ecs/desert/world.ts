@@ -3,11 +3,11 @@ import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
-import { Barrier, Drive, Drop, Flyer, Motion, MOTION, Phys, Pickup, PrevPos, Shadow, Shard, Transform } from '../components'
+import { Barrier, Drive, Drop, Flyer, Motion, MOTION, Phasing, Phys, Pickup, PrevPos, Radius, Shadow, Shard, Transform } from '../components'
 import { traces } from '../store'
 import { approach } from '../systems/shared/body'
 import { leaderX, leaderY } from '../utils/team'
-import { desertPlanFor, gridAt, slopeAt, sunAt, wrapU } from './terrain'
+import { desertPlanFor, gridAt, slopeAt, solidAt, sunAt, wrapU } from './terrain'
 import { paceOf } from './gait'
 import { newTracks, packAt, stepTracks } from './tracks'
 import type { DesertPlan } from './terrain'
@@ -22,6 +22,12 @@ const ZERO: Point = { x: 0, y: 0 }
 const NO_GHOSTS: Point[] = []
 /** 弹体飞到离队长这么近（格）的对面那一半就消失：再往前就该从背后绕回来了 */
 const FAR_EDGE_U = 0.5
+/** 追人的离标志物这么近（格，在身体半径之外）就开始贴着边绕；游荡与逃跑的看得远一些 */
+const GLIDE_U = 0.3
+const DRIFT_GLIDE_U = 0.6
+/** 刷怪点与定点离标志物至少留这么宽（格），头目留得更宽 */
+const SETTLE_U = 0.7
+const BOSS_SETTLE_U = 1.3
 
 /** 沙漠此刻的状态：按种子生成的地形，沙上的印子与踩实 */
 export interface DesertState {
@@ -126,6 +132,33 @@ function rewrap(sim: Sim): void {
 
 const SLOPE = { x: 0, y: 0 }
 const PACE: Pace = { demand: 1, speed: 1 }
+const SOLID = { d: 0, nx: 0, ny: 0 }
+
+/** 半径 rad（像素）的身体陷进标志物多深就沿外法线退回多远，夹在两块之间时最多退三次 */
+function pushOut(plan: DesertPlan, x: number, y: number, rad: number): Point {
+  let px = x
+  let py = y
+  for (let k = 0; k < 3; k++) {
+    solidAt(plan, px / UNIT, py / UNIT, SOLID)
+    const gap = SOLID.d * UNIT - rad
+    if (gap >= 0) break
+    px -= SOLID.nx * gap
+    py -= SOLID.ny * gap
+  }
+  return { x: px, y: py }
+}
+
+/** 贴着标志物走：离它不到 reach（像素）又正朝它去时，削掉朝里的那一份，顺着边绕过去 */
+function glide(plan: DesertPlan, x: number, y: number, dx: number, dy: number, reach: number): Point {
+  solidAt(plan, x / UNIT, y / UNIT, SOLID)
+  if (SOLID.d * UNIT > reach) return { x: dx, y: dy }
+  const dot = dx * SOLID.nx + dy * SOLID.ny
+  if (dot >= -0.2) return { x: dx, y: dy }
+  const tx = dx - dot * SOLID.nx
+  const ty = dy - dot * SOLID.ny
+  const len = Math.hypot(tx, ty)
+  return len > 1e-6 ? { x: tx / len, y: ty / len } : { x: -SOLID.ny, y: SOLID.nx }
+}
 
 /** 在 (x, y) 像素处朝 (dx, dy) 走：坡度沿前进方向取，沙的松实按格子取，再算上被踩实的程度 */
 function paceAt(s: DesertState, cfg: DesertConfig, x: number, y: number, dx: number, dy: number): Pace {
@@ -190,30 +223,39 @@ export const desert: WorldHooks = {
     approach(out, x, y, vx, vy, dx * f, dy * f, k, dt)
     return true
   },
-  constrainBody(sim, _eid, _from, next) {
-    return nearLeader(sim, next.x, next.y)
+  /** 标志物挡人：会穿墙的照旧穿过去 */
+  constrainBody(sim, eid, _from, next) {
+    const p = nearLeader(sim, next.x, next.y)
+    if (hasComponent(sim.world, eid, Phasing)) return p
+    return pushOut(desertOf(sim).plan, p.x, p.y, Radius.v[eid]!)
   },
   basin() {
     return null
   },
-  chaseDir(_sim, eid, tx, ty) {
-    return norm(tx - Transform.x[eid]!, ty - Transform.y[eid]!)
+  chaseDir(sim, eid, tx, ty) {
+    const x = Transform.x[eid]!
+    const y = Transform.y[eid]!
+    const d = norm(tx - x, ty - y)
+    if (hasComponent(sim.world, eid, Phasing)) return d
+    return glide(desertOf(sim).plan, x, y, d.x, d.y, Radius.v[eid]! + GLIDE_U * UNIT)
   },
   wallHit() {
     return null
   },
   smashWall() {},
-  wanderDir(_sim, _eid, dx, dy) {
-    return { x: dx, y: dy }
+  wanderDir(sim, eid, dx, dy) {
+    if (hasComponent(sim.world, eid, Phasing)) return { x: dx, y: dy }
+    return glide(desertOf(sim).plan, Transform.x[eid]!, Transform.y[eid]!, dx, dy, Radius.v[eid]! + DRIFT_GLIDE_U * UNIT)
   },
-  fleeDir(_sim, _eid, awayX, awayY) {
-    return { x: awayX, y: awayY }
+  fleeDir(sim, eid, awayX, awayY) {
+    if (hasComponent(sim.world, eid, Phasing)) return { x: awayX, y: awayY }
+    return glide(desertOf(sim).plan, Transform.x[eid]!, Transform.y[eid]!, awayX, awayY, Radius.v[eid]! + DRIFT_GLIDE_U * UNIT)
   },
   outside(sim, x, y) {
     const m = FAR_EDGE_U * UNIT
     return Math.abs(wrapU(x - leaderX(sim), sim.mapW)) > sim.mapW / 2 - m || Math.abs(wrapU(y - leaderY(sim), sim.mapH)) > sim.mapH / 2 - m
   },
-  /** 刷怪点在环面上随便一处，离队长至少 minPlayerDist 格，头目更远 */
+  /** 刷怪点在环面上随便一处，离队长至少 minPlayerDist 格，头目更远；不压着标志物 */
   spawnPoint(sim, boss) {
     const lx = leaderX(sim)
     const ly = leaderY(sim)
@@ -223,7 +265,7 @@ export const desert: WorldHooks = {
       p = { x: lx + (sim.rng.next() - 0.5) * sim.mapW, y: ly + (sim.rng.next() - 0.5) * sim.mapH }
       if (Math.hypot(p.x - lx, p.y - ly) >= min) break
     }
-    return p
+    return pushOut(desertOf(sim).plan, p.x, p.y, (boss ? BOSS_SETTLE_U : SETTLE_U) * UNIT)
   },
   /** 环面没有中心：据点从队伍出发的地方起算 */
   center(sim) {
@@ -231,7 +273,8 @@ export const desert: WorldHooks = {
     return nearLeader(sim, st.x * UNIT, st.y * UNIT)
   },
   settle(sim, p) {
-    return nearLeader(sim, p.x, p.y)
+    const q = nearLeader(sim, p.x, p.y)
+    return pushOut(desertOf(sim).plan, q.x, q.y, SETTLE_U * UNIT)
   },
   onStart(sim) {
     desertOf(sim)

@@ -33,12 +33,22 @@ export interface Slab {
   readonly angle: number
 }
 
-/** 一样标志物的形状：同一个种子总是同一个样子，一对标志物一模一样 */
+/** 挡人的实心部分：从 (x0, y0) 到 (x1, y1)（相对标志物中心，格）的线段向两边各鼓出 r 格，两头是半圆 */
+export interface Solid {
+  readonly x0: number
+  readonly y0: number
+  readonly x1: number
+  readonly y1: number
+  readonly r: number
+}
+
+/** 一样标志物的形状：同一个种子总是同一个样子，一对标志物一模一样；solids 是它压在地上、挡人的那部分 */
 export interface LandmarkShape {
   readonly kind: LandmarkKind
   readonly limbs: readonly Limb[]
   readonly stones: readonly Stone[]
   readonly slab: Slab | null
+  readonly solids: readonly Solid[]
   /** 本身伸出中心多远，格 */
   readonly reach: number
   /** 最高处离地多高，米 */
@@ -46,6 +56,13 @@ export interface LandmarkShape {
 }
 
 const TAU = Math.PI * 2
+
+/** 把一堆石头圈成一个圆：圆心在标志物中心，刚好盖住最外面那块 */
+function around(stones: readonly Stone[]): Solid {
+  let r = 0
+  for (const s of stones) r = Math.max(r, Math.hypot(s.x, s.y) + s.r)
+  return { x0: 0, y0: 0, x1: 0, y1: 0, r }
+}
 
 function tree(rng: Rng): LandmarkShape {
   const limbs: Limb[] = []
@@ -94,7 +111,7 @@ function tree(rng: Rng): LandmarkShape {
       top = Math.max(top, z + 0.24)
     }
   }
-  return { kind: 'tree', limbs, stones: [], slab: null, reach: reach + 0.1, top }
+  return { kind: 'tree', limbs, stones: [], slab: null, solids: [{ x0: 0, y0: 0, x1: tx, y1: ty, r: 0.12 }], reach: reach + 0.1, top }
 }
 
 function post(rng: Rng): LandmarkShape {
@@ -109,7 +126,7 @@ function post(rng: Rng): LandmarkShape {
     const d = 0.13 + 0.07 * rng.next()
     stones.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: 0.07 + 0.04 * rng.next(), z0: 0, z1: 0.07 + 0.06 * rng.next() })
   }
-  return { kind: 'post', limbs, stones, slab: null, reach: 0.35, top: height }
+  return { kind: 'post', limbs, stones, slab: null, solids: [around(stones)], reach: 0.35, top: height }
 }
 
 function cairn(rng: Rng): LandmarkShape {
@@ -128,7 +145,7 @@ function cairn(rng: Rng): LandmarkShape {
       stones.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: l.r * (0.85 + 0.3 * rng.next()), z0: l.z0, z1: l.z1 * (0.92 + 0.12 * rng.next()) })
     }
   }
-  return { kind: 'cairn', limbs: [], stones, slab: null, reach: 0.5, top: 0.8 }
+  return { kind: 'cairn', limbs: [], stones, slab: null, solids: [around(stones)], reach: 0.5, top: 0.8 }
 }
 
 /** 驼骨：一条微弯的脊椎，一头是头骨，中段两侧的肋骨往外弯、一半埋在沙里，几根腿骨散在旁边 */
@@ -178,7 +195,14 @@ function bones(rng: Rng): LandmarkShape {
     const half = 0.2 + 0.08 * rng.next()
     limbs.push({ x0: cx - Math.cos(s) * half, y0: cy - Math.sin(s) * half, z0: 0.04, x1: cx + Math.cos(s) * half, y1: cy + Math.sin(s) * half, z1: 0.04, r0: 0.04, r1: 0.032 })
   }
-  return { kind: 'bones', limbs, stones, slab: null, reach: 1.25, top: 0.26 }
+  // 尾巴一段细，带肋骨的一段宽，脖子连头骨一段；散落的腿骨贴着沙、跨得过去
+  const snout = { x: head.x + head.dx * 0.33, y: head.y + head.dy * 0.33 }
+  const solids: Solid[] = [
+    { x0: spine[0]!.x, y0: spine[0]!.y, x1: spine[3]!.x, y1: spine[3]!.y, r: 0.08 },
+    { x0: spine[3]!.x, y0: spine[3]!.y, x1: spine[8]!.x, y1: spine[8]!.y, r: 0.4 },
+    { x0: spine[8]!.x, y0: spine[8]!.y, x1: snout.x, y1: snout.y, r: 0.15 },
+  ]
+  return { kind: 'bones', limbs, stones, slab: null, solids, reach: 1.25, top: 0.26 }
 }
 
 function rock(rng: Rng, windAngle: number): LandmarkShape {
@@ -189,7 +213,12 @@ function rock(rng: Rng, windAngle: number): LandmarkShape {
     const d = slab.length * (0.55 + 0.25 * rng.next())
     stones.push({ x: Math.cos(a) * d, y: Math.sin(a) * d * 0.6, r: 0.06 + 0.06 * rng.next(), z0: 0, z1: 0.05 + 0.05 * rng.next() })
   }
-  return { kind: 'rock', limbs: [], stones, slab, reach: slab.length * 0.85, top: slab.height }
+  // 迎风钝、背风收尖：顺着长轴分三段，一段比一段细；周围的小石子跨得过去
+  const half = slab.length / 2
+  const r0 = slab.width / 2
+  const along = (u0: number, u1: number, r: number): Solid => ({ x0: Math.cos(slab.angle) * u0, y0: Math.sin(slab.angle) * u0, x1: Math.cos(slab.angle) * u1, y1: Math.sin(slab.angle) * u1, r })
+  const solids = [along(-half + r0, 0, r0), along(0, half * 0.5, r0 * 0.72), along(half * 0.5, half * 0.86, r0 * 0.36)]
+  return { kind: 'rock', limbs: [], stones, slab, solids, reach: slab.length * 0.85, top: slab.height }
 }
 
 /** 按种类与种子生成一样标志物；岩盘顺着盛行风拉长 */

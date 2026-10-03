@@ -209,6 +209,35 @@ export function sunAt(p: DesertPlan, x: number, y: number): number {
   return gridAt(p, p.sun, x, y)
 }
 
+/**
+ * (x, y) 格处离最近的标志物实心部分多远（格，陷进去为负），连同从它往外的单位方向；离哪样都远时 d 是无穷大
+ */
+export function solidAt(p: DesertPlan, x: number, y: number, out: { d: number; nx: number; ny: number }): { d: number; nx: number; ny: number } {
+  out.d = Infinity
+  out.nx = 0
+  out.ny = 0
+  for (const l of p.landmarks) {
+    const qx = wrapU(x - l.x, p.sizeU)
+    const qy = wrapU(y - l.y, p.sizeU)
+    const far = l.shape.reach + 1
+    if (qx > far || qx < -far || qy > far || qy < -far) continue
+    for (const s of l.shape.solids) {
+      const ex = s.x1 - s.x0
+      const ey = s.y1 - s.y0
+      const l2 = ex * ex + ey * ey
+      const t = l2 > 1e-12 ? clamp01(((qx - s.x0) * ex + (qy - s.y0) * ey) / l2) : 0
+      const dx = qx - s.x0 - ex * t
+      const dy = qy - s.y0 - ey * t
+      const len = Math.hypot(dx, dy)
+      if (len - s.r >= out.d) continue
+      out.d = len - s.r
+      out.nx = len > 1e-9 ? dx / len : 1
+      out.ny = len > 1e-9 ? dy / len : 0
+    }
+  }
+  return out
+}
+
 /** 环面上两点的距离，格 */
 function torusDist(size: number, ax: number, ay: number, bx: number, by: number): number {
   return Math.hypot(wrapU(ax - bx, size), wrapU(ay - by, size))
