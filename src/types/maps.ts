@@ -664,6 +664,94 @@ export interface RiverConfig {
     readonly wetM: number
   }
 }
+/** 沙漠里一种身体在沙上留下的印子：靴印、光脚印、爪印、蹄印、蛇的拖痕、跳着落地的一对印子、一圈细腿戳出的点 */
+export type DesertGait = 'boot' | 'foot' | 'paw' | 'hoof' | 'slither' | 'hop' | 'legs'
+
+/**
+ * 沙漠：一片四边首尾相接的沙海，地图的四边是回绕的接缝，镜头跟着队长走、看不到边。沙丘与标志物都是一对一对的：
+ * 同一个摆在横竖各隔半圈的两处，再加上整圈的回绕，怎么走都分不清是回到了原地还是到了另一处。
+ * 赶路按坡度、沙的松实与风算代谢，背阴处歇着回得快；身体走过的地方留下脚印，越累越深，见底时拖着脚走；风把脚印慢慢填平，沙暴来时填得飞快。
+ * 物理量按米、千克、秒算，一格 meterPerU 米
+ */
+export interface DesertConfig {
+  readonly meterPerU: number
+  /** 镜头的长边最多看多少格：看到的范围小于环面的一圈，每样东西只画离队长最近的那一份 */
+  readonly viewMaxU: number
+  /** 太阳的仰角（度），方位与角色的光一致 */
+  readonly sunDeg: number
+  /**
+   * 新月形沙丘：几对、高（米）。迎风坡按抛物线从坡脚升到脊线，坡脚的坡度是 stossSlope（正切）；背风的落沙坡是休止角 reposeDeg 的斜面；
+   * 两角之间宽是沙丘长的 width 倍，两角往下风伸出沙丘长的 sweep 倍；各个沙丘的朝向在盛行风两侧最多偏 turnDeg 度
+   */
+  readonly dunes: {
+    readonly pairs: readonly [number, number]
+    readonly heightM: readonly [number, number]
+    readonly stossSlope: number
+    readonly reposeDeg: number
+    readonly width: number
+    readonly sweep: number
+    readonly turnDeg: number
+  }
+  /** 盛行风吹去的方向在背着太阳的方向两侧最多偏多少度：落沙坡多半背着太阳，丘后有阴影 */
+  readonly windSpreadDeg: number
+  /** 丘间的缓缓起伏：幅度（米）与一圈里起伏几次 */
+  readonly swell: { readonly heightM: number; readonly waves: number }
+  /** 丘间的地面：一圈里有几片斑块；砾石地与盐壳各占丘间的多少，其余是一层薄薄的松沙 */
+  readonly floor: { readonly patches: number; readonly gravel: number; readonly crust: number }
+  /** 标志物：几对（每对一模一样，横竖各隔半圈），彼此至少隔多远（格） */
+  readonly landmarks: { readonly pairs: number; readonly gapU: number }
+  /**
+   * 走路的代谢按 Minetti 的坡度曲线：松沙上每米是硬地的 softSand 倍，被踩实的沙最多省掉多出来的 packRelief；
+   * 吃力时最多出到平地正常走路的 maxPower 倍功率，再吃力就走慢；下坡最多快到 downhillMax 倍；顶风多做的功按肌肉效率 efficiency 折成代谢，顺风省下其中的 tailRelief
+   */
+  readonly gait: {
+    readonly softSand: number
+    readonly packRelief: number
+    readonly maxPower: number
+    readonly downhillMax: number
+    readonly efficiency: number
+    readonly tailRelief: number
+  }
+  /** 背阴处歇着的体力回复倍率；向阳处按地图的体力回复，沙暴遮住太阳时到处都算背阴 */
+  readonly shadeRegen: number
+  /**
+   * 风：平时、沙暴与起沙的风速（离地一米，米/秒）；沙暴先起、再稳、后落，隔一阵来一次，风向相对盛行风最多偏 veerDeg 度。
+   * 空气密度；半径 refRadiusU 格、质量倍率 1 的身体的 Cd·A/m（米²/千克）：小而轻的身体顶风更费力
+   */
+  readonly wind: {
+    readonly breezeMs: number
+    readonly stormMs: number
+    readonly thresholdMs: number
+    readonly firstMs: number
+    readonly intervalMs: number
+    readonly jitterMs: number
+    readonly riseMs: number
+    readonly holdMs: number
+    readonly fallMs: number
+    readonly veerDeg: number
+    readonly airDensity: number
+    readonly dragArea: number
+    readonly refRadiusU: number
+  }
+  /**
+   * 脚印：印子贴图每格多少个格子。标准身体在松沙上一步踩多深（米），硬地上只踩下去 firm 倍，累到见底时深到 tired 倍，体力低于 dragFrom 开始拖着脚；
+   * 步幅与脚长占身体半径的比例；风把印子填平的速度（米/秒），平时与沙暴最猛时；一步把那里的沙踩实多少，落进多深的沙就又松了；各种敌人的步态，没写的按光脚，队员穿着靴子
+   */
+  readonly tracks: {
+    readonly perU: number
+    readonly depthM: number
+    readonly firm: number
+    readonly tired: number
+    readonly dragFrom: number
+    readonly stride: number
+    readonly foot: number
+    readonly calmFill: number
+    readonly stormFill: number
+    readonly pack: number
+    readonly packFillM: number
+    readonly gaits: Partial<Record<EnemyKind, DesertGait>>
+  }
+}
 export interface TorusConfig {
   readonly arenaLong: number
   readonly arenaShort: number
@@ -674,7 +762,7 @@ export interface MapDef {
   readonly emoji: string
   readonly name: string
   readonly desc: string
-  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave'
+  readonly kind: 'bounded' | 'oldRiver' | 'void' | 'ruins' | 'daynight' | 'space' | 'ice' | 'nebulaOld' | 'nebula' | 'volcano' | 'ship' | 'river' | 'floe' | 'cave' | 'desert'
   readonly size?: { readonly w: number; readonly h: number }
   readonly stamina: GroundStamina
   readonly palette: Palette
@@ -695,6 +783,7 @@ export interface MapDef {
   readonly floe?: FloeConfig
   readonly cave?: CaveConfig
   readonly river?: RiverConfig
+  readonly desert?: DesertConfig
   readonly torus?: TorusConfig
   readonly finalWaveSub?: string
   readonly boss: EnemyKind
