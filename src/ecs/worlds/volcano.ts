@@ -1,10 +1,11 @@
 import { UNIT } from '../../util/units'
 import { fbm } from '../../util/noise'
+import { Rng } from '../../util/rng'
 import { makeBasin, roomAt } from './basin'
 import type { Basin } from './basin'
+import type { Landmark } from './gates'
 import type { VolcanoConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
-import type { Rng } from '../../util/rng'
 
 /**
  * 地形与熔岩的格子场：地面高度、熔岩厚度都以格计，温度 1 是刚喷出。
@@ -47,6 +48,9 @@ export type EruptionPhase = 'dormant' | 'warn' | 'erupt'
 
 export interface VolcanoState {
   readonly field: LavaField
+  /** 喷气孔：画面冒蒸汽、出怪口钻出火山怪都从这里取 */
+  readonly vents: readonly Point[]
+  readonly marks: VolcanoMarks
   phase: EruptionPhase
   /** 这一阶段开始的时刻 */
   since: number
@@ -208,6 +212,43 @@ export function makeField(rng: Rng, cfg: VolcanoConfig, mapW: number, mapH: numb
   }
   for (let k = 0; k < cfg.eruption.history; k++) runEruption(f, cfg, spillOf(f, cfg, rng), -1e9)
   return f
+}
+
+/** 有几个喷气孔 */
+export const VENT_COUNT = 5
+/** 喷气孔口子的半径，格 */
+const VENT_U = 0.45
+/** 头目下山的起点：朝盆地那一侧的山坡上，离火山口占挡路圈半径的这么多 */
+const FOOT_ON = 0.85
+
+/** 冒硫磺蒸汽的喷气孔：山脚外朝盆地的那一侧有几个，落在盆地里 */
+export function fumaroles(f: LavaField, cfg: VolcanoConfig, count: number): Point[] {
+  const rng = new Rng(f.seed ^ 0x51f0)
+  const out: Point[] = []
+  const base = Math.atan2(f.inY, f.inX)
+  for (let k = 0; k < count * 8 && out.length < count; k++) {
+    const a = base + (rng.next() * 2 - 1) * 1.3
+    const r = (cfg.cone.blockU + 0.8 + rng.next() * 5) * UNIT
+    const p = { x: f.craterX + Math.cos(a) * r, y: f.craterY + Math.sin(a) * r }
+    if (roomAt(f.basin, p.x, p.y) >= 0.6 * UNIT) out.push(p)
+  }
+  return out
+}
+
+/** 火山给出怪口的地标，按组：山体（cone，别的出怪口离它远些）、喷气孔、头目下山的山坡（foot）；火山口只在喷发时有 */
+export interface VolcanoMarks {
+  readonly calm: Readonly<Record<string, readonly Landmark[]>>
+  readonly erupt: Readonly<Record<string, readonly Landmark[]>>
+}
+
+export function volcanoMarks(f: LavaField, cfg: VolcanoConfig, vents: readonly Point[]): VolcanoMarks {
+  const c = cfg.cone
+  const cone: Landmark = { x: f.craterX, y: f.craterY, r: c.blockU * (1 + c.blockJitter) * UNIT, nx: 0, ny: 0 }
+  const vent = vents.map((p): Landmark => ({ x: p.x, y: p.y, r: VENT_U * UNIT, nx: 0, ny: 0 }))
+  const foot: Landmark = { x: f.craterX + f.inX * c.blockU * FOOT_ON * UNIT, y: f.craterY + f.inY * c.blockU * FOOT_ON * UNIT, r: 0, nx: f.inX, ny: f.inY }
+  const crater: Landmark = { x: f.craterX, y: f.craterY, r: 0, nx: f.inX, ny: f.inY }
+  const calm = { cone: [cone], vent, foot: [foot], crater: [] }
+  return { calm, erupt: { ...calm, crater: [crater] } }
 }
 
 /** 这次喷发熔岩从口沿外那一圈格子漫出：随机几股集中、大多朝着盆地，其余方向只漫出一点 */

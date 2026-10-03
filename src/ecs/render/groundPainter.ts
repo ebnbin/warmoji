@@ -1,7 +1,6 @@
 import { groundBuffer, paintGround, rockMasks } from './volcano'
-import type { CellRect, GroundField, GroundJob, GroundPiece } from './volcano'
+import type { CellRect, GroundField, GroundJob, GroundMarks, GroundPiece } from './volcano'
 import type { VolcanoConfig } from '../../types/maps'
-import type { Point } from '../../util/vec'
 
 /** 退回主线程画时每画这么久让一次主线程，毫秒 */
 const SLICE_MS = 50
@@ -15,7 +14,7 @@ const nextTick = (): Promise<void> => new Promise((resolve) => setTimeout(resolv
 export class GroundPainter {
   private readonly field: GroundField
   private readonly cfg: VolcanoConfig
-  private readonly vents: readonly Point[]
+  private readonly marks: GroundMarks
   private readonly ppc: number
   private workers: Worker[] = []
   private busy = false
@@ -23,12 +22,12 @@ export class GroundPainter {
   private settle?: () => void
   private closed = false
 
-  constructor(field: GroundField, cfg: VolcanoConfig, vents: readonly Point[], ppc: number, threads: number) {
+  constructor(field: GroundField, cfg: VolcanoConfig, marks: GroundMarks, ppc: number, threads: number) {
     this.field = field
     this.cfg = cfg
-    this.vents = vents
+    this.marks = marks
     this.ppc = ppc
-    const setup: GroundJob = { kind: 'setup', field, cfg, vents, ppc }
+    const setup: GroundJob = { kind: 'setup', field, cfg, marks, ppc }
     try {
       for (let k = 0; k < threads; k++) {
         const w = new Worker(new URL('./groundWorker.ts', import.meta.url), { type: 'module' })
@@ -67,7 +66,7 @@ export class GroundPainter {
         if (done[index]) continue
         const rect = rects[index]!
         const pixels = groundBuffer(rect, this.ppc)
-        paintGround(field, this.cfg, this.ppc, this.vents, masks, pixels, rect.c0, rect.r0, rect.c1, rect.r1)
+        paintGround(field, this.cfg, this.ppc, this.marks, masks, pixels, rect.c0, rect.r0, rect.c1, rect.r1)
         take({ index, rect, pixels })
         if (performance.now() - t < SLICE_MS) continue
         await nextTick()

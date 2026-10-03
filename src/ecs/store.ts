@@ -7,6 +7,7 @@ import type { StatBase, StatLayer, StatMods } from '../types/stats'
 import type { Loot } from '../types/runs'
 import type { CallSpec, FoeSpec } from './fight/state'
 import type { SpawnTraits } from './entities/telegraph'
+import type { Entry } from './worlds/gates'
 
 const slots = <T>(): (T | undefined)[] => new Array<T | undefined>(INITIAL_CAPACITY).fill(undefined)
 
@@ -37,6 +38,9 @@ export const modDef = slots<FieldPickupDef>()
 export const telegraphDef = slots<EnemyDef>()
 
 export const telegraphTraits = slots<SpawnTraits>()
+
+/** 预兆到点后敌人从哪个出怪口、怎么进场；没有出怪口的地图上为空，就在预兆的地方冒出来 */
+export const telegraphEntry = slots<Entry>()
 
 export const carrierPickup = slots<FieldPickupDef>()
 

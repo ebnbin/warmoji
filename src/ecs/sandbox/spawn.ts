@@ -1,8 +1,8 @@
-import { ENEMIES } from '../../data/enemies'
+import { ENEMIES, SPAWN } from '../../data/enemies'
 import { mapEnemyRoster } from '../../data/maps'
 import { toPx } from '../../data/px'
 import type { EnemyKind } from '../../types/enemies'
-import { foeCount, sightedSpawnPoint } from '../entities/enemy'
+import { foeCount, placeFoe } from '../entities/enemy'
 import { spawnTelegraph, telegraphCount } from '../entities/telegraph'
 import { sandboxDifficulty, sandboxEnemySet, spawnParams } from './knobs'
 import type { Sim } from '../sim'
@@ -23,7 +23,7 @@ export function runKnobs(sim: Sim, st: { cooldownMs: number }, deltaMs: number):
     const raw = ENEMIES[kinds[Math.floor(sim.rng.next() * kinds.length)]!]
     const def = toPx(raw)
     const boss = raw.role === 'boss'
-    const pos = boss ? sim.hooks.spawnPoint(sim, true) : sightedSpawnPoint(sim)
-    spawnTelegraph(sim, def, pos.x, pos.y, Math.round(def.hp * hpMul), false, boss)
+    const pos = placeFoe(sim, { hpMul }, raw.kind, boss)
+    spawnTelegraph(sim, def, pos.x, pos.y, Math.round(def.hp * hpMul), false, boss, {}, SPAWN.telegraphMs, pos.entry)
   }
 }

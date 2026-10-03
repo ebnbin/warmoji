@@ -1,4 +1,4 @@
-import { UNIT } from '../../util/units'
+import { DEG2RAD, UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { ENEMIES, SPAWN } from '../../data/enemies'
 import { ENEMY_BODY } from '../../data/abilities'
@@ -11,10 +11,13 @@ import { clampToDisc, confineVelocity, meteorSweep, ringPoint } from '../worlds/
 import { gravity, holeAt, inHorizon, meteorStart, meteorTrajectory } from '../worlds/nebulaOld'
 import { accrete, aroundCircle, endMeteor, feed, flyMeteor, fromCenterU, gravityAt, inHorizon as inNebulaHorizon, keepInCavity, launchMeteor, makeNebula, pruneFlares, reachPx, settleSpot, spawnSpot, sweepContact } from '../worlds/nebula'
 import type { NebulaMeteor, NebulaState } from '../worlds/nebula'
-import { around, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava } from '../worlds/volcano'
+import { around, fumaroles, makeField, moltenAt, NO_SPILL, spillOf, spillVolume, stepLava, VENT_COUNT, volcanoMarks } from '../worlds/volcano'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
 import type { Basin } from '../worlds/basin'
+import { roomFor } from '../worlds/gates'
+import type { GateRuntime, Landmark } from '../worlds/gates'
 import type { VolcanoState } from '../worlds/volcano'
+import { GRAVITY as SHIP_G } from '../../data/ship'
 import { addWeight, bumpBalls, clearWeights, makeShip, paceOf, stepBalls, stepOnDeck, stepShip } from '../worlds/ship'
 import type { ShipState } from '../worlds/ship'
 import { ashore, bulk, edgeAt, FALLING, fallTime, floeFor, footingOf, frictionAt, GRAVITY, gustSpan, heightAt, ICE, inWater, newFloe, seaward, slideLoose, standing, stepInWater, stepOnIce, SWIMMING, windAt, windPush } from '../worlds/floe'
@@ -95,11 +98,14 @@ export interface WorldState {
   nebula: NebulaState | null
   floe: FloeState | null
   cave: CaveState | null
+  gates: GateRuntime | null
 }
 
 export function newWorldState(): WorldState {
-  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, nebula: null, floe: null, cave: null }
+  return { tickAt: 0, walls: null, hole: null, volcano: null, ship: null, river: null, nebula: null, floe: null, cave: null, gates: null }
 }
+
+const NO_MARKS: Readonly<Record<string, readonly Landmark[]>> = {}
 
 export interface WorldHooks {
   readonly torus: boolean
@@ -121,6 +127,8 @@ export interface WorldHooks {
   constrainBody(sim: Sim, eid: number, from: Point, next: Point): Point
   /** 岩壁、舷墙这类硬边界围出的能走的地面，身体按它挡在壁外；边界不是这样定的地图没有 */
   basin(sim: Sim): Basin | null
+  /** 能站的地面：出怪口沿它的外边界摆，翻进从它外面起跳；默认是 basin，冰面外是海、空腔外是软壳层这类没有硬墙的地图另给 */
+  ground(sim: Sim): Basin | null
   chaseDir(sim: Sim, eid: number, tx: number, ty: number): Point
   wallHit(sim: Sim, ax: number, ay: number, bx: number, by: number): Point | null
   smashWall(sim: Sim, x: number, y: number): void
@@ -133,6 +141,12 @@ export interface WorldHooks {
   center(sim: Sim): Point
   /** 把一个点收进敌人能站、能走到队伍的范围 */
   settle(sim: Sim, p: Point): Point
+  /** 半径 radius 像素的一只敌人此刻能不能落在这里：站得下、脚下没有要命的东西；只有出怪口挑落点时用 */
+  canSpawn(sim: Sim, x: number, y: number, radius: number): boolean
+  /** 地图自己的地标，按组：出怪口里摆在同名地标上的从这里取；一组要么整组都在、要么整组都空（火山口只在喷发时有），组里的次序不变 */
+  landmarks(sim: Sim): Readonly<Record<string, readonly Landmark[]>>
+  /** 此刻怪更多从哪一侧来：方向是那一侧朝外的方向，长度按这张图自己的单位（船是倾角的度数，浮冰是风速）；不偏为零 */
+  lean(sim: Sim): Point
   onStart(sim: Sim): void
   tick(sim: Sim, delta: number): void
 }
@@ -217,6 +231,18 @@ const bounded: WorldHooks = {
   settle(sim, p) {
     const inset = SPAWN.edgeInset * UNIT
     return { x: Math.min(Math.max(p.x, inset), sim.mapW - inset), y: Math.min(Math.max(p.y, inset), sim.mapH - inset) }
+  },
+  ground(sim) {
+    return sim.hooks.basin(sim)
+  },
+  canSpawn() {
+    return true
+  },
+  landmarks() {
+    return NO_MARKS
+  },
+  lean() {
+    return ZERO
   },
   onStart() {},
   tick() {},
@@ -662,7 +688,8 @@ function volcanoOf(sim: Sim): VolcanoState {
   if (!s) {
     const cfg = volcanoCfg(sim)
     const field = makeField(new Rng(sim.run.decorSeed ^ 0x7a1c), cfg, sim.mapW, sim.mapH, MAP.cameraMargin * UNIT)
-    s = { field, phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, spill: NO_SPILL, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
+    const vents = fumaroles(field, cfg, VENT_COUNT)
+    s = { field, vents, marks: volcanoMarks(field, cfg, vents), phase: 'dormant', since: 0, nextAt: cfg.eruption.firstMs, spill: NO_SPILL, count: 0, stepAcc: 0, hurtAt: cfg.lava.tickMs }
     sim.worldState.volcano = s
   }
   return s
@@ -769,6 +796,15 @@ const volcano: WorldHooks = {
   settle(sim, p) {
     return keepOut(volcanoOf(sim).field.basin, p.x, p.y, SPAWN.edgeInset * UNIT)
   },
+  canSpawn(sim, x, y, radius) {
+    const f = volcanoOf(sim).field
+    return roomFor(f.basin, x, y, radius) && !moltenAt(f, x, y)
+  },
+  /** 火山口只在喷发时抛出东西 */
+  landmarks(sim) {
+    const s = volcanoOf(sim)
+    return s.phase === 'erupt' ? s.marks.erupt : s.marks.calm
+  },
   onStart(sim) {
     volcanoOf(sim)
   },
@@ -873,6 +909,20 @@ const ship: WorldHooks = {
   settle(sim, p) {
     return keepOut(shipOf(sim).deck.basin, p.x, p.y, SPAWN.edgeInset * UNIT)
   },
+  canSpawn(sim, x, y, radius) {
+    return roomFor(shipOf(sim).deck.basin, x, y, radius)
+  },
+  landmarks(sim) {
+    return shipOf(sim).deck.marks
+  },
+  /** 往低的一舷偏，偏多少按倾角的度数：低的一侧干舷离水面近，登船的多 */
+  lean(sim) {
+    const s = shipOf(sim)
+    const along = Math.hypot(s.gx, s.gy)
+    if (along === 0) return ZERO
+    const deg = Math.asin(Math.min(1, along / ((SHIP_G * UNIT) / shipCfg(sim).meterPerU))) / DEG2RAD
+    return { x: (s.gx / along) * deg, y: (s.gy / along) * deg }
+  },
   onStart(sim) {
     shipOf(sim)
   },
@@ -919,7 +969,7 @@ function slowestFoeU(sim: Sim): number {
   let v = SLOWEST.get(sim.mapId)
   if (v === undefined) {
     const def = MAPS[sim.mapId]
-    v = Math.min(...def.mix.map((r) => ENEMIES[r.kind].speed), ENEMIES[def.boss].speed) / UNIT
+    v = Math.min(...def.mix.map((r) => ENEMIES[r.kind].speed), ENEMIES[def.boss].speed)
     SLOWEST.set(sim.mapId, v)
   }
   return v
@@ -932,6 +982,9 @@ function nebulaClearPx(sim: Sim): number {
 
 const ACCRETION_TINT = 0xffb36b
 const METEOR_GLOW_TINT = 0xff8a3d
+/** 流星撞碎后这么久里碎块还会被甩进空腔，毫秒；碎块从内壁往里这么远处甩出，格 */
+const SHARDS_MS = 3000
+const SHARDS_IN_U = 0.5
 
 /** 吞下的身体折成多少 GM：按质量与半径的三次方 */
 function bodyGm(cfg: NebulaConfig, eid: number): number {
@@ -1032,6 +1085,7 @@ function nebulaMeteors(sim: Sim, s: NebulaState, cfg: NebulaConfig, delta: numbe
   strikeNebula(sim, cfg, m, x0, y0)
   if (!end && now - m.since < mc.maxFlightMs) return
   if (end === 'swallow') feed(s, cfg, mc.gm, now, m.x, m.y)
+  if (end === 'shatter') s.shatter = { x: m.x, y: m.y, at: now }
   endMeteor(s, { kind: end ?? 'fade', x: m.x, y: m.y, vx: m.vx, vy: m.vy, at: now })
   s.meteor = null
   s.meteorAt = now + mc.intervalMs + (sim.rng.next() * 2 - 1) * mc.intervalJitterMs
@@ -1078,6 +1132,40 @@ const nebula: WorldHooks = {
   settle(sim, p) {
     return settleSpot(nebulaOf(sim), nebulaCfg(sim), p.x, p.y, nebulaClearPx(sim), SPAWN.edgeInset * UNIT)
   },
+  ground(sim) {
+    return nebulaOf(sim).cavity
+  },
+  /** 和刷怪点一样：在空腔里离内壁留得出身体，离黑洞在最慢的敌人走得出来的地方 */
+  canSpawn(sim, x, y, radius) {
+    const s = nebulaOf(sim)
+    return roomFor(s.cavity, x, y, radius) && Math.hypot(x - s.layout.hx, y - s.layout.hy) >= nebulaClearPx(sim)
+  },
+  /**
+   * hole 是黑洞；meteor 是刚撞碎在壳层上的流星，碎块从那里的内壁甩进来，撞碎后一阵就没了；
+   * horizon 是黑洞朝着队长那一侧、最慢的敌人刚好走得出来的地方，朝着队长
+   */
+  landmarks(sim) {
+    const s = nebulaOf(sim)
+    const L = s.layout
+    const sh = s.shatter
+    const meteor: Landmark[] = []
+    if (sh && sim.elapsedMs - sh.at <= SHARDS_MS) {
+      const ox = sh.x - L.cx
+      const oy = sh.y - L.cy
+      const d = Math.hypot(ox, oy) || 1
+      const r = (nebulaCfg(sim).shell.innerU - SHARDS_IN_U) * UNIT
+      meteor.push({ x: L.cx + (ox / d) * r, y: L.cy + (oy / d) * r, r: 0, nx: -ox / d, ny: -oy / d })
+    }
+    const lx = leaderX(sim) - L.hx
+    const ly = leaderY(sim) - L.hy
+    const away = Math.hypot(lx, ly) > 1e-6 ? norm(lx, ly) : norm(L.sx - L.hx, L.sy - L.hy)
+    const clear = nebulaClearPx(sim)
+    return {
+      hole: [{ x: L.hx, y: L.hy, r: 0, nx: 0, ny: 0 }],
+      meteor,
+      horizon: [{ x: L.hx + away.x * clear, y: L.hy + away.y * clear, r: 0, nx: away.x, ny: away.y }],
+    }
+  },
   onStart(sim) {
     nebulaOf(sim)
   },
@@ -1115,6 +1203,8 @@ const LINE_CLEAR_U = 0.35
 const LUNGE_U = 1.5
 /** 漂在水上的小东西随海流漂：速度朝海流靠拢的速率，每秒 */
 const FLOAT_K = 2
+/** 此刻的风推得动的身体落在离冰缘再远这么多的地方，格：免得一落地就被吹下海 */
+const BLOWN_U = 1
 
 /** 离冰缘 reach 格以内还朝着海走，就改为顺着冰缘走；正对着海时转向一侧 */
 function alongEdge(f: FloeField, x: number, y: number, dx: number, dy: number, reach: number): Point {
@@ -1338,6 +1428,28 @@ const floe: WorldHooks = {
   settle(sim, p) {
     return ashore(floeOf(sim).field, p.x, p.y, SPAWN.edgeInset)
   },
+  ground(sim) {
+    return floeOf(sim).ground
+  },
+  /** 落在冰上离冰缘留得出身体；此刻的风推得动它的地方（光冰、新冰）离冰缘再多留一截 */
+  canSpawn(sim, x, y, radius) {
+    const s = floeOf(sim)
+    if (!roomFor(s.ground, x, y, radius)) return false
+    const cfg = floeCfg(sim)
+    const w = windAt(s.field, cfg, s.gust, sim.elapsedMs)
+    const push = windPush(cfg, w.speed, w.angle, 0, 0, bulk(cfg, radius, ENEMY_BODY.mass))
+    const hold = frictionAt(s.field, cfg, x, y).s * (GRAVITY / cfg.meterPerU) * UNIT
+    return Math.hypot(push.x, push.y) <= hold || roomFor(s.ground, x, y, radius + BLOWN_U * UNIT)
+  },
+  landmarks(sim) {
+    return floeOf(sim).marks
+  },
+  /** 往上风偏，偏多少按此刻的风速（米/秒）：风从哪边来，从哪边冰缘爬上来的就多 */
+  lean(sim) {
+    const s = floeOf(sim)
+    const w = windAt(s.field, floeCfg(sim), s.gust, sim.elapsedMs)
+    return { x: -Math.cos(w.angle) * w.speed, y: -Math.sin(w.angle) * w.speed }
+  },
   onStart(sim) {
     floeOf(sim)
   },
@@ -1481,6 +1593,15 @@ const cave: WorldHooks = {
   },
   spawnPoint(sim, boss) {
     return caveSpawn(sim, boss)
+  },
+  /** 只看站不站得下：暗处由刷怪点挑，白天亮着的地标整组不出 */
+  canSpawn(sim, x, y, radius) {
+    return roomFor(caveOf(sim).layout.rock, x, y, radius)
+  },
+  /** 洞里暗到看不清了，水潭、荧光丛与天窗才出怪：白天那里亮堂堂的，怪只从暗处出来 */
+  landmarks(sim) {
+    const s = caveOf(sim)
+    return s.light.hallLux < caveCfg(sim).view.clearLux ? s.marks : s.dayMarks
   },
   settle(sim, p) {
     const rock = caveOf(sim).layout.rock

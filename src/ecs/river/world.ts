@@ -3,13 +3,16 @@ import { UNIT } from '../../util/units'
 import { norm } from '../../util/vec'
 import { MAPS } from '../../data/maps'
 import { SPAWN } from '../../data/enemies'
+import { ENEMY_BODY } from '../../data/abilities'
 import { Airborne, Alive, CharScale, Drive, Hp, Motion, MOTION, Phys, Pickup, Radius, Shard, Slot, Transform, Uid } from '../components'
 import { die } from '../systems/shared/combat'
 import { fleeSteer } from '../systems/shared/steer'
 import { hazardSource } from '../utils/source'
 import { leaderPoint } from '../utils/team'
 import { awayFromWall, keepOut, roomAt } from '../worlds/basin'
+import { roomFor } from '../worlds/gates'
 import { riverPlan } from './layout'
+import { riverMarks } from './marks'
 import { flowAt, sinkAt, solveWater } from './water'
 import { drift, swept } from './bodies'
 import type { Flow, Water } from './water'
@@ -17,6 +20,7 @@ import type { RiverPlan } from './layout'
 import type { MapId, RiverConfig } from '../../types/maps'
 import type { Point } from '../../util/vec'
 import type { Sim } from '../sim'
+import type { Landmark } from '../worlds/gates'
 import type { Surface, WorldHooks } from '../worlds/hooks'
 
 const ZERO: Point = { x: 0, y: 0 }
@@ -28,11 +32,12 @@ const FALL_U = 0.25
 const FALLS_TINT = 0x9fd8ff
 
 /**
- * 河流此刻的状态：按种子生成的地图，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定，
+ * 河流此刻的状态：按种子生成的地图与它上面的地标，解出来的稳态水流（线程里解，解完之前还是 null）与解完的约定，
  * 以及哪些身体正在水里站不住、随水漂着（按实体记，uid 对不上就是换了实体）
  */
 export interface RiverState {
   readonly plan: RiverPlan
+  readonly marks: Readonly<Record<string, readonly Landmark[]>>
   water: Water | null
   ready: Promise<void>
   readonly swimming: Map<number, number>
@@ -82,7 +87,8 @@ export function riverOf(sim: Sim): RiverState {
   let s = sim.worldState.river
   if (!s) {
     const cfg = cfgOf(sim)
-    const state: RiverState = { plan: riverPlanFor(cfg, sim.run.decorSeed), water: null, ready: Promise.resolve(), swimming: new Map() }
+    const plan = riverPlanFor(cfg, sim.run.decorSeed)
+    const state: RiverState = { plan, marks: riverMarks(cfg, plan), water: null, ready: Promise.resolve(), swimming: new Map() }
     state.ready = solveAsync(cfg, state.plan).then((w) => {
       state.water = w
     })
@@ -127,7 +133,7 @@ function alongWall(s: RiverState, x: number, y: number, dx: number, dy: number, 
   return { x: -n.y * side, y: n.x * side }
 }
 
-/** 干地上离壁至少 room 像素的一点：从 p 往外一圈圈找，找不到就原样退回壁外 */
+/** 干地上离壁至少 room 像素、没越过断崖边的一点：从 p 往外一圈圈找，找不到就原样退回壁外 */
 function dryNear(sim: Sim, s: RiverState, p: Point, room: number): Point {
   const b = s.plan.basin
   for (let r = 0; r <= 6 * UNIT; r += 0.5 * UNIT) {
@@ -135,7 +141,7 @@ function dryNear(sim: Sim, s: RiverState, p: Point, room: number): Point {
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2
       const q = { x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r }
-      if (roomAt(b, q.x, q.y) >= room && !wetAt(sim, s, q.x, q.y)) return q
+      if (roomAt(b, q.x, q.y) >= room && !wetAt(sim, s, q.x, q.y) && overFalls(s, q.x, q.y) < 0) return q
     }
   }
   return keepOut(b, p.x, p.y, room)
@@ -246,6 +252,9 @@ export const river: WorldHooks = {
   basin(sim) {
     return riverOf(sim).plan.basin
   },
+  ground(sim) {
+    return riverOf(sim).plan.basin
+  },
   chaseDir(sim, eid, tx, ty) {
     const x = Transform.x[eid]!
     const y = Transform.y[eid]!
@@ -294,6 +303,21 @@ export const river: WorldHooks = {
   },
   settle(sim, p) {
     return dryNear(sim, riverOf(sim), p, SPAWN.edgeInset * UNIT)
+  },
+  /** 站得下、没越过断崖边；落在水里的要这么大的身体在那里站得住 */
+  canSpawn(sim, x, y, radius) {
+    const s = riverOf(sim)
+    if (!roomFor(s.plan.basin, x, y, radius) || overFalls(s, x, y) >= 0) return false
+    if (!s.water) return true
+    const cfg = cfgOf(sim)
+    flowAt(s.water, x / UNIT, y / UNIT, FLOW)
+    return FLOW.h < cfg.body.wetM || !swept(cfg, radius, ENEMY_BODY.mass, FLOW.h, FLOW.u, FLOW.v, false)
+  },
+  landmarks(sim) {
+    return riverOf(sim).marks
+  },
+  lean() {
+    return ZERO
   },
   onStart(sim) {
     riverOf(sim)

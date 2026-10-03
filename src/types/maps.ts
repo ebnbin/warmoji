@@ -670,6 +670,55 @@ export interface TorusConfig {
   readonly projectileLifeMs: number
   readonly frame: number
 }
+/** 敌人怎么从出怪口进场：rise 原地从下面钻出来，walk 从洞口里走出来，climb 从场地边外翻进来，drop 从上面落下来，lob 从远处被抛进来 */
+export type Entrance = 'rise' | 'walk' | 'climb' | 'drop' | 'lob'
+/** 进场时冒出的样子：puff 一团烟尘，splash 水花，steam 白汽，sparks 火星，snow 雪沫，leaves 碎叶，glow 星光 */
+export type EntranceLook = 'puff' | 'splash' | 'steam' | 'sparks' | 'snow' | 'leaves' | 'glow'
+
+/** 离某一组地标至少多远 */
+export interface GateAway {
+  readonly mark: string
+  readonly minU: number
+}
+
+/**
+ * 出怪口摆在哪：rim 是能走的地面的外边界，切成 segU 格长的一段段；nooks 是外边界上每隔约 spacingU 格的一处口子；
+ * mark 是地图自己给的同名地标；ground 是整片能走的地面。away 让它离某一组地标至少那么远
+ */
+export type GatePlace =
+  | { readonly kind: 'rim'; readonly segU: number; readonly away?: GateAway }
+  | { readonly kind: 'nooks'; readonly spacingU: number; readonly away?: GateAway }
+  | { readonly kind: 'mark' }
+  | { readonly kind: 'ground' }
+
+/**
+ * 一种出怪口：weight 是几种都够得着时抽中的权重，perSec 是每一处每秒最多出几只（多的分给别处），only 只出这几种敌人，reachU 是抛入的口子抛得到多远；
+ * snapU 是这一种自己的吸附半径（不写按地图的）；look 是进场时冒出的样子（默认一团烟尘），落下的冒在落点，抛入的起点落点都冒，其余的冒在起点
+ */
+export interface GateKind {
+  readonly name: string
+  readonly at: GatePlace
+  readonly enter: Entrance
+  readonly look?: EntranceLook
+  readonly snapU?: number
+  readonly weight: number
+  readonly perSec?: number
+  readonly only?: readonly EnemyKind[]
+  readonly reachU?: number
+}
+
+/**
+ * 出怪口：敌人照常先定一个出生点，再吸附到 snapU 格以内的出怪口，从那里按它的进场方式出来；哪一处都够不着就在原地按 fallback 出来。
+ * look 是在原地出来时冒出的样子；boss 是头目从哪种出怪口登场；lean 让地图偏向的那一侧（船低的一舷、浮冰的上风）边上的出怪口权重变大，偏到 full 时乘满 mul 倍，full 按这张图偏向的单位
+ */
+export interface GatesConfig {
+  readonly snapU: number
+  readonly fallback: Extract<Entrance, 'rise' | 'drop'>
+  readonly look?: EntranceLook
+  readonly boss?: string
+  readonly lean?: { readonly mul: number; readonly full: number }
+  readonly kinds: Readonly<Record<string, GateKind>>
+}
 export interface MapDef {
   readonly emoji: string
   readonly name: string
@@ -681,6 +730,8 @@ export interface MapDef {
   readonly decor: MapDecor
   readonly drift?: readonly string[]
   readonly mix: readonly EnemyMixRow[]
+  /** 敌人从地图上哪些地方、怎么进场；不写就在能站的地方原地冒出来 */
+  readonly gates?: GatesConfig
   readonly dayMix?: readonly EnemyMixRow[]
   readonly nightMix?: readonly EnemyMixRow[]
   readonly walls?: WallsConfig

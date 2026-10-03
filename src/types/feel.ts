@@ -23,4 +23,11 @@ export interface FeelTuning {
     readonly ringRadius: number
   }
   readonly emplace: { readonly popMs: number; readonly retireMs: number }
+  /** 从出怪口进场的动作：腾空多高（格）、多久；走出与翻进的落点离口子 distU 格，翻进从边外 outU 格起跳；抛入的时长与高度按飞多远算 */
+  readonly entrance: {
+    readonly walk: { readonly ms: number; readonly heightU: number; readonly distU: readonly [number, number] }
+    readonly climb: { readonly ms: number; readonly heightU: number; readonly distU: readonly [number, number]; readonly outU: number }
+    readonly drop: { readonly ms: number; readonly heightU: number }
+    readonly lob: { readonly minMs: number; readonly msPerU: number; readonly heightPerU: number }
+  }
 }

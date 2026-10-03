@@ -441,6 +441,20 @@ export const MAPS = {
       density: [0.03, 0.05],
     },
     mix: VOLCANO_MIX,
+    // 崖脚的洞里走出来、崖顶跳下来、喷气孔里钻出来、喷发时火山口抛出来、骷髅从灰里爬起来；暴龙从山坡上下来
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      boss: 'foot',
+      kinds: {
+        cave: { name: '洞穴', at: { kind: 'nooks', spacingU: 6, away: { mark: 'cone', minU: 9 } }, enter: 'walk', snapU: 5, weight: 3, perSec: 1.5, only: ['zombie', 'boar', 'creeper', 'skeleton'] },
+        cliff: { name: '崖顶', at: { kind: 'rim', segU: 3, away: { mark: 'cone', minU: 9 } }, enter: 'climb', snapU: 5, weight: 1.5, perSec: 1, only: ['gargoyle', 'zombie'] },
+        vent: { name: '喷气孔', at: { kind: 'mark' }, enter: 'rise', look: 'steam', weight: 2, perSec: 1, only: ['turtle', 'creeper'] },
+        crater: { name: '火山口', at: { kind: 'mark' }, enter: 'lob', look: 'sparks', weight: 4, perSec: 4, reachU: 14, only: ['comet', 'turtle'] },
+        ash: { name: '灰地', at: { kind: 'ground' }, enter: 'rise', weight: 1 },
+        foot: { name: '山坡', at: { kind: 'mark' }, enter: 'walk', weight: 1, only: ['rhino'] },
+      },
+    },
     finalWaveSub: '暴龙踏着熔岩而来——别在火山脚下恋战！',
     volcano: {
       cellU: 0.5,
@@ -497,6 +511,19 @@ export const MAPS = {
       density: [0.006, 0.009],
     },
     mix: SHIP_MIX,
+    // 舱底的从舱口与天窗爬上来、海里的翻过舷墙登船（船往哪边倾，低的那一舷来得多）、幽灵从索具上落下；巨鳄也翻舷墙上来
+    gates: {
+      snapU: 3,
+      fallback: 'drop',
+      boss: 'rail',
+      lean: { mul: 4, full: 4 },
+      kinds: {
+        hatch: { name: '舱口', at: { kind: 'mark' }, enter: 'rise', weight: 3, perSec: 2.5, only: ['zombie', 'skeleton', 'rat', 'raccoon', 'creeper'] },
+        skylight: { name: '天窗', at: { kind: 'mark' }, enter: 'rise', weight: 2, perSec: 1, only: ['ghost', 'rat'] },
+        rail: { name: '舷墙', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'splash', weight: 2, perSec: 1, only: ['zombie', 'skeleton', 'puffer', 'siren', 'croc'] },
+        rigging: { name: '索具', at: { kind: 'ground' }, enter: 'drop', weight: 1, only: ['ghost'] },
+      },
+    },
     finalWaveSub: '巨鳄爬上了甲板——它有一吨重，它往哪边走，船就往哪边倾！',
     ship: {
       meterPerU: 0.45,
@@ -536,6 +563,20 @@ export const MAPS = {
       density: [0.008, 0.012],
     },
     mix: RIVER_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      boss: 'deep',
+      kinds: {
+        grove: { name: '林间', at: { kind: 'nooks', spacingU: 7, away: { mark: 'ports', minU: 7.5 } }, enter: 'walk', look: 'leaves', weight: 3, perSec: 1.5, only: ['zombie', 'ghost', 'blob', 'slime', 'snake'] },
+        thicket: { name: '林缘', at: { kind: 'rim', segU: 3, away: { mark: 'ports', minU: 7.5 } }, enter: 'climb', look: 'leaves', weight: 1.5, perSec: 1, only: ['zombie', 'blob', 'slime', 'snake'] },
+        bank: { name: '河岸', at: { kind: 'mark' }, enter: 'climb', look: 'splash', weight: 3, perSec: 1.5, only: ['snake', 'puffer', 'turtle', 'siren', 'crab'] },
+        falls: { name: '瀑布', at: { kind: 'mark' }, enter: 'lob', look: 'splash', weight: 2, perSec: 2, reachU: 12, only: ['zombie', 'blob', 'slime', 'snake', 'crab', 'turtle', 'puffer'] },
+        mist: { name: '谷雾', at: { kind: 'mark' }, enter: 'climb', look: 'steam', weight: 2, perSec: 1, only: ['ghost'] },
+        deep: { name: '急流', at: { kind: 'mark' }, enter: 'rise', look: 'splash', weight: 1, only: ['croc'] },
+        meadow: { name: '草地', at: { kind: 'ground' }, enter: 'rise', look: 'leaves', weight: 1 },
+      },
+    },
     finalWaveSub: '巨鳄稳稳站在急流里——别跟它在深水里纠缠！',
     river: {
       meterPerU: 0.5,
@@ -569,6 +610,20 @@ export const MAPS = {
       density: [0.05, 0.09],
     },
     mix: ICE_MIX,
+    gates: {
+      snapU: 4,
+      fallback: 'rise',
+      look: 'snow',
+      boss: 'sky',
+      lean: { mul: 3, full: 13 },
+      kinds: {
+        edge: { name: '冰缘', at: { kind: 'rim', segU: 3 }, enter: 'climb', look: 'splash', snapU: 8, weight: 3, perSec: 1.5, only: ['zombie', 'turtle', 'crab', 'snake', 'blob'] },
+        seam: { name: '新冰缝', at: { kind: 'mark' }, enter: 'rise', look: 'splash', weight: 2, perSec: 1, only: ['turtle', 'crab', 'snake'] },
+        drift: { name: '雪堆', at: { kind: 'mark' }, enter: 'rise', look: 'snow', weight: 2, perSec: 1.5, only: ['zombie', 'boar', 'blob', 'creeper', 'knight'] },
+        squall: { name: '风雪', at: { kind: 'ground' }, enter: 'drop', look: 'snow', weight: 1.5, only: ['ghost'] },
+        sky: { name: '天上', at: { kind: 'ground' }, enter: 'drop', look: 'snow', weight: 1, only: ['swan'] },
+      },
+    },
     floe: {
       meterPerU: 0.4,
       frameU: 52,
@@ -636,6 +691,19 @@ export const MAPS = {
       density: [0, 0],
     },
     mix: NEBULA_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      look: 'glow',
+      boss: 'horizon',
+      kinds: {
+        shell: { name: '壳层', at: { kind: 'rim', segU: 3, away: { mark: 'hole', minU: 10 } }, enter: 'climb', look: 'glow', weight: 3, perSec: 1.5, only: ['zombie', 'alien', 'chameleon', 'siren', 'ghost'] },
+        sky: { name: '上空', at: { kind: 'ground' }, enter: 'drop', look: 'glow', weight: 1.5, only: ['ufo', 'siren'] },
+        meteor: { name: '流星', at: { kind: 'mark' }, enter: 'lob', look: 'sparks', weight: 4, perSec: 3, reachU: 20, only: ['comet'] },
+        horizon: { name: '视界边', at: { kind: 'mark' }, enter: 'walk', look: 'glow', weight: 1, only: ['blackhole'] },
+        dust: { name: '星尘', at: { kind: 'ground' }, enter: 'rise', look: 'glow', weight: 1 },
+      },
+    },
     finalWaveSub: '奇点从视界边上走来——别被它和黑洞夹在中间！',
     nebula: {
       shell: { innerU: 18, outerU: 26, gm: 3_000_000, rise: 1.5, tau: 90 },
@@ -683,6 +751,20 @@ export const MAPS = {
       density: [0.03, 0.05],
     },
     mix: CAVE_MIX,
+    gates: {
+      snapU: 3,
+      fallback: 'rise',
+      boss: 'main',
+      kinds: {
+        alcove: { name: '支洞', at: { kind: 'mark' }, enter: 'walk', weight: 3, perSec: 1.5 },
+        crack: { name: '石缝', at: { kind: 'nooks', spacingU: 6, away: { mark: 'tunnel', minU: 2.5 } }, enter: 'walk', weight: 2, perSec: 1, only: ['rat', 'slime', 'creeper', 'zombie', 'skeleton'] },
+        pool: { name: '水潭', at: { kind: 'mark' }, enter: 'rise', look: 'splash', weight: 2, perSec: 1, only: ['slime', 'siren'] },
+        glow: { name: '荧光丛', at: { kind: 'mark' }, enter: 'rise', look: 'glow', weight: 2, perSec: 1, only: ['mushroom', 'slime'] },
+        skylight: { name: '天窗', at: { kind: 'mark' }, enter: 'drop', weight: 1.5, perSec: 1, only: ['gargoyle', 'zombie', 'skeleton'] },
+        main: { name: '主天窗', at: { kind: 'mark' }, enter: 'drop', weight: 1, only: ['eclipse'] },
+        dark: { name: '暗处', at: { kind: 'ground' }, enter: 'rise', weight: 1 },
+      },
+    },
     finalWaveSub: '夜伯爵从黑暗里来——守住火光！',
     cave: {
       hall: { insetU: [2.5, 5.5], waveU: 8, cornerU: 6, neckU: 0.8, ceilingM: 10, wallU: 2.2 },
